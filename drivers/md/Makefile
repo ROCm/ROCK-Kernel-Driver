@@ -34,10 +34,11 @@ obj-$(CONFIG_DM_CRYPT)		+= dm-crypt.o
 obj-$(CONFIG_DM_DELAY)		+= dm-delay.o
 obj-$(CONFIG_DM_MULTIPATH)	+= dm-multipath.o dm-round-robin.o
 obj-$(CONFIG_DM_SNAPSHOT)	+= dm-snapshot.o
-obj-$(CONFIG_DM_MIRROR)		+= dm-mirror.o dm-log.o
+obj-$(CONFIG_DM_MIRROR)		+= dm-mirror.o dm-regions.o dm-log.o
+obj-$(CONFIG_DM_RAID45)		+= dm-raid45.o dm-log.o dm-memcache.o \
+				   dm-regions.o dm-message.o
 obj-$(CONFIG_DM_ZERO)		+= dm-zero.o
-obj-$(CONFIG_DM_RAID45)		+= dm-raid4-5.o dm-log.o dm-mem-cache.o \
-				   dm-region_hash.o dm-message.o
+
 quiet_cmd_unroll = UNROLL  $@
       cmd_unroll = $(PERL) $(srctree)/$(src)/unroll.pl $(UNROLL) \
                    < $< > $@ || ( rm -f $@ && exit 1 )

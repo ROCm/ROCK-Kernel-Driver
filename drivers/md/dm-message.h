@@ -1,7 +1,9 @@
 /*
- * Copyright (C) 2007  Red Hat GmbH
+ * Copyright (C) 2007,2008 Red Hat, Inc. All rights reserved.
  *
  * Module Author: Heinz Mauelshagen <Mauelshagen@RedHat.de>
+ *
+ * General device-mapper message interface argument parser.
  *
  * This file is released under the GPL.
  *
@@ -71,7 +73,7 @@ struct dm_msg_spec {
 /* Parameter access macros. */
 #define	DM_MSG_PARM(msg) ((msg)->spec->parm)
 
-#define	DM_MSG_STR_ARGS(msg, idx) ((char*) *(msg)->spec->args->ptr[idx])
+#define	DM_MSG_STR_ARGS(msg, idx) ((char *) *(msg)->spec->args->ptr[idx])
 #define	DM_MSG_INT_ARGS(msg, idx) ((int) *(msg)->spec->args->ptr[idx])
 #define	DM_MSG_UINT_ARGS(msg, idx) ((unsigned) DM_MSG_INT_ARG(msg, idx))
 #define	DM_MSG_UINT64_ARGS(msg, idx) ((uint64_t)  *(msg)->spec->args->ptr[idx])

@@ -269,12 +269,6 @@ config DM_DELAY
 
 	If unsure, say N.
 
-config DM_UEVENT
-	bool "DM uevents (EXPERIMENTAL)"
-	depends on BLK_DEV_DM && EXPERIMENTAL
-	---help---
-	Generate udev events for DM events.
-
 config DM_RAID45
 	tristate "RAID 4/5 target (EXPERIMENTAL)"
 	depends on BLK_DEV_DM && EXPERIMENTAL
@@ -282,5 +276,11 @@ config DM_RAID45
 	A target that supports RAID4 and RAID5 mappings.
 
 	If unsure, say N.
+
+config DM_UEVENT
+	bool "DM uevents (EXPERIMENTAL)"
+	depends on BLK_DEV_DM && EXPERIMENTAL
+	---help---
+	Generate udev events for DM events.
 
 endif # MD

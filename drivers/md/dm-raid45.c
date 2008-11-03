@@ -1,11 +1,9 @@
 /*
- * Copyright (C) 2005-2008  Red Hat GmbH
+ * Copyright (C) 2005-2008 Red Hat, Inc. All rights reserved.
  *
- * Module Author: Heinz Mauelshagen <Mauelshagen@RedHat.de>
+ * Module Author: Heinz Mauelshagen <Mauelshagen@RedHat.com>
  *
  * This file is released under the GPL.
- *
- * WARNING: this is Alpha software wich can corrupt your data!
  *
  *
  * Linux 2.6 Device Mapper RAID4 and RAID5 target.
@@ -13,6 +11,7 @@
  * Supports:
  *	o RAID4 with dedicated and selectable parity device
  *	o RAID5 with rotating parity (left+right, symmetric+asymmetric)
+ *	o run time optimization of xor algorithm used to calculate parity
  *
  *
  * Thanks to MD for:
@@ -40,20 +39,25 @@
  *
  */
 
-static const char *version = "v0.2427";
+static const char *version = "v0.2431";
 
 #include "dm.h"
 #include "dm-bio-list.h"
-#include <linux/dm-io.h>
-#include <linux/dm-dirty-log.h>
-#include "dm-mem-cache.h"
+#include "dm-memcache.h"
 #include "dm-message.h"
-#include "dm-region_hash.h"
-#include "dm-raid4-5.h"
+#include "dm-raid45.h"
+
 #include <linux/kernel.h>
 #include <linux/vmalloc.h>
 
-#define	STR_LEN(ptr, str) ptr, str, strlen(ptr)
+#include <linux/dm-io.h>
+#include <linux/dm-dirty-log.h>
+#include <linux/dm-regions.h>
+
+/* # of parallel recovered regions */
+/* FIXME: cope with multiple recovery stripes in raid_set struct. */
+#define MAX_RECOVER	1 /* needs to be 1! */
+
 /*
  * Configurable parameters
  */
@@ -116,9 +120,6 @@ static const char *version = "v0.2427";
 /* Check argument is power of 2. */
 #define POWER_OF_2(a) (!(a & (a - 1)))
 
-/* xor optimization. */
-typedef unsigned long xor_t;
-
 /* Factor out to dm-bio-list.h */
 static inline void bio_list_push(struct bio_list *bl, struct bio *bio)
 {
@@ -131,7 +132,7 @@ static inline void bio_list_push(struct bio_list *bl, struct bio *bio)
 
 /* Factor out to dm.h */
 #define TI_ERR_RET(str, ret) \
-        do { ti->error = DM_MSG_PREFIX ": " str; return ret; } while(0);
+	do { ti->error = DM_MSG_PREFIX ": " str; return ret; } while (0);
 #define TI_ERR(str)     TI_ERR_RET(str, -EINVAL)
 
 /*-----------------------------------------------------------------
@@ -167,6 +168,7 @@ enum list_types {
 	LIST_ENDIO,	/* Stripes to endio. */
 	LIST_LRU,	/* Least recently used stripes. */
 	LIST_HASH,	/* Hashed stripes. */
+	LIST_RECOVER = LIST_HASH,	/* For recovery type stripes only. */
 	NR_LISTS,	/* To size array in struct stripe. */
 };
 
@@ -286,7 +288,7 @@ struct stripe_cache {
 	struct dm_io_client *dm_io_client; /* dm-io client resource context. */
 
 	/* dm-mem-cache client resource context. */
-	struct dm_mem_cache_client *dm_mem_cache_client;
+	struct dm_mem_cache_client *mem_cache_client;
 
 	int stripes_parm;	    /* # stripes parameter from constructor. */
 	atomic_t stripes;	    /* actual # of stripes in cache. */
@@ -410,7 +412,7 @@ static struct stats_map stats_map[] = {
 /*
  * A RAID set.
  */
-typedef void (*xor_function_t)(unsigned count, xor_t **data);
+typedef void (*xor_function_t)(unsigned count, unsigned long **data);
 struct raid_set {
 	struct dm_target *ti;	/* Target pointer. */
 
@@ -429,7 +431,7 @@ struct raid_set {
 	} io;
 
 	/* External locking. */
-	struct dmraid45_locking_type *locking;
+	struct dm_raid45_locking_type *locking;
 
 	struct stripe_cache sc;	/* Stripe cache for this set. */
 
@@ -443,7 +445,12 @@ struct raid_set {
 	/* Recovery parameters. */
 	struct recover {
 		struct dm_dirty_log *dl;	/* Dirty log. */
-		void *rh;	/* Region hash. */
+		struct dm_rh_client *rh;	/* Region hash. */
+
+		/* dm-mem-cache client resource context for recovery stripes. */
+		struct dm_mem_cache_client *mem_cache_client;
+
+		struct list_head stripes;	/* List of recovery stripes. */
 
 		region_t nr_regions;
 		region_t nr_regions_to_recover;
@@ -461,8 +468,7 @@ struct raid_set {
 		atomic_t io_count[2];	/* counter recover/regular io. */
 		unsigned long last_jiffies;
 
-		void *reg;	/* Actual region to recover. */
-		struct stripe *stripe; /* Stripe used for recovery. */
+		struct dm_region *reg;	/* Actual region to recover. */
 		sector_t pos;	/* Position within region to recover. */
 		sector_t end;	/* End of region to recover. */
 	} recover;
@@ -507,7 +513,7 @@ struct raid_set {
 	atomic_t stats[S_NR_STATS];
 
 	/* Dynamically allocated temporary pointers for xor(). */
-	xor_t **data;
+	unsigned long **data;
 
 	/* Dynamically allocated RAID devices. Alignment? */
 	struct raid_dev dev[0];
@@ -631,6 +637,12 @@ static INLINE void io_get(struct raid_set *rs)
 /* Put the io reference and conditionally wake io waiters. */
 static INLINE void io_put(struct raid_set *rs)
 {
+	/* Intel: rebuild data corrupter? */
+	if (!atomic_read(&rs->io.in_process)) {
+		DMERR("%s would go negative!!!", __func__);
+		return;
+	}
+
 	if (atomic_dec_and_test(&rs->io.in_process))
 		wake_up(&rs->io.suspendq);
 }
@@ -712,12 +724,11 @@ static INLINE void page_set(struct page *page, enum dirty_type type)
 static INLINE int
 region_state(struct raid_set *rs, sector_t sector, unsigned long state)
 {
-	void *rh = rs->recover.rh;
+	struct dm_rh_client *rh = rs->recover.rh;
 
-	if (unlikely(RSRecover(rs)))
-		return rh_state(rh, rh_sector_to_region(rh, sector), 1) & state;
-	else
-		return 0;
+	return RSRecover(rs) ?
+	       (dm_rh_get_state(rh, dm_rh_sector_to_region(rh, sector), 1) &
+		state) : 0;
 }
 
 /* Check maximum devices which may fail in a raid set. */
@@ -786,7 +797,11 @@ static INLINE int dev_to_init(struct raid_set *rs)
 	return rs->set.dev_to_init > -1;
 }
 
-/* Index of device to calculate parity on. */
+/*
+ * Index of device to calculate parity on.
+ * Either the parity device index *or* the selected device to init
+ * after a spare replacement.
+ */
 static INLINE unsigned dev_for_parity(struct stripe *stripe)
 {
 	struct raid_set *rs = RS(stripe->sc);
@@ -814,8 +829,11 @@ static int raid_set_congested(void *congested_data, int bdi_bits)
 	unsigned p = rs->set.raid_devs;
 
 	/* If any of our component devices are overloaded. */
-	while (p--)
-		r |= bdi_congested(&bdev_get_queue(rs->dev[p].dev->bdev)->backing_dev_info, bdi_bits);
+	while (p--) {
+		struct request_queue *q = bdev_get_queue(rs->dev[p].dev->bdev);
+
+		r |= bdi_congested(&q->backing_dev_info, bdi_bits);
+	}
 
 	/* REMOVEME: statistics. */
 	atomic_inc(rs->stats + (r ? S_CONGESTED : S_NOT_CONGESTED));
@@ -962,7 +980,7 @@ _bio_endio(struct raid_set *rs, struct bio *bio, int error)
 /* Initialize/destroy stripe hash. */
 static int hash_init(struct stripe_hash *hash, unsigned stripes)
 {
-	unsigned buckets = 1, max_buckets = stripes / 4;
+	unsigned buckets = 2, max_buckets = stripes / 4;
 	unsigned hash_primes[] = {
 		/* Table of primes for hash_fn/table size optimization. */
 		3, 7, 13, 27, 53, 97, 193, 389, 769,
@@ -970,7 +988,8 @@ static int hash_init(struct stripe_hash *hash, unsigned stripes)
 	};
 
 	/* Calculate number of buckets (2^^n <= stripes / 4). */
-	while ((buckets <<= 1) < max_buckets);
+	while (buckets < max_buckets)
+		buckets <<= 1;
 
 	/* Allocate stripe hash. */
 	hash->hash = vmalloc(buckets * sizeof(*hash->hash));
@@ -1057,13 +1076,16 @@ LIST_ADD(lru, LIST_LRU)
 #undef LIST_ADD
 
 #define POP(list) \
-	if (list_empty(sc->lists + list)) \
-		stripe = NULL; \
-	else { \
-		stripe = list_entry(sc->lists[list].next, struct stripe, \
-				    lists[list]); \
-		list_del_init(&stripe->lists[list]); \
-	}
+	do { \
+		if (list_empty(sc->lists + list)) \
+			stripe = NULL; \
+		else { \
+			stripe = list_first_entry(&sc->lists[list], \
+						  struct stripe, \
+						  lists[list]); \
+			list_del_init(&stripe->lists[list]); \
+		} \
+	} while (0);
 
 /* Pop an available stripe off the lru list. */
 static struct stripe *stripe_lru_pop(struct stripe_cache *sc)
@@ -1171,7 +1193,7 @@ static int hash_resize(struct stripe_cache *sc)
  * Stripe cache locking functions
  */
 /* Dummy lock function for local RAID4+5. */
-static void *no_lock(sector_t key, enum lock_type type)
+static void *no_lock(sector_t key, enum dm_lock_type type)
 {
 	return &no_lock;
 }
@@ -1182,14 +1204,14 @@ static void no_unlock(void *lock_handle)
 }
 
 /* No locking (for local RAID 4+5). */
-static struct dmraid45_locking_type locking_none = {
+static struct dm_raid45_locking_type locking_none = {
 	.lock = no_lock,
 	.unlock = no_unlock,
 };
 
 /* Clustered RAID 4+5. */
 /* FIXME: code this. */
-static struct dmraid45_locking_type locking_cluster = {
+static struct dm_raid45_locking_type locking_cluster = {
 	.lock = no_lock,
 	.unlock = no_unlock,
 };
@@ -1198,8 +1220,8 @@ static struct dmraid45_locking_type locking_cluster = {
 static int
 stripe_lock(struct raid_set *rs, struct stripe *stripe, int rw, sector_t key)
 {
-	stripe->lock = rs->locking->lock(key, rw == READ ? RAID45_SHARED :
-							   RAID45_EX);
+	stripe->lock = rs->locking->lock(key, rw == READ ? DM_RAID45_SHARED :
+							   DM_RAID45_EX);
 	return stripe->lock ? 0 : -EPERM;
 }
 
@@ -1254,7 +1276,7 @@ static INLINE void stripe_allow_io(struct stripe *stripe)
 
 /* Initialize a stripe. */
 static void
-stripe_init(struct stripe_cache *sc, struct stripe *stripe, unsigned io_size)
+stripe_init(struct stripe_cache *sc, struct stripe *stripe)
 {
 	unsigned p = RS(sc)->set.raid_devs;
 	unsigned i;
@@ -1275,9 +1297,8 @@ stripe_init(struct stripe_cache *sc, struct stripe *stripe, unsigned io_size)
 
 	i = ARRAY_SIZE(stripe->lists);
 	while (i--)
-		INIT_LIST_HEAD(&stripe->lists[i]);
+		INIT_LIST_HEAD(stripe->lists + i);
 
-	stripe->io.size = io_size;
 	atomic_set(&stripe->cnt, 0);
 	atomic_set(&stripe->io.pending, 0);
 
@@ -1326,40 +1347,37 @@ static INLINE size_t stripe_size(struct raid_set *rs)
 }
 
 /* Allocate a stripe and its memory object. */
-enum grow { grow, keep };
+/* XXX adjust to cope with stripe cache and recovery stripe caches. */
+enum grow { SC_GROW, SC_KEEP };
 static struct stripe *stripe_alloc(struct stripe_cache *sc,
-				   unsigned io_size, enum grow grow)
+				   struct dm_mem_cache_client *mc,
+				   enum grow grow)
 {
 	int r;
-	unsigned pages_per_chunk = chunk_pages(io_size);
 	struct stripe *stripe;
 
-	stripe = kmem_cache_alloc(sc->kc.cache, GFP_KERNEL);
+	stripe = kmem_cache_zalloc(sc->kc.cache, GFP_KERNEL);
 	if (stripe) {
-		memset(stripe, 0, stripe_size(RS(sc)));
-
-		/* Grow the dm-mem-cache on request. */
-		if (grow == grow) {
-			r = dm_mem_cache_grow(sc->dm_mem_cache_client,
-					      pages_per_chunk);
+		/* Grow the dm-mem-cache by one object. */
+		if (grow == SC_GROW) {
+			r = dm_mem_cache_grow(mc, 1);
 			if (r)
 				goto err_free;
 		}
 
-		stripe->obj = dm_mem_cache_alloc(sc->dm_mem_cache_client,
-						 pages_per_chunk);
+		stripe->obj = dm_mem_cache_alloc(mc);
 		if (!stripe->obj)
 			goto err_shrink;
 
-		stripe_init(sc, stripe, io_size);
+		stripe_init(sc, stripe);
 	}
 
 	return stripe;
 
-   err_shrink:
-	if (grow == grow)
-		dm_mem_cache_shrink(sc->dm_mem_cache_client, pages_per_chunk);
-   err_free:
+err_shrink:
+	if (grow == SC_GROW)
+		dm_mem_cache_shrink(mc, 1);
+err_free:
 	kmem_cache_free(sc->kc.cache, stripe);
 	return NULL;
 }
@@ -1368,21 +1386,24 @@ static struct stripe *stripe_alloc(struct stripe_cache *sc,
  * Free a stripes memory object, shrink the
  * memory cache and free the stripe itself
  */
-static void stripe_free(struct stripe *stripe)
+static void stripe_free(struct stripe *stripe, struct dm_mem_cache_client *mc)
 {
-	dm_mem_cache_free(stripe->sc->dm_mem_cache_client, stripe->obj);
-	dm_mem_cache_shrink(stripe->sc->dm_mem_cache_client,
-			    chunk_pages(stripe->io.size));
+	dm_mem_cache_free(mc, stripe->obj);
+	dm_mem_cache_shrink(mc, 1);
 	kmem_cache_free(stripe->sc->kc.cache, stripe);
 }
 
 /* Free the recovery stripe. */
 static void stripe_recover_free(struct raid_set *rs)
 {
-	if (rs->recover.stripe) {
-		ClearRSRecover(rs);
-		stripe_free(rs->recover.stripe);
-		rs->recover.stripe = NULL;
+	struct recover *rec = &rs->recover;
+	struct list_head *stripes = &rec->stripes;
+
+	while (!list_empty(stripes)) {
+		struct stripe *stripe = list_first_entry(stripes, struct stripe,
+							 lists[LIST_RECOVER]);
+		list_del(stripe->lists + LIST_RECOVER);
+		stripe_free(stripe, rec->mem_cache_client);
 	}
 }
 
@@ -1452,9 +1473,11 @@ sc_grow(struct stripe_cache *sc, unsigned stripes, enum grow grow)
 
 	/* Try to allocate this many (additional) stripes. */
 	while (stripes--) {
-		struct stripe *stripe = stripe_alloc(sc, rs->set.io_size, grow);
+		struct stripe *stripe =
+			stripe_alloc(sc, sc->mem_cache_client, grow);
 
 		if (likely(stripe)) {
+			stripe->io.size = rs->set.io_size;
 			stripe_lru_add(stripe, POS_TAIL, LIST_LOCKED);
 			atomic_inc(&sc->stripes);
 		} else {
@@ -1478,9 +1501,9 @@ static int sc_shrink(struct stripe_cache *sc, unsigned stripes)
 
 		stripe = stripe_lru_pop(sc);
 		if (stripe) {
-			/* An lru stripe may never have ios pending!. */
+			/* An lru stripe may never have ios pending! */
 			BUG_ON(stripe_io(stripe));
-			stripe_free(stripe);
+			stripe_free(stripe, sc->mem_cache_client);
 			atomic_dec(&sc->stripes);
 		} else {
 			r = -ENOENT;
@@ -1506,6 +1529,7 @@ static int sc_init(struct raid_set *rs, unsigned stripes)
 	unsigned i, nr;
 	struct stripe_cache *sc = &rs->sc;
 	struct stripe *stripe;
+	struct recover *rec = &rs->recover;
 
 	/* Initialize lists and locks. */
 	i = ARRAY_SIZE(sc->lists);
@@ -1521,7 +1545,7 @@ static int sc_init(struct raid_set *rs, unsigned stripes)
 	atomic_set(&sc->stripes_last, 0);
 	atomic_set(&sc->stripes_to_shrink, 0);
 	atomic_set(&sc->active_stripes, 0);
-	atomic_set(&sc->max_active_stripes, 0);	/* REMOVEME: */
+	atomic_set(&sc->max_active_stripes, 0);	/* REMOVEME: statistics. */
 
 	/*
 	 * We need a runtime unique # to suffix the kmem cache name
@@ -1534,38 +1558,57 @@ static int sc_init(struct raid_set *rs, unsigned stripes)
 	if (!sc->kc.cache)
 		return -ENOMEM;
 
-	/* Create memory cache client context and Allocate memory objects. */
-	sc->dm_mem_cache_client = dm_mem_cache_client_create(
-		stripes * stripe_pages(rs, rs->set.io_size) +
-		2 * stripe_pages(rs, rs->recover.io_size),
-		stripes + 2, rs->set.raid_devs);
-	if (IS_ERR(sc->dm_mem_cache_client))
-		return PTR_ERR(sc->dm_mem_cache_client);
+	/* Create memory cache client context for RAID stripe cache. */
+	sc->mem_cache_client =
+		dm_mem_cache_client_create(stripes, rs->set.raid_devs,
+					   chunk_pages(rs->set.io_size));
+	if (IS_ERR(sc->mem_cache_client))
+		return PTR_ERR(sc->mem_cache_client);
+
+	/* Create memory cache client context for RAID recovery stripe(s). */
+	rec->mem_cache_client =
+		dm_mem_cache_client_create(MAX_RECOVER, rs->set.raid_devs,
+					   chunk_pages(rec->io_size));
+	if (IS_ERR(rec->mem_cache_client))
+		return PTR_ERR(rec->mem_cache_client);
 
 	/* Allocate stripe for set recovery. */
-	stripe = stripe_alloc(sc, rs->recover.io_size, keep);
-	if (!stripe)
-		return -ENOMEM;
+	/* XXX: cope with MAX_RECOVERY. */
+	INIT_LIST_HEAD(&rec->stripes);
+	for (i = 0; i < MAX_RECOVER; i++) {
+		stripe = stripe_alloc(sc, rec->mem_cache_client, SC_KEEP);
+		if (!stripe)
+			return -ENOMEM;
 
-	SetStripeRecover(stripe);
-	rs->recover.stripe = stripe;
-	return sc_grow(sc, stripes, keep);	/* Grow the cache. */
+		SetStripeRecover(stripe);
+		stripe->io.size = rec->io_size;
+		list_add(stripe->lists + LIST_RECOVER, &rec->stripes);
+	}
+
+	/*
+	 * Allocate the stripe objetcs from the
+	 * cache and add them to the LRU list.
+	 */
+	return sc_grow(sc, stripes, SC_KEEP);
 }
 
 /* Destroy the stripe cache. */
 static void sc_exit(struct stripe_cache *sc)
 {
-	if (sc->hash.hash) {
-		if (sc->kc.cache) {
-			BUG_ON(sc_shrink(sc, atomic_read(&sc->stripes)));
-			kmem_cache_destroy(sc->kc.cache);
-		}
-
-		if (sc->dm_mem_cache_client)
-			dm_mem_cache_client_destroy(sc->dm_mem_cache_client);
-
-		hash_exit(&sc->hash);
+	if (sc->kc.cache) {
+		BUG_ON(sc_shrink(sc, atomic_read(&sc->stripes)));
+		kmem_cache_destroy(sc->kc.cache);
 	}
+
+	if (sc->mem_cache_client)
+		dm_mem_cache_client_destroy(sc->mem_cache_client);
+
+	ClearRSRecover(RS(sc));
+	stripe_recover_free(RS(sc));
+	if (RS(sc)->recover.mem_cache_client)
+		dm_mem_cache_client_destroy(RS(sc)->recover.mem_cache_client);
+
+	hash_exit(&sc->hash);
 }
 
 /*
@@ -1638,7 +1681,7 @@ raid_address(struct raid_set *rs, sector_t sector, struct address *addr)
 	addr->di = di;
 	addr->pi = pi;
 
-   out:
+out:
 	return addr;
 }
 
@@ -1668,7 +1711,7 @@ bio_copy_page_list(int rw, struct stripe *stripe,
 		int len = bv->bv_len, size;
 		unsigned bio_offset = 0;
 		void *bio_addr = __bio_kmap_atomic(bio, i, KM_USER0);
-   redo:
+redo:
 		size = (page_offset + len > PAGE_SIZE) ?
 		       PAGE_SIZE - page_offset : len;
 
@@ -1707,7 +1750,7 @@ bio_copy_page_list(int rw, struct stripe *stripe,
  * Xor optimization macros.
  */
 /* Xor data pointer declaration and initialization macros. */
-#define DECLARE_2	xor_t *d0 = data[0], *d1 = data[1]
+#define DECLARE_2	unsigned long *d0 = data[0], *d1 = data[1]
 #define DECLARE_3	DECLARE_2, *d2 = data[2]
 #define DECLARE_4	DECLARE_3, *d3 = data[3]
 #define DECLARE_5	DECLARE_4, *d4 = data[4]
@@ -1733,7 +1776,7 @@ bio_copy_page_list(int rw, struct stripe *stripe,
 
 /* Define a _xor_#chunks_#xors_per_run() function. */
 #define	_XOR(chunks, xors_per_run) \
-static void _xor ## chunks ## _ ## xors_per_run(xor_t **data) \
+static void _xor ## chunks ## _ ## xors_per_run(unsigned long **data) \
 { \
 	unsigned end = XOR_SIZE / sizeof(data[0]), i; \
 	DECLARE_ ## chunks; \
@@ -1757,7 +1800,7 @@ MAKE_XOR_PER_RUN(64)	/* Define _xor_*_64() functions. */
 
 #define MAKE_XOR(xors_per_run) \
 struct { \
-	void (*f)(xor_t**); \
+	void (*f)(unsigned long **); \
 } static xor_funcs ## xors_per_run[] = { \
 	{ NULL }, \
 	{ NULL }, \
@@ -1770,7 +1813,7 @@ struct { \
 	{ _xor8_ ## xors_per_run }, \
 }; \
 \
-static void xor_ ## xors_per_run(unsigned n, xor_t **data) \
+static void xor_ ## xors_per_run(unsigned n, unsigned long **data) \
 { \
 	/* Call respective function for amount of chunks. */ \
 	xor_funcs ## xors_per_run[n].f(data); \
@@ -1810,7 +1853,7 @@ static void xor(struct stripe *stripe, unsigned pi, unsigned sector)
 	struct raid_set *rs = RS(stripe->sc);
 	unsigned max_chunks = rs->xor.chunks, n, p;
 	unsigned o = sector / SECTORS_PER_PAGE; /* Offset into the page_list. */
-	xor_t **d = rs->data;
+	unsigned long **d = rs->data;
 	xor_function_t xor_f = rs->xor.f->f;
 
 	/* Address of parity page to xor into. */
@@ -1861,7 +1904,6 @@ static void parity_xor(struct stripe *stripe)
 		 io_size = stripe->io.size,
 		 xor_size = chunk_size > io_size ? io_size : chunk_size;
 	sector_t off;
-
 
 	/* This can be the recover stripe with a larger io size. */
 	for (off = 0; off < io_size; off += xor_size) {
@@ -1919,7 +1961,6 @@ static struct stripe *stripe_get(struct raid_set *rs, struct address *addr)
 	struct stripe_cache *sc = &rs->sc;
 	struct stripe *stripe;
 
-
 	stripe = stripe_lookup(sc, addr->key);
 	if (stripe) {
 		_stripe_get(stripe);
@@ -1934,8 +1975,8 @@ static struct stripe *stripe_get(struct raid_set *rs, struct address *addr)
 			/* Invalidate before reinserting with changed key. */
 			stripe_invalidate(stripe);
 			stripe->key = addr->key;
-			stripe->region = rh_sector_to_region(rs->recover.rh,
-							     addr->key);
+			stripe->region = dm_rh_sector_to_region(rs->recover.rh,
+								addr->key);
 			stripe->idx.parity = addr->pi;
 			sc_insert(sc, stripe);
 			/* REMOVEME: statistics. */
@@ -1972,8 +2013,6 @@ static void stripe_put(struct stripe *stripe)
  * Read and write functions are split in order to avoid
  * conditionals in the main loop for performamce reasons.
  */
-typedef void(*endio_helper_function)(struct stripe *, struct page_list *,
-				     struct bio *);
 
 /* Helper read bios on a page list. */
 static void _bio_copy_page_list(struct stripe *stripe, struct page_list *pl,
@@ -1986,7 +2025,7 @@ static void _bio_copy_page_list(struct stripe *stripe, struct page_list *pl,
 static void _rh_dec(struct stripe *stripe, struct page_list *pl,
 		    struct bio *bio)
 {
-	rh_dec(RS(stripe->sc)->recover.rh, stripe->region);
+	dm_rh_dec(RS(stripe->sc)->recover.rh, stripe->region);
 }
 
 /* End io all bios on a page list. */
@@ -2002,11 +2041,16 @@ page_list_endio(int rw, struct stripe *stripe, unsigned p, unsigned *count)
 
 		if (PageLocked(page))
 			r = -EBUSY;
+		/*
+		 * FIXME: PageUptodate() not cleared
+		 *	  properly for missing chunks ?
+		 */
 		else if (PageUptodate(page)) {
 			struct bio *bio;
 			struct raid_set *rs = RS(stripe->sc);
-			endio_helper_function h_f =
-			   rw == READ ? _bio_copy_page_list : _rh_dec;
+			void (*h_f)(struct stripe *, struct page_list *,
+				    struct bio *) =
+				(rw == READ) ? _bio_copy_page_list : _rh_dec;
 
 			while ((bio = bio_list_pop(bl))) {
 				h_f(stripe, pl, bio);
@@ -2026,7 +2070,7 @@ page_list_endio(int rw, struct stripe *stripe, unsigned p, unsigned *count)
  * End io all reads/writes on a stripe copying
  * read date accross from stripe to bios.
  */
-static int stripe_end_io(int rw, struct stripe *stripe, unsigned *count)
+static int stripe_endio(int rw, struct stripe *stripe, unsigned *count)
 {
 	int r = 0;
 	unsigned p = RS(stripe->sc)->set.raid_devs;
@@ -2052,11 +2096,11 @@ bio_list_fail(struct raid_set *rs, struct stripe *stripe, struct bio_list *bl)
 
 	/* Update region counters. */
 	if (stripe) {
-		void *rh = rs->recover.rh;
+		struct dm_rh_client *rh = rs->recover.rh;
 
 		bio_list_for_each(bio, bl) {
 			if (bio_data_dir(bio) == WRITE)
-				rh_dec(rh, stripe->region);
+				dm_rh_dec(rh, stripe->region);
 		}
 	}
 
@@ -2150,8 +2194,7 @@ recover_io_count(struct raid_set *rs, struct stripe *stripe)
 	if (RSRecover(rs)) {
 		recover_io_reset(rs);
 		atomic_inc(rs->recover.io_count +
-			   (stripe == rs->recover.stripe ?
-			    IO_RECOVER : IO_WORK));
+			   (StripeRecover(stripe) ? IO_RECOVER : IO_WORK));
 	}
 }
 
@@ -2192,7 +2235,8 @@ static void page_list_rw(struct stripe *stripe, unsigned p)
 	recover_io_count(rs, stripe);	/* Recovery io accounting. */
 
 	/* REMOVEME: statistics. */
-	atomic_inc(rs->stats + (PageDirty(page) ? S_DM_IO_WRITE: S_DM_IO_READ));
+	atomic_inc(rs->stats +
+		    (PageDirty(page) ? S_DM_IO_WRITE : S_DM_IO_READ));
 
 	ClearPageError(page);
 	set_page_locked(page);
@@ -2291,7 +2335,7 @@ static INLINE int stripe_check_overwrite(struct stripe *stripe, unsigned p)
 
 /*
  * Prepare stripe to avoid io on broken/reconstructed
- * drive to be reconstructed on endio.
+ * drive in order to reconstruct date on endio.
  */
 enum prepare_type { IO_ALLOW, IO_PROHIBIT };
 static void stripe_prepare(struct stripe *stripe, unsigned p,
@@ -2301,9 +2345,18 @@ static void stripe_prepare(struct stripe *stripe, unsigned p,
 
 	switch (type) {
 	case IO_PROHIBIT:
+		/*
+		 * In case we prohibit, we gotta make sure, that
+		 * io on all other chunks than the one which failed
+		 * or is being reconstructed is allowed and that it
+		 * doesn't have state uptodate.
+		 */
+		stripe_allow_io(stripe);
+		ClearPageUptodate(page);
+		ProhibitPageIO(page);
+
 		/* REMOVEME: statistics. */
 		atomic_inc(RS(stripe->sc)->stats + S_PROHIBITPAGEIO);
-		ProhibitPageIO(page);
 		stripe->idx.recover = p;
 		SetStripeReconstruct(stripe);
 		break;
@@ -2345,7 +2398,7 @@ static INLINE void stripe_check_reconstruct(struct stripe *stripe,
 		 *   o make sure all needed pages are read in
 		 *   o writes are allowed to go through
 		 */
-		int r = region_state(rs, stripe->key, RH_NOSYNC);
+		int r = region_state(rs, stripe->key, DM_RH_NOSYNC);
 
 		if (r) {
 			/* REMOVEME: statistics. */
@@ -2356,7 +2409,7 @@ static INLINE void stripe_check_reconstruct(struct stripe *stripe,
 		}
 	}
 
- 	/*
+	/*
 	 * All disks good. Avoid reading parity chunk and reconstruct it
 	 * unless we have prohibited io to chunk(s).
 	 */
@@ -2365,6 +2418,11 @@ static INLINE void stripe_check_reconstruct(struct stripe *stripe,
 			stripe_prepare(stripe, stripe->idx.parity, IO_ALLOW);
 		else {
 			stripe_prepare(stripe, stripe->idx.parity, IO_PROHIBIT);
+
+			/*
+			 * Overrule stripe_prepare to reconstruct the
+			 * parity chunk, because it'll be created new anyway.
+			 */
 			ClearStripeReconstruct(stripe);
 		}
 	}
@@ -2445,6 +2503,8 @@ static INLINE int stripe_check_read(struct stripe *stripe)
 /*
  * Read/write a stripe.
  *
+ * All stripe read/write activity goes through this function.
+ *
  * States to cover:
  *   o stripe to read and/or write
  *   o stripe with error to reconstruct
@@ -2477,7 +2537,7 @@ static int stripe_rw(struct stripe *stripe)
 			 *
 			 * For the time being, I got to redo parity...
 			 */
-			// parity_xor(stripe);		/* Xor chunks out. */
+			/* parity_xor(stripe); */	/* Xor chunks out. */
 			stripe_zero_chunk(stripe, stripe->idx.parity);
 			writes_merge(stripe);		/* Merge writes in. */
 			parity_xor(stripe);		/* Update parity. */
@@ -2488,6 +2548,7 @@ static int stripe_rw(struct stripe *stripe)
 		if (r > 0)
 			prohibited = 1;
 	} else if (!raid_set_degraded(rs))
+		/* Only allow for read avoidance if not degraded. */
 		prohibited = stripe_check_read(stripe);
 
 	/*
@@ -2519,18 +2580,17 @@ static int stripe_flush(struct stripe *stripe, enum flush_type type)
 
 	stripe_lru_del(stripe, LIST_LOCKED);
 
-	/* Delay flush by putting it on io list for later processing. */
-	if (type == FLUSH_DELAY)
-		stripe_io_add(stripe, POS_TAIL, LIST_UNLOCKED);
-
 	/* Immediately flush. */
-	else if (type == FLUSH_NOW) {
+	if (type == FLUSH_NOW) {
 		if (likely(raid_set_operational(RS(stripe->sc))))
 			r = stripe_rw(stripe); /* Read/write stripe. */
 		else
 			/* Optimization: Fail early on failed sets. */
 			stripe_fail_io(stripe);
-	} else
+	/* Delay flush by putting it on io list for later processing. */
+	} else if (type == FLUSH_DELAY)
+		stripe_io_add(stripe, POS_TAIL, LIST_UNLOCKED);
+	else
 		BUG();
 
 	return r;
@@ -2572,7 +2632,7 @@ static INLINE int stripe_queue_bio(struct raid_set *rs, struct bio *bio,
 			SetStripeRBW(stripe);
 
 			/* Inrement pending write count on region. */
-			rh_inc(rs->recover.rh, stripe->region);
+			dm_rh_inc(rs->recover.rh, stripe->region);
 			r = 1;	/* Region hash needs a flush. */
 		}
 
@@ -2590,7 +2650,7 @@ static INLINE int stripe_queue_bio(struct raid_set *rs, struct bio *bio,
 
 	/* Got no stripe from cache -> reject bio. */
 	} else {
-   out:
+out:
 		bio_list_add(reject, bio);
 		/* REMOVEME: statistics. */
 		atomic_inc(rs->stats + S_IOS_POST);
@@ -2653,7 +2713,7 @@ static int recover_bandwidth(struct raid_set *rs)
 		/* Pay attention to larger recover stripe size. */
 		int recover =
 		    atomic_read(rs->recover.io_count + IO_RECOVER) *
-				rs->recover.stripe->io.size /
+				rs->recover.io_size /
 				rs->set.io_size;
 
 		/*
@@ -2667,7 +2727,7 @@ static int recover_bandwidth(struct raid_set *rs)
 		}
 	}
 
-   out:
+out:
 	atomic_inc(rs->stats + S_BANDWIDTH);	/* REMOVEME: statistics. */
 	return 1;
 }
@@ -2676,14 +2736,15 @@ static int recover_bandwidth(struct raid_set *rs)
 static int recover_get_region(struct raid_set *rs)
 {
 	struct recover *rec = &rs->recover;
-	void *rh = rec->rh;
+	struct dm_rh_client *rh = rec->rh;
 
 	/* Start quiescing some regions. */
 	if (!RSRegionGet(rs)) {
 		int r = recover_bandwidth(rs); /* Enough bandwidth ?. */
 
 		if (r) {
-			if (rh_recovery_prepare(rh) < 0) {
+			r = dm_rh_recovery_prepare(rh);
+			if (r < 0) {
 				DMINFO("No %sregions to recover",
 				       rec->nr_regions_to_recover ?
 				       "more " : "");
@@ -2696,17 +2757,16 @@ static int recover_get_region(struct raid_set *rs)
 	}
 
 	if (!rec->reg) {
-		rec->reg = rh_recovery_start(rh);
+		rec->reg = dm_rh_recovery_start(rh);
 		if (rec->reg) {
 			/*
 			 * A reference for the the region I'll
 			 * keep till I've completely synced it.
 			 */
 			io_get(rs);
-			rec->pos =
-			   rh_region_to_sector(rh,
-					       rh_get_region_key(rec->reg));
-			rec->end = rec->pos + rh_get_region_size(rh);
+			rec->pos = dm_rh_region_to_sector(rh,
+				dm_rh_get_region_key(rec->reg));
+			rec->end = rec->pos + dm_rh_get_region_size(rh);
 			return 1;
 		} else
 			return -EAGAIN;
@@ -2739,114 +2799,126 @@ static void recovery_region_reset(struct raid_set *rs)
 static void recover_rh_update(struct raid_set *rs, int error)
 {
 	struct recover *rec = &rs->recover;
-	void *rh = rec->rh;
-	void *reg = rec->reg;
+	struct dm_rh_client *rh = rec->rh;
+	struct dm_region *reg = rec->reg;
 
 	if (reg) {
-		rh_recovery_end(reg, error);
+		dm_rh_recovery_end(rh, reg, error);
 		if (!error)
 			rec->nr_regions_recovered++;
 
 		recovery_region_reset(rs);
 	}
 
-	rh_update_states(rh);
-	rh_flush(rh);
+	dm_rh_update_states(rh, 1);
+	dm_rh_flush(rh);
 	io_put(rs);	/* Release the io reference for the region. */
 }
 
 /* Called by main io daemon to recover regions. */
-static INLINE void do_recovery(struct raid_set *rs)
+/* FIXME: cope with MAX_RECOVER > 1. */
+static INLINE void _do_recovery(struct raid_set *rs, struct stripe *stripe)
 {
-	if (RSRecover(rs)) {
-		int r;
-		struct recover *rec = &rs->recover;
-		struct stripe *stripe = rec->stripe;
+	int r;
+	struct recover *rec = &rs->recover;
 
-		/* If recovery is active -> return. */
-		if (StripeActive(stripe))
-			return;
-
-		/* io error is fatal for recovery -> stop it. */
-		if (unlikely(StripeError(stripe)))
-			goto err;
-
-		/* Get a region to recover. */
-		r = recover_get_region(rs);
-		switch (r) {
-		case 1:	/* Got a new region. */
-			/* Flag read before write. */
-			ClearStripeRead(stripe);
-			SetStripeRBW(stripe);
-			break;
-
-		case 0:
-			/* Got a region in the works. */
-			r = recover_bandwidth(rs);
-			if (r) /* Got enough bandwidth. */
-				break;
-
-		case -EAGAIN:
-			/* No bandwidth/quiesced region yet, try later. */
-			wake_do_raid_delayed(rs, HZ / 10);
-			return;
-
-		case -ENOENT:	/* No more regions. */
-			goto free;
-		}
-
-		/* Read/write a recover stripe. */
-		r = recover_stripe_rw(rs, stripe);
-		if (r) {
-			/* Io initiated, get another reference for the IO. */
-			io_get(rs);
-			return;
-		}
-
-		/* Update recovery position within region. */
-		rec->pos += stripe->io.size;
-
-		/* If we're at end of region, update region hash. */
-		if (rec->pos >= rec->end ||
-		    rec->pos >= rs->set.sectors_per_dev)
-			recover_rh_update(rs, 0);
-		else
-			SetStripeRBW(stripe);
-
-		/* Schedule myself for another round... */
-		wake_do_raid(rs);
+	/* If recovery is active -> return. */
+	if (StripeActive(stripe))
 		return;
 
-   err:
-		raid_set_check_degrade(rs, stripe);
+	/* io error is fatal for recovery -> stop it. */
+	if (unlikely(StripeError(stripe)))
+		goto err;
 
-		{
-			char buf[BDEVNAME_SIZE];
+	/* Get a region to recover. */
+	r = recover_get_region(rs);
+	switch (r) {
+	case 1:	/* Got a new region. */
+		/* Flag read before write. */
+		ClearStripeRead(stripe);
+		SetStripeRBW(stripe);
+		break;
 
-			DMERR("stopping recovery due to "
-			      "ERROR on /dev/%s, stripe at offset %llu",
-			      bdevname(rs->dev[rs->set.ei].dev->bdev, buf),
-			      (unsigned long long) stripe->key);
+	case 0:
+		/* Got a region in the works. */
+		r = recover_bandwidth(rs);
+		if (r) /* Got enough bandwidth. */
+			break;
 
-		}
+	case -EAGAIN:
+		/* No bandwidth/quiesced region yet, try later. */
+		wake_do_raid_delayed(rs, HZ / 10);
+		return;
 
-		/* Make sure, that all quiesced regions get released. */
-		do {
-			if (rec->reg)
-				rh_recovery_end(rec->reg, -EIO);
-
-			rec->reg = rh_recovery_start(rec->rh);
-		} while (rec->reg);
-
-		recover_rh_update(rs, -EIO);
-   free:
-		stripe_recover_free(rs);
-		rs->set.dev_to_init = -1;
-		rs->recover.end_jiffies = jiffies;
-		/* Check for jiffies overrun. */
-		if (rs->recover.end_jiffies < rs->recover.start_jiffies)
-			rs->recover.end_jiffies = ~0;
+	case -ENOENT:	/* No more regions. */
+		dm_table_event(rs->ti->table);
+		goto free;
 	}
+
+	/* Read/write a recover stripe. */
+	r = recover_stripe_rw(rs, stripe);
+	if (r) {
+		/* IO initiated, get another reference for the IO. */
+		io_get(rs);
+		return;
+	}
+
+	/* Update recovery position within region. */
+	rec->pos += stripe->io.size;
+
+	/* If we're at end of region, update region hash. */
+	if (rec->pos >= rec->end ||
+	    rec->pos >= rs->set.sectors_per_dev)
+		recover_rh_update(rs, 0);
+	else
+		SetStripeRBW(stripe);
+
+	/* Schedule myself for another round... */
+	wake_do_raid(rs);
+	return;
+
+err:
+	raid_set_check_degrade(rs, stripe);
+
+	{
+		char buf[BDEVNAME_SIZE];
+
+		DMERR("stopping recovery due to "
+		      "ERROR on /dev/%s, stripe at offset %llu",
+		      bdevname(rs->dev[rs->set.ei].dev->bdev, buf),
+		      (unsigned long long) stripe->key);
+
+	}
+
+	/* Make sure, that all quiesced regions get released. */
+	do {
+		if (rec->reg)
+			dm_rh_recovery_end(rec->rh, rec->reg, -EIO);
+
+		rec->reg = dm_rh_recovery_start(rec->rh);
+	} while (rec->reg);
+
+	recover_rh_update(rs, -EIO);
+free:
+	rs->set.dev_to_init = -1;
+
+	/* Check for jiffies overrun. */
+	rs->recover.end_jiffies = jiffies;
+	if (rs->recover.end_jiffies < rs->recover.start_jiffies)
+		rs->recover.end_jiffies = ~0;
+
+	ClearRSRecover(rs);
+}
+
+static INLINE void do_recovery(struct raid_set *rs)
+{
+	struct stripe *stripe;
+
+	list_for_each_entry(stripe, &rs->recover.stripes, lists[LIST_RECOVER])
+		_do_recovery(rs, stripe);
+
+	if (!RSRecover(rs))
+		stripe_recover_free(rs);
 }
 
 /*
@@ -2869,12 +2941,14 @@ static void do_endios(struct raid_set *rs)
 
 			io_put(rs); /* Release region io reference. */
 			ClearStripeActive(stripe);
-			atomic_dec(&sc->active_stripes); /* REMOVEME: */
+
+			/* REMOVEME: statistics*/
+			atomic_dec(&sc->active_stripes);
 			continue;
 		}
 
 		/* Early end io all reads on any uptodate chunks. */
-		stripe_end_io(READ, stripe, (count = 0, &count));
+		stripe_endio(READ, stripe, (count = 0, &count));
 		if (stripe_io(stripe)) {
 			if (count) /* REMOVEME: statistics. */
 				atomic_inc(rs->stats + S_ACTIVE_READS);
@@ -2923,7 +2997,7 @@ static void do_endios(struct raid_set *rs)
 		 * Now that we've got a complete stripe, we can
 		 * process the rest of the end ios on reads.
 		 */
-		BUG_ON(stripe_end_io(READ, stripe, NULL));
+		BUG_ON(stripe_endio(READ, stripe, NULL));
 		ClearStripeRead(stripe);
 
 		/*
@@ -2933,7 +3007,7 @@ static void do_endios(struct raid_set *rs)
 		 */
 		if (TestClearStripeMerged(stripe))
 			/* End io all bios which got merged already. */
-			BUG_ON(stripe_end_io(WRITE_MERGED, stripe, NULL));
+			BUG_ON(stripe_endio(WRITE_MERGED, stripe, NULL));
 
 		/* Got to put on flush list because of new writes. */
 		if (StripeRBW(stripe))
@@ -2985,7 +3059,7 @@ static INLINE void do_ios(struct raid_set *rs, struct bio_list *ios)
 {
 	int r;
 	unsigned flush = 0;
-	void *rh = rs->recover.rh;
+	struct dm_rh_client *rh = rs->recover.rh;
 	struct bio *bio;
 	struct bio_list delay, reject;
 
@@ -3015,30 +3089,34 @@ static INLINE void do_ios(struct raid_set *rs, struct bio_list *ios)
 			}
 		}
 
-		r = region_state(rs, _sector(rs, bio), RH_RECOVERING);
+		r = region_state(rs, _sector(rs, bio), DM_RH_RECOVERING);
 		if (unlikely(r)) {
 			/* Got to wait for recovering regions. */
 			bio_list_add(&delay, bio);
 			SetRSBandwidth(rs);
 		} else {
 			/*
-	 		 * Process ios to non-recovering regions by queueing
-	 		 * them to stripes (does rh_inc()) for writes).
-	 		 */
+			 * Process ios to non-recovering regions by queueing
+			 * them to stripes (does rh_inc()) for writes).
+			 */
 			flush += stripe_queue_bio(rs, bio, &reject);
 		}
 	}
 
-	if (flush)
-		rh_flush(rh);	/* Writes got queued -> flush dirty log. */
+	if (flush) {
+		r = dm_rh_flush(rh); /* Writes got queued -> flush dirty log. */
+		if (r)
+			DMERR("dirty log flush");
+	}
 
 	/* Delay ios to regions which are recovering. */
 	while ((bio = bio_list_pop(&delay))) {
 		/* REMOVEME: statistics.*/
 		atomic_inc(rs->stats + S_DELAYED_BIOS);
 		atomic_inc(rs->stats + S_SUM_DELAYED_BIOS);
-		rh_delay_by_region(rh, bio,
-				   rh_sector_to_region(rh, _sector(rs, bio)));
+		dm_rh_delay_by_region(rh, bio,
+			dm_rh_sector_to_region(rh, _sector(rs, bio)));
+
 	}
 
 	/* Merge any rejected bios back to the head of the input list. */
@@ -3077,13 +3155,8 @@ static INLINE void do_unplug(struct raid_set *rs)
 
 	while (dev-- > rs->dev) {
 		/* Only call any device unplug function, if io got queued. */
-		if (io_dev_clear(dev)) {
-			struct request_queue *q =
-				bdev_get_queue(dev->dev->bdev);
-
-			if (q->unplug_fn)
-				q->unplug_fn(q);
-		}
+		if (io_dev_clear(dev))
+			blk_unplug(bdev_get_queue(dev->dev->bdev));
 	}
 }
 
@@ -3113,7 +3186,7 @@ static void do_raid(struct work_struct *ws)
 	 * and the region counters get decremented
 	 * before we update the region hash states.
 	 */
-   redo:
+redo:
 	do_endios(rs);
 
 	/*
@@ -3123,10 +3196,11 @@ static void do_raid(struct work_struct *ws)
 	do_sc_shrink(rs);
 
 	/* Update region hash states before we go any further. */
-	rh_update_states(rs->recover.rh);
+	dm_rh_update_states(rs->recover.rh, 1);
 
 	/* Try to recover regions. */
-	do_recovery(rs);
+	if (RSRecover(rs))
+		do_recovery(rs);
 
 	/* More endios -> process. */
 	if (!stripe_endio_empty(&rs->sc)) {
@@ -3167,7 +3241,7 @@ static void do_raid(struct work_struct *ws)
  * delayed bios queued to recovered regions
  * (Gets called via rh_update_states()).
  */
-static void dispatch_delayed_bios(void *context, struct bio_list *bl)
+static void dispatch_delayed_bios(void *context, struct bio_list *bl, int dummy)
 {
 	struct raid_set *rs = context;
 	struct bio *bio;
@@ -3185,30 +3259,30 @@ static void dispatch_delayed_bios(void *context, struct bio_list *bl)
 /*************************************************************
  * Constructor helpers
  *************************************************************/
-#define XOR_SPEED_SIZE	rs->recover.io_size
-
 /* Calculate MB/sec. */
 static INLINE unsigned mbpers(struct raid_set *rs, unsigned speed)
 {
 	return to_bytes(speed * rs->set.data_devs *
-			XOR_SPEED_SIZE * HZ >> 10) >> 10;
+			rs->recover.io_size * HZ >> 10) >> 10;
 }
 
 /*
  * Discover fastest xor algorithm and # of chunks combination.
  */
 /* Calculate speed for algorithm and # of chunks. */
-static INLINE unsigned xor_speed(struct raid_set *rs)
+static INLINE unsigned xor_speed(struct stripe *stripe)
 {
 	unsigned r = 0;
 	unsigned long j;
 
-	for (j = jiffies; j == jiffies;); /* Wait for next tick. */
+	/* Wait for next tick. */
+	for (j = jiffies; j == jiffies;)
+		;
 
 	/* Do xors for a full tick. */
 	for (j = jiffies; j == jiffies;) {
 		mb();
-		common_xor(rs->recover.stripe, XOR_SPEED_SIZE, 0, 0);
+		common_xor(stripe, stripe->io.size, 0, 0);
 		mb();
 		r++;
 		mb();
@@ -3222,12 +3296,17 @@ static unsigned xor_optimize(struct raid_set *rs)
 {
 	unsigned chunks_max = 2, speed_max = 0;
 	struct xor_func *f = ARRAY_END(xor_funcs), *f_max = NULL;
+	struct stripe *stripe;
+
+	BUG_ON(list_empty(&rs->recover.stripes));
+	stripe = list_first_entry(&rs->recover.stripes, struct stripe,
+			    lists[LIST_RECOVER]);
 
 	/*
-	* Got to allow io on all chunks, so that
-	* xor() will actually work on them.
- 	*/
-	stripe_allow_io(rs->recover.stripe);
+	 * Got to allow io on all chunks, so that
+	 * xor() will actually work on them.
+	 */
+	stripe_allow_io(stripe);
 
 	/* Try all xor functions. */
 	while (f-- > xor_funcs) {
@@ -3238,7 +3317,7 @@ static unsigned xor_optimize(struct raid_set *rs)
 		rs->xor.chunks = XOR_CHUNKS_MAX + 1;
 
 		while (rs->xor.chunks-- > 2) {
-			speed = xor_speed(rs);
+			speed = xor_speed(stripe);
 			if (speed > speed_max) {
 				speed_max = speed;
 				chunks_max = rs->xor.chunks;
@@ -3269,6 +3348,7 @@ context_alloc(struct raid_set **raid_set, struct raid_type *raid_type,
 	sector_t region_size, ti_len;
 	struct raid_set *rs = NULL;
 	struct dm_dirty_log *dl;
+	struct recover *rec;
 
 	/*
 	 * Create the dirty log
@@ -3304,13 +3384,15 @@ context_alloc(struct raid_set **raid_set, struct raid_type *raid_type,
 	if (!rs)
 		goto bad_alloc;
 
+	rec = &rs->recover;
 	atomic_set(&rs->io.in_process, 0);
 	atomic_set(&rs->io.in_process_max, 0);
-	rs->recover.io_size = recover_io_size;
+	rec->io_size = recover_io_size;
 
 	/* Pointer to data array. */
-	rs->data = (xor_t **) ((void *) rs->dev + raid_devs * sizeof(*rs->dev));
-	rs->recover.dl = dl;
+	rs->data = (unsigned long **)
+		   ((void *) rs->dev + raid_devs * sizeof(*rs->dev));
+	rec->dl = dl;
 	rs->set.raid_devs = p = raid_devs;
 	rs->set.data_devs = raid_devs - raid_type->parity_devs;
 	rs->set.raid_type = raid_type;
@@ -3336,8 +3418,8 @@ context_alloc(struct raid_set **raid_set, struct raid_type *raid_type,
 
 	rs->ti = ti;
 
-	atomic_set(rs->recover.io_count + IO_WORK, 0);
-	atomic_set(rs->recover.io_count + IO_RECOVER, 0);
+	atomic_set(rec->io_count + IO_WORK, 0);
+	atomic_set(rec->io_count + IO_RECOVER, 0);
 
 	/* Initialize io lock and queues. */
 	spin_lock_init(&rs->io.in_lock);
@@ -3346,11 +3428,11 @@ context_alloc(struct raid_set **raid_set, struct raid_type *raid_type,
 
 	init_waitqueue_head(&rs->io.suspendq);	/* Suspend waiters (dm-io). */
 
-	rs->recover.nr_regions = dm_sector_div_up(sectors_per_dev, region_size);
-	r = region_hash_init(&rs->recover.rh, 1, dispatch_delayed_bios, rs,
-		    wake_do_raid, rs, dl, region_size,
-		    rs->recover.nr_regions);
-	if (r)
+	rec->nr_regions = dm_sector_div_up(sectors_per_dev, region_size);
+	rec->rh = dm_rh_client_create(MAX_RECOVER, dispatch_delayed_bios, rs,
+				      wake_do_raid, rs, dl, region_size,
+				      rs->recover.nr_regions);
+	if (IS_ERR(rec->rh))
 		goto bad_rh;
 
 	/* Initialize stripe cache. */
@@ -3371,41 +3453,42 @@ context_alloc(struct raid_set **raid_set, struct raid_type *raid_type,
 	*raid_set = rs;
 	return 0;
 
-   bad_dirty_log:
+bad_dirty_log:
 	TI_ERR_RET("Error creating dirty log", -ENOMEM);
 
 
-   bad_chunk_size:
+bad_chunk_size:
 	dm_dirty_log_destroy(dl);
 	TI_ERR("Chunk size larger than region size");
 
-   bad_recover_io_size:
+bad_recover_io_size:
 	dm_dirty_log_destroy(dl);
 	TI_ERR("Recover stripe io size larger than region size");
 
-   bad_array:
+bad_array:
 	dm_dirty_log_destroy(dl);
 	TI_ERR("Arry too big");
 
-   bad_alloc:
+bad_alloc:
 	dm_dirty_log_destroy(dl);
 	TI_ERR_RET("Cannot allocate raid context", -ENOMEM);
 
-   bad_rh:
+bad_rh:
 	dm_dirty_log_destroy(dl);
 	ti->error = DM_MSG_PREFIX "Error creating dirty region hash";
 	goto free_rs;
 
-   bad_sc:
+bad_sc:
 	ti->error = DM_MSG_PREFIX "Error creating stripe cache";
 	goto free;
 
-   bad_dm_io_client:
+bad_dm_io_client:
 	ti->error = DM_MSG_PREFIX "Error allocating dm-io resources";
-   free:
+free:
+	dm_rh_client_destroy(rec->rh);
 	sc_exit(&rs->sc);
-	rh_exit(rs->recover.rh);
-   free_rs:
+	dm_rh_client_destroy(rec->rh); /* Destroys dirty log as well. */
+free_rs:
 	kfree(rs);
 	return -ENOMEM;
 }
@@ -3418,9 +3501,9 @@ context_free(struct raid_set *rs, struct dm_target *ti, unsigned r)
 		dm_put_device(ti, rs->dev[r].dev);
 
 	dm_io_client_destroy(rs->sc.dm_io_client);
-	stripe_recover_free(rs);
 	sc_exit(&rs->sc);
-	rh_exit(rs->recover.rh);	/* Destroys dirty log as well. */
+	dm_rh_client_destroy(rs->recover.rh);
+	dm_dirty_log_destroy(rs->recover.dl);
 	kfree(rs);
 }
 
@@ -3544,8 +3627,7 @@ raid_variable_parms(struct dm_target *ti, char **argv,
 		    (*chunk_size != -1 &&
 		     (!POWER_OF_2(*chunk_size) ||
 		      !range_ok(*chunk_size, IO_SIZE_MIN, CHUNK_SIZE_MAX))))
-			TI_ERR ("Invalid chunk size; "
-				"must be 2^^n and <= 16384");
+			TI_ERR("Invalid chunk size; must be 2^^n and <= 16384");
 
 		*chunk_size_parm = *chunk_size;
 		if (*chunk_size == -1)
@@ -3577,7 +3659,7 @@ raid_variable_parms(struct dm_target *ti, char **argv,
 			    (*io_size != -1 &&
 			     (!POWER_OF_2(*io_size) ||
 			      !range_ok(*io_size, IO_SIZE_MIN,
-				        min(BIO_MAX_SECTORS / 2,
+					min(BIO_MAX_SECTORS / 2,
 					*chunk_size)))))
 				TI_ERR("Invalid io size; must "
 				       "be 2^^n and less equal "
@@ -3632,7 +3714,7 @@ raid_variable_parms(struct dm_target *ti, char **argv,
 static int
 raid_locking_parms(struct dm_target *ti, char **argv,
 		   unsigned i, int *locking_parms,
-		   struct dmraid45_locking_type **locking_type)
+		   struct dm_raid45_locking_type **locking_type)
 {
 	*locking_parms = 0;
 	*locking_type = &locking_none;
@@ -3661,8 +3743,11 @@ static void rs_set_bdi(struct raid_set *rs, unsigned stripes, unsigned chunks)
 	/* Set read-ahead for the RAID set and the component devices. */
 	bdi->ra_pages = stripes * stripe_pages(rs, rs->set.io_size);
 	ra_pages = chunks * chunk_pages(rs->set.io_size);
-	for (p = rs->set.raid_devs; p--; )
-		bdev_get_queue(rs->dev[p].dev->bdev)->backing_dev_info.ra_pages = ra_pages;
+	for (p = rs->set.raid_devs; p--; ) {
+		struct request_queue *q = bdev_get_queue(rs->dev[p].dev->bdev);
+
+		q->backing_dev_info.ra_pages = ra_pages;
+	}
 
 	/* Set congested function and data. */
 	bdi->congested_fn = raid_set_congested;
@@ -3739,7 +3824,7 @@ static int raid_ctr(struct dm_target *ti, unsigned argc, char **argv)
 	    stripes = STRIPES, stripes_parm = -1;
 	unsigned speed;
 	sector_t tmp, sectors_per_dev;
-	struct dmraid45_locking_type *locking;
+	struct dm_raid45_locking_type *locking;
 	struct raid_set *rs;
 	struct raid_type *raid_type;
 
@@ -3778,8 +3863,9 @@ static int raid_ctr(struct dm_target *ti, unsigned argc, char **argv)
 		return r;
 
 	/* # of raid devices. */
-	if (sscanf(argv[dl_parms + parity_parm + raid_parms + locking_parms +4],
-	     "%d", &raid_devs) != 1 || raid_devs < raid_type->minimal_devs)
+	i = dl_parms + parity_parm + raid_parms + locking_parms + 4;
+	if (sscanf(argv[i], "%d", &raid_devs) != 1 ||
+	    raid_devs < raid_type->minimal_devs)
 		TI_ERR("Invalid number of raid devices");
 
 	/* In case of RAID4, check parity drive index is in limits. */
@@ -3863,6 +3949,8 @@ static int raid_ctr(struct dm_target *ti, unsigned argc, char **argv)
 	rs->recover.start_jiffies = jiffies;
 	rs->recover.end_jiffies = 0;
 	recovery_region_reset(rs);
+
+	/* Allow for recovery of any nosync regions. */
 	SetRSRecover(rs);
 
 	/* Set backing device information (eg. read ahead). */
@@ -3886,7 +3974,7 @@ static int raid_ctr(struct dm_target *ti, unsigned argc, char **argv)
 	ti->private = rs;
 	return 0;
 
-   err:
+err:
 	context_free(rs, ti, i);
 	return r;
 }
@@ -3898,8 +3986,9 @@ static void raid_dtr(struct dm_target *ti)
 {
 	struct raid_set *rs = ti->private;
 
-	/* Indicate recovery end. */
+	/* Indicate recovery end so that ios in flight drain. */
 	ClearRSRecover(rs);
+
 	wake_do_raid(rs);	/* Wake daemon. */
 	wait_ios(rs);		/* Wait for any io still being processed. */
 	destroy_workqueue(rs->io.wq);
@@ -3958,7 +4047,7 @@ static void raid_postsuspend(struct dm_target *ti)
 	SetRSSuspended(rs);
 
 	if (RSRecover(rs))
-		rh_stop_recovery(rs->recover.rh); /* Wakes do_raid(). */
+		dm_rh_stop_recovery(rs->recover.rh); /* Wakes do_raid(). */
 	else
 		wake_do_raid(rs);
 
@@ -3973,22 +4062,23 @@ static void raid_postsuspend(struct dm_target *ti)
 static void raid_resume(struct dm_target *ti)
 {
 	struct raid_set *rs = ti->private;
-	struct dm_dirty_log *dl = rs->recover.dl;
+	struct recover *rec = &rs->recover;
+	struct dm_dirty_log *dl = rec->dl;
 
 	if (dl->type->resume && dl->type->resume(dl))
 		/* Resume dirty log. */
 		/* FIXME: need better error handling. */
 		DMWARN("log resume failed");
 
-	rs->recover.nr_regions_to_recover =
-	    rs->recover.nr_regions - dl->type->get_sync_count(dl);
+	rec->nr_regions_to_recover =
+	    rec->nr_regions - dl->type->get_sync_count(dl);
 
 	ClearRSSuspended(rs);
 
 	/* Reset any unfinished recovery. */
 	if (RSRecover(rs)) {
 		recovery_region_reset(rs);
-		rh_start_recovery(rs->recover.rh); /* Calls wake_do_raid(). */
+		dm_rh_start_recovery(rec->rh);/* Calls wake_do_raid(). */
 	} else
 		wake_do_raid(rs);
 }
@@ -4073,8 +4163,7 @@ raid_status(struct dm_target *ti, status_type_t type,
 
 		DMEMIT("1 ");
 		for (i = 0; i < rs->set.raid_devs; i++) {
-			DMEMIT("%c",
-			       dev_operational(rs, i) ? 'A' : 'D');
+			DMEMIT("%c", dev_operational(rs, i) ? 'A' : 'D');
 
 			if (rs->set.raid_type->level == raid4 &&
 			    i == rs->set.pi)
@@ -4146,7 +4235,8 @@ enum raid_msg_actions {
 static int _absolute(unsigned long action, int act, int r)
 {
 	/* Make delta absolute. */
-	if (test_bit(act_set, &action));
+	if (test_bit(act_set, &action))
+		;
 	else if (test_bit(act_grow, &action))
 		r += act;
 	else if (test_bit(act_shrink, &action))
@@ -4225,8 +4315,8 @@ static int devel_flags(struct dm_msg *msg, void *context)
 		if (test_bit(act_stats, &msg->action)) {
 			stats_reset(rs);
 			goto on;
-		} else if (test_bit(act_overwrite, &msg->action)) {
-   on:
+		} else if test_bit(act_overwrite, &msg->action) {
+on:
 			set_bit(msg->spec->parm, &rs->io.flags);
 			return 0;
 		}
@@ -4276,7 +4366,7 @@ static int stripecache_resize(struct dm_msg *msg, void *context)
 		 */
 		if (range_ok(stripes, STRIPES_MIN, STRIPES_MAX)) {
 			if (stripes > act)
-				return sc_grow(&rs->sc, stripes - act, grow);
+				return sc_grow(&rs->sc, stripes - act, SC_GROW);
 			else if (stripes < act) {
 				atomic_set(&rs->sc.stripes_to_shrink,
 					   act - stripes);
@@ -4325,21 +4415,25 @@ raid_message(struct dm_target *ti, unsigned argc, char **argv)
 
 	/* Bandwidth option. */
 	static struct dm_message_option bw_opt = { 3, str_sgs, act_sgs };
-	static struct dm_message_argument bw_args =
-		{ 1, i_arg, { dm_msg_int_t } };
+	static struct dm_message_argument bw_args = {
+		1, i_arg, { dm_msg_int_t }
+	};
 
 	/* Device option. */
 	static struct dm_message_option dev_opt = { 2, str_dev, act_oor };
-	static struct dm_message_argument dev_args =
-		{ 1, p_arg, { dm_msg_base_t } };
+	static struct dm_message_argument dev_args = {
+		1, p_arg, { dm_msg_base_t }
+	};
 
 	/* Read ahead option. */
 	static struct dm_message_option ra_opt = { 1, str_sgs, act_sgs };
-	static struct dm_message_argument ra_args =
-		{ 2, i_arg, { dm_msg_int_t, dm_msg_int_t } };
+	static struct dm_message_argument ra_args = {
+		2, i_arg, { dm_msg_int_t, dm_msg_int_t }
+	};
 
-	static struct dm_message_argument null_args =
-		{ 0, NULL, { dm_msg_int_t } };
+	static struct dm_message_argument null_args = {
+		0, NULL, { dm_msg_int_t }
+	};
 
 	/* Overwrite and statistics option. */
 	static struct dm_message_option ovr_stats_opt = { 3, str_oor, act_oor };

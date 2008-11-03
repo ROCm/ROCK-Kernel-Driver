@@ -1,11 +1,14 @@
 /*
- * Copyright (C) 2006,2007 Red Hat GmbH
+ * Copyright (C) 2006-2008 Red Hat, Inc. All rights reserved.
  *
- * Module Author: Heinz Mauelshagen <Mauelshagen@RedHat.de>
+ * Module Author: Heinz Mauelshagen <heinzm@redhat.com>
  *
- * Allocate/free total_pages to a per client page pool.
- * Allocate/free memory objects with chunks (1..n) of pages_per_chunk pages
- * hanging off.
+ * Device-mapper memory object handling:
+ *
+ * o allocate/free total_pages in a per client page pool.
+ *
+ * o allocate/free memory objects with chunks (1..n) of
+ *   pages_per_chunk pages hanging off.
  *
  * This file is released under the GPL.
  */
@@ -13,8 +16,8 @@
 #define	DM_MEM_CACHE_VERSION	"0.2"
 
 #include "dm.h"
+#include "dm-memcache.h"
 #include <linux/dm-io.h>
-#include "dm-mem-cache.h"
 
 struct dm_mem_cache_client {
 	spinlock_t lock;
@@ -22,6 +25,7 @@ struct dm_mem_cache_client {
 	struct page_list *free_list;
 	unsigned objects;
 	unsigned chunks;
+	unsigned pages_per_chunk;
 	unsigned free_pages;
 	unsigned total_pages;
 };
@@ -67,17 +71,16 @@ static struct page_list *alloc_cache_pages(unsigned pages)
 
 	return ret;
 
-   err:
+err:
 	free_cache_pages(ret);
 	return NULL;
 }
 
 /*
- * Allocate page_list elements from the pool to chunks of the mem object
+ * Allocate page_list elements from the pool to chunks of the memory object.
  */
 static void alloc_chunks(struct dm_mem_cache_client *cl,
-			 struct dm_mem_cache_object *obj,
-			 unsigned pages_per_chunk)
+			 struct dm_mem_cache_object *obj)
 {
 	unsigned chunks = cl->chunks;
 	unsigned long flags;
@@ -85,7 +88,7 @@ static void alloc_chunks(struct dm_mem_cache_client *cl,
 	local_irq_save(flags);
 	local_irq_disable();
 	while (chunks--) {
-		unsigned p = pages_per_chunk;
+		unsigned p = cl->pages_per_chunk;
 
 		obj[chunks].pl = NULL;
 
@@ -138,16 +141,19 @@ static void free_chunks(struct dm_mem_cache_client *cl,
  * Create/destroy dm memory cache client resources.
  */
 struct dm_mem_cache_client *
-dm_mem_cache_client_create(unsigned total_pages, unsigned objects,
-			   unsigned chunks)
+dm_mem_cache_client_create(unsigned objects, unsigned chunks,
+			   unsigned pages_per_chunk)
 {
+	unsigned total_pages = objects * chunks * pages_per_chunk;
 	struct dm_mem_cache_client *client;
 
+	BUG_ON(!total_pages);
 	client = kzalloc(sizeof(*client), GFP_KERNEL);
 	if (!client)
 		return ERR_PTR(-ENOMEM);
 
-	client->objs_pool = mempool_create_kmalloc_pool(objects, chunks * sizeof(struct dm_mem_cache_object));
+	client->objs_pool = mempool_create_kmalloc_pool(objects,
+				chunks * sizeof(struct dm_mem_cache_object));
 	if (!client->objs_pool)
 		goto err;
 
@@ -158,15 +164,17 @@ dm_mem_cache_client_create(unsigned total_pages, unsigned objects,
 	spin_lock_init(&client->lock);
 	client->objects = objects;
 	client->chunks = chunks;
+	client->pages_per_chunk = pages_per_chunk;
 	client->free_pages = client->total_pages = total_pages;
 	return client;
 
-   err1:
+err1:
 	mempool_destroy(client->objs_pool);
-   err:
+err:
 	kfree(client);
 	return ERR_PTR(-ENOMEM);
 }
+EXPORT_SYMBOL(dm_mem_cache_client_create);
 
 void dm_mem_cache_client_destroy(struct dm_mem_cache_client *cl)
 {
@@ -175,21 +183,24 @@ void dm_mem_cache_client_destroy(struct dm_mem_cache_client *cl)
 	mempool_destroy(cl->objs_pool);
 	kfree(cl);
 }
+EXPORT_SYMBOL(dm_mem_cache_client_destroy);
 
 /*
  * Grow a clients cache by an amount of pages.
  *
  * Don't call from interrupt context!
  */
-int dm_mem_cache_grow(struct dm_mem_cache_client *cl,
-		      unsigned pages_per_chunk)
+int dm_mem_cache_grow(struct dm_mem_cache_client *cl, unsigned objects)
 {
-	unsigned pages = cl->chunks * pages_per_chunk;
-	struct page_list *pl = alloc_cache_pages(pages), *last = pl;
+	unsigned pages = objects * cl->chunks * cl->pages_per_chunk;
+	struct page_list *pl, *last;
 
+	BUG_ON(!pages);
+	pl = alloc_cache_pages(pages);
 	if (!pl)
 		return -ENOMEM;
 
+	last = pl;
 	while (last->next)
 		last = last->next;
 
@@ -204,15 +215,17 @@ int dm_mem_cache_grow(struct dm_mem_cache_client *cl,
 	mempool_resize(cl->objs_pool, cl->objects, GFP_NOIO);
 	return 0;
 }
+EXPORT_SYMBOL(dm_mem_cache_grow);
 
 /* Shrink a clients cache by an amount of pages */
-int dm_mem_cache_shrink(struct dm_mem_cache_client *cl,
-			unsigned pages_per_chunk)
+int dm_mem_cache_shrink(struct dm_mem_cache_client *cl, unsigned objects)
 {
-	int r = 0;
-	unsigned pages = cl->chunks * pages_per_chunk, p = pages;
+	int r;
+	unsigned pages = objects * cl->chunks * cl->pages_per_chunk, p = pages;
 	unsigned long flags;
 	struct page_list *last = NULL, *pl, *pos;
+
+	BUG_ON(!pages);
 
 	spin_lock_irqsave(&cl->lock, flags);
 	pl = pos = cl->free_list;
@@ -224,6 +237,7 @@ int dm_mem_cache_shrink(struct dm_mem_cache_client *cl,
 	if (++p)
 		r = -ENOMEM;
 	else {
+		r = 0;
 		cl->free_list = pos;
 		cl->free_pages -= pages;
 		cl->total_pages -= pages;
@@ -239,17 +253,17 @@ int dm_mem_cache_shrink(struct dm_mem_cache_client *cl,
 
 	return r;
 }
+EXPORT_SYMBOL(dm_mem_cache_shrink);
 
 /*
  * Allocate/free a memory object
  *
  * Can be called from interrupt context
  */
-struct dm_mem_cache_object *dm_mem_cache_alloc(struct dm_mem_cache_client *cl,
-					       unsigned pages_per_chunk)
+struct dm_mem_cache_object *dm_mem_cache_alloc(struct dm_mem_cache_client *cl)
 {
 	int r = 0;
-	unsigned pages = cl->chunks * pages_per_chunk;
+	unsigned pages = cl->chunks * cl->pages_per_chunk;
 	unsigned long flags;
 	struct dm_mem_cache_object *obj;
 
@@ -269,9 +283,10 @@ struct dm_mem_cache_object *dm_mem_cache_alloc(struct dm_mem_cache_client *cl,
 		return ERR_PTR(r);
 	}
 
-	alloc_chunks(cl, obj, pages_per_chunk);
+	alloc_chunks(cl, obj);
 	return obj;
 }
+EXPORT_SYMBOL(dm_mem_cache_alloc);
 
 void dm_mem_cache_free(struct dm_mem_cache_client *cl,
 		       struct dm_mem_cache_object *obj)
@@ -279,14 +294,8 @@ void dm_mem_cache_free(struct dm_mem_cache_client *cl,
 	free_chunks(cl, obj);
 	mempool_free(obj, cl->objs_pool);
 }
-
-EXPORT_SYMBOL(dm_mem_cache_client_create);
-EXPORT_SYMBOL(dm_mem_cache_client_destroy);
-EXPORT_SYMBOL(dm_mem_cache_alloc);
 EXPORT_SYMBOL(dm_mem_cache_free);
-EXPORT_SYMBOL(dm_mem_cache_grow);
-EXPORT_SYMBOL(dm_mem_cache_shrink);
 
 MODULE_DESCRIPTION(DM_NAME " dm memory cache");
-MODULE_AUTHOR("Heinz Mauelshagen <hjm@redhat.de>");
+MODULE_AUTHOR("Heinz Mauelshagen <hjm@redhat.com>");
 MODULE_LICENSE("GPL");
