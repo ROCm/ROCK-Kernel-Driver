@@ -4315,7 +4315,7 @@ static int devel_flags(struct dm_msg *msg, void *context)
 		if (test_bit(act_stats, &msg->action)) {
 			stats_reset(rs);
 			goto on;
-		} else if test_bit(act_overwrite, &msg->action) {
+		} else if (test_bit(act_overwrite, &msg->action)) {
 on:
 			set_bit(msg->spec->parm, &rs->io.flags);
 			return 0;
