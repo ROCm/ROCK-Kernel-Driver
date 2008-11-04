@@ -445,9 +445,8 @@ struct zfcp_blk_drv_data {
 #define ZFCP_BLK_LAT_VALID			0x1
 #define ZFCP_BLK_REQ_ERROR			0x2
 	u16 flags;
-	u16 retries;
-	u16 inb_usage;
-	u16 outb_usage;
+	u8 inb_usage;
+	u8 outb_usage;
 	u64 channel_lat;
 	u64 fabric_lat;
 } __attribute__ ((packed));

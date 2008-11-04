@@ -723,7 +723,7 @@ static struct zfcp_fsf_req *zfcp_fsf_req_create(struct zfcp_adapter *adapter,
 		req = zfcp_fsf_alloc_qtcb(pool);
 
 	if (unlikely(!req))
-		return ERR_PTR(-ENOMEM);
+		return ERR_PTR(-EIO);
 
 	if (adapter->req_no == 0)
 		adapter->req_no++;
@@ -2093,23 +2093,24 @@ static void zfcp_fsf_trace_latency(struct zfcp_fsf_req *fsf_req)
 	int ticks = fsf_req->adapter->timer_ticks;
 
 	trace.flags = 0;
-	trace.magic = cpu_to_be32(ZFCP_BLK_DRV_DATA_MAGIC);
+	trace.magic = ZFCP_BLK_DRV_DATA_MAGIC;
 	if (fsf_req->adapter->adapter_features & FSF_FEATURE_MEASUREMENT_DATA) {
-		trace.flags |= cpu_to_be16(ZFCP_BLK_LAT_VALID);
+		trace.flags |= ZFCP_BLK_LAT_VALID;
 		lat_inf = &fsf_req->qtcb->prefix.prot_status_qual.latency_info;
-		trace.channel_lat = cpu_to_be64(lat_inf->channel_lat * ticks);
-		trace.fabric_lat = cpu_to_be64(lat_inf->fabric_lat * ticks);
+		trace.channel_lat = lat_inf->channel_lat * ticks;
+		trace.fabric_lat = lat_inf->fabric_lat * ticks;
 	}
 	if (fsf_req->status & ZFCP_STATUS_FSFREQ_ERROR)
-		trace.flags |= cpu_to_be16(ZFCP_BLK_REQ_ERROR);
-	trace.retries = cpu_to_be16(scsi_cmnd->retries);
-	trace.inb_usage = cpu_to_be16(fsf_req->qdio_inb_usage);
-	trace.outb_usage = cpu_to_be16(fsf_req->qdio_outb_usage);
+		trace.flags |= ZFCP_BLK_REQ_ERROR;
+	trace.inb_usage = fsf_req->qdio_inb_usage;
+	trace.outb_usage = fsf_req->qdio_outb_usage;
 
 	blk_add_driver_data(req->q, req, &trace, sizeof(trace));
 }
 #else
-#define zfcp_fsf_trace_latency(fsf_req)	do { } while (0)
+static inline void zfcp_fsf_trace_latency(struct zfcp_fsf_req *fsf_req)
+{
+}
 #endif
 
 static void zfcp_fsf_send_fcp_command_task_handler(struct zfcp_fsf_req *req)
