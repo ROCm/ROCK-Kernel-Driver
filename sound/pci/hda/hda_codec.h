@@ -306,15 +306,15 @@ enum {
 #define AC_KNBCAP_DELTA			(1<<7)
 
 /* HDMI LPCM capabilities */
-#define AC_LPCMCAP_48K_CP_CHNS		(0x0f<<0) /* max channels w/ CP-on */	
+#define AC_LPCMCAP_48K_CP_CHNS		(0x0f<<0) /* max channels w/ CP-on */
 #define AC_LPCMCAP_48K_NO_CHNS		(0x0f<<4) /* max channels w/o CP-on */
 #define AC_LPCMCAP_48K_20BIT		(1<<8)	/* 20b bitrate supported */
 #define AC_LPCMCAP_48K_24BIT		(1<<9)	/* 24b bitrate supported */
-#define AC_LPCMCAP_96K_CP_CHNS		(0x0f<<10) /* max channels w/ CP-on */	
+#define AC_LPCMCAP_96K_CP_CHNS		(0x0f<<10) /* max channels w/ CP-on */
 #define AC_LPCMCAP_96K_NO_CHNS		(0x0f<<14) /* max channels w/o CP-on */
 #define AC_LPCMCAP_96K_20BIT		(1<<18)	/* 20b bitrate supported */
 #define AC_LPCMCAP_96K_24BIT		(1<<19)	/* 24b bitrate supported */
-#define AC_LPCMCAP_192K_CP_CHNS		(0x0f<<20) /* max channels w/ CP-on */	
+#define AC_LPCMCAP_192K_CP_CHNS		(0x0f<<20) /* max channels w/ CP-on */
 #define AC_LPCMCAP_192K_NO_CHNS		(0x0f<<24) /* max channels w/o CP-on */
 #define AC_LPCMCAP_192K_20BIT		(1<<28)	/* 20b bitrate supported */
 #define AC_LPCMCAP_192K_24BIT		(1<<29)	/* 24b bitrate supported */

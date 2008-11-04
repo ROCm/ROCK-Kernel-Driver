@@ -35,7 +35,7 @@ static int __init set_pci_mem_align(char *str)
 }
 __setup("pci-mem-align", set_pci_mem_align);
 
-/* This quirk function enables us to force all memory resources which are 
+/* This quirk function enables us to force all memory resources which are
  * assigned to PCI devices, to be page-aligned.
  */
 static void __devinit quirk_align_mem_resources(struct pci_dev *dev)

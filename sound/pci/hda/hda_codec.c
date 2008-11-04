@@ -2593,7 +2593,7 @@ static void setup_dig_out_stream(struct hda_codec *codec, hda_nid_t nid,
 {
 	/* turn off SPDIF once; otherwise the IEC958 bits won't be updated */
 	if (codec->spdif_status_reset && (codec->spdif_ctls & AC_DIG1_ENABLE))
-		set_dig_out_convert(codec, nid, 
+		set_dig_out_convert(codec, nid,
 				    codec->spdif_ctls & ~AC_DIG1_ENABLE & 0xff,
 				    -1);
 	snd_hda_codec_setup_stream(codec, nid, stream_tag, 0, format);
