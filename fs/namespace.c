@@ -2370,7 +2370,7 @@ char *d_namespace_path(struct dentry *dentry, struct vfsmount *vfsmnt,
 	path_get(&current->fs->root);
 	read_unlock(&current->fs->lock);
 	spin_lock(&vfsmount_lock);
-	if (root.mnt)
+	if (root.mnt && root.mnt->mnt_ns)
 		ns_root.mnt = mntget(root.mnt->mnt_ns->root);
 	if (ns_root.mnt)
 		ns_root.dentry = dget(ns_root.mnt->mnt_root);
