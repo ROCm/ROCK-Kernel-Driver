@@ -689,6 +689,10 @@ static inline void *shost_priv(struct Scsi_Host *shost)
 
 int scsi_is_host_device(const struct device *);
 
+/*
+ * walks object list backward, to find the first shost object.
+ * Skips over transport objects that may not be stargets, etc
+ */
 static inline struct Scsi_Host *dev_to_shost(struct device *dev)
 {
 	while (!scsi_is_host_device(dev)) {
@@ -697,6 +701,17 @@ static inline struct Scsi_Host *dev_to_shost(struct device *dev)
 		dev = dev->parent;
 	}
 	return container_of(dev, struct Scsi_Host, shost_gendev);
+}
+
+/*
+ * walks object list backward, to find the first non-scsi object
+ * Skips over transport objects that may be vports, shosts under vports, etc 
+ */
+static inline struct device *dev_to_nonscsi_dev(struct device *dev)
+{
+	while (dev->type == NULL || scsi_is_host_device(dev))
+		dev = dev->parent;
+	return dev;
 }
 
 static inline int scsi_host_in_recovery(struct Scsi_Host *shost)
