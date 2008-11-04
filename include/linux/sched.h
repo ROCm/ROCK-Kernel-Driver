@@ -96,7 +96,6 @@ struct exec_domain;
 struct futex_pi_state;
 struct robust_list_head;
 struct bio;
-struct pfm_context;
 
 /*
  * List of flags we want to share for kernel threads,
@@ -1308,9 +1307,6 @@ struct task_struct {
 	struct latency_record latency_record[LT_SAVECOUNT];
 #endif
 	u64	instrumentation;
-#ifdef CONFIG_PERFMON
-	struct pfm_context *pfm_context;
-#endif
 };
 
 /*

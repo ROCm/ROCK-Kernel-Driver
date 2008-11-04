@@ -26,6 +26,7 @@
 
 #include <asm/uaccess.h>
 #include <asm/utrap.h>
+#include <asm/perfctr.h>
 #include <asm/unistd.h>
 
 #include "entry.h"
@@ -790,10 +791,106 @@ asmlinkage long sys_rt_sigaction(int sig,
 	return ret;
 }
 
+/* Invoked by rtrap code to update performance counters in
+ * user space.
+ */
+asmlinkage void update_perfctrs(void)
+{
+	unsigned long pic, tmp;
+
+	read_pic(pic);
+	tmp = (current_thread_info()->kernel_cntd0 += (unsigned int)pic);
+	__put_user(tmp, current_thread_info()->user_cntd0);
+	tmp = (current_thread_info()->kernel_cntd1 += (pic >> 32));
+	__put_user(tmp, current_thread_info()->user_cntd1);
+	reset_pic();
+}
+
 asmlinkage long sys_perfctr(int opcode, unsigned long arg0, unsigned long arg1, unsigned long arg2)
 {
-	/* Superceded by perfmon2 */
-	return -ENOSYS;
+	int err = 0;
+
+	switch(opcode) {
+	case PERFCTR_ON:
+		current_thread_info()->pcr_reg = arg2;
+		current_thread_info()->user_cntd0 = (u64 __user *) arg0;
+		current_thread_info()->user_cntd1 = (u64 __user *) arg1;
+		current_thread_info()->kernel_cntd0 =
+			current_thread_info()->kernel_cntd1 = 0;
+		write_pcr(arg2);
+		reset_pic();
+		set_thread_flag(TIF_PERFCTR);
+		break;
+
+	case PERFCTR_OFF:
+		err = -EINVAL;
+		if (test_thread_flag(TIF_PERFCTR)) {
+			current_thread_info()->user_cntd0 =
+				current_thread_info()->user_cntd1 = NULL;
+			current_thread_info()->pcr_reg = 0;
+			write_pcr(0);
+			clear_thread_flag(TIF_PERFCTR);
+			err = 0;
+		}
+		break;
+
+	case PERFCTR_READ: {
+		unsigned long pic, tmp;
+
+		if (!test_thread_flag(TIF_PERFCTR)) {
+			err = -EINVAL;
+			break;
+		}
+		read_pic(pic);
+		tmp = (current_thread_info()->kernel_cntd0 += (unsigned int)pic);
+		err |= __put_user(tmp, current_thread_info()->user_cntd0);
+		tmp = (current_thread_info()->kernel_cntd1 += (pic >> 32));
+		err |= __put_user(tmp, current_thread_info()->user_cntd1);
+		reset_pic();
+		break;
+	}
+
+	case PERFCTR_CLRPIC:
+		if (!test_thread_flag(TIF_PERFCTR)) {
+			err = -EINVAL;
+			break;
+		}
+		current_thread_info()->kernel_cntd0 =
+			current_thread_info()->kernel_cntd1 = 0;
+		reset_pic();
+		break;
+
+	case PERFCTR_SETPCR: {
+		u64 __user *user_pcr = (u64 __user *)arg0;
+
+		if (!test_thread_flag(TIF_PERFCTR)) {
+			err = -EINVAL;
+			break;
+		}
+		err |= __get_user(current_thread_info()->pcr_reg, user_pcr);
+		write_pcr(current_thread_info()->pcr_reg);
+		current_thread_info()->kernel_cntd0 =
+			current_thread_info()->kernel_cntd1 = 0;
+		reset_pic();
+		break;
+	}
+
+	case PERFCTR_GETPCR: {
+		u64 __user *user_pcr = (u64 __user *)arg0;
+
+		if (!test_thread_flag(TIF_PERFCTR)) {
+			err = -EINVAL;
+			break;
+		}
+		err |= __put_user(current_thread_info()->pcr_reg, user_pcr);
+		break;
+	}
+
+	default:
+		err = -EINVAL;
+		break;
+	};
+	return err;
 }
 
 /*

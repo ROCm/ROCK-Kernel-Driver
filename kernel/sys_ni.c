@@ -126,19 +126,6 @@ cond_syscall(sys_vm86);
 cond_syscall(compat_sys_ipc);
 cond_syscall(compat_sys_sysctl);
 
-cond_syscall(sys_pfm_create_context);
-cond_syscall(sys_pfm_write_pmcs);
-cond_syscall(sys_pfm_write_pmds);
-cond_syscall(sys_pfm_read_pmds);
-cond_syscall(sys_pfm_restart);
-cond_syscall(sys_pfm_start);
-cond_syscall(sys_pfm_stop);
-cond_syscall(sys_pfm_load_context);
-cond_syscall(sys_pfm_unload_context);
-cond_syscall(sys_pfm_create_evtsets);
-cond_syscall(sys_pfm_delete_evtsets);
-cond_syscall(sys_pfm_getinfo_evtsets);
-
 /* arch-specific weak syscall entries */
 cond_syscall(sys_pciconfig_read);
 cond_syscall(sys_pciconfig_write);

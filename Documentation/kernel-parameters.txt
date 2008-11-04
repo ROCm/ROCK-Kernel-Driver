@@ -1681,9 +1681,6 @@ and is between 256 and 4096 characters. It is defined in the file
 			Format: { 0 | 1 }
 			See arch/parisc/kernel/pdc_chassis.c
 
-	perfmon_debug	[PERFMON] Enables Perfmon debug messages. Needed
-			to see traces of the early startup startup phase.
-
 	pf.		[PARIDE]
 			See Documentation/paride.txt.
 

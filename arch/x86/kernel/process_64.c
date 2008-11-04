@@ -36,7 +36,6 @@
 #include <linux/kprobes.h>
 #include <linux/kdebug.h>
 #include <linux/tick.h>
-#include <linux/perfmon_kern.h>
 #include <linux/prctl.h>
 
 #include <asm/uaccess.h>
@@ -241,7 +240,6 @@ void exit_thread(void)
 		t->io_bitmap_max = 0;
 		put_cpu();
 	}
-	pfm_exit_thread();
 }
 
 void flush_thread(void)
@@ -345,8 +343,6 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 	savesegment(fs, p->thread.fsindex);
 	savesegment(es, p->thread.es);
 	savesegment(ds, p->thread.ds);
-
-	pfm_copy_thread(p);
 
 	if (unlikely(test_tsk_thread_flag(me, TIF_IO_BITMAP))) {
 		p->thread.io_bitmap_ptr = kmalloc(IO_BITMAP_BYTES, GFP_KERNEL);
@@ -478,9 +474,6 @@ static inline void __switch_to_xtra(struct task_struct *prev_p,
 	prev = &prev_p->thread,
 	next = &next_p->thread;
 
-	if (test_tsk_thread_flag(prev_p, TIF_PERFMON_CTXSW))
-		pfm_ctxsw_out(prev_p, next_p);
-
 	debugctl = prev->debugctlmsr;
 	if (next->ds_area_msr != prev->ds_area_msr) {
 		/* we clear debugctl to make sure DS
@@ -492,9 +485,6 @@ static inline void __switch_to_xtra(struct task_struct *prev_p,
 
 	if (next->debugctlmsr != debugctl)
 		update_debugctlmsr(next->debugctlmsr);
-
-	if (test_tsk_thread_flag(next_p, TIF_PERFMON_CTXSW))
-		pfm_ctxsw_in(prev_p, next_p);
 
 	if (test_tsk_thread_flag(next_p, TIF_DEBUG)) {
 		loaddebug(next, 0);

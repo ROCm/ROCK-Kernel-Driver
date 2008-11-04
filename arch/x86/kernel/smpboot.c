@@ -42,7 +42,6 @@
 #include <linux/init.h>
 #include <linux/smp.h>
 #include <linux/module.h>
-#include <linux/perfmon_kern.h>
 #include <linux/sched.h>
 #include <linux/percpu.h>
 #include <linux/bootmem.h>
@@ -1380,7 +1379,6 @@ int __cpu_disable(void)
 	remove_cpu_from_maps(cpu);
 	unlock_vector_lock();
 	fixup_irqs(cpu_online_map);
-	pfm_cpu_disable();
 	return 0;
 }
 

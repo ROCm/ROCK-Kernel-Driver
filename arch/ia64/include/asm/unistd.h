@@ -308,23 +308,11 @@
 #define __NR_dup3			1316
 #define __NR_pipe2			1317
 #define __NR_inotify_init1		1318
-#define __NR_pfm_create_context		1319
-#define __NR_pfm_write_pmcs		(__NR_pfm_create_context+1)
-#define __NR_pfm_write_pmds		(__NR_pfm_create_context+2)
-#define __NR_pfm_read_pmds		(__NR_pfm_create_context+3)
-#define __NR_pfm_load_context		(__NR_pfm_create_context+4)
-#define __NR_pfm_start			(__NR_pfm_create_context+5)
-#define __NR_pfm_stop			(__NR_pfm_create_context+6)
-#define __NR_pfm_restart		(__NR_pfm_create_context+7)
-#define __NR_pfm_create_evtsets		(__NR_pfm_create_context+8)
-#define __NR_pfm_getinfo_evtsets 	(__NR_pfm_create_context+9)
-#define __NR_pfm_delete_evtsets 	(__NR_pfm_create_context+10)
-#define __NR_pfm_unload_context		(__NR_pfm_create_context+11)
 
 #ifdef __KERNEL__
 
 
-#define NR_syscalls			307 /* length of syscall table */
+#define NR_syscalls			295 /* length of syscall table */
 
 /*
  * The following defines stop scripts/checksyscalls.sh from complaining about

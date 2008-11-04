@@ -45,7 +45,6 @@
 #include <linux/cpufreq.h>
 #include <linux/kexec.h>
 #include <linux/crash_dump.h>
-#include <linux/perfmon_kern.h>
 
 #include <asm/ia32.h>
 #include <asm/machvec.h>
@@ -1052,8 +1051,6 @@ cpu_init (void)
 	}
 	platform_cpu_init();
 	pm_idle = default_idle;
-
-	pfm_init_percpu();
 }
 
 void __init

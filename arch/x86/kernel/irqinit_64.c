@@ -11,7 +11,6 @@
 #include <linux/kernel_stat.h>
 #include <linux/sysdev.h>
 #include <linux/bitops.h>
-#include <linux/perfmon_kern.h>
 
 #include <asm/acpi.h>
 #include <asm/atomic.h>
@@ -217,10 +216,6 @@ void __init native_init_IRQ(void)
 	/* IPI vectors for APIC spurious and error interrupts */
 	alloc_intr_gate(SPURIOUS_APIC_VECTOR, spurious_interrupt);
 	alloc_intr_gate(ERROR_APIC_VECTOR, error_interrupt);
-
-#ifdef CONFIG_PERFMON
-	alloc_intr_gate(LOCAL_PERFMON_VECTOR, pmu_interrupt);
-#endif
 
 	if (!acpi_ioapic)
 		setup_irq(2, &irq2);

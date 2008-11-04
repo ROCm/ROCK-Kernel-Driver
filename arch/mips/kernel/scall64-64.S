@@ -487,16 +487,4 @@ sys_call_table:
 	PTR	sys_dup3
 	PTR	sys_pipe2
 	PTR	sys_inotify_init1
-	PTR	sys_pfm_create_context
-	PTR	sys_pfm_write_pmcs		/* 5290 */
-	PTR	sys_pfm_write_pmds
-	PTR	sys_pfm_read_pmds
-	PTR	sys_pfm_load_context
-	PTR	sys_pfm_start
-	PTR	sys_pfm_stop			/* 5295 */
-	PTR	sys_pfm_restart
-	PTR	sys_pfm_create_evtsets
-	PTR	sys_pfm_getinfo_evtsets
-	PTR	sys_pfm_delete_evtsets
-	PTR	sys_pfm_unload_context		/* 5300 */
 	.size	sys_call_table,.-sys_call_table

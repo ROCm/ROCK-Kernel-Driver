@@ -154,12 +154,6 @@ endif
 endif
 
 #
-# Perfmon support
-#
-
-core-$(CONFIG_PERFMON)		+= arch/mips/perfmon/
-
-#
 # Firmware support
 #
 libs-$(CONFIG_ARC)		+= arch/mips/fw/arc/

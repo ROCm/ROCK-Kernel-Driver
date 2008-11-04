@@ -158,8 +158,6 @@ core-$(CONFIG_LGUEST_GUEST) += arch/x86/lguest/
 core-y += arch/x86/kernel/
 core-y += arch/x86/mm/
 
-core-$(CONFIG_PERFMON) += arch/x86/perfmon/
-
 # Remaining sub architecture files
 core-y += $(mcore-y)
 

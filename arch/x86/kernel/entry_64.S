@@ -890,13 +890,7 @@ END(error_interrupt)
 ENTRY(spurious_interrupt)
 	apicinterrupt SPURIOUS_APIC_VECTOR,smp_spurious_interrupt
 END(spurious_interrupt)
-
-#ifdef CONFIG_PERFMON
-ENTRY(pmu_interrupt)
-	apicinterrupt LOCAL_PERFMON_VECTOR,smp_pmu_interrupt
-END(pmu_interrupt)
-#endif
-
+				
 /*
  * Exception entry points.
  */ 		

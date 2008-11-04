@@ -32,8 +32,4 @@ BUILD_INTERRUPT(spurious_interrupt,SPURIOUS_APIC_VECTOR)
 BUILD_INTERRUPT(thermal_interrupt,THERMAL_APIC_VECTOR)
 #endif
 
-#ifdef CONFIG_PERFMON
-BUILD_INTERRUPT(pmu_interrupt,LOCAL_PERFMON_VECTOR)
-#endif
-
 #endif

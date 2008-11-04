@@ -104,24 +104,6 @@ static inline notrace void set_soft_enabled(unsigned long enable)
 	: : "r" (enable), "i" (offsetof(struct paca_struct, soft_enabled)));
 }
 
-#ifdef CONFIG_PERFMON
-static inline unsigned long get_pmu_except_pending(void)
-{
-	unsigned long pending;
-
-	__asm__ __volatile__("lbz %0,%1(13)"
-	: "=r" (pending) : "i" (offsetof(struct paca_struct, pmu_except_pending)));
-
-	return pending;
-}
-
-static inline void set_pmu_except_pending(unsigned long pending)
-{
-	__asm__ __volatile__("stb %0,%1(13)"
-	: : "r" (pending), "i" (offsetof(struct paca_struct, pmu_except_pending)));
-}
-#endif /* CONFIG_PERFMON */
-
 notrace void raw_local_irq_restore(unsigned long en)
 {
 	/*
@@ -179,19 +161,6 @@ notrace void raw_local_irq_restore(unsigned long en)
 		u64 tmp;
 		lv1_get_version_info(&tmp);
 	}
-
-#ifdef CONFIG_PERFMON
-	/*
-	 * If a PMU exception occurred while interrupts were soft disabled,
-	 * force a PMU exception.
-	 */
-	if (get_pmu_except_pending()) {
-		set_pmu_except_pending(0);
-		/* Make sure we trigger the edge detection circuitry */
-		mtspr(SPRN_MMCR0, mfspr(SPRN_MMCR0) & ~MMCR0_PMAO);
-		mtspr(SPRN_MMCR0, mfspr(SPRN_MMCR0) | MMCR0_PMAO);
-	}
-#endif /* CONFIG_PERFMON */
 
 	__hard_irq_enable();
 }

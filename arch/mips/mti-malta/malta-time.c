@@ -27,7 +27,6 @@
 #include <linux/time.h>
 #include <linux/timex.h>
 #include <linux/mc146818rtc.h>
-#include <linux/perfmon_kern.h>
 
 #include <asm/mipsregs.h>
 #include <asm/mipsmtregs.h>

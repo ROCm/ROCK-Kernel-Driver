@@ -832,16 +832,4 @@ ia32_sys_call_table:
 	.quad sys_dup3			/* 330 */
 	.quad sys_pipe2
 	.quad sys_inotify_init1
-	.quad sys_pfm_create_context
-	.quad sys_pfm_write_pmcs
-	.quad sys_pfm_write_pmds	/* 335 */
-	.quad sys_pfm_read_pmds
-	.quad sys_pfm_load_context
-	.quad sys_pfm_start
-	.quad sys_pfm_stop
-	.quad sys_pfm_restart		/* 340 */
-	.quad sys_pfm_create_evtsets
-	.quad sys_pfm_getinfo_evtsets
-	.quad sys_pfm_delete_evtsets
-	.quad sys_pfm_unload_context
 ia32_syscall_end:

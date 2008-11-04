@@ -72,7 +72,6 @@
 #include <linux/ctype.h>
 #include <linux/ftrace.h>
 #include <trace/sched.h>
-#include <linux/perfmon_kern.h>
 
 #include <asm/tlb.h>
 #include <asm/irq_regs.h>

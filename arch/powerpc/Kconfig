@@ -230,8 +230,6 @@ source "init/Kconfig"
 source "arch/powerpc/sysdev/Kconfig"
 source "arch/powerpc/platforms/Kconfig"
 
-source "arch/powerpc/perfmon/Kconfig"
-
 menu "Kernel options"
 
 config HIGHMEM

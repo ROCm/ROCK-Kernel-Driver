@@ -97,10 +97,6 @@ struct paca_struct {
 	u8 soft_enabled;		/* irq soft-enable flag */
 	u8 hard_enabled;		/* set if irqs are enabled in MSR */
 	u8 io_sync;			/* writel() needs spin_unlock sync */
-#ifdef CONFIG_PERFMON
-	u8 pmu_except_pending;          /* PMU exception occurred while soft
-					 * disabled */
-#endif
 
 	/* Stuff for accurate time accounting */
 	u64 user_time;			/* accumulated usermode TB ticks */

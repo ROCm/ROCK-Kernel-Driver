@@ -61,11 +61,6 @@
 
 /* Macros for the pm_status register. */
 #define CBE_PM_CTR_OVERFLOW_INTR(ctr)      (1 << (31 - ((ctr) & 7)))
-#define CBE_PM_OVERFLOW_CTRS(pm_status)    (((pm_status) >> 24) & 0xff)
-#define CBE_PM_ALL_OVERFLOW_INTR           0xff000000
-#define CBE_PM_INTERVAL_INTR               0x00800000
-#define CBE_PM_TRACE_BUFFER_FULL_INTR      0x00400000
-#define CBE_PM_TRACE_BUFFER_UNDERFLOW_INTR 0x00200000
 
 enum pm_reg_name {
 	group_control,

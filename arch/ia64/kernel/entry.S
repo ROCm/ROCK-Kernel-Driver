@@ -1697,18 +1697,6 @@ sys_call_table:
 	data8 sys_dup3
 	data8 sys_pipe2
 	data8 sys_inotify_init1
-	data8 sys_pfm_create_context
-	data8 sys_pfm_write_pmcs		// 1320
-	data8 sys_pfm_write_pmds
-	data8 sys_pfm_read_pmds
-	data8 sys_pfm_load_context
-	data8 sys_pfm_start
-	data8 sys_pfm_stop			// 1325
-	data8 sys_pfm_restart
-	data8 sys_pfm_create_evtsets
-	data8 sys_pfm_getinfo_evtsets
-	data8 sys_pfm_delete_evtsets
-	data8 sys_pfm_unload_context		// 1330
 
 	.org sys_call_table + 8*NR_syscalls	// guard against failures to increase NR_syscalls
 #endif /* __IA64_ASM_PARAVIRTUALIZED_NATIVE */

@@ -3244,14 +3244,6 @@ M:	balbir@linux.vnet.ibm.com
 L:	linux-kernel@vger.kernel.org
 S:	Maintained
 
-PERFMON SUBSYSTEM
-P:	Stephane Eranian
-M:	eranian@gmail.com
-L:	perfmon2-devel@lists.sf.net
-W:	http://perfmon2.sf.net
-T:	git kernel.org:/pub/scm/linux/kernel/git/eranian/linux-2.6
-S:	Maintained
-
 PERSONALITY HANDLING
 P:	Christoph Hellwig
 M:	hch@infradead.org

@@ -162,8 +162,6 @@ header-y += video_decoder.h
 header-y += video_encoder.h
 header-y += videotext.h
 header-y += x25.h
-header-y += perfmon.h
-header-y += perfmon_dfl_smpl.h
 
 unifdef-y += acct.h
 unifdef-y += adb.h

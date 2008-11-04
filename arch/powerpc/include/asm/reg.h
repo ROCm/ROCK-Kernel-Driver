@@ -698,7 +698,6 @@
 #define PV_POWER5	0x003A
 #define PV_POWER5p	0x003B
 #define PV_970FX	0x003C
-#define PV_POWER6	0x003E
 #define PV_630		0x0040
 #define PV_630p	0x0041
 #define PV_970MP	0x0044

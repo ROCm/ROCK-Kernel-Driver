@@ -28,7 +28,6 @@
 #include <linux/acpi_pmtmr.h>
 #include <linux/module.h>
 #include <linux/dmi.h>
-#include <linux/perfmon_kern.h>
 
 #include <asm/atomic.h>
 #include <asm/smp.h>
@@ -698,7 +697,6 @@ u8 setup_APIC_eilvt_ibs(u8 vector, u8 msg_type, u8 mask)
 	setup_APIC_eilvt(APIC_EILVT_LVTOFF_IBS, vector, msg_type, mask);
 	return APIC_EILVT_LVTOFF_IBS;
 }
-EXPORT_SYMBOL(setup_APIC_eilvt_ibs);
 
 /*
  * Local APIC start and shutdown
@@ -1398,9 +1396,6 @@ void __init apic_intr_init(void)
 	/* thermal monitor LVT interrupt */
 #ifdef CONFIG_X86_MCE_P4THERMAL
 	alloc_intr_gate(THERMAL_APIC_VECTOR, thermal_interrupt);
-#endif
-#ifdef CONFIG_PERFMON
-	set_intr_gate(LOCAL_PERFMON_VECTOR, pmu_interrupt);
 #endif
 }
 

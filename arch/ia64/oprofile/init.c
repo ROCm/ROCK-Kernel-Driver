@@ -12,8 +12,8 @@
 #include <linux/init.h>
 #include <linux/errno.h>
  
-extern int op_perfmon_init(struct oprofile_operations * ops);
-extern void op_perfmon_exit(void);
+extern int perfmon_init(struct oprofile_operations * ops);
+extern void perfmon_exit(void);
 extern void ia64_backtrace(struct pt_regs * const regs, unsigned int depth);
 
 int __init oprofile_arch_init(struct oprofile_operations * ops)
@@ -22,7 +22,7 @@ int __init oprofile_arch_init(struct oprofile_operations * ops)
 
 #ifdef CONFIG_PERFMON
 	/* perfmon_init() can fail, but we have no way to report it */
-	ret = op_perfmon_init(ops);
+	ret = perfmon_init(ops);
 #endif
 	ops->backtrace = ia64_backtrace;
 
@@ -33,6 +33,6 @@ int __init oprofile_arch_init(struct oprofile_operations * ops)
 void oprofile_arch_exit(void)
 {
 #ifdef CONFIG_PERFMON
-	op_perfmon_exit();
+	perfmon_exit();
 #endif
 }

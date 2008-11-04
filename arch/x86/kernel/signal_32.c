@@ -19,7 +19,6 @@
 #include <linux/wait.h>
 #include <linux/tracehook.h>
 #include <linux/elf.h>
-#include <linux/perfmon_kern.h>
 #include <linux/smp.h>
 #include <linux/mm.h>
 
@@ -665,10 +664,6 @@ static void do_signal(struct pt_regs *regs)
 void
 do_notify_resume(struct pt_regs *regs, void *unused, __u32 thread_info_flags)
 {
-	/* process perfmon asynchronous work (e.g. block thread or reset) */
-	if (thread_info_flags & _TIF_PERFMON_WORK)
-		pfm_handle_work(regs);
-
 	/* deal with pending signal delivery */
 	if (thread_info_flags & _TIF_SIGPENDING)
 		do_signal(regs);
