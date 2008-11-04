@@ -30,6 +30,9 @@ enum sparc_cpu {
 #define ARCH_SUN4C_SUN4 0
 #define ARCH_SUN4 0
 
+extern char *sparc_cpu_type;
+extern char *sparc_fpu_type;
+extern char *sparc_pmu_type;
 extern char reboot_command[];
 
 /* These are here in an effort to more fully work around Spitfire Errata
@@ -104,15 +107,13 @@ do {	__asm__ __volatile__("ba,pt	%%xcc, 1f\n\t" \
 #define write_pcr(__p) __asm__ __volatile__("wr	%0, 0x0, %%pcr" : : "r" (__p))
 #define read_pic(__p)  __asm__ __volatile__("rd %%pic, %0" : "=r" (__p))
 
-/* Blackbird errata workaround.  See commentary in
- * arch/sparc64/kernel/smp.c:smp_percpu_timer_interrupt()
- * for more information.
- */
-#define reset_pic()    						\
-	__asm__ __volatile__("ba,pt	%xcc, 99f\n\t"		\
+/* Blackbird errata workaround.  */
+#define write_pic(val)    					\
+	__asm__ __volatile__("ba,pt	%%xcc, 99f\n\t"		\
 			     ".align	64\n"			\
-			  "99:wr	%g0, 0x0, %pic\n\t"	\
-			     "rd	%pic, %g0")
+			  "99:wr	%0, 0x0, %%pic\n\t"	\
+			     "rd	%%pic, %%g0" : : "r" (val))
+#define reset_pic()	write_pic(0)
 
 #ifndef __ASSEMBLY__
 
@@ -145,14 +146,10 @@ do {						\
 	 * and 2 stores in this critical code path.  -DaveM
 	 */
 #define switch_to(prev, next, last)					\
-do {	if (test_thread_flag(TIF_PERFCTR)) {				\
-		unsigned long __tmp;					\
-		read_pcr(__tmp);					\
-		current_thread_info()->pcr_reg = __tmp;			\
-		read_pic(__tmp);					\
-		current_thread_info()->kernel_cntd0 += (unsigned int)(__tmp);\
-		current_thread_info()->kernel_cntd1 += ((__tmp) >> 32);	\
-	}								\
+do {	if (test_tsk_thread_flag(prev, TIF_PERFMON_CTXSW))		\
+		pfm_ctxsw_out(prev, next);				\
+	if (test_tsk_thread_flag(next, TIF_PERFMON_CTXSW))		\
+		pfm_ctxsw_in(prev, next);				\
 	flush_tlb_pending();						\
 	save_and_clear_fpu();						\
 	/* If you are tempted to conditionalize the following */	\
@@ -197,11 +194,6 @@ do {	if (test_thread_flag(TIF_PERFCTR)) {				\
 	        "l1", "l2", "l3", "l4", "l5", "l6", "l7",		\
 	  "i0", "i1", "i2", "i3", "i4", "i5",				\
 	  "o0", "o1", "o2", "o3", "o4", "o5",       "o7");		\
-	/* If you fuck with this, update ret_from_syscall code too. */	\
-	if (test_thread_flag(TIF_PERFCTR)) {				\
-		write_pcr(current_thread_info()->pcr_reg);		\
-		reset_pic();						\
-	}								\
 } while(0)
 
 static inline unsigned long xchg32(__volatile__ unsigned int *m, unsigned int val)

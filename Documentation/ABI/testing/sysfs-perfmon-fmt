@@ -1,0 +1,18 @@
+What:		/sys/kernel/perfmon/formats
+Date:		2007
+KernelVersion:	2.6.24
+Contact:	eranian@gmail.com
+
+Description:	provide description of available perfmon2 custom sampling buffer formats
+		which are implemented as independent kernel modules. Each formats gets
+		a subdir which a few entries.
+
+		The name of the subdir is the name of the sampling format. The same name
+		must be passed to pfm_create_context() to use the format.
+
+		Each subdir XX contains the following entries:
+
+	/sys/kernel/perfmon/formats/XX/version (read-only):
+
+		Version number of the format in clear text and null terminated.
+

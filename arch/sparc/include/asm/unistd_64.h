@@ -340,8 +340,20 @@
 #define __NR_dup3		320
 #define __NR_pipe2		321
 #define __NR_inotify_init1	322
+#define __NR_pfm_create_context 323
+#define __NR_pfm_write_pmcs	324
+#define __NR_pfm_write_pmds	325
+#define __NR_pfm_read_pmds	326
+#define __NR_pfm_load_context	327
+#define __NR_pfm_start		328
+#define __NR_pfm_stop		329
+#define __NR_pfm_restart	330
+#define __NR_pfm_create_evtsets	331
+#define __NR_pfm_getinfo_evtsets 332
+#define __NR_pfm_delete_evtsets	333
+#define __NR_pfm_unload_context	334
 
-#define NR_SYSCALLS		323
+#define NR_SYSCALLS		335
 
 #ifdef __KERNEL__
 #define __ARCH_WANT_IPC_PARSE_VERSION

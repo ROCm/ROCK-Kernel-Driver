@@ -341,10 +341,22 @@
 #define __NR_dup3		316
 #define __NR_pipe2		317
 #define __NR_inotify_init1	318
+#define __NR_pfm_create_context	319
+#define __NR_pfm_write_pmcs	320
+#define __NR_pfm_write_pmds	321
+#define __NR_pfm_read_pmds	322
+#define __NR_pfm_load_context	323
+#define __NR_pfm_start		324
+#define __NR_pfm_stop		325
+#define __NR_pfm_restart	326
+#define __NR_pfm_create_evtsets	327
+#define __NR_pfm_getinfo_evtsets 328
+#define __NR_pfm_delete_evtsets 329
+#define __NR_pfm_unload_context	330
 
 #ifdef __KERNEL__
 
-#define __NR_syscalls		319
+#define __NR_syscalls		331
 
 #define __NR__exit __NR_exit
 #define NR_syscalls	__NR_syscalls

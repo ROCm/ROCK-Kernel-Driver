@@ -20,16 +20,17 @@
 DEFINE_PER_CPU(cpuinfo_sparc, __cpu_data) = { 0 };
 
 struct cpu_iu_info {
-  short manuf;
-  short impl;
-  char* cpu_name;   /* should be enough I hope... */
+	short manuf;
+	short impl;
+	char *cpu_name;
+	char *pmu_name;
 };
 
 struct cpu_fp_info {
-  short manuf;
-  short impl;
-  char fpu_vers;
-  char* fp_name;
+	short manuf;
+	short impl;
+	char fpu_vers;
+	char* fp_name;
 };
 
 static struct cpu_fp_info linux_sparc_fpu[] = {
@@ -49,23 +50,24 @@ static struct cpu_fp_info linux_sparc_fpu[] = {
 #define NSPARCFPU  ARRAY_SIZE(linux_sparc_fpu)
 
 static struct cpu_iu_info linux_sparc_chips[] = {
-  { 0x17, 0x10, "TI UltraSparc I   (SpitFire)"},
-  { 0x22, 0x10, "TI UltraSparc I   (SpitFire)"},
-  { 0x17, 0x11, "TI UltraSparc II  (BlackBird)"},
-  { 0x17, 0x12, "TI UltraSparc IIi (Sabre)"},
-  { 0x17, 0x13, "TI UltraSparc IIe (Hummingbird)"},
-  { 0x3e, 0x14, "TI UltraSparc III (Cheetah)"},
-  { 0x3e, 0x15, "TI UltraSparc III+ (Cheetah+)"},
-  { 0x3e, 0x16, "TI UltraSparc IIIi (Jalapeno)"},
-  { 0x3e, 0x18, "TI UltraSparc IV (Jaguar)"},
-  { 0x3e, 0x19, "TI UltraSparc IV+ (Panther)"},
-  { 0x3e, 0x22, "TI UltraSparc IIIi+ (Serrano)"},
-};
+   { 0x17, 0x10, "TI UltraSparc I   (SpitFire)",    "ultra12"},
+   { 0x22, 0x10, "TI UltraSparc I   (SpitFire)",    "ultra12"},
+   { 0x17, 0x11, "TI UltraSparc II  (BlackBird)",   "ultra12"},
+   { 0x17, 0x12, "TI UltraSparc IIi (Sabre)",       "ultra12"},
+   { 0x17, 0x13, "TI UltraSparc IIe (Hummingbird)", "ultra12"},
+   { 0x3e, 0x14, "TI UltraSparc III (Cheetah)",     "ultra3"},
+   { 0x3e, 0x15, "TI UltraSparc III+ (Cheetah+)",   "ultra3+"},
+   { 0x3e, 0x16, "TI UltraSparc IIIi (Jalapeno)",   "ultra3i"},
+   { 0x3e, 0x18, "TI UltraSparc IV (Jaguar)",       "ultra4"},
+   { 0x3e, 0x19, "TI UltraSparc IV+ (Panther)",     "ultra4+"},
+   { 0x3e, 0x22, "TI UltraSparc IIIi+ (Serrano)",   "ultra3+"},
+ };
 
 #define NSPARCCHIPS  ARRAY_SIZE(linux_sparc_chips)
 
 char *sparc_cpu_type;
 char *sparc_fpu_type;
+char *sparc_pmu_type;
 
 static void __init sun4v_cpu_probe(void)
 {
@@ -73,11 +75,13 @@ static void __init sun4v_cpu_probe(void)
 	case SUN4V_CHIP_NIAGARA1:
 		sparc_cpu_type = "UltraSparc T1 (Niagara)";
 		sparc_fpu_type = "UltraSparc T1 integrated FPU";
+		sparc_pmu_type = "niagara";
 		break;
 
 	case SUN4V_CHIP_NIAGARA2:
 		sparc_cpu_type = "UltraSparc T2 (Niagara2)";
 		sparc_fpu_type = "UltraSparc T2 integrated FPU";
+		sparc_pmu_type = "niagara2";
 		break;
 
 	default:
@@ -85,6 +89,7 @@ static void __init sun4v_cpu_probe(void)
 		       prom_cpu_compatible);
 		sparc_cpu_type = "Unknown SUN4V CPU";
 		sparc_fpu_type = "Unknown SUN4V FPU";
+		sparc_pmu_type = "Unknown SUN4V PMU";
 		break;
 	}
 }
@@ -117,6 +122,8 @@ retry:
 			if (linux_sparc_chips[i].impl == impl) {
 				sparc_cpu_type =
 					linux_sparc_chips[i].cpu_name;
+				sparc_pmu_type =
+					linux_sparc_chips[i].pmu_name;
 				break;
 			}
 		}
@@ -134,7 +141,7 @@ retry:
  			printk("DEBUG: manuf[%lx] impl[%lx]\n",
  			       manuf, impl);
  		}
-		sparc_cpu_type = "Unknown CPU";
+	        sparc_pmu_type = "Unknown PMU";
 	}
 
 	for (i = 0; i < NSPARCFPU; i++) {

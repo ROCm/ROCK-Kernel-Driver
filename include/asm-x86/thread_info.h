@@ -79,6 +79,7 @@ struct thread_info {
 #define TIF_SYSCALL_EMU		6	/* syscall emulation active */
 #define TIF_SYSCALL_AUDIT	7	/* syscall auditing active */
 #define TIF_SECCOMP		8	/* secure computing */
+#define TIF_PERFMON_WORK	9	/* work for pfm_handle_work() */
 #define TIF_MCE_NOTIFY		10	/* notify userspace of an MCE */
 #define TIF_NOTSC		16	/* TSC is not accessible in userland */
 #define TIF_IA32		17	/* 32bit process */
@@ -92,6 +93,7 @@ struct thread_info {
 #define TIF_DEBUGCTLMSR		25	/* uses thread_struct.debugctlmsr */
 #define TIF_DS_AREA_MSR		26      /* uses thread_struct.ds_area_msr */
 #define TIF_BTS_TRACE_TS	27      /* record scheduling event timestamps */
+#define TIF_PERFMON_CTXSW	28	/* perfmon needs ctxsw calls */
 #ifdef CONFIG_X86_XEN
 #define TIF_CSTAR		31      /* cstar-based syscall (special handling) */
 #endif
@@ -117,6 +119,8 @@ struct thread_info {
 #define _TIF_DEBUGCTLMSR	(1 << TIF_DEBUGCTLMSR)
 #define _TIF_DS_AREA_MSR	(1 << TIF_DS_AREA_MSR)
 #define _TIF_BTS_TRACE_TS	(1 << TIF_BTS_TRACE_TS)
+#define _TIF_PERFMON_WORK	(1 << TIF_PERFMON_WORK)
+#define _TIF_PERFMON_CTXSW	(1 << TIF_PERFMON_CTXSW)
 #define _TIF_CSTAR		(1 << TIF_CSTAR)
 
 /* work to do in syscall_trace_enter() */
@@ -139,13 +143,13 @@ struct thread_info {
 
 /* Only used for 64 bit */
 #define _TIF_DO_NOTIFY_MASK						\
-	(_TIF_SIGPENDING|_TIF_MCE_NOTIFY|_TIF_NOTIFY_RESUME)
+	(_TIF_SIGPENDING|_TIF_MCE_NOTIFY|_TIF_NOTIFY_RESUME|_TIF_PERFMON_WORK)
 
 /* flags to check in __switch_to() */
 #ifndef CONFIG_XEN
 #define _TIF_WORK_CTXSW							\
 	(_TIF_IO_BITMAP|_TIF_DEBUGCTLMSR|_TIF_DS_AREA_MSR|_TIF_BTS_TRACE_TS| \
-								_TIF_NOTSC)
+	 _TIF_NOTSC|_TIF_PERFMON_CTXSW)
 
 #else
 #define _TIF_WORK_CTXSW (_TIF_NOTSC \

@@ -81,4 +81,6 @@ sys_call_table:
 /*305*/	.long sys_set_mempolicy, sys_kexec_load, sys_move_pages, sys_getcpu, sys_epoll_pwait
 /*310*/	.long sys_utimensat, sys_signalfd, sys_timerfd_create, sys_eventfd, sys_fallocate
 /*315*/	.long sys_timerfd_settime, sys_timerfd_gettime, sys_signalfd4, sys_eventfd2, sys_epoll_create1
-/*320*/	.long sys_dup3, sys_pipe2, sys_inotify_init1
+/*320*/	.long sys_dup3, sys_pipe2, sys_inotify_init1, sys_pfm_create_context, sys_pfm_write_pmcs, sys_pfm_write_pmds
+/*325*/ .long sys_pfm_write_pmds, sys_pfm_read_pmds, sys_pfm_load_context, sys_pfm_start, sys_pfm_stop
+/*330*/	.long sys_pfm_restart, sys_pfm_create_evtsets, sys_pfm_getinfo_evtsets, sys_pfm_delete_evtsets, sys_pfm_unload_context
