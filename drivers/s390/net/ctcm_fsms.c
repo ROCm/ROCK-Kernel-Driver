@@ -196,18 +196,18 @@ void ctcm_ccw_check_rc(struct channel *ch, int rc, char *msg)
 		CTCM_FUNTAIL, ch->id, msg, rc);
 	switch (rc) {
 	case -EBUSY:
-		kmsg_info("%s: The communication peer is busy\n",
+		pr_info("%s: The communication peer is busy\n",
 			ch->id);
 		fsm_event(ch->fsm, CTC_EVENT_IO_EBUSY, ch);
 		break;
 	case -ENODEV:
-		kmsg_err("%s: The specified target device is not valid\n",
-			ch->id);
+		pr_err("%s: The specified target device is not valid\n",
+		       ch->id);
 		fsm_event(ch->fsm, CTC_EVENT_IO_ENODEV, ch);
 		break;
 	default:
-		kmsg_err("An I/O operation resulted in error %04x\n",
-			rc);
+		pr_err("An I/O operation resulted in error %04x\n",
+		       rc);
 		fsm_event(ch->fsm, CTC_EVENT_IO_UNKNOWN, ch);
 	}
 }

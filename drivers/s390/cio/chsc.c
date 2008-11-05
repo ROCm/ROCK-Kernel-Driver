@@ -14,7 +14,6 @@
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/device.h>
-#include <linux/kmsg.h>
 
 #include <asm/cio.h>
 #include <asm/chpid.h>
@@ -347,8 +346,8 @@ static void chsc_process_sei_chp_config(struct chsc_sei_area *sei_area)
 		if (!chp_test_bit(data->map, num))
 			continue;
 		chpid.id = num;
-		kmsg_notice("Processing %s for channel path %x.%02x\n",
-			    events[data->op], chpid.cssid, chpid.id);
+		pr_notice("Processing %s for channel path %x.%02x\n",
+			  events[data->op], chpid.cssid, chpid.id);
 		switch (data->op) {
 		case 0:
 			chp_cfg_schedule(chpid, 1);

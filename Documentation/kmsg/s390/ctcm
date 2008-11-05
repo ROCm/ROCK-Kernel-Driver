@@ -1,5 +1,4 @@
 /*?
- * Tag: ctcm.1028e6
  * Text: "%s: An I/O-error occurred on the CTCM device\n"
  * Severity: Error
  * Parameter:
@@ -15,7 +14,6 @@
  */
 
 /*?
- * Tag: ctcm.5e5e89
  * Text: "%s: An adapter hardware operation timed out\n"
  * Severity: Error
  * Parameter:
@@ -30,7 +28,6 @@
  */
 
 /*?
- * Tag: ctcm.9937f6
  * Text: "%s: An error occurred on the adapter hardware\n"
  * Severity: Error
  * Parameter:
@@ -45,7 +42,6 @@
  */
 
 /*?
- * Tag: ctcm.afe161
  * Text: "%s: The communication peer has disconnected\n"
  * Severity: Notice
  * Parameter:
@@ -60,7 +56,6 @@
  */
 
 /*?
- * Tag: ctcm.58aa19
  * Text: "%s: The remote operating system is not available\n"
  * Severity: Notice
  * Parameter:
@@ -75,7 +70,6 @@
  */
 
 /*?
- * Tag: ctcm.a5c5f8
  * Text: "%s: The adapter received a non-specific IRQ\n"
  * Severity: Warning
  * Parameter:
@@ -94,7 +88,6 @@
  */
 
 /*?
- * Tag: ctcm.67dba6
  * Text: "%s: A check occurred on the subchannel\n"
  * Severity: Warning
  * Parameter:
@@ -111,9 +104,8 @@
  */
 
 /*?
- * Tag: ctcm.bd22ef
  * Text: "%s: The communication peer is busy\n"
- * Severity: Warning
+ * Severity: Informational
  * Parameter:
  *   @1: channel ID
  * Description:
@@ -124,7 +116,6 @@
  */
 
 /*?
- * Tag: ctcm.129d05
  * Text: "%s: The specified target device is not valid\n"
  * Severity: Error
  * Parameter:
@@ -137,7 +128,6 @@
  */
 
 /*?
- * Tag: ctcm.c97a8e
  * Text: "An I/O operation resulted in error %04x\n"
  * Severity: Error
  * Parameter:
@@ -154,7 +144,6 @@
  */
 
 /*?
- * Tag: ctcm.bd667e
  * Text: "%s: Initialization failed with RX/TX init handshake error %s\n"
  * Severity: Warning
  * Parameter:
@@ -171,7 +160,6 @@
  */
 
 /*?
- * Tag: ctcm.e32220
  * Text: "%s: The network backlog for %s is exceeded, package dropped\n"
  * Severity: Warning
  * Parameter:
@@ -187,7 +175,6 @@
  */
 
 /*?
- * Tag: ctcm.848c66
  * Text: "%s: The XID used in the MPC protocol is not valid, rc = %d\n"
  * Severity: Warning
  * Parameter:
@@ -201,12 +188,12 @@
  * support organization.
  */
 
-/*? Tag: ctcm.60dac3 Text: "CTCM driver unloaded\n" */
-/*? Tag: ctcm.a4131c Text: "%s: %s Internal error: net_device is NULL, ch = 0x%p\n" */
-/*? Tag: ctcm.555bd4 Text: "%s / register_cu3088_discipline failed, ret = %d\n" */
-/*? Tag: ctcm.c335d7 Text: "%s: %s: Internal error: Can't determine channel for interrupt device %s\n" */
-/*? Tag: ctcm.151d85 Text: "CTCM driver initialized\n" */
-/*? Tag: ctcm.a31795 Text: "%s: setup OK : r/w = %s/%s, protocol : %d\n" */
-/*? Tag: ctcm.8993ef Text: "%s: Connected with remote side\n" */
-/*? Tag: ctcm.201aad Text: "%s: Restarting device\n" */
+/*? Text: "CTCM driver unloaded\n" */
+/*? Text: "%s: %s Internal error: net_device is NULL, ch = 0x%p\n" */
+/*? Text: "%s / register_cu3088_discipline failed, ret = %d\n" */
+/*? Text: "%s: %s: Internal error: Can't determine channel for interrupt device %s\n" */
+/*? Text: "CTCM driver initialized\n" */
+/*? Text: "%s: setup OK : r/w = %s/%s, protocol : %d\n" */
+/*? Text: "%s: Connected with remote side\n" */
+/*? Text: "%s: Restarting device\n" */
 

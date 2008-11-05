@@ -1150,13 +1150,13 @@ static int qeth_l2_recover(void *ptr)
 
 static int __init qeth_l2_init(void)
 {
-	kmsg_info("register layer 2 discipline\n");
+	pr_info("register layer 2 discipline\n");
 	return 0;
 }
 
 static void __exit qeth_l2_exit(void)
 {
-	kmsg_info("unregister layer 2 discipline\n");
+	pr_info("unregister layer 2 discipline\n");
 }
 
 static void qeth_l2_shutdown(struct ccwgroup_device *gdev)

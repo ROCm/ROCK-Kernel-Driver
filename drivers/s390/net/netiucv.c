@@ -54,7 +54,6 @@
 #include <linux/tcp.h>
 #include <linux/skbuff.h>
 #include <linux/ctype.h>
-#include <linux/kmsg.h>
 #include <net/dst.h>
 
 #include <asm/io.h>
@@ -2074,7 +2073,7 @@ static struct attribute_group *netiucv_drv_attr_groups[] = {
 
 static void netiucv_banner(void)
 {
-	kmsg_info("driver initialized\n");
+	pr_info("driver initialized\n");
 }
 
 static void __exit netiucv_exit(void)
@@ -2100,7 +2099,7 @@ static void __exit netiucv_exit(void)
 	iucv_unregister(&netiucv_handler, 1);
 	iucv_unregister_dbf_views();
 
-	kmsg_info("driver unloaded\n");
+	pr_info("driver unloaded\n");
 	return;
 }
 

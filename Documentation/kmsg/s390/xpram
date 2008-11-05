@@ -1,5 +1,4 @@
 /*?
- * Tag: xpram.ab9aa4
  * Text: "%d is not a valid number of XPRAM devices\n"
  * Severity: Error
  * Parameter:
@@ -18,7 +17,6 @@
  */
 
 /*?
- * Tag: xpram.f004d1
  * Text: "Not enough expanded memory available\n"
  * Severity: Error
  * Description:
@@ -39,7 +37,6 @@
  */
 
 /*?
- * Tag: xpram.f6ae78
  * Text: "No expanded memory available\n"
  * Severity: Error
  * Description:
@@ -52,10 +49,10 @@
  * to create XPRAM partitions.
  */
 
-/*? Tag: xpram.fc5e30 Text: "  number of devices (partitions): %d \n" */
-/*? Tag: xpram.9a3d44 Text: "  size of partition %d: %u kB\n" */
-/*? Tag: xpram.d1b9da Text: "  size of partition %d to be set automatically\n" */
-/*? Tag: xpram.758fd6 Text: "  memory needed (for sized partitions): %lu kB\n" */
-/*? Tag: xpram.3fc92b Text: "  partitions to be sized automatically: %d\n" */
-/*? Tag: xpram.6cdcc1 Text: "  automatically determined partition size: %lu kB\n" */
-/*? Tag: xpram.546055 Text: "  %u pages expanded memory found (%lu KB).\n" */
+/*? Text: "  number of devices (partitions): %d \n" */
+/*? Text: "  size of partition %d: %u kB\n" */
+/*? Text: "  size of partition %d to be set automatically\n" */
+/*? Text: "  memory needed (for sized partitions): %lu kB\n" */
+/*? Text: "  partitions to be sized automatically: %d\n" */
+/*? Text: "  automatically determined partition size: %lu kB\n" */
+/*? Text: "  %u pages expanded memory found (%lu KB).\n" */

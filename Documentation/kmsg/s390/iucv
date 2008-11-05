@@ -1,5 +1,4 @@
 /*?
- * Tag: iucv.beb348
  * Text: "Defining an interrupt buffer on CPU %i failed with 0x%02x (%s)\n"
  * Severity: Warning
  * Parameter:
@@ -17,5 +16,5 @@
  * error value is not 0x03, report this problem to your support organization.
  */
 
-/*? Tag: iucv.2a8b71 Text: "iucv_external_interrupt: out of memory\n" */
+/*? Text: "iucv_external_interrupt: out of memory\n" */
 

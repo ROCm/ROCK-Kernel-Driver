@@ -1,5 +1,4 @@
 /*?
- * Tag: zfcp.cfb51a
  * Text: "%s is not a valid SCSI device\n"
  * Severity: Error
  * Parameter:
@@ -16,7 +15,6 @@
  */
 
 /*?
- * Tag: zfcp.6ef1c1
  * Text: "Registering the misc device zfcp_cfdc failed\n"
  * Severity: Error
  * Description:
@@ -32,7 +30,6 @@
  */
 
 /*?
- * Tag: zfcp.b2d959
  * Text: "The zfcp device driver could not register with the common I/O layer\n"
  * Severity: Error
  * Description:
@@ -46,7 +43,6 @@
  */
 
 /*?
- * Tag: zfcp.c43da1
  * Text: "%s: Setting up data structures for the FCP adapter failed\n"
  * Severity: Error
  * Parameter:
@@ -62,7 +58,6 @@
  */
 
 /*?
- * Tag: zfcp.a2c9a0
  * Text: "%s: The FCP device is operational again\n"
  * Severity: Informational
  * Parameter:
@@ -77,7 +72,6 @@
  */
 
 /*?
- * Tag: zfcp.3d74c1
  * Text: "%s: The CHPID for the FCP device is offline\n"
  * Severity: Warning
  * Parameter:
@@ -94,7 +88,6 @@
  */
 
 /*?
- * Tag: zfcp.da77f6
  * Text: "%s: The FCP device has been detached\n"
  * Severity: Warning
  * Parameter:
@@ -107,7 +100,6 @@
  */
 
 /*?
- * Tag: zfcp.f0e7d1
  * Text: "%s: Registering the FCP device with the SCSI stack failed\n"
  * Severity: Error
  * Parameter:
@@ -123,7 +115,6 @@
  */
 
 /*?
- * Tag: zfcp.3536c4
  * Text: "%s: ERP cannot recover an error on the FCP device\n"
  * Severity: Error
  * Parameter:
@@ -137,7 +128,6 @@
  */
 
 /*?
- * Tag: zfcp.c5aa19
  * Text: "%s: Creating an ERP thread for the FCP device failed.\n"
  * Severity: Error
  * Parameter:
@@ -154,7 +144,6 @@
  */
 
 /*?
- * Tag: zfcp.7cc8a8
  * Text: "%s: ERP failed for unit 0x%016Lx on port 0x%016Lx\n"
  * Severity: Error
  * Parameter:
@@ -171,7 +160,6 @@
  */
 
 /*?
- * Tag: zfcp.4c37ab
  * Text: "%s: ERP failed for remote port 0x%016Lx\n"
  * Severity: Error
  * Parameter:
@@ -186,7 +174,6 @@
  */
 
 /*?
- * Tag: zfcp.cad10f
  * Text: "%s: Attaching the name server port to the FCP device failed\n"
  * Severity: Error
  * Parameter:
@@ -202,7 +189,6 @@
  */
 
 /*?
- * Tag: zfcp.2936d3
  * Text: "%s: Registering unit 0x%016Lx on port 0x%016Lx failed\n"
  * Severity: Error
  * Parameter:
@@ -218,7 +204,6 @@
  */
 
 /*?
- * Tag: zfcp.ca57bd
  * Text: "%s: Registering port 0x%016Lx failed\n"
  * Severity: Error
  * Parameter:
@@ -233,7 +218,6 @@
  */
 
 /*?
- * Tag: zfcp.9d7741
  * Text: "%s: A QDIO problem occurred\n"
  * Severity: Warning
  * Parameter:
@@ -247,7 +231,6 @@
  */
 
 /*?
- * Tag: zfcp.4f6eb5
  * Text: "%s: A QDIO protocol error occurred, operations continue\n"
  * Severity: Warning
  * Parameter:
@@ -262,7 +245,6 @@
  */
 
 /*?
- * Tag: zfcp.9ab431
  * Text: "%s: Setting up the QDIO connection to the FCP adapter failed\n"
  * Severity: Error
  * Parameter:
@@ -278,7 +260,6 @@
  */
 
 /*?
- * Tag: zfcp.1fb20b
  * Text: "%s: The FCP adapter reported a problem that cannot be recovered\n"
  * Severity: Error
  * Parameter:
@@ -292,7 +273,6 @@
  */
 
 /*?
- * Tag: zfcp.7bfaf3
  * Text: "%s: There is a wrap plug instead of a fibre channel cable\n"
  * Severity: Warning
  * Parameter:
@@ -305,7 +285,6 @@
  */
 
 /*?
- * Tag: zfcp.be6513
  * Text: "%s: Access denied to unit 0x%016Lx on port 0x%016Lx\n"
  * Severity: Warning
  * Parameter:
@@ -321,7 +300,6 @@
  */
 
 /*?
- * Tag: zfcp.be69e9
  * Text: "%s: FCP device not operational because of an unsupported FC class\n"
  * Severity: Error
  * Parameter:
@@ -336,7 +314,6 @@
  */
 
 /*?
- * Tag: zfcp.0e4056
  * Text: "%s: 0x%Lx is an ambiguous request identifier\n"
  * Severity: Error
  * Parameter:
@@ -351,7 +328,6 @@
  */
 
 /*?
- * Tag: zfcp.f07311
  * Text: "%s: QTCB version 0x%x not supported by FCP adapter (0x%x to 0x%x)\n"
  * Severity: Error
  * Parameter:
@@ -371,7 +347,6 @@
  */
 
 /*?
- * Tag: zfcp.427484
  * Text: "%s: The FCP adapter could not log in to the fibre channel fabric\n"
  * Severity: Warning
  * Parameter:
@@ -383,7 +358,6 @@
  */
 
 /*?
- * Tag: zfcp.5286cc
  * Text: "%s: The FCP device is suspended because of a firmware update\n"
  * Severity: Warning
  * Parameter:
@@ -397,7 +371,6 @@
  */
 
 /*?
- * Tag: zfcp.43ae93
  * Text: "%s: All NPIV ports on the FCP adapter have been assigned\n"
  * Severity: Warning
  * Parameter:
@@ -413,7 +386,6 @@
  */
 
 /*?
- * Tag: zfcp.7d37bf
  * Text: "%s: The link between the FCP adapter and the FC fabric is down\n"
  * Severity: Warning
  * Parameter:
@@ -427,7 +399,6 @@
  */
 
 /*?
- * Tag: zfcp.32b20f
  * Text: "%s: Access denied to port 0x%016Lx\n"
  * Severity: Warning
  * Parameter:
@@ -442,7 +413,6 @@
  */
 
 /*?
- * Tag: zfcp.78b888
  * Text: "%s: The QTCB type is not supported by the FCP adapter\n"
  * Severity: Error
  * Parameter:
@@ -457,7 +427,6 @@
  */
 
 /*?
- * Tag: zfcp.670278
  * Text: "%s: The error threshold for checksum statistics has been exceeded\n"
  * Severity: Warning
  * Parameter:
@@ -473,7 +442,6 @@
  */
 
 /*?
- * Tag: zfcp.3c9e5d
  * Text: "%s: The local link has been restored\n"
  * Severity: Informational
  * Parameter:
@@ -487,7 +455,6 @@
  */
 
 /*?
- * Tag: zfcp.a762d2
  * Text: "%s: Access denied according to ACT rule type %s, rule %d\n"
  * Severity: Warning
  * Parameter:
@@ -503,7 +470,6 @@
  */
 
 /*?
- * Tag: zfcp.0b653e
  * Text: "%s: The mode table on the FCP adapter has been damaged\n"
  * Severity: Warning
  * Parameter:
@@ -515,7 +481,6 @@
  */
 
 /*?
- * Tag: zfcp.aaeeac
  * Text: "%s: The adjacent fibre channel node does not support FCP\n"
  * Severity: Warning
  * Parameter:
@@ -529,7 +494,6 @@
  */
 
 /*?
- * Tag: zfcp.21ac6b
  * Text: "%s: The FCP adapter does not recognize the command 0x%x\n"
  * Severity: Error
  * Parameter:
@@ -544,7 +508,6 @@
  */
 
 /*?
- * Tag: zfcp.482822
  * Text: "%s: There is no light signal from the local fibre channel cable\n"
  * Severity: Warning
  * Parameter:
@@ -558,7 +521,6 @@
  */
 
 /*?
- * Tag: zfcp.2b8c3d
  * Text: "%s: The WWPN assignment file on the FCP adapter has been damaged\n"
  * Severity: Warning
  * Parameter:
@@ -570,7 +532,6 @@
  */
 
 /*?
- * Tag: zfcp.4ecbfb
  * Text: "%s: The FCP device detected a WWPN that is duplicate or not valid\n"
  * Severity: Warning
  * Parameter:
@@ -584,7 +545,6 @@
  */
 
 /*?
- * Tag: zfcp.03ecc9
  * Text: "%s: The fibre channel fabric does not support NPIV\n"
  * Severity: Warning
  * Parameter:
@@ -601,7 +561,6 @@
  */
 
 /*?
- * Tag: zfcp.9f99f1
  * Text: "%s: The FCP adapter cannot support more NPIV ports\n"
  * Severity: Warning
  * Parameter:
@@ -617,7 +576,6 @@
  */
 
 /*?
- * Tag: zfcp.d04d80
  * Text: "%s: The adjacent switch cannot support more NPIV ports\n"
  * Severity: Warning
  * Parameter:
@@ -633,7 +591,6 @@
  */
 
 /*?
- * Tag: zfcp.44d3b9
  * Text: "%s: 0x%x is not a valid transfer protocol status\n"
  * Severity: Error
  * Parameter:
@@ -649,7 +606,6 @@
  */
 
 /*?
- * Tag: zfcp.2dfec4
  * Text: "%s: Unknown or unsupported arbitrated loop fibre channel topology detected\n"
  * Severity: Error
  * Parameter:
@@ -665,7 +621,6 @@
  */
 
 /*?
- * Tag: zfcp.7dcc7c
  * Text: "%s: FCP adapter maximum QTCB size (%d bytes) is too small\n"
  * Severity: Error
  * Parameter:
@@ -682,7 +637,6 @@
  */
 
 /*?
- * Tag: zfcp.23e365
  * Text: "%s: The FCP adapter only supports newer control block versions\n"
  * Severity: Error
  * Parameter:
@@ -696,7 +650,6 @@
  */
 
 /*?
- * Tag: zfcp.e8e91e
  * Text: "%s: The FCP adapter only supports older control block versions\n"
  * Severity: Error
  * Parameter:
@@ -709,7 +662,6 @@
  */
 
 /*?
- * Tag: zfcp.346bb2
  * Text: "%s: Not enough FCP adapter resources to open remote port 0x%016Lx\n"
  * Severity: Warning
  * Parameter:
@@ -725,7 +677,6 @@
  */
 
 /*?
- * Tag: zfcp.71e412
  * Text: "%s: Remote port 0x%016Lx could not be opened\n"
  * Severity: Warning
  * Parameter:
@@ -741,7 +692,6 @@
  */
 
 /*?
- * Tag: zfcp.418f63
  * Text: "%s: LUN 0x%Lx on port 0x%Lx is already in use by CSS%d, MIF Image ID %x\n"
  * Severity: Warning
  * Parameter:
@@ -758,7 +708,6 @@
  */
 
 /*?
- * Tag: zfcp.06ce2c
  * Text: "%s: No handle is available for LUN 0x%016Lx on port 0x%016Lx\n"
  * Severity: Warning
  * Parameter:
@@ -773,7 +722,6 @@
  */
 
 /*?
- * Tag: zfcp.bbb603
  * Text: "%s: SCSI device at LUN 0x%016Lx on port 0x%016Lx opened read-only\n"
  * Severity: Informational
  * Parameter:
@@ -790,7 +738,6 @@
  */
 
 /*?
- * Tag: zfcp.cfdd0c
  * Text: "%s: Exclusive read-only access not supported (unit 0x%016Lx, port 0x%016Lx)\n"
  * Severity: Error
  * Parameter:
@@ -806,7 +753,6 @@
  */
 
 /*?
- * Tag: zfcp.097a34
  * Text: "%s: Shared read-write access not supported (unit 0x%016Lx, port 0x%016Lx\n)"
  * Severity: Error
  * Parameter:
@@ -822,7 +768,6 @@
  */
 
 /*?
- * Tag: zfcp.ba26ad
  * Text: "%s: Incorrect direction %d, unit 0x%016Lx on port 0x%016Lx closed\n"
  * Severity: Error
  * Parameter:
@@ -838,7 +783,6 @@
  */
 
 /*?
- * Tag: zfcp.34e655
  * Text: "%s: Incorrect CDB length %d, unit 0x%016Lx on port 0x%016Lx closed\n"
  * Severity: Error
  * Parameter:
@@ -855,7 +799,6 @@
  */
 
 /*?
- * Tag: zfcp.196a8f
  * Text: "%s: Oversize data package, unit 0x%016Lx on port 0x%016Lx closed\n"
  * Severity: Error
  * Parameter:
@@ -871,7 +814,6 @@
  */
 
 /*?
- * Tag: zfcp.3abb5a
  * Text: "%s: Opening WKA port 0x%x failed\n"
  * Severity: Warning
  * Parameter:

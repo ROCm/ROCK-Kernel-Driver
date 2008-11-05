@@ -18,7 +18,6 @@
 #include <linux/bootmem.h>
 #include <linux/ctype.h>
 #include <linux/ioport.h>
-#include <linux/kmsg.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/ebcdic.h>
@@ -276,7 +275,7 @@ query_segment_type (struct dcss_segment *seg)
 		goto out_free;
 	}
 	if (diag_cc > 1) {
-		kmsg_warn("Querying a DCSS type failed with rc=%ld\n", vmrc);
+		pr_warning("Querying a DCSS type failed with rc=%ld\n", vmrc);
 		rc = dcss_diag_translate_rc (vmrc);
 		goto out_free;
 	}
@@ -469,8 +468,8 @@ __segment_load (char *name, int do_nonshared, unsigned long *addr, unsigned long
 		goto out_resource;
 	}
 	if (diag_cc > 1) {
-		kmsg_warn("Loading DCSS %s failed with rc=%ld\n", name,
-			  end_addr);
+		pr_warning("Loading DCSS %s failed with rc=%ld\n", name,
+			   end_addr);
 		rc = dcss_diag_translate_rc(end_addr);
 		dcss_diag(&purgeseg_scode, seg->dcss_name,
 				&dummy, &dummy);
@@ -484,13 +483,13 @@ __segment_load (char *name, int do_nonshared, unsigned long *addr, unsigned long
 	*addr = seg->start_addr;
 	*end  = seg->end;
 	if (do_nonshared)
-		kmsg_info("DCSS %s of range %p to %p and type %s loaded as "
-			  "exclusive-writable\n", name, (void*) seg->start_addr,
-			  (void*) seg->end, segtype_string[seg->vm_segtype]);
+		pr_info("DCSS %s of range %p to %p and type %s loaded as "
+			"exclusive-writable\n", name, (void*) seg->start_addr,
+			(void*) seg->end, segtype_string[seg->vm_segtype]);
 	else {
-		kmsg_info("DCSS %s of range %p to %p and type %s loaded in "
-			  "shared access mode\n", name, (void*) seg->start_addr,
-			  (void*) seg->end, segtype_string[seg->vm_segtype]);
+		pr_info("DCSS %s of range %p to %p and type %s loaded in "
+			"shared access mode\n", name, (void*) seg->start_addr,
+			(void*) seg->end, segtype_string[seg->vm_segtype]);
 	}
 	goto out;
  out_resource:
@@ -579,14 +578,14 @@ segment_modify_shared (char *name, int do_nonshared)
 		goto out_unlock;
 	}
 	if (do_nonshared == seg->do_nonshared) {
-		kmsg_info("DCSS %s is already in the requested access "
-			  "mode\n", name);
+		pr_info("DCSS %s is already in the requested access "
+			"mode\n", name);
 		rc = 0;
 		goto out_unlock;
 	}
 	if (atomic_read (&seg->ref_count) != 1) {
-		kmsg_warn("DCSS %s is in use and cannot be reloaded\n",
-			  name);
+		pr_warning("DCSS %s is in use and cannot be reloaded\n",
+			   name);
 		rc = -EAGAIN;
 		goto out_unlock;
 	}
@@ -599,8 +598,8 @@ segment_modify_shared (char *name, int do_nonshared)
 			seg->res->flags |= IORESOURCE_READONLY;
 
 	if (request_resource(&iomem_resource, seg->res)) {
-		kmsg_warn("DCSS %s overlaps with used memory resources "
-			  "and cannot be reloaded\n", name);
+		pr_warning("DCSS %s overlaps with used memory resources "
+			   "and cannot be reloaded\n", name);
 		rc = -EBUSY;
 		kfree(seg->res);
 		goto out_del_mem;
@@ -618,8 +617,8 @@ segment_modify_shared (char *name, int do_nonshared)
 		goto out_del_res;
 	}
 	if (diag_cc > 1) {
-		kmsg_warn("Reloading DCSS %s failed with rc=%ld\n", name,
-			  end_addr);
+		pr_warning("Reloading DCSS %s failed with rc=%ld\n", name,
+			   end_addr);
 		rc = dcss_diag_translate_rc(end_addr);
 		goto out_del_res;
 	}
@@ -658,7 +657,7 @@ segment_unload(char *name)
 	mutex_lock(&dcss_lock);
 	seg = segment_by_name (name);
 	if (seg == NULL) {
-		kmsg_err("Unloading unknown DCSS %s failed\n", name);
+		pr_err("Unloading unknown DCSS %s failed\n", name);
 		goto out_unlock;
 	}
 	if (atomic_dec_return(&seg->ref_count) != 0)
@@ -693,7 +692,7 @@ segment_save(char *name)
 	seg = segment_by_name (name);
 
 	if (seg == NULL) {
-		kmsg_err("Saving unknown DCSS %s failed\n", name);
+		pr_err("Saving unknown DCSS %s failed\n", name);
 		goto out;
 	}
 
@@ -710,14 +709,14 @@ segment_save(char *name)
 	response = 0;
 	cpcmd(cmd1, NULL, 0, &response);
 	if (response) {
-		kmsg_err("Saving a DCSS failed with DEFSEG response code "
-			 "%i\n", response);
+		pr_err("Saving a DCSS failed with DEFSEG response code "
+		       "%i\n", response);
 		goto out;
 	}
 	cpcmd(cmd2, NULL, 0, &response);
 	if (response) {
-		kmsg_err("Saving a DCSS failed with SAVESEG response code "
-			  "%i\n", response);
+		pr_err("Saving a DCSS failed with SAVESEG response code "
+		       "%i\n", response);
 		goto out;
 	}
 out:
@@ -732,39 +731,39 @@ void segment_warning(int rc, char *seg_name)
 {
 	switch (rc) {
 	case -ENOENT:
-		kmsg_err("DCSS %s cannot be loaded or queried\n", seg_name);
+		pr_err("DCSS %s cannot be loaded or queried\n", seg_name);
 		break;
 	case -ENOSYS:
-		kmsg_err("DCSS %s cannot be loaded or queried without "
-			 "z/VM\n", seg_name);
+		pr_err("DCSS %s cannot be loaded or queried without "
+		       "z/VM\n", seg_name);
 		break;
 	case -EIO:
-		kmsg_err("Loading or querying DCSS %s resulted in a "
-			 "hardware error\n", seg_name);
+		pr_err("Loading or querying DCSS %s resulted in a "
+		       "hardware error\n", seg_name);
 		break;
 	case -ENOTSUPP:
-		kmsg_err("DCSS %s has multiple page ranges and cannot be "
-			 "loaded or queried\n", seg_name);
+		pr_err("DCSS %s has multiple page ranges and cannot be "
+		       "loaded or queried\n", seg_name);
 		break;
 	case -ENOSPC:
-		kmsg_err("DCSS %s overlaps with used storage and cannot "
-			 "be loaded\n", seg_name);
+		pr_err("DCSS %s overlaps with used storage and cannot "
+		       "be loaded\n", seg_name);
 		break;
 	case -EBUSY:
-		kmsg_err("%s needs used memory resources and cannot be "
-			 "loaded or queried\n", seg_name);
+		pr_err("%s needs used memory resources and cannot be "
+		       "loaded or queried\n", seg_name);
 		break;
 	case -EPERM:
-		kmsg_err("DCSS %s is already loaded in a different access "
-			 "mode\n", seg_name);
+		pr_err("DCSS %s is already loaded in a different access "
+		       "mode\n", seg_name);
 		break;
 	case -ENOMEM:
-		kmsg_err("There is not enough memory to load or query "
-			 "DCSS %s\n", seg_name);
+		pr_err("There is not enough memory to load or query "
+		       "DCSS %s\n", seg_name);
 		break;
 	case -ERANGE:
-		kmsg_err("DCSS %s exceeds the kernel mapping range (%lu) "
-			 "and cannot be loaded\n", seg_name, VMEM_MAX_PHYS);
+		pr_err("DCSS %s exceeds the kernel mapping range (%lu) "
+		       "and cannot be loaded\n", seg_name, VMEM_MAX_PHYS);
 		break;
 	default:
 		break;

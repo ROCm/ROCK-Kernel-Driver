@@ -20,7 +20,6 @@
 #include <linux/err.h>
 #include <linux/slab.h>
 #include <linux/completion.h>
-#include <linux/kmsg.h>
 #include <asm/ebcdic.h>
 #include <asm/sclp.h>
 
@@ -154,16 +153,16 @@ static int cpi_req(void)
 	wait_for_completion(&completion);
 
 	if (req->status != SCLP_REQ_DONE) {
-		kmsg_warn("request failed (status=0x%02x)\n",
-			  req->status);
+		pr_warning("request failed (status=0x%02x)\n",
+			   req->status);
 		rc = -EIO;
 		goto out_free_req;
 	}
 
 	response = ((struct cpi_sccb *) req->sccb)->header.response_code;
 	if (response != 0x0020) {
-		kmsg_warn("request failed with response code 0x%x\n",
-			  response);
+		pr_warning("request failed with response code 0x%x\n",
+			   response);
 		rc = -EIO;
 	}
 

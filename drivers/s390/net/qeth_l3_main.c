@@ -1320,9 +1320,9 @@ static int qeth_l3_softsetup_ipv6(struct qeth_card *card)
 
 	rc = qeth_l3_query_ipassists(card, QETH_PROT_IPV6);
 	if (rc) {
-		dev_err(&card->gdev->dev,
-			"Activating IPv6 support for %s failed\n",
-			QETH_CARD_IFNAME(card));
+		dev_warn(&card->gdev->dev,
+			 "Activating IPv6 support for %s failed\n",
+			 QETH_CARD_IFNAME(card));
 		return rc;
 	}
 	rc = qeth_l3_send_simple_setassparms(card, IPA_IPV6,
@@ -3359,7 +3359,7 @@ static int qeth_l3_register_notifiers(void)
 		return rc;
 	}
 #else
-	kmsg_warn("There is no IPv6 support for the layer 3 discipline\n");
+	pr_warning("There is no IPv6 support for the layer 3 discipline\n");
 #endif
 	return 0;
 }
@@ -3378,7 +3378,7 @@ static int __init qeth_l3_init(void)
 {
 	int rc = 0;
 
-	kmsg_info("register layer 3 discipline\n");
+	pr_info("register layer 3 discipline\n");
 	rc = qeth_l3_register_notifiers();
 	return rc;
 }
@@ -3386,7 +3386,7 @@ static int __init qeth_l3_init(void)
 static void __exit qeth_l3_exit(void)
 {
 	qeth_l3_unregister_notifiers();
-	kmsg_info("unregister layer 3 discipline\n");
+	pr_info("unregister layer 3 discipline\n");
 }
 
 module_init(qeth_l3_init);

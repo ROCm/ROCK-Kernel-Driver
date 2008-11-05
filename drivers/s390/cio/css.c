@@ -16,7 +16,6 @@
 #include <linux/errno.h>
 #include <linux/list.h>
 #include <linux/reboot.h>
-#include <linux/kmsg.h>
 #include <asm/isc.h>
 
 #include "../s390mach.h"
@@ -848,8 +847,8 @@ out:
 	s390_unregister_crw_handler(CRW_RSC_CSS);
 	chsc_free_sei_area();
 	kfree(slow_subchannel_set);
-	kmsg_alert("The CSS device driver initialization failed with "
-		   "errno=%d\n", ret);
+	pr_alert("The CSS device driver initialization failed with "
+		 "errno=%d\n", ret);
 	return ret;
 }
 

@@ -12,7 +12,6 @@
 #include <linux/smp.h>
 #include <linux/seq_file.h>
 #include <linux/delay.h>
-#include <linux/kmsg.h>
 
 #include <asm/elf.h>
 #include <asm/lowcore.h>
@@ -20,8 +19,8 @@
 
 void __cpuinit print_cpu_info(struct cpuinfo_S390 *cpuinfo)
 {
-	kmsg_info("Processor %d started, address %d, identification %06X\n",
-		  cpuinfo->cpu_nr, cpuinfo->cpu_addr, cpuinfo->cpu_id.ident);
+	pr_info("Processor %d started, address %d, identification %06X\n",
+		cpuinfo->cpu_nr, cpuinfo->cpu_addr, cpuinfo->cpu_id.ident);
 }
 
 /*

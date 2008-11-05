@@ -1,5 +1,4 @@
 /*?
- * Tag: claw.e346bf
  * Text: "%s: add_files failed\n"
  * Severity: Warning
  * Parameter:
@@ -17,7 +16,6 @@
  */
 
 /*?
- * Tag: claw.6c9750
  * Text: "%s: unsolicited interrupt for device received c-%02x d-%02x\n"
  * Severity: Warning
  * Parameter:
@@ -36,7 +34,6 @@
  */
 
 /*?
- * Tag: claw.0d87d4
  * Text: "%s: Can't determine channel for interrupt\n"
  * Severity: Warning
  * Parameter:
@@ -52,26 +49,6 @@
  */
 
 /*?
- * Tag: claw.4
- * Text: "%s: unsolicited interrupt for device received c-%02x d-%02x"
- * Severity: Warning
- * Parameter:
- *   @1: Channel Device address
- *   @2: Returned Sub Channel Status word
- *   @3: Returned Device Status word
- * Description:
- * An IRQ (channel interrupt) was received for a device that
- * was not in a state to receive data.  The IRQ will be
- * ignored.
- * User action:
- * This can happen normally as devices come on and off line.
- * If the problem persists or the device will not
- * activate channel tracing or device traces may be
- * used to diagnose the problem.
- */
-
-/*?
- * Tag: claw.39773d
  * Text: "%s: %s: wrong selection code - irq state=%d\n"
  * Severity: Warning
  * Parameter:
@@ -96,7 +73,6 @@
  */
 
 /*?
- * Tag: claw.ccfe27
  * Text: "%s: %s: channel problems during close - read: %02x -  write: %02x\n"
  * Severity: Warning
  * Parameter:
@@ -116,7 +92,6 @@
  */
 
 /*?
- * Tag: claw.9daf61
  * Text: "%s: Device not found for IO ENODEV\n"
  * Severity: Error
  * Parameter:
@@ -132,7 +107,6 @@
  */
 
 /*?
- * Tag: claw.9b5723
  * Text: "%s: Status pending... EIO \n"
  * Severity: Error
  * Parameter:
@@ -148,7 +122,6 @@
  */
 
 /*?
- * Tag: claw.fa1695
  * Text: "%s: Invalid Dev State EINVAL \n"
  * Severity: Error
  * Parameter:
@@ -165,7 +138,6 @@
  */
 
 /*?
- * Tag: claw.919e27
  * Text: "%s: Unknown error in Do_IO %d\n"
  * Severity: Error
  * Parameter:
@@ -181,7 +153,6 @@
  */
 
 /*?
- * Tag: claw.d02204
  * Text: "%s: %s: Interface disconnect or Selective reset occurred (remote side)\n"
  * Severity: Warning
  * Parameter:
@@ -197,7 +168,6 @@
  */
 
 /*?
- * Tag: claw.980336
  * Text: "%s: %s: System reset occurred (remote side)\n"
  * Severity: Warning
  * Parameter:
@@ -213,7 +183,6 @@
  */
 
 /*?
- * Tag: claw.08179a
  * Text: "%s: %s: Data-streaming timeout)\n"
  * Severity: Warning
  * Parameter:
@@ -229,7 +198,6 @@
  */
 
 /*?
- * Tag: claw.8e4754
  * Text: "%s: %s: Data-transfer parity error\n"
  * Severity: Warning
  * Parameter:
@@ -245,7 +213,6 @@
  */
 
 /*?
- * Tag: claw.9ff943
  * Text: "%s: %s: Hardware malfunction (remote side)\n"
  * Severity: Warning
  * Parameter:
@@ -261,7 +228,6 @@
  */
 
 /*?
- * Tag: claw.1de3a7
  * Text: "%s: %s: read-data parity error (remote side)\n"
  * Severity: Warning
  * Parameter:
@@ -277,7 +243,6 @@
  */
 
 /*?
- * Tag: claw.be83da
  * Text: "%s: %s: %d is wrong version id. Expected %d\n"
  * Severity: Informational
  * Parameter:
@@ -295,7 +260,6 @@
  */
 
 /*?
- * Tag: claw.cec268
  * Text: "%s: %s: Host name mismatch. Received: %s expected: %s\n"
  * Severity: Informational
  * Parameter:
@@ -314,7 +278,6 @@
  */
 
 /*?
- * Tag: claw.e912da
  * Text: "%s: %s: WS name mismatch. Received: %s expected: %s\n"
  * Severity: Informational
  * Parameter:
@@ -333,7 +296,6 @@
  */
 
 /*?
- * Tag: claw.484eea
  * Text: "%s: host write size is too small\n"
  * Severity: Informational
  * Parameter:
@@ -350,7 +312,6 @@
  */
 
 /*?
- * Tag: claw.e5f839
  * Text: "%s: host read size is too small\n"
  * Severity: Informational
  * Parameter:
@@ -367,7 +328,6 @@
  */
 
 /*?
- * Tag: claw.f812a3
  * Text: "%s: %s: Recv Sys Validate Resp: Vers=%d,Corr=%d,RC=%d,WS name=%.8s,Host name=%.8s\n"
  * Severity: Informational
  * Parameter:
@@ -387,7 +347,6 @@
  */
 
 /*?
- * Tag: claw.c38291
  * Text: "%s: %s: Sys Validate Resp : Host, WS name is mismatch\n"
  * Severity: Informational
  * Parameter:
@@ -403,7 +362,6 @@
  */
 
 /*?
- * Tag: claw.cf8d2b
  * Text: "%s: %s: Sys Validate Resp : Wrong version\n"
  * Severity: Informational
  * Parameter:
@@ -419,7 +377,6 @@
  */
 
 /*?
- * Tag: claw.d31686
  * Text: "%s: %s: Sys Validate Resp : bad frame size\n"
  * Severity: Informational
  * Parameter:
@@ -435,7 +392,6 @@
  */
 
 /*?
- * Tag: claw.cee4a3
  * Text: "%s: %s: Sys Validate error code=%d \n"
  * Severity: Informational
  * Parameter:
@@ -452,7 +408,6 @@
  */
 
 /*?
- * Tag: claw.b3fff2
  * Text: "%s: %s: Conn Req error : already logical link is active \n"
  * Severity: Informational
  * Parameter:
@@ -467,7 +422,6 @@
  */
 
 /*?
- * Tag: claw.f07391
  * Text: "%s: %s: Conn Req error : req logical link id is not 1\n"
  * Severity: Informational
  * Parameter:
@@ -482,7 +436,6 @@
  */
 
 /*?
- * Tag: claw.3fedb9
  * Text: "%s: %s: Conn Req error : req appl name does not match\n"
  * Severity: Informational
  * Parameter:
@@ -496,7 +449,6 @@
  */
 
 /*?
- * Tag: claw.2253bd
  * Text: "%s: %s: Conn Resp error: rc=%d \n"
  * Severity: Informational
  * Parameter:
@@ -511,7 +463,6 @@
  */
 
 /*?
- * Tag: claw.622bd4
  * Text: "%s: %s: Conn Resp error: req appl name does not match\n"
  * Severity: Informational
  * Parameter:
@@ -527,7 +478,6 @@
  */
 
 /*?
- * Tag: claw.76b1d7
  * Text: "%s: %s: Conn confirm: unexpected linkid=%d \n"
  * Severity: Informational
  * Parameter:
@@ -543,7 +493,6 @@
  */
 
 /*?
- * Tag: claw.2999f9
  * Text: "%s: %s: CLAW ERROR detected\n"
  * Severity: Informational
  * Parameter:
@@ -558,7 +507,6 @@
  */
 
 /*?
- * Tag: claw.5661ca
  * Text: "%s: %s: Unexpected command code=%d \n"
  * Severity: Informational
  * Parameter:
@@ -576,7 +524,6 @@
  */
 
 /*?
- * Tag: claw.44ec31
  * Text: "%s: %s: Invalid frame detected length is %02x\n"
  * Severity: Informational
  * Parameter:
@@ -593,7 +540,6 @@
  */
 
 /*?
- * Tag: claw.aa6ab0
  * Text: "%s: buffer allocate failed on receive\n"
  * Severity: Informational
  * Parameter:
@@ -607,7 +553,6 @@
  */
 
 /*?
- * Tag: claw.8649df
  * Text: "%s: add channel failed with ret = %d\n"
  * Severity: Warning
  * Parameter:
@@ -627,7 +572,6 @@
  */
 
 /*?
- * Tag: claw.6a7946
  * Text: "%s: device set online READ failed with ret = %d\n"
  * Severity: Warning
  * Parameter:
@@ -641,7 +585,6 @@
  */
 
 /*?
- * Tag: claw.3f8cd5
  * Text: "%s: device set online WRITE failed with ret = %d\n"
  * Severity: Warning
  * Parameter:
@@ -655,7 +598,6 @@
  */
 
 /*?
- * Tag: claw.b1e9fd
  * Text: "%s: failed creating network device\n"
  * Severity: Warning
  * Parameter:
@@ -670,7 +612,6 @@
  */
 
 /*?
- * Tag: claw.b2eaaf
  * Text: "debug_register failed %d\n"
  * Severity: Warning
  * Parameter:
@@ -684,8 +625,7 @@
  */
 
 /*?
- * Tag: claw.43
- * Text: "register_cu3088_discipline() failed rc=%d"
+ * Text: "register_cu3088_discipline() failed rc=%d\n"
  * Severity: Warning
  * Parameter:
  *   @1: ret
@@ -698,30 +638,29 @@
  * the device driver and reload.
  */
 
-/*? Tag: claw.c50275 Text: "%s: %s: CLAW device %.8s: Received Control Packet\n" */
-/*? Tag: claw.7929bb Text: "%s: %s: CLAW device %.8s: System validate completed.\n" */
-/*? Tag: claw.2db596 Text: "%s: %s: CLAW device %.8s: Connection completed link_id=%d.\n" */
-/*? Tag: claw.6fb687 Text: "%s: %s: remote side is not ready\n" */
-/*? Tag: claw.2c6ecc Text: "%s: %s: Unit Check with sense byte:0x%04x\n" */
-/*? Tag: claw.6711df Text: "%s: %s: write connection restarting\n" */
-/*? Tag: claw.6471cd Text: "%s: %s: subchannel check for device: %04x - Sch Stat %02x  Dev Stat %02x CPA - %04x\n" */
-/*? Tag: claw.4d0d65 Text: "%s: %s: Unit Exception occurred in write channel\n" */
-/*? Tag: claw.7c7e40 Text: "%s: %s: Resetting Event occurred:\n" */
-/*? Tag: claw.0ea64e Text: "%s: %s: Recv Conn Confirm:Vers=%d,link_id=%d,Corr=%d,Host appl=%.8s,WS appl=%.8s\n" */
-/*? Tag: claw.9f3041 Text: "%s: %s: Recv Conn Req: Vers=%d,link_id=%d,Corr=%d,HOST appl=%.8s,WS appl=%.8s\n" */
-/*? Tag: claw.6d4410 Text: "%s: %s: Recv Sys Validate Request: Vers=%d,link_id=%d,Corr=%d,WS name=%.8s,Host name=%.8s\n" */
-/*? Tag: claw.998f1b Text: "%s: %s: Confirmed Now packing\n" */
-/*? Tag: claw.8a8cb8 Text: "%s: %s: Unit Check Occured in write channel\n" */
-/*? Tag: claw.97d6f6 Text: "%s: %s: Restart is required after remote side recovers \n" */
-/*? Tag: claw.da648b Text: "%s: %s: sys Validate Rsize:%d Wsize:%d\n" */
-/*? Tag: claw.9a59f8 Text: "%s: %s:readsize=%d  writesize=%d readbuffer=%d writebuffer=%d read=0x%04x write=0x%04x\n" */
-/*? Tag: claw.5fc55e Text: "%s: %s:host_name:%.8s, adapter_name :%.8s api_type: %.8s\n" */
-/*? Tag: claw.a0b4c6 Text: "Driver unloaded\n" */
-/*? Tag: claw.35862f Text: "Loading %s\n" */
-/*? Tag: claw.bfd5d0 Text: "%s:  will be removed.\n" */
-/*? Tag: claw.f59f19 Text: "register_cu3088_discipline() failed rc=%d\n" */
-/*? Tag: claw.665fe2 Text: "%s: add for %s\n" */
-/*? Tag: claw.669957 Text: "%s: %s: shutting down \n" */
-/*? Tag: claw.6e82dd Text: "%s: CLAW device %.8s: System validate completed.\n" */
-/*? Tag: claw.e96f72 Text: "%s: %s: Disconnect: Vers=%d,link_id=%d,Corr=%d\n" */
-/*? Tag: claw.f56e75 Text: "%s: %s: Revc Conn Resp: Vers=%d,link_id=%d,Corr=%d,RC=%d,Host appl=%.8s, WS appl=%.8s\n" */
+/*? Text: "%s: %s: CLAW device %.8s: Received Control Packet\n" */
+/*? Text: "%s: %s: CLAW device %.8s: System validate completed.\n" */
+/*? Text: "%s: %s: CLAW device %.8s: Connection completed link_id=%d.\n" */
+/*? Text: "%s: %s: remote side is not ready\n" */
+/*? Text: "%s: %s: Unit Check with sense byte:0x%04x\n" */
+/*? Text: "%s: %s: write connection restarting\n" */
+/*? Text: "%s: %s: subchannel check for device: %04x - Sch Stat %02x  Dev Stat %02x CPA - %04x\n" */
+/*? Text: "%s: %s: Unit Exception occurred in write channel\n" */
+/*? Text: "%s: %s: Resetting Event occurred:\n" */
+/*? Text: "%s: %s: Recv Conn Confirm:Vers=%d,link_id=%d,Corr=%d,Host appl=%.8s,WS appl=%.8s\n" */
+/*? Text: "%s: %s: Recv Conn Req: Vers=%d,link_id=%d,Corr=%d,HOST appl=%.8s,WS appl=%.8s\n" */
+/*? Text: "%s: %s: Recv Sys Validate Request: Vers=%d,link_id=%d,Corr=%d,WS name=%.8s,Host name=%.8s\n" */
+/*? Text: "%s: %s: Confirmed Now packing\n" */
+/*? Text: "%s: %s: Unit Check Occured in write channel\n" */
+/*? Text: "%s: %s: Restart is required after remote side recovers \n" */
+/*? Text: "%s: %s: sys Validate Rsize:%d Wsize:%d\n" */
+/*? Text: "%s: %s:readsize=%d  writesize=%d readbuffer=%d writebuffer=%d read=0x%04x write=0x%04x\n" */
+/*? Text: "%s: %s:host_name:%.8s, adapter_name :%.8s api_type: %.8s\n" */
+/*? Text: "Driver unloaded\n" */
+/*? Text: "Loading %s\n" */
+/*? Text: "%s:  will be removed.\n" */
+/*? Text: "%s: add for %s\n" */
+/*? Text: "%s: %s: shutting down \n" */
+/*? Text: "%s: CLAW device %.8s: System validate completed.\n" */
+/*? Text: "%s: %s: Disconnect: Vers=%d,link_id=%d,Corr=%d\n" */
+/*? Text: "%s: %s: Revc Conn Resp: Vers=%d,link_id=%d,Corr=%d,RC=%d,Host appl=%.8s, WS appl=%.8s\n" */

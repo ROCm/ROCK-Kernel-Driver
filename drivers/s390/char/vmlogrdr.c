@@ -30,7 +30,6 @@
 #include <linux/device.h>
 #include <linux/smp_lock.h>
 #include <linux/string.h>
-#include <linux/kmsg.h>
 
 MODULE_AUTHOR
 	("(C) 2004 IBM Corporation by Xenia Tkatschow (xenia@us.ibm.com)\n"
@@ -176,7 +175,7 @@ static void vmlogrdr_iucv_path_severed(struct iucv_path *path, u8 ipuser[16])
 	struct vmlogrdr_priv_t * logptr = path->private;
 	u8 reason = (u8) ipuser[8];
 
-	kmsg_err("vmlogrdr: connection severed with reason %i\n", reason);
+	pr_err("vmlogrdr: connection severed with reason %i\n", reason);
 
 	iucv_path_sever(path, NULL);
 	kfree(path);
@@ -334,8 +333,8 @@ static int vmlogrdr_open (struct inode *inode, struct file *filp)
 	if (logptr->autorecording) {
 		ret = vmlogrdr_recording(logptr,1,logptr->autopurge);
 		if (ret)
-			kmsg_warn("vmlogrdr: failed to start "
-				  "recording automatically\n");
+			pr_warning("vmlogrdr: failed to start "
+				   "recording automatically\n");
 	}
 
 	/* create connection to the system service */
@@ -346,9 +345,9 @@ static int vmlogrdr_open (struct inode *inode, struct file *filp)
 				       logptr->system_service, NULL, NULL,
 				       logptr);
 	if (connect_rc) {
-		kmsg_err("vmlogrdr: iucv connection to %s "
-			 "failed with rc %i \n",
-			 logptr->system_service, connect_rc);
+		pr_err("vmlogrdr: iucv connection to %s "
+		       "failed with rc %i \n",
+		       logptr->system_service, connect_rc);
 		goto out_path;
 	}
 
@@ -389,8 +388,8 @@ static int vmlogrdr_release (struct inode *inode, struct file *filp)
 	if (logptr->autorecording) {
 		ret = vmlogrdr_recording(logptr,0,logptr->autopurge);
 		if (ret)
-			kmsg_warn("vmlogrdr: failed to stop "
-				  "recording automatically\n");
+			pr_warning("vmlogrdr: failed to stop "
+				   "recording automatically\n");
 	}
 	logptr->dev_in_use = 0;
 
@@ -825,7 +824,7 @@ static int __init vmlogrdr_init(void)
 	dev_t dev;
 
 	if (! MACHINE_IS_VM) {
-		kmsg_err("not running under VM, driver not loaded.\n");
+		pr_err("not running under VM, driver not loaded.\n");
 		return -ENODEV;
 	}
 

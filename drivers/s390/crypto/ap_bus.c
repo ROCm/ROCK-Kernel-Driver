@@ -34,7 +34,6 @@
 #include <linux/notifier.h>
 #include <linux/kthread.h>
 #include <linux/mutex.h>
-#include <linux/kmsg.h>
 #include <asm/s390_rdev.h>
 #include <asm/reset.h>
 #include <linux/hrtimer.h>
@@ -1340,13 +1339,13 @@ int __init ap_module_init(void)
 	int rc, i;
 
 	if (ap_domain_index < -1 || ap_domain_index >= AP_DOMAINS) {
-		kmsg_warn("%d is not a valid cryptographic domain\n",
-			  ap_domain_index);
+		pr_warning("%d is not a valid cryptographic domain\n",
+			   ap_domain_index);
 		return -EINVAL;
 	}
 	if (ap_instructions_available() != 0) {
-		kmsg_warn("The hardware system does not support "
-			  "AP instructions\n");
+		pr_warning("The hardware system does not support "
+			   "AP instructions\n");
 		return -ENODEV;
 	}
 	register_reset_call(&ap_reset_call);

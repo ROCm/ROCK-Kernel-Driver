@@ -25,7 +25,6 @@
 #include <linux/notifier.h>
 #include <linux/cpu.h>
 #include <linux/workqueue.h>
-#include <linux/kmsg.h>
 #include <asm/appldata.h>
 #include <asm/timer.h>
 #include <asm/uaccess.h>
@@ -392,8 +391,8 @@ appldata_generic_handler(ctl_table *ctl, int write, struct file *filp,
 					(unsigned long) ops->data, ops->size,
 					ops->mod_lvl);
 		if (rc != 0) {
-			kmsg_err("Starting the data collection for %s "
-				 "failed with rc=%d\n", ops->name, rc);
+			pr_err("Starting the data collection for %s "
+			       "failed with rc=%d\n", ops->name, rc);
 			module_put(ops->owner);
 		} else
 			ops->active = 1;
@@ -403,8 +402,8 @@ appldata_generic_handler(ctl_table *ctl, int write, struct file *filp,
 				(unsigned long) ops->data, ops->size,
 				ops->mod_lvl);
 		if (rc != 0)
-			kmsg_err("Stopping the data collection for %s "
-				 "failed with rc=%d\n", ops->name, rc);
+			pr_err("Stopping the data collection for %s "
+			       "failed with rc=%d\n", ops->name, rc);
 		module_put(ops->owner);
 	}
 	spin_unlock(&appldata_ops_lock);

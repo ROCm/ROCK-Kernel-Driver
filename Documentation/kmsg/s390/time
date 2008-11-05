@@ -1,5 +1,4 @@
 /*?
- * Tag: time.eb7580
  * Text: "The ETR interface has adjusted the clock by %li microseconds\n"
  * Severity: Notice
  * Parameter:
@@ -14,7 +13,6 @@
  */
 
 /*?
- * Tag: time.cbf4df
  * Text: "The real or virtual hardware system does not provide an ETR interface\n"
  * Severity: Warning
  * Description:
@@ -26,7 +24,6 @@
  */
 
 /*?
- * Tag: time.c4b95f
  * Text: "The real or virtual hardware system does not provide an STP interface\n"
  * Severity: Warning
  * Description:

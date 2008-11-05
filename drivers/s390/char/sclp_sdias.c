@@ -8,7 +8,6 @@
 #define KMSG_COMPONENT "sclp_sdias"
 
 #include <linux/sched.h>
-#include <linux/kmsg.h>
 #include <asm/sclp.h>
 #include <asm/debug.h>
 #include <asm/ipl.h>
@@ -134,7 +133,7 @@ int sclp_sdias_blk_count(void)
 
 	rc = sdias_sclp_send(&request);
 	if (rc) {
-		kmsg_err("sclp_send failed for get_nr_blocks\n");
+		pr_err("sclp_send failed for get_nr_blocks\n");
 		goto out;
 	}
 	if (sccb.hdr.response_code != 0x0020) {
@@ -148,8 +147,8 @@ int sclp_sdias_blk_count(void)
 			rc = sccb.evbuf.blk_cnt;
 			break;
 		default:
-			kmsg_err("SCLP error: %x\n",
-				 sccb.evbuf.event_status);
+			pr_err("SCLP error: %x\n",
+			       sccb.evbuf.event_status);
 			rc = -EIO;
 			goto out;
 	}
@@ -205,7 +204,7 @@ int sclp_sdias_copy(void *dest, int start_blk, int nr_blks)
 
 	rc = sdias_sclp_send(&request);
 	if (rc) {
-		kmsg_err("sclp_send failed: %x\n", rc);
+		pr_err("sclp_send failed: %x\n", rc);
 		goto out;
 	}
 	if (sccb.hdr.response_code != 0x0020) {
@@ -223,9 +222,9 @@ int sclp_sdias_copy(void *dest, int start_blk, int nr_blks)
 		case EVSTATE_NO_DATA:
 			TRACE("no data\n");
 		default:
-			kmsg_err("Error from SCLP while copying hsa. "
-				 "Event status = %x\n",
-				 sccb.evbuf.event_status);
+			pr_err("Error from SCLP while copying hsa. "
+			       "Event status = %x\n",
+			       sccb.evbuf.event_status);
 			rc = -EIO;
 	}
 out:

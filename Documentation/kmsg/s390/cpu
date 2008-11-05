@@ -1,5 +1,4 @@
 /*?
- * Tag: cpu.17772b
  * Text: "Processor %d started, address %d, identification %06X\n"
  * Severity: Informational
  * Parameter:
@@ -13,7 +12,6 @@
  */
 
 /*?
- * Tag: cpu.b6ef4d
  * Text: "Processor %d stopped\n"
  * Severity: Informational
  * Parameter:
@@ -25,7 +23,6 @@
  */
 
 /*?
- * Tag: cpu.33a262
  * Text: "%d configured CPUs, %d standby CPUs\n"
  * Severity: Informational
  * Parameter:
@@ -38,7 +35,6 @@
  */
 
 /*?
- * Tag: cpu.3748dd
  * Text: "The CPU configuration topology of the machine is:"
  * Severity: Informational
  * Description:
@@ -54,7 +50,6 @@
  */
 
 /*?
- * Tag: cpu.e2917c
  * Text: "CPU %i exceeds the maximum %i and is excluded from the dump\n"
  * Severity: Warning
  * Parameter:

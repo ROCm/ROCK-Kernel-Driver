@@ -19,7 +19,6 @@
 #include <linux/miscdevice.h>
 #include <linux/module.h>
 #include <linux/smp_lock.h>
-#include <linux/kmsg.h>
 #include <asm/cpcmd.h>
 #include <asm/debug.h>
 #include <asm/uaccess.h>
@@ -194,8 +193,8 @@ static int __init vmcp_init(void)
 	int ret;
 
 	if (!MACHINE_IS_VM) {
-		kmsg_warn("The z/VM CP interface device driver cannot be "
-			     "loaded without z/VM\n");
+		pr_warning("The z/VM CP interface device driver cannot be "
+			   "loaded without z/VM\n");
 		return -ENODEV;
 	}
 

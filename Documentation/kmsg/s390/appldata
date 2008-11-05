@@ -1,5 +1,4 @@
 /*?
- * Tag: appldata.f26e28
  * Text: "Starting the data collection for %s failed with rc=%d\n"
  * Severity: Error
  * Parameter:
@@ -18,7 +17,6 @@
  */
 
 /*?
- * Tag: appldata.0ae163
  * Text: "Stopping the data collection for %s failed with rc=%d\n"
  * Severity: Error
  * Parameter:
@@ -33,7 +31,6 @@
  */
 
 /*?
- * Tag: appldata.ccf8e3
  * Text: "Starting a new OS data collection failed with rc=%d\n"
  * Severity: Error
  * Parameter:
@@ -52,7 +49,6 @@
  */
 
 /*?
- * Tag: appldata.887845
  * Text: "Stopping a faulty OS data collection failed with rc=%d\n"
  * Severity: Error
  * Parameter:
@@ -71,7 +67,6 @@
  */
 
 /*?
- * Tag: appldata.81e326
  * Text: "Maximum OS record size %i exceeds the maximum record size %i\n"
  * Severity: Error
  * Parameter:

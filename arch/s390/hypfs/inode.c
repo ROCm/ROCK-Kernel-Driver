@@ -21,7 +21,6 @@
 #include <linux/module.h>
 #include <linux/seq_file.h>
 #include <linux/mount.h>
-#include <linux/kmsg.h>
 #include <asm/ebcdic.h>
 #include "hypfs.h"
 
@@ -203,7 +202,7 @@ static ssize_t hypfs_aio_write(struct kiocb *iocb, const struct iovec *iov,
 	else
 		rc = hypfs_diag_create_files(sb, sb->s_root);
 	if (rc) {
-		kmsg_err("Updating the hypfs tree failed\n");
+		pr_err("Updating the hypfs tree failed\n");
 		hypfs_delete_tree(sb->s_root);
 		goto out;
 	}
@@ -255,7 +254,7 @@ static int hypfs_parse_options(char *options, struct super_block *sb)
 			break;
 		case opt_err:
 		default:
-			kmsg_err("%s is not a valid mount option\n", str);
+			pr_err("%s is not a valid mount option\n", str);
 			return -EINVAL;
 		}
 	}
@@ -319,7 +318,7 @@ static int hypfs_fill_super(struct super_block *sb, void *data, int silent)
 	}
 	hypfs_update_update(sb);
 	sb->s_root = root_dentry;
-	kmsg_info("Hypervisor filesystem mounted\n");
+	pr_info("Hypervisor filesystem mounted\n");
 	return 0;
 
 err_tree:
@@ -515,7 +514,7 @@ fail_sysfs:
 	if (!MACHINE_IS_VM)
 		hypfs_diag_exit();
 fail_diag:
-	kmsg_err("Initialization of hypfs failed with rc=%i\n", rc);
+	pr_err("Initialization of hypfs failed with rc=%i\n", rc);
 	return rc;
 }
 

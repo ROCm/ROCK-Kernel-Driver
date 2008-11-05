@@ -18,7 +18,6 @@
 #include <linux/kernel_stat.h>
 #include <linux/netdevice.h>
 #include <linux/sched.h>
-#include <linux/kmsg.h>
 #include <asm/appldata.h>
 #include <asm/smp.h>
 
@@ -145,16 +144,16 @@ static void appldata_get_os_data(void *data)
 					   (unsigned long) ops.data, new_size,
 					   ops.mod_lvl);
 			if (rc != 0)
-				kmsg_err("Starting a new OS data collection "
-					 "failed with rc=%d\n", rc);
+				pr_err("Starting a new OS data collection "
+				       "failed with rc=%d\n", rc);
 
 			rc = appldata_diag(APPLDATA_RECORD_OS_ID,
 					   APPLDATA_STOP_REC,
 					   (unsigned long) ops.data, ops.size,
 					   ops.mod_lvl);
 			if (rc != 0)
-				kmsg_err("Stopping a faulty OS data "
-					 "collection failed with rc=%d\n", rc);
+				pr_err("Stopping a faulty OS data "
+				       "collection failed with rc=%d\n", rc);
 		}
 		ops.size = new_size;
 	}
@@ -175,8 +174,8 @@ static int __init appldata_os_init(void)
 	max_size = sizeof(struct appldata_os_data) +
 		   (NR_CPUS * sizeof(struct appldata_os_per_cpu));
 	if (max_size > APPLDATA_MAX_REC_SIZE) {
-		kmsg_err("Maximum OS record size %i exceeds the maximum "
-			 "record size %i\n", max_size, APPLDATA_MAX_REC_SIZE);
+		pr_err("Maximum OS record size %i exceeds the maximum "
+		       "record size %i\n", max_size, APPLDATA_MAX_REC_SIZE);
 		rc = -ENOMEM;
 		goto out;
 	}

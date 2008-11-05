@@ -1,5 +1,4 @@
 /*?
- * Tag: extmem.7c6a46
  * Text: "Querying a DCSS type failed with rc=%ld\n"
  * Severity: Warning
  * Parameter:
@@ -14,7 +13,6 @@
  */
 
 /*?
- * Tag: extmem.790ab9
  * Text: "Loading DCSS %s failed with rc=%ld\n"
  * Severity: Warning
  * Parameter:
@@ -29,7 +27,6 @@
  */
 
 /*?
- * Tag: extmem.da1614
  * Text: "DCSS %s of range %p to %p and type %s loaded as exclusive-writable\n"
  * Severity: Informational
  * Parameter:
@@ -44,7 +41,6 @@
  */
 
 /*?
- * Tag: extmem.aa62ff
  * Text: "DCSS %s of range %p to %p and type %s loaded in shared access mode\n"
  * Severity: Informational
  * Parameter:
@@ -59,7 +55,6 @@
  */
 
 /*?
- * Tag: extmem.7fb545
  * Text: "DCSS %s is already in the requested access mode\n"
  * Severity: Informational
  * Parameter:
@@ -72,7 +67,6 @@
  */
 
 /*?
- * Tag: extmem.f0af04
  * Text: "DCSS %s is in use and cannot be reloaded\n"
  * Severity: Warning
  * Parameter:
@@ -87,7 +81,6 @@
  */
 
 /*?
- * Tag: extmem.326775
  * Text: "DCSS %s overlaps with used memory resources and cannot be reloaded\n"
  * Severity: Warning
  * Parameter:
@@ -105,7 +98,6 @@
  */
 
 /*?
- * Tag: extmem.972edd
  * Text: "Reloading DCSS %s failed with rc=%ld\n"
  * Severity: Warning
  * Parameter:
@@ -121,7 +113,6 @@
  */
 
 /*?
- * Tag: extmem.4a7f92
  * Text: "Unloading unknown DCSS %s failed\n"
  * Severity: Error
  * Parameter:
@@ -135,7 +126,6 @@
  */
 
 /*?
- * Tag: extmem.d03247
  * Text: "Saving unknown DCSS %s failed\n"
  * Severity: Error
  * Parameter:
@@ -149,7 +139,6 @@
  */
 
 /*?
- * Tag: extmem.b8acd6
  * Text: "Saving a DCSS failed with DEFSEG response code %i\n"
  * Severity: Error
  * Parameter:
@@ -163,7 +152,6 @@
  */
 
 /*?
- * Tag: extmem.c55583
  * Text: "Saving a DCSS failed with SAVESEG response code %i\n"
  * Severity: Error
  * Parameter:
@@ -177,9 +165,8 @@
  */
 
 /*?
- * Tag: extmem.8b00b5
  * Text: "DCSS %s cannot be loaded or queried\n"
- * Severity: Warning
+ * Severity: Error
  * Parameter:
  *   @1: DCSS name
  * Description:
@@ -192,9 +179,8 @@
  */
 
 /*?
- * Tag: extmem.9e2ee4
  * Text: "DCSS %s cannot be loaded or queried without z/VM\n"
- * Severity: Warning
+ * Severity: Error
  * Parameter:
  *   @1: DCSS name
  * Description:
@@ -205,9 +191,8 @@
  */
 
 /*?
- * Tag: extmem.e676d6
  * Text: "Loading or querying DCSS %s resulted in a hardware error\n"
- * Severity: Warning
+ * Severity: Error
  * Parameter:
  *   @1: DCSS name
  * Description:
@@ -220,9 +205,8 @@
  */
 
 /*?
- * Tag: extmem.06a5dd
  * Text: "DCSS %s has multiple page ranges and cannot be loaded or queried\n"
- * Severity: Warning
+ * Severity: Error
  * Parameter:
  *   @1: DCSS name
  * Description:
@@ -236,9 +220,8 @@
  */
 
 /*?
- * Tag: extmem.cb0afe
  * Text: "%s needs used memory resources and cannot be loaded or queried\n"
- * Severity: Warning
+ * Severity: Error
  * Parameter:
  *   @1: DCSS name
  * Description:
@@ -254,9 +237,8 @@
  */
 
 /*?
- * Tag: extmem.99ae11
  * Text: "DCSS %s is already loaded in a different access mode\n"
- * Severity: Warning
+ * Severity: Error
  * Parameter:
  *   @1: DCSS name
  * Description:
@@ -268,9 +250,8 @@
  */
 
 /*?
- * Tag: extmem.febf72
  * Text: "There is not enough memory to load or query DCSS %s\n"
- * Severity: Warning
+ * Severity: Error
  * Parameter:
  *   @1: DCSS name
  * Description:
@@ -280,7 +261,6 @@
  */
 
 /*?
- * Tag: extmem.e08a4c
  * Text: "DCSS %s overlaps with used storage and cannot be loaded\n"
  * Severity: Error
  * Parameter:
@@ -297,7 +277,6 @@
  */
 
 /*?
- * Tag: extmem.8e36b2
  * Text: "DCSS %s exceeds the kernel mapping range (%lu) and cannot be loaded\n"
  * Severity: Error
  * Parameter:

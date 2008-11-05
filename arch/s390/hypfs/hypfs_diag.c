@@ -13,7 +13,6 @@
 #include <linux/errno.h>
 #include <linux/string.h>
 #include <linux/vmalloc.h>
-#include <linux/kmsg.h>
 #include <asm/ebcdic.h>
 #include "hypfs.h"
 
@@ -530,14 +529,14 @@ __init int hypfs_diag_init(void)
 	int rc;
 
 	if (diag204_probe()) {
-		kmsg_err("The hardware system does not support hypfs\n");
+		pr_err("The hardware system does not support hypfs\n");
 		return -ENODATA;
 	}
 	rc = diag224_get_name_table();
 	if (rc) {
 		diag204_free_buffer();
-		kmsg_err("The hardware system does not provide all "
-			 "functions required by hypfs\n");
+		pr_err("The hardware system does not provide all "
+		       "functions required by hypfs\n");
 	}
 	return rc;
 }

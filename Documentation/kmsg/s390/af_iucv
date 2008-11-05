@@ -1,5 +1,4 @@
 /*?
- * Tag: af_iucv.5c08c7
  * Text: "Application %s on z/VM guest %s exceeds message limit\n"
  * Severity: Error
  * Parameter:
@@ -18,7 +17,6 @@
  */
 
 /*?
- * Tag: af_iucv.cc24c0
  * Text: "The af_iucv module cannot be loaded without z/VM\n"
  * Severity: Error
  * Description:

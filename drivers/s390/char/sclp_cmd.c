@@ -16,7 +16,6 @@
 #include <linux/mm.h>
 #include <linux/mmzone.h>
 #include <linux/memory.h>
-#include <linux/kmsg.h>
 #include <asm/chpid.h>
 #include <asm/sclp.h>
 
@@ -171,8 +170,8 @@ static int do_sync_request(sclp_cmdw_t cmd, void *sccb)
 
 	/* Check response. */
 	if (request->status != SCLP_REQ_DONE) {
-		kmsg_warn("sync request failed (cmd=0x%08x, "
-			  "status=0x%02x)\n", cmd, request->status);
+		pr_warning("sync request failed (cmd=0x%08x, "
+			   "status=0x%02x)\n", cmd, request->status);
 		rc = -EIO;
 	}
 out:
@@ -226,8 +225,8 @@ int sclp_get_cpu_info(struct sclp_cpu_info *info)
 	if (rc)
 		goto out;
 	if (sccb->header.response_code != 0x0010) {
-		kmsg_warn("readcpuinfo failed (response=0x%04x)\n",
-			  sccb->header.response_code);
+		pr_warning("readcpuinfo failed (response=0x%04x)\n",
+			   sccb->header.response_code);
 		rc = -EIO;
 		goto out;
 	}
@@ -264,9 +263,9 @@ static int do_cpu_configure(sclp_cmdw_t cmd)
 	case 0x0120:
 		break;
 	default:
-		kmsg_warn("configure cpu failed (cmd=0x%08x, "
-			  "response=0x%04x)\n", cmd,
-			  sccb->header.response_code);
+		pr_warning("configure cpu failed (cmd=0x%08x, "
+			   "response=0x%04x)\n", cmd,
+			   sccb->header.response_code);
 		rc = -EIO;
 		break;
 	}
@@ -626,9 +625,9 @@ static int do_chp_configure(sclp_cmdw_t cmd)
 	case 0x0450:
 		break;
 	default:
-		kmsg_warn("configure channel-path failed "
-			  "(cmd=0x%08x, response=0x%04x)\n", cmd,
-			  sccb->header.response_code);
+		pr_warning("configure channel-path failed "
+			   "(cmd=0x%08x, response=0x%04x)\n", cmd,
+			   sccb->header.response_code);
 		rc = -EIO;
 		break;
 	}
@@ -695,8 +694,8 @@ int sclp_chp_read_info(struct sclp_chp_info *info)
 	if (rc)
 		goto out;
 	if (sccb->header.response_code != 0x0010) {
-		kmsg_warn("read channel-path info failed "
-			  "(response=0x%04x)\n", sccb->header.response_code);
+		pr_warning("read channel-path info failed "
+			   "(response=0x%04x)\n", sccb->header.response_code);
 		rc = -EIO;
 		goto out;
 	}

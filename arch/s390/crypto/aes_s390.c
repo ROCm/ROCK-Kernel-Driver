@@ -24,7 +24,6 @@
 #include <linux/err.h>
 #include <linux/module.h>
 #include <linux/init.h>
-#include <linux/kmsg.h>
 #include "crypt_s390.h"
 
 #define AES_KEYLEN_128		1
@@ -172,8 +171,8 @@ static int fallback_init_cip(struct crypto_tfm *tfm)
 			CRYPTO_ALG_ASYNC | CRYPTO_ALG_NEED_FALLBACK);
 
 	if (IS_ERR(sctx->fallback.cip)) {
-		kmsg_err("Allocating AES fallback algorithm %s failed\n",
-			 name);
+		pr_err("Allocating AES fallback algorithm %s failed\n",
+		       name);
 		return PTR_ERR(sctx->fallback.blk);
 	}
 
@@ -353,8 +352,8 @@ static int fallback_init_blk(struct crypto_tfm *tfm)
 			CRYPTO_ALG_ASYNC | CRYPTO_ALG_NEED_FALLBACK);
 
 	if (IS_ERR(sctx->fallback.blk)) {
-		kmsg_err("Allocating AES fallback algorithm %s failed\n",
-			 name);
+		pr_err("Allocating AES fallback algorithm %s failed\n",
+		       name);
 		return PTR_ERR(sctx->fallback.blk);
 	}
 
@@ -520,8 +519,8 @@ static int __init aes_s390_init(void)
 
 	/* z9 109 and z9 BC/EC only support 128 bit key length */
 	if (keylen_flag == AES_KEYLEN_128)
-		kmsg_info("AES hardware acceleration is only available for"
-			  " 128-bit keys\n");
+		pr_info("AES hardware acceleration is only available for"
+			" 128-bit keys\n");
 
 	ret = crypto_register_alg(&aes_alg);
 	if (ret)

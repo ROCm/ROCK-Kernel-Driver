@@ -89,7 +89,6 @@
 #include <linux/tcp.h>
 #include <linux/timer.h>
 #include <linux/types.h>
-#include <linux/kmsg.h>
 
 #include "cu3088.h"
 #include "claw.h"
@@ -3296,7 +3295,7 @@ claw_cleanup(void)
 {
 	unregister_cu3088_discipline(&claw_group_driver);
 	claw_unregister_debug_facility();
-	kmsg_info("Driver unloaded\n");
+	pr_info("Driver unloaded\n");
 
 }
 
@@ -3311,10 +3310,10 @@ claw_init(void)
 {
 	int ret = 0;
 
-	kmsg_info("Loading %s\n", version);
+	pr_info("Loading %s\n", version);
 	ret = claw_register_debug_facility();
 	if (ret) {
-		kmsg_warn("debug_register failed %d\n", ret);
+		pr_warning("debug_register failed %d\n", ret);
 		return ret;
 	}
 	CLAW_DBF_TEXT(2, setup, "init_mod");
@@ -3322,8 +3321,7 @@ claw_init(void)
 	if (ret) {
 		CLAW_DBF_TEXT(2, setup, "init_bad");
 		claw_unregister_debug_facility();
-		kmsg_warn("register_cu3088_discipline() failed rc=%d\n",
-			ret);
+		pr_warning("register_cu3088_discipline() failed rc=%d\n", ret);
 	}
 	return ret;
 }

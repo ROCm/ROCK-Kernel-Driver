@@ -1,5 +1,4 @@
 /*?
- * Tag: hypfs.7f5705
  * Text: "The hardware system does not support hypfs\n"
  * Severity: Error
  * Description:
@@ -10,7 +9,6 @@
  */
 
 /*?
- * Tag: hypfs.8985b2
  * Text: "The hardware system does not provide all functions required by hypfs\n"
  * Severity: Error
  * Description:
@@ -21,7 +19,6 @@
  */
 
 /*?
- * Tag: hypfs.90c29b
  * Text: "Updating the hypfs tree failed\n"
  * Severity: Error
  * Description:
@@ -32,7 +29,6 @@
  */
 
 /*?
- * Tag: hypfs.a2406e
  * Text: "%s is not a valid mount option\n"
  * Severity: Error
  * Parameter:
@@ -45,7 +41,6 @@
  */
 
 /*?
- * Tag: hypfs.7a79f0
  * Text: "Initialization of hypfs failed with rc=%i\n"
  * Severity: Error
  * Parameter:
@@ -58,4 +53,4 @@
  * See errno.h for information about the error codes.
  */
 
-/*? Tag: hypfs.615b8e Text: "Hypervisor filesystem mounted\n" */
+/*? Text: "Hypervisor filesystem mounted\n" */

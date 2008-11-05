@@ -35,7 +35,6 @@
 #include <linux/moduleparam.h>
 #include <linux/slab.h>
 #include <linux/timex.h>	/* get_clock() */
-#include <linux/kmsg.h>
 
 #include <asm/ccwdev.h>
 #include <asm/cio.h>
@@ -1362,8 +1361,8 @@ static int __init init_cmf(void)
 	default:
 		return 1;
 	}
-	kmsg_info("Channel measurement facility initialized using format "
-		  "%s (mode %s)\n", format_string, detect_string);
+	pr_info("Channel measurement facility initialized using format "
+		"%s (mode %s)\n", format_string, detect_string);
 	return 0;
 }
 

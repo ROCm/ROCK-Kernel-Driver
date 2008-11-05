@@ -1,4 +1,4 @@
-/*? Tag: sclp_sdias.50a6d8 Text: "sclp_send failed for get_nr_blocks\n" */
-/*? Tag: sclp_sdias.797d4c Text: "SCLP error: %x\n" */
-/*? Tag: sclp_sdias.25509b Text: "sclp_send failed: %x\n" */
-/*? Tag: sclp_sdias.0c1461 Text: "Error from SCLP while copying hsa. Event status = %x\n" */
+/*? Text: "sclp_send failed for get_nr_blocks\n" */
+/*? Text: "SCLP error: %x\n" */
+/*? Text: "sclp_send failed: %x\n" */
+/*? Text: "Error from SCLP while copying hsa. Event status = %x\n" */

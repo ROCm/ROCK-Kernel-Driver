@@ -1,5 +1,4 @@
 /*?
- * Tag: monreader.c042b6
  * Text: "Reading monitor data failed with rc=%i\n"
  * Severity: Error
  * Parameter:
@@ -19,7 +18,6 @@
  */
 
 /*?
- * Tag: monreader.15a7a1
  * Text: "z/VM *MONITOR system service disconnected with rc=%i\n"
  * Severity: Error
  * Parameter:
@@ -36,7 +34,6 @@
  */
 
 /*?
- * Tag: monreader.029e2e
  * Text: "The read queue for monitor data is full\n"
  * Severity: Warning
  * Description:
@@ -50,7 +47,6 @@
  */
 
 /*?
- * Tag: monreader.88c26a
  * Text: "Connecting to the z/VM *MONITOR system service failed with rc=%i\n"
  * Severity: Error
  * Parameter:
@@ -69,7 +65,6 @@
  */
 
 /*?
- * Tag: monreader.ca6466
  * Text: "Disconnecting the z/VM *MONITOR system service failed with rc=%i\n"
  * Severity: Warning
  * Parameter:
@@ -87,7 +82,6 @@
  */
 
 /*?
- * Tag: monreader.98669d
  * Text: "The z/VM *MONITOR record device driver cannot be loaded without z/VM\n"
  * Severity: Error
  * Description:
@@ -103,7 +97,6 @@
  */
 
 /*?
- * Tag: monreader.6f04b5
  * Text: "The z/VM *MONITOR record device driver failed to register with IUCV\n"
  * Severity: Error
  * Description:
@@ -119,7 +112,6 @@
  */
 
 /*?
- * Tag: monreader.0111fc
  * Text: "The specified *MONITOR DCSS %s does not have the required type SC\n"
  * Severity: Error
  * Parameter:

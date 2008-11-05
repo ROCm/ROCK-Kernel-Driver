@@ -4461,7 +4461,7 @@ static int __init qeth_core_init(void)
 {
 	int rc;
 
-	kmsg_info("loading core functions\n");
+	pr_info("loading core functions\n");
 	INIT_LIST_HEAD(&qeth_core_card_list.list);
 	rwlock_init(&qeth_core_card_list.rwlock);
 
@@ -4504,7 +4504,7 @@ ccw_err:
 	QETH_DBF_MESSAGE(2, "Initialization failed with code %d\n", rc);
 	qeth_unregister_dbf_views();
 out_err:
-	kmsg_err("Initializing the qeth device driver failed\n");
+	pr_err("Initializing the qeth device driver failed\n");
 	return rc;
 }
 
@@ -4517,7 +4517,7 @@ static void __exit qeth_core_exit(void)
 	ccw_driver_unregister(&qeth_ccw_driver);
 	kmem_cache_destroy(qeth_core_header_cache);
 	qeth_unregister_dbf_views();
-	kmsg_info("core functions removed\n");
+	pr_info("core functions removed\n");
 }
 
 module_init(qeth_core_init);

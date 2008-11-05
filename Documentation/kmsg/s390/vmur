@@ -1,5 +1,4 @@
 /*?
- * Tag: vmur.53bf56
  * Text: "The %s cannot be loaded without z/VM\n"
  * Severity: Error
  * Parameter:
@@ -17,7 +16,6 @@
  */
 
 /*?
- * Tag: vmur.ff8847
  * Text: "Kernel function alloc_chrdev_region failed with error code %d\n"
  * Severity: Error
  * Parameter:
@@ -32,5 +30,5 @@
  * Consider assigning more memory to your LPAR or z/VM guest virtual machine.
  */
 
-/*? Tag: vmur.94f909 Text: "%s loaded.\n" */
-/*? Tag: vmur.c072c1 Text: "%s unloaded.\n" */
+/*? Text: "%s loaded.\n" */
+/*? Text: "%s unloaded.\n" */

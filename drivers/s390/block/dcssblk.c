@@ -18,7 +18,6 @@
 #include <linux/completion.h>
 #include <linux/interrupt.h>
 #include <asm/s390_rdev.h>
-#include <linux/kmsg.h>
 
 #define DCSSBLK_NAME "dcssblk"
 #define DCSSBLK_MINORS_PER_DISK 1
@@ -254,9 +253,9 @@ dcssblk_is_continuous(struct dcssblk_dev_info *dev_info)
 	/* check continuity */
 	for (i = 0; i < dev_info->num_of_segments - 1; i++) {
 		if ((sort_list[i].end + 1) != sort_list[i+1].start) {
-			kmsg_err("Adjacent DCSSs %s and %s are not "
-				 "contiguous\n", sort_list[i].segment_name,
-				 sort_list[i+1].segment_name);
+			pr_err("Adjacent DCSSs %s and %s are not "
+			       "contiguous\n", sort_list[i].segment_name,
+			       sort_list[i+1].segment_name);
 			rc = -EINVAL;
 			goto out;
 		}
@@ -267,10 +266,10 @@ dcssblk_is_continuous(struct dcssblk_dev_info *dev_info)
 				!(sort_list[i+1].segment_type &
 				SEGMENT_EXCLUSIVE) ||
 				(sort_list[i+1].segment_type == SEG_TYPE_ER)) {
-				kmsg_err("DCSS %s and DCSS %s have "
-					 "incompatible types\n",
-					 sort_list[i].segment_name,
-					 sort_list[i+1].segment_name);
+				pr_err("DCSS %s and DCSS %s have "
+				       "incompatible types\n",
+				       sort_list[i].segment_name,
+				       sort_list[i+1].segment_name);
 				rc = -EINVAL;
 				goto out;
 			}
@@ -372,9 +371,9 @@ dcssblk_shared_store(struct device *dev, struct device_attribute *attr, const ch
 	} else if (inbuf[0] == '0') {
 		/* reload segments in exclusive mode */
 		if (dev_info->segment_type == SEG_TYPE_SC) {
-			kmsg_err("DCSS %s is of type SC and cannot be "
-				 "loaded as exclusive-writable\n",
-				 dev_info->segment_name);
+			pr_err("DCSS %s is of type SC and cannot be "
+			       "loaded as exclusive-writable\n",
+			       dev_info->segment_name);
 			rc = -EINVAL;
 			goto out;
 		}
@@ -397,8 +396,8 @@ dcssblk_shared_store(struct device *dev, struct device_attribute *attr, const ch
 	goto out;
 
 removeseg:
-	kmsg_err("DCSS device %s is removed after a failed access mode "
-		 "change\n", dev_info->segment_name);
+	pr_err("DCSS device %s is removed after a failed access mode "
+	       "change\n", dev_info->segment_name);
 	temp = entry;
 	list_for_each_entry(entry, &dev_info->seg_list, lh) {
 		if (entry != temp)
@@ -446,17 +445,17 @@ dcssblk_save_store(struct device *dev, struct device_attribute *attr, const char
 	if (inbuf[0] == '1') {
 		if (atomic_read(&dev_info->use_count) == 0) {
 			// device is idle => we save immediately
-			kmsg_info("All DCSSs that map to device %s are "
-				  "saved\n", dev_info->segment_name);
+			pr_info("All DCSSs that map to device %s are "
+				"saved\n", dev_info->segment_name);
 			list_for_each_entry(entry, &dev_info->seg_list, lh) {
 				segment_save(entry->segment_name);
 			}
 		}  else {
 			// device is busy => we save it when it becomes
 			// idle in dcssblk_release
-			kmsg_info("Device %s is in use, its DCSSs will be "
-				  "saved when it becomes idle\n",
-				  dev_info->segment_name);
+			pr_info("Device %s is in use, its DCSSs will be "
+				"saved when it becomes idle\n",
+				dev_info->segment_name);
 			dev_info->save_pending = 1;
 		}
 	} else if (inbuf[0] == '0') {
@@ -464,9 +463,9 @@ dcssblk_save_store(struct device *dev, struct device_attribute *attr, const char
 			// device is busy & the user wants to undo his save
 			// request
 			dev_info->save_pending = 0;
-			kmsg_info("A pending save request for device %s "
-				  "has been canceled\n",
-				  dev_info->segment_name);
+			pr_info("A pending save request for device %s "
+				"has been canceled\n",
+				dev_info->segment_name);
 		}
 	} else {
 		up_write(&dcssblk_devices_sem);
@@ -606,8 +605,8 @@ dcssblk_add_store(struct device *dev, struct device_attribute *attr, const char 
 
 	seg_byte_size = (dev_info->end - dev_info->start + 1);
 	set_capacity(dev_info->gd, seg_byte_size >> 9); // size in sectors
-	kmsg_info("Loaded %s with total size %lu bytes and capacity %lu "
-		  "sectors\n", local_buf, seg_byte_size, seg_byte_size >> 9);
+	pr_info("Loaded %s with total size %lu bytes and capacity %lu "
+		"sectors\n", local_buf, seg_byte_size, seg_byte_size >> 9);
 
 	dev_info->save_pending = 0;
 	dev_info->is_shared = 1;
@@ -735,15 +734,15 @@ dcssblk_remove_store(struct device *dev, struct device_attribute *attr, const ch
 	dev_info = dcssblk_get_device_by_name(local_buf);
 	if (dev_info == NULL) {
 		up_write(&dcssblk_devices_sem);
-		kmsg_warn("Device %s cannot be removed because it is not a "
-			  "known device\n", local_buf);
+		pr_warning("Device %s cannot be removed because it is not a "
+			   "known device\n", local_buf);
 		rc = -ENODEV;
 		goto out_buf;
 	}
 	if (atomic_read(&dev_info->use_count) != 0) {
 		up_write(&dcssblk_devices_sem);
-		kmsg_warn("Device %s cannot be removed while it is in "
-			 "use\n", local_buf);
+		pr_warning("Device %s cannot be removed while it is in "
+			   "use\n", local_buf);
 		rc = -EBUSY;
 		goto out_buf;
 	}
@@ -801,8 +800,8 @@ dcssblk_release(struct inode *inode, struct file *filp)
 	down_write(&dcssblk_devices_sem);
 	if (atomic_dec_and_test(&dev_info->use_count)
 	    && (dev_info->save_pending)) {
-		kmsg_info("Device %s has become idle and is being saved "
-			  "now\n", dev_info->segment_name);
+		pr_info("Device %s has become idle and is being saved "
+			"now\n", dev_info->segment_name);
 		list_for_each_entry(entry, &dev_info->seg_list, lh) {
 			segment_save(entry->segment_name);
 		}
@@ -845,9 +844,9 @@ dcssblk_make_request(struct request_queue *q, struct bio *bio)
 		case SEG_TYPE_SC:
 			/* cannot write to these segments */
 			if (bio_data_dir(bio) == WRITE) {
-				kmsg_warn("Writing to %s failed because it "
-					  "is a read-only device\n",
-					  dev_name(&dev_info->dev));
+				pr_warning("Writing to %s failed because it "
+					   "is a read-only device\n",
+					   dev_name(&dev_info->dev));
 				goto fail;
 			}
 		}

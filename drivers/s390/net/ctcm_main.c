@@ -313,7 +313,7 @@ static inline void ccw_unit_check(struct channel *ch, __u8 sense)
 	if (sense & SNS0_INTERVENTION_REQ) {
 		if (sense & 0x01) {
 			if (ch->sense_rc != 0x01) {
-				kmsg_notice(
+				pr_notice(
 					"%s: The communication peer has "
 					"disconnected\n", ch->id);
 				ch->sense_rc = 0x01;
@@ -321,7 +321,7 @@ static inline void ccw_unit_check(struct channel *ch, __u8 sense)
 			fsm_event(ch->fsm, CTC_EVENT_UC_RCRESET, ch);
 		} else {
 			if (ch->sense_rc != SNS0_INTERVENTION_REQ) {
-				kmsg_notice(
+				pr_notice(
 					"%s: The remote operating system is "
 					"not available\n", ch->id);
 				ch->sense_rc = SNS0_INTERVENTION_REQ;
@@ -1704,7 +1704,7 @@ static void __exit ctcm_exit(void)
 {
 	unregister_cu3088_discipline(&ctcm_group_driver);
 	ctcm_unregister_dbf_views();
-	kmsg_info("CTCM driver unloaded\n");
+	pr_info("CTCM driver unloaded\n");
 }
 
 /*
@@ -1712,7 +1712,7 @@ static void __exit ctcm_exit(void)
  */
 static void print_banner(void)
 {
-	kmsg_info("CTCM driver initialized\n");
+	pr_info("CTCM driver initialized\n");
 }
 
 /**
@@ -1734,7 +1734,7 @@ static int __init ctcm_init(void)
 	ret = register_cu3088_discipline(&ctcm_group_driver);
 	if (ret) {
 		ctcm_unregister_dbf_views();
-		kmsg_err("%s / register_cu3088_discipline failed, ret = %d\n",
+		pr_err("%s / register_cu3088_discipline failed, ret = %d\n",
 			__func__, ret);
 		return ret;
 	}

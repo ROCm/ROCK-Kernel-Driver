@@ -1,5 +1,4 @@
 /*?
- * Tag: aes_s390.dc0a3b
  * Text: "Allocating AES fallback algorithm %s failed\n"
  * Severity: Error
  * Parameter:
@@ -17,7 +16,6 @@
  */
 
 /*?
- * Tag: aes_s390.cb83bb
  * Text: "AES hardware acceleration is only available for 128-bit keys\n"
  * Severity: Informational
  * Description:

@@ -1,5 +1,4 @@
 /*?
- * Tag: cio.2b995e
  * Text: "%s is not a valid device for the cio_ignore kernel parameter\n"
  * Severity: Warning
  * Parameter:
@@ -17,7 +16,6 @@
  */
 
 /*?
- * Tag: cio.309e64
  * Text: "0.%x.%04x to 0.%x.%04x is not a valid range for cio_ignore\n"
  * Severity: Warning
  * Parameter:
@@ -39,7 +37,6 @@
  */
 
 /*?
- * Tag: cio.2943d5
  * Text: "Processing %s for channel path %x.%02x\n"
  * Severity: Notice
  * Parameter:
@@ -53,7 +50,6 @@
  */
 
 /*?
- * Tag: cio.0f6270
  * Text: "No CCW console was found\n"
  * Severity: Warning
  * Description:
@@ -68,7 +64,6 @@
  */
 
 /*?
- * Tag: cio.b5d5f6
  * Text: "Channel measurement facility initialized using format %s (mode %s)\n"
  * Severity: Informational
  * Parameter:
@@ -85,7 +80,6 @@
  */
 
 /*?
- * Tag: cio.fd4591
  * Text: "The CSS device driver initialization failed with errno=%d\n"
  * Severity: Alert
  * Parameter:
@@ -95,4 +89,4 @@
  * User action:
  * See the errno man page to find out what caused the problem.
  */
- /*? Tag: cio.d23234 Text: "%s: Got subchannel machine check but no sch_event handler provided.\n" */
+ /*? Text: "%s: Got subchannel machine check but no sch_event handler provided.\n" */

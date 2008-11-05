@@ -34,7 +34,6 @@
 #include <linux/cpu.h>
 #include <linux/timex.h>
 #include <linux/bootmem.h>
-#include <linux/kmsg.h>
 #include <asm/ipl.h>
 #include <asm/setup.h>
 #include <asm/sigp.h>
@@ -391,8 +390,8 @@ static void __init smp_get_save_area(unsigned int cpu, unsigned int phy_cpu)
 	if (ipl_info.type != IPL_TYPE_FCP_DUMP)
 		return;
 	if (cpu >= NR_CPUS) {
-		kmsg_warn("CPU %i exceeds the maximum %i and is excluded from "
-			  "the dump\n", cpu, NR_CPUS - 1);
+		pr_warning("CPU %i exceeds the maximum %i and is excluded from "
+			   "the dump\n", cpu, NR_CPUS - 1);
 		return;
 	}
 	zfcpdump_save_areas[cpu] = kmalloc(sizeof(union save_area), GFP_KERNEL);
@@ -565,7 +564,7 @@ static void __init smp_detect_cpus(void)
 	}
 out:
 	kfree(info);
-	kmsg_info("%d configured CPUs, %d standby CPUs\n", c_cpus, s_cpus);
+	pr_info("%d configured CPUs, %d standby CPUs\n", c_cpus, s_cpus);
 	get_online_cpus();
 	__smp_rescan_cpus();
 	put_online_cpus();
@@ -775,7 +774,7 @@ void __cpu_die(unsigned int cpu)
 	while (!smp_cpu_not_running(cpu))
 		cpu_relax();
 	smp_free_lowcore(cpu);
-	kmsg_info("Processor %d stopped\n", cpu);
+	pr_info("Processor %d stopped\n", cpu);
 }
 
 void cpu_die(void)

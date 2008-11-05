@@ -12,7 +12,6 @@
 #include <linux/cpu.h>
 #include <linux/sysdev.h>
 #include <linux/workqueue.h>
-#include <linux/kmsg.h>
 #include <asm/smp.h>
 
 #include "sclp.h"
@@ -33,7 +32,7 @@ static void sclp_cpu_capability_notify(struct work_struct *work)
 	int cpu;
 	struct sys_device *sysdev;
 
-	kmsg_warn("cpu capability changed.\n");
+	pr_warning("cpu capability changed.\n");
 	get_online_cpus();
 	for_each_online_cpu(cpu) {
 		sysdev = get_cpu_sysdev(cpu);
@@ -80,7 +79,7 @@ static int __init sclp_conf_init(void)
 		return rc;
 
 	if (!(sclp_conf_register.sclp_send_mask & EVTYP_CONFMGMDATA_MASK)) {
-		kmsg_warn("no configuration management.\n");
+		pr_warning("no configuration management.\n");
 		sclp_unregister(&sclp_conf_register);
 		rc = -ENOSYS;
 	}

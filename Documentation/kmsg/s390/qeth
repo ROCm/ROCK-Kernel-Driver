@@ -1,5 +1,4 @@
 /*?
- * Tag: qeth.d3d5be
  * Text: "%s: The LAN is offline\n"
  * Severity: Warning
  * Parameter:
@@ -16,7 +15,6 @@
  */
 
 /*?
- * Tag: qeth.2d2c17
  * Text: "%s: The user canceled setting the qeth device offline\n"
  * Severity: Warning
  * Parameter:
@@ -30,7 +28,6 @@
  */
 
 /*?
- * Tag: qeth.0638b3
  * Text: "%s: A recovery process has been started for the device\n"
  * Severity: Warning
  * Parameter:
@@ -43,7 +40,6 @@
  */
 
 /*?
- * Tag: qeth.9b4776
  * Text: "%s: The qeth device driver failed to recover an error on the device\n"
  * Severity: Warning
  * Parameter:
@@ -61,7 +57,6 @@
  */
 
 /*?
- * Tag: qeth.7e4b84
  * Text: "%s: The link for interface %s on CHPID 0x%X failed\n"
  * Severity: Warning
  * Parameter:
@@ -78,7 +73,6 @@
  */
 
 /*?
- * Tag: qeth.29bcde
  * Text: "%s: The link for %s on CHPID 0x%X has been restored\n"
  * Severity: Informational
  * Parameter:
@@ -93,7 +87,6 @@
  */
 
 /*?
- * Tag: qeth.ad3f88
  * Text: "%s: A hardware operation timed out on the device\n"
  * Severity: Warning
  * Parameter:
@@ -107,7 +100,6 @@
  */
 
 /*?
- * Tag: qeth.9e5556
  * Text: "%s: The adapter hardware is of an unknown type\n"
  * Severity: Error
  * Parameter:
@@ -125,7 +117,6 @@
  */
 
 /*?
- * Tag: qeth.11a4ac
  * Text: "%s: The adapter is used exclusively by another host\n"
  * Severity: Error
  * Parameter:
@@ -138,7 +129,6 @@
  */
 
 /*?
- * Tag: qeth.e4f2ad
  * Text: "%s: QDIO reported an error, rc=%i\n"
  * Severity: Warning
  * Parameter:
@@ -154,7 +144,6 @@
  */
 
 /*?
- * Tag: qeth.36145f
  * Text: "%s: There is no kernel module to support discipline %d\n"
  * Severity: Error
  * Parameter:
@@ -171,7 +160,6 @@
  */
 
 /*?
- * Tag: qeth.4da7f2
  * Text: "Initializing the qeth device driver failed\n"
  * Severity: Error
  * Parameter:
@@ -184,7 +172,6 @@
  */
 
 /*?
- * Tag: qeth.3e39fe
  * Text: "%s: Registering IP address %s failed\n"
  * Severity: Warning
  * Parameter:
@@ -198,7 +185,6 @@
  */
 
 /*?
- * Tag: qeth.b3bcd2
  * Text: "%s: Reading the adapter MAC address failed\n"
  * Severity: Warning
  * Parameter:
@@ -213,7 +199,6 @@
  */
 
 /*?
- * Tag: qeth.b5ea0e
  * Text: "%s: Starting ARP processing support for %s failed\n"
  * Severity: Warning
  * Parameter:
@@ -228,7 +213,6 @@
  */
 
 /*?
- * Tag: qeth.01f8d7
  * Text: "%s: Starting IP fragmentation support for %s failed\n"
  * Severity: Warning
  * Parameter:
@@ -244,7 +228,6 @@
  */
 
 /*?
- * Tag: qeth.e14063
  * Text: "%s: Starting proxy ARP support for %s failed\n"
  * Severity: Warning
  * Parameter:
@@ -261,7 +244,6 @@
  */
 
 /*?
- * Tag: qeth.dbbd03
  * Text: "%s: Starting VLAN support for %s failed\n"
  * Severity: Warning
  * Parameter:
@@ -277,7 +259,6 @@
  */
 
 /*?
- * Tag: qeth.8b72f3
  * Text: "%s: Starting multicast support for %s failed\n"
  * Severity: Warning
  * Parameter:
@@ -293,7 +274,6 @@
  */
 
 /*?
- * Tag: qeth.9d9024
  * Text: "%s: Activating IPv6 support for %s failed\n"
  * Severity: Error
  * Parameter:
@@ -310,7 +290,6 @@
  */
 
 /*?
- * Tag: qeth.a42de7
  * Text: "%s: Enabling the passthrough mode for %s failed\n"
  * Severity: Warning
  * Parameter:
@@ -330,7 +309,6 @@
  */
 
 /*?
- * Tag: qeth.8732cb
  * Text: "%s: Enabling broadcast filtering for %s failed\n"
  * Severity: Warning
  * Parameter:
@@ -346,7 +324,6 @@
  */
 
 /*?
- * Tag: qeth.984f09
  * Text: "%s: Setting up broadcast filtering for %s failed\n"
  * Severity: Warning
  * Parameter:
@@ -362,7 +339,6 @@
  */
 
 /*?
- * Tag: qeth.5cceb2
  * Text: "%s: Setting up broadcast echo filtering for %s failed\n"
  * Severity: Warning
  * Parameter:
@@ -378,7 +354,6 @@
  */
 
 /*?
- * Tag: qeth.47ff65
  * Text: "%s: Starting HW checksumming for %s failed, using SW checksumming\n"
  * Severity: Warning
  * Parameter:
@@ -398,7 +373,6 @@
  */
 
 /*?
- * Tag: qeth.83f45b
  * Text: "%s: Enabling HW checksumming for %s failed, using SW checksumming\n"
  * Severity: Warning
  * Parameter:
@@ -418,7 +392,6 @@
  */
 
 /*?
- * Tag: qeth.50d1bf
  * Text: "%s: Starting outbound TCP segmentation offload for %s failed\n"
  * Severity: Warning
  * Parameter:
@@ -436,7 +409,6 @@
  */
 
 /*?
- * Tag: qeth.05c874
  * Text: "%s: The network adapter failed to generate a unique ID\n"
  * Severity: Warning
  * Parameter:
@@ -453,7 +425,6 @@
  */
 
 /*?
- * Tag: qeth.5d5e5c
  * Text: "There is no IPv6 support for the layer 3 discipline\n"
  * Severity: Warning
  * Description:
@@ -466,36 +437,36 @@
  * want to use IPv6 with layer 3 qeth devices.
  */
 
-/*? Tag: qeth.f9f47e Text: "core functions removed\n" */
-/*? Tag: qeth.4b371c Text: "%s: Device is a%s card%s%s%s\nwith link type %s.\n" */
-/*? Tag: qeth.1a8e8d Text: "%s: Device is a%s card%s%s%s\nwith link type %s (no portname needed by interface).\n" */
-/*? Tag: qeth.5db021 Text: "%s: Device is a%s card%s%s%s\nwith link type %s (portname: %s)\n" */
-/*? Tag: qeth.935e7d Text: "%s: issue_next_read failed: no iob available!\n" */
-/*? Tag: qeth.e5f5dc Text: "%s: Priority Queueing not supported\n" */
-/*? Tag: qeth.fb86d5 Text: "%s: sense data available. cstat 0x%X dstat 0x%X\n" */
-/*? Tag: qeth.4ee99c Text: "loading core functions\n" */
-/*? Tag: qeth.e9785b Text: "%s: MAC address %2.2x:%2.2x:%2.2x:%2.2x:%2.2x:%2.2x successfully registered on device %s\n" */
-/*? Tag: qeth.f18f49 Text: "%s: Device successfully recovered!\n" */
-/*? Tag: qeth.933eb7 Text: "register layer 2 discipline\n" */
-/*? Tag: qeth.245d73 Text: "unregister layer 2 discipline\n" */
-/*? Tag: qeth.dcca89 Text: "%s: Hardware IP fragmentation not supported on %s\n" */
-/*? Tag: qeth.53ad89 Text: "%s: IPv6 not supported on %s\n" */
-/*? Tag: qeth.c87e67 Text: "%s: VLAN not supported on %s\n" */
-/*? Tag: qeth.d8c1fb Text: "%s: Inbound source address not supported on %s\n" */
-/*? Tag: qeth.def254 Text: "%s: IPV6 enabled\n" */
-/*? Tag: qeth.d069c6 Text: "%s: ARP processing not supported on %s!\n" */
-/*? Tag: qeth.268ac2 Text: "%s: Hardware IP fragmentation enabled \n" */
-/*? Tag: qeth.a50ea5 Text: "%s: set adapter parameters not supported.\n" */
-/*? Tag: qeth.afbd6c Text: "%s: VLAN enabled\n" */
-/*? Tag: qeth.2c6def Text: "register layer 3 discipline\n" */
-/*? Tag: qeth.451bb9 Text: "%s: Outbound TSO enabled\n" */
-/*? Tag: qeth.552458 Text: "%s: Broadcast not supported on %s\n" */
-/*? Tag: qeth.6456c4 Text: "%s: Outbound TSO not supported on %s\n" */
-/*? Tag: qeth.626666 Text: "%s: Inbound HW Checksumming not supported on %s,\ncontinuing using Inbound SW Checksumming\n" */
-/*? Tag: qeth.e1052c Text: "%s: Using no checksumming on %s.\n" */
-/*? Tag: qeth.1b3f8f Text: "%s: Broadcast enabled\n" */
-/*? Tag: qeth.ae261f Text: "%s: Multicast not supported on %s\n" */
-/*? Tag: qeth.3cbf5f Text: "%s: Using SW checksumming on %s.\n" */
-/*? Tag: qeth.0c69ff Text: "%s: HW Checksumming (inbound) enabled\n" */
-/*? Tag: qeth.7d4de7 Text: "unregister layer 3 discipline\n" */
-/*? Tag: qeth.c78069 Text: "%s: Multicast enabled\n" */
+/*? Text: "core functions removed\n" */
+/*? Text: "%s: Device is a%s card%s%s%s\nwith link type %s.\n" */
+/*? Text: "%s: Device is a%s card%s%s%s\nwith link type %s (no portname needed by interface).\n" */
+/*? Text: "%s: Device is a%s card%s%s%s\nwith link type %s (portname: %s)\n" */
+/*? Text: "%s: issue_next_read failed: no iob available!\n" */
+/*? Text: "%s: Priority Queueing not supported\n" */
+/*? Text: "%s: sense data available. cstat 0x%X dstat 0x%X\n" */
+/*? Text: "loading core functions\n" */
+/*? Text: "%s: MAC address %2.2x:%2.2x:%2.2x:%2.2x:%2.2x:%2.2x successfully registered on device %s\n" */
+/*? Text: "%s: Device successfully recovered!\n" */
+/*? Text: "register layer 2 discipline\n" */
+/*? Text: "unregister layer 2 discipline\n" */
+/*? Text: "%s: Hardware IP fragmentation not supported on %s\n" */
+/*? Text: "%s: IPv6 not supported on %s\n" */
+/*? Text: "%s: VLAN not supported on %s\n" */
+/*? Text: "%s: Inbound source address not supported on %s\n" */
+/*? Text: "%s: IPV6 enabled\n" */
+/*? Text: "%s: ARP processing not supported on %s!\n" */
+/*? Text: "%s: Hardware IP fragmentation enabled \n" */
+/*? Text: "%s: set adapter parameters not supported.\n" */
+/*? Text: "%s: VLAN enabled\n" */
+/*? Text: "register layer 3 discipline\n" */
+/*? Text: "%s: Outbound TSO enabled\n" */
+/*? Text: "%s: Broadcast not supported on %s\n" */
+/*? Text: "%s: Outbound TSO not supported on %s\n" */
+/*? Text: "%s: Inbound HW Checksumming not supported on %s,\ncontinuing using Inbound SW Checksumming\n" */
+/*? Text: "%s: Using no checksumming on %s.\n" */
+/*? Text: "%s: Broadcast enabled\n" */
+/*? Text: "%s: Multicast not supported on %s\n" */
+/*? Text: "%s: Using SW checksumming on %s.\n" */
+/*? Text: "%s: HW Checksumming (inbound) enabled\n" */
+/*? Text: "unregister layer 3 discipline\n" */
+/*? Text: "%s: Multicast enabled\n" */

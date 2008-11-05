@@ -1,5 +1,4 @@
 /*?
- * Tag: ap.7564a4
  * Text: "%d is not a valid cryptographic domain\n"
  * Severity: Warning
  * Parameter:
@@ -14,7 +13,6 @@
  */
 
 /*?
- * Tag: ap.3677f7
  * Text: "The hardware system does not support AP instructions\n"
  * Severity: Warning
  * Description:
@@ -28,7 +26,6 @@
  */
 
 /*?
- * Tag: ap.fce52f
  * Text: "Registering adapter interrupts for AP %d failed\n"
  * Severity: Error
  * Parameter:

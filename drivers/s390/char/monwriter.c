@@ -21,7 +21,6 @@
 #include <linux/ctype.h>
 #include <linux/poll.h>
 #include <linux/mutex.h>
-#include <linux/kmsg.h>
 #include <asm/uaccess.h>
 #include <asm/ebcdic.h>
 #include <asm/io.h>
@@ -67,7 +66,7 @@ static int monwrite_diag(struct monwrite_hdr *myhdr, char *buffer, int fcn)
 	rc = appldata_asm(&id, fcn, (void *) buffer, myhdr->datalen);
 	if (rc <= 0)
 		return rc;
-	kmsg_err("Writing monitor data failed with rc=%i\n", rc);
+	pr_err("Writing monitor data failed with rc=%i\n", rc);
 	if (rc == 5)
 		return -EPERM;
 	return -EINVAL;

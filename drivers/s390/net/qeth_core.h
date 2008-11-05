@@ -22,7 +22,6 @@
 #include <linux/bitops.h>
 #include <linux/seq_file.h>
 #include <linux/ethtool.h>
-#include <linux/kmsg.h>
 
 #include <net/ipv6.h>
 #include <net/if_inet6.h>

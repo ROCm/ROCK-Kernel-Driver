@@ -24,7 +24,6 @@
 #include <asm/ebcdic.h>
 #include <asm/cpcmd.h>
 #include <linux/kmod.h>
-#include <linux/kmsg.h>
 
 #include <net/iucv/iucv.h>
 #include <net/iucv/af_iucv.h>
@@ -661,9 +660,9 @@ static int iucv_sock_sendmsg(struct kiocb *iocb, struct socket *sock,
 				memcpy(user_id, iucv->dst_user_id, 8);
 				appl_id[8] = 0;
 				memcpy(appl_id, iucv->dst_name, 8);
-				kmsg_err("Application %s on z/VM guest %s"
-					" exceeds message limit\n",
-					user_id, appl_id);
+				pr_err("Application %s on z/VM guest %s"
+				       " exceeds message limit\n",
+				       user_id, appl_id);
 			}
 			skb_unlink(skb, &iucv->send_skb_q);
 			err = -EPIPE;
@@ -1202,8 +1201,8 @@ static int __init afiucv_init(void)
 	int err;
 
 	if (!MACHINE_IS_VM) {
-		kmsg_err("The af_iucv module cannot be loaded"
-			" without z/VM\n");
+		pr_err("The af_iucv module cannot be loaded"
+		       " without z/VM\n");
 		err = -EPROTONOSUPPORT;
 		goto out;
 	}

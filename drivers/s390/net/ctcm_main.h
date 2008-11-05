@@ -14,7 +14,6 @@
 
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
-#include <linux/kmsg.h>
 
 #include "fsm.h"
 #include "cu3088.h"

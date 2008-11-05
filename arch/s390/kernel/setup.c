@@ -41,7 +41,6 @@
 #include <linux/ctype.h>
 #include <linux/reboot.h>
 #include <linux/topology.h>
-#include <linux/kmsg.h>
 
 #include <asm/ipl.h>
 #include <asm/uaccess.h>
@@ -360,18 +359,18 @@ static void setup_addressing_mode(void)
 	if (s390_noexec) {
 		if (set_amode_and_uaccess(PSW_ASC_SECONDARY,
 					  PSW32_ASC_SECONDARY))
-			kmsg_info("Execute protection active, "
-				  "mvcos available\n");
+			pr_info("Execute protection active, "
+				"mvcos available\n");
 		else
-			kmsg_info("Execute protection active, "
-				  "mvcos not available\n");
+			pr_info("Execute protection active, "
+				"mvcos not available\n");
 	} else if (switch_amode) {
 		if (set_amode_and_uaccess(PSW_ASC_PRIMARY, PSW32_ASC_PRIMARY))
-			kmsg_info("Address spaces switched, "
-				  "mvcos available\n");
+			pr_info("Address spaces switched, "
+				"mvcos available\n");
 		else
-			kmsg_info("Address spaces switched, "
-				  "mvcos not available\n");
+			pr_info("Address spaces switched, "
+				"mvcos not available\n");
 	}
 #ifdef CONFIG_TRACE_IRQFLAGS
 	sysc_restore_trace_psw.mask = psw_kernel_bits & ~PSW_MASK_MCHECK;
@@ -584,15 +583,15 @@ setup_memory(void)
 			start = PFN_PHYS(start_pfn) + bmap_size + PAGE_SIZE;
 
 			if (start + INITRD_SIZE > memory_end) {
-				kmsg_err("initrd extends beyond end of "
-					 "memory (0x%08lx > 0x%08lx) "
-					 "disabling initrd\n",
-					 start + INITRD_SIZE, memory_end);
+				pr_err("initrd extends beyond end of "
+				       "memory (0x%08lx > 0x%08lx) "
+				       "disabling initrd\n",
+				       start + INITRD_SIZE, memory_end);
 				INITRD_START = INITRD_SIZE = 0;
 			} else {
-				kmsg_info("Moving initrd (0x%08lx -> "
-					  "0x%08lx, size: %ld)\n",
-					  INITRD_START, start, INITRD_SIZE);
+				pr_info("Moving initrd (0x%08lx -> "
+					"0x%08lx, size: %ld)\n",
+					INITRD_START, start, INITRD_SIZE);
 				memmove((void *) start, (void *) INITRD_START,
 					INITRD_SIZE);
 				INITRD_START = start;
@@ -654,10 +653,10 @@ setup_memory(void)
 			initrd_start = INITRD_START;
 			initrd_end = initrd_start + INITRD_SIZE;
 		} else {
-			kmsg_err("initrd extends beyond end of "
-				 "memory (0x%08lx > 0x%08lx) "
-				 "disabling initrd\n",
-				 initrd_start + INITRD_SIZE, memory_end);
+			pr_err("initrd extends beyond end of "
+			       "memory (0x%08lx > 0x%08lx) "
+			       "disabling initrd\n",
+			       initrd_start + INITRD_SIZE, memory_end);
 			initrd_start = initrd_end = 0;
 		}
 	}
@@ -770,26 +769,26 @@ setup_arch(char **cmdline_p)
          */
 #ifndef CONFIG_64BIT
 	if (MACHINE_IS_VM)
-		kmsg_info("Linux is running as a z/VM "
-			  "guest operating system in 31-bit mode\n");
+		pr_info("Linux is running as a z/VM "
+			"guest operating system in 31-bit mode\n");
 	else
-		kmsg_info("Linux is running natively in 31-bit mode\n");
+		pr_info("Linux is running natively in 31-bit mode\n");
 	if (MACHINE_HAS_IEEE)
-		kmsg_info("The hardware system has IEEE compatible "
-			  "floating point units\n");
+		pr_info("The hardware system has IEEE compatible "
+			"floating point units\n");
 	else
-		kmsg_info("The hardware system has no IEEE compatible "
-			  "floating point units\n");
+		pr_info("The hardware system has no IEEE compatible "
+			"floating point units\n");
 #else /* CONFIG_64BIT */
 	if (MACHINE_IS_VM)
-		kmsg_info("Linux is running as a z/VM "
-			  "guest operating system in 64-bit mode\n");
+		pr_info("Linux is running as a z/VM "
+			"guest operating system in 64-bit mode\n");
 	else if (MACHINE_IS_KVM) {
-		kmsg_info("Linux is running under KVM in 64-bit mode\n");
+		pr_info("Linux is running under KVM in 64-bit mode\n");
 		add_preferred_console("hvc", 0, NULL);
 		s390_virtio_console_init();
 	} else
-		kmsg_info("Linux is running natively in 64-bit mode\n");
+		pr_info("Linux is running natively in 64-bit mode\n");
 #endif /* CONFIG_64BIT */
 
 	/* Have one command line that is parsed and saved in /proc/cmdline */

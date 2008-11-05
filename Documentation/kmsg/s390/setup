@@ -1,5 +1,4 @@
 /*?
- * Tag: setup.d96661
  * Text: "Execute protection active, mvcos available\n"
  * Severity: Informational
  * Description:
@@ -11,7 +10,6 @@
  */
 
 /*?
- * Tag: setup.cac471
  * Text: "Execute protection active, mvcos not available\n"
  * Severity: Informational
  * Description:
@@ -24,7 +22,6 @@
  */
 
 /*?
- * Tag: setup.0cb929
  * Text: "Address spaces switched, mvcos available\n"
  * Severity: Informational
  * Description:
@@ -37,7 +34,6 @@
  */
 
 /*?
- * Tag: setup.78bb87
  * Text: "Address spaces switched, mvcos not available\n"
  * Severity: Informational
  * Description:
@@ -51,7 +47,6 @@
  */
 
 /*?
- * Tag: setup.904d83
  * Text: "initrd extends beyond end of memory (0x%08lx > 0x%08lx) disabling initrd\n"
  * Severity: Error
  * Parameter:
@@ -68,7 +63,6 @@
  */
 
 /*?
- * Tag: setup.cdb2a0
  * Text: "Moving initrd (0x%08lx -> 0x%08lx, size: %ld)\n"
  * Severity: Informational
  * Parameter:
@@ -84,7 +78,6 @@
  */
 
 /*?
- * Tag: setup.0961dd
  * Text: "Linux is running as a z/VM guest operating system in 31-bit mode\n"
  * Severity: Informational
  * Description:
@@ -95,7 +88,6 @@
  */
 
 /*?
- * Tag: setup.db58c7
  * Text: "Linux is running natively in 31-bit mode\n"
  * Severity: Informational
  * Description:
@@ -108,7 +100,6 @@
  */
 
 /*?
- * Tag: setup.262f23
  * Text: "The hardware system has IEEE compatible floating point units\n"
  * Severity: Informational
  * Description:
@@ -119,7 +110,6 @@
  */
 
 /*?
- * Tag: setup.9d71f8
  * Text: "The hardware system has no IEEE compatible floating point units\n"
  * Severity: Informational
  * Description:
@@ -130,7 +120,6 @@
  */
 
 /*?
- * Tag: setup.1a06a7
  * Text: "Linux is running as a z/VM guest operating system in 64-bit mode\n"
  * Severity: Informational
  * Description:
@@ -141,7 +130,6 @@
  */
 
 /*?
- * Tag: setup.6bac7a
  * Text: "Linux is running natively in 64-bit mode\n"
  * Severity: Informational
  * Description:
@@ -154,7 +142,6 @@
  */
 
 /*?
- * Tag: setup.289988
  * Text: "Linux is running under KVM in 64-bit mode\n"
  * Severity: Informational
  * Description:

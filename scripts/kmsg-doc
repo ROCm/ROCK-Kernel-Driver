@@ -96,13 +96,17 @@ sub calc_jhash($)
     $c = 0;
     $i = 0;
     for ($len = $length + 12; $len >= 12; $len -= 12) {
-	if ($len < 23) {
+	if ($len < 24) {
 	    # add length for last round
 	    $c += $length;
 	}
 	$a += $ar[$i] + ($ar[$i+1]<<8) + ($ar[$i+2]<<16) + ($ar[$i+3]<<24);
 	$b += $ar[$i+4] + ($ar[$i+5]<<8) + ($ar[$i+6]<<16) + ($ar[$i+7]<<24);
-	$c += $ar[$i+8] + ($ar[$i+9]<<8) + ($ar[$i+10]<<16) + ($ar[$i+11]<<24);
+	if ($len >= 24) {
+	    $c += $ar[$i+8] + ($ar[$i+9]<<8) + ($ar[$i+10]<<16) + ($ar[$i+11]<<24);
+	} else {
+	    $c += ($ar[$i+8]<<8) + ($ar[$i+9]<<16) + ($ar[$i+10]<<24);
+	}
 	$a &= 0xffffffff; $b &= 0xffffffff; $c &= 0xffffffff;
 	$a -= $b; $a -= $c; $a ^= ($c >> 13); $a &= 0xffffffff;
 	$b -= $c; $b -= $a; $b ^= ($a << 8); $b &= 0xffffffff;
@@ -120,14 +124,24 @@ sub calc_jhash($)
 
 sub add_kmsg_desc($$$$$$)
 {
-    my ($tag, $text, $sev, $argv, $desc, $user) = @_;
+    my ($component, $text, $sev, $argv, $desc, $user) = @_;
+    my ($hash, $tag);
+
+    $text = remove_quotes($text);
+    $hash = substr(sprintf("%08x", calc_jhash($text)), 2, 6);
+    $tag = $component . "." . $hash;
 
     if ($kmsg_desc{$tag}) {
-	warn "Duplicate message with tag $tag\n";
+	if ($text ne $kmsg_desc{$tag}->{'TEXT'}) {
+	    warn "Duplicate message with tag $tag\n";
+	    warn "  --- $kmsg_desc{$tag}->{'TEXT'}\n";
+	    warn "  +++ $text\n";
+	} else {
+	    warn "Duplicate message description for \"$text\"\n";
+	}
 	$errors++;
 	return;
     }
-    $text = remove_quotes($text);
     $kmsg_desc{$tag}->{'TEXT'} = $text;
     $kmsg_desc{$tag}->{'SEV'} = $sev;
     $kmsg_desc{$tag}->{'ARGV'} = $argv;
@@ -135,14 +149,15 @@ sub add_kmsg_desc($$$$$$)
     $kmsg_desc{$tag}->{'USER'} = $user;
 }
 
-sub add_kmsg_print($$$$$)
+sub add_kmsg_print($$$$)
 {
-    my ($component, $sev, $prefix, $text, $argv) = @_;
+    my ($component, $sev, $text, $argv) = @_;
     my ($hash, $tag, $count, $parm);
 
     $text = remove_quotes($text);
     $hash = substr(sprintf("%08x", calc_jhash($text)), 2, 6);
     $tag = $component . "." . $hash;
+
     # Pretty print severity
     $sev =~ s/"<0>"/Emerg/;
     $sev =~ s/"<1>"/Alert/;
@@ -153,18 +168,17 @@ sub add_kmsg_print($$$$$)
     $sev =~ s/"<6>"/Informational/;
     $sev =~ s/"<7>"/Debug/;
     $kmsg_print{$kmsg_count}->{'TAG'} = $tag;
-    $kmsg_print{$kmsg_count}->{'TEXT'} = $prefix . $text;
+    $kmsg_print{$kmsg_count}->{'TEXT'} = $text;
     $kmsg_print{$kmsg_count}->{'SEV'} = $sev;
     $kmsg_print{$kmsg_count}->{'ARGV'} = $argv;
     $kmsg_count += 1;
 }
 
-sub process_source_file($)
+sub process_source_file($$)
 {
-    my $file = "@_";
+    my ($component, $file) = @_;
     my $state;
-    my $component = "";
-    my ($tag, $text, $sev, $argv, $desc, $user);
+    my ($text, $sev, $argv, $desc, $user);
 
     if (!open(FD, "$file")) {
 	return "";
@@ -179,24 +193,20 @@ sub process_source_file($)
 	}
 	if ($state == 0) {
 	    # single line kmsg for undocumented messages, format:
-	    # /*? Tag: <component>.<hash> Text: "<message>" */
-	    if (/^\s*\/\*\?\s*Tag:\s*(\S*)\s*Text:\s*(\".*\")\s*\*\/\s*$/o) {
-		add_kmsg_desc($1, $2, "", "", "", "");
+	    # /*? Text: "<message>" */
+	    if (/^\s*\/\*\?\s*Text:\s*(\".*\")\s*\*\/\s*$/o) {
+		add_kmsg_desc($component, $1, "", "", "", "");
 	    }
 	    # kmsg message start: '/*?'
 	    if (/^\s*\/\*\?\s*$/o) {
 		$state = 1;
-		($tag, $text, $sev, $argv, $desc, $user) = ( "", "", "", "", "", "" );
+		($text, $sev, $argv, $desc, $user) = ( "", "", "", "", "" );
 	    }
 	} elsif ($state == 1) {
 	    # kmsg message end: ' */'
 	    if (/^\s*\*\/\s*/o) {
-		add_kmsg_desc($tag, $text, $sev, $argv, $desc, $user);
+		add_kmsg_desc($component, $text, $sev, $argv, $desc, $user);
 		$state = 0;
-	    }
-	    # kmsg message tag: ' * Tag: <tag>'
-	    elsif (/^\s*\*\s*Tag:\s*(\S*)\s*$/o) {
-		$tag = $1;
 	    }
 	    # kmsg message text: ' * Text: "<message>"'
 	    elsif (/^\s*\*\s*Text:\s*(\".*\")\s*$/o) {
@@ -253,7 +263,7 @@ sub process_source_file($)
 	} elsif ($state == 3) {
 	    # kmsg message end: ' */'
 	    if (/^\s*\*\/\s*/o) {
-		add_kmsg_desc($tag, $text, $sev, $argv, $desc, $user);
+		add_kmsg_desc($component, $text, $sev, $argv, $desc, $user);
 		$state = 0;
 	    }
 	    # kmsg message description start: ' * User action:'
@@ -272,7 +282,7 @@ sub process_source_file($)
 	} elsif ($state == 4) {
 	    # kmsg message end: ' */'
 	    if (/^\s*\*\/\s*/o) {
-		add_kmsg_desc($tag, $text, $sev, $argv, $desc, $user);
+		add_kmsg_desc($component, $text, $sev, $argv, $desc, $user);
 		$state = 0;
 	    }
 	    # kmsg message user action line: ' * <text>'
@@ -298,14 +308,14 @@ sub process_cpp_file($$$$)
 	chomp;
 	if (/.*__KMSG_PRINT\(\s*(\S*)\s*_FMT_(.*)_ARGS_\s*(.*)?_END_\s*\)/o) {
 	    if ($component ne "") {
-		add_kmsg_print($component, $1, "", $2, $3);
+		add_kmsg_print($component, $1, $2, $3);
 	    } else {
 		warn "Error(${file}:$.): kmsg without component\n";
 		$errors++;
 	    }
-	} elsif (/.*__KMSG_DEV\(\s*(\S*)\s*_FMT_(.*)_ARGS_\s*(.*)?_END_\*s\)/o) {
+	} elsif (/.*__KMSG_DEV\(\s*(\S*)\s*_FMT_(.*)_ARGS_\s*(.*)?_END_\s*\)/o) {
 	    if ($component ne "") {
-		add_kmsg_print($component, $1, "%s: ", $2, $3);
+		add_kmsg_print($component, $1, "\"%s: \"" . $2, $3);
 	    } else {
 		warn "Error(${file}:$.): kmsg without component\n";
 		$errors++;
@@ -322,7 +332,7 @@ sub check_messages($)
     for ($i = 0; $i < $kmsg_count; $i++) {
 	$tag = $kmsg_print{$i}->{'TAG'};
 	if (!defined($kmsg_desc{$tag})) {
-	    add_kmsg_desc($tag,
+	    add_kmsg_desc($component,
 			  "\"" . $kmsg_print{$i}->{'TEXT'} . "\"",
 			  $kmsg_print{$i}->{'SEV'},
 			  $kmsg_print{$i}->{'ARGV'},
@@ -330,15 +340,15 @@ sub check_messages($)
 			  "What is the user supposed to do");
 	    $kmsg_desc{$tag}->{'CHECK'} = 1;
 	    $failed = 1;
-	    warn "$component: Missing description for: $tag\n";
+	    warn "$component: Missing description for: $kmsg_desc{$tag}\n";
 	    $errors++;
 	    next;
 	}
-	if ($kmsg_print{$i}->{'TEXT'} ne $kmsg_desc{$tag}->{'TEXT'}) {
-	    warn "$component: format string mismatch for: $tag\n";
-	    warn "  --- $kmsg_print{$i}->{'TEXT'}\n";
-	    warn "  +++ $kmsg_desc{$tag}->{'TEXT'}\n";
-	    $errors++;
+	if ($kmsg_desc{$tag}->{'SEV'} ne "" &&
+	    $kmsg_desc{$tag}->{'SEV'} ne $kmsg_print{$i}->{'SEV'}) {
+	    warn "Message severity mismatch for \"$kmsg_print{$i}->{'TEXT'}\"\n";
+	    warn "  --- $kmsg_desc{$tag}->{'SEV'}\n";
+	    warn "  +++ $kmsg_print{$i}->{'SEV'}\n";
 	}
     }
     return $failed;
@@ -352,7 +362,6 @@ sub print_templates()
 	    next;
 	}
 	print "/*?\n";
-	print " * Tag: $tag\n";
 	print " * Text: \"$kmsg_desc{$tag}->{'TEXT'}\"\n";
 	print " * Severity: $kmsg_desc{$tag}->{'SEV'}\n";
 	$argv = $kmsg_desc{$tag}->{'ARGV'};
@@ -377,13 +386,13 @@ sub print_templates()
 
 sub write_man_pages()
 {
-    my $file;
+    my ($i, $file);
 
-    foreach $tag (keys(%kmsg_desc)) {
-	if (defined($kmsg_desc{$tag}->{'CHECK'})) {
-	    next;
-	}
-	if ($kmsg_desc{$tag}->{'DESC'} eq "") {
+    for ($i = 0; $i < $kmsg_count; $i++) {
+	$tag = $kmsg_print{$i}->{'TAG'};
+	if (!defined($kmsg_desc{$tag}) ||
+	    defined($kmsg_desc{$tag}->{'CHECK'}) ||
+	    $kmsg_desc{$tag}->{'DESC'} eq "") {
 	    next;
 	}
 	$file = $objtree . "man/" . $tag . ".9";
@@ -448,14 +457,16 @@ foreach $tmp (@ARGV) {
     $filename = $tmp;
 }
 
-$component = process_source_file($filename);
+$component = process_source_file("", $filename);
 if ($component ne "") {
-    process_source_file($srctree . "Documentation/kmsg/" . $srcarch . $component);
-    process_source_file($srctree . "Documentation/kmsg/" . $component);
+    process_source_file($component, $srctree . "Documentation/kmsg/" .
+			$srcarch . $component);
+    process_source_file($component, $srctree . "Documentation/kmsg/" .
+			$component);
 }
 
+process_cpp_file($cc, $gcc_options, $filename, $component);
 if ($option eq "check") {
-    process_cpp_file($cc, $gcc_options, $filename, $component);
     if (check_messages($component)) {
 	print_templates();
     }

@@ -44,7 +44,6 @@
 #include <linux/err.h>
 #include <linux/device.h>
 #include <linux/cpu.h>
-#include <linux/kmsg.h>
 #include <net/iucv/iucv.h>
 #include <asm/atomic.h>
 #include <asm/ebcdic.h>
@@ -427,8 +426,8 @@ static void iucv_declare_cpu(void *data)
 			err = "Paging or storage error";
 			break;
 		}
-		kmsg_warn("Defining an interrupt buffer on CPU %i"
-			" failed with 0x%02x (%s)\n", cpu, rc, err);
+		pr_warning("Defining an interrupt buffer on CPU %i"
+			   " failed with 0x%02x (%s)\n", cpu, rc, err);
 		return;
 	}
 
@@ -1575,7 +1574,7 @@ static void iucv_external_interrupt(u16 code)
 	BUG_ON(p->iptype  < 0x01 || p->iptype > 0x09);
 	work = kmalloc(sizeof(struct iucv_irq_list), GFP_ATOMIC);
 	if (!work) {
-		kmsg_warn("iucv_external_interrupt: out of memory\n");
+		pr_warning("iucv_external_interrupt: out of memory\n");
 		return;
 	}
 	memcpy(&work->data, p, sizeof(work->data));

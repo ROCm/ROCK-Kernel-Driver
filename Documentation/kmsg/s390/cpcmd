@@ -1,5 +1,4 @@
 /*?
- * Tag: cpcmd.5984fe
  * Text: "The cpcmd kernel function failed to allocate a response buffer\n"
  * Severity: Warning
  * Description:

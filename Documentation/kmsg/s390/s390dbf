@@ -1,5 +1,4 @@
 /*?
- * Tag: s390dbf.2d934d
  * Text: "Root becomes the owner of all s390dbf files in sysfs\n"
  * Severity: Warning
  * Description:
@@ -9,7 +8,6 @@
  */
 
 /*?
- * Tag: s390dbf.ac1eb1
  * Text: "Registering debug feature %s failed\n"
  * Severity: Error
  * Parameter:
@@ -23,7 +21,6 @@
  */
 
 /*?
- * Tag: s390dbf.a1b9ad
  * Text: "Registering view %s/%s would exceed the maximum number of views %i\n"
  * Severity: Error
  * Parameter:
@@ -39,7 +36,6 @@
  */
 
 /*?
- * Tag: s390dbf.ee54db
  * Text: "%s is not a valid level for a debug feature\n"
  * Severity: Warning
  * Parameter:
@@ -54,9 +50,8 @@
  */
 
 /*?
- * Tag: s390dbf.3e616a
  * Text: "Flushing debug data failed because %c is not a valid area\n"
- * Severity: Warning
+ * Severity: Informational
  * Parameter:
  *   @1: debug area number
  * Description:
@@ -69,9 +64,8 @@
  */
 
 /*?
- * Tag: s390dbf.d8734b
  * Text: "Allocating memory for %i pages failed\n"
- * Severity: Error
+ * Severity: Informational
  * Parameter:
  *   @1: number of pages
  * Description:
@@ -83,7 +77,7 @@
  * memory to your LPAR or z/VM guest virtual machine.
  */
 
-/*? Tag: s390dbf.b8e5ce Text: "%s: set new size (%i pages)\n" */
-/*? Tag: s390dbf.513d22 Text: "%s: switched off\n" */
-/*? Tag: s390dbf.da91f4 Text: "%s: level %i is out of range (%i - %i)\n" */
-/*? Tag: s390dbf.25e612 Text: "Registering view %s/%s failed due to out of memory\n" */
+/*? Text: "%s: set new size (%i pages)\n" */
+/*? Text: "%s: switched off\n" */
+/*? Text: "%s: level %i is out of range (%i - %i)\n" */
+/*? Text: "Registering view %s/%s failed due to out of memory\n" */

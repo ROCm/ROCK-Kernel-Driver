@@ -21,7 +21,6 @@
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
 #include <linux/poll.h>
-#include <linux/kmsg.h>
 #include <net/iucv/iucv.h>
 #include <asm/uaccess.h>
 #include <asm/ebcdic.h>
@@ -162,7 +161,7 @@ static int mon_send_reply(struct mon_msg *monmsg,
 	} else
 		monmsg->replied_msglim = 1;
 	if (rc) {
-		kmsg_err("Reading monitor data failed with rc=%i\n", rc);
+		pr_err("Reading monitor data failed with rc=%i\n", rc);
 		return -EIO;
 	}
 	return 0;
@@ -241,8 +240,8 @@ static void mon_iucv_path_severed(struct iucv_path *path, u8 ipuser[16])
 {
 	struct mon_private *monpriv = path->private;
 
-	kmsg_err("z/VM *MONITOR system service disconnected with rc=%i\n",
-		 ipuser[0]);
+	pr_err("z/VM *MONITOR system service disconnected with rc=%i\n",
+	       ipuser[0]);
 	iucv_path_sever(path, NULL);
 	atomic_set(&monpriv->iucv_severed, 1);
 	wake_up(&mon_conn_wait_queue);
@@ -257,7 +256,7 @@ static void mon_iucv_message_pending(struct iucv_path *path,
 	memcpy(&monpriv->msg_array[monpriv->write_index]->msg,
 	       msg, sizeof(*msg));
 	if (atomic_inc_return(&monpriv->msglim_count) == MON_MSGLIM) {
-		kmsg_warn("The read queue for monitor data is full\n");
+		pr_warning("The read queue for monitor data is full\n");
 		monpriv->msg_array[monpriv->write_index]->msglim_reached = 1;
 	}
 	monpriv->write_index = (monpriv->write_index + 1) % MON_MSGLIM;
@@ -301,8 +300,8 @@ static int mon_open(struct inode *inode, struct file *filp)
 	rc = iucv_path_connect(monpriv->path, &monreader_iucv_handler,
 			       MON_SERVICE, NULL, user_data_connect, monpriv);
 	if (rc) {
-		kmsg_err("Connecting to the z/VM *MONITOR system service "
-			    "failed with rc=%i\n", rc);
+		pr_err("Connecting to the z/VM *MONITOR system service "
+		       "failed with rc=%i\n", rc);
 		rc = -EIO;
 		goto out_path;
 	}
@@ -343,8 +342,8 @@ static int mon_close(struct inode *inode, struct file *filp)
 	 */
 	rc = iucv_path_sever(monpriv->path, user_data_sever);
 	if (rc)
-		kmsg_warn("Disconnecting the z/VM *MONITOR system service "
-			     "failed with rc=%i\n", rc);
+		pr_warning("Disconnecting the z/VM *MONITOR system service "
+			   "failed with rc=%i\n", rc);
 
 	atomic_set(&monpriv->iucv_severed, 0);
 	atomic_set(&monpriv->iucv_connected, 0);
@@ -460,8 +459,8 @@ static int __init mon_init(void)
 	int rc;
 
 	if (!MACHINE_IS_VM) {
-		kmsg_err("The z/VM *MONITOR record device driver cannot be "
-			    "loaded without z/VM\n");
+		pr_err("The z/VM *MONITOR record device driver cannot be "
+		       "loaded without z/VM\n");
 		return -ENODEV;
 	}
 
@@ -470,8 +469,8 @@ static int __init mon_init(void)
 	 */
 	rc = iucv_register(&monreader_iucv_handler, 1);
 	if (rc) {
-		kmsg_err("The z/VM *MONITOR record device driver failed to "
-			    "register with IUCV\n");
+		pr_err("The z/VM *MONITOR record device driver failed to "
+		       "register with IUCV\n");
 		return rc;
 	}
 
@@ -481,8 +480,8 @@ static int __init mon_init(void)
 		goto out_iucv;
 	}
 	if (rc != SEG_TYPE_SC) {
-		kmsg_err("The specified *MONITOR DCSS %s does not have the "
-			    "required type SC\n", mon_dcss_name);
+		pr_err("The specified *MONITOR DCSS %s does not have the "
+		       "required type SC\n", mon_dcss_name);
 		rc = -EINVAL;
 		goto out_iucv;
 	}

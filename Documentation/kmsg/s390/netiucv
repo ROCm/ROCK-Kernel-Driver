@@ -1,5 +1,4 @@
 /*?
- * Tag: netiucv.12527e
  * Text: "%s: The peer interface of the IUCV device has closed the connection\n"
  * Severity: Informational
  * Parameter:
@@ -13,7 +12,6 @@
  */
 
 /*?
- * Tag: netiucv.a94e73
  * Text: "%s: The IUCV device failed to connect to z/VM guest %s\n"
  * Severity: Warning
  * Parameter:
@@ -28,7 +26,6 @@
  */
 
 /*?
- * Tag: netiucv.e5abd4
  * Text: "%s: The IUCV device failed to connect to the peer on z/VM guest %s\n"
  * Severity: Warning
  * Parameter:
@@ -43,7 +40,6 @@
  */
 
 /*?
- * Tag: netiucv.7781b0
  * Text: "%s: Connecting the IUCV device would exceed the maximum number of IUCV connections\n"
  * Severity: Error
  * Parameter:
@@ -57,7 +53,6 @@
  */
 
 /*?
- * Tag: netiucv.d99283
  * Text: "%s: z/VM guest %s has too many IUCV connections to connect with the IUCV device\n"
  * Severity: Error
  * Parameter:
@@ -73,7 +68,6 @@
  */
 
 /*?
- * Tag: netiucv.f173d5
  * Text: "%s: The IUCV device cannot connect to a z/VM guest with no IUCV authorization\n"
  * Severity: Error
  * Parameter:
@@ -89,7 +83,6 @@
  */
 
 /*?
- * Tag: netiucv.d5e733
  * Text: "%s: Connecting the IUCV device failed with error %d\n"
  * Severity: Error
  * Parameter:
@@ -102,7 +95,6 @@
  */
 
 /*?
- * Tag: netiucv.4a3c97
  * Text: "%s: The IUCV device has been connected successfully to %s\n"
  * Severity: Informational
  * Parameter:
@@ -116,7 +108,6 @@
  */
 
 /*?
- * Tag: netiucv.80ea67
  * Text: "%s: The IUCV interface to %s has been established successfully\n"
  * Severity: Informational
  * Parameter:
@@ -131,7 +122,6 @@
  */
 
 /*?
- * Tag: netiucv.9f3c9d
  * Text: "%s: The IUCV device is connected to %s and cannot be removed\n"
  * Severity: Warning
  * Parameter:
@@ -145,5 +135,5 @@
  * then try again to remove the interface.
  */
 
-/*? Tag: netiucv.f83456 Text: "driver unloaded\n" */
-/*? Tag: netiucv.8db02b Text: "driver initialized\n" */
+/*? Text: "driver unloaded\n" */
+/*? Text: "driver initialized\n" */

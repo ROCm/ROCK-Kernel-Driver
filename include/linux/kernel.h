@@ -298,20 +298,40 @@ static inline char *pack_hex_byte(char *buf, u8 byte)
 	return buf;
 }
 
+#ifdef KMSG_COMPONENT
+#define pr_printk(level, format, ...) \
+	printk(level KMSG_COMPONENT  ": " format, ##__VA_ARGS__)
+#else
+#define pr_printk(level, format, ...) \
+	printk(level ": " format, ##__VA_ARGS__)
+#endif
+
+#if defined(__KMSG_CHECKER) && defined(KMSG_COMPONENT)
+/* generate magic string for scripts/kmsg-doc to parse */
+#define pr_printk_hash(level, format, ...) \
+	__KMSG_PRINT(level _FMT_ format _ARGS_ ##__VA_ARGS__ _END_)
+#elif defined(CONFIG_KMSG_IDS) && defined(KMSG_COMPONENT)
+int printk_hash(const char *, const char *, ...);
+#define pr_printk_hash(level, format, ...) \
+	printk_hash(level KMSG_COMPONENT ".%06x" ": ", format, ##__VA_ARGS__)
+#else /* !defined(CONFIG_KMSG_IDS) */
+#define pr_printk_hash pr_printk
+#endif
+
 #define pr_emerg(fmt, arg...) \
-	printk(KERN_EMERG fmt, ##arg)
+	pr_printk_hash(KERN_EMERG, fmt, ##arg)
 #define pr_alert(fmt, arg...) \
-	printk(KERN_ALERT fmt, ##arg)
+	pr_printk_hash(KERN_ALERT, fmt, ##arg)
 #define pr_crit(fmt, arg...) \
-	printk(KERN_CRIT fmt, ##arg)
+	pr_printk_hash(KERN_CRIT, fmt, ##arg)
 #define pr_err(fmt, arg...) \
-	printk(KERN_ERR fmt, ##arg)
+	pr_printk_hash(KERN_ERR, fmt, ##arg)
 #define pr_warning(fmt, arg...) \
-	printk(KERN_WARNING fmt, ##arg)
+	pr_printk_hash(KERN_WARNING, fmt, ##arg)
 #define pr_notice(fmt, arg...) \
-	printk(KERN_NOTICE fmt, ##arg)
+	pr_printk_hash(KERN_NOTICE, fmt, ##arg)
 #define pr_info(fmt, arg...) \
-	printk(KERN_INFO fmt, ##arg)
+	pr_printk_hash(KERN_INFO, fmt, ##arg)
 
 /* If you are writing a driver, please use dev_dbg instead */
 #if defined(CONFIG_DYNAMIC_PRINTK_DEBUG)
@@ -320,10 +340,10 @@ static inline char *pack_hex_byte(char *buf, u8 byte)
 	} while (0)
 #elif defined(DEBUG)
 #define pr_debug(fmt, arg...) \
-	printk(KERN_DEBUG fmt, ##arg)
+	pr_printk(KERN_DEBUG, fmt, ##arg)
 #else
 #define pr_debug(fmt, arg...) \
-	({ if (0) printk(KERN_DEBUG fmt, ##arg); 0; })
+	({ if (0) pr_printk(KERN_DEBUG, fmt, ##arg); 0; })
 #endif
 
 /*

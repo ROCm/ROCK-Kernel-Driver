@@ -1402,14 +1402,13 @@ EXPORT_SYMBOL(printk_hash);
  * @dev: device this printk is all about
  * @fmt: format string
  */
-asmlinkage int printk_dev_hash(const char *prefix, const struct device *dev,
+asmlinkage int printk_dev_hash(const char *prefix, const char *driver_name,
 			       const char *fmt, ...)
 {
 	va_list args;
 	int r;
 
-	r = printk(prefix, dev_driver_string(dev),
-		   jhash(fmt, strlen(fmt), 0) & 0xffffff, dev_name(dev));
+	r = printk(prefix, driver_name, jhash(fmt, strlen(fmt), 0) & 0xffffff);
 	va_start(args, fmt);
 	r += vprintk(fmt, args);
 	va_end(args);

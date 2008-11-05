@@ -1,5 +1,4 @@
 /*?
- * Tag: lcs.1666ed
  * Text: "%s:  Allocating a socket buffer to interface %s failed\n"
  * Severity: Error
  * Parameter:
@@ -15,7 +14,6 @@
  */
 
 /*?
- * Tag: lcs.fd3431
  * Text: "%s:  Shutting down the LCS device failed\n "
  * Severity: Error
  * Parameter:
@@ -29,9 +27,8 @@
  */
 
 /*?
- * Tag: lcs.c4ca7a
  * Text: "%s: Detecting a network adapter for LCS devices failed with rc=%d (0x%x)\n"
- * Severity: Error
+ * Severity: Warning
  * Parameter:
  *   @1: lcs_detect return code in decimal notation
  *   @2: lcs_detect return code in hexadecimal notation
@@ -42,7 +39,6 @@
  */
 
 /*?
- * Tag: lcs.abd525
  * Text: "%s: A recovery process has been started for the LCS device\n"
  * Severity: Warning
  * Parameter:
@@ -56,7 +52,6 @@
  */
 
 /*?
- * Tag: lcs.43b3aa
  * Text: "%s: An I/O-error occurred on the LCS device\n"
  * Severity: Warning
  * Parameter:
@@ -72,7 +67,6 @@
  */
 
 /*?
- * Tag: lcs.d96565
  * Text: "%s: A command timed out on the LCS device\n"
  * Severity: Warning
  * Parameter:
@@ -88,7 +82,6 @@
  */
 
 /*?
- * Tag: lcs.dae31d
  * Text: "%s: An error occurred on the LCS device, rc=%ld\n"
  * Severity: Warning
  * Parameter:
@@ -105,7 +98,6 @@
  */
 
 /*?
-* Tag: lcs.45e59d
  * Text: "%s: The LCS device stopped because of an error, dstat=0x%X, cstat=0x%X \n"
  * Severity: Warning
  * Parameter:
@@ -123,7 +115,6 @@
  */
 
 /*?
- * Tag: lcs.c16f9f
  * Text: "%s: Starting an LCS device resulted in an error, rc=%d!\n"
  * Severity: Error
  * Parameter:
@@ -138,9 +129,8 @@
  */
 
 /*?
- * Tag: lcs.c5d9db
  * Text: "%s: Sending data from the LCS device to the LAN failed with rc=%d\n"
- * Severity: Error
+ * Severity: Warning
  * Parameter:
  *   @1: bus ID of the LCS device
  *   @2: ccw_device_resume return code in decimal notation
@@ -154,17 +144,17 @@
  * problem persists, contact IBM support.
  */
 
-/*? Tag: lcs.1ba8a7 Text: "Query IPAssist failed. Assuming unsupported!\n" */
-/*? Tag: lcs.c4901b Text: "Stoplan for %s initiated by LGW.\n" */
-/*? Tag: lcs.0760e8 Text: "Not enough memory to add new multicast entry!\n" */
-/*? Tag: lcs.d6f064 Text: "Not enough memory for debug facility.\n" */
-/*? Tag: lcs.85e209 Text: "Adding multicast address failed. Table possibly full!\n" */
-/*? Tag: lcs.f3f857 Text: "Error in opening device!\n" */
-/*? Tag: lcs.0aabaa Text: "LCS device %s %s IPv6 support\n" */
-/*? Tag: lcs.453fea Text: "Device %s successfully recovered!\n" */
-/*? Tag: lcs.ea2a85 Text: "LCS device %s %s Multicast support\n" */
-/*? Tag: lcs.38cb90 Text: " Initialization failed\n" */
-/*? Tag: lcs.35862f Text: "Loading %s\n" */
-/*? Tag: lcs.f53f45 Text: "Initialization failed\n" */
-/*? Tag: lcs.c5a5fa Text: "Terminating lcs module.\n" */
-/*? Tag: lcs.535a08 Text: "Device %s could not be recovered!\n" */
+/*? Text: "Query IPAssist failed. Assuming unsupported!\n" */
+/*? Text: "Stoplan for %s initiated by LGW.\n" */
+/*? Text: "Not enough memory to add new multicast entry!\n" */
+/*? Text: "Not enough memory for debug facility.\n" */
+/*? Text: "Adding multicast address failed. Table possibly full!\n" */
+/*? Text: "Error in opening device!\n" */
+/*? Text: "LCS device %s %s IPv6 support\n" */
+/*? Text: "Device %s successfully recovered!\n" */
+/*? Text: "LCS device %s %s Multicast support\n" */
+/*? Text: " Initialization failed\n" */
+/*? Text: "Loading %s\n" */
+/*? Text: "Initialization failed\n" */
+/*? Text: "Terminating lcs module.\n" */
+/*? Text: "Device %s could not be recovered!\n" */
