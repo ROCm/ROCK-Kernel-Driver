@@ -321,6 +321,8 @@ enum {
 	ATA_EH_LPM		= (1 << 4),  /* link power management action */
 
 	ATA_EH_PERDEV_MASK	= ATA_EH_REVALIDATE,
+	ATA_EH_ALL_ACTIONS	= ATA_EH_REVALIDATE | ATA_EH_RESET |
+				  ATA_EH_ENABLE_LINK | ATA_EH_LPM,
 
 	/* ata_eh_info->flags */
 	ATA_EHI_HOTPLUGGED	= (1 << 0),  /* could have been hotplugged */
@@ -334,6 +336,9 @@ enum {
 	ATA_EHI_POST_SETMODE	= (1 << 20), /* revaildating after setmode */
 
 	ATA_EHI_DID_RESET	= ATA_EHI_DID_SOFTRESET | ATA_EHI_DID_HARDRESET,
+
+	/* mask of flags to transfer *to* the slave link */
+	ATA_EHI_TO_SLAVE_MASK	= ATA_EHI_NO_AUTOPSY | ATA_EHI_QUIET,
 
 	/* max tries if error condition is still set after ->error_handler */
 	ATA_EH_MAX_TRIES	= 5,
@@ -688,7 +693,8 @@ struct ata_port {
 	unsigned int		qc_active;
 	int			nr_active_links; /* #links with active qcs */
 
-	struct ata_link		link;	/* host default link */
+	struct ata_link		link;		/* host default link */
+	struct ata_link		*slave_link;	/* see ata_slave_link_init() */
 
 	int			nr_pmp_links;	/* nr of available PMP links */
 	struct ata_link		*pmp_link;	/* array of PMP links */
@@ -772,8 +778,8 @@ struct ata_port_operations {
 	/*
 	 * Optional features
 	 */
-	int  (*scr_read)(struct ata_port *ap, unsigned int sc_reg, u32 *val);
-	int  (*scr_write)(struct ata_port *ap, unsigned int sc_reg, u32 val);
+	int  (*scr_read)(struct ata_link *link, unsigned int sc_reg, u32 *val);
+	int  (*scr_write)(struct ata_link *link, unsigned int sc_reg, u32 val);
 	void (*pmp_attach)(struct ata_port *ap);
 	void (*pmp_detach)(struct ata_port *ap);
 	int  (*enable_pm)(struct ata_port *ap, enum link_pm policy);
@@ -895,6 +901,7 @@ extern void ata_port_disable(struct ata_port *);
 extern struct ata_host *ata_host_alloc(struct device *dev, int max_ports);
 extern struct ata_host *ata_host_alloc_pinfo(struct device *dev,
 			const struct ata_port_info * const * ppi, int n_ports);
+extern int ata_slave_link_init(struct ata_port *ap);
 extern int ata_host_start(struct ata_host *host);
 extern int ata_host_register(struct ata_host *host,
 			     struct scsi_host_template *sht);
@@ -920,8 +927,8 @@ extern int sata_scr_valid(struct ata_link *link);
 extern int sata_scr_read(struct ata_link *link, int reg, u32 *val);
 extern int sata_scr_write(struct ata_link *link, int reg, u32 val);
 extern int sata_scr_write_flush(struct ata_link *link, int reg, u32 val);
-extern int ata_link_online(struct ata_link *link);
-extern int ata_link_offline(struct ata_link *link);
+extern bool ata_link_online(struct ata_link *link);
+extern bool ata_link_offline(struct ata_link *link);
 #ifdef CONFIG_PM
 extern int ata_host_suspend(struct ata_host *host, pm_message_t mesg);
 extern void ata_host_resume(struct ata_host *host);
@@ -1134,7 +1141,7 @@ static inline bool sata_pmp_attached(struct ata_port *ap)
 
 static inline int ata_is_host_link(const struct ata_link *link)
 {
-	return link == &link->ap->link;
+	return link == &link->ap->link || link == link->ap->slave_link;
 }
 #else /* CONFIG_SATA_PMP */
 static inline bool sata_pmp_supported(struct ata_port *ap)
@@ -1167,7 +1174,7 @@ static inline int sata_srst_pmp(struct ata_link *link)
 	printk("%sata%u: "fmt, lv, (ap)->print_id , ##args)
 
 #define ata_link_printk(link, lv, fmt, args...) do { \
-	if (sata_pmp_attached((link)->ap)) \
+	if (sata_pmp_attached((link)->ap) || (link)->ap->slave_link)	\
 		printk("%sata%u.%02u: "fmt, lv, (link)->ap->print_id,	\
 		       (link)->pmp , ##args); \
 	else \
@@ -1265,34 +1272,17 @@ static inline int ata_link_active(struct ata_link *link)
 	return ata_tag_valid(link->active_tag) || link->sactive;
 }
 
-static inline struct ata_link *ata_port_first_link(struct ata_port *ap)
-{
-	if (sata_pmp_attached(ap))
-		return ap->pmp_link;
-	return &ap->link;
-}
+extern struct ata_link *__ata_port_next_link(struct ata_port *ap,
+					     struct ata_link *link,
+					     bool dev_only);
 
-static inline struct ata_link *ata_port_next_link(struct ata_link *link)
-{
-	struct ata_port *ap = link->ap;
-
-	if (ata_is_host_link(link)) {
-		if (!sata_pmp_attached(ap))
-			return NULL;
-		return ap->pmp_link;
-	}
-
-	if (++link < ap->nr_pmp_links + ap->pmp_link)
-		return link;
-	return NULL;
-}
-
-#define __ata_port_for_each_link(lk, ap) \
-	for ((lk) = &(ap)->link; (lk); (lk) = ata_port_next_link(lk))
+#define __ata_port_for_each_link(link, ap) \
+	for ((link) = __ata_port_next_link((ap), NULL, false); (link); \
+	     (link) = __ata_port_next_link((ap), (link), false))
 
 #define ata_port_for_each_link(link, ap) \
-	for ((link) = ata_port_first_link(ap); (link); \
-	     (link) = ata_port_next_link(link))
+	for ((link) = __ata_port_next_link((ap), NULL, true); (link); \
+	     (link) = __ata_port_next_link((ap), (link), true))
 
 #define ata_link_for_each_dev(dev, link) \
 	for ((dev) = (link)->device; \
