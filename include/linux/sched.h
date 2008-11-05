@@ -407,8 +407,9 @@ extern int get_dumpable(struct mm_struct *mm);
 #define MMF_DUMP_FILTER_BITS	5
 #define MMF_DUMP_FILTER_MASK \
 	(((1 << MMF_DUMP_FILTER_BITS) - 1) << MMF_DUMP_FILTER_SHIFT)
-#define MMF_DUMP_FILTER_DEFAULT \
-	((1 << MMF_DUMP_ANON_PRIVATE) |	(1 << MMF_DUMP_ANON_SHARED))
+#define MMF_DUMP_FILTER_DEFAULT						\
+	((1 << MMF_DUMP_ANON_PRIVATE) |	(1 << MMF_DUMP_ANON_SHARED) |	\
+	 (1 << MMF_DUMP_ELF_HEADERS))
 
 struct sighand_struct {
 	atomic_t		count;
