@@ -803,7 +803,7 @@ void __devinit pcibios_fixup_bus_self(struct pci_bus *bus)
 	 * now differently between 32 and 64 bits.
 	 */
 	if (dev == NULL)
-		return;
+		goto host_bridge;
 
 	for (i = 0; i < PCI_BUS_NUM_RESOURCES; ++i) {
 		if ((res = bus->resource[i]) == NULL)
@@ -843,6 +843,8 @@ void __devinit pcibios_fixup_bus_self(struct pci_bus *bus)
 
 		fixup_resource(res, dev);
 	}
+
+host_bridge:
 
 	/* Additional setup that is different between 32 and 64 bits for now */
 	pcibios_do_bus_setup_self(bus);
