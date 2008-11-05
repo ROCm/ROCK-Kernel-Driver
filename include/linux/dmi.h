@@ -88,6 +88,8 @@ extern int dmi_walk(void (*decode)(const struct dmi_header *));
 #else
 
 static inline int dmi_check_system(const struct dmi_system_id *list) { return 0; }
+static inline const struct dmi_system_id *dmi_first_match(const struct dmi_system_id *list)
+	{ return NULL; }
 static inline const char * dmi_get_system_info(int field) { return NULL; }
 static inline const struct dmi_device * dmi_find_device(int type, const char *name,
 	const struct dmi_device *from) { return NULL; }
