@@ -705,7 +705,7 @@ static inline struct Scsi_Host *dev_to_shost(struct device *dev)
 
 /*
  * walks object list backward, to find the first non-scsi object
- * Skips over transport objects that may be vports, shosts under vports, etc 
+ * Skips over transport objects that may be vports, shosts under vports, etc
  */
 static inline struct device *dev_to_nonscsi_dev(struct device *dev)
 {
