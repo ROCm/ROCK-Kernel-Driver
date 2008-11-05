@@ -359,10 +359,6 @@ typedef struct kernel_cap_struct {
 
 #ifdef __KERNEL__
 
-#ifdef CONFIG_SECURITY_FILE_CAPABILITIES
-extern int file_caps_enabled;
-#endif
-
 /*
  * Internal kernel functions only
  */
