@@ -4,7 +4,6 @@
  * Copyright (c) 2007-2008 Jim Paris <jim@jtan.com>
  * Added support RSX DMA Vivien Chappelier <vivien.chappelier@free.fr>
  */
-#undef DEBUG
 
 #include <linux/io.h>
 #include <linux/init.h>
@@ -17,10 +16,11 @@
 #include <linux/gfp.h>
 #include <linux/delay.h>
 #include <linux/mtd/mtd.h>
-#include <linux/proc_fs.h>
 
 #include <asm/lv1call.h>
 #include <asm/ps3.h>
+
+#define DEVICE_NAME		"ps3vram"
 
 #define XDR_BUF_SIZE (2 * 1024 * 1024) /* XDR buffer (must be 1MB aligned) */
 #define XDR_IOIF 0x0c000000
@@ -65,8 +65,6 @@ struct ps3vram_cache {
 	unsigned int page_count;
 	unsigned int page_size;
 	struct ps3vram_tag *tags;
-	unsigned int hit;
-	unsigned int miss;
 };
 
 struct ps3vram_priv {
@@ -90,7 +88,9 @@ struct ps3vram_priv {
 #define DMA_NOTIFIER_OFFSET_BASE 0x1000     /* first DMA notifier offset */
 #define DMA_NOTIFIER_SIZE        0x40
 
-#define NOTIFIER 8	/* notifier used for completion report */
+#define NUM_NOTIFIERS		16
+
+#define NOTIFIER 7	/* notifier used for completion report */
 
 /* A trailing '-' means to subtract off ps3fb_videomemory.size */
 char *size = "256M-";
@@ -147,7 +147,7 @@ static void ps3vram_dump_reports(struct mtd_info *mtd)
 	struct ps3vram_priv *priv = mtd->priv;
 	int i;
 
-	for (i = 0; i < 16; i++) {
+	for (i = 0; i < NUM_NOTIFIERS; i++) {
 		uint32_t *n = ps3vram_get_notifier(priv->reports, i);
 		pr_info("%p: %08x\n", n, *n);
 	}
@@ -216,6 +216,8 @@ static void ps3vram_fire_ring(struct mtd_info *mtd)
 	struct ps3vram_priv *priv = mtd->priv;
 	u64 status;
 
+	mutex_lock(&ps3_gpu_mutex);
+
 	priv->ctrl[CTRL_PUT] = FIFO_BASE + FIFO_OFFSET +
 		(priv->fifo_ptr - priv->fifo_base) * sizeof(uint32_t);
 
@@ -232,6 +234,8 @@ static void ps3vram_fire_ring(struct mtd_info *mtd)
 		ps3vram_wait_ring(mtd, 200);
 		ps3vram_rewind_ring(mtd);
 	}
+
+	mutex_unlock(&ps3_gpu_mutex);
 }
 
 static void ps3vram_bind(struct mtd_info *mtd)
@@ -396,7 +400,6 @@ static unsigned int ps3vram_cache_match(struct mtd_info *mtd, loff_t address)
 		    cache->tags[i].address == base) {
 			dbg("found entry %d : 0x%08x",
 			    i, cache->tags[i].address);
-			cache->hit++;
 			return i;
 		}
 	}
@@ -408,7 +411,6 @@ static unsigned int ps3vram_cache_match(struct mtd_info *mtd, loff_t address)
 	ps3vram_cache_evict(mtd, i);
 	ps3vram_cache_load(mtd, i, base);
 
-	cache->miss++;
 	return i;
 }
 
@@ -554,55 +556,7 @@ static int ps3vram_write(struct mtd_info *mtd, loff_t to, size_t len,
 	return 0;
 }
 
-/* XXX: Fake structure so we can call ps3_{open,close}_hv_device */
-static struct ps3_system_bus_device fake_dev = {
-	.match_id = PS3_MATCH_ID_GRAPHICS,
-	.dev_type = PS3_DEVICE_TYPE_IOC0,
-};
-
-static int ps3vram_proc_read(char *buf, char **start, off_t offset,
-			     int count, int *eof, void *data)
-{
-	struct ps3vram_priv *priv = (struct ps3vram_priv *) data;
-	int len;
-	off_t end;
-	char tmp[256];
-
-	len = sprintf(tmp, "hit:%u\nmiss:%u\n",
-		      priv->cache.hit, priv->cache.miss);
-
-	*start = buf;
-
-	end = (off_t)count + offset;
-
-	if (end >= (off_t)len) {
-		*eof = 1;
-		count = ((off_t)len > offset) ?
-			(int)((off_t)len - offset) : 0;
-	}
-
-	memcpy(buf, tmp + offset, count);
-
-	return count;
-}
-
-static void init_proc(void)
-{
-	struct proc_dir_entry *proc_file;
-
-	proc_file = create_proc_entry("ps3vram", 0644, NULL);
-
-	if (!proc_file) {
-		pr_warning("failed to create /proc entry\n");
-		return;
-	}
-
-	proc_file->owner = THIS_MODULE;
-	proc_file->data = ps3vram_mtd.priv;
-	proc_file->read_proc = ps3vram_proc_read;
-}
-
-static int __init init_ps3vram(void)
+static int __devinit ps3vram_probe(struct ps3_system_bus_device *dev)
 {
 	struct ps3vram_priv *priv;
 	uint64_t status;
@@ -634,7 +588,7 @@ static int __init init_ps3vram(void)
 	priv->fifo_ptr = priv->fifo_base;
 
 	/* XXX: Need to open GPU, in case ps3fb or snd_ps3 aren't loaded */
-	if (ps3_open_hv_device(&fake_dev)) {
+	if (ps3_open_hv_device(dev)) {
 		pr_err("ps3vram: ps3_open_hv_device failed\n");
 		ret = -EAGAIN;
 		goto out_close_gpu;
@@ -713,7 +667,9 @@ static int __init init_ps3vram(void)
 		goto out_unmap_ctrl;
 	}
 
+	mutex_lock(&ps3_gpu_mutex);
 	ps3vram_init_ring(&ps3vram_mtd);
+	mutex_unlock(&ps3_gpu_mutex);
 
 	ps3vram_mtd.name = "ps3vram";
 	ps3vram_mtd.size = ddr_size;
@@ -730,14 +686,16 @@ static int __init init_ps3vram(void)
 
 	ps3vram_bind(&ps3vram_mtd);
 
-	if (ps3vram_wait_ring(&ps3vram_mtd, 100) < 0) {
+	mutex_lock(&ps3_gpu_mutex);
+	ret = ps3vram_wait_ring(&ps3vram_mtd, 100);
+	mutex_unlock(&ps3_gpu_mutex);
+	if (ret < 0) {
 		pr_err("failed to initialize channels\n");
 		ret = -ETIMEDOUT;
 		goto out_unmap_reports;
 	}
 
 	ps3vram_cache_init(&ps3vram_mtd);
-	init_proc();
 
 	if (add_mtd_device(&ps3vram_mtd)) {
 		pr_err("ps3vram: failed to register device\n");
@@ -761,7 +719,7 @@ out_free_context:
 out_free_memory:
 	lv1_gpu_memory_free(priv->memory_handle);
 out_close_gpu:
-	ps3_close_hv_device(&fake_dev);
+	ps3_close_hv_device(dev);
 out_free_xdr_buf:
 	free_pages((unsigned long) priv->xdr_buf, get_order(XDR_BUF_SIZE));
 out_free_priv:
@@ -771,15 +729,12 @@ out:
 	return ret;
 }
 
-static void __exit cleanup_ps3vram(void)
+static int ps3vram_shutdown(struct ps3_system_bus_device *dev)
 {
 	struct ps3vram_priv *priv;
 
 	priv = ps3vram_mtd.priv;
-	if (priv == NULL)
-		return;
 
-	remove_proc_entry("ps3vram", NULL);
 	del_mtd_device(&ps3vram_mtd);
 	ps3vram_cache_cleanup(&ps3vram_mtd);
 	iounmap(priv->reports);
@@ -787,15 +742,34 @@ static void __exit cleanup_ps3vram(void)
 	iounmap(priv->base);
 	lv1_gpu_context_free(priv->context_handle);
 	lv1_gpu_memory_free(priv->memory_handle);
-	ps3_close_hv_device(&fake_dev);
+	ps3_close_hv_device(dev);
 	free_pages((unsigned long) priv->xdr_buf, get_order(XDR_BUF_SIZE));
 	kfree(priv);
-
-	pr_info("ps3vram mtd device unregistered\n");
+	return 0;
 }
 
-module_init(init_ps3vram);
-module_exit(cleanup_ps3vram);
+static struct ps3_system_bus_driver ps3vram_driver = {
+	.match_id	= PS3_MATCH_ID_GRAPHICS,
+	.match_sub_id	= PS3_MATCH_SUB_ID_RAMDISK,
+	.core.name	= DEVICE_NAME,
+	.core.owner	= THIS_MODULE,
+	.probe		= ps3vram_probe,
+	.remove		= ps3vram_shutdown,
+	.shutdown	= ps3vram_shutdown,
+};
+
+static int __init ps3vram_init(void)
+{
+	return ps3_system_bus_driver_register(&ps3vram_driver);
+}
+
+static void __exit ps3vram_exit(void)
+{
+	ps3_system_bus_driver_unregister(&ps3vram_driver);
+}
+
+module_init(ps3vram_init);
+module_exit(ps3vram_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Jim Paris <jim@jtan.com>");

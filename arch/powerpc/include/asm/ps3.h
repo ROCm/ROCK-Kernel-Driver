@@ -340,6 +340,7 @@ enum ps3_system_bus_device_type {
 enum ps3_match_sub_id {
 	/* for PS3_MATCH_ID_GRAPHICS */
 	PS3_MATCH_SUB_ID_FB		= 1,
+	PS3_MATCH_SUB_ID_RAMDISK	= 2,
 };
 
 /**
@@ -515,5 +516,8 @@ u32 ps3_get_and_clear_pm_interrupts(u32 cpu);
 void ps3_sync_irq(int node);
 u32 ps3_get_hw_thread_id(int cpu);
 u64 ps3_get_spe_id(void *arg);
+
+/* mutex synchronizing GPU accesses and video mode changes */
+extern struct mutex ps3_gpu_mutex;
 
 #endif
