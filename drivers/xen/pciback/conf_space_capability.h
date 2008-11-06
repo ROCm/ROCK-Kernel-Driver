@@ -17,7 +17,7 @@ struct pciback_config_capability {
 	int capability;
 
 	/* If the device has the capability found above, add these fields */
-	struct config_field *fields;
+	const struct config_field *fields;
 };
 
 #endif

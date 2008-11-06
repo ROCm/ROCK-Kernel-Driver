@@ -207,3 +207,14 @@ void arch_acpi_processor_init_extcntl(const struct processor_extcntl_ops **ops)
 	*ops = &xen_extcntl_ops;
 }
 EXPORT_SYMBOL(arch_acpi_processor_init_extcntl);
+
+unsigned int cpufreq_quick_get(unsigned int cpu)
+{
+	xen_platform_op_t op = {
+		.cmd			= XENPF_get_cpu_freq,
+		.interface_version	= XENPF_INTERFACE_VERSION,
+		.u.get_cpu_freq.vcpu	= cpu
+	};
+
+	return HYPERVISOR_platform_op(&op) == 0 ? op.u.get_cpu_freq.freq : 0;
+}

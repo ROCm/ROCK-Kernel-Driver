@@ -18,7 +18,7 @@ static int vpd_address_write(struct pci_dev *dev, int offset, u16 value,
 		return pci_write_config_word(dev, offset, value);
 }
 
-static struct config_field caplist_vpd[] = {
+static const struct config_field caplist_vpd[] = {
 	{
 	 .offset    = PCI_VPD_ADDR,
 	 .size      = 2,
@@ -31,9 +31,7 @@ static struct config_field caplist_vpd[] = {
 	 .u.dw.read  = pciback_read_config_dword,
 	 .u.dw.write = NULL,
 	 },
-	{
-	 .size = 0,
-	 },
+	{}
 };
  
 struct pciback_config_capability pciback_config_capability_vpd = {

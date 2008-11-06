@@ -90,7 +90,7 @@ void __init xen_machine_kexec_setup_resources(void)
 	xen_hypervisor_res.start = range.start;
 	xen_hypervisor_res.end = range.start + range.size - 1;
 	xen_hypervisor_res.flags = IORESOURCE_BUSY | IORESOURCE_MEM;
-#ifdef CONFIG_X86_64
+#ifdef CONFIG_X86
 	insert_resource(iomem_resource, &xen_hypervisor_res);
 #endif
 
@@ -105,6 +105,9 @@ void __init xen_machine_kexec_setup_resources(void)
 	if (range.size) {
 		crashk_res.start = range.start;
 		crashk_res.end = range.start + range.size - 1;
+#ifdef CONFIG_X86
+		insert_resource(iomem_resource, &crashk_res);
+#endif
 	}
 
 	/* get physical address of vmcoreinfo */

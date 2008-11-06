@@ -4,6 +4,7 @@
 
 config XEN
 	bool
+	select IRQ_PER_CPU if SMP
 
 if XEN
 config XEN_INTERFACE_VERSION
@@ -72,6 +73,15 @@ config XEN_NETDEV_BACKEND
 	  The network-device backend driver allows the kernel to export its
 	  network devices to other guests via a high-performance shared-memory
 	  interface.
+
+config XEN_NETDEV_TX_SHIFT
+	int "Maximum simultaneous transmit requests (as a power of 2)"
+	depends on XEN_NETDEV_BACKEND
+	range 5 16
+	default 8
+	help
+	  The maximum number transmits the driver can hold pending, expressed
+	  as the exponent of a power of 2.
 
 config XEN_NETDEV_PIPELINED_TRANSMITTER
 	bool "Pipelined transmitter (DANGEROUS)"
@@ -254,6 +264,16 @@ config XEN_SYSFS
 	help
 	  Xen hypervisor attributes will show up under /sys/hypervisor/.
 
+config XEN_NR_GUEST_DEVICES
+	int "Number of guest devices"
+	range 0 4032 if CONFIG_64BIT
+	range 0 960
+	default 256 if XEN_BACKEND
+	default 16
+	help
+	  Specify the total number of virtual devices (i.e. both frontend
+	  and backend) that you want the kernel to be able to service.
+
 choice
 	prompt "Xen version compatibility"
 	default XEN_COMPAT_030002_AND_LATER
@@ -291,6 +311,9 @@ config HAVE_IRQ_IGNORE_UNHANDLED
 
 config GENERIC_HARDIRQS_NO__DO_IRQ
 	def_bool y
+
+config IRQ_PER_CPU
+	bool
 
 config NO_IDLE_HZ
 	def_bool y

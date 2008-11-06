@@ -48,6 +48,7 @@ struct gnttab_free_callback {
 	void (*fn)(void *);
 	void *arg;
 	u16 count;
+	u8 queued;
 };
 
 int gnttab_grant_foreign_access(domid_t domid, unsigned long frame,
@@ -109,8 +110,9 @@ static inline void __gnttab_dma_unmap_page(struct page *page)
 
 void gnttab_reset_grant_page(struct page *page);
 
-int gnttab_suspend(void);
+#ifndef CONFIG_XEN
 int gnttab_resume(void);
+#endif
 
 void *arch_gnttab_alloc_shared(unsigned long *frames);
 

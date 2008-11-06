@@ -392,11 +392,11 @@ static void set_ioapic_affinity_irq(unsigned int irq, cpumask_t cpumask)
 
 	cpus_and(tmp, cpumask, cpu_online_map);
 	if (cpus_empty(tmp))
-		tmp = TARGET_CPUS;
+		tmp = *TARGET_CPUS;
 
 	cpus_and(cpumask, tmp, CPU_MASK_ALL);
 
-	apicid_value = cpu_mask_to_apicid(cpumask);
+	apicid_value = cpu_mask_to_apicid(&cpumask);
 	/* Prepare to do the io_apic_write */
 	apicid_value = apicid_value << 24;
 	spin_lock_irqsave(&ioapic_lock, flags);
@@ -978,7 +978,7 @@ void __init setup_ioapic_dest(void)
 			if (irq_entry == -1)
 				continue;
 			irq = pin_2_irq(irq_entry, ioapic, pin);
-			set_ioapic_affinity_irq(irq, TARGET_CPUS);
+			set_ioapic_affinity_irq(irq, *TARGET_CPUS);
 		}
 
 	}
@@ -2592,13 +2592,13 @@ static void set_msi_irq_affinity(unsigned int irq, cpumask_t mask)
 
 	cpus_and(tmp, mask, cpu_online_map);
 	if (cpus_empty(tmp))
-		tmp = TARGET_CPUS;
+		tmp = *TARGET_CPUS;
 
 	vector = assign_irq_vector(irq);
 	if (vector < 0)
 		return;
 
-	dest = cpu_mask_to_apicid(mask);
+	dest = cpu_mask_to_apicid(&mask);
 
 	read_msi_msg(irq, &msg);
 
@@ -2685,11 +2685,11 @@ static void set_ht_irq_affinity(unsigned int irq, cpumask_t mask)
 
 	cpus_and(tmp, mask, cpu_online_map);
 	if (cpus_empty(tmp))
-		tmp = TARGET_CPUS;
+		tmp = *TARGET_CPUS;
 
 	cpus_and(mask, tmp, CPU_MASK_ALL);
 
-	dest = cpu_mask_to_apicid(mask);
+	dest = cpu_mask_to_apicid(&mask);
 
 	target_ht_irq(irq, dest);
 	irq_desc[irq].affinity = mask;
@@ -2719,7 +2719,7 @@ int arch_setup_ht_irq(unsigned int irq, struct pci_dev *dev)
 
 		cpus_clear(tmp);
 		cpu_set(vector >> 8, tmp);
-		dest = cpu_mask_to_apicid(tmp);
+		dest = cpu_mask_to_apicid(&tmp);
 
 		msg.address_hi = HT_IRQ_HIGH_DEST_ID(dest);
 

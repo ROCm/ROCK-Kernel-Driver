@@ -14,8 +14,7 @@
 
 extern irqreturn_t smp_reschedule_interrupt(int, void *);
 
-static DEFINE_PER_CPU(int, spinlock_irq) = -1;
-static char spinlock_name[NR_CPUS][15];
+static int __read_mostly spinlock_irq = -1;
 
 struct spinning {
 	raw_spinlock_t *lock;
@@ -32,34 +31,37 @@ static DEFINE_PER_CPU(raw_rwlock_t, spinning_rm_lock) = __RAW_RW_LOCK_UNLOCKED;
 
 int __cpuinit xen_spinlock_init(unsigned int cpu)
 {
+	static struct irqaction spinlock_action = {
+		.handler = smp_reschedule_interrupt,
+		.flags   = IRQF_DISABLED,
+		.name    = "spinlock"
+	};
 	int rc;
 
-	sprintf(spinlock_name[cpu], "spinlock%u", cpu);
-	rc = bind_ipi_to_irqhandler(SPIN_UNLOCK_VECTOR,
-				    cpu,
-				    smp_reschedule_interrupt,
-				    IRQF_DISABLED|IRQF_NOBALANCING,
-				    spinlock_name[cpu],
-				    NULL);
+	rc = bind_ipi_to_irqaction(SPIN_UNLOCK_VECTOR,
+				   cpu,
+				   &spinlock_action);
  	if (rc < 0)
  		return rc;
 
-	disable_irq(rc); /* make sure it's never delivered */
-	per_cpu(spinlock_irq, cpu) = rc;
+	if (spinlock_irq < 0) {
+		disable_irq(rc); /* make sure it's never delivered */
+		spinlock_irq = rc;
+	} else
+		BUG_ON(spinlock_irq != rc);
 
 	return 0;
 }
 
 void __cpuinit xen_spinlock_cleanup(unsigned int cpu)
 {
-	if (per_cpu(spinlock_irq, cpu) >= 0)
-		unbind_from_irqhandler(per_cpu(spinlock_irq, cpu), NULL);
-	per_cpu(spinlock_irq, cpu) = -1;
+	if (spinlock_irq >= 0)
+		unbind_from_per_cpu_irq(spinlock_irq, cpu, NULL);
 }
 
 int xen_spin_wait(raw_spinlock_t *lock, unsigned int token)
 {
-	int rc = 0, irq = __get_cpu_var(spinlock_irq);
+	int rc = 0, irq = spinlock_irq;
 	raw_rwlock_t *rm_lock;
 	unsigned long flags;
 	struct spinning spinning;
@@ -145,18 +147,15 @@ void xen_spin_kick(raw_spinlock_t *lock, unsigned int token)
 
 		spinning = per_cpu(spinning, cpu);
 		smp_rmb();
-		while (spinning) {
-			if (spinning->lock == lock
-			    && spinning->ticket == token)
-				break;
-			spinning = spinning->prev;
-		}
+		if (spinning
+		    && (spinning->lock != lock || spinning->ticket != token))
+			spinning = NULL;
 
 		__raw_read_unlock(rm_lock);
 		raw_local_irq_restore(flags);
 
-		if (spinning) {
-			notify_remote_via_irq(per_cpu(spinlock_irq, cpu));
+		if (unlikely(spinning)) {
+			notify_remote_via_ipi(SPIN_UNLOCK_VECTOR, cpu);
 			return;
 		}
 	}

@@ -233,7 +233,7 @@ unsigned int do_IRQ(struct pt_regs *regs)
 	}
 
 	old_regs = set_irq_regs(regs);
-	irq_enter();
+	/*irq_enter();*/
 
 	overflow = check_stack_overflow();
 
@@ -243,7 +243,7 @@ unsigned int do_IRQ(struct pt_regs *regs)
 		desc->handle_irq(irq, desc);
 	}
 
-	irq_exit();
+	/*irq_exit();*/
 	set_irq_regs(old_regs);
 	return 1;
 }
@@ -410,6 +410,9 @@ void fixup_irqs(cpumask_t map)
 	for (irq = 0; irq < NR_IRQS; irq++) {
 		cpumask_t mask;
 		if (irq == 2)
+			continue;
+
+		if (irq_desc[irq].status & IRQ_PER_CPU)
 			continue;
 
 		cpus_and(mask, irq_desc[irq].affinity, map);

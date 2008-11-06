@@ -332,6 +332,9 @@ static void xen_properties_destroy(void)
 
 #ifdef CONFIG_KEXEC
 
+extern size_t vmcoreinfo_size_xen;
+extern unsigned long paddr_vmcoreinfo_xen;
+
 static ssize_t vmcoreinfo_show(struct hyp_sysfs_attr *attr, char *page)
 {
 	return sprintf(page, "%lx %zx\n",

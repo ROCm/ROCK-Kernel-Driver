@@ -31,11 +31,11 @@ DEFINE_PCI_CONFIG(write, word, u16)
 DEFINE_PCI_CONFIG(write, dword, u32)
 
 static int conf_space_read(struct pci_dev *dev,
-			   struct config_field_entry *entry, int offset,
-			   u32 * value)
+			   const struct config_field_entry *entry,
+			   int offset, u32 *value)
 {
 	int ret = 0;
-	struct config_field *field = entry->field;
+	const struct config_field *field = entry->field;
 
 	*value = 0;
 
@@ -59,11 +59,11 @@ static int conf_space_read(struct pci_dev *dev,
 }
 
 static int conf_space_write(struct pci_dev *dev,
-			    struct config_field_entry *entry, int offset,
-			    u32 value)
+			    const struct config_field_entry *entry,
+			    int offset, u32 value)
 {
 	int ret = 0;
-	struct config_field *field = entry->field;
+	const struct config_field *field = entry->field;
 
 	switch (field->size) {
 	case 1:
@@ -140,8 +140,8 @@ int pciback_config_read(struct pci_dev *dev, int offset, int size,
 {
 	int err = 0;
 	struct pciback_dev_data *dev_data = pci_get_drvdata(dev);
-	struct config_field_entry *cfg_entry;
-	struct config_field *field;
+	const struct config_field_entry *cfg_entry;
+	const struct config_field *field;
 	int req_start, req_end, field_start, field_end;
 	/* if read fails for any reason, return 0 (as if device didn't respond) */
 	u32 value = 0, tmp_val;
@@ -202,8 +202,8 @@ int pciback_config_write(struct pci_dev *dev, int offset, int size, u32 value)
 {
 	int err = 0, handled = 0;
 	struct pciback_dev_data *dev_data = pci_get_drvdata(dev);
-	struct config_field_entry *cfg_entry;
-	struct config_field *field;
+	const struct config_field_entry *cfg_entry;
+	const struct config_field *field;
 	u32 tmp_val;
 	int req_start, req_end, field_start, field_end;
 
@@ -290,7 +290,7 @@ void pciback_config_free_dyn_fields(struct pci_dev *dev)
 {
 	struct pciback_dev_data *dev_data = pci_get_drvdata(dev);
 	struct config_field_entry *cfg_entry, *t;
-	struct config_field *field;
+	const struct config_field *field;
 
 	dev_dbg(&dev->dev,
 		"free-ing dynamically allocated virtual configuration space fields\n");
@@ -299,7 +299,7 @@ void pciback_config_free_dyn_fields(struct pci_dev *dev)
 		field = cfg_entry->field;
 
 		if (field->clean) {
-			field->clean(field);
+			field->clean((struct config_field *)field);
 
 			if (cfg_entry->data)
 				kfree(cfg_entry->data);
@@ -314,8 +314,8 @@ void pciback_config_free_dyn_fields(struct pci_dev *dev)
 void pciback_config_reset_dev(struct pci_dev *dev)
 {
 	struct pciback_dev_data *dev_data = pci_get_drvdata(dev);
-	struct config_field_entry *cfg_entry;
-	struct config_field *field;
+	const struct config_field_entry *cfg_entry;
+	const struct config_field *field;
 
 	dev_dbg(&dev->dev, "resetting virtual configuration space\n");
 
@@ -331,7 +331,7 @@ void pciback_config_free_dev(struct pci_dev *dev)
 {
 	struct pciback_dev_data *dev_data = pci_get_drvdata(dev);
 	struct config_field_entry *cfg_entry, *t;
-	struct config_field *field;
+	const struct config_field *field;
 
 	dev_dbg(&dev->dev, "free-ing virtual configuration space fields\n");
 
@@ -348,7 +348,7 @@ void pciback_config_free_dev(struct pci_dev *dev)
 }
 
 int pciback_config_add_field_offset(struct pci_dev *dev,
-				    struct config_field *field,
+				    const struct config_field *field,
 				    unsigned int base_offset)
 {
 	int err = 0;

@@ -48,15 +48,6 @@ static inline int __prepare_ICR2(unsigned int mask)
 }
 #else
 #include <xen/evtchn.h>
-
-DECLARE_PER_CPU(int, ipi_to_irq[NR_IPIS]);
-
-static inline void __send_IPI_one(unsigned int cpu, int vector)
-{
-	int irq = per_cpu(ipi_to_irq, cpu)[vector];
-	BUG_ON(irq < 0);
-	notify_remote_via_irq(irq);
-}
 #endif
 
 void __send_IPI_shortcut(unsigned int shortcut, int vector)
@@ -90,12 +81,12 @@ void __send_IPI_shortcut(unsigned int shortcut, int vector)
 
 	switch (shortcut) {
 	case APIC_DEST_SELF:
-		__send_IPI_one(smp_processor_id(), vector);
+		notify_remote_via_ipi(vector, smp_processor_id());
 		break;
 	case APIC_DEST_ALLBUT:
 		for_each_online_cpu(cpu)
 			if (cpu != smp_processor_id())
-				__send_IPI_one(cpu, vector);
+				notify_remote_via_ipi(vector, cpu);
 		break;
 	default:
 		printk("XXXXXX __send_IPI_shortcut %08x vector %d\n", shortcut,
@@ -163,8 +154,9 @@ void send_IPI_mask_bitmask(const cpumask_t *cpumask, int vector)
 	__send_IPI_dest_field(mask, vector);
 #else
 	WARN_ON(!cpus_subset(*cpumask, cpu_online_map));
-	for_each_cpu_mask_and(cpu, *cpumask, cpu_online_map)
-		__send_IPI_one(cpu, vector);
+	for_each_online_cpu(cpu)
+		if (cpu_isset(cpu, *cpumask))
+			notify_remote_via_ipi(vector, cpu);
 #endif
 	local_irq_restore(flags);
 }
@@ -182,12 +174,34 @@ void send_IPI_mask_sequence(const cpumask_t *mask, int vector)
 	 */
 
 	local_irq_save(flags);
-	for_each_cpu_mask(query_cpu, *mask)
+	for_each_cpu_mask_and(query_cpu, *mask, cpu_online_map)
 		__send_IPI_dest_field(cpu_to_logical_apicid(query_cpu), vector);
-
 	local_irq_restore(flags);
 #else
 	send_IPI_mask_bitmask(mask, vector);
+#endif
+}
+
+void send_IPI_mask_allbutself(const cpumask_t *mask, int vector)
+{
+#ifndef CONFIG_XEN
+	unsigned long flags;
+	unsigned int query_cpu;
+	unsigned int this_cpu = smp_processor_id();
+
+	/* See Hack comment above */
+
+	local_irq_save(flags);
+	for_each_cpu_mask_and(query_cpu, *mask, cpu_online_map)
+		if (query_cpu != this_cpu)
+			__send_IPI_dest_field(cpu_to_logical_apicid(query_cpu),
+					      vector);
+	local_irq_restore(flags);
+#else
+	cpumask_t allbut = *mask;
+
+	cpu_clear(smp_processor_id(), allbut);
+	send_IPI_mask_bitmask(&allbut, vector);
 #endif
 }
 

@@ -13,16 +13,14 @@
 
 static LIST_HEAD(capabilities);
 
-static struct config_field caplist_header[] = {
+static const struct config_field caplist_header[] = {
 	{
 	 .offset    = PCI_CAP_LIST_ID,
 	 .size      = 2, /* encompass PCI_CAP_LIST_ID & PCI_CAP_LIST_NEXT */
 	 .u.w.read  = pciback_read_config_word,
 	 .u.w.write = NULL,
 	},
-	{
-	 .size = 0,
-	},
+	{}
 };
 
 static inline void register_capability(struct pciback_config_capability *cap)

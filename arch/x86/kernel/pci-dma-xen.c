@@ -223,19 +223,19 @@ static __init int iommu_setup(char *p)
 }
 early_param("iommu", iommu_setup);
 
-static int check_pages_physically_contiguous(unsigned long pfn, 
+static int check_pages_physically_contiguous(unsigned long pfn,
 					     unsigned int offset,
 					     size_t length)
 {
 	unsigned long next_mfn;
 	int i;
 	int nr_pages;
-	
+
 	next_mfn = pfn_to_mfn(pfn);
 	nr_pages = (offset + length + PAGE_SIZE-1) >> PAGE_SHIFT;
-	
+
 	for (i = 1; i < nr_pages; i++) {
-		if (pfn_to_mfn(++pfn) != ++next_mfn) 
+		if (pfn_to_mfn(++pfn) != ++next_mfn)
 			return 0;
 	}
 	return 1;
@@ -243,17 +243,11 @@ static int check_pages_physically_contiguous(unsigned long pfn,
 
 int range_straddles_page_boundary(paddr_t p, size_t size)
 {
-	extern unsigned long *contiguous_bitmap;
 	unsigned long pfn = p >> PAGE_SHIFT;
 	unsigned int offset = p & ~PAGE_MASK;
 
-	if (offset + size <= PAGE_SIZE)
-		return 0;
-	if (test_bit(pfn, contiguous_bitmap))
-		return 0;
-	if (check_pages_physically_contiguous(pfn, offset, size))
-		return 0;
-	return 1;
+	return ((offset + size > PAGE_SIZE) &&
+		!check_pages_physically_contiguous(pfn, offset, size));
 }
 
 int dma_supported(struct device *dev, u64 mask)

@@ -24,17 +24,15 @@
 #include <asm/genapic.h>
 #include <xen/evtchn.h>
 
-DECLARE_PER_CPU(int, ipi_to_irq[NR_IPIS]);
-
 static inline void __send_IPI_one(unsigned int cpu, int vector)
 {
-	int irq = per_cpu(ipi_to_irq, cpu)[vector];
-	BUG_ON(irq < 0);
-	notify_remote_via_irq(irq);
+	notify_remote_via_ipi(vector, cpu);
 }
 
-void xen_send_IPI_shortcut(unsigned int shortcut, int vector)
+static void xen_send_IPI_shortcut(unsigned int shortcut,
+				  const cpumask_t *cpumask, int vector)
 {
+	unsigned long flags;
 	int cpu;
 
 	switch (shortcut) {
@@ -42,20 +40,26 @@ void xen_send_IPI_shortcut(unsigned int shortcut, int vector)
 		__send_IPI_one(smp_processor_id(), vector);
 		break;
 	case APIC_DEST_ALLBUT:
+		local_irq_save(flags);
+		WARN_ON(!cpus_subset(*cpumask, cpu_online_map));
 		for_each_possible_cpu(cpu) {
 			if (cpu == smp_processor_id())
 				continue;
-			if (cpu_isset(cpu, cpu_online_map)) {
+			if (cpu_isset(cpu, *cpumask)) {
 				__send_IPI_one(cpu, vector);
 			}
 		}
+		local_irq_restore(flags);
 		break;
 	case APIC_DEST_ALLINC:
+		local_irq_save(flags);
+		WARN_ON(!cpus_subset(*cpumask, cpu_online_map));
 		for_each_possible_cpu(cpu) {
-			if (cpu_isset(cpu, cpu_online_map)) {
+			if (cpu_isset(cpu, *cpumask)) {
 				__send_IPI_one(cpu, vector);
 			}
 		}
+		local_irq_restore(flags);
 		break;
 	default:
 		printk("XXXXXX __send_IPI_shortcut %08x vector %d\n", shortcut,
@@ -64,65 +68,36 @@ void xen_send_IPI_shortcut(unsigned int shortcut, int vector)
 	}
 }
 
-static cpumask_t* xen_target_cpus(cpumask_t *retmask)
+static const cpumask_t *xen_target_cpus(void)
 {
 	return &cpu_online_map;
 }
 
-static void xen_vector_allocation_domain(int cpu, cpumask_t *retmask)
+static void xen_send_IPI_mask(const cpumask_t *cpumask, int vector)
 {
-	cpus_clear(*retmask);
-	cpu_set(cpu, *retmask);
+	xen_send_IPI_shortcut(APIC_DEST_ALLINC, cpumask, vector);
 }
 
-/*
- * Set up the logical destination ID.
- * Do nothing, not called now.
- */
-static void xen_init_apic_ldr(void)
+static void xen_send_IPI_mask_allbutself(const cpumask_t *cpumask,
+					 int vector)
 {
+	xen_send_IPI_shortcut(APIC_DEST_ALLBUT, cpumask, vector);
 }
 
 static void xen_send_IPI_allbutself(int vector)
 {
-	/*
-	 * if there are no other CPUs in the system then
-	 * we get an APIC send error if we try to broadcast.
-	 * thus we have to avoid sending IPIs in this case.
-	 */
-	if (num_online_cpus() > 1)
-		xen_send_IPI_shortcut(APIC_DEST_ALLBUT, vector);
+	xen_send_IPI_shortcut(APIC_DEST_ALLBUT, &cpu_online_map, vector);
 }
 
 static void xen_send_IPI_all(int vector)
 {
-	xen_send_IPI_shortcut(APIC_DEST_ALLINC, vector);
+	xen_send_IPI_shortcut(APIC_DEST_ALLINC, &cpu_online_map, vector);
 }
 
-static void xen_send_IPI_mask(const cpumask_t *cpumask, int vector)
+static void xen_send_IPI_self(int vector)
 {
-	unsigned long mask = cpus_addr(*cpumask)[0];
-	unsigned int cpu;
-	unsigned long flags;
-
-	local_irq_save(flags);
-	WARN_ON(mask & ~cpus_addr(cpu_online_map)[0]);
-
-	for_each_possible_cpu(cpu) {
-		if (cpu_isset(cpu, *cpumask)) {
-			__send_IPI_one(cpu, vector);
-		}
-	}
-	local_irq_restore(flags);
+	xen_send_IPI_shortcut(APIC_DEST_SELF, NULL, vector);
 }
-
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
-static int xen_apic_id_registered(void)
-{
-	/* better be set */
-	return physid_isset(smp_processor_id(), phys_cpu_present_map);
-}
-#endif
 
 static unsigned int xen_cpu_mask_to_apicid(const cpumask_t *cpumask)
 {
@@ -144,14 +119,11 @@ struct genapic apic_xen =  {
 #endif
 	.int_dest_mode = 1,
 	.target_cpus = xen_target_cpus,
-	.vector_allocation_domain = xen_vector_allocation_domain,
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
-	.apic_id_registered = xen_apic_id_registered,
-#endif
-	.init_apic_ldr = xen_init_apic_ldr,
 	.send_IPI_all = xen_send_IPI_all,
 	.send_IPI_allbutself = xen_send_IPI_allbutself,
 	.send_IPI_mask = xen_send_IPI_mask,
+	.send_IPI_mask_allbutself = xen_send_IPI_mask_allbutself,
+	.send_IPI_self = xen_send_IPI_self,
 	.cpu_mask_to_apicid = xen_cpu_mask_to_apicid,
 	.phys_pkg_id = phys_pkg_id,
 };

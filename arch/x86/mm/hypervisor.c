@@ -565,54 +565,6 @@ void xen_set_ldt(const void *ptr, unsigned int ents)
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 
-/*
- * Bitmap is indexed by page number. If bit is set, the page is part of a
- * xen_create_contiguous_region() area of memory.
- */
-unsigned long *contiguous_bitmap;
-
-static void contiguous_bitmap_set(
-	unsigned long first_page, unsigned long nr_pages)
-{
-	unsigned long start_off, end_off, curr_idx, end_idx;
-
-	curr_idx  = first_page / BITS_PER_LONG;
-	start_off = first_page & (BITS_PER_LONG-1);
-	end_idx   = (first_page + nr_pages) / BITS_PER_LONG;
-	end_off   = (first_page + nr_pages) & (BITS_PER_LONG-1);
-
-	if (curr_idx == end_idx) {
-		contiguous_bitmap[curr_idx] |=
-			((1UL<<end_off)-1) & -(1UL<<start_off);
-	} else {
-		contiguous_bitmap[curr_idx] |= -(1UL<<start_off);
-		while ( ++curr_idx < end_idx )
-			contiguous_bitmap[curr_idx] = ~0UL;
-		contiguous_bitmap[curr_idx] |= (1UL<<end_off)-1;
-	}
-}
-
-static void contiguous_bitmap_clear(
-	unsigned long first_page, unsigned long nr_pages)
-{
-	unsigned long start_off, end_off, curr_idx, end_idx;
-
-	curr_idx  = first_page / BITS_PER_LONG;
-	start_off = first_page & (BITS_PER_LONG-1);
-	end_idx   = (first_page + nr_pages) / BITS_PER_LONG;
-	end_off   = (first_page + nr_pages) & (BITS_PER_LONG-1);
-
-	if (curr_idx == end_idx) {
-		contiguous_bitmap[curr_idx] &=
-			-(1UL<<end_off) | ((1UL<<start_off)-1);
-	} else {
-		contiguous_bitmap[curr_idx] &= (1UL<<start_off)-1;
-		while ( ++curr_idx != end_idx )
-			contiguous_bitmap[curr_idx] = 0;
-		contiguous_bitmap[curr_idx] &= -(1UL<<end_off);
-	}
-}
-
 /* Protected by balloon_lock. */
 #define MAX_CONTIG_ORDER 9 /* 2MB */
 static unsigned long discontig_frames[1<<MAX_CONTIG_ORDER];
@@ -709,10 +661,6 @@ int xen_create_contiguous_region(
 	if (HYPERVISOR_multicall_check(cr_mcl, i, NULL))
 		BUG();
 
-	if (success)
-		contiguous_bitmap_set(__pa(vstart) >> PAGE_SHIFT,
-				      1UL << order);
-
 	balloon_unlock(flags);
 
 	return success ? 0 : -ENOMEM;
@@ -738,8 +686,7 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 		}
 	};
 
-	if (xen_feature(XENFEAT_auto_translated_physmap) ||
-	    !test_bit(__pa(vstart) >> PAGE_SHIFT, contiguous_bitmap))
+	if (xen_feature(XENFEAT_auto_translated_physmap))
 		return;
 
 	if (unlikely(order > MAX_CONTIG_ORDER))
@@ -751,8 +698,6 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 	scrub_pages((void *)vstart, 1 << order);
 
 	balloon_lock(flags);
-
-	contiguous_bitmap_clear(__pa(vstart) >> PAGE_SHIFT, 1UL << order);
 
 	/* 1. Find start MFN of contiguous extent. */
 	in_frame = pfn_to_mfn(__pa(vstart) >> PAGE_SHIFT);

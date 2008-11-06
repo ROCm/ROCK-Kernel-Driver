@@ -53,12 +53,9 @@ EXPORT_PER_CPU_SYMBOL(cpu_info);
 DEFINE_PER_CPU(int, cpu_state) = { 0 };
 #endif
 
-static DEFINE_PER_CPU(int, resched_irq);
-static DEFINE_PER_CPU(int, callfunc_irq);
-static DEFINE_PER_CPU(int, call1func_irq);
-static char resched_name[NR_CPUS][15];
-static char callfunc_name[NR_CPUS][15];
-static char call1func_name[NR_CPUS][15];
+static int __read_mostly resched_irq = -1;
+static int __read_mostly callfunc_irq = -1;
+static int __read_mostly call1func_irq = -1;
 
 #ifdef CONFIG_X86_LOCAL_APIC
 #define set_cpu_to_apicid(cpu, apicid) (per_cpu(x86_cpu_to_apicid, cpu) = (apicid))
@@ -117,43 +114,50 @@ remove_siblinginfo(unsigned int cpu)
 
 static int __cpuinit xen_smp_intr_init(unsigned int cpu)
 {
+	static struct irqaction resched_action = {
+		.handler = smp_reschedule_interrupt,
+		.flags   = IRQF_DISABLED,
+		.name    = "resched"
+	}, callfunc_action = {
+		.handler = smp_call_function_interrupt,
+		.flags   = IRQF_DISABLED,
+		.name    = "callfunc"
+	}, call1func_action = {
+		.handler = smp_call_function_single_interrupt,
+		.flags   = IRQF_DISABLED,
+		.name    = "call1func"
+	};
 	int rc;
 
-	per_cpu(resched_irq, cpu) = per_cpu(callfunc_irq, cpu) =
-		per_cpu(call1func_irq, cpu) = -1;
-
-	sprintf(resched_name[cpu], "resched%u", cpu);
-	rc = bind_ipi_to_irqhandler(RESCHEDULE_VECTOR,
-				    cpu,
-				    smp_reschedule_interrupt,
-				    IRQF_DISABLED|IRQF_NOBALANCING,
-				    resched_name[cpu],
-				    NULL);
+	rc = bind_ipi_to_irqaction(RESCHEDULE_VECTOR,
+				   cpu,
+				   &resched_action);
 	if (rc < 0)
 		goto fail;
-	per_cpu(resched_irq, cpu) = rc;
+	if (resched_irq < 0)
+		resched_irq = rc;
+	else
+		BUG_ON(resched_irq != rc);
 
-	sprintf(callfunc_name[cpu], "callfunc%u", cpu);
-	rc = bind_ipi_to_irqhandler(CALL_FUNCTION_VECTOR,
-				    cpu,
-				    smp_call_function_interrupt,
-				    IRQF_DISABLED|IRQF_NOBALANCING,
-				    callfunc_name[cpu],
-				    NULL);
+	rc = bind_ipi_to_irqaction(CALL_FUNCTION_VECTOR,
+				   cpu,
+				   &callfunc_action);
 	if (rc < 0)
 		goto fail;
-	per_cpu(callfunc_irq, cpu) = rc;
+	if (callfunc_irq < 0)
+		callfunc_irq = rc;
+	else
+		BUG_ON(callfunc_irq != rc);
 
-	sprintf(call1func_name[cpu], "call1func%u", cpu);
-	rc = bind_ipi_to_irqhandler(CALL_FUNC_SINGLE_VECTOR,
-				    cpu,
-				    smp_call_function_single_interrupt,
-				    IRQF_DISABLED|IRQF_NOBALANCING,
-				    call1func_name[cpu],
-				    NULL);
+	rc = bind_ipi_to_irqaction(CALL_FUNC_SINGLE_VECTOR,
+				   cpu,
+				   &call1func_action);
 	if (rc < 0)
 		goto fail;
-	per_cpu(call1func_irq, cpu) = rc;
+	if (call1func_irq < 0)
+		call1func_irq = rc;
+	else
+		BUG_ON(call1func_irq != rc);
 
 	rc = xen_spinlock_init(cpu);
 	if (rc < 0)
@@ -165,12 +169,12 @@ static int __cpuinit xen_smp_intr_init(unsigned int cpu)
 	return 0;
 
  fail:
-	if (per_cpu(resched_irq, cpu) >= 0)
-		unbind_from_irqhandler(per_cpu(resched_irq, cpu), NULL);
-	if (per_cpu(callfunc_irq, cpu) >= 0)
-		unbind_from_irqhandler(per_cpu(callfunc_irq, cpu), NULL);
-	if (per_cpu(call1func_irq, cpu) >= 0)
-		unbind_from_irqhandler(per_cpu(call1func_irq, cpu), NULL);
+	if (resched_irq >= 0)
+		unbind_from_per_cpu_irq(resched_irq, cpu, NULL);
+	if (callfunc_irq >= 0)
+		unbind_from_per_cpu_irq(callfunc_irq, cpu, NULL);
+	if (call1func_irq >= 0)
+		unbind_from_per_cpu_irq(call1func_irq, cpu, NULL);
 	xen_spinlock_cleanup(cpu);
 	return rc;
 }
@@ -181,9 +185,9 @@ static void __cpuinit xen_smp_intr_exit(unsigned int cpu)
 	if (cpu != 0)
 		local_teardown_timer(cpu);
 
-	unbind_from_irqhandler(per_cpu(resched_irq, cpu), NULL);
-	unbind_from_irqhandler(per_cpu(callfunc_irq, cpu), NULL);
-	unbind_from_irqhandler(per_cpu(call1func_irq, cpu), NULL);
+	unbind_from_per_cpu_irq(resched_irq, cpu, NULL);
+	unbind_from_per_cpu_irq(callfunc_irq, cpu, NULL);
+	unbind_from_per_cpu_irq(call1func_irq, cpu, NULL);
 	xen_spinlock_cleanup(cpu);
 }
 #endif

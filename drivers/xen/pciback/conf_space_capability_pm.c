@@ -94,7 +94,7 @@ static void *pm_ctrl_init(struct pci_dev *dev, int offset)
 	return ERR_PTR(err);
 }
 
-static struct config_field caplist_pm[] = {
+static const struct config_field caplist_pm[] = {
 	{
 		.offset     = PCI_PM_PMC,
 		.size       = 2,
@@ -117,9 +117,7 @@ static struct config_field caplist_pm[] = {
 		.size       = 1,
 		.u.b.read   = pciback_read_config_byte,
 	},
-	{
-		.size = 0,
-	},
+	{}
 };
 
 struct pciback_config_capability pciback_config_capability_pm = {

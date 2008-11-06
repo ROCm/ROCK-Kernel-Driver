@@ -195,8 +195,8 @@ asmlinkage unsigned int do_IRQ(struct pt_regs *regs)
 	/* high bit used in ret_from_ code  */
 	unsigned irq = ~regs->orig_ax;
 
-	exit_idle();
-	irq_enter();
+	/*exit_idle();*/
+	/*irq_enter();*/
 
 #ifdef CONFIG_DEBUG_STACKOVERFLOW
 	stack_overflow_check(regs);
@@ -214,7 +214,7 @@ asmlinkage unsigned int do_IRQ(struct pt_regs *regs)
 				__func__, smp_processor_id(), irq);
 	}
 
-	irq_exit();
+	/*irq_exit();*/
 
 	set_irq_regs(old_regs);
 	return 1;
@@ -238,6 +238,7 @@ void fixup_irqs(cpumask_t map)
 		spin_lock(&irq_desc[irq].lock);
 
 		if (!irq_has_action(irq) ||
+		    (irq_desc[irq].status & IRQ_PER_CPU) ||
 		    cpus_equal(irq_desc[irq].affinity, map)) {
 			spin_unlock(&irq_desc[irq].lock);
 			continue;

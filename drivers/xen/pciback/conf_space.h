@@ -59,7 +59,7 @@ struct config_field {
 
 struct config_field_entry {
 	struct list_head list;
-	struct config_field *field;
+	const struct config_field *field;
 	unsigned int base_offset;
 	void *data;
 };
@@ -70,17 +70,17 @@ struct config_field_entry {
  * the first entry in an array (of which the ending is marked by size==0)
  */
 int pciback_config_add_field_offset(struct pci_dev *dev,
-				    struct config_field *field,
+				    const struct config_field *field,
 				    unsigned int offset);
 
 static inline int pciback_config_add_field(struct pci_dev *dev,
-					   struct config_field *field)
+					   const struct config_field *field)
 {
 	return pciback_config_add_field_offset(dev, field, 0);
 }
 
 static inline int pciback_config_add_fields(struct pci_dev *dev,
-					    struct config_field *field)
+					    const struct config_field *field)
 {
 	int i, err = 0;
 	for (i = 0; field[i].size != 0; i++) {
@@ -92,7 +92,7 @@ static inline int pciback_config_add_fields(struct pci_dev *dev,
 }
 
 static inline int pciback_config_add_fields_offset(struct pci_dev *dev,
-						   struct config_field *field,
+						   const struct config_field *field,
 						   unsigned int offset)
 {
 	int i, err = 0;

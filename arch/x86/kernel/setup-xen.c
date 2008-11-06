@@ -1013,16 +1013,8 @@ void __init setup_arch(char **cmdline_p)
 		p2m_pages = xen_start_info->nr_pages;
 
 	if (!xen_feature(XENFEAT_auto_translated_physmap)) {
-		extern unsigned long *contiguous_bitmap;
 		unsigned long i, j, size;
 		unsigned int k, fpp;
-
-#ifdef CONFIG_X86_32
-#define max_pfn max_low_pfn
-#endif
-		contiguous_bitmap = alloc_bootmem((max_pfn + 2*BITS_PER_LONG)
-						  >> 3);
-#undef max_pfn
 
 		/* Make sure we have a large enough P->M table. */
 		phys_to_machine_mapping = alloc_bootmem_pages(

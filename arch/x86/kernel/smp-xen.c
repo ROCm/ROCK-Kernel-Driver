@@ -126,9 +126,9 @@ void xen_send_call_func_single_ipi(int cpu)
 	send_IPI_mask(&cpumask_of_cpu(cpu), CALL_FUNC_SINGLE_VECTOR);
 }
 
-void xen_send_call_func_ipi(cpumask_t mask)
+void xen_send_call_func_ipi(const cpumask_t *mask)
 {
-	send_IPI_mask(&mask, CALL_FUNCTION_VECTOR);
+	send_IPI_mask_allbutself(mask, CALL_FUNCTION_VECTOR);
 }
 
 static void stop_this_cpu(void *dummy)

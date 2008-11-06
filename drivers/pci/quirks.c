@@ -24,40 +24,50 @@
 #include <linux/kallsyms.h>
 #include "pci.h"
 
-#ifdef CONFIG_XEN
-/* A global flag which signals if we should page-align PCI mem windows. */
-int pci_mem_align = 0;
-
-static int __init set_pci_mem_align(char *str)
-{
-	pci_mem_align = 1;
-	return 1;
-}
-__setup("pci-mem-align", set_pci_mem_align);
-
-/* This quirk function enables us to force all memory resources which are
- * assigned to PCI devices, to be page-aligned.
+#ifdef CONFIG_PCI_REASSIGN
+/*
+ * This quirk function disables the device and releases resources
+ * which is specified by kernel's boot parameter 'reassigndev'.
+ * Later on, kernel will assign page-aligned memory resource back
+ * to that device.
  */
-static void __devinit quirk_align_mem_resources(struct pci_dev *dev)
+static void __devinit quirk_release_resources(struct pci_dev *dev)
 {
 	int i;
 	struct resource *r;
-	resource_size_t old_start;
 
-	if (!pci_mem_align)
-		return;
+	if (is_reassigndev(dev)) {
+		if (dev->hdr_type == PCI_HEADER_TYPE_NORMAL &&
+		    (dev->class >> 8) == PCI_CLASS_BRIDGE_HOST) {
+			/* PCI Host Bridge isn't a target device */
+			return;
+		}
+		dev_info(&dev->dev, "disable device and release resources\n");
+		pci_disable_device(dev);
 
-	for (i=0; i < DEVICE_COUNT_RESOURCE; i++) {
-		r = &dev->resource[i];
-		if ((r == NULL) || !(r->flags & IORESOURCE_MEM))
-			continue;
+		for (i=0; i < PCI_NUM_RESOURCES; i++) {
+			r = &dev->resource[i];
+			if (!(r->flags & IORESOURCE_MEM))
+				continue;
 
-		old_start = r->start;
-		r->start = (r->start + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
-		r->end = r->end - (old_start - r->start);
+			r->end = r->end - r->start;
+			r->start = 0;
+
+			if (i < PCI_BRIDGE_RESOURCES) {
+				pci_update_resource(dev, r, i);
+			}
+		}
+		/* need to disable bridge's resource window,
+		 * to make kernel enable to reassign new resource
+		 * window later on.
+		 */
+		if (dev->hdr_type == PCI_HEADER_TYPE_BRIDGE &&
+		    (dev->class >> 8) == PCI_CLASS_BRIDGE_PCI) {
+			pci_disable_bridge_window(dev);
+		}
 	}
 }
-DECLARE_PCI_FIXUP_HEADER(PCI_ANY_ID, PCI_ANY_ID, quirk_align_mem_resources);
+DECLARE_PCI_FIXUP_HEADER(PCI_ANY_ID, PCI_ANY_ID, quirk_release_resources);
 #endif
 
 /* The Mellanox Tavor device gives false positive parity errors

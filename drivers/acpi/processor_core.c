@@ -724,8 +724,17 @@ static int __cpuinit acpi_processor_start(struct acpi_device *device)
 #if defined(CONFIG_CPU_FREQ) || defined(CONFIG_PROCESSOR_EXTERNAL_CONTROL)
 	acpi_processor_ppc_has_changed(pr);
 #endif
-	acpi_processor_get_throttling_info(pr);
-	acpi_processor_get_limit_info(pr);
+
+	/*
+	 * pr->id may equal to -1 while processor_cntl_external enabled.
+	 * throttle and thermal module don't support this case.
+	 * Tx only works when dom0 vcpu == pcpu num by far, as we give
+	 * control to dom0.
+	 */
+	if (pr->id != -1) {
+		acpi_processor_get_throttling_info(pr);
+		acpi_processor_get_limit_info(pr);
+	}
 
 
 	acpi_processor_power_init(pr, device);

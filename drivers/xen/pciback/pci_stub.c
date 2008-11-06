@@ -467,7 +467,7 @@ static void pcistub_remove(struct pci_dev *dev)
 	}
 }
 
-static struct pci_device_id pcistub_ids[] = {
+static const struct pci_device_id pcistub_ids[] = {
 	{
 	 .vendor = PCI_ANY_ID,
 	 .device = PCI_ANY_ID,
@@ -700,8 +700,8 @@ static ssize_t pcistub_quirk_show(struct device_driver *drv, char *buf)
 	extern struct list_head pciback_quirks;
 	struct pciback_config_quirk *quirk;
 	struct pciback_dev_data *dev_data;
-	struct config_field *field;
-	struct config_field_entry *cfg_entry;
+	const struct config_field *field;
+	const struct config_field_entry *cfg_entry;
 
 	spin_lock_irqsave(&device_ids_lock, flags);
 	list_for_each_entry(quirk, &pciback_quirks, quirks_list) {

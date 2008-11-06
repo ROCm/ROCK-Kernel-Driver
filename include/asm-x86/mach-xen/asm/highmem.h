@@ -77,6 +77,23 @@ struct page *kmap_atomic_to_page(void *ptr);
 extern void add_highpages_with_active_regions(int nid, unsigned long start_pfn,
 					unsigned long end_pfn);
 
+void clear_highpage(struct page *);
+static inline void clear_user_highpage(struct page *page, unsigned long vaddr)
+{
+	clear_highpage(page);
+}
+#define __HAVE_ARCH_CLEAR_HIGHPAGE
+#define __HAVE_ARCH_CLEAR_USER_HIGHPAGE
+
+void copy_highpage(struct page *to, struct page *from);
+static inline void copy_user_highpage(struct page *to, struct page *from,
+	unsigned long vaddr, struct vm_area_struct *vma)
+{
+	copy_highpage(to, from);
+}
+#define __HAVE_ARCH_COPY_HIGHPAGE
+#define __HAVE_ARCH_COPY_USER_HIGHPAGE
+
 #endif /* __KERNEL__ */
 
 #endif /* _ASM_HIGHMEM_H */

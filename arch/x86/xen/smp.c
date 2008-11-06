@@ -373,7 +373,7 @@ static void xen_smp_send_call_function_ipi(const cpumask_t *mask)
 {
 	int cpu;
 
-	xen_send_IPI_mask(*mask, XEN_CALL_FUNCTION_VECTOR);
+	xen_send_IPI_mask(mask, XEN_CALL_FUNCTION_VECTOR);
 
 	/* Make sure other vcpus get a chance to run if they need to. */
 	for_each_cpu_mask_nr(cpu, *mask) {

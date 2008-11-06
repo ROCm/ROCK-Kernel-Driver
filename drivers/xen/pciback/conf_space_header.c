@@ -210,7 +210,7 @@ static int bist_write(struct pci_dev *dev, int offset, u8 value, void *data)
 	return err;
 }
 
-static struct config_field header_common[] = {
+static const struct config_field header_common[] = {
 	{
 	 .offset    = PCI_COMMAND,
 	 .size      = 2,
@@ -245,9 +245,7 @@ static struct config_field header_common[] = {
 	 .u.b.read  = pciback_read_config_byte,
 	 .u.b.write = bist_write,
 	},
-	{
-	 .size = 0,
-	},
+	{}
 };
 
 #define CFG_FIELD_BAR(reg_offset) 			\
@@ -272,7 +270,7 @@ static struct config_field header_common[] = {
 	 .u.dw.write = rom_write, 			\
 	 }
 
-static struct config_field header_0[] = {
+static const struct config_field header_0[] = {
 	CFG_FIELD_BAR(PCI_BASE_ADDRESS_0),
 	CFG_FIELD_BAR(PCI_BASE_ADDRESS_1),
 	CFG_FIELD_BAR(PCI_BASE_ADDRESS_2),
@@ -280,18 +278,14 @@ static struct config_field header_0[] = {
 	CFG_FIELD_BAR(PCI_BASE_ADDRESS_4),
 	CFG_FIELD_BAR(PCI_BASE_ADDRESS_5),
 	CFG_FIELD_ROM(PCI_ROM_ADDRESS),
-	{
-	 .size = 0,
-	},
+	{}
 };
 
-static struct config_field header_1[] = {
+static const struct config_field header_1[] = {
 	CFG_FIELD_BAR(PCI_BASE_ADDRESS_0),
 	CFG_FIELD_BAR(PCI_BASE_ADDRESS_1),
 	CFG_FIELD_ROM(PCI_ROM_ADDRESS1),
-	{
-	 .size = 0,
-	},
+	{}
 };
 
 int pciback_config_header_add_fields(struct pci_dev *dev)

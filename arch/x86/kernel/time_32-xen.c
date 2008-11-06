@@ -88,6 +88,10 @@ static DEFINE_PER_CPU(struct vcpu_runstate_info, runstate);
 /* Must be signed, as it's compared with s64 quantities which can be -ve. */
 #define NS_PER_TICK (1000000000LL/HZ)
 
+static struct vcpu_set_periodic_timer xen_set_periodic_tick = {
+	.period_ns = NS_PER_TICK
+};
+
 static void __clock_was_set(struct work_struct *unused)
 {
 	clock_was_set();
@@ -599,6 +603,25 @@ void mark_tsc_unstable(char *reason)
 }
 EXPORT_SYMBOL_GPL(mark_tsc_unstable);
 
+static void init_missing_ticks_accounting(unsigned int cpu)
+{
+	struct vcpu_register_runstate_memory_area area;
+	struct vcpu_runstate_info *runstate = &per_cpu(runstate, cpu);
+	int rc;
+
+	memset(runstate, 0, sizeof(*runstate));
+
+	area.addr.v = runstate;
+	rc = HYPERVISOR_vcpu_op(VCPUOP_register_runstate_memory_area, cpu, &area);
+	WARN_ON(rc && rc != -ENOSYS);
+
+	per_cpu(processed_blocked_time, cpu) =
+		runstate->time[RUNSTATE_blocked];
+	per_cpu(processed_stolen_time, cpu) =
+		runstate->time[RUNSTATE_runnable] +
+		runstate->time[RUNSTATE_offline];
+}
+
 static cycle_t cs_last;
 
 static cycle_t xen_clocksource_read(void)
@@ -635,11 +658,34 @@ static cycle_t xen_clocksource_read(void)
 #endif
 }
 
+/* No locking required. Interrupts are disabled on all CPUs. */
 static void xen_clocksource_resume(void)
 {
-	extern void time_resume(void);
+	unsigned int cpu;
 
-	time_resume();
+	init_cpu_khz();
+
+	for_each_online_cpu(cpu) {
+		switch (HYPERVISOR_vcpu_op(VCPUOP_set_periodic_timer, cpu,
+					   &xen_set_periodic_tick)) {
+		case 0:
+#if CONFIG_XEN_COMPAT <= 0x030004
+		case -ENOSYS:
+#endif
+			break;
+		default:
+			BUG();
+		}
+		get_time_values_from_xen(cpu);
+		per_cpu(processed_system_time, cpu) =
+			per_cpu(shadow_time, 0).system_timestamp;
+		init_missing_ticks_accounting(cpu);
+	}
+
+	processed_system_time = per_cpu(shadow_time, 0).system_timestamp;
+
+	update_wallclock();
+
 	cs_last = local_clock();
 }
 
@@ -653,25 +699,6 @@ static struct clocksource clocksource_xen = {
 	.flags			= CLOCK_SOURCE_IS_CONTINUOUS,
 	.resume			= xen_clocksource_resume,
 };
-
-static void init_missing_ticks_accounting(unsigned int cpu)
-{
-	struct vcpu_register_runstate_memory_area area;
-	struct vcpu_runstate_info *runstate = &per_cpu(runstate, cpu);
-	int rc;
-
-	memset(runstate, 0, sizeof(*runstate));
-
-	area.addr.v = runstate;
-	rc = HYPERVISOR_vcpu_op(VCPUOP_register_runstate_memory_area, cpu, &area);
-	WARN_ON(rc && rc != -ENOSYS);
-
-	per_cpu(processed_blocked_time, cpu) =
-		runstate->time[RUNSTATE_blocked];
-	per_cpu(processed_stolen_time, cpu) =
-		runstate->time[RUNSTATE_runnable] +
-		runstate->time[RUNSTATE_offline];
-}
 
 unsigned long xen_read_persistent_clock(void)
 {
@@ -702,24 +729,18 @@ int xen_update_persistent_clock(void)
 }
 
 /* Dynamically-mapped IRQ. */
-DEFINE_PER_CPU(int, timer_irq);
-
-static void setup_cpu0_timer_irq(void)
-{
-	per_cpu(timer_irq, 0) =
-		bind_virq_to_irqhandler(
-			VIRQ_TIMER,
-			0,
-			timer_interrupt,
-			IRQF_DISABLED|IRQF_NOBALANCING,
-			"timer0",
-			NULL);
-	BUG_ON(per_cpu(timer_irq, 0) < 0);
-}
-
-static struct vcpu_set_periodic_timer xen_set_periodic_tick = {
-	.period_ns = NS_PER_TICK
+static int __read_mostly timer_irq = -1;
+static struct irqaction timer_action = {
+	.handler = timer_interrupt,
+	.flags   = IRQF_DISABLED,
+	.name    = "timer"
 };
+
+static void __init setup_cpu0_timer_irq(void)
+{
+	timer_irq = bind_virq_to_irqaction(VIRQ_TIMER, 0, &timer_action);
+	BUG_ON(timer_irq < 0);
+}
 
 void __init time_init(void)
 {
@@ -844,38 +865,7 @@ void xen_halt(void)
 }
 EXPORT_SYMBOL(xen_halt);
 
-/* No locking required. Interrupts are disabled on all CPUs. */
-void time_resume(void)
-{
-	unsigned int cpu;
-
-	init_cpu_khz();
-
-	for_each_online_cpu(cpu) {
-		switch (HYPERVISOR_vcpu_op(VCPUOP_set_periodic_timer, cpu,
-					   &xen_set_periodic_tick)) {
-		case 0:
-#if CONFIG_XEN_COMPAT <= 0x030004
-		case -ENOSYS:
-#endif
-			break;
-		default:
-			BUG();
-		}
-		get_time_values_from_xen(cpu);
-		per_cpu(processed_system_time, cpu) =
-			per_cpu(shadow_time, 0).system_timestamp;
-		init_missing_ticks_accounting(cpu);
-	}
-
-	processed_system_time = per_cpu(shadow_time, 0).system_timestamp;
-
-	update_wallclock();
-}
-
 #ifdef CONFIG_SMP
-static char timer_name[NR_CPUS][15];
-
 int __cpuinit local_setup_timer(unsigned int cpu)
 {
 	int seq, irq;
@@ -901,16 +891,10 @@ int __cpuinit local_setup_timer(unsigned int cpu)
 		init_missing_ticks_accounting(cpu);
 	} while (read_seqretry(&xtime_lock, seq));
 
-	sprintf(timer_name[cpu], "timer%u", cpu);
-	irq = bind_virq_to_irqhandler(VIRQ_TIMER,
-				      cpu,
-				      timer_interrupt,
-				      IRQF_DISABLED|IRQF_NOBALANCING,
-				      timer_name[cpu],
-				      NULL);
+	irq = bind_virq_to_irqaction(VIRQ_TIMER, cpu, &timer_action);
 	if (irq < 0)
 		return irq;
-	per_cpu(timer_irq, cpu) = irq;
+	BUG_ON(timer_irq != irq);
 
 	return 0;
 }
@@ -918,7 +902,7 @@ int __cpuinit local_setup_timer(unsigned int cpu)
 void __cpuinit local_teardown_timer(unsigned int cpu)
 {
 	BUG_ON(cpu == 0);
-	unbind_from_irqhandler(per_cpu(timer_irq, cpu), NULL);
+	unbind_from_per_cpu_irq(timer_irq, cpu, &timer_action);
 }
 #endif
 

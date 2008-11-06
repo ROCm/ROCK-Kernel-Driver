@@ -71,18 +71,12 @@ void __init setup_apic_routing(void)
 
 /* Same for both flat and physical. */
 
-#ifdef CONFIG_XEN
-extern void xen_send_IPI_shortcut(unsigned int shortcut, int vector);
-#endif
-
-void send_IPI_self(int vector)
-{
 #ifndef CONFIG_XEN
+void apic_send_IPI_self(int vector)
+{
 	__send_IPI_shortcut(APIC_DEST_SELF, vector, APIC_DEST_PHYSICAL);
-#else
-	xen_send_IPI_shortcut(APIC_DEST_SELF, vector);
-#endif
 }
+#endif
 
 int __init acpi_madt_oem_check(char *oem_id, char *oem_table_id)
 {

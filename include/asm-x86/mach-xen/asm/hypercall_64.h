@@ -327,9 +327,19 @@ static inline int __must_check
 HYPERVISOR_grant_table_op(
 	unsigned int cmd, void *uop, unsigned int count)
 {
+	bool fixup = false;
+	int rc;
+
 	if (arch_use_lazy_mmu_mode())
 		xen_multicall_flush(false);
-	return _hypercall3(int, grant_table_op, cmd, uop, count);
+#ifdef GNTTABOP_map_grant_ref
+	if (cmd == GNTTABOP_map_grant_ref)
+#endif
+		fixup = gnttab_pre_map_adjust(cmd, uop, count);
+	rc = _hypercall3(int, grant_table_op, cmd, uop, count);
+	if (rc == 0 && fixup)
+		rc = gnttab_post_map_adjust(uop, count);
+	return rc;
 }
 
 static inline int __must_check

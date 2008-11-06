@@ -212,6 +212,11 @@ static irqreturn_t xenoprof_ovf_interrupt(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+static struct irqaction ovf_action = {
+	.handler = xenoprof_ovf_interrupt,
+	.flags   = IRQF_DISABLED,
+	.name    = "xenoprof"
+};
 
 static void unbind_virq(void)
 {
@@ -219,7 +224,7 @@ static void unbind_virq(void)
 
 	for_each_online_cpu(i) {
 		if (ovf_irq[i] >= 0) {
-			unbind_from_irqhandler(ovf_irq[i], NULL);
+			unbind_from_per_cpu_irq(ovf_irq[i], i, &ovf_action);
 			ovf_irq[i] = -1;
 		}
 	}
@@ -232,12 +237,7 @@ static int bind_virq(void)
 	int result;
 
 	for_each_online_cpu(i) {
-		result = bind_virq_to_irqhandler(VIRQ_XENOPROF,
-						 i,
-						 xenoprof_ovf_interrupt,
-						 IRQF_DISABLED|IRQF_NOBALANCING,
-						 "xenoprof",
-						 NULL);
+		result = bind_virq_to_irqaction(VIRQ_XENOPROF, i, &ovf_action);
 
 		if (result < 0) {
 			unbind_virq();

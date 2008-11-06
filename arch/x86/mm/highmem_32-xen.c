@@ -151,7 +151,54 @@ struct page *kmap_atomic_to_page(void *ptr)
 	return pte_page(*pte);
 }
 
+void clear_highpage(struct page *page)
+{
+	void *kaddr;
+
+	if (likely(xen_feature(XENFEAT_highmem_assist))
+	    && PageHighMem(page)) {
+		struct mmuext_op meo;
+
+		meo.cmd = MMUEXT_CLEAR_PAGE;
+		meo.arg1.mfn = pfn_to_mfn(page_to_pfn(page));
+		if (HYPERVISOR_mmuext_op(&meo, 1, NULL, DOMID_SELF) == 0)
+			return;
+	}
+
+	kaddr = kmap_atomic(page, KM_USER0);
+	clear_page(kaddr);
+	kunmap_atomic(kaddr, KM_USER0);
+}
+
+void copy_highpage(struct page *to, struct page *from)
+{
+	void *vfrom, *vto;
+
+	if (likely(xen_feature(XENFEAT_highmem_assist))
+	    && (PageHighMem(from) || PageHighMem(to))) {
+		unsigned long from_pfn = page_to_pfn(from);
+		unsigned long to_pfn = page_to_pfn(to);
+		struct mmuext_op meo;
+
+		meo.cmd = MMUEXT_COPY_PAGE;
+		meo.arg1.mfn = pfn_to_mfn(to_pfn);
+		meo.arg2.src_mfn = pfn_to_mfn(from_pfn);
+		if (mfn_to_pfn(meo.arg2.src_mfn) == from_pfn
+		    && mfn_to_pfn(meo.arg1.mfn) == to_pfn
+		    && HYPERVISOR_mmuext_op(&meo, 1, NULL, DOMID_SELF) == 0)
+			return;
+	}
+
+	vfrom = kmap_atomic(from, KM_USER0);
+	vto = kmap_atomic(to, KM_USER1);
+	copy_page(vto, vfrom);
+	kunmap_atomic(vfrom, KM_USER0);
+	kunmap_atomic(vto, KM_USER1);
+}
+
 EXPORT_SYMBOL(kmap);
 EXPORT_SYMBOL(kunmap);
 EXPORT_SYMBOL(kmap_atomic);
 EXPORT_SYMBOL(kunmap_atomic);
+EXPORT_SYMBOL(clear_highpage);
+EXPORT_SYMBOL(copy_highpage);

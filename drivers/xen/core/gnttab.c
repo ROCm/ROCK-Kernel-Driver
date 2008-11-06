@@ -35,6 +35,7 @@
 #include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/seqlock.h>
+#include <linux/sysdev.h>
 #include <xen/interface/xen.h>
 #include <xen/gnttab.h>
 #include <asm/pgtable.h>
@@ -112,6 +113,7 @@ static void do_free_callbacks(void)
 		next = callback->next;
 		if (gnttab_free_count >= callback->count) {
 			callback->next = NULL;
+			callback->queued = 0;
 			callback->fn(callback->arg);
 		} else {
 			callback->next = gnttab_free_callback_list;
@@ -343,11 +345,12 @@ void gnttab_request_free_callback(struct gnttab_free_callback *callback,
 {
 	unsigned long flags;
 	spin_lock_irqsave(&gnttab_list_lock, flags);
-	if (callback->next)
+	if (callback->queued)
 		goto out;
 	callback->fn = fn;
 	callback->arg = arg;
 	callback->count = count;
+	callback->queued = 1;
 	callback->next = gnttab_free_callback_list;
 	gnttab_free_callback_list = callback;
 	check_free_callbacks();
@@ -365,6 +368,7 @@ void gnttab_cancel_free_callback(struct gnttab_free_callback *callback)
 	for (pcb = &gnttab_free_callback_list; *pcb; pcb = &(*pcb)->next) {
 		if (*pcb == callback) {
 			*pcb = callback->next;
+			callback->queued = 0;
 			break;
 		}
 	}
@@ -629,22 +633,106 @@ void __gnttab_dma_map_page(struct page *page)
 	} while (unlikely(read_seqretry(&gnttab_dma_lock, seq)));
 }
 
-int gnttab_resume(void)
+#ifdef __HAVE_ARCH_PTE_SPECIAL
+
+static unsigned int GNTMAP_pte_special;
+
+bool gnttab_pre_map_adjust(unsigned int cmd, struct gnttab_map_grant_ref *map,
+			   unsigned int count)
+{
+	unsigned int i;
+	bool fixup;
+
+	if (unlikely(cmd != GNTTABOP_map_grant_ref))
+		count = 0;
+
+	for (i = 0, fixup = false; i < count; ++i, ++map) {
+		if (!(map->flags & GNTMAP_host_map)
+		    || !(map->flags & GNTMAP_application_map))
+			continue;
+		if (GNTMAP_pte_special)
+			map->flags |= GNTMAP_pte_special;
+		else
+			fixup = true;
+	}
+
+	BUG_ON(fixup && xen_feature(XENFEAT_auto_translated_physmap));
+
+	return fixup;
+}
+EXPORT_SYMBOL(gnttab_pre_map_adjust);
+
+#if CONFIG_XEN_COMPAT < 0x030400
+int gnttab_post_map_adjust(const struct gnttab_map_grant_ref *map, unsigned int count)
+{
+	unsigned int i;
+	int rc = 0;
+
+	for (i = 0; i < count && rc == 0; ++i, ++map) {
+		pte_t pte;
+
+		if (!(map->flags & GNTMAP_host_map)
+		    || !(map->flags & GNTMAP_application_map))
+			continue;
+
+#ifdef CONFIG_X86
+		pte = __pte_ma((map->dev_bus_addr | _PAGE_PRESENT | _PAGE_USER
+				| _PAGE_ACCESSED | _PAGE_DIRTY | _PAGE_NX
+				| _PAGE_SPECIAL)
+			       & __supported_pte_mask);
+#else
+#error Architecture not yet supported.
+#endif
+		if (!(map->flags & GNTMAP_readonly))
+			pte = pte_mkwrite(pte);
+
+		if (map->flags & GNTMAP_contains_pte) {
+			mmu_update_t u;
+
+			u.ptr = map->host_addr;
+			u.val = __pte_val(pte);
+			rc = HYPERVISOR_mmu_update(&u, 1, NULL, DOMID_SELF);
+		} else
+			rc = HYPERVISOR_update_va_mapping(map->host_addr, pte, 0);
+	}
+
+	return rc;
+}
+EXPORT_SYMBOL(gnttab_post_map_adjust);
+#endif
+
+#endif /* __HAVE_ARCH_PTE_SPECIAL */
+
+static int gnttab_resume(struct sys_device *dev)
 {
 	if (max_nr_grant_frames() < nr_grant_frames)
 		return -ENOSYS;
 	return gnttab_map(0, nr_grant_frames - 1);
 }
+#define gnttab_resume() gnttab_resume(NULL)
 
-int gnttab_suspend(void)
-{
 #ifdef CONFIG_X86
+static int gnttab_suspend(struct sys_device *dev, pm_message_t state)
+{
 	apply_to_page_range(&init_mm, (unsigned long)shared,
 			    PAGE_SIZE * nr_grant_frames,
 			    unmap_pte_fn, NULL);
-#endif
 	return 0;
 }
+#else
+#define gnttab_suspend NULL
+#endif
+
+static struct sysdev_class gnttab_sysclass = {
+	.name		= "gnttab",
+	.resume		= gnttab_resume,
+	.suspend	= gnttab_suspend,
+};
+
+static struct sys_device device_gnttab = {
+	.id		= 0,
+	.cls		= &gnttab_sysclass,
+};
 
 #else /* !CONFIG_XEN */
 
@@ -723,6 +811,17 @@ int __devinit gnttab_init(void)
 	if (!is_running_on_xen())
 		return -ENODEV;
 
+#ifdef CONFIG_XEN
+	{
+		int err = sysdev_class_register(&gnttab_sysclass);
+
+		if (!err)
+			err = sysdev_register(&device_gnttab);
+		if (err)
+			return err;
+	}
+#endif
+
 	nr_grant_frames = 1;
 	boot_max_nr_grant_frames = __max_nr_grant_frames();
 
@@ -754,6 +853,18 @@ int __devinit gnttab_init(void)
 	gnttab_entry(nr_init_grefs - 1) = GNTTAB_LIST_END;
 	gnttab_free_count = nr_init_grefs - NR_RESERVED_ENTRIES;
 	gnttab_free_head  = NR_RESERVED_ENTRIES;
+
+#ifdef __HAVE_ARCH_PTE_SPECIAL
+	if (!xen_feature(XENFEAT_auto_translated_physmap)
+	    && xen_feature(XENFEAT_gnttab_map_avail_bits)) {
+#ifdef CONFIG_X86
+		GNTMAP_pte_special = (__pte_val(pte_mkspecial(__pte_ma(0)))
+				      >> _PAGE_BIT_UNUSED1) << _GNTMAP_guest_avail0;
+#else
+#error Architecture not yet supported.
+#endif
+	}
+#endif
 
 	return 0;
 

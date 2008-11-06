@@ -57,7 +57,7 @@ struct smp_ops {
 	void (*smp_send_stop)(void);
 	void (*smp_send_reschedule)(int cpu);
 
-	void (*send_call_func_ipi)(cpumask_t mask);
+	void (*send_call_func_ipi)(const cpumask_t *mask);
 	void (*send_call_func_single_ipi)(int cpu);
 };
 
@@ -106,7 +106,7 @@ static inline void arch_send_call_function_single_ipi(int cpu)
 
 static inline void arch_send_call_function_ipi(cpumask_t mask)
 {
-	smp_ops.send_call_func_ipi(mask);
+	smp_ops.send_call_func_ipi(&mask);
 }
 
 void native_smp_prepare_boot_cpu(void);
@@ -118,13 +118,13 @@ int native_cpu_up(unsigned int cpunum);
 
 void xen_smp_send_stop(void);
 void xen_smp_send_reschedule(int cpu);
-void xen_send_call_func_ipi(cpumask_t mask);
+void xen_send_call_func_ipi(const cpumask_t *mask);
 void xen_send_call_func_single_ipi(int cpu);
 
 #define smp_send_stop		xen_smp_send_stop
 #define smp_send_reschedule	xen_smp_send_reschedule
 #define arch_send_call_function_single_ipi	xen_send_call_func_single_ipi
-#define arch_send_call_function_ipi		xen_send_call_func_ipi
+#define arch_send_call_function_ipi(m)		xen_send_call_func_ipi(&(m))
 
 #endif /* CONFIG_XEN */
 

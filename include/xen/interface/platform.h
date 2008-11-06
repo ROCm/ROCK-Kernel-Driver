@@ -312,6 +312,16 @@ struct xenpf_set_processor_pminfo {
 typedef struct xenpf_set_processor_pminfo xenpf_set_processor_pminfo_t;
 DEFINE_XEN_GUEST_HANDLE(xenpf_set_processor_pminfo_t);
 
+#define XENPF_get_cpu_freq        ('N' << 24)
+struct xenpf_get_cpu_freq {
+    /* IN variables */
+    uint32_t vcpu;
+    /* OUT variables */
+    uint32_t freq; /* in kHz */
+};
+typedef struct xenpf_get_cpu_freq xenpf_get_cpu_freq_t;
+DEFINE_XEN_GUEST_HANDLE(xenpf_get_cpu_freq_t);
+
 struct xen_platform_op {
     uint32_t cmd;
     uint32_t interface_version; /* XENPF_INTERFACE_VERSION */
@@ -327,6 +337,7 @@ struct xen_platform_op {
         struct xenpf_change_freq       change_freq;
         struct xenpf_getidletime       getidletime;
         struct xenpf_set_processor_pminfo set_pminfo;
+        struct xenpf_get_cpu_freq      get_cpu_freq;
         uint8_t                        pad[128];
     } u;
 };

@@ -42,9 +42,9 @@
 #include <xen/interface/physdev.h>
 #include <xen/interface/sched.h>
 #include <xen/interface/nmi.h>
+#include <asm/percpu.h>
 #include <asm/ptrace.h>
 #include <asm/page.h>
-#include <asm/percpu.h>
 
 extern shared_info_t *HYPERVISOR_shared_info;
 
@@ -166,13 +166,30 @@ static inline bool arch_use_lazy_mmu_mode(void)
 	       && xen_use_lazy_mmu_mode();
 }
 
+struct gnttab_map_grant_ref;
+bool gnttab_pre_map_adjust(unsigned int cmd, struct gnttab_map_grant_ref *,
+			   unsigned int count);
+#if CONFIG_XEN_COMPAT < 0x030400
+int gnttab_post_map_adjust(const struct gnttab_map_grant_ref *, unsigned int);
+#else
+static inline int gnttab_post_map_adjust(const struct gnttab_map_grant_ref *m,
+					 unsigned int count)
+{
+	BUG();
+	return -ENOSYS;
+}
+#endif
+
 #else /* CONFIG_XEN */
 
 static inline void xen_multicall_flush(bool ignore) {}
 static inline bool arch_use_lazy_mmu_mode(void) { return false; }
-#define xen_multi_update_va_mapping ({ BUG(); -ENOSYS; })
-#define xen_multi_mmu_update ({ BUG(); -ENOSYS; })
-#define xen_multi_mmuext_op ({ BUG(); -ENOSYS; })
+#define xen_multi_update_va_mapping(...) ({ BUG(); -ENOSYS; })
+#define xen_multi_mmu_update(...) ({ BUG(); -ENOSYS; })
+#define xen_multi_mmuext_op(...) ({ BUG(); -ENOSYS; })
+
+#define gnttab_pre_map_adjust(...) false
+#define gnttab_post_map_adjust(...) ({ BUG(); -ENOSYS; })
 
 #endif /* CONFIG_XEN */
 
@@ -329,7 +346,7 @@ MULTI_grant_table_op(multicall_entry_t *mcl, unsigned int cmd,
 #endif
 
 #ifdef LINUX
-/* drivers/staging/rtl2860/ uses Windows-style types, including VOID */
+/* drivers/staging/rt2860/ uses Windows-style types, including VOID */
 #undef VOID
 #endif
 
