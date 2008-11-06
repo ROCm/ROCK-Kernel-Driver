@@ -335,7 +335,9 @@ static int dasd_state_unfmt_to_basic(struct dasd_device *device)
 static int
 dasd_state_ready_to_online(struct dasd_device * device)
 {
-	int rc;
+	int rc, i;
+	struct gendisk *disk;
+	struct hd_struct *p;
 
 	if (device->discipline->ready_to_online) {
 		rc = device->discipline->ready_to_online(device);
@@ -343,8 +345,19 @@ dasd_state_ready_to_online(struct dasd_device * device)
 			return rc;
 	}
 	device->state = DASD_STATE_ONLINE;
-	if (device->block)
+	if (device->block) {
 		dasd_schedule_block_bh(device->block);
+
+		disk = device->block->bdev->bd_disk;
+		kobject_uevent(&disk->dev.kobj, KOBJ_CHANGE);
+		/* send uevents for all partitions */
+		for (i = 1; i < disk->minors; i++) {
+			p = disk->part[i-1];
+			if (!p || !p->nr_sects)
+				continue;
+			kobject_uevent(&p->dev.kobj, KOBJ_CHANGE);
+		}
+	}
 	return 0;
 }
 
@@ -353,7 +366,9 @@ dasd_state_ready_to_online(struct dasd_device * device)
  */
 static int dasd_state_online_to_ready(struct dasd_device *device)
 {
-	int rc;
+	int rc, i;
+	struct gendisk *disk;
+	struct hd_struct *p;
 
 	if (device->discipline->online_to_ready) {
 		rc = device->discipline->online_to_ready(device);
@@ -361,6 +376,18 @@ static int dasd_state_online_to_ready(struct dasd_device *device)
 			return rc;
 	}
 	device->state = DASD_STATE_READY;
+
+	/* send uevents for all partitions */
+	if (device->block) {
+		disk = device->block->bdev->bd_disk;
+		for (i = 1; i < disk->minors; i++) {
+			p = disk->part[i-1];
+			if (!p || !p->nr_sects)
+				continue;
+			kobject_uevent(&p->dev.kobj, KOBJ_CHANGE);
+		}
+		kobject_uevent(&disk->dev.kobj, KOBJ_CHANGE);
+	}
 	return 0;
 }
 
