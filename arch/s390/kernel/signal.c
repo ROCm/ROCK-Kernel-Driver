@@ -409,11 +409,6 @@ handle_signal(unsigned long sig, struct k_sigaction *ka,
 		spin_unlock_irq(&current->sighand->siglock);
 	}
 
-	if (current->instrumentation) {
-		clear_thread_flag(TIF_SYSCALL_TRACE);
-		current->instrumentation &= ~PTS_SELF;
-	}
-
 	return ret;
 }
 
