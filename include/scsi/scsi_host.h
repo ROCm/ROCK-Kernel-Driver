@@ -704,12 +704,20 @@ static inline struct Scsi_Host *dev_to_shost(struct device *dev)
 }
 
 /*
- * walks object list backward, to find the first object with dma_parms set.
+ * walks object list backward, to find the first physical
+ * device object.
  */
-static inline struct device *dev_to_dma_dev(struct device *dev)
+static inline struct device *dev_to_nonscsi_dev(struct device *dev)
 {
-	while (dev && dev->dma_parms == NULL)
+	while (dev && (dev->bus == NULL || scsi_is_host_device(dev))) {
+		if (dev->dma_parms) {
+			dev_printk(KERN_WARNING, dev,
+				   "dma_parms set, bus %p\n",
+				   dev->bus);
+			break;
+		}
 		dev = dev->parent;
+	}
 	return dev;
 }
 

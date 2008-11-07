@@ -29,18 +29,17 @@
 #include <scsi/fc/fc_fcp.h>
 #include <scsi/fc/fc_ns.h>
 #include <scsi/fc/fc_els.h>
+#include <scsi/fc/fc_gs.h>
 
 #include <scsi/libfc/fc_frame.h>
 
 #define LIBFC_DEBUG
 
 #ifdef LIBFC_DEBUG
-/*
- * Log message.
- */
+/* Log messages */
 #define FC_DBG(fmt, args...)						\
 	do {								\
-		printk(KERN_INFO "%s " fmt, __func__, ##args);	\
+		printk(KERN_INFO "%s " fmt, __func__, ##args);		\
 	} while (0)
 #else
 #define FC_DBG(fmt, args...)
@@ -58,20 +57,15 @@
 #define ntohll(x) be64_to_cpu(x)
 #define htonll(x) cpu_to_be64(x)
 
-#define ntoh24(p)	(((p)[0] << 16) | ((p)[1] << 8) | ((p)[2]))
+#define ntoh24(p) (((p)[0] << 16) | ((p)[1] << 8) | ((p)[2]))
 
-#define hton24(p, v)	do { \
-	p[0] = (((v) >> 16) & 0xFF); \
-	p[1] = (((v) >> 8) & 0xFF); \
-	p[2] = ((v) & 0xFF); \
-} while (0)
+#define hton24(p, v)	do {			\
+		p[0] = (((v) >> 16) & 0xFF);	\
+		p[1] = (((v) >> 8) & 0xFF);	\
+		p[2] = ((v) & 0xFF);		\
+	} while (0)
 
 struct fc_exch_mgr;
-
-/*
- * tgt_flags
- */
-#define FC_TGT_REC_SUPPORTED	    (1 << 0)
 
 /*
  * FC HBA status
@@ -79,38 +73,53 @@ struct fc_exch_mgr;
 #define FC_PAUSE		    (1 << 1)
 #define FC_LINK_UP		    (1 << 0)
 
-/* for fc_softc */
-#define FC_MAX_OUTSTANDING_COMMANDS 1024
-
-/*
- * Transport Capabilities
- */
-#define TRANS_C_SG		    (1 << 0)  /* Scatter gather */
-
 enum fc_lport_state {
 	LPORT_ST_NONE = 0,
 	LPORT_ST_FLOGI,
 	LPORT_ST_DNS,
-	LPORT_ST_REG_PN,
-	LPORT_ST_REG_FT,
+	LPORT_ST_RPN_ID,
+	LPORT_ST_RFT_ID,
 	LPORT_ST_SCR,
 	LPORT_ST_READY,
-	LPORT_ST_DNS_STOP,
 	LPORT_ST_LOGO,
 	LPORT_ST_RESET
+};
+
+enum fc_lport_event {
+	LPORT_EV_RPORT_NONE = 0,
+	LPORT_EV_RPORT_CREATED,
+	LPORT_EV_RPORT_FAILED,
+	LPORT_EV_RPORT_STOP,
+	LPORT_EV_RPORT_LOGO
 };
 
 enum fc_rport_state {
 	RPORT_ST_NONE = 0,
 	RPORT_ST_INIT,		/* initialized */
-	RPORT_ST_STARTED,	/* started */
 	RPORT_ST_PLOGI,		/* waiting for PLOGI completion */
-	RPORT_ST_PLOGI_RECV,	/* received PLOGI (as target) */
 	RPORT_ST_PRLI,		/* waiting for PRLI completion */
 	RPORT_ST_RTV,		/* waiting for RTV completion */
-	RPORT_ST_ERROR,		/* error */
 	RPORT_ST_READY,		/* ready for use */
 	RPORT_ST_LOGO,		/* port logout sent */
+};
+
+enum fc_rport_trans_state {
+	FC_PORTSTATE_ROGUE,
+	FC_PORTSTATE_REAL,
+};
+
+/**
+ * struct fc_disc_port - temporary discovery port to hold rport identifiers
+ * @lp: Fibre Channel host port instance
+ * @peers: node for list management during discovery and RSCN processing
+ * @ids: identifiers structure to pass to fc_remote_port_add()
+ * @rport_work: work struct for starting the rport state machine
+ */
+struct fc_disc_port {
+	struct fc_lport             *lp;
+	struct list_head            peers;
+	struct fc_rport_identifiers ids;
+	struct work_struct	    rport_work;
 };
 
 /**
@@ -122,8 +131,9 @@ enum fc_rport_state {
  * @retries: retry count in current state
  * @e_d_tov: error detect timeout value (in msec)
  * @r_a_tov: resource allocation timeout value (in msec)
- * @rp_lock: lock protects state
+ * @rp_mutex: mutex protects rport
  * @retry_work:
+ * @event_callback: Callback for rport READY, FAILED or LOGO
  */
 struct fc_rport_libfc_priv {
 	struct fc_lport		*local_port;
@@ -135,9 +145,24 @@ struct fc_rport_libfc_priv {
 	unsigned int	retries;
 	unsigned int	e_d_tov;
 	unsigned int	r_a_tov;
-	spinlock_t	rp_lock;
+	enum fc_rport_trans_state trans_state;
+	struct mutex    rp_mutex;
 	struct delayed_work	retry_work;
+	enum fc_lport_event     event;
+	void (*event_callback)(struct fc_lport *,
+			       struct fc_rport *,
+			       enum fc_lport_event);
+	struct list_head         peers;
+	struct work_struct       event_work;
 };
+
+#define PRIV_TO_RPORT(x)						\
+	(struct fc_rport *)((void *)x - sizeof(struct fc_rport));
+#define RPORT_TO_PRIV(x)						\
+	(struct fc_rport_libfc_priv *)((void *)x + sizeof(struct fc_rport));
+
+struct fc_rport *fc_rport_rogue_create(struct fc_disc_port *);
+void fc_rport_rogue_destroy(struct fc_rport *);
 
 static inline void fc_rport_set_name(struct fc_rport *rport, u64 wwpn, u64 wwnn)
 {
@@ -176,6 +201,68 @@ struct fc_seq_els_data {
 	struct fc_frame *fp;
 	enum fc_els_rjt_reason reason;
 	enum fc_els_rjt_explan explan;
+};
+
+/*
+ * FCP request structure, one for each scsi cmd request
+ */
+struct fc_fcp_pkt {
+	/*
+	 * housekeeping stuff
+	 */
+	struct fc_lport *lp;	/* handle to hba struct */
+	u16		state;		/* scsi_pkt state state */
+	u16		tgt_flags;	/* target flags	 */
+	atomic_t	ref_cnt;	/* fcp pkt ref count */
+	spinlock_t	scsi_pkt_lock;	/* Must be taken before the host lock
+					 * if both are held at the same time */
+	/*
+	 * SCSI I/O related stuff
+	 */
+	struct scsi_cmnd *cmd;		/* scsi command pointer. set/clear
+					 * under host lock */
+	struct list_head list;		/* tracks queued commands. access under
+					 * host lock */
+	/*
+	 * timeout related stuff
+	 */
+	struct timer_list timer;	/* command timer */
+	struct completion tm_done;
+	int	wait_for_comp;
+	unsigned long	start_time;	/* start jiffie */
+	unsigned long	end_time;	/* end jiffie */
+	unsigned long	last_pkt_time;	 /* jiffies of last frame received */
+
+	/*
+	 * scsi cmd and data transfer information
+	 */
+	u32		data_len;
+	/*
+	 * transport related veriables
+	 */
+	struct fcp_cmnd cdb_cmd;
+	size_t		xfer_len;
+	u32		xfer_contig_end; /* offset of end of contiguous xfer */
+	u16		max_payload;	/* max payload size in bytes */
+
+	/*
+	 * scsi/fcp return status
+	 */
+	u32		io_status;	/* SCSI result upper 24 bits */
+	u8		cdb_status;
+	u8		status_code;	/* FCP I/O status */
+	/* bit 3 Underrun bit 2: overrun */
+	u8		scsi_comp_flags;
+	u32		req_flags;	/* bit 0: read bit:1 write */
+	u32		scsi_resid;	/* residule length */
+
+	struct fc_rport	*rport;		/* remote port pointer */
+	struct fc_seq	*seq_ptr;	/* current sequence pointer */
+	/*
+	 * Error Processing
+	 */
+	u8		recov_retry;	/* count of recovery retries */
+	struct fc_seq	*recov_seq;	/* sequence for REC or SRR */
 };
 
 struct libfc_function_template {
@@ -219,9 +306,12 @@ struct libfc_function_template {
 	 * fc_frame pointer in response handler will also indicate timeout
 	 * as error using IS_ERR related macros.
 	 *
-	 * The response handler argumemt resp_arg is passed back to resp
-	 * handler when it is invoked by EM layer in above mentioned
-	 * two scenarios.
+	 * The exchange destructor handler is also set in this routine.
+	 * The destructor handler is invoked by EM layer when exchange
+	 * is about to free, this can be used by caller to free its
+	 * resources along with exchange free.
+	 *
+	 * The arg is passed back to resp and destructor handler.
 	 *
 	 * The timeout value (in msec) for an exchange is set if non zero
 	 * timer_msec argument is specified. The timer is canceled when
@@ -232,10 +322,12 @@ struct libfc_function_template {
 	 */
 	struct fc_seq *(*exch_seq_send)(struct fc_lport *lp,
 					struct fc_frame *fp,
-					void (*resp)(struct fc_seq *,
+					void (*resp)(struct fc_seq *sp,
 						     struct fc_frame *fp,
 						     void *arg),
-					void *resp_arg,	unsigned int timer_msec,
+					void (*destructor)(struct fc_seq *sp,
+							   void *arg),
+					void *arg, unsigned int timer_msec,
 					u32 sid, u32 did, u32 f_ctl);
 
 	/*
@@ -316,9 +408,10 @@ struct libfc_function_template {
 	void (*lport_recv)(struct fc_lport *lp, struct fc_seq *sp,
 			   struct fc_frame *fp);
 
-	int (*lport_login)(struct fc_lport *);
 	int (*lport_reset)(struct fc_lport *);
-	int (*lport_logout)(struct fc_lport *);
+
+	void (*event_callback)(struct fc_lport *, struct fc_rport *,
+			       enum fc_lport_event);
 
 	/**
 	 * Remote Port interfaces
@@ -341,31 +434,45 @@ struct libfc_function_template {
 	 */
 	int (*rport_logout)(struct fc_rport *rport);
 
+	/*
+	 * Delete the rport and remove it from the transport if
+	 * it had been added. This will not send a LOGO, use
+	 * rport_logout for a gracefull logout.
+	 */
+	int (*rport_stop)(struct fc_rport *rport);
+
+	/*
+	 * Recieve a request from a remote port.
+	 */
 	void (*rport_recv_req)(struct fc_seq *, struct fc_frame *,
 			       struct fc_rport *);
 
 	struct fc_rport *(*rport_lookup)(const struct fc_lport *, u32);
 
-	struct fc_rport *(*rport_create)(struct fc_lport *,
-					 struct fc_rport_identifiers *);
-
-	void (*rport_reset)(struct fc_rport *);
-
-	void (*rport_reset_list)(struct fc_lport *);
-
 	/**
-	 * SCSI interfaces
+	 * FCP interfaces
 	 */
+
+	/*
+	 * Send a fcp cmd from fsp pkt.
+	 * Called with the SCSI host lock unlocked and irqs disabled.
+	 *
+	 * The resp handler is called when FCP_RSP received.
+	 *
+	 */
+	int (*fcp_cmd_send)(struct fc_lport *lp, struct fc_fcp_pkt *fsp,
+			    void (*resp)(struct fc_seq *, struct fc_frame *fp,
+					 void *arg));
 
 	/*
 	 * Used at least durring linkdown and reset
 	 */
-	void (*scsi_cleanup)(struct fc_lport *);
+	void (*fcp_cleanup)(struct fc_lport *lp);
 
 	/*
 	 * Abort all I/O on a local port
 	 */
-	void (*scsi_abort_io)(struct fc_lport *);
+	void (*fcp_abort_io)(struct fc_lport *lp);
 
 	/**
 	 * Discovery interfaces
@@ -378,9 +485,6 @@ struct libfc_function_template {
 	 * Start discovery for a local port.
 	 */
 	int (*disc_start)(struct fc_lport *);
-
-	void (*dns_register)(struct fc_lport *);
-	void (*disc_stop)(struct fc_lport *);
 };
 
 struct fc_lport {
@@ -392,11 +496,12 @@ struct fc_lport {
 	struct fc_rport		*dns_rp;
 	struct fc_rport		*ptp_rp;
 	void			*scsi_priv;
+	struct list_head         rports;
 
 	/* Operational Information */
 	struct libfc_function_template tt;
 	u16			link_status;
-	u8			ns_disc_done;
+	u8			disc_done;
 	enum fc_lport_state	state;
 	unsigned long		boot_time;
 
@@ -405,18 +510,17 @@ struct fc_lport {
 
 	u64			wwpn;
 	u64			wwnn;
-	u32			fid;
 	u8			retry_count;
-	unsigned char		ns_disc_retry_count;
-	unsigned char		ns_disc_delay;
-	unsigned char		ns_disc_pending;
-	unsigned char		ns_disc_requested;
-	unsigned short		ns_disc_seq_count;
-	unsigned char		ns_disc_buf_len;
+	unsigned char		disc_retry_count;
+	unsigned char		disc_delay;
+	unsigned char		disc_pending;
+	unsigned char		disc_requested;
+	unsigned short		disc_seq_count;
+	unsigned char		disc_buf_len;
 
 	/* Capabilities */
-	char			ifname[IFNAMSIZ];
-	u32			capabilities;
+	u32			sg_supp:1;	/* scatter gather supported */
+	u32			seq_offload:1;	/* seq offload supported */
 	u32			mfs;	/* max FC payload size */
 	unsigned int		service_params;
 	unsigned int		e_d_tov;
@@ -427,13 +531,13 @@ struct fc_lport {
 	struct fc_ns_fts	fcts;	        /* FC-4 type masks */
 	struct fc_els_rnid_gen	rnid_gen;	/* RNID information */
 
-	/* Locks */
-	spinlock_t		state_lock;	/* serializes state changes */
+	/* Semaphores */
+	struct mutex lp_mutex;
 
 	/* Miscellaneous */
-	struct fc_gpn_ft_resp	ns_disc_buf;	/* partial name buffer */
-	struct timer_list	state_timer;	/* timer for state events */
-	struct delayed_work	ns_disc_work;
+	struct fc_gpn_ft_resp	disc_buf;	/* partial name buffer */
+	struct delayed_work	retry_work;
+	struct delayed_work	disc_work;
 
 	void			*drv_priv;
 };
@@ -447,11 +551,6 @@ static inline int fc_lport_test_ready(struct fc_lport *lp)
 	return lp->state == LPORT_ST_READY;
 }
 
-static inline u32 fc_lport_get_fid(const struct fc_lport *lp)
-{
-	return lp->fid;
-}
-
 static inline void fc_set_wwnn(struct fc_lport *lp, u64 wwnn)
 {
 	lp->wwnn = wwnn;
@@ -462,33 +561,26 @@ static inline void fc_set_wwpn(struct fc_lport *lp, u64 wwnn)
 	lp->wwpn = wwnn;
 }
 
-static inline int fc_lport_locked(struct fc_lport *lp)
-{
-#if defined(CONFIG_SMP) || defined(CONFIG_DEBUG_SPINLOCK)
-	return spin_is_locked(&lp->state_lock);
-#else
-	return 1;
-#endif /* CONFIG_SMP || CONFIG_DEBUG_SPINLOCK */
-}
-
-/*
- * Locking code.
+/**
+ * fc_fill_dns_hdr - Fill in a name service request header
+ * @lp: Fibre Channel host port instance
+ * @ct: Common Transport (CT) header structure
+ * @op: Name Service request code
+ * @req_size: Full size of Name Service request
  */
-static inline void fc_lport_lock(struct fc_lport *lp)
+static inline void fc_fill_dns_hdr(struct fc_lport *lp, struct fc_ct_hdr *ct,
+				   unsigned int op, unsigned int req_size)
 {
-	spin_lock_bh(&lp->state_lock);
-}
-
-static inline void fc_lport_unlock(struct fc_lport *lp)
-{
-	spin_unlock_bh(&lp->state_lock);
+	memset(ct, 0, sizeof(*ct) + req_size);
+	ct->ct_rev = FC_CT_REV;
+	ct->ct_fs_type = FC_FST_DIR;
+	ct->ct_fs_subtype = FC_NS_SUBTYPE;
+	ct->ct_cmd = htons((u16) op);
 }
 
 static inline void fc_lport_state_enter(struct fc_lport *lp,
 					enum fc_lport_state state)
 {
-	WARN_ON(!fc_lport_locked(lp));
-	del_timer(&lp->state_timer);
 	if (state != lp->state)
 		lp->retry_count = 0;
 	lp->state = state;
@@ -543,7 +635,7 @@ int fc_lport_config(struct fc_lport *);
 /*
  * Reset the local port.
  */
-int fc_lport_enter_reset(struct fc_lport *);
+int fc_lport_reset(struct fc_lport *);
 
 /*
  * Set the mfs or reset
@@ -555,12 +647,12 @@ int fc_set_mfs(struct fc_lport *lp, u32 mfs);
  * REMOTE PORT LAYER
  *****************************/
 int fc_rport_init(struct fc_lport *lp);
-
+void fc_rport_terminate_io(struct fc_rport *rp);
 
 /**
  * DISCOVERY LAYER
  *****************************/
-int fc_ns_init(struct fc_lport *lp);
+int fc_disc_init(struct fc_lport *lp);
 
 
 /**
@@ -579,6 +671,14 @@ int fc_fcp_init(struct fc_lport *);
  */
 int fc_queuecommand(struct scsi_cmnd *sc_cmd,
 		    void (*done)(struct scsi_cmnd *));
+
+/*
+ * complete processing of a fcp packet
+ *
+ * This function may sleep if a fsp timer is pending.
+ * The host lock must not be held by caller.
+ */
+void fc_fcp_complete(struct fc_fcp_pkt *fsp);
 
 /*
  * Send an ABTS frame to the target device. The sc_cmd argument
@@ -670,10 +770,12 @@ void fc_exch_recv(struct fc_lport *lp, struct fc_exch_mgr *mp,
  */
 struct fc_seq *fc_exch_seq_send(struct fc_lport *lp,
 				struct fc_frame *fp,
-				void (*resp)(struct fc_seq *,
+				void (*resp)(struct fc_seq *sp,
 					     struct fc_frame *fp,
 					     void *arg),
-				void *resp_arg, u32 timer_msec,
+				void (*destructor)(struct fc_seq *sp,
+						   void *arg),
+				void *arg, u32 timer_msec,
 				u32 sid, u32 did, u32 f_ctl);
 
 /*
@@ -738,15 +840,12 @@ void fc_seq_get_xids(struct fc_seq *sp, u16 *oxid, u16 *rxid);
  */
 void fc_seq_set_rec_data(struct fc_seq *sp, u32 rec_data);
 
-/**
- * fc_functions_template
- *****************************/
-void fc_attr_init(struct fc_lport *);
-void fc_get_host_port_id(struct Scsi_Host *shost);
+/*
+ * Functions for fc_functions_template
+ */
 void fc_get_host_speed(struct Scsi_Host *shost);
 void fc_get_host_port_type(struct Scsi_Host *shost);
 void fc_get_host_port_state(struct Scsi_Host *shost);
-void fc_get_host_fabric_name(struct Scsi_Host *shost);
 void fc_set_rport_loss_tmo(struct fc_rport *rport, u32 timeout);
 struct fc_host_statistics *fc_get_host_stats(struct Scsi_Host *);
 
@@ -755,6 +854,7 @@ struct fc_host_statistics *fc_get_host_stats(struct Scsi_Host *);
  */
 int fc_setup_exch_mgr(void);
 void fc_destroy_exch_mgr(void);
-
+int fc_setup_rport(void);
+void fc_destroy_rport(void);
 
 #endif /* _LIBFC_H_ */

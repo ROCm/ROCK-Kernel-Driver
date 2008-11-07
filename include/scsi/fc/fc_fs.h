@@ -329,16 +329,4 @@ enum fc_pf_rjt_reason {
 	FC_RJT_VENDOR =		0xff,	/* vendor specific reject */
 };
 
-/*
- * Data descriptor format (R_CTL == FC_RCTL_DD_DATA_DESC).
- * This is used for FCP SCSI transfer ready.
- */
-struct fc_data_desc {
-	__be32		dd_offset;	/* data relative offset in bytes */
-	__be32		dd_len;		/* transfer buffer size in bytes */
-	__u8		_dd_resvd[4];
-};
-
-#define FC_DATA_DESC_LEN    12	/* expected length of structure */
-
 #endif /* _FC_FS_H_ */

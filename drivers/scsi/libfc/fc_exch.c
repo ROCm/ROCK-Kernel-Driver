@@ -1,5 +1,7 @@
 /*
  * Copyright(c) 2007 Intel Corporation. All rights reserved.
+ * Copyright(c) 2008 Red Hat, Inc.  All rights reserved.
+ * Copyright(c) 2008 Mike Christie
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -35,6 +37,13 @@
  * fc_exch_debug can be set in debugger or at compile time to get more logs.
  */
 static int fc_exch_debug;
+
+#define FC_DEBUG_EXCH(fmt...)			\
+	do {					\
+		if (fc_exch_debug)		\
+			FC_DBG(fmt);		\
+	} while (0)
+
 static struct kmem_cache *fc_em_cachep;	/* cache for exchanges */
 
 /*
@@ -73,6 +82,9 @@ struct fc_exch;
  *	esb_stat, f_ctl, seq.ssb_stat, seq.f_ctl.
  *	seq_id
  *	sequence allocation
+ *
+ * If the em_lock and ex_lock must be taken at the same time, the
+ * em_lock must be taken before the ex_lock.
  */
 struct fc_exch {
 	struct fc_exch_mgr *em;		/* exchange manager */
@@ -81,7 +93,7 @@ struct fc_exch {
 	struct list_head	ex_list;	/* free or busy list linkage */
 	spinlock_t	ex_lock;	/* lock covering exchange state */
 	atomic_t	ex_refcnt;	/* reference counter */
-	struct timer_list ex_timer;	/* timer for upper level protocols */
+	struct delayed_work timeout_work; /* timer for upper level protocols */
 	struct fc_lport	*lp;		/* fc device instance */
 	u16		oxid;		/* originator's exchange ID */
 	u16		rxid;		/* responder's exchange ID */
@@ -95,13 +107,16 @@ struct fc_exch {
 	u8		fh_type;	/* frame type */
 	enum fc_class	class;		/* class of service */
 	struct fc_seq	seq;		/* single sequence */
-	struct fc_exch	*aborted_ep;	/* ref to ep rrq is cleaning up */
-
 	/*
 	 * Handler for responses to this current exchange.
 	 */
 	void		(*resp)(struct fc_seq *, struct fc_frame *, void *);
-	void		*resp_arg;	/* 3rd arg for exchange resp handler */
+	void		(*destructor)(struct fc_seq *, void *);
+	/*
+	 * arg is passed as void pointer to exchange
+	 * resp and destructor handlers
+	 */
+	void		*arg;
 };
 
 /*
@@ -297,10 +312,11 @@ static void fc_exch_release(struct fc_exch *ep)
 
 	if (atomic_dec_and_test(&ep->ex_refcnt)) {
 		mp = ep->em;
+		if (ep->destructor)
+			ep->destructor(&ep->seq, ep->arg);
 		if (ep->lp->tt.exch_put)
 			ep->lp->tt.exch_put(ep->lp, mp, ep->xid);
 		WARN_ON(!ep->esb_stat & ESB_ST_COMPLETE);
-		WARN_ON(timer_pending(&ep->ex_timer));
 		mempool_free(ep, mp->ep_pool);
 	}
 }
@@ -322,9 +338,8 @@ static int fc_exch_done_locked(struct fc_exch *ep)
 
 	if (!(ep->esb_stat & ESB_ST_REC_QUAL)) {
 		ep->state |= FC_EX_DONE;
-		if (del_timer(&ep->ex_timer))
+		if (cancel_delayed_work(&ep->timeout_work))
 			atomic_dec(&ep->ex_refcnt); /* drop hold for timer */
-		atomic_dec(&ep->ex_refcnt); /* drop hold from alloc */
 		rc = 0;
 	}
 	return rc;
@@ -341,6 +356,7 @@ static void fc_exch_mgr_delete_ep(struct fc_exch *ep)
 	mp->exches[ep->xid - mp->min_xid] = NULL;
 	list_del(&ep->ex_list);
 	spin_unlock_bh(&mp->em_lock);
+	fc_exch_release(ep);	/* drop hold for exch in mp */
 }
 
 /*
@@ -352,7 +368,10 @@ static inline void fc_exch_timer_set_locked(struct fc_exch *ep,
 	if (ep->state & (FC_EX_RST_CLEANUP | FC_EX_DONE))
 		return;
 
-	if (!mod_timer(&ep->ex_timer, jiffies + msecs_to_jiffies(timer_msec)))
+	FC_DEBUG_EXCH("Exchange (%4x) timed out, notifying the upper layer\n",
+		      ep->xid);
+	if (schedule_delayed_work(&ep->timeout_work,
+				  msecs_to_jiffies(timer_msec)))
 		fc_exch_hold(ep);		/* hold for timer */
 }
 
@@ -425,9 +444,10 @@ EXPORT_SYMBOL(fc_seq_exch_abort);
  * Exchange timeout - handle exchange timer expiration.
  * The timer will have been cancelled before this is called.
  */
-static void fc_exch_timeout(unsigned long ep_arg)
+static void fc_exch_timeout(struct work_struct *work)
 {
-	struct fc_exch *ep = (struct fc_exch *)ep_arg;
+	struct fc_exch *ep = container_of(work, struct fc_exch,
+					  timeout_work.work);
 	struct fc_seq *sp = &ep->seq;
 	void (*resp)(struct fc_seq *, struct fc_frame *fp, void *arg);
 	void *arg;
@@ -441,13 +461,13 @@ static void fc_exch_timeout(unsigned long ep_arg)
 	e_stat = ep->esb_stat;
 	if (e_stat & ESB_ST_COMPLETE) {
 		ep->esb_stat = e_stat & ~ESB_ST_REC_QUAL;
-		spin_unlock_bh(&ep->ex_lock);
 		if (e_stat & ESB_ST_REC_QUAL)
 			fc_exch_rrq(ep);
+		spin_unlock_bh(&ep->ex_lock);
 		goto done;
 	} else {
 		resp = ep->resp;
-		arg = ep->resp_arg;
+		arg = ep->arg;
 		ep->resp = NULL;
 		if (e_stat & ESB_ST_ABNORMAL)
 			rc = fc_exch_done_locked(ep);
@@ -492,6 +512,7 @@ static struct fc_seq *fc_seq_alloc(struct fc_exch *ep, u8 seq_id)
  *
  * if xid is supplied zero then assign next free exchange ID
  * from exchange manager, otherwise use supplied xid.
+ * Returns with exch lock held.
  */
 struct fc_exch *fc_exch_alloc(struct fc_exch_mgr *mp, u16 xid)
 {
@@ -540,15 +561,23 @@ struct fc_exch *fc_exch_alloc(struct fc_exch_mgr *mp, u16 xid)
 			xid = fc_exch_next_xid(mp, xid);
 		}
 
-		if (likely(mp->exches[xid - min_xid] == NULL)) {
-			mp->last_xid = xid;
-		} else {
-			spin_unlock_bh(&mp->em_lock);
-			atomic_inc(&mp->stats.no_free_exch_xid);
-			mempool_free(ep, mp->ep_pool);
-			goto out;
-		}
+		if (unlikely(mp->exches[xid - min_xid] != NULL))
+			goto err;
+		mp->last_xid = xid;
 	}
+
+	/*  lport lock ? */
+	if (mp->lp->state == LPORT_ST_RESET)
+		goto err;	/*  don't add new ep during local port reset  */
+
+	fc_exch_hold(ep);	/* hold for exch in mp */
+	spin_lock_init(&ep->ex_lock);
+	/*
+	 * Hold exch lock for caller to prevent fc_exch_reset()
+	 * from releasing exch  while fc_exch_alloc() caller is
+	 * still working on exch.
+	 */
+	spin_lock_bh(&ep->ex_lock);
 
 	mp->exches[xid - min_xid] = ep;
 	list_add_tail(&ep->ex_list, &mp->ex_list);
@@ -565,13 +594,14 @@ struct fc_exch *fc_exch_alloc(struct fc_exch_mgr *mp, u16 xid)
 	ep->f_ctl = FC_FC_FIRST_SEQ;	/* next seq is first seq */
 	ep->rxid = FC_XID_UNKNOWN;
 	ep->class = mp->class;
-
-	spin_lock_init(&ep->ex_lock);
-	setup_timer(&ep->ex_timer, fc_exch_timeout, (unsigned long)ep);
-
-	fc_exch_hold(ep);	/* hold for caller */
+	INIT_DELAYED_WORK(&ep->timeout_work, fc_exch_timeout);
 out:
 	return ep;
+err:
+	spin_unlock_bh(&mp->em_lock);
+	atomic_inc(&mp->stats.no_free_exch_xid);
+	mempool_free(ep, mp->ep_pool);
+	return NULL;
 }
 EXPORT_SYMBOL(fc_exch_alloc);
 
@@ -654,6 +684,8 @@ static struct fc_exch *fc_exch_resp(struct fc_exch_mgr *mp, struct fc_frame *fp)
 			WARN_ON(rxid != FC_XID_UNKNOWN);
 			fh->fh_rx_id = htons(ep->rxid);
 		}
+		fc_exch_hold(ep);	/* hold for caller */
+		spin_unlock_bh(&ep->ex_lock);	/* lock from exch_get */
 	}
 	return ep;
 }
@@ -667,7 +699,7 @@ static enum fc_pf_rjt_reason
 fc_seq_lookup_recip(struct fc_exch_mgr *mp, struct fc_frame *fp)
 {
 	struct fc_frame_header *fh = fc_frame_header_get(fp);
-	struct fc_exch *ep = NULL, *new_ep = NULL;
+	struct fc_exch *ep = NULL;
 	struct fc_seq *sp = NULL;
 	enum fc_pf_rjt_reason reject = FC_RJT_NONE;
 	u32 f_ctl;
@@ -717,12 +749,11 @@ fc_seq_lookup_recip(struct fc_exch_mgr *mp, struct fc_frame *fp)
 				reject = FC_RJT_RX_ID;
 				goto rel;
 			}
-			new_ep = ep = fc_exch_resp(mp, fp);
+			ep = fc_exch_resp(mp, fp);
 			if (!ep) {
 				reject = FC_RJT_EXCH_EST;	/* XXX */
 				goto out;
 			}
-			fc_exch_hold(ep);	/* Additional hold for caller */
 			xid = ep->xid;	/* get our XID */
 		} else if (!ep) {
 			atomic_inc(&mp->stats.xid_not_found);
@@ -760,9 +791,8 @@ fc_seq_lookup_recip(struct fc_exch_mgr *mp, struct fc_frame *fp)
 out:
 	return reject;
 rel:
-	fc_exch_release(ep);
-	if (new_ep)
-		fc_exch_release(new_ep);
+	fc_exch_done(&ep->seq);
+	fc_exch_release(ep);	/* hold from fc_exch_find/fc_exch_resp */
 	return reject;
 }
 
@@ -823,9 +853,8 @@ static struct fc_seq *fc_seq_start_next_locked(struct fc_seq *sp)
 	struct fc_exch *ep = fc_seq_exch(sp);
 
 	sp = fc_seq_alloc(ep, ep->seq_id++);
-	if (fc_exch_debug)
-		FC_DBG("exch %4x f_ctl %6x seq %2x f_ctl %6x\n",
-		       ep->xid, ep->f_ctl, sp->id, sp->f_ctl);
+	FC_DEBUG_EXCH("exch %4x f_ctl %6x seq %2x f_ctl %6x\n",
+		      ep->xid, ep->f_ctl, sp->id, sp->f_ctl);
 	return sp;
 }
 /*
@@ -893,7 +922,18 @@ int fc_seq_send(struct fc_lport *lp, struct fc_seq *sp,
 	}
 
 	hton24(fh->fh_f_ctl, f_ctl | fill);
-	fh->fh_seq_cnt = htons(sp->cnt++);
+	fh->fh_seq_cnt = htons(sp->cnt);
+
+	/*
+	 * update sequence count if this frame is carrying
+	 * multiple FC frames when sequence offload is enabled
+	 * by LLD.
+	 */
+	if (fr_max_payload(fp))
+		sp->cnt += DIV_ROUND_UP((fr_len(fp) - sizeof(*fh)),
+					fr_max_payload(fp));
+	else
+		sp->cnt++;
 
 	/*
 	 * Send the frame.
@@ -1160,13 +1200,12 @@ static void fc_exch_recv_req(struct fc_lport *lp, struct fc_exch_mgr *mp,
 		 * first.
 		 */
 		if (ep->resp)
-			ep->resp(sp, fp, ep->resp_arg);
+			ep->resp(sp, fp, ep->arg);
 		else
 			lp->tt.lport_recv(lp, sp, fp);
 		fc_exch_release(ep);	/* release from lookup */
 	} else {
-		if (fc_exch_debug)
-			FC_DBG("exch/seq lookup failed: reject %x\n", reject);
+		FC_DEBUG_EXCH("exch/seq lookup failed: reject %x\n", reject);
 		fc_frame_free(fp);
 	}
 }
@@ -1222,7 +1261,7 @@ static void fc_exch_recv_seq_resp(struct fc_exch_mgr *mp, struct fc_frame *fp)
 	if (fc_sof_needs_ack(sof))
 		fc_seq_send_ack(sp, fp);
 	resp = ep->resp;
-	ex_resp_arg = ep->resp_arg;
+	ex_resp_arg = ep->arg;
 
 	if (fh->fh_type != FC_TYPE_FCP && fr_eof(fp) == FC_EOF_T &&
 	    (f_ctl & (FC_FC_LAST_SEQ | FC_FC_END_SEQ)) ==
@@ -1270,12 +1309,10 @@ static void fc_exch_recv_resp(struct fc_exch_mgr *mp, struct fc_frame *fp)
 	sp = fc_seq_lookup_orig(mp, fp);	/* doesn't hold sequence */
 	if (!sp) {
 		atomic_inc(&mp->stats.xid_not_found);
-		if (fc_exch_debug)
-			FC_DBG("seq lookup failed\n");
+		FC_DEBUG_EXCH("seq lookup failed\n");
 	} else {
 		atomic_inc(&mp->stats.non_bls_resp);
-		if (fc_exch_debug)
-			FC_DBG("non-BLS response to sequence");
+		FC_DEBUG_EXCH("non-BLS response to sequence");
 	}
 	fc_frame_free(fp);
 }
@@ -1296,11 +1333,10 @@ static void fc_exch_abts_resp(struct fc_exch *ep, struct fc_frame *fp)
 	int rc = 1, has_rec = 0;
 
 	fh = fc_frame_header_get(fp);
-	if (fc_exch_debug)
-		FC_DBG("exch: BLS rctl %x - %s\n",
-		       fh->fh_r_ctl, fc_exch_rctl_name(fh->fh_r_ctl));
+	FC_DEBUG_EXCH("exch: BLS rctl %x - %s\n",
+		      fh->fh_r_ctl, fc_exch_rctl_name(fh->fh_r_ctl));
 
-	if (del_timer_sync(&ep->ex_timer))
+	if (cancel_delayed_work_sync(&ep->timeout_work))
 		fc_exch_release(ep);	/* release from pending timer hold */
 
 	spin_lock_bh(&ep->ex_lock);
@@ -1332,7 +1368,7 @@ static void fc_exch_abts_resp(struct fc_exch *ep, struct fc_frame *fp)
 	}
 
 	resp = ep->resp;
-	ex_resp_arg = ep->resp_arg;
+	ex_resp_arg = ep->arg;
 
 	/* do we need to do some other checks here. Can we reuse more of
 	 * fc_exch_recv_seq_resp
@@ -1341,7 +1377,7 @@ static void fc_exch_abts_resp(struct fc_exch *ep, struct fc_frame *fp)
 	/*
 	 * do we want to check END_SEQ as well as LAST_SEQ here?
 	 */
-	if (fh->fh_type != FC_TYPE_FCP &&
+	if (ep->fh_type != FC_TYPE_FCP &&
 	    ntoh24(fh->fh_f_ctl) & FC_FC_LAST_SEQ)
 		rc = fc_exch_done_locked(ep);
 	spin_unlock_bh(&ep->ex_lock);
@@ -1390,10 +1426,9 @@ static void fc_exch_recv_bls(struct fc_exch_mgr *mp, struct fc_frame *fp)
 		case FC_RCTL_ACK_0:
 			break;
 		default:
-			if (fc_exch_debug)
-				FC_DBG("BLS rctl %x - %s received",
-				       fh->fh_r_ctl,
-				       fc_exch_rctl_name(fh->fh_r_ctl));
+			FC_DEBUG_EXCH("BLS rctl %x - %s received",
+				      fh->fh_r_ctl,
+				      fc_exch_rctl_name(fh->fh_r_ctl));
 			break;
 		}
 		fc_frame_free(fp);
@@ -1478,18 +1513,16 @@ static void fc_exch_reset(struct fc_exch *ep)
 	 * functions can also grab the lport lock which could cause
 	 * a deadlock).
 	 */
-	if (del_timer(&ep->ex_timer))
+	if (cancel_delayed_work(&ep->timeout_work))
 		atomic_dec(&ep->ex_refcnt);     /* drop hold for timer */
 	resp = ep->resp;
 	ep->resp = NULL;
 	if (ep->esb_stat & ESB_ST_REC_QUAL)
 		atomic_dec(&ep->ex_refcnt);	/* drop hold for rec_qual */
 	ep->esb_stat &= ~ESB_ST_REC_QUAL;
-	arg = ep->resp_arg;
+	arg = ep->arg;
 	sp = &ep->seq;
-
-	if (ep->fh_type != FC_TYPE_FCP)
-		rc = fc_exch_done_locked(ep);
+	rc = fc_exch_done_locked(ep);
 	spin_unlock_bh(&ep->ex_lock);
 	if (!rc)
 		fc_exch_mgr_delete_ep(ep);
@@ -1640,9 +1673,7 @@ reject:
  */
 static void fc_exch_rrq_resp(struct fc_seq *sp, struct fc_frame *fp, void *arg)
 {
-	struct fc_exch *ep = fc_seq_exch(sp);
-	struct fc_exch *aborted_ep;
-
+	struct fc_exch *aborted_ep = arg;
 	unsigned int op;
 
 	if (IS_ERR(fp)) {
@@ -1669,16 +1700,9 @@ static void fc_exch_rrq_resp(struct fc_seq *sp, struct fc_frame *fp, void *arg)
 	}
 
 cleanup:
-	spin_lock_bh(&ep->ex_lock);
-	aborted_ep = ep->aborted_ep;
-	ep->aborted_ep = NULL;
-	spin_unlock_bh(&ep->ex_lock);
-
-	if (aborted_ep) {
-		fc_exch_done(&aborted_ep->seq);
-		/* drop hold for rec qual */
-		fc_exch_release(aborted_ep);
-	}
+	fc_exch_done(&aborted_ep->seq);
+	/* drop hold for rec qual */
+	fc_exch_release(aborted_ep);
 }
 
 /*
@@ -1692,7 +1716,6 @@ static void fc_exch_rrq(struct fc_exch *ep)
 	struct fc_els_rrq *rrq;
 	struct fc_frame *fp;
 	struct fc_seq *rrq_sp;
-	struct fc_exch *rrq_ep;
 	u32 did;
 
 	lp = ep->lp;
@@ -1711,18 +1734,14 @@ static void fc_exch_rrq(struct fc_exch *ep)
 	did = ep->did;
 	if (ep->esb_stat & ESB_ST_RESP)
 		did = ep->sid;
-	rrq_sp = fc_exch_seq_send(lp, fp, fc_exch_rrq_resp, ep, lp->e_d_tov,
-				  lp->fid, did, FC_FC_SEQ_INIT | FC_FC_END_SEQ);
+	rrq_sp = fc_exch_seq_send(lp, fp, fc_exch_rrq_resp, NULL, ep,
+				  lp->e_d_tov, fc_host_port_id(lp->host), did,
+				  FC_FC_SEQ_INIT | FC_FC_END_SEQ);
 	if (!rrq_sp) {
-		spin_lock_bh(&ep->ex_lock);
 		ep->esb_stat |= ESB_ST_REC_QUAL;
 		fc_exch_timer_set_locked(ep, ep->r_a_tov);
-		spin_unlock_bh(&ep->ex_lock);
 		return;
 	}
-
-	rrq_ep = fc_seq_exch(rrq_sp);
-	rrq_ep->aborted_ep = ep;
 }
 
 
@@ -1770,8 +1789,10 @@ static void fc_exch_els_rrq(struct fc_seq *sp, struct fc_frame *fp)
 		ep->esb_stat &= ~ESB_ST_REC_QUAL;
 		atomic_dec(&ep->ex_refcnt);	/* drop hold for rec qual */
 	}
-	if ((ep->esb_stat & ESB_ST_COMPLETE) && (del_timer(&ep->ex_timer)))
-		atomic_dec(&ep->ex_refcnt);	/* drop hold for timer */
+	if (ep->esb_stat & ESB_ST_COMPLETE) {
+		if (cancel_delayed_work(&ep->timeout_work))
+			atomic_dec(&ep->ex_refcnt);	/* drop hold for timer */
+	}
 
 	spin_unlock_bh(&ep->ex_lock);
 
@@ -1810,17 +1831,18 @@ struct fc_exch_mgr *fc_exch_mgr_alloc(struct fc_lport *lp,
 	len += sizeof(struct fc_exch_mgr);
 
 	mp = kzalloc(len, GFP_ATOMIC);
-	if (mp) {
-		mp->class = class;
-		mp->total_exches = 0;
-		mp->exches = (struct fc_exch **)(mp + 1);
-		mp->last_xid = min_xid - 1;
-		mp->min_xid = min_xid;
-		mp->max_xid = max_xid;
-		mp->lp = lp;
-		INIT_LIST_HEAD(&mp->ex_list);
-		spin_lock_init(&mp->em_lock);
-	}
+	if (!mp)
+		return NULL;
+
+	mp->class = class;
+	mp->total_exches = 0;
+	mp->exches = (struct fc_exch **)(mp + 1);
+	mp->last_xid = min_xid - 1;
+	mp->min_xid = min_xid;
+	mp->max_xid = max_xid;
+	mp->lp = lp;
+	INIT_LIST_HEAD(&mp->ex_list);
+	spin_lock_init(&mp->em_lock);
 
 	mp->ep_pool = mempool_create_slab_pool(2, fc_em_cachep);
 	if (!mp->ep_pool)
@@ -1860,13 +1882,15 @@ struct fc_seq *fc_exch_seq_send(struct fc_lport *lp,
 				void (*resp)(struct fc_seq *,
 					     struct fc_frame *fp,
 					     void *arg),
-				void *resp_arg, u32 timer_msec,
+				void (*destructor)(struct fc_seq *, void *),
+				void *arg, u32 timer_msec,
 				u32 sid, u32 did, u32 f_ctl)
 {
 	struct fc_exch *ep;
 	struct fc_seq *sp = NULL;
 	struct fc_frame_header *fh;
 	u16 fill;
+	int rc = 1;
 
 	ep = lp->tt.exch_get(lp, fp);
 	if (!ep) {
@@ -1876,7 +1900,8 @@ struct fc_seq *fc_exch_seq_send(struct fc_lport *lp,
 	ep->esb_stat |= ESB_ST_SEQ_INIT;
 	fc_exch_set_addr(ep, sid, did);
 	ep->resp = resp;
-	ep->resp_arg = resp_arg;
+	ep->destructor = destructor;
+	ep->arg = arg;
 	ep->r_a_tov = FC_DEF_R_A_TOV;
 	ep->lp = lp;
 	sp = &ep->seq;
@@ -1908,23 +1933,25 @@ struct fc_seq *fc_exch_seq_send(struct fc_lport *lp,
 	fh = fc_frame_header_get(fp);
 	hton24(fh->fh_f_ctl, f_ctl | fill);
 	fh->fh_seq_cnt = htons(sp->cnt++);
+	ep->fh_type = fh->fh_type; /* save for possbile timeout handling */
 
 	if (unlikely(lp->tt.frame_send(lp, fp)))
 		goto err;
 
-	spin_lock_bh(&ep->ex_lock);
 	if (timer_msec)
 		fc_exch_timer_set_locked(ep, timer_msec);
 	sp->f_ctl = f_ctl;	/* save for possible abort */
 	ep->f_ctl &= ~FC_FC_FIRST_SEQ;	/* not first seq */
-	ep->fh_type = fh->fh_type; /* save for possbile timeout handling */
 
 	if (f_ctl & FC_FC_SEQ_INIT)
 		ep->esb_stat &= ~ESB_ST_SEQ_INIT;
 	spin_unlock_bh(&ep->ex_lock);
 	return sp;
 err:
-	fc_exch_done(sp);
+	rc = fc_exch_done_locked(ep);
+	spin_unlock_bh(&ep->ex_lock);
+	if (!rc)
+		fc_exch_mgr_delete_ep(ep);
 	return NULL;
 }
 EXPORT_SYMBOL(fc_exch_seq_send);
@@ -1938,6 +1965,7 @@ void fc_exch_recv(struct fc_lport *lp, struct fc_exch_mgr *mp,
 	struct fc_frame_header *fh = fc_frame_header_get(fp);
 	u32 f_ctl;
 
+	/* lport lock ? */
 	if (!lp || !mp || (lp->state == LPORT_ST_NONE)) {
 		FC_DBG("fc_lport or EM is not allocated and configured");
 		fc_frame_free(fp);

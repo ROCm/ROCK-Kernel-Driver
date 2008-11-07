@@ -82,7 +82,7 @@ struct fc_frame *fc_frame_alloc_fill(struct fc_lport *lp, size_t payload_len)
 	if (fp) {
 		memset((char *) fr_hdr(fp) + payload_len, 0, fill);
 		/* trim is OK, we just allocated it so there are no fragments */
-		skb_trim(fp_skb(fp), payload_len);
+		skb_trim(fp_skb(fp), payload_len + sizeof(struct fc_frame_header));
 	}
 	return fp;
 }

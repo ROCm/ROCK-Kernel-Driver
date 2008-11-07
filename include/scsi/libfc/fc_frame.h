@@ -51,6 +51,7 @@
 #define fr_sof(fp)	(fr_cb(fp)->fr_sof)
 #define fr_eof(fp)	(fr_cb(fp)->fr_eof)
 #define fr_flags(fp)	(fr_cb(fp)->fr_flags)
+#define fr_max_payload(fp)	(fr_cb(fp)->fr_max_payload)
 
 struct fc_frame {
 	struct sk_buff skb;
@@ -63,6 +64,7 @@ struct fcoe_rcv_info {
 	enum fc_sof	fr_sof;		/* start of frame delimiter */
 	enum fc_eof	fr_eof;		/* end of frame delimiter */
 	u8		fr_flags;	/* flags - see below */
+	u16		fr_max_payload;	/* max FC payload */
 };
 
 /*

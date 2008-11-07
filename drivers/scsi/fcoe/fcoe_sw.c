@@ -1,5 +1,5 @@
 /*
- * Copyright(c) 2007 Intel Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2008 Intel Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -46,33 +46,73 @@
 
 #define FCOE_VERSION "0.1"
 
-#define FCOE_MAX_LUN        255
-#define FCOE_MAX_FCP_TARGET 256
+#define FCOE_MAX_LUN		255
+#define FCOE_MAX_FCP_TARGET	256
 
-#define FCOE_MIN_XID		    0x0004
-#define FCOE_MAX_XID		    0x07ef
+#define FCOE_MAX_OUTSTANDING_COMMANDS	1024
 
-int debug_fcoe;
+#define FCOE_MIN_XID		0x0004
+#define FCOE_MAX_XID		0x07ef
 
-struct fcoe_info fcoei = {
-	.fcoe_hostlist = LIST_HEAD_INIT(fcoei.fcoe_hostlist),
+LIST_HEAD(fcoe_hostlist);
+DEFINE_RWLOCK(fcoe_hostlist_lock);
+DEFINE_TIMER(fcoe_timer, NULL, 0, 0);
+struct fcoe_percpu_s *fcoe_percpu[NR_CPUS];
+
+static struct scsi_transport_template *fcoe_transport_template;
+
+static int fcoe_reset(struct Scsi_Host *shost)
+{
+	struct fc_lport *lport = shost_priv(shost);
+	fc_lport_reset(lport);
+	return 0;
+}
+
+struct fc_function_template fcoe_transport_function = {
+	.show_host_node_name = 1,
+	.show_host_port_name = 1,
+	.show_host_supported_classes = 1,
+	.show_host_supported_fc4s = 1,
+	.show_host_active_fc4s = 1,
+	.show_host_maxframe_size = 1,
+
+	.show_host_port_id = 1,
+	.show_host_supported_speeds = 1,
+	.get_host_speed = fc_get_host_speed,
+	.show_host_speed = 1,
+	.show_host_port_type = 1,
+	.get_host_port_state = fc_get_host_port_state,
+	.show_host_port_state = 1,
+	.show_host_symbolic_name = 1,
+
+	.dd_fcrport_size = sizeof(struct fc_rport_libfc_priv),
+	.show_rport_maxframe_size = 1,
+	.show_rport_supported_classes = 1,
+
+	.show_host_fabric_name = 1,
+	.show_starget_node_name = 1,
+	.show_starget_port_name = 1,
+	.show_starget_port_id = 1,
+	.set_rport_dev_loss_tmo = fc_set_rport_loss_tmo,
+	.show_rport_dev_loss_tmo = 1,
+	.get_fc_host_stats = fc_get_host_stats,
+	.issue_fc_host_lip = fcoe_reset,
+
+	.terminate_rport_io = fc_rport_terminate_io,
 };
 
-static struct fcoe_softc *fcoe_find_fc_lport(const char *name)
+static struct fcoe_softc *fcoe_find_fc_lport(const struct net_device *netdev)
 {
 	struct fcoe_softc *fc;
-	struct fc_lport *lp;
-	struct fcoe_info *fci = &fcoei;
 
-	read_lock(&fci->fcoe_hostlist_lock);
-	list_for_each_entry(fc, &fci->fcoe_hostlist, list) {
-		lp = fc->lp;
-		if (!strncmp(name, lp->ifname, IFNAMSIZ)) {
-			read_unlock(&fci->fcoe_hostlist_lock);
+	read_lock(&fcoe_hostlist_lock);
+	list_for_each_entry(fc, &fcoe_hostlist, list) {
+		if (fc->real_dev == netdev) {
+			read_unlock(&fcoe_hostlist_lock);
 			return fc;
 		}
 	}
-	read_unlock(&fci->fcoe_hostlist_lock);
+	read_unlock(&fcoe_hostlist_lock);
 	return NULL;
 }
 
@@ -124,49 +164,47 @@ static struct scsi_host_template fcoe_driver_template = {
 	.change_queue_type = fc_change_queue_type,
 	.this_id = -1,
 	.cmd_per_lun = 32,
-	.can_queue = FC_MAX_OUTSTANDING_COMMANDS,
+	.can_queue = FCOE_MAX_OUTSTANDING_COMMANDS,
 	.use_clustering = ENABLE_CLUSTERING,
 	.sg_tablesize = 4,
 	.max_sectors = 0xffff,
 };
 
-int fcoe_destroy_interface(const char *ifname)
+int fcoe_destroy_interface(struct net_device *netdev)
 {
 	int cpu, idx;
-	struct fcoe_dev_stats *p;
 	struct fcoe_percpu_s *pp;
 	struct fcoe_softc *fc;
 	struct fcoe_rcv_info *fr;
-	struct fcoe_info *fci = &fcoei;
 	struct sk_buff_head *list;
 	struct sk_buff *skb, *next;
 	struct sk_buff *head;
 	struct fc_lport *lp;
 	u8 flogi_maddr[ETH_ALEN];
 
-	fc = fcoe_find_fc_lport(ifname);
+	fc = fcoe_find_fc_lport(netdev);
 	if (!fc)
 		return -ENODEV;
 
 	lp = fc->lp;
 
 	/* Remove the instance from fcoe's list */
-	write_lock_bh(&fci->fcoe_hostlist_lock);
+	write_lock_bh(&fcoe_hostlist_lock);
 	list_del(&fc->list);
-	write_unlock_bh(&fci->fcoe_hostlist_lock);
+	write_unlock_bh(&fcoe_hostlist_lock);
+
+	/* Don't listen for Ethernet packets anymore */
+	dev_remove_pack(&fc->fcoe_packet_type);
+
+	/* Detach from the scsi-ml */
+	fc_remove_host(lp->host);
+	scsi_remove_host(lp->host);
 
 	/* Cleanup the fc_lport */
 	fc_lport_destroy(lp);
 	fc_fcp_destroy(lp);
 	if (lp->emp)
 		fc_exch_mgr_free(lp->emp);
-
-	/* Detach from the scsi-ml */
-	fc_remove_host(lp->host);
-	scsi_remove_host(lp->host);
-
-	/* Don't listen for Ethernet packets anymore */
-	dev_remove_pack(&fc->fcoe_packet_type);
 
 	/* Delete secondary MAC addresses */
 	rtnl_lock();
@@ -178,8 +216,8 @@ int fcoe_destroy_interface(const char *ifname)
 
 	/* Free the per-CPU revieve threads */
 	for (idx = 0; idx < NR_CPUS; idx++) {
-		if (fci->fcoe_percpu[idx]) {
-			pp = fci->fcoe_percpu[idx];
+		if (fcoe_percpu[idx]) {
+			pp = fcoe_percpu[idx];
 			spin_lock_bh(&pp->fcoe_rx_list.lock);
 			list = &pp->fcoe_rx_list;
 			head = list->next;
@@ -200,13 +238,8 @@ int fcoe_destroy_interface(const char *ifname)
 	fcoe_clean_pending_queue(lp);
 
 	/* Free memory used by statistical counters */
-	for_each_online_cpu(cpu) {
-		p = lp->dev_stats[cpu];
-		if (p) {
-			lp->dev_stats[cpu] = NULL;
-			kfree(p);
-		}
-	}
+	for_each_online_cpu(cpu)
+		kfree(lp->dev_stats[cpu]);
 
 	/* Release the net_device and Scsi_Host */
 	dev_put(fc->real_dev);
@@ -260,7 +293,6 @@ static struct libfc_function_template fcoe_libfc_fcn_templ = {
 static int lport_config(struct fc_lport *lp, struct Scsi_Host *shost)
 {
 	int i = 0;
-	struct fcoe_dev_stats *p;
 
 	lp->host = shost;
 	lp->drv_priv = (void *)(lp + 1);
@@ -280,11 +312,9 @@ static int lport_config(struct fc_lport *lp, struct Scsi_Host *shost)
 	/*
 	 * allocate per cpu stats block
 	 */
-	for_each_online_cpu(i) {
-		p = kzalloc(sizeof(struct fcoe_dev_stats), GFP_KERNEL);
-		if (p)
-			lp->dev_stats[i] = p;
-	}
+	for_each_online_cpu(i)
+		lp->dev_stats[i] = kzalloc(sizeof(struct fcoe_dev_stats),
+					   GFP_KERNEL);
 
 	/* Finish fc_lport configuration */
 	fc_lport_config(lp);
@@ -302,11 +332,8 @@ static int net_config(struct fc_lport *lp)
 
 	/* Require support for get_pauseparam ethtool op. */
 	net_dev = fc->real_dev;
-	if (!net_dev->ethtool_ops && (net_dev->priv_flags & IFF_802_1Q_VLAN))
+	if (net_dev->priv_flags & IFF_802_1Q_VLAN)
 		net_dev = vlan_dev_real_dev(net_dev);
-	if (!net_dev->ethtool_ops || !net_dev->ethtool_ops->get_pauseparam)
-		return -EOPNOTSUPP;
-
 	fc->phys_dev = net_dev;
 
 	/* Do not support for bonding device */
@@ -330,12 +357,10 @@ static int net_config(struct fc_lport *lp)
 		lp->link_status |= FC_LINK_UP;
 
 	if (fc->real_dev->features & NETIF_F_SG)
-		lp->capabilities = TRANS_C_SG;
+		lp->sg_supp = 1;
 
 
 	skb_queue_head_init(&fc->fcoe_pending_queue);
-
-	memcpy(lp->ifname, fc->real_dev->name, IFNAMSIZ);
 
 	/* setup Source Mac Address */
 	memcpy(fc->ctl_src_addr, fc->real_dev->dev_addr,
@@ -388,8 +413,7 @@ static int libfc_config(struct fc_lport *lp)
 	fc_exch_init(lp);
 	fc_lport_init(lp);
 	fc_rport_init(lp);
-	fc_ns_init(lp);
-	fc_attr_init(lp);
+	fc_disc_init(lp);
 
 	return 0;
 }
@@ -399,26 +423,15 @@ static int libfc_config(struct fc_lport *lp)
  * create struct fcdev which is a shared structure between opefc
  * and transport level protocol.
  */
-int fcoe_create_interface(const char *ifname)
+int fcoe_create_interface(struct net_device *netdev)
 {
 	struct fc_lport *lp = NULL;
 	struct fcoe_softc *fc;
-	struct net_device *net_dev;
 	struct Scsi_Host *shost;
-	struct fcoe_info *fci = &fcoei;
 	int rc = 0;
 
-	net_dev = dev_get_by_name(&init_net, ifname);
-	if (net_dev == NULL) {
-		FC_DBG("could not get network device for %s",
-		       ifname);
-		return -ENODEV;
-	}
-
-	if (fcoe_find_fc_lport(net_dev->name) != NULL) {
-		rc = -EEXIST;
-		goto out_put_dev;
-	}
+	if (fcoe_find_fc_lport(netdev) != NULL)
+		return -EEXIST;
 
 	shost = scsi_host_alloc(&fcoe_driver_template,
 				sizeof(struct fc_lport) +
@@ -426,8 +439,7 @@ int fcoe_create_interface(const char *ifname)
 
 	if (!shost) {
 		FC_DBG("Could not allocate host structure\n");
-		rc = -ENOMEM;
-		goto out_put_dev;
+		return -ENOMEM;
 	}
 
 	lp = shost_priv(shost);
@@ -438,7 +450,7 @@ int fcoe_create_interface(const char *ifname)
 	/* Configure the fcoe_softc */
 	fc = (struct fcoe_softc *)lp->drv_priv;
 	fc->lp = lp;
-	fc->real_dev = net_dev;
+	fc->real_dev = netdev;
 	shost_config(lp);
 
 
@@ -451,7 +463,7 @@ int fcoe_create_interface(const char *ifname)
 
 	sprintf(fc_host_symbolic_name(lp->host), "%s v%s over %s",
 		FCOE_DRIVER_NAME, FCOE_VERSION,
-		ifname);
+		netdev->name);
 
 	/* Configure netdev and networking properties of the lp */
 	rc = net_config(lp);
@@ -463,22 +475,21 @@ int fcoe_create_interface(const char *ifname)
 	if (rc)
 		goto out_lp_destroy;
 
-	write_lock_bh(&fci->fcoe_hostlist_lock);
-	list_add_tail(&fc->list, &fci->fcoe_hostlist);
-	write_unlock_bh(&fci->fcoe_hostlist_lock);
+	write_lock_bh(&fcoe_hostlist_lock);
+	list_add_tail(&fc->list, &fcoe_hostlist);
+	write_unlock_bh(&fcoe_hostlist_lock);
 
 	lp->boot_time = jiffies;
 
 	fc_fabric_login(lp);
 
+	dev_hold(netdev);
 	return rc;
 
 out_lp_destroy:
 	fc_exch_mgr_free(lp->emp); /* Free the EM */
 out_host_put:
 	scsi_host_put(lp->host);
-out_put_dev:
-	dev_put(net_dev);
 	return rc;
 }
 
@@ -494,4 +505,16 @@ void fcoe_clean_pending_queue(struct fc_lport *lp)
 		spin_lock_bh(&fc->fcoe_pending_queue.lock);
 	}
 	spin_unlock_bh(&fc->fcoe_pending_queue.lock);
+}
+
+int __init fcoe_sw_init(void)
+{
+	fcoe_transport_template =
+		fc_attach_transport(&fcoe_transport_function);
+	return fcoe_transport_template ? 0 : -1;
+}
+
+void __exit fcoe_sw_exit(void)
+{
+	fc_release_transport(fcoe_transport_template);
 }

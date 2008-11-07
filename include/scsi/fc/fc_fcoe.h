@@ -93,14 +93,6 @@ static inline void fc_fcoe_set_mac(u8 *mac, u8 *did)
 	mac[5] = did[2];
 }
 
-/*
- * VLAN header.	 This is also defined in linux/if_vlan.h, but for kernels only.
- */
-struct fcoe_vlan_hdr {
-	__be16		vlan_tag;	/* VLAN tag including priority */
-	__be16		vlan_ethertype;	/* encapsulated ethertype ETH_P_FCOE */
-};
-
 #ifndef ETH_P_8021Q
 #define	ETH_P_8021Q	0x8100
 #endif

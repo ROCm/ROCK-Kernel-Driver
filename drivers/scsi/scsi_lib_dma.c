@@ -23,7 +23,7 @@ int scsi_dma_map(struct scsi_cmnd *cmd)
 	int nseg = 0;
 
 	if (scsi_sg_count(cmd)) {
-		struct device *dev = dev_to_dma_dev(
+		struct device *dev = dev_to_nonscsi_dev(
 					cmd->device->host->shost_gendev.parent);
 
 		BUG_ON(!dev);
@@ -43,7 +43,7 @@ EXPORT_SYMBOL(scsi_dma_map);
 void scsi_dma_unmap(struct scsi_cmnd *cmd)
 {
 	if (scsi_sg_count(cmd)) {
-		struct device *dev = dev_to_dma_dev(
+		struct device *dev = dev_to_nonscsi_dev(
 					cmd->device->host->shost_gendev.parent);
 
 		BUG_ON(!dev);

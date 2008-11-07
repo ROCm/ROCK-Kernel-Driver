@@ -38,7 +38,19 @@
 
 #include <scsi/libfc/libfc.h>
 
-int fc_fcp_debug;
+MODULE_AUTHOR("Open-FCoE.org");
+MODULE_DESCRIPTION("libfc");
+MODULE_LICENSE("GPL");
+MODULE_VERSION("1.0.3");
+
+static int fc_fcp_debug;
+
+#define FC_DEBUG_FCP(fmt...)			\
+	do {					\
+		if (fc_fcp_debug)		\
+			FC_DBG(fmt);		\
+	} while (0)
+
 static struct kmem_cache *scsi_pkt_cachep;
 
 /* SRB state definitions */
@@ -52,70 +64,8 @@ static struct kmem_cache *scsi_pkt_cachep;
 #define FC_SRB_FCP_PROCESSING_TMO (1 << 6)	/* timer function processing */
 #define FC_SRB_NOMEM		(1 << 7)	/* dropped to out of mem */
 
-#define FC_SRB_READ		    (1 << 1)
-#define FC_SRB_WRITE		    (1 << 0)
-
-/*
- * scsi request structure, one for each scsi request
- */
-struct fc_fcp_pkt {
-	/*
-	 * housekeeping stuff
-	 */
-	struct fc_lport *lp;	/* handle to hba struct */
-	u16		state;		/* scsi_pkt state state */
-	u16		tgt_flags;	/* target flags	 */
-	atomic_t	ref_cnt;	/* only used byr REC ELS */
-	spinlock_t	scsi_pkt_lock;	/* Must be taken before the host lock
-					 * if both are held at the same time */
-	/*
-	 * SCSI I/O related stuff
-	 */
-	struct scsi_cmnd *cmd;		/* scsi command pointer. set/clear
-					 * under host lock */
-	struct list_head list;		/* tracks queued commands. access under
-					 * host lock */
-	/*
-	 * timeout related stuff
-	 */
-	struct timer_list timer;	/* command timer */
-	struct completion tm_done;
-	int	wait_for_comp;
-	unsigned long	start_time;	/* start jiffie */
-	unsigned long	end_time;	/* end jiffie */
-	unsigned long	last_pkt_time;	 /* jiffies of last frame received */
-
-	/*
-	 * scsi cmd and data transfer information
-	 */
-	u32		data_len;
-	/*
-	 * transport related veriables
-	 */
-	struct fcp_cmnd cdb_cmd;
-	size_t		xfer_len;
-	u32		xfer_contig_end; /* offset of end of contiguous xfer */
-	u16		max_payload;	/* max payload size in bytes */
-
-	/*
-	 * scsi/fcp return status
-	 */
-	u32		io_status;	/* SCSI result upper 24 bits */
-	u8		cdb_status;
-	u8		status_code;	/* FCP I/O status */
-	/* bit 3 Underrun bit 2: overrun */
-	u8		scsi_comp_flags;
-	u32		req_flags;	/* bit 0: read bit:1 write */
-	u32		scsi_resid;	/* residule length */
-
-	struct fc_rport	*rport;		/* remote port pointer */
-	struct fc_seq	*seq_ptr;	/* current sequence pointer */
-	/*
-	 * Error Processing
-	 */
-	u8		recov_retry;	/* count of recovery retries */
-	struct fc_seq	*recov_seq;	/* sequence for REC or SRR */
-};
+#define FC_SRB_READ		(1 << 1)
+#define FC_SRB_WRITE		(1 << 0)
 
 /*
  * The SCp.ptr should be tested and set under the host lock. NULL indicates
@@ -142,11 +92,10 @@ struct fc_fcp_internal {
 static void fc_fcp_recv_data(struct fc_fcp_pkt *, struct fc_frame *);
 static void fc_fcp_recv(struct fc_seq *, struct fc_frame *, void *);
 static void fc_fcp_resp(struct fc_fcp_pkt *, struct fc_frame *);
-static void fc_fcp_complete(struct fc_fcp_pkt *);
+static void fc_fcp_complete_locked(struct fc_fcp_pkt *);
 static void fc_tm_done(struct fc_seq *, struct fc_frame *, void *);
 static void fc_fcp_error(struct fc_fcp_pkt *fsp, struct fc_frame *fp);
 static void fc_timeout_error(struct fc_fcp_pkt *);
-static int fc_fcp_send_cmd(struct fc_fcp_pkt *);
 static void fc_fcp_timeout(unsigned long data);
 static void fc_fcp_rec(struct fc_fcp_pkt *);
 static void fc_fcp_rec_error(struct fc_fcp_pkt *, struct fc_frame *);
@@ -160,17 +109,17 @@ static void fc_fcp_srr_error(struct fc_fcp_pkt *, struct fc_frame *);
 /*
  * command status codes
  */
-#define FC_COMPLETE		    0
-#define FC_CMD_ABORTED		    1
-#define FC_CMD_RESET		    2
-#define FC_CMD_PLOGO		    3
-#define FC_SNS_RCV		    4
-#define FC_TRANS_ERR		    5
-#define FC_DATA_OVRRUN		    6
-#define FC_DATA_UNDRUN		    7
-#define FC_ERROR		    8
-#define FC_HRD_ERROR		    9
-#define FC_CMD_TIME_OUT		   10
+#define FC_COMPLETE		0
+#define FC_CMD_ABORTED		1
+#define FC_CMD_RESET		2
+#define FC_CMD_PLOGO		3
+#define FC_SNS_RCV		4
+#define FC_TRANS_ERR		5
+#define FC_DATA_OVRRUN		6
+#define FC_DATA_UNDRUN		7
+#define FC_ERROR		8
+#define FC_HRD_ERROR		9
+#define FC_CMD_TIME_OUT		10
 
 /*
  * Error recovery timeout values.
@@ -180,8 +129,8 @@ static void fc_fcp_srr_error(struct fc_fcp_pkt *, struct fc_frame *);
 #define FC_SCSI_REC_TOV		(2 * HZ)
 #define FC_HOST_RESET_TIMEOUT	(30 * HZ)
 
-#define FC_MAX_ERROR_CNT  5
-#define FC_MAX_RECOV_RETRY 3
+#define FC_MAX_ERROR_CNT	5
+#define FC_MAX_RECOV_RETRY	3
 
 #define FC_FCP_DFLT_QUEUE_DEPTH 32
 
@@ -197,39 +146,56 @@ static void fc_fcp_srr_error(struct fc_fcp_pkt *, struct fc_frame *);
 static struct fc_fcp_pkt *fc_fcp_pkt_alloc(struct fc_lport *lp, gfp_t gfp)
 {
 	struct fc_fcp_internal *si = fc_get_scsi_internal(lp);
-	struct fc_fcp_pkt *sp;
+	struct fc_fcp_pkt *fsp;
 
-	sp = mempool_alloc(si->scsi_pkt_pool, gfp);
-	if (sp) {
-		memset(sp, 0, sizeof(*sp));
-		sp->lp = lp;
-		atomic_set(&sp->ref_cnt, 1);
-		init_timer(&sp->timer);
-		INIT_LIST_HEAD(&sp->list);
+	fsp = mempool_alloc(si->scsi_pkt_pool, gfp);
+	if (fsp) {
+		memset(fsp, 0, sizeof(*fsp));
+		fsp->lp = lp;
+		atomic_set(&fsp->ref_cnt, 1);
+		init_timer(&fsp->timer);
+		INIT_LIST_HEAD(&fsp->list);
+		spin_lock_init(&fsp->scsi_pkt_lock);
 	}
-	return sp;
+	return fsp;
 }
 
 /**
  * fc_fcp_pkt_release - release hold on scsi_pkt packet
- * @sp:		fcp packet struct
+ * @fsp:	fcp packet struct
  *
  * This is used by upper layer scsi driver.
  * Context	: call from process  and interrupt context.
  *		  no locking required
  */
-static void fc_fcp_pkt_release(struct fc_fcp_pkt *sp)
+static void fc_fcp_pkt_release(struct fc_fcp_pkt *fsp)
 {
-	if (atomic_dec_and_test(&sp->ref_cnt)) {
-		struct fc_fcp_internal *si = fc_get_scsi_internal(sp->lp);
+	if (atomic_dec_and_test(&fsp->ref_cnt)) {
+		struct fc_fcp_internal *si = fc_get_scsi_internal(fsp->lp);
 
-		mempool_free(sp, si->scsi_pkt_pool);
+		mempool_free(fsp, si->scsi_pkt_pool);
 	}
 }
 
-static void fc_fcp_pkt_hold(struct fc_fcp_pkt *sp)
+static void fc_fcp_pkt_hold(struct fc_fcp_pkt *fsp)
 {
-	atomic_inc(&sp->ref_cnt);
+	atomic_inc(&fsp->ref_cnt);
+}
+
+/**
+ * fc_fcp_pkt_destory - release hold on scsi_pkt packet
+ *
+ * @seq:		exchange sequence
+ * @fsp:	fcp packet struct
+ *
+ * Release hold on scsi_pkt packet set to keep scsi_pkt
+ * till EM layer exch resource is not freed.
+ * Context	: called from from EM layer.
+ *		  no locking required
+ */
+static void fc_fcp_pkt_destroy(struct fc_seq *seq, void *fsp)
+{
+	fc_fcp_pkt_release(fsp);
 }
 
 /**
@@ -252,10 +218,9 @@ static void fc_fcp_pkt_hold(struct fc_fcp_pkt *sp)
 static inline int fc_fcp_lock_pkt(struct fc_fcp_pkt *fsp)
 {
 	spin_lock_bh(&fsp->scsi_pkt_lock);
-	if (!fsp->cmd) {
+	if (fsp->state & FC_SRB_COMPL) {
 		spin_unlock_bh(&fsp->scsi_pkt_lock);
-		FC_DBG("Invalid scsi cmd pointer on fcp packet.\n");
-		return -EINVAL;
+		return -EPERM;
 	}
 
 	fc_fcp_pkt_hold(fsp);
@@ -297,7 +262,7 @@ static void fc_fcp_retry_cmd(struct fc_fcp_pkt *fsp)
 	fsp->state &= ~FC_SRB_ABORT_PENDING;
 	fsp->io_status = SUGGEST_RETRY << 24;
 	fsp->status_code = FC_ERROR;
-	fc_fcp_complete(fsp);
+	fc_fcp_complete_locked(fsp);
 }
 
 /*
@@ -308,7 +273,7 @@ static void fc_fcp_recv_data(struct fc_fcp_pkt *fsp, struct fc_frame *fp)
 {
 	struct scsi_cmnd *sc = fsp->cmd;
 	struct fc_lport *lp = fsp->lp;
-	struct fcoe_dev_stats *sp;
+	struct fcoe_dev_stats *stats;
 	struct fc_frame_header *fh;
 	size_t start_offset;
 	size_t offset;
@@ -332,11 +297,8 @@ static void fc_fcp_recv_data(struct fc_fcp_pkt *fsp, struct fc_frame *fp)
 		if ((fr_flags(fp) & FCPHF_CRC_UNCHECKED) &&
 		    fc_frame_crc_check(fp))
 			goto crc_err;
-		if (fc_fcp_debug) {
-			FC_DBG("data received past end.	 "
-			       "len %zx offset %zx "
-			       "data_len %x\n", len, offset, fsp->data_len);
-		}
+		FC_DEBUG_FCP("data received past end. len %zx offset %zx "
+			     "data_len %x\n", len, offset, fsp->data_len);
 		fc_fcp_retry_cmd(fsp);
 		return;
 	}
@@ -395,9 +357,9 @@ static void fc_fcp_recv_data(struct fc_fcp_pkt *fsp, struct fc_frame *fp)
 
 		if (~crc != le32_to_cpu(*(__le32 *)(buf + len))) {
 crc_err:
-			sp = lp->dev_stats[smp_processor_id()];
-			sp->ErrorFrames++;
-			if (sp->InvalidCRCCount++ < 5)
+			stats = lp->dev_stats[smp_processor_id()];
+			stats->ErrorFrames++;
+			if (stats->InvalidCRCCount++ < 5)
 				FC_DBG("CRC error on data frame\n");
 			/*
 			 * Assume the frame is total garbage.
@@ -422,66 +384,65 @@ crc_err:
 	 */
 	if (unlikely(fsp->state & FC_SRB_RCV_STATUS) &&
 	    fsp->xfer_len == fsp->data_len - fsp->scsi_resid)
-		fc_fcp_complete(fsp);
+		fc_fcp_complete_locked(fsp);
 }
 
 /*
  * Send SCSI data to target.
  * Called after receiving a Transfer Ready data descriptor.
+ * if LLD is capable of seq offload then send down seq_blen
+ * size of data in single frame, otherwise send multiple FC
+ * frames of max FC frame payload supported by target port.
  */
-static int fc_fcp_send_data(struct fc_fcp_pkt *fsp, struct fc_seq *sp,
-			    size_t offset, size_t len,
-			    struct fc_frame *oldfp, int sg_supp)
+static int fc_fcp_send_data(struct fc_fcp_pkt *fsp, struct fc_seq *seq,
+			    size_t offset, size_t seq_blen)
 {
 	struct scsi_cmnd *sc;
 	struct scatterlist *sg;
 	struct fc_frame *fp = NULL;
 	struct fc_lport *lp = fsp->lp;
 	size_t remaining;
-	size_t mfs;
+	size_t t_blen;
 	size_t tlen;
 	size_t sg_bytes;
 	size_t frame_offset;
 	int error;
 	void *data = NULL;
 	void *page_addr;
-	int using_sg = sg_supp;
+	int using_sg = lp->sg_supp;
 	u32 f_ctl;
 
-	if (unlikely(offset + len > fsp->data_len)) {
-		/*
-		 * this should never happen
-		 */
-		if (fc_fcp_debug) {
-			FC_DBG("xfer-ready past end. len %zx offset %zx\n",
-			       len, offset);
-		}
+	WARN_ON(seq_blen <= 0);
+	if (unlikely(offset + seq_blen > fsp->data_len)) {
+		/* this should never happen */
+		FC_DEBUG_FCP("xfer-ready past end. seq_blen %zx offset %zx\n",
+			     seq_blen, offset);
 		fc_fcp_send_abort(fsp);
 		return 0;
 	} else if (offset != fsp->xfer_len) {
-		/*
-		 * Out of Order Data Request - no problem, but unexpected.
-		 */
-		if (fc_fcp_debug) {
-			FC_DBG("xfer-ready non-contiguous. "
-			       "len %zx offset %zx\n", len, offset);
-		}
+		/* Out of Order Data Request - no problem, but unexpected. */
+		FC_DEBUG_FCP("xfer-ready non-contiguous. "
+			     "seq_blen %zx offset %zx\n", seq_blen, offset);
 	}
-	mfs = fsp->max_payload;
-	WARN_ON(mfs > FC_MAX_PAYLOAD);
-	WARN_ON(mfs < FC_MIN_MAX_PAYLOAD);
-	if (mfs > 512)
-		mfs &= ~(512 - 1);	/* round down to block size */
-	WARN_ON(mfs < FC_MIN_MAX_PAYLOAD);	/* won't go below 256 */
-	WARN_ON(len <= 0);
+
+	/*
+	 * if LLD is capable of seq_offload then set transport
+	 * burst length (t_blen) to seq_blen, otherwise set t_blen
+	 * to max FC frame payload previously set in fsp->max_payload.
+	 */
+	t_blen = lp->seq_offload ? seq_blen : fsp->max_payload;
+	WARN_ON(t_blen < FC_MIN_MAX_PAYLOAD);
+	if (t_blen > 512)
+		t_blen &= ~(512 - 1);	/* round down to block size */
+	WARN_ON(t_blen < FC_MIN_MAX_PAYLOAD);	/* won't go below 256 */
 	sc = fsp->cmd;
 
-	remaining = len;
+	remaining = seq_blen;
 	frame_offset = offset;
 	tlen = 0;
-	sp = lp->tt.seq_start_next(sp);
+	seq = lp->tt.seq_start_next(seq);
 	f_ctl = FC_FC_REL_OFF;
-	WARN_ON(!sp);
+	WARN_ON(!seq);
 
 	/*
 	 * If a get_page()/put_page() will fail, don't use sg lists
@@ -519,7 +480,7 @@ static int fc_fcp_send_data(struct fc_fcp_pkt *fsp, struct fc_seq *sp,
 			continue;
 		}
 		if (!fp) {
-			tlen = min(mfs, remaining);
+			tlen = min(t_blen, remaining);
 
 			/*
 			 * TODO.  Temporary workaround.	 fc_seq_send() can't
@@ -542,6 +503,7 @@ static int fc_fcp_send_data(struct fc_fcp_pkt *fsp, struct fc_seq *sp,
 			}
 			fc_frame_setup(fp, FC_RCTL_DD_SOL_DATA, FC_TYPE_FCP);
 			fc_frame_set_offset(fp, frame_offset);
+			fr_max_payload(fp) = fsp->max_payload;
 		}
 		sg_bytes = min(tlen, sg->length - offset);
 		if (using_sg) {
@@ -583,12 +545,12 @@ static int fc_fcp_send_data(struct fc_fcp_pkt *fsp, struct fc_seq *sp,
 			 * transfer sequence initiative.
 			 */
 			f_ctl |= FC_FC_SEQ_INIT | FC_FC_END_SEQ;
-			error = lp->tt.seq_send(lp, sp, fp, f_ctl);
+			error = lp->tt.seq_send(lp, seq, fp, f_ctl);
 		} else if (tlen == 0) {
 			/*
 			 * send fragment using for a sequence.
 			 */
-			error = lp->tt.seq_send(lp, sp, fp, f_ctl);
+			error = lp->tt.seq_send(lp, seq, fp, f_ctl);
 		} else {
 			continue;
 		}
@@ -600,24 +562,42 @@ static int fc_fcp_send_data(struct fc_fcp_pkt *fsp, struct fc_seq *sp,
 			return 0;
 		}
 	}
-	fsp->xfer_len += len;	/* premature count? */
+	fsp->xfer_len += seq_blen;	/* premature count? */
 	return 0;
 }
 
-static void fc_fcp_abts_resp(struct fc_fcp_pkt *fsp, struct fc_frame_header *fh)
+static void fc_fcp_abts_resp(struct fc_fcp_pkt *fsp, struct fc_frame *fp)
 {
-	/*
-	 * we will let the command timeout and scsi-ml escalate if
-	 * the abort was rejected
-	 */
-	if (fh->fh_r_ctl == FC_RCTL_BA_ACC) {
+	int ba_done = 1;
+	struct fc_ba_rjt *brp;
+	struct fc_frame_header *fh;
+
+	fh = fc_frame_header_get(fp);
+	switch (fh->fh_r_ctl) {
+	case FC_RCTL_BA_ACC:
+		break;
+	case FC_RCTL_BA_RJT:
+		brp = fc_frame_payload_get(fp, sizeof(*brp));
+		if (brp && brp->br_reason == FC_BA_RJT_LOG_ERR)
+			break;
+		/* fall thru */
+	default:
+		/*
+		 * we will let the command timeout
+		 * and scsi-ml recover in this case,
+		 * therefore cleared the ba_done flag.
+		 */
+		ba_done = 0;
+	}
+
+	if (ba_done) {
 		fsp->state |= FC_SRB_ABORTED;
 		fsp->state &= ~FC_SRB_ABORT_PENDING;
 
 		if (fsp->wait_for_comp)
 			complete(&fsp->tm_done);
 		else
-			fc_fcp_complete(fsp);
+			fc_fcp_complete_locked(fsp);
 	}
 }
 
@@ -661,12 +641,12 @@ done:
  * Context  : called from Soft IRQ context
  *	      can not called holding list lock
  */
-static void fc_fcp_recv(struct fc_seq *sp, struct fc_frame *fp, void *arg)
+static void fc_fcp_recv(struct fc_seq *seq, struct fc_frame *fp, void *arg)
 {
 	struct fc_fcp_pkt *fsp = (struct fc_fcp_pkt *)arg;
 	struct fc_lport *lp;
 	struct fc_frame_header *fh;
-	struct fc_data_desc *dd;
+	struct fcp_txrdy *dd;
 	u8 r_ctl;
 	int rc = 0;
 
@@ -684,7 +664,7 @@ static void fc_fcp_recv(struct fc_seq *sp, struct fc_frame *fp, void *arg)
 	fsp->last_pkt_time = jiffies;
 
 	if (fh->fh_type == FC_TYPE_BLS) {
-		fc_fcp_abts_resp(fsp, fh);
+		fc_fcp_abts_resp(fsp, fp);
 		goto unlock;
 	}
 
@@ -700,12 +680,11 @@ static void fc_fcp_recv(struct fc_seq *sp, struct fc_frame *fp, void *arg)
 		dd = fc_frame_payload_get(fp, sizeof(*dd));
 		WARN_ON(!dd);
 
-		rc = fc_fcp_send_data(fsp, sp,
-				      (size_t) ntohl(dd->dd_offset),
-				      (size_t) ntohl(dd->dd_len), fp,
-				      lp->capabilities & TRANS_C_SG);
+		rc = fc_fcp_send_data(fsp, seq,
+				      (size_t) ntohl(dd->ft_data_ro),
+				      (size_t) ntohl(dd->ft_burst_len));
 		if (!rc)
-			lp->tt.seq_set_rec_data(sp, fsp->xfer_len);
+			lp->tt.seq_set_rec_data(seq, fsp->xfer_len);
 		else if (rc == -ENOMEM)
 			fsp->state |= FC_SRB_NOMEM;
 	} else if (r_ctl == FC_RCTL_DD_SOL_DATA) {
@@ -715,7 +694,7 @@ static void fc_fcp_recv(struct fc_seq *sp, struct fc_frame *fp, void *arg)
 		 */
 		WARN_ON(fr_len(fp) < sizeof(*fh));	/* len may be 0 */
 		fc_fcp_recv_data(fsp, fp);
-		lp->tt.seq_set_rec_data(sp, fsp->xfer_contig_end);
+		lp->tt.seq_set_rec_data(seq, fsp->xfer_contig_end);
 	} else if (r_ctl == FC_RCTL_DD_CMD_STATUS) {
 		WARN_ON(fr_flags(fp) & FCPHF_CRC_UNCHECKED);
 
@@ -832,7 +811,7 @@ static void fc_fcp_resp(struct fc_fcp_pkt *fsp, struct fc_frame *fp)
 		       fsp->rport->port_id,
 		       fsp->xfer_len, expected_len, fsp->data_len);
 	}
-	fc_fcp_complete(fsp);
+	fc_fcp_complete_locked(fsp);
 	return;
 
 len_err:
@@ -840,20 +819,20 @@ len_err:
 	       flags, fr_len(fp), respl, snsl);
 err:
 	fsp->status_code = FC_ERROR;
-	fc_fcp_complete(fsp);
+	fc_fcp_complete_locked(fsp);
 }
 
 /**
- * fc_fcp_complete - complete processing of a fcp packet
+ * fc_fcp_complete_locked - complete processing of a fcp packet
  * @fsp:	fcp packet
  *
  * This function may sleep if a timer is pending. The packet lock must be
  * held, and the host lock must not be held.
  */
-static void fc_fcp_complete(struct fc_fcp_pkt *fsp)
+static void fc_fcp_complete_locked(struct fc_fcp_pkt *fsp)
 {
 	struct fc_lport *lp = fsp->lp;
-	struct fc_seq *sp;
+	struct fc_seq *seq;
 	u32 f_ctl;
 
 	if (fsp->state & FC_SRB_ABORT_PENDING)
@@ -875,14 +854,14 @@ static void fc_fcp_complete(struct fc_fcp_pkt *fsp)
 		}
 	}
 
-	sp = fsp->seq_ptr;
-	if (sp) {
+	seq = fsp->seq_ptr;
+	if (seq) {
 		fsp->seq_ptr = NULL;
 		if (unlikely(fsp->scsi_comp_flags & FCP_CONF_REQ)) {
 			struct fc_frame *conf_frame;
 			struct fc_seq *csp;
 
-			csp = lp->tt.seq_start_next(sp);
+			csp = lp->tt.seq_start_next(seq);
 			conf_frame = fc_frame_alloc(fsp->lp, 0);
 			if (conf_frame) {
 				fc_frame_setup(conf_frame,
@@ -892,7 +871,7 @@ static void fc_fcp_complete(struct fc_fcp_pkt *fsp)
 				lp->tt.seq_send(lp, csp, conf_frame, f_ctl);
 			}
 		}
-		lp->tt.exch_done(sp);
+		lp->tt.exch_done(seq);
 	}
 	fc_io_compl(fsp);
 }
@@ -986,7 +965,7 @@ static int fc_fcp_pkt_send(struct fc_lport *lp, struct fc_fcp_pkt *fsp)
 	list_add_tail(&fsp->list, &si->scsi_pkt_queue);
 
 	spin_unlock_irq(lp->host->host_lock);
-	rc = fc_fcp_send_cmd(fsp);
+	rc = lp->tt.fcp_cmd_send(lp, fsp, fc_fcp_recv);
 	spin_lock_irq(lp->host->host_lock);
 	if (rc)
 		list_del(&fsp->list);
@@ -994,47 +973,48 @@ static int fc_fcp_pkt_send(struct fc_lport *lp, struct fc_fcp_pkt *fsp)
 	return rc;
 }
 
-static int fc_fcp_send_cmd(struct fc_fcp_pkt *fsp)
+static int fc_fcp_cmd_send(struct fc_lport *lp, struct fc_fcp_pkt *fsp,
+			   void (*resp)(struct fc_seq *,
+					struct fc_frame *fp,
+					void *arg))
 {
-	struct fc_lport *lp;
 	struct fc_frame *fp;
-	struct fc_seq *sp;
+	struct fc_seq *seq;
 	struct fc_rport *rport;
 	struct fc_rport_libfc_priv *rp;
+	const size_t len = sizeof(fsp->cdb_cmd);
 	int rc = 0;
 
 	if (fc_fcp_lock_pkt(fsp))
 		return 0;
 
-	if (fsp->state & FC_SRB_COMPL)
-		goto unlock;
-
-	lp = fsp->lp;
 	fp = fc_frame_alloc(lp, sizeof(fsp->cdb_cmd));
 	if (!fp) {
 		rc = -1;
 		goto unlock;
 	}
 
-	memcpy(fc_frame_payload_get(fp, sizeof(fsp->cdb_cmd)),
-	       &fsp->cdb_cmd, sizeof(fsp->cdb_cmd));
+	memcpy(fc_frame_payload_get(fp, len), &fsp->cdb_cmd, len);
 	fc_frame_setup(fp, FC_RCTL_DD_UNSOL_CMD, FC_TYPE_FCP);
 	fc_frame_set_offset(fp, 0);
 	rport = fsp->rport;
 	fsp->max_payload = rport->maxframe_size;
 	rp = rport->dd_data;
-	sp = lp->tt.exch_seq_send(lp, fp,
-				  fc_fcp_recv,
-				  fsp, 0,
-				  rp->local_port->fid,
-				  rport->port_id,
-				  FC_FC_SEQ_INIT | FC_FC_END_SEQ);
-	if (!sp) {
+	seq = lp->tt.exch_seq_send(lp, fp,
+				   resp,
+				   fc_fcp_pkt_destroy,
+				   fsp, 0,
+				   fc_host_port_id(rp->local_port->host),
+				   rport->port_id,
+				   FC_FC_SEQ_INIT | FC_FC_END_SEQ);
+	if (!seq) {
 		fc_frame_free(fp);
 		rc = -1;
 		goto unlock;
 	}
-	fsp->seq_ptr = sp;
+	fsp->last_pkt_time = jiffies;
+	fsp->seq_ptr = seq;
+	fc_fcp_pkt_hold(fsp);	/* hold for fc_fcp_pkt_destroy */
 
 	setup_timer(&fsp->timer, fc_fcp_timeout, (unsigned long)fsp);
 	fc_fcp_timer_set(fsp,
@@ -1068,7 +1048,7 @@ static void fc_fcp_error(struct fc_fcp_pkt *fsp, struct fc_frame *fp)
 	 */
 	fsp->state &= ~FC_SRB_ABORT_PENDING;
 	fsp->status_code = FC_CMD_PLOGO;
-	fc_fcp_complete(fsp);
+	fc_fcp_complete_locked(fsp);
 unlock:
 	fc_fcp_unlock_pkt(fsp);
 }
@@ -1098,7 +1078,7 @@ static int fc_fcp_pkt_abort(struct fc_lport *lp, struct fc_fcp_pkt *fsp)
 	} else if (fsp->state & FC_SRB_ABORTED) {
 		FC_DBG("target abort cmd  passed\n");
 		rc = SUCCESS;
-		fc_fcp_complete(fsp);
+		fc_fcp_complete_locked(fsp);
 	}
 
 	return rc;
@@ -1110,45 +1090,16 @@ static int fc_fcp_pkt_abort(struct fc_lport *lp, struct fc_fcp_pkt *fsp)
 static void fc_lun_reset_send(unsigned long data)
 {
 	struct fc_fcp_pkt *fsp = (struct fc_fcp_pkt *)data;
-	const size_t len = sizeof(fsp->cdb_cmd);
 	struct fc_lport *lp = fsp->lp;
-	struct fc_frame *fp;
-	struct fc_seq  *sp;
-	struct fc_rport *rport;
-	struct fc_rport_libfc_priv *rp;
-
-	spin_lock_bh(&fsp->scsi_pkt_lock);
-	if (fsp->state & FC_SRB_COMPL)
-		goto unlock;
-
-	fp = fc_frame_alloc(lp, len);
-	if (!fp)
-		goto retry;
-	memcpy(fc_frame_payload_get(fp, len), &fsp->cdb_cmd, len);
-	fc_frame_setup(fp, FC_RCTL_DD_UNSOL_CMD, FC_TYPE_FCP);
-	fc_frame_set_offset(fp, 0);
-	rport = fsp->rport;
-	rp = rport->dd_data;
-	sp = lp->tt.exch_seq_send(lp, fp,
-				  fc_tm_done,
-				  fsp, 0,
-				  rp->local_port->fid,
-				  rport->port_id,
-				  FC_FC_SEQ_INIT | FC_FC_END_SEQ);
-
-	if (sp) {
-		fsp->seq_ptr = sp;
-		goto unlock;
+	if (lp->tt.fcp_cmd_send(lp, fsp, fc_tm_done)) {
+		if (fsp->recov_retry++ >= FC_MAX_RECOV_RETRY)
+			return;
+		if (fc_fcp_lock_pkt(fsp))
+			return;
+		setup_timer(&fsp->timer, fc_lun_reset_send, (unsigned long)fsp);
+		fc_fcp_timer_set(fsp, FC_SCSI_REC_TOV);
+		fc_fcp_unlock_pkt(fsp);
 	}
-	/*
-	 * Exchange or frame allocation failed.	 Set timer and retry.
-	 */
-	fc_frame_free(fp);
-retry:
-	setup_timer(&fsp->timer, fc_lun_reset_send, (unsigned long)fsp);
-	fc_fcp_timer_set(fsp, FC_SCSI_REC_TOV);
-unlock:
-	spin_unlock_bh(&fsp->scsi_pkt_lock);
 }
 
 /*
@@ -1183,12 +1134,6 @@ static int fc_lun_reset(struct fc_lport *lp, struct fc_fcp_pkt *fsp,
 
 	spin_lock_bh(&fsp->scsi_pkt_lock);
 	if (fsp->seq_ptr) {
-		/* TODO:
-		 * if the exch resp function is running and trying to grab
-		 * the scsi_pkt_lock, this could free the exch from under
-		 * it and it could allow the fsp to be freed from under
-		 * fc_tm_done.
-		 */
 		lp->tt.exch_done(fsp->seq_ptr);
 		fsp->seq_ptr = NULL;
 	}
@@ -1212,12 +1157,11 @@ static int fc_lun_reset(struct fc_lport *lp, struct fc_fcp_pkt *fsp,
 /*
  * Task Managment response handler
  */
-static void fc_tm_done(struct fc_seq *sp, struct fc_frame *fp, void *arg)
+static void fc_tm_done(struct fc_seq *seq, struct fc_frame *fp, void *arg)
 {
 	struct fc_fcp_pkt *fsp = arg;
 	struct fc_frame_header *fh;
 
-	spin_lock_bh(&fsp->scsi_pkt_lock);
 	if (IS_ERR(fp)) {
 		/*
 		 * If there is an error just let it timeout or wait
@@ -1225,18 +1169,16 @@ static void fc_tm_done(struct fc_seq *sp, struct fc_frame *fp, void *arg)
 		 *
 		 * scsi-eh will escalate for when either happens.
 		 */
-		spin_unlock_bh(&fsp->scsi_pkt_lock);
 		return;
 	}
 
+	if (fc_fcp_lock_pkt(fsp))
+		return;
+
 	/*
 	 * raced with eh timeout handler.
-	 *
-	 * TODO: If this happens we could be freeing the fsp right now and
-	 * would oops. Next patches will fix this race.
 	 */
-	if ((fsp->state & FC_SRB_COMPL) || !fsp->seq_ptr ||
-	    !fsp->wait_for_comp) {
+	if (!fsp->seq_ptr || !fsp->wait_for_comp) {
 		spin_unlock_bh(&fsp->scsi_pkt_lock);
 		return;
 	}
@@ -1245,9 +1187,9 @@ static void fc_tm_done(struct fc_seq *sp, struct fc_frame *fp, void *arg)
 	if (fh->fh_type != FC_TYPE_BLS)
 		fc_fcp_resp(fsp, fp);
 	fsp->seq_ptr = NULL;
-	fsp->lp->tt.exch_done(sp);
+	fsp->lp->tt.exch_done(seq);
 	fc_frame_free(fp);
-	spin_unlock_bh(&fsp->scsi_pkt_lock);
+	fc_fcp_unlock_pkt(fsp);
 }
 
 static void fc_fcp_cleanup(struct fc_lport *lp)
@@ -1282,20 +1224,20 @@ static void fc_fcp_timeout(unsigned long data)
 	if (fc_fcp_lock_pkt(fsp))
 		return;
 
-	if (fsp->state & FC_SRB_COMPL)
+	if (fsp->cdb_cmd.fc_tm_flags)
 		goto unlock;
+
 	fsp->state |= FC_SRB_FCP_PROCESSING_TMO;
 
 	if (rp->flags & FC_RP_FLAGS_REC_SUPPORTED)
 		fc_fcp_rec(fsp);
-	/* TODO: change this to time_before/after */
-	else if (jiffies - fsp->last_pkt_time < FC_SCSI_ER_TIMEOUT / 2)
+	else if (time_after_eq(fsp->last_pkt_time + (FC_SCSI_ER_TIMEOUT / 2),
+			       jiffies))
 		fc_fcp_timer_set(fsp, FC_SCSI_ER_TIMEOUT);
 	else if (fsp->state & FC_SRB_RCV_STATUS)
-		fc_fcp_complete(fsp);
+		fc_fcp_complete_locked(fsp);
 	else
 		fc_timeout_error(fsp);
-
 	fsp->state &= ~FC_SRB_FCP_PROCESSING_TMO;
 unlock:
 	fc_fcp_unlock_pkt(fsp);
@@ -1307,7 +1249,7 @@ unlock:
 static void fc_fcp_rec(struct fc_fcp_pkt *fsp)
 {
 	struct fc_lport *lp;
-	struct fc_seq *sp;
+	struct fc_seq *seq;
 	struct fc_frame *fp;
 	struct fc_els_rec *rec;
 	struct fc_rport *rport;
@@ -1318,14 +1260,14 @@ static void fc_fcp_rec(struct fc_fcp_pkt *fsp)
 	lp = fsp->lp;
 	rport = fsp->rport;
 	rp = rport->dd_data;
-	sp = fsp->seq_ptr;
-	if (!sp || rp->rp_state != RPORT_ST_READY) {
+	seq = fsp->seq_ptr;
+	if (!seq || rp->rp_state != RPORT_ST_READY) {
 		fsp->status_code = FC_HRD_ERROR;
 		fsp->io_status = SUGGEST_RETRY << 24;
-		fc_fcp_complete(fsp);
+		fc_fcp_complete_locked(fsp);
 		return;
 	}
-	lp->tt.seq_get_xids(sp, &ox_id, &rx_id);
+	lp->tt.seq_get_xids(seq, &ox_id, &rx_id);
 	fp = fc_frame_alloc(lp, sizeof(*rec));
 	if (!fp)
 		goto retry;
@@ -1333,20 +1275,20 @@ static void fc_fcp_rec(struct fc_fcp_pkt *fsp)
 	rec = fc_frame_payload_get(fp, sizeof(*rec));
 	memset(rec, 0, sizeof(*rec));
 	rec->rec_cmd = ELS_REC;
-	hton24(rec->rec_s_id, lp->fid);
+	hton24(rec->rec_s_id, fc_host_port_id(lp->host));
 	rec->rec_ox_id = htons(ox_id);
 	rec->rec_rx_id = htons(rx_id);
 
 	fc_frame_setup(fp, FC_RCTL_ELS_REQ, FC_TYPE_ELS);
 	fc_frame_set_offset(fp, 0);
-	sp = lp->tt.exch_seq_send(lp, fp,
-				  fc_fcp_rec_resp,
-				  fsp, jiffies_to_msecs(FC_SCSI_REC_TOV),
-				  rp->local_port->fid,
-				  rport->port_id,
-				  FC_FC_SEQ_INIT | FC_FC_END_SEQ);
+	seq = lp->tt.exch_seq_send(lp, fp,
+				   fc_fcp_rec_resp, NULL,
+				   fsp, jiffies_to_msecs(FC_SCSI_REC_TOV),
+				   fc_host_port_id(rp->local_port->host),
+				   rport->port_id,
+				   FC_FC_SEQ_INIT | FC_FC_END_SEQ);
 
-	if (sp) {
+	if (seq) {
 		fc_fcp_pkt_hold(fsp);		/* hold while REC outstanding */
 		return;
 	} else
@@ -1365,7 +1307,7 @@ retry:
  * then set the timeout and return otherwise complete the exchange
  * and tell the scsi layer to restart the I/O.
  */
-static void fc_fcp_rec_resp(struct fc_seq *sp, struct fc_frame *fp, void *arg)
+static void fc_fcp_rec_resp(struct fc_seq *seq, struct fc_frame *fp, void *arg)
 {
 	struct fc_fcp_pkt *fsp = (struct fc_fcp_pkt *)arg;
 	struct fc_els_rec_acc *recp;
@@ -1391,20 +1333,22 @@ static void fc_fcp_rec_resp(struct fc_seq *sp, struct fc_frame *fp, void *arg)
 		rjt = fc_frame_payload_get(fp, sizeof(*rjt));
 		switch (rjt->er_reason) {
 		default:
-			if (fc_fcp_debug)
-				FC_DBG("device %x unexpected REC reject "
-				       "reason %d expl %d\n",
-				       fsp->rport->port_id, rjt->er_reason,
-				       rjt->er_explan);
+			FC_DEBUG_FCP("device %x unexpected REC reject "
+				     "reason %d expl %d\n",
+				     fsp->rport->port_id, rjt->er_reason,
+				     rjt->er_explan);
 			/* fall through */
-
 		case ELS_RJT_UNSUP:
-			if (fc_fcp_debug)
-				FC_DBG("device does not support REC\n");
+			FC_DEBUG_FCP("device does not support REC\n");
 			rp = fsp->rport->dd_data;
+			/*
+			 * if we do not spport RECs or got some bogus
+			 * reason then resetup timer so we check for
+			 * making progress.
+			 */
 			rp->flags &= ~FC_RP_FLAGS_REC_SUPPORTED;
-			/* fall through */
-
+			fc_fcp_timer_set(fsp, FC_SCSI_ER_TIMEOUT);
+			break;
 		case ELS_RJT_LOGIC:
 		case ELS_RJT_UNAB:
 			/*
@@ -1566,7 +1510,7 @@ static void fc_fcp_srr(struct fc_fcp_pkt *fsp, enum fc_rctl r_ctl, u32 offset)
 	struct fc_lport *lp = fsp->lp;
 	struct fc_rport *rport;
 	struct fc_rport_libfc_priv *rp;
-	struct fc_seq *sp;
+	struct fc_seq *seq;
 	struct fcp_srr *srr;
 	struct fc_frame *fp;
 	u8 cdb_op;
@@ -1594,17 +1538,17 @@ static void fc_fcp_srr(struct fc_fcp_pkt *fsp, enum fc_rctl r_ctl, u32 offset)
 
 	fc_frame_setup(fp, FC_RCTL_ELS4_REQ, FC_TYPE_FCP);
 	fc_frame_set_offset(fp, 0);
-	sp = lp->tt.exch_seq_send(lp, fp,
-				  fc_fcp_srr_resp,
-				  fsp, jiffies_to_msecs(FC_SCSI_REC_TOV),
-				  rp->local_port->fid,
-				  rport->port_id,
-				  FC_FC_SEQ_INIT | FC_FC_END_SEQ);
-	if (!sp) {
+	seq = lp->tt.exch_seq_send(lp, fp,
+				   fc_fcp_srr_resp, NULL,
+				   fsp, jiffies_to_msecs(FC_SCSI_REC_TOV),
+				   fc_host_port_id(rp->local_port->host),
+				   rport->port_id,
+				   FC_FC_SEQ_INIT | FC_FC_END_SEQ);
+	if (!seq) {
 		fc_frame_free(fp);
 		goto retry;
 	}
-	fsp->recov_seq = sp;
+	fsp->recov_seq = seq;
 	fsp->xfer_len = offset;
 	fsp->xfer_contig_end = offset;
 	fsp->state &= ~FC_SRB_RCV_STATUS;
@@ -1617,7 +1561,7 @@ retry:
 /*
  * Handle response from SRR.
  */
-static void fc_fcp_srr_resp(struct fc_seq *sp, struct fc_frame *fp, void *arg)
+static void fc_fcp_srr_resp(struct fc_seq *seq, struct fc_frame *fp, void *arg)
 {
 	struct fc_fcp_pkt *fsp = arg;
 	struct fc_frame_header *fh;
@@ -1659,7 +1603,7 @@ static void fc_fcp_srr_resp(struct fc_seq *sp, struct fc_frame *fp, void *arg)
 		break;
 	}
 	fc_fcp_unlock_pkt(fsp);
-	fsp->lp->tt.exch_done(sp);
+	fsp->lp->tt.exch_done(seq);
 out:
 	fc_frame_free(fp);
 	fc_fcp_pkt_release(fsp);	/* drop hold for outstanding SRR */
@@ -1707,7 +1651,7 @@ int fc_queuecommand(struct scsi_cmnd *sc_cmd, void (*done)(struct scsi_cmnd *))
 {
 	struct fc_lport *lp;
 	struct fc_rport *rport = starget_to_rport(scsi_target(sc_cmd->device));
-	struct fc_fcp_pkt *sp;
+	struct fc_fcp_pkt *fsp;
 	struct fc_rport_libfc_priv *rp;
 	int rval;
 	int rc = 0;
@@ -1739,8 +1683,8 @@ int fc_queuecommand(struct scsi_cmnd *sc_cmd, void (*done)(struct scsi_cmnd *))
 		goto out;
 	}
 
-	sp = fc_fcp_pkt_alloc(lp, GFP_ATOMIC);
-	if (sp == NULL) {
+	fsp = fc_fcp_pkt_alloc(lp, GFP_ATOMIC);
+	if (fsp == NULL) {
 		rc = SCSI_MLQUEUE_HOST_BUSY;
 		goto out;
 	}
@@ -1748,48 +1692,48 @@ int fc_queuecommand(struct scsi_cmnd *sc_cmd, void (*done)(struct scsi_cmnd *))
 	/*
 	 * build the libfc request pkt
 	 */
-	sp->cmd = sc_cmd;	/* save the cmd */
-	sp->lp = lp;		/* save the softc ptr */
-	sp->rport = rport;	/* set the remote port ptr */
+	fsp->cmd = sc_cmd;	/* save the cmd */
+	fsp->lp = lp;		/* save the softc ptr */
+	fsp->rport = rport;	/* set the remote port ptr */
 	sc_cmd->scsi_done = done;
 
 	/*
 	 * set up the transfer length
 	 */
-	sp->data_len = scsi_bufflen(sc_cmd);
-	sp->xfer_len = 0;
+	fsp->data_len = scsi_bufflen(sc_cmd);
+	fsp->xfer_len = 0;
 
 	/*
 	 * setup the data direction
 	 */
 	stats = lp->dev_stats[smp_processor_id()];
 	if (sc_cmd->sc_data_direction == DMA_FROM_DEVICE) {
-		sp->req_flags = FC_SRB_READ;
+		fsp->req_flags = FC_SRB_READ;
 		stats->InputRequests++;
-		stats->InputMegabytes = sp->data_len;
+		stats->InputMegabytes = fsp->data_len;
 	} else if (sc_cmd->sc_data_direction == DMA_TO_DEVICE) {
-		sp->req_flags = FC_SRB_WRITE;
+		fsp->req_flags = FC_SRB_WRITE;
 		stats->OutputRequests++;
-		stats->OutputMegabytes = sp->data_len;
+		stats->OutputMegabytes = fsp->data_len;
 	} else {
-		sp->req_flags = 0;
+		fsp->req_flags = 0;
 		stats->ControlRequests++;
 	}
 
-	sp->tgt_flags = rp->flags;
+	fsp->tgt_flags = rp->flags;
 
-	init_timer(&sp->timer);
-	sp->timer.data = (unsigned long)sp;
+	init_timer(&fsp->timer);
+	fsp->timer.data = (unsigned long)fsp;
 
 	/*
 	 * send it to the lower layer
 	 * if we get -1 return then put the request in the pending
 	 * queue.
 	 */
-	rval = fc_fcp_pkt_send(lp, sp);
+	rval = fc_fcp_pkt_send(lp, fsp);
 	if (rval != 0) {
-		sp->state = FC_SRB_FREE;
-		fc_fcp_pkt_release(sp);
+		fsp->state = FC_SRB_FREE;
+		fc_fcp_pkt_release(fsp);
 		rc = SCSI_MLQUEUE_HOST_BUSY;
 	}
 out:
@@ -1799,30 +1743,30 @@ EXPORT_SYMBOL(fc_queuecommand);
 
 /**
  * fc_io_compl -  Handle responses for completed commands
- * @sp:		scsi packet
+ * @fsp:	scsi packet
  *
  * Translates a error to a Linux SCSI error.
  *
  * The fcp packet lock must be held when calling.
  */
-static void fc_io_compl(struct fc_fcp_pkt *sp)
+static void fc_io_compl(struct fc_fcp_pkt *fsp)
 {
 	struct fc_fcp_internal *si;
 	struct scsi_cmnd *sc_cmd;
 	struct fc_lport *lp;
 	unsigned long flags;
 
-	sp->state |= FC_SRB_COMPL;
-	if (!(sp->state & FC_SRB_FCP_PROCESSING_TMO)) {
-		spin_unlock_bh(&sp->scsi_pkt_lock);
-		del_timer_sync(&sp->timer);
-		spin_lock_bh(&sp->scsi_pkt_lock);
+	fsp->state |= FC_SRB_COMPL;
+	if (!(fsp->state & FC_SRB_FCP_PROCESSING_TMO)) {
+		spin_unlock_bh(&fsp->scsi_pkt_lock);
+		del_timer_sync(&fsp->timer);
+		spin_lock_bh(&fsp->scsi_pkt_lock);
 	}
 
-	lp = sp->lp;
+	lp = fsp->lp;
 	si = fc_get_scsi_internal(lp);
 	spin_lock_irqsave(lp->host->host_lock, flags);
-	if (!sp->cmd) {
+	if (!fsp->cmd) {
 		spin_unlock_irqrestore(lp->host->host_lock, flags);
 		return;
 	}
@@ -1833,28 +1777,28 @@ static void fc_io_compl(struct fc_fcp_pkt *sp)
 	 * try again so clear the throttled flag incase we get more
 	 * time outs.
 	 */
-	if (si->throttled && sp->state & FC_SRB_NOMEM)
+	if (si->throttled && fsp->state & FC_SRB_NOMEM)
 		si->throttled = 0;
 
-	sc_cmd = sp->cmd;
-	sp->cmd = NULL;
+	sc_cmd = fsp->cmd;
+	fsp->cmd = NULL;
 
 	if (!sc_cmd->SCp.ptr) {
 		spin_unlock_irqrestore(lp->host->host_lock, flags);
 		return;
 	}
 
-	CMD_SCSI_STATUS(sc_cmd) = sp->cdb_status;
-	switch (sp->status_code) {
+	CMD_SCSI_STATUS(sc_cmd) = fsp->cdb_status;
+	switch (fsp->status_code) {
 	case FC_COMPLETE:
-		if (sp->cdb_status == 0) {
+		if (fsp->cdb_status == 0) {
 			/*
 			 * good I/O status
 			 */
 			sc_cmd->result = DID_OK << 16;
-			if (sp->scsi_resid)
-				CMD_RESID_LEN(sc_cmd) = sp->scsi_resid;
-		} else if (sp->cdb_status == QUEUE_FULL) {
+			if (fsp->scsi_resid)
+				CMD_RESID_LEN(sc_cmd) = fsp->scsi_resid;
+		} else if (fsp->cdb_status == QUEUE_FULL) {
 			struct scsi_device *tmp_sdev;
 			struct scsi_device *sdev = sc_cmd->device;
 
@@ -1868,47 +1812,44 @@ static void fc_io_compl(struct fc_fcp_pkt *sp)
 							      queue_depth - 1);
 				}
 			}
-			sc_cmd->result = (DID_OK << 16) | sp->cdb_status;
+			sc_cmd->result = (DID_OK << 16) | fsp->cdb_status;
 		} else {
 			/*
 			 * transport level I/O was ok but scsi
 			 * has non zero status
 			 */
-			sc_cmd->result = (DID_OK << 16) | sp->cdb_status;
+			sc_cmd->result = (DID_OK << 16) | fsp->cdb_status;
 		}
 		break;
 	case FC_ERROR:
-		if (sp->io_status & (SUGGEST_RETRY << 24))
-			sc_cmd->result = DID_IMM_RETRY << 16;
-		else
-			sc_cmd->result = (DID_ERROR << 16) | sp->io_status;
+		sc_cmd->result = DID_ERROR << 16;
 		break;
 	case FC_DATA_UNDRUN:
-		if (sp->cdb_status == 0) {
+		if (fsp->cdb_status == 0) {
 			/*
 			 * scsi status is good but transport level
 			 * underrun. for read it should be an error??
 			 */
-			sc_cmd->result = (DID_OK << 16) | sp->cdb_status;
+			sc_cmd->result = (DID_OK << 16) | fsp->cdb_status;
 		} else {
 			/*
 			 * scsi got underrun, this is an error
 			 */
-			CMD_RESID_LEN(sc_cmd) = sp->scsi_resid;
-			sc_cmd->result = (DID_ERROR << 16) | sp->cdb_status;
+			CMD_RESID_LEN(sc_cmd) = fsp->scsi_resid;
+			sc_cmd->result = (DID_ERROR << 16) | fsp->cdb_status;
 		}
 		break;
 	case FC_DATA_OVRRUN:
 		/*
 		 * overrun is an error
 		 */
-		sc_cmd->result = (DID_ERROR << 16) | sp->cdb_status;
+		sc_cmd->result = (DID_ERROR << 16) | fsp->cdb_status;
 		break;
 	case FC_CMD_ABORTED:
-		sc_cmd->result = (DID_ABORT << 16) | sp->io_status;
+		sc_cmd->result = (DID_ABORT << 16) | fsp->io_status;
 		break;
 	case FC_CMD_TIME_OUT:
-		sc_cmd->result = (DID_BUS_BUSY << 16) | sp->io_status;
+		sc_cmd->result = (DID_BUS_BUSY << 16) | fsp->io_status;
 		break;
 	case FC_CMD_RESET:
 		sc_cmd->result = (DID_RESET << 16);
@@ -1921,14 +1862,31 @@ static void fc_io_compl(struct fc_fcp_pkt *sp)
 		break;
 	}
 
-	list_del(&sp->list);
+	list_del(&fsp->list);
 	sc_cmd->SCp.ptr = NULL;
 	sc_cmd->scsi_done(sc_cmd);
 	spin_unlock_irqrestore(lp->host->host_lock, flags);
 
 	/* release ref from initial allocation in queue command */
-	fc_fcp_pkt_release(sp);
+	fc_fcp_pkt_release(fsp);
 }
+
+/**
+ * fc_fcp_complete - complete processing of a fcp packet
+ * @fsp:	fcp packet
+ *
+ * This function may sleep if a fsp timer is pending.
+ * The host lock must not be held by caller.
+ */
+void fc_fcp_complete(struct fc_fcp_pkt *fsp)
+{
+	if (fc_fcp_lock_pkt(fsp))
+		return;
+
+	fc_fcp_complete_locked(fsp);
+	fc_fcp_unlock_pkt(fsp);
+}
+EXPORT_SYMBOL(fc_fcp_complete);
 
 /**
  * fc_eh_abort - Abort a command...from scsi host template
@@ -1939,7 +1897,7 @@ static void fc_io_compl(struct fc_fcp_pkt *sp)
  */
 int fc_eh_abort(struct scsi_cmnd *sc_cmd)
 {
-	struct fc_fcp_pkt *sp;
+	struct fc_fcp_pkt *fsp;
 	struct fc_lport *lp;
 	int rc = FAILED;
 	unsigned long flags;
@@ -1951,27 +1909,27 @@ int fc_eh_abort(struct scsi_cmnd *sc_cmd)
 		return rc;
 
 	spin_lock_irqsave(lp->host->host_lock, flags);
-	sp = CMD_SP(sc_cmd);
-	if (!sp) {
+	fsp = CMD_SP(sc_cmd);
+	if (!fsp) {
 		/* command completed while scsi eh was setting up */
 		spin_unlock_irqrestore(lp->host->host_lock, flags);
 		return SUCCESS;
 	}
-	/* grab a ref so the sp and sc_cmd cannot be relased from under us */
-	fc_fcp_pkt_hold(sp);
+	/* grab a ref so the fsp and sc_cmd cannot be relased from under us */
+	fc_fcp_pkt_hold(fsp);
 	spin_unlock_irqrestore(lp->host->host_lock, flags);
 
-	if (fc_fcp_lock_pkt(sp)) {
+	if (fc_fcp_lock_pkt(fsp)) {
 		/* completed while we were waiting for timer to be deleted */
 		rc = SUCCESS;
 		goto release_pkt;
 	}
 
-	rc = fc_fcp_pkt_abort(lp, sp);
-	fc_fcp_unlock_pkt(sp);
+	rc = fc_fcp_pkt_abort(lp, fsp);
+	fc_fcp_unlock_pkt(fsp);
 
 release_pkt:
-	fc_fcp_pkt_release(sp);
+	fc_fcp_pkt_release(fsp);
 	return rc;
 }
 EXPORT_SYMBOL(fc_eh_abort);
@@ -1986,7 +1944,7 @@ EXPORT_SYMBOL(fc_eh_abort);
 int fc_eh_device_reset(struct scsi_cmnd *sc_cmd)
 {
 	struct fc_lport *lp;
-	struct fc_fcp_pkt *sp;
+	struct fc_fcp_pkt *fsp;
 	struct fc_rport *rport = starget_to_rport(scsi_target(sc_cmd->device));
 	int rc = FAILED;
 	struct fc_rport_libfc_priv *rp;
@@ -2002,8 +1960,8 @@ int fc_eh_device_reset(struct scsi_cmnd *sc_cmd)
 	if (lp->state != LPORT_ST_READY)
 		return rc;
 
-	sp = fc_fcp_pkt_alloc(lp, GFP_NOIO);
-	if (sp == NULL) {
+	fsp = fc_fcp_pkt_alloc(lp, GFP_NOIO);
+	if (fsp == NULL) {
 		FC_DBG("could not allocate scsi_pkt\n");
 		sc_cmd->result = DID_NO_CONNECT << 16;
 		goto out;
@@ -2014,15 +1972,15 @@ int fc_eh_device_reset(struct scsi_cmnd *sc_cmd)
 	 * the sc passed in is not setup for execution like when sent
 	 * through the queuecommand callout.
 	 */
-	sp->lp = lp;		/* save the softc ptr */
-	sp->rport = rport;	/* set the remote port ptr */
+	fsp->lp = lp;		/* save the softc ptr */
+	fsp->rport = rport;	/* set the remote port ptr */
 
 	/*
 	 * flush outstanding commands
 	 */
-	rc = fc_lun_reset(lp, sp, scmd_id(sc_cmd), sc_cmd->device->lun);
-	sp->state = FC_SRB_FREE;
-	fc_fcp_pkt_release(sp);
+	rc = fc_lun_reset(lp, fsp, scmd_id(sc_cmd), sc_cmd->device->lun);
+	fsp->state = FC_SRB_FREE;
+	fc_fcp_pkt_release(fsp);
 
 out:
 	return rc;
@@ -2048,7 +2006,7 @@ int fc_eh_host_reset(struct scsi_cmnd *sc_cmd)
 		shost_printk(KERN_INFO, shost, "Host reset succeeded.\n");
 		return SUCCESS;
 	} else {
-		shost_printk(KERN_INFO, shost, "Host reset succeeded failed."
+		shost_printk(KERN_INFO, shost, "Host reset failed. "
 			    "lport not ready.\n");
 		return FAILED;
 	}
@@ -2121,11 +2079,14 @@ int fc_fcp_init(struct fc_lport *lp)
 	int rc;
 	struct fc_fcp_internal *si;
 
-	if (!lp->tt.scsi_cleanup)
-		lp->tt.scsi_cleanup = fc_fcp_cleanup;
+	if (!lp->tt.fcp_cmd_send)
+		lp->tt.fcp_cmd_send = fc_fcp_cmd_send;
 
-	if (!lp->tt.scsi_abort_io)
-		lp->tt.scsi_abort_io = fc_fcp_abort_io;
+	if (!lp->tt.fcp_cleanup)
+		lp->tt.fcp_cleanup = fc_fcp_cleanup;
+
+	if (!lp->tt.fcp_abort_io)
+		lp->tt.fcp_abort_io = fc_fcp_abort_io;
 
 	si = kzalloc(sizeof(struct fc_fcp_internal), GFP_KERNEL);
 	if (!si)
@@ -2160,7 +2121,17 @@ static int __init libfc_init(void)
 
 	rc = fc_setup_exch_mgr();
 	if (rc)
-		kmem_cache_destroy(scsi_pkt_cachep);
+		goto destroy_pkt_cache;
+
+	rc = fc_setup_rport();
+	if (rc)
+		goto destroy_em;
+
+	return rc;
+destroy_em:
+	fc_destroy_exch_mgr();
+destroy_pkt_cache:
+	kmem_cache_destroy(scsi_pkt_cachep);
 	return rc;
 }
 
@@ -2168,6 +2139,7 @@ static void __exit libfc_exit(void)
 {
 	kmem_cache_destroy(scsi_pkt_cachep);
 	fc_destroy_exch_mgr();
+	fc_destroy_rport();
 }
 
 module_init(libfc_init);

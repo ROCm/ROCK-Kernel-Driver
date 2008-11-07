@@ -1,5 +1,5 @@
 /*
- * Copyright(c) 2007 Intel Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2008 Intel Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -48,16 +48,10 @@ struct fcoe_percpu_s {
 	int crc_eof_offset;
 };
 
-struct fcoe_info {
-	struct timer_list timer;
-	/*
-	 * fcoe host list is protected by the following read/write lock
-	 */
-	rwlock_t fcoe_hostlist_lock;
-	struct list_head fcoe_hostlist;
-
-	struct fcoe_percpu_s *fcoe_percpu[NR_CPUS];
-};
+extern struct timer_list fcoe_timer;
+extern rwlock_t fcoe_hostlist_lock;
+extern struct list_head fcoe_hostlist;
+extern struct fcoe_percpu_s *fcoe_percpu[];
 
 struct fcoe_softc {
 	struct list_head list;
@@ -79,22 +73,20 @@ struct fcoe_softc {
 	u8 address_mode;
 };
 
-extern int debug_fcoe;
-extern struct fcoe_percpu_s *fcoe_percpu[];
-extern struct scsi_transport_template *fcoe_transport_template;
 int fcoe_percpu_receive_thread(void *arg);
 
 /*
  * HBA transport ops prototypes
  */
-extern struct fcoe_info fcoei;
-
 void fcoe_clean_pending_queue(struct fc_lport *fd);
 void fcoe_watchdog(ulong vp);
-int fcoe_destroy_interface(const char *ifname);
-int fcoe_create_interface(const char *ifname);
+int fcoe_destroy_interface(struct net_device *);
+int fcoe_create_interface(struct net_device *);
 int fcoe_xmit(struct fc_lport *, struct fc_frame *);
 int fcoe_rcv(struct sk_buff *, struct net_device *,
 	     struct packet_type *, struct net_device *);
 int fcoe_link_ok(struct fc_lport *);
+
+int __init fcoe_sw_init(void);
+void __exit fcoe_sw_exit(void);
 #endif /* _FCOE_DEF_H_ */

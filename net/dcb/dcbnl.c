@@ -106,6 +106,8 @@ static struct nla_policy dcbnl_bcn_nest[DCB_BCN_ATTR_MAX + 1] = {
 	[DCB_BCN_ATTR_RP_6]         = {.type = NLA_U8},
 	[DCB_BCN_ATTR_RP_7]         = {.type = NLA_U8},
 	[DCB_BCN_ATTR_RP_ALL]       = {.type = NLA_FLAG},
+	[DCB_BCN_ATTR_BCNA_0]       = {.type = NLA_U32},
+	[DCB_BCN_ATTR_BCNA_1]       = {.type = NLA_U32},
 	[DCB_BCN_ATTR_ALPHA]        = {.type = NLA_U32},
 	[DCB_BCN_ATTR_BETA]         = {.type = NLA_U32},
 	[DCB_BCN_ATTR_GD]           = {.type = NLA_U32},
@@ -433,7 +435,6 @@ static int dcbnl_setnumtcs(struct net_device *netdev, struct nlattr **tb,
 	struct nlattr *data[DCB_NUMTCS_ATTR_MAX + 1];
 	int ret = -EINVAL;
 	u8 value;
-	u8 status;
 	int i;
 
 	if (!tb[DCB_ATTR_NUMTCS] || !netdev->dcbnl_ops->setstate)
@@ -456,14 +457,11 @@ static int dcbnl_setnumtcs(struct net_device *netdev, struct nlattr **tb,
 		ret = netdev->dcbnl_ops->setnumtcs(netdev, i, value);
 
 		if (ret)
-			goto err;
+			goto operr;
 	}
 
-	value = nla_get_u8(tb[DCB_ATTR_STATE]);
-
-	status = netdev->dcbnl_ops->setnumtcs(netdev, i, value);
-
-	ret = dcbnl_reply(!!status, RTM_SETDCB, DCB_CMD_SNUMTCS,
+operr:
+	ret = dcbnl_reply(!!ret, RTM_SETDCB, DCB_CMD_SNUMTCS,
 				DCB_ATTR_NUMTCS, pid, seq, flags);
 
 err:
@@ -494,9 +492,9 @@ static int dcbnl_setpfcstate(struct net_device *netdev, struct nlattr **tb,
 	if (!tb[DCB_ATTR_PFC_STATE] || !netdev->dcbnl_ops->setpfcstate)
 		return ret;
 
-	value = nla_get_u8(tb[DCB_ATTR_STATE]);
+	value = nla_get_u8(tb[DCB_ATTR_PFC_STATE]);
 
-	netdev->dcbnl_ops->setstate(netdev, value);
+	netdev->dcbnl_ops->setpfcstate(netdev, value);
 
 	ret = dcbnl_reply(0, RTM_SETDCB, DCB_CMD_PFC_SSTATE, DCB_ATTR_PFC_STATE,
 				pid, seq, flags);
@@ -893,7 +891,7 @@ static int dcbnl_bcn_getcfg(struct net_device *netdev, struct nlattr **tb,
 			goto err_bcn;
 	}
 
-	for (i = DCB_BCN_ATTR_ALPHA; i <= DCB_BCN_ATTR_RI; i++) {
+	for (i = DCB_BCN_ATTR_BCNA_0; i <= DCB_BCN_ATTR_RI; i++) {
 		if (!getall && !bcn_tb[i])
 			continue;
 
@@ -951,7 +949,7 @@ static int dcbnl_bcn_setcfg(struct net_device *netdev, struct nlattr **tb,
 			data[i]->nla_type - DCB_BCN_ATTR_RP_0, value_byte);
 	}
 
-	for (i = DCB_BCN_ATTR_ALPHA; i <= DCB_BCN_ATTR_RI; i++) {
+	for (i = DCB_BCN_ATTR_BCNA_0; i <= DCB_BCN_ATTR_RI; i++) {
 		if (data[i] == NULL)
 			continue;
 		value_int = nla_get_u32(data[i]);

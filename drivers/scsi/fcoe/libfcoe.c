@@ -1,5 +1,5 @@
 /*
- * Copyright(c) 2007 Intel Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2008 Intel Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -45,6 +45,8 @@
 #include <scsi/fc/fc_fcoe.h>
 #include "fcoe_def.h"
 
+static int debug_fcoe;
+
 #define FCOE_MAX_QUEUE_DEPTH  256
 
 /* destination address mode */
@@ -75,7 +77,6 @@ int fcoe_rcv(struct sk_buff *skb, struct net_device *dev,
 	unsigned short oxid;
 	int cpu_idx;
 	struct fcoe_percpu_s *fps;
-	struct fcoe_info *fci = &fcoei;
 
 	fc = container_of(ptype, struct fcoe_softc, fcoe_packet_type);
 	lp = fc->lp;
@@ -115,10 +116,10 @@ int fcoe_rcv(struct sk_buff *skb, struct net_device *dev,
 	 * for a given idx then use first online cpu.
 	 */
 	cpu_idx = oxid & (num_online_cpus() >> 1);
-	if (fci->fcoe_percpu[cpu_idx] == NULL)
+	if (fcoe_percpu[cpu_idx] == NULL)
 		cpu_idx = first_cpu(cpu_online_map);
 #endif
-	fps = fci->fcoe_percpu[cpu_idx];
+	fps = fcoe_percpu[cpu_idx];
 
 	spin_lock_bh(&fps->fcoe_rx_list.lock);
 	__skb_queue_tail(&fps->fcoe_rx_list, skb);
@@ -134,7 +135,8 @@ err:
 #else
 	stats = lp->dev_stats[0];
 #endif
-	stats->ErrorFrames++;
+	if (stats)
+		stats->ErrorFrames++;
 
 err2:
 	kfree_skb(skb);
@@ -155,13 +157,12 @@ static inline int fcoe_start_io(struct sk_buff *skb)
 
 static int fcoe_get_paged_crc_eof(struct sk_buff *skb, int tlen)
 {
-	struct fcoe_info *fci = &fcoei;
 	struct fcoe_percpu_s *fps;
 	struct page *page;
 	int cpu_idx;
 
 	cpu_idx = get_cpu();
-	fps = fci->fcoe_percpu[cpu_idx];
+	fps = fcoe_percpu[cpu_idx];
 	page = fps->crc_eof_page;
 	if (!page) {
 		page = alloc_page(GFP_ATOMIC);
@@ -333,8 +334,10 @@ int fcoe_xmit(struct fc_lport *lp, struct fc_frame *fp)
 	hp->fcoe_sof = sof;
 
 	stats = lp->dev_stats[smp_processor_id()];
-	stats->TxFrames++;
-	stats->TxWords += wlen;
+	if (stats) {
+		stats->TxFrames++;
+		stats->TxWords += wlen;
+	}
 	skb->dev = fc->real_dev;
 
 	fr_dev(fp) = lp;
@@ -422,10 +425,12 @@ int fcoe_percpu_receive_thread(void *arg)
 
 		hp = (struct fcoe_hdr *)skb->data;
 		if (unlikely(FC_FCOE_DECAPS_VER(hp) != FC_FCOE_VER)) {
-			if (stats->ErrorFrames < 5)
-				FC_DBG("unknown FCoE version %x",
-				       FC_FCOE_DECAPS_VER(hp));
-			stats->ErrorFrames++;
+			if (stats) {
+				if (stats->ErrorFrames < 5)
+					FC_DBG("unknown FCoE version %x",
+					       FC_FCOE_DECAPS_VER(hp));
+				stats->ErrorFrames++;
+			}
 			kfree_skb(skb);
 			continue;
 		}
@@ -436,15 +441,20 @@ int fcoe_percpu_receive_thread(void *arg)
 		tlen = sizeof(struct fcoe_crc_eof);
 
 		if (unlikely(fr_len > skb->len)) {
-			if (stats->ErrorFrames < 5)
-				FC_DBG("length error fr_len 0x%x skb->len 0x%x",
-				       fr_len, skb->len);
-			stats->ErrorFrames++;
+			if (stats) {
+				if (stats->ErrorFrames < 5)
+					FC_DBG("length error fr_len 0x%x "
+					       "skb->len 0x%x", fr_len,
+					       skb->len);
+				stats->ErrorFrames++;
+			}
 			kfree_skb(skb);
 			continue;
 		}
-		stats->RxFrames++;
-		stats->RxWords += fr_len / FCOE_WORD_TO_BYTE;
+		if (stats) {
+			stats->RxFrames++;
+			stats->RxWords += fr_len / FCOE_WORD_TO_BYTE;
+		}
 
 		fp = (struct fc_frame *) skb;
 		fc_frame_init(fp);
@@ -469,12 +479,15 @@ int fcoe_percpu_receive_thread(void *arg)
 				fcoe_recv_flogi(fc, fp, mac);
 			fc_exch_recv(lp, lp->emp, fp);
 		} else {
-			if (debug_fcoe || stats->InvalidCRCCount < 5) {
+			if (debug_fcoe ||
+			    (stats && stats->InvalidCRCCount < 5)) {
 				printk(KERN_WARNING \
 				       "fcoe: dropping frame with CRC error");
 			}
-			stats->InvalidCRCCount++;
-			stats->ErrorFrames++;
+			if (stats) {
+				stats->InvalidCRCCount++;
+				stats->ErrorFrames++;
+			}
 			fc_frame_free(fp);
 		}
 	}
@@ -534,11 +547,10 @@ void fcoe_watchdog(ulong vp)
 {
 	struct fc_lport *lp;
 	struct fcoe_softc *fc;
-	struct fcoe_info *fci = &fcoei;
 	int paused = 0;
 
-	read_lock(&fci->fcoe_hostlist_lock);
-	list_for_each_entry(fc, &fci->fcoe_hostlist, list) {
+	read_lock(&fcoe_hostlist_lock);
+	list_for_each_entry(fc, &fcoe_hostlist, list) {
 		lp = fc->lp;
 		if (lp) {
 			if (fc->fcoe_pending_queue.qlen > FCOE_MAX_QUEUE_DEPTH)
@@ -549,10 +561,10 @@ void fcoe_watchdog(ulong vp)
 			}
 		}
 	}
-	read_unlock(&fci->fcoe_hostlist_lock);
+	read_unlock(&fcoe_hostlist_lock);
 
-	fci->timer.expires = jiffies + (1 * HZ);
-	add_timer(&fci->timer);
+	fcoe_timer.expires = jiffies + (1 * HZ);
+	add_timer(&fcoe_timer);
 }
 
 /*

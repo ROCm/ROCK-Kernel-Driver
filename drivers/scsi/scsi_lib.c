@@ -1754,7 +1754,7 @@ struct request_queue *__scsi_alloc_queue(struct Scsi_Host *shost,
 					 request_fn_proc *request_fn)
 {
 	struct request_queue *q;
-	struct device *dev = dev_to_dma_dev(shost->shost_gendev.parent);
+	struct device *dev = dev_to_nonscsi_dev(shost->shost_gendev.parent);
 
 	BUG_ON(!dev);
 	q = blk_init_queue(request_fn, NULL);

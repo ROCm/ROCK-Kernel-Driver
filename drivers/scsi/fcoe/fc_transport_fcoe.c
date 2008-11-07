@@ -1,5 +1,5 @@
 /*
- * Copyright(c) 2007 Intel Corporation. All rights reserved.
+ * Copyright(c) 2007 - 2008 Intel Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -38,6 +38,7 @@
 MODULE_AUTHOR("Open-FCoE.org");
 MODULE_DESCRIPTION("FCoE");
 MODULE_LICENSE("GPL");
+MODULE_VERSION("1.0.3");
 
 /*
  * Static functions and variables definations
@@ -48,50 +49,6 @@ static int fcoe_cpu_callback(struct notifier_block *, ulong, void *);
 static int fcoe_device_notification(struct notifier_block *, ulong, void *);
 static void fcoe_dev_setup(void);
 static void fcoe_dev_cleanup(void);
-
-struct scsi_transport_template *fcoe_transport_template;
-
-static int fcoe_reset(struct Scsi_Host *shost)
-{
-	struct fc_lport *lp = shost_priv(shost);
-	fc_lport_enter_reset(lp);
-	return 0;
-}
-
-struct fc_function_template fcoe_transport_function = {
-	.show_host_node_name = 1,
-	.show_host_port_name = 1,
-	.show_host_supported_classes = 1,
-	.show_host_supported_fc4s = 1,
-	.show_host_active_fc4s = 1,
-	.show_host_maxframe_size = 1,
-
-	.get_host_port_id = fc_get_host_port_id,
-	.show_host_port_id = 1,
-	.get_host_speed = fc_get_host_speed,
-	.show_host_speed = 1,
-	.get_host_port_type = fc_get_host_port_type,
-	.show_host_port_type = 1,
-	.get_host_port_state = fc_get_host_port_state,
-	.show_host_port_state = 1,
-	.show_host_symbolic_name = 1,
-
-	.dd_fcrport_size = sizeof(struct fc_rport_libfc_priv),
-	.show_rport_maxframe_size = 1,
-	.show_rport_supported_classes = 1,
-
-	.get_host_fabric_name = fc_get_host_fabric_name,
-	.show_host_fabric_name = 1,
-	.show_starget_node_name = 1,
-	.show_starget_port_name = 1,
-	.show_starget_port_id = 1,
-	.set_rport_dev_loss_tmo = fc_set_rport_loss_tmo,
-	.show_rport_dev_loss_tmo = 1,
-	.get_fc_host_stats = fc_get_host_stats,
-	.issue_fc_host_lip = fcoe_reset,
-};
-
-struct fcoe_percpu_s *fcoe_percpu[NR_CPUS];
 
 #ifdef CONFIG_HOTPLUG_CPU
 static struct notifier_block fcoe_cpu_notifier = {
@@ -115,19 +72,15 @@ static void fcoe_create_percpu_data(int cpu)
 {
 	struct fc_lport *lp;
 	struct fcoe_softc *fc;
-	struct fcoe_dev_stats *p;
-	struct fcoe_info *fci = &fcoei;
 
-	write_lock_bh(&fci->fcoe_hostlist_lock);
-	list_for_each_entry(fc, &fci->fcoe_hostlist, list) {
+	write_lock_bh(&fcoe_hostlist_lock);
+	list_for_each_entry(fc, &fcoe_hostlist, list) {
 		lp = fc->lp;
-		if (lp->dev_stats[cpu] == NULL) {
-			p = kzalloc(sizeof(struct fcoe_dev_stats), GFP_KERNEL);
-			if (p)
-				lp->dev_stats[cpu] = p;
-		}
+		if (lp->dev_stats[cpu] == NULL)
+			lp->dev_stats[cpu] = kzalloc(sizeof(struct fcoe_dev_stats),
+						     GFP_KERNEL);
 	}
-	write_unlock_bh(&fci->fcoe_hostlist_lock);
+	write_unlock_bh(&fcoe_hostlist_lock);
 }
 
 /*
@@ -136,21 +89,16 @@ static void fcoe_create_percpu_data(int cpu)
  */
 static void fcoe_destroy_percpu_data(int cpu)
 {
-	struct fcoe_dev_stats *p;
 	struct fc_lport *lp;
 	struct fcoe_softc *fc;
-	struct fcoe_info *fci = &fcoei;
 
-	write_lock_bh(&fci->fcoe_hostlist_lock);
-	list_for_each_entry(fc, &fci->fcoe_hostlist, list) {
+	write_lock_bh(&fcoe_hostlist_lock);
+	list_for_each_entry(fc, &fcoe_hostlist, list) {
 		lp = fc->lp;
-		p = lp->dev_stats[cpu];
-		if (p != NULL) {
-			lp->dev_stats[cpu] = NULL;
-			kfree(p);
-		}
+		kfree(lp->dev_stats[cpu]);
+		lp->dev_stats[cpu] = NULL;
 	}
-	write_unlock_bh(&fci->fcoe_hostlist_lock);
+	write_unlock_bh(&fcoe_hostlist_lock);
 }
 
 /*
@@ -206,19 +154,18 @@ static int fcoe_device_notification(struct notifier_block *notifier,
 	struct net_device *real_dev = ptr;
 	struct fcoe_softc *fc;
 	struct fcoe_dev_stats *stats;
-	struct fcoe_info *fci = &fcoei;
 	u16 new_status;
 	u32 mfs;
 	int rc = NOTIFY_OK;
 
-	read_lock(&fci->fcoe_hostlist_lock);
-	list_for_each_entry(fc, &fci->fcoe_hostlist, list) {
+	read_lock(&fcoe_hostlist_lock);
+	list_for_each_entry(fc, &fcoe_hostlist, list) {
 		if (fc->real_dev == real_dev) {
 			lp = fc->lp;
 			break;
 		}
 	}
-	read_unlock(&fci->fcoe_hostlist_lock);
+	read_unlock(&fcoe_hostlist_lock);
 	if (lp == NULL) {
 		rc = NOTIFY_DONE;
 		goto out;
@@ -258,7 +205,8 @@ static int fcoe_device_notification(struct notifier_block *notifier,
 			fc_linkup(lp);
 		else {
 			stats = lp->dev_stats[smp_processor_id()];
-			stats->LinkFailureCount++;
+			if (stats)
+				stats->LinkFailureCount++;
 			fc_linkdown(lp);
 			fcoe_clean_pending_queue(lp);
 		}
@@ -274,53 +222,56 @@ static void trimstr(char *str, int len)
 		*cp = '\0';
 }
 
-static ssize_t fcoe_destroy(struct kobject *kobj, struct kobj_attribute *attr,
-			    const char *buffer, size_t size)
+static int fcoe_destroy(const char *buffer, struct kernel_param *kp)
 {
-	char ifname[40];
-	strcpy(ifname, buffer);
+	struct net_device *netdev;
+	char ifname[IFNAMSIZ + 2];
+	int rc = -ENODEV;
+
+	strlcpy(ifname, buffer, IFNAMSIZ);
 	trimstr(ifname, strlen(ifname));
-	fcoe_destroy_interface(ifname);
-	return size;
+	netdev = dev_get_by_name(&init_net, ifname);
+	if (netdev) {
+		rc = fcoe_destroy_interface(netdev);
+		dev_put(netdev);
+	}
+	return rc;
 }
 
-static ssize_t fcoe_create(struct kobject *kobj, struct kobj_attribute *attr,
-			   const char *buffer, size_t size)
+static int fcoe_create(const char *buffer, struct kernel_param *kp)
 {
-	char ifname[40];
-	strcpy(ifname, buffer);
+	struct net_device *netdev;
+	char ifname[IFNAMSIZ + 2];
+	int rc = -ENODEV;
+
+	strlcpy(ifname, buffer, IFNAMSIZ);
 	trimstr(ifname, strlen(ifname));
-	fcoe_create_interface(ifname);
-	return size;
+	netdev = dev_get_by_name(&init_net, ifname);
+	if (netdev) {
+		rc = fcoe_create_interface(netdev);
+		dev_put(netdev);
+	}
+	return rc;
 }
 
-static const struct kobj_attribute fcoe_destroyattr = \
-	__ATTR(destroy, S_IWUSR, NULL, fcoe_destroy);
-static const struct kobj_attribute fcoe_createattr = \
-	__ATTR(create, S_IWUSR, NULL, fcoe_create);
+module_param_call(create, fcoe_create, NULL, NULL, S_IWUSR);
+__MODULE_PARM_TYPE(create, "string");
+MODULE_PARM_DESC(create, "Create fcoe port using net device passed in.");
+module_param_call(destroy, fcoe_destroy, NULL, NULL, S_IWUSR);
+__MODULE_PARM_TYPE(destroy, "string");
+MODULE_PARM_DESC(destroy, "Destroy fcoe port");
 
 /*
  * Initialization routine
  * 1. Will create fc transport software structure
  * 2. initialize the link list of port information structure
  */
-static int __init fcoeinit(void)
+static int __init fcoe_init(void)
 {
-	int rc = 0;
 	int cpu;
 	struct fcoe_percpu_s *p;
-	struct fcoe_info *fci = &fcoei;
 
-	rc = sysfs_create_file(&THIS_MODULE->mkobj.kobj,
-			       &fcoe_destroyattr.attr);
-	if (!rc)
-		rc = sysfs_create_file(&THIS_MODULE->mkobj.kobj,
-				       &fcoe_createattr.attr);
-
-	if (rc)
-		return rc;
-
-	rwlock_init(&fci->fcoe_hostlist_lock);
+	rwlock_init(&fcoe_hostlist_lock);
 
 #ifdef CONFIG_HOTPLUG_CPU
 	register_cpu_notifier(&fcoe_cpu_notifier);
@@ -342,21 +293,16 @@ static int __init fcoeinit(void)
 			 */
 			if (likely(!IS_ERR(p->thread))) {
 				p->cpu = cpu;
-				fci->fcoe_percpu[cpu] = p;
+				fcoe_percpu[cpu] = p;
 				skb_queue_head_init(&p->fcoe_rx_list);
 				kthread_bind(p->thread, cpu);
 				wake_up_process(p->thread);
 			} else {
-				fci->fcoe_percpu[cpu] = NULL;
+				fcoe_percpu[cpu] = NULL;
 				kfree(p);
 
 			}
 		}
-	}
-	if (rc < 0) {
-		FC_DBG("failed to initialize proc intrerface\n");
-		rc = -ENODEV;
-		goto out_chrdev;
 	}
 
 	/*
@@ -364,35 +310,25 @@ static int __init fcoeinit(void)
 	 */
 	fcoe_dev_setup();
 
-	init_timer(&fci->timer);
-	fci->timer.data = (ulong) fci;
-	fci->timer.function = fcoe_watchdog;
-	fci->timer.expires = (jiffies + (10 * HZ));
-	add_timer(&fci->timer);
+	init_timer(&fcoe_timer);
+	fcoe_timer.data = 0;
+	fcoe_timer.function = fcoe_watchdog;
+	fcoe_timer.expires = (jiffies + (10 * HZ));
+	add_timer(&fcoe_timer);
 
-	fcoe_transport_template =
-		fc_attach_transport(&fcoe_transport_function);
-
-	if (fcoe_transport_template == NULL) {
+	if (fcoe_sw_init() != 0) {
 		FC_DBG("fail to attach fc transport");
 		return -1;
 	}
 
 	return 0;
-
-out_chrdev:
-#ifdef CONFIG_HOTPLUG_CPU
-	unregister_cpu_notifier(&fcoe_cpu_notifier);
-#endif /* CONFIG_HOTPLUG_CPU */
-	return rc;
 }
+module_init(fcoe_init);
 
 static void __exit fcoe_exit(void)
 {
 	u32 idx;
 	struct fcoe_softc *fc, *tmp;
-	struct fc_lport *lp;
-	struct fcoe_info *fci = &fcoei;
 	struct fcoe_percpu_s *p;
 	struct sk_buff *skb;
 
@@ -407,34 +343,30 @@ static void __exit fcoe_exit(void)
 	/*
 	 * stop timer
 	 */
-	del_timer_sync(&fci->timer);
+	del_timer_sync(&fcoe_timer);
 
 	/*
 	 * assuming that at this time there will be no
 	 * ioctl in prograss, therefore we do not need to lock the
 	 * list.
 	 */
-	list_for_each_entry_safe(fc, tmp, &fci->fcoe_hostlist, list) {
-		lp = fc->lp;
-		fcoe_destroy_interface(lp->ifname);
-	}
+	list_for_each_entry_safe(fc, tmp, &fcoe_hostlist, list)
+		fcoe_destroy_interface(fc->real_dev);
 
 	for (idx = 0; idx < NR_CPUS; idx++) {
-		if (fci->fcoe_percpu[idx]) {
-			kthread_stop(fci->fcoe_percpu[idx]->thread);
-			p = fci->fcoe_percpu[idx];
+		if (fcoe_percpu[idx]) {
+			kthread_stop(fcoe_percpu[idx]->thread);
+			p = fcoe_percpu[idx];
 			spin_lock_bh(&p->fcoe_rx_list.lock);
 			while ((skb = __skb_dequeue(&p->fcoe_rx_list)) != NULL)
 				kfree_skb(skb);
 			spin_unlock_bh(&p->fcoe_rx_list.lock);
-			if (fci->fcoe_percpu[idx]->crc_eof_page)
-				put_page(fci->fcoe_percpu[idx]->crc_eof_page);
-			kfree(fci->fcoe_percpu[idx]);
+			if (fcoe_percpu[idx]->crc_eof_page)
+				put_page(fcoe_percpu[idx]->crc_eof_page);
+			kfree(fcoe_percpu[idx]);
 		}
 	}
 
-	fc_release_transport(fcoe_transport_template);
+	fcoe_sw_exit();
 }
-
-module_init(fcoeinit);
 module_exit(fcoe_exit);

@@ -93,6 +93,8 @@ int ixgbe_copy_dcb_cfg(struct ixgbe_dcb_config *src_dcb_cfg,
 		dst_dcb_cfg->bcn.rp_admin_mode[i - DCB_BCN_ATTR_RP_0] =
 			src_dcb_cfg->bcn.rp_admin_mode[i - DCB_BCN_ATTR_RP_0];
 	}
+	dst_dcb_cfg->bcn.bcna_option[0] = src_dcb_cfg->bcn.bcna_option[0];
+	dst_dcb_cfg->bcn.bcna_option[1] = src_dcb_cfg->bcn.bcna_option[1];
 	dst_dcb_cfg->bcn.rp_alpha = src_dcb_cfg->bcn.rp_alpha;
 	dst_dcb_cfg->bcn.rp_beta = src_dcb_cfg->bcn.rp_beta;
 	dst_dcb_cfg->bcn.rp_gd = src_dcb_cfg->bcn.rp_gd;
@@ -135,7 +137,7 @@ static void ixgbe_dcbnl_set_state(struct net_device *netdev, u8 state)
 		if (adapter->flags & IXGBE_FLAG_DCB_ENABLED) {
 			return;
 		} else {
-			if (netdev->flags & IFF_UP)
+			if (netif_running(netdev))
 				netdev->stop(netdev);
 			ixgbe_reset_interrupt_capability(adapter);
 			ixgbe_napi_del_all(adapter);
@@ -149,13 +151,13 @@ static void ixgbe_dcbnl_set_state(struct net_device *netdev, u8 state)
 			adapter->flags |= IXGBE_FLAG_DCB_ENABLED;
 			ixgbe_init_interrupt_scheme(adapter);
 			ixgbe_napi_add_all(adapter);
-			if (netdev->flags & IFF_UP)
+			if (netif_running(netdev))
 				netdev->open(netdev);
 		}
 	} else {
 		/* Turn off DCB */
 		if (adapter->flags & IXGBE_FLAG_DCB_ENABLED) {
-			if (netdev->flags & IFF_UP)
+			if (netif_running(netdev))
 				netdev->stop(netdev);
 			ixgbe_reset_interrupt_capability(adapter);
 			ixgbe_napi_del_all(adapter);
@@ -169,7 +171,7 @@ static void ixgbe_dcbnl_set_state(struct net_device *netdev, u8 state)
 			adapter->flags |= IXGBE_FLAG_RSS_ENABLED;
 			ixgbe_init_interrupt_scheme(adapter);
 			ixgbe_napi_add_all(adapter);
-			if (netdev->flags & IFF_UP)
+			if (netif_running(netdev))
 				netdev->open(netdev);
 		} else {
 			return;
@@ -338,6 +340,9 @@ static u8 ixgbe_dcbnl_set_all(struct net_device *netdev)
 	while (test_and_set_bit(__IXGBE_RESETTING, &adapter->state))
 		msleep(1);
 
+	if (netif_running(netdev))
+		ixgbe_down(adapter);
+
 	ret = ixgbe_copy_dcb_cfg(&adapter->temp_dcb_cfg, &adapter->dcb_cfg,
 				 adapter->ring_feature[RING_F_DCB].indices);
 	if (ret) {
@@ -345,8 +350,9 @@ static u8 ixgbe_dcbnl_set_all(struct net_device *netdev)
 		return ret;
 	}
 
-	ixgbe_down(adapter);
-	ixgbe_up(adapter);
+	if (netif_running(netdev))
+		ixgbe_up(adapter);
+
 	adapter->dcb_set_bitmap = 0x00;
 	clear_bit(__IXGBE_RESETTING, &adapter->state);
 	return ret;
@@ -447,6 +453,12 @@ static void ixgbe_dcbnl_getbcncfg(struct net_device *netdev, int enum_index,
 	struct ixgbe_adapter *adapter = netdev_priv(netdev);
 
 	switch (enum_index) {
+	case DCB_BCN_ATTR_BCNA_0:
+		*setting = adapter->dcb_cfg.bcn.bcna_option[0];
+		break;
+	case DCB_BCN_ATTR_BCNA_1:
+		*setting = adapter->dcb_cfg.bcn.bcna_option[1];
+		break;
 	case DCB_BCN_ATTR_ALPHA:
 		*setting = adapter->dcb_cfg.bcn.rp_alpha;
 		break;
@@ -506,6 +518,18 @@ static void ixgbe_dcbnl_setbcncfg(struct net_device *netdev, int enum_index,
 	struct ixgbe_adapter *adapter = netdev_priv(netdev);
 
 	switch (enum_index) {
+	case DCB_BCN_ATTR_BCNA_0:
+		adapter->temp_dcb_cfg.bcn.bcna_option[0] = setting;
+		if (adapter->temp_dcb_cfg.bcn.bcna_option[0] !=
+			adapter->dcb_cfg.bcn.bcna_option[0])
+			adapter->dcb_set_bitmap |= BIT_BCN;
+		break;
+	case DCB_BCN_ATTR_BCNA_1:
+		adapter->temp_dcb_cfg.bcn.bcna_option[1] = setting;
+		if (adapter->temp_dcb_cfg.bcn.bcna_option[1] !=
+			adapter->dcb_cfg.bcn.bcna_option[1])
+			adapter->dcb_set_bitmap |= BIT_BCN;
+		break;
 	case DCB_BCN_ATTR_ALPHA:
 		adapter->temp_dcb_cfg.bcn.rp_alpha = setting;
 		if (adapter->temp_dcb_cfg.bcn.rp_alpha !=
