@@ -125,6 +125,27 @@ static void igb_vlan_rx_register(struct net_device *, struct vlan_group *);
 static void igb_vlan_rx_add_vid(struct net_device *, u16);
 static void igb_vlan_rx_kill_vid(struct net_device *, u16);
 static void igb_restore_vlan(struct igb_adapter *);
+#ifdef CONFIG_PCI_IOV
+static void igb_msg_task(struct work_struct *);
+static int igb_send_msg_to_vf(struct igb_adapter *, u32 *, u32);
+static int igb_get_vf_msg_ack(struct igb_adapter *, u32);
+static int igb_rcv_msg_from_vf(struct igb_adapter *, u32);
+static int igb_set_pf_mac(struct net_device *, int, u8*);
+static void igb_enable_pf_queues(struct igb_adapter *adapter);
+static void igb_set_vf_vmolr(struct igb_adapter *adapter, int vfn);
+void igb_set_mc_list_pools(struct igb_adapter *, struct e1000_hw *, int, u16);
+static int igb_vmm_control(struct igb_adapter *, bool);
+static int igb_set_vf_mac(struct net_device *, int, u8*);
+static int __attribute__ ((used))igb_set_vf_vlan(struct net_device *, int, int);
+static void igb_mbox_handler(struct igb_adapter *);
+static int  __attribute__ ((used))igb_vf_notification_fn(struct pci_dev *, unsigned int);
+static void igb_dump_rar_entries(struct igb_adapter *);
+void igb_dump_interrupt_registers(struct igb_adapter *);
+#ifdef USE_IOV1
+static void igb_read_sriov_cap_data(struct pci_dev *pdev,
+				    struct igb_adapter *adapter);
+#endif
+#endif
 
 static int igb_suspend(struct pci_dev *, pm_message_t);
 #ifdef CONFIG_PM
@@ -291,6 +312,11 @@ static void igb_assign_vector(struct igb_adapter *adapter, int rx_queue,
 	u32 msixbm = 0;
 	struct e1000_hw *hw = &adapter->hw;
 	u32 ivar, index;
+#ifdef CONFIG_PCI_IOV
+	u32 rbase_offset = adapter->vfs_allocated_count;
+#else
+	u32 rbase_offset = 0;
+#endif
 
 	switch (hw->mac.type) {
 	case e1000_82575:
@@ -315,9 +341,9 @@ static void igb_assign_vector(struct igb_adapter *adapter, int rx_queue,
 		   a vector number along with a "valid" bit.  Sadly, the layout
 		   of the table is somewhat counterintuitive. */
 		if (rx_queue > IGB_N0_QUEUE) {
-			index = (rx_queue & 0x7);
+			index = ((rx_queue + rbase_offset) & 0x7);
 			ivar = array_rd32(E1000_IVAR0, index);
-			if (rx_queue < 8) {
+			if ((rx_queue + rbase_offset) < 8) {
 				/* vector goes into low byte of register */
 				ivar = ivar & 0xFFFFFF00;
 				ivar |= msix_vector | E1000_IVAR_VALID;
@@ -330,9 +356,9 @@ static void igb_assign_vector(struct igb_adapter *adapter, int rx_queue,
 			array_wr32(E1000_IVAR0, index, ivar);
 		}
 		if (tx_queue > IGB_N0_QUEUE) {
-			index = (tx_queue & 0x7);
+			index = ((tx_queue + rbase_offset) & 0x7);
 			ivar = array_rd32(E1000_IVAR0, index);
-			if (tx_queue < 8) {
+			if ((tx_queue + rbase_offset) < 8) {
 				/* vector goes into second byte of register */
 				ivar = ivar & 0xFFFF00FF;
 				ivar |= (msix_vector | E1000_IVAR_VALID) << 8;
@@ -419,6 +445,10 @@ static void igb_configure_msix(struct igb_adapter *adapter)
 		tmp = (vector++ | E1000_IVAR_VALID) << 8;
 		wr32(E1000_IVAR_MISC, tmp);
 
+#ifdef CONFIG_PCI_IOV
+		if (adapter->vfs_allocated_count > 0)
+			wr32(E1000_MBVFIMR, 0xFF);
+#endif
 		adapter->eims_enable_mask = (1 << (vector)) - 1;
 		adapter->eims_other = 1 << (vector - 1);
 		break;
@@ -439,8 +469,11 @@ static int igb_request_msix(struct igb_adapter *adapter)
 {
 	struct net_device *netdev = adapter->netdev;
 	int i, err = 0, vector = 0;
-
-	vector = 0;
+#ifdef CONFIG_PCI_IOV
+	u32 rbase_offset = adapter->vfs_allocated_count;
+#else
+	u32 rbase_offset = 0;
+#endif
 
 	for (i = 0; i < adapter->num_tx_queues; i++) {
 		struct igb_ring *ring = &(adapter->tx_ring[i]);
@@ -450,7 +483,7 @@ static int igb_request_msix(struct igb_adapter *adapter)
 				  &(adapter->tx_ring[i]));
 		if (err)
 			goto out;
-		ring->itr_register = E1000_EITR(0) + (vector << 2);
+		ring->itr_register = E1000_EITR(0 + rbase_offset) + (vector << 2);
 		ring->itr_val = 976; /* ~4000 ints/sec */
 		vector++;
 	}
@@ -465,7 +498,7 @@ static int igb_request_msix(struct igb_adapter *adapter)
 				  &(adapter->rx_ring[i]));
 		if (err)
 			goto out;
-		ring->itr_register = E1000_EITR(0) + (vector << 2);
+		ring->itr_register = E1000_EITR(0 + rbase_offset) + (vector << 2);
 		ring->itr_val = adapter->itr;
 		/* overwrite the poll routine for MSIX, we've already done
 		 * netif_napi_add */
@@ -648,7 +681,11 @@ static void igb_irq_enable(struct igb_adapter *adapter)
 		wr32(E1000_EIAC, adapter->eims_enable_mask);
 		wr32(E1000_EIAM, adapter->eims_enable_mask);
 		wr32(E1000_EIMS, adapter->eims_enable_mask);
+#ifdef CONFIG_PCI_IOV
+		wr32(E1000_IMS, (E1000_IMS_LSC | E1000_IMS_VMMB));
+#else
 		wr32(E1000_IMS, E1000_IMS_LSC);
+#endif
 	} else {
 		wr32(E1000_IMS, IMS_ENABLE_MASK);
 		wr32(E1000_IAM, IMS_ENABLE_MASK);
@@ -772,6 +809,15 @@ int igb_up(struct igb_adapter *adapter)
 	if (adapter->msix_entries)
 		igb_configure_msix(adapter);
 
+#ifdef CONFIG_PCI_IOV
+	if (adapter->vfs_allocated_count > 0) {
+		igb_vmm_control(adapter, TRUE);
+		igb_set_pf_mac(adapter->netdev,
+			       adapter->vfs_allocated_count,
+			       hw->mac.addr);
+		igb_enable_pf_queues(adapter);
+	}
+#endif
 	/* Clear any pending interrupts. */
 	rd32(E1000_ICR);
 	igb_irq_enable(adapter);
@@ -1012,7 +1058,10 @@ static int __devinit igb_probe(struct pci_dev *pdev,
 	pci_save_state(pdev);
 
 	err = -ENOMEM;
-	netdev = alloc_etherdev_mq(sizeof(struct igb_adapter), IGB_MAX_TX_QUEUES);
+	/* This actually needs a check to see if this is 82575 or 82576
+	 * but allocate 8 for now
+	 */
+	netdev = alloc_etherdev_mq(sizeof(struct igb_adapter), 8);
 	if (!netdev)
 		goto err_alloc_etherdev;
 
@@ -1036,6 +1085,25 @@ static int __devinit igb_probe(struct pci_dev *pdev,
 	if (!adapter->hw.hw_addr)
 		goto err_ioremap;
 
+#ifdef CONFIG_PCI_IOV
+#ifndef USE_IOV1
+	err = pci_iov_register(pdev, igb_vf_notification_fn, NULL);
+#else
+	igb_read_sriov_cap_data(pdev, adapter);
+	pdev->vf_notification_fn = igb_vf_notification_fn;
+	/* This is a severe hack... eventually it goes away as it will be
+	 * up to system SW to enable IOV for given devices and not the job
+	 * of the driver to do this itself...  only done here now for
+	 * development and debug porpoises
+	 */
+	if ((pdev->devfn & 0x7) == 0 && adapter->vfs_allocated_count == 0) {
+		err = pci_enable_iov(pdev, (adapter->vfs_allocated_count = 4));
+	}
+	igb_read_sriov_cap_data(pdev, adapter);
+	printk(KERN_INFO "VFs enabled := %d\n", adapter->vfs_allocated_count);
+#endif /* USE_IOV1 */
+
+#endif
 	netdev->open = &igb_open;
 	netdev->stop = &igb_close;
 	netdev->get_stats = &igb_get_stats;
@@ -1166,7 +1234,11 @@ static int __devinit igb_probe(struct pci_dev *pdev,
 
 	INIT_WORK(&adapter->reset_task, igb_reset_task);
 	INIT_WORK(&adapter->watchdog_task, igb_watchdog_task);
+#ifdef CONFIG_PCI_IOV
+	if (adapter->vfs_allocated_count > 0)
+		INIT_WORK(&adapter->msg_task, igb_msg_task);
 
+#endif
 	/* Initialize link & ring properties that are user-changeable */
 	adapter->tx_ring->count = 256;
 	for (i = 0; i < adapter->num_tx_queues; i++)
@@ -1266,6 +1338,23 @@ static int __devinit igb_probe(struct pci_dev *pdev,
 	dev_info(&pdev->dev, "%s: PBA No: %06x-%03x\n", netdev->name,
 		(part_num >> 8), (part_num & 0xff));
 
+#ifdef CONFIG_PCI_IOV
+#ifdef USE_IOV1
+	if (adapter->vfs_allocated_count > 0) {
+		igb_set_pf_mac(netdev,
+			       adapter->vfs_allocated_count,
+			       hw->mac.addr);
+		for (i = 0; i < adapter->vfs_allocated_count; i++)
+			igb_vf_notification_fn(pdev, (i | 0x10000000));
+	}
+#else
+	if (adapter->vfs_allocated_count > 0) {
+		igb_set_pf_mac(netdev,
+			       adapter->vfs_allocated_count,
+			       hw->mac.addr);
+	}
+#endif
+#endif
 	dev_info(&pdev->dev,
 		"Using %s interrupts. %d rx queue(s), %d tx queue(s)\n",
 		adapter->msix_entries ? "MSI-X" :
@@ -1380,8 +1469,18 @@ static int __devinit igb_sw_init(struct igb_adapter *adapter)
 
 	/* Number of supported queues. */
 	/* Having more queues than CPUs doesn't make sense. */
-	adapter->num_rx_queues = min((u32)IGB_MAX_RX_QUEUES, (u32)num_online_cpus());
-	adapter->num_tx_queues = min(IGB_MAX_TX_QUEUES, num_online_cpus());
+#ifdef CONFIG_PCI_IOV
+#define ONLY_ONE_IOV_QUEUE
+#ifdef ONLY_ONE_IOV_QUEUE
+	adapter->num_rx_queues = 1;
+	adapter->num_tx_queues = 1;
+#else
+	adapter->num_rx_queues = min((u32)(hw->mac.type > e1000_82575 ? 8 : 4),
+				     (u32)num_online_cpus());
+	adapter->num_tx_queues = min((u32)(hw->mac.type > e1000_82575 ? 8 : 4),
+				     (u32)num_online_cpus());
+#endif
+#endif /* CONFIG_PCI_IOV */
 
 	/* This call may decrease the number of queues depending on
 	 * interrupt mode. */
@@ -1445,6 +1544,16 @@ static int igb_open(struct net_device *netdev)
 	 * clean_rx handler before we do so.  */
 	igb_configure(adapter);
 
+#ifdef CONFIG_PCI_IOV
+	if (adapter->vfs_allocated_count > 0) {
+		igb_vmm_control(adapter, TRUE);
+		igb_set_pf_mac(netdev,
+			       adapter->vfs_allocated_count,
+			       hw->mac.addr);
+		igb_enable_pf_queues(adapter);
+	}
+
+#endif
 	err = igb_request_irq(adapter);
 	if (err)
 		goto err_req_irq;
@@ -1565,6 +1674,7 @@ err:
  **/
 static int igb_setup_all_tx_resources(struct igb_adapter *adapter)
 {
+	struct e1000_hw *hw = &adapter->hw;
 	int i, err = 0;
 	int r_idx;
 
@@ -1579,7 +1689,7 @@ static int igb_setup_all_tx_resources(struct igb_adapter *adapter)
 		}
 	}
 
-	for (i = 0; i < IGB_MAX_TX_QUEUES; i++) {
+	for (i = 0; i < (hw->mac.type > e1000_82575 ? 8 : 4); i++) {
 		r_idx = i % adapter->num_tx_queues;
 		adapter->multi_tx_table[i] = &adapter->tx_ring[r_idx];
 	}	
@@ -1599,9 +1709,15 @@ static void igb_configure_tx(struct igb_adapter *adapter)
 	u32 tctl;
 	u32 txdctl, txctrl;
 	int i;
+#ifdef CONFIG_PCI_IOV
+	u32 rbase_offset = adapter->vfs_allocated_count;
+#else
+	u32 rbase_offset = 0;
+#endif
 
-	for (i = 0; i < adapter->num_tx_queues; i++) {
-		struct igb_ring *ring = &(adapter->tx_ring[i]);
+	for (i = rbase_offset;
+	     i < (adapter->num_tx_queues + rbase_offset); i++) {
+		struct igb_ring *ring = &(adapter->tx_ring[i - rbase_offset]);
 
 		wr32(E1000_TDLEN(i),
 				ring->count * sizeof(struct e1000_tx_desc));
@@ -1748,6 +1864,11 @@ static void igb_setup_rctl(struct igb_adapter *adapter)
 	u32 rctl;
 	u32 srrctl = 0;
 	int i;
+#ifdef CONFIG_PCI_IOV
+	u32 rbase_offset = adapter->vfs_allocated_count;
+#else
+	u32 rbase_offset = 0;
+#endif
 
 	rctl = rd32(E1000_RCTL);
 
@@ -1817,9 +1938,21 @@ static void igb_setup_rctl(struct igb_adapter *adapter)
 		srrctl |= E1000_SRRCTL_DESCTYPE_ADV_ONEBUF;
 	}
 
-	for (i = 0; i < adapter->num_rx_queues; i++)
+	for (i = rbase_offset;
+	     i < (adapter->num_rx_queues + rbase_offset); i++)
 		wr32(E1000_SRRCTL(i), srrctl);
 
+#ifdef CONFIG_PCI_IOV
+	/* Attention!!!  For SR-IOV PF driver operations you must enable
+	 * queue drop for the queue 0 or the PF driver will *never* receive
+	 * any traffic on it's own default queue, which will be equal to the
+	 * number of VFs enabled.
+	 */
+	if (adapter->vfs_allocated_count > 0) {
+		srrctl = rd32(E1000_SRRCTL(0));
+		wr32(E1000_SRRCTL(0), (srrctl | 0x80000000));
+	}
+#endif
 	wr32(E1000_RCTL, rctl);
 }
 
@@ -1836,6 +1969,11 @@ static void igb_configure_rx(struct igb_adapter *adapter)
 	u32 rctl, rxcsum;
 	u32 rxdctl;
 	int i;
+#ifdef CONFIG_PCI_IOV
+	u32 rbase_offset = adapter->vfs_allocated_count;
+#else
+	u32 rbase_offset = 0;
+#endif
 
 	/* disable receives while setting up the descriptors */
 	rctl = rd32(E1000_RCTL);
@@ -1848,8 +1986,9 @@ static void igb_configure_rx(struct igb_adapter *adapter)
 
 	/* Setup the HW Rx Head and Tail Descriptor Pointers and
 	 * the Base and Length of the Rx Descriptor Ring */
-	for (i = 0; i < adapter->num_rx_queues; i++) {
-		struct igb_ring *ring = &(adapter->rx_ring[i]);
+	for (i = rbase_offset;
+	     i < (adapter->num_rx_queues + rbase_offset); i++) {
+		struct igb_ring *ring = &(adapter->rx_ring[i - rbase_offset]);
 		rdba = ring->dma;
 		wr32(E1000_RDBAL(i),
 				rdba & 0x00000000ffffffffULL);
@@ -2244,8 +2383,25 @@ static void igb_set_multi(struct net_device *netdev)
 		memcpy(mta_list + (i*ETH_ALEN), mc_ptr->dmi_addr, ETH_ALEN);
 		mc_ptr = mc_ptr->next;
 	}
+#ifdef CONFIG_PCI_IOV
+	if (adapter->vfs_allocated_count > 0) {
+		igb_update_mc_addr_list_82575(hw, mta_list, i,
+					      adapter->vfs_allocated_count + 1,
+					      mac->rar_entry_count);
+		igb_set_mc_list_pools(adapter, hw, i, mac->rar_entry_count);
+	/* TODO - if this is done after VF's are loaded and have their MC
+	 * addresses set then we need to restore their entries in the MTA.
+	 * This means we have to save them in the adapter structure somewhere
+	 * so that we can retrieve them when this particular event occurs
+	 */
+	} else {
+		igb_update_mc_addr_list_82575(hw, mta_list, i, 1,
+					      mac->rar_entry_count);
+	}
+#else
 	igb_update_mc_addr_list_82575(hw, mta_list, i, 1,
 	                              mac->rar_entry_count);
+#endif
 	kfree(mta_list);
 }
 
@@ -2981,10 +3137,11 @@ static int igb_xmit_frame_ring_adv(struct sk_buff *skb,
 static int igb_xmit_frame_adv(struct sk_buff *skb, struct net_device *netdev)
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
+	struct e1000_hw *hw = &adapter->hw;
 	struct igb_ring *tx_ring;
 
 	int r_idx = 0;
-	r_idx = skb->queue_mapping & (IGB_MAX_TX_QUEUES - 1);
+	r_idx = skb->queue_mapping & ((hw->mac.type > e1000_82575 ? 8 : 4) - 1);
 	tx_ring = adapter->multi_tx_table[r_idx];
 
 	/* This goes back to the question of how to logically map a tx queue
@@ -3251,6 +3408,21 @@ static irqreturn_t igb_msix_other(int irq, void *data)
 	u32 icr = rd32(E1000_ICR);
 
 	/* reading ICR causes bit 31 of EICR to be cleared */
+#ifdef CONFIG_PCI_IOV
+	adapter->int0counter++;
+
+	/* Check for a mailbox event */
+	if (icr & E1000_ICR_VMMB) {
+		adapter->vf_icr = rd32(E1000_MBVFICR);
+		/* Clear the bits */
+		wr32(E1000_MBVFICR, adapter->vf_icr);
+		E1000_WRITE_FLUSH(hw);
+		adapter->vflre = rd32(E1000_VFLRE);
+		wr32(E1000_VFLRE, adapter->vflre);
+		E1000_WRITE_FLUSH(hw);
+		igb_mbox_handler(adapter);
+	}
+#endif
 	if (!(icr & E1000_ICR_LSC))
 		goto no_link_interrupt;
 	hw->mac.get_link_status = 1;
@@ -3259,6 +3431,11 @@ static irqreturn_t igb_msix_other(int irq, void *data)
 		mod_timer(&adapter->watchdog_timer, jiffies + 1);
 	
 no_link_interrupt:
+#ifdef CONFIG_PCI_IOV
+	if (adapter->vfs_allocated_count != 0)
+		wr32(E1000_IMS, (E1000_IMS_LSC | E1000_IMS_VMMB));
+	else
+#endif
 	wr32(E1000_IMS, E1000_IMS_LSC);
 	wr32(E1000_EIMS, adapter->eims_other);
 
@@ -3274,6 +3451,10 @@ static irqreturn_t igb_msix_tx(int irq, void *data)
 #ifdef CONFIG_DCA
 	if (adapter->flags & IGB_FLAG_DCA_ENABLED)
 		igb_update_tx_dca(tx_ring);
+#endif
+#ifdef CONFIG_PCI_IOV
+	adapter->int1counter++;
+
 #endif
 	tx_ring->total_bytes = 0;
 	tx_ring->total_packets = 0;
@@ -3314,6 +3495,10 @@ static irqreturn_t igb_msix_rx(int irq, void *data)
 	struct igb_ring *rx_ring = data;
 	struct igb_adapter *adapter = rx_ring->adapter;
 
+#ifdef CONFIG_PCI_IOV
+	adapter->int1counter++;
+
+#endif
 	/* Write the ITR value calculated at the end of the
 	 * previous interrupt.
 	 */
@@ -3451,6 +3636,184 @@ static int igb_notify_dca(struct notifier_block *nb, unsigned long event,
 	return ret_val ? NOTIFY_BAD : NOTIFY_DONE;
 }
 #endif /* CONFIG_DCA */
+
+#ifdef CONFIG_PCI_IOV
+static void igb_set_vf_multicasts(struct igb_adapter *adapter,
+				  u32 *msgbuf, u32 vf)
+{
+	struct e1000_hw *hw = &adapter->hw;
+	int n = (msgbuf[0] & E1000_VT_MSGINFO_MASK) >> E1000_VT_MSGINFO_SHIFT;
+	int i;
+	u32 hash_value;
+	u8 *p = (u8 *)&msgbuf[1];
+
+	/* VFs are limited to using the MTA hash table for their multicast
+	 * addresses */
+	for (i = 0; i < n; i++) {
+		hash_value = e1000_hash_mc_addr_generic(hw, p);
+		printk("Adding MC Addr: %2.2X:%2.2X:%2.2X:%2.2X:%2.2X:%2.2X\n"
+		       "for VF %d\n",
+		       p[0],
+		       p[1],
+		       p[2],
+		       p[3],
+		       p[4],
+		       p[5],
+		       vf);
+		printk("Hash value = 0x%03X\n", hash_value);
+		hw->mac.ops.mta_set(hw, hash_value);
+		p += ETH_ADDR_LEN;
+	}
+}
+
+static void igb_msg_task(struct work_struct *work)
+{
+	struct igb_adapter *adapter;
+	struct e1000_hw *hw;
+	u32 bit, vf, vfr;
+	u32 vflre;
+	u32 vf_icr;
+
+	adapter = container_of(work, struct igb_adapter, msg_task);
+	hw = &adapter->hw;
+
+	vflre = adapter->vflre;
+	vf_icr = adapter->vf_icr;
+
+	/* Now that we have salted away local values of these events
+	 * for processing we can enable the interrupt so more events
+	 * can be captured
+	 */
+
+	wr32(E1000_IMS, E1000_IMS_VMMB);
+
+	if (vflre & 0xFF) {
+		printk("VFLR Event %2.2X\n", vflre);
+		vfr = rd32(E1000_VFRE);
+		wr32(E1000_VFRE, vfr | vflre);
+		E1000_WRITE_FLUSH(hw);
+		vfr = rd32(E1000_VFTE);
+		wr32(E1000_VFTE, vfr | vflre);
+		E1000_WRITE_FLUSH(hw);
+	}
+
+	if (!vf_icr)
+		return;
+
+	/* Check for message acks from VF first as that may affect
+	 * pending messages to the VF
+	 */
+	for (bit = 1, vf = 0; bit < 0x100; bit <<= 1, vf++) {
+		if ((bit << 16) & vf_icr)
+			igb_get_vf_msg_ack(adapter, vf);
+	}
+
+	/* Check for message sent from a VF */
+	for (bit = 1, vf = 0; bit < 0x100; bit <<= 1, vf++) {
+		if (bit & vf_icr)
+			igb_rcv_msg_from_vf(adapter, vf);
+	}
+}
+
+static int igb_send_msg_to_vf(struct igb_adapter *adapter, u32 *msg, u32 vfn)
+{
+	struct e1000_hw *hw = &adapter->hw;
+
+	return e1000_send_mail_to_vf(hw, msg, vfn, 16);
+}
+
+static int igb_get_vf_msg_ack(struct igb_adapter *adapter, u32 vf)
+{
+	return 0;
+}
+
+static int igb_rcv_msg_from_vf(struct igb_adapter *adapter, u32 vf)
+{
+	u32 msgbuf[16];
+	struct net_device *netdev = adapter->netdev;
+	struct e1000_hw *hw = &adapter->hw;
+	u32 reg;
+	s32 retval;
+	int err = 0;
+
+	retval = e1000_receive_mail_from_vf(hw, msgbuf, vf, 16);
+
+	switch ((msgbuf[0] & 0xFFFF)) {
+	case E1000_VF_MSGTYPE_REQ_MAC:
+		{
+			unsigned char *p;
+			msgbuf[0] |= E1000_VT_MSGTYPE_ACK;
+			p = (char *)&msgbuf[1];
+			memcpy(p, adapter->vf_mac_addresses[vf], ETH_ALEN);
+			if ((err = igb_send_msg_to_vf(adapter, msgbuf, vf)
+			     == 0)) {
+				printk(KERN_INFO "Sending MAC Address %2.2x:%2.2x:"
+				       "%2.2x:%2.2x:%2.2x:%2.2x to VF %d\n",
+				       p[0], p[1], p[2], p[3], p[4], p[5], vf);
+				igb_set_vf_mac(netdev,
+					       vf,
+					       adapter->vf_mac_addresses[vf]);
+				igb_set_vf_vmolr(adapter, vf);
+			}
+			else {
+				printk(KERN_ERR "Error %d Sending MAC Address to VF\n",
+				       err);
+			}
+		}
+		break;
+	case E1000_VF_MSGTYPE_VFLR:
+		{
+			u32 vfe = rd32(E1000_VFTE);
+			vfe |= (1 << vf);
+			wr32(E1000_VFTE, vfe);
+			vfe = rd32(E1000_VFRE);
+			vfe |= (1 << vf);
+			wr32(E1000_VFRE, vfe);
+			printk(KERN_INFO "Enabling VFTE and VFRE for vf %d\n",
+			       vf);
+			msgbuf[0] |= E1000_VT_MSGTYPE_ACK;
+			if ((err = igb_send_msg_to_vf(adapter, msgbuf, vf)
+			     != 0))
+				printk(KERN_ERR "Error %d Sending VFLR Ack"
+				       "to VF\n", err);
+		}
+		break;
+	case E1000_VF_SET_MULTICAST:
+		igb_set_vf_multicasts(adapter, msgbuf, vf);
+		msgbuf[0] |= E1000_VT_MSGTYPE_ACK;
+		if ((err = igb_send_msg_to_vf(adapter, msgbuf, vf) != 0))
+			printk(KERN_ERR "Error %d Sending set MC Addr Ack"
+			       "to VF\n", err);
+		break;
+	case E1000_VF_SET_LPE:
+		/* Make sure global LPE is set */
+		reg = rd32(E1000_RCTL);
+		reg |= E1000_RCTL_LPE;
+		wr32(E1000_RCTL, reg);
+		/* Set per VM LPE */
+		reg = rd32(E1000_VMOLR(vf));
+		reg |= E1000_VMOLR_LPE;
+		wr32(E1000_VMOLR(vf), reg);
+		msgbuf[0] |= E1000_VT_MSGTYPE_ACK;
+		if ((err = igb_send_msg_to_vf(adapter, msgbuf, vf) != 0))
+			printk(KERN_ERR "Error %d Sending set VMOLR LPE Ack"
+			       "to VF\n", err);
+		break;
+	default:
+		if ((msgbuf[0] & 0xFF000000) != E1000_VT_MSGTYPE_ACK &&
+		    (msgbuf[0] & 0xFF000000) != E1000_VT_MSGTYPE_NACK)
+			printk(KERN_ERR "Unhandled Msg %8.8x\n", msgbuf[0]);
+		break;
+	}
+
+	return retval;
+}
+
+static void igb_mbox_handler(struct igb_adapter *adapter)
+{
+	schedule_work(&adapter->msg_task);
+}
+#endif
 
 /**
  * igb_intr_msi - Interrupt Handler
@@ -4507,5 +4870,398 @@ static void igb_io_resume(struct pci_dev *pdev)
 	igb_get_hw_control(adapter);
 
 }
+
+#ifdef CONFIG_PCI_IOV
+static int igb_set_pf_mac(struct net_device *netdev, int queue, u8*mac_addr)
+{
+	struct igb_adapter *adapter;
+	struct e1000_hw *hw;
+	u32 reg_data;
+
+	adapter = netdev_priv(netdev);
+	hw = &adapter->hw;
+
+	/* point the pool selector for our default MAC entry to
+	 * the right pool, which is equal to the number of vfs enabled.
+	 */
+	reg_data = rd32(E1000_RAH(0));
+	reg_data |= (1 << (18 + queue));
+	wr32(E1000_RAH(0), reg_data);
+
+	return 0;
+}
+
+static void igb_set_vf_vmolr(struct igb_adapter *adapter, int vfn)
+{
+	struct e1000_hw *hw = &adapter->hw;
+	u32 reg_data;
+
+	reg_data = rd32(E1000_VMOLR(vfn));
+	reg_data |= 0xF << 24; /* aupe, rompe, rope, bam */
+	wr32(E1000_VMOLR(vfn), reg_data);
+}
+
+static int igb_set_vf_mac(struct net_device *netdev,
+						 int vf,
+						 unsigned char *mac_addr)
+{
+	struct igb_adapter *adapter;
+	struct e1000_hw *hw;
+	u32 reg_data;
+	int rar_entry = vf + 1; /* VF MAC addresses start at entry 1 */
+
+	adapter = netdev_priv(netdev);
+	hw = &adapter->hw;
+
+	e1000_rar_set(hw, mac_addr, rar_entry);
+
+	memcpy(adapter->vf_mac_addresses[vf], mac_addr, 6);
+
+	reg_data = rd32(E1000_RAH(rar_entry));
+	reg_data |= (1 << (18 + vf));
+	wr32(E1000_RAH(rar_entry), reg_data);
+
+	return 0;
+}
+
+static void igb_dump_rar_entries(struct igb_adapter *adapter)
+{
+	int i;
+	u32 rah_data, ral_data;
+	struct e1000_hw *hw = &adapter->hw;
+
+	for (i = 0; i < E1000_RAR_ENTRIES_82576; i++) {
+		rah_data = rd32(E1000_RAH(i));
+		ral_data = rd32(E1000_RAL(i));
+		printk("RAR ENTRY %d = %8.8X:%8.8X\n",
+		       i, rah_data, ral_data);
+	}
+}
+
+static int __attribute__ ((used)) igb_set_vf_vlan(struct net_device *netdev,
+						  int vf,
+						  int vlan_id)
+{
+	return 0;
+}
+
+static int igb_vmm_control(struct igb_adapter *adapter, bool enable)
+{
+	struct e1000_hw *hw;
+	u32 reg_data;
+
+	hw = &adapter->hw;
+
+	if (enable) {
+		/* Enable multi-queue */
+		reg_data = rd32(E1000_MRQC);
+		reg_data &= E1000_MRQC_ENABLE_MASK;
+		reg_data |= E1000_MRQC_ENABLE_VMDQ;
+		wr32(E1000_MRQC, reg_data);
+		/* VF's need PF reset indication before they
+		 * can send/receive mail */
+		reg_data = rd32(E1000_CTRL_EXT);
+		reg_data |= E1000_CTRL_EXT_PFRSTD;
+		wr32(E1000_CTRL_EXT, reg_data);
+
+		/* We need to mirror all traffic sent by VM's to
+		 * the default port 0 so that traffic destined to
+		 * VM's on this host that are not a VF can have
+		 * the traffic directed by the local SW switch
+		 */
+		reg_data = rd32(E1000_VMRCTL);
+		/* Clear MP bits - Port 0 */
+		reg_data &= ~(E1000_VMRCTL_MIRROR_DSTPORT_MASK); 
+		reg_data |= (E1000_VMRCTL_POOL_MIRROR_ENABLE |
+			     E1000_VMRCTL_UPLINK_MIRROR_ENABLE |
+			     E1000_VMRCTL_DOWNLINK_MIRROR_ENABLE);
+		reg_data |= (adapter->vfs_allocated_count) << 
+			     E1000_VMRCTL_MIRROR_PORT_SHIFT;
+		wr32(E1000_VMRCTL, reg_data);
+
+		/* Set the default pool for the PF's first queue */
+		reg_data = rd32(E1000_VT_CTL);
+		reg_data &= ~(E1000_VT_CTL_DEFAULT_POOL_MASK |
+			      E1000_VT_CTL_DISABLE_DEF_POOL);
+		reg_data |= adapter->vfs_allocated_count << 
+			E1000_VT_CTL_DEFAULT_POOL_SHIFT;
+		wr32(E1000_VT_CTL, reg_data);
+
+		e1000_vmdq_loopback_enable_vf(hw);
+		e1000_vmdq_replication_enable_vf(hw, 0xFF);
+	} else {
+		e1000_vmdq_loopback_disable_vf(hw);
+		e1000_vmdq_replication_disable_vf(hw);
+	}
+
+	return 0;
+}
+
+#ifdef USE_IOV1
+static	int __attribute__ ((used))
+igb_vf_notification_fn(struct pci_dev *pdev, unsigned int event_mask)
+{
+	unsigned char my_mac_addr[6] = {0x00, 0xDE, 0xAD, 0xBE, 0xEF, 0xFF};
+	struct net_device *netdev = pci_get_drvdata(pdev);
+	struct igb_adapter *adapter = netdev_priv(netdev);
+	unsigned int vfn = (event_mask & 7);
+
+	bool enable = ((event_mask & 0x10000000U) != 0);
+
+	if (enable) {
+		printk(KERN_INFO "IOV: VF %d is enabled\n", vfn);
+		my_mac_addr[5] = (unsigned char)vfn;
+		igb_set_vf_mac(netdev, vfn, my_mac_addr);
+		igb_set_vf_vmolr(adapter, vfn);
+	}
+	else
+		printk(KERN_INFO "IOV: VF %d is disabled\n", vfn);
+
+	return 0;
+}
+#else
+static	int __attribute__ ((used))
+igb_vf_notification_fn(struct pci_dev *pdev, unsigned int event_mask)
+{
+	unsigned char my_mac_addr[6] = {0x00, 0xDE, 0xAD, 0xBE, 0xEF, 0xFF};
+	struct net_device *netdev = pci_get_drvdata(pdev);
+	struct igb_adapter *adapter = netdev_priv(netdev);
+	unsigned int vfn = (event_mask & PCI_IOV_NUM_VIRTFN);
+	int i;
+
+	bool enable = ((event_mask & PCI_IOV_ENABLE) != 0);
+
+	if (!enable) {
+		printk(KERN_INFO "IOV: VF %d is disabled\n", vfn);
+		return 0;
+	}
+
+	adapter->vfs_allocated_count = 0;
+	for (i = 0; i < vfn; i++) {
+		printk(KERN_INFO "IOV: VF %d is enabled\n", i);
+		my_mac_addr[5] = (unsigned char)i;
+		igb_set_vf_mac(netdev, i, my_mac_addr);
+		igb_set_vf_vmolr(adapter, i);
+		adapter->vfs_allocated_count++;
+	}
+
+	printk(KERN_INFO "VFs enabled := %d\n", adapter->vfs_allocated_count);
+
+	return 0;
+}
+#endif
+
+#ifdef USE_IOV1
+static void igb_read_sriov_cap_data(struct pci_dev *pdev,
+				    struct igb_adapter *adapter)
+{
+	u32 sriov_pci_data;
+
+	if (pci_read_config_dword(pdev, 0x160, &sriov_pci_data)
+	    					== PCIBIOS_SUCCESSFUL) {
+		/* Again, SRIOV capability not defined in kernel headers */
+		if ((sriov_pci_data & 0xFF) == 0x10) {
+			/* See if VF's are enabled */
+			pci_read_config_dword(pdev, 0x168, &sriov_pci_data);
+			if ((sriov_pci_data & 0x9) == 0x9) {
+				/* OK, now see how many are enabled */
+				pci_read_config_dword(pdev, 0x170,
+						      &sriov_pci_data);
+				adapter->vfs_allocated_count =
+					sriov_pci_data & 0xFFFF;
+				/* Can't be greater than 7 */
+				if (adapter->vfs_allocated_count > 7)
+					adapter->vfs_allocated_count = 7;
+			}
+		}
+	}
+}
+#endif
+
+static void igb_enable_pf_queues(struct igb_adapter *adapter)
+{
+	u64 rdba;
+	int i;
+	u32 rbase_offset = adapter->vfs_allocated_count;
+	struct e1000_hw *hw = &adapter->hw;
+	u32 rxdctl;
+
+	for (i = rbase_offset;
+	     i < (adapter->num_rx_queues + rbase_offset); i++) {
+		struct igb_ring *ring = &adapter->rx_ring[i - rbase_offset];
+		rdba = ring->dma;
+
+		rxdctl = rd32(E1000_RXDCTL(i));
+		rxdctl |= E1000_RXDCTL_QUEUE_ENABLE;
+		rxdctl &= 0xFFF00000;
+		rxdctl |= IGB_RX_PTHRESH;
+		rxdctl |= IGB_RX_HTHRESH << 8;
+		rxdctl |= IGB_RX_WTHRESH << 16;
+		wr32(E1000_RXDCTL(i), rxdctl);
+		printk("RXDTCL%d == %8.8x\n", i, rxdctl);
+
+		wr32(E1000_RDBAL(i),
+		                rdba & 0x00000000ffffffffULL);
+		wr32(E1000_RDBAH(i), rdba >> 32);
+		wr32(E1000_RDLEN(i),
+		               ring->count * sizeof(union e1000_adv_rx_desc));
+
+		writel(ring->next_to_use, adapter->hw.hw_addr + ring->tail);
+		writel(ring->next_to_clean, adapter->hw.hw_addr + ring->head);
+	}
+}
+
+void igb_set_mc_list_pools(struct igb_adapter *adapter,
+			   struct e1000_hw *hw,
+			   int entry_count, u16 total_rar_filters)
+{
+	u32 reg_data;
+	int i;
+	int pool = adapter->vfs_allocated_count;
+
+	for (i = adapter->vfs_allocated_count + 1; i < total_rar_filters; i++) {
+		reg_data = rd32(E1000_RAH(i));
+		reg_data |= (1 << (18 + pool));
+		wr32(E1000_RAH(i), reg_data);
+		entry_count--;
+		if (!entry_count)
+			break;
+	}
+
+	reg_data = rd32(E1000_VMOLR(pool));
+	/* Set bit 25 for this pool in the VM Offload register so that
+	 * it can accept packets that match the MTA table */
+	reg_data |= (1 << 25);
+	wr32(E1000_VMOLR(pool), reg_data);
+}
+
+#ifdef DEBUG_IOV
+void igb_dump_interrupt_registers(struct igb_adapter *adapter)
+{
+	struct e1000_hw *hw = &adapter->hw;
+	int i;
+	u32 rbase_offset = adapter->vfs_allocated_count;
+#define NUM_REGS 38 /* 1 based count */
+	u32 regs[NUM_REGS];
+	u32 *regs_buff = regs;
+
+	char *reg_name[] = {
+	"CTRL",  "STATUS",
+	"RCTL", "RDLEN", "RDH", "RDT", "RDTR",
+	"TCTL", "TDBAL", "TDBAH", "TDLEN", "TDH", "TDT",
+	"TIDV", "TXDCTL", "TADV", "TARC0",
+	"TDBAL1", "TDBAH1", "TDLEN1", "TDH1", "TDT1",
+	"TXDCTL1", "TARC1",
+	"CTRL_EXT", "ERT", "RDBAL", "RDBAH",
+	"TDFH", "TDFT", "TDFHS", "TDFTS", "TDFPC",
+	"RDFH", "RDFT", "RDFHS", "RDFTS", "RDFPC",
+	};
+
+
+	printk("EICR : %8.8x\n", rd32(E1000_EICR));
+	printk("EIMS : %8.8x\n", rd32(E1000_EIMS));
+	printk("EIAC : %8.8x\n", rd32(E1000_EIAC));
+	printk("MISC : %8.8x\n", rd32(E1000_IVAR_MISC));
+	for (i = 0; i < 8; i++) {
+		printk("IVAR%d : %8.8x\n", i,
+		       array_rd32(E1000_IVAR0, i));
+	}
+	printk("MQRC : %8.8x\n", rd32(E1000_MRQC));
+	printk("VT_CTL : %8.8x\n", rd32(E1000_VT_CTL));
+	for (i = 0; i < 8; i++) {
+		printk("VMOLR%d : %8.8x\n", i,
+		       rd32(E1000_VMOLR(i)));
+	}
+
+	regs_buff[0]  = rd32(E1000_CTRL);
+	regs_buff[1]  = rd32(E1000_STATUS);
+
+	regs_buff[2]  = rd32(E1000_RCTL);
+	regs_buff[3]  = rd32(E1000_RDLEN(rbase_offset));
+	regs_buff[4]  = rd32(E1000_RDH(rbase_offset));
+	regs_buff[5]  = rd32(E1000_RDT(rbase_offset));
+	regs_buff[6]  = rd32(E1000_RDTR);
+
+	regs_buff[7]  = rd32(E1000_TCTL);
+	regs_buff[8]  = rd32(E1000_TDBAL(rbase_offset));
+	regs_buff[9]  = rd32(E1000_TDBAH(rbase_offset));
+	regs_buff[10] = rd32(E1000_TDLEN(rbase_offset));
+	regs_buff[11] = rd32(E1000_TDH(rbase_offset));
+	regs_buff[12] = rd32(E1000_TDT(rbase_offset));
+	regs_buff[13] = rd32(E1000_TIDV);
+	regs_buff[14] = rd32(E1000_TXDCTL(rbase_offset));
+	regs_buff[15] = rd32(E1000_TADV);
+	regs_buff[16] = rd32(E1000_TARC(rbase_offset));
+
+	regs_buff[17] = rd32(E1000_TDBAL(1 + rbase_offset));
+	regs_buff[18] = rd32(E1000_TDBAH(1 + rbase_offset));
+	regs_buff[19] = rd32(E1000_TDLEN(1 + rbase_offset));
+	regs_buff[20] = rd32(E1000_TDH(1 + rbase_offset));
+	regs_buff[21] = rd32(E1000_TDT(1 + rbase_offset));
+	regs_buff[22] = rd32(E1000_TXDCTL((1 + rbase_offset)));
+	regs_buff[23] = rd32(E1000_TARC((1 + rbase_offset)));
+	regs_buff[24] = rd32(E1000_CTRL_EXT);
+	regs_buff[26] = rd32(E1000_RDBAL(rbase_offset));
+	regs_buff[27] = rd32(E1000_RDBAH(rbase_offset));
+	regs_buff[28] = rd32(E1000_TDFH);
+	regs_buff[29] = rd32(E1000_TDFT);
+	regs_buff[30] = rd32(E1000_TDFHS);
+	regs_buff[31] = rd32(E1000_TDFTS);
+	regs_buff[32] = rd32(E1000_TDFPC);
+#define E1000_RDFH 0x2410
+#define E1000_RDFT 0x2418
+#define E1000_RDFHS 0x2420
+#define E1000_RDFTS 0x2428
+#define E1000_RDFPC 0x2430
+	regs_buff[33] = rd32(E1000_RDFH);
+	regs_buff[34] = rd32(E1000_RDFT);
+	regs_buff[35] = rd32(E1000_RDFHS);
+	regs_buff[36] = rd32(E1000_RDFTS);
+	regs_buff[37] = rd32(E1000_RDFPC);
+
+	DPRINTK(DRV, ERR, "Register dump\n");
+	for (i = 0; i < NUM_REGS; i++) {
+		printk("%-15s  %08x\n",
+		reg_name[i], regs_buff[i]);
+	}
+
+	for (i = 0; i < 15; i++) {
+		printk("SRRCTL%d = %8.8x\n", i,
+		       rd32(E1000_SRRCTL(i)));
+	}
+
+	printk("VFRE = %8.8x\n", rd32(E1000_VFRE));
+	printk("VFTE = %8.8x\n", rd32(E1000_VFTE));
+	printk("RXCSUM = %8.8x\n", rd32(E1000_RXCSUM));
+	printk("MBVIMR = %8.8x\n", rd32(E1000_MBVFIMR));
+
+	printk("XONRXC = %8.8x\n", rd32(0x04048));
+	printk("XONTXC = %8.8x\n", rd32(0x0404C));
+	printk("XOFFRXC = %8.8x\n", rd32(0x04050));
+	printk("XOFFTXC = %8.8x\n", rd32(0x04054));
+	printk("FCRUC = %8.8x\n", rd32(0x04058));
+
+
+	igb_dump_rar_entries(adapter);
+
+	printk("Other ints %d\nTx/Rx ints %d\n",
+	       adapter->int0counter,
+	       adapter->int1counter);
+
+#if 0
+
+	/* Dumping first 32 descriptors in the queue 0 cache */
+	for (i = 0; i < 256; i++) {
+		printk("Queue %2d: %8.8x:%8.8x:%8.8x:%8.8x\n",
+		       i / 32,
+		       rd32((0x7000 + (0 * 0x200) + (i * 0x10)) + 0),
+		       rd32((0x7000 + (0 * 0x200) + (i * 0x10)) + 4),
+		       rd32((0x7000 + (0 * 0x200) + (i * 0x10)) + 8),
+		       rd32((0x7000 + (0 * 0x200) + (i * 0x10)) + 12));
+	}
+#endif
+}
+#endif /* DEBUG_IOV */
+#endif /* CONFIG_PCI_IOV */
 
 /* igb_main.c */

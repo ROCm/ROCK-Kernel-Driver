@@ -34,6 +34,11 @@
 #include "e1000_mac.h"
 #include "e1000_82575.h"
 
+#ifdef CONFIG_PCI_IOV
+#define USE_IOV1
+#define DEBUG_IOV
+#endif
+
 struct igb_adapter;
 
 #ifdef CONFIG_IGB_LRO
@@ -67,10 +72,6 @@ struct igb_adapter;
 #define IGB_DEFAULT_ITR                    3 /* dynamic */
 #define IGB_MAX_ITR_USECS              10000
 #define IGB_MIN_ITR_USECS                 10
-
-/* Transmit and receive queues */
-#define IGB_MAX_RX_QUEUES                  4
-#define IGB_MAX_TX_QUEUES                  4
 
 /* RX descriptor control thresholds.
  * PTHRESH - MAC will consider prefetch if it has fewer than this number of
@@ -287,12 +288,21 @@ struct igb_adapter {
 	int bars;
 	int need_ioport;
 
-	struct igb_ring *multi_tx_table[IGB_MAX_TX_QUEUES];
+	struct igb_ring *multi_tx_table[8];
 #ifdef CONFIG_IGB_LRO
 	unsigned int lro_max_aggr;
 	unsigned int lro_aggregated;
 	unsigned int lro_flushed;
 	unsigned int lro_no_desc;
+#endif
+#ifdef CONFIG_PCI_IOV
+	unsigned int vfs_allocated_count;
+	struct work_struct msg_task;
+	u32 vf_icr;
+	u32 vflre;
+	unsigned char vf_mac_addresses[8][6];
+	int int0counter;
+	int int1counter;
 #endif
 };
 
