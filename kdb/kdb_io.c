@@ -246,7 +246,8 @@ kdb_read(char *buffer, size_t bufsize)
 				*cp = tmp;
 			}
 			break;
-		case 13: /* enter */
+		case 13: /* enter \r */
+		case 10: /* enter \n */
 			*lastchar++ = '\n';
 			*lastchar++ = '\0';
 			kdb_printf("\n");
