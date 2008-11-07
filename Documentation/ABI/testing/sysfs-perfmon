@@ -1,0 +1,87 @@
+What:		/sys/kernel/perfmon
+Date:		Nov 2007
+KernelVersion:	2.6.24
+Contact:	eranian@gmail.com
+
+Description:	provide the configuration interface for the perfmon2 subsystems.
+	        The tree contains information about the detected hardware, current
+		state of the subsystem as well as some configuration parameters.
+
+		The tree consists of the following entries:
+
+	/sys/kernel/perfmon/debug (read-write):
+
+		Enable perfmon2 debugging output via klogd. Debug messages produced during
+		PMU interrupt handling are not controlled by this entry. The traces a rate-limited
+		to avoid flooding of the console. It is possible to change the throttling
+	        via /proc/sys/kernel/printk_ratelimit. The value is interpreted as a bitmask.
+		Each bit enables a particular type of debug messages. Refer to the file
+		include/linux/perfmon_kern.h for more information
+
+	/sys/kernel/perfmon/pmc_max_fast_arg (read-only):
+
+		Number of perfmon2 syscall arguments copied directly onto the
+   		stack (copy_from_user) for pfm_write_pmcs(). Copying to the stack avoids
+		having to allocate a buffer. The unit is the number of pfarg_pmc_t
+		structures.
+
+	/sys/kernel/perfmon/pmd_max_fast_arg (read-only):
+
+		Number of perfmon2 syscall arguments copied directly onto the
+   		stack (copy_from_user) for pfm_write_pmds()/pfm_read_pmds(). Copying
+		to the stack avoids having to allocate a buffer. The unit is the number
+		of pfarg_pmd_t structures.
+
+
+	/sys/kernel/perfmon/reset_stats (write-only):
+
+		Reset the statistics collected by perfmon2. Stats are available
+		per-cpu via debugfs.
+
+	/sys/kernel/perfmon/smpl_buffer_mem_cur (read-only):
+
+		Reports the amount of memory currently dedicated to sampling
+   		buffers by the kernel. The unit is byte.
+
+   	/sys/kernel/perfmon/smpl_buffer_mem_max (read-write):
+
+		Maximum amount of kernel memory usable for sampling buffers. -1 means
+		everything that is available. Unit is byte.
+
+   	/sys/kernel/perfmon/smpl_buffer_mem_cur (read-only):
+
+		Current utilization of kernel memory in bytes.
+
+   	/sys/kernel/perfmon/sys_group (read-write):
+
+		Users group allowed to create a system-wide perfmon2 context (session).
+   		-1 means any group. This control will be kept until we find a package
+		able to control capabilities via PAM.
+
+	/sys/kernel/perfmon/task_group (read-write):
+
+		Users group allowed to create a per-thread context (session).
+   		-1 means any group. This control will be kept until we find a
+		package able to control capabilities via PAM.
+
+	/sys/kernel/perfmon/sys_sessions_count (read-only):
+
+		Number of system-wide contexts currently attached to CPUs.
+
+	/sys/kernel/perfmon/task_sessions_count (read-only):
+
+		Number of per-thread contexts currently attached to threads.
+
+   	/sys/kernel/perfmon/version (read-only):
+
+		Perfmon2 interface revision number.
+
+	/sys/kernel/perfmon/arg_mem_max(read-write):
+
+		Maximum size of vector arguments expressed in bytes. Can be modified
+
+	/sys/kernel/perfmon/mode(read-write):
+
+		Bitmask to enable/disable certain perfmon2 features.
+		Currently defined:
+		- bit 0: if set, then reserved bitfield are ignored on PMC writes

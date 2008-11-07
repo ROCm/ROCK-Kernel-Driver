@@ -1475,6 +1475,8 @@ config COMPAT_VDSO
 
 	  If unsure, say Y.
 
+source "arch/x86/perfmon/Kconfig"
+
 endmenu
 
 config ARCH_ENABLE_MEMORY_HOTPLUG

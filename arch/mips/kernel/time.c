@@ -49,10 +49,11 @@ int update_persistent_clock(struct timespec now)
 	return rtc_mips_set_mmss(now.tv_sec);
 }
 
-static int null_perf_irq(void)
+int null_perf_irq(void)
 {
 	return 0;
 }
+EXPORT_SYMBOL(null_perf_irq);
 
 int (*perf_irq)(void) = null_perf_irq;
 

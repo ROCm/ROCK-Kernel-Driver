@@ -65,55 +65,14 @@ __handle_user_windows:
 		ba,pt			%xcc, __handle_user_windows_continue
 
 		 andn			%l1, %l4, %l1
-__handle_perfctrs:
-		call			update_perfctrs
-		 wrpr			%g0, RTRAP_PSTATE, %pstate
-		wrpr			%g0, RTRAP_PSTATE_IRQOFF, %pstate
-		ldub			[%g6 + TI_WSAVED], %o2
-		brz,pt			%o2, 1f
-		 nop
-		/* Redo userwin+sched+sig checks */
-		call			fault_in_user_windows
-
-		 wrpr			%g0, RTRAP_PSTATE, %pstate
-		wrpr			%g0, RTRAP_PSTATE_IRQOFF, %pstate
-		ldx			[%g6 + TI_FLAGS], %l0
-		andcc			%l0, _TIF_NEED_RESCHED, %g0
-		be,pt			%xcc, 1f
-
-		 nop
-		call			schedule
-		 wrpr			%g0, RTRAP_PSTATE, %pstate
-		wrpr			%g0, RTRAP_PSTATE_IRQOFF, %pstate
-		ldx			[%g6 + TI_FLAGS], %l0
-1:		andcc			%l0, _TIF_DO_NOTIFY_RESUME_MASK, %g0
-
-		be,pt			%xcc, __handle_perfctrs_continue
-		 sethi			%hi(TSTATE_PEF), %o0
-		mov			%l5, %o1
-		add			%sp, PTREGS_OFF, %o0
-		mov			%l0, %o2
-		call			do_notify_resume
-
-		 wrpr			%g0, RTRAP_PSTATE, %pstate
-		wrpr			%g0, RTRAP_PSTATE_IRQOFF, %pstate
-		/* Signal delivery can modify pt_regs tstate, so we must
-		 * reload it.
-		 */
-		ldx			[%sp + PTREGS_OFF + PT_V9_TSTATE], %l1
-		sethi			%hi(0xf << 20), %l4
-		and			%l1, %l4, %l4
-		andn			%l1, %l4, %l1
-		ba,pt			%xcc, __handle_perfctrs_continue
-
-		 sethi			%hi(TSTATE_PEF), %o0
 __handle_userfpu:
 		rd			%fprs, %l5
 		andcc			%l5, FPRS_FEF, %g0
 		sethi			%hi(TSTATE_PEF), %o0
 		be,a,pn			%icc, __handle_userfpu_continue
 		 andn			%l1, %o0, %l1
-		ba,a,pt			%xcc, __handle_userfpu_continue
+		ba,pt			%xcc, __handle_userfpu_continue
+		 nop
 
 __handle_signal:
 		mov			%l5, %o1
@@ -202,12 +161,8 @@ __handle_signal_continue:
 		brnz,pn			%o2, __handle_user_windows
 		 nop
 __handle_user_windows_continue:
-		ldx			[%g6 + TI_FLAGS], %l5
-		andcc			%l5, _TIF_PERFCTR, %g0
 		sethi			%hi(TSTATE_PEF), %o0
-		bne,pn			%xcc, __handle_perfctrs
-__handle_perfctrs_continue:
-		 andcc			%l1, %o0, %g0
+		andcc			%l1, %o0, %g0
 
 		/* This fpdepth clear is necessary for non-syscall rtraps only */
 user_nowork:

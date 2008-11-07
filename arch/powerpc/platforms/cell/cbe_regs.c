@@ -33,6 +33,7 @@ static struct cbe_regs_map
 	struct cbe_iic_regs __iomem *iic_regs;
 	struct cbe_mic_tm_regs __iomem *mic_tm_regs;
 	struct cbe_pmd_shadow_regs pmd_shadow_regs;
+	struct cbe_ppe_priv_regs __iomem *ppe_priv_regs;
 } cbe_regs_maps[MAX_CBE];
 static int cbe_regs_map_count;
 
@@ -145,6 +146,23 @@ struct cbe_mic_tm_regs __iomem *cbe_get_cpu_mic_tm_regs(int cpu)
 }
 EXPORT_SYMBOL_GPL(cbe_get_cpu_mic_tm_regs);
 
+struct cbe_ppe_priv_regs __iomem *cbe_get_ppe_priv_regs(struct device_node *np)
+{
+	struct cbe_regs_map *map = cbe_find_map(np);
+	if (map == NULL)
+		return NULL;
+	return map->ppe_priv_regs;
+}
+
+struct cbe_ppe_priv_regs __iomem *cbe_get_cpu_ppe_priv_regs(int cpu)
+{
+	struct cbe_regs_map *map = cbe_thread_map[cpu].regs;
+	if (map == NULL)
+		return NULL;
+	return map->ppe_priv_regs;
+}
+EXPORT_SYMBOL_GPL(cbe_get_cpu_ppe_priv_regs);
+
 u32 cbe_get_hw_thread_id(int cpu)
 {
 	return cbe_thread_map[cpu].thread_id;
@@ -206,6 +224,11 @@ void __init cbe_fill_regs_map(struct cbe_regs_map *map)
 		for_each_node_by_type(np, "mic-tm")
 			if (of_get_parent(np) == be)
 				map->mic_tm_regs = of_iomap(np, 0);
+
+		for_each_node_by_type(np, "ppe-mmio")
+			if (of_get_parent(np) == be)
+				map->ppe_priv_regs = of_iomap(np, 0);
+
 	} else {
 		struct device_node *cpu;
 		/* That hack must die die die ! */
@@ -227,6 +250,10 @@ void __init cbe_fill_regs_map(struct cbe_regs_map *map)
 		prop = of_get_property(cpu, "mic-tm", NULL);
 		if (prop != NULL)
 			map->mic_tm_regs = ioremap(prop->address, prop->len);
+
+		prop = of_get_property(cpu, "ppe-mmio", NULL);
+		if (prop != NULL)
+			map->ppe_priv_regs = ioremap(prop->address, prop->len);
 	}
 }
 

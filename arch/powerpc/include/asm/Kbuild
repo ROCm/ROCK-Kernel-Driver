@@ -21,6 +21,7 @@ header-y += resource.h
 header-y += sigcontext.h
 header-y += statfs.h
 header-y += ps3fb.h
+header-y += perfmon.h
 
 unifdef-y += bootx.h
 unifdef-y += byteorder.h

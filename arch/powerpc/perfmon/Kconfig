@@ -1,0 +1,67 @@
+menu "Hardware Performance Monitoring support"
+config PERFMON
+	bool "Perfmon2 performance monitoring interface"
+	default n
+	help
+	Enables the perfmon2 interface to access the hardware
+	performance counters. See <http://perfmon2.sf.net/> for
+	more details.
+
+config PERFMON_DEBUG
+	bool "Perfmon debugging"
+	default n
+	depends on PERFMON
+	help
+	Enables perfmon debugging support
+
+config PERFMON_DEBUG_FS
+	bool "Enable perfmon statistics reporting via debugfs"
+	default y
+	depends on PERFMON && DEBUG_FS
+	help
+	Enable collection and reporting of perfmon timing statistics under
+	debugfs. This is used for debugging and performance analysis of the
+	subsystem. The debugfs filesystem must be mounted.
+
+config PERFMON_POWER4
+	tristate "Support for Power4 hardware performance counters"
+	depends on PERFMON && PPC64
+	default n
+	help
+	Enables support for the Power 4 hardware performance counters
+	If unsure, say M.
+
+config PERFMON_POWER5
+	tristate "Support for Power5 hardware performance counters"
+	depends on PERFMON && PPC64
+	default n
+	help
+	Enables support for the Power 5 hardware performance counters
+	If unsure, say M.
+
+config PERFMON_POWER6
+	tristate "Support for Power6 hardware performance counters"
+	depends on PERFMON && PPC64
+	default n
+	help
+	Enables support for the Power 6 hardware performance counters
+	If unsure, say M.
+
+config PERFMON_PPC32
+	tristate "Support for PPC32 hardware performance counters"
+	depends on PERFMON && PPC32
+	default n
+	help
+	Enables support for the PPC32 hardware performance counters
+	If unsure, say M.
+
+config PERFMON_CELL
+	tristate "Support for Cell hardware performance counters"
+	depends on PERFMON && PPC_CELL
+	select PS3_LPM if PPC_PS3
+	default n
+	help
+	Enables support for the Cell hardware performance counters.
+	If unsure, say M.
+
+endmenu

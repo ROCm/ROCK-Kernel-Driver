@@ -1,0 +1,26 @@
+menu "Hardware Performance Monitoring support"
+config PERFMON
+	bool "Perfmon2 performance monitoring interface"
+	default n
+	help
+	Enables the perfmon2 interface to access the hardware
+	performance counters. See <http://perfmon2.sf.net/> for
+	more details.
+
+config PERFMON_DEBUG
+	bool "Perfmon debugging"
+	depends on PERFMON
+	default n
+	help
+	Enables perfmon debugging support
+
+config PERFMON_DEBUG_FS
+	bool "Enable perfmon statistics reporting via debugfs"
+	default y
+	depends on PERFMON && DEBUG_FS
+	help
+	Enable collection and reporting of perfmon timing statistics under
+	debugfs. This is used for debugging and performance analysis of the
+	subsystem. The debugfs filesystem must be mounted.
+
+endmenu

@@ -32,6 +32,8 @@ core-y				+= arch/sparc64/math-emu/
 libs-y				+= arch/sparc64/prom/ arch/sparc64/lib/
 drivers-$(CONFIG_OPROFILE)	+= arch/sparc64/oprofile/
 
+core-$(CONFIG_PERFMON)		+= arch/sparc64/perfmon/
+
 boot := arch/sparc64/boot
 
 image tftpboot.img vmlinux.aout: vmlinux
