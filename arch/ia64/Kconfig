@@ -470,6 +470,15 @@ config COMPAT_FOR_U64_ALIGNMENT
 config IA64_MCA_RECOVERY
 	tristate "MCA recovery from errors other than TLB."
 
+config IA64_CPE_MIGRATE
+	tristate "Migrate data off pages with correctable errors"
+	default m
+	help
+	  Migrate data off pages with correctable memory errors.  Selecting
+	  Y will build this functionality into the kernel.  Selecting M will
+	  build this functionality as a kernel loadable module.  Installing
+	  the module will turn on the functionality.
+
 config IA64_PALINFO
 	tristate "/proc/pal support"
 	help

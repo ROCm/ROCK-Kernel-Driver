@@ -65,6 +65,7 @@ int isolate_lru_page(struct page *page, struct list_head *pagelist)
 	}
 	return ret;
 }
+EXPORT_SYMBOL(isolate_lru_page);
 
 /*
  * migrate_prep() needs to be called before we start compiling a list of pages
@@ -82,6 +83,7 @@ int migrate_prep(void)
 
 	return 0;
 }
+EXPORT_SYMBOL(migrate_prep);
 
 static inline void move_to_lru(struct page *page)
 {
@@ -116,6 +118,7 @@ int putback_lru_pages(struct list_head *l)
 	}
 	return count;
 }
+EXPORT_SYMBOL(putback_lru_pages);
 
 /*
  * Restore a potential migration pte to a working pte entry
@@ -741,7 +744,26 @@ unlock:
  		 * restored.
  		 */
  		list_del(&page->lru);
- 		move_to_lru(page);
+		if (PageMemError(page)) {
+			if (rc == 0)
+				/*
+				 * A page with a memory error that has
+				 * been migrated will not be moved to
+				 * the LRU.
+				 */
+				goto move_newpage;
+			else
+				/*
+				 * The page failed to migrate and will not
+				 * be added to the bad page list.  Clearing
+				 * the error bit will allow another attempt
+				 * to migrate if it gets another correctable
+				 * error.
+				 */
+				ClearPageMemError(page);
+		}
+
+		move_to_lru(page);
 	}
 
 move_newpage:
@@ -813,6 +835,17 @@ int migrate_pages(struct list_head *from,
 			}
 		}
 	}
+
+	if (rc != 0)
+		list_for_each_entry_safe(page, page2, from, lru)
+			if (PageMemError(page))
+				/*
+				 * The page failed to migrate.  Clearing
+				 * the error bit will allow another attempt
+				 * to migrate if it gets another correctable
+				 * error.
+				 */
+				ClearPageMemError(page);
 	rc = 0;
 out:
 	if (!swapwrite)
@@ -825,6 +858,7 @@ out:
 
 	return nr_failed + retry;
 }
+EXPORT_SYMBOL(migrate_pages);
 
 #ifdef CONFIG_NUMA
 /*

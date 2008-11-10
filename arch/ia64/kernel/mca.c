@@ -68,6 +68,9 @@
  *
  * 2007-04-27 Russ Anderson <rja@sgi.com>
  *	      Support multiple cpus going through OS_MCA in the same event.
+ *
+ * 2008-04-22 Russ Anderson <rja@sgi.com>
+ *	      Migrate data off pages with correctable memory errors.
  */
 #include <linux/jiffies.h>
 #include <linux/types.h>
@@ -167,7 +170,14 @@ static int cmc_polling_enabled = 1;
  * but encounters problems retrieving CPE logs.  This should only be
  * necessary for debugging.
  */
-static int cpe_poll_enabled = 1;
+int cpe_poll_enabled = 1;
+EXPORT_SYMBOL(cpe_poll_enabled);
+
+unsigned int total_badpages;
+EXPORT_SYMBOL(total_badpages);
+
+LIST_HEAD(badpagelist);
+EXPORT_SYMBOL(badpagelist);
 
 extern void salinfo_log_wakeup(int type, u8 *buffer, u64 size, int irqsafe);
 
@@ -527,6 +537,28 @@ int mca_recover_range(unsigned long addr)
 }
 EXPORT_SYMBOL_GPL(mca_recover_range);
 
+/* Function pointer to Corrected Error memory migration driver */
+int (*ia64_mca_ce_extension)(void *);
+
+int
+ia64_reg_CE_extension(int (*fn)(void *))
+{
+	if (ia64_mca_ce_extension)
+		return 1;
+
+	ia64_mca_ce_extension = fn;
+	return 0;
+}
+EXPORT_SYMBOL(ia64_reg_CE_extension);
+
+void
+ia64_unreg_CE_extension(void)
+{
+	if (ia64_mca_ce_extension)
+		ia64_mca_ce_extension = NULL;
+}
+EXPORT_SYMBOL(ia64_unreg_CE_extension);
+
 #ifdef CONFIG_ACPI
 
 int cpe_vector = -1;
@@ -538,6 +570,7 @@ ia64_mca_cpe_int_handler (int cpe_irq, void *arg)
 	static unsigned long	cpe_history[CPE_HISTORY_LENGTH];
 	static int		index;
 	static DEFINE_SPINLOCK(cpe_history_lock);
+	int recover;
 
 	IA64_MCA_DEBUG("%s: received interrupt vector = %#x on CPU %d\n",
 		       __func__, cpe_irq, smp_processor_id());
@@ -584,6 +617,8 @@ ia64_mca_cpe_int_handler (int cpe_irq, void *arg)
 out:
 	/* Get the CPE error record and log it */
 	ia64_mca_log_sal_error_record(SAL_INFO_TYPE_CPE);
+	recover = (ia64_mca_ce_extension && ia64_mca_ce_extension(
+				IA64_LOG_CURR_BUFFER(SAL_INFO_TYPE_CPE)));
 
 	return IRQ_HANDLED;
 }
