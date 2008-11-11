@@ -3530,6 +3530,12 @@ static int stac9200_parse_auto_config(struct hda_codec *codec)
 	if ((err = stac9200_auto_create_lfe_ctls(codec, &spec->autocfg)) < 0)
 		return err;
 
+	if (spec->num_muxes > 0) {
+		err = stac92xx_auto_create_mux_input_ctls(codec);
+		if (err < 0)
+			return err;
+	}
+
 	if (spec->autocfg.dig_out_pin)
 		spec->multiout.dig_out_nid = 0x05;
 	if (spec->autocfg.dig_in_pin)
@@ -3647,14 +3653,18 @@ static int stac92xx_init(struct hda_codec *codec)
 	for (i = 0; i < AUTO_PIN_LAST; i++) {
 		hda_nid_t nid = cfg->input_pins[i];
 		if (nid) {
-			unsigned int pinctl = snd_hda_codec_read(codec, nid,
-				0, AC_VERB_GET_PIN_WIDGET_CONTROL, 0);
-			/* if PINCTL already set then skip */
-			if (pinctl & AC_PINCAP_IN)
-				continue;
-			pinctl = AC_PINCTL_IN_EN;
-			if (i == AUTO_PIN_MIC || i == AUTO_PIN_FRONT_MIC)
-				pinctl |= stac92xx_get_vref(codec, nid);
+			unsigned int pinctl;
+			if (i == AUTO_PIN_MIC || i == AUTO_PIN_FRONT_MIC) {
+				/* for mic pins, force to initialize */
+				pinctl = stac92xx_get_vref(codec, nid);
+			} else {
+				pinctl = snd_hda_codec_read(codec, nid, 0,
+					AC_VERB_GET_PIN_WIDGET_CONTROL, 0);
+				/* if PINCTL already set then skip */
+				if (pinctl & AC_PINCTL_IN_EN)
+					continue;
+			}
+			pinctl |= AC_PINCTL_IN_EN;
 			stac92xx_auto_set_pinctl(codec, nid, pinctl);
 		}
 	}
