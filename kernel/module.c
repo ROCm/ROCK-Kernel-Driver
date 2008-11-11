@@ -559,17 +559,24 @@ static char last_unloaded_module[MODULE_NAME_LEN+1];
 
 #ifdef CONFIG_MODULE_UNLOAD
 /* Init the unload section of the module. */
-static void module_unload_init(struct module *mod)
+static int module_unload_init(struct module *mod)
 {
 	unsigned int i;
 
 	INIT_LIST_HEAD(&mod->modules_which_use_me);
-	for (i = 0; i < NR_CPUS; i++)
+
+	mod->ref = kcalloc(nr_cpu_ids, sizeof(*mod->ref), GFP_KERNEL);
+	if (!mod->ref)
+		return -ENOMEM;
+
+	for (i = 0; i < nr_cpu_ids; i++)
 		local_set(&mod->ref[i].count, 0);
 	/* Hold reference count during initialization. */
 	local_set(&mod->ref[raw_smp_processor_id()].count, 1);
 	/* Backwards compatibility macros put refcount during init. */
 	mod->waiter = current;
+
+	return 0;
 }
 
 /* modules using other modules */
@@ -649,6 +656,7 @@ static void module_unload_free(struct module *mod)
 			}
 		}
 	}
+	kfree(mod->ref);
 }
 
 #ifdef CONFIG_MODULE_FORCE_UNLOAD
@@ -707,7 +715,7 @@ unsigned int module_refcount(struct module *mod)
 {
 	unsigned int i, total = 0;
 
-	for (i = 0; i < NR_CPUS; i++)
+	for (i = 0; i < nr_cpu_ids; i++)
 		total += local_read(&mod->ref[i].count);
 	return total;
 }
@@ -896,8 +904,9 @@ static inline int use_module(struct module *a, struct module *b)
 	return strong_try_module_get(b) == 0;
 }
 
-static inline void module_unload_init(struct module *mod)
+static inline int module_unload_init(struct module *mod)
 {
+	return 0;
 }
 #endif /* CONFIG_MODULE_UNLOAD */
 
@@ -2123,7 +2132,9 @@ static noinline struct module *load_module(void __user *umod,
 	mod = (void *)sechdrs[modindex].sh_addr;
 
 	/* Now we've moved module, initialize linked lists, etc. */
-	module_unload_init(mod);
+	err = module_unload_init(mod);
+	if (err)
+		goto free_unload;
 
 	/* add kobject, so we can reference it. */
 	err = mod_sysfs_init(mod);
