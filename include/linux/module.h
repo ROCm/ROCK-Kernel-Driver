@@ -349,7 +349,7 @@ struct module
 	void (*exit)(void);
 
 	/* Reference counts */
-	struct module_ref ref[NR_CPUS];
+	struct module_ref *ref;
 #endif
 };
 #ifndef MODULE_ARCH_INIT
