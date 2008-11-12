@@ -31,8 +31,8 @@
  * information is necessary as for the resource tree.
  */
 struct firmware_map_entry {
-	resource_size_t		start;	/* start of the memory range */
-	resource_size_t		end;	/* end of the memory range (incl.) */
+	uint64_t		start;	/* start of the memory range */
+	uint64_t		end;	/* end of the memory range (incl.) */
 	const char		*type;	/* type of the memory range */
 	struct list_head	list;	/* entry for the linked list */
 	struct kobject		kobj;   /* kobject for each entry */
@@ -101,7 +101,7 @@ static LIST_HEAD(map_entries);
  * Common implementation of firmware_map_add() and firmware_map_add_early()
  * which expects a pre-allocated struct firmware_map_entry.
  **/
-static int firmware_map_add_entry(resource_size_t start, resource_size_t end,
+static int firmware_map_add_entry(uint64_t start, uint64_t end,
 				  const char *type,
 				  struct firmware_map_entry *entry)
 {
@@ -132,8 +132,7 @@ static int firmware_map_add_entry(resource_size_t start, resource_size_t end,
  *
  * Returns 0 on success, or -ENOMEM if no memory could be allocated.
  **/
-int firmware_map_add(resource_size_t start, resource_size_t end,
-		     const char *type)
+int firmware_map_add(uint64_t start, uint64_t end, const char *type)
 {
 	struct firmware_map_entry *entry;
 
@@ -157,7 +156,7 @@ int firmware_map_add(resource_size_t start, resource_size_t end,
  *
  * Returns 0 on success, or -ENOMEM if no memory could be allocated.
  **/
-int __init firmware_map_add_early(resource_size_t start, resource_size_t end,
+int __init firmware_map_add_early(uint64_t start, uint64_t end,
 				  const char *type)
 {
 	struct firmware_map_entry *entry;
@@ -175,14 +174,12 @@ int __init firmware_map_add_early(resource_size_t start, resource_size_t end,
 
 static ssize_t start_show(struct firmware_map_entry *entry, char *buf)
 {
-	return snprintf(buf, PAGE_SIZE, "0x%llx\n",
-		(unsigned long long)entry->start);
+	return snprintf(buf, PAGE_SIZE, "0x%llx\n", entry->start);
 }
 
 static ssize_t end_show(struct firmware_map_entry *entry, char *buf)
 {
-	return snprintf(buf, PAGE_SIZE, "0x%llx\n",
-		(unsigned long long)entry->end);
+	return snprintf(buf, PAGE_SIZE, "0x%llx\n", entry->end);
 }
 
 static ssize_t type_show(struct firmware_map_entry *entry, char *buf)

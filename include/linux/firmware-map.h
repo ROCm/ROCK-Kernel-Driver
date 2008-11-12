@@ -24,21 +24,19 @@
  */
 #ifdef CONFIG_FIRMWARE_MEMMAP
 
-int firmware_map_add(resource_size_t start, resource_size_t end,
-		     const char *type);
-int firmware_map_add_early(resource_size_t start, resource_size_t end,
-			   const char *type);
+int firmware_map_add(uint64_t start, uint64_t end, const char *type);
+int firmware_map_add_early(uint64_t start, uint64_t end, const char *type);
 
 #else /* CONFIG_FIRMWARE_MEMMAP */
 
-static inline int firmware_map_add(resource_size_t start, resource_size_t end,
+static inline int firmware_map_add(uint64_t start, uint64_t end,
 				   const char *type)
 {
 	return 0;
 }
 
-static inline int firmware_map_add_early(resource_size_t start,
-					 resource_size_t end, const char *type)
+static inline int firmware_map_add_early(uint64_t start, uint64_t end,
+					 const char *type)
 {
 	return 0;
 }
