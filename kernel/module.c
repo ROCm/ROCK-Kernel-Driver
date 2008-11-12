@@ -562,13 +562,17 @@ static char last_unloaded_module[MODULE_NAME_LEN+1];
 static int module_unload_init(struct module *mod)
 {
 	unsigned int i;
+	size_t refsize = nr_cpu_ids * sizeof(*mod->ref);
 
 	INIT_LIST_HEAD(&mod->modules_which_use_me);
 
-	mod->ref = kcalloc(nr_cpu_ids, sizeof(*mod->ref), GFP_KERNEL);
-	if (!mod->ref)
-		return -ENOMEM;
-
+	mod->ref = kzalloc(refsize, GFP_KERNEL);
+	if (!mod->ref) {
+		mod->ref = vmalloc(refsize);
+		if (!mod->ref)
+			return -ENOMEM;
+		memset(mod->ref, 0, refsize);
+	}
 	for (i = 0; i < nr_cpu_ids; i++)
 		local_set(&mod->ref[i].count, 0);
 	/* Hold reference count during initialization. */
@@ -656,7 +660,10 @@ static void module_unload_free(struct module *mod)
 			}
 		}
 	}
-	kfree(mod->ref);
+	if (is_vmalloc_addr(mod->ref))
+		vfree(mod->ref);
+	else
+		kfree(mod->ref);
 }
 
 #ifdef CONFIG_MODULE_FORCE_UNLOAD
