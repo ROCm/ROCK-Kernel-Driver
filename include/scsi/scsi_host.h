@@ -705,10 +705,12 @@ static inline struct Scsi_Host *dev_to_shost(struct device *dev)
 
 /*
  * walks object list backward, to find the first physical
- * device object.
+ * device object. If none is found return the original device.
  */
 static inline struct device *dev_to_nonscsi_dev(struct device *dev)
 {
+	struct device *orig = dev;
+
 	while (dev && (dev->bus == NULL || scsi_is_host_device(dev))) {
 		if (dev->dma_parms) {
 			dev_printk(KERN_WARNING, dev,
@@ -718,7 +720,7 @@ static inline struct device *dev_to_nonscsi_dev(struct device *dev)
 		}
 		dev = dev->parent;
 	}
-	return dev;
+	return dev?dev:orig;
 }
 
 static inline int scsi_host_in_recovery(struct Scsi_Host *shost)
