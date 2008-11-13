@@ -59,7 +59,7 @@ struct mem_cgroup_stat_cpu {
 } ____cacheline_aligned_in_smp;
 
 struct mem_cgroup_stat {
-	struct mem_cgroup_stat_cpu cpustat[NR_CPUS];
+	struct mem_cgroup_stat_cpu *cpustat;
 };
 
 /*
@@ -143,6 +143,7 @@ struct mem_cgroup {
 	struct mem_cgroup_stat stat;
 };
 static struct mem_cgroup init_mem_cgroup;
+static struct mem_cgroup_stat_cpu init_mem_cgroup_stat_cpu[NR_CPUS];
 
 /*
  * We use the lower bit of the page->page_cgroup pointer as a bit spin
@@ -1097,23 +1098,54 @@ static void free_mem_cgroup_per_zone_info(struct mem_cgroup *mem, int node)
 static struct mem_cgroup *mem_cgroup_alloc(void)
 {
 	struct mem_cgroup *mem;
+	struct mem_cgroup_stat_cpu *cpustat;
+	size_t statsize = nr_cpu_ids * sizeof(*cpustat);
 
-	if (sizeof(*mem) < PAGE_SIZE)
-		mem = kmalloc(sizeof(*mem), GFP_KERNEL);
-	else
+	if (sizeof(*mem) > PAGE_SIZE) {
 		mem = vmalloc(sizeof(*mem));
-
-	if (mem)
+		if (!mem)
+			goto out;
 		memset(mem, 0, sizeof(*mem));
+	} else
+		mem = kzalloc(sizeof(*mem), GFP_KERNEL);
+
+	if (!mem)
+		goto out;
+
+	if (statsize > PAGE_SIZE) {
+		cpustat = vmalloc(statsize);
+		if (!cpustat)
+			goto out_mem;
+		memset(cpustat, 0, statsize);
+	} else
+		cpustat = kzalloc(statsize, GFP_KERNEL);
+
+	if (!cpustat)
+		goto out_mem;
+
+	mem->stat.cpustat = cpustat;
 	return mem;
+
+out_mem:
+	if (is_vmalloc_addr(mem))
+		vfree(mem);
+	else
+		kfree(mem);
+out:
+	return NULL;
 }
 
 static void mem_cgroup_free(struct mem_cgroup *mem)
 {
-	if (sizeof(*mem) < PAGE_SIZE)
-		kfree(mem);
+	if (is_vmalloc_addr(mem->stat.cpustat))
+		vfree(mem->stat.cpustat);
 	else
+		kfree(mem->stat.cpustat);
+
+	if (is_vmalloc_addr(mem))
 		vfree(mem);
+	else
+		kfree(mem);
 }
 
 
@@ -1125,6 +1157,7 @@ mem_cgroup_create(struct cgroup_subsys *ss, struct cgroup *cont)
 
 	if (unlikely((cont->parent) == NULL)) {
 		mem = &init_mem_cgroup;
+		mem->stat.cpustat = &init_mem_cgroup_stat_cpu[0];
 		page_cgroup_cache = KMEM_CACHE(page_cgroup, SLAB_PANIC);
 	} else {
 		mem = mem_cgroup_alloc();
