@@ -285,6 +285,7 @@ void prep_compound_page(struct page *page, unsigned long order)
 	}
 }
 
+#ifdef CONFIG_HUGETLBFS
 void prep_compound_gigantic_page(struct page *page, unsigned long order)
 {
 	int i;
@@ -299,6 +300,7 @@ void prep_compound_gigantic_page(struct page *page, unsigned long order)
 		p->first_page = page;
 	}
 }
+#endif
 
 static void destroy_compound_page(struct page *page, unsigned long order)
 {

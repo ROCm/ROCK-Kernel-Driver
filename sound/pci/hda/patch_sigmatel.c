@@ -4234,13 +4234,12 @@ again:
 		spec->init = dell_eq_core_init;
 		/* fallthru */
 	case STAC_DELL_M6:
+		if (!spec->init)
+			spec->init = dell_m6_core_init;
 		spec->num_smuxes = 0;
 		spec->mixer = &stac92hd73xx_6ch_mixer[DELL_M6_MIXER];
 		spec->amp_nids = &stac92hd73xx_amp_nids[DELL_M6_AMP];
 		spec->num_amps = 1;
-
-		if (!spec->init)
-			spec->init = dell_m6_core_init;
 		switch (codec->subsystem_id) {
 		case 0x1028025e: /* Analog Mics */
 		case 0x1028025f:

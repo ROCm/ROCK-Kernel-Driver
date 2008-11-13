@@ -2239,7 +2239,7 @@ int ata_eh_reset(struct ata_link *link, int classify,
 	if (link->flags & ATA_LFLAG_NO_SRST)
 		softreset = NULL;
 
-	/* make sure each reset attempt is at least COOL_DOWN apart */
+	/* make sure each reset attemp is at least COOL_DOWN apart */
 	if (ehc->i.flags & ATA_EHI_DID_RESET) {
 		now = jiffies;
 		WARN_ON(time_after(ehc->last_reset, now));
