@@ -206,7 +206,7 @@ static inline void ddp_unmark_entries(struct cxgb3i_ddp_info *ddp,
 	spin_unlock(&ddp->map_lock);
 }
 
-static inline int sgl_map(struct cxgb3i_adapter *snic, 
+static inline int sgl_map(struct cxgb3i_adapter *snic,
 			  struct scatterlist *sgl, unsigned int sgcnt)
 {
 	struct scatterlist *sg;
@@ -223,7 +223,7 @@ static inline int sgl_map(struct cxgb3i_adapter *snic,
 	return sgcnt;
 }
 
-static inline void sgl_unmap(struct cxgb3i_adapter *snic, 
+static inline void sgl_unmap(struct cxgb3i_adapter *snic,
 			     struct scatterlist *sgl, unsigned int sgcnt)
 {
 	struct scatterlist *sg;
@@ -283,7 +283,7 @@ u32 cxgb3i_ddp_tag_reserve(struct cxgb3i_adapter *snic, unsigned int tid,
 	err = sgl_map(snic, sgl, sgcnt);
 	if (err < sgcnt)
 		goto unmap_sgl;
-	
+
 	tag = sw_tag | (idx << snic->tag_format.rsvd_shift);
 
 	hdr.rsvd = 0;
