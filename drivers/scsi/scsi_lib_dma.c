@@ -26,7 +26,6 @@ int scsi_dma_map(struct scsi_cmnd *cmd)
 		struct device *dev = dev_to_nonscsi_dev(
 					cmd->device->host->shost_gendev.parent);
 
-		BUG_ON(!dev);
 		nseg = dma_map_sg(dev, scsi_sglist(cmd), scsi_sg_count(cmd),
 				  cmd->sc_data_direction);
 		if (unlikely(!nseg))
@@ -46,7 +45,6 @@ void scsi_dma_unmap(struct scsi_cmnd *cmd)
 		struct device *dev = dev_to_nonscsi_dev(
 					cmd->device->host->shost_gendev.parent);
 
-		BUG_ON(!dev);
 		dma_unmap_sg(dev, scsi_sglist(cmd), scsi_sg_count(cmd),
 			     cmd->sc_data_direction);
 	}
