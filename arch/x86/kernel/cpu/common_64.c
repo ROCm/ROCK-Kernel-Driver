@@ -34,6 +34,7 @@
 #include <asm/sections.h>
 #include <asm/setup.h>
 #include <asm/genapic.h>
+#include <asm/hypervisor.h>
 
 #include "cpu.h"
 
@@ -387,6 +388,7 @@ static void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 
 	detect_ht(c);
 
+	init_hypervisor(c);
 	/*
 	 * On SMP, boot_cpu_data holds the common feature set between
 	 * all CPUs; so make sure that we indicate which features are

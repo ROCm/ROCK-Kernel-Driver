@@ -15,6 +15,7 @@
 #include <asm/mce.h>
 #include <asm/pat.h>
 #include <asm/asm.h>
+#include <asm/hypervisor.h>
 #ifdef CONFIG_X86_LOCAL_APIC
 #include <asm/mpspec.h>
 #include <asm/apic.h>
@@ -506,6 +507,7 @@ static void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 				c->x86, c->x86_model);
 	}
 
+	init_hypervisor(c);
 	/*
 	 * On SMP, boot_cpu_data holds the common feature set between
 	 * all CPUs; so make sure that we indicate which features are
