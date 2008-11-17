@@ -73,6 +73,9 @@ struct lpfc_sli2_slim;
 /* Number of MSI-X vectors the driver uses */
 #define LPFC_MSIX_VECTORS	2
 
+/* Active interrupt test threshold */
+#define LPFC_INTR_THRESHOLD	1
+
 /* lpfc wait event data ready flag */
 #define LPFC_DATA_READY		(1<<0)
 
@@ -629,6 +632,7 @@ struct lpfc_hba {
 	uint32_t cfg_hba_queue_depth;
 	uint32_t cfg_enable_hba_reset;
 	uint32_t cfg_enable_hba_heartbeat;
+	uint32_t cfg_pci_max_read;
 
 	lpfc_vpd_t vpd;		/* vital product data */
 
@@ -718,6 +722,8 @@ struct lpfc_hba {
 
 	struct fc_host_statistics link_stats;
 	enum intr_type_t intr_type;
+	uint32_t intr_mode;
+#define LPFC_INTR_ERROR	0xFFFFFFFF
 	struct msix_entry msix_entries[LPFC_MSIX_VECTORS];
 	struct lpfcdfc_host *dfc_host;
 

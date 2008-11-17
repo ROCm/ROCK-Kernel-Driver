@@ -2370,6 +2370,14 @@ typedef struct {
 	uint32_t rsvd1;
 } CLEAR_LA_VAR;
 
+/* Structure for MB Command SET_SLIM (33) */
+/* Values needed to set MAX_DMA_LENGTH parameter */
+#define SLIM_VAR_MAX_DMA_LENGTH 0x100506
+#define SLIM_VAL_MAX_DMA_512    0x0
+#define SLIM_VAL_MAX_DMA_1024   0x1
+#define SLIM_VAL_MAX_DMA_2048   0x2
+#define SLIM_VAL_MAX_DMA_4096   0x3
+
 /* Structure for MB Command DUMP */
 
 typedef struct {
@@ -2621,10 +2629,17 @@ typedef struct {
 
 	uint32_t pcbLow;       /* bit 31:0  of memory based port config block */
 	uint32_t pcbHigh;      /* bit 63:32 of memory based port config block */
-	uint32_t hbainit[6];
+	uint32_t hbainit[5];
+#ifdef __BIG_ENDIAN_BITFIELD
+	uint32_t hps	   :  1; /* bit 31 word9 Host Pointer in slim */
+	uint32_t rsvd	   : 31; /* least significant 31 bits of word 9 */
+#else   /*  __LITTLE_ENDIAN */
+	uint32_t rsvd      : 31; /* least significant 31 bits of word 9 */
+	uint32_t hps	   :  1; /* bit 31 word9 Host Pointer in slim */
+#endif
 
 #ifdef __BIG_ENDIAN_BITFIELD
-	uint32_t rsvd      : 24;  /* Reserved                             */
+	uint32_t rsvd1     : 24;  /* Reserved                             */
 	uint32_t cmv	   :  1;  /* Configure Max VPIs                   */
 	uint32_t ccrp      :  1;  /* Config Command Ring Polling          */
 	uint32_t csah      :  1;  /* Configure Synchronous Abort Handling */
@@ -2642,7 +2657,7 @@ typedef struct {
 	uint32_t csah      :  1;  /* Configure Synchronous Abort Handling */
 	uint32_t ccrp      :  1;  /* Config Command Ring Polling          */
 	uint32_t cmv	   :  1;  /* Configure Max VPIs                   */
-	uint32_t rsvd      : 24;  /* Reserved                             */
+	uint32_t rsvd1     : 24;  /* Reserved                             */
 #endif
 #ifdef __BIG_ENDIAN_BITFIELD
 	uint32_t rsvd2     : 24;  /* Reserved                             */

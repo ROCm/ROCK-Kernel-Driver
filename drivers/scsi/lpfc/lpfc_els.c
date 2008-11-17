@@ -278,7 +278,8 @@ lpfc_prep_els_iocb(struct lpfc_vport *vport, uint8_t expectRsp,
 	return elsiocb;
 
 els_iocb_free_pbuf_exit:
-	lpfc_mbuf_free(phba, prsp->virt, prsp->phys);
+	if (expectRsp)
+		lpfc_mbuf_free(phba, prsp->virt, prsp->phys);
 	kfree(pbuflist);
 
 els_iocb_free_prsp_exit:
@@ -942,6 +943,10 @@ lpfc_initial_flogi(struct lpfc_vport *vport)
 {
 	struct lpfc_hba *phba = vport->phba;
 	struct lpfc_nodelist *ndlp;
+
+	if ((vport->cfg_enable_auth) &&
+	    (lpfc_security_service_state == SECURITY_OFFLINE))
+		return 1;
 
 	vport->port_state = LPFC_FLOGI;
 	lpfc_set_disctmo(vport);
@@ -4985,10 +4990,6 @@ lpfc_els_timeout_handler(struct lpfc_vport *vport)
 	uint32_t timeout;
 	uint32_t remote_ID = 0xffffffff;
 
-	/* If the timer is already canceled do nothing */
-	if ((vport->work_port_events & WORKER_ELS_TMO) == 0) {
-		return;
-	}
 	spin_lock_irq(&phba->hbalock);
 	timeout = (uint32_t)(phba->fc_ratov << 1);
 

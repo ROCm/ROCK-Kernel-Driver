@@ -15,6 +15,8 @@
 #include "ql4_glbl.h"
 #include "ql4_dbg.h"
 #include "ql4_inline.h"
+#include "ql4_os.h"
+
 
 /*
  * Driver version
@@ -56,24 +58,32 @@ MODULE_PARM_DESC(extended_error_logging,
 		 "Option to enable extended error logging, "
 		 "Default is 0 - no logging, 1 - debug logging");
 
+/* Command Timeout before ddb state goes to MISSING */
+int cmd_timeout = IOCB_CMD_TIMEOUT;
+module_param(cmd_timeout, int, S_IRUGO | S_IRUSR);
+MODULE_PARM_DESC(cmd_timeout, "Command Timeout");
+
+/* Timeout before ddb state MISSING goes DEAD */
+int recovery_tmo = RECOVERY_TIMEOUT;
+module_param(recovery_tmo, int, S_IRUGO | S_IRUSR);
+MODULE_PARM_DESC(recovery_tmo, "Recovery Timeout");
+
 int ql4_mod_unload = 0;
 /*
  * SCSI host template entry points
  */
-static void qla4xxx_config_dma_addressing(struct scsi_qla_host *ha);
+
+void qla4xxx_config_dma_addressing(struct scsi_qla_host *ha);
 
 /*
  * iSCSI template entry points
  */
-static int qla4xxx_tgt_dscvr(struct Scsi_Host *shost,
-			     enum iscsi_tgt_dscvr type, uint32_t enable,
-			     struct sockaddr *dst_addr);
+static int qla4xxx_host_get_param(struct Scsi_Host *,
+			enum iscsi_host_param, char *);
 static int qla4xxx_conn_get_param(struct iscsi_cls_conn *conn,
 				  enum iscsi_param param, char *buf);
 static int qla4xxx_sess_get_param(struct iscsi_cls_session *sess,
 				  enum iscsi_param param, char *buf);
-static int qla4xxx_host_get_param(struct Scsi_Host *shost,
-				  enum iscsi_host_param param, char *buf);
 static void qla4xxx_recovery_timedout(struct iscsi_cls_session *session);
 
 /*
@@ -85,11 +95,13 @@ static int qla4xxx_eh_device_reset(struct scsi_cmnd *cmd);
 static int qla4xxx_eh_host_reset(struct scsi_cmnd *cmd);
 static int qla4xxx_slave_alloc(struct scsi_device *device);
 static int qla4xxx_slave_configure(struct scsi_device *device);
+static void qla4xxx_slave_destroy(struct scsi_device *device);
 
 static struct scsi_host_template qla4xxx_driver_template = {
 	.module			= THIS_MODULE,
 	.name			= DRIVER_NAME,
 	.proc_name		= DRIVER_NAME,
+	.proc_info		= qla4xxx_proc_info,
 	.queuecommand		= qla4xxx_queuecommand,
 
 	.eh_device_reset_handler = qla4xxx_eh_device_reset,
@@ -97,6 +109,7 @@ static struct scsi_host_template qla4xxx_driver_template = {
 
 	.slave_configure	= qla4xxx_slave_configure,
 	.slave_alloc		= qla4xxx_slave_alloc,
+	.slave_destroy		= qla4xxx_slave_destroy,
 
 	.this_id		= -1,
 	.cmd_per_lun		= 3,
@@ -113,10 +126,13 @@ static struct iscsi_transport qla4xxx_iscsi_transport = {
 				  ISCSI_CONN_ADDRESS |
 				  ISCSI_TARGET_NAME |
 				  ISCSI_TPGT,
-	.tgt_dscvr		= qla4xxx_tgt_dscvr,
+
+	QL_INIT_SESSION_DATASIZE(sessiondata_size)
+	QL_INIT_HOST_TEMPLATE(host_template)
+
+	.get_host_param		= qla4xxx_host_get_param,
 	.get_conn_param		= qla4xxx_conn_get_param,
 	.get_session_param	= qla4xxx_sess_get_param,
-	.get_host_param		= qla4xxx_host_get_param,
 	.session_recovery_timedout = qla4xxx_recovery_timedout,
 };
 
@@ -134,31 +150,9 @@ static void qla4xxx_recovery_timedout(struct iscsi_cls_session *session)
 		ddb_entry->fw_ddb_index, ddb_entry->os_target_id,
 		ha->port_down_retry_count);
 
-	DEBUG2(printk("scsi%ld: %s: scheduling dpc routine - dpc flags = "
-				"0x%lx\n", ha->host_no, __func__, ha->dpc_flags));
+	QL_SET_DDB_OFFLINE(ha, ddb_entry);
+
 	queue_work(ha->dpc_thread, &ha->dpc_work);
-}
-
-static int qla4xxx_host_get_param(struct Scsi_Host *shost,
-				  enum iscsi_host_param param, char *buf)
-{
-	struct scsi_qla_host *ha = to_qla_host(shost);
-	int len;
-
-	switch (param) {
-	case ISCSI_HOST_PARAM_IPADDRESS:
-		len = sprintf(buf, "%d.%d.%d.%d", ha->ip_address[0],
-				ha->ip_address[1], ha->ip_address[2],
-				ha->ip_address[3]);
-		break;
-	case ISCSI_HOST_PARAM_INITIATOR_NAME:
-		len = sprintf(buf, "%s", ha->name_string);
-		break;
-	default:
-		return -ENOSYS;
-	}
-
-	return len;
 }
 
 int qla4xxx_conn_start(struct iscsi_cls_conn *conn)
@@ -166,7 +160,8 @@ int qla4xxx_conn_start(struct iscsi_cls_conn *conn)
 	struct iscsi_cls_session *session;
 	struct ddb_entry *ddb_entry;
 
-	session = iscsi_dev_to_session(conn->dev.parent);
+	session = QL_ISCSI_CONN_TO_SESS(conn);
+
 	ddb_entry = session->dd_data;
 
 	DEBUG2(printk("scsi%ld: %s: index [%d] starting conn\n",
@@ -181,7 +176,8 @@ static void qla4xxx_conn_stop(struct iscsi_cls_conn *conn, int flag)
 	struct iscsi_cls_session *session;
 	struct ddb_entry *ddb_entry;
 
-	session = iscsi_dev_to_session(conn->dev.parent);
+	session = QL_ISCSI_CONN_TO_SESS(conn);
+
 	ddb_entry = session->dd_data;
 
 	DEBUG2(printk("scsi%ld: %s: index [%d] stopping conn\n",
@@ -207,6 +203,12 @@ static int qla4xxx_sess_get_param(struct iscsi_cls_session *sess,
 	case ISCSI_PARAM_TPGT:
 		len = sprintf(buf, "%u", ddb_entry->tpgt);
 		break;
+
+#ifdef ISCSI_ISID
+	case ISCSI_PARAM_ISID:
+		len = sprintf(buf, "%u", QL_ISCSI_SESSION_ID(ddb_entry));
+		break;
+#endif
 	default:
 		return -ENOSYS;
 	}
@@ -221,7 +223,8 @@ static int qla4xxx_conn_get_param(struct iscsi_cls_conn *conn,
 	struct ddb_entry *ddb_entry;
 	int len;
 
-	session = iscsi_dev_to_session(conn->dev.parent);
+	session = QL_ISCSI_CONN_TO_SESS(conn);
+
 	ddb_entry = session->dd_data;
 
 	switch (param) {
@@ -240,47 +243,53 @@ static int qla4xxx_conn_get_param(struct iscsi_cls_conn *conn,
 	return len;
 }
 
-static int qla4xxx_tgt_dscvr(struct Scsi_Host *shost,
-			     enum iscsi_tgt_dscvr type, uint32_t enable,
-			     struct sockaddr *dst_addr)
+static int qla4xxx_host_get_param(struct Scsi_Host *shost,
+			enum iscsi_host_param param, char *buf)
 {
-	struct scsi_qla_host *ha;
-	struct sockaddr_in *addr;
-	struct sockaddr_in6 *addr6;
-	int ret = 0;
+	struct scsi_qla_host *ha = to_qla_host(shost);
+	int len;
 
-	ha = (struct scsi_qla_host *) shost->hostdata;
-
-	switch (type) {
-	case ISCSI_TGT_DSCVR_SEND_TARGETS:
-		if (dst_addr->sa_family == AF_INET) {
-			addr = (struct sockaddr_in *)dst_addr;
-			if (qla4xxx_send_tgts(ha, (char *)&addr->sin_addr,
-					      addr->sin_port) != QLA_SUCCESS)
-				ret = -EIO;
-		} else if (dst_addr->sa_family == AF_INET6) {
-			/*
-			 * TODO: fix qla4xxx_send_tgts
-			 */
-			addr6 = (struct sockaddr_in6 *)dst_addr;
-			if (qla4xxx_send_tgts(ha, (char *)&addr6->sin6_addr,
-					      addr6->sin6_port) != QLA_SUCCESS)
-				ret = -EIO;
-		} else
-			ret = -ENOSYS;
+	switch (param) {
+	case ISCSI_HOST_PARAM_IPADDRESS:
+		len = sprintf(buf, "%d.%d.%d.%d", ha->ip_address[0],
+				ha->ip_address[1], ha->ip_address[2],
+				ha->ip_address[3]);
+		break;
+	case ISCSI_HOST_PARAM_INITIATOR_NAME:
+		len = sprintf(buf, "%s", ha->name_string);
 		break;
 	default:
-		ret = -ENOSYS;
+		return -ENOSYS;
 	}
-	return ret;
+
+	return len;
 }
+
+static int ql_alloc_osindex(struct scsi_qla_host *ha)
+{
+	unsigned int idx;
+
+	for (idx = 0; idx < MAX_DDB_ENTRIES; idx++)
+		if (test_and_set_bit((idx & 0x1F), &ha->os_map[(idx >> 5)]) == 0)
+			return idx;
+	return -1;
+}
+
+static void free_osindex(struct scsi_qla_host *ha, uint32_t idx)
+{
+	clear_bit((idx & 0x1F), &ha->os_map[idx >> 5]);
+}
+
 
 void qla4xxx_destroy_sess(struct ddb_entry *ddb_entry)
 {
 	if (!ddb_entry->sess)
 		return;
+	free_osindex(ddb_entry->ha, ddb_entry->os_target_id);
 
 	if (ddb_entry->conn) {
+		QL_ISCSI_IF_DESTROY_SESSION_DONE(ddb_entry);
+		QL_ISCSI_DESTROY_CONN(ddb_entry);
 		iscsi_remove_session(ddb_entry->sess);
 	}
 	iscsi_free_session(ddb_entry->sess);
@@ -290,25 +299,27 @@ int qla4xxx_add_sess(struct ddb_entry *ddb_entry, int scan)
 {
 	int err;
 
-	err = iscsi_add_session(ddb_entry->sess, ddb_entry->fw_ddb_index);
+	err = QL_ISCSI_ADD_SESS(ddb_entry);
+
 	if (err) {
 		DEBUG2(printk(KERN_ERR "Could not add session.\n"));
 		return err;
 	}
 
-	ddb_entry->conn = iscsi_create_conn(ddb_entry->sess, 0, 0);
+	ddb_entry->conn = QL_ISCSI_CREATE_CONN(ddb_entry);
+
 	if (!ddb_entry->conn) {
 		iscsi_remove_session(ddb_entry->sess);
 		DEBUG2(printk(KERN_ERR "Could not add connection.\n"));
 		return -ENOMEM;
 	}
 
-	ddb_entry->sess->recovery_tmo = ddb_entry->ha->port_down_retry_count;
-	if (scan)
-		scsi_scan_target(&ddb_entry->sess->dev, 0,
-				 ddb_entry->sess->target_id,
-				 SCAN_WILD_CARD, 0);
-	iscsi_unblock_session(ddb_entry->sess);
+	ddb_entry->sess->recovery_tmo = QL_SESS_RECOVERY_TO(ddb_entry);
+
+	qla4xxx_scan_target(ddb_entry);
+
+	QL_ISCSI_CREATE_SESS_DONE(ddb_entry);
+
 	return 0;
 }
 
@@ -317,13 +328,20 @@ struct ddb_entry *qla4xxx_alloc_sess(struct scsi_qla_host *ha)
 	struct ddb_entry *ddb_entry;
 	struct iscsi_cls_session *sess;
 
-	sess = iscsi_alloc_session(ha->host, &qla4xxx_iscsi_transport,
-			sizeof(struct ddb_entry));
-	if (!sess)
+	int os_idx;
+
+	if ((os_idx = ql_alloc_osindex(ha)) >= MAX_DDB_ENTRIES)
 		return NULL;
+
+	sess = QL_ISCSI_ALLOC_SESSION(ha, &qla4xxx_iscsi_transport);
+	if (!sess) {
+		free_osindex(ha, os_idx);
+		return NULL;
+	}
 
 	ddb_entry = sess->dd_data;
 	memset(ddb_entry, 0, sizeof(*ddb_entry));
+	ddb_entry->os_target_id = os_idx;
 	ddb_entry->ha = ha;
 	ddb_entry->sess = sess;
 	return ddb_entry;
@@ -371,9 +389,9 @@ void qla4xxx_mark_device_missing(struct scsi_qla_host *ha,
 }
 
 static struct srb* qla4xxx_get_new_srb(struct scsi_qla_host *ha,
-				       struct ddb_entry *ddb_entry,
-				       struct scsi_cmnd *cmd,
-				       void (*done)(struct scsi_cmnd *))
+						 struct ddb_entry *ddb_entry,
+						 struct scsi_cmnd *cmd,
+						 void (*done)(struct scsi_cmnd *))
 {
 	struct srb *srb;
 
@@ -392,17 +410,6 @@ static struct srb* qla4xxx_get_new_srb(struct scsi_qla_host *ha,
 	return srb;
 }
 
-static void qla4xxx_srb_free_dma(struct scsi_qla_host *ha, struct srb *srb)
-{
-	struct scsi_cmnd *cmd = srb->cmd;
-
-	if (srb->flags & SRB_DMA_VALID) {
-		scsi_dma_unmap(cmd);
-		srb->flags &= ~SRB_DMA_VALID;
-	}
-	cmd->SCp.ptr = NULL;
-}
-
 void qla4xxx_srb_compl(struct scsi_qla_host *ha, struct srb *srb)
 {
 	struct scsi_cmnd *cmd = srb->cmd;
@@ -418,14 +425,14 @@ void qla4xxx_srb_compl(struct scsi_qla_host *ha, struct srb *srb)
  * qla4xxx_queuecommand - scsi layer issues scsi command to driver.
  * @cmd: Pointer to Linux's SCSI command structure
  * @done_fn: Function that the driver calls to notify the SCSI mid-layer
- *     that the command has been processed.
+ * that the command has been processed.
  *
  * Remarks:
  * This routine is invoked by Linux to send a SCSI command to the driver.
  * The mid-level driver tries to ensure that queuecommand never gets
  * invoked concurrently with itself or the interrupt handler (although
  * the interrupt handler may call this routine as part of request-
- * completion handling).   Unfortunely, it sometimes calls the scheduler
+ * completion handling).	Unfortunely, it sometimes calls the scheduler
  * in interrupt context which is a big NO! NO!.
  **/
 static int qla4xxx_queuecommand(struct scsi_cmnd *cmd,
@@ -546,7 +553,7 @@ static int qla4xxx_mem_alloc(struct scsi_qla_host *ha)
 	align = 0;
 	if ((unsigned long)ha->queues_dma & (MEM_ALIGN_VALUE - 1))
 		align = MEM_ALIGN_VALUE - ((unsigned long)ha->queues_dma &
-					   (MEM_ALIGN_VALUE - 1));
+						(MEM_ALIGN_VALUE - 1));
 
 	/* Update request and response queue pointers. */
 	ha->request_dma = ha->queues_dma + align;
@@ -554,16 +561,16 @@ static int qla4xxx_mem_alloc(struct scsi_qla_host *ha)
 	ha->response_dma = ha->queues_dma + align +
 		(REQUEST_QUEUE_DEPTH * QUEUE_SIZE);
 	ha->response_ring = (struct queue_entry *) (ha->queues + align +
-						    (REQUEST_QUEUE_DEPTH *
-						     QUEUE_SIZE));
+							 (REQUEST_QUEUE_DEPTH *
+							  QUEUE_SIZE));
 	ha->shadow_regs_dma = ha->queues_dma + align +
 		(REQUEST_QUEUE_DEPTH * QUEUE_SIZE) +
 		(RESPONSE_QUEUE_DEPTH * QUEUE_SIZE);
 	ha->shadow_regs = (struct shadow_regs *) (ha->queues + align +
 						  (REQUEST_QUEUE_DEPTH *
-						   QUEUE_SIZE) +
+							QUEUE_SIZE) +
 						  (RESPONSE_QUEUE_DEPTH *
-						   QUEUE_SIZE));
+							QUEUE_SIZE));
 
 	/* Allocate memory for srb pool. */
 	ha->srb_mempool = mempool_create(SRB_MIN_REQ, mempool_alloc_slab,
@@ -595,12 +602,12 @@ static void qla4xxx_timer(struct scsi_qla_host *ha)
 	list_for_each_entry_safe(ddb_entry, dtemp, &ha->ddb_list, list) {
 		/* Count down time between sending relogins */
 		if (adapter_up(ha) &&
-		    !test_bit(DF_RELOGIN, &ddb_entry->flags) &&
-		    atomic_read(&ddb_entry->state) != DDB_STATE_ONLINE) {
+			 !test_bit(DF_RELOGIN, &ddb_entry->flags) &&
+			 atomic_read(&ddb_entry->state) != DDB_STATE_ONLINE) {
 			if (atomic_read(&ddb_entry->retry_relogin_timer) !=
-			    INVALID_ENTRY) {
+				 INVALID_ENTRY) {
 				if (atomic_read(&ddb_entry->retry_relogin_timer)
-						== 0) {
+							== 0) {
 					atomic_set(&ddb_entry->
 						retry_relogin_timer,
 						INVALID_ENTRY);
@@ -608,9 +615,9 @@ static void qla4xxx_timer(struct scsi_qla_host *ha)
 						&ha->dpc_flags);
 					set_bit(DF_RELOGIN, &ddb_entry->flags);
 					DEBUG2(printk("scsi%ld: %s: index [%d]"
-						      " login device\n",
-						      ha->host_no, __func__,
-						      ddb_entry->fw_ddb_index));
+						" login device\n",
+						ha->host_no, __func__,
+						ddb_entry->fw_ddb_index));
 				} else
 					atomic_dec(&ddb_entry->
 							retry_relogin_timer);
@@ -619,64 +626,64 @@ static void qla4xxx_timer(struct scsi_qla_host *ha)
 
 		/* Wait for relogin to timeout */
 		if (atomic_read(&ddb_entry->relogin_timer) &&
-		    (atomic_dec_and_test(&ddb_entry->relogin_timer) != 0)) {
+			 (atomic_dec_and_test(&ddb_entry->relogin_timer) != 0)) {
 			/*
 			 * If the relogin times out and the device is
 			 * still NOT ONLINE then try and relogin again.
 			 */
 			if (atomic_read(&ddb_entry->state) !=
-			    DDB_STATE_ONLINE &&
-			    ddb_entry->fw_ddb_device_state ==
-			    DDB_DS_SESSION_FAILED) {
+				 DDB_STATE_ONLINE &&
+				 ddb_entry->fw_ddb_device_state ==
+				 DDB_DS_SESSION_FAILED) {
 				/* Reset retry relogin timer */
 				atomic_inc(&ddb_entry->relogin_retry_count);
 				DEBUG2(printk("scsi%ld: index[%d] relogin"
-					      " timed out-retrying"
-					      " relogin (%d)\n",
-					      ha->host_no,
-					      ddb_entry->fw_ddb_index,
-					      atomic_read(&ddb_entry->
+							" timed out-retrying"
+							" relogin (%d)\n",
+							ha->host_no,
+							ddb_entry->fw_ddb_index,
+							atomic_read(&ddb_entry->
 							  relogin_retry_count))
 					);
 				start_dpc++;
 				DEBUG(printk("scsi%ld:%d:%d: index [%d] "
-					     "initate relogin after"
-					     " %d seconds\n",
-					     ha->host_no, ddb_entry->bus,
-					     ddb_entry->target,
-					     ddb_entry->fw_ddb_index,
-					     ddb_entry->default_time2wait + 4)
-					);
+					"initate relogin after"
+					" %d seconds\n",
+					ha->host_no, ddb_entry->bus,
+					ddb_entry->target,
+					ddb_entry->fw_ddb_index,
+					ddb_entry->default_time2wait + 4));
 
 				atomic_set(&ddb_entry->retry_relogin_timer,
-					   ddb_entry->default_time2wait + 4);
+					ddb_entry->default_time2wait + 4);
 			}
 		}
 	}
 
 	/* Check for heartbeat interval. */
 	if (ha->firmware_options & FWOPT_HEARTBEAT_ENABLE &&
-	    ha->heartbeat_interval != 0) {
+		 ha->heartbeat_interval != 0) {
 		ha->seconds_since_last_heartbeat++;
 		if (ha->seconds_since_last_heartbeat >
-		    ha->heartbeat_interval + 2)
+			 ha->heartbeat_interval + 2)
 			set_bit(DPC_RESET_HA, &ha->dpc_flags);
 	}
 
 
 	/* Wakeup the dpc routine for this adapter, if needed. */
 	if ((start_dpc ||
-	     test_bit(DPC_RESET_HA, &ha->dpc_flags) ||
-	     test_bit(DPC_RETRY_RESET_HA, &ha->dpc_flags) ||
-	     test_bit(DPC_RELOGIN_DEVICE, &ha->dpc_flags) ||
-	     test_bit(DPC_RESET_HA_DESTROY_DDB_LIST, &ha->dpc_flags) ||
-	     test_bit(DPC_RESET_HA_INTR, &ha->dpc_flags) ||
-	     test_bit(DPC_GET_DHCP_IP_ADDR, &ha->dpc_flags) ||
-	     test_bit(DPC_AEN, &ha->dpc_flags)) &&
-	    ha->dpc_thread) {
+		test_bit(DPC_RESET_HA, &ha->dpc_flags) ||
+		test_bit(DPC_RETRY_RESET_HA, &ha->dpc_flags) ||
+		test_bit(DPC_RELOGIN_DEVICE, &ha->dpc_flags) ||
+		test_bit(DPC_RESET_HA_DESTROY_DDB_LIST, &ha->dpc_flags) ||
+		test_bit(DPC_RESET_HA_INTR, &ha->dpc_flags) ||
+		test_bit(DPC_GET_DHCP_IP_ADDR, &ha->dpc_flags) ||
+		QL_DPC_OFFLINE_SET(ha) ||
+		test_bit(DPC_AEN, &ha->dpc_flags)) &&
+		ha->dpc_thread) {
 		DEBUG2(printk("scsi%ld: %s: scheduling dpc routine"
-			      " - dpc flags = 0x%lx\n",
-			      ha->host_no, __func__, ha->dpc_flags));
+					" - dpc flags = 0x%lx\n",
+					ha->host_no, __func__, ha->dpc_flags));
 		queue_work(ha->dpc_thread, &ha->dpc_work);
 	}
 
@@ -732,14 +739,15 @@ static int qla4xxx_cmd_wait(struct scsi_qla_host *ha)
 	return stat;
 }
 
-void qla4xxx_hw_reset(struct scsi_qla_host *ha)
+void qla4xxx_hw_reset(struct scsi_qla_host *ha, int hw_lock)
 {
 	uint32_t ctrl_status;
 	unsigned long flags = 0;
 
 	DEBUG2(printk(KERN_ERR "scsi%ld: %s\n", ha->host_no, __func__));
 
-	spin_lock_irqsave(&ha->hardware_lock, flags);
+	if (hw_lock)
+		spin_lock_irqsave(&ha->hardware_lock, flags);
 	/*
 	 * If the SCSI Reset Interrupt bit is set, clear it.
 	 * Otherwise, the Soft Reset won't work.
@@ -752,7 +760,8 @@ void qla4xxx_hw_reset(struct scsi_qla_host *ha)
 	writel(set_rmask(CSR_SOFT_RESET), &ha->reg->ctrl_status);
 	readl(&ha->reg->ctrl_status);
 
-	spin_unlock_irqrestore(&ha->hardware_lock, flags);
+	if (hw_lock)
+		spin_unlock_irqrestore(&ha->hardware_lock, flags);
 }
 
 /**
@@ -766,7 +775,7 @@ int qla4xxx_soft_reset(struct scsi_qla_host *ha)
 	int status = QLA_ERROR;
 	uint32_t ctrl_status;
 
-	qla4xxx_hw_reset(ha);
+	qla4xxx_hw_reset(ha, 1);
 
 	/* Wait until the Network Reset Intr bit is cleared */
 	max_wait_time = RESET_INTR_TOV;
@@ -783,9 +792,9 @@ int qla4xxx_soft_reset(struct scsi_qla_host *ha)
 
 	if ((ctrl_status & CSR_NET_RESET_INTR) != 0) {
 		DEBUG2(printk(KERN_WARNING
-			      "scsi%ld: Network Reset Intr not cleared by "
-			      "Network function, clearing it now!\n",
-			      ha->host_no));
+			"scsi%ld: Network Reset Intr not cleared by "
+			"Network function, clearing it now!\n",
+			ha->host_no));
 		spin_lock_irqsave(&ha->hardware_lock, flags);
 		writel(set_rmask(CSR_NET_RESET_INTR), &ha->reg->ctrl_status);
 		readl(&ha->reg->ctrl_status);
@@ -881,14 +890,13 @@ static void qla4xxx_flush_active_srbs(struct scsi_qla_host *ha)
  * qla4xxx_recover_adapter - recovers adapter after a fatal error
  * @ha: Pointer to host adapter structure.
  **/
-static int qla4xxx_recover_adapter(struct scsi_qla_host *ha) 
+static int qla4xxx_recover_adapter(struct scsi_qla_host *ha)
 {
 	int status;
 
 	/* Stall incoming I/O until we are done */
 	clear_bit(AF_ONLINE, &ha->flags);
-	DEBUG2(printk("scsi%ld: %s calling qla4xxx_cmd_wait\n", ha->host_no,
-		      __func__));
+	dev_info(&ha->pdev->dev, "%s: adapter OFFLINE\n", __func__);
 
 	/* Wait for outstanding commands to complete.
 	 * Stalls the driver for max 30 secs
@@ -905,7 +913,7 @@ static int qla4xxx_recover_adapter(struct scsi_qla_host *ha)
 	 */
 	if (status == QLA_SUCCESS) {
 		DEBUG2(printk(KERN_ERR "scsi%ld: %s - Performing soft reset..\n",
-			      ha->host_no, __func__));
+					ha->host_no, __func__));
 		qla4xxx_flush_active_srbs(ha);
 		if (ql4xxx_lock_drvr_wait(ha) == QLA_SUCCESS)
 			status = qla4xxx_soft_reset(ha);
@@ -920,24 +928,26 @@ static int qla4xxx_recover_adapter(struct scsi_qla_host *ha)
 	 * with ISP interrupts enabled */
 	if (status == QLA_SUCCESS) {
 		DEBUG2(printk("scsi%ld: %s - Initializing adapter..\n",
-			      ha->host_no, __func__));
+			ha->host_no, __func__));
 
 		/* If successful, AF_ONLINE flag set in
 		 * qla4xxx_initialize_adapter */
+		if (ha->mac_index == 3)
+			ssleep(6);
 		status = qla4xxx_initialize_adapter(ha, PRESERVE_DDB_LIST);
 	}
 
 	/* Failed adapter initialization?
 	 * Retry reset_ha only if invoked via DPC (DPC_RESET_HA) */
 	if ((test_bit(AF_ONLINE, &ha->flags) == 0) &&
-	    (test_bit(DPC_RESET_HA, &ha->dpc_flags))) {
+		 (test_bit(DPC_RESET_HA, &ha->dpc_flags))) {
 		/* Adapter initialization failed, see if we can retry
 		 * resetting the ha */
 		if (!test_bit(DPC_RETRY_RESET_HA, &ha->dpc_flags)) {
 			ha->retry_reset_ha_cnt = MAX_RESET_HA_RETRIES;
 			DEBUG2(printk("scsi%ld: recover adapter - retrying "
-				      "(%d) more times\n", ha->host_no,
-				      ha->retry_reset_ha_cnt));
+				"(%d) more times\n", ha->host_no,
+				ha->retry_reset_ha_cnt));
 			set_bit(DPC_RETRY_RESET_HA, &ha->dpc_flags);
 			status = QLA_ERROR;
 		} else {
@@ -945,9 +955,9 @@ static int qla4xxx_recover_adapter(struct scsi_qla_host *ha)
 				/* Schedule another Reset HA--DPC will retry */
 				ha->retry_reset_ha_cnt--;
 				DEBUG2(printk("scsi%ld: recover adapter - "
-					      "retry remaining %d\n",
-					      ha->host_no,
-					      ha->retry_reset_ha_cnt));
+					"retry remaining %d\n",
+					ha->host_no,
+					ha->retry_reset_ha_cnt));
 				status = QLA_ERROR;
 			}
 
@@ -955,8 +965,8 @@ static int qla4xxx_recover_adapter(struct scsi_qla_host *ha)
 				/* Recover adapter retries have been exhausted.
 				 * Adapter DEAD */
 				DEBUG2(printk("scsi%ld: recover adapter "
-					      "failed - board disabled\n",
-					      ha->host_no));
+					"failed - board disabled\n",
+					ha->host_no));
 				qla4xxx_flush_active_srbs(ha);
 				clear_bit(DPC_RETRY_RESET_HA, &ha->dpc_flags);
 				clear_bit(DPC_RESET_HA, &ha->dpc_flags);
@@ -991,10 +1001,9 @@ static int qla4xxx_recover_adapter(struct scsi_qla_host *ha)
  * the mid-level tries to sleep when it reaches the driver threshold
  * "host->can_queue". This can cause a panic if we were in our interrupt code.
  **/
-static void qla4xxx_do_dpc(struct work_struct *work)
+static QL_DECLARE_DPC(qla4xxx_do_dpc, data)
 {
-	struct scsi_qla_host *ha =
-		container_of(work, struct scsi_qla_host, dpc_work);
+	struct scsi_qla_host *ha = QL_DPC_DATA_TO_HA(data);
 	struct ddb_entry *ddb_entry, *dtemp;
 	int status = QLA_ERROR;
 
@@ -1009,11 +1018,11 @@ static void qla4xxx_do_dpc(struct work_struct *work)
 		return;
 
 	if (adapter_up(ha) ||
-	    test_bit(DPC_RESET_HA, &ha->dpc_flags) ||
-	    test_bit(DPC_RESET_HA_INTR, &ha->dpc_flags) ||
-	    test_bit(DPC_RESET_HA_DESTROY_DDB_LIST, &ha->dpc_flags)) {
+		 test_bit(DPC_RESET_HA, &ha->dpc_flags) ||
+		 test_bit(DPC_RESET_HA_INTR, &ha->dpc_flags) ||
+		 test_bit(DPC_RESET_HA_DESTROY_DDB_LIST, &ha->dpc_flags)) {
 		if (test_bit(DPC_RESET_HA_DESTROY_DDB_LIST, &ha->dpc_flags) ||
-		    test_bit(DPC_RESET_HA, &ha->dpc_flags))
+			 test_bit(DPC_RESET_HA, &ha->dpc_flags))
 			qla4xxx_recover_adapter(ha);
 
 		if (test_bit(DPC_RESET_HA_INTR, &ha->dpc_flags)) {
@@ -1025,14 +1034,15 @@ static void qla4xxx_do_dpc(struct work_struct *work)
 					break;
 				msleep(1000);
 			}
+
 			if (wait_time == 0)
 				DEBUG2(printk("scsi%ld: %s: SR|FSR "
-					      "bit not cleared-- resetting\n",
-					      ha->host_no, __func__));
+					"bit not cleared-- resetting\n",
+					ha->host_no, __func__));
 			qla4xxx_flush_active_srbs(ha);
 			if (ql4xxx_lock_drvr_wait(ha) == QLA_SUCCESS) {
 				qla4xxx_process_aen(ha, FLUSH_DDB_CHANGED_AENS);
-				status = qla4xxx_initialize_adapter(ha, 
+				status = qla4xxx_initialize_adapter(ha,
 						PRESERVE_DDB_LIST);
 			}
 			clear_bit(DPC_RESET_HA_INTR, &ha->dpc_flags);
@@ -1049,13 +1059,42 @@ static void qla4xxx_do_dpc(struct work_struct *work)
 	if (test_and_clear_bit(DPC_GET_DHCP_IP_ADDR, &ha->dpc_flags))
 		qla4xxx_get_dhcp_ip_address(ha);
 
+	qla4xxx_check_dev_offline(ha);
+
+	if (test_and_clear_bit(DPC_DELETE_DEVICE, &ha->dpc_flags)) {
+		list_for_each_entry_safe(ddb_entry, dtemp,
+			&ha->ddb_list, list) {
+			if (test_and_clear_bit(DF_DELETED,
+				&ddb_entry->flags)) {
+				if (atomic_read(&ddb_entry->state) ==
+					DDB_STATE_DEAD) {
+					dev_info(&ha->pdev->dev,
+					"%s: ddb[%d] os[%d] - "
+					"delete\n",
+					__func__,
+					ddb_entry->fw_ddb_index,
+					ddb_entry->os_target_id);
+				} else {
+					dev_info(&ha->pdev->dev,
+					"%s: ddb[%d] os[%d] - "
+					"ddb state not dead but"
+					" marked for delete\n",
+					__func__,
+					ddb_entry->fw_ddb_index,
+					ddb_entry->os_target_id);
+				}
+			}
+		}
+	}
+
 	/* ---- relogin device? --- */
 	if (adapter_up(ha) &&
-	    test_and_clear_bit(DPC_RELOGIN_DEVICE, &ha->dpc_flags)) {
+		 test_and_clear_bit(DPC_RELOGIN_DEVICE, &ha->dpc_flags)) {
 		list_for_each_entry_safe(ddb_entry, dtemp,
 					 &ha->ddb_list, list) {
 			if (test_and_clear_bit(DF_RELOGIN, &ddb_entry->flags) &&
-			    atomic_read(&ddb_entry->state) != DDB_STATE_ONLINE)
+				(atomic_read(&ddb_entry->state) !=
+					 DDB_STATE_ONLINE))
 				qla4xxx_relogin_device(ha, ddb_entry);
 
 			/*
@@ -1092,7 +1131,7 @@ static void qla4xxx_free_adapter(struct scsi_qla_host *ha)
 
 	/* Issue Soft Reset to put firmware in unknown state */
 	if (ql4xxx_lock_drvr_wait(ha) == QLA_SUCCESS)
-		qla4xxx_hw_reset(ha);
+		qla4xxx_hw_reset(ha, 1);
 
 	/* Remove timer thread, if present */
 	if (ha->timer_active)
@@ -1142,6 +1181,7 @@ static int qla4xxx_iospace_config(struct scsi_qla_host *ha)
 	if (!(mmio_flags & IORESOURCE_MEM)) {
 		dev_err(&ha->pdev->dev,
 			"region #0 not an MMIO resource, aborting\n");
+
 		goto iospace_error_exit;
 	}
 	if (mmio_len < MIN_IOBASE_LEN) {
@@ -1173,14 +1213,6 @@ iospace_error_exit:
 	return -ENOMEM;
 }
 
-static void ql4_get_aen_log(struct scsi_qla_host *ha, struct ql4_aen_log *aenl)
-{
-	if (aenl) {
-		memcpy(aenl, &ha->aen_log, sizeof (ha->aen_log));
-		ha->aen_log.count = 0;
-	}
-}
-
 /**
  * qla4xxx_probe_adapter - callback function to probe HBA
  * @pdev: pointer to pci_dev structure
@@ -1191,7 +1223,7 @@ static void ql4_get_aen_log(struct scsi_qla_host *ha, struct ql4_aen_log *aenl)
  * the driver.
  **/
 static int __devinit qla4xxx_probe_adapter(struct pci_dev *pdev,
-					   const struct pci_device_id *ent)
+						const struct pci_device_id *ent)
 {
 	int ret = -ENODEV, status;
 	struct Scsi_Host *host;
@@ -1206,7 +1238,7 @@ static int __devinit qla4xxx_probe_adapter(struct pci_dev *pdev,
 	host = scsi_host_alloc(&qla4xxx_driver_template, sizeof(*ha));
 	if (host == NULL) {
 		printk(KERN_WARNING
-		       "qla4xxx: Couldn't allocate host from scsi layer!\n");
+				 "qla4xxx: Couldn't allocate host from scsi layer!\n");
 		goto probe_disable_device;
 	}
 
@@ -1218,10 +1250,7 @@ static int __devinit qla4xxx_probe_adapter(struct pci_dev *pdev,
 	ha->pdev = pdev;
 	ha->host = host;
 	ha->host_no = host->host_no;
-
-	ha->ql4mbx = qla4xxx_mailbox_command;
-	ha->ql4cmd = qla4xxx_send_command_to_isp;
-	ha->ql4getaenlog = ql4_get_aen_log;
+	set_bit(AF_OS_INDEX_VALID, &ha->flags);
 
 	/* Configure PCI I/O space. */
 	ret = qla4xxx_iospace_config(ha);
@@ -1229,7 +1258,7 @@ static int __devinit qla4xxx_probe_adapter(struct pci_dev *pdev,
 		goto probe_failed;
 
 	dev_info(&ha->pdev->dev, "Found an ISP%04x, irq %d, iobase 0x%p\n",
-		 pdev->device, pdev->irq, ha->reg);
+			pdev->device, pdev->irq, ha->reg);
 
 	qla4xxx_config_dma_addressing(ha);
 
@@ -1245,7 +1274,7 @@ static int __devinit qla4xxx_probe_adapter(struct pci_dev *pdev,
 	/* Allocate dma buffers */
 	if (qla4xxx_mem_alloc(ha)) {
 		dev_warn(&ha->pdev->dev,
-			 "[ERROR] Failed to allocate memory for adapter\n");
+			"[ERROR] Failed to allocate memory for adapter\n");
 
 		ret = -ENOMEM;
 		goto probe_failed;
@@ -1258,8 +1287,8 @@ static int __devinit qla4xxx_probe_adapter(struct pci_dev *pdev,
 	 */
 	status = qla4xxx_initialize_adapter(ha, REBUILD_DDB_LIST);
 	while (status == QLA_ERROR && init_retry_count++ < MAX_INIT_RETRIES) {
-		DEBUG2(printk(KERN_ERR "scsi%ld: %s: retrying adapter initialization "
-					"(%d)\n", ha->host_no, __func__, init_retry_count));
+		DEBUG2(dev_info(&ha->pdev->dev, "%s: retry adapter init %d\n",
+			__func__, init_retry_count));
 		qla4xxx_soft_reset(ha);
 		status = qla4xxx_initialize_adapter(ha, REBUILD_DDB_LIST);
 	}
@@ -1280,7 +1309,7 @@ static int __devinit qla4xxx_probe_adapter(struct pci_dev *pdev,
 
 	/* Startup the kernel thread for this host adapter. */
 	DEBUG2(printk("scsi: %s: Starting kernel thread for "
-		      "qla4xxx_dpc\n", __func__));
+				"qla4xxx_dpc\n", __func__));
 	sprintf(buf, "qla4xxx_%lu_dpc", ha->host_no);
 	ha->dpc_thread = create_singlethread_workqueue(buf);
 	if (!ha->dpc_thread) {
@@ -1288,9 +1317,11 @@ static int __devinit qla4xxx_probe_adapter(struct pci_dev *pdev,
 		ret = -ENODEV;
 		goto probe_failed;
 	}
-	INIT_WORK(&ha->dpc_work, qla4xxx_do_dpc);
+	QL_INIT_WORK(ha, qla4xxx_do_dpc);
+
 	ret = request_irq(pdev->irq, qla4xxx_intr_handler,
-			IRQF_DISABLED | IRQF_SHARED, "qla4xxx", ha);
+			QL_REQ_IRQ_FLAGS, "qla4xxx", ha);
+
 	if (ret) {
 		dev_warn(&ha->pdev->dev, "Failed to reserve interrupt %d"
 			" already in use.\n", pdev->irq);
@@ -1298,7 +1329,7 @@ static int __devinit qla4xxx_probe_adapter(struct pci_dev *pdev,
 	}
 	set_bit(AF_IRQ_ATTACHED, &ha->flags);
 	host->irq = pdev->irq;
-	DEBUG(printk("scsi%d: irq %d attached\n", ha->host_no, ha->pdev->irq));
+	dev_info(&ha->pdev->dev, "irq %d attached\n", ha->pdev->irq);
 
 	qla4xxx_enable_intrs(ha);
 
@@ -1313,6 +1344,9 @@ static int __devinit qla4xxx_probe_adapter(struct pci_dev *pdev,
 	if (ret)
 		goto probe_failed;
 
+	if ((ret = QL_ISCSI_REGISTER_HOST(host, qla4xxx_scsi_transport)))
+		goto remove_host;
+
 	/* Update transport device information for all devices. */
 	list_for_each_entry_safe(ddb_entry, ddbtemp, &ha->ddb_list, list) {
 
@@ -1320,25 +1354,36 @@ static int __devinit qla4xxx_probe_adapter(struct pci_dev *pdev,
 			set_bit(DF_SCAN_ISSUED, &ddb_entry->flags);
 
 		if (qla4xxx_add_sess(ddb_entry,
-			test_bit(DF_SCAN_ISSUED, &ddb_entry->flags)))
+			test_bit(DF_SCAN_ISSUED, &ddb_entry->flags))) {
+			QL_ISCSI_UNREGISTER_HOST(host, qla4xxx_scsi_transport);
 			goto remove_host;
+		}
 		if (!test_bit(DF_SCAN_ISSUED, &ddb_entry->flags))
 			qla4xxx_mark_device_missing(ha, ddb_entry);
 	}
 
-	printk(KERN_INFO
-	       " QLogic iSCSI HBA Driver version: %s\n"
-	       "  QLogic ISP%04x @ %s, pdev = %p host#=%ld, fw=%02d.%02d.%02d.%02d\n",
-	       qla4xxx_version_str, ha->pdev->device, pci_name(ha->pdev), pdev,
-	       ha->host_no, ha->firmware_version[0], ha->firmware_version[1],
-	       ha->patch_number, ha->build_number);
+	dev_info(&ha->pdev->dev, " QLogic iSCSI HBA Driver version: %s\n"
+		"  QLogic ISP%04x @ %s, pdev = %p host#=%ld,"
+		" fw=%02d.%02d.%02d.%02d\n", qla4xxx_version_str,
+		ha->pdev->device, pci_name(ha->pdev), pdev,
+		ha->host_no, ha->firmware_version[0], ha->firmware_version[1],
+		ha->patch_number, ha->build_number);
 
 	/* Insert new entry into the list of adapters. */
 	klist_add_tail(&ha->node, &qla4xxx_hostlist);
 	ha->instance = atomic_inc_return(&qla4xxx_hba_count) - 1;
 
-	DEBUG2(printk("qla4xxx: listhead=%p, done adding ha=%p i=%d\n",
-		      &qla4xxx_hostlist, &ha->node, ha->instance));
+	if (qla4xxx_ioctl_init(ha)) {
+		dev_info(&ha->pdev->dev, "ioctl init failed\n");
+		QL_ISCSI_UNREGISTER_HOST(host, qla4xxx_scsi_transport);
+		goto remove_host;
+	}
+
+	DEBUG2(dev_info(&ha->pdev->dev, "listhead=%p, done adding ha=%p i=%d\n",
+		&qla4xxx_hostlist, &ha->node, ha->instance));
+
+//	set_bit(AF_INIT_DONE, &ha->flags);
+	dev_info(&ha->pdev->dev, "%s: AF_INIT_DONE\n", __func__);
 
 	return 0;
 
@@ -1377,7 +1422,11 @@ static void __devexit qla4xxx_remove_adapter(struct pci_dev *pdev)
 	/* remove devs from iscsi_sessions to scsi_devices */
 	qla4xxx_free_ddb_list(ha);
 
+	QL_ISCSI_UNREGISTER_HOST(ha->host, qla4xxx_scsi_transport);
+
 	scsi_remove_host(ha->host);
+
+	qla4xxx_ioctl_exit(ha);
 
 	qla4xxx_free_adapter(ha);
 
@@ -1393,7 +1442,7 @@ static void __devexit qla4xxx_remove_adapter(struct pci_dev *pdev)
  * At exit, the @ha's flags.enable_64bit_addressing set to indicated
  * supported addressing method.
  */
-static void qla4xxx_config_dma_addressing(struct scsi_qla_host *ha)
+void qla4xxx_config_dma_addressing(struct scsi_qla_host *ha)
 {
 	int retval;
 
@@ -1402,9 +1451,9 @@ static void qla4xxx_config_dma_addressing(struct scsi_qla_host *ha)
 		if (pci_set_consistent_dma_mask(ha->pdev, DMA_64BIT_MASK)) {
 			dev_dbg(&ha->pdev->dev,
 				  "Failed to set 64 bit PCI consistent mask; "
-				  "using 32 bit.\n");
+					"using 32 bit.\n");
 			retval = pci_set_consistent_dma_mask(ha->pdev,
-							     DMA_32BIT_MASK);
+					  DMA_32BIT_MASK);
 		}
 	} else
 		retval = pci_set_dma_mask(ha->pdev, DMA_32BIT_MASK);
@@ -1412,7 +1461,7 @@ static void qla4xxx_config_dma_addressing(struct scsi_qla_host *ha)
 
 static int qla4xxx_slave_alloc(struct scsi_device *sdev)
 {
-	struct iscsi_cls_session *sess = starget_to_session(sdev->sdev_target);
+	struct iscsi_cls_session *sess = QL_ISCSI_SDEV_TO_SESS(sdev);
 
 	if (sess) {
 		sdev->hostdata = sess->dd_data;
@@ -1429,6 +1478,11 @@ static int qla4xxx_slave_configure(struct scsi_device *sdev)
 		scsi_deactivate_tcq(sdev, 32);
 
 	return 0;
+}
+
+static void qla4xxx_slave_destroy(struct scsi_device *sdev)
+{
+	sdev->hostdata = NULL;
 }
 
 /**
@@ -1470,7 +1524,7 @@ struct srb * qla4xxx_del_from_active_array(struct scsi_qla_host *ha, uint32_t in
  * for some max time.
  **/
 static int qla4xxx_eh_wait_on_command(struct scsi_qla_host *ha,
-				      struct scsi_cmnd *cmd)
+						struct scsi_cmnd *cmd)
 {
 	int done = 0;
 	struct srb *rp;
@@ -1564,8 +1618,8 @@ static int qla4xxx_eh_device_reset(struct scsi_cmnd *cmd)
 		return ret;
 
 	dev_info(&ha->pdev->dev,
-		 "scsi%ld:%d:%d:%d: DEVICE RESET ISSUED.\n", ha->host_no,
-		 cmd->device->channel, cmd->device->id, cmd->device->lun);
+		"%s: %d:%d:%d: DEVICE RESET ISSUED.\n", __func__,
+		cmd->device->channel, cmd->device->id, cmd->device->lun);
 
 	if (qla4xxx_wait_for_hba_online(ha) != QLA_SUCCESS) {
 		dev_info(&ha->pdev->dev, "%s: HBA OFFLINE: FAILED\n", __func__);
@@ -1584,12 +1638,12 @@ static int qla4xxx_eh_device_reset(struct scsi_cmnd *cmd)
 	 */
 	if (cmd->device->host->shost_state == SHOST_RECOVERY) {
 		if (qla4xxx_eh_wait_for_active_target_commands(ha,
-							       cmd->device->id,
-							       cmd->device->
-							       lun)) {
+									 cmd->device->id,
+									 cmd->device->
+									 lun)) {
 			dev_info(&ha->pdev->dev,
-				 "DEVICE RESET FAILED - waiting for "
-				 "commands.\n");
+					"DEVICE RESET FAILED - waiting for "
+					"commands.\n");
 			goto eh_dev_reset_done;
 		}
 	}
@@ -1598,9 +1652,9 @@ static int qla4xxx_eh_device_reset(struct scsi_cmnd *cmd)
 		goto eh_dev_reset_done;
 
 	dev_info(&ha->pdev->dev,
-		 "scsi(%ld:%d:%d:%d): DEVICE RESET SUCCEEDED.\n",
-		 ha->host_no, cmd->device->channel, cmd->device->id,
-		 cmd->device->lun);
+			"scsi(%ld:%d:%d:%d): DEVICE RESET SUCCEEDED.\n",
+			ha->host_no, cmd->device->channel, cmd->device->id,
+			cmd->device->lun);
 
 	ret = SUCCESS;
 
@@ -1635,7 +1689,7 @@ static int qla4xxx_eh_host_reset(struct scsi_cmnd *cmd)
 	}
 
 	dev_info(&ha->pdev->dev, "HOST RESET %s.\n",
-		 return_status == FAILED ? "FAILED" : "SUCCEDED");
+			return_status == FAILED ? "FAILED" : "SUCCEDED");
 
 	return return_status;
 }
@@ -1664,7 +1718,7 @@ static struct pci_device_id qla4xxx_pci_tbl[] = {
 };
 MODULE_DEVICE_TABLE(pci, qla4xxx_pci_tbl);
 
-static struct pci_driver qla4xxx_pci_driver = {
+struct pci_driver qla4xxx_pci_driver = {
 	.name		= DRIVER_NAME,
 	.id_table	= qla4xxx_pci_tbl,
 	.probe		= qla4xxx_probe_adapter,
@@ -1678,12 +1732,11 @@ static int __init qla4xxx_module_init(void)
 	atomic_set(&qla4xxx_hba_count, 0);
 	klist_init(&qla4xxx_hostlist, NULL, NULL);
 	/* Allocate cache for SRBs. */
-	srb_cachep = kmem_cache_create("qla4xxx_srbs", sizeof(struct srb), 0,
-			SLAB_HWCACHE_ALIGN, NULL);
+	srb_cachep = ql_kmem_cache_create();
+
 	if (srb_cachep == NULL) {
-		printk(KERN_ERR
-		       "%s: Unable to allocate SRB cache..."
-		       "Failing load!\n", DRIVER_NAME);
+		printk(KERN_ERR "%s: Unable to allocate SRB cache..."
+				 "Failing load!\n", DRIVER_NAME);
 		ret = -ENOMEM;
 		goto no_srp_cache;
 	}
@@ -1700,7 +1753,14 @@ static int __init qla4xxx_module_init(void)
 		goto release_srb_cache;
 	}
 
+	ret = QL_MISC_INIT;
+	if (ret) {
+		printk(KERN_INFO "QLogic iSCSI HBA Driver ioctl init failed\n");
+		goto unregister_transport;
+	}
+
 	printk(KERN_INFO "QLogic iSCSI HBA Driver\n");
+
 	ret = pci_register_driver(&qla4xxx_pci_driver);
 	if (ret)
 		goto unregister_transport;
@@ -1718,6 +1778,9 @@ no_srp_cache:
 static void __exit qla4xxx_module_exit(void)
 {
 	ql4_mod_unload = 1;
+
+	QL_MISC_EXIT;
+
 	pci_unregister_driver(&qla4xxx_pci_driver);
 	iscsi_unregister_transport(&qla4xxx_iscsi_transport);
 	kmem_cache_destroy(srb_cachep);

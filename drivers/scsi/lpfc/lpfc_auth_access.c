@@ -1,7 +1,7 @@
 /*******************************************************************
  * This file is part of the Emulex Linux Device Driver for         *
  * Fibre Channel Host Bus Adapters.                                *
- * Copyright (C) 2006-2007 Emulex.  All rights reserved.           *
+ * Copyright (C) 2006-2008 Emulex.  All rights reserved.           *
  * EMULEX and SLI are trademarks of Emulex.                        *
  * www.emulex.com                                                  *
  *                                                                 *
@@ -213,10 +213,11 @@ lpfc_fc_sc_request(struct lpfc_vport *vport,
 	fc_sc_req->tran_id = seq;
 
 	len = sizeof(struct fc_nl_sc_message) + auth_req_len;
-	fc_nl_sc_msg = kzalloc(sizeof(struct fc_nl_sc_message) + auth_req_len,
-			       GFP_KERNEL);
-	if (!fc_nl_sc_msg)
+	fc_nl_sc_msg = kzalloc(len, GFP_KERNEL);
+	if (!fc_nl_sc_msg) {
+		kfree(fc_sc_req);
 		return -ENOMEM;
+	}
 	fc_nl_sc_msg->msgtype = msg_type;
 	fc_nl_sc_msg->data_len = auth_req_len;
 	memcpy(fc_nl_sc_msg->data, auth_req, auth_req_len);
@@ -228,6 +229,7 @@ lpfc_fc_sc_request(struct lpfc_vport *vport,
 	scsi_nl_send_vendor_msg(fc_service_pid, shost->host_no,
 				(SCSI_NL_VID_TYPE_PCI | PCI_VENDOR_ID_EMULEX),
 				(char *) fc_nl_sc_msg, len);
+	kfree(fc_nl_sc_msg);
 	lpfc_fc_sc_add_timer(fc_sc_req, FC_SC_REQ_TIMEOUT,
 			     lpfc_fc_sc_req_times_out);
 	return 0;

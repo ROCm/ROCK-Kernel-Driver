@@ -543,6 +543,7 @@ sdev_rd_attr (scsi_level, "%d\n");
 sdev_rd_attr (vendor, "%.8s\n");
 sdev_rd_attr (model, "%.16s\n");
 sdev_rd_attr (rev, "%.4s\n");
+sdev_rd_attr (tgps, "%d\n");
 
 /*
  * TODO: can we make these symlinks to the block layer ones?

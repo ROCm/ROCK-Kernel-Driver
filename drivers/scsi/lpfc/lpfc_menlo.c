@@ -289,19 +289,16 @@ static void
 sysfs_menlo_idle(struct lpfc_hba *phba,
 		struct lpfc_sysfs_menlo *sysfs_menlo)
 {
-	struct Scsi_Host *shost = lpfc_shost_from_vport(phba->pport);
 
 	spin_lock_irq(&phba->hbalock);
 	list_del_init(&sysfs_menlo->list);
 	spin_unlock_irq(&phba->hbalock);
-	spin_lock_irq(shost->host_lock);
 
 	if (sysfs_menlo->cr.cmdiocbq)
 		sysfs_menlo_genreq_free(phba, &sysfs_menlo->cr);
 	if (sysfs_menlo->cx.cmdiocbq)
 		sysfs_menlo_genreq_free(phba, &sysfs_menlo->cx);
 
-	spin_unlock_irq(shost->host_lock);
 	kfree(sysfs_menlo);
 }
 
@@ -543,14 +540,15 @@ lpfc_menlo_write(struct lpfc_hba *phba,
 	}
 
 	if ((count + sysfs_menlo->cr.offset) > sysfs_menlo->cmdhdr.cmdsize) {
-		if ( sysfs_menlo->cmdhdr.cmdsize != 4) {
-		lpfc_printf_log(phba, KERN_ERR, LOG_LIBDFC,
+		if (sysfs_menlo->cmdhdr.cmdsize >=
+			sizeof(struct lpfc_sysfs_menlo_hdr)) {
+			lpfc_printf_log(phba, KERN_ERR, LOG_LIBDFC,
 			"1213 FCoE cmd overflow: off %d + cnt %d > cmdsz %d\n",
-			(int)sysfs_menlo->cr.offset,
-			(int)count,
-			(int)sysfs_menlo->cmdhdr.cmdsize);
-		sysfs_menlo_idle(phba, sysfs_menlo);
-		return -ERANGE;
+				(int)sysfs_menlo->cr.offset,
+				(int)count,
+				(int)sysfs_menlo->cmdhdr.cmdsize);
+			sysfs_menlo_idle(phba, sysfs_menlo);
+			return -ERANGE;
 		}
 	}
 

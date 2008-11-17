@@ -283,11 +283,11 @@ static int hp_sw_activate(struct scsi_device *sdev)
 }
 
 static const struct scsi_dh_devlist hp_sw_dh_data_list[] = {
-	{"COMPAQ", "MSA1000 VOLUME"},
-	{"COMPAQ", "HSV110"},
-	{"HP", "HSV100"},
-	{"DEC", "HSG80"},
-	{NULL, NULL},
+	{"COMPAQ", "MSA1000 VOLUME", 0},
+	{"COMPAQ", "HSV110", 0},
+	{"HP", "HSV100", 0},
+	{"DEC", "HSG80", 0},
+	{NULL, NULL, 0},
 };
 
 static int hp_sw_bus_attach(struct scsi_device *sdev);

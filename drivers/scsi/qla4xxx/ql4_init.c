@@ -10,6 +10,7 @@
 #include "ql4_glbl.h"
 #include "ql4_dbg.h"
 #include "ql4_inline.h"
+#include "ql4_os.h"
 
 /* link auto negotiation normally takes roughly 2s.   */
 /* If we don't have link in 3 times that period quit. */
@@ -18,9 +19,6 @@
 /*
  * QLogic ISP4xxx Hardware Support Function Prototypes.
  */
-
-static struct ddb_entry * qla4xxx_alloc_ddb(struct scsi_qla_host *ha,
-					    uint32_t fw_ddb_index);
 
 static void ql4xxx_set_mac_number(struct scsi_qla_host *ha)
 {
@@ -52,15 +50,14 @@ static void ql4xxx_set_mac_number(struct scsi_qla_host *ha)
 }
 
 /**
- * qla4xxx_free_ddb - deallocate ddb	
+ * qla4xxx_free_ddb - deallocate ddb
  * @ha: pointer to host adapter structure.
  * @ddb_entry: pointer to device database entry
  *
  * This routine deallocates and unlinks the specified ddb_entry from the
  * adapter's
  **/
-static void qla4xxx_free_ddb(struct scsi_qla_host *ha,
-			     struct ddb_entry *ddb_entry)
+void qla4xxx_free_ddb(struct scsi_qla_host *ha, struct ddb_entry *ddb_entry)
 {
 	/* Remove device entry from list */
 	list_del_init(&ddb_entry->list);
@@ -359,8 +356,8 @@ static void qla4xxx_fill_ddb(struct ddb_entry *ddb_entry,
  * This routine allocates a ddb_entry, ititializes some values, and
  * inserts it into the ddb list.
  **/
-static struct ddb_entry * qla4xxx_alloc_ddb(struct scsi_qla_host *ha,
-					    uint32_t fw_ddb_index)
+struct ddb_entry * qla4xxx_alloc_ddb(struct scsi_qla_host *ha,
+				     uint32_t fw_ddb_index)
 {
 	struct ddb_entry *ddb_entry;
 
@@ -478,7 +475,7 @@ static int qla4xxx_build_ddb_list(struct scsi_qla_host *ha)
 			(strlen(fw_ddb_entry->iscsi_name) != 0)){
 			ddb_entry = qla4xxx_alloc_ddb(ha, fw_ddb_index);
 			if (ddb_entry == NULL) {
-				DEBUG2(dev_info(&ha->pdev->dev,"%s alloc_ddb %d "
+				DEBUG2(dev_info(&ha->pdev->dev,"%s alloc_ddb %d"
 					"failed\n", __func__, fw_ddb_index));
 				goto exit_ddb_list;
 			}
@@ -488,7 +485,7 @@ static int qla4xxx_build_ddb_list(struct scsi_qla_host *ha)
 			ddb_entry->connection_id = conn_id;
 			qla4xxx_fill_ddb(ddb_entry, fw_ddb_entry);
 			ddb_entry->fw_ddb_device_state = ddb_state;
-			
+
 			if (ddb_entry->fw_ddb_device_state == DDB_DS_SESSION_ACTIVE) {
 				atomic_set(&ddb_entry->state, DDB_STATE_ONLINE);
 				dev_info(&ha->pdev->dev,
@@ -695,6 +692,8 @@ static int qla4xxx_initialize_ddb_list(struct scsi_qla_host *ha)
 
 	qla4xxx_flush_AENS(ha);
 
+	/* Wait for an AEN */
+	qla4xxx_devices_ready(ha);
 
 	/*
 	 * First perform device discovery for active
@@ -703,9 +702,6 @@ static int qla4xxx_initialize_ddb_list(struct scsi_qla_host *ha)
 	 */
 	if ((status = qla4xxx_build_ddb_list(ha)) == QLA_ERROR)
 		return status;
-
-	/* Wait for an AEN */
-	qla4xxx_devices_ready(ha);
 
 	/*
 	 * Targets can come online after the inital discovery, so processing
@@ -747,13 +743,15 @@ int qla4xxx_reinitialize_ddb_list(struct scsi_qla_host *ha)
 
 			qla4xxx_fill_ddb(ddb_entry, fw_ddb_entry);
 
-			if (ddb_entry->fw_ddb_device_state == DDB_DS_SESSION_ACTIVE) {
+			if (ddb_entry->fw_ddb_device_state ==
+				DDB_DS_SESSION_ACTIVE) {
 				atomic_set(&ddb_entry->state, DDB_STATE_ONLINE);
 				dev_info(&ha->pdev->dev,
-					"scsi%ld: %s: ddb[%d] os[%d] marked ONLINE\n",
-					ha->host_no, __func__, ddb_entry->fw_ddb_index,
+					"%s: ddb[%d] os[%d] marked ONLINE\n",
+					__func__, ddb_entry->fw_ddb_index,
 					ddb_entry->os_target_id);
-			} else if (atomic_read(&ddb_entry->state) == DDB_STATE_ONLINE)
+			} else if (atomic_read(&ddb_entry->state) ==
+					DDB_STATE_ONLINE)
 				qla4xxx_mark_device_missing(ha, ddb_entry);
 		}
 	}
@@ -884,8 +882,8 @@ static int qla4xxx_start_firmware_from_flash(struct scsi_qla_host *ha)
 		writel(set_rmask(NVR_WRITE_ENABLE),
 		       &ha->reg->u1.isp4022.nvram);
 
-        writel(2, &ha->reg->mailbox[6]);
-        readl(&ha->reg->mailbox[6]);
+	writel(2, &ha->reg->mailbox[6]);
+	readl(&ha->reg->mailbox[6]);
 
 	writel(set_rmask(CSR_BOOT_ENABLE), &ha->reg->ctrl_status);
 	readl(&ha->reg->ctrl_status);
@@ -1054,7 +1052,7 @@ static int qla4xxx_start_firmware(struct scsi_qla_host *ha)
 		}
 		config_chip = 1;
 
-		/* Reset clears the semaphore, so acquire again */
+		/* Reset clears the semaphore, so aquire again */
 		if (ql4xxx_lock_drvr_wait(ha) != QLA_SUCCESS)
 			return QLA_ERROR;
 	}
@@ -1083,7 +1081,7 @@ static int qla4xxx_start_firmware(struct scsi_qla_host *ha)
  * @renew_ddb_list: Indicates what to do with the adapter's ddb list
  *	after adapter recovery has completed.
  *	0=preserve ddb list, 1=destroy and rebuild ddb list
- * 
+ *
  * This routine parforms all of the steps necessary to initialize the adapter.
  *
  **/
@@ -1119,12 +1117,12 @@ int qla4xxx_initialize_adapter(struct scsi_qla_host *ha,
 	 * followed by 0x8014 aen" to trigger the tgt discovery process.
 	 */
 	if (ha->firmware_state & FW_STATE_DHCP_IN_PROGRESS)
-		goto exit_init_online;
+		goto exit_init_hba0;
 
 	/* Skip device discovery if ip and subnet is zero */
 	if (memcmp(ha->ip_address, ip_address, IP_ADDR_LEN) == 0 ||
 	    memcmp(ha->subnet_mask, ip_address, IP_ADDR_LEN) == 0)
-		goto exit_init_online;
+		goto exit_init_hba0;
 
 	if (renew_ddb_list == PRESERVE_DDB_LIST) {
 		/*
@@ -1153,8 +1151,10 @@ int qla4xxx_initialize_adapter(struct scsi_qla_host *ha,
 			      ha->host_no));
 	}
 
-exit_init_online:
+exit_init_hba0:
 	set_bit(AF_ONLINE, &ha->flags);
+	dev_info(&ha->pdev->dev, "%s: adapter ONLINE\n", __func__);
+
 exit_init_hba:
 	return status;
 }
@@ -1204,40 +1204,63 @@ static void qla4xxx_add_device_dynamically(struct scsi_qla_host *ha,
 		}
 	}
 
-	if (!found)
+	if (!found) {
 		ddb_entry = qla4xxx_alloc_ddb(ha, fw_ddb_index);
-	else if (ddb_entry->fw_ddb_index != fw_ddb_index) {
-		/* Target has been bound to a new fw_ddb_index */
-		qla4xxx_free_ddb(ha, ddb_entry);
-		ddb_entry = qla4xxx_alloc_ddb(ha, fw_ddb_index);
-	}
 
-	if (ddb_entry == NULL) {
-		DEBUG2(dev_info(&ha->pdev->dev, "%s NULL DDB %d\n",
-			__func__, fw_ddb_index));
-		goto exit_dyn_add;
-	}
-
-	ddb_entry->fw_ddb_index = fw_ddb_index;
-	ha->fw_ddb_index_map[fw_ddb_index] = ddb_entry;
-	ddb_entry->tcp_source_port_num = src_port;
-	ddb_entry->connection_id = conn_id;
-	qla4xxx_fill_ddb(ddb_entry, fw_ddb_entry);
-	ddb_entry->fw_ddb_device_state = ddb_state;
-
-	if (!probe) {
-		if (qla4xxx_add_sess(ddb_entry, 1)) {
-			DEBUG2(printk(KERN_WARNING
-			      "scsi%ld: failed to add new device at index "
-			      "[%d]\n Unable to add connection and session\n",
-			      ha->host_no, fw_ddb_index));
-			qla4xxx_free_ddb(ha, ddb_entry);
+		if (ddb_entry == NULL) {
+			DEBUG2(dev_info(&ha->pdev->dev, "%s NULL DDB %d\n",
+				__func__, fw_ddb_index));
+			goto exit_dyn_add;
 		}
-	}
 
-	DEBUG6(dev_info(&ha->pdev->dev, "%s added ddb 0x%p sess 0x%p conn 0x%p"
-		" state 0x%x\n", __func__, ddb_entry, ddb_entry->sess,
-		ddb_entry->conn, ddb_entry->state));
+		ddb_entry->fw_ddb_index = fw_ddb_index;
+		ha->fw_ddb_index_map[fw_ddb_index] = ddb_entry;
+		ddb_entry->tcp_source_port_num = src_port;
+		ddb_entry->connection_id = conn_id;
+		qla4xxx_fill_ddb(ddb_entry, fw_ddb_entry);
+		ddb_entry->fw_ddb_device_state = ddb_state;
+
+		if (probe)
+			goto exit_dyn_add;
+
+		if (qla4xxx_add_sess(ddb_entry, 1)) {
+			DEBUG2(dev_info(&ha->pdev->dev,
+			      "%s: failed to add new ddb %d\n",
+			      __func__, fw_ddb_index));
+			qla4xxx_free_ddb(ha, ddb_entry);
+		} else {
+			DEBUG6(dev_info(&ha->pdev->dev,
+				"%s added ddb 0x%p sess 0x%p"
+				" conn 0x%p state 0x%x\n",
+				__func__, ddb_entry,
+				ddb_entry->sess, ddb_entry->conn,
+				ddb_entry->state));
+		}
+	} else if (ddb_entry->fw_ddb_index != fw_ddb_index) {
+		/* Target has been bound to a new fw_ddb_index */
+		ha->fw_ddb_index_map[ddb_entry->fw_ddb_index] = NULL;
+		ddb_entry->fw_ddb_index = fw_ddb_index;
+		ddb_entry->fw_ddb_device_state = ddb_state;
+		ha->fw_ddb_index_map[fw_ddb_index] = ddb_entry;
+		atomic_set(&ddb_entry->port_down_timer,
+			   ha->port_down_retry_count);
+		atomic_set(&ddb_entry->relogin_retry_count, 0);
+		atomic_set(&ddb_entry->relogin_timer, 0);
+		clear_bit(DF_RELOGIN, &ddb_entry->flags);
+		clear_bit(DF_NO_RELOGIN, &ddb_entry->flags);
+		atomic_set(&ddb_entry->state, DDB_STATE_ONLINE);
+
+		dev_info(&ha->pdev->dev,
+			"scsi%ld: %s: ddb[%d] os[%d] marked ONLINE sess:%p conn:%p\n",
+			ha->host_no, __func__, ddb_entry->fw_ddb_index,
+			ddb_entry->os_target_id, ddb_entry->sess, ddb_entry->conn);
+
+		if (!probe)
+			qla4xxx_conn_start(ddb_entry->conn);
+		DEBUG6(dev_info(&ha->pdev->dev, "%s calling conn_start ddb 0x%p sess 0x%p"
+			" conn 0x%p state 0x%x\n", __func__, ddb_entry, ddb_entry->sess,
+			ddb_entry->conn, ddb_entry->state));
+	}
 exit_dyn_add:
 	dma_free_coherent(&ha->pdev->dev, sizeof(*fw_ddb_entry), fw_ddb_entry,
 		fw_ddb_entry_dma);
@@ -1272,15 +1295,15 @@ int qla4xxx_process_ddb_changed(struct scsi_qla_host *ha,
 			qla4xxx_add_device_dynamically(ha, fw_ddb_index, probe);
 		return QLA_SUCCESS;
 	}
-	DEBUG6(dev_info(&ha->pdev->dev, "%s ddb_entry 0x%p ostate 0x%x"
-		" sess 0x%p conn 0x%p\n", __func__, ddb_entry,
-		ddb_entry->state, ddb_entry->sess, ddb_entry->conn));
+	DEBUG6(dev_info(&ha->pdev->dev, "%s ddb[%d] os[%d] ostate 0x%x"
+		" sess 0x%p conn 0x%p o_fwstate 0x%x n_fwstate ox%x \n",
+		__func__, ddb_entry->fw_ddb_index, ddb_entry->os_target_id,
+		ddb_entry->state, ddb_entry->sess, ddb_entry->conn,
+		ddb_entry->fw_ddb_device_state, state));
 
 	/* Device already exists in our database. */
 	old_fw_ddb_device_state = ddb_entry->fw_ddb_device_state;
-	DEBUG2(printk("scsi%ld: %s DDB - old state= 0x%x, new state=0x%x for "
-		      "index [%d]\n", ha->host_no, __func__,
-		      ddb_entry->fw_ddb_device_state, state, fw_ddb_index));
+
 	if (old_fw_ddb_device_state == state &&
 	    state == DDB_DS_SESSION_ACTIVE) {
 		/* Do nothing, state not changed. */
@@ -1297,26 +1320,33 @@ int qla4xxx_process_ddb_changed(struct scsi_qla_host *ha,
 		atomic_set(&ddb_entry->port_down_timer,
 			   ha->port_down_retry_count);
 		atomic_set(&ddb_entry->state, DDB_STATE_ONLINE);
+		dev_info(&ha->pdev->dev,
+			"%s: ddb[%d] os[%d] marked ONLINE\n",
+			__func__, ddb_entry->fw_ddb_index,
+			ddb_entry->os_target_id);
+
 		atomic_set(&ddb_entry->relogin_retry_count, 0);
 		atomic_set(&ddb_entry->relogin_timer, 0);
 		clear_bit(DF_RELOGIN, &ddb_entry->flags);
 		clear_bit(DF_NO_RELOGIN, &ddb_entry->flags);
 
-		DEBUG6(dev_info(&ha->pdev->dev, "%s conn startddb_entry 0x%p"
-			" sess 0x%p conn 0x%p\n",
-			__func__, ddb_entry, ddb_entry->sess, ddb_entry->conn)); 
+		if (ddb_entry->conn) {
+			DEBUG6(dev_info(&ha->pdev->dev,
+				"%s conn startddb_entry 0x%p"
+				" sess 0x%p conn 0x%p\n",
+				__func__,
+				ddb_entry, ddb_entry->sess, ddb_entry->conn));
 
-		qla4xxx_conn_start(ddb_entry->conn);
+			qla4xxx_conn_start(ddb_entry->conn);
 
-		DEBUG6(dev_info(&ha->pdev->dev, "%s conn start done "
-			"ddb_entry 0x%p sess 0x%p conn 0x%p\n",
-			__func__, ddb_entry, ddb_entry->sess, ddb_entry->conn));
+			DEBUG6(dev_info(&ha->pdev->dev, "%s conn start done "
+				"ddb_entry 0x%p sess 0x%p conn 0x%p\n",
+				__func__, ddb_entry, ddb_entry->sess, ddb_entry->conn));
 
-		if (!test_bit(DF_SCAN_ISSUED, &ddb_entry->flags)) {
-			scsi_scan_target(&ddb_entry->sess->dev, 0,
-				ddb_entry->sess->target_id,
-				SCAN_WILD_CARD, 0);
-			set_bit(DF_SCAN_ISSUED, &ddb_entry->flags);
+			if (!test_bit(DF_SCAN_ISSUED, &ddb_entry->flags)) {
+				qla4xxx_scan_target(ddb_entry);
+				set_bit(DF_SCAN_ISSUED, &ddb_entry->flags);
+			}
 		}
 	} else {
 		/* Device went away, try to relogin. */

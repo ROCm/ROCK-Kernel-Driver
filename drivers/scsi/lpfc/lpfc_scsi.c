@@ -65,6 +65,8 @@ lpfc_update_stats(struct lpfc_hba *phba, struct  lpfc_scsi_buf *lpfc_cmd)
 	if (cmd->result)
 		return;
 
+	latency = jiffies_to_msecs((long)jiffies - (long)lpfc_cmd->start_time);
+
 	spin_lock_irqsave(shost->host_lock, flags);
 	if (!vport->stat_data_enabled ||
 		vport->stat_data_blocked ||
@@ -73,13 +75,15 @@ lpfc_update_stats(struct lpfc_hba *phba, struct  lpfc_scsi_buf *lpfc_cmd)
 		spin_unlock_irqrestore(shost->host_lock, flags);
 		return;
 	}
-	latency = jiffies_to_msecs(jiffies - lpfc_cmd->start_time);
 
 	if (phba->bucket_type == LPFC_LINEAR_BUCKET) {
 		i = (latency + phba->bucket_step - 1 - phba->bucket_base)/
 			phba->bucket_step;
-		if (i >= LPFC_MAX_BUCKET_COUNT)
-			i = LPFC_MAX_BUCKET_COUNT;
+		/* check array subscript bounds */
+		if (i < 0)
+			i = 0;
+		else if (i >= LPFC_MAX_BUCKET_COUNT)
+			i = LPFC_MAX_BUCKET_COUNT - 1;
 	} else {
 		for (i = 0; i < LPFC_MAX_BUCKET_COUNT-1; i++)
 			if (latency <= (phba->bucket_base +
@@ -413,14 +417,14 @@ lpfc_new_scsi_buf(struct lpfc_vport *vport)
 	bpl[0].addrLow = le32_to_cpu(putPaddrLow(pdma_phys_fcp_cmd));
 	bpl[0].tus.f.bdeSize = sizeof(struct fcp_cmnd);
 	bpl[0].tus.f.bdeFlags = BUFF_TYPE_BDE_64;
-	bpl[0].tus.w = le32_to_cpu(bpl->tus.w);
+	bpl[0].tus.w = le32_to_cpu(bpl[0].tus.w);
 
 	/* Setup the physical region for the FCP RSP */
 	bpl[1].addrHigh = le32_to_cpu(putPaddrHigh(pdma_phys_fcp_rsp));
 	bpl[1].addrLow = le32_to_cpu(putPaddrLow(pdma_phys_fcp_rsp));
 	bpl[1].tus.f.bdeSize = sizeof(struct fcp_rsp);
 	bpl[1].tus.f.bdeFlags = BUFF_TYPE_BDE_64;
-	bpl[1].tus.w = le32_to_cpu(bpl->tus.w);
+	bpl[1].tus.w = le32_to_cpu(bpl[1].tus.w);
 
 	/*
 	 * Since the IOCB for the FCP I/O is built into this lpfc_scsi_buf,
@@ -920,7 +924,7 @@ lpfc_scsi_cmd_iocb_cmpl(struct lpfc_hba *phba, struct lpfc_iocbq *pIocbIn,
 		if (!pnode || !NLP_CHK_NODE_ACT(pnode)
 		    || (pnode->nlp_state != NLP_STE_MAPPED_NODE))
 			cmd->result = ScsiResult(DID_TRANSPORT_DISRUPTED,
-			SAM_STAT_BUSY);
+						 SAM_STAT_BUSY);
 	} else {
 		cmd->result = ScsiResult(DID_OK, 0);
 	}

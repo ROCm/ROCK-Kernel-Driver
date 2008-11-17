@@ -144,7 +144,6 @@
 #define RESET_FIRMWARE_TOV		30
 #define LOGOUT_TOV			10
 #define IOCB_TOV_MARGIN			10
-#define RELOGIN_TOV			18
 #define ISNS_DEREG_TOV			5
 
 #define MAX_RESET_HA_RETRIES		2
@@ -252,6 +251,8 @@ struct ddb_entry {
 #define DF_NO_RELOGIN		1	/* Do not relogin if IOCTL
 					 * logged it out */
 #define DF_SCAN_ISSUED		2
+#define DF_OFFLINE		3	/* Offline Device */
+#define DF_DELETED		4	/* Device has been removed */
 
 /*
  * Asynchronous Event Queue structure
@@ -286,7 +287,6 @@ struct scsi_qla_host {
 	uint32_t tot_ddbs;
 	unsigned long flags;
 
-#define AF_ISNS_CMD_DONE	     13 /* 0x00002000 */
 #define AF_ONLINE			0 /* 0x00000001 */
 #define AF_INIT_DONE			1 /* 0x00000002 */
 #define AF_MBOX_COMMAND			2 /* 0x00000004 */
@@ -294,9 +294,9 @@ struct scsi_qla_host {
 #define AF_INTERRUPTS_ON		6 /* 0x00000040 Not Used */
 #define AF_GET_CRASH_RECORD		7 /* 0x00000080 */
 #define AF_LINK_UP			8 /* 0x00000100 */
-#define AF_TOPCAT_CHIP_PRESENT		9 /* 0x00000200 */
 #define AF_IRQ_ATTACHED			10 /* 0x00000400 */
 #define AF_DISABLE_ACB_COMPLETE		11 /* 0x00000800 */
+#define AF_OS_INDEX_VALID		12 /* 0x00001000 */
 
 	unsigned long dpc_flags;
 
@@ -308,6 +308,8 @@ struct scsi_qla_host {
 #define DPC_ISNS_RESTART		7 /* 0x00000080 */
 #define DPC_AEN				9 /* 0x00000200 */
 #define DPC_GET_DHCP_IP_ADDR		15 /* 0x00008000 */
+#define DPC_OFFLINE_DEVICE		16 /* 0x00010000 */
+#define DPC_DELETE_DEVICE		17 /* 0x00020000 */
 
 	uint16_t	iocb_cnt;
 	uint16_t	iocb_hiwat;
@@ -460,13 +462,14 @@ struct scsi_qla_host {
 	void (*ql4getaenlog)(struct scsi_qla_host *ha, struct ql4_aen_log *aenl);
 #define QL_INDICES_PER_ENTRY	32
 #define QL_OSINDEX_ENTRIES	(MAX_DDB_ENTRIES/QL_INDICES_PER_ENTRY)
-	volatile uint32_t os_map[QL_OSINDEX_ENTRIES];
+	volatile unsigned long os_map[QL_OSINDEX_ENTRIES];
 };
 
 static inline int is_qla4010(struct scsi_qla_host *ha)
 {
 	return ha->pdev->device == PCI_DEVICE_ID_QLOGIC_ISP4010;
 }
+
 
 static inline int is_qla4022(struct scsi_qla_host *ha)
 {

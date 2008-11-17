@@ -835,6 +835,40 @@ lpfc_config_pcb_setup(struct lpfc_hba * phba)
 }
 
 /**
+ * lpfc_set_var: Prepare a mailbox command to write slim.
+ * @phba: pointer to lpfc hba data structure.
+ * @pmb: pointer to the driver internal queue element for mailbox command.
+ * @addr: This the set variable number that identifies the variable.
+ * @value:The value that we are setting the parameter to.
+ *
+ * The routine just sets the addr and value in the set variable mailbox
+ * command structure.
+ * returns: NONE.
+ **/
+void
+lpfc_set_var(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb, uint32_t addr,
+	      uint32_t value)
+{
+	MAILBOX_t *mb;
+
+	mb = &pmb->mb;
+	memset(pmb, 0, sizeof(LPFC_MBOXQ_t));
+
+	/*
+	 * Always turn on DELAYED ABTS for ELS timeouts
+	 */
+	if ((addr == 0x052198) && (value == 0))
+		value = 1;
+
+	mb->un.varWords[0] = addr;
+	mb->un.varWords[1] = value;
+
+	mb->mbxCommand = MBX_SET_VARIABLE;
+	mb->mbxOwner = OWN_HOST;
+	return;
+}
+
+/**
  * lpfc_read_rev: Prepare a mailbox command for reading HBA revision.
  * @phba: pointer to lpfc hba data structure.
  * @pmb: pointer to the driver internal queue element for mailbox command.
@@ -1093,6 +1127,9 @@ lpfc_config_port(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
 	mb->un.varCfgPort.pcbLow = putPaddrLow(pdma_addr);
 	mb->un.varCfgPort.pcbHigh = putPaddrHigh(pdma_addr);
 
+	/* Always Host Group Pointer is in SLIM */
+	mb->un.varCfgPort.hps = 1;
+
 	/* If HBA supports SLI=3 ask for it */
 
 	if (phba->sli_rev == 3 && phba->vpd.sli3Feat.cerbm) {
@@ -1195,16 +1232,11 @@ lpfc_config_port(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
 				    sizeof(*phba->host_gp));
 	}
 
-	/* Setup Port Group ring pointer */
-	if (phba->sli3_options & LPFC_SLI3_INB_ENABLED) {
-		pgp_offset = offsetof(struct lpfc_sli2_slim,
-				      mbx.us.s3_inb_pgp.port);
-		phba->hbq_get = phba->mbox->us.s3_inb_pgp.hbq_get;
-	} else if (phba->sli_rev == 3) {
+	/* Setup Port Group offset */
+	if (phba->sli_rev == 3)
 		pgp_offset = offsetof(struct lpfc_sli2_slim,
 				      mbx.us.s3_pgp.port);
-		phba->hbq_get = phba->mbox->us.s3_pgp.hbq_get;
-	} else
+	else
 		pgp_offset = offsetof(struct lpfc_sli2_slim, mbx.us.s2.port);
 	pdma_addr = phba->slim2p.phys + pgp_offset;
 	phba->pcb->pgpAddrHigh = putPaddrHigh(pdma_addr);

@@ -39,6 +39,7 @@
 #include "lpfc_crtn.h"
 #include "lpfc_vport.h"
 #include "lpfc_debugfs.h"
+#include "lpfc_security.h"
 
 /* AlpaArray for assignment of scsid for scan-down and bind_method */
 static uint8_t lpfcAlpaArray[] = {
@@ -1008,9 +1009,12 @@ lpfc_mbx_cmpl_local_config_link(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
 	/* Start discovery by sending a FLOGI. port_state is identically
 	 * LPFC_FLOGI while waiting for FLOGI cmpl
 	 */
-	if (vport->port_state != LPFC_FLOGI) {
+	if ((vport->cfg_enable_auth) &&
+	    (lpfc_security_service_state == SECURITY_OFFLINE))
+		lpfc_issue_clear_la(phba, vport);
+	else if (vport->port_state != LPFC_FLOGI)
 		lpfc_initial_flogi(vport);
-	}
+
 	return;
 
 out:

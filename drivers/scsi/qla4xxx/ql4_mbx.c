@@ -10,6 +10,7 @@
 #include "ql4_glbl.h"
 #include "ql4_dbg.h"
 #include "ql4_inline.h"
+#include "ql4_os.h"
 
 
 /**
@@ -43,6 +44,7 @@ int qla4xxx_mailbox_command(struct scsi_qla_host *ha, uint8_t inCount,
 
 	/* Mailbox code active */
 	wait_count = MBOX_TOV * 100;
+
 	while (wait_count--) {
 		mutex_lock(&ha->mbox_sem);
 		if (!test_bit(AF_MBOX_COMMAND, &ha->flags)) {
@@ -166,6 +168,8 @@ int qla4xxx_mailbox_command(struct scsi_qla_host *ha, uint8_t inCount,
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 mbox_exit:
+	if (status == QLA_SUCCESS)
+		qla4xxx_check_for_clear_ddb(ha, mbx_cmd);
 	mutex_lock(&ha->mbox_sem);
 	clear_bit(AF_MBOX_COMMAND, &ha->flags);
 	mutex_unlock(&ha->mbox_sem);
@@ -851,8 +855,8 @@ int qla4xxx_get_flash(struct scsi_qla_host * ha, dma_addr_t dma_addr,
  * qla4xxx_get_fw_version - gets firmware version
  * @ha: Pointer to host adapter structure.
  *
- * Retrieves the firmware version on HBA. In QLA4010, mailboxes 2 & 3 may 
- * hold an address for data.  Make sure that we write 0 to those mailboxes, 
+ * Retrieves the firmware version on HBA. In QLA4010, mailboxes 2 & 3 may
+ * hold an address for data.  Make sure that we write 0 to those mailboxes,
  * if unused.
  **/
 int qla4xxx_get_fw_version(struct scsi_qla_host * ha)
@@ -882,8 +886,7 @@ int qla4xxx_get_fw_version(struct scsi_qla_host * ha)
 	return QLA_SUCCESS;
 }
 
-static int qla4xxx_get_default_ddb(struct scsi_qla_host *ha,
-				   dma_addr_t dma_addr)
+int qla4xxx_get_default_ddb(struct scsi_qla_host *ha, dma_addr_t dma_addr)
 {
 	uint32_t mbox_cmd[MBOX_REG_COUNT];
 	uint32_t mbox_sts[MBOX_REG_COUNT];

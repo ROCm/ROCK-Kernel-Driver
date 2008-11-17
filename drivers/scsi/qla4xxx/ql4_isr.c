@@ -10,6 +10,7 @@
 #include "ql4_glbl.h"
 #include "ql4_dbg.h"
 #include "ql4_inline.h"
+#include "ql4_os.h"
 
 /**
  * qla4xxx_status_entry - processes status IOCBs
@@ -59,8 +60,8 @@ static void qla4xxx_status_entry(struct scsi_qla_host *ha,
 			break;
 		}
 		if (sts_entry->iscsiFlags & ISCSI_FLAG_RESIDUAL_UNDER) {
-			scsi_set_resid(cmd, residual);
-			if (!scsi_status && ((scsi_bufflen(cmd) - residual) <
+			QL_SET_SCSI_RESID(cmd, residual);
+			if (!scsi_status && ((QL_SCSI_BUFFLEN(cmd) - residual) <
 				   cmd->underflow)) {
 				cmd->result = DID_ERROR << 16;
 				break;
@@ -145,7 +146,7 @@ static void qla4xxx_status_entry(struct scsi_qla_host *ha,
 			break;
 		}
 
-		scsi_set_resid(cmd, residual);
+		QL_SET_SCSI_RESID(cmd, residual);
 
 		/*
 		 * If there is scsi_status, it takes precedense over
@@ -187,7 +188,7 @@ static void qla4xxx_status_entry(struct scsi_qla_host *ha,
 			if ((sts_entry->iscsiFlags &
 			     ISCSI_FLAG_RESIDUAL_UNDER) == 0) {
 				cmd->result = DID_BUS_BUSY << 16;
-			} else if ((scsi_bufflen(cmd) - residual) <
+			} else if ((QL_SCSI_BUFFLEN(cmd) - residual) <
 				   cmd->underflow) {
 				/*
 				 * Handle mid-layer underflow???
@@ -206,7 +207,7 @@ static void qla4xxx_status_entry(struct scsi_qla_host *ha,
 					"resid = 0x%x, compstat = 0x%x\n",
 					ha->host_no, cmd->device->channel,
 					cmd->device->id, cmd->device->lun,
-					__func__, scsi_bufflen(cmd),
+					__func__, QL_SCSI_BUFFLEN(cmd),
 					residual,
 					sts_entry->completionStatus));
 
@@ -399,13 +400,13 @@ static void qla4xxx_isr_decode_mailbox(struct scsi_qla_host * ha,
 		/* Immediately process the AENs that don't require much work.
 		 * Only queue the database_changed AENs */
 
-		dev_info(&ha->pdev->dev, "%s mbx0 0x%08x mbx1 0x%08x"
+		DEBUG6(dev_info(&ha->pdev->dev, "%s mbx0 0x%08x mbx1 0x%08x"
 			" mbx2 0x%08x mbx3 0x%08x mbx4 0x%08x mbx5 0x%08x "
 			"mbx6 0x%08x mbx7 0x%08x\n", __func__,
 			readl(&ha->reg->mailbox[0]), readl(&ha->reg->mailbox[1]),
 			readl(&ha->reg->mailbox[2]), readl(&ha->reg->mailbox[3]),
 			readl(&ha->reg->mailbox[4]), readl(&ha->reg->mailbox[5]),
-			readl(&ha->reg->mailbox[6]), readl(&ha->reg->mailbox[7]));
+			readl(&ha->reg->mailbox[6]), readl(&ha->reg->mailbox[7])));
 
 		if (ha->aen_log.count < MAX_AEN_ENTRIES) {
 			for (i = 0; i < MBOX_AEN_REG_COUNT; i++)
@@ -415,11 +416,13 @@ static void qla4xxx_isr_decode_mailbox(struct scsi_qla_host * ha,
 		}
 		switch (mbox_status) {
 		case MBOX_ASTS_SYSTEM_ERROR:
+			dev_info(&ha->pdev->dev, "%s: System Err\n", __func__);
 			/* Log Mailbox registers */
 			if (ql4xdontresethba) {
 				DEBUG2(printk("%s:Dont Reset HBA\n",
 					      __func__));
 			} else {
+				qla4xxx_hw_reset(ha, 0);
 				set_bit(AF_GET_CRASH_RECORD, &ha->flags);
 				set_bit(DPC_RESET_HA, &ha->dpc_flags);
 			}
@@ -436,15 +439,13 @@ static void qla4xxx_isr_decode_mailbox(struct scsi_qla_host * ha,
 			break;
 
 		case MBOX_ASTS_LINK_UP:
-			DEBUG2(printk("scsi%ld: AEN %04x Adapter LINK UP\n",
-				      ha->host_no, mbox_status));
 			set_bit(AF_LINK_UP, &ha->flags);
+			dev_info(&ha->pdev->dev, "%s: LINK UP\n", __func__);
 			break;
 
 		case MBOX_ASTS_LINK_DOWN:
-			DEBUG2(printk("scsi%ld: AEN %04x Adapter LINK DOWN\n",
-				      ha->host_no, mbox_status));
 			clear_bit(AF_LINK_UP, &ha->flags);
+			dev_info(&ha->pdev->dev, "%s: LINK DOWN\n", __func__);
 			break;
 
 		case MBOX_ASTS_HEARTBEAT:
@@ -473,9 +474,9 @@ static void qla4xxx_isr_decode_mailbox(struct scsi_qla_host * ha,
 			mbox_stat2 = readl(&ha->reg->mailbox[2]);
 			mbox_stat3 = readl(&ha->reg->mailbox[3]);
 
-			if ((mbox_stat3 == 5) && (mbox_stat2 == 3)) 
+			if ((mbox_stat3 == 5) && (mbox_stat2 == 3))
 				set_bit(DPC_GET_DHCP_IP_ADDR, &ha->dpc_flags);
-			else if ((mbox_stat3 == 2) && (mbox_stat2 == 5)) 
+			else if ((mbox_stat3 == 2) && (mbox_stat2 == 5))
 				set_bit(DPC_RESET_HA, &ha->dpc_flags);
 			break;
 
@@ -594,10 +595,10 @@ void qla4xxx_interrupt_service_routine(struct scsi_qla_host * ha,
  * qla4xxx_intr_handler - hardware interrupt handler.
  * @irq: Unused
  * @dev_id: Pointer to host adapter structure
+ * @regs: Unused
  **/
-irqreturn_t qla4xxx_intr_handler(int irq, void *dev_id)
+QL_DECLARE_INTR_HANDLER(qla4xxx_intr_handler, irq, dev_id, regs)
 {
-
 	struct scsi_qla_host *ha;
 	uint32_t intr_status;
 	unsigned long flags = 0;
@@ -628,8 +629,7 @@ irqreturn_t qla4xxx_intr_handler(int irq, void *dev_id)
 			intr_status = readl(&ha->reg->ctrl_status);
 
 		if ((intr_status &
-		     (CSR_SCSI_RESET_INTR|CSR_FATAL_ERROR|INTR_PENDING)) ==
-		    0) {
+		     (CSR_SCSI_RESET_INTR|CSR_FATAL_ERROR|INTR_PENDING)) == 0) {
 			if (reqs_count == 0)
 				ha->spurious_int_count++;
 			break;
@@ -665,6 +665,8 @@ irqreturn_t qla4xxx_intr_handler(int irq, void *dev_id)
 			break;
 		} else if (intr_status & CSR_SCSI_RESET_INTR) {
 			clear_bit(AF_ONLINE, &ha->flags);
+			dev_info(&ha->pdev->dev,"%s: adapter OFFLINE\n",
+				__func__);
 			__qla4xxx_disable_intrs(ha);
 
 			writel(set_rmask(CSR_SCSI_RESET_INTR),

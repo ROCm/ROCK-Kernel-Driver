@@ -162,7 +162,7 @@ lpfc_ioctl_hba_rnid(struct lpfc_hba * phba,
 	for (i0 = 0;
 	     i0 < 10 && (pndl->nlp_flag & NLP_ELS_SND_MASK) == NLP_RNID_SND;
 	     i0++) {
-		mdelay(1000);
+		msleep(1000);
 	}
 
 	if (i0 == 10) {
@@ -731,7 +731,6 @@ lpfc_ioctl_send_mgmt_cmd(struct lpfc_hba * phba,
 	outdmp = dfc_cmd_data_alloc(phba, NULL, bpl, snsbfrcnt);
 	if (!outdmp) {
 		rc = ENOMEM;
-		spin_lock_irq(shost->host_lock);
 		goto send_mgmt_cmd_free_indmp;
 	}
 
@@ -1104,7 +1103,7 @@ lpfc_ioctl_loopback_mode(struct lpfc_hba *phba,
 		if (i++ > 500)	/* wait up to 5 seconds */
 			break;
 
-		mdelay(10);
+		msleep(10);
 	}
 
 	memset((void *)pmboxq, 0, sizeof (LPFC_MBOXQ_t));

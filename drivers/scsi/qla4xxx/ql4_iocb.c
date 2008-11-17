@@ -11,132 +11,7 @@
 #include "ql4_dbg.h"
 #include "ql4_inline.h"
 
-#define VMWARE_CMD_TIMEOUT	30
 #include <scsi/scsi_tcq.h>
-
-/**
- * qla4xxx_get_req_pkt - returns a valid entry in request queue.
- * @ha: Pointer to host adapter structure.
- * @queue_entry: Pointer to pointer to queue entry structure
- *
- * This routine performs the following tasks:
- *	- returns the current request_in pointer (if queue not full)
- *	- advances the request_in pointer
- *	- checks for queue full
- **/
-static int qla4xxx_get_req_pkt(struct scsi_qla_host *ha,
-			       struct queue_entry **queue_entry)
-{
-	uint16_t request_in;
-	uint8_t status = QLA_SUCCESS;
-
-	*queue_entry = ha->request_ptr;
-
-	/* get the latest request_in and request_out index */
-	request_in = ha->request_in;
-	ha->request_out = (uint16_t) le32_to_cpu(ha->shadow_regs->req_q_out);
-
-	/* Advance request queue pointer and check for queue full */
-	if (request_in == (REQUEST_QUEUE_DEPTH - 1)) {
-		request_in = 0;
-		ha->request_ptr = ha->request_ring;
-	} else {
-		request_in++;
-		ha->request_ptr++;
-	}
-
-	/* request queue is full, try again later */
-	if ((ha->iocb_cnt + 1) >= ha->iocb_hiwat) {
-		/* restore request pointer */
-		ha->request_ptr = *queue_entry;
-		status = QLA_ERROR;
-	} else {
-		ha->request_in = request_in;
-		memset(*queue_entry, 0, sizeof(**queue_entry));
-	}
-
-	return status;
-}
-
-/**
- * qla4xxx_send_marker_iocb - issues marker iocb to HBA
- * @ha: Pointer to host adapter structure.
- * @ddb_entry: Pointer to device database entry
- * @lun: SCSI LUN
- * @marker_type: marker identifier
- *
- * This routine issues a marker IOCB.
- **/
-int qla4xxx_send_marker_iocb(struct scsi_qla_host *ha,
-			     struct ddb_entry *ddb_entry, int lun)
-{
-	struct marker_entry *marker_entry;
-	unsigned long flags = 0;
-	uint8_t status = QLA_SUCCESS;
-
-	/* Acquire hardware specific lock */
-	spin_lock_irqsave(&ha->hardware_lock, flags);
-
-	/* Get pointer to the queue entry for the marker */
-	if (qla4xxx_get_req_pkt(ha, (struct queue_entry **) &marker_entry) !=
-	    QLA_SUCCESS) {
-		status = QLA_ERROR;
-		goto exit_send_marker;
-	}
-
-	/* Put the marker in the request queue */
-	marker_entry->hdr.entryType = ET_MARKER;
-	marker_entry->hdr.entryCount = 1;
-	marker_entry->target = cpu_to_le16(ddb_entry->fw_ddb_index);
-	marker_entry->modifier = cpu_to_le16(MM_LUN_RESET);
-	int_to_scsilun(lun, &marker_entry->lun);
-	wmb();
-
-	/* Tell ISP it's got a new I/O request */
-	writel(ha->request_in, &ha->reg->req_q_in);
-	readl(&ha->reg->req_q_in);
-
-exit_send_marker:
-	spin_unlock_irqrestore(&ha->hardware_lock, flags);
-	return status;
-}
-
-static struct continuation_t1_entry* qla4xxx_alloc_cont_entry(
-	struct scsi_qla_host *ha)
-{
-	struct continuation_t1_entry *cont_entry;
-
-	cont_entry = (struct continuation_t1_entry *)ha->request_ptr;
-
-	/* Advance request queue pointer */
-	if (ha->request_in == (REQUEST_QUEUE_DEPTH - 1)) {
-		ha->request_in = 0;
-		ha->request_ptr = ha->request_ring;
-	} else {
-		ha->request_in++;
-		ha->request_ptr++;
-	}
-
-	/* Load packet defaults */
-	cont_entry->hdr.entryType = ET_CONTINUE;
-	cont_entry->hdr.entryCount = 1;
-	cont_entry->hdr.systemDefined = (uint8_t) cpu_to_le16(ha->request_in);
-
-	return cont_entry;
-}
-
-static uint16_t qla4xxx_calc_request_entries(uint16_t dsds)
-{
-	uint16_t iocbs;
-
-	iocbs = 1;
-	if (dsds > COMMAND_SEG) {
-		iocbs += (dsds - COMMAND_SEG) / CONTINUE_SEG;
-		if ((dsds - COMMAND_SEG) % CONTINUE_SEG)
-			iocbs++;
-	}
-	return iocbs;
-}
 
 static void qla4xxx_build_scsi_iocbs(struct srb *srb,
 				     struct command_t3_entry *cmd_entry,
@@ -224,6 +99,7 @@ int qla4xxx_send_command_to_isp(struct scsi_qla_host *ha, struct srb * srb)
 	/* Acquire hardware specific lock */
 	spin_lock_irqsave(&ha->hardware_lock, flags);
 
+	//index = (uint32_t)cmd->request->tag;
 	index = ha->current_active_index;
 	for (i = 0; i < MAX_SRBS; i++) {
 		index++;
@@ -242,10 +118,14 @@ int qla4xxx_send_command_to_isp(struct scsi_qla_host *ha, struct srb * srb)
 	}
 
 	/* Calculate the number of request entries needed. */
-	nseg = scsi_dma_map(cmd);
-	if (nseg < 0)
-		goto queuing_error;
-	tot_dsds = nseg;
+	if (srb->flags & SRB_SCSI_PASSTHRU)
+		tot_dsds = 1;
+	else {
+		nseg = scsi_dma_map(cmd);
+		if (nseg < 0)
+			goto queuing_error;
+		tot_dsds = nseg;
+	}
 
 	req_cnt = qla4xxx_calc_request_entries(tot_dsds);
 
@@ -281,9 +161,9 @@ int qla4xxx_send_command_to_isp(struct scsi_qla_host *ha, struct srb * srb)
 	cmd_entry->hdr.entryCount = req_cnt;
 
 	/* Set data transfer direction control flags
-	 * NOTE: Look at data_direction bits iff there is data to be
-	 *       transferred, as the data direction bit is sometimed filled
-	 *       in when there is no data to be transferred */
+         * NOTE: Look at data_direction bits iff there is data to be
+         *       transferred, as the data direction bit is sometimed filled
+         *       in when there is no data to be transferred */
 	cmd_entry->control_flags = CF_NO_DATA;
 	if (scsi_bufflen(cmd)) {
 		if (cmd->sc_data_direction == DMA_TO_DEVICE)
@@ -324,10 +204,10 @@ int qla4xxx_send_command_to_isp(struct scsi_qla_host *ha, struct srb * srb)
 
 	/*
 	 * Check to see if adapter is online before placing request on
-	 * request queue.  If a reset occurs and a request is in the queue,
-	 * the firmware will still attempt to process the request, retrieving
-	 * garbage for pointers.
-	 */
+         * request queue.  If a reset occurs and a request is in the queue,
+         * the firmware will still attempt to process the request, retrieving
+         * garbage for pointers.
+         */
 	if (!test_bit(AF_ONLINE, &ha->flags)) {
 		DEBUG2(printk("scsi%ld: %s: Adapter OFFLINE! "
 			      "Do not issue command.\n",
@@ -355,13 +235,12 @@ int qla4xxx_send_command_to_isp(struct scsi_qla_host *ha, struct srb * srb)
 	return QLA_SUCCESS;
 
 queuing_error:
-	if (srb->flags & SRB_SCSI_PASSTHRU)
-		return QLA_ERROR;
-
-	if (tot_dsds)
-		scsi_dma_unmap(cmd);
+	if (!(srb->flags & SRB_SCSI_PASSTHRU))
+		if (tot_dsds)
+			scsi_dma_unmap(cmd);
 
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 	return QLA_ERROR;
 }
+

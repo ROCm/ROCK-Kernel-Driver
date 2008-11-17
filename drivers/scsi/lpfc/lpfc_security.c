@@ -45,8 +45,7 @@ lpfc_security_service_online(struct Scsi_Host *shost)
 
 	lpfc_security_service_state = SECURITY_ONLINE;
 	if (vport->cfg_enable_auth &&
-	    vport->auth.auth_mode == FC_AUTHMODE_UNKNOWN &&
-	    vport->phba->link_state == LPFC_HBA_ERROR)
+	    vport->auth.auth_mode == FC_AUTHMODE_UNKNOWN)
 		lpfc_selective_reset(vport->phba);
 }
 

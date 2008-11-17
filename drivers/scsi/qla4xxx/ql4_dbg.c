@@ -13,28 +13,6 @@
 
 #include <scsi/scsi_dbg.h>
 
-static void qla4xxx_print_srb_info(struct srb * srb)
-{
-	printk("%s: srb = 0x%p, flags=0x%02x\n", __func__, srb, srb->flags);
-	printk("%s: cmd = 0x%p, saved_dma_handle = 0x%lx\n",
-	       __func__, srb->cmd, (unsigned long) srb->dma_handle);
-	printk("%s: fw_ddb_index = %d, lun = %d\n",
-	       __func__, srb->fw_ddb_index, srb->cmd->device->lun);
-	printk("%s: iocb_tov = %d\n",
-	       __func__, srb->iocb_tov);
-	printk("%s: cc_stat = 0x%x\n", __func__, srb->cc_stat);
-}
-
-void qla4xxx_print_scsi_cmd(struct scsi_cmnd *cmd)
-{
-	printk("SCSI Command = 0x%p, Handle=0x%p\n", cmd, cmd->host_scribble);
-	printk("  b=%d, t=%02xh, l=%02xh, cmd_len = %02xh\n",
-	       cmd->device->channel, cmd->device->id, cmd->device->lun,
-	       cmd->cmd_len);
-	scsi_print_command(cmd);
-	qla4xxx_print_srb_info((struct srb *) cmd->SCp.ptr);
-}
-
 void __dump_registers(struct scsi_qla_host *ha)
 {
 	uint8_t i;
@@ -143,17 +121,6 @@ void __dump_registers(struct scsi_qla_host *ha)
 	}
 }
 
-void qla4xxx_dump_mbox_registers(struct scsi_qla_host *ha)
-{
-	unsigned long flags = 0;
-	int i = 0;
-	spin_lock_irqsave(&ha->hardware_lock, flags);
-	for (i = 1; i < MBOX_REG_COUNT; i++)
-		printk(KERN_INFO "  Mailbox[%d] = %08x\n", i,
-		       readw(&ha->reg->mailbox[i]));
-	spin_unlock_irqrestore(&ha->hardware_lock, flags);
-}
-
 void qla4xxx_dump_registers(struct scsi_qla_host *ha)
 {
 	unsigned long flags = 0;
@@ -179,6 +146,5 @@ void qla4xxx_dump_buffer(void *b, uint32_t size)
 		else
 			printk(KERN_DEBUG "  ");
 	}
-	if (cnt % 16)
-		printk(KERN_DEBUG "\n");
+	printk(KERN_DEBUG "\n");
 }

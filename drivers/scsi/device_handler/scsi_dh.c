@@ -28,6 +28,7 @@ struct scsi_dh_devinfo_list {
 	struct list_head node;
 	char vendor[9];
 	char model[17];
+	char tgps;
 	struct scsi_device_handler *handler;
 };
 
@@ -60,7 +61,8 @@ scsi_dh_cache_lookup(struct scsi_device *sdev)
 	spin_lock(&list_lock);
 	list_for_each_entry(tmp, &scsi_dh_dev_list, node) {
 		if (!strncmp(sdev->vendor, tmp->vendor, strlen(tmp->vendor)) &&
-		    !strncmp(sdev->model, tmp->model, strlen(tmp->model))) {
+		    !strncmp(sdev->model, tmp->model, strlen(tmp->model)) &&
+		    (!tmp->tgps || (sdev->tgps & tmp->tgps) != 0)) {
 			found_dh = tmp->handler;
 			break;
 		}
@@ -79,7 +81,9 @@ static int scsi_dh_handler_lookup(struct scsi_device_handler *scsi_dh,
 		if (!strncmp(sdev->vendor, scsi_dh->devlist[i].vendor,
 			     strlen(scsi_dh->devlist[i].vendor)) &&
 		    !strncmp(sdev->model, scsi_dh->devlist[i].model,
-			     strlen(scsi_dh->devlist[i].model))) {
+			     strlen(scsi_dh->devlist[i].model)) &&
+		    (!scsi_dh->devlist[i].tgps ||
+		     (sdev->tgps & scsi_dh->devlist[i].tgps) != 0)) {
 			found = 1;
 			break;
 		}
@@ -128,6 +132,7 @@ device_handler_match(struct scsi_device_handler *scsi_dh,
 			strncpy(tmp->model, sdev->model, 16);
 			tmp->vendor[8] = '\0';
 			tmp->model[16] = '\0';
+			tmp->tgps = sdev->tgps;
 			tmp->handler = found_dh;
 			spin_lock(&list_lock);
 			list_add(&tmp->node, &scsi_dh_dev_list);
@@ -504,12 +509,9 @@ void scsi_dh_detach(struct request_queue *q)
 	if (!sdev)
 		return;
 
-	if (sdev->scsi_dh_data) {
-		/* if sdev is not on internal list, detach */
-		scsi_dh = sdev->scsi_dh_data->scsi_dh;
-		if (!device_handler_match(scsi_dh, sdev))
-			scsi_dh_handler_detach(sdev, scsi_dh);
-	}
+	if (sdev->scsi_dh_data)
+		scsi_dh_handler_detach(sdev, sdev->scsi_dh_data->scsi_dh);
+
 	put_device(&sdev->sdev_gendev);
 }
 EXPORT_SYMBOL_GPL(scsi_dh_detach);

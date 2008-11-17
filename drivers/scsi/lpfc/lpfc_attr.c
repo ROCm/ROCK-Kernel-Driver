@@ -42,6 +42,7 @@
 #include "lpfc_crtn.h"
 #include "lpfc_vport.h"
 #include "lpfc_auth_access.h"
+#include "lpfc_security.h"
 
 #define LPFC_DEF_DEVLOSS_TMO 30
 #define LPFC_MIN_DEVLOSS_TMO 1
@@ -3100,6 +3101,27 @@ LPFC_ATTR_R(enable_hba_heartbeat, 1, 0, 1, "Enable HBA Heartbeat.");
  */
 LPFC_ATTR_R(sg_seg_cnt, LPFC_DEFAULT_SG_SEG_CNT, LPFC_DEFAULT_SG_SEG_CNT,
 	    LPFC_MAX_SG_SEG_CNT, "Max Scatter Gather Segment Count");
+/*
+ * lpfc_pci_max_read:  Maximum DMA read byte count. This parameter can have
+ * values 512, 1024, 2048, 4096. Default value is 2048.
+ */
+static int lpfc_pci_max_read = 2048;
+module_param(lpfc_pci_max_read, int, 0);
+MODULE_PARM_DESC(lpfc_pci_max_read,
+	"Maximum DMA read byte count. Allowed values:"
+	" 512,1024,2048,4096.");
+static int
+lpfc_pci_max_read_init(struct lpfc_hba *phba, int val)
+{
+	phba->cfg_pci_max_read = 2048;
+	if ((val == 512) || (val == 1024) || (val == 2048) || (val == 4096))
+		phba->cfg_pci_max_read = val;
+	return 0;
+}
+
+lpfc_param_show(pci_max_read)
+static DEVICE_ATTR(lpfc_pci_max_read, S_IRUGO,
+			lpfc_pci_max_read_show, NULL);
 
 struct device_attribute *lpfc_hba_attrs[] = {
 	&dev_attr_info,
@@ -3136,6 +3158,7 @@ struct device_attribute *lpfc_hba_attrs[] = {
 	&dev_attr_lpfc_fdmi_on,
 	&dev_attr_lpfc_max_luns,
 	&dev_attr_lpfc_enable_npiv,
+	&dev_attr_lpfc_pci_max_read,
 	&dev_attr_nport_evt_cnt,
 	&dev_attr_board_mode,
 	&dev_attr_max_vpi,
@@ -4176,12 +4199,22 @@ lpfc_alloc_sysfs_attr(struct lpfc_vport *vport)
 	if (error)
 		goto out_remove_ctlreg_attr;
 
+	 error = sysfs_create_bin_file(&shost->shost_dev.kobj,
+					&sysfs_menlo_attr);
+	if (error)
+		goto out_remove_menlo_attr;
+
+
 	return 0;
 out_remove_ctlreg_attr:
 	sysfs_remove_bin_file(&shost->shost_dev.kobj, &sysfs_ctlreg_attr);
 out_remove_stat_attr:
 	sysfs_remove_bin_file(&shost->shost_dev.kobj,
 			&sysfs_drvr_stat_data_attr);
+out_remove_menlo_attr:
+	sysfs_remove_bin_file(&shost->shost_dev.kobj,
+			&sysfs_menlo_attr);
+
 out:
 	return error;
 }
@@ -4269,6 +4302,13 @@ lpfc_get_host_port_state(struct Scsi_Host *shost)
 	if (vport->fc_flag & FC_OFFLINE_MODE)
 		fc_host_port_state(shost) = FC_PORTSTATE_OFFLINE;
 	else {
+		if ((vport->cfg_enable_auth) &&
+		    (lpfc_security_service_state == SECURITY_OFFLINE)) {
+			fc_host_port_state(shost) = FC_PORTSTATE_ERROR;
+			spin_unlock_irq(shost->host_lock);
+			return;
+		}
+
 		switch (phba->link_state) {
 		case LPFC_LINK_UNKNOWN:
 		case LPFC_LINK_DOWN:
@@ -4837,6 +4877,7 @@ lpfc_get_cfgparam(struct lpfc_hba *phba)
 	lpfc_link_speed_init(phba, lpfc_link_speed);
 	lpfc_poll_tmo_init(phba, lpfc_poll_tmo);
 	lpfc_enable_npiv_init(phba, lpfc_enable_npiv);
+	lpfc_pci_max_read_init(phba, lpfc_pci_max_read);
 	lpfc_use_msi_init(phba, lpfc_use_msi);
 	lpfc_enable_hba_reset_init(phba, lpfc_enable_hba_reset);
 	lpfc_enable_hba_heartbeat_init(phba, lpfc_enable_hba_heartbeat);
