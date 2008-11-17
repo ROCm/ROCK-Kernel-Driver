@@ -78,7 +78,7 @@ int qla4xxx_process_ddb_changed(struct scsi_qla_host * ha,
 				uint32_t fw_ddb_index, uint32_t state, uint32_t probe);
 
 int qla4xxx_mailbox_command(struct scsi_qla_host *ha, uint8_t inCount,
-			    nuint8_t outCount, uint32_t *mbx_cmd, uint32_t *mbx_sts);
+			    uint8_t outCount, uint32_t *mbx_cmd, uint32_t *mbx_sts);
 
 extern int extended_error_logging;
 extern int ql4xdiscoverywait;

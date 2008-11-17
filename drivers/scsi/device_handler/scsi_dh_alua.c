@@ -252,7 +252,7 @@ done:
  */
 static int alua_check_tgps(struct scsi_device *sdev, struct alua_dh_data *h)
 {
-	int err;
+	int err = SCSI_DH_OK;
 
 	/* Check TPGS setting */
 	h->tpgs = sdev->tgps;
