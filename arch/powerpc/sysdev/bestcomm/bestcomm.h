@@ -140,15 +140,29 @@ bcom_queue_full(struct bcom_task *tsk)
 }
 
 /**
+ * bcom_get_bd - Get a BD from the queue
+ * @tsk: The BestComm task structure
+ * index: Index of the BD to fetch
+ */
+static inline struct bcom_bd
+*bcom_get_bd(struct bcom_task *tsk, unsigned int index)
+{
+	return tsk->bd + index * tsk->bd_size;
+}
+
+/**
  * bcom_buffer_done - Checks if a BestComm 
  * @tsk: The BestComm task structure
  */
 static inline int
 bcom_buffer_done(struct bcom_task *tsk)
 {
+	struct bcom_bd *bd;
 	if (bcom_queue_empty(tsk))
 		return 0;
-	return !(tsk->bd[tsk->outdex].status & BCOM_BD_READY);
+
+	bd = bcom_get_bd(tsk, tsk->outdex);
+	return !(bd->status & BCOM_BD_READY);
 }
 
 /**
@@ -160,16 +174,21 @@ bcom_buffer_done(struct bcom_task *tsk)
 static inline struct bcom_bd *
 bcom_prepare_next_buffer(struct bcom_task *tsk)
 {
-	tsk->bd[tsk->index].status = 0;	/* cleanup last status */
-	return &tsk->bd[tsk->index];
+	struct bcom_bd *bd;
+
+	bd = bcom_get_bd(tsk, tsk->index);
+	bd->status = 0;	/* cleanup last status */
+	return bd;
 }
 
 static inline void
 bcom_submit_next_buffer(struct bcom_task *tsk, void *cookie)
 {
+	struct bcom_bd *bd = bcom_get_bd(tsk, tsk->index);
+
 	tsk->cookie[tsk->index] = cookie;
 	mb();	/* ensure the bd is really up-to-date */
-	tsk->bd[tsk->index].status |= BCOM_BD_READY;
+	bd->status |= BCOM_BD_READY;
 	tsk->index = _bcom_next_index(tsk);
 	if (tsk->flags & BCOM_FLAGS_ENABLE_TASK)
 		bcom_enable(tsk);
@@ -179,10 +198,12 @@ static inline void *
 bcom_retrieve_buffer(struct bcom_task *tsk, u32 *p_status, struct bcom_bd **p_bd)
 {
 	void *cookie = tsk->cookie[tsk->outdex];
+	struct bcom_bd *bd = bcom_get_bd(tsk, tsk->outdex);
+
 	if (p_status)
-		*p_status = tsk->bd[tsk->outdex].status;
+		*p_status = bd->status;
 	if (p_bd)
-		*p_bd = &tsk->bd[tsk->outdex];
+		*p_bd = bd;
 	tsk->outdex = _bcom_next_outdex(tsk);
 	return cookie;
 }
