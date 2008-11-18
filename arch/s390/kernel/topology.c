@@ -67,18 +67,21 @@ static int machine_has_topology_irq;
 static struct timer_list topology_timer;
 static void set_topology_timer(void);
 static DECLARE_WORK(topology_work, topology_work_fn);
+/* topology_lock protects the core linked list */
+static DEFINE_SPINLOCK(topology_lock);
 
 cpumask_t cpu_core_map[NR_CPUS];
 
 cpumask_t cpu_coregroup_map(unsigned int cpu)
 {
 	struct core_info *core = &core_info;
+	unsigned long flags;
 	cpumask_t mask;
 
 	cpus_clear(mask);
 	if (!machine_has_topology)
 		return cpu_present_map;
-	mutex_lock(&smp_cpu_state_mutex);
+	spin_lock_irqsave(&topology_lock, flags);
 	while (core) {
 		if (cpu_isset(cpu, core->mask)) {
 			mask = core->mask;
@@ -86,7 +89,7 @@ cpumask_t cpu_coregroup_map(unsigned int cpu)
 		}
 		core = core->next;
 	}
-	mutex_unlock(&smp_cpu_state_mutex);
+	spin_unlock_irqrestore(&topology_lock, flags);
 	if (cpus_empty(mask))
 		mask = cpumask_of_cpu(cpu);
 	return mask;
@@ -135,7 +138,7 @@ static void tl_to_cores(struct tl_info *info)
 	union tl_entry *tle, *end;
 	struct core_info *core = &core_info;
 
-	mutex_lock(&smp_cpu_state_mutex);
+	spin_lock_irq(&topology_lock);
 	clear_cores();
 	tle = info->tle;
 	end = (union tl_entry *)((unsigned long)info + info->length);
@@ -159,7 +162,7 @@ static void tl_to_cores(struct tl_info *info)
 		}
 		tle = next_tle(tle);
 	}
-	mutex_unlock(&smp_cpu_state_mutex);
+	spin_unlock_irq(&topology_lock);
 }
 
 static void topology_update_polarization_simple(void)

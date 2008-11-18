@@ -303,7 +303,7 @@ static inline char *pack_hex_byte(char *buf, u8 byte)
 	printk(level KMSG_COMPONENT  ": " format, ##__VA_ARGS__)
 #else
 #define pr_printk(level, format, ...) \
-	printk(level ": " format, ##__VA_ARGS__)
+	printk(level format, ##__VA_ARGS__)
 #endif
 
 #if defined(__KMSG_CHECKER) && defined(KMSG_COMPONENT)
