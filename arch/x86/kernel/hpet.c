@@ -278,6 +278,7 @@ static int hpet_legacy_next_event(unsigned long delta,
 	cnt += (u32) delta;
 	hpet_writel(cnt, HPET_T0_CMP);
 
+	hpet_readl(HPET_T0_CMP); /* pre-read for bnc#433746 */
 	/*
 	 * We need to read back the CMP register to make sure that
 	 * what we wrote hit the chip before we compare it to the
