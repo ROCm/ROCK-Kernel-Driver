@@ -36,6 +36,7 @@ struct lppaca lppaca[] = {
 		.end_of_quantum = 0xfffffffffffffffful,
 		.slb_count = 64,
 		.vmxregs_in_use = 0,
+		.page_ins = 0,
 	},
 };
 
