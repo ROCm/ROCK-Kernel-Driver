@@ -228,8 +228,8 @@ static int elousb_probe(struct usb_interface *intf, const struct usb_device_id *
 	input_dev->absbit[0] = BIT(ABS_X) | BIT(ABS_Y);
 	set_bit(ABS_PRESSURE, input_dev->absbit);
 
-	input_set_abs_params(input_dev, ABS_X, 0, 4096, 0, 0);
-	input_set_abs_params(input_dev, ABS_Y, 0, 4096, 0, 0);
+	input_set_abs_params(input_dev, ABS_X, 0, 4000, 0, 0);
+	input_set_abs_params(input_dev, ABS_Y, 0, 3840, 0, 0);
 	input_set_abs_params(input_dev, ABS_PRESSURE, 0, 256, 0, 0);
 
 	input_set_drvdata(input_dev, elo);
