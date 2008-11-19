@@ -1840,29 +1840,26 @@ int novfs_get_pri_conn(struct novfs_xplat *pdata, struct novfs_schandle Session)
 	return (status);
 }
 
-int novfs_set_map_drive(struct novfs_xplat *pdata, struct novfs_schandle Session)
+int novfs_set_map_drive(struct nwc_map_drive_ex *symInfo, struct novfs_schandle Session)
 {
 
 	struct novfs_xplat_call_request *cmd;
 	struct novfs_xplat_call_reply *reply;
-	unsigned long status = 0, datalen, cmdlen, replylen, cpylen;
-	struct nwc_map_drive_ex symInfo;
+	unsigned long status = 0, datalen, cmdlen, replylen;
 
 	DbgPrint("Call to NwcSetMapDrive\n");
-	cpylen = copy_from_user(&symInfo, pdata->reqData, sizeof(symInfo));
 	cmdlen = sizeof(*cmd);
 	datalen =
-	    sizeof(symInfo) + symInfo.dirPathOffsetLength +
-	    symInfo.linkOffsetLength;
+	    sizeof(struct nwc_map_drive_ex ) + symInfo->dirPathOffsetLength +
+	    symInfo->linkOffsetLength;
 
 	DbgPrint(" cmdlen = %d\n", cmdlen);
 	DbgPrint(" dataLen = %d\n", datalen);
 	DbgPrint(" symInfo.dirPathOffsetLength = %d\n",
-		 symInfo.dirPathOffsetLength);
-	DbgPrint(" symInfo.linkOffsetLength = %d\n", symInfo.linkOffsetLength);
-	DbgPrint(" pdata->datalen = %d\n", pdata->reqLen);
+		 symInfo->dirPathOffsetLength);
+	DbgPrint(" symInfo.linkOffsetLength = %d\n", symInfo->linkOffsetLength);
 
-	novfs_dump(sizeof(symInfo), &symInfo);
+	novfs_dump(sizeof(struct nwc_map_drive_ex), symInfo);
 
 	cmdlen += datalen;
 
@@ -1876,7 +1873,7 @@ int novfs_set_map_drive(struct novfs_xplat *pdata, struct novfs_schandle Session
 	cmd->Command.SessionId = Session;
 	cmd->NwcCommand = NWC_MAP_DRIVE;
 
-	cpylen = copy_from_user(cmd->data, pdata->reqData, datalen);
+	memcpy(cmd->data, symInfo, datalen);
 	status =
 		Queue_Daemon_Command((void *)cmd, cmdlen, NULL, 0,
 				(void **)&reply, &replylen,

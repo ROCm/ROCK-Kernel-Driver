@@ -137,11 +137,11 @@ int novfs_i_revalidate(struct dentry *dentry);
  * Extended attributes operations
  */
 
-int novfs_i_getxattr(struct dentry *dentry, const char *name, void *buffer,
+ssize_t novfs_i_getxattr(struct dentry *dentry, const char *name, void *buffer,
 		     size_t size);
 int novfs_i_setxattr(struct dentry *dentry, const char *name, const void *value,
 		     size_t value_size, int flags);
-int novfs_i_listxattr(struct dentry *dentry, char *buffer, size_t buffer_size);
+ssize_t novfs_i_listxattr(struct dentry *dentry, char *buffer, size_t buffer_size);
 
 void update_inode(struct inode *Inode, struct novfs_entry_info *Info);
 
@@ -262,21 +262,17 @@ static struct inode_operations novfs_inode_operations = {
 	.rename = novfs_i_rename,
 	.setattr = novfs_i_setattr,
 	.getattr = novfs_i_getattr,
-/*
 	.getxattr = novfs_i_getxattr,
 	.setxattr = novfs_i_setxattr,
 	.listxattr = novfs_i_listxattr,
-*/
 };
 
 static struct inode_operations novfs_file_inode_operations = {
 	.setattr = novfs_i_setattr,
 	.getattr = novfs_i_getattr,
-/*
 	.getxattr = novfs_i_getxattr,
 	.setxattr = novfs_i_setxattr,
 	.listxattr = novfs_i_listxattr,
-*/
 };
 
 static struct super_operations novfs_ops = {
@@ -935,14 +931,23 @@ int novfs_dir_open(struct inode *dir, struct file *file)
 
 int novfs_dir_release(struct inode *dir, struct file *file)
 {
-	struct file_private *file_private;
-	file_private = (struct file_private *) file->private_data;
+	struct file_private *file_private = file->private_data;
+	struct inode *inode = file->f_dentry->d_inode;
+	struct novfs_schandle sessionId;
 
 	DbgPrint("novfs_dir_release: Inode 0x%p %d Name %.*s\n", dir,
 		 dir->i_ino, file->f_dentry->d_name.len,
 		 file->f_dentry->d_name.name);
 
 	if (file_private) {
+		if (file_private->enumHandle && (file_private->enumHandle != ((void *)-1))) {
+			sessionId = novfs_scope_get_sessionId(((struct inode_data *)inode->i_private)->Scope);
+			if (SC_PRESENT(sessionId) == 0) {
+				((struct inode_data *)inode->i_private)->Scope = novfs_get_scope(file->f_dentry);
+				sessionId = novfs_scope_get_sessionId(((struct inode_data *)inode->i_private)->Scope);
+			}
+			novfs_end_directory_enumerate(file_private->enumHandle, sessionId);
+		}
 		kfree(file_private);
 		file->private_data = NULL;
 	}
@@ -966,6 +971,16 @@ loff_t novfs_dir_lseek(struct file * file, loff_t offset, int origin)
 
 	file_private = (struct file_private *) file->private_data;
 	file_private->listedall = 0;
+	if (file_private->enumHandle && (file_private->enumHandle != ((void *)-1))) {
+		struct novfs_schandle sessionId;
+		struct inode *inode = file->f_dentry->d_inode;
+		sessionId = novfs_scope_get_sessionId(((struct inode_data *)inode->i_private)->Scope);
+		if (SC_PRESENT(sessionId) == 0) {
+			((struct inode_data *)inode->i_private)->Scope = novfs_get_scope(file->f_dentry);
+			sessionId = novfs_scope_get_sessionId(((struct inode_data *)inode->i_private)->Scope);
+		}
+		novfs_end_directory_enumerate(file_private->enumHandle, sessionId);
+	}
 	file_private->enumHandle = NULL;
 
 	return 0;
@@ -2864,9 +2879,15 @@ int novfs_i_unlink(struct inode *dir, struct dentry *dentry)
 					} else {
 						retCode =
 						    novfs_delete(path,
-								 S_ISDIR(inode->
-									 i_mode),
-								 session);
+								 S_ISDIR(inode->i_mode), session);
+						if (retCode) {
+							struct iattr ia;
+							memset(&ia, 0, sizeof(ia));
+							ia.ia_valid = ATTR_MODE;
+							ia.ia_mode = S_IRWXU;
+							novfs_set_attr(path, &ia, session);
+							retCode = novfs_delete(path, S_ISDIR(inode->i_mode), session);
+						}
 					}
 					if (!retCode || IS_DEADDIR(inode)) {
 						novfs_remove_inode_entry(dir,
@@ -3119,13 +3140,16 @@ int novfs_i_rename(struct inode *odir, struct dentry *od, struct inode *ndir,
 								}
 
 								retCode =
-								    novfs_delete
-								    (newpath,
-								     S_ISDIR
-								     (nd->
-								      d_inode->
-								      i_mode),
-								     session);
+								    novfs_delete(newpath, S_ISDIR(nd->d_inode->i_mode), session);
+								if (retCode) {
+									struct iattr ia;
+									memset(&ia, 0, sizeof(ia));
+									ia.ia_valid = ATTR_MODE;
+									ia.ia_mode = S_IRWXU;
+									novfs_set_attr(newpath, &ia, session);
+									retCode = novfs_delete(newpath, S_ISDIR(nd->d_inode->i_mode), session);
+								}
+
 							}
 
 							session = novfs_scope_get_sessionId(((struct inode_data *) ndir->i_private)->Scope);
@@ -3378,7 +3402,7 @@ int novfs_i_getattr(struct vfsmount *mnt, struct dentry *dentry,
 	return (retCode);
 }
 
-int novfs_i_getxattr(struct dentry *dentry, const char *name, void *buffer,
+ssize_t novfs_i_getxattr(struct dentry *dentry, const char *name, void *buffer,
 		     size_t buffer_size)
 {
 	struct inode *inode = dentry->d_inode;
@@ -3528,7 +3552,7 @@ int novfs_i_setxattr(struct dentry *dentry, const char *name, const void *value,
 	return (retError);
 }
 
-int novfs_i_listxattr(struct dentry *dentry, char *buffer, size_t buffer_size)
+ssize_t novfs_i_listxattr(struct dentry *dentry, char *buffer, size_t buffer_size)
 {
 	struct inode *inode = dentry->d_inode;
 	struct novfs_schandle sessionId;
@@ -3720,6 +3744,9 @@ int novfs_statfs(struct dentry *de, struct kstatfs *buf)
 	DbgPrint("fd=%llu\n", fd);
 	DbgPrint("te=%llu\n", te);
 	DbgPrint("fe=%llu\n", fd);
+	/* fix for Nautilus */
+	if (sb->s_blocksize == 0)
+		sb->s_blocksize = 4096;
 
 	buf->f_type = sb->s_magic;
 	buf->f_bsize = sb->s_blocksize;
@@ -3762,7 +3789,6 @@ struct inode *novfs_get_inode(struct super_block *sb, int mode, int dev,
 		inode->i_mode = mode;
 		inode->i_uid = Uid;
 		inode->i_gid = 0;
-		inode->i_sb->s_blocksize = sb->s_blocksize;
 		inode->i_blkbits = sb->s_blocksize_bits;
 		inode->i_blocks = 0;
 		inode->i_rdev = 0;
@@ -3826,8 +3852,6 @@ struct inode *novfs_get_inode(struct super_block *sb, int mode, int dev,
 		case S_IFDIR:
 			inode->i_op = &novfs_inode_operations;
 			inode->i_fop = &novfs_dir_operations;
-
-			inode->i_sb->s_blocksize = 0;
 			inode->i_blkbits = 0;
 			break;
 
@@ -3957,6 +3981,7 @@ static int novfs_get_sb(struct file_system_type *Fstype, int Flags,
 
 static void novfs_kill_sb(struct super_block *super)
 {
+	shrink_dcache_sb(super);
 	kill_litter_super(super);
 }
 

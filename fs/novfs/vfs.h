@@ -344,7 +344,8 @@ extern int novfs_close_stream(void * ConnHandle, unsigned char * Handle,
 			      struct novfs_schandle SessionId);
 
 extern int novfs_add_to_root(char *);
-
+extern int novfs_end_directory_enumerate(void *EnumHandle,
+					struct novfs_schandle SessionId);
 
 /*
  * scope.c functions
@@ -432,7 +433,7 @@ extern int novfs_set_pri_conn(struct novfs_xplat *pdata,
 		struct novfs_schandle Session);
 extern int novfs_get_pri_conn(struct novfs_xplat *pdata,
 		struct novfs_schandle Session);
-extern int novfs_set_map_drive(struct novfs_xplat *pdata,
+extern int novfs_set_map_drive(struct nwc_map_drive_ex *,
 		struct novfs_schandle Session);
 extern int novfs_unmap_drive(struct novfs_xplat *pdata,
 		struct novfs_schandle Session);

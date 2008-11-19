@@ -405,7 +405,7 @@ int novfs_setx_file_info(char *Path, const char *Name, const void *Value,
 
 		cmd->flags = flags;
 		cmd->pathLen = pathlen;
-		memcpy(cmd->data, Path, cmd->pathLen + 1);	//+ '\0'
+		memcpy(cmd->data, Path, cmd->pathLen);
 
 		cmd->nameLen = namelen;
 		memcpy(cmd->data + cmd->pathLen + 1, Name, cmd->nameLen + 1);
@@ -601,7 +601,7 @@ static int begin_directory_enumerate(unsigned char * Path, int PathLen, void ** 
 	return (retCode);
 }
 
-static int end_directory_enumerate(void *EnumHandle, struct novfs_schandle SessionId)
+int novfs_end_directory_enumerate(void *EnumHandle, struct novfs_schandle SessionId)
 {
 	struct novfs_end_enumerate_directory_request cmd;
 	struct novfs_end_enumerate_directory_reply *reply = NULL;
@@ -793,11 +793,9 @@ int novfs_get_dir_listex(unsigned char * Path, void ** EnumHandle, int *Count,
 		    directory_enumerate_ex(EnumHandle, SessionId, Count, Info,
 					   INTERRUPTIBLE);
 		if (retCode) {
-			end_directory_enumerate(*EnumHandle, SessionId);
-			if (-1 == retCode) {
-				retCode = 0;
-				*EnumHandle = Uint32toHandle(-1);
-			}
+			novfs_end_directory_enumerate(*EnumHandle, SessionId);
+			retCode = 0;
+			*EnumHandle = Uint32toHandle(-1);
 		}
 	}
 	return (retCode);
@@ -915,32 +913,33 @@ int novfs_create(unsigned char * Path, int DirectoryFlag, struct novfs_schandle 
 
 	cmdlen = offsetof(struct novfs_create_file_request, path) + pathlen;
 	cmd = kmalloc(cmdlen, GFP_KERNEL);
-	if (cmd) {
-		cmd->Command.CommandType = VFS_COMMAND_CREATE_FILE;
-		if (DirectoryFlag) {
-			cmd->Command.CommandType = VFS_COMMAND_CREATE_DIRECOTRY;
-		}
-		cmd->Command.SequenceNumber = 0;
-		cmd->Command.SessionId = SessionId;
-
-		cmd->pathlength = pathlen;
-		memcpy(cmd->path, Path, pathlen);
-
-		retCode =
-		    Queue_Daemon_Command(cmd, cmdlen, NULL, 0, (void *)&reply,
-					 &replylen, INTERRUPTIBLE);
-
-		if (reply) {
-			retCode = 0;
-			if (reply->Reply.ErrorCode) {
-				retCode = -EIO;
-			}
-			kfree(reply);
-		}
-		kfree(cmd);
-	} else {
-		retCode = -ENOMEM;
+	if (!cmd)
+		return -ENOMEM;
+	cmd->Command.CommandType = VFS_COMMAND_CREATE_FILE;
+	if (DirectoryFlag) {
+		cmd->Command.CommandType = VFS_COMMAND_CREATE_DIRECOTRY;
 	}
+	cmd->Command.SequenceNumber = 0;
+	cmd->Command.SessionId = SessionId;
+
+	cmd->pathlength = pathlen;
+	memcpy(cmd->path, Path, pathlen);
+
+	retCode =
+		Queue_Daemon_Command(cmd, cmdlen, NULL, 0, (void *)&reply,
+				&replylen, INTERRUPTIBLE);
+
+	if (reply) {
+		retCode = 0;
+		if (reply->Reply.ErrorCode) {
+			retCode = -EIO;
+			if (reply->Reply.ErrorCode == NWE_ACCESS_DENIED)
+				retCode = -EACCES;
+
+		}
+		kfree(reply);
+	}
+	kfree(cmd);
 	return (retCode);
 }
 
