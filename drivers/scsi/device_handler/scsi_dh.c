@@ -498,7 +498,6 @@ void scsi_dh_detach(struct request_queue *q)
 {
 	unsigned long flags;
 	struct scsi_device *sdev;
-	struct scsi_device_handler *scsi_dh = NULL;
 
 	spin_lock_irqsave(q->queue_lock, flags);
 	sdev = q->queuedata;
