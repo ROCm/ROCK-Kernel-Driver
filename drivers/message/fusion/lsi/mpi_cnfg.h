@@ -1452,8 +1452,7 @@ typedef struct _CONFIG_PAGE_BIOS_2
 #define MPI_BIOSPAGE2_FORM_SAS_WWN                      (0x05)
 #define MPI_BIOSPAGE2_FORM_ENCLOSURE_SLOT               (0x06)
 
-typedef struct _CONFIG_PAGE_BIOS_4
-{
+typedef struct _CONFIG_PAGE_BIOS_4 {
     CONFIG_PAGE_HEADER      Header;                     /* 00h */
     U64                     ReassignmentBaseWWID;       /* 04h */
 } CONFIG_PAGE_BIOS_4, MPI_POINTER PTR_CONFIG_PAGE_BIOS_4,

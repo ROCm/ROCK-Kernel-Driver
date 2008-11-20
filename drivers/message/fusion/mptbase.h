@@ -72,8 +72,8 @@
 #define COPYRIGHT	"Copyright (c) 1999-2008 " MODULEAUTHOR
 #endif
 
-#define MPT_LINUX_VERSION_COMMON	"4.00.43.00"
-#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-4.00.43.00"
+#define MPT_LINUX_VERSION_COMMON	"4.00.43.00suse"
+#define MPT_LINUX_PACKAGE_NAME		"@(#)mptlinux-4.00.43.00suse"
 #define WHAT_MAGIC_STRING		"@" "(" "#" ")"
 #define MPT_LINUX_MAJOR_VERSION		4
 #define MPT_LINUX_MINOR_VERSION		00
@@ -177,10 +177,10 @@
 #define MPT_SCSI_SG_DEPTH	40
 #endif
 
-#ifdef  CONFIG_FUSION_MAX_FC_SGE
-#if     CONFIG_FUSION_MAX_FC_SGE  < 16
+#ifdef	CONFIG_FUSION_MAX_FC_SGE
+#if	CONFIG_FUSION_MAX_FC_SGE  < 16
 #define MPT_SCSI_FC_SG_DEPTH	16
-#elif   CONFIG_FUSION_MAX_FC_SGE  > 256
+#elif	CONFIG_FUSION_MAX_FC_SGE  > 256
 #define MPT_SCSI_FC_SG_DEPTH	256
 #else
 #define MPT_SCSI_FC_SG_DEPTH	CONFIG_FUSION_MAX_FC_SGE
@@ -444,10 +444,10 @@ do { \
 #define MPT_MGMT_STATUS_RF_VALID	0x01	/* The Reply Frame is VALID */
 #define MPT_MGMT_STATUS_COMMAND_GOOD	0x02	/* Command Status GOOD */
 #define MPT_MGMT_STATUS_PENDING		0x04	/* command is pending */
-#define MPT_MGMT_STATUS_DID_IOCRESET	0x08	/* IOC Reset occurred on the current*/
+#define MPT_MGMT_STATUS_DID_IOCRESET	0x08	/* IOC Reset occurred */
 #define MPT_MGMT_STATUS_SENSE_VALID	0x10	/* valid sense info */
 #define MPT_MGMT_STATUS_TIMER_ACTIVE	0x20	/* obsolete */
-#define MPT_MGMT_STATUS_FREE_MF		0x40	/* free the mf from complete routine */
+#define MPT_MGMT_STATUS_FREE_MF		0x40	/* free the mf */
 
 
 #define INITIALIZE_MGMT_STATUS(status) \
@@ -467,7 +467,7 @@ typedef struct _MPT_MGMT {
 	u8			 status;	/* current command status */
 	int			 completion_code;
 	u32			 msg_context;
-}MPT_MGMT;
+} MPT_MGMT;
 
 /*
  *  Event Structure and define
@@ -540,7 +540,7 @@ typedef	struct _RaidCfgData {
 	IOCPage2_t	*pIocPg2;		/* table of Raid Volumes */
 	IOCPage3_t	*pIocPg3;		/* table of physical disks */
 	IOCPage6_t	*pIocPg6;		/* table of IR static data */
-	struct semaphore	inactive_list_mutex;
+	struct mutex	inactive_list_mutex;
 	struct list_head	inactive_list; /* link list for physical
 						disk that belong in
 						inactive volumes */
@@ -571,7 +571,8 @@ struct mptfc_rport_info
 };
 
 typedef void (*MPT_ADD_SGE)(char *pAddr, u32 flagslength, dma_addr_t dma_addr);
-typedef void (*MPT_ADD_CHAIN)(char *pAddr, u8 next, u16 length, dma_addr_t dma_addr);
+typedef void (*MPT_ADD_CHAIN)
+	(char *pAddr, u8 next, u16 length, dma_addr_t dma_addr);
 
 /*
  *  Adapter Structure - pci_dev specific. Maximum: MPT_MAX_ADAPTERS
@@ -583,7 +584,8 @@ typedef struct _MPT_ADAPTER
 	char			 name[MPT_NAME_LENGTH];	/* "iocN"             */
 	char			 prod_name[MPT_NAME_LENGTH];	/* "LSIFC9x9"         */
 #ifdef CONFIG_FUSION_LOGGING
-	char			 evStr[EVENT_DESCR_STR_SZ]; /* used in mpt_display_event_info */
+	/* used in mpt_display_event_info */
+	char			 evStr[EVENT_DESCR_STR_SZ];
 #endif
 	char			 board_name[16];
 	char			 board_assembly[16];
@@ -597,7 +599,8 @@ typedef struct _MPT_ADAPTER
 	SYSIF_REGS __iomem	*pio_chip;	/* Programmed IO (downloadboot) */
 	u8			 bus_type;
 	unsigned long		 mem_phys;	/* == f4020000 (mmap) */
-	unsigned long		 pio_mem_phys;	/* Programmed IO (downloadboot) */
+	/* Programmed IO (downloadboot) */
+	unsigned long		 pio_mem_phys;
 	int			 mem_size;	/* mmap memory size */
 	int			 number_of_buses;
 	int			 devices_per_bus;
@@ -612,8 +615,10 @@ typedef struct _MPT_ADAPTER
 	int			 reply_depth;	/* Num Allocated reply frames */
 	int			 reply_sz;	/* Reply frame size */
 	int			 num_chain;	/* Number of chain buffers */
-	MPT_ADD_SGE		 add_sge;	/* Pointer to add_sge function */
-	MPT_ADD_CHAIN		 add_chain;	/* Pointer to add_chain function */
+	/* Pointer to add_sge function */
+	MPT_ADD_SGE		 add_sge;
+	/* Pointer to add_chain function */
+	MPT_ADD_CHAIN		 add_chain;
 		/* Pool of buffers for chaining. ReqToChain
 		 * and ChainToChain track index of chain buffers.
 		 * ChainBuffer (DMA) virt/phys addresses.
@@ -646,7 +651,8 @@ typedef struct _MPT_ADAPTER
 	dma_addr_t		 HostPageBuffer_dma;
 	int			 mtrr_reg;
 	struct pci_dev		*pcidev;	/* struct pci_dev pointer */
-	int			bars;	/* bitmask of BAR's that must be configured */
+	/* bitmask of BAR's that must be configured */
+	int			bars;
 	int			 msi_enable;
 	u8			__iomem *memmap;	/* mmap address */
 	struct Scsi_Host	*sh;		/* Scsi Host pointer */
@@ -680,7 +686,8 @@ typedef struct _MPT_ADAPTER
 #if defined(CPQ_CIM)
 	u32			 csmi_change_count;	/* count to track all IR
 					events for CSMI */
-	u8			 pci_slot_number; /* ioc page 1 - pci slot number */
+	/* ioc page 1 - pci slot number */
+	u8			 pci_slot_number;
 #endif
 
 	u8			 ir_firmware; /* =1 if IR firmware detected */
@@ -711,11 +718,12 @@ typedef struct _MPT_ADAPTER
 	u8			 fw_events_off; /* if '1', then ignore events */
 	char fw_event_q_name[20];
 
-	struct mptsas_portinfo	*hba_port_info; /* port_info object for the host */
+	/* port_info object for the host */
+	struct mptsas_portinfo	*hba_port_info;
 	u64			 hba_port_sas_addr;
 	u16			 hba_port_num_phy;
 	struct list_head	 sas_device_info_list;
-	struct semaphore	 sas_device_info_mutex;
+	struct mutex		 sas_device_info_mutex;
 	u8			 old_sas_discovery_protocal;
 	u8			 sas_discovery_quiesce_io;
 	int			 sas_index; /* index refrencing */
@@ -735,6 +743,7 @@ typedef struct _MPT_ADAPTER
 	char			 reset_work_q_name[20];
 	struct workqueue_struct *reset_work_q;
 	struct delayed_work	 fault_reset_work;
+	spinlock_t		 fault_reset_work_lock;
 	struct work_struct	 fc_setup_reset_work;
 	struct list_head	 fc_rports;
 	struct work_struct	 fc_lsc_work;
@@ -743,9 +752,12 @@ typedef struct _MPT_ADAPTER
 	struct work_struct	 fc_rescan_work;
 	char			 fc_rescan_work_q_name[20];
 	struct workqueue_struct *fc_rescan_work_q;
-	unsigned long		  hard_resets;		/* driver forced bus resets count */
-	unsigned long		  soft_resets;		/* fw/external bus resets count */
-	unsigned long		  timeouts;		/* cmd timeouts */
+	/* driver forced bus resets count */
+	unsigned long		  hard_resets;
+	/* fw/external bus resets count */
+	unsigned long		  soft_resets;
+	/* cmd timeouts */
+	unsigned long		  timeouts;
 	struct scsi_cmnd	**ScsiLookup;
 	spinlock_t		  scsi_lookup_lock;
 	int			  sdev_queue_depth;	/* sdev queue depth */
@@ -907,10 +919,14 @@ extern int	 mpt_config(MPT_ADAPTER *ioc, CONFIGPARMS *cfg);
 extern int	 mpt_alloc_fw_memory(MPT_ADAPTER *ioc, int size);
 extern void	 mpt_free_fw_memory(MPT_ADAPTER *ioc);
 extern int	 mpt_findImVolumes(MPT_ADAPTER *ioc);
-extern int	 mptbase_sas_persist_operation(MPT_ADAPTER *ioc, u8 persist_opcode);
-extern int	 mpt_raid_phys_disk_pg0(MPT_ADAPTER *ioc, u8 phys_disk_num, pRaidPhysDiskPage0_t phys_disk);
-extern int	 mpt_raid_phys_disk_pg1(MPT_ADAPTER *ioc, u8 phys_disk_num, pRaidPhysDiskPage1_t phys_disk);
-extern int	 mpt_raid_phys_disk_get_num_paths(MPT_ADAPTER *ioc, u8 phys_disk_num);
+extern int	 mptbase_sas_persist_operation(MPT_ADAPTER *ioc,
+    u8 persist_opcode);
+extern int	 mpt_raid_phys_disk_pg0(MPT_ADAPTER *ioc, u8 phys_disk_num,
+    pRaidPhysDiskPage0_t phys_disk);
+extern int	 mpt_raid_phys_disk_pg1(MPT_ADAPTER *ioc, u8 phys_disk_num,
+    pRaidPhysDiskPage1_t phys_disk);
+extern int	 mpt_raid_phys_disk_get_num_paths(MPT_ADAPTER *ioc,
+    u8 phys_disk_num);
 
 extern int	 mpt_set_taskmgmt_in_progress_flag(MPT_ADAPTER *ioc);
 extern void	 mpt_clear_taskmgmt_in_progress_flag(MPT_ADAPTER *ioc);
@@ -920,7 +936,6 @@ extern void	 mpt_halt_firmware(MPT_ADAPTER *ioc);
  *  Public data decl's...
  */
 extern struct list_head	  ioc_list;
-extern struct proc_dir_entry	*mpt_proc_root_dir;
 extern int mpt_debug_level;
 extern int mpt_fwfault_debug;
 

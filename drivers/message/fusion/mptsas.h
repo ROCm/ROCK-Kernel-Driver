@@ -84,9 +84,12 @@ struct sas_device_info {
 	u16			slot;		/* enclosure slot id */
 	u64			enclosure_logical_id; /*enclosure address */
 	u8			is_logical_volume; /* is this logical volume */
-	u8			is_hidden_raid_component; /* this belongs to volume */
-	u8			volume_id; /* this valid when is_hidden_raid_component set */
-	u8			is_cached;	/* cached data for a removed device */
+	/* this belongs to volume */
+	u8			is_hidden_raid_component;
+	/* this valid when is_hidden_raid_component set */
+	u8			volume_id;
+	/* cached data for a removed device */
+	u8			is_cached;
 };
 
 struct mptsas_hotplug_event {

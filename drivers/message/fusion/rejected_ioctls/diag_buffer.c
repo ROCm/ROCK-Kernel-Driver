@@ -4,19 +4,20 @@
  * Outputs:	None.
  * Return:	0 if successful
  *		-EFAULT if data unavailable
- *		-EBUSY  if previous command timout and IOC reset is not complete.
+ *		-EBUSY  if previous command timout and IOC reset is not
+ *		complete.
  *		-ENODEV if no such device/adapter
  *		-ETIME	if timer expires
  *		-ENOMEM if memory allocation error
  */
 static int
-mptctl_register_diag_buffer (unsigned long arg)
+mptctl_register_diag_buffer(unsigned long arg)
 {
 	mpt_diag_register_t	__user *uarg = (void __user *) arg;
 	mpt_diag_register_t	karg;
 	MPT_ADAPTER		*ioc;
 	int			iocnum, rc, ii;
-	void *			request_data;
+	void 			*request_data;
 	dma_addr_t		request_data_dma;
 	u32			request_data_sz;
 	MPT_FRAME_HDR		*mf;
@@ -30,37 +31,39 @@ mptctl_register_diag_buffer (unsigned long arg)
 	if (copy_from_user(&karg, uarg, sizeof(mpt_diag_register_t))) {
 		printk(KERN_ERR "%s@%d::%s - "
 		"Unable to read in mpt_diag_register_t struct @ %p\n",
-		    __FILE__, __LINE__, __FUNCTION__, uarg);
+		    __FILE__, __LINE__, __func__, uarg);
 		return -EFAULT;
 	}
 
-	if (((iocnum = mpt_verify_adapter(karg.hdr.iocnum, &ioc)) < 0) ||
-		(ioc == NULL)) {
+	iocnum = mpt_verify_adapter(karg.hdr.iocnum, &ioc);
+
+	if ((iocnum < 0) || (ioc == NULL)) {
 		printk(KERN_ERR "%s::%s() @%d - ioc%d not found!\n",
-		    __FILE__, __FUNCTION__, __LINE__, iocnum);
+		    __FILE__, __func__, __LINE__, iocnum);
 		return -ENODEV;
 	}
 
 	dctlprintk(ioc, printk(MYIOC_s_DEBUG_FMT "%s enter.\n", ioc->name,
-	       	__FUNCTION__));
+		__func__));
 	buffer_type = karg.data.BufferType;
 	if (!(ioc->facts.IOCCapabilities & MPT_DIAG_CAPABILITY(buffer_type))) {
 		printk(MYIOC_s_DEBUG_FMT "%s: doesn't have Capability for "
-		    "buffer_type=%x\n", ioc->name, __FUNCTION__, buffer_type);
+		    "buffer_type=%x\n", ioc->name, __func__, buffer_type);
 		return -ENODEV;
 	}
 
 	if (ioc->DiagBuffer_Status[buffer_type] &
 	    MPT_DIAG_BUFFER_IS_REGISTERED) {
 		printk(MYIOC_s_DEBUG_FMT "%s: already has a Registered "
-		    "buffer for buffer_type=%x\n", ioc->name, __FUNCTION__,
+		    "buffer for buffer_type=%x\n", ioc->name, __func__,
 		    buffer_type);
 		return -EFAULT;
 	}
 
 	/* Get a free request frame and save the message context.
 	 */
-	if ((mf = mpt_get_msg_frame(mptctl_id, ioc)) == NULL)
+	mf = mpt_get_msg_frame(mptctl_id, ioc);
+	if (mf  == NULL)
 		return -EAGAIN;
 
 	request_data = ioc->DiagBuffer[buffer_type];
@@ -85,9 +88,9 @@ mptctl_register_diag_buffer (unsigned long arg)
 		if (request_data == NULL) {
 			printk(MYIOC_s_DEBUG_FMT "%s: pci_alloc_consistent"
 			    " FAILED, (request_sz=%d)\n", ioc->name,
-			    __FUNCTION__, request_data_sz);
+			    __func__, request_data_sz);
 			mpt_free_msg_frame(ioc, mf);
-                	return -EAGAIN;
+			return -EAGAIN;
 		}
 		ioc->DiagBuffer[buffer_type] = request_data;
 		ioc->DiagBuffer_sz[buffer_type] = request_data_sz;
@@ -95,7 +98,7 @@ mptctl_register_diag_buffer (unsigned long arg)
 	}
 
 	ioc->DiagBuffer_Status[buffer_type] = 0;
- 	diag_buffer_post_request = (DiagBufferPostRequest_t *)mf;
+	diag_buffer_post_request = (DiagBufferPostRequest_t *)mf;
 	diag_buffer_post_request->Function = MPI_FUNCTION_DIAG_BUFFER_POST;
 	diag_buffer_post_request->ChainOffset = 0;
 	diag_buffer_post_request->BufferType = karg.data.BufferType;
@@ -137,7 +140,7 @@ mptctl_register_diag_buffer (unsigned long arg)
 	if (!(ioc->ioctl_cmds.status & MPT_MGMT_STATUS_COMMAND_GOOD)) {
 		rc = -ETIME;
 		printk(MYIOC_s_WARN_FMT "%s: failed\n", ioc->name,
-		    __FUNCTION__);
+		    __func__);
 		if (ioc->ioctl_cmds.status & MPT_MGMT_STATUS_DID_IOCRESET) {
 			mpt_free_msg_frame(ioc, mf);
 			goto out;
@@ -150,7 +153,7 @@ mptctl_register_diag_buffer (unsigned long arg)
 	/* process the completed Reply Message Frame */
 	if ((ioc->ioctl_cmds.status & MPT_MGMT_STATUS_RF_VALID) == 0) {
 		dctlprintk(ioc, printk(MYIOC_s_DEBUG_FMT "%s: status=%x\n",
-		    ioc->name, __FUNCTION__, ioc->ioctl_cmds.status));
+		    ioc->name, __func__, ioc->ioctl_cmds.status));
 		rc = -EFAULT;
 		goto out;
 	}
@@ -160,12 +163,13 @@ mptctl_register_diag_buffer (unsigned long arg)
 	    MPI_IOCSTATUS_SUCCESS) {
 		if (diag_buffer_post_reply->MsgLength > 5)
 			ioc->DataSize[buffer_type] =
-			     le32_to_cpu(diag_buffer_post_reply->TransferLength);
+			    le32_to_cpu
+			    (diag_buffer_post_reply->TransferLength);
 		ioc->DiagBuffer_Status[buffer_type] |=
 			MPT_DIAG_BUFFER_IS_REGISTERED;
 	} else {
 		dctlprintk(ioc, printk(MYIOC_s_DEBUG_FMT "%s: IOCStatus=%x "
-		    "IOCLogInfo=%x\n", ioc->name, __FUNCTION__,
+		    "IOCLogInfo=%x\n", ioc->name, __func__,
 		    diag_buffer_post_reply->IOCStatus,
 		    diag_buffer_post_reply->IOCLogInfo));
 		rc = -EFAULT;
@@ -187,18 +191,19 @@ mptctl_register_diag_buffer (unsigned long arg)
  * Outputs:	None.
  * Return:	0 if successful
  *		-EFAULT if data unavailable
- *		-EBUSY  if previous command timout and IOC reset is not complete.
+ *		-EBUSY  if previous command timout and IOC reset is
+ *		not complete.
  *		-ENODEV if no such device/adapter
  *		-ETIME	if timer expires
  *		-ENOMEM if memory allocation error
  */
 static int
-mptctl_release_diag_buffer (unsigned long arg)
+mptctl_release_diag_buffer(unsigned long arg)
 {
 	mpt_diag_release_t	__user *uarg = (void __user *) arg;
 	mpt_diag_release_t	karg;
 	MPT_ADAPTER		*ioc;
-	void *			request_data;
+	void 			*request_data;
 	int			iocnum, rc;
 	MPT_FRAME_HDR		*mf;
 	DiagReleaseRequest_t 	*diag_release;
@@ -210,42 +215,42 @@ mptctl_release_diag_buffer (unsigned long arg)
 	if (copy_from_user(&karg, uarg, sizeof(mpt_diag_release_t))) {
 		printk(KERN_ERR "%s@%d::%s - "
 		"Unable to read in mpt_diag_release_t struct @ %p\n",
-		    __FILE__, __LINE__, __FUNCTION__, uarg);
+		    __FILE__, __LINE__, __func__, uarg);
 		return -EFAULT;
 	}
 
-	if (((iocnum = mpt_verify_adapter(karg.hdr.iocnum, &ioc)) < 0) ||
-		(ioc == NULL)) {
+	iocnum = mpt_verify_adapter(karg.hdr.iocnum, &ioc);
+	if ((iocnum < 0) || (ioc == NULL)) {
 		printk(KERN_ERR "%s::%s() @%d - ioc%d not found!\n",
-		    __FILE__, __FUNCTION__, __LINE__, iocnum);
+		    __FILE__, __func__, __LINE__, iocnum);
 		return -ENODEV;
 	}
 
 	dctlprintk(ioc, printk(MYIOC_s_DEBUG_FMT "%s enter.\n", ioc->name,
-	       	__FUNCTION__));
+		__func__));
 	buffer_type = karg.data.UniqueId & 0x000000ff;
 	if (!(ioc->facts.IOCCapabilities & MPT_DIAG_CAPABILITY(buffer_type))) {
 		printk(MYIOC_s_DEBUG_FMT "%s: doesn't have Capability for "
-		    "buffer_type=%x\n", ioc->name, __FUNCTION__, buffer_type);
+		    "buffer_type=%x\n", ioc->name, __func__, buffer_type);
 		return -ENODEV;
 	}
 
 	if ((ioc->DiagBuffer_Status[buffer_type] &
-	       	MPT_DIAG_BUFFER_IS_REGISTERED) == 0 ) {
+		MPT_DIAG_BUFFER_IS_REGISTERED) == 0) {
 		printk(MYIOC_s_DEBUG_FMT "%s: buffer_type=%x is not "
-		    "registered\n", ioc->name, __FUNCTION__, buffer_type);
+		    "registered\n", ioc->name, __func__, buffer_type);
 		return -EFAULT;
 	}
 
 	if (karg.data.UniqueId != ioc->UniqueId[buffer_type]) {
 		printk(MYIOC_s_DEBUG_FMT "%s: unique_id=%x is not registered\n",
-		    ioc->name, __FUNCTION__, karg.data.UniqueId);
+		    ioc->name, __func__, karg.data.UniqueId);
 		return -EFAULT;
 	}
 
 	if (ioc->DiagBuffer_Status[buffer_type] & MPT_DIAG_BUFFER_IS_RELEASED) {
 		dctlprintk(ioc, printk(MYIOC_s_DEBUG_FMT "%s: buffer_type=%x "
-		    "is already released\n", ioc->name, __FUNCTION__,
+		    "is already released\n", ioc->name, __func__,
 		    buffer_type));
 		return rc;
 	}
@@ -254,13 +259,14 @@ mptctl_release_diag_buffer (unsigned long arg)
 
 	if (request_data == NULL) {
 		printk(MYIOC_s_DEBUG_FMT "%s: doesn't have buffer for "
-		    "buffer_type=%x\n", ioc->name, __FUNCTION__, buffer_type);
+		    "buffer_type=%x\n", ioc->name, __func__, buffer_type);
 		return -ENODEV;
 	}
 
 	/* Get a free request frame and save the message context.
 	 */
-	if ((mf = mpt_get_msg_frame(mptctl_id, ioc)) == NULL)
+	mf = mpt_get_msg_frame(mptctl_id, ioc);
+	if (mf == NULL)
 		return -EAGAIN;
 
 	diag_release = (DiagReleaseRequest_t *)mf;
@@ -281,7 +287,7 @@ mptctl_release_diag_buffer (unsigned long arg)
 	if (!(ioc->ioctl_cmds.status & MPT_MGMT_STATUS_COMMAND_GOOD)) {
 		rc = -ETIME;
 		printk(MYIOC_s_WARN_FMT "%s: failed\n", ioc->name,
-		    __FUNCTION__);
+		    __func__);
 		if (ioc->ioctl_cmds.status & MPT_MGMT_STATUS_DID_IOCRESET) {
 			mpt_free_msg_frame(ioc, mf);
 			goto out;
@@ -294,7 +300,7 @@ mptctl_release_diag_buffer (unsigned long arg)
 	/* process the completed Reply Message Frame */
 	if ((ioc->ioctl_cmds.status & MPT_MGMT_STATUS_RF_VALID) == 0) {
 		dctlprintk(ioc, printk(MYIOC_s_DEBUG_FMT "%s: status=%x\n",
-		    ioc->name, __FUNCTION__, ioc->ioctl_cmds.status));
+		    ioc->name, __func__, ioc->ioctl_cmds.status));
 		rc = -EFAULT;
 		goto out;
 	}
@@ -304,7 +310,7 @@ mptctl_release_diag_buffer (unsigned long arg)
 	    MPI_IOCSTATUS_SUCCESS) {
 		dctlprintk(ioc, printk(MYIOC_s_DEBUG_FMT "%s: IOCStatus=%x "
 			"IOCLogInfo=%x\n",
-		    ioc->name, __FUNCTION__, diag_release_reply->IOCStatus,
+		    ioc->name, __func__, diag_release_reply->IOCStatus,
 		    diag_release_reply->IOCLogInfo));
 		rc = -EFAULT;
 	} else
@@ -324,19 +330,20 @@ mptctl_release_diag_buffer (unsigned long arg)
  * Outputs:	None.
  * Return:	0 if successful
  *		-EFAULT if data unavailable
- *		-EBUSY  if previous command timout and IOC reset is not complete.
+ *		-EBUSY  if previous command timout and IOC reset is
+ *		not complete.
  *		-ENODEV if no such device/adapter
  *		-ETIME	if timer expires
  *		-ENOMEM if memory allocation error
  */
 static int
-mptctl_unregister_diag_buffer (unsigned long arg)
+mptctl_unregister_diag_buffer(unsigned long arg)
 {
 	mpt_diag_unregister_t	__user *uarg = (void __user *) arg;
 	mpt_diag_unregister_t	karg;
 	MPT_ADAPTER		*ioc;
 	int			iocnum;
-	void *			request_data;
+	void 			*request_data;
 	dma_addr_t		request_data_dma;
 	u32			request_data_sz;
 	u8			buffer_type;
@@ -344,49 +351,48 @@ mptctl_unregister_diag_buffer (unsigned long arg)
 	if (copy_from_user(&karg, uarg, sizeof(mpt_diag_unregister_t))) {
 		printk(KERN_ERR "%s@%d::%s - "
 		"Unable to read in mpt_diag_unregister_t struct @ %p\n",
-		    __FILE__, __LINE__, __FUNCTION__, uarg);
+		    __FILE__, __LINE__, __func__, uarg);
 		return -EFAULT;
 	}
-
-	if (((iocnum = mpt_verify_adapter(karg.hdr.iocnum, &ioc)) < 0) ||
-		(ioc == NULL)) {
+	iocnum = mpt_verify_adapter(karg.hdr.iocnum, &ioc);
+	if ((iocnum < 0) || (ioc == NULL)) {
 		printk(KERN_ERR "%s::%s() @%d - ioc%d not found!\n",
-		    __FILE__, __FUNCTION__, __LINE__, iocnum);
+		    __FILE__, __func__, __LINE__, iocnum);
 		return -ENODEV;
 	}
 
 	dctlprintk(ioc, printk(MYIOC_s_DEBUG_FMT "%s enter.\n", ioc->name,
-		__FUNCTION__));
+		__func__));
 	buffer_type = karg.data.UniqueId & 0x000000ff;
 	if (!(ioc->facts.IOCCapabilities & MPT_DIAG_CAPABILITY(buffer_type))) {
 		printk(MYIOC_s_DEBUG_FMT "%s: doesn't have Capability for "
-		    "buffer_type=%x\n", ioc->name, __FUNCTION__, buffer_type);
+		    "buffer_type=%x\n", ioc->name, __func__, buffer_type);
 		return -ENODEV;
 	}
 
 	if ((ioc->DiagBuffer_Status[buffer_type] &
 		MPT_DIAG_BUFFER_IS_REGISTERED) == 0) {
 		printk(MYIOC_s_DEBUG_FMT "%s: buffer_type=%x is not "
-		    "registered\n", ioc->name, __FUNCTION__, buffer_type);
+		    "registered\n", ioc->name, __func__, buffer_type);
 		return -EFAULT;
 	}
 	if ((ioc->DiagBuffer_Status[buffer_type] &
 		MPT_DIAG_BUFFER_IS_RELEASED) == 0) {
 		printk(MYIOC_s_DEBUG_FMT "%s: buffer_type=%x has not been "
-		    "released\n", ioc->name, __FUNCTION__, buffer_type);
+		    "released\n", ioc->name, __func__, buffer_type);
 		return -EFAULT;
 	}
 
 	if (karg.data.UniqueId != ioc->UniqueId[buffer_type]) {
 		printk(MYIOC_s_DEBUG_FMT "%s: unique_id=%x is not registered\n",
-		    ioc->name, __FUNCTION__, karg.data.UniqueId);
+		    ioc->name, __func__, karg.data.UniqueId);
 		return -EFAULT;
 	}
 
 	request_data = ioc->DiagBuffer[buffer_type];
 	if (!request_data) {
 		printk(MYIOC_s_DEBUG_FMT "%s: doesn't have buffer for "
-		    "buffer_type=%x\n", ioc->name, __FUNCTION__, buffer_type);
+		    "buffer_type=%x\n", ioc->name, __func__, buffer_type);
 		return -ENODEV;
 	}
 
@@ -405,18 +411,19 @@ mptctl_unregister_diag_buffer (unsigned long arg)
  * Outputs:	None.
  * Return:	0 if successful
  *		-EFAULT if data unavailable
- *		-EBUSY  if previous command timout and IOC reset is not complete.
+ *		-EBUSY  if previous command timout and IOC reset
+ *		is not complete.
  *		-ENODEV if no such device/adapter
  *		-ETIME	if timer expires
  *		-ENOMEM if memory allocation error
  */
 static int
-mptctl_query_diag_buffer (unsigned long arg)
+mptctl_query_diag_buffer(unsigned long arg)
 {
 	mpt_diag_query_t	__user *uarg = (void __user *)arg;
 	mpt_diag_query_t	karg;
 	MPT_ADAPTER		*ioc;
-	void *			request_data;
+	void 			*request_data;
 	int			iocnum, ii, rc;
 	u8			buffer_type;
 
@@ -424,38 +431,38 @@ mptctl_query_diag_buffer (unsigned long arg)
 	if (copy_from_user(&karg, uarg, sizeof(mpt_diag_query_t))) {
 		printk(KERN_ERR "%s@%d::%s - "
 		"Unable to read in mpt_diag_query_t struct @ %p\n",
-		    __FILE__, __LINE__, __FUNCTION__, uarg);
+		    __FILE__, __LINE__, __func__, uarg);
 		return -EFAULT;
 	}
 
 	karg.data.Flags = 0;
-	if (((iocnum = mpt_verify_adapter(karg.hdr.iocnum, &ioc)) < 0) ||
-		(ioc == NULL)) {
+	iocnum = mpt_verify_adapter(karg.hdr.iocnum, &ioc);
+	if ((iocnum < 0) || (ioc == NULL)) {
 		printk(KERN_ERR "%s::%s() @%d - ioc%d not found!\n",
-		    __FILE__, __FUNCTION__, __LINE__, iocnum);
+		    __FILE__, __func__, __LINE__, iocnum);
 		goto out;
 	}
 
 	dctlprintk(ioc, printk(MYIOC_s_DEBUG_FMT "%s enter.\n", ioc->name,
-	       	__FUNCTION__));
+		__func__));
 	buffer_type = karg.data.BufferType;
 	if (!(ioc->facts.IOCCapabilities & MPT_DIAG_CAPABILITY(buffer_type))) {
 		printk(MYIOC_s_DEBUG_FMT "%s: doesn't have Capability for "
-		    "buffer_type=%x\n", ioc->name, __FUNCTION__, buffer_type);
+		    "buffer_type=%x\n", ioc->name, __func__, buffer_type);
 		goto out;
 	}
 
 	if ((ioc->DiagBuffer_Status[buffer_type] &
-	       	MPT_DIAG_BUFFER_IS_REGISTERED) == 0) {
+		MPT_DIAG_BUFFER_IS_REGISTERED) == 0) {
 		printk(MYIOC_s_DEBUG_FMT "%s: buffer_type=%x is not "
-		    "registered\n", ioc->name, __FUNCTION__, buffer_type);
+		    "registered\n", ioc->name, __func__, buffer_type);
 		goto out;
 	}
 
 	if (karg.data.UniqueId & 0xffffff00) {
 		if (karg.data.UniqueId != ioc->UniqueId[buffer_type]) {
 			printk(MYIOC_s_DEBUG_FMT "%s: unique_id=%x is not "
-			    "registered\n", ioc->name, __FUNCTION__,
+			    "registered\n", ioc->name, __func__,
 			    karg.data.UniqueId);
 			goto out;
 		}
@@ -464,7 +471,7 @@ mptctl_query_diag_buffer (unsigned long arg)
 	request_data = ioc->DiagBuffer[buffer_type];
 	if (!request_data) {
 		printk(MYIOC_s_DEBUG_FMT "%s: doesn't have buffer for "
-		    "buffer_type=%x\n", ioc->name, __FUNCTION__, buffer_type);
+		    "buffer_type=%x\n", ioc->name, __func__, buffer_type);
 		goto out;
 	}
 
@@ -490,7 +497,7 @@ mptctl_query_diag_buffer (unsigned long arg)
  out:
 	if (copy_to_user(uarg, &karg, sizeof(mpt_diag_query_t))) {
 		printk(MYIOC_s_ERR_FMT "%s Unable to write mpt_diag_query_t "
-		    "data @ %p\n", ioc->name, __FUNCTION__, uarg);
+		    "data @ %p\n", ioc->name, __func__, uarg);
 		return -EFAULT;
 	}
 	return rc;
@@ -502,13 +509,14 @@ mptctl_query_diag_buffer (unsigned long arg)
  * Outputs:	None.
  * Return:	0 if successful
  *		-EFAULT if data unavailable
- *		-EBUSY  if previous command timout and IOC reset is not complete.
+ *		-EBUSY  if previous command timout and IOC reset
+ *		is not complete.
  *		-ENODEV if no such device/adapter
  *		-ETIME	if timer expires
  *		-ENOMEM if memory allocation error
  */
 static int
-mptctl_read_diag_buffer (unsigned long arg)
+mptctl_read_diag_buffer(unsigned long arg)
 {
 	mpt_diag_read_buffer_t	__user *uarg = (void __user *) arg;
 	mpt_diag_read_buffer_t	karg;
@@ -527,50 +535,49 @@ mptctl_read_diag_buffer (unsigned long arg)
 	if (copy_from_user(&karg, uarg, sizeof(mpt_diag_read_buffer_t))) {
 		printk(KERN_ERR "%s@%d::%s - "
 		"Unable to read in mpt_diag_read_buffer_t struct @ %p\n",
-		    __FILE__, __LINE__, __FUNCTION__, uarg);
+		    __FILE__, __LINE__, __func__, uarg);
 		return -EFAULT;
 	}
-
-	if (((iocnum = mpt_verify_adapter(karg.hdr.iocnum, &ioc)) < 0) ||
-		(ioc == NULL)) {
+	iocnum = mpt_verify_adapter(karg.hdr.iocnum, &ioc);
+	if ((iocnum < 0) || (ioc == NULL)) {
 		printk(KERN_ERR "%s::%s() @%d - ioc%d not found!\n",
-		    __FILE__, __FUNCTION__, __LINE__, iocnum);
+		    __FILE__, __func__, __LINE__, iocnum);
 		return -ENODEV;
 	}
 
 	dctlprintk(ioc, printk(MYIOC_s_DEBUG_FMT "%s enter.\n", ioc->name,
-	    __FUNCTION__));
+		__func__));
 	buffer_type = karg.data.UniqueId & 0x000000ff;
 	if (!(ioc->facts.IOCCapabilities & MPT_DIAG_CAPABILITY(buffer_type))) {
 		printk(MYIOC_s_DEBUG_FMT "%s: doesn't have Capability "
-		    "for buffer_type=%x\n", ioc->name, __FUNCTION__,
+		    "for buffer_type=%x\n", ioc->name, __func__,
 		    buffer_type);
 		return -EFAULT;
 	}
 
 	if (karg.data.UniqueId != ioc->UniqueId[buffer_type]) {
 		printk(MYIOC_s_DEBUG_FMT "%s: unique_id=%x is not registered\n",
-		    ioc->name, __FUNCTION__, karg.data.UniqueId);
+		    ioc->name, __func__, karg.data.UniqueId);
 		return -EFAULT;
 	}
 
 	request_data = ioc->DiagBuffer[buffer_type];
 	if (!request_data) {
 		printk(MYIOC_s_DEBUG_FMT "%s: doesn't have buffer for "
-		    "buffer_type=%x\n", ioc->name, __FUNCTION__, buffer_type);
+		    "buffer_type=%x\n", ioc->name, __func__, buffer_type);
 		return -EFAULT;
 	}
 
 	diagData = (void *)(request_data + karg.data.StartingOffset);
 	dctlprintk(ioc, printk(MYIOC_s_DEBUG_FMT "%s: diagData=%p "
-	    "request_data=%p StartingOffset=%x\n", ioc->name, __FUNCTION__,
+	    "request_data=%p StartingOffset=%x\n", ioc->name, __func__,
 	    diagData, request_data, karg.data.StartingOffset));
 
 	if (copy_to_user((void __user *)&uarg->data.DiagnosticData[0],
 	    diagData, karg.data.BytesToRead)) {
 		printk(MYIOC_s_ERR_FMT "%s: Unable to write "
 		    "mpt_diag_read_buffer_t data @ %p\n", ioc->name,
-		    __FUNCTION__, diagData);
+		    __func__, diagData);
 		return -EFAULT;
 	}
 
@@ -578,17 +585,18 @@ mptctl_read_diag_buffer (unsigned long arg)
 		goto out;
 
 	dctlprintk(ioc, printk(MYIOC_s_DEBUG_FMT "%s: Reregister "
-		"buffer_type=%x\n", ioc->name, __FUNCTION__, buffer_type));
+		"buffer_type=%x\n", ioc->name, __func__, buffer_type));
 	if ((ioc->DiagBuffer_Status[buffer_type] &
-	    MPT_DIAG_BUFFER_IS_RELEASED) == 0) {
+		MPT_DIAG_BUFFER_IS_RELEASED) == 0) {
 		dctlprintk(ioc, printk(MYIOC_s_DEBUG_FMT "%s: buffer_type=%x "
-		    "is still registered\n", ioc->name, __FUNCTION__,
+		    "is still registered\n", ioc->name, __func__,
 		    buffer_type));
 		return rc;
 	}
 	/* Get a free request frame and save the message context.
 	*/
-	if ((mf = mpt_get_msg_frame(mptctl_id, ioc)) == NULL)
+	mf = mpt_get_msg_frame(mptctl_id, ioc);
+	if (mf == NULL)
 		return -EAGAIN;
 
 	diag_buffer_post_request = (DiagBufferPostRequest_t *)mf;
@@ -602,7 +610,7 @@ mptctl_read_diag_buffer (unsigned long arg)
 	diag_buffer_post_request->Reserved2 = 0;
 	diag_buffer_post_request->Reserved3 = 0;
 	diag_buffer_post_request->BufferAddress.High = 0;
-	if ( buffer_type == MPI_DIAG_BUF_TYPE_EXTENDED )
+	if (buffer_type == MPI_DIAG_BUF_TYPE_EXTENDED)
 		diag_buffer_post_request->ExtendedType =
 			cpu_to_le32(ioc->ExtendedType[buffer_type]);
 	diag_buffer_post_request->BufferLength =
@@ -627,7 +635,7 @@ mptctl_read_diag_buffer (unsigned long arg)
 	if (!(ioc->ioctl_cmds.status & MPT_MGMT_STATUS_COMMAND_GOOD)) {
 		rc = -ETIME;
 		printk(MYIOC_s_WARN_FMT "%s: failed\n", ioc->name,
-		    __FUNCTION__);
+		    __func__);
 		if (ioc->ioctl_cmds.status & MPT_MGMT_STATUS_DID_IOCRESET) {
 			mpt_free_msg_frame(ioc, mf);
 			goto out;
@@ -640,7 +648,7 @@ mptctl_read_diag_buffer (unsigned long arg)
 	/* process the completed Reply Message Frame */
 	if ((ioc->ioctl_cmds.status & MPT_MGMT_STATUS_RF_VALID) == 0) {
 		dctlprintk(ioc, printk(MYIOC_s_DEBUG_FMT "%s: status=%x\n",
-		    ioc->name, __FUNCTION__, ioc->ioctl_cmds.status));
+		    ioc->name, __func__, ioc->ioctl_cmds.status));
 		rc = -EFAULT;
 	}
 
@@ -654,7 +662,7 @@ mptctl_read_diag_buffer (unsigned long arg)
 		    MPT_DIAG_BUFFER_IS_REGISTERED;
 	} else {
 		dctlprintk(ioc, printk(MYIOC_s_DEBUG_FMT "%s: IOCStatus=%x "
-		    "IOCLogInfo=%x\n", ioc->name, __FUNCTION__,
+		    "IOCLogInfo=%x\n", ioc->name, __func__,
 		    diag_buffer_post_reply->IOCStatus,
 		    diag_buffer_post_reply->IOCLogInfo));
 		rc = -EFAULT;

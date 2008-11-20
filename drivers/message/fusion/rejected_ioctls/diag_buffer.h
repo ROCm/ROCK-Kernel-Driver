@@ -1,8 +1,13 @@
-#define MPTDIAGREGISTER				_IOWR(MPT_MAGIC_NUMBER,26,mpt_diag_register_t)
-#define MPTDIAGRELEASE				_IOWR(MPT_MAGIC_NUMBER,27,mpt_diag_release_t)
-#define MPTDIAGUNREGISTER			_IOWR(MPT_MAGIC_NUMBER,28,mpt_diag_unregister_t)
-#define MPTDIAGQUERY				_IOWR(MPT_MAGIC_NUMBER,29,mpt_diag_query_t)
-#define MPTDIAGREADBUFFER			_IOWR(MPT_MAGIC_NUMBER,30,mpt_diag_read_buffer_t)
+#define MPTDIAGREGISTER	\
+	_IOWR(MPT_MAGIC_NUMBER, 26, mpt_diag_register_t)
+#define MPTDIAGRELEASE \
+	_IOWR(MPT_MAGIC_NUMBER, 27, mpt_diag_release_t)
+#define MPTDIAGUNREGISTER \
+	_IOWR(MPT_MAGIC_NUMBER, 28, mpt_diag_unregister_t)
+#define MPTDIAGQUERY \
+	_IOWR(MPT_MAGIC_NUMBER, 29, mpt_diag_query_t)
+#define MPTDIAGREADBUFFER \
+	_IOWR(MPT_MAGIC_NUMBER, 30, mpt_diag_read_buffer_t)
 
 #define MPI_FW_DIAG_IOCTL			(0x80646961)
 #define MPI_FW_DIAG_TYPE_REGISTER		(0x00000001)
@@ -25,7 +30,8 @@
 #define MPI_FW_DIAG_ERROR_NO_BUFFER		(0x00000013)
 #define MPI_FW_DIAG_ERROR_ALREADY_RELEASED	(0x00000014)
 
-#define MPT_DIAG_CAPABILITY(bufftype)	(MPI_IOCFACTS_CAPABILITY_DIAG_TRACE_BUFFER << bufftype)
+#define MPT_DIAG_CAPABILITY(bufftype) \
+    (MPI_IOCFACTS_CAPABILITY_DIAG_TRACE_BUFFER << bufftype)
 
 #define MPT_DIAG_BUFFER_IS_REGISTERED 		1
 #define MPT_DIAG_BUFFER_IS_RELEASED 		2

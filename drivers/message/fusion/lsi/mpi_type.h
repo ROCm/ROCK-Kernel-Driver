@@ -50,18 +50,8 @@ typedef signed   short  S16;
 typedef unsigned short  U16;
 
 
-#if defined(unix) || defined(__arm) || defined(ALPHA) || defined(__PPC__) || defined(__ppc)
-
-    typedef signed   int   S32;
-    typedef unsigned int   U32;
-
-#else
-
-    typedef signed   long  S32;
-    typedef unsigned long  U32;
-
-#endif
-
+typedef int32_t   S32;
+typedef u_int32_t U32;
 
 typedef struct _S64
 {

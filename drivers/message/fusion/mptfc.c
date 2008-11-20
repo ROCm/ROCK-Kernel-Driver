@@ -270,28 +270,28 @@ static int
 mptfc_abort(struct scsi_cmnd *SCpnt)
 {
 	return
-	    mptfc_block_error_handler(SCpnt, mptscsih_abort, __FUNCTION__);
+	    mptfc_block_error_handler(SCpnt, mptscsih_abort, __func__);
 }
 
 static int
 mptfc_dev_reset(struct scsi_cmnd *SCpnt)
 {
 	return
-	    mptfc_block_error_handler(SCpnt, mptscsih_dev_reset, __FUNCTION__);
+	    mptfc_block_error_handler(SCpnt, mptscsih_dev_reset, __func__);
 }
 
 static int
 mptfc_bus_reset(struct scsi_cmnd *SCpnt)
 {
 	return
-	    mptfc_block_error_handler(SCpnt, mptscsih_bus_reset, __FUNCTION__);
+	    mptfc_block_error_handler(SCpnt, mptscsih_bus_reset, __func__);
 }
 
 static int
 mptfc_host_reset(struct scsi_cmnd *SCpnt)
 {
 	return
-	    mptfc_block_error_handler(SCpnt, mptscsih_host_reset, __FUNCTION__);
+	    mptfc_block_error_handler(SCpnt, mptscsih_host_reset, __func__);
 }
 
 static void
@@ -553,7 +553,6 @@ mptfc_target_destroy(struct scsi_target *starget)
 	struct fc_rport		*rport;
 	struct mptfc_rport_info *ri;
 
-	printk("%s - starget=%p\n", __FUNCTION__, starget);
 	rport = starget_to_rport(starget);
 	if (rport) {
 		ri = *((struct mptfc_rport_info **)rport->dd_data);
@@ -994,7 +993,8 @@ mptfc_SetFcPortPage1_defaults(MPT_ADAPTER *ioc)
 	#define OFF_FLAGS (MPI_FCPORTPAGE1_FLAGS_VERBOSE_RESCAN_EVENTS)
 
 	for (ii=0; ii<ioc->facts.NumberOfPorts; ii++) {
-		if ((rc = mptfc_GetFcPortPage1(ioc, ii)) < 0)
+		rc = mptfc_GetFcPortPage1(ioc, ii);
+		if (rc < 0)
 			return rc;
 		pp1 = ioc->fc_data.fc_port_page1[ii].data;
 		if ((pp1->InitiatorDeviceTimeout == MPTFC_FW_DEVICE_TIMEOUT)
@@ -1006,7 +1006,8 @@ mptfc_SetFcPortPage1_defaults(MPT_ADAPTER *ioc)
 		pp1->InitiatorIoPendTimeout = MPTFC_FW_IO_PEND_TIMEOUT;
 		pp1->Flags &= ~OFF_FLAGS;
 		pp1->Flags |= ON_FLAGS;
-		if ((rc = mptfc_WriteFcPortPage1(ioc, ii)) < 0)
+		rc = mptfc_WriteFcPortPage1(ioc, ii);
+		if (rc < 0)
 			return rc;
 	}
 	return 0;
@@ -1170,8 +1171,9 @@ mptfc_rescan_devices(struct work_struct *work)
 	 * if cannot set defaults, something's really wrong, bail out
 	 */
 
-	if ((rc = mptfc_SetFcPortPage1_defaults(ioc)) < 0) {
-		dfcprintk (ioc, printk(MYIOC_s_DEBUG_FMT
+	rc = mptfc_SetFcPortPage1_defaults(ioc);
+	if (rc < 0) {
+		dfcprintk(ioc, printk(MYIOC_s_DEBUG_FMT
 		    "mptfc_rescan.%d: unable to set PP1 defaults, rc %d.\n",
 		    ioc->name, ioc->sh->host_no, rc));
 		return;
@@ -1373,8 +1375,9 @@ mptfc_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	/* initialize workqueue */
 
-	snprintf(ioc->fc_rescan_work_q_name, sizeof(ioc->fc_rescan_work_q_name), "mptfc_wq_%d",
-		sh->host_no);
+	snprintf(ioc->fc_rescan_work_q_name,
+	    sizeof(ioc->fc_rescan_work_q_name), "mptfc_wq_%d",
+	    sh->host_no);
 	ioc->fc_rescan_work_q =
 		create_singlethread_workqueue(ioc->fc_rescan_work_q_name);
 	if (!ioc->fc_rescan_work_q)
@@ -1462,10 +1465,10 @@ mptfc_ioc_reset(MPT_ADAPTER *ioc, int reset_phase)
 	if ((ioc->bus_type != FC) || (!rc))
 		return rc;
 
-	switch(reset_phase) {
+	switch (reset_phase) {
 	case MPT_IOC_SETUP_RESET:
 		dtmprintk(ioc, printk(MYIOC_s_DEBUG_FMT
-		    "%s: MPT_IOC_SETUP_RESET\n", ioc->name, __FUNCTION__));
+		    "%s: MPT_IOC_SETUP_RESET\n", ioc->name, __func__));
 		spin_lock_irqsave(&ioc->fc_rescan_work_lock, flags);
 		if (ioc->fc_rescan_work_q) {
 			queue_work(ioc->fc_rescan_work_q,
@@ -1475,11 +1478,11 @@ mptfc_ioc_reset(MPT_ADAPTER *ioc, int reset_phase)
 		break;
 	case MPT_IOC_PRE_RESET:
 		dtmprintk(ioc, printk(MYIOC_s_DEBUG_FMT
-		    "%s: MPT_IOC_PRE_RESET\n", ioc->name, __FUNCTION__));
+		    "%s: MPT_IOC_PRE_RESET\n", ioc->name, __func__));
 		break;
 	case MPT_IOC_POST_RESET:
 		dtmprintk(ioc, printk(MYIOC_s_DEBUG_FMT
-		    "%s: MPT_IOC_POST_RESET\n",  ioc->name, __FUNCTION__));
+		    "%s: MPT_IOC_POST_RESET\n",  ioc->name, __func__));
 		spin_lock_irqsave(&ioc->fc_rescan_work_lock, flags);
 		if (ioc->fc_rescan_work_q) {
 			queue_work(ioc->fc_rescan_work_q,
@@ -1493,11 +1496,12 @@ mptfc_ioc_reset(MPT_ADAPTER *ioc, int reset_phase)
 	return 1;
 }
 
+/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /**
  *	mptfc_init - Register MPT adapter(s) as SCSI host(s) with SCSI mid-layer.
  *
  *	Returns 0 for success, non-zero for failure.
- **/
+ */
 static int __init
 mptfc_init(void)
 {
@@ -1529,11 +1533,12 @@ mptfc_init(void)
 	return error;
 }
 
+/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /**
  *	mptfc_remove - Remove fc infrastructure for devices
  *	@pdev: Pointer to pci_dev structure
  *
- **/
+ */
 static void __devexit
 mptfc_remove(struct pci_dev *pdev)
 {
@@ -1542,8 +1547,6 @@ mptfc_remove(struct pci_dev *pdev)
 	struct workqueue_struct *work_q;
 	unsigned long		flags;
 	int			ii;
-
-	printk("%s -pdev=%p\n", __FUNCTION__, pdev);
 
 	/* destroy workqueue */
 	if ((work_q=ioc->fc_rescan_work_q)) {

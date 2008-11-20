@@ -87,7 +87,8 @@ MODULE_PARM_DESC(mpt_saf_te, " Force enabling SEP Processor: enable=1  (default=
 
 static int mpt_qas = MPTSCSIH_QAS;
 module_param(mpt_qas, int, 1);
-MODULE_PARM_DESC(mpt_qas, " Quick Arbitration and Selection (QAS) enabled=1, disabled=0 (default=MPTSCSIH_QAS=1)");
+MODULE_PARM_DESC(mpt_qas, " Quick Arbitration and Selection (QAS) enabled=1,"
+   " disabled= (default=MPTSCSIH_QAS=1)");
 
 static void mptspi_write_offset(struct scsi_target *, int);
 static void mptspi_write_width(struct scsi_target *, int);
@@ -240,7 +241,7 @@ mptspi_setTargetNegoParms(MPT_SCSI_HOST *hd, VirtTarget *target,
 		 */
 
 		ddvprintk(ioc, printk(MYIOC_s_DEBUG_FMT
-		"Disabling QAS due to noQas=%02x on id=%d!\n", ioc->name, noQas, id));
+			"Disabling QAS due to noQas=%02x on id=%d!\n", ioc->name, noQas, id));
 	}
 }
 
@@ -314,7 +315,7 @@ mptspi_writeIOCPage4(MPT_SCSI_HOST *hd, u8 channel , u8 id)
 
 	ddvprintk(ioc, printk(MYIOC_s_DEBUG_FMT
 		"writeIOCPage4: MaxSEP=%d ActiveSEP=%d id=%d bus=%d\n",
-			ioc->name, IOCPage4Ptr->MaxSEP, IOCPage4Ptr->ActiveSEP, id, channel));
+		ioc->name, IOCPage4Ptr->MaxSEP, IOCPage4Ptr->ActiveSEP, id, channel));
 
 	mpt_put_msg_frame(ioc->DoneCtx, ioc, mf);
 
@@ -495,7 +496,7 @@ mptspi_print_write_nego(struct _MPT_SCSI_HOST *hd, struct scsi_target *starget, 
 	    ii & MPI_SCSIDEVPAGE0_NP_WR_FLOW ? "WRFLOW ": "",
 	    ii & MPI_SCSIDEVPAGE0_NP_RD_STRM ? "RDSTRM ": "",
 	    ii & MPI_SCSIDEVPAGE0_NP_RTI ? "RTI ": "",
-	    ii & MPI_SCSIDEVPAGE0_NP_PCOMP_EN ? "PCOMP ": "");
+	    ii & MPI_SCSIDEVPAGE0_NP_PCOMP_EN ? "PCOMP " : "");
 }
 
 /**
@@ -523,7 +524,7 @@ mptspi_print_read_nego(struct _MPT_SCSI_HOST *hd, struct scsi_target *starget, u
 	    ii & MPI_SCSIDEVPAGE0_NP_WR_FLOW ? "WRFLOW ": "",
 	    ii & MPI_SCSIDEVPAGE0_NP_RD_STRM ? "RDSTRM ": "",
 	    ii & MPI_SCSIDEVPAGE0_NP_RTI ? "RTI ": "",
-	    ii & MPI_SCSIDEVPAGE0_NP_PCOMP_EN ? "PCOMP ": "");
+	    ii & MPI_SCSIDEVPAGE0_NP_PCOMP_EN ? "PCOMP " : "");
 }
 
 static int mptspi_read_spi_device_pg0(struct scsi_target *starget,
@@ -822,8 +823,8 @@ static int mptspi_write_spi_device_pg1(struct scsi_target *starget,
 
 	pg1 = dma_alloc_coherent(&ioc->pcidev->dev, size, &pg1_dma, GFP_KERNEL);
 	if (pg1 == NULL) {
-		starget_printk(KERN_ERR, starget,
-		    MYIOC_s_FMT "dma_alloc_coherent for parameters failed\n", ioc->name);
+		starget_printk(KERN_ERR, starget, MYIOC_s_FMT
+		    "dma_alloc_coherent for parameters failed\n", ioc->name);
 		return -EINVAL;
 	}
 
@@ -1071,12 +1072,12 @@ mpt_work_wrapper(struct work_struct *work)
 		if(vtarget->id != disk)
 			continue;
 
-		starget_printk(KERN_INFO, vtarget->starget,
-		    MYIOC_s_FMT "Integrated RAID requests DV of new device\n", ioc->name);
+		starget_printk(KERN_INFO, vtarget->starget, MYIOC_s_FMT
+		    "Integrated RAID requests DV of new device\n", ioc->name);
 		mptspi_dv_device(hd, sdev);
 	}
-	shost_printk(KERN_INFO, shost,
-	    MYIOC_s_FMT "Integrated RAID detects new device %d\n", ioc->name, disk);
+	shost_printk(KERN_INFO, shost, MYIOC_s_FMT
+	    "Integrated RAID detects new device %d\n", ioc->name, disk);
 	scsi_scan_target(&ioc->sh->shost_gendev, 1, disk, 0, 1);
 }
 
@@ -1087,8 +1088,8 @@ static void mpt_dv_raid(struct _MPT_SCSI_HOST *hd, int disk)
 	MPT_ADAPTER *ioc = hd->ioc;
 
 	if (!wqw) {
-		shost_printk(KERN_ERR, ioc->sh,
-		    MYIOC_s_FMT "Failed to act on RAID event for physical disk %d\n",
+		shost_printk(KERN_ERR, ioc->sh, MYIOC_s_FMT
+		    "Failed to act on RAID event for physical disk %d\n",
 		    ioc->name, disk);
 		return;
 	}
