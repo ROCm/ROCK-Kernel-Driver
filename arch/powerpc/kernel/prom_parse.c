@@ -253,7 +253,7 @@ int of_irq_map_pci(struct pci_dev *pdev, struct of_irq *out_irq)
 	if (dn) {
 		rc = of_irq_map_one(dn, 0, out_irq);
 		if (!rc)
-			eturn rc;
+			return rc;
 	}
 
 	/* Ok, we don't, time to have fun. Let's start by building up an
