@@ -83,6 +83,7 @@ gate_desc idt_table[256]
 #endif
 
 int panic_on_unrecovered_nmi;
+int panic_on_io_nmi;
 int kstack_depth_to_print = 24;
 static unsigned int code_bytes = 64;
 #ifdef CONFIG_STACK_UNWIND
@@ -737,6 +738,9 @@ io_check_error(unsigned char reason, struct pt_regs *regs)
 {
 	printk(KERN_EMERG "NMI: IOCK error (debug interrupt?)\n");
 	show_registers(regs);
+
+	if (panic_on_io_nmi)
+		panic("NMI IOCK error: Not continuing");
 
 	/* Re-enable the IOCK line, wait for a few seconds */
 	clear_io_check_error(reason);
