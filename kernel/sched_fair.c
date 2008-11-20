@@ -141,6 +141,49 @@ static inline struct sched_entity *parent_entity(struct sched_entity *se)
 	return se->parent;
 }
 
+/* return depth at which a sched entity is present in the hierarchy */
+static inline int depth_se(struct sched_entity *se)
+{
+	int depth = 0;
+
+	for_each_sched_entity(se)
+		depth++;
+
+	return depth;
+}
+
+static void
+find_matching_se(struct sched_entity **se, struct sched_entity **pse)
+{
+	int se_depth, pse_depth;
+
+	/*
+	 * preemption test can be made between sibling entities who are in the
+	 * same cfs_rq i.e who have a common parent. Walk up the hierarchy of
+	 * both tasks until we find their ancestors who are siblings of common
+	 * parent.
+	 */
+
+	/* First walk up until both entities are at same depth */
+	se_depth = depth_se(*se);
+	pse_depth = depth_se(*pse);
+
+	while (se_depth > pse_depth) {
+		se_depth--;
+		*se = parent_entity(*se);
+	}
+
+	while (pse_depth > se_depth) {
+		pse_depth--;
+		*pse = parent_entity(*pse);
+	}
+
+	while (!is_same_group(*se, *pse)) {
+		*se = parent_entity(*se);
+		*pse = parent_entity(*pse);
+	}
+}
+
 #else	/* CONFIG_FAIR_GROUP_SCHED */
 
 static inline struct rq *rq_of(struct cfs_rq *cfs_rq)
@@ -189,6 +232,11 @@ is_same_group(struct sched_entity *se, struct sched_entity *pse)
 static inline struct sched_entity *parent_entity(struct sched_entity *se)
 {
 	return NULL;
+}
+
+static inline void
+find_matching_se(struct sched_entity **se, struct sched_entity **pse)
+{
 }
 
 #endif	/* CONFIG_FAIR_GROUP_SCHED */
@@ -334,7 +382,7 @@ int sched_nr_latency_handler(struct ctl_table *table, int write,
 #endif
 
 /*
- * delta *= w / rw
+ * delta *= P[w / rw]
  */
 static inline unsigned long
 calc_delta_weight(unsigned long delta, struct sched_entity *se)
@@ -348,15 +396,13 @@ calc_delta_weight(unsigned long delta, struct sched_entity *se)
 }
 
 /*
- * delta *= rw / w
+ * delta /= w
  */
 static inline unsigned long
 calc_delta_fair(unsigned long delta, struct sched_entity *se)
 {
-	for_each_sched_entity(se) {
-		delta = calc_delta_mine(delta,
-				cfs_rq_of(se)->load.weight, &se->load);
-	}
+	if (unlikely(se->load.weight != NICE_0_LOAD))
+		delta = calc_delta_mine(delta, NICE_0_LOAD, &se->load);
 
 	return delta;
 }
@@ -386,84 +432,26 @@ static u64 __sched_period(unsigned long nr_running)
  * We calculate the wall-time slice from the period by taking a part
  * proportional to the weight.
  *
- * s = p*w/rw
+ * s = p*P[w/rw]
  */
 static u64 sched_slice(struct cfs_rq *cfs_rq, struct sched_entity *se)
 {
-	return calc_delta_weight(__sched_period(cfs_rq->nr_running), se);
+	unsigned long nr_running = cfs_rq->nr_running;
+
+	if (unlikely(!se->on_rq))
+		nr_running++;
+
+	return calc_delta_weight(__sched_period(nr_running), se);
 }
 
 /*
  * We calculate the vruntime slice of a to be inserted task
  *
- * vs = s*rw/w = p
+ * vs = s/w
  */
-static u64 sched_vslice_add(struct cfs_rq *cfs_rq, struct sched_entity *se)
+static u64 sched_vslice(struct cfs_rq *cfs_rq, struct sched_entity *se)
 {
-	unsigned long nr_running = cfs_rq->nr_running;
-
-	if (!se->on_rq)
-		nr_running++;
-
-	return __sched_period(nr_running);
-}
-
-/*
- * The goal of calc_delta_asym() is to be asymmetrically around NICE_0_LOAD, in
- * that it favours >=0 over <0.
- *
- *   -20         |
- *               |
- *     0 --------+-------
- *             .'
- *    19     .'
- *
- */
-static unsigned long
-calc_delta_asym(unsigned long delta, struct sched_entity *se)
-{
-	struct load_weight lw = {
-		.weight = NICE_0_LOAD,
-		.inv_weight = 1UL << (WMULT_SHIFT-NICE_0_SHIFT)
-	};
-
-	for_each_sched_entity(se) {
-		struct load_weight *se_lw = &se->load;
-		unsigned long rw = cfs_rq_of(se)->load.weight;
-
-#ifdef CONFIG_FAIR_SCHED_GROUP
-		struct cfs_rq *cfs_rq = se->my_q;
-		struct task_group *tg = NULL
-
-		if (cfs_rq)
-			tg = cfs_rq->tg;
-
-		if (tg && tg->shares < NICE_0_LOAD) {
-			/*
-			 * scale shares to what it would have been had
-			 * tg->weight been NICE_0_LOAD:
-			 *
-			 *   weight = 1024 * shares / tg->weight
-			 */
-			lw.weight *= se->load.weight;
-			lw.weight /= tg->shares;
-
-			lw.inv_weight = 0;
-
-			se_lw = &lw;
-			rw += lw.weight - se->load.weight;
-		} else
-#endif
-
-		if (se->load.weight < NICE_0_LOAD) {
-			se_lw = &lw;
-			rw += NICE_0_LOAD - se->load.weight;
-		}
-
-		delta = calc_delta_mine(delta, rw, se_lw);
-	}
-
-	return delta;
+	return calc_delta_fair(sched_slice(cfs_rq, se), se);
 }
 
 /*
@@ -683,7 +671,7 @@ place_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int initial)
 	 * stays open at the end.
 	 */
 	if (initial && sched_feat(START_DEBIT))
-		vruntime += sched_vslice_add(cfs_rq, se);
+		vruntime += sched_vslice(cfs_rq, se);
 
 	if (!initial) {
 		/* sleeps upto a single latency don't count. */
@@ -1280,9 +1268,7 @@ static unsigned long wakeup_gran(struct sched_entity *se)
 	 * More easily preempt - nice tasks, while not making it harder for
 	 * + nice tasks.
 	 */
-	if (sched_feat(ASYM_GRAN))
-		gran = calc_delta_asym(sysctl_sched_wakeup_granularity, se);
-	else
+	if (!sched_feat(ASYM_GRAN) || se->load.weight > NICE_0_LOAD)
 		gran = calc_delta_fair(sysctl_sched_wakeup_granularity, se);
 
 	return gran;
@@ -1307,7 +1293,7 @@ wakeup_preempt_entity(struct sched_entity *curr, struct sched_entity *se)
 {
 	s64 gran, vdiff = curr->vruntime - se->vruntime;
 
-	if (vdiff < 0)
+	if (vdiff <= 0)
 		return -1;
 
 	gran = wakeup_gran(curr);
@@ -1315,17 +1301,6 @@ wakeup_preempt_entity(struct sched_entity *curr, struct sched_entity *se)
 		return 1;
 
 	return 0;
-}
-
-/* return depth at which a sched entity is present in the hierarchy */
-static inline int depth_se(struct sched_entity *se)
-{
-	int depth = 0;
-
-	for_each_sched_entity(se)
-		depth++;
-
-	return depth;
 }
 
 /*
@@ -1336,7 +1311,6 @@ static void check_preempt_wakeup(struct rq *rq, struct task_struct *p)
 	struct task_struct *curr = rq->curr;
 	struct cfs_rq *cfs_rq = task_cfs_rq(curr);
 	struct sched_entity *se = &curr->se, *pse = &p->se;
-	int se_depth, pse_depth;
 
 	if (unlikely(rt_prio(p->prio))) {
 		update_rq_clock(rq);
@@ -1360,34 +1334,19 @@ static void check_preempt_wakeup(struct rq *rq, struct task_struct *p)
 	if (!sched_feat(WAKEUP_PREEMPT))
 		return;
 
-	/*
-	 * preemption test can be made between sibling entities who are in the
-	 * same cfs_rq i.e who have a common parent. Walk up the hierarchy of
-	 * both tasks until we find their ancestors who are siblings of common
-	 * parent.
-	 */
+	find_matching_se(&se, &pse);
 
-	/* First walk up until both entities are at same depth */
-	se_depth = depth_se(se);
-	pse_depth = depth_se(pse);
+	while (se) {
+		BUG_ON(!pse);
 
-	while (se_depth > pse_depth) {
-		se_depth--;
-		se = parent_entity(se);
-	}
+		if (wakeup_preempt_entity(se, pse) == 1) {
+			resched_task(curr);
+			break;
+		}
 
-	while (pse_depth > se_depth) {
-		pse_depth--;
-		pse = parent_entity(pse);
-	}
-
-	while (!is_same_group(se, pse)) {
 		se = parent_entity(se);
 		pse = parent_entity(pse);
 	}
-
-	if (wakeup_preempt_entity(se, pse) == 1)
-		resched_task(curr);
 }
 
 static struct task_struct *pick_next_task_fair(struct rq *rq)
