@@ -298,7 +298,9 @@ void machine_kexec(struct kimage *image)
 
 void arch_crash_save_vmcoreinfo(void)
 {
+#ifndef CONFIG_XEN /* could really be CONFIG_RELOCATABLE */
 	VMCOREINFO_SYMBOL(phys_base);
+#endif
 	VMCOREINFO_SYMBOL(init_level4_pgt);
 
 #ifdef CONFIG_NUMA

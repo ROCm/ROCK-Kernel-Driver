@@ -1143,6 +1143,7 @@ config HIGHPTE
 config X86_RESERVE_LOW_64K
         bool "Reserve low 64K of RAM on AMI/Phoenix BIOSen"
 	default y
+	depends on !XEN
 	help
 	 Reserve the first 64K of physical RAM on BIOSes that are known
 	 to potentially corrupt that memory range. A numbers of BIOSes are
@@ -1348,8 +1349,7 @@ source kernel/Kconfig.hz
 
 config KEXEC
 	bool "kexec system call"
-	depends on X86_BIOS_REBOOT
-	depends on !XEN_UNPRIVILEGED_GUEST
+	depends on X86_BIOS_REBOOT || (XEN && !XEN_UNPRIVILEGED_GUEST)
 	help
 	  kexec is a system call that implements the ability to shutdown your
 	  current kernel, and to start another kernel.  It is like a reboot
@@ -1495,7 +1495,9 @@ config COMPAT_VDSO
 
 	  If unsure, say Y.
 
+if !XEN
 source "arch/x86/perfmon/Kconfig"
+endif
 
 endmenu
 

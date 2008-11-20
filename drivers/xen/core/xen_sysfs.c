@@ -345,13 +345,12 @@ HYPERVISOR_ATTR_RO(vmcoreinfo);
 
 static int __init xen_sysfs_vmcoreinfo_init(void)
 {
-	return sysfs_create_file(&hypervisor_subsys.kobj,
-				 &vmcoreinfo_attr.attr);
+	return sysfs_create_file(hypervisor_kobj, &vmcoreinfo_attr.attr);
 }
 
 static void xen_sysfs_vmcoreinfo_destroy(void)
 {
-	sysfs_remove_file(&hypervisor_subsys.kobj, &vmcoreinfo_attr.attr);
+	sysfs_remove_file(hypervisor_kobj, &vmcoreinfo_attr.attr);
 }
 
 #endif

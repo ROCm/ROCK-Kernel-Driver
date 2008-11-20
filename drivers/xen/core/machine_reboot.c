@@ -53,6 +53,14 @@ void machine_power_off(void)
 	HYPERVISOR_shutdown(SHUTDOWN_poweroff);
 }
 
+#ifdef CONFIG_KEXEC
+#include <asm/reboot.h>
+void machine_crash_shutdown(struct pt_regs *regs)
+{
+	native_machine_crash_shutdown(regs);
+}
+#endif
+
 int reboot_thru_bios = 0;	/* for dmi_scan.c */
 EXPORT_SYMBOL(machine_restart);
 EXPORT_SYMBOL(machine_halt);

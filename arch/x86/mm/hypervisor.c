@@ -46,6 +46,8 @@
 #include <asm/tlbflush.h>
 #include <linux/highmem.h>
 
+EXPORT_SYMBOL(hypercall_page);
+
 #define NR_MC     BITS_PER_LONG
 #define NR_MMU    BITS_PER_LONG
 #define NR_MMUEXT (BITS_PER_LONG / 4)
@@ -60,12 +62,30 @@ struct lazy_mmu {
 };
 static DEFINE_PER_CPU(struct lazy_mmu, lazy_mmu);
 
+static inline bool use_lazy_mmu_mode(void)
+{
+#ifdef CONFIG_PREEMPT
+	if (!preempt_count())
+		return false;
+#endif
+	return !irq_count();
+}
+
+static void multicall_failed(const multicall_entry_t *mc, int rc)
+{
+	printk(KERN_EMERG "hypercall#%lu(%lx, %lx, %lx, %lx)"
+			  " failed: %d (caller %lx)\n",
+	       mc->op, mc->args[0], mc->args[1], mc->args[2], mc->args[3],
+	       rc, mc->args[5]);
+	BUG();
+}
+
 int xen_multicall_flush(bool ret_last) {
 	struct lazy_mmu *lazy = &__get_cpu_var(lazy_mmu);
 	multicall_entry_t *mc = lazy->mc;
 	unsigned int count = lazy->nr_mc;
 
-	if (!count)
+	if (!count || !use_lazy_mmu_mode())
 		return 0;
 
 	lazy->nr_mc = 0;
@@ -73,45 +93,20 @@ int xen_multicall_flush(bool ret_last) {
 	lazy->nr_mmuext = 0;
 
 	if (count == 1) {
-		int rc;
+		int rc = _hypercall(int, mc->op, mc->args[0], mc->args[1],
+				    mc->args[2], mc->args[3], mc->args[4]);
 
-		/*todo adjust hypercall macros to accept non-immediate
-		       hypercall number */
-		switch (mc->op) {
-		case __HYPERVISOR_update_va_mapping:
-			rc = _hypercall4(int, update_va_mapping,
-					 mc->args[0], mc->args[1],
-					 mc->args[2], mc->args[3]);
-			break;
-		case __HYPERVISOR_mmu_update:
-			rc = _hypercall4(int, mmu_update,
-					 mc->args[0], mc->args[1],
-					 mc->args[2], mc->args[3]);
-			break;
-		case __HYPERVISOR_mmuext_op:
-			rc = _hypercall4(int, mmuext_op,
-					 mc->args[0], mc->args[1],
-					 mc->args[2], mc->args[3]);
-			break;
-		default:
-			BUG();
+		if (unlikely(rc)) {
+			if (ret_last)
+				return rc;
+			multicall_failed(mc, rc);
 		}
-		if (ret_last)
-			return rc;
-		BUG_ON(rc);
 	} else {
 		if (HYPERVISOR_multicall(mc, count))
 			BUG();
 		while (count-- > ret_last)
-			if (unlikely(mc++->result)) {
-				--mc;
-				printk(KERN_EMERG
-				       "hypercall(%lu, %lx, %lx, %lx, %lx)"
-				       " failed: %ld\n",
-				       mc->op, mc->args[0], mc->args[1],
-				       mc->args[2], mc->args[3], mc->result);
-				BUG();
-			}
+			if (unlikely(mc++->result))
+				multicall_failed(mc - 1, mc[-1].result);
 		if (ret_last)
 			return mc->result;
 	}
@@ -120,24 +115,24 @@ int xen_multicall_flush(bool ret_last) {
 }
 EXPORT_SYMBOL(xen_multicall_flush);
 
-bool xen_use_lazy_mmu_mode(void)
-{
-#ifdef CONFIG_PREEMPT
-	if (!preempt_count())
-		return false;
-#endif
-	return !irq_count();
-}
-EXPORT_SYMBOL(xen_use_lazy_mmu_mode);
-
 int xen_multi_update_va_mapping(unsigned long va, pte_t pte,
-				unsigned long flags)
+				unsigned long uvmf)
 {
 	struct lazy_mmu *lazy = &__get_cpu_var(lazy_mmu);
 	multicall_entry_t *mc;
 
+	if (unlikely(!use_lazy_mmu_mode()))
+#ifdef CONFIG_X86_PAE
+		return _hypercall4(int, update_va_mapping, va,
+				   pte.pte_low, pte.pte_high, uvmf);
+#else
+		return _hypercall3(int, update_va_mapping, va,
+				   pte.pte, uvmf);
+#endif
+
 	if (unlikely(lazy->nr_mc == NR_MC))
 		xen_multicall_flush(false);
+
 	mc = lazy->mc + lazy->nr_mc++;
 	mc->op = __HYPERVISOR_update_va_mapping;
 	mc->args[0] = va;
@@ -147,8 +142,16 @@ int xen_multi_update_va_mapping(unsigned long va, pte_t pte,
 	mc->args[1] = pte.pte_low;
 	mc->args[2] = pte.pte_high;
 #endif
-	mc->args[MULTI_UVMFLAGS_INDEX] = flags;
+	mc->args[MULTI_UVMFLAGS_INDEX] = uvmf;
+	mc->args[5] = (long)__builtin_return_address(0);
+
 	return 0;
+}
+
+static inline bool mmu_may_merge(const multicall_entry_t *mc,
+				 unsigned int op, domid_t domid)
+{
+	return mc->op == op && !mc->args[2] && mc->args[3] == domid;
 }
 
 int xen_multi_mmu_update(mmu_update_t *src, unsigned int count,
@@ -156,22 +159,28 @@ int xen_multi_mmu_update(mmu_update_t *src, unsigned int count,
 {
 	struct lazy_mmu *lazy = &__get_cpu_var(lazy_mmu);
 	multicall_entry_t *mc = lazy->mc + lazy->nr_mc;
-	mmu_update_t *dst = lazy->mmu + lazy->nr_mmu;
-	bool commit = (lazy->nr_mmu += count) > NR_MMU || success_count;
-	bool merge = lazy->nr_mc && mc[-1].op == __HYPERVISOR_mmu_update
-		     && !commit && !mc[-1].args[2] && mc[-1].args[3] == domid;
+	mmu_update_t *dst;
+	bool commit, merge;
 
+	if (unlikely(!use_lazy_mmu_mode()))
+		return _hypercall4(int, mmu_update, src, count,
+				   success_count, domid);
+
+	commit = (lazy->nr_mmu + count) > NR_MMU || success_count;
+	merge = lazy->nr_mc && !commit
+		&& mmu_may_merge(mc - 1, __HYPERVISOR_mmu_update, domid);
 	if (unlikely(lazy->nr_mc == NR_MC) && !merge) {
 		xen_multicall_flush(false);
 		mc = lazy->mc;
-		dst = lazy->mmu;
-		lazy->nr_mmu = count;
 		commit = count > NR_MMU || success_count;
 	}
 
-	if (!lazy->nr_mc && commit)
-		return _hypercall4(int, mmu_update, src, count, success_count, domid);
+	if (!lazy->nr_mc && unlikely(commit))
+		return _hypercall4(int, mmu_update, src, count,
+				   success_count, domid);
 
+	dst = lazy->mmu + lazy->nr_mmu;
+	lazy->nr_mmu += count;
 	if (merge) {
 		mc[-1].args[1] += count;
 		memcpy(dst, src, count * sizeof(*src));
@@ -186,6 +195,7 @@ int xen_multi_mmu_update(mmu_update_t *src, unsigned int count,
 		mc->args[1] = count;
 		mc->args[2] = (unsigned long)success_count;
 		mc->args[3] = domid;
+		mc->args[5] = (long)__builtin_return_address(0);
 	}
 
 	while (!commit && count--)
@@ -197,10 +207,8 @@ int xen_multi_mmu_update(mmu_update_t *src, unsigned int count,
 			commit = true;
 			break;
 		}
-	if (commit)
-		return xen_multicall_flush(true);
 
-	return 0;
+	return commit ? xen_multicall_flush(true) : 0;
 }
 
 int xen_multi_mmuext_op(struct mmuext_op *src, unsigned int count,
@@ -210,6 +218,10 @@ int xen_multi_mmuext_op(struct mmuext_op *src, unsigned int count,
 	multicall_entry_t *mc;
 	struct mmuext_op *dst;
 	bool commit, merge;
+
+	if (unlikely(!use_lazy_mmu_mode()))
+		return _hypercall4(int, mmuext_op, src, count,
+				   success_count, domid);
 
 	/*
 	 * While it could be useful in theory, I've never seen the body of
@@ -276,21 +288,21 @@ int xen_multi_mmuext_op(struct mmuext_op *src, unsigned int count,
 	}
 
 	mc = lazy->mc + lazy->nr_mc;
-	dst = lazy->mmuext + lazy->nr_mmuext;
-	commit = (lazy->nr_mmuext += count) > NR_MMUEXT || success_count;
-	merge = lazy->nr_mc && mc[-1].op == __HYPERVISOR_mmuext_op
-		&& !commit && !mc[-1].args[2] && mc[-1].args[3] == domid;
+	commit = (lazy->nr_mmuext + count) > NR_MMUEXT || success_count;
+	merge = lazy->nr_mc && !commit
+		&& mmu_may_merge(mc - 1, __HYPERVISOR_mmuext_op, domid);
 	if (unlikely(lazy->nr_mc == NR_MC) && !merge) {
 		xen_multicall_flush(false);
 		mc = lazy->mc;
-		dst = lazy->mmuext;
-		lazy->nr_mmuext = count;
 		commit = count > NR_MMUEXT || success_count;
 	}
 
-	if (!lazy->nr_mc && commit)
-		return _hypercall4(int, mmuext_op, src, count, success_count, domid);
+	if (!lazy->nr_mc && unlikely(commit))
+		return _hypercall4(int, mmuext_op, src, count,
+				   success_count, domid);
 
+	dst = lazy->mmuext + lazy->nr_mmuext;
+	lazy->nr_mmuext += count;
 	if (merge) {
 		mc[-1].args[1] += count;
 		memcpy(dst, src, count * sizeof(*src));
@@ -305,6 +317,7 @@ int xen_multi_mmuext_op(struct mmuext_op *src, unsigned int count,
 		mc->args[1] = count;
 		mc->args[2] = (unsigned long)success_count;
 		mc->args[3] = domid;
+		mc->args[5] = (long)__builtin_return_address(0);
 	}
 
 	while (!commit && count--)
@@ -325,10 +338,8 @@ int xen_multi_mmuext_op(struct mmuext_op *src, unsigned int count,
 			commit = true;
 			break;
 		}
-	if (commit)
-		return xen_multicall_flush(true);
 
-	return 0;
+	return commit ? xen_multicall_flush(true) : 0;
 }
 
 void xen_l1_entry_update(pte_t *ptr, pte_t val)

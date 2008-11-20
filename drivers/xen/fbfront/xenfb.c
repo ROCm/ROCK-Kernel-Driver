@@ -683,6 +683,10 @@ static int __devinit xenfb_probe(struct xenbus_device *dev,
 	}
 	info->fb_info = fb_info;
 
+	ret = xenfb_connect_backend(dev, info);
+	if (ret < 0)
+		goto error;
+
 	/* FIXME should this be delayed until backend XenbusStateConnected? */
 	info->kthread = kthread_run(xenfb_thread, info, "xenfb thread");
 	if (IS_ERR(info->kthread)) {
@@ -691,10 +695,6 @@ static int __devinit xenfb_probe(struct xenbus_device *dev,
 		xenbus_dev_fatal(dev, ret, "register_framebuffer");
 		goto error;
 	}
-
-	ret = xenfb_connect_backend(dev, info);
-	if (ret < 0)
-		goto error;
 
 	xenfb_make_preferred_console();
 	return 0;
@@ -907,4 +907,3 @@ module_exit(xenfb_cleanup);
 
 MODULE_DESCRIPTION("Xen virtual framebuffer device frontend");
 MODULE_LICENSE("GPL");
-MODULE_ALIAS("xen:vfb");

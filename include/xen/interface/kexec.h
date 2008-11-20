@@ -155,6 +155,8 @@ typedef struct xen_kexec_range {
     unsigned long start;
 } xen_kexec_range_t;
 
+#ifndef VMCOREINFO_BYTES
+
 /* vmcoreinfo stuff */
 #define VMCOREINFO_BYTES           (4096)
 #define VMCOREINFO_NOTE_NAME       "VMCOREINFO_XEN"
@@ -175,6 +177,8 @@ void vmcoreinfo_append_str(const char *fmt, ...)
 #define VMCOREINFO_OFFSET_ALIAS(name, field, alias) \
        vmcoreinfo_append_str("OFFSET(%s.%s)=%lu\n", #name, #alias, \
                              (unsigned long)offsetof(struct name, field))
+
+#endif /* VMCOREINFO_* */
 
 #endif /* _XEN_PUBLIC_KEXEC_H */
 

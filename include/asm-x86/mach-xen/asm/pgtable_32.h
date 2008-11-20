@@ -1,8 +1,6 @@
 #ifndef _I386_PGTABLE_H
 #define _I386_PGTABLE_H
 
-#include <asm/hypervisor.h>
-
 /*
  * The Linux memory management assumes a three-level page table setup. On
  * the i386, we use that, but "fold" the mid level into the top-level page

@@ -179,6 +179,18 @@ static inline void notify_remote_via_evtchn(int port)
 	VOID(HYPERVISOR_event_channel_op(EVTCHNOP_send, &send));
 }
 
+static inline void
+multi_notify_remote_via_evtchn(multicall_entry_t *mcl, int port)
+{
+	struct evtchn_send *send = (void *)(mcl->args + 2);
+
+	BUILD_BUG_ON(sizeof(*send) > sizeof(mcl->args) - 2 * sizeof(*mcl->args));
+	send->port = port;
+	mcl->op = __HYPERVISOR_event_channel_op;
+	mcl->args[0] = EVTCHNOP_send;
+	mcl->args[1] = (unsigned long)send;
+}
+
 /* Clear an irq's pending state, in preparation for polling on it. */
 void xen_clear_irq_pending(int irq);
 
@@ -197,6 +209,7 @@ void xen_poll_irq(int irq);
  * by bind_*_to_irqhandler().
  */
 void notify_remote_via_irq(int irq);
+int multi_notify_remote_via_irq(multicall_entry_t *, int irq);
 int irq_to_evtchn_port(int irq);
 
 #define PIRQ_SET_MAPPING 0x0

@@ -41,9 +41,9 @@
 int xen_spinlock_init(unsigned int cpu);
 void xen_spinlock_cleanup(unsigned int cpu);
 extern int xen_spin_wait(raw_spinlock_t *, unsigned int token);
-extern unsigned int xen_spin_adjust(raw_spinlock_t *, unsigned int token);
 extern int xen_spin_wait_flags(raw_spinlock_t *, unsigned int *token,
 			       unsigned int flags);
+extern unsigned int xen_spin_adjust(raw_spinlock_t *, unsigned int token);
 extern void xen_spin_kick(raw_spinlock_t *, unsigned int token);
 
 /*

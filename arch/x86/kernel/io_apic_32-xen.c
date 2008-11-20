@@ -1229,6 +1229,9 @@ static int __assign_irq_vector(int irq)
 
 	BUG_ON((unsigned)irq >= NR_IRQ_VECTORS);
 
+	if (irq < PIRQ_BASE || irq - PIRQ_BASE > NR_PIRQS)
+		return -EINVAL;
+
 	if (irq_vector[irq] > 0)
 		return irq_vector[irq];
 

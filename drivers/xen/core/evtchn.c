@@ -610,6 +610,8 @@ void unbind_from_per_cpu_irq(unsigned int irq, unsigned int cpu,
 	if (VALID_EVTCHN(evtchn)) {
 		struct irq_desc *desc = irq_desc + irq;
 
+		mask_evtchn(evtchn);
+
 		BUG_ON(irq_bindcount[irq] <= 1);
 		irq_bindcount[irq]--;
 
@@ -1007,13 +1009,12 @@ static void set_affinity_irq(unsigned int irq, cpumask_t dest)
 int resend_irq_on_evtchn(unsigned int irq)
 {
 	int masked, evtchn = evtchn_from_irq(irq);
-	shared_info_t *s = HYPERVISOR_shared_info;
 
 	if (!VALID_EVTCHN(evtchn))
 		return 1;
 
 	masked = test_and_set_evtchn_mask(evtchn);
-	synch_set_bit(evtchn, s->evtchn_pending);
+	set_evtchn(evtchn);
 	if (!masked)
 		unmask_evtchn(evtchn);
 
@@ -1070,8 +1071,9 @@ static void end_dynirq(unsigned int irq)
 }
 
 static struct irq_chip dynirq_chip = {
-	.name     = "Dynamic-irq",
+	.name     = "Dynamic",
 	.startup  = startup_dynirq,
+	.shutdown = mask_dynirq,
 	.mask     = mask_dynirq,
 	.unmask   = unmask_dynirq,
 	.mask_ack = ack_dynirq,
@@ -1083,71 +1085,6 @@ static struct irq_chip dynirq_chip = {
 #endif
 	.retrigger = resend_irq_on_evtchn,
 };
-
-void evtchn_register_pirq(int irq)
-{
-	struct irq_desc *desc;
-	unsigned long flags;
-
-	irq_info[irq] = mk_irq_info(IRQT_PIRQ, irq, 0);
-
-	/* Cannot call set_irq_probe(), as that's marked __init. */
-	desc = irq_desc + irq;
-	spin_lock_irqsave(&desc->lock, flags);
-	desc->status &= ~IRQ_NOPROBE;
-	spin_unlock_irqrestore(&desc->lock, flags);
-}
-
-#if defined(CONFIG_X86_IO_APIC)
-#define identity_mapped_irq(irq) (!IO_APIC_IRQ((irq) - PIRQ_BASE))
-#elif defined(CONFIG_X86)
-#define identity_mapped_irq(irq) (((irq) - PIRQ_BASE) < 16)
-#else
-#define identity_mapped_irq(irq) (1)
-#endif
-
-int evtchn_map_pirq(int irq, int xen_pirq)
-{
-	if (irq < 0) {
-		static DEFINE_SPINLOCK(irq_alloc_lock);
-
-		irq = PIRQ_BASE + NR_PIRQS - 1;
-		spin_lock(&irq_alloc_lock);
-		do {
-			if (identity_mapped_irq(irq))
-				continue;
-			if (!index_from_irq(irq)) {
-				BUG_ON(type_from_irq(irq) != IRQT_UNBOUND);
-				irq_info[irq] = mk_irq_info(IRQT_PIRQ,
-							    xen_pirq, 0);
-				break;
-			}
-		} while (--irq >= PIRQ_BASE);
-		spin_unlock(&irq_alloc_lock);
-		if (irq < PIRQ_BASE)
-			return -ENOSPC;
-	} else if (!xen_pirq) {
-		if (unlikely(type_from_irq(irq) != IRQT_PIRQ))
-			return -EINVAL;
-		irq_info[irq] = IRQ_UNBOUND;
-		return 0;
-	} else if (type_from_irq(irq) != IRQT_PIRQ
-		   || index_from_irq(irq) != xen_pirq) {
-		printk(KERN_ERR "IRQ#%d is already mapped to %d:%u - "
-				"cannot map to PIRQ#%u\n",
-		       irq, type_from_irq(irq), index_from_irq(irq), xen_pirq);
-		return -EINVAL;
-	}
-	return index_from_irq(irq) ? irq : -EINVAL;
-}
-
-int evtchn_get_xen_pirq(int irq)
-{
-	if (identity_mapped_irq(irq))
-		return irq;
-	BUG_ON(type_from_irq(irq) != IRQT_PIRQ);
-	return index_from_irq(irq);
-}
 
 static inline void pirq_unmask_notify(int irq)
 {
@@ -1259,8 +1196,7 @@ static void end_pirq(unsigned int irq)
 }
 
 static struct irq_chip pirq_chip = {
-	.name     = "Phys-irq",
-	.typename = "Phys-irq",
+	.name     = "Phys",
 	.startup  = startup_pirq,
 	.shutdown = shutdown_pirq,
 	.mask     = mask_pirq,
@@ -1307,6 +1243,21 @@ void notify_remote_via_irq(int irq)
 		notify_remote_via_evtchn(evtchn);
 }
 EXPORT_SYMBOL_GPL(notify_remote_via_irq);
+
+int multi_notify_remote_via_irq(multicall_entry_t *mcl, int irq)
+{
+	int evtchn = evtchn_from_irq(irq);
+
+	BUG_ON(type_from_irq(irq) == IRQT_VIRQ);
+	BUG_IF_IPI(irq);
+
+	if (!VALID_EVTCHN(evtchn))
+		return -EINVAL;
+
+	multi_notify_remote_via_evtchn(mcl, evtchn);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(multi_notify_remote_via_irq);
 
 int irq_to_evtchn_port(int irq)
 {
@@ -1543,8 +1494,71 @@ static int __init evtchn_register(void)
 		err = sysdev_register(&device_evtchn);
 	return err;
 }
-
 core_initcall(evtchn_register);
+
+#if defined(CONFIG_X86_IO_APIC)
+#define identity_mapped_irq(irq) (!IO_APIC_IRQ((irq) - PIRQ_BASE))
+#elif defined(CONFIG_X86)
+#define identity_mapped_irq(irq) (((irq) - PIRQ_BASE) < 16)
+#else
+#define identity_mapped_irq(irq) (1)
+#endif
+
+void evtchn_register_pirq(int irq)
+{
+	BUG_ON(irq < PIRQ_BASE || irq - PIRQ_BASE > NR_PIRQS);
+	if (identity_mapped_irq(irq))
+		return;
+	irq_info[irq] = mk_irq_info(IRQT_PIRQ, irq, 0);
+	set_irq_chip_and_handler_name(irq, &pirq_chip, handle_level_irq,
+				      "level");
+}
+
+int evtchn_map_pirq(int irq, int xen_pirq)
+{
+	if (irq < 0) {
+		static DEFINE_SPINLOCK(irq_alloc_lock);
+
+		irq = PIRQ_BASE + NR_PIRQS - 1;
+		spin_lock(&irq_alloc_lock);
+		do {
+			if (identity_mapped_irq(irq))
+				continue;
+			if (!index_from_irq(irq)) {
+				BUG_ON(type_from_irq(irq) != IRQT_UNBOUND);
+				irq_info[irq] = mk_irq_info(IRQT_PIRQ,
+							    xen_pirq, 0);
+				break;
+			}
+		} while (--irq >= PIRQ_BASE);
+		spin_unlock(&irq_alloc_lock);
+		if (irq < PIRQ_BASE)
+			return -ENOSPC;
+		set_irq_chip_and_handler_name(irq, &pirq_chip,
+					      handle_level_irq, "level");
+	} else if (!xen_pirq) {
+		if (unlikely(type_from_irq(irq) != IRQT_PIRQ))
+			return -EINVAL;
+		set_irq_chip_and_handler(irq, &no_irq_chip, NULL);
+		irq_info[irq] = IRQ_UNBOUND;
+		return 0;
+	} else if (type_from_irq(irq) != IRQT_PIRQ
+		   || index_from_irq(irq) != xen_pirq) {
+		printk(KERN_ERR "IRQ#%d is already mapped to %d:%u - "
+				"cannot map to PIRQ#%u\n",
+		       irq, type_from_irq(irq), index_from_irq(irq), xen_pirq);
+		return -EINVAL;
+	}
+	return index_from_irq(irq) ? irq : -EINVAL;
+}
+
+int evtchn_get_xen_pirq(int irq)
+{
+	if (identity_mapped_irq(irq))
+		return irq;
+	BUG_ON(type_from_irq(irq) != IRQT_PIRQ);
+	return index_from_irq(irq);
+}
 
 void __init xen_init_IRQ(void)
 {
@@ -1575,23 +1589,23 @@ void __init xen_init_IRQ(void)
 
 		irq_desc[i].status |= IRQ_NOPROBE;
 		set_irq_chip_and_handler_name(i, &dynirq_chip,
-		                              handle_level_irq, "level");
+					      handle_level_irq, "level");
 	}
 
 	/* Phys IRQ space is statically bound (1:1 mapping). Nail refcnts. */
 	for (i = PIRQ_BASE; i < (PIRQ_BASE + NR_PIRQS); i++) {
 		irq_bindcount[i] = 1;
 
+		if (!identity_mapped_irq(i))
+			continue;
+
 #ifdef RTC_IRQ
 		/* If not domain 0, force our RTC driver to fail its probe. */
-		if (identity_mapped_irq(i) && ((i - PIRQ_BASE) == RTC_IRQ)
-		    && !is_initial_xendomain())
+		if (i - PIRQ_BASE == RTC_IRQ && !is_initial_xendomain())
 			continue;
 #endif
 
-		if (!identity_mapped_irq(i))
-			irq_desc[i].status |= IRQ_NOPROBE;
 		set_irq_chip_and_handler_name(i, &pirq_chip,
-		                              handle_level_irq, "level");
+					      handle_level_irq, "level");
 	}
 }

@@ -40,7 +40,7 @@ static int privcmd_enforce_singleshot_mapping(struct vm_area_struct *vma);
 static long privcmd_ioctl(struct file *file,
 			  unsigned int cmd, unsigned long data)
 {
-	int ret = -ENOSYS;
+	long ret = -ENOSYS;
 	void __user *udata = (void __user *) data;
 
 	switch (cmd) {
@@ -50,42 +50,15 @@ static long privcmd_ioctl(struct file *file,
 		if (copy_from_user(&hypercall, udata, sizeof(hypercall)))
 			return -EFAULT;
 
-#if defined(__i386__)
+#ifdef CONFIG_X86
 		if (hypercall.op >= (PAGE_SIZE >> 5))
 			break;
-		__asm__ __volatile__ (
-			"pushl %%ebx; pushl %%ecx; pushl %%edx; "
-			"pushl %%esi; pushl %%edi; "
-			"movl  8(%%eax),%%ebx ;"
-			"movl 16(%%eax),%%ecx ;"
-			"movl 24(%%eax),%%edx ;"
-			"movl 32(%%eax),%%esi ;"
-			"movl 40(%%eax),%%edi ;"
-			"movl   (%%eax),%%eax ;"
-			"shll $5,%%eax ;"
-			"addl $hypercall_page,%%eax ;"
-			"call *%%eax ;"
-			"popl %%edi; popl %%esi; popl %%edx; "
-			"popl %%ecx; popl %%ebx"
-			: "=a" (ret) : "0" (&hypercall) : "memory" );
-#elif defined (__x86_64__)
-		if (hypercall.op < (PAGE_SIZE >> 5)) {
-			long ign1, ign2, ign3;
-			__asm__ __volatile__ (
-				"movq %8,%%r10; movq %9,%%r8;"
-				"shll $5,%%eax ;"
-				"addq $hypercall_page,%%rax ;"
-				"call *%%rax"
-				: "=a" (ret), "=D" (ign1),
-				  "=S" (ign2), "=d" (ign3)
-				: "0" ((unsigned int)hypercall.op),
-				"1" (hypercall.arg[0]),
-				"2" (hypercall.arg[1]),
-				"3" (hypercall.arg[2]),
-				"g" (hypercall.arg[3]),
-				"g" (hypercall.arg[4])
-				: "r8", "r10", "memory" );
-		}
+		ret = _hypercall(long, (unsigned int)hypercall.op,
+				 (unsigned long)hypercall.arg[0],
+				 (unsigned long)hypercall.arg[1],
+				 (unsigned long)hypercall.arg[2],
+				 (unsigned long)hypercall.arg[3],
+				 (unsigned long)hypercall.arg[4]);
 #else
 		ret = privcmd_hypercall(&hypercall);
 #endif

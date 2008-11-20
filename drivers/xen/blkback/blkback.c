@@ -152,9 +152,9 @@ static void unplug_queue(blkif_t *blkif)
 	blkif->plug = NULL;
 }
 
-static void plug_queue(blkif_t *blkif, struct bio *bio)
+static void plug_queue(blkif_t *blkif, struct block_device *bdev)
 {
-	struct request_queue *q = bdev_get_queue(bio->bi_bdev);
+	struct request_queue *q = bdev_get_queue(bdev);
 
 	if (q == blkif->plug)
 		return;
@@ -397,8 +397,8 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 		unsigned long buf; unsigned int nsec;
 	} seg[BLKIF_MAX_SEGMENTS_PER_REQUEST];
 	unsigned int nseg;
-	struct bio *bio = NULL, *biolist[BLKIF_MAX_SEGMENTS_PER_REQUEST];
-	int ret, i, nbio = 0;
+	struct bio *bio = NULL;
+	int ret, i;
 	int operation;
 
 	switch (req->operation) {
@@ -485,6 +485,10 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 		goto fail_flush;
 	}
 
+	plug_queue(blkif, preq.bdev);
+	atomic_set(&pending_req->pendcnt, 1);
+	blkif_get(blkif);
+
 	for (i = 0; i < nseg; i++) {
 		if (((int)preq.sector_number|(int)seg[i].nsec) &
 		    ((bdev_hardsect_size(preq.bdev) >> 9) - 1)) {
@@ -498,7 +502,12 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 				     virt_to_page(vaddr(pending_req, i)),
 				     seg[i].nsec << 9,
 				     seg[i].buf & ~PAGE_MASK) == 0)) {
-			bio = biolist[nbio++] = bio_alloc(GFP_KERNEL, nseg-i);
+			if (bio) {
+				atomic_inc(&pending_req->pendcnt);
+				submit_bio(operation, bio);
+			}
+
+			bio = bio_alloc(GFP_KERNEL, nseg-i);
 			if (unlikely(bio == NULL))
 				goto fail_put_bio;
 
@@ -513,7 +522,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 
 	if (!bio) {
 		BUG_ON(operation != WRITE_BARRIER);
-		bio = biolist[nbio++] = bio_alloc(GFP_KERNEL, 0);
+		bio = bio_alloc(GFP_KERNEL, 0);
 		if (unlikely(bio == NULL))
 			goto fail_put_bio;
 
@@ -523,12 +532,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 		bio->bi_sector  = -1;
 	}
 
-	plug_queue(blkif, bio);
-	atomic_set(&pending_req->pendcnt, nbio);
-	blkif_get(blkif);
-
-	for (i = 0; i < nbio; i++)
-		submit_bio(operation, biolist[i]);
+	submit_bio(operation, bio);
 
 	if (operation == READ)
 		blkif->st_rd_sect += preq.nr_sects;
@@ -537,16 +541,22 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 
 	return;
 
- fail_put_bio:
-	for (i = 0; i < (nbio-1); i++)
-		bio_put(biolist[i]);
  fail_flush:
 	fast_flush_area(pending_req);
  fail_response:
 	make_response(blkif, req->id, req->operation, BLKIF_RSP_ERROR);
 	free_req(pending_req);
 	msleep(1); /* back off a bit */
-} 
+	return;
+
+ fail_put_bio:
+	__end_block_io_op(pending_req, -EINVAL);
+	if (bio)
+		bio_put(bio);
+	unplug_queue(blkif);
+	msleep(1); /* back off a bit */
+	return;
+}
 
 
 

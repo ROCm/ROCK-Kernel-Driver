@@ -1458,7 +1458,18 @@ static int __init crash_save_vmcoreinfo_init(void)
 
 	VMCOREINFO_SYMBOL(init_uts_ns);
 	VMCOREINFO_SYMBOL(node_online_map);
+#ifndef CONFIG_X86_XEN
 	VMCOREINFO_SYMBOL(swapper_pg_dir);
+#else
+/*
+ * Since for x86-32 Xen swapper_pg_dir is a pointer rather than an array,
+ * make the value stored consistent with native (i.e. the base address of
+ * the page directory).
+ */
+# define swapper_pg_dir *swapper_pg_dir
+	VMCOREINFO_SYMBOL(swapper_pg_dir);
+# undef swapper_pg_dir
+#endif
 	VMCOREINFO_SYMBOL(_stext);
 
 #ifndef CONFIG_NEED_MULTIPLE_NODES

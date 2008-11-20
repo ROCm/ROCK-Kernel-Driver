@@ -23,14 +23,6 @@ static int pci_bus_probe_wrapper(struct device *dev)
 		return r;
 
 	r = pci_bus_probe(dev);
-	if (r) {
-		int ret;
-
-		ret = HYPERVISOR_physdev_op(PHYSDEVOP_manage_pci_remove,
-					    &manage_pci);
-		WARN_ON(ret && ret != -ENOSYS);
-	}
-
 	return r;
 }
 

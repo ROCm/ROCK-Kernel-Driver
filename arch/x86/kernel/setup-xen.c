@@ -98,6 +98,7 @@
 
 #include <mach_apic.h>
 #include <asm/paravirt.h>
+#include <asm/hypervisor.h>
 
 #include <asm/percpu.h>
 #include <asm/topology.h>
@@ -118,9 +119,6 @@
 
 shared_info_t *HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
 EXPORT_SYMBOL(HYPERVISOR_shared_info);
-
-extern char hypercall_page[PAGE_SIZE];
-EXPORT_SYMBOL(hypercall_page);
 
 static int xen_panic_event(struct notifier_block *, unsigned long, void *);
 static struct notifier_block xen_panic_block = {
@@ -643,6 +641,41 @@ static struct x86_quirks default_x86_quirks __initdata;
 
 struct x86_quirks *x86_quirks __initdata = &default_x86_quirks;
 
+#ifdef CONFIG_X86_RESERVE_LOW_64K
+static int __init dmi_low_memory_corruption(const struct dmi_system_id *d)
+{
+	printk(KERN_NOTICE
+		"%s detected: BIOS may corrupt low RAM, working it around.\n",
+		d->ident);
+
+	e820_update_range(0, 0x10000, E820_RAM, E820_RESERVED);
+	sanitize_e820_map(e820.map, ARRAY_SIZE(e820.map), &e820.nr_map);
+
+	return 0;
+}
+#endif
+
+/* List of systems that have known low memory corruption BIOS problems */
+static struct dmi_system_id __initdata bad_bios_dmi_table[] = {
+#ifdef CONFIG_X86_RESERVE_LOW_64K
+	{
+		.callback = dmi_low_memory_corruption,
+		.ident = "AMI BIOS",
+		.matches = {
+			DMI_MATCH(DMI_BIOS_VENDOR, "American Megatrends Inc."),
+		},
+	},
+	{
+		.callback = dmi_low_memory_corruption,
+		.ident = "Phoenix BIOS",
+		.matches = {
+			DMI_MATCH(DMI_BIOS_VENDOR, "Phoenix Technologies, LTD"),
+		},
+	},
+#endif
+	{}
+};
+
 /*
  * Determine if we were loaded by an EFI loader.  If so, then we have also been
  * passed the efi memmap, systab, etc., so we should use these data structures
@@ -818,6 +851,11 @@ void __init setup_arch(char **cmdline_p)
 
 	finish_e820_parsing();
 
+	if (is_initial_xendomain()) {
+		dmi_scan_machine();
+		dmi_check_system(bad_bios_dmi_table);
+	}
+
 #ifdef CONFIG_X86_32
 	probe_roms();
 #endif
@@ -920,9 +958,6 @@ void __init setup_arch(char **cmdline_p)
 #if defined(CONFIG_X86_64) && !defined(CONFIG_XEN)
 	vsmp_init();
 #endif
-
-	if (is_initial_xendomain())
-		dmi_scan_machine();
 
 	io_delay_init();
 
@@ -1108,6 +1143,12 @@ void __init setup_arch(char **cmdline_p)
 	if (is_initial_xendomain())
 		e820_reserve_resources();
 #endif
+
+	/*
+	 * VMware detection requires dmi to be available, so this
+	 * needs to be done after dmi_scan_machine, for the BP.
+	 */
+	init_hypervisor(&boot_cpu_data);
 
 #ifdef CONFIG_X86_32
 	request_resource(&iomem_resource, &video_ram_resource);

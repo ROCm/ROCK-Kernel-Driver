@@ -641,24 +641,23 @@ bool gnttab_pre_map_adjust(unsigned int cmd, struct gnttab_map_grant_ref *map,
 			   unsigned int count)
 {
 	unsigned int i;
-	bool fixup;
 
 	if (unlikely(cmd != GNTTABOP_map_grant_ref))
 		count = 0;
 
-	for (i = 0, fixup = false; i < count; ++i, ++map) {
+	for (i = 0; i < count; ++i, ++map) {
 		if (!(map->flags & GNTMAP_host_map)
 		    || !(map->flags & GNTMAP_application_map))
 			continue;
 		if (GNTMAP_pte_special)
 			map->flags |= GNTMAP_pte_special;
-		else
-			fixup = true;
+		else {
+			BUG_ON(xen_feature(XENFEAT_auto_translated_physmap));
+			return true;
+		}
 	}
 
-	BUG_ON(fixup && xen_feature(XENFEAT_auto_translated_physmap));
-
-	return fixup;
+	return false;
 }
 EXPORT_SYMBOL(gnttab_pre_map_adjust);
 
@@ -854,7 +853,7 @@ int __devinit gnttab_init(void)
 	gnttab_free_count = nr_init_grefs - NR_RESERVED_ENTRIES;
 	gnttab_free_head  = NR_RESERVED_ENTRIES;
 
-#ifdef __HAVE_ARCH_PTE_SPECIAL
+#if defined(CONFIG_XEN) && defined(__HAVE_ARCH_PTE_SPECIAL)
 	if (!xen_feature(XENFEAT_auto_translated_physmap)
 	    && xen_feature(XENFEAT_gnttab_map_avail_bits)) {
 #ifdef CONFIG_X86

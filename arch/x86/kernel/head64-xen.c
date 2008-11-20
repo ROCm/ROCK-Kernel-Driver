@@ -7,6 +7,9 @@
  *	Modified for Xen.
  */
 
+/* PDA is not ready to be used until the end of x86_64_start_kernel(). */
+#define arch_use_lazy_mmu_mode() false
+
 #include <linux/init.h>
 #include <linux/linkage.h>
 #include <linux/types.h>

@@ -611,9 +611,13 @@ static int blktap_release(struct inode *inode, struct file *filp)
 
 	/* Clear any active mappings and free foreign map table */
 	if (info->vma) {
+		struct mm_struct *mm = info->vma->vm_mm;
+
+		down_write(&mm->mmap_sem);
 		zap_page_range(
 			info->vma, info->vma->vm_start, 
 			info->vma->vm_end - info->vma->vm_start, NULL);
+		up_write(&mm->mmap_sem);
 
 		kfree(info->vma->vm_private_data);
 
@@ -993,12 +997,13 @@ static void fast_flush_area(pending_req_t *req, int k_idx, int u_idx,
 			    int tapidx)
 {
 	struct gnttab_unmap_grant_ref unmap[BLKIF_MAX_SEGMENTS_PER_REQUEST*2];
-	unsigned int i, invcount = 0;
+	unsigned int i, invcount = 0, locked = 0;
 	struct grant_handle_pair *khandle;
 	uint64_t ptep;
 	int ret, mmap_idx;
 	unsigned long kvaddr, uvaddr;
 	tap_blkif_t *info;
+	struct mm_struct *mm;
 	
 
 	info = tapfds[tapidx];
@@ -1008,13 +1013,15 @@ static void fast_flush_area(pending_req_t *req, int k_idx, int u_idx,
 		return;
 	}
 
+	mm = info->vma ? info->vma->vm_mm : NULL;
+
 	if (info->vma != NULL &&
 	    xen_feature(XENFEAT_auto_translated_physmap)) {
-		down_write(&info->vma->vm_mm->mmap_sem);
+		down_write(&mm->mmap_sem);
 		zap_page_range(info->vma, 
 			       MMAP_VADDR(info->user_vstart, u_idx, 0), 
 			       req->nr_pages << PAGE_SHIFT, NULL);
-		up_write(&info->vma->vm_mm->mmap_sem);
+		up_write(&mm->mmap_sem);
 		return;
 	}
 
@@ -1039,10 +1046,13 @@ static void fast_flush_area(pending_req_t *req, int k_idx, int u_idx,
 
 		if (khandle->user != INVALID_GRANT_HANDLE) {
 			BUG_ON(xen_feature(XENFEAT_auto_translated_physmap));
+			if (!locked++)
+				down_write(&mm->mmap_sem);
 			if (create_lookup_pte_addr(
-				info->vma->vm_mm,
+				mm,
 				MMAP_VADDR(info->user_vstart, u_idx, i),
 				&ptep) !=0) {
+				up_write(&mm->mmap_sem);
 				WPRINTK("Couldn't get a pte addr!\n");
 				return;
 			}
@@ -1061,10 +1071,17 @@ static void fast_flush_area(pending_req_t *req, int k_idx, int u_idx,
 		GNTTABOP_unmap_grant_ref, unmap, invcount);
 	BUG_ON(ret);
 	
-	if (info->vma != NULL && !xen_feature(XENFEAT_auto_translated_physmap))
+	if (info->vma != NULL &&
+	    !xen_feature(XENFEAT_auto_translated_physmap)) {
+		if (!locked++)
+			down_write(&mm->mmap_sem);
 		zap_page_range(info->vma, 
 			       MMAP_VADDR(info->user_vstart, u_idx, 0), 
 			       req->nr_pages << PAGE_SHIFT, NULL);
+	}
+
+	if (locked)
+		up_write(&mm->mmap_sem);
 }
 
 /******************************************************************
@@ -1356,6 +1373,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 	int pending_idx = RTN_PEND_IDX(pending_req,pending_req->mem_idx);
 	int usr_idx;
 	uint16_t mmap_idx = pending_req->mem_idx;
+	struct mm_struct *mm;
 
 	switch (req->operation) {
 	case BLKIF_OP_PACKET:
@@ -1416,6 +1434,9 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 	pending_req->status    = BLKIF_RSP_OKAY;
 	pending_req->nr_pages  = nseg;
 	op = 0;
+	mm = info->vma->vm_mm;
+	if (!xen_feature(XENFEAT_auto_translated_physmap))
+		down_write(&mm->mmap_sem);
 	for (i = 0; i < nseg; i++) {
 		unsigned long uvaddr;
 		unsigned long kvaddr;
@@ -1434,9 +1455,9 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 
 		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
 			/* Now map it to user. */
-			ret = create_lookup_pte_addr(info->vma->vm_mm, 
-						     uvaddr, &ptep);
+			ret = create_lookup_pte_addr(mm, uvaddr, &ptep);
 			if (ret) {
+				up_write(&mm->mmap_sem);
 				WPRINTK("Couldn't get a pte addr!\n");
 				goto fail_flush;
 			}
@@ -1458,6 +1479,8 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 	BUG_ON(ret);
 
 	if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+		up_write(&mm->mmap_sem);
+
 		for (i = 0; i < (nseg*2); i+=2) {
 			unsigned long uvaddr;
 			unsigned long kvaddr;
@@ -1531,7 +1554,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 		goto fail_flush;
 
 	if (xen_feature(XENFEAT_auto_translated_physmap))
-		down_write(&info->vma->vm_mm->mmap_sem);
+		down_write(&mm->mmap_sem);
 	/* Mark mapped pages as reserved: */
 	for (i = 0; i < req->nr_segments; i++) {
 		unsigned long kvaddr;
@@ -1545,13 +1568,13 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 					     MMAP_VADDR(info->user_vstart,
 							usr_idx, i), pg);
 			if (ret) {
-				up_write(&info->vma->vm_mm->mmap_sem);
+				up_write(&mm->mmap_sem);
 				goto fail_flush;
 			}
 		}
 	}
 	if (xen_feature(XENFEAT_auto_translated_physmap))
-		up_write(&info->vma->vm_mm->mmap_sem);
+		up_write(&mm->mmap_sem);
 	
 	/*record [mmap_idx,pending_idx] to [usr_idx] mapping*/
 	info->idx_map[usr_idx] = MAKE_ID(mmap_idx, pending_idx);

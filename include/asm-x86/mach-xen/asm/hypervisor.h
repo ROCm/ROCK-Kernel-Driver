@@ -67,6 +67,8 @@ extern start_info_t *xen_start_info;
 #define is_initial_xendomain() 0
 #endif
 
+#define init_hypervisor(c) ((void)((c)->x86_hyper_vendor = X86_HYPER_VENDOR_XEN))
+
 /* arch/xen/kernel/evtchn.c */
 /* Force a proper event-channel callback from Xen. */
 void force_evtchn_callback(void);
@@ -133,7 +135,6 @@ void scrub_pages(void *, unsigned int);
 DECLARE_PER_CPU(bool, xen_lazy_mmu);
 
 int xen_multicall_flush(bool);
-bool xen_use_lazy_mmu_mode(void);
 
 int __must_check xen_multi_update_va_mapping(unsigned long va, pte_t,
 					     unsigned long flags);
@@ -154,17 +155,24 @@ static inline void arch_leave_lazy_mmu_mode(void)
 	xen_multicall_flush(false);
 }
 
+#if defined(CONFIG_X86_32)
+#define arch_use_lazy_mmu_mode() unlikely(x86_read_percpu(xen_lazy_mmu))
+#elif !defined(arch_use_lazy_mmu_mode)
+#define arch_use_lazy_mmu_mode() unlikely(__get_cpu_var(xen_lazy_mmu))
+#endif
+
+#if 0 /* All uses are in places potentially called asynchronously, but
+       * asynchronous code should rather not make use of lazy mode at all.
+       * Therefore, all uses of this function get commented out, proper
+       * detection of asynchronous invocations is added whereever needed,
+       * and this function is disabled to catch any new (improper) uses.
+       */
 static inline void arch_flush_lazy_mmu_mode(void)
 {
-	if (unlikely(__get_cpu_var(xen_lazy_mmu)))
+	if (arch_use_lazy_mmu_mode())
 		xen_multicall_flush(false);
 }
-
-static inline bool arch_use_lazy_mmu_mode(void)
-{
-	return unlikely(__get_cpu_var(xen_lazy_mmu))
-	       && xen_use_lazy_mmu_mode();
-}
+#endif
 
 struct gnttab_map_grant_ref;
 bool gnttab_pre_map_adjust(unsigned int cmd, struct gnttab_map_grant_ref *,
@@ -183,7 +191,7 @@ static inline int gnttab_post_map_adjust(const struct gnttab_map_grant_ref *m,
 #else /* CONFIG_XEN */
 
 static inline void xen_multicall_flush(bool ignore) {}
-static inline bool arch_use_lazy_mmu_mode(void) { return false; }
+#define arch_use_lazy_mmu_mode() false
 #define xen_multi_update_va_mapping(...) ({ BUG(); -ENOSYS; })
 #define xen_multi_mmu_update(...) ({ BUG(); -ENOSYS; })
 #define xen_multi_mmuext_op(...) ({ BUG(); -ENOSYS; })
@@ -192,8 +200,6 @@ static inline bool arch_use_lazy_mmu_mode(void) { return false; }
 #define gnttab_post_map_adjust(...) ({ BUG(); -ENOSYS; })
 
 #endif /* CONFIG_XEN */
-
-#include <xen/hypercall.h>
 
 #if defined(CONFIG_X86_64)
 #define MULTI_UVMFLAGS_INDEX 2
@@ -205,10 +211,13 @@ static inline bool arch_use_lazy_mmu_mode(void) { return false; }
 
 #ifdef CONFIG_XEN
 #define is_running_on_xen() 1
+extern char hypercall_page[PAGE_SIZE];
 #else
 extern char *hypercall_stubs;
 #define is_running_on_xen() (!!hypercall_stubs)
 #endif
+
+#include <xen/hypercall.h>
 
 static inline int
 HYPERVISOR_yield(

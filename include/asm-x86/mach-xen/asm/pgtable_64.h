@@ -13,9 +13,8 @@
 #include <linux/threads.h>
 #include <linux/sched.h>
 #include <asm/pda.h>
-#ifdef CONFIG_XEN
-#include <asm/hypervisor.h>
 
+#ifdef CONFIG_XEN
 extern pud_t level3_user_pgt[512];
 
 extern void xen_init_pt(void);

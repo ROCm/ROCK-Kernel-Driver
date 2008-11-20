@@ -91,7 +91,7 @@ void __init xen_machine_kexec_setup_resources(void)
 	xen_hypervisor_res.end = range.start + range.size - 1;
 	xen_hypervisor_res.flags = IORESOURCE_BUSY | IORESOURCE_MEM;
 #ifdef CONFIG_X86
-	insert_resource(iomem_resource, &xen_hypervisor_res);
+	insert_resource(&iomem_resource, &xen_hypervisor_res);
 #endif
 
 	/* fill in crashk_res if range is reserved by hypervisor */
@@ -106,7 +106,7 @@ void __init xen_machine_kexec_setup_resources(void)
 		crashk_res.start = range.start;
 		crashk_res.end = range.start + range.size - 1;
 #ifdef CONFIG_X86
-		insert_resource(iomem_resource, &crashk_res);
+		insert_resource(&iomem_resource, &crashk_res);
 #endif
 	}
 

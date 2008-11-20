@@ -755,6 +755,10 @@ static int __assign_irq_vector(int irq, const cpumask_t *mask)
 	struct irq_cfg *cfg;
   
 	BUG_ON((unsigned)irq >= NR_IRQS);
+
+	if (irq < PIRQ_BASE || irq - PIRQ_BASE > NR_PIRQS)
+		return -EINVAL;
+
 	cfg = &irq_cfg[irq];
 
 	if ((cfg->move_in_progress) || cfg->move_cleanup_count)

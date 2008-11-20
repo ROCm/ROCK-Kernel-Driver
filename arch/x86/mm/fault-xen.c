@@ -300,6 +300,9 @@ static inline pmd_t *vmalloc_sync_one(pgd_t *pgd, unsigned long address)
 	if (!pmd_present(*pmd_k))
 		return NULL;
 	if (!pmd_present(*pmd)) {
+		bool lazy = x86_read_percpu(xen_lazy_mmu);
+
+		x86_write_percpu(xen_lazy_mmu, false);
 #if CONFIG_XEN_COMPAT > 0x030002
 		set_pmd(pmd, *pmd_k);
 #else
@@ -309,7 +312,7 @@ static inline pmd_t *vmalloc_sync_one(pgd_t *pgd, unsigned long address)
 		 */
 		set_pmd(pmd, __pmd(pmd_val(*pmd_k)));
 #endif
-		arch_flush_lazy_mmu_mode();
+		x86_write_percpu(xen_lazy_mmu, lazy);
 	} else
 		BUG_ON(pmd_page(*pmd) != pmd_page(*pmd_k));
 	return pmd_k;
