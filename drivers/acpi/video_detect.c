@@ -217,7 +217,7 @@ int acpi_video_backlight_support(void)
 		return 1;
 
 	/* Then go the default way */
-	return acpi_video_support & ACPI_VIDEO_BACKLIGHT;
+	return acpi_video_support & (ACPI_VIDEO_BACKLIGHT | ACPI_VIDEO_IGD);
 }
 EXPORT_SYMBOL(acpi_video_backlight_support);
 
