@@ -1520,7 +1520,7 @@ static void ixgbe_configure_srrctl(struct ixgbe_adapter *adapter, int index)
 	int queue0;
 	unsigned long mask;
 
-	/* we must program one srrctl register per RSS queue since we 
+	/* we must program one srrctl register per RSS queue since we
 	 * have enabled RDRXCTL.MVMEN
 	 */
 	mask = (unsigned long)adapter->ring_feature[RING_F_RSS].mask;
