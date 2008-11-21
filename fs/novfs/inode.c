@@ -4055,22 +4055,11 @@ int __init init_novfs(void)
 
 void __exit exit_novfs(void)
 {
-	printk(KERN_INFO "exit_novfs\n");
-
 	novfs_scope_exit();
-	printk(KERN_INFO "exit_novfs after Scope_Uninit\n");
-
 	novfs_daemon_queue_exit();
-	printk(KERN_INFO "exit_novfs after Uninit_Daemon_Queue\n");
-
 	novfs_profile_exit();
-	printk(KERN_INFO "exit_novfs after profile_exit\n");
-
 	novfs_proc_exit();
-	printk(KERN_INFO "exit_novfs Uninit_Procfs_Interface\n");
-
 	unregister_filesystem(&novfs_fs_type);
-	printk(KERN_INFO "exit_novfs: Exit\n");
 
 	if (novfs_current_mnt) {
 		kfree(novfs_current_mnt);

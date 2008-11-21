@@ -1914,11 +1914,11 @@ static int set_map_drive(struct novfs_xplat *pdata, struct novfs_schandle Sessio
 	struct drive_map *drivemap, *dm;
 	struct list_head *list;
 
-	retVal = novfs_set_map_drive(pdata, Session);
-	if (retVal)
-		return retVal;
 	if (copy_from_user(&symInfo, pdata->reqData, sizeof(symInfo)))
 		return -EFAULT;
+	retVal = novfs_set_map_drive(&symInfo, Session);
+	if (retVal)
+		return retVal;
 	drivemap =
 		kmalloc(sizeof(struct drive_map) + symInfo.linkOffsetLength,
 				GFP_KERNEL);
@@ -1936,7 +1936,7 @@ static int set_map_drive(struct novfs_xplat *pdata, struct novfs_schandle Sessio
 		full_name_hash(drivemap->name,
 				symInfo.linkOffsetLength - 1);
 	drivemap->namelen = symInfo.linkOffsetLength - 1;
-	DbgPrint("NwdSetMapDrive: hash=0x%x path=%s\n",
+	DbgPrint("set_map_drive: hash=0x%lx path=%s\n",
 			drivemap->hash, drivemap->name);
 
 	dm = (struct drive_map *) & DriveMapList.next;
@@ -1945,8 +1945,8 @@ static int set_map_drive(struct novfs_xplat *pdata, struct novfs_schandle Sessio
 
 	list_for_each(list, &DriveMapList) {
 		dm = list_entry(list, struct drive_map, list);
-		DbgPrint("NwdSetMapDrive: dm=0x%p\n"
-				"   hash:    0x%x\n"
+		DbgPrint("set_map_drive: dm=0x%p\n"
+				"   hash:    0x%lx\n"
 				"   namelen: %d\n"
 				"   name:    %s\n",
 				dm, dm->hash, dm->namelen, dm->name);
@@ -1971,7 +1971,8 @@ static int set_map_drive(struct novfs_xplat *pdata, struct novfs_schandle Sessio
 					&dm->list);
 		}
 	}
-	kfree(drivemap);
+	else
+		kfree(drivemap);
 	up(&DriveMapLock);
 	return (retVal);
 }
