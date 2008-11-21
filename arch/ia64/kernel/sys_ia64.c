@@ -59,6 +59,8 @@ arch_get_unmapped_area (struct file *filp, unsigned long addr, unsigned long len
 	start_addr = addr = (addr + align_mask) & ~align_mask;
 
 	for (vma = find_vma(mm, addr); ; vma = vma->vm_next) {
+		unsigned long guard;
+
 		/* At this point:  (!vma || addr < vma->vm_end). */
 		if (TASK_SIZE - len < addr || RGN_MAP_LIMIT - len < REGION_OFFSET(addr)) {
 			if (start_addr != TASK_UNMAPPED_BASE) {
@@ -68,7 +70,14 @@ arch_get_unmapped_area (struct file *filp, unsigned long addr, unsigned long len
 			}
 			return -ENOMEM;
 		}
-		if (!vma || addr + len <= vma->vm_start) {
+		if (!vma)
+			goto got_it;
+		guard = 0;
+		if (vma->vm_flags & VM_GROWSDOWN)
+			guard = min(TASK_SIZE - (addr + len),
+				(unsigned long)guard << PAGE_SHIFT);
+		if (addr + len + guard <= vma->vm_start) {
+got_it:
 			/* Remember the address where we stopped this search:  */
 			mm->free_area_cache = addr + len;
 			return addr;
