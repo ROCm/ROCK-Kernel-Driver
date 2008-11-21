@@ -4076,6 +4076,7 @@ static int __devinit ixgbe_probe(struct pci_dev *pdev,
 	} else if (err == IXGBE_ERR_SFP_NOT_SUPPORTED) {
 		DPRINTK(PROBE, ERR, "failed to load because an "
 			"unsupported SFP+ module type was detected.\n");
+		goto err_hw_init;
 	} else if (err) {
 		goto err_hw_init;
 	}
@@ -4262,7 +4263,8 @@ static void __devexit ixgbe_remove(struct pci_dev *pdev)
 	}
 
 #endif
-	unregister_netdev(netdev);
+	if (netdev->reg_state == NETREG_REGISTERED)
+		unregister_netdev(netdev);
 
 	ixgbe_reset_interrupt_capability(adapter);
 
