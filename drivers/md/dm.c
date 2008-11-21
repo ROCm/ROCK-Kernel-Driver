@@ -310,16 +310,25 @@ static void __exit dm_exit(void)
 static int dm_blk_open(struct inode *inode, struct file *file)
 {
 	struct mapped_device *md;
+	int retval = 0;
 
 	spin_lock(&_minor_lock);
 
 	md = inode->i_bdev->bd_disk->private_data;
-	if (!md)
+	if (!md) {
+		retval = -ENXIO;
 		goto out;
+	}
 
 	if (test_bit(DMF_FREEING, &md->flags) ||
 	    test_bit(DMF_DELETING, &md->flags)) {
 		md = NULL;
+		retval = -ENXIO;
+		goto out;
+	}
+	if (md->disk->policy && (file->f_mode & FMODE_WRITE)) {
+		md = NULL;
+		retval = -EROFS;
 		goto out;
 	}
 
@@ -329,7 +338,7 @@ static int dm_blk_open(struct inode *inode, struct file *file)
 out:
 	spin_unlock(&_minor_lock);
 
-	return md ? 0 : -ENXIO;
+	return retval;
 }
 
 static int dm_blk_close(struct inode *inode, struct file *file)
@@ -1901,6 +1910,11 @@ static int __bind(struct mapped_device *md, struct dm_table *t)
 	write_lock(&md->map_lock);
 	md->map = t;
 	dm_table_set_restrictions(t, q);
+	if (!(dm_table_get_mode(t) & FMODE_WRITE)) {
+		set_disk_ro(md->disk, 1);
+	} else {
+		set_disk_ro(md->disk, 0);
+	}
 	write_unlock(&md->map_lock);
 
 	return 0;

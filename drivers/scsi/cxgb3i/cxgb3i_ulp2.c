@@ -45,36 +45,30 @@
 static struct page *pad_page;
 
 #define ULP2_PGIDX_MAX		4
-#define ULP2_4K_PAGE_SHIFT	12
-#define ULP2_4K_PAGE_MASK	(~((1UL << ULP2_4K_PAGE_SHIFT) - 1))
-static unsigned char ddp_page_order[ULP2_PGIDX_MAX];
-static unsigned long ddp_page_size[ULP2_PGIDX_MAX];
-static unsigned char ddp_page_shift[ULP2_PGIDX_MAX];
+#define ULP2_DDP_THRESHOLD	2048
+static unsigned char ddp_page_order[ULP2_PGIDX_MAX] = {0, 1, 2, 4};
+static unsigned char ddp_page_shift[ULP2_PGIDX_MAX] = {12, 13, 14, 16};
 static unsigned char sw_tag_idx_bits;
 static unsigned char sw_tag_age_bits;
+static unsigned char page_idx = ULP2_PGIDX_MAX;
 
 static void cxgb3i_ddp_page_init(void)
 {
 	int i;
-	unsigned long n = PAGE_SIZE >> ULP2_4K_PAGE_SHIFT;
-
-	if (PAGE_SIZE & (~ULP2_4K_PAGE_MASK)) {
-		cxgb3i_log_debug("PAGE_SIZE 0x%lx is not multiple of 4K, "
-				"ddp disabled.\n", PAGE_SIZE);
-		return;
-	}
-	n = __ilog2_u32(n);
-	for (i = 0; i < ULP2_PGIDX_MAX; i++, n++) {
-		ddp_page_order[i] = n;
-		ddp_page_shift[i] = ULP2_4K_PAGE_SHIFT + n;
-		ddp_page_size[i] = 1 << ddp_page_shift[i];
-		cxgb3i_log_debug("%d, order %u, shift %u, size 0x%lx.\n", i,
-				 ddp_page_order[i], ddp_page_shift[i],
-				 ddp_page_size[i]);
-	}
 
 	sw_tag_idx_bits = (__ilog2_u32(ISCSI_ITT_MASK)) + 1;
 	sw_tag_age_bits = (__ilog2_u32(ISCSI_AGE_MASK)) + 1;
+
+	for (i = 0; i < ULP2_PGIDX_MAX; i++) {
+		if (PAGE_SIZE == (1UL << ddp_page_shift[i])) {
+			page_idx = i;
+			cxgb3i_log_info("PAGE_SIZE %lu, idx %u.\n",
+					PAGE_SIZE, page_idx);
+		}
+	}
+
+	if (page_idx == ULP2_PGIDX_MAX)
+		cxgb3i_log_info("PAGE_SIZE %lu, no match.\n", PAGE_SIZE);
 }
 
 static inline void ulp_mem_io_set_hdr(struct sk_buff *skb, unsigned int addr)
@@ -91,38 +85,27 @@ static inline void ulp_mem_io_set_hdr(struct sk_buff *skb, unsigned int addr)
 
 static int set_ddp_map(struct cxgb3i_adapter *snic, struct pagepod_hdr *hdr,
 		       unsigned int idx, unsigned int npods,
-		       struct scatterlist *sgl, unsigned int sgcnt)
+		       struct cxgb3i_gather_list *gl)
 {
-	struct cxgb3i_ddp_info *ddp = &snic->ddp;
-	struct scatterlist *sg = sgl;
+	struct cxgb3i_ddp_info *ddp = snic->ddp;
 	unsigned int pm_addr = (idx << PPOD_SIZE_SHIFT) + ddp->llimit;
 	int i;
 
-	for (i = 0; i < npods; i++, pm_addr += PPOD_SIZE) {
-		struct sk_buff *skb;
+	for (i = 0; i < npods; i++, idx++, pm_addr += PPOD_SIZE) {
+		struct sk_buff *skb = ddp->gl_skb[idx];
 		struct pagepod *ppod;
-		int j, k;
-		skb =
-		    alloc_skb(sizeof(struct ulp_mem_io) + PPOD_SIZE,
-			      GFP_ATOMIC);
-		if (!skb) {
-			cxgb3i_log_debug("skb OMM.\n");
-			return -ENOMEM;
-		}
-		skb_put(skb, sizeof(struct ulp_mem_io) + PPOD_SIZE);
+		int j, pidx;
+
+		/* hold on to the skb until we clear the ddp mapping */
+		skb_get(skb);
 
 		ulp_mem_io_set_hdr(skb, pm_addr);
 		ppod =
 		    (struct pagepod *)(skb->head + sizeof(struct ulp_mem_io));
 		memcpy(&(ppod->hdr), hdr, sizeof(struct pagepod));
-		for (j = 0, k = i * 4; j < 5; j++, k++) {
-			if (k < sgcnt) {
-				ppod->addr[j] = cpu_to_be64(sg_dma_address(sg));
-				if (j < 4)
-					sg = sg_next(sg);
-			} else
-				ppod->addr[j] = 0UL;
-		}
+		for (pidx = 4 * i, j = 0; j < 5; ++j, ++pidx)
+			ppod->addr[j] = pidx < gl->nelem ?
+				     cpu_to_be64(gl->phys_addr[pidx]) : 0UL;
 
 		skb->priority = CPL_PRIORITY_CONTROL;
 		cxgb3_ofld_send(snic->tdev, skb);
@@ -133,18 +116,14 @@ static int set_ddp_map(struct cxgb3i_adapter *snic, struct pagepod_hdr *hdr,
 static int clear_ddp_map(struct cxgb3i_adapter *snic, unsigned int idx,
 			 unsigned int npods)
 {
-	struct cxgb3i_ddp_info *ddp = &snic->ddp;
+	struct cxgb3i_ddp_info *ddp = snic->ddp;
 	unsigned int pm_addr = (idx << PPOD_SIZE_SHIFT) + ddp->llimit;
 	int i;
 
-	for (i = 0; i < npods; i++, pm_addr += PPOD_SIZE) {
-		struct sk_buff *skb;
-		skb =
-		    alloc_skb(sizeof(struct ulp_mem_io) + PPOD_SIZE,
-			      GFP_ATOMIC);
-		if (!skb)
-			return -ENOMEM;
-		skb_put(skb, sizeof(struct ulp_mem_io) + PPOD_SIZE);
+	for (i = 0; i < npods; i++, idx++, pm_addr += PPOD_SIZE) {
+		struct sk_buff *skb = ddp->gl_skb[idx];
+
+		ddp->gl_skb[idx] = NULL;
 		memset((skb->head + sizeof(struct ulp_mem_io)), 0, PPOD_SIZE);
 		ulp_mem_io_set_hdr(skb, pm_addr);
 		skb->priority = CPL_PRIORITY_CONTROL;
@@ -153,42 +132,80 @@ static int clear_ddp_map(struct cxgb3i_adapter *snic, unsigned int idx,
 	return 0;
 }
 
-static int cxgb3i_ddp_sgl_check(struct scatterlist *sgl, unsigned int sgcnt)
+static struct cxgb3i_gather_list *ddp_make_gl(unsigned int xferlen,
+					      struct scatterlist *sgl,
+					      unsigned int sgcnt, int gfp)
 {
-	struct scatterlist *sg;
-	int i;
+	struct cxgb3i_gather_list *gl;
+	struct scatterlist *sg = sgl;
+	struct page *sgpage = sg_page(sg);
+	unsigned int sglen = sg->length;
+	unsigned int sgoffset = sg->offset;
+	unsigned int npages = (xferlen + sgoffset + PAGE_SIZE - 1) >>
+			      PAGE_SHIFT;
+	int i = 1, j = 0;
 
-	/* make sure the sgl is fit for ddp:
-	 *      each has the same page size, and
-	 *      first & last page do not need to be used completely, and
-	 *      the rest of page must be used completely
-	 */
-	for_each_sg(sgl, sg, sgcnt, i) {
-		if ((i && sg->offset) ||
-		    ((i != sgcnt - 1) &&
-		     (sg->length + sg->offset) != PAGE_SIZE)) {
-			cxgb3i_tag_debug("sg %u/%u, off %u, len %u.\n",
-					 i, sgcnt, sg->offset, sg->length);
-			return -EINVAL;
+	gl = kzalloc(sizeof(struct cxgb3i_gather_list) +
+		     npages * (sizeof(dma_addr_t) + sizeof(struct page *)),
+		     gfp);
+	if (!gl)
+		return NULL;
+
+	gl->pages = (struct page **)&gl->phys_addr[npages];
+	gl->length = xferlen;
+	gl->offset = sgoffset;
+	gl->pages[0] = sgpage;
+
+	sg = sg_next(sg);
+	while (sg) {
+		struct page *page = sg_page(sg);
+
+		if (sgpage == page && sg->offset == sgoffset + sglen)
+			sglen += sg->length;
+		else {
+			/* make sure the sgl is fit for ddp:
+			 * each has the same page size, and
+			 * all of the middle pages are used completely
+			 */
+			if ((j && sgoffset) ||
+			    ((i != sgcnt - 1) &&
+			     ((sglen + sgoffset) & ~PAGE_MASK)))
+				goto error_out;
+
+			j++;
+			if (j == gl->nelem)
+				goto error_out;
+			gl->pages[j] = page;
+			sglen = sg->length;
+			sgoffset = sg->offset;
+			sgpage = page;
 		}
+		i++;
+		sg = sg_next(sg);
 	}
+	gl->nelem = ++j;
+	return gl;
 
-	return 0;
+error_out:
+	kfree(gl);
+	return NULL;
 }
 
 static inline int ddp_find_unused_entries(struct cxgb3i_ddp_info *ddp,
-					  int start, int max, int count)
+					  int start, int max, int count,
+					  struct cxgb3i_gather_list *gl)
 {
 	unsigned int i, j;
 
 	spin_lock(&ddp->map_lock);
 	for (i = start; i <= max;) {
 		for (j = 0; j < count; j++) {
-			if (ddp->map[i + j])
+			if (ddp->gl_map[i + j])
 				break;
 		}
 		if (j == count) {
-			memset(&ddp->map[i], 1, count);
+			for (j = 0; j < count; j++)
+				ddp->gl_map[i + j] = gl;
 			spin_unlock(&ddp->map_lock);
 			return i;
 		}
@@ -202,86 +219,127 @@ static inline void ddp_unmark_entries(struct cxgb3i_ddp_info *ddp,
 				      int start, int count)
 {
 	spin_lock(&ddp->map_lock);
-	memset(&ddp->map[start], 0, count);
+	memset(&ddp->gl_map[start], 0,
+	       count * sizeof(struct cxgb3i_gather_list *));
 	spin_unlock(&ddp->map_lock);
 }
 
-static inline int sgl_map(struct cxgb3i_adapter *snic,
-			  struct scatterlist *sgl, unsigned int sgcnt)
+static inline void ddp_free_gl_skb(struct cxgb3i_ddp_info *ddp,
+				   int idx, int count)
 {
-	struct scatterlist *sg;
-	int i, err;
-
-	for_each_sg(sgl, sg, sgcnt, i) {
-		err = pci_map_sg(snic->pdev, sg, 1, PCI_DMA_FROMDEVICE);
-		if (err <= 0) {
-			cxgb3i_tag_debug("sgcnt %d/%u, pci map failed %d.\n",
-				 	 i, sgcnt, err);
-			return err;
-		}
-	}
-	return sgcnt;
-}
-
-static inline void sgl_unmap(struct cxgb3i_adapter *snic,
-			     struct scatterlist *sgl, unsigned int sgcnt)
-{
-	struct scatterlist *sg;
 	int i;
 
-	for_each_sg(sgl, sg, sgcnt, i) {
-		if (sg_dma_address(sg))
-			pci_unmap_sg(snic->pdev, sg, 1, PCI_DMA_FROMDEVICE);
-		else
-			break;
+	for (i = 0; i < count; i++, idx++)
+		if (ddp->gl_skb[idx]) {
+			kfree_skb(ddp->gl_skb[idx]);
+			ddp->gl_skb[idx] = NULL;
+		}
+}
+
+static inline int ddp_alloc_gl_skb(struct cxgb3i_ddp_info *ddp,
+				   int idx, int count, int gfp)
+{
+	int i;
+
+	for (i = 0; i < count; i++) {
+		struct sk_buff *skb = alloc_skb(sizeof(struct ulp_mem_io) +
+						PPOD_SIZE, gfp);
+		if (skb) {
+			ddp->gl_skb[idx + i] = skb;
+			skb_put(skb, sizeof(struct ulp_mem_io) + PPOD_SIZE);
+		} else {
+			ddp_free_gl_skb(ddp, idx, i);
+			return -ENOMEM;
+		}
 	}
+	return 0;
+}
+
+static inline void ddp_gl_unmap(struct pci_dev *pdev,
+				struct cxgb3i_gather_list *gl)
+{
+	int i;
+
+	for (i = 0; i < gl->nelem; i++)
+		pci_unmap_page(pdev, gl->phys_addr[i], PAGE_SIZE,
+			       PCI_DMA_FROMDEVICE);
+}
+
+static inline int ddp_gl_map(struct pci_dev *pdev,
+			     struct cxgb3i_gather_list *gl)
+{
+	int i;
+
+	for (i = 0; i < gl->nelem; i++) {
+		gl->phys_addr[i] = pci_map_page(pdev, gl->pages[i], 0,
+						PAGE_SIZE,
+						PCI_DMA_FROMDEVICE);
+		if (unlikely(pci_dma_mapping_error(pdev, gl->phys_addr[i])))
+			goto unmap;
+	}
+
+	return i;
+
+unmap:
+	if (i) {
+		unsigned int nelem = gl->nelem;
+
+		gl->nelem = i;
+		ddp_gl_unmap(pdev, gl);
+		gl->nelem = nelem;
+	}
+	return -ENOMEM;
 }
 
 u32 cxgb3i_ddp_tag_reserve(struct cxgb3i_adapter *snic, unsigned int tid,
 			   u32 sw_tag, unsigned int xferlen,
-			   struct scatterlist *sgl, unsigned int sgcnt)
+			   struct scatterlist *sgl, unsigned int sgcnt,
+			   int gfp)
 {
-	struct cxgb3i_ddp_info *ddp = &snic->ddp;
+	struct cxgb3i_ddp_info *ddp = snic->ddp;
+	struct cxgb3i_gather_list *gl;
 	struct pagepod_hdr hdr;
 	unsigned int npods;
 	int idx = -1, idx_max;
 	u32 tag;
-	int err;
 
-	if (!ddp || !sgcnt || xferlen < PAGE_SIZE) {
-		cxgb3i_tag_debug("sgcnt %u, xferlen %u < %lu, NO DDP.\n",
-				 sgcnt, xferlen, PAGE_SIZE);
+	if (page_idx || !ddp || !sgcnt || xferlen < ULP2_DDP_THRESHOLD) {
+		cxgb3i_tag_debug("pgidx %u, sgcnt %u, xfer %u/%u, NO ddp.\n",
+				 page_idx, sgcnt, xferlen, ULP2_DDP_THRESHOLD);
 		return RESERVED_ITT;
 	}
 
-	err = cxgb3i_ddp_sgl_check(sgl, sgcnt);
-	if (err < 0) {
+	gl = ddp_make_gl(xferlen, sgl, sgcnt, gfp);
+	if (!gl) {
 		cxgb3i_tag_debug("sgcnt %u, xferlen %u, SGL check fail.\n",
 				 sgcnt, xferlen);
 		return RESERVED_ITT;
 	}
 
-	npods = (sgcnt + PPOD_PAGES_MAX - 1) >> PPOD_PAGES_SHIFT;
+	npods = (gl->nelem + PPOD_PAGES_MAX - 1) >> PPOD_PAGES_SHIFT;
 	idx_max = ddp->nppods - npods + 1;
 
 	if (ddp->idx_last == ddp->nppods)
-		idx = ddp_find_unused_entries(ddp, 0, idx_max, npods);
+		idx = ddp_find_unused_entries(ddp, 0, idx_max, npods, gl);
 	else {
 		idx = ddp_find_unused_entries(ddp, ddp->idx_last + 1, idx_max,
-					      npods);
+					      npods, gl);
 		if ((idx < 0) && (ddp->idx_last >= npods))
 			idx = ddp_find_unused_entries(ddp, 0,
 						      ddp->idx_last - npods + 1,
-						      npods);
+						      npods, gl);
 	}
 	if (idx < 0) {
+		kfree(gl);
 		cxgb3i_tag_debug("sgcnt %u, xferlen %u, npods %u NO DDP.\n",
 				 sgcnt, xferlen, npods);
 		return RESERVED_ITT;
 	}
 
-	err = sgl_map(snic, sgl, sgcnt);
-	if (err < sgcnt)
+	if (ddp_alloc_gl_skb(ddp, idx, npods, gfp) < 0)
+		goto unmark_entries;
+
+	if (ddp_gl_map(snic->pdev, gl) < 0)
 		goto unmap_sgl;
 
 	tag = sw_tag | (idx << snic->tag_format.rsvd_shift);
@@ -290,9 +348,9 @@ u32 cxgb3i_ddp_tag_reserve(struct cxgb3i_adapter *snic, unsigned int tid,
 	hdr.vld_tid = htonl(F_PPOD_VALID | V_PPOD_TID(tid));
 	hdr.pgsz_tag_clr = htonl(tag & snic->tag_format.rsvd_tag_mask);
 	hdr.maxoffset = htonl(xferlen);
-	hdr.pgoffset = htonl(sgl->offset);
+	hdr.pgoffset = htonl(gl->offset);
 
-	if (set_ddp_map(snic, &hdr, idx, npods, sgl, sgcnt) < 0)
+	if (set_ddp_map(snic, &hdr, idx, npods, gl) < 0)
 		goto unmap_sgl;
 
 	ddp->idx_last = idx;
@@ -301,7 +359,9 @@ u32 cxgb3i_ddp_tag_reserve(struct cxgb3i_adapter *snic, unsigned int tid,
 	return tag;
 
 unmap_sgl:
-	sgl_unmap(snic, sgl, sgcnt);
+	ddp_gl_unmap(snic->pdev, gl);
+	ddp_free_gl_skb(ddp, idx, npods);
+unmark_entries:
 	ddp_unmark_entries(ddp, idx, npods);
 	return RESERVED_ITT;
 }
@@ -311,14 +371,18 @@ void cxgb3i_ddp_tag_release(struct cxgb3i_adapter *snic, u32 tag,
 {
 	u32 idx = (tag >> snic->tag_format.rsvd_shift) &
 		  snic->tag_format.rsvd_mask;
-	unsigned int npods = (sgcnt + PPOD_PAGES_MAX - 1) >> PPOD_PAGES_SHIFT;
 
 	if (idx < snic->tag_format.rsvd_mask) {
+		struct cxgb3i_ddp_info *ddp = snic->ddp;
+		struct cxgb3i_gather_list *gl = ddp->gl_map[idx];
+		unsigned int npods = (gl->nelem + PPOD_PAGES_MAX - 1) >>
+				     PPOD_PAGES_SHIFT;
+
 		cxgb3i_tag_debug("ddp tag 0x%x, release idx 0x%x, npods %u.\n",
 				 tag, idx, npods);
 		clear_ddp_map(snic, idx, npods);
-		ddp_unmark_entries(&snic->ddp, idx, npods);
-		sgl_unmap(snic, sgl, sgcnt);
+		ddp_unmark_entries(ddp, idx, npods);
+		ddp_gl_unmap(snic->pdev, gl);
 	}
 }
 
@@ -330,6 +394,7 @@ int cxgb3i_conn_ulp_setup(struct cxgb3i_conn *cconn, int hcrc, int dcrc)
 					GFP_KERNEL | __GFP_NOFAIL);
 	struct cpl_set_tcb_field *req;
 	u32 submode = (hcrc ? 1 : 0) | (dcrc ? 2 : 0);
+	u32 pgcode = page_idx < ULP2_PGIDX_MAX ? page_idx : 0;
 
 	/* set up ulp submode and page size */
 	req = (struct cpl_set_tcb_field *)skb_put(skb, sizeof(*req));
@@ -339,8 +404,7 @@ int cxgb3i_conn_ulp_setup(struct cxgb3i_conn *cconn, int hcrc, int dcrc)
 	req->cpu_idx = 0;
 	req->word = htons(31);
 	req->mask = cpu_to_be64(0xFF000000);
-	/* the connection page size is always the same as ddp-pgsz0 */
-	req->val = cpu_to_be64(submode << 24);
+	req->val = cpu_to_be64(((pgcode << 4) | submode) << 24);
 	skb->priority = CPL_PRIORITY_CONTROL;
 
 	cxgb3_ofld_send(c3cn->cdev, skb);
@@ -397,13 +461,15 @@ static int cxgb3i_conn_read_pdu_skb(struct iscsi_conn *conn,
 		segment->status = (conn->datadgst_en &&
 				   (skb_ulp_mode(skb) & ULP2_FLAG_DCRC_ERROR)) ?
 		    ISCSI_SEGMENT_DGST_ERR : 0;
-		if (skb_ulp_mode(skb) & ULP2_FLAG_DATA_DDPED) {
-			cxgb3i_ddp_debug("opcode 0x%x, data %u, ddp'ed.\n",
-					 hdr->opcode & ISCSI_OPCODE_MASK,
-					 tcp_conn->in.datalen);
+		if (skb_ulp_mode(skb) & ULP2_FLAG_DATA_DDPED)
 			segment->total_copied = segment->total_size;
-		} else
+		else {
+			cxgb3i_ddp_debug("opcode 0x%x, data %u, NOT ddp'ed, "
+					 "itt 0x%x.\n",
+					 hdr->opcode & ISCSI_OPCODE_MASK,
+					 tcp_conn->in.datalen, hdr->itt);
 			offset += sizeof(struct cpl_iscsi_hdr_norss);
+		}
 
 		while (segment->total_copied < segment->total_size) {
 			iscsi_tcp_segment_map(segment, 1);
@@ -481,67 +547,64 @@ int cxgb3i_conn_ulp2_xmit(struct iscsi_conn *conn)
 			if (padlen)
 				memset(dst, 0, padlen);
 		} else {
-			unsigned int offset = 0;
-			while (datalen) {
-				struct page *page = alloc_page(GFP_ATOMIC);
-				int idx = skb_shinfo(skb)->nr_frags;
-				skb_frag_t *frag = &skb_shinfo(skb)->frags[idx];
+			struct page *pg = virt_to_page(data_seg->data);
 
-				if (!page)
-					goto free_skb;
-
-				frag->page = page;
-				frag->page_offset = 0;
-				if (datalen > PAGE_SIZE)
-					frag->size = PAGE_SIZE;
-				else
-					frag->size = datalen;
-				memcpy(page_address(page),
-				       data_seg->data + offset, frag->size);
-
-				skb_shinfo(skb)->nr_frags++;
-				datalen -= frag->size;
-				offset += frag->size;
-			}
+			get_page(pg);
+			skb_fill_page_desc(skb, 0, pg,
+					   offset_in_page(data_seg->data),
+					   datalen);
+			skb->len += datalen;
+			skb->data_len += datalen;
+			skb->truesize += datalen;
 		}
 	} else {
 		struct scatterlist *sg = data_seg->sg;
 		unsigned int offset = data_seg->sg_offset;
-		while (datalen) {
-			int idx = skb_shinfo(skb)->nr_frags;
-			skb_frag_t *frag = &skb_shinfo(skb)->frags[idx];
-			struct page *pg = sg_page(sg);
+		struct page *page = sg_page(sg);
+		unsigned int sglen = sg->length - offset;
 
-			get_page(pg);
-			frag->page = pg;
-			frag->page_offset = offset + sg->offset;
-			frag->size = min(sg->length, datalen);
+		do {
+			int i = skb_shinfo(skb)->nr_frags;
+			unsigned int copy;
 
-			offset = 0;
-			skb_shinfo(skb)->nr_frags++;
-			datalen -= frag->size;
-			sg = sg_next(sg);
-		}
+			if (!sglen) {
+				sg = sg_next(sg);
+				page = sg_page(sg);
+				offset = 0;
+				sglen = sg->length;
+			}
+			copy = min(sglen, datalen);
+
+			if (i && skb_can_coalesce(skb, i, page,
+						  sg->offset + offset)) {
+				skb_shinfo(skb)->frags[i - 1].size += copy;
+			} else {
+				get_page(page);
+				skb_fill_page_desc(skb, i, page,
+						   sg->offset + offset, copy);
+			}
+			skb->len += copy;
+			skb->data_len += copy;
+			skb->truesize += copy;
+			offset += copy;
+			sglen -= copy;
+			datalen -= copy;
+		} while (datalen);
 	}
 
-	if (skb_shinfo(skb)->nr_frags) {
-		if (padlen) {
-			int idx = skb_shinfo(skb)->nr_frags;
-			skb_frag_t *frag = &skb_shinfo(skb)->frags[idx];
-			frag->page = pad_page;
-			frag->page_offset = 0;
-			frag->size = padlen;
-			skb_shinfo(skb)->nr_frags++;
-		}
-		datalen = data_seg->total_size + padlen;
-		skb->data_len += datalen;
-		skb->truesize += datalen;
-		skb->len += datalen;
+	if (padlen && skb_shinfo(skb)->nr_frags) {
+		int idx = skb_shinfo(skb)->nr_frags;
+		get_page(pad_page);
+		skb_fill_page_desc(skb, idx, pad_page, 0, padlen);
+		skb->data_len += padlen;
+		skb->truesize += padlen;
+		skb->len += padlen;
 	}
 
 send_pdu:
 	err = cxgb3i_c3cn_send_pdus((struct s3_conn *)tcp_conn->sock,
 				    skb, MSG_DONTWAIT | MSG_NOSIGNAL);
+
 	if (err > 0) {
 		int pdulen = hdrlen + datalen + padlen;
 		if (conn->hdrdgst_en)
@@ -556,7 +619,6 @@ send_pdu:
 		return pdulen;
 	}
 
-free_skb:
 	kfree_skb(skb);
 	if (err < 0 && err != -EAGAIN) {
 		cxgb3i_log_error("conn 0x%p, xmit err %d.\n", conn, err);
@@ -649,12 +711,10 @@ void cxgb3i_conn_closing(struct s3_conn *c3cn)
 int cxgb3i_adapter_ulp_init(struct cxgb3i_adapter *snic)
 {
 	struct t3cdev *tdev = snic->tdev;
-	struct cxgb3i_ddp_info *ddp = &snic->ddp;
+	struct cxgb3i_ddp_info *ddp;
 	struct ulp_iscsi_info uinfo;
 	unsigned int ppmax, bits, max_bits;
 	int i, err;
-
-	spin_lock_init(&ddp->map_lock);
 
 	err = tdev->ctl(tdev, ULP_ISCSI_GET_PARAMS, &uinfo);
 	if (err < 0) {
@@ -684,12 +744,21 @@ int cxgb3i_adapter_ulp_init(struct cxgb3i_adapter *snic)
 	snic->tag_format.rsvd_tag_mask =
 		(1 << (snic->tag_format.rsvd_bits + PPOD_IDX_SHIFT)) - 1;
 
-	ddp->map = cxgb3i_alloc_big_mem(ppmax);
-	if (!ddp->map) {
-		cxgb3i_log_warn("snic unable to alloc ddp ppod 0x%u, "
-				"ddp disabled.\n", ppmax);
+	ddp = cxgb3i_alloc_big_mem(sizeof(struct cxgb3i_ddp_info) +
+				   ppmax *
+				   (sizeof(struct cxgb3i_gather_list *) +
+				    sizeof(struct sk_buff *)));
+	if (!ddp) {
+		cxgb3i_log_warn("snic %s unable to alloc ddp ppod 0x%u, "
+				"ddp disabled.\n", tdev->name, ppmax);
 		return 0;
 	}
+	ddp->gl_map = (struct cxgb3i_gather_list **)(ddp + 1);
+	ddp->gl_skb = (struct sk_buff **)(((char *)ddp->gl_map) +
+					  ppmax *
+					  sizeof(struct cxgb3i_gather_list *));
+
+	spin_lock_init(&ddp->map_lock);
 	ddp->llimit = uinfo.llimit;
 	ddp->ulimit = uinfo.ulimit;
 
@@ -710,7 +779,7 @@ int cxgb3i_adapter_ulp_init(struct cxgb3i_adapter *snic)
 	ddp->nppods = ppmax;
 	ddp->idx_last = ppmax;
 
-	tdev->ulp_iscsi = ddp;
+	tdev->ulp_iscsi = snic->ddp = ddp;
 
 	cxgb3i_log_info("snic nppods %u (0x%x ~ 0x%x), rsvd shift %u, "
 			"bits %u, mask 0x%x, 0x%x, pkt %u,%u.\n",
@@ -723,19 +792,33 @@ int cxgb3i_adapter_ulp_init(struct cxgb3i_adapter *snic)
 	return 0;
 
 free_ppod_map:
-	cxgb3i_free_big_mem(ddp->map);
+	cxgb3i_free_big_mem(ddp);
 	return 0;
 }
 
 void cxgb3i_adapter_ulp_cleanup(struct cxgb3i_adapter *snic)
 {
-	u8 *map = snic->ddp.map;
+	struct cxgb3i_ddp_info *ddp = snic->ddp;
 
-	if (map) {
+	if (ddp) {
+		int i = 0;
+
 		snic->tdev->ulp_iscsi = NULL;
 		spin_lock(&snic->lock);
-		snic->ddp.map = NULL;
+		snic->ddp = NULL;
 		spin_unlock(&snic->lock);
-		cxgb3i_free_big_mem(map);
+
+		while (i < ddp->nppods) {
+			struct cxgb3i_gather_list *gl = ddp->gl_map[i];
+			if (gl) {
+				int npods = (gl->nelem + PPOD_PAGES_MAX - 1)
+					     >> PPOD_PAGES_SHIFT;
+
+				kfree(gl);
+				ddp_free_gl_skb(ddp, i, npods);
+			} else
+				i++;
+		}
+		cxgb3i_free_big_mem(ddp);
 	}
 }

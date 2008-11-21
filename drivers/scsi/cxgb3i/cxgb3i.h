@@ -62,6 +62,25 @@ struct cxgb3i_tag_format {
 };
 
 /**
+ * struct cxgb3i_gather_list - cxgb3i direct data placement memory
+ *
+ * @tag:	ddp tag
+ * @length:	total data buffer length
+ * @offset:	initial offset to the 1st page
+ * @nelem:	# of pages
+ * @pages:	pages
+ * @phys_addr:	physical address
+ */
+struct cxgb3i_gather_list {
+	u32 tag;
+	unsigned int length;
+	unsigned int offset;
+	unsigned int nelem;
+	struct page **pages;
+	dma_addr_t phys_addr[0];
+};
+
+/**
  * struct cxgb3i_ddp_info - cxgb3i direct data placement for pdu payload
  *
  * @llimit:	lower bound of the page pod memory
@@ -77,7 +96,8 @@ struct cxgb3i_ddp_info {
 	unsigned int nppods;
 	unsigned int idx_last;
 	spinlock_t map_lock;
-	u8 *map;
+	struct cxgb3i_gather_list **gl_map;
+	struct sk_buff **gl_skb;
 };
 
 /**
@@ -119,7 +139,7 @@ struct cxgb3i_adapter {
 	unsigned int rx_max_size;
 
 	struct cxgb3i_tag_format tag_format;
-	struct cxgb3i_ddp_info ddp;
+	struct cxgb3i_ddp_info *ddp;
 };
 
 /**
@@ -174,6 +194,6 @@ void cxgb3i_ddp_tag_release(struct cxgb3i_adapter *, u32,
 			    struct scatterlist *, unsigned int);
 u32 cxgb3i_ddp_tag_reserve(struct cxgb3i_adapter *, unsigned int,
 			   u32, unsigned int, struct scatterlist *,
-			   unsigned int);
+			   unsigned int, int);
 int cxgb3i_conn_ulp2_xmit(struct iscsi_conn *);
 #endif

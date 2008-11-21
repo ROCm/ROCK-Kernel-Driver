@@ -451,10 +451,18 @@ static int __table_get_device(struct dm_table *t, struct dm_target *ti,
 		dd->mode = mode;
 		dd->bdev = NULL;
 
-		if ((r = open_dev(dd, dev, t->md))) {
+		r = open_dev(dd, dev, t->md);
+		if (r == -EROFS) {
+			dd->mode &= ~FMODE_WRITE;
+			r = open_dev(dd, dev, t->md);
+		}
+		if (r) {
 			kfree(dd);
 			return r;
 		}
+
+		if (dd->mode != mode)
+			t->mode = dd->mode;
 
 		format_dev_t(dd->name, dev);
 

@@ -211,7 +211,8 @@ static unsigned int wrlen __read_mostly;
  * in the skb and whether it has any payload in its main body.  This maps the
  * length of the gather list represented by an skb into the # of necessary WRs.
  */
-static unsigned int skb_wrs[MAX_SKB_FRAGS + 2] __read_mostly;
+#define SKB_WR_LIST_SIZE	(16384/512 + 1)
+static unsigned int skb_wrs[SKB_WR_LIST_SIZE + 2] __read_mostly;
 
 static void s3_init_wr_tab(unsigned int wr_len)
 {
@@ -220,7 +221,7 @@ static void s3_init_wr_tab(unsigned int wr_len)
 	if (skb_wrs[1])		/* already initialized */
 		return;
 
-	for (i = 1; i < ARRAY_SIZE(skb_wrs); i++) {
+	for (i = 1; i < SKB_WR_LIST_SIZE; i++) {
 		int sgl_len = (3 * i) / 2 + (i & 1);
 
 		sgl_len += 3;
@@ -582,7 +583,6 @@ static inline void make_tx_data_wr(struct s3_conn *c3cn,
 			   V_TX_SHOVE((skb_peek(&c3cn->write_queue) ? 0 : 1)));
 
 	if (!c3cn_flag(c3cn, C3CN_TX_DATA_SENT)) {
-
 		req->flags |= htonl(V_TX_ACK_PAGES(2) | F_TX_INIT |
 				    V_TX_CPU_IDX(c3cn->qset));
 
@@ -825,7 +825,7 @@ static int s3_push_frames(struct s3_conn *c3cn, int req_completion)
 		if (wrs_needed > 1 && len + sizeof(struct tx_data_wr) <= wrlen)
 			wrs_needed = 1;
 
-		WARN_ON(frags >= ARRAY_SIZE(skb_wrs) || wrs_needed < 1);
+		WARN_ON(frags >= SKB_WR_LIST_SIZE || wrs_needed < 1);
 
 		if (c3cn->wr_avail < wrs_needed)
 			break;
@@ -941,8 +941,19 @@ int cxgb3i_c3cn_send_pdus(struct s3_conn *c3cn, struct sk_buff *skb, int flags)
 		goto out_err;
 
 	while (skb) {
+		int frags = skb_shinfo(skb)->nr_frags +
+			    (skb->len != skb->data_len);
+
 		if (unlikely(skb_headroom(skb) < TX_HEADER_LEN)) {
 			c3cn_tx_debug("c3cn 0x%p, skb head.\n", c3cn);
+			err = -EINVAL;
+			goto out_err;
+		}
+
+		if (frags >= SKB_WR_LIST_SIZE) {
+			cxgb3i_log_error("c3cn 0x%p, tx frags %d, len %u,%u.\n",
+					 c3cn, skb_shinfo(skb)->nr_frags,
+					 skb->len, skb->data_len);
 			err = -EINVAL;
 			goto out_err;
 		}

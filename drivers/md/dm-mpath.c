@@ -768,8 +768,8 @@ static int multipath_ctr(struct dm_target *ti, unsigned int argc,
 {
 	/* target parameters */
 	static struct param _params[] = {
-		{1, 1024, "invalid number of priority groups"},
-		{1, 1024, "invalid initial priority group number"},
+		{0, 1024, "invalid number of priority groups"},
+		{0, 1024, "invalid initial priority group number"},
 	};
 
 	int r;

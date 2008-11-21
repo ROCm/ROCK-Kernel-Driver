@@ -723,14 +723,16 @@ static int cxgb3i_reserve_itt(struct iscsi_task *task, itt_t *hdr_itt)
 		struct s3_conn *c3cn = (struct s3_conn *)(tcp_conn->sock);
 		tag =
 		    cxgb3i_ddp_tag_reserve(snic, c3cn->tid, sw_tag,
-					   scsi_out(sc)->length,
-					   scsi_out(sc)->table.sgl,
-					   scsi_out(sc)->table.nents);
+					   scsi_in(sc)->length,
+					   scsi_in(sc)->table.sgl,
+					   scsi_in(sc)->table.nents,
+					   GFP_ATOMIC);
 	}
 	if (tag == RESERVED_ITT)
 		tag = sw_tag | (snic->tag_format.rsvd_mask <<
 				snic->tag_format.rsvd_shift);
 	*hdr_itt = htonl(tag);
+
 	return 0;
 }
 
@@ -744,8 +746,8 @@ static void cxgb3i_release_itt(struct iscsi_task *task, itt_t hdr_itt)
 	hdr_itt = ntohl(hdr_itt);
 	if (sc && (sc->sc_data_direction == DMA_FROM_DEVICE))
 		cxgb3i_ddp_tag_release(snic, hdr_itt,
-				       scsi_out(sc)->table.sgl,
-				       scsi_out(sc)->table.nents);
+				       scsi_in(sc)->table.sgl,
+				       scsi_in(sc)->table.nents);
 }
 
 /**
