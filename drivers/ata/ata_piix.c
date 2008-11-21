@@ -923,6 +923,58 @@ static int piix_sidpr_scr_read(struct ata_link *link,
 	return 0;
 }
 
+static irqreturn_t piix_interrupt(int irq, void *dev_instance)
+{
+	struct ata_host *host = dev_instance;
+	unsigned int i;
+	unsigned int handled = 0;
+	unsigned long flags;
+
+	spin_lock_irqsave(&host->lock, flags);
+
+	for (i = 0; i < host->n_ports; i++) {
+		struct ata_port *ap = host->ports[i];
+		struct ata_queued_cmd *qc;
+		u8 host_stat;
+
+		if (ata_port_is_dummy(ap))
+			continue;
+
+		qc = ata_qc_from_tag(ap, ap->link.active_tag);
+		if (qc && !(qc->tf.flags & ATA_TFLAG_POLLING)) {
+			handled |= ata_sff_host_intr(ap, qc);
+			continue;
+		}
+
+		/*
+		 * Control reaches here if HSM is not expecting IRQ.
+		 * If the controller is actually asserting IRQ line,
+		 * this will lead to nobody cared.  Fortuantely,
+		 * DMA_INTR of PIIX is set whenever IDEIRQ is set so
+		 * it can be used to detect spurious IRQs.  As the
+		 * driver is not expecting IRQ at all, clearing IRQ
+		 * here won't lead to loss of IRQ event.
+		 */
+		if (unlikely(!ap->ioaddr.bmdma_addr))
+			continue;
+
+		host_stat = ap->ops->bmdma_status(ap);
+		if (!(host_stat & ATA_DMA_INTR))
+			continue;
+
+		if (printk_ratelimit())
+			ata_port_printk(ap, KERN_INFO,
+					"clearing spurious IRQ\n");
+		ap->ops->sff_check_status(ap);
+		ap->ops->sff_irq_clear(ap);
+		handled |= 1;
+	}
+
+	spin_unlock_irqrestore(&host->lock, flags);
+
+	return IRQ_RETVAL(handled);
+}
+
 static int piix_sidpr_scr_write(struct ata_link *link,
 				unsigned int reg, u32 val)
 {
@@ -1505,7 +1557,7 @@ static int __devinit piix_init_one(struct pci_dev *pdev,
 	}
 
 	pci_set_master(pdev);
-	return ata_pci_sff_activate_host(host, ata_sff_interrupt, &piix_sht);
+	return ata_pci_sff_activate_host(host, piix_interrupt, &piix_sht);
 }
 
 static int __init piix_init(void)
