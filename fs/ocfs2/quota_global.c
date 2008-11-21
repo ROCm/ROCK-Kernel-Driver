@@ -768,6 +768,8 @@ static int ocfs2_dquot_initialize(struct inode *inode, int type)
 	for (cnt = 0; cnt < MAXQUOTAS; cnt++) {
 		if (type != -1 && cnt != type)
 			continue;
+		if (!sb_has_quota_active(sb, cnt))
+			continue;
 		oinfo = sb_dqinfo(sb, cnt)->dqi_priv;
 		status = ocfs2_lock_global_qf(oinfo, 0);
 		if (status < 0)
@@ -836,6 +838,8 @@ static int ocfs2_dquot_drop_slow(struct inode *inode)
 	struct ocfs2_mem_dqinfo *oinfo;
 
 	for (cnt = 0; cnt < MAXQUOTAS; cnt++) {
+		if (!sb_has_quota_active(sb, cnt))
+			continue;
 		oinfo = sb_dqinfo(sb, cnt)->dqi_priv;
 		status = ocfs2_lock_global_qf(oinfo, 1);
 		if (status < 0)
@@ -873,6 +877,8 @@ static int ocfs2_dquot_drop(struct inode *inode)
 
 	mlog_entry_void();
 	for (cnt = 0; cnt < MAXQUOTAS; cnt++) {
+		if (!sb_has_quota_active(sb, cnt))
+			continue;
 		oinfo = sb_dqinfo(sb, cnt)->dqi_priv;
 		status = ocfs2_lock_global_qf(oinfo, 0);
 		if (status < 0)

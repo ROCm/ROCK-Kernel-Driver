@@ -383,15 +383,8 @@ struct ocfs2_quota_recovery *ocfs2_begin_quota_recovery(
 			goto out;
 		}
 		status = ocfs2_inode_lock_full(lqinode, NULL, 1,
-						       OCFS2_META_LOCK_NOQUEUE);
-		/* Someone else is holding the lock? Then he must be
-		 * doing the recovery. Just skip the file... */
-		if (status == -EAGAIN) {
-			mlog(ML_NOTICE, "skipping quota recovery for slot %d "
-			     "because quota file is locked.\n", slot_num);
-			status = 0;
-			goto out_put;
-		} else if (status < 0) {
+						       OCFS2_META_LOCK_RECOVERY);
+		if (status < 0) {
 			mlog_errno(status);
 			goto out_put;
 		}

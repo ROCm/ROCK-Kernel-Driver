@@ -1126,8 +1126,6 @@ skip_recovery:
 	if (status < 0)
 		mlog_errno(status);
 
-	ocfs2_super_unlock(osb, 1);
-
 	/* Now it is right time to recover quotas... */
 	for (i = 0; i < rm_quota_used; i++) {
 		qrec = ocfs2_begin_quota_recovery(osb, rm_quota[i]);
@@ -1139,6 +1137,8 @@ skip_recovery:
 		ocfs2_queue_recovery_completion(osb->journal, rm_quota[i],
 						NULL, NULL, qrec);
 	}
+
+	ocfs2_super_unlock(osb, 1);
 
 	/* We always run recovery on our own orphan dir - the dead
 	 * node(s) may have disallowd a previos inode delete. Re-processing
