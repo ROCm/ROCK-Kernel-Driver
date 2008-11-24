@@ -1414,9 +1414,14 @@ and is between 256 and 4096 characters. It is defined in the file
 			instruction doesn't work correctly and not to
 			use it.
 
-	no_file_caps	Tells the kernel not to honor file capabilities.  The
-			only way then for a file to be executed with privilege
-			is to be setuid root or executed by root.
+	file_caps	Tells the kernel whether to honor file capabilities.
+			When disabled, the only way then for a file to be
+			executed with privilege is to be setuid root or executed
+			by root.
+			Format: {"0" | "1"}
+			0 -- ignore file capabilities.
+			1 -- honor file capabilities.
+			Default value is 0.
 
 	nohalt		[IA-64] Tells the kernel not to use the power saving
 			function PAL_HALT_LIGHT when idle. This increases

@@ -34,14 +34,14 @@ EXPORT_SYMBOL(__cap_full_set);
 EXPORT_SYMBOL(__cap_init_eff_set);
 
 #ifdef CONFIG_SECURITY_FILE_CAPABILITIES
-int file_caps_enabled = 1;
+int file_caps_enabled;
 
-static int __init file_caps_disable(char *str)
+static int __init setup_file_caps(char *str)
 {
-	file_caps_enabled = 0;
+	get_option(&str, &file_caps_enabled);
 	return 1;
 }
-__setup("no_file_caps", file_caps_disable);
+__setup("file_caps", setup_file_caps);
 #endif
 
 /*
