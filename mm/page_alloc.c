@@ -1689,6 +1689,12 @@ nofail_alloc:
 
 nopage:
 	if (!(gfp_mask & __GFP_NOWARN) && printk_ratelimit()) {
+		if (!wait) {
+			printk(KERN_INFO "The following is only an harmless informational message.\n");
+			printk(KERN_INFO "Unless you get a _continuous_flood_ of these messages it means\n");
+			printk(KERN_INFO "everything is working fine. Allocations from irqs cannot be\n");
+			printk(KERN_INFO "perfectly reliable and the kernel is designed to handle that.\n");
+		}
 		printk(KERN_WARNING "%s: page allocation failure."
 			" order:%d, mode:0x%x, alloc_flags:0x%x, pflags:0x%x\n",
 			p->comm, order, gfp_mask, alloc_flags, p->flags);
