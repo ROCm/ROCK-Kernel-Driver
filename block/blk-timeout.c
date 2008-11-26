@@ -23,9 +23,6 @@ void blk_delete_timer(struct request *req)
 		return;
 
 	list_del_init(&req->timeout_list);
-
-	if (list_empty(&q->timeout_list))
-		del_timer(&q->timeout);
 }
 
 static void blk_rq_timed_out(struct request *req)
