@@ -611,7 +611,9 @@ static int __init check_legacy_serial_console(void)
 	if (i >= legacy_serial_count)
 		goto not_found;
 
+#if defined(CONFIG_PPC_PSERIES) && defined(CONFIG_SERIAL_8250_CONSOLE)
 	detect_need_for_ctrl_o();
+#endif
 	of_node_put(prom_stdout);
 
 	DBG("Found serial console at ttyS%d\n", offset);
