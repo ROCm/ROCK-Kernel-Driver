@@ -99,6 +99,8 @@ static unsigned int nr_uarts = CONFIG_SERIAL_8250_RUNTIME_UARTS;
 #define CONFIG_SERIAL_MANY_PORTS 1
 #endif
 
+#define arch_8250_sysrq_via_ctrl_o(x) 0
+
 /*
  * HUB6 is always on.  This will be removed once the header
  * files have been cleaned.
@@ -1309,7 +1311,11 @@ receive_chars(struct uart_8250_port *up, unsigned int *status)
 
 	do {
 		if (likely(lsr & UART_LSR_DR))
+		{
 			ch = serial_inp(up, UART_RX);
+			if (arch_8250_sysrq_via_ctrl_o(ch, &up->port))
+				goto ignore_char;
+		}
 		else
 			/*
 			 * Intel 82571 has a Serial Over Lan device that will
