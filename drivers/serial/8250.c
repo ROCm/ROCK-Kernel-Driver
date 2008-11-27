@@ -99,7 +99,7 @@ static unsigned int nr_uarts = CONFIG_SERIAL_8250_RUNTIME_UARTS;
 #define CONFIG_SERIAL_MANY_PORTS 1
 #endif
 
-#define arch_8250_sysrq_via_ctrl_o(x) 0
+#define arch_8250_sysrq_via_ctrl_o(a,b) 0
 
 /*
  * HUB6 is always on.  This will be removed once the header
