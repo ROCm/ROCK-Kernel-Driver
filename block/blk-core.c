@@ -1544,6 +1544,28 @@ void submit_bio(int rw, struct bio *bio)
 EXPORT_SYMBOL(submit_bio);
 
 /**
+ * blkdev_dequeue_request - dequeue request and start timeout timer
+ * @req: request to dequeue
+ *
+ * Dequeue @req and start timeout timer on it.  This hands off the
+ * request to the driver.
+ *
+ * Block internal functions which don't want to start timer should
+ * call elv_dequeue_request().
+ */
+void blkdev_dequeue_request(struct request *req)
+{
+	elv_dequeue_request(req->q, req);
+
+	/*
+	 * We are now handing the request to the hardware, add the
+	 * timeout handler.
+	 */
+	blk_add_timer(req);
+}
+EXPORT_SYMBOL(blkdev_dequeue_request);
+
+/**
  * blk_rq_check_limits - Helper function to check a request for the queue limit
  * @q:  the queue
  * @rq: the request being checked
@@ -1759,7 +1781,7 @@ static void end_that_request_last(struct request *req, int error)
 		blk_queue_end_tag(req->q, req);
 
 	if (blk_queued_rq(req))
-		blkdev_dequeue_request(req);
+		elv_dequeue_request(req->q, req);
 
 	if (unlikely(laptop_mode) && blk_fs_request(req))
 		laptop_io_completion();
