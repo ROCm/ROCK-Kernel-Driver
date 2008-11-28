@@ -17,19 +17,14 @@
  * Maintained at www.Open-FCoE.org
  */
 
-/*
- * FCOE protocol file
- */
-
 #include <linux/module.h>
 #include <linux/version.h>
 #include <linux/kernel.h>
+#include <linux/pci.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
-#include <linux/ethtool.h>
-#include <linux/if_ether.h>
 #include <linux/if_vlan.h>
 #include <net/rtnetlink.h>
 
@@ -39,36 +34,25 @@
 #include <scsi/scsi_transport.h>
 #include <scsi/scsi_transport_fc.h>
 
-#include <scsi/libfc/libfc.h>
+#include <scsi/libfc.h>
+#include <scsi/libfcoe.h>
+#include <scsi/fc_transport_fcoe.h>
 
-#include <scsi/fc/fc_fcoe.h>
-#include "fcoe_def.h"
-
-#define FCOE_VERSION "0.1"
+#define FCOE_SW_VERSION	"0.1"
+#define	FCOE_SW_NAME	"fcoesw"
+#define	FCOE_SW_VENDOR	"Open-FCoE.org"
 
 #define FCOE_MAX_LUN		255
 #define FCOE_MAX_FCP_TARGET	256
 
 #define FCOE_MAX_OUTSTANDING_COMMANDS	1024
 
-#define FCOE_MIN_XID		0x0004
-#define FCOE_MAX_XID		0x07ef
+#define FCOE_MIN_XID		0x0001	/* the min xid supported by fcoe_sw */
+#define FCOE_MAX_XID		0x07ef	/* the max xid supported by fcoe_sw */
 
-LIST_HEAD(fcoe_hostlist);
-DEFINE_RWLOCK(fcoe_hostlist_lock);
-DEFINE_TIMER(fcoe_timer, NULL, 0, 0);
-struct fcoe_percpu_s *fcoe_percpu[NR_CPUS];
+static struct scsi_transport_template *scsi_transport_fcoe_sw;
 
-static struct scsi_transport_template *fcoe_transport_template;
-
-static int fcoe_reset(struct Scsi_Host *shost)
-{
-	struct fc_lport *lport = shost_priv(shost);
-	fc_lport_reset(lport);
-	return 0;
-}
-
-struct fc_function_template fcoe_transport_function = {
+struct fc_function_template fcoe_sw_transport_function = {
 	.show_host_node_name = 1,
 	.show_host_port_name = 1,
 	.show_host_supported_classes = 1,
@@ -101,60 +85,10 @@ struct fc_function_template fcoe_transport_function = {
 	.terminate_rport_io = fc_rport_terminate_io,
 };
 
-static struct fcoe_softc *fcoe_find_fc_lport(const struct net_device *netdev)
-{
-	struct fcoe_softc *fc;
-
-	read_lock(&fcoe_hostlist_lock);
-	list_for_each_entry(fc, &fcoe_hostlist, list) {
-		if (fc->real_dev == netdev) {
-			read_unlock(&fcoe_hostlist_lock);
-			return fc;
-		}
-	}
-	read_unlock(&fcoe_hostlist_lock);
-	return NULL;
-}
-
-/*
- * Convert 48-bit IEEE MAC address to 64-bit FC WWN.
- */
-static u64 fcoe_wwn_from_mac(unsigned char mac[MAX_ADDR_LEN],
-			     unsigned int scheme, unsigned int port)
-{
-	u64 wwn;
-	u64 host_mac;
-
-	/* The MAC is in NO, so flip only the low 48 bits */
-	host_mac = ((u64) mac[0] << 40) |
-		((u64) mac[1] << 32) |
-		((u64) mac[2] << 24) |
-		((u64) mac[3] << 16) |
-		((u64) mac[4] << 8) |
-		(u64) mac[5];
-
-	WARN_ON(host_mac >= (1ULL << 48));
-	wwn = host_mac | ((u64) scheme << 60);
-	switch (scheme) {
-	case 1:
-		WARN_ON(port != 0);
-		break;
-	case 2:
-		WARN_ON(port >= 0xfff);
-		wwn |= (u64) port << 48;
-		break;
-	default:
-		WARN_ON(1);
-		break;
-	}
-
-	return wwn;
-}
-
-static struct scsi_host_template fcoe_driver_template = {
+static struct scsi_host_template fcoe_sw_shost_template = {
 	.module = THIS_MODULE,
 	.name = "FCoE Driver",
-	.proc_name = FCOE_DRIVER_NAME,
+	.proc_name = FCOE_SW_NAME,
 	.queuecommand = fc_queuecommand,
 	.eh_abort_handler = fc_eh_abort,
 	.eh_device_reset_handler = fc_eh_device_reset,
@@ -170,137 +104,17 @@ static struct scsi_host_template fcoe_driver_template = {
 	.max_sectors = 0xffff,
 };
 
-int fcoe_destroy_interface(struct net_device *netdev)
-{
-	int cpu, idx;
-	struct fcoe_percpu_s *pp;
-	struct fcoe_softc *fc;
-	struct fcoe_rcv_info *fr;
-	struct sk_buff_head *list;
-	struct sk_buff *skb, *next;
-	struct sk_buff *head;
-	struct fc_lport *lp;
-	u8 flogi_maddr[ETH_ALEN];
-
-	fc = fcoe_find_fc_lport(netdev);
-	if (!fc)
-		return -ENODEV;
-
-	lp = fc->lp;
-
-	/* Remove the instance from fcoe's list */
-	write_lock_bh(&fcoe_hostlist_lock);
-	list_del(&fc->list);
-	write_unlock_bh(&fcoe_hostlist_lock);
-
-	/* Don't listen for Ethernet packets anymore */
-	dev_remove_pack(&fc->fcoe_packet_type);
-
-	/* Detach from the scsi-ml */
-	fc_remove_host(lp->host);
-	scsi_remove_host(lp->host);
-
-	/* Cleanup the fc_lport */
-	fc_lport_destroy(lp);
-	fc_fcp_destroy(lp);
-	if (lp->emp)
-		fc_exch_mgr_free(lp->emp);
-
-	/* Delete secondary MAC addresses */
-	rtnl_lock();
-	memcpy(flogi_maddr, (u8[6]) FC_FCOE_FLOGI_MAC, ETH_ALEN);
-	dev_unicast_delete(fc->real_dev, flogi_maddr, ETH_ALEN);
-	if (compare_ether_addr(fc->data_src_addr, (u8[6]) { 0 }))
-		dev_unicast_delete(fc->real_dev, fc->data_src_addr, ETH_ALEN);
-	rtnl_unlock();
-
-	/* Free the per-CPU revieve threads */
-	for (idx = 0; idx < NR_CPUS; idx++) {
-		if (fcoe_percpu[idx]) {
-			pp = fcoe_percpu[idx];
-			spin_lock_bh(&pp->fcoe_rx_list.lock);
-			list = &pp->fcoe_rx_list;
-			head = list->next;
-			for (skb = head; skb != (struct sk_buff *)list;
-			     skb = next) {
-				next = skb->next;
-				fr = fcoe_dev_from_skb(skb);
-				if (fr->fr_dev == fc->lp) {
-					__skb_unlink(skb, list);
-					kfree_skb(skb);
-				}
-			}
-			spin_unlock_bh(&pp->fcoe_rx_list.lock);
-		}
-	}
-
-	/* Free existing skbs */
-	fcoe_clean_pending_queue(lp);
-
-	/* Free memory used by statistical counters */
-	for_each_online_cpu(cpu)
-		kfree(lp->dev_stats[cpu]);
-
-	/* Release the net_device and Scsi_Host */
-	dev_put(fc->real_dev);
-	scsi_host_put(lp->host);
-	return 0;
-}
-
 /*
- * Return zero if link is OK for use by FCoE.
- * Any permanently-disqualifying conditions have been previously checked.
- * This also updates the speed setting, which may change with link for 100/1000.
+ * fcoe_sw_lport_config - sets up the fc_lport
+ * @lp: ptr to the fc_lport
+ * @shost: ptr to the parent scsi host
  *
- * This function should probably be checking for PAUSE support at some point
- * in the future. Currently Per-priority-pause is not determinable using
- * ethtool, so we shouldn't be restrictive until that problem is resolved.
+ * Returns: 0 for success
+ *
  */
-int fcoe_link_ok(struct fc_lport *lp)
-{
-	struct fcoe_softc *fc = (struct fcoe_softc *)lp->drv_priv;
-	struct net_device *dev = fc->real_dev;
-	struct ethtool_cmd ecmd = { ETHTOOL_GSET };
-	int rc = 0;
-
-	if ((dev->flags & IFF_UP) && netif_carrier_ok(dev)) {
-		dev = fc->phys_dev;
-		if (dev->ethtool_ops->get_settings) {
-			dev->ethtool_ops->get_settings(dev, &ecmd);
-			lp->link_supported_speeds &=
-				~(FC_PORTSPEED_1GBIT | FC_PORTSPEED_10GBIT);
-			if (ecmd.supported & (SUPPORTED_1000baseT_Half |
-					      SUPPORTED_1000baseT_Full))
-				lp->link_supported_speeds |= FC_PORTSPEED_1GBIT;
-			if (ecmd.supported & SUPPORTED_10000baseT_Full)
-				lp->link_supported_speeds |=
-					FC_PORTSPEED_10GBIT;
-			if (ecmd.speed == SPEED_1000)
-				lp->link_speed = FC_PORTSPEED_1GBIT;
-			if (ecmd.speed == SPEED_10000)
-				lp->link_speed = FC_PORTSPEED_10GBIT;
-		}
-	} else
-		rc = -1;
-
-	return rc;
-}
-
-static struct libfc_function_template fcoe_libfc_fcn_templ = {
-	.frame_send = fcoe_xmit,
-};
-
-static int lport_config(struct fc_lport *lp, struct Scsi_Host *shost)
+static int fcoe_sw_lport_config(struct fc_lport *lp)
 {
 	int i = 0;
-
-	lp->host = shost;
-	lp->drv_priv = (void *)(lp + 1);
-
-	lp->emp = fc_exch_mgr_alloc(lp, FC_CLASS_3,
-				    FCOE_MIN_XID, FCOE_MAX_XID);
-	if (!lp->emp)
-		return -ENOMEM;
 
 	lp->link_status = 0;
 	lp->max_retry_count = 3;
@@ -316,25 +130,39 @@ static int lport_config(struct fc_lport *lp, struct Scsi_Host *shost)
 		lp->dev_stats[i] = kzalloc(sizeof(struct fcoe_dev_stats),
 					   GFP_KERNEL);
 
-	/* Finish fc_lport configuration */
+	/* lport fc_lport related configuration */
 	fc_lport_config(lp);
 
 	return 0;
 }
 
-static int net_config(struct fc_lport *lp)
+/*
+ * fcoe_sw_netdev_config - sets up fcoe_softc for lport and network
+ * related properties
+ * @lp : ptr to the fc_lport
+ * @netdev : ptr to the associated netdevice struct
+ *
+ * Must be called after fcoe_sw_lport_config() as it will use lport mutex
+ *
+ * Returns : 0 for success
+ *
+ */
+static int fcoe_sw_netdev_config(struct fc_lport *lp, struct net_device *netdev)
 {
 	u32 mfs;
 	u64 wwnn, wwpn;
-	struct net_device *net_dev;
-	struct fcoe_softc *fc = (struct fcoe_softc *)lp->drv_priv;
+	struct fcoe_softc *fc;
 	u8 flogi_maddr[ETH_ALEN];
 
+	/* Setup lport private data to point to fcoe softc */
+	fc = lport_priv(lp);
+	fc->lp = lp;
+	fc->real_dev = netdev;
+	fc->phys_dev = netdev;
+
 	/* Require support for get_pauseparam ethtool op. */
-	net_dev = fc->real_dev;
-	if (net_dev->priv_flags & IFF_802_1Q_VLAN)
-		net_dev = vlan_dev_real_dev(net_dev);
-	fc->phys_dev = net_dev;
+	if (netdev->priv_flags & IFF_802_1Q_VLAN)
+		fc->phys_dev = vlan_dev_real_dev(netdev);
 
 	/* Do not support for bonding device */
 	if ((fc->real_dev->priv_flags & IFF_MASTER_ALB) ||
@@ -356,6 +184,7 @@ static int net_config(struct fc_lport *lp)
 	if (!fcoe_link_ok(lp))
 		lp->link_status |= FC_LINK_UP;
 
+	/* offload features support */
 	if (fc->real_dev->features & NETIF_F_SG)
 		lp->sg_supp = 1;
 
@@ -394,96 +223,210 @@ static int net_config(struct fc_lport *lp)
 	return 0;
 }
 
-static void shost_config(struct fc_lport *lp)
+/*
+ * fcoe_sw_shost_config - sets up fc_lport->host
+ * @lp : ptr to the fc_lport
+ * @shost : ptr to the associated scsi host
+ * @dev : device associated to scsi host
+ *
+ * Must be called after fcoe_sw_lport_config) and fcoe_sw_netdev_config()
+ *
+ * Returns : 0 for success
+ *
+ */
+static int fcoe_sw_shost_config(struct fc_lport *lp, struct Scsi_Host *shost,
+				struct device *dev)
 {
+	int rc = 0;
+
+	/* lport scsi host config */
+	lp->host = shost;
+
 	lp->host->max_lun = FCOE_MAX_LUN;
 	lp->host->max_id = FCOE_MAX_FCP_TARGET;
 	lp->host->max_channel = 0;
-	lp->host->transportt = fcoe_transport_template;
-}
+	lp->host->transportt = scsi_transport_fcoe_sw;
 
-static int libfc_config(struct fc_lport *lp)
-{
-	/* Set the function pointers set by the LLDD */
-	memcpy(&lp->tt, &fcoe_libfc_fcn_templ,
-	       sizeof(struct libfc_function_template));
-
-	if (fc_fcp_init(lp))
-		return -ENOMEM;
-	fc_exch_init(lp);
-	fc_lport_init(lp);
-	fc_rport_init(lp);
-	fc_disc_init(lp);
+	/* add the new host to the SCSI-ml */
+	rc = scsi_add_host(lp->host, dev);
+	if (rc) {
+		FC_DBG("fcoe_sw_shost_config:error on scsi_add_host\n");
+		return rc;
+	}
+	sprintf(fc_host_symbolic_name(lp->host), "%s v%s over %s",
+		FCOE_SW_NAME, FCOE_SW_VERSION,
+		fcoe_netdev(lp)->name);
 
 	return 0;
 }
 
 /*
- * This function creates the fcoe interface
- * create struct fcdev which is a shared structure between opefc
- * and transport level protocol.
+ * fcoe_sw_em_config - allocates em for this lport
+ * @lp: the port that em is to allocated for
+ *
+ * Returns : 0 on success
  */
-int fcoe_create_interface(struct net_device *netdev)
+static inline int fcoe_sw_em_config(struct fc_lport *lp)
 {
+	BUG_ON(lp->emp);
+
+	lp->emp = fc_exch_mgr_alloc(lp, FC_CLASS_3,
+				    FCOE_MIN_XID, FCOE_MAX_XID);
+	if (!lp->emp)
+		return -ENOMEM;
+
+	return 0;
+}
+
+/*
+ * fcoe_sw_destroy - FCoE software HBA tear-down function
+ * @netdev: ptr to the associated net_device
+ *
+ * Returns: 0 if link is OK for use by FCoE.
+ */
+static int fcoe_sw_destroy(struct net_device *netdev)
+{
+	int cpu;
+	struct fc_lport *lp = NULL;
+	struct fcoe_softc *fc;
+	u8 flogi_maddr[ETH_ALEN];
+
+	BUG_ON(!netdev);
+
+	printk(KERN_DEBUG "fcoe_sw_destroy:interface on %s\n",
+	       netdev->name);
+
+	lp = fcoe_hostlist_lookup(netdev);
+	if (!lp)
+		return -ENODEV;
+
+	fc = fcoe_softc(lp);
+
+	/* Remove the instance from fcoe's list */
+	fcoe_hostlist_remove(lp);
+
+	/* Don't listen for Ethernet packets anymore */
+	dev_remove_pack(&fc->fcoe_packet_type);
+
+	/* Cleanup the fc_lport */
+	fc_lport_destroy(lp);
+	fc_fcp_destroy(lp);
+
+	/* Detach from the scsi-ml */
+	fc_remove_host(lp->host);
+	scsi_remove_host(lp->host);
+
+	/* There are no more rports or I/O, free the EM */
+	if (lp->emp)
+		fc_exch_mgr_free(lp->emp);
+
+	/* Delete secondary MAC addresses */
+	rtnl_lock();
+	memcpy(flogi_maddr, (u8[6]) FC_FCOE_FLOGI_MAC, ETH_ALEN);
+	dev_unicast_delete(fc->real_dev, flogi_maddr, ETH_ALEN);
+	if (compare_ether_addr(fc->data_src_addr, (u8[6]) { 0 }))
+		dev_unicast_delete(fc->real_dev, fc->data_src_addr, ETH_ALEN);
+	rtnl_unlock();
+
+	/* Free the per-CPU revieve threads */
+	fcoe_percpu_clean(lp);
+
+	/* Free existing skbs */
+	fcoe_clean_pending_queue(lp);
+
+	/* Free memory used by statistical counters */
+	for_each_online_cpu(cpu)
+		kfree(lp->dev_stats[cpu]);
+
+	/* Release the net_device and Scsi_Host */
+	dev_put(fc->real_dev);
+	scsi_host_put(lp->host);
+
+	return 0;
+}
+
+static struct libfc_function_template fcoe_sw_libfc_fcn_templ = {
+	.frame_send = fcoe_xmit,
+};
+
+/*
+ * fcoe_sw_create - this function creates the fcoe interface
+ * @netdev: pointer the associated netdevice
+ *
+ * Creates fc_lport struct and scsi_host for lport, configures lport
+ * and starts fabric login.
+ *
+ * Returns : 0 on success
+ */
+static int fcoe_sw_create(struct net_device *netdev)
+{
+	int rc;
 	struct fc_lport *lp = NULL;
 	struct fcoe_softc *fc;
 	struct Scsi_Host *shost;
-	int rc = 0;
 
-	if (fcoe_find_fc_lport(netdev) != NULL)
+	BUG_ON(!netdev);
+
+	printk(KERN_DEBUG "fcoe_sw_create:interface on %s\n",
+	       netdev->name);
+
+	lp = fcoe_hostlist_lookup(netdev);
+	if (lp)
 		return -EEXIST;
 
-	shost = scsi_host_alloc(&fcoe_driver_template,
-				sizeof(struct fc_lport) +
+	shost = fcoe_host_alloc(&fcoe_sw_shost_template,
 				sizeof(struct fcoe_softc));
-
 	if (!shost) {
 		FC_DBG("Could not allocate host structure\n");
 		return -ENOMEM;
 	}
-
 	lp = shost_priv(shost);
-	rc = lport_config(lp, shost);
-	if (rc)
-		goto out_host_put;
+	fc = lport_priv(lp);
 
-	/* Configure the fcoe_softc */
-	fc = (struct fcoe_softc *)lp->drv_priv;
-	fc->lp = lp;
-	fc->real_dev = netdev;
-	shost_config(lp);
-
-
-	/* Add the new host to the SCSI-ml */
-	rc = scsi_add_host(lp->host, NULL);
+	/* configure fc_lport, e.g., em */
+	rc = fcoe_sw_lport_config(lp);
 	if (rc) {
-		FC_DBG("error on scsi_add_host\n");
+		FC_DBG("Could not configure lport\n");
+		goto out_host_put;
+	}
+
+	/* configure lport network properties */
+	rc = fcoe_sw_netdev_config(lp, netdev);
+	if (rc) {
+		FC_DBG("Could not configure netdev for lport\n");
+		goto out_host_put;
+	}
+
+	/* configure lport scsi host properties */
+	rc = fcoe_sw_shost_config(lp, shost, &netdev->dev);
+	if (rc) {
+		FC_DBG("Could not configure shost for lport\n");
+		goto out_host_put;
+	}
+
+	/* lport exch manager allocation */
+	rc = fcoe_sw_em_config(lp);
+	if (rc) {
+		FC_DBG("Could not configure em for lport\n");
+		goto out_host_put;
+	}
+
+	/* Initialize the library */
+	rc = fcoe_libfc_config(lp, &fcoe_sw_libfc_fcn_templ);
+	if (rc) {
+		FC_DBG("Could not configure libfc for lport!\n");
 		goto out_lp_destroy;
 	}
 
-	sprintf(fc_host_symbolic_name(lp->host), "%s v%s over %s",
-		FCOE_DRIVER_NAME, FCOE_VERSION,
-		netdev->name);
-
-	/* Configure netdev and networking properties of the lp */
-	rc = net_config(lp);
-	if (rc)
-		goto out_lp_destroy;
-
-	/* Initialize the library */
-	rc = libfc_config(lp);
-	if (rc)
-		goto out_lp_destroy;
-
-	write_lock_bh(&fcoe_hostlist_lock);
-	list_add_tail(&fc->list, &fcoe_hostlist);
-	write_unlock_bh(&fcoe_hostlist_lock);
+	/* add to lports list */
+	fcoe_hostlist_add(lp);
 
 	lp->boot_time = jiffies;
 
 	fc_fabric_login(lp);
 
 	dev_hold(netdev);
+
 	return rc;
 
 out_lp_destroy:
@@ -493,28 +436,55 @@ out_host_put:
 	return rc;
 }
 
-void fcoe_clean_pending_queue(struct fc_lport *lp)
+/*
+ * fcoe_sw_match - the fcoe sw transport match function
+ *
+ * Returns : false always
+ */
+static bool fcoe_sw_match(struct net_device *netdev)
 {
-	struct fcoe_softc  *fc = lp->drv_priv;
-	struct sk_buff *skb;
-
-	spin_lock_bh(&fc->fcoe_pending_queue.lock);
-	while ((skb = __skb_dequeue(&fc->fcoe_pending_queue)) != NULL) {
-		spin_unlock_bh(&fc->fcoe_pending_queue.lock);
-		kfree_skb(skb);
-		spin_lock_bh(&fc->fcoe_pending_queue.lock);
-	}
-	spin_unlock_bh(&fc->fcoe_pending_queue.lock);
+	/* FIXME - for sw transport, always return false */
+	return false;
 }
 
+/* the sw hba fcoe transport */
+struct fcoe_transport fcoe_sw_transport = {
+	.name = "fcoesw",
+	.create = fcoe_sw_create,
+	.destroy = fcoe_sw_destroy,
+	.match = fcoe_sw_match,
+	.vendor = 0x0,
+	.device = 0xffff,
+};
+
+/*
+ * fcoe_sw_init - registers fcoe_sw_transport
+ *
+ * Returns : 0 on success
+ */
 int __init fcoe_sw_init(void)
 {
-	fcoe_transport_template =
-		fc_attach_transport(&fcoe_transport_function);
-	return fcoe_transport_template ? 0 : -1;
+	/* attach to scsi transport */
+	scsi_transport_fcoe_sw =
+		fc_attach_transport(&fcoe_sw_transport_function);
+	if (!scsi_transport_fcoe_sw) {
+		printk(KERN_ERR "fcoe_sw_init:fc_attach_transport() failed\n");
+		return -ENODEV;
+	}
+	/* register sw transport */
+	fcoe_transport_register(&fcoe_sw_transport);
+	return 0;
 }
 
-void __exit fcoe_sw_exit(void)
+/*
+ * fcoe_sw_exit - unregisters fcoe_sw_transport
+ *
+ * Returns : 0 on success
+ */
+int __exit fcoe_sw_exit(void)
 {
-	fc_release_transport(fcoe_transport_template);
+	/* dettach the transport */
+	fc_release_transport(scsi_transport_fcoe_sw);
+	fcoe_transport_unregister(&fcoe_sw_transport);
+	return 0;
 }

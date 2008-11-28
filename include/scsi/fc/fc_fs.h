@@ -82,6 +82,12 @@ enum fc_rctl {
 	FC_RCTL_ELS4_REQ = 0x32, /* FC-4 ELS request */
 	FC_RCTL_ELS4_REP = 0x33, /* FC-4 ELS reply */
 	/*
+	 * Optional Extended Headers
+	 */
+	FC_RCTL_VFTH = 0x50,	/* virtual fabric tagging header */
+	FC_RCTL_IFRH = 0x51,	/* inter-fabric routing header */
+	FC_RCTL_ENCH = 0x52,	/* encapsulation header */
+	/*
 	 * Basic Link Services fh_r_ctl values.
 	 */
 	FC_RCTL_BA_NOP = 0x80,	/* basic link service NOP */
@@ -200,6 +206,8 @@ enum fc_fh_type {
  * Exchange IDs.
  */
 #define FC_XID_UNKNOWN  0xffff	/* unknown exchange ID */
+#define FC_XID_MIN	0x0	/* supported min exchange ID */
+#define FC_XID_MAX	0xfffe	/* supported max exchange ID */
 
 /*
  * fh_f_ctl - Frame control flags.

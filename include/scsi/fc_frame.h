@@ -22,8 +22,10 @@
 
 #include <linux/scatterlist.h>
 #include <linux/skbuff.h>
+#include <scsi/scsi_cmnd.h>
 
 #include <scsi/fc/fc_fs.h>
+#include <scsi/fc/fc_fcp.h>
 #include <scsi/fc/fc_encaps.h>
 
 /*
@@ -52,6 +54,8 @@
 #define fr_eof(fp)	(fr_cb(fp)->fr_eof)
 #define fr_flags(fp)	(fr_cb(fp)->fr_flags)
 #define fr_max_payload(fp)	(fr_cb(fp)->fr_max_payload)
+#define fr_cmd(fp)	(fr_cb(fp)->fr_cmd)
+#define fr_dir(fp)	(fr_cmd(fp)->sc_data_direction)
 
 struct fc_frame {
 	struct sk_buff skb;
@@ -61,6 +65,7 @@ struct fcoe_rcv_info {
 	struct packet_type  *ptype;
 	struct fc_lport	*fr_dev;	/* transport layer private pointer */
 	struct fc_seq	*fr_seq;	/* for use with exchange manager */
+	struct scsi_cmnd *fr_cmd;	/* for use of scsi command */
 	enum fc_sof	fr_sof;		/* start of frame delimiter */
 	enum fc_eof	fr_eof;		/* end of frame delimiter */
 	u8		fr_flags;	/* flags - see below */
@@ -194,39 +199,35 @@ static inline enum fc_class fc_frame_class(const struct fc_frame *fp)
 }
 
 /*
- * Set r_ctl and type in preparation for sending frame.
- * This also clears fh_parm_offset.
- */
-static inline void fc_frame_setup(struct fc_frame *fp, enum fc_rctl r_ctl,
-				  enum fc_fh_type type)
-{
-	struct fc_frame_header *fh;
-
-	fh = fc_frame_header_get(fp);
-	WARN_ON(r_ctl == 0);
-	fh->fh_r_ctl = r_ctl;
-	fh->fh_type = type;
-	fh->fh_parm_offset = htonl(0);
-}
-
-/*
- * Set offset in preparation for sending frame.
- */
-static inline void
-fc_frame_set_offset(struct fc_frame *fp, u32 offset)
-{
-	struct fc_frame_header *fh;
-
-	fh = fc_frame_header_get(fp);
-	fh->fh_parm_offset = htonl(offset);
-}
-
-/*
  * Check the CRC in a frame.
  * The CRC immediately follows the last data item *AFTER* the length.
  * The return value is zero if the CRC matches.
  */
 u32 fc_frame_crc_check(struct fc_frame *);
+
+static inline u8 fc_frame_rctl(const struct fc_frame *fp)
+{
+	return fc_frame_header_get(fp)->fh_r_ctl;
+}
+
+static inline bool fc_frame_is_cmd(const struct fc_frame *fp)
+{
+	return fc_frame_rctl(fp) == FC_RCTL_DD_UNSOL_CMD;
+}
+
+static inline bool fc_frame_is_read(const struct fc_frame *fp)
+{
+	if (fc_frame_is_cmd(fp) && fr_cmd(fp))
+		return fr_dir(fp) == DMA_FROM_DEVICE;
+	return false;
+}
+
+static inline bool fc_frame_is_write(const struct fc_frame *fp)
+{
+	if (fc_frame_is_cmd(fp) && fr_cmd(fp))
+		return fr_dir(fp) == DMA_TO_DEVICE;
+	return false;
+}
 
 /*
  * Check for leaks.

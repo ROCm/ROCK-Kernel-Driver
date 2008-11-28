@@ -31,6 +31,10 @@
 #define	ETH_P_FCOE	0x8906		/* FCOE ether type */
 #endif
 
+#ifndef ETH_P_8021Q
+#define	ETH_P_8021Q	0x8100
+#endif
+
 /*
  * FC_FCOE_OUI hasn't been standardized yet.   XXX TBD.
  */
@@ -81,7 +85,9 @@ struct fcoe_crc_eof {
 } __attribute__((packed));
 
 /*
- * Store OUI + DID into MAC address field.
+ * fc_fcoe_set_mac - Store OUI + DID into MAC address field.
+ * @mac: mac address to be set
+ * @did: fc dest id to use
  */
 static inline void fc_fcoe_set_mac(u8 *mac, u8 *did)
 {
@@ -92,9 +98,5 @@ static inline void fc_fcoe_set_mac(u8 *mac, u8 *did)
 	mac[4] = did[1];
 	mac[5] = did[2];
 }
-
-#ifndef ETH_P_8021Q
-#define	ETH_P_8021Q	0x8100
-#endif
 
 #endif /* _FC_FCOE_H_ */

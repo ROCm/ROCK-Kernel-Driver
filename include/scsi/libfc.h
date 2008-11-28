@@ -31,7 +31,7 @@
 #include <scsi/fc/fc_els.h>
 #include <scsi/fc/fc_gs.h>
 
-#include <scsi/libfc/fc_frame.h>
+#include <scsi/fc_frame.h>
 
 #define LIBFC_DEBUG
 
@@ -65,8 +65,6 @@
 		p[2] = ((v) & 0xFF);		\
 	} while (0)
 
-struct fc_exch_mgr;
-
 /*
  * FC HBA status
  */
@@ -85,12 +83,18 @@ enum fc_lport_state {
 	LPORT_ST_RESET
 };
 
+enum fc_disc_event {
+	DISC_EV_NONE = 0,
+	DISC_EV_SUCCESS,
+	DISC_EV_FAILED
+};
+
 enum fc_lport_event {
-	LPORT_EV_RPORT_NONE = 0,
-	LPORT_EV_RPORT_CREATED,
-	LPORT_EV_RPORT_FAILED,
-	LPORT_EV_RPORT_STOP,
-	LPORT_EV_RPORT_LOGO
+	RPORT_EV_NONE = 0,
+	RPORT_EV_CREATED,
+	RPORT_EV_FAILED,
+	RPORT_EV_STOP,
+	RPORT_EV_LOGO
 };
 
 enum fc_rport_state {
@@ -265,6 +269,74 @@ struct fc_fcp_pkt {
 	struct fc_seq	*recov_seq;	/* sequence for REC or SRR */
 };
 
+/*
+ * Structure and function definitions for managing Fibre Channel Exchanges
+ * and Sequences
+ *
+ * fc_exch holds state for one exchange and links to its active sequence.
+ *
+ * fc_seq holds the state for an individual sequence.
+ */
+
+struct fc_exch_mgr;
+
+/*
+ * Sequence.
+ */
+struct fc_seq {
+	u8	id;		/* seq ID */
+	u16	ssb_stat;	/* status flags for sequence status block */
+	u16	cnt;		/* frames sent so far on sequence */
+	u32	f_ctl;		/* F_CTL flags for frames */
+	u32	rec_data;	/* FC-4 value for REC */
+};
+
+#define FC_EX_DONE		(1 << 0) /* ep is completed */
+#define FC_EX_RST_CLEANUP	(1 << 1) /* reset is forcing completion */
+
+/*
+ * Exchange.
+ *
+ * Locking notes: The ex_lock protects changes to the following fields:
+ *	esb_stat, f_ctl, seq.ssb_stat, seq.f_ctl.
+ *	seq_id
+ *	sequence allocation
+ *
+ */
+struct fc_exch {
+	struct fc_exch_mgr *em;		/* exchange manager */
+	u32		state;		/* internal driver state */
+	u16		xid;		/* our exchange ID */
+	struct list_head	ex_list;	/* free or busy list linkage */
+	spinlock_t	ex_lock;	/* lock covering exchange state */
+	atomic_t	ex_refcnt;	/* reference counter */
+	struct delayed_work timeout_work; /* timer for upper level protocols */
+	struct fc_lport	*lp;		/* fc device instance */
+	u16		oxid;		/* originator's exchange ID */
+	u16		rxid;		/* responder's exchange ID */
+	u32		oid;		/* originator's FCID */
+	u32		sid;		/* source FCID */
+	u32		did;		/* destination FCID */
+	u32		esb_stat;	/* exchange status for ESB */
+	u32		r_a_tov;	/* r_a_tov from rport (msec) */
+	u8		seq_id;		/* next sequence ID to use */
+	u32		f_ctl;		/* F_CTL flags for sequences */
+	u8		fh_type;	/* frame type */
+	enum fc_class	class;		/* class of service */
+	struct fc_seq	seq;		/* single sequence */
+	/*
+	 * Handler for responses to this current exchange.
+	 */
+	void		(*resp)(struct fc_seq *, struct fc_frame *, void *);
+	void		(*destructor)(struct fc_seq *, void *);
+	/*
+	 * arg is passed as void pointer to exchange
+	 * resp and destructor handlers
+	 */
+	void		*arg;
+};
+#define	fc_seq_exch(sp) container_of(sp, struct fc_exch, seq)
+
 struct libfc_function_template {
 
 	/**
@@ -287,6 +359,21 @@ struct libfc_function_template {
 	 */
 
 	/**
+	 * ELS/CT interfaces
+	 */
+
+	/*
+	 * elsct_send - sends ELS/CT frame
+	 */
+	struct fc_seq *(*elsct_send)(struct fc_lport *lport,
+				     struct fc_rport *rport,
+				     struct fc_frame *fp,
+				     unsigned int op,
+				     void (*resp)(struct fc_seq *,
+					     struct fc_frame *fp,
+					     void *arg),
+				     void *arg, u32 timer_msec);
+	/**
 	 * Exhance Manager interfaces
 	 */
 
@@ -297,7 +384,10 @@ struct libfc_function_template {
 	 * filled before calling exch_seq_send(), those fields are,
 	 *
 	 * - routing control
+	 * - FC port did
+	 * - FC port sid
 	 * - FC header type
+	 * - frame control
 	 * - parameter or relative offset
 	 *
 	 * The exchange response handler is set in this routine to resp()
@@ -317,8 +407,6 @@ struct libfc_function_template {
 	 * timer_msec argument is specified. The timer is canceled when
 	 * it fires or when the exchange is done. The exchange timeout handler
 	 * is registered by EM layer.
-	 *
-	 * The caller also need to specify FC sid, did and frame control field.
 	 */
 	struct fc_seq *(*exch_seq_send)(struct fc_lport *lp,
 					struct fc_frame *fp,
@@ -327,14 +415,13 @@ struct libfc_function_template {
 						     void *arg),
 					void (*destructor)(struct fc_seq *sp,
 							   void *arg),
-					void *arg, unsigned int timer_msec,
-					u32 sid, u32 did, u32 f_ctl);
+					void *arg, unsigned int timer_msec);
 
 	/*
 	 * send a frame using existing sequence and exchange.
 	 */
 	int (*seq_send)(struct fc_lport *lp, struct fc_seq *sp,
-			struct fc_frame *fp, u32 f_ctl);
+			struct fc_frame *fp);
 
 	/*
 	 * Send ELS response using mainly infomation
@@ -388,16 +475,7 @@ struct libfc_function_template {
 	void (*exch_mgr_reset)(struct fc_exch_mgr *,
 			       u32 s_id, u32 d_id);
 
-	/*
-	 * Get exchange Ids of a sequence
-	 */
-	void (*seq_get_xids)(struct fc_seq *sp, u16 *oxid, u16 *rxid);
-
-	/*
-	 * Set REC data to a sequence
-	 */
-	void (*seq_set_rec_data)(struct fc_seq *sp, u32 rec_data);
-
+	void (*rport_flush_queue)(void);
 	/**
 	 * Local Port interfaces
 	 */
@@ -409,9 +487,6 @@ struct libfc_function_template {
 			   struct fc_frame *fp);
 
 	int (*lport_reset)(struct fc_lport *);
-
-	void (*event_callback)(struct fc_lport *, struct fc_rport *,
-			       enum fc_lport_event);
 
 	/**
 	 * Remote Port interfaces
@@ -429,17 +504,10 @@ struct libfc_function_template {
 	int (*rport_login)(struct fc_rport *rport);
 
 	/*
-	 * Logs the specified local port out of a N_Port identified
-	 * by the ID provided.
+	 * Logoff, and remove the rport from the transport if
+	 * it had been added. This will send a LOGO to the target.
 	 */
-	int (*rport_logout)(struct fc_rport *rport);
-
-	/*
-	 * Delete the rport and remove it from the transport if
-	 * it had been added. This will not send a LOGO, use
-	 * rport_logout for a gracefull logout.
-	 */
-	int (*rport_stop)(struct fc_rport *rport);
+	int (*rport_logoff)(struct fc_rport *rport);
 
 	/*
 	 * Recieve a request from a remote port.
@@ -484,7 +552,22 @@ struct libfc_function_template {
 	/*
 	 * Start discovery for a local port.
 	 */
-	int (*disc_start)(struct fc_lport *);
+	void (*disc_start)(void (*disc_callback)(struct fc_lport *,
+						 enum fc_disc_event),
+			   struct fc_lport *);
+
+	/*
+	 * Stop discovery for a given lport. This will remove
+	 * all discovered rports
+	 */
+	void (*disc_stop) (struct fc_lport *);
+
+	/*
+	 * Stop discovery for a given lport. This will block
+	 * until all discovered rports are deleted from the
+	 * FC transport class
+	 */
+	void (*disc_stop_final) (struct fc_lport *);
 };
 
 struct fc_lport {
@@ -496,38 +579,32 @@ struct fc_lport {
 	struct fc_rport		*dns_rp;
 	struct fc_rport		*ptp_rp;
 	void			*scsi_priv;
-	struct list_head         rports;
 
 	/* Operational Information */
 	struct libfc_function_template tt;
 	u16			link_status;
-	u8			disc_done;
 	enum fc_lport_state	state;
 	unsigned long		boot_time;
 
 	struct fc_host_statistics host_stats;
 	struct fcoe_dev_stats	*dev_stats[NR_CPUS];
-
 	u64			wwpn;
 	u64			wwnn;
 	u8			retry_count;
-	unsigned char		disc_retry_count;
-	unsigned char		disc_delay;
-	unsigned char		disc_pending;
-	unsigned char		disc_requested;
-	unsigned short		disc_seq_count;
-	unsigned char		disc_buf_len;
 
 	/* Capabilities */
 	u32			sg_supp:1;	/* scatter gather supported */
 	u32			seq_offload:1;	/* seq offload supported */
-	u32			mfs;	/* max FC payload size */
+	u32			crc_offload:1;	/* crc offload supported */
+	u32			lro_enabled:1;	/* large receive offload */
+	u32			mfs;	        /* max FC payload size */
 	unsigned int		service_params;
 	unsigned int		e_d_tov;
 	unsigned int		r_a_tov;
 	u8			max_retry_count;
 	u16			link_speed;
 	u16			link_supported_speeds;
+	u16			lro_xid;	/* max xid for fcoe lro */
 	struct fc_ns_fts	fcts;	        /* FC-4 type masks */
 	struct fc_els_rnid_gen	rnid_gen;	/* RNID information */
 
@@ -535,16 +612,17 @@ struct fc_lport {
 	struct mutex lp_mutex;
 
 	/* Miscellaneous */
-	struct fc_gpn_ft_resp	disc_buf;	/* partial name buffer */
 	struct delayed_work	retry_work;
 	struct delayed_work	disc_work;
-
-	void			*drv_priv;
 };
 
 /**
  * FC_LPORT HELPER FUNCTIONS
  *****************************/
+static inline void *lport_priv(const struct fc_lport *lp)
+{
+	return (void *)(lp + 1);
+}
 
 static inline int fc_lport_test_ready(struct fc_lport *lp)
 {
@@ -559,23 +637,6 @@ static inline void fc_set_wwnn(struct fc_lport *lp, u64 wwnn)
 static inline void fc_set_wwpn(struct fc_lport *lp, u64 wwnn)
 {
 	lp->wwpn = wwnn;
-}
-
-/**
- * fc_fill_dns_hdr - Fill in a name service request header
- * @lp: Fibre Channel host port instance
- * @ct: Common Transport (CT) header structure
- * @op: Name Service request code
- * @req_size: Full size of Name Service request
- */
-static inline void fc_fill_dns_hdr(struct fc_lport *lp, struct fc_ct_hdr *ct,
-				   unsigned int op, unsigned int req_size)
-{
-	memset(ct, 0, sizeof(*ct) + req_size);
-	ct->ct_rev = FC_CT_REV;
-	ct->ct_fs_type = FC_FST_DIR;
-	ct->ct_fs_subtype = FC_NS_SUBTYPE;
-	ct->ct_cmd = htons((u16) op);
 }
 
 static inline void fc_lport_state_enter(struct fc_lport *lp,
@@ -716,6 +777,14 @@ int fc_change_queue_type(struct scsi_device *sdev, int tag_type);
  */
 void fc_fcp_destroy(struct fc_lport *);
 
+/**
+ * ELS/CT interface
+ *****************************/
+/*
+ * Initializes ELS/CT interface
+ */
+int fc_elsct_init(struct fc_lport *lp);
+
 
 /**
  * EXCHANGE MANAGER LAYER
@@ -775,14 +844,12 @@ struct fc_seq *fc_exch_seq_send(struct fc_lport *lp,
 					     void *arg),
 				void (*destructor)(struct fc_seq *sp,
 						   void *arg),
-				void *arg, u32 timer_msec,
-				u32 sid, u32 did, u32 f_ctl);
+				void *arg, u32 timer_msec);
 
 /*
  * send a frame using existing sequence and exchange.
  */
-int fc_seq_send(struct fc_lport *lp, struct fc_seq *sp,
-		struct fc_frame *fp, u32 f_ctl);
+int fc_seq_send(struct fc_lport *lp, struct fc_seq *sp, struct fc_frame *fp);
 
 /*
  * Send ELS response using mainly infomation
@@ -816,8 +883,8 @@ struct fc_exch *fc_exch_get(struct fc_lport *lp, struct fc_frame *fp);
  * if ex_id is zero then next free exchange id
  * from specified exchange manger mp will be assigned.
  */
-struct fc_exch *fc_exch_alloc(struct fc_exch_mgr *mp, u16 ex_id);
-
+struct fc_exch *fc_exch_alloc(struct fc_exch_mgr *mp,
+			      struct fc_frame *fp, u16 ex_id);
 /*
  * Start a new sequence on the same exchange as the supplied sequence.
  */
@@ -829,16 +896,6 @@ struct fc_seq *fc_seq_start_next(struct fc_seq *sp);
  * If d_id is non-zero, reset only exchanges sending to that FID.
  */
 void fc_exch_mgr_reset(struct fc_exch_mgr *, u32 s_id, u32 d_id);
-
-/*
- * Get exchange Ids of a sequence
- */
-void fc_seq_get_xids(struct fc_seq *sp, u16 *oxid, u16 *rxid);
-
-/*
- * Set REC data to a sequence
- */
-void fc_seq_set_rec_data(struct fc_seq *sp, u32 rec_data);
 
 /*
  * Functions for fc_functions_template

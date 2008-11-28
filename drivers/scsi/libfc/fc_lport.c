@@ -78,7 +78,8 @@
 
 #include <scsi/fc/fc_gs.h>
 
-#include <scsi/libfc/libfc.h>
+#include <scsi/libfc.h>
+#include <scsi/fc_encode.h>
 
 /* Fabric IDs to use for point-to-point mode, chosen on whims. */
 #define FC_LOCAL_PTP_FID_LO   0x010101
@@ -124,71 +125,59 @@ static int fc_frame_drop(struct fc_lport *lport, struct fc_frame *fp)
 }
 
 /**
- * fc_lport_lookup_rport - lookup a remote port by port_id
- * @lport: Fibre Channel host port instance
- * @port_id: remote port port_id to match
- */
-struct fc_rport *fc_lport_lookup_rport(const struct fc_lport *lport,
-				       u32 port_id)
-{
-	struct fc_rport *rport, *found;
-	struct fc_rport_libfc_priv *rdata;
-
-	found = NULL;
-
-	list_for_each_entry(rdata, &lport->rports, peers) {
-		rport = PRIV_TO_RPORT(rdata);
-		if (rport->port_id == port_id) {
-			found = rport;
-			get_device(&found->dev);
-			break;
-		}
-	}
-	return found;
-}
-
-
-
-/**
  * fc_lport_rport_event - Event handler for rport events
  * @lport: The lport which is receiving the event
  * @rport: The rport which the event has occured on
  * @event: The event that occured
  *
  * Locking Note: The rport lock should not be held when calling
- *               this function.
+ *		 this function.
  */
 static void fc_lport_rport_event(struct fc_lport *lport,
 				 struct fc_rport *rport,
 				 enum fc_lport_event event)
 {
-	struct fc_rport_libfc_priv *rdata = rport->dd_data;
-
 	FC_DEBUG_LPORT("Received a %d event for port (%6x)\n", event,
 		       rport->port_id);
 
-	mutex_lock(&lport->lp_mutex);
 	switch (event) {
-	case LPORT_EV_RPORT_CREATED:
+	case RPORT_EV_CREATED:
 		if (rport->port_id == FC_FID_DIR_SERV) {
-			lport->dns_rp = rport;
-			fc_lport_enter_rpn_id(lport);
-		} else {
-			list_add_tail(&rdata->peers, &lport->rports);
-		}
+			mutex_lock(&lport->lp_mutex);
+			if (lport->state == LPORT_ST_DNS) {
+				lport->dns_rp = rport;
+				fc_lport_enter_rpn_id(lport);
+			} else {
+				FC_DEBUG_LPORT("Received an CREATED event on "
+					       "port (%6x) for the directory "
+					       "server, but the lport is not "
+					       "in the DNS state, it's in the "
+					       "%d state", rport->port_id,
+					       lport->state);
+				lport->tt.rport_logoff(rport);
+			}
+			mutex_unlock(&lport->lp_mutex);
+		} else
+			FC_DEBUG_LPORT("Received an event for port (%6x) "
+				       "which is not the directory server\n",
+				       rport->port_id);
 		break;
-	case LPORT_EV_RPORT_LOGO:
-	case LPORT_EV_RPORT_FAILED:
-	case LPORT_EV_RPORT_STOP:
-		if (rport->port_id == FC_FID_DIR_SERV)
+	case RPORT_EV_LOGO:
+	case RPORT_EV_FAILED:
+	case RPORT_EV_STOP:
+		if (rport->port_id == FC_FID_DIR_SERV) {
+			mutex_lock(&lport->lp_mutex);
 			lport->dns_rp = NULL;
-		else
-			list_del(&rdata->peers);
+			mutex_unlock(&lport->lp_mutex);
+
+		} else
+			FC_DEBUG_LPORT("Received an event for port (%6x) "
+				       "which is not the directory server\n",
+				       rport->port_id);
 		break;
-	case LPORT_EV_RPORT_NONE:
+	case RPORT_EV_NONE:
 		break;
 	}
-	mutex_unlock(&lport->lp_mutex);
 }
 
 /**
@@ -225,7 +214,7 @@ static void fc_lport_ptp_setup(struct fc_lport *lport,
 	dp.ids.roles = FC_RPORT_ROLE_UNKNOWN;
 
 	if (lport->ptp_rp) {
-		lport->tt.rport_stop(lport->ptp_rp);
+		lport->tt.rport_logoff(lport->ptp_rp);
 		lport->ptp_rp = NULL;
 	}
 
@@ -379,6 +368,7 @@ static void fc_lport_recv_echo_req(struct fc_seq *sp, struct fc_frame *in_fp,
 				   struct fc_lport *lport)
 {
 	struct fc_frame *fp;
+	struct fc_exch *ep = fc_seq_exch(sp);
 	unsigned int len;
 	void *pp;
 	void *dp;
@@ -399,9 +389,10 @@ static void fc_lport_recv_echo_req(struct fc_seq *sp, struct fc_frame *in_fp,
 		memcpy(dp, pp, len);
 		*((u32 *)dp) = htonl(ELS_LS_ACC << 24);
 		sp = lport->tt.seq_start_next(sp);
-		f_ctl = FC_FC_LAST_SEQ | FC_FC_END_SEQ;
-		fc_frame_setup(fp, FC_RCTL_ELS_REP, FC_TYPE_ELS);
-		lport->tt.seq_send(lport, sp, fp, f_ctl);
+		f_ctl = FC_FC_EX_CTX | FC_FC_LAST_SEQ | FC_FC_END_SEQ;
+		fc_fill_fc_hdr(fp, FC_RCTL_ELS_REP, ep->did, ep->sid,
+			       FC_TYPE_ELS, f_ctl, 0);
+		lport->tt.seq_send(lport, sp, fp);
 	}
 	fc_frame_free(in_fp);
 }
@@ -419,6 +410,7 @@ static void fc_lport_recv_rnid_req(struct fc_seq *sp, struct fc_frame *in_fp,
 				   struct fc_lport *lport)
 {
 	struct fc_frame *fp;
+	struct fc_exch *ep = fc_seq_exch(sp);
 	struct fc_els_rnid *req;
 	struct {
 		struct fc_els_rnid_resp rnid;
@@ -462,9 +454,11 @@ static void fc_lport_recv_rnid_req(struct fc_seq *sp, struct fc_frame *in_fp,
 				       sizeof(rp->gen));
 			}
 			sp = lport->tt.seq_start_next(sp);
-			f_ctl = FC_FC_SEQ_INIT | FC_FC_LAST_SEQ | FC_FC_END_SEQ;
-			fc_frame_setup(fp, FC_RCTL_ELS_REP, FC_TYPE_ELS);
-			lport->tt.seq_send(lport, sp, fp, f_ctl);
+			f_ctl = FC_FC_EX_CTX | FC_FC_LAST_SEQ;
+			f_ctl |= FC_FC_END_SEQ | FC_FC_SEQ_INIT;
+			fc_fill_fc_hdr(fp, FC_RCTL_ELS_REP, ep->did, ep->sid,
+				       FC_TYPE_ELS, f_ctl, 0);
+			lport->tt.seq_send(lport, sp, fp);
 		}
 	}
 	fc_frame_free(in_fp);
@@ -492,7 +486,7 @@ static void fc_lport_recv_logo_req(struct fc_seq *sp, struct fc_frame *fp,
  * @lport: The lport that should log into the fabric
  *
  * Locking Note: This function should not be called
- *               with the lport lock held.
+ *		 with the lport lock held.
  */
 int fc_fabric_login(struct fc_lport *lport)
 {
@@ -515,6 +509,9 @@ EXPORT_SYMBOL(fc_fabric_login);
  */
 void fc_linkup(struct fc_lport *lport)
 {
+	FC_DEBUG_LPORT("Link is up for port (%6x)\n",
+		       fc_host_port_id(lport->host));
+
 	mutex_lock(&lport->lp_mutex);
 	if ((lport->link_status & FC_LINK_UP) != FC_LINK_UP) {
 		lport->link_status |= FC_LINK_UP;
@@ -533,13 +530,14 @@ EXPORT_SYMBOL(fc_linkup);
 void fc_linkdown(struct fc_lport *lport)
 {
 	mutex_lock(&lport->lp_mutex);
+	FC_DEBUG_LPORT("Link is down for port (%6x)\n",
+		       fc_host_port_id(lport->host));
 
 	if ((lport->link_status & FC_LINK_UP) == FC_LINK_UP) {
 		lport->link_status &= ~(FC_LINK_UP);
 		fc_lport_enter_reset(lport);
 		lport->tt.fcp_cleanup(lport);
 	}
-
 	mutex_unlock(&lport->lp_mutex);
 }
 EXPORT_SYMBOL(fc_linkdown);
@@ -577,9 +575,9 @@ EXPORT_SYMBOL(fc_unpause);
  **/
 int fc_fabric_logoff(struct fc_lport *lport)
 {
+	lport->tt.disc_stop_final(lport);
 	mutex_lock(&lport->lp_mutex);
 	fc_lport_enter_logo(lport);
-	lport->tt.fcp_cleanup(lport);
 	mutex_unlock(&lport->lp_mutex);
 	return 0;
 }
@@ -599,9 +597,8 @@ EXPORT_SYMBOL(fc_fabric_logoff);
  **/
 int fc_lport_destroy(struct fc_lport *lport)
 {
-	cancel_delayed_work_sync(&lport->disc_work);
-	lport->tt.fcp_abort_io(lport);
 	lport->tt.frame_send = fc_frame_drop;
+	lport->tt.fcp_abort_io(lport);
 	lport->tt.exch_mgr_reset(lport->emp, 0, 0);
 	return 0;
 }
@@ -626,16 +623,39 @@ int fc_set_mfs(struct fc_lport *lport, u32 mfs)
 		rc = 0;
 	}
 
-	if (!rc && mfs < old_mfs) {
-		lport->disc_done = 0;
+	if (!rc && mfs < old_mfs)
 		fc_lport_enter_reset(lport);
-	}
 
 	mutex_unlock(&lport->lp_mutex);
 
 	return rc;
 }
 EXPORT_SYMBOL(fc_set_mfs);
+
+/**
+ * fc_lport_disc_callback - Callback for discovery events
+ * @lport: FC local port
+ * @event: The discovery event
+ */
+void fc_lport_disc_callback(struct fc_lport *lport, enum fc_disc_event event)
+{
+	switch (event) {
+	case DISC_EV_SUCCESS:
+		FC_DEBUG_LPORT("Got a SUCCESS event for port (%6x)\n",
+			       fc_host_port_id(lport->host));
+		break;
+	case DISC_EV_FAILED:
+		FC_DEBUG_LPORT("Got a FAILED event for port (%6x)\n",
+			       fc_host_port_id(lport->host));
+		mutex_lock(&lport->lp_mutex);
+		fc_lport_enter_reset(lport);
+		mutex_unlock(&lport->lp_mutex);
+		break;
+	case DISC_EV_NONE:
+		WARN_ON(1);
+		break;
+	}
+}
 
 /**
  * fc_rport_enter_ready - Enter the ready state and start discovery
@@ -651,7 +671,7 @@ static void fc_lport_enter_ready(struct fc_lport *lport)
 
 	fc_lport_state_enter(lport, LPORT_ST_READY);
 
-	lport->tt.disc_start(lport);
+	lport->tt.disc_start(fc_lport_disc_callback, lport);
 }
 
 /**
@@ -674,6 +694,7 @@ static void fc_lport_recv_flogi_req(struct fc_seq *sp_in,
 	struct fc_frame *fp;
 	struct fc_frame_header *fh;
 	struct fc_seq *sp;
+	struct fc_exch *ep;
 	struct fc_els_flogi *flp;
 	struct fc_els_flogi *new_flp;
 	u64 remote_wwpn;
@@ -724,9 +745,11 @@ static void fc_lport_recv_flogi_req(struct fc_seq *sp_in,
 		 * Send the response.  If this fails, the originator should
 		 * repeat the sequence.
 		 */
-		f_ctl = FC_FC_LAST_SEQ | FC_FC_END_SEQ;
-		fc_frame_setup(fp, FC_RCTL_ELS_REP, FC_TYPE_ELS);
-		lport->tt.seq_send(lport, sp, fp, f_ctl);
+		f_ctl = FC_FC_EX_CTX | FC_FC_LAST_SEQ | FC_FC_END_SEQ;
+		ep = fc_seq_exch(sp);
+		fc_fill_fc_hdr(fp, FC_RCTL_ELS_REP, ep->did, ep->sid,
+			       FC_TYPE_ELS, f_ctl, 0);
+		lport->tt.seq_send(lport, sp, fp);
 
 	} else {
 		fc_lport_error(lport, fp);
@@ -734,8 +757,8 @@ static void fc_lport_recv_flogi_req(struct fc_seq *sp_in,
 	fc_lport_ptp_setup(lport, remote_fid, remote_wwpn,
 			   get_unaligned_be64(&flp->fl_wwnn));
 
-	if (lport->tt.disc_start(lport))
-		FC_DBG("target discovery start error\n");
+	lport->tt.disc_start(fc_lport_disc_callback, lport);
+
 out:
 	sp = fr_seq(rx_fp);
 	fc_frame_free(rx_fp);
@@ -751,7 +774,7 @@ out:
  * if an rport should handle the request.
  *
  * Locking Note: This function should not be called with the lport
- *               lock held becuase it will grab the lock.
+ *		 lock held becuase it will grab the lock.
  */
 static void fc_lport_recv_req(struct fc_lport *lport, struct fc_seq *sp,
 			      struct fc_frame *fp)
@@ -808,7 +831,7 @@ static void fc_lport_recv_req(struct fc_lport *lport, struct fc_seq *sp,
 			s_id = ntoh24(fh->fh_s_id);
 			d_id = ntoh24(fh->fh_d_id);
 
-			rport = fc_lport_lookup_rport(lport, s_id);
+			rport = lport->tt.rport_lookup(lport, s_id);
 			if (rport) {
 				lport->tt.rport_recv_req(sp, fp, rport);
 				put_device(&rport->dev); /* hold from lookup */
@@ -840,7 +863,7 @@ static void fc_lport_recv_req(struct fc_lport *lport, struct fc_seq *sp,
  * @lport: The lport which should be reset
  *
  * Locking Note: This functions should not be called with the
- *               lport lock held.
+ *		 lport lock held.
  */
 int fc_lport_reset(struct fc_lport *lport)
 {
@@ -850,24 +873,6 @@ int fc_lport_reset(struct fc_lport *lport)
 	return 0;
 }
 EXPORT_SYMBOL(fc_lport_reset);
-
-/**
- * fc_lport_stop_rports - delete all the remote ports associated with the lport
- * @lport: libfc local port instance
- *
- * Locking Note: This function expects that the lport mutex is locked before
- * calling it.
- */
-void fc_lport_stop_rports(struct fc_lport *lport)
-{
-	struct fc_rport *rport;
-	struct fc_rport_libfc_priv *rdata;
-
-	list_for_each_entry(rdata, &lport->rports, peers) {
-		rport = PRIV_TO_RPORT(rdata);
-		lport->tt.rport_stop(rport);
-	}
-}
 
 /**
  * fc_rport_enter_reset - Reset the local port
@@ -883,17 +888,15 @@ static void fc_lport_enter_reset(struct fc_lport *lport)
 
 	fc_lport_state_enter(lport, LPORT_ST_RESET);
 
-	if (lport->dns_rp) {
-		lport->tt.rport_stop(lport->dns_rp);
-		lport->dns_rp = NULL;
-	}
+	if (lport->dns_rp)
+		lport->tt.rport_logoff(lport->dns_rp);
 
 	if (lport->ptp_rp) {
-		lport->tt.rport_stop(lport->ptp_rp);
+		lport->tt.rport_logoff(lport->ptp_rp);
 		lport->ptp_rp = NULL;
 	}
 
-	fc_lport_stop_rports(lport);
+	lport->tt.disc_stop(lport);
 
 	lport->tt.exch_mgr_reset(lport->emp, 0, 0);
 	fc_host_fabric_name(lport->host) = 0;
@@ -952,7 +955,7 @@ static void fc_lport_error(struct fc_lport *lport, struct fc_frame *fp)
 
 /**
  * fc_lport_rft_id_resp - Handle response to Register Fibre
- *                        Channel Types by ID (RPN_ID) request
+ *			  Channel Types by ID (RPN_ID) request
  * @sp: current sequence in RPN_ID exchange
  * @fp: response frame
  * @lp_arg: Fibre Channel host port instance
@@ -1004,7 +1007,7 @@ err:
 
 /**
  * fc_lport_rpn_id_resp - Handle response to Register Port
- *                        Name by ID (RPN_ID) request
+ *			  Name by ID (RPN_ID) request
  * @sp: current sequence in RPN_ID exchange
  * @fp: response frame
  * @lp_arg: Fibre Channel host port instance
@@ -1110,32 +1113,20 @@ err:
 static void fc_lport_enter_scr(struct fc_lport *lport)
 {
 	struct fc_frame *fp;
-	struct fc_els_scr *scr;
 
 	FC_DEBUG_LPORT("Port (%6x) entered SCR state from %s state\n",
 		       fc_host_port_id(lport->host), fc_lport_state(lport));
 
 	fc_lport_state_enter(lport, LPORT_ST_SCR);
 
-	fp = fc_frame_alloc(lport, sizeof(*scr));
+	fp = fc_frame_alloc(lport, sizeof(struct fc_els_scr));
 	if (!fp) {
 		fc_lport_error(lport, fp);
 		return;
 	}
 
-	scr = fc_frame_payload_get(fp, sizeof(*scr));
-	memset(scr, 0, sizeof(*scr));
-	scr->scr_cmd = ELS_SCR;
-	scr->scr_reg_func = ELS_SCRF_FULL;
-	fc_frame_setup(fp, FC_RCTL_ELS_REQ, FC_TYPE_ELS);
-	fc_frame_set_offset(fp, 0);
-
-	if (!lport->tt.exch_seq_send(lport, fp,
-				     fc_lport_scr_resp, NULL,
-				     lport, lport->e_d_tov,
-				     fc_host_port_id(lport->host),
-				     FC_FID_FCTRL,
-				     FC_FC_SEQ_INIT | FC_FC_END_SEQ))
+	if (!lport->tt.elsct_send(lport, NULL, fp, ELS_SCR,
+				  fc_lport_scr_resp, lport, lport->e_d_tov))
 		fc_lport_error(lport, fp);
 }
 
@@ -1149,11 +1140,6 @@ static void fc_lport_enter_scr(struct fc_lport *lport)
 static void fc_lport_enter_rft_id(struct fc_lport *lport)
 {
 	struct fc_frame *fp;
-	struct req {
-		struct fc_ct_hdr ct;
-		struct fc_ns_fid fid;	/* port ID object */
-		struct fc_ns_fts fts;	/* FC4-types object */
-	} *req;
 	struct fc_ns_fts *lps;
 	int i;
 
@@ -1170,31 +1156,20 @@ static void fc_lport_enter_rft_id(struct fc_lport *lport)
 	if (i < 0) {
 		/* nothing to register, move on to SCR */
 		fc_lport_enter_scr(lport);
-	} else {
-		fp = fc_frame_alloc(lport, sizeof(*req));
-		if (!fp) {
-			fc_lport_error(lport, fp);
-			return;
-		}
-
-		req = fc_frame_payload_get(fp, sizeof(*req));
-		fc_fill_dns_hdr(lport, &req->ct,
-				FC_NS_RFT_ID,
-				sizeof(*req) -
-				sizeof(struct fc_ct_hdr));
-		hton24(req->fid.fp_fid, fc_host_port_id(lport->host));
-		req->fts = *lps;
-		fc_frame_setup(fp, FC_RCTL_DD_UNSOL_CTL, FC_TYPE_CT);
-
-		if (!lport->tt.exch_seq_send(lport, fp,
-					     fc_lport_rft_id_resp, NULL,
-					     lport, lport->e_d_tov,
-					     fc_host_port_id(lport->host),
-					     FC_FID_DIR_SERV,
-					     FC_FC_SEQ_INIT |
-					     FC_FC_END_SEQ))
-			fc_lport_error(lport, fp);
+		return;
 	}
+
+	fp = fc_frame_alloc(lport, sizeof(struct fc_ct_hdr) +
+			    sizeof(struct fc_ns_rft));
+	if (!fp) {
+		fc_lport_error(lport, fp);
+		return;
+	}
+
+	if (!lport->tt.elsct_send(lport, NULL, fp, FC_NS_RFT_ID,
+				  fc_lport_rft_id_resp,
+				  lport, lport->e_d_tov))
+		fc_lport_error(lport, fp);
 }
 
 /**
@@ -1207,37 +1182,23 @@ static void fc_lport_enter_rft_id(struct fc_lport *lport)
 static void fc_lport_enter_rpn_id(struct fc_lport *lport)
 {
 	struct fc_frame *fp;
-	struct req {
-		struct fc_ct_hdr ct;
-		struct fc_ns_rn_id rn;
-	} *req;
 
 	FC_DEBUG_LPORT("Port (%6x) entered RPN_ID state from %s state\n",
 		       fc_host_port_id(lport->host), fc_lport_state(lport));
 
 	fc_lport_state_enter(lport, LPORT_ST_RPN_ID);
 
-	fp = fc_frame_alloc(lport, sizeof(*req));
+	fp = fc_frame_alloc(lport, sizeof(struct fc_ct_hdr) +
+			    sizeof(struct fc_ns_rn_id));
 	if (!fp) {
 		fc_lport_error(lport, fp);
 		return;
 	}
 
-	req = fc_frame_payload_get(fp, sizeof(*req));
-	memset(req, 0, sizeof(*req));
-	fc_fill_dns_hdr(lport, &req->ct, FC_NS_RPN_ID, sizeof(req->rn));
-	hton24(req->rn.fr_fid.fp_fid, fc_host_port_id(lport->host));
-	put_unaligned_be64(lport->wwpn, &req->rn.fr_wwn);
-	fc_frame_setup(fp, FC_RCTL_DD_UNSOL_CTL, FC_TYPE_CT);
-
-	if (!lport->tt.exch_seq_send(lport, fp,
-				     fc_lport_rpn_id_resp, NULL,
-				     lport, lport->e_d_tov,
-				     fc_host_port_id(lport->host),
-				     FC_FID_DIR_SERV,
-				     FC_FC_SEQ_INIT | FC_FC_END_SEQ))
+	if (!lport->tt.elsct_send(lport, NULL, fp, FC_NS_RPN_ID,
+				  fc_lport_rpn_id_resp,
+				  lport, lport->e_d_tov))
 		fc_lport_error(lport, fp);
-
 }
 
 /**
@@ -1264,16 +1225,10 @@ static void fc_lport_enter_dns(struct fc_lport *lport)
 
 	fc_lport_state_enter(lport, LPORT_ST_DNS);
 
-	if (!lport->dns_rp) {
-		/* Set up a rogue rport to directory server */
-		rport = fc_rport_rogue_create(&dp);
+	rport = fc_rport_rogue_create(&dp);
+	if (!rport)
+		goto err;
 
-		if (!rport)
-			goto err;
-		lport->dns_rp = rport;
-	}
-
-	rport = lport->dns_rp;
 	rdata = rport->dd_data;
 	rdata->event_callback = fc_lport_rport_event;
 	lport->tt.rport_login(rport);
@@ -1388,10 +1343,8 @@ static void fc_lport_enter_logo(struct fc_lport *lport)
 	fc_lport_state_enter(lport, LPORT_ST_LOGO);
 
 	/* DNS session should be closed so we can release it here */
-	if (lport->dns_rp) {
-		lport->tt.rport_logout(lport->dns_rp);
-		lport->dns_rp = NULL;
-	}
+	if (lport->dns_rp)
+		lport->tt.rport_logoff(lport->dns_rp);
 
 	fp = fc_frame_alloc(lport, sizeof(*logo));
 	if (!fp) {
@@ -1399,19 +1352,8 @@ static void fc_lport_enter_logo(struct fc_lport *lport)
 		return;
 	}
 
-	logo = fc_frame_payload_get(fp, sizeof(*logo));
-	memset(logo, 0, sizeof(*logo));
-	logo->fl_cmd = ELS_LOGO;
-	hton24(logo->fl_n_port_id, fc_host_port_id(lport->host));
-	logo->fl_n_port_wwn = htonll(lport->wwpn);
-	fc_frame_setup(fp, FC_RCTL_ELS_REQ, FC_TYPE_ELS);
-	fc_frame_set_offset(fp, 0);
-
-	if (!lport->tt.exch_seq_send(lport, fp,
-				     fc_lport_logo_resp, NULL,
-				     lport, lport->e_d_tov,
-				     fc_host_port_id(lport->host), FC_FID_FLOGI,
-				     FC_FC_SEQ_INIT | FC_FC_END_SEQ))
+	if (!lport->tt.elsct_send(lport, NULL, fp, ELS_LOGO, fc_lport_logo_resp,
+				  lport, lport->e_d_tov))
 		fc_lport_error(lport, fp);
 }
 
@@ -1496,8 +1438,8 @@ static void fc_lport_flogi_resp(struct fc_seq *sp, struct fc_frame *fp,
 		if (flp) {
 			csp_flags = ntohs(flp->fl_csp.sp_features);
 			if ((csp_flags & FC_SP_FT_FPORT) == 0) {
-				if (lport->tt.disc_start(lport))
-					FC_DBG("Target disc start error\n");
+				lport->tt.disc_start(fc_lport_disc_callback,
+						     lport);
 			}
 		}
 	} else {
@@ -1520,29 +1462,18 @@ err:
 void fc_lport_enter_flogi(struct fc_lport *lport)
 {
 	struct fc_frame *fp;
-	struct fc_els_flogi *flp;
 
 	FC_DEBUG_LPORT("Processing FLOGI state\n");
 
 	fc_lport_state_enter(lport, LPORT_ST_FLOGI);
 
-	fp = fc_frame_alloc(lport, sizeof(*flp));
+	fp = fc_frame_alloc(lport, sizeof(struct fc_els_flogi));
 	if (!fp)
 		return fc_lport_error(lport, fp);
 
-	flp = fc_frame_payload_get(fp, sizeof(*flp));
-	fc_lport_flogi_fill(lport, flp, ELS_FLOGI);
-
-	fc_frame_setup(fp, FC_RCTL_ELS_REQ, FC_TYPE_ELS);
-	fc_frame_set_offset(fp, 0);
-
-	if (!lport->tt.exch_seq_send(lport, fp,
-				     fc_lport_flogi_resp, NULL,
-				     lport, lport->e_d_tov,
-				     0, FC_FID_FLOGI,
-				     FC_FC_SEQ_INIT | FC_FC_END_SEQ))
+	if (!lport->tt.elsct_send(lport, NULL, fp, ELS_FLOGI,
+				  fc_lport_flogi_resp, lport, lport->e_d_tov))
 		fc_lport_error(lport, fp);
-
 }
 
 /* Configure a fc_lport */
@@ -1550,11 +1481,8 @@ int fc_lport_config(struct fc_lport *lport)
 {
 	INIT_DELAYED_WORK(&lport->retry_work, fc_lport_timeout);
 	mutex_init(&lport->lp_mutex);
-	INIT_LIST_HEAD(&lport->rports);
 
 	fc_lport_state_enter(lport, LPORT_ST_NONE);
-
-	lport->disc_delay = DNS_DELAY;
 
 	fc_lport_add_fc4_type(lport, FC_TYPE_FCP);
 	fc_lport_add_fc4_type(lport, FC_TYPE_CT);
@@ -1570,12 +1498,6 @@ int fc_lport_init(struct fc_lport *lport)
 
 	if (!lport->tt.lport_reset)
 		lport->tt.lport_reset = fc_lport_reset;
-
-	if (!lport->tt.rport_lookup)
-		lport->tt.rport_lookup = fc_lport_lookup_rport;
-
-	if (!lport->tt.event_callback)
-		lport->tt.event_callback = fc_lport_rport_event;
 
 	fc_host_port_type(lport->host) = FC_PORTTYPE_NPORT;
 	fc_host_node_name(lport->host) = lport->wwnn;
