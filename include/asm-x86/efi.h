@@ -49,6 +49,20 @@ extern u64 efi_call5(void *fp, u64 arg1, u64 arg2, u64 arg3,
 extern u64 efi_call6(void *fp, u64 arg1, u64 arg2, u64 arg3,
 		     u64 arg4, u64 arg5, u64 arg6);
 
+
+#ifndef CONFIG_EFI
+/*
+ * IF EFI is not configured, have the EFI calls return -ENOSYS.
+ */
+#define efi_call0(_f)					(-ENOSYS)
+#define efi_call1(_f, _a1)				(-ENOSYS)
+#define efi_call2(_f, _a1, _a2)				(-ENOSYS)
+#define efi_call3(_f, _a1, _a2, _a3)			(-ENOSYS)
+#define efi_call4(_f, _a1, _a2, _a3, _a4)		(-ENOSYS)
+#define efi_call5(_f, _a1, _a2, _a3, _a4, _a5)		(-ENOSYS)
+#define efi_call6(_f, _a1, _a2, _a3, _a4, _a5, _a6)	(-ENOSYS)
+#endif /* CONFIG_EFI */
+
 #define efi_call_phys0(f)			\
 	efi_call0((void *)(f))
 #define efi_call_phys1(f, a1)			\
