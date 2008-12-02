@@ -1453,6 +1453,27 @@ qla24xx_process_response_queue(struct scsi_qla_host *ha)
 		case STATUS_CONT_TYPE:
 			qla2x00_status_cont_entry(ha, (sts_cont_entry_t *)pkt);
 			break;
+		case MS_IOCB_TYPE:
+			if (ha->pass_thru_cmd_result)
+				DEBUG2(qla_printk(KERN_INFO, ha,
+				    "Passthru cmd result on.\n"));
+			if (!ha->pass_thru_cmd_in_process)
+				DEBUG2(qla_printk(KERN_INFO, ha,
+				    "Passthru in process off.\n"));
+
+			ha->pass_thru_cmd_result = 1;
+			complete(&ha->pass_thru_intr_comp);
+			break;
+		case ELS_IOCB_TYPE:
+			if (ha->pass_thru_cmd_result)
+				DEBUG2(qla_printk(KERN_INFO, ha,
+				    "Passthru cmd result on.\n"));
+			if (!ha->pass_thru_cmd_in_process)
+				DEBUG2(qla_printk(KERN_INFO, ha,
+				    "Passthru in process off.\n"));
+
+			ha->pass_thru_cmd_result = 1;
+			complete(&ha->pass_thru_intr_comp);
 		case VP_RPT_ID_IOCB_TYPE:
 			qla24xx_report_id_acquisition(ha,
 			    (struct vp_rpt_id_entry_24xx *)pkt);

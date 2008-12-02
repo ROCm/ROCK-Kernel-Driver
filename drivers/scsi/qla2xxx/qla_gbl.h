@@ -122,6 +122,8 @@ extern int qla2x00_start_scsi(srb_t *sp);
 extern int qla24xx_start_scsi(srb_t *sp);
 int qla2x00_marker(scsi_qla_host_t *, uint16_t, uint16_t, uint8_t);
 int __qla2x00_marker(scsi_qla_host_t *, uint16_t, uint16_t, uint8_t);
+extern request_t *qla2x00_req_pkt(scsi_qla_host_t *);
+extern void qla2x00_isp_cmd(scsi_qla_host_t *ha);
 
 /*
  * Global Function Prototypes in qla_mbx.c source file.
@@ -153,6 +155,10 @@ qla2x00_verify_checksum(scsi_qla_host_t *, uint32_t);
 
 extern int
 qla2x00_issue_iocb(scsi_qla_host_t *, void *, dma_addr_t, size_t);
+
+extern int
+qla2x00_issue_iocb_timeout(scsi_qla_host_t *, void *, dma_addr_t, size_t,
+    uint32_t);
 
 extern int
 qla2x00_abort_command(scsi_qla_host_t *, srb_t *);
@@ -259,6 +265,8 @@ qla2x00_set_idma_speed(scsi_qla_host_t *, uint16_t, uint16_t, uint16_t *);
 
 extern int qla84xx_verify_chip(struct scsi_qla_host *, uint16_t *);
 
+extern int qla84xx_reset(struct scsi_qla_host *, uint32_t);
+
 /*
  * Global Function Prototypes in qla_isr.c source file.
  */
@@ -328,6 +336,8 @@ extern void qla24xx_fw_dump(scsi_qla_host_t *, int);
 extern void qla25xx_fw_dump(scsi_qla_host_t *, int);
 extern void qla2x00_dump_regs(scsi_qla_host_t *);
 extern void qla2x00_dump_buffer(uint8_t *, uint32_t);
+extern void qla2x00_print_byte_buf(void *, size_t, size_t);
+extern void qla2x00_print_word_buf(void *, size_t, size_t);
 
 /*
  * Global Function Prototypes in qla_gs.c source file.
@@ -348,6 +358,7 @@ extern int qla2x00_fdmi_register(scsi_qla_host_t *);
 extern int qla2x00_gfpn_id(scsi_qla_host_t *, sw_info_t *);
 extern int qla2x00_gpsc(scsi_qla_host_t *, sw_info_t *);
 extern void qla2x00_get_sym_node_name(scsi_qla_host_t *, uint8_t *);
+extern int qla2x00_mgmt_svr_login(scsi_qla_host_t *);
 
 /*
  * Global Function Prototypes in qla_attr.c source file.
@@ -362,6 +373,13 @@ extern void qla2x00_free_sysfs_attr(scsi_qla_host_t *);
 extern void qla2x00_init_host_attr(scsi_qla_host_t *);
 extern void qla2x00_alloc_sysfs_attr(scsi_qla_host_t *);
 extern void qla2x00_free_sysfs_attr(scsi_qla_host_t *);
+
+/*
+ * Global functions in qla_nlk.c
+ */
+extern int ql_nl_register(void);
+extern void ql_nl_unregister(void);
+extern void qla_free_nlnk_dmabuf(scsi_qla_host_t *);
 
 /*
  * Global Function Prototypes in qla_dfs.c source file.

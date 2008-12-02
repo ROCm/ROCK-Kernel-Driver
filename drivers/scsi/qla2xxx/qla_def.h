@@ -94,6 +94,89 @@
 #define LSD(x)	((uint32_t)((uint64_t)(x)))
 #define MSD(x)	((uint32_t)((((uint64_t)(x)) >> 16) >> 16))
 
+/* ELS PT request buffer = 32 bytes */
+#define EXT_ELS_PT_REQ_WWPN_VALID	0x1
+#define EXT_ELS_PT_REQ_WWNN_VALID	0x2
+#define EXT_ELS_PT_REQ_PID_VALID	0x4
+
+struct ext_els_pt_req {
+	uint8_t     WWNN[8];
+	uint8_t     WWPN[8];
+	uint8_t     Id[4];
+	uint16_t    ValidMask;
+	uint16_t    Lid;
+	uint16_t    Rxid;
+	uint16_t    AccRjt;
+	uint32_t    Reserved;
+};
+
+/* CT IU */
+struct ct_iu {
+	uint8_t revision;
+	uint8_t in_id[3];
+	uint8_t gs_type;
+	uint8_t gs_subtype;
+	uint8_t options;
+	uint8_t reserved0;
+	uint16_t command;
+	uint16_t max_rsp_size;
+	uint8_t fragment_id;
+	uint8_t reserved1[3];
+};
+
+/* CT request format */
+struct fc_ct_request {
+	struct ct_iu ct_iu;
+	union {
+		struct {
+			uint8_t reserved;
+			uint8_t port_id[3];
+		} port_id;
+
+		struct {
+			uint8_t port_type;
+			uint8_t domain;
+			uint8_t area;
+			uint8_t reserved;
+		} gid_pt;
+
+		struct {
+			uint8_t reserved;
+			uint8_t port_id[3];
+			uint8_t fc4_types[32];
+		} rft_id;
+
+		struct {
+			uint8_t reserved;
+			uint8_t port_id[3];
+			uint16_t reserved2;
+			uint8_t fc4_feature;
+			uint8_t fc4_type;
+		} rff_id;
+
+		struct {
+			uint8_t reserved;
+			uint8_t port_id[3];
+			uint8_t node_name[8];
+		} rnn_id;
+
+		struct {
+			uint8_t node_name[8];
+			uint8_t name_len;
+			uint8_t sym_node_name[255];
+		} rsnn_nn;
+
+		struct {
+			uint8_t hba_indentifier[8];
+		} ghat;
+	} extended;
+};
+
+/* ELS request format */
+struct els_request {
+	struct ext_els_pt_req header;
+	struct ct_iu ct_iu;
+};
 
 /*
  * I/O register
@@ -2161,6 +2244,14 @@ struct qla_statistics {
 	uint64_t output_bytes;
 };
 
+#include "qla_nlnk.h"
+/* place holder for fw buffer parameters for netlink */
+struct qlfc_fw {
+        void *fw_buf;
+        dma_addr_t fw_dma;
+        uint32_t len;
+};
+
 /*
  * Linux Host Adapter structure
  */
@@ -2426,6 +2517,8 @@ typedef struct scsi_qla_host {
 	/* SNS command interfaces for 2200. */
 	struct sns_cmd_pkt	*sns_cmd;
 	dma_addr_t		sns_cmd_dma;
+	char			*pass_thru;
+	dma_addr_t		pass_thru_dma;
 
 #define SFP_DEV_SIZE	256
 #define SFP_BLOCK_SIZE	64
@@ -2467,6 +2560,7 @@ typedef struct scsi_qla_host {
 	struct mutex vport_lock;	/* Virtual port synchronization */
 	struct completion mbx_cmd_comp;	/* Serialize mbx access */
 	struct completion mbx_intr_comp;  /* Used for completion notification */
+	struct completion pass_thru_intr_comp; /* For pass thru notification */
 
 	uint32_t	mbx_flags;
 #define  MBX_IN_PROGRESS	BIT_0
@@ -2608,8 +2702,13 @@ typedef struct scsi_qla_host {
 	uint16_t	max_npiv_vports;	/* 63 or 125 per topoloty */
 	int		cur_vport_count;
 
+	/* pass throuth support */
+	int		pass_thru_cmd_result;
+	int		pass_thru_cmd_in_process;
+
 	struct qla_chip_state_84xx *cs84xx;
 	struct qla_statistics qla_stats;
+	struct qlfc_fw fw_buf;
 } scsi_qla_host_t;
 
 
