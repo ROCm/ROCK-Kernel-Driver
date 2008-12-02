@@ -753,7 +753,7 @@
  */
 
 /*?
- * Text: "%s: Shared read-write access not supported (unit 0x%016Lx, port 0x%016Lx\n)"
+ * Text: "%s: Shared read-write access not supported (unit 0x%016Lx, port 0x%016Lx)\n"
  * Severity: Error
  * Parameter:
  *   @1: bus ID of the zfcp device
