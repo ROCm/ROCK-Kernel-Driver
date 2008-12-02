@@ -1212,9 +1212,10 @@ struct qla_fdt_layout {
 
 struct qla_flt_location {
 	uint8_t sig[4];
-	uint32_t start_lo;
-	uint32_t start_hi;
-	uint16_t unused;
+	uint16_t start_lo;
+	uint16_t start_hi;
+	uint8_t version;
+	uint8_t unused[5];
 	uint16_t checksum;
 };
 

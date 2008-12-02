@@ -454,6 +454,287 @@ static struct bin_attribute sysfs_sfp_attr = {
 	.read = qla2x00_sysfs_read_sfp,
 };
 
+static fc_port_t *
+qla2x00_find_port(struct scsi_qla_host *ha, uint8_t *pn)
+{
+	fc_port_t *fcport;
+
+	list_for_each_entry(fcport, &ha->fcports, list)
+		if (!memcmp(pn, fcport->port_name, sizeof(fcport->port_name)))
+			return fcport;
+
+	return NULL;
+}
+
+static void
+qla2x00_wait_for_passthru_completion(struct scsi_qla_host *ha)
+{
+	if (!wait_for_completion_timeout(&ha->pass_thru_intr_comp, 10 * HZ)) {
+		DEBUG2(qla_printk(KERN_WARNING, ha,
+		    "Passthru request timed out.\n"));
+		ha->isp_ops->fw_dump(ha, 0);
+	}
+}
+
+static ssize_t
+qla2x00_sysfs_read_els(struct kobject *kobj, struct bin_attribute *bin_attr,
+		       char *buf, loff_t off, size_t count)
+{
+	struct scsi_qla_host *ha = shost_priv(dev_to_shost(container_of(kobj,
+	    struct device, kobj)));
+
+	if (!IS_FWI2_CAPABLE(ha))
+		return 0;
+
+	if (!ha->pass_thru_cmd_in_process || !ha->pass_thru_cmd_result) {
+		DEBUG2(qla_printk(KERN_WARNING, ha,
+		    "Passthru ELS response is not available.\n"));
+		return 0;
+	}
+
+	memcpy(buf, ha->pass_thru, count);
+
+	ha->pass_thru_cmd_result = 0;
+	ha->pass_thru_cmd_in_process = 0;
+
+	return count;
+}
+
+static ssize_t
+qla2x00_sysfs_write_els(struct kobject *kobj, struct bin_attribute *bin_attr,
+		       char *buf, loff_t off, size_t count)
+{
+	struct scsi_qla_host *ha = shost_priv(dev_to_shost(container_of(kobj,
+	    struct device, kobj)));
+	struct els_request *request = (struct els_request *) buf;
+	struct els_entry_24xx *els_iocb;
+	unsigned long flags;
+	uint16_t nextlid = 0;
+	fc_port_t *fcport;
+
+	count -= sizeof(request->header);
+
+	if (!IS_FWI2_CAPABLE(ha) ||
+	    atomic_read(&ha->loop_state) != LOOP_READY)
+		goto els_error0;
+
+	if (count < sizeof(request->ct_iu)) {
+		DEBUG2(qla_printk(KERN_WARNING, ha,
+		    "Passthru ELS buffer insufficient size %ld...\n", count));
+		goto els_error0;
+	}
+
+	if (ha->pass_thru_cmd_in_process || ha->pass_thru_cmd_result) {
+		DEBUG2(qla_printk(KERN_WARNING, ha,
+		    "Passthru ELS request is already progress\n"));
+		goto els_error0;
+	}
+
+	fcport = qla2x00_find_port(ha, request->header.WWPN);
+	if (!fcport) {
+		DEBUG2(qla_printk(KERN_WARNING, ha,
+		    "Passthru ELS request failed find port\n"));
+		goto els_error0;
+	}
+
+	if (qla2x00_fabric_login(ha, fcport, &nextlid)) {
+		DEBUG2(qla_printk(KERN_WARNING, ha,
+		    "Passthru ELS request failed to login port %06X\n",
+		    fcport->d_id.b24));
+		goto els_error0;
+	}
+
+	ha->pass_thru_cmd_in_process = 1;
+	spin_lock_irqsave(&ha->hardware_lock, flags);
+
+	els_iocb = (void *)qla2x00_req_pkt(ha);
+	if (els_iocb == NULL) {
+		DEBUG2(qla_printk(KERN_WARNING, ha,
+		    "Passthru ELS request failed to get request packet\n"));
+		goto els_error1;
+	}
+
+	if (count > PAGE_SIZE) {
+		DEBUG2(qla_printk(KERN_INFO, ha,
+		    "Passthru ELS request excessive size %ld...\n", count));
+		count = PAGE_SIZE;
+	}
+
+	memset(ha->pass_thru, 0, PAGE_SIZE);
+	memcpy(ha->pass_thru, &request->ct_iu, count);
+
+	els_iocb->entry_type = ELS_IOCB_TYPE;
+	els_iocb->entry_count = 1;
+	els_iocb->sys_define = 0;
+	els_iocb->entry_status = 0;
+	els_iocb->nport_handle = cpu_to_le16(fcport->loop_id);
+	els_iocb->tx_dsd_count = __constant_cpu_to_le16(1);
+	els_iocb->vp_index = ha->vp_idx;
+	els_iocb->sof_type = EST_SOFI3;
+	els_iocb->rx_dsd_count = __constant_cpu_to_le16(1);
+	els_iocb->opcode = 0;
+	els_iocb->port_id[0] = fcport->d_id.b.al_pa;
+	els_iocb->port_id[1] = fcport->d_id.b.area;
+	els_iocb->port_id[2] = fcport->d_id.b.domain;
+	els_iocb->control_flags = __constant_cpu_to_le16(0);
+	els_iocb->rx_byte_count = cpu_to_le32(PAGE_SIZE);
+	els_iocb->tx_byte_count = cpu_to_le32(count);
+	els_iocb->tx_address[0] = cpu_to_le32(LSD(ha->pass_thru_dma));
+	els_iocb->tx_address[1] = cpu_to_le32(MSD(ha->pass_thru_dma));
+	els_iocb->tx_len = els_iocb->tx_byte_count;
+	els_iocb->rx_address[0] = cpu_to_le32(LSD(ha->pass_thru_dma));
+	els_iocb->rx_address[1] = cpu_to_le32(MSD(ha->pass_thru_dma));
+	els_iocb->rx_len = els_iocb->rx_byte_count;
+
+	wmb();
+	qla2x00_isp_cmd(ha);
+
+	spin_unlock_irqrestore(&ha->hardware_lock, flags);
+	qla2x00_wait_for_passthru_completion(ha);
+
+	return count;
+
+els_error1:
+	ha->pass_thru_cmd_in_process = 0;
+	spin_unlock_irqrestore(&ha->hardware_lock, flags);
+els_error0:
+	DEBUG2(qla_printk(KERN_WARNING, ha,
+	    "Passthru ELS failed on scsi(%ld)\n", ha->host_no));
+	return 0;
+}
+
+static struct bin_attribute sysfs_els_attr = {
+	.attr = {
+		.name = "els",
+		.mode = S_IRUSR | S_IWUSR,
+		.owner = THIS_MODULE,
+	},
+	.size = 0,
+	.read = qla2x00_sysfs_read_els,
+	.write = qla2x00_sysfs_write_els,
+};
+
+static ssize_t
+qla2x00_sysfs_read_ct(struct kobject *kobj, struct bin_attribute *bin_attr,
+		       char *buf, loff_t off, size_t count)
+{
+	struct scsi_qla_host *ha = shost_priv(dev_to_shost(container_of(kobj,
+	    struct device, kobj)));
+
+	if (!IS_FWI2_CAPABLE(ha))
+		return 0;
+
+	if (!ha->pass_thru_cmd_in_process || !ha->pass_thru_cmd_result) {
+		DEBUG2(qla_printk(KERN_WARNING, ha,
+		    "Passthru CT response is not available.\n"));
+		return 0;
+	}
+
+	memcpy(buf, ha->pass_thru, count);
+
+	ha->pass_thru_cmd_result = 0;
+	ha->pass_thru_cmd_in_process = 0;
+
+	return count;
+}
+
+static ssize_t
+qla2x00_sysfs_write_ct(struct kobject *kobj, struct bin_attribute *bin_attr,
+		       char *buf, loff_t off, size_t count)
+{
+	struct scsi_qla_host *ha = shost_priv(dev_to_shost(container_of(kobj,
+	    struct device, kobj)));
+	struct fc_ct_request *request = (struct fc_ct_request *) buf;
+	struct ct_entry_24xx *ct_iocb;
+	unsigned long flags;
+
+	if (!IS_FWI2_CAPABLE(ha) ||
+	    atomic_read(&ha->loop_state) != LOOP_READY)
+		goto ct_error0;
+
+	if (count < sizeof(request->ct_iu)) {
+		DEBUG2(qla_printk(KERN_WARNING, ha,
+		    "Passthru CT buffer insufficient size %ld...\n", count));
+		goto ct_error0;
+	}
+
+	if (ha->pass_thru_cmd_in_process || ha->pass_thru_cmd_result) {
+		DEBUG2(qla_printk(KERN_WARNING, ha,
+		    "Passthru CT request is already progress\n"));
+		goto ct_error0;
+	}
+
+	if (qla2x00_mgmt_svr_login(ha)) {
+		DEBUG2(qla_printk(KERN_WARNING, ha,
+		    "Passthru CT request failed to login management server\n"));
+		goto ct_error0;
+	}
+
+	ha->pass_thru_cmd_in_process = 1;
+	spin_lock_irqsave(&ha->hardware_lock, flags);
+
+	ct_iocb = (void *)qla2x00_req_pkt(ha);
+	if (ct_iocb == NULL) {
+		DEBUG2(qla_printk(KERN_WARNING, ha,
+		    "Passthru CT request failed to get request packet\n"));
+		goto ct_error1;
+	}
+
+	if (count > PAGE_SIZE) {
+		DEBUG2(qla_printk(KERN_INFO, ha,
+		    "Passthru CT request excessive size %ld...\n", count));
+		count = PAGE_SIZE;
+	}
+
+	memset(ha->pass_thru, 0, PAGE_SIZE);
+	memcpy(ha->pass_thru, &request->ct_iu, count);
+
+	ct_iocb->entry_type = CT_IOCB_TYPE;
+	ct_iocb->entry_count = 1;
+	ct_iocb->entry_status = 0;
+	ct_iocb->comp_status = __constant_cpu_to_le16(0);
+	ct_iocb->nport_handle = cpu_to_le16(ha->mgmt_svr_loop_id);
+	ct_iocb->cmd_dsd_count = __constant_cpu_to_le16(1);
+	ct_iocb->vp_index = ha->vp_idx;
+	ct_iocb->timeout = __constant_cpu_to_le16(25);
+	ct_iocb->rsp_dsd_count = __constant_cpu_to_le16(1);
+	ct_iocb->rsp_byte_count = cpu_to_le32(PAGE_SIZE);
+	ct_iocb->cmd_byte_count = cpu_to_le32(count);
+	ct_iocb->dseg_0_address[0] = cpu_to_le32(LSD(ha->pass_thru_dma));
+	ct_iocb->dseg_0_address[1] = cpu_to_le32(MSD(ha->pass_thru_dma));
+	ct_iocb->dseg_0_len = ct_iocb->cmd_byte_count;
+	ct_iocb->dseg_1_address[0] = cpu_to_le32(LSD(ha->pass_thru_dma));
+	ct_iocb->dseg_1_address[1] = cpu_to_le32(MSD(ha->pass_thru_dma));
+	ct_iocb->dseg_1_len = ct_iocb->rsp_byte_count;
+
+	wmb();
+	qla2x00_isp_cmd(ha);
+
+	spin_unlock_irqrestore(&ha->hardware_lock, flags);
+	qla2x00_wait_for_passthru_completion(ha);
+
+	return count;
+
+ct_error1:
+	ha->pass_thru_cmd_in_process = 0;
+	spin_unlock_irqrestore(&ha->hardware_lock, flags);
+ct_error0:
+	DEBUG2(qla_printk(KERN_WARNING, ha,
+	    "Passthru CT failed on scsi(%ld)\n", ha->host_no));
+	return 0;
+}
+
+static struct bin_attribute sysfs_ct_attr = {
+	.attr = {
+		.name = "ct",
+		.mode = S_IRUSR | S_IWUSR,
+		.owner = THIS_MODULE,
+	},
+	.size = 0,
+	.read = qla2x00_sysfs_read_ct,
+	.write = qla2x00_sysfs_write_ct,
+};
+
 static struct sysfs_entry {
 	char *name;
 	struct bin_attribute *attr;
@@ -465,6 +746,8 @@ static struct sysfs_entry {
 	{ "optrom_ctl", &sysfs_optrom_ctl_attr, },
 	{ "vpd", &sysfs_vpd_attr, 1 },
 	{ "sfp", &sysfs_sfp_attr, 1 },
+	{ "els", &sysfs_els_attr, 1 },
+	{ "ct", &sysfs_ct_attr, 1 },
 	{ NULL },
 };
 
@@ -797,6 +1080,27 @@ qla2x00_total_isp_aborts_show(struct device *dev,
 	    ha->qla_stats.total_isp_aborts);
 }
 
+static ssize_t
+qla24xx_84xx_fw_version_show(struct device *dev,
+			      struct device_attribute *attr, char *buf)
+{
+	int rval = QLA_SUCCESS;
+	uint16_t status[2] = {0, 0};
+	scsi_qla_host_t *ha = shost_priv(class_to_shost(dev));
+
+	if (IS_QLA84XX(ha) && ha->cs84xx) {
+		if (ha->cs84xx->op_fw_version == 0) {
+			rval = qla84xx_verify_chip(ha, status);
+		}
+
+		if ((rval == QLA_SUCCESS) && (status[0] == 0))
+			return snprintf(buf, PAGE_SIZE, "%u\n",
+			    (uint32_t)ha->cs84xx->op_fw_version);
+	}
+
+	return snprintf(buf, PAGE_SIZE, "\n");
+}
+
 static DEVICE_ATTR(driver_version, S_IRUGO, qla2x00_drvr_version_show, NULL);
 static DEVICE_ATTR(fw_version, S_IRUGO, qla2x00_fw_version_show, NULL);
 static DEVICE_ATTR(serial_num, S_IRUGO, qla2x00_serial_num_show, NULL);
@@ -821,6 +1125,8 @@ static DEVICE_ATTR(optrom_fw_version, S_IRUGO, qla2x00_optrom_fw_version_show,
 		   NULL);
 static DEVICE_ATTR(total_isp_aborts, S_IRUGO, qla2x00_total_isp_aborts_show,
 		   NULL);
+static DEVICE_ATTR(84xx_fw_version, S_IRUGO, qla24xx_84xx_fw_version_show,
+		   NULL);
 
 struct device_attribute *qla2x00_host_attrs[] = {
 	&dev_attr_driver_version,
@@ -840,6 +1146,7 @@ struct device_attribute *qla2x00_host_attrs[] = {
 	&dev_attr_optrom_fcode_version,
 	&dev_attr_optrom_fw_version,
 	&dev_attr_total_isp_aborts,
+	&dev_attr_84xx_fw_version,
 	NULL,
 };
 

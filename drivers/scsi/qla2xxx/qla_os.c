@@ -1678,6 +1678,7 @@ qla2x00_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 	init_completion(&ha->mbx_cmd_comp);
 	complete(&ha->mbx_cmd_comp);
 	init_completion(&ha->mbx_intr_comp);
+	init_completion(&ha->pass_thru_intr_comp);
 
 	INIT_LIST_HEAD(&ha->list);
 	INIT_LIST_HEAD(&ha->fcports);
@@ -1797,6 +1798,8 @@ qla2x00_remove_one(struct pci_dev *pdev)
 	qla84xx_put_chip(ha);
 
 	qla2x00_free_sysfs_attr(ha);
+
+	qla_free_nlnk_dmabuf(ha);
 
 	fc_remove_host(ha->host);
 
@@ -2028,10 +2031,19 @@ qla2x00_mem_alloc(scsi_qla_host_t *ha)
 		    sizeof(struct ct_sns_pkt), &ha->ct_sns_dma, GFP_KERNEL);
 		if (!ha->ct_sns)
 			goto fail_free_ms_iocb;
+		/*Get consistent memory allocated for pass-thru commands */
+		ha->pass_thru = dma_alloc_coherent(&ha->pdev->dev,
+		    PAGE_SIZE, &ha->pass_thru_dma, GFP_KERNEL);
+		if (!ha->pass_thru)
+			goto fail_free_ct_sns;
 	}
 
 	return 0;
 
+fail_free_ct_sns:
+	dma_pool_free(ha->s_dma_pool, ha->ct_sns, ha->ct_sns_dma);
+	ha->ct_sns = NULL;
+	ha->ct_sns_dma = 0;
 fail_free_ms_iocb:
 	dma_pool_free(ha->s_dma_pool, ha->ms_iocb, ha->ms_iocb_dma);
 	ha->ms_iocb = NULL;
@@ -2100,6 +2112,10 @@ qla2x00_mem_free(scsi_qla_host_t *ha)
 		dma_free_coherent(&ha->pdev->dev, sizeof(struct sns_cmd_pkt),
 		    ha->sns_cmd, ha->sns_cmd_dma);
 
+	if (ha->pass_thru)
+		dma_free_coherent(&ha->pdev->dev, PAGE_SIZE,
+		    ha->pass_thru, ha->pass_thru_dma);
+
 	if (ha->ct_sns)
 		dma_free_coherent(&ha->pdev->dev, sizeof(struct ct_sns_pkt),
 		    ha->ct_sns, ha->ct_sns_dma);
@@ -2138,6 +2154,8 @@ qla2x00_mem_free(scsi_qla_host_t *ha)
 	ha->sns_cmd_dma = 0;
 	ha->ct_sns = NULL;
 	ha->ct_sns_dma = 0;
+	ha->pass_thru = NULL;
+	ha->pass_thru_dma = 0;
 	ha->ms_iocb = NULL;
 	ha->ms_iocb_dma = 0;
 	ha->init_cb = NULL;
@@ -2911,10 +2929,18 @@ qla2x00_module_init(void)
 		return -ENODEV;
 	}
 
+	if (ql_nl_register()) {
+		kmem_cache_destroy(srb_cachep);
+		fc_release_transport(qla2xxx_transport_template);
+		fc_release_transport(qla2xxx_transport_vport_template);
+		return -ENODEV;
+	}
+
 	printk(KERN_INFO "QLogic Fibre Channel HBA Driver: %s\n",
 	    qla2x00_version_str);
 	ret = pci_register_driver(&qla2xxx_pci_driver);
 	if (ret) {
+		ql_nl_unregister();
 		kmem_cache_destroy(srb_cachep);
 		fc_release_transport(qla2xxx_transport_template);
 		fc_release_transport(qla2xxx_transport_vport_template);
@@ -2930,6 +2956,7 @@ qla2x00_module_exit(void)
 {
 	pci_unregister_driver(&qla2xxx_pci_driver);
 	qla2x00_release_firmware();
+	ql_nl_unregister();
 	kmem_cache_destroy(srb_cachep);
 	fc_release_transport(qla2xxx_transport_template);
 	fc_release_transport(qla2xxx_transport_vport_template);

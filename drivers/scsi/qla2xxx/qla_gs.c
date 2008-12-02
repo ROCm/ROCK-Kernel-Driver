@@ -1093,7 +1093,7 @@ qla2x00_sns_rnn_id(scsi_qla_host_t *ha)
  *
  * Returns 0 on success.
  */
-static int
+int
 qla2x00_mgmt_svr_login(scsi_qla_host_t *ha)
 {
 	int ret;

@@ -433,7 +433,7 @@ extern int novfs_set_pri_conn(struct novfs_xplat *pdata,
 		struct novfs_schandle Session);
 extern int novfs_get_pri_conn(struct novfs_xplat *pdata,
 		struct novfs_schandle Session);
-extern int novfs_set_map_drive(struct nwc_map_drive_ex *,
+extern int novfs_set_map_drive(struct novfs_xplat *pdata,
 		struct novfs_schandle Session);
 extern int novfs_unmap_drive(struct novfs_xplat *pdata,
 		struct novfs_schandle Session);

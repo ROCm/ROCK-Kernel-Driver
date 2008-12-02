@@ -681,7 +681,7 @@ qla2x00_verify_checksum(scsi_qla_host_t *ha, uint32_t risc_addr)
  * Context:
  *	Kernel context.
  */
-static int
+int
 qla2x00_issue_iocb_timeout(scsi_qla_host_t *ha, void *buffer,
     dma_addr_t phys_addr, size_t size, uint32_t tov)
 {
@@ -2945,6 +2945,33 @@ qla2x00_dump_ram(scsi_qla_host_t *ha, dma_addr_t req_dma, uint32_t addr,
 }
 
 /* 84XX Support **************************************************************/
+
+/*
+ * qla84xx_reset
+ *     Resets the QLA8432
+ */
+int
+qla84xx_reset(struct scsi_qla_host *ha, uint32_t diag_fw)
+{
+	int rval;
+	mbx_cmd_t mc;
+	mbx_cmd_t *mcp = &mc;
+
+	mcp->mb[0] = MBC_ISP84XX_RESET;
+	mcp->mb[1] = diag_fw;
+	mcp->out_mb = MBX_1 | MBX_0;
+	mcp->in_mb = MBX_1 | MBX_0;
+	mcp->tov = MBX_TOV_SECONDS;
+	mcp->flags = 0;
+
+	rval = qla2x00_mailbox_command(ha, mcp);
+
+	if (rval != QLA_SUCCESS)
+		DEBUG2_16(printk("%s(%ld): failed mb[0]=0x%x mb[1]=0x%x\n",
+		    __func__, ha->host_no, mcp->mb[0], mcp->mb[1]));
+
+	return (rval);
+}
 
 struct cs84xx_mgmt_cmd {
 	union {
