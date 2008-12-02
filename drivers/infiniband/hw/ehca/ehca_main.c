@@ -993,9 +993,7 @@ static int ehca_mem_notifier(struct notifier_block *nb,
 			spin_unlock(&shca_list_lock);
 			if (printk_timed_ratelimit(&ehca_dmem_warn_time,
 						   30 * 1000))
-				ehca_gen_err("DMEM operations are not allowed"
-					     "as long as an ehca adapter is"
-					     "attached to the LPAR");
+				ehca_gen_err("DMEM operations are not allowed in conjunction with eHCA");
 			return NOTIFY_BAD;
 		}
 	}
