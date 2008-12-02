@@ -209,6 +209,31 @@ void t3_os_link_changed(struct adapter *adapter, int port_id, int link_stat,
 	}
 }
 
+/**
+ *	t3_os_phymod_changed - handle PHY module changes
+ *	@phy: the PHY reporting the module change
+ *	@mod_type: new module type
+ *
+ *	This is the OS-dependent handler for PHY module changes.  It is
+ *	invoked when a PHY module is removed or inserted for any OS-specific
+ *	processing.
+ */
+void t3_os_phymod_changed(struct adapter *adap, int port_id)
+{
+	static const char *mod_str[] = {
+		NULL, "SR", "LR", "LRM", "TWINAX", "TWINAX", "unknown"
+	};
+
+	const struct net_device *dev = adap->port[port_id];
+	const struct port_info *pi = netdev_priv(dev);
+
+	if (pi->phy.modtype == phy_modtype_none)
+		printk(KERN_INFO "%s: PHY module unplugged\n", dev->name);
+	else
+		printk(KERN_INFO "%s: %s PHY module inserted\n", dev->name,
+		       mod_str[pi->phy.modtype]);
+}
+
 static void cxgb_set_rxmode(struct net_device *dev)
 {
 	struct t3_rx_mode rm;
@@ -275,10 +300,10 @@ static void name_msix_vecs(struct adapter *adap)
 
 		for (i = 0; i < pi->nqsets; i++, msi_idx++) {
 			snprintf(adap->msix_info[msi_idx].desc, n,
-				 "%s (queue %d)", d->name, i);
+				 "%s-%d", d->name, pi->first_qset + i);
 			adap->msix_info[msi_idx].desc[n] = 0;
 		}
- 	}
+	}
 }
 
 static int request_msix_data_irqs(struct adapter *adap)
@@ -305,6 +330,22 @@ static int request_msix_data_irqs(struct adapter *adap)
 		}
 	}
 	return 0;
+}
+
+static void free_irq_resources(struct adapter *adapter)
+{
+	if (adapter->flags & USING_MSIX) {
+		int i, n = 0;
+
+		free_irq(adapter->msix_info[0].vec, adapter);
+		for_each_port(adapter, i)
+		    n += adap2pinfo(adapter, i)->nqsets;
+
+		for (i = 0; i < n; ++i)
+			free_irq(adapter->msix_info[i + 1].vec,
+				 &adapter->sge.qs[i]);
+	} else
+		free_irq(adapter->pdev->irq, adapter);
 }
 
 static int await_mgmt_replies(struct adapter *adap, unsigned long init_cnt,
@@ -454,6 +495,36 @@ static void enable_all_napi(struct adapter *adap)
 }
 
 /**
+ *	set_qset_lro - Turn a queue set's LRO capability on and off
+ *	@dev: the device the qset is attached to
+ *	@qset_idx: the queue set index
+ *	@val: the LRO switch
+ *
+ *	Sets LRO on or off for a particular queue set.
+ *	the device's features flag is updated to reflect the LRO
+ *	capability when all queues belonging to the device are
+ *	in the same state.
+ */
+static void set_qset_lro(struct net_device *dev, int qset_idx, int val)
+{
+	struct port_info *pi = netdev_priv(dev);
+	struct adapter *adapter = pi->adapter;
+	int i, lro_on = 1;
+
+	adapter->params.sge.qset[qset_idx].lro = !!val;
+	adapter->sge.qs[qset_idx].lro_enabled = !!val;
+
+	/* let ethtool report LRO on only if all queues are LRO enabled */
+	for (i = pi->first_qset; i < pi->first_qset + pi->nqsets; ++i)
+		lro_on &= adapter->params.sge.qset[i].lro;
+
+	if (lro_on)
+		dev->features |= NETIF_F_LRO;
+	else
+		dev->features &= ~NETIF_F_LRO;
+}
+
+/**
  *	setup_sge_qsets - configure SGE Tx/Rx/response queues
  *	@adap: the adapter
  *
@@ -474,7 +545,9 @@ static int setup_sge_qsets(struct adapter *adap)
 		struct port_info *pi = netdev_priv(dev);
 
 		pi->qs = &adap->sge.qs[pi->first_qset];
-		for (j = 0; j < pi->nqsets; ++j, ++qset_idx) {
+		for (j = pi->first_qset; j < pi->first_qset + pi->nqsets;
+		     ++j, ++qset_idx) {
+			set_qset_lro(dev, qset_idx, pi->rx_csum_offload);
 			err = t3_sge_alloc_qset(adap, qset_idx, 1,
 				(adap->flags & USING_MSIX) ? qset_idx + 1 :
 							     irq_idx,
@@ -782,11 +855,12 @@ static void init_port_mtus(struct adapter *adapter)
 	t3_write_reg(adapter, A_TP_MTU_PORT_TABLE, mtus);
 }
 
-static void send_pktsched_cmd(struct adapter *adap, int sched, int qidx, int lo,
+static int send_pktsched_cmd(struct adapter *adap, int sched, int qidx, int lo,
 			      int hi, int port)
 {
 	struct sk_buff *skb;
 	struct mngt_pktsched_wr *req;
+	int ret;
 
 	skb = alloc_skb(sizeof(*req), GFP_KERNEL | __GFP_NOFAIL);
 	req = (struct mngt_pktsched_wr *)skb_put(skb, sizeof(*req));
@@ -797,20 +871,28 @@ static void send_pktsched_cmd(struct adapter *adap, int sched, int qidx, int lo,
 	req->min = lo;
 	req->max = hi;
 	req->binding = port;
-	t3_mgmt_tx(adap, skb);
+	ret = t3_mgmt_tx(adap, skb);
+
+	return ret;
 }
 
-static void bind_qsets(struct adapter *adap)
+static int bind_qsets(struct adapter *adap)
 {
-	int i, j;
+	int i, j, err = 0;
 
 	for_each_port(adap, i) {
 		const struct port_info *pi = adap2pinfo(adap, i);
 
-		for (j = 0; j < pi->nqsets; ++j)
-			send_pktsched_cmd(adap, 1, pi->first_qset + j, -1,
-					  -1, i);
+		for (j = 0; j < pi->nqsets; ++j) {
+			int ret = send_pktsched_cmd(adap, 1,
+						    pi->first_qset + j, -1,
+						    -1, i);
+			if (ret)
+				err = ret;
+		}
 	}
+
+	return err;
 }
 
 #define FW_FNAME "t3fw-%d.%d.%d.bin"
@@ -989,9 +1071,16 @@ static int cxgb_up(struct adapter *adap)
 		t3_write_reg(adap, A_TP_INT_ENABLE, 0x7fbfffff);
 	}
 
-	if ((adap->flags & (USING_MSIX | QUEUES_BOUND)) == USING_MSIX)
-		bind_qsets(adap);
-	adap->flags |= QUEUES_BOUND;
+	if (!(adap->flags & QUEUES_BOUND)) {
+		err = bind_qsets(adap);
+		if (err) {
+			CH_ERR(adap, "failed to bind qsets, err %d\n", err);
+			t3_intr_disable(adap);
+			free_irq_resources(adap);
+			goto out;
+		}
+		adap->flags |= QUEUES_BOUND;
+	}
 
 out:
 	return err;
@@ -1010,19 +1099,7 @@ static void cxgb_down(struct adapter *adapter)
 	t3_intr_disable(adapter);
 	spin_unlock_irq(&adapter->work_lock);
 
-	if (adapter->flags & USING_MSIX) {
-		int i, n = 0;
-
-		free_irq(adapter->msix_info[0].vec, adapter);
-		for_each_port(adapter, i)
-		    n += adap2pinfo(adapter, i)->nqsets;
-
-		for (i = 0; i < n; ++i)
-			free_irq(adapter->msix_info[i + 1].vec,
-				 &adapter->sge.qs[i]);
-	} else
-		free_irq(adapter->pdev->irq, adapter);
-
+	free_irq_resources(adapter);
 	flush_workqueue(cxgb3_wq);	/* wait for external IRQ handler */
 	quiesce_rx(adapter);
 }
@@ -1333,8 +1410,8 @@ static unsigned long collect_sge_port_stats(struct adapter *adapter,
 	int i;
 	unsigned long tot = 0;
 
-	for (i = 0; i < p->nqsets; ++i)
-		tot += adapter->sge.qs[i + p->first_qset].port_stats[idx];
+	for (i = p->first_qset; i < p->first_qset + p->nqsets; ++i)
+		tot += adapter->sge.qs[i].port_stats[idx];
 	return tot;
 }
 
@@ -1534,11 +1611,22 @@ static int speed_duplex_to_caps(int speed, int duplex)
 
 static int set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 {
+	int cap;
 	struct port_info *p = netdev_priv(dev);
 	struct link_config *lc = &p->link_config;
 
-	if (!(lc->supported & SUPPORTED_Autoneg))
-		return -EOPNOTSUPP;	/* can't change speed/duplex */
+	if (!(lc->supported & SUPPORTED_Autoneg)) {
+		/*
+		 * PHY offers a single speed/duplex.  See if that's what's
+		 * being requested.
+		 */
+		if (cmd->autoneg == AUTONEG_DISABLE) {
+			cap = speed_duplex_to_caps(cmd->speed, cmd->duplex);
+			if (lc->supported & cap)
+				return 0;
+		}
+		return -EINVAL;
+	}
 
 	if (cmd->autoneg == AUTONEG_DISABLE) {
 		int cap = speed_duplex_to_caps(cmd->speed, cmd->duplex);
@@ -1614,11 +1702,10 @@ static int set_rx_csum(struct net_device *dev, u32 data)
 
 	p->rx_csum_offload = data;
 	if (!data) {
-		struct adapter *adap = p->adapter;
 		int i;
 
 		for (i = p->first_qset; i < p->first_qset + p->nqsets; i++)
-			adap->sge.qs[i].lro_enabled = 0;
+			set_qset_lro(dev, i, 0);
 	}
 	return 0;
 }
@@ -1773,6 +1860,25 @@ static void get_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
 	memset(&wol->sopass, 0, sizeof(wol->sopass));
 }
 
+static int cxgb3_set_flags(struct net_device *dev, u32 data)
+{
+	struct port_info *pi = netdev_priv(dev);
+	int i;
+
+	if (data & ETH_FLAG_LRO) {
+		if (!pi->rx_csum_offload)
+			return -EINVAL;
+
+		for (i = pi->first_qset; i < pi->first_qset + pi->nqsets; i++)
+			set_qset_lro(dev, i, 1);
+
+	} else
+		for (i = pi->first_qset; i < pi->first_qset + pi->nqsets; i++)
+			set_qset_lro(dev, i, 0);
+
+	return 0;
+}
+
 static const struct ethtool_ops cxgb_ethtool_ops = {
 	.get_settings = get_settings,
 	.set_settings = set_settings,
@@ -1802,6 +1908,8 @@ static const struct ethtool_ops cxgb_ethtool_ops = {
 	.get_regs = get_regs,
 	.get_wol = get_wol,
 	.set_tso = ethtool_op_set_tso,
+	.get_flags = ethtool_op_get_flags,
+	.set_flags = cxgb3_set_flags,
 };
 
 static int in_range(int val, int lo, int hi)
@@ -1824,6 +1932,8 @@ static int cxgb_extension_ioctl(struct net_device *dev, void __user *useraddr)
 		int i;
 		struct qset_params *q;
 		struct ch_qset_params t;
+		int q1 = pi->first_qset;
+		int nqsets = pi->nqsets;
 
 		if (!capable(CAP_NET_ADMIN))
 			return -EPERM;
@@ -1846,12 +1956,36 @@ static int cxgb_extension_ioctl(struct net_device *dev, void __user *useraddr)
 			|| !in_range(t.rspq_size, MIN_RSPQ_ENTRIES,
 					MAX_RSPQ_ENTRIES))
 			return -EINVAL;
+
+		if ((adapter->flags & FULL_INIT_DONE) && t.lro > 0)
+			for_each_port(adapter, i) {
+				pi = adap2pinfo(adapter, i);
+				if (t.qset_idx >= pi->first_qset &&
+				    t.qset_idx < pi->first_qset + pi->nqsets &&
+				    !pi->rx_csum_offload)
+					return -EINVAL;
+			}
+
 		if ((adapter->flags & FULL_INIT_DONE) &&
 			(t.rspq_size >= 0 || t.fl_size[0] >= 0 ||
 			t.fl_size[1] >= 0 || t.txq_size[0] >= 0 ||
 			t.txq_size[1] >= 0 || t.txq_size[2] >= 0 ||
 			t.polling >= 0 || t.cong_thres >= 0))
 			return -EBUSY;
+
+		/* Allow setting of any available qset when offload enabled */
+		if (test_bit(OFFLOAD_DEVMAP_BIT, &adapter->open_device_map)) {
+			q1 = 0;
+			for_each_port(adapter, i) {
+				pi = adap2pinfo(adapter, i);
+				nqsets += pi->first_qset + pi->nqsets;
+			}
+		}
+
+		if (t.qset_idx < q1)
+			return -EINVAL;
+		if (t.qset_idx > q1 + nqsets - 1)
+			return -EINVAL;
 
 		q = &adapter->params.sge.qset[t.qset_idx];
 
@@ -1892,23 +2026,34 @@ static int cxgb_extension_ioctl(struct net_device *dev, void __user *useraddr)
 				}
 			}
 		}
-		if (t.lro >= 0) {
-			struct sge_qset *qs = &adapter->sge.qs[t.qset_idx];
-			q->lro = t.lro;
-			qs->lro_enabled = t.lro;
-		}
+		if (t.lro >= 0)
+			set_qset_lro(dev, t.qset_idx, t.lro);
+
 		break;
 	}
 	case CHELSIO_GET_QSET_PARAMS:{
 		struct qset_params *q;
 		struct ch_qset_params t;
+		int q1 = pi->first_qset;
+		int nqsets = pi->nqsets;
+		int i;
 
 		if (copy_from_user(&t, useraddr, sizeof(t)))
 			return -EFAULT;
-		if (t.qset_idx >= SGE_QSETS)
+
+		/* Display qsets for all ports when offload enabled */
+		if (test_bit(OFFLOAD_DEVMAP_BIT, &adapter->open_device_map)) {
+			q1 = 0;
+			for_each_port(adapter, i) {
+				pi = adap2pinfo(adapter, i);
+				nqsets = pi->first_qset + pi->nqsets;
+			}
+		}
+
+		if (t.qset_idx >= nqsets)
 			return -EINVAL;
 
-		q = &adapter->params.sge.qset[t.qset_idx];
+		q = &adapter->params.sge.qset[q1 + t.qset_idx];
 		t.rspq_size = q->rspq_size;
 		t.txq_size[0] = q->txq_size[0];
 		t.txq_size[1] = q->txq_size[1];
@@ -1919,6 +2064,12 @@ static int cxgb_extension_ioctl(struct net_device *dev, void __user *useraddr)
 		t.lro = q->lro;
 		t.intr_lat = q->coalesce_usecs;
 		t.cong_thres = q->cong_thres;
+		t.qnum = q1;
+
+		if (adapter->flags & USING_MSIX)
+			t.vector = adapter->msix_info[q1 + t.qset_idx + 1].vec;
+		else
+			t.vector = adapter->pdev->irq;
 
 		if (copy_to_user(useraddr, &t, sizeof(t)))
 			return -EFAULT;
@@ -2166,7 +2317,7 @@ static int cxgb_ioctl(struct net_device *dev, struct ifreq *req, int cmd)
 			mmd = data->phy_id >> 8;
 			if (!mmd)
 				mmd = MDIO_DEV_PCS;
-			else if (mmd > MDIO_DEV_XGXS)
+			else if (mmd > MDIO_DEV_VEND2)
 				return -EINVAL;
 
 			ret =
@@ -2192,7 +2343,7 @@ static int cxgb_ioctl(struct net_device *dev, struct ifreq *req, int cmd)
 			mmd = data->phy_id >> 8;
 			if (!mmd)
 				mmd = MDIO_DEV_PCS;
-			else if (mmd > MDIO_DEV_XGXS)
+			else if (mmd > MDIO_DEV_VEND2)
 				return -EINVAL;
 
 			ret =
@@ -2264,8 +2415,8 @@ static void t3_synchronize_rx(struct adapter *adap, const struct port_info *p)
 {
 	int i;
 
-	for (i = 0; i < p->nqsets; i++) {
-		struct sge_rspq *q = &adap->sge.qs[i + p->first_qset].rspq;
+	for (i = p->first_qset; i < p->first_qset + p->nqsets; i++) {
+		struct sge_rspq *q = &adap->sge.qs[i].rspq;
 
 		spin_lock_irq(&q->lock);
 		spin_unlock_irq(&q->lock);
@@ -2339,7 +2490,7 @@ static void check_link_status(struct adapter *adapter)
 		struct net_device *dev = adapter->port[i];
 		struct port_info *p = netdev_priv(dev);
 
-		if (!(p->port_type->caps & SUPPORTED_IRQ) && netif_running(dev))
+		if (!(p->phy.caps & SUPPORTED_IRQ) && netif_running(dev))
 			t3_link_changed(adapter, i);
 	}
 }
@@ -2572,6 +2723,42 @@ static struct pci_error_handlers t3_err_handler = {
 	.resume = t3_io_resume,
 };
 
+/*
+ * Set the number of qsets based on the number of CPUs and the number of ports,
+ * not to exceed the number of available qsets, assuming there are enough qsets
+ * per port in HW.
+ */
+static void set_nqsets(struct adapter *adap)
+{
+	int i, j = 0;
+	int num_cpus = num_online_cpus();
+	int hwports = adap->params.nports;
+	int nqsets = SGE_QSETS;
+
+	if (adap->params.rev > 0) {
+		if (hwports == 2 &&
+		    (hwports * nqsets > SGE_QSETS ||
+		     num_cpus >= nqsets / hwports))
+			nqsets /= hwports;
+		if (nqsets > num_cpus)
+			nqsets = num_cpus;
+		if (nqsets < 1 || hwports == 4)
+			nqsets = 1;
+	} else
+		nqsets = 1;
+
+	for_each_port(adap, i) {
+		struct port_info *pi = adap2pinfo(adap, i);
+
+		pi->first_qset = j;
+		pi->nqsets = nqsets;
+		j = pi->first_qset + nqsets;
+
+		dev_info(&adap->pdev->dev,
+			 "Port %d using %d queue sets.\n", i, nqsets);
+	}
+}
+
 static int __devinit cxgb_enable_msix(struct adapter *adap)
 {
 	struct msix_entry entries[SGE_QSETS + 1];
@@ -2616,7 +2803,7 @@ static void __devinit print_port_info(struct adapter *adap,
 		if (!test_bit(i, &adap->registered_device_map))
 			continue;
 		printk(KERN_INFO "%s: %s %s %sNIC (rev %d) %s%s\n",
-		       dev->name, ai->desc, pi->port_type->desc,
+		       dev->name, ai->desc, pi->phy.desc,
 		       is_offload(adap) ? "R" : "", adap->params.rev, buf,
 		       (adap->flags & USING_MSIX) ? " MSI-X" :
 		       (adap->flags & USING_MSI) ? " MSI" : "");
@@ -2729,9 +2916,6 @@ static int __devinit init_one(struct pci_dev *pdev,
 		pi = netdev_priv(netdev);
 		pi->adapter = adapter;
 		pi->rx_csum_offload = 1;
-		pi->nqsets = 1;
-		pi->first_qset = i;
-		pi->activity = 0;
 		pi->port_id = i;
 		netif_carrier_off(netdev);
 		netdev->irq = pdev->irq;
@@ -2807,6 +2991,8 @@ static int __devinit init_one(struct pci_dev *pdev,
 		adapter->flags |= USING_MSIX;
 	else if (msi > 0 && pci_enable_msi(pdev) == 0)
 		adapter->flags |= USING_MSI;
+
+	set_nqsets(adapter);
 
 	err = sysfs_create_group(&adapter->port[0]->dev.kobj,
 				 &cxgb3_attr_group);

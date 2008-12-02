@@ -932,8 +932,10 @@ struct zfcp_fsf_req *zfcp_fsf_abort_fcp_command(unsigned long old_req_id,
 		goto out;
 	req = zfcp_fsf_req_create(adapter, FSF_QTCB_ABORT_FCP_CMND,
 				  req_flags, adapter->pool.fsf_req_abort);
-	if (IS_ERR(req))
+	if (IS_ERR(req)) {
+		req = NULL;
 		goto out;
+	}
 
 	if (unlikely(!(atomic_read(&unit->status) &
 		       ZFCP_STATUS_COMMON_UNBLOCKED)))
@@ -1586,6 +1588,7 @@ static void zfcp_fsf_open_wka_port_handler(struct zfcp_fsf_req *req)
 		wka_port->status = ZFCP_WKA_PORT_OFFLINE;
 		break;
 	case FSF_PORT_ALREADY_OPEN:
+		break;
 	case FSF_GOOD:
 		wka_port->handle = header->port_handle;
 		wka_port->status = ZFCP_WKA_PORT_ONLINE;
@@ -1903,7 +1906,7 @@ static void zfcp_fsf_open_unit_handler(struct zfcp_fsf_req *req)
 				dev_err(&adapter->ccw_device->dev,
 					"Shared read-write access not "
 					"supported (unit 0x%016Lx, port "
-					"0x%016Lx\n)",
+					"0x%016Lx)\n",
 					(unsigned long long)unit->fcp_lun,
 					(unsigned long long)unit->port->wwpn);
 				zfcp_erp_unit_failed(unit, 36, req);
@@ -2448,8 +2451,10 @@ struct zfcp_fsf_req *zfcp_fsf_send_fcp_ctm(struct zfcp_adapter *adapter,
 		goto out;
 	req = zfcp_fsf_req_create(adapter, FSF_QTCB_FCP_CMND, req_flags,
 				  adapter->pool.fsf_req_scsi);
-	if (IS_ERR(req))
+	if (IS_ERR(req)) {
+		req = NULL;
 		goto out;
+	}
 
 	req->status |= ZFCP_STATUS_FSFREQ_TASK_MANAGEMENT;
 	req->data = unit;
