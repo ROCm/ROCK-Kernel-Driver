@@ -993,7 +993,7 @@ int novfs_scan_conn_info(struct novfs_xplat *pdata, struct novfs_schandle Sessio
 		DbgPrint("NwScanConnInfo: Reply recieved\n");
 		DbgPrint("   NextIndex = %x\n", connInfo.uScanIndex);
 		DbgPrint("   ErrorCode = %x\n", reply->Reply.ErrorCode);
-		DbgPrint("   data = %x\n", reply->data);
+		DbgPrint("   data = %p\n", reply->data);
 
 		pDConnInfo = (struct nwd_scan_conn_info *) reply->data;
 		retCode = (unsigned long) reply->Reply.ErrorCode;
@@ -1840,26 +1840,29 @@ int novfs_get_pri_conn(struct novfs_xplat *pdata, struct novfs_schandle Session)
 	return (status);
 }
 
-int novfs_set_map_drive(struct nwc_map_drive_ex *symInfo, struct novfs_schandle Session)
+int novfs_set_map_drive(struct novfs_xplat *pdata, struct novfs_schandle Session)
 {
 
 	struct novfs_xplat_call_request *cmd;
 	struct novfs_xplat_call_reply *reply;
 	unsigned long status = 0, datalen, cmdlen, replylen;
+	struct nwc_map_drive_ex symInfo;
 
 	DbgPrint("Call to NwcSetMapDrive\n");
 	cmdlen = sizeof(*cmd);
-	datalen =
-	    sizeof(struct nwc_map_drive_ex ) + symInfo->dirPathOffsetLength +
-	    symInfo->linkOffsetLength;
+	if (copy_from_user(&symInfo, pdata->reqData, sizeof(symInfo)))
+		return -EFAULT;
+	datalen = sizeof(symInfo) + symInfo.dirPathOffsetLength +
+	    symInfo.linkOffsetLength;
 
 	DbgPrint(" cmdlen = %d\n", cmdlen);
 	DbgPrint(" dataLen = %d\n", datalen);
 	DbgPrint(" symInfo.dirPathOffsetLength = %d\n",
-		 symInfo->dirPathOffsetLength);
-	DbgPrint(" symInfo.linkOffsetLength = %d\n", symInfo->linkOffsetLength);
+		 symInfo.dirPathOffsetLength);
+	DbgPrint(" symInfo.linkOffsetLength = %d\n", symInfo.linkOffsetLength);
+	DbgPrint(" pdata->datalen = %d\n", pdata->reqLen);
 
-	novfs_dump(sizeof(struct nwc_map_drive_ex), symInfo);
+	novfs_dump(sizeof(symInfo), &symInfo);
 
 	cmdlen += datalen;
 
@@ -1873,7 +1876,10 @@ int novfs_set_map_drive(struct nwc_map_drive_ex *symInfo, struct novfs_schandle 
 	cmd->Command.SessionId = Session;
 	cmd->NwcCommand = NWC_MAP_DRIVE;
 
-	memcpy(cmd->data, symInfo, datalen);
+	if (copy_from_user(cmd->data, pdata->reqData, datalen)) {
+		kfree(cmd);
+		return -EFAULT;
+	}
 	status =
 		Queue_Daemon_Command((void *)cmd, cmdlen, NULL, 0,
 				(void **)&reply, &replylen,

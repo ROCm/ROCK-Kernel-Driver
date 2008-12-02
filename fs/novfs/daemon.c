@@ -15,6 +15,7 @@
 
 #include <linux/module.h>
 #include <linux/fs.h>
+#include <linux/mount.h>
 #include <linux/slab.h>
 #include <linux/list.h>
 #include <linux/timer.h>
@@ -96,7 +97,7 @@ static int NwdConvertNetwareHandle(struct novfs_xplat *pdata, struct daemon_hand
 static int set_map_drive(struct novfs_xplat *pdata, struct novfs_schandle Session);
 static int unmap_drive(struct novfs_xplat *pdata, struct novfs_schandle Session);
 static int NwdGetMountPath(struct novfs_xplat *pdata);
-static int local_unlink(const char *pathname);
+static long local_unlink(const char *pathname);
 
 
 /*===[ Global variables ]=================================================*/
@@ -1610,7 +1611,7 @@ int novfs_daemon_lib_ioctl(struct inode *inode, struct file *file, unsigned int 
 
 				case NWC_SET_CONN_INFO:
 					DbgPrint
-					    ("[VFS XPLAT] Call NwGetConnInfo\n");
+					    ("[VFS XPLAT] Call NwSetConnInfo\n");
 					retCode =
 					    novfs_set_conn_info(&data, dh->session);
 					break;
@@ -1914,11 +1915,11 @@ static int set_map_drive(struct novfs_xplat *pdata, struct novfs_schandle Sessio
 	struct drive_map *drivemap, *dm;
 	struct list_head *list;
 
-	if (copy_from_user(&symInfo, pdata->reqData, sizeof(symInfo)))
-		return -EFAULT;
-	retVal = novfs_set_map_drive(&symInfo, Session);
+	retVal = novfs_set_map_drive(pdata, Session);
 	if (retVal)
 		return retVal;
+	if (copy_from_user(&symInfo, pdata->reqData, sizeof(symInfo)))
+		return -EFAULT;
 	drivemap =
 		kmalloc(sizeof(struct drive_map) + symInfo.linkOffsetLength,
 				GFP_KERNEL);
@@ -2061,54 +2062,68 @@ static void RemoveDriveMaps(void)
 	up(&DriveMapLock);
 }
 
-static int local_unlink(const char *pathname)
+/* As picked from do_unlinkat() */
+
+static long local_unlink(const char *pathname)
 {
 	int error;
 	struct dentry *dentry;
+	char *name, *c;
 	struct nameidata nd;
 	struct inode *inode = NULL;
 
-	DbgPrint("local_unlink: %s\n", pathname);
 	error = path_lookup(pathname, LOOKUP_PARENT, &nd);
-	DbgPrint("local_unlink: path_lookup %d\n", error);
-	if (!error) {
-		error = -EISDIR;
-		if (nd.last_type == LAST_NORM) {
-			dentry = lookup_create(&nd, 1);
-			DbgPrint("local_unlink: lookup_hash 0x%p\n", dentry);
+	DbgPrint("local_unlink: path_lookup %s error: %d\n", pathname, error);
+	if (error)
+		return error;
 
-			error = PTR_ERR(dentry);
-			if (!IS_ERR(dentry)) {
-				if (nd.last.name[nd.last.len]) {
-					error =
-					    !dentry->
-					    d_inode ? -ENOENT : S_ISDIR(dentry->
-									d_inode->
-									i_mode)
-					    ? -EISDIR : -ENOTDIR;
-				} else {
-					inode = dentry->d_inode;
-					if (inode) {
-						atomic_inc(&inode->i_count);
-					}
-					error = vfs_unlink(nd.path.dentry->d_inode, dentry, nd.path.mnt);
-					DbgPrint
-					    ("local_unlink: vfs_unlink %d\n",
-					     error);
-				}
-				dput(dentry);
-			}
-			mutex_unlock(&nd.path.dentry->d_inode->i_mutex);
-
-		}
-		path_put(&nd.path);
+	error = -EISDIR;
+	if (nd.last_type != LAST_NORM)
+		goto exit1;
+	mutex_lock(&nd.path.dentry->d_inode->i_mutex);
+	/* Get the filename of pathname */
+	name=c=(char *)pathname;
+	while (*c!='\0') {
+		if (*c=='/')
+			name=++c;
+		c++;
+	}
+	dentry = lookup_one_len(name, nd.path.dentry, strlen(name));
+	error = PTR_ERR(dentry);
+	DbgPrint("local_unlink: dentry %p\n", dentry);
+	if (!(dentry->d_inode->i_mode & S_IFLNK)) {
+		DbgPrint("local_unlink: %s not a link", name);
+		error=-ENOENT;
+		goto exit1;
 	}
 
-	if (inode) {
+	if (!IS_ERR(dentry)) {
+		/* Why not before? Because we want correct error value */
+		if (nd.last.name[nd.last.len])
+			goto slashes;
+		inode = dentry->d_inode;
+		if (inode)
+			atomic_inc(&inode->i_count);
+		error = mnt_want_write(nd.path.mnt);
+		DbgPrint("local_unlink: inode %p mnt_want_write error %d\n", inode, error);
+		if (error)
+			goto exit2;
+		error = vfs_unlink(nd.path.dentry->d_inode, dentry, nd.path.mnt);
+		mnt_drop_write(nd.path.mnt);
+	exit2:
+		dput(dentry);
+	}
+	mutex_unlock(&nd.path.dentry->d_inode->i_mutex);
+	if (inode)
 		iput(inode);	/* truncate the inode here */
-	}
-
-	DbgPrint("local_unlink: error=%d\n", error);
+exit1:
+	path_put(&nd.path);
+	DbgPrint("local_unlink: returning error %d\n", error);
 	return error;
+
+slashes:
+	error = !dentry->d_inode ? -ENOENT :
+		S_ISDIR(dentry->d_inode->i_mode) ? -EISDIR : -ENOTDIR;
+	goto exit2;
 }
 
