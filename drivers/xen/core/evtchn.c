@@ -1594,7 +1594,13 @@ int evtchn_map_pirq(int irq, int xen_pirq)
 	} else if (!xen_pirq) {
 		if (unlikely(type_from_irq(irq) != IRQT_PIRQ))
 			return -EINVAL;
-		dynamic_irq_cleanup(irq);
+		/*
+		 * dynamic_irq_cleanup(irq) would seem to be the correct thing
+		 * here, but cannot be used as we get here also during shutdown
+		 * when a driver didn't free_irq() its MSI(-X) IRQ(s), which
+		 * then causes a warning in dynamic_irq_cleanup().
+		 */
+		set_irq_chip_and_handler(irq, NULL, NULL);
 		irq_info[irq] = IRQ_UNBOUND;
 		return 0;
 	} else if (type_from_irq(irq) != IRQT_PIRQ
