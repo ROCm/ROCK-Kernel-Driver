@@ -56,15 +56,13 @@ struct srp_internal {
 #define	dev_to_rport(d)	container_of(d, struct srp_rport, dev)
 #define transport_class_to_srp_rport(dev) dev_to_rport((dev)->parent)
 
-#define CHECK_shost_data(shost) do { if (to_srp_host_attrs(shost) == NULL) { printk(KERN_EMERG "%s[%u] %s(%u)->%s(%u) no shost_data\n",__func__,__LINE__,current->parent->comm, current->parent->pid, current->comm, current->pid); WARN_ON(1); } } while (0)
-
 static int srp_host_setup(struct transport_container *tc, struct device *dev,
 			  struct device *cdev)
 {
 	struct Scsi_Host *shost = dev_to_shost(dev);
 	struct srp_host_attrs *srp_host = to_srp_host_attrs(shost);
 
-	CHECK_shost_data(shost); atomic_set(&srp_host->next_port_id, 0);
+	atomic_set(&srp_host->next_port_id, 0);
 	return 0;
 }
 
@@ -213,7 +211,7 @@ struct srp_rport *srp_rport_add(struct Scsi_Host *shost,
 	memcpy(rport->port_id, ids->port_id, sizeof(rport->port_id));
 	rport->roles = ids->roles;
 
-	CHECK_shost_data(shost); id = atomic_inc_return(&to_srp_host_attrs(shost)->next_port_id);
+	id = atomic_inc_return(&to_srp_host_attrs(shost)->next_port_id);
 	sprintf(rport->dev.bus_id, "port-%d:%d", shost->host_no, id);
 
 	transport_setup_device(&rport->dev);
