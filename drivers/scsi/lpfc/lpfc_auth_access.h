@@ -1,7 +1,7 @@
 /*******************************************************************
  * This file is part of the Emulex Linux Device Driver for         *
  * Fibre Channel Host Bus Adapters.                                *
- * Copyright (C) 2006-2007 Emulex.  All rights reserved.           *
+ * Copyright (C) 2006-2008 Emulex.  All rights reserved.           *
  * EMULEX and SLI are trademarks of Emulex.                        *
  * www.emulex.com                                                  *
  *                                                                 *
@@ -17,26 +17,6 @@
  * more details, a copy of which can be found in the file COPYING  *
  * included with this package.                                     *
  *******************************************************************/
-
-#define to_fc_internal(tmpl)	container_of(tmpl, struct fc_internal, t)
-
-/* scsi_nl_hdr->version value */
-#define SCSI_NL_VERSION				1
-
-/* scsi_nl_hdr->magic value */
-#define SCSI_NL_MAGIC				0xA1B2
-
-/* scsi_nl_hdr->transport value */
-#define SCSI_NL_TRANSPORT			0
-#define SCSI_NL_TRANSPORT_FC			1
-#define SCSI_NL_MAX_TRANSPORTS			2
-
-#define FC_NL_GROUP_CNT		0
-
-	/* Note: when specifying vendor_id to fc_host_post_vendor_event()
-	 *   be sure to read the Vendor Type and ID formatting requirements
-	 *   specified in scsi_netlink.h
-	 */
 
 #define FC_SC_REQ_TIMEOUT (60*HZ)
 

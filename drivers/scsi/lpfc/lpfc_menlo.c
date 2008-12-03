@@ -1064,13 +1064,22 @@ lpfc_menlo_read(struct lpfc_hba *phba, char *buf, loff_t off, size_t count,
 	}
 	genreq->offset += count;
 
-
-	if (genreq->offset >= sysfs_menlo->cmdhdr.rspsize) {
+	if (genreq->offset >= (genreq->rspiocbq->iocb.un.ulpWord[0] &
+			       0x00ffffff)) {
 		lpfc_printf_log(phba, KERN_INFO, LOG_LIBDFC,
-			"1222 menlo_read: done off %d rc=%d"
-			" cnt %d rsp_code %x\n",
-			(int)off, rc, (int)count,*((uint32_t *)buf));
-		rc = count;
+			"1222 menlo_read: done off %d genoff:%d rspsz:%d "
+			"rc=%d cnt %d rsp_code %x Word0:%x\n",
+			(int)off, (int)genreq->offset,
+			sysfs_menlo->cmdhdr.rspsize, rc, (int)count,
+			*((uint32_t *)buf),
+			genreq->rspiocbq->iocb.un.ulpWord[0]);
+
+		if ((genreq->rspiocbq->iocb.un.ulpWord[0] & 0x00ffffff)
+		    < sysfs_menlo->cmdhdr.rspsize)
+			rc = (genreq->rspiocbq->iocb.un.ulpWord[0] & 0x00ffffff)
+				+ count - genreq->offset;
+		else
+			rc = count;
 		goto lpfc_menlo_read_err_exit;
 	}
 
