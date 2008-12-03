@@ -1288,14 +1288,14 @@ static int do_block_io_op(blkif_t *blkif)
 			break;		
 		}
 
-		pending_req = alloc_req();
-		if (NULL == pending_req) {
-			blkif->st_oo_req++;
+		if (kthread_should_stop()) {
 			more_to_do = 1;
 			break;
 		}
 
-		if (kthread_should_stop()) {
+		pending_req = alloc_req();
+		if (NULL == pending_req) {
+			blkif->st_oo_req++;
 			more_to_do = 1;
 			break;
 		}

@@ -75,9 +75,9 @@ int xen_spin_wait(raw_spinlock_t *lock, unsigned int token)
 	/* announce we're spinning */
 	spinning.ticket = token;
 	spinning.lock = lock;
-	spinning.prev = __get_cpu_var(spinning);
+	spinning.prev = x86_read_percpu(spinning);
 	smp_wmb();
-	__get_cpu_var(spinning) = &spinning;
+	x86_write_percpu(spinning, &spinning);
 
 	/* clear pending */
 	xen_clear_irq_pending(irq);
@@ -104,7 +104,7 @@ int xen_spin_wait(raw_spinlock_t *lock, unsigned int token)
 	kstat_this_cpu.irqs[irq] += !rc;
 
 	/* announce we're done */
-	__get_cpu_var(spinning) = spinning.prev;
+	x86_write_percpu(spinning, spinning.prev);
 	rm_lock = &__get_cpu_var(spinning_rm_lock);
 	raw_local_irq_save(flags);
 	__raw_write_lock(rm_lock);

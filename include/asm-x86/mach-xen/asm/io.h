@@ -85,8 +85,8 @@ extern void unxlate_dev_mem_ptr(unsigned long phys, void *addr);
 extern void map_devmem(unsigned long pfn, unsigned long len, pgprot_t);
 extern void unmap_devmem(unsigned long pfn, unsigned long len, pgprot_t);
 
-extern int ioremap_change_attr(unsigned long vaddr, unsigned long size,
-				unsigned long prot_val);
+extern int ioremap_check_change_attr(unsigned long mfn, unsigned long size,
+				     unsigned long prot_val);
 extern void __iomem *ioremap_wc(unsigned long offset, unsigned long size);
 
 /*

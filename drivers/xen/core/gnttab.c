@@ -450,6 +450,7 @@ static int map_pte_fn(pte_t *pte, struct page *pmd_page,
 	return 0;
 }
 
+#ifdef CONFIG_PM_SLEEP
 static int unmap_pte_fn(pte_t *pte, struct page *pmd_page,
 			unsigned long addr, void *data)
 {
@@ -457,6 +458,7 @@ static int unmap_pte_fn(pte_t *pte, struct page *pmd_page,
 	set_pte_at(&init_mm, addr, pte, __pte(0));
 	return 0;
 }
+#endif
 
 void *arch_gnttab_alloc_shared(unsigned long *frames)
 {
@@ -506,8 +508,9 @@ static int gnttab_map(unsigned int start_idx, unsigned int end_idx)
 	return 0;
 }
 
-static void gnttab_page_free(struct page *page)
+static void gnttab_page_free(struct page *page, unsigned int order)
 {
+	BUG_ON(order);
 	ClearPageForeign(page);
 	gnttab_reset_grant_page(page);
 	put_page(page);
@@ -710,6 +713,7 @@ static int gnttab_resume(struct sys_device *dev)
 }
 #define gnttab_resume() gnttab_resume(NULL)
 
+#ifdef CONFIG_PM_SLEEP
 #ifdef CONFIG_X86
 static int gnttab_suspend(struct sys_device *dev, pm_message_t state)
 {
@@ -732,6 +736,7 @@ static struct sys_device device_gnttab = {
 	.id		= 0,
 	.cls		= &gnttab_sysclass,
 };
+#endif
 
 #else /* !CONFIG_XEN */
 
@@ -810,8 +815,8 @@ int __devinit gnttab_init(void)
 	if (!is_running_on_xen())
 		return -ENODEV;
 
-#ifdef CONFIG_XEN
-	{
+#if defined(CONFIG_XEN) && defined(CONFIG_PM_SLEEP)
+	if (!is_initial_xendomain()) {
 		int err = sysdev_class_register(&gnttab_sysclass);
 
 		if (!err)

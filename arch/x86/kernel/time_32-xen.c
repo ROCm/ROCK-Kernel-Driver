@@ -474,7 +474,7 @@ irqreturn_t timer_interrupt(int irq, void *dev_id)
 
 	/* Keep nmi watchdog up to date */
 #ifdef __i386__
-	per_cpu(irq_stat, smp_processor_id()).irq0_irqs++;
+	x86_add_percpu(irq_stat.irq0_irqs, 1);
 #else
 	add_pda(irq0_irqs, 1);
 #endif

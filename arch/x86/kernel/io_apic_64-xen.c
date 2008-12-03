@@ -249,6 +249,7 @@ union entry_union {
 	struct IO_APIC_route_entry entry;
 };
 
+#ifndef CONFIG_XEN
 static struct IO_APIC_route_entry ioapic_read_entry(int apic, int pin)
 {
 	union entry_union eu;
@@ -259,6 +260,7 @@ static struct IO_APIC_route_entry ioapic_read_entry(int apic, int pin)
 	spin_unlock_irqrestore(&ioapic_lock, flags);
 	return eu.entry;
 }
+#endif
 
 /*
  * When we write a new IO APIC routing entry, we need to write the high
@@ -1870,6 +1872,8 @@ void __init setup_IO_APIC(void)
 		print_IO_APIC();
 }
 
+#ifndef CONFIG_XEN
+
 struct sysfs_ioapic_data {
 	struct sys_device dev;
 	struct IO_APIC_route_entry entry[0];
@@ -1954,7 +1958,6 @@ static int __init ioapic_init_sysfs(void)
 
 device_initcall(ioapic_init_sysfs);
 
-#ifndef CONFIG_XEN
 /*
  * Dynamic irq allocate and deallocation
  */
@@ -1994,7 +1997,8 @@ void destroy_irq(unsigned int irq)
 	__clear_irq_vector(irq);
 	spin_unlock_irqrestore(&vector_lock, flags);
 }
-#endif
+
+#endif /* CONFIG_XEN */
 
 /*
  * MSI message composition

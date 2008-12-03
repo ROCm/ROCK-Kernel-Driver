@@ -36,7 +36,7 @@
 
 #include <linux/spinlock.h>
 
-#ifndef CONFIG_PARAVIRT_XEN
+#if !defined(CONFIG_PARAVIRT_XEN) || defined(HAVE_XEN_PLATFORM_COMPAT_H)
 /*
  * Inform the balloon driver that it should allow some slop for device-driver
  * memory activities.

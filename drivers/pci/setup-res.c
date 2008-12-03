@@ -189,10 +189,12 @@ int pci_assign_resource(struct pci_dev *dev, int resno)
 	} else {
 		res->flags &= ~IORESOURCE_STARTALIGN;
 		if (resno < PCI_BRIDGE_RESOURCES) {
+#ifdef CONFIG_PCI_REASSIGN
 			dev_dbg(&dev->dev, "assign resource(%d) "
 				"%016llx - %016llx\n", resno,
 				(unsigned long long)res->start,
 				(unsigned long long)res->end);
+#endif
 			pci_update_resource(dev, res, resno);
 		}
 	}
@@ -232,10 +234,12 @@ int pci_assign_resource_fixed(struct pci_dev *dev, int resno)
 			(unsigned long long)res->start,
 			(unsigned long long)res->end);
 	} else if (resno < PCI_BRIDGE_RESOURCES) {
+#ifdef CONFIG_PCI_REASSIGN
 		dev_dbg(&dev->dev, "assign resource(%d) "
 			"%016llx - %016llx\n", resno,
 			(unsigned long long)res->start,
 			(unsigned long long)res->end);
+#endif
 		pci_update_resource(dev, res, resno);
 	}
 
@@ -248,6 +252,7 @@ EXPORT_SYMBOL_GPL(pci_assign_resource_fixed);
 void pdev_sort_resources(struct pci_dev *dev, struct resource_list *head)
 {
 	int i;
+	int reassigndev = is_reassigndev(dev);
 
 	for (i = 0; i < PCI_NUM_RESOURCES; i++) {
 		struct resource *r;
@@ -270,12 +275,22 @@ void pdev_sort_resources(struct pci_dev *dev, struct resource_list *head)
 				(unsigned long long)r->end, r->flags);
 			continue;
 		}
+		if (i < PCI_BRIDGE_RESOURCES && (r->flags & IORESOURCE_MEM) &&
+		    reassigndev)
+			r_align = ALIGN(r_align, PAGE_SIZE);
+
 		for (list = head; ; list = list->next) {
 			resource_size_t align = 0;
 			struct resource_list *ln = list->next;
 
-			if (ln)
+			if (ln) {
 				align = resource_alignment(ln->res);
+				if (ln->res - ln->dev->resource <
+				    PCI_BRIDGE_RESOURCES &&
+				    (ln->res->flags & IORESOURCE_MEM) &&
+				    is_reassigndev(ln->dev))
+					align = ALIGN(align, PAGE_SIZE);
+			}
 
 			if (r_align > align) {
 				tmp = kmalloc(sizeof(*tmp), GFP_KERNEL);

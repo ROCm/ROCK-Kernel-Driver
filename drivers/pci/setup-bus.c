@@ -354,7 +354,7 @@ static int pbus_size_mem(struct pci_bus *bus, unsigned long mask, unsigned long 
 				continue;
 			r_size = r->end - r->start + 1;
 
-			if (reassign)
+			if ((i < PCI_BRIDGE_RESOURCES) && reassign)
 				r_size = ALIGN(r_size, PAGE_SIZE);
 
 			/* For bridges size != alignment */

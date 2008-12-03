@@ -55,7 +55,6 @@ struct netbk_tx_pending_inuse {
 };
 
 static void netif_idx_release(u16 pending_idx);
-static void netif_page_release(struct page *page);
 static void make_tx_response(netif_t *netif, 
 			     netif_tx_request_t *txp,
 			     s8       st);
@@ -1453,8 +1452,9 @@ static void netif_idx_release(u16 pending_idx)
 	tasklet_schedule(&net_tx_tasklet);
 }
 
-static void netif_page_release(struct page *page)
+static void netif_page_release(struct page *page, unsigned int order)
 {
+	BUG_ON(order);
 	netif_idx_release(netif_page_index(page));
 }
 

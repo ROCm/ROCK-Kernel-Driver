@@ -180,9 +180,6 @@ DEFINE_PER_CPU(int, ipi_to_irq[NR_IPIS]) = {[0 ... NR_IPIS-1] = -1};
 /* Reference counts for bindings to IRQs. */
 static int irq_bindcount[NR_IRQS];
 
-/* Bitmap indicating which PIRQs require Xen to be notified on unmask. */
-static DECLARE_BITMAP(pirq_needs_eoi, NR_PIRQS);
-
 #ifdef CONFIG_SMP
 
 static u8 cpu_evtchn[NR_EVENT_CHANNELS];
@@ -1086,16 +1083,48 @@ static struct irq_chip dynirq_chip = {
 	.retrigger = resend_irq_on_evtchn,
 };
 
-static inline void pirq_unmask_notify(int irq)
+/* Bitmap indicating which PIRQs require Xen to be notified on unmask. */
+static bool pirq_eoi_does_unmask;
+static DECLARE_BITMAP(pirq_needs_eoi, ALIGN(NR_PIRQS, PAGE_SIZE * 8))
+	__page_aligned_bss;
+
+static void pirq_unmask_and_notify(unsigned int evtchn, unsigned int irq)
 {
 	struct physdev_eoi eoi = { .irq = evtchn_get_xen_pirq(irq) };
-	if (unlikely(test_bit(irq - PIRQ_BASE, pirq_needs_eoi)))
-		VOID(HYPERVISOR_physdev_op(PHYSDEVOP_eoi, &eoi));
+
+	if (pirq_eoi_does_unmask) {
+		if (test_bit(eoi.irq, pirq_needs_eoi))
+			VOID(HYPERVISOR_physdev_op(PHYSDEVOP_eoi, &eoi));
+		else
+			unmask_evtchn(evtchn);
+	} else if (test_bit(irq - PIRQ_BASE, pirq_needs_eoi)) {
+		if (smp_processor_id() != cpu_from_evtchn(evtchn)) {
+			struct evtchn_unmask unmask = { .port = evtchn };
+			struct multicall_entry mcl[2];
+
+			mcl[0].op = __HYPERVISOR_event_channel_op;
+			mcl[0].args[0] = EVTCHNOP_unmask;
+			mcl[0].args[1] = (unsigned long)&unmask;
+			mcl[1].op = __HYPERVISOR_physdev_op;
+			mcl[1].args[0] = PHYSDEVOP_eoi;
+			mcl[1].args[1] = (unsigned long)&eoi;
+
+			if (HYPERVISOR_multicall(mcl, 2))
+				BUG();
+		} else {
+			unmask_evtchn(evtchn);
+			VOID(HYPERVISOR_physdev_op(PHYSDEVOP_eoi, &eoi));
+		}
+	} else
+		unmask_evtchn(evtchn);
 }
 
 static inline void pirq_query_unmask(int irq)
 {
 	struct physdev_irq_status_query irq_status;
+
+	if (pirq_eoi_does_unmask)
+		return;
 	irq_status.irq = evtchn_get_xen_pirq(irq);
 	if (HYPERVISOR_physdev_op(PHYSDEVOP_irq_status_query, &irq_status))
 		irq_status.flags = 0;
@@ -1136,8 +1165,7 @@ static unsigned int startup_pirq(unsigned int irq)
 	irq_info[irq] = mk_irq_info(IRQT_PIRQ, bind_pirq.pirq, evtchn);
 
  out:
-	unmask_evtchn(evtchn);
-	pirq_unmask_notify(irq);
+	pirq_unmask_and_notify(evtchn, irq);
 
 	return 0;
 }
@@ -1189,10 +1217,8 @@ static void end_pirq(unsigned int irq)
 	if ((irq_desc[irq].status & (IRQ_DISABLED|IRQ_PENDING)) ==
 	    (IRQ_DISABLED|IRQ_PENDING)) {
 		shutdown_pirq(irq);
-	} else if (VALID_EVTCHN(evtchn)) {
-		unmask_evtchn(evtchn);
-		pirq_unmask_notify(irq);
-	}
+	} else if (VALID_EVTCHN(evtchn))
+		pirq_unmask_and_notify(evtchn, irq);
 }
 
 static struct irq_chip pirq_chip = {
@@ -1346,6 +1372,7 @@ void xen_poll_irq(int irq)
 		BUG();
 }
 
+#ifdef CONFIG_PM_SLEEP
 static void restore_cpu_virqs(unsigned int cpu)
 {
 	struct evtchn_bind_virq bind_virq;
@@ -1442,8 +1469,31 @@ static void restore_cpu_ipis(unsigned int cpu)
 static int evtchn_resume(struct sys_device *dev)
 {
 	unsigned int cpu, irq, evtchn;
+	struct evtchn_status status;
+
+	/* Avoid doing anything in the 'suspend cancelled' case. */
+	status.dom = DOMID_SELF;
+#ifdef PER_CPU_VIRQ_IRQ
+	status.port = evtchn_from_irq(__get_cpu_var(virq_to_irq)[VIRQ_TIMER]);
+#else
+	status.port = __get_cpu_var(virq_to_evtchn)[VIRQ_TIMER];
+#endif
+	if (HYPERVISOR_event_channel_op(EVTCHNOP_status, &status))
+		BUG();
+	if (status.status == EVTCHNSTAT_virq
+	    && status.vcpu == smp_processor_id()
+	    && status.u.virq == VIRQ_TIMER)
+		return 0;
 
 	init_evtchn_cpu_bindings();
+
+	if (pirq_eoi_does_unmask) {
+		struct physdev_pirq_eoi_mfn eoi_mfn;
+
+		eoi_mfn.mfn = virt_to_bus(pirq_needs_eoi) >> PAGE_SHIFT;
+		if (HYPERVISOR_physdev_op(PHYSDEVOP_pirq_eoi_mfn, &eoi_mfn))
+			BUG();
+	}
 
 	/* New event-channel space is not 'live' yet. */
 	for (evtchn = 0; evtchn < NR_EVENT_CHANNELS; evtchn++)
@@ -1488,13 +1538,18 @@ static struct sys_device device_evtchn = {
 
 static int __init evtchn_register(void)
 {
-	int err = sysdev_class_register(&evtchn_sysclass);
+	int err;
 
+	if (is_initial_xendomain())
+		return 0;
+
+	err = sysdev_class_register(&evtchn_sysclass);
 	if (!err)
 		err = sysdev_register(&device_evtchn);
 	return err;
 }
 core_initcall(evtchn_register);
+#endif
 
 #if defined(CONFIG_X86_IO_APIC)
 #define identity_mapped_irq(irq) (!IO_APIC_IRQ((irq) - PIRQ_BASE))
@@ -1539,7 +1594,7 @@ int evtchn_map_pirq(int irq, int xen_pirq)
 	} else if (!xen_pirq) {
 		if (unlikely(type_from_irq(irq) != IRQT_PIRQ))
 			return -EINVAL;
-		set_irq_chip_and_handler(irq, &no_irq_chip, NULL);
+		dynamic_irq_cleanup(irq);
 		irq_info[irq] = IRQ_UNBOUND;
 		return 0;
 	} else if (type_from_irq(irq) != IRQT_PIRQ
@@ -1563,6 +1618,7 @@ int evtchn_get_xen_pirq(int irq)
 void __init xen_init_IRQ(void)
 {
 	unsigned int i;
+	struct physdev_pirq_eoi_mfn eoi_mfn;
 
 #ifndef PER_CPU_VIRQ_IRQ
 	__set_bit(VIRQ_TIMER, virq_per_cpu);
@@ -1574,6 +1630,11 @@ void __init xen_init_IRQ(void)
 #endif
 
 	init_evtchn_cpu_bindings();
+
+	BUG_ON(!bitmap_empty(pirq_needs_eoi, PAGE_SIZE * 8));
+	eoi_mfn.mfn = virt_to_bus(pirq_needs_eoi) >> PAGE_SHIFT;
+	if (HYPERVISOR_physdev_op(PHYSDEVOP_pirq_eoi_mfn, &eoi_mfn) == 0)
+		pirq_eoi_does_unmask = true;
 
 	/* No event channels are 'live' right now. */
 	for (i = 0; i < NR_EVENT_CHANNELS; i++)

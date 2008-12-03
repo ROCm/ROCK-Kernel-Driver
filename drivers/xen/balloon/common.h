@@ -47,6 +47,7 @@ struct balloon_stats {
 	unsigned long balloon_high;
 };
 
+extern unsigned long num_physpages;
 extern struct balloon_stats balloon_stats;
 #define bs balloon_stats
 
@@ -54,5 +55,6 @@ int balloon_sysfs_init(void);
 void balloon_sysfs_exit(void);
 
 void balloon_set_new_target(unsigned long target);
+unsigned long balloon_minimum_target(void);
 
 #endif /* __XEN_BALLOON_COMMON_H__ */

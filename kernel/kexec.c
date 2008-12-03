@@ -397,9 +397,6 @@ static void kimage_free_pages(struct page *page)
 	count = 1 << order;
 	for (i = 0; i < count; i++)
 		ClearPageReserved(page + i);
-#ifdef CONFIG_XEN
-	xen_destroy_contiguous_region((unsigned long)page_address(page), order);
-#endif
 	__free_pages(page, order);
 }
 

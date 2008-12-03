@@ -443,7 +443,7 @@ int phys_mem_access_prot_allowed(struct file *file, unsigned long mfn,
 				unsigned long size, pgprot_t *vma_prot)
 {
 	u64 addr = (u64)mfn << PAGE_SHIFT;
-	unsigned long sz, flags = -1;
+	unsigned long flags = -1;
 	int retval;
 
 	if (!range_is_allowed(mfn, size))
@@ -491,21 +491,14 @@ int phys_mem_access_prot_allowed(struct file *file, unsigned long mfn,
 	if (retval < 0)
 		return 0;
 
-	for (sz = 0; sz < size; ++mfn, sz += PAGE_SIZE) {
-		unsigned long pfn = mfn_to_local_pfn(mfn);
-
-		if (((pfn < max_low_pfn_mapped) ||
-		     (pfn >= (1UL<<(32 - PAGE_SHIFT)) && pfn < max_pfn_mapped)) &&
-		    ioremap_change_attr((unsigned long)__va(pfn << PAGE_SHIFT),
-					PAGE_SIZE, flags) < 0) {
-			free_memtype(addr, addr + size);
-			printk(KERN_INFO
-			"%s:%d /dev/mem ioremap_change_attr failed %s for %Lx-%Lx\n",
-				current->comm, current->pid,
-				cattr_name(flags),
-				addr, addr + size);
-			return 0;
-		}
+	if (ioremap_check_change_attr(mfn, size, flags) < 0) {
+		free_memtype(addr, addr + size);
+		printk(KERN_INFO
+		"%s:%d /dev/mem ioremap_change_attr failed %s for %Lx-%Lx\n",
+			current->comm, current->pid,
+			cattr_name(flags),
+			addr, addr + size);
+		return 0;
 	}
 
 	*vma_prot = __pgprot((pgprot_val(*vma_prot) & ~_PAGE_CACHE_MASK) |

@@ -92,7 +92,6 @@ extern unsigned long totalhigh_pages;
 #define inc_totalhigh_pages() ((void)0)
 #define dec_totalhigh_pages() ((void)0)
 #endif
-extern unsigned long num_physpages;
 
 /* List of ballooned pages, threaded through the mem_map array. */
 static LIST_HEAD(ballooned_pages);
@@ -195,7 +194,7 @@ static unsigned long current_target(void)
 	return target;
 }
 
-static unsigned long minimum_target(void)
+unsigned long balloon_minimum_target(void)
 {
 #ifndef CONFIG_XEN
 #define max_pfn num_physpages
@@ -422,7 +421,7 @@ void balloon_set_new_target(unsigned long target)
 {
 	/* No need for lock. Not read-modify-write updates. */
 	bs.hard_limit   = ~0UL;
-	bs.target_pages = max(target, minimum_target());
+	bs.target_pages = max(target, balloon_minimum_target());
 	schedule_work(&balloon_worker);
 }
 
@@ -504,7 +503,7 @@ static int balloon_read(char *page, char **start, off_t off,
 		"Driver pages:       %8lu kB\n"
 		"Xen hard limit:     ",
 		PAGES2KB(bs.current_pages), PAGES2KB(bs.target_pages), 
-		PAGES2KB(minimum_target()), PAGES2KB(num_physpages),
+		PAGES2KB(balloon_minimum_target()), PAGES2KB(num_physpages),
 		PAGES2KB(bs.balloon_low), PAGES2KB(bs.balloon_high),
 		PAGES2KB(bs.driver_pages));
 
@@ -581,8 +580,8 @@ subsys_initcall(balloon_init);
 
 static void __exit balloon_exit(void)
 {
-    /* XXX - release balloon here */
-    return; 
+	balloon_sysfs_exit();
+	/* XXX - release balloon here */
 }
 
 module_exit(balloon_exit); 

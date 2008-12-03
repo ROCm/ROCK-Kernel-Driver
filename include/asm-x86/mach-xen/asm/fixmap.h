@@ -9,11 +9,10 @@
 
 extern int fixmaps_set;
 
-void xen_set_fixmap(enum fixed_addresses idx,
-		       unsigned long phys, pgprot_t flags);
+void xen_set_fixmap(enum fixed_addresses, maddr_t, pgprot_t);
 
 static inline void __set_fixmap(enum fixed_addresses idx,
-				unsigned long phys, pgprot_t flags)
+				maddr_t phys, pgprot_t flags)
 {
 	xen_set_fixmap(idx, phys, flags);
 }

@@ -285,7 +285,7 @@ CLEARPAGEFLAG(Uptodate, uptodate)
 #ifdef CONFIG_XEN
 TESTPAGEFLAG(Foreign, foreign)
 static inline void SetPageForeign(struct page *page,
-				  void (*dtor)(struct page *))
+				  void (*dtor)(struct page *, unsigned int))
 {
 	BUG_ON(!dtor);
 	set_bit(PG_foreign, &page->flags);
@@ -296,9 +296,9 @@ static inline void ClearPageForeign(struct page *page)
 	clear_bit(PG_foreign, &page->flags);
 	page->index = 0;
 }
-static inline void PageForeignDestructor(struct page *page)
+static inline void PageForeignDestructor(struct page *page, unsigned int order)
 {
-	((void (*)(struct page *))page->index)(page);
+	((void (*)(struct page *, unsigned int))page->index)(page, order);
 }
 #endif
 

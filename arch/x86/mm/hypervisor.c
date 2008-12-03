@@ -837,6 +837,15 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 }
 EXPORT_SYMBOL_GPL(xen_destroy_contiguous_region);
 
+static void undo_limit_pages(struct page *pages, unsigned int order)
+{
+	BUG_ON(xen_feature(XENFEAT_auto_translated_physmap));
+	BUG_ON(order > MAX_CONTIG_ORDER);
+	xen_limit_pages_to_max_mfn(pages, order, 0);
+	ClearPageForeign(pages);
+	__free_pages(pages, order);
+}
+
 int xen_limit_pages_to_max_mfn(
 	struct page *pages, unsigned int order, unsigned int address_bits)
 {
@@ -865,16 +874,28 @@ int xen_limit_pages_to_max_mfn(
 	if (unlikely(order > MAX_CONTIG_ORDER))
 		return -ENOMEM;
 
-	bitmap_zero(limit_map, 1U << order);
+	if (address_bits) {
+		if (address_bits < PAGE_SHIFT)
+			return -EINVAL;
+		bitmap_zero(limit_map, 1U << order);
+	} else if (order) {
+		BUILD_BUG_ON(sizeof(pages->index) != sizeof(*limit_map));
+		for (i = 0; i < BITS_TO_LONGS(1U << order); ++i)
+			limit_map[i] = pages[i + 1].index;
+	} else
+		__set_bit(0, limit_map);
+
 	set_xen_guest_handle(exchange.in.extent_start, in_frames);
 	set_xen_guest_handle(exchange.out.extent_start, out_frames);
 
 	/* 0. Scrub the pages. */
 	for (i = 0, n = 0; i < 1U<<order ; i++) {
 		page = &pages[i];
-		if (!(pfn_to_mfn(page_to_pfn(page)) >> (address_bits - PAGE_SHIFT)))
-			continue;
-		__set_bit(i, limit_map);
+		if (address_bits) {
+			if (!(pfn_to_mfn(page_to_pfn(page)) >> (address_bits - PAGE_SHIFT)))
+				continue;
+			__set_bit(i, limit_map);
+		}
 
 		if (!PageHighMem(page))
 			scrub_pages(page_address(page), 1);
@@ -960,7 +981,19 @@ int xen_limit_pages_to_max_mfn(
 
 	balloon_unlock(flags);
 
-	return success ? 0 : -ENOMEM;
+	if (!success)
+		return -ENOMEM;
+
+	if (address_bits) {
+		if (order) {
+			BUILD_BUG_ON(sizeof(*limit_map) != sizeof(pages->index));
+			for (i = 0; i < BITS_TO_LONGS(1U << order); ++i)
+				pages[i + 1].index = limit_map[i];
+		}
+		SetPageForeign(pages, undo_limit_pages);
+	}
+
+	return 0;
 }
 EXPORT_SYMBOL_GPL(xen_limit_pages_to_max_mfn);
 

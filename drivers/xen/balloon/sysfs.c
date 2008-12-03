@@ -30,6 +30,7 @@
 
 #include <linux/capability.h>
 #include <linux/errno.h>
+#include <linux/init.h>
 #include <linux/stat.h>
 #include <linux/string.h>
 #include <linux/sysdev.h>
@@ -52,6 +53,8 @@
 	static SYSDEV_ATTR(name, S_IRUGO, show_##name, NULL)
 
 BALLOON_SHOW(current_kb, "%lu\n", PAGES2KB(bs.current_pages));
+BALLOON_SHOW(min_kb, "%lu\n", PAGES2KB(balloon_minimum_target()));
+BALLOON_SHOW(max_kb, "%lu\n", PAGES2KB(num_physpages));
 BALLOON_SHOW(low_kb, "%lu\n", PAGES2KB(bs.balloon_low));
 BALLOON_SHOW(high_kb, "%lu\n", PAGES2KB(bs.balloon_high));
 BALLOON_SHOW(hard_limit_kb,
@@ -96,6 +99,8 @@ static struct sysdev_attribute *balloon_attrs[] = {
 
 static struct attribute *balloon_info_attrs[] = {
 	&attr_current_kb.attr,
+	&attr_min_kb.attr,
+	&attr_max_kb.attr,
 	&attr_low_kb.attr,
 	&attr_high_kb.attr,
 	&attr_hard_limit_kb.attr,
@@ -114,7 +119,7 @@ static struct sysdev_class balloon_sysdev_class = {
 
 static struct sys_device balloon_sysdev;
 
-static int register_balloon(struct sys_device *sysdev)
+static int __init register_balloon(struct sys_device *sysdev)
 {
 	int i, error;
 
@@ -151,7 +156,7 @@ static int register_balloon(struct sys_device *sysdev)
 	return error;
 }
 
-static void unregister_balloon(struct sys_device *sysdev)
+static __exit void unregister_balloon(struct sys_device *sysdev)
 {
 	int i;
 
@@ -162,12 +167,12 @@ static void unregister_balloon(struct sys_device *sysdev)
 	sysdev_class_unregister(&balloon_sysdev_class);
 }
 
-int balloon_sysfs_init(void)
+int __init balloon_sysfs_init(void)
 {
 	return register_balloon(&balloon_sysdev);
 }
 
-void balloon_sysfs_exit(void)
+void __exit balloon_sysfs_exit(void)
 {
 	unregister_balloon(&balloon_sysdev);
 }

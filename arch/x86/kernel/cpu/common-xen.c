@@ -459,6 +459,8 @@ static void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 	c->x86_max_cores = 1;
 	c->x86_clflush_size = 32;
 	memset(&c->x86_capability, 0, sizeof c->x86_capability);
+	if (boot_cpu_has(X86_FEATURE_SYSCALL32))
+		set_cpu_cap(c, X86_FEATURE_SYSCALL32);
 
 	if (!have_cpuid_p()) {
 		/*

@@ -149,5 +149,4 @@ extern int is_reassigndev(struct pci_dev *dev);
 extern void pci_disable_bridge_window(struct pci_dev *dev);
 #else
 #define is_reassigndev(dev) 0
-static inline void pci_disable_bridge_window(struct pci_dev *dev) {}
 #endif

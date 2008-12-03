@@ -65,10 +65,10 @@ unsigned long io_apic_irqs;
 #else
 int (*ioapic_renumber_irq)(int ioapic, int irq);
 atomic_t irq_mis_count;
-#endif /* CONFIG_XEN */
 
 /* Where if anywhere is the i8259 connect in external int mode */
 static struct { int pin, apic; } ioapic_i8259 = { -1, -1 };
+#endif /* CONFIG_XEN */
 
 static DEFINE_SPINLOCK(ioapic_lock);
 static DEFINE_SPINLOCK(vector_lock);
@@ -198,6 +198,7 @@ union entry_union {
 	struct IO_APIC_route_entry entry;
 };
 
+#ifndef CONFIG_XEN
 static struct IO_APIC_route_entry ioapic_read_entry(int apic, int pin)
 {
 	union entry_union eu;
@@ -208,6 +209,7 @@ static struct IO_APIC_route_entry ioapic_read_entry(int apic, int pin)
 	spin_unlock_irqrestore(&ioapic_lock, flags);
 	return eu.entry;
 }
+#endif
 
 /*
  * When we write a new IO APIC routing entry, we need to write the high
@@ -869,6 +871,7 @@ static int find_irq_entry(int apic, int pin, int type)
 	return -1;
 }
 
+#ifndef CONFIG_XEN
 /*
  * Find the pin to which IRQ[irq] (ISA) is connected
  */
@@ -910,6 +913,7 @@ static int __init find_isa_irq_apic(int irq, int type)
 
 	return -1;
 }
+#endif
 
 /*
  * Find a specific PCI IRQ entry.
@@ -1657,7 +1661,9 @@ void __init print_IO_APIC(void) {}
 static void __init enable_IO_APIC(void)
 {
 	union IO_APIC_reg_01 reg_01;
+#ifndef CONFIG_XEN
 	int i8259_apic, i8259_pin;
+#endif
 	int i, apic;
 	unsigned long flags;
 
@@ -1678,6 +1684,7 @@ static void __init enable_IO_APIC(void)
 		spin_unlock_irqrestore(&ioapic_lock, flags);
 		nr_ioapic_registers[apic] = reg_01.bits.entries+1;
 	}
+#ifndef CONFIG_XEN
 	for (apic = 0; apic < nr_ioapics; apic++) {
 		int pin;
 		/* See if any of the pins is in ExtINT mode */
@@ -1716,6 +1723,7 @@ static void __init enable_IO_APIC(void)
 	{
 		printk(KERN_WARNING "ExtINT in hardware and MP table differ\n");
 	}
+#endif
 
 	/*
 	 * Do not trust the IO-APIC being empty at bootup
@@ -2422,6 +2430,8 @@ static int __init io_apic_bug_finalize(void)
 
 late_initcall(io_apic_bug_finalize);
 
+#ifndef CONFIG_XEN
+
 struct sysfs_ioapic_data {
 	struct sys_device dev;
 	struct IO_APIC_route_entry entry[0];
@@ -2506,7 +2516,6 @@ static int __init ioapic_init_sysfs(void)
 
 device_initcall(ioapic_init_sysfs);
 
-#ifndef CONFIG_XEN
 /*
  * Dynamic irq allocate and deallocation
  */
@@ -2548,7 +2557,8 @@ void destroy_irq(unsigned int irq)
 	irq_vector[irq] = 0;
 	spin_unlock_irqrestore(&vector_lock, flags);
 }
-#endif
+
+#endif /* CONFIG_XEN */
 
 /*
  * MSI message composition

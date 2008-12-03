@@ -973,6 +973,8 @@ void __init setup_arch(char **cmdline_p)
 	 */
 	acpi_boot_table_init();
 
+	early_acpi_boot_init();
+
 #ifdef CONFIG_ACPI_NUMA
 	/*
 	 * Parse SRAT to discover nodes.
@@ -1071,6 +1073,7 @@ void __init setup_arch(char **cmdline_p)
 		fpp = PAGE_SIZE/sizeof(unsigned long);
 		size = (max_pfn + fpp - 1) / fpp;
 		size = (size + fpp - 1) / fpp;
+		++size; /* include a zero terminator for crash tools */
 		size *= sizeof(unsigned long);
 		pfn_to_mfn_frame_list_list = alloc_bootmem_pages(size);
 		if (size > PAGE_SIZE
@@ -1078,6 +1081,7 @@ void __init setup_arch(char **cmdline_p)
 						    pfn_to_mfn_frame_list_list,
 						    get_order(size), 0))
 			BUG();
+		size -= sizeof(unsigned long);
 		pfn_to_mfn_frame_list = alloc_bootmem(size);
 
 		for (i = j = 0, k = -1; i < max_pfn; i += fpp, j++) {

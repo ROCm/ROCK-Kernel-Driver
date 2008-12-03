@@ -246,7 +246,7 @@ int __init page_is_ram(unsigned long pagenr)
  * Fix up the linear direct mapping of the kernel to avoid cache attribute
  * conflicts.
  */
-int ioremap_change_attr(unsigned long vaddr, unsigned long size,
+static int ioremap_change_attr(unsigned long vaddr, unsigned long size,
 			       unsigned long prot_val)
 {
 	unsigned long nrpages = size >> PAGE_SHIFT;
@@ -266,6 +266,25 @@ int ioremap_change_attr(unsigned long vaddr, unsigned long size,
 	}
 
 	return err;
+}
+
+int ioremap_check_change_attr(unsigned long mfn, unsigned long size,
+			      unsigned long prot_val)
+{
+	unsigned long sz;
+	int rc;
+
+	for (sz = rc = 0; sz < size && !rc; ++mfn, sz += PAGE_SIZE) {
+		unsigned long pfn = mfn_to_local_pfn(mfn);
+
+		if (pfn >= max_low_pfn_mapped &&
+		    (pfn < (1UL<<(32 - PAGE_SHIFT)) || pfn >= max_pfn_mapped))
+			continue;
+		rc = ioremap_change_attr((unsigned long)__va(pfn << PAGE_SHIFT),
+					 PAGE_SIZE, prot_val);
+	}
+
+	return rc;
 }
 
 /*

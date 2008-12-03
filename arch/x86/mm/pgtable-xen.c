@@ -16,6 +16,12 @@ pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 	return pte;
 }
 
+static void _pte_free(struct page *page, unsigned int order)
+{
+	BUG_ON(order);
+	__pte_free(page);
+}
+
 pgtable_t pte_alloc_one(struct mm_struct *mm, unsigned long address)
 {
 	struct page *pte;
@@ -27,7 +33,7 @@ pgtable_t pte_alloc_one(struct mm_struct *mm, unsigned long address)
 #endif
 	if (pte) {
 		pgtable_page_ctor(pte);
-		SetPageForeign(pte, __pte_free);
+		SetPageForeign(pte, _pte_free);
 		init_page_count(pte);
 	}
 	return pte;
@@ -67,6 +73,12 @@ void __pte_free_tlb(struct mmu_gather *tlb, struct page *pte)
 }
 
 #if PAGETABLE_LEVELS > 2
+static void _pmd_free(struct page *page, unsigned int order)
+{
+	BUG_ON(order);
+	__pmd_free(page);
+}
+
 pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long address)
 {
 	struct page *pmd;
@@ -74,7 +86,7 @@ pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long address)
 	pmd = alloc_pages(GFP_KERNEL|__GFP_REPEAT|__GFP_ZERO, 0);
 	if (!pmd)
 		return NULL;
-	SetPageForeign(pmd, __pmd_free);
+	SetPageForeign(pmd, _pmd_free);
 	init_page_count(pmd);
 	return page_address(pmd);
 }
@@ -804,7 +816,7 @@ int ptep_clear_flush_young(struct vm_area_struct *vma,
 
 int fixmaps_set;
 
-void xen_set_fixmap(enum fixed_addresses idx, unsigned long phys, pgprot_t flags)
+void xen_set_fixmap(enum fixed_addresses idx, maddr_t phys, pgprot_t flags)
 {
 	unsigned long address = __fix_to_virt(idx);
 	pte_t pte;
