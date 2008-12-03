@@ -258,7 +258,7 @@ static void scsi_post_sense_event(struct scsi_device *sdev,
 	len = SCSI_NL_MSGALIGN(sizeof(*msg));
 	skblen = NLMSG_SPACE(len);
 
-	skb = alloc_skb(skblen, GFP_KERNEL);
+	skb = alloc_skb(skblen, GFP_ATOMIC);
 	if (!skb) {
 		err = -ENOBUFS;
 		goto send_fail;
