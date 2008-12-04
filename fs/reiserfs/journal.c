@@ -82,6 +82,7 @@ static struct workqueue_struct *commit_wq;
 #define LIST_TOUCHED 1
 #define LIST_DIRTY   2
 #define LIST_COMMIT_PENDING  4	/* someone will commit this list */
+#define LIST_DEAD 8
 
 /* flags for do_journal_end */
 #define FLUSH_ALL   1		/* flush commit and real blocks */
@@ -1031,6 +1032,17 @@ static int flush_commit_list(struct super_block *s,
 	/* before we can put our commit blocks on disk, we have to make sure everyone older than
 	 ** us is on disk too
 	 */
+	if (jl->j_len <= 0) {
+		reiserfs_warning(s, "journal-d1",
+				 "jl->j_len = %lu; jl->j_state = %lx; "
+				 "jl->j_trans_id = %u; "
+				 "jl->j_refcount = %d; "
+				 "journal->trans_id = %u; "
+				 "oldest live jl->j_trans_id = %u\n",
+				 jl->j_len, jl->j_state,
+				 trans_id, journal->j_trans_id,
+		JOURNAL_LIST_ENTRY(journal->j_journal_list.next)->j_trans_id);
+	}
 	BUG_ON(jl->j_len <= 0);
 	BUG_ON(trans_id == journal->j_trans_id);
 
@@ -1636,7 +1648,7 @@ static int flush_journal_list(struct super_block *s,
 	jl->j_realblock = NULL;
 	jl->j_commit_bh = NULL;
 	jl->j_trans_id = 0;
-	jl->j_state = 0;
+	jl->j_state = LIST_DEAD;
 	put_journal_list(s, jl);
 	if (flushall)
 		mutex_unlock(&journal->j_flush_mutex);
