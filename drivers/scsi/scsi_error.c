@@ -258,7 +258,7 @@ static void scsi_post_sense_event(struct scsi_device *sdev,
 	len = SCSI_NL_MSGALIGN(sizeof(*msg));
 	skblen = NLMSG_SPACE(len);
 
-	skb = alloc_skb(skblen, GFP_KERNEL);
+	skb = alloc_skb(skblen, GFP_ATOMIC);
 	if (!skb) {
 		err = -ENOBUFS;
 		goto send_fail;
@@ -1013,8 +1013,7 @@ static int scsi_eh_try_stu(struct scsi_cmnd *scmd)
 		int i, rtn = NEEDS_RETRY;
 
 		for (i = 0; rtn == NEEDS_RETRY && i < 2; i++)
-			rtn = scsi_send_eh_cmnd(scmd, stu_command, 6,
-						scmd->device->timeout, 0);
+			rtn = scsi_send_eh_cmnd(scmd, stu_command, 6, scmd->device->request_queue->rq_timeout, 0);
 
 		if (rtn == SUCCESS)
 			return 0;

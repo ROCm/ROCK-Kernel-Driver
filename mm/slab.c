@@ -2785,7 +2785,7 @@ static int cache_grow(struct kmem_cache *cachep,
 	size_t offset;
 	gfp_t local_flags;
 	struct kmem_list3 *l3;
-	int reserve;
+	int reserve = -1;
 
 	/*
 	 * Be lazy and only check for valid flags here,  keeping it out of the
@@ -2841,7 +2841,8 @@ static int cache_grow(struct kmem_cache *cachep,
 	if (local_flags & __GFP_WAIT)
 		local_irq_disable();
 	check_irq_off();
-	slab_set_reserve(cachep, reserve);
+	if (reserve != -1)
+		slab_set_reserve(cachep, reserve);
 	spin_lock(&l3->list_lock);
 
 	/* Make slab active. */

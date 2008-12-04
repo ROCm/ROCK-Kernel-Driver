@@ -25,7 +25,7 @@ long ext4_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	unsigned int flags;
 	unsigned short rsv_window_size;
 
-	ext4_debug("cmd = %u, arg = %lu\n", cmd, arg);
+	ext4_debug ("cmd = %u, arg = %lu\n", cmd, arg);
 
 	switch (cmd) {
 	case EXT4_IOC_GETFLAGS:
@@ -186,7 +186,7 @@ setversion_out:
 	case EXT4_IOC_SETRSVSZ: {
 		int err;
 
-		if (!test_opt(inode->i_sb, RESERVATION) || !S_ISREG(inode->i_mode))
+		if (!test_opt(inode->i_sb, RESERVATION) ||!S_ISREG(inode->i_mode))
 			return -ENOTTY;
 
 		if (!is_owner_or_cap(inode))
@@ -267,7 +267,26 @@ setversion_out:
 	}
 
 	case EXT4_IOC_MIGRATE:
-		return ext4_ext_migrate(inode, filp, cmd, arg);
+	{
+		int err;
+		if (!is_owner_or_cap(inode))
+			return -EACCES;
+
+		err = mnt_want_write(filp->f_path.mnt);
+		if (err)
+			return err;
+		/*
+		 * inode_mutex prevent write and truncate on the file.
+		 * Read still goes through. We take i_data_sem in
+		 * ext4_ext_swap_inode_data before we switch the
+		 * inode format to prevent read.
+		 */
+		mutex_lock(&(inode->i_mutex));
+		err = ext4_ext_migrate(inode);
+		mutex_unlock(&(inode->i_mutex));
+		mnt_drop_write(filp->f_path.mnt);
+		return err;
+	}
 
 	default:
 		return -ENOTTY;
