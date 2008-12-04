@@ -847,16 +847,6 @@ void put_disk(struct gendisk *disk)
 
 EXPORT_SYMBOL(put_disk);
 
-static void set_disk_ro_uevent(struct gendisk *gd, int ro)
-{
-	char event[] = "DISK_RO=1";
-	char *envp[] = { event, NULL };
-
-	if (!ro)
-		event[9] = '0';
-	kobject_uevent_env(&gd->dev.kobj, KOBJ_CHANGE, envp);
-}
-
 void set_device_ro(struct block_device *bdev, int flag)
 {
 	if (bdev->bd_contains != bdev)
@@ -870,9 +860,6 @@ EXPORT_SYMBOL(set_device_ro);
 void set_disk_ro(struct gendisk *disk, int flag)
 {
 	int i;
-	if (disk->policy != flag)
-		set_disk_ro_uevent(disk, flag);
-
 	disk->policy = flag;
 	for (i = 0; i < disk->minors - 1; i++)
 		if (disk->part[i]) disk->part[i]->policy = flag;
