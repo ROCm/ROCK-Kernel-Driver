@@ -398,10 +398,10 @@ nfsd_setattr(struct svc_rqst *rqstp, struct svc_fh *fhp, struct iattr *iap,
 	if (!check_guard || guardtime == inode->i_ctime.tv_sec) {
 		fh_lock(fhp);
 		host_err = notify_change(dentry, fhp->fh_export->ex_path.mnt, iap);
-		err = nfserrno(host_err);
 		/* to get NFSERR_JUKEBOX on the wire, need -ETIMEDOUT */
-		if (err == -EAGAIN)
-			err = -ETIMEDOUT;
+		if (host_err == -EAGAIN)
+			host_err = -ETIMEDOUT;
+		err = nfserrno(host_err);
 		fh_unlock(fhp);
 	}
 	if (size_change)
@@ -963,8 +963,8 @@ nfsd_vfs_read(struct svc_rqst *rqstp, struct svc_fh *fhp, struct file *file,
 		fsnotify_access(file->f_path.dentry);
 	} else {
 		/* to get NFSERR_JUKEBOX on the wire, need -ETIMEDOUT */
-		if (err == -EAGAIN)
-			err = -ETIMEDOUT;
+		if (host_err == -EAGAIN)
+			host_err = -ETIMEDOUT;
 		err = nfserrno(host_err);
 	}
 out:
@@ -1083,8 +1083,8 @@ nfsd_vfs_write(struct svc_rqst *rqstp, struct svc_fh *fhp, struct file *file,
 		err = 0;
 	else {
 		/* to get NFSERR_JUKEBOX on the wire, need -ETIMEDOUT */
-		if (err == -EAGAIN)
-			err = -ETIMEDOUT;
+		if (host_err == -EAGAIN)
+			host_err = -ETIMEDOUT;
 		err = nfserrno(host_err);
 	}
 out:

@@ -36,7 +36,7 @@ config XFS_QUOTA
 	  they are completely independent subsystems.
 
 config XFS_DMAPI
-	bool "XFS DMAPI support"
+	tristate "XFS DMAPI support"
 	depends on XFS_FS
 	select DMAPI
 	help
