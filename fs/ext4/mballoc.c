@@ -785,11 +785,9 @@ static int ext4_mb_init_cache(struct page *page, char *incore)
 		if (bh[i] == NULL)
 			goto out;
 
-		if (buffer_uptodate(bh[i]) &&
-		    !(desc->bg_flags & cpu_to_le16(EXT4_BG_BLOCK_UNINIT)))
+		if (bh_uptodate_or_lock(bh[i]))
 			continue;
 
-		lock_buffer(bh[i]);
 		spin_lock(sb_bgl_lock(EXT4_SB(sb), first_group + i));
 		if (desc->bg_flags & cpu_to_le16(EXT4_BG_BLOCK_UNINIT)) {
 			ext4_init_block_bitmap(sb, bh[i],
