@@ -110,11 +110,6 @@ static int prism2sta_probe_usb(
 	 * linux netdevice.
 	 */
 	SET_NETDEV_DEV(wlandev->netdev, &(interface->dev));
-        if ( register_wlandev(wlandev) != 0 ) {
-		WLAN_LOG_ERROR("%s: register_wlandev() failed.\n", dev_info);
-		result = -EIO;
-		goto failed;
-        }
 
 	/* Do a chip-level reset on the MAC */
 	if (prism2_doreset) {
@@ -132,11 +127,18 @@ static int prism2sta_probe_usb(
 		}
 	}
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,15))
 	usb_get_dev(dev);
-#endif
 
 	wlandev->msdstate = WLAN_MSD_HWPRESENT;
+
+        if ( register_wlandev(wlandev) != 0 ) {
+		WLAN_LOG_ERROR("%s: register_wlandev() failed.\n", dev_info);
+		result = -EIO;
+		goto failed;
+        }
+
+/* enable the card */
+	prism2sta_ifstate(wlandev, P80211ENUM_ifstate_enable);
 
 	goto done;
 
@@ -254,9 +256,7 @@ prism2sta_disconnect_usb(struct usb_interface *interface)
 		unregister_wlandev(wlandev);
 		wlan_unsetup(wlandev);
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,15))
 		usb_put_dev(hw->usb);
-#endif
 
 		hfa384x_destroy(hw);
 		kfree(hw);
@@ -272,9 +272,6 @@ prism2sta_disconnect_usb(struct usb_interface *interface)
 
 
 static struct usb_driver prism2_usb_driver = {
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,16))
-	.owner = THIS_MODULE,
-#endif
 	.name = "prism2_usb",
 	.probe = prism2sta_probe_usb,
 	.disconnect = prism2sta_disconnect_usb,
