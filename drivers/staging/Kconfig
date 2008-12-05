@@ -49,4 +49,6 @@ source "drivers/staging/otus/Kconfig"
 
 source "drivers/staging/rt2860/Kconfig"
 
+source "drivers/staging/benet/Kconfig"
+
 endif # STAGING
