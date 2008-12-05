@@ -866,19 +866,17 @@ static int ibmvstgt_probe(struct vio_dev *dev, const struct vio_device_id *id)
 
 	err = scsi_add_host(shost, target->dev);
 	if (err)
-		goto destroy_queue;
+		goto free_srp_target;
+
+	err = scsi_tgt_alloc_queue(shost);
+	if (err)
+		goto free_srp_target;
 
 	err = crq_queue_create(&vport->crq_queue, target);
 	if (err)
 		goto free_srp_target;
 
-	err = scsi_tgt_alloc_queue(shost);
-	if (err)
-		goto destroy_queue;
-
 	return 0;
-destroy_queue:
-	crq_queue_destroy(target);
 free_srp_target:
 	srp_target_free(target);
 put_host:
