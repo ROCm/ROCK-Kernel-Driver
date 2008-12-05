@@ -51,4 +51,6 @@ source "drivers/staging/rt2860/Kconfig"
 
 source "drivers/staging/benet/Kconfig"
 
+source "drivers/staging/rtl8187se/Kconfig"
+
 endif # STAGING

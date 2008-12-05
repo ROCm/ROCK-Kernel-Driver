@@ -17,3 +17,4 @@ obj-$(CONFIG_AGNX)		+= agnx/
 obj-$(CONFIG_OTUS)		+= otus/
 obj-$(CONFIG_RT2860)		+= rt2860/
 obj-$(CONFIG_BENET)		+= benet/
+obj-$(CONFIG_RTL8187SE)		+= rtl8187se/
