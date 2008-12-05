@@ -45,9 +45,6 @@ static int fc_disc_debug;
 			FC_DBG(fmt);		\
 	} while (0)
 
-static struct mutex		disc_list_lock;
-static struct list_head		disc_list;
-
 struct fc_disc {
 	unsigned char		retry_count;
 	unsigned char		delay;
@@ -66,7 +63,6 @@ struct fc_disc {
 	struct fc_gpn_ft_resp	partial_buf;	/* partial name buffer */
 	struct delayed_work	disc_work;
 
-	struct list_head	list;
 };
 
 static void fc_disc_gpn_ft_req(struct fc_disc *);
@@ -87,33 +83,26 @@ static void fc_disc_restart(struct fc_disc *);
 struct fc_rport *fc_disc_lookup_rport(const struct fc_lport *lport,
 				      u32 port_id)
 {
-	struct fc_disc *disc;
+	struct fc_disc *disc = lport->disc;
 	struct fc_rport *rport, *found = NULL;
 	struct fc_rport_libfc_priv *rdata;
 	int disc_found = 0;
 
-	mutex_lock(&disc_list_lock);
-	list_for_each_entry(disc, &disc_list, list) {
-		if (disc->lport == lport) {
-			list_for_each_entry(rdata, &disc->rports, peers) {
-				rport = PRIV_TO_RPORT(rdata);
-				if (rport->port_id == port_id) {
-					disc_found = 1;
-					found = rport;
-					get_device(&found->dev);
-					break;
-				}
-			}
+	if (!disc)
+		return NULL;
+
+	list_for_each_entry(rdata, &disc->rports, peers) {
+		rport = PRIV_TO_RPORT(rdata);
+		if (rport->port_id == port_id) {
+			disc_found = 1;
+			found = rport;
+			get_device(&found->dev);
+			break;
 		}
 	}
-	mutex_unlock(&disc_list_lock);
 
-	if (!disc_found) {
-		FC_DEBUG_DISC("The rport (%6x) for lport (%6x) "
-			      "is not maintained by the discovery layer\n",
-			      port_id, fc_host_port_id(lport->host));
+	if (!disc_found)
 		found = NULL;
-	}
 
 	return found;
 }
@@ -127,18 +116,14 @@ static inline struct fc_disc *fc_disc_alloc(struct fc_lport *lport)
 	struct fc_disc *disc;
 
 	disc = kzalloc(sizeof(struct fc_disc), GFP_KERNEL);
-	INIT_LIST_HEAD(&disc->list);
 	INIT_DELAYED_WORK(&disc->disc_work, fc_disc_timeout);
 	mutex_init(&disc->disc_mutex);
 	INIT_LIST_HEAD(&disc->rports);
 
 	disc->lport = lport;
+	lport->disc = disc;
 	disc->delay = FC_DISC_DELAY;
 	disc->event = DISC_EV_NONE;
-
-	mutex_lock(&disc_list_lock);
-	list_add_tail(&disc->list, &disc_list);
-	mutex_unlock(&disc_list_lock);
 
 	return disc;
 }
@@ -182,23 +167,19 @@ static void fc_disc_rport_event(struct fc_lport *lport,
 				enum fc_lport_event event)
 {
 	struct fc_rport_libfc_priv *rdata = rport->dd_data;
-	struct fc_disc *disc;
+	struct fc_disc *disc = lport->disc;
 	int found = 0;
 
 	FC_DEBUG_DISC("Received a %d event for port (%6x)\n", event,
 		      rport->port_id);
 
 	if (event == RPORT_EV_CREATED) {
-		mutex_lock(&disc_list_lock);
-		list_for_each_entry(disc, &disc_list, list) {
-			if (disc->lport == lport) {
-				found = 1;
-				mutex_lock(&disc->disc_mutex);
-				list_add_tail(&rdata->peers, &disc->rports);
-				mutex_unlock(&disc->disc_mutex);
-			}
+		if (disc) {
+			found = 1;
+			mutex_lock(&disc->disc_mutex);
+			list_add_tail(&rdata->peers, &disc->rports);
+			mutex_unlock(&disc->disc_mutex);
 		}
-		mutex_unlock(&disc_list_lock);
 	}
 
 	if (!found)
@@ -323,19 +304,9 @@ static void fc_disc_recv_req(struct fc_seq *sp, struct fc_frame *fp,
 			     struct fc_lport *lport)
 {
 	u8 op;
-	struct fc_disc *disc;
-	int found = 0;
+	struct fc_disc *disc = lport->disc;
 
-	mutex_lock(&disc_list_lock);
-	list_for_each_entry(disc, &disc_list, list) {
-		if (disc->lport == lport) {
-			found = 1;
-			break;
-		}
-	}
-	mutex_unlock(&disc_list_lock);
-
-	if (!found) {
+	if (!disc) {
 		FC_DBG("Received a request for an lport not managed "
 		       "by the discovery engine\n");
 		return;
@@ -394,19 +365,9 @@ static void fc_disc_start(void (*disc_callback)(struct fc_lport *,
 {
 	struct fc_rport *rport;
 	struct fc_rport_identifiers ids;
-	struct fc_disc *disc;
-	int found = 0;
+	struct fc_disc *disc = lport->disc;
 
-	mutex_lock(&disc_list_lock);
-	list_for_each_entry(disc, &disc_list, list) {
-		if (disc->lport == lport) {
-			found = 1;
-			break;
-		}
-	}
-	mutex_unlock(&disc_list_lock);
-
-	if (!found) {
+	if (!disc) {
 		FC_DEBUG_DISC("No existing discovery job, "
 			      "creating one for lport (%6x)\n",
 			      fc_host_port_id(lport->host));
@@ -510,7 +471,7 @@ static int fc_disc_new_target(struct fc_disc *disc,
 				rport = fc_rport_rogue_create(&dp);
 			}
 			if (!rport)
-				error = ENOMEM;
+				error = -ENOMEM;
 		}
 		if (rport) {
 			rp = rport->dd_data;
@@ -577,18 +538,16 @@ static void fc_disc_error(struct fc_disc *disc, struct fc_frame *fp)
 		if (disc->retry_count < FC_DISC_RETRY_LIMIT) {
 			/* go ahead and retry */
 			if (!fp)
-				delay = msecs_to_jiffies(500);
+				delay = msecs_to_jiffies(FC_DISC_RETRY_DELAY);
 			else {
-				delay = jiffies +
-					msecs_to_jiffies(lport->e_d_tov);
+				delay = msecs_to_jiffies(lport->e_d_tov);
 
 				/* timeout faster first time */
 				if (!disc->retry_count)
 					delay /= 4;
 			}
 			disc->retry_count++;
-			schedule_delayed_work(&disc->disc_work,
-					      delay);
+			schedule_delayed_work(&disc->disc_work, delay);
 		} else {
 			/* exceeded retries */
 			disc->event = DISC_EV_FAILED;
@@ -868,16 +827,12 @@ out:
  */
 void fc_disc_stop(struct fc_lport *lport)
 {
-	struct fc_disc *disc, *next;
+	struct fc_disc *disc = lport->disc;
 
-	mutex_lock(&disc_list_lock);
-	list_for_each_entry_safe(disc, next, &disc_list, list) {
-		if (disc->lport == lport) {
-			cancel_delayed_work_sync(&disc->disc_work);
-			fc_disc_stop_rports(disc);
-		}
+	if (disc) {
+		cancel_delayed_work_sync(&disc->disc_work);
+		fc_disc_stop_rports(disc);
 	}
-	mutex_unlock(&disc_list_lock);
 }
 
 /**
@@ -889,18 +844,8 @@ void fc_disc_stop(struct fc_lport *lport)
  */
 void fc_disc_stop_final(struct fc_lport *lport)
 {
-	struct fc_disc *disc, *next;
 	fc_disc_stop(lport);
 	lport->tt.rport_flush_queue();
-
-	mutex_lock(&disc_list_lock);
-	list_for_each_entry_safe(disc, next, &disc_list, list) {
-		if (disc->lport == lport) {
-			list_del(&disc->list);
-			kfree(disc);
-		}
-	}
-	mutex_unlock(&disc_list_lock);
 }
 
 /**
@@ -909,8 +854,6 @@ void fc_disc_stop_final(struct fc_lport *lport)
  */
 int fc_disc_init(struct fc_lport *lport)
 {
-	INIT_LIST_HEAD(&disc_list);
-	mutex_init(&disc_list_lock);
 
 	if (!lport->tt.disc_start)
 		lport->tt.disc_start = fc_disc_start;

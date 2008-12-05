@@ -378,7 +378,6 @@ int fc_seq_exch_abort(const struct fc_seq *req_sp, unsigned int timer_msec)
 		return -ENOMEM;
 	}
 
-	sp->f_ctl |= FC_FC_SEQ_INIT;
 	ep->esb_stat |= ESB_ST_SEQ_INIT | ESB_ST_ABNORMAL;
 	if (timer_msec)
 		fc_exch_timer_set_locked(ep, timer_msec);
@@ -466,7 +465,6 @@ static struct fc_seq *fc_seq_alloc(struct fc_exch *ep, u8 seq_id)
 
 	sp = &ep->seq;
 	sp->ssb_stat = 0;
-	sp->f_ctl = 0;
 	sp->cnt = 0;
 	sp->id = seq_id;
 	return sp;
@@ -530,7 +528,7 @@ static u16 fc_em_alloc_xid(struct fc_exch_mgr *mp, const struct fc_frame *fp)
 struct fc_exch *fc_exch_alloc(struct fc_exch_mgr *mp,
 			      struct fc_frame *fp, u16 xid)
 {
-	struct fc_exch *ep = NULL;
+	struct fc_exch *ep;
 
 	/* allocate memory for exchange */
 	ep = mempool_alloc(mp->ep_pool, GFP_ATOMIC);
@@ -834,8 +832,8 @@ static struct fc_seq *fc_seq_start_next_locked(struct fc_seq *sp)
 	struct fc_exch *ep = fc_seq_exch(sp);
 
 	sp = fc_seq_alloc(ep, ep->seq_id++);
-	FC_DEBUG_EXCH("exch %4x f_ctl %6x seq %2x f_ctl %6x\n",
-		      ep->xid, ep->f_ctl, sp->id, sp->f_ctl);
+	FC_DEBUG_EXCH("exch %4x f_ctl %6x seq %2x\n",
+		      ep->xid, ep->f_ctl, sp->id);
 	return sp;
 }
 /*
@@ -860,12 +858,13 @@ int fc_seq_send(struct fc_lport *lp, struct fc_seq *sp, struct fc_frame *fp)
 	struct fc_exch *ep;
 	struct fc_frame_header *fh = fc_frame_header_get(fp);
 	int error;
+	u32	f_ctl;
 
 	ep = fc_seq_exch(sp);
 	WARN_ON((ep->esb_stat & ESB_ST_SEQ_INIT) != ESB_ST_SEQ_INIT);
 
-	sp->f_ctl = ntoh24(fh->fh_f_ctl);
-	fc_exch_setup_hdr(ep, fp, sp->f_ctl);
+	f_ctl = ntoh24(fh->fh_f_ctl);
+	fc_exch_setup_hdr(ep, fp, f_ctl);
 
 	/*
 	 * update sequence count if this frame is carrying
@@ -889,9 +888,8 @@ int fc_seq_send(struct fc_lport *lp, struct fc_seq *sp, struct fc_frame *fp)
 	 * We can only be called to send once for each sequence.
 	 */
 	spin_lock_bh(&ep->ex_lock);
-	ep->f_ctl &= ~FC_FC_FIRST_SEQ;	/* not first seq */
-	sp->f_ctl &= ~FC_FC_FIRST_SEQ;	/* not first seq */
-	if (sp->f_ctl & (FC_FC_END_SEQ | FC_FC_SEQ_INIT))
+	ep->f_ctl = f_ctl & ~FC_FC_FIRST_SEQ;	/* not first seq */
+	if (f_ctl & (FC_FC_END_SEQ | FC_FC_SEQ_INIT))
 		ep->esb_stat &= ~ESB_ST_SEQ_INIT;
 	spin_unlock_bh(&ep->ex_lock);
 	return error;
@@ -930,8 +928,9 @@ static void fc_seq_send_last(struct fc_seq *sp, struct fc_frame *fp,
 	struct fc_exch *ep = fc_seq_exch(sp);
 
 	f_ctl = FC_FC_LAST_SEQ | FC_FC_END_SEQ | FC_FC_SEQ_INIT;
+	f_ctl |= ep->f_ctl;
 	fc_fill_fc_hdr(fp, rctl, ep->did, ep->sid, fh_type, f_ctl, 0);
-	fc_seq_send(fc_seq_exch(sp)->lp, sp, fp);
+	fc_seq_send(ep->lp, sp, fp);
 }
 
 /*
@@ -952,7 +951,6 @@ static void fc_seq_send_ack(struct fc_seq *sp, const struct fc_frame *rx_fp)
 	 */
 	if (fc_sof_needs_ack(fr_sof(rx_fp))) {
 		fp = fc_frame_alloc(lp, 0);
-		BUG_ON(!fp);
 		if (!fp)
 			return;
 
@@ -1848,7 +1846,6 @@ struct fc_seq *fc_exch_seq_send(struct fc_lport *lp,
 	ep->r_a_tov = FC_DEF_R_A_TOV;
 	ep->lp = lp;
 	sp = &ep->seq;
-	WARN_ON((sp->f_ctl & FC_FC_END_SEQ) != 0);
 
 	ep->fh_type = fh->fh_type; /* save for possbile timeout handling */
 	ep->f_ctl = ntoh24(fh->fh_f_ctl);
@@ -1861,7 +1858,6 @@ struct fc_seq *fc_exch_seq_send(struct fc_lport *lp,
 	if (timer_msec)
 		fc_exch_timer_set_locked(ep, timer_msec);
 	ep->f_ctl &= ~FC_FC_FIRST_SEQ;	/* not first seq */
-	sp->f_ctl = ep->f_ctl;	/* save for possible abort */
 
 	if (ep->f_ctl & FC_FC_SEQ_INIT)
 		ep->esb_stat &= ~ESB_ST_SEQ_INIT;

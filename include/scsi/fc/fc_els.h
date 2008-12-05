@@ -401,6 +401,20 @@ struct fc_els_prli {
 };
 
 /*
+ * ELS_ADISC payload
+ */
+struct fc_els_adisc {
+	__u8		adisc_cmd;
+	__u8		adisc_resv[3];
+	__u8            adisc_resv1;
+	__u8            adisc_hard_addr[3];
+	__be64          adisc_wwpn;
+	__be64          adisc_wwnn;
+	__u8            adisc_resv2;
+	__u8            adisc_port_id[3];
+} __attribute__((__packed__));
+
+/*
  * ELS_LOGO - process or fabric logout.
  */
 struct fc_els_logo {

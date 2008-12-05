@@ -287,7 +287,6 @@ struct fc_seq {
 	u8	id;		/* seq ID */
 	u16	ssb_stat;	/* status flags for sequence status block */
 	u16	cnt;		/* frames sent so far on sequence */
-	u32	f_ctl;		/* F_CTL flags for frames */
 	u32	rec_data;	/* FC-4 value for REC */
 };
 
@@ -570,6 +569,8 @@ struct libfc_function_template {
 	void (*disc_stop_final) (struct fc_lport *);
 };
 
+struct fc_disc;
+
 struct fc_lport {
 	struct list_head list;
 
@@ -578,6 +579,7 @@ struct fc_lport {
 	struct fc_exch_mgr	*emp;
 	struct fc_rport		*dns_rp;
 	struct fc_rport		*ptp_rp;
+	struct fc_disc          *disc;
 	void			*scsi_priv;
 
 	/* Operational Information */

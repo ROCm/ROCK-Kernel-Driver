@@ -42,6 +42,7 @@
 MODULE_AUTHOR("Open-FCoE.org");
 MODULE_DESCRIPTION("libfc");
 MODULE_LICENSE("GPL");
+MODULE_VERSION("1.0.5");
 
 static int fc_fcp_debug;
 

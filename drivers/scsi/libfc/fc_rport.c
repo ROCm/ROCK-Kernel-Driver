@@ -333,7 +333,11 @@ int fc_rport_logoff(struct fc_rport *rport)
 	 */
 	fc_rport_state_enter(rport, RPORT_ST_NONE);
 
+	mutex_unlock(&rdata->rp_mutex);
+
 	cancel_delayed_work_sync(&rdata->retry_work);
+
+	mutex_lock(&rdata->rp_mutex);
 
 	rdata->event = RPORT_EV_STOP;
 	queue_work(rport_event_queue, &rdata->event_work);

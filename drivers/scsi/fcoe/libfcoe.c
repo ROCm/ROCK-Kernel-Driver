@@ -59,7 +59,7 @@ static int debug_fcoe;
 MODULE_AUTHOR("Open-FCoE.org");
 MODULE_DESCRIPTION("FCoE");
 MODULE_LICENSE("GPL");
-MODULE_VERSION("1.0.4");
+MODULE_VERSION("1.0.5");
 
 /* fcoe host list */
 LIST_HEAD(fcoe_hostlist);
@@ -453,10 +453,9 @@ int fcoe_xmit(struct fc_lport *lp, struct fc_frame *fp)
 	/* adjust skb netowrk/transport offsets to match mac/fcoe/fc */
 	skb_push(skb, elen + hlen);
 	skb_reset_mac_header(skb);
-	skb_set_network_header(skb, elen);
-	skb_set_transport_header(skb, elen + hlen);
+	skb_reset_network_header(skb);
 	skb->mac_len = elen;
-	skb->protocol = htons(ETH_P_FCOE);
+	skb->protocol = htons(ETH_P_802_3);
 	skb->dev = fc->real_dev;
 
 	/* fill up mac and fcoe headers */
@@ -473,7 +472,7 @@ int fcoe_xmit(struct fc_lport *lp, struct fc_frame *fp)
 	else
 		memcpy(eh->h_source, fc->data_src_addr, ETH_ALEN);
 
-	hp = (struct fcoe_hdr *)skb_network_header(skb);
+	hp = (struct fcoe_hdr *)(eh + 1);
 	memset(hp, 0, sizeof(*hp));
 	if (FC_FCOE_VER)
 		FC_FCOE_ENCAPS_VER(hp, FC_FCOE_VER);
