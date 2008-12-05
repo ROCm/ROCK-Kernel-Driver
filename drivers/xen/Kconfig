@@ -266,7 +266,7 @@ config XEN_SYSFS
 
 config XEN_NR_GUEST_DEVICES
 	int "Number of guest devices"
-	range 0 4032 if CONFIG_64BIT
+	range 0 4032 if 64BIT
 	range 0 960
 	default 256 if XEN_BACKEND
 	default 16
