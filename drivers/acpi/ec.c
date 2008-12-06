@@ -121,6 +121,8 @@ static struct acpi_ec {
 	spinlock_t curr_lock;
 } *boot_ec, *first_ec;
 
+int acpi_ec_intr = 1; /* Default is interrupt mode */
+
 /* 
  * Some Asus system have exchanged ECDT data/command IO addresses.
  */
@@ -897,6 +899,8 @@ static int ec_install_handlers(struct acpi_ec *ec)
 				  &acpi_ec_gpe_handler, ec);
 	if (ACPI_FAILURE(status))
 		return -ENODEV;
+	if (!acpi_ec_intr)
+		set_bit(EC_FLAGS_NO_GPE, &ec->flags);
 	acpi_set_gpe_type(NULL, ec->gpe, ACPI_GPE_TYPE_RUNTIME);
 	acpi_enable_gpe(NULL, ec->gpe, ACPI_NOT_ISR);
 	status = acpi_install_address_space_handler(ec->handle,
@@ -1088,3 +1092,14 @@ static void __exit acpi_ec_exit(void)
 	return;
 }
 #endif	/* 0 */
+
+static int __init acpi_ec_set_intr_mode(char *str)
+{
+	if (!get_option(&str, &acpi_ec_intr)) {
+		acpi_ec_intr = 0;
+		return 0;
+	}
+	return 1;
+}
+
+__setup("ec_intr=", acpi_ec_set_intr_mode);
