@@ -951,6 +951,43 @@ void dm_table_set_restrictions(struct dm_table *t, struct request_queue *q)
 		queue_flag_set_unlocked(QUEUE_FLAG_STACKABLE, q);
 }
 
+void dm_table_set_integrity(struct dm_table *t, struct mapped_device *md)
+{
+	struct list_head *devices = dm_table_get_devices(t);
+	struct dm_dev *prev, *cur;
+
+	/*
+	 * Run through all devices to ensure they have matching
+	 * integrity profile
+	 */
+	cur = prev = NULL;
+
+	list_for_each_entry(cur, devices, list) {
+
+		if (prev && blk_integrity_compare(prev->bdev->bd_disk,
+						  cur->bdev->bd_disk) < 0) {
+			printk(KERN_ERR "%s: %s %s Integrity mismatch!\n",
+			       __func__, prev->bdev->bd_disk->disk_name,
+			       cur->bdev->bd_disk->disk_name);
+			return;
+		}
+		prev = cur;
+	}
+
+	/* Register dm device as being integrity capable */
+	if (prev && bdev_get_integrity(prev->bdev)) {
+		struct gendisk *disk = dm_disk(md);
+
+		if (blk_integrity_register(dm_disk(md),
+					   bdev_get_integrity(prev->bdev)))
+			printk(KERN_ERR "%s: %s Could not register integrity!\n",
+			       __func__, disk->disk_name);
+		else
+			printk(KERN_INFO "Enabling data integrity on %s\n",
+			       disk->disk_name);
+	}
+}
+
 unsigned int dm_table_get_num_targets(struct dm_table *t)
 {
 	return t->num_targets;

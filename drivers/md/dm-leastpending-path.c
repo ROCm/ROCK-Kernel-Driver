@@ -1,5 +1,5 @@
 /*
-  *****************************************************************************
+ *****************************************************************************
  *                                                                           *
  *     (C)  Copyright 2008 Hewlett-Packard Development Company, L.P          *
  *                                                                           *
@@ -206,7 +206,7 @@ static struct dm_path* lpp_find_least_pending_io_path(struct selector *s)
 }
 
 static struct dm_path *lpp_select_path(struct path_selector *ps,
-				   unsigned *repeat_count)
+				       unsigned *repeat_count, size_t nr_bytes)
 {
 	struct selector *s = (struct selector *) ps->context;
 	return lpp_find_least_pending_io_path(s);

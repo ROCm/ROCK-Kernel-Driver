@@ -99,6 +99,7 @@ struct multipath {
  */
 struct dm_mpath_io {
 	struct pgpath *pgpath;
+	size_t nr_bytes;
 };
 
 typedef int (*action_fn) (struct pgpath *pgpath);
@@ -246,11 +247,12 @@ static void __switch_pg(struct multipath *m, struct pgpath *pgpath)
 	m->pg_init_count = 0;
 }
 
-static int __choose_path_in_pg(struct multipath *m, struct priority_group *pg)
+static int __choose_path_in_pg(struct multipath *m, struct priority_group *pg,
+			       size_t nr_bytes)
 {
 	struct dm_path *path;
 
-	path = pg->ps.type->select_path(&pg->ps, &m->repeat_count);
+	path = pg->ps.type->select_path(&pg->ps, &m->repeat_count, nr_bytes);
 	if (!path)
 		return -ENXIO;
 
@@ -262,7 +264,7 @@ static int __choose_path_in_pg(struct multipath *m, struct priority_group *pg)
 	return 0;
 }
 
-static void __choose_pgpath(struct multipath *m)
+static void __choose_pgpath(struct multipath *m, size_t nr_bytes)
 {
 	struct priority_group *pg;
 	unsigned bypassed = 1;
@@ -274,12 +276,12 @@ static void __choose_pgpath(struct multipath *m)
 	if (m->next_pg) {
 		pg = m->next_pg;
 		m->next_pg = NULL;
-		if (!__choose_path_in_pg(m, pg))
+		if (!__choose_path_in_pg(m, pg, nr_bytes))
 			return;
 	}
 
 	/* Don't change PG until it has no remaining paths */
-	if (m->current_pg && !__choose_path_in_pg(m, m->current_pg))
+	if (m->current_pg && !__choose_path_in_pg(m, m->current_pg, nr_bytes))
 		return;
 
 	/*
@@ -291,7 +293,7 @@ static void __choose_pgpath(struct multipath *m)
 		list_for_each_entry(pg, &m->priority_groups, list) {
 			if (pg->bypassed == bypassed)
 				continue;
-			if (!__choose_path_in_pg(m, pg))
+			if (!__choose_path_in_pg(m, pg, nr_bytes))
 				return;
 		}
 	} while (bypassed--);
@@ -322,6 +324,7 @@ static int map_io(struct multipath *m, struct request *clone,
 		  struct dm_mpath_io *mpio, unsigned was_queued)
 {
 	int r = DM_MAPIO_REMAPPED;
+	size_t nr_bytes = blk_rq_bytes(clone);
 	unsigned long flags;
 	struct pgpath *pgpath;
 	struct block_device *bdev;
@@ -331,7 +334,7 @@ static int map_io(struct multipath *m, struct request *clone,
 	/* Do we need to select a new pgpath? */
 	if (!m->current_pgpath ||
 	    (!m->queue_io && (m->repeat_count && --m->repeat_count == 0)))
-		__choose_pgpath(m);
+		__choose_pgpath(m, nr_bytes);
 
 	pgpath = m->current_pgpath;
 
@@ -358,6 +361,11 @@ static int map_io(struct multipath *m, struct request *clone,
 		r = -EIO;	/* Failed */
 
 	mpio->pgpath = pgpath;
+	mpio->nr_bytes = nr_bytes;
+
+	if (r == DM_MAPIO_REMAPPED && pgpath->pg->ps.type->start_io)
+		pgpath->pg->ps.type->start_io(&pgpath->pg->ps, &pgpath->path,
+					      nr_bytes);
 
 	spin_unlock_irqrestore(&m->lock, flags);
 
@@ -437,7 +445,7 @@ static void process_queued_ios(struct work_struct *work)
 		goto out;
 
 	if (!m->current_pgpath)
-		__choose_pgpath(m);
+		__choose_pgpath(m, 1 << 19); /* Assume 512 KB */
 
 	pgpath = m->current_pgpath;
 
@@ -1190,7 +1198,7 @@ static int multipath_end_io(struct dm_target *ti, struct request *clone,
 	if (pgpath) {
 		ps = &pgpath->pg->ps;
 		if (ps->type->end_io)
-			ps->type->end_io(ps, &pgpath->path);
+			ps->type->end_io(ps, &pgpath->path, mpio->nr_bytes);
 	}
 	mempool_free(mpio, m->mpio_pool);
 
@@ -1409,7 +1417,7 @@ static int multipath_ioctl(struct dm_target *ti, struct inode *inode,
 	spin_lock_irqsave(&m->lock, flags);
 
 	if (!m->current_pgpath)
-		__choose_pgpath(m);
+		__choose_pgpath(m, 1 << 19); /* Assume 512KB */
 
 	if (m->current_pgpath) {
 		bdev = m->current_pgpath->path.dev->bdev;

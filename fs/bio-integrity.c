@@ -107,7 +107,8 @@ void bio_integrity_free(struct bio *bio, struct bio_set *bs)
 	BUG_ON(bip == NULL);
 
 	/* A cloned bio doesn't own the integrity metadata */
-	if (!bio_flagged(bio, BIO_CLONED) && bip->bip_buf != NULL)
+	if (!bio_flagged(bio, BIO_CLONED) && !bio_flagged(bio, BIO_FS_INTEGRITY)
+	    && bip->bip_buf != NULL)
 		kfree(bip->bip_buf);
 
 	mempool_free(bip->bip_vec, bs->bvec_pools[bip->bip_pool]);
@@ -654,19 +655,20 @@ EXPORT_SYMBOL(bio_integrity_split);
  * bio_integrity_clone - Callback for cloning bios with integrity metadata
  * @bio:	New bio
  * @bio_src:	Original bio
+ * @gfp_mask:	Memory allocation mask
  * @bs:		bio_set to allocate bip from
  *
  * Description:	Called to allocate a bip when cloning a bio
  */
 int bio_integrity_clone(struct bio *bio, struct bio *bio_src,
-			struct bio_set *bs)
+			gfp_t gfp_mask, struct bio_set *bs)
 {
 	struct bio_integrity_payload *bip_src = bio_src->bi_integrity;
 	struct bio_integrity_payload *bip;
 
 	BUG_ON(bip_src == NULL);
 
-	bip = bio_integrity_alloc_bioset(bio, GFP_NOIO, bip_src->bip_vcnt, bs);
+	bip = bio_integrity_alloc_bioset(bio, gfp_mask, bip_src->bip_vcnt, bs);
 
 	if (bip == NULL)
 		return -EIO;

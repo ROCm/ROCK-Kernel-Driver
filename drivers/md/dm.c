@@ -1022,6 +1022,13 @@ static struct bio *split_bvec(struct bio *bio, sector_t sector,
 	clone->bi_size = to_bytes(len);
 	clone->bi_io_vec->bv_offset = offset;
 	clone->bi_io_vec->bv_len = clone->bi_size;
+	clone->bi_flags |= 1 << BIO_CLONED;
+
+	if (bio_integrity(bio)) {
+		bio_integrity_clone(clone, bio, GFP_NOIO, bs);
+		bio_integrity_trim(clone,
+				   bio_sector_offset(bio, idx, offset), len);
+	}
 
 	return clone;
 }
@@ -1043,6 +1050,14 @@ static struct bio *clone_bio(struct bio *bio, sector_t sector,
 	clone->bi_vcnt = idx + bv_count;
 	clone->bi_size = to_bytes(len);
 	clone->bi_flags &= ~(1 << BIO_SEG_VALID);
+
+	if (bio_integrity(bio)) {
+		bio_integrity_clone(clone, bio, GFP_NOIO, bs);
+
+		if (idx != bio->bi_idx || clone->bi_size < bio->bi_size)
+			bio_integrity_trim(clone,
+					   bio_sector_offset(bio, idx, 0), len);
+	}
 
 	return clone;
 }
@@ -1365,6 +1380,11 @@ static int clone_request_bios(struct request *clone, struct request *rq,
 		}
 
 		__bio_clone(clone_bio, bio);
+		if (bio_integrity(bio))
+			if (bio_integrity_clone(clone_bio, bio, GFP_ATOMIC,
+						md->bs) < 0)
+				goto free_and_out;
+
 		clone_bio->bi_destructor = dm_bio_destructor;
 		clone_bio->bi_end_io = end_clone_bio;
 		info->rq = clone;
@@ -1835,6 +1855,7 @@ static void free_dev(struct mapped_device *md)
 		mempool_destroy(md->io_pool);
 	if (md->bs)
 		bioset_free(md->bs);
+	blk_integrity_unregister(md->disk);
 	del_gendisk(md->disk);
 	free_minor(minor);
 
@@ -1910,6 +1931,7 @@ static int __bind(struct mapped_device *md, struct dm_table *t)
 	write_lock(&md->map_lock);
 	md->map = t;
 	dm_table_set_restrictions(t, q);
+	dm_table_set_integrity(t, md);
 	if (!(dm_table_get_mode(t) & FMODE_WRITE)) {
 		set_disk_ro(md->disk, 1);
 	} else {
