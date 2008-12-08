@@ -126,7 +126,7 @@ static int aa_is_nameX(struct aa_ext *e, enum aa_code code, const char *name)
 	 * AA_NAME tag value is a u16.
 	 */
 	if (aa_is_X(e, AA_NAME)) {
-		char *tag;
+		char *tag = NULL;
 		size_t size = aa_is_u16_chunk(e, &tag);
 		/* if a name is specified it must match. otherwise skip tag */
 		if (name && (!size || strcmp(name, tag)))

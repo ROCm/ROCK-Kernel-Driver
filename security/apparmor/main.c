@@ -229,9 +229,13 @@ static int aa_audit_base(struct aa_profile *profile, struct aa_audit *sa,
 		audit_log_format(ab, " protocol=%d", sa->protocol);
 	}
 
-        audit_log_format(ab, " pid=%d", current->pid);
+	audit_log_format(ab, " pid=%d", current->pid);
 
 	if (profile) {
+		if (!sa->parent)
+			audit_log_format(ab, " parent=%d",
+					 current->real_parent->pid);
+
 		audit_log_format(ab, " profile=");
 		audit_log_untrustedstring(ab, profile->name);
 
@@ -325,7 +329,7 @@ static int aa_audit_file(struct aa_profile *profile, struct aa_audit *sa)
 	} else {
 		int mask = AUDIT_QUIET_MASK(sa->audit_mask);
 
-		if (!(sa->denied_mask & ~mask))
+		if (!(sa->denied_mask & ~mask) && !PROFILE_COMPLAIN(profile))
 			return sa->error_code;
 
 		/* mask off perms whose denial is being silenced */
@@ -1006,10 +1010,6 @@ repeat:
 
 		unlock_profile(profile);
 
-		if (APPARMOR_COMPLAIN(child_cxt) &&
-		    profile == profile->ns->null_complain_profile) {
-			aa_audit_hint(profile, &sa);
-		}
 		aa_put_profile(profile);
 	} else
 		aa_free_task_context(child_cxt);

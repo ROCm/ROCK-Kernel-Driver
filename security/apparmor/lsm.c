@@ -143,20 +143,6 @@ static int param_set_aa_enabled(const char *val, struct kernel_param *kp)
 	return 0;
 }
 
-static int aa_reject_syscall(struct task_struct *task, gfp_t flags,
-			     const char *name)
-{
-	struct aa_profile *profile = aa_get_profile(task);
-	int error = 0;
-
-	if (profile) {
-		error = aa_audit_syscallreject(profile, flags, name);
-		aa_put_profile(profile);
-	}
-
-	return error;
-}
-
 static int apparmor_ptrace(struct task_struct *parent,
 			   struct task_struct *child)
 {
@@ -290,17 +276,6 @@ static int apparmor_bprm_secureexec(struct linux_binprm *bprm)
 	}
 
 	return ret;
-}
-
-static int apparmor_sb_mount(char *dev_name, struct path *path, char *type,
-			      unsigned long flags, void *data)
-{
-	return aa_reject_syscall(current, GFP_KERNEL, "mount");
-}
-
-static int apparmor_umount(struct vfsmount *mnt, int flags)
-{
-	return aa_reject_syscall(current, GFP_KERNEL, "umount");
 }
 
 static int apparmor_inode_mkdir(struct inode *dir, struct dentry *dentry,
@@ -911,6 +886,7 @@ static int apparmor_task_setrlimit(unsigned int resource,
 }
 
 struct security_operations apparmor_ops = {
+	.name =				"apparmor",
 	.ptrace_may_access =		apparmor_ptrace_may_access,
 	.ptrace_traceme =		apparmor_ptrace_traceme,
 	.capget =			cap_capget,
@@ -923,9 +899,6 @@ struct security_operations apparmor_ops = {
 	.bprm_apply_creds =		cap_bprm_apply_creds,
 	.bprm_set_security =		apparmor_bprm_set_security,
 	.bprm_secureexec =		apparmor_bprm_secureexec,
-
-	.sb_mount =			apparmor_sb_mount,
-	.sb_umount =			apparmor_umount,
 
 	.inode_mkdir =			apparmor_inode_mkdir,
 	.inode_rmdir =			apparmor_inode_rmdir,
@@ -989,8 +962,8 @@ static int __init apparmor_init(void)
 {
 	int error;
 
-	if (!apparmor_enabled) {
-		info_message("AppArmor disabled by boottime parameter\n");
+	if (!apparmor_enabled || !security_module_enable(&apparmor_ops)) {
+		info_message("AppArmor disabled by boot time parameter\n");
 		return 0;
 	}
 
