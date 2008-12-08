@@ -115,12 +115,6 @@ static ssize_t pfm_controls_show(struct kobject *kobj, struct kobj_attribute *at
 
 	if (is_attr_name(attr, "arg_mem_max"))
 		return snprintf(buf, PAGE_SIZE, "%zu\n", pfm_controls.arg_mem_max);
-
-	if (is_attr_name(attr, "syscall")) {
-		base = pfm_arch_get_base_syscall();
-		return snprintf(buf, PAGE_SIZE, "%d\n",  base);
-	}
-
 	if (is_attr_name(attr, "sys_sessions_count"))
 		return pfm_sysfs_res_show(buf, PAGE_SIZE, 1);
 
@@ -192,7 +186,6 @@ skip:
  */
 static PFM_RO_ATTR(version, pfm_controls_show);
 static PFM_RO_ATTR(task_sessions_count, pfm_controls_show);
-static PFM_RO_ATTR(syscall, pfm_controls_show);
 static PFM_RO_ATTR(sys_sessions_count, pfm_controls_show);
 static PFM_RO_ATTR(smpl_buffer_mem_cur, pfm_controls_show);
 
@@ -206,7 +199,6 @@ static PFM_RW_ATTR(reset_stats, pfm_controls_show, pfm_controls_store);
 
 static struct attribute *pfm_kernel_attrs[] = {
 	&attr_version.attr,
-	&attr_syscall.attr,
 	&attr_task_sessions_count.attr,
 	&attr_sys_sessions_count.attr,
 	&attr_smpl_buffer_mem_cur.attr,

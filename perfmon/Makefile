@@ -7,6 +7,7 @@ obj-y = perfmon_init.o perfmon_rw.o perfmon_res.o           \
 	perfmon_file.o perfmon_ctxsw.o perfmon_intr.o	    \
 	perfmon_dfl_smpl.o perfmon_sets.o perfmon_hotplug.o \
 	perfmon_msg.o perfmon_smpl.o perfmon_attach.o       \
-	perfmon_activate.o perfmon_ctx.o perfmon_fmt.o
+	perfmon_activate.o perfmon_ctx.o perfmon_fmt.o	    \
+	perfmon_control.o
 
 obj-$(CONFIG_PERFMON_DEBUG_FS) +=  perfmon_debugfs.o

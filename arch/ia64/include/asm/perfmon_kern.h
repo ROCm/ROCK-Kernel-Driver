@@ -333,11 +333,6 @@ static inline void pfm_release_dbregs(struct task_struct *task)
 
 #define pfm_use_dbregs(_t)     __pfm_use_dbregs(_t)
 
-static inline int pfm_arch_get_base_syscall(void)
-{
-	return __NR_pfm_create_context;
-}
-
 struct pfm_arch_pmu_info {
 	unsigned long mask_pmcs[PFM_PMC_BV]; /* modify on when masking */
 };

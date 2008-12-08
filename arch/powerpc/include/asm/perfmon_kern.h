@@ -359,11 +359,6 @@ static inline void pfm_arch_arm_handle_work(struct task_struct *task)
 static inline void pfm_arch_disarm_handle_work(struct task_struct *task)
 {}
 
-static inline int pfm_arch_get_base_syscall(void)
-{
-	return __NR_pfm_create_context;
-}
-
 struct pfm_arch_context {
 	/* Cell: Most recent value of the pm_status
 	 * register read by the interrupt handler.

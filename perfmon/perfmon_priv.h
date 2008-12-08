@@ -158,6 +158,7 @@ static inline void pfm_check_save_prev_ctx(void)
 
 
 int pfm_init_fs(void);
+int pfm_init_control(void);
 
 int pfm_init_hotplug(void);
 
@@ -177,6 +178,30 @@ static inline void pfm_post_work(struct task_struct *task,
 #define PFM_PMC_STK_ARG	PFM_ARCH_PMC_STK_ARG
 #define PFM_PMD_STK_ARG	PFM_ARCH_PMD_STK_ARG
 
+/* these used to be in linux/syscalls.h, now accessed via ioctl interface */
+asmlinkage long sys_pfm_create_context(struct pfarg_ctx __user *ureq,
+				       char __user *fmt_name,
+				       void __user *fmt_uarg, size_t fmt_size);
+asmlinkage long sys_pfm_write_pmcs(int fd, struct pfarg_pmc __user *ureq,
+				   int count);
+asmlinkage long sys_pfm_write_pmds(int fd, struct pfarg_pmd __user *ureq,
+				   int count);
+asmlinkage long sys_pfm_read_pmds(int fd, struct pfarg_pmd __user *ureq,
+				  int count);
+asmlinkage long sys_pfm_restart(int fd);
+asmlinkage long sys_pfm_stop(int fd);
+asmlinkage long sys_pfm_start(int fd, struct pfarg_start __user *ureq);
+asmlinkage long sys_pfm_load_context(int fd, struct pfarg_load __user *ureq);
+asmlinkage long sys_pfm_unload_context(int fd);
+asmlinkage long sys_pfm_delete_evtsets(int fd,
+				       struct pfarg_setinfo __user *ureq,
+				       int count);
+asmlinkage long sys_pfm_create_evtsets(int fd,
+				       struct pfarg_setdesc __user *ureq,
+				       int count);
+asmlinkage long sys_pfm_getinfo_evtsets(int fd,
+					struct pfarg_setinfo __user *ureq,
+					int count);
 #endif /* CONFIG_PERFMON */
 
 #endif /* __PERFMON_PRIV_H__ */

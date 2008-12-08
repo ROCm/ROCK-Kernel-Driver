@@ -260,11 +260,6 @@ static inline int pfm_arch_pmu_config_init(struct pfm_pmu_config *cfg)
 	return 0;
 }
 
-static inline int pfm_arch_get_base_syscall(void)
-{
-	return __NR_pfm_create_context;
-}
-
 struct pfm_arch_context {
 	/* empty */
 };

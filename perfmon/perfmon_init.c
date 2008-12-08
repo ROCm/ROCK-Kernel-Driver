@@ -50,7 +50,7 @@ DEFINE_PER_CPU(struct pfm_stats, pfm_stats);
 DEFINE_PER_CPU(struct hrtimer, pfm_hrtimer);
 
 
-int perfmon_disabled;	/* >0 if perfmon is disabled */
+int perfmon_disabled = 0;	/* >0 if perfmon is disabled */
 
 /*
  * called from cpu_init() and pfm_pmu_register()
@@ -102,6 +102,9 @@ int __init pfm_init(void)
 		goto error_disable;
 
 	if (pfm_init_sysfs())
+		goto error_disable;
+
+	if (pfm_init_control())
 		goto error_disable;
 
 	/* not critical, so no error checking */

@@ -525,16 +525,6 @@ static inline void pfm_arch_arm_handle_work(struct task_struct *task)
 static inline void pfm_arch_disarm_handle_work(struct task_struct *task)
 {}
 
-static inline int pfm_arch_get_base_syscall(void)
-{
-#ifdef __x86_64__
-	/* 32-bit syscall definition coming from ia32_unistd.h */
-	if (test_thread_flag(TIF_IA32))
-		return __NR_ia32_pfm_create_context;
-#endif
-	return __NR_pfm_create_context;
-}
-
 #define PFM_ARCH_CTX_SIZE	(sizeof(struct pfm_arch_context))
 /*
  * x86 does not need extra alignment requirements for the sampling buffer
