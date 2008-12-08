@@ -165,7 +165,6 @@ static void pcie_aspm_configure_common_clock(struct pci_dev *pdev)
 	u16 reg16 = 0;
 	struct pci_dev *child_dev;
 	int same_clock = 1;
-	int loop_count = 0;
 
 	/*
 	 * all functions of a slot should have the same Slot Clock
@@ -213,15 +212,12 @@ static void pcie_aspm_configure_common_clock(struct pci_dev *pdev)
 	pci_write_config_word(pdev, pos + PCI_EXP_LNKCTL, reg16);
 
 	/* Wait for link training end */
-	while (loop_count < 100) {
+	while (1) {
 		pci_read_config_word(pdev, pos + PCI_EXP_LNKSTA, &reg16);
 		if (!(reg16 & PCI_EXP_LNKSTA_LT))
 			break;
 		cpu_relax();
-		loop_count++;
 	}
-	if (loop_count == 100) 
-		dev_printk (KERN_WARNING, &pdev->dev, "Could not configure ASPM\n");
 }
 
 /*
