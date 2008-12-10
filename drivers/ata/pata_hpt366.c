@@ -30,7 +30,7 @@
 #define DRV_VERSION	"0.6.2"
 
 struct hpt_clock {
-	u8	xfer_speed;
+	u8	xfer_mode;
 	u32	timing;
 };
 
@@ -183,41 +183,68 @@ static unsigned long hpt366_filter(struct ata_device *adev, unsigned long mask)
 			mask &= ~(0xF8 << ATA_SHIFT_UDMA);
 		if (hpt_dma_blacklisted(adev, "UDMA4", bad_ata66_4))
 			mask &= ~(0xF0 << ATA_SHIFT_UDMA);
-	}
+	} else if (adev->class == ATA_DEV_ATAPI)
+		mask &= ~(ATA_MASK_MWDMA | ATA_MASK_UDMA);
+
 	return ata_bmdma_mode_filter(adev, mask);
-}
-
-/**
- *	hpt36x_find_mode	-	reset the hpt36x bus
- *	@ap: ATA port
- *	@speed: transfer mode
- *
- *	Return the 32bit register programming information for this channel
- *	that matches the speed provided.
- */
-
-static u32 hpt36x_find_mode(struct ata_port *ap, int speed)
-{
-	struct hpt_clock *clocks = ap->host->private_data;
-
-	while(clocks->xfer_speed) {
-		if (clocks->xfer_speed == speed)
-			return clocks->timing;
-		clocks++;
-	}
-	BUG();
-	return 0xffffffffU;	/* silence compiler warning */
 }
 
 static int hpt36x_cable_detect(struct ata_port *ap)
 {
-	u8 ata66;
 	struct pci_dev *pdev = to_pci_dev(ap->host->dev);
+	u8 ata66;
 
+	/*
+	 * Each channel of pata_hpt366 occupies separate PCI function
+	 * as the primary channel and bit1 indicates the cable type.
+	 */
 	pci_read_config_byte(pdev, 0x5A, &ata66);
-	if (ata66 & (1 << ap->port_no))
+	if (ata66 & 2)
 		return ATA_CBL_PATA40;
 	return ATA_CBL_PATA80;
+}
+
+static void hpt366_set_mode(struct ata_port *ap, struct ata_device *adev,
+			    u8 mode)
+{
+	struct hpt_clock *clocks = ap->host->private_data;
+	struct pci_dev *pdev = to_pci_dev(ap->host->dev);
+	u32 addr1 = 0x40 + 4 * (adev->devno + 2 * ap->port_no);
+	u32 addr2 = 0x51 + 4 * ap->port_no;
+	u32 mask, reg;
+	u8 fast;
+
+	/* Fast interrupt prediction disable, hold off interrupt disable */
+	pci_read_config_byte(pdev, addr2, &fast);
+	if (fast & 0x80) {
+		fast &= ~0x80;
+		pci_write_config_byte(pdev, addr2, fast);
+	}
+
+	/* determine timing mask and find matching clock entry */
+	if (mode < XFER_MW_DMA_0)
+		mask = 0xc1f8ffff;
+	else if (mode < XFER_UDMA_0)
+		mask = 0x303800ff;
+	else
+		mask = 0x30070000;
+
+	while (clocks->xfer_mode) {
+		if (clocks->xfer_mode == mode)
+			break;
+		clocks++;
+	}
+	if (!clocks->xfer_mode)
+		BUG();
+
+	/*
+	 * Combine new mode bits with old config bits and disable
+	 * on-chip PIO FIFO/buffer (and PIO MST mode as well) to avoid
+	 * problems handling I/O errors later.
+	 */
+	pci_read_config_dword(pdev, addr1, &reg);
+	reg = ((reg & ~mask) | (clocks->timing & mask)) & ~0xc0000000;
+	pci_write_config_dword(pdev, addr1, reg);
 }
 
 /**
@@ -230,28 +257,7 @@ static int hpt36x_cable_detect(struct ata_port *ap)
 
 static void hpt366_set_piomode(struct ata_port *ap, struct ata_device *adev)
 {
-	struct pci_dev *pdev = to_pci_dev(ap->host->dev);
-	u32 addr1, addr2;
-	u32 reg;
-	u32 mode;
-	u8 fast;
-
-	addr1 = 0x40 + 4 * (adev->devno + 2 * ap->port_no);
-	addr2 = 0x51 + 4 * ap->port_no;
-
-	/* Fast interrupt prediction disable, hold off interrupt disable */
-	pci_read_config_byte(pdev, addr2, &fast);
-	if (fast & 0x80) {
-		fast &= ~0x80;
-		pci_write_config_byte(pdev, addr2, fast);
-	}
-
-	pci_read_config_dword(pdev, addr1, &reg);
-	mode = hpt36x_find_mode(ap, adev->pio_mode);
-	mode &= ~0x8000000;	/* No FIFO in PIO */
-	mode &= ~0x30070000;	/* Leave config bits alone */
-	reg &= 0x30070000;	/* Strip timing bits */
-	pci_write_config_dword(pdev, addr1, reg | mode);
+	hpt366_set_mode(ap, adev, adev->pio_mode);
 }
 
 /**
@@ -265,28 +271,7 @@ static void hpt366_set_piomode(struct ata_port *ap, struct ata_device *adev)
 
 static void hpt366_set_dmamode(struct ata_port *ap, struct ata_device *adev)
 {
-	struct pci_dev *pdev = to_pci_dev(ap->host->dev);
-	u32 addr1, addr2;
-	u32 reg;
-	u32 mode;
-	u8 fast;
-
-	addr1 = 0x40 + 4 * (adev->devno + 2 * ap->port_no);
-	addr2 = 0x51 + 4 * ap->port_no;
-
-	/* Fast interrupt prediction disable, hold off interrupt disable */
-	pci_read_config_byte(pdev, addr2, &fast);
-	if (fast & 0x80) {
-		fast &= ~0x80;
-		pci_write_config_byte(pdev, addr2, fast);
-	}
-
-	pci_read_config_dword(pdev, addr1, &reg);
-	mode = hpt36x_find_mode(ap, adev->dma_mode);
-	mode |= 0x8000000;	/* FIFO in MWDMA or UDMA */
-	mode &= ~0xC0000000;	/* Leave config bits alone */
-	reg &= 0xC0000000;	/* Strip timing bits */
-	pci_write_config_dword(pdev, addr1, reg | mode);
+	hpt366_set_mode(ap, adev, adev->dma_mode);
 }
 
 static struct scsi_host_template hpt36x_sht = {
@@ -382,10 +367,10 @@ static int hpt36x_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 	/* PCI clocking determines the ATA timing values to use */
 	/* info_hpt366 is safe against re-entry so we can scribble on it */
 	switch((reg1 & 0x700) >> 8) {
-		case 5:
+		case 9:
 			hpriv = &hpt366_40;
 			break;
-		case 9:
+		case 5:
 			hpriv = &hpt366_25;
 			break;
 		default:
