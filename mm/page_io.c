@@ -139,6 +139,8 @@ void swap_sync_page(struct page *page)
 {
 	struct swap_info_struct *sis = page_swap_info(page);
 
+	if (!sis)
+		return;
 	if (sis->flags & SWP_FILE) {
 		struct address_space *mapping = sis->swap_file->f_mapping;
 
