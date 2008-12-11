@@ -2231,7 +2231,7 @@ static int unix_net_init(struct net *net)
 #endif
 	error = 0;
 out:
-	return 0;
+	return error;
 }
 
 static void unix_net_exit(struct net *net)

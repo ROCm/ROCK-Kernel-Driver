@@ -1451,6 +1451,7 @@ static struct snd_emu_chip_details emu_chip_details[] = {
 	 .ca0151_chip = 1,
 	 .spk71 = 1,
 	 .spdif_bug = 1,
+	 .invert_shared_spdif = 1,	/* digital/analog switch swapped */
 	 .ac97_chip = 1} ,
 	/* Tested by shane-alsa@cm.nu 5th Nov 2005 */
 	/* The 0x20061102 does have SB0350 written on it
@@ -1522,6 +1523,7 @@ static struct snd_emu_chip_details emu_chip_details[] = {
 	 .ca0151_chip = 1,
 	 .spk71 = 1,
 	 .spdif_bug = 1,
+	 .invert_shared_spdif = 1,	/* digital/analog switch swapped */
 	 .ac97_chip = 1} ,
 	{.vendor = 0x1102, .device = 0x0004, .subsystem = 0x10021102,
 	 .driver = "Audigy2", .name = "Audigy 2 Platinum [SB0240P]", 
@@ -1541,6 +1543,7 @@ static struct snd_emu_chip_details emu_chip_details[] = {
 	 .ca0102_chip = 1,
 	 .ca0151_chip = 1,
 	 .spdif_bug = 1,
+	 .invert_shared_spdif = 1,	/* digital/analog switch swapped */
 	 .ac97_chip = 1} ,
 	{.vendor = 0x1102, .device = 0x0004, .subsystem = 0x00531102,
 	 .driver = "Audigy", .name = "Audigy 1 [SB0090]", 
