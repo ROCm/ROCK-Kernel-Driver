@@ -1850,7 +1850,6 @@ struct swap_info_struct *page_swap_info(struct page *page)
 		 * In other cases the page should be locked and
 		 * should be in a SwapCache
 		 */
-		WARN_ON(PageLocked(page));
 		return NULL;
 	}
 	return &swap_info[swp_type(swap)];
