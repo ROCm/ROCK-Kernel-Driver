@@ -566,6 +566,9 @@ int dm_get_device(struct dm_target *ti, const char *path, sector_t start,
  */
 void dm_put_device(struct dm_target *ti, struct dm_dev *dd)
 {
+	if (!dd)
+		return;
+
 	if (atomic_dec_and_test(&dd->count)) {
 		close_dev(dd, ti->table->md);
 		list_del(&dd->list);

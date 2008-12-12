@@ -10663,6 +10663,16 @@ static struct alc_config_preset alc262_presets[] = {
 		.channel_mode = alc262_modes,
 		.input_mux = &alc262_capture_source,
 	},
+	[ALC262_NEC] = {
+		.mixers = { alc262_nec_mixer },
+		.init_verbs = { alc262_nec_verbs },
+		.num_dacs = ARRAY_SIZE(alc262_dac_nids),
+		.dac_nids = alc262_dac_nids,
+		.hp_nid = 0x03,
+		.num_channel_mode = ARRAY_SIZE(alc262_modes),
+		.channel_mode = alc262_modes,
+		.input_mux = &alc262_capture_source,
+	},
 	[ALC262_TOSHIBA_S06] = {
 		.mixers = { alc262_toshiba_s06_mixer },
 		.init_verbs = { alc262_init_verbs, alc262_toshiba_s06_verbs,
