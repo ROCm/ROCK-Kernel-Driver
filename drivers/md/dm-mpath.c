@@ -141,7 +141,8 @@ static void deactivate_path(struct work_struct *work)
 	struct pgpath *pgpath =
 		container_of(work, struct pgpath, deactivate_path);
 
-	blk_abort_queue(pgpath->path.dev->bdev->bd_disk->queue);
+	if (pgpath->path.dev)
+		blk_abort_queue(pgpath->path.dev->bdev->bd_disk->queue);
 }
 
 static struct priority_group *alloc_priority_group(void)
@@ -579,6 +580,7 @@ static struct pgpath *parse_path(struct arg_set *as, struct path_selector *ps,
 {
 	int r;
 	struct pgpath *p;
+	char *path;
 	struct multipath *m = ti->private;
 
 	/* we need at least a path arg */
@@ -591,14 +593,33 @@ static struct pgpath *parse_path(struct arg_set *as, struct path_selector *ps,
 	if (!p)
 		return NULL;
 
-	r = dm_get_device(ti, shift(as), ti->begin, ti->len,
+	path = shift(as);
+	r = dm_get_device(ti, path, ti->begin, ti->len,
 			  dm_table_get_mode(ti->table), &p->path.dev);
 	if (r) {
-		ti->error = "error getting device";
-		goto bad;
+		unsigned major, minor;
+
+		/* Try to add a failed device */
+		if (sscanf(path, "%u:%u", &major, &minor) == 2) {
+			/* Extract the major/minor numbers */
+			p->path.pdev = MKDEV(major, minor);
+			if (MAJOR(p->path.pdev) != major ||
+			    MINOR(p->path.pdev) != minor) {
+				/* Nice try, didn't work */
+				DMWARN("Invalid device path %s", path);
+				ti->error = "error converting devnum";
+				goto bad;
+			}
+			DMWARN("adding disabled device %d:%d", major, minor);
+			p->path.dev = NULL;
+			p->is_active = 0;
+		} else {
+			ti->error = "error getting device";
+			goto bad;
+		}
 	}
 
-	if (m->hw_handler_name) {
+	if (m->hw_handler_name && p->path.dev) {
 		struct request_queue *q = bdev_get_queue(p->path.dev->bdev);
 
 		r = scsi_dh_attach(q, m->hw_handler_name);
@@ -900,8 +921,9 @@ static int fail_path(struct pgpath *pgpath)
 	if (pgpath == m->current_pgpath)
 		m->current_pgpath = NULL;
 
-	dm_path_uevent(DM_UEVENT_PATH_FAILED, m->ti,
-		      pgpath->path.dev->name, m->nr_valid_paths);
+	if (pgpath->path.dev)
+		dm_path_uevent(DM_UEVENT_PATH_FAILED, m->ti,
+			       pgpath->path.dev->name, m->nr_valid_paths);
 
 	queue_work(kmultipathd, &m->trigger_event);
 	queue_work(kmultipathd, &pgpath->deactivate_path);
@@ -925,6 +947,13 @@ static int reinstate_path(struct pgpath *pgpath)
 
 	if (pgpath->is_active)
 		goto out;
+
+	if (!pgpath->path.dev) {
+		DMWARN("Cannot reinstate disabled path %d:%d",
+		       MAJOR(pgpath->path.pdev), MINOR(pgpath->path.pdev));
+		r = -ENODEV;
+		goto out;
+	}
 
 	if (!pgpath->pg->ps.type->reinstate_path) {
 		DMWARN("Reinstate path not supported by path selector %s",
@@ -963,6 +992,9 @@ static int action_dev(struct multipath *m, struct dm_dev *dev,
 	int r = 0;
 	struct pgpath *pgpath;
 	struct priority_group *pg;
+
+	if (!dev)
+		return 0;
 
 	list_for_each_entry(pg, &m->priority_groups, list) {
 		list_for_each_entry(pgpath, &pg->pgpaths, list) {
@@ -1311,9 +1343,16 @@ static int multipath_status(struct dm_target *ti, status_type_t type,
 			       pg->ps.type->info_args);
 
 			list_for_each_entry(p, &pg->pgpaths, list) {
-				DMEMIT("%s %s %u ", p->path.dev->name,
-				       p->is_active ? "A" : "F",
-				       p->fail_count);
+				if (p->path.dev) {
+					DMEMIT("%s %s %u ", p->path.dev->name,
+					       p->is_active ? "A" : "F",
+					       p->fail_count);
+				} else {
+					DMEMIT("%d:%d F %u ",
+					       MAJOR(p->path.pdev),
+					       MINOR(p->path.pdev),
+					       p->fail_count);
+				}
 				if (pg->ps.type->status)
 					sz += pg->ps.type->status(&pg->ps,
 					      &p->path, type, result + sz,
@@ -1337,7 +1376,12 @@ static int multipath_status(struct dm_target *ti, status_type_t type,
 			       pg->ps.type->table_args);
 
 			list_for_each_entry(p, &pg->pgpaths, list) {
-				DMEMIT("%s ", p->path.dev->name);
+				if (p->path.dev)
+					DMEMIT("%s ", p->path.dev->name);
+				else
+					DMEMIT("%d:%d ",
+					       MAJOR(p->path.pdev),
+					       MINOR(p->path.pdev));
 				if (pg->ps.type->status)
 					sz += pg->ps.type->status(&pg->ps,
 					      &p->path, type, result + sz,
@@ -1419,7 +1463,7 @@ static int multipath_ioctl(struct dm_target *ti, struct inode *inode,
 	if (!m->current_pgpath)
 		__choose_pgpath(m, 1 << 19); /* Assume 512KB */
 
-	if (m->current_pgpath) {
+	if (m->current_pgpath && m->current_pgpath->path.dev) {
 		bdev = m->current_pgpath->path.dev->bdev;
 		fake_dentry.d_inode = bdev->bd_inode;
 		fake_file.f_mode = m->current_pgpath->path.dev->mode;

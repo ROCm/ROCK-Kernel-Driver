@@ -261,7 +261,7 @@ scsi_generic_msg_handler(struct sk_buff *skb)
 
 		/* if successful, scsi_host_lookup takes a shost reference */
 		shost = scsi_host_lookup(msg->host_no);
-		if (!shost) {
+		if (IS_ERR(shost)) {
 			err = -ENODEV;
 			goto driver_exit;
 		}
