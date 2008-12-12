@@ -1040,7 +1040,7 @@ static int flush_commit_list(struct super_block *s,
 				 "journal->trans_id = %u; "
 				 "oldest live jl->j_trans_id = %u\n",
 				 jl->j_len, jl->j_state,
-				 trans_id, journal->j_trans_id,
+				 jl->j_refcount, trans_id, journal->j_trans_id,
 		JOURNAL_LIST_ENTRY(journal->j_journal_list.next)->j_trans_id);
 	}
 	BUG_ON(jl->j_len <= 0);
