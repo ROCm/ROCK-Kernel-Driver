@@ -4020,8 +4020,13 @@ static int do_journal_end(struct reiserfs_transaction_handle *th,
 						 * the transaction */
 	th->t_refcount--;
 	current->journal_info = th->t_handle_save;
-#endif
 
+	if (journal->j_len == 0) {
+		reiserfs_prepare_for_journal(sb, SB_BUFFER_WITH_SB(sb),
+					     1);
+		journal_mark_dirty(th, sb, SB_BUFFER_WITH_SB(sb));
+	}
+#endif
 	/* setup description block */
 	d_bh =
 	    journal_getblk(sb,
