@@ -145,6 +145,9 @@ static struct cxgb3i_gather_list *ddp_make_gl(unsigned int xferlen,
 			      PAGE_SHIFT;
 	int i = 1, j = 0;
 
+	if (sgoffset)
+		return NULL;
+
 	gl = kzalloc(sizeof(struct cxgb3i_gather_list) +
 		     npages * (sizeof(dma_addr_t) + sizeof(struct page *)),
 		     gfp);
@@ -173,7 +176,7 @@ static struct cxgb3i_gather_list *ddp_make_gl(unsigned int xferlen,
 				goto error_out;
 
 			j++;
-			if (j == gl->nelem)
+			if (j == gl->nelem || sg->offset)
 				goto error_out;
 			gl->pages[j] = page;
 			sglen = sg->length;
@@ -303,7 +306,8 @@ u32 cxgb3i_ddp_tag_reserve(struct cxgb3i_adapter *snic, unsigned int tid,
 	int idx = -1, idx_max;
 	u32 tag;
 
-	if (page_idx || !ddp || !sgcnt || xferlen < ULP2_DDP_THRESHOLD) {
+	if (page_idx >= ULP2_PGIDX_MAX || !ddp || !sgcnt ||
+		xferlen < ULP2_DDP_THRESHOLD) {
 		cxgb3i_tag_debug("pgidx %u, sgcnt %u, xfer %u/%u, NO ddp.\n",
 				 page_idx, sgcnt, xferlen, ULP2_DDP_THRESHOLD);
 		return RESERVED_ITT;
@@ -330,10 +334,9 @@ u32 cxgb3i_ddp_tag_reserve(struct cxgb3i_adapter *snic, unsigned int tid,
 						      npods, gl);
 	}
 	if (idx < 0) {
-		kfree(gl);
 		cxgb3i_tag_debug("sgcnt %u, xferlen %u, npods %u NO DDP.\n",
 				 sgcnt, xferlen, npods);
-		return RESERVED_ITT;
+		goto free_gl;
 	}
 
 	if (ddp_alloc_gl_skb(ddp, idx, npods, gfp) < 0)
@@ -341,7 +344,7 @@ u32 cxgb3i_ddp_tag_reserve(struct cxgb3i_adapter *snic, unsigned int tid,
 
 	if (ddp_gl_map(snic->pdev, gl) < 0)
 		goto unmap_sgl;
-
+	
 	tag = sw_tag | (idx << snic->tag_format.rsvd_shift);
 
 	hdr.rsvd = 0;
@@ -363,6 +366,8 @@ unmap_sgl:
 	ddp_free_gl_skb(ddp, idx, npods);
 unmark_entries:
 	ddp_unmark_entries(ddp, idx, npods);
+free_gl:
+	kfree(gl);
 	return RESERVED_ITT;
 }
 
@@ -393,8 +398,10 @@ int cxgb3i_conn_ulp_setup(struct cxgb3i_conn *cconn, int hcrc, int dcrc)
 	struct sk_buff *skb = alloc_skb(sizeof(struct cpl_set_tcb_field),
 					GFP_KERNEL | __GFP_NOFAIL);
 	struct cpl_set_tcb_field *req;
-	u32 submode = (hcrc ? 1 : 0) | (dcrc ? 2 : 0);
-	u32 pgcode = page_idx < ULP2_PGIDX_MAX ? page_idx : 0;
+	u64 val = (hcrc ? 1 : 0) | (dcrc ? 2 : 0);
+
+	if (page_idx < ULP2_PGIDX_MAX)
+		val |= page_idx << 4;
 
 	/* set up ulp submode and page size */
 	req = (struct cpl_set_tcb_field *)skb_put(skb, sizeof(*req));
@@ -404,7 +411,7 @@ int cxgb3i_conn_ulp_setup(struct cxgb3i_conn *cconn, int hcrc, int dcrc)
 	req->cpu_idx = 0;
 	req->word = htons(31);
 	req->mask = cpu_to_be64(0xFF000000);
-	req->val = cpu_to_be64(((pgcode << 4) | submode) << 24);
+	req->val = cpu_to_be64(val << 24);
 	skb->priority = CPL_PRIORITY_CONTROL;
 
 	cxgb3_ofld_send(c3cn->cdev, skb);
@@ -461,12 +468,16 @@ static int cxgb3i_conn_read_pdu_skb(struct iscsi_conn *conn,
 		segment->status = (conn->datadgst_en &&
 				   (skb_ulp_mode(skb) & ULP2_FLAG_DCRC_ERROR)) ?
 		    ISCSI_SEGMENT_DGST_ERR : 0;
-		if (skb_ulp_mode(skb) & ULP2_FLAG_DATA_DDPED)
-			segment->total_copied = segment->total_size;
-		else {
-			cxgb3i_ddp_debug("opcode 0x%x, data %u, NOT ddp'ed, "
+		if (skb_ulp_mode(skb) & ULP2_FLAG_DATA_DDPED) {
+			cxgb3i_ddp_debug("skb 0x%p, opcode 0x%x, data %u, ddp'ed, "
 					 "itt 0x%x.\n",
-					 hdr->opcode & ISCSI_OPCODE_MASK,
+					 skb, hdr->opcode & ISCSI_OPCODE_MASK,
+					 tcp_conn->in.datalen, hdr->itt);
+			segment->total_copied = segment->total_size;
+		} else {
+			cxgb3i_ddp_debug("skb 0x%p, opcode 0x%x, data %u, not ddp'ed, "
+					 "itt 0x%x.\n",
+					 skb, hdr->opcode & ISCSI_OPCODE_MASK,
 					 tcp_conn->in.datalen, hdr->itt);
 			offset += sizeof(struct cpl_iscsi_hdr_norss);
 		}

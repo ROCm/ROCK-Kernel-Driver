@@ -45,6 +45,12 @@ MODULE_PARM_DESC(cxgb3_sport_base, "starting port number (default=20000)");
 #define c3cn_tx_debug(fmt...)
 #endif
 
+#ifdef __DEBUG_C3CN_RX__
+#define c3cn_rx_debug         cxgb3i_log_debug
+#else
+#define c3cn_rx_debug(fmt...)
+#endif
+
 /* connection flags */
 static inline void c3cn_set_flag(struct s3_conn *c3cn, enum c3cn_flags flag)
 {
@@ -1576,6 +1582,9 @@ static void process_rx_iscsi_hdr(struct s3_conn *c3cn,
 	skb_ulp_pdulen(skb) = ntohs(ddp_cpl.len);
 	skb_ulp_ddigest(skb) = ntohl(ddp_cpl.ulp_crc);
 	status = ntohl(ddp_cpl.ddp_status);
+
+	c3cn_rx_debug("skb 0x%p, len %u, pdulen %u, ddp status 0x%x.\n",
+				  skb, skb->len, skb_ulp_pdulen(skb), status);
 
 	if (status & (1 << RX_DDP_STATUS_HCRC_SHIFT))
 		skb_ulp_mode(skb) |= ULP2_FLAG_HCRC_ERROR;

@@ -22,6 +22,12 @@
 #include <scsi/scsi_transport_iscsi.h>
 
 #include "cxgb3i.h"
+#include "cxgb3i_ulp2.h"
+
+#define align_to_4k_boundary(n)	\
+	do { \
+		n = (n) & ~((1 << 12) - 1); \
+	} while(0)
 
 static struct scsi_transport_template *cxgb3i_scsi_transport;
 static struct scsi_host_template cxgb3i_host_template;
@@ -370,36 +376,59 @@ static void cxgb3i_session_destroy(struct iscsi_cls_session *cls_session)
  *
  * Creates a new iSCSI connection instance for a given session
  */
-static inline void cxgb3i_conn_max_xmit_dlength(struct iscsi_conn *conn)
+static inline int cxgb3i_conn_max_xmit_dlength(struct iscsi_conn *conn)
 {
 	struct cxgb3i_conn *cconn = conn->dd_data;
+	unsigned int max = min_t(unsigned int, ULP2_MAX_PDU_SIZE,
+						   cconn->hba->snic->tx_max_size -
+						   ISCSI_PDU_HEADER_MAX);
+
+	cxgb3i_log_debug("conn 0x%p, max xmit %u.\n",
+			 conn, conn->max_xmit_dlength);
 
 	if (conn->max_xmit_dlength)
 		conn->max_xmit_dlength = min_t(unsigned int,
-						conn->max_xmit_dlength,
-						cconn->hba->snic->tx_max_size -
-						ISCSI_PDU_HEADER_MAX);
+						conn->max_xmit_dlength, max);
 	else
-		conn->max_xmit_dlength = cconn->hba->snic->tx_max_size -
-						ISCSI_PDU_HEADER_MAX;
-	cxgb3i_log_debug("conn 0x%p, max xmit %u.\n",
+		conn->max_xmit_dlength = max;
+
+	align_to_4k_boundary(conn->max_xmit_dlength);
+
+	cxgb3i_log_debug("conn 0x%p, set max xmit %u.\n",
 			 conn, conn->max_xmit_dlength);
+
+	return 0;
 }
 
-static inline void cxgb3i_conn_max_recv_dlength(struct iscsi_conn *conn)
+static inline int cxgb3i_conn_max_recv_dlength(struct iscsi_conn *conn)
 {
 	struct cxgb3i_conn *cconn = conn->dd_data;
+	unsigned int max = min_t(unsigned int, ULP2_MAX_PDU_SIZE,
+						   cconn->hba->snic->rx_max_size -
+						   ISCSI_PDU_HEADER_MAX);
 
-	if (conn->max_recv_dlength)
-		conn->max_recv_dlength = min_t(unsigned int,
-						conn->max_recv_dlength,
-						cconn->hba->snic->rx_max_size -
-						ISCSI_PDU_HEADER_MAX);
-	else
-		conn->max_recv_dlength = cconn->hba->snic->rx_max_size -
-						ISCSI_PDU_HEADER_MAX;
 	cxgb3i_log_debug("conn 0x%p, max recv %u.\n",
 			 conn, conn->max_recv_dlength);
+
+	align_to_4k_boundary(max);
+
+	if (conn->max_recv_dlength) {
+		if (conn->max_recv_dlength > max) {
+			cxgb3i_log_error("MaxRecvDataSegmentLength %u, not supported."
+					 "Need to be <= %u.\n",
+					 conn->max_recv_dlength, max);
+			return -EINVAL;
+		}
+		conn->max_recv_dlength = min_t(unsigned int,
+						conn->max_recv_dlength, max);
+		align_to_4k_boundary(conn->max_recv_dlength);
+	} else
+		conn->max_recv_dlength = max;
+
+	cxgb3i_log_debug("conn 0x%p, set max recv %u.\n",
+			 conn, conn->max_recv_dlength);
+
+	return 0;
 }
 
 static struct iscsi_cls_conn *cxgb3i_conn_create(struct iscsi_cls_session
@@ -546,13 +575,13 @@ static int cxgb3i_conn_set_param(struct iscsi_cls_conn *cls_conn,
 	switch (param) {
 	case ISCSI_PARAM_HDRDGST_EN:
 		err = iscsi_set_param(cls_conn, param, buf, buflen);
-		if (!err && conn->hdrdgst_en)
+		if (!err)
 			cxgb3i_conn_ulp_setup(cconn, conn->hdrdgst_en,
 					      conn->datadgst_en);
 		break;
 	case ISCSI_PARAM_DATADGST_EN:
 		err = iscsi_set_param(cls_conn, param, buf, buflen);
-		if (!err && conn->datadgst_en)
+		if (!err)
 			cxgb3i_conn_ulp_setup(cconn, conn->hdrdgst_en,
 					      conn->datadgst_en);
 		break;
@@ -568,11 +597,11 @@ static int cxgb3i_conn_set_param(struct iscsi_cls_conn *cls_conn,
 			return -ENOMEM;
 	case ISCSI_PARAM_MAX_RECV_DLENGTH:
 		err = iscsi_set_param(cls_conn, param, buf, buflen);
-		cxgb3i_conn_max_recv_dlength(conn);
+		err = cxgb3i_conn_max_recv_dlength(conn);
 		break;
 	case ISCSI_PARAM_MAX_XMIT_DLENGTH:
 		err = iscsi_set_param(cls_conn, param, buf, buflen);
-		cxgb3i_conn_max_xmit_dlength(conn);
+		err = cxgb3i_conn_max_xmit_dlength(conn);
 		break;
 	default:
 		return iscsi_set_param(cls_conn, param, buf, buflen);

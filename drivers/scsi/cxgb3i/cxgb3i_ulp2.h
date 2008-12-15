@@ -101,6 +101,7 @@ struct cpl_rx_data_ddp_norss {
 #define ULP2_FLAG_PAD_ERROR		0x40
 
 #define ULP2_MAX_PKT_SIZE		16224
+#define ULP2_MAX_PDU_SIZE		8192
 
 void cxgb3i_conn_closing(struct s3_conn *);
 void cxgb3i_conn_pdu_ready(struct s3_conn *c3cn);
