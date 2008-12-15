@@ -230,6 +230,7 @@ static unsigned int product_5052_count;
 static struct usb_device_id ti_id_table_3410[1+TI_EXTRA_VID_PID_COUNT+1] = {
 	{ USB_DEVICE(TI_VENDOR_ID, TI_3410_PRODUCT_ID) },
 	{ USB_DEVICE(TI_VENDOR_ID, TI_3410_EZ430_ID) },
+	{ USB_DEVICE(0x04b3, 0x4543) },
 };
 
 static struct usb_device_id ti_id_table_5052[4+TI_EXTRA_VID_PID_COUNT+1] = {
@@ -246,6 +247,7 @@ static struct usb_device_id ti_id_table_combined[] = {
 	{ USB_DEVICE(TI_VENDOR_ID, TI_5152_BOOT_PRODUCT_ID) },
 	{ USB_DEVICE(TI_VENDOR_ID, TI_5052_EEPROM_PRODUCT_ID) },
 	{ USB_DEVICE(TI_VENDOR_ID, TI_5052_FIRMWARE_PRODUCT_ID) },
+	{ USB_DEVICE(0x04b3, 0x4543) },
 	{ }
 };
 
@@ -457,9 +459,11 @@ static int ti_startup(struct usb_serial *serial)
 		goto free_tdev;
 	}
 
-	/* the second configuration must be set (in sysfs by hotplug script) */
+	/* the second configuration must be set */
+	printk(KERN_DEBUG"%s: bConfigurationValue: %x\n", __FUNCTION__, dev->actconfig->desc.bConfigurationValue);
 	if (dev->actconfig->desc.bConfigurationValue == TI_BOOT_CONFIG) {
-		status = -ENODEV;
+		status = usb_driver_set_configuration(dev, TI_ACTIVE_CONFIG);
+		status = status ? status : -ENODEV;
 		goto free_tdev;
 	}
 
