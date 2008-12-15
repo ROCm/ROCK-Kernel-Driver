@@ -27,12 +27,6 @@ static void qla4xxx_build_scsi_iocbs(struct srb *srb,
 	cmd = srb->cmd;
 	ha = srb->ha;
 
-	if (!scsi_bufflen(cmd) || cmd->sc_data_direction == DMA_NONE) {
-		/* No data being transferred */
-		cmd_entry->ttlByteCnt = __constant_cpu_to_le32(0);
-		return;
-	}
-
 	avail_dsds = COMMAND_SEG;
 	cur_dsd = (struct data_seg_a64 *) & (cmd_entry->dataseg[0]);
 
@@ -40,6 +34,12 @@ static void qla4xxx_build_scsi_iocbs(struct srb *srb,
 		cur_dsd->base.addrLow = cpu_to_le32(LSDW(srb->dma_handle));
 		cur_dsd->base.addrHigh = cpu_to_le32(MSDW(srb->dma_handle));
 		cur_dsd->count = cpu_to_le32(srb->dma_len);
+		return;
+	}
+
+	if (!scsi_bufflen(cmd) || cmd->sc_data_direction == DMA_NONE) {
+		/* No data being transferred */
+		cmd_entry->ttlByteCnt = __constant_cpu_to_le32(0);
 		return;
 	}
 
@@ -155,7 +155,7 @@ int qla4xxx_send_command_to_isp(struct scsi_qla_host *ha, struct srb * srb)
 
 	int_to_scsilun(cmd->device->lun, &cmd_entry->lun);
 	cmd_entry->cmdSeqNum = cpu_to_le32(ddb_entry->CmdSn);
-	cmd_entry->ttlByteCnt = cpu_to_le32(scsi_bufflen(cmd));
+
 	memcpy(cmd_entry->cdb, cmd->cmnd, cmd->cmd_len);
 	cmd_entry->dataSegCnt = cpu_to_le16(tot_dsds);
 	cmd_entry->hdr.entryCount = req_cnt;
@@ -165,6 +165,9 @@ int qla4xxx_send_command_to_isp(struct scsi_qla_host *ha, struct srb * srb)
          *       transferred, as the data direction bit is sometimed filled
          *       in when there is no data to be transferred */
 	cmd_entry->control_flags = CF_NO_DATA;
+
+	cmd_entry->ttlByteCnt = cpu_to_le32(scsi_bufflen(cmd));
+
 	if (scsi_bufflen(cmd)) {
 		if (cmd->sc_data_direction == DMA_TO_DEVICE)
 			cmd_entry->control_flags = CF_WRITE;
@@ -203,7 +206,7 @@ int qla4xxx_send_command_to_isp(struct scsi_qla_host *ha, struct srb * srb)
 	wmb();
 
 	/*
-	 * Check to see if adapter is online before placing request on
+         * Check to see if adapter is online before placing request on
          * request queue.  If a reset occurs and a request is in the queue,
          * the firmware will still attempt to process the request, retrieving
          * garbage for pointers.
@@ -243,4 +246,3 @@ queuing_error:
 
 	return QLA_ERROR;
 }
-

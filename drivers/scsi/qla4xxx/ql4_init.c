@@ -14,7 +14,7 @@
 
 /* link auto negotiation normally takes roughly 2s.   */
 /* If we don't have link in 3 times that period quit. */
-#define        QLA4XXX_LINK_UP_DELAY   6
+#define	QLA4XXX_LINK_UP_DELAY   6
 
 /*
  * QLogic ISP4xxx Hardware Support Function Prototypes.
@@ -63,8 +63,10 @@ void qla4xxx_free_ddb(struct scsi_qla_host *ha, struct ddb_entry *ddb_entry)
 	list_del_init(&ddb_entry->list);
 
 	/* Remove device pointer from index mapping arrays */
-	ha->fw_ddb_index_map[ddb_entry->fw_ddb_index] = NULL;
-	ha->tot_ddbs--;
+	if (!QL_DDB_STATE_REMOVED(ddb_entry)) {
+		ha->fw_ddb_index_map[ddb_entry->fw_ddb_index] = NULL;
+		ha->tot_ddbs--;
+	}
 
 	/* Free memory and scsi-ml struct for device entry */
 	qla4xxx_destroy_sess(ddb_entry);
@@ -267,14 +269,6 @@ static int qla4xxx_fw_ready(struct scsi_qla_host *ha)
 					  (ha->addl_fw_state &
 					   FW_ADDSTATE_LINK_UP) != 0 ?
 					  "UP" : "DOWN"));
-			DEBUG2(dev_info(&ha->pdev->dev,
-					  "scsi%ld: %s: iSNS Service "
-					  "Started %s\n",
-					  ha->host_no, __func__,
-					  (ha->addl_fw_state &
-					   FW_ADDSTATE_ISNS_SVC_ENABLED) != 0 ?
-					  "YES" : "NO"));
-
 			ready = 1;
 			break;
 		}
@@ -341,6 +335,7 @@ static void qla4xxx_fill_ddb(struct ddb_entry *ddb_entry,
 
 	ddb_entry->port = le16_to_cpu(fw_ddb_entry->port);
 	ddb_entry->tpgt = le32_to_cpu(fw_ddb_entry->tgt_portal_grp);
+	memcpy(ddb_entry->isid, fw_ddb_entry->isid, sizeof(ddb_entry->isid));
 	memcpy(&ddb_entry->iscsi_name[0], &fw_ddb_entry->iscsi_name[0],
 		min(sizeof(ddb_entry->iscsi_name),
 		sizeof(fw_ddb_entry->iscsi_name)));
@@ -396,7 +391,7 @@ struct ddb_entry * qla4xxx_alloc_ddb(struct scsi_qla_host *ha,
  * @ha: Pointer to host adapter structure.
  *
  * This routine searches for all valid firmware ddb entries and builds
- * an internal ddb list. Ddbs that are considered valid are those with 
+ * an internal ddb list. Ddbs that are considered valid are those with
  * a device state of SESSION_ACTIVE.
  **/
 static int qla4xxx_build_ddb_list(struct scsi_qla_host *ha)
@@ -486,19 +481,6 @@ static int qla4xxx_build_ddb_list(struct scsi_qla_host *ha)
 			qla4xxx_fill_ddb(ddb_entry, fw_ddb_entry);
 			ddb_entry->fw_ddb_device_state = ddb_state;
 
-			if (ddb_entry->fw_ddb_device_state == DDB_DS_SESSION_ACTIVE) {
-				atomic_set(&ddb_entry->state, DDB_STATE_ONLINE);
-				dev_info(&ha->pdev->dev,
-					"scsi%ld: %s: ddb[%d] os[%d] marked ONLINE\n",
-					ha->host_no, __func__, ddb_entry->fw_ddb_index,
-					ddb_entry->os_target_id);
-			} else {
-				atomic_set(&ddb_entry->state, DDB_STATE_MISSING);
-				dev_info(&ha->pdev->dev,
-					"scsi%ld: %s: ddb[%d] os[%d] marked MISSING\n",
-					ha->host_no, __func__, ddb_entry->fw_ddb_index,
-					ddb_entry->os_target_id);
-			}
 			DEBUG6(dev_info(&ha->pdev->dev, "%s: DDB[%d] osIdx = %d State %04x"
 				" ConnErr %08x %d.%d.%d.%d:%04d \"%s\"\n", __func__,
 				fw_ddb_index, ddb_entry->os_target_id, ddb_state, conn_err,
@@ -714,7 +696,7 @@ static int qla4xxx_initialize_ddb_list(struct scsi_qla_host *ha)
 }
 
 /**
- * qla4xxx_update_ddb_list - update the driver ddb list
+ * qla4xxx_reinitialize_ddb_list - update the driver ddb list
  * @ha: pointer to host adapter structure.
  *
  * This routine obtains device information from the F/W database after
@@ -735,11 +717,12 @@ int qla4xxx_reinitialize_ddb_list(struct scsi_qla_host *ha)
 
 	/* Update the device information for all devices. */
 	list_for_each_entry_safe(ddb_entry, detemp, &ha->ddb_list, list) {
-		if (qla4xxx_get_fwddb_entry(ha, ddb_entry->fw_ddb_index,
-			fw_ddb_entry, fw_ddb_entry_dma, NULL, NULL,
-			&ddb_entry->fw_ddb_device_state, NULL,
-			&ddb_entry->tcp_source_port_num,
-			&ddb_entry->connection_id) == QLA_SUCCESS) {
+		if (!QL_DDB_STATE_REMOVED(ddb_entry) &&
+			(qla4xxx_get_fwddb_entry(ha, ddb_entry->fw_ddb_index,
+				fw_ddb_entry, fw_ddb_entry_dma, NULL, NULL,
+				&ddb_entry->fw_ddb_device_state, NULL,
+				&ddb_entry->tcp_source_port_num,
+				&ddb_entry->connection_id) == QLA_SUCCESS)) {
 
 			qla4xxx_fill_ddb(ddb_entry, fw_ddb_entry);
 
@@ -1192,8 +1175,13 @@ static void qla4xxx_add_device_dynamically(struct scsi_qla_host *ha,
 	}
 
 	list_for_each_entry(ddb_entry, &ha->ddb_list, list) {
-		if (memcmp(ddb_entry->iscsi_name, fw_ddb_entry->iscsi_name,
-			ISCSI_NAME_SIZE) == 0) {
+		if ((memcmp(ddb_entry->iscsi_name, fw_ddb_entry->iscsi_name,
+			ISCSI_NAME_SIZE) == 0) &&
+			(ddb_entry->tpgt ==
+				le32_to_cpu(fw_ddb_entry->tgt_portal_grp)) &&
+			(memcmp(ddb_entry->isid, fw_ddb_entry->isid,
+				sizeof(ddb_entry->isid)) == 0) &&
+			!QL_DDB_STATE_REMOVED(ddb_entry)) {
 			found = 1;
 
 			DEBUG6(dev_info(&ha->pdev->dev, "%s found target ddb = 0x%p"

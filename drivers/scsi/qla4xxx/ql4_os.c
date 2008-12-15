@@ -111,6 +111,8 @@ static struct scsi_host_template qla4xxx_driver_template = {
 	.slave_alloc		= qla4xxx_slave_alloc,
 	.slave_destroy		= qla4xxx_slave_destroy,
 
+	.target_destroy		= qla4xxx_target_destroy,
+
 	.this_id		= -1,
 	.cmd_per_lun		= 3,
 	.use_clustering		= ENABLE_CLUSTERING,
@@ -290,7 +292,8 @@ void qla4xxx_destroy_sess(struct ddb_entry *ddb_entry)
 	if (ddb_entry->conn) {
 		QL_ISCSI_IF_DESTROY_SESSION_DONE(ddb_entry);
 		QL_ISCSI_DESTROY_CONN(ddb_entry);
-		iscsi_remove_session(ddb_entry->sess);
+		if (!QL_DDB_STATE_REMOVED(ddb_entry))
+			iscsi_remove_session(ddb_entry->sess);
 	}
 	iscsi_free_session(ddb_entry->sess);
 }
@@ -385,7 +388,8 @@ void qla4xxx_mark_device_missing(struct scsi_qla_host *ha,
 	dev_info(&ha->pdev->dev, "%s: ddb[%d] os[%d] marked MISSING\n",
 		 __func__, ddb_entry->fw_ddb_index, ddb_entry->os_target_id);
 
-	qla4xxx_conn_stop(ddb_entry->conn, STOP_CONN_RECOVER);
+	if (ddb_entry->conn)
+		qla4xxx_conn_stop(ddb_entry->conn, STOP_CONN_RECOVER);
 }
 
 static struct srb* qla4xxx_get_new_srb(struct scsi_qla_host *ha,
@@ -444,7 +448,8 @@ static int qla4xxx_queuecommand(struct scsi_cmnd *cmd,
 	int rval;
 
 	if (atomic_read(&ddb_entry->state) != DDB_STATE_ONLINE) {
-		if (atomic_read(&ddb_entry->state) == DDB_STATE_DEAD) {
+		if ((atomic_read(&ddb_entry->state) == DDB_STATE_DEAD) ||
+			QL_DDB_STATE_REMOVED(ddb_entry)) {
 			cmd->result = DID_NO_CONNECT << 16;
 			goto qc_fail_command;
 		}
@@ -602,8 +607,9 @@ static void qla4xxx_timer(struct scsi_qla_host *ha)
 	list_for_each_entry_safe(ddb_entry, dtemp, &ha->ddb_list, list) {
 		/* Count down time between sending relogins */
 		if (adapter_up(ha) &&
-			 !test_bit(DF_RELOGIN, &ddb_entry->flags) &&
-			 atomic_read(&ddb_entry->state) != DDB_STATE_ONLINE) {
+			!test_bit(DF_RELOGIN, &ddb_entry->flags) &&
+			!QL_DDB_STATE_REMOVED(ddb_entry) &&
+			atomic_read(&ddb_entry->state) != DDB_STATE_ONLINE) {
 			if (atomic_read(&ddb_entry->retry_relogin_timer) !=
 				 INVALID_ENTRY) {
 				if (atomic_read(&ddb_entry->retry_relogin_timer)
@@ -626,15 +632,16 @@ static void qla4xxx_timer(struct scsi_qla_host *ha)
 
 		/* Wait for relogin to timeout */
 		if (atomic_read(&ddb_entry->relogin_timer) &&
-			 (atomic_dec_and_test(&ddb_entry->relogin_timer) != 0)) {
+			(atomic_dec_and_test(&ddb_entry->relogin_timer) != 0)) {
 			/*
 			 * If the relogin times out and the device is
 			 * still NOT ONLINE then try and relogin again.
 			 */
 			if (atomic_read(&ddb_entry->state) !=
-				 DDB_STATE_ONLINE &&
-				 ddb_entry->fw_ddb_device_state ==
-				 DDB_DS_SESSION_FAILED) {
+				DDB_STATE_ONLINE &&
+				!QL_DDB_STATE_REMOVED(ddb_entry) &&
+				ddb_entry->fw_ddb_device_state ==
+				DDB_DS_SESSION_FAILED) {
 				/* Reset retry relogin timer */
 				atomic_inc(&ddb_entry->relogin_retry_count);
 				DEBUG2(printk("scsi%ld: index[%d] relogin"
@@ -678,6 +685,7 @@ static void qla4xxx_timer(struct scsi_qla_host *ha)
 		test_bit(DPC_RESET_HA_DESTROY_DDB_LIST, &ha->dpc_flags) ||
 		test_bit(DPC_RESET_HA_INTR, &ha->dpc_flags) ||
 		test_bit(DPC_GET_DHCP_IP_ADDR, &ha->dpc_flags) ||
+		test_bit(DPC_REMOVE_DEVICE, &ha->dpc_flags) ||
 		QL_DPC_OFFLINE_SET(ha) ||
 		test_bit(DPC_AEN, &ha->dpc_flags)) &&
 		ha->dpc_thread) {
@@ -1061,31 +1069,7 @@ static QL_DECLARE_DPC(qla4xxx_do_dpc, data)
 
 	qla4xxx_check_dev_offline(ha);
 
-	if (test_and_clear_bit(DPC_DELETE_DEVICE, &ha->dpc_flags)) {
-		list_for_each_entry_safe(ddb_entry, dtemp,
-			&ha->ddb_list, list) {
-			if (test_and_clear_bit(DF_DELETED,
-				&ddb_entry->flags)) {
-				if (atomic_read(&ddb_entry->state) ==
-					DDB_STATE_DEAD) {
-					dev_info(&ha->pdev->dev,
-					"%s: ddb[%d] os[%d] - "
-					"delete\n",
-					__func__,
-					ddb_entry->fw_ddb_index,
-					ddb_entry->os_target_id);
-				} else {
-					dev_info(&ha->pdev->dev,
-					"%s: ddb[%d] os[%d] - "
-					"ddb state not dead but"
-					" marked for delete\n",
-					__func__,
-					ddb_entry->fw_ddb_index,
-					ddb_entry->os_target_id);
-				}
-			}
-		}
-	}
+	qla4xxx_remove_device(ha);
 
 	/* ---- relogin device? --- */
 	if (adapter_up(ha) &&
@@ -1093,6 +1077,7 @@ static QL_DECLARE_DPC(qla4xxx_do_dpc, data)
 		list_for_each_entry_safe(ddb_entry, dtemp,
 					 &ha->ddb_list, list) {
 			if (test_and_clear_bit(DF_RELOGIN, &ddb_entry->flags) &&
+				!QL_DDB_STATE_REMOVED(ddb_entry) &&
 				(atomic_read(&ddb_entry->state) !=
 					 DDB_STATE_ONLINE))
 				qla4xxx_relogin_device(ha, ddb_entry);
@@ -1181,7 +1166,6 @@ static int qla4xxx_iospace_config(struct scsi_qla_host *ha)
 	if (!(mmio_flags & IORESOURCE_MEM)) {
 		dev_err(&ha->pdev->dev,
 			"region #0 not an MMIO resource, aborting\n");
-
 		goto iospace_error_exit;
 	}
 	if (mmio_len < MIN_IOBASE_LEN) {
@@ -1336,7 +1320,7 @@ static int __devinit qla4xxx_probe_adapter(struct pci_dev *pdev,
 	/* Start timer thread. */
 	qla4xxx_start_timer(ha, qla4xxx_timer, 1);
 
-	set_bit(AF_INIT_DONE, &ha->flags);
+//	set_bit(AF_INIT_DONE, &ha->flags);
 
 	pci_set_drvdata(pdev, ha);
 
@@ -1382,7 +1366,7 @@ static int __devinit qla4xxx_probe_adapter(struct pci_dev *pdev,
 	DEBUG2(dev_info(&ha->pdev->dev, "listhead=%p, done adding ha=%p i=%d\n",
 		&qla4xxx_hostlist, &ha->node, ha->instance));
 
-//	set_bit(AF_INIT_DONE, &ha->flags);
+	set_bit(AF_INIT_DONE, &ha->flags);
 	dev_info(&ha->pdev->dev, "%s: AF_INIT_DONE\n", __func__);
 
 	return 0;
@@ -1465,6 +1449,7 @@ static int qla4xxx_slave_alloc(struct scsi_device *sdev)
 
 	if (sess) {
 		sdev->hostdata = sess->dd_data;
+		QL_SET_SDEV_HOSTDATA(sdev, sess);
 		return 0;
 	}
 	return FAILED;

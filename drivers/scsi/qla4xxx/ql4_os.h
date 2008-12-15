@@ -44,13 +44,16 @@
 		iscsi_unblock_session(ddb_entry->sess)
 #define QL_ISCSI_ALLOC_SESSION(ha, trans) \
 		iscsi_alloc_session(ha->host, trans, sizeof(struct ddb_entry))
+#define QL_SET_SDEV_HOSTDATA(sdev, sess)
 
+#define QL_DDB_STATE_REMOVED(ddb_entry) 0
 
 #define QL_MISC_INIT 0
 #define QL_MISC_EXIT
 
 #define qla4xxx_check_dev_offline(ha)
 #define qla4xxx_proc_info NULL
+#define qla4xxx_target_destroy NULL
 
 #define QL_SET_SCSI_RESID(cmd, residual) scsi_set_resid(cmd, residual)
 #define QL_SCSI_BUFFLEN(cmd) scsi_bufflen(cmd)
@@ -69,10 +72,8 @@
 		void dpc_func(struct work_struct *data)
 
 #define QL_INIT_SESSION_DATASIZE(sessiondata_size)
-//		.sessiondata_size       = sizeof(struct ddb_entry),
 
 #define QL_INIT_HOST_TEMPLATE(host_template)
-//		.host_template          = &qla4xxx_driver_template,
 
 QL_DECLARE_INTR_HANDLER(qla4xxx_intr_handler, irq, dev_id, regs);
 
@@ -120,6 +121,24 @@ static inline void qla4xxx_srb_free_dma(struct scsi_qla_host *ha,
 	}
 
 	cmd->SCp.ptr = NULL;
+}
+
+static inline void qla4xxx_remove_device(struct scsi_qla_host *ha)
+{
+	struct ddb_entry *ddb_entry, *dtemp;
+
+	if (test_and_clear_bit(DPC_REMOVE_DEVICE, &ha->dpc_flags)) {
+		list_for_each_entry_safe(ddb_entry, dtemp,
+			&ha->ddb_list, list) {
+			if (test_and_clear_bit(DF_REMOVE, &ddb_entry->flags)) {
+				dev_info(&ha->pdev->dev,
+					"%s: ddb[%d] os[%d] - removed\n",
+					__func__, ddb_entry->fw_ddb_index,
+					ddb_entry->os_target_id);
+				qla4xxx_free_ddb(ha, ddb_entry);
+			}
+		}
+	}
 }
 
 #endif	/* _QLA4x_OS_H */
