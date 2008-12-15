@@ -144,7 +144,6 @@
 #define RESET_FIRMWARE_TOV		30
 #define LOGOUT_TOV			10
 #define IOCB_TOV_MARGIN			10
-#define ISNS_DEREG_TOV			5
 
 #define MAX_RESET_HA_RETRIES		2
 
@@ -232,6 +231,8 @@ struct ddb_entry {
 	uint8_t ip_addr[ISCSI_IPADDR_SIZE];
 	uint8_t iscsi_name[ISCSI_NAME_SIZE];	/* 72 x48 */
 	uint8_t iscsi_alias[0x20];
+	uint8_t isid[6];
+	uint8_t rsrvd[2];
 };
 
 /*
@@ -243,6 +244,8 @@ struct ddb_entry {
 					 * commands */
 #define DDB_STATE_MISSING	2	/* Device logged off, trying
 					 * to re-login */
+#define DDB_STATE_REMOVED	3	/* The fw ddb_entry is freed
+					 * the session can be destroyed */
 
 /*
  * DDB flags.
@@ -252,7 +255,7 @@ struct ddb_entry {
 					 * logged it out */
 #define DF_SCAN_ISSUED		2
 #define DF_OFFLINE		3	/* Offline Device */
-#define DF_DELETED		4	/* Device has been removed */
+#define DF_REMOVE		4	/* FW DDB is destroyed */
 
 /*
  * Asynchronous Event Queue structure
@@ -305,11 +308,10 @@ struct scsi_qla_host {
 #define DPC_RELOGIN_DEVICE		3 /* 0x00000008 */
 #define DPC_RESET_HA_DESTROY_DDB_LIST	4 /* 0x00000010 */
 #define DPC_RESET_HA_INTR		5 /* 0x00000020 */
-#define DPC_ISNS_RESTART		7 /* 0x00000080 */
 #define DPC_AEN				9 /* 0x00000200 */
 #define DPC_GET_DHCP_IP_ADDR		15 /* 0x00008000 */
 #define DPC_OFFLINE_DEVICE		16 /* 0x00010000 */
-#define DPC_DELETE_DEVICE		17 /* 0x00020000 */
+#define DPC_REMOVE_DEVICE		17 /* 0x00020000 */
 
 	uint16_t	iocb_cnt;
 	uint16_t	iocb_hiwat;

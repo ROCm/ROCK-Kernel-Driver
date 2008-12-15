@@ -55,8 +55,8 @@ static inline void qla4xxx_check_for_clear_ddb(struct scsi_qla_host *ha,
 			dev_info(&ha->pdev->dev, "%s: ddb[%d] os[%d] freed\n",
 				__func__, ddb_entry->fw_ddb_index,
 				ddb_entry->os_target_id);
-			set_bit(DF_DELETED, &ddb_entry->flags);
-			set_bit(DPC_DELETE_DEVICE, &ha->dpc_flags);
+			set_bit(DF_REMOVE, &ddb_entry->flags);
+			set_bit(DPC_REMOVE_DEVICE, &ha->dpc_flags);
 			queue_work(ha->dpc_thread, &ha->dpc_work);
 		}
 	}
