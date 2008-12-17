@@ -1503,6 +1503,9 @@ static void map_request(struct dm_target *ti, struct request *rq,
 	tio->ti = ti;
 	atomic_inc(&md->pending);
 
+#if 0
+	/* This might trigger accidentally */
+
 	/*
 	 * Although submitted requests to the md->queue are checked against
 	 * the table/queue limitations at the submission time, the limitations
@@ -1525,6 +1528,7 @@ static void map_request(struct dm_target *ti, struct request *rq,
 		dm_kill_request(clone, r);
 		return;
 	}
+#endif
 
 	r = ti->type->map_rq(ti, clone, &tio->info);
 	switch (r) {

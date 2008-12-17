@@ -2291,6 +2291,13 @@ static void ext3_commit_super (struct super_block * sb,
 	es->s_free_blocks_count = cpu_to_le32(ext3_count_free_blocks(sb));
 	es->s_free_inodes_count = cpu_to_le32(ext3_count_free_inodes(sb));
 	BUFFER_TRACE(sbh, "marking dirty");
+
+	/* We only read the superblock once. The in-memory version is
+	 * always the most recent. If ext3_error is called after a
+	 * superblock write failure, it will be !uptodate. This write
+	 * will likely fail also, but it avoids the WARN_ON in
+	 * mark_buffer_dirty. */
+	set_buffer_uptodate(sbh);
 	mark_buffer_dirty(sbh);
 	if (sync)
 		sync_dirty_buffer(sbh);
