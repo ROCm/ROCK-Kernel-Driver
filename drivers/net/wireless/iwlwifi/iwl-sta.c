@@ -457,9 +457,6 @@ int iwl_remove_station(struct iwl_priv *priv, const u8 *addr, int is_ap)
 
 	BUG_ON(priv->num_stations < 0);
 
-	/* clean ucode key table bit map */
-	priv->ucode_key_table = 0;
-
 	spin_unlock_irqrestore(&priv->sta_lock, flags);
 
 	ret = iwl_send_remove_station(priv, addr, CMD_ASYNC);
