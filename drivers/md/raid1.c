@@ -1020,7 +1020,6 @@ static void error(mddev_t *mddev, mdk_rdev_t *rdev)
 		 * likely hit an error on this device.
 		 */
 		set_bit(MD_RECOVERY_DISABLED, &mddev->recovery);
-		set_bit(MD_RECOVERY_ERR, &mddev->recovery);
 		return;
 	}
 	if (test_and_clear_bit(In_sync, &rdev->flags)) {
