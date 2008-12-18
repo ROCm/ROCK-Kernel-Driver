@@ -365,7 +365,7 @@ static pte_t blktap_clear_pte(struct vm_area_struct *vma,
 		BUG_ON(xen_feature(XENFEAT_auto_translated_physmap));
 
 		copy = *ptep;
-		gnttab_set_unmap_op(&unmap[count], virt_to_machine(ptep), 
+		gnttab_set_unmap_op(&unmap[count], ptep_to_machine(ptep),
 				    GNTMAP_host_map 
 				    | GNTMAP_application_map 
 				    | GNTMAP_contains_pte,
@@ -935,7 +935,7 @@ static int req_increase(void)
 
 static void mmap_req_del(int mmap)
 {
-	BUG_ON(!spin_is_locked(&pending_free_lock));
+	assert_spin_locked(&pending_free_lock);
 
 	kfree(pending_reqs[mmap]);
 	pending_reqs[mmap] = NULL;

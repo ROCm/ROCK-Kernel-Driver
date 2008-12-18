@@ -570,6 +570,19 @@ static inline void clone_pgd_range(pgd_t *dst, pgd_t *src, int count)
 	 | ((unsigned long)(va) & (PAGE_SIZE - 1)));			\
 })
 
+#ifdef CONFIG_HIGHPTE
+#include <asm/io.h>
+struct page *kmap_atomic_to_page(void *);
+#define ptep_to_machine(ptep)						\
+({									\
+	pte_t *__ptep = (ptep);						\
+	page_to_phys(kmap_atomic_to_page(__ptep))			\
+		| ((unsigned long)__ptep & (PAGE_SIZE - 1));		\
+})
+#else
+#define ptep_to_machine(ptep)	virt_to_machine(ptep)
+#endif
+
 #define __HAVE_ARCH_PTEP_MODIFY_PROT_TRANSACTION
 static inline pte_t ptep_modify_prot_start(struct mm_struct *mm, unsigned long addr,
 					   pte_t *ptep)
@@ -580,10 +593,6 @@ static inline pte_t ptep_modify_prot_start(struct mm_struct *mm, unsigned long a
 #endif
 	return *ptep;
 }
-
-#ifdef CONFIG_HIGHPTE
-extern void *high_memory;
-#endif
 
 static inline void ptep_modify_prot_commit(struct mm_struct *mm, unsigned long addr,
 					   pte_t *ptep, pte_t pte)
@@ -596,13 +605,7 @@ static inline void ptep_modify_prot_commit(struct mm_struct *mm, unsigned long a
 		return;
 	}
 #endif
-#ifdef CONFIG_HIGHPTE
-	if ((void *)ptep > high_memory)
-		u.ptr = arbitrary_virt_to_machine(ptep)
-		        | MMU_PT_UPDATE_PRESERVE_AD;
-	else
-#endif
-		u.ptr = virt_to_machine(ptep) | MMU_PT_UPDATE_PRESERVE_AD;
+	u.ptr = ptep_to_machine(ptep) | MMU_PT_UPDATE_PRESERVE_AD;
 	u.val = __pte_val(pte);
 	if (HYPERVISOR_mmu_update(&u, 1, NULL, DOMID_SELF))
 		BUG();

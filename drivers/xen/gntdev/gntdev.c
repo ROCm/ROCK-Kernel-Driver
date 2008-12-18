@@ -770,7 +770,7 @@ static pte_t gntdev_clear_pte(struct vm_area_struct *vma, unsigned long addr,
 			/* Copy the existing value of the PTE for returning. */
 			copy = *ptep;
 
-			gnttab_set_unmap_op(&op, virt_to_machine(ptep), 
+			gnttab_set_unmap_op(&op, ptep_to_machine(ptep),
 					    GNTMAP_contains_pte,
 					    private_data->grants[slot_index]
 					    .u.valid.user_handle);

@@ -66,19 +66,24 @@
  *  'xencons=tty'  [XC_TTY]:     Console attached to '/dev/tty[0-9]+'.
  *  'xencons=ttyS' [XC_SERIAL]:  Console attached to '/dev/ttyS[0-9]+'.
  *  'xencons=xvc'  [XC_XVC]:     Console attached to '/dev/xvc0'.
+ *  'xencons=hvc'  [XC_HVC]:     Console attached to '/dev/hvc0'.
  *  default:                     XC_XVC
  * 
  * NB. In mode XC_TTY, we create dummy consoles for tty2-63. This suppresses
  * warnings from standard distro startup scripts.
  */
 static enum {
-	XC_OFF, XC_TTY, XC_SERIAL, XC_XVC
+	XC_OFF, XC_TTY, XC_SERIAL, XC_XVC, XC_HVC
 } xc_mode = XC_XVC;
 static int xc_num = -1;
 
 /* /dev/xvc0 device number allocated by lanana.org. */
 #define XEN_XVC_MAJOR 204
 #define XEN_XVC_MINOR 191
+
+/* /dev/hvc0 device number */
+#define XEN_HVC_MAJOR 229
+#define XEN_HVC_MINOR 0
 
 static int __init xencons_setup(char *str)
 {
@@ -96,6 +101,9 @@ static int __init xencons_setup(char *str)
 		console_use_vt = 0;
 	} else if (!strncmp(str, "xvc", 3)) {
 		xc_mode = XC_XVC;
+		str += 3;
+	} else if (!strncmp(str, "hvc", 3)) {
+		xc_mode = XC_HVC;
 		str += 3;
 	} else if (!strncmp(str, "off", 3)) {
 		xc_mode = XC_OFF;
@@ -203,6 +211,14 @@ static int __init xen_console_init(void)
 		strcpy(kcons_info.name, "xvc");
 		if (xc_num == -1)
 			xc_num = 0;
+		break;
+
+	case XC_HVC:
+		strcpy(kcons_info.name, "hvc");
+		if (xc_num == -1)
+			xc_num = 0;
+		if (!is_initial_xendomain())
+			add_preferred_console(kcons_info.name, xc_num, NULL);
 		break;
 
 	case XC_SERIAL:
@@ -677,6 +693,12 @@ static int __init xencons_init(void)
 		DRV(xencons_driver)->name        = "xvc";
 		DRV(xencons_driver)->major       = XEN_XVC_MAJOR;
 		DRV(xencons_driver)->minor_start = XEN_XVC_MINOR;
+		DRV(xencons_driver)->name_base   = xc_num;
+		break;
+	case XC_HVC:
+		DRV(xencons_driver)->name        = "hvc";
+		DRV(xencons_driver)->major       = XEN_HVC_MAJOR;
+		DRV(xencons_driver)->minor_start = XEN_HVC_MINOR;
 		DRV(xencons_driver)->name_base   = xc_num;
 		break;
 	case XC_SERIAL:

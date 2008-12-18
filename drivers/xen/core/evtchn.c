@@ -36,6 +36,7 @@
 #include <linux/sched.h>
 #include <linux/kernel_stat.h>
 #include <linux/sysdev.h>
+#include <linux/bootmem.h>
 #include <linux/version.h>
 #include <asm/atomic.h>
 #include <asm/system.h>
@@ -1085,8 +1086,8 @@ static struct irq_chip dynirq_chip = {
 
 /* Bitmap indicating which PIRQs require Xen to be notified on unmask. */
 static bool pirq_eoi_does_unmask;
-static DECLARE_BITMAP(pirq_needs_eoi, ALIGN(NR_PIRQS, PAGE_SIZE * 8))
-	__page_aligned_bss;
+static unsigned long *pirq_needs_eoi;
+static DECLARE_BITMAP(probing_pirq, NR_PIRQS);
 
 static void pirq_unmask_and_notify(unsigned int evtchn, unsigned int irq)
 {
@@ -1133,25 +1134,31 @@ static inline void pirq_query_unmask(int irq)
 		set_bit(irq - PIRQ_BASE, pirq_needs_eoi);
 }
 
-/*
- * On startup, if there is no action associated with the IRQ then we are
- * probing. In this case we should not share with others as it will confuse us.
- */
-#define probing_irq(_irq) (irq_desc[(_irq)].action == NULL)
+static int set_type_pirq(unsigned int irq, unsigned int type)
+{
+	if (type != IRQ_TYPE_PROBE)
+		return -EINVAL;
+	set_bit(irq - PIRQ_BASE, probing_pirq);
+	return 0;
+}
 
 static unsigned int startup_pirq(unsigned int irq)
 {
 	struct evtchn_bind_pirq bind_pirq;
 	int evtchn = evtchn_from_irq(irq);
 
-	if (VALID_EVTCHN(evtchn))
+	if (VALID_EVTCHN(evtchn)) {
+		clear_bit(irq - PIRQ_BASE, probing_pirq);
 		goto out;
+	}
 
 	bind_pirq.pirq = evtchn_get_xen_pirq(irq);
 	/* NB. We are happy to share unless we are probing. */
-	bind_pirq.flags = probing_irq(irq) ? 0 : BIND_PIRQ__WILL_SHARE;
+	bind_pirq.flags = test_and_clear_bit(irq - PIRQ_BASE, probing_pirq)
+			  || (irq_desc[irq].status & IRQ_AUTODETECT)
+			  ? 0 : BIND_PIRQ__WILL_SHARE;
 	if (HYPERVISOR_event_channel_op(EVTCHNOP_bind_pirq, &bind_pirq) != 0) {
-		if (!probing_irq(irq))
+		if (bind_pirq.flags)
 			printk(KERN_INFO "Failed to obtain physical IRQ %d\n",
 			       irq);
 		return 0;
@@ -1230,6 +1237,7 @@ static struct irq_chip pirq_chip = {
 	.mask_ack = ack_pirq,
 	.ack      = ack_pirq,
 	.end      = end_pirq,
+	.set_type = set_type_pirq,
 #ifdef CONFIG_SMP
 	.set_affinity = set_affinity_irq,
 #endif
@@ -1488,10 +1496,10 @@ static int evtchn_resume(struct sys_device *dev)
 	init_evtchn_cpu_bindings();
 
 	if (pirq_eoi_does_unmask) {
-		struct physdev_pirq_eoi_mfn eoi_mfn;
+		struct physdev_pirq_eoi_gmfn eoi_gmfn;
 
-		eoi_mfn.mfn = virt_to_bus(pirq_needs_eoi) >> PAGE_SHIFT;
-		if (HYPERVISOR_physdev_op(PHYSDEVOP_pirq_eoi_mfn, &eoi_mfn))
+		eoi_gmfn.gmfn = virt_to_machine(pirq_needs_eoi) >> PAGE_SHIFT;
+		if (HYPERVISOR_physdev_op(PHYSDEVOP_pirq_eoi_gmfn, &eoi_gmfn))
 			BUG();
 	}
 
@@ -1624,7 +1632,7 @@ int evtchn_get_xen_pirq(int irq)
 void __init xen_init_IRQ(void)
 {
 	unsigned int i;
-	struct physdev_pirq_eoi_mfn eoi_mfn;
+	struct physdev_pirq_eoi_gmfn eoi_gmfn;
 
 #ifndef PER_CPU_VIRQ_IRQ
 	__set_bit(VIRQ_TIMER, virq_per_cpu);
@@ -1637,9 +1645,10 @@ void __init xen_init_IRQ(void)
 
 	init_evtchn_cpu_bindings();
 
-	BUG_ON(!bitmap_empty(pirq_needs_eoi, PAGE_SIZE * 8));
-	eoi_mfn.mfn = virt_to_bus(pirq_needs_eoi) >> PAGE_SHIFT;
-	if (HYPERVISOR_physdev_op(PHYSDEVOP_pirq_eoi_mfn, &eoi_mfn) == 0)
+	pirq_needs_eoi = alloc_bootmem_pages(sizeof(unsigned long)
+		* BITS_TO_LONGS(ALIGN(NR_PIRQS, PAGE_SIZE * 8)));
+	eoi_gmfn.gmfn = virt_to_machine(pirq_needs_eoi) >> PAGE_SHIFT;
+	if (HYPERVISOR_physdev_op(PHYSDEVOP_pirq_eoi_gmfn, &eoi_gmfn) == 0)
 		pirq_eoi_does_unmask = true;
 
 	/* No event channels are 'live' right now. */

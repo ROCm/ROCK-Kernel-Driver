@@ -345,12 +345,7 @@ int xen_multi_mmuext_op(struct mmuext_op *src, unsigned int count,
 void xen_l1_entry_update(pte_t *ptr, pte_t val)
 {
 	mmu_update_t u;
-#ifdef CONFIG_HIGHPTE
-	u.ptr = ((unsigned long)ptr >= (unsigned long)high_memory) ?
-		arbitrary_virt_to_machine(ptr) : virt_to_machine(ptr);
-#else
-	u.ptr = virt_to_machine(ptr);
-#endif
+	u.ptr = ptep_to_machine(ptr);
 	u.val = __pte_val(val);
 	BUG_ON(HYPERVISOR_mmu_update(&u, 1, NULL, DOMID_SELF) < 0);
 }
@@ -491,6 +486,7 @@ void xen_tlb_flush_all(void)
 	op.cmd = MMUEXT_TLB_FLUSH_ALL;
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
+EXPORT_SYMBOL_GPL(xen_tlb_flush_all);
 
 void xen_tlb_flush_mask(cpumask_t *mask)
 {
@@ -509,6 +505,7 @@ void xen_invlpg_all(unsigned long ptr)
 	op.arg1.linear_addr = ptr & PAGE_MASK;
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
+EXPORT_SYMBOL_GPL(xen_invlpg_all);
 
 void xen_invlpg_mask(cpumask_t *mask, unsigned long ptr)
 {

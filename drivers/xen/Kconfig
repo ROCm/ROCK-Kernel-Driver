@@ -15,7 +15,6 @@ menu "XEN"
 
 config XEN_PRIVILEGED_GUEST
 	bool "Privileged Guest (domain 0)"
-	select PCI_REASSIGN if PCI
 	help
 	  Support for privileged operation (domain 0)
 
@@ -110,8 +109,9 @@ config XEN_NETDEV_LOOPBACK
 
 config XEN_PCIDEV_BACKEND
 	tristate "PCI-device backend driver"
-	depends on PCI && XEN_BACKEND
+	depends on PCI && XEN_PRIVILEGED_GUEST && XEN_BACKEND
 	default XEN_BACKEND
+	select PCI_REASSIGN
 	help
 	  The PCI device backend driver allows the kernel to export arbitrary
 	  PCI devices to other guests. If you select this to be a module, you
@@ -121,8 +121,8 @@ config XEN_PCIDEV_BACKEND
 choice
 	prompt "PCI Backend Mode"
 	depends on XEN_PCIDEV_BACKEND
-	default XEN_PCIDEV_BACKEND_VPCI if !IA64
 	default XEN_PCIDEV_BACKEND_CONTROLLER if IA64
+	default XEN_PCIDEV_BACKEND_VPCI
 
 config XEN_PCIDEV_BACKEND_VPCI
 	bool "Virtual PCI"

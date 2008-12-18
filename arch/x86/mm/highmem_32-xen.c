@@ -200,5 +200,8 @@ EXPORT_SYMBOL(kmap);
 EXPORT_SYMBOL(kunmap);
 EXPORT_SYMBOL(kmap_atomic);
 EXPORT_SYMBOL(kunmap_atomic);
+#ifdef CONFIG_HIGHPTE
+EXPORT_SYMBOL(kmap_atomic_to_page);
+#endif
 EXPORT_SYMBOL(clear_highpage);
 EXPORT_SYMBOL(copy_highpage);
