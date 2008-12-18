@@ -1035,8 +1035,8 @@ static int flush_commit_list(struct super_block *s,
 	if (jl->j_len <= 0) {
 		reiserfs_warning(s, "journal-d1",
 				 "jl->j_len = %lu; jl->j_state = %lx; "
-				 "jl->j_trans_id = %u; "
 				 "jl->j_refcount = %d; "
+				 "jl->j_trans_id = %u; "
 				 "journal->trans_id = %u; "
 				 "oldest live jl->j_trans_id = %u\n",
 				 jl->j_len, jl->j_state,
