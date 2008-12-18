@@ -3060,7 +3060,7 @@ action_store(mddev_t *mddev, const char *page, size_t len)
 			set_bit(MD_RECOVERY_INTR, &mddev->recovery);
 			md_unregister_thread(mddev->sync_thread);
 			mddev->sync_thread = NULL;
-			mddev->recovery = 0;
+			mddev->recovery &= ~65535;
 		}
 	} else if (test_bit(MD_RECOVERY_RUNNING, &mddev->recovery) ||
 		   test_bit(MD_RECOVERY_NEEDED, &mddev->recovery))
@@ -4532,7 +4532,7 @@ static int set_bitmap_file(mddev_t *mddev, int fd)
 	if (mddev->pers) {
 		if (!mddev->pers->quiesce)
 			return -EBUSY;
-		if (mddev->recovery || mddev->sync_thread)
+		if ((mddev->recovery & 65535) || mddev->sync_thread)
 			return -EBUSY;
 		/* we should be able to change the bitmap.. */
 	}
@@ -4787,7 +4787,7 @@ static int update_array_info(mddev_t *mddev, mdu_array_info_t *info)
 	if ((state ^ info->state) & (1<<MD_SB_BITMAP_PRESENT)) {
 		if (mddev->pers->quiesce == NULL)
 			return -EINVAL;
-		if (mddev->recovery || mddev->sync_thread)
+		if ((mddev->recovery & 65535) || mddev->sync_thread)
 			return -EBUSY;
 		if (info->state & (1<<MD_SB_BITMAP_PRESENT)) {
 			/* add the bitmap */
@@ -6052,7 +6052,8 @@ static int remove_and_add_spares(mddev_t *mddev)
 			}
 		}
 
-	if (mddev->degraded && ! mddev->ro) {
+	if (mddev->degraded && ! mddev->ro &&
+	    !test_bit(MD_RECOVERY_DISABLED, &mddev->recovery)) {
 		rdev_for_each(rdev, rtmp, mddev) {
 			if (rdev->raid_disk >= 0 &&
 			    !test_bit(In_sync, &rdev->flags) &&
@@ -6204,7 +6205,7 @@ void md_check_recovery(mddev_t *mddev)
 				rdev_for_each(rdev, rtmp, mddev)
 					rdev->saved_raid_disk = -1;
 
-			mddev->recovery = 0;
+			mddev->recovery &= ~65535;
 			/* flag recovery needed just to double check */
 			set_bit(MD_RECOVERY_NEEDED, &mddev->recovery);
 			sysfs_notify(&mddev->kobj, NULL, "sync_action");

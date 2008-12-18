@@ -200,6 +200,8 @@ struct mddev_s
 	 * RESHAPE:  A reshape is happening
 	 *
 	 * If neither SYNC or RESHAPE are set, then it is a recovery.
+	 *
+	 * DISABLED: read error on degraded array makes recovery impossible.
 	 */
 #define	MD_RECOVERY_RUNNING	0
 #define	MD_RECOVERY_SYNC	1
@@ -211,6 +213,9 @@ struct mddev_s
 #define	MD_RECOVERY_CHECK	7
 #define MD_RECOVERY_RESHAPE	8
 #define	MD_RECOVERY_FROZEN	9
+
+
+#define	MD_RECOVERY_DISABLED	16
 
 	unsigned long			recovery;
 
