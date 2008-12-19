@@ -157,13 +157,28 @@ static void sprintf_disk_child(char *buf, struct disk_child *dc)
 		dc_size(dc));
 }
 
+static void sprintf_journal_list(char *buf, struct reiserfs_journal_list *jl)
+{
+	sprintf(buf, "[j_start=%lu, j_state=%lu, j_len=%lu, j_nonzerolen=%d, "
+		     "j_commit_left=%u, j_older_commits_done=%u, j_trans_id=%u, "
+		     "j_timestamp=%ld, j_refcount=%d (%08x%08x%08x%08x%08x%08x)]",
+		     jl->j_start, jl->j_state, jl->j_len,
+		     atomic_read(&jl->j_nonzerolen),
+		     atomic_read(&jl->j_commit_left),
+		     atomic_read(&jl->j_older_commits_done),
+		     jl->j_trans_id, jl->j_timestamp, jl->j_refcount,
+		     jl->j_magic1, jl->j_magic2, jl->j_magic3, jl->j_magic4,
+		     jl->j_magic5, jl->j_magic6);
+}
+
 static char *is_there_reiserfs_struct(char *fmt, int *what)
 {
 	char *k = fmt;
 
 	while ((k = strchr(k, '%')) != NULL) {
 		if (k[1] == 'k' || k[1] == 'K' || k[1] == 'h' || k[1] == 't' ||
-		    k[1] == 'z' || k[1] == 'b' || k[1] == 'y' || k[1] == 'a') {
+		    k[1] == 'z' || k[1] == 'b' || k[1] == 'y' || k[1] == 'a' ||
+		    k[1] == 'j') {
 			*what = k[1];
 			break;
 		}
@@ -232,6 +247,11 @@ static void prepare_error_buf(const char *fmt, va_list args)
 			sprintf_de_head(p,
 					va_arg(args,
 					       struct reiserfs_de_head *));
+			break;
+		case 'j':
+			sprintf_journal_list(p,
+					va_arg(args,
+						struct reiserfs_journal_list *));
 			break;
 		}
 

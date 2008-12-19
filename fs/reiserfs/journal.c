@@ -83,6 +83,7 @@ static struct workqueue_struct *commit_wq;
 #define LIST_DIRTY   2
 #define LIST_COMMIT_PENDING  4	/* someone will commit this list */
 #define LIST_DEAD 8
+#define LIST_CURRENT 16
 
 /* flags for do_journal_end */
 #define FLUSH_ALL   1		/* flush commit and real blocks */
@@ -1033,14 +1034,11 @@ static int flush_commit_list(struct super_block *s,
 	 ** us is on disk too
 	 */
 	if (jl->j_len <= 0) {
-		reiserfs_warning(s, "journal-d1",
-				 "jl->j_len = %lu; jl->j_state = %lx; "
-				 "jl->j_refcount = %d; "
-				 "jl->j_trans_id = %u; "
+		reiserfs_warning(s, "journal-d1", "%j; "
+				 "trans_id = %u; "
 				 "journal->trans_id = %u; "
 				 "oldest live jl->j_trans_id = %u\n",
-				 jl->j_len, jl->j_state,
-				 jl->j_refcount, trans_id, journal->j_trans_id,
+				 trans_id, journal->j_trans_id,
 		JOURNAL_LIST_ENTRY(journal->j_journal_list.next)->j_trans_id);
 	}
 	BUG_ON(jl->j_len <= 0);
@@ -2573,6 +2571,12 @@ static struct reiserfs_journal_list *alloc_journal_list(struct super_block *s)
 	INIT_LIST_HEAD(&jl->j_bh_list);
 	mutex_init(&jl->j_commit_mutex);
 	SB_JOURNAL(s)->j_num_lists++;
+	jl->j_magic1 = 0xa5a5a5a5;
+	jl->j_magic2 = 0xb4b4b4b4;
+	jl->j_magic3 = 0xc3c3c3c3;
+	jl->j_magic4 = 0xd2d2d2d2;
+	jl->j_magic5 = 0xe1e1e1e1;
+	jl->j_magic6 = 0x96969696;
 	get_journal_list(jl);
 	return jl;
 }
@@ -2836,6 +2840,7 @@ int journal_init(struct super_block *sb, const char *j_dev_name,
 
 	journal->j_list_bitmap_index = 0;
 	journal_list_init(sb);
+	journal->j_current_jl->j_state |= LIST_CURRENT;
 
 	memset(journal->j_list_hash_table, 0,
 	       JOURNAL_HASH_SIZE * sizeof(struct reiserfs_journal_cnode *));
@@ -4174,6 +4179,8 @@ static int do_journal_end(struct reiserfs_transaction_handle *th,
 	 */
 
 	journal->j_current_jl = alloc_journal_list(sb);
+	journal->j_current_jl->j_state |= LIST_CURRENT;
+	jl->j_state &= LIST_CURRENT;
 
 	/* now it is safe to insert this transaction on the main list */
 	list_add_tail(&jl->j_list, &journal->j_journal_list);

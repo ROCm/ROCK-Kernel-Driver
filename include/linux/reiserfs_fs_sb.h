@@ -149,6 +149,12 @@ struct reiserfs_list_bitmap {
 ** and to make sure every real block in a transaction is on disk before allowing the log area
 ** to be overwritten */
 struct reiserfs_journal_list {
+	unsigned int j_magic1;
+	unsigned int j_magic2;
+	unsigned int j_magic3;
+	unsigned int j_magic4;
+	unsigned int j_magic5;
+	unsigned int j_magic6;
 	unsigned long j_start;
 	unsigned long j_state;
 	unsigned long j_len;
