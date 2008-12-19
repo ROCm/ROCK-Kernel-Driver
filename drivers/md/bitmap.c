@@ -230,7 +230,7 @@ static struct page *read_sb_page(mddev_t *mddev, long offset,
 
 		target = rdev->sb_start + offset + index * (PAGE_SIZE/512);
 
-		if (sync_page_io(rdev->bdev, target, size, page, READ)) {
+		if (sync_page_io(rdev->bdev, target, roundup(size, bdev_hardsect_size(rdev->bdev)), page, READ)) {
 			page->index = index;
 			attach_page_buffers(page, NULL); /* so that free_buffer will
 							  * quietly no-op */
