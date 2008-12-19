@@ -208,7 +208,7 @@ static void bitmap_checkfree(struct bitmap *bitmap, unsigned long page)
  */
 
 /* IO operations when bitmap is stored near all superblocks */
-static struct page *read_sb_page(mddev_t *mddev, long offset, unsigned long index)
+static struct page *read_sb_page(struct bitmap *bitmap, long offset, unsigned long index)
 {
 	/* choose a good rdev and read the page from there */
 
@@ -220,7 +220,7 @@ static struct page *read_sb_page(mddev_t *mddev, long offset, unsigned long inde
 	if (!page)
 		return ERR_PTR(-ENOMEM);
 
-	rdev_for_each(rdev, tmp, mddev) {
+	rdev_for_each(rdev, tmp, bitmap->mddev) {
 		int size = PAGE_SIZE;
 
 		if (! test_bit(In_sync, &rdev->flags)
@@ -229,8 +229,8 @@ static struct page *read_sb_page(mddev_t *mddev, long offset, unsigned long inde
 
 		target = rdev->sb_start + offset + index * (PAGE_SIZE/512);
 
-		if (index == mddev->bitmap->file_pages - 1)
-			size = roundup(mddev->bitmap->last_page_size,
+		if (index == bitmap->file_pages - 1)
+			size = roundup(bitmap->last_page_size,
 				       bdev_hardsect_size(rdev->bdev));
 
 		if (sync_page_io(rdev->bdev, target, size, page, READ)) {
@@ -550,7 +550,7 @@ static int bitmap_read_sb(struct bitmap *bitmap)
 
 		bitmap->sb_page = read_page(bitmap->file, 0, bitmap, bytes);
 	} else {
-		bitmap->sb_page = read_sb_page(bitmap->mddev, bitmap->offset, 0);
+		bitmap->sb_page = read_sb_page(bitmap, bitmap->offset, 0);
 	}
 	if (IS_ERR(bitmap->sb_page)) {
 		err = PTR_ERR(bitmap->sb_page);
@@ -967,7 +967,7 @@ static int bitmap_init_from_disk(struct bitmap *bitmap, sector_t start)
 				page = read_page(file, index, bitmap, count);
 				offset = 0;
 			} else {
-				page = read_sb_page(bitmap->mddev, bitmap->offset, index);
+				page = read_sb_page(bitmap, bitmap->offset, index);
 				offset = 0;
 			}
 			if (IS_ERR(page)) { /* read error */
