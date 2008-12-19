@@ -16,5 +16,6 @@ obj-$(CONFIG_USB_ATMEL)		+= at76_usb/
 obj-$(CONFIG_AGNX)		+= agnx/
 obj-$(CONFIG_OTUS)		+= otus/
 obj-$(CONFIG_RT2860)		+= rt2860/
+obj-$(CONFIG_RT2870)		+= rt2870/
 obj-$(CONFIG_BENET)		+= benet/
 obj-$(CONFIG_RTL8187SE)		+= rtl8187se/
