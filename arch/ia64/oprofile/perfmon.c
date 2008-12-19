@@ -91,7 +91,7 @@ int __init op_perfmon_init(struct oprofile_operations * ops)
 }
 
 
-void __exit op_perfmon_exit(void)
+void op_perfmon_exit(void)
 {
 	if (!using_perfmon)
 		return;
