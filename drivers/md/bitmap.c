@@ -221,13 +221,19 @@ static struct page *read_sb_page(mddev_t *mddev, long offset, unsigned long inde
 		return ERR_PTR(-ENOMEM);
 
 	rdev_for_each(rdev, tmp, mddev) {
+		int size = PAGE_SIZE;
+
 		if (! test_bit(In_sync, &rdev->flags)
 		    || test_bit(Faulty, &rdev->flags))
 			continue;
 
 		target = rdev->sb_start + offset + index * (PAGE_SIZE/512);
 
-		if (sync_page_io(rdev->bdev, target, PAGE_SIZE, page, READ)) {
+		if (index == mddev->bitmap->file_pages - 1)
+			size = roundup(mddev->bitmap->last_page_size,
+				       bdev_hardsect_size(rdev->bdev));
+
+		if (sync_page_io(rdev->bdev, target, size, page, READ)) {
 			page->index = index;
 			attach_page_buffers(page, NULL); /* so that free_buffer will
 							  * quietly no-op */
