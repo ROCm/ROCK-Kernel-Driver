@@ -2395,7 +2395,7 @@ static void hotkey_notify(struct ibm_struct *ibm, u32 event)
 		case 1:
 			/* 0x1000-0x1FFF: key presses */
 			scancode = hkey & 0xfff;
-			if (tp_features.bright_igdmode) {
+			if (tp_features.bright_igdmode && ibm_backlight_device) {
 				/* ToDo:
 				 * Is there an already defined key?
 				 */
