@@ -153,6 +153,7 @@ page_table_range_init(unsigned long start, unsigned long end, pgd_t *pgd_base)
 	unsigned long vaddr;
 	pgd_t *pgd;
 	pmd_t *pmd;
+	pte_t *lastpte = NULL;
 
 	vaddr = start;
 	pgd_idx = pgd_index(vaddr);
@@ -164,7 +165,30 @@ page_table_range_init(unsigned long start, unsigned long end, pgd_t *pgd_base)
 		pmd = pmd + pmd_index(vaddr);
 		for (; (pmd_idx < PTRS_PER_PMD) && (vaddr != end);
 							pmd++, pmd_idx++) {
-			one_page_table_init(pmd);
+			pte_t *pte;
+
+			pte = one_page_table_init(pmd);
+			/*
+			 * Something (early fixmap) has already put a pte page
+			 * here, which causes the page table allocation to
+			 * become nonlinear. Attempt to fix it, and if it is
+			 * still nonlinear then we have to bug.
+			 */
+			if (lastpte && lastpte + PTRS_PER_PTE != pte) {
+				pte_t *newpte;
+				int i;
+
+				pmd_clear(pmd);
+				__flush_tlb_all();
+
+				newpte = one_page_table_init(pmd);
+				BUG_ON(lastpte + PTRS_PER_PTE != newpte);
+				for (i = 0; i < PTRS_PER_PTE; i++) {
+					set_pte(newpte + i, pte_val(*(pte + i)));
+				}
+				pte = lastpte;
+			}
+			lastpte = pte;
 
 			vaddr += PMD_SIZE;
 		}
