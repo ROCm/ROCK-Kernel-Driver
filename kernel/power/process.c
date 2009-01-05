@@ -13,7 +13,6 @@
 #include <linux/module.h>
 #include <linux/syscalls.h>
 #include <linux/freezer.h>
-#include <linux/cgroup_freezer.h>
 
 /* 
  * Timeout for stopping processes
