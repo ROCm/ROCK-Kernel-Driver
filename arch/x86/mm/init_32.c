@@ -182,11 +182,11 @@ page_table_range_init(unsigned long start, unsigned long end, pgd_t *pgd_base)
 				__flush_tlb_all();
 
 				newpte = one_page_table_init(pmd);
-				BUG_ON(lastpte + PTRS_PER_PTE != newpte);
+				WARN_ON_ONCE(lastpte + PTRS_PER_PTE != newpte);
 				for (i = 0; i < PTRS_PER_PTE; i++) {
 					set_pte(newpte + i, *(pte + i));
 				}
-				pte = lastpte;
+				pte = newpte;
 			}
 			lastpte = pte;
 
