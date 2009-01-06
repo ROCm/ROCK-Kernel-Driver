@@ -787,19 +787,8 @@ repeat:
 		if (unlikely(page == RADIX_TREE_RETRY))
 			goto restart;
 
-		if (!page_cache_get_speculative(page)) {
-			/*
-			 * A failed page_cache_get_speculative operation does
-			 * not imply any barriers (Documentation/atomic_ops.txt),
-			 * and as such, we must force the compiler to deref the
-			 * radix-tree slot again rather than using the cached
-			 * value (because we need to give up if the page has been
-			 * removed from the radix-tree, rather than looping until
-			 * it gets reused for something else).
-			 */
-			barrier();
+		if (!page_cache_get_speculative(page))
 			goto repeat;
-		}
 
 		/* Has the page moved? */
 		if (unlikely(page != *((void **)pages[i]))) {
@@ -855,11 +844,8 @@ repeat:
 		if (page->mapping == NULL || page->index != index)
 			break;
 
-		if (!page_cache_get_speculative(page)) {
-			/* barrier: see find_get_pages() */
-			barrier();
+		if (!page_cache_get_speculative(page))
 			goto repeat;
-		}
 
 		/* Has the page moved? */
 		if (unlikely(page != *((void **)pages[i]))) {
@@ -912,11 +898,8 @@ repeat:
 		if (unlikely(page == RADIX_TREE_RETRY))
 			goto restart;
 
-		if (!page_cache_get_speculative(page)) {
-			/* barrier: see find_get_pages() */
-			barrier();
+		if (!page_cache_get_speculative(page))
 			goto repeat;
-		}
 
 		/* Has the page moved? */
 		if (unlikely(page != *((void **)pages[i]))) {
