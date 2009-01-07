@@ -282,7 +282,7 @@ static void scsi_post_sense_event(struct scsi_device *sdev,
 		(sshdr->asc << 8) | sshdr->ascq;
 
 	err = nlmsg_multicast(scsi_nl_sock, skb, 0, SCSI_NL_GRP_ML_EVENTS,
-			      GFP_KERNEL);
+			      GFP_ATOMIC);
 	if (err && (err != -ESRCH))
 		/* nlmsg_multicast already kfree_skb'd */
 		goto send_fail;
