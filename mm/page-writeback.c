@@ -66,7 +66,7 @@ static inline long sync_writeback_pages(void)
 /*
  * Start background writeback (via pdflush) at this percentage
  */
-int dirty_background_ratio = 5;
+int dirty_background_ratio = 10;
 
 /*
  * free highmem will not be subtracted from the total free memory
@@ -77,7 +77,7 @@ int vm_highmem_is_dirtyable;
 /*
  * The generator of dirty data starts writeback at this percentage
  */
-int vm_dirty_ratio = 10;
+int vm_dirty_ratio = 40;
 
 /*
  * The interval between `kupdate'-style writebacks, in jiffies
