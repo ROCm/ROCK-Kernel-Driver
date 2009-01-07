@@ -4303,7 +4303,7 @@ lpfc_get_host_port_state(struct Scsi_Host *shost)
 		fc_host_port_state(shost) = FC_PORTSTATE_OFFLINE;
 	else {
 		if ((vport->cfg_enable_auth) &&
-		    (lpfc_security_service_state == SECURITY_OFFLINE)) {
+		    (vport->security_service_state == SECURITY_OFFLINE)) {
 			fc_host_port_state(shost) = FC_PORTSTATE_ERROR;
 			spin_unlock_irq(shost->host_lock);
 			return;

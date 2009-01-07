@@ -549,14 +549,9 @@ lpfc_config_port_post(struct lpfc_hba *phba)
 		mempool_free(pmb, phba->mbox_mem_pool);
 	}
 
-	if (vport->cfg_enable_auth) {
-		if (lpfc_security_service_state == SECURITY_OFFLINE) {
-			lpfc_printf_log(vport->phba, KERN_ERR, LOG_SECURITY,
-				"1000 Authentication is enabled but "
-				"authentication service is not running\n");
+	if (vport->cfg_enable_auth &&
+	    vport->security_service_state == SECURITY_OFFLINE)
 			vport->auth.auth_mode = FC_AUTHMODE_UNKNOWN;
-		}
-	}
 
 	/* Allocate new MBOX buffer, will be freed in mbox compl */
 	pmb = mempool_alloc(phba->mbox_mem_pool, GFP_KERNEL);
@@ -2124,6 +2119,7 @@ lpfc_create_port(struct lpfc_hba *phba, int instance, struct device *dev)
 	INIT_WORK(&vport->sc_offline_work, lpfc_fc_sc_security_offline);
 	INIT_LIST_HEAD(&vport->sc_users);
 	INIT_LIST_HEAD(&vport->sc_response_wait_queue);
+	vport->security_service_state = SECURITY_OFFLINE;
 
 	spin_lock_irq(&phba->hbalock);
 	list_add_tail(&vport->listentry, &phba->port_list);
@@ -2904,19 +2900,6 @@ lpfc_pci_probe_one(struct pci_dev *pdev, const struct pci_device_id *pid)
 
 	shost = lpfc_shost_from_vport(vport);
 
-	if ((lpfc_get_security_enabled)(shost)) {
-		unsigned long flags;
-		spin_lock_irqsave(&fc_security_user_lock, flags);
-		list_add_tail(&vport->sc_users, &fc_security_user_list);
-		spin_unlock_irqrestore(&fc_security_user_lock, flags);
-		if (fc_service_state == FC_SC_SERVICESTATE_ONLINE) {
-			lpfc_fc_queue_security_work(vport,
-				&vport->sc_online_work);
-		}
-		/* Triggers fcauthd to register if it is running */
-		fc_host_post_event(shost, fc_get_event_number(),
-				   FCH_EVT_PORT_ONLINE, shost->host_no);
-	}
 	phba->pport = vport;
 	lpfc_debugfs_initialize(vport);
 
@@ -2990,6 +2973,15 @@ lpfc_pci_probe_one(struct pci_dev *pdev, const struct pci_device_id *pid)
 		}
 	}
 
+	if ((lpfc_get_security_enabled)(shost)) {
+		unsigned long flags;
+		spin_lock_irqsave(&fc_security_user_lock, flags);
+		list_add_tail(&vport->sc_users, &fc_security_user_list);
+		spin_unlock_irqrestore(&fc_security_user_lock, flags);
+		/* Triggers fcauthd to register if it is running */
+		fc_host_post_event(shost, fc_get_event_number(),
+				   FCH_EVT_PORT_ONLINE, shost->host_no);
+	}
 	/*
 	 * hba setup may have changed the hba_queue_depth so we need to adjust
 	 * the value of can_queue.

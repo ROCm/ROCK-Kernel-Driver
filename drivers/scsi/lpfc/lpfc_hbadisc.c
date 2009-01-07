@@ -1010,7 +1010,7 @@ lpfc_mbx_cmpl_local_config_link(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
 	 * LPFC_FLOGI while waiting for FLOGI cmpl
 	 */
 	if ((vport->cfg_enable_auth) &&
-	    (lpfc_security_service_state == SECURITY_OFFLINE))
+	    (vport->security_service_state == SECURITY_OFFLINE))
 		lpfc_issue_clear_la(phba, vport);
 	else if (vport->port_state != LPFC_FLOGI)
 		lpfc_initial_flogi(vport);

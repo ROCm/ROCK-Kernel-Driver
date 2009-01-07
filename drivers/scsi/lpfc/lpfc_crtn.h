@@ -295,7 +295,7 @@ int lpfc_get_instance(void);
 void lpfc_host_attrib_init(struct Scsi_Host *);
 
 int lpfc_selective_reset(struct lpfc_hba *);
-int lpfc_security_wait(struct lpfc_hba *);
+int lpfc_security_wait(struct lpfc_vport *);
 int  lpfc_get_security_enabled(struct Scsi_Host *);
 void lpfc_security_service_online(struct Scsi_Host *);
 void lpfc_security_service_offline(struct Scsi_Host *);
@@ -318,7 +318,6 @@ extern void lpfc_debugfs_slow_ring_trc(struct lpfc_hba *, char *, uint32_t,
 	uint32_t, uint32_t);
 extern struct lpfc_hbq_init *lpfc_hbq_defs[];
 
-extern uint8_t lpfc_security_service_state;
 extern spinlock_t fc_security_user_lock;
 extern struct list_head fc_security_user_list;
 extern int fc_service_state;
