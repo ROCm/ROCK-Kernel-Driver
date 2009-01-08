@@ -8,6 +8,8 @@
 #ifndef _PCI_ACPI_H_
 #define _PCI_ACPI_H_
 
+#include <linux/acpi.h>
+
 #define OSC_QUERY_TYPE			0
 #define OSC_SUPPORT_TYPE 		1
 #define OSC_CONTROL_TYPE		2
@@ -49,6 +51,7 @@
 #ifdef CONFIG_ACPI
 extern acpi_status pci_osc_control_set(acpi_handle handle, u32 flags);
 extern acpi_status __pci_osc_support_set(u32 flags, const char *hid);
+int pci_acpi_osc_support(acpi_handle handle, u32 flags);
 static inline acpi_status pci_osc_support_set(u32 flags)
 {
 	return __pci_osc_support_set(flags, PCI_ROOT_HID_STRING);
