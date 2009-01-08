@@ -8,7 +8,7 @@
  *
  * Modified by Aravind Menon for Xen
  * These modifications are:
- * Copyright (C) 2005 Hewlett-Packard Co.	
+ * Copyright (C) 2005 Hewlett-Packard Co.
  */
 
 #include <linux/fs.h>
@@ -132,7 +132,7 @@ static unsigned int adomains = 0;
 static int active_domains[MAX_OPROF_DOMAINS + 1];
 static DEFINE_MUTEX(adom_mutex);
 
-static ssize_t adomain_write(struct file * file, char const __user * buf, 
+static ssize_t adomain_write(struct file * file, char const __user * buf,
 			     size_t count, loff_t * offset)
 {
 	char *tmpbuf;
@@ -140,9 +140,9 @@ static ssize_t adomain_write(struct file * file, char const __user * buf,
 	int i;
 	unsigned long val;
 	ssize_t retval = count;
-	
+
 	if (*offset)
-		return -EINVAL;	
+		return -EINVAL;
 	if (count > TMPBUFSIZE - 1)
 		return -EINVAL;
 
@@ -186,7 +186,7 @@ static ssize_t adomain_write(struct file * file, char const __user * buf,
 	return retval;
 }
 
-static ssize_t adomain_read(struct file * file, char __user * buf, 
+static ssize_t adomain_read(struct file * file, char __user * buf,
 			    size_t count, loff_t * offset)
 {
 	char * tmpbuf;
@@ -226,7 +226,7 @@ static unsigned int pdomains = 0;
 static int passive_domains[MAX_OPROF_DOMAINS];
 static DEFINE_MUTEX(pdom_mutex);
 
-static ssize_t pdomain_write(struct file * file, char const __user * buf, 
+static ssize_t pdomain_write(struct file * file, char const __user * buf,
 			     size_t count, loff_t * offset)
 {
 	char *tmpbuf;
@@ -234,9 +234,9 @@ static ssize_t pdomain_write(struct file * file, char const __user * buf,
 	int i;
 	unsigned long val;
 	ssize_t retval = count;
-	
+
 	if (*offset)
-		return -EINVAL;	
+		return -EINVAL;
 	if (count > TMPBUFSIZE - 1)
 		return -EINVAL;
 
@@ -280,7 +280,7 @@ static ssize_t pdomain_write(struct file * file, char const __user * buf,
 	return retval;
 }
 
-static ssize_t pdomain_read(struct file * file, char __user * buf, 
+static ssize_t pdomain_read(struct file * file, char __user * buf,
 			    size_t count, loff_t * offset)
 {
 	char * tmpbuf;

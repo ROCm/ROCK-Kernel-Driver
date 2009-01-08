@@ -773,6 +773,11 @@ static inline void msi_remove_pci_irq_vectors(struct pci_dev *dev)
 
 static inline void pci_restore_msi_state(struct pci_dev *dev)
 { }
+
+static inline int pci_msi_enabled(void)
+{
+	return 0;
+}
 #ifdef CONFIG_XEN
 #define register_msi_get_owner(func) 0
 #define unregister_msi_get_owner(func) 0
@@ -787,10 +792,20 @@ extern void pci_msix_shutdown(struct pci_dev *dev);
 extern void pci_disable_msix(struct pci_dev *dev);
 extern void msi_remove_pci_irq_vectors(struct pci_dev *dev);
 extern void pci_restore_msi_state(struct pci_dev *dev);
+extern int pci_msi_enabled(void);
 #ifdef CONFIG_XEN
 extern int register_msi_get_owner(int (*func)(struct pci_dev *dev));
 extern int unregister_msi_get_owner(int (*func)(struct pci_dev *dev));
 #endif
+#endif
+
+#ifndef CONFIG_PCIEASPM
+static inline int pcie_aspm_enabled(void)
+{
+	return 0;
+}
+#else
+extern int pcie_aspm_enabled(void);
 #endif
 
 #ifdef CONFIG_HT_IRQ
