@@ -116,6 +116,10 @@ static struct of_device_id ehea_device_table[] = {
 		.name = "lhea",
 		.compatible = "IBM,lhea",
 	},
+	{
+		.type = "network",
+		.compatible = "IBM,lhea-ethernet",
+	},
 	{},
 };
 MODULE_DEVICE_TABLE(of, ehea_device_table);
