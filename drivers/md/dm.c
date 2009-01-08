@@ -1640,22 +1640,26 @@ static void dm_unplug_all(struct request_queue *q)
 
 static int dm_any_congested(void *congested_data, int bdi_bits)
 {
-	int r;
+	int r = bdi_bits;
 	struct mapped_device *md = (struct mapped_device *) congested_data;
-	struct dm_table *map = dm_get_table(md);
+	struct dm_table *map;
 
-	if (!map || test_bit(DMF_BLOCK_IO, &md->flags))
-		r = bdi_bits;
-	else if (dm_request_based(md))
-		/*
-		 * Request-based dm cares about only own queue for
-		 * the query about congestion status of request_queue
-		 */
-		r = md->queue->backing_dev_info.state & bdi_bits;
-	else
-		r = dm_table_any_congested(map, bdi_bits);
+	if (!test_bit(DMF_BLOCK_IO, &md->flags)) {
+		map = dm_get_table(md);
+		if (map) {
+			if (dm_request_based(md))
+				/*
+				 * Request-based dm cares about only own queue for
+				 * the query about congestion status of request_queue
+				 */
+				r = md->queue->backing_dev_info.state & bdi_bits;
+			else
+				r = dm_table_any_congested(map, bdi_bits);
+			dm_table_put(map);
+		}
+	}
 
-	dm_table_put(map);
+
 	return r;
 }
 
@@ -1916,10 +1920,12 @@ static int __bind(struct mapped_device *md, struct dm_table *t)
 
 	if (md->suspended_bdev)
 		__set_size(md, size);
-	if (size == 0)
-		return 0;
 
-	dm_table_get(t);
+	if (!size) {
+		dm_table_destroy(t);
+		return 0;
+	}
+
 	dm_table_event_callback(t, event_callback, md);
 
 	/*
@@ -1957,7 +1963,7 @@ static void __unbind(struct mapped_device *md)
 	write_lock(&md->map_lock);
 	md->map = NULL;
 	write_unlock(&md->map_lock);
-	dm_table_put(map);
+	dm_table_destroy(map);
 }
 
 /*
@@ -2045,8 +2051,8 @@ void dm_put(struct mapped_device *md)
 			dm_table_presuspend_targets(map);
 			dm_table_postsuspend_targets(map);
 		}
-		__unbind(md);
 		dm_table_put(map);
+		__unbind(md);
 		free_dev(md);
 	}
 }
