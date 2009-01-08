@@ -62,6 +62,7 @@ typedef struct drm_via_private {
 	drm_local_map_t *sarea;
 	drm_local_map_t *fb;
 	drm_local_map_t *mmio;
+	enum drm_agp_type agptype;
 	unsigned long agpAddr;
 	wait_queue_head_t decoder_queue[VIA_NR_XVMC_LOCKS];
 	char *dma_ptr;
@@ -93,7 +94,13 @@ typedef struct drm_via_private {
 	unsigned long vram_offset;
 	unsigned long agp_offset;
 	drm_via_blitq_t blit_queues[VIA_NUM_BLIT_ENGINES];
+	struct drm_map video_agp_address_map[3];
+	enum {
+	CR_FOR_RINGBUFFER,
+	CR_FOR_VIDEO
+	} cr_status;
 	uint32_t dma_diff;
+	int initialize;
 } drm_via_private_t;
 
 enum via_family {
@@ -119,6 +126,8 @@ extern int via_mem_free(struct drm_device *dev, void *data, struct drm_file *fil
 extern int via_agp_init(struct drm_device *dev, void *data, struct drm_file *file_priv);
 extern int via_map_init(struct drm_device *dev, void *data, struct drm_file *file_priv);
 extern int via_decoder_futex(struct drm_device *dev, void *data, struct drm_file *file_priv);
+extern int via_get_drm_info(struct drm_device *dev, void *data,
+	struct drm_file *file_priv);
 extern int via_wait_irq(struct drm_device *dev, void *data, struct drm_file *file_priv);
 extern int via_dma_blit_sync( struct drm_device *dev, void *data, struct drm_file *file_priv );
 extern int via_dma_blit( struct drm_device *dev, void *data, struct drm_file *file_priv );
@@ -149,5 +158,8 @@ extern void via_lastclose(struct drm_device *dev);
 
 extern void via_dmablit_handler(struct drm_device *dev, int engine, int from_irq);
 extern void via_init_dmablit(struct drm_device *dev);
+
+extern int via_drm_resume(struct pci_dev *dev);
+extern int via_drm_suspend(struct pci_dev *dev, pm_message_t state);
 
 #endif

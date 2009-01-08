@@ -37,10 +37,16 @@ static struct pci_device_id pciidlist[] = {
 	viadrv_PCI_IDS
 };
 
+int  via_driver_open(struct drm_device *dev, struct drm_file *priv)
+{
+    priv->authenticated = 1;
+    return 0;
+}
 static struct drm_driver driver = {
 	.driver_features =
 	    DRIVER_USE_AGP | DRIVER_USE_MTRR | DRIVER_HAVE_IRQ |
 	    DRIVER_IRQ_SHARED | DRIVER_IRQ_VBL,
+	.open = via_driver_open,
 	.load = via_driver_load,
 	.unload = via_driver_unload,
 	.context_dtor = via_final_context,
@@ -68,8 +74,10 @@ static struct drm_driver driver = {
 		 .fasync = drm_fasync,
 	},
 	.pci_driver = {
-		 .name = DRIVER_NAME,
-		 .id_table = pciidlist,
+		.name = DRIVER_NAME,
+		.id_table = pciidlist,
+		.suspend = via_drm_suspend,
+		.resume = via_drm_resume,
 	},
 
 	.name = DRIVER_NAME,

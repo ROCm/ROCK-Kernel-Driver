@@ -68,12 +68,22 @@
 	*vb++ = (w2);				\
 	dev_priv->dma_low += 8;
 
+#define VIA_OUT_VIDEO_AGP_BUFFER(cmd1, cmd2)    \
+	do {                                    \
+		*cur_virtual++ = cmd1;          \
+		*cur_virtual++ = cmd2;          \
+		cmdbuf_info.cmd_size += 8;      \
+	} while (0);
+
+static void via_cmdbuf_flush(struct drm_via_private *dev_priv,
+	uint32_t cmd_type);
 static void via_cmdbuf_start(drm_via_private_t * dev_priv);
 static void via_cmdbuf_pause(drm_via_private_t * dev_priv);
 static void via_cmdbuf_reset(drm_via_private_t * dev_priv);
 static void via_cmdbuf_rewind(drm_via_private_t * dev_priv);
 static int via_wait_idle(drm_via_private_t * dev_priv);
 static void via_pad_cache(drm_via_private_t * dev_priv, int qwords);
+
 
 /*
  * Free space in command buffer.
@@ -155,17 +165,35 @@ static inline uint32_t *via_check_dma(drm_via_private_t * dev_priv,
 
 int via_dma_cleanup(struct drm_device * dev)
 {
+	struct drm_via_video_save_head *pnode;
+	int i;
+
+
+	for (pnode = via_video_save_head; pnode; pnode =
+		(struct drm_via_video_save_head *)pnode->next)
+		memcpy(pnode->psystemmem, pnode->pvideomem, pnode->size);
 	if (dev->dev_private) {
 		drm_via_private_t *dev_priv =
 		    (drm_via_private_t *) dev->dev_private;
 
 		if (dev_priv->ring.virtual_start) {
-			via_cmdbuf_reset(dev_priv);
+			if (dev_priv->cr_status == CR_FOR_RINGBUFFER)
+				via_cmdbuf_flush(dev_priv, HC_HAGPBpID_STOP);
+
+			via_wait_idle(dev_priv);
 
 			drm_core_ioremapfree(&dev_priv->ring.map, dev);
 			dev_priv->ring.virtual_start = NULL;
 		}
 
+		for (i = 0; i < 3; i++) {
+			if (dev_priv->video_agp_address_map[i].handle &&
+			 dev_priv->video_agp_address_map[i].size)
+				drm_core_ioremapfree(dev_priv->
+				video_agp_address_map+i, dev);
+			/*Fix for suspend reuse video buf*/
+			dev_priv->video_agp_address_map[i].handle = NULL;
+		}
 	}
 
 	return 0;
@@ -175,6 +203,7 @@ static int via_initialize(struct drm_device * dev,
 			  drm_via_private_t * dev_priv,
 			  drm_via_dma_init_t * init)
 {
+	struct drm_via_video_save_head *pnode;
 	if (!dev_priv || !dev_priv->mmio) {
 		DRM_ERROR("via_dma_init called before via_map_init\n");
 		return -EFAULT;
@@ -194,6 +223,9 @@ static int via_initialize(struct drm_device * dev,
 		DRM_ERROR("AGP DMA is not supported on this chip\n");
 		return -EINVAL;
 	}
+
+	for (pnode = via_video_save_head; pnode; pnode = pnode->next)
+		memcpy(pnode->pvideomem, pnode->psystemmem, pnode->size);
 
 	dev_priv->ring.map.offset = dev->agp->base + init->offset;
 	dev_priv->ring.map.size = init->size;
@@ -224,6 +256,7 @@ static int via_initialize(struct drm_device * dev,
 
 	via_cmdbuf_start(dev_priv);
 
+	dev_priv->cr_status = CR_FOR_RINGBUFFER;
 	return 0;
 }
 
@@ -332,16 +365,174 @@ static int via_flush_ioctl(struct drm_device *dev, void *data, struct drm_file *
 static int via_cmdbuffer(struct drm_device *dev, void *data, struct drm_file *file_priv)
 {
 	drm_via_cmdbuffer_t *cmdbuf = data;
-	int ret;
+	drm_via_private_t *dev_priv = dev->dev_private;
+	int ret = 0, count;
 
 	LOCK_TEST_WITH_RETURN(dev, file_priv);
 
 	DRM_DEBUG("buf %p size %lu\n", cmdbuf->buf, cmdbuf->size);
 
+	if (dev_priv->cr_status == CR_FOR_VIDEO) {
+		/* Because our driver will hook CR stop cmd behind video cmd,
+		* all we need to do here is to wait for CR idle,
+		* and initialize ring buffer.
+		*/
+		count = 10000000;
+		while (count-- && (VIA_READ(VIA_REG_STATUS) &
+			VIA_CMD_RGTR_BUSY))
+			cpu_relax();
+		/* Seldom happen */
+		if (count < 0) {
+			DRM_INFO("The CR can't be idle from video agp cmd \
+				dispatch when it is needed by ring buffer \n");
+			return -1;
+		}
+		/* CR has been idle so that we need to initialize ring buffer */
+		dev_priv->dma_ptr = dev_priv->ring.virtual_start;
+		dev_priv->dma_low = 0;
+		dev_priv->dma_high = 0x1000000;
+		dev_priv->dma_wrap = 0x1000000;
+		dev_priv->dma_offset = 0x0;
+		dev_priv->last_pause_ptr = NULL;
+		dev_priv->hw_addr_ptr = dev_priv->mmio->handle + 0x418;
+
+		via_cmdbuf_start(dev_priv);
+
+		dev_priv->cr_status = CR_FOR_RINGBUFFER;
+
+	}
 	ret = via_dispatch_cmdbuffer(dev, cmdbuf);
 	if (ret) {
 		return ret;
 	}
+
+	return 0;
+}
+
+int via_cmdbuffer_video_agp(struct drm_device *dev, void *data,
+	struct drm_file *file_priv)
+{
+	drm_via_private_t *dev_priv = dev->dev_private;
+	struct drm_via_video_agp_cmd cmdbuf_info;
+	int count;
+	u32 start_addr, start_addr_lo;
+	u32 end_addr, end_addr_lo;
+	u32 pause_addr, pause_addr_hi, pause_addr_lo;
+	u32 *cur_virtual;
+	u32 command;
+	int i = 0;
+	struct drm_map map;
+
+	LOCK_TEST_WITH_RETURN(dev, file_priv);
+
+	/* Check whether CR services for ring buffer or for video engine. */
+	if (dev_priv->cr_status == CR_FOR_RINGBUFFER) {
+		/* Here we need to hook stop cmd in tail of ringbuffer
+		 * in order to stop CR, for we will reset start/end/pause
+		 * address for fetch cmd from video AGP buffer
+		 */
+		 via_cmdbuf_flush(dev_priv, HC_HAGPBpID_STOP);
+	}
+
+	/* Set CR status here to avoid ring buffer crush in case we
+	* can't initialize CR for video properly
+	*/
+	dev_priv->cr_status = CR_FOR_VIDEO;
+
+	/* Wait idle since we will reset CR relevant registers. */
+	count = 10000000;
+	while (count-- && (VIA_READ(VIA_REG_STATUS) & VIA_CMD_RGTR_BUSY))
+		cpu_relax();
+
+	/* Seldom happen */
+	if (count < 0) {
+		DRM_INFO("The CR can't be idle from video agp cmd dispatch \
+			when it is needed by ring buffer \n");
+		return -1;
+	}
+
+	/* Till here, the CR has been idle, all need to here is to initialize
+	* CR START/END/PAUSE address registers according to video AGP buffer
+	* location and size. BE LUCKY!!!
+	*/
+	cmdbuf_info = *(struct drm_via_video_agp_cmd *)data;
+
+	start_addr = cmdbuf_info.offset + dev->agp->base;
+	end_addr = cmdbuf_info.buffer_size + start_addr;
+
+	if ((cmdbuf_info.buffer_size & 0xFF) ||
+	(start_addr + 2 * 0xFF > end_addr) ||
+	start_addr & 0xFF) {
+		DRM_INFO("The video cmd is too large or you didn't set the \
+			video cmd 2 DWORD alignment. \n");
+		return -1;
+	}
+
+	map.offset = start_addr;
+	map.size = cmdbuf_info.buffer_size;
+	map.type = map.flags = map.mtrr = 0;
+	map.handle = 0;
+
+	for (i = 0; i < 3; i++) {
+		if ((dev_priv->video_agp_address_map[i].offset == map.offset) &&
+		(dev_priv->video_agp_address_map[i].size == map.size) &&
+		dev_priv->video_agp_address_map[i].handle) {
+			map.handle = dev_priv->video_agp_address_map[i].handle;
+			break;
+		}
+		if (!dev_priv->video_agp_address_map[i].handle)
+			break;
+	}
+
+	/* Check whether this agp cmd buffer has already been remaped before */
+	/* case: Never be remaped before */
+	if (!map.handle) {
+		drm_core_ioremap(&map, dev);
+		if (!map.handle)
+			return -1;
+		/* there is a free hole for filling in this address map */
+		if (i < 3)
+			dev_priv->video_agp_address_map[i] = map;
+		else {
+			drm_core_ioremapfree(dev_priv->video_agp_address_map,
+				dev);
+			dev_priv->video_agp_address_map[0] = map;
+		}
+	}
+
+	cur_virtual = map.handle + cmdbuf_info.cmd_size;
+
+	VIA_OUT_VIDEO_AGP_BUFFER(HC_HEADER2 | ((VIA_REG_TRANSET >> 2) << 12) |
+			(VIA_REG_TRANSPACE >> 2), HC_ParaType_PreCR << 16);
+
+	/* pause register need 0xFF alignment */
+	do {
+		VIA_OUT_VIDEO_AGP_BUFFER(HC_DUMMY, HC_DUMMY);
+	} while (cmdbuf_info.cmd_size & 0xFF);
+	pause_addr = cmdbuf_info.cmd_size + start_addr - 8;
+
+	pause_addr_lo = ((HC_SubA_HAGPBpL << 24) | HC_HAGPBpID_STOP |
+	(pause_addr & HC_HAGPBpL_MASK));
+	pause_addr_hi = ((HC_SubA_HAGPBpH << 24) | (pause_addr >> 24));
+	start_addr_lo = ((HC_SubA_HAGPBstL << 24) | (start_addr & 0xFFFFFF));
+	end_addr_lo = ((HC_SubA_HAGPBendL << 24) | (end_addr & 0xFFFFFF));
+	command = ((HC_SubA_HAGPCMNT << 24) | (start_addr >> 24) |
+		   ((end_addr & 0xff000000) >> 16));
+	*(cur_virtual-2) = pause_addr_hi;
+	*(cur_virtual-1) = pause_addr_lo;
+
+	via_flush_write_combine();
+
+	VIA_WRITE(VIA_REG_TRANSET, (HC_ParaType_PreCR << 16));
+	VIA_WRITE(VIA_REG_TRANSPACE, command);
+	VIA_WRITE(VIA_REG_TRANSPACE, start_addr_lo);
+	VIA_WRITE(VIA_REG_TRANSPACE, end_addr_lo);
+
+	VIA_WRITE(VIA_REG_TRANSPACE, pause_addr_hi);
+	VIA_WRITE(VIA_REG_TRANSPACE, pause_addr_lo);
+	DRM_WRITEMEMORYBARRIER();
+	/* fire */
+	VIA_WRITE(VIA_REG_TRANSPACE, command | HC_HAGPCMNT_MASK);
 
 	return 0;
 }
@@ -735,6 +926,146 @@ static int via_cmdbuf_size(struct drm_device *dev, void *data, struct drm_file *
 	return ret;
 }
 
+/*The following functions are for ACPI*/
+
+static void initialize3Dengine(drm_via_private_t *dev_priv)
+{
+	int i = 0;
+
+	VIA_WRITE(0x43C, 0x00010000);
+
+	for (i = 0; i <= 0x7D; i++)
+		VIA_WRITE(0x440, (unsigned long) i << 24);
+
+	VIA_WRITE(0x43C, 0x00020000);
+
+	for (i = 0; i <= 0x94; i++)
+		VIA_WRITE(0x440, (unsigned long) i << 24);
+
+	VIA_WRITE(0x440, 0x82400000);
+	VIA_WRITE(0x43C, 0x01020000);
+
+	for (i = 0; i <= 0x94; i++)
+		VIA_WRITE(0x440, (unsigned long) i << 24);
+
+	VIA_WRITE(0x440, 0x82400000);
+	VIA_WRITE(0x43C, 0xfe020000);
+
+	for (i = 0; i <= 0x03; i++)
+		VIA_WRITE(0x440, (unsigned long) i << 24);
+
+	VIA_WRITE(0x43C, 0x00030000);
+
+	for (i = 0; i <= 0xff; i++)
+		VIA_WRITE(0x440, 0);
+
+	VIA_WRITE(0x43C, 0x00100000);
+	VIA_WRITE(0x440, 0x00333004);
+	VIA_WRITE(0x440, 0x10000002);
+	VIA_WRITE(0x440, 0x60000000);
+	VIA_WRITE(0x440, 0x61000000);
+	VIA_WRITE(0x440, 0x62000000);
+	VIA_WRITE(0x440, 0x63000000);
+	VIA_WRITE(0x440, 0x64000000);
+
+	VIA_WRITE(0x43C, 0x00fe0000);
+	VIA_WRITE(0x440, 0x40008c0f);
+	VIA_WRITE(0x440, 0x44000000);
+	VIA_WRITE(0x440, 0x45080C04);
+	VIA_WRITE(0x440, 0x46800408);
+	VIA_WRITE(0x440, 0x50000000);
+	VIA_WRITE(0x440, 0x51000000);
+	VIA_WRITE(0x440, 0x52000000);
+	VIA_WRITE(0x440, 0x53000000);
+
+
+	VIA_WRITE(0x43C, 0x00fe0000);
+	VIA_WRITE(0x440, 0x08000001);
+	VIA_WRITE(0x440, 0x0A000183);
+	VIA_WRITE(0x440, 0x0B00019F);
+	VIA_WRITE(0x440, 0x0C00018B);
+	VIA_WRITE(0x440, 0x0D00019B);
+	VIA_WRITE(0x440, 0x0E000000);
+	VIA_WRITE(0x440, 0x0F000000);
+	VIA_WRITE(0x440, 0x10000000);
+	VIA_WRITE(0x440, 0x11000000);
+	VIA_WRITE(0x440, 0x20000000);
+}
+/* For acpi case, when system resume from suspend or hibernate,
+ * need to re-initialize dma info into HW
+ */
+int via_drm_resume(struct pci_dev *pci)
+{
+	struct drm_device *dev = (struct drm_device *)pci_get_drvdata(pci);
+	drm_via_private_t *dev_priv = (drm_via_private_t *) dev->dev_private;
+	struct drm_via_video_save_head *pnode = 0;
+
+	if (!dev_priv->initialize)
+		return 0;
+	/* when resume, initialize 3d registers */
+	initialize3Dengine(dev_priv);
+
+	/* here we need to restore some video memory content */
+	for (pnode = via_video_save_head; pnode; pnode = pnode->next)
+		memcpy(pnode->pvideomem, pnode->psystemmem, pnode->size);
+
+	/* if pci path, return */
+	if (!dev_priv->ring.virtual_start)
+		return 0;
+
+	dev_priv->dma_ptr = dev_priv->ring.virtual_start;
+	dev_priv->dma_low = 0;
+	dev_priv->dma_high = 0x1000000;
+	dev_priv->dma_wrap = 0x1000000;
+	dev_priv->dma_offset = 0x0;
+	dev_priv->last_pause_ptr = NULL;
+	dev_priv->hw_addr_ptr = dev_priv->mmio->handle + 0x418;
+
+	via_cmdbuf_start(dev_priv);
+
+	return 0;
+}
+
+int via_drm_suspend(struct pci_dev *pci, pm_message_t state)
+{
+	struct drm_device *dev = (struct drm_device *)pci_get_drvdata(pci);
+	drm_via_private_t *dev_priv = (drm_via_private_t *) dev->dev_private;
+
+	struct drm_via_video_save_head *pnode = 0;
+
+	if (!dev_priv->initialize)
+		return 0;
+	/*here we need to save some video mem information into system memory,
+	to keep the system consistent between suspend *before* and *after*
+	1.save only necessary */
+	for (pnode = via_video_save_head; pnode;
+		pnode = (struct drm_via_video_save_head *)pnode->next)
+		memcpy(pnode->psystemmem, pnode->pvideomem, pnode->size);
+
+	/* Only agp path need to flush the cmd */
+	if (dev_priv->ring.virtual_start)
+		via_cmdbuf_reset(dev_priv);
+
+	return 0;
+}
+int via_drm_authmagic(struct drm_device *dev, void *data,
+	struct drm_file *file_priv)
+{
+	return 0;
+}
+
+int via_drm_init_judge(struct drm_device *dev, void *data,
+	struct drm_file *file_priv)
+{
+	struct drm_via_private *dev_priv = dev->dev_private;
+
+	if (dev_priv->initialize)
+		*(int *)data = 1;
+	else
+		*(int *)data = -1;
+	return 0;
+}
+
 struct drm_ioctl_desc via_ioctls[] = {
 	DRM_IOCTL_DEF(DRM_VIA_ALLOCMEM, via_mem_alloc, DRM_AUTH),
 	DRM_IOCTL_DEF(DRM_VIA_FREEMEM, via_mem_free, DRM_AUTH),
@@ -742,6 +1073,7 @@ struct drm_ioctl_desc via_ioctls[] = {
 	DRM_IOCTL_DEF(DRM_VIA_FB_INIT, via_fb_init, DRM_AUTH|DRM_MASTER),
 	DRM_IOCTL_DEF(DRM_VIA_MAP_INIT, via_map_init, DRM_AUTH|DRM_MASTER),
 	DRM_IOCTL_DEF(DRM_VIA_DEC_FUTEX, via_decoder_futex, DRM_AUTH),
+	DRM_IOCTL_DEF(DRM_VIA_GET_INFO, via_get_drm_info, DRM_AUTH),
 	DRM_IOCTL_DEF(DRM_VIA_DMA_INIT, via_dma_init, DRM_AUTH),
 	DRM_IOCTL_DEF(DRM_VIA_CMDBUFFER, via_cmdbuffer, DRM_AUTH),
 	DRM_IOCTL_DEF(DRM_VIA_FLUSH, via_flush_ioctl, DRM_AUTH),
@@ -749,7 +1081,10 @@ struct drm_ioctl_desc via_ioctls[] = {
 	DRM_IOCTL_DEF(DRM_VIA_CMDBUF_SIZE, via_cmdbuf_size, DRM_AUTH),
 	DRM_IOCTL_DEF(DRM_VIA_WAIT_IRQ, via_wait_irq, DRM_AUTH),
 	DRM_IOCTL_DEF(DRM_VIA_DMA_BLIT, via_dma_blit, DRM_AUTH),
-	DRM_IOCTL_DEF(DRM_VIA_BLIT_SYNC, via_dma_blit_sync, DRM_AUTH)
+	DRM_IOCTL_DEF(DRM_VIA_BLIT_SYNC, via_dma_blit_sync, DRM_AUTH),
+	DRM_IOCTL_DEF(DRM_VIA_AUTH_MAGIC, via_drm_authmagic, 0),
+	DRM_IOCTL_DEF(DRM_VIA_FLUSH_VIDEO, via_cmdbuffer_video_agp, 0),
+	DRM_IOCTL_DEF(DRM_VIA_INIT_JUDGE, via_drm_init_judge, 0)
 };
 
 int via_max_ioctl = DRM_ARRAY_SIZE(via_ioctls);
