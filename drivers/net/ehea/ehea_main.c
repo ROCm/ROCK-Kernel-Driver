@@ -111,7 +111,7 @@ static int __devinit ehea_probe_adapter(struct of_device *dev,
 
 static int __devexit ehea_remove(struct of_device *dev);
 
-static struct of_device_id ehea_device_table[] = {
+static struct of_device_id ehea_module_device_table[] = {
 	{
 		.name = "lhea",
 		.compatible = "IBM,lhea",
@@ -122,7 +122,15 @@ static struct of_device_id ehea_device_table[] = {
 	},
 	{},
 };
-MODULE_DEVICE_TABLE(of, ehea_device_table);
+MODULE_DEVICE_TABLE(of, ehea_module_device_table);
+
+static struct of_device_id ehea_device_table[] = {
+	{
+		.name = "lhea",
+		.compatible = "IBM,lhea",
+	},
+	{},
+};
 
 static struct of_platform_driver ehea_driver = {
 	.name = "ehea",
