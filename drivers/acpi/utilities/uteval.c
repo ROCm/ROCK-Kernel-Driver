@@ -69,6 +69,7 @@ static char *acpi_interfaces_supported[] = {
 	"Windows 2001.1",	/* Windows Server 2003 */
 	"Windows 2001.1 SP1",	/* Windows Server 2003 SP1 - Added 03/2006 */
 	"Windows 2006",		/* Windows Vista - Added 03/2006 */
+	"SLE11",		/* SLE11 identification */
 
 	/* Feature Group Strings */
 
