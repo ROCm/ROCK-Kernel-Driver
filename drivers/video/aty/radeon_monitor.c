@@ -862,6 +862,18 @@ void __devinit radeon_check_modes(struct radeonfb_info *rinfo, const char *mode_
 			has_default_mode = 1;
  	}
 
+#ifdef CONFIG_PPC_PSERIES
+	if (!has_default_mode &&
+	    of_device_is_compatible(rinfo->of_node, "pci1002,515e") &&
+	    (machine_is_compatible("IBM,8844")) ) {
+		printk("Falling back to 800x600 on JSxx hardware\n");
+		if (fb_find_mode(&info->var, info, "800x600@60",
+				 info->monspecs.modedb,
+				 info->monspecs.modedb_len, NULL, 8) != 0)
+			has_default_mode = 1;
+	}
+#endif
+
 	/*
 	 * Still no mode, let's pick up a default from the db
 	 */
