@@ -101,6 +101,7 @@ struct lpfc_nodelist {
 
 	struct timer_list   nlp_delayfunc;	/* Used for delayed ELS cmds */
 	struct timer_list   nlp_reauth_tmr;	/* Used for re-authentication */
+	struct lpfc_hba *phba;
 	struct fc_rport *rport;			/* Corresponding FC transport
 						   port structure */
 	struct lpfc_vport *vport;

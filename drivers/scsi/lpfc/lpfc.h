@@ -634,6 +634,7 @@ struct lpfc_hba {
 	uint32_t cfg_enable_hba_reset;
 	uint32_t cfg_enable_hba_heartbeat;
 	uint32_t cfg_pci_max_read;
+	uint32_t cfg_hostmem_hgp;
 
 	lpfc_vpd_t vpd;		/* vital product data */
 

@@ -1127,9 +1127,6 @@ lpfc_config_port(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
 	mb->un.varCfgPort.pcbLow = putPaddrLow(pdma_addr);
 	mb->un.varCfgPort.pcbHigh = putPaddrHigh(pdma_addr);
 
-	/* Always Host Group Pointer is in SLIM */
-	mb->un.varCfgPort.hps = 1;
-
 	/* If HBA supports SLI=3 ask for it */
 
 	if (phba->sli_rev == 3 && phba->vpd.sli3Feat.cerbm) {
@@ -1208,28 +1205,41 @@ lpfc_config_port(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
 	 *
 	 */
 
-	if (phba->sli_rev == 3) {
-		phba->host_gp = &mb_slim->us.s3.host[0];
-		phba->hbq_put = &mb_slim->us.s3.hbq_put[0];
-	} else {
-		phba->host_gp = &mb_slim->us.s2.host[0];
+	if (phba->cfg_hostmem_hgp && phba->sli_rev != 3) {
+		phba->host_gp = &phba->mbox->us.s2.host[0];
 		phba->hbq_put = NULL;
-	}
+		offset = (uint8_t *)&phba->mbox->us.s2.host -
+			(uint8_t *)phba->slim2p.virt;
+		pdma_addr = phba->slim2p.phys + offset;
+		phba->pcb->hgpAddrHigh = putPaddrHigh(pdma_addr);
+		phba->pcb->hgpAddrLow = putPaddrLow(pdma_addr);
+	} else {
+		/* Always Host Group Pointer is in SLIM */
+		mb->un.varCfgPort.hps = 1;
 
-	/* mask off BAR0's flag bits 0 - 3 */
-	phba->pcb->hgpAddrLow = (bar_low & PCI_BASE_ADDRESS_MEM_MASK) +
-		(void __iomem *)phba->host_gp -
-		(void __iomem *)phba->MBslimaddr;
-	if (bar_low & PCI_BASE_ADDRESS_MEM_TYPE_64)
-		phba->pcb->hgpAddrHigh = bar_high;
-	else
-		phba->pcb->hgpAddrHigh = 0;
-	/* write HGP data to SLIM at the required longword offset */
-	memset(&hgp, 0, sizeof(struct lpfc_hgp));
+		if (phba->sli_rev == 3) {
+			phba->host_gp = &mb_slim->us.s3.host[0];
+			phba->hbq_put = &mb_slim->us.s3.hbq_put[0];
+		} else {
+			phba->host_gp = &mb_slim->us.s2.host[0];
+			phba->hbq_put = NULL;
+		}
 
-	for (i=0; i < phba->sli.num_rings; i++) {
-		lpfc_memcpy_to_slim(phba->host_gp + i, &hgp,
+		/* mask off BAR0's flag bits 0 - 3 */
+		phba->pcb->hgpAddrLow = (bar_low & PCI_BASE_ADDRESS_MEM_MASK) +
+			(void __iomem *)phba->host_gp -
+			(void __iomem *)phba->MBslimaddr;
+		if (bar_low & PCI_BASE_ADDRESS_MEM_TYPE_64)
+			phba->pcb->hgpAddrHigh = bar_high;
+		else
+			phba->pcb->hgpAddrHigh = 0;
+		/* write HGP data to SLIM at the required longword offset */
+		memset(&hgp, 0, sizeof(struct lpfc_hgp));
+
+		for (i = 0; i < phba->sli.num_rings; i++) {
+			lpfc_memcpy_to_slim(phba->host_gp + i, &hgp,
 				    sizeof(*phba->host_gp));
+		}
 	}
 
 	/* Setup Port Group offset */

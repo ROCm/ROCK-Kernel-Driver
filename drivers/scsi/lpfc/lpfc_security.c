@@ -230,7 +230,7 @@ lpfc_reauth_node(unsigned long ptr)
 	struct lpfc_work_evt  *evtp = &ndlp->els_reauth_evt;
 
 	ndlp = (struct lpfc_nodelist *) ptr;
-	phba = ndlp->vport->phba;
+	phba = ndlp->phba;
 
 	spin_lock_irqsave(&phba->hbalock, flags);
 	if (!list_empty(&evtp->evt_listp)) {

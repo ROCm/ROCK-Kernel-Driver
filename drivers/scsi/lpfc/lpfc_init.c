@@ -3087,8 +3087,6 @@ lpfc_pci_remove_one(struct pci_dev *pdev)
 
 	lpfc_free_sysfs_attr(vport);
 
-	kthread_stop(phba->worker_thread);
-
 	/* Release all the vports against this physical port */
 	vports = lpfc_create_vport_work_array(phba);
 	if (vports != NULL)
@@ -3106,7 +3104,12 @@ lpfc_pci_remove_one(struct pci_dev *pdev)
 	 * clears the rings, discards all mailbox commands, and resets
 	 * the HBA.
 	 */
+
+	/* HBA interrupt will be diabled after this call */
 	lpfc_sli_hba_down(phba);
+	/* Stop kthread signal shall trigger work_done one more time */
+	kthread_stop(phba->worker_thread);
+	/* Final cleanup of txcmplq and reset the HBA */
 	lpfc_sli_brdrestart(phba);
 
 	lpfc_stop_phba_timers(phba);
