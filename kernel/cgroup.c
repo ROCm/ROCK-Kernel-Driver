@@ -3098,7 +3098,7 @@ static void cgroup_release_agent(struct work_struct *work)
 	mutex_unlock(&cgroup_mutex);
 }
 
-static int __init cgroup_disable(char *str)
+static int __init cgroup_change(char *str, int disabled)
 {
 	int i;
 	char *token;
@@ -3111,13 +3111,25 @@ static int __init cgroup_disable(char *str)
 			struct cgroup_subsys *ss = subsys[i];
 
 			if (!strcmp(token, ss->name)) {
-				ss->disabled = 1;
-				printk(KERN_INFO "Disabling %s control group"
-					" subsystem\n", ss->name);
+				ss->disabled = disabled;
+				printk(KERN_INFO "%sabling %s control group"
+					" subsystem\n",
+					disabled ? "Dis" : "En", ss->name);
 				break;
 			}
 		}
 	}
 	return 1;
+}
+
+static int __init cgroup_enable(char *str)
+{
+	return cgroup_change(str, 0);
+}
+__setup("cgroup_enable=", cgroup_enable);
+
+static int __init cgroup_disable(char *str)
+{
+	return cgroup_change(str, 1);
 }
 __setup("cgroup_disable=", cgroup_disable);
