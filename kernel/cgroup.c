@@ -2530,6 +2530,8 @@ int __init cgroup_init_early(void)
 			BUG();
 		}
 
+		ss->disabled = 1; /* performance regressions */
+
 		if (ss->early_init)
 			cgroup_init_subsys(ss);
 	}
