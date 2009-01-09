@@ -138,6 +138,13 @@ static void __cpuinit init_intel(struct cpuinfo_x86 *c)
 	}
 #endif
 
+	/*
+	 * Detect the extended topology information if available. This
+	 * will reinitialise the initial_apicid which will be used
+	 * in init_intel_cacheinfo()
+	 */
+	detect_extended_topology(c);
+
 	l2 = init_intel_cacheinfo(c);
 	if (c->cpuid_level > 9) {
 		unsigned eax = cpuid_eax(10);
@@ -182,8 +189,6 @@ static void __cpuinit init_intel(struct cpuinfo_x86 *c)
 
 	if (p)
 		strcpy(c->x86_model_id, p);
-
-	detect_extended_topology(c);
 
 	if (!cpu_has(c, X86_FEATURE_XTOPOLOGY)) {
 		/*
