@@ -312,6 +312,7 @@ u32 cxgb3i_ddp_tag_reserve(struct cxgb3i_adapter *snic, unsigned int tid,
 				 page_idx, sgcnt, xferlen, ULP2_DDP_THRESHOLD);
 		return RESERVED_ITT;
 	}
+	return RESERVED_ITT;
 
 	gl = ddp_make_gl(xferlen, sgl, sgcnt, gfp);
 	if (!gl) {
@@ -380,8 +381,14 @@ void cxgb3i_ddp_tag_release(struct cxgb3i_adapter *snic, u32 tag,
 	if (idx < snic->tag_format.rsvd_mask) {
 		struct cxgb3i_ddp_info *ddp = snic->ddp;
 		struct cxgb3i_gather_list *gl = ddp->gl_map[idx];
-		unsigned int npods = (gl->nelem + PPOD_PAGES_MAX - 1) >>
-				     PPOD_PAGES_SHIFT;
+		unsigned int npods;
+
+		if (!gl || !gl->nelem) {
+			cxgb3i_log_warn("release tag 0x%x, idx 0x%x, no gl.\n",
+					tag, idx);
+			return;
+		}
+		npods = (gl->nelem + PPOD_PAGES_MAX - 1) >> PPOD_PAGES_SHIFT;
 
 		cxgb3i_tag_debug("ddp tag 0x%x, release idx 0x%x, npods %u.\n",
 				 tag, idx, npods);
@@ -469,14 +476,14 @@ static int cxgb3i_conn_read_pdu_skb(struct iscsi_conn *conn,
 				   (skb_ulp_mode(skb) & ULP2_FLAG_DCRC_ERROR)) ?
 		    ISCSI_SEGMENT_DGST_ERR : 0;
 		if (skb_ulp_mode(skb) & ULP2_FLAG_DATA_DDPED) {
-			cxgb3i_ddp_debug("skb 0x%p, opcode 0x%x, data %u, ddp'ed, "
-					 "itt 0x%x.\n",
+			cxgb3i_ddp_debug("skb 0x%p, opcode 0x%x, data %u, "
+					 "ddp'ed, itt 0x%x.\n",
 					 skb, hdr->opcode & ISCSI_OPCODE_MASK,
 					 tcp_conn->in.datalen, hdr->itt);
 			segment->total_copied = segment->total_size;
 		} else {
-			cxgb3i_ddp_debug("skb 0x%p, opcode 0x%x, data %u, not ddp'ed, "
-					 "itt 0x%x.\n",
+			cxgb3i_ddp_debug("skb 0x%p, opcode 0x%x, data %u, "
+					 "not ddp'ed, itt 0x%x.\n",
 					 skb, hdr->opcode & ISCSI_OPCODE_MASK,
 					 tcp_conn->in.datalen, hdr->itt);
 			offset += sizeof(struct cpl_iscsi_hdr_norss);
@@ -613,8 +620,7 @@ int cxgb3i_conn_ulp2_xmit(struct iscsi_conn *conn)
 	}
 
 send_pdu:
-	err = cxgb3i_c3cn_send_pdus((struct s3_conn *)tcp_conn->sock,
-				    skb, MSG_DONTWAIT | MSG_NOSIGNAL);
+	err = cxgb3i_c3cn_send_pdus((struct s3_conn *)tcp_conn->sock, skb);
 
 	if (err > 0) {
 		int pdulen = hdrlen + datalen + padlen;
@@ -758,7 +764,8 @@ int cxgb3i_adapter_ulp_init(struct cxgb3i_adapter *snic)
 	ddp = cxgb3i_alloc_big_mem(sizeof(struct cxgb3i_ddp_info) +
 				   ppmax *
 				   (sizeof(struct cxgb3i_gather_list *) +
-				    sizeof(struct sk_buff *)));
+				    sizeof(struct sk_buff *)),
+				   GFP_KERNEL);
 	if (!ddp) {
 		cxgb3i_log_warn("snic %s unable to alloc ddp ppod 0x%u, "
 				"ddp disabled.\n", tdev->name, ppmax);
