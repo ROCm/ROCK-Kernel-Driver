@@ -98,6 +98,8 @@ static const struct via_isa_bridge {
 	u8 rev_max;
 	u16 flags;
 } via_isa_bridges[] = {
+	{ "vtxxxx",	PCI_DEVICE_ID_VIA_ANON,    0x00, 0x2f, VIA_UDMA_133 |
+	VIA_BAD_AST },
 	{ "vx800",	PCI_DEVICE_ID_VIA_VX800,    0x00, 0x2f, VIA_UDMA_133 |
 	VIA_BAD_AST | VIA_SATA_PATA },
 	{ "vt8237s",	PCI_DEVICE_ID_VIA_8237S,    0x00, 0x2f, VIA_UDMA_133 | VIA_BAD_AST },
@@ -176,6 +178,14 @@ static int via_cable_detect(struct ata_port *ap) {
 
 	if ((config->flags & VIA_SATA_PATA) && ap->port_no == 0)
 		return ATA_CBL_SATA;
+
+	if (ap->port_no == 0 && pdev->device == 0xC409) {
+		pci_read_config_dword(pdev, 0x52, &ata66);
+		return (ata66 & 0x10)  ? ATA_CBL_PATA80 : ATA_CBL_PATA40;
+	} else if (ap->port_no == 1 && pdev->device == 0xC409) {
+		DPRINTK("C409 only has one pata channel\n");
+		return ATA_CBL_PATA_UNK;
+	}
 
 	/* Early chips are 40 wire */
 	if ((config->flags & VIA_UDMA) < VIA_UDMA_66)
@@ -336,13 +346,13 @@ static void via_set_dmamode(struct ata_port *ap, struct ata_device *adev)
  */
 static void via_tf_load(struct ata_port *ap, const struct ata_taskfile *tf)
 {
-	struct ata_taskfile tmp_tf;
+	struct ata_ioports *ioaddr = &ap->ioaddr;
 
-	if (ap->ctl != ap->last_ctl && !(tf->flags & ATA_TFLAG_DEVICE)) {
-		tmp_tf = *tf;
-		tmp_tf.flags |= ATA_TFLAG_DEVICE;
-		tf = &tmp_tf;
+	if (tf->ctl != ap->last_ctl) {
+		iowrite8(tf->ctl, ioaddr->ctl_addr);
+		iowrite8(tf->device, ioaddr->device_addr);
 	}
+
 	ata_sff_tf_load(ap, tf);
 }
 
@@ -485,9 +495,9 @@ static int via_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	if (!config->id) {
 		printk(KERN_WARNING "via: Unknown VIA SouthBridge, disabling.\n");
-		return -ENODEV;
-	}
-	pci_dev_put(isa);
+		config = via_isa_bridges;
+	} else
+		pci_dev_put(isa);
 
 	if (!(config->flags & VIA_NO_ENABLES)) {
 		/* 0x40 low bits indicate enabled channels */
@@ -588,6 +598,7 @@ static const struct pci_device_id via[] = {
 	{ PCI_VDEVICE(VIA, 0x1571), },
 	{ PCI_VDEVICE(VIA, 0x3164), },
 	{ PCI_VDEVICE(VIA, 0x5324), },
+	{ PCI_VDEVICE(VIA, 0xC409), },
 
 	{ },
 };
