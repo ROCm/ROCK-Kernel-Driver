@@ -99,6 +99,13 @@ config DRM_VIA
 	  Choose this option if you have a Via unichrome or compatible video
 	  chipset. If M is selected the module will be called via.
 
+config DRM_VIA_CHROME9
+	tristate "Via chrome9 video cards"
+	depends on DRM
+	help
+	  Choose this option if you have a Via chrome9 or compatible video
+	  chipset. If M is selected the module will be called via_chrome9.
+
 config DRM_SAVAGE
 	tristate "Savage video cards"
 	depends on DRM

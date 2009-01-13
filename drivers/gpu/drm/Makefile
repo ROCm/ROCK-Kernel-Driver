@@ -23,4 +23,5 @@ obj-$(CONFIG_DRM_I915)  += i915/
 obj-$(CONFIG_DRM_SIS)   += sis/
 obj-$(CONFIG_DRM_SAVAGE)+= savage/
 obj-$(CONFIG_DRM_VIA)	+=via/
+obj-$(CONFIG_DRM_VIA_CHROME9)	+=via_chrome9/
 
