@@ -230,7 +230,9 @@ static struct page *read_sb_page(mddev_t *mddev, long offset,
 
 		target = rdev->sb_start + offset + index * (PAGE_SIZE/512);
 
-		if (sync_page_io(rdev->bdev, target, roundup(size, bdev_hardsect_size(rdev->bdev)), page, READ)) {
+		if (sync_page_io(rdev->bdev, target,
+				 roundup(size, bdev_hardsect_size(rdev->bdev)),
+				 page, READ)) {
 			page->index = index;
 			attach_page_buffers(page, NULL); /* so that free_buffer will
 							  * quietly no-op */
@@ -962,10 +964,9 @@ static int bitmap_init_from_disk(struct bitmap *bitmap, sector_t start)
 				 */
 				page = bitmap->sb_page;
 				offset = sizeof(bitmap_super_t);
-				if (! file)
-					read_sb_page(bitmap->mddev, bitmap->offset,
-						     page,
-						     index, count);
+				read_sb_page(bitmap->mddev, bitmap->offset,
+					     page,
+					     index, count);
 			} else if (file) {
 				page = read_page(file, index, bitmap, count);
 				offset = 0;
