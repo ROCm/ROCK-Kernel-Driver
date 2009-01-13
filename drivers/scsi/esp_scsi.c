@@ -1158,7 +1158,7 @@ static int esp_reconnect(struct esp *esp)
 			   ESP_BUSID);
 
 	tp = &esp->target[target];
-	dev = __scsi_device_lookup_by_target(tp->starget, NULL, lun);
+	dev = __scsi_device_lookup_by_target(tp->starget, lun);
 	if (!dev) {
 		printk(KERN_ERR PFX "esp%d: Reconnect, no lp "
 		       "tgt[%u] lun[%u]\n",

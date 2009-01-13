@@ -1094,29 +1094,26 @@ EXPORT_SYMBOL(__starget_for_each_device);
 /**
  * __scsi_device_lookup_by_target - find a device given the target (UNLOCKED)
  * @starget:	SCSI target pointer
- * @sdev:	SCSI device pointer
  * @lun:	SCSI Logical Unit Number
  *
  * Description: Looks up the scsi_device with the specified @lun for a given
  * @starget.  The returned scsi_device does not have an additional
  * reference.  You must hold the host's host_lock over this call and
- * any access to the returned scsi_device. If @sdev is not NULL use the
- * specified @sdev as a starting point after which to start the lookup.
+ * any access to the returned scsi_device. A scsi_device in state
+ * SDEV_DEL is skipped.
  *
  * Note:  The only reason why drivers should use this is because
  * they need to access the device list in irq context.  Otherwise you
  * really want to use scsi_device_lookup_by_target instead.
  **/
 struct scsi_device *__scsi_device_lookup_by_target(struct scsi_target *starget,
-						   struct scsi_device *sdev,
 						   uint lun)
 {
-	if (!sdev)
-		sdev = list_prepare_entry(sdev, &starget->devices,
-					  same_target_siblings);
+	struct scsi_device *sdev;
 
-	list_for_each_entry_continue(sdev, &starget->devices,
-				     same_target_siblings) {
+	list_for_each_entry(sdev, &starget->devices, same_target_siblings) {
+		if (sdev->sdev_state == SDEV_DEL)
+			continue;
 		if (sdev->lun ==lun)
 			return sdev;
 	}
@@ -1137,15 +1134,14 @@ EXPORT_SYMBOL(__scsi_device_lookup_by_target);
 struct scsi_device *scsi_device_lookup_by_target(struct scsi_target *starget,
 						 uint lun)
 {
-	struct scsi_device *sdev = NULL;
+	struct scsi_device *sdev;
 	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
 	unsigned long flags;
 
 	spin_lock_irqsave(shost->host_lock, flags);
- restart:
-	sdev = __scsi_device_lookup_by_target(starget, sdev, lun);
+	sdev = __scsi_device_lookup_by_target(starget, lun);
 	if (sdev && scsi_device_get(sdev))
-		goto restart;
+		sdev = NULL;
 	spin_unlock_irqrestore(shost->host_lock, flags);
 
 	return sdev;

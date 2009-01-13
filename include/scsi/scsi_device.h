@@ -285,7 +285,6 @@ extern struct scsi_device *__scsi_device_lookup(struct Scsi_Host *,
 extern struct scsi_device *scsi_device_lookup_by_target(struct scsi_target *,
 							uint);
 extern struct scsi_device *__scsi_device_lookup_by_target(struct scsi_target *,
-							  struct scsi_device *,
 							  uint);
 extern void starget_for_each_device(struct scsi_target *, void *,
 		     void (*fn)(struct scsi_device *, void *));
