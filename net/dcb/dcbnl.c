@@ -437,7 +437,7 @@ static int dcbnl_setnumtcs(struct net_device *netdev, struct nlattr **tb,
 	u8 value;
 	int i;
 
-	if (!tb[DCB_ATTR_NUMTCS] || !netdev->dcbnl_ops->setstate)
+	if (!tb[DCB_ATTR_NUMTCS] || !netdev->dcbnl_ops->setnumtcs)
 		return ret;
 
 	ret = nla_parse_nested(data, DCB_NUMTCS_ATTR_MAX, tb[DCB_ATTR_NUMTCS],
@@ -682,10 +682,8 @@ static int dcbnl_setstate(struct net_device *netdev, struct nlattr **tb,
 
 	value = nla_get_u8(tb[DCB_ATTR_STATE]);
 
-	netdev->dcbnl_ops->setstate(netdev, value);
-
-	ret = dcbnl_reply(0, RTM_SETDCB, DCB_CMD_SSTATE, DCB_ATTR_STATE,
-				pid, seq, flags);
+	ret = dcbnl_reply(netdev->dcbnl_ops->setstate(netdev, value),
+		RTM_SETDCB, DCB_CMD_SSTATE, DCB_ATTR_STATE, pid, seq, flags);
 
 	return ret;
 }

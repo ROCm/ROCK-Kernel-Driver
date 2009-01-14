@@ -126,7 +126,7 @@ static u16 ixgbe_dcb_select_queue(struct net_device *dev, struct sk_buff *skb)
 	return 0;
 }
 
-static void ixgbe_dcbnl_set_state(struct net_device *netdev, u8 state)
+static u8 ixgbe_dcbnl_set_state(struct net_device *netdev, u8 state)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(netdev);
 
@@ -135,25 +135,30 @@ static void ixgbe_dcbnl_set_state(struct net_device *netdev, u8 state)
 	if (state > 0) {
 		/* Turn on DCB */
 		if (adapter->flags & IXGBE_FLAG_DCB_ENABLED) {
-			return;
-		} else {
-			if (netif_running(netdev))
-				netdev->stop(netdev);
-			ixgbe_reset_interrupt_capability(adapter);
-			ixgbe_napi_del_all(adapter);
-			kfree(adapter->tx_ring);
-			kfree(adapter->rx_ring);
-			adapter->tx_ring = NULL;
-			adapter->rx_ring = NULL;
-			netdev->select_queue = &ixgbe_dcb_select_queue;
+			return 0;
+		} 
 
-			adapter->flags &= ~IXGBE_FLAG_RSS_ENABLED;
-			adapter->flags |= IXGBE_FLAG_DCB_ENABLED;
-			ixgbe_init_interrupt_scheme(adapter);
-			ixgbe_napi_add_all(adapter);
-			if (netif_running(netdev))
-				netdev->open(netdev);
-		}
+		if (!(adapter->flags & IXGBE_FLAG_MSIX_ENABLED)) {
+			DPRINTK(DRV, ERR, "Enable Failed, needs MSI-X\n");
+			return 1;
+		} 
+
+		if (netif_running(netdev))
+			netdev->stop(netdev);
+		ixgbe_reset_interrupt_capability(adapter);
+		ixgbe_napi_del_all(adapter);
+		kfree(adapter->tx_ring);
+		kfree(adapter->rx_ring);
+		adapter->tx_ring = NULL;
+		adapter->rx_ring = NULL;
+		netdev->select_queue = &ixgbe_dcb_select_queue;
+
+		adapter->flags &= ~IXGBE_FLAG_RSS_ENABLED;
+		adapter->flags |= IXGBE_FLAG_DCB_ENABLED;
+		ixgbe_init_interrupt_scheme(adapter);
+		ixgbe_napi_add_all(adapter);
+		if (netif_running(netdev))
+			netdev->open(netdev);
 	} else {
 		/* Turn off DCB */
 		if (adapter->flags & IXGBE_FLAG_DCB_ENABLED) {
@@ -173,10 +178,9 @@ static void ixgbe_dcbnl_set_state(struct net_device *netdev, u8 state)
 			ixgbe_napi_add_all(adapter);
 			if (netif_running(netdev))
 				netdev->open(netdev);
-		} else {
-			return;
 		}
 	}
+	return 0;
 }
 
 static void ixgbe_dcbnl_get_perm_hw_addr(struct net_device *netdev,

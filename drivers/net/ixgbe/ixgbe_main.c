@@ -1917,6 +1917,7 @@ static void ixgbe_napi_disable_all(struct ixgbe_adapter *adapter)
 	}
 }
 
+#ifdef CONFIG_IXGBE_DCB
 /*
  * ixgbe_configure_dcb - Configure DCB hardware
  * @adapter: ixgbe adapter struct
@@ -1952,6 +1953,7 @@ static void ixgbe_configure_dcb(struct ixgbe_adapter *adapter)
 	IXGBE_WRITE_REG(hw, IXGBE_VLNCTRL, vlnctrl);
 	hw->mac.ops.set_vfta(&adapter->hw, 0, 0, true);
 }
+#endif /* CONFIG_IXGBE_DCB */
 
 static void ixgbe_configure(struct ixgbe_adapter *adapter)
 {
@@ -1961,12 +1963,17 @@ static void ixgbe_configure(struct ixgbe_adapter *adapter)
 	ixgbe_set_rx_mode(netdev);
 
 	ixgbe_restore_vlan(adapter);
+#ifdef CONFIG_IXGBE_DCB
 	if (adapter->flags & IXGBE_FLAG_DCB_ENABLED) {
 		netif_set_gso_max_size(netdev, 32768);
 		ixgbe_configure_dcb(adapter);
 	} else {
 		netif_set_gso_max_size(netdev, 65536);
 	}
+#else
+	netif_set_gso_max_size(netdev, 65536);
+#endif /* CONFIG_IXGBE_DCB */
+
 
 	ixgbe_configure_tx(adapter);
 	ixgbe_configure_rx(adapter);
@@ -2744,8 +2751,10 @@ static int __devinit ixgbe_sw_init(struct ixgbe_adapter *adapter)
 	struct ixgbe_hw *hw = &adapter->hw;
 	struct pci_dev *pdev = adapter->pdev;
 	unsigned int rss;
+#ifdef CONFIG_IXGBE_DCB
 	int j;
 	struct tc_configuration *tc;
+#endif /* CONFIG_IXGBE_DCB */
 
 	/* PCI config space info */
 
@@ -2764,6 +2773,7 @@ static int __devinit ixgbe_sw_init(struct ixgbe_adapter *adapter)
 		adapter->flags |= IXGBE_FLAG_FAN_FAIL_CAPABLE;
 	adapter->ring_feature[RING_F_DCB].indices = IXGBE_MAX_DCB_INDICES;
 
+#ifdef CONFIG_IXGBE_DCB
 	/* Configure DCB traffic classes */
 	for (j = 0; j < MAX_TRAFFIC_CLASS; j++) {
 		tc = &adapter->dcb_cfg.tc_config[j];
@@ -2782,6 +2792,7 @@ static int __devinit ixgbe_sw_init(struct ixgbe_adapter *adapter)
 	ixgbe_copy_dcb_cfg(&adapter->dcb_cfg, &adapter->temp_dcb_cfg,
 			   adapter->ring_feature[RING_F_DCB].indices);
 #endif
+#endif /* CONFIG_IXGBE_DCB */
 
 	/* default flow control settings */
 	hw->fc.original_type = ixgbe_fc_none;
@@ -4114,9 +4125,11 @@ static int __devinit ixgbe_probe(struct pci_dev *pdev,
 	if (adapter->flags & IXGBE_FLAG_DCB_ENABLED)
 		adapter->flags &= ~IXGBE_FLAG_RSS_ENABLED;
 
+#ifdef CONFIG_IXGBE_DCB
 #ifdef CONFIG_DCBNL
 	netdev->dcbnl_ops = &dcbnl_ops;
 #endif
+#endif /* CONFIG_IXGBE_DCB */
 
 	if (pci_using_dac)
 		netdev->features |= NETIF_F_HIGHDMA;

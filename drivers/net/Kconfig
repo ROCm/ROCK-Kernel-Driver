@@ -2417,6 +2417,16 @@ config IXGBE_LRO
 
 	  If in doubt, say N.
 
+config IXGBE_DCB
+	bool "Data Center Bridging (DCB) Support"
+	default n
+	depends on IXGBE && DCB
+	---help---
+	 Say Y here if you want to use Data Center Bridging (DCB) in the
+	 driver.
+
+	 If unsure, say N.
+
 config IXGB
 	tristate "Intel(R) PRO/10GbE support"
 	depends on PCI
