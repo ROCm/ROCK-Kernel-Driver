@@ -71,6 +71,7 @@
  */
 enum pageflags {
 	PG_locked,		/* Page is locked. Don't touch. */
+	PG_waiters,		/* Page has PG_locked waiters. */
 	PG_error,
 	PG_referenced,
 	PG_uptodate,
@@ -180,6 +181,7 @@ static inline int PAGEMASK_##uname(void)				\
 struct page;	/* forward declaration */
 
 TESTPAGEFLAG(Locked, locked)
+PAGEFLAG(Waiters, waiters)
 PAGEFLAG(Error, error)
 PAGEFLAG(Referenced, referenced) TESTCLEARFLAG(Referenced, referenced)
 PAGEFLAG(Dirty, dirty) TESTSCFLAG(Dirty, dirty) __CLEARPAGEFLAG(Dirty, dirty)
@@ -381,8 +383,9 @@ PAGEFLAG_FALSE(MemError)
 #endif
 
 #define PAGE_FLAGS	(1 << PG_lru   | 1 << PG_private   | 1 << PG_locked | \
-			 1 << PG_buddy | 1 << PG_writeback | PAGE_FLAGS_XEN | \
-			 1 << PG_slab  | 1 << PG_swapcache | 1 << PG_active)
+			 1 << PG_buddy | 1 << PG_writeback | 1 << PG_waiters | \
+			 1 << PG_slab  | 1 << PG_swapcache | 1 << PG_active | \
+			 PAGE_FLAGS_XEN)
 
 /*
  * Flags checked in bad_page().  Pages on the free list should not have
