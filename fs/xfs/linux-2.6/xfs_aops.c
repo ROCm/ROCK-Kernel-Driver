@@ -1147,16 +1147,6 @@ error:
 	if (iohead)
 		xfs_cancel_ioend(iohead);
 
-	/*
-	 * If it's delalloc and we have nowhere to put it,
-	 * throw it away, unless the lower layers told
-	 * us to try again.
-	 */
-	if (err != -EAGAIN) {
-		if (!unmapped)
-			block_invalidatepage(page, 0);
-		ClearPageUptodate(page);
-	}
 	return err;
 }
 
@@ -1185,7 +1175,7 @@ xfs_vm_writepage(
 	struct page		*page,
 	struct writeback_control *wbc)
 {
-	int			error;
+	int			error = 0;
 	int			need_trans;
 	int			delalloc, unmapped, unwritten;
 	struct inode		*inode = page->mapping->host;
@@ -1231,19 +1221,16 @@ xfs_vm_writepage(
 	 * to real space and flush out to disk.
 	 */
 	error = xfs_page_state_convert(inode, page, wbc, 1, unmapped);
-	if (error == -EAGAIN)
-		goto out_fail;
 	if (unlikely(error < 0))
-		goto out_unlock;
+		goto out_fail;
 
 	return 0;
 
 out_fail:
 	redirty_page_for_writepage(wbc, page);
 	unlock_page(page);
-	return 0;
-out_unlock:
-	unlock_page(page);
+	if (error == -EAGAIN)
+		error = 0;
 	return error;
 }
 
