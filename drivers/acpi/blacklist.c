@@ -193,16 +193,6 @@ static int __init dmi_disable_osi_vista(const struct dmi_system_id *d)
 	return 0;
 }
 
-extern int irq_disable_derivation;
-
-static int __init dmi_irq_disable_derivation(const struct dmi_system_id *d)
-{
-	printk(KERN_NOTICE PREFIX "DMI detect: %s, IRQ derivation disabled\n",
-	       d->ident);
-	irq_disable_derivation = 1;
-	return 0;
-}
-
 /*
  * Most BIOS that invoke OSI(Linux) do nothing with it.
  * But some cause Linux to break.
@@ -634,14 +624,6 @@ static struct dmi_system_id acpi_osi_dmi_table[] __initdata = {
 	.ident = "Toshiba",
 	.matches = {
 		     DMI_MATCH(DMI_SYS_VENDOR, "TOSHIBA"),
-		},
-	},
-	{
-	.callback = dmi_irq_disable_derivation,
-	.ident = "ASUS M2A-VM",
-	.matches = {
-		     DMI_MATCH(DMI_BOARD_VENDOR, "ASUSTeK"),
-		     DMI_MATCH(DMI_BIOS_VERSION, "M2A-VM "),
 		},
 	},
 	{}
