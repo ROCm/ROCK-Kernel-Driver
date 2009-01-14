@@ -2407,8 +2407,12 @@ fc_rport_final_delete(struct work_struct *work)
 	/*
 	 * Notify the driver that the rport is now dead. The LLDD will
 	 * also guarantee that any communication to the rport is terminated
+	 *
+	 * Avoid this call if we already called it when we preserved the
+	 * rport for the binding.
 	 */
-	if (i->f->dev_loss_tmo_callbk)
+	if (!(rport->flags & FC_RPORT_DEVLOSS_CALLBK_DONE) &&
+	    (i->f->dev_loss_tmo_callbk))
 		i->f->dev_loss_tmo_callbk(rport);
 
 	transport_remove_device(dev);
@@ -2647,7 +2651,8 @@ fc_remote_port_add(struct Scsi_Host *shost, int channel,
 				spin_lock_irqsave(shost->host_lock, flags);
 
 				rport->flags &= ~(FC_RPORT_FAST_FAIL_TIMEDOUT |
-						  FC_RPORT_DEVLOSS_PENDING);
+						  FC_RPORT_DEVLOSS_PENDING |
+						  FC_RPORT_DEVLOSS_CALLBK_DONE);
 
 				/* if target, initiate a scan */
 				if (rport->scsi_target_id != -1) {
@@ -2944,6 +2949,7 @@ fc_timeout_deleted_rport(struct work_struct *work)
 	struct fc_rport *rport =
 		container_of(work, struct fc_rport, dev_loss_work.work);
 	struct Scsi_Host *shost = rport_to_shost(rport);
+	struct fc_internal *i = to_fc_internal(shost->transportt);
 	struct fc_host_attrs *fc_host = shost_to_fc_host(shost);
 	unsigned long flags;
 
@@ -3030,6 +3036,8 @@ fc_timeout_deleted_rport(struct work_struct *work)
 		break;
 	}
 
+	rport->flags |= FC_RPORT_DEVLOSS_CALLBK_DONE;
+
 	/*
 	 * As this only occurs if the remote port (scsi target)
 	 * went away and didn't come back - we'll remove
@@ -3039,7 +3047,17 @@ fc_timeout_deleted_rport(struct work_struct *work)
 
 	scsi_target_unblock(&rport->dev);
 	fc_queue_work(shost, &rport->stgt_delete_work);
+
+	/*
+	 * Notify the driver that the rport is now dead. The LLDD will
+	 * also guarantee that any communication to the rport is terminated
+	 * 
+	 * Note: we set the CALLBK_DONE flag above to correspond
+	 */
+	if (i->f->dev_loss_tmo_callbk)
+		i->f->dev_loss_tmo_callbk(rport);
 }
+
 
 /**
  * fc_timeout_fail_rport_io - Timeout handler for a fast io failing on a disconnected SCSI target.

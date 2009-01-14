@@ -25,6 +25,7 @@
 #include "via_drm.h"
 #include "via_drv.h"
 
+static int associate;
 static int via_do_init_map(struct drm_device * dev, drm_via_init_t * init)
 {
 	drm_via_private_t *dev_priv = dev->dev_private;
@@ -65,12 +66,35 @@ static int via_do_init_map(struct drm_device * dev, drm_via_init_t * init)
 	via_init_dmablit(dev);
 
 	dev->dev_private = (void *)dev_priv;
+
+	/* from doing this, we has the stuff in prev data
+	 * structure to manage agp
+	 */
+	if (init->agp_type != DISABLED) {
+		dev->agp_buffer_map = drm_core_findmap(dev, init->agp_offset);
+		if (!dev->agp_buffer_map) {
+			DRM_ERROR("failed to find dma buffer region!\n");
+			return -EINVAL;
+		}
+		if (init->agp_type == AGP_DOUBLE_BUFFER)
+			dev_priv->agptype = AGP_DOUBLE_BUFFER;
+		if (init->agp_type == AGP_RING_BUFFER)
+			dev_priv->agptype = AGP_RING_BUFFER;
+	} else {
+		dev_priv->agptype = DISABLED;
+		dev->agp_buffer_map = 0;
+	}
+	/* end */
+	dev_priv->initialize = 1;
+
 	return 0;
 }
 
 int via_do_cleanup_map(struct drm_device * dev)
 {
+	drm_via_private_t *dev_priv = dev->dev_private;
 	via_dma_cleanup(dev);
+	dev_priv->initialize = 0;
 
 	return 0;
 }
@@ -95,6 +119,11 @@ int via_driver_load(struct drm_device *dev, unsigned long chipset)
 {
 	drm_via_private_t *dev_priv;
 	int ret = 0;
+	if (!associate) {
+		pci_set_drvdata(dev->pdev, dev);
+		dev->pdev->driver = &dev->driver->pci_driver;
+		associate = 1;
+	}
 
 	dev_priv = drm_calloc(1, sizeof(drm_via_private_t), DRM_MEM_DRIVER);
 	if (dev_priv == NULL)
@@ -118,6 +147,22 @@ int via_driver_unload(struct drm_device *dev)
 	drm_sman_takedown(&dev_priv->sman);
 
 	drm_free(dev_priv, sizeof(drm_via_private_t), DRM_MEM_DRIVER);
+
+	return 0;
+}
+int via_get_drm_info(struct drm_device *dev, void *data,
+	struct drm_file *file_priv)
+{
+	drm_via_private_t *dev_priv = (drm_via_private_t *)dev->dev_private;
+	struct drm_via_info *info = data;
+
+	if (!dev_priv->initialize)
+		return -EINVAL;
+
+	info->RegSize = dev_priv->mmio->size;
+	info->AgpSize = dev->agp_buffer_map->size;
+	info->RegHandle = dev_priv->mmio->offset;
+	info->AgpHandle = dev->agp_buffer_map->offset;
 
 	return 0;
 }

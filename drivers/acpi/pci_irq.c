@@ -524,11 +524,24 @@ acpi_pci_irq_derive(struct pci_dev *dev,
 		return -1;
 	}
 
-	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Derive IRQ %d for device %s from %s\n",
-			  irq, pci_name(dev), pci_name(bridge)));
+	dev_printk(KERN_INFO, &dev->dev, "Derive IRQ %d from %s\n", irq,
+		   pci_name(bridge));
 
 	return irq;
 }
+
+int irq_disable_derivation;
+
+/* Other OSes seem not to follow up parent devices
+ * (at least pci bridges) to derive an irq from them.
+ */
+static int __init acpi_irq_disable_derivation(char *str)
+{
+	irq_disable_derivation = 1;
+	return 0;
+}
+
+__setup("acpi_irq_disable_derivation", acpi_irq_disable_derivation);
 
 /*
  * acpi_pci_irq_enable
@@ -576,7 +589,7 @@ int acpi_pci_irq_enable(struct pci_dev *dev)
 	 * If no PRT entry was found, we'll try to derive an IRQ from the
 	 * device's parent bridge.
 	 */
-	if (irq < 0)
+	if (irq < 0 && irq_disable_derivation == 0)
 		irq = acpi_pci_irq_derive(dev, pin, &triggering,
 					  &polarity, &link,
 					  acpi_pci_allocate_irq);

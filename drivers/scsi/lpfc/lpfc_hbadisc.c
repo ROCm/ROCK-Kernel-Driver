@@ -120,7 +120,7 @@ lpfc_terminate_rport_io(struct fc_rport *rport)
 		return;
 	}
 
-	phba  = ndlp->vport->phba;
+	phba  = ndlp->phba;
 
 	lpfc_debugfs_disc_trc(ndlp->vport, LPFC_DISC_TRC_RPORT,
 		"rport terminate: sid:x%x did:x%x flg:x%x",
@@ -1010,7 +1010,7 @@ lpfc_mbx_cmpl_local_config_link(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
 	 * LPFC_FLOGI while waiting for FLOGI cmpl
 	 */
 	if ((vport->cfg_enable_auth) &&
-	    (lpfc_security_service_state == SECURITY_OFFLINE))
+	    (vport->security_service_state == SECURITY_OFFLINE))
 		lpfc_issue_clear_la(phba, vport);
 	else if (vport->port_state != LPFC_FLOGI)
 		lpfc_initial_flogi(vport);
@@ -1912,9 +1912,14 @@ lpfc_disable_node(struct lpfc_vport *vport, struct lpfc_nodelist *ndlp)
  * @vport: Pointer to Virtual Port object.
  * @ndlp: Pointer to FC node object.
  * @did: FC_ID of the node.
- * 	This function is always called when node object need to
- * be initialized. It initializes all the fields of the node
- * object.
+ *
+ * This function is always called when node object need to be initialized.
+ * It initializes all the fields of the node object. Although the reference
+ * to phba from @ndlp can be obtained indirectly through it's reference to
+ * @vport, a direct reference to phba is taken here by @ndlp. This is due
+ * to the life-span of the @ndlp might go beyond the existence of @vport as
+ * the final release of ndlp is determined by its reference count. And, the
+ * operation on @ndlp needs the reference to phba.
  **/
 static inline void
 lpfc_initialize_node(struct lpfc_vport *vport, struct lpfc_nodelist *ndlp,
@@ -1931,6 +1936,7 @@ lpfc_initialize_node(struct lpfc_vport *vport, struct lpfc_nodelist *ndlp,
 	ndlp->nlp_reauth_tmr.data = (unsigned long)ndlp;
 	ndlp->nlp_DID = did;
 	ndlp->vport = vport;
+	ndlp->phba = vport->phba;
 	ndlp->nlp_sid = NLP_NO_SID;
 	kref_init(&ndlp->kref);
 	NLP_INT_NODE_ACT(ndlp);
@@ -3268,7 +3274,7 @@ lpfc_nlp_release(struct kref *kref)
 	lpfc_nlp_remove(ndlp->vport, ndlp);
 
 	/* clear the ndlp active flag for all release cases */
-	phba = ndlp->vport->phba;
+	phba = ndlp->phba;
 	spin_lock_irqsave(&phba->ndlp_lock, flags);
 	NLP_CLR_NODE_ACT(ndlp);
 	spin_unlock_irqrestore(&phba->ndlp_lock, flags);
@@ -3276,7 +3282,7 @@ lpfc_nlp_release(struct kref *kref)
 	/* free ndlp memory for final ndlp release */
 	if (NLP_CHK_FREE_REQ(ndlp)) {
 		kfree(ndlp->lat_data);
-		mempool_free(ndlp, ndlp->vport->phba->nlp_mem_pool);
+		mempool_free(ndlp, ndlp->phba->nlp_mem_pool);
 	}
 }
 
@@ -3299,7 +3305,7 @@ lpfc_nlp_get(struct lpfc_nodelist *ndlp)
 		 * ndlp reference count that is in the process of being
 		 * released.
 		 */
-		phba = ndlp->vport->phba;
+		phba = ndlp->phba;
 		spin_lock_irqsave(&phba->ndlp_lock, flags);
 		if (!NLP_CHK_NODE_ACT(ndlp) || NLP_CHK_FREE_ACK(ndlp)) {
 			spin_unlock_irqrestore(&phba->ndlp_lock, flags);
@@ -3335,7 +3341,7 @@ lpfc_nlp_put(struct lpfc_nodelist *ndlp)
 	"node put:        did:x%x flg:x%x refcnt:x%x",
 		ndlp->nlp_DID, ndlp->nlp_flag,
 		atomic_read(&ndlp->kref.refcount));
-	phba = ndlp->vport->phba;
+	phba = ndlp->phba;
 	spin_lock_irqsave(&phba->ndlp_lock, flags);
 	/* Check the ndlp memory free acknowledge flag to avoid the
 	 * possible race condition that kref_put got invoked again

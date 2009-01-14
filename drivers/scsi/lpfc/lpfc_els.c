@@ -945,7 +945,7 @@ lpfc_initial_flogi(struct lpfc_vport *vport)
 	struct lpfc_nodelist *ndlp;
 
 	if ((vport->cfg_enable_auth) &&
-	    (lpfc_security_service_state == SECURITY_OFFLINE))
+	    (vport->security_service_state == SECURITY_OFFLINE))
 		return 1;
 
 	vport->port_state = LPFC_FLOGI;
@@ -1000,7 +1000,7 @@ lpfc_initial_fdisc(struct lpfc_vport *vport)
 	struct lpfc_nodelist *ndlp;
 
 	if (vport->cfg_enable_auth) {
-		if (lpfc_security_wait(phba)) {
+		if (lpfc_security_wait(vport)) {
 			lpfc_printf_vlog(vport, KERN_ERR, LOG_SECURITY,
 					 "1049 Authentication is enabled but "
 					 "authentication service is not "
@@ -6978,7 +6978,7 @@ static void lpfc_fabric_abort_vport(struct lpfc_vport *vport)
 void lpfc_fabric_abort_nport(struct lpfc_nodelist *ndlp)
 {
 	LIST_HEAD(completions);
-	struct lpfc_hba  *phba = ndlp->vport->phba;
+	struct lpfc_hba  *phba = ndlp->phba;
 	struct lpfc_iocbq *tmp_iocb, *piocb;
 	struct lpfc_sli_ring *pring = &phba->sli.ring[LPFC_ELS_RING];
 	IOCB_t *cmd;

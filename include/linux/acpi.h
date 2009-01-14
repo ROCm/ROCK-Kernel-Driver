@@ -157,6 +157,8 @@ struct acpi_prt_list {
 
 struct pci_dev;
 
+extern int irq_disable_derivation;
+
 int acpi_pci_irq_enable (struct pci_dev *dev);
 void acpi_penalize_isa_irq(int irq, int active);
 

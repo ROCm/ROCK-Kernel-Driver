@@ -2277,6 +2277,16 @@ LPFC_VPORT_ATTR_R(lun_queue_depth, 30, 1, 128,
 		  "Max number of FCP commands we can queue to a specific LUN");
 
 /*
+# hostmem_hgp:  This parameter is used to force driver to keep host group
+# pointers in host memory. When the parameter is set to zero, the driver
+# keeps the host group pointers in HBA memory otherwise the host group
+# pointers are kept in the host memory. Value range is [0,1]. Default value
+# is 0.
+*/
+LPFC_ATTR_R(hostmem_hgp, 0, 0, 1,
+	"Use host memory for host group pointers.");
+
+/*
 # hba_queue_depth:  This parameter is used to limit the number of outstanding
 # commands per lpfc HBA. Value range is [32,8192]. If this parameter
 # value is greater than the maximum number of exchanges supported by the HBA,
@@ -3191,6 +3201,7 @@ struct device_attribute *lpfc_hba_attrs[] = {
 	&dev_attr_lpfc_sg_seg_cnt,
 	&dev_attr_lpfc_max_scsicmpl_time,
 	&dev_attr_lpfc_stat_data_ctrl,
+	&dev_attr_lpfc_hostmem_hgp,
 	NULL,
 };
 
@@ -4303,7 +4314,7 @@ lpfc_get_host_port_state(struct Scsi_Host *shost)
 		fc_host_port_state(shost) = FC_PORTSTATE_OFFLINE;
 	else {
 		if ((vport->cfg_enable_auth) &&
-		    (lpfc_security_service_state == SECURITY_OFFLINE)) {
+		    (vport->security_service_state == SECURITY_OFFLINE)) {
 			fc_host_port_state(shost) = FC_PORTSTATE_ERROR;
 			spin_unlock_irq(shost->host_lock);
 			return;
@@ -4881,6 +4892,7 @@ lpfc_get_cfgparam(struct lpfc_hba *phba)
 	lpfc_use_msi_init(phba, lpfc_use_msi);
 	lpfc_enable_hba_reset_init(phba, lpfc_enable_hba_reset);
 	lpfc_enable_hba_heartbeat_init(phba, lpfc_enable_hba_heartbeat);
+	lpfc_hostmem_hgp_init(phba, lpfc_hostmem_hgp);
 	phba->cfg_poll = lpfc_poll;
 	phba->cfg_soft_wwnn = 0L;
 	phba->cfg_soft_wwpn = 0L;

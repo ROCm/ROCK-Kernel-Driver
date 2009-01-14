@@ -2875,9 +2875,6 @@ int cgroup_clone(struct task_struct *tsk, struct cgroup_subsys *subsys,
  again:
 	root = subsys->root;
 	if (root == &rootnode) {
-		printk(KERN_INFO
-		       "Not cloning cgroup for unused subsystem %s\n",
-		       subsys->name);
 		mutex_unlock(&cgroup_mutex);
 		return 0;
 	}
@@ -3098,7 +3095,7 @@ static void cgroup_release_agent(struct work_struct *work)
 	mutex_unlock(&cgroup_mutex);
 }
 
-static int __init cgroup_disable(char *str)
+static int __init cgroup_turnonoff(char *str, int disable)
 {
 	int i;
 	char *token;
@@ -3111,13 +3108,22 @@ static int __init cgroup_disable(char *str)
 			struct cgroup_subsys *ss = subsys[i];
 
 			if (!strcmp(token, ss->name)) {
-				ss->disabled = 1;
-				printk(KERN_INFO "Disabling %s control group"
-					" subsystem\n", ss->name);
+				ss->disabled = disable;
 				break;
 			}
 		}
 	}
 	return 1;
 }
+
+static int __init cgroup_disable(char *str)
+{
+	return cgroup_turnonoff(str, 1);
+}
 __setup("cgroup_disable=", cgroup_disable);
+
+static int __init cgroup_enable(char *str)
+{
+	return cgroup_turnonoff(str, 0);
+}
+__setup("cgroup_enable=", cgroup_enable);

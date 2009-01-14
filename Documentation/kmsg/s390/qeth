@@ -275,7 +275,7 @@
 
 /*?
  * Text: "%s: Activating IPv6 support for %s failed\n"
- * Severity: Error
+ * Severity: Warning
  * Parameter:
  *   @1: bus ID of the qeth device
  *   @2: network interface name
@@ -437,6 +437,35 @@
  * want to use IPv6 with layer 3 qeth devices.
  */
 
+/*?
+ * Text: "%s: The qeth device is not configured for the OSI layer required by z/VM\n"
+ * Severity: Error
+ * Description:
+ * A qeth device that connects to a virtual network on z/VM must be configured for the
+ * same Open Systems Interconnection (OSI) layer as the virtual network. An ETHERNET
+ * guest LAN or VSWITCH uses the data link layer (layer 2) while an IP guest LAN
+ * or VSWITCH uses the network layer (layer 3).
+ * User action:
+ * If you are connecting to an ETHERNET guest LAN or VSWITCH, set the layer2 sysfs
+ * attribute of the qeth device to 1. If you are connecting to an IP guest LAN or
+ * VSWITCH, set the layer2 sysfs attribute of the qeth device to 0.
+ */
+
+/*?
+ * Text: "%s: Starting source MAC-address support for %s failed\n"
+ * Severity: Warning
+ * Parameter:
+ *   @1: bus ID of the qeth device
+ *   @2: network interface name
+ * Description:
+ * The qeth device driver could not enable source MAC-address on the network
+ * adapter.
+ * User action:
+ * Ungroup and regroup the subchannel triplet of the device. If this does not
+ * resolve the problem, reboot Linux. If the problem persists, gather Linux
+ * debug data and report the problem to your support organization.
+ */
+
 /*? Text: "core functions removed\n" */
 /*? Text: "%s: Device is a%s card%s%s%s\nwith link type %s.\n" */
 /*? Text: "%s: Device is a%s card%s%s%s\nwith link type %s (no portname needed by interface).\n" */
@@ -452,7 +481,7 @@
 /*? Text: "%s: Hardware IP fragmentation not supported on %s\n" */
 /*? Text: "%s: IPv6 not supported on %s\n" */
 /*? Text: "%s: VLAN not supported on %s\n" */
-/*? Text: "%s: Inbound source address not supported on %s\n" */
+/*? Text: "%s: Inbound source MAC-address not supported on %s\n" */
 /*? Text: "%s: IPV6 enabled\n" */
 /*? Text: "%s: ARP processing not supported on %s!\n" */
 /*? Text: "%s: Hardware IP fragmentation enabled \n" */

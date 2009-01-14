@@ -1206,12 +1206,9 @@ static int qeth_l3_start_ipa_source_mac(struct qeth_card *card)
 
 	QETH_DBF_TEXT(TRACE, 3, "stsrcmac");
 
-	if (!card->options.fake_ll)
-		return -EOPNOTSUPP;
-
 	if (!qeth_is_supported(card, IPA_SOURCE_MAC)) {
 		dev_info(&card->gdev->dev,
-			"Inbound source address not supported on %s\n",
+			"Inbound source MAC-address not supported on %s\n",
 			QETH_CARD_IFNAME(card));
 		return -EOPNOTSUPP;
 	}
@@ -1920,8 +1917,13 @@ static inline __u16 qeth_l3_rebuild_skb(struct qeth_card *card,
 			memcpy(tg_addr, card->dev->dev_addr,
 				card->dev->addr_len);
 		}
-		card->dev->header_ops->create(skb, card->dev, prot, tg_addr,
-					      "FAKELL", card->dev->addr_len);
+		if (hdr->hdr.l3.ext_flags & QETH_HDR_EXT_SRC_MAC_ADDR)
+			card->dev->header_ops->create(skb, card->dev, prot,
+				tg_addr, &hdr->hdr.l3.dest_addr[2],
+				card->dev->addr_len);
+		else
+			card->dev->header_ops->create(skb, card->dev, prot,
+				tg_addr, "FAKELL", card->dev->addr_len);
 	}
 
 #ifdef CONFIG_TR
@@ -2081,9 +2083,11 @@ static int qeth_l3_stop_card(struct qeth_card *card, int recovery_mode)
 		if (recovery_mode)
 			qeth_l3_stop(card->dev);
 		else {
-			rtnl_lock();
-			dev_close(card->dev);
-			rtnl_unlock();
+			if (card->dev) {
+				rtnl_lock();
+				dev_close(card->dev);
+				rtnl_unlock();
+			}
 		}
 		if (!card->use_hard_stop) {
 			rc = qeth_send_stoplan(card);

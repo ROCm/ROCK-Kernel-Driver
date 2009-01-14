@@ -459,11 +459,10 @@ static int mode_select_handle_sense(struct scsi_device *sdev,
 	sense = (sense_hdr.sense_key << 16) | (sense_hdr.asc << 8) |
 			sense_hdr.ascq;
 	/* If it is retryable failure, submit the c9 inquiry again */
-	if (sense == 0x59136 || sense == 0x68b02 || sense == 0xb8b02 ||
-			    sense == 0x62900) {
+	if (sense_hdr.sense_key == 6 || sense == 0x59136 || sense == 0xb8b02) {
 		/* 0x59136    - Command lock contention
-		 * 0x[6b]8b02 - Quiesense in progress or achieved
-		 * 0x62900    - Power On, Reset, or Bus Device Reset
+		 * 0xb8b02    - Quiescense achieved
+		 * 0x6xxxx    - Unit Attention
 		 */
 		err = SCSI_DH_RETRY;
 	}

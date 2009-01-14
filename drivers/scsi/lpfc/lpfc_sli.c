@@ -3327,6 +3327,21 @@ lpfc_mbox_timeout_handler(struct lpfc_hba *phba)
 	struct lpfc_sli *psli = &phba->sli;
 	struct lpfc_sli_ring *pring;
 
+	/* Check the pmbox pointer first.  There is a race condition
+	 * between the mbox timeout handler getting executed in the
+	 * worklist and the mailbox actually completing. When this
+	 * race condition occurs, the mbox_active will be NULL.
+	 */
+	spin_lock_irq(&phba->hbalock);
+	if (pmbox == NULL) {
+		lpfc_printf_log(phba, KERN_WARNING,
+				LOG_MBOX | LOG_SLI,
+				"0353 Active Mailbox cleared - mailbox timeout "
+				"exiting\n");
+		spin_unlock_irq(&phba->hbalock);
+		return;
+	}
+
 	/* Mbox cmd <mbxCommand> timeout */
 	lpfc_printf_log(phba, KERN_ERR, LOG_MBOX | LOG_SLI,
 			"0310 Mailbox command x%x timeout Data: x%x x%x x%p\n",
@@ -3334,6 +3349,7 @@ lpfc_mbox_timeout_handler(struct lpfc_hba *phba)
 			phba->pport->port_state,
 			phba->sli.sli_flag,
 			phba->sli.mbox_active);
+	spin_unlock_irq(&phba->hbalock);
 
 	/* Setting state unknown so lpfc_sli_abort_iocb_ring
 	 * would get IOCB_ERROR from lpfc_sli_issue_iocb, allowing

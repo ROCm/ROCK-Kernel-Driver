@@ -41,7 +41,7 @@ static int __init setup_file_caps(char *str)
 	get_option(&str, &file_caps_enabled);
 	return 1;
 }
-__setup("file_caps", setup_file_caps);
+__setup("file_caps=", setup_file_caps);
 #endif
 
 /*

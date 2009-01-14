@@ -12,7 +12,7 @@
 #include "cxgb3i.h"
 
 #define DRV_MODULE_NAME         "cxgb3i"
-#define DRV_MODULE_VERSION	"1.0.0"
+#define DRV_MODULE_VERSION	"0.1.0"
 #define DRV_MODULE_RELDATE	"Jun. 1, 2008"
 
 static char version[] =
@@ -48,7 +48,6 @@ static void open_s3_dev(struct t3cdev *t3dev)
 		vers_printed = 1;
 	}
 
-	cxgb3i_log_debug("open cxgb3 %s.\n", t3dev->name);
 	cxgb3i_sdev_add(t3dev, &t3c_client);
 	cxgb3i_adapter_add(t3dev);
 }
@@ -59,7 +58,6 @@ static void open_s3_dev(struct t3cdev *t3dev)
  */
 static void close_s3_dev(struct t3cdev *t3dev)
 {
-	cxgb3i_log_debug("close cxgb3 %s.\n", t3dev->name);
 	cxgb3i_adapter_remove(t3dev);
 	cxgb3i_sdev_remove(t3dev);
 }

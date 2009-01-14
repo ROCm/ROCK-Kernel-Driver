@@ -1241,4 +1241,5 @@ struct cgroup_subsys mem_cgroup_subsys = {
 	.populate = mem_cgroup_populate,
 	.attach = mem_cgroup_move_task,
 	.early_init = 0,
+	.disabled = 1,
 };

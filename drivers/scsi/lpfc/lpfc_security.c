@@ -36,14 +36,12 @@
 #include "lpfc_auth_access.h"
 #include "lpfc_vport.h"
 
-uint8_t lpfc_security_service_state = SECURITY_OFFLINE;
-
 void
 lpfc_security_service_online(struct Scsi_Host *shost)
 {
 	struct lpfc_vport *vport = (struct lpfc_vport *)shost->hostdata;
 
-	lpfc_security_service_state = SECURITY_ONLINE;
+	vport->security_service_state = SECURITY_ONLINE;
 	if (vport->cfg_enable_auth &&
 	    vport->auth.auth_mode == FC_AUTHMODE_UNKNOWN)
 		lpfc_selective_reset(vport->phba);
@@ -52,7 +50,9 @@ lpfc_security_service_online(struct Scsi_Host *shost)
 void
 lpfc_security_service_offline(struct Scsi_Host *shost)
 {
-	lpfc_security_service_state = SECURITY_OFFLINE;
+	struct lpfc_vport *vport = (struct lpfc_vport *)shost->hostdata;
+
+	vport->security_service_state = SECURITY_OFFLINE;
 }
 
 void
@@ -185,21 +185,21 @@ lpfc_get_security_enabled(struct Scsi_Host *shost)
 }
 
 int
-lpfc_security_wait(struct lpfc_hba *phba)
+lpfc_security_wait(struct lpfc_vport *vport)
 {
 	int i = 0;
-	if (lpfc_security_service_state == SECURITY_ONLINE)
+	if (vport->security_service_state == SECURITY_ONLINE)
 		return 0;
-	lpfc_printf_log(phba, KERN_WARNING, LOG_SECURITY,
+	lpfc_printf_vlog(vport, KERN_ERR, LOG_SECURITY,
 			"1058 Waiting for authentication service...\n");
-	while (lpfc_security_service_state == SECURITY_OFFLINE) {
+	while (vport->security_service_state == SECURITY_OFFLINE) {
 		i++;
 		if (i > SECURITY_WAIT_TMO * 2)
 			return -ETIMEDOUT;
 		/* Delay for half of a second */
 		msleep(500);
 	}
-	lpfc_printf_log(phba, KERN_WARNING, LOG_SECURITY,
+	lpfc_printf_vlog(vport, KERN_ERR, LOG_SECURITY,
 			"1059 Authentication service online.\n");
 	return 0;
 }
@@ -230,7 +230,7 @@ lpfc_reauth_node(unsigned long ptr)
 	struct lpfc_work_evt  *evtp = &ndlp->els_reauth_evt;
 
 	ndlp = (struct lpfc_nodelist *) ptr;
-	phba = ndlp->vport->phba;
+	phba = ndlp->phba;
 
 	spin_lock_irqsave(&phba->hbalock, flags);
 	if (!list_empty(&evtp->evt_listp)) {
@@ -310,7 +310,7 @@ lpfc_get_auth_config(struct lpfc_nodelist *ndlp, struct lpfc_name *rwwn)
 		auth_req.remote_wwpn = AUTH_FABRIC_WWN;
 	else
 		auth_req.remote_wwpn = wwn_to_u64(rwwn->u.wwn);
-	if (lpfc_security_service_state == SECURITY_OFFLINE) {
+	if (vport->security_service_state == SECURITY_OFFLINE) {
 		lpfc_printf_vlog(vport, KERN_ERR, LOG_SECURITY,
 				 "1053 Start Authentication: "
 				 "Security service offline.\n");

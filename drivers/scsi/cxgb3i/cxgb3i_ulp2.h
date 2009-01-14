@@ -106,4 +106,27 @@ struct cpl_rx_data_ddp_norss {
 void cxgb3i_conn_closing(struct s3_conn *);
 void cxgb3i_conn_pdu_ready(struct s3_conn *c3cn);
 void cxgb3i_conn_tx_open(struct s3_conn *c3cn);
+
+/*
+ * large memory chunk allocation/release
+ * use vmalloc() if kmalloc() fails
+ */
+static inline void *cxgb3i_alloc_big_mem(unsigned int size, gfp_t gfp)
+{
+	void *p = kmalloc(size, gfp);
+
+	if (!p)
+		p = vmalloc(size);
+	if (p)
+		memset(p, 0, size);
+	return p;
+}
+
+static inline void cxgb3i_free_big_mem(void *addr)
+{
+	if (is_vmalloc_addr(addr))
+		vfree(addr);
+	else
+		kfree(addr);
+}
 #endif

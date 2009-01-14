@@ -208,9 +208,6 @@ static int get_irq_server(unsigned int virq, unsigned int strict_check)
 	cpumask_t cpumask = irq_desc[virq].affinity;
 	cpumask_t tmp = CPU_MASK_NONE;
 
-	if (! cpu_isset(default_server, cpu_online_map))
-		xics_update_irq_servers();
-
 	if (!distribute_irqs)
 		return default_server;
 
@@ -659,8 +656,8 @@ void __init xics_init_IRQ(void)
 	if (found == 0)
 		return;
 
-	xics_init_host();
 	xics_update_irq_servers();
+	xics_init_host();
 
 	if (firmware_has_feature(FW_FEATURE_LPAR))
 		ppc_md.get_irq = xics_get_irq_lpar;

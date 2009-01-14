@@ -478,6 +478,7 @@ struct lpfc_vport {
 	struct list_head sc_users;
 	struct work_struct sc_online_work;
 	struct work_struct sc_offline_work;
+	uint8_t security_service_state;
 
 	/* Vport Config Parameters */
 	uint32_t cfg_scan_down;
@@ -633,6 +634,7 @@ struct lpfc_hba {
 	uint32_t cfg_enable_hba_reset;
 	uint32_t cfg_enable_hba_heartbeat;
 	uint32_t cfg_pci_max_read;
+	uint32_t cfg_hostmem_hgp;
 
 	lpfc_vpd_t vpd;		/* vital product data */
 

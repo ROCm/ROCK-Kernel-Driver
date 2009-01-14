@@ -1012,11 +1012,28 @@ skip_fsfstatus:
 		send_ct->handler(send_ct->handler_data);
 }
 
-static int zfcp_fsf_setup_sbals(struct zfcp_fsf_req *req,
-				struct scatterlist *sg_req,
-				struct scatterlist *sg_resp, int max_sbals)
+static int zfcp_fsf_setup_ct_els_sbals(struct zfcp_fsf_req *req,
+				       struct scatterlist *sg_req,
+				       struct scatterlist *sg_resp,
+				       int max_sbals)
 {
+	struct qdio_buffer_element *sbale = zfcp_qdio_sbale_req(req);
+	u32 feat = req->adapter->adapter_features;
 	int bytes;
+
+	if (!(feat & FSF_FEATURE_ELS_CT_CHAINED_SBALS)) {
+		if (sg_req->length > PAGE_SIZE || sg_resp->length > PAGE_SIZE ||
+		    !sg_is_last(sg_req) || !sg_is_last(sg_resp))
+			return -EOPNOTSUPP;
+
+		sbale[0].flags |= SBAL_FLAGS0_TYPE_WRITE_READ;
+		sbale[2].addr   = sg_virt(sg_req);
+		sbale[2].length = sg_req->length;
+		sbale[3].addr   = sg_virt(sg_resp);
+		sbale[3].length = sg_resp->length;
+		sbale[3].flags |= SBAL_FLAGS_LAST_ENTRY;
+		return 0;
+	}
 
 	bytes = zfcp_qdio_sbals_from_sg(req, SBAL_FLAGS0_TYPE_WRITE_READ,
 					sg_req, max_sbals);
@@ -1059,8 +1076,8 @@ int zfcp_fsf_send_ct(struct zfcp_send_ct *ct, mempool_t *pool,
 		goto out;
 	}
 
-	ret = zfcp_fsf_setup_sbals(req, ct->req, ct->resp,
-				   FSF_MAX_SBALS_PER_REQ);
+	ret = zfcp_fsf_setup_ct_els_sbals(req, ct->req, ct->resp,
+					  FSF_MAX_SBALS_PER_REQ);
 	if (ret)
 		goto failed_send;
 
@@ -1170,7 +1187,7 @@ int zfcp_fsf_send_els(struct zfcp_send_els *els)
 		goto out;
 	}
 
-	ret = zfcp_fsf_setup_sbals(req, els->req, els->resp, 2);
+	ret = zfcp_fsf_setup_ct_els_sbals(req, els->req, els->resp, 2);
 
 	if (ret)
 		goto failed_send;
@@ -1405,13 +1422,7 @@ static void zfcp_fsf_open_port_handler(struct zfcp_fsf_req *req)
 		switch (header->fsf_status_qual.word[0]) {
 		case FSF_SQ_INVOKE_LINK_TEST_PROCEDURE:
 		case FSF_SQ_ULP_DEPENDENT_ERP_REQUIRED:
-			req->status |= ZFCP_STATUS_FSFREQ_ERROR;
-			break;
 		case FSF_SQ_NO_RETRY_POSSIBLE:
-			dev_warn(&req->adapter->ccw_device->dev,
-				 "Remote port 0x%016Lx could not be opened\n",
-				 (unsigned long long)port->wwpn);
-			zfcp_erp_port_failed(port, 32, req);
 			req->status |= ZFCP_STATUS_FSFREQ_ERROR;
 			break;
 		}
@@ -1439,7 +1450,8 @@ static void zfcp_fsf_open_port_handler(struct zfcp_fsf_req *req)
 		 * Alternately, an ADISC/PDISC ELS should suffice, as well.
 		 */
 		plogi = (struct fsf_plogi *) req->qtcb->bottom.support.els;
-		if (req->qtcb->bottom.support.els1_length >= sizeof(*plogi)) {
+		if (req->qtcb->bottom.support.els1_length >=
+		    FSF_PLOGI_MIN_LEN) {
 			if (plogi->serv_param.wwpn != port->wwpn)
 				atomic_clear_mask(ZFCP_STATUS_PORT_DID_DID,
 						  &port->status);

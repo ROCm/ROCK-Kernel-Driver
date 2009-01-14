@@ -571,6 +571,10 @@ static void qeth_send_control_data_cb(struct qeth_channel *channel,
 	card = CARD_FROM_CDEV(channel->ccwdev);
 	if (qeth_check_idx_response(iob->data)) {
 		qeth_clear_ipacmd_list(card);
+		if (((iob->data[2] & 0xc0) == 0xc0) && iob->data[4] == 0xf6)
+			dev_err(&card->gdev->dev,
+				"The qeth device is not configured "
+				"for the OSI layer required by z/VM\n");
 		qeth_schedule_recovery(card);
 		goto out;
 	}
@@ -1071,7 +1075,6 @@ static void qeth_set_intial_options(struct qeth_card *card)
 	card->options.macaddr_mode = QETH_TR_MACADDR_NONCANONICAL;
 	card->options.fake_broadcast = 0;
 	card->options.add_hhlen = DEFAULT_ADD_HHLEN;
-	card->options.fake_ll = 0;
 	card->options.performance_stats = 0;
 	card->options.rx_sg_cb = QETH_RX_SG_CB;
 }

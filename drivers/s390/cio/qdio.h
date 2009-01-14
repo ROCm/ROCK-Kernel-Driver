@@ -10,6 +10,7 @@
 
 #include <asm/page.h>
 #include <asm/schid.h>
+#include <asm/debug.h>
 #include "chsc.h"
 
 #define QDIO_BUSY_BIT_PATIENCE		100	/* 100 microseconds */
@@ -111,12 +112,12 @@ static inline int do_sqbs(u64 token, unsigned char state, int queue,
 }
 
 static inline int do_eqbs(u64 token, unsigned char *state, int queue,
-			  int *start, int *count)
+			  int *start, int *count, int ack)
 {
 	register unsigned long _ccq asm ("0") = *count;
 	register unsigned long _token asm ("1") = token;
 	unsigned long _queuestart = ((unsigned long)queue << 32) | *start;
-	unsigned long _state = 0;
+	unsigned long _state = (unsigned long)ack << 63;
 
 	asm volatile(
 		"	.insn	rrf,0xB99c0000,%1,%2,0,0"
@@ -133,7 +134,7 @@ static inline int do_eqbs(u64 token, unsigned char *state, int queue,
 static inline int do_sqbs(u64 token, unsigned char state, int queue,
 			  int *start, int *count) { return 0; }
 static inline int do_eqbs(u64 token, unsigned char *state, int queue,
-			  int *start, int *count) { return 0; }
+			  int *start, int *count, int ack) { return 0; }
 #endif /* CONFIG_64BIT */
 
 struct qdio_irq;
@@ -186,11 +187,11 @@ struct qdio_input_q {
 	/* input buffer acknowledgement flag */
 	int polling;
 
+	/* how much sbals are acknowledged with qebsm */
+	int ack_count;
+
 	/* last time of noticing incoming data */
 	u64 timestamp;
-
-	/* lock for clearing the acknowledgement */
-	spinlock_t lock;
 };
 
 struct qdio_output_q {
@@ -297,11 +298,13 @@ struct qdio_irq {
 	struct qdio_q *input_qs[QDIO_MAX_QUEUES_PER_IRQ];
 	struct qdio_q *output_qs[QDIO_MAX_QUEUES_PER_IRQ];
 
+	debug_info_t *debug_area;
 	struct mutex setup_mutex;
 };
 
 /* helper functions */
 #define queue_type(q)	q->irq_ptr->qib.qfmt
+#define SCH_NO(q)       (q->irq_ptr->schid.sch_no)
 
 #define is_thinint_irq(irq) \
 	(irq->qib.qfmt == QDIO_IQDIO_QFMT || \
@@ -345,10 +348,13 @@ static inline unsigned long long get_usecs(void)
 	((bufnr + 1) & QDIO_MAX_BUFFERS_MASK)
 #define add_buf(bufnr, inc) \
 	((bufnr + inc) & QDIO_MAX_BUFFERS_MASK)
+#define sub_buf(bufnr, dec) \
+	((bufnr - dec) & QDIO_MAX_BUFFERS_MASK)
 
 /* prototypes for thin interrupt */
 void qdio_sync_after_thinint(struct qdio_q *q);
-int get_buf_state(struct qdio_q *q, unsigned int bufnr, unsigned char *state);
+int get_buf_state(struct qdio_q *q, unsigned int bufnr, unsigned char *state,
+		  int auto_ack);
 void qdio_check_outbound_after_thinint(struct qdio_q *q);
 int qdio_inbound_q_moved(struct qdio_q *q);
 void qdio_kick_inbound_handler(struct qdio_q *q);
@@ -382,6 +388,8 @@ int qdio_setup_irq(struct qdio_initialize *init_data);
 void qdio_print_subchannel_info(struct qdio_irq *irq_ptr,
 				struct ccw_device *cdev);
 void qdio_release_memory(struct qdio_irq *irq_ptr);
+int qdio_setup_create_sysfs(struct ccw_device *cdev);
+void qdio_setup_destroy_sysfs(struct ccw_device *cdev);
 int qdio_setup_init(void);
 void qdio_setup_exit(void);
 

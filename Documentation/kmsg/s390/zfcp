@@ -677,21 +677,6 @@
  */
 
 /*?
- * Text: "%s: Remote port 0x%016Lx could not be opened\n"
- * Severity: Warning
- * Parameter:
- *   @1: bus ID of the zfcp device
- *   @2: WWPN
- * Description:
- * The FCP adapter rejected a request to open the specified port. No retry
- * is possible.
- * User action:
- * Verify the setup and try removing and adding the port again. If this
- * problem persists, gather Linux debug data, collect the FCP adapter
- * hardware logs, and report the problem to your support organization.
- */
-
-/*?
  * Text: "%s: LUN 0x%Lx on port 0x%Lx is already in use by CSS%d, MIF Image ID %x\n"
  * Severity: Warning
  * Parameter:
@@ -827,4 +812,20 @@
  * used through this adapter is below the maximum allowed. If the
  * problem persists, gather Linux debug data, collect the FCP adapter
  * hardware logs, and report the problem to your support organization.
+ */
+
+/*?
+ * Text: "%s: The name server reported %d words residual data\n"
+ * Severity: Warning
+ * Parameter:
+ *   @1: bus ID of the zfcp device
+ *   @2: number of words in residual data
+ * Description:
+ * The fibre channel name server sent too much information about remote ports.
+ * The zfcp device driver did not receive sufficient information to attach all
+ * available remote ports in the SAN.
+ * User action:
+ * Verify that you are running the latest firmware level on the FCP
+ * adapter. Check your SAN setup and consider reducing the number of ports
+ * visible to the FCP adapter by using more restrictive zoning in the SAN.
  */

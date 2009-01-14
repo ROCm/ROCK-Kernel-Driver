@@ -24,6 +24,18 @@
 #include "cxgb3i.h"
 #include "cxgb3i_ulp2.h"
 
+#ifdef __DEBUG_CXGB3I_TAG__
+#define cxgb3i_tag_debug	cxgb3i_log_debug
+#else
+#define cxgb3i_tag_debug(fmt...)
+#endif
+
+#ifdef __DEBUG_CXGB3I_API__
+#define cxgb3i_api_debug	cxgb3i_log_debug
+#else
+#define cxgb3i_api_debug(fmt...)
+#endif
+
 #define align_to_4k_boundary(n)	\
 	do { \
 		n = (n) & ~((1 << 12) - 1); \
@@ -48,7 +60,7 @@ struct cxgb3i_adapter *cxgb3i_adapter_add(struct t3cdev *t3dev)
 
 	snic = kzalloc(sizeof(*snic), GFP_KERNEL);
 	if (!snic) {
-		cxgb3i_log_debug("cxgb3 %s, OOM.\n", t3dev->name);
+		cxgb3i_api_debug("cxgb3 %s, OOM.\n", t3dev->name);
 		return NULL;
 	}
 
@@ -164,7 +176,7 @@ struct cxgb3i_hba *cxgb3i_hba_host_add(struct cxgb3i_adapter *snic,
 		goto pci_dev_put;
 	}
 
-	cxgb3i_log_debug("shost 0x%p, hba 0x%p, no %u.\n",
+	cxgb3i_api_debug("shost 0x%p, hba 0x%p, no %u.\n",
 			 shost, hba, shost->host_no);
 
 	return hba;
@@ -177,7 +189,7 @@ pci_dev_put:
 
 void cxgb3i_hba_host_remove(struct cxgb3i_hba *hba)
 {
-	cxgb3i_log_debug("shost 0x%p, hba 0x%p, no %u.\n",
+	cxgb3i_api_debug("shost 0x%p, hba 0x%p, no %u.\n",
 			 hba->shost, hba, hba->shost->host_no);
 	iscsi_host_remove(hba->shost);
 	pci_dev_put(hba->snic->pdev);
@@ -218,7 +230,7 @@ static struct iscsi_endpoint *cxgb3i_ep_connect(struct sockaddr *dst_addr,
 		cxgb3i_log_info("NOT going through cxgbi device.\n");
 		goto release_conn;
 	}
-	if (c3cn_in_state(c3cn, C3CN_STATE_CLOSE)) {
+	if (c3cn_is_closing(c3cn)) {
 		err = -ENOSPC;
 		cxgb3i_log_info("ep connect unable to connect.\n");
 		goto release_conn;
@@ -234,12 +246,12 @@ static struct iscsi_endpoint *cxgb3i_ep_connect(struct sockaddr *dst_addr,
 	cep->c3cn = c3cn;
 	cep->hba = hba;
 
-	cxgb3i_log_debug("ep 0x%p, 0x%p, c3cn 0x%p, hba 0x%p.\n",
+	cxgb3i_api_debug("ep 0x%p, 0x%p, c3cn 0x%p, hba 0x%p.\n",
 			  ep, cep, c3cn, hba);
 	return ep;
 
 release_conn:
-	cxgb3i_log_debug("conn 0x%p failed, release.\n", c3cn);
+	cxgb3i_api_debug("conn 0x%p failed, release.\n", c3cn);
 	if (c3cn)
 		cxgb3i_c3cn_release(c3cn);
 	return ERR_PTR(err);
@@ -257,9 +269,9 @@ static int cxgb3i_ep_poll(struct iscsi_endpoint *ep, int timeout_ms)
 	struct cxgb3i_endpoint *cep = ep->dd_data;
 	struct s3_conn *c3cn = cep->c3cn;
 
-	if (!c3cn_in_state(c3cn, C3CN_STATE_ESTABLISHED))
+	if (!c3cn_is_established(c3cn))
 		return 0;
-	cxgb3i_log_debug("ep 0x%p, c3cn 0x%p established.\n", ep, c3cn);
+	cxgb3i_api_debug("ep 0x%p, c3cn 0x%p established.\n", ep, c3cn);
 	return 1;
 }
 
@@ -274,7 +286,7 @@ static void cxgb3i_ep_disconnect(struct iscsi_endpoint *ep)
 	struct cxgb3i_endpoint *cep = ep->dd_data;
 	struct cxgb3i_conn *cconn = cep->cconn;
 
-	cxgb3i_log_debug("ep 0x%p, cep 0x%p.\n", ep, cep);
+	cxgb3i_api_debug("ep 0x%p, cep 0x%p.\n", ep, cep);
 
 	if (cconn && cconn->conn) {
 		struct iscsi_tcp_conn *tcp_conn = &cconn->tcp_conn;
@@ -291,7 +303,7 @@ static void cxgb3i_ep_disconnect(struct iscsi_endpoint *ep)
 		write_unlock_bh(&cep->c3cn->callback_lock);
 	}
 
-	cxgb3i_log_debug("ep 0x%p, cep 0x%p, release c3cn 0x%p.\n",
+	cxgb3i_api_debug("ep 0x%p, cep 0x%p, release c3cn 0x%p.\n",
 			 ep, cep, cep->c3cn);
 	cxgb3i_c3cn_release(cep->c3cn);
 	iscsi_destroy_endpoint(ep);
@@ -325,7 +337,7 @@ cxgb3i_session_create(struct iscsi_endpoint *ep, u16 cmds_max, u16 qdepth,
 	cep = ep->dd_data;
 	hba = cep->hba;
 	shost = hba->shost;
-	cxgb3i_log_debug("ep 0x%p, cep 0x%p, hba 0x%p.\n", ep, cep, hba);
+	cxgb3i_api_debug("ep 0x%p, cep 0x%p, hba 0x%p.\n", ep, cep, hba);
 	BUG_ON(hba != iscsi_host_priv(shost));
 
 	*host_no = shost->host_no;
@@ -364,7 +376,7 @@ remove_session:
  */
 static void cxgb3i_session_destroy(struct iscsi_cls_session *cls_session)
 {
-	cxgb3i_log_debug("sess 0x%p.\n", cls_session);
+	cxgb3i_api_debug("sess 0x%p.\n", cls_session);
 	iscsi_r2tpool_free(cls_session->dd_data);
 	iscsi_session_teardown(cls_session);
 }
@@ -380,10 +392,10 @@ static inline int cxgb3i_conn_max_xmit_dlength(struct iscsi_conn *conn)
 {
 	struct cxgb3i_conn *cconn = conn->dd_data;
 	unsigned int max = min_t(unsigned int, ULP2_MAX_PDU_SIZE,
-						   cconn->hba->snic->tx_max_size -
-						   ISCSI_PDU_HEADER_MAX);
+					   cconn->hba->snic->tx_max_size -
+					   ISCSI_PDU_HEADER_MAX);
 
-	cxgb3i_log_debug("conn 0x%p, max xmit %u.\n",
+	cxgb3i_api_debug("conn 0x%p, max xmit %u.\n",
 			 conn, conn->max_xmit_dlength);
 
 	if (conn->max_xmit_dlength)
@@ -394,7 +406,7 @@ static inline int cxgb3i_conn_max_xmit_dlength(struct iscsi_conn *conn)
 
 	align_to_4k_boundary(conn->max_xmit_dlength);
 
-	cxgb3i_log_debug("conn 0x%p, set max xmit %u.\n",
+	cxgb3i_api_debug("conn 0x%p, set max xmit %u.\n",
 			 conn, conn->max_xmit_dlength);
 
 	return 0;
@@ -404,18 +416,18 @@ static inline int cxgb3i_conn_max_recv_dlength(struct iscsi_conn *conn)
 {
 	struct cxgb3i_conn *cconn = conn->dd_data;
 	unsigned int max = min_t(unsigned int, ULP2_MAX_PDU_SIZE,
-						   cconn->hba->snic->rx_max_size -
-						   ISCSI_PDU_HEADER_MAX);
+					   cconn->hba->snic->rx_max_size -
+					   ISCSI_PDU_HEADER_MAX);
 
-	cxgb3i_log_debug("conn 0x%p, max recv %u.\n",
+	cxgb3i_api_debug("conn 0x%p, max recv %u.\n",
 			 conn, conn->max_recv_dlength);
 
 	align_to_4k_boundary(max);
 
 	if (conn->max_recv_dlength) {
 		if (conn->max_recv_dlength > max) {
-			cxgb3i_log_error("MaxRecvDataSegmentLength %u, not supported."
-					 "Need to be <= %u.\n",
+			cxgb3i_log_error("MaxRecvDataSegmentLength %u, not "
+					 "supported. Need to be <= %u.\n",
 					 conn->max_recv_dlength, max);
 			return -EINVAL;
 		}
@@ -425,7 +437,7 @@ static inline int cxgb3i_conn_max_recv_dlength(struct iscsi_conn *conn)
 	} else
 		conn->max_recv_dlength = max;
 
-	cxgb3i_log_debug("conn 0x%p, set max recv %u.\n",
+	cxgb3i_api_debug("conn 0x%p, set max recv %u.\n",
 			 conn, conn->max_recv_dlength);
 
 	return 0;
@@ -438,7 +450,7 @@ static struct iscsi_cls_conn *cxgb3i_conn_create(struct iscsi_cls_session
 	struct iscsi_conn *conn;
 	struct cxgb3i_conn *cconn;
 
-	cxgb3i_log_debug("sess 0x%p, cid %u.\n", cls_session, cid);
+	cxgb3i_api_debug("sess 0x%p, cid %u.\n", cls_session, cid);
 
 	cls_conn = iscsi_conn_setup(cls_session, sizeof(*cconn), cid);
 	if (!cls_conn)
@@ -495,7 +507,7 @@ static int cxgb3i_conn_bind(struct iscsi_cls_session *cls_session,
 	if (!ep)
 		return -EINVAL;
 
-	cxgb3i_log_debug("ep 0x%p, cls sess 0x%p, cls conn 0x%p.\n",
+	cxgb3i_api_debug("ep 0x%p, cls sess 0x%p, cls conn 0x%p.\n",
 			 ep, cls_session, cls_conn);
 
 	err = iscsi_conn_bind(cls_session, cls_conn, is_leading);
@@ -544,7 +556,7 @@ static int cxgb3i_conn_get_param(struct iscsi_cls_conn *cls_conn,
 	struct iscsi_conn *conn = cls_conn->dd_data;
 	int len;
 
-	cxgb3i_log_debug("cls_conn 0x%p, param %d.\n", cls_conn, param);
+	cxgb3i_api_debug("cls_conn 0x%p, param %d.\n", cls_conn, param);
 
 	switch (param) {
 	case ISCSI_PARAM_CONN_PORT:
@@ -621,15 +633,22 @@ static int cxgb3i_host_set_param(struct Scsi_Host *shost,
 {
 	struct cxgb3i_hba *hba = iscsi_host_priv(shost);
 
-	cxgb3i_log_debug("param %d, buf %s.\n", param, buf);
+	cxgb3i_api_debug("param %d, buf %s.\n", param, buf);
 
-	if (hba && param == ISCSI_HOST_PARAM_IPADDRESS) {
+	switch (param) {
+	case ISCSI_HOST_PARAM_IPADDRESS:
+	{
 		__be32 addr = in_aton(buf);
 		cxgb3i_set_private_ipv4addr(hba->ndev, addr);
 		return 0;
 	}
-
-	return iscsi_host_get_param(shost, param, buf);
+	case ISCSI_HOST_PARAM_HWADDRESS:
+	case ISCSI_HOST_PARAM_NETDEV_NAME:
+		/* ignore */
+		return 0;
+	default:
+		return iscsi_host_set_param(shost, param, buf, buflen);
+	}
 }
 
 /**
@@ -645,7 +664,7 @@ static int cxgb3i_host_get_param(struct Scsi_Host *shost,
 	int i;
 	int len = 0;
 
-	cxgb3i_log_debug("hba %s, param %d.\n", hba->ndev->name, param);
+	cxgb3i_api_debug("hba %s, param %d.\n", hba->ndev->name, param);
 
 	switch (param) {
 	case ISCSI_HOST_PARAM_HWADDRESS:
@@ -720,6 +739,10 @@ static inline void cxgb3i_parse_tag(struct cxgb3i_tag_format *format,
 			    << format->rsvd_shift;
 		*sw_bits |= tag & ((1 << format->rsvd_shift) - 1);
 	}
+
+	cxgb3i_tag_debug("parse tag 0x%x, rsvd 0x%x, sw  0x%x.\n",
+			 tag, rsvd_bits ? *rsvd_bits : 0xFFFFFFFF,
+			 sw_bits ? *sw_bits : 0xFFFFFFFF);
 }
 
 
@@ -735,6 +758,9 @@ static void cxgb3i_parse_itt(struct iscsi_conn *conn, itt_t itt,
 		*idx = sw_bits & ISCSI_ITT_MASK;
 	if (age)
 		*age = (sw_bits >> snic->tag_format.idx_bits) & ISCSI_AGE_MASK;
+
+	cxgb3i_tag_debug("parse itt 0x%x, idx 0x%x, age 0x%x.\n",
+			 itt,  idx ? *idx : 0xFFFFF, age ? *age : 0xFF);
 }
 
 static int cxgb3i_reserve_itt(struct iscsi_task *task, itt_t *hdr_itt)
@@ -762,6 +788,9 @@ static int cxgb3i_reserve_itt(struct iscsi_task *task, itt_t *hdr_itt)
 				snic->tag_format.rsvd_shift);
 	*hdr_itt = htonl(tag);
 
+	cxgb3i_tag_debug("new tag 0x%x/0x%x (itt 0x%x, age 0x%x).\n",
+			 tag, *hdr_itt, task->itt, sess->age);
+
 	return 0;
 }
 
@@ -771,10 +800,12 @@ static void cxgb3i_release_itt(struct iscsi_task *task, itt_t hdr_itt)
 	struct iscsi_conn *conn = task->conn;
 	struct cxgb3i_conn *cconn = conn->dd_data;
 	struct cxgb3i_adapter *snic = cconn->hba->snic;
+	u32 tag = ntohl(hdr_itt);
 
-	hdr_itt = ntohl(hdr_itt);
+	cxgb3i_tag_debug("release tag 0x%x.\n", tag);
+
 	if (sc && (sc->sc_data_direction == DMA_FROM_DEVICE))
-		cxgb3i_ddp_tag_release(snic, hdr_itt,
+		cxgb3i_ddp_tag_release(snic, tag,
 				       scsi_in(sc)->table.sgl,
 				       scsi_in(sc)->table.nents);
 }
@@ -871,14 +902,14 @@ int cxgb3i_iscsi_init(void)
 		cxgb3i_log_error("Could not register cxgb3i transport.\n");
 		return -ENODEV;
 	}
-	cxgb3i_log_debug("cxgb3i transport 0x%p.\n", cxgb3i_scsi_transport);
+	cxgb3i_api_debug("cxgb3i transport 0x%p.\n", cxgb3i_scsi_transport);
 	return 0;
 }
 
 void cxgb3i_iscsi_cleanup(void)
 {
 	if (cxgb3i_scsi_transport) {
-		cxgb3i_log_debug("cxgb3i transport 0x%p.\n",
+		cxgb3i_api_debug("cxgb3i transport 0x%p.\n",
 				 cxgb3i_scsi_transport);
 		iscsi_unregister_transport(&cxgb3i_iscsi_transport);
 	}

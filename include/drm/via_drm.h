@@ -51,6 +51,12 @@
 #define VIA_LOG_MIN_TEX_REGION_SIZE 16
 #endif
 
+struct drm_via_info {
+	unsigned long AgpHandle;
+	unsigned long AgpSize;
+	unsigned long RegHandle;
+	unsigned long RegSize;
+} ;
 #define VIA_UPLOAD_TEX0IMAGE  0x1	/* handled clientside */
 #define VIA_UPLOAD_TEX1IMAGE  0x2	/* handled clientside */
 #define VIA_UPLOAD_CTX        0x4
@@ -67,7 +73,7 @@
 #define DRM_VIA_FB_INIT	        0x03
 #define DRM_VIA_MAP_INIT	0x04
 #define DRM_VIA_DEC_FUTEX       0x05
-#define NOT_USED
+#define DRM_VIA_GET_INFO    0x06
 #define DRM_VIA_DMA_INIT	0x07
 #define DRM_VIA_CMDBUFFER	0x08
 #define DRM_VIA_FLUSH	        0x09
@@ -77,6 +83,9 @@
 #define DRM_VIA_WAIT_IRQ        0x0d
 #define DRM_VIA_DMA_BLIT        0x0e
 #define DRM_VIA_BLIT_SYNC       0x0f
+#define DRM_VIA_AUTH_MAGIC      0x11
+#define DRM_VIA_FLUSH_VIDEO	0x12
+#define DRM_VIA_INIT_JUDGE	0x16
 
 #define DRM_IOCTL_VIA_ALLOCMEM	  DRM_IOWR(DRM_COMMAND_BASE + DRM_VIA_ALLOCMEM, drm_via_mem_t)
 #define DRM_IOCTL_VIA_FREEMEM	  DRM_IOW( DRM_COMMAND_BASE + DRM_VIA_FREEMEM, drm_via_mem_t)
@@ -84,6 +93,8 @@
 #define DRM_IOCTL_VIA_FB_INIT	  DRM_IOWR(DRM_COMMAND_BASE + DRM_VIA_FB_INIT, drm_via_fb_t)
 #define DRM_IOCTL_VIA_MAP_INIT	  DRM_IOWR(DRM_COMMAND_BASE + DRM_VIA_MAP_INIT, drm_via_init_t)
 #define DRM_IOCTL_VIA_DEC_FUTEX   DRM_IOW( DRM_COMMAND_BASE + DRM_VIA_DEC_FUTEX, drm_via_futex_t)
+#define DRM_IOCTL_VIA_GET_INFO    DRM_IOR(DRM_COMMAND_BASE + \
+					DRM_VIA_GET_INFO, struct drm_via_info)
 #define DRM_IOCTL_VIA_DMA_INIT	  DRM_IOWR(DRM_COMMAND_BASE + DRM_VIA_DMA_INIT, drm_via_dma_init_t)
 #define DRM_IOCTL_VIA_CMDBUFFER	  DRM_IOW( DRM_COMMAND_BASE + DRM_VIA_CMDBUFFER, drm_via_cmdbuffer_t)
 #define DRM_IOCTL_VIA_FLUSH	  DRM_IO(  DRM_COMMAND_BASE + DRM_VIA_FLUSH)
@@ -91,8 +102,14 @@
 #define DRM_IOCTL_VIA_CMDBUF_SIZE DRM_IOWR( DRM_COMMAND_BASE + DRM_VIA_CMDBUF_SIZE, \
 					    drm_via_cmdbuf_size_t)
 #define DRM_IOCTL_VIA_WAIT_IRQ    DRM_IOWR( DRM_COMMAND_BASE + DRM_VIA_WAIT_IRQ, drm_via_irqwait_t)
+#define DRM_IOCTL_VIA_FLUSH_VIDEO DRM_IOW(DRM_COMMAND_BASE + \
+			DRM_VIA_FLUSH_VIDEO, struct drm_via_video_agp_cmd)
 #define DRM_IOCTL_VIA_DMA_BLIT    DRM_IOW(DRM_COMMAND_BASE + DRM_VIA_DMA_BLIT, drm_via_dmablit_t)
 #define DRM_IOCTL_VIA_BLIT_SYNC   DRM_IOW(DRM_COMMAND_BASE + DRM_VIA_BLIT_SYNC, drm_via_blitsync_t)
+#define DRM_IOCTL_VIA_AUTH_MAGIC  DRM_IOW(DRM_COMMAND_BASE + \
+					DRM_VIA_AUTH_MAGIC, drm_auth_t)
+#define DRM_IOCTL_VIA_INIT_JUDGE  DRM_IOR(DRM_COMMAND_BASE + \
+					DRM_VIA_INIT_JUDGE, int)
 
 /* Indices into buf.Setup where various bits of state are mirrored per
  * context and per buffer.  These can be fired at the card as a unit,
@@ -112,6 +129,13 @@
 #define VIA_MEM_SYSTEM  2
 #define VIA_MEM_MIXED   3
 #define VIA_MEM_UNKNOWN 4
+#define VIA_MEM_VIDEO_SAVE      2 /*For video memory need to be saved in ACPI */
+
+enum drm_agp_type {
+	AGP_RING_BUFFER,
+	AGP_DOUBLE_BUFFER,
+	DISABLED
+};
 
 typedef struct {
 	uint32_t offset;
@@ -141,6 +165,8 @@ typedef struct _drm_via_init {
 	unsigned long fb_offset;
 	unsigned long mmio_offset;
 	unsigned long agpAddr;
+	unsigned long agp_offset;
+	enum drm_agp_type agp_type;
 } drm_via_init_t;
 
 typedef struct _drm_via_futex {
@@ -245,6 +271,12 @@ typedef union drm_via_irqwait {
 	struct drm_wait_vblank_reply reply;
 } drm_via_irqwait_t;
 
+struct drm_via_video_agp_cmd {
+	u32 offset;
+	u32 cmd_size;
+	u32 buffer_size;
+} ;
+
 typedef struct drm_via_blitsync {
 	uint32_t sync_handle;
 	unsigned engine;
@@ -272,4 +304,13 @@ typedef struct drm_via_dmablit {
 	drm_via_blitsync_t sync;
 } drm_via_dmablit_t;
 
+struct drm_via_video_save_head {
+    void *pvideomem;
+    void *psystemmem;
+    int size;
+    /* token used to identify this video memory */
+    unsigned long token;
+    void *next;
+} ;
+extern struct drm_via_video_save_head *via_video_save_head;
 #endif				/* _VIA_DRM_H_ */
