@@ -288,6 +288,9 @@ static inline int snd_hda_codec_proc_new(struct hda_codec *codec) { return 0; }
 int snd_hda_check_board_config(struct hda_codec *codec, int num_configs,
 			       const char **modelnames,
 			       const struct snd_pci_quirk *pci_list);
+int snd_hda_check_board_codec_sid_config(struct hda_codec *codec,
+                               int num_configs, const char **models,
+                               const struct snd_pci_quirk *tbl);
 int snd_hda_add_new_ctls(struct hda_codec *codec,
 			 struct snd_kcontrol_new *knew);
 
