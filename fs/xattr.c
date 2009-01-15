@@ -255,9 +255,9 @@ setxattr(struct dentry *dentry, struct vfsmount *mnt, const char __user *name,
 	return error;
 }
 
-asmlinkage long
-sys_setxattr(const char __user *pathname, const char __user *name,
-	     const void __user *value, size_t size, int flags)
+SYSCALL_DEFINE5(setxattr, const char __user *, pathname,
+		const char __user *, name, const void __user *, value,
+		size_t, size, int, flags)
 {
 	struct path path;
 	int error;
@@ -274,9 +274,9 @@ sys_setxattr(const char __user *pathname, const char __user *name,
 	return error;
 }
 
-asmlinkage long
-sys_lsetxattr(const char __user *pathname, const char __user *name,
-	      const void __user *value, size_t size, int flags)
+SYSCALL_DEFINE5(lsetxattr, const char __user *, pathname,
+		const char __user *, name, const void __user *, value,
+		size_t, size, int, flags)
 {
 	struct path path;
 	int error;
@@ -293,9 +293,8 @@ sys_lsetxattr(const char __user *pathname, const char __user *name,
 	return error;
 }
 
-asmlinkage long
-sys_fsetxattr(int fd, const char __user *name, const void __user *value,
-	      size_t size, int flags)
+SYSCALL_DEFINE5(fsetxattr, int, fd, const char __user *, name,
+		const void __user *,value, size_t, size, int, flags)
 {
 	struct file *f;
 	struct dentry *dentry;
@@ -354,9 +353,8 @@ getxattr(struct dentry *dentry, struct vfsmount *mnt, const char __user *name,
 	return error;
 }
 
-asmlinkage ssize_t
-sys_getxattr(const char __user *pathname, const char __user *name,
-	     void __user *value, size_t size)
+SYSCALL_DEFINE4(getxattr, const char __user *, pathname,
+		const char __user *, name, void __user *, value, size_t, size)
 {
 	struct path path;
 	ssize_t error;
@@ -369,9 +367,8 @@ sys_getxattr(const char __user *pathname, const char __user *name,
 	return error;
 }
 
-asmlinkage ssize_t
-sys_lgetxattr(const char __user *pathname, const char __user *name, void __user *value,
-	      size_t size)
+SYSCALL_DEFINE4(lgetxattr, const char __user *, pathname,
+		const char __user *, name, void __user *, value, size_t, size)
 {
 	struct path path;
 	ssize_t error;
@@ -384,8 +381,8 @@ sys_lgetxattr(const char __user *pathname, const char __user *name, void __user 
 	return error;
 }
 
-asmlinkage ssize_t
-sys_fgetxattr(int fd, const char __user *name, void __user *value, size_t size)
+SYSCALL_DEFINE4(fgetxattr, int, fd, const char __user *, name,
+		void __user *, value, size_t, size)
 {
 	struct file *f;
 	ssize_t error = -EBADF;
@@ -430,8 +427,8 @@ listxattr(struct dentry *dentry, struct vfsmount *mnt, char __user *list,
 	return error;
 }
 
-asmlinkage ssize_t
-sys_listxattr(const char __user *pathname, char __user *list, size_t size)
+SYSCALL_DEFINE3(listxattr, const char __user *, pathname, char __user *, list,
+		size_t, size)
 {
 	struct path path;
 	ssize_t error;
@@ -444,8 +441,8 @@ sys_listxattr(const char __user *pathname, char __user *list, size_t size)
 	return error;
 }
 
-asmlinkage ssize_t
-sys_llistxattr(const char __user *pathname, char __user *list, size_t size)
+SYSCALL_DEFINE3(llistxattr, const char __user *, pathname, char __user *, list,
+		size_t, size)
 {
 	struct path path;
 	ssize_t error;
@@ -458,8 +455,7 @@ sys_llistxattr(const char __user *pathname, char __user *list, size_t size)
 	return error;
 }
 
-asmlinkage ssize_t
-sys_flistxattr(int fd, char __user *list, size_t size)
+SYSCALL_DEFINE3(flistxattr, int, fd, char __user *, list, size_t, size)
 {
 	struct file *f;
 	ssize_t error = -EBADF;
@@ -492,8 +488,8 @@ removexattr(struct dentry *dentry, struct vfsmount *mnt,
 	return vfs_removexattr(dentry, mnt, kname, file);
 }
 
-asmlinkage long
-sys_removexattr(const char __user *pathname, const char __user *name)
+SYSCALL_DEFINE2(removexattr, const char __user *, pathname,
+		const char __user *, name)
 {
 	struct path path;
 	int error;
@@ -510,8 +506,8 @@ sys_removexattr(const char __user *pathname, const char __user *name)
 	return error;
 }
 
-asmlinkage long
-sys_lremovexattr(const char __user *pathname, const char __user *name)
+SYSCALL_DEFINE2(lremovexattr, const char __user *, pathname,
+		const char __user *, name)
 {
 	struct path path;
 	int error;
@@ -528,8 +524,7 @@ sys_lremovexattr(const char __user *pathname, const char __user *name)
 	return error;
 }
 
-asmlinkage long
-sys_fremovexattr(int fd, const char __user *name)
+SYSCALL_DEFINE2(fremovexattr, int, fd, const char __user *, name)
 {
 	struct file *f;
 	struct dentry *dentry;

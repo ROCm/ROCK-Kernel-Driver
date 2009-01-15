@@ -246,6 +246,13 @@ UNUSUAL_DEV(  0x0421, 0x04b9, 0x0500, 0x0551,
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_CAPACITY ),
 
+/* Reported by Paulo Fessel <pfessel@gmail.com> */
+UNUSUAL_DEV(  0x0421, 0x04bd, 0x0000, 0x9999,
+		"Nokia",
+		"5200",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_CAPACITY ),
+
 /* Reported by Richard Nauber <RichardNauber@web.de> */
 UNUSUAL_DEV(  0x0421, 0x04fa, 0x0550, 0x0660,
 		"Nokia",
@@ -1040,7 +1047,7 @@ UNUSUAL_DEV( 0x067b, 0x2507, 0x0100, 0x0100,
 		US_FL_FIX_CAPACITY | US_FL_GO_SLOW ),
 
 /* Reported by Alex Butcher <alex.butcher@assursys.co.uk> */
-UNUSUAL_DEV( 0x067b, 0x3507, 0x0001, 0x0001,
+UNUSUAL_DEV( 0x067b, 0x3507, 0x0001, 0x0101,
 		"Prolific Technology Inc.",
 		"ATAPI-6 Bridge Controller",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
@@ -1320,6 +1327,13 @@ UNUSUAL_DEV( 0x0840, 0x0082, 0x0001, 0x0001,
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_CAPACITY),
 
+/* Reported and patched by Nguyen Anh Quynh <aquynh@gmail.com> */
+UNUSUAL_DEV( 0x0840, 0x0084, 0x0001, 0x0001,
+		"Argosy",
+		"Storage",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_CAPACITY),
+
 /* Entry and supporting patch by Theodore Kilgore <kilgota@auburn.edu>.
  * Flag will support Bulk devices which use a standards-violating 32-byte
  * Command Block Wrapper. Here, the "DC2MEGA" cameras (several brands) with
@@ -1424,6 +1438,13 @@ UNUSUAL_DEV( 0x0a17, 0x006, 0x0000, 0xffff,
 		"Optio S/S4",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY ),
+
+/* Reported by Jaak Ristioja <Ristioja@gmail.com> */
+UNUSUAL_DEV( 0x0a17, 0x006e, 0x0100, 0x0100,
+		"Pentax",
+		"K10D",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_CAPACITY ),
 
 /* These are virtual windows driver CDs, which the zd1211rw driver
  * automatically converts into WLAN devices. */

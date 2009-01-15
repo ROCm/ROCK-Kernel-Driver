@@ -137,7 +137,7 @@ out:
 	return error;
 }
 
-asmlinkage long sys_setpriority(int which, int who, int niceval)
+SYSCALL_DEFINE3(setpriority, int, which, int, who, int, niceval)
 {
 	struct task_struct *g, *p;
 	struct user_struct *user;
@@ -201,7 +201,7 @@ out:
  * has been offset by 20 (ie it returns 40..1 instead of -20..19)
  * to stay compatible.
  */
-asmlinkage long sys_getpriority(int which, int who)
+SYSCALL_DEFINE2(getpriority, int, which, int, who)
 {
 	struct task_struct *g, *p;
 	struct user_struct *user;
@@ -347,7 +347,8 @@ EXPORT_SYMBOL_GPL(kernel_power_off);
  *
  * reboot doesn't sync: do that yourself before calling this.
  */
-asmlinkage long sys_reboot(int magic1, int magic2, unsigned int cmd, void __user * arg)
+SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,
+		void __user *, arg)
 {
 	char buffer[256];
 
@@ -470,7 +471,7 @@ void ctrl_alt_del(void)
  * SMP: There are not races, the GIDs are checked only by filesystem
  *      operations (as far as semantic preservation is concerned).
  */
-asmlinkage long sys_setregid(gid_t rgid, gid_t egid)
+SYSCALL_DEFINE2(setregid, gid_t, rgid, gid_t, egid)
 {
 	int old_rgid = current->gid;
 	int old_egid = current->egid;
@@ -519,7 +520,7 @@ asmlinkage long sys_setregid(gid_t rgid, gid_t egid)
  *
  * SMP: Same implicit races as above.
  */
-asmlinkage long sys_setgid(gid_t gid)
+SYSCALL_DEFINE1(setgid, gid_t, gid)
 {
 	int old_egid = current->egid;
 	int retval;
@@ -589,7 +590,7 @@ static int set_user(uid_t new_ruid, int dumpclear)
  * 100% compatible with BSD.  A program which uses just setuid() will be
  * 100% compatible with POSIX with saved IDs. 
  */
-asmlinkage long sys_setreuid(uid_t ruid, uid_t euid)
+SYSCALL_DEFINE2(setreuid, uid_t, ruid, uid_t, euid)
 {
 	int old_ruid, old_euid, old_suid, new_ruid, new_euid;
 	int retval;
@@ -651,7 +652,7 @@ asmlinkage long sys_setreuid(uid_t ruid, uid_t euid)
  * will allow a root program to temporarily drop privileges and be able to
  * regain them by swapping the real and effective uid.  
  */
-asmlinkage long sys_setuid(uid_t uid)
+SYSCALL_DEFINE1(setuid, uid_t, uid)
 {
 	int old_euid = current->euid;
 	int old_ruid, old_suid, new_suid;
@@ -690,7 +691,7 @@ asmlinkage long sys_setuid(uid_t uid)
  * This function implements a generic ability to update ruid, euid,
  * and suid.  This allows you to implement the 4.4 compatible seteuid().
  */
-asmlinkage long sys_setresuid(uid_t ruid, uid_t euid, uid_t suid)
+SYSCALL_DEFINE3(setresuid, uid_t, ruid, uid_t, euid, uid_t, suid)
 {
 	int old_ruid = current->uid;
 	int old_euid = current->euid;
@@ -733,7 +734,7 @@ asmlinkage long sys_setresuid(uid_t ruid, uid_t euid, uid_t suid)
 	return security_task_post_setuid(old_ruid, old_euid, old_suid, LSM_SETID_RES);
 }
 
-asmlinkage long sys_getresuid(uid_t __user *ruid, uid_t __user *euid, uid_t __user *suid)
+SYSCALL_DEFINE3(getresuid, uid_t __user *, ruid, uid_t __user *, euid, uid_t __user *, suid)
 {
 	int retval;
 
@@ -747,7 +748,7 @@ asmlinkage long sys_getresuid(uid_t __user *ruid, uid_t __user *euid, uid_t __us
 /*
  * Same as above, but for rgid, egid, sgid.
  */
-asmlinkage long sys_setresgid(gid_t rgid, gid_t egid, gid_t sgid)
+SYSCALL_DEFINE3(setresgid, gid_t, rgid, gid_t, egid, gid_t, sgid)
 {
 	int retval;
 
@@ -784,7 +785,7 @@ asmlinkage long sys_setresgid(gid_t rgid, gid_t egid, gid_t sgid)
 	return 0;
 }
 
-asmlinkage long sys_getresgid(gid_t __user *rgid, gid_t __user *egid, gid_t __user *sgid)
+SYSCALL_DEFINE3(getresgid, gid_t __user *, rgid, gid_t __user *, egid, gid_t __user *, sgid)
 {
 	int retval;
 
@@ -802,7 +803,7 @@ asmlinkage long sys_getresgid(gid_t __user *rgid, gid_t __user *egid, gid_t __us
  * whatever uid it wants to). It normally shadows "euid", except when
  * explicitly set by setfsuid() or for access..
  */
-asmlinkage long sys_setfsuid(uid_t uid)
+SYSCALL_DEFINE1(setfsuid, uid_t, uid)
 {
 	int old_fsuid;
 
@@ -831,7 +832,7 @@ asmlinkage long sys_setfsuid(uid_t uid)
 /*
  * Samma på svenska..
  */
-asmlinkage long sys_setfsgid(gid_t gid)
+SYSCALL_DEFINE1(setfsgid, gid_t, gid)
 {
 	int old_fsgid;
 
@@ -853,7 +854,7 @@ asmlinkage long sys_setfsgid(gid_t gid)
 	return old_fsgid;
 }
 
-asmlinkage long sys_times(struct tms __user * tbuf)
+SYSCALL_DEFINE1(times, struct tms __user *, tbuf)
 {
 	/*
 	 *	In the SMP world we might just be unlucky and have one of
@@ -903,7 +904,7 @@ asmlinkage long sys_times(struct tms __user * tbuf)
  * Auch. Had to add the 'did_exec' flag to conform completely to POSIX.
  * LBT 04.03.94
  */
-asmlinkage long sys_setpgid(pid_t pid, pid_t pgid)
+SYSCALL_DEFINE2(setpgid, pid_t, pid, pid_t, pgid)
 {
 	struct task_struct *p;
 	struct task_struct *group_leader = current->group_leader;
@@ -974,7 +975,7 @@ out:
 	return err;
 }
 
-asmlinkage long sys_getpgid(pid_t pid)
+SYSCALL_DEFINE1(getpgid, pid_t, pid)
 {
 	struct task_struct *p;
 	struct pid *grp;
@@ -1004,14 +1005,14 @@ out:
 
 #ifdef __ARCH_WANT_SYS_GETPGRP
 
-asmlinkage long sys_getpgrp(void)
+SYSCALL_DEFINE0(getpgrp)
 {
 	return sys_getpgid(0);
 }
 
 #endif
 
-asmlinkage long sys_getsid(pid_t pid)
+SYSCALL_DEFINE1(getsid, pid_t, pid)
 {
 	struct task_struct *p;
 	struct pid *sid;
@@ -1039,7 +1040,7 @@ out:
 	return retval;
 }
 
-asmlinkage long sys_setsid(void)
+SYSCALL_DEFINE0(setsid)
 {
 	struct task_struct *group_leader = current->group_leader;
 	struct pid *sid = task_pid(group_leader);
@@ -1245,7 +1246,7 @@ int set_current_groups(struct group_info *group_info)
 
 EXPORT_SYMBOL(set_current_groups);
 
-asmlinkage long sys_getgroups(int gidsetsize, gid_t __user *grouplist)
+SYSCALL_DEFINE2(getgroups, int, gidsetsize, gid_t __user *, grouplist)
 {
 	int i = 0;
 
@@ -1278,7 +1279,7 @@ out:
  *	without another task interfering.
  */
  
-asmlinkage long sys_setgroups(int gidsetsize, gid_t __user *grouplist)
+SYSCALL_DEFINE2(setgroups, int, gidsetsize, gid_t __user *, grouplist)
 {
 	struct group_info *group_info;
 	int retval;
@@ -1328,7 +1329,7 @@ EXPORT_SYMBOL(in_egroup_p);
 
 DECLARE_RWSEM(uts_sem);
 
-asmlinkage long sys_newuname(struct new_utsname __user * name)
+SYSCALL_DEFINE1(newuname, struct new_utsname __user *, name)
 {
 	int errno = 0;
 
@@ -1339,7 +1340,7 @@ asmlinkage long sys_newuname(struct new_utsname __user * name)
 	return errno;
 }
 
-asmlinkage long sys_sethostname(char __user *name, int len)
+SYSCALL_DEFINE2(sethostname, char __user *, name, int, len)
 {
 	int errno;
 	char tmp[__NEW_UTS_LEN];
@@ -1361,7 +1362,7 @@ asmlinkage long sys_sethostname(char __user *name, int len)
 
 #ifdef __ARCH_WANT_SYS_GETHOSTNAME
 
-asmlinkage long sys_gethostname(char __user *name, int len)
+SYSCALL_DEFINE2(gethostname, char __user *, name, int, len)
 {
 	int i, errno;
 
@@ -1384,7 +1385,7 @@ asmlinkage long sys_gethostname(char __user *name, int len)
  * Only setdomainname; getdomainname can be implemented by calling
  * uname()
  */
-asmlinkage long sys_setdomainname(char __user *name, int len)
+SYSCALL_DEFINE2(setdomainname, char __user *, name, int, len)
 {
 	int errno;
 	char tmp[__NEW_UTS_LEN];
@@ -1405,7 +1406,7 @@ asmlinkage long sys_setdomainname(char __user *name, int len)
 	return errno;
 }
 
-asmlinkage long sys_getrlimit(unsigned int resource, struct rlimit __user *rlim)
+SYSCALL_DEFINE2(getrlimit, unsigned int, resource, struct rlimit __user *, rlim)
 {
 	if (resource >= RLIM_NLIMITS)
 		return -EINVAL;
@@ -1424,7 +1425,8 @@ asmlinkage long sys_getrlimit(unsigned int resource, struct rlimit __user *rlim)
  *	Back compatibility for getrlimit. Needed for some apps.
  */
  
-asmlinkage long sys_old_getrlimit(unsigned int resource, struct rlimit __user *rlim)
+SYSCALL_DEFINE2(old_getrlimit, unsigned int, resource,
+		struct rlimit __user *, rlim)
 {
 	struct rlimit x;
 	if (resource >= RLIM_NLIMITS)
@@ -1442,7 +1444,7 @@ asmlinkage long sys_old_getrlimit(unsigned int resource, struct rlimit __user *r
 
 #endif
 
-asmlinkage long sys_setrlimit(unsigned int resource, struct rlimit __user *rlim)
+SYSCALL_DEFINE2(setrlimit, unsigned int, resource, struct rlimit __user *, rlim)
 {
 	struct rlimit new_rlim, *old_rlim;
 	unsigned long it_prof_secs;
@@ -1618,7 +1620,7 @@ int getrusage(struct task_struct *p, int who, struct rusage __user *ru)
 	return copy_to_user(ru, &r, sizeof(r)) ? -EFAULT : 0;
 }
 
-asmlinkage long sys_getrusage(int who, struct rusage __user *ru)
+SYSCALL_DEFINE2(getrusage, int, who, struct rusage __user *, ru)
 {
 	if (who != RUSAGE_SELF && who != RUSAGE_CHILDREN &&
 	    who != RUSAGE_THREAD)
@@ -1626,14 +1628,14 @@ asmlinkage long sys_getrusage(int who, struct rusage __user *ru)
 	return getrusage(current, who, ru);
 }
 
-asmlinkage long sys_umask(int mask)
+SYSCALL_DEFINE1(umask, int, mask)
 {
 	mask = xchg(&current->fs->umask, mask & S_IRWXUGO);
 	return mask;
 }
 
-asmlinkage long sys_prctl(int option, unsigned long arg2, unsigned long arg3,
-			  unsigned long arg4, unsigned long arg5)
+SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
+		unsigned long, arg4, unsigned long, arg5)
 {
 	long error = 0;
 
@@ -1734,8 +1736,8 @@ asmlinkage long sys_prctl(int option, unsigned long arg2, unsigned long arg3,
 	return error;
 }
 
-asmlinkage long sys_getcpu(unsigned __user *cpup, unsigned __user *nodep,
-			   struct getcpu_cache __user *unused)
+SYSCALL_DEFINE3(getcpu, unsigned __user *, cpup, unsigned __user *, nodep,
+		struct getcpu_cache __user *, unused)
 {
 	int err = 0;
 	int cpu = raw_smp_processor_id();
