@@ -1246,6 +1246,9 @@ static int io_subchannel_probe(struct subchannel *sch)
 		return 0;
 	}
 	io_subchannel_init_fields(sch);
+	rc = cio_modify(sch);
+	if (rc)
+		goto out_schedule;
 	/*
 	 * First check if a fitting device may be found amongst the
 	 * disconnected devices or in the orphanage.
@@ -1676,6 +1679,9 @@ static int ccw_device_console_enable(struct ccw_device *cdev,
 	sch->private = cio_get_console_priv();
 	memset(sch->private, 0, sizeof(struct io_subchannel_private));
 	io_subchannel_init_fields(sch);
+	rc = cio_modify(sch);
+	if (rc)
+		return rc;
 	sch->driver = &io_subchannel_driver;
 	/* Initialize the ccw_device structure. */
 	cdev->dev.parent= &sch->dev;

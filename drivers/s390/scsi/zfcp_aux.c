@@ -175,6 +175,11 @@ static int __init zfcp_module_init(void)
 	if (!zfcp_data.gid_pn_cache)
 		goto out_gid_cache;
 
+	zfcp_data.gpn_ft_cache = zfcp_cache_create(
+			sizeof(struct ct_iu_gpn_ft_req), "zfcp_gpn");
+	if (!zfcp_data.gpn_ft_cache)
+		goto out_gpn_cache;
+
 	zfcp_data.work_queue = create_singlethread_workqueue("zfcp_wq");
 
 	INIT_LIST_HEAD(&zfcp_data.adapter_list_head);
@@ -209,6 +214,8 @@ out_ccw_register:
 out_misc:
 	fc_release_transport(zfcp_data.scsi_transport_template);
 out_transport:
+	kmem_cache_destroy(zfcp_data.gpn_ft_cache);
+out_gpn_cache:
 	kmem_cache_destroy(zfcp_data.gid_pn_cache);
 out_gid_cache:
 	kmem_cache_destroy(zfcp_data.sr_buffer_cache);

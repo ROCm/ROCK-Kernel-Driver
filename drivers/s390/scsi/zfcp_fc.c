@@ -10,14 +10,6 @@
 
 #include "zfcp_ext.h"
 
-struct ct_iu_gpn_ft_req {
-	struct ct_hdr header;
-	u8 flags;
-	u8 domain_id_scope;
-	u8 area_id_scope;
-	u8 fc4_type;
-} __attribute__ ((packed));
-
 struct gpn_ft_resp_acc {
 	u8 control;
 	u8 port_id[3];
@@ -450,7 +442,8 @@ static void zfcp_free_sg_env(struct zfcp_gpn_ft *gpn_ft, int buf_num)
 {
 	struct scatterlist *sg = &gpn_ft->sg_req;
 
-	kfree(sg_virt(sg)); /* free request buffer */
+	/* free request buffer */
+	kmem_cache_free(zfcp_data.gpn_ft_cache, sg_virt(sg));
 	zfcp_sg_free_table(gpn_ft->sg_resp, buf_num);
 
 	kfree(gpn_ft);
@@ -465,7 +458,7 @@ static struct zfcp_gpn_ft *zfcp_alloc_sg_env(int buf_num)
 	if (!gpn_ft)
 		return NULL;
 
-	req = kzalloc(sizeof(struct ct_iu_gpn_ft_req), GFP_KERNEL);
+	req = kmem_cache_alloc(zfcp_data.gpn_ft_cache, GFP_KERNEL);
 	if (!req) {
 		kfree(gpn_ft);
 		gpn_ft = NULL;

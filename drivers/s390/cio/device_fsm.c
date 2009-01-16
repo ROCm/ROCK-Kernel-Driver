@@ -1028,6 +1028,8 @@ void ccw_device_trigger_reprobe(struct ccw_device *cdev)
 	sch->schib.pmcw.ena = 0;
 	if ((sch->lpm & (sch->lpm - 1)) != 0)
 		sch->schib.pmcw.mp = 1;
+	if (cio_modify(sch))
+		return;
 	/* We should also udate ssd info, but this has to wait. */
 	/* Check if this is another device which appeared on the same sch. */
 	if (sch->schib.pmcw.dev != cdev->private->dev_id.devno) {

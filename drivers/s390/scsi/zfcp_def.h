@@ -333,6 +333,14 @@ struct ct_iu_gid_pn_resp {
 	u32 d_id;
 } __attribute__ ((packed));
 
+struct ct_iu_gpn_ft_req {
+	struct ct_hdr header;
+	u8 flags;
+	u8 domain_id_scope;
+	u8 area_id_scope;
+	u8 fc4_type;
+} __attribute__ ((packed));
+
 /**
  * struct zfcp_send_ct - used to pass parameters to function zfcp_fsf_send_ct
  * @wka_port: port where the request is sent to
@@ -595,6 +603,7 @@ struct zfcp_data {
 	struct kmem_cache	*fsf_req_qtcb_cache;
 	struct kmem_cache	*sr_buffer_cache;
 	struct kmem_cache	*gid_pn_cache;
+	struct kmem_cache	*gpn_ft_cache;
 	struct workqueue_struct	*work_queue;
 };
 
