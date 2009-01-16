@@ -2329,7 +2329,7 @@ static ssize_t generic_perform_write_2copy(struct file *file,
 			break;
 		}
 
-		page = grab_cache_page_write_begin(mapping, index, GFP_KERNEL);
+		page = grab_cache_page_write_begin(mapping, index, 0);
 		if (!page) {
 			status = -ENOMEM;
 			break;
