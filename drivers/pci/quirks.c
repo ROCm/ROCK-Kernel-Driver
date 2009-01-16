@@ -648,27 +648,6 @@ static void __init quirk_ioapic_rmw(struct pci_dev *dev)
 		sis_apic_bug = 1;
 }
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_SI,	PCI_ANY_ID,			quirk_ioapic_rmw);
-
-#define AMD8131_revA0        0x01
-#define AMD8131_revB0        0x11
-#define AMD8131_MISC         0x40
-#define AMD8131_NIOAMODE_BIT 0
-static void quirk_amd_8131_ioapic(struct pci_dev *dev)
-{ 
-        unsigned char tmp;
-        
-        if (nr_ioapics == 0) 
-                return;
-
-        if (dev->revision == AMD8131_revA0 || dev->revision == AMD8131_revB0) {
-                dev_info(&dev->dev, "Fixing up AMD8131 IOAPIC mode\n");
-                pci_read_config_byte( dev, AMD8131_MISC, &tmp);
-                tmp &= ~(1 << AMD8131_NIOAMODE_BIT);
-                pci_write_config_byte( dev, AMD8131_MISC, tmp);
-        }
-} 
-DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_8131_BRIDGE, quirk_amd_8131_ioapic);
-DECLARE_PCI_FIXUP_RESUME_EARLY(PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_8131_BRIDGE, quirk_amd_8131_ioapic);
 #endif /* CONFIG_X86_IO_APIC */
 
 /*
@@ -1486,14 +1465,22 @@ static void quirk_reroute_to_boot_interrupts_intel(struct pci_dev *dev)
 			dev->vendor, dev->device);
 	return;
 }
-DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_80333_0,	quirk_reroute_to_boot_interrupts_intel);
-DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_80333_1,	quirk_reroute_to_boot_interrupts_intel);
-DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ESB2_0,	quirk_reroute_to_boot_interrupts_intel);
-DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_PXH_0,	quirk_reroute_to_boot_interrupts_intel);
-DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_PXH_1,	quirk_reroute_to_boot_interrupts_intel);
-DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_PXHV,	quirk_reroute_to_boot_interrupts_intel);
-DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_80332_0,	quirk_reroute_to_boot_interrupts_intel);
-DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_80332_1,	quirk_reroute_to_boot_interrupts_intel);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_80333_0,	quirk_reroute_to_boot_interrupts_intel);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_80333_1,	quirk_reroute_to_boot_interrupts_intel);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ESB2_0,	quirk_reroute_to_boot_interrupts_intel);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_PXH_0,	quirk_reroute_to_boot_interrupts_intel);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_PXH_1,	quirk_reroute_to_boot_interrupts_intel);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_PXHV,	quirk_reroute_to_boot_interrupts_intel);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_80332_0,	quirk_reroute_to_boot_interrupts_intel);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_80332_1,	quirk_reroute_to_boot_interrupts_intel);
+DECLARE_PCI_FIXUP_RESUME(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_80333_0,	quirk_reroute_to_boot_interrupts_intel);
+DECLARE_PCI_FIXUP_RESUME(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_80333_1,	quirk_reroute_to_boot_interrupts_intel);
+DECLARE_PCI_FIXUP_RESUME(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ESB2_0,	quirk_reroute_to_boot_interrupts_intel);
+DECLARE_PCI_FIXUP_RESUME(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_PXH_0,	quirk_reroute_to_boot_interrupts_intel);
+DECLARE_PCI_FIXUP_RESUME(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_PXH_1,	quirk_reroute_to_boot_interrupts_intel);
+DECLARE_PCI_FIXUP_RESUME(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_PXHV,	quirk_reroute_to_boot_interrupts_intel);
+DECLARE_PCI_FIXUP_RESUME(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_80332_0,	quirk_reroute_to_boot_interrupts_intel);
+DECLARE_PCI_FIXUP_RESUME(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_80332_1,	quirk_reroute_to_boot_interrupts_intel);
 
 /*
  * On some chipsets we can disable the generation of legacy INTx boot
@@ -1521,7 +1508,8 @@ static void quirk_disable_intel_boot_interrupt(struct pci_dev *dev)
 	printk(KERN_INFO "disabled boot interrupt on device 0x%04x:0x%04x\n",
 		dev->vendor, dev->device);
 }
-DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL,   PCI_DEVICE_ID_INTEL_ESB_10, 	quirk_disable_intel_boot_interrupt);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL,   PCI_DEVICE_ID_INTEL_ESB_10, 	quirk_disable_intel_boot_interrupt);
+DECLARE_PCI_FIXUP_RESUME(PCI_VENDOR_ID_INTEL,   PCI_DEVICE_ID_INTEL_ESB_10, 	quirk_disable_intel_boot_interrupt);
 
 /*
  * disable boot interrupts on HT-1000
@@ -1553,13 +1541,19 @@ static void quirk_disable_broadcom_boot_interrupt(struct pci_dev *dev)
 	printk(KERN_INFO "disabled boot interrupts on PCI device"
 			"0x%04x:0x%04x\n", dev->vendor, dev->device);
 }
-DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_SERVERWORKS,   PCI_DEVICE_ID_SERVERWORKS_HT1000SB, 	quirk_disable_broadcom_boot_interrupt);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_SERVERWORKS,   PCI_DEVICE_ID_SERVERWORKS_HT1000SB, 	quirk_disable_broadcom_boot_interrupt);
+DECLARE_PCI_FIXUP_RESUME(PCI_VENDOR_ID_SERVERWORKS,   PCI_DEVICE_ID_SERVERWORKS_HT1000SB, 	quirk_disable_broadcom_boot_interrupt);
 
 /*
  * disable boot interrupts on AMD and ATI chipsets
  */
+/*
+ * NOIOAMODE needs to be disabled to disable "boot interrupts". For AMD 8131
+ * rev. A0 and B0, NOIOAMODE needs to be disabled anyway to fix IO-APIC mode
+ * (due to an erratum).
+ */
 #define AMD_813X_MISC			0x40
-#define AMD_813X_NOIOAMODE		1
+#define AMD_813X_NOIOAMODE		(1<<0)
 
 static void quirk_disable_amd_813x_boot_interrupt(struct pci_dev *dev)
 {
@@ -1569,14 +1563,16 @@ static void quirk_disable_amd_813x_boot_interrupt(struct pci_dev *dev)
 		return;
 
 	pci_read_config_dword(dev, AMD_813X_MISC, &pci_config_dword);
-	pci_config_dword |= AMD_813X_NOIOAMODE;
+	pci_config_dword &= ~AMD_813X_NOIOAMODE;
 	pci_write_config_dword(dev, AMD_813X_MISC, pci_config_dword);
 
 	printk(KERN_INFO "disabled boot interrupts on PCI device "
 			"0x%04x:0x%04x\n", dev->vendor, dev->device);
 }
-DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_AMD,   PCI_DEVICE_ID_AMD_8131_BRIDGE, 	quirk_disable_amd_813x_boot_interrupt);
-DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_AMD,   PCI_DEVICE_ID_AMD_8132_BRIDGE, 	quirk_disable_amd_813x_boot_interrupt);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_AMD,   PCI_DEVICE_ID_AMD_8131_BRIDGE, 	quirk_disable_amd_813x_boot_interrupt);
+DECLARE_PCI_FIXUP_RESUME(PCI_VENDOR_ID_AMD,   PCI_DEVICE_ID_AMD_8131_BRIDGE, 	quirk_disable_amd_813x_boot_interrupt);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_AMD,   PCI_DEVICE_ID_AMD_8132_BRIDGE, 	quirk_disable_amd_813x_boot_interrupt);
+DECLARE_PCI_FIXUP_RESUME(PCI_VENDOR_ID_AMD,   PCI_DEVICE_ID_AMD_8132_BRIDGE, 	quirk_disable_amd_813x_boot_interrupt);
 
 #define AMD_8111_PCI_IRQ_ROUTING	0x56
 
@@ -1598,39 +1594,8 @@ static void quirk_disable_amd_8111_boot_interrupt(struct pci_dev *dev)
 	printk(KERN_INFO "disabled boot interrupts on PCI device "
 			"0x%04x:0x%04x\n", dev->vendor, dev->device);
 }
-DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_AMD,   PCI_DEVICE_ID_AMD_8111_SMBUS, 	quirk_disable_amd_8111_boot_interrupt);
-
-/*
- * disable PCI boot interrupt mapping to PIC / first IO-APIC on SB700S
- */
-#define AMD_SB700S_MAP_REG		0x64
-#define AMD_SB700S_MAP_ENABLE		(1<<0)
-#define AMD_SB700S_IRQ_IDX		0xC00
-#define AMD_SB700S_IRQ_DATA		0xC01
-
-static void quirk_disable_amd_sb700s_boot_interrupt(struct pci_dev *dev)
-{
-	u32 pci_config_dword;
-	int i, irqs[] = {0x0, 0x1, 0x2, 0x3, 0x4, 0x9, 0xa, 0xb, 0xc};
-
-	if (noioapicquirk)
-		return;
-
-	pci_read_config_dword(dev, AMD_SB700S_MAP_REG, &pci_config_dword);
-	pci_write_config_dword(dev, AMD_SB700S_MAP_REG, pci_config_dword |
-			AMD_SB700S_MAP_ENABLE);
-
-	for (i = 0; i < ARRAY_SIZE(irqs); i++) {
-		outb(irqs[i], AMD_SB700S_IRQ_IDX);
-		outb(0x00, AMD_SB700S_IRQ_DATA);
-	}
-
-	pci_write_config_dword(dev, AMD_SB700S_MAP_REG, pci_config_dword);
-
-	printk(KERN_INFO "disabled boot interrupts on PCI device "
-			"0x%04x:0x%04x\n", dev->vendor, dev->device);
-}
-DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_ATI,   PCI_DEVICE_ID_ATI_SBX00_SMBUS, 	quirk_disable_amd_sb700s_boot_interrupt);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_AMD,   PCI_DEVICE_ID_AMD_8111_SMBUS, 	quirk_disable_amd_8111_boot_interrupt);
+DECLARE_PCI_FIXUP_RESUME(PCI_VENDOR_ID_AMD,   PCI_DEVICE_ID_AMD_8111_SMBUS, 	quirk_disable_amd_8111_boot_interrupt);
 #endif /* CONFIG_X86_IO_APIC */
 
 /*
