@@ -292,6 +292,7 @@ void iwl_rx_allocate(struct iwl_priv *priv)
 		spin_unlock_irqrestore(&rxq->lock, flags);
 	}
 }
+EXPORT_SYMBOL(iwl_rx_allocate);
 
 void iwl_rx_replenish(struct iwl_priv *priv)
 {
