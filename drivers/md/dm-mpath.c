@@ -596,7 +596,7 @@ static struct pgpath *parse_path(struct arg_set *as, struct path_selector *ps,
 		unsigned major, minor;
 
 		/* Try to add a failed device */
-		if (sscanf(path, "%u:%u", &major, &minor) == 2) {
+		if (r == -ENXIO && sscanf(path, "%u:%u", &major, &minor) == 2) {
 			dev_t dev;
 
 			/* Extract the major/minor numbers */
