@@ -22,6 +22,7 @@
 #include <linux/page-isolation.h>
 #include <linux/memcontrol.h>
 #include <linux/kobject.h>
+#include <linux/kthread.h>
 
 #include <asm/page.h>
 #include <asm/system.h>
@@ -40,12 +41,15 @@ static struct cpe_info cpe[CE_HISTORY_LENGTH];
 static int cpe_polling_enabled = 1;
 static int cpe_head;
 static int cpe_tail;
-static int work_scheduled;
 static int mstat_cannot_isolate;
 static int mstat_failed_to_discard;
 static int mstat_already_marked;
 static int mstat_already_on_list;
 
+/* IRQ handler notifies this wait queue on receipt of an IRQ */
+DECLARE_WAIT_QUEUE_HEAD(cpe_activate_IRQ_wq);
+static DECLARE_COMPLETION(kthread_cpe_migrated_exited);
+int cpe_active;
 DEFINE_SPINLOCK(cpe_migrate_lock);
 
 static void
@@ -159,12 +163,12 @@ ia64_mca_cpe_move_page(u64 paddr, u32 node)
 }
 
 /*
- * ia64_mca_cpe_migrate
- *	The worker that does the actual migration.  It pulls a
- *	physical address off the list and calls the migration code.
+ * cpe_process_queue
+ *	Pulls the physical address off the list and calls the migration code.
+ *	Will process all the addresses on the list.
  */
-static void
-ia64_mca_cpe_migrate(struct work_struct *unused)
+void
+cpe_process_queue(void)
 {
 	int ret;
 	u64 paddr;
@@ -192,10 +196,36 @@ ia64_mca_cpe_migrate(struct work_struct *unused)
 			cpe_tail = 0;
 
 	} while (cpe_tail != cpe_head);
-	work_scheduled = 0;
+	return;
 }
 
-static DECLARE_WORK(cpe_enable_work, ia64_mca_cpe_migrate);
+inline int
+cpe_list_empty(void)
+{
+	return (cpe_head == cpe_tail) && (!cpe[cpe_head].paddr);
+}
+
+/*
+ * kthread_cpe_migrate
+ *	kthread_cpe_migrate is created at module load time and lives
+ *	until the module is removed.  When not active, it will sleep.
+ */
+static int
+kthread_cpe_migrate(void *ignore)
+{
+	while (cpe_active) {
+		/*
+		 * wait for work
+		 */
+		(void)wait_event_interruptible(cpe_activate_IRQ_wq,
+						(!cpe_list_empty() ||
+						!cpe_active));
+		cpe_process_queue();		/* process work */
+	}
+	complete(&kthread_cpe_migrated_exited);
+	return 0;
+}
+
 DEFINE_SPINLOCK(cpe_list_lock);
 
 /*
@@ -227,10 +257,7 @@ cpe_setup_migrate(void *rec)
 	if (ret < 0)
 		return -EINVAL;
 
-	if ((cpe_head != cpe_tail) || (cpe[cpe_head].paddr != 0))
-		/*
-		 * List not empty
-		 */
+	if (!cpe_list_empty())
 		for (i = 0; i < CE_HISTORY_LENGTH; i++) {
 			if (PAGE_ALIGN(cpe[i].paddr) == PAGE_ALIGN(paddr)) {
 				mstat_already_on_list++;
@@ -255,10 +282,7 @@ cpe_setup_migrate(void *rec)
 	}
 	spin_unlock(&cpe_list_lock);
 
-	if (!work_scheduled) {
-		work_scheduled = 1;
-		schedule_work(&cpe_enable_work);
-	}
+	wake_up_interruptible(&cpe_activate_IRQ_wq);
 
 	return 1;
 }
@@ -395,10 +419,21 @@ static int __init
 cpe_migrate_external_handler_init(void)
 {
 	int error;
+	struct task_struct *kthread;
 
 	error = sysfs_create_file(kernel_kobj, &badram_attr.attr);
 	if (error)
 		return -EINVAL;
+
+	/*
+	 * set up the kthread
+	 */
+	cpe_active = 1;
+	kthread = kthread_run(kthread_cpe_migrate, NULL, "cpe_migrate");
+	if (IS_ERR(kthread)) {
+		complete(&kthread_cpe_migrated_exited);
+		return -EFAULT;
+	}
 
 	/*
 	 * register external ce handler
@@ -418,6 +453,11 @@ cpe_migrate_external_handler_exit(void)
 {
 	/* unregister external mca handlers */
 	ia64_unreg_CE_extension();
+
+	/* Stop kthread */
+	cpe_active = 0;			/* tell kthread_cpe_migrate to exit */
+	wake_up_interruptible(&cpe_activate_IRQ_wq);
+	wait_for_completion(&kthread_cpe_migrated_exited);
 
 	sysfs_remove_file(kernel_kobj, &badram_attr.attr);
 }

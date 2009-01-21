@@ -391,6 +391,11 @@ void sn_irq_fixup(struct pci_dev *pci_dev, struct sn_irq_info *sn_irq_info)
 #ifdef CONFIG_SMP
 	cpuphys = cpu_physical_id(cpu);
 	set_irq_affinity_info(sn_irq_info->irq_irq, cpuphys, 0);
+	/*
+	 * Affinity was set by the PROM, prevent it from
+	 * being reset by the request_irq() path.
+	 */
+	irq_desc[sn_irq_info->irq_irq].status |= IRQ_AFFINITY_SET;
 #endif
 }
 
