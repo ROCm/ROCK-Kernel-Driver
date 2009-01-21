@@ -727,6 +727,25 @@ static void radeon_videomode_to_var(struct fb_var_screeninfo *var,
 	var->vmode = mode->vmode;
 }
 
+#ifdef CONFIG_PPC_PSERIES
+static int is_powerblade(const char *model)
+{
+	struct device_node *root;
+	const char* cp;
+	int len, l, rc = 0;
+
+	root = of_find_node_by_path("/");
+	if (root && model) {
+		l = strlen(model);
+		cp = of_get_property(root, "model", &len);
+		if (cp)
+			rc = memcmp(model, cp, min(len, l)) == 0;
+		of_node_put(root);
+	}
+	return rc;
+}
+#endif
+
 /*
  * Build the modedb for head 1 (head 2 will come later), check panel infos
  * from either BIOS or EDID, and pick up the default mode
@@ -864,11 +883,11 @@ void __devinit radeon_check_modes(struct radeonfb_info *rinfo, const char *mode_
 
 #ifdef CONFIG_PPC_PSERIES
 	if (!has_default_mode && (
-	     machine_is_compatible("IBM,8842") || /* JS20 */
-	     machine_is_compatible("IBM,8844") || /* JS21 */
-	     machine_is_compatible("IBM,7998") || /* JS12/JS21/JS22 */
-	     machine_is_compatible("IBM,0792") || /* QS21 */
-	     machine_is_compatible("IBM,0793")    /* QS22 */
+		is_powerblade("IBM,8842") || /* JS20 */
+		is_powerblade("IBM,8844") || /* JS21 */
+		is_powerblade("IBM,7998") || /* JS12/JS21/JS22 */
+		is_powerblade("IBM,0792") || /* QS21 */
+		is_powerblade("IBM,0793")    /* QS22 */
 	    )) {
 		printk("Falling back to 800x600 on JSxx hardware\n");
 		if (fb_find_mode(&info->var, info, "800x600@60",
