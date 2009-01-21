@@ -73,13 +73,13 @@ DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
 extern pmd_t level2_fixmap_pgt[PTRS_PER_PMD];
 extern pte_t level1_fixmap_pgt[PTRS_PER_PTE];
 
+#ifndef CONFIG_XEN
 int direct_gbpages
 #ifdef CONFIG_DIRECT_GBPAGES
 				= 1
 #endif
 ;
 
-#ifndef CONFIG_XEN
 static int __init parse_direct_gbpages_off(char *arg)
 {
 	direct_gbpages = 0;
@@ -155,7 +155,7 @@ void __meminit early_make_page_readonly(void *va, unsigned int feature)
 
 static unsigned long __meminitdata table_start;
 static unsigned long __meminitdata table_cur;
-static unsigned long __meminitdata table_end;
+static unsigned long __meminitdata table_top;
 
 /*
  * NOTE: This function is marked __ref because it calls __init function
@@ -167,7 +167,7 @@ static __ref void *spp_getpage(void)
 
 	if (after_bootmem)
 		ptr = (void *) get_zeroed_page(GFP_ATOMIC);
-	else if (table_cur < table_end) {
+	else if (table_cur < table_top) {
 		ptr = __va(table_cur << PAGE_SHIFT);
 		table_cur++;
 		memset(ptr, 0, PAGE_SIZE);
@@ -348,7 +348,7 @@ static inline int __meminit make_readonly(unsigned long paddr)
 	/* Make new page tables read-only. */
 	if (!xen_feature(XENFEAT_writable_page_tables)
 	    && (paddr >= (table_start << PAGE_SHIFT))
-	    && (paddr < (table_end << PAGE_SHIFT)))
+	    && (paddr < (table_top << PAGE_SHIFT)))
 		readonly = 1;
 	/* Make old page tables read-only. */
 	if (!xen_feature(XENFEAT_writable_page_tables)
@@ -695,17 +695,18 @@ static void __init extend_init_mapping(unsigned long tables_space)
 			      table_cur << PAGE_SHIFT, "INITMAP");
 }
 
-static void __init find_early_table_space(unsigned long end)
+static void __init find_early_table_space(unsigned long end, int use_pse,
+					  int use_gbpages)
 {
 	unsigned long puds, pmds, ptes, tables;
 
 	puds = (end + PUD_SIZE - 1) >> PUD_SHIFT;
+	tables = round_up(puds * sizeof(pud_t), PAGE_SIZE);
 	pmds = (end + PMD_SIZE - 1) >> PMD_SHIFT;
-	ptes = (end + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	tables += round_up(pmds * sizeof(pmd_t), PAGE_SIZE);
 
-	tables = round_up(puds * 8, PAGE_SIZE) + 
-		round_up(pmds * 8, PAGE_SIZE) + 
-		round_up(ptes * 8, PAGE_SIZE); 
+	ptes = (end + PAGE_SIZE - 1) >> PAGE_SHIFT;
+	tables += round_up(ptes * sizeof(pte_t), PAGE_SIZE);
 
 	table_cur = (__pa(xen_start_info->pt_base) >> PAGE_SHIFT) +
 		xen_start_info->nr_pt_frames;
@@ -713,10 +714,10 @@ static void __init find_early_table_space(unsigned long end)
 	extend_init_mapping(tables);
 
 	table_start = table_cur;
-	table_end = table_start + (tables>>PAGE_SHIFT);
+	table_top = table_start + (tables >> PAGE_SHIFT);
 
 	printk(KERN_DEBUG "kernel direct mapping tables up to %lx @ %lx-%lx\n",
-		end, table_start << PAGE_SHIFT, table_end << PAGE_SHIFT);
+		end, table_start << PAGE_SHIFT, table_top << PAGE_SHIFT);
 }
 
 static void __init xen_finish_init_mapping(bool reserve)
@@ -743,23 +744,14 @@ static void __init xen_finish_init_mapping(bool reserve)
 	 * overlap with modules area (if init mapping is very big).
 	 */
 	start = PAGE_ALIGN((unsigned long)_end);
-	end   = __START_KERNEL_map + (table_end << PAGE_SHIFT);
+	end   = __START_KERNEL_map + (table_top << PAGE_SHIFT);
 	for (; start < end; start += PAGE_SIZE)
 		if (HYPERVISOR_update_va_mapping(start, __pte_ma(0), 0))
 			BUG();
 
 	/* Allocate pte's for initial fixmaps from 'table_cur' allocator. */
 	start = table_cur;
-	table_end = ~0UL;
-
-	/*
-	 * Prefetch pte's for the bt_ioremap() area. It gets used before the
-	 * boot-time allocator is online, so allocate-on-demand would fail.
-	 */
-	early_ioremap_clear();
-	for (i = FIX_BTMAP_END; i <= FIX_BTMAP_BEGIN; i++)
-		__set_fixmap(i, 0, __pgprot(0));
-	early_ioremap_reset();
+	table_top = ~0UL;
 
 	/* Switch to the real shared_info page, and clear the dummy page. */
 	set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
@@ -777,7 +769,7 @@ static void __init xen_finish_init_mapping(bool reserve)
 				     PAGE_KERNEL_RO);
 
 	/* Disable the 'table_cur' allocator. */
-	table_end = table_cur;
+	table_top = table_cur;
 	if (reserve && table_cur > start)
 		reserve_early(start << PAGE_SHIFT,
 			      table_cur << PAGE_SHIFT, "FIXMAP");
@@ -785,10 +777,12 @@ static void __init xen_finish_init_mapping(bool reserve)
 
 static void __init init_gbpages(void)
 {
+#ifndef CONFIG_XEN
 	if (direct_gbpages && cpu_has_gbpages)
 		printk(KERN_INFO "Using GB pages for direct mapping\n");
 	else
 		direct_gbpages = 0;
+#endif
 }
 
 static unsigned long __init kernel_physical_mapping_init(unsigned long start,
@@ -873,6 +867,7 @@ unsigned long __init_refok init_memory_mapping(unsigned long start,
 	bool first = !table_start;
 	struct map_range mr[NR_RANGE_MR];
 	int nr_range, i;
+	int use_pse, use_gbpages;
 
 	printk(KERN_INFO "init_memory_mapping\n");
 
@@ -886,9 +881,21 @@ unsigned long __init_refok init_memory_mapping(unsigned long start,
 	if (!after_bootmem)
 		init_gbpages();
 
-	if (direct_gbpages)
+#ifdef CONFIG_DEBUG_PAGEALLOC
+	/*
+	 * For CONFIG_DEBUG_PAGEALLOC, identity mapping will use small pages.
+	 * This will simplify cpa(), which otherwise needs to support splitting
+	 * large pages into small in interrupt context, etc.
+	 */
+	use_pse = use_gbpages = 0;
+#else
+	use_pse = cpu_has_pse;
+	use_gbpages = direct_gbpages;
+#endif
+
+	if (use_gbpages)
 		page_size_mask |= 1 << PG_LEVEL_1G;
-	if (cpu_has_pse)
+	if (use_pse)
 		page_size_mask |= 1 << PG_LEVEL_2M;
 
 	memset(mr, 0, sizeof(mr));
@@ -949,24 +956,24 @@ unsigned long __init_refok init_memory_mapping(unsigned long start,
 			 (mr[i].page_size_mask & (1<<PG_LEVEL_2M))?"2M":"4k"));
 
 	if (first)
-		find_early_table_space(end);
+		find_early_table_space(end, use_pse, use_gbpages);
 
 	for (i = 0; i < nr_range; i++)
 		last_map_addr = kernel_physical_mapping_init(
 					mr[i].start, mr[i].end,
 					mr[i].page_size_mask);
 
-	BUG_ON(table_cur > table_end);
+	BUG_ON(table_cur > table_top);
 	if (start < (table_start << PAGE_SHIFT)) {
-		WARN_ON(table_cur != table_end);
+		WARN_ON(table_cur != table_top);
 		xen_finish_init_mapping(!first);
 	}
 
 	__flush_tlb_all();
 
-	if (first && table_end > table_start)
+	if (first && table_top > table_start)
 		reserve_early(table_start << PAGE_SHIFT,
-			      table_end << PAGE_SHIFT, "PGTABLE");
+			      table_top << PAGE_SHIFT, "PGTABLE");
 
 	printk(KERN_INFO "last_map_addr: %lx end: %lx\n",
 			 last_map_addr, end);
@@ -1261,8 +1268,6 @@ int __init reserve_bootmem_generic(unsigned long phys, unsigned long len,
 
 #ifndef CONFIG_XEN
 	if (phys+len <= MAX_DMA_PFN*PAGE_SIZE) {
-		static unsigned long dma_reserve __initdata;
-
 		dma_reserve += len / PAGE_SIZE;
 		set_dma_reserve(dma_reserve);
 	}

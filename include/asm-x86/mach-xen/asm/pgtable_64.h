@@ -282,7 +282,7 @@ static inline int pud_large(pud_t pte)
 
 #define update_mmu_cache(vma, address, pte) do { } while (0)
 
-extern int direct_gbpages;
+#define direct_gbpages 0
 
 /* Encode and de-code a swap entry */
 #if _PAGE_BIT_FILE < _PAGE_BIT_PROTNONE

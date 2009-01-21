@@ -996,7 +996,7 @@ config HIGHMEM
 config X86_PAE
 	def_bool n
 	prompt "PAE (Physical Address Extension) Support"
-	depends on X86_32 && !HIGHMEM4G
+	depends on X86_32 && (!HIGHMEM4G || X86_XEN)
 	select RESOURCES_64BIT
 	help
 	  PAE is required for NX support, and furthermore enables

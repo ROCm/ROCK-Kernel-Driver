@@ -329,6 +329,12 @@ static void __iomem *__ioremap_caller(resource_size_t phys_addr,
 		return (__force void __iomem *)isa_bus_to_virt((unsigned long)phys_addr);
 
 	/*
+	 * Check if the request spans more than any BAR in the iomem resource
+	 * tree.
+	 */
+	WARN_ON(iomem_map_sanity_check(phys_addr, size));
+
+	/*
 	 * Don't allow anybody to remap normal RAM that we're using..
 	 */
 	for (mfn = PFN_DOWN(phys_addr); mfn < PFN_UP(last_addr); mfn++) {
@@ -670,36 +676,12 @@ void __init early_ioremap_init(void)
 	}
 }
 
-void __init early_ioremap_clear(void)
-{
-	pmd_t *pmd;
-
-	if (early_ioremap_debug)
-		printk(KERN_INFO "early_ioremap_clear()\n");
-
-	pmd = early_ioremap_pmd(fix_to_virt(FIX_BTMAP_BEGIN));
-	xen_l2_entry_update(pmd, __pmd(0));
-	make_lowmem_page_writable(bm_pte, XENFEAT_writable_page_tables);
-	/* paravirt_release_pte(__pa(bm_pte) >> PAGE_SHIFT); */
-	__flush_tlb_all();
-}
-
+#ifdef CONFIG_X86_32
 void __init early_ioremap_reset(void)
 {
-	enum fixed_addresses idx;
-	unsigned long addr, phys;
-	pte_t *pte;
-
 	after_paging_init = 1;
-	for (idx = FIX_BTMAP_BEGIN; idx >= FIX_BTMAP_END; idx--) {
-		addr = fix_to_virt(idx);
-		pte = early_ioremap_pte(addr);
-		if (pte_present(*pte)) {
-			phys = __pte_val(*pte) & PAGE_MASK;
-			set_fixmap(idx, phys);
-		}
-	}
 }
+#endif /* CONFIG_X86_32 */
 
 static void __init __early_set_fixmap(enum fixed_addresses idx,
 				   unsigned long phys, pgprot_t flags)

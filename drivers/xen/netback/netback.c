@@ -40,9 +40,6 @@
 
 /*define NETBE_DEBUG_INTERRUPT*/
 
-/* extra field used in struct page */
-#define netif_page_index(pg) (*(long *)&(pg)->mapping)
-
 struct netbk_rx_meta {
 	skb_frag_t frag;
 	int id;
@@ -87,6 +84,25 @@ static inline unsigned long idx_to_pfn(unsigned int idx)
 static inline unsigned long idx_to_kaddr(unsigned int idx)
 {
 	return (unsigned long)pfn_to_kaddr(idx_to_pfn(idx));
+}
+
+/* extra field used in struct page */
+static inline void netif_set_page_index(struct page *pg, unsigned int index)
+{
+	*(unsigned long *)&pg->mapping = index;
+}
+
+static inline int netif_page_index(struct page *pg)
+{
+	unsigned long idx = (unsigned long)pg->mapping;
+
+	if (!PageForeign(pg))
+		return -1;
+
+	if ((idx >= MAX_PENDING_REQS) || (mmap_pages[idx] != pg))
+		return -1;
+
+	return idx;
 }
 
 #define PKT_PROT_LEN 64
@@ -374,6 +390,7 @@ static u16 netbk_gop_frag(netif_t *netif, struct netbk_rx_meta *meta,
 	multicall_entry_t *mcl;
 	netif_rx_request_t *req;
 	unsigned long old_mfn, new_mfn;
+	int idx = netif_page_index(page);
 
 	old_mfn = virt_to_mfn(page_address(page));
 
@@ -384,9 +401,8 @@ static u16 netbk_gop_frag(netif_t *netif, struct netbk_rx_meta *meta,
 		meta->copy = 1;
 		copy_gop = npo->copy + npo->copy_prod++;
 		copy_gop->flags = GNTCOPY_dest_gref;
-		if (PageForeign(page)) {
-			struct pending_tx_info *src_pend =
-				&pending_tx_info[netif_page_index(page)];
+		if (idx > -1) {
+			struct pending_tx_info *src_pend = &pending_tx_info[idx];
 			copy_gop->source.domid = src_pend->netif->domid;
 			copy_gop->source.u.ref = src_pend->req.gref;
 			copy_gop->flags |= GNTCOPY_source_gref;
@@ -1454,8 +1470,10 @@ static void netif_idx_release(u16 pending_idx)
 
 static void netif_page_release(struct page *page, unsigned int order)
 {
+	int idx = netif_page_index(page);
 	BUG_ON(order);
-	netif_idx_release(netif_page_index(page));
+	BUG_ON(idx < 0);
+	netif_idx_release(idx);
 }
 
 irqreturn_t netif_be_int(int irq, void *dev_id)
@@ -1595,7 +1613,7 @@ static int __init netback_init(void)
 	for (i = 0; i < MAX_PENDING_REQS; i++) {
 		page = mmap_pages[i];
 		SetPageForeign(page, netif_page_release);
-		netif_page_index(page) = i;
+		netif_set_page_index(page, i);
 		INIT_LIST_HEAD(&pending_inuse[i].list);
 	}
 

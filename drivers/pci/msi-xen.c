@@ -320,62 +320,24 @@ static void pci_intx_for_msi(struct pci_dev *dev, int enable)
 		pci_intx(dev, enable);
 }
 
-static void __pci_restore_msi_state(struct pci_dev *dev)
-{
-	int pirq;
-
-	if (!dev->msi_enabled)
-		return;
-
-	pirq = msi_map_pirq_to_vector(dev, dev->irq, 0, 0);
-	if (pirq < 0)
-		return;
-
-	pci_intx_for_msi(dev, 0);
-	msi_set_enable(dev, 0);
-}
-
-static void __pci_restore_msix_state(struct pci_dev *dev)
-{
-	int pos;
-	unsigned long flags;
-	u64 table_base;
-	struct msi_dev_list *msi_dev_entry;
-	struct msi_pirq_entry *pirq_entry, *tmp;
-
-	pos = pci_find_capability(dev, PCI_CAP_ID_MSIX);
-	if (pos <= 0)
-		return;
-
-	if (!dev->msix_enabled)
-		return;
-
-	msi_dev_entry = get_msi_dev_pirq_list(dev);
-	table_base = find_table_base(dev, pos);
-	if (!table_base)
-		return;
-
-	spin_lock_irqsave(&msi_dev_entry->pirq_list_lock, flags);
-	list_for_each_entry_safe(pirq_entry, tmp,
-				 &msi_dev_entry->pirq_list_head, list) {
-		int rc = msi_map_pirq_to_vector(dev, pirq_entry->pirq,
-						pirq_entry->entry_nr, table_base);
-		if (rc < 0)
-			printk(KERN_WARNING
-			       "%s: re-mapping irq #%d (pirq%d) failed: %d\n",
-			       pci_name(dev), pirq_entry->entry_nr,
-			       pirq_entry->pirq, rc);
-	}
-	spin_unlock_irqrestore(&msi_dev_entry->pirq_list_lock, flags);
-
-	pci_intx_for_msi(dev, 0);
-	msix_set_enable(dev, 0);
-}
-
 void pci_restore_msi_state(struct pci_dev *dev)
 {
-	__pci_restore_msi_state(dev);
-	__pci_restore_msix_state(dev);
+	int rc;
+	struct physdev_restore_msi restore;
+
+	if (!dev->msi_enabled && !dev->msix_enabled)
+		return;
+
+	pci_intx_for_msi(dev, 0);
+	if (dev->msi_enabled)
+		msi_set_enable(dev, 0);
+	if (dev->msix_enabled)
+		msix_set_enable(dev, 0);
+
+	restore.bus = dev->bus->number;
+	restore.devfn = dev->devfn;
+	rc = HYPERVISOR_physdev_op(PHYSDEVOP_restore_msi, &restore);
+	WARN(rc && rc != -ENOSYS, "restore_msi -> %d\n", rc);
 }
 EXPORT_SYMBOL_GPL(pci_restore_msi_state);
 

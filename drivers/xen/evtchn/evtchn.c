@@ -497,20 +497,22 @@ static int __cpuinit evtchn_cpu_notify(struct notifier_block *nfb,
 {
 	int hotcpu = (unsigned long)hcpu;
 	cpumask_t map = cpu_online_map;
-	int port, newcpu;
+	int i, j, newcpu;
 	struct per_user_data *u;
 
 	switch (action) {
 	case CPU_DOWN_PREPARE:
 		cpu_clear(hotcpu, map);
 		spin_lock_irq(&port_user_lock);
-		for (port = 0; port < NR_EVENT_CHANNELS; port++) {
-			if ((u = port_user[port]) != NULL && 
-			    u->bind_cpu == hotcpu &&
-			    (newcpu = next_bind_cpu(map)) < NR_CPUS) {
-				rebind_evtchn_to_cpu(port, newcpu);
-				u->bind_cpu = newcpu;
-			}
+		for (i = 0; i < NR_EVENT_CHANNELS; i++) {
+			u = port_user[i];
+			if ((u == NULL) || (u->bind_cpu != hotcpu))
+				continue;
+			newcpu = next_bind_cpu(map);
+			for (j = i; j < NR_EVENT_CHANNELS; j++)
+				if (port_user[j] == u)
+					rebind_evtchn_to_cpu(j, newcpu);
+			u->bind_cpu = newcpu;
 		}
 		spin_unlock_irq(&port_user_lock);
 		break;
