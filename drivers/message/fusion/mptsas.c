@@ -1580,12 +1580,10 @@ mptsas_test_unit_ready(MPT_ADAPTER *ioc, u8 channel, u8 id, u16 count)
 	enum device_state	state;
 	int			rc;
 	u8		skey, asc, ascq;
-	u8		retry_ua;
 
 	if (count >= mpt_cmd_retry_count)
 		return DEVICE_ERROR;
 
-	retry_ua = 0;
 	iocmd = kzalloc(sizeof(INTERNAL_CMD), GFP_KERNEL);
 	if (!iocmd) {
 		printk(MYIOC_s_ERR_FMT "%s: kzalloc(%zd) FAILED!\n",
@@ -1646,10 +1644,8 @@ mptsas_test_unit_ready(MPT_ADAPTER *ioc, u8 channel, u8 id, u16 count)
 		     __func__, channel, id, skey, asc, ascq));
 
 		if (skey == UNIT_ATTENTION) {
-			if (!retry_ua) {
-				retry_ua++;
-				goto retry;
-			}
+			state = DEVICE_RETRY;
+			break;
 		} else if (skey == NOT_READY) {
 			/*
 			 * medium isn't present
@@ -3740,6 +3736,7 @@ mptsas_hotplug_work(MPT_ADAPTER *ioc, struct fw_event_work *fw_event,
 				return;
 			}
 		}
+		mpt_findImVolumes(ioc);
 
 	case MPTSAS_ADD_DEVICE:
 		memset(&sas_device, 0, sizeof(struct mptsas_devinfo));
