@@ -199,7 +199,7 @@ static struct dm_path *lpp_select_path(struct path_selector *ps,
        return least_io_path->path;
 }
 
-static int lpp_end_io(struct path_selector *ps, struct dm_path *path)
+static int lpp_end_io(struct path_selector *ps, struct dm_path *path, size_t nr_bytes)
 {
        struct path_info *pi = NULL;
 
