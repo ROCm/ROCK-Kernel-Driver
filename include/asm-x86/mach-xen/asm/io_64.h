@@ -178,8 +178,6 @@ static inline void *phys_to_virt(unsigned long address)
 #include <asm-generic/iomap.h>
 
 extern void early_ioremap_init(void);
-extern void early_ioremap_clear(void);
-extern void early_ioremap_reset(void);
 extern void *early_ioremap(unsigned long addr, unsigned long size);
 extern void early_iounmap(void *addr, unsigned long size);
 

@@ -117,6 +117,17 @@ int irq_select_affinity(unsigned int irq)
 
 	cpus_and(mask, cpu_online_map, irq_default_affinity);
 
+	/*
+	 * Preserve the affinity that was previously set, but make
+	 * sure one of the targets is online.
+	 */
+	if (irq_desc[irq].status & IRQ_AFFINITY_SET) {
+		if (cpus_intersects(irq_desc[irq].affinity, cpu_online_map))
+			mask = irq_desc[irq].affinity;
+		else
+			irq_desc[irq].status &= ~IRQ_AFFINITY_SET;
+	}
+
 	irq_desc[irq].affinity = mask;
 	irq_desc[irq].chip->set_affinity(irq, mask);
 

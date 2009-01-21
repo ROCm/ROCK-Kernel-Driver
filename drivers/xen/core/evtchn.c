@@ -1072,6 +1072,7 @@ static struct irq_chip dynirq_chip = {
 	.name     = "Dynamic",
 	.startup  = startup_dynirq,
 	.shutdown = mask_dynirq,
+	.disable  = mask_dynirq,
 	.mask     = mask_dynirq,
 	.unmask   = unmask_dynirq,
 	.mask_ack = ack_dynirq,
@@ -1394,8 +1395,6 @@ static void restore_cpu_virqs(unsigned int cpu)
 		if (test_bit(virq, virq_per_cpu)) {
 			const struct per_cpu_irqaction *cur;
 
-			if(cpu != smp_processor_id())
-				continue;
 			for (cur = virq_actions[virq]; cur; cur = cur->next)
 				if (cpu_isset(cpu, cur->cpus))
 					break;
@@ -1416,7 +1415,9 @@ static void restore_cpu_virqs(unsigned int cpu)
 
 		/* Record the new mapping. */
 		evtchn_to_irq[evtchn] = irq;
-#ifndef PER_CPU_VIRQ_IRQ
+#ifdef PER_CPU_VIRQ_IRQ
+		irq_info[irq] = mk_irq_info(IRQT_VIRQ, virq, evtchn);
+#else
 		if (test_bit(virq, virq_per_cpu))
 			per_cpu(virq_to_evtchn, cpu)[virq] = evtchn;
 		else {
@@ -1426,8 +1427,6 @@ static void restore_cpu_virqs(unsigned int cpu)
 			for_each_possible_cpu(cpu)
 				per_cpu(virq_to_evtchn, cpu)[virq] = evtchn;
 		}
-#else
-		irq_info[irq] = mk_irq_info(IRQT_VIRQ, virq, evtchn);
 #endif
 		bind_evtchn_to_cpu(evtchn, cpu);
 
@@ -1469,7 +1468,8 @@ static void restore_cpu_ipis(unsigned int cpu)
 		bind_evtchn_to_cpu(evtchn, cpu);
 
 		/* Ready for use. */
-		unmask_evtchn(evtchn);
+		if (!(irq_desc[irq].status & IRQ_DISABLED))
+			unmask_evtchn(evtchn);
 	}
 #endif
 }
@@ -1519,17 +1519,8 @@ static int evtchn_resume(struct sys_device *dev)
 
 	for_each_possible_cpu(cpu) {
 		restore_cpu_virqs(cpu);
-#ifdef PER_CPU_IPI_IRQ
 		restore_cpu_ipis(cpu);
-#else
-		/* No IPI <-> event-channel mappings. */
-		for (irq = 0; irq < NR_IPIS; ++irq)
-			per_cpu(ipi_to_evtchn, cpu)[irq] = -1;
-#endif
 	}
-#ifndef PER_CPU_IPI_IRQ
-	restore_cpu_ipis(smp_processor_id());
-#endif
 
 	return 0;
 }

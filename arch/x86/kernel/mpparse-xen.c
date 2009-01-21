@@ -768,12 +768,12 @@ static void __init __find_smp_config(unsigned int reserve)
 {
 #ifndef CONFIG_XEN
 	unsigned int address;
+#endif
 
 	if (x86_quirks->mach_find_smp_config) {
 		if (x86_quirks->mach_find_smp_config(reserve))
 			return;
 	}
-#endif
 
 	/*
 	 * FIXME: Linux assumes you have 640K of base ram..
