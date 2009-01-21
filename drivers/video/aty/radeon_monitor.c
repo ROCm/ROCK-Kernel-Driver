@@ -863,9 +863,13 @@ void __devinit radeon_check_modes(struct radeonfb_info *rinfo, const char *mode_
  	}
 
 #ifdef CONFIG_PPC_PSERIES
-	if (!has_default_mode &&
-	    of_device_is_compatible(rinfo->of_node, "pci1002,515e") &&
-	    (machine_is_compatible("IBM,8844")) ) {
+	if (!has_default_mode && (
+	     machine_is_compatible("IBM,8842") || /* JS20 */
+	     machine_is_compatible("IBM,8844") || /* JS21 */
+	     machine_is_compatible("IBM,7998") || /* JS12/JS21/JS22 */
+	     machine_is_compatible("IBM,0792") || /* QS21 */
+	     machine_is_compatible("IBM,0793")    /* QS22 */
+	    )) {
 		printk("Falling back to 800x600 on JSxx hardware\n");
 		if (fb_find_mode(&info->var, info, "800x600@60",
 				 info->monspecs.modedb,
