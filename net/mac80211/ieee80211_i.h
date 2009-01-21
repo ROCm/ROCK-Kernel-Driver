@@ -108,7 +108,7 @@ struct ieee80211_sta_bss {
 	u64 timestamp;
 	int beacon_int;
 
-	unsigned long last_probe_resp;
+	bool probe_resp;
 	unsigned long last_update;
 
 	/* during assocation, we save an ERP value from a probe response so
@@ -309,7 +309,7 @@ struct ieee80211_if_sta {
 		IEEE80211_DISABLED, IEEE80211_AUTHENTICATE,
 		IEEE80211_ASSOCIATE, IEEE80211_ASSOCIATED,
 		IEEE80211_IBSS_SEARCH, IEEE80211_IBSS_JOINED,
-		IEEE80211_MESH_UP, IEEE80211_DIRECT_PROBE
+		IEEE80211_MESH_UP
 	} state;
 	size_t ssid_len;
 	u8 scan_ssid[IEEE80211_MAX_SSID_LEN];
@@ -354,7 +354,6 @@ struct ieee80211_if_sta {
 	struct sk_buff_head skb_queue;
 
 	int auth_tries, assoc_tries;
- 	int direct_probe_tries; /* retries for direct probes */
 
 	unsigned long request;
 
@@ -364,7 +363,6 @@ struct ieee80211_if_sta {
 #define IEEE80211_STA_REQ_SCAN 0
 #define IEEE80211_STA_REQ_AUTH 1
 #define IEEE80211_STA_REQ_RUN  2
-#define IEEE80211_STA_REQ_DIRECT_PROBE 3
 
 #define IEEE80211_AUTH_ALG_OPEN BIT(0)
 #define IEEE80211_AUTH_ALG_SHARED_KEY BIT(1)
