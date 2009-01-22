@@ -56,12 +56,12 @@ static void hpet_write_value(unsigned long d, unsigned long a)
 
 #else
 
-static inline unsigned long hpet_read_long(unsigned long a)
+static inline unsigned long hpet_read_value(unsigned long a)
 {
 	return readl(hpet_virt_address + a);
 }
 
-static void hpet_writeq(unsigned long d, unsigned long a)
+static void hpet_write_value(unsigned long d, unsigned long a)
 {
 	writel(d, hpet_virt_address + a);
 }
