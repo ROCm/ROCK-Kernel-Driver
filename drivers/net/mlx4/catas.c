@@ -45,7 +45,7 @@ static LIST_HEAD(catas_list);
 static struct workqueue_struct *catas_wq;
 static struct work_struct catas_work;
 
-static int internal_err_reset = 1;
+static int internal_err_reset = 0;
 module_param(internal_err_reset, int, 0644);
 MODULE_PARM_DESC(internal_err_reset,
 		 "Reset device on internal errors if non-zero (default 1)");
