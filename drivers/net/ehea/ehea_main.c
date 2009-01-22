@@ -134,6 +134,7 @@ static struct of_device_id ehea_device_table[] = {
 
 static struct of_platform_driver ehea_driver = {
 	.name = "ehea",
+	.owner = THIS_MODULE,
 	.match_table = ehea_device_table,
 	.probe = ehea_probe_adapter,
 	.remove = ehea_remove,

@@ -311,6 +311,7 @@ static struct of_device_id zmii_match[] =
 };
 
 static struct of_platform_driver zmii_driver = {
+	.owner = THIS_MODULE,
 	.name = "emac-zmii",
 	.match_table = zmii_match,
 

@@ -2788,10 +2788,8 @@ static int __devinit ixgbe_sw_init(struct ixgbe_adapter *adapter)
 	adapter->dcb_cfg.rx_pba_cfg = pba_equal;
 	adapter->dcb_cfg.round_robin_enable = false;
 	adapter->dcb_set_bitmap = 0x00;
-#ifdef CONFIG_DCBNL
 	ixgbe_copy_dcb_cfg(&adapter->dcb_cfg, &adapter->temp_dcb_cfg,
 			   adapter->ring_feature[RING_F_DCB].indices);
-#endif
 #endif /* CONFIG_IXGBE_DCB */
 
 	/* default flow control settings */
@@ -4126,9 +4124,7 @@ static int __devinit ixgbe_probe(struct pci_dev *pdev,
 		adapter->flags &= ~IXGBE_FLAG_RSS_ENABLED;
 
 #ifdef CONFIG_IXGBE_DCB
-#ifdef CONFIG_DCBNL
 	netdev->dcbnl_ops = &dcbnl_ops;
-#endif
 #endif /* CONFIG_IXGBE_DCB */
 
 	if (pci_using_dac)

@@ -1385,6 +1385,7 @@ static struct of_device_id fsl_sata_match[] = {
 MODULE_DEVICE_TABLE(of, fsl_sata_match);
 
 static struct of_platform_driver fsl_sata_driver = {
+	.owner		= THIS_MODULE,
 	.name		= "fsl-sata",
 	.match_table	= fsl_sata_match,
 	.probe		= sata_fsl_probe,

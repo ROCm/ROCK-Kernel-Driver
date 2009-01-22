@@ -355,6 +355,7 @@ static struct of_device_id xps2_of_match[] __devinitdata = {
 MODULE_DEVICE_TABLE(of, xps2_of_match);
 
 static struct of_platform_driver xps2_of_driver = {
+	.owner		= THIS_MODULE,
 	.name		= DRIVER_NAME,
 	.match_table	= xps2_of_match,
 	.probe		= xps2_of_probe,

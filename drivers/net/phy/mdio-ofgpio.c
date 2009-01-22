@@ -185,6 +185,7 @@ static struct of_device_id mdio_ofgpio_match[] = {
 };
 
 static struct of_platform_driver mdio_ofgpio_driver = {
+	.owner = THIS_MODULE,
 	.name = "mdio-gpio",
 	.match_table = mdio_ofgpio_match,
 	.probe = mdio_ofgpio_probe,

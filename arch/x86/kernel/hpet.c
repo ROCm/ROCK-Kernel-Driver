@@ -24,6 +24,7 @@
  */
 unsigned long hpet_address;
 static void __iomem *hpet_virt_address;
+static int hpet_legacy_use_64_bits;
 
 unsigned long hpet_readl(unsigned long a)
 {
@@ -37,6 +38,33 @@ static inline void hpet_writel(unsigned long d, unsigned long a)
 
 #ifdef CONFIG_X86_64
 #include <asm/pgtable.h>
+static inline unsigned long hpet_read_value(unsigned long a)
+{
+	if (hpet_legacy_use_64_bits)
+		readq(hpet_virt_address + a);
+	else
+		readl(hpet_virt_address + a);
+}
+
+static void hpet_write_value(unsigned long d, unsigned long a)
+{
+	if (hpet_legacy_use_64_bits)
+		writeq(d, hpet_virt_address + a);
+	else
+		writel(d, hpet_virt_address + a);
+}
+
+#else
+
+static inline unsigned long hpet_read_value(unsigned long a)
+{
+	return readl(hpet_virt_address + a);
+}
+
+static void hpet_write_value(unsigned long d, unsigned long a)
+{
+	writel(d, hpet_virt_address + a);
+}
 #endif
 
 static inline void hpet_set_mapping(void)
@@ -77,6 +105,17 @@ static int __init disable_hpet(char *str)
 	return 1;
 }
 __setup("nohpet", disable_hpet);
+
+#ifdef CONFIG_X86_64
+static int hpet64 = 0;
+static int __init hpet64_setup(char *str)
+{
+	hpet64 = 1;
+	return 1;
+}
+__setup("hpet64", hpet64_setup);
+#endif
+
 
 static inline int is_hpet_capable(void)
 {
@@ -141,6 +180,7 @@ static void hpet_reserve_platform_timers(unsigned long id) { }
  * Common hpet info
  */
 static unsigned long hpet_period;
+static int hpet_legacy_use_64_bits; /* configure T0 in 64-bit mode? */
 
 static void hpet_legacy_set_mode(enum clock_event_mode mode,
 			  struct clock_event_device *evt);
@@ -192,10 +232,37 @@ static void hpet_enable_legacy_int(void)
 	hpet_legacy_int_enabled = 1;
 }
 
+static int timer0_use_64_bits(void)
+{
+#ifndef CONFIG_X86_64
+	/* using the HPET in 64-bit mode without atomic 64-bit
+	 * accesses is too inefficient
+	 */
+	return 0;
+#else
+
+	if (unlikely(hpet64)) {
+		u32 id, t0_cfg;
+		id = hpet_readl(HPET_ID);
+		t0_cfg = hpet_readl(HPET_T0_CFG);
+
+		if ((id & HPET_ID_64BIT) && (t0_cfg & HPET_TN_64BIT_CAP)) {
+			printk(KERN_DEBUG "hpet timer0 configured in 64-bit mode\n");
+			return 1;
+		}
+		else {
+			printk(KERN_DEBUG "hpet timer0 does not support 64-bit mode\n");
+			return 0;
+		}
+	}
+#endif
+}
+
 static void hpet_legacy_clockevent_register(void)
 {
 	/* Start HPET legacy interrupts */
 	hpet_enable_legacy_int();
+	hpet_legacy_use_64_bits = timer0_use_64_bits();
 
 	/*
 	 * The mult factor is defined as (include/linux/clockchips.h)
@@ -233,26 +300,28 @@ static void hpet_legacy_set_mode(enum clock_event_mode mode,
 	case CLOCK_EVT_MODE_PERIODIC:
 		delta = ((uint64_t)(NSEC_PER_SEC/HZ)) * hpet_clockevent.mult;
 		delta >>= hpet_clockevent.shift;
-		now = hpet_readl(HPET_COUNTER);
+		now = hpet_read_value(HPET_COUNTER);
 		cmp = now + (unsigned long) delta;
 		cfg = hpet_readl(HPET_T0_CFG);
 		cfg |= HPET_TN_ENABLE | HPET_TN_PERIODIC |
-		       HPET_TN_SETVAL | HPET_TN_32BIT;
+		       HPET_TN_SETVAL |
+		       (hpet_legacy_use_64_bits ? 0 : HPET_TN_32BIT);
 		hpet_writel(cfg, HPET_T0_CFG);
 		/*
 		 * The first write after writing TN_SETVAL to the
 		 * config register sets the counter value, the second
 		 * write sets the period.
 		 */
-		hpet_writel(cmp, HPET_T0_CMP);
+		hpet_write_value(cmp, HPET_T0_CMP);
 		udelay(1);
-		hpet_writel((unsigned long) delta, HPET_T0_CMP);
+		hpet_write_value((unsigned long) delta, HPET_T0_CMP);
 		break;
 
 	case CLOCK_EVT_MODE_ONESHOT:
 		cfg = hpet_readl(HPET_T0_CFG);
 		cfg &= ~HPET_TN_PERIODIC;
-		cfg |= HPET_TN_ENABLE | HPET_TN_32BIT;
+		cfg |= HPET_TN_ENABLE |
+		       (hpet_legacy_use_64_bits ? 0 : HPET_TN_32BIT);
 		hpet_writel(cfg, HPET_T0_CFG);
 		break;
 
@@ -272,11 +341,11 @@ static void hpet_legacy_set_mode(enum clock_event_mode mode,
 static int hpet_legacy_next_event(unsigned long delta,
 				  struct clock_event_device *evt)
 {
-	u32 cnt;
+	unsigned long cnt;
 
-	cnt = hpet_readl(HPET_COUNTER);
+	cnt = hpet_read_value(HPET_COUNTER);
 	cnt += (u32) delta;
-	hpet_writel(cnt, HPET_T0_CMP);
+	hpet_write_value(cnt, HPET_T0_CMP);
 
 	hpet_readl(HPET_T0_CMP); /* pre-read for bnc#433746 */
 	/*
@@ -284,9 +353,9 @@ static int hpet_legacy_next_event(unsigned long delta,
 	 * what we wrote hit the chip before we compare it to the
 	 * counter.
 	 */
-	WARN_ON_ONCE((u32)hpet_readl(HPET_T0_CMP) != cnt);
+	WARN_ON_ONCE((u32)hpet_readl(HPET_T0_CMP) != (u32)cnt);
 
-	return (s32)((u32)hpet_readl(HPET_COUNTER) - cnt) >= 0 ? -ETIME : 0;
+	return (s32)((u32)hpet_readl(HPET_COUNTER) - (u32)cnt) >= 0 ? -ETIME : 0;
 }
 
 /*

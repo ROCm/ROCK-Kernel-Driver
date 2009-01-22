@@ -499,6 +499,8 @@ and is between 256 and 4096 characters. It is defined in the file
 			force: allow force enabled of undocumented chips (ICH4,
 			VIA, nVidia)
 
+	hpet64		[X86-64,HPET] enable 64-bit mode of the HPET timer (bnc#456700)
+
 	com20020=	[HW,NET] ARCnet - COM20020 chipset
 			Format:
 			<io>[,<irq>[,<nodeID>[,<backplane>[,<ckp>[,<timeout>]]]]]

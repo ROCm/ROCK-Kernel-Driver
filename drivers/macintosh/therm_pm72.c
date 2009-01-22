@@ -2220,6 +2220,7 @@ static struct of_device_id fcu_match[] =
 
 static struct of_platform_driver fcu_of_platform_driver = 
 {
+	.owner		= THIS_MODULE,
 	.name 		= "temperature",
 	.match_table	= fcu_match,
 	.probe		= fcu_of_probe,

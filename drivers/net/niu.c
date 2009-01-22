@@ -9139,6 +9139,7 @@ static struct of_device_id niu_match[] = {
 MODULE_DEVICE_TABLE(of, niu_match);
 
 static struct of_platform_driver niu_of_driver = {
+	.owner		= THIS_MODULE,
 	.name		= "niu",
 	.match_table	= niu_match,
 	.probe		= niu_of_probe,

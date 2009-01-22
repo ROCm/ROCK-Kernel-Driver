@@ -598,6 +598,7 @@ static struct of_device_id cg14_match[] = {
 MODULE_DEVICE_TABLE(of, cg14_match);
 
 static struct of_platform_driver cg14_driver = {
+	.owner		= THIS_MODULE,
 	.name		= "cg14",
 	.match_table	= cg14_match,
 	.probe		= cg14_probe,

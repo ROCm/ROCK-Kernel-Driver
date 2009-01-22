@@ -91,6 +91,7 @@ static struct of_device_id pata_of_platform_match[] = {
 MODULE_DEVICE_TABLE(of, pata_of_platform_match);
 
 static struct of_platform_driver pata_of_platform_driver = {
+	.owner		= THIS_MODULE,
 	.name		= "pata_of_platform",
 	.match_table	= pata_of_platform_match,
 	.probe		= pata_of_platform_probe,

@@ -934,6 +934,7 @@ MODULE_DEVICE_TABLE(of, ehca_device_table);
 
 static struct of_platform_driver ehca_driver = {
 	.name        = "ehca",
+	.owner       = THIS_MODULE,
 	.match_table = ehca_device_table,
 	.probe       = ehca_probe,
 	.remove      = ehca_remove,

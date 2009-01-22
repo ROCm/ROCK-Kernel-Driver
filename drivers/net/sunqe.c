@@ -983,6 +983,7 @@ static struct of_device_id qec_sbus_match[] = {
 MODULE_DEVICE_TABLE(of, qec_sbus_match);
 
 static struct of_platform_driver qec_sbus_driver = {
+	.owner		= THIS_MODULE,
 	.name		= "qec",
 	.match_table	= qec_sbus_match,
 	.probe		= qec_sbus_probe,

@@ -140,6 +140,7 @@ static struct of_device_id rng_match[] = {
 };
 
 static struct of_platform_driver rng_driver = {
+	.owner		= THIS_MODULE,
 	.name		= "pasemi-rng",
 	.match_table	= rng_match,
 	.probe		= rng_probe,

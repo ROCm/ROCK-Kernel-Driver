@@ -1079,6 +1079,7 @@ static const struct of_device_id fsl_elbc_match[] = {
 static struct of_platform_driver fsl_elbc_ctrl_driver = {
 	.driver = {
 		.name	= "fsl-elbc",
+		.owner	= THIS_MODULE,
 	},
 	.match_table = fsl_elbc_match,
 	.probe = fsl_elbc_ctrl_probe,

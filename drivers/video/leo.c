@@ -650,6 +650,7 @@ static struct of_device_id leo_match[] = {
 MODULE_DEVICE_TABLE(of, leo_match);
 
 static struct of_platform_driver leo_driver = {
+	.owner		= THIS_MODULE,
 	.name		= "leo",
 	.match_table	= leo_match,
 	.probe		= leo_probe,

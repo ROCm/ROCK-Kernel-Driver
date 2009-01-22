@@ -231,6 +231,7 @@ static struct of_device_id ecpp_match[] = {
 };
 
 static struct of_platform_driver ecpp_driver = {
+	.owner			= THIS_MODULE,
 	.name			= "ecpp",
 	.match_table		= ecpp_match,
 	.probe			= ecpp_probe,

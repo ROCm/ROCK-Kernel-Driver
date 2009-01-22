@@ -104,6 +104,7 @@ static struct of_device_id power_match[] = {
 };
 
 static struct of_platform_driver power_driver = {
+	.owner		= THIS_MODULE,
 	.match_table	= power_match,
 	.probe		= power_probe,
 	.driver		= {
