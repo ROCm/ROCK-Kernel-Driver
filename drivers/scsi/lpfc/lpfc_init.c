@@ -332,6 +332,7 @@ int
 lpfc_config_port_post(struct lpfc_hba *phba)
 {
 	struct lpfc_vport *vport = phba->pport;
+	struct Scsi_Host *shost = lpfc_shost_from_vport(vport);
 	LPFC_MBOXQ_t *pmb;
 	MAILBOX_t *mb;
 	struct lpfc_dmabuf *mp;
@@ -389,6 +390,11 @@ lpfc_config_port_post(struct lpfc_hba *phba)
 	       sizeof (struct lpfc_name));
 	memcpy(&vport->fc_portname, &vport->fc_sparam.portName,
 	       sizeof (struct lpfc_name));
+
+	/* Update the fc_host data structures with new wwn. */
+	fc_host_node_name(shost) = wwn_to_u64(vport->fc_nodename.u.wwn);
+	fc_host_port_name(shost) = wwn_to_u64(vport->fc_portname.u.wwn);
+
 	/* If no serial number in VPD data, use low 6 bytes of WWNN */
 	/* This should be consolidated into parse_vpd ? - mr */
 	if (phba->SerialNumber[0] == 0) {
@@ -1765,8 +1771,10 @@ lpfc_stop_vport_timers(struct lpfc_vport *vport)
 	del_timer_sync(&vport->els_tmofunc);
 	del_timer_sync(&vport->fc_fdmitmo);
 	while (!list_empty(&vport->sc_response_wait_queue)) {
-		fc_sc_req = list_get_first(&vport->sc_response_wait_queue,
+		list_remove_head(&vport->sc_response_wait_queue, fc_sc_req,
 					   struct fc_security_request, rlist);
+		if (!fc_sc_req)
+			continue;
 		del_timer_sync(&fc_sc_req->timer);
 		kfree(fc_sc_req);
 	}

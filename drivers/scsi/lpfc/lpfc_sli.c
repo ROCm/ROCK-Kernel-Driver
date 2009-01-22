@@ -817,8 +817,8 @@ static struct lpfc_hbq_init lpfc_els_hbq = {
 	.profile = 0,
 	.ring_mask = (1 << LPFC_ELS_RING),
 	.buffer_count = 0,
-	.init_count = 20,
-	.add_count = 5,
+	.init_count = 40,
+	.add_count = 40,
 };
 
 /* HBQ for the extra ring if needed */

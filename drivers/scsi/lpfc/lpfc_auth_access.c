@@ -223,6 +223,9 @@ lpfc_fc_sc_request(struct lpfc_vport *vport,
 	memcpy(fc_nl_sc_msg->data, auth_req, auth_req_len);
 	fc_nl_sc_msg->tran_id = seq;
 
+	lpfc_fc_sc_add_timer(fc_sc_req, FC_SC_REQ_TIMEOUT,
+			     lpfc_fc_sc_req_times_out);
+
 	spin_lock_irqsave(shost->host_lock, flags);
 	list_add_tail(&fc_sc_req->rlist, &vport->sc_response_wait_queue);
 	spin_unlock_irqrestore(shost->host_lock, flags);
@@ -230,8 +233,6 @@ lpfc_fc_sc_request(struct lpfc_vport *vport,
 				(SCSI_NL_VID_TYPE_PCI | PCI_VENDOR_ID_EMULEX),
 				(char *) fc_nl_sc_msg, len);
 	kfree(fc_nl_sc_msg);
-	lpfc_fc_sc_add_timer(fc_sc_req, FC_SC_REQ_TIMEOUT,
-			     lpfc_fc_sc_req_times_out);
 	return 0;
 }
 
