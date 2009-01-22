@@ -51,7 +51,7 @@ static LIST_HEAD(catas_list);
 static struct workqueue_struct *catas_wq;
 static struct work_struct catas_work;
 
-static int catas_reset_disable;
+static int catas_reset_disable = 1;
 module_param_named(catas_reset_disable, catas_reset_disable, int, 0644);
 MODULE_PARM_DESC(catas_reset_disable, "disable reset on catastrophic event if nonzero");
 

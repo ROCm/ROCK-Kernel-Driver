@@ -795,8 +795,11 @@ static void rs_tx_status(void *priv_rate, struct net_device *dev,
 	u8 active_index = 0;
 	__le16 fc = hdr->frame_control;
 	s32 tpt = 0;
+	struct ieee80211_supported_band *sband;
 
 	IWL_DEBUG_RATE_LIMIT("get frame ack response, update rate scale window\n");
+
+	sband = local->hw.wiphy->bands[info->band];
 
 	if (!ieee80211_is_data(fc) || is_multicast_ether_addr(hdr->addr1))
 		return;
@@ -965,7 +968,8 @@ static void rs_tx_status(void *priv_rate, struct net_device *dev,
 	}
 
 	/* See if there's a better rate or modulation mode to try. */
-	rs_rate_scale_perform(priv, dev, hdr, sta);
+	if(sta && sta->supp_rates[sband->band])
+		rs_rate_scale_perform(priv, dev, hdr, sta);
 out:
 	rcu_read_unlock();
 	return;
@@ -2090,19 +2094,25 @@ static void rs_get_rate(void *priv_rate, struct net_device *dev,
 	__le16 fc;
 	struct iwl_priv *priv = (struct iwl_priv *)priv_rate;
 	struct iwl_lq_sta *lq_sta;
+	u64 mask_bit = 0;
 
 	IWL_DEBUG_RATE_LIMIT("rate scale calculate new rate for skb\n");
 
 	rcu_read_lock();
 
 	sta = sta_info_get(local, hdr->addr1);
+	if (sta)
+		mask_bit = sta->supp_rates[sband->band];
 
 	/* Send management frames and broadcast/multicast data using lowest
 	 * rate. */
 	fc = hdr->frame_control;
 	if (!ieee80211_is_data(fc) || is_multicast_ether_addr(hdr->addr1) ||
 	    !sta || !sta->rate_ctrl_priv) {
-		sel->rate_idx = rate_lowest_index(local, sband, sta);
+		if (!mask_bit)
+			sel->rate_idx = rate_lowest_index(local, sband, NULL);
+		else
+			sel->rate_idx = rate_lowest_index(local, sband, sta);
 		goto out;
 	}
 
