@@ -389,6 +389,7 @@ static struct of_device_id bpp_match[] = {
 MODULE_DEVICE_TABLE(of, bpp_match);
 
 static struct of_platform_driver bpp_sbus_driver = {
+	.owner		= THIS_MODULE,
 	.name		= "bpp",
 	.match_table	= bpp_match,
 	.probe		= bpp_probe,

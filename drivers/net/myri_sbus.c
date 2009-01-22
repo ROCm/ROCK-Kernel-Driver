@@ -1150,6 +1150,7 @@ static struct of_device_id myri_sbus_match[] = {
 MODULE_DEVICE_TABLE(of, myri_sbus_match);
 
 static struct of_platform_driver myri_sbus_driver = {
+	.owner		= THIS_MODULE,
 	.name		= "myri",
 	.match_table	= myri_sbus_match,
 	.probe		= myri_sbus_probe,

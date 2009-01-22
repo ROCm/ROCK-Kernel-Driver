@@ -514,6 +514,7 @@ static struct of_device_id tcx_match[] = {
 MODULE_DEVICE_TABLE(of, tcx_match);
 
 static struct of_platform_driver tcx_driver = {
+	.owner		= THIS_MODULE,
 	.name		= "tcx",
 	.match_table	= tcx_match,
 	.probe		= tcx_probe,

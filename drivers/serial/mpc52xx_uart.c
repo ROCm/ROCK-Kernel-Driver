@@ -1391,6 +1391,7 @@ mpc52xx_uart_of_enumerate(void)
 MODULE_DEVICE_TABLE(of, mpc52xx_uart_of_match);
 
 static struct of_platform_driver mpc52xx_uart_of_driver = {
+	.owner		= THIS_MODULE,
 	.match_table	= mpc52xx_uart_of_match,
 	.probe		= mpc52xx_uart_of_probe,
 	.remove		= mpc52xx_uart_of_remove,

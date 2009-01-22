@@ -1583,6 +1583,7 @@ static struct of_device_id sunlance_sbus_match[] = {
 MODULE_DEVICE_TABLE(of, sunlance_sbus_match);
 
 static struct of_platform_driver sunlance_sbus_driver = {
+	.owner		= THIS_MODULE,
 	.name		= "sunlance",
 	.match_table	= sunlance_sbus_match,
 	.probe		= sunlance_sbus_probe,

@@ -148,6 +148,7 @@ static int __devinit auxio_probe(struct of_device *dev, const struct of_device_i
 }
 
 static struct of_platform_driver auxio_driver = {
+	.owner		= THIS_MODULE,
 	.match_table	= auxio_match,
 	.probe		= auxio_probe,
 	.driver		= {

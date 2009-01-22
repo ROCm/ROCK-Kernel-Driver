@@ -670,6 +670,7 @@ static struct of_device_id smu_platform_match[] =
 
 static struct of_platform_driver smu_of_platform_driver =
 {
+	.owner		= THIS_MODULE,
 	.name 		= "smu",
 	.match_table	= smu_platform_match,
 	.probe		= smu_platform_probe,

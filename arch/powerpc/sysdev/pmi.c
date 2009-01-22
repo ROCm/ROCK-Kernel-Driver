@@ -205,6 +205,7 @@ static int pmi_of_remove(struct of_device *dev)
 }
 
 static struct of_platform_driver pmi_of_platform_driver = {
+	.owner		= THIS_MODULE,
 	.match_table	= pmi_match,
 	.probe		= pmi_of_probe,
 	.remove		= pmi_of_remove,

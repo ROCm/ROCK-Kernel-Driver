@@ -268,6 +268,7 @@ static struct of_device_id uec_mdio_match[] = {
 };
 
 static struct of_platform_driver uec_mdio_driver = {
+	.owner	= THIS_MODULE,
 	.name	= MII_DRV_NAME,
 	.probe	= uec_mdio_probe,
 	.remove	= uec_mdio_remove,

@@ -751,6 +751,7 @@ static struct of_device_id n2rng_match[] = {
 MODULE_DEVICE_TABLE(of, n2rng_match);
 
 static struct of_platform_driver n2rng_driver = {
+	.owner		= THIS_MODULE,
 	.name		= "n2rng",
 	.match_table	= n2rng_match,
 	.probe		= n2rng_probe,

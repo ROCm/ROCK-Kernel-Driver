@@ -192,6 +192,7 @@ static const struct of_device_id mpc52xx_wkup_gpiochip_match[] = {
 };
 
 static struct of_platform_driver mpc52xx_wkup_gpiochip_driver = {
+	.owner = THIS_MODULE,
 	.name = "gpio_wkup",
 	.match_table = mpc52xx_wkup_gpiochip_match,
 	.probe = mpc52xx_wkup_gpiochip_probe,
@@ -348,6 +349,7 @@ static const struct of_device_id mpc52xx_simple_gpiochip_match[] = {
 };
 
 static struct of_platform_driver mpc52xx_simple_gpiochip_driver = {
+	.owner = THIS_MODULE,
 	.name = "gpio",
 	.match_table = mpc52xx_simple_gpiochip_match,
 	.probe = mpc52xx_simple_gpiochip_probe,
@@ -433,6 +435,7 @@ static const struct of_device_id mpc52xx_gpt_gpiochip_match[] = {
 };
 
 static struct of_platform_driver mpc52xx_gpt_gpiochip_driver = {
+	.owner = THIS_MODULE,
 	.name = "gpio_gpt",
 	.match_table = mpc52xx_gpt_gpiochip_match,
 	.probe = mpc52xx_gpt_gpiochip_probe,

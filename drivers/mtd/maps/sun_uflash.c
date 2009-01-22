@@ -151,6 +151,7 @@ static struct of_device_id uflash_match[] = {
 MODULE_DEVICE_TABLE(of, uflash_match);
 
 static struct of_platform_driver uflash_driver = {
+	.owner		= THIS_MODULE,
 	.name		= UFLASH_DEVNAME,
 	.match_table	= uflash_match,
 	.probe		= uflash_probe,

@@ -68,6 +68,7 @@ probe in an SBUS driver under Linux:
 
 	static struct of_platform_driver mydevice_driver = {
 		.match_table	= mydevice_match,
+		.owner		= THIS_MODULE,
 		.probe		= mydevice_probe,
 		.remove		= __devexit_p(mydevice_remove),
 		.driver		= {

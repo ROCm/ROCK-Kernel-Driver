@@ -2679,6 +2679,7 @@ static struct of_device_id dbri_match[] = {
 MODULE_DEVICE_TABLE(of, dbri_match);
 
 static struct of_platform_driver dbri_sbus_driver = {
+	.owner		= THIS_MODULE,
 	.name		= "dbri",
 	.match_table	= dbri_match,
 	.probe		= dbri_probe,

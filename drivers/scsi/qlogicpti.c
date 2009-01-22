@@ -1434,6 +1434,7 @@ static struct of_device_id qpti_match[] = {
 MODULE_DEVICE_TABLE(of, qpti_match);
 
 static struct of_platform_driver qpti_sbus_driver = {
+	.owner		= THIS_MODULE,
 	.name		= "qpti",
 	.match_table	= qpti_match,
 	.probe		= qpti_sbus_probe,

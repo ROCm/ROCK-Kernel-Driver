@@ -4083,6 +4083,7 @@ static struct of_device_id ucc_geth_match[] = {
 MODULE_DEVICE_TABLE(of, ucc_geth_match);
 
 static struct of_platform_driver ucc_geth_driver = {
+	.owner		= THIS_MODULE,
 	.name		= DRV_NAME,
 	.match_table	= ucc_geth_match,
 	.probe		= ucc_geth_probe,

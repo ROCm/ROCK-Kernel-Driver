@@ -1036,6 +1036,7 @@ static struct of_device_id of_fsl_dma_chan_ids[] = {
 };
 
 static struct of_platform_driver of_fsl_dma_chan_driver = {
+	.owner = THIS_MODULE,
 	.name = "of-fsl-dma-channel",
 	.match_table = of_fsl_dma_chan_ids,
 	.probe = of_fsl_dma_chan_probe,
@@ -1116,6 +1117,7 @@ static struct of_device_id of_fsl_dma_ids[] = {
 };
 
 static struct of_platform_driver of_fsl_dma_driver = {
+	.owner = THIS_MODULE,
 	.name = "of-fsl-dma",
 	.match_table = of_fsl_dma_ids,
 	.probe = of_fsl_dma_probe,

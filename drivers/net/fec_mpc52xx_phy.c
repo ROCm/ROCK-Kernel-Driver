@@ -185,6 +185,7 @@ static struct of_device_id mpc52xx_fec_mdio_match[] = {
 };
 
 struct of_platform_driver mpc52xx_fec_mdio_driver = {
+	.owner = THIS_MODULE,
 	.name = "mpc5200b-fec-phy",
 	.probe = mpc52xx_fec_mdio_probe,
 	.remove = mpc52xx_fec_mdio_remove,

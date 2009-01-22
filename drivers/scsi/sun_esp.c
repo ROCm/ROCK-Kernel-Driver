@@ -611,6 +611,7 @@ static struct of_device_id esp_match[] = {
 MODULE_DEVICE_TABLE(of, esp_match);
 
 static struct of_platform_driver esp_sbus_driver = {
+	.owner		= THIS_MODULE,
 	.name		= "esp",
 	.match_table	= esp_match,
 	.probe		= esp_sbus_probe,

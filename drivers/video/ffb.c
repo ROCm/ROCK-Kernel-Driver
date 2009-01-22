@@ -1054,6 +1054,7 @@ static struct of_device_id ffb_match[] = {
 MODULE_DEVICE_TABLE(of, ffb_match);
 
 static struct of_platform_driver ffb_driver = {
+	.owner		= THIS_MODULE,
 	.name		= "ffb",
 	.match_table	= ffb_match,
 	.probe		= ffb_probe,

@@ -356,6 +356,7 @@ static struct of_device_id electra_cf_match[] = {
 MODULE_DEVICE_TABLE(of, electra_cf_match);
 
 static struct of_platform_driver electra_cf_driver = {
+	.owner = THIS_MODULE,
 	.name	   = (char *)driver_name,
 	.match_table    = electra_cf_match,
 	.probe	  = electra_cf_probe,

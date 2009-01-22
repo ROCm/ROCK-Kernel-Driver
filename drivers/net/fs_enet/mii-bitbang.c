@@ -249,6 +249,7 @@ static struct of_device_id fs_enet_mdio_bb_match[] = {
 };
 
 static struct of_platform_driver fs_enet_bb_mdio_driver = {
+	.owner = THIS_MODULE,
 	.name = "fsl-bb-mdio",
 	.match_table = fs_enet_mdio_bb_match,
 	.probe = fs_enet_mdio_probe,

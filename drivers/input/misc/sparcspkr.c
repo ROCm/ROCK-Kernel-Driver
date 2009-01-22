@@ -258,6 +258,7 @@ static struct of_device_id bbc_beep_match[] = {
 };
 
 static struct of_platform_driver bbc_beep_driver = {
+	.owner		= THIS_MODULE,
 	.name		= "bbcbeep",
 	.match_table	= bbc_beep_match,
 	.probe		= bbc_beep_probe,
@@ -337,6 +338,7 @@ static struct of_device_id grover_beep_match[] = {
 };
 
 static struct of_platform_driver grover_beep_driver = {
+	.owner		= THIS_MODULE,
 	.name		= "groverbeep",
 	.match_table	= grover_beep_match,
 	.probe		= grover_beep_probe,

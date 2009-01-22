@@ -2923,6 +2923,7 @@ static struct of_device_id emac_match[] =
 };
 
 static struct of_platform_driver emac_driver = {
+	.owner = THIS_MODULE,
 	.name = "emac",
 	.match_table = emac_match,
 

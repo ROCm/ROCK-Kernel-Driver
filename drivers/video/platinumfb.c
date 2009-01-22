@@ -674,6 +674,7 @@ static struct of_device_id platinumfb_match[] =
 
 static struct of_platform_driver platinum_driver = 
 {
+	.owner		= THIS_MODULE,
 	.name 		= "platinumfb",
 	.match_table	= platinumfb_match,
 	.probe		= platinumfb_probe,

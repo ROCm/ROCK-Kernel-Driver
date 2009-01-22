@@ -3336,6 +3336,7 @@ static struct of_device_id hme_sbus_match[] = {
 MODULE_DEVICE_TABLE(of, hme_sbus_match);
 
 static struct of_platform_driver hme_sbus_driver = {
+	.owner		= THIS_MODULE,
 	.name		= "hme",
 	.match_table	= hme_sbus_match,
 	.probe		= hme_sbus_probe,

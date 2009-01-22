@@ -163,6 +163,7 @@ static struct of_platform_driver ep8248e_mdio_driver = {
 	.match_table = ep8248e_mdio_match,
 	.probe = ep8248e_mdio_probe,
 	.remove = ep8248e_mdio_remove,
+	.owner = THIS_MODULE,
 };
 
 struct cpm_pin {

@@ -267,6 +267,7 @@ static struct of_device_id of_fun_match[] = {
 MODULE_DEVICE_TABLE(of, of_fun_match);
 
 static struct of_platform_driver of_fun_driver = {
+	.owner		= THIS_MODULE,
 	.name		= "fsl,upm-nand",
 	.match_table	= of_fun_match,
 	.probe		= fun_probe,

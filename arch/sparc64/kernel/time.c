@@ -777,6 +777,7 @@ static struct of_device_id clock_match[] = {
 };
 
 static struct of_platform_driver clock_driver = {
+	.owner		= THIS_MODULE,
 	.match_table	= clock_match,
 	.probe		= clock_probe,
 	.driver		= {

@@ -121,6 +121,7 @@ static struct of_device_id of_isp1760_match[] = {
 MODULE_DEVICE_TABLE(of, of_isp1760_match);
 
 static struct of_platform_driver isp1760_of_driver = {
+	.owner		= THIS_MODULE,
 	.name           = "nxp-isp1760",
 	.match_table    = of_isp1760_match,
 	.probe          = of_isp1760_probe,

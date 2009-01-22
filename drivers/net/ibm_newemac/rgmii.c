@@ -317,6 +317,7 @@ static struct of_device_id rgmii_match[] =
 };
 
 static struct of_platform_driver rgmii_driver = {
+	.owner = THIS_MODULE,
 	.name = "emac-rgmii",
 	.match_table = rgmii_match,
 

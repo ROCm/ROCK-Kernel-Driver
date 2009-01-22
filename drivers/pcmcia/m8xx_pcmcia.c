@@ -1319,6 +1319,7 @@ static struct of_device_id m8xx_pcmcia_match[] = {
 MODULE_DEVICE_TABLE(of, m8xx_pcmcia_match);
 
 static struct of_platform_driver m8xx_pcmcia_driver = {
+	.owner = THIS_MODULE,
 	.name = driver_name,
 	.match_table = m8xx_pcmcia_match,
 	.probe = m8xx_probe,

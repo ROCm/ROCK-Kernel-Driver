@@ -281,6 +281,7 @@ static struct of_device_id of_flash_match[] = {
 MODULE_DEVICE_TABLE(of, of_flash_match);
 
 static struct of_platform_driver of_flash_driver = {
+	.owner		= THIS_MODULE,
 	.name		= "of-flash",
 	.match_table	= of_flash_match,
 	.probe		= of_flash_probe,
