@@ -652,7 +652,8 @@ static void rs_get_rate(void *priv_rate, struct net_device *dev,
 	struct ieee80211_local *local = wdev_priv(dev->ieee80211_ptr);
 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)skb->data;
 	struct sta_info *sta;
-	u16 fc, rate_mask;
+	u16 fc;
+	u16 rate_mask = 0;
 	struct iwl3945_priv *priv = (struct iwl3945_priv *)priv_rate;
 	DECLARE_MAC_BUF(mac);
 
@@ -661,6 +662,8 @@ static void rs_get_rate(void *priv_rate, struct net_device *dev,
 	rcu_read_lock();
 
 	sta = sta_info_get(local, hdr->addr1);
+	if (sta)
+		rate_mask = sta->supp_rates[sband->band];
 
 	/* Send management frames and broadcast/multicast data using lowest
 	 * rate. */
@@ -669,12 +672,14 @@ static void rs_get_rate(void *priv_rate, struct net_device *dev,
 	    is_multicast_ether_addr(hdr->addr1) ||
 	    !sta || !sta->rate_ctrl_priv) {
 		IWL_DEBUG_RATE("leave: No STA priv data to update!\n");
-		sel->rate_idx = rate_lowest_index(local, sband, sta);
+		if (!rate_mask)
+			sel->rate_idx = rate_lowest_index(local, sband, NULL);
+		else
+			sel->rate_idx = rate_lowest_index(local, sband, sta);
 		rcu_read_unlock();
 		return;
 	}
 
-	rate_mask = sta->supp_rates[sband->band];
 	index = min(sta->last_txrate_idx & 0xffff, IWL_RATE_COUNT - 1);
 
 	if (sband->band == IEEE80211_BAND_5GHZ)
