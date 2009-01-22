@@ -658,6 +658,36 @@ static void ieee80211_send_auth(struct net_device *dev,
 	ieee80211_sta_tx(dev, skb, encrypt);
 }
 
+static void ieee80211_direct_probe(struct ieee80211_sub_if_data *sdata,
+				   struct ieee80211_if_sta *ifsta)
+{
+	DECLARE_MAC_BUF(mac);
+
+	ifsta->auth_tries++;	/* used as direct_probe_tries */
+	if (ifsta->auth_tries > IEEE80211_AUTH_MAX_TRIES) {
+		printk(KERN_DEBUG "%s: direct probe to AP %s timed out\n",
+		       sdata->dev->name, print_mac(mac, ifsta->bssid));
+		ifsta->state = IEEE80211_DISABLED;
+		return;
+	}
+
+	printk(KERN_DEBUG "%s: direct probe to AP %s try %d\n",
+			sdata->dev->name, print_mac(mac, ifsta->bssid),
+			ifsta->auth_tries);
+
+	ifsta->state = IEEE80211_DIRECT_PROBE;
+
+	set_bit(IEEE80211_STA_REQ_DIRECT_PROBE, &ifsta->request);
+
+	/* Direct probe is sent to broadcast address as some APs
+	 * will not answer to direct packet in unassociated state.
+	 */
+	ieee80211_send_probe_req(sdata->dev, NULL,
+				 ifsta->ssid, ifsta->ssid_len);
+
+	mod_timer(&ifsta->timer, jiffies + IEEE80211_AUTH_TIMEOUT);
+}
+
 
 static void ieee80211_authenticate(struct net_device *dev,
 				   struct ieee80211_if_sta *ifsta)
@@ -1958,7 +1988,7 @@ static void ieee80211_rx_mgmt_deauth(struct net_device *dev,
 	if (ifsta->state == IEEE80211_AUTHENTICATE ||
 	    ifsta->state == IEEE80211_ASSOCIATE ||
 	    ifsta->state == IEEE80211_ASSOCIATED) {
-		ifsta->state = IEEE80211_AUTHENTICATE;
+		ifsta->state = IEEE80211_DIRECT_PROBE;
 		mod_timer(&ifsta->timer, jiffies +
 				      IEEE80211_RETRY_AUTH_INTERVAL);
 	}
@@ -2559,8 +2589,7 @@ static void ieee80211_rx_bss_info(struct net_device *dev,
 				  struct ieee80211_mgmt *mgmt,
 				  size_t len,
 				  struct ieee80211_rx_status *rx_status,
-				  struct ieee802_11_elems *elems,
-				  int beacon)
+				  struct ieee802_11_elems *elems)
 {
 	struct ieee80211_local *local = wdev_priv(dev->ieee80211_ptr);
 	int freq, clen;
@@ -2569,6 +2598,7 @@ static void ieee80211_rx_bss_info(struct net_device *dev,
 	struct ieee80211_sub_if_data *sdata = IEEE80211_DEV_TO_SUB_IF(dev);
 	u64 beacon_timestamp, rx_timestamp;
 	struct ieee80211_channel *channel;
+	bool beacon = ieee80211_is_beacon(mgmt->frame_control);
 	DECLARE_MAC_BUF(mac);
 	DECLARE_MAC_BUF(mac2);
 
@@ -2728,15 +2758,14 @@ static void ieee80211_rx_bss_info(struct net_device *dev,
 	bss->signal = rx_status->signal;
 	bss->noise = rx_status->noise;
 	bss->qual = rx_status->qual;
-	if (!beacon && !bss->probe_resp)
-		bss->probe_resp = true;
-
+	if (!beacon)
+		bss->last_probe_resp = jiffies;
 	/*
 	 * In STA mode, the remaining parameters should not be overridden
 	 * by beacons because they're not necessarily accurate there.
 	 */
 	if (sdata->vif.type != IEEE80211_IF_TYPE_IBSS &&
-	    bss->probe_resp && beacon) {
+	    bss->last_probe_resp && beacon) {
 		ieee80211_rx_bss_put(local, bss);
 		return;
 	}
@@ -2891,6 +2920,8 @@ static void ieee80211_rx_mgmt_probe_resp(struct net_device *dev,
 {
 	size_t baselen;
 	struct ieee802_11_elems elems;
+	struct ieee80211_sub_if_data *sdata = IEEE80211_DEV_TO_SUB_IF(dev);
+	struct ieee80211_if_sta *ifsta = &sdata->u.sta;
 
 	baselen = (u8 *) mgmt->u.probe_resp.variable - (u8 *) mgmt;
 	if (baselen > len)
@@ -2899,7 +2930,17 @@ static void ieee80211_rx_mgmt_probe_resp(struct net_device *dev,
 	ieee802_11_parse_elems(mgmt->u.probe_resp.variable, len - baselen,
 				&elems);
 
-	ieee80211_rx_bss_info(dev, mgmt, len, rx_status, &elems, 0);
+	ieee80211_rx_bss_info(dev, mgmt, len, rx_status, &elems);
+
+	/* direct probe may be part of the association flow */
+ 	if (test_and_clear_bit(IEEE80211_STA_REQ_DIRECT_PROBE,
+ 							&ifsta->request)) {
+ 		printk(KERN_DEBUG "%s direct probe responded\n",
+ 		       sdata->dev->name);
+		ifsta->auth_tries = 0;	/* direct_probe_tries -> auth_tries */
+ 		ieee80211_authenticate(dev, ifsta);
+ 	}
+
 }
 
 
@@ -2923,7 +2964,7 @@ static void ieee80211_rx_mgmt_beacon(struct net_device *dev,
 
 	ieee802_11_parse_elems(mgmt->u.beacon.variable, len - baselen, &elems);
 
-	ieee80211_rx_bss_info(dev, mgmt, len, rx_status, &elems, 1);
+	ieee80211_rx_bss_info(dev, mgmt, len, rx_status, &elems);
 
 	sdata = IEEE80211_DEV_TO_SUB_IF(dev);
 	if (sdata->vif.type != IEEE80211_IF_TYPE_STA)
@@ -3361,7 +3402,8 @@ void ieee80211_sta_work(struct work_struct *work)
 		mesh_path_start_discovery(dev);
 #endif
 
-	if (ifsta->state != IEEE80211_AUTHENTICATE &&
+	if (ifsta->state != IEEE80211_DIRECT_PROBE &&
+	    ifsta->state != IEEE80211_AUTHENTICATE &&
 	    ifsta->state != IEEE80211_ASSOCIATE &&
 	    test_and_clear_bit(IEEE80211_STA_REQ_SCAN, &ifsta->request)) {
 		if (ifsta->scan_ssid_len)
@@ -3381,6 +3423,10 @@ void ieee80211_sta_work(struct work_struct *work)
 	switch (ifsta->state) {
 	case IEEE80211_DISABLED:
 		break;
+ 	case IEEE80211_DIRECT_PROBE:
+ 		ieee80211_direct_probe(sdata, ifsta);
+ 		break;
+
 	case IEEE80211_AUTHENTICATE:
 		ieee80211_authenticate(dev, ifsta);
 		break;
@@ -3541,8 +3587,18 @@ static int ieee80211_sta_config_auth(struct net_device *dev,
 					       selected->ssid_len);
 		ieee80211_sta_set_bssid(dev, selected->bssid);
 		ieee80211_sta_def_wmm_params(dev, selected, 0);
+
+ 		/* Send out direct probe if no probe resp was received or
+ 		 * the one we have is outdated
+ 		 */
+ 		if (!selected->last_probe_resp ||
+ 		    time_after(jiffies, selected->last_probe_resp
+ 					+ IEEE80211_SCAN_RESULT_EXPIRE))
+ 			ifsta->state = IEEE80211_DIRECT_PROBE;
+ 		else
+ 			ifsta->state = IEEE80211_AUTHENTICATE;
+
 		ieee80211_rx_bss_put(local, selected);
-		ifsta->state = IEEE80211_AUTHENTICATE;
 		ieee80211_sta_reset_auth(dev, ifsta);
 		return 0;
 	} else {
@@ -3553,6 +3609,7 @@ static int ieee80211_sta_config_auth(struct net_device *dev,
 				ieee80211_sta_start_scan(dev, ifsta->ssid,
 							 ifsta->ssid_len);
 			ifsta->state = IEEE80211_AUTHENTICATE;
+			ifsta->auth_tries = 0; /* direct_probe_tries -> auth_tries */
 			set_bit(IEEE80211_STA_REQ_AUTH, &ifsta->request);
 		} else
 			ifsta->state = IEEE80211_DISABLED;
