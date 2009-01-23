@@ -66,6 +66,7 @@ enum {
 	STAC_9205_DELL_M42,
 	STAC_9205_DELL_M43,
 	STAC_9205_DELL_M44,
+	STAC_9205_EAPD,
 	STAC_9205_MODELS
 };
 
@@ -1788,6 +1789,8 @@ static struct snd_pci_quirk stac92hd71bxx_cfg_tbl[] = {
 		      "HP dv5", STAC_HP_M4),
 	SND_PCI_QUIRK(PCI_VENDOR_ID_HP, 0x30f4,
 		      "HP dv7", STAC_HP_M4),
+	SND_PCI_QUIRK(PCI_VENDOR_ID_HP, 0x30f7,
+		      "HP dv4", STAC_HP_DV5),
 	SND_PCI_QUIRK(PCI_VENDOR_ID_HP, 0x30fc,
 		      "HP dv7", STAC_HP_M4),
 	SND_PCI_QUIRK(PCI_VENDOR_ID_HP, 0x3603,
@@ -2025,6 +2028,9 @@ static struct snd_pci_quirk stac922x_cfg_tbl[] = {
 		      "Intel D945P", STAC_D945GTP3),
 	SND_PCI_QUIRK(PCI_VENDOR_ID_INTEL, 0x0707,
 		      "Intel D945P", STAC_D945GTP5),
+	/* other intel */
+	SND_PCI_QUIRK(PCI_VENDOR_ID_INTEL, 0x0204,
+		      "Intel D945", STAC_D945_REF),
 	/* other systems  */
 	/* Apple Intel Mac (Mac Mini, MacBook, MacBook Pro...) */
 	SND_PCI_QUIRK(0x8384, 0x7680,
@@ -2224,6 +2230,7 @@ static unsigned int *stac9205_brd_tbl[STAC_9205_MODELS] = {
 	[STAC_9205_DELL_M42] = dell_9205_m42_pin_configs,
 	[STAC_9205_DELL_M43] = dell_9205_m43_pin_configs,
 	[STAC_9205_DELL_M44] = dell_9205_m44_pin_configs,
+	[STAC_9205_EAPD] = NULL,
 };
 
 static const char *stac9205_models[STAC_9205_MODELS] = {
@@ -2231,12 +2238,14 @@ static const char *stac9205_models[STAC_9205_MODELS] = {
 	[STAC_9205_DELL_M42] = "dell-m42",
 	[STAC_9205_DELL_M43] = "dell-m43",
 	[STAC_9205_DELL_M44] = "dell-m44",
+	[STAC_9205_EAPD] = "eapd",
 };
 
 static struct snd_pci_quirk stac9205_cfg_tbl[] = {
 	/* SigmaTel reference board */
 	SND_PCI_QUIRK(PCI_VENDOR_ID_INTEL, 0x2668,
 		      "DFI LanParty", STAC_9205_REF),
+	/* Dell */
 	SND_PCI_QUIRK(PCI_VENDOR_ID_DELL, 0x01f1,
 		      "unknown Dell", STAC_9205_DELL_M42),
 	SND_PCI_QUIRK(PCI_VENDOR_ID_DELL, 0x01f2,
@@ -2267,6 +2276,8 @@ static struct snd_pci_quirk stac9205_cfg_tbl[] = {
 		      "Dell Inspiron", STAC_9205_DELL_M44),
 	SND_PCI_QUIRK(PCI_VENDOR_ID_DELL, 0x0228,
 		      "Dell Vostro 1500", STAC_9205_DELL_M42),
+	/* Gateway */
+	SND_PCI_QUIRK(0x107b, 0x0565, "Gateway T1616", STAC_9205_EAPD),
 	{} /* terminator */
 };
 
@@ -5072,7 +5083,9 @@ static int patch_stac9205(struct hda_codec *codec)
 
 	spec->aloopback_mask = 0x40;
 	spec->aloopback_shift = 0;
-	spec->eapd_switch = 1;
+	/* Turn on/off EAPD per HP plugging */
+	if (spec->board_config != STAC_9205_EAPD)
+		spec->eapd_switch = 1;
 	spec->multiout.dac_nids = spec->dac_nids;
 	
 	switch (spec->board_config){

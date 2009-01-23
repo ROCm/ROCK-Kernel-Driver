@@ -1037,6 +1037,7 @@ Prior to version 0.9.0rc4 options had a 'snd_' prefix. This was removed.
 	  dell-m42	Dell (unknown)
 	  dell-m43	Dell Precision
 	  dell-m44	Dell Inspiron
+	  eapd		Keep EAPD on (e.g. Gateway T1616)
 
 	STAC9220/9221
 	  ref		Reference board
