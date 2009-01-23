@@ -24,6 +24,14 @@
  * also handles RSCN events and re-discovery if necessary.
  */
 
+/*
+ * DISC LOCKING
+ *
+ * The disc mutex is can be locked when acquiring rport locks, but may not
+ * be held when acquiring the lport lock. Refer to fc_lport.c for more
+ * details.
+ */
+
 #include <linux/timer.h>
 #include <linux/err.h>
 #include <asm/unaligned.h>
@@ -45,26 +53,6 @@ static int fc_disc_debug;
 			FC_DBG(fmt);		\
 	} while (0)
 
-struct fc_disc {
-	unsigned char		retry_count;
-	unsigned char		delay;
-	unsigned char		pending;
-	unsigned char		requested;
-	unsigned short		seq_count;
-	unsigned char		buf_len;
-	enum fc_disc_event	event;
-
-	void (*disc_callback)(struct fc_lport *,
-			      enum fc_disc_event);
-
-	struct list_head	 rports;
-	struct fc_lport		*lport;
-	struct mutex		disc_mutex;
-	struct fc_gpn_ft_resp	partial_buf;	/* partial name buffer */
-	struct delayed_work	disc_work;
-
-};
-
 static void fc_disc_gpn_ft_req(struct fc_disc *);
 static void fc_disc_gpn_ft_resp(struct fc_seq *, struct fc_frame *, void *);
 static int fc_disc_new_target(struct fc_disc *, struct fc_rport *,
@@ -83,20 +71,16 @@ static void fc_disc_restart(struct fc_disc *);
 struct fc_rport *fc_disc_lookup_rport(const struct fc_lport *lport,
 				      u32 port_id)
 {
-	struct fc_disc *disc = lport->disc;
+	const struct fc_disc *disc = &lport->disc;
 	struct fc_rport *rport, *found = NULL;
 	struct fc_rport_libfc_priv *rdata;
 	int disc_found = 0;
-
-	if (!disc)
-		return NULL;
 
 	list_for_each_entry(rdata, &disc->rports, peers) {
 		rport = PRIV_TO_RPORT(rdata);
 		if (rport->port_id == port_id) {
 			disc_found = 1;
 			found = rport;
-			get_device(&found->dev);
 			break;
 		}
 	}
@@ -105,27 +89,6 @@ struct fc_rport *fc_disc_lookup_rport(const struct fc_lport *lport,
 		found = NULL;
 
 	return found;
-}
-
-/**
- * fc_disc_alloc - Allocate a discovery work object
- * @lport: The FC lport associated with the discovery job
- */
-static inline struct fc_disc *fc_disc_alloc(struct fc_lport *lport)
-{
-	struct fc_disc *disc;
-
-	disc = kzalloc(sizeof(struct fc_disc), GFP_KERNEL);
-	INIT_DELAYED_WORK(&disc->disc_work, fc_disc_timeout);
-	mutex_init(&disc->disc_mutex);
-	INIT_LIST_HEAD(&disc->rports);
-
-	disc->lport = lport;
-	lport->disc = disc;
-	disc->delay = FC_DISC_DELAY;
-	disc->event = DISC_EV_NONE;
-
-	return disc;
 }
 
 /**
@@ -154,7 +117,7 @@ void fc_disc_stop_rports(struct fc_disc *disc)
 }
 
 /**
- * fc_disc_rport_event - Event handler for rport events
+ * fc_disc_rport_callback - Event handler for rport events
  * @lport: The lport which is receiving the event
  * @rport: The rport which the event has occured on
  * @event: The event that occured
@@ -162,12 +125,12 @@ void fc_disc_stop_rports(struct fc_disc *disc)
  * Locking Note: The rport lock should not be held when calling
  *		 this function.
  */
-static void fc_disc_rport_event(struct fc_lport *lport,
-				struct fc_rport *rport,
-				enum fc_lport_event event)
+static void fc_disc_rport_callback(struct fc_lport *lport,
+				   struct fc_rport *rport,
+				   enum fc_rport_event event)
 {
 	struct fc_rport_libfc_priv *rdata = rport->dd_data;
-	struct fc_disc *disc = lport->disc;
+	struct fc_disc *disc = &lport->disc;
 	int found = 0;
 
 	FC_DEBUG_DISC("Received a %d event for port (%6x)\n", event,
@@ -217,17 +180,27 @@ static void fc_disc_recv_rscn_req(struct fc_seq *sp, struct fc_frame *fp,
 	FC_DEBUG_DISC("Received an RSCN event on port (%6x)\n",
 		      fc_host_port_id(lport->host));
 
+	/* make sure the frame contains an RSCN message */
 	rp = fc_frame_payload_get(fp, sizeof(*rp));
-
-	if (!rp || rp->rscn_page_len != sizeof(*pp))
+	if (!rp)
 		goto reject;
-
+	/* make sure the page length is as expected (4 bytes) */
+	if (rp->rscn_page_len != sizeof(*pp))
+		goto reject;
+	/* get the RSCN payload length */
 	len = ntohs(rp->rscn_plen);
 	if (len < sizeof(*rp))
 		goto reject;
+	/* make sure the frame contains the expected payload */
+	rp = fc_frame_payload_get(fp, len);
+	if (!rp)
+		goto reject;
+	/* payload must be a multiple of the RSCN page size */
 	len -= sizeof(*rp);
+	if (len % sizeof(*pp))
+		goto reject;
 
-	for (pp = (void *)(rp + 1); len; len -= sizeof(*pp), pp++) {
+	for (pp = (void *)(rp + 1); len > 0; len -= sizeof(*pp), pp++) {
 		ev_qual = pp->rscn_page_flags >> ELS_RSCN_EV_QUAL_BIT;
 		ev_qual &= ELS_RSCN_EV_QUAL_MASK;
 		fmt = pp->rscn_page_flags >> ELS_RSCN_ADDR_FMT_BIT;
@@ -283,6 +256,7 @@ static void fc_disc_recv_rscn_req(struct fc_seq *sp, struct fc_frame *fp,
 	fc_frame_free(fp);
 	return;
 reject:
+	FC_DEBUG_DISC("Received a bad RSCN frame\n");
 	rjt_data.fp = NULL;
 	rjt_data.reason = ELS_RJT_LOGIC;
 	rjt_data.explan = ELS_EXPL_NONE;
@@ -304,13 +278,7 @@ static void fc_disc_recv_req(struct fc_seq *sp, struct fc_frame *fp,
 			     struct fc_lport *lport)
 {
 	u8 op;
-	struct fc_disc *disc = lport->disc;
-
-	if (!disc) {
-		FC_DBG("Received a request for an lport not managed "
-		       "by the discovery engine\n");
-		return;
-	}
+	struct fc_disc *disc = &lport->disc;
 
 	op = fc_frame_payload_op(fp);
 	switch (op) {
@@ -365,17 +333,7 @@ static void fc_disc_start(void (*disc_callback)(struct fc_lport *,
 {
 	struct fc_rport *rport;
 	struct fc_rport_identifiers ids;
-	struct fc_disc *disc = lport->disc;
-
-	if (!disc) {
-		FC_DEBUG_DISC("No existing discovery job, "
-			      "creating one for lport (%6x)\n",
-			      fc_host_port_id(lport->host));
-		disc = fc_disc_alloc(lport);
-	} else
-		FC_DEBUG_DISC("Found an existing discovery job "
-			      "for lport (%6x)\n",
-			      fc_host_port_id(lport->host));
+	struct fc_disc *disc = &lport->disc;
 
 	/*
 	 * At this point we may have a new disc job or an existing
@@ -419,6 +377,10 @@ static void fc_disc_start(void (*disc_callback)(struct fc_lport *,
 
 	mutex_unlock(&disc->disc_mutex);
 }
+
+static struct fc_rport_operations fc_disc_rport_ops = {
+	.event_callback = fc_disc_rport_callback,
+};
 
 /**
  * fc_disc_new_target - Handle new target found by discovery
@@ -475,7 +437,7 @@ static int fc_disc_new_target(struct fc_disc *disc,
 		}
 		if (rport) {
 			rp = rport->dd_data;
-			rp->event_callback = fc_disc_rport_event;
+			rp->ops = &fc_disc_rport_ops;
 			rp->rp_state = RPORT_ST_INIT;
 			lport->tt.rport_login(rport);
 		}
@@ -658,7 +620,7 @@ static int fc_disc_gpn_ft_parse(struct fc_disc *disc, void *buf, size_t len)
 			rport = fc_rport_rogue_create(&dp);
 			if (rport) {
 				rdata = rport->dd_data;
-				rdata->event_callback = fc_disc_rport_event;
+				rdata->ops = &fc_disc_rport_ops;
 				rdata->local_port = lport;
 				lport->tt.rport_login(rport);
 			} else
@@ -804,15 +766,13 @@ static void fc_disc_single(struct fc_disc *disc, struct fc_disc_port *dp)
 		goto out;
 
 	rport = lport->tt.rport_lookup(lport, dp->ids.port_id);
-	if (rport) {
+	if (rport)
 		fc_disc_del_target(disc, rport);
-		put_device(&rport->dev); /* hold from lookup */
-	}
 
 	new_rport = fc_rport_rogue_create(dp);
 	if (new_rport) {
 		rdata = new_rport->dd_data;
-		rdata->event_callback = fc_disc_rport_event;
+		rdata->ops = &fc_disc_rport_ops;
 		kfree(dp);
 		lport->tt.rport_login(new_rport);
 	}
@@ -827,7 +787,7 @@ out:
  */
 void fc_disc_stop(struct fc_lport *lport)
 {
-	struct fc_disc *disc = lport->disc;
+	struct fc_disc *disc = &lport->disc;
 
 	if (disc) {
 		cancel_delayed_work_sync(&disc->disc_work);
@@ -854,6 +814,7 @@ void fc_disc_stop_final(struct fc_lport *lport)
  */
 int fc_disc_init(struct fc_lport *lport)
 {
+	struct fc_disc *disc;
 
 	if (!lport->tt.disc_start)
 		lport->tt.disc_start = fc_disc_start;
@@ -869,6 +830,15 @@ int fc_disc_init(struct fc_lport *lport)
 
 	if (!lport->tt.rport_lookup)
 		lport->tt.rport_lookup = fc_disc_lookup_rport;
+
+	disc = &lport->disc;
+	INIT_DELAYED_WORK(&disc->disc_work, fc_disc_timeout);
+	mutex_init(&disc->disc_mutex);
+	INIT_LIST_HEAD(&disc->rports);
+
+	disc->lport = lport;
+	disc->delay = FC_DISC_DELAY;
+	disc->event = DISC_EV_NONE;
 
 	return 0;
 }

@@ -32,8 +32,6 @@
 #include <scsi/libfc.h>
 #include <scsi/fc_encode.h>
 
-#define	  FC_DEF_R_A_TOV      (10 * 1000) /* resource allocation timeout */
-
 /*
  * fc_exch_debug can be set in debugger or at compile time to get more logs.
  */
@@ -68,7 +66,8 @@ static struct kmem_cache *fc_em_cachep;	/* cache for exchanges */
  */
 struct fc_exch_mgr {
 	enum fc_class	class;		/* default class for sequences */
-	spinlock_t	em_lock;	/* exchange manager lock */
+	spinlock_t	em_lock;	/* exchange manager lock,
+					   must be taken before ex_lock */
 	u16		last_xid;	/* last allocated exchange ID */
 	u16		min_xid;	/* min exchange ID */
 	u16		max_xid;	/* max exchange ID */
@@ -179,6 +178,8 @@ static struct fc_seq *fc_seq_start_next_locked(struct fc_seq *sp);
  * sequence allocation and deallocation must be locked.
  *  - exchange refcnt can be done atomicly without locks.
  *  - sequence allocation must be locked by exch lock.
+ *  - If the em_lock and ex_lock must be taken at the same time, then the
+ *    em_lock must be taken before the ex_lock.
  */
 
 /*
@@ -1093,7 +1094,7 @@ static void fc_exch_recv_abts(struct fc_exch *ep, struct fc_frame *rx_fp)
 		ap->ba_high_seq_cnt = fh->fh_seq_cnt;
 		ap->ba_low_seq_cnt = htons(sp->cnt);
 	}
-	sp = fc_seq_start_next(sp);
+	sp = fc_seq_start_next_locked(sp);
 	spin_unlock_bh(&ep->ex_lock);
 	fc_seq_send_last(sp, fp, FC_RCTL_BA_ACC, FC_TYPE_BLS);
 	fc_frame_free(rx_fp);
@@ -1477,10 +1478,11 @@ static void fc_exch_reset(struct fc_exch *ep)
  * If sid is non-zero, reset only exchanges we source from that FID.
  * If did is non-zero, reset only exchanges destined to that FID.
  */
-void fc_exch_mgr_reset(struct fc_exch_mgr *mp, u32 sid, u32 did)
+void fc_exch_mgr_reset(struct fc_lport *lp, u32 sid, u32 did)
 {
 	struct fc_exch *ep;
 	struct fc_exch *next;
+	struct fc_exch_mgr *mp = lp->emp;
 
 	spin_lock_bh(&mp->em_lock);
 restart:
@@ -1604,7 +1606,7 @@ static void fc_exch_rrq_resp(struct fc_seq *sp, struct fc_frame *fp, void *arg)
 	if (IS_ERR(fp)) {
 		int err = PTR_ERR(fp);
 
-		if (err == -FC_EX_CLOSED)
+		if (err == -FC_EX_CLOSED || err == -FC_EX_TIMEOUT)
 			goto cleanup;
 		FC_DBG("Cannot process RRQ, because of frame error %d\n", err);
 		return;

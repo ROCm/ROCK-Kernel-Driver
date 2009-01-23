@@ -59,7 +59,7 @@ static int debug_fcoe;
 MODULE_AUTHOR("Open-FCoE.org");
 MODULE_DESCRIPTION("FCoE");
 MODULE_LICENSE("GPL");
-MODULE_VERSION("1.0.5");
+MODULE_VERSION("1.0.6");
 
 /* fcoe host list */
 LIST_HEAD(fcoe_hostlist);
@@ -167,7 +167,7 @@ static int fcoe_cpu_callback(struct notifier_block *nfb, unsigned long action,
 #endif /* CONFIG_HOTPLUG_CPU */
 
 /**
- * foce_rcv - this is the fcoe receive function called by NET_RX_SOFTIRQ
+ * fcoe_rcv - this is the fcoe receive function called by NET_RX_SOFTIRQ
  * @skb: the receive skb
  * @dev: associated net device
  * @ptype: context
@@ -184,7 +184,6 @@ int fcoe_rcv(struct sk_buff *skb, struct net_device *dev,
 	struct fcoe_rcv_info *fr;
 	struct fcoe_softc *fc;
 	struct fcoe_dev_stats *stats;
-	u8 *data;
 	struct fc_frame_header *fh;
 	unsigned short oxid;
 	int cpu_idx;
@@ -211,9 +210,18 @@ int fcoe_rcv(struct sk_buff *skb, struct net_device *dev,
 		FC_DBG("wrong FC type frame");
 		goto err;
 	}
-	data = skb->data;
-	data += sizeof(struct fcoe_hdr);
-	fh = (struct fc_frame_header *)data;
+
+	/*
+	 * Check for minimum frame length, and make sure required FCoE
+	 * and FC headers are pulled into the linear data area.
+	 */
+	if (unlikely((skb->len < FCOE_MIN_FRAME) ||
+	    !pskb_may_pull(skb, FCOE_HEADER_LEN)))
+		goto err;
+
+	skb_set_transport_header(skb, sizeof(struct fcoe_hdr));
+	fh = (struct fc_frame_header *) skb_transport_header(skb);
+
 	oxid = ntohs(fh->fh_ox_id);
 
 	fr = fcoe_dev_from_skb(skb);
@@ -222,13 +230,14 @@ int fcoe_rcv(struct sk_buff *skb, struct net_device *dev,
 	cpu_idx = 0;
 #ifdef CONFIG_SMP
 	/*
-	 * The exchange ID are ANDed with num of online CPUs,
-	 * so that will have the least lock contention in
-	 * handling the exchange. if there is no thread
-	 * for a given idx then use first online cpu.
+	 * The incoming frame exchange id(oxid) is ANDed with num of online
+	 * cpu bits to get cpu_idx and then this cpu_idx is used for selecting
+	 * a per cpu kernel thread from fcoe_percpu. In case the cpu is
+	 * offline or no kernel thread for derived cpu_idx then cpu_idx is
+	 * initialize to first online cpu index.
 	 */
-	cpu_idx = oxid & (num_online_cpus() >> 1);
-	if (fcoe_percpu[cpu_idx] == NULL)
+	cpu_idx = oxid & (num_online_cpus() - 1);
+	if (!fcoe_percpu[cpu_idx] || !cpu_online(cpu_idx))
 		cpu_idx = first_cpu(cpu_online_map);
 #endif
 	fps = fcoe_percpu[cpu_idx];
@@ -496,7 +505,7 @@ int fcoe_xmit(struct fc_lport *lp, struct fc_frame *fp)
 	if (rc) {
 		fcoe_insert_wait_queue(lp, skb);
 		if (fc->fcoe_pending_queue.qlen > FCOE_MAX_QUEUE_DEPTH)
-			fc_pause(lp);
+			lp->qfull = 1;
 	}
 
 	return 0;
@@ -514,14 +523,12 @@ int fcoe_percpu_receive_thread(void *arg)
 {
 	struct fcoe_percpu_s *p = arg;
 	u32 fr_len;
-	unsigned int hlen;
-	unsigned int tlen;
 	struct fc_lport *lp;
 	struct fcoe_rcv_info *fr;
 	struct fcoe_dev_stats *stats;
 	struct fc_frame_header *fh;
 	struct sk_buff *skb;
-	struct fcoe_crc_eof *cp;
+	struct fcoe_crc_eof crc_eof;
 	struct fc_frame *fp;
 	u8 *mac = NULL;
 	struct fcoe_softc *fc;
@@ -572,10 +579,12 @@ int fcoe_percpu_receive_thread(void *arg)
 			skb_linearize(skb);	/* not ideal */
 
 		/*
-		 * Check the header and pull it off.
+		 * Frame length checks and setting up the header pointers
+		 * was done in fcoe_rcv already.
 		 */
-		hlen = sizeof(struct fcoe_hdr);
-		hp = (struct fcoe_hdr *)skb->data;
+		hp = (struct fcoe_hdr *) skb_network_header(skb);
+		fh = (struct fc_frame_header *) skb_transport_header(skb);
+
 		if (unlikely(FC_FCOE_DECAPS_VER(hp) != FC_FCOE_VER)) {
 			if (stats) {
 				if (stats->ErrorFrames < 5)
@@ -586,33 +595,31 @@ int fcoe_percpu_receive_thread(void *arg)
 			kfree_skb(skb);
 			continue;
 		}
-		skb_pull(skb, sizeof(struct fcoe_hdr));
-		tlen = sizeof(struct fcoe_crc_eof);
-		fr_len = skb->len - tlen;
-		skb_trim(skb, fr_len);
 
-		if (unlikely(fr_len > skb->len)) {
-			if (stats) {
-				if (stats->ErrorFrames < 5)
-					FC_DBG("length error fr_len 0x%x "
-					       "skb->len 0x%x", fr_len,
-					       skb->len);
-				stats->ErrorFrames++;
-			}
-			kfree_skb(skb);
-			continue;
-		}
+		skb_pull(skb, sizeof(struct fcoe_hdr));
+		fr_len = skb->len - sizeof(struct fcoe_crc_eof);
+
 		if (stats) {
 			stats->RxFrames++;
 			stats->RxWords += fr_len / FCOE_WORD_TO_BYTE;
 		}
 
 		fp = (struct fc_frame *)skb;
-		cp = (struct fcoe_crc_eof *)(skb->data + fr_len);
 		fc_frame_init(fp);
-		fr_eof(fp) = cp->fcoe_eof;
-		fr_sof(fp) = hp->fcoe_sof;
 		fr_dev(fp) = lp;
+		fr_sof(fp) = hp->fcoe_sof;
+
+		/* Copy out the CRC and EOF trailer for access */
+		if (skb_copy_bits(skb, fr_len, &crc_eof, sizeof(crc_eof))) {
+			kfree_skb(skb);
+			continue;
+		}
+		fr_eof(fp) = crc_eof.fcoe_eof;
+		fr_crc(fp) = crc_eof.fcoe_crc32;
+		if (pskb_trim(skb, fr_len)) {
+			kfree_skb(skb);
+			continue;
+		}
 
 		/*
 		 * We only check CRC if no offload is available and if it is
@@ -631,7 +638,7 @@ int fcoe_percpu_receive_thread(void *arg)
 			continue;
 		}
 		if (fr_flags(fp) & FCPHF_CRC_UNCHECKED) {
-			if (le32_to_cpu(cp->fcoe_crc32) !=
+			if (le32_to_cpu(fr_crc(fp)) !=
 			    ~crc32(~0, skb->data, fr_len)) {
 				if (debug_fcoe || stats->InvalidCRCCount < 5)
 					printk(KERN_WARNING "fcoe: dropping "
@@ -712,7 +719,7 @@ static void fcoe_recv_flogi(struct fcoe_softc *fc, struct fc_frame *fp, u8 *sa)
  * fcoe_watchdog - fcoe timer callback
  * @vp:
  *
- * This checks the pending queue length for fcoe and put fcoe to be paused state
+ * This checks the pending queue length for fcoe and set lport qfull
  * if the FCOE_MAX_QUEUE_DEPTH is reached. This is done for all fc_lport on the
  * fcoe_hostlist.
  *
@@ -722,17 +729,17 @@ void fcoe_watchdog(ulong vp)
 {
 	struct fc_lport *lp;
 	struct fcoe_softc *fc;
-	int paused = 0;
+	int qfilled = 0;
 
 	read_lock(&fcoe_hostlist_lock);
 	list_for_each_entry(fc, &fcoe_hostlist, list) {
 		lp = fc->lp;
 		if (lp) {
 			if (fc->fcoe_pending_queue.qlen > FCOE_MAX_QUEUE_DEPTH)
-				paused = 1;
+				qfilled = 1;
 			if (fcoe_check_wait_queue(lp) <	 FCOE_MAX_QUEUE_DEPTH) {
-				if (paused)
-					fc_unpause(lp);
+				if (qfilled)
+					lp->qfull = 0;
 			}
 		}
 	}
@@ -761,8 +768,7 @@ void fcoe_watchdog(ulong vp)
  **/
 static int fcoe_check_wait_queue(struct fc_lport *lp)
 {
-	int rc, unpause = 0;
-	int paused = 0;
+	int rc;
 	struct sk_buff *skb;
 	struct fcoe_softc *fc;
 
@@ -770,10 +776,10 @@ static int fcoe_check_wait_queue(struct fc_lport *lp)
 	spin_lock_bh(&fc->fcoe_pending_queue.lock);
 
 	/*
-	 * is this interface paused?
+	 * if interface pending queue full then set qfull in lport.
 	 */
 	if (fc->fcoe_pending_queue.qlen > FCOE_MAX_QUEUE_DEPTH)
-		paused = 1;
+		lp->qfull = 1;
 	if (fc->fcoe_pending_queue.qlen) {
 		while ((skb = __skb_dequeue(&fc->fcoe_pending_queue)) != NULL) {
 			spin_unlock_bh(&fc->fcoe_pending_queue.lock);
@@ -785,11 +791,9 @@ static int fcoe_check_wait_queue(struct fc_lport *lp)
 			spin_lock_bh(&fc->fcoe_pending_queue.lock);
 		}
 		if (fc->fcoe_pending_queue.qlen < FCOE_MAX_QUEUE_DEPTH)
-			unpause = 1;
+			lp->qfull = 0;
 	}
 	spin_unlock_bh(&fc->fcoe_pending_queue.lock);
-	if ((unpause) && (paused))
-		fc_unpause(lp);
 	return fc->fcoe_pending_queue.qlen;
 }
 
@@ -867,7 +871,7 @@ static int fcoe_device_notification(struct notifier_block *notifier,
 	struct net_device *real_dev = ptr;
 	struct fcoe_softc *fc;
 	struct fcoe_dev_stats *stats;
-	u16 new_status;
+	u32 new_link_up;
 	u32 mfs;
 	int rc = NOTIFY_OK;
 
@@ -884,37 +888,31 @@ static int fcoe_device_notification(struct notifier_block *notifier,
 		goto out;
 	}
 
-	new_status = lp->link_status;
+	new_link_up = lp->link_up;
 	switch (event) {
 	case NETDEV_DOWN:
 	case NETDEV_GOING_DOWN:
-		new_status &= ~FC_LINK_UP;
+		new_link_up = 0;
 		break;
 	case NETDEV_UP:
 	case NETDEV_CHANGE:
-		new_status &= ~FC_LINK_UP;
-		if (!fcoe_link_ok(lp))
-			new_status |= FC_LINK_UP;
+		new_link_up = !fcoe_link_ok(lp);
 		break;
 	case NETDEV_CHANGEMTU:
 		mfs = fc->real_dev->mtu -
 			(sizeof(struct fcoe_hdr) +
 			 sizeof(struct fcoe_crc_eof));
-		if (fc->user_mfs && fc->user_mfs < mfs)
-			mfs = fc->user_mfs;
 		if (mfs >= FC_MIN_MAX_FRAME)
 			fc_set_mfs(lp, mfs);
-		new_status &= ~FC_LINK_UP;
-		if (!fcoe_link_ok(lp))
-			new_status |= FC_LINK_UP;
+		new_link_up = !fcoe_link_ok(lp);
 		break;
 	case NETDEV_REGISTER:
 		break;
 	default:
 		FC_DBG("unknown event %ld call", event);
 	}
-	if (lp->link_status != new_status) {
-		if ((new_status & FC_LINK_UP) == FC_LINK_UP)
+	if (lp->link_up != new_link_up) {
+		if (new_link_up)
 			fc_linkup(lp);
 		else {
 			stats = lp->dev_stats[smp_processor_id()];
@@ -987,8 +985,8 @@ static int fcoe_ethdrv_get(const struct net_device *netdev)
 
 	owner = fcoe_netdev_to_module_owner(netdev);
 	if (owner) {
-		printk(KERN_DEBUG "foce:hold driver module %s for %s\n",
-		       owner->name, netdev->name);
+		printk(KERN_DEBUG "fcoe:hold driver module %s for %s\n",
+		       module_name(owner), netdev->name);
 		return  try_module_get(owner);
 	}
 	return -ENODEV;
@@ -1007,8 +1005,8 @@ static int fcoe_ethdrv_put(const struct net_device *netdev)
 
 	owner = fcoe_netdev_to_module_owner(netdev);
 	if (owner) {
-		printk(KERN_DEBUG "foce:release driver module %s for %s\n",
-		       owner->name, netdev->name);
+		printk(KERN_DEBUG "fcoe:release driver module %s for %s\n",
+		       module_name(owner), netdev->name);
 		module_put(owner);
 		return 0;
 	}

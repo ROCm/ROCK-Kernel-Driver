@@ -68,9 +68,6 @@
 /*
  * FC HBA status
  */
-#define FC_PAUSE		    (1 << 1)
-#define FC_LINK_UP		    (1 << 0)
-
 enum fc_lport_state {
 	LPORT_ST_NONE = 0,
 	LPORT_ST_FLOGI,
@@ -87,14 +84,6 @@ enum fc_disc_event {
 	DISC_EV_NONE = 0,
 	DISC_EV_SUCCESS,
 	DISC_EV_FAILED
-};
-
-enum fc_lport_event {
-	RPORT_EV_NONE = 0,
-	RPORT_EV_CREATED,
-	RPORT_EV_FAILED,
-	RPORT_EV_STOP,
-	RPORT_EV_LOGO
 };
 
 enum fc_rport_state {
@@ -126,6 +115,19 @@ struct fc_disc_port {
 	struct work_struct	    rport_work;
 };
 
+enum fc_rport_event {
+	RPORT_EV_NONE = 0,
+	RPORT_EV_CREATED,
+	RPORT_EV_FAILED,
+	RPORT_EV_STOP,
+	RPORT_EV_LOGO
+};
+
+struct fc_rport_operations {
+	void (*event_callback)(struct fc_lport *, struct fc_rport *,
+			       enum fc_rport_event);
+};
+
 /**
  * struct fc_rport_libfc_priv - libfc internal information about a remote port
  * @local_port: Fibre Channel host port instance
@@ -140,24 +142,22 @@ struct fc_disc_port {
  * @event_callback: Callback for rport READY, FAILED or LOGO
  */
 struct fc_rport_libfc_priv {
-	struct fc_lport		*local_port;
-	enum fc_rport_state rp_state;
-	u16			flags;
+	struct fc_lport		   *local_port;
+	enum fc_rport_state        rp_state;
+	u16			   flags;
 	#define FC_RP_FLAGS_REC_SUPPORTED	(1 << 0)
 	#define FC_RP_FLAGS_RETRY		(1 << 1)
-	u16		max_seq;
-	unsigned int	retries;
-	unsigned int	e_d_tov;
-	unsigned int	r_a_tov;
-	enum fc_rport_trans_state trans_state;
-	struct mutex    rp_mutex;
-	struct delayed_work	retry_work;
-	enum fc_lport_event     event;
-	void (*event_callback)(struct fc_lport *,
-			       struct fc_rport *,
-			       enum fc_lport_event);
-	struct list_head         peers;
-	struct work_struct       event_work;
+	u16		           max_seq;
+	unsigned int	           retries;
+	unsigned int	           e_d_tov;
+	unsigned int	           r_a_tov;
+	enum fc_rport_trans_state  trans_state;
+	struct mutex               rp_mutex;
+	struct delayed_work	   retry_work;
+	enum fc_rport_event        event;
+	struct fc_rport_operations *ops;
+	struct list_head           peers;
+	struct work_struct         event_work;
 };
 
 #define PRIV_TO_RPORT(x)						\
@@ -166,7 +166,6 @@ struct fc_rport_libfc_priv {
 	(struct fc_rport_libfc_priv *)((void *)x + sizeof(struct fc_rport));
 
 struct fc_rport *fc_rport_rogue_create(struct fc_disc_port *);
-void fc_rport_rogue_destroy(struct fc_rport *);
 
 static inline void fc_rport_set_name(struct fc_rport *rport, u64 wwpn, u64 wwnn)
 {
@@ -296,11 +295,10 @@ struct fc_seq {
 /*
  * Exchange.
  *
- * Locking notes: The ex_lock protects changes to the following fields:
- *	esb_stat, f_ctl, seq.ssb_stat, seq.f_ctl.
+ * Locking notes: The ex_lock protects following items:
+ *	state, esb_stat, f_ctl, seq.ssb_stat
  *	seq_id
  *	sequence allocation
- *
  */
 struct fc_exch {
 	struct fc_exch_mgr *em;		/* exchange manager */
@@ -471,7 +469,7 @@ struct libfc_function_template {
 	 * If s_id is non-zero, reset only exchanges originating from that FID.
 	 * If d_id is non-zero, reset only exchanges sending to that FID.
 	 */
-	void (*exch_mgr_reset)(struct fc_exch_mgr *,
+	void (*exch_mgr_reset)(struct fc_lport *,
 			       u32 s_id, u32 d_id);
 
 	void (*rport_flush_queue)(void);
@@ -569,7 +567,25 @@ struct libfc_function_template {
 	void (*disc_stop_final) (struct fc_lport *);
 };
 
-struct fc_disc;
+/* information used by the discovery layer */
+struct fc_disc {
+	unsigned char		retry_count;
+	unsigned char		delay;
+	unsigned char		pending;
+	unsigned char		requested;
+	unsigned short		seq_count;
+	unsigned char		buf_len;
+	enum fc_disc_event	event;
+
+	void (*disc_callback)(struct fc_lport *,
+			      enum fc_disc_event);
+
+	struct list_head	 rports;
+	struct fc_lport		*lport;
+	struct mutex		disc_mutex;
+	struct fc_gpn_ft_resp	partial_buf;	/* partial name buffer */
+	struct delayed_work	disc_work;
+};
 
 struct fc_lport {
 	struct list_head list;
@@ -579,12 +595,13 @@ struct fc_lport {
 	struct fc_exch_mgr	*emp;
 	struct fc_rport		*dns_rp;
 	struct fc_rport		*ptp_rp;
-	struct fc_disc          *disc;
 	void			*scsi_priv;
+	struct fc_disc          disc;
 
 	/* Operational Information */
 	struct libfc_function_template tt;
-	u16			link_status;
+	u8			link_up;
+	u8			qfull;
 	enum fc_lport_state	state;
 	unsigned long		boot_time;
 
@@ -683,12 +700,6 @@ void fc_linkup(struct fc_lport *);
  * Link is down for the given local port.
  */
 void fc_linkdown(struct fc_lport *);
-
-/*
- * Pause and unpause traffic.
- */
-void fc_pause(struct fc_lport *);
-void fc_unpause(struct fc_lport *);
 
 /*
  * Configure the local port.
@@ -897,7 +908,7 @@ struct fc_seq *fc_seq_start_next(struct fc_seq *sp);
  * If s_id is non-zero, reset only exchanges originating from that FID.
  * If d_id is non-zero, reset only exchanges sending to that FID.
  */
-void fc_exch_mgr_reset(struct fc_exch_mgr *, u32 s_id, u32 d_id);
+void fc_exch_mgr_reset(struct fc_lport *, u32 s_id, u32 d_id);
 
 /*
  * Functions for fc_functions_template

@@ -20,13 +20,13 @@
  */
 
 #include <linux/module.h>
+#include <linux/delay.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/spinlock.h>
 #include <linux/scatterlist.h>
 #include <linux/err.h>
 #include <linux/crc32.h>
-#include <linux/delay.h>
 
 #include <scsi/scsi_tcq.h>
 #include <scsi/scsi.h>
@@ -42,7 +42,7 @@
 MODULE_AUTHOR("Open-FCoE.org");
 MODULE_DESCRIPTION("libfc");
 MODULE_LICENSE("GPL");
-MODULE_VERSION("1.0.5");
+MODULE_VERSION("1.0.6");
 
 static int fc_fcp_debug;
 
@@ -356,7 +356,7 @@ static void fc_fcp_recv_data(struct fc_fcp_pkt *fsp, struct fc_frame *fp)
 			len += 4 - (len % 4);
 		}
 
-		if (~crc != le32_to_cpu(*(__le32 *)(buf + len))) {
+		if (~crc != le32_to_cpu(fr_crc(fp))) {
 crc_err:
 			stats = lp->dev_stats[smp_processor_id()];
 			stats->ErrorFrames++;
@@ -1622,7 +1622,7 @@ out:
 static inline int fc_fcp_lport_queue_ready(struct fc_lport *lp)
 {
 	/* lock ? */
-	return (lp->state == LPORT_ST_READY) && (lp->link_status & FC_LINK_UP);
+	return (lp->state == LPORT_ST_READY) && lp->link_up && !lp->qfull;
 }
 
 /**
@@ -1891,7 +1891,7 @@ int fc_eh_abort(struct scsi_cmnd *sc_cmd)
 	lp = shost_priv(sc_cmd->device->host);
 	if (lp->state != LPORT_ST_READY)
 		return rc;
-	else if (!(lp->link_status & FC_LINK_UP))
+	else if (!lp->link_up)
 		return rc;
 
 	spin_lock_irqsave(lp->host->host_lock, flags);

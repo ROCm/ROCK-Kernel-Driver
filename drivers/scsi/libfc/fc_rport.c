@@ -18,20 +18,23 @@
  */
 
 /*
+ * RPORT GENERAL INFO
+ *
  * This file contains all processing regarding fc_rports. It contains the
  * rport state machine and does all rport interaction with the transport class.
  * There should be no other places in libfc that interact directly with the
  * transport class in regards to adding and deleting rports.
  *
  * fc_rport's represent N_Port's within the fabric.
+ */
+
+/*
+ * RPORT LOCKING
  *
- * rport locking notes:
- *
- * The rport should never hold the rport mutex and then lock the lport
- * mutex. The rport's mutex is considered lesser than the lport's mutex, so
- * the lport mutex can be held before locking the rport mutex, but not the
- * other way around. See the comment block at the top of fc_lport.c for more
- * details.
+ * The rport should never hold the rport mutex and then attempt to acquire
+ * either the lport or disc mutexes. The rport's mutex is considered lesser
+ * than both the lport's mutex and the disc mutex. Refer to fc_lport.c for
+ * more comments on the heirarchy.
  *
  * The locking strategy is similar to the lport's strategy. The lock protects
  * the rport's states and is held and released by the entry points to the rport
@@ -78,6 +81,7 @@ static void fc_rport_recv_logo_req(struct fc_rport *,
 				   struct fc_seq *, struct fc_frame *);
 static void fc_rport_timeout(struct work_struct *);
 static void fc_rport_error(struct fc_rport *, struct fc_frame *);
+static void fc_rport_error_retry(struct fc_rport *, struct fc_frame *);
 static void fc_rport_work(struct work_struct *);
 
 static const char *fc_rport_state_names[] = {
@@ -89,6 +93,13 @@ static const char *fc_rport_state_names[] = {
 	[RPORT_ST_READY] = "Ready",
 	[RPORT_ST_LOGO] = "LOGO",
 };
+
+static void fc_rport_rogue_destroy(struct device *dev)
+{
+	struct fc_rport *rport = dev_to_rport(dev);
+	FC_DEBUG_RPORT("Destroying rogue rport (%6x)\n", rport->port_id);
+	kfree(rport);
+}
 
 struct fc_rport *fc_rport_rogue_create(struct fc_disc_port *dp)
 {
@@ -108,16 +119,11 @@ struct fc_rport *fc_rport_rogue_create(struct fc_disc_port *dp)
 	rport->roles = dp->ids.roles;
 	rport->maxframe_size = FC_MIN_MAX_PAYLOAD;
 	/*
-	 * init the device, so other code can manipulate the rport as if
-	 * it came from the fc class. We also do an extra get because
-	 * libfc will free this rport instead of relying on the normal
-	 * refcounting.
-	 *
 	 * Note: all this libfc rogue rport code will be removed for
 	 * upstream so it fine that this is really ugly and hacky right now.
 	 */
 	device_initialize(&rport->dev);
-	get_device(&rport->dev);
+ 	rport->dev.release = fc_rport_rogue_destroy;
 
 	mutex_init(&rdata->rp_mutex);
 	rdata->local_port = dp->lp;
@@ -125,7 +131,7 @@ struct fc_rport *fc_rport_rogue_create(struct fc_disc_port *dp)
 	rdata->rp_state = RPORT_ST_INIT;
 	rdata->event = RPORT_EV_NONE;
 	rdata->flags = FC_RP_FLAGS_REC_SUPPORTED;
-	rdata->event_callback = NULL;
+	rdata->ops = NULL;
 	rdata->e_d_tov = dp->lp->e_d_tov;
 	rdata->r_a_tov = dp->lp->r_a_tov;
 	INIT_DELAYED_WORK(&rdata->retry_work, fc_rport_timeout);
@@ -137,11 +143,6 @@ struct fc_rport *fc_rport_rogue_create(struct fc_disc_port *dp)
 	INIT_LIST_HEAD(&rdata->peers);
 
 	return rport;
-}
-
-void fc_rport_rogue_destroy(struct fc_rport *rport)
-{
-	kfree(rport);
 }
 
 /**
@@ -214,18 +215,18 @@ static void fc_rport_state_enter(struct fc_rport *rport,
 
 static void fc_rport_work(struct work_struct *work)
 {
+	u32 port_id;
 	struct fc_rport_libfc_priv *rdata =
 		container_of(work, struct fc_rport_libfc_priv, event_work);
-	enum fc_lport_event event;
+	enum fc_rport_event event;
 	enum fc_rport_trans_state trans_state;
 	struct fc_lport *lport = rdata->local_port;
-	void (*event_callback)(struct fc_lport *, struct fc_rport *,
-			       enum fc_lport_event);
+	struct fc_rport_operations *rport_ops;
 	struct fc_rport *rport = PRIV_TO_RPORT(rdata);
 
 	mutex_lock(&rdata->rp_mutex);
 	event = rdata->event;
-	event_callback = rdata->event_callback;
+	rport_ops = rdata->ops;
 
 	if (event == RPORT_EV_CREATED) {
 		struct fc_rport *new_rport;
@@ -250,7 +251,7 @@ static void fc_rport_work(struct work_struct *work)
 			new_rdata = new_rport->dd_data;
 			new_rdata->e_d_tov = rdata->e_d_tov;
 			new_rdata->r_a_tov = rdata->r_a_tov;
-			new_rdata->event_callback = rdata->event_callback;
+			new_rdata->ops = rdata->ops;
 			new_rdata->local_port = rdata->local_port;
 			new_rdata->flags = FC_RP_FLAGS_REC_SUPPORTED;
 			new_rdata->trans_state = FC_PORTSTATE_REAL;
@@ -266,22 +267,26 @@ static void fc_rport_work(struct work_struct *work)
 			       "(%6x).\n", ids.port_id);
 			event = RPORT_EV_FAILED;
 		}
-		fc_rport_rogue_destroy(rport);
+		put_device(&rport->dev);
 		rport = new_rport;
 		rdata = new_rport->dd_data;
-		if (event_callback)
-			event_callback(lport, rport, event);
+		if (rport_ops->event_callback)
+			rport_ops->event_callback(lport, rport, event);
 	} else if ((event == RPORT_EV_FAILED) ||
 		   (event == RPORT_EV_LOGO) ||
 		   (event == RPORT_EV_STOP)) {
 		trans_state = rdata->trans_state;
 		mutex_unlock(&rdata->rp_mutex);
-		if (event_callback)
-			event_callback(lport, rport, event);
+		if (rport_ops->event_callback)
+			rport_ops->event_callback(lport, rport, event);
 		if (trans_state == FC_PORTSTATE_ROGUE)
-			fc_rport_rogue_destroy(rport);
-		else
+			put_device(&rport->dev);
+		else {
+			port_id = rport->port_id;
 			fc_remote_port_delete(rport);
+			lport->tt.exch_mgr_reset(lport, 0, port_id);
+			lport->tt.exch_mgr_reset(lport, port_id, 0);
+		}
 	} else
 		mutex_unlock(&rdata->rp_mutex);
 }
@@ -400,19 +405,15 @@ static void fc_rport_timeout(struct work_struct *work)
 	case RPORT_ST_NONE:
 		break;
 	}
-	put_device(&rport->dev);
 
 	mutex_unlock(&rdata->rp_mutex);
+	put_device(&rport->dev);
 }
 
 /**
- * fc_rport_error - Handler for any errors
+ * fc_rport_error - Error handler, called once retries have been exhausted
  * @rport: The fc_rport object
  * @fp: The frame pointer
- *
- * If the error was caused by a resource allocation failure
- * then wait for half a second and retry, otherwise retry
- * immediately.
  *
  * Locking Note: The rport lock is expected to be held before
  * calling this routine
@@ -420,41 +421,61 @@ static void fc_rport_timeout(struct work_struct *work)
 static void fc_rport_error(struct fc_rport *rport, struct fc_frame *fp)
 {
 	struct fc_rport_libfc_priv *rdata = rport->dd_data;
-	unsigned long delay = 0;
 
 	FC_DEBUG_RPORT("Error %ld in state %s, retries %d\n",
 		       PTR_ERR(fp), fc_rport_state(rport), rdata->retries);
 
-	if (!fp || PTR_ERR(fp) == -FC_EX_TIMEOUT) {
-		/* 
-		 * Memory allocation failure, or the exchange timed out.
-		 *  Retry after delay
-		 */
-		if (rdata->retries < rdata->local_port->max_retry_count) {
-			rdata->retries++;
-			if (!fp)
-				delay = msecs_to_jiffies(500);
-			get_device(&rport->dev);
-			schedule_delayed_work(&rdata->retry_work, delay);
-		} else {
-			switch (rdata->rp_state) {
-			case RPORT_ST_PLOGI:
-			case RPORT_ST_PRLI:
-			case RPORT_ST_LOGO:
-				rdata->event = RPORT_EV_FAILED;
-				queue_work(rport_event_queue,
-					   &rdata->event_work);
-				break;
-			case RPORT_ST_RTV:
-				fc_rport_enter_ready(rport);
-				break;
-			case RPORT_ST_NONE:
-			case RPORT_ST_READY:
-			case RPORT_ST_INIT:
-				break;
-			}
-		}
+	switch (rdata->rp_state) {
+	case RPORT_ST_PLOGI:
+	case RPORT_ST_PRLI:
+	case RPORT_ST_LOGO:
+		rdata->event = RPORT_EV_FAILED;
+		queue_work(rport_event_queue,
+			   &rdata->event_work);
+		break;
+	case RPORT_ST_RTV:
+		fc_rport_enter_ready(rport);
+		break;
+	case RPORT_ST_NONE:
+	case RPORT_ST_READY:
+	case RPORT_ST_INIT:
+		break;
 	}
+}
+
+/**
+ * fc_rport_error_retry - Error handler when retries are desired
+ * @rport: The fc_rport object
+ * @fp: The frame pointer
+ *
+ * If the error was an exchange timeout retry immediately,
+ * otherwise wait for E_D_TOV.
+ *
+ * Locking Note: The rport lock is expected to be held before
+ * calling this routine
+ */
+static void fc_rport_error_retry(struct fc_rport *rport, struct fc_frame *fp)
+{
+	struct fc_rport_libfc_priv *rdata = rport->dd_data;
+	unsigned long delay = FC_DEF_E_D_TOV;
+
+	/* make sure this isn't an FC_EX_CLOSED error, never retry those */
+	if (PTR_ERR(fp) == -FC_EX_CLOSED)
+		return fc_rport_error(rport, fp);
+
+	if (rdata->retries < rdata->local_port->max_retry_count) {
+		FC_DEBUG_RPORT("Error %ld in state %s, retrying\n",
+				PTR_ERR(fp), fc_rport_state(rport));
+		rdata->retries++;
+		/* no additional delay on exchange timeouts */
+		if (PTR_ERR(fp) == -FC_EX_TIMEOUT)
+			delay = 0;
+		get_device(&rport->dev);
+		schedule_delayed_work(&rdata->retry_work, delay);
+		return;
+	}
+
+	return fc_rport_error(rport, fp);
 }
 
 /**
@@ -491,7 +512,7 @@ static void fc_rport_plogi_resp(struct fc_seq *sp, struct fc_frame *fp,
 	}
 
 	if (IS_ERR(fp)) {
-		fc_rport_error(rport, fp);
+		fc_rport_error_retry(rport, fp);
 		goto err;
 	}
 
@@ -523,12 +544,13 @@ static void fc_rport_plogi_resp(struct fc_seq *sp, struct fc_frame *fp,
 		else
 			fc_rport_enter_prli(rport);
 	} else
-		fc_rport_error(rport, fp);
+		fc_rport_error_retry(rport, fp);
 
 out:
 	fc_frame_free(fp);
 err:
 	mutex_unlock(&rdata->rp_mutex);
+	put_device(&rport->dev);
 }
 
 /**
@@ -552,14 +574,16 @@ static void fc_rport_enter_plogi(struct fc_rport *rport)
 	rport->maxframe_size = FC_MIN_MAX_PAYLOAD;
 	fp = fc_frame_alloc(lport, sizeof(struct fc_els_flogi));
 	if (!fp) {
-		fc_rport_error(rport, fp);
+		fc_rport_error_retry(rport, fp);
 		return;
 	}
 	rdata->e_d_tov = lport->e_d_tov;
 
 	if (!lport->tt.elsct_send(lport, rport, fp, ELS_PLOGI,
 				  fc_rport_plogi_resp, rport, lport->e_d_tov))
-		fc_rport_error(rport, fp);
+		fc_rport_error_retry(rport, fp);
+	else
+		get_device(&rport->dev);
 }
 
 /**
@@ -597,7 +621,7 @@ static void fc_rport_prli_resp(struct fc_seq *sp, struct fc_frame *fp,
 	}
 
 	if (IS_ERR(fp)) {
-		fc_rport_error(rport, fp);
+		fc_rport_error_retry(rport, fp);
 		goto err;
 	}
 
@@ -629,6 +653,7 @@ out:
 	fc_frame_free(fp);
 err:
 	mutex_unlock(&rdata->rp_mutex);
+	put_device(&rport->dev);
 }
 
 /**
@@ -654,7 +679,7 @@ static void fc_rport_logo_resp(struct fc_seq *sp, struct fc_frame *fp,
 		       rport->port_id);
 
 	if (IS_ERR(fp)) {
-		fc_rport_error(rport, fp);
+		fc_rport_error_retry(rport, fp);
 		goto err;
 	}
 
@@ -677,6 +702,7 @@ out:
 	fc_frame_free(fp);
 err:
 	mutex_unlock(&rdata->rp_mutex);
+	put_device(&rport->dev);
 }
 
 /**
@@ -703,13 +729,15 @@ static void fc_rport_enter_prli(struct fc_rport *rport)
 
 	fp = fc_frame_alloc(lport, sizeof(*pp));
 	if (!fp) {
-		fc_rport_error(rport, fp);
+		fc_rport_error_retry(rport, fp);
 		return;
 	}
 
 	if (!lport->tt.elsct_send(lport, rport, fp, ELS_PRLI,
 				  fc_rport_prli_resp, rport, lport->e_d_tov))
-		fc_rport_error(rport, fp);
+		fc_rport_error_retry(rport, fp);
+	else
+		get_device(&rport->dev);
 }
 
 /**
@@ -775,6 +803,7 @@ out:
 	fc_frame_free(fp);
 err:
 	mutex_unlock(&rdata->rp_mutex);
+	put_device(&rport->dev);
 }
 
 /**
@@ -797,13 +826,15 @@ static void fc_rport_enter_rtv(struct fc_rport *rport)
 
 	fp = fc_frame_alloc(lport, sizeof(struct fc_els_rtv));
 	if (!fp) {
-		fc_rport_error(rport, fp);
+		fc_rport_error_retry(rport, fp);
 		return;
 	}
 
 	if (!lport->tt.elsct_send(lport, rport, fp, ELS_RTV,
 				     fc_rport_rtv_resp, rport, lport->e_d_tov))
-		fc_rport_error(rport, fp);
+		fc_rport_error_retry(rport, fp);
+	else
+		get_device(&rport->dev);
 }
 
 /**
@@ -826,13 +857,15 @@ static void fc_rport_enter_logo(struct fc_rport *rport)
 
 	fp = fc_frame_alloc(lport, sizeof(struct fc_els_logo));
 	if (!fp) {
-		fc_rport_error(rport, fp);
+		fc_rport_error_retry(rport, fp);
 		return;
 	}
 
 	if (!lport->tt.elsct_send(lport, rport, fp, ELS_LOGO,
 				  fc_rport_logo_resp, rport, lport->e_d_tov))
-		fc_rport_error(rport, fp);
+		fc_rport_error_retry(rport, fp);
+	else
+		get_device(&rport->dev);
 }
 
 
@@ -1274,7 +1307,7 @@ void fc_rport_terminate_io(struct fc_rport *rport)
 	struct fc_rport_libfc_priv *rdata = rport->dd_data;
 	struct fc_lport *lport = rdata->local_port;
 
-	lport->tt.exch_mgr_reset(lport->emp, 0, rport->port_id);
-	lport->tt.exch_mgr_reset(lport->emp, rport->port_id, 0);
+	lport->tt.exch_mgr_reset(lport, 0, rport->port_id);
+	lport->tt.exch_mgr_reset(lport, rport->port_id, 0);
 }
 EXPORT_SYMBOL(fc_rport_terminate_io);

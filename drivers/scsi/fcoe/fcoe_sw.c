@@ -100,7 +100,7 @@ static struct scsi_host_template fcoe_sw_shost_template = {
 	.cmd_per_lun = 32,
 	.can_queue = FCOE_MAX_OUTSTANDING_COMMANDS,
 	.use_clustering = ENABLE_CLUSTERING,
-	.sg_tablesize = 4,
+	.sg_tablesize = SG_ALL,
 	.max_sectors = 0xffff,
 };
 
@@ -116,7 +116,8 @@ static int fcoe_sw_lport_config(struct fc_lport *lp)
 {
 	int i = 0;
 
-	lp->link_status = 0;
+	lp->link_up = 0;
+	lp->qfull = 0;
 	lp->max_retry_count = 3;
 	lp->e_d_tov = 2 * 1000;	/* FC-FS default */
 	lp->r_a_tov = 2 * 2 * 1000;
@@ -178,11 +179,11 @@ static int fcoe_sw_netdev_config(struct fc_lport *lp, struct net_device *netdev)
 	 */
 	mfs = fc->real_dev->mtu - (sizeof(struct fcoe_hdr) +
 				   sizeof(struct fcoe_crc_eof));
-	fc_set_mfs(lp, mfs);
+	if (fc_set_mfs(lp, mfs))
+		return -EINVAL;
 
-	lp->link_status = ~FC_PAUSE & ~FC_LINK_UP;
 	if (!fcoe_link_ok(lp))
-		lp->link_status |= FC_LINK_UP;
+		lp->link_up = 1;
 
 	/* offload features support */
 	if (fc->real_dev->features & NETIF_F_SG)
@@ -301,6 +302,9 @@ static int fcoe_sw_destroy(struct net_device *netdev)
 		return -ENODEV;
 
 	fc = fcoe_softc(lp);
+
+	/* Logout of the fabric */
+	fc_fabric_logoff(lp);
 
 	/* Remove the instance from fcoe's list */
 	fcoe_hostlist_remove(lp);

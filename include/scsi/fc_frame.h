@@ -56,6 +56,7 @@
 #define fr_max_payload(fp)	(fr_cb(fp)->fr_max_payload)
 #define fr_cmd(fp)	(fr_cb(fp)->fr_cmd)
 #define fr_dir(fp)	(fr_cmd(fp)->sc_data_direction)
+#define fr_crc(fp)	(fr_cb(fp)->fr_crc)
 
 struct fc_frame {
 	struct sk_buff skb;
@@ -66,11 +67,13 @@ struct fcoe_rcv_info {
 	struct fc_lport	*fr_dev;	/* transport layer private pointer */
 	struct fc_seq	*fr_seq;	/* for use with exchange manager */
 	struct scsi_cmnd *fr_cmd;	/* for use of scsi command */
+	u32		fr_crc;
+	u16		fr_max_payload;	/* max FC payload */
 	enum fc_sof	fr_sof;		/* start of frame delimiter */
 	enum fc_eof	fr_eof;		/* end of frame delimiter */
 	u8		fr_flags;	/* flags - see below */
-	u16		fr_max_payload;	/* max FC payload */
 };
+
 
 /*
  * Get fc_frame pointer for an skb that's already been imported.

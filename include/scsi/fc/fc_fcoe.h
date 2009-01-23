@@ -85,6 +85,18 @@ struct fcoe_crc_eof {
 } __attribute__((packed));
 
 /*
+ * Minimum FCoE + FC header length
+ * 14 bytes FCoE header + 24 byte FC header = 38 bytes
+ */
+#define FCOE_HEADER_LEN 38
+
+/*
+ * Minimum FCoE frame size
+ * 14 bytes FCoE header + 24 byte FC header + 8 byte FCoE trailer = 46 bytes
+ */
+#define FCOE_MIN_FRAME 46
+
+/*
  * fc_fcoe_set_mac - Store OUI + DID into MAC address field.
  * @mac: mac address to be set
  * @did: fc dest id to use

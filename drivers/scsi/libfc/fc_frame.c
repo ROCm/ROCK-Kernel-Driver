@@ -42,7 +42,7 @@ u32 fc_frame_crc_check(struct fc_frame *fp)
 	len = (fr_len(fp) + 3) & ~3;	/* round up length to include fill */
 	bp = (const u8 *) fr_hdr(fp);
 	crc = ~crc32(~0, bp, len);
-	error = crc ^ *(u32 *) (bp + len);
+	error = crc ^ fr_crc(fp);
 	return error;
 }
 EXPORT_SYMBOL(fc_frame_crc_check);

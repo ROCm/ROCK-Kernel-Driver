@@ -18,34 +18,51 @@
  */
 
 /*
- * General locking notes:
+ * PORT LOCKING NOTES
  *
- * The lport and rport blocks both have mutexes that are used to protect
- * the port objects states. The main motivation for this protection is that
- * we don't want to be preparing a request/response in one context while
- * another thread "resets" the port in question. For example, if the lport
- * block is sending a SCR request to the directory server we don't want
- * the lport to be reset before we fill out the frame header's port_id. The
- * problem is that a reset would cause the lport's port_id to reset to 0.
- * If we don't protect the lport we'd spew incorrect frames.
+ * These comments only apply to the 'port code' which consists of the lport,
+ * disc and rport blocks.
  *
- * At the time of this writing there are two primary mutexes, one for the
- * lport and one for the rport. Since the lport uses the rport and makes
- * calls into that block the rport should never make calls that would cause
- * the lport's mutex to be locked. In other words, the lport's mutex is
- * considered the outer lock and the rport's lock is considered the inner
- * lock. The bottom line is that you can hold a lport's mutex and then
- * hold the rport's mutex, but not the other way around.
+ * MOTIVATION
  *
- * The only complication to this rule is the callbacks from the rport to
- * the lport's event_callback function. When rports become READY they make
- * a callback to the lport so that it can track them. In the case of the
- * directory server that callback might cause the lport to change its
- * state, implying that the lport mutex would need to be held. This problem
- * was solved by serializing the rport notifications to the lport and the
- * callback is made without holding the rport's lock.
+ * The lport, disc and rport blocks all have mutexes that are used to protect
+ * those objects. The main motivation for these locks is to prevent from
+ * having an lport reset just before we send a frame. In that scenario the
+ * lport's FID would get set to zero and then we'd send a frame with an
+ * invalid SID. We also need to ensure that states don't change unexpectedly
+ * while processing another state.
  *
- * lport locking notes:
+ * HEIRARCHY
+ *
+ * The following heirarchy defines the locking rules. A greater lock
+ * may be held before acquiring a lesser lock, but a lesser lock should never
+ * be held while attempting to acquire a greater lock. Here is the heirarchy-
+ *
+ * lport > disc, lport > rport, disc > rport
+ *
+ * CALLBACKS
+ *
+ * The callbacks cause complications with this scheme. There is a callback
+ * from the rport (to either lport or disc) and a callback from disc
+ * (to the lport).
+ *
+ * As rports exit the rport state machine a callback is made to the owner of
+ * the rport to notify success or failure. Since the callback is likely to
+ * cause the lport or disc to grab its lock we cannot hold the rport lock
+ * while making the callback. To ensure that the rport is not free'd while
+ * processing the callback the rport callbacks are serialized through a
+ * single-threaded workqueue. An rport would never be free'd while in a
+ * callback handler becuase no other rport work in this queue can be executed
+ * at the same time.
+ *
+ * When discovery succeeds or fails a callback is made to the lport as
+ * notification. Currently, succesful discovery causes the lport to take no
+ * action. A failure will cause the lport to reset. There is likely a circular
+ * locking problem with this implementation.
+ */
+
+/*
+ * LPORT LOCKING
  *
  * The critical sections protected by the lport's mutex are quite broad and
  * may be improved upon in the future. The lport code and its locking doesn't
@@ -54,9 +71,9 @@
  *
  * The strategy is to lock whenever processing a request or response. Note
  * that every _enter_* function corresponds to a state change. They generally
- * change the lports state and then sends a request out on the wire. We lock
+ * change the lports state and then send a request out on the wire. We lock
  * before calling any of these functions to protect that state change. This
- * means that the entry points into the lport block to manage the locks while
+ * means that the entry points into the lport block manage the locks while
  * the state machine can transition between states (i.e. _enter_* functions)
  * while always staying protected.
  *
@@ -68,9 +85,6 @@
  * Retries also have to consider the locking. The retries occur from a work
  * context and the work function will lock the lport and then retry the state
  * (i.e. _enter_* function).
- *
- * The implication to all of this is that each lport can only process one
- * state at a time.
  */
 
 #include <linux/timer.h>
@@ -125,7 +139,7 @@ static int fc_frame_drop(struct fc_lport *lport, struct fc_frame *fp)
 }
 
 /**
- * fc_lport_rport_event - Event handler for rport events
+ * fc_lport_rport_callback - Event handler for rport events
  * @lport: The lport which is receiving the event
  * @rport: The rport which the event has occured on
  * @event: The event that occured
@@ -133,9 +147,9 @@ static int fc_frame_drop(struct fc_lport *lport, struct fc_frame *fp)
  * Locking Note: The rport lock should not be held when calling
  *		 this function.
  */
-static void fc_lport_rport_event(struct fc_lport *lport,
-				 struct fc_rport *rport,
-				 enum fc_lport_event event)
+static void fc_lport_rport_callback(struct fc_lport *lport,
+				    struct fc_rport *rport,
+				    enum fc_rport_event event)
 {
 	FC_DEBUG_LPORT("Received a %d event for port (%6x)\n", event,
 		       rport->port_id);
@@ -236,7 +250,7 @@ void fc_get_host_port_state(struct Scsi_Host *shost)
 {
 	struct fc_lport *lp = shost_priv(shost);
 
-	if ((lp->link_status & FC_LINK_UP) == FC_LINK_UP)
+	if (lp->link_up)
 		fc_host_port_state(shost) = FC_PORTSTATE_ONLINE;
 	else
 		fc_host_port_state(shost) = FC_PORTSTATE_OFFLINE;
@@ -470,7 +484,7 @@ static void fc_lport_recv_rnid_req(struct fc_seq *sp, struct fc_frame *in_fp,
  * @sp: current sequence in the ADISC exchange
  * @fp: ADISC request frame
  *
- * Locking Note: The lport lock is exected to be held before calling
+ * Locking Note: The lport lock is expected to be held before calling
  * this function.
  */
 static void fc_lport_recv_adisc_req(struct fc_seq *sp, struct fc_frame *in_fp,
@@ -563,8 +577,8 @@ void fc_linkup(struct fc_lport *lport)
 		       fc_host_port_id(lport->host));
 
 	mutex_lock(&lport->lp_mutex);
-	if ((lport->link_status & FC_LINK_UP) != FC_LINK_UP) {
-		lport->link_status |= FC_LINK_UP;
+	if (!lport->link_up) {
+		lport->link_up = 1;
 
 		if (lport->state == LPORT_ST_RESET)
 			fc_lport_enter_flogi(lport);
@@ -583,38 +597,14 @@ void fc_linkdown(struct fc_lport *lport)
 	FC_DEBUG_LPORT("Link is down for port (%6x)\n",
 		       fc_host_port_id(lport->host));
 
-	if ((lport->link_status & FC_LINK_UP) == FC_LINK_UP) {
-		lport->link_status &= ~(FC_LINK_UP);
+	if (lport->link_up) {
+		lport->link_up = 0;
 		fc_lport_enter_reset(lport);
 		lport->tt.fcp_cleanup(lport);
 	}
 	mutex_unlock(&lport->lp_mutex);
 }
 EXPORT_SYMBOL(fc_linkdown);
-
-/**
- * fc_pause - Pause the flow of frames
- * @lport: The lport to be paused
- */
-void fc_pause(struct fc_lport *lport)
-{
-	mutex_lock(&lport->lp_mutex);
-	lport->link_status |= FC_PAUSE;
-	mutex_unlock(&lport->lp_mutex);
-}
-EXPORT_SYMBOL(fc_pause);
-
-/**
- * fc_unpause - Unpause the flow of frames
- * @lport: The lport to be unpaused
- */
-void fc_unpause(struct fc_lport *lport)
-{
-	mutex_lock(&lport->lp_mutex);
-	lport->link_status &= ~(FC_PAUSE);
-	mutex_unlock(&lport->lp_mutex);
-}
-EXPORT_SYMBOL(fc_unpause);
 
 /**
  * fc_fabric_logoff - Logout of the fabric
@@ -627,8 +617,6 @@ int fc_fabric_logoff(struct fc_lport *lport)
 {
 	lport->tt.disc_stop_final(lport);
 	mutex_lock(&lport->lp_mutex);
-	kfree(lport->disc);
-	lport->disc = NULL;
 	fc_lport_enter_logo(lport);
 	mutex_unlock(&lport->lp_mutex);
 	return 0;
@@ -651,15 +639,25 @@ int fc_lport_destroy(struct fc_lport *lport)
 {
 	lport->tt.frame_send = fc_frame_drop;
 	lport->tt.fcp_abort_io(lport);
-	lport->tt.exch_mgr_reset(lport->emp, 0, 0);
+	lport->tt.exch_mgr_reset(lport, 0, 0);
 	return 0;
 }
 EXPORT_SYMBOL(fc_lport_destroy);
 
+/**
+ * fc_set_mfs - sets up the mfs for the corresponding fc_lport
+ * @lport: fc_lport pointer to unregister
+ * @mfs: the new mfs for fc_lport
+ *
+ * Set mfs for the given fc_lport to the new mfs.
+ *
+ * Return: 0 for success
+ *
+ **/
 int fc_set_mfs(struct fc_lport *lport, u32 mfs)
 {
 	unsigned int old_mfs;
-	int rc = -1;
+	int rc = -EINVAL;
 
 	mutex_lock(&lport->lp_mutex);
 
@@ -667,7 +665,6 @@ int fc_set_mfs(struct fc_lport *lport, u32 mfs)
 
 	if (mfs >= FC_MIN_MAX_FRAME) {
 		mfs &= ~3;
-		WARN_ON((size_t) mfs < FC_MIN_MAX_FRAME);
 		if (mfs > FC_MAX_FRAME)
 			mfs = FC_MAX_FRAME;
 		mfs -= sizeof(struct fc_frame_header);
@@ -887,10 +884,9 @@ static void fc_lport_recv_req(struct fc_lport *lport, struct fc_seq *sp,
 			d_id = ntoh24(fh->fh_d_id);
 
 			rport = lport->tt.rport_lookup(lport, s_id);
-			if (rport) {
+			if (rport)
 				lport->tt.rport_recv_req(sp, fp, rport);
-				put_device(&rport->dev); /* hold from lookup */
-			} else {
+			else {
 				rjt_data.fp = NULL;
 				rjt_data.reason = ELS_RJT_UNAB;
 				rjt_data.explan = ELS_EXPL_NONE;
@@ -953,11 +949,11 @@ static void fc_lport_enter_reset(struct fc_lport *lport)
 
 	lport->tt.disc_stop(lport);
 
-	lport->tt.exch_mgr_reset(lport->emp, 0, 0);
+	lport->tt.exch_mgr_reset(lport, 0, 0);
 	fc_host_fabric_name(lport->host) = 0;
 	fc_host_port_id(lport->host) = 0;
 
-	if ((lport->link_status & FC_LINK_UP) == FC_LINK_UP)
+	if (lport->link_up)
 		fc_lport_enter_flogi(lport);
 }
 
@@ -1256,6 +1252,10 @@ static void fc_lport_enter_rpn_id(struct fc_lport *lport)
 		fc_lport_error(lport, fp);
 }
 
+static struct fc_rport_operations fc_lport_rport_ops = {
+	.event_callback = fc_lport_rport_callback,
+};
+
 /**
  * fc_rport_enter_dns - Create a rport to the name server
  * @lport: Fibre Channel local port requesting a rport for the name server
@@ -1285,7 +1285,7 @@ static void fc_lport_enter_dns(struct fc_lport *lport)
 		goto err;
 
 	rdata = rport->dd_data;
-	rdata->event_callback = fc_lport_rport_event;
+	rdata->ops = &fc_lport_rport_ops;
 	lport->tt.rport_login(rport);
 	return;
 
