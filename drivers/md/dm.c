@@ -1304,7 +1304,11 @@ static int dm_make_request(struct request_queue *q, struct bio *bio)
 		return 0;
 	}
 
-	if (unlikely(!md->map)) {
+	/*
+	 * Submitting to a stopped queue with no map is okay;
+	 * might happen during reconfiguration.
+	 */
+	if (unlikely(!md->map) && !blk_queue_stopped(q)) {
 		bio_endio(bio, -EIO);
 		return 0;
 	}
@@ -1503,9 +1507,6 @@ static void map_request(struct dm_target *ti, struct request *rq,
 	tio->ti = ti;
 	atomic_inc(&md->pending);
 
-#if 0
-	/* This might trigger accidentally */
-
 	/*
 	 * Although submitted requests to the md->queue are checked against
 	 * the table/queue limitations at the submission time, the limitations
@@ -1525,10 +1526,12 @@ static void map_request(struct dm_target *ti, struct request *rq,
 	if (unlikely(r)) {
 		DMWARN("violating the queue limitation. the limitation may be"
 		       " shrunk while there are some requests in the queue.");
+#if 0
+		/* This might trigger accidentally */
 		dm_kill_request(clone, r);
 		return;
-	}
 #endif
+	}
 
 	r = ti->type->map_rq(ti, clone, &tio->info);
 	switch (r) {

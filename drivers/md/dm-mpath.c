@@ -159,9 +159,7 @@ static struct priority_group *alloc_priority_group(void)
 
 static void free_pgpaths(struct list_head *pgpaths, struct dm_target *ti)
 {
-	unsigned long flags;
 	struct pgpath *pgpath, *tmp;
-	struct multipath *m = ti->private;
 
 	list_for_each_entry_safe(pgpath, tmp, pgpaths, list) {
 		list_del(&pgpath->list);
@@ -436,8 +434,8 @@ static void process_queued_ios(struct work_struct *work)
 {
 	struct multipath *m =
 		container_of(work, struct multipath, process_queued_ios);
-       struct pgpath *pgpath = NULL, *tmp;
-       unsigned must_queue = 1;
+	struct pgpath *pgpath = NULL, *tmp;
+	unsigned must_queue = 1;
 	unsigned long flags;
 
 	spin_lock_irqsave(&m->lock, flags);
@@ -449,6 +447,12 @@ static void process_queued_ios(struct work_struct *work)
 		__choose_pgpath(m, 1 << 19); /* Assume 512 KB */
 
 	pgpath = m->current_pgpath;
+
+	if (pgpath) {
+		struct block_device *bdev = pgpath->path.dev->bdev;
+		if (unlikely(blk_queue_stopped(bdev_get_queue(bdev))))
+			goto out;
+	}
 
 	if ((pgpath && !m->queue_io) ||
 	    (!pgpath && !m->queue_if_no_path))
@@ -619,22 +623,27 @@ static struct pgpath *parse_path(struct arg_set *as, struct path_selector *ps,
 		memcpy(p->path.pdev, p->path.dev->name, 16);
 	}
 
-	if (m->hw_handler_name && p->path.dev) {
+	if (p->path.dev) {
 		struct request_queue *q = bdev_get_queue(p->path.dev->bdev);
 
-		r = scsi_dh_attach(q, m->hw_handler_name);
-		if (r == -EBUSY) {
-			/*
-			 * Already attached to different hw_handler,
-			 * try to reattach with correct one.
-			 */
-			scsi_dh_detach(q);
+		if (m->hw_handler_name) {
 			r = scsi_dh_attach(q, m->hw_handler_name);
-		}
-		if (r < 0) {
-			ti->error = "error attaching hardware handler";
-			dm_put_device(ti, p->path.dev);
-			goto bad;
+			if (r == -EBUSY) {
+				/*
+				 * Already attached to different hw_handler,
+				 * try to reattach with correct one.
+				 */
+				scsi_dh_detach(q);
+				r = scsi_dh_attach(q, m->hw_handler_name);
+			}
+			if (r < 0) {
+				ti->error = "error attaching hardware handler";
+				dm_put_device(ti, p->path.dev);
+				goto bad;
+			}
+		} else {
+			/* Play safe and detach hardware handler */
+			scsi_dh_detach(q);
 		}
 	}
 
@@ -644,6 +653,11 @@ static struct pgpath *parse_path(struct arg_set *as, struct path_selector *ps,
 		goto bad;
 	}
 
+	if (!p->is_active) {
+		ps->type->fail_path(ps, &p->path);
+		p->fail_count++;
+		m->nr_valid_paths--;
+	}
 	return p;
 
  bad:
