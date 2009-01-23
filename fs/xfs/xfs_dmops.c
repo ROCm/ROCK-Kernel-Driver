@@ -58,7 +58,6 @@ xfs_dmops_get(struct xfs_mount *mp, struct xfs_mount_args *args)
 		mp->m_dm_ops = &xfs_dmcore_stub;
 	}
 
-	mp->m_dm_ops = &xfs_dmcore_stub;
 	return 0;
 }
 

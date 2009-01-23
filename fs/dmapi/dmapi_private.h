@@ -37,8 +37,8 @@
 #include "sv.h"
 
 #ifdef CONFIG_PROC_FS
-#define DMAPI_PROCFS		"orig/fs/dmapi_v2" /* DMAPI device in /proc. */
-#define DMAPI_DBG_PROCFS	"orig/fs/dmapi_d" /* DMAPI debugging dir */
+#define DMAPI_PROCFS		"fs/dmapi_v2" /* DMAPI device in /proc. */
+#define DMAPI_DBG_PROCFS	"fs/dmapi_d" /* DMAPI debugging dir */
 #endif
 
 extern struct kmem_cache	*dm_fsreg_cachep;
