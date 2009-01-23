@@ -30,6 +30,7 @@ static inline int task_is_pdflush(struct task_struct *task)
 enum writeback_sync_modes {
 	WB_SYNC_NONE,	/* Don't wait on anything */
 	WB_SYNC_ALL,	/* Wait on every mapping */
+	WB_SYNC_HOLD,	/* DOES NOTHING, DO NOT USE, ONLY HERE FOR ABI issue */
 };
 
 /*
