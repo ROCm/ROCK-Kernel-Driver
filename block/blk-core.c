@@ -138,6 +138,9 @@ static void req_bio_endio(struct request *rq, struct bio *bio,
 			nbytes = bio->bi_size;
 		}
 
+		if (unlikely(rq->cmd_flags & REQ_QUIET))
+			set_bit(BIO_QUIET, &bio->bi_flags);
+
 		bio->bi_size -= nbytes;
 		bio->bi_sector += (nbytes >> 9);
 
@@ -906,9 +909,11 @@ EXPORT_SYMBOL(blk_get_request);
  */
 void blk_start_queueing(struct request_queue *q)
 {
-	if (!blk_queue_plugged(q))
+	if (!blk_queue_plugged(q)) {
+		if (unlikely(blk_queue_stopped(q)))
+			return;
 		q->request_fn(q);
-	else
+	} else
 		__generic_unplug_device(q);
 }
 EXPORT_SYMBOL(blk_start_queueing);
