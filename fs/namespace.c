@@ -130,10 +130,20 @@ struct vfsmount *alloc_vfsmnt(const char *name)
 		INIT_LIST_HEAD(&mnt->mnt_share);
 		INIT_LIST_HEAD(&mnt->mnt_slave_list);
 		INIT_LIST_HEAD(&mnt->mnt_slave);
-		atomic_set(&mnt->__mnt_writers, 0);
+#ifdef CONFIG_SMP
+		mnt->mnt_writers = alloc_percpu(int);
+		if (!mnt->mnt_writers)
+			goto out_free_devname;
+#else
+		mnt->mnt_writers = 0;
+#endif
 	}
 	return mnt;
 
+#ifdef CONFIG_SMP
+out_free_devname:
+	kfree(mnt->mnt_devname);
+#endif
 out_free_id:
 	mnt_free_id(mnt);
 out_free_cache:
@@ -170,65 +180,38 @@ int __mnt_is_readonly(struct vfsmount *mnt)
 }
 EXPORT_SYMBOL_GPL(__mnt_is_readonly);
 
-struct mnt_writer {
-	/*
-	 * If holding multiple instances of this lock, they
-	 * must be ordered by cpu number.
-	 */
-	spinlock_t lock;
-	struct lock_class_key lock_class; /* compiles out with !lockdep */
-	unsigned long count;
-	struct vfsmount *mnt;
-} ____cacheline_aligned_in_smp;
-static DEFINE_PER_CPU(struct mnt_writer, mnt_writers);
-
-static int __init init_mnt_writers(void)
+static inline void inc_mnt_writers(struct vfsmount *mnt)
 {
-	int cpu;
-	for_each_possible_cpu(cpu) {
-		struct mnt_writer *writer = &per_cpu(mnt_writers, cpu);
-		spin_lock_init(&writer->lock);
-		lockdep_set_class(&writer->lock, &writer->lock_class);
-		writer->count = 0;
-	}
-	return 0;
+#ifdef CONFIG_SMP
+	(*per_cpu_ptr(mnt->mnt_writers, smp_processor_id()))++;
+#else
+	mnt->mnt_writers++;
+#endif
 }
-fs_initcall(init_mnt_writers);
 
-static void unlock_mnt_writers(void)
+static inline void dec_mnt_writers(struct vfsmount *mnt)
 {
+#ifdef CONFIG_SMP
+	(*per_cpu_ptr(mnt->mnt_writers, smp_processor_id()))--;
+#else
+	mnt->mnt_writers--;
+#endif
+}
+
+static unsigned int count_mnt_writers(struct vfsmount *mnt)
+{
+#ifdef CONFIG_SMP
+	unsigned int count = 0;
 	int cpu;
-	struct mnt_writer *cpu_writer;
 
 	for_each_possible_cpu(cpu) {
-		cpu_writer = &per_cpu(mnt_writers, cpu);
-		spin_unlock(&cpu_writer->lock);
+		count += *per_cpu_ptr(mnt->mnt_writers, cpu);
 	}
-}
 
-static inline void __clear_mnt_count(struct mnt_writer *cpu_writer)
-{
-	if (!cpu_writer->mnt)
-		return;
-	/*
-	 * This is in case anyone ever leaves an invalid,
-	 * old ->mnt and a count of 0.
-	 */
-	if (!cpu_writer->count)
-		return;
-	atomic_add(cpu_writer->count, &cpu_writer->mnt->__mnt_writers);
-	cpu_writer->count = 0;
-}
- /*
- * must hold cpu_writer->lock
- */
-static inline void use_cpu_writer_for_mount(struct mnt_writer *cpu_writer,
-					  struct vfsmount *mnt)
-{
-	if (cpu_writer->mnt == mnt)
-		return;
-	__clear_mnt_count(cpu_writer);
-	cpu_writer->mnt = mnt;
+	return count;
+#else
+	return mnt->mnt_writers;
+#endif
 }
 
 /*
@@ -252,74 +235,71 @@ static inline void use_cpu_writer_for_mount(struct mnt_writer *cpu_writer,
 int mnt_want_write(struct vfsmount *mnt)
 {
 	int ret = 0;
-	struct mnt_writer *cpu_writer;
 
-	cpu_writer = &get_cpu_var(mnt_writers);
-	spin_lock(&cpu_writer->lock);
+	preempt_disable();
+	inc_mnt_writers(mnt);
+	/*
+	 * The store to inc_mnt_writers must be visible before we pass
+	 * MNT_WRITE_HOLD loop below, so that the slowpath can see our
+	 * incremented count after it has set MNT_WRITE_HOLD.
+	 */
+	smp_mb();
+	while (mnt->mnt_flags & MNT_WRITE_HOLD)
+		cpu_relax();
+	/*
+	 * After the slowpath clears MNT_WRITE_HOLD, mnt_is_readonly will
+	 * be set to match its requirements. So we must not load that until
+	 * MNT_WRITE_HOLD is cleared.
+	 */
+	smp_rmb();
 	if (__mnt_is_readonly(mnt)) {
+		dec_mnt_writers(mnt);
 		ret = -EROFS;
 		goto out;
 	}
-	use_cpu_writer_for_mount(cpu_writer, mnt);
-	cpu_writer->count++;
 out:
-	spin_unlock(&cpu_writer->lock);
-	put_cpu_var(mnt_writers);
+	preempt_enable();
 	return ret;
 }
 EXPORT_SYMBOL_GPL(mnt_want_write);
 
-static void lock_mnt_writers(void)
-{
-	int cpu;
-	struct mnt_writer *cpu_writer;
-
-	for_each_possible_cpu(cpu) {
-		cpu_writer = &per_cpu(mnt_writers, cpu);
-		spin_lock(&cpu_writer->lock);
-		__clear_mnt_count(cpu_writer);
-		cpu_writer->mnt = NULL;
-	}
-}
-
-/*
- * These per-cpu write counts are not guaranteed to have
- * matched increments and decrements on any given cpu.
- * A file open()ed for write on one cpu and close()d on
- * another cpu will imbalance this count.  Make sure it
- * does not get too far out of whack.
+/**
+ * mnt_clone_write - get write access to a mount
+ * @mnt: the mount on which to take a write
+ *
+ * This is effectively like mnt_want_write, except
+ * it must only be used to take an extra write reference
+ * on a mountpoint that we already know has a write reference
+ * on it. This allows some optimisation.
+ *
+ * After finished, mnt_drop_write must be called as usual to
+ * drop the reference.
  */
-static void handle_write_count_underflow(struct vfsmount *mnt)
+void mnt_clone_write(struct vfsmount *mnt)
 {
-	if (atomic_read(&mnt->__mnt_writers) >=
-	    MNT_WRITER_UNDERFLOW_LIMIT)
-		return;
-	/*
-	 * It isn't necessary to hold all of the locks
-	 * at the same time, but doing it this way makes
-	 * us share a lot more code.
-	 */
-	lock_mnt_writers();
-	/*
-	 * vfsmount_lock is for mnt_flags.
-	 */
-	spin_lock(&vfsmount_lock);
-	/*
-	 * If coalescing the per-cpu writer counts did not
-	 * get us back to a positive writer count, we have
-	 * a bug.
-	 */
-	if ((atomic_read(&mnt->__mnt_writers) < 0) &&
-	    !(mnt->mnt_flags & MNT_IMBALANCED_WRITE_COUNT)) {
-		WARN(1, KERN_DEBUG "leak detected on mount(%p) writers "
-				"count: %d\n",
-			mnt, atomic_read(&mnt->__mnt_writers));
-		/* use the flag to keep the dmesg spam down */
-		mnt->mnt_flags |= MNT_IMBALANCED_WRITE_COUNT;
-	}
-	spin_unlock(&vfsmount_lock);
-	unlock_mnt_writers();
+	preempt_disable();
+	inc_mnt_writers(mnt);
+	preempt_enable();
 }
+EXPORT_SYMBOL_GPL(mnt_clone_write);
+
+/**
+ * mnt_want_write_file - get write access to a file's mount
+ * @file: the file who's mount on which to take a write
+ *
+ * This is like mnt_want_write, but it takes a file and can
+ * do some optimisations if the file is open for write already
+ */
+int mnt_want_write_file(struct vfsmount *mnt, struct file *file)
+{
+	if (!(file->f_mode & FMODE_WRITE))
+		return mnt_want_write(mnt);
+	else {
+		mnt_clone_write(mnt);
+		return 0;
+	}
+}
+EXPORT_SYMBOL_GPL(mnt_want_write_file);
 
 /**
  * mnt_drop_write - give up write access to a mount
@@ -331,37 +311,9 @@ static void handle_write_count_underflow(struct vfsmount *mnt)
  */
 void mnt_drop_write(struct vfsmount *mnt)
 {
-	int must_check_underflow = 0;
-	struct mnt_writer *cpu_writer;
-
-	cpu_writer = &get_cpu_var(mnt_writers);
-	spin_lock(&cpu_writer->lock);
-
-	use_cpu_writer_for_mount(cpu_writer, mnt);
-	if (cpu_writer->count > 0) {
-		cpu_writer->count--;
-	} else {
-		must_check_underflow = 1;
-		atomic_dec(&mnt->__mnt_writers);
-	}
-
-	spin_unlock(&cpu_writer->lock);
-	/*
-	 * Logically, we could call this each time,
-	 * but the __mnt_writers cacheline tends to
-	 * be cold, and makes this expensive.
-	 */
-	if (must_check_underflow)
-		handle_write_count_underflow(mnt);
-	/*
-	 * This could be done right after the spinlock
-	 * is taken because the spinlock keeps us on
-	 * the cpu, and disables preemption.  However,
-	 * putting it here bounds the amount that
-	 * __mnt_writers can underflow.  Without it,
-	 * we could theoretically wrap __mnt_writers.
-	 */
-	put_cpu_var(mnt_writers);
+	preempt_disable();
+	dec_mnt_writers(mnt);
+	preempt_enable();
 }
 EXPORT_SYMBOL_GPL(mnt_drop_write);
 
@@ -369,24 +321,34 @@ static int mnt_make_readonly(struct vfsmount *mnt)
 {
 	int ret = 0;
 
-	lock_mnt_writers();
+	spin_lock(&vfsmount_lock);
+	mnt->mnt_flags |= MNT_WRITE_HOLD;
 	/*
-	 * With all the locks held, this value is stable
+	 * After storing MNT_WRITE_HOLD, we'll read the counters. This store
+	 * should be visible before we do.
 	 */
-	if (atomic_read(&mnt->__mnt_writers) > 0) {
+	smp_mb();
+
+	/*
+	 * With writers on hold, if this value is zero, then there are definitely
+	 * no active writers (although held writers may subsequently increment
+	 * the count, they'll have to wait, and decrement it after seeing
+	 * MNT_READONLY).
+	 */
+	if (count_mnt_writers(mnt) > 0) {
 		ret = -EBUSY;
 		goto out;
 	}
-	/*
-	 * nobody can do a successful mnt_want_write() with all
-	 * of the counts in MNT_DENIED_WRITE and the locks held.
-	 */
-	spin_lock(&vfsmount_lock);
 	if (!ret)
 		mnt->mnt_flags |= MNT_READONLY;
-	spin_unlock(&vfsmount_lock);
 out:
-	unlock_mnt_writers();
+	/*
+	 * MNT_READONLY must become visible before ~MNT_WRITE_HOLD, so writers
+	 * that become unheld will see MNT_READONLY.
+	 */
+	smp_wmb();
+	mnt->mnt_flags &= ~MNT_WRITE_HOLD;
+	spin_unlock(&vfsmount_lock);
 	return ret;
 }
 
@@ -410,6 +372,9 @@ void free_vfsmnt(struct vfsmount *mnt)
 {
 	kfree(mnt->mnt_devname);
 	mnt_free_id(mnt);
+#ifdef CONFIG_SMP
+	free_percpu(mnt->mnt_writers);
+#endif
 	kmem_cache_free(mnt_cache, mnt);
 }
 
@@ -604,36 +569,14 @@ static struct vfsmount *clone_mnt(struct vfsmount *old, struct dentry *root,
 
 static inline void __mntput(struct vfsmount *mnt)
 {
-	int cpu;
 	struct super_block *sb = mnt->mnt_sb;
-	/*
-	 * We don't have to hold all of the locks at the
-	 * same time here because we know that we're the
-	 * last reference to mnt and that no new writers
-	 * can come in.
-	 */
-	for_each_possible_cpu(cpu) {
-		struct mnt_writer *cpu_writer = &per_cpu(mnt_writers, cpu);
-		if (cpu_writer->mnt != mnt)
-			continue;
-		spin_lock(&cpu_writer->lock);
-		atomic_add(cpu_writer->count, &mnt->__mnt_writers);
-		cpu_writer->count = 0;
-		/*
-		 * Might as well do this so that no one
-		 * ever sees the pointer and expects
-		 * it to be valid.
-		 */
-		cpu_writer->mnt = NULL;
-		spin_unlock(&cpu_writer->lock);
-	}
 	/*
 	 * This probably indicates that somebody messed
 	 * up a mnt_want/drop_write() pair.  If this
 	 * happens, the filesystem was probably unable
 	 * to make r/w->r/o transitions.
 	 */
-	WARN_ON(atomic_read(&mnt->__mnt_writers));
+	WARN_ON(count_mnt_writers(mnt));
 	dput(mnt->mnt_root);
 	free_vfsmnt(mnt);
 	deactivate_super(sb);

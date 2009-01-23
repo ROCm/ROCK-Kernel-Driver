@@ -1249,7 +1249,7 @@ void file_update_time(struct file *file)
 	if (IS_NOCMTIME(inode))
 		return;
 
-	err = mnt_want_write(file->f_path.mnt);
+	err = mnt_want_write_file(file->f_path.mnt, file);
 	if (err)
 		return;
 
