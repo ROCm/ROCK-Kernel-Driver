@@ -54,7 +54,18 @@ static unsigned int def_sampling_rate;
 			(MIN_SAMPLING_RATE_RATIO * jiffies_to_usecs(10))
 #define MIN_SAMPLING_RATE			\
 			(def_sampling_rate / MIN_SAMPLING_RATE_RATIO)
+/* Above MIN_SAMPLING_RATE will vanish with its sysfs file soon
+ * Define the minimal settable sampling rate to the greater of:
+ *   - "HW transition latency" * 100 (same as default sampling / 10)
+ *   - MIN_STAT_SAMPLING_RATE
+ * To avoid that userspace shoots itself.
+*/
+#define MINIMUM_SAMPLING_RATE			\
+			((def_sampling_rate / 10) < MIN_STAT_SAMPLING_RATE \
+			 ? MIN_STAT_SAMPLING_RATE : (def_sampling_rate / 10))
+/* This will also vanish soon with removing sampling_rate_max */
 #define MAX_SAMPLING_RATE			(500 * def_sampling_rate)
+
 #define DEF_SAMPLING_RATE_LATENCY_MULTIPLIER	(1000)
 #define DEF_SAMPLING_DOWN_FACTOR		(1)
 #define MAX_SAMPLING_DOWN_FACTOR		(10)
@@ -193,12 +204,14 @@ static ssize_t store_sampling_rate(struct cpufreq_policy *unused,
 	ret = sscanf (buf, "%u", &input);
 
 	mutex_lock(&dbs_mutex);
-	if (ret != 1 || input > MAX_SAMPLING_RATE || input < MIN_SAMPLING_RATE) {
+	if (ret != 1) {
 		mutex_unlock(&dbs_mutex);
 		return -EINVAL;
 	}
-
-	dbs_tuners_ins.sampling_rate = input;
+	if  (input < MINIMUM_SAMPLING_RATE)
+		dbs_tuners_ins.sampling_rate = MINIMUM_SAMPLING_RATE;
+	else
+		dbs_tuners_ins.sampling_rate = input;
 	mutex_unlock(&dbs_mutex);
 
 	return count;

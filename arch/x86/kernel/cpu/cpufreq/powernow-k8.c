@@ -927,10 +927,23 @@ static void powernow_k8_cpu_exit_acpi(struct powernow_k8_data *data)
 		acpi_processor_unregister_performance(&data->acpi_data, data->cpu);
 }
 
+static int get_transition_latency(struct powernow_k8_data *data)
+{
+	int max_latency = 0;
+	int i;
+        for (i = 0; i < data->acpi_data.state_count; i++) {
+		int cur_latency = data->acpi_data.states[i].transition_latency
+			+ data->acpi_data.states[i].bus_master_latency;
+		if (cur_latency > max_latency)
+			max_latency = cur_latency;
+	}
+	return max_latency;
+}
 #else
 static int powernow_k8_cpu_init_acpi(struct powernow_k8_data *data) { return -ENODEV; }
 static void powernow_k8_cpu_exit_acpi(struct powernow_k8_data *data) { return; }
 static void powernow_k8_acpi_pst_values(struct powernow_k8_data *data, unsigned int index) { return; }
+static int get_transition_latency(struct powernow_k8_data *data) { return 0; }
 #endif /* CONFIG_X86_POWERNOW_K8_ACPI */
 
 /* Take a frequency, and issue the fid/vid transition command */
@@ -1029,6 +1042,7 @@ static int powernowk8_target(struct cpufreq_policy *pol, unsigned targfreq, unsi
 	u32 checkvid;
 	unsigned int newstate;
 	int ret = -EIO;
+
 
 	if (!data)
 		return -EINVAL;
@@ -1161,7 +1175,16 @@ static int __cpuinit powernowk8_cpu_init(struct cpufreq_policy *pol)
 			kfree(data);
 			return -ENODEV;
 		}
+	        /* Take a crude guess here.
+	         * That guess was in microseconds, so multiply with 1000 */
+		pol->cpuinfo.transition_latency = (
+			( (data->rvo + 8) * data->vstable * VST_UNITS_20US) +
+			(  (1 << data->irt) * 30)
+			) * 1000;
 	}
+	else /* ACPI _PSS objects available */
+		pol->cpuinfo.transition_latency =
+			get_transition_latency(data) * 1000;
 
 	/* only run on specific CPU from here on */
 	oldmask = current->cpus_allowed;
@@ -1191,11 +1214,6 @@ static int __cpuinit powernowk8_cpu_init(struct cpufreq_policy *pol)
 	else
 		pol->cpus = per_cpu(cpu_core_map, pol->cpu);
 	data->available_cores = &(pol->cpus);
-
-	/* Take a crude guess here.
-	 * That guess was in microseconds, so multiply with 1000 */
-	pol->cpuinfo.transition_latency = (((data->rvo + 8) * data->vstable * VST_UNITS_20US)
-	    + (3 * (1 << data->irt) * 10)) * 1000;
 
 	if (cpu_family == CPU_HW_PSTATE)
 		pol->cur = find_khz_freq_from_pstate(data->powernow_table, data->currpstate);
