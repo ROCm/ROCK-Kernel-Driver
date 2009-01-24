@@ -265,12 +265,10 @@ struct task_group {
 	unsigned long shares;
 #endif
 
-#ifdef CONFIG_RT_GROUP_SCHED
 	struct sched_rt_entity **rt_se;
 	struct rt_rq **rt_rq;
 
 	struct rt_bandwidth rt_bandwidth;
-#endif
 
 	struct rcu_head rcu;
 	struct list_head list;
@@ -456,14 +454,12 @@ struct rt_rq {
 	/* Nests inside the rq lock: */
 	spinlock_t rt_runtime_lock;
 
-#ifdef CONFIG_RT_GROUP_SCHED
 	unsigned long rt_nr_boosted;
 
 	struct rq *rq;
 	struct list_head leaf_rt_rq_list;
 	struct task_group *tg;
 	struct sched_rt_entity *rt_se;
-#endif
 };
 
 #ifdef CONFIG_SMP
@@ -535,9 +531,8 @@ struct rq {
 	/* list of leaf cfs_rq on this cpu: */
 	struct list_head leaf_cfs_rq_list;
 #endif
-#ifdef CONFIG_RT_GROUP_SCHED
+
 	struct list_head leaf_rt_rq_list;
-#endif
 
 	/*
 	 * This is part of a global counter where only the total sum
