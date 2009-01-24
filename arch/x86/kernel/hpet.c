@@ -41,9 +41,9 @@ static inline void hpet_writel(unsigned long d, unsigned long a)
 static inline unsigned long hpet_read_value(unsigned long a)
 {
 	if (hpet_legacy_use_64_bits)
-		readq(hpet_virt_address + a);
+		return readq(hpet_virt_address + a);
 	else
-		readl(hpet_virt_address + a);
+		return readl(hpet_virt_address + a);
 }
 
 static void hpet_write_value(unsigned long d, unsigned long a)
@@ -255,6 +255,7 @@ static int timer0_use_64_bits(void)
 			return 0;
 		}
 	}
+	else return 0;
 #endif
 }
 
