@@ -173,6 +173,7 @@ cmd_cc_symtypes_c	   = \
 			      -r $(firstword $(wildcard			\
 			      	     $(@:.symtypes=.symref) /dev/null))	\
 			      $(if $(KBUILD_PRESERVE),-p)		\
+			      $(if $(KBUILD_OVERRIDE),-o)		\
 			      -a $(ARCH)				\
 		  >/dev/null;						\
 		test -s $@ || rm -f $@
@@ -211,6 +212,7 @@ cmd_modversions =							\
 			      -r $(firstword $(wildcard			\
 			      	     $(@:.o=.symref) /dev/null))	\
 			      $(if $(KBUILD_PRESERVE),-p)		\
+			      $(if $(KBUILD_OVERRIDE),-o)		\
 			      -a $(ARCH)				\
 		> $(@D)/.tmp_$(@F:.o=.ver);				\
 									\
