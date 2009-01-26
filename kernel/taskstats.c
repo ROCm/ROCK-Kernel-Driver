@@ -433,6 +433,12 @@ static int taskstats_user_cmd(struct sk_buff *skb, struct genl_info *info)
 	struct taskstats *stats;
 	size_t size;
 	cpumask_t mask;
+#ifdef CONFIG_IA64
+	struct taskstats statn;
+#define statf	&statn
+#else
+#define statf	stats
+#endif
 
 	rc = parse(info->attrs[TASKSTATS_CMD_ATTR_REGISTER_CPUMASK], &mask);
 	if (rc < 0)
@@ -463,7 +469,7 @@ static int taskstats_user_cmd(struct sk_buff *skb, struct genl_info *info)
 		if (!stats)
 			goto err;
 
-		rc = fill_pid(pid, NULL, stats);
+		rc = fill_pid(pid, NULL, statf);
 		if (rc < 0)
 			goto err;
 	} else if (info->attrs[TASKSTATS_CMD_ATTR_TGID]) {
@@ -472,12 +478,15 @@ static int taskstats_user_cmd(struct sk_buff *skb, struct genl_info *info)
 		if (!stats)
 			goto err;
 
-		rc = fill_tgid(tgid, NULL, stats);
+		rc = fill_tgid(tgid, NULL, statf);
 		if (rc < 0)
 			goto err;
 	} else
 		goto err;
 
+#ifdef CONFIG_IA64
+	memcpy(stats, &statn, sizeof(statn));
+#endif
 	return send_reply(rep_skb, info->snd_pid);
 err:
 	nlmsg_free(rep_skb);
