@@ -329,12 +329,6 @@ static void __iomem *__ioremap_caller(resource_size_t phys_addr,
 		return (__force void __iomem *)isa_bus_to_virt((unsigned long)phys_addr);
 
 	/*
-	 * Check if the request spans more than any BAR in the iomem resource
-	 * tree.
-	 */
-	WARN_ON(iomem_map_sanity_check(phys_addr, size));
-
-	/*
 	 * Don't allow anybody to remap normal RAM that we're using..
 	 */
 	for (mfn = PFN_DOWN(phys_addr); mfn < PFN_UP(last_addr); mfn++) {
