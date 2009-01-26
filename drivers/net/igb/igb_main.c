@@ -1118,7 +1118,9 @@ static int __devinit igb_probe(struct pci_dev *pdev,
 	netdev->features |= NETIF_F_TSO6;
 
 #ifdef CONFIG_IGB_LRO
+#ifdef IGB_LRO_DEFAULT_ON
 	netdev->features |= NETIF_F_LRO;
+#endif
 #endif
 
 	netdev->vlan_features |= NETIF_F_TSO;

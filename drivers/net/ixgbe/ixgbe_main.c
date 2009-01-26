@@ -4112,7 +4112,9 @@ static int __devinit ixgbe_probe(struct pci_dev *pdev,
 	netdev->features |= NETIF_F_TSO;
 	netdev->features |= NETIF_F_TSO6;
 #ifdef CONFIG_IXGBE_LRO
+#ifdef IXGBE_LRO_DEFAULT_ON
 	netdev->features |= NETIF_F_LRO;
+#endif
 #endif
 
 	netdev->vlan_features |= NETIF_F_TSO;
