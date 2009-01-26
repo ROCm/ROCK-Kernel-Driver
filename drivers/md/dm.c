@@ -714,13 +714,14 @@ static void free_bio_clone(struct request *clone)
 	struct dm_rq_target_io *tio = clone->end_io_data;
 	struct mapped_device *md = tio->md;
 	struct bio *bio;
-	struct dm_clone_bio_info *info;
 
 	while ((bio = clone->bio) != NULL) {
 		clone->bio = bio->bi_next;
 
-		info = bio->bi_private;
-		free_bio_info(md, info);
+		if (bio->bi_private) {
+			struct dm_clone_bio_info *info = bio->bi_private;
+			free_bio_info(md, info);
+		}
 
 		bio->bi_private = md->bs;
 		bio_put(bio);
