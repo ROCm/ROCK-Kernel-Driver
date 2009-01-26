@@ -195,28 +195,12 @@ static inline u32 __er32flash(struct e1000_hw *hw, unsigned long reg)
 
 static inline void __ew16flash(struct e1000_hw *hw, unsigned long reg, u16 val)
 {
-#ifdef _ASM_X86_CACHEFLUSH_H
-	set_memory_rw((unsigned long)hw->flash_address,
-	              hw->flash_len >> PAGE_SHIFT);
-#endif
 	writew(val, hw->flash_address + reg);
-#ifdef _ASM_X86_CACHEFLUSH_H
-	set_memory_ro((unsigned long)hw->flash_address,
-	              hw->flash_len >> PAGE_SHIFT);
-#endif
 }
 
 static inline void __ew32flash(struct e1000_hw *hw, unsigned long reg, u32 val)
 {
-#ifdef _ASM_X86_CACHEFLUSH_H
-	set_memory_rw((unsigned long)hw->flash_address,
-	              hw->flash_len >> PAGE_SHIFT);
-#endif
 	writel(val, hw->flash_address + reg);
-#ifdef _ASM_X86_CACHEFLUSH_H
-	set_memory_ro((unsigned long)hw->flash_address,
-	              hw->flash_len >> PAGE_SHIFT);
-#endif
 }
 
 #define er16flash(reg)		__er16flash(hw, (reg))

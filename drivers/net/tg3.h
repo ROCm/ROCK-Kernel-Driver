@@ -2586,6 +2586,7 @@ struct tg3 {
 #define PHY_ID_BCM5761			0xbc050fd0
 #define PHY_ID_BCM5906			0xdc00ac40
 #define PHY_ID_BCM8002			0x60010140
+#define PHY_ID_BCM57780			0x5c0d8990
 #define PHY_ID_INVALID			0xffffffff
 #define PHY_ID_REV_MASK			0x0000000f
 #define PHY_REV_BCM5401_B0		0x1

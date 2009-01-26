@@ -903,7 +903,7 @@ static void mark_reserved_regions_for_nid(int nid)
 			 */
 			if (end_pfn > node_ar.end_pfn)
 				reserve_size = (node_ar.end_pfn << PAGE_SHIFT)
-					- (start_pfn << PAGE_SHIFT);
+					- physbase;
 			/*
 			 * Only worry about *this* node, others may not
 			 * yet have valid NODE_DATA().
