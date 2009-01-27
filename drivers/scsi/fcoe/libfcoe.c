@@ -59,7 +59,7 @@ static int debug_fcoe;
 MODULE_AUTHOR("Open-FCoE.org");
 MODULE_DESCRIPTION("FCoE");
 MODULE_LICENSE("GPL");
-MODULE_VERSION("1.0.6");
+MODULE_VERSION("1.0.7");
 
 /* fcoe host list */
 LIST_HEAD(fcoe_hostlist);
