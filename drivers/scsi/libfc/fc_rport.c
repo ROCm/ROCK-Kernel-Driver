@@ -123,7 +123,7 @@ struct fc_rport *fc_rport_rogue_create(struct fc_disc_port *dp)
 	 * upstream so it fine that this is really ugly and hacky right now.
 	 */
 	device_initialize(&rport->dev);
- 	rport->dev.release = fc_rport_rogue_destroy;
+	rport->dev.release = fc_rport_rogue_destroy;
 
 	mutex_init(&rdata->rp_mutex);
 	rdata->local_port = dp->lp;
