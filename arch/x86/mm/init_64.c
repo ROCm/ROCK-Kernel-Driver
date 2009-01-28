@@ -896,7 +896,24 @@ void mark_rodata_ro(void)
 	set_memory_ro(start, (end-start) >> PAGE_SHIFT);
 #endif
 }
+EXPORT_SYMBOL(mark_rodata_ro);
 
+void mark_rodata_rw(void)
+{
+	unsigned long start = PFN_ALIGN(_stext), end = PFN_ALIGN(__end_rodata);
+	unsigned long rodata_start =
+		((unsigned long)__start_rodata + PAGE_SIZE - 1) & PAGE_MASK;
+
+#ifdef CONFIG_DYNAMIC_FTRACE
+	/* Dynamic tracing modifies the kernel text section */
+	start = rodata_start;
+#endif
+
+	printk(KERN_INFO "Write enabling the kernel read-only data: %luk\n",
+	       (end - start) >> 10);
+	set_memory_rw_force(start, (end - start) >> PAGE_SHIFT);
+}
+EXPORT_SYMBOL(mark_rodata_rw);
 #endif
 
 #ifdef CONFIG_BLK_DEV_INITRD

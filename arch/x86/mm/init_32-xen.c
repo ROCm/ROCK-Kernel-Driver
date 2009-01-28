@@ -1174,6 +1174,28 @@ void mark_rodata_ro(void)
 	set_pages_ro(virt_to_page(start), size >> PAGE_SHIFT);
 #endif
 }
+EXPORT_SYMBOL(mark_rodata_ro);
+
+void mark_rodata_rw(void)
+{
+	unsigned long start = PFN_ALIGN(_text);
+	unsigned long size = PFN_ALIGN(_etext) - start;
+
+#ifndef CONFIG_DYNAMIC_FTRACE
+	/* Dynamic tracing modifies the kernel text section */
+	set_pages_rw_force(virt_to_page(start), size >> PAGE_SHIFT);
+	printk(KERN_INFO "Write enabling the kernel text: %luk\n",
+		size >> 10);
+
+#endif /* CONFIG_DYNAMIC_FTRACE */
+
+	start += size;
+	size = (unsigned long)__end_rodata - start;
+	set_pages_rw_force(virt_to_page(start), size >> PAGE_SHIFT);
+	printk(KERN_INFO "Write enabling the kernel read-only data: %luk\n",
+		size >> 10);
+}
+EXPORT_SYMBOL(mark_rodata_rw);
 #endif
 
 void free_init_pages(char *what, unsigned long begin, unsigned long end)

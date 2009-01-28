@@ -63,6 +63,7 @@ int set_memory_x(unsigned long addr, int numpages);
 int set_memory_nx(unsigned long addr, int numpages);
 int set_memory_ro(unsigned long addr, int numpages);
 int set_memory_rw(unsigned long addr, int numpages);
+int set_memory_rw_force(unsigned long addr, int numpages);
 int set_memory_np(unsigned long addr, int numpages);
 int set_memory_4k(unsigned long addr, int numpages);
 
@@ -92,6 +93,7 @@ int set_pages_x(struct page *page, int numpages);
 int set_pages_nx(struct page *page, int numpages);
 int set_pages_ro(struct page *page, int numpages);
 int set_pages_rw(struct page *page, int numpages);
+int set_pages_rw_force(struct page *page, int numpages);
 
 
 void clflush_cache_range(void *addr, unsigned int size);
@@ -100,7 +102,11 @@ void cpa_init(void);
 
 #ifdef CONFIG_DEBUG_RODATA
 void mark_rodata_ro(void);
+void mark_rodata_rw(void);
 extern const int rodata_test_data;
+#else
+static inline void mark_rodata_ro(void) {}
+static inline void mark_rodata_rw(void) {}
 #endif
 
 #ifdef CONFIG_DEBUG_RODATA_TEST
