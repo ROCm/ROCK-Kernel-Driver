@@ -131,7 +131,7 @@ static inline unsigned int cpu_mask_to_apicid(const cpumask_t *cpumask)
 	int cpu;
 	int apicid;	
 
-	cpu = first_cpu(cpumask);
+	cpu = first_cpu(*cpumask);
 	apicid = cpu_to_logical_apicid(cpu);
 	return apicid;
 }
