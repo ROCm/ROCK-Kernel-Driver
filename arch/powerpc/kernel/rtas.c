@@ -46,6 +46,7 @@ EXPORT_SYMBOL(rtas);
 
 struct rtas_suspend_me_data {
 	atomic_t working; /* number of cpus accessing this struct */
+	atomic_t done;
 	int token; /* ibm,suspend-me */
 	int error;
 	struct completion *complete; /* wait on this until working == 0 */
@@ -663,7 +664,7 @@ static int ibm_suspend_me_token = RTAS_UNKNOWN_SERVICE;
 #ifdef CONFIG_PPC_PSERIES
 static void rtas_percpu_suspend_me(void *info)
 {
-	long rc;
+	long rc = H_SUCCESS;
 	unsigned long msr_save;
 	int cpu;
 	struct rtas_suspend_me_data *data =
@@ -675,7 +676,8 @@ static void rtas_percpu_suspend_me(void *info)
 	msr_save = mfmsr();
 	mtmsr(msr_save & ~(MSR_EE));
 
-	rc = plpar_hcall_norets(H_JOIN);
+	while (rc == H_SUCCESS && !atomic_read(&data->done))
+		rc = plpar_hcall_norets(H_JOIN);
 
 	mtmsr(msr_save);
 
@@ -698,6 +700,9 @@ static void rtas_percpu_suspend_me(void *info)
 		       smp_processor_id(), rc);
 		data->error = rc;
 	}
+
+	atomic_set(&data->done, 1);
+
 	/* This cpu did the suspend or got an error; in either case,
 	 * we need to prod all other other cpus out of join state.
 	 * Extra prods are harmless.
@@ -740,6 +745,7 @@ static int rtas_ibm_suspend_me(struct rtas_args *args)
 	}
 
 	atomic_set(&data.working, 0);
+	atomic_set(&data.done, 0);
 	data.token = rtas_token("ibm,suspend-me");
 	data.error = 0;
 	data.complete = &done;
