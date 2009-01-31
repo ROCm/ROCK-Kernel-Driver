@@ -292,6 +292,7 @@ static void fuse_put_super(struct super_block *sb)
 	list_del(&fc->entry);
 	fuse_ctl_remove_conn(fc);
 	mutex_unlock(&fuse_mutex);
+	bdi_destroy(&fc->bdi);
 	fuse_conn_put(fc);
 }
 
@@ -531,7 +532,6 @@ void fuse_conn_put(struct fuse_conn *fc)
 		if (fc->destroy_req)
 			fuse_request_free(fc->destroy_req);
 		mutex_destroy(&fc->inst_mutex);
-		bdi_destroy(&fc->bdi);
 		kfree(fc);
 	}
 }
@@ -832,12 +832,16 @@ static int fuse_fill_super(struct super_block *sb, void *data, int silent)
 	if (!file)
 		return -EINVAL;
 
-	if (file->f_op != &fuse_dev_operations)
+	if (file->f_op != &fuse_dev_operations) {
+		fput(file);
 		return -EINVAL;
+	}
 
 	fc = new_conn(sb);
-	if (!fc)
+	if (!fc) {
+		fput(file);
 		return -ENOMEM;
+	}
 
 	fc->flags = d.flags;
 	fc->user_id = d.user_id;
