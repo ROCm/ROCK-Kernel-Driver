@@ -20,8 +20,6 @@
  *
  */
 
-//#define BONDING_DEBUG 1
-
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
@@ -38,6 +36,7 @@
 #include <linux/in.h>
 #include <net/ipx.h>
 #include <net/arp.h>
+#include <net/ipv6.h>
 #include <asm/byteorder.h>
 #include "bonding.h"
 #include "bond_alb.h"
@@ -81,6 +80,7 @@
 #define RLB_PROMISC_TIMEOUT	10*ALB_TIMER_TICKS_PER_SEC
 
 static const u8 mac_bcast[ETH_ALEN] = {0xff,0xff,0xff,0xff,0xff,0xff};
+static const u8 mac_v6_allmcast[ETH_ALEN] = {0x33,0x33,0x00,0x00,0x00,0x01};
 static const int alb_delta_in_ticks = HZ / ALB_TIMER_TICKS_PER_SEC;
 
 #pragma pack(1)
@@ -344,30 +344,37 @@ static void rlb_update_entry_from_arp(struct bonding *bond, struct arp_pkt *arp)
 
 static int rlb_arp_recv(struct sk_buff *skb, struct net_device *bond_dev, struct packet_type *ptype, struct net_device *orig_dev)
 {
-	struct bonding *bond = bond_dev->priv;
+	struct bonding *bond;
 	struct arp_pkt *arp = (struct arp_pkt *)skb->data;
 	int res = NET_RX_DROP;
 
 	if (dev_net(bond_dev) != &init_net)
 		goto out;
 
-	if (!(bond_dev->flags & IFF_MASTER))
+	while (bond_dev->priv_flags & IFF_802_1Q_VLAN)
+		bond_dev = vlan_dev_real_dev(bond_dev);
+
+	if (!(bond_dev->priv_flags & IFF_BONDING) ||
+	    !(bond_dev->flags & IFF_MASTER))
 		goto out;
 
 	if (!arp) {
-		dprintk("Packet has no ARP data\n");
+		pr_debug("Packet has no ARP data\n");
 		goto out;
 	}
 
 	if (skb->len < sizeof(struct arp_pkt)) {
-		dprintk("Packet is too small to be an ARP\n");
+		pr_debug("Packet is too small to be an ARP\n");
 		goto out;
 	}
 
 	if (arp->op_code == htons(ARPOP_REPLY)) {
 		/* update rx hash table for this ARP */
+		printk("rar: update orig %s bond_dev %s\n", orig_dev->name,
+		       bond_dev->name);
+		bond = netdev_priv(bond_dev);
 		rlb_update_entry_from_arp(bond, arp);
-		dprintk("Server received an ARP Reply from client\n");
+		pr_debug("Server received an ARP Reply from client\n");
 	}
 
 	res = NET_RX_SUCCESS;
@@ -713,7 +720,7 @@ static struct slave *rlb_arp_xmit(struct sk_buff *skb, struct bonding *bond)
 	struct arp_pkt *arp = arp_pkt(skb);
 	struct slave *tx_slave = NULL;
 
-	if (arp->op_code == __constant_htons(ARPOP_REPLY)) {
+	if (arp->op_code == htons(ARPOP_REPLY)) {
 		/* the arp must be sent on the selected
 		* rx channel
 		*/
@@ -721,8 +728,8 @@ static struct slave *rlb_arp_xmit(struct sk_buff *skb, struct bonding *bond)
 		if (tx_slave) {
 			memcpy(arp->mac_src,tx_slave->dev->dev_addr, ETH_ALEN);
 		}
-		dprintk("Server sent ARP Reply packet\n");
-	} else if (arp->op_code == __constant_htons(ARPOP_REQUEST)) {
+		pr_debug("Server sent ARP Reply packet\n");
+	} else if (arp->op_code == htons(ARPOP_REQUEST)) {
 		/* Create an entry in the rx_hashtbl for this client as a
 		 * place holder.
 		 * When the arp reply is received the entry will be updated
@@ -741,7 +748,7 @@ static struct slave *rlb_arp_xmit(struct sk_buff *skb, struct bonding *bond)
 		 * updated with their assigned mac.
 		 */
 		rlb_req_update_subnet_clients(bond, arp->ip_src);
-		dprintk("Server sent ARP Request packet\n");
+		pr_debug("Server sent ARP Request packet\n");
 	}
 
 	return tx_slave;
@@ -816,7 +823,7 @@ static int rlb_initialize(struct bonding *bond)
 
 	/*initialize packet type*/
 	pk_type->type = __constant_htons(ETH_P_ARP);
-	pk_type->dev = bond->dev;
+	pk_type->dev = NULL;
 	pk_type->func = rlb_arp_recv;
 
 	/* register to receive ARPs */
@@ -1209,11 +1216,6 @@ static int alb_set_mac_address(struct bonding *bond, void *addr)
 	}
 
 	bond_for_each_slave(bond, slave, i) {
-		if (slave->dev->set_mac_address == NULL) {
-			res = -EOPNOTSUPP;
-			goto unwind;
-		}
-
 		/* save net_device's current hw address */
 		memcpy(tmp_addr, slave->dev->dev_addr, ETH_ALEN);
 
@@ -1222,9 +1224,8 @@ static int alb_set_mac_address(struct bonding *bond, void *addr)
 		/* restore net_device's hw address */
 		memcpy(slave->dev->dev_addr, tmp_addr, ETH_ALEN);
 
-		if (res) {
+		if (res)
 			goto unwind;
-		}
 	}
 
 	return 0;
@@ -1283,7 +1284,7 @@ void bond_alb_deinitialize(struct bonding *bond)
 
 int bond_alb_xmit(struct sk_buff *skb, struct net_device *bond_dev)
 {
-	struct bonding *bond = bond_dev->priv;
+	struct bonding *bond = netdev_priv(bond_dev);
 	struct ethhdr *eth_data;
 	struct alb_bond_info *bond_info = &(BOND_ALB_INFO(bond));
 	struct slave *tx_slave = NULL;
@@ -1293,6 +1294,7 @@ int bond_alb_xmit(struct sk_buff *skb, struct net_device *bond_dev)
 	u32 hash_index = 0;
 	const u8 *hash_start = NULL;
 	int res = 1;
+	struct ipv6hdr *ip6hdr;
 
 	skb_reset_mac_header(skb);
 	eth_data = eth_hdr(skb);
@@ -1322,7 +1324,28 @@ int bond_alb_xmit(struct sk_buff *skb, struct net_device *bond_dev)
 	}
 		break;
 	case ETH_P_IPV6:
+		/* IPv6 doesn't really use broadcast mac address, but leave
+		 * that here just in case.
+		 */
 		if (memcmp(eth_data->h_dest, mac_bcast, ETH_ALEN) == 0) {
+			do_tx_balance = 0;
+			break;
+		}
+
+		/* IPv6 uses all-nodes multicast as an equivalent to
+		 * broadcasts in IPv4.
+		 */
+		if (memcmp(eth_data->h_dest, mac_v6_allmcast, ETH_ALEN) == 0) {
+			do_tx_balance = 0;
+			break;
+		}
+
+		/* Additianally, DAD probes should not be tx-balanced as that
+		 * will lead to false positives for duplicate addresses and
+		 * prevent address configuration from working.
+		 */
+		ip6hdr = ipv6_hdr(skb);
+		if (ipv6_addr_any(&ip6hdr->saddr)) {
 			do_tx_balance = 0;
 			break;
 		}
@@ -1682,7 +1705,7 @@ void bond_alb_handle_active_change(struct bonding *bond, struct slave *new_slave
  */
 int bond_alb_set_mac_address(struct net_device *bond_dev, void *addr)
 {
-	struct bonding *bond = bond_dev->priv;
+	struct bonding *bond = netdev_priv(bond_dev);
 	struct sockaddr *sa = addr;
 	struct slave *slave, *swap_slave;
 	int res;

@@ -2184,7 +2184,7 @@ static void ipr_dump_location_data(struct ipr_ioa_cfg *ioa_cfg,
 		sizeof(struct ipr_dump_entry_header);
 	driver_dump->location_entry.hdr.data_type = IPR_DUMP_DATA_TYPE_ASCII;
 	driver_dump->location_entry.hdr.id = IPR_DUMP_LOCATION_ID;
-	strcpy(driver_dump->location_entry.location, ioa_cfg->pdev->dev.bus_id);
+	strcpy(driver_dump->location_entry.location, dev_name(&ioa_cfg->pdev->dev));
 	driver_dump->hdr.num_entries++;
 }
 
@@ -2456,20 +2456,14 @@ static ssize_t ipr_read_trace(struct kobject *kobj,
 	struct Scsi_Host *shost = class_to_shost(dev);
 	struct ipr_ioa_cfg *ioa_cfg = (struct ipr_ioa_cfg *)shost->hostdata;
 	unsigned long lock_flags = 0;
-	int size = IPR_TRACE_SIZE;
-	char *src = (char *)ioa_cfg->trace;
-
-	if (off > size)
-		return 0;
-	if (off + count > size) {
-		size -= off;
-		count = size;
-	}
+	ssize_t ret;
 
 	spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
-	memcpy(buf, &src[off], count);
+	ret = memory_read_from_buffer(buf, count, &off, ioa_cfg->trace,
+				IPR_TRACE_SIZE);
 	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
-	return count;
+
+	return ret;
 }
 
 static struct bin_attribute ipr_trace_attr = {
@@ -4918,7 +4912,7 @@ static int ipr_ioctl(struct scsi_device *sdev, int cmd, void __user *arg)
 	if (res && ipr_is_gata(res)) {
 		if (cmd == HDIO_GET_IDENTITY)
 			return -ENOTTY;
-		return ata_scsi_ioctl(sdev, cmd, arg);
+		return ata_sas_scsi_ioctl(res->sata_port->ap, sdev, cmd, arg);
 	}
 
 	return -EINVAL;
@@ -5395,9 +5389,9 @@ static int ipr_ioa_reset_done(struct ipr_cmnd *ipr_cmd)
 	list_add_tail(&ipr_cmd->queue, &ioa_cfg->free_q);
 	wake_up_all(&ioa_cfg->reset_wait_q);
 
-	spin_unlock_irq(ioa_cfg->host->host_lock);
+	spin_unlock(ioa_cfg->host->host_lock);
 	scsi_unblock_requests(ioa_cfg->host);
-	spin_lock_irq(ioa_cfg->host->host_lock);
+	spin_lock(ioa_cfg->host->host_lock);
 
 	if (!ioa_cfg->allow_cmds)
 		scsi_block_requests(ioa_cfg->host);
@@ -7479,7 +7473,7 @@ static int __devinit ipr_probe_ioa(struct pci_dev *pdev,
 		goto out_scsi_host_put;
 	}
 
-	ipr_regs = ioremap(ipr_regs_pci, pci_resource_len(pdev, 0));
+	ipr_regs = pci_ioremap_bar(pdev, 0);
 
 	if (!ipr_regs) {
 		dev_err(&pdev->dev,
@@ -7859,7 +7853,6 @@ static struct pci_driver ipr_driver = {
 	.remove = ipr_remove,
 	.shutdown = ipr_shutdown,
 	.err_handler = &ipr_err_handler,
-	.dynids.use_driver_data = 1
 };
 
 /**

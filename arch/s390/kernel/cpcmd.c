@@ -8,6 +8,7 @@
  */
 
 #define KMSG_COMPONENT "cpcmd"
+#define pr_fmt(fmt) KMSG_COMPONENT ": " fmt
 
 #include <linux/kernel.h>
 #include <linux/module.h>

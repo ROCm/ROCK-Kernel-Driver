@@ -24,16 +24,17 @@
 #define PHYS_OFFSET	UL(0x10000000)
 
 /*
- * These are exactly the same on the RiscPC as the
- * physical memory view.
- */
-#define __virt_to_bus(x) __virt_to_phys(x)
-#define __bus_to_virt(x) __phys_to_virt(x)
-
-/*
  * Cache flushing area - ROM
  */
 #define FLUSH_BASE_PHYS		0x00000000
 #define FLUSH_BASE		0xdf000000
+
+/*
+ * Sparsemem support.  Each section is a maximum of 64MB.  The sections
+ * are offset by 128MB and can cover 128MB, so that gives us a maximum
+ * of 29 physmem bits.
+ */
+#define MAX_PHYSMEM_BITS	29
+#define SECTION_SIZE_BITS	26
 
 #endif

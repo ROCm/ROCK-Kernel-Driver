@@ -26,9 +26,6 @@
 #include "quota.h"
 #include "util.h"
 
-char *gfs2_sys_margs;
-spinlock_t gfs2_sys_margs_lock;
-
 static ssize_t id_show(struct gfs2_sbd *sdp, char *buf)
 {
 	return snprintf(buf, PAGE_SIZE, "%u:%u\n",
@@ -263,19 +260,10 @@ ARGS_ATTR(localcaching,    "%d\n");
 ARGS_ATTR(localflocks,     "%d\n");
 ARGS_ATTR(debug,           "%d\n");
 ARGS_ATTR(upgrade,         "%d\n");
-ARGS_ATTR(num_glockd,      "%u\n");
 ARGS_ATTR(posix_acl,       "%d\n");
 ARGS_ATTR(quota,           "%u\n");
 ARGS_ATTR(suiddir,         "%d\n");
 ARGS_ATTR(data,            "%d\n");
-
-/* one oddball doesn't fit the macro mold */
-static ssize_t noatime_show(struct gfs2_sbd *sdp, char *buf)
-{
-	return snprintf(buf, PAGE_SIZE, "%d\n",
-			!!test_bit(SDF_NOATIME, &sdp->sd_flags));
-}
-static struct args_attr args_attr_noatime = __ATTR_RO(noatime);
 
 static struct attribute *args_attrs[] = {
 	&args_attr_lockproto.attr,
@@ -287,36 +275,10 @@ static struct attribute *args_attrs[] = {
 	&args_attr_localflocks.attr,
 	&args_attr_debug.attr,
 	&args_attr_upgrade.attr,
-	&args_attr_num_glockd.attr,
 	&args_attr_posix_acl.attr,
 	&args_attr_quota.attr,
 	&args_attr_suiddir.attr,
 	&args_attr_data.attr,
-	&args_attr_noatime.attr,
-	NULL,
-};
-
-/*
- * display counters from superblock
- */
-
-struct counters_attr {
-	struct attribute attr;
-	ssize_t (*show)(struct gfs2_sbd *, char *);
-};
-
-#define COUNTERS_ATTR(name, fmt)                                            \
-static ssize_t name##_show(struct gfs2_sbd *sdp, char *buf)                 \
-{                                                                           \
-	return snprintf(buf, PAGE_SIZE, fmt,                                \
-			(unsigned int)atomic_read(&sdp->sd_##name));        \
-}                                                                           \
-static struct counters_attr counters_attr_##name = __ATTR_RO(name)
-
-COUNTERS_ATTR(reclaimed,        "%u\n");
-
-static struct attribute *counters_attrs[] = {
-	&counters_attr_reclaimed.attr,
 	NULL,
 };
 
@@ -402,12 +364,10 @@ static ssize_t name##_store(struct gfs2_sbd *sdp, const char *buf, size_t len)\
 }                                                                             \
 TUNE_ATTR_2(name, name##_store)
 
-TUNE_ATTR(demote_secs, 0);
 TUNE_ATTR(incore_log_blocks, 0);
 TUNE_ATTR(log_flush_secs, 0);
 TUNE_ATTR(quota_warn_period, 0);
 TUNE_ATTR(quota_quantum, 0);
-TUNE_ATTR(atime_quantum, 0);
 TUNE_ATTR(max_readahead, 0);
 TUNE_ATTR(complain_secs, 0);
 TUNE_ATTR(statfs_slow, 0);
@@ -418,16 +378,13 @@ TUNE_ATTR(stall_secs, 1);
 TUNE_ATTR(statfs_quantum, 1);
 TUNE_ATTR_DAEMON(recoverd_secs, recoverd_process);
 TUNE_ATTR_DAEMON(logd_secs, logd_process);
-TUNE_ATTR_DAEMON(quotad_secs, quotad_process);
 TUNE_ATTR_3(quota_scale, quota_scale_show, quota_scale_store);
 
 static struct attribute *tune_attrs[] = {
-	&tune_attr_demote_secs.attr,
 	&tune_attr_incore_log_blocks.attr,
 	&tune_attr_log_flush_secs.attr,
 	&tune_attr_quota_warn_period.attr,
 	&tune_attr_quota_quantum.attr,
-	&tune_attr_atime_quantum.attr,
 	&tune_attr_max_readahead.attr,
 	&tune_attr_complain_secs.attr,
 	&tune_attr_statfs_slow.attr,
@@ -437,7 +394,6 @@ static struct attribute *tune_attrs[] = {
 	&tune_attr_statfs_quantum.attr,
 	&tune_attr_recoverd_secs.attr,
 	&tune_attr_logd_secs.attr,
-	&tune_attr_quotad_secs.attr,
 	&tune_attr_quota_scale.attr,
 	&tune_attr_new_files_jdata.attr,
 	NULL,
@@ -446,11 +402,6 @@ static struct attribute *tune_attrs[] = {
 static struct attribute_group lockstruct_group = {
 	.name = "lockstruct",
 	.attrs = lockstruct_attrs,
-};
-
-static struct attribute_group counters_group = {
-	.name = "counters",
-	.attrs = counters_attrs,
 };
 
 static struct attribute_group args_group = {
@@ -477,13 +428,9 @@ int gfs2_sys_fs_add(struct gfs2_sbd *sdp)
 	if (error)
 		goto fail_reg;
 
-	error = sysfs_create_group(&sdp->sd_kobj, &counters_group);
-	if (error)
-		goto fail_lockstruct;
-
 	error = sysfs_create_group(&sdp->sd_kobj, &args_group);
 	if (error)
-		goto fail_counters;
+		goto fail_lockstruct;
 
 	error = sysfs_create_group(&sdp->sd_kobj, &tune_group);
 	if (error)
@@ -494,8 +441,6 @@ int gfs2_sys_fs_add(struct gfs2_sbd *sdp)
 
 fail_args:
 	sysfs_remove_group(&sdp->sd_kobj, &args_group);
-fail_counters:
-	sysfs_remove_group(&sdp->sd_kobj, &counters_group);
 fail_lockstruct:
 	sysfs_remove_group(&sdp->sd_kobj, &lockstruct_group);
 fail_reg:
@@ -509,16 +454,27 @@ void gfs2_sys_fs_del(struct gfs2_sbd *sdp)
 {
 	sysfs_remove_group(&sdp->sd_kobj, &tune_group);
 	sysfs_remove_group(&sdp->sd_kobj, &args_group);
-	sysfs_remove_group(&sdp->sd_kobj, &counters_group);
 	sysfs_remove_group(&sdp->sd_kobj, &lockstruct_group);
 	kobject_put(&sdp->sd_kobj);
 }
 
+static int gfs2_uevent(struct kset *kset, struct kobject *kobj,
+		       struct kobj_uevent_env *env)
+{
+	struct gfs2_sbd *sdp = container_of(kobj, struct gfs2_sbd, sd_kobj);
+	add_uevent_var(env, "LOCKTABLE=%s", sdp->sd_table_name);
+	add_uevent_var(env, "LOCKPROTO=%s", sdp->sd_proto_name);
+	return 0;
+}
+
+static struct kset_uevent_ops gfs2_uevent_ops = {
+	.uevent = gfs2_uevent,
+};
+
+
 int gfs2_sys_init(void)
 {
-	gfs2_sys_margs = NULL;
-	spin_lock_init(&gfs2_sys_margs_lock);
-	gfs2_kset = kset_create_and_add("gfs2", NULL, fs_kobj);
+	gfs2_kset = kset_create_and_add("gfs2", &gfs2_uevent_ops, fs_kobj);
 	if (!gfs2_kset)
 		return -ENOMEM;
 	return 0;
@@ -526,7 +482,6 @@ int gfs2_sys_init(void)
 
 void gfs2_sys_uninit(void)
 {
-	kfree(gfs2_sys_margs);
 	kset_unregister(gfs2_kset);
 }
 

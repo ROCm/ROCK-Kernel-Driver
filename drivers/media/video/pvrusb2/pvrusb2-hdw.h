@@ -36,6 +36,16 @@
 #define PVR2_CID_FREQUENCY 6
 #define PVR2_CID_HRES 7
 #define PVR2_CID_VRES 8
+#define PVR2_CID_CROPL 9
+#define PVR2_CID_CROPT 10
+#define PVR2_CID_CROPW 11
+#define PVR2_CID_CROPH 12
+#define PVR2_CID_CROPCAPPAN 13
+#define PVR2_CID_CROPCAPPAD 14
+#define PVR2_CID_CROPCAPBL 15
+#define PVR2_CID_CROPCAPBT 16
+#define PVR2_CID_CROPCAPBW 17
+#define PVR2_CID_CROPCAPBH 18
 
 /* Legal values for the INPUT state variable */
 #define PVR2_CVAL_INPUT_TV 0
@@ -170,6 +180,9 @@ void pvr2_hdw_execute_tuner_poll(struct pvr2_hdw *);
 /* Return information about the tuner */
 int pvr2_hdw_get_tuner_status(struct pvr2_hdw *,struct v4l2_tuner *);
 
+/* Return information about cropping capabilities */
+int pvr2_hdw_get_cropcap(struct pvr2_hdw *, struct v4l2_cropcap *);
+
 /* Query device and see if it thinks it is on a high-speed USB link */
 int pvr2_hdw_is_hsm(struct pvr2_hdw *);
 
@@ -229,8 +242,8 @@ void pvr2_hdw_v4l_store_minor_number(struct pvr2_hdw *,
    setFl   - true to set the register, false to read it
    val_ptr - storage location for source / result. */
 int pvr2_hdw_register_access(struct pvr2_hdw *,
-			     u32 match_type, u32 match_chip,u64 reg_id,
-			     int setFl,u64 *val_ptr);
+			     struct v4l2_dbg_match *match, u64 reg_id,
+			     int setFl, u64 *val_ptr);
 
 /* The following entry points are all lower level things you normally don't
    want to worry about. */

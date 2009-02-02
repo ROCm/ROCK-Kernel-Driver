@@ -25,45 +25,31 @@
 #include <asm/visws/cobalt.h>
 #include <asm/visws/piix4.h>
 #include <asm/arch_hooks.h>
+#include <asm/io_apic.h>
 #include <asm/fixmap.h>
 #include <asm/reboot.h>
 #include <asm/setup.h>
 #include <asm/e820.h>
-#include <asm/smp.h>
 #include <asm/io.h>
 
 #include <mach_ipi.h>
 
 #include "mach_apic.h"
 
-#include <linux/init.h>
-#include <linux/smp.h>
-
 #include <linux/kernel_stat.h>
-#include <linux/interrupt.h>
-#include <linux/init.h>
 
-#include <asm/io.h>
-#include <asm/apic.h>
 #include <asm/i8259.h>
 #include <asm/irq_vectors.h>
-#include <asm/visws/cobalt.h>
 #include <asm/visws/lithium.h>
-#include <asm/visws/piix4.h>
 
 #include <linux/sched.h>
 #include <linux/kernel.h>
-#include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/pci_ids.h>
 
 extern int no_broadcast;
 
-#include <asm/io.h>
 #include <asm/apic.h>
-#include <asm/arch_hooks.h>
-#include <asm/visws/cobalt.h>
-#include <asm/visws/lithium.h>
 
 char visws_board_type	= -1;
 char visws_board_rev	= -1;
@@ -190,33 +176,31 @@ static int __init visws_get_smp_config(unsigned int early)
  * No problem for Linux.
  */
 
-static void __init MP_processor_info(struct mpc_config_processor *m)
+static void __init MP_processor_info(struct mpc_cpu *m)
 {
 	int ver, logical_apicid;
 	physid_mask_t apic_cpus;
 
-	if (!(m->mpc_cpuflag & CPU_ENABLED))
+	if (!(m->cpuflag & CPU_ENABLED))
 		return;
 
-	logical_apicid = m->mpc_apicid;
+	logical_apicid = m->apicid;
 	printk(KERN_INFO "%sCPU #%d %u:%u APIC version %d\n",
-	       m->mpc_cpuflag & CPU_BOOTPROCESSOR ? "Bootup " : "",
-	       m->mpc_apicid,
-	       (m->mpc_cpufeature & CPU_FAMILY_MASK) >> 8,
-	       (m->mpc_cpufeature & CPU_MODEL_MASK) >> 4,
-	       m->mpc_apicver);
+	       m->cpuflag & CPU_BOOTPROCESSOR ? "Bootup " : "",
+	       m->apicid, (m->cpufeature & CPU_FAMILY_MASK) >> 8,
+	       (m->cpufeature & CPU_MODEL_MASK) >> 4, m->apicver);
 
-	if (m->mpc_cpuflag & CPU_BOOTPROCESSOR)
-		boot_cpu_physical_apicid = m->mpc_apicid;
+	if (m->cpuflag & CPU_BOOTPROCESSOR)
+		boot_cpu_physical_apicid = m->apicid;
 
-	ver = m->mpc_apicver;
-	if ((ver >= 0x14 && m->mpc_apicid >= 0xff) || m->mpc_apicid >= 0xf) {
+	ver = m->apicver;
+	if ((ver >= 0x14 && m->apicid >= 0xff) || m->apicid >= 0xf) {
 		printk(KERN_ERR "Processor #%d INVALID. (Max ID: %d).\n",
-			m->mpc_apicid, MAX_APICS);
+			m->apicid, MAX_APICS);
 		return;
 	}
 
-	apic_cpus = apicid_to_cpu_present(m->mpc_apicid);
+	apic_cpus = apicid_to_cpu_present(m->apicid);
 	physids_or(phys_cpu_present_map, phys_cpu_present_map, apic_cpus);
 	/*
 	 * Validate version
@@ -224,15 +208,15 @@ static void __init MP_processor_info(struct mpc_config_processor *m)
 	if (ver == 0x0) {
 		printk(KERN_ERR "BIOS bug, APIC version is 0 for CPU#%d! "
 			"fixing up to 0x10. (tell your hw vendor)\n",
-			m->mpc_apicid);
+			m->apicid);
 		ver = 0x10;
 	}
-	apic_version[m->mpc_apicid] = ver;
+	apic_version[m->apicid] = ver;
 }
 
 static int __init visws_find_smp_config(unsigned int reserve)
 {
-	struct mpc_config_processor *mp = phys_to_virt(CO_CPU_TAB_PHYS);
+	struct mpc_cpu *mp = phys_to_virt(CO_CPU_TAB_PHYS);
 	unsigned short ncpus = readw(phys_to_virt(CO_CPU_NUM_PHYS));
 
 	if (ncpus > CO_CPU_MAX) {
@@ -498,10 +482,11 @@ static void disable_cobalt_irq(unsigned int irq)
 static unsigned int startup_cobalt_irq(unsigned int irq)
 {
 	unsigned long flags;
+	struct irq_desc *desc = irq_to_desc(irq);
 
 	spin_lock_irqsave(&cobalt_lock, flags);
-	if ((irq_desc[irq].status & (IRQ_DISABLED | IRQ_INPROGRESS | IRQ_WAITING)))
-		irq_desc[irq].status &= ~(IRQ_DISABLED | IRQ_INPROGRESS | IRQ_WAITING);
+	if ((desc->status & (IRQ_DISABLED | IRQ_INPROGRESS | IRQ_WAITING)))
+		desc->status &= ~(IRQ_DISABLED | IRQ_INPROGRESS | IRQ_WAITING);
 	enable_cobalt_irq(irq);
 	spin_unlock_irqrestore(&cobalt_lock, flags);
 	return 0;
@@ -520,9 +505,10 @@ static void ack_cobalt_irq(unsigned int irq)
 static void end_cobalt_irq(unsigned int irq)
 {
 	unsigned long flags;
+	struct irq_desc *desc = irq_to_desc(irq);
 
 	spin_lock_irqsave(&cobalt_lock, flags);
-	if (!(irq_desc[irq].status & (IRQ_DISABLED | IRQ_INPROGRESS)))
+	if (!(desc->status & (IRQ_DISABLED | IRQ_INPROGRESS)))
 		enable_cobalt_irq(irq);
 	spin_unlock_irqrestore(&cobalt_lock, flags);
 }
@@ -640,12 +626,12 @@ static irqreturn_t piix4_master_intr(int irq, void *dev_id)
 
 	spin_unlock_irqrestore(&i8259A_lock, flags);
 
-	desc = irq_desc + realirq;
+	desc = irq_to_desc(realirq);
 
 	/*
 	 * handle this 'virtual interrupt' as a Cobalt one now.
 	 */
-	kstat_cpu(smp_processor_id()).irqs[realirq]++;
+	kstat_incr_irqs_this_cpu(realirq, desc);
 
 	if (likely(desc->action != NULL))
 		handle_IRQ_event(realirq, desc->action);
@@ -676,27 +662,29 @@ void init_VISWS_APIC_irqs(void)
 	int i;
 
 	for (i = 0; i < CO_IRQ_APIC0 + CO_APIC_LAST + 1; i++) {
-		irq_desc[i].status = IRQ_DISABLED;
-		irq_desc[i].action = 0;
-		irq_desc[i].depth = 1;
+		struct irq_desc *desc = irq_to_desc(i);
+
+		desc->status = IRQ_DISABLED;
+		desc->action = 0;
+		desc->depth = 1;
 
 		if (i == 0) {
-			irq_desc[i].chip = &cobalt_irq_type;
+			desc->chip = &cobalt_irq_type;
 		}
 		else if (i == CO_IRQ_IDE0) {
-			irq_desc[i].chip = &cobalt_irq_type;
+			desc->chip = &cobalt_irq_type;
 		}
 		else if (i == CO_IRQ_IDE1) {
-			irq_desc[i].chip = &cobalt_irq_type;
+			desc->chip = &cobalt_irq_type;
 		}
 		else if (i == CO_IRQ_8259) {
-			irq_desc[i].chip = &piix4_master_irq_type;
+			desc->chip = &piix4_master_irq_type;
 		}
 		else if (i < CO_IRQ_APIC0) {
-			irq_desc[i].chip = &piix4_virtual_irq_type;
+			desc->chip = &piix4_virtual_irq_type;
 		}
 		else if (IS_CO_APIC(i)) {
-			irq_desc[i].chip = &cobalt_irq_type;
+			desc->chip = &cobalt_irq_type;
 		}
 	}
 

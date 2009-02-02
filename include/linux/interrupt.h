@@ -8,9 +8,13 @@
 #include <linux/preempt.h>
 #include <linux/cpumask.h>
 #include <linux/irqreturn.h>
+#include <linux/irqnr.h>
 #include <linux/hardirq.h>
 #include <linux/sched.h>
 #include <linux/irqflags.h>
+#include <linux/smp.h>
+#include <linux/percpu.h>
+
 #include <asm/atomic.h>
 #include <asm/ptrace.h>
 #include <asm/system.h>
@@ -104,15 +108,15 @@ extern void enable_irq(unsigned int irq);
 
 #if defined(CONFIG_SMP) && defined(CONFIG_GENERIC_HARDIRQS)
 
-extern cpumask_t irq_default_affinity;
+extern cpumask_var_t irq_default_affinity;
 
-extern int irq_set_affinity(unsigned int irq, cpumask_t cpumask);
+extern int irq_set_affinity(unsigned int irq, const struct cpumask *cpumask);
 extern int irq_can_set_affinity(unsigned int irq);
 extern int irq_select_affinity(unsigned int irq);
 
 #else /* CONFIG_SMP */
 
-static inline int irq_set_affinity(unsigned int irq, cpumask_t cpumask)
+static inline int irq_set_affinity(unsigned int irq, const struct cpumask *m)
 {
 	return -EINVAL;
 }
@@ -218,12 +222,6 @@ static inline int disable_irq_wake(unsigned int irq)
 }
 #endif /* CONFIG_GENERIC_HARDIRQS */
 
-#ifdef CONFIG_HAVE_IRQ_IGNORE_UNHANDLED
-int irq_ignore_unhandled(unsigned int irq);
-#else
-#define irq_ignore_unhandled(irq) 0
-#endif
-
 #ifndef __ARCH_SET_SOFTIRQ_PENDING
 #define set_softirq_pending(x) (local_softirq_pending() = (x))
 #define or_softirq_pending(x)  (local_softirq_pending() |= (x))
@@ -254,10 +252,10 @@ enum
 	BLOCK_SOFTIRQ,
 	TASKLET_SOFTIRQ,
 	SCHED_SOFTIRQ,
-#ifdef CONFIG_HIGH_RES_TIMERS
 	HRTIMER_SOFTIRQ,
-#endif
-	RCU_SOFTIRQ, 	/* Preferable RCU should always be the last softirq */
+	RCU_SOFTIRQ,	/* Preferable RCU should always be the last softirq */
+
+	NR_SOFTIRQS
 };
 
 /* softirq mask and active fields moved to irq_cpustat_t in
@@ -277,6 +275,25 @@ extern void softirq_init(void);
 extern void raise_softirq_irqoff(unsigned int nr);
 extern void raise_softirq(unsigned int nr);
 
+/* This is the worklist that queues up per-cpu softirq work.
+ *
+ * send_remote_sendirq() adds work to these lists, and
+ * the softirq handler itself dequeues from them.  The queues
+ * are protected by disabling local cpu interrupts and they must
+ * only be accessed by the local cpu that they are for.
+ */
+DECLARE_PER_CPU(struct list_head [NR_SOFTIRQS], softirq_work_list);
+
+/* Try to send a softirq to a remote cpu.  If this cannot be done, the
+ * work will be queued to the local cpu.
+ */
+extern void send_remote_softirq(struct call_single_data *cp, int cpu, int softirq);
+
+/* Like send_remote_softirq(), but the caller must disable local cpu interrupts
+ * and compute the current cpu, passed in as 'this_cpu'.
+ */
+extern void __send_remote_softirq(struct call_single_data *cp, int cpu,
+				  int this_cpu, int softirq);
 
 /* Tasklets --- multithreaded analogue of BHs.
 
@@ -446,5 +463,11 @@ static inline void init_irq_proc(void)
 #endif
 
 int show_interrupts(struct seq_file *p, void *v);
+
+struct irq_desc;
+
+extern int early_irq_init(void);
+extern int arch_early_irq_init(void);
+extern int arch_init_chip_data(struct irq_desc *desc, int cpu);
 
 #endif

@@ -30,7 +30,6 @@ static inline int task_is_pdflush(struct task_struct *task)
 enum writeback_sync_modes {
 	WB_SYNC_NONE,	/* Don't wait on anything */
 	WB_SYNC_ALL,	/* Wait on every mapping */
-	WB_SYNC_HOLD,	/* DOES NOTHING, DO NOT USE, ONLY HERE FOR ABI issue */
 };
 
 /*
@@ -63,7 +62,15 @@ struct writeback_control {
 	unsigned for_writepages:1;	/* This is a writepages() call */
 	unsigned range_cyclic:1;	/* range_start is cyclic */
 	unsigned more_io:1;		/* more io to be dispatched */
-	unsigned range_cont:1;
+	/*
+	 * write_cache_pages() won't update wbc->nr_to_write and
+	 * mapping->writeback_index if no_nrwrite_index_update
+	 * is set.  write_cache_pages() may write more than we
+	 * requested and we want to make sure nr_to_write and
+	 * writeback_index are updated in a consistent manner
+	 * so we use a single control to update them
+	 */
+	unsigned no_nrwrite_index_update:1;
 };
 
 /*
@@ -99,7 +106,9 @@ void throttle_vm_writeout(gfp_t gfp_mask);
 
 /* These are exported to sysctl. */
 extern int dirty_background_ratio;
+extern unsigned long dirty_background_bytes;
 extern int vm_dirty_ratio;
+extern unsigned long vm_dirty_bytes;
 extern int dirty_writeback_interval;
 extern int dirty_expire_interval;
 extern int vm_highmem_is_dirtyable;
@@ -108,7 +117,16 @@ extern int laptop_mode;
 
 extern unsigned long determine_dirtyable_memory(void);
 
+extern int dirty_background_ratio_handler(struct ctl_table *table, int write,
+		struct file *filp, void __user *buffer, size_t *lenp,
+		loff_t *ppos);
+extern int dirty_background_bytes_handler(struct ctl_table *table, int write,
+		struct file *filp, void __user *buffer, size_t *lenp,
+		loff_t *ppos);
 extern int dirty_ratio_handler(struct ctl_table *table, int write,
+		struct file *filp, void __user *buffer, size_t *lenp,
+		loff_t *ppos);
+extern int dirty_bytes_handler(struct ctl_table *table, int write,
 		struct file *filp, void __user *buffer, size_t *lenp,
 		loff_t *ppos);
 
@@ -117,8 +135,8 @@ struct file;
 int dirty_writeback_centisecs_handler(struct ctl_table *, int, struct file *,
 				      void __user *, size_t *, loff_t *);
 
-void get_dirty_limits(long *pbackground, long *pdirty, long *pbdi_dirty,
-		 struct backing_dev_info *bdi);
+void get_dirty_limits(unsigned long *pbackground, unsigned long *pdirty,
+		      unsigned long *pbdi_dirty, struct backing_dev_info *bdi);
 
 void page_writeback_init(void);
 void balance_dirty_pages_ratelimited_nr(struct address_space *mapping,

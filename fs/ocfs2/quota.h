@@ -14,17 +14,12 @@
 #include <linux/quota.h>
 #include <linux/list.h>
 #include <linux/dqblk_qtree.h>
-#include <linux/timer.h>
 
 #include "ocfs2.h"
 
 /* Common stuff */
 /* id number of quota format */
 #define QFMT_OCFS2 3
-
-/* How many bytes to we reserve in each quota file block for our internal
- * purposes? E.g. checksums... */
-#define OCFS2_QBLK_RESERVED_SPACE 8
 
 /*
  * In-memory structures
@@ -64,7 +59,7 @@ struct ocfs2_mem_dqinfo {
 	struct buffer_head *dqi_lqi_bh;	/* Buffer head with local quota file inode */
 	struct buffer_head *dqi_ibh;	/* Buffer with information header */
 	struct qtree_mem_dqinfo dqi_gi;	/* Info about global file */
-	struct timer_list dqi_sync_timer;	/* Timer for syncing dquots */
+	struct delayed_work dqi_sync_work;	/* Work for syncing dquots */
 	struct ocfs2_quota_recovery *dqi_rec;	/* Pointer to recovery
 						 * information, in case we
 						 * enable quotas on file
@@ -112,10 +107,13 @@ static inline int ocfs2_global_release_dquot(struct dquot *dquot)
 
 int ocfs2_lock_global_qf(struct ocfs2_mem_dqinfo *oinfo, int ex);
 void ocfs2_unlock_global_qf(struct ocfs2_mem_dqinfo *oinfo, int ex);
-
-int init_ocfs2_quota_format(void);
-void exit_ocfs2_quota_format(void);
+int ocfs2_read_quota_block(struct inode *inode, u64 v_block,
+			   struct buffer_head **bh);
 
 extern struct dquot_operations ocfs2_quota_operations;
+extern struct quota_format_type ocfs2_quota_format;
+
+int ocfs2_quota_setup(void);
+void ocfs2_quota_shutdown(void);
 
 #endif /* _OCFS2_QUOTA_H */

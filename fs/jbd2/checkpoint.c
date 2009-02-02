@@ -20,6 +20,7 @@
 #include <linux/time.h>
 #include <linux/fs.h>
 #include <linux/jbd2.h>
+#include <linux/marker.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
 
@@ -93,7 +94,8 @@ static int __try_to_free_cp_buf(struct journal_head *jh)
 	int ret = 0;
 	struct buffer_head *bh = jh2bh(jh);
 
-	if (jh->b_jlist == BJ_None && !buffer_locked(bh) && !buffer_dirty(bh)) {
+	if (jh->b_jlist == BJ_None && !buffer_locked(bh) &&
+	    !buffer_dirty(bh) && !buffer_write_io_error(bh)) {
 		JBUFFER_TRACE(jh, "remove from checkpoint list");
 		ret = __jbd2_journal_remove_checkpoint(jh) + 1;
 		jbd_unlock_bh_state(bh);
@@ -193,21 +195,25 @@ static void jbd_sync_bh(journal_t *journal, struct buffer_head *bh)
  * buffers. Note that we take the buffers in the opposite ordering
  * from the one in which they were submitted for IO.
  *
+ * Return 0 on success, and return <0 if some buffers have failed
+ * to be written out.
+ *
  * Called with j_list_lock held.
  */
-static void __wait_cp_io(journal_t *journal, transaction_t *transaction)
+static int __wait_cp_io(journal_t *journal, transaction_t *transaction)
 {
 	struct journal_head *jh;
 	struct buffer_head *bh;
 	tid_t this_tid;
 	int released = 0;
+	int ret = 0;
 
 	this_tid = transaction->t_tid;
 restart:
 	/* Did somebody clean up the transaction in the meanwhile? */
 	if (journal->j_checkpoint_transactions != transaction ||
 			transaction->t_tid != this_tid)
-		return;
+		return ret;
 	while (!released && transaction->t_checkpoint_io_list) {
 		jh = transaction->t_checkpoint_io_list;
 		bh = jh2bh(jh);
@@ -227,6 +233,9 @@ restart:
 			spin_lock(&journal->j_list_lock);
 			goto restart;
 		}
+		if (unlikely(buffer_write_io_error(bh)))
+			ret = -EIO;
+
 		/*
 		 * Now in whatever state the buffer currently is, we know that
 		 * it has been written out and so we can drop it from the list
@@ -236,18 +245,18 @@ restart:
 		jbd2_journal_remove_journal_head(bh);
 		__brelse(bh);
 	}
+
+	return ret;
 }
 
-#define NR_BATCH	64
-
 static void
-__flush_batch(journal_t *journal, struct buffer_head **bhs, int *batch_count)
+__flush_batch(journal_t *journal, int *batch_count)
 {
 	int i;
 
-	ll_rw_block(SWRITE, *batch_count, bhs);
+	ll_rw_block(SWRITE, *batch_count, journal->j_chkpt_bhs);
 	for (i = 0; i < *batch_count; i++) {
-		struct buffer_head *bh = bhs[i];
+		struct buffer_head *bh = journal->j_chkpt_bhs[i];
 		clear_buffer_jwrite(bh);
 		BUFFER_TRACE(bh, "brelse");
 		__brelse(bh);
@@ -259,14 +268,14 @@ __flush_batch(journal_t *journal, struct buffer_head **bhs, int *batch_count)
  * Try to flush one buffer from the checkpoint list to disk.
  *
  * Return 1 if something happened which requires us to abort the current
- * scan of the checkpoint list.
+ * scan of the checkpoint list.  Return <0 if the buffer has failed to
+ * be written out.
  *
  * Called with j_list_lock held and drops it if 1 is returned
  * Called under jbd_lock_bh_state(jh2bh(jh)), and drops it
  */
 static int __process_buffer(journal_t *journal, struct journal_head *jh,
-			struct buffer_head **bhs, int *batch_count,
-			transaction_t *transaction)
+			    int *batch_count, transaction_t *transaction)
 {
 	struct buffer_head *bh = jh2bh(jh);
 	int ret = 0;
@@ -291,6 +300,9 @@ static int __process_buffer(journal_t *journal, struct journal_head *jh,
 		jbd2_log_wait_commit(journal, tid);
 		ret = 1;
 	} else if (!buffer_dirty(bh)) {
+		ret = 1;
+		if (unlikely(buffer_write_io_error(bh)))
+			ret = -EIO;
 		J_ASSERT_JH(jh, !buffer_jbddirty(bh));
 		BUFFER_TRACE(bh, "remove from checkpoint");
 		__jbd2_journal_remove_checkpoint(jh);
@@ -298,7 +310,6 @@ static int __process_buffer(journal_t *journal, struct journal_head *jh,
 		jbd_unlock_bh_state(bh);
 		jbd2_journal_remove_journal_head(bh);
 		__brelse(bh);
-		ret = 1;
 	} else {
 		/*
 		 * Important: we are about to write the buffer, and
@@ -311,14 +322,14 @@ static int __process_buffer(journal_t *journal, struct journal_head *jh,
 		get_bh(bh);
 		J_ASSERT_BH(bh, !buffer_jwrite(bh));
 		set_buffer_jwrite(bh);
-		bhs[*batch_count] = bh;
+		journal->j_chkpt_bhs[*batch_count] = bh;
 		__buffer_relink_io(jh);
 		jbd_unlock_bh_state(bh);
 		transaction->t_chp_stats.cs_written++;
 		(*batch_count)++;
-		if (*batch_count == NR_BATCH) {
+		if (*batch_count == JBD2_NR_BATCH) {
 			spin_unlock(&journal->j_list_lock);
-			__flush_batch(journal, bhs, batch_count);
+			__flush_batch(journal, batch_count);
 			ret = 1;
 		}
 	}
@@ -331,6 +342,7 @@ static int __process_buffer(journal_t *journal, struct journal_head *jh,
  * to disk. We submit larger chunks of data at once.
  *
  * The journal should be locked before calling this function.
+ * Called with j_checkpoint_mutex held.
  */
 int jbd2_log_do_checkpoint(journal_t *journal)
 {
@@ -346,6 +358,8 @@ int jbd2_log_do_checkpoint(journal_t *journal)
 	 * journal straight away.
 	 */
 	result = jbd2_cleanup_journal_tail(journal);
+	trace_mark(jbd2_checkpoint, "dev %s need_checkpoint %d",
+		   journal->j_devname, result);
 	jbd_debug(1, "cleanup_journal_tail returned %d\n", result);
 	if (result <= 0)
 		return result;
@@ -354,6 +368,7 @@ int jbd2_log_do_checkpoint(journal_t *journal)
 	 * OK, we need to start writing disk blocks.  Take one transaction
 	 * and write it.
 	 */
+	result = 0;
 	spin_lock(&journal->j_list_lock);
 	if (!journal->j_checkpoint_transactions)
 		goto out;
@@ -370,9 +385,8 @@ restart:
 	if (journal->j_checkpoint_transactions == transaction &&
 			transaction->t_tid == this_tid) {
 		int batch_count = 0;
-		struct buffer_head *bhs[NR_BATCH];
 		struct journal_head *jh;
-		int retry = 0;
+		int retry = 0, err;
 
 		while (!retry && transaction->t_checkpoint_list) {
 			struct buffer_head *bh;
@@ -384,8 +398,10 @@ restart:
 				retry = 1;
 				break;
 			}
-			retry = __process_buffer(journal, jh, bhs, &batch_count,
+			retry = __process_buffer(journal, jh, &batch_count,
 						 transaction);
+			if (retry < 0 && !result)
+				result = retry;
 			if (!retry && (need_resched() ||
 				spin_needbreak(&journal->j_list_lock))) {
 				spin_unlock(&journal->j_list_lock);
@@ -399,7 +415,7 @@ restart:
 				spin_unlock(&journal->j_list_lock);
 				retry = 1;
 			}
-			__flush_batch(journal, bhs, &batch_count);
+			__flush_batch(journal, &batch_count);
 		}
 
 		if (retry) {
@@ -410,14 +426,18 @@ restart:
 		 * Now we have cleaned up the first transaction's checkpoint
 		 * list. Let's clean up the second one
 		 */
-		__wait_cp_io(journal, transaction);
+		err = __wait_cp_io(journal, transaction);
+		if (!result)
+			result = err;
 	}
 out:
 	spin_unlock(&journal->j_list_lock);
-	result = jbd2_cleanup_journal_tail(journal);
 	if (result < 0)
-		return result;
-	return 0;
+		jbd2_journal_abort(journal, result);
+	else
+		result = jbd2_cleanup_journal_tail(journal);
+
+	return (result < 0) ? result : 0;
 }
 
 /*
@@ -433,8 +453,9 @@ out:
  * This is the only part of the journaling code which really needs to be
  * aware of transaction aborts.  Checkpointing involves writing to the
  * main filesystem area rather than to the journal, so it can proceed
- * even in abort state, but we must not update the journal superblock if
- * we have an abort error outstanding.
+ * even in abort state, but we must not update the super block if
+ * checkpointing may have failed.  Otherwise, we would lose some metadata
+ * buffers which should be written-back to the filesystem.
  */
 
 int jbd2_cleanup_journal_tail(journal_t *journal)
@@ -442,6 +463,9 @@ int jbd2_cleanup_journal_tail(journal_t *journal)
 	transaction_t * transaction;
 	tid_t		first_tid;
 	unsigned long	blocknr, freed;
+
+	if (is_journal_aborted(journal))
+		return 1;
 
 	/* OK, work out the oldest transaction remaining in the log, and
 	 * the log block it starts at.
@@ -658,6 +682,7 @@ int __jbd2_journal_remove_checkpoint(struct journal_head *jh)
 	   safely remove this transaction from the log */
 
 	__jbd2_journal_drop_transaction(journal, transaction);
+	kfree(transaction);
 
 	/* Just in case anybody was waiting for more transactions to be
            checkpointed... */
@@ -732,5 +757,4 @@ void __jbd2_journal_drop_transaction(journal_t *journal, transaction_t *transact
 	J_ASSERT(journal->j_running_transaction != transaction);
 
 	jbd_debug(1, "Dropping transaction %d, all done\n", transaction->t_tid);
-	kfree(transaction);
 }

@@ -136,6 +136,14 @@ static int slave_configure(struct scsi_device *sdev)
 					      max_sectors);
 	}
 
+	/* Some USB host controllers can't do DMA; they have to use PIO.
+	 * They indicate this by setting their dma_mask to NULL.  For
+	 * such controllers we need to make sure the block layer sets
+	 * up bounce buffers in addressable memory.
+	 */
+	if (!us->pusb_dev->bus->controller->dma_mask)
+		blk_queue_bounce_limit(sdev->request_queue, BLK_BOUNCE_HIGH);
+
 	/* We can't put these settings in slave_alloc() because that gets
 	 * called before the device type is known.  Consequently these
 	 * settings can't be overridden via the scsi devinfo mechanism. */
@@ -192,6 +200,10 @@ static int slave_configure(struct scsi_device *sdev)
 		 * The sd driver has to guess which is the case. */
 		if (us->fflags & US_FL_CAPACITY_HEURISTICS)
 			sdev->guess_capacity = 1;
+
+		/* assume SPC3 or latter devices support sense size > 18 */
+		if (sdev->scsi_level > SCSI_SPC_2)
+			us->fflags |= US_FL_SANE_SENSE;
 
 		/* Some devices report a SCSI revision level above 2 but are
 		 * unable to handle the REPORT LUNS command (for which

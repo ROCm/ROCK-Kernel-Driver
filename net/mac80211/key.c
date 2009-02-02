@@ -118,12 +118,12 @@ static const u8 *get_mac_for_key(struct ieee80211_key *key)
 	 * address to indicate a transmit-only key.
 	 */
 	if (key->conf.alg != ALG_WEP &&
-	    (key->sdata->vif.type == IEEE80211_IF_TYPE_AP ||
-	     key->sdata->vif.type == IEEE80211_IF_TYPE_VLAN))
+	    (key->sdata->vif.type == NL80211_IFTYPE_AP ||
+	     key->sdata->vif.type == NL80211_IFTYPE_AP_VLAN))
 		addr = zero_addr;
 
 	if (key->sta)
-		addr = key->sta->addr;
+		addr = key->sta->sta.addr;
 
 	return addr;
 }
@@ -132,7 +132,6 @@ static void ieee80211_key_enable_hw_accel(struct ieee80211_key *key)
 {
 	const u8 *addr;
 	int ret;
-	DECLARE_MAC_BUF(mac);
 
 	assert_key_lock();
 	might_sleep();
@@ -154,16 +153,15 @@ static void ieee80211_key_enable_hw_accel(struct ieee80211_key *key)
 
 	if (ret && ret != -ENOSPC && ret != -EOPNOTSUPP)
 		printk(KERN_ERR "mac80211-%s: failed to set key "
-		       "(%d, %s) to hardware (%d)\n",
+		       "(%d, %pM) to hardware (%d)\n",
 		       wiphy_name(key->local->hw.wiphy),
-		       key->conf.keyidx, print_mac(mac, addr), ret);
+		       key->conf.keyidx, addr, ret);
 }
 
 static void ieee80211_key_disable_hw_accel(struct ieee80211_key *key)
 {
 	const u8 *addr;
 	int ret;
-	DECLARE_MAC_BUF(mac);
 
 	assert_key_lock();
 	might_sleep();
@@ -186,9 +184,9 @@ static void ieee80211_key_disable_hw_accel(struct ieee80211_key *key)
 
 	if (ret)
 		printk(KERN_ERR "mac80211-%s: failed to remove key "
-		       "(%d, %s) from hardware (%d)\n",
+		       "(%d, %pM) from hardware (%d)\n",
 		       wiphy_name(key->local->hw.wiphy),
-		       key->conf.keyidx, print_mac(mac, addr), ret);
+		       key->conf.keyidx, addr, ret);
 
 	spin_lock(&todo_lock);
 	key->flags &= ~KEY_FLAG_UPLOADED_TO_HARDWARE;
@@ -281,6 +279,20 @@ struct ieee80211_key *ieee80211_key_alloc(enum ieee80211_key_alg alg,
 	key->conf.alg = alg;
 	key->conf.keyidx = idx;
 	key->conf.keylen = key_len;
+	switch (alg) {
+	case ALG_WEP:
+		key->conf.iv_len = WEP_IV_LEN;
+		key->conf.icv_len = WEP_ICV_LEN;
+		break;
+	case ALG_TKIP:
+		key->conf.iv_len = TKIP_IV_LEN;
+		key->conf.icv_len = TKIP_ICV_LEN;
+		break;
+	case ALG_CCMP:
+		key->conf.iv_len = CCMP_HDR_LEN;
+		key->conf.icv_len = CCMP_MIC_LEN;
+		break;
+	}
 	memcpy(key->conf.key, key_data, key_len);
 	INIT_LIST_HEAD(&key->list);
 	INIT_LIST_HEAD(&key->todo);
@@ -331,7 +343,7 @@ void ieee80211_key_link(struct ieee80211_key *key,
 		 */
 		key->conf.flags |= IEEE80211_KEY_FLAG_PAIRWISE;
 	} else {
-		if (sdata->vif.type == IEEE80211_IF_TYPE_STA) {
+		if (sdata->vif.type == NL80211_IFTYPE_STATION) {
 			struct sta_info *ap;
 
 			/*

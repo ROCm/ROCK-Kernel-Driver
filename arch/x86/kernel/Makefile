@@ -6,11 +6,13 @@ extra-y                := head_$(BITS).o head$(BITS).o head.o init_task.o vmlinu
 
 CPPFLAGS_vmlinux.lds += -U$(UTS_MACHINE)
 
-ifdef CONFIG_FTRACE
+ifdef CONFIG_FUNCTION_TRACER
 # Do not profile debug and lowlevel utilities
 CFLAGS_REMOVE_tsc.o = -pg
 CFLAGS_REMOVE_rtc.o = -pg
-CFLAGS_REMOVE_paravirt.o = -pg
+CFLAGS_REMOVE_paravirt-spinlocks.o = -pg
+CFLAGS_REMOVE_ftrace.o = -pg
+CFLAGS_REMOVE_early_printk.o = -pg
 endif
 
 #
@@ -22,9 +24,9 @@ CFLAGS_vsyscall_64.o	:= $(PROFILING) -g0 $(nostackp)
 CFLAGS_hpet.o		:= $(nostackp)
 CFLAGS_tsc.o		:= $(nostackp)
 
-obj-y			:= process_$(BITS).o signal_$(BITS).o entry_$(BITS).o
-obj-y			+= traps_$(BITS).o irq_$(BITS).o
-obj-y			+= time_$(BITS).o ioport.o ldt.o
+obj-y			:= process_$(BITS).o signal.o entry_$(BITS).o
+obj-y			+= traps.o irq.o irq_$(BITS).o dumpstack_$(BITS).o
+obj-y			+= time_$(BITS).o ioport.o ldt.o dumpstack.o
 obj-y			+= setup.o i8259.o irqinit_$(BITS).o setup_percpu.o
 obj-$(CONFIG_X86_VISWS)	+= visws_quirks.o
 obj-$(CONFIG_X86_32)	+= probe_roms_32.o
@@ -38,9 +40,9 @@ obj-y			+= tsc.o io_delay.o rtc.o
 
 obj-$(CONFIG_X86_TRAMPOLINE)	+= trampoline.o
 obj-y				+= process.o
-obj-y				+= i387.o
+obj-y				+= i387.o xsave.o
 obj-y				+= ptrace.o
-obj-y				+= ds.o
+obj-$(CONFIG_X86_DS)		+= ds.o
 obj-$(CONFIG_X86_32)		+= tls.o
 obj-$(CONFIG_IA32_EMULATION)	+= tls.o
 obj-y				+= step.o
@@ -51,7 +53,6 @@ obj-$(CONFIG_X86_BIOS_REBOOT)	+= reboot.o
 obj-$(CONFIG_MCA)		+= mca_32.o
 obj-$(CONFIG_X86_MSR)		+= msr.o
 obj-$(CONFIG_X86_CPUID)		+= cpuid.o
-obj-$(CONFIG_MICROCODE)		+= microcode.o
 obj-$(CONFIG_PCI)		+= early-quirks.o
 apm-y				:= apm_32.o
 obj-$(CONFIG_APM)		+= apm.o
@@ -61,14 +62,16 @@ obj-$(CONFIG_X86_32_SMP)	+= smpcommon.o
 obj-$(CONFIG_X86_64_SMP)	+= tsc_sync.o smpcommon.o
 obj-$(CONFIG_X86_TRAMPOLINE)	+= trampoline_$(BITS).o
 obj-$(CONFIG_X86_MPPARSE)	+= mpparse.o
-obj-$(CONFIG_X86_LOCAL_APIC)	+= apic_$(BITS).o nmi.o
-obj-$(CONFIG_X86_IO_APIC)	+= io_apic_$(BITS).o
+obj-$(CONFIG_X86_LOCAL_APIC)	+= apic.o nmi.o
+obj-$(CONFIG_X86_IO_APIC)	+= io_apic.o
 obj-$(CONFIG_X86_REBOOTFIXUPS)	+= reboot_fixups_32.o
 obj-$(CONFIG_DYNAMIC_FTRACE)	+= ftrace.o
+obj-$(CONFIG_FUNCTION_GRAPH_TRACER)	+= ftrace.o
 obj-$(CONFIG_KEXEC)		+= machine_kexec_$(BITS).o
 obj-$(CONFIG_KEXEC)		+= relocate_kernel_$(BITS).o crash.o
 obj-$(CONFIG_CRASH_DUMP)	+= crash_dump_$(BITS).o
 obj-$(CONFIG_X86_NUMAQ)		+= numaq_32.o
+obj-$(CONFIG_X86_ES7000)	+= es7000_32.o
 obj-$(CONFIG_X86_SUMMIT_NUMA)	+= summit_32.o
 obj-y				+= vsmp_64.o
 obj-$(CONFIG_KPROBES)		+= kprobes.o
@@ -89,7 +92,7 @@ obj-$(CONFIG_DEBUG_NX_TEST)	+= test_nx.o
 obj-$(CONFIG_VMI)		+= vmi_32.o vmiclock_32.o
 obj-$(CONFIG_KVM_GUEST)		+= kvm.o
 obj-$(CONFIG_KVM_CLOCK)		+= kvmclock.o
-obj-$(CONFIG_PARAVIRT)		+= paravirt.o paravirt_patch_$(BITS).o
+obj-$(CONFIG_PARAVIRT)		+= paravirt.o paravirt_patch_$(BITS).o paravirt-spinlocks.o
 obj-$(CONFIG_PARAVIRT_CLOCK)	+= pvclock.o
 
 obj-$(CONFIG_PCSPKR_PLATFORM)	+= pcspeaker.o
@@ -99,32 +102,28 @@ scx200-y			+= scx200_32.o
 
 obj-$(CONFIG_OLPC)		+= olpc.o
 
-obj-$(CONFIG_X86_XEN)		+= fixup.o
+microcode-y				:= microcode_core.o
+microcode-$(CONFIG_MICROCODE_INTEL)	+= microcode_intel.o
+microcode-$(CONFIG_MICROCODE_AMD)	+= microcode_amd.o
+obj-$(CONFIG_MICROCODE)			+= microcode.o
+
+obj-$(CONFIG_X86_CHECK_BIOS_CORRUPTION) += check.o
+
+obj-$(CONFIG_SWIOTLB)			+= pci-swiotlb_64.o # NB rename without _64
 
 ###
 # 64 bit specific files
 ifeq ($(CONFIG_X86_64),y)
-	obj-$(CONFIG_X86_LOCAL_APIC)	+= genapic_64.o genapic_flat_64.o genx2apic_uv_x.o
-	obj-$(CONFIG_X86_XEN_GENAPIC)	+= genapic_64.o genapic_xen_64.o
-	obj-y				+= tlb_uv.o uv_sysfs.o
+        obj-y				+= genapic_64.o genapic_flat_64.o genx2apic_uv_x.o tlb_uv.o
+	obj-y				+= bios_uv.o uv_irq.o uv_sysfs.o
         obj-y				+= genx2apic_cluster.o
         obj-y				+= genx2apic_phys.o
-	obj-y				+= bios_uv.o uv_irq.o
         obj-$(CONFIG_X86_PM_TIMER)	+= pmtimer_64.o
         obj-$(CONFIG_AUDIT)		+= audit_64.o
 
         obj-$(CONFIG_GART_IOMMU)	+= pci-gart_64.o aperture_64.o
         obj-$(CONFIG_CALGARY_IOMMU)	+= pci-calgary_64.o tce_64.o
         obj-$(CONFIG_AMD_IOMMU)		+= amd_iommu_init.o amd_iommu.o
-        obj-$(CONFIG_SWIOTLB)		+= pci-swiotlb_64.o
 
         obj-$(CONFIG_PCI_MMCONFIG)	+= mmconf-fam10h_64.o
-
-	apic_64-$(CONFIG_XEN)		+= apic_32.o
-	time_64-$(CONFIG_XEN)		+= time_32.o
 endif
-
-disabled-obj-$(CONFIG_XEN) := %_uv.o early-quirks.o genapic_flat_64.o \
-	genx2apic_%.o hpet.o i8253.o i8259.o irqinit_$(BITS).o \
-	pci-swiotlb_64.o reboot.o smpboot.o tlb_$(BITS).o tsc.o tsc_sync.o \
-	uv_%.o vsmp_64.o

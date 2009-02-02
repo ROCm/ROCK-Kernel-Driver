@@ -136,7 +136,7 @@ static int msr_open(struct inode *inode, struct file *file)
 	lock_kernel();
 	cpu = iminor(file->f_path.dentry->d_inode);
 
-	if (cpu >= NR_CPUS || !cpu_online(cpu)) {
+	if (cpu >= nr_cpu_ids || !cpu_online(cpu)) {
 		ret = -ENXIO;	/* No such CPU */
 		goto out;
 	}
@@ -163,8 +163,8 @@ static int __cpuinit msr_device_create(int cpu)
 {
 	struct device *dev;
 
-	dev = device_create_drvdata(msr_class, NULL, MKDEV(MSR_MAJOR, cpu),
-				    NULL, "msr%d", cpu);
+	dev = device_create(msr_class, NULL, MKDEV(MSR_MAJOR, cpu), NULL,
+			    "msr%d", cpu);
 	return IS_ERR(dev) ? PTR_ERR(dev) : 0;
 }
 

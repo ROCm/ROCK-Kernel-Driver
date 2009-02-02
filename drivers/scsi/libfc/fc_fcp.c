@@ -42,7 +42,6 @@
 MODULE_AUTHOR("Open-FCoE.org");
 MODULE_DESCRIPTION("libfc");
 MODULE_LICENSE("GPL");
-MODULE_VERSION("1.0.7");
 
 static int fc_fcp_debug;
 
@@ -1622,7 +1621,7 @@ out:
 static inline int fc_fcp_lport_queue_ready(struct fc_lport *lp)
 {
 	/* lock ? */
-	return (lp->state == LPORT_ST_READY) && lp->link_up && !lp->qfull;
+	return (lp->state == LPORT_ST_READY) && (lp->link_status & FC_LINK_UP);
 }
 
 /**
@@ -1811,12 +1810,12 @@ static void fc_io_compl(struct fc_fcp_pkt *fsp)
 		sc_cmd->result = DID_ERROR << 16;
 		break;
 	case FC_DATA_UNDRUN:
-		if ((fsp->cdb_status == 0) && !(fsp->req_flags & FC_SRB_READ)) {
+		if (fsp->cdb_status == 0) {
 			/*
 			 * scsi status is good but transport level
-			 * underrun.
+			 * underrun. for read it should be an error??
 			 */
-			sc_cmd->result = DID_OK << 16;
+			sc_cmd->result = (DID_OK << 16) | fsp->cdb_status;
 		} else {
 			/*
 			 * scsi got underrun, this is an error
@@ -1891,7 +1890,7 @@ int fc_eh_abort(struct scsi_cmnd *sc_cmd)
 	lp = shost_priv(sc_cmd->device->host);
 	if (lp->state != LPORT_ST_READY)
 		return rc;
-	else if (!lp->link_up)
+	else if (!(lp->link_status & FC_LINK_UP))
 		return rc;
 
 	spin_lock_irqsave(lp->host->host_lock, flags);

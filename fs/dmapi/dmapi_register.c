@@ -1526,6 +1526,7 @@ dm_open_by_handle_rvp(
 	int		flags,
 	int		*rvp)
 {
+	const struct cred *cred = current_cred();
 	dm_handle_t	handle;
 	int		error;
 	short		td_type;
@@ -1552,7 +1553,7 @@ dm_open_by_handle_rvp(
 		return(-EMFILE);
 	}
 
-	dentry = d_alloc_anon(inodep);
+	dentry = d_obtain_alias(inodep);
 	if (dentry == NULL) {
 		iput(inodep);
 		put_unused_fd(new_fd);
@@ -1569,22 +1570,16 @@ dm_open_by_handle_rvp(
 	mntget(mfilp->f_vfsmnt);
 
 	/* Create file pointer */
-	filp = dentry_open(dentry, mfilp->f_vfsmnt, flags);
+	filp = dentry_open(dentry, mfilp->f_vfsmnt, flags, cred);
 	if (IS_ERR(filp)) {
 		put_unused_fd(new_fd);
 		fput(mfilp);
 		return PTR_ERR(filp);
 	}
 
-	if (td_type == DM_TDT_REG) {
-		struct filesystem_dmapi_operations *dmapiops;
-		dmapiops = dm_fsys_ops(inodep->i_sb);
-		if (dmapiops && dmapiops->get_invis_ops) {
-			/* invisible operation should not change atime */
-			filp->f_flags |= O_NOATIME;
-			filp->f_op = dmapiops->get_invis_ops(inodep);
-		}
-	}
+	if (td_type == DM_TDT_REG)
+		filp->f_mode |= FMODE_NOCMTIME;
+
 	fd_install(new_fd, filp);
 	fput(mfilp);
 	*rvp = new_fd;

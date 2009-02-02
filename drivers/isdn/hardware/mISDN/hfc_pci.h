@@ -26,7 +26,7 @@
  * change mask and threshold simultaneously
  */
 #define HFCPCI_BTRANS_THRESHOLD 128
-#define HFCPCI_BTRANS_MAX	256
+#define HFCPCI_FILLEMPTY	64
 #define HFCPCI_BTRANS_THRESMASK 0x00
 
 /* defines for PCI config */
@@ -183,8 +183,8 @@
 #define D_FREG_MASK  0xF
 
 struct zt {
-	unsigned short z1;  /* Z1 pointer 16 Bit */
-	unsigned short z2;  /* Z2 pointer 16 Bit */
+	__le16 z1;  /* Z1 pointer 16 Bit */
+	__le16 z2;  /* Z2 pointer 16 Bit */
 };
 
 struct dfifo {

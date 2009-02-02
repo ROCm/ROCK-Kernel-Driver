@@ -52,6 +52,7 @@
 #include <asm/numa.h>
 #include <asm/sal.h>
 #include <asm/cyclone.h>
+#include <asm/xen/hypervisor.h>
 
 #define BAD_MADT_ENTRY(entry, end) (                                        \
 		(!entry) || (unsigned long)entry + sizeof(*entry) > end ||  \
@@ -64,6 +65,7 @@ EXPORT_SYMBOL(pm_idle);
 void (*pm_power_off) (void);
 EXPORT_SYMBOL(pm_power_off);
 
+u32 acpi_rsdt_forced;
 unsigned int acpi_cpei_override;
 unsigned int acpi_cpei_phys_cpuid;
 
@@ -91,6 +93,9 @@ acpi_get_sysname(void)
 	struct acpi_table_rsdp *rsdp;
 	struct acpi_table_xsdt *xsdt;
 	struct acpi_table_header *hdr;
+#ifdef CONFIG_DMAR
+	u64 i, nentries;
+#endif
 
 	rsdp_phys = acpi_find_rsdp();
 	if (!rsdp_phys) {
@@ -121,7 +126,21 @@ acpi_get_sysname(void)
 			return "uv";
 		else
 			return "sn2";
+	} else if (xen_pv_domain() && !strcmp(hdr->oem_id, "XEN")) {
+		return "xen";
 	}
+
+#ifdef CONFIG_DMAR
+	/* Look for Intel IOMMU */
+	nentries = (hdr->length - sizeof(*hdr)) /
+			 sizeof(xsdt->table_offset_entry[0]);
+	for (i = 0; i < nentries; i++) {
+		hdr = __va(xsdt->table_offset_entry[i]);
+		if (strncmp(hdr->signature, ACPI_SIG_DMAR,
+			sizeof(ACPI_SIG_DMAR) - 1) == 0)
+			return "dig_vtd";
+	}
+#endif
 
 	return "dig";
 #else
@@ -137,6 +156,10 @@ acpi_get_sysname(void)
 	return "uv";
 # elif defined (CONFIG_IA64_DIG)
 	return "dig";
+# elif defined (CONFIG_IA64_XEN_GUEST)
+	return "xen";
+# elif defined(CONFIG_IA64_DIG_VTD)
+	return "dig_vtd";
 # else
 #	error Unknown platform.  Fix acpi.c.
 # endif
@@ -180,7 +203,6 @@ char *__init __acpi_map_table(unsigned long phys_addr, unsigned long size)
                             Boot-time Table Parsing
    -------------------------------------------------------------------------- */
 
-static int total_cpus __initdata;
 static int available_cpus __initdata;
 struct acpi_table_madt *acpi_madt __initdata;
 static u8 has_8259;
@@ -979,7 +1001,7 @@ acpi_map_iosapic(acpi_handle handle, u32 depth, void *context, void **ret)
 	node = pxm_to_node(pxm);
 
 	if (node >= MAX_NUMNODES || !node_online(node) ||
-	    cpus_empty(node_to_cpumask(node)))
+	    cpumask_empty(cpumask_of_node(node)))
 		return AE_OK;
 
 	/* We know a gsi to node mapping! */

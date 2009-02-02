@@ -24,6 +24,8 @@
 #include <linux/bootmem.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
+#include <linux/reboot.h>
+
 #include <asm/uaccess.h>
 #include "sclp.h"
 
@@ -581,23 +583,6 @@ sclp_vt220_chars_in_buffer(struct tty_struct *tty)
 	return count;
 }
 
-static void
-__sclp_vt220_flush_buffer(void)
-{
-	unsigned long flags;
-
-	sclp_vt220_emit_current();
-	spin_lock_irqsave(&sclp_vt220_lock, flags);
-	if (timer_pending(&sclp_vt220_timer))
-		del_timer(&sclp_vt220_timer);
-	while (sclp_vt220_outqueue_count > 0) {
-		spin_unlock_irqrestore(&sclp_vt220_lock, flags);
-		sclp_sync_wait();
-		spin_lock_irqsave(&sclp_vt220_lock, flags);
-	}
-	spin_unlock_irqrestore(&sclp_vt220_lock, flags);
-}
-
 /*
  * Pass on all buffers to the hardware. Return only when there are no more
  * buffers pending.
@@ -743,16 +728,39 @@ sclp_vt220_con_device(struct console *c, int *index)
 	return sclp_vt220_driver;
 }
 
-/*
- * This routine is called from panic when the kernel is going to give up.
- * We have to make sure that all buffers will be flushed to the SCLP.
- * Note that this function may be called from within an interrupt context.
- */
-static void
-sclp_vt220_con_unblank(void)
+static void __sclp_vt220_flush_buffer(void)
+{
+	unsigned long flags;
+
+	sclp_vt220_emit_current();
+	spin_lock_irqsave(&sclp_vt220_lock, flags);
+	if (timer_pending(&sclp_vt220_timer))
+		del_timer(&sclp_vt220_timer);
+	while (sclp_vt220_outqueue_count > 0) {
+		spin_unlock_irqrestore(&sclp_vt220_lock, flags);
+		sclp_sync_wait();
+		spin_lock_irqsave(&sclp_vt220_lock, flags);
+	}
+	spin_unlock_irqrestore(&sclp_vt220_lock, flags);
+}
+
+static int
+sclp_vt220_notify(struct notifier_block *self,
+			  unsigned long event, void *data)
 {
 	__sclp_vt220_flush_buffer();
+	return NOTIFY_OK;
 }
+
+static struct notifier_block on_panic_nb = {
+	.notifier_call = sclp_vt220_notify,
+	.priority = 1,
+};
+
+static struct notifier_block on_reboot_nb = {
+	.notifier_call = sclp_vt220_notify,
+	.priority = 1,
+};
 
 /* Structure needed to register with printk */
 static struct console sclp_vt220_console =
@@ -760,7 +768,6 @@ static struct console sclp_vt220_console =
 	.name = SCLP_VT220_CONSOLE_NAME,
 	.write = sclp_vt220_con_write,
 	.device = sclp_vt220_con_device,
-	.unblank = sclp_vt220_con_unblank,
 	.flags = CON_PRINTBUFFER,
 	.index = SCLP_VT220_CONSOLE_INDEX
 };
@@ -776,6 +783,8 @@ sclp_vt220_con_init(void)
 	if (rc)
 		return rc;
 	/* Attach linux console */
+	atomic_notifier_chain_register(&panic_notifier_list, &on_panic_nb);
+	register_reboot_notifier(&on_reboot_nb);
 	register_console(&sclp_vt220_console);
 	return 0;
 }

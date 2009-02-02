@@ -229,12 +229,12 @@ set_camera_power(struct vicam_camera *cam, int state)
 	return 0;
 }
 
-static int
-vicam_ioctl(struct inode *inode, struct file *file, unsigned int ioctlnr, unsigned long arg)
+static long
+vicam_ioctl(struct file *file, unsigned int ioctlnr, unsigned long arg)
 {
 	void __user *user_arg = (void __user *)arg;
 	struct vicam_camera *cam = file->private_data;
-	int retval = 0;
+	long retval = 0;
 
 	if (!cam)
 		return -ENODEV;
@@ -470,11 +470,10 @@ vicam_ioctl(struct inode *inode, struct file *file, unsigned int ioctlnr, unsign
 }
 
 static int
-vicam_open(struct inode *inode, struct file *file)
+vicam_open(struct file *file)
 {
-	struct video_device *dev = video_devdata(file);
-	struct vicam_camera *cam =
-	    (struct vicam_camera *) dev->priv;
+	struct vicam_camera *cam = video_drvdata(file);
+
 	DBG("open\n");
 
 	if (!cam) {
@@ -488,20 +487,24 @@ vicam_open(struct inode *inode, struct file *file)
 	 * rely on this fact forever.
 	 */
 
+	lock_kernel();
 	if (cam->open_count > 0) {
 		printk(KERN_INFO
 		       "vicam_open called on already opened camera");
+		unlock_kernel();
 		return -EBUSY;
 	}
 
 	cam->raw_image = kmalloc(VICAM_MAX_READ_SIZE, GFP_KERNEL);
 	if (!cam->raw_image) {
+		unlock_kernel();
 		return -ENOMEM;
 	}
 
 	cam->framebuf = rvmalloc(VICAM_MAX_FRAME_SIZE * VICAM_FRAMES);
 	if (!cam->framebuf) {
 		kfree(cam->raw_image);
+		unlock_kernel();
 		return -ENOMEM;
 	}
 
@@ -509,6 +512,7 @@ vicam_open(struct inode *inode, struct file *file)
 	if (!cam->cntrlbuf) {
 		kfree(cam->raw_image);
 		rvfree(cam->framebuf, VICAM_MAX_FRAME_SIZE * VICAM_FRAMES);
+		unlock_kernel();
 		return -ENOMEM;
 	}
 
@@ -526,12 +530,13 @@ vicam_open(struct inode *inode, struct file *file)
 	cam->open_count++;
 
 	file->private_data = cam;
+	unlock_kernel();
 
 	return 0;
 }
 
 static int
-vicam_close(struct inode *inode, struct file *file)
+vicam_close(struct file *file)
 {
 	struct vicam_camera *cam = file->private_data;
 	int open_count;
@@ -778,23 +783,20 @@ vicam_mmap(struct file *file, struct vm_area_struct *vma)
 	return 0;
 }
 
-static const struct file_operations vicam_fops = {
+static const struct v4l2_file_operations vicam_fops = {
 	.owner		= THIS_MODULE,
 	.open		= vicam_open,
 	.release	= vicam_close,
 	.read		= vicam_read,
 	.mmap		= vicam_mmap,
 	.ioctl		= vicam_ioctl,
-#ifdef CONFIG_COMPAT
-	.compat_ioctl	= v4l_compat_ioctl32,
-#endif
-	.llseek		= no_llseek,
 };
 
 static struct video_device vicam_template = {
 	.name 		= "ViCam-based USB Camera",
 	.fops 		= &vicam_fops,
 	.minor 		= -1,
+	.release 	= video_device_release_empty,
 };
 
 /* table of devices that work with this driver */
@@ -838,8 +840,7 @@ vicam_probe( struct usb_interface *intf, const struct usb_device_id *id)
 	       interface->desc.bInterfaceNumber, (unsigned) (interface->desc.bNumEndpoints));
 	endpoint = &interface->endpoint[0].desc;
 
-	if ((endpoint->bEndpointAddress & 0x80) &&
-	    ((endpoint->bmAttributes & 3) == 0x02)) {
+	if (usb_endpoint_is_bulk_in(endpoint)) {
 		/* we found a bulk in endpoint */
 		bulkEndpoint = endpoint->bEndpointAddress;
 	} else {
@@ -859,9 +860,8 @@ vicam_probe( struct usb_interface *intf, const struct usb_device_id *id)
 
 	mutex_init(&cam->cam_lock);
 
-	memcpy(&cam->vdev, &vicam_template,
-	       sizeof (vicam_template));
-	cam->vdev.priv = cam;	// sort of a reverse mapping for those functions that get vdev only
+	memcpy(&cam->vdev, &vicam_template, sizeof(vicam_template));
+	video_set_drvdata(&cam->vdev, cam);
 
 	cam->udev = dev;
 	cam->bulkEndpoint = bulkEndpoint;
@@ -872,7 +872,8 @@ vicam_probe( struct usb_interface *intf, const struct usb_device_id *id)
 		return -EIO;
 	}
 
-	printk(KERN_INFO "ViCam webcam driver now controlling video device %d\n",cam->vdev.minor);
+	printk(KERN_INFO "ViCam webcam driver now controlling video device %d\n",
+			cam->vdev.num);
 
 	usb_set_intfdata (intf, cam);
 

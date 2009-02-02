@@ -57,6 +57,19 @@ extern struct workqueue_struct *pciehp_wq;
 #define warn(format, arg...)						\
 	printk(KERN_WARNING "%s: " format, MY_NAME , ## arg)
 
+#define ctrl_dbg(ctrl, format, arg...)					\
+	do {								\
+		if (pciehp_debug)					\
+			dev_printk(, &ctrl->pcie->device,		\
+					format, ## arg);		\
+	} while (0)
+#define ctrl_err(ctrl, format, arg...)					\
+	dev_err(&ctrl->pcie->device, format, ## arg)
+#define ctrl_info(ctrl, format, arg...)					\
+	dev_info(&ctrl->pcie->device, format, ## arg)
+#define ctrl_warn(ctrl, format, arg...)					\
+	dev_warn(&ctrl->pcie->device, format, ## arg)
+
 #define SLOT_NAME_SIZE 10
 struct slot {
 	u8 bus;
@@ -85,6 +98,7 @@ struct controller {
 	int num_slots;			/* Number of slots on ctlr */
 	int slot_num_inc;		/* 1 or -1 */
 	struct pci_dev *pci_dev;
+	struct pcie_device *pcie;	/* PCI Express port service */
 	struct list_head slot_list;
 	struct hpc_ops *hpc_ops;
 	wait_queue_head_t queue;	/* sleep & wake process */
@@ -96,6 +110,7 @@ struct controller {
 	struct timer_list poll_timer;
 	int cmd_busy;
 	unsigned int no_cmd_complete:1;
+	unsigned int link_active_reporting:1;
 };
 
 #define INT_BUTTON_IGNORE		0
@@ -173,7 +188,7 @@ static inline struct slot *pciehp_find_slot(struct controller *ctrl, u8 device)
 			return slot;
 	}
 
-	err("%s: slot (device=0x%x) not found\n", __func__, device);
+	ctrl_err(ctrl, "Slot (device=0x%02x) not found\n", device);
 	return NULL;
 }
 
@@ -202,14 +217,25 @@ struct hpc_ops {
 #ifdef CONFIG_ACPI
 #include <acpi/acpi.h>
 #include <acpi/acpi_bus.h>
-#include <acpi/actypes.h>
 #include <linux/pci-acpi.h>
+
+extern void __init pciehp_acpi_slot_detection_init(void);
+extern int pciehp_acpi_slot_detection_check(struct pci_dev *dev);
+
+static inline void pciehp_firmware_init(void)
+{
+	pciehp_acpi_slot_detection_init();
+}
 
 static inline int pciehp_get_hp_hw_control_from_firmware(struct pci_dev *dev)
 {
+	int retval;
 	u32 flags = (OSC_PCI_EXPRESS_NATIVE_HP_CONTROL |
 		     OSC_PCI_EXPRESS_CAP_STRUCTURE_CONTROL);
-	return acpi_get_hp_hw_control_from_firmware(dev, flags);
+	retval = acpi_get_hp_hw_control_from_firmware(dev, flags);
+	if (retval)
+		return retval;
+	return pciehp_acpi_slot_detection_check(dev);
 }
 
 static inline int pciehp_get_hp_params_from_firmware(struct pci_dev *dev,
@@ -220,6 +246,7 @@ static inline int pciehp_get_hp_params_from_firmware(struct pci_dev *dev,
 	return 0;
 }
 #else
+#define pciehp_firmware_init()				do {} while (0)
 #define pciehp_get_hp_hw_control_from_firmware(dev) 	0
 #define pciehp_get_hp_params_from_firmware(dev, hpp)    (-ENODEV)
 #endif 				/* CONFIG_ACPI */

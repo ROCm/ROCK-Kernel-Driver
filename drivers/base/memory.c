@@ -21,6 +21,8 @@
 #include <linux/memory_hotplug.h>
 #include <linux/mm.h>
 #include <linux/mutex.h>
+#include <linux/stat.h>
+
 #include <asm/atomic.h>
 #include <asm/uaccess.h>
 
@@ -325,7 +327,7 @@ memory_probe_store(struct class *class, const char *buf, size_t count)
 
 	return count;
 }
-static CLASS_ATTR(probe, 0700, NULL, memory_probe_store);
+static CLASS_ATTR(probe, S_IWUSR, NULL, memory_probe_store);
 
 static int memory_probe_init(void)
 {
@@ -345,8 +347,9 @@ static inline int memory_probe_init(void)
  * section belongs to...
  */
 
-static int add_memory_block(unsigned long node_id, struct mem_section *section,
-		     unsigned long state, int phys_device)
+static int add_memory_block(int nid, struct mem_section *section,
+			unsigned long state, int phys_device,
+			enum mem_add_context context)
 {
 	struct memory_block *mem = kzalloc(sizeof(*mem), GFP_KERNEL);
 	int ret = 0;
@@ -368,6 +371,10 @@ static int add_memory_block(unsigned long node_id, struct mem_section *section,
 		ret = mem_create_simple_file(mem, phys_device);
 	if (!ret)
 		ret = mem_create_simple_file(mem, removable);
+	if (!ret) {
+		if (context == HOTPLUG)
+			ret = register_mem_sect_under_node(mem, nid);
+	}
 
 	return ret;
 }
@@ -380,7 +387,7 @@ static int add_memory_block(unsigned long node_id, struct mem_section *section,
  *
  * This could be made generic for all sysdev classes.
  */
-static struct memory_block *find_memory_block(struct mem_section *section)
+struct memory_block *find_memory_block(struct mem_section *section)
 {
 	struct kobject *kobj;
 	struct sys_device *sysdev;
@@ -409,6 +416,7 @@ int remove_memory_block(unsigned long node_id, struct mem_section *section,
 	struct memory_block *mem;
 
 	mem = find_memory_block(section);
+	unregister_mem_sect_under_nodes(mem);
 	mem_remove_simple_file(mem, phys_index);
 	mem_remove_simple_file(mem, state);
 	mem_remove_simple_file(mem, phys_device);
@@ -422,9 +430,9 @@ int remove_memory_block(unsigned long node_id, struct mem_section *section,
  * need an interface for the VM to add new memory regions,
  * but without onlining it.
  */
-int register_new_memory(struct mem_section *section)
+int register_new_memory(int nid, struct mem_section *section)
 {
-	return add_memory_block(0, section, MEM_OFFLINE, 0);
+	return add_memory_block(nid, section, MEM_OFFLINE, 0, HOTPLUG);
 }
 
 int unregister_memory_section(struct mem_section *section)
@@ -456,7 +464,8 @@ int __init memory_dev_init(void)
 	for (i = 0; i < NR_MEM_SECTIONS; i++) {
 		if (!present_section_nr(i))
 			continue;
-		err = add_memory_block(0, __nr_to_section(i), MEM_ONLINE, 0);
+		err = add_memory_block(0, __nr_to_section(i), MEM_ONLINE,
+					0, BOOT);
 		if (!ret)
 			ret = err;
 	}

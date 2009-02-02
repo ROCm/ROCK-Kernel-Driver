@@ -60,14 +60,16 @@ void tfrc_lh_cleanup(struct tfrc_loss_hist *lh)
 			lh->ring[LIH_INDEX(lh->counter)] = NULL;
 		}
 }
-EXPORT_SYMBOL_GPL(tfrc_lh_cleanup);
 
 static void tfrc_lh_calc_i_mean(struct tfrc_loss_hist *lh)
 {
 	u32 i_i, i_tot0 = 0, i_tot1 = 0, w_tot = 0;
 	int i, k = tfrc_lh_length(lh) - 1; /* k is as in rfc3448bis, 5.4 */
 
-	for (i=0; i <= k; i++) {
+	if (k <= 0)
+		return;
+
+	for (i = 0; i <= k; i++) {
 		i_i = tfrc_lh_get_interval(lh, i);
 
 		if (i < k) {
@@ -78,7 +80,6 @@ static void tfrc_lh_calc_i_mean(struct tfrc_loss_hist *lh)
 			i_tot1 += i_i * tfrc_lh_weights[i-1];
 	}
 
-	BUG_ON(w_tot == 0);
 	lh->i_mean = max(i_tot0, i_tot1) / w_tot;
 }
 
@@ -119,7 +120,6 @@ u8 tfrc_lh_update_i_mean(struct tfrc_loss_hist *lh, struct sk_buff *skb)
 
 	return (lh->i_mean < old_i_mean);
 }
-EXPORT_SYMBOL_GPL(tfrc_lh_update_i_mean);
 
 /* Determine if `new_loss' does begin a new loss interval [RFC 4342, 10.2] */
 static inline u8 tfrc_lh_is_new_loss(struct tfrc_loss_interval *cur,
@@ -167,7 +167,6 @@ int tfrc_lh_interval_add(struct tfrc_loss_hist *lh, struct tfrc_rx_hist *rh,
 	}
 	return 1;
 }
-EXPORT_SYMBOL_GPL(tfrc_lh_interval_add);
 
 int __init tfrc_li_init(void)
 {

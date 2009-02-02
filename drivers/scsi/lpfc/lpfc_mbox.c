@@ -835,40 +835,6 @@ lpfc_config_pcb_setup(struct lpfc_hba * phba)
 }
 
 /**
- * lpfc_set_var: Prepare a mailbox command to write slim.
- * @phba: pointer to lpfc hba data structure.
- * @pmb: pointer to the driver internal queue element for mailbox command.
- * @addr: This the set variable number that identifies the variable.
- * @value:The value that we are setting the parameter to.
- *
- * The routine just sets the addr and value in the set variable mailbox
- * command structure.
- * returns: NONE.
- **/
-void
-lpfc_set_var(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb, uint32_t addr,
-	      uint32_t value)
-{
-	MAILBOX_t *mb;
-
-	mb = &pmb->mb;
-	memset(pmb, 0, sizeof(LPFC_MBOXQ_t));
-
-	/*
-	 * Always turn on DELAYED ABTS for ELS timeouts
-	 */
-	if ((addr == 0x052198) && (value == 0))
-		value = 1;
-
-	mb->un.varWords[0] = addr;
-	mb->un.varWords[1] = value;
-
-	mb->mbxCommand = MBX_SET_VARIABLE;
-	mb->mbxOwner = OWN_HOST;
-	return;
-}
-
-/**
  * lpfc_read_rev: Prepare a mailbox command for reading HBA revision.
  * @phba: pointer to lpfc hba data structure.
  * @pmb: pointer to the driver internal queue element for mailbox command.
@@ -1127,9 +1093,14 @@ lpfc_config_port(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
 	mb->un.varCfgPort.pcbLow = putPaddrLow(pdma_addr);
 	mb->un.varCfgPort.pcbHigh = putPaddrHigh(pdma_addr);
 
+	/* Always Host Group Pointer is in SLIM */
+	mb->un.varCfgPort.hps = 1;
+
 	/* If HBA supports SLI=3 ask for it */
 
 	if (phba->sli_rev == 3 && phba->vpd.sli3Feat.cerbm) {
+		if (phba->cfg_enable_bg)
+			mb->un.varCfgPort.cbg = 1; /* configure BlockGuard */
 		mb->un.varCfgPort.cerbm = 1; /* Request HBQs */
 		mb->un.varCfgPort.ccrp = 1; /* Command Ring Polling */
 		mb->un.varCfgPort.cinb = 1; /* Interrupt Notification Block */
@@ -1149,7 +1120,7 @@ lpfc_config_port(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
 	phba->pcb->feature = FEATURE_INITIAL_SLI2;
 
 	/* Setup Mailbox pointers */
-	phba->pcb->mailBoxSize = sizeof(MAILBOX_t) + MAILBOX_EXT_SIZE;
+	phba->pcb->mailBoxSize = sizeof(MAILBOX_t);
 	offset = (uint8_t *)phba->mbox - (uint8_t *)phba->slim2p.virt;
 	pdma_addr = phba->slim2p.phys + offset;
 	phba->pcb->mbAddrHigh = putPaddrHigh(pdma_addr);
@@ -1205,41 +1176,28 @@ lpfc_config_port(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
 	 *
 	 */
 
-	if (phba->cfg_hostmem_hgp && phba->sli_rev != 3) {
-		phba->host_gp = &phba->mbox->us.s2.host[0];
-		phba->hbq_put = NULL;
-		offset = (uint8_t *)&phba->mbox->us.s2.host -
-			(uint8_t *)phba->slim2p.virt;
-		pdma_addr = phba->slim2p.phys + offset;
-		phba->pcb->hgpAddrHigh = putPaddrHigh(pdma_addr);
-		phba->pcb->hgpAddrLow = putPaddrLow(pdma_addr);
+	if (phba->sli_rev == 3) {
+		phba->host_gp = &mb_slim->us.s3.host[0];
+		phba->hbq_put = &mb_slim->us.s3.hbq_put[0];
 	} else {
-		/* Always Host Group Pointer is in SLIM */
-		mb->un.varCfgPort.hps = 1;
+		phba->host_gp = &mb_slim->us.s2.host[0];
+		phba->hbq_put = NULL;
+	}
 
-		if (phba->sli_rev == 3) {
-			phba->host_gp = &mb_slim->us.s3.host[0];
-			phba->hbq_put = &mb_slim->us.s3.hbq_put[0];
-		} else {
-			phba->host_gp = &mb_slim->us.s2.host[0];
-			phba->hbq_put = NULL;
-		}
+	/* mask off BAR0's flag bits 0 - 3 */
+	phba->pcb->hgpAddrLow = (bar_low & PCI_BASE_ADDRESS_MEM_MASK) +
+		(void __iomem *)phba->host_gp -
+		(void __iomem *)phba->MBslimaddr;
+	if (bar_low & PCI_BASE_ADDRESS_MEM_TYPE_64)
+		phba->pcb->hgpAddrHigh = bar_high;
+	else
+		phba->pcb->hgpAddrHigh = 0;
+	/* write HGP data to SLIM at the required longword offset */
+	memset(&hgp, 0, sizeof(struct lpfc_hgp));
 
-		/* mask off BAR0's flag bits 0 - 3 */
-		phba->pcb->hgpAddrLow = (bar_low & PCI_BASE_ADDRESS_MEM_MASK) +
-			(void __iomem *)phba->host_gp -
-			(void __iomem *)phba->MBslimaddr;
-		if (bar_low & PCI_BASE_ADDRESS_MEM_TYPE_64)
-			phba->pcb->hgpAddrHigh = bar_high;
-		else
-			phba->pcb->hgpAddrHigh = 0;
-		/* write HGP data to SLIM at the required longword offset */
-		memset(&hgp, 0, sizeof(struct lpfc_hgp));
-
-		for (i = 0; i < phba->sli.num_rings; i++) {
-			lpfc_memcpy_to_slim(phba->host_gp + i, &hgp,
+	for (i=0; i < phba->sli.num_rings; i++) {
+		lpfc_memcpy_to_slim(phba->host_gp + i, &hgp,
 				    sizeof(*phba->host_gp));
-		}
 	}
 
 	/* Setup Port Group offset */

@@ -212,7 +212,7 @@ exit:
 struct iw_statistics* p80211wext_get_wireless_stats (netdevice_t *dev)
 {
 	p80211msg_lnxreq_commsquality_t  quality;
-	wlandevice_t *wlandev = (wlandevice_t*)dev->priv;
+	wlandevice_t *wlandev = dev->ml_priv;
 	struct iw_statistics* wstats = &wlandev->wstats;
 	int retval;
 
@@ -289,7 +289,7 @@ static int p80211wext_giwfreq(netdevice_t *dev,
 			      struct iw_request_info *info,
 			      struct iw_freq *freq, char *extra)
 {
-	wlandevice_t *wlandev = (wlandevice_t*)dev->priv;
+	wlandevice_t *wlandev = dev->ml_priv;
 	p80211item_uint32_t             mibitem;
 	p80211msg_dot11req_mibset_t     msg;
 	int result;
@@ -327,7 +327,7 @@ static int p80211wext_siwfreq(netdevice_t *dev,
 			      struct iw_request_info *info,
 			      struct iw_freq *freq, char *extra)
 {
-	wlandevice_t *wlandev = (wlandevice_t*)dev->priv;
+	wlandevice_t *wlandev = dev->ml_priv;
 	p80211item_uint32_t             mibitem;
 	p80211msg_dot11req_mibset_t     msg;
 	int result;
@@ -366,7 +366,7 @@ static int p80211wext_giwmode(netdevice_t *dev,
 			      struct iw_request_info *info,
 			      __u32 *mode, char *extra)
 {
-	wlandevice_t *wlandev = (wlandevice_t*)dev->priv;
+	wlandevice_t *wlandev = dev->ml_priv;
 
 	DBFENTER;
 
@@ -393,7 +393,7 @@ static int p80211wext_siwmode(netdevice_t *dev,
 			      struct iw_request_info *info,
 			      __u32 *mode, char *extra)
 {
-	wlandevice_t *wlandev = (wlandevice_t*)dev->priv;
+	wlandevice_t *wlandev = dev->ml_priv;
 	p80211item_uint32_t             mibitem;
 	p80211msg_dot11req_mibset_t     msg;
 	int 	result;
@@ -526,7 +526,7 @@ static int p80211wext_giwap(netdevice_t *dev,
 			    struct sockaddr *ap_addr, char *extra)
 {
 
-	wlandevice_t *wlandev = (wlandevice_t*)dev->priv;
+	wlandevice_t *wlandev = dev->ml_priv;
 
 	DBFENTER;
 
@@ -541,7 +541,7 @@ static int p80211wext_giwencode(netdevice_t *dev,
 				struct iw_request_info *info,
 				struct iw_point *erq, char *key)
 {
-	wlandevice_t *wlandev = (wlandevice_t*)dev->priv;
+	wlandevice_t *wlandev = dev->ml_priv;
 	int err = 0;
 	int i;
 
@@ -585,7 +585,7 @@ static int p80211wext_siwencode(netdevice_t *dev,
 				struct iw_request_info *info,
 				struct iw_point *erq, char *key)
 {
-	wlandevice_t *wlandev = (wlandevice_t*)dev->priv;
+	wlandevice_t *wlandev = dev->ml_priv;
 	p80211msg_dot11req_mibset_t	msg;
 	p80211item_pstr32_t		pstr;
 
@@ -718,7 +718,7 @@ static int p80211wext_giwessid(netdevice_t *dev,
 			       struct iw_request_info *info,
 			       struct iw_point *data, char *essid)
 {
-	wlandevice_t *wlandev = (wlandevice_t*)dev->priv;
+	wlandevice_t *wlandev = dev->ml_priv;
 
 	DBFENTER;
 
@@ -744,7 +744,7 @@ static int p80211wext_siwessid(netdevice_t *dev,
 			       struct iw_request_info *info,
 			       struct iw_point *data, char *essid)
 {
-	wlandevice_t *wlandev = (wlandevice_t*)dev->priv;
+	wlandevice_t *wlandev = dev->ml_priv;
 	p80211msg_lnxreq_autojoin_t     msg;
 
 	int result;
@@ -798,7 +798,7 @@ static int p80211wext_siwcommit(netdevice_t *dev,
 				struct iw_request_info *info,
 				struct iw_point *data, char *essid)
 {
-	wlandevice_t *wlandev = (wlandevice_t*)dev->priv;
+	wlandevice_t *wlandev = dev->ml_priv;
 	int err = 0;
 
 	DBFENTER;
@@ -821,7 +821,7 @@ static int p80211wext_giwrate(netdevice_t *dev,
 			      struct iw_request_info *info,
 			      struct iw_param *rrq, char *extra)
 {
-	wlandevice_t *wlandev = (wlandevice_t*)dev->priv;
+	wlandevice_t *wlandev = dev->ml_priv;
 	p80211item_uint32_t             mibitem;
 	p80211msg_dot11req_mibset_t     msg;
 	int result;
@@ -875,7 +875,7 @@ static int p80211wext_giwrts(netdevice_t *dev,
 			     struct iw_request_info *info,
 			     struct iw_param *rts, char *extra)
 {
-	wlandevice_t *wlandev = (wlandevice_t*)dev->priv;
+	wlandevice_t *wlandev = dev->ml_priv;
 	p80211item_uint32_t             mibitem;
 	p80211msg_dot11req_mibset_t     msg;
 	int result;
@@ -909,7 +909,7 @@ static int p80211wext_siwrts(netdevice_t *dev,
 			     struct iw_request_info *info,
 			     struct iw_param *rts, char *extra)
 {
-	wlandevice_t *wlandev = (wlandevice_t*)dev->priv;
+	wlandevice_t *wlandev = dev->ml_priv;
 	p80211item_uint32_t             mibitem;
 	p80211msg_dot11req_mibset_t     msg;
 	int result;
@@ -946,7 +946,7 @@ static int p80211wext_giwfrag(netdevice_t *dev,
 			      struct iw_request_info *info,
 			      struct iw_param *frag, char *extra)
 {
-	wlandevice_t *wlandev = (wlandevice_t*)dev->priv;
+	wlandevice_t *wlandev = dev->ml_priv;
 	p80211item_uint32_t             mibitem;
 	p80211msg_dot11req_mibset_t     msg;
 	int result;
@@ -979,7 +979,7 @@ static int p80211wext_siwfrag(netdevice_t *dev,
 			      struct iw_request_info *info,
 			      struct iw_param *frag, char *extra)
 {
-	wlandevice_t *wlandev = (wlandevice_t*)dev->priv;
+	wlandevice_t *wlandev = dev->ml_priv;
 	p80211item_uint32_t             mibitem;
 	p80211msg_dot11req_mibset_t     msg;
 	int result;
@@ -1025,7 +1025,7 @@ static int p80211wext_giwretry(netdevice_t *dev,
 			       struct iw_request_info *info,
 			       struct iw_param *rrq, char *extra)
 {
-	wlandevice_t *wlandev = (wlandevice_t*)dev->priv;
+	wlandevice_t *wlandev = dev->ml_priv;
 	p80211item_uint32_t             mibitem;
 	p80211msg_dot11req_mibset_t     msg;
 	int result;
@@ -1104,7 +1104,7 @@ static int p80211wext_siwretry(netdevice_t *dev,
 			       struct iw_request_info *info,
 			       struct iw_param *rrq, char *extra)
 {
-	wlandevice_t *wlandev = (wlandevice_t*)dev->priv;
+	wlandevice_t *wlandev = dev->ml_priv;
 	p80211item_uint32_t             mibitem;
 	p80211msg_dot11req_mibset_t     msg;
 	int result;
@@ -1173,7 +1173,7 @@ static int p80211wext_siwtxpow(netdevice_t *dev,
                                struct iw_request_info *info,
                                struct iw_param *rrq, char *extra)
 {
-        wlandevice_t *wlandev = (wlandevice_t*)dev->priv;
+	wlandevice_t *wlandev = dev->ml_priv;
         p80211item_uint32_t             mibitem;
         p80211msg_dot11req_mibset_t     msg;
         int result;
@@ -1209,7 +1209,7 @@ static int p80211wext_giwtxpow(netdevice_t *dev,
 			       struct iw_request_info *info,
 			       struct iw_param *rrq, char *extra)
 {
-	wlandevice_t *wlandev = (wlandevice_t*)dev->priv;
+	wlandevice_t *wlandev = dev->ml_priv;
 	p80211item_uint32_t             mibitem;
 	p80211msg_dot11req_mibset_t     msg;
 	int result;
@@ -1246,7 +1246,7 @@ static int p80211wext_siwspy(netdevice_t *dev,
 			     struct iw_request_info *info,
 			     struct iw_point *srq, char *extra)
 {
-	wlandevice_t *wlandev = (wlandevice_t*)dev->priv;
+	wlandevice_t *wlandev = dev->ml_priv;
         struct sockaddr address[IW_MAX_SPY];
         int number = srq->length;
         int i;
@@ -1282,7 +1282,7 @@ static int p80211wext_giwspy(netdevice_t *dev,
 			     struct iw_request_info *info,
 			     struct iw_point *srq, char *extra)
 {
-	wlandevice_t *wlandev = (wlandevice_t*)dev->priv;
+	wlandevice_t *wlandev = dev->ml_priv;
 
         struct sockaddr address[IW_MAX_SPY];
         struct iw_quality spy_stat[IW_MAX_SPY];
@@ -1342,7 +1342,7 @@ static int p80211wext_siwscan(netdevice_t *dev,
 			     struct iw_request_info *info,
 			     struct iw_point *srq, char *extra)
 {
-	wlandevice_t *wlandev = (wlandevice_t*)dev->priv;
+	wlandevice_t *wlandev = dev->ml_priv;
 	p80211msg_dot11req_scan_t	msg;
 	int result;
 	int err = 0;
@@ -1465,7 +1465,7 @@ static int p80211wext_giwscan(netdevice_t *dev,
 			     struct iw_request_info *info,
 			     struct iw_point *srq, char *extra)
 {
-	wlandevice_t *wlandev = (wlandevice_t*)dev->priv;
+	wlandevice_t *wlandev = dev->ml_priv;
 	p80211msg_dot11req_scan_results_t	msg;
 	int result = 0;
 	int err = 0;
@@ -1513,7 +1513,7 @@ static int p80211wext_set_encodeext(struct net_device *dev,
 				struct iw_request_info *info,
 				union iwreq_data *wrqu, char *extra)
 {
-  wlandevice_t *wlandev = (wlandevice_t*)dev->priv;
+  wlandevice_t *wlandev = dev->ml_priv;
   struct iw_encode_ext *ext = (struct iw_encode_ext *)extra;
 	p80211msg_dot11req_mibset_t	msg;
 	p80211item_pstr32_t		*pstr;
@@ -1589,7 +1589,7 @@ static int p80211wext_get_encodeext(struct net_device *dev,
 				union iwreq_data *wrqu, char *extra)
 
 {
-	wlandevice_t *wlandev = (wlandevice_t*)dev->priv;
+	wlandevice_t *wlandev = dev->ml_priv;
 	struct iw_encode_ext *ext = (struct iw_encode_ext *)extra;
 
 	struct iw_point *encoding = &wrqu->encoding;
@@ -1644,7 +1644,7 @@ static int p80211_wext_set_iwauth (struct net_device *dev,
 				   struct iw_request_info *info,
 				   union iwreq_data *wrqu, char *extra)
 {
-  wlandevice_t *wlandev = (wlandevice_t*)dev->priv;
+  wlandevice_t *wlandev = dev->ml_priv;
   struct iw_param *param = &wrqu->param;
   int result =0;
 
@@ -1696,7 +1696,7 @@ static int p80211_wext_get_iwauth (struct net_device *dev,
 				   struct iw_request_info *info,
 				   union iwreq_data *wrqu, char *extra)
 {
-  wlandevice_t *wlandev = (wlandevice_t*)dev->priv;
+  wlandevice_t *wlandev = dev->ml_priv;
   struct iw_param *param = &wrqu->param;
   int result =0;
 
@@ -1794,6 +1794,7 @@ struct iw_handler_def p80211wext_handler_def = {
 	.private_args = NULL,
 	.get_wireless_stats = p80211wext_get_wireless_stats
 };
+
 
 int p80211wext_event_associated(wlandevice_t *wlandev, int assoc)
 {

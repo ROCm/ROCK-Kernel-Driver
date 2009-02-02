@@ -83,7 +83,6 @@ static struct workqueue_struct *commit_wq;
 #define LIST_DIRTY   2
 #define LIST_COMMIT_PENDING  4	/* someone will commit this list */
 #define LIST_DEAD 8
-#define LIST_CURRENT 16
 
 /* flags for do_journal_end */
 #define FLUSH_ALL   1		/* flush commit and real blocks */
@@ -1034,11 +1033,14 @@ static int flush_commit_list(struct super_block *s,
 	 ** us is on disk too
 	 */
 	if (jl->j_len <= 0) {
-		reiserfs_warning(s, "journal-d1", "%j; "
-				 "trans_id = %u; "
+		reiserfs_warning(s, "journal-d1",
+				 "jl->j_len = %lu; jl->j_state = %lx; "
+				 "jl->j_trans_id = %u; "
+				 "jl->j_refcount = %d; "
 				 "journal->trans_id = %u; "
 				 "oldest live jl->j_trans_id = %u\n",
-				 jl, trans_id, journal->j_trans_id,
+				 jl->j_len, jl->j_state,
+				 trans_id, journal->j_trans_id,
 		JOURNAL_LIST_ENTRY(journal->j_journal_list.next)->j_trans_id);
 	}
 	BUG_ON(jl->j_len <= 0);
@@ -2571,12 +2573,6 @@ static struct reiserfs_journal_list *alloc_journal_list(struct super_block *s)
 	INIT_LIST_HEAD(&jl->j_bh_list);
 	mutex_init(&jl->j_commit_mutex);
 	SB_JOURNAL(s)->j_num_lists++;
-	jl->j_magic1 = 0xa5a5a5a5;
-	jl->j_magic2 = 0xb4b4b4b4;
-	jl->j_magic3 = 0xc3c3c3c3;
-	jl->j_magic4 = 0xd2d2d2d2;
-	jl->j_magic5 = 0xe1e1e1e1;
-	jl->j_magic6 = 0x96969696;
 	get_journal_list(jl);
 	return jl;
 }
@@ -2596,7 +2592,7 @@ static int release_journal_dev(struct super_block *super,
 	if (journal->j_dev_bd != NULL) {
 		if (journal->j_dev_bd->bd_dev != super->s_dev)
 			bd_release(journal->j_dev_bd);
-		result = blkdev_put(journal->j_dev_bd);
+		result = blkdev_put(journal->j_dev_bd, journal->j_dev_mode);
 		journal->j_dev_bd = NULL;
 	}
 
@@ -2613,7 +2609,7 @@ static int journal_init_dev(struct super_block *super,
 {
 	int result;
 	dev_t jdev;
-	int blkdev_mode = FMODE_READ | FMODE_WRITE;
+	fmode_t blkdev_mode = FMODE_READ | FMODE_WRITE;
 	char b[BDEVNAME_SIZE];
 
 	result = 0;
@@ -2628,6 +2624,7 @@ static int journal_init_dev(struct super_block *super,
 	/* there is no "jdev" option and journal is on separate device */
 	if ((!jdev_name || !jdev_name[0])) {
 		journal->j_dev_bd = open_by_devnum(jdev, blkdev_mode);
+		journal->j_dev_mode = blkdev_mode;
 		if (IS_ERR(journal->j_dev_bd)) {
 			result = PTR_ERR(journal->j_dev_bd);
 			journal->j_dev_bd = NULL;
@@ -2638,7 +2635,7 @@ static int journal_init_dev(struct super_block *super,
 		} else if (jdev != super->s_dev) {
 			result = bd_claim(journal->j_dev_bd, journal);
 			if (result) {
-				blkdev_put(journal->j_dev_bd);
+				blkdev_put(journal->j_dev_bd, blkdev_mode);
 				return result;
 			}
 
@@ -2648,7 +2645,9 @@ static int journal_init_dev(struct super_block *super,
 		return 0;
 	}
 
-	journal->j_dev_bd = open_bdev_excl(jdev_name, 0, journal);
+	journal->j_dev_mode = blkdev_mode;
+	journal->j_dev_bd = open_bdev_exclusive(jdev_name,
+						blkdev_mode, journal);
 	if (IS_ERR(journal->j_dev_bd)) {
 		result = PTR_ERR(journal->j_dev_bd);
 		journal->j_dev_bd = NULL;
@@ -2840,7 +2839,6 @@ int journal_init(struct super_block *sb, const char *j_dev_name,
 
 	journal->j_list_bitmap_index = 0;
 	journal_list_init(sb);
-	journal->j_current_jl->j_state |= LIST_CURRENT;
 
 	memset(journal->j_list_hash_table, 0,
 	       JOURNAL_HASH_SIZE * sizeof(struct reiserfs_journal_cnode *));
@@ -4179,8 +4177,6 @@ static int do_journal_end(struct reiserfs_transaction_handle *th,
 	 */
 
 	journal->j_current_jl = alloc_journal_list(sb);
-	journal->j_current_jl->j_state |= LIST_CURRENT;
-	jl->j_state &= LIST_CURRENT;
 
 	/* now it is safe to insert this transaction on the main list */
 	list_add_tail(&jl->j_list, &journal->j_journal_list);

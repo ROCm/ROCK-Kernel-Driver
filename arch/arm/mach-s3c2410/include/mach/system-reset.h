@@ -11,9 +11,9 @@
 */
 
 #include <mach/hardware.h>
-#include <asm/io.h>
+#include <linux/io.h>
 
-#include <asm/plat-s3c/regs-watchdog.h>
+#include <plat/regs-watchdog.h>
 #include <mach/regs-clock.h>
 
 #include <linux/clk.h>

@@ -23,7 +23,7 @@
  */
 #define NR_UNIX98_PTY_DEFAULT	4096      /* Default maximum for Unix98 ptys */
 #define NR_UNIX98_PTY_MAX	(1 << MINORBITS) /* Absolute limit */
-#define NR_LDISCS		18
+#define NR_LDISCS		19
 
 /* line disciplines */
 #define N_TTY		0
@@ -45,6 +45,7 @@
 #define N_HCI		15	/* Bluetooth HCI UART */
 #define N_GIGASET_M101	16	/* Siemens Gigaset M101 serial DECT adapter */
 #define N_SLCAN		17	/* Serial / USB serial CAN Adaptors */
+#define N_PPS		18	/* Pulse per Second */
 
 /*
  * This character is the same as _POSIX_VDISABLE: it cannot be used as
@@ -179,8 +180,18 @@ struct signal_struct;
  * until a hangup so don't use the wrong path.
  */
 
+struct tty_port;
+
+struct tty_port_operations {
+	/* Return 1 if the carrier is raised */
+	int (*carrier_raised)(struct tty_port *port);
+	void (*raise_dtr_rts)(struct tty_port *port);
+};
+	
 struct tty_port {
 	struct tty_struct	*tty;		/* Back pointer */
+	const struct tty_port_operations *ops;	/* Port operations */
+	spinlock_t		lock;		/* Lock protecting tty field */
 	int			blocked_open;	/* Waiting to open */
 	int			count;		/* Usage count */
 	wait_queue_head_t	open_wait;	/* Open waiters */
@@ -208,6 +219,7 @@ struct tty_operations;
 
 struct tty_struct {
 	int	magic;
+	struct kref kref;
 	struct tty_driver *driver;
 	const struct tty_operations *ops;
 	int index;
@@ -217,6 +229,7 @@ struct tty_struct {
 	spinlock_t ctrl_lock;
 	/* Termios values are protected by the termios mutex */
 	struct ktermios *termios, *termios_locked;
+	struct termiox *termiox;	/* May be NULL for unsupported */
 	char name[64];
 	struct pid *pgrp;		/* Protected by ctrl lock */
 	struct pid *session;
@@ -249,6 +262,7 @@ struct tty_struct {
 	unsigned int column;
 	unsigned char lnext:1, erasing:1, raw:1, real_raw:1, icanon:1;
 	unsigned char closing:1;
+	unsigned char echo_overrun:1;
 	unsigned short minimum_to_wake;
 	unsigned long overrun_time;
 	int num_overrun;
@@ -258,11 +272,16 @@ struct tty_struct {
 	int read_tail;
 	int read_cnt;
 	unsigned long read_flags[N_TTY_BUF_SIZE/(8*sizeof(unsigned long))];
+	unsigned char *echo_buf;
+	unsigned int echo_pos;
+	unsigned int echo_cnt;
 	int canon_data;
 	unsigned long canon_head;
 	unsigned int canon_column;
 	struct mutex atomic_read_lock;
 	struct mutex atomic_write_lock;
+	struct mutex output_lock;
+	struct mutex echo_lock;
 	unsigned char *write_buf;
 	int write_cnt;
 	spinlock_t read_lock;
@@ -291,6 +310,7 @@ struct tty_struct {
 #define TTY_PUSH 		6	/* n_tty private */
 #define TTY_CLOSING 		7	/* ->close() in progress */
 #define TTY_LDISC 		9	/* Line discipline attached */
+#define TTY_LDISC_CHANGING 	10	/* Line discipline changing */
 #define TTY_HW_COOK_OUT 	14	/* Hardware can do output cooking */
 #define TTY_HW_COOK_IN 		15	/* Hardware can do input cooking */
 #define TTY_PTY_LOCK 		16	/* pty private */
@@ -309,6 +329,25 @@ extern int kmsg_redirect;
 
 extern void console_init(void);
 extern int vcs_init(void);
+
+extern struct class *tty_class;
+
+/**
+ *	tty_kref_get		-	get a tty reference
+ *	@tty: tty device
+ *
+ *	Return a new reference to a tty object. The caller must hold
+ *	sufficient locks/counts to ensure that their existing reference cannot
+ *	go away
+ */
+
+static inline struct tty_struct *tty_kref_get(struct tty_struct *tty)
+{
+	if (tty)
+		kref_get(&tty->kref);
+	return tty;
+}
+extern void tty_kref_put(struct tty_struct *tty);
 
 extern int tty_paranoia_check(struct tty_struct *tty, struct inode *inode,
 			      const char *routine);
@@ -331,15 +370,16 @@ extern int tty_write_room(struct tty_struct *tty);
 extern void tty_driver_flush_buffer(struct tty_struct *tty);
 extern void tty_throttle(struct tty_struct *tty);
 extern void tty_unthrottle(struct tty_struct *tty);
-extern int tty_do_resize(struct tty_struct *tty, struct tty_struct *real_tty,
-						struct winsize *ws);
-
+extern int tty_do_resize(struct tty_struct *tty, struct winsize *ws);
+extern void tty_shutdown(struct tty_struct *tty);
+extern void tty_free_termios(struct tty_struct *tty);
 extern int is_current_pgrp_orphaned(void);
 extern struct pid *tty_get_pgrp(struct tty_struct *tty);
 extern int is_ignored(int sig);
 extern int tty_signal(int sig, struct tty_struct *tty);
 extern void tty_hangup(struct tty_struct *tty);
 extern void tty_vhangup(struct tty_struct *tty);
+extern void tty_vhangup_self(void);
 extern void tty_unhangup(struct file *filp);
 extern int tty_hung_up_p(struct file *filp);
 extern void do_SAK(struct tty_struct *tty);
@@ -347,6 +387,9 @@ extern void __do_SAK(struct tty_struct *tty);
 extern void disassociate_ctty(int priv);
 extern void no_tty(void);
 extern void tty_flip_buffer_push(struct tty_struct *tty);
+extern void tty_buffer_free_all(struct tty_struct *tty);
+extern void tty_buffer_flush(struct tty_struct *tty);
+extern void tty_buffer_init(struct tty_struct *tty);
 extern speed_t tty_get_baud_rate(struct tty_struct *tty);
 extern speed_t tty_termios_baud_rate(struct ktermios *termios);
 extern speed_t tty_termios_input_baud_rate(struct ktermios *termios);
@@ -372,6 +415,15 @@ extern int tty_perform_flush(struct tty_struct *tty, unsigned long arg);
 extern dev_t tty_devnum(struct tty_struct *tty);
 extern void proc_clear_tty(struct task_struct *p);
 extern struct tty_struct *get_current_tty(void);
+extern void tty_default_fops(struct file_operations *fops);
+extern struct tty_struct *alloc_tty_struct(void);
+extern void free_tty_struct(struct tty_struct *tty);
+extern void initialize_tty_struct(struct tty_struct *tty,
+		struct tty_driver *driver, int idx);
+extern struct tty_struct *tty_init_dev(struct tty_driver *driver, int idx,
+								int first_ok);
+extern void tty_release_dev(struct file *filp);
+extern int tty_init_termios(struct tty_struct *tty);
 
 extern struct mutex tty_mutex;
 
@@ -382,6 +434,16 @@ extern int tty_write_lock(struct tty_struct *tty, int ndelay);
 extern void tty_port_init(struct tty_port *port);
 extern int tty_port_alloc_xmit_buf(struct tty_port *port);
 extern void tty_port_free_xmit_buf(struct tty_port *port);
+extern struct tty_struct *tty_port_tty_get(struct tty_port *port);
+extern void tty_port_tty_set(struct tty_port *port, struct tty_struct *tty);
+extern int tty_port_carrier_raised(struct tty_port *port);
+extern void tty_port_raise_dtr_rts(struct tty_port *port);
+extern void tty_port_hangup(struct tty_port *port);
+extern int tty_port_block_til_ready(struct tty_port *port,
+				struct tty_struct *tty, struct file *filp);
+extern int tty_port_close_start(struct tty_port *port,
+				struct tty_struct *tty, struct file *filp);
+extern void tty_port_close_end(struct tty_port *port, struct tty_struct *tty);
 
 extern int tty_register_ldisc(int disc, struct tty_ldisc_ops *new_ldisc);
 extern int tty_unregister_ldisc(int disc);
@@ -403,12 +465,16 @@ extern void tty_audit_add_data(struct tty_struct *tty, unsigned char *data,
 			       size_t size);
 extern void tty_audit_exit(void);
 extern void tty_audit_fork(struct signal_struct *sig);
+extern void tty_audit_tiocsti(struct tty_struct *tty, char ch);
 extern void tty_audit_push(struct tty_struct *tty);
 extern void tty_audit_push_task(struct task_struct *tsk,
 					uid_t loginuid, u32 sessionid);
 #else
 static inline void tty_audit_add_data(struct tty_struct *tty,
 				      unsigned char *data, size_t size)
+{
+}
+static inline void tty_audit_tiocsti(struct tty_struct *tty, char ch)
 {
 }
 static inline void tty_audit_exit(void)
@@ -427,7 +493,7 @@ static inline void tty_audit_push_task(struct task_struct *tsk,
 #endif
 
 /* tty_ioctl.c */
-extern int n_tty_ioctl(struct tty_struct *tty, struct file *file,
+extern int n_tty_ioctl_helper(struct tty_struct *tty, struct file *file,
 		       unsigned int cmd, unsigned long arg);
 
 /* serial.c */

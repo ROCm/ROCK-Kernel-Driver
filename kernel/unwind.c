@@ -1048,51 +1048,51 @@ int unwind(struct unwind_frame_info *frame)
 		if (!fde)
 			dprintk(1, "FDE validation failed (%p,%p).", ptr, end);
 	}
-	if (cie == NULL || fde == NULL) {
 #ifdef CONFIG_FRAME_POINTER
-		unsigned long top, bottom;
+	if (cie == NULL || fde == NULL) {
+		unsigned long top = TSK_STACK_TOP(frame->task);
+		unsigned long bottom = STACK_BOTTOM(frame->task);
+		unsigned long fp = UNW_FP(frame);
+		unsigned long sp = UNW_SP(frame);
+		unsigned long link;
 
-		if ((UNW_SP(frame) | UNW_FP(frame)) % sizeof(unsigned long))
+		if ((sp | fp) & sizeof(unsigned long))
 			return -EPERM;
-		top = TSK_STACK_TOP(frame->task);
-		bottom = STACK_BOTTOM(frame->task);
-# if FRAME_RETADDR_OFFSET < 0
-		if (UNW_SP(frame) < top
-		    && UNW_FP(frame) <= UNW_SP(frame)
-		    && bottom < UNW_FP(frame)
-# else
-		if (UNW_SP(frame) > top
-		    && UNW_FP(frame) >= UNW_SP(frame)
-		    && bottom > UNW_FP(frame)
-# endif
-		    && !((UNW_SP(frame) | UNW_FP(frame))
-		         & (sizeof(unsigned long) - 1))) {
-			unsigned long link;
 
-			if (!probe_kernel_address(UNW_FP(frame) + FRAME_LINK_OFFSET,
-			                          link)
 # if FRAME_RETADDR_OFFSET < 0
-			    && link > bottom && link < UNW_FP(frame)
+		if (!(sp < top && fp <= sp && bottom < fp))
 # else
-			    && link > UNW_FP(frame) && link < bottom
+		if (!(sp < top && fp >= sp && bottom < fp))
 # endif
-			    && !(link & (sizeof(link) - 1))
-			    && !probe_kernel_address(UNW_FP(frame) + FRAME_RETADDR_OFFSET,
-			                             UNW_PC(frame))) {
-				UNW_SP(frame) = UNW_FP(frame) + FRAME_RETADDR_OFFSET
+			return -ENXIO;
+
+		if (probe_kernel_address(fp + FRAME_LINK_OFFSET, link))
+			return -ENXIO;
+
 # if FRAME_RETADDR_OFFSET < 0
-					-
+		if (!(link > bottom && link < fp))
 # else
-					+
+		if (!(link > bottom && link > fp))
 # endif
-					  sizeof(UNW_PC(frame));
-				UNW_FP(frame) = link;
-				return 0;
-			}
-		}
-#endif
-		return -ENXIO;
+			return -ENXIO;
+
+		if (link & (sizeof(unsigned long) - 1))
+			return -ENXIO;
+
+		fp += FRAME_RETADDR_OFFSET;
+		if (probe_kernel_address(fp, UNW_PC(frame)))
+			return -ENXIO;
+
+		/* Ok, we can use it */
+# if FRAME_RETADDR_OFFSET < 0
+		UNW_SP(frame) = fp - sizeof(UNW_PC(frame));
+# else
+		UNW_SP(frame) = fp + sizeof(UNW_PC(frame));
+# endif
+		UNW_FP(frame) = link;
+		return 0;
 	}
+#endif
 	state.org = startLoc;
 	memcpy(&state.cfa, &badCFA, sizeof(state.cfa));
 	/* process instructions */
@@ -1273,14 +1273,13 @@ EXPORT_SYMBOL_GPL(unwind_init_blocked);
  * Prepare to unwind the currently running thread.
  */
 int unwind_init_running(struct unwind_frame_info *info,
-                        asmlinkage int (*callback)(struct unwind_frame_info *,
-                                                   void *arg),
-                        void *arg)
+			asmlinkage unwind_callback_fn callback,
+			const struct stacktrace_ops *ops, void *data)
 {
 	info->task = current;
 	info->call_frame = 0;
 
-	return arch_unwind_init_running(info, callback, arg);
+	return arch_unwind_init_running(info, callback, ops, data);
 }
 EXPORT_SYMBOL_GPL(unwind_init_running);
 

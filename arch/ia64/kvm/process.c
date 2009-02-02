@@ -527,7 +527,8 @@ void reflect_interruption(u64 ifa, u64 isr, u64 iim,
 	vector = vec2off[vec];
 
 	if (!(vpsr & IA64_PSR_IC) && (vector != IA64_DATA_NESTED_TLB_VECTOR)) {
-		panic_vm(vcpu);
+		panic_vm(vcpu, "Interruption with vector :0x%lx occurs "
+						"with psr.ic = 0\n", vector);
 		return;
 	}
 
@@ -586,7 +587,7 @@ static void set_pal_call_result(struct kvm_vcpu *vcpu)
 		vcpu_set_gr(vcpu, 10, p->u.pal_data.ret.v1, 0);
 		vcpu_set_gr(vcpu, 11, p->u.pal_data.ret.v2, 0);
 	} else
-		panic_vm(vcpu);
+		panic_vm(vcpu, "Mis-set for exit reason!\n");
 }
 
 static void set_sal_call_data(struct kvm_vcpu *vcpu)
@@ -614,7 +615,7 @@ static void set_sal_call_result(struct kvm_vcpu *vcpu)
 		vcpu_set_gr(vcpu, 10, p->u.sal_data.ret.r10, 0);
 		vcpu_set_gr(vcpu, 11, p->u.sal_data.ret.r11, 0);
 	} else
-		panic_vm(vcpu);
+		panic_vm(vcpu, "Mis-set for exit reason!\n");
 }
 
 void  kvm_ia64_handle_break(unsigned long ifa, struct kvm_pt_regs *regs,
@@ -680,7 +681,7 @@ static void generate_exirq(struct kvm_vcpu *vcpu)
 	vpsr = VCPU(vcpu, vpsr);
 	isr = vpsr & IA64_PSR_RI;
 	if (!(vpsr & IA64_PSR_IC))
-		panic_vm(vcpu);
+		panic_vm(vcpu, "Trying to inject one IRQ with psr.ic=0\n");
 	reflect_interruption(0, isr, 0, 12, regs); /* EXT IRQ */
 }
 
@@ -713,7 +714,7 @@ void leave_hypervisor_tail(void)
 				if (!(VCPU(v, itv) & (1 << 16))) {
 					vcpu_pend_interrupt(v, VCPU(v, itv)
 							& 0xff);
-				VMX(v, itc_check) = 0;
+					VMX(v, itc_check) = 0;
 				} else {
 					v->arch.timer_pending = 1;
 				}
@@ -941,8 +942,20 @@ static void vcpu_do_resume(struct kvm_vcpu *vcpu)
 	ia64_set_pta(vcpu->arch.vhpt.pta.val);
 }
 
+static void vmm_sanity_check(struct kvm_vcpu *vcpu)
+{
+	struct exit_ctl_data *p = &vcpu->arch.exit_data;
+
+	if (!vmm_sanity && p->exit_reason != EXIT_REASON_DEBUG) {
+		panic_vm(vcpu, "Failed to do vmm sanity check,"
+			"it maybe caused by crashed vmm!!\n\n");
+	}
+}
+
 static void kvm_do_resume_op(struct kvm_vcpu *vcpu)
 {
+	vmm_sanity_check(vcpu); /*Guarantee vcpu runing on healthy vmm!*/
+
 	if (test_and_clear_bit(KVM_REQ_RESUME, &vcpu->requests)) {
 		vcpu_do_resume(vcpu);
 		return;
@@ -962,9 +975,17 @@ static void kvm_do_resume_op(struct kvm_vcpu *vcpu)
 void vmm_transition(struct kvm_vcpu *vcpu)
 {
 	ia64_call_vsa(PAL_VPS_SAVE, (unsigned long)vcpu->arch.vpd,
-			0, 0, 0, 0, 0, 0);
+			1, 0, 0, 0, 0, 0);
 	vmm_trampoline(&vcpu->arch.guest, &vcpu->arch.host);
 	ia64_call_vsa(PAL_VPS_RESTORE, (unsigned long)vcpu->arch.vpd,
-						0, 0, 0, 0, 0, 0);
+						1, 0, 0, 0, 0, 0);
 	kvm_do_resume_op(vcpu);
+}
+
+void vmm_panic_handler(u64 vec)
+{
+	struct kvm_vcpu *vcpu = current_vcpu;
+	vmm_sanity = 0;
+	panic_vm(vcpu, "Unexpected interruption occurs in VMM, vector:0x%lx\n",
+			vec2off[vec]);
 }

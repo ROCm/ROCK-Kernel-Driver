@@ -41,6 +41,7 @@ struct sm501_gpio_chip {
 	struct gpio_chip	gpio;
 	struct sm501_gpio	*ourgpio;	/* to get back to parent. */
 	void __iomem		*regbase;
+	void __iomem		*control;	/* address of control reg. */
 };
 
 struct sm501_gpio {
@@ -623,8 +624,8 @@ unsigned long sm501_set_clock(struct device *dev,
 
 	sm501_sync_regs(sm);
 
-	dev_info(sm->dev, "gate %08lx, clock %08lx, mode %08lx\n",
-		 gate, clock, mode);
+	dev_dbg(sm->dev, "gate %08lx, clock %08lx, mode %08lx\n",
+		gate, clock, mode);
 
 	sm501_mdelay(sm, 16);
 	mutex_unlock(&sm->clock_lock);
@@ -742,7 +743,7 @@ static int sm501_register_device(struct sm501_devdata *sm,
 	int ret;
 
 	for (ptr = 0; ptr < pdev->num_resources; ptr++) {
-		printk("%s[%d] flags %08lx: %08llx..%08llx\n",
+		printk(KERN_DEBUG "%s[%d] flags %08lx: %08llx..%08llx\n",
 		       pdev->name, ptr,
 		       pdev->resource[ptr].flags,
 		       (unsigned long long)pdev->resource[ptr].start,
@@ -908,6 +909,25 @@ static int sm501_gpio_get(struct gpio_chip *chip, unsigned offset)
 	return result & 1UL;
 }
 
+static void sm501_gpio_ensure_gpio(struct sm501_gpio_chip *smchip,
+				   unsigned long bit)
+{
+	unsigned long ctrl;
+
+	/* check and modify if this pin is not set as gpio. */
+
+	if (readl(smchip->control) & bit) {
+		dev_info(sm501_gpio_to_dev(smchip->ourgpio)->dev,
+			 "changing mode of gpio, bit %08lx\n", bit);
+
+		ctrl = readl(smchip->control);
+		ctrl &= ~bit;
+		writel(ctrl, smchip->control);
+
+		sm501_sync_regs(sm501_gpio_to_dev(smchip->ourgpio));
+	}
+}
+
 static void sm501_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
 
 {
@@ -929,6 +949,8 @@ static void sm501_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
 	writel(val, regs);
 
 	sm501_sync_regs(sm501_gpio_to_dev(smgpio));
+	sm501_gpio_ensure_gpio(smchip, bit);
+
 	spin_unlock_irqrestore(&smgpio->lock, save);
 }
 
@@ -941,8 +963,8 @@ static int sm501_gpio_input(struct gpio_chip *chip, unsigned offset)
 	unsigned long save;
 	unsigned long ddr;
 
-	dev_info(sm501_gpio_to_dev(smgpio)->dev, "%s(%p,%d)\n",
-		 __func__, chip, offset);
+	dev_dbg(sm501_gpio_to_dev(smgpio)->dev, "%s(%p,%d)\n",
+		__func__, chip, offset);
 
 	spin_lock_irqsave(&smgpio->lock, save);
 
@@ -950,6 +972,8 @@ static int sm501_gpio_input(struct gpio_chip *chip, unsigned offset)
 	writel(ddr & ~bit, regs + SM501_GPIO_DDR_LOW);
 
 	sm501_sync_regs(sm501_gpio_to_dev(smgpio));
+	sm501_gpio_ensure_gpio(smchip, bit);
+
 	spin_unlock_irqrestore(&smgpio->lock, save);
 
 	return 0;
@@ -1012,9 +1036,11 @@ static int __devinit sm501_gpio_register_chip(struct sm501_devdata *sm,
 		if (base > 0)
 			base += 32;
 		chip->regbase = gpio->regs + SM501_GPIO_DATA_HIGH;
+		chip->control = sm->regs + SM501_GPIO63_32_CONTROL;
 		gchip->label  = "SM501-HIGH";
 	} else {
 		chip->regbase = gpio->regs + SM501_GPIO_DATA_LOW;
+		chip->control = sm->regs + SM501_GPIO31_0_CONTROL;
 		gchip->label  = "SM501-LOW";
 	}
 
@@ -1374,31 +1400,31 @@ static int sm501_init_dev(struct sm501_devdata *sm)
 static int sm501_plat_probe(struct platform_device *dev)
 {
 	struct sm501_devdata *sm;
-	int err;
+	int ret;
 
 	sm = kzalloc(sizeof(struct sm501_devdata), GFP_KERNEL);
 	if (sm == NULL) {
 		dev_err(&dev->dev, "no memory for device data\n");
-		err = -ENOMEM;
+		ret = -ENOMEM;
 		goto err1;
 	}
 
 	sm->dev = &dev->dev;
 	sm->pdev_id = dev->id;
-	sm->irq = platform_get_irq(dev, 0);
-	sm->io_res = platform_get_resource(dev, IORESOURCE_MEM, 1);
-	sm->mem_res = platform_get_resource(dev, IORESOURCE_MEM, 0);
 	sm->platdata = dev->dev.platform_data;
 
-	if (sm->irq < 0) {
+	ret = platform_get_irq(dev, 0);
+	if (ret < 0) {
 		dev_err(&dev->dev, "failed to get irq resource\n");
-		err = sm->irq;
 		goto err_res;
 	}
+	sm->irq = ret;
 
+	sm->io_res = platform_get_resource(dev, IORESOURCE_MEM, 1);
+	sm->mem_res = platform_get_resource(dev, IORESOURCE_MEM, 0);
 	if (sm->io_res == NULL || sm->mem_res == NULL) {
 		dev_err(&dev->dev, "failed to get IO resource\n");
-		err = -ENOENT;
+		ret = -ENOENT;
 		goto err_res;
 	}
 
@@ -1407,7 +1433,7 @@ static int sm501_plat_probe(struct platform_device *dev)
 
 	if (sm->regs_claim == NULL) {
 		dev_err(&dev->dev, "cannot claim registers\n");
-		err= -EBUSY;
+		ret = -EBUSY;
 		goto err_res;
 	}
 
@@ -1418,7 +1444,7 @@ static int sm501_plat_probe(struct platform_device *dev)
 
 	if (sm->regs == NULL) {
 		dev_err(&dev->dev, "cannot remap registers\n");
-		err = -EIO;
+		ret = -EIO;
 		goto err_claim;
 	}
 
@@ -1430,7 +1456,7 @@ static int sm501_plat_probe(struct platform_device *dev)
  err_res:
 	kfree(sm);
  err1:
-	return err;
+	return ret;
 
 }
 
@@ -1625,8 +1651,7 @@ static int sm501_pci_probe(struct pci_dev *dev,
 		goto err3;
 	}
 
-	sm->regs = ioremap(pci_resource_start(dev, 1),
-			   pci_resource_len(dev, 1));
+	sm->regs = pci_ioremap_bar(dev, 1);
 
 	if (sm->regs == NULL) {
 		dev_err(&dev->dev, "cannot remap registers\n");

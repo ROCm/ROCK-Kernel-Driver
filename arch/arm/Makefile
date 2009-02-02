@@ -47,7 +47,7 @@ comma = ,
 # Note that GCC does not numerically define an architecture version
 # macro, but instead defines a whole series of macros which makes
 # testing for a specific architecture or later rather impossible.
-arch-$(CONFIG_CPU_32v7)		:=-D__LINUX_ARM_ARCH__=7 $(call cc-option,-march=armv7a,-march=armv5t -Wa$(comma)-march=armv7a)
+arch-$(CONFIG_CPU_32v7)		:=-D__LINUX_ARM_ARCH__=7 $(call cc-option,-march=armv7-a,-march=armv5t -Wa$(comma)-march=armv7-a)
 arch-$(CONFIG_CPU_32v6)		:=-D__LINUX_ARM_ARCH__=6 $(call cc-option,-march=armv6,-march=armv5t -Wa$(comma)-march=armv6)
 # Only override the compiler option if ARMv6. The ARMv6K extensions are
 # always available in ARMv7
@@ -76,6 +76,7 @@ tune-$(CONFIG_CPU_SA110)	:=-mtune=strongarm110
 tune-$(CONFIG_CPU_SA1100)	:=-mtune=strongarm1100
 tune-$(CONFIG_CPU_XSCALE)	:=$(call cc-option,-mtune=xscale,-mtune=strongarm110) -Wa,-mcpu=xscale
 tune-$(CONFIG_CPU_XSC3)		:=$(call cc-option,-mtune=xscale,-mtune=strongarm110) -Wa,-mcpu=xscale
+tune-$(CONFIG_CPU_FEROCEON)	:=$(call cc-option,-mtune=marvell-f,-mtune=xscale)
 tune-$(CONFIG_CPU_V6)		:=$(call cc-option,-mtune=arm1136j-s,-mtune=strongarm)
 
 ifeq ($(CONFIG_AEABI),y)
@@ -96,7 +97,6 @@ textofs-y	:= 0x00008000
 
  machine-$(CONFIG_ARCH_RPC)	   := rpc
  machine-$(CONFIG_ARCH_EBSA110)	   := ebsa110
- machine-$(CONFIG_ARCH_CLPS7500)   := clps7500
  machine-$(CONFIG_FOOTBRIDGE)	   := footbridge
  machine-$(CONFIG_ARCH_SHARK)	   := shark
  machine-$(CONFIG_ARCH_SA1100)	   := sa1100
@@ -118,9 +118,13 @@ endif
  machine-$(CONFIG_ARCH_IXP23XX)    := ixp23xx
  machine-$(CONFIG_ARCH_OMAP1)	   := omap1
  machine-$(CONFIG_ARCH_OMAP2)	   := omap2
+ machine-$(CONFIG_ARCH_OMAP3)	   := omap2
     plat-$(CONFIG_ARCH_OMAP)	   := omap
  machine-$(CONFIG_ARCH_S3C2410)	   := s3c2410 s3c2400 s3c2412 s3c2440 s3c2442 s3c2443
-    plat-$(CONFIG_PLAT_S3C24XX)	   := s3c24xx
+ machine-$(CONFIG_ARCH_S3C24A0)	   := s3c24a0
+    plat-$(CONFIG_PLAT_S3C24XX)	   := s3c24xx s3c
+ machine-$(CONFIG_ARCH_S3C64XX)	   := s3c6400 s3c6410
+    plat-$(CONFIG_PLAT_S3C64XX)	   := s3c64xx s3c
  machine-$(CONFIG_ARCH_LH7A40X)	   := lh7a40x
  machine-$(CONFIG_ARCH_VERSATILE)  := versatile
  machine-$(CONFIG_ARCH_IMX)	   := imx
@@ -138,11 +142,13 @@ endif
     plat-$(CONFIG_ARCH_MXC)	   := mxc
  machine-$(CONFIG_ARCH_MX2)	   := mx2
  machine-$(CONFIG_ARCH_MX3)	   := mx3
+ machine-$(CONFIG_ARCH_MX1)	   := mx1
  machine-$(CONFIG_ARCH_ORION5X)	   := orion5x
     plat-$(CONFIG_PLAT_ORION)	   := orion
- machine-$(CONFIG_ARCH_MSM7X00A)   := msm
+ machine-$(CONFIG_ARCH_MSM)	   := msm
  machine-$(CONFIG_ARCH_LOKI)       := loki
  machine-$(CONFIG_ARCH_MV78XX0)    := mv78xx0
+ machine-$(CONFIG_ARCH_W90X900)    := w90x900
 
 ifeq ($(CONFIG_ARCH_EBSA110),y)
 # This is what happens if you forget the IOCS16 line.

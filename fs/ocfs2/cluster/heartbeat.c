@@ -854,7 +854,7 @@ static int o2hb_thread(void *data)
 
 	while (!kthread_should_stop() && !reg->hr_unclean_stop) {
 		/* We track the time spent inside
-		 * o2hb_do_disk_heartbeat so that we avoid more then
+		 * o2hb_do_disk_heartbeat so that we avoid more than
 		 * hr_timeout_ms between disk writes. On busy systems
 		 * this should result in a heartbeat which is less
 		 * likely to time itself out. */
@@ -976,7 +976,7 @@ static void o2hb_region_release(struct config_item *item)
 	}
 
 	if (reg->hr_bdev)
-		blkdev_put(reg->hr_bdev);
+		blkdev_put(reg->hr_bdev, FMODE_READ|FMODE_WRITE);
 
 	if (reg->hr_slots)
 		kfree(reg->hr_slots);
@@ -1268,7 +1268,7 @@ static ssize_t o2hb_region_dev_write(struct o2hb_region *reg,
 		goto out;
 
 	reg->hr_bdev = I_BDEV(filp->f_mapping->host);
-	ret = blkdev_get(reg->hr_bdev, FMODE_WRITE | FMODE_READ, 0);
+	ret = blkdev_get(reg->hr_bdev, FMODE_WRITE | FMODE_READ);
 	if (ret) {
 		reg->hr_bdev = NULL;
 		goto out;
@@ -1358,7 +1358,7 @@ out:
 		iput(inode);
 	if (ret < 0) {
 		if (reg->hr_bdev) {
-			blkdev_put(reg->hr_bdev);
+			blkdev_put(reg->hr_bdev, FMODE_READ|FMODE_WRITE);
 			reg->hr_bdev = NULL;
 		}
 	}

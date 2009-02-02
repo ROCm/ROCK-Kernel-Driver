@@ -36,6 +36,8 @@
 #include <linux/mpage.h>
 #include <linux/uio.h>
 #include <linux/bio.h>
+#include <linux/fiemap.h>
+#include <linux/namei.h>
 #include "xattr.h"
 #include "acl.h"
 #include "nfs4acl.h"
@@ -982,6 +984,13 @@ out:
 	return ret;
 }
 
+int ext3_fiemap(struct inode *inode, struct fiemap_extent_info *fieinfo,
+		u64 start, u64 len)
+{
+	return generic_block_fiemap(inode, fieinfo, start, len,
+				    ext3_get_block);
+}
+
 /*
  * `handle' can be NULL if create is zero
  */
@@ -1179,6 +1188,13 @@ write_begin_failed:
 		ext3_journal_stop(handle);
 		unlock_page(page);
 		page_cache_release(page);
+		/*
+		 * block_write_begin may have instantiated a few blocks
+		 * outside i_size.  Trim these off again. Don't need
+		 * i_size_read because we hold i_mutex.
+		 */
+		if (pos + len > inode->i_size)
+			vmtruncate(inode, inode->i_size);
 	}
 	if (ret == -ENOSPC && ext3_should_retry_alloc(inode->i_sb, &retries))
 		goto retry;
@@ -2806,9 +2822,11 @@ struct inode *ext3_iget(struct super_block *sb, unsigned long ino)
 		inode->i_op = &ext3_dir_inode_operations;
 		inode->i_fop = &ext3_dir_operations;
 	} else if (S_ISLNK(inode->i_mode)) {
-		if (ext3_inode_is_fast_symlink(inode))
+		if (ext3_inode_is_fast_symlink(inode)) {
 			inode->i_op = &ext3_fast_symlink_inode_operations;
-		else {
+			nd_terminate_link(ei->i_data, inode->i_size,
+				sizeof(ei->i_data) - 1);
+		} else {
 			inode->i_op = &ext3_symlink_inode_operations;
 			ext3_set_aops(inode);
 		}
@@ -3016,9 +3034,9 @@ static int ext3_inode_change_ok(struct inode *inode, struct iattr *attr)
 
 	/* Make sure a caller can chown. */
 	if ((ia_valid & ATTR_UID) &&
-	    (current->fsuid != inode->i_uid ||
+	    (current_fsuid() != inode->i_uid ||
 	     attr->ia_uid != inode->i_uid) &&
-	    (current->fsuid != attr->ia_uid ||
+	    (current_fsuid() != attr->ia_uid ||
 	     ext3_nfs4acl_permission(inode, ACE4_WRITE_OWNER)) &&
 	    !capable(CAP_CHOWN))
 		goto error;
@@ -3026,7 +3044,7 @@ static int ext3_inode_change_ok(struct inode *inode, struct iattr *attr)
 	/* Make sure caller can chgrp. */
 	if ((ia_valid & ATTR_GID)) {
 		int in_group = in_group_p(attr->ia_gid);
-		if ((current->fsuid != inode->i_uid ||
+		if ((current_fsuid() != inode->i_uid ||
 		    (!in_group && attr->ia_gid != inode->i_gid)) &&
 		    (!in_group ||
 		     ext3_nfs4acl_permission(inode, ACE4_WRITE_OWNER)) &&
@@ -3036,7 +3054,7 @@ static int ext3_inode_change_ok(struct inode *inode, struct iattr *attr)
 
 	/* Make sure a caller can chmod. */
 	if (ia_valid & ATTR_MODE) {
-		if (current->fsuid != inode->i_uid &&
+		if (current_fsuid() != inode->i_uid &&
 		    ext3_nfs4acl_permission(inode, ACE4_WRITE_ACL) &&
 		    !capable(CAP_FOWNER))
 			goto error;
@@ -3048,7 +3066,7 @@ static int ext3_inode_change_ok(struct inode *inode, struct iattr *attr)
 
 	/* Check for setting the inode time. */
 	if (ia_valid & (ATTR_MTIME_SET | ATTR_ATIME_SET)) {
-		if (current->fsuid != inode->i_uid &&
+		if (current_fsuid() != inode->i_uid &&
 		    ext3_nfs4acl_permission(inode, ACE4_WRITE_ATTRIBUTES) &&
 		    !capable(CAP_FOWNER))
 			goto error;

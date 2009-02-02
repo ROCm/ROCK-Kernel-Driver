@@ -28,11 +28,11 @@
 #include <linux/timex.h>
 #include <linux/clocksource.h>
 #include <linux/clockchips.h>
+#include <linux/io.h>
 
 #include <mach/udc.h>
 #include <mach/hardware.h>
 #include <asm/uaccess.h>
-#include <asm/io.h>
 #include <asm/pgtable.h>
 #include <asm/page.h>
 #include <asm/irq.h>
@@ -487,7 +487,7 @@ static int __init ixp4xx_clockevent_init(void)
 		clockevent_delta2ns(0xfffffffe, &clockevent_ixp4xx);
 	clockevent_ixp4xx.min_delta_ns =
 		clockevent_delta2ns(0xf, &clockevent_ixp4xx);
-	clockevent_ixp4xx.cpumask = cpumask_of_cpu(0);
+	clockevent_ixp4xx.cpumask = cpumask_of(0);
 
 	clockevents_register_device(&clockevent_ixp4xx);
 	return 0;

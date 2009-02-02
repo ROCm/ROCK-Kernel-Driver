@@ -22,54 +22,17 @@
 #include <linux/delay.h>
 #include <linux/acpi.h>
 #include <linux/kallsyms.h>
+#include <linux/dmi.h>
 #include "pci.h"
 
-#ifdef CONFIG_PCI_REASSIGN
-/*
- * This quirk function disables the device and releases resources
- * which is specified by kernel's boot parameter 'reassigndev'.
- * Later on, kernel will assign page-aligned memory resource back
- * to that device.
- */
-static void __devinit quirk_release_resources(struct pci_dev *dev)
-{
-	int i;
-	struct resource *r;
+int isa_dma_bridge_buggy;
+EXPORT_SYMBOL(isa_dma_bridge_buggy);
+int pci_pci_problems;
+EXPORT_SYMBOL(pci_pci_problems);
+int pcie_mch_quirk;
+EXPORT_SYMBOL(pcie_mch_quirk);
 
-	if (is_reassigndev(dev)) {
-		if (dev->hdr_type == PCI_HEADER_TYPE_NORMAL &&
-		    (dev->class >> 8) == PCI_CLASS_BRIDGE_HOST) {
-			/* PCI Host Bridge isn't a target device */
-			return;
-		}
-		dev_info(&dev->dev, "disable device and release resources\n");
-		pci_disable_device(dev);
-
-		for (i=0; i < PCI_NUM_RESOURCES; i++) {
-			r = &dev->resource[i];
-			if (!(r->flags & IORESOURCE_MEM))
-				continue;
-
-			r->end = r->end - r->start;
-			r->start = 0;
-
-			if (i < PCI_BRIDGE_RESOURCES) {
-				pci_update_resource(dev, r, i);
-			}
-		}
-		/* need to disable bridge's resource window,
-		 * to make kernel enable to reassign new resource
-		 * window later on.
-		 */
-		if (dev->hdr_type == PCI_HEADER_TYPE_BRIDGE &&
-		    (dev->class >> 8) == PCI_CLASS_BRIDGE_PCI) {
-			pci_disable_bridge_window(dev);
-		}
-	}
-}
-DECLARE_PCI_FIXUP_HEADER(PCI_ANY_ID, PCI_ANY_ID, quirk_release_resources);
-#endif
-
+#ifdef CONFIG_PCI_QUIRKS
 /* The Mellanox Tavor device gives false positive parity errors
  * Mark this device with a broken_parity_status, to allow
  * PCI scanning code to "skip" this now blacklisted device.
@@ -93,7 +56,7 @@ static void quirk_passive_release(struct pci_dev *dev)
 	while ((d = pci_get_device(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82371SB_0, d))) {
 		pci_read_config_byte(d, 0x82, &dlc);
 		if (!(dlc & 1<<1)) {
-			dev_err(&d->dev, "PIIX3: Enabling Passive Release\n");
+			dev_info(&d->dev, "PIIX3: Enabling Passive Release\n");
 			dlc |= 1<<1;
 			pci_write_config_byte(d, 0x82, dlc);
 		}
@@ -108,8 +71,6 @@ DECLARE_PCI_FIXUP_RESUME(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82441,	quirk_p
     
     This appears to be BIOS not version dependent. So presumably there is a 
     chipset level fix */
-int isa_dma_bridge_buggy;
-EXPORT_SYMBOL(isa_dma_bridge_buggy);
     
 static void __devinit quirk_isa_dma_hangs(struct pci_dev *dev)
 {
@@ -129,9 +90,6 @@ DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_AL,	PCI_DEVICE_ID_AL_M1533, 	quirk_isa_dma
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_NEC,	PCI_DEVICE_ID_NEC_CBUS_1,	quirk_isa_dma_hangs);
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_NEC,	PCI_DEVICE_ID_NEC_CBUS_2,	quirk_isa_dma_hangs);
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_NEC,	PCI_DEVICE_ID_NEC_CBUS_3,	quirk_isa_dma_hangs);
-
-int pci_pci_problems;
-EXPORT_SYMBOL(pci_pci_problems);
 
 /*
  *	Chipsets where PCI->PCI transfers vanish or hang
@@ -491,7 +449,7 @@ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,    PCI_DEVICE_ID_INTEL_82801DB_12,
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,    PCI_DEVICE_ID_INTEL_82801EB_0,		quirk_ich4_lpc_acpi);
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,    PCI_DEVICE_ID_INTEL_ESB_1,		quirk_ich4_lpc_acpi);
 
-static void __devinit quirk_ich6_lpc_acpi(struct pci_dev *dev)
+static void __devinit ich6_lpc_acpi_gpio(struct pci_dev *dev)
 {
 	u32 region;
 
@@ -501,20 +459,95 @@ static void __devinit quirk_ich6_lpc_acpi(struct pci_dev *dev)
 	pci_read_config_dword(dev, 0x48, &region);
 	quirk_io_region(dev, region, 64, PCI_BRIDGE_RESOURCES+1, "ICH6 GPIO");
 }
-DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ICH6_0, quirk_ich6_lpc_acpi);
-DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ICH6_1, quirk_ich6_lpc_acpi);
-DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ICH7_0, quirk_ich6_lpc_acpi);
-DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ICH7_1, quirk_ich6_lpc_acpi);
-DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ICH7_31, quirk_ich6_lpc_acpi);
-DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ICH8_0, quirk_ich6_lpc_acpi);
-DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ICH8_2, quirk_ich6_lpc_acpi);
-DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ICH8_3, quirk_ich6_lpc_acpi);
-DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ICH8_1, quirk_ich6_lpc_acpi);
-DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ICH8_4, quirk_ich6_lpc_acpi);
-DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ICH9_2, quirk_ich6_lpc_acpi);
-DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ICH9_4, quirk_ich6_lpc_acpi);
-DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ICH9_7, quirk_ich6_lpc_acpi);
-DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ICH9_8, quirk_ich6_lpc_acpi);
+
+static void __devinit ich6_lpc_generic_decode(struct pci_dev *dev, unsigned reg, const char *name, int dynsize)
+{
+	u32 val;
+	u32 size, base;
+
+	pci_read_config_dword(dev, reg, &val);
+
+	/* Enabled? */
+	if (!(val & 1))
+		return;
+	base = val & 0xfffc;
+	if (dynsize) {
+		/*
+		 * This is not correct. It is 16, 32 or 64 bytes depending on
+		 * register D31:F0:ADh bits 5:4.
+		 *
+		 * But this gets us at least _part_ of it.
+		 */
+		size = 16;
+	} else {
+		size = 128;
+	}
+	base &= ~(size-1);
+
+	/* Just print it out for now. We should reserve it after more debugging */
+	dev_info(&dev->dev, "%s PIO at %04x-%04x\n", name, base, base+size-1);
+}
+
+static void __devinit quirk_ich6_lpc(struct pci_dev *dev)
+{
+	/* Shared ACPI/GPIO decode with all ICH6+ */
+	ich6_lpc_acpi_gpio(dev);
+
+	/* ICH6-specific generic IO decode */
+	ich6_lpc_generic_decode(dev, 0x84, "LPC Generic IO decode 1", 0);
+	ich6_lpc_generic_decode(dev, 0x88, "LPC Generic IO decode 2", 1);
+}
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ICH6_0, quirk_ich6_lpc);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ICH6_1, quirk_ich6_lpc);
+
+static void __devinit ich7_lpc_generic_decode(struct pci_dev *dev, unsigned reg, const char *name)
+{
+	u32 val;
+	u32 mask, base;
+
+	pci_read_config_dword(dev, reg, &val);
+
+	/* Enabled? */
+	if (!(val & 1))
+		return;
+
+	/*
+	 * IO base in bits 15:2, mask in bits 23:18, both
+	 * are dword-based
+	 */
+	base = val & 0xfffc;
+	mask = (val >> 16) & 0xfc;
+	mask |= 3;
+
+	/* Just print it out for now. We should reserve it after more debugging */
+	dev_info(&dev->dev, "%s PIO at %04x (mask %04x)\n", name, base, mask);
+}
+
+/* ICH7-10 has the same common LPC generic IO decode registers */
+static void __devinit quirk_ich7_lpc(struct pci_dev *dev)
+{
+	/* We share the common ACPI/DPIO decode with ICH6 */
+	ich6_lpc_acpi_gpio(dev);
+
+	/* And have 4 ICH7+ generic decodes */
+	ich7_lpc_generic_decode(dev, 0x84, "ICH7 LPC Generic IO decode 1");
+	ich7_lpc_generic_decode(dev, 0x88, "ICH7 LPC Generic IO decode 2");
+	ich7_lpc_generic_decode(dev, 0x8c, "ICH7 LPC Generic IO decode 3");
+	ich7_lpc_generic_decode(dev, 0x90, "ICH7 LPC Generic IO decode 4");
+}
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ICH7_0, quirk_ich7_lpc);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ICH7_1, quirk_ich7_lpc);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ICH7_31, quirk_ich7_lpc);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ICH8_0, quirk_ich7_lpc);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ICH8_2, quirk_ich7_lpc);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ICH8_3, quirk_ich7_lpc);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ICH8_1, quirk_ich7_lpc);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ICH8_4, quirk_ich7_lpc);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ICH9_2, quirk_ich7_lpc);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ICH9_4, quirk_ich7_lpc);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ICH9_7, quirk_ich7_lpc);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_ICH9_8, quirk_ich7_lpc);
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,   PCI_DEVICE_ID_INTEL_ICH10_1, quirk_ich7_lpc);
 
 /*
  * VIA ACPI: One IO region pointed to by longword at
@@ -1387,9 +1420,6 @@ static void __init quirk_alder_ioapic(struct pci_dev *pdev)
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_EESSC,	quirk_alder_ioapic);
 #endif
 
-int pcie_mch_quirk;
-EXPORT_SYMBOL(pcie_mch_quirk);
-
 static void __devinit quirk_pcie_mch(struct pci_dev *pdev)
 {
 	pcie_mch_quirk = 1;
@@ -1570,8 +1600,6 @@ static void quirk_disable_amd_813x_boot_interrupt(struct pci_dev *dev)
 			"0x%04x:0x%04x\n", dev->vendor, dev->device);
 }
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_AMD,   PCI_DEVICE_ID_AMD_8131_BRIDGE, 	quirk_disable_amd_813x_boot_interrupt);
-DECLARE_PCI_FIXUP_RESUME(PCI_VENDOR_ID_AMD,   PCI_DEVICE_ID_AMD_8131_BRIDGE, 	quirk_disable_amd_813x_boot_interrupt);
-DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_AMD,   PCI_DEVICE_ID_AMD_8132_BRIDGE, 	quirk_disable_amd_813x_boot_interrupt);
 DECLARE_PCI_FIXUP_RESUME(PCI_VENDOR_ID_AMD,   PCI_DEVICE_ID_AMD_8132_BRIDGE, 	quirk_disable_amd_813x_boot_interrupt);
 
 #define AMD_8111_PCI_IRQ_ROUTING	0x56
@@ -1731,85 +1759,6 @@ static void __devinit fixup_rev1_53c810(struct pci_dev* dev)
 }
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_NCR, PCI_DEVICE_ID_NCR_53C810, fixup_rev1_53c810);
 
-static void pci_do_fixups(struct pci_dev *dev, struct pci_fixup *f, struct pci_fixup *end)
-{
-	while (f < end) {
-		if ((f->vendor == dev->vendor || f->vendor == (u16) PCI_ANY_ID) &&
- 		    (f->device == dev->device || f->device == (u16) PCI_ANY_ID)) {
-#ifdef DEBUG
-			dev_dbg(&dev->dev, "calling ");
-			print_fn_descriptor_symbol("%s\n", f->hook);
-#endif
-			f->hook(dev);
-		}
-		f++;
-	}
-}
-
-extern struct pci_fixup __start_pci_fixups_early[];
-extern struct pci_fixup __end_pci_fixups_early[];
-extern struct pci_fixup __start_pci_fixups_header[];
-extern struct pci_fixup __end_pci_fixups_header[];
-extern struct pci_fixup __start_pci_fixups_final[];
-extern struct pci_fixup __end_pci_fixups_final[];
-extern struct pci_fixup __start_pci_fixups_enable[];
-extern struct pci_fixup __end_pci_fixups_enable[];
-extern struct pci_fixup __start_pci_fixups_resume[];
-extern struct pci_fixup __end_pci_fixups_resume[];
-extern struct pci_fixup __start_pci_fixups_resume_early[];
-extern struct pci_fixup __end_pci_fixups_resume_early[];
-extern struct pci_fixup __start_pci_fixups_suspend[];
-extern struct pci_fixup __end_pci_fixups_suspend[];
-
-
-void pci_fixup_device(enum pci_fixup_pass pass, struct pci_dev *dev)
-{
-	struct pci_fixup *start, *end;
-
-	switch(pass) {
-	case pci_fixup_early:
-		start = __start_pci_fixups_early;
-		end = __end_pci_fixups_early;
-		break;
-
-	case pci_fixup_header:
-		start = __start_pci_fixups_header;
-		end = __end_pci_fixups_header;
-		break;
-
-	case pci_fixup_final:
-		start = __start_pci_fixups_final;
-		end = __end_pci_fixups_final;
-		break;
-
-	case pci_fixup_enable:
-		start = __start_pci_fixups_enable;
-		end = __end_pci_fixups_enable;
-		break;
-
-	case pci_fixup_resume:
-		start = __start_pci_fixups_resume;
-		end = __end_pci_fixups_resume;
-		break;
-
-	case pci_fixup_resume_early:
-		start = __start_pci_fixups_resume_early;
-		end = __end_pci_fixups_resume_early;
-		break;
-
-	case pci_fixup_suspend:
-		start = __start_pci_fixups_suspend;
-		end = __end_pci_fixups_suspend;
-		break;
-
-	default:
-		/* stupid compiler warning, you would think with an enum... */
-		return;
-	}
-	pci_do_fixups(dev, start, end);
-}
-EXPORT_SYMBOL(pci_fixup_device);
-
 /* Enable 1k I/O space granularity on the Intel P64H2 */
 static void __devinit quirk_p64h2_1k_io(struct pci_dev *dev)
 {
@@ -1947,24 +1896,24 @@ static void __devinit quirk_brcm_570x_limit_vpd(struct pci_dev *dev)
 	}
 }
 
-DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_BROADCOM,
-			 PCI_DEVICE_ID_NX2_5706,
-			 quirk_brcm_570x_limit_vpd);
-DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_BROADCOM,
-			 PCI_DEVICE_ID_NX2_5706S,
-			 quirk_brcm_570x_limit_vpd);
-DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_BROADCOM,
-			 PCI_DEVICE_ID_NX2_5708,
-			 quirk_brcm_570x_limit_vpd);
-DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_BROADCOM,
-			 PCI_DEVICE_ID_NX2_5708S,
-			 quirk_brcm_570x_limit_vpd);
-DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_BROADCOM,
-			 PCI_DEVICE_ID_NX2_5709,
-			 quirk_brcm_570x_limit_vpd);
-DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_BROADCOM,
-			 PCI_DEVICE_ID_NX2_5709S,
-			 quirk_brcm_570x_limit_vpd);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_BROADCOM,
+			PCI_DEVICE_ID_NX2_5706,
+			quirk_brcm_570x_limit_vpd);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_BROADCOM,
+			PCI_DEVICE_ID_NX2_5706S,
+			quirk_brcm_570x_limit_vpd);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_BROADCOM,
+			PCI_DEVICE_ID_NX2_5708,
+			quirk_brcm_570x_limit_vpd);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_BROADCOM,
+			PCI_DEVICE_ID_NX2_5708S,
+			quirk_brcm_570x_limit_vpd);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_BROADCOM,
+			PCI_DEVICE_ID_NX2_5709,
+			quirk_brcm_570x_limit_vpd);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_BROADCOM,
+			PCI_DEVICE_ID_NX2_5709S,
+			quirk_brcm_570x_limit_vpd);
 
 #ifdef CONFIG_PCI_MSI
 /* Some chipsets do not support MSI. We cannot easily rely on setting
@@ -2083,6 +2032,22 @@ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_SERVERWORKS,
 			 PCI_DEVICE_ID_SERVERWORKS_HT1000_PXB,
 			 ht_enable_msi_mapping);
 
+/* The P5N32-SLI Premium motherboard from Asus has a problem with msi
+ * for the MCP55 NIC. It is not yet determined whether the msi problem
+ * also affects other devices. As for now, turn off msi for this device.
+ */
+static void __devinit nvenet_msi_disable(struct pci_dev *dev)
+{
+	if (dmi_name_in_vendors("P5N32-SLI PREMIUM")) {
+		dev_info(&dev->dev,
+			 "Disabling msi for MCP55 NIC on P5N32-SLI Premium\n");
+		dev->no_msi = 1;
+	}
+}
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_NVIDIA,
+			PCI_DEVICE_ID_NVIDIA_NVENET_15,
+			nvenet_msi_disable);
+
 static void __devinit nv_msi_ht_cap_quirk(struct pci_dev *dev)
 {
 	struct pci_dev *host_bridge;
@@ -2183,3 +2148,83 @@ DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_ATI, 0x4375,
 			quirk_msi_intx_disable_bug);
 
 #endif /* CONFIG_PCI_MSI */
+
+static void pci_do_fixups(struct pci_dev *dev, struct pci_fixup *f,
+			  struct pci_fixup *end)
+{
+	while (f < end) {
+		if ((f->vendor == dev->vendor || f->vendor == (u16) PCI_ANY_ID) &&
+		    (f->device == dev->device || f->device == (u16) PCI_ANY_ID)) {
+			dev_dbg(&dev->dev, "calling %pF\n", f->hook);
+			f->hook(dev);
+		}
+		f++;
+	}
+}
+
+extern struct pci_fixup __start_pci_fixups_early[];
+extern struct pci_fixup __end_pci_fixups_early[];
+extern struct pci_fixup __start_pci_fixups_header[];
+extern struct pci_fixup __end_pci_fixups_header[];
+extern struct pci_fixup __start_pci_fixups_final[];
+extern struct pci_fixup __end_pci_fixups_final[];
+extern struct pci_fixup __start_pci_fixups_enable[];
+extern struct pci_fixup __end_pci_fixups_enable[];
+extern struct pci_fixup __start_pci_fixups_resume[];
+extern struct pci_fixup __end_pci_fixups_resume[];
+extern struct pci_fixup __start_pci_fixups_resume_early[];
+extern struct pci_fixup __end_pci_fixups_resume_early[];
+extern struct pci_fixup __start_pci_fixups_suspend[];
+extern struct pci_fixup __end_pci_fixups_suspend[];
+
+
+void pci_fixup_device(enum pci_fixup_pass pass, struct pci_dev *dev)
+{
+	struct pci_fixup *start, *end;
+
+	switch(pass) {
+	case pci_fixup_early:
+		start = __start_pci_fixups_early;
+		end = __end_pci_fixups_early;
+		break;
+
+	case pci_fixup_header:
+		start = __start_pci_fixups_header;
+		end = __end_pci_fixups_header;
+		break;
+
+	case pci_fixup_final:
+		start = __start_pci_fixups_final;
+		end = __end_pci_fixups_final;
+		break;
+
+	case pci_fixup_enable:
+		start = __start_pci_fixups_enable;
+		end = __end_pci_fixups_enable;
+		break;
+
+	case pci_fixup_resume:
+		start = __start_pci_fixups_resume;
+		end = __end_pci_fixups_resume;
+		break;
+
+	case pci_fixup_resume_early:
+		start = __start_pci_fixups_resume_early;
+		end = __end_pci_fixups_resume_early;
+		break;
+
+	case pci_fixup_suspend:
+		start = __start_pci_fixups_suspend;
+		end = __end_pci_fixups_suspend;
+		break;
+
+	default:
+		/* stupid compiler warning, you would think with an enum... */
+		return;
+	}
+	pci_do_fixups(dev, start, end);
+}
+#else
+void pci_fixup_device(enum pci_fixup_pass pass, struct pci_dev *dev) {}
+#endif
+EXPORT_SYMBOL(pci_fixup_device);

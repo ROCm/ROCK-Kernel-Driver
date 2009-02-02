@@ -35,6 +35,7 @@ struct uio_device {
 	int			vma_count;
 	struct uio_info		*info;
 	struct kobject		*map_dir;
+	struct kobject		*portio_dir;
 };
 
 static int uio_major;
@@ -46,6 +47,9 @@ static struct uio_class {
 	struct kref kref;
 	struct class *class;
 } *uio_class;
+
+/* Protect idr accesses */
+static DEFINE_MUTEX(minor_lock);
 
 /*
  * attributes
@@ -67,20 +71,28 @@ static ssize_t map_size_show(struct uio_mem *mem, char *buf)
 	return sprintf(buf, "0x%lx\n", mem->size);
 }
 
-struct uio_sysfs_entry {
+static ssize_t map_offset_show(struct uio_mem *mem, char *buf)
+{
+	return sprintf(buf, "0x%lx\n", mem->addr & ~PAGE_MASK);
+}
+
+struct map_sysfs_entry {
 	struct attribute attr;
 	ssize_t (*show)(struct uio_mem *, char *);
 	ssize_t (*store)(struct uio_mem *, const char *, size_t);
 };
 
-static struct uio_sysfs_entry addr_attribute =
+static struct map_sysfs_entry addr_attribute =
 	__ATTR(addr, S_IRUGO, map_addr_show, NULL);
-static struct uio_sysfs_entry size_attribute =
+static struct map_sysfs_entry size_attribute =
 	__ATTR(size, S_IRUGO, map_size_show, NULL);
+static struct map_sysfs_entry offset_attribute =
+	__ATTR(offset, S_IRUGO, map_offset_show, NULL);
 
 static struct attribute *attrs[] = {
 	&addr_attribute.attr,
 	&size_attribute.attr,
+	&offset_attribute.attr,
 	NULL,	/* need to NULL terminate the list of attributes */
 };
 
@@ -95,9 +107,9 @@ static ssize_t map_type_show(struct kobject *kobj, struct attribute *attr,
 {
 	struct uio_map *map = to_map(kobj);
 	struct uio_mem *mem = map->mem;
-	struct uio_sysfs_entry *entry;
+	struct map_sysfs_entry *entry;
 
-	entry = container_of(attr, struct uio_sysfs_entry, attr);
+	entry = container_of(attr, struct map_sysfs_entry, attr);
 
 	if (!entry->show)
 		return -EIO;
@@ -105,14 +117,91 @@ static ssize_t map_type_show(struct kobject *kobj, struct attribute *attr,
 	return entry->show(mem, buf);
 }
 
-static struct sysfs_ops uio_sysfs_ops = {
+static struct sysfs_ops map_sysfs_ops = {
 	.show = map_type_show,
 };
 
 static struct kobj_type map_attr_type = {
 	.release	= map_release,
-	.sysfs_ops	= &uio_sysfs_ops,
+	.sysfs_ops	= &map_sysfs_ops,
 	.default_attrs	= attrs,
+};
+
+struct uio_portio {
+	struct kobject kobj;
+	struct uio_port *port;
+};
+#define to_portio(portio) container_of(portio, struct uio_portio, kobj)
+
+static ssize_t portio_start_show(struct uio_port *port, char *buf)
+{
+	return sprintf(buf, "0x%lx\n", port->start);
+}
+
+static ssize_t portio_size_show(struct uio_port *port, char *buf)
+{
+	return sprintf(buf, "0x%lx\n", port->size);
+}
+
+static ssize_t portio_porttype_show(struct uio_port *port, char *buf)
+{
+	const char *porttypes[] = {"none", "x86", "gpio", "other"};
+
+	if ((port->porttype < 0) || (port->porttype > UIO_PORT_OTHER))
+		return -EINVAL;
+
+	return sprintf(buf, "port_%s\n", porttypes[port->porttype]);
+}
+
+struct portio_sysfs_entry {
+	struct attribute attr;
+	ssize_t (*show)(struct uio_port *, char *);
+	ssize_t (*store)(struct uio_port *, const char *, size_t);
+};
+
+static struct portio_sysfs_entry portio_start_attribute =
+	__ATTR(start, S_IRUGO, portio_start_show, NULL);
+static struct portio_sysfs_entry portio_size_attribute =
+	__ATTR(size, S_IRUGO, portio_size_show, NULL);
+static struct portio_sysfs_entry portio_porttype_attribute =
+	__ATTR(porttype, S_IRUGO, portio_porttype_show, NULL);
+
+static struct attribute *portio_attrs[] = {
+	&portio_start_attribute.attr,
+	&portio_size_attribute.attr,
+	&portio_porttype_attribute.attr,
+	NULL,
+};
+
+static void portio_release(struct kobject *kobj)
+{
+	struct uio_portio *portio = to_portio(kobj);
+	kfree(portio);
+}
+
+static ssize_t portio_type_show(struct kobject *kobj, struct attribute *attr,
+			     char *buf)
+{
+	struct uio_portio *portio = to_portio(kobj);
+	struct uio_port *port = portio->port;
+	struct portio_sysfs_entry *entry;
+
+	entry = container_of(attr, struct portio_sysfs_entry, attr);
+
+	if (!entry->show)
+		return -EIO;
+
+	return entry->show(port, buf);
+}
+
+static struct sysfs_ops portio_sysfs_ops = {
+	.show = portio_type_show,
+};
+
+static struct kobj_type portio_attr_type = {
+	.release	= portio_release,
+	.sysfs_ops	= &portio_sysfs_ops,
+	.default_attrs	= portio_attrs,
 };
 
 static ssize_t show_name(struct device *dev,
@@ -166,10 +255,13 @@ static struct attribute_group uio_attr_grp = {
 static int uio_dev_add_attributes(struct uio_device *idev)
 {
 	int ret;
-	int mi;
+	int mi, pi;
 	int map_found = 0;
+	int portio_found = 0;
 	struct uio_mem *mem;
 	struct uio_map *map;
+	struct uio_port *port;
+	struct uio_portio *portio;
 
 	ret = sysfs_create_group(&idev->dev->kobj, &uio_attr_grp);
 	if (ret)
@@ -184,25 +276,58 @@ static int uio_dev_add_attributes(struct uio_device *idev)
 			idev->map_dir = kobject_create_and_add("maps",
 							&idev->dev->kobj);
 			if (!idev->map_dir)
-				goto err;
+				goto err_map;
 		}
 		map = kzalloc(sizeof(*map), GFP_KERNEL);
 		if (!map)
-			goto err;
+			goto err_map;
 		kobject_init(&map->kobj, &map_attr_type);
 		map->mem = mem;
 		mem->map = map;
 		ret = kobject_add(&map->kobj, idev->map_dir, "map%d", mi);
 		if (ret)
-			goto err;
+			goto err_map;
 		ret = kobject_uevent(&map->kobj, KOBJ_ADD);
 		if (ret)
-			goto err;
+			goto err_map;
+	}
+
+	for (pi = 0; pi < MAX_UIO_PORT_REGIONS; pi++) {
+		port = &idev->info->port[pi];
+		if (port->size == 0)
+			break;
+		if (!portio_found) {
+			portio_found = 1;
+			idev->portio_dir = kobject_create_and_add("portio",
+							&idev->dev->kobj);
+			if (!idev->portio_dir)
+				goto err_portio;
+		}
+		portio = kzalloc(sizeof(*portio), GFP_KERNEL);
+		if (!portio)
+			goto err_portio;
+		kobject_init(&portio->kobj, &portio_attr_type);
+		portio->port = port;
+		port->portio = portio;
+		ret = kobject_add(&portio->kobj, idev->portio_dir,
+							"port%d", pi);
+		if (ret)
+			goto err_portio;
+		ret = kobject_uevent(&portio->kobj, KOBJ_ADD);
+		if (ret)
+			goto err_portio;
 	}
 
 	return 0;
 
-err:
+err_portio:
+	for (pi--; pi >= 0; pi--) {
+		port = &idev->info->port[pi];
+		portio = port->portio;
+		kobject_put(&portio->kobj);
+	}
+	kobject_put(idev->portio_dir);
+err_map:
 	for (mi--; mi>=0; mi--) {
 		mem = &idev->info->mem[mi];
 		map = mem->map;
@@ -217,21 +342,31 @@ err_group:
 
 static void uio_dev_del_attributes(struct uio_device *idev)
 {
-	int mi;
+	int i;
 	struct uio_mem *mem;
-	for (mi = 0; mi < MAX_UIO_MAPS; mi++) {
-		mem = &idev->info->mem[mi];
+	struct uio_port *port;
+
+	for (i = 0; i < MAX_UIO_MAPS; i++) {
+		mem = &idev->info->mem[i];
 		if (mem->size == 0)
 			break;
 		kobject_put(&mem->map->kobj);
 	}
 	kobject_put(idev->map_dir);
+
+	for (i = 0; i < MAX_UIO_PORT_REGIONS; i++) {
+		port = &idev->info->port[i];
+		if (port->size == 0)
+			break;
+		kobject_put(&port->portio->kobj);
+	}
+	kobject_put(idev->portio_dir);
+
 	sysfs_remove_group(&idev->dev->kobj, &uio_attr_grp);
 }
 
 static int uio_get_minor(struct uio_device *idev)
 {
-	static DEFINE_MUTEX(minor_lock);
 	int retval = -ENOMEM;
 	int id;
 
@@ -253,7 +388,9 @@ exit:
 
 static void uio_free_minor(struct uio_device *idev)
 {
+	mutex_lock(&minor_lock);
 	idr_remove(&uio_idr, idev->minor);
+	mutex_unlock(&minor_lock);
 }
 
 /**
@@ -297,8 +434,9 @@ static int uio_open(struct inode *inode, struct file *filep)
 	struct uio_listener *listener;
 	int ret = 0;
 
-	lock_kernel();
+	mutex_lock(&minor_lock);
 	idev = idr_find(&uio_idr, iminor(inode));
+	mutex_unlock(&minor_lock);
 	if (!idev) {
 		ret = -ENODEV;
 		goto out;
@@ -324,18 +462,15 @@ static int uio_open(struct inode *inode, struct file *filep)
 		if (ret)
 			goto err_infoopen;
 	}
-	unlock_kernel();
 	return 0;
 
 err_infoopen:
-
 	kfree(listener);
-err_alloc_listener:
 
+err_alloc_listener:
 	module_put(idev->owner);
 
 out:
-	unlock_kernel();
 	return ret;
 }
 
@@ -357,9 +492,6 @@ static int uio_release(struct inode *inode, struct file *filep)
 		ret = idev->info->release(idev->info, inode);
 
 	module_put(idev->owner);
-
-	if (filep->f_flags & FASYNC)
-		ret = uio_fasync(-1, filep, 0);
 	kfree(listener);
 	return ret;
 }
@@ -482,15 +614,23 @@ static int uio_vma_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
 	struct uio_device *idev = vma->vm_private_data;
 	struct page *page;
+	unsigned long offset;
 
 	int mi = uio_find_mem_index(vma);
 	if (mi < 0)
 		return VM_FAULT_SIGBUS;
 
+	/*
+	 * We need to subtract mi because userspace uses offset = N*PAGE_SIZE
+	 * to use mem[N].
+	 */
+	offset = (vmf->pgoff - mi) << PAGE_SHIFT;
+
 	if (idev->info->mem[mi].memtype == UIO_MEM_LOGICAL)
-		page = virt_to_page(idev->info->mem[mi].addr);
+		page = virt_to_page(idev->info->mem[mi].addr + offset);
 	else
-		page = vmalloc_to_page((void*)idev->info->mem[mi].addr);
+		page = vmalloc_to_page((void *)idev->info->mem[mi].addr
+							+ offset);
 	get_page(page);
 	vmf->page = page;
 	return 0;
@@ -682,9 +822,9 @@ int __uio_register_device(struct module *owner,
 	if (ret)
 		goto err_get_minor;
 
-	idev->dev = device_create_drvdata(uio_class->class, parent,
-					  MKDEV(uio_major, idev->minor), idev,
-					  "uio%d", idev->minor);
+	idev->dev = device_create(uio_class->class, parent,
+				  MKDEV(uio_major, idev->minor), idev,
+				  "uio%d", idev->minor);
 	if (IS_ERR(idev->dev)) {
 		printk(KERN_ERR "UIO: device register failed\n");
 		ret = PTR_ERR(idev->dev);

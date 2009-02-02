@@ -309,7 +309,7 @@ enum RTL8139_registers {
 	Cfg9346		= 0x50,
 	Config0		= 0x51,
 	Config1		= 0x52,
-	FlashReg	= 0x54,
+	TimerInt	= 0x54,
 	MediaStatus	= 0x58,
 	Config3		= 0x59,
 	Config4		= 0x5A,	 /* absent on RTL-8139A */
@@ -325,6 +325,7 @@ enum RTL8139_registers {
 	FIFOTMS		= 0x70,	 /* FIFO Control and test. */
 	CSCR		= 0x74,	 /* Chip Status and Configuration Register. */
 	PARA78		= 0x78,
+	FlashReg	= 0xD4,	/* Communication with Flash ROM, four bytes. */
 	PARA7c		= 0x7c,	 /* Magic transceiver parameter register. */
 	Config5		= 0xD8,	 /* absent on RTL-8139A */
 };
@@ -740,8 +741,7 @@ static void rtl8139_chip_reset (void __iomem *ioaddr)
 }
 
 
-static int __devinit rtl8139_init_board (struct pci_dev *pdev,
-					 struct net_device **dev_out)
+static __devinit struct net_device * rtl8139_init_board (struct pci_dev *pdev)
 {
 	void __iomem *ioaddr;
 	struct net_device *dev;
@@ -755,13 +755,11 @@ static int __devinit rtl8139_init_board (struct pci_dev *pdev,
 
 	assert (pdev != NULL);
 
-	*dev_out = NULL;
-
 	/* dev and priv zeroed in alloc_etherdev */
 	dev = alloc_etherdev (sizeof (*tp));
 	if (dev == NULL) {
 		dev_err(&pdev->dev, "Unable to alloc new net device\n");
-		return -ENOMEM;
+		return ERR_PTR(-ENOMEM);
 	}
 	SET_NETDEV_DEV(dev, &pdev->dev);
 
@@ -905,16 +903,29 @@ match:
 
 	rtl8139_chip_reset (ioaddr);
 
-	*dev_out = dev;
-	return 0;
+	return dev;
 
 err_out:
 	__rtl8139_cleanup_dev (dev);
 	if (disable_dev_on_err)
 		pci_disable_device (pdev);
-	return rc;
+	return ERR_PTR(rc);
 }
 
+static const struct net_device_ops rtl8139_netdev_ops = {
+	.ndo_open		= rtl8139_open,
+	.ndo_stop		= rtl8139_close,
+	.ndo_get_stats		= rtl8139_get_stats,
+	.ndo_validate_addr	= eth_validate_addr,
+	.ndo_set_mac_address 	= eth_mac_addr,
+	.ndo_start_xmit		= rtl8139_start_xmit,
+	.ndo_set_multicast_list	= rtl8139_set_rx_mode,
+	.ndo_do_ioctl		= netdev_ioctl,
+	.ndo_tx_timeout		= rtl8139_tx_timeout,
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	.ndo_poll_controller	= rtl8139_poll_controller,
+#endif
+};
 
 static int __devinit rtl8139_init_one (struct pci_dev *pdev,
 				       const struct pci_device_id *ent)
@@ -924,7 +935,6 @@ static int __devinit rtl8139_init_one (struct pci_dev *pdev,
 	int i, addr_len, option;
 	void __iomem *ioaddr;
 	static int board_idx = -1;
-	DECLARE_MAC_BUF(mac);
 
 	assert (pdev != NULL);
 	assert (ent != NULL);
@@ -945,10 +955,9 @@ static int __devinit rtl8139_init_one (struct pci_dev *pdev,
 	if (pdev->vendor == PCI_VENDOR_ID_REALTEK &&
 	    pdev->device == PCI_DEVICE_ID_REALTEK_8139 && pdev->revision >= 0x20) {
 		dev_info(&pdev->dev,
-			   "This (id %04x:%04x rev %02x) is an enhanced 8139C+ chip\n",
+			   "This (id %04x:%04x rev %02x) is an enhanced 8139C+ chip, use 8139cp\n",
 		       	   pdev->vendor, pdev->device, pdev->revision);
-		dev_info(&pdev->dev,
-			   "Use the \"8139cp\" driver for improved performance and stability.\n");
+		return -ENODEV;
 	}
 
 	if (pdev->vendor == PCI_VENDOR_ID_REALTEK &&
@@ -959,9 +968,9 @@ static int __devinit rtl8139_init_one (struct pci_dev *pdev,
 		use_io = 1;
 	}
 
-	i = rtl8139_init_board (pdev, &dev);
-	if (i < 0)
-		return i;
+	dev = rtl8139_init_board (pdev);
+	if (IS_ERR(dev))
+		return PTR_ERR(dev);
 
 	assert (dev != NULL);
 	tp = netdev_priv(dev);
@@ -977,19 +986,10 @@ static int __devinit rtl8139_init_one (struct pci_dev *pdev,
 	memcpy(dev->perm_addr, dev->dev_addr, dev->addr_len);
 
 	/* The Rtl8139-specific entries in the device structure. */
-	dev->open = rtl8139_open;
-	dev->hard_start_xmit = rtl8139_start_xmit;
-	netif_napi_add(dev, &tp->napi, rtl8139_poll, 64);
-	dev->stop = rtl8139_close;
-	dev->get_stats = rtl8139_get_stats;
-	dev->set_multicast_list = rtl8139_set_rx_mode;
-	dev->do_ioctl = netdev_ioctl;
+	dev->netdev_ops = &rtl8139_netdev_ops;
 	dev->ethtool_ops = &rtl8139_ethtool_ops;
-	dev->tx_timeout = rtl8139_tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
-#ifdef CONFIG_NET_POLL_CONTROLLER
-	dev->poll_controller = rtl8139_poll_controller;
-#endif
+	netif_napi_add(dev, &tp->napi, rtl8139_poll, 64);
 
 	/* note: the hardware is not capable of sg/csum/highdma, however
 	 * through the use of skb_copy_and_csum_dev we enable these
@@ -1024,11 +1024,11 @@ static int __devinit rtl8139_init_one (struct pci_dev *pdev,
 	pci_set_drvdata (pdev, dev);
 
 	printk (KERN_INFO "%s: %s at 0x%lx, "
-		"%s, IRQ %d\n",
+		"%pM, IRQ %d\n",
 		dev->name,
 		board_info[ent->driver_data].name,
 		dev->base_addr,
-		print_mac(mac, dev->dev_addr),
+		dev->dev_addr,
 		dev->irq);
 
 	printk (KERN_DEBUG "%s:  Identified 8139 chip type '%s'\n",
@@ -1722,13 +1722,18 @@ static int rtl8139_start_xmit (struct sk_buff *skb, struct net_device *dev)
 	}
 
 	spin_lock_irqsave(&tp->lock, flags);
+	/*
+	 * Writing to TxStatus triggers a DMA transfer of the data
+	 * copied to tp->tx_buf[entry] above. Use a memory barrier
+	 * to make sure that the device sees the updated data.
+	 */
+	wmb();
 	RTL_W32_F (TxStatus0 + (entry * sizeof (u32)),
 		   tp->tx_flag | max(len, (unsigned int)ETH_ZLEN));
 
 	dev->trans_start = jiffies;
 
 	tp->cur_tx++;
-	wmb();
 
 	if ((tp->cur_tx - NUM_TX_DESC) == tp->dirty_tx)
 		netif_stop_queue (dev);
@@ -2009,9 +2014,9 @@ no_early_rx:
 		/* Malloc up new buffer, compatible with net-2e. */
 		/* Omit the four octet CRC from the length. */
 
-		skb = dev_alloc_skb (pkt_size + 2);
+		skb = netdev_alloc_skb(dev, pkt_size + NET_IP_ALIGN);
 		if (likely(skb)) {
-			skb_reserve (skb, 2);	/* 16 byte align the IP fields. */
+			skb_reserve (skb, NET_IP_ALIGN);	/* 16 byte align the IP fields. */
 #if RX_BUF_IDX == 3
 			wrap_copy(skb, rx_ring, ring_offset+4, pkt_size);
 #else
@@ -2021,7 +2026,6 @@ no_early_rx:
 
 			skb->protocol = eth_type_trans (skb, dev);
 
-			dev->last_rx = jiffies;
 			dev->stats.rx_bytes += pkt_size;
 			dev->stats.rx_packets++;
 
@@ -2124,7 +2128,7 @@ static int rtl8139_poll(struct napi_struct *napi, int budget)
 		 */
 		spin_lock_irqsave(&tp->lock, flags);
 		RTL_W16_F(IntrMask, rtl8139_intr_mask);
-		__netif_rx_complete(dev, napi);
+		__netif_rx_complete(napi);
 		spin_unlock_irqrestore(&tp->lock, flags);
 	}
 	spin_unlock(&tp->rx_lock);
@@ -2174,9 +2178,9 @@ static irqreturn_t rtl8139_interrupt (int irq, void *dev_instance)
 	/* Receive packets are processed by poll routine.
 	   If not running start it now. */
 	if (status & RxAckBits){
-		if (netif_rx_schedule_prep(dev, &tp->napi)) {
+		if (netif_rx_schedule_prep(&tp->napi)) {
 			RTL_W16_F (IntrMask, rtl8139_norx_intr_mask);
-			__netif_rx_schedule(dev, &tp->napi);
+			__netif_rx_schedule(&tp->napi);
 		}
 	}
 

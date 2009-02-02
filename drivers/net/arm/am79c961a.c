@@ -208,9 +208,9 @@ am79c961_init_for_open(struct net_device *dev)
 	/*
 	 * Stop the chip.
 	 */
-	spin_lock_irqsave(priv->chip_lock, flags);
+	spin_lock_irqsave(&priv->chip_lock, flags);
 	write_rreg (dev->base_addr, CSR0, CSR0_BABL|CSR0_CERR|CSR0_MISS|CSR0_MERR|CSR0_TINT|CSR0_RINT|CSR0_STOP);
-	spin_unlock_irqrestore(priv->chip_lock, flags);
+	spin_unlock_irqrestore(&priv->chip_lock, flags);
 
 	write_ireg (dev->base_addr, 5, 0x00a0); /* Receive address LED */
 	write_ireg (dev->base_addr, 6, 0x0081); /* Collision LED */
@@ -332,10 +332,10 @@ am79c961_close(struct net_device *dev)
 	netif_stop_queue(dev);
 	netif_carrier_off(dev);
 
-	spin_lock_irqsave(priv->chip_lock, flags);
+	spin_lock_irqsave(&priv->chip_lock, flags);
 	write_rreg (dev->base_addr, CSR0, CSR0_STOP);
 	write_rreg (dev->base_addr, CSR3, CSR3_MASKALL);
-	spin_unlock_irqrestore(priv->chip_lock, flags);
+	spin_unlock_irqrestore(&priv->chip_lock, flags);
 
 	free_irq (dev->irq, dev);
 
@@ -391,7 +391,7 @@ static void am79c961_setmulticastlist (struct net_device *dev)
 			am79c961_mc_hash(dmi, multi_hash);
 	}
 
-	spin_lock_irqsave(priv->chip_lock, flags);
+	spin_lock_irqsave(&priv->chip_lock, flags);
 
 	stopped = read_rreg(dev->base_addr, CSR0) & CSR0_STOP;
 
@@ -405,9 +405,9 @@ static void am79c961_setmulticastlist (struct net_device *dev)
 		 * Spin waiting for chip to report suspend mode
 		 */
 		while ((read_rreg(dev->base_addr, CTRL1) & CTRL1_SPND) == 0) {
-			spin_unlock_irqrestore(priv->chip_lock, flags);
+			spin_unlock_irqrestore(&priv->chip_lock, flags);
 			nop();
-			spin_lock_irqsave(priv->chip_lock, flags);
+			spin_lock_irqsave(&priv->chip_lock, flags);
 		}
 	}
 
@@ -429,7 +429,7 @@ static void am79c961_setmulticastlist (struct net_device *dev)
 		write_rreg(dev->base_addr, CTRL1, 0);
 	}
 
-	spin_unlock_irqrestore(priv->chip_lock, flags);
+	spin_unlock_irqrestore(&priv->chip_lock, flags);
 }
 
 static void am79c961_timeout(struct net_device *dev)
@@ -467,10 +467,10 @@ am79c961_sendpacket(struct sk_buff *skb, struct net_device *dev)
 	am_writeword (dev, hdraddr + 2, TMD_OWN|TMD_STP|TMD_ENP);
 	priv->txhead = head;
 
-	spin_lock_irqsave(priv->chip_lock, flags);
+	spin_lock_irqsave(&priv->chip_lock, flags);
 	write_rreg (dev->base_addr, CSR0, CSR0_TDMD|CSR0_IENA);
 	dev->trans_start = jiffies;
-	spin_unlock_irqrestore(priv->chip_lock, flags);
+	spin_unlock_irqrestore(&priv->chip_lock, flags);
 
 	/*
 	 * If the next packet is owned by the ethernet device,
@@ -532,7 +532,6 @@ am79c961_rx(struct net_device *dev, struct dev_priv *priv)
 			am_writeword(dev, hdraddr + 2, RMD_OWN);
 			skb->protocol = eth_type_trans(skb, dev);
 			netif_rx(skb);
-			dev->last_rx = jiffies;
 			priv->stats.rx_bytes += len;
 			priv->stats.rx_packets ++;
 		} else {
@@ -745,10 +744,8 @@ static int __init am79c961_probe(struct platform_device *pdev)
 
 	ret = register_netdev(dev);
 	if (ret == 0) {
-		DECLARE_MAC_BUF(mac);
-
-		printk(KERN_INFO "%s: ether address %s\n",
-		       dev->name, print_mac(mac, dev->dev_addr));
+		printk(KERN_INFO "%s: ether address %pM\n",
+		       dev->name, dev->dev_addr);
 		return 0;
 	}
 

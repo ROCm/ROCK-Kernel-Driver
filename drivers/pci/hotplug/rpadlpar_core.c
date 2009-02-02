@@ -14,6 +14,7 @@
  *      as published by the Free Software Foundation; either version
  *      2 of the License, or (at your option) any later version.
  */
+
 #undef DEBUG
 
 #include <linux/init.h>
@@ -153,6 +154,7 @@ static void dlpar_pci_add_bus(struct device_node *dn)
 		return;
 	}
 
+	/* Scan below the new bridge */
 	if (dev->hdr_type == PCI_HEADER_TYPE_BRIDGE ||
 	    dev->hdr_type == PCI_HEADER_TYPE_CARDBUS)
 		of_scan_pci_bridge(dn, dev);
@@ -165,7 +167,7 @@ static void dlpar_pci_add_bus(struct device_node *dn)
 	 * bus of the EADS bridge so the bridge device itself gets
 	 * properly added
 	 */
-	pcibios_finish_adding_new_bus(phb->bus);
+	pcibios_finish_adding_to_bus(phb->bus);
 }
 
 static int dlpar_add_pci_slot(char *drc_name, struct device_node *dn)
@@ -204,24 +206,6 @@ static int dlpar_add_pci_slot(char *drc_name, struct device_node *dn)
 	return 0;
 }
 
-static int dlpar_remove_root_bus(struct pci_controller *phb)
-{
-	struct pci_bus *phb_bus;
-
-	phb_bus = phb->bus;
-	pr_debug("PCI:  -> removing root bus %04x:%02x\n",
-		 pci_domain_nr(phb_bus), phb_bus->number);
-
-	/* We cannot to remove a root bus that has children */
-	if (!(list_empty(&phb_bus->children) &&
-	      list_empty(&phb_bus->devices))) {
-		pr_debug("PCI: PHB removal failed, bus not empty !\n");
-		return -EBUSY;
-	}
-
-	return remove_phb_dynamic(phb);
-}
-
 static int dlpar_remove_phb(char *drc_name, struct device_node *dn)
 {
 	struct slot *slot;
@@ -231,22 +215,17 @@ static int dlpar_remove_phb(char *drc_name, struct device_node *dn)
 	if (!pcibios_find_pci_bus(dn))
 		return -EINVAL;
 
-	pr_debug("PCI: Removing PHB %s...\n", dn->full_name);
-
 	/* If pci slot is hotplugable, use hotplug to remove it */
 	slot = find_php_slot(dn);
-	if (slot) {
-		if (rpaphp_deregister_slot(slot)) {
-			printk(KERN_ERR
-				"%s: unable to remove hotplug slot %s\n",
-				__func__, drc_name);
-			return -EIO;
-		}
+	if (slot && rpaphp_deregister_slot(slot)) {
+		printk(KERN_ERR "%s: unable to remove hotplug slot %s\n",
+		       __func__, drc_name);
+		return -EIO;
 	}
 
 	pdn = dn->data;
 	BUG_ON(!pdn || !pdn->phb);
-	rc = dlpar_remove_root_bus(pdn->phb);
+	rc = remove_phb_dynamic(pdn->phb);
 	if (rc < 0)
 		return rc;
 
@@ -381,11 +360,11 @@ int dlpar_remove_pci_slot(char *drc_name, struct device_node *dn)
 	pr_debug("PCI: Removing PCI slot below EADS bridge %s\n",
 		 bus->self ? pci_name(bus->self) : "<!PHB!>");
 
-	/* If pci slot is hotplugable, remove hotplug data structures */
 	slot = find_php_slot(dn);
 	if (slot) {
 		pr_debug("PCI: Removing hotplug slot for %04x:%02x...\n",
 			 pci_domain_nr(bus), bus->number);
+
 		if (rpaphp_deregister_slot(slot)) {
 			printk(KERN_ERR
 				"%s: unable to remove hotplug slot %s\n",
@@ -409,6 +388,7 @@ int dlpar_remove_pci_slot(char *drc_name, struct device_node *dn)
 	pr_debug("PCI: Now removing bridge device %s\n", pci_name(bus->self));
 	eeh_remove_bus_device(bus->self);
 	pci_remove_bus_device(bus->self);
+
 	return 0;
 }
 

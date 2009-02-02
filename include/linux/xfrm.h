@@ -199,6 +199,9 @@ enum {
 #define XFRM_MSG_NEWSPDINFO XFRM_MSG_NEWSPDINFO
 	XFRM_MSG_GETSPDINFO,
 #define XFRM_MSG_GETSPDINFO XFRM_MSG_GETSPDINFO
+
+	XFRM_MSG_MAPPING,
+#define XFRM_MSG_MAPPING XFRM_MSG_MAPPING
 	__XFRM_MSG_MAX
 };
 #define XFRM_MSG_MAX (__XFRM_MSG_MAX - 1)
@@ -279,6 +282,7 @@ enum xfrm_attr_type_t {
 	XFRMA_POLICY_TYPE,	/* struct xfrm_userpolicy_type */
 	XFRMA_MIGRATE,
 	XFRMA_ALG_AEAD,		/* struct xfrm_algo_aead */
+	XFRMA_KMADDRESS,        /* struct xfrm_user_kmaddress */
 	__XFRMA_MAX
 
 #define XFRMA_MAX (__XFRMA_MAX - 1)
@@ -415,6 +419,15 @@ struct xfrm_user_report {
 	struct xfrm_selector		sel;
 };
 
+/* Used by MIGRATE to pass addresses IKE should use to perform
+ * SA negotiation with the peer */
+struct xfrm_user_kmaddress {
+	xfrm_address_t                  local;
+	xfrm_address_t                  remote;
+	__u32				reserved;
+	__u16				family;
+};
+
 struct xfrm_user_migrate {
 	xfrm_address_t			old_daddr;
 	xfrm_address_t			old_saddr;
@@ -426,6 +439,15 @@ struct xfrm_user_migrate {
 	__u32				reqid;
 	__u16				old_family;
 	__u16				new_family;
+};
+
+struct xfrm_user_mapping {
+	struct xfrm_usersa_id		id;
+	__u32				reqid;
+	xfrm_address_t			old_saddr;
+	xfrm_address_t			new_saddr;
+	__be16				old_sport;
+	__be16				new_sport;
 };
 
 #ifndef __KERNEL__
@@ -454,6 +476,8 @@ enum xfrm_nlgroups {
 #define XFRMNLGRP_REPORT	XFRMNLGRP_REPORT
 	XFRMNLGRP_MIGRATE,
 #define XFRMNLGRP_MIGRATE	XFRMNLGRP_MIGRATE
+	XFRMNLGRP_MAPPING,
+#define XFRMNLGRP_MAPPING	XFRMNLGRP_MAPPING
 	__XFRMNLGRP_MAX
 };
 #define XFRMNLGRP_MAX	(__XFRMNLGRP_MAX - 1)

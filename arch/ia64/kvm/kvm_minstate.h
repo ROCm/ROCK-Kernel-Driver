@@ -24,6 +24,8 @@
 #include <asm/asmmacro.h>
 #include <asm/types.h>
 #include <asm/kregs.h>
+#include <asm/kvm_host.h>
+
 #include "asm-offsets.h"
 
 #define KVM_MINSTATE_START_SAVE_MIN	     					\
@@ -33,7 +35,7 @@
 	addl r22 = VMM_RBS_OFFSET,r1;            /* compute base of RBS */	\
 	;;									\
 	lfetch.fault.excl.nt1 [r22];						\
-	addl r1 = IA64_STK_OFFSET-VMM_PT_REGS_SIZE,r1;  /* compute base of memory stack */  \
+	addl r1 = KVM_STK_OFFSET-VMM_PT_REGS_SIZE, r1;  \
 	mov r23 = ar.bspstore;			/* save ar.bspstore */          \
 	;;									\
 	mov ar.bspstore = r22;				/* switch to kernel RBS */\
@@ -50,27 +52,18 @@
 
 #define PAL_VSA_SYNC_READ						\
 	/* begin to call pal vps sync_read */				\
+{.mii;									\
 	add r25 = VMM_VPD_BASE_OFFSET, r21;				\
-	adds r20 = VMM_VCPU_VSA_BASE_OFFSET, r21;  /* entry point */	\
-	;;								\
-	ld8 r25 = [r25];      /* read vpd base */			\
-	ld8 r20 = [r20];						\
-	;;								\
-	add r20 = PAL_VPS_SYNC_READ,r20;				\
-	;;								\
-{ .mii;									\
 	nop 0x0;							\
-	mov r24 = ip;							\
-	mov b0 = r20;							\
+	mov r24=ip;							\
+	;;								\
+}									\
+{.mmb									\
+	add r24=0x20, r24;						\
+	ld8 r25 = [r25];      /* read vpd base */			\
+	br.cond.sptk kvm_vps_sync_read;		/*call the service*/	\
 	;;								\
 };									\
-{ .mmb;									\
-	add r24 = 0x20, r24;						\
-	nop 0x0;							\
-	br.cond.sptk b0;        /*  call the service */			\
-	;;								\
-};
-
 
 
 #define KVM_MINSTATE_GET_CURRENT(reg)   mov reg=r21

@@ -324,14 +324,16 @@ append:
 	switch (chunk->chunk_hdr->type) {
 	    case SCTP_CID_DATA:
 		retval = sctp_packet_append_data(packet, chunk);
+		if (SCTP_XMIT_OK != retval)
+			goto finish;
 		/* Disallow SACK bundling after DATA. */
 		packet->has_sack = 1;
 		/* Disallow AUTH bundling after DATA */
 		packet->has_auth = 1;
 		/* Let it be knows that packet has DATA in it */
 		packet->has_data = 1;
-		if (SCTP_XMIT_OK != retval)
-			goto finish;
+		/* timestamp the chunk for rtx purposes */
+		chunk->sent_at = jiffies;
 		break;
 	    case SCTP_CID_COOKIE_ECHO:
 		packet->has_cookie_echo = 1;
@@ -470,7 +472,6 @@ int sctp_packet_transmit(struct sctp_packet *packet)
 			} else
 				chunk->resent = 1;
 
-			chunk->sent_at = jiffies;
 			has_data = 1;
 		}
 
@@ -699,7 +700,7 @@ static sctp_xmit_t sctp_packet_append_data(struct sctp_packet *packet,
 	 *    When a Fast Retransmit is being performed the sender SHOULD
 	 *    ignore the value of cwnd and SHOULD NOT delay retransmission.
 	 */
-	if (chunk->fast_retransmit <= 0)
+	if (chunk->fast_retransmit != SCTP_NEED_FRTX)
 		if (transport->flight_size >= transport->cwnd) {
 			retval = SCTP_XMIT_RWND_FULL;
 			goto finish;

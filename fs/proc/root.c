@@ -16,7 +16,6 @@
 #include <linux/sched.h>
 #include <linux/module.h>
 #include <linux/bitops.h>
-#include <linux/smp_lock.h>
 #include <linux/mount.h>
 #include <linux/pid_namespace.h>
 
@@ -104,9 +103,9 @@ static struct file_system_type proc_fs_type = {
 
 void __init proc_root_init(void)
 {
-	int err = proc_init_inodecache();
-	if (err)
-		return;
+	int err;
+
+	proc_init_inodecache();
 	err = register_filesystem(&proc_fs_type);
 	if (err)
 		return;
@@ -117,7 +116,7 @@ void __init proc_root_init(void)
 		return;
 	}
 
-	proc_misc_init();
+	proc_symlink("mounts", NULL, "self/mounts");
 
 	proc_net_init();
 
@@ -162,17 +161,12 @@ static int proc_root_readdir(struct file * filp,
 	unsigned int nr = filp->f_pos;
 	int ret;
 
-	lock_kernel();
-
 	if (nr < FIRST_PROCESS_ENTRY) {
 		int error = proc_readdir(filp, dirent, filldir);
-		if (error <= 0) {
-			unlock_kernel();
+		if (error <= 0)
 			return error;
-		}
 		filp->f_pos = FIRST_PROCESS_ENTRY;
 	}
-	unlock_kernel();
 
 	ret = proc_pid_readdir(filp, dirent, filldir);
 	return ret;

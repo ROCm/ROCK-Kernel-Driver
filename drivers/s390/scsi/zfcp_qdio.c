@@ -7,6 +7,7 @@
  */
 
 #define KMSG_COMPONENT "zfcp"
+#define pr_fmt(fmt) KMSG_COMPONENT ": " fmt
 
 #include "zfcp_ext.h"
 
@@ -76,23 +77,6 @@ static void zfcp_qdio_zero_sbals(struct qdio_buffer *sbal[], int first, int cnt)
 	}
 }
 
-/* this needs to be called prior to updating the queue fill level */
-static void zfcp_qdio_account(struct zfcp_adapter *adapter)
-{
-	ktime_t now;
-	s64 span;
-	int free, used;
-
-	spin_lock(&adapter->qdio_stat_lock);
-	now = ktime_get();
-	span = ktime_us_delta(now, adapter->req_q_time);
-	free = max(0, atomic_read(&adapter->req_q.count));
-	used = QDIO_MAX_BUFFERS_PER_Q - free;
-	adapter->req_q_util += used * span;
-	adapter->req_q_time = now;
-	spin_unlock(&adapter->qdio_stat_lock);
-}
-
 static void zfcp_qdio_int_req(struct ccw_device *cdev, unsigned int qdio_err,
 			      int queue_no, int first, int count,
 			      unsigned long parm)
@@ -109,7 +93,6 @@ static void zfcp_qdio_int_req(struct ccw_device *cdev, unsigned int qdio_err,
 	/* cleanup all SBALs being program-owned now */
 	zfcp_qdio_zero_sbals(queue->sbal, first, count);
 
-	zfcp_qdio_account(adapter);
 	atomic_add(count, &queue->count);
 	wake_up(&adapter->request_wq);
 }
@@ -129,7 +112,7 @@ static void zfcp_qdio_reqid_check(struct zfcp_adapter *adapter,
 		 * corruption and must stop the machine immediatly.
 		 */
 		panic("error: unknown request id (%lx) on adapter %s.\n",
-		      req_id, zfcp_get_busid_by_adapter(adapter));
+		      req_id, dev_name(&adapter->ccw_device->dev));
 
 	zfcp_reqlist_remove(adapter, fsf_req);
 	spin_unlock_irqrestore(&adapter->req_list_lock, flags);
@@ -376,8 +359,6 @@ int zfcp_qdio_send(struct zfcp_fsf_req *fsf_req)
 		sbale->flags |= SBAL_FLAGS0_PCI;
 	}
 
-	zfcp_qdio_account(adapter);
-
 	retval = do_QDIO(adapter->ccw_device, QDIO_FLAG_SYNC_OUTPUT, 0, first,
 			 count);
 	if (unlikely(retval)) {
@@ -411,7 +392,7 @@ int zfcp_qdio_allocate(struct zfcp_adapter *adapter)
 
 	init_data->cdev = adapter->ccw_device;
 	init_data->q_format = QDIO_ZFCP_QFMT;
-	memcpy(init_data->adapter_name, zfcp_get_busid_by_adapter(adapter), 8);
+	memcpy(init_data->adapter_name, dev_name(&adapter->ccw_device->dev), 8);
 	ASCEBC(init_data->adapter_name, 8);
 	init_data->qib_param_field_format = 0;
 	init_data->qib_param_field = NULL;

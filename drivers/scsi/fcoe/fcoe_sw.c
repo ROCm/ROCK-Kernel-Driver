@@ -116,8 +116,7 @@ static int fcoe_sw_lport_config(struct fc_lport *lp)
 {
 	int i = 0;
 
-	lp->link_up = 0;
-	lp->qfull = 0;
+	lp->link_status = 0;
 	lp->max_retry_count = 3;
 	lp->e_d_tov = 2 * 1000;	/* FC-FS default */
 	lp->r_a_tov = 2 * 2 * 1000;
@@ -182,8 +181,9 @@ static int fcoe_sw_netdev_config(struct fc_lport *lp, struct net_device *netdev)
 	if (fc_set_mfs(lp, mfs))
 		return -EINVAL;
 
+	lp->link_status = ~FC_PAUSE & ~FC_LINK_UP;
 	if (!fcoe_link_ok(lp))
-		lp->link_up = 1;
+		lp->link_status |= FC_LINK_UP;
 
 	/* offload features support */
 	if (fc->real_dev->features & NETIF_F_SG)

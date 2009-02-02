@@ -80,10 +80,11 @@ static void tda827x_set_std(struct dvb_frontend *fe,
 		mode = "xx";
 	}
 
-	if (params->mode == V4L2_TUNER_RADIO)
+	if (params->mode == V4L2_TUNER_RADIO) {
 		priv->sgIF = 88; /* if frequency is 5.5 MHz */
-
-	dprintk("setting tda827x to system %s\n", mode);
+		dprintk("setting tda827x to radio FM\n");
+	} else
+		dprintk("setting tda827x to system %s\n", mode);
 }
 
 
@@ -199,7 +200,7 @@ static int tda827xo_set_params(struct dvb_frontend *fe,
 		fe->ops.i2c_gate_ctrl(fe, 1);
 	i2c_transfer(priv->i2c_adap, &msg, 1);
 
-	priv->frequency = tuner_freq - if_freq; // FIXME
+	priv->frequency = params->frequency;
 	priv->bandwidth = (fe->ops.info.type == FE_OFDM) ? params->u.ofdm.bandwidth : 0;
 
 	return 0;
@@ -304,7 +305,7 @@ static int tda827xo_set_analog_params(struct dvb_frontend *fe,
 	reg2[1] = 0x08;   /* Vsync en */
 	i2c_transfer(priv->i2c_adap, &msg, 1);
 
-	priv->frequency = freq * 62500;
+	priv->frequency = params->frequency;
 
 	return 0;
 }
@@ -447,17 +448,19 @@ static void tda827xa_lna_gain(struct dvb_frontend *fe, int high,
 			else
 				arg = 0;
 		}
-		if (priv->cfg->tuner_callback)
-			priv->cfg->tuner_callback(priv->i2c_adap->algo_data,
-								gp_func, arg);
+		if (fe->callback)
+			fe->callback(priv->i2c_adap->algo_data,
+				     DVB_FRONTEND_COMPONENT_TUNER,
+				     gp_func, arg);
 		buf[1] = high ? 0 : 1;
 		if (priv->cfg->config == 2)
 			buf[1] = high ? 1 : 0;
 		i2c_transfer(priv->i2c_adap, &msg, 1);
 		break;
 	case 3: /* switch with GPIO of saa713x */
-		if (priv->cfg->tuner_callback)
-			priv->cfg->tuner_callback(priv->i2c_adap->algo_data, 0, high);
+		if (fe->callback)
+			fe->callback(priv->i2c_adap->algo_data,
+				     DVB_FRONTEND_COMPONENT_TUNER, 0, high);
 		break;
 	}
 }
@@ -589,7 +592,7 @@ static int tda827xa_set_params(struct dvb_frontend *fe,
 		fe->ops.i2c_gate_ctrl(fe, 1);
 	i2c_transfer(priv->i2c_adap, &msg, 1);
 
-	priv->frequency = tuner_freq - if_freq; // FIXME
+	priv->frequency = params->frequency;
 	priv->bandwidth = (fe->ops.info.type == FE_OFDM) ? params->u.ofdm.bandwidth : 0;
 
 	return 0;
@@ -689,7 +692,7 @@ static int tda827xa_set_analog_params(struct dvb_frontend *fe,
 	tuner_reg[1] = 0x19 + (priv->lpsel << 1);
 	i2c_transfer(priv->i2c_adap, &msg, 1);
 
-	priv->frequency = freq * 62500;
+	priv->frequency = params->frequency;
 
 	return 0;
 }

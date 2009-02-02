@@ -27,8 +27,8 @@ struct path_info {
 
 	atomic_t in_flight;	/* Total size of in-flight I/Os */
 	size_t perf;		/* Recent performance of the path */
-	sector_t last_sectors;	/* Total sectors of the last disk_stat_read */
-	size_t last_io_ticks;	/* io_ticks of the last disk_stat_read */
+	sector_t last_sectors;	/* Total sectors of the last part_stat_read */
+	size_t last_io_ticks;	/* io_ticks of the last part_stat_read */
 };
 
 static struct selector *alloc_selector(void)
@@ -131,9 +131,9 @@ static int st_add_path(struct path_selector *ps, struct dm_path *path,
 	pi->repeat_count = repeat_count;
 
 	pi->perf = 0;
-	pi->last_sectors = disk_stat_read(disk, sectors[READ])
-			   + disk_stat_read(disk, sectors[WRITE]);
-	pi->last_io_ticks = disk_stat_read(disk, io_ticks);
+	pi->last_sectors = part_stat_read(&disk->part0, sectors[READ])
+			   + part_stat_read(&disk->part0, sectors[WRITE]);
+	pi->last_io_ticks = part_stat_read(&disk->part0, io_ticks);
 	atomic_set(&pi->in_flight, 0);
 
 	path->pscontext = pi;
@@ -167,9 +167,9 @@ static void stats_update(struct path_info *pi)
 	size_t io_ticks, tmp;
 	struct gendisk *disk = pi->path->dev->bdev->bd_disk;
 
-	sectors = disk_stat_read(disk, sectors[READ])
-		  + disk_stat_read(disk, sectors[WRITE]);
-	io_ticks = disk_stat_read(disk, io_ticks);
+	sectors = part_stat_read(&disk->part0, sectors[READ])
+		  + part_stat_read(&disk->part0, sectors[WRITE]);
+	io_ticks = part_stat_read(&disk->part0, io_ticks);
 
 	if ((sectors != pi->last_sectors) && (io_ticks != pi->last_io_ticks)) {
 		tmp = (sectors - pi->last_sectors) << 9;

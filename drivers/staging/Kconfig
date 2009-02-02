@@ -21,7 +21,25 @@ menuconfig STAGING
 
 	  If in doubt, say N here.
 
+
 if STAGING
+
+config STAGING_EXCLUDE_BUILD
+	bool "Exclude Staging drivers from being built" if STAGING
+	default y
+	---help---
+	  Are you sure you really want to build the staging drivers?
+	  They taint your kernel, don't live up to the normal Linux
+	  kernel quality standards, are a bit crufty around the edges,
+	  and might go off and kick your dog when you aren't paying
+	  attention.
+
+	  Say N here to be able to select and build the Staging drivers.
+	  This option is primarily here to prevent them from being built
+	  when selecting 'make allyesconfg' and 'make allmodconfig' so
+	  don't be all that put off, your dog will be just fine.
+
+if !STAGING_EXCLUDE_BUILD
 
 source "drivers/staging/et131x/Kconfig"
 
@@ -30,6 +48,8 @@ source "drivers/staging/slicoss/Kconfig"
 source "drivers/staging/sxg/Kconfig"
 
 source "drivers/staging/me4000/Kconfig"
+
+source "drivers/staging/meilhaus/Kconfig"
 
 source "drivers/staging/go7007/Kconfig"
 
@@ -43,6 +63,8 @@ source "drivers/staging/echo/Kconfig"
 
 source "drivers/staging/at76_usb/Kconfig"
 
+source "drivers/staging/poch/Kconfig"
+
 source "drivers/staging/agnx/Kconfig"
 
 source "drivers/staging/otus/Kconfig"
@@ -53,6 +75,25 @@ source "drivers/staging/rt2870/Kconfig"
 
 source "drivers/staging/benet/Kconfig"
 
+source "drivers/staging/comedi/Kconfig"
+
+source "drivers/staging/asus_oled/Kconfig"
+
+source "drivers/staging/panel/Kconfig"
+
+source "drivers/staging/altpciechdma/Kconfig"
+
 source "drivers/staging/rtl8187se/Kconfig"
 
+source "drivers/staging/rspiusb/Kconfig"
+
+source "drivers/staging/mimio/Kconfig"
+
+source "drivers/staging/frontier/Kconfig"
+
+source "drivers/staging/epl/Kconfig"
+
+source "drivers/staging/android/Kconfig"
+
+endif # !STAGING_EXCLUDE_BUILD
 endif # STAGING

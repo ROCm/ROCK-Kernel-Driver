@@ -9,7 +9,7 @@ vdso32_int80_end:
 
 	.globl vdso32_syscall_start, vdso32_syscall_end
 vdso32_syscall_start:
-#if defined(CONFIG_COMPAT) || defined(CONFIG_X86_XEN)
+#ifdef CONFIG_COMPAT
 	.incbin "arch/x86/vdso/vdso32-syscall.so"
 #endif
 vdso32_syscall_end:

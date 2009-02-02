@@ -93,7 +93,7 @@ static int jffs2_garbage_collect_thread(void *_c)
 			schedule();
 		} else
 			spin_unlock(&c->erase_completion_lock);
-
+			
 
 		/* This thread is purely an optimisation. But if it runs when
 		   other things could be running, it actually makes things a

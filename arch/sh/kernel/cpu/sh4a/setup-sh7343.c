@@ -30,6 +30,7 @@ static struct resource iic0_resources[] = {
 
 static struct platform_device iic0_device = {
 	.name           = "i2c-sh_mobile",
+	.id             = 0, /* "i2c0" clock */
 	.num_resources  = ARRAY_SIZE(iic0_resources),
 	.resource       = iic0_resources,
 };
@@ -50,6 +51,7 @@ static struct resource iic1_resources[] = {
 
 static struct platform_device iic1_device = {
 	.name           = "i2c-sh_mobile",
+	.id             = 1, /* "i2c1" clock */
 	.num_resources  = ARRAY_SIZE(iic1_resources),
 	.resource       = iic1_resources,
 };
@@ -110,12 +112,55 @@ static struct platform_device veu_device = {
 	.num_resources	= ARRAY_SIZE(veu_resources),
 };
 
+static struct uio_info jpu_platform_data = {
+	.name = "JPU",
+	.version = "0",
+	.irq = 27,
+};
+
+static struct resource jpu_resources[] = {
+	[0] = {
+		.name	= "JPU",
+		.start	= 0xfea00000,
+		.end	= 0xfea102d3,
+		.flags	= IORESOURCE_MEM,
+	},
+	[1] = {
+		/* place holder for contiguous memory */
+	},
+};
+
+static struct platform_device jpu_device = {
+	.name		= "uio_pdrv_genirq",
+	.id		= 2,
+	.dev = {
+		.platform_data	= &jpu_platform_data,
+	},
+	.resource	= jpu_resources,
+	.num_resources	= ARRAY_SIZE(jpu_resources),
+};
+
 static struct plat_sci_port sci_platform_data[] = {
 	{
 		.mapbase	= 0xffe00000,
 		.flags		= UPF_BOOT_AUTOCONF,
 		.type		= PORT_SCIF,
-		.irqs		= { 80, 81, 83, 82 },
+		.irqs		= { 80, 80, 80, 80 },
+	}, {
+		.mapbase	= 0xffe10000,
+		.flags		= UPF_BOOT_AUTOCONF,
+		.type		= PORT_SCIF,
+		.irqs		= { 81, 81, 81, 81 },
+	}, {
+		.mapbase	= 0xffe20000,
+		.flags		= UPF_BOOT_AUTOCONF,
+		.type		= PORT_SCIF,
+		.irqs		= { 82, 82, 82, 82 },
+	}, {
+		.mapbase	= 0xffe30000,
+		.flags		= UPF_BOOT_AUTOCONF,
+		.type		= PORT_SCIF,
+		.irqs		= { 83, 83, 83, 83 },
 	}, {
 		.flags = 0,
 	}
@@ -135,25 +180,20 @@ static struct platform_device *sh7343_devices[] __initdata = {
 	&sci_device,
 	&vpu_device,
 	&veu_device,
+	&jpu_device,
 };
 
 static int __init sh7343_devices_setup(void)
 {
-	clk_always_enable("mstp031"); /* TLB */
-	clk_always_enable("mstp030"); /* IC */
-	clk_always_enable("mstp029"); /* OC */
-	clk_always_enable("mstp028"); /* URAM */
-	clk_always_enable("mstp026"); /* XYMEM */
-	clk_always_enable("mstp023"); /* INTC3 */
-	clk_always_enable("mstp022"); /* INTC */
-	clk_always_enable("mstp020"); /* SuperHyway */
-	clk_always_enable("mstp109"); /* I2C0 */
-	clk_always_enable("mstp108"); /* I2C1 */
-	clk_always_enable("mstp202"); /* VEU */
-	clk_always_enable("mstp201"); /* VPU */
+	clk_always_enable("uram0"); /* URAM */
+	clk_always_enable("xymem0"); /* XYMEM */
+	clk_always_enable("veu0"); /* VEU */
+	clk_always_enable("vpu0"); /* VPU */
+	clk_always_enable("jpu0"); /* JPU */
 
 	platform_resource_setup_memory(&vpu_device, "vpu", 1 << 20);
 	platform_resource_setup_memory(&veu_device, "veu", 2 << 20);
+	platform_resource_setup_memory(&jpu_device, "jpu", 2 << 20);
 
 	return platform_add_devices(sh7343_devices,
 				    ARRAY_SIZE(sh7343_devices));
@@ -171,7 +211,7 @@ enum {
 	MMC_ERR, MMC_TRAN, MMC_FSTAT, MMC_FRDY,
 	DMAC4, DMAC5, DMAC_DADERR,
 	KEYSC,
-	SCIF, SCIF1, SCIF2, SCIF3, SCIF4,
+	SCIF, SCIF1, SCIF2, SCIF3,
 	SIOF0, SIOF1, SIO,
 	FLCTL_FLSTEI, FLCTL_FLENDI, FLCTL_FLTREQ0I, FLCTL_FLTREQ1I,
 	I2C0_ALI, I2C0_TACKI, I2C0_WAITI, I2C0_DTEI,

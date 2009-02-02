@@ -18,13 +18,39 @@
 #include <linux/device.h>
 #include <linux/regulator/consumer.h>
 
-struct regulator_constraints;
 struct regulator_dev;
+struct regulator_init_data;
 
 /**
  * struct regulator_ops - regulator operations.
  *
- * This struct describes regulator operations.
+ * This struct describes regulator operations which can be implemented by
+ * regulator chip drivers.
+ *
+ * @enable: Enable the regulator.
+ * @disable: Disable the regulator.
+ * @is_enabled: Return 1 if the regulator is enabled, 0 otherwise.
+ *
+ * @set_voltage: Set the voltage for the regulator within the range specified.
+ *               The driver should select the voltage closest to min_uV.
+ * @get_voltage: Return the currently configured voltage for the regulator.
+ *
+ * @set_current_limit: Configure a limit for a current-limited regulator.
+ * @get_current_limit: Get the limit for a current-limited regulator.
+ *
+ * @set_mode: Set the operating mode for the regulator.
+ * @get_mode: Get the current operating mode for the regulator.
+ * @get_optimum_mode: Get the most efficient operating mode for the regulator
+ *                    when running with the specified parameters.
+ *
+ * @set_suspend_voltage: Set the voltage for the regulator when the system
+ *                       is suspended.
+ * @set_suspend_enable: Mark the regulator as enabled when the system is
+ *                      suspended.
+ * @set_suspend_disable: Mark the regulator as disabled when the system is
+ *                       suspended.
+ * @set_suspend_mode: Set the operating mode for the regulator when the
+ *                    system is suspended.
  */
 struct regulator_ops {
 
@@ -51,7 +77,7 @@ struct regulator_ops {
 					  int output_uV, int load_uA);
 
 	/* the operations below are for configuration of regulator state when
-	 * it's parent PMIC enters a global STANBY/HIBERNATE state */
+	 * its parent PMIC enters a global STANDBY/HIBERNATE state */
 
 	/* set regulator suspend voltage */
 	int (*set_suspend_voltage) (struct regulator_dev *, int uV);
@@ -75,6 +101,15 @@ enum regulator_type {
 /**
  * struct regulator_desc - Regulator descriptor
  *
+ * Each regulator registered with the core is described with a structure of
+ * this type.
+ *
+ * @name: Identifying name for the regulator.
+ * @id: Numerical identifier for the regulator.
+ * @ops: Regulator operations table.
+ * @irq: Interrupt number for the regulator.
+ * @type: Indicates if the regulator is a voltage or current regulator.
+ * @owner: Module providing the regulator, used for refcounting.
  */
 struct regulator_desc {
 	const char *name;
@@ -85,15 +120,17 @@ struct regulator_desc {
 	struct module *owner;
 };
 
-
 struct regulator_dev *regulator_register(struct regulator_desc *regulator_desc,
-					  void *reg_data);
+	struct device *dev, void *driver_data);
 void regulator_unregister(struct regulator_dev *rdev);
 
 int regulator_notifier_call_chain(struct regulator_dev *rdev,
 				  unsigned long event, void *data);
 
 void *rdev_get_drvdata(struct regulator_dev *rdev);
+struct device *rdev_get_dev(struct regulator_dev *rdev);
 int rdev_get_id(struct regulator_dev *rdev);
+
+void *regulator_get_init_drvdata(struct regulator_init_data *reg_init_data);
 
 #endif

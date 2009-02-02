@@ -946,3 +946,4 @@ static int sysvipc_msg_proc_show(struct seq_file *s, void *it)
 			msq->q_ctime);
 }
 #endif
+DEFINE_TRACE(ipc_msg_create);

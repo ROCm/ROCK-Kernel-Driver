@@ -25,7 +25,7 @@
 #include <asm/uv/bios.h>
 #include <asm/uv/uv_hub.h>
 
-struct uv_systab uv_systab;
+static struct uv_systab uv_systab;
 
 s64 uv_bios_call(enum uv_bios_cmd which, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5)
 {
@@ -101,15 +101,13 @@ s64 uv_bios_get_sn_info(int fc, int *uvtype, long *partid, long *coher,
 }
 
 int
-uv_bios_mq_watchlist_alloc(int blade, void *mq, unsigned int mq_size,
+uv_bios_mq_watchlist_alloc(int blade, unsigned long addr, unsigned int mq_size,
 			   unsigned long *intr_mmr_offset)
 {
 	union uv_watchlist_u size_blade;
-	unsigned long addr;
 	u64 watchlist;
 	s64 ret;
 
-	addr = uv_gpa(mq);
 	size_blade.size = mq_size;
 	size_blade.blade = blade;
 

@@ -878,6 +878,14 @@ static void cfq_arm_slice_timer(struct cfq_data *cfqd)
 	struct cfq_io_context *cic;
 	unsigned long sl;
 
+	/*
+	 * SSD device without seek penalty, disable idling. But only do so
+	 * for devices that support queuing, otherwise we still have a problem
+	 * with sync vs async workloads.
+	 */
+	if (blk_queue_nonrot(cfqd->queue) && cfqd->hw_tag)
+		return;
+
 	WARN_ON(!RB_EMPTY_ROOT(&cfqq->sort_list));
 	WARN_ON(cfq_cfqq_slice_new(cfqq));
 
@@ -1128,12 +1136,8 @@ static int cfq_dispatch_requests(struct request_queue *q, int force)
 		if (cfq_class_idle(cfqq))
 			max_dispatch = 1;
 
-		if (cfqq->dispatched >= max_dispatch) {
-			if (cfqd->busy_queues > 1)
-				break;
-			if (cfqq->dispatched >= 4 * max_dispatch)
-				break;
-		}
+		if (cfqq->dispatched >= max_dispatch && cfqd->busy_queues > 1)
+			break;
 
 		if (cfqd->sync_flight && !cfq_cfqq_sync(cfqq))
 			break;
@@ -1316,7 +1320,7 @@ static void cfq_exit_single_io_context(struct io_context *ioc,
 		 * race between exiting task and queue
 		 */
 		smp_read_barrier_depends();
-		if (likely(cic->key))
+		if (cic->key)
 			__cfq_exit_single_io_context(cfqd, cic);
 
 		spin_unlock_irqrestore(q->queue_lock, flags);
@@ -2160,7 +2164,7 @@ out_cont:
 static void cfq_shutdown_timer_wq(struct cfq_data *cfqd)
 {
 	del_timer_sync(&cfqd->idle_slice_timer);
-	kblockd_flush_work(&cfqd->unplug_work);
+	cancel_work_sync(&cfqd->unplug_work);
 }
 
 static void cfq_put_async_queues(struct cfq_data *cfqd)
@@ -2178,7 +2182,7 @@ static void cfq_put_async_queues(struct cfq_data *cfqd)
 		cfq_put_queue(cfqd->async_idle_cfqq);
 }
 
-static void cfq_exit_queue(elevator_t *e)
+static void cfq_exit_queue(struct elevator_queue *e)
 {
 	struct cfq_data *cfqd = e->elevator_data;
 	struct request_queue *q = cfqd->queue;
@@ -2288,7 +2292,7 @@ cfq_var_store(unsigned int *var, const char *page, size_t count)
 }
 
 #define SHOW_FUNCTION(__FUNC, __VAR, __CONV)				\
-static ssize_t __FUNC(elevator_t *e, char *page)			\
+static ssize_t __FUNC(struct elevator_queue *e, char *page)		\
 {									\
 	struct cfq_data *cfqd = e->elevator_data;			\
 	unsigned int __data = __VAR;					\
@@ -2308,7 +2312,7 @@ SHOW_FUNCTION(cfq_slice_async_rq_show, cfqd->cfq_slice_async_rq, 0);
 #undef SHOW_FUNCTION
 
 #define STORE_FUNCTION(__FUNC, __PTR, MIN, MAX, __CONV)			\
-static ssize_t __FUNC(elevator_t *e, const char *page, size_t count)	\
+static ssize_t __FUNC(struct elevator_queue *e, const char *page, size_t count)	\
 {									\
 	struct cfq_data *cfqd = e->elevator_data;			\
 	unsigned int __data;						\

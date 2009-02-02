@@ -136,6 +136,7 @@ const struct inode_operations ext3_file_inode_operations = {
 	.removexattr	= generic_removexattr,
 #endif
 	.permission	= ext3_permission,
+	.fiemap		= ext3_fiemap,
 	.may_create	= ext3_may_create,
 	.may_delete	= ext3_may_delete,
 };

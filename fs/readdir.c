@@ -118,7 +118,7 @@ SYSCALL_DEFINE3(old_readdir, unsigned int, fd,
 	buf.dirent = dirent;
 
 	error = vfs_readdir(file, fillonedir, &buf);
-	if (error >= 0)
+	if (buf.result)
 		error = buf.result;
 
 	fput(file);
@@ -211,9 +211,8 @@ SYSCALL_DEFINE3(getdents, unsigned int, fd,
 	buf.error = 0;
 
 	error = vfs_readdir(file, filldir, &buf);
-	if (error < 0)
-		goto out_putf;
-	error = buf.error;
+	if (error >= 0)
+		error = buf.error;
 	lastdirent = buf.previous;
 	if (lastdirent) {
 		if (put_user(file->f_pos, &lastdirent->d_off))
@@ -221,8 +220,6 @@ SYSCALL_DEFINE3(getdents, unsigned int, fd,
 		else
 			error = count - buf.count;
 	}
-
-out_putf:
 	fput(file);
 out:
 	return error;
@@ -296,19 +293,16 @@ SYSCALL_DEFINE3(getdents64, unsigned int, fd,
 	buf.error = 0;
 
 	error = vfs_readdir(file, filldir64, &buf);
-	if (error < 0)
-		goto out_putf;
-	error = buf.error;
+	if (error >= 0)
+		error = buf.error;
 	lastdirent = buf.previous;
 	if (lastdirent) {
 		typeof(lastdirent->d_off) d_off = file->f_pos;
-		error = -EFAULT;
 		if (__put_user(d_off, &lastdirent->d_off))
-			goto out_putf;
-		error = count - buf.count;
+			error = -EFAULT;
+		else
+			error = count - buf.count;
 	}
-
-out_putf:
 	fput(file);
 out:
 	return error;

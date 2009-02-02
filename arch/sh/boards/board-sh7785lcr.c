@@ -18,8 +18,9 @@
 #include <linux/i2c.h>
 #include <linux/i2c-pca-platform.h>
 #include <linux/i2c-algo-pca.h>
+#include <linux/irq.h>
 #include <asm/heartbeat.h>
-#include <asm/sh7785lcr.h>
+#include <mach/sh7785lcr.h>
 
 /*
  * NOTE: This board has 2 physical memory maps.

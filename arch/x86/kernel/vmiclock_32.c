@@ -226,7 +226,7 @@ static void __devinit vmi_time_init_clockevent(void)
 	/* Upper bound is clockevent's use of ulong for cycle deltas. */
 	evt->max_delta_ns = clockevent_delta2ns(ULONG_MAX, evt);
 	evt->min_delta_ns = clockevent_delta2ns(1, evt);
-	evt->cpumask = cpumask_of_cpu(cpu);
+	evt->cpumask = cpumask_of(cpu);
 
 	printk(KERN_WARNING "vmi: registering clock event %s. mult=%lu shift=%u\n",
 	       evt->name, evt->mult, evt->shift);
@@ -235,11 +235,14 @@ static void __devinit vmi_time_init_clockevent(void)
 
 void __init vmi_time_init(void)
 {
+	unsigned int cpu;
 	/* Disable PIT: BIOSes start PIT CH0 with 18.2hz peridic. */
 	outb_pit(0x3a, PIT_MODE); /* binary, mode 5, LSB/MSB, ch 0 */
 
 	vmi_time_init_clockevent();
 	setup_irq(0, &vmi_clock_action);
+	for_each_possible_cpu(cpu)
+		per_cpu(vector_irq, cpu)[vmi_get_timer_vector()] = 0;
 }
 
 #ifdef CONFIG_X86_LOCAL_APIC

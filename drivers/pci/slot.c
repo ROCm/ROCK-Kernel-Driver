@@ -49,10 +49,15 @@ static ssize_t address_read_file(struct pci_slot *slot, char *buf)
 
 static void pci_slot_release(struct kobject *kobj)
 {
+	struct pci_dev *dev;
 	struct pci_slot *slot = to_pci_slot(kobj);
 
 	pr_debug("%s: releasing pci_slot on %x:%d\n", __func__,
 		 slot->bus->number, slot->number);
+
+	list_for_each_entry(dev, &slot->bus->devices, bus_list)
+		if (PCI_SLOT(dev->devfn) == slot->number)
+			dev->slot = NULL;
 
 	list_del(&slot->list);
 
@@ -182,11 +187,11 @@ static struct pci_slot *get_slot(struct pci_bus *parent, int slot_nr)
  * %struct pci_bus and bb is the bus number. In other words, the devfn of
  * the 'placeholder' slot will not be displayed.
  */
-
 struct pci_slot *pci_create_slot(struct pci_bus *parent, int slot_nr,
 				 const char *name,
 				 struct hotplug_slot *hotplug)
 {
+	struct pci_dev *dev;
 	struct pci_slot *slot;
 	int err = 0;
 	char *slot_name = NULL;
@@ -224,6 +229,7 @@ placeholder:
 	slot->number = slot_nr;
 
 	slot->kobj.kset = pci_slots_kset;
+
 	slot_name = make_slot_name(name);
 	if (!slot_name) {
 		err = -ENOMEM;
@@ -237,6 +243,10 @@ placeholder:
 
 	INIT_LIST_HEAD(&slot->list);
 	list_add(&slot->list, &parent->slots);
+
+	list_for_each_entry(dev, &parent->devices, bus_list)
+		if (PCI_SLOT(dev->devfn) == slot_nr)
+			dev->slot = slot;
 
 	/* Don't care if debug printk has a -1 for slot_nr */
 	pr_debug("%s: created pci_slot on %04x:%02x:%02x\n",
@@ -254,7 +264,7 @@ err:
 EXPORT_SYMBOL_GPL(pci_create_slot);
 
 /**
- * pci_update_slot_number - update %struct pci_slot -> number
+ * pci_renumber_slot - update %struct pci_slot -> number
  * @slot - %struct pci_slot to update
  * @slot_nr - new number for slot
  *
@@ -262,27 +272,22 @@ EXPORT_SYMBOL_GPL(pci_create_slot);
  * created a placeholder slot in pci_create_slot() by passing a -1 as
  * slot_nr, to update their %struct pci_slot with the correct @slot_nr.
  */
-
-void pci_update_slot_number(struct pci_slot *slot, int slot_nr)
+void pci_renumber_slot(struct pci_slot *slot, int slot_nr)
 {
-	int name_count = 0;
 	struct pci_slot *tmp;
 
 	down_write(&pci_bus_sem);
 
 	list_for_each_entry(tmp, &slot->bus->slots, list) {
 		WARN_ON(tmp->number == slot_nr);
-		if (!strcmp(kobject_name(&tmp->kobj), kobject_name(&slot->kobj)))
-			name_count++;
+		goto out;
 	}
 
-	if (name_count > 1)
-		printk(KERN_WARNING "pci_update_slot_number found %d slots with the same name: %s\n", name_count, kobject_name(&slot->kobj));
-
 	slot->number = slot_nr;
+out:
 	up_write(&pci_bus_sem);
 }
-EXPORT_SYMBOL_GPL(pci_update_slot_number);
+EXPORT_SYMBOL_GPL(pci_renumber_slot);
 
 /**
  * pci_destroy_slot - decrement refcount for physical PCI slot

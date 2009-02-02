@@ -209,11 +209,7 @@ __do_get_xsec:
 	/* Check for update count & load values. We use the low
 	 * order 32 bits of the update count
 	 */
-#ifdef CONFIG_PPC64
-1:	lwz	r8,(CFG_TB_UPDATE_COUNT+4)(r9)
-#else
-1:	lwz	r8,(CFG_TB_UPDATE_COUNT)(r9)
-#endif
+1:	lwz	r8,(CFG_TB_UPDATE_COUNT+LOPART)(r9)
 	andi.	r0,r8,1			/* pending update ? loop */
 	bne-	1b
 	xor	r0,r8,r8		/* create dependency */
@@ -260,11 +256,7 @@ __do_get_xsec:
 	or	r6,r4,r3
 	xor	r0,r6,r6
 	add	r9,r9,r0
-#ifdef CONFIG_PPC64
-	lwz	r0,(CFG_TB_UPDATE_COUNT+4)(r9)
-#else
-	lwz	r0,(CFG_TB_UPDATE_COUNT)(r9)
-#endif
+	lwz	r0,(CFG_TB_UPDATE_COUNT+LOPART)(r9)
         cmpl    cr0,r8,r0		/* check if updated */
 	bne-	1b
 

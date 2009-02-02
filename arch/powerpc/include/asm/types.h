@@ -1,7 +1,12 @@
 #ifndef _ASM_POWERPC_TYPES_H
 #define _ASM_POWERPC_TYPES_H
 
-#ifdef __powerpc64__
+/*
+ * This is here because we used to use l64 for 64bit powerpc
+ * and we don't want to impact user mode with our change to ll64
+ * in the kernel.
+ */
+#if defined(__powerpc64__) && !defined(__KERNEL__)
 # include <asm-generic/int-l64.h>
 #else
 # include <asm-generic/int-ll64.h>
@@ -48,14 +53,7 @@ typedef struct {
 
 typedef __vector128 vector128;
 
-/* Physical address used by some IO functions */
-#if defined(CONFIG_PPC64) || defined(CONFIG_PHYS_64BIT)
-typedef u64 phys_addr_t;
-#else
-typedef u32 phys_addr_t;
-#endif
-
-#ifdef __powerpc64__
+#if defined(__powerpc64__) || defined(CONFIG_PHYS_64BIT)
 typedef u64 dma_addr_t;
 #else
 typedef u32 dma_addr_t;

@@ -52,7 +52,7 @@ static const char *version = "v0.2431";
 
 #include <linux/dm-io.h>
 #include <linux/dm-dirty-log.h>
-#include <linux/dm-regions.h>
+#include <linux/dm-region-hash.h>
 
 /* # of parallel recovered regions */
 /* FIXME: cope with multiple recovery stripes in raid_set struct. */
@@ -183,7 +183,7 @@ struct stripe {
 	struct stripe_cache *sc;	/* Backpointer to stripe cache. */
 
 	sector_t key;		/* Hash key. */
-	sector_t region;	/* Region stripe is mapped to. */
+	region_t region;	/* Region stripe is mapped to. */
 
 	/* Reference count. */
 	atomic_t cnt;
@@ -445,7 +445,7 @@ struct raid_set {
 	/* Recovery parameters. */
 	struct recover {
 		struct dm_dirty_log *dl;	/* Dirty log. */
-		struct dm_rh_client *rh;	/* Region hash. */
+		struct dm_region_hash *rh;	/* Region hash. */
 
 		/* dm-mem-cache client resource context for recovery stripes. */
 		struct dm_mem_cache_client *mem_cache_client;
@@ -724,7 +724,7 @@ static INLINE void page_set(struct page *page, enum dirty_type type)
 static INLINE int
 region_state(struct raid_set *rs, sector_t sector, unsigned long state)
 {
-	struct dm_rh_client *rh = rs->recover.rh;
+	struct dm_region_hash *rh = rs->recover.rh;
 
 	return RSRecover(rs) ?
 	       (dm_rh_get_state(rh, dm_rh_sector_to_region(rh, sector), 1) &
@@ -1252,7 +1252,7 @@ stripe_pages_invalidate(struct stripe *stripe)
 		ClearPageChecked(page);
 		ClearPageDirty(page);
 		ClearPageError(page);
-		clear_page_locked(page);
+		__clear_page_locked(page);
 		ClearPagePrivate(page);
 		ClearPageUptodate(page);
 	}
@@ -2096,7 +2096,7 @@ bio_list_fail(struct raid_set *rs, struct stripe *stripe, struct bio_list *bl)
 
 	/* Update region counters. */
 	if (stripe) {
-		struct dm_rh_client *rh = rs->recover.rh;
+		struct dm_region_hash *rh = rs->recover.rh;
 
 		bio_list_for_each(bio, bl) {
 			if (bio_data_dir(bio) == WRITE)
@@ -2159,7 +2159,7 @@ static void endio(unsigned long error, void *context)
 	else
 		page_set(page, CLEAN);
 
-	clear_page_locked(page);
+	__clear_page_locked(page);
 	stripe_io_dec(stripe);
 
 	/* Add stripe to endio list and wake daemon. */
@@ -2239,7 +2239,7 @@ static void page_list_rw(struct stripe *stripe, unsigned p)
 		    (PageDirty(page) ? S_DM_IO_WRITE : S_DM_IO_READ));
 
 	ClearPageError(page);
-	set_page_locked(page);
+	__set_page_locked(page);
 	io_dev_queued(dev);
 	BUG_ON(dm_io(&control, 1, &io, NULL));
 }
@@ -2736,7 +2736,7 @@ out:
 static int recover_get_region(struct raid_set *rs)
 {
 	struct recover *rec = &rs->recover;
-	struct dm_rh_client *rh = rec->rh;
+	struct dm_region_hash *rh = rec->rh;
 
 	/* Start quiescing some regions. */
 	if (!RSRegionGet(rs)) {
@@ -2799,19 +2799,18 @@ static void recovery_region_reset(struct raid_set *rs)
 static void recover_rh_update(struct raid_set *rs, int error)
 {
 	struct recover *rec = &rs->recover;
-	struct dm_rh_client *rh = rec->rh;
 	struct dm_region *reg = rec->reg;
 
 	if (reg) {
-		dm_rh_recovery_end(rh, reg, error);
+		dm_rh_recovery_end(reg, error);
 		if (!error)
 			rec->nr_regions_recovered++;
 
 		recovery_region_reset(rs);
 	}
 
-	dm_rh_update_states(rh, 1);
-	dm_rh_flush(rh);
+	dm_rh_update_states(reg->rh, 1);
+	dm_rh_flush(reg->rh);
 	io_put(rs);	/* Release the io reference for the region. */
 }
 
@@ -2893,7 +2892,7 @@ err:
 	/* Make sure, that all quiesced regions get released. */
 	do {
 		if (rec->reg)
-			dm_rh_recovery_end(rec->rh, rec->reg, -EIO);
+			dm_rh_recovery_end(rec->reg, -EIO);
 
 		rec->reg = dm_rh_recovery_start(rec->rh);
 	} while (rec->reg);
@@ -3059,7 +3058,7 @@ static INLINE void do_ios(struct raid_set *rs, struct bio_list *ios)
 {
 	int r;
 	unsigned flush = 0;
-	struct dm_rh_client *rh = rs->recover.rh;
+	struct dm_region_hash *rh = rs->recover.rh;
 	struct bio *bio;
 	struct bio_list delay, reject;
 
@@ -3114,8 +3113,7 @@ static INLINE void do_ios(struct raid_set *rs, struct bio_list *ios)
 		/* REMOVEME: statistics.*/
 		atomic_inc(rs->stats + S_DELAYED_BIOS);
 		atomic_inc(rs->stats + S_SUM_DELAYED_BIOS);
-		dm_rh_delay_by_region(rh, bio,
-			dm_rh_sector_to_region(rh, _sector(rs, bio)));
+		dm_rh_delay(rh, bio);
 
 	}
 
@@ -3241,7 +3239,7 @@ redo:
  * delayed bios queued to recovered regions
  * (Gets called via rh_update_states()).
  */
-static void dispatch_delayed_bios(void *context, struct bio_list *bl, int dummy)
+static void dispatch_delayed_bios(void *context, struct bio_list *bl)
 {
 	struct raid_set *rs = context;
 	struct bio *bio;
@@ -3330,6 +3328,16 @@ static unsigned xor_optimize(struct raid_set *rs)
 	rs->xor.f = f_max;
 	rs->xor.chunks = chunks_max;
 	return speed_max;
+}
+
+static inline int array_too_big(unsigned long fixed, unsigned long obj,
+                                unsigned long num)
+{
+	return (num > (ULONG_MAX - fixed) / obj);
+}
+
+static void wakeup_all_recovery_waiters(void *context)
+{
 }
 
 /*
@@ -3429,9 +3437,11 @@ context_alloc(struct raid_set **raid_set, struct raid_type *raid_type,
 	init_waitqueue_head(&rs->io.suspendq);	/* Suspend waiters (dm-io). */
 
 	rec->nr_regions = dm_sector_div_up(sectors_per_dev, region_size);
-	rec->rh = dm_rh_client_create(MAX_RECOVER, dispatch_delayed_bios, rs,
-				      wake_do_raid, rs, dl, region_size,
-				      rs->recover.nr_regions);
+
+	rec->rh = dm_region_hash_create(rs, dispatch_delayed_bios, wake_do_raid,
+					wakeup_all_recovery_waiters,
+					rs->ti->begin, MAX_RECOVER, dl,
+					region_size, rs->recover.nr_regions);
 	if (IS_ERR(rec->rh))
 		goto bad_rh;
 
@@ -3485,9 +3495,9 @@ bad_sc:
 bad_dm_io_client:
 	ti->error = DM_MSG_PREFIX "Error allocating dm-io resources";
 free:
-	dm_rh_client_destroy(rec->rh);
+	dm_region_hash_destroy(rec->rh);
 	sc_exit(&rs->sc);
-	dm_rh_client_destroy(rec->rh); /* Destroys dirty log as well. */
+	dm_region_hash_destroy(rec->rh); /* Destroys dirty log as well. */
 free_rs:
 	kfree(rs);
 	return -ENOMEM;
@@ -3502,7 +3512,7 @@ context_free(struct raid_set *rs, struct dm_target *ti, unsigned r)
 
 	dm_io_client_destroy(rs->sc.dm_io_client);
 	sc_exit(&rs->sc);
-	dm_rh_client_destroy(rs->recover.rh);
+	dm_region_hash_destroy(rs->recover.rh);
 	dm_dirty_log_destroy(rs->recover.dl);
 	kfree(rs);
 }
@@ -4501,10 +4511,8 @@ static int __init dm_raid_init(void)
 
 static void __exit dm_raid_exit(void)
 {
-	int r;
-
-	r = dm_unregister_target(&raid_target);
-	init_exit("un", "exit", r);
+	dm_unregister_target(&raid_target);
+	init_exit("un", "exit", 0);
 }
 
 /* Module hooks. */

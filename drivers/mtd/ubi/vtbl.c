@@ -244,8 +244,8 @@ static int vtbl_check(const struct ubi_device *ubi,
 		}
 
 		if (reserved_pebs > ubi->good_peb_count) {
-			dbg_err("too large reserved_pebs, good PEBs %d",
-				ubi->good_peb_count);
+			dbg_err("too large reserved_pebs %d, good PEBs %d",
+				reserved_pebs, ubi->good_peb_count);
 			err = 9;
 			goto bad;
 		}
@@ -577,7 +577,7 @@ static int init_volumes(struct ubi_device *ubi, const struct ubi_scan_info *si,
 		if (vtbl[i].flags & UBI_VTBL_AUTORESIZE_FLG) {
 			/* Auto re-size flag may be set only for one volume */
 			if (ubi->autoresize_vol_id != -1) {
-				ubi_err("more then one auto-resize volume (%d "
+				ubi_err("more than one auto-resize volume (%d "
 					"and %d)", ubi->autoresize_vol_id, i);
 				kfree(vol);
 				return -EINVAL;

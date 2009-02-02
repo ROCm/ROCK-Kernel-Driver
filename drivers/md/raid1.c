@@ -32,6 +32,7 @@
  */
 
 #include "dm-bio-list.h"
+#include <linux/delay.h>
 #include <linux/raid/raid1.h>
 #include <linux/raid/bitmap.h>
 
@@ -779,7 +780,7 @@ static int make_request(struct request_queue *q, struct bio * bio)
 	struct page **behind_pages = NULL;
 	const int rw = bio_data_dir(bio);
 	const int do_sync = bio_sync(bio);
-	int do_barriers;
+	int cpu, do_barriers;
 	mdk_rdev_t *blocked_rdev;
 
 	/*
@@ -804,8 +805,11 @@ static int make_request(struct request_queue *q, struct bio * bio)
 
 	bitmap = mddev->bitmap;
 
-	disk_stat_inc(mddev->gendisk, ios[rw]);
-	disk_stat_add(mddev->gendisk, sectors[rw], bio_sectors(bio));
+	cpu = part_stat_lock();
+	part_stat_inc(cpu, &mddev->gendisk->part0, ios[rw]);
+	part_stat_add(cpu, &mddev->gendisk->part0, sectors[rw],
+		      bio_sectors(bio));
+	part_stat_unlock();
 
 	/*
 	 * make_request() can abort the operation when READA is being
@@ -1016,10 +1020,10 @@ static void error(mddev_t *mddev, mdk_rdev_t *rdev)
 		/*
 		 * Don't fail the drive, act as though we were just a
 		 * normal single drive.
-		 * Disable any future recovery attempts as they will
-		 * likely hit an error on this device.
+		 * However don't try a recovery from this drive as
+		 * it is very likely to fail.
 		 */
-		set_bit(MD_RECOVERY_DISABLED, &mddev->recovery);
+		mddev->recovery_disabled = 1;
 		return;
 	}
 	if (test_and_clear_bit(In_sync, &rdev->flags)) {
@@ -1919,7 +1923,6 @@ static int run(mddev_t *mddev)
 	int i, j, disk_idx;
 	mirror_info_t *disk;
 	mdk_rdev_t *rdev;
-	struct list_head *tmp;
 
 	if (mddev->level != 1) {
 		printk("raid1: %s: raid level not set to mirroring (%d)\n",
@@ -1964,7 +1967,7 @@ static int run(mddev_t *mddev)
 	spin_lock_init(&conf->device_lock);
 	mddev->queue->queue_lock = &conf->device_lock;
 
-	rdev_for_each(rdev, tmp, mddev) {
+	list_for_each_entry(rdev, &mddev->disks, same_set) {
 		disk_idx = rdev->raid_disk;
 		if (disk_idx >= mddev->raid_disks
 		    || disk_idx < 0)

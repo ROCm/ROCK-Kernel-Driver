@@ -1251,7 +1251,6 @@ dev_release (struct inode *inode, struct file *fd)
 	 * alternatively, all host requests will time out.
 	 */
 
-	fasync_helper (-1, fd, 0, &dev->fasync);
 	kfree (dev->buf);
 	dev->buf = NULL;
 	put_dev (dev);
@@ -2002,7 +2001,6 @@ gadgetfs_make_inode (struct super_block *sb,
 		inode->i_mode = mode;
 		inode->i_uid = default_uid;
 		inode->i_gid = default_gid;
-		inode->i_blocks = 0;
 		inode->i_atime = inode->i_mtime = inode->i_ctime
 				= CURRENT_TIME;
 		inode->i_private = data;

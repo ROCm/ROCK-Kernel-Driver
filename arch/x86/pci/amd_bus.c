@@ -2,7 +2,7 @@
 #include <linux/pci.h>
 #include <linux/topology.h>
 #include <linux/cpu.h>
-#include "pci.h"
+#include <asm/pci_x86.h>
 
 #ifdef CONFIG_X86_64
 #include <asm/pci-direct.h>
@@ -580,7 +580,7 @@ static int __cpuinit amd_cpu_notify(struct notifier_block *self,
 				    unsigned long action, void *hcpu)
 {
 	int cpu = (long)hcpu;
-	switch(action) {
+	switch (action) {
 	case CPU_ONLINE:
 	case CPU_ONLINE_FROZEN:
 		smp_call_function_single(cpu, enable_pci_io_ecs, NULL, 0);
@@ -607,14 +607,6 @@ static int __init pci_io_ecs_init(void)
 	for_each_online_cpu(cpu)
 		amd_cpu_notify(&amd_cpu_notifier, (unsigned long)CPU_ONLINE,
 			       (void *)(long)cpu);
-#ifdef CONFIG_XEN
-	{
-		u64 reg;
-		rdmsrl(MSR_AMD64_NB_CFG, reg);
-		if (!(reg & ENABLE_CF8_EXT_CFG))
-			return 0;
-	}
-#endif
 	pci_probe |= PCI_HAS_IO_ECS;
 
 	return 0;
@@ -622,10 +614,6 @@ static int __init pci_io_ecs_init(void)
 
 static int __init amd_postcore_init(void)
 {
-#ifdef CONFIG_XEN
-	if (!is_initial_xendomain())
-		return 0;
-#endif
 	if (boot_cpu_data.x86_vendor != X86_VENDOR_AMD)
 		return 0;
 

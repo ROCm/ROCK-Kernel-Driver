@@ -4,6 +4,7 @@
  */
 
 #define KMSG_COMPONENT "cpu"
+#define pr_fmt(fmt) KMSG_COMPONENT ": " fmt
 
 #include <linux/kernel.h>
 #include <linux/mm.h>
@@ -94,6 +95,11 @@ cpumask_t cpu_coregroup_map(unsigned int cpu)
 	if (cpus_empty(mask))
 		mask = cpumask_of_cpu(cpu);
 	return mask;
+}
+
+const struct cpumask *cpu_coregroup_mask(unsigned int cpu)
+{
+	return &cpu_core_map[cpu];
 }
 
 static void add_cpus_to_core(struct tl_cpu *tl_cpu, struct core_info *core)

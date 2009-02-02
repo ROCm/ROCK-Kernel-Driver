@@ -19,6 +19,8 @@
 #include <asm/ccwdev.h>
 #include <asm/ccwgroup.h>
 
+#define CCW_BUS_ID_SIZE		20
+
 /* In Linux 2.4, we had a channel device layer called "chandev"
  * that did all sorts of obscure stuff for networking devices.
  * This is another driver that serves as a replacement for just
@@ -180,7 +182,7 @@ static int __get_next_bus_id(const char **buf, char *bus_id)
 		len = end - start + 1;
 		end++;
 	}
-	if (len < BUS_ID_SIZE) {
+	if (len < CCW_BUS_ID_SIZE) {
 		strlcpy(bus_id, start, len);
 		rc = 0;
 	} else
@@ -189,7 +191,7 @@ static int __get_next_bus_id(const char **buf, char *bus_id)
 	return rc;
 }
 
-static int __is_valid_bus_id(char bus_id[BUS_ID_SIZE])
+static int __is_valid_bus_id(char bus_id[CCW_BUS_ID_SIZE])
 {
 	int cssid, ssid, devno;
 
@@ -221,7 +223,7 @@ int ccwgroup_create_from_string(struct device *root, unsigned int creator_id,
 {
 	struct ccwgroup_device *gdev;
 	int rc, i;
-	char tmp_bus_id[BUS_ID_SIZE];
+	char tmp_bus_id[CCW_BUS_ID_SIZE];
 	const char *curr_buf;
 
 	gdev = kzalloc(sizeof(*gdev) + num_devices * sizeof(gdev->cdev[0]),
@@ -277,8 +279,7 @@ int ccwgroup_create_from_string(struct device *root, unsigned int creator_id,
 		goto error;
 	}
 
-	snprintf (gdev->dev.bus_id, BUS_ID_SIZE, "%s",
-			gdev->cdev[0]->dev.bus_id);
+	dev_set_name(&gdev->dev, "%s", dev_name(&gdev->cdev[0]->dev));
 
 	rc = device_add(&gdev->dev);
 	if (rc)

@@ -53,7 +53,7 @@ int uv_setup_irq(char *irq_name, int cpu, int mmr_blade,
 	int ret;
 
 	irq = create_irq();
-	if (irq < 0)
+	if (irq <= 0)
 		return -EBUSY;
 
 	ret = arch_enable_uv_irq(irq_name, irq, cpu, mmr_blade, mmr_offset);

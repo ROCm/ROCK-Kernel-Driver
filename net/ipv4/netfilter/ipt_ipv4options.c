@@ -22,16 +22,9 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Fabrice Marie <fabrice@netfilter.org>");
 
 static bool
-match(const struct sk_buff *skb,
-      const struct net_device *in,
-      const struct net_device *out,
-      const struct xt_match *match,
-      const void *matchinfo,
-      int offset,
-      unsigned int protoff,
-      bool *hotdrop)
+match(const struct sk_buff *skb, const struct xt_match_param *params)
 {
-	const struct ipt_ipv4options_info *info = matchinfo;   /* match info for rule */
+	const struct ipt_ipv4options_info *info = params->matchinfo;   /* match info for rule */
 	const struct iphdr *iph = ip_hdr(skb);
 	const struct ip_options *opt;
 
@@ -106,15 +99,11 @@ match(const struct sk_buff *skb,
 }
 
 static bool
-checkentry(const char *tablename,
-	   const void *ip,
-	   const struct xt_match *match,
-	   void *matchinfo,
-	   unsigned int hook_mask)
+checkentry(const struct xt_mtchk_param *params)
 {
-	const struct ipt_ipv4options_info *info = matchinfo;   /* match info for rule */
+	const struct ipt_ipv4options_info *info = params->matchinfo;   /* match info for rule */
 	/* Check the size */
-	if (match->matchsize != IPT_ALIGN(sizeof(struct ipt_ipv4options_info)))
+	if (params->match->matchsize != IPT_ALIGN(sizeof(struct ipt_ipv4options_info)))
 		return 0;
 	/* Now check the coherence of the data ... */
 	if (((info->options & IPT_IPV4OPTION_MATCH_ANY_OPT) == IPT_IPV4OPTION_MATCH_ANY_OPT) &&

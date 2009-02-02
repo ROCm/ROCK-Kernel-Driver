@@ -117,6 +117,7 @@ static void setup_queues_misc(struct qdio_q *q, struct qdio_irq *irq_ptr,
 	q->mask = 1 << (31 - i);
 	q->nr = i;
 	q->handler = handler;
+	spin_lock_init(&q->lock);
 }
 
 static void setup_storage_lists(struct qdio_q *q, struct qdio_irq *irq_ptr,
@@ -451,8 +452,8 @@ void qdio_print_subchannel_info(struct qdio_irq *irq_ptr,
 		 (irq_ptr->qib.qfmt == QDIO_QETH_QFMT) ? "OSA" :
 			((irq_ptr->qib.qfmt == QDIO_ZFCP_QFMT) ? "ZFCP" : "HS"),
 		 irq_ptr->schid.sch_no,
- 		 is_thinint_irq(irq_ptr),
- 		 (irq_ptr->sch_token) ? 1 : 0,
+		 is_thinint_irq(irq_ptr),
+		 (irq_ptr->sch_token) ? 1 : 0,
 		 (irq_ptr->qib.ac & QIB_AC_OUTBOUND_PCI_SUPPORTED) ? 1 : 0,
 		 css_general_characteristics.aif_tdd,
 		 (irq_ptr->siga_flag.input) ? "R" : " ",

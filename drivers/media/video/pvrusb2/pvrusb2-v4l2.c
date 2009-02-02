@@ -168,14 +168,13 @@ static const char *get_v4l_name(int v4l_type)
  * This is part of Video 4 Linux API. The procedure handles ioctl() calls.
  *
  */
-static int pvr2_v4l2_do_ioctl(struct inode *inode, struct file *file,
-			      unsigned int cmd, void *arg)
+static long pvr2_v4l2_do_ioctl(struct file *file, unsigned int cmd, void *arg)
 {
 	struct pvr2_v4l2_fh *fh = file->private_data;
 	struct pvr2_v4l2 *vp = fh->vhead;
 	struct pvr2_v4l2_dev *dev_info = fh->dev_info;
 	struct pvr2_hdw *hdw = fh->channel.mc_head->hdw;
-	int ret = -EINVAL;
+	long ret = -EINVAL;
 
 	if (pvrusb2_debug & PVR2_TRACE_V4LIOCTL) {
 		v4l_print_ioctl(pvr2_hdw_get_driver_name(hdw),cmd);
@@ -533,7 +532,7 @@ static int pvr2_v4l2_do_ioctl(struct inode *inode, struct file *file,
 
 			lmin = pvr2_ctrl_get_min(hcp);
 			lmax = pvr2_ctrl_get_max(hcp);
-			ldef = pvr2_ctrl_get_def(hcp);
+			pvr2_ctrl_get_def(hcp, &ldef);
 			if (w == -1) {
 				w = ldef;
 			} else if (w < lmin) {
@@ -543,7 +542,7 @@ static int pvr2_v4l2_do_ioctl(struct inode *inode, struct file *file,
 			}
 			lmin = pvr2_ctrl_get_min(vcp);
 			lmax = pvr2_ctrl_get_max(vcp);
-			ldef = pvr2_ctrl_get_def(vcp);
+			pvr2_ctrl_get_def(vcp, &ldef);
 			if (h == -1) {
 				h = ldef;
 			} else if (h < lmin) {
@@ -604,6 +603,7 @@ static int pvr2_v4l2_do_ioctl(struct inode *inode, struct file *file,
 	case VIDIOC_QUERYCTRL:
 	{
 		struct pvr2_ctrl *cptr;
+		int val;
 		struct v4l2_queryctrl *vc = (struct v4l2_queryctrl *)arg;
 		ret = 0;
 		if (vc->id & V4L2_CTRL_FLAG_NEXT_CTRL) {
@@ -627,7 +627,8 @@ static int pvr2_v4l2_do_ioctl(struct inode *inode, struct file *file,
 			   pvr2_ctrl_get_desc(cptr));
 		strlcpy(vc->name,pvr2_ctrl_get_desc(cptr),sizeof(vc->name));
 		vc->flags = pvr2_ctrl_get_v4lflags(cptr);
-		vc->default_value = pvr2_ctrl_get_def(cptr);
+		pvr2_ctrl_get_def(cptr, &val);
+		vc->default_value = val;
 		switch (pvr2_ctrl_get_type(cptr)) {
 		case pvr2_ctl_enum:
 			vc->type = V4L2_CTRL_TYPE_MENU;
@@ -753,6 +754,92 @@ static int pvr2_v4l2_do_ioctl(struct inode *inode, struct file *file,
 		break;
 	}
 
+	case VIDIOC_CROPCAP:
+	{
+		struct v4l2_cropcap *cap = (struct v4l2_cropcap *)arg;
+		if (cap->type != V4L2_BUF_TYPE_VIDEO_CAPTURE) {
+			ret = -EINVAL;
+			break;
+		}
+		ret = pvr2_hdw_get_cropcap(hdw, cap);
+		cap->type = V4L2_BUF_TYPE_VIDEO_CAPTURE; /* paranoia */
+		break;
+	}
+	case VIDIOC_G_CROP:
+	{
+		struct v4l2_crop *crop = (struct v4l2_crop *)arg;
+		int val = 0;
+		if (crop->type != V4L2_BUF_TYPE_VIDEO_CAPTURE) {
+			ret = -EINVAL;
+			break;
+		}
+		ret = pvr2_ctrl_get_value(
+			pvr2_hdw_get_ctrl_by_id(hdw, PVR2_CID_CROPL), &val);
+		if (ret != 0) {
+			ret = -EINVAL;
+			break;
+		}
+		crop->c.left = val;
+		ret = pvr2_ctrl_get_value(
+			pvr2_hdw_get_ctrl_by_id(hdw, PVR2_CID_CROPT), &val);
+		if (ret != 0) {
+			ret = -EINVAL;
+			break;
+		}
+		crop->c.top = val;
+		ret = pvr2_ctrl_get_value(
+			pvr2_hdw_get_ctrl_by_id(hdw, PVR2_CID_CROPW), &val);
+		if (ret != 0) {
+			ret = -EINVAL;
+			break;
+		}
+		crop->c.width = val;
+		ret = pvr2_ctrl_get_value(
+			pvr2_hdw_get_ctrl_by_id(hdw, PVR2_CID_CROPH), &val);
+		if (ret != 0) {
+			ret = -EINVAL;
+			break;
+		}
+		crop->c.height = val;
+	}
+	case VIDIOC_S_CROP:
+	{
+		struct v4l2_crop *crop = (struct v4l2_crop *)arg;
+		struct v4l2_cropcap cap;
+		if (crop->type != V4L2_BUF_TYPE_VIDEO_CAPTURE) {
+			ret = -EINVAL;
+			break;
+		}
+		cap.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+		ret = pvr2_ctrl_set_value(
+			pvr2_hdw_get_ctrl_by_id(hdw, PVR2_CID_CROPL),
+			crop->c.left);
+		if (ret != 0) {
+			ret = -EINVAL;
+			break;
+		}
+		ret = pvr2_ctrl_set_value(
+			pvr2_hdw_get_ctrl_by_id(hdw, PVR2_CID_CROPT),
+			crop->c.top);
+		if (ret != 0) {
+			ret = -EINVAL;
+			break;
+		}
+		ret = pvr2_ctrl_set_value(
+			pvr2_hdw_get_ctrl_by_id(hdw, PVR2_CID_CROPW),
+			crop->c.width);
+		if (ret != 0) {
+			ret = -EINVAL;
+			break;
+		}
+		ret = pvr2_ctrl_set_value(
+			pvr2_hdw_get_ctrl_by_id(hdw, PVR2_CID_CROPH),
+			crop->c.height);
+		if (ret != 0) {
+			ret = -EINVAL;
+			break;
+		}
+	}
 	case VIDIOC_LOG_STATUS:
 	{
 		pvr2_hdw_trigger_module_log(hdw);
@@ -764,19 +851,19 @@ static int pvr2_v4l2_do_ioctl(struct inode *inode, struct file *file,
 	case VIDIOC_DBG_G_REGISTER:
 	{
 		u64 val;
-		struct v4l2_register *req = (struct v4l2_register *)arg;
+		struct v4l2_dbg_register *req = (struct v4l2_dbg_register *)arg;
 		if (cmd == VIDIOC_DBG_S_REGISTER) val = req->val;
 		ret = pvr2_hdw_register_access(
-			hdw,req->match_type,req->match_chip,req->reg,
-			cmd == VIDIOC_DBG_S_REGISTER,&val);
+			hdw, &req->match, req->reg,
+			cmd == VIDIOC_DBG_S_REGISTER, &val);
 		if (cmd == VIDIOC_DBG_G_REGISTER) req->val = val;
 		break;
 	}
 #endif
 
 	default :
-		ret = v4l_compat_translate_ioctl(inode,file,cmd,
-						 arg,pvr2_v4l2_do_ioctl);
+		ret = v4l_compat_translate_ioctl(file, cmd,
+						 arg, pvr2_v4l2_do_ioctl);
 	}
 
 	pvr2_hdw_commit_ctl(hdw);
@@ -784,28 +871,27 @@ static int pvr2_v4l2_do_ioctl(struct inode *inode, struct file *file,
 	if (ret < 0) {
 		if (pvrusb2_debug & PVR2_TRACE_V4LIOCTL) {
 			pvr2_trace(PVR2_TRACE_V4LIOCTL,
-				   "pvr2_v4l2_do_ioctl failure, ret=%d",ret);
+				   "pvr2_v4l2_do_ioctl failure, ret=%ld", ret);
 		} else {
 			if (pvrusb2_debug & PVR2_TRACE_V4LIOCTL) {
 				pvr2_trace(PVR2_TRACE_V4LIOCTL,
-					   "pvr2_v4l2_do_ioctl failure, ret=%d"
-					   " command was:",ret);
+					   "pvr2_v4l2_do_ioctl failure, ret=%ld"
+					   " command was:", ret);
 				v4l_print_ioctl(pvr2_hdw_get_driver_name(hdw),
 						cmd);
 			}
 		}
 	} else {
 		pvr2_trace(PVR2_TRACE_V4LIOCTL,
-			   "pvr2_v4l2_do_ioctl complete, ret=%d (0x%x)",
-			   ret,ret);
+			   "pvr2_v4l2_do_ioctl complete, ret=%ld (0x%lx)",
+			   ret, ret);
 	}
 	return ret;
 }
 
-
 static void pvr2_v4l2_dev_destroy(struct pvr2_v4l2_dev *dip)
 {
-	int minor_id = dip->devbase.minor;
+	int num = dip->devbase.num;
 	struct pvr2_hdw *hdw = dip->v4lp->channel.mc_head->hdw;
 	enum pvr2_config cfg = dip->config;
 	int v4l_type = dip->v4l_type;
@@ -821,7 +907,7 @@ static void pvr2_v4l2_dev_destroy(struct pvr2_v4l2_dev *dip)
 	video_unregister_device(&dip->devbase);
 
 	printk(KERN_INFO "pvrusb2: unregistered device %s%u [%s]\n",
-	       get_v4l_name(v4l_type),minor_id & 0x1f,
+	       get_v4l_name(v4l_type), num,
 	       pvr2_config_get_name(cfg));
 
 }
@@ -862,7 +948,7 @@ static void pvr2_v4l2_internal_check(struct pvr2_channel *chp)
 }
 
 
-static int pvr2_v4l2_ioctl(struct inode *inode, struct file *file,
+static long pvr2_v4l2_ioctl(struct file *file,
 			   unsigned int cmd, unsigned long arg)
 {
 
@@ -870,11 +956,11 @@ static int pvr2_v4l2_ioctl(struct inode *inode, struct file *file,
 #define IVTV_IOC_G_CODEC        0xFFEE7703
 #define IVTV_IOC_S_CODEC        0xFFEE7704
 	if (cmd == IVTV_IOC_G_CODEC || cmd == IVTV_IOC_S_CODEC) return 0;
-	return video_usercopy(inode, file, cmd, arg, pvr2_v4l2_do_ioctl);
+	return video_usercopy(file, cmd, arg, pvr2_v4l2_do_ioctl);
 }
 
 
-static int pvr2_v4l2_release(struct inode *inode, struct file *file)
+static int pvr2_v4l2_release(struct file *file)
 {
 	struct pvr2_v4l2_fh *fhp = file->private_data;
 	struct pvr2_v4l2 *vp = fhp->vhead;
@@ -922,7 +1008,7 @@ static int pvr2_v4l2_release(struct inode *inode, struct file *file)
 }
 
 
-static int pvr2_v4l2_open(struct inode *inode, struct file *file)
+static int pvr2_v4l2_open(struct file *file)
 {
 	struct pvr2_v4l2_dev *dip; /* Our own context pointer */
 	struct pvr2_v4l2_fh *fhp;
@@ -1149,13 +1235,12 @@ static unsigned int pvr2_v4l2_poll(struct file *file, poll_table *wait)
 }
 
 
-static const struct file_operations vdev_fops = {
+static const struct v4l2_file_operations vdev_fops = {
 	.owner      = THIS_MODULE,
 	.open       = pvr2_v4l2_open,
 	.release    = pvr2_v4l2_release,
 	.read       = pvr2_v4l2_read,
 	.ioctl      = pvr2_v4l2_ioctl,
-	.llseek     = no_llseek,
 	.poll       = pvr2_v4l2_poll,
 };
 
@@ -1222,7 +1307,7 @@ static void pvr2_v4l2_dev_init(struct pvr2_v4l2_dev *dip,
 	}
 
 	printk(KERN_INFO "pvrusb2: registered device %s%u [%s]\n",
-	       get_v4l_name(dip->v4l_type),dip->devbase.minor & 0x1f,
+	       get_v4l_name(dip->v4l_type), dip->devbase.num,
 	       pvr2_config_get_name(dip->config));
 
 	pvr2_hdw_v4l_store_minor_number(vp->channel.mc_head->hdw,

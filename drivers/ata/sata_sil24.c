@@ -51,13 +51,6 @@ struct sil24_sge {
 	__le32	flags;
 };
 
-/*
- * Port multiplier
- */
-struct sil24_port_multiplier {
-	__le32	diag;
-	__le32	sactive;
-};
 
 enum {
 	SIL24_HOST_BAR		= 0,
@@ -1328,6 +1321,11 @@ static int sil24_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 			return rc;
 		}
 	}
+
+	/* Set max read request size to 4096.  This slightly increases
+	 * write throughput for pci-e variants.
+	 */
+	pcie_set_readrq(pdev, 4096);
 
 	sil24_init_controller(host);
 

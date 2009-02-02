@@ -23,7 +23,6 @@
 /*
  * nfsd version
  */
-#define NFSD_VERSION		"0.5"
 #define NFSD_SUPPORTED_MINOR_VERSION	0
 
 /*
@@ -38,6 +37,7 @@
 #define NFSD_MAY_LOCK		32
 #define NFSD_MAY_OWNER_OVERRIDE	64
 #define NFSD_MAY_LOCAL_ACCESS	128 /* IRIX doing local access check on device special file*/
+#define NFSD_MAY_BYPASS_GSS_ON_ROOT 256
 
 #define NFSD_MAY_CREATE		(NFSD_MAY_EXEC|NFSD_MAY_WRITE)
 #define NFSD_MAY_REMOVE		(NFSD_MAY_EXEC|NFSD_MAY_WRITE|NFSD_MAY_TRUNC)
@@ -85,8 +85,7 @@ __be32		nfsd_setattr(struct svc_rqst *, struct svc_fh *,
 #ifdef CONFIG_NFSD_V4
 __be32          nfsd4_set_nfs4_acl(struct svc_rqst *, struct svc_fh *,
                     struct nfs4_acl *);
-int             nfsd4_get_nfs4_acl(struct svc_rqst *, struct dentry *,
-				struct vfsmount *mnt, struct nfs4_acl **);
+int             nfsd4_get_nfs4_acl(struct svc_rqst *, struct dentry *, struct nfs4_acl **);
 #endif /* CONFIG_NFSD_V4 */
 __be32		nfsd_create(struct svc_rqst *, struct svc_fh *,
 				char *name, int len, struct iattr *attrs,
@@ -126,7 +125,7 @@ int		nfsd_truncate(struct svc_rqst *, struct svc_fh *,
 __be32		nfsd_readdir(struct svc_rqst *, struct svc_fh *,
 			     loff_t *, struct readdir_cd *, filldir_t);
 __be32		nfsd_statfs(struct svc_rqst *, struct svc_fh *,
-				struct kstatfs *);
+				struct kstatfs *, int access);
 
 int		nfsd_notify_change(struct inode *, struct iattr *);
 __be32		nfsd_permission(struct svc_rqst *, struct svc_export *,

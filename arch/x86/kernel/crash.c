@@ -26,66 +26,21 @@
 #include <linux/kdebug.h>
 #include <asm/smp.h>
 #include <asm/reboot.h>
+#include <asm/virtext.h>
 
 #include <mach_ipi.h>
 
-#ifndef CONFIG_XEN
-/* This keeps a track of which one is crashing cpu. */
-static int crashing_cpu;
 
 #if defined(CONFIG_SMP) && defined(CONFIG_X86_LOCAL_APIC)
-static atomic_t waiting_for_crash_ipi;
 
-#ifdef CONFIG_KDB_KDUMP
-void halt_current_cpu(struct pt_regs *regs)
-{
-#ifdef CONFIG_X86_32
-	struct pt_regs fixed_regs;
-#endif
-	local_irq_disable();
-#ifdef CONFIG_X86_32
-	if (!user_mode_vm(regs)) {
-		crash_fixup_ss_esp(&fixed_regs, regs);
-		regs = &fixed_regs;
-	}
-#endif
-	crash_save_cpu(regs, raw_smp_processor_id());
-	disable_local_APIC();
-	atomic_dec(&waiting_for_crash_ipi);
-	/* Assume hlt works */
-	halt();
-	for(;;)
-		cpu_relax();
-}
-#endif /* CONFIG_KDB_KDUMP */
-
-static int crash_nmi_callback(struct notifier_block *self,
-			unsigned long val, void *data)
+static void kdump_nmi_callback(int cpu, struct die_args *args)
 {
 	struct pt_regs *regs;
-#ifndef CONFIG_KDB_KDUMP
 #ifdef CONFIG_X86_32
 	struct pt_regs fixed_regs;
 #endif
-#endif /* !CONFIG_KDB_KDUMP */
-	int cpu;
 
-	if (val != DIE_NMI_IPI)
-		return NOTIFY_OK;
-
-	regs = ((struct die_args *)data)->regs;
-	cpu = raw_smp_processor_id();
-
-	/* Don't do anything if this handler is invoked on crashing cpu.
-	 * Otherwise, system will completely hang. Crashing cpu can get
-	 * an NMI if system was initially booted with nmi_watchdog parameter.
-	 */
-	if (cpu == crashing_cpu)
-		return NOTIFY_STOP;
-#ifdef CONFIG_KDB_KDUMP
-	halt_current_cpu(regs);
-#else
-	local_irq_disable();
+	regs = args->regs;
 
 #ifdef CONFIG_X86_32
 	if (!user_mode_vm(regs)) {
@@ -94,104 +49,32 @@ static int crash_nmi_callback(struct notifier_block *self,
 	}
 #endif
 	crash_save_cpu(regs, cpu);
-	disable_local_APIC();
-	atomic_dec(&waiting_for_crash_ipi);
-	/* Assume hlt works */
-	halt();
-	for (;;)
-		cpu_relax();
-#endif /* !CONFIG_KDB_KDUMP */
 
-	return 1;
-}
-
-static void smp_send_nmi_allbutself(void)
-{
-	send_IPI_allbutself(NMI_VECTOR);
-}
-
-static struct notifier_block crash_nmi_nb = {
-	.notifier_call = crash_nmi_callback,
-};
-
-#ifdef CONFIG_KDB_KDUMP
-static void wait_other_cpus(void)
-{
-	unsigned long msecs;
-
-	msecs = 1000; /* Wait at most a second for the other cpus to stop */
-	while ((atomic_read(&waiting_for_crash_ipi) > 0) && msecs) {
-		udelay(1000);
-	msecs--;
-	}
-}
-
-static void nmi_shootdown_cpus_init(void)
-{
-	atomic_set(&waiting_for_crash_ipi, num_online_cpus() - 1);
-}
-
-static void nmi_shootdown_cpus(void)
-{
-	nmi_shootdown_cpus_init();
-
-	/* Would it be better to replace the trap vector here? */
-	if (register_die_notifier(&crash_nmi_nb))
-		return;		/* return what? */
-	/* Ensure the new callback function is set before sending
-	 * out the NMI
+	/* Disable VMX or SVM if needed.
+	 *
+	 * We need to disable virtualization on all CPUs.
+	 * Having VMX or SVM enabled on any CPU may break rebooting
+	 * after the kdump kernel has finished its task.
 	 */
-	wmb();
-
-	smp_send_nmi_allbutself();
-
-	wait_other_cpus();
-	/* Leave the nmi callback set */
+	cpu_emergency_vmxoff();
+	cpu_emergency_svm_disable();
 
 	disable_local_APIC();
 }
+
+static void kdump_nmi_shootdown_cpus(void)
+{
+	nmi_shootdown_cpus(kdump_nmi_callback);
+
+	disable_local_APIC();
+}
+
 #else
-static void nmi_shootdown_cpus(void)
-{
-	unsigned long msecs;
-
-	atomic_set(&waiting_for_crash_ipi, num_online_cpus() - 1);
-	/* Would it be better to replace the trap vector here? */
-	if (register_die_notifier(&crash_nmi_nb))
-		return;		/* return what? */
-	/* Ensure the new callback function is set before sending
-	 * out the NMI
-	 */
-	wmb();
-
-	smp_send_nmi_allbutself();
-
-	msecs = 1000; /* Wait at most a second for the other cpus to stop */
-	while ((atomic_read(&waiting_for_crash_ipi) > 0) && msecs) {
-		mdelay(1);
-		msecs--;
-	}
-
-	/* Leave the nmi callback set */
-	disable_local_APIC();
-}
-#endif /* !CONFIG_KDB_KDUMP */
-
-#else /* defined(CONFIG_SMP) && defined(CONFIG_X86_LOCAL_APIC) */
-
-static void nmi_shootdown_cpus(void)
+static void kdump_nmi_shootdown_cpus(void)
 {
 	/* There are no cpus to shootdown */
 }
-
-#ifdef CONFIG_KDB_KDUMP
-static void nmi_shootdown_cpus_init(void) {};
-static void wait_other_cpus() {}
-static void halt_current_cpu(struct pt_regs *regs) {};
-#endif /* CONFIG_KDB_KDUMP */
-
-#endif /* defined(CONFIG_SMP) && defined(CONFIG_X86_LOCAL_APIC) */
-#endif /* CONFIG_XEN */
+#endif
 
 void native_machine_crash_shutdown(struct pt_regs *regs)
 {
@@ -206,47 +89,21 @@ void native_machine_crash_shutdown(struct pt_regs *regs)
 	/* The kernel is broken so disable interrupts */
 	local_irq_disable();
 
-#ifndef CONFIG_XEN
-	/* Make a note of crashing cpu. Will be used in NMI callback.*/
-	crashing_cpu = safe_smp_processor_id();
-	nmi_shootdown_cpus();
+	kdump_nmi_shootdown_cpus();
+
+	/* Booting kdump kernel with VMX or SVM enabled won't work,
+	 * because (among other limitations) we can't disable paging
+	 * with the virt flags.
+	 */
+	cpu_emergency_vmxoff();
+	cpu_emergency_svm_disable();
+
 	lapic_shutdown();
 #if defined(CONFIG_X86_IO_APIC)
 	disable_IO_APIC();
 #endif
-#endif /* CONFIG_XEN */
 #ifdef CONFIG_HPET_TIMER
 	hpet_disable();
 #endif
 	crash_save_cpu(regs, safe_smp_processor_id());
 }
-
-#ifdef CONFIG_KDB_KDUMP
-void machine_crash_shutdown_begin(void)
-{
-	local_irq_disable();
-
-	/* Make a note of crashing cpu. Will be used in NMI callback.*/
-	crashing_cpu = safe_smp_processor_id();
-#ifndef CONFIG_XEN
-	nmi_shootdown_cpus_init();
-#endif /* CONFIG_XEN */
-}
-
-void machine_crash_shutdown_end(struct pt_regs *regs)
-{
-#ifndef CONFIG_XEN
-	wait_other_cpus();
-
-	local_irq_disable();
-	lapic_shutdown();
-#if defined(CONFIG_X86_IO_APIC)
-	disable_IO_APIC();
-#endif
-#ifdef CONFIG_HPET_TIMER
-	hpet_disable();
-#endif
-#endif /* CONFIG_XEN */
-	crash_save_cpu(regs,safe_smp_processor_id());
-}
-#endif /* CONFIG_KDB_KDUMP */

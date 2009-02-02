@@ -16,8 +16,6 @@
 #ifdef  __KERNEL__
 
 #include <linux/types.h>
-#include <linux/mount.h>
-#include <linux/fs.h>
 
 /* Namespaces */
 #define XATTR_OS2_PREFIX "os2."
@@ -49,10 +47,10 @@ struct xattr_handler {
 };
 
 ssize_t xattr_getsecurity(struct inode *, const char *, void *, size_t);
-ssize_t vfs_getxattr(struct dentry *, struct vfsmount *, const char *, void *, size_t, struct file *file);
-ssize_t vfs_listxattr(struct dentry *d, struct vfsmount *, char *list, size_t size, struct file *file);
-int vfs_setxattr(struct dentry *, struct vfsmount *, const char *, const void *, size_t, int, struct file *file);
-int vfs_removexattr(struct dentry *, struct vfsmount *mnt, const char *, struct file *file);
+ssize_t vfs_getxattr(struct dentry *, const char *, void *, size_t);
+ssize_t vfs_listxattr(struct dentry *d, char *list, size_t size);
+int vfs_setxattr(struct dentry *, const char *, const void *, size_t, int);
+int vfs_removexattr(struct dentry *, const char *);
 
 ssize_t generic_getxattr(struct dentry *dentry, const char *name, void *buffer, size_t size);
 ssize_t generic_listxattr(struct dentry *dentry, char *buffer, size_t buffer_size);

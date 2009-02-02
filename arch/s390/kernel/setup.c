@@ -15,6 +15,7 @@
  */
 
 #define KMSG_COMPONENT "setup"
+#define pr_fmt(fmt) KMSG_COMPONENT ": " fmt
 
 #include <linux/errno.h>
 #include <linux/module.h>
@@ -426,6 +427,8 @@ setup_lowcore(void)
 		/* enable extended save area */
 		__ctl_set_bit(14, 29);
 	}
+#else
+	lc->vdso_per_cpu_data = (unsigned long) &lc->paste[0];
 #endif
 	set_prefix((u32)(unsigned long) lc);
 }
@@ -663,23 +666,6 @@ setup_memory(void)
 #endif
 }
 
-static int __init __stfle(unsigned long long *list, int doublewords)
-{
-	typedef struct { unsigned long long _[doublewords]; } addrtype;
-	register unsigned long __nr asm("0") = doublewords - 1;
-
-	asm volatile(".insn s,0xb2b00000,%0" /* stfle */
-		     : "=m" (*(addrtype *) list), "+d" (__nr) : : "cc");
-	return __nr + 1;
-}
-
-int __init stfle(unsigned long long *list, int doublewords)
-{
-	if (!(stfl() & (1UL << 24)))
-		return -EOPNOTSUPP;
-	return __stfle(list, doublewords);
-}
-
 /*
  * Setup hardware capabilities.
  */
@@ -751,7 +737,12 @@ static void __init setup_hwcaps(void)
 		strcpy(elf_platform, "z990");
 		break;
 	case 0x2094:
+	case 0x2096:
 		strcpy(elf_platform, "z9-109");
+		break;
+	case 0x2097:
+	case 0x2098:
+		strcpy(elf_platform, "z10");
 		break;
 	}
 }
@@ -764,6 +755,9 @@ static void __init setup_hwcaps(void)
 void __init
 setup_arch(char **cmdline_p)
 {
+	/* set up preferred console */
+	add_preferred_console("ttyS", 0, NULL);
+
         /*
          * print what head.S has found out about the machine
          */

@@ -333,7 +333,7 @@ static int add_edac_dev_to_global_list(struct edac_device_ctl_info *edac_dev)
 fail0:
 	edac_printk(KERN_WARNING, EDAC_MC,
 			"%s (%s) %s %s already assigned %d\n",
-			rover->dev->bus_id, edac_dev_name(rover),
+			dev_name(rover->dev), edac_dev_name(rover),
 			rover->mod_name, rover->ctl_name, rover->dev_idx);
 	return 1;
 
@@ -393,6 +393,12 @@ static void edac_device_workq_function(struct work_struct *work_req)
 	struct edac_device_ctl_info *edac_dev = to_edac_device_ctl_work(d_work);
 
 	mutex_lock(&device_ctls_mutex);
+
+	/* If we are being removed, bail out immediately */
+	if (edac_dev->op_state == OP_OFFLINE) {
+		mutex_unlock(&device_ctls_mutex);
+		return;
+	}
 
 	/* Only poll controllers that are running polled and have a check */
 	if ((edac_dev->op_state == OP_RUNNING_POLL) &&
@@ -585,13 +591,13 @@ struct edac_device_ctl_info *edac_device_del_device(struct device *dev)
 	/* mark this instance as OFFLINE */
 	edac_dev->op_state = OP_OFFLINE;
 
-	/* clear workq processing on this instance */
-	edac_device_workq_teardown(edac_dev);
-
 	/* deregister from global list */
 	del_edac_device_from_global_list(edac_dev);
 
 	mutex_unlock(&device_ctls_mutex);
+
+	/* clear workq processing on this instance */
+	edac_device_workq_teardown(edac_dev);
 
 	/* Tear down the sysfs entries for this instance */
 	edac_device_remove_sysfs(edac_dev);

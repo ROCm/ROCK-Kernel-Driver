@@ -39,7 +39,7 @@ static unsigned int classify_1d(struct sk_buff *skb)
 		return skb->priority - 256;
 
 	switch (skb->protocol) {
-	case __constant_htons(ETH_P_IP):
+	case htons(ETH_P_IP):
 		dscp = ip_hdr(skb)->tos & 0xfc;
 		break;
 
@@ -47,8 +47,6 @@ static unsigned int classify_1d(struct sk_buff *skb)
 		return 0;
 	}
 
-	if (dscp & 0x1c)
-		return 0;
 	return dscp >> 5;
 }
 
@@ -75,9 +73,8 @@ static int wme_downgrade_ac(struct sk_buff *skb)
 
 
 /* Indicate which queue to use.  */
-static u16 classify80211(struct sk_buff *skb, struct net_device *dev)
+static u16 classify80211(struct ieee80211_local *local, struct sk_buff *skb)
 {
-	struct ieee80211_local *local = wdev_priv(dev->ieee80211_ptr);
 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *) skb->data;
 
 	if (!ieee80211_is_data(hdr->frame_control)) {
@@ -115,32 +112,31 @@ static u16 classify80211(struct sk_buff *skb, struct net_device *dev)
 
 u16 ieee80211_select_queue(struct net_device *dev, struct sk_buff *skb)
 {
+	struct ieee80211_master_priv *mpriv = netdev_priv(dev);
+	struct ieee80211_local *local = mpriv->local;
+	struct ieee80211_hw *hw = &local->hw;
 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *) skb->data;
-	struct ieee80211_local *local = wdev_priv(dev->ieee80211_ptr);
-	struct ieee80211_tx_info *info = IEEE80211_SKB_CB(skb);
 	struct sta_info *sta;
 	u16 queue;
 	u8 tid;
 
-	queue = classify80211(skb, dev);
+	queue = classify80211(local, skb);
 	if (unlikely(queue >= local->hw.queues))
 		queue = local->hw.queues - 1;
 
-	if (info->flags & IEEE80211_TX_CTL_REQUEUE) {
+	if (skb->requeue) {
+		if (!hw->ampdu_queues)
+			return queue;
+
 		rcu_read_lock();
 		sta = sta_info_get(local, hdr->addr1);
 		tid = skb->priority & IEEE80211_QOS_CTL_TAG1D_MASK;
 		if (sta) {
-			struct ieee80211_hw *hw = &local->hw;
 			int ampdu_queue = sta->tid_to_tx_q[tid];
 
 			if ((ampdu_queue < ieee80211_num_queues(hw)) &&
-			    test_bit(ampdu_queue, local->queue_pool)) {
+			    test_bit(ampdu_queue, local->queue_pool))
 				queue = ampdu_queue;
-				info->flags |= IEEE80211_TX_CTL_AMPDU;
-			} else {
-				info->flags &= ~IEEE80211_TX_CTL_AMPDU;
-			}
 		}
 		rcu_read_unlock();
 
@@ -161,20 +157,18 @@ u16 ieee80211_select_queue(struct net_device *dev, struct sk_buff *skb)
 		*p++ = ack_policy | tid;
 		*p = 0;
 
+		if (!hw->ampdu_queues)
+			return queue;
+
 		rcu_read_lock();
 
 		sta = sta_info_get(local, hdr->addr1);
 		if (sta) {
 			int ampdu_queue = sta->tid_to_tx_q[tid];
-			struct ieee80211_hw *hw = &local->hw;
 
 			if ((ampdu_queue < ieee80211_num_queues(hw)) &&
-			    test_bit(ampdu_queue, local->queue_pool)) {
+			    test_bit(ampdu_queue, local->queue_pool))
 				queue = ampdu_queue;
-				info->flags |= IEEE80211_TX_CTL_AMPDU;
-			} else {
-				info->flags &= ~IEEE80211_TX_CTL_AMPDU;
-			}
 		}
 
 		rcu_read_unlock();
@@ -208,13 +202,11 @@ int ieee80211_ht_agg_queue_add(struct ieee80211_local *local,
 			 * on the previous queue
 			 * since HT is strict in order */
 #ifdef CONFIG_MAC80211_HT_DEBUG
-			if (net_ratelimit()) {
-				DECLARE_MAC_BUF(mac);
+			if (net_ratelimit())
 				printk(KERN_DEBUG "allocated aggregation queue"
-					" %d tid %d addr %s pool=0x%lX\n",
-					i, tid, print_mac(mac, sta->addr),
+					" %d tid %d addr %pM pool=0x%lX\n",
+					i, tid, sta->sta.addr,
 					local->queue_pool[0]);
-			}
 #endif /* CONFIG_MAC80211_HT_DEBUG */
 			return 0;
 		}

@@ -33,6 +33,7 @@
 #include <linux/delay.h>
 #include <linux/dma-mapping.h>
 #include <linux/workqueue.h>
+#include <linux/i7300_idle.h>
 #include "ioatdma.h"
 #include "ioatdma_registers.h"
 #include "ioatdma_hw.h"
@@ -171,6 +172,11 @@ static int ioat_dma_enumerate_channels(struct ioatdma_device *device)
 	xfercap_scale = readb(device->reg_base + IOAT_XFERCAP_OFFSET);
 	xfercap = (xfercap_scale == 0 ? -1 : (1UL << xfercap_scale));
 
+#ifdef  CONFIG_I7300_IDLE_IOAT_CHANNEL
+	if (i7300_idle_platform_probe(NULL, NULL) == 0) {
+		device->common.chancnt--;
+	}
+#endif
 	for (i = 0; i < device->common.chancnt; i++) {
 		ioat_chan = kzalloc(sizeof(*ioat_chan), GFP_KERNEL);
 		if (!ioat_chan) {
@@ -728,8 +734,7 @@ static void ioat2_dma_massage_chan_desc(struct ioat_dma_chan *ioat_chan)
  * ioat_dma_alloc_chan_resources - returns the number of allocated descriptors
  * @chan: the channel to be filled out
  */
-static int ioat_dma_alloc_chan_resources(struct dma_chan *chan,
-					 struct dma_client *client)
+static int ioat_dma_alloc_chan_resources(struct dma_chan *chan)
 {
 	struct ioat_dma_chan *ioat_chan = to_ioat_chan(chan);
 	struct ioat_desc_sw *desc;
@@ -978,11 +983,9 @@ static struct ioat_desc_sw *ioat_dma_get_next_descriptor(
 	switch (ioat_chan->device->version) {
 	case IOAT_VER_1_2:
 		return ioat1_dma_get_next_descriptor(ioat_chan);
-		break;
 	case IOAT_VER_2_0:
 	case IOAT_VER_3_0:
 		return ioat2_dma_get_next_descriptor(ioat_chan);
-		break;
 	}
 	return NULL;
 }
@@ -1377,7 +1380,7 @@ static int ioat_dma_self_test(struct ioatdma_device *device)
 	dma_chan = container_of(device->common.channels.next,
 				struct dma_chan,
 				device_node);
-	if (device->common.device_alloc_chan_resources(dma_chan, NULL) < 1) {
+	if (device->common.device_alloc_chan_resources(dma_chan) < 1) {
 		dev_err(&device->pdev->dev,
 			"selftest cannot allocate chan resource\n");
 		err = -ENODEV;

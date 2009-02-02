@@ -31,6 +31,8 @@
 #include <linux/writeback.h>
 #include <linux/buffer_head.h>
 #include <linux/mpage.h>
+#include <linux/fiemap.h>
+#include <linux/namei.h>
 #include "ext2.h"
 #include "acl.h"
 #include "xip.h"
@@ -496,8 +498,6 @@ static int ext2_alloc_branch(struct inode *inode,
  * ext2_splice_branch - splice the allocated branch onto inode.
  * @inode: owner
  * @block: (logical) number of block we are adding
- * @chain: chain of indirect blocks (with a missing link - see
- *	ext2_alloc_branch)
  * @where: location of missing link
  * @num:   number of indirect blocks we are adding
  * @blks:  number of direct blocks we are adding
@@ -702,6 +702,13 @@ int ext2_get_block(struct inode *inode, sector_t iblock, struct buffer_head *bh_
 	}
 	return ret;
 
+}
+
+int ext2_fiemap(struct inode *inode, struct fiemap_extent_info *fieinfo,
+		u64 start, u64 len)
+{
+	return generic_block_fiemap(inode, fieinfo, start, len,
+				    ext2_get_block);
 }
 
 static int ext2_writepage(struct page *page, struct writeback_control *wbc)
@@ -1278,9 +1285,11 @@ struct inode *ext2_iget (struct super_block *sb, unsigned long ino)
 		else
 			inode->i_mapping->a_ops = &ext2_aops;
 	} else if (S_ISLNK(inode->i_mode)) {
-		if (ext2_inode_is_fast_symlink(inode))
+		if (ext2_inode_is_fast_symlink(inode)) {
 			inode->i_op = &ext2_fast_symlink_inode_operations;
-		else {
+			nd_terminate_link(ei->i_data, inode->i_size,
+				sizeof(ei->i_data) - 1);
+		} else {
 			inode->i_op = &ext2_symlink_inode_operations;
 			if (test_opt(inode->i_sb, NOBH))
 				inode->i_mapping->a_ops = &ext2_nobh_aops;

@@ -45,6 +45,14 @@ config MTD_PARTITIONS
 	  devices. Partitioning on NFTL 'devices' is a different - that's the
 	  'normal' form of partitioning used on a block device.
 
+config MTD_TESTS
+	tristate "MTD tests support"
+	depends on m
+	help
+	  This option includes various MTD tests into compilation. The tests
+	  should normally be compiled as kernel modules. The modules perform
+	  various checks and verifications when loaded.
+
 config MTD_REDBOOT_PARTS
 	tristate "RedBoot partition table parsing"
 	depends on MTD_PARTITIONS
@@ -171,6 +179,11 @@ config MTD_CHAR
 	  the system, allowing the user to read and write directly to the
 	  memory chips, and also use ioctl() to obtain information about
 	  the device, or to erase parts of it.
+
+config HAVE_MTD_OTP
+	bool
+	help
+	  Enable access to OTP regions using MTD_CHAR.
 
 config MTD_BLKDEVS
 	tristate "Common interface to block layer for MTD 'translation layers'"
@@ -310,6 +323,8 @@ source "drivers/mtd/devices/Kconfig"
 source "drivers/mtd/nand/Kconfig"
 
 source "drivers/mtd/onenand/Kconfig"
+
+source "drivers/mtd/lpddr/Kconfig"
 
 source "drivers/mtd/ubi/Kconfig"
 

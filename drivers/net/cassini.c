@@ -74,6 +74,7 @@
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/vmalloc.h>
 #include <linux/ioport.h>
 #include <linux/pci.h>
 #include <linux/mm.h>
@@ -91,6 +92,7 @@
 #include <linux/ip.h>
 #include <linux/tcp.h>
 #include <linux/mutex.h>
+#include <linux/firmware.h>
 
 #include <net/checksum.h>
 
@@ -197,6 +199,7 @@ static int link_mode;
 MODULE_AUTHOR("Adrian Sun (asun@darksunrising.com)");
 MODULE_DESCRIPTION("Sun Cassini(+) ethernet driver");
 MODULE_LICENSE("GPL");
+MODULE_FIRMWARE("sun/cassini.bin");
 module_param(cassini_debug, int, 0);
 MODULE_PARM_DESC(cassini_debug, "Cassini bitmapped debugging message enable value");
 module_param(link_mode, int, 0);
@@ -812,9 +815,44 @@ static int cas_reset_mii_phy(struct cas *cp)
 	return (limit <= 0);
 }
 
+static int cas_saturn_firmware_init(struct cas *cp)
+{
+	const struct firmware *fw;
+	const char fw_name[] = "sun/cassini.bin";
+	int err;
+
+	if (PHY_NS_DP83065 != cp->phy_id)
+		return 0;
+
+	err = request_firmware(&fw, fw_name, &cp->pdev->dev);
+	if (err) {
+		printk(KERN_ERR "cassini: Failed to load firmware \"%s\"\n",
+		       fw_name);
+		return err;
+	}
+	if (fw->size < 2) {
+		printk(KERN_ERR "cassini: bogus length %zu in \"%s\"\n",
+		       fw->size, fw_name);
+		err = -EINVAL;
+		goto out;
+	}
+	cp->fw_load_addr= fw->data[1] << 8 | fw->data[0];
+	cp->fw_size = fw->size - 2;
+	cp->fw_data = vmalloc(cp->fw_size);
+	if (!cp->fw_data) {
+		err = -ENOMEM;
+		printk(KERN_ERR "cassini: \"%s\" Failed %d\n", fw_name, err);
+		goto out;
+	}
+	memcpy(cp->fw_data, &fw->data[2], cp->fw_size);
+out:
+	release_firmware(fw);
+	return err;
+}
+
 static void cas_saturn_firmware_load(struct cas *cp)
 {
-	cas_saturn_patch_t *patch = cas_saturn_patch;
+	int i;
 
 	cas_phy_powerdown(cp);
 
@@ -833,11 +871,9 @@ static void cas_saturn_firmware_load(struct cas *cp)
 
 	/* download new firmware */
 	cas_phy_write(cp, DP83065_MII_MEM, 0x1);
-	cas_phy_write(cp, DP83065_MII_REGE, patch->addr);
-	while (patch->addr) {
-		cas_phy_write(cp, DP83065_MII_REGD, patch->val);
-		patch++;
-	}
+	cas_phy_write(cp, DP83065_MII_REGE, cp->fw_load_addr);
+	for (i = 0; i < cp->fw_size; i++)
+		cas_phy_write(cp, DP83065_MII_REGD, cp->fw_data[i]);
 
 	/* enable firmware */
 	cas_phy_write(cp, DP83065_MII_REGE, 0x8ff8);
@@ -2182,7 +2218,7 @@ static inline void cas_rx_flow_pkt(struct cas *cp, const u64 *words,
 	 * do any additional locking here. stick the buffer
 	 * at the end.
 	 */
-	__skb_insert(skb, flow->prev, (struct sk_buff *) flow, flow);
+	__skb_queue_tail(flow, skb);
 	if (words[0] & RX_COMP1_RELEASE_FLOW) {
 		while ((skb = __skb_dequeue(flow))) {
 			cas_skb_release(skb);
@@ -2311,7 +2347,7 @@ static int cas_rx_ringN(struct cas *cp, int ring, int budget)
 	drops = 0;
 	while (1) {
 		struct cas_rx_comp *rxc = rxcs + entry;
-		struct sk_buff *skb;
+		struct sk_buff *uninitialized_var(skb);
 		int type, len;
 		u64 words[4];
 		int i, dring;
@@ -2369,7 +2405,6 @@ static int cas_rx_ringN(struct cas *cp, int ring, int budget)
 		cp->net_stats[ring].rx_packets++;
 		cp->net_stats[ring].rx_bytes += len;
 		spin_unlock(&cp->stat_lock[ring]);
-		cp->dev->last_rx = jiffies;
 
 	next:
 		npackets++;
@@ -2471,7 +2506,7 @@ static irqreturn_t cas_interruptN(int irq, void *dev_id)
 	if (status & INTR_RX_DONE_ALT) { /* handle rx separately */
 #ifdef USE_NAPI
 		cas_mask_intr(cp);
-		netif_rx_schedule(dev, &cp->napi);
+		netif_rx_schedule(&cp->napi);
 #else
 		cas_rx_ringN(cp, ring, 0);
 #endif
@@ -2522,7 +2557,7 @@ static irqreturn_t cas_interrupt1(int irq, void *dev_id)
 	if (status & INTR_RX_DONE_ALT) { /* handle rx separately */
 #ifdef USE_NAPI
 		cas_mask_intr(cp);
-		netif_rx_schedule(dev, &cp->napi);
+		netif_rx_schedule(&cp->napi);
 #else
 		cas_rx_ringN(cp, 1, 0);
 #endif
@@ -2578,7 +2613,7 @@ static irqreturn_t cas_interrupt(int irq, void *dev_id)
 	if (status & INTR_RX_DONE) {
 #ifdef USE_NAPI
 		cas_mask_intr(cp);
-		netif_rx_schedule(dev, &cp->napi);
+		netif_rx_schedule(&cp->napi);
 #else
 		cas_rx_ringN(cp, 0, 0);
 #endif
@@ -2656,7 +2691,7 @@ rx_comp:
 #endif
 	spin_unlock_irqrestore(&cp->lock, flags);
 	if (enable_intr) {
-		netif_rx_complete(dev, napi);
+		netif_rx_complete(napi);
 		cas_unmask_intr(cp);
 	}
 	return credits;
@@ -4942,6 +4977,22 @@ static void __devinit cas_program_bridge(struct pci_dev *cas_pdev)
 	pci_write_config_byte(pdev, PCI_LATENCY_TIMER, 0xff);
 }
 
+static const struct net_device_ops cas_netdev_ops = {
+	.ndo_open		= cas_open,
+	.ndo_stop		= cas_close,
+	.ndo_start_xmit		= cas_start_xmit,
+	.ndo_get_stats 		= cas_get_stats,
+	.ndo_set_multicast_list = cas_set_multicast,
+	.ndo_do_ioctl		= cas_ioctl,
+	.ndo_tx_timeout		= cas_tx_timeout,
+	.ndo_change_mtu		= cas_change_mtu,
+	.ndo_set_mac_address	= eth_mac_addr,
+	.ndo_validate_addr	= eth_validate_addr,
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	.ndo_poll_controller	= cas_netpoll,
+#endif
+};
+
 static int __devinit cas_init_one(struct pci_dev *pdev,
 				  const struct pci_device_id *ent)
 {
@@ -4952,7 +5003,6 @@ static int __devinit cas_init_one(struct pci_dev *pdev,
 	int i, err, pci_using_dac;
 	u16 pci_cmd;
 	u8 orig_cacheline_size = 0, cas_cacheline_size = 0;
-	DECLARE_MAC_BUF(mac);
 
 	if (cas_version_printed++ == 0)
 		printk(KERN_INFO "%s", version);
@@ -5108,6 +5158,9 @@ static int __devinit cas_init_one(struct pci_dev *pdev,
 	cas_reset(cp, 0);
 	if (cas_check_invariants(cp))
 		goto err_out_iounmap;
+	if (cp->cas_flags & CAS_FLAG_SATURN)
+		if (cas_saturn_firmware_init(cp))
+			goto err_out_iounmap;
 
 	cp->init_block = (struct cas_init_block *)
 		pci_alloc_consistent(pdev, sizeof(struct cas_init_block),
@@ -5129,21 +5182,12 @@ static int __devinit cas_init_one(struct pci_dev *pdev,
 	for (i = 0; i < N_RX_FLOWS; i++)
 		skb_queue_head_init(&cp->rx_flows[i]);
 
-	dev->open = cas_open;
-	dev->stop = cas_close;
-	dev->hard_start_xmit = cas_start_xmit;
-	dev->get_stats = cas_get_stats;
-	dev->set_multicast_list = cas_set_multicast;
-	dev->do_ioctl = cas_ioctl;
+	dev->netdev_ops = &cas_netdev_ops;
 	dev->ethtool_ops = &cas_ethtool_ops;
-	dev->tx_timeout = cas_tx_timeout;
 	dev->watchdog_timeo = CAS_TX_TIMEOUT;
-	dev->change_mtu = cas_change_mtu;
+
 #ifdef USE_NAPI
 	netif_napi_add(dev, &cp->napi, cas_poll, 64);
-#endif
-#ifdef CONFIG_NET_POLL_CONTROLLER
-	dev->poll_controller = cas_netpoll;
 #endif
 	dev->irq = pdev->irq;
 	dev->dma = 0;
@@ -5162,12 +5206,12 @@ static int __devinit cas_init_one(struct pci_dev *pdev,
 
 	i = readl(cp->regs + REG_BIM_CFG);
 	printk(KERN_INFO "%s: Sun Cassini%s (%sbit/%sMHz PCI/%s) "
-	       "Ethernet[%d] %s\n",  dev->name,
+	       "Ethernet[%d] %pM\n",  dev->name,
 	       (cp->cas_flags & CAS_FLAG_REG_PLUS) ? "+" : "",
 	       (i & BIM_CFG_32BIT) ? "32" : "64",
 	       (i & BIM_CFG_66MHZ) ? "66" : "33",
 	       (cp->phy_type == CAS_PHY_SERDES) ? "Fi" : "Cu", pdev->irq,
-	       print_mac(mac, dev->dev_addr));
+	       dev->dev_addr);
 
 	pci_set_drvdata(pdev, dev);
 	cp->hw_running = 1;
@@ -5216,6 +5260,9 @@ static void __devexit cas_remove_one(struct pci_dev *pdev)
 
 	cp = netdev_priv(dev);
 	unregister_netdev(dev);
+
+	if (cp->fw_data)
+		vfree(cp->fw_data);
 
 	mutex_lock(&cp->pm_mutex);
 	flush_scheduled_work();

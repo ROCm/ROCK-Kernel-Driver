@@ -25,7 +25,7 @@ static inline int qdio_dbf_passes(debug_info_t *dbf_grp, int level)
 }
 
 #define DBF_ERR		3	/* error conditions	*/
-#define DBF_WARN	4	/* warning conditions   */
+#define DBF_WARN	4	/* warning conditions	*/
 #define DBF_INFO	6	/* informational	*/
 
 #undef DBF_EVENT

@@ -94,8 +94,8 @@ static irqreturn_t au1000_interrupt(int, void *);
 static void au1000_tx_timeout(struct net_device *);
 static void set_rx_mode(struct net_device *);
 static int au1000_ioctl(struct net_device *, struct ifreq *, int);
-static int mdio_read(struct net_device *, int, int);
-static void mdio_write(struct net_device *, int, int, u16);
+static int au1000_mdio_read(struct net_device *, int, int);
+static void au1000_mdio_write(struct net_device *, int, int, u16);
 static void au1000_adjust_link(struct net_device *);
 static void enable_mac(struct net_device *, int);
 
@@ -191,9 +191,9 @@ struct au1000_private *au_macs[NUM_ETH_INTERFACES];
 /*
  * MII operations
  */
-static int mdio_read(struct net_device *dev, int phy_addr, int reg)
+static int au1000_mdio_read(struct net_device *dev, int phy_addr, int reg)
 {
-	struct au1000_private *aup = (struct au1000_private *) dev->priv;
+	struct au1000_private *aup = netdev_priv(dev);
 	volatile u32 *const mii_control_reg = &aup->mac->mii_control;
 	volatile u32 *const mii_data_reg = &aup->mac->mii_data;
 	u32 timedout = 20;
@@ -225,9 +225,10 @@ static int mdio_read(struct net_device *dev, int phy_addr, int reg)
 	return (int)*mii_data_reg;
 }
 
-static void mdio_write(struct net_device *dev, int phy_addr, int reg, u16 value)
+static void au1000_mdio_write(struct net_device *dev, int phy_addr,
+			      int reg, u16 value)
 {
-	struct au1000_private *aup = (struct au1000_private *) dev->priv;
+	struct au1000_private *aup = netdev_priv(dev);
 	volatile u32 *const mii_control_reg = &aup->mac->mii_control;
 	volatile u32 *const mii_data_reg = &aup->mac->mii_data;
 	u32 timedout = 20;
@@ -249,7 +250,7 @@ static void mdio_write(struct net_device *dev, int phy_addr, int reg, u16 value)
 	*mii_control_reg = mii_control;
 }
 
-static int mdiobus_read(struct mii_bus *bus, int phy_addr, int regnum)
+static int au1000_mdiobus_read(struct mii_bus *bus, int phy_addr, int regnum)
 {
 	/* WARNING: bus->phy_map[phy_addr].attached_dev == dev does
 	 * _NOT_ hold (e.g. when PHY is accessed through other MAC's MII bus) */
@@ -257,21 +258,21 @@ static int mdiobus_read(struct mii_bus *bus, int phy_addr, int regnum)
 
 	enable_mac(dev, 0); /* make sure the MAC associated with this
 			     * mii_bus is enabled */
-	return mdio_read(dev, phy_addr, regnum);
+	return au1000_mdio_read(dev, phy_addr, regnum);
 }
 
-static int mdiobus_write(struct mii_bus *bus, int phy_addr, int regnum,
-			 u16 value)
+static int au1000_mdiobus_write(struct mii_bus *bus, int phy_addr, int regnum,
+				u16 value)
 {
 	struct net_device *const dev = bus->priv;
 
 	enable_mac(dev, 0); /* make sure the MAC associated with this
 			     * mii_bus is enabled */
-	mdio_write(dev, phy_addr, regnum, value);
+	au1000_mdio_write(dev, phy_addr, regnum, value);
 	return 0;
 }
 
-static int mdiobus_reset(struct mii_bus *bus)
+static int au1000_mdiobus_reset(struct mii_bus *bus)
 {
 	struct net_device *const dev = bus->priv;
 
@@ -282,7 +283,7 @@ static int mdiobus_reset(struct mii_bus *bus)
 
 static int mii_probe (struct net_device *dev)
 {
-	struct au1000_private *const aup = (struct au1000_private *) dev->priv;
+	struct au1000_private *const aup = netdev_priv(dev);
 	struct phy_device *phydev = NULL;
 
 #if defined(AU1XXX_PHY_STATIC_CONFIG)
@@ -290,7 +291,7 @@ static int mii_probe (struct net_device *dev)
 
 	if(aup->mac_id == 0) { /* get PHY0 */
 # if defined(AU1XXX_PHY0_ADDR)
-		phydev = au_macs[AU1XXX_PHY0_BUSID]->mii_bus.phy_map[AU1XXX_PHY0_ADDR];
+		phydev = au_macs[AU1XXX_PHY0_BUSID]->mii_bus->phy_map[AU1XXX_PHY0_ADDR];
 # else
 		printk (KERN_INFO DRV_NAME ":%s: using PHY-less setup\n",
 			dev->name);
@@ -298,7 +299,7 @@ static int mii_probe (struct net_device *dev)
 # endif /* defined(AU1XXX_PHY0_ADDR) */
 	} else if (aup->mac_id == 1) { /* get PHY1 */
 # if defined(AU1XXX_PHY1_ADDR)
-		phydev = au_macs[AU1XXX_PHY1_BUSID]->mii_bus.phy_map[AU1XXX_PHY1_ADDR];
+		phydev = au_macs[AU1XXX_PHY1_BUSID]->mii_bus->phy_map[AU1XXX_PHY1_ADDR];
 # else
 		printk (KERN_INFO DRV_NAME ":%s: using PHY-less setup\n",
 			dev->name);
@@ -311,8 +312,8 @@ static int mii_probe (struct net_device *dev)
 
 	/* find the first (lowest address) PHY on the current MAC's MII bus */
 	for (phy_addr = 0; phy_addr < PHY_MAX_ADDR; phy_addr++)
-		if (aup->mii_bus.phy_map[phy_addr]) {
-			phydev = aup->mii_bus.phy_map[phy_addr];
+		if (aup->mii_bus->phy_map[phy_addr]) {
+			phydev = aup->mii_bus->phy_map[phy_addr];
 # if !defined(AU1XXX_PHY_SEARCH_HIGHEST_ADDR)
 			break; /* break out with first one found */
 # endif
@@ -331,7 +332,7 @@ static int mii_probe (struct net_device *dev)
 		 * the MAC0 MII bus */
 		for (phy_addr = 0; phy_addr < PHY_MAX_ADDR; phy_addr++) {
 			struct phy_device *const tmp_phydev =
-				au_macs[0]->mii_bus.phy_map[phy_addr];
+				au_macs[0]->mii_bus->phy_map[phy_addr];
 
 			if (!tmp_phydev)
 				continue; /* no PHY here... */
@@ -352,7 +353,6 @@ static int mii_probe (struct net_device *dev)
 	}
 
 	/* now we are supposed to have a proper phydev, to attach to... */
-	BUG_ON(!phydev);
 	BUG_ON(phydev->attached_dev);
 
 	phydev = phy_connect(dev, phydev->dev.bus_id, &au1000_adjust_link, 0,
@@ -414,7 +414,7 @@ void ReleaseDB(struct au1000_private *aup, db_dest_t *pDB)
 
 static void enable_rx_tx(struct net_device *dev)
 {
-	struct au1000_private *aup = (struct au1000_private *) dev->priv;
+	struct au1000_private *aup = netdev_priv(dev);
 
 	if (au1000_debug > 4)
 		printk(KERN_INFO "%s: enable_rx_tx\n", dev->name);
@@ -425,7 +425,7 @@ static void enable_rx_tx(struct net_device *dev)
 
 static void hard_stop(struct net_device *dev)
 {
-	struct au1000_private *aup = (struct au1000_private *) dev->priv;
+	struct au1000_private *aup = netdev_priv(dev);
 
 	if (au1000_debug > 4)
 		printk(KERN_INFO "%s: hard stop\n", dev->name);
@@ -437,7 +437,7 @@ static void hard_stop(struct net_device *dev)
 static void enable_mac(struct net_device *dev, int force_reset)
 {
 	unsigned long flags;
-	struct au1000_private *aup = (struct au1000_private *) dev->priv;
+	struct au1000_private *aup = netdev_priv(dev);
 
 	spin_lock_irqsave(&aup->lock, flags);
 
@@ -456,7 +456,7 @@ static void enable_mac(struct net_device *dev, int force_reset)
 
 static void reset_mac_unlocked(struct net_device *dev)
 {
-	struct au1000_private *const aup = (struct au1000_private *) dev->priv;
+	struct au1000_private *const aup = netdev_priv(dev);
 	int i;
 
 	hard_stop(dev);
@@ -482,7 +482,7 @@ static void reset_mac_unlocked(struct net_device *dev)
 
 static void reset_mac(struct net_device *dev)
 {
-	struct au1000_private *const aup = (struct au1000_private *) dev->priv;
+	struct au1000_private *const aup = netdev_priv(dev);
 	unsigned long flags;
 
 	if (au1000_debug > 4)
@@ -571,7 +571,7 @@ static int __init au1000_init_module(void)
 
 static int au1000_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 {
-	struct au1000_private *aup = (struct au1000_private *)dev->priv;
+	struct au1000_private *aup = netdev_priv(dev);
 
 	if (aup->phy_dev)
 		return phy_ethtool_gset(aup->phy_dev, cmd);
@@ -581,7 +581,7 @@ static int au1000_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 
 static int au1000_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 {
-	struct au1000_private *aup = (struct au1000_private *)dev->priv;
+	struct au1000_private *aup = netdev_priv(dev);
 
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
@@ -595,7 +595,7 @@ static int au1000_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 static void
 au1000_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 {
-	struct au1000_private *aup = (struct au1000_private *)dev->priv;
+	struct au1000_private *aup = netdev_priv(dev);
 
 	strcpy(info->driver, DRV_NAME);
 	strcpy(info->version, DRV_VERSION);
@@ -651,7 +651,9 @@ static struct net_device * au1000_probe(int port_num)
 	printk("%s: Au1xx0 Ethernet found at 0x%x, irq %d\n",
 		dev->name, base, irq);
 
-	aup = dev->priv;
+	aup = netdev_priv(dev);
+
+	spin_lock_init(&aup->lock);
 
 	/* Allocate the data buffers */
 	/* Snooping works fine with eth on all au1xxx */
@@ -696,28 +698,32 @@ static struct net_device * au1000_probe(int port_num)
 	*aup->enable = 0;
 	aup->mac_enabled = 0;
 
-	aup->mii_bus.priv = dev;
-	aup->mii_bus.read = mdiobus_read;
-	aup->mii_bus.write = mdiobus_write;
-	aup->mii_bus.reset = mdiobus_reset;
-	aup->mii_bus.name = "au1000_eth_mii";
-	snprintf(aup->mii_bus.id, MII_BUS_ID_SIZE, "%x", aup->mac_id);
-	aup->mii_bus.irq = kmalloc(sizeof(int)*PHY_MAX_ADDR, GFP_KERNEL);
+	aup->mii_bus = mdiobus_alloc();
+	if (aup->mii_bus == NULL)
+		goto err_out;
+
+	aup->mii_bus->priv = dev;
+	aup->mii_bus->read = au1000_mdiobus_read;
+	aup->mii_bus->write = au1000_mdiobus_write;
+	aup->mii_bus->reset = au1000_mdiobus_reset;
+	aup->mii_bus->name = "au1000_eth_mii";
+	snprintf(aup->mii_bus->id, MII_BUS_ID_SIZE, "%x", aup->mac_id);
+	aup->mii_bus->irq = kmalloc(sizeof(int)*PHY_MAX_ADDR, GFP_KERNEL);
 	for(i = 0; i < PHY_MAX_ADDR; ++i)
-		aup->mii_bus.irq[i] = PHY_POLL;
+		aup->mii_bus->irq[i] = PHY_POLL;
 
 	/* if known, set corresponding PHY IRQs */
 #if defined(AU1XXX_PHY_STATIC_CONFIG)
 # if defined(AU1XXX_PHY0_IRQ)
 	if (AU1XXX_PHY0_BUSID == aup->mac_id)
-		aup->mii_bus.irq[AU1XXX_PHY0_ADDR] = AU1XXX_PHY0_IRQ;
+		aup->mii_bus->irq[AU1XXX_PHY0_ADDR] = AU1XXX_PHY0_IRQ;
 # endif
 # if defined(AU1XXX_PHY1_IRQ)
 	if (AU1XXX_PHY1_BUSID == aup->mac_id)
-		aup->mii_bus.irq[AU1XXX_PHY1_ADDR] = AU1XXX_PHY1_IRQ;
+		aup->mii_bus->irq[AU1XXX_PHY1_ADDR] = AU1XXX_PHY1_IRQ;
 # endif
 #endif
-	mdiobus_register(&aup->mii_bus);
+	mdiobus_register(aup->mii_bus);
 
 	if (mii_probe(dev) != 0) {
 		goto err_out;
@@ -753,7 +759,6 @@ static struct net_device * au1000_probe(int port_num)
 		aup->tx_db_inuse[i] = pDB;
 	}
 
-	spin_lock_init(&aup->lock);
 	dev->base_addr = base;
 	dev->irq = irq;
 	dev->open = au1000_open;
@@ -774,6 +779,11 @@ static struct net_device * au1000_probe(int port_num)
 	return dev;
 
 err_out:
+	if (aup->mii_bus != NULL) {
+		mdiobus_unregister(aup->mii_bus);
+		mdiobus_free(aup->mii_bus);
+	}
+
 	/* here we should have a valid dev plus aup-> register addresses
 	 * so we can reset the mac properly.*/
 	reset_mac(dev);
@@ -806,7 +816,7 @@ err_out:
  */
 static int au1000_init(struct net_device *dev)
 {
-	struct au1000_private *aup = (struct au1000_private *) dev->priv;
+	struct au1000_private *aup = netdev_priv(dev);
 	unsigned long flags;
 	int i;
 	u32 control;
@@ -857,7 +867,7 @@ static int au1000_init(struct net_device *dev)
 static void
 au1000_adjust_link(struct net_device *dev)
 {
-	struct au1000_private *aup = (struct au1000_private *) dev->priv;
+	struct au1000_private *aup = netdev_priv(dev);
 	struct phy_device *phydev = aup->phy_dev;
 	unsigned long flags;
 
@@ -936,7 +946,7 @@ au1000_adjust_link(struct net_device *dev)
 static int au1000_open(struct net_device *dev)
 {
 	int retval;
-	struct au1000_private *aup = (struct au1000_private *) dev->priv;
+	struct au1000_private *aup = netdev_priv(dev);
 
 	if (au1000_debug > 4)
 		printk("%s: open: dev=%p\n", dev->name, dev);
@@ -971,7 +981,7 @@ static int au1000_open(struct net_device *dev)
 static int au1000_close(struct net_device *dev)
 {
 	unsigned long flags;
-	struct au1000_private *const aup = (struct au1000_private *) dev->priv;
+	struct au1000_private *const aup = netdev_priv(dev);
 
 	if (au1000_debug > 4)
 		printk("%s: close: dev=%p\n", dev->name, dev);
@@ -1002,8 +1012,10 @@ static void __exit au1000_cleanup_module(void)
 	for (i = 0; i < num_ifs; i++) {
 		dev = iflist[i].dev;
 		if (dev) {
-			aup = (struct au1000_private *) dev->priv;
+			aup = netdev_priv(dev);
 			unregister_netdev(dev);
+			mdiobus_unregister(aup->mii_bus);
+			mdiobus_free(aup->mii_bus);
 			for (j = 0; j < NUM_RX_DMA; j++)
 				if (aup->rx_db_inuse[j])
 					ReleaseDB(aup, aup->rx_db_inuse[j]);
@@ -1022,7 +1034,7 @@ static void __exit au1000_cleanup_module(void)
 
 static void update_tx_stats(struct net_device *dev, u32 status)
 {
-	struct au1000_private *aup = (struct au1000_private *) dev->priv;
+	struct au1000_private *aup = netdev_priv(dev);
 	struct net_device_stats *ps = &dev->stats;
 
 	if (status & TX_FRAME_ABORTED) {
@@ -1051,7 +1063,7 @@ static void update_tx_stats(struct net_device *dev, u32 status)
  */
 static void au1000_tx_ack(struct net_device *dev)
 {
-	struct au1000_private *aup = (struct au1000_private *) dev->priv;
+	struct au1000_private *aup = netdev_priv(dev);
 	volatile tx_dma_t *ptxd;
 
 	ptxd = aup->tx_dma_ring[aup->tx_tail];
@@ -1078,7 +1090,7 @@ static void au1000_tx_ack(struct net_device *dev)
  */
 static int au1000_tx(struct sk_buff *skb, struct net_device *dev)
 {
-	struct au1000_private *aup = (struct au1000_private *) dev->priv;
+	struct au1000_private *aup = netdev_priv(dev);
 	struct net_device_stats *ps = &dev->stats;
 	volatile tx_dma_t *ptxd;
 	u32 buff_stat;
@@ -1132,7 +1144,7 @@ static int au1000_tx(struct sk_buff *skb, struct net_device *dev)
 
 static inline void update_rx_stats(struct net_device *dev, u32 status)
 {
-	struct au1000_private *aup = (struct au1000_private *) dev->priv;
+	struct au1000_private *aup = netdev_priv(dev);
 	struct net_device_stats *ps = &dev->stats;
 
 	ps->rx_packets++;
@@ -1160,7 +1172,7 @@ static inline void update_rx_stats(struct net_device *dev, u32 status)
  */
 static int au1000_rx(struct net_device *dev)
 {
-	struct au1000_private *aup = (struct au1000_private *) dev->priv;
+	struct au1000_private *aup = netdev_priv(dev);
 	struct sk_buff *skb;
 	volatile rx_dma_t *prxd;
 	u32 buff_stat, status;
@@ -1227,7 +1239,6 @@ static int au1000_rx(struct net_device *dev)
 		/* next descriptor */
 		prxd = aup->rx_dma_ring[aup->rx_head];
 		buff_stat = prxd->buff_stat;
-		dev->last_rx = jiffies;
 	}
 	return 0;
 }
@@ -1263,7 +1274,7 @@ static void au1000_tx_timeout(struct net_device *dev)
 
 static void set_rx_mode(struct net_device *dev)
 {
-	struct au1000_private *aup = (struct au1000_private *) dev->priv;
+	struct au1000_private *aup = netdev_priv(dev);
 
 	if (au1000_debug > 4)
 		printk("%s: set_rx_mode: flags=%x\n", dev->name, dev->flags);
@@ -1295,7 +1306,7 @@ static void set_rx_mode(struct net_device *dev)
 
 static int au1000_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
-	struct au1000_private *aup = (struct au1000_private *)dev->priv;
+	struct au1000_private *aup = netdev_priv(dev);
 
 	if (!netif_running(dev)) return -EINVAL;
 

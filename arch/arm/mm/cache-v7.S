@@ -26,6 +26,7 @@
  *	- mm    - mm_struct describing address space
  */
 ENTRY(v7_flush_dcache_all)
+	dmb					@ ensure ordering with previous memory accesses
 	mrc	p15, 1, r0, c0, c0, 1		@ read clidr
 	ands	r3, r0, #0x7000000		@ extract loc from clidr
 	mov	r3, r3, lsr #23			@ left align loc bit field
@@ -64,8 +65,10 @@ skip:
 finished:
 	mov	r10, #0				@ swith back to cache level 0
 	mcr	p15, 2, r10, c0, c0, 0		@ select current cache level in cssr
+	dsb
 	isb
 	mov	pc, lr
+ENDPROC(v7_flush_dcache_all)
 
 /*
  *	v7_flush_cache_all()
@@ -85,6 +88,7 @@ ENTRY(v7_flush_kern_cache_all)
 	mcr	p15, 0, r0, c7, c5, 0		@ I+BTB cache invalidate
 	ldmfd	sp!, {r4-r5, r7, r9-r11, lr}
 	mov	pc, lr
+ENDPROC(v7_flush_kern_cache_all)
 
 /*
  *	v7_flush_cache_all()
@@ -110,6 +114,8 @@ ENTRY(v7_flush_user_cache_all)
  */
 ENTRY(v7_flush_user_cache_range)
 	mov	pc, lr
+ENDPROC(v7_flush_user_cache_all)
+ENDPROC(v7_flush_user_cache_range)
 
 /*
  *	v7_coherent_kern_range(start,end)
@@ -155,6 +161,8 @@ ENTRY(v7_coherent_user_range)
 	dsb
 	isb
 	mov	pc, lr
+ENDPROC(v7_coherent_kern_range)
+ENDPROC(v7_coherent_user_range)
 
 /*
  *	v7_flush_kern_dcache_page(kaddr)
@@ -174,6 +182,7 @@ ENTRY(v7_flush_kern_dcache_page)
 	blo	1b
 	dsb
 	mov	pc, lr
+ENDPROC(v7_flush_kern_dcache_page)
 
 /*
  *	v7_dma_inv_range(start,end)
@@ -202,6 +211,7 @@ ENTRY(v7_dma_inv_range)
 	blo	1b
 	dsb
 	mov	pc, lr
+ENDPROC(v7_dma_inv_range)
 
 /*
  *	v7_dma_clean_range(start,end)
@@ -219,6 +229,7 @@ ENTRY(v7_dma_clean_range)
 	blo	1b
 	dsb
 	mov	pc, lr
+ENDPROC(v7_dma_clean_range)
 
 /*
  *	v7_dma_flush_range(start,end)
@@ -236,6 +247,7 @@ ENTRY(v7_dma_flush_range)
 	blo	1b
 	dsb
 	mov	pc, lr
+ENDPROC(v7_dma_flush_range)
 
 	__INITDATA
 

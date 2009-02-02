@@ -42,7 +42,7 @@ struct bsg_device {
 	int done_cmds;
 	wait_queue_head_t wq_done;
 	wait_queue_head_t wq_free;
-	char name[BUS_ID_SIZE];
+	char name[20];
 	int max_queue;
 	unsigned long flags;
 };
@@ -173,7 +173,7 @@ unlock:
 
 static int blk_fill_sgv4_hdr_rq(struct request_queue *q, struct request *rq,
 				struct sg_io_v4 *hdr, struct bsg_device *bd,
-				int has_write_perm)
+				fmode_t has_write_perm)
 {
 	if (hdr->request_len > BLK_MAX_CDB) {
 		rq->cmd = kzalloc(hdr->request_len, GFP_KERNEL);
@@ -244,7 +244,7 @@ bsg_validate_sgv4_hdr(struct request_queue *q, struct sg_io_v4 *hdr, int *rw)
  * map sg_io_v4 to a request.
  */
 static struct request *
-bsg_map_hdr(struct bsg_device *bd, struct sg_io_v4 *hdr, int has_write_perm)
+bsg_map_hdr(struct bsg_device *bd, struct sg_io_v4 *hdr, fmode_t has_write_perm)
 {
 	struct request_queue *q = bd->queue;
 	struct request *rq, *next_rq = NULL;
@@ -285,7 +285,8 @@ bsg_map_hdr(struct bsg_device *bd, struct sg_io_v4 *hdr, int has_write_perm)
 		next_rq->cmd_type = rq->cmd_type;
 
 		dxferp = (void*)(unsigned long)hdr->din_xferp;
-		ret =  blk_rq_map_user(q, next_rq, dxferp, hdr->din_xfer_len);
+		ret =  blk_rq_map_user(q, next_rq, NULL, dxferp,
+				       hdr->din_xfer_len, GFP_KERNEL);
 		if (ret)
 			goto out;
 	}
@@ -300,7 +301,8 @@ bsg_map_hdr(struct bsg_device *bd, struct sg_io_v4 *hdr, int has_write_perm)
 		dxfer_len = 0;
 
 	if (dxfer_len) {
-		ret = blk_rq_map_user(q, rq, dxferp, dxfer_len);
+		ret = blk_rq_map_user(q, rq, NULL, dxferp, dxfer_len,
+				      GFP_KERNEL);
 		if (ret)
 			goto out;
 	}
@@ -601,7 +603,8 @@ bsg_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 }
 
 static int __bsg_write(struct bsg_device *bd, const char __user *buf,
-		       size_t count, ssize_t *bytes_written, int has_write_perm)
+		       size_t count, ssize_t *bytes_written,
+		       fmode_t has_write_perm)
 {
 	struct bsg_command *bc;
 	struct request *rq;
@@ -778,7 +781,7 @@ static struct bsg_device *bsg_add_device(struct inode *inode,
 	mutex_lock(&bsg_mutex);
 	hlist_add_head(&bd->dev_list, bsg_dev_idx_hash(iminor(inode)));
 
-	strncpy(bd->name, rq->bsg_dev.class_dev->bus_id, sizeof(bd->name) - 1);
+	strncpy(bd->name, dev_name(rq->bsg_dev.class_dev), sizeof(bd->name) - 1);
 	dprintk("bound to <%s>, max queue %d\n",
 		format_dev_t(buf, inode->i_rdev), bd->max_queue);
 
@@ -913,7 +916,7 @@ static long bsg_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case SG_EMULATED_HOST:
 	case SCSI_IOCTL_SEND_COMMAND: {
 		void __user *uarg = (void __user *) arg;
-		return scsi_cmd_ioctl(file, bd->queue, NULL, cmd, uarg);
+		return scsi_cmd_ioctl(bd->queue, NULL, file->f_mode, cmd, uarg);
 	}
 	case SG_IO: {
 		struct request *rq;
@@ -989,7 +992,7 @@ int bsg_register_queue(struct request_queue *q, struct device *parent,
 	if (name)
 		devname = name;
 	else
-		devname = parent->bus_id;
+		devname = dev_name(parent);
 
 	/*
 	 * we need a proper transport to send commands, not a stacked device
@@ -1024,8 +1027,7 @@ int bsg_register_queue(struct request_queue *q, struct device *parent,
 	bcd->release = release;
 	kref_init(&bcd->ref);
 	dev = MKDEV(bsg_major, bcd->minor);
-	class_dev = device_create_drvdata(bsg_class, parent, dev, NULL,
-					  "%s", devname);
+	class_dev = device_create(bsg_class, parent, dev, NULL, "%s", devname);
 	if (IS_ERR(class_dev)) {
 		ret = PTR_ERR(class_dev);
 		goto put_dev;

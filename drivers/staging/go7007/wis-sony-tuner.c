@@ -17,7 +17,6 @@
 
 #include <linux/module.h>
 #include <linux/init.h>
-#include <linux/version.h>
 #include <linux/i2c.h>
 #include <linux/videodev2.h>
 #include <media/tuner.h>
@@ -605,7 +604,7 @@ static int tuner_command(struct i2c_client *client, unsigned int cmd, void *arg)
 	{
 		struct v4l2_tuner *tun = arg;
 
-		memset(t, 0, sizeof(*tun));
+		memset(tun, 0, sizeof(*tun));
 		strcpy(tun->name, "Television");
 		tun->type = V4L2_TUNER_ANALOG_TV;
 		tun->rangelow = 0UL; /* does anything use these? */

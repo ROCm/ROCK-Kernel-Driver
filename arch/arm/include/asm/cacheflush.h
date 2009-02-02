@@ -10,11 +10,11 @@
 #ifndef _ASMARM_CACHEFLUSH_H
 #define _ASMARM_CACHEFLUSH_H
 
-#include <linux/sched.h>
 #include <linux/mm.h>
 
 #include <asm/glue.h>
 #include <asm/shmparam.h>
+#include <asm/cachetype.h>
 
 #define CACHE_COLOUR(vaddr)	((vaddr & (SHMLBA - 1)) >> PAGE_SHIFT)
 
@@ -296,16 +296,6 @@ static inline void outer_flush_range(unsigned long start, unsigned long end)
 #endif
 
 /*
- * flush_cache_vmap() is used when creating mappings (eg, via vmap,
- * vmalloc, ioremap etc) in kernel space for pages.  Since the
- * direct-mappings of these pages may contain cached data, we need
- * to do a full cache flush to ensure that writebacks don't corrupt
- * data placed into these pages via the new mappings.
- */
-#define flush_cache_vmap(start, end)		flush_cache_all()
-#define flush_cache_vunmap(start, end)		flush_cache_all()
-
-/*
  * Copy user data from/to a page which is mapped into a different
  * processes address space.  Really, we want to allow our "user
  * space" model to handle this.
@@ -444,94 +434,29 @@ static inline void flush_ioremap_region(unsigned long phys, void __iomem *virt,
 	dmac_inv_range(start, start + size);
 }
 
-#define __cacheid_present(val)			(val != read_cpuid(CPUID_ID))
-#define __cacheid_type_v7(val)			((val & (7 << 29)) == (4 << 29))
-
-#define __cacheid_vivt_prev7(val)		((val & (15 << 25)) != (14 << 25))
-#define __cacheid_vipt_prev7(val)		((val & (15 << 25)) == (14 << 25))
-#define __cacheid_vipt_nonaliasing_prev7(val)	((val & (15 << 25 | 1 << 23)) == (14 << 25))
-#define __cacheid_vipt_aliasing_prev7(val)	((val & (15 << 25 | 1 << 23)) == (14 << 25 | 1 << 23))
-
-#define __cacheid_vivt(val)			(__cacheid_type_v7(val) ? 0 : __cacheid_vivt_prev7(val))
-#define __cacheid_vipt(val)			(__cacheid_type_v7(val) ? 1 : __cacheid_vipt_prev7(val))
-#define __cacheid_vipt_nonaliasing(val)		(__cacheid_type_v7(val) ? 1 : __cacheid_vipt_nonaliasing_prev7(val))
-#define __cacheid_vipt_aliasing(val)		(__cacheid_type_v7(val) ? 0 : __cacheid_vipt_aliasing_prev7(val))
-#define __cacheid_vivt_asid_tagged_instr(val)	(__cacheid_type_v7(val) ? ((val & (3 << 14)) == (1 << 14)) : 0)
-
-#if defined(CONFIG_CPU_CACHE_VIVT) && !defined(CONFIG_CPU_CACHE_VIPT)
 /*
- * VIVT caches only
+ * flush_cache_vmap() is used when creating mappings (eg, via vmap,
+ * vmalloc, ioremap etc) in kernel space for pages.  On non-VIPT
+ * caches, since the direct-mappings of these pages may contain cached
+ * data, we need to do a full cache flush to ensure that writebacks
+ * don't corrupt data placed into these pages via the new mappings.
  */
-#define cache_is_vivt()			1
-#define cache_is_vipt()			0
-#define cache_is_vipt_nonaliasing()	0
-#define cache_is_vipt_aliasing()	0
-#define icache_is_vivt_asid_tagged()	0
+static inline void flush_cache_vmap(unsigned long start, unsigned long end)
+{
+	if (!cache_is_vipt_nonaliasing())
+		flush_cache_all();
+	else
+		/*
+		 * set_pte_at() called from vmap_pte_range() does not
+		 * have a DSB after cleaning the cache line.
+		 */
+		dsb();
+}
 
-#elif !defined(CONFIG_CPU_CACHE_VIVT) && defined(CONFIG_CPU_CACHE_VIPT)
-/*
- * VIPT caches only
- */
-#define cache_is_vivt()			0
-#define cache_is_vipt()			1
-#define cache_is_vipt_nonaliasing()					\
-	({								\
-		unsigned int __val = read_cpuid(CPUID_CACHETYPE);	\
-		__cacheid_vipt_nonaliasing(__val);			\
-	})
-
-#define cache_is_vipt_aliasing()					\
-	({								\
-		unsigned int __val = read_cpuid(CPUID_CACHETYPE);	\
-		__cacheid_vipt_aliasing(__val);				\
-	})
-
-#define icache_is_vivt_asid_tagged()					\
-	({								\
-		unsigned int __val = read_cpuid(CPUID_CACHETYPE);	\
-		__cacheid_vivt_asid_tagged_instr(__val);		\
-	})
-
-#else
-/*
- * VIVT or VIPT caches.  Note that this is unreliable since ARM926
- * and V6 CPUs satisfy the "(val & (15 << 25)) == (14 << 25)" test.
- * There's no way to tell from the CacheType register what type (!)
- * the cache is.
- */
-#define cache_is_vivt()							\
-	({								\
-		unsigned int __val = read_cpuid(CPUID_CACHETYPE);	\
-		(!__cacheid_present(__val)) || __cacheid_vivt(__val);	\
-	})
-		
-#define cache_is_vipt()							\
-	({								\
-		unsigned int __val = read_cpuid(CPUID_CACHETYPE);	\
-		__cacheid_present(__val) && __cacheid_vipt(__val);	\
-	})
-
-#define cache_is_vipt_nonaliasing()					\
-	({								\
-		unsigned int __val = read_cpuid(CPUID_CACHETYPE);	\
-		__cacheid_present(__val) &&				\
-		 __cacheid_vipt_nonaliasing(__val);			\
-	})
-
-#define cache_is_vipt_aliasing()					\
-	({								\
-		unsigned int __val = read_cpuid(CPUID_CACHETYPE);	\
-		__cacheid_present(__val) &&				\
-		 __cacheid_vipt_aliasing(__val);			\
-	})
-
-#define icache_is_vivt_asid_tagged()					\
-	({								\
-		unsigned int __val = read_cpuid(CPUID_CACHETYPE);	\
-		__cacheid_present(__val) &&				\
-		 __cacheid_vivt_asid_tagged_instr(__val);		\
-	})
-
-#endif
+static inline void flush_cache_vunmap(unsigned long start, unsigned long end)
+{
+	if (!cache_is_vipt_nonaliasing())
+		flush_cache_all();
+}
 
 #endif

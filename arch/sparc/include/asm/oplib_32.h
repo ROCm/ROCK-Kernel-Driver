@@ -21,7 +21,6 @@ enum prom_major_version {
 	PROM_V2,      /* sun4c and early sun4m V2 prom */
 	PROM_V3,      /* sun4m and later, up to sun4d/sun4e machines V3 */
 	PROM_P1275,   /* IEEE compliant ISA based Sun PROM, only sun4u */
-	PROM_SUN4,    /* Old sun4 proms are totally different, but we'll shoehorn it to make it fit */
 };
 
 extern enum prom_major_version prom_vers;
@@ -137,7 +136,7 @@ extern char prom_getchar(void);
 extern void prom_putchar(char character);
 
 /* Prom's internal routines, don't use in kernel/boot code. */
-extern void prom_printf(char *fmt, ...);
+extern void prom_printf(const char *fmt, ...);
 extern void prom_write(const char *buf, unsigned int len);
 
 /* Multiprocessor operations... */
@@ -178,17 +177,6 @@ extern void prom_putsegment(int context, unsigned long virt_addr,
 
 /* PROM device tree traversal functions... */
 
-#ifdef PROMLIB_INTERNAL
-
-/* Internal version of prom_getchild. */
-extern int __prom_getchild(int parent_node);
-
-/* Internal version of prom_getsibling. */
-extern int __prom_getsibling(int node);
-
-#endif
-
-
 /* Get the child node of the given node, or zero if no child exists. */
 extern int prom_getchild(int parent_node);
 
@@ -200,12 +188,12 @@ extern int prom_getsibling(int node);
 /* Get the length, at the passed node, of the given property type.
  * Returns -1 on error (ie. no such property at this node).
  */
-extern int prom_getproplen(int thisnode, char *property);
+extern int prom_getproplen(int thisnode, const char *property);
 
 /* Fetch the requested property using the given buffer.  Returns
  * the number of bytes the prom put into your buffer or -1 on error.
  */
-extern int __must_check prom_getproperty(int thisnode, char *property,
+extern int __must_check prom_getproperty(int thisnode, const char *property,
 					 char *prop_buffer, int propbuf_size);
 
 /* Acquire an integer property. */
@@ -247,7 +235,7 @@ extern int prom_node_has_property(int node, char *property);
 /* Set the indicated property at the given node with the passed value.
  * Returns the number of bytes of your value that the prom took.
  */
-extern int prom_setprop(int node, char *prop_name, char *prop_value,
+extern int prom_setprop(int node, const char *prop_name, char *prop_value,
 			int value_size);
 
 extern int prom_pathtoinode(char *path);

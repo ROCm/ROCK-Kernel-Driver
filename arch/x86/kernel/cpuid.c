@@ -36,14 +36,13 @@
 #include <linux/smp_lock.h>
 #include <linux/major.h>
 #include <linux/fs.h>
-#include <linux/smp_lock.h>
 #include <linux/device.h>
 #include <linux/cpu.h>
 #include <linux/notifier.h>
+#include <linux/uaccess.h>
 
 #include <asm/processor.h>
 #include <asm/msr.h>
-#include <asm/uaccess.h>
 #include <asm/system.h>
 
 static struct class *cpuid_class;
@@ -83,7 +82,7 @@ static loff_t cpuid_seek(struct file *file, loff_t offset, int orig)
 }
 
 static ssize_t cpuid_read(struct file *file, char __user *buf,
-			  size_t count, loff_t * ppos)
+			  size_t count, loff_t *ppos)
 {
 	char __user *tmp = buf;
 	struct cpuid_regs cmd;
@@ -118,11 +117,11 @@ static int cpuid_open(struct inode *inode, struct file *file)
 	unsigned int cpu;
 	struct cpuinfo_x86 *c;
 	int ret = 0;
-	
+
 	lock_kernel();
 
 	cpu = iminor(file->f_path.dentry->d_inode);
-	if (cpu >= NR_CPUS || !cpu_online(cpu)) {
+	if (cpu >= nr_cpu_ids || !cpu_online(cpu)) {
 		ret = -ENXIO;	/* No such CPU */
 		goto out;
 	}
@@ -148,8 +147,8 @@ static __cpuinit int cpuid_device_create(int cpu)
 {
 	struct device *dev;
 
-	dev = device_create_drvdata(cpuid_class, NULL, MKDEV(CPUID_MAJOR, cpu),
-				    NULL, "cpu%d", cpu);
+	dev = device_create(cpuid_class, NULL, MKDEV(CPUID_MAJOR, cpu), NULL,
+			    "cpu%d", cpu);
 	return IS_ERR(dev) ? PTR_ERR(dev) : 0;
 }
 

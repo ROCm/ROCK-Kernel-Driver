@@ -8,7 +8,7 @@
  *    RadioTrack II driver for Linux radio support (C) 1998 Ben Pfaff
  *
  *    Based on RadioTrack I/RadioReveal (C) 1997 M. Kirkwood
- *    Converted to new API by Alan Cox <Alan.Cox@linux.org>
+ *    Converted to new API by Alan Cox <alan@lxorguk.ukuu.org.uk>
  *    Various bugfixes and enhancements by Russell Kroll <rkroll@exploits.org>
  *
  * TODO: Allow for more than one of these foolish entities :-)
@@ -57,6 +57,7 @@ static int shutdown	= 1;
 static int keepmuted	= 1;
 static int initmute	= 1;
 static int radio_nr	= -1;
+static unsigned long in_use;
 
 module_param(io, int, 0444);
 MODULE_PARM_DESC(io, "Force I/O port for the GemTek Radio card if automatic "
@@ -393,15 +394,22 @@ static struct v4l2_queryctrl radio_qctrl[] = {
 	}
 };
 
-static const struct file_operations gemtek_fops = {
+static int gemtek_exclusive_open(struct file *file)
+{
+	return test_and_set_bit(0, &in_use) ? -EBUSY : 0;
+}
+
+static int gemtek_exclusive_release(struct file *file)
+{
+	clear_bit(0, &in_use);
+	return 0;
+}
+
+static const struct v4l2_file_operations gemtek_fops = {
 	.owner		= THIS_MODULE,
-	.open		= video_exclusive_open,
-	.release	= video_exclusive_release,
+	.open		= gemtek_exclusive_open,
+	.release	= gemtek_exclusive_release,
 	.ioctl		= video_ioctl2,
-#ifdef CONFIG_COMPAT
-	.compat_ioctl	= v4l_compat_ioctl32,
-#endif
-	.llseek		= no_llseek
 };
 
 static int vidioc_querycap(struct file *file, void *priv,
@@ -447,8 +455,7 @@ static int vidioc_s_tuner(struct file *file, void *priv, struct v4l2_tuner *v)
 static int vidioc_s_frequency(struct file *file, void *priv,
 			      struct v4l2_frequency *f)
 {
-	struct video_device *dev = video_devdata(file);
-	struct gemtek_device *rt = dev->priv;
+	struct gemtek_device *rt = video_drvdata(file);
 
 	gemtek_setfreq(rt, f->frequency);
 
@@ -458,8 +465,7 @@ static int vidioc_s_frequency(struct file *file, void *priv,
 static int vidioc_g_frequency(struct file *file, void *priv,
 			      struct v4l2_frequency *f)
 {
-	struct video_device *dev = video_devdata(file);
-	struct gemtek_device *rt = dev->priv;
+	struct gemtek_device *rt = video_drvdata(file);
 
 	f->type = V4L2_TUNER_RADIO;
 	f->frequency = rt->lastfreq;
@@ -483,8 +489,7 @@ static int vidioc_queryctrl(struct file *file, void *priv,
 static int vidioc_g_ctrl(struct file *file, void *priv,
 			 struct v4l2_control *ctrl)
 {
-	struct video_device *dev = video_devdata(file);
-	struct gemtek_device *rt = dev->priv;
+	struct gemtek_device *rt = video_drvdata(file);
 
 	switch (ctrl->id) {
 	case V4L2_CID_AUDIO_MUTE:
@@ -503,8 +508,7 @@ static int vidioc_g_ctrl(struct file *file, void *priv,
 static int vidioc_s_ctrl(struct file *file, void *priv,
 			 struct v4l2_control *ctrl)
 {
-	struct video_device *dev = video_devdata(file);
-	struct gemtek_device *rt = dev->priv;
+	struct gemtek_device *rt = video_drvdata(file);
 
 	switch (ctrl->id) {
 	case V4L2_CID_AUDIO_MUTE:
@@ -569,9 +573,10 @@ static const struct v4l2_ioctl_ops gemtek_ioctl_ops = {
 };
 
 static struct video_device gemtek_radio = {
-	.name			= "GemTek Radio card",
-	.fops			= &gemtek_fops,
-	.ioctl_ops 		= &gemtek_ioctl_ops,
+	.name		= "GemTek Radio card",
+	.fops		= &gemtek_fops,
+	.ioctl_ops 	= &gemtek_ioctl_ops,
+	.release	= video_device_release_empty,
 };
 
 /*
@@ -610,7 +615,7 @@ static int __init gemtek_init(void)
 		return -EINVAL;
 	}
 
-	gemtek_radio.priv = &gemtek_unit;
+	video_set_drvdata(&gemtek_radio, &gemtek_unit);
 
 	if (video_register_device(&gemtek_radio, VFL_TYPE_RADIO, radio_nr) < 0) {
 		release_region(io, 1);

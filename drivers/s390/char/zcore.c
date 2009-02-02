@@ -10,6 +10,7 @@
  */
 
 #define KMSG_COMPONENT "zdump"
+#define pr_fmt(fmt) KMSG_COMPONENT ": " fmt
 
 #include <linux/init.h>
 #include <linux/miscdevice.h>

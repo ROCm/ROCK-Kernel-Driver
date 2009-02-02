@@ -17,24 +17,20 @@
 #include <linux/netfilter_ipv4/ipt_iprange.h>
 
 static bool
-iprange_mt_v0(const struct sk_buff *skb, const struct net_device *in,
-              const struct net_device *out, const struct xt_match *match,
-              const void *matchinfo, int offset, unsigned int protoff,
-              bool *hotdrop)
+iprange_mt_v0(const struct sk_buff *skb, const struct xt_match_param *par)
 {
-	const struct ipt_iprange_info *info = matchinfo;
+	const struct ipt_iprange_info *info = par->matchinfo;
 	const struct iphdr *iph = ip_hdr(skb);
 
 	if (info->flags & IPRANGE_SRC) {
 		if ((ntohl(iph->saddr) < ntohl(info->src.min_ip)
 			  || ntohl(iph->saddr) > ntohl(info->src.max_ip))
 			 ^ !!(info->flags & IPRANGE_SRC_INV)) {
-			pr_debug("src IP %u.%u.%u.%u NOT in range %s"
-				 "%u.%u.%u.%u-%u.%u.%u.%u\n",
-				 NIPQUAD(iph->saddr),
+			pr_debug("src IP %pI4 NOT in range %s%pI4-%pI4\n",
+				 &iph->saddr,
 				 info->flags & IPRANGE_SRC_INV ? "(INV) " : "",
-				 NIPQUAD(info->src.min_ip),
-				 NIPQUAD(info->src.max_ip));
+				 &info->src.min_ip,
+				 &info->src.max_ip);
 			return false;
 		}
 	}
@@ -42,12 +38,11 @@ iprange_mt_v0(const struct sk_buff *skb, const struct net_device *in,
 		if ((ntohl(iph->daddr) < ntohl(info->dst.min_ip)
 			  || ntohl(iph->daddr) > ntohl(info->dst.max_ip))
 			 ^ !!(info->flags & IPRANGE_DST_INV)) {
-			pr_debug("dst IP %u.%u.%u.%u NOT in range %s"
-				 "%u.%u.%u.%u-%u.%u.%u.%u\n",
-				 NIPQUAD(iph->daddr),
+			pr_debug("dst IP %pI4 NOT in range %s%pI4-%pI4\n",
+				 &iph->daddr,
 				 info->flags & IPRANGE_DST_INV ? "(INV) " : "",
-				 NIPQUAD(info->dst.min_ip),
-				 NIPQUAD(info->dst.max_ip));
+				 &info->dst.min_ip,
+				 &info->dst.max_ip);
 			return false;
 		}
 	}
@@ -55,12 +50,9 @@ iprange_mt_v0(const struct sk_buff *skb, const struct net_device *in,
 }
 
 static bool
-iprange_mt4(const struct sk_buff *skb, const struct net_device *in,
-            const struct net_device *out, const struct xt_match *match,
-            const void *matchinfo, int offset, unsigned int protoff,
-            bool *hotdrop)
+iprange_mt4(const struct sk_buff *skb, const struct xt_match_param *par)
 {
-	const struct xt_iprange_mtinfo *info = matchinfo;
+	const struct xt_iprange_mtinfo *info = par->matchinfo;
 	const struct iphdr *iph = ip_hdr(skb);
 	bool m;
 
@@ -69,12 +61,11 @@ iprange_mt4(const struct sk_buff *skb, const struct net_device *in,
 		m |= ntohl(iph->saddr) > ntohl(info->src_max.ip);
 		m ^= !!(info->flags & IPRANGE_SRC_INV);
 		if (m) {
-			pr_debug("src IP " NIPQUAD_FMT " NOT in range %s"
-			         NIPQUAD_FMT "-" NIPQUAD_FMT "\n",
-			         NIPQUAD(iph->saddr),
+			pr_debug("src IP %pI4 NOT in range %s%pI4-%pI4\n",
+			         &iph->saddr,
 			         (info->flags & IPRANGE_SRC_INV) ? "(INV) " : "",
-			         NIPQUAD(info->src_max.ip),
-			         NIPQUAD(info->src_max.ip));
+			         &info->src_max.ip,
+			         &info->src_max.ip);
 			return false;
 		}
 	}
@@ -83,12 +74,11 @@ iprange_mt4(const struct sk_buff *skb, const struct net_device *in,
 		m |= ntohl(iph->daddr) > ntohl(info->dst_max.ip);
 		m ^= !!(info->flags & IPRANGE_DST_INV);
 		if (m) {
-			pr_debug("dst IP " NIPQUAD_FMT " NOT in range %s"
-			         NIPQUAD_FMT "-" NIPQUAD_FMT "\n",
-			         NIPQUAD(iph->daddr),
+			pr_debug("dst IP %pI4 NOT in range %s%pI4-%pI4\n",
+			         &iph->daddr,
 			         (info->flags & IPRANGE_DST_INV) ? "(INV) " : "",
-			         NIPQUAD(info->dst_min.ip),
-			         NIPQUAD(info->dst_max.ip));
+			         &info->dst_min.ip,
+			         &info->dst_max.ip);
 			return false;
 		}
 	}
@@ -111,12 +101,9 @@ iprange_ipv6_sub(const struct in6_addr *a, const struct in6_addr *b)
 }
 
 static bool
-iprange_mt6(const struct sk_buff *skb, const struct net_device *in,
-            const struct net_device *out, const struct xt_match *match,
-            const void *matchinfo, int offset, unsigned int protoff,
-            bool *hotdrop)
+iprange_mt6(const struct sk_buff *skb, const struct xt_match_param *par)
 {
-	const struct xt_iprange_mtinfo *info = matchinfo;
+	const struct xt_iprange_mtinfo *info = par->matchinfo;
 	const struct ipv6hdr *iph = ipv6_hdr(skb);
 	bool m;
 
@@ -141,7 +128,7 @@ static struct xt_match iprange_mt_reg[] __read_mostly = {
 	{
 		.name      = "iprange",
 		.revision  = 0,
-		.family    = AF_INET,
+		.family    = NFPROTO_IPV4,
 		.match     = iprange_mt_v0,
 		.matchsize = sizeof(struct ipt_iprange_info),
 		.me        = THIS_MODULE,
@@ -149,7 +136,7 @@ static struct xt_match iprange_mt_reg[] __read_mostly = {
 	{
 		.name      = "iprange",
 		.revision  = 1,
-		.family    = AF_INET,
+		.family    = NFPROTO_IPV4,
 		.match     = iprange_mt4,
 		.matchsize = sizeof(struct xt_iprange_mtinfo),
 		.me        = THIS_MODULE,
@@ -157,7 +144,7 @@ static struct xt_match iprange_mt_reg[] __read_mostly = {
 	{
 		.name      = "iprange",
 		.revision  = 1,
-		.family    = AF_INET6,
+		.family    = NFPROTO_IPV6,
 		.match     = iprange_mt6,
 		.matchsize = sizeof(struct xt_iprange_mtinfo),
 		.me        = THIS_MODULE,

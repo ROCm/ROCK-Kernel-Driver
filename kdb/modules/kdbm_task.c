@@ -33,7 +33,7 @@ kdb_cpus_allowed_string(struct task_struct *tp)
 	else if (cpus_weight(tp->cpus_allowed) == 1)
 		snprintf(maskbuf, sizeof(maskbuf), "ONLY(%d)", first_cpu(tp->cpus_allowed));
 	else
-		cpulist_scnprintf(maskbuf, sizeof(maskbuf), tp->cpus_allowed);
+		cpulist_scnprintf(maskbuf, sizeof(maskbuf), &tp->cpus_allowed);
 	return maskbuf;
 }
 
@@ -45,6 +45,7 @@ kdbm_task(int argc, const char **argv)
 	int nextarg;
 	int e = 0;
 	struct task_struct *tp = NULL, *tp1;
+	const struct cred *cred;
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
@@ -102,13 +103,13 @@ kdbm_task(int argc, const char **argv)
 	    "  fs=0x%p files=0x%p mm=0x%p\n",
 	    tp->fs, tp->files, tp->mm);
 
+	cred = get_cred((struct cred *) __task_cred(tp));
 	kdb_printf(
 	    "  uid=%d euid=%d suid=%d fsuid=%d gid=%d egid=%d sgid=%d fsgid=%d\n",
-	    tp->uid, tp->euid, tp->suid, tp->fsuid, tp->gid, tp->egid, tp->sgid, tp->fsgid);
+	    cred->uid, cred->euid, cred->suid, cred->fsuid, cred->gid, cred->egid, cred->sgid, cred->fsgid);
 
-	kdb_printf(
-	    "  user=0x%p\n",
-	    tp->user);
+	kdb_printf( "  user=0x%p\n", cred->user);
+	put_cred(cred);
 
 	if (tp->sysvsem.undo_list)
 		kdb_printf(

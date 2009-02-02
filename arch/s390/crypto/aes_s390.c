@@ -18,6 +18,7 @@
  */
 
 #define KMSG_COMPONENT "aes_s390"
+#define pr_fmt(fmt) KMSG_COMPONENT ": " fmt
 
 #include <crypto/aes.h>
 #include <crypto/algapi.h>

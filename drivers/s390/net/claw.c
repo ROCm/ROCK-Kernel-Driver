@@ -60,9 +60,6 @@
  *    1.25  Added Packing support
  *    1.5
  */
-
-#define KMSG_COMPONENT "claw"
-
 #include <asm/ccwdev.h>
 #include <asm/ccwgroup.h>
 #include <asm/debug.h>
@@ -97,7 +94,7 @@
    CLAW uses the s390dbf file system  see claw_trace and claw_setup
 */
 
-static char version[] __initdata = "CLAW driver";
+
 static char debug_buffer[255];
 /**
  * Debug Facility Stuff
@@ -301,7 +298,8 @@ claw_probe(struct ccwgroup_device *cgdev)
 	if (rc) {
 		probe_error(cgdev);
 		put_device(&cgdev->dev);
-		dev_warn(&cgdev->dev, "add_files failed\n");
+		printk(KERN_WARNING "add_files failed %s %s Exit Line %d \n",
+			dev_name(&cgdev->cdev[0]->dev), __func__, __LINE__);
 		CLAW_DBF_TEXT_(2, setup, "probex%d", rc);
 		return rc;
 	}
@@ -498,8 +496,7 @@ claw_open(struct net_device *dev)
            ~(DEV_STAT_CHN_END | DEV_STAT_DEV_END)) != 0x00) ||
            (((privptr->channel[READ].flag |
 	   	privptr->channel[WRITE].flag) & CLAW_TIMER) != 0x00)) {
-		dev_info(&privptr->channel[READ].cdev->dev,
-			"%s: remote side is not ready\n", dev->name);
+                printk(KERN_INFO "%s: remote side is not ready\n", dev->name);
 		CLAW_DBF_TEXT(2, trace, "notrdy");
 
                 for ( i = 0; i < 2;  i++) {
@@ -585,9 +582,10 @@ claw_irq_handler(struct ccw_device *cdev,
 	CLAW_DBF_TEXT(4, trace, "clawirq");
         /* Bypass all 'unsolicited interrupts' */
 	if (!cdev->dev.driver_data) {
-		dev_warn(&cdev->dev, "unsolicited interrupt for device "
-			"received c-%02x d-%02x\n",
-			irb->scsw.cmd.cstat, irb->scsw.cmd.dstat);
+                printk(KERN_WARNING "claw: unsolicited interrupt for device:"
+		 	"%s received c-%02x d-%02x\n",
+		       dev_name(&cdev->dev), irb->scsw.cmd.cstat,
+		       irb->scsw.cmd.dstat);
 		CLAW_DBF_TEXT(2, trace, "badirq");
                 return;
         }
@@ -599,8 +597,8 @@ claw_irq_handler(struct ccw_device *cdev,
 	else if (privptr->channel[WRITE].cdev == cdev)
 		p_ch = &privptr->channel[WRITE];
 	else {
-		dev_warn(&cdev->dev, "Can't determine channel for "
-			"interrupt\n");
+		printk(KERN_WARNING "claw: Can't determine channel for "
+			"interrupt, device %s\n", dev_name(&cdev->dev));
 		CLAW_DBF_TEXT(2, trace, "badchan");
 		return;
 	}
@@ -614,8 +612,7 @@ claw_irq_handler(struct ccw_device *cdev,
 
 	/* Check for good subchannel return code, otherwise info message */
 	if (irb->scsw.cmd.cstat && !(irb->scsw.cmd.cstat & SCHN_STAT_PCI)) {
-		dev_info(&cdev->dev,
-			"%s: subchannel check for device: %04x -"
+                printk(KERN_INFO "%s: subchannel check for device: %04x -"
 			" Sch Stat %02x  Dev Stat %02x CPA - %04x\n",
                         dev->name, p_ch->devno,
 			irb->scsw.cmd.cstat, irb->scsw.cmd.dstat,
@@ -654,7 +651,7 @@ claw_irq_handler(struct ccw_device *cdev,
 			wake_up(&p_ch->wait); /* wake claw_open (READ)*/
 		} else if (p_ch->flag == CLAW_WRITE) {
 			p_ch->claw_state = CLAW_START_WRITE;
-			/*      send SYSTEM_VALIDATE                    */
+			/*	send SYSTEM_VALIDATE			*/
 			claw_strt_read(dev, LOCK_NO);
 			claw_send_control(dev,
 				SYSTEM_VALIDATE_REQUEST,
@@ -662,9 +659,10 @@ claw_irq_handler(struct ccw_device *cdev,
 				p_env->host_name,
 				p_env->adapter_name);
 		} else {
-			dev_warn(&cdev->dev, "unsolicited "
-				"interrupt for device "
-				"received c-%02x d-%02x\n",
+			printk(KERN_WARNING "claw: unsolicited "
+				"interrupt for device:"
+				"%s received c-%02x d-%02x\n",
+				dev_name(&cdev->dev),
 				irb->scsw.cmd.cstat,
 				irb->scsw.cmd.dstat);
 			return;
@@ -679,8 +677,8 @@ claw_irq_handler(struct ccw_device *cdev,
 			    (p_ch->irb->ecw[0] & 0x40) == 0x40 ||
 			    (p_ch->irb->ecw[0])        == 0) {
 				privptr->stats.rx_errors++;
-				dev_info(&cdev->dev,
-					"%s: Restart is required after remote "
+				printk(KERN_INFO "%s: Restart is "
+					"required after remote "
 					"side recovers \n",
 					dev->name);
 			}
@@ -715,13 +713,11 @@ claw_irq_handler(struct ccw_device *cdev,
 		return;
 	case CLAW_START_WRITE:
 		if (p_ch->irb->scsw.cmd.dstat & DEV_STAT_UNIT_CHECK) {
-			dev_info(&cdev->dev,
-				"%s: Unit Check Occured in "
+			printk(KERN_INFO "%s: Unit Check Occured in "
 				"write channel\n", dev->name);
 			clear_bit(0, (void *)&p_ch->IO_active);
 			if (p_ch->irb->ecw[0] & 0x80) {
-				dev_info(&cdev->dev,
-					"%s: Resetting Event "
+				printk(KERN_INFO "%s: Resetting Event "
 					"occurred:\n", dev->name);
 				init_timer(&p_ch->timer);
 				p_ch->timer.function =
@@ -729,8 +725,7 @@ claw_irq_handler(struct ccw_device *cdev,
 				p_ch->timer.data = (unsigned long)p_ch;
 				p_ch->timer.expires = jiffies + 10*HZ;
 				add_timer(&p_ch->timer);
-				dev_info(&cdev->dev,
-					"%s: write connection "
+				printk(KERN_INFO "%s: write connection "
 					"restarting\n", dev->name);
 			}
 			CLAW_DBF_TEXT(4, trace, "rstrtwrt");
@@ -738,10 +733,9 @@ claw_irq_handler(struct ccw_device *cdev,
 		}
 		if (p_ch->irb->scsw.cmd.dstat & DEV_STAT_UNIT_EXCEP) {
 			clear_bit(0, (void *)&p_ch->IO_active);
-			dev_info(&cdev->dev,
-				"%s: Unit Exception "
-				"occurred in write channel\n",
-				dev->name);
+			printk(KERN_INFO "%s: Unit Exception "
+			       "Occured in write channel\n",
+			       dev->name);
 		}
 		if (!((p_ch->irb->scsw.cmd.stctl & SCSW_STCTL_SEC_STATUS) ||
 		(p_ch->irb->scsw.cmd.stctl == SCSW_STCTL_STATUS_PEND) ||
@@ -763,8 +757,7 @@ claw_irq_handler(struct ccw_device *cdev,
 		CLAW_DBF_TEXT(4, trace, "StWtExit");
 		return;
 	default:
-		dev_warn(&cdev->dev,
-			"%s: wrong selection code - irq "
+		printk(KERN_WARNING "%s: wrong selection code - irq "
 			"state=%d\n", dev->name, p_ch->claw_state);
 		CLAW_DBF_TEXT(2, trace, "badIRQ");
 		return;
@@ -917,8 +910,7 @@ claw_release(struct net_device *dev)
         if (((privptr->channel[READ].last_dstat |
 		privptr->channel[WRITE].last_dstat) &
 		~(DEV_STAT_CHN_END | DEV_STAT_DEV_END)) != 0x00) {
-		dev_warn(&privptr->channel[READ].cdev->dev,
-			"%s: channel problems during close - "
+                printk(KERN_WARNING "%s: channel problems during close - "
 			"read: %02x -  write: %02x\n",
                 dev->name,
 		privptr->channel[READ].last_dstat,
@@ -1143,19 +1135,21 @@ ccw_check_return_code(struct ccw_device *cdev, int return_code)
 		case -EBUSY: /* BUSY is a transient state no action needed */
 			break;
 		case -ENODEV:
-			dev_err(&cdev->dev, "Device not found "
-				"for IO ENODEV\n");
+			printk(KERN_EMERG "%s: Missing device called "
+				"for IO ENODEV\n", dev_name(&cdev->dev));
 			break;
 		case -EIO:
-			dev_err(&cdev->dev, "Status pending... EIO \n");
+			printk(KERN_EMERG "%s: Status pending... EIO \n",
+				dev_name(&cdev->dev));
 			break;
 		case -EINVAL:
-			dev_err(&cdev->dev,
-				"Invalid Dev State EINVAL \n");
+			printk(KERN_EMERG "%s: Invalid Dev State EINVAL \n",
+				dev_name(&cdev->dev));
 			break;
 		default:
-			dev_err(&cdev->dev, "Unknown error in "
-				 "Do_IO %d\n", return_code);
+			printk(KERN_EMERG "%s: Unknown error in "
+				 "Do_IO %d\n", dev_name(&cdev->dev),
+			       return_code);
 		}
 	}
 	CLAW_DBF_TEXT(4, trace, "ccwret");
@@ -1169,40 +1163,39 @@ static void
 ccw_check_unit_check(struct chbk * p_ch, unsigned char sense )
 {
 	struct net_device *ndev = p_ch->ndev;
-	struct device *dev = &p_ch->cdev->dev;
 
 	CLAW_DBF_TEXT(4, trace, "unitchek");
-	dev_info(dev, "%s: Unit Check with sense byte:0x%04x\n",
-		ndev->name, sense);
+        printk(KERN_INFO "%s: Unit Check with sense byte:0x%04x\n",
+	       ndev->name, sense);
 
         if (sense & 0x40) {
                 if (sense & 0x01) {
-			dev_warn(dev, "%s: Interface disconnect or "
+                        printk(KERN_WARNING "%s: Interface disconnect or "
 				"Selective reset "
 				"occurred (remote side)\n", ndev->name);
                 }
                 else {
-			dev_warn(dev, "%s: System reset occurred"
+                        printk(KERN_WARNING "%s: System reset occured"
 				" (remote side)\n", ndev->name);
                 }
         }
         else if (sense & 0x20) {
                 if (sense & 0x04) {
-			dev_warn(dev, "%s: Data-streaming "
+                        printk(KERN_WARNING "%s: Data-streaming "
 				"timeout)\n", ndev->name);
                 }
                 else  {
-			dev_warn(dev, "%s: Data-transfer parity"
+                        printk(KERN_WARNING "%s: Data-transfer parity"
 				" error\n", ndev->name);
                 }
         }
         else if (sense & 0x10) {
                 if (sense & 0x20) {
-			dev_warn(dev, "%s: Hardware malfunction "
+                        printk(KERN_WARNING "%s: Hardware malfunction "
 				"(remote side)\n", ndev->name);
                 }
                 else {
-			dev_warn(dev, "%s: read-data parity error "
+                        printk(KERN_WARNING "%s: read-data parity error "
 				"(remote side)\n", ndev->name);
                 }
         }
@@ -2010,7 +2003,7 @@ claw_process_control( struct net_device *dev, struct ccwbk * p_ccw)
 	tdev = &privptr->channel[READ].cdev->dev;
 	memcpy( &temp_host_name, p_env->host_name, 8);
         memcpy( &temp_ws_name, p_env->adapter_name , 8);
-	dev_info(tdev, "%s: CLAW device %.8s: "
+        printk(KERN_INFO "%s: CLAW device %.8s: "
 		"Received Control Packet\n",
 		dev->name, temp_ws_name);
         if (privptr->release_pend==1) {
@@ -2029,28 +2022,30 @@ claw_process_control( struct net_device *dev, struct ccwbk * p_ccw)
 		if (p_ctlbk->version != CLAW_VERSION_ID) {
 			claw_snd_sys_validate_rsp(dev, p_ctlbk,
 				CLAW_RC_WRONG_VERSION);
-			dev_info(tdev, "%s: %d is wrong version id. "
-				"Expected %d\n", dev->name, p_ctlbk->version,
-				CLAW_VERSION_ID);
+			printk("%s: %d is wrong version id. "
+			       "Expected %d\n",
+			       dev->name, p_ctlbk->version,
+			       CLAW_VERSION_ID);
 		}
 		p_sysval = (struct sysval *)&(p_ctlbk->data);
-		dev_info(tdev, "%s: Recv Sys Validate Request: "
-			"Vers=%d,link_id=%d,Corr=%d,WS name=%.8s,"
-			"Host name=%.8s\n",
-			dev->name, p_ctlbk->version,
-			p_ctlbk->linkid,
-			p_ctlbk->correlator,
-			p_sysval->WS_name,
-			p_sysval->host_name);
+		printk("%s: Recv Sys Validate Request: "
+		       "Vers=%d,link_id=%d,Corr=%d,WS name=%."
+		       "8s,Host name=%.8s\n",
+		       dev->name, p_ctlbk->version,
+		       p_ctlbk->linkid,
+		       p_ctlbk->correlator,
+		       p_sysval->WS_name,
+		       p_sysval->host_name);
 		if (memcmp(temp_host_name, p_sysval->host_name, 8)) {
 			claw_snd_sys_validate_rsp(dev, p_ctlbk,
 				CLAW_RC_NAME_MISMATCH);
 			CLAW_DBF_TEXT(2, setup, "HSTBAD");
 			CLAW_DBF_TEXT_(2, setup, "%s", p_sysval->host_name);
 			CLAW_DBF_TEXT_(2, setup, "%s", temp_host_name);
-			dev_info(tdev,
-				"%s: Host name mismatch. Received: %s "
-					"expected: %s\n",
+			printk(KERN_INFO "%s:  Host name mismatch\n",
+				dev->name);
+			printk(KERN_INFO "%s: Received :%s: "
+				"expected :%s: \n",
 				dev->name,
 				p_sysval->host_name,
 				temp_host_name);
@@ -2061,36 +2056,35 @@ claw_process_control( struct net_device *dev, struct ccwbk * p_ccw)
 			CLAW_DBF_TEXT(2, setup, "WSNBAD");
 			CLAW_DBF_TEXT_(2, setup, "%s", p_sysval->WS_name);
 			CLAW_DBF_TEXT_(2, setup, "%s", temp_ws_name);
-			dev_info(tdev, "%s: WS name mismatch."
-				" Received: %s expected: %s\n",
-				dev->name,
-				p_sysval->WS_name,
-				temp_ws_name);
+			printk(KERN_INFO "%s: WS name mismatch\n",
+				dev->name);
+			printk(KERN_INFO "%s: Received :%s: "
+			       "expected :%s: \n",
+			       dev->name,
+			       p_sysval->WS_name,
+			       temp_ws_name);
 		}
 		if ((p_sysval->write_frame_size < p_env->write_size) &&
 		    (p_env->packing == 0)) {
 			claw_snd_sys_validate_rsp(dev, p_ctlbk,
 				CLAW_RC_HOST_RCV_TOO_SMALL);
-			dev_info(tdev,
-				"host write size is too small\n");
+			printk(KERN_INFO "%s: host write size is too "
+				"small\n", dev->name);
 			CLAW_DBF_TEXT(2, setup, "wrtszbad");
 		}
 		if ((p_sysval->read_frame_size < p_env->read_size) &&
 		    (p_env->packing == 0)) {
 			claw_snd_sys_validate_rsp(dev, p_ctlbk,
 				CLAW_RC_HOST_RCV_TOO_SMALL);
-			dev_info(tdev,
-				"host read size is too small\n");
+			printk(KERN_INFO "%s: host read size is too "
+				"small\n", dev->name);
 			CLAW_DBF_TEXT(2, setup, "rdsizbad");
 		}
 		claw_snd_sys_validate_rsp(dev, p_ctlbk, 0);
-		dev_info(tdev,
-			"CLAW device %.8s: System validate"
-			" completed.\n", temp_ws_name);
-		dev_info(tdev,
-			"%s: sys Validate Rsize:%d Wsize:%d\n",
-			dev->name, p_sysval->read_frame_size,
-			p_sysval->write_frame_size);
+		printk(KERN_INFO "%s: CLAW device %.8s: System validate "
+			"completed.\n", dev->name, temp_ws_name);
+		printk("%s: sys Validate Rsize:%d Wsize:%d\n", dev->name,
+			p_sysval->read_frame_size, p_sysval->write_frame_size);
 		privptr->system_validate_comp = 1;
 		if (strncmp(p_env->api_type, WS_APPL_NAME_PACKED, 6) == 0)
 			p_env->packing = PACKING_ASK;
@@ -2098,9 +2092,8 @@ claw_process_control( struct net_device *dev, struct ccwbk * p_ccw)
 		break;
 	case SYSTEM_VALIDATE_RESPONSE:
 		p_sysval = (struct sysval *)&(p_ctlbk->data);
-		dev_info(tdev,
-			"%s: Recv Sys Validate Resp: Vers=%d,Corr=%d,"
-			"RC=%d,WS name=%.8s,Host name=%.8s\n",
+		printk("%s: Recv Sys Validate Resp: Vers=%d,Corr=%d,RC=%d,"
+			"WS name=%.8s,Host name=%.8s\n",
 			dev->name,
 			p_ctlbk->version,
 			p_ctlbk->correlator,
@@ -2109,31 +2102,32 @@ claw_process_control( struct net_device *dev, struct ccwbk * p_ccw)
 			p_sysval->host_name);
 		switch (p_ctlbk->rc) {
 		case 0:
-			dev_info(tdev, "%s: CLAW device "
-				"%.8s: System validate completed.\n",
-				dev->name, temp_ws_name);
+			printk(KERN_INFO "%s: CLAW device "
+				"%.8s: System validate "
+				"completed.\n",
+			       dev->name, temp_ws_name);
 			if (privptr->system_validate_comp == 0)
 				claw_strt_conn_req(dev);
 			privptr->system_validate_comp = 1;
 			break;
 		case CLAW_RC_NAME_MISMATCH:
-			dev_info(tdev, "%s: Sys Validate "
+			printk(KERN_INFO "%s: Sys Validate "
 				"Resp : Host, WS name is "
 				"mismatch\n",
-				dev->name);
+			       dev->name);
 			break;
 		case CLAW_RC_WRONG_VERSION:
-			dev_info(tdev, "%s: Sys Validate "
+			printk(KERN_INFO "%s: Sys Validate "
 				"Resp : Wrong version\n",
 				dev->name);
 			break;
 		case CLAW_RC_HOST_RCV_TOO_SMALL:
-			dev_info(tdev, "%s: Sys Validate "
+			printk(KERN_INFO "%s: Sys Validate "
 				"Resp : bad frame size\n",
 				dev->name);
 			break;
 		default:
-			dev_info(tdev, "%s: Sys Validate "
+			printk(KERN_INFO "%s: Sys Validate "
 				"error code=%d \n",
 				 dev->name, p_ctlbk->rc);
 			break;
@@ -2142,7 +2136,7 @@ claw_process_control( struct net_device *dev, struct ccwbk * p_ccw)
 
 	case CONNECTION_REQUEST:
 		p_connect = (struct conncmd *)&(p_ctlbk->data);
-		dev_info(tdev, "%s: Recv Conn Req: Vers=%d,link_id=%d,"
+		printk(KERN_INFO "%s: Recv Conn Req: Vers=%d,link_id=%d,"
 			"Corr=%d,HOST appl=%.8s,WS appl=%.8s\n",
 			dev->name,
 			p_ctlbk->version,
@@ -2152,20 +2146,20 @@ claw_process_control( struct net_device *dev, struct ccwbk * p_ccw)
 			p_connect->WS_name);
 		if (privptr->active_link_ID != 0) {
 			claw_snd_disc(dev, p_ctlbk);
-			dev_info(tdev, "%s: Conn Req error : "
+			printk(KERN_INFO "%s: Conn Req error : "
 				"already logical link is active \n",
 				dev->name);
 		}
 		if (p_ctlbk->linkid != 1) {
 			claw_snd_disc(dev, p_ctlbk);
-			dev_info(tdev, "%s: Conn Req error : "
+			printk(KERN_INFO "%s: Conn Req error : "
 				"req logical link id is not 1\n",
 				dev->name);
 		}
 		rc = find_link(dev, p_connect->host_name, p_connect->WS_name);
 		if (rc != 0) {
 			claw_snd_disc(dev, p_ctlbk);
-			dev_info(tdev, "%s: Conn Req error : "
+			printk(KERN_INFO "%s: Conn Resp error: "
 				"req appl name does not match\n",
 				dev->name);
 		}
@@ -2178,7 +2172,7 @@ claw_process_control( struct net_device *dev, struct ccwbk * p_ccw)
 			p_env->packing = PACK_SEND;
 			claw_snd_conn_req(dev, 0);
 		}
-		dev_info(tdev, "%s: CLAW device %.8s: Connection "
+		printk(KERN_INFO "%s: CLAW device %.8s: Connection "
 			"completed link_id=%d.\n",
 			dev->name, temp_ws_name,
 			p_ctlbk->linkid);
@@ -2188,7 +2182,7 @@ claw_process_control( struct net_device *dev, struct ccwbk * p_ccw)
 		break;
 	case CONNECTION_RESPONSE:
 		p_connect = (struct conncmd *)&(p_ctlbk->data);
-		dev_info(tdev, "%s: Revc Conn Resp: Vers=%d,link_id=%d,"
+		printk(KERN_INFO "%s: Revc Conn Resp: Vers=%d,link_id=%d,"
 			"Corr=%d,RC=%d,Host appl=%.8s, WS appl=%.8s\n",
 			dev->name,
 			p_ctlbk->version,
@@ -2199,7 +2193,7 @@ claw_process_control( struct net_device *dev, struct ccwbk * p_ccw)
 			p_connect->WS_name);
 
 		if (p_ctlbk->rc != 0) {
-			dev_info(tdev, "%s: Conn Resp error: rc=%d \n",
+			printk(KERN_INFO "%s: Conn Resp error: rc=%d \n",
 				dev->name, p_ctlbk->rc);
 			return 1;
 		}
@@ -2207,7 +2201,7 @@ claw_process_control( struct net_device *dev, struct ccwbk * p_ccw)
 			p_connect->host_name, p_connect->WS_name);
 		if (rc != 0) {
 			claw_snd_disc(dev, p_ctlbk);
-			dev_info(tdev, "%s: Conn Resp error: "
+			printk(KERN_INFO "%s: Conn Resp error: "
 				"req appl name does not match\n",
 				 dev->name);
 		}
@@ -2216,8 +2210,7 @@ claw_process_control( struct net_device *dev, struct ccwbk * p_ccw)
 		break;
 	case CONNECTION_CONFIRM:
 		p_connect = (struct conncmd *)&(p_ctlbk->data);
-		dev_info(tdev,
-			"%s: Recv Conn Confirm:Vers=%d,link_id=%d,"
+		printk(KERN_INFO "%s: Recv Conn Confirm:Vers=%d,link_id=%d,"
 			"Corr=%d,Host appl=%.8s,WS appl=%.8s\n",
 			dev->name,
 			p_ctlbk->version,
@@ -2228,21 +2221,21 @@ claw_process_control( struct net_device *dev, struct ccwbk * p_ccw)
 		if (p_ctlbk->linkid == -(privptr->active_link_ID)) {
 			privptr->active_link_ID = p_ctlbk->linkid;
 			if (p_env->packing > PACKING_ASK) {
-				dev_info(tdev,
-				"%s: Confirmed Now packing\n", dev->name);
+				printk(KERN_INFO "%s: Confirmed Now packing\n",
+					dev->name);
 				p_env->packing = DO_PACKED;
 			}
 			p_ch = &privptr->channel[WRITE];
 			wake_up(&p_ch->wait);
 		} else {
-			dev_info(tdev, "%s: Conn confirm: "
+		       printk(KERN_INFO "%s: Conn confirm: "
 				"unexpected linkid=%d \n",
 				dev->name, p_ctlbk->linkid);
 			claw_snd_disc(dev, p_ctlbk);
 		}
 		break;
 	case DISCONNECT:
-		dev_info(tdev, "%s: Disconnect: "
+		printk(KERN_INFO "%s: Disconnect: "
 			"Vers=%d,link_id=%d,Corr=%d\n",
 			dev->name, p_ctlbk->version,
 			p_ctlbk->linkid, p_ctlbk->correlator);
@@ -2254,11 +2247,11 @@ claw_process_control( struct net_device *dev, struct ccwbk * p_ccw)
 			privptr->active_link_ID = 0;
 		break;
 	case CLAW_ERROR:
-		dev_info(tdev, "%s: CLAW ERROR detected\n",
+		printk(KERN_INFO "%s: CLAW ERROR detected\n",
 			dev->name);
 		break;
 	default:
-		dev_info(tdev, "%s: Unexpected command code=%d \n",
+		printk(KERN_INFO "%s:  Unexpected command code=%d \n",
 			dev->name,  p_ctlbk->command);
 		break;
         }
@@ -2518,8 +2511,7 @@ unpack_read(struct net_device *dev )
                         mtc_this_frm=1;
                         if (p_this_ccw->header.length!=
 				privptr->p_env->read_size ) {
-				dev_info(p_dev,
-					"%s: Invalid frame detected "
+                                printk(KERN_INFO " %s: Invalid frame detected "
 					"length is %02x\n" ,
                                         dev->name, p_this_ccw->header.length);
                         }
@@ -2603,8 +2595,8 @@ unpack_next:
                         }
                         else {
                                 privptr->stats.rx_dropped++;
-				dev_warn(p_dev,
-					"buffer allocate failed on receive\n");
+                                printk(KERN_WARNING "%s: %s() low on memory\n",
+				dev->name,__func__);
                         }
                         privptr->mtc_offset=0;
                         privptr->mtc_logical_link=-1;
@@ -2857,11 +2849,11 @@ add_channel(struct ccw_device *cdev,int i,struct claw_privbk *privptr)
 	struct chbk *p_ch;
 	struct ccw_dev_id dev_id;
 
-	CLAW_DBF_TEXT_(2, setup, "%s", cdev->dev.bus_id);
+	CLAW_DBF_TEXT_(2, setup, "%s", dev_name(&cdev->dev));
 	privptr->channel[i].flag  = i+1;   /* Read is 1 Write is 2 */
 	p_ch = &privptr->channel[i];
 	p_ch->cdev = cdev;
-	snprintf(p_ch->id, CLAW_ID_SIZE, "cl-%s", cdev->dev.bus_id);
+	snprintf(p_ch->id, CLAW_ID_SIZE, "cl-%s", dev_name(&cdev->dev));
 	ccw_device_get_id(cdev, &dev_id);
 	p_ch->devno = dev_id.devno;
 	if ((p_ch->irb = kzalloc(sizeof (struct irb),GFP_KERNEL)) == NULL) {
@@ -2888,8 +2880,8 @@ claw_new_device(struct ccwgroup_device *cgdev)
 	int ret;
 	struct ccw_dev_id dev_id;
 
-	dev_info(&cgdev->dev, "add for %s\n",
-		 dev_name(&cgdev->cdev[READ]->dev));
+	printk(KERN_INFO "claw: add for %s\n",
+	       dev_name(&cgdev->cdev[READ]->dev));
 	CLAW_DBF_TEXT(2, setup, "new_dev");
 	privptr = cgdev->dev.driver_data;
 	cgdev->cdev[READ]->dev.driver_data = privptr;
@@ -2905,28 +2897,29 @@ claw_new_device(struct ccwgroup_device *cgdev)
 	if (ret == 0)
 		ret = add_channel(cgdev->cdev[1],1,privptr);
 	if (ret != 0) {
-		dev_warn(&cgdev->dev, "add channel failed "
-			"with ret = %d\n", ret);
+		printk(KERN_WARNING
+			"add channel failed with ret = %d\n", ret);
 		goto out;
 	}
 	ret = ccw_device_set_online(cgdev->cdev[READ]);
 	if (ret != 0) {
-		dev_warn(&cgdev->dev,
-			"device set online READ failed "
-			"with ret = %d\n", ret);
+		printk(KERN_WARNING
+			"claw: ccw_device_set_online %s READ failed "
+		       "with ret = %d\n", dev_name(&cgdev->cdev[READ]->dev),
+		       ret);
 		goto out;
 	}
 	ret = ccw_device_set_online(cgdev->cdev[WRITE]);
 	if (ret != 0) {
-		dev_warn(&cgdev->dev,
-			"device set online WRITE failed "
-			"with ret = %d\n", ret);
+		printk(KERN_WARNING
+			"claw: ccw_device_set_online %s WRITE failed "
+		       "with ret = %d\n", dev_name(&cgdev->cdev[WRITE]->dev),
+		       ret);
 		goto out;
 	}
 	dev = alloc_netdev(0,"claw%d",claw_init_netdevice);
 	if (!dev) {
-		dev_warn(&cgdev->dev,
-			"failed creating network device\n");
+		printk(KERN_WARNING "%s:alloc_netdev failed\n",__func__);
 		goto out;
 	}
 	dev->ml_priv = privptr;
@@ -2954,13 +2947,13 @@ claw_new_device(struct ccwgroup_device *cgdev)
 	privptr->channel[WRITE].ndev = dev;
 	privptr->p_env->ndev = dev;
 
-	dev_info(&cgdev->dev, "%s:readsize=%d  writesize=%d "
+	printk(KERN_INFO "%s:readsize=%d  writesize=%d "
 		"readbuffer=%d writebuffer=%d read=0x%04x write=0x%04x\n",
                 dev->name, p_env->read_size,
 		p_env->write_size, p_env->read_buffers,
                 p_env->write_buffers, p_env->devno[READ],
 		p_env->devno[WRITE]);
-	dev_info(&cgdev->dev, "%s:host_name:%.8s, adapter_name "
+        printk(KERN_INFO "%s:host_name:%.8s, adapter_name "
 		":%.8s api_type: %.8s\n",
                 dev->name, p_env->host_name,
 		p_env->adapter_name , p_env->api_type);
@@ -2997,15 +2990,15 @@ claw_shutdown_device(struct ccwgroup_device *cgdev)
 	struct net_device *ndev;
 	int	ret;
 
-	CLAW_DBF_TEXT_(2, setup, "%s", cgdev->dev.bus_id);
+	CLAW_DBF_TEXT_(2, setup, "%s", dev_name(&cgdev->dev));
 	priv = cgdev->dev.driver_data;
 	if (!priv)
 		return -ENODEV;
 	ndev = priv->channel[READ].ndev;
 	if (ndev) {
 		/* Close the device */
-		dev_info(&cgdev->dev, "%s: shutting down \n",
-			ndev->name);
+		printk(KERN_INFO
+			"%s: shuting down \n",ndev->name);
 		if (ndev->flags & IFF_RUNNING)
 			ret = claw_release(ndev);
 		ndev->flags &=~IFF_RUNNING;
@@ -3027,10 +3020,11 @@ claw_remove_device(struct ccwgroup_device *cgdev)
 	struct claw_privbk *priv;
 
 	BUG_ON(!cgdev);
-	CLAW_DBF_TEXT_(2, setup, "%s", cgdev->dev.bus_id);
+	CLAW_DBF_TEXT_(2, setup, "%s", dev_name(&cgdev->dev));
 	priv = cgdev->dev.driver_data;
 	BUG_ON(!priv);
-	dev_info(&cgdev->dev, " will be removed.\n");
+	printk(KERN_INFO "claw: %s() called %s will be removed.\n",
+			__func__, dev_name(&cgdev->cdev[0]->dev));
 	if (cgdev->state == CCWGROUP_ONLINE)
 		claw_shutdown_device(cgdev);
 	claw_remove_files(&cgdev->dev);
@@ -3295,7 +3289,7 @@ claw_cleanup(void)
 {
 	unregister_cu3088_discipline(&claw_group_driver);
 	claw_unregister_debug_facility();
-	pr_info("Driver unloaded\n");
+	printk(KERN_INFO "claw: Driver unloaded\n");
 
 }
 
@@ -3309,11 +3303,12 @@ static int __init
 claw_init(void)
 {
 	int ret = 0;
+	printk(KERN_INFO "claw: starting driver\n");
 
-	pr_info("Loading %s\n", version);
 	ret = claw_register_debug_facility();
 	if (ret) {
-		pr_warning("debug_register failed %d\n", ret);
+		printk(KERN_WARNING "claw: %s() debug_register failed %d\n",
+			__func__,ret);
 		return ret;
 	}
 	CLAW_DBF_TEXT(2, setup, "init_mod");
@@ -3321,7 +3316,8 @@ claw_init(void)
 	if (ret) {
 		CLAW_DBF_TEXT(2, setup, "init_bad");
 		claw_unregister_debug_facility();
-		pr_warning("register_cu3088_discipline() failed rc=%d\n", ret);
+		printk(KERN_WARNING "claw; %s() cu3088 register failed %d\n",
+			__func__,ret);
 	}
 	return ret;
 }

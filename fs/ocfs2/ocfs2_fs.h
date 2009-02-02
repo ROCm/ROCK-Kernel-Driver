@@ -65,6 +65,7 @@
 #define OCFS2_EXTENT_BLOCK_SIGNATURE	"EXBLK01"
 #define OCFS2_GROUP_DESC_SIGNATURE      "GROUP01"
 #define OCFS2_XATTR_BLOCK_SIGNATURE	"XATTR01"
+#define OCFS2_DIR_TRAILER_SIGNATURE	"DIRTRL1"
 
 /* Compatibility flags */
 #define OCFS2_HAS_COMPAT_FEATURE(sb,mask)			\
@@ -86,13 +87,15 @@
 #define OCFS2_CLEAR_INCOMPAT_FEATURE(sb,mask)			\
 	OCFS2_SB(sb)->s_feature_incompat &= ~(mask)
 
-#define OCFS2_FEATURE_COMPAT_SUPP	OCFS2_FEATURE_COMPAT_BACKUP_SB
+#define OCFS2_FEATURE_COMPAT_SUPP	(OCFS2_FEATURE_COMPAT_BACKUP_SB	\
+					 | OCFS2_FEATURE_COMPAT_JBD2_SB)
 #define OCFS2_FEATURE_INCOMPAT_SUPP	(OCFS2_FEATURE_INCOMPAT_LOCAL_MOUNT \
 					 | OCFS2_FEATURE_INCOMPAT_SPARSE_ALLOC \
 					 | OCFS2_FEATURE_INCOMPAT_INLINE_DATA \
 					 | OCFS2_FEATURE_INCOMPAT_EXTENDED_SLOT_MAP \
 					 | OCFS2_FEATURE_INCOMPAT_USERSPACE_STACK \
-					 | OCFS2_FEATURE_INCOMPAT_XATTR)
+					 | OCFS2_FEATURE_INCOMPAT_XATTR \
+					 | OCFS2_FEATURE_INCOMPAT_META_ECC)
 #define OCFS2_FEATURE_RO_COMPAT_SUPP	(OCFS2_FEATURE_RO_COMPAT_UNWRITTEN \
 					 | OCFS2_FEATURE_RO_COMPAT_USRQUOTA \
 					 | OCFS2_FEATURE_RO_COMPAT_GRPQUOTA)
@@ -148,11 +151,19 @@
 /* Support for extended attributes */
 #define OCFS2_FEATURE_INCOMPAT_XATTR		0x0200
 
+/* Metadata checksum and error correction */
+#define OCFS2_FEATURE_INCOMPAT_META_ECC		0x0800
+
 /*
  * backup superblock flag is used to indicate that this volume
  * has backup superblocks.
  */
 #define OCFS2_FEATURE_COMPAT_BACKUP_SB		0x0001
+
+/*
+ * The filesystem will correctly handle journal feature bits.
+ */
+#define OCFS2_FEATURE_COMPAT_JBD2_SB		0x0002
 
 /*
  * Unwritten extents support.
@@ -421,6 +432,22 @@ static unsigned char ocfs2_type_by_mode[S_IFMT >> S_SHIFT] = {
 #define OCFS2_RAW_SB(dinode)		(&((dinode)->id2.i_super))
 
 /*
+ * Block checking structure.  This is used in metadata to validate the
+ * contents.  If OCFS2_FEATURE_INCOMPAT_META_ECC is not set, it is all
+ * zeros.
+ */
+struct ocfs2_block_check {
+/*00*/	__le32 bc_crc32e;	/* 802.3 Ethernet II CRC32 */
+	__le16 bc_ecc;		/* Single-error-correction parity vector.
+				   This is a simple Hamming code dependant
+				   on the blocksize.  OCFS2's maximum
+				   blocksize, 4K, requires 16 parity bits,
+				   so we fit in __le16. */
+	__le16 bc_reserved1;
+/*08*/
+};
+
+/*
  * On disk extent record for OCFS2
  * It describes a range of clusters on disk.
  *
@@ -507,7 +534,7 @@ struct ocfs2_truncate_log {
 struct ocfs2_extent_block
 {
 /*00*/	__u8 h_signature[8];		/* Signature for verification */
-	__le64 h_reserved1;
+	struct ocfs2_block_check h_check;	/* Error checking */
 /*10*/	__le16 h_suballoc_slot;		/* Slot suballocator this
 					   extent_header belongs to */
 	__le16 h_suballoc_bit;		/* Bit offset in suballocator
@@ -677,7 +704,8 @@ struct ocfs2_dinode {
 					   was set in i_flags */
 	__le16 i_dyn_features;
 	__le64 i_xattr_loc;
-/*80*/	__le64 i_reserved2[7];
+/*80*/	struct ocfs2_block_check i_check;	/* Error checking */
+/*88*/	__le64 i_reserved2[6];
 /*B8*/	union {
 		__le64 i_pad1;		/* Generic way to refer to this
 					   64bit union */
@@ -726,6 +754,34 @@ struct ocfs2_dir_entry {
 } __attribute__ ((packed));
 
 /*
+ * Per-block record for the unindexed directory btree. This is carefully
+ * crafted so that the rec_len and name_len records of an ocfs2_dir_entry are
+ * mirrored. That way, the directory manipulation code needs a minimal amount
+ * of update.
+ *
+ * NOTE: Keep this structure aligned to a multiple of 4 bytes.
+ */
+struct ocfs2_dir_block_trailer {
+/*00*/	__le64		db_compat_inode;	/* Always zero. Was inode */
+
+	__le16		db_compat_rec_len;	/* Backwards compatible with
+						 * ocfs2_dir_entry. */
+	__u8		db_compat_name_len;	/* Always zero. Was name_len */
+	__u8		db_reserved0;
+	__le16		db_reserved1;
+	__le16		db_free_rec_len;	/* Size of largest empty hole
+						 * in this block. (unused) */
+/*10*/	__u8		db_signature[8];	/* Signature for verification */
+	__le64		db_reserved2;
+	__le64		db_free_next;		/* Next block in list (unused) */
+/*20*/	__le64		db_blkno;		/* Offset on disk, in blocks */
+	__le64		db_parent_dinode;	/* dinode which owns me, in
+						   blocks */
+/*30*/	struct ocfs2_block_check db_check;	/* Error checking */
+/*40*/
+};
+
+/*
  * On disk allocator group structure for OCFS2
  */
 struct ocfs2_group_desc
@@ -744,7 +800,8 @@ struct ocfs2_group_desc
 /*20*/	__le64   bg_parent_dinode;       /* dinode which owns me, in
 					   blocks */
 	__le64   bg_blkno;               /* Offset on disk, in blocks */
-/*30*/	__le64   bg_reserved2[2];
+/*30*/	struct ocfs2_block_check bg_check;	/* Error checking */
+	__le64   bg_reserved2;
 /*40*/	__u8    bg_bitmap[0];
 };
 
@@ -759,12 +816,12 @@ struct ocfs2_group_desc
  */
 struct ocfs2_xattr_entry {
 	__le32	xe_name_hash;    /* hash value of xattr prefix+suffix. */
-	__le16	xe_name_offset;  /* byte offset from the 1st etnry in the local
+	__le16	xe_name_offset;  /* byte offset from the 1st entry in the
 				    local xattr storage(inode, xattr block or
 				    xattr bucket). */
 	__u8	xe_name_len;	 /* xattr name len, does't include prefix. */
-	__u8	xe_type;         /* the low 7 bits indicates the name prefix's
-				  * type and the highest 1 bits indicate whether
+	__u8	xe_type;         /* the low 7 bits indicate the name prefix
+				  * type and the highest bit indicates whether
 				  * the EA is stored in the local storage. */
 	__le64	xe_value_size;	 /* real xattr value length. */
 };
@@ -783,18 +840,24 @@ struct ocfs2_xattr_header {
 						   xattr. */
 	__le16	xh_name_value_len;              /* total length of name/value
 						   length in this bucket. */
-	__le16	xh_num_buckets;                 /* bucket nums in one extent
-						   record, only valid in the
-						   first bucket. */
-	__le64  xh_csum;
+	__le16	xh_num_buckets;                 /* Number of xattr buckets
+						   in this extent record,
+						   only valid in the first
+						   bucket. */
+	struct ocfs2_block_check xh_check;	/* Error checking
+						   (Note, this is only
+						    used for xattr
+						    buckets.  A block uses
+						    xb_check and sets
+						    this field to zero.) */
 	struct ocfs2_xattr_entry xh_entries[0]; /* xattr entry list. */
 };
 
 /*
  * On disk structure for xattr value root.
  *
- * It is used when one extended attribute's size is larger, and we will save it
- * in an outside cluster. It will stored in a b-tree like file content.
+ * When an xattr's value is large enough, it is stored in an external
+ * b-tree like file data.  The xattr value root points to this structure.
  */
 struct ocfs2_xattr_value_root {
 /*00*/	__le32	xr_clusters;              /* clusters covered by xattr value. */
@@ -837,7 +900,7 @@ struct ocfs2_xattr_block {
 					block group */
 	__le32	xb_fs_generation;    /* Must match super block */
 /*10*/	__le64	xb_blkno;            /* Offset on disk, in blocks */
-	__le64	xb_csum;
+	struct ocfs2_block_check xb_check;	/* Error checking */
 /*20*/	__le16	xb_flags;            /* Indicates whether this block contains
 					real xattr or a xattr tree. */
 	__le16	xb_reserved0;
@@ -851,6 +914,32 @@ struct ocfs2_xattr_block {
 							tree. */
 	} xb_attrs;
 };
+
+#define OCFS2_XATTR_ENTRY_LOCAL		0x80
+#define OCFS2_XATTR_TYPE_MASK		0x7F
+static inline void ocfs2_xattr_set_local(struct ocfs2_xattr_entry *xe,
+					 int local)
+{
+	if (local)
+		xe->xe_type |= OCFS2_XATTR_ENTRY_LOCAL;
+	else
+		xe->xe_type &= ~OCFS2_XATTR_ENTRY_LOCAL;
+}
+
+static inline int ocfs2_xattr_is_local(struct ocfs2_xattr_entry *xe)
+{
+	return xe->xe_type & OCFS2_XATTR_ENTRY_LOCAL;
+}
+
+static inline void ocfs2_xattr_set_type(struct ocfs2_xattr_entry *xe, int type)
+{
+	xe->xe_type |= type & OCFS2_XATTR_TYPE_MASK;
+}
+
+static inline int ocfs2_xattr_get_type(struct ocfs2_xattr_entry *xe)
+{
+	return xe->xe_type & OCFS2_XATTR_TYPE_MASK;
+}
 
 /*
  *  On disk structures for global quota file
@@ -867,6 +956,12 @@ struct ocfs2_xattr_block {
 	0, \
 }
 
+
+/* Each block of each quota file has a certain fixed number of bytes reserved
+ * for OCFS2 internal use at its end. OCFS2 can use it for things like
+ * checksums, etc. */
+#define OCFS2_QBLK_RESERVED_SPACE 8
+
 /* Generic header of all quota files */
 struct ocfs2_disk_dqheader {
 	__le32 dqh_magic;	/* Magic number identifying file */
@@ -878,12 +973,14 @@ struct ocfs2_disk_dqheader {
 /* Information header of global quota file (immediately follows the generic
  * header) */
 struct ocfs2_global_disk_dqinfo {
-/*00*/	__le32 dqi_bgrace;
-	__le32 dqi_igrace;
-	__le32 dqi_syncms;
-	__le32 dqi_blocks;
-/*10*/	__le32 dqi_free_blk;
-	__le32 dqi_free_entry;
+/*00*/	__le32 dqi_bgrace;	/* Grace time for space softlimit excess */
+	__le32 dqi_igrace;	/* Grace time for inode softlimit excess */
+	__le32 dqi_syncms;	/* Time after which we sync local changes to
+				 * global quota file */
+	__le32 dqi_blocks;	/* Number of blocks in quota file */
+/*10*/	__le32 dqi_free_blk;	/* First free block in quota file */
+	__le32 dqi_free_entry;	/* First block with free dquot entry in quota
+				 * file */
 };
 
 /* Structure with global user / group information. We reserve some space
@@ -947,30 +1044,23 @@ struct ocfs2_local_disk_dqblk {
 /*10*/	__le64 dqb_inodemod;	/* Change in the amount of used inodes */
 };
 
-#define OCFS2_XATTR_ENTRY_LOCAL		0x80
-#define OCFS2_XATTR_TYPE_MASK		0x7F
-static inline void ocfs2_xattr_set_local(struct ocfs2_xattr_entry *xe,
-					 int local)
-{
-	if (local)
-		xe->xe_type |= OCFS2_XATTR_ENTRY_LOCAL;
-	else
-		xe->xe_type &= ~OCFS2_XATTR_ENTRY_LOCAL;
-}
 
-static inline int ocfs2_xattr_is_local(struct ocfs2_xattr_entry *xe)
-{
-	return xe->xe_type & OCFS2_XATTR_ENTRY_LOCAL;
-}
+/*
+ * The quota trailer lives at the end of each quota block.
+ */
 
-static inline void ocfs2_xattr_set_type(struct ocfs2_xattr_entry *xe, int type)
-{
-	xe->xe_type |= type & OCFS2_XATTR_TYPE_MASK;
-}
+struct ocfs2_disk_dqtrailer {
+/*00*/	struct ocfs2_block_check dq_check;	/* Error checking */
+/*08*/	/* Cannot be larger than OCFS2_QBLK_RESERVED_SPACE */
+};
 
-static inline int ocfs2_xattr_get_type(struct ocfs2_xattr_entry *xe)
+static inline struct ocfs2_disk_dqtrailer *ocfs2_block_dqtrailer(int blocksize,
+								 void *buf)
 {
-	return xe->xe_type & OCFS2_XATTR_TYPE_MASK;
+	char *ptr = buf;
+	ptr += blocksize - OCFS2_QBLK_RESERVED_SPACE;
+
+	return (struct ocfs2_disk_dqtrailer *)ptr;
 }
 
 #ifdef __KERNEL__

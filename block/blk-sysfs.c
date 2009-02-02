@@ -88,9 +88,7 @@ queue_ra_store(struct request_queue *q, const char *page, size_t count)
 	unsigned long ra_kb;
 	ssize_t ret = queue_var_store(&ra_kb, page, count);
 
-	spin_lock_irq(q->queue_lock);
 	q->backing_dev_info.ra_pages = ra_kb >> (PAGE_CACHE_SHIFT - 10);
-	spin_unlock_irq(q->queue_lock);
 
 	return ret;
 }
@@ -117,10 +115,7 @@ queue_max_sectors_store(struct request_queue *q, const char *page, size_t count)
 
 	if (max_sectors_kb > max_hw_sectors_kb || max_sectors_kb < page_kb)
 		return -EINVAL;
-	/*
-	 * Take the queue lock to update the readahead and max_sectors
-	 * values synchronously:
-	 */
+
 	spin_lock_irq(q->queue_lock);
 	q->max_sectors = max_sectors_kb << 1;
 	spin_unlock_irq(q->queue_lock);
@@ -341,7 +336,7 @@ int blk_register_queue(struct gendisk *disk)
 	if (!q->request_fn)
 		return 0;
 
-	ret = kobject_add(&q->kobj, kobject_get(&disk->dev.kobj),
+	ret = kobject_add(&q->kobj, kobject_get(&disk_to_dev(disk)->kobj),
 			  "%s", "queue");
 	if (ret < 0)
 		return ret;
@@ -370,6 +365,6 @@ void blk_unregister_queue(struct gendisk *disk)
 
 		kobject_uevent(&q->kobj, KOBJ_REMOVE);
 		kobject_del(&q->kobj);
-		kobject_put(&disk->dev.kobj);
+		kobject_put(&disk_to_dev(disk)->kobj);
 	}
 }

@@ -22,7 +22,7 @@
  * file called LICENSE.
  *
  * Contact Information:
- * James P. Ketrenos <ipw2100-admin@linux.intel.com>
+ *  Intel Linux Wireless <ilw@linux.intel.com>
  * Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
  *
  *****************************************************************************/
@@ -218,8 +218,7 @@ int iwl_rx_queue_restock(struct iwl_priv *priv)
 
 	/* If we've added more space for the firmware to place data, tell it.
 	 * Increment device's write pointer in multiples of 8. */
-	if ((write != (rxq->write & ~0x7))
-	    || (abs(rxq->write - rxq->read) > 7)) {
+	if (write != (rxq->write & ~0x7)) {
 		spin_lock_irqsave(&rxq->lock, flags);
 		rxq->need_update = 1;
 		spin_unlock_irqrestore(&rxq->lock, flags);
@@ -292,7 +291,6 @@ void iwl_rx_allocate(struct iwl_priv *priv)
 		spin_unlock_irqrestore(&rxq->lock, flags);
 	}
 }
-EXPORT_SYMBOL(iwl_rx_allocate);
 
 void iwl_rx_replenish(struct iwl_priv *priv)
 {
@@ -327,7 +325,10 @@ void iwl_rx_queue_free(struct iwl_priv *priv, struct iwl_rx_queue *rxq)
 
 	pci_free_consistent(priv->pci_dev, 4 * RX_QUEUE_SIZE, rxq->bd,
 			    rxq->dma_addr);
+	pci_free_consistent(priv->pci_dev, sizeof(struct iwl_rb_status),
+			    rxq->rb_stts, rxq->rb_stts_dma);
 	rxq->bd = NULL;
+	rxq->rb_stts  = NULL;
 }
 EXPORT_SYMBOL(iwl_rx_queue_free);
 
@@ -344,7 +345,12 @@ int iwl_rx_queue_alloc(struct iwl_priv *priv)
 	/* Alloc the circular buffer of Read Buffer Descriptors (RBDs) */
 	rxq->bd = pci_alloc_consistent(dev, 4 * RX_QUEUE_SIZE, &rxq->dma_addr);
 	if (!rxq->bd)
-		return -ENOMEM;
+		goto err_bd;
+
+	rxq->rb_stts = pci_alloc_consistent(dev, sizeof(struct iwl_rb_status),
+					&rxq->rb_stts_dma);
+	if (!rxq->rb_stts)
+		goto err_rb;
 
 	/* Fill the rx_used queue with _all_ of the Rx buffers */
 	for (i = 0; i < RX_FREE_BUFFERS + RX_QUEUE_SIZE; i++)
@@ -356,6 +362,12 @@ int iwl_rx_queue_alloc(struct iwl_priv *priv)
 	rxq->free_count = 0;
 	rxq->need_update = 0;
 	return 0;
+
+err_rb:
+	pci_free_consistent(priv->pci_dev, 4 * RX_QUEUE_SIZE, rxq->bd,
+			    rxq->dma_addr);
+err_bd:
+	return -ENOMEM;
 }
 EXPORT_SYMBOL(iwl_rx_queue_alloc);
 
@@ -394,7 +406,9 @@ int iwl_rx_init(struct iwl_priv *priv, struct iwl_rx_queue *rxq)
 {
 	int ret;
 	unsigned long flags;
-	unsigned int rb_size;
+	u32 rb_size;
+	const u32 rfdnlog = RX_QUEUE_SIZE_LOG; /* 256 RBDs */
+	const u32 rb_timeout = 0; /* FIXME: RX_RB_TIMEOUT why this stalls RX */
 
 	spin_lock_irqsave(&priv->lock, flags);
 	ret = iwl_grab_nic_access(priv);
@@ -416,26 +430,33 @@ int iwl_rx_init(struct iwl_priv *priv, struct iwl_rx_queue *rxq)
 
 	/* Tell device where to find RBD circular buffer in DRAM */
 	iwl_write_direct32(priv, FH_RSCSR_CHNL0_RBDCB_BASE_REG,
-			   rxq->dma_addr >> 8);
+			   (u32)(rxq->dma_addr >> 8));
 
 	/* Tell device where in DRAM to update its Rx status */
 	iwl_write_direct32(priv, FH_RSCSR_CHNL0_STTS_WPTR_REG,
-			   (priv->shared_phys + priv->rb_closed_offset) >> 4);
+			   rxq->rb_stts_dma >> 4);
 
-	/* Enable Rx DMA, enable host interrupt, Rx buffer size 4k, 256 RBDs */
+	/* Enable Rx DMA
+	 * FH_RCSR_CHNL0_RX_IGNORE_RXF_EMPTY is set because of HW bug in
+	 *      the credit mechanism in 5000 HW RX FIFO
+	 * Direct rx interrupts to hosts
+	 * Rx buffer size 4 or 8k
+	 * RB timeout 0x10
+	 * 256 RBDs
+	 */
 	iwl_write_direct32(priv, FH_MEM_RCSR_CHNL0_CONFIG_REG,
 			   FH_RCSR_RX_CONFIG_CHNL_EN_ENABLE_VAL |
+			   FH_RCSR_CHNL0_RX_IGNORE_RXF_EMPTY |
 			   FH_RCSR_CHNL0_RX_CONFIG_IRQ_DEST_INT_HOST_VAL |
-			   rb_size |
-			     /* 0x10 << 4 | */
-			   (RX_QUEUE_SIZE_LOG <<
-			      FH_RCSR_RX_CONFIG_RBDCB_SIZE_BITSHIFT));
-
-	/*
-	 * iwl_write32(priv,CSR_INT_COAL_REG,0);
-	 */
+			   FH_RCSR_CHNL0_RX_CONFIG_SINGLE_FRAME_MSK |
+			   rb_size|
+			   (rb_timeout << FH_RCSR_RX_CONFIG_REG_IRQ_RBTH_POS)|
+			   (rfdnlog << FH_RCSR_RX_CONFIG_RBDCB_SIZE_POS));
 
 	iwl_release_nic_access(priv);
+
+	iwl_write32(priv, CSR_INT_COALESCING, 0x40);
+
 	spin_unlock_irqrestore(&priv->lock, flags);
 
 	return 0;
@@ -455,10 +476,8 @@ int iwl_rxq_stop(struct iwl_priv *priv)
 
 	/* stop Rx DMA */
 	iwl_write_direct32(priv, FH_MEM_RCSR_CHNL0_CONFIG_REG, 0);
-	ret = iwl_poll_direct_bit(priv, FH_MEM_RSSR_RX_STATUS_REG,
-				     (1 << 24), 1000);
-	if (ret < 0)
-		IWL_ERROR("Can't stop Rx DMA.\n");
+	iwl_poll_direct_bit(priv, FH_MEM_RSSR_RX_STATUS_REG,
+			    FH_RSSR_CHNL0_RX_STATUS_CHNL_IDLE, 1000);
 
 	iwl_release_nic_access(priv);
 	spin_unlock_irqrestore(&priv->lock, flags);
@@ -472,7 +491,7 @@ void iwl_rx_missed_beacon_notif(struct iwl_priv *priv,
 
 {
 	struct iwl_rx_packet *pkt = (struct iwl_rx_packet *)rxb->skb->data;
-	struct iwl4965_missed_beacon_notif *missed_beacon;
+	struct iwl_missed_beacon_notif *missed_beacon;
 
 	missed_beacon = &pkt->u.missed_beacon;
 	if (le32_to_cpu(missed_beacon->consequtive_missed_beacons) > 5) {
@@ -486,49 +505,6 @@ void iwl_rx_missed_beacon_notif(struct iwl_priv *priv,
 	}
 }
 EXPORT_SYMBOL(iwl_rx_missed_beacon_notif);
-
-int iwl_rx_agg_start(struct iwl_priv *priv, const u8 *addr, int tid, u16 ssn)
-{
-	unsigned long flags;
-	int sta_id;
-
-	sta_id = iwl_find_station(priv, addr);
-	if (sta_id == IWL_INVALID_STATION)
-		return -ENXIO;
-
-	spin_lock_irqsave(&priv->sta_lock, flags);
-	priv->stations[sta_id].sta.station_flags_msk = 0;
-	priv->stations[sta_id].sta.sta.modify_mask = STA_MODIFY_ADDBA_TID_MSK;
-	priv->stations[sta_id].sta.add_immediate_ba_tid = (u8)tid;
-	priv->stations[sta_id].sta.add_immediate_ba_ssn = cpu_to_le16(ssn);
-	priv->stations[sta_id].sta.mode = STA_CONTROL_MODIFY_MSK;
-	spin_unlock_irqrestore(&priv->sta_lock, flags);
-
-	return iwl_send_add_sta(priv, &priv->stations[sta_id].sta,
-					CMD_ASYNC);
-}
-EXPORT_SYMBOL(iwl_rx_agg_start);
-
-int iwl_rx_agg_stop(struct iwl_priv *priv, const u8 *addr, int tid)
-{
-	unsigned long flags;
-	int sta_id;
-
-	sta_id = iwl_find_station(priv, addr);
-	if (sta_id == IWL_INVALID_STATION)
-		return -ENXIO;
-
-	spin_lock_irqsave(&priv->sta_lock, flags);
-	priv->stations[sta_id].sta.station_flags_msk = 0;
-	priv->stations[sta_id].sta.sta.modify_mask = STA_MODIFY_DELBA_TID_MSK;
-	priv->stations[sta_id].sta.remove_immediate_ba_tid = (u8)tid;
-	priv->stations[sta_id].sta.mode = STA_CONTROL_MODIFY_MSK;
-	spin_unlock_irqrestore(&priv->sta_lock, flags);
-
-	return iwl_send_add_sta(priv, &priv->stations[sta_id].sta,
-					CMD_ASYNC);
-}
-EXPORT_SYMBOL(iwl_rx_agg_stop);
 
 
 /* Calculate noise level, based on measurements during network silence just
@@ -653,20 +629,24 @@ static int iwl_calc_sig_qual(int rssi_dbm, int noise_dbm)
 	return sig_qual;
 }
 
-#ifdef CONFIG_IWLWIFI_DEBUG
+/* Calc max signal level (dBm) among 3 possible receivers */
+static inline int iwl_calc_rssi(struct iwl_priv *priv,
+				struct iwl_rx_phy_res *rx_resp)
+{
+	return priv->cfg->ops->utils->calc_rssi(priv, rx_resp);
+}
 
+#ifdef CONFIG_IWLWIFI_DEBUG
 /**
  * iwl_dbg_report_frame - dump frame to syslog during debug sessions
  *
  * You may hack this function to show different aspects of received frames,
  * including selective frame dumps.
- * group100 parameter selects whether to show 1 out of 100 good frames.
- *
- * TODO:  This was originally written for 3945, need to audit for
- *        proper operation with 4965.
+ * group100 parameter selects whether to show 1 out of 100 good data frames.
+ *    All beacon and probe response frames are printed.
  */
 static void iwl_dbg_report_frame(struct iwl_priv *priv,
-		      struct iwl_rx_packet *pkt,
+		      struct iwl_rx_phy_res *phy_res, u16 length,
 		      struct ieee80211_hdr *header, int group100)
 {
 	u32 to_us;
@@ -678,20 +658,9 @@ static void iwl_dbg_report_frame(struct iwl_priv *priv,
 	u16 seq_ctl;
 	u16 channel;
 	u16 phy_flags;
-	int rate_sym;
-	u16 length;
-	u16 status;
-	u16 bcn_tmr;
+	u32 rate_n_flags;
 	u32 tsf_low;
-	u64 tsf;
-	u8 rssi;
-	u8 agc;
-	u16 sig_avg;
-	u16 noise_diff;
-	struct iwl4965_rx_frame_stats *rx_stats = IWL_RX_STATS(pkt);
-	struct iwl4965_rx_frame_hdr *rx_hdr = IWL_RX_HDR(pkt);
-	struct iwl4965_rx_frame_end *rx_end = IWL_RX_END(pkt);
-	u8 *data = IWL_RX_DATA(pkt);
+	int rssi;
 
 	if (likely(!(priv->debug_level & IWL_DL_RX)))
 		return;
@@ -701,22 +670,13 @@ static void iwl_dbg_report_frame(struct iwl_priv *priv,
 	seq_ctl = le16_to_cpu(header->seq_ctrl);
 
 	/* metadata */
-	channel = le16_to_cpu(rx_hdr->channel);
-	phy_flags = le16_to_cpu(rx_hdr->phy_flags);
-	rate_sym = rx_hdr->rate;
-	length = le16_to_cpu(rx_hdr->len);
-
-	/* end-of-frame status and timestamp */
-	status = le32_to_cpu(rx_end->status);
-	bcn_tmr = le32_to_cpu(rx_end->beacon_timestamp);
-	tsf_low = le64_to_cpu(rx_end->timestamp) & 0x0ffffffff;
-	tsf = le64_to_cpu(rx_end->timestamp);
+	channel = le16_to_cpu(phy_res->channel);
+	phy_flags = le16_to_cpu(phy_res->phy_flags);
+	rate_n_flags = le32_to_cpu(phy_res->rate_n_flags);
 
 	/* signal statistics */
-	rssi = rx_stats->rssi;
-	agc = rx_stats->agc;
-	sig_avg = le16_to_cpu(rx_stats->sig_avg);
-	noise_diff = le16_to_cpu(rx_stats->noise_diff);
+	rssi = iwl_calc_rssi(priv, phy_res);
+	tsf_low = le64_to_cpu(phy_res->timestamp) & 0x0ffffffff;
 
 	to_us = !compare_ether_addr(header->addr1, priv->mac_addr);
 
@@ -770,11 +730,13 @@ static void iwl_dbg_report_frame(struct iwl_priv *priv,
 		else
 			title = "Frame";
 
-		rate_idx = iwl_hwrate_to_plcp_idx(rate_sym);
-		if (unlikely(rate_idx == -1))
+		rate_idx = iwl_hwrate_to_plcp_idx(rate_n_flags);
+		if (unlikely((rate_idx < 0) || (rate_idx >= IWL_RATE_COUNT))) {
 			bitrate = 0;
-		else
+			WARN_ON_ONCE(1);
+		} else {
 			bitrate = iwl_rates[rate_idx].ieee / 2;
+		}
 
 		/* print frame summary.
 		 * MAC addresses show just the last byte (for brevity),
@@ -786,127 +748,19 @@ static void iwl_dbg_report_frame(struct iwl_priv *priv,
 				     length, rssi, channel, bitrate);
 		else {
 			/* src/dst addresses assume managed mode */
-			IWL_DEBUG_RX("%s: 0x%04x, dst=0x%02x, "
-				     "src=0x%02x, rssi=%u, tim=%lu usec, "
+			IWL_DEBUG_RX("%s: 0x%04x, dst=0x%02x, src=0x%02x, "
+				     "len=%u, rssi=%d, tim=%lu usec, "
 				     "phy=0x%02x, chnl=%d\n",
 				     title, le16_to_cpu(fc), header->addr1[5],
-				     header->addr3[5], rssi,
+				     header->addr3[5], length, rssi,
 				     tsf_low - priv->scan_start_tsf,
 				     phy_flags, channel);
 		}
 	}
 	if (print_dump)
-		iwl_print_hex_dump(priv, IWL_DL_RX, data, length);
-}
-#else
-static inline void iwl_dbg_report_frame(struct iwl_priv *priv,
-					    struct iwl_rx_packet *pkt,
-					    struct ieee80211_hdr *header,
-					    int group100)
-{
+		iwl_print_hex_dump(priv, IWL_DL_RX, header, length);
 }
 #endif
-
-static void iwl_add_radiotap(struct iwl_priv *priv,
-				 struct sk_buff *skb,
-				 struct iwl_rx_phy_res *rx_start,
-				 struct ieee80211_rx_status *stats,
-				 u32 ampdu_status)
-{
-	s8 signal = stats->signal;
-	s8 noise = 0;
-	int rate = stats->rate_idx;
-	u64 tsf = stats->mactime;
-	__le16 antenna;
-	__le16 phy_flags_hw = rx_start->phy_flags;
-	struct iwl4965_rt_rx_hdr {
-		struct ieee80211_radiotap_header rt_hdr;
-		__le64 rt_tsf;		/* TSF */
-		u8 rt_flags;		/* radiotap packet flags */
-		u8 rt_rate;		/* rate in 500kb/s */
-		__le16 rt_channelMHz;	/* channel in MHz */
-		__le16 rt_chbitmask;	/* channel bitfield */
-		s8 rt_dbmsignal;	/* signal in dBm, kluged to signed */
-		s8 rt_dbmnoise;
-		u8 rt_antenna;		/* antenna number */
-	} __attribute__ ((packed)) *iwl4965_rt;
-
-	/* TODO: We won't have enough headroom for HT frames. Fix it later. */
-	if (skb_headroom(skb) < sizeof(*iwl4965_rt)) {
-		if (net_ratelimit())
-			printk(KERN_ERR "not enough headroom [%d] for "
-			       "radiotap head [%zd]\n",
-			       skb_headroom(skb), sizeof(*iwl4965_rt));
-		return;
-	}
-
-	/* put radiotap header in front of 802.11 header and data */
-	iwl4965_rt = (void *)skb_push(skb, sizeof(*iwl4965_rt));
-
-	/* initialise radiotap header */
-	iwl4965_rt->rt_hdr.it_version = PKTHDR_RADIOTAP_VERSION;
-	iwl4965_rt->rt_hdr.it_pad = 0;
-
-	/* total header + data */
-	put_unaligned_le16(sizeof(*iwl4965_rt), &iwl4965_rt->rt_hdr.it_len);
-
-	/* Indicate all the fields we add to the radiotap header */
-	put_unaligned_le32((1 << IEEE80211_RADIOTAP_TSFT) |
-			   (1 << IEEE80211_RADIOTAP_FLAGS) |
-			   (1 << IEEE80211_RADIOTAP_RATE) |
-			   (1 << IEEE80211_RADIOTAP_CHANNEL) |
-			   (1 << IEEE80211_RADIOTAP_DBM_ANTSIGNAL) |
-			   (1 << IEEE80211_RADIOTAP_DBM_ANTNOISE) |
-			   (1 << IEEE80211_RADIOTAP_ANTENNA),
-			   &(iwl4965_rt->rt_hdr.it_present));
-
-	/* Zero the flags, we'll add to them as we go */
-	iwl4965_rt->rt_flags = 0;
-
-	put_unaligned_le64(tsf, &iwl4965_rt->rt_tsf);
-
-	iwl4965_rt->rt_dbmsignal = signal;
-	iwl4965_rt->rt_dbmnoise = noise;
-
-	/* Convert the channel frequency and set the flags */
-	put_unaligned(cpu_to_le16(stats->freq), &iwl4965_rt->rt_channelMHz);
-	if (!(phy_flags_hw & RX_RES_PHY_FLAGS_BAND_24_MSK))
-		put_unaligned_le16(IEEE80211_CHAN_OFDM | IEEE80211_CHAN_5GHZ,
-				   &iwl4965_rt->rt_chbitmask);
-	else if (phy_flags_hw & RX_RES_PHY_FLAGS_MOD_CCK_MSK)
-		put_unaligned_le16(IEEE80211_CHAN_CCK | IEEE80211_CHAN_2GHZ,
-				   &iwl4965_rt->rt_chbitmask);
-	else	/* 802.11g */
-		put_unaligned_le16(IEEE80211_CHAN_OFDM | IEEE80211_CHAN_2GHZ,
-				   &iwl4965_rt->rt_chbitmask);
-
-	if (rate == -1)
-		iwl4965_rt->rt_rate = 0;
-	else
-		iwl4965_rt->rt_rate = iwl_rates[rate].ieee;
-
-	/*
-	 * "antenna number"
-	 *
-	 * It seems that the antenna field in the phy flags value
-	 * is actually a bitfield. This is undefined by radiotap,
-	 * it wants an actual antenna number but I always get "7"
-	 * for most legacy frames I receive indicating that the
-	 * same frame was received on all three RX chains.
-	 *
-	 * I think this field should be removed in favour of a
-	 * new 802.11n radiotap field "RX chains" that is defined
-	 * as a bitmask.
-	 */
-	antenna = phy_flags_hw & RX_RES_PHY_FLAGS_ANTENNA_MSK;
-	iwl4965_rt->rt_antenna = le16_to_cpu(antenna) >> 4;
-
-	/* set the preamble flag if appropriate */
-	if (phy_flags_hw & RX_RES_PHY_FLAGS_SHORT_PREAMBLE_MSK)
-		iwl4965_rt->rt_flags |= IEEE80211_RADIOTAP_F_SHORTPRE;
-
-	stats->flag |= RX_FLAG_RADIOTAP;
-}
 
 static void iwl_update_rx_stats(struct iwl_priv *priv, u16 fc, u16 len)
 {
@@ -1092,53 +946,10 @@ static void iwl_pass_packet_to_mac80211(struct iwl_priv *priv,
 	    iwl_set_decrypted_flag(priv, hdr, ampdu_status, stats))
 		return;
 
-	if (priv->add_radiotap)
-		iwl_add_radiotap(priv, rxb->skb, rx_start, stats, ampdu_status);
-
 	iwl_update_rx_stats(priv, le16_to_cpu(hdr->frame_control), len);
 	ieee80211_rx_irqsafe(priv->hw, rxb->skb, stats);
 	priv->alloc_rxb_skb--;
 	rxb->skb = NULL;
-}
-
-/* Calc max signal level (dBm) among 3 possible receivers */
-static inline int iwl_calc_rssi(struct iwl_priv *priv,
-				struct iwl_rx_phy_res *rx_resp)
-{
-	return priv->cfg->ops->utils->calc_rssi(priv, rx_resp);
-}
-
-
-static void iwl_sta_modify_ps_wake(struct iwl_priv *priv, int sta_id)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&priv->sta_lock, flags);
-	priv->stations[sta_id].sta.station_flags &= ~STA_FLG_PWR_SAVE_MSK;
-	priv->stations[sta_id].sta.station_flags_msk = STA_FLG_PWR_SAVE_MSK;
-	priv->stations[sta_id].sta.sta.modify_mask = 0;
-	priv->stations[sta_id].sta.mode = STA_CONTROL_MODIFY_MSK;
-	spin_unlock_irqrestore(&priv->sta_lock, flags);
-
-	iwl_send_add_sta(priv, &priv->stations[sta_id].sta, CMD_ASYNC);
-}
-
-static void iwl_update_ps_mode(struct iwl_priv *priv, u16 ps_bit, u8 *addr)
-{
-	/* FIXME: need locking over ps_status ??? */
-	u8 sta_id = iwl_find_station(priv, addr);
-
-	if (sta_id != IWL_INVALID_STATION) {
-		u8 sta_awake = priv->stations[sta_id].
-				ps_status == STA_PS_STATUS_WAKE;
-
-		if (sta_awake && ps_bit)
-			priv->stations[sta_id].ps_status = STA_PS_STATUS_SLEEP;
-		else if (!sta_awake && !ps_bit) {
-			iwl_sta_modify_ps_wake(priv, sta_id);
-			priv->stations[sta_id].ps_status = STA_PS_STATUS_WAKE;
-		}
-	}
 }
 
 /* This is necessary only for a number of statistics, see the caller. */
@@ -1148,10 +959,10 @@ static int iwl_is_network_packet(struct iwl_priv *priv,
 	/* Filter incoming packets to determine if they are targeted toward
 	 * this network, discarding packets coming from ourselves */
 	switch (priv->iw_mode) {
-	case IEEE80211_IF_TYPE_IBSS: /* Header: Dest. | Source    | BSSID */
+	case NL80211_IFTYPE_ADHOC: /* Header: Dest. | Source    | BSSID */
 		/* packets to our IBSS update information */
 		return !compare_ether_addr(header->addr3, priv->bssid);
-	case IEEE80211_IF_TYPE_STA: /* Header: Dest. | AP{BSSID} | Source */
+	case NL80211_IFTYPE_STATION: /* Header: Dest. | AP{BSSID} | Source */
 		/* packets to our IBSS update information */
 		return !compare_ether_addr(header->addr2, priv->bssid);
 	default:
@@ -1189,7 +1000,6 @@ void iwl_rx_reply_rx(struct iwl_priv *priv,
 	if (rx_status.band == IEEE80211_BAND_5GHZ)
 		rx_status.rate_idx -= IWL_FIRST_OFDM_RATE;
 
-	rx_status.antenna = 0;
 	rx_status.flag = 0;
 
 	/* TSF isn't reliable. In order to allow smooth user experience,
@@ -1264,15 +1074,36 @@ void iwl_rx_reply_rx(struct iwl_priv *priv,
 		priv->last_rx_noise = IWL_NOISE_MEAS_NOT_AVAILABLE;
 
 	/* Set "1" to report good data frames in groups of 100 */
-	/* FIXME: need to optimze the call: */
-	iwl_dbg_report_frame(priv, pkt, header, 1);
-
+#ifdef CONFIG_IWLWIFI_DEBUG
+	if (unlikely(priv->debug_level & IWL_DL_RX))
+		iwl_dbg_report_frame(priv, rx_start, len, header, 1);
+#endif
 	IWL_DEBUG_STATS_LIMIT("Rssi %d, noise %d, qual %d, TSF %llu\n",
 		rx_status.signal, rx_status.noise, rx_status.signal,
 		(unsigned long long)rx_status.mactime);
 
+	/*
+	 * "antenna number"
+	 *
+	 * It seems that the antenna field in the phy flags value
+	 * is actually a bit field. This is undefined by radiotap,
+	 * it wants an actual antenna number but I always get "7"
+	 * for most legacy frames I receive indicating that the
+	 * same frame was received on all three RX chains.
+	 *
+	 * I think this field should be removed in favor of a
+	 * new 802.11n radiotap field "RX chains" that is defined
+	 * as a bitmask.
+	 */
+	rx_status.antenna = le16_to_cpu(rx_start->phy_flags &
+					RX_RES_PHY_FLAGS_ANTENNA_MSK) >> 4;
+
+	/* set the preamble flag if appropriate */
+	if (rx_start->phy_flags & RX_RES_PHY_FLAGS_SHORT_PREAMBLE_MSK)
+		rx_status.flag |= RX_FLAG_SHORTPRE;
+
 	/* Take shortcut when only in monitor mode */
-	if (priv->iw_mode == IEEE80211_IF_TYPE_MNTR) {
+	if (priv->iw_mode == NL80211_IFTYPE_MONITOR) {
 		iwl_pass_packet_to_mac80211(priv, include_phy,
 						 rxb, &rx_status);
 		return;
@@ -1289,7 +1120,7 @@ void iwl_rx_reply_rx(struct iwl_priv *priv,
 	switch (fc & IEEE80211_FCTL_FTYPE) {
 	case IEEE80211_FTYPE_MGMT:
 	case IEEE80211_FTYPE_DATA:
-		if (priv->iw_mode == IEEE80211_IF_TYPE_AP)
+		if (priv->iw_mode == NL80211_IFTYPE_AP)
 			iwl_update_ps_mode(priv, fc  & IEEE80211_FCTL_PM,
 						header->addr2);
 		/* fall through */

@@ -61,7 +61,7 @@ extern u8 journal_enable_debug;
 	do {								\
 		if ((n) <= journal_enable_debug) {			\
 			printk (KERN_DEBUG "(%s, %d): %s: ",		\
-				__FILE__, __LINE__, __FUNCTION__);	\
+				__FILE__, __LINE__, __func__);	\
 			printk (f, ## a);				\
 		}							\
 	} while (0)
@@ -543,6 +543,11 @@ struct transaction_s
 	unsigned long		t_expires;
 
 	/*
+	 * When this transaction started, in nanoseconds [no locking]
+	 */
+	ktime_t			t_start_time;
+
+	/*
 	 * How many handles used this transaction? [t_handle_lock]
 	 */
 	int t_handle_count;
@@ -609,6 +614,8 @@ struct transaction_s
  * @j_wbufsize: maximum number of buffer_heads allowed in j_wbuf, the
  *	number that will fit in j_blocksize
  * @j_last_sync_writer: most recent pid which did a synchronous write
+ * @j_average_commit_time: the average amount of time in nanoseconds it
+ *	takes to commit a transaction to the disk.
  * @j_private: An opaque pointer to fs-private information.
  */
 
@@ -798,7 +805,17 @@ struct journal_s
 	struct buffer_head	**j_wbuf;
 	int			j_wbufsize;
 
+	/*
+	 * this is the pid of the last person to run a synchronous operation
+	 * through the journal.
+	 */
 	pid_t			j_last_sync_writer;
+
+	/*
+	 * the average amount of time in nanoseconds it takes to commit a
+	 * transaction to the disk.  [j_state_lock]
+	 */
+	u64			j_average_commit_time;
 
 	/*
 	 * An opaque pointer to fs-private information.  ext3 puts its
@@ -816,6 +833,9 @@ struct journal_s
 #define JFS_FLUSHED	0x008	/* The journal superblock has been flushed */
 #define JFS_LOADED	0x010	/* The journal superblock has been loaded */
 #define JFS_BARRIER	0x020	/* Use IDE barriers */
+#define JFS_ABORT_ON_SYNCDATA_ERR	0x040  /* Abort the journal on file
+						* data write error in ordered
+						* mode */
 
 /*
  * Function declarations for the journaling transaction and buffer
@@ -984,7 +1004,7 @@ extern int	cleanup_journal_tail(journal_t *);
 
 #define jbd_ENOSYS() \
 do {								           \
-	printk (KERN_ERR "JBD unimplemented function %s\n", __FUNCTION__); \
+	printk (KERN_ERR "JBD unimplemented function %s\n", __func__); \
 	current->state = TASK_UNINTERRUPTIBLE;			           \
 	schedule();						           \
 } while (1)

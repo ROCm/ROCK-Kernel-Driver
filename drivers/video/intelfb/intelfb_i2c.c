@@ -111,7 +111,6 @@ static int intelfb_setup_i2c_bus(struct intelfb_info *dinfo,
 		 "intelfb %s", name);
 	chan->adapter.class		= class;
 	chan->adapter.owner		= THIS_MODULE;
-	chan->adapter.id		= I2C_HW_B_INTELFB;
 	chan->adapter.algo_data		= &chan->algo;
 	chan->adapter.dev.parent	= &chan->dinfo->pdev->dev;
 	chan->algo.setsda		= intelfb_gpio_setsda;
@@ -171,6 +170,7 @@ void intelfb_create_i2c_busses(struct intelfb_info *dinfo)
 		/* has some LVDS + tv-out */
 	case INTEL_945G:
 	case INTEL_945GM:
+	case INTEL_945GME:
 	case INTEL_965G:
 	case INTEL_965GM:
 		/* SDVO ports have a single control bus - 2 devices */

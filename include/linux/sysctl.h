@@ -69,7 +69,6 @@ enum
 	CTL_BUS=8,		/* Busses */
 	CTL_ABI=9,		/* Binary emulation */
 	CTL_CPU=10,		/* CPU stuff (speed scaling, etc) */
-	CTL_XEN=123,		/* Xen info and control */
 	CTL_ARLAN=254,		/* arlan wireless driver */
 	CTL_S390DBF=5677,	/* s390 debug */
 	CTL_SUNRPC=7249,	/* sunrpc debug */
@@ -976,7 +975,7 @@ extern int sysctl_perm(struct ctl_table_root *root,
 
 typedef struct ctl_table ctl_table;
 
-typedef int ctl_handler (struct ctl_table *table, int __user *name, int nlen,
+typedef int ctl_handler (struct ctl_table *table,
 			 void __user *oldval, size_t __user *oldlenp,
 			 void __user *newval, size_t newlen);
 
@@ -999,8 +998,6 @@ extern int proc_doulongvec_minmax(struct ctl_table *, int, struct file *,
 				  void __user *, size_t *, loff_t *);
 extern int proc_doulongvec_ms_jiffies_minmax(struct ctl_table *table, int,
 				      struct file *, void __user *, size_t *, loff_t *);
-
-extern char *sysctl_pathname(ctl_table *, char *, int);
 
 extern int do_sysctl (int __user *name, int nlen,
 		      void __user *oldval, size_t __user *oldlenp,

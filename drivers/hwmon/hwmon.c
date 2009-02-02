@@ -55,8 +55,8 @@ again:
 		return ERR_PTR(err);
 
 	id = id & MAX_ID_MASK;
-	hwdev = device_create_drvdata(hwmon_class, dev, MKDEV(0, 0), NULL,
-				      HWMON_ID_FORMAT, id);
+	hwdev = device_create(hwmon_class, dev, MKDEV(0, 0), NULL,
+			      HWMON_ID_FORMAT, id);
 
 	if (IS_ERR(hwdev)) {
 		spin_lock(&idr_lock);
@@ -76,7 +76,7 @@ void hwmon_device_unregister(struct device *dev)
 {
 	int id;
 
-	if (likely(sscanf(dev->bus_id, HWMON_ID_FORMAT, &id) == 1)) {
+	if (likely(sscanf(dev_name(dev), HWMON_ID_FORMAT, &id) == 1)) {
 		device_unregister(dev);
 		spin_lock(&idr_lock);
 		idr_remove(&hwmon_idr, id);

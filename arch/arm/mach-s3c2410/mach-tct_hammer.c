@@ -33,6 +33,7 @@
 #include <linux/device.h>
 #include <linux/platform_device.h>
 #include <linux/serial_core.h>
+#include <linux/io.h>
 
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
@@ -40,13 +41,13 @@
 #include <asm/mach/flash.h>
 
 #include <mach/hardware.h>
-#include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/mach-types.h>
 
-#include <asm/plat-s3c/regs-serial.h>
-#include <asm/plat-s3c24xx/devs.h>
-#include <asm/plat-s3c24xx/cpu.h>
+#include <plat/regs-serial.h>
+#include <plat/iic.h>
+#include <plat/devs.h>
+#include <plat/cpu.h>
 
 #ifdef CONFIG_MTD_PARTITIONS
 
@@ -127,7 +128,7 @@ static struct s3c2410_uartcfg tct_hammer_uartcfgs[] = {
 static struct platform_device *tct_hammer_devices[] __initdata = {
 	&s3c_device_adc,
 	&s3c_device_wdt,
-	&s3c_device_i2c,
+	&s3c_device_i2c0,
 	&s3c_device_usb,
 	&s3c_device_rtc,
 	&s3c_device_usbgadget,
@@ -146,6 +147,7 @@ static void __init tct_hammer_map_io(void)
 
 static void __init tct_hammer_init(void)
 {
+	s3c_i2c0_set_platdata(NULL);
 	platform_add_devices(tct_hammer_devices, ARRAY_SIZE(tct_hammer_devices));
 }
 

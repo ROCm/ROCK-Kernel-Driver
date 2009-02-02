@@ -36,7 +36,6 @@ const struct file_operations afs_file_operations = {
 	.fsync		= afs_fsync,
 	.lock		= afs_lock,
 	.flock		= afs_flock,
-	.fsetattr	= afs_fsetattr,
 };
 
 const struct inode_operations afs_file_inode_operations = {
@@ -51,8 +50,8 @@ const struct address_space_operations afs_fs_aops = {
 	.launder_page	= afs_launder_page,
 	.releasepage	= afs_releasepage,
 	.invalidatepage	= afs_invalidatepage,
-	.prepare_write	= afs_prepare_write,
-	.commit_write	= afs_commit_write,
+	.write_begin	= afs_write_begin,
+	.write_end	= afs_write_end,
 	.writepage	= afs_writepage,
 	.writepages	= afs_writepages,
 };

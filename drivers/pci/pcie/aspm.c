@@ -17,6 +17,7 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/jiffies.h>
+#include <linux/delay.h>
 #include <linux/pci-aspm.h>
 #include "../pci.h"
 
@@ -74,6 +75,8 @@ static const char *policy_str[] = {
 	[POLICY_PERFORMANCE] = "performance",
 	[POLICY_POWERSAVE] = "powersave"
 };
+
+#define LINK_RETRAIN_TIMEOUT HZ
 
 static int policy_to_aspm_state(struct pci_dev *pdev)
 {
@@ -238,16 +241,18 @@ static void pcie_aspm_configure_common_clock(struct pci_dev *pdev)
 	pci_write_config_word(pdev, pos + PCI_EXP_LNKCTL, reg16);
 
 	/* Wait for link training end */
-	/* break out after waiting for 1 second */
+	/* break out after waiting for timeout */
 	start_jiffies = jiffies;
-	while ((jiffies - start_jiffies) < HZ) {
+	for (;;) {
 		pci_read_config_word(pdev, pos + PCI_EXP_LNKSTA, &reg16);
 		if (!(reg16 & PCI_EXP_LNKSTA_LT))
 			break;
-		cpu_relax();
+		if (time_after(jiffies, start_jiffies + LINK_RETRAIN_TIMEOUT))
+			break;
+		msleep(1);
 	}
 	/* training failed -> recover */
-	if ((jiffies - start_jiffies) >= HZ) {
+	if (reg16 & PCI_EXP_LNKSTA_LT) {
 		dev_printk (KERN_ERR, &pdev->dev, "ASPM: Could not configure"
 			    " common clock\n");
 		i = 0;
@@ -607,9 +612,9 @@ static int pcie_aspm_sanity_check(struct pci_dev *pdev)
 		pci_read_config_dword(child_dev, child_pos + PCI_EXP_DEVCAP,
 			&reg32);
 		if (!(reg32 & PCI_EXP_DEVCAP_RBER) && !aspm_force) {
-			printk("Pre-1.1 PCIe device detected, "
-				"disable ASPM for %s. It can be enabled forcedly"
-				" with 'pcie_aspm=force'\n", pci_name(pdev));
+			dev_printk(KERN_INFO, &child_dev->dev, "disabling ASPM"
+				" on pre-1.1 PCIe device.  You can enable it"
+				" with 'pcie_aspm=force'\n");
 			return -EINVAL;
 		}
 	}

@@ -2,7 +2,7 @@
  * arch/arm/mach-orion5x/include/mach/orion5x.h
  *
  * Generic definitions of Orion SoC flavors:
- *  Orion-1, Orion-VoIP, Orion-NAS, and Orion-2.
+ *  Orion-1, Orion-VoIP, Orion-NAS, Orion-2, and Orion-1-90.
  *
  * Maintainer: Tzachi Perelstein <tzachi@marvell.com>
  *
@@ -76,6 +76,9 @@
 #define MV88F5281_REV_D0	4
 #define MV88F5281_REV_D1	5
 #define MV88F5281_REV_D2	6
+/* Orion-1-90 (88F6183) */
+#define MV88F6183_DEV_ID	0x6183
+#define MV88F6183_REV_B0	3
 
 /*******************************************************************************
  * Orion Registers Map
@@ -86,6 +89,7 @@
 #define ORION5X_DEV_BUS_PHYS_BASE	(ORION5X_REGS_PHYS_BASE | 0x10000)
 #define ORION5X_DEV_BUS_VIRT_BASE	(ORION5X_REGS_VIRT_BASE | 0x10000)
 #define ORION5X_DEV_BUS_REG(x)		(ORION5X_DEV_BUS_VIRT_BASE | (x))
+#define  SPI_PHYS_BASE			(ORION5X_DEV_BUS_PHYS_BASE | 0x0600)
 #define  I2C_PHYS_BASE			(ORION5X_DEV_BUS_PHYS_BASE | 0x1000)
 #define  UART0_PHYS_BASE		(ORION5X_DEV_BUS_PHYS_BASE | 0x2000)
 #define  UART0_VIRT_BASE		(ORION5X_DEV_BUS_VIRT_BASE | 0x2000)
@@ -130,14 +134,6 @@
 #define MPP_16_19_CTRL		ORION5X_DEV_BUS_REG(0x050)
 #define MPP_DEV_CTRL		ORION5X_DEV_BUS_REG(0x008)
 #define MPP_RESET_SAMPLE	ORION5X_DEV_BUS_REG(0x010)
-#define GPIO_OUT		ORION5X_DEV_BUS_REG(0x100)
-#define GPIO_IO_CONF		ORION5X_DEV_BUS_REG(0x104)
-#define GPIO_BLINK_EN		ORION5X_DEV_BUS_REG(0x108)
-#define GPIO_IN_POL		ORION5X_DEV_BUS_REG(0x10c)
-#define GPIO_DATA_IN		ORION5X_DEV_BUS_REG(0x110)
-#define GPIO_EDGE_CAUSE		ORION5X_DEV_BUS_REG(0x114)
-#define GPIO_EDGE_MASK		ORION5X_DEV_BUS_REG(0x118)
-#define GPIO_LEVEL_MASK		ORION5X_DEV_BUS_REG(0x11c)
 #define DEV_BANK_0_PARAM	ORION5X_DEV_BUS_REG(0x45c)
 #define DEV_BANK_1_PARAM	ORION5X_DEV_BUS_REG(0x460)
 #define DEV_BANK_2_PARAM	ORION5X_DEV_BUS_REG(0x464)
@@ -145,7 +141,6 @@
 #define DEV_BUS_CTRL		ORION5X_DEV_BUS_REG(0x4c0)
 #define DEV_BUS_INT_CAUSE	ORION5X_DEV_BUS_REG(0x4d0)
 #define DEV_BUS_INT_MASK	ORION5X_DEV_BUS_REG(0x4d4)
-#define GPIO_MAX		32
 
 /***************************************************************************
  * Orion CPU Bridge Registers
@@ -153,9 +148,11 @@
 #define CPU_CONF		ORION5X_BRIDGE_REG(0x100)
 #define CPU_CTRL		ORION5X_BRIDGE_REG(0x104)
 #define CPU_RESET_MASK		ORION5X_BRIDGE_REG(0x108)
+#define  WDT_RESET		0x0002
 #define CPU_SOFT_RESET		ORION5X_BRIDGE_REG(0x10c)
 #define POWER_MNG_CTRL_REG	ORION5X_BRIDGE_REG(0x11C)
 #define BRIDGE_CAUSE		ORION5X_BRIDGE_REG(0x110)
+#define  WDT_INT_REQ		0x0008
 #define BRIDGE_MASK		ORION5X_BRIDGE_REG(0x114)
 #define  BRIDGE_INT_TIMER0	0x0002
 #define  BRIDGE_INT_TIMER1	0x0004

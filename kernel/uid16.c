@@ -84,11 +84,12 @@ SYSCALL_DEFINE3(setresuid16, old_uid_t, ruid, old_uid_t, euid, old_uid_t, suid)
 
 SYSCALL_DEFINE3(getresuid16, old_uid_t __user *, ruid, old_uid_t __user *, euid, old_uid_t __user *, suid)
 {
+	const struct cred *cred = current_cred();
 	int retval;
 
-	if (!(retval = put_user(high2lowuid(current->uid), ruid)) &&
-	    !(retval = put_user(high2lowuid(current->euid), euid)))
-		retval = put_user(high2lowuid(current->suid), suid);
+	if (!(retval   = put_user(high2lowuid(cred->uid),  ruid)) &&
+	    !(retval   = put_user(high2lowuid(cred->euid), euid)))
+		retval = put_user(high2lowuid(cred->suid), suid);
 
 	return retval;
 }
@@ -105,11 +106,12 @@ SYSCALL_DEFINE3(setresgid16, old_gid_t, rgid, old_gid_t, egid, old_gid_t, sgid)
 
 SYSCALL_DEFINE3(getresgid16, old_gid_t __user *, rgid, old_gid_t __user *, egid, old_gid_t __user *, sgid)
 {
+	const struct cred *cred = current_cred();
 	int retval;
 
-	if (!(retval = put_user(high2lowgid(current->gid), rgid)) &&
-	    !(retval = put_user(high2lowgid(current->egid), egid)))
-		retval = put_user(high2lowgid(current->sgid), sgid);
+	if (!(retval   = put_user(high2lowgid(cred->gid),  rgid)) &&
+	    !(retval   = put_user(high2lowgid(cred->egid), egid)))
+		retval = put_user(high2lowgid(cred->sgid), sgid);
 
 	return retval;
 }
@@ -162,25 +164,24 @@ static int groups16_from_user(struct group_info *group_info,
 
 SYSCALL_DEFINE2(getgroups16, int, gidsetsize, old_gid_t __user *, grouplist)
 {
-	int i = 0;
+	const struct cred *cred = current_cred();
+	int i;
 
 	if (gidsetsize < 0)
 		return -EINVAL;
 
-	get_group_info(current->group_info);
-	i = current->group_info->ngroups;
+	i = cred->group_info->ngroups;
 	if (gidsetsize) {
 		if (i > gidsetsize) {
 			i = -EINVAL;
 			goto out;
 		}
-		if (groups16_to_user(grouplist, current->group_info)) {
+		if (groups16_to_user(grouplist, cred->group_info)) {
 			i = -EFAULT;
 			goto out;
 		}
 	}
 out:
-	put_group_info(current->group_info);
 	return i;
 }
 
@@ -211,20 +212,20 @@ SYSCALL_DEFINE2(setgroups16, int, gidsetsize, old_gid_t __user *, grouplist)
 
 SYSCALL_DEFINE0(getuid16)
 {
-	return high2lowuid(current->uid);
+	return high2lowuid(current_uid());
 }
 
 SYSCALL_DEFINE0(geteuid16)
 {
-	return high2lowuid(current->euid);
+	return high2lowuid(current_euid());
 }
 
 SYSCALL_DEFINE0(getgid16)
 {
-	return high2lowgid(current->gid);
+	return high2lowgid(current_gid());
 }
 
 SYSCALL_DEFINE0(getegid16)
 {
-	return high2lowgid(current->egid);
+	return high2lowgid(current_egid());
 }

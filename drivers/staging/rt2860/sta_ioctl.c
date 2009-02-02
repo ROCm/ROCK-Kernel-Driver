@@ -571,7 +571,7 @@ rt_ioctl_giwname(struct net_device *dev,
 		   struct iw_request_info *info,
 		   char *name, char *extra)
 {
-//	PRTMP_ADAPTER pAdapter = (PRTMP_ADAPTER) dev->priv;
+//	PRTMP_ADAPTER pAdapter = dev->ml_priv;
 
 #ifdef RT2860
     strncpy(name, "RT2860 Wireless", IFNAMSIZ);
@@ -583,7 +583,7 @@ int rt_ioctl_siwfreq(struct net_device *dev,
 			struct iw_request_info *info,
 			struct iw_freq *freq, char *extra)
 {
-	PRTMP_ADAPTER pAdapter = (PRTMP_ADAPTER) dev->priv;
+	PRTMP_ADAPTER pAdapter = dev->ml_priv;
 	int 	chan = -1;
 
     //check if the interface is down
@@ -623,19 +623,19 @@ int rt_ioctl_giwfreq(struct net_device *dev,
 
 	if (dev->priv_flags == INT_MAIN)
 	{
-		pAdapter = dev->priv;
+		pAdapter = dev->ml_priv;
 	}
 	else
 	{
-		pVirtualAd = dev->priv;
+		pVirtualAd = dev->ml_priv;
 		if (pVirtualAd && pVirtualAd->RtmpDev)
-			pAdapter = pVirtualAd->RtmpDev->priv;
+			pAdapter = pVirtualAd->RtmpDev->ml_priv;
 	}
 
 	if (pAdapter == NULL)
 	{
 		/* if 1st open fail, pAd will be free;
-		   So the net_dev->priv will be NULL in 2rd open */
+		   So the net_dev->ml_priv will be NULL in 2rd open */
 		return -ENETDOWN;
 	}
 
@@ -653,7 +653,7 @@ int rt_ioctl_siwmode(struct net_device *dev,
 		   struct iw_request_info *info,
 		   __u32 *mode, char *extra)
 {
-	PRTMP_ADAPTER pAdapter = (PRTMP_ADAPTER) dev->priv;
+	PRTMP_ADAPTER pAdapter = dev->ml_priv;
 
 	//check if the interface is down
     if(!RTMP_TEST_FLAG(pAdapter, fRTMP_ADAPTER_INTERRUPT_IN_USE))
@@ -695,19 +695,19 @@ int rt_ioctl_giwmode(struct net_device *dev,
 
 	if (dev->priv_flags == INT_MAIN)
 	{
-		pAdapter = dev->priv;
+		pAdapter = dev->ml_priv;
 	}
 	else
 	{
-		pVirtualAd = dev->priv;
+		pVirtualAd = dev->ml_priv;
 		if (pVirtualAd && pVirtualAd->RtmpDev)
-			pAdapter = pVirtualAd->RtmpDev->priv;
+			pAdapter = pVirtualAd->RtmpDev->ml_priv;
 	}
 
 	if (pAdapter == NULL)
 	{
 		/* if 1st open fail, pAd will be free;
-		   So the net_dev->priv will be NULL in 2rd open */
+		   So the net_dev->ml_priv will be NULL in 2rd open */
 		return -ENETDOWN;
 	}
 
@@ -732,7 +732,7 @@ int rt_ioctl_siwsens(struct net_device *dev,
 		   struct iw_request_info *info,
 		   char *name, char *extra)
 {
-	PRTMP_ADAPTER pAdapter = (PRTMP_ADAPTER) dev->priv;
+	PRTMP_ADAPTER pAdapter = dev->ml_priv;
 
 	//check if the interface is down
     	if(!RTMP_TEST_FLAG(pAdapter, fRTMP_ADAPTER_INTERRUPT_IN_USE))
@@ -763,19 +763,19 @@ int rt_ioctl_giwrange(struct net_device *dev,
 
 	if (dev->priv_flags == INT_MAIN)
 	{
-		pAdapter = dev->priv;
+		pAdapter = dev->ml_priv;
 	}
 	else
 	{
-		pVirtualAd = dev->priv;
+		pVirtualAd = dev->ml_priv;
 		if (pVirtualAd && pVirtualAd->RtmpDev)
-			pAdapter = pVirtualAd->RtmpDev->priv;
+			pAdapter = pVirtualAd->RtmpDev->ml_priv;
 	}
 
 	if (pAdapter == NULL)
 	{
 		/* if 1st open fail, pAd will be free;
-		   So the net_dev->priv will be NULL in 2rd open */
+		   So the net_dev->ml_priv will be NULL in 2rd open */
 		return -ENETDOWN;
 	}
 
@@ -857,7 +857,7 @@ int rt_ioctl_siwap(struct net_device *dev,
 		      struct iw_request_info *info,
 		      struct sockaddr *ap_addr, char *extra)
 {
-	PRTMP_ADAPTER pAdapter = (PRTMP_ADAPTER) dev->priv;
+	PRTMP_ADAPTER pAdapter = dev->ml_priv;
     NDIS_802_11_MAC_ADDRESS Bssid;
 
 	//check if the interface is down
@@ -902,19 +902,19 @@ int rt_ioctl_giwap(struct net_device *dev,
 
 	if (dev->priv_flags == INT_MAIN)
 	{
-		pAdapter = dev->priv;
+		pAdapter = dev->ml_priv;
 	}
 	else
 	{
-		pVirtualAd = dev->priv;
+		pVirtualAd = dev->ml_priv;
 		if (pVirtualAd && pVirtualAd->RtmpDev)
-			pAdapter = pVirtualAd->RtmpDev->priv;
+			pAdapter = pVirtualAd->RtmpDev->ml_priv;
 	}
 
 	if (pAdapter == NULL)
 	{
 		/* if 1st open fail, pAd will be free;
-		   So the net_dev->priv will be NULL in 2rd open */
+		   So the net_dev->ml_priv will be NULL in 2rd open */
 		return -ENETDOWN;
 	}
 
@@ -984,7 +984,7 @@ int rt_ioctl_iwaplist(struct net_device *dev,
 			struct iw_request_info *info,
 			struct iw_point *data, char *extra)
 {
- 	PRTMP_ADAPTER pAdapter = (PRTMP_ADAPTER) dev->priv;
+ 	PRTMP_ADAPTER pAdapter = dev->ml_priv;
 
 	struct sockaddr addr[IW_MAX_AP];
 	struct iw_quality qual[IW_MAX_AP];
@@ -1020,7 +1020,7 @@ int rt_ioctl_siwscan(struct net_device *dev,
 			struct iw_request_info *info,
 			struct iw_point *data, char *extra)
 {
-	PRTMP_ADAPTER pAdapter = (PRTMP_ADAPTER) dev->priv;
+	PRTMP_ADAPTER pAdapter = dev->ml_priv;
 
 	ULONG								Now;
 	int Status = NDIS_STATUS_SUCCESS;
@@ -1102,7 +1102,7 @@ int rt_ioctl_giwscan(struct net_device *dev,
 			struct iw_point *data, char *extra)
 {
 
-	PRTMP_ADAPTER pAdapter = (PRTMP_ADAPTER) dev->priv;
+	PRTMP_ADAPTER pAdapter = dev->ml_priv;
 	int i=0;
 	char *current_ev = extra, *previous_ev = extra;
 	char *end_buf;
@@ -1391,7 +1391,7 @@ int rt_ioctl_siwessid(struct net_device *dev,
 			 struct iw_request_info *info,
 			 struct iw_point *data, char *essid)
 {
-	PRTMP_ADAPTER pAdapter = (PRTMP_ADAPTER) dev->priv;
+	PRTMP_ADAPTER pAdapter = dev->ml_priv;
 
 	//check if the interface is down
     if(!RTMP_TEST_FLAG(pAdapter, fRTMP_ADAPTER_INTERRUPT_IN_USE))
@@ -1437,19 +1437,19 @@ int rt_ioctl_giwessid(struct net_device *dev,
 
 	if (dev->priv_flags == INT_MAIN)
 	{
-		pAdapter = dev->priv;
+		pAdapter = dev->ml_priv;
 	}
 	else
 	{
-		pVirtualAd = dev->priv;
+		pVirtualAd = dev->ml_priv;
 		if (pVirtualAd && pVirtualAd->RtmpDev)
-			pAdapter = pVirtualAd->RtmpDev->priv;
+			pAdapter = pVirtualAd->RtmpDev->ml_priv;
 	}
 
 	if (pAdapter == NULL)
 	{
 		/* if 1st open fail, pAd will be free;
-		   So the net_dev->priv will be NULL in 2rd open */
+		   So the net_dev->ml_priv will be NULL in 2rd open */
 		return -ENETDOWN;
 	}
 
@@ -1480,7 +1480,7 @@ int rt_ioctl_siwnickn(struct net_device *dev,
 			 struct iw_request_info *info,
 			 struct iw_point *data, char *nickname)
 {
-	PRTMP_ADAPTER pAdapter = (PRTMP_ADAPTER) dev->priv;
+	PRTMP_ADAPTER pAdapter = dev->ml_priv;
 
     //check if the interface is down
     if(!RTMP_TEST_FLAG(pAdapter, fRTMP_ADAPTER_INTERRUPT_IN_USE))
@@ -1508,19 +1508,19 @@ int rt_ioctl_giwnickn(struct net_device *dev,
 
 	if (dev->priv_flags == INT_MAIN)
 	{
-		pAdapter = dev->priv;
+		pAdapter = dev->ml_priv;
 	}
 	else
 	{
-		pVirtualAd = dev->priv;
+		pVirtualAd = dev->ml_priv;
 		if (pVirtualAd && pVirtualAd->RtmpDev)
-			pAdapter = pVirtualAd->RtmpDev->priv;
+			pAdapter = pVirtualAd->RtmpDev->ml_priv;
 	}
 
 	if (pAdapter == NULL)
 	{
 		/* if 1st open fail, pAd will be free;
-		   So the net_dev->priv will be NULL in 2rd open */
+		   So the net_dev->ml_priv will be NULL in 2rd open */
 		return -ENETDOWN;
 	}
 
@@ -1537,7 +1537,7 @@ int rt_ioctl_siwrts(struct net_device *dev,
 		       struct iw_request_info *info,
 		       struct iw_param *rts, char *extra)
 {
-	PRTMP_ADAPTER pAdapter = (PRTMP_ADAPTER) dev->priv;
+	PRTMP_ADAPTER pAdapter = dev->ml_priv;
 	u16 val;
 
     //check if the interface is down
@@ -1571,19 +1571,19 @@ int rt_ioctl_giwrts(struct net_device *dev,
 
 	if (dev->priv_flags == INT_MAIN)
 	{
-		pAdapter = dev->priv;
+		pAdapter = dev->ml_priv;
 	}
 	else
 	{
-		pVirtualAd = dev->priv;
+		pVirtualAd = dev->ml_priv;
 		if (pVirtualAd && pVirtualAd->RtmpDev)
-			pAdapter = pVirtualAd->RtmpDev->priv;
+			pAdapter = pVirtualAd->RtmpDev->ml_priv;
 	}
 
 	if (pAdapter == NULL)
 	{
 		/* if 1st open fail, pAd will be free;
-		   So the net_dev->priv will be NULL in 2rd open */
+		   So the net_dev->ml_priv will be NULL in 2rd open */
 		return -ENETDOWN;
 	}
 
@@ -1605,7 +1605,7 @@ int rt_ioctl_siwfrag(struct net_device *dev,
 			struct iw_request_info *info,
 			struct iw_param *frag, char *extra)
 {
-	PRTMP_ADAPTER pAdapter = (PRTMP_ADAPTER) dev->priv;
+	PRTMP_ADAPTER pAdapter = dev->ml_priv;
 	u16 val;
 
 	//check if the interface is down
@@ -1637,19 +1637,19 @@ int rt_ioctl_giwfrag(struct net_device *dev,
 
 	if (dev->priv_flags == INT_MAIN)
 	{
-		pAdapter = dev->priv;
+		pAdapter = dev->ml_priv;
 	}
 	else
 	{
-		pVirtualAd = dev->priv;
+		pVirtualAd = dev->ml_priv;
 		if (pVirtualAd && pVirtualAd->RtmpDev)
-			pAdapter = pVirtualAd->RtmpDev->priv;
+			pAdapter = pVirtualAd->RtmpDev->ml_priv;
 	}
 
 	if (pAdapter == NULL)
 	{
 		/* if 1st open fail, pAd will be free;
-		   So the net_dev->priv will be NULL in 2rd open */
+		   So the net_dev->ml_priv will be NULL in 2rd open */
 		return -ENETDOWN;
 	}
 
@@ -1673,7 +1673,7 @@ int rt_ioctl_siwencode(struct net_device *dev,
 			  struct iw_request_info *info,
 			  struct iw_point *erq, char *extra)
 {
-	PRTMP_ADAPTER pAdapter = (PRTMP_ADAPTER) dev->priv;
+	PRTMP_ADAPTER pAdapter = dev->ml_priv;
 
 	//check if the interface is down
     	if(!RTMP_TEST_FLAG(pAdapter, fRTMP_ADAPTER_INTERRUPT_IN_USE))
@@ -1780,19 +1780,19 @@ rt_ioctl_giwencode(struct net_device *dev,
 
 	if (dev->priv_flags == INT_MAIN)
 	{
-		pAdapter = dev->priv;
+		pAdapter = dev->ml_priv;
 	}
 	else
 	{
-		pVirtualAd = dev->priv;
+		pVirtualAd = dev->ml_priv;
 		if (pVirtualAd && pVirtualAd->RtmpDev)
-			pAdapter = pVirtualAd->RtmpDev->priv;
+			pAdapter = pVirtualAd->RtmpDev->ml_priv;
 	}
 
 	if (pAdapter == NULL)
 	{
 		/* if 1st open fail, pAd will be free;
-		   So the net_dev->priv will be NULL in 2rd open */
+		   So the net_dev->ml_priv will be NULL in 2rd open */
 		return -ENETDOWN;
 	}
 
@@ -1860,19 +1860,19 @@ rt_ioctl_setparam(struct net_device *dev, struct iw_request_info *info,
 
 	if (dev->priv_flags == INT_MAIN)
 	{
-		pAdapter = dev->priv;
+		pAdapter = dev->ml_priv;
 	}
 	else
 	{
-		pVirtualAd = dev->priv;
-		pAdapter = pVirtualAd->RtmpDev->priv;
+		pVirtualAd = dev->ml_priv;
+		pAdapter = pVirtualAd->RtmpDev->ml_priv;
 	}
 	pObj = (POS_COOKIE) pAdapter->OS_Cookie;
 
 	if (pAdapter == NULL)
 	{
 		/* if 1st open fail, pAd will be free;
-		   So the net_dev->priv will be NULL in 2rd open */
+		   So the net_dev->ml_priv will be NULL in 2rd open */
 		return -ENETDOWN;
 	}
 
@@ -1928,7 +1928,7 @@ rt_private_get_statistics(struct net_device *dev, struct iw_request_info *info,
 		struct iw_point *wrq, char *extra)
 {
 	INT				Status = 0;
-    PRTMP_ADAPTER   pAd = (PRTMP_ADAPTER) dev->priv;
+    PRTMP_ADAPTER   pAd = dev->ml_priv;
 
     if (extra == NULL)
     {
@@ -2055,18 +2055,18 @@ rt_private_show(struct net_device *dev, struct iw_request_info *info,
     u32             subcmd = wrq->flags;
 
 	if (dev->priv_flags == INT_MAIN)
-		pAd = dev->priv;
+		pAd = dev->ml_priv;
 	else
 	{
-		pVirtualAd = dev->priv;
-		pAd = pVirtualAd->RtmpDev->priv;
+		pVirtualAd = dev->ml_priv;
+		pAd = pVirtualAd->RtmpDev->ml_priv;
 	}
 	pObj = (POS_COOKIE) pAd->OS_Cookie;
 
 	if (pAd == NULL)
 	{
 		/* if 1st open fail, pAd will be free;
-		   So the net_dev->priv will be NULL in 2rd open */
+		   So the net_dev->ml_priv will be NULL in 2rd open */
 		return -ENETDOWN;
 	}
 
@@ -2200,7 +2200,7 @@ rt_private_show(struct net_device *dev, struct iw_request_info *info,
 			}
 			break;
         default:
-            DBGPRINT(RT_DEBUG_TRACE, ("%s - unknow subcmd = %d\n", __FUNCTION__, subcmd));
+            DBGPRINT(RT_DEBUG_TRACE, ("%s - unknow subcmd = %d\n", __func__, subcmd));
             break;
     }
 
@@ -2213,13 +2213,13 @@ int rt_ioctl_siwmlme(struct net_device *dev,
 			   union iwreq_data *wrqu,
 			   char *extra)
 {
-	PRTMP_ADAPTER   pAd = (PRTMP_ADAPTER) dev->priv;
+	PRTMP_ADAPTER   pAd = dev->ml_priv;
 	struct iw_mlme *pMlme = (struct iw_mlme *)wrqu->data.pointer;
 	MLME_QUEUE_ELEM				MsgElem;
 	MLME_DISASSOC_REQ_STRUCT	DisAssocReq;
 	MLME_DEAUTH_REQ_STRUCT      DeAuthReq;
 
-	DBGPRINT(RT_DEBUG_TRACE, ("====> %s\n", __FUNCTION__));
+	DBGPRINT(RT_DEBUG_TRACE, ("====> %s\n", __func__));
 
 	if (pMlme == NULL)
 		return -EINVAL;
@@ -2228,7 +2228,7 @@ int rt_ioctl_siwmlme(struct net_device *dev,
 	{
 #ifdef IW_MLME_DEAUTH
 		case IW_MLME_DEAUTH:
-			DBGPRINT(RT_DEBUG_TRACE, ("====> %s - IW_MLME_DEAUTH\n", __FUNCTION__));
+			DBGPRINT(RT_DEBUG_TRACE, ("====> %s - IW_MLME_DEAUTH\n", __func__));
 			COPY_MAC_ADDR(DeAuthReq.Addr, pAd->CommonCfg.Bssid);
 			DeAuthReq.Reason = pMlme->reason_code;
 			MsgElem.MsgLen = sizeof(MLME_DEAUTH_REQ_STRUCT);
@@ -2243,7 +2243,7 @@ int rt_ioctl_siwmlme(struct net_device *dev,
 #endif // IW_MLME_DEAUTH //
 #ifdef IW_MLME_DISASSOC
 		case IW_MLME_DISASSOC:
-			DBGPRINT(RT_DEBUG_TRACE, ("====> %s - IW_MLME_DISASSOC\n", __FUNCTION__));
+			DBGPRINT(RT_DEBUG_TRACE, ("====> %s - IW_MLME_DISASSOC\n", __func__));
 			COPY_MAC_ADDR(DisAssocReq.Addr, pAd->CommonCfg.Bssid);
 			DisAssocReq.Reason =  pMlme->reason_code;
 
@@ -2257,7 +2257,7 @@ int rt_ioctl_siwmlme(struct net_device *dev,
 			break;
 #endif // IW_MLME_DISASSOC //
 		default:
-			DBGPRINT(RT_DEBUG_TRACE, ("====> %s - Unknow Command\n", __FUNCTION__));
+			DBGPRINT(RT_DEBUG_TRACE, ("====> %s - Unknow Command\n", __func__));
 			break;
 	}
 
@@ -2270,7 +2270,7 @@ int rt_ioctl_siwauth(struct net_device *dev,
 			  struct iw_request_info *info,
 			  union iwreq_data *wrqu, char *extra)
 {
-	PRTMP_ADAPTER   pAdapter = (PRTMP_ADAPTER) dev->priv;
+	PRTMP_ADAPTER   pAdapter = dev->ml_priv;
 	struct iw_param *param = &wrqu->param;
 
     //check if the interface is down
@@ -2290,7 +2290,7 @@ int rt_ioctl_siwauth(struct net_device *dev,
             else if (param->value == IW_AUTH_WPA_VERSION_WPA2)
                 pAdapter->StaCfg.AuthMode = Ndis802_11AuthModeWPA2PSK;
 
-            DBGPRINT(RT_DEBUG_TRACE, ("%s::IW_AUTH_WPA_VERSION - param->value = %d!\n", __FUNCTION__, param->value));
+            DBGPRINT(RT_DEBUG_TRACE, ("%s::IW_AUTH_WPA_VERSION - param->value = %d!\n", __func__, param->value));
             break;
     	case IW_AUTH_CIPHER_PAIRWISE:
             if (param->value == IW_AUTH_CIPHER_NONE)
@@ -2321,7 +2321,7 @@ int rt_ioctl_siwauth(struct net_device *dev,
                 pAdapter->StaCfg.OrigWepStatus = pAdapter->StaCfg.WepStatus;
                 pAdapter->StaCfg.PairCipher = Ndis802_11Encryption3Enabled;
             }
-            DBGPRINT(RT_DEBUG_TRACE, ("%s::IW_AUTH_CIPHER_PAIRWISE - param->value = %d!\n", __FUNCTION__, param->value));
+            DBGPRINT(RT_DEBUG_TRACE, ("%s::IW_AUTH_CIPHER_PAIRWISE - param->value = %d!\n", __func__, param->value));
             break;
     	case IW_AUTH_CIPHER_GROUP:
             if (param->value == IW_AUTH_CIPHER_NONE)
@@ -2341,7 +2341,7 @@ int rt_ioctl_siwauth(struct net_device *dev,
             {
                 pAdapter->StaCfg.GroupCipher = Ndis802_11Encryption3Enabled;
             }
-            DBGPRINT(RT_DEBUG_TRACE, ("%s::IW_AUTH_CIPHER_GROUP - param->value = %d!\n", __FUNCTION__, param->value));
+            DBGPRINT(RT_DEBUG_TRACE, ("%s::IW_AUTH_CIPHER_GROUP - param->value = %d!\n", __func__, param->value));
             break;
     	case IW_AUTH_KEY_MGMT:
             if (param->value == IW_AUTH_KEY_MGMT_802_1X)
@@ -2370,12 +2370,12 @@ int rt_ioctl_siwauth(struct net_device *dev,
             {
 				STA_PORT_SECURED(pAdapter);
             }
-            DBGPRINT(RT_DEBUG_TRACE, ("%s::IW_AUTH_KEY_MGMT - param->value = %d!\n", __FUNCTION__, param->value));
+            DBGPRINT(RT_DEBUG_TRACE, ("%s::IW_AUTH_KEY_MGMT - param->value = %d!\n", __func__, param->value));
             break;
     	case IW_AUTH_RX_UNENCRYPTED_EAPOL:
             break;
     	case IW_AUTH_PRIVACY_INVOKED:
-            DBGPRINT(RT_DEBUG_TRACE, ("%s::IW_AUTH_PRIVACY_INVOKED - param->value = %d!\n", __FUNCTION__, param->value));
+            DBGPRINT(RT_DEBUG_TRACE, ("%s::IW_AUTH_PRIVACY_INVOKED - param->value = %d!\n", __func__, param->value));
     		break;
     	case IW_AUTH_DROP_UNENCRYPTED:
             if (param->value != 0)
@@ -2384,7 +2384,7 @@ int rt_ioctl_siwauth(struct net_device *dev,
 			{
 				STA_PORT_SECURED(pAdapter);
 			}
-            DBGPRINT(RT_DEBUG_TRACE, ("%s::IW_AUTH_WPA_VERSION - param->value = %d!\n", __FUNCTION__, param->value));
+            DBGPRINT(RT_DEBUG_TRACE, ("%s::IW_AUTH_WPA_VERSION - param->value = %d!\n", __func__, param->value));
     		break;
     	case IW_AUTH_80211_AUTH_ALG:
 			if (param->value & IW_AUTH_ALG_SHARED_KEY)
@@ -2397,10 +2397,10 @@ int rt_ioctl_siwauth(struct net_device *dev,
 			}
             else
 				return -EINVAL;
-            DBGPRINT(RT_DEBUG_TRACE, ("%s::IW_AUTH_80211_AUTH_ALG - param->value = %d!\n", __FUNCTION__, param->value));
+            DBGPRINT(RT_DEBUG_TRACE, ("%s::IW_AUTH_80211_AUTH_ALG - param->value = %d!\n", __func__, param->value));
 			break;
     	case IW_AUTH_WPA_ENABLED:
-    		DBGPRINT(RT_DEBUG_TRACE, ("%s::IW_AUTH_WPA_ENABLED - Driver supports WPA!(param->value = %d)\n", __FUNCTION__, param->value));
+    		DBGPRINT(RT_DEBUG_TRACE, ("%s::IW_AUTH_WPA_ENABLED - Driver supports WPA!(param->value = %d)\n", __func__, param->value));
     		break;
     	default:
     		return -EOPNOTSUPP;
@@ -2413,7 +2413,7 @@ int rt_ioctl_giwauth(struct net_device *dev,
 			       struct iw_request_info *info,
 			       union iwreq_data *wrqu, char *extra)
 {
-	PRTMP_ADAPTER   pAdapter = (PRTMP_ADAPTER) dev->priv;
+	PRTMP_ADAPTER   pAdapter = dev->ml_priv;
 	struct iw_param *param = &wrqu->param;
 
     //check if the interface is down
@@ -2487,7 +2487,7 @@ int rt_ioctl_siwencodeext(struct net_device *dev,
 			   union iwreq_data *wrqu,
 			   char *extra)
 			{
-    PRTMP_ADAPTER   pAdapter = (PRTMP_ADAPTER) dev->priv;
+    PRTMP_ADAPTER   pAdapter = dev->ml_priv;
 	struct iw_point *encoding = &wrqu->encoding;
 	struct iw_encode_ext *ext = (struct iw_encode_ext *)extra;
     int keyIdx, alg = ext->alg;
@@ -2508,7 +2508,7 @@ int rt_ioctl_siwencodeext(struct net_device *dev,
 		pAdapter->SharedKey[BSS0][keyIdx].CipherAlg = CIPHER_NONE;
 		AsicRemoveSharedKeyEntry(pAdapter, 0, (UCHAR)keyIdx);
         NdisZeroMemory(&pAdapter->SharedKey[BSS0][keyIdx], sizeof(CIPHER_KEY));
-        DBGPRINT(RT_DEBUG_TRACE, ("%s::Remove all keys!(encoding->flags = %x)\n", __FUNCTION__, encoding->flags));
+        DBGPRINT(RT_DEBUG_TRACE, ("%s::Remove all keys!(encoding->flags = %x)\n", __func__, encoding->flags));
     }
 					else
     {
@@ -2520,15 +2520,15 @@ int rt_ioctl_siwencodeext(struct net_device *dev,
         if (ext->ext_flags & IW_ENCODE_EXT_SET_TX_KEY)
         {
             pAdapter->StaCfg.DefaultKeyId = keyIdx;
-            DBGPRINT(RT_DEBUG_TRACE, ("%s::DefaultKeyId = %d\n", __FUNCTION__, pAdapter->StaCfg.DefaultKeyId));
+            DBGPRINT(RT_DEBUG_TRACE, ("%s::DefaultKeyId = %d\n", __func__, pAdapter->StaCfg.DefaultKeyId));
         }
 
         switch (alg) {
     		case IW_ENCODE_ALG_NONE:
-                DBGPRINT(RT_DEBUG_TRACE, ("%s::IW_ENCODE_ALG_NONE\n", __FUNCTION__));
+                DBGPRINT(RT_DEBUG_TRACE, ("%s::IW_ENCODE_ALG_NONE\n", __func__));
     			break;
     		case IW_ENCODE_ALG_WEP:
-                DBGPRINT(RT_DEBUG_TRACE, ("%s::IW_ENCODE_ALG_WEP - ext->key_len = %d, keyIdx = %d\n", __FUNCTION__, ext->key_len, keyIdx));
+                DBGPRINT(RT_DEBUG_TRACE, ("%s::IW_ENCODE_ALG_WEP - ext->key_len = %d, keyIdx = %d\n", __func__, ext->key_len, keyIdx));
     			if (ext->key_len == MAX_WEP_KEY_SIZE)
                 {
         			pAdapter->SharedKey[BSS0][keyIdx].KeyLen = MAX_WEP_KEY_SIZE;
@@ -2546,7 +2546,7 @@ int rt_ioctl_siwencodeext(struct net_device *dev,
 			    NdisMoveMemory(pAdapter->SharedKey[BSS0][keyIdx].Key, ext->key, ext->key_len);
     			break;
             case IW_ENCODE_ALG_TKIP:
-                DBGPRINT(RT_DEBUG_TRACE, ("%s::IW_ENCODE_ALG_TKIP - keyIdx = %d, ext->key_len = %d\n", __FUNCTION__, keyIdx, ext->key_len));
+                DBGPRINT(RT_DEBUG_TRACE, ("%s::IW_ENCODE_ALG_TKIP - keyIdx = %d, ext->key_len = %d\n", __func__, keyIdx, ext->key_len));
                 if (ext->key_len == 32)
                 {
                     if (ext->ext_flags & IW_ENCODE_EXT_SET_TX_KEY)
@@ -2596,7 +2596,7 @@ rt_ioctl_giwencodeext(struct net_device *dev,
 			  struct iw_request_info *info,
 			  union iwreq_data *wrqu, char *extra)
 {
-	PRTMP_ADAPTER pAd = (PRTMP_ADAPTER) dev->priv;
+	PRTMP_ADAPTER pAd = dev->ml_priv;
 	PCHAR pKey = NULL;
 	struct iw_point *encoding = &wrqu->encoding;
 	struct iw_encode_ext *ext = (struct iw_encode_ext *)extra;
@@ -2680,7 +2680,7 @@ int rt_ioctl_siwgenie(struct net_device *dev,
 			  struct iw_request_info *info,
 			  union iwreq_data *wrqu, char *extra)
 {
-	PRTMP_ADAPTER   pAd = (PRTMP_ADAPTER) dev->priv;
+	PRTMP_ADAPTER   pAd = dev->ml_priv;
 
 	if (wrqu->data.length > MAX_LEN_OF_RSNIE ||
 	    (wrqu->data.length && extra == NULL))
@@ -2705,7 +2705,7 @@ int rt_ioctl_giwgenie(struct net_device *dev,
 			       struct iw_request_info *info,
 			       union iwreq_data *wrqu, char *extra)
 {
-	PRTMP_ADAPTER   pAd = (PRTMP_ADAPTER) dev->priv;
+	PRTMP_ADAPTER   pAd = dev->ml_priv;
 
 	if ((pAd->StaCfg.RSNIE_Len == 0) ||
 		(pAd->StaCfg.AuthMode < Ndis802_11AuthModeWPA))
@@ -2751,7 +2751,7 @@ int rt_ioctl_siwpmksa(struct net_device *dev,
 			   union iwreq_data *wrqu,
 			   char *extra)
 {
-	PRTMP_ADAPTER   pAd = (PRTMP_ADAPTER) dev->priv;
+	PRTMP_ADAPTER   pAd = dev->ml_priv;
 	struct iw_pmksa *pPmksa = (struct iw_pmksa *)wrqu->data.pointer;
 	INT	CachedIdx = 0, idx = 0;
 
@@ -2834,7 +2834,7 @@ rt_private_ioctl_bbp(struct net_device *dev, struct iw_request_info *info,
 	UINT32				bbpValue;
 	BOOLEAN				bIsPrintAllBBP = FALSE;
 	INT					Status = 0;
-    PRTMP_ADAPTER       pAdapter = (PRTMP_ADAPTER) dev->priv;
+    PRTMP_ADAPTER       pAdapter = dev->ml_priv;
 
 
 	memset(extra, 0x00, IW_PRIV_SIZE_MASK);
@@ -2961,7 +2961,7 @@ int rt_ioctl_siwrate(struct net_device *dev,
 			struct iw_request_info *info,
 			union iwreq_data *wrqu, char *extra)
 {
-    PRTMP_ADAPTER   pAd = (PRTMP_ADAPTER) dev->priv;
+    PRTMP_ADAPTER   pAd = dev->ml_priv;
     UINT32          rate = wrqu->bitrate.value, fixed = wrqu->bitrate.fixed;
 
     //check if the interface is down
@@ -3019,7 +3019,7 @@ int rt_ioctl_giwrate(struct net_device *dev,
 			       struct iw_request_info *info,
 			       union iwreq_data *wrqu, char *extra)
 {
-    PRTMP_ADAPTER   pAd = (PRTMP_ADAPTER) dev->priv;
+    PRTMP_ADAPTER   pAd = dev->ml_priv;
     int rate_index = 0, rate_count = 0;
     HTTRANSMIT_SETTING ht_setting;
     __s32 ralinkrate[] =
@@ -5409,19 +5409,19 @@ INT rt28xx_sta_ioctl(
 
 	if (net_dev->priv_flags == INT_MAIN)
 	{
-		pAd = net_dev->priv;
+		pAd = net_dev->ml_priv;
 	}
 	else
 	{
-		pVirtualAd = net_dev->priv;
-		pAd = pVirtualAd->RtmpDev->priv;
+		pVirtualAd = net_dev->ml_priv;
+		pAd = pVirtualAd->RtmpDev->ml_priv;
 	}
 	pObj = (POS_COOKIE) pAd->OS_Cookie;
 
 	if (pAd == NULL)
 	{
 		/* if 1st open fail, pAd will be free;
-		   So the net_dev->priv will be NULL in 2rd open */
+		   So the net_dev->ml_priv will be NULL in 2rd open */
 		return -ENETDOWN;
 	}
 

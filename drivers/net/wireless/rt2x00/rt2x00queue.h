@@ -87,10 +87,13 @@ enum data_queue_qid {
  *
  * @SKBDESC_DMA_MAPPED_RX: &skb_dma field has been mapped for RX
  * @SKBDESC_DMA_MAPPED_TX: &skb_dma field has been mapped for TX
+ * @FRAME_DESC_IV_STRIPPED: Frame contained a IV/EIV provided by
+ *	mac80211 but was stripped for processing by the driver.
  */
 enum skb_frame_desc_flags {
-	SKBDESC_DMA_MAPPED_RX = (1 << 0),
-	SKBDESC_DMA_MAPPED_TX = (1 << 1),
+	SKBDESC_DMA_MAPPED_RX = 1 << 0,
+	SKBDESC_DMA_MAPPED_TX = 1 << 1,
+	FRAME_DESC_IV_STRIPPED = 1 << 2,
 };
 
 /**
@@ -101,17 +104,25 @@ enum skb_frame_desc_flags {
  *
  * @flags: Frame flags, see &enum skb_frame_desc_flags.
  * @desc_len: Length of the frame descriptor.
+ * @tx_rate_idx: the index of the TX rate, used for TX status reporting
+ * @tx_rate_flags: the TX rate flags, used for TX status reporting
  * @desc: Pointer to descriptor part of the frame.
  *	Note that this pointer could point to something outside
  *	of the scope of the skb->data pointer.
+ * @iv: IV/EIV data used during encryption/decryption.
  * @skb_dma: (PCI-only) the DMA address associated with the sk buffer.
  * @entry: The entry to which this sk buffer belongs.
  */
 struct skb_frame_desc {
-	unsigned int flags;
+	u8 flags;
 
-	unsigned int desc_len;
+	u8 desc_len;
+	u8 tx_rate_idx;
+	u8 tx_rate_flags;
+
 	void *desc;
+
+	__le32 iv[2];
 
 	dma_addr_t skb_dma;
 
@@ -132,13 +143,18 @@ static inline struct skb_frame_desc* get_skb_frame_desc(struct sk_buff *skb)
 /**
  * enum rxdone_entry_desc_flags: Flags for &struct rxdone_entry_desc
  *
- * @RXDONE_SIGNAL_PLCP: Does the signal field contain the plcp value,
- *	or does it contain the bitrate itself.
+ * @RXDONE_SIGNAL_PLCP: Signal field contains the plcp value.
+ * @RXDONE_SIGNAL_BITRATE: Signal field contains the bitrate value.
  * @RXDONE_MY_BSS: Does this frame originate from device's BSS.
+ * @RXDONE_CRYPTO_IV: Driver provided IV/EIV data.
+ * @RXDONE_CRYPTO_ICV: Driver provided ICV data.
  */
 enum rxdone_entry_desc_flags {
 	RXDONE_SIGNAL_PLCP = 1 << 0,
-	RXDONE_MY_BSS = 1 << 1,
+	RXDONE_SIGNAL_BITRATE = 1 << 1,
+	RXDONE_MY_BSS = 1 << 2,
+	RXDONE_CRYPTO_IV = 1 << 3,
+	RXDONE_CRYPTO_ICV = 1 << 4,
 };
 
 /**
@@ -152,7 +168,10 @@ enum rxdone_entry_desc_flags {
  * @size: Data size of the received frame.
  * @flags: MAC80211 receive flags (See &enum mac80211_rx_flags).
  * @dev_flags: Ralink receive flags (See &enum rxdone_entry_desc_flags).
-
+ * @cipher: Cipher type used during decryption.
+ * @cipher_status: Decryption status.
+ * @iv: IV/EIV data used during decryption.
+ * @icv: ICV data used during decryption.
  */
 struct rxdone_entry_desc {
 	u64 timestamp;
@@ -161,6 +180,11 @@ struct rxdone_entry_desc {
 	int size;
 	int flags;
 	int dev_flags;
+	u8 cipher;
+	u8 cipher_status;
+
+	__le32 iv[2];
+	__le32 icv;
 };
 
 /**
@@ -206,6 +230,10 @@ struct txdone_entry_desc {
  * @ENTRY_TXD_BURST: This frame belongs to the same burst event.
  * @ENTRY_TXD_ACK: An ACK is required for this frame.
  * @ENTRY_TXD_RETRY_MODE: When set, the long retry count is used.
+ * @ENTRY_TXD_ENCRYPT: This frame should be encrypted.
+ * @ENTRY_TXD_ENCRYPT_PAIRWISE: Use pairwise key table (instead of shared).
+ * @ENTRY_TXD_ENCRYPT_IV: Generate IV/EIV in hardware.
+ * @ENTRY_TXD_ENCRYPT_MMIC: Generate MIC in hardware.
  */
 enum txentry_desc_flags {
 	ENTRY_TXD_RTS_FRAME,
@@ -218,6 +246,10 @@ enum txentry_desc_flags {
 	ENTRY_TXD_BURST,
 	ENTRY_TXD_ACK,
 	ENTRY_TXD_RETRY_MODE,
+	ENTRY_TXD_ENCRYPT,
+	ENTRY_TXD_ENCRYPT_PAIRWISE,
+	ENTRY_TXD_ENCRYPT_IV,
+	ENTRY_TXD_ENCRYPT_MMIC,
 };
 
 /**
@@ -236,6 +268,9 @@ enum txentry_desc_flags {
  * @ifs: IFS value.
  * @cw_min: cwmin value.
  * @cw_max: cwmax value.
+ * @cipher: Cipher type used for encryption.
+ * @key_idx: Key index used for encryption.
+ * @iv_offset: Position where IV should be inserted by hardware.
  */
 struct txentry_desc {
 	unsigned long flags;
@@ -252,6 +287,10 @@ struct txentry_desc {
 	short ifs;
 	short cw_min;
 	short cw_max;
+
+	enum cipher cipher;
+	u16 key_idx;
+	u16 iv_offset;
 };
 
 /**
@@ -335,11 +374,14 @@ enum queue_index {
  * @length: Number of frames in queue.
  * @index: Index pointers to entry positions in the queue,
  *	use &enum queue_index to get a specific index field.
+ * @txop: maximum burst time.
  * @aifs: The aifs value for outgoing frames (field ignored in RX queue).
  * @cw_min: The cw min value for outgoing frames (field ignored in RX queue).
  * @cw_max: The cw max value for outgoing frames (field ignored in RX queue).
  * @data_size: Maximum data size for the frames in this queue.
  * @desc_size: Hardware descriptor size for the data in this queue.
+ * @usb_endpoint: Device endpoint used for communication (USB only)
+ * @usb_maxpacket: Max packet size for given endpoint (USB only)
  */
 struct data_queue {
 	struct rt2x00_dev *rt2x00dev;
@@ -354,12 +396,16 @@ struct data_queue {
 	unsigned short length;
 	unsigned short index[Q_INDEX_MAX];
 
+	unsigned short txop;
 	unsigned short aifs;
 	unsigned short cw_min;
 	unsigned short cw_max;
 
 	unsigned short data_size;
 	unsigned short desc_size;
+
+	unsigned short usb_endpoint;
+	unsigned short usb_maxpacket;
 };
 
 /**
@@ -403,6 +449,19 @@ struct data_queue_desc {
 	&(__dev)->tx[(__dev)->ops->tx_queues]
 
 /**
+ * queue_next - Return pointer to next queue in list (HELPER MACRO).
+ * @__queue: Current queue for which we need the next queue
+ *
+ * Using the current queue address we take the address directly
+ * after the queue to take the next queue. Note that this macro
+ * should be used carefully since it does not protect against
+ * moving past the end of the list. (See macros &queue_end and
+ * &tx_queue_end for determining the end of the queue).
+ */
+#define queue_next(__queue) \
+	&(__queue)[1]
+
+/**
  * queue_loop - Loop through the queues within a specific range (HELPER MACRO).
  * @__entry: Pointer where the current queue entry will be stored in.
  * @__start: Start queue pointer.
@@ -412,8 +471,8 @@ struct data_queue_desc {
  */
 #define queue_loop(__entry, __start, __end)			\
 	for ((__entry) = (__start);				\
-	     prefetch(&(__entry)[1]), (__entry) != (__end);	\
-	     (__entry) = &(__entry)[1])
+	     prefetch(queue_next(__entry)), (__entry) != (__end);\
+	     (__entry) = queue_next(__entry))
 
 /**
  * queue_for_each - Loop through all queues
@@ -484,25 +543,51 @@ static inline int rt2x00queue_threshold(struct data_queue *queue)
 }
 
 /**
- * rt2x00_desc_read - Read a word from the hardware descriptor.
+ * _rt2x00_desc_read - Read a word from the hardware descriptor.
+ * @desc: Base descriptor address
+ * @word: Word index from where the descriptor should be read.
+ * @value: Address where the descriptor value should be written into.
+ */
+static inline void _rt2x00_desc_read(__le32 *desc, const u8 word, __le32 *value)
+{
+	*value = desc[word];
+}
+
+/**
+ * rt2x00_desc_read - Read a word from the hardware descriptor, this
+ * function will take care of the byte ordering.
  * @desc: Base descriptor address
  * @word: Word index from where the descriptor should be read.
  * @value: Address where the descriptor value should be written into.
  */
 static inline void rt2x00_desc_read(__le32 *desc, const u8 word, u32 *value)
 {
-	*value = le32_to_cpu(desc[word]);
+	__le32 tmp;
+	_rt2x00_desc_read(desc, word, &tmp);
+	*value = le32_to_cpu(tmp);
 }
 
 /**
- * rt2x00_desc_write - wrote a word to the hardware descriptor.
+ * rt2x00_desc_write - write a word to the hardware descriptor, this
+ * function will take care of the byte ordering.
+ * @desc: Base descriptor address
+ * @word: Word index from where the descriptor should be written.
+ * @value: Value that should be written into the descriptor.
+ */
+static inline void _rt2x00_desc_write(__le32 *desc, const u8 word, __le32 value)
+{
+	desc[word] = value;
+}
+
+/**
+ * rt2x00_desc_write - write a word to the hardware descriptor.
  * @desc: Base descriptor address
  * @word: Word index from where the descriptor should be written.
  * @value: Value that should be written into the descriptor.
  */
 static inline void rt2x00_desc_write(__le32 *desc, const u8 word, u32 value)
 {
-	desc[word] = cpu_to_le32(value);
+	_rt2x00_desc_write(desc, word, cpu_to_le32(value));
 }
 
 #endif /* RT2X00QUEUE_H */

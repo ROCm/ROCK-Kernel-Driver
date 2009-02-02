@@ -32,6 +32,7 @@ Christoph Hellwig <hch@lst.de>
 Corey Minyard <minyard@acm.org>
 David Brownell <david-b@pacbell.net>
 David Woodhouse <dwmw2@shinybook.infradead.org>
+Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 Domen Puncer <domen@coderock.org>
 Douglas Gilbert <dougg@torque.net>
 Ed L. Cashin <ecashin@coraid.com>
@@ -66,6 +67,7 @@ Kenneth W Chen <kenneth.w.chen@intel.com>
 Koushik <raghavendra.koushik@neterion.com>
 Leonid I Ananiev <leonid.i.ananiev@intel.com>
 Linas Vepstas <linas@austin.ibm.com>
+Mark Brown <broonie@sirena.org.uk>
 Matthieu CASTET <castet.matthieu@free.fr>
 Michael Buesch <mb@bu3sch.de>
 Michael Buesch <mbuesch@freenet.de>
@@ -79,6 +81,8 @@ Nguyen Anh Quynh <aquynh@gmail.com>
 Paolo 'Blaisorblade' Giarrusso <blaisorblade@yahoo.it>
 Patrick Mochel <mochel@digitalimplant.org>
 Peter A Jonsson <pj@ludd.ltu.se>
+Peter Oruba <peter@oruba.de>
+Peter Oruba <peter.oruba@amd.com>
 Praveen BP <praveenbp@ti.com>
 Rajesh Shah <rajesh.shah@intel.com>
 Ralf Baechle <ralf@linux-mips.org>

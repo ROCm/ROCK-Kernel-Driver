@@ -267,8 +267,10 @@ static int __devinit max732x_probe(struct i2c_client *client,
 	int ret, nr_port;
 
 	pdata = client->dev.platform_data;
-	if (pdata == NULL)
-		return -ENODEV;
+	if (pdata == NULL) {
+		dev_dbg(&client->dev, "no platform data\n");
+		return -EINVAL;
+	}
 
 	chip = kzalloc(sizeof(struct max732x_chip), GFP_KERNEL);
 	if (chip == NULL)
@@ -372,7 +374,10 @@ static int __init max732x_init(void)
 {
 	return i2c_add_driver(&max732x_driver);
 }
-module_init(max732x_init);
+/* register after i2c postcore initcall and before
+ * subsys initcalls that may rely on these GPIOs
+ */
+subsys_initcall(max732x_init);
 
 static void __exit max732x_exit(void)
 {

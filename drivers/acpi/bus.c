@@ -48,6 +48,23 @@ EXPORT_SYMBOL(acpi_root_dir);
 
 #define STRUCT_TO_INT(s)	(*((int*)&s))
 
+static int set_power_nocheck(const struct dmi_system_id *id)
+{
+	printk(KERN_NOTICE PREFIX "%s detected - "
+		"disable power check in power transistion\n", id->ident);
+	acpi_power_nocheck = 1;
+	return 0;
+}
+static struct dmi_system_id __cpuinitdata power_nocheck_dmi_table[] = {
+	{
+	set_power_nocheck, "HP Pavilion 05", {
+	DMI_MATCH(DMI_BIOS_VENDOR, "Phoenix Technologies LTD"),
+	DMI_MATCH(DMI_SYS_VENDOR, "HP Pavilion 05"),
+	DMI_MATCH(DMI_PRODUCT_VERSION, "2001211RE101GLEND") }, NULL},
+	{},
+};
+
+
 /* --------------------------------------------------------------------------
                                 Device Management
    -------------------------------------------------------------------------- */
@@ -77,7 +94,7 @@ EXPORT_SYMBOL(acpi_bus_get_device);
 int acpi_bus_get_status(struct acpi_device *device)
 {
 	acpi_status status = AE_OK;
-	unsigned long sta = 0;
+	unsigned long long sta = 0;
 
 
 	if (!device)
@@ -155,7 +172,7 @@ int acpi_bus_get_power(acpi_handle handle, int *state)
 	int result = 0;
 	acpi_status status = 0;
 	struct acpi_device *device = NULL;
-	unsigned long psc = 0;
+	unsigned long long psc = 0;
 
 
 	result = acpi_bus_get_device(handle, &device);
@@ -223,7 +240,19 @@ int acpi_bus_set_power(acpi_handle handle, int state)
 	/*
 	 * Get device's current power state
 	 */
-	acpi_bus_get_power(device->handle, &device->power.state);
+	if (!acpi_power_nocheck) {
+		/*
+		 * Maybe the incorrect power state is returned on the bogus
+		 * bios, which is different with the real power state.
+		 * For example: the bios returns D0 state and the real power
+		 * state is D3. OS expects to set the device to D0 state. In
+		 * such case if OS uses the power state returned by the BIOS,
+		 * the device can't be transisted to the correct power state.
+		 * So if the acpi_power_nocheck is set, it is unnecessary to
+		 * get the power state by calling acpi_bus_get_power.
+		 */
+		acpi_bus_get_power(device->handle, &device->power.state);
+	}
 	if ((state == device->power.state) && !device->flags.force_power_state) {
 		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Device is already at D%d\n",
 				  state));
@@ -745,7 +774,7 @@ static int __init acpi_bus_init(void)
 		       "Unable to initialize ACPI OS objects\n");
 		goto error1;
 	}
-#ifdef CONFIG_ACPI_EC
+
 	/*
 	 * ACPI 2.0 requires the EC driver to be loaded and work before
 	 * the EC device is found in the namespace (i.e. before acpi_initialize_objects()
@@ -756,13 +785,18 @@ static int __init acpi_bus_init(void)
 	 */
 	status = acpi_ec_ecdt_probe();
 	/* Ignore result. Not having an ECDT is not fatal. */
-#endif
 
 	status = acpi_initialize_objects(ACPI_FULL_INITIALIZATION);
 	if (ACPI_FAILURE(status)) {
 		printk(KERN_ERR PREFIX "Unable to initialize ACPI objects\n");
 		goto error1;
 	}
+
+	/*
+	 * Maybe EC region is required at bus_scan/acpi_get_devices. So it
+	 * is necessary to enable it as early as possible.
+	 */
+	acpi_boot_ec_enable();
 
 	printk(KERN_INFO PREFIX "Interpreter enabled\n");
 
@@ -833,7 +867,11 @@ static int __init acpi_init(void)
 		}
 	} else
 		disable_acpi();
-
+	/*
+	 * If the laptop falls into the DMI check table, the power state check
+	 * will be disabled in the course of device power transistion.
+	 */
+	dmi_check_system(power_nocheck_dmi_table);
 	return result;
 }
 

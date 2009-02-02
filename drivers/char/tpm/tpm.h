@@ -90,7 +90,7 @@ struct tpm_chip {
 	struct device *dev;	/* Device stuff */
 
 	int dev_num;		/* /dev/tpm# */
-	int num_opens;		/* only one allowed */
+	unsigned long is_open;	/* only one allowed */
 	int time_expired;
 
 	/* Data passed to and from the tpm via the read/write calls */
@@ -107,9 +107,6 @@ struct tpm_chip {
 	struct dentry **bios_dir;
 
 	struct list_head list;
-#ifdef CONFIG_XEN
-	void *priv;
-#endif
 	void (*release) (struct device *);
 };
 
@@ -127,18 +124,6 @@ static inline void tpm_write_index(int base, int index, int value)
 	outb(value & 0xFF, base+1);
 }
 
-#ifdef CONFIG_XEN
-static inline void *chip_get_private(const struct tpm_chip *chip)
-{
-	return chip->priv;
-}
-
-static inline void chip_set_private(struct tpm_chip *chip, void *priv)
-{
-	chip->priv = priv;
-}
-#endif
-
 extern void tpm_get_timeouts(struct tpm_chip *);
 extern void tpm_gen_interrupt(struct tpm_chip *);
 extern void tpm_continue_selftest(struct tpm_chip *);
@@ -147,6 +132,7 @@ extern struct tpm_chip* tpm_register_hardware(struct device *,
 				 const struct tpm_vendor_specific *);
 extern int tpm_open(struct inode *, struct file *);
 extern int tpm_release(struct inode *, struct file *);
+extern void tpm_dev_vendor_release(struct tpm_chip *);
 extern ssize_t tpm_write(struct file *, const char __user *, size_t,
 			 loff_t *);
 extern ssize_t tpm_read(struct file *, char __user *, size_t, loff_t *);

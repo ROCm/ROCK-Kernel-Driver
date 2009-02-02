@@ -31,7 +31,7 @@ static raw_spinlock_t wakeup_lock =
 
 static void __wakeup_reset(struct trace_array *tr);
 
-#ifdef CONFIG_FTRACE
+#ifdef CONFIG_FUNCTION_TRACER
 /*
  * irqsoff uses its own tracer function to keep the overhead down:
  */
@@ -44,12 +44,13 @@ wakeup_tracer_call(unsigned long ip, unsigned long parent_ip)
 	long disabled;
 	int resched;
 	int cpu;
+	int pc;
 
 	if (likely(!wakeup_task))
 		return;
 
-	resched = need_resched();
-	preempt_disable_notrace();
+	pc = preempt_count();
+	resched = ftrace_preempt_disable();
 
 	cpu = raw_smp_processor_id();
 	data = tr->data[cpu];
@@ -70,7 +71,7 @@ wakeup_tracer_call(unsigned long ip, unsigned long parent_ip)
 	if (task_cpu(wakeup_task) != cpu)
 		goto unlock;
 
-	trace_function(tr, data, ip, parent_ip, flags);
+	trace_function(tr, data, ip, parent_ip, flags, pc);
 
  unlock:
 	__raw_spin_unlock(&wakeup_lock);
@@ -79,22 +80,14 @@ wakeup_tracer_call(unsigned long ip, unsigned long parent_ip)
  out:
 	atomic_dec(&data->disabled);
 
-	/*
-	 * To prevent recursion from the scheduler, if the
-	 * resched flag was set before we entered, then
-	 * don't reschedule.
-	 */
-	if (resched)
-		preempt_enable_no_resched_notrace();
-	else
-		preempt_enable_notrace();
+	ftrace_preempt_enable(resched);
 }
 
 static struct ftrace_ops trace_ops __read_mostly =
 {
 	.func = wakeup_tracer_call,
 };
-#endif /* CONFIG_FTRACE */
+#endif /* CONFIG_FUNCTION_TRACER */
 
 /*
  * Should this new latency be reported/recorded?
@@ -121,6 +114,7 @@ probe_wakeup_sched_switch(struct rq *rq, struct task_struct *prev,
 	unsigned long flags;
 	long disabled;
 	int cpu;
+	int pc;
 
 	tracing_record_cmdline(prev);
 
@@ -139,6 +133,8 @@ probe_wakeup_sched_switch(struct rq *rq, struct task_struct *prev,
 	if (next != wakeup_task)
 		return;
 
+	pc = preempt_count();
+
 	/* The task we are waiting for is waking up */
 	data = wakeup_trace->data[wakeup_cpu];
 
@@ -155,7 +151,7 @@ probe_wakeup_sched_switch(struct rq *rq, struct task_struct *prev,
 	if (unlikely(!tracer_enabled || next != wakeup_task))
 		goto out_unlock;
 
-	trace_function(wakeup_trace, data, CALLER_ADDR1, CALLER_ADDR2, flags);
+	trace_function(wakeup_trace, data, CALLER_ADDR1, CALLER_ADDR2, flags, pc);
 
 	/*
 	 * usecs conversion is slow so we try to delay the conversion
@@ -191,7 +187,7 @@ static void __wakeup_reset(struct trace_array *tr)
 
 	for_each_possible_cpu(cpu) {
 		data = tr->data[cpu];
-		tracing_reset(data);
+		tracing_reset(tr, cpu);
 	}
 
 	wakeup_cpu = -1;
@@ -215,11 +211,12 @@ static void wakeup_reset(struct trace_array *tr)
 }
 
 static void
-probe_wakeup(struct rq *rq, struct task_struct *p)
+probe_wakeup(struct rq *rq, struct task_struct *p, int success)
 {
 	int cpu = smp_processor_id();
 	unsigned long flags;
 	long disabled;
+	int pc;
 
 	if (likely(!tracer_enabled))
 		return;
@@ -232,6 +229,7 @@ probe_wakeup(struct rq *rq, struct task_struct *p)
 			p->prio >= current->prio)
 		return;
 
+	pc = preempt_count();
 	disabled = atomic_inc_return(&wakeup_trace->data[cpu]->disabled);
 	if (unlikely(disabled != 1))
 		goto out;
@@ -256,13 +254,19 @@ probe_wakeup(struct rq *rq, struct task_struct *p)
 
 	wakeup_trace->data[wakeup_cpu]->preempt_timestamp = ftrace_now(cpu);
 	trace_function(wakeup_trace, wakeup_trace->data[wakeup_cpu],
-		       CALLER_ADDR1, CALLER_ADDR2, flags);
+		       CALLER_ADDR1, CALLER_ADDR2, flags, pc);
 
 out_locked:
 	__raw_spin_unlock(&wakeup_lock);
 out:
 	atomic_dec(&wakeup_trace->data[cpu]->disabled);
 }
+
+/*
+ * save_tracer_enabled is used to save the state of the tracer_enabled
+ * variable when we disable it when we open a trace output file.
+ */
+static int save_tracer_enabled;
 
 static void start_wakeup_tracer(struct trace_array *tr)
 {
@@ -302,7 +306,13 @@ static void start_wakeup_tracer(struct trace_array *tr)
 
 	register_ftrace_function(&trace_ops);
 
-	tracer_enabled = 1;
+	if (tracing_is_enabled()) {
+		tracer_enabled = 1;
+		save_tracer_enabled = 1;
+	} else {
+		tracer_enabled = 0;
+		save_tracer_enabled = 0;
+	}
 
 	return;
 fail_deprobe_wake_new:
@@ -314,49 +324,53 @@ fail_deprobe:
 static void stop_wakeup_tracer(struct trace_array *tr)
 {
 	tracer_enabled = 0;
+	save_tracer_enabled = 0;
 	unregister_ftrace_function(&trace_ops);
 	unregister_trace_sched_switch(probe_wakeup_sched_switch);
 	unregister_trace_sched_wakeup_new(probe_wakeup);
 	unregister_trace_sched_wakeup(probe_wakeup);
 }
 
-static void wakeup_tracer_init(struct trace_array *tr)
+static int wakeup_tracer_init(struct trace_array *tr)
 {
 	wakeup_trace = tr;
-
-	if (tr->ctrl)
-		start_wakeup_tracer(tr);
+	start_wakeup_tracer(tr);
+	return 0;
 }
 
 static void wakeup_tracer_reset(struct trace_array *tr)
 {
-	if (tr->ctrl) {
-		stop_wakeup_tracer(tr);
-		/* make sure we put back any tasks we are tracing */
-		wakeup_reset(tr);
-	}
+	stop_wakeup_tracer(tr);
+	/* make sure we put back any tasks we are tracing */
+	wakeup_reset(tr);
 }
 
-static void wakeup_tracer_ctrl_update(struct trace_array *tr)
+static void wakeup_tracer_start(struct trace_array *tr)
 {
-	if (tr->ctrl)
-		start_wakeup_tracer(tr);
-	else
-		stop_wakeup_tracer(tr);
+	wakeup_reset(tr);
+	tracer_enabled = 1;
+	save_tracer_enabled = 1;
+}
+
+static void wakeup_tracer_stop(struct trace_array *tr)
+{
+	tracer_enabled = 0;
+	save_tracer_enabled = 0;
 }
 
 static void wakeup_tracer_open(struct trace_iterator *iter)
 {
 	/* stop the trace while dumping */
-	if (iter->tr->ctrl)
-		stop_wakeup_tracer(iter->tr);
+	tracer_enabled = 0;
 }
 
 static void wakeup_tracer_close(struct trace_iterator *iter)
 {
 	/* forget about any processes we were recording */
-	if (iter->tr->ctrl)
-		start_wakeup_tracer(iter->tr);
+	if (save_tracer_enabled) {
+		wakeup_reset(iter->tr);
+		tracer_enabled = 1;
+	}
 }
 
 static struct tracer wakeup_tracer __read_mostly =
@@ -364,9 +378,10 @@ static struct tracer wakeup_tracer __read_mostly =
 	.name		= "wakeup",
 	.init		= wakeup_tracer_init,
 	.reset		= wakeup_tracer_reset,
+	.start		= wakeup_tracer_start,
+	.stop		= wakeup_tracer_stop,
 	.open		= wakeup_tracer_open,
 	.close		= wakeup_tracer_close,
-	.ctrl_update	= wakeup_tracer_ctrl_update,
 	.print_max	= 1,
 #ifdef CONFIG_FTRACE_SELFTEST
 	.selftest    = trace_selftest_startup_wakeup,

@@ -94,18 +94,10 @@ int acpi_parse_mcfg (struct acpi_table_header *header);
 void acpi_table_print_madt_entry (struct acpi_subtable_header *madt);
 
 /* the following four functions are architecture-dependent */
-#ifdef CONFIG_HAVE_ARCH_PARSE_SRAT
-#define NR_NODE_MEMBLKS MAX_NUMNODES
-#define acpi_numa_slit_init(slit) do {} while (0)
-#define acpi_numa_processor_affinity_init(pa) do {} while (0)
-#define acpi_numa_memory_affinity_init(ma) do {} while (0)
-#define acpi_numa_arch_fixup() do {} while (0)
-#else
 void acpi_numa_slit_init (struct acpi_table_slit *slit);
 void acpi_numa_processor_affinity_init (struct acpi_srat_cpu_affinity *pa);
 void acpi_numa_memory_affinity_init (struct acpi_srat_mem_affinity *ma);
 void acpi_numa_arch_fixup(void);
-#endif
 
 #ifdef CONFIG_ACPI_HOTPLUG_CPU
 /* Arch dependent functions for cpu hotplug support */
@@ -139,22 +131,6 @@ extern int acpi_get_override_irq(int bus_irq, int *trigger, int *polarity);
  */
 void acpi_unregister_gsi (u32 gsi);
 
-struct acpi_prt_entry {
-	struct list_head	node;
-	struct acpi_pci_id	id;
-	u8			pin;
-	struct {
-		acpi_handle		handle;
-		u32			index;
-	}			link;
-	u32			irq;
-};
-
-struct acpi_prt_list {
-	int			count;
-	struct list_head	entries;
-};
-
 struct pci_dev;
 
 int acpi_pci_irq_enable (struct pci_dev *dev);
@@ -171,16 +147,12 @@ struct acpi_pci_driver {
 int acpi_pci_register_driver(struct acpi_pci_driver *driver);
 void acpi_pci_unregister_driver(struct acpi_pci_driver *driver);
 
-#ifdef CONFIG_ACPI_EC
-
 extern int ec_read(u8 addr, u8 *val);
 extern int ec_write(u8 addr, u8 val);
 extern int ec_transaction(u8 command,
                           const u8 *wdata, unsigned wdata_len,
                           u8 *rdata, unsigned rdata_len,
 			  int force_poll);
-
-#endif /*CONFIG_ACPI_EC*/
 
 #if defined(CONFIG_ACPI_WMI) || defined(CONFIG_ACPI_WMI_MODULE)
 
@@ -284,6 +256,7 @@ int acpi_check_mem_region(resource_size_t start, resource_size_t n,
 #ifdef CONFIG_PM_SLEEP
 void __init acpi_no_s4_hw_signature(void);
 void __init acpi_old_suspend_ordering(void);
+void __init acpi_s4_no_nvs(void);
 #endif /* CONFIG_PM_SLEEP */
 #else	/* CONFIG_ACPI */
 

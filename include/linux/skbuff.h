@@ -146,8 +146,14 @@ struct skb_shared_info {
 	unsigned short	gso_segs;
 	unsigned short  gso_type;
 	__be32          ip6_frag_id;
+#ifdef CONFIG_HAS_DMA
+	unsigned int	num_dma_maps;
+#endif
 	struct sk_buff	*frag_list;
 	skb_frag_t	frags[MAX_SKB_FRAGS];
+#ifdef CONFIG_HAS_DMA
+	dma_addr_t	dma_maps[MAX_SKB_FRAGS + 1];
+#endif
 };
 
 /* We divide dataref into two halves.  The higher 16 bits hold references
@@ -217,8 +223,6 @@ typedef unsigned char *sk_buff_data_t;
  *	@local_df: allow local fragmentation
  *	@cloned: Head may be cloned (check refcnt to be sure)
  *	@nohdr: Payload reference only, must not modify header
- *	@proto_data_valid: Protocol data validated since arriving at localhost
- *	@proto_csum_blank: Protocol csum must be added before leaving localhost
  *	@pkt_type: Packet class
  *	@fclone: skbuff clone status
  *	@ip_summed: Driver fed us an IP checksum
@@ -246,6 +250,9 @@ typedef unsigned char *sk_buff_data_t;
  *	@tc_verd: traffic control verdict
  *	@ndisc_nodetype: router type (from link layer)
  *	@do_not_encrypt: set to prevent encryption of this frame
+ *	@requeue: set to indicate that the wireless core should attempt
+ *		a software retry on this frame if we failed to
+ *		receive an ACK for it
  *	@dma_cookie: a cookie to one of several possible DMA operations
  *		done by skb DMA functions
  *	@secmark: security marking
@@ -265,8 +272,9 @@ struct sk_buff {
 		struct  dst_entry	*dst;
 		struct  rtable		*rtable;
 	};
+#ifdef CONFIG_XFRM
 	struct	sec_path	*sp;
-
+#endif
 	/*
 	 * This is the control buffer. It is free to use for every
 	 * layer. Please put your private variables there. If you
@@ -321,15 +329,12 @@ struct sk_buff {
 #endif
 #if defined(CONFIG_MAC80211) || defined(CONFIG_MAC80211_MODULE)
 	__u8			do_not_encrypt:1;
+	__u8			requeue:1;
 #endif
 #ifdef CONFIG_NETVM
 	__u8 			emergency:1;
 #endif
-#ifdef CONFIG_XEN
-	__u8			proto_data_valid:1,
-				proto_csum_blank:1;
-#endif
-	/* 10-16 bit hole */
+	/* 12-16 bit hole */
 
 #ifdef CONFIG_NET_DMA
 	dma_cookie_t		dma_cookie;
@@ -362,6 +367,14 @@ struct sk_buff {
 
 #include <asm/system.h>
 
+#ifdef CONFIG_HAS_DMA
+#include <linux/dma-mapping.h>
+extern int skb_dma_map(struct device *dev, struct sk_buff *skb,
+		       enum dma_data_direction dir);
+extern void skb_dma_unmap(struct device *dev, struct sk_buff *skb,
+			  enum dma_data_direction dir);
+#endif
+
 #define SKB_ALLOC_FCLONE	0x01
 #define SKB_ALLOC_RX		0x02
 
@@ -389,6 +402,8 @@ static inline struct sk_buff *alloc_skb_fclone(unsigned int size,
 {
 	return __alloc_skb(size, priority, SKB_ALLOC_FCLONE, -1);
 }
+
+extern int skb_recycle_check(struct sk_buff *skb, int skb_size);
 
 extern struct sk_buff *skb_morph(struct sk_buff *dst, struct sk_buff *src);
 extern struct sk_buff *skb_clone(struct sk_buff *skb,
@@ -477,6 +492,68 @@ static inline unsigned char *skb_end_pointer(const struct sk_buff *skb)
 static inline int skb_queue_empty(const struct sk_buff_head *list)
 {
 	return list->next == (struct sk_buff *)list;
+}
+
+/**
+ *	skb_queue_is_last - check if skb is the last entry in the queue
+ *	@list: queue head
+ *	@skb: buffer
+ *
+ *	Returns true if @skb is the last buffer on the list.
+ */
+static inline bool skb_queue_is_last(const struct sk_buff_head *list,
+				     const struct sk_buff *skb)
+{
+	return (skb->next == (struct sk_buff *) list);
+}
+
+/**
+ *	skb_queue_is_first - check if skb is the first entry in the queue
+ *	@list: queue head
+ *	@skb: buffer
+ *
+ *	Returns true if @skb is the first buffer on the list.
+ */
+static inline bool skb_queue_is_first(const struct sk_buff_head *list,
+				      const struct sk_buff *skb)
+{
+	return (skb->prev == (struct sk_buff *) list);
+}
+
+/**
+ *	skb_queue_next - return the next packet in the queue
+ *	@list: queue head
+ *	@skb: current buffer
+ *
+ *	Return the next packet in @list after @skb.  It is only valid to
+ *	call this if skb_queue_is_last() evaluates to false.
+ */
+static inline struct sk_buff *skb_queue_next(const struct sk_buff_head *list,
+					     const struct sk_buff *skb)
+{
+	/* This BUG_ON may seem severe, but if we just return then we
+	 * are going to dereference garbage.
+	 */
+	BUG_ON(skb_queue_is_last(list, skb));
+	return skb->next;
+}
+
+/**
+ *	skb_queue_prev - return the prev packet in the queue
+ *	@list: queue head
+ *	@skb: current buffer
+ *
+ *	Return the prev packet in @list before @skb.  It is only valid to
+ *	call this if skb_queue_is_first() evaluates to false.
+ */
+static inline struct sk_buff *skb_queue_prev(const struct sk_buff_head *list,
+					     const struct sk_buff *skb)
+{
+	/* This BUG_ON may seem severe, but if we just return then we
+	 * are going to dereference garbage.
+	 */
+	BUG_ON(skb_queue_is_first(list, skb));
+	return skb->prev;
 }
 
 /**
@@ -667,6 +744,22 @@ static inline __u32 skb_queue_len(const struct sk_buff_head *list_)
 	return list_->qlen;
 }
 
+/**
+ *	__skb_queue_head_init - initialize non-spinlock portions of sk_buff_head
+ *	@list: queue to initialize
+ *
+ *	This initializes only the list and queue length aspects of
+ *	an sk_buff_head object.  This allows to initialize the list
+ *	aspects of an sk_buff_head without reinitializing things like
+ *	the spinlock.  It can also be used for on-stack sk_buff_head
+ *	objects where the spinlock is known to not be used.
+ */
+static inline void __skb_queue_head_init(struct sk_buff_head *list)
+{
+	list->prev = list->next = (struct sk_buff *)list;
+	list->qlen = 0;
+}
+
 /*
  * This function creates a split out lock class for each invocation;
  * this is needed for now since a whole lot of users of the skb-queue
@@ -678,8 +771,7 @@ static inline __u32 skb_queue_len(const struct sk_buff_head *list_)
 static inline void skb_queue_head_init(struct sk_buff_head *list)
 {
 	spin_lock_init(&list->lock);
-	list->prev = list->next = (struct sk_buff *)list;
-	list->qlen = 0;
+	__skb_queue_head_init(list);
 }
 
 static inline void skb_queue_head_init_class(struct sk_buff_head *list,
@@ -704,6 +796,83 @@ static inline void __skb_insert(struct sk_buff *newsk,
 	newsk->prev = prev;
 	next->prev  = prev->next = newsk;
 	list->qlen++;
+}
+
+static inline void __skb_queue_splice(const struct sk_buff_head *list,
+				      struct sk_buff *prev,
+				      struct sk_buff *next)
+{
+	struct sk_buff *first = list->next;
+	struct sk_buff *last = list->prev;
+
+	first->prev = prev;
+	prev->next = first;
+
+	last->next = next;
+	next->prev = last;
+}
+
+/**
+ *	skb_queue_splice - join two skb lists, this is designed for stacks
+ *	@list: the new list to add
+ *	@head: the place to add it in the first list
+ */
+static inline void skb_queue_splice(const struct sk_buff_head *list,
+				    struct sk_buff_head *head)
+{
+	if (!skb_queue_empty(list)) {
+		__skb_queue_splice(list, (struct sk_buff *) head, head->next);
+		head->qlen += list->qlen;
+	}
+}
+
+/**
+ *	skb_queue_splice - join two skb lists and reinitialise the emptied list
+ *	@list: the new list to add
+ *	@head: the place to add it in the first list
+ *
+ *	The list at @list is reinitialised
+ */
+static inline void skb_queue_splice_init(struct sk_buff_head *list,
+					 struct sk_buff_head *head)
+{
+	if (!skb_queue_empty(list)) {
+		__skb_queue_splice(list, (struct sk_buff *) head, head->next);
+		head->qlen += list->qlen;
+		__skb_queue_head_init(list);
+	}
+}
+
+/**
+ *	skb_queue_splice_tail - join two skb lists, each list being a queue
+ *	@list: the new list to add
+ *	@head: the place to add it in the first list
+ */
+static inline void skb_queue_splice_tail(const struct sk_buff_head *list,
+					 struct sk_buff_head *head)
+{
+	if (!skb_queue_empty(list)) {
+		__skb_queue_splice(list, head->prev, (struct sk_buff *) head);
+		head->qlen += list->qlen;
+	}
+}
+
+/**
+ *	skb_queue_splice_tail - join two skb lists and reinitialise the emptied list
+ *	@list: the new list to add
+ *	@head: the place to add it in the first list
+ *
+ *	Each of the lists is a queue.
+ *	The list at @list is reinitialised
+ */
+static inline void skb_queue_splice_tail_init(struct sk_buff_head *list,
+					      struct sk_buff_head *head)
+{
+	if (!skb_queue_empty(list)) {
+		__skb_queue_splice(list, head->prev, (struct sk_buff *) head);
+		head->qlen += list->qlen;
+		__skb_queue_head_init(list);
+	}
 }
 
 /**
@@ -1480,6 +1649,15 @@ static inline int pskb_trim_rcsum(struct sk_buff *skb, unsigned int len)
 		     skb != (struct sk_buff *)(queue);				\
 		     skb = tmp, tmp = skb->next)
 
+#define skb_queue_walk_from(queue, skb)						\
+		for (; prefetch(skb->next), (skb != (struct sk_buff *)(queue));	\
+		     skb = skb->next)
+
+#define skb_queue_walk_from_safe(queue, skb, tmp)				\
+		for (tmp = skb->next;						\
+		     skb != (struct sk_buff *)(queue);				\
+		     skb = tmp, tmp = skb->next)
+
 #define skb_queue_reverse_walk(queue, skb) \
 		for (skb = (queue)->prev;					\
 		     prefetch(skb->prev), (skb != (struct sk_buff *)(queue));	\
@@ -1522,8 +1700,12 @@ extern int             skb_splice_bits(struct sk_buff *skb,
 extern void	       skb_copy_and_csum_dev(const struct sk_buff *skb, u8 *to);
 extern void	       skb_split(struct sk_buff *skb,
 				 struct sk_buff *skb1, const u32 len);
+extern int	       skb_shift(struct sk_buff *tgt, struct sk_buff *skb,
+				 int shiftlen);
 
 extern struct sk_buff *skb_segment(struct sk_buff *skb, int features);
+extern int	       skb_gro_receive(struct sk_buff **head,
+				       struct sk_buff *skb);
 
 static inline void *skb_header_pointer(const struct sk_buff *skb, int offset,
 				       int len, void *buffer)
@@ -1739,6 +1921,18 @@ static inline void skb_copy_queue_mapping(struct sk_buff *to, const struct sk_bu
 	to->queue_mapping = from->queue_mapping;
 }
 
+#ifdef CONFIG_XFRM
+static inline struct sec_path *skb_sec_path(struct sk_buff *skb)
+{
+	return skb->sp;
+}
+#else
+static inline struct sec_path *skb_sec_path(struct sk_buff *skb)
+{
+	return NULL;
+}
+#endif
+
 static inline int skb_is_gso(const struct sk_buff *skb)
 {
 	return skb_shinfo(skb)->gso_size;
@@ -1771,12 +1965,5 @@ static inline void skb_forward_csum(struct sk_buff *skb)
 }
 
 bool skb_partial_csum_set(struct sk_buff *skb, u16 start, u16 off);
-
-#if defined(CONFIG_XEN) || defined(CONFIG_PARAVIRT_XEN)
-int skb_checksum_setup(struct sk_buff *skb);
-#else
-static inline int skb_checksum_setup(struct sk_buff *skb) { return 0; }
-#endif
-
 #endif	/* __KERNEL__ */
 #endif	/* _LINUX_SKBUFF_H */

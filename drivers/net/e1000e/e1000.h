@@ -36,6 +36,7 @@
 #include <linux/workqueue.h>
 #include <linux/io.h>
 #include <linux/netdevice.h>
+#include <asm/cacheflush.h>
 
 #include "hw.h"
 
@@ -193,6 +194,7 @@ struct e1000_adapter {
 	u16 mng_vlan_id;
 	u16 link_speed;
 	u16 link_duplex;
+	u16 eeprom_vers;
 
 	spinlock_t tx_queue_lock; /* prevent concurrent tail updates */
 
@@ -388,6 +390,7 @@ extern int e1000e_setup_tx_resources(struct e1000_adapter *adapter);
 extern void e1000e_free_rx_resources(struct e1000_adapter *adapter);
 extern void e1000e_free_tx_resources(struct e1000_adapter *adapter);
 extern void e1000e_update_stats(struct e1000_adapter *adapter);
+extern bool e1000_has_link(struct e1000_adapter *adapter);
 extern void e1000e_set_interrupt_capability(struct e1000_adapter *adapter);
 extern void e1000e_reset_interrupt_capability(struct e1000_adapter *adapter);
 

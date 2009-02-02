@@ -52,7 +52,9 @@
 	US_FLAG(MAX_SECTORS_MIN,0x00002000)			\
 		/* Sets max_sectors to arch min */		\
 	US_FLAG(BULK_IGNORE_TAG,0x00004000)			\
-		/* Ignore tag mismatch in bulk operations */	\
+		/* Ignore tag mismatch in bulk operations */    \
+	US_FLAG(SANE_SENSE,     0x00008000)			\
+		/* Sane Sense (> 18 bytes) */			\
 	US_FLAG(CAPACITY_OK,	0x00010000)			\
 		/* READ CAPACITY response is correct */
 

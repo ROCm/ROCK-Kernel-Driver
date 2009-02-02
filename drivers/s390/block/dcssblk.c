@@ -5,6 +5,7 @@
  */
 
 #define KMSG_COMPONENT "dcssblk"
+#define pr_fmt(fmt) KMSG_COMPONENT ": " fmt
 
 #include <linux/module.h>
 #include <linux/moduleparam.h>
@@ -17,14 +18,14 @@
 #include <asm/io.h>
 #include <linux/completion.h>
 #include <linux/interrupt.h>
-#include <asm/s390_rdev.h>
 
 #define DCSSBLK_NAME "dcssblk"
 #define DCSSBLK_MINORS_PER_DISK 1
 #define DCSSBLK_PARM_LEN 400
+#define DCSS_BUS_ID_SIZE 20
 
-static int dcssblk_open(struct inode *inode, struct file *filp);
-static int dcssblk_release(struct inode *inode, struct file *filp);
+static int dcssblk_open(struct block_device *bdev, fmode_t mode);
+static int dcssblk_release(struct gendisk *disk, fmode_t mode);
 static int dcssblk_make_request(struct request_queue *q, struct bio *bio);
 static int dcssblk_direct_access(struct block_device *bdev, sector_t secnum,
 				 void **kaddr, unsigned long *pfn);
@@ -42,7 +43,7 @@ static struct block_device_operations dcssblk_devops = {
 struct dcssblk_dev_info {
 	struct list_head lh;
 	struct device dev;
-	char segment_name[BUS_ID_SIZE];
+	char segment_name[DCSS_BUS_ID_SIZE];
 	atomic_t use_count;
 	struct gendisk *gd;
 	unsigned long start;
@@ -57,7 +58,7 @@ struct dcssblk_dev_info {
 
 struct segment_info {
 	struct list_head lh;
-	char segment_name[BUS_ID_SIZE];
+	char segment_name[DCSS_BUS_ID_SIZE];
 	unsigned long start;
 	unsigned long end;
 	int segment_type;
@@ -126,7 +127,7 @@ dcssblk_assign_free_minor(struct dcssblk_dev_info *dev_info)
 		found = 0;
 		// test if minor available
 		list_for_each_entry(entry, &dcssblk_devices, lh)
-			if (minor == entry->gd->first_minor)
+			if (minor == MINOR(disk_devt(entry->gd)))
 				found++;
 		if (!found) break; // got unused minor
 	}
@@ -586,7 +587,7 @@ dcssblk_add_store(struct device *dev, struct device_attribute *attr, const char 
 	dev_info->start = dcssblk_find_lowest_addr(dev_info);
 	dev_info->end = dcssblk_find_highest_addr(dev_info);
 
-	strlcpy(dev_info->dev.bus_id, dev_info->segment_name, BUS_ID_SIZE);
+	dev_set_name(&dev_info->dev, dev_info->segment_name);
 	dev_info->dev.release = dcssblk_release_segment;
 	INIT_LIST_HEAD(&dev_info->lh);
 	dev_info->gd = alloc_disk(DCSSBLK_MINORS_PER_DISK);
@@ -624,7 +625,7 @@ dcssblk_add_store(struct device *dev, struct device_attribute *attr, const char 
 	if (rc)
 		goto release_gd;
 	sprintf(dev_info->gd->disk_name, "dcssblk%d",
-		dev_info->gd->first_minor);
+		MINOR(disk_devt(dev_info->gd)));
 	list_add_tail(&dev_info->lh, &dcssblk_devices);
 
 	if (!try_module_get(THIS_MODULE)) {
@@ -768,32 +769,31 @@ out_buf:
 }
 
 static int
-dcssblk_open(struct inode *inode, struct file *filp)
+dcssblk_open(struct block_device *bdev, fmode_t mode)
 {
 	struct dcssblk_dev_info *dev_info;
 	int rc;
 
-	dev_info = inode->i_bdev->bd_disk->private_data;
+	dev_info = bdev->bd_disk->private_data;
 	if (NULL == dev_info) {
 		rc = -ENODEV;
 		goto out;
 	}
 	atomic_inc(&dev_info->use_count);
-	inode->i_bdev->bd_block_size = 4096;
+	bdev->bd_block_size = 4096;
 	rc = 0;
 out:
 	return rc;
 }
 
 static int
-dcssblk_release(struct inode *inode, struct file *filp)
+dcssblk_release(struct gendisk *disk, fmode_t mode)
 {
-	struct dcssblk_dev_info *dev_info;
+	struct dcssblk_dev_info *dev_info = disk->private_data;
 	struct segment_info *entry;
 	int rc;
 
-	dev_info = inode->i_bdev->bd_disk->private_data;
-	if (NULL == dev_info) {
+	if (!dev_info) {
 		rc = -ENODEV;
 		goto out;
 	}
@@ -945,7 +945,7 @@ dcssblk_check_params(void)
 static void __exit
 dcssblk_exit(void)
 {
-	s390_root_dev_unregister(dcssblk_root_dev);
+	root_device_unregister(dcssblk_root_dev);
 	unregister_blkdev(dcssblk_major, DCSSBLK_NAME);
 }
 
@@ -954,22 +954,22 @@ dcssblk_init(void)
 {
 	int rc;
 
-	dcssblk_root_dev = s390_root_dev_register("dcssblk");
+	dcssblk_root_dev = root_device_register("dcssblk");
 	if (IS_ERR(dcssblk_root_dev))
 		return PTR_ERR(dcssblk_root_dev);
 	rc = device_create_file(dcssblk_root_dev, &dev_attr_add);
 	if (rc) {
-		s390_root_dev_unregister(dcssblk_root_dev);
+		root_device_unregister(dcssblk_root_dev);
 		return rc;
 	}
 	rc = device_create_file(dcssblk_root_dev, &dev_attr_remove);
 	if (rc) {
-		s390_root_dev_unregister(dcssblk_root_dev);
+		root_device_unregister(dcssblk_root_dev);
 		return rc;
 	}
 	rc = register_blkdev(0, DCSSBLK_NAME);
 	if (rc < 0) {
-		s390_root_dev_unregister(dcssblk_root_dev);
+		root_device_unregister(dcssblk_root_dev);
 		return rc;
 	}
 	dcssblk_major = rc;

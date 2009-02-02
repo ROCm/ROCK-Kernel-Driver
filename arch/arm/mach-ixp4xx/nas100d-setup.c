@@ -28,11 +28,11 @@
 #include <linux/reboot.h>
 #include <linux/i2c.h>
 #include <linux/i2c-gpio.h>
+#include <linux/io.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/flash.h>
-#include <asm/io.h>
 #include <asm/gpio.h>
 
 static struct flash_platform_data nas100d_flash_data = {
@@ -231,7 +231,6 @@ static irqreturn_t nas100d_reset_handler(int irq, void *dev_id)
 
 static void __init nas100d_init(void)
 {
-	DECLARE_MAC_BUF(mac_buf);
 	uint8_t __iomem *f;
 	int i;
 
@@ -294,8 +293,8 @@ static void __init nas100d_init(void)
 #endif
 		iounmap(f);
 	}
-	printk(KERN_INFO "NAS100D: Using MAC address %s for port 0\n",
-	       print_mac(mac_buf, nas100d_plat_eth[0].hwaddr));
+	printk(KERN_INFO "NAS100D: Using MAC address %pM for port 0\n",
+	       nas100d_plat_eth[0].hwaddr);
 
 }
 

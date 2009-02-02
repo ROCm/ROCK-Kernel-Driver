@@ -46,7 +46,7 @@ void zfLnxRecv80211(zdev_t* dev, zbuf_t* buf, struct zsAdditionInfo* addInfo)
     u16_t frameCtrl;
     u16_t frameSubtype;
     zbuf_t *skb1;
-    struct usbdrv_private *macp = dev->priv;
+    struct usbdrv_private *macp = dev->ml_priv;
 
     //frameCtrl = zmw_buf_readb(dev, buf, 0);
     frameCtrl = *(u8_t*)((u8_t*)buf->data);
@@ -65,11 +65,7 @@ void zfLnxRecv80211(zdev_t* dev, zbuf_t* buf, struct zsAdditionInfo* addInfo)
                 if(skb1 != NULL)
                 {
                     skb1->dev = dev;
-                #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,22))
-	            skb1->mac.raw = skb1->data;
-                #else
                     skb1->mac_header = skb1->data;
-                #endif
 	            skb1->ip_summed = CHECKSUM_NONE;
 	            skb1->pkt_type = PACKET_OTHERHOST;
 	            skb1->protocol = __constant_htons(0x0019);  /* ETH_P_80211_RAW */
@@ -88,6 +84,7 @@ void zfLnxRecv80211(zdev_t* dev, zbuf_t* buf, struct zsAdditionInfo* addInfo)
 #define ZM_AVOID_UDP_LARGE_PACKET_FAIL
 void zfLnxRecvEth(zdev_t* dev, zbuf_t* buf, u16_t port)
 {
+    struct usbdrv_private *macp = dev->ml_priv;
 #ifdef ZM_AVOID_UDP_LARGE_PACKET_FAIL
     zbuf_t *new_buf;
 
@@ -165,10 +162,8 @@ void zfLnxRecvEth(zdev_t* dev, zbuf_t* buf, u16_t port)
     case NET_RX_CN_HIGH:
         break;
     default:
-            ((struct usbdrv_private*)(dev->priv))->
-                    drv_stats.net_stats.rx_packets++;
-            ((struct usbdrv_private*)(dev->priv))->
-                    drv_stats.net_stats.rx_bytes += buf->len;
+            macp->drv_stats.net_stats.rx_packets++;
+            macp->drv_stats.net_stats.rx_bytes += buf->len;
         break;
     }
 

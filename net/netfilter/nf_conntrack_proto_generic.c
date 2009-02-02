@@ -45,7 +45,7 @@ static int packet(struct nf_conn *ct,
 		  const struct sk_buff *skb,
 		  unsigned int dataoff,
 		  enum ip_conntrack_info ctinfo,
-		  int pf,
+		  u_int8_t pf,
 		  unsigned int hooknum)
 {
 	nf_ct_refresh_acct(ct, ctinfo, skb, nf_ct_generic_timeout);
@@ -67,7 +67,7 @@ static struct ctl_table generic_sysctl_table[] = {
 		.data		= &nf_ct_generic_timeout,
 		.maxlen		= sizeof(unsigned int),
 		.mode		= 0644,
-		.proc_handler	= &proc_dointvec_jiffies,
+		.proc_handler	= proc_dointvec_jiffies,
 	},
 	{
 		.ctl_name	= 0
@@ -80,7 +80,7 @@ static struct ctl_table generic_compat_sysctl_table[] = {
 		.data		= &nf_ct_generic_timeout,
 		.maxlen		= sizeof(unsigned int),
 		.mode		= 0644,
-		.proc_handler	= &proc_dointvec_jiffies,
+		.proc_handler	= proc_dointvec_jiffies,
 	},
 	{
 		.ctl_name	= 0

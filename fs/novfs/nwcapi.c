@@ -97,7 +97,7 @@ int novfs_open_conn_by_name(struct novfs_xplat *pdata, void ** Handle, struct no
 			*Handle = connReply->newConnHandle;
 
 			cpylen = copy_to_user(pdata->reqData, &ocbn, sizeof(ocbn));
-			DbgPrint("New Conn Handle = %X\n", connReply->newConnHandle);
+			DbgPrint("New Conn Handle = %X", connReply->newConnHandle);
 		}
 		kfree(reply);
 	}
@@ -136,7 +136,7 @@ int novfs_open_conn_by_addr(struct novfs_xplat *pdata, void ** Handle, struct no
 	cpylen =
 		copy_from_user(&tranAddr, ocba.pTranAddr, sizeof(tranAddr));
 
-	DbgPrint("NwOpenConnByAddr: tranAddr\n");
+	DbgPrint("tranAddr");
 	novfs_dump(sizeof(tranAddr), &tranAddr);
 
 	openConn->TranAddr.uTransportType = tranAddr.uTransportType;
@@ -147,7 +147,7 @@ int novfs_open_conn_by_addr(struct novfs_xplat *pdata, void ** Handle, struct no
 		copy_from_user(addr, tranAddr.puAddress,
 				tranAddr.uAddressLength);
 
-	DbgPrint("NwOpenConnByAddr: addr\n");
+	DbgPrint("addr");
 	novfs_dump(sizeof(addr), addr);
 
 	openConn->TranAddr.oAddress = *(unsigned int *) (&addr[2]);
@@ -173,8 +173,7 @@ int novfs_open_conn_by_addr(struct novfs_xplat *pdata, void ** Handle, struct no
 			cpylen =
 				copy_to_user(pdata->reqData, &ocba,
 						sizeof(ocba));
-			DbgPrint("New Conn Handle = %X\n",
-					connReply->ConnHandle);
+			DbgPrint("New Conn Handle = %X", connReply->ConnHandle);
 		}
 		kfree(reply);
 	}
@@ -233,8 +232,7 @@ int novfs_open_conn_by_ref(struct novfs_xplat *pdata, void ** Handle, struct nov
 			cpylen =
 				copy_to_user(pdata->reqData, &ocbr,
 						sizeof(ocbr));
-			DbgPrint("New Conn Handle = %X\n",
-					openConn->ConnHandle);
+			DbgPrint("New Conn Handle = %X", openConn->ConnHandle);
 		}
 		kfree(reply);
 	}
@@ -258,7 +256,7 @@ int novfs_raw_send(struct novfs_xplat *pdata, struct novfs_schandle Session)
 	unsigned char *reqData;
 	unsigned long actualReplyLength = 0;
 
-	DbgPrint("[XPLAT] Process Raw NCP Send\n");
+	DbgPrint("[XPLAT] Process Raw NCP Send");
 	cpylen = copy_from_user(&xRequest, pdata->reqData, sizeof(xRequest));
 
 	/*
@@ -267,7 +265,7 @@ int novfs_raw_send(struct novfs_xplat *pdata, struct novfs_schandle Session)
 	frag =
 	    kmalloc(xRequest.uNumReplyFrags * sizeof(struct nwc_frag), GFP_KERNEL);
 
-	DbgPrint("[XPLAT RawNCP] - Reply Frag Count 0x%X\n",
+	DbgPrint("[XPLAT RawNCP] - Reply Frag Count 0x%X",
 		 xRequest.uNumReplyFrags);
 
 	if (!frag)
@@ -280,12 +278,12 @@ int novfs_raw_send(struct novfs_xplat *pdata, struct novfs_schandle Session)
 
 	cFrag = frag;
 	for (x = 0; x < xRequest.uNumReplyFrags; x++) {
-		DbgPrint("[XPLAT - RawNCP] - Frag Len = %d\n", cFrag->uLength);
+		DbgPrint("[XPLAT - RawNCP] - Frag Len = %d", cFrag->uLength);
 		totalLen += cFrag->uLength;
 		cFrag++;
 	}
 
-	DbgPrint("[XPLAT - RawNCP] - totalLen = %d\n", totalLen);
+	DbgPrint("[XPLAT - RawNCP] - totalLen = %d", totalLen);
 	datalen = 0;
 	reqFrag =
 	    kmalloc(xRequest.uNumRequestFrags * sizeof(struct nwc_frag),
@@ -308,9 +306,9 @@ int novfs_raw_send(struct novfs_xplat *pdata, struct novfs_schandle Session)
 	 * Allocate the cmd Request
 	 */
 	cmdlen = datalen + sizeof(*cmd) + sizeof(*ncpData);
-	DbgPrint("[XPLAT RawNCP] - Frag Count 0x%X\n",
+	DbgPrint("[XPLAT RawNCP] - Frag Count 0x%X",
 		 xRequest.uNumRequestFrags);
-	DbgPrint("[XPLAT RawNCP] - Total Command Data Len = %x\n", cmdlen);
+	DbgPrint("[XPLAT RawNCP] - Total Command Data Len = %x", cmdlen);
 
 	cmd = kmalloc(cmdlen, GFP_KERNEL);
 	if (!cmd)
@@ -346,8 +344,8 @@ int novfs_raw_send(struct novfs_xplat *pdata, struct novfs_schandle Session)
 		Queue_Daemon_Command((void *)cmd, cmdlen, NULL, 0,
 				(void **)&reply, &replylen,
 				INTERRUPTIBLE);
-	DbgPrint("RawNCP - reply = %x\n", reply);
-	DbgPrint("RawNCP - retCode = %x\n", retCode);
+	DbgPrint("RawNCP - reply = %x", reply);
+	DbgPrint("RawNCP - retCode = %x", retCode);
 
 	if (reply) {
 		/*
@@ -356,7 +354,7 @@ int novfs_raw_send(struct novfs_xplat *pdata, struct novfs_schandle Session)
 		ncpReply = (struct nwd_ncp_rep *) reply->data;
 		retCode = reply->Reply.ErrorCode;
 
-		DbgPrint("RawNCP - Reply Frag Count 0x%X\n",
+		DbgPrint("RawNCP - Reply Frag Count 0x%X",
 				xRequest.uNumReplyFrags);
 
 		/*
@@ -368,7 +366,7 @@ int novfs_raw_send(struct novfs_xplat *pdata, struct novfs_schandle Session)
 		totalLen = ncpReply->replyLen;
 		for (x = 0; x < xRequest.uNumReplyFrags; x++) {
 
-			DbgPrint("RawNCP - Copy Frag %d: 0x%X\n", x,
+			DbgPrint("RawNCP - Copy Frag %d: 0x%X", x,
 					cFrag->uLength);
 
 			datalen =
@@ -491,33 +489,33 @@ int novfs_login_id(struct novfs_xplat *pdata, struct novfs_schandle Session)
 
 	cpylen = copy_from_user(&lgn, pdata->reqData, sizeof(lgn));
 
-	DbgPrint("NwLoginIdentity:\n");
+	DbgPrint("");
 	novfs_dump(sizeof(lgn), &lgn);
 
 	cpylen = copy_from_user(&nwcStr, lgn.pDomainName, sizeof(nwcStr));
-	DbgPrint("NwLoginIdentity: DomainName\n");
+	DbgPrint("DomainName\n");
 	novfs_dump(sizeof(nwcStr), &nwcStr);
 
 	if ((server.buffer = kmalloc(nwcStr.DataLen, GFP_KERNEL))) {
 		server.type = nwcStr.DataType;
 		server.len = nwcStr.DataLen;
 		if (!copy_from_user((void *)server.buffer, nwcStr.pBuffer, server.len)) {
-			DbgPrint("NwLoginIdentity: Server\n");
+			DbgPrint("Server");
 			novfs_dump(server.len, server.buffer);
 
 			cpylen = copy_from_user(&nwcStr, lgn.pObjectName, sizeof(nwcStr));
-			DbgPrint("NwLoginIdentity: ObjectName\n");
+			DbgPrint("ObjectName");
 			novfs_dump(sizeof(nwcStr), &nwcStr);
 
 			if ((username.buffer = kmalloc(nwcStr.DataLen, GFP_KERNEL))) {
 				username.type = nwcStr.DataType;
 				username.len = nwcStr.DataLen;
 				if (!copy_from_user((void *)username.buffer, nwcStr.pBuffer, username.len)) {
-					DbgPrint("NwLoginIdentity: User\n");
+					DbgPrint("User");
 					novfs_dump(username.len, username.buffer);
 
 					cpylen = copy_from_user(&nwcStr, lgn.pPassword, sizeof(nwcStr));
-					DbgPrint("NwLoginIdentity: Password\n");
+					DbgPrint("Password");
 					novfs_dump(sizeof(nwcStr), &nwcStr);
 
 					if ((password.buffer = kmalloc(nwcStr.DataLen, GFP_KERNEL))) {
@@ -949,19 +947,19 @@ int novfs_scan_conn_info(struct novfs_xplat *pdata, struct novfs_schandle Sessio
 
 	pDConnInfo = (struct nwd_scan_conn_info *) cmd->data;
 
-	DbgPrint("NwScanConnInfo: Input Data\n");
-	DbgPrint("connInfo.uScanIndex = 0x%X\n", connInfo.uScanIndex);
-	DbgPrint("connInfo.uConnectionReference = 0x%X\n",
+	DbgPrint("Input Data");
+	__DbgPrint("    connInfo.uScanIndex = 0x%X\n", connInfo.uScanIndex);
+	__DbgPrint("    connInfo.uConnectionReference = 0x%X\n",
 			connInfo.uConnectionReference);
-	DbgPrint("connInfo.uScanInfoLevel = 0x%X\n",
+	__DbgPrint("    connInfo.uScanInfoLevel = 0x%X\n",
 			connInfo.uScanInfoLevel);
-	DbgPrint("connInfo.uScanInfoLen = 0x%X\n",
+	__DbgPrint("    connInfo.uScanInfoLen = 0x%X\n",
 			connInfo.uScanInfoLen);
-	DbgPrint("connInfo.uReturnInfoLength = 0x%X\n",
+	__DbgPrint("    connInfo.uReturnInfoLength = 0x%X\n",
 			connInfo.uReturnInfoLength);
-	DbgPrint("connInfo.uReturnInfoLevel = 0x%X\n",
+	__DbgPrint("    connInfo.uReturnInfoLevel = 0x%X\n",
 			connInfo.uReturnInfoLevel);
-	DbgPrint("connInfo.uScanFlags = 0x%X\n", connInfo.uScanFlags);
+	__DbgPrint("    connInfo.uScanFlags = 0x%X\n", connInfo.uScanFlags);
 
 	pDConnInfo->uScanIndex = connInfo.uScanIndex;
 	pDConnInfo->uConnectionReference =
@@ -990,10 +988,10 @@ int novfs_scan_conn_info(struct novfs_xplat *pdata, struct novfs_schandle Sessio
 				(void **)&reply, &replylen,
 				INTERRUPTIBLE);
 	if (reply) {
-		DbgPrint("NwScanConnInfo: Reply recieved\n");
-		DbgPrint("   NextIndex = %x\n", connInfo.uScanIndex);
-		DbgPrint("   ErrorCode = %x\n", reply->Reply.ErrorCode);
-		DbgPrint("   data = %p\n", reply->data);
+		DbgPrint("Reply recieved");
+		__DbgPrint("   NextIndex = %x\n", connInfo.uScanIndex);
+		__DbgPrint("   ErrorCode = %x\n", reply->Reply.ErrorCode);
+		__DbgPrint("   data = %p\n", reply->data);
 
 		pDConnInfo = (struct nwd_scan_conn_info *) reply->data;
 		retCode = (unsigned long) reply->Reply.ErrorCode;
@@ -1044,8 +1042,7 @@ static void GetUserData(struct nwc_scan_conn_info * connInfo, struct novfs_xplat
 
 	pDConnInfo = (struct nwd_scan_conn_info *) reply->data;
 	uLevel = pDConnInfo->uReturnInfoLevel;
-	DbgPrint
-	    ("[GetUserData] uLevel = %d, reply = 0x%p, reply->data = 0x%X\n",
+	DbgPrint("uLevel = %d, reply = 0x%p, reply->data = 0x%X",
 	     uLevel, reply, reply->data);
 
 	switch (uLevel) {
@@ -1082,8 +1079,7 @@ static void GetUserData(struct nwc_scan_conn_info * connInfo, struct novfs_xplat
 			srcData = (unsigned char *) reply->data;
 			dataLen = reply->dataLen;
 
-			DbgPrint
-			    ("GetUserData NWC_CONN_INFO_TRAN_ADDR 0x%p -> 0x%p :: 0x%X\n",
+			DbgPrint("NWC_CONN_INFO_TRAN_ADDR 0x%p -> 0x%p :: 0x%X",
 			     srcData, connInfo->pReturnConnInfo, dataLen);
 
 			cpylen =
@@ -1120,7 +1116,7 @@ static void GetUserData(struct nwc_scan_conn_info * connInfo, struct novfs_xplat
 	}
 
 	if (srcData && dataLen) {
-		DbgPrint("Copy Data in GetUserData 0x%p -> 0x%p :: 0x%X\n",
+		DbgPrint("Copy Data 0x%p -> 0x%p :: 0x%X",
 			 srcData, connInfo->pReturnConnInfo, dataLen);
 		cpylen =
 		    copy_to_user(connInfo->pReturnConnInfo, srcData, dataLen);
@@ -1302,11 +1298,10 @@ int novfs_get_preferred_DS_tree(struct novfs_xplat *pdata, struct novfs_schandle
 				reply->data + pDGetTree->DsTreeNameOffset;
 			p = (struct nwc_get_pref_ds_tree *) pdata->reqData;
 
-			DbgPrint
-				("NwcGetPreferredDSTree: Reply recieved\n");
-			DbgPrint("   TreeLen = %x\n",
+			DbgPrint("Reply recieved");
+			__DbgPrint("   TreeLen = %x\n",
 					pDGetTree->uTreeLength);
-			DbgPrint("   TreeName = %s\n", dPtr);
+			__DbgPrint("   TreeName = %s\n", dPtr);
 
 			cpylen =
 				copy_to_user(p, &pDGetTree->uTreeLength, 4);
@@ -1473,8 +1468,7 @@ int novfs_get_default_ctx(struct novfs_xplat *pdata,
 		if (!retCode) {
 			pGet = (struct nwd_get_def_name_ctx *) reply->data;
 
-			DbgPrint
-				("NwcGetDefaultNameCtx: retCode=0x%x uNameLength1=%d uNameLength2=%d\n",
+			DbgPrint("retCode=0x%x uNameLength1=%d uNameLength2=%d",
 				 retCode, pGet->uNameLength,
 				 xplatCall.uNameLength);
 			if (xplatCall.uNameLength < pGet->uNameLength) {
@@ -1593,9 +1587,9 @@ int novfs_enum_ids(struct novfs_xplat *pdata, struct novfs_schandle Session)
 	cmd->Command.SessionId = Session;
 	cmd->NwcCommand = NWC_ENUMERATE_IDENTITIES;
 
-	DbgPrint("NwcEnumIdentities: Send Request\n");
-	DbgPrint("   iterator = %x\n", xplatCall.Iterator);
-	DbgPrint("   cmdlen = %d\n", cmdlen);
+	DbgPrint("Send Request");
+	__DbgPrint("   iterator = %x\n", xplatCall.Iterator);
+	__DbgPrint("   cmdlen = %d\n", cmdlen);
 
 	pEnum = (struct nwd_enum_ids *) cmd->data;
 	pEnum->Iterator = xplatCall.Iterator;
@@ -1611,7 +1605,7 @@ int novfs_enum_ids(struct novfs_xplat *pdata, struct novfs_schandle Session)
 		cpylen =
 			copy_to_user(&eId->Iterator, &pEnum->Iterator,
 					sizeof(pEnum->Iterator));
-		DbgPrint("[XPLAT NWCAPI] Found AuthId 0x%X\n",
+		DbgPrint("[XPLAT NWCAPI] Found AuthId 0x%X",
 				pEnum->AuthenticationId);
 		cpylen =
 			copy_to_user(&eId->AuthenticationId,
@@ -1638,7 +1632,7 @@ int novfs_enum_ids(struct novfs_xplat *pdata, struct novfs_schandle Session)
 			str =
 				(char *)((char *)reply->data +
 						pEnum->domainNameOffset);
-			DbgPrint("[XPLAT NWCAPI] Found Domain %s\n",
+			DbgPrint("[XPLAT NWCAPI] Found Domain %s",
 					str);
 			cpylen =
 				copy_to_user(xferStr.pBuffer, str,
@@ -1655,7 +1649,7 @@ int novfs_enum_ids(struct novfs_xplat *pdata, struct novfs_schandle Session)
 			str =
 				(char *)((char *)reply->data +
 						pEnum->objectNameOffset);
-			DbgPrint("[XPLAT NWCAPI] Found User %s\n", str);
+			DbgPrint("[XPLAT NWCAPI] Found User %s", str);
 			cpylen =
 				copy_to_user(xferStr.pBuffer, str,
 						pEnum->objectNameLen);
@@ -1848,19 +1842,19 @@ int novfs_set_map_drive(struct novfs_xplat *pdata, struct novfs_schandle Session
 	unsigned long status = 0, datalen, cmdlen, replylen;
 	struct nwc_map_drive_ex symInfo;
 
-	DbgPrint("Call to NwcSetMapDrive\n");
+	DbgPrint("");
 	cmdlen = sizeof(*cmd);
 	if (copy_from_user(&symInfo, pdata->reqData, sizeof(symInfo)))
 		return -EFAULT;
 	datalen = sizeof(symInfo) + symInfo.dirPathOffsetLength +
 	    symInfo.linkOffsetLength;
 
-	DbgPrint(" cmdlen = %d\n", cmdlen);
-	DbgPrint(" dataLen = %d\n", datalen);
-	DbgPrint(" symInfo.dirPathOffsetLength = %d\n",
+	__DbgPrint(" cmdlen = %d\n", cmdlen);
+	__DbgPrint(" dataLen = %d\n", datalen);
+	__DbgPrint(" symInfo.dirPathOffsetLength = %d\n",
 		 symInfo.dirPathOffsetLength);
-	DbgPrint(" symInfo.linkOffsetLength = %d\n", symInfo.linkOffsetLength);
-	DbgPrint(" pdata->datalen = %d\n", pdata->reqLen);
+	__DbgPrint(" symInfo.linkOffsetLength = %d\n", symInfo.linkOffsetLength);
+	__DbgPrint(" pdata->datalen = %d\n", pdata->reqLen);
 
 	novfs_dump(sizeof(symInfo), &symInfo);
 
@@ -1901,7 +1895,7 @@ int novfs_unmap_drive(struct novfs_xplat *pdata, struct novfs_schandle Session)
 	unsigned long status = 0, datalen, cmdlen, replylen, cpylen;
 	struct nwc_unmap_drive_ex symInfo;
 
-	DbgPrint("Call to NwcUnMapDrive\n");
+	DbgPrint("");
 
 	cpylen = copy_from_user(&symInfo, pdata->reqData, sizeof(symInfo));
 	cmdlen = sizeof(*cmd);
@@ -1940,7 +1934,7 @@ int novfs_enum_drives(struct novfs_xplat *pdata, struct novfs_schandle Session)
 	unsigned long offset;
 	char *cp;
 
-	DbgPrint("Call to NwcEnumerateDrives\n");
+	DbgPrint("");
 
 	cmdlen = sizeof(*cmd);
 	cmd = kmalloc(cmdlen, GFP_KERNEL);
@@ -1959,7 +1953,7 @@ int novfs_enum_drives(struct novfs_xplat *pdata, struct novfs_schandle Session)
 
 	if (reply) {
 		status = reply->Reply.ErrorCode;
-		DbgPrint("Status Code = 0x%X\n", status);
+		DbgPrint("Status Code = 0x%X", status);
 		if (!status) {
 			offset =
 				sizeof(((struct nwc_get_mapped_drives *) pdata->

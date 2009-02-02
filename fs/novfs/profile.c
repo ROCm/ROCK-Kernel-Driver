@@ -74,7 +74,7 @@ static ssize_t User_proc_write_DbgBuffer(struct file *file, const char __user *b
 		cpylen = copy_from_user(lbuf, buf, nbytes);
 
 		lbuf[nbytes] = 0;
-		DbgPrint("User_proc_write_DbgBuffer: %s\n", lbuf);
+		DbgPrint("%s", lbuf);
 
 		for (i = 0; lbuf[i] && lbuf[i] != '\n'; i++) ;
 
@@ -196,7 +196,7 @@ static int LocalPrint(char *Fmt, ...)
 	return (len);
 }
 
-int DbgPrint(char *Fmt, ...)
+int ___DbgPrint(const char *site, const char *Fmt, ...)
 {
 	char *buf;
 	int len = 0;
@@ -209,9 +209,9 @@ int DbgPrint(char *Fmt, ...)
 		if (buf) {
 			va_start(args, Fmt);
 			len = sprintf(buf, "[%d] ", current->pid);
+			len += strncat(buf + len, site, DBG_BUFFER_SIZE - len);
 
-			len +=
-			    vsnprintf(buf + len, DBG_BUFFER_SIZE - len, Fmt,
+			len += vsnprintf(buf + len, DBG_BUFFER_SIZE - len, Fmt,
 				      args);
 			if (-1 == len) {
 				len = DBG_BUFFER_SIZE - 1;
@@ -285,7 +285,7 @@ void novfs_dump(int size, void *dumpptr)
 				if (0 == (i % 16)) {
 					if (line) {
 						doline(bptr, ptr, line);
-						DbgPrint("%s\n", buf);
+						__DbgPrint("%s\n", buf);
 						bptr = buf;
 					}
 					bptr += sprintf(bptr, "0x%p: ", ptr);
@@ -294,7 +294,7 @@ void novfs_dump(int size, void *dumpptr)
 				bptr += sprintf(bptr, "%02x ", *ptr++);
 			}
 			doline(bptr, ptr, line);
-			DbgPrint("%s\n", buf);
+			__DbgPrint("%s\n", buf);
 		}
 	}
 }

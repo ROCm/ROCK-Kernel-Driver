@@ -4,10 +4,10 @@
 #include <linux/inetdevice.h>
 #include <linux/tracepoint.h>
 
-DEFINE_TRACE(ipv4_addr_add,
+DECLARE_TRACE(ipv4_addr_add,
 	TPPROTO(struct in_ifaddr *ifa),
 	TPARGS(ifa));
-DEFINE_TRACE(ipv4_addr_del,
+DECLARE_TRACE(ipv4_addr_del,
 	TPPROTO(struct in_ifaddr *ifa),
 	TPARGS(ifa));
 

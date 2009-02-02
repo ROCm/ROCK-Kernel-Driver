@@ -62,7 +62,7 @@ static struct ctrl sd_ctrls[] = {
 	},
 };
 
-static struct v4l2_pix_format sif_mode[] = {
+static const struct v4l2_pix_format sif_mode[] = {
 	{160, 120, V4L2_PIX_FMT_SPCA508, V4L2_FIELD_NONE,
 		.bytesperline = 160,
 		.sizeimage = 160 * 120 * 3 / 2,
@@ -1528,7 +1528,7 @@ static int sd_init(struct gspca_dev *gspca_dev)
 	return 0;
 }
 
-static void sd_start(struct gspca_dev *gspca_dev)
+static int sd_start(struct gspca_dev *gspca_dev)
 {
 	int mode;
 
@@ -1546,6 +1546,7 @@ static void sd_start(struct gspca_dev *gspca_dev)
 		break;
 	}
 	reg_write(gspca_dev->dev, 0x8112, 0x10 | 0x20);
+	return 0;
 }
 
 static void sd_stopN(struct gspca_dev *gspca_dev)

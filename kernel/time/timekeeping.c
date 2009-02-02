@@ -78,6 +78,9 @@ static void clocksource_forward_now(void)
 
 	nsec = cyc2ns(clock, cycle_delta);
 	timespec_add_ns(&xtime, nsec);
+
+	nsec = ((s64)cycle_delta * clock->mult_orig) >> clock->shift;
+	clock->raw_time.tv_nsec += nsec;
 }
 
 /**
@@ -188,6 +191,8 @@ static void change_clocksource(void)
 
 	clocksource_forward_now();
 
+	new->raw_time = clock->raw_time;
+
 	clock = new;
 	clock->cycle_last = 0;
 	clock->cycle_last = clocksource_read(new);
@@ -208,6 +213,39 @@ static void change_clocksource(void)
 static inline void clocksource_forward_now(void) { }
 static inline void change_clocksource(void) { }
 #endif
+
+/**
+ * getrawmonotonic - Returns the raw monotonic time in a timespec
+ * @ts:		pointer to the timespec to be set
+ *
+ * Returns the raw monotonic time (completely un-modified by ntp)
+ */
+void getrawmonotonic(struct timespec *ts)
+{
+	unsigned long seq;
+	s64 nsecs;
+	cycle_t cycle_now, cycle_delta;
+
+	do {
+		seq = read_seqbegin(&xtime_lock);
+
+		/* read clocksource: */
+		cycle_now = clocksource_read(clock);
+
+		/* calculate the delta since the last update_wall_time: */
+		cycle_delta = (cycle_now - clock->cycle_last) & clock->mask;
+
+		/* convert to nanoseconds: */
+		nsecs = ((s64)cycle_delta * clock->mult_orig) >> clock->shift;
+
+		*ts = clock->raw_time;
+
+	} while (read_seqretry(&xtime_lock, seq));
+
+	timespec_add_ns(ts, nsecs);
+}
+EXPORT_SYMBOL(getrawmonotonic);
+
 
 /**
  * timekeeping_valid_for_hres - Check if timekeeping is suitable for hres
@@ -452,7 +490,7 @@ void update_wall_time(void)
 #else
 	offset = clock->cycle_interval;
 #endif
-	clock->xtime_nsec += (s64)xtime.tv_nsec << clock->shift;
+	clock->xtime_nsec = (s64)xtime.tv_nsec << clock->shift;
 
 	/* normally this loop will run just once, however in the
 	 * case of lost or late ticks, it will accumulate correctly.
@@ -469,6 +507,12 @@ void update_wall_time(void)
 			second_overflow();
 		}
 
+		clock->raw_time.tv_nsec += clock->raw_interval;
+		if (clock->raw_time.tv_nsec >= NSEC_PER_SEC) {
+			clock->raw_time.tv_nsec -= NSEC_PER_SEC;
+			clock->raw_time.tv_sec++;
+		}
+
 		/* accumulate error between NTP and clock interval */
 		clock->error += tick_length;
 		clock->error -= clock->xtime_interval << (NTP_SCALE_SHIFT - clock->shift);
@@ -477,9 +521,34 @@ void update_wall_time(void)
 	/* correct the clock when NTP error is too big */
 	clocksource_adjust(offset);
 
-	/* store full nanoseconds into xtime */
-	xtime.tv_nsec = (s64)clock->xtime_nsec >> clock->shift;
+	/*
+	 * Since in the loop above, we accumulate any amount of time
+	 * in xtime_nsec over a second into xtime.tv_sec, its possible for
+	 * xtime_nsec to be fairly small after the loop. Further, if we're
+	 * slightly speeding the clocksource up in clocksource_adjust(),
+	 * its possible the required corrective factor to xtime_nsec could
+	 * cause it to underflow.
+	 *
+	 * Now, we cannot simply roll the accumulated second back, since
+	 * the NTP subsystem has been notified via second_overflow. So
+	 * instead we push xtime_nsec forward by the amount we underflowed,
+	 * and add that amount into the error.
+	 *
+	 * We'll correct this error next time through this function, when
+	 * xtime_nsec is not as small.
+	 */
+	if (unlikely((s64)clock->xtime_nsec < 0)) {
+		s64 neg = -(s64)clock->xtime_nsec;
+		clock->xtime_nsec = 0;
+		clock->error += neg << (NTP_SCALE_SHIFT - clock->shift);
+	}
+
+	/* store full nanoseconds into xtime after rounding it up and
+	 * add the remainder to the error difference.
+	 */
+	xtime.tv_nsec = ((s64)clock->xtime_nsec >> clock->shift) + 1;
 	clock->xtime_nsec -= (s64)xtime.tv_nsec << clock->shift;
+	clock->error += clock->xtime_nsec << (NTP_SCALE_SHIFT - clock->shift);
 
 	update_xtime_cache(cyc2ns(clock, offset));
 

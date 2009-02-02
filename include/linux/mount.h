@@ -5,8 +5,6 @@
  *
  * Author:  Marco van Wieringen <mvw@planets.elm.net>
  *
- * Version: $Id: mount.h,v 2.0 1996/11/17 16:48:14 mvw Exp mvw $
- *
  */
 #ifndef _LINUX_MOUNT_H
 #define _LINUX_MOUNT_H
@@ -133,7 +131,5 @@ extern void mark_mounts_for_expiry(struct list_head *mounts);
 
 extern spinlock_t vfsmount_lock;
 extern dev_t name_to_dev_t(char *name);
-
-extern char *d_namespace_path(struct dentry *, struct vfsmount *, char *, int);
 
 #endif /* _LINUX_MOUNT_H */

@@ -21,6 +21,7 @@
 #include <asm/smp.h>
 #include <asm/ipi.h>
 #include <asm/genapic.h>
+#include <asm/setup.h>
 
 extern struct genapic apic_flat;
 extern struct genapic apic_physflat;
@@ -30,7 +31,7 @@ extern struct genapic apic_x2apic_cluster;
 
 struct genapic __read_mostly *genapic = &apic_flat;
 
-static struct genapic *apic_probe[] = {
+static struct genapic *apic_probe[] __initdata = {
 	&apic_x2apic_uv_x,
 	&apic_x2apic_phys,
 	&apic_x2apic_cluster,
@@ -53,6 +54,9 @@ void __init setup_apic_routing(void)
 			genapic = &apic_physflat;
 		printk(KERN_INFO "Setting APIC routing to %s\n", genapic->name);
 	}
+
+	if (x86_quirks->update_genapic)
+		x86_quirks->update_genapic();
 }
 
 /* Same for both flat and physical. */
@@ -62,7 +66,7 @@ void apic_send_IPI_self(int vector)
 	__send_IPI_shortcut(APIC_DEST_SELF, vector, APIC_DEST_PHYSICAL);
 }
 
-int acpi_madt_oem_check(char *oem_id, char *oem_table_id)
+int __init acpi_madt_oem_check(char *oem_id, char *oem_table_id)
 {
 	int i;
 

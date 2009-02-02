@@ -37,7 +37,7 @@
 #define BIT_BCN         0x10
 
 int ixgbe_copy_dcb_cfg(struct ixgbe_dcb_config *src_dcb_cfg,
-		       struct ixgbe_dcb_config *dst_dcb_cfg, int tc_max)
+                       struct ixgbe_dcb_config *dst_dcb_cfg, int tc_max)
 {
 	struct tc_configuration *src_tc_cfg = NULL;
 	struct tc_configuration *dst_tc_cfg = NULL;
@@ -128,25 +128,27 @@ static u16 ixgbe_dcb_select_queue(struct net_device *dev, struct sk_buff *skb)
 
 static u8 ixgbe_dcbnl_set_state(struct net_device *netdev, u8 state)
 {
+	u8 err = 0;
 	struct ixgbe_adapter *adapter = netdev_priv(netdev);
 
 	DPRINTK(DRV, INFO, "Set DCB Admin Mode.\n");
 
 	if (state > 0) {
 		/* Turn on DCB */
-		if (adapter->flags & IXGBE_FLAG_DCB_ENABLED) {
-			return 0;
-		} 
+		if (adapter->flags & IXGBE_FLAG_DCB_ENABLED)
+			goto out;
 
 		if (!(adapter->flags & IXGBE_FLAG_MSIX_ENABLED)) {
-			DPRINTK(DRV, ERR, "Enable Failed, needs MSI-X\n");
-			return 1;
-		} 
+			DPRINTK(DRV, ERR, "Enable failed, needs MSI-X\n");
+			err = 1;
+			goto out;
+		}
 
 		if (netif_running(netdev))
-			netdev->stop(netdev);
+			netdev->netdev_ops->ndo_stop(netdev);
 		ixgbe_reset_interrupt_capability(adapter);
 		ixgbe_napi_del_all(adapter);
+		INIT_LIST_HEAD(&netdev->napi_list);
 		kfree(adapter->tx_ring);
 		kfree(adapter->rx_ring);
 		adapter->tx_ring = NULL;
@@ -156,16 +158,16 @@ static u8 ixgbe_dcbnl_set_state(struct net_device *netdev, u8 state)
 		adapter->flags &= ~IXGBE_FLAG_RSS_ENABLED;
 		adapter->flags |= IXGBE_FLAG_DCB_ENABLED;
 		ixgbe_init_interrupt_scheme(adapter);
-		ixgbe_napi_add_all(adapter);
 		if (netif_running(netdev))
-			netdev->open(netdev);
+			netdev->netdev_ops->ndo_open(netdev);
 	} else {
 		/* Turn off DCB */
 		if (adapter->flags & IXGBE_FLAG_DCB_ENABLED) {
 			if (netif_running(netdev))
-				netdev->stop(netdev);
+				netdev->netdev_ops->ndo_stop(netdev);
 			ixgbe_reset_interrupt_capability(adapter);
 			ixgbe_napi_del_all(adapter);
+			INIT_LIST_HEAD(&netdev->napi_list);
 			kfree(adapter->tx_ring);
 			kfree(adapter->rx_ring);
 			adapter->tx_ring = NULL;
@@ -175,12 +177,12 @@ static u8 ixgbe_dcbnl_set_state(struct net_device *netdev, u8 state)
 			adapter->flags &= ~IXGBE_FLAG_DCB_ENABLED;
 			adapter->flags |= IXGBE_FLAG_RSS_ENABLED;
 			ixgbe_init_interrupt_scheme(adapter);
-			ixgbe_napi_add_all(adapter);
 			if (netif_running(netdev))
-				netdev->open(netdev);
+				netdev->netdev_ops->ndo_open(netdev);
 		}
 	}
-	return 0;
+out:
+	return err;
 }
 
 static void ixgbe_dcbnl_get_perm_hw_addr(struct net_device *netdev,
@@ -194,8 +196,8 @@ static void ixgbe_dcbnl_get_perm_hw_addr(struct net_device *netdev,
 }
 
 static void ixgbe_dcbnl_set_pg_tc_cfg_tx(struct net_device *netdev, int tc,
-					 u8 prio, u8 bwg_id, u8 bw_pct,
-					 u8 up_map)
+                                         u8 prio, u8 bwg_id, u8 bw_pct,
+                                         u8 up_map)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(netdev);
 
@@ -222,7 +224,7 @@ static void ixgbe_dcbnl_set_pg_tc_cfg_tx(struct net_device *netdev, int tc,
 }
 
 static void ixgbe_dcbnl_set_pg_bwg_cfg_tx(struct net_device *netdev, int bwg_id,
-					  u8 bw_pct)
+                                          u8 bw_pct)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(netdev);
 
@@ -234,8 +236,8 @@ static void ixgbe_dcbnl_set_pg_bwg_cfg_tx(struct net_device *netdev, int bwg_id,
 }
 
 static void ixgbe_dcbnl_set_pg_tc_cfg_rx(struct net_device *netdev, int tc,
-					 u8 prio, u8 bwg_id, u8 bw_pct,
-					 u8 up_map)
+                                         u8 prio, u8 bwg_id, u8 bw_pct,
+                                         u8 up_map)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(netdev);
 
@@ -262,7 +264,7 @@ static void ixgbe_dcbnl_set_pg_tc_cfg_rx(struct net_device *netdev, int tc,
 }
 
 static void ixgbe_dcbnl_set_pg_bwg_cfg_rx(struct net_device *netdev, int bwg_id,
-					  u8 bw_pct)
+                                          u8 bw_pct)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(netdev);
 
@@ -274,8 +276,8 @@ static void ixgbe_dcbnl_set_pg_bwg_cfg_rx(struct net_device *netdev, int bwg_id,
 }
 
 static void ixgbe_dcbnl_get_pg_tc_cfg_tx(struct net_device *netdev, int tc,
-					 u8 *prio, u8 *bwg_id, u8 *bw_pct,
-					 u8 *up_map)
+                                         u8 *prio, u8 *bwg_id, u8 *bw_pct,
+                                         u8 *up_map)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(netdev);
 
@@ -286,7 +288,7 @@ static void ixgbe_dcbnl_get_pg_tc_cfg_tx(struct net_device *netdev, int tc,
 }
 
 static void ixgbe_dcbnl_get_pg_bwg_cfg_tx(struct net_device *netdev, int bwg_id,
-					  u8 *bw_pct)
+                                          u8 *bw_pct)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(netdev);
 
@@ -294,8 +296,8 @@ static void ixgbe_dcbnl_get_pg_bwg_cfg_tx(struct net_device *netdev, int bwg_id,
 }
 
 static void ixgbe_dcbnl_get_pg_tc_cfg_rx(struct net_device *netdev, int tc,
-					 u8 *prio, u8 *bwg_id, u8 *bw_pct,
-					 u8 *up_map)
+                                         u8 *prio, u8 *bwg_id, u8 *bw_pct,
+                                         u8 *up_map)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(netdev);
 
@@ -306,7 +308,7 @@ static void ixgbe_dcbnl_get_pg_tc_cfg_rx(struct net_device *netdev, int tc,
 }
 
 static void ixgbe_dcbnl_get_pg_bwg_cfg_rx(struct net_device *netdev, int bwg_id,
-					  u8 *bw_pct)
+                                          u8 *bw_pct)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(netdev);
 
@@ -314,7 +316,7 @@ static void ixgbe_dcbnl_get_pg_bwg_cfg_rx(struct net_device *netdev, int bwg_id,
 }
 
 static void ixgbe_dcbnl_set_pfc_cfg(struct net_device *netdev, int priority,
-				    u8 setting)
+                                    u8 setting)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(netdev);
 
@@ -325,7 +327,7 @@ static void ixgbe_dcbnl_set_pfc_cfg(struct net_device *netdev, int priority,
 }
 
 static void ixgbe_dcbnl_get_pfc_cfg(struct net_device *netdev, int priority,
-				    u8 *setting)
+                                    u8 *setting)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(netdev);
 

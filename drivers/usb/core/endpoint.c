@@ -169,7 +169,8 @@ static int usb_endpoint_major_init(void)
 	error = alloc_chrdev_region(&dev, 0, MAX_ENDPOINT_MINORS,
 				    "usb_endpoint");
 	if (error) {
-		err("unable to get a dynamic major for usb endpoints");
+		printk(KERN_ERR "Unable to get a dynamic major for "
+		       "usb endpoints.\n");
 		return error;
 	}
 	usb_endpoint_major = MAJOR(dev);
@@ -275,7 +276,7 @@ static void ep_device_release(struct device *dev)
 	kfree(ep_dev);
 }
 
-int usb_create_ep_files(struct device *parent,
+int usb_create_ep_devs(struct device *parent,
 			struct usb_host_endpoint *endpoint,
 			struct usb_device *udev)
 {
@@ -339,7 +340,7 @@ exit:
 	return retval;
 }
 
-void usb_remove_ep_files(struct usb_host_endpoint *endpoint)
+void usb_remove_ep_devs(struct usb_host_endpoint *endpoint)
 {
 	struct ep_device *ep_dev = endpoint->ep_dev;
 

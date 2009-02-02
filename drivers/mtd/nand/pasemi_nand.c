@@ -107,7 +107,7 @@ static int __devinit pasemi_nand_probe(struct of_device *ofdev,
 	if (pasemi_nand_mtd)
 		return -ENODEV;
 
-	pr_debug("pasemi_nand at %lx-%lx\n", res.start, res.end);
+	pr_debug("pasemi_nand at %llx-%llx\n", res.start, res.end);
 
 	/* Allocate memory for MTD device structure and private data */
 	pasemi_nand_mtd = kzalloc(sizeof(struct mtd_info) +
@@ -141,6 +141,7 @@ static int __devinit pasemi_nand_probe(struct of_device *ofdev,
 	}
 
 	lpcctl = pci_resource_start(pdev, 0);
+	pci_dev_put(pdev);
 
 	if (!request_region(lpcctl, 4, driver_name)) {
 		err = -EBUSY;
@@ -169,7 +170,7 @@ static int __devinit pasemi_nand_probe(struct of_device *ofdev,
 		goto out_lpc;
 	}
 
-	printk(KERN_INFO "PA Semi NAND flash at %08lx, control at I/O %x\n",
+	printk(KERN_INFO "PA Semi NAND flash at %08llx, control at I/O %x\n",
 	       res.start, lpcctl);
 
 	return 0;

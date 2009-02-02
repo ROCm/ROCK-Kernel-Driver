@@ -59,6 +59,7 @@ static void		svc_udp_data_ready(struct sock *, int);
 static int		svc_udp_recvfrom(struct svc_rqst *);
 static int		svc_udp_sendto(struct svc_rqst *);
 static void		svc_sock_detach(struct svc_xprt *);
+static void		svc_tcp_sock_detach(struct svc_xprt *);
 static void		svc_sock_free(struct svc_xprt *);
 
 static struct svc_xprt *svc_create_socket(struct svc_serv *, int,
@@ -102,7 +103,6 @@ static void svc_reclassify_socket(struct socket *sock)
 static void svc_release_skb(struct svc_rqst *rqstp)
 {
 	struct sk_buff *skb = rqstp->rq_xprt_ctxt;
-	struct svc_deferred_req *dr = rqstp->rq_deferred;
 
 	if (skb) {
 		struct svc_sock *svsk =
@@ -111,10 +111,6 @@ static void svc_release_skb(struct svc_rqst *rqstp)
 
 		dprintk("svc: service %p, releasing skb %p\n", rqstp, skb);
 		skb_free_datagram(svsk->sk_sk, skb);
-	}
-	if (dr) {
-		rqstp->rq_deferred = NULL;
-		kfree(dr);
 	}
 }
 
@@ -250,10 +246,10 @@ static int one_sock_name(char *buf, struct svc_sock *svsk)
 
 	switch(svsk->sk_sk->sk_family) {
 	case AF_INET:
-		len = sprintf(buf, "ipv4 %s %u.%u.%u.%u %d\n",
-			      svsk->sk_sk->sk_protocol==IPPROTO_UDP?
+		len = sprintf(buf, "ipv4 %s %pI4 %d\n",
+			      svsk->sk_sk->sk_protocol == IPPROTO_UDP ?
 			      "udp" : "tcp",
-			      NIPQUAD(inet_sk(svsk->sk_sk)->rcv_saddr),
+			      &inet_sk(svsk->sk_sk)->rcv_saddr,
 			      inet_sk(svsk->sk_sk)->num);
 		break;
 	default:
@@ -289,7 +285,7 @@ svc_sock_names(char *buf, struct svc_serv *serv, char *toclose)
 		return -ENOENT;
 	return len;
 }
-EXPORT_SYMBOL(svc_sock_names);
+EXPORT_SYMBOL_GPL(svc_sock_names);
 
 /*
  * Check input queue length
@@ -1017,7 +1013,7 @@ static struct svc_xprt_ops svc_tcp_ops = {
 	.xpo_recvfrom = svc_tcp_recvfrom,
 	.xpo_sendto = svc_tcp_sendto,
 	.xpo_release_rqst = svc_release_skb,
-	.xpo_detach = svc_sock_detach,
+	.xpo_detach = svc_tcp_sock_detach,
 	.xpo_free = svc_sock_free,
 	.xpo_prep_reply_hdr = svc_tcp_prep_reply_hdr,
 	.xpo_has_wspace = svc_tcp_has_wspace,
@@ -1101,7 +1097,7 @@ void svc_sock_update_bufs(struct svc_serv *serv)
 	}
 	spin_unlock_bh(&serv->sv_lock);
 }
-EXPORT_SYMBOL(svc_sock_update_bufs);
+EXPORT_SYMBOL_GPL(svc_sock_update_bufs);
 
 /*
  * Initialize socket for RPC use and create svc_sock struct
@@ -1114,6 +1110,7 @@ static struct svc_sock *svc_setup_socket(struct svc_serv *serv,
 	struct svc_sock	*svsk;
 	struct sock	*inet;
 	int		pmap_register = !(flags & SVC_SOCK_ANONYMOUS);
+	int		val;
 
 	dprintk("svc: svc_setup_socket %p\n", sock);
 	if (!(svsk = kzalloc(sizeof(*svsk), GFP_KERNEL))) {
@@ -1146,6 +1143,18 @@ static struct svc_sock *svc_setup_socket(struct svc_serv *serv,
 	else
 		svc_tcp_init(svsk, serv);
 
+	/*
+	 * We start one listener per sv_serv.  We want AF_INET
+	 * requests to be automatically shunted to our AF_INET6
+	 * listener using a mapped IPv4 address.  Make sure
+	 * no-one starts an equivalent IPv4 listener, which
+	 * would steal our incoming connections.
+	 */
+	val = 0;
+	if (serv->sv_family == AF_INET6)
+		kernel_setsockopt(sock, SOL_IPV6, IPV6_V6ONLY,
+					(char *)&val, sizeof(val));
+
 	dprintk("svc: svc_setup_socket created %p (inet %p)\n",
 				svsk, svsk->sk_sk);
 
@@ -1154,8 +1163,7 @@ static struct svc_sock *svc_setup_socket(struct svc_serv *serv,
 
 int svc_addsock(struct svc_serv *serv,
 		int fd,
-		char *name_return,
-		int *proto)
+		char *name_return)
 {
 	int err = 0;
 	struct socket *so = sockfd_lookup(fd, &err);
@@ -1195,7 +1203,6 @@ int svc_addsock(struct svc_serv *serv,
 		sockfd_put(so);
 		return err;
 	}
-	if (proto) *proto = so->sk->sk_protocol;
 	return one_sock_name(name_return, svsk);
 }
 EXPORT_SYMBOL_GPL(svc_addsock);
@@ -1276,6 +1283,24 @@ static void svc_sock_detach(struct svc_xprt *xprt)
 	sk->sk_state_change = svsk->sk_ostate;
 	sk->sk_data_ready = svsk->sk_odata;
 	sk->sk_write_space = svsk->sk_owspace;
+
+	if (sk->sk_sleep && waitqueue_active(sk->sk_sleep))
+		wake_up_interruptible(sk->sk_sleep);
+}
+
+/*
+ * Disconnect the socket, and reset the callbacks
+ */
+static void svc_tcp_sock_detach(struct svc_xprt *xprt)
+{
+	struct svc_sock *svsk = container_of(xprt, struct svc_sock, sk_xprt);
+
+	dprintk("svc: svc_tcp_sock_detach(%p)\n", svsk);
+
+	svc_sock_detach(xprt);
+
+	if (!test_bit(XPT_LISTENER, &xprt->xpt_flags))
+		kernel_sock_shutdown(svsk->sk_sock, SHUT_RDWR);
 }
 
 /*

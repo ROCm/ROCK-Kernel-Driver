@@ -1,3 +1,12 @@
+#ifndef __WINBOND_MLME_H
+#define __WINBOND_MLME_H
+
+#include <linux/types.h>
+#include <linux/spinlock.h>
+
+#include "mac_structures.h"
+#include "mds_s.h"
+
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 //	Mlme.h
 //		Define the related definitions of MLME module
@@ -125,12 +134,12 @@
 typedef struct _MLME_FRAME
 {
 	//NDIS_PACKET		MLME_Packet;
-	PCHAR			pMMPDU;
+	s8 *			pMMPDU;
 	u16			len;
 	u8			DataType;
 	u8			IsInUsed;
 
-	OS_SPIN_LOCK	MLMESpinLock;
+	spinlock_t	MLMESpinLock;
 
     u8		TxMMPDU[MAX_NUM_TX_MMPDU][MAX_MMPDU_SIZE];
 	u8		TxMMPDUInUse[ (MAX_NUM_TX_MMPDU+3) & ~0x03 ];
@@ -192,4 +201,4 @@ typedef struct _RXDATA
 
 }__attribute__ ((packed)) RXDATA, *psRXDATA;
 
-
+#endif

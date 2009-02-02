@@ -530,15 +530,14 @@ static void do_acct_process(struct bsd_acct_struct *acct,
 	do_div(elapsed, AHZ);
 	ac.ac_btime = get_seconds() - elapsed;
 	/* we really need to bite the bullet and change layout */
-	ac.ac_uid = current->uid;
-	ac.ac_gid = current->gid;
+	current_uid_gid(&ac.ac_uid, &ac.ac_gid);
 #if ACCT_VERSION==2
 	ac.ac_ahz = AHZ;
 #endif
 #if ACCT_VERSION==1 || ACCT_VERSION==2
 	/* backward-compatible 16 bit fields */
-	ac.ac_uid16 = current->uid;
-	ac.ac_gid16 = current->gid;
+	ac.ac_uid16 = ac.ac_uid;
+	ac.ac_gid16 = ac.ac_gid;
 #endif
 #if ACCT_VERSION==3
 	ac.ac_pid = task_tgid_nr_ns(current, ns);
@@ -548,7 +547,7 @@ static void do_acct_process(struct bsd_acct_struct *acct,
 #endif
 
 	spin_lock_irq(&current->sighand->siglock);
-	tty = current->signal->tty;
+	tty = current->signal->tty;	/* Safe as we hold the siglock */
 	ac.ac_tty = tty ? old_encode_dev(tty_devnum(tty)) : 0;
 	ac.ac_utime = encode_comp_t(jiffies_to_AHZ(cputime_to_jiffies(pacct->ac_utime)));
 	ac.ac_stime = encode_comp_t(jiffies_to_AHZ(cputime_to_jiffies(pacct->ac_stime)));

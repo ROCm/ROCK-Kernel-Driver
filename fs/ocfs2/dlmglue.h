@@ -49,6 +49,8 @@ struct ocfs2_meta_lvb {
 	__be32       lvb_reserved2;
 };
 
+#define OCFS2_QINFO_LVB_VERSION 1
+
 struct ocfs2_qinfo_lvb {
 	__u8	lvb_version;
 	__u8	lvb_reserved[3];

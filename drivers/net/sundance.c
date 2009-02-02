@@ -409,6 +409,7 @@ static int  change_mtu(struct net_device *dev, int new_mtu);
 static int  eeprom_read(void __iomem *ioaddr, int location);
 static int  mdio_read(struct net_device *dev, int phy_id, int location);
 static void mdio_write(struct net_device *dev, int phy_id, int location, int value);
+static int  mdio_wait_link(struct net_device *dev, int wait);
 static int  netdev_open(struct net_device *dev);
 static void check_duplex(struct net_device *dev);
 static void netdev_timer(unsigned long data);
@@ -448,6 +449,19 @@ static void sundance_reset(struct net_device *dev, unsigned long reset_cmd)
 	}
 }
 
+static const struct net_device_ops netdev_ops = {
+	.ndo_open		= netdev_open,
+	.ndo_stop		= netdev_close,
+	.ndo_start_xmit		= start_tx,
+	.ndo_get_stats 		= get_stats,
+	.ndo_set_multicast_list = set_rx_mode,
+	.ndo_do_ioctl 		= netdev_ioctl,
+	.ndo_tx_timeout		= tx_timeout,
+	.ndo_change_mtu		= change_mtu,
+	.ndo_set_mac_address 	= eth_mac_addr,
+	.ndo_validate_addr	= eth_validate_addr,
+};
+
 static int __devinit sundance_probe1 (struct pci_dev *pdev,
 				      const struct pci_device_id *ent)
 {
@@ -467,7 +481,6 @@ static int __devinit sundance_probe1 (struct pci_dev *pdev,
 	int bar = 1;
 #endif
 	int phy, phy_end, phy_idx = 0;
-	DECLARE_MAC_BUF(mac);
 
 /* when built into the kernel, we only print version if device is found */
 #ifndef MODULE
@@ -530,25 +543,19 @@ static int __devinit sundance_probe1 (struct pci_dev *pdev,
 	np->mii_if.reg_num_mask = 0x1f;
 
 	/* The chip-specific entries in the device structure. */
-	dev->open = &netdev_open;
-	dev->hard_start_xmit = &start_tx;
-	dev->stop = &netdev_close;
-	dev->get_stats = &get_stats;
-	dev->set_multicast_list = &set_rx_mode;
-	dev->do_ioctl = &netdev_ioctl;
+	dev->netdev_ops = &netdev_ops;
 	SET_ETHTOOL_OPS(dev, &ethtool_ops);
-	dev->tx_timeout = &tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
-	dev->change_mtu = &change_mtu;
+
 	pci_set_drvdata(pdev, dev);
 
 	i = register_netdev(dev);
 	if (i)
 		goto err_out_unmap_rx;
 
-	printk(KERN_INFO "%s: %s at %p, %s, IRQ %d.\n",
+	printk(KERN_INFO "%s: %s at %p, %pM, IRQ %d.\n",
 	       dev->name, pci_id_tbl[chip_idx].name, ioaddr,
-	       print_mac(mac, dev->dev_addr), irq);
+	       dev->dev_addr, irq);
 
 	np->phys[0] = 1;		/* Default setting */
 	np->mii_preamble_required++;
@@ -783,6 +790,24 @@ static void mdio_write(struct net_device *dev, int phy_id, int location, int val
 		mdio_delay();
 	}
 	return;
+}
+
+static int mdio_wait_link(struct net_device *dev, int wait)
+{
+	int bmsr;
+	int phy_id;
+	struct netdev_private *np;
+
+	np = netdev_priv(dev);
+	phy_id = np->phys[0];
+
+	do {
+		bmsr = mdio_read(dev, phy_id, MII_BMSR);
+		if (bmsr & 0x0004)
+			return 0;
+		mdelay(1);
+	} while (--wait > 0);
+	return -1;
 }
 
 static int netdev_open(struct net_device *dev)
@@ -1332,7 +1357,6 @@ static void rx_poll(unsigned long data)
 			skb->protocol = eth_type_trans(skb, dev);
 			/* Note: checksum -> skb->ip_summed = CHECKSUM_UNNECESSARY; */
 			netif_rx(skb);
-			dev->last_rx = jiffies;
 		}
 		entry = (entry + 1) % RX_RING_SIZE;
 		received++;
@@ -1393,41 +1417,51 @@ static void netdev_error(struct net_device *dev, int intr_status)
 	int speed;
 
 	if (intr_status & LinkChange) {
-		if (np->an_enable) {
-			mii_advertise = mdio_read (dev, np->phys[0], MII_ADVERTISE);
-			mii_lpa= mdio_read (dev, np->phys[0], MII_LPA);
-			mii_advertise &= mii_lpa;
-			printk (KERN_INFO "%s: Link changed: ", dev->name);
-			if (mii_advertise & ADVERTISE_100FULL) {
-				np->speed = 100;
-				printk ("100Mbps, full duplex\n");
-			} else if (mii_advertise & ADVERTISE_100HALF) {
-				np->speed = 100;
-				printk ("100Mbps, half duplex\n");
-			} else if (mii_advertise & ADVERTISE_10FULL) {
-				np->speed = 10;
-				printk ("10Mbps, full duplex\n");
-			} else if (mii_advertise & ADVERTISE_10HALF) {
-				np->speed = 10;
-				printk ("10Mbps, half duplex\n");
-			} else
-				printk ("\n");
+		if (mdio_wait_link(dev, 10) == 0) {
+			printk(KERN_INFO "%s: Link up\n", dev->name);
+			if (np->an_enable) {
+				mii_advertise = mdio_read(dev, np->phys[0],
+							   MII_ADVERTISE);
+				mii_lpa = mdio_read(dev, np->phys[0], MII_LPA);
+				mii_advertise &= mii_lpa;
+				printk(KERN_INFO "%s: Link changed: ",
+					dev->name);
+				if (mii_advertise & ADVERTISE_100FULL) {
+					np->speed = 100;
+					printk("100Mbps, full duplex\n");
+				} else if (mii_advertise & ADVERTISE_100HALF) {
+					np->speed = 100;
+					printk("100Mbps, half duplex\n");
+				} else if (mii_advertise & ADVERTISE_10FULL) {
+					np->speed = 10;
+					printk("10Mbps, full duplex\n");
+				} else if (mii_advertise & ADVERTISE_10HALF) {
+					np->speed = 10;
+					printk("10Mbps, half duplex\n");
+				} else
+					printk("\n");
 
+			} else {
+				mii_ctl = mdio_read(dev, np->phys[0], MII_BMCR);
+				speed = (mii_ctl & BMCR_SPEED100) ? 100 : 10;
+				np->speed = speed;
+				printk(KERN_INFO "%s: Link changed: %dMbps ,",
+					dev->name, speed);
+				printk("%s duplex.\n",
+					(mii_ctl & BMCR_FULLDPLX) ?
+						"full" : "half");
+			}
+			check_duplex(dev);
+			if (np->flowctrl && np->mii_if.full_duplex) {
+				iowrite16(ioread16(ioaddr + MulticastFilter1+2) | 0x0200,
+					ioaddr + MulticastFilter1+2);
+				iowrite16(ioread16(ioaddr + MACCtrl0) | EnbFlowCtrl,
+					ioaddr + MACCtrl0);
+			}
+			netif_carrier_on(dev);
 		} else {
-			mii_ctl = mdio_read (dev, np->phys[0], MII_BMCR);
-			speed = (mii_ctl & BMCR_SPEED100) ? 100 : 10;
-			np->speed = speed;
-			printk (KERN_INFO "%s: Link changed: %dMbps ,",
-				dev->name, speed);
-			printk ("%s duplex.\n", (mii_ctl & BMCR_FULLDPLX) ?
-				"full" : "half");
-		}
-		check_duplex (dev);
-		if (np->flowctrl && np->mii_if.full_duplex) {
-			iowrite16(ioread16(ioaddr + MulticastFilter1+2) | 0x0200,
-				ioaddr + MulticastFilter1+2);
-			iowrite16(ioread16(ioaddr + MACCtrl0) | EnbFlowCtrl,
-				ioaddr + MACCtrl0);
+			printk(KERN_INFO "%s: Link down\n", dev->name);
+			netif_carrier_off(dev);
 		}
 	}
 	if (intr_status & StatsMax) {

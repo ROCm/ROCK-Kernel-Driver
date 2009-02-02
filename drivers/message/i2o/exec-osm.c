@@ -19,7 +19,7 @@
  *		Auvo Häkkinen <Auvo.Hakkinen@cs.Helsinki.FI>
  *		Deepak Saxena <deepak@plexity.net>
  *		Boji T Kannanthanam <boji.t.kannanthanam@intel.com>
- *		Alan Cox <alan@redhat.com>:
+ *		Alan Cox <alan@lxorguk.ukuu.org.uk>:
  *			Ported to Linux 2.5.
  *		Markus Lidel <Markus.Lidel@shadowconnect.com>:
  *			Minor fixes for 2.6.
@@ -388,8 +388,8 @@ static int i2o_exec_lct_notify(struct i2o_controller *c, u32 change_ind)
 
 	dev = &c->pdev->dev;
 
-	if (i2o_dma_realloc
-	    (dev, &c->dlct, le32_to_cpu(sb->expected_lct_size), GFP_KERNEL))
+	if (i2o_dma_realloc(dev, &c->dlct,
+					le32_to_cpu(sb->expected_lct_size)))
 		return -ENOMEM;
 
 	msg = i2o_msg_get_wait(c, I2O_TIMEOUT_MESSAGE_GET);

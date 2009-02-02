@@ -8,6 +8,8 @@
 
 #include <linux/syscalls.h>
 #include <linux/fs.h>
+#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include <linux/slab.h>
 #include <linux/kmod.h>
 #include <linux/init.h>
@@ -214,24 +216,64 @@ int get_filesystem_list(char * buf)
 	return len;
 }
 
-struct file_system_type *get_fs_type(const char *name)
+#ifdef CONFIG_PROC_FS
+static int filesystems_proc_show(struct seq_file *m, void *v)
+{
+	struct file_system_type * tmp;
+
+	read_lock(&file_systems_lock);
+	tmp = file_systems;
+	while (tmp) {
+		seq_printf(m, "%s\t%s\n",
+			(tmp->fs_flags & FS_REQUIRES_DEV) ? "" : "nodev",
+			tmp->name);
+		tmp = tmp->next;
+	}
+	read_unlock(&file_systems_lock);
+	return 0;
+}
+
+static int filesystems_proc_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, filesystems_proc_show, NULL);
+}
+
+static const struct file_operations filesystems_proc_fops = {
+	.open		= filesystems_proc_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static int __init proc_filesystems_init(void)
+{
+	proc_create("filesystems", 0, NULL, &filesystems_proc_fops);
+	return 0;
+}
+module_init(proc_filesystems_init);
+#endif
+
+static struct file_system_type *__get_fs_type(const char *name, int len)
 {
 	struct file_system_type *fs;
-	const char *dot = strchr(name, '.');
-	unsigned len = dot ? dot - name : strlen(name);
 
 	read_lock(&file_systems_lock);
 	fs = *(find_filesystem(name, len));
 	if (fs && !try_module_get(fs->owner))
 		fs = NULL;
 	read_unlock(&file_systems_lock);
-	if (!fs && (request_module("%.*s", len, name) == 0)) {
-		read_lock(&file_systems_lock);
-		fs = *(find_filesystem(name, len));
-		if (fs && !try_module_get(fs->owner))
-			fs = NULL;
-		read_unlock(&file_systems_lock);
-	}
+	return fs;
+}
+
+struct file_system_type *get_fs_type(const char *name)
+{
+	struct file_system_type *fs;
+	const char *dot = strchr(name, '.');
+	int len = dot ? dot - name : strlen(name);
+
+	fs = __get_fs_type(name, len);
+	if (!fs && (request_module("%.*s", len, name) == 0))
+		fs = __get_fs_type(name, len);
 
 	if (dot && fs && !(fs->fs_flags & FS_HAS_SUBTYPE)) {
 		put_filesystem(fs);

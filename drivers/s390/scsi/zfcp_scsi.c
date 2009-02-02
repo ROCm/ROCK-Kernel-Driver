@@ -7,6 +7,7 @@
  */
 
 #define KMSG_COMPONENT "zfcp"
+#define pr_fmt(fmt) KMSG_COMPONENT ": " fmt
 
 #include "zfcp_ext.h"
 #include <asm/atomic.h>

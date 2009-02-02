@@ -155,7 +155,7 @@ static int com20020_probe(struct pcmcia_device *p_dev)
     if (!dev)
 	goto fail_alloc_dev;
 
-    lp = dev->priv;
+    lp = netdev_priv(dev);
     lp->timeout = timeout;
     lp->backplane = backplane;
     lp->clockp = clockp;
@@ -260,21 +260,21 @@ static int com20020_config(struct pcmcia_device *link)
     DEBUG(0, "com20020_config(0x%p)\n", link);
 
     DEBUG(1,"arcnet: baseport1 is %Xh\n", link->io.BasePort1);
-    i = !CS_SUCCESS;
+    i = -ENODEV;
     if (!link->io.BasePort1)
     {
 	for (ioaddr = 0x100; ioaddr < 0x400; ioaddr += 0x10)
 	{
 	    link->io.BasePort1 = ioaddr;
 	    i = pcmcia_request_io(link, &link->io);
-	    if (i == CS_SUCCESS)
+	    if (i == 0)
 		break;
 	}
     }
     else
 	i = pcmcia_request_io(link, &link->io);
     
-    if (i != CS_SUCCESS)
+    if (i != 0)
     {
 	DEBUG(1,"arcnet: requestIO failed totally!\n");
 	goto failed;
@@ -287,7 +287,7 @@ static int com20020_config(struct pcmcia_device *link)
 	   link->irq.AssignedIRQ,
 	   link->irq.IRQInfo1, link->irq.IRQInfo2);
     i = pcmcia_request_irq(link, &link->irq);
-    if (i != CS_SUCCESS)
+    if (i != 0)
     {
 	DEBUG(1,"arcnet: requestIRQ failed totally!\n");
 	goto failed;
@@ -303,7 +303,7 @@ static int com20020_config(struct pcmcia_device *link)
 	goto failed;
     }
     
-    lp = dev->priv;
+    lp = netdev_priv(dev);
     lp->card_name = "PCMCIA COM20020";
     lp->card_flags = ARC_CAN_10MBIT; /* pretend all of them can 10Mbit */
 
@@ -364,7 +364,7 @@ static int com20020_resume(struct pcmcia_device *link)
 
 	if (link->open) {
 		int ioaddr = dev->base_addr;
-		struct arcnet_local *lp = dev->priv;
+		struct arcnet_local *lp = netdev_priv(dev);
 		ARCRESET;
 	}
 

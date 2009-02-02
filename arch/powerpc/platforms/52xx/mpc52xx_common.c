@@ -42,7 +42,7 @@ static struct of_device_id mpc52xx_bus_ids[] __initdata = {
  * from interrupt context while node mapping (which calls ioremap())
  * cannot be used at such point.
  */
-static spinlock_t mpc52xx_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(mpc52xx_lock);
 static struct mpc52xx_gpt __iomem *mpc52xx_wdt;
 static struct mpc52xx_cdm __iomem *mpc52xx_cdm;
 
@@ -90,7 +90,7 @@ mpc5200_setup_xlb_arbiter(void)
 	of_node_put(np);
 	if (!xlb) {
 		printk(KERN_ERR __FILE__ ": "
-			"Error mapping XLB in mpc52xx_setup_cpu().  "
+			"Error mapping XLB in mpc52xx_setup_cpu(). "
 			"Expect some abnormal behavior\n");
 		return;
 	}
@@ -99,11 +99,14 @@ mpc5200_setup_xlb_arbiter(void)
 	out_be32(&xlb->master_pri_enable, 0xff);
 	out_be32(&xlb->master_priority, 0x11111111);
 
-	/* Disable XLB pipelining
+	/*
+	 * Disable XLB pipelining
 	 * (cfr errate 292. We could do this only just before ATA PIO
 	 *  transaction and re-enable it afterwards ...)
+	 * Not needed on MPC5200B.
 	 */
-	out_be32(&xlb->config, in_be32(&xlb->config) | MPC52xx_XLB_CFG_PLDIS);
+	if ((mfspr(SPRN_SVR) & MPC5200_SVR_MASK) == MPC5200_SVR)
+		out_be32(&xlb->config, in_be32(&xlb->config) | MPC52xx_XLB_CFG_PLDIS);
 
 	iounmap(xlb);
 }
@@ -216,7 +219,8 @@ mpc52xx_restart(char *cmd)
 		out_be32(&mpc52xx_wdt->count, 0x000000ff);
 		out_be32(&mpc52xx_wdt->mode, 0x00009004);
 	} else
-		printk("mpc52xx_restart: Can't access wdt. "
+		printk(KERN_ERR __FILE__ ": "
+			"mpc52xx_restart: Can't access wdt. "
 			"Restart impossible, system halted.\n");
 
 	while (1);

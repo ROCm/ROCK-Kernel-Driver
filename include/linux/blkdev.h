@@ -16,6 +16,7 @@
 #include <linux/bio.h>
 #include <linux/module.h>
 #include <linux/stringify.h>
+#include <linux/gfp.h>
 #include <linux/bsg.h>
 #include <linux/smp.h>
 
@@ -25,7 +26,6 @@ struct scsi_ioctl_command;
 
 struct request_queue;
 struct elevator_queue;
-typedef struct elevator_queue elevator_t;
 struct request_pm_state;
 struct blk_trace;
 struct request;
@@ -312,7 +312,7 @@ struct request_queue
 	 */
 	struct list_head	queue_head;
 	struct request		*last_merge;
-	elevator_t		*elevator;
+	struct elevator_queue	*elevator;
 
 	/*
 	 * the queue request freelist, one for reads and one for writes
@@ -445,7 +445,10 @@ struct request_queue
 #define QUEUE_FLAG_BIDI		9	/* queue supports bidi requests */
 #define QUEUE_FLAG_NOMERGES    10	/* disable merge attempts */
 #define QUEUE_FLAG_SAME_COMP   11	/* force complete on same CPU */
+#define QUEUE_FLAG_FAIL_IO     12	/* fake timeout */
 #define QUEUE_FLAG_STACKABLE   13	/* supports request stacking */
+#define QUEUE_FLAG_NONROT      14	/* non-rotational device (SSD) */
+#define QUEUE_FLAG_VIRT        QUEUE_FLAG_NONROT /* paravirt device */
 
 static inline int queue_is_locked(struct request_queue *q)
 {
@@ -519,22 +522,32 @@ enum {
 	 * TAG_FLUSH	: ordering by tag w/ pre and post flushes
 	 * TAG_FUA	: ordering by tag w/ pre flush and FUA write
 	 */
-	QUEUE_ORDERED_NONE	= 0x00,
-	QUEUE_ORDERED_DRAIN	= 0x01,
-	QUEUE_ORDERED_TAG	= 0x02,
+	QUEUE_ORDERED_BY_DRAIN		= 0x01,
+	QUEUE_ORDERED_BY_TAG		= 0x02,
+	QUEUE_ORDERED_DO_PREFLUSH	= 0x10,
+	QUEUE_ORDERED_DO_BAR		= 0x20,
+	QUEUE_ORDERED_DO_POSTFLUSH	= 0x40,
+	QUEUE_ORDERED_DO_FUA		= 0x80,
 
-	QUEUE_ORDERED_PREFLUSH	= 0x10,
-	QUEUE_ORDERED_POSTFLUSH	= 0x20,
-	QUEUE_ORDERED_FUA	= 0x40,
+	QUEUE_ORDERED_NONE		= 0x00,
 
-	QUEUE_ORDERED_DRAIN_FLUSH = QUEUE_ORDERED_DRAIN |
-			QUEUE_ORDERED_PREFLUSH | QUEUE_ORDERED_POSTFLUSH,
-	QUEUE_ORDERED_DRAIN_FUA	= QUEUE_ORDERED_DRAIN |
-			QUEUE_ORDERED_PREFLUSH | QUEUE_ORDERED_FUA,
-	QUEUE_ORDERED_TAG_FLUSH	= QUEUE_ORDERED_TAG |
-			QUEUE_ORDERED_PREFLUSH | QUEUE_ORDERED_POSTFLUSH,
-	QUEUE_ORDERED_TAG_FUA	= QUEUE_ORDERED_TAG |
-			QUEUE_ORDERED_PREFLUSH | QUEUE_ORDERED_FUA,
+	QUEUE_ORDERED_DRAIN		= QUEUE_ORDERED_BY_DRAIN |
+					  QUEUE_ORDERED_DO_BAR,
+	QUEUE_ORDERED_DRAIN_FLUSH	= QUEUE_ORDERED_DRAIN |
+					  QUEUE_ORDERED_DO_PREFLUSH |
+					  QUEUE_ORDERED_DO_POSTFLUSH,
+	QUEUE_ORDERED_DRAIN_FUA		= QUEUE_ORDERED_DRAIN |
+					  QUEUE_ORDERED_DO_PREFLUSH |
+					  QUEUE_ORDERED_DO_FUA,
+
+	QUEUE_ORDERED_TAG		= QUEUE_ORDERED_BY_TAG |
+					  QUEUE_ORDERED_DO_BAR,
+	QUEUE_ORDERED_TAG_FLUSH		= QUEUE_ORDERED_TAG |
+					  QUEUE_ORDERED_DO_PREFLUSH |
+					  QUEUE_ORDERED_DO_POSTFLUSH,
+	QUEUE_ORDERED_TAG_FUA		= QUEUE_ORDERED_TAG |
+					  QUEUE_ORDERED_DO_PREFLUSH |
+					  QUEUE_ORDERED_DO_FUA,
 
 	/*
 	 * Ordered operation sequence
@@ -551,6 +564,7 @@ enum {
 #define blk_queue_tagged(q)	test_bit(QUEUE_FLAG_QUEUED, &(q)->queue_flags)
 #define blk_queue_stopped(q)	test_bit(QUEUE_FLAG_STOPPED, &(q)->queue_flags)
 #define blk_queue_nomerges(q)	test_bit(QUEUE_FLAG_NOMERGES, &(q)->queue_flags)
+#define blk_queue_nonrot(q)	test_bit(QUEUE_FLAG_NONROT, &(q)->queue_flags)
 #define blk_queue_flushing(q)	((q)->ordseq)
 #define blk_queue_stackable(q)	\
 	test_bit(QUEUE_FLAG_STACKABLE, &(q)->queue_flags)
@@ -568,7 +582,7 @@ enum {
 				 blk_failfast_driver(rq))
 #define blk_rq_started(rq)	((rq)->cmd_flags & REQ_STARTED)
 
-#define blk_account_rq(rq)	(blk_rq_started(rq) && (blk_fs_request(rq) || blk_discard_rq(rq)))
+#define blk_account_rq(rq)	(blk_rq_started(rq) && (blk_fs_request(rq) || blk_discard_rq(rq))) 
 
 #define blk_pm_suspend_request(rq)	((rq)->cmd_type == REQ_TYPE_PM_SUSPEND)
 #define blk_pm_resume_request(rq)	((rq)->cmd_type == REQ_TYPE_PM_RESUME)
@@ -581,7 +595,6 @@ enum {
 #define blk_fua_rq(rq)		((rq)->cmd_flags & REQ_FUA)
 #define blk_discard_rq(rq)	((rq)->cmd_flags & REQ_DISCARD)
 #define blk_bidi_rq(rq)		((rq)->next_rq != NULL)
-#define blk_empty_barrier(rq)	(blk_barrier_rq(rq) && blk_fs_request(rq) && !(rq)->hard_nr_sectors)
 /* rq->queuelist of dequeued request must be list_empty() */
 #define blk_queued_rq(rq)	(!list_empty(&(rq)->queuelist))
 
@@ -673,6 +686,14 @@ static inline void blk_queue_bounce(struct request_queue *q, struct bio **bio)
 }
 #endif /* CONFIG_MMU */
 
+struct rq_map_data {
+	struct page **pages;
+	int page_order;
+	int nr_entries;
+	unsigned long offset;
+	int null_mapped;
+};
+
 struct req_iterator {
 	int i;
 	struct bio *bio;
@@ -708,10 +729,10 @@ extern void blk_plug_device(struct request_queue *);
 extern void blk_plug_device_unlocked(struct request_queue *);
 extern int blk_remove_plug(struct request_queue *);
 extern void blk_recount_segments(struct request_queue *, struct bio *);
-extern int scsi_cmd_ioctl(struct file *, struct request_queue *,
-			  struct gendisk *, unsigned int, void __user *);
-extern int sg_scsi_ioctl(struct file *, struct request_queue *,
-		struct gendisk *, struct scsi_ioctl_command __user *);
+extern int scsi_cmd_ioctl(struct request_queue *, struct gendisk *, fmode_t,
+			  unsigned int, void __user *);
+extern int sg_scsi_ioctl(struct request_queue *, struct gendisk *, fmode_t,
+			 struct scsi_ioctl_command __user *);
 
 /*
  * Temporary export, until SCSI gets fixed up.
@@ -745,11 +766,14 @@ extern void __blk_stop_queue(struct request_queue *q);
 extern void __blk_run_queue(struct request_queue *);
 extern void blk_run_queue(struct request_queue *);
 extern void blk_start_queueing(struct request_queue *);
-extern int blk_rq_map_user(struct request_queue *, struct request *, void __user *, unsigned long);
+extern int blk_rq_map_user(struct request_queue *, struct request *,
+			   struct rq_map_data *, void __user *, unsigned long,
+			   gfp_t);
 extern int blk_rq_unmap_user(struct bio *);
 extern int blk_rq_map_kern(struct request_queue *, struct request *, void *, unsigned int, gfp_t);
 extern int blk_rq_map_user_iov(struct request_queue *, struct request *,
-			       struct sg_iovec *, int, unsigned int);
+			       struct rq_map_data *, struct sg_iovec *, int,
+			       unsigned int, gfp_t);
 extern int blk_execute_rq(struct request_queue *, struct gendisk *,
 			  struct request *, int);
 extern void blk_execute_rq_nowait(struct request_queue *, struct gendisk *,
@@ -792,8 +816,6 @@ extern int __blk_end_request(struct request *rq, int error,
 extern int blk_end_bidi_request(struct request *rq, int error,
 				unsigned int nr_bytes, unsigned int bidi_bytes);
 extern void end_request(struct request *, int);
-extern void end_queued_request(struct request *, int);
-extern void end_dequeued_request(struct request *, int);
 extern int blk_end_request_callback(struct request *rq, int error,
 				unsigned int nr_bytes,
 				int (drv_callback)(struct request *));
@@ -844,15 +866,14 @@ extern void blk_queue_rq_timed_out(struct request_queue *, rq_timed_out_fn *);
 extern void blk_queue_rq_timeout(struct request_queue *, unsigned int);
 extern struct backing_dev_info *blk_get_backing_dev_info(struct block_device *bdev);
 extern int blk_queue_ordered(struct request_queue *, unsigned, prepare_flush_fn *);
-extern int blk_do_ordered(struct request_queue *, struct request **);
+extern bool blk_do_ordered(struct request_queue *, struct request **);
 extern unsigned blk_ordered_cur_seq(struct request_queue *);
 extern unsigned blk_ordered_req_seq(struct request *);
-extern void blk_ordered_complete_seq(struct request_queue *, unsigned, int);
+extern bool blk_ordered_complete_seq(struct request_queue *, unsigned, int);
 
 extern int blk_rq_map_sg(struct request_queue *, struct request *, struct scatterlist *);
 extern void blk_dump_rq_flags(struct request *, char *);
 extern void generic_unplug_device(struct request_queue *);
-extern void __generic_unplug_device(struct request_queue *);
 extern long nr_blockdev_pages(void);
 
 int blk_get_queue(struct request_queue *);
@@ -883,22 +904,23 @@ static inline struct request *blk_map_queue_find_tag(struct blk_queue_tag *bqt,
 }
 
 extern int blkdev_issue_flush(struct block_device *, sector_t *);
-extern int blkdev_issue_discard(struct block_device *, sector_t sector,
-				unsigned nr_sects);
+extern int blkdev_issue_discard(struct block_device *,
+				sector_t sector, sector_t nr_sects, gfp_t);
 
 static inline int sb_issue_discard(struct super_block *sb,
-				   sector_t block, unsigned nr_blocks)
+				   sector_t block, sector_t nr_blocks)
 {
 	block <<= (sb->s_blocksize_bits - 9);
 	nr_blocks <<= (sb->s_blocksize_bits - 9);
-	return blkdev_issue_discard(sb->s_bdev, block, nr_blocks);
+	return blkdev_issue_discard(sb->s_bdev, block, nr_blocks, GFP_KERNEL);
 }
 
 /*
 * command filter functions
 */
 extern int blk_verify_command(struct blk_cmd_filter *filter,
-			      unsigned char *cmd, int has_write_perm);
+			      unsigned char *cmd, fmode_t has_write_perm);
+extern void blk_unregister_filter(struct gendisk *disk);
 extern void blk_set_cmd_filter_defaults(struct blk_cmd_filter *filter);
 
 #define MAX_PHYS_SEGMENTS 128
@@ -932,6 +954,13 @@ static inline int queue_dma_alignment(struct request_queue *q)
 	return q ? q->dma_alignment : 511;
 }
 
+static inline int blk_rq_aligned(struct request_queue *q, void *addr,
+				 unsigned int len)
+{
+	unsigned int alignment = queue_dma_alignment(q) | q->dma_pad_mask;
+	return !((unsigned long)addr & alignment) && !(len & alignment);
+}
+
 /* assumes size > 256 */
 static inline unsigned int blksize_bits(unsigned int size)
 {
@@ -959,7 +988,6 @@ static inline void put_dev_sector(Sector p)
 
 struct work_struct;
 int kblockd_schedule_work(struct request_queue *q, struct work_struct *work);
-void kblockd_flush_work(struct work_struct *work);
 
 #define MODULE_ALIAS_BLOCKDEV(major,minor) \
 	MODULE_ALIAS("block-major-" __stringify(major) "-" __stringify(minor))
@@ -1007,15 +1035,8 @@ extern int blk_integrity_compare(struct gendisk *, struct gendisk *);
 extern int blk_rq_map_integrity_sg(struct request *, struct scatterlist *);
 extern int blk_rq_count_integrity_sg(struct request *);
 
-static inline unsigned short blk_integrity_tuple_size(struct blk_integrity *bi)
-{
-	if (bi)
-		return bi->tuple_size;
-
-	return 0;
-}
-
-static inline struct blk_integrity *bdev_get_integrity(struct block_device *bdev)
+static inline
+struct blk_integrity *bdev_get_integrity(struct block_device *bdev)
 {
 	return bdev->bd_disk->integrity;
 }
@@ -1023,34 +1044,6 @@ static inline struct blk_integrity *bdev_get_integrity(struct block_device *bdev
 static inline struct blk_integrity *blk_get_integrity(struct gendisk *disk)
 {
 	return disk->integrity;
-}
-
-static inline unsigned int bdev_get_tag_size(struct block_device *bdev)
-{
-	struct blk_integrity *bi = bdev_get_integrity(bdev);
-
-	if (bi)
-		return bi->tag_size;
-
-	return 0;
-}
-
-static inline int bdev_integrity_enabled(struct block_device *bdev, int rw)
-{
-	struct blk_integrity *bi = bdev_get_integrity(bdev);
-
-	if (bi == NULL)
-		return 0;
-
-	if (rw == READ && bi->verify_fn != NULL &&
-	    (bi->flags & INTEGRITY_FLAG_READ))
-		return 1;
-
-	if (rw == WRITE && bi->generate_fn != NULL &&
-	    (bi->flags & INTEGRITY_FLAG_WRITE))
-		return 1;
-
-	return 0;
 }
 
 static inline int blk_integrity_rq(struct request *rq)
@@ -1068,13 +1061,28 @@ static inline int blk_integrity_rq(struct request *rq)
 #define blk_rq_map_integrity_sg(a, b)		(0)
 #define bdev_get_integrity(a)			(0)
 #define blk_get_integrity(a)			(0)
-#define bdev_get_tag_size(a)			(0)
 #define blk_integrity_compare(a, b)		(0)
 #define blk_integrity_register(a, b)		(0)
 #define blk_integrity_unregister(a)		do { } while (0);
 
 #endif /* CONFIG_BLK_DEV_INTEGRITY */
 
+struct block_device_operations {
+	int (*open) (struct block_device *, fmode_t);
+	int (*release) (struct gendisk *, fmode_t);
+	int (*locked_ioctl) (struct block_device *, fmode_t, unsigned, unsigned long);
+	int (*ioctl) (struct block_device *, fmode_t, unsigned, unsigned long);
+	int (*compat_ioctl) (struct block_device *, fmode_t, unsigned, unsigned long);
+	int (*direct_access) (struct block_device *, sector_t,
+						void **, unsigned long *);
+	int (*media_changed) (struct gendisk *);
+	int (*revalidate_disk) (struct gendisk *);
+	int (*getgeo)(struct block_device *, struct hd_geometry *);
+	struct module *owner;
+};
+
+extern int __blkdev_driver_ioctl(struct block_device *, fmode_t, unsigned int,
+				 unsigned long);
 #else /* CONFIG_BLOCK */
 /*
  * stubs for when the block layer is configured out

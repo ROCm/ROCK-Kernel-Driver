@@ -6,10 +6,11 @@
  */
 
 #include <linux/init.h>
+#include <linux/module.h>
+
 #include <asm/openprom.h>
 #include <asm/oplib.h>
 #include <asm/types.h>
-#include <asm/sbus.h>
 #include <asm/system.h>
 
 struct linux_prom_ranges promlib_obio_ranges[PROMREG_MAX];
@@ -63,6 +64,7 @@ prom_apply_obio_ranges(struct linux_prom_registers *regs, int nregs)
 	if(num_obio_ranges)
 		prom_adjust_regs(regs, nregs, promlib_obio_ranges, num_obio_ranges);
 }
+EXPORT_SYMBOL(prom_apply_obio_ranges);
 
 void __init prom_ranges_init(void)
 {

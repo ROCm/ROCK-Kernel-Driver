@@ -46,7 +46,6 @@ EXPORT_SYMBOL(rtas);
 
 struct rtas_suspend_me_data {
 	atomic_t working; /* number of cpus accessing this struct */
-	atomic_t done;
 	int token; /* ibm,suspend-me */
 	int error;
 	struct completion *complete; /* wait on this until working == 0 */
@@ -567,6 +566,32 @@ int rtas_get_sensor(int sensor, int index, int *state)
 }
 EXPORT_SYMBOL(rtas_get_sensor);
 
+bool rtas_indicator_present(int token, int *maxindex)
+{
+	int proplen, count, i;
+	const struct indicator_elem {
+		u32 token;
+		u32 maxindex;
+	} *indicators;
+
+	indicators = of_get_property(rtas.dev, "rtas-indicators", &proplen);
+	if (!indicators)
+		return false;
+
+	count = proplen / sizeof(struct indicator_elem);
+
+	for (i = 0; i < count; i++) {
+		if (indicators[i].token != token)
+			continue;
+		if (maxindex)
+			*maxindex = indicators[i].maxindex;
+		return true;
+	}
+
+	return false;
+}
+EXPORT_SYMBOL(rtas_indicator_present);
+
 int rtas_set_indicator(int indicator, int index, int new_value)
 {
 	int token = rtas_token("set-indicator");
@@ -664,7 +689,7 @@ static int ibm_suspend_me_token = RTAS_UNKNOWN_SERVICE;
 #ifdef CONFIG_PPC_PSERIES
 static void rtas_percpu_suspend_me(void *info)
 {
-	long rc = H_SUCCESS;
+	long rc;
 	unsigned long msr_save;
 	int cpu;
 	struct rtas_suspend_me_data *data =
@@ -676,8 +701,7 @@ static void rtas_percpu_suspend_me(void *info)
 	msr_save = mfmsr();
 	mtmsr(msr_save & ~(MSR_EE));
 
-	while (rc == H_SUCCESS && !atomic_read(&data->done))
-		rc = plpar_hcall_norets(H_JOIN);
+	rc = plpar_hcall_norets(H_JOIN);
 
 	mtmsr(msr_save);
 
@@ -700,9 +724,6 @@ static void rtas_percpu_suspend_me(void *info)
 		       smp_processor_id(), rc);
 		data->error = rc;
 	}
-
-	atomic_set(&data->done, 1);
-
 	/* This cpu did the suspend or got an error; in either case,
 	 * we need to prod all other other cpus out of join state.
 	 * Extra prods are harmless.
@@ -745,7 +766,6 @@ static int rtas_ibm_suspend_me(struct rtas_args *args)
 	}
 
 	atomic_set(&data.working, 0);
-	atomic_set(&data.done, 0);
 	data.token = rtas_token("ibm,suspend-me");
 	data.error = 0;
 	data.complete = &done;

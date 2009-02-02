@@ -382,28 +382,13 @@ static struct platform_device at91sam9263_nand_device = {
 
 void __init at91_add_device_nand(struct atmel_nand_data *data)
 {
-	unsigned long csa, mode;
+	unsigned long csa;
 
 	if (!data)
 		return;
 
 	csa = at91_sys_read(AT91_MATRIX_EBI0CSA);
 	at91_sys_write(AT91_MATRIX_EBI0CSA, csa | AT91_MATRIX_EBI0_CS3A_SMC_SMARTMEDIA);
-
-	/* set the bus interface characteristics */
-	at91_sys_write(AT91_SMC_SETUP(3), AT91_SMC_NWESETUP_(1) | AT91_SMC_NCS_WRSETUP_(0)
-			| AT91_SMC_NRDSETUP_(1) | AT91_SMC_NCS_RDSETUP_(0));
-
-	at91_sys_write(AT91_SMC_PULSE(3), AT91_SMC_NWEPULSE_(3) | AT91_SMC_NCS_WRPULSE_(3)
-			| AT91_SMC_NRDPULSE_(3) | AT91_SMC_NCS_RDPULSE_(3));
-
-	at91_sys_write(AT91_SMC_CYCLE(3), AT91_SMC_NWECYCLE_(5) | AT91_SMC_NRDCYCLE_(5));
-
-	if (data->bus_width_16)
-		mode = AT91_SMC_DBW_16;
-	else
-		mode = AT91_SMC_DBW_8;
-	at91_sys_write(AT91_SMC_MODE(3), mode | AT91_SMC_READMODE | AT91_SMC_WRITEMODE | AT91_SMC_EXNWMODE_DISABLE | AT91_SMC_TDF_(2));
 
 	/* enable pin */
 	if (data->enable_pin)
@@ -882,6 +867,59 @@ static void __init at91_add_device_watchdog(void)
 }
 #else
 static void __init at91_add_device_watchdog(void) {}
+#endif
+
+
+/* --------------------------------------------------------------------
+ *  PWM
+ * --------------------------------------------------------------------*/
+
+#if defined(CONFIG_ATMEL_PWM)
+static u32 pwm_mask;
+
+static struct resource pwm_resources[] = {
+	[0] = {
+		.start	= AT91SAM9263_BASE_PWMC,
+		.end	= AT91SAM9263_BASE_PWMC + SZ_16K - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	[1] = {
+		.start	= AT91SAM9263_ID_PWMC,
+		.end	= AT91SAM9263_ID_PWMC,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+static struct platform_device at91sam9263_pwm0_device = {
+	.name	= "atmel_pwm",
+	.id	= -1,
+	.dev	= {
+		.platform_data		= &pwm_mask,
+	},
+	.resource	= pwm_resources,
+	.num_resources	= ARRAY_SIZE(pwm_resources),
+};
+
+void __init at91_add_device_pwm(u32 mask)
+{
+	if (mask & (1 << AT91_PWM0))
+		at91_set_B_periph(AT91_PIN_PB7, 1);	/* enable PWM0 */
+
+	if (mask & (1 << AT91_PWM1))
+		at91_set_B_periph(AT91_PIN_PB8, 1);	/* enable PWM1 */
+
+	if (mask & (1 << AT91_PWM2))
+		at91_set_B_periph(AT91_PIN_PC29, 1);	/* enable PWM2 */
+
+	if (mask & (1 << AT91_PWM3))
+		at91_set_B_periph(AT91_PIN_PB29, 1);	/* enable PWM3 */
+
+	pwm_mask = mask;
+
+	platform_device_register(&at91sam9263_pwm0_device);
+}
+#else
+void __init at91_add_device_pwm(u32 mask) {}
 #endif
 
 

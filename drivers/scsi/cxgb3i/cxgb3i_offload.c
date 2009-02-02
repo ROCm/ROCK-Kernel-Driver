@@ -19,10 +19,11 @@
 #include "cxgb3_ctl_defs.h"
 #include "firmware_exports.h"
 #include "cxgb3i_offload.h"
-#include "cxgb3i_ulp2.h"
+#include "cxgb3i_pdu.h"
+#include "cxgb3i_ddp.h"
 
 #ifdef __DEBUG_C3CN_CONN__
-#define c3cn_conn_debug         cxgb3i_log_debug
+#define c3cn_conn_debug         cxgb3i_log_info
 #else
 #define c3cn_conn_debug(fmt...)
 #endif
@@ -495,7 +496,7 @@ static inline void reset_wr_list(struct s3_conn *c3cn)
 static inline void enqueue_wr(struct s3_conn *c3cn,
 			      struct sk_buff *skb)
 {
-	skb->sp = NULL;
+	skb_wr_data(skb) = NULL;
 
 	/*
 	 * We want to take an extra reference since both us and the driver
@@ -508,7 +509,7 @@ static inline void enqueue_wr(struct s3_conn *c3cn,
 	if (!c3cn->wr_pending_head)
 		c3cn->wr_pending_head = skb;
 	else
-		c3cn->wr_pending_tail->sp = (void *)skb;
+		skb_wr_data(skb) = skb;
 	c3cn->wr_pending_tail = skb;
 }
 
@@ -528,8 +529,8 @@ static inline struct sk_buff *dequeue_wr(struct s3_conn *c3cn)
 
 	if (likely(skb)) {
 		/* Don't bother clearing the tail */
-		c3cn->wr_pending_head = (struct sk_buff *)skb->sp;
-		skb->sp = NULL;
+		c3cn->wr_pending_head = skb_wr_data(skb);
+		skb_wr_data(skb) = NULL;
 	}
 	return skb;
 }
@@ -614,7 +615,7 @@ static int c3cn_push_tx_frames(struct s3_conn *c3cn, int req_completion)
 		if (c3cn->wr_avail < wrs_needed) {
 			c3cn_tx_debug("c3cn 0x%p, skb len %u/%u, frag %u, "
 				      "wr %d < %u.\n",
-				      c3cn, skb->len, skb->data_len, frags,
+				      c3cn, skb->len, skb->datalen, frags,
 				      wrs_needed, c3cn->wr_avail);
 			break;
 		}
@@ -1105,9 +1106,6 @@ static void process_rx_iscsi_hdr(struct s3_conn *c3cn, struct sk_buff *skb)
 	skb_ulp_pdulen(skb) = ntohs(ddp_cpl.len);
 	skb_ulp_ddigest(skb) = ntohl(ddp_cpl.ulp_crc);
 	status = ntohl(ddp_cpl.ddp_status);
-
-	c3cn_rx_debug("skb 0x%p, len %u, pdulen %u, ddp status 0x%x.\n",
-				  skb, skb->len, skb_ulp_pdulen(skb), status);
 
 	c3cn_rx_debug("rx skb 0x%p, len %u, pdulen %u, ddp status 0x%x.\n",
 		      skb, skb->len, skb_ulp_pdulen(skb), status);

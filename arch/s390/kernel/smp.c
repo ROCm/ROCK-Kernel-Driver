@@ -21,6 +21,7 @@
  */
 
 #define KMSG_COMPONENT "cpu"
+#define pr_fmt(fmt) KMSG_COMPONENT ": " fmt
 
 #include <linux/module.h>
 #include <linux/init.h>
@@ -46,6 +47,7 @@
 #include <asm/lowcore.h>
 #include <asm/sclp.h>
 #include <asm/cpu.h>
+#include <asm/vdso.h>
 #include "entry.h"
 
 /*
@@ -53,12 +55,6 @@
  */
 struct _lowcore *lowcore_ptr[NR_CPUS];
 EXPORT_SYMBOL(lowcore_ptr);
-
-cpumask_t cpu_online_map = CPU_MASK_NONE;
-EXPORT_SYMBOL(cpu_online_map);
-
-cpumask_t cpu_possible_map = CPU_MASK_ALL;
-EXPORT_SYMBOL(cpu_possible_map);
 
 static struct task_struct *current_set[NR_CPUS];
 
@@ -443,13 +439,13 @@ int __cpuinit start_secondary(void *cpuvoid)
 	preempt_disable();
 	/* Enable TOD clock interrupts on the secondary cpu. */
 	init_cpu_timer();
-#ifdef CONFIG_VIRT_TIMER
 	/* Enable cpu timer interrupts on the secondary cpu. */
 	init_cpu_vtimer();
-#endif
 	/* Enable pfault pseudo page faults on this cpu. */
 	pfault_init();
 
+	/* call cpu notifiers */
+	notify_cpu_starting(smp_processor_id());
 	/* Mark this cpu as online */
 	ipi_call_lock();
 	cpu_set(smp_processor_id(), cpu_online_map);
@@ -502,18 +498,18 @@ static int __cpuinit smp_alloc_lowcore(int cpu)
 
 		save_area = get_zeroed_page(GFP_KERNEL);
 		if (!save_area)
-			goto out_save_area;
+			goto out;
 		lowcore->extended_save_area_addr = (u32) save_area;
 	}
+#else
+	if (vdso_alloc_per_cpu(cpu, lowcore))
+		goto out;
 #endif
 	lowcore_ptr[cpu] = lowcore;
 	return 0;
 
-#ifndef CONFIG_64BIT
-out_save_area:
-	free_page(panic_stack);
-#endif
 out:
+	free_page(panic_stack);
 	free_pages(async_stack, ASYNC_ORDER);
 	free_pages((unsigned long) lowcore, lc_order);
 	return -ENOMEM;
@@ -530,6 +526,8 @@ static void smp_free_lowcore(int cpu)
 #ifndef CONFIG_64BIT
 	if (MACHINE_HAS_IEEE)
 		free_page((unsigned long) lowcore->extended_save_area_addr);
+#else
+	vdso_free_per_cpu(cpu, lowcore);
 #endif
 	free_page(lowcore->panic_stack - PAGE_SIZE);
 	free_pages(lowcore->async_stack - ASYNC_SIZE, ASYNC_ORDER);
@@ -672,6 +670,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	lowcore = (void *) __get_free_pages(GFP_KERNEL | GFP_DMA, lc_order);
 	panic_stack = __get_free_page(GFP_KERNEL);
 	async_stack = __get_free_pages(GFP_KERNEL, ASYNC_ORDER);
+	BUG_ON(!lowcore || !panic_stack || !async_stack);
 #ifndef CONFIG_64BIT
 	if (MACHINE_HAS_IEEE)
 		save_area = get_zeroed_page(GFP_KERNEL);
@@ -685,6 +684,9 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 #ifndef CONFIG_64BIT
 	if (MACHINE_HAS_IEEE)
 		lowcore->extended_save_area_addr = (u32) save_area;
+#else
+	if (vdso_alloc_per_cpu(smp_processor_id(), lowcore))
+		BUG();
 #endif
 	set_prefix((u32)(unsigned long) lowcore);
 	local_mcck_enable();
@@ -853,9 +855,11 @@ static ssize_t show_idle_count(struct sys_device *dev,
 	unsigned long long idle_count;
 
 	idle = &per_cpu(s390_idle, dev->id);
-	spin_lock_irq(&idle->lock);
+	spin_lock(&idle->lock);
 	idle_count = idle->idle_count;
-	spin_unlock_irq(&idle->lock);
+	if (idle->idle_enter)
+		idle_count++;
+	spin_unlock(&idle->lock);
 	return sprintf(buf, "%llu\n", idle_count);
 }
 static SYSDEV_ATTR(idle_count, 0444, show_idle_count, NULL);
@@ -864,18 +868,17 @@ static ssize_t show_idle_time(struct sys_device *dev,
 				struct sysdev_attribute *attr, char *buf)
 {
 	struct s390_idle_data *idle;
-	unsigned long long new_time;
+	unsigned long long now, idle_time, idle_enter;
 
 	idle = &per_cpu(s390_idle, dev->id);
-	spin_lock_irq(&idle->lock);
-	if (idle->in_idle) {
-		new_time = get_clock();
-		idle->idle_time += new_time - idle->idle_enter;
-		idle->idle_enter = new_time;
-	}
-	new_time = idle->idle_time;
-	spin_unlock_irq(&idle->lock);
-	return sprintf(buf, "%llu\n", new_time >> 12);
+	spin_lock(&idle->lock);
+	now = get_clock();
+	idle_time = idle->idle_time;
+	idle_enter = idle->idle_enter;
+	if (idle_enter != 0ULL && idle_enter < now)
+		idle_time += now - idle_enter;
+	spin_unlock(&idle->lock);
+	return sprintf(buf, "%llu\n", idle_time >> 12);
 }
 static SYSDEV_ATTR(idle_time_us, 0444, show_idle_time, NULL);
 

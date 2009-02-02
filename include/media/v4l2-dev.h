@@ -9,32 +9,41 @@
 #ifndef _V4L2_DEV_H
 #define _V4L2_DEV_H
 
-#define OBSOLETE_DEVDATA 1 /* to be removed soon */
-
 #include <linux/poll.h>
 #include <linux/fs.h>
 #include <linux/device.h>
+#include <linux/cdev.h>
 #include <linux/mutex.h>
-#include <linux/compiler.h> /* need __user */
 #include <linux/videodev2.h>
 
 #define VIDEO_MAJOR	81
-/* Minor device allocation */
-#define MINOR_VFL_TYPE_GRABBER_MIN   0
-#define MINOR_VFL_TYPE_GRABBER_MAX  63
-#define MINOR_VFL_TYPE_RADIO_MIN    64
-#define MINOR_VFL_TYPE_RADIO_MAX   127
-#define MINOR_VFL_TYPE_VTX_MIN     192
-#define MINOR_VFL_TYPE_VTX_MAX     223
-#define MINOR_VFL_TYPE_VBI_MIN     224
-#define MINOR_VFL_TYPE_VBI_MAX     255
 
 #define VFL_TYPE_GRABBER	0
 #define VFL_TYPE_VBI		1
 #define VFL_TYPE_RADIO		2
 #define VFL_TYPE_VTX		3
+#define VFL_TYPE_MAX		4
 
 struct v4l2_ioctl_callbacks;
+struct video_device;
+struct v4l2_device;
+
+/* Flag to mark the video_device struct as unregistered.
+   Drivers can set this flag if they want to block all future
+   device access. It is set by video_unregister_device. */
+#define V4L2_FL_UNREGISTERED	(0)
+
+struct v4l2_file_operations {
+	struct module *owner;
+	ssize_t (*read) (struct file *, char __user *, size_t, loff_t *);
+	ssize_t (*write) (struct file *, const char __user *, size_t, loff_t *);
+	unsigned int (*poll) (struct file *, struct poll_table_struct *);
+	long (*ioctl) (struct file *, unsigned int, unsigned long);
+	long (*unlocked_ioctl) (struct file *, unsigned int, unsigned long);
+	int (*mmap) (struct file *, struct vm_area_struct *);
+	int (*open) (struct file *);
+	int (*release) (struct file *);
+};
 
 /*
  * Newer version of video_device, handled by videodev2.c
@@ -45,16 +54,24 @@ struct v4l2_ioctl_callbacks;
 struct video_device
 {
 	/* device ops */
-	const struct file_operations *fops;
+	const struct v4l2_file_operations *fops;
 
 	/* sysfs */
 	struct device dev;		/* v4l device */
+	struct cdev *cdev;		/* character device */
+
+	/* Set either parent or v4l2_dev if your driver uses v4l2_device */
 	struct device *parent;		/* device parent */
+	struct v4l2_device *v4l2_dev;	/* v4l2_device parent */
 
 	/* device info */
 	char name[32];
 	int vfl_type;
+	/* 'minor' is set to -1 if the registration failed */
 	int minor;
+	u16 num;
+	/* use bitops to set/clear/test flags */
+	unsigned long flags;
 	/* attribute to differentiate multiple indices on one physical device */
 	int index;
 
@@ -65,54 +82,64 @@ struct video_device
 	v4l2_std_id current_norm;	/* Current tvnorm */
 
 	/* callbacks */
-	void (*release)(struct video_device *vfd);
+	void (*release)(struct video_device *vdev);
 
 	/* ioctl callbacks */
 	const struct v4l2_ioctl_ops *ioctl_ops;
-
-#ifdef OBSOLETE_DEVDATA /* to be removed soon */
-	/* dev->driver_data will be used instead some day.
-	 * Use the video_{get|set}_drvdata() helper functions,
-	 * so the switch over will be transparent for you.
-	 * Or use {pci|usb}_{get|set}_drvdata() directly. */
-	void *priv;
-#endif
-
-	/* for videodev.c internal usage -- please don't touch */
-	int users;                     /* video_exclusive_{open|close} ... */
-	struct mutex lock;             /* ... helper function uses these   */
 };
 
-/* Class-dev to video-device */
+/* dev to video-device */
 #define to_video_device(cd) container_of(cd, struct video_device, dev)
 
-/* Version 2 functions */
-extern int video_register_device(struct video_device *vfd, int type, int nr);
-int video_register_device_index(struct video_device *vfd, int type, int nr,
-					int index);
-void video_unregister_device(struct video_device *);
+/* Register video devices. Note that if video_register_device fails,
+   the release() callback of the video_device structure is *not* called, so
+   the caller is responsible for freeing any data. Usually that means that
+   you call video_device_release() on failure.
 
-/* helper functions to alloc / release struct video_device, the
-   later can be used for video_device->release() */
-struct video_device *video_device_alloc(void);
-void video_device_release(struct video_device *vfd);
+   Also note that vdev->minor is set to -1 if the registration failed. */
+int __must_check video_register_device(struct video_device *vdev, int type, int nr);
+int __must_check video_register_device_index(struct video_device *vdev,
+						int type, int nr, int index);
 
-#ifdef OBSOLETE_DEVDATA /* to be removed soon */
+/* Unregister video devices. Will do nothing if vdev == NULL or
+   vdev->minor < 0. */
+void video_unregister_device(struct video_device *vdev);
+
+/* helper functions to alloc/release struct video_device, the
+   latter can also be used for video_device->release(). */
+struct video_device * __must_check video_device_alloc(void);
+
+/* this release function frees the vdev pointer */
+void video_device_release(struct video_device *vdev);
+
+/* this release function does nothing, use when the video_device is a
+   static global struct. Note that having a static video_device is
+   a dubious construction at best. */
+void video_device_release_empty(struct video_device *vdev);
+
 /* helper functions to access driver private data. */
-static inline void *video_get_drvdata(struct video_device *dev)
+static inline void *video_get_drvdata(struct video_device *vdev)
 {
-	return dev->priv;
+	return dev_get_drvdata(&vdev->dev);
 }
 
-static inline void video_set_drvdata(struct video_device *dev, void *data)
+static inline void video_set_drvdata(struct video_device *vdev, void *data)
 {
-	dev->priv = data;
+	dev_set_drvdata(&vdev->dev, data);
 }
 
-/* Obsolete stuff - Still needed for radio devices and obsolete drivers */
-extern struct video_device* video_devdata(struct file*);
-extern int video_exclusive_open(struct inode *inode, struct file *file);
-extern int video_exclusive_release(struct inode *inode, struct file *file);
-#endif
+struct video_device *video_devdata(struct file *file);
+
+/* Combine video_get_drvdata and video_devdata as this is
+   used very often. */
+static inline void *video_drvdata(struct file *file)
+{
+	return video_get_drvdata(video_devdata(file));
+}
+
+static inline int video_is_unregistered(struct video_device *vdev)
+{
+	return test_bit(V4L2_FL_UNREGISTERED, &vdev->flags);
+}
 
 #endif /* _V4L2_DEV_H */

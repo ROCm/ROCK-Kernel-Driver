@@ -47,6 +47,8 @@ struct flowi {
 #define fl4_scope	nl_u.ip4_u.scope
 
 	__u8	proto;
+	__u8	flags;
+#define FLOWI_FLAG_ANYSRC 0x01
 	union {
 		struct {
 			__be16	sport;
@@ -82,12 +84,13 @@ struct flowi {
 #define FLOW_DIR_OUT	1
 #define FLOW_DIR_FWD	2
 
+struct net;
 struct sock;
-typedef int (*flow_resolve_t)(struct flowi *key, u16 family, u8 dir,
-			       void **objp, atomic_t **obj_refp);
+typedef int (*flow_resolve_t)(struct net *net, struct flowi *key, u16 family,
+			      u8 dir, void **objp, atomic_t **obj_refp);
 
-extern void *flow_cache_lookup(struct flowi *key, u16 family, u8 dir,
-	 		       flow_resolve_t resolver);
+extern void *flow_cache_lookup(struct net *net, struct flowi *key, u16 family,
+			       u8 dir, flow_resolve_t resolver);
 extern void flow_cache_flush(void);
 extern atomic_t flow_cache_genid;
 

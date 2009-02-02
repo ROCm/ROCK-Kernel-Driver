@@ -304,7 +304,7 @@ static int ehca_sense_attributes(struct ehca_shca *shca)
 
 	h_ret = hipz_h_query_hca(shca->ipz_hca_handle, rblock);
 	if (h_ret != H_SUCCESS) {
-		ehca_gen_err("Cannot query device properties. h_ret=%li",
+		ehca_gen_err("Cannot query device properties. h_ret=%lli",
 			     h_ret);
 		ret = -EPERM;
 		goto sense_attributes1;
@@ -391,7 +391,7 @@ static int ehca_sense_attributes(struct ehca_shca *shca)
 	port = (struct hipz_query_port *)rblock;
 	h_ret = hipz_h_query_port(shca->ipz_hca_handle, 1, port);
 	if (h_ret != H_SUCCESS) {
-		ehca_gen_err("Cannot query port properties. h_ret=%li",
+		ehca_gen_err("Cannot query port properties. h_ret=%lli",
 			     h_ret);
 		ret = -EPERM;
 		goto sense_attributes1;
@@ -682,7 +682,7 @@ static ssize_t ehca_show_adapter_handle(struct device *dev,
 {
 	struct ehca_shca *shca = dev->driver_data;
 
-	return sprintf(buf, "%lx\n", shca->ipz_hca_handle.handle);
+	return sprintf(buf, "%llx\n", shca->ipz_hca_handle.handle);
 
 }
 static DEVICE_ATTR(adapter_handle, S_IRUGO, ehca_show_adapter_handle, NULL);
@@ -717,6 +717,7 @@ static int __devinit ehca_probe(struct of_device *dev,
 	const u64 *handle;
 	struct ib_pd *ibpd;
 	int ret, i, eq_size;
+	unsigned long flags;
 
 	handle = of_get_property(dev->node, "ibm,hca-handle", NULL);
 	if (!handle) {
@@ -830,9 +831,9 @@ static int __devinit ehca_probe(struct of_device *dev,
 		ehca_err(&shca->ib_device,
 			 "Cannot create device attributes  ret=%d", ret);
 
-	spin_lock(&shca_list_lock);
+	spin_lock_irqsave(&shca_list_lock, flags);
 	list_add(&shca->shca_list, &shca_list);
-	spin_unlock(&shca_list_lock);
+	spin_unlock_irqrestore(&shca_list_lock, flags);
 
 	return 0;
 
@@ -878,6 +879,7 @@ probe1:
 static int __devexit ehca_remove(struct of_device *dev)
 {
 	struct ehca_shca *shca = dev->dev.driver_data;
+	unsigned long flags;
 	int ret;
 
 	sysfs_remove_group(&dev->dev.kobj, &ehca_dev_attr_grp);
@@ -915,9 +917,9 @@ static int __devexit ehca_remove(struct of_device *dev)
 
 	ib_dealloc_device(&shca->ib_device);
 
-	spin_lock(&shca_list_lock);
+	spin_lock_irqsave(&shca_list_lock, flags);
 	list_del(&shca->shca_list);
-	spin_unlock(&shca_list_lock);
+	spin_unlock_irqrestore(&shca_list_lock, flags);
 
 	return ret;
 }
@@ -954,7 +956,7 @@ void ehca_poll_eqs(unsigned long data)
 			struct ehca_eq *eq = &shca->eq;
 			int max = 3;
 			volatile u64 q_ofs, q_ofs2;
-			u64 flags;
+			unsigned long flags;
 			spin_lock_irqsave(&eq->spinlock, flags);
 			q_ofs = eq->ipz_queue.current_q_offset;
 			spin_unlock_irqrestore(&eq->spinlock, flags);
@@ -973,9 +975,10 @@ void ehca_poll_eqs(unsigned long data)
 }
 
 static int ehca_mem_notifier(struct notifier_block *nb,
-                             unsigned long action, void *data)
+			     unsigned long action, void *data)
 {
 	static unsigned long ehca_dmem_warn_time;
+	unsigned long flags;
 
 	switch (action) {
 	case MEM_CANCEL_OFFLINE:
@@ -986,15 +989,16 @@ static int ehca_mem_notifier(struct notifier_block *nb,
 	case MEM_GOING_ONLINE:
 	case MEM_GOING_OFFLINE:
 		/* only ok if no hca is attached to the lpar */
-		spin_lock(&shca_list_lock);
+		spin_lock_irqsave(&shca_list_lock, flags);
 		if (list_empty(&shca_list)) {
-			spin_unlock(&shca_list_lock);
+			spin_unlock_irqrestore(&shca_list_lock, flags);
 			return NOTIFY_OK;
 		} else {
-			spin_unlock(&shca_list_lock);
+			spin_unlock_irqrestore(&shca_list_lock, flags);
 			if (printk_timed_ratelimit(&ehca_dmem_warn_time,
 						   30 * 1000))
-				ehca_gen_err("DMEM operations are not allowed in conjunction with eHCA");
+				ehca_gen_err("DMEM operations are not allowed"
+					     "in conjunction with eHCA");
 			return NOTIFY_BAD;
 		}
 	}

@@ -745,6 +745,14 @@ static int as_can_break_anticipation(struct as_data *ad, struct request *rq)
  */
 static int as_can_anticipate(struct as_data *ad, struct request *rq)
 {
+#if 0 /* disable for now, we need to check tag level as well */
+	/*
+	 * SSD device without seek penalty, disable idling
+	 */
+	if (blk_queue_nonrot(ad->q)) axman
+		return 0;
+#endif
+
 	if (!ad->io_context)
 		/*
 		 * Last request submitted was a write
@@ -1331,12 +1339,12 @@ static int as_may_queue(struct request_queue *q, int rw)
 	return ret;
 }
 
-static void as_exit_queue(elevator_t *e)
+static void as_exit_queue(struct elevator_queue *e)
 {
 	struct as_data *ad = e->elevator_data;
 
 	del_timer_sync(&ad->antic_timer);
-	kblockd_flush_work(&ad->antic_work);
+	cancel_work_sync(&ad->antic_work);
 
 	BUG_ON(!list_empty(&ad->fifo_list[REQ_SYNC]));
 	BUG_ON(!list_empty(&ad->fifo_list[REQ_ASYNC]));
@@ -1401,7 +1409,7 @@ as_var_store(unsigned long *var, const char *page, size_t count)
 	return count;
 }
 
-static ssize_t est_time_show(elevator_t *e, char *page)
+static ssize_t est_time_show(struct elevator_queue *e, char *page)
 {
 	struct as_data *ad = e->elevator_data;
 	int pos = 0;
@@ -1419,7 +1427,7 @@ static ssize_t est_time_show(elevator_t *e, char *page)
 }
 
 #define SHOW_FUNCTION(__FUNC, __VAR)				\
-static ssize_t __FUNC(elevator_t *e, char *page)		\
+static ssize_t __FUNC(struct elevator_queue *e, char *page)	\
 {								\
 	struct as_data *ad = e->elevator_data;			\
 	return as_var_show(jiffies_to_msecs((__VAR)), (page));	\
@@ -1432,7 +1440,7 @@ SHOW_FUNCTION(as_write_batch_expire_show, ad->batch_expire[REQ_ASYNC]);
 #undef SHOW_FUNCTION
 
 #define STORE_FUNCTION(__FUNC, __PTR, MIN, MAX)				\
-static ssize_t __FUNC(elevator_t *e, const char *page, size_t count)	\
+static ssize_t __FUNC(struct elevator_queue *e, const char *page, size_t count)	\
 {									\
 	struct as_data *ad = e->elevator_data;				\
 	int ret = as_var_store(__PTR, (page), count);			\

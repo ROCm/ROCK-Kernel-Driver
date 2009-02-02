@@ -43,12 +43,7 @@
  * miss any bits.
  */
 
-#include <linux/module.h>
-#include <linux/slab.h>
-#include <linux/highmem.h>
-#include <linux/bitops.h>
 #include <linux/kthread.h>
-#include <asm/atomic.h>
 #include "raid6.h"
 
 #include <linux/raid/bitmap.h>
@@ -275,7 +270,7 @@ static int grow_buffers(struct stripe_head *sh, int num)
 	return 0;
 }
 
-static void raid5_build_block (struct stripe_head *sh, int i);
+static void raid5_build_block(struct stripe_head *sh, int i);
 
 static void init_stripe(struct stripe_head *sh, sector_t sector, int pd_idx, int disks)
 {
@@ -1151,7 +1146,7 @@ static void raid5_end_read_request(struct bio * bi, int error)
 	release_stripe(sh);
 }
 
-static void raid5_end_write_request (struct bio *bi, int error)
+static void raid5_end_write_request(struct bio *bi, int error)
 {
  	struct stripe_head *sh = bi->bi_private;
 	raid5_conf_t *conf = sh->raid_conf;
@@ -1183,7 +1178,7 @@ static void raid5_end_write_request (struct bio *bi, int error)
 
 static sector_t compute_blocknr(struct stripe_head *sh, int i);
 	
-static void raid5_build_block (struct stripe_head *sh, int i)
+static void raid5_build_block(struct stripe_head *sh, int i)
 {
 	struct r5dev *dev = &sh->dev[i];
 
@@ -1221,10 +1216,10 @@ static void error(mddev_t *mddev, mdk_rdev_t *rdev)
 			set_bit(MD_RECOVERY_INTR, &mddev->recovery);
 		}
 		set_bit(Faulty, &rdev->flags);
-		printk (KERN_ALERT
-			"raid5: Disk failure on %s, disabling device.\n"
-			"raid5: Operation continuing on %d devices.\n",
-			bdevname(rdev->bdev,b), conf->raid_disks - mddev->degraded);
+		printk(KERN_ALERT
+		       "raid5: Disk failure on %s, disabling device.\n"
+		       "raid5: Operation continuing on %d devices.\n",
+		       bdevname(rdev->bdev,b), conf->raid_disks - mddev->degraded);
 	}
 }
 
@@ -1320,8 +1315,8 @@ static sector_t raid5_compute_sector(sector_t r_sector, unsigned int raid_disks,
 			*dd_idx = (*pd_idx + 2 + *dd_idx) % raid_disks;
 			break;
 		default:
-			printk (KERN_CRIT "raid6: unsupported algorithm %d\n",
-				conf->algorithm);
+			printk(KERN_CRIT "raid6: unsupported algorithm %d\n",
+			       conf->algorithm);
 		}
 		break;
 	}
@@ -1396,8 +1391,8 @@ static sector_t compute_blocknr(struct stripe_head *sh, int i)
 			}
 			break;
 		default:
-			printk (KERN_CRIT "raid6: unsupported algorithm %d\n",
-				conf->algorithm);
+			printk(KERN_CRIT "raid6: unsupported algorithm %d\n",
+			       conf->algorithm);
 		}
 		break;
 	}
@@ -1405,7 +1400,7 @@ static sector_t compute_blocknr(struct stripe_head *sh, int i)
 	chunk_number = stripe * data_disks + i;
 	r_sector = (sector_t)chunk_number * sectors_per_chunk + chunk_offset;
 
-	check = raid5_compute_sector (r_sector, raid_disks, data_disks, &dummy1, &dummy2, conf);
+	check = raid5_compute_sector(r_sector, raid_disks, data_disks, &dummy1, &dummy2, conf);
 	if (check != sh->sector || dummy1 != dd_idx || dummy2 != sh->pd_idx) {
 		printk(KERN_ERR "compute_blocknr: map not correct\n");
 		return 0;
@@ -3387,7 +3382,7 @@ static int make_request(struct request_queue *q, struct bio * bi)
 	sector_t logical_sector, last_sector;
 	struct stripe_head *sh;
 	const int rw = bio_data_dir(bi);
-	int remaining;
+	int cpu, remaining;
 
 	if (unlikely(bio_barrier(bi))) {
 		bio_endio(bi, -EOPNOTSUPP);
@@ -3396,8 +3391,11 @@ static int make_request(struct request_queue *q, struct bio * bi)
 
 	md_write_start(mddev, bi);
 
-	disk_stat_inc(mddev->gendisk, ios[rw]);
-	disk_stat_add(mddev->gendisk, sectors[rw], bio_sectors(bi));
+	cpu = part_stat_lock();
+	part_stat_inc(cpu, &mddev->gendisk->part0, ios[rw]);
+	part_stat_add(cpu, &mddev->gendisk->part0, sectors[rw],
+		      bio_sectors(bi));
+	part_stat_unlock();
 
 	if (rw == READ &&
 	     mddev->reshape_position == MaxSector &&
@@ -4000,13 +3998,19 @@ static int run(mddev_t *mddev)
 	int raid_disk, memory;
 	mdk_rdev_t *rdev;
 	struct disk_info *disk;
-	struct list_head *tmp;
 	int working_disks = 0;
 
 	if (mddev->level != 5 && mddev->level != 4 && mddev->level != 6) {
 		printk(KERN_ERR "raid5: %s: raid level not set to 4/5/6 (%d)\n",
 		       mdname(mddev), mddev->level);
 		return -EIO;
+	}
+
+	if (mddev->chunk_size < PAGE_SIZE) {
+		printk(KERN_ERR "md/raid5: chunk_size must be at least "
+		       "PAGE_SIZE but %d < %ld\n",
+		       mddev->chunk_size, PAGE_SIZE);
+		return -EINVAL;
 	}
 
 	if (mddev->reshape_position != MaxSector) {
@@ -4103,7 +4107,7 @@ static int run(mddev_t *mddev)
 
 	pr_debug("raid5: run(%s) called.\n", mdname(mddev));
 
-	rdev_for_each(rdev, tmp, mddev) {
+	list_for_each_entry(rdev, &mddev->disks, same_set) {
 		raid_disk = rdev->raid_disk;
 		if (raid_disk >= conf->raid_disks
 		    || raid_disk < 0)
@@ -4286,7 +4290,7 @@ static int stop(mddev_t *mddev)
 }
 
 #ifdef DEBUG
-static void print_sh (struct seq_file *seq, struct stripe_head *sh)
+static void print_sh(struct seq_file *seq, struct stripe_head *sh)
 {
 	int i;
 
@@ -4302,7 +4306,7 @@ static void print_sh (struct seq_file *seq, struct stripe_head *sh)
 	seq_printf(seq, "\n");
 }
 
-static void printall (struct seq_file *seq, raid5_conf_t *conf)
+static void printall(struct seq_file *seq, raid5_conf_t *conf)
 {
 	struct stripe_head *sh;
 	struct hlist_node *hn;
@@ -4320,7 +4324,7 @@ static void printall (struct seq_file *seq, raid5_conf_t *conf)
 }
 #endif
 
-static void status (struct seq_file *seq, mddev_t *mddev)
+static void status(struct seq_file *seq, mddev_t *mddev)
 {
 	raid5_conf_t *conf = (raid5_conf_t *) mddev->private;
 	int i;
@@ -4528,7 +4532,6 @@ static int raid5_start_reshape(mddev_t *mddev)
 {
 	raid5_conf_t *conf = mddev_to_conf(mddev);
 	mdk_rdev_t *rdev;
-	struct list_head *rtmp;
 	int spares = 0;
 	int added_devices = 0;
 	unsigned long flags;
@@ -4536,7 +4539,7 @@ static int raid5_start_reshape(mddev_t *mddev)
 	if (test_bit(MD_RECOVERY_RUNNING, &mddev->recovery))
 		return -EBUSY;
 
-	rdev_for_each(rdev, rtmp, mddev)
+	list_for_each_entry(rdev, &mddev->disks, same_set)
 		if (rdev->raid_disk < 0 &&
 		    !test_bit(Faulty, &rdev->flags))
 			spares++;
@@ -4558,7 +4561,7 @@ static int raid5_start_reshape(mddev_t *mddev)
 	/* Add some new drives, as many as will fit.
 	 * We know there are enough to make the newly sized array work.
 	 */
-	rdev_for_each(rdev, rtmp, mddev)
+	list_for_each_entry(rdev, &mddev->disks, same_set)
 		if (rdev->raid_disk < 0 &&
 		    !test_bit(Faulty, &rdev->flags)) {
 			if (raid5_add_disk(mddev, rdev) == 0) {

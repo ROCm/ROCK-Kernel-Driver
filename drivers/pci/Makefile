@@ -3,8 +3,8 @@
 #
 
 obj-y		+= access.o bus.o probe.o remove.o pci.o quirks.o slot.o \
-			pci-driver.o search.o pci-sysfs.o rom.o setup-res.o
-obj-$(CONFIG_PCI_REASSIGN) += reassigndev.o
+			pci-driver.o search.o pci-sysfs.o rom.o setup-res.o \
+			irq.o
 obj-$(CONFIG_PROC_FS) += proc.o
 
 # Build PCI Express stuff if needed
@@ -52,6 +52,8 @@ obj-$(CONFIG_ACPI)    += pci-acpi.o
 obj-$(CONFIG_HOTPLUG) += setup-bus.o
 
 obj-$(CONFIG_PCI_SYSCALL) += syscall.o
+
+obj-$(CONFIG_PCI_STUB) += pci-stub.o
 
 ifeq ($(CONFIG_PCI_DEBUG),y)
 EXTRA_CFLAGS += -DDEBUG

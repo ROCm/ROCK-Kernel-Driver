@@ -206,6 +206,7 @@ enum e1e_registers {
 	E1000_MANC2H    = 0x05860, /* Management Control To Host - RW */
 	E1000_SW_FW_SYNC = 0x05B5C, /* Software-Firmware Synchronization - RW */
 	E1000_GCR	= 0x05B00, /* PCI-Ex Control */
+	E1000_GCR2      = 0x05B64, /* PCI-Ex Control #2 */
 	E1000_FACTPS    = 0x05B30, /* Function Active and Power State to MNG */
 	E1000_SWSM      = 0x05B50, /* SW Semaphore */
 	E1000_FWSM      = 0x05B54, /* FW Semaphore */
@@ -437,7 +438,7 @@ enum e1000_rev_polarity{
 	e1000_rev_polarity_undefined = 0xFF
 };
 
-enum e1000_fc_type {
+enum e1000_fc_mode {
 	e1000_fc_none = 0,
 	e1000_fc_rx_pause,
 	e1000_fc_tx_pause,
@@ -739,6 +740,7 @@ struct e1000_phy_operations {
 	s32  (*set_d0_lplu_state)(struct e1000_hw *, bool);
 	s32  (*set_d3_lplu_state)(struct e1000_hw *, bool);
 	s32  (*write_phy_reg)(struct e1000_hw *, u32, u16);
+	s32  (*cfg_on_link_up)(struct e1000_hw *);
 };
 
 /* Function pointers for the NVM. */
@@ -849,8 +851,8 @@ struct e1000_fc_info {
 	u16 pause_time;          /* Flow control pause timer */
 	bool send_xon;           /* Flow control send XON */
 	bool strict_ieee;        /* Strict IEEE mode */
-	enum e1000_fc_type type; /* Type of flow control */
-	enum e1000_fc_type original_type;
+	enum e1000_fc_mode current_mode; /* FC mode in effect */
+	enum e1000_fc_mode requested_mode; /* FC mode requested by caller */
 };
 
 struct e1000_dev_spec_82571 {
@@ -875,6 +877,7 @@ struct e1000_hw {
 
 	u8 __iomem *hw_addr;
 	u8 __iomem *flash_address;
+	resource_size_t flash_len;
 
 	struct e1000_mac_info  mac;
 	struct e1000_fc_info   fc;

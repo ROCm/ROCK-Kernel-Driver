@@ -7,7 +7,7 @@
  * Contains functions related to writing back dirty pages at the
  * address_space level.
  *
- * 10Apr2002	akpm@zip.com.au
+ * 10Apr2002	Andrew Morton
  *		Initial version
  */
 
@@ -69,6 +69,12 @@ static inline long sync_writeback_pages(void)
 int dirty_background_ratio = 10;
 
 /*
+ * dirty_background_bytes starts at 0 (disabled) so that it is a function of
+ * dirty_background_ratio * the amount of dirtyable memory
+ */
+unsigned long dirty_background_bytes;
+
+/*
  * free highmem will not be subtracted from the total free memory
  * for calculating free ratios if vm_highmem_is_dirtyable is true
  */
@@ -78,6 +84,12 @@ int vm_highmem_is_dirtyable;
  * The generator of dirty data starts writeback at this percentage
  */
 int vm_dirty_ratio = 40;
+
+/*
+ * vm_dirty_bytes starts at 0 (disabled) so that it is a function of
+ * vm_dirty_ratio * the amount of dirtyable memory
+ */
+unsigned long vm_dirty_bytes;
 
 /*
  * The interval between `kupdate'-style writebacks, in jiffies
@@ -135,23 +147,75 @@ static int calc_period_shift(void)
 {
 	unsigned long dirty_total;
 
-	dirty_total = (vm_dirty_ratio * determine_dirtyable_memory()) / 100;
+	if (vm_dirty_bytes)
+		dirty_total = vm_dirty_bytes / PAGE_SIZE;
+	else
+		dirty_total = (vm_dirty_ratio * determine_dirtyable_memory()) /
+				100;
 	return 2 + ilog2(dirty_total - 1);
 }
 
 /*
- * update the period when the dirty ratio changes.
+ * update the period when the dirty threshold changes.
  */
+static void update_completion_period(void)
+{
+	int shift = calc_period_shift();
+	prop_change_shift(&vm_completions, shift);
+	prop_change_shift(&vm_dirties, shift);
+}
+
+int dirty_background_ratio_handler(struct ctl_table *table, int write,
+		struct file *filp, void __user *buffer, size_t *lenp,
+		loff_t *ppos)
+{
+	int ret;
+
+	ret = proc_dointvec_minmax(table, write, filp, buffer, lenp, ppos);
+	if (ret == 0 && write)
+		dirty_background_bytes = 0;
+	return ret;
+}
+
+int dirty_background_bytes_handler(struct ctl_table *table, int write,
+		struct file *filp, void __user *buffer, size_t *lenp,
+		loff_t *ppos)
+{
+	int ret;
+
+	ret = proc_doulongvec_minmax(table, write, filp, buffer, lenp, ppos);
+	if (ret == 0 && write)
+		dirty_background_ratio = 0;
+	return ret;
+}
+
 int dirty_ratio_handler(struct ctl_table *table, int write,
 		struct file *filp, void __user *buffer, size_t *lenp,
 		loff_t *ppos)
 {
 	int old_ratio = vm_dirty_ratio;
-	int ret = proc_dointvec_minmax(table, write, filp, buffer, lenp, ppos);
+	int ret;
+
+	ret = proc_dointvec_minmax(table, write, filp, buffer, lenp, ppos);
 	if (ret == 0 && write && vm_dirty_ratio != old_ratio) {
-		int shift = calc_period_shift();
-		prop_change_shift(&vm_completions, shift);
-		prop_change_shift(&vm_dirties, shift);
+		update_completion_period();
+		vm_dirty_bytes = 0;
+	}
+	return ret;
+}
+
+
+int dirty_bytes_handler(struct ctl_table *table, int write,
+		struct file *filp, void __user *buffer, size_t *lenp,
+		loff_t *ppos)
+{
+	int old_bytes = vm_dirty_bytes;
+	int ret;
+
+	ret = proc_doulongvec_minmax(table, write, filp, buffer, lenp, ppos);
+	if (ret == 0 && write && vm_dirty_bytes != old_bytes) {
+		update_completion_period();
+		vm_dirty_ratio = 0;
 	}
 	return ret;
 }
@@ -329,9 +393,7 @@ static unsigned long highmem_dirtyable_memory(unsigned long total)
 		struct zone *z =
 			&NODE_DATA(node)->node_zones[ZONE_HIGHMEM];
 
-		x += zone_page_state(z, NR_FREE_PAGES)
-			+ zone_page_state(z, NR_INACTIVE)
-			+ zone_page_state(z, NR_ACTIVE);
+		x += zone_page_state(z, NR_FREE_PAGES) + zone_lru_pages(z);
 	}
 	/*
 	 * Make sure that the number of highmem pages is never larger
@@ -355,9 +417,7 @@ unsigned long determine_dirtyable_memory(void)
 {
 	unsigned long x;
 
-	x = global_page_state(NR_FREE_PAGES)
-		+ global_page_state(NR_INACTIVE)
-		+ global_page_state(NR_ACTIVE);
+	x = global_page_state(NR_FREE_PAGES) + global_lru_pages();
 
 	if (!vm_highmem_is_dirtyable)
 		x -= highmem_dirtyable_memory(x);
@@ -366,26 +426,32 @@ unsigned long determine_dirtyable_memory(void)
 }
 
 void
-get_dirty_limits(long *pbackground, long *pdirty, long *pbdi_dirty,
-		 struct backing_dev_info *bdi)
+get_dirty_limits(unsigned long *pbackground, unsigned long *pdirty,
+		 unsigned long *pbdi_dirty, struct backing_dev_info *bdi)
 {
-	int background_ratio;		/* Percentages */
-	int dirty_ratio;
-	long background;
-	long dirty;
+	unsigned long background;
+	unsigned long dirty;
 	unsigned long available_memory = determine_dirtyable_memory();
 	struct task_struct *tsk;
 
-	dirty_ratio = vm_dirty_ratio;
-	if (dirty_ratio < 5)
-		dirty_ratio = 5;
+	if (vm_dirty_bytes)
+		dirty = DIV_ROUND_UP(vm_dirty_bytes, PAGE_SIZE);
+	else {
+		int dirty_ratio;
 
-	background_ratio = dirty_background_ratio;
-	if (background_ratio >= dirty_ratio)
-		background_ratio = dirty_ratio / 2;
+		dirty_ratio = vm_dirty_ratio;
+		if (dirty_ratio < 5)
+			dirty_ratio = 5;
+		dirty = (dirty_ratio * available_memory) / 100;
+	}
 
-	background = (background_ratio * available_memory) / 100;
-	dirty = (dirty_ratio * available_memory) / 100;
+	if (dirty_background_bytes)
+		background = DIV_ROUND_UP(dirty_background_bytes, PAGE_SIZE);
+	else
+		background = (dirty_background_ratio * available_memory) / 100;
+
+	if (background >= dirty)
+		background = dirty / 2;
 	tsk = current;
 	if (tsk->flags & PF_LESS_THROTTLE || rt_task(tsk)) {
 		background += background / 4;
@@ -427,9 +493,9 @@ static void balance_dirty_pages(struct address_space *mapping)
 {
 	long nr_reclaimable, bdi_nr_reclaimable;
 	long nr_writeback, bdi_nr_writeback;
-	long background_thresh;
-	long dirty_thresh;
-	long bdi_thresh;
+	unsigned long background_thresh;
+	unsigned long dirty_thresh;
+	unsigned long bdi_thresh;
 	unsigned long pages_written = 0;
 	unsigned long write_chunk = sync_writeback_pages();
 
@@ -584,8 +650,8 @@ EXPORT_SYMBOL(balance_dirty_pages_ratelimited_nr);
 
 void throttle_vm_writeout(gfp_t gfp_mask)
 {
-	long background_thresh;
-	long dirty_thresh;
+	unsigned long background_thresh;
+	unsigned long dirty_thresh;
 
         for ( ; ; ) {
 		get_dirty_limits(&background_thresh, &dirty_thresh, NULL, NULL);
@@ -628,8 +694,8 @@ static void background_writeout(unsigned long _min_pages)
 	};
 
 	for ( ; ; ) {
-		long background_thresh;
-		long dirty_thresh;
+		unsigned long background_thresh;
+		unsigned long dirty_thresh;
 
 		get_dirty_limits(&background_thresh, &dirty_thresh, NULL, NULL);
 		if (global_page_state(NR_FILE_DIRTY) +
@@ -878,6 +944,7 @@ int write_cache_pages(struct address_space *mapping,
 	pgoff_t done_index;
 	int cycled;
 	int range_whole = 0;
+	long nr_to_write = wbc->nr_to_write;
 
 	if (wbc->nonblocking && bdi_write_congested(bdi)) {
 		wbc->encountered_congestion = 1;
@@ -965,7 +1032,6 @@ continue_unlock:
 				goto continue_unlock;
 
 			ret = (*writepage)(page, wbc, data);
-
 			if (unlikely(ret)) {
 				if (ret == AOP_WRITEPAGE_ACTIVATE) {
 					unlock_page(page);
@@ -1012,11 +1078,12 @@ continue_unlock:
 		end = writeback_index - 1;
 		goto retry;
 	}
-	if (wbc->range_cyclic || (range_whole && wbc->nr_to_write > 0))
-		mapping->writeback_index = done_index;
+	if (!wbc->no_nrwrite_index_update) {
+		if (wbc->range_cyclic || (range_whole && nr_to_write > 0))
+			mapping->writeback_index = done_index;
+		wbc->nr_to_write = nr_to_write;
+	}
 
-	if (wbc->range_cont)
-		wbc->range_start = index << PAGE_CACHE_SHIFT;
 	return ret;
 }
 EXPORT_SYMBOL(write_cache_pages);

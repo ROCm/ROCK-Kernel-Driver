@@ -7,6 +7,7 @@
  * This file provides all the same external entries as smp.c but uses
  * the voyager hal to provide the functionality
  */
+#include <linux/cpu.h>
 #include <linux/module.h>
 #include <linux/mm.h>
 #include <linux/kernel_stat.h>
@@ -62,11 +63,6 @@ static int voyager_extended_cpus = 1;
 /* Used for the invalidate map that's also checked in the spinlock */
 static volatile unsigned long smp_invalidate_needed;
 
-/* Bitmask of currently online CPUs - used by setup.c for
-   /proc/cpuinfo, visible externally but still physical */
-cpumask_t cpu_online_map = CPU_MASK_NONE;
-EXPORT_SYMBOL(cpu_online_map);
-
 /* Bitmask of CPUs present in the system - exported by i386_syms.c, used
  * by scheduler but indexed physically */
 cpumask_t phys_cpu_present_map = CPU_MASK_NONE;
@@ -90,6 +86,7 @@ static void ack_vic_irq(unsigned int irq);
 static void vic_enable_cpi(void);
 static void do_boot_cpu(__u8 cpuid);
 static void do_quad_bootstrap(void);
+static void initialize_secondary(void);
 
 int hard_smp_processor_id(void);
 int safe_smp_processor_id(void);
@@ -216,8 +213,6 @@ static cpumask_t smp_commenced_mask = CPU_MASK_NONE;
 /* This is for the new dynamic CPU boot code */
 cpumask_t cpu_callin_map = CPU_MASK_NONE;
 cpumask_t cpu_callout_map = CPU_MASK_NONE;
-cpumask_t cpu_possible_map = CPU_MASK_NONE;
-EXPORT_SYMBOL(cpu_possible_map);
 
 /* The per processor IRQ masks (these are usually kept in sync) */
 static __u16 vic_irq_mask[NR_CPUS] __cacheline_aligned;
@@ -344,6 +339,12 @@ static void do_quad_bootstrap(void)
 	}
 }
 
+void prefill_possible_map(void)
+{
+	/* This is empty on voyager because we need a much
+	 * earlier detection which is done in find_smp_config */
+}
+
 /* Set up all the basic stuff: read the SMP config and make all the
  * SMP information reflect only the boot cpu.  All others will be
  * brought on-line later. */
@@ -356,9 +357,8 @@ void __init find_smp_config(void)
 	printk("VOYAGER SMP: Boot cpu is %d\n", boot_cpu_id);
 
 	/* initialize the CPU structures (moved from smp_boot_cpus) */
-	for (i = 0; i < NR_CPUS; i++) {
+	for (i = 0; i < nr_cpu_ids; i++)
 		cpu_irq_affinity[i] = ~0;
-	}
 	cpu_online_map = cpumask_of_cpu(boot_cpu_id);
 
 	/* The boot CPU must be extended */
@@ -413,6 +413,7 @@ void __init smp_store_cpu_info(int id)
 	struct cpuinfo_x86 *c = &cpu_data(id);
 
 	*c = boot_cpu_data;
+	c->cpu_index = id;
 
 	identify_secondary_cpu(c);
 }
@@ -447,6 +448,8 @@ static void __init start_secondary(void *unused)
 	vic_enable_cpi();
 
 	VDEBUG(("VOYAGER SMP: CPU%d, stack at about %p\n", cpuid, &cpuid));
+
+	notify_cpu_starting(cpuid);
 
 	/* enable interrupts */
 	local_irq_enable();
@@ -648,6 +651,8 @@ void __init smp_boot_cpus(void)
 	 smp_tune_scheduling();
 	 */
 	smp_store_cpu_info(boot_cpu_id);
+	/* setup the jump vector */
+	initial_code = (unsigned long)initialize_secondary;
 	printk("CPU%d: ", boot_cpu_id);
 	print_cpu_info(&cpu_data(boot_cpu_id));
 
@@ -666,7 +671,7 @@ void __init smp_boot_cpus(void)
 
 	/* loop over all the extended VIC CPUs and boot them.  The
 	 * Quad CPUs must be bootstrapped by their extended VIC cpu */
-	for (i = 0; i < NR_CPUS; i++) {
+	for (i = 0; i < nr_cpu_ids; i++) {
 		if (i == boot_cpu_id || !cpu_isset(i, phys_cpu_present_map))
 			continue;
 		do_boot_cpu(i);
@@ -700,7 +705,7 @@ void __init smp_boot_cpus(void)
 
 /* Reload the secondary CPUs task structure (this function does not
  * return ) */
-void __init initialize_secondary(void)
+static void __init initialize_secondary(void)
 {
 #if 0
 	// AC kernels only
@@ -1221,7 +1226,7 @@ int setup_profiling_timer(unsigned int multiplier)
 	 * new values until the next timer interrupt in which they do process
 	 * accounting.
 	 */
-	for (i = 0; i < NR_CPUS; ++i)
+	for (i = 0; i < nr_cpu_ids; ++i)
 		per_cpu(prof_multiplier, i) = multiplier;
 
 	return 0;
@@ -1246,12 +1251,12 @@ static void handle_vic_irq(unsigned int irq, struct irq_desc *desc)
 #define QIC_SET_GATE(cpi, vector) \
 	set_intr_gate((cpi) + QIC_DEFAULT_CPI_BASE, (vector))
 
-void __init smp_intr_init(void)
+void __init voyager_smp_intr_init(void)
 {
 	int i;
 
 	/* initialize the per cpu irq mask to all disabled */
-	for (i = 0; i < NR_CPUS; i++)
+	for (i = 0; i < nr_cpu_ids; i++)
 		vic_irq_mask[i] = 0xFFFF;
 
 	VIC_SET_GATE(VIC_CPI_LEVEL0, vic_cpi_interrupt);
@@ -1481,7 +1486,7 @@ static void disable_local_vic_irq(unsigned int irq)
  * the interrupt off to another CPU */
 static void before_handle_vic_irq(unsigned int irq)
 {
-	irq_desc_t *desc = irq_desc + irq;
+	irq_desc_t *desc = irq_to_desc(irq);
 	__u8 cpu = smp_processor_id();
 
 	_raw_spin_lock(&vic_irq_lock);
@@ -1516,7 +1521,7 @@ static void before_handle_vic_irq(unsigned int irq)
 /* Finish the VIC interrupt: basically mask */
 static void after_handle_vic_irq(unsigned int irq)
 {
-	irq_desc_t *desc = irq_desc + irq;
+	irq_desc_t *desc = irq_to_desc(irq);
 
 	_raw_spin_lock(&vic_irq_lock);
 	{
@@ -1778,6 +1783,17 @@ void __init smp_setup_processor_id(void)
 	x86_write_percpu(cpu_number, hard_smp_processor_id());
 }
 
+static void voyager_send_call_func(cpumask_t callmask)
+{
+	__u32 mask = cpus_addr(callmask)[0] & ~(1 << smp_processor_id());
+	send_CPI(mask, VIC_CALL_FUNCTION_CPI);
+}
+
+static void voyager_send_call_func_single(int cpu)
+{
+	send_CPI(1 << cpu, VIC_CALL_FUNCTION_SINGLE_CPI);
+}
+
 struct smp_ops smp_ops = {
 	.smp_prepare_boot_cpu = voyager_smp_prepare_boot_cpu,
 	.smp_prepare_cpus = voyager_smp_prepare_cpus,
@@ -1787,6 +1803,6 @@ struct smp_ops smp_ops = {
 	.smp_send_stop = voyager_smp_send_stop,
 	.smp_send_reschedule = voyager_smp_send_reschedule,
 
-	.send_call_func_ipi = native_send_call_func_ipi,
-	.send_call_func_single_ipi = native_send_call_func_single_ipi,
+	.send_call_func_ipi = voyager_send_call_func,
+	.send_call_func_single_ipi = voyager_send_call_func_single,
 };

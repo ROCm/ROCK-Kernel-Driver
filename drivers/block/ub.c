@@ -349,8 +349,6 @@ struct ub_dev {
 
 	struct work_struct reset_work;
 	wait_queue_head_t reset_wait;
-
-	int sg_stat[6];
 };
 
 /*
@@ -685,7 +683,6 @@ static int ub_request_fn_1(struct ub_lun *lun, struct request *rq)
 		goto drop;
 	}
 	urq->nsg = n_elem;
-	sc->sg_stat[n_elem < 5 ? n_elem : 5]++;
 
 	if (blk_pc_request(rq)) {
 		ub_cmd_build_packet(sc, lun, cmd, urq);
@@ -1549,8 +1546,6 @@ static void ub_top_sense_done(struct ub_dev *sc, struct ub_scsi_cmd *scmd)
 
 /*
  * Reset management
- * XXX Move usb_reset_device to khubd. Hogging kevent is not a good thing.
- * XXX Make usb_sync_reset asynchronous.
  */
 
 static void ub_reset_enter(struct ub_dev *sc, int try)
@@ -1584,7 +1579,7 @@ static void ub_reset_task(struct work_struct *work)
 	struct ub_dev *sc = container_of(work, struct ub_dev, reset_work);
 	unsigned long flags;
 	struct ub_lun *lun;
-	int lkr, rc;
+	int rc;
 
 	if (!sc->reset) {
 		printk(KERN_WARNING "%s: Running reset unrequested\n",
@@ -1602,10 +1597,11 @@ static void ub_reset_task(struct work_struct *work)
 	} else if (sc->dev->actconfig->desc.bNumInterfaces != 1) {
 		;
 	} else {
-		if ((lkr = usb_lock_device_for_reset(sc->dev, sc->intf)) < 0) {
+		rc = usb_lock_device_for_reset(sc->dev, sc->intf);
+		if (rc < 0) {
 			printk(KERN_NOTICE
 			    "%s: usb_lock_device_for_reset failed (%d)\n",
-			    sc->name, lkr);
+			    sc->name, rc);
 		} else {
 			rc = usb_reset_device(sc->dev);
 			if (rc < 0) {
@@ -1613,9 +1609,7 @@ static void ub_reset_task(struct work_struct *work)
 				    "usb_lock_device_for_reset failed (%d)\n",
 				    sc->name, rc);
 			}
-
-			if (lkr)
-				usb_unlock_device(sc->dev);
+			usb_unlock_device(sc->dev);
 		}
 	}
 
@@ -1633,6 +1627,22 @@ static void ub_reset_task(struct work_struct *work)
 	}
 	wake_up(&sc->reset_wait);
 	spin_unlock_irqrestore(sc->lock, flags);
+}
+
+/*
+ * XXX Reset brackets are too much hassle to implement, so just stub them
+ * in order to prevent forced unbinding (which deadlocks solid when our
+ * ->disconnect method waits for the reset to complete and this kills keventd).
+ *
+ * XXX Tell Alan to move usb_unlock_device inside of usb_reset_device,
+ * or else the post_reset is invoked, and restats I/O on a locked device.
+ */
+static int ub_pre_reset(struct usb_interface *iface) {
+	return 0;
+}
+
+static int ub_post_reset(struct usb_interface *iface) {
+	return 0;
 }
 
 /*
@@ -1670,10 +1680,9 @@ static void ub_revalidate(struct ub_dev *sc, struct ub_lun *lun)
  * This is mostly needed to keep refcounting, but also to support
  * media checks on removable media drives.
  */
-static int ub_bd_open(struct inode *inode, struct file *filp)
+static int ub_bd_open(struct block_device *bdev, fmode_t mode)
 {
-	struct gendisk *disk = inode->i_bdev->bd_disk;
-	struct ub_lun *lun = disk->private_data;
+	struct ub_lun *lun = bdev->bd_disk->private_data;
 	struct ub_dev *sc = lun->udev;
 	unsigned long flags;
 	int rc;
@@ -1687,19 +1696,19 @@ static int ub_bd_open(struct inode *inode, struct file *filp)
 	spin_unlock_irqrestore(&ub_lock, flags);
 
 	if (lun->removable || lun->readonly)
-		check_disk_change(inode->i_bdev);
+		check_disk_change(bdev);
 
 	/*
 	 * The sd.c considers ->media_present and ->changed not equivalent,
 	 * under some pretty murky conditions (a failure of READ CAPACITY).
 	 * We may need it one day.
 	 */
-	if (lun->removable && lun->changed && !(filp->f_flags & O_NDELAY)) {
+	if (lun->removable && lun->changed && !(mode & FMODE_NDELAY)) {
 		rc = -ENOMEDIUM;
 		goto err_open;
 	}
 
-	if (lun->readonly && (filp->f_mode & FMODE_WRITE)) {
+	if (lun->readonly && (mode & FMODE_WRITE)) {
 		rc = -EROFS;
 		goto err_open;
 	}
@@ -1713,9 +1722,8 @@ err_open:
 
 /*
  */
-static int ub_bd_release(struct inode *inode, struct file *filp)
+static int ub_bd_release(struct gendisk *disk, fmode_t mode)
 {
-	struct gendisk *disk = inode->i_bdev->bd_disk;
 	struct ub_lun *lun = disk->private_data;
 	struct ub_dev *sc = lun->udev;
 
@@ -1726,13 +1734,13 @@ static int ub_bd_release(struct inode *inode, struct file *filp)
 /*
  * The ioctl interface.
  */
-static int ub_bd_ioctl(struct inode *inode, struct file *filp,
+static int ub_bd_ioctl(struct block_device *bdev, fmode_t mode,
     unsigned int cmd, unsigned long arg)
 {
-	struct gendisk *disk = inode->i_bdev->bd_disk;
+	struct gendisk *disk = bdev->bd_disk;
 	void __user *usermem = (void __user *) arg;
 
-	return scsi_cmd_ioctl(filp, disk->queue, disk, cmd, usermem);
+	return scsi_cmd_ioctl(disk->queue, disk, mode, cmd, usermem);
 }
 
 /*
@@ -1796,7 +1804,7 @@ static struct block_device_operations ub_bd_fops = {
 	.owner		= THIS_MODULE,
 	.open		= ub_bd_open,
 	.release	= ub_bd_release,
-	.ioctl		= ub_bd_ioctl,
+	.locked_ioctl	= ub_bd_ioctl,
 	.media_changed	= ub_bd_media_changed,
 	.revalidate_disk = ub_bd_revalidate,
 };
@@ -2451,6 +2459,8 @@ static struct usb_driver ub_driver = {
 	.probe =	ub_probe,
 	.disconnect =	ub_disconnect,
 	.id_table =	ub_usb_ids,
+	.pre_reset =	ub_pre_reset,
+	.post_reset =	ub_post_reset,
 };
 
 static int __init ub_init(void)

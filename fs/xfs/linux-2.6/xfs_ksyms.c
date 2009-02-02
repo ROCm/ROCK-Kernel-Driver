@@ -21,9 +21,7 @@
 #include "xfs_bit.h"
 #include "xfs_buf.h"
 #include "xfs_log.h"
-#include "xfs_imap.h"
 #include "xfs_inum.h"
-#include "xfs_clnt.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
 #include "xfs_ag.h"
@@ -65,17 +63,14 @@
 #include "xfs_iomap.h"
 #include "xfs_filestream.h"
 #include "xfs_vnodeops.h"
-#include "xfs_vfsops.h"
 #include "support/ktrace.h"
 
 EXPORT_SYMBOL(xfs_iunlock);
-EXPORT_SYMBOL(xfs_invis_file_operations);
 EXPORT_SYMBOL(xfs_attr_remove);
 EXPORT_SYMBOL(xfs_iunlock_map_shared);
 EXPORT_SYMBOL(xfs_iget);
 EXPORT_SYMBOL(xfs_bmapi);
 EXPORT_SYMBOL(xfs_internal_inum);
-EXPORT_SYMBOL(sys_cred);
 EXPORT_SYMBOL(xfs_attr_set);
 EXPORT_SYMBOL(xfs_trans_reserve);
 EXPORT_SYMBOL(xfs_trans_ijoin);

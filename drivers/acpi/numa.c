@@ -29,7 +29,6 @@
 #include <linux/errno.h>
 #include <linux/acpi.h>
 #include <acpi/acpi_bus.h>
-#include <acpi/acmacros.h>
 
 #define ACPI_NUMA	0x80000000
 #define _COMPONENT	ACPI_NUMA
@@ -258,7 +257,7 @@ int __init acpi_numa_init(void)
 
 int acpi_get_pxm(acpi_handle h)
 {
-	unsigned long pxm;
+	unsigned long long pxm;
 	acpi_status status;
 	acpi_handle handle;
 	acpi_handle phandle = h;

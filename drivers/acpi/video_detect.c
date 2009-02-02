@@ -38,7 +38,6 @@
 #include <linux/dmi.h>
 
 ACPI_MODULE_NAME("video");
-#define ACPI_VIDEO_COMPONENT		0x08000000
 #define _COMPONENT		ACPI_VIDEO_COMPONENT
 
 static long acpi_video_support;
@@ -250,7 +249,7 @@ EXPORT_SYMBOL(acpi_video_display_switch_support);
  * To force that backlight or display output switching is processed by vendor
  * specific acpi drivers or video.ko driver.
  */
-int __init acpi_backlight(char *str)
+static int __init acpi_backlight(char *str)
 {
 	if (str == NULL || *str == '\0')
 		return 1;
@@ -266,7 +265,7 @@ int __init acpi_backlight(char *str)
 }
 __setup("acpi_backlight=", acpi_backlight);
 
-int __init acpi_display_output(char *str)
+static int __init acpi_display_output(char *str)
 {
 	if (str == NULL || *str == '\0')
 		return 1;

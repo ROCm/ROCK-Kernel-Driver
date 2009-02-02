@@ -15,13 +15,8 @@
  * Size of kernel stack for each process
  */
 #ifndef __s390x__
-#ifndef __SMALL_STACK
 #define THREAD_ORDER 1
 #define ASYNC_ORDER  1
-#else
-#define THREAD_ORDER 0
-#define ASYNC_ORDER  0
-#endif
 #else /* __s390x__ */
 #ifndef __SMALL_STACK
 #define THREAD_ORDER 2
@@ -52,6 +47,8 @@ struct thread_info {
 	unsigned int		cpu;		/* current CPU */
 	int			preempt_count;	/* 0 => preemptable, <0 => BUG */
 	struct restart_block	restart_block;
+	__u64			user_timer;
+	__u64			system_timer;
 };
 
 /*
@@ -99,7 +96,7 @@ static inline struct thread_info *current_thread_info(void)
 #define TIF_31BIT		18	/* 32bit process */ 
 #define TIF_MEMDIE		19
 #define TIF_RESTORE_SIGMASK	20	/* restore signal mask in do_signal() */
-#define TIF_FREEZE		21
+#define TIF_FREEZE		21	/* thread is freezing for suspend */
 
 #define _TIF_SYSCALL_TRACE	(1<<TIF_SYSCALL_TRACE)
 #define _TIF_NOTIFY_RESUME	(1<<TIF_NOTIFY_RESUME)

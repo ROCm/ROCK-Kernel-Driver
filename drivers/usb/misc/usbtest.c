@@ -192,8 +192,6 @@ static struct urb *simple_alloc_urb (
 {
 	struct urb		*urb;
 
-	if (bytes < 0)
-		return NULL;
 	urb = usb_alloc_urb (0, GFP_KERNEL);
 	if (!urb)
 		return urb;
@@ -1561,8 +1559,7 @@ usbtest_ioctl (struct usb_interface *intf, unsigned int code, void *buf)
 	if (code != USBTEST_REQUEST)
 		return -EOPNOTSUPP;
 
-	if (param->iterations <= 0 || param->length < 0
-			|| param->sglen < 0 || param->vary < 0)
+	if (param->iterations <= 0)
 		return -EINVAL;
 
 	if (mutex_lock_interruptible(&dev->lock))

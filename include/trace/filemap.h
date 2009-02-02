@@ -3,10 +3,10 @@
 
 #include <linux/tracepoint.h>
 
-DEFINE_TRACE(wait_on_page_start,
+DECLARE_TRACE(wait_on_page_start,
 	TPPROTO(struct page *page, int bit_nr),
 	TPARGS(page, bit_nr));
-DEFINE_TRACE(wait_on_page_end,
+DECLARE_TRACE(wait_on_page_end,
 	TPPROTO(struct page *page, int bit_nr),
 	TPARGS(page, bit_nr));
 

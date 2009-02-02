@@ -6,6 +6,7 @@
  */
 
 #define KMSG_COMPONENT "sclp_config"
+#define pr_fmt(fmt) KMSG_COMPONENT ": " fmt
 
 #include <linux/init.h>
 #include <linux/errno.h>

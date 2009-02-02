@@ -14,8 +14,6 @@
 
 #define CARDBUS_LATENCY_TIMER	176	/* secondary latency timer */
 #define CARDBUS_RESERVE_BUSNR	3
-#define PCI_CFG_SPACE_SIZE	256
-#define PCI_CFG_SPACE_EXP_SIZE	4096
 
 /* Ugh.  Need to stop exporting this to modules. */
 LIST_HEAD(pci_root_buses);
@@ -44,72 +42,6 @@ int no_pci_devices(void)
 }
 EXPORT_SYMBOL(no_pci_devices);
 
-#ifdef HAVE_PCI_LEGACY
-/**
- * pci_create_legacy_files - create legacy I/O port and memory files
- * @b: bus to create files under
- *
- * Some platforms allow access to legacy I/O port and ISA memory space on
- * a per-bus basis.  This routine creates the files and ties them into
- * their associated read, write and mmap files from pci-sysfs.c
- *
- * On error unwind, but don't propogate the error to the caller
- * as it is ok to set up the PCI bus without these files.
- */
-static void pci_create_legacy_files(struct pci_bus *b)
-{
-	int error;
-
-	b->legacy_io = kzalloc(sizeof(struct bin_attribute) * 2,
-			       GFP_ATOMIC);
-	if (!b->legacy_io)
-		goto kzalloc_err;
-
-	b->legacy_io->attr.name = "legacy_io";
-	b->legacy_io->size = 0xffff;
-	b->legacy_io->attr.mode = S_IRUSR | S_IWUSR;
-	b->legacy_io->read = pci_read_legacy_io;
-	b->legacy_io->write = pci_write_legacy_io;
-	error = device_create_bin_file(&b->dev, b->legacy_io);
-	if (error)
-		goto legacy_io_err;
-
-	/* Allocated above after the legacy_io struct */
-	b->legacy_mem = b->legacy_io + 1;
-	b->legacy_mem->attr.name = "legacy_mem";
-	b->legacy_mem->size = 1024*1024;
-	b->legacy_mem->attr.mode = S_IRUSR | S_IWUSR;
-	b->legacy_mem->mmap = pci_mmap_legacy_mem;
-	error = device_create_bin_file(&b->dev, b->legacy_mem);
-	if (error)
-		goto legacy_mem_err;
-
-	return;
-
-legacy_mem_err:
-	device_remove_bin_file(&b->dev, b->legacy_io);
-legacy_io_err:
-	kfree(b->legacy_io);
-	b->legacy_io = NULL;
-kzalloc_err:
-	printk(KERN_WARNING "pci: warning: could not create legacy I/O port "
-	       "and ISA memory resources to sysfs\n");
-	return;
-}
-
-void pci_remove_legacy_files(struct pci_bus *b)
-{
-	if (b->legacy_io) {
-		device_remove_bin_file(&b->dev, b->legacy_io);
-		device_remove_bin_file(&b->dev, b->legacy_mem);
-		kfree(b->legacy_io); /* both are allocated here */
-	}
-}
-#else /* !HAVE_PCI_LEGACY */
-static inline void pci_create_legacy_files(struct pci_bus *bus) { return; }
-void pci_remove_legacy_files(struct pci_bus *bus) { return; }
-#endif /* HAVE_PCI_LEGACY */
-
 /*
  * PCI Bus Class Devices
  */
@@ -119,11 +51,11 @@ static ssize_t pci_bus_show_cpuaffinity(struct device *dev,
 					char *buf)
 {
 	int ret;
-	cpumask_t cpumask;
+	const struct cpumask *cpumask;
 
-	cpumask = pcibus_to_cpumask(to_pci_bus(dev));
+	cpumask = cpumask_of_pcibus(to_pci_bus(dev));
 	ret = type?
-		cpulist_scnprintf(buf, PAGE_SIZE-2, cpumask):
+		cpulist_scnprintf(buf, PAGE_SIZE-2, cpumask) :
 		cpumask_scnprintf(buf, PAGE_SIZE-2, cpumask);
 	buf[ret++] = '\n';
 	buf[ret] = '\0';
@@ -203,13 +135,6 @@ static u64 pci_size(u64 base, u64 maxbase, u64 mask)
 	return size;
 }
 
-enum pci_bar_type {
-	pci_bar_unknown,	/* Standard PCI BAR probe */
-	pci_bar_io,		/* An io port BAR */
-	pci_bar_mem32,		/* A 32-bit memory BAR */
-	pci_bar_mem64,		/* A 64-bit memory BAR */
-};
-
 static inline enum pci_bar_type decode_bar(struct resource *res, u32 bar)
 {
 	if ((bar & PCI_BASE_ADDRESS_SPACE) == PCI_BASE_ADDRESS_SPACE_IO) {
@@ -224,11 +149,16 @@ static inline enum pci_bar_type decode_bar(struct resource *res, u32 bar)
 	return pci_bar_mem32;
 }
 
-/*
- * If the type is not unknown, we assume that the lowest bit is 'enable'.
- * Returns 1 if the BAR was 64-bit and 0 if it was 32-bit.
+/**
+ * pci_read_base - read a PCI BAR
+ * @dev: the PCI device
+ * @type: type of the BAR
+ * @res: resource buffer to be filled in
+ * @pos: BAR position in the config space
+ *
+ * Returns 1 if the BAR is 64-bit, or 0 if 32-bit.
  */
-static int __pci_read_base(struct pci_dev *dev, enum pci_bar_type type,
+int __pci_read_base(struct pci_dev *dev, enum pci_bar_type type,
 			struct resource *res, unsigned int pos)
 {
 	u32 l, sz, mask;
@@ -304,9 +234,8 @@ static int __pci_read_base(struct pci_dev *dev, enum pci_bar_type type,
 		} else {
 			res->start = l64;
 			res->end = l64 + sz64;
-			printk(KERN_DEBUG "PCI: %s reg %x 64bit mmio: [%llx, %llx]\n",
-				pci_name(dev), pos, (unsigned long long)res->start,
-				(unsigned long long)res->end);
+			dev_printk(KERN_DEBUG, &dev->dev,
+				"reg %x 64bit mmio: %pR\n", pos, res);
 		}
 	} else {
 		sz = pci_size(l, sz, mask);
@@ -316,9 +245,10 @@ static int __pci_read_base(struct pci_dev *dev, enum pci_bar_type type,
 
 		res->start = l;
 		res->end = l + sz;
-		printk(KERN_DEBUG "PCI: %s reg %x %s: [%llx, %llx]\n", pci_name(dev),
-			pos, (res->flags & IORESOURCE_IO) ? "io port":"32bit mmio",
-			(unsigned long long)res->start, (unsigned long long)res->end);
+
+		dev_printk(KERN_DEBUG, &dev->dev, "reg %x %s: %pR\n", pos,
+			(res->flags & IORESOURCE_IO) ? "io port" : "32bit mmio",
+			res);
 	}
 
  out:
@@ -366,9 +296,6 @@ void __devinit pci_read_bridge_bases(struct pci_bus *child)
 			child->resource[i] = child->parent->resource[i - 3];
 	}
 
-	for(i=0; i<3; i++)
-		child->resource[i] = &dev->resource[PCI_BRIDGE_RESOURCES+i];
-
 	res = child->resource[0];
 	pci_read_config_byte(dev, PCI_IO_BASE, &io_base_lo);
 	pci_read_config_byte(dev, PCI_IO_LIMIT, &io_limit_lo);
@@ -389,9 +316,7 @@ void __devinit pci_read_bridge_bases(struct pci_bus *child)
 			res->start = base;
 		if (!res->end)
 			res->end = limit + 0xfff;
-		printk(KERN_DEBUG "PCI: bridge %s io port: [%llx, %llx]\n",
-			pci_name(dev), (unsigned long long) res->start,
-			(unsigned long long) res->end);
+		dev_printk(KERN_DEBUG, &dev->dev, "bridge io port: %pR\n", res);
 	}
 
 	res = child->resource[1];
@@ -403,9 +328,8 @@ void __devinit pci_read_bridge_bases(struct pci_bus *child)
 		res->flags = (mem_base_lo & PCI_MEMORY_RANGE_TYPE_MASK) | IORESOURCE_MEM;
 		res->start = base;
 		res->end = limit + 0xfffff;
-		printk(KERN_DEBUG "PCI: bridge %s 32bit mmio: [%llx, %llx]\n",
-			pci_name(dev), (unsigned long long) res->start,
-			(unsigned long long) res->end);
+		dev_printk(KERN_DEBUG, &dev->dev, "bridge 32bit mmio: %pR\n",
+			res);
 	}
 
 	res = child->resource[2];
@@ -441,9 +365,9 @@ void __devinit pci_read_bridge_bases(struct pci_bus *child)
 		res->flags = (mem_base_lo & PCI_MEMORY_RANGE_TYPE_MASK) | IORESOURCE_MEM | IORESOURCE_PREFETCH;
 		res->start = base;
 		res->end = limit + 0xfffff;
-		printk(KERN_DEBUG "PCI: bridge %s %sbit mmio pref: [%llx, %llx]\n",
-			pci_name(dev), (res->flags & PCI_PREF_RANGE_TYPE_64) ? "64" : "32",
-			(unsigned long long) res->start, (unsigned long long) res->end);
+		dev_printk(KERN_DEBUG, &dev->dev, "bridge %sbit mmio pref: %pR\n",
+			(res->flags & PCI_PREF_RANGE_TYPE_64) ? "64" : "32",
+			res);
 	}
 }
 
@@ -474,19 +398,17 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
 	if (!child)
 		return NULL;
 
-	child->self = bridge;
 	child->parent = parent;
 	child->ops = parent->ops;
 	child->sysdata = parent->sysdata;
 	child->bus_flags = parent->bus_flags;
-	child->bridge = get_device(&bridge->dev);
 
 	/* initialize some portions of the bus device, but don't register it
 	 * now as the parent is not properly set up yet.  This device will get
 	 * registered later in pci_bus_add_devices()
 	 */
 	child->dev.class = &pcibus_class;
-	sprintf(child->dev.bus_id, "%04x:%02x", pci_domain_nr(child), busnr);
+	dev_set_name(&child->dev, "%04x:%02x", pci_domain_nr(child), busnr);
 
 	/*
 	 * Set up the primary, secondary and subordinate
@@ -496,8 +418,14 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
 	child->primary = parent->secondary;
 	child->subordinate = 0xff;
 
+	if (!bridge)
+		return child;
+
+	child->self = bridge;
+	child->bridge = get_device(&bridge->dev);
+
 	/* Set up default resource pointers and names.. */
-	for (i = 0; i < 4; i++) {
+	for (i = 0; i < PCI_BRIDGE_RESOURCE_NUM; i++) {
 		child->resource[i] = &bridge->resource[PCI_BRIDGE_RESOURCES+i];
 		child->resource[i]->name = child->name;
 	}
@@ -551,11 +479,19 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev *dev, int max,
 	int is_cardbus = (dev->hdr_type == PCI_HEADER_TYPE_CARDBUS);
 	u32 buses, i, j = 0;
 	u16 bctl;
+	int broken = 0;
 
 	pci_read_config_dword(dev, PCI_PRIMARY_BUS, &buses);
 
 	dev_dbg(&dev->dev, "scanning behind bridge, config %06x, pass %d\n",
 		buses & 0xffffff, pass);
+
+	/* Check if setup is sensible at all */
+	if (!pass &&
+	    ((buses & 0xff) != bus->number || ((buses >> 8) & 0xff) <= bus->number)) {
+		dev_dbg(&dev->dev, "bus configuration invalid, reconfiguring\n");
+		broken = 1;
+	}
 
 	/* Disable MasterAbortMode during probing to avoid reporting
 	   of bus errors (in some architectures) */ 
@@ -563,7 +499,7 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev *dev, int max,
 	pci_write_config_word(dev, PCI_BRIDGE_CONTROL,
 			      bctl & ~PCI_BRIDGE_CTL_MASTER_ABORT);
 
-	if ((buses & 0xffff00) && !pcibios_assign_all_busses() && !is_cardbus) {
+	if ((buses & 0xffff00) && !pcibios_assign_all_busses() && !is_cardbus && !broken) {
 		unsigned int cmax, busnr;
 		/*
 		 * Bus already configured by firmware, process it in the first
@@ -601,7 +537,7 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev *dev, int max,
 		 * do in the second pass.
 		 */
 		if (!pass) {
-			if (pcibios_assign_all_busses())
+			if (pcibios_assign_all_busses() || broken)
 				/* Temporarily disable forwarding of the
 				   configuration cycles on all bridges in
 				   this bus segment to avoid possible
@@ -764,7 +700,7 @@ static int pci_setup_device(struct pci_dev * dev)
 	dev->class = class;
 	class >>= 8;
 
-	dev_dbg(&dev->dev, "found [%04x/%04x] class %06x header type %02x\n",
+	dev_dbg(&dev->dev, "found [%04x:%04x] class %06x header type %02x\n",
 		 dev->vendor, dev->device, class, dev->hdr_type);
 
 	/* "Unknown power state" */
@@ -846,6 +782,11 @@ static int pci_setup_device(struct pci_dev * dev)
 	return 0;
 }
 
+static void pci_release_capabilities(struct pci_dev *dev)
+{
+	pci_vpd_release(dev);
+}
+
 /**
  * pci_release_dev - free a pci device structure when all users of it are finished.
  * @dev: device that's been disconnected
@@ -858,7 +799,7 @@ static void pci_release_dev(struct device *dev)
 	struct pci_dev *pci_dev;
 
 	pci_dev = to_pci_dev(dev);
-	pci_vpd_release(pci_dev);
+	pci_release_capabilities(pci_dev);
 	kfree(pci_dev);
 }
 
@@ -889,8 +830,9 @@ static void set_pcie_port_type(struct pci_dev *pdev)
 int pci_cfg_space_size_ext(struct pci_dev *dev)
 {
 	u32 status;
+	int pos = PCI_CFG_SPACE_SIZE;
 
-	if (pci_read_config_dword(dev, 256, &status) != PCIBIOS_SUCCESSFUL)
+	if (pci_read_config_dword(dev, pos, &status) != PCIBIOS_SUCCESSFUL)
 		goto fail;
 	if (status == 0xffffffff)
 		goto fail;
@@ -938,8 +880,6 @@ struct pci_dev *alloc_pci_dev(void)
 
 	INIT_LIST_HEAD(&dev->bus_list);
 
-	pci_msi_init_pci_dev(dev);
-
 	return dev;
 }
 EXPORT_SYMBOL(alloc_pci_dev);
@@ -951,6 +891,7 @@ EXPORT_SYMBOL(alloc_pci_dev);
 static struct pci_dev *pci_scan_device(struct pci_bus *bus, int devfn)
 {
 	struct pci_dev *dev;
+	struct pci_slot *slot;
 	u32 l;
 	u8 hdr_type;
 	int delay = 1;
@@ -999,6 +940,10 @@ static struct pci_dev *pci_scan_device(struct pci_bus *bus, int devfn)
 	dev->error_state = pci_channel_io_normal;
 	set_pcie_port_type(dev);
 
+	list_for_each_entry(slot, &bus->slots, list)
+		if (PCI_SLOT(devfn) == slot->number)
+			dev->slot = slot;
+
 	/* Assume 32-bit PCI; let 64-bit PCI cards (which are far rarer)
 	   set this higher, assuming the system even supports it.  */
 	dev->dma_mask = 0xffffffff;
@@ -1007,9 +952,26 @@ static struct pci_dev *pci_scan_device(struct pci_bus *bus, int devfn)
 		return NULL;
 	}
 
+	return dev;
+}
+
+static void pci_init_capabilities(struct pci_dev *dev)
+{
+	/* MSI/MSI-X list */
+	pci_msi_init_pci_dev(dev);
+
+	/* Buffers for saving PCIe and PCI-X capabilities */
+	pci_allocate_cap_save_buffers(dev);
+
+	/* Power Management */
+	pci_pm_init(dev);
+	platform_pci_wakeup_init(dev);
+
+	/* Vital Product Data */
 	pci_vpd_pci22_init(dev);
 
-	return dev;
+	/* Alternative Routing-ID Forwarding */
+	pci_enable_ari(dev);
 }
 
 void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
@@ -1028,11 +990,8 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
 	/* Fix up broken headers */
 	pci_fixup_device(pci_fixup_header, dev);
 
-	/* Buffers for saving PCIe and PCI-X capabilities */
-	pci_allocate_cap_save_buffers(dev);
-
-	/* Initialize power management of the device */
-	pci_pm_init(dev);
+	/* Initialize various capabilities */
+	pci_init_capabilities(dev);
 
 	/*
 	 * Add the device to our list of discovered devices
@@ -1177,7 +1136,7 @@ struct pci_bus * pci_create_bus(struct device *parent,
 	memset(dev, 0, sizeof(*dev));
 	dev->parent = parent;
 	dev->release = pci_release_bus_bridge_dev;
-	sprintf(dev->bus_id, "pci%04x:%02x", pci_domain_nr(b), bus);
+	dev_set_name(dev, "pci%04x:%02x", pci_domain_nr(b), bus);
 	error = device_register(dev);
 	if (error)
 		goto dev_reg_err;
@@ -1188,7 +1147,7 @@ struct pci_bus * pci_create_bus(struct device *parent,
 
 	b->dev.class = &pcibus_class;
 	b->dev.parent = b->bridge;
-	sprintf(b->dev.bus_id, "%04x:%02x", pci_domain_nr(b), bus);
+	dev_set_name(&b->dev, "%04x:%02x", pci_domain_nr(b), bus);
 	error = device_register(&b->dev);
 	if (error)
 		goto class_dev_reg_err;
@@ -1240,8 +1199,11 @@ EXPORT_SYMBOL(pci_scan_bridge);
 EXPORT_SYMBOL_GPL(pci_scan_child_bus);
 #endif
 
-static int __init pci_sort_bf_cmp(const struct pci_dev *a, const struct pci_dev *b)
+static int __init pci_sort_bf_cmp(const struct device *d_a, const struct device *d_b)
 {
+	const struct pci_dev *a = to_pci_dev(d_a);
+	const struct pci_dev *b = to_pci_dev(d_b);
+
 	if      (pci_domain_nr(a->bus) < pci_domain_nr(b->bus)) return -1;
 	else if (pci_domain_nr(a->bus) > pci_domain_nr(b->bus)) return  1;
 
@@ -1254,50 +1216,7 @@ static int __init pci_sort_bf_cmp(const struct pci_dev *a, const struct pci_dev 
 	return 0;
 }
 
-/*
- * Yes, this forcably breaks the klist abstraction temporarily.  It
- * just wants to sort the klist, not change reference counts and
- * take/drop locks rapidly in the process.  It does all this while
- * holding the lock for the list, so objects can't otherwise be
- * added/removed while we're swizzling.
- */
-static void __init pci_insertion_sort_klist(struct pci_dev *a, struct list_head *list)
-{
-	struct list_head *pos;
-	struct klist_node *n;
-	struct device *dev;
-	struct pci_dev *b;
-
-	list_for_each(pos, list) {
-		n = container_of(pos, struct klist_node, n_node);
-		dev = container_of(n, struct device, knode_bus);
-		b = to_pci_dev(dev);
-		if (pci_sort_bf_cmp(a, b) <= 0) {
-			list_move_tail(&a->dev.knode_bus.n_node, &b->dev.knode_bus.n_node);
-			return;
-		}
-	}
-	list_move_tail(&a->dev.knode_bus.n_node, list);
-}
-
 void __init pci_sort_breadthfirst(void)
 {
-	LIST_HEAD(sorted_devices);
-	struct list_head *pos, *tmp;
-	struct klist_node *n;
-	struct device *dev;
-	struct pci_dev *pdev;
-	struct klist *device_klist;
-
-	device_klist = bus_get_device_klist(&pci_bus_type);
-
-	spin_lock(&device_klist->k_lock);
-	list_for_each_safe(pos, tmp, &device_klist->k_list) {
-		n = container_of(pos, struct klist_node, n_node);
-		dev = container_of(n, struct device, knode_bus);
-		pdev = to_pci_dev(dev);
-		pci_insertion_sort_klist(pdev, &sorted_devices);
-	}
-	list_splice(&sorted_devices, &device_klist->k_list);
-	spin_unlock(&device_klist->k_lock);
+	bus_sort_breadthfirst(&pci_bus_type, &pci_sort_bf_cmp);
 }

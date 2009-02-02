@@ -110,7 +110,7 @@ static struct ctrl sd_ctrls[] = {
 	},
 };
 
-static struct v4l2_pix_format vga_mode[] = {
+static const struct v4l2_pix_format vga_mode[] = {
 	{160, 120, V4L2_PIX_FMT_SPCA505, V4L2_FIELD_NONE,
 		.bytesperline = 160,
 		.sizeimage = 160 * 120 * 3 / 2,
@@ -422,7 +422,7 @@ static int sd_init(struct gspca_dev *gspca_dev)
 	return 0;
 }
 
-static void sd_start(struct gspca_dev *gspca_dev)
+static int sd_start(struct gspca_dev *gspca_dev)
 {
 	struct usb_device *dev = gspca_dev->dev;
 	__u16 norme;
@@ -549,6 +549,7 @@ static void sd_start(struct gspca_dev *gspca_dev)
 	PDEBUG(D_STREAM, "webcam started");
 	spca506_GetNormeInput(gspca_dev, &norme, &channel);
 	spca506_SetNormeInput(gspca_dev, norme, channel);
+	return 0;
 }
 
 static void sd_stopN(struct gspca_dev *gspca_dev)

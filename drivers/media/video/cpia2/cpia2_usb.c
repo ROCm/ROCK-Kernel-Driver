@@ -25,7 +25,7 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
  *  Stripped of 2.4 stuff ready for main kernel submit by
- *		Alan Cox <alan@redhat.com>
+ *		Alan Cox <alan@lxorguk.ukuu.org.uk>
  ****************************************************************************/
 
 #include <linux/kernel.h>
@@ -478,7 +478,7 @@ int cpia2_usb_change_streaming_alternate(struct camera_data *cam,
  * set_alternate
  *
  *****************************************************************************/
-int set_alternate(struct camera_data *cam, unsigned int alt)
+static int set_alternate(struct camera_data *cam, unsigned int alt)
 {
 	int ret = 0;
 

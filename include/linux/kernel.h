@@ -48,6 +48,12 @@ extern const char linux_proc_banner[];
 #define FIELD_SIZEOF(t, f) (sizeof(((t*)0)->f))
 #define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
 #define roundup(x, y) ((((x) + ((y) - 1)) / (y)) * (y))
+#define DIV_ROUND_CLOSEST(x, divisor)(			\
+{							\
+	typeof(divisor) __divisor = divisor;		\
+	(((x) + ((__divisor) / 2)) / (__divisor));	\
+}							\
+)
 
 #define _RET_IP_		(unsigned long)__builtin_return_address(0)
 #define _THIS_IP_  ({ __label__ __here; __here: (unsigned long)&&__here; })
@@ -116,6 +122,8 @@ extern int _cond_resched(void);
 # define might_resched() do { } while (0)
 #endif
 
+#ifdef CONFIG_DEBUG_SPINLOCK_SLEEP
+  void __might_sleep(char *file, int line);
 /**
  * might_sleep - annotation for functions that can sleep
  *
@@ -126,8 +134,6 @@ extern int _cond_resched(void);
  * be bitten later when the calling function happens to sleep when it is not
  * supposed to.
  */
-#ifdef CONFIG_DEBUG_SPINLOCK_SLEEP
-  void __might_sleep(char *file, int line);
 # define might_sleep() \
 	do { __might_sleep(__FILE__, __LINE__); might_resched(); } while (0)
 #else
@@ -140,6 +146,15 @@ extern int _cond_resched(void);
 		int __x = (x);			\
 		(__x < 0) ? -__x : __x;		\
 	})
+
+#ifdef CONFIG_PROVE_LOCKING
+void might_fault(void);
+#else
+static inline void might_fault(void)
+{
+	might_sleep();
+}
+#endif
 
 extern struct atomic_notifier_head panic_notifier_list;
 extern long (*panic_blink)(long time);
@@ -183,13 +198,39 @@ extern int vsscanf(const char *, const char *, va_list)
 
 extern int get_option(char **str, int *pint);
 extern char *get_options(const char *str, int nints, int *ints);
-extern unsigned long long memparse(char *ptr, char **retptr);
+extern unsigned long long memparse(const char *ptr, char **retptr);
 
 extern int core_kernel_text(unsigned long addr);
 extern int __kernel_text_address(unsigned long addr);
 extern int kernel_text_address(unsigned long addr);
+extern int func_ptr_is_kernel_text(void *ptr);
+
 struct pid;
 extern struct pid *session_of_pgrp(struct pid *pgrp);
+
+/*
+ * FW_BUG
+ * Add this to a message where you are sure the firmware is buggy or behaves
+ * really stupid or out of spec. Be aware that the responsible BIOS developer
+ * should be able to fix this issue or at least get a concrete idea of the
+ * problem by reading your message without the need of looking at the kernel
+ * code.
+ * 
+ * Use it for definite and high priority BIOS bugs.
+ *
+ * FW_WARN
+ * Use it for not that clear (e.g. could the kernel messed up things already?)
+ * and medium priority BIOS bugs.
+ *
+ * FW_INFO
+ * Use this one if you want to tell the user or vendor about something
+ * suspicious, but generally harmless related to the firmware.
+ *
+ * Use it for information or very low priority BIOS bugs.
+ */
+#define FW_BUG		"[Firmware Bug]: "
+#define FW_WARN		"[Firmware Warn]: "
+#define FW_INFO		"[Firmware Info]: "
 
 #ifdef CONFIG_PRINTK
 asmlinkage int vprintk(const char *fmt, va_list args)
@@ -214,6 +255,9 @@ static inline bool printk_timed_ratelimit(unsigned long *caller_jiffies, \
 		{ return false; }
 #endif
 
+extern int printk_needs_cpu(int cpu);
+extern void printk_tick(void);
+
 extern void asmlinkage __attribute__((format(printf, 1, 2)))
 	early_printk(const char *fmt, ...);
 
@@ -237,10 +281,12 @@ extern int panic_timeout;
 extern int panic_on_oops;
 extern int panic_on_unrecovered_nmi;
 extern int panic_on_io_nmi;
-extern int tainted;
 extern int unsupported;
 extern const char *print_tainted(void);
-extern void add_taint(unsigned);
+extern void add_taint(unsigned flag);
+extern void add_nonfatal_taint(unsigned flag);
+extern int test_taint(unsigned flag);
+extern unsigned long get_taint(void);
 extern int root_mountflags;
 
 /* Values used for system_state */
@@ -253,24 +299,24 @@ extern enum system_states {
 	SYSTEM_SUSPEND_DISK,
 } system_state;
 
-#define TAINT_PROPRIETARY_MODULE	(1<<0)
-#define TAINT_FORCED_MODULE		(1<<1)
-#define TAINT_UNSAFE_SMP		(1<<2)
-#define TAINT_FORCED_RMMOD		(1<<3)
-#define TAINT_MACHINE_CHECK		(1<<4)
-#define TAINT_BAD_PAGE			(1<<5)
-#define TAINT_USER			(1<<6)
-#define TAINT_DIE			(1<<7)
-#define TAINT_OVERRIDDEN_ACPI_TABLE	(1<<8)
-#define TAINT_WARN			(1<<9)
-#define TAINT_CRAP			(1<<10)
+#define TAINT_PROPRIETARY_MODULE	0
+#define TAINT_FORCED_MODULE		1
+#define TAINT_UNSAFE_SMP		2
+#define TAINT_FORCED_RMMOD		3
+#define TAINT_MACHINE_CHECK		4
+#define TAINT_BAD_PAGE			5
+#define TAINT_USER			6
+#define TAINT_DIE			7
+#define TAINT_OVERRIDDEN_ACPI_TABLE	8
+#define TAINT_WARN			9
+#define TAINT_CRAP			10
 
 /*
  * Take the upper bits to hopefully allow them
  * to stay the same for more than one release.
  */
-#define TAINT_NO_SUPPORT		(1<<30)
-#define TAINT_EXTERNAL_SUPPORT		(1<<31)
+#define TAINT_NO_SUPPORT		30
+#define TAINT_EXTERNAL_SUPPORT		31
 
 extern void dump_stack(void) __cold;
 
@@ -299,52 +345,36 @@ static inline char *pack_hex_byte(char *buf, u8 byte)
 	return buf;
 }
 
-#ifdef KMSG_COMPONENT
-#define pr_printk(level, format, ...) \
-	printk(level KMSG_COMPONENT  ": " format, ##__VA_ARGS__)
-#else
-#define pr_printk(level, format, ...) \
-	printk(level format, ##__VA_ARGS__)
+#ifndef pr_fmt
+#define pr_fmt(fmt) fmt
 #endif
 
-#if defined(__KMSG_CHECKER) && defined(KMSG_COMPONENT)
-/* generate magic string for scripts/kmsg-doc to parse */
-#define pr_printk_hash(level, format, ...) \
-	__KMSG_PRINT(level _FMT_ format _ARGS_ ##__VA_ARGS__ _END_)
-#elif defined(CONFIG_KMSG_IDS) && defined(KMSG_COMPONENT)
-int printk_hash(const char *, const char *, ...);
-#define pr_printk_hash(level, format, ...) \
-	printk_hash(level KMSG_COMPONENT ".%06x" ": ", format, ##__VA_ARGS__)
-#else /* !defined(CONFIG_KMSG_IDS) */
-#define pr_printk_hash pr_printk
-#endif
-
-#define pr_emerg(fmt, arg...) \
-	pr_printk_hash(KERN_EMERG, fmt, ##arg)
-#define pr_alert(fmt, arg...) \
-	pr_printk_hash(KERN_ALERT, fmt, ##arg)
-#define pr_crit(fmt, arg...) \
-	pr_printk_hash(KERN_CRIT, fmt, ##arg)
-#define pr_err(fmt, arg...) \
-	pr_printk_hash(KERN_ERR, fmt, ##arg)
-#define pr_warning(fmt, arg...) \
-	pr_printk_hash(KERN_WARNING, fmt, ##arg)
-#define pr_notice(fmt, arg...) \
-	pr_printk_hash(KERN_NOTICE, fmt, ##arg)
-#define pr_info(fmt, arg...) \
-	pr_printk_hash(KERN_INFO, fmt, ##arg)
+#define pr_emerg(fmt, ...) \
+        printk(KERN_EMERG pr_fmt(fmt), ##__VA_ARGS__)
+#define pr_alert(fmt, ...) \
+        printk(KERN_ALERT pr_fmt(fmt), ##__VA_ARGS__)
+#define pr_crit(fmt, ...) \
+        printk(KERN_CRIT pr_fmt(fmt), ##__VA_ARGS__)
+#define pr_err(fmt, ...) \
+        printk(KERN_ERR pr_fmt(fmt), ##__VA_ARGS__)
+#define pr_warning(fmt, ...) \
+        printk(KERN_WARNING pr_fmt(fmt), ##__VA_ARGS__)
+#define pr_notice(fmt, ...) \
+        printk(KERN_NOTICE pr_fmt(fmt), ##__VA_ARGS__)
+#define pr_info(fmt, ...) \
+        printk(KERN_INFO pr_fmt(fmt), ##__VA_ARGS__)
 
 /* If you are writing a driver, please use dev_dbg instead */
-#if defined(CONFIG_DYNAMIC_PRINTK_DEBUG)
+#if defined(DEBUG)
+#define pr_debug(fmt, ...) \
+	printk(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__)
+#elif defined(CONFIG_DYNAMIC_PRINTK_DEBUG)
 #define pr_debug(fmt, ...) do { \
-	dynamic_pr_debug(fmt, ##__VA_ARGS__); \
+	dynamic_pr_debug(pr_fmt(fmt), ##__VA_ARGS__); \
 	} while (0)
-#elif defined(DEBUG)
-#define pr_debug(fmt, arg...) \
-	pr_printk(KERN_DEBUG, fmt, ##arg)
 #else
-#define pr_debug(fmt, arg...) \
-	({ if (0) pr_printk(KERN_DEBUG, fmt, ##arg); 0; })
+#define pr_debug(fmt, ...) \
+	({ if (0) printk(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__); 0; })
 #endif
 
 /*
@@ -357,18 +387,6 @@ int printk_hash(const char *, const char *, ...);
 	((unsigned char *)&addr)[2], \
 	((unsigned char *)&addr)[3]
 #define NIPQUAD_FMT "%u.%u.%u.%u"
-
-#define NIP6(addr) \
-	ntohs((addr).s6_addr16[0]), \
-	ntohs((addr).s6_addr16[1]), \
-	ntohs((addr).s6_addr16[2]), \
-	ntohs((addr).s6_addr16[3]), \
-	ntohs((addr).s6_addr16[4]), \
-	ntohs((addr).s6_addr16[5]), \
-	ntohs((addr).s6_addr16[6]), \
-	ntohs((addr).s6_addr16[7])
-#define NIP6_FMT "%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x"
-#define NIP6_SEQFMT "%04x%04x%04x%04x%04x%04x%04x%04x"
 
 #if defined(__LITTLE_ENDIAN)
 #define HIPQUAD(addr) \
@@ -468,6 +486,12 @@ int printk_hash(const char *, const char *, ...);
 	__val = __val < __min ? __min: __val;	\
 	__val > __max ? __max: __val; })
 
+
+/*
+ * swap - swap value of @a and @b
+ */
+#define swap(a, b) ({ typeof(a) __tmp = (a); (a) = (b); (b) = __tmp; })
+
 /**
  * container_of - cast a member of a structure out to the containing structure
  * @ptr:	the pointer to the member.
@@ -519,6 +543,11 @@ struct sysinfo {
 #define NUMA_BUILD 1
 #else
 #define NUMA_BUILD 0
+#endif
+
+/* Rebuild everything on CONFIG_FTRACE_MCOUNT_RECORD */
+#ifdef CONFIG_FTRACE_MCOUNT_RECORD
+# define REBUILD_DUE_TO_FTRACE_MCOUNT_RECORD
 #endif
 
 #endif

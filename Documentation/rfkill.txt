@@ -191,12 +191,20 @@ Userspace input handlers (uevents) or kernel input handlers (rfkill-input):
 	  to tell the devices registered with the rfkill class to change
 	  their state (i.e. translates the input layer event into real
 	  action).
+
 	* rfkill-input implements EPO by handling EV_SW SW_RFKILL_ALL 0
 	  (power off all transmitters) in a special way: it ignores any
 	  overrides and local state cache and forces all transmitters to the
 	  RFKILL_STATE_SOFT_BLOCKED state (including those which are already
-	  supposed to be BLOCKED).  Note that the opposite event (power on all
-	  transmitters) is handled normally.
+	  supposed to be BLOCKED).
+	* rfkill EPO will remain active until rfkill-input receives an
+	  EV_SW SW_RFKILL_ALL 1 event.  While the EPO is active, transmitters
+	  are locked in the blocked state (rfkill will refuse to unblock them).
+	* rfkill-input implements different policies that the user can
+	  select for handling EV_SW SW_RFKILL_ALL 1.  It will unlock rfkill,
+	  and either do nothing (leave transmitters blocked, but now unlocked),
+	  restore the transmitters to their state before the EPO, or unblock
+	  them all.
 
 Userspace uevent handler or kernel platform-specific drivers hooked to the
 rfkill notifier chain:
@@ -331,15 +339,15 @@ class to get a sysfs interface :-)
 correct event for your switch/button.  These events are emergency power-off
 events when they are trying to turn the transmitters off.  An example of an
 input device which SHOULD generate *_RFKILL_ALL events is the wireless-kill
-switch in a laptop which is NOT a hotkey, but a real switch that kills radios
-in hardware, even if the O.S. has gone to lunch.  An example of an input device
-which SHOULD NOT generate *_RFKILL_ALL events by default, is any sort of hot
-key that does nothing by itself, as well as any hot key that is type-specific
-(e.g. the one for WLAN).
+switch in a laptop which is NOT a hotkey, but a real sliding/rocker switch.
+An example of an input device which SHOULD NOT generate *_RFKILL_ALL events by
+default, is any sort of hot key that is type-specific (e.g. the one for WLAN).
 
 
 3.1 Guidelines for wireless device drivers
 ------------------------------------------
+
+(in this text, rfkill->foo means the foo field of struct rfkill).
 
 1. Each independent transmitter in a wireless device (usually there is only one
 transmitter per device) should have a SINGLE rfkill class attached to it.
@@ -363,10 +371,32 @@ This rule exists because users of the rfkill subsystem expect to get (and set,
 when possible) the overall transmitter rfkill state, not of a particular rfkill
 line.
 
-5. During suspend, the rfkill class will attempt to soft-block the radio
-through a call to rfkill->toggle_radio, and will try to restore its previous
-state during resume.  After a rfkill class is suspended, it will *not* call
-rfkill->toggle_radio until it is resumed.
+5. The wireless device driver MUST NOT leave the transmitter enabled during
+suspend and hibernation unless:
+
+	5.1. The transmitter has to be enabled for some sort of functionality
+	like wake-on-wireless-packet or autonomous packed forwarding in a mesh
+	network, and that functionality is enabled for this suspend/hibernation
+	cycle.
+
+AND
+
+	5.2. The device was not on a user-requested BLOCKED state before
+	the suspend (i.e. the driver must NOT unblock a device, not even
+	to support wake-on-wireless-packet or remain in the mesh).
+
+In other words, there is absolutely no allowed scenario where a driver can
+automatically take action to unblock a rfkill controller (obviously, this deals
+with scenarios where soft-blocking or both soft and hard blocking is happening.
+Scenarios where hardware rfkill lines are the only ones blocking the
+transmitter are outside of this rule, since the wireless device driver does not
+control its input hardware rfkill lines in the first place).
+
+6. During resume, rfkill will try to restore its previous state.
+
+7. After a rfkill class is suspended, it will *not* call rfkill->toggle_radio
+until it is resumed.
+
 
 Example of a WLAN wireless driver connected to the rfkill subsystem:
 --------------------------------------------------------------------

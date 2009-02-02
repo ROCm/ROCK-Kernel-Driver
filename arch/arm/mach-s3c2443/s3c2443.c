@@ -20,21 +20,21 @@
 #include <linux/serial_core.h>
 #include <linux/sysdev.h>
 #include <linux/clk.h>
+#include <linux/io.h>
 
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
 #include <asm/mach/irq.h>
 
 #include <mach/hardware.h>
-#include <asm/io.h>
 #include <asm/irq.h>
 
 #include <mach/regs-s3c2443-clock.h>
 #include <mach/reset.h>
 
-#include <asm/plat-s3c24xx/s3c2443.h>
-#include <asm/plat-s3c24xx/devs.h>
-#include <asm/plat-s3c24xx/cpu.h>
+#include <plat/s3c2443.h>
+#include <plat/devs.h>
+#include <plat/cpu.h>
 
 static struct map_desc s3c2443_iodesc[] __initdata = {
 	IODESC_ENT(WATCHDOG),
@@ -81,10 +81,9 @@ void __init s3c2443_init_uarts(struct s3c2410_uartcfg *cfg, int no)
  * machine specific initialisation.
  */
 
-void __init s3c2443_map_io(struct map_desc *mach_desc, int mach_size)
+void __init s3c2443_map_io(void)
 {
 	iotable_init(s3c2443_iodesc, ARRAY_SIZE(s3c2443_iodesc));
-	iotable_init(mach_desc, mach_size);
 }
 
 /* need to register class before we actually register the device, and

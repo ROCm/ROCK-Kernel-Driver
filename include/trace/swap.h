@@ -4,16 +4,16 @@
 #include <linux/swap.h>
 #include <linux/tracepoint.h>
 
-DEFINE_TRACE(swap_in,
+DECLARE_TRACE(swap_in,
 	TPPROTO(struct page *page, swp_entry_t entry),
 	TPARGS(page, entry));
-DEFINE_TRACE(swap_out,
+DECLARE_TRACE(swap_out,
 	TPPROTO(struct page *page),
 	TPARGS(page));
-DEFINE_TRACE(swap_file_open,
+DECLARE_TRACE(swap_file_open,
 	TPPROTO(struct file *file, char *filename),
 	TPARGS(file, filename));
-DEFINE_TRACE(swap_file_close,
+DECLARE_TRACE(swap_file_close,
 	TPPROTO(struct file *file),
 	TPARGS(file));
 

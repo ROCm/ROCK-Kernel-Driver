@@ -99,6 +99,8 @@ struct ehci_hcd {			/* one per controller */
 			owned by the companion during a bus suspend */
 	unsigned long		port_c_suspend;		/* which ports have
 			the change-suspend feature turned on */
+	unsigned long		suspended_ports;	/* which ports are
+			suspended */
 
 	/* per-HC memory pools (could be per-bus, but ...) */
 	struct dma_pool		*qh_pool;	/* qh per active urb */
@@ -118,6 +120,16 @@ struct ehci_hcd {			/* one per controller */
 	unsigned		has_fsl_port_bug:1; /* FreeScale */
 	unsigned		big_endian_mmio:1;
 	unsigned		big_endian_desc:1;
+	unsigned		has_amcc_usb23:1;
+
+	/* required for usb32 quirk */
+	#define OHCI_CTRL_HCFS          (3 << 6)
+	#define OHCI_USB_OPER           (2 << 6)
+	#define OHCI_USB_SUSPEND        (3 << 6)
+
+	#define OHCI_HCCTRL_OFFSET      0x4
+	#define OHCI_HCCTRL_LEN         0x4
+	__hc32			*ohci_hcctrl_reg;
 
 	u8			sbrn;		/* packed release number */
 
@@ -604,16 +616,7 @@ ehci_port_speed(struct ehci_hcd *ehci, unsigned int portsc)
 /*
  * Big-endian read/write functions are arch-specific.
  * Other arches can be added if/when they're needed.
- *
- * REVISIT: arch/powerpc now has readl/writel_be, so the
- * definition below can die once the 4xx support is
- * finally ported over.
  */
-#if defined(CONFIG_PPC) && !defined(CONFIG_PPC_MERGE)
-#define readl_be(addr)		in_be32((__force unsigned *)addr)
-#define writel_be(val, addr)	out_be32((__force unsigned *)addr, val)
-#endif
-
 #if defined(CONFIG_ARM) && defined(CONFIG_ARCH_IXP4XX)
 #define readl_be(addr)		__raw_readl((__force unsigned *)addr)
 #define writel_be(val, addr)	__raw_writel(val, (__force unsigned *)addr)
@@ -642,6 +645,30 @@ static inline void ehci_writel(const struct ehci_hcd *ehci,
 	writel(val, regs);
 #endif
 }
+
+/*
+ * On certain ppc-44x SoC there is a HW issue, that could only worked around with
+ * explicit suspend/operate of OHCI. This function hereby makes sense only on that arch.
+ * Other common bits are dependant on has_amcc_usb23 quirk flag.
+ */
+#ifdef CONFIG_44x
+static inline void set_ohci_hcfs(struct ehci_hcd *ehci, int operational)
+{
+	u32 hc_control;
+
+	hc_control = (readl_be(ehci->ohci_hcctrl_reg) & ~OHCI_CTRL_HCFS);
+	if (operational)
+		hc_control |= OHCI_USB_OPER;
+	else
+		hc_control |= OHCI_USB_SUSPEND;
+
+	writel_be(hc_control, ehci->ohci_hcctrl_reg);
+	(void) readl_be(ehci->ohci_hcctrl_reg);
+}
+#else
+static inline void set_ohci_hcfs(struct ehci_hcd *ehci, int operational)
+{ }
+#endif
 
 /*-------------------------------------------------------------------------*/
 

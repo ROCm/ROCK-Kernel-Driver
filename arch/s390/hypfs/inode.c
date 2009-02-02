@@ -7,6 +7,7 @@
  */
 
 #define KMSG_COMPONENT "hypfs"
+#define pr_fmt(fmt) KMSG_COMPONENT ": " fmt
 
 #include <linux/types.h>
 #include <linux/errno.h>
@@ -105,7 +106,6 @@ static struct inode *hypfs_make_inode(struct super_block *sb, int mode)
 		ret->i_mode = mode;
 		ret->i_uid = hypfs_info->uid;
 		ret->i_gid = hypfs_info->gid;
-		ret->i_blocks = 0;
 		ret->i_atime = ret->i_mtime = ret->i_ctime = CURRENT_TIME;
 		if (mode & S_IFDIR)
 			ret->i_nlink = 2;
@@ -221,7 +221,7 @@ static int hypfs_release(struct inode *inode, struct file *filp)
 
 enum { opt_uid, opt_gid, opt_err };
 
-static match_table_t hypfs_tokens = {
+static const match_table_t hypfs_tokens = {
 	{opt_uid, "uid=%u"},
 	{opt_gid, "gid=%u"},
 	{opt_err, NULL}
@@ -281,8 +281,8 @@ static int hypfs_fill_super(struct super_block *sb, void *data, int silent)
 	if (!sbi)
 		return -ENOMEM;
 	mutex_init(&sbi->lock);
-	sbi->uid = current->uid;
-	sbi->gid = current->gid;
+	sbi->uid = current_uid();
+	sbi->gid = current_gid();
 	sb->s_fs_info = sbi;
 	sb->s_blocksize = PAGE_CACHE_SIZE;
 	sb->s_blocksize_bits = PAGE_CACHE_SHIFT;

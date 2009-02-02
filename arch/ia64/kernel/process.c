@@ -28,6 +28,7 @@
 #include <linux/delay.h>
 #include <linux/kdebug.h>
 #include <linux/utsname.h>
+#include <linux/tracehook.h>
 #include <linux/perfmon_kern.h>
 
 #include <asm/cpu.h>
@@ -43,6 +44,7 @@
 #include <asm/uaccess.h>
 #include <asm/unwind.h>
 #include <asm/user.h>
+#include <asm/perfmon_kern.h>
 
 #include "entry.h"
 
@@ -157,19 +159,6 @@ show_regs (struct pt_regs *regs)
 		show_stack(NULL, NULL);
 }
 
-void tsk_clear_notify_resume(struct task_struct *tsk)
-{
-	if (test_ti_thread_flag(task_thread_info(tsk), TIF_PERFMON_WORK))
-		return;
-	if (test_ti_thread_flag(task_thread_info(tsk), TIF_RESTORE_RSE))
-		return;
-	clear_ti_thread_flag(task_thread_info(tsk), TIF_NOTIFY_RESUME);
-}
-
-/*
- * do_notify_resume_user():
- *	Called from notify_resume_user at entry.S, with interrupts disabled.
- */
 void
 do_notify_resume_user(sigset_t *unused, struct sigscratch *scr, long in_syscall)
 {
@@ -191,6 +180,11 @@ do_notify_resume_user(sigset_t *unused, struct sigscratch *scr, long in_syscall)
 	if (test_thread_flag(TIF_SIGPENDING)) {
 		local_irq_enable();	/* force interrupt enable */
 		ia64_do_signal(scr, in_syscall);
+	}
+
+	if (test_thread_flag(TIF_NOTIFY_RESUME)) {
+		clear_thread_flag(TIF_NOTIFY_RESUME);
+		tracehook_notify_resume(&scr->pt);
 	}
 
 	/* copy user rbs to kernel rbs */
@@ -256,7 +250,6 @@ default_idle (void)
 /* We don't actually take CPU down, just spin without interrupts. */
 static inline void play_dead(void)
 {
-	extern void ia64_cpu_local_tick (void);
 	unsigned int this_cpu = smp_processor_id();
 
 	/* Ack it */

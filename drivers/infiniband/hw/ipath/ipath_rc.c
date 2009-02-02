@@ -573,9 +573,8 @@ int ipath_make_rc_req(struct ipath_qp *qp)
 		ohdr->u.rc.reth.length = cpu_to_be32(qp->s_len);
 		qp->s_state = OP(RDMA_READ_REQUEST);
 		hwords += sizeof(ohdr->u.rc.reth) / sizeof(u32);
-		bth2 = qp->s_psn++ & IPATH_PSN_MASK;
-		if (ipath_cmp24(qp->s_psn, qp->s_next_psn) > 0)
-			qp->s_next_psn = qp->s_psn;
+		bth2 = qp->s_psn & IPATH_PSN_MASK;
+		qp->s_psn = wqe->lpsn + 1;
 		ss = NULL;
 		len = 0;
 		qp->s_cur++;
@@ -675,7 +674,8 @@ static void send_rc_ack(struct ipath_qp *qp)
 	hdr.lrh[0] = cpu_to_be16(lrh0);
 	hdr.lrh[1] = cpu_to_be16(qp->remote_ah_attr.dlid);
 	hdr.lrh[2] = cpu_to_be16(hwords + SIZE_OF_CRC);
-	hdr.lrh[3] = cpu_to_be16(dd->ipath_lid);
+	hdr.lrh[3] = cpu_to_be16(dd->ipath_lid |
+				 qp->remote_ah_attr.src_path_bits);
 	ohdr->bth[0] = cpu_to_be32(bth0);
 	ohdr->bth[1] = cpu_to_be32(qp->remote_qpn);
 	ohdr->bth[2] = cpu_to_be32(qp->r_ack_psn & IPATH_PSN_MASK);

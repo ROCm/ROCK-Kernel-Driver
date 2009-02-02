@@ -83,8 +83,8 @@ static int v2_read_file_info(struct super_block *sb, int type)
 	}
 	info->dqi_priv = kmalloc(sizeof(struct qtree_mem_dqinfo), GFP_NOFS);
 	if (!info->dqi_priv) {
-		printk(KERN_WARNING "Not enough memory for quota information"
-				    "structure.\n");
+		printk(KERN_WARNING
+		       "Not enough memory for quota information structure.\n");
 		return -1;
 	}
 	qinfo = info->dqi_priv;

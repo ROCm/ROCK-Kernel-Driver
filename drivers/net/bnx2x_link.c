@@ -1,4 +1,4 @@
-/* Copyright 2008 Broadcom Corporation
+/* Copyright 2008-2009 Broadcom Corporation
  *
  * Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -289,7 +289,7 @@ static u8 bnx2x_emac_enable(struct link_params *params,
 		/* pause enable/disable */
 		bnx2x_bits_dis(bp, emac_base + EMAC_REG_EMAC_RX_MODE,
 			       EMAC_RX_MODE_FLOW_EN);
-		if (vars->flow_ctrl & FLOW_CTRL_RX)
+		if (vars->flow_ctrl & BNX2X_FLOW_CTRL_RX)
 			bnx2x_bits_en(bp, emac_base +
 				    EMAC_REG_EMAC_RX_MODE,
 				    EMAC_RX_MODE_FLOW_EN);
@@ -297,7 +297,7 @@ static u8 bnx2x_emac_enable(struct link_params *params,
 		bnx2x_bits_dis(bp,  emac_base + EMAC_REG_EMAC_TX_MODE,
 			     (EMAC_TX_MODE_EXT_PAUSE_EN |
 			      EMAC_TX_MODE_FLOW_EN));
-		if (vars->flow_ctrl & FLOW_CTRL_TX)
+		if (vars->flow_ctrl & BNX2X_FLOW_CTRL_TX)
 			bnx2x_bits_en(bp, emac_base +
 				    EMAC_REG_EMAC_TX_MODE,
 				   (EMAC_TX_MODE_EXT_PAUSE_EN |
@@ -317,6 +317,9 @@ static u8 bnx2x_emac_enable(struct link_params *params,
 		val &= ~0x810;
 	EMAC_WR(bp, EMAC_REG_EMAC_MODE, val);
 
+	/* enable emac */
+	REG_WR(bp, NIG_REG_NIG_EMAC0_EN + port*4, 1);
+
 	/* enable emac for jumbo packets */
 	EMAC_WR(bp, EMAC_REG_EMAC_RX_MTU_SIZE,
 		(EMAC_RX_MTU_SIZE_JUMBO_ENA |
@@ -333,7 +336,7 @@ static u8 bnx2x_emac_enable(struct link_params *params,
 	/* enable the NIG in/out to the emac */
 	REG_WR(bp, NIG_REG_EMAC0_IN_EN + port*4, 0x1);
 	val = 0;
-	if (vars->flow_ctrl & FLOW_CTRL_TX)
+	if (vars->flow_ctrl & BNX2X_FLOW_CTRL_TX)
 		val = 1;
 
 	REG_WR(bp, NIG_REG_EMAC0_PAUSE_OUT_EN + port*4, val);
@@ -396,7 +399,7 @@ static u8 bnx2x_bmac_enable(struct link_params *params, struct link_vars *vars,
 
 	/* tx control */
 	val = 0xc0;
-	if (vars->flow_ctrl & FLOW_CTRL_TX)
+	if (vars->flow_ctrl & BNX2X_FLOW_CTRL_TX)
 		val |= 0x800000;
 	wb_data[0] = val;
 	wb_data[1] = 0;
@@ -423,7 +426,7 @@ static u8 bnx2x_bmac_enable(struct link_params *params, struct link_vars *vars,
 
 	/* rx control set to don't strip crc */
 	val = 0x14;
-	if (vars->flow_ctrl & FLOW_CTRL_RX)
+	if (vars->flow_ctrl & BNX2X_FLOW_CTRL_RX)
 		val |= 0x20;
 	wb_data[0] = val;
 	wb_data[1] = 0;
@@ -460,7 +463,7 @@ static u8 bnx2x_bmac_enable(struct link_params *params, struct link_vars *vars,
 	REG_WR(bp, NIG_REG_XGXS_LANE_SEL_P0 + port*4, 0x0);
 	REG_WR(bp, NIG_REG_EGRESS_EMAC0_PORT + port*4, 0x0);
 	val = 0;
-	if (vars->flow_ctrl & FLOW_CTRL_TX)
+	if (vars->flow_ctrl & BNX2X_FLOW_CTRL_TX)
 		val = 1;
 	REG_WR(bp, NIG_REG_BMAC0_PAUSE_OUT_EN + port*4, val);
 	REG_WR(bp, NIG_REG_EGRESS_EMAC0_OUT_EN + port*4, 0x0);
@@ -580,14 +583,14 @@ void bnx2x_link_status_update(struct link_params *params,
 		}
 
 		if (vars->link_status & LINK_STATUS_TX_FLOW_CONTROL_ENABLED)
-			vars->flow_ctrl |= FLOW_CTRL_TX;
+			vars->flow_ctrl |= BNX2X_FLOW_CTRL_TX;
 		else
-			vars->flow_ctrl &= ~FLOW_CTRL_TX;
+			vars->flow_ctrl &= ~BNX2X_FLOW_CTRL_TX;
 
 		if (vars->link_status & LINK_STATUS_RX_FLOW_CONTROL_ENABLED)
-			vars->flow_ctrl |= FLOW_CTRL_RX;
+			vars->flow_ctrl |= BNX2X_FLOW_CTRL_RX;
 		else
-			vars->flow_ctrl &= ~FLOW_CTRL_RX;
+			vars->flow_ctrl &= ~BNX2X_FLOW_CTRL_RX;
 
 		if (vars->phy_flags & PHY_XGXS_FLAG) {
 			if (vars->line_speed &&
@@ -618,7 +621,7 @@ void bnx2x_link_status_update(struct link_params *params,
 
 		vars->line_speed = 0;
 		vars->duplex = DUPLEX_FULL;
-		vars->flow_ctrl = FLOW_CTRL_NONE;
+		vars->flow_ctrl = BNX2X_FLOW_CTRL_NONE;
 
 		/* indicate no mac active */
 		vars->mac_type = MAC_TYPE_NONE;
@@ -691,7 +694,7 @@ static u8 bnx2x_pbf_update(struct link_params *params, u32 flow_ctrl,
 		return -EINVAL;
 	}
 
-	if (flow_ctrl & FLOW_CTRL_RX ||
+	if (flow_ctrl & BNX2X_FLOW_CTRL_RX ||
 	    line_speed == SPEED_10 ||
 	    line_speed == SPEED_100 ||
 	    line_speed == SPEED_1000 ||
@@ -1300,8 +1303,8 @@ static void bnx2x_calc_ieee_aneg_adv(struct link_params *params, u32 *ieee_fc)
 	 * Please refer to Table 28B-3 of the 802.3ab-1999 spec */
 
 	switch (params->req_flow_ctrl) {
-	case FLOW_CTRL_AUTO:
-		if (params->req_fc_auto_adv == FLOW_CTRL_BOTH) {
+	case BNX2X_FLOW_CTRL_AUTO:
+		if (params->req_fc_auto_adv == BNX2X_FLOW_CTRL_BOTH) {
 			*ieee_fc |=
 			     MDIO_COMBO_IEEE0_AUTO_NEG_ADV_PAUSE_BOTH;
 		} else {
@@ -1309,17 +1312,17 @@ static void bnx2x_calc_ieee_aneg_adv(struct link_params *params, u32 *ieee_fc)
 		       MDIO_COMBO_IEEE0_AUTO_NEG_ADV_PAUSE_ASYMMETRIC;
 		}
 		break;
-	case FLOW_CTRL_TX:
+	case BNX2X_FLOW_CTRL_TX:
 		*ieee_fc |=
 		       MDIO_COMBO_IEEE0_AUTO_NEG_ADV_PAUSE_ASYMMETRIC;
 		break;
 
-	case FLOW_CTRL_RX:
-	case FLOW_CTRL_BOTH:
+	case BNX2X_FLOW_CTRL_RX:
+	case BNX2X_FLOW_CTRL_BOTH:
 		*ieee_fc |= MDIO_COMBO_IEEE0_AUTO_NEG_ADV_PAUSE_BOTH;
 		break;
 
-	case FLOW_CTRL_NONE:
+	case BNX2X_FLOW_CTRL_NONE:
 	default:
 		*ieee_fc |= MDIO_COMBO_IEEE0_AUTO_NEG_ADV_PAUSE_NONE;
 		break;
@@ -1463,18 +1466,18 @@ static void bnx2x_pause_resolve(struct link_vars *vars, u32 pause_result)
 {						/*  LD	    LP	 */
 	switch (pause_result) { 		/* ASYM P ASYM P */
 	case 0xb:       			/*   1  0   1  1 */
-		vars->flow_ctrl = FLOW_CTRL_TX;
+		vars->flow_ctrl = BNX2X_FLOW_CTRL_TX;
 		break;
 
 	case 0xe:       			/*   1  1   1  0 */
-		vars->flow_ctrl = FLOW_CTRL_RX;
+		vars->flow_ctrl = BNX2X_FLOW_CTRL_RX;
 		break;
 
 	case 0x5:       			/*   0  1   0  1 */
 	case 0x7:       			/*   0  1   1  1 */
 	case 0xd:       			/*   1  1   0  1 */
 	case 0xf:       			/*   1  1   1  1 */
-		vars->flow_ctrl = FLOW_CTRL_BOTH;
+		vars->flow_ctrl = BNX2X_FLOW_CTRL_BOTH;
 		break;
 
 	default:
@@ -1531,7 +1534,7 @@ static u8 bnx2x_ext_phy_resove_fc(struct link_params *params,
 		DP(NETIF_MSG_LINK, "Ext PHY pause result 0x%x \n",
 		   pause_result);
 		bnx2x_pause_resolve(vars, pause_result);
-		if (vars->flow_ctrl == FLOW_CTRL_NONE &&
+		if (vars->flow_ctrl == BNX2X_FLOW_CTRL_NONE &&
 		     ext_phy_type == PORT_HW_CFG_XGXS_EXT_PHY_TYPE_BCM8073) {
 			bnx2x_cl45_read(bp, port,
 				      ext_phy_type,
@@ -1567,10 +1570,10 @@ static void bnx2x_flow_ctrl_resolve(struct link_params *params,
 	u16 lp_pause;   /* link partner */
 	u16 pause_result;
 
-	vars->flow_ctrl = FLOW_CTRL_NONE;
+	vars->flow_ctrl = BNX2X_FLOW_CTRL_NONE;
 
 	/* resolve from gp_status in case of AN complete and not sgmii */
-	if ((params->req_flow_ctrl == FLOW_CTRL_AUTO) &&
+	if ((params->req_flow_ctrl == BNX2X_FLOW_CTRL_AUTO) &&
 	    (gp_status & MDIO_AN_CL73_OR_37_COMPLETE) &&
 	    (!(vars->phy_flags & PHY_SGMII_FLAG)) &&
 	    (XGXS_EXT_PHY_TYPE(params->ext_phy_config) ==
@@ -1591,11 +1594,11 @@ static void bnx2x_flow_ctrl_resolve(struct link_params *params,
 				 MDIO_COMBO_IEEE0_AUTO_NEG_ADV_PAUSE_MASK)>>7;
 		DP(NETIF_MSG_LINK, "pause_result 0x%x\n", pause_result);
 		bnx2x_pause_resolve(vars, pause_result);
-	} else if ((params->req_flow_ctrl == FLOW_CTRL_AUTO) &&
+	} else if ((params->req_flow_ctrl == BNX2X_FLOW_CTRL_AUTO) &&
 		   (bnx2x_ext_phy_resove_fc(params, vars))) {
 		return;
 	} else {
-		if (params->req_flow_ctrl == FLOW_CTRL_AUTO)
+		if (params->req_flow_ctrl == BNX2X_FLOW_CTRL_AUTO)
 			vars->flow_ctrl = params->req_fc_auto_adv;
 		else
 			vars->flow_ctrl = params->req_flow_ctrl;
@@ -1609,7 +1612,7 @@ static u8 bnx2x_link_settings_status(struct link_params *params,
 				      u32 gp_status)
 {
 	struct bnx2x *bp = params->bp;
-
+	u16 new_line_speed;
 	u8 rc = 0;
 	vars->link_status = 0;
 
@@ -1629,7 +1632,7 @@ static u8 bnx2x_link_settings_status(struct link_params *params,
 
 		switch (gp_status & GP_STATUS_SPEED_MASK) {
 		case GP_STATUS_10M:
-			vars->line_speed = SPEED_10;
+			new_line_speed = SPEED_10;
 			if (vars->duplex == DUPLEX_FULL)
 				vars->link_status |= LINK_10TFD;
 			else
@@ -1637,7 +1640,7 @@ static u8 bnx2x_link_settings_status(struct link_params *params,
 			break;
 
 		case GP_STATUS_100M:
-			vars->line_speed = SPEED_100;
+			new_line_speed = SPEED_100;
 			if (vars->duplex == DUPLEX_FULL)
 				vars->link_status |= LINK_100TXFD;
 			else
@@ -1646,7 +1649,7 @@ static u8 bnx2x_link_settings_status(struct link_params *params,
 
 		case GP_STATUS_1G:
 		case GP_STATUS_1G_KX:
-			vars->line_speed = SPEED_1000;
+			new_line_speed = SPEED_1000;
 			if (vars->duplex == DUPLEX_FULL)
 				vars->link_status |= LINK_1000TFD;
 			else
@@ -1654,7 +1657,7 @@ static u8 bnx2x_link_settings_status(struct link_params *params,
 			break;
 
 		case GP_STATUS_2_5G:
-			vars->line_speed = SPEED_2500;
+			new_line_speed = SPEED_2500;
 			if (vars->duplex == DUPLEX_FULL)
 				vars->link_status |= LINK_2500TFD;
 			else
@@ -1671,32 +1674,32 @@ static u8 bnx2x_link_settings_status(struct link_params *params,
 		case GP_STATUS_10G_KX4:
 		case GP_STATUS_10G_HIG:
 		case GP_STATUS_10G_CX4:
-			vars->line_speed = SPEED_10000;
+			new_line_speed = SPEED_10000;
 			vars->link_status |= LINK_10GTFD;
 			break;
 
 		case GP_STATUS_12G_HIG:
-			vars->line_speed = SPEED_12000;
+			new_line_speed = SPEED_12000;
 			vars->link_status |= LINK_12GTFD;
 			break;
 
 		case GP_STATUS_12_5G:
-			vars->line_speed = SPEED_12500;
+			new_line_speed = SPEED_12500;
 			vars->link_status |= LINK_12_5GTFD;
 			break;
 
 		case GP_STATUS_13G:
-			vars->line_speed = SPEED_13000;
+			new_line_speed = SPEED_13000;
 			vars->link_status |= LINK_13GTFD;
 			break;
 
 		case GP_STATUS_15G:
-			vars->line_speed = SPEED_15000;
+			new_line_speed = SPEED_15000;
 			vars->link_status |= LINK_15GTFD;
 			break;
 
 		case GP_STATUS_16G:
-			vars->line_speed = SPEED_16000;
+			new_line_speed = SPEED_16000;
 			vars->link_status |= LINK_16GTFD;
 			break;
 
@@ -1708,6 +1711,15 @@ static u8 bnx2x_link_settings_status(struct link_params *params,
 			break;
 		}
 
+		/* Upon link speed change set the NIG into drain mode.
+		Comes to deals with possible FIFO glitch due to clk change
+		when speed is decreased without link down indicator */
+		if (new_line_speed != vars->line_speed) {
+			REG_WR(bp, NIG_REG_EGRESS_DRAIN0_MODE
+				    + params->port*4, 0);
+			msleep(1);
+		}
+		vars->line_speed = new_line_speed;
 		vars->link_status |= LINK_STATUS_SERDES_LINK;
 
 		if ((params->req_line_speed == SPEED_AUTO_NEG) &&
@@ -1728,11 +1740,11 @@ static u8 bnx2x_link_settings_status(struct link_params *params,
 				LINK_STATUS_PARALLEL_DETECTION_USED;
 
 		}
-		if (vars->flow_ctrl & FLOW_CTRL_TX)
+		if (vars->flow_ctrl & BNX2X_FLOW_CTRL_TX)
 			vars->link_status |=
 				LINK_STATUS_TX_FLOW_CONTROL_ENABLED;
 
-		if (vars->flow_ctrl & FLOW_CTRL_RX)
+		if (vars->flow_ctrl & BNX2X_FLOW_CTRL_RX)
 			vars->link_status |=
 				LINK_STATUS_RX_FLOW_CONTROL_ENABLED;
 
@@ -1742,7 +1754,7 @@ static u8 bnx2x_link_settings_status(struct link_params *params,
 		vars->phy_link_up = 0;
 
 		vars->duplex = DUPLEX_FULL;
-		vars->flow_ctrl = FLOW_CTRL_NONE;
+		vars->flow_ctrl = BNX2X_FLOW_CTRL_NONE;
 		vars->autoneg = AUTO_NEG_DISABLED;
 		vars->mac_type = MAC_TYPE_NONE;
 	}
@@ -3359,7 +3371,7 @@ static u8 bnx2x_format_ver(u32 num, u8 *str, u16 len)
 	u8 shift = 8*4;
 	u8 digit;
 	if (len < 10) {
-		/* Need more then 10chars for this format */
+		/* Need more than 10chars for this format */
 		*str_ptr = '\0';
 		return -EINVAL;
 	}
@@ -3571,7 +3583,7 @@ static void bnx2x_set_xgxs_loopback(struct link_params *params,
 			       (MDIO_REG_BANK_CL73_IEEEB0 +
 				(MDIO_CL73_IEEEB0_CL73_AN_CONTROL & 0xf)),
 			       0x6041);
-
+		msleep(200);
 		/* set aer mmd back */
 		bnx2x_set_aer_mmd(params, vars);
 
@@ -3870,9 +3882,15 @@ static u8 bnx2x_link_initialize(struct link_params *params,
 	}
 
 	if (vars->phy_flags & PHY_XGXS_FLAG) {
-		if (params->req_line_speed &&
+		if ((params->req_line_speed &&
 		    ((params->req_line_speed == SPEED_100) ||
-		     (params->req_line_speed == SPEED_10))) {
+		     (params->req_line_speed == SPEED_10))) ||
+		    (!params->req_line_speed &&
+		     (params->speed_cap_mask >=
+		       PORT_HW_CFG_SPEED_CAPABILITY_D0_10M_FULL) &&
+		     (params->speed_cap_mask <
+		       PORT_HW_CFG_SPEED_CAPABILITY_D0_1G)
+		     ))  {
 			vars->phy_flags |= PHY_SGMII_FLAG;
 		} else {
 			vars->phy_flags &= ~PHY_SGMII_FLAG;
@@ -3924,7 +3942,7 @@ u8 bnx2x_phy_init(struct link_params *params, struct link_vars *vars)
 	vars->link_up = 0;
 	vars->line_speed = 0;
 	vars->duplex = DUPLEX_FULL;
-	vars->flow_ctrl = FLOW_CTRL_NONE;
+	vars->flow_ctrl = BNX2X_FLOW_CTRL_NONE;
 	vars->mac_type = MAC_TYPE_NONE;
 
 	if (params->switch_cfg ==  SWITCH_CFG_1G)
@@ -3946,12 +3964,12 @@ u8 bnx2x_phy_init(struct link_params *params, struct link_vars *vars)
 		vars->link_up = 1;
 		vars->line_speed = SPEED_10000;
 		vars->duplex = DUPLEX_FULL;
-		vars->flow_ctrl = FLOW_CTRL_NONE;
+		vars->flow_ctrl = BNX2X_FLOW_CTRL_NONE;
 		vars->link_status = (LINK_STATUS_LINK_UP | LINK_10GTFD);
 		/* enable on E1.5 FPGA */
 		if (CHIP_IS_E1H(bp)) {
 			vars->flow_ctrl |=
-				(FLOW_CTRL_TX | FLOW_CTRL_RX);
+				(BNX2X_FLOW_CTRL_TX | BNX2X_FLOW_CTRL_RX);
 			vars->link_status |=
 					(LINK_STATUS_TX_FLOW_CONTROL_ENABLED |
 					 LINK_STATUS_RX_FLOW_CONTROL_ENABLED);
@@ -3974,7 +3992,7 @@ u8 bnx2x_phy_init(struct link_params *params, struct link_vars *vars)
 		vars->link_up = 1;
 		vars->line_speed = SPEED_10000;
 		vars->duplex = DUPLEX_FULL;
-		vars->flow_ctrl = FLOW_CTRL_NONE;
+		vars->flow_ctrl = BNX2X_FLOW_CTRL_NONE;
 		vars->link_status = (LINK_STATUS_LINK_UP | LINK_10GTFD);
 
 		bnx2x_bmac_enable(params, vars, 0);
@@ -3994,7 +4012,7 @@ u8 bnx2x_phy_init(struct link_params *params, struct link_vars *vars)
 		vars->link_up = 1;
 		vars->line_speed = SPEED_10000;
 		vars->duplex = DUPLEX_FULL;
-		vars->flow_ctrl = FLOW_CTRL_NONE;
+		vars->flow_ctrl = BNX2X_FLOW_CTRL_NONE;
 		vars->mac_type = MAC_TYPE_BMAC;
 
 		vars->phy_flags = PHY_XGXS_FLAG;
@@ -4009,7 +4027,7 @@ u8 bnx2x_phy_init(struct link_params *params, struct link_vars *vars)
 		vars->link_up = 1;
 		vars->line_speed = SPEED_1000;
 		vars->duplex = DUPLEX_FULL;
-		vars->flow_ctrl = FLOW_CTRL_NONE;
+		vars->flow_ctrl = BNX2X_FLOW_CTRL_NONE;
 		vars->mac_type = MAC_TYPE_EMAC;
 
 		vars->phy_flags = PHY_XGXS_FLAG;
@@ -4026,7 +4044,7 @@ u8 bnx2x_phy_init(struct link_params *params, struct link_vars *vars)
 		vars->link_up = 1;
 		vars->line_speed = SPEED_10000;
 		vars->duplex = DUPLEX_FULL;
-		vars->flow_ctrl = FLOW_CTRL_NONE;
+		vars->flow_ctrl = BNX2X_FLOW_CTRL_NONE;
 
 		vars->phy_flags = PHY_XGXS_FLAG;
 
@@ -4194,6 +4212,11 @@ static u8 bnx2x_update_link_down(struct link_params *params,
 	/* activate nig drain */
 	REG_WR(bp, NIG_REG_EGRESS_DRAIN0_MODE + port*4, 1);
 
+	/* disable emac */
+	REG_WR(bp, NIG_REG_NIG_EMAC0_EN + port*4, 0);
+
+	msleep(10);
+
 	/* reset BigMac */
 	bnx2x_bmac_rx_disable(bp, params->port);
 	REG_WR(bp, GRCBASE_MISC +
@@ -4238,6 +4261,7 @@ static u8 bnx2x_update_link_up(struct link_params *params,
 
 	/* update shared memory */
 	bnx2x_update_mng(params, vars->link_status);
+	msleep(20);
 	return rc;
 }
 /* This function should called upon link interrupt */
@@ -4275,6 +4299,9 @@ u8 bnx2x_link_update(struct link_params *params, struct link_vars *vars)
 	DP(NETIF_MSG_LINK, " 10G %x, XGXS_LINK %x\n",
 	  REG_RD(bp, NIG_REG_XGXS0_STATUS_LINK10G + port*0x68),
 	  REG_RD(bp, NIG_REG_XGXS0_STATUS_LINK_STATUS + port*0x68));
+
+	/* disable emac */
+	REG_WR(bp, NIG_REG_NIG_EMAC0_EN + port*4, 0);
 
 	ext_phy_type = XGXS_EXT_PHY_TYPE(params->ext_phy_config);
 
@@ -4377,10 +4404,11 @@ static u8 bnx2x_8073_common_init_phy(struct bnx2x *bp, u32 shmem_base)
 			      ext_phy_addr[port],
 			      MDIO_PMA_DEVAD,
 			      MDIO_PMA_REG_ROM_VER1, &fw_ver1);
-		if (fw_ver1 == 0) {
+		if (fw_ver1 == 0 || fw_ver1 == 0x4321) {
 			DP(NETIF_MSG_LINK,
-				 "bnx2x_8073_common_init_phy port %x "
-				 "fw Download failed\n", port);
+				 "bnx2x_8073_common_init_phy port %x:"
+				 "Download failed. fw version = 0x%x\n",
+				 port, fw_ver1);
 			return -EINVAL;
 		}
 

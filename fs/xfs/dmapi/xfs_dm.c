@@ -21,7 +21,6 @@
 #include "xfs_bit.h"
 #include "xfs_log.h"
 #include "xfs_inum.h"
-#include "xfs_clnt.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
 #include "xfs_ag.h"
@@ -46,7 +45,6 @@
 #include "xfs_attr.h"
 #include "xfs_attr_leaf.h"
 #include "xfs_inode_item.h"
-#include "xfs_vfsops.h"
 #include "xfs_vnodeops.h"
 #include <dmapi.h>
 #include <dmapi_kern.h>
@@ -142,7 +140,7 @@ xfs_dm_send_data_event(
 	int		flags,
 	int		*lock_flags)
 {
-	struct inode	*inode = ip->i_vnode;
+	struct inode	*inode = &ip->i_vnode;
 	int		error;
 	uint16_t	dmstate;
 
@@ -304,7 +302,7 @@ STATIC uint
 xfs_dic2dmflags(
 	xfs_dinode_t	*dip)
 {
-	return _xfs_dic2dmflags(be16_to_cpu(dip->di_core.di_flags)) |
+	return _xfs_dic2dmflags(be16_to_cpu(dip->di_flags)) |
 			(XFS_DFORK_Q(dip) ? DM_XFLAG_HASATTR : 0);
 }
 
@@ -321,7 +319,7 @@ xfs_dip_to_stat(
 	xfs_dinode_t		*dip,
 	dm_stat_t		*buf)
 {
-	xfs_dinode_core_t	*dic = &dip->di_core;
+	xfs_dinode_t	*dic = dip;
 
 	/*
 	 * The inode format changed when we moved the link count and
@@ -334,7 +332,7 @@ xfs_dip_to_stat(
 	 * the new format. We don't change the version number so that we
 	 * can distinguish this from a real new format inode.
 	 */
-	if (dic->di_version == XFS_DINODE_VERSION_1) {
+	if (dic->di_version == 1) {
 		buf->dt_nlink = be16_to_cpu(dic->di_onlink);
 		/*buf->dt_xfs_projid = 0;*/
 	} else {
@@ -360,7 +358,7 @@ xfs_dip_to_stat(
 
 	switch (dic->di_format) {
 	case XFS_DINODE_FMT_DEV:
-		buf->dt_rdev = be32_to_cpu(dip->di_u.di_dev);
+		buf->dt_rdev = xfs_dinode_get_rdev(dic);
 		buf->dt_blksize = BLKDEV_IOSIZE;
 		buf->dt_blocks = 0;
 		break;
@@ -507,7 +505,7 @@ xfs_dm_bulkall_iget_one(
 		return error;
 
 	xfs_ip_to_stat(mp, ino, ip, &xbuf->dx_statinfo);
-	dm_ip_to_handle(ip->i_vnode, &handle);
+	dm_ip_to_handle(&ip->i_vnode, &handle);
 	xfs_dm_handle_to_xstat(xbuf, xstat_sz, &handle, sizeof(handle));
 
 	/* Drop ILOCK_SHARED for call to xfs_attr_get */
@@ -515,7 +513,7 @@ xfs_dm_bulkall_iget_one(
 
 	memset(&xbuf->dx_attrdata, 0, sizeof(dm_vardata_t));
 	error = xfs_attr_get(ip, attr_name, attr_buf, &value_len, ATTR_ROOT);
-	iput(ip->i_vnode);
+	iput(&ip->i_vnode);
 
 	DM_EA_XLATE_ERR(error);
 	if (error && (error != ENOATTR)) {
@@ -544,7 +542,7 @@ xfs_dm_inline_attr(
 	caddr_t		attr_buf,
 	int		*value_lenp)
 {
-	if (dip->di_core.di_aformat == XFS_DINODE_FMT_LOCAL) {
+	if (dip->di_aformat == XFS_DINODE_FMT_LOCAL) {
 		xfs_attr_shortform_t	*sf;
 		xfs_attr_sf_entry_t	*sfe;
 		unsigned int		namelen = strlen(attr_name);
@@ -586,7 +584,7 @@ dm_dip_to_handle(
 	fid.dm_fid_len = sizeof(struct dm_fid) - sizeof(fid.dm_fid_len);
 	fid.dm_fid_pad = 0;
 	fid.dm_fid_ino = ino;
-	fid.dm_fid_gen = be32_to_cpu(dip->di_core.di_gen);
+	fid.dm_fid_gen = be32_to_cpu(dip->di_gen);
 
 	memcpy(&handlep->ha_fsid, fsid, sizeof(*fsid));
 	memcpy(&handlep->ha_fid, &fid, fid.dm_fid_len + sizeof(fid.dm_fid_len));
@@ -611,7 +609,7 @@ xfs_dm_bulkall_inline_one(
 	int		value_len = *value_lenp;
 	int		error;
 
-	if (dip->di_core.di_mode == 0)
+	if (dip->di_mode == 0)
 		return ENOENT;
 
 	xfs_dip_to_stat(mp, ino, dip, &xbuf->dx_statinfo);
@@ -765,7 +763,7 @@ xfs_dm_bulkattr_iget_one(
 		return error;
 
 	xfs_ip_to_stat(mp, ino, ip, sbuf);
-	dm_ip_to_handle(ip->i_vnode, &handle);
+	dm_ip_to_handle(&ip->i_vnode, &handle);
 	xfs_dm_handle_to_stat(sbuf, stat_sz, &handle, sizeof(handle));
 
 	xfs_iput(ip, XFS_ILOCK_SHARED);
@@ -783,7 +781,7 @@ xfs_dm_bulkattr_inline_one(
 {
 	dm_handle_t	handle;
 
-	if (dip->di_core.di_mode == 0)
+	if (dip->di_mode == 0)
 		return ENOENT;
 	xfs_dip_to_stat(mp, ino, dip, sbuf);
 	dm_dip_to_handle(ino, dip, fsid, &handle);
@@ -946,7 +944,7 @@ xfs_dm_f_set_eventlist(
 	ip->i_d.di_dmevmask = (eventset & max_mask) | (ip->i_d.di_dmevmask & ~max_mask);
 
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
-	igrab(ip->i_vnode);
+	igrab(&ip->i_vnode);
 	xfs_trans_commit(tp, 0);
 
 	return(0);
@@ -1081,6 +1079,7 @@ xfs_dm_rdwr(
 	void		__user *bufp,
 	int		*rvp)
 {
+	const struct cred *cred = current_cred();
 	xfs_inode_t	*ip = XFS_I(inode);
 	int		error;
 	int		oflags;
@@ -1117,17 +1116,18 @@ xfs_dm_rdwr(
 
 	igrab(inode);
 
-	dentry = d_alloc_anon(inode);
+	dentry = d_obtain_alias(inode);
 	if (dentry == NULL) {
 		iput(inode);
 		return ENOMEM;
 	}
 
-	file = dentry_open(dentry, mntget(ip->i_mount->m_vfsmount), oflags);
+	file = dentry_open(dentry, mntget(ip->i_mount->m_vfsmount), oflags,
+			   cred);
 	if (IS_ERR(file)) {
 		return -PTR_ERR(file);
 	}
-	file->f_op = &xfs_invis_file_operations;
+	file->f_mode |= FMODE_NOCMTIME;
 
 	if (fmode & FMODE_READ) {
 		xfer = file->f_op->read(file, bufp, len, (loff_t*)&off);
@@ -2473,8 +2473,7 @@ xfs_dm_punch_hole(
 #endif
 
 	error = xfs_change_file_space(ip, XFS_IOC_UNRESVSP, &bf,
-				(xfs_off_t)off, sys_cred,
-				XFS_ATTR_DMI|XFS_ATTR_NOLOCK);
+				(xfs_off_t)off, XFS_ATTR_DMI|XFS_ATTR_NOLOCK);
 
 	/*
 	 * if punching to end of file, kill any blocks past EOF that
@@ -2495,7 +2494,6 @@ xfs_dm_punch_hole(
 	/* Let threads in send_data_event know we punched the file. */
 	ip->i_d.di_dmstate++;
 	xfs_iunlock(ip, XFS_IOLOCK_EXCL);
-	xfs_iflags_set(ip, XFS_IMODIFIED);
 
 up_and_out:
 	up_rw_sems(inode, DM_SEM_FLAG_WR);
@@ -2732,7 +2730,7 @@ xfs_dm_set_fileattr(
 		iattr.ia_size = stat.fa_size;
 	}
 
-	return -xfs_setattr(XFS_I(inode), &iattr, XFS_ATTR_DMI, NULL);
+	return -xfs_setattr(XFS_I(inode), &iattr, XFS_ATTR_DMI);
 }
 
 
@@ -3146,7 +3144,7 @@ xfs_dm_send_destroy_event(
 	dm_right_t	vp_right)	/* always DM_RIGHT_NULL */
 {
 	/* Returns positive errors to XFS */
-	return -dm_send_destroy_event(ip->i_vnode, vp_right);
+	return -dm_send_destroy_event(&ip->i_vnode, vp_right);
 }
 
 
@@ -3166,8 +3164,8 @@ xfs_dm_send_namesp_event(
 {
 	/* Returns positive errors to XFS */
 	return -dm_send_namesp_event(event, mp ? mp->m_super : NULL,
-				    ip1->i_vnode, vp1_right,
-				    ip2 ? ip2->i_vnode : NULL, vp2_right,
+				    &ip1->i_vnode, vp1_right,
+				    ip2 ? &ip2->i_vnode : NULL, vp2_right,
 				    name1, name2,
 				    mode, retcode, flags);
 }
@@ -3194,7 +3192,7 @@ xfs_dm_send_unmount_event(
 	int		retcode,	/* errno, if unmount failed */
 	int		flags)
 {
-	dm_send_unmount_event(mp->m_super, ip ? ip->i_vnode : NULL,
+	dm_send_unmount_event(mp->m_super, ip ? &ip->i_vnode : NULL,
 			      vfsp_right, mode, retcode, flags);
 }
 
@@ -3214,13 +3212,6 @@ xfs_dmops_t	xfs_dmcore_xfs = {
 };
 EXPORT_SYMBOL(xfs_dmcore_xfs);
 
-STATIC const struct file_operations *
-xfs_dm_get_invis_ops(
-	struct inode *ip)
-{
-	return &xfs_invis_file_operations;
-}
-
 STATIC int
 xfs_dm_fh_to_inode(
 	struct super_block	*sb,
@@ -3237,7 +3228,7 @@ xfs_dm_fh_to_inode(
 
 	if (!dmfid->dm_fid_len) {
 		/* filesystem handle */
-		*inode = igrab(mp->m_rootip->i_vnode);
+		*inode = igrab(&mp->m_rootip->i_vnode);
 		if (!*inode)
 			return -ENOENT;
 		return 0;
@@ -3264,7 +3255,7 @@ xfs_dm_fh_to_inode(
 		return -ENOENT;
 	}
 
-	*inode = ip->i_vnode;
+	*inode = &ip->i_vnode;
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
 	return 0;
 }
@@ -3309,7 +3300,6 @@ xfs_dm_get_fsid(
 static struct filesystem_dmapi_operations xfs_dmapiops = {
 	.get_fsys_vector	= xfs_dm_get_dmapiops,
 	.fh_to_inode		= xfs_dm_fh_to_inode,
-	.get_invis_ops		= xfs_dm_get_invis_ops,
 	.inode_to_fh		= xfs_dm_inode_to_fh,
 	.get_fsid		= xfs_dm_get_fsid,
 };

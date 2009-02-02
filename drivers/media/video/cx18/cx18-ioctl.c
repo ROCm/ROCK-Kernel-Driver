@@ -4,6 +4,7 @@
  *  Derived from ivtv-ioctl.c
  *
  *  Copyright (C) 2007  Hans Verkuil <hverkuil@xs4all.nl>
+ *  Copyright (C) 2008  Andy Walls <awalls@radix.net>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -22,6 +23,7 @@
  */
 
 #include "cx18-driver.h"
+#include "cx18-io.h"
 #include "cx18-version.h"
 #include "cx18-mailbox.h"
 #include "cx18-i2c.h"
@@ -170,7 +172,6 @@ static int cx18_try_fmt_vid_cap(struct file *file, void *fh,
 {
 	struct cx18_open_id *id = fh;
 	struct cx18 *cx = id->cx;
-
 	int w = fmt->fmt.pix.width;
 	int h = fmt->fmt.pix.height;
 
@@ -202,8 +203,7 @@ static int cx18_s_fmt_vid_cap(struct file *file, void *fh,
 	struct cx18_open_id *id = fh;
 	struct cx18 *cx = id->cx;
 	int ret;
-	int w = fmt->fmt.pix.width;
-	int h = fmt->fmt.pix.height;
+	int w, h;
 
 	ret = v4l2_prio_check(&cx->prio, &id->prio);
 	if (ret)
@@ -212,6 +212,8 @@ static int cx18_s_fmt_vid_cap(struct file *file, void *fh,
 	ret = cx18_try_fmt_vid_cap(file, fh, fmt);
 	if (ret)
 		return ret;
+	w = fmt->fmt.pix.width;
+	h = fmt->fmt.pix.height;
 
 	if (cx->params.width == w && cx->params.height == h)
 		return 0;
@@ -236,13 +238,12 @@ static int cx18_s_fmt_vbi_cap(struct file *file, void *fh,
 	if (ret)
 		return ret;
 
-	if (id->type == CX18_ENC_STREAM_TYPE_VBI &&
-			cx->vbi.sliced_in->service_set &&
-			atomic_read(&cx->ana_capturing) > 0)
+	if (!cx18_raw_vbi(cx) && atomic_read(&cx->ana_capturing) > 0)
 		return -EBUSY;
 
 	cx->vbi.sliced_in->service_set = 0;
-	cx18_av_cmd(cx, VIDIOC_S_FMT, &cx->vbi.in);
+	cx->vbi.in.type = V4L2_BUF_TYPE_VBI_CAPTURE;
+	cx18_av_cmd(cx, VIDIOC_S_FMT, fmt);
 	return cx18_g_fmt_vbi_cap(file, fh, fmt);
 }
 
@@ -253,30 +254,24 @@ static int cx18_s_fmt_sliced_vbi_cap(struct file *file, void *fh,
 }
 
 static int cx18_g_chip_ident(struct file *file, void *fh,
-				struct v4l2_chip_ident *chip)
+				struct v4l2_dbg_chip_ident *chip)
 {
 	struct cx18 *cx = ((struct cx18_open_id *)fh)->cx;
 
 	chip->ident = V4L2_IDENT_NONE;
 	chip->revision = 0;
-	if (chip->match_type == V4L2_CHIP_MATCH_HOST) {
-		if (v4l2_chip_match_host(chip->match_type, chip->match_chip))
-			chip->ident = V4L2_IDENT_CX23418;
+	if (v4l2_chip_match_host(&chip->match)) {
+		chip->ident = V4L2_IDENT_CX23418;
 		return 0;
 	}
-	if (chip->match_type == V4L2_CHIP_MATCH_I2C_DRIVER)
-		return cx18_i2c_id(cx, chip->match_chip, VIDIOC_G_CHIP_IDENT,
-					chip);
-	if (chip->match_type == V4L2_CHIP_MATCH_I2C_ADDR)
-		return cx18_call_i2c_client(cx, chip->match_chip,
-						VIDIOC_G_CHIP_IDENT, chip);
-	return -EINVAL;
+	cx18_call_i2c_clients(cx, VIDIOC_DBG_G_CHIP_IDENT, chip);
+	return 0;
 }
 
 #ifdef CONFIG_VIDEO_ADV_DEBUG
 static int cx18_cxc(struct cx18 *cx, unsigned int cmd, void *arg)
 {
-	struct v4l2_register *regs = arg;
+	struct v4l2_dbg_register *regs = arg;
 	unsigned long flags;
 
 	if (!capable(CAP_SYS_ADMIN))
@@ -285,40 +280,35 @@ static int cx18_cxc(struct cx18 *cx, unsigned int cmd, void *arg)
 		return -EINVAL;
 
 	spin_lock_irqsave(&cx18_cards_lock, flags);
+	regs->size = 4;
 	if (cmd == VIDIOC_DBG_G_REGISTER)
-		regs->val = read_enc(regs->reg);
+		regs->val = cx18_read_enc(cx, regs->reg);
 	else
-		write_enc(regs->val, regs->reg);
+		cx18_write_enc(cx, regs->val, regs->reg);
 	spin_unlock_irqrestore(&cx18_cards_lock, flags);
 	return 0;
 }
 
 static int cx18_g_register(struct file *file, void *fh,
-				struct v4l2_register *reg)
+				struct v4l2_dbg_register *reg)
 {
 	struct cx18 *cx = ((struct cx18_open_id *)fh)->cx;
 
-	if (v4l2_chip_match_host(reg->match_type, reg->match_chip))
+	if (v4l2_chip_match_host(&reg->match))
 		return cx18_cxc(cx, VIDIOC_DBG_G_REGISTER, reg);
-	if (reg->match_type == V4L2_CHIP_MATCH_I2C_DRIVER)
-		return cx18_i2c_id(cx, reg->match_chip, VIDIOC_DBG_G_REGISTER,
-					reg);
-	return cx18_call_i2c_client(cx, reg->match_chip, VIDIOC_DBG_G_REGISTER,
-					reg);
+	cx18_call_i2c_clients(cx, VIDIOC_DBG_G_REGISTER, reg);
+	return 0;
 }
 
 static int cx18_s_register(struct file *file, void *fh,
-				struct v4l2_register *reg)
+				struct v4l2_dbg_register *reg)
 {
 	struct cx18 *cx = ((struct cx18_open_id *)fh)->cx;
 
-	if (v4l2_chip_match_host(reg->match_type, reg->match_chip))
+	if (v4l2_chip_match_host(&reg->match))
 		return cx18_cxc(cx, VIDIOC_DBG_S_REGISTER, reg);
-	if (reg->match_type == V4L2_CHIP_MATCH_I2C_DRIVER)
-		return cx18_i2c_id(cx, reg->match_chip, VIDIOC_DBG_S_REGISTER,
-					reg);
-	return cx18_call_i2c_client(cx, reg->match_chip, VIDIOC_DBG_S_REGISTER,
-					reg);
+	cx18_call_i2c_clients(cx, VIDIOC_DBG_S_REGISTER, reg);
+	return 0;
 }
 #endif
 
@@ -345,7 +335,7 @@ static int cx18_querycap(struct file *file, void *fh,
 
 	strlcpy(vcap->driver, CX18_DRIVER_NAME, sizeof(vcap->driver));
 	strlcpy(vcap->card, cx->card_name, sizeof(vcap->card));
-	strlcpy(vcap->bus_info, pci_name(cx->dev), sizeof(vcap->bus_info));
+	snprintf(vcap->bus_info, sizeof(vcap->bus_info), "PCI:%s", pci_name(cx->dev));
 	vcap->version = CX18_DRIVER_VERSION; 	    /* version */
 	vcap->capabilities = cx->v4l2_cap; 	    /* capabilities */
 	return 0;
@@ -622,6 +612,7 @@ static int cx18_encoder_cmd(struct file *file, void *fh,
 {
 	struct cx18_open_id *id = fh;
 	struct cx18 *cx = id->cx;
+	u32 h;
 
 	switch (enc->cmd) {
 	case V4L2_ENC_CMD_START:
@@ -643,8 +634,14 @@ static int cx18_encoder_cmd(struct file *file, void *fh,
 			return -EPERM;
 		if (test_and_set_bit(CX18_F_I_ENC_PAUSED, &cx->i_flags))
 			return 0;
+		h = cx18_find_handle(cx);
+		if (h == CX18_INVALID_TASK_HANDLE) {
+			CX18_ERR("Can't find valid task handle for "
+				 "V4L2_ENC_CMD_PAUSE\n");
+			return -EBADFD;
+		}
 		cx18_mute(cx);
-		cx18_vapi(cx, CX18_CPU_CAPTURE_PAUSE, 1, cx18_find_handle(cx));
+		cx18_vapi(cx, CX18_CPU_CAPTURE_PAUSE, 1, h);
 		break;
 
 	case V4L2_ENC_CMD_RESUME:
@@ -654,7 +651,13 @@ static int cx18_encoder_cmd(struct file *file, void *fh,
 			return -EPERM;
 		if (!test_and_clear_bit(CX18_F_I_ENC_PAUSED, &cx->i_flags))
 			return 0;
-		cx18_vapi(cx, CX18_CPU_CAPTURE_RESUME, 1, cx18_find_handle(cx));
+		h = cx18_find_handle(cx);
+		if (h == CX18_INVALID_TASK_HANDLE) {
+			CX18_ERR("Can't find valid task handle for "
+				 "V4L2_ENC_CMD_RESUME\n");
+			return -EBADFD;
+		}
+		cx18_vapi(cx, CX18_CPU_CAPTURE_RESUME, 1, h);
 		cx18_unmute(cx);
 		break;
 
@@ -731,7 +734,7 @@ static int cx18_log_status(struct file *file, void *fh)
 			continue;
 		CX18_INFO("Stream %s: status 0x%04lx, %d%% of %d KiB (%d buffers) in use\n",
 			  s->name, s->s_flags,
-			  (s->buffers - s->q_free.buffers) * 100 / s->buffers,
+			  atomic_read(&s->q_full.buffers) * 100 / s->buffers,
 			  (s->buffers * s->buf_size) / 1024, s->buffers);
 	}
 	CX18_INFO("Read MPEG/VBI: %lld/%lld bytes\n",
@@ -741,7 +744,7 @@ static int cx18_log_status(struct file *file, void *fh)
 	return 0;
 }
 
-static int cx18_default(struct file *file, void *fh, int cmd, void *arg)
+static long cx18_default(struct file *file, void *fh, int cmd, void *arg)
 {
 	struct cx18 *cx = ((struct cx18_open_id *)fh)->cx;
 
@@ -769,19 +772,19 @@ static int cx18_default(struct file *file, void *fh, int cmd, void *arg)
 	return 0;
 }
 
-int cx18_v4l2_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
+long cx18_v4l2_ioctl(struct file *filp, unsigned int cmd,
 		    unsigned long arg)
 {
 	struct video_device *vfd = video_devdata(filp);
 	struct cx18_open_id *id = (struct cx18_open_id *)filp->private_data;
 	struct cx18 *cx = id->cx;
-	int res;
+	long res;
 
 	mutex_lock(&cx->serialize_lock);
 
 	if (cx18_debug & CX18_DBGFLG_IOCTL)
 		vfd->debug = V4L2_DEBUG_IOCTL | V4L2_DEBUG_IOCTL_ARG;
-	res = video_ioctl2(inode, filp, cmd, arg);
+	res = video_ioctl2(filp, cmd, arg);
 	vfd->debug = 0;
 	mutex_unlock(&cx->serialize_lock);
 	return res;

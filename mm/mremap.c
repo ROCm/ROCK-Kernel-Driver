@@ -3,7 +3,7 @@
  *
  *	(C) Copyright 1996 Linus Torvalds
  *
- *	Address space accounting code	<alan@redhat.com>
+ *	Address space accounting code	<alan@lxorguk.ukuu.org.uk>
  *	(C) Copyright 2002 Red Hat Inc, All Rights Reserved
  */
 
@@ -23,6 +23,8 @@
 #include <asm/uaccess.h>
 #include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
+
+#include "internal.h"
 
 static pmd_t *get_old_pmd(struct mm_struct *mm, unsigned long addr)
 {
@@ -238,8 +240,8 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 	if (vm_flags & VM_LOCKED) {
 		mm->locked_vm += new_len >> PAGE_SHIFT;
 		if (new_len > old_len)
-			make_pages_present(new_addr + old_len,
-					   new_addr + new_len);
+			mlock_vma_pages_range(new_vma, new_addr + old_len,
+						       new_addr + new_len);
 	}
 
 	return new_addr;
@@ -379,7 +381,7 @@ unsigned long do_mremap(unsigned long addr,
 			vm_stat_account(mm, vma->vm_flags, vma->vm_file, pages);
 			if (vma->vm_flags & VM_LOCKED) {
 				mm->locked_vm += pages;
-				make_pages_present(addr + old_len,
+				mlock_vma_pages_range(vma, addr + old_len,
 						   addr + new_len);
 			}
 			ret = addr;

@@ -21,7 +21,7 @@
  * file called LICENSE.
  *
  * Contact Information:
- * James P. Ketrenos <ipw2100-admin@linux.intel.com>
+ *  Intel Linux Wireless <ilw@linux.intel.com>
  * Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
  *
  *****************************************************************************/
@@ -34,12 +34,12 @@ extern u32 iwl3945_debug_level;
 #define IWL_DEBUG(level, fmt, args...) \
 do { if (iwl3945_debug_level & (level)) \
   printk(KERN_ERR DRV_NAME": %c %s " fmt, \
-	 in_interrupt() ? 'I' : 'U', __FUNCTION__ , ## args); } while (0)
+	 in_interrupt() ? 'I' : 'U', __func__ , ## args); } while (0)
 
 #define IWL_DEBUG_LIMIT(level, fmt, args...) \
 do { if ((iwl3945_debug_level & (level)) && net_ratelimit()) \
   printk(KERN_ERR DRV_NAME": %c %s " fmt, \
-	 in_interrupt() ? 'I' : 'U', __FUNCTION__ , ## args); } while (0)
+	 in_interrupt() ? 'I' : 'U', __func__ , ## args); } while (0)
 
 static inline void iwl3945_print_hex_dump(int level, void *p, u32 len)
 {

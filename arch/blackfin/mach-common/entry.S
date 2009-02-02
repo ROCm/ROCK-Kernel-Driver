@@ -36,6 +36,7 @@
 #include <linux/init.h>
 #include <linux/linkage.h>
 #include <linux/unistd.h>
+#include <linux/threads.h>
 #include <asm/blackfin.h>
 #include <asm/errno.h>
 #include <asm/fixed_code.h>
@@ -75,11 +76,11 @@ ENTRY(_ex_workaround_261)
 	 * handle it.
 	 */
 	P4 = R7;	/* Store EXCAUSE */
-	p5.l = _last_cplb_fault_retx;
-	p5.h = _last_cplb_fault_retx;
-	r7 = [p5];
+
+	GET_PDA(p5, r7);
+	r7 = [p5 + PDA_LFRETX];
 	r6 = retx;
-	[p5] = r6;
+	[p5 + PDA_LFRETX] = r6;
 	cc = r6 == r7;
 	if !cc jump _bfin_return_from_exception;
 	/* fall through */
@@ -111,36 +112,43 @@ ENTRY(_ex_dcplb_viol)
 ENTRY(_ex_dcplb_miss)
 ENTRY(_ex_icplb_miss)
 	(R7:6,P5:4) = [sp++];
-	ASTAT = [sp++];
-	SAVE_ALL_SYS
-#ifdef CONFIG_MPU
+	/* We leave the previously pushed ASTAT on the stack.  */
+	SAVE_CONTEXT_CPLB
+
 	/* We must load R1 here, _before_ DEBUG_HWTRACE_SAVE, since that
 	 * will change the stack pointer.  */
 	R0 = SEQSTAT;
 	R1 = SP;
-#endif
+
 	DEBUG_HWTRACE_SAVE(p5, r7)
-#ifdef CONFIG_MPU
+
 	sp += -12;
 	call _cplb_hdr;
 	sp += 12;
 	CC = R0 == 0;
 	IF !CC JUMP _handle_bad_cplb;
-#else
-	call __cplb_hdr;
+
+#ifdef CONFIG_DEBUG_DOUBLEFAULT
+	/* While we were processing this, did we double fault? */
+	r7 = SEQSTAT;           /* reason code is in bit 5:0 */
+	r6.l = lo(SEQSTAT_EXCAUSE);
+	r6.h = hi(SEQSTAT_EXCAUSE);
+	r7 = r7 & r6;
+	r6 = 0x25;
+	CC = R7 == R6;
+	if CC JUMP _double_fault;
 #endif
+
 	DEBUG_HWTRACE_RESTORE(p5, r7)
-	RESTORE_ALL_SYS
+	RESTORE_CONTEXT_CPLB
+	ASTAT = [SP++];
 	SP = EX_SCRATCH_REG;
 	rtx;
 ENDPROC(_ex_icplb_miss)
 
 ENTRY(_ex_syscall)
-	(R7:6,P5:4) = [sp++];
-	ASTAT = [sp++];
 	raise 15;		/* invoked by TRAP #0, for sys call */
-	sp = EX_SCRATCH_REG;
-	rtx
+	jump.s _bfin_return_from_exception;
 ENDPROC(_ex_syscall)
 
 ENTRY(_ex_soft_bp)
@@ -181,8 +189,8 @@ ENTRY(_ex_single_step)
 	if cc jump .Lfind_priority_done;
 	jump.s .Lfind_priority_start;
 .Lfind_priority_done:
-	p4.l = _debugger_step;
-	p4.h = _debugger_step;
+	p4.l = _kgdb_single_step;
+	p4.h = _kgdb_single_step;
 	r6 = [p4];
 	cc = r6 == 0;
 	if cc jump .Ldo_single_step;
@@ -250,6 +258,29 @@ ENTRY(_bfin_return_from_exception)
 	R7=LC1;
 	LC1=R7;
 #endif
+
+#ifdef CONFIG_DEBUG_DOUBLEFAULT
+	/* While we were processing the current exception,
+	 * did we cause another, and double fault?
+	 */
+	r7 = SEQSTAT;           /* reason code is in bit 5:0 */
+	r6.l = lo(SEQSTAT_EXCAUSE);
+	r6.h = hi(SEQSTAT_EXCAUSE);
+	r7 = r7 & r6;
+	r6 = 0x25;
+	CC = R7 == R6;
+	if CC JUMP _double_fault;
+
+	/* Did we cause a HW error? */
+	p5.l = lo(ILAT);
+	p5.h = hi(ILAT);
+	r6 = [p5];
+	r7 = 0x20;		/* Did I just cause anther HW error? */
+	r6 = r7 & r6;
+	CC = R7 == R6;
+	if CC JUMP _double_fault;
+#endif
+
 	(R7:6,P5:4) = [sp++];
 	ASTAT = [sp++];
 	sp = EX_SCRATCH_REG;
@@ -265,9 +296,8 @@ ENTRY(_handle_bad_cplb)
 	 * the stack to get ready so, we can fall through - we
 	 * need to make a CPLB exception look like a normal exception
 	 */
-
-	RESTORE_ALL_SYS
-	[--sp] = ASTAT;
+	RESTORE_CONTEXT_CPLB
+	/* ASTAT is still on the stack, where it is needed.  */
 	[--sp] = (R7:6,P5:4);
 
 ENTRY(_ex_replaceable)
@@ -292,33 +322,38 @@ ENTRY(_ex_trap_c)
 	[p4] = p5;
 	csync;
 
+	GET_PDA(p5, r6);
+#ifndef CONFIG_DEBUG_DOUBLEFAULT
+
+	/*
+	 * Save these registers, as they are only valid in exception context
+	 *  (where we are now - as soon as we defer to IRQ5, they can change)
+	 * DCPLB_STATUS and ICPLB_STATUS are also only valid in EVT3,
+	 * but they are not very interesting, so don't save them
+	 */
+
 	p4.l = lo(DCPLB_FAULT_ADDR);
 	p4.h = hi(DCPLB_FAULT_ADDR);
 	r7 = [p4];
-	p5.h = _saved_dcplb_fault_addr;
-	p5.l = _saved_dcplb_fault_addr;
-	[p5] = r7;
+	[p5 + PDA_DCPLB] = r7;
 
-	r7 = [p4 + (ICPLB_FAULT_ADDR - DCPLB_FAULT_ADDR)];
-	p5.h = _saved_icplb_fault_addr;
-	p5.l = _saved_icplb_fault_addr;
-	[p5] = r7;
-
-	p4.l = _excpt_saved_stuff;
-	p4.h = _excpt_saved_stuff;
+	p4.l = lo(ICPLB_FAULT_ADDR);
+	p4.h = hi(ICPLB_FAULT_ADDR);
+	r6 = [p4];
+	[p5 + PDA_ICPLB] = r6;
 
 	r6 = retx;
-	[p4] = r6;
-
+	[p5 + PDA_RETX] = r6;
+#endif
 	r6 = SYSCFG;
-	[p4 + 4] = r6;
+	[p5 + PDA_SYSCFG] = r6;
 	BITCLR(r6, 0);
 	SYSCFG = r6;
 
 	/* Disable all interrupts, but make sure level 5 is enabled so
 	 * we can switch to that level.  Save the old mask.  */
 	cli r6;
-	[p4 + 8] = r6;
+	[p5 + PDA_EXIMASK] = r6;
 
 	p4.l = lo(SAFE_USER_INSTRUCTION);
 	p4.h = hi(SAFE_USER_INSTRUCTION);
@@ -327,59 +362,57 @@ ENTRY(_ex_trap_c)
 	r6 = 0x3f;
 	sti r6;
 
-	(R7:6,P5:4) = [sp++];
-	ASTAT = [sp++];
-	SP = EX_SCRATCH_REG;
 	raise 5;
-	rtx;
+	jump.s _bfin_return_from_exception;
 ENDPROC(_ex_trap_c)
 
 /* We just realized we got an exception, while we were processing a different
- * exception. This is a unrecoverable event, so crash
+ * exception. This is a unrecoverable event, so crash.
+ * Note: this cannot be ENTRY() as we jump here with "if cc jump" ...
  */
-ENTRY(_double_fault)
-        /* Turn caches & protection off, to ensure we don't get any more
-         * double exceptions
-         */
+_double_fault:
+	/* Turn caches & protection off, to ensure we don't get any more
+	 * double exceptions
+	 */
 
-        P4.L = LO(IMEM_CONTROL);
-        P4.H = HI(IMEM_CONTROL);
+	P4.L = LO(IMEM_CONTROL);
+	P4.H = HI(IMEM_CONTROL);
 
-        R5 = [P4];              /* Control Register*/
-        BITCLR(R5,ENICPLB_P);
-        SSYNC;          /* SSYNC required before writing to IMEM_CONTROL. */
-        .align 8;
-        [P4] = R5;
-        SSYNC;
+	R5 = [P4];              /* Control Register*/
+	BITCLR(R5,ENICPLB_P);
+	SSYNC;          /* SSYNC required before writing to IMEM_CONTROL. */
+	.align 8;
+	[P4] = R5;
+	SSYNC;
 
-        P4.L = LO(DMEM_CONTROL);
-        P4.H = HI(DMEM_CONTROL);
-        R5 = [P4];
-        BITCLR(R5,ENDCPLB_P);
-        SSYNC;          /* SSYNC required before writing to DMEM_CONTROL. */
-        .align 8;
-        [P4] = R5;
-        SSYNC;
+	P4.L = LO(DMEM_CONTROL);
+	P4.H = HI(DMEM_CONTROL);
+	R5 = [P4];
+	BITCLR(R5,ENDCPLB_P);
+	SSYNC;          /* SSYNC required before writing to DMEM_CONTROL. */
+	.align 8;
+	[P4] = R5;
+	SSYNC;
 
-        /* Fix up the stack */
-        (R7:6,P5:4) = [sp++];
-        ASTAT = [sp++];
-        SP = EX_SCRATCH_REG;
+	/* Fix up the stack */
+	(R7:6,P5:4) = [sp++];
+	ASTAT = [sp++];
+	SP = EX_SCRATCH_REG;
 
-        /* We should be out of the exception stack, and back down into
-         * kernel or user space stack
-         */
-        SAVE_ALL_SYS
+	/* We should be out of the exception stack, and back down into
+	 * kernel or user space stack
+	 */
+	SAVE_ALL_SYS
 
 	/* The dumping functions expect the return address in the RETI
 	 * slot.  */
 	r6 = retx;
 	[sp + PT_PC] = r6;
 
-        r0 = sp;        /* stack frame pt_regs pointer argument ==> r0 */
-        SP += -12;
-        call _double_fault_c;
-        SP += 12;
+	r0 = sp;        /* stack frame pt_regs pointer argument ==> r0 */
+	SP += -12;
+	call _double_fault_c;
+	SP += 12;
 .L_double_fault_panic:
         JUMP .L_double_fault_panic
 
@@ -388,17 +421,16 @@ ENDPROC(_double_fault)
 ENTRY(_exception_to_level5)
 	SAVE_ALL_SYS
 
-	p4.l = _excpt_saved_stuff;
-	p4.h = _excpt_saved_stuff;
-	r6 = [p4];
+	GET_PDA(p4, r7);        /* Fetch current PDA */
+	r6 = [p4 + PDA_RETX];
 	[sp + PT_PC] = r6;
 
-	r6 = [p4 + 4];
+	r6 = [p4 + PDA_SYSCFG];
 	[sp + PT_SYSCFG] = r6;
 
 	/* Restore interrupt mask.  We haven't pushed RETI, so this
 	 * doesn't enable interrupts until we return from this handler.  */
-	r6 = [p4 + 8];
+	r6 = [p4 + PDA_EXIMASK];
 	sti r6;
 
 	/* Restore the hardware error vector.  */
@@ -420,6 +452,17 @@ ENTRY(_exception_to_level5)
 	call _trap_c;
 	SP += 12;
 
+#ifdef CONFIG_DEBUG_DOUBLEFAULT
+	/* Grab ILAT */
+	p2.l = lo(ILAT);
+	p2.h = hi(ILAT);
+	r0 = [p2];
+	r1 = 0x20;  /* Did I just cause anther HW error? */
+	r0 = r0 & r1;
+	CC = R0 == R1;
+	if CC JUMP _double_fault;
+#endif
+
 	call _ret_from_exception;
 	RESTORE_ALL_SYS
 	rti;
@@ -431,12 +474,48 @@ ENTRY(_trap) /* Exception: 4th entry into system event table(supervisor mode)*/
 	 * scratch register (for want of a better option).
 	 */
 	EX_SCRATCH_REG = sp;
-	sp.l = _exception_stack_top;
-	sp.h = _exception_stack_top;
+	GET_PDA_SAFE(sp);
+	sp = [sp + PDA_EXSTACK]
 	/* Try to deal with syscalls quickly.  */
 	[--sp] = ASTAT;
 	[--sp] = (R7:6,P5:4);
+
+#if ANOMALY_05000283 || ANOMALY_05000315
+	cc = r7 == r7;
+	p5.h = HI(CHIPID);
+	p5.l = LO(CHIPID);
+	if cc jump 1f;
+	r7.l = W[p5];
+1:
+#endif
+
+#ifdef CONFIG_DEBUG_DOUBLEFAULT
+	/*
+	 * Save these registers, as they are only valid in exception context
+	 * (where we are now - as soon as we defer to IRQ5, they can change)
+	 * DCPLB_STATUS and ICPLB_STATUS are also only valid in EVT3,
+	 * but they are not very interesting, so don't save them
+	 */
+
+	GET_PDA(p5, r7);
+	p4.l = lo(DCPLB_FAULT_ADDR);
+	p4.h = hi(DCPLB_FAULT_ADDR);
+	r7 = [p4];
+	[p5 + PDA_DCPLB] = r7;
+
+	p4.l = lo(ICPLB_FAULT_ADDR);
+	p4.h = hi(ICPLB_FAULT_ADDR);
+	r7 = [p4];
+	[p5 + PDA_ICPLB] = r7;
+
+	r6 = retx;
+	[p5 + PDA_RETX] = r6;
+
 	r7 = SEQSTAT;		/* reason code is in bit 5:0 */
+	[p5 + PDA_SEQSTAT] = r7;
+#else
+	r7 = SEQSTAT;           /* reason code is in bit 5:0 */
+#endif
 	r6.l = lo(SEQSTAT_EXCAUSE);
 	r6.h = hi(SEQSTAT_EXCAUSE);
 	r7 = r7 & r6;
@@ -458,11 +537,11 @@ ENTRY(_kernel_execve)
 	p0 = sp;
 	r3 = SIZEOF_PTREGS / 4;
 	r4 = 0(x);
-0:
+.Lclear_regs:
 	[p0++] = r4;
 	r3 += -1;
 	cc = r3 == 0;
-	if !cc jump 0b (bp);
+	if !cc jump .Lclear_regs (bp);
 
 	p0 = sp;
 	sp += -16;
@@ -470,7 +549,7 @@ ENTRY(_kernel_execve)
 	call _do_execve;
 	SP += 16;
 	cc = r0 == 0;
-	if ! cc jump 1f;
+	if ! cc jump .Lexecve_failed;
 	/* Success.  Copy our temporary pt_regs to the top of the kernel
 	 * stack and do a normal exception return.
 	 */
@@ -486,12 +565,12 @@ ENTRY(_kernel_execve)
 	p0 = fp;
 	r4 = [p0--];
 	r3 = SIZEOF_PTREGS / 4;
-0:
+.Lcopy_regs:
 	r4 = [p0--];
 	[p1--] = r4;
 	r3 += -1;
 	cc = r3 == 0;
-	if ! cc jump 0b (bp);
+	if ! cc jump .Lcopy_regs (bp);
 
 	r0 = (KERNEL_STACK_SIZE - SIZEOF_PTREGS) (z);
 	p1 = r0;
@@ -503,7 +582,7 @@ ENTRY(_kernel_execve)
 
 	RESTORE_CONTEXT;
 	rti;
-1:
+.Lexecve_failed:
 	unlink;
 	rts;
 ENDPROC(_kernel_execve)
@@ -616,6 +695,9 @@ ENTRY(_system_call)
 	rts;
 ENDPROC(_system_call)
 
+/* Do not mark as ENTRY() to avoid error in assembler ...
+ * this symbol need not be global anyways, so ...
+ */
 _sys_trace:
 	call _syscall_trace;
 
@@ -834,9 +916,14 @@ _schedule_and_signal_from_int:
 	p1 = rets;
 	[sp + PT_RESERVED] = p1;
 
-	p0.l = _irq_flags;
-	p0.h = _irq_flags;
+#ifdef CONFIG_SMP
+	GET_PDA(p0, r0); 	/* Fetch current PDA (can't migrate to other CPU here) */
+	r0 = [p0 + PDA_IRQFLAGS];
+#else
+	p0.l = _bfin_irq_flags;
+	p0.h = _bfin_irq_flags;
 	r0 = [p0];
+#endif
 	sti r0;
 
 	r0 = sp;
@@ -941,6 +1028,15 @@ ENTRY(_early_trap)
 	SAVE_ALL_SYS
 	trace_buffer_stop(p0,r0);
 
+#if ANOMALY_05000283 || ANOMALY_05000315
+	cc = r5 == r5;
+	p4.h = HI(CHIPID);
+	p4.l = LO(CHIPID);
+	if cc jump 1f;
+	r5.l = W[p4];
+1:
+#endif
+
 	/* Turn caches off, to ensure we don't get double exceptions */
 
 	P4.L = LO(IMEM_CONTROL);
@@ -992,7 +1088,12 @@ ENTRY(_ex_table)
 	 */
 	.long _ex_syscall       /* 0x00 - User Defined - Linux Syscall */
 	.long _ex_soft_bp       /* 0x01 - User Defined - Software breakpoint */
+#ifdef	CONFIG_KGDB
+	.long _ex_trap_c	/* 0x02 - User Defined - KGDB initial connection
+							 and break signal trap */
+#else
 	.long _ex_replaceable   /* 0x02 - User Defined */
+#endif
 	.long _ex_trap_c        /* 0x03 - User Defined - userspace stack overflow */
 	.long _ex_trap_c        /* 0x04 - User Defined - dump trace buffer */
 	.long _ex_replaceable   /* 0x05 - User Defined */
@@ -1432,24 +1533,20 @@ ENTRY(_sys_call_table)
 	.rept NR_syscalls-(.-_sys_call_table)/4
 	.long _sys_ni_syscall
 	.endr
+END(_sys_call_table)
 
-	/*
-	 * Used to save the real RETX, IMASK and SYSCFG when temporarily
-	 * storing safe values across the transition from exception to IRQ5.
-	 */
-_excpt_saved_stuff:
-	.long 0;
-	.long 0;
-	.long 0;
-
-_exception_stack:
-	.rept 1024
-	.long 0;
+#ifdef CONFIG_EXCEPTION_L1_SCRATCH
+/* .section .l1.bss.scratch */
+.set _exception_stack_top, L1_SCRATCH_START + L1_SCRATCH_LENGTH
+#else
+#ifdef CONFIG_SYSCALL_TAB_L1
+.section .l1.bss
+#else
+.bss
+#endif
+ENTRY(_exception_stack)
+	.rept 1024 * NR_CPUS
+	.long 0
 	.endr
 _exception_stack_top:
-
-#if ANOMALY_05000261
-/* Used by the assembly entry point to work around an anomaly.  */
-_last_cplb_fault_retx:
-	.long 0;
 #endif

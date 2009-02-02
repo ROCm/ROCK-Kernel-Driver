@@ -44,11 +44,13 @@
 
 static __inline__ int scm_check_creds(struct ucred *creds)
 {
+	const struct cred *cred = current_cred();
+
 	if ((creds->pid == task_tgid_vnr(current) || capable(CAP_SYS_ADMIN)) &&
-	    ((creds->uid == current->uid || creds->uid == current->euid ||
-	      creds->uid == current->suid) || capable(CAP_SETUID)) &&
-	    ((creds->gid == current->gid || creds->gid == current->egid ||
-	      creds->gid == current->sgid) || capable(CAP_SETGID))) {
+	    ((creds->uid == cred->uid   || creds->uid == cred->euid ||
+	      creds->uid == cred->suid) || capable(CAP_SETUID)) &&
+	    ((creds->gid == cred->gid   || creds->gid == cred->egid ||
+	      creds->gid == cred->sgid) || capable(CAP_SETGID))) {
 	       return 0;
 	}
 	return -EPERM;
@@ -75,7 +77,6 @@ static int scm_fp_copy(struct cmsghdr *cmsg, struct scm_fp_list **fplp)
 		if (!fpl)
 			return -ENOMEM;
 		*fplp = fpl;
-		INIT_LIST_HEAD(&fpl->list);
 		fpl->count = 0;
 	}
 	fpp = &fpl->fp[fpl->count];
@@ -301,7 +302,6 @@ struct scm_fp_list *scm_fp_dup(struct scm_fp_list *fpl)
 
 	new_fpl = kmalloc(sizeof(*fpl), GFP_KERNEL);
 	if (new_fpl) {
-		INIT_LIST_HEAD(&new_fpl->list);
 		for (i=fpl->count-1; i>=0; i--)
 			get_file(fpl->fp[i]);
 		memcpy(new_fpl, fpl, sizeof(*fpl));

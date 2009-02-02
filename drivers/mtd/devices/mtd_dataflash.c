@@ -16,6 +16,7 @@
 #include <linux/device.h>
 #include <linux/mutex.h>
 #include <linux/err.h>
+#include <linux/math64.h>
 
 #include <linux/spi/spi.h>
 #include <linux/spi/flash.h>
@@ -30,11 +31,9 @@
  * doesn't (yet) use these for any kind of i/o overlap or prefetching.
  *
  * Sometimes DataFlash is packaged in MMC-format cards, although the
- * MMC stack can't use SPI (yet), or distinguish between MMC and DataFlash
+ * MMC stack can't (yet?) distinguish between MMC and DataFlash
  * protocols during enumeration.
  */
-
-#define CONFIG_DATAFLASH_WRITE_VERIFY
 
 /* reads can bypass the buffers */
 #define OP_READ_CONTINUOUS	0xE8
@@ -80,7 +79,8 @@
  */
 #define OP_READ_ID		0x9F
 #define OP_READ_SECURITY	0x77
-#define OP_WRITE_SECURITY	0x9A	/* OTP bits */
+#define OP_WRITE_SECURITY_REVC	0x9A
+#define OP_WRITE_SECURITY	0x9B	/* revision D */
 
 
 struct dataflash {
@@ -129,7 +129,7 @@ static int dataflash_waitready(struct spi_device *spi)
 		status = dataflash_status(spi);
 		if (status < 0) {
 			DEBUG(MTD_DEBUG_LEVEL1, "%s: status %d?\n",
-					spi->dev.bus_id, status);
+					dev_name(&spi->dev), status);
 			status = 0;
 		}
 
@@ -153,15 +153,20 @@ static int dataflash_erase(struct mtd_info *mtd, struct erase_info *instr)
 	struct spi_message	msg;
 	unsigned		blocksize = priv->page_size << 3;
 	uint8_t			*command;
+	uint32_t		rem;
 
-	DEBUG(MTD_DEBUG_LEVEL2, "%s: erase addr=0x%x len 0x%x\n",
-			spi->dev.bus_id,
-			instr->addr, instr->len);
+	DEBUG(MTD_DEBUG_LEVEL2, "%s: erase addr=0x%llx len 0x%llx\n",
+	      dev_name(&spi->dev), (long long)instr->addr,
+	      (long long)instr->len);
 
 	/* Sanity checks */
-	if ((instr->addr + instr->len) > mtd->size
-			|| (instr->len % priv->page_size) != 0
-			|| (instr->addr % priv->page_size) != 0)
+	if (instr->addr + instr->len > mtd->size)
+		return -EINVAL;
+	div_u64_rem(instr->len, priv->page_size, &rem);
+	if (rem)
+		return -EINVAL;
+	div_u64_rem(instr->addr, priv->page_size, &rem);
+	if (rem)
 		return -EINVAL;
 
 	spi_message_init(&msg);
@@ -179,7 +184,7 @@ static int dataflash_erase(struct mtd_info *mtd, struct erase_info *instr)
 		/* Calculate flash page address; use block erase (for speed) if
 		 * we're at a block boundary and need to erase the whole block.
 		 */
-		pageaddr = instr->addr / priv->page_size;
+		pageaddr = div_u64(instr->len, priv->page_size);
 		do_block = (pageaddr & 0x7) == 0 && instr->len >= blocksize;
 		pageaddr = pageaddr << priv->page_offset;
 
@@ -198,7 +203,7 @@ static int dataflash_erase(struct mtd_info *mtd, struct erase_info *instr)
 
 		if (status < 0) {
 			printk(KERN_ERR "%s: erase %x, err %d\n",
-				spi->dev.bus_id, pageaddr, status);
+				dev_name(&spi->dev), pageaddr, status);
 			/* REVISIT:  can retry instr->retries times; or
 			 * giveup and instr->fail_addr = instr->addr;
 			 */
@@ -240,7 +245,7 @@ static int dataflash_read(struct mtd_info *mtd, loff_t from, size_t len,
 	int			status;
 
 	DEBUG(MTD_DEBUG_LEVEL2, "%s: read 0x%x..0x%x\n",
-		priv->spi->dev.bus_id, (unsigned)from, (unsigned)(from + len));
+		dev_name(&priv->spi->dev), (unsigned)from, (unsigned)(from + len));
 
 	*retlen = 0;
 
@@ -289,7 +294,7 @@ static int dataflash_read(struct mtd_info *mtd, loff_t from, size_t len,
 		status = 0;
 	} else
 		DEBUG(MTD_DEBUG_LEVEL1, "%s: read %x..%x --> %d\n",
-			priv->spi->dev.bus_id,
+			dev_name(&priv->spi->dev),
 			(unsigned)from, (unsigned)(from + len),
 			status);
 	return status;
@@ -316,7 +321,7 @@ static int dataflash_write(struct mtd_info *mtd, loff_t to, size_t len,
 	uint8_t			*command;
 
 	DEBUG(MTD_DEBUG_LEVEL2, "%s: write 0x%x..0x%x\n",
-		spi->dev.bus_id, (unsigned)to, (unsigned)(to + len));
+		dev_name(&spi->dev), (unsigned)to, (unsigned)(to + len));
 
 	*retlen = 0;
 
@@ -375,7 +380,7 @@ static int dataflash_write(struct mtd_info *mtd, loff_t to, size_t len,
 			status = spi_sync(spi, &msg);
 			if (status < 0)
 				DEBUG(MTD_DEBUG_LEVEL1, "%s: xfer %u -> %d \n",
-					spi->dev.bus_id, addr, status);
+					dev_name(&spi->dev), addr, status);
 
 			(void) dataflash_waitready(priv->spi);
 		}
@@ -397,12 +402,12 @@ static int dataflash_write(struct mtd_info *mtd, loff_t to, size_t len,
 		spi_transfer_del(x + 1);
 		if (status < 0)
 			DEBUG(MTD_DEBUG_LEVEL1, "%s: pgm %u/%u -> %d \n",
-				spi->dev.bus_id, addr, writelen, status);
+				dev_name(&spi->dev), addr, writelen, status);
 
 		(void) dataflash_waitready(priv->spi);
 
 
-#ifdef	CONFIG_DATAFLASH_WRITE_VERIFY
+#ifdef CONFIG_MTD_DATAFLASH_VERIFY_WRITE
 
 		/* (3) Compare to Buffer1 */
 		addr = pageaddr << priv->page_offset;
@@ -417,21 +422,21 @@ static int dataflash_write(struct mtd_info *mtd, loff_t to, size_t len,
 		status = spi_sync(spi, &msg);
 		if (status < 0)
 			DEBUG(MTD_DEBUG_LEVEL1, "%s: compare %u -> %d \n",
-				spi->dev.bus_id, addr, status);
+				dev_name(&spi->dev), addr, status);
 
 		status = dataflash_waitready(priv->spi);
 
 		/* Check result of the compare operation */
 		if (status & (1 << 6)) {
 			printk(KERN_ERR "%s: compare page %u, err %d\n",
-				spi->dev.bus_id, pageaddr, status);
+				dev_name(&spi->dev), pageaddr, status);
 			remaining = 0;
 			status = -EIO;
 			break;
 		} else
 			status = 0;
 
-#endif	/* CONFIG_DATAFLASH_WRITE_VERIFY */
+#endif	/* CONFIG_MTD_DATAFLASH_VERIFY_WRITE */
 
 		remaining = remaining - writelen;
 		pageaddr++;
@@ -451,16 +456,192 @@ static int dataflash_write(struct mtd_info *mtd, loff_t to, size_t len,
 
 /* ......................................................................... */
 
+#ifdef CONFIG_MTD_DATAFLASH_OTP
+
+static int dataflash_get_otp_info(struct mtd_info *mtd,
+		struct otp_info *info, size_t len)
+{
+	/* Report both blocks as identical:  bytes 0..64, locked.
+	 * Unless the user block changed from all-ones, we can't
+	 * tell whether it's still writable; so we assume it isn't.
+	 */
+	info->start = 0;
+	info->length = 64;
+	info->locked = 1;
+	return sizeof(*info);
+}
+
+static ssize_t otp_read(struct spi_device *spi, unsigned base,
+		uint8_t *buf, loff_t off, size_t len)
+{
+	struct spi_message	m;
+	size_t			l;
+	uint8_t			*scratch;
+	struct spi_transfer	t;
+	int			status;
+
+	if (off > 64)
+		return -EINVAL;
+
+	if ((off + len) > 64)
+		len = 64 - off;
+	if (len == 0)
+		return len;
+
+	spi_message_init(&m);
+
+	l = 4 + base + off + len;
+	scratch = kzalloc(l, GFP_KERNEL);
+	if (!scratch)
+		return -ENOMEM;
+
+	/* OUT: OP_READ_SECURITY, 3 don't-care bytes, zeroes
+	 * IN:  ignore 4 bytes, data bytes 0..N (max 127)
+	 */
+	scratch[0] = OP_READ_SECURITY;
+
+	memset(&t, 0, sizeof t);
+	t.tx_buf = scratch;
+	t.rx_buf = scratch;
+	t.len = l;
+	spi_message_add_tail(&t, &m);
+
+	dataflash_waitready(spi);
+
+	status = spi_sync(spi, &m);
+	if (status >= 0) {
+		memcpy(buf, scratch + 4 + base + off, len);
+		status = len;
+	}
+
+	kfree(scratch);
+	return status;
+}
+
+static int dataflash_read_fact_otp(struct mtd_info *mtd,
+		loff_t from, size_t len, size_t *retlen, u_char *buf)
+{
+	struct dataflash	*priv = (struct dataflash *)mtd->priv;
+	int			status;
+
+	/* 64 bytes, from 0..63 ... start at 64 on-chip */
+	mutex_lock(&priv->lock);
+	status = otp_read(priv->spi, 64, buf, from, len);
+	mutex_unlock(&priv->lock);
+
+	if (status < 0)
+		return status;
+	*retlen = status;
+	return 0;
+}
+
+static int dataflash_read_user_otp(struct mtd_info *mtd,
+		loff_t from, size_t len, size_t *retlen, u_char *buf)
+{
+	struct dataflash	*priv = (struct dataflash *)mtd->priv;
+	int			status;
+
+	/* 64 bytes, from 0..63 ... start at 0 on-chip */
+	mutex_lock(&priv->lock);
+	status = otp_read(priv->spi, 0, buf, from, len);
+	mutex_unlock(&priv->lock);
+
+	if (status < 0)
+		return status;
+	*retlen = status;
+	return 0;
+}
+
+static int dataflash_write_user_otp(struct mtd_info *mtd,
+		loff_t from, size_t len, size_t *retlen, u_char *buf)
+{
+	struct spi_message	m;
+	const size_t		l = 4 + 64;
+	uint8_t			*scratch;
+	struct spi_transfer	t;
+	struct dataflash	*priv = (struct dataflash *)mtd->priv;
+	int			status;
+
+	if (len > 64)
+		return -EINVAL;
+
+	/* Strictly speaking, we *could* truncate the write ... but
+	 * let's not do that for the only write that's ever possible.
+	 */
+	if ((from + len) > 64)
+		return -EINVAL;
+
+	/* OUT: OP_WRITE_SECURITY, 3 zeroes, 64 data-or-zero bytes
+	 * IN:  ignore all
+	 */
+	scratch = kzalloc(l, GFP_KERNEL);
+	if (!scratch)
+		return -ENOMEM;
+	scratch[0] = OP_WRITE_SECURITY;
+	memcpy(scratch + 4 + from, buf, len);
+
+	spi_message_init(&m);
+
+	memset(&t, 0, sizeof t);
+	t.tx_buf = scratch;
+	t.len = l;
+	spi_message_add_tail(&t, &m);
+
+	/* Write the OTP bits, if they've not yet been written.
+	 * This modifies SRAM buffer1.
+	 */
+	mutex_lock(&priv->lock);
+	dataflash_waitready(priv->spi);
+	status = spi_sync(priv->spi, &m);
+	mutex_unlock(&priv->lock);
+
+	kfree(scratch);
+
+	if (status >= 0) {
+		status = 0;
+		*retlen = len;
+	}
+	return status;
+}
+
+static char *otp_setup(struct mtd_info *device, char revision)
+{
+	device->get_fact_prot_info = dataflash_get_otp_info;
+	device->read_fact_prot_reg = dataflash_read_fact_otp;
+	device->get_user_prot_info = dataflash_get_otp_info;
+	device->read_user_prot_reg = dataflash_read_user_otp;
+
+	/* rev c parts (at45db321c and at45db1281 only!) use a
+	 * different write procedure; not (yet?) implemented.
+	 */
+	if (revision > 'c')
+		device->write_user_prot_reg = dataflash_write_user_otp;
+
+	return ", OTP";
+}
+
+#else
+
+static char *otp_setup(struct mtd_info *device, char revision)
+{
+	return " (OTP)";
+}
+
+#endif
+
+/* ......................................................................... */
+
 /*
  * Register DataFlash device with MTD subsystem.
  */
 static int __devinit
-add_dataflash(struct spi_device *spi, char *name,
-		int nr_pages, int pagesize, int pageoffset)
+add_dataflash_otp(struct spi_device *spi, char *name,
+		int nr_pages, int pagesize, int pageoffset, char revision)
 {
 	struct dataflash		*priv;
 	struct mtd_info			*device;
 	struct flash_platform_data	*pdata = spi->dev.platform_data;
+	char				*otp_tag = "";
 
 	priv = kzalloc(sizeof *priv, GFP_KERNEL);
 	if (!priv)
@@ -489,8 +670,12 @@ add_dataflash(struct spi_device *spi, char *name,
 	device->write = dataflash_write;
 	device->priv = priv;
 
-	dev_info(&spi->dev, "%s (%d KBytes) pagesize %d bytes\n",
-			name, DIV_ROUND_UP(device->size, 1024), pagesize);
+	if (revision >= 'c')
+		otp_tag = otp_setup(device, revision);
+
+	dev_info(&spi->dev, "%s (%lld KBytes) pagesize %d bytes%s\n",
+			name, (long long)((device->size + 1023) >> 10),
+			pagesize, otp_tag);
 	dev_set_drvdata(&spi->dev, priv);
 
 	if (mtd_has_partitions()) {
@@ -517,6 +702,14 @@ add_dataflash(struct spi_device *spi, char *name,
 				pdata->nr_parts, device->name);
 
 	return add_mtd_device(device) == 1 ? -ENODEV : 0;
+}
+
+static inline int __devinit
+add_dataflash(struct spi_device *spi, char *name,
+		int nr_pages, int pagesize, int pageoffset)
+{
+	return add_dataflash_otp(spi, name, nr_pages, pagesize,
+			pageoffset, 0);
 }
 
 struct flash_info {
@@ -592,7 +785,7 @@ static struct flash_info *__devinit jedec_probe(struct spi_device *spi)
 	tmp = spi_write_then_read(spi, &code, 1, id, 3);
 	if (tmp < 0) {
 		DEBUG(MTD_DEBUG_LEVEL0, "%s: error %d reading JEDEC ID\n",
-			spi->dev.bus_id, tmp);
+			dev_name(&spi->dev), tmp);
 		return ERR_PTR(tmp);
 	}
 	if (id[0] != 0x1f)
@@ -664,13 +857,16 @@ static int __devinit dataflash_probe(struct spi_device *spi)
 	 * Try to detect dataflash by JEDEC ID.
 	 * If it succeeds we know we have either a C or D part.
 	 * D will support power of 2 pagesize option.
+	 * Both support the security register, though with different
+	 * write procedures.
 	 */
 	info = jedec_probe(spi);
 	if (IS_ERR(info))
 		return PTR_ERR(info);
 	if (info != NULL)
-		return add_dataflash(spi, info->name, info->nr_pages,
-				 info->pagesize, info->pageoffset);
+		return add_dataflash_otp(spi, info->name, info->nr_pages,
+				info->pagesize, info->pageoffset,
+				(info->flags & SUP_POW2PS) ? 'd' : 'c');
 
 	/*
 	 * Older chips support only legacy commands, identifing
@@ -679,7 +875,7 @@ static int __devinit dataflash_probe(struct spi_device *spi)
 	status = dataflash_status(spi);
 	if (status <= 0 || status == 0xff) {
 		DEBUG(MTD_DEBUG_LEVEL1, "%s: status error %d\n",
-				spi->dev.bus_id, status);
+				dev_name(&spi->dev), status);
 		if (status == 0 || status == 0xff)
 			status = -ENODEV;
 		return status;
@@ -715,13 +911,13 @@ static int __devinit dataflash_probe(struct spi_device *spi)
 	/* obsolete AT45DB1282 not (yet?) supported */
 	default:
 		DEBUG(MTD_DEBUG_LEVEL1, "%s: unsupported device (%x)\n",
-				spi->dev.bus_id, status & 0x3c);
+				dev_name(&spi->dev), status & 0x3c);
 		status = -ENODEV;
 	}
 
 	if (status < 0)
 		DEBUG(MTD_DEBUG_LEVEL1, "%s: add_dataflash --> %d\n",
-				spi->dev.bus_id, status);
+				dev_name(&spi->dev), status);
 
 	return status;
 }
@@ -731,7 +927,7 @@ static int __devexit dataflash_remove(struct spi_device *spi)
 	struct dataflash	*flash = dev_get_drvdata(&spi->dev);
 	int			status;
 
-	DEBUG(MTD_DEBUG_LEVEL1, "%s: remove\n", spi->dev.bus_id);
+	DEBUG(MTD_DEBUG_LEVEL1, "%s: remove\n", dev_name(&spi->dev));
 
 	if (mtd_has_partitions() && flash->partitioned)
 		status = del_mtd_partitions(&flash->mtd);

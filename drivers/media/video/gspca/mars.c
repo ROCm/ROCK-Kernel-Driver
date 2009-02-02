@@ -39,7 +39,7 @@ struct sd {
 static struct ctrl sd_ctrls[] = {
 };
 
-static struct v4l2_pix_format vga_mode[] = {
+static const struct v4l2_pix_format vga_mode[] = {
 	{320, 240, V4L2_PIX_FMT_JPEG, V4L2_FIELD_NONE,
 		.bytesperline = 320,
 		.sizeimage = 320 * 240 * 3 / 8 + 589,
@@ -123,7 +123,7 @@ static int sd_config(struct gspca_dev *gspca_dev,
 	cam = &gspca_dev->cam;
 	cam->epaddr = 0x01;
 	cam->cam_mode = vga_mode;
-	cam->nmodes = sizeof vga_mode / sizeof vga_mode[0];
+	cam->nmodes = ARRAY_SIZE(vga_mode);
 	sd->qindex = 1;			/* set the quantization table */
 	return 0;
 }
@@ -134,7 +134,7 @@ static int sd_init(struct gspca_dev *gspca_dev)
 	return 0;
 }
 
-static void sd_start(struct gspca_dev *gspca_dev)
+static int sd_start(struct gspca_dev *gspca_dev)
 {
 	int err_code;
 	__u8 *data;
@@ -143,9 +143,10 @@ static void sd_start(struct gspca_dev *gspca_dev)
 	int intpipe;
 
 	PDEBUG(D_STREAM, "camera start, iface %d, alt 8", gspca_dev->iface);
-	if (usb_set_interface(gspca_dev->dev, gspca_dev->iface, 8) < 0) {
+	err_code = usb_set_interface(gspca_dev->dev, gspca_dev->iface, 8);
+	if (err_code < 0) {
 		PDEBUG(D_ERR|D_STREAM, "Set packet size: set interface error");
-		return;
+		return err_code;
 	}
 
 	data = gspca_dev->usb_buf;
@@ -154,7 +155,7 @@ static void sd_start(struct gspca_dev *gspca_dev)
 
 	err_code = reg_w(gspca_dev, data[0], 2);
 	if (err_code < 0)
-		return;
+		return err_code;
 
 	/*
 	   Initialize the MR97113 chip register
@@ -180,14 +181,14 @@ static void sd_start(struct gspca_dev *gspca_dev)
 
 	err_code = reg_w(gspca_dev, data[0], 11);
 	if (err_code < 0)
-		return;
+		return err_code;
 
 	data[0] = 0x23;		/* address */
 	data[1] = 0x09;		/* reg 35, append frame header */
 
 	err_code = reg_w(gspca_dev, data[0], 2);
 	if (err_code < 0)
-		return;
+		return err_code;
 
 	data[0] = 0x3c;		/* address */
 /*	if (gspca_dev->width == 1280) */
@@ -198,7 +199,7 @@ static void sd_start(struct gspca_dev *gspca_dev)
 				 *	(unit: 4KB) 200KB */
 	err_code = reg_w(gspca_dev, data[0], 2);
 	if (err_code < 0)
-		return;
+		return err_code;
 
 	if (0) {			/* fixed dark-gain */
 		data[1] = 0;		/* reg 94, Y Gain (1.75) */
@@ -240,13 +241,13 @@ static void sd_start(struct gspca_dev *gspca_dev)
 
 	err_code = reg_w(gspca_dev, data[0], 6);
 	if (err_code < 0)
-		return;
+		return err_code;
 
 	data[0] = 0x67;
 	data[1] = 0x13;		/* reg 103, first pixel B, disable sharpness */
 	err_code = reg_w(gspca_dev, data[0], 2);
 	if (err_code < 0)
-		return;
+		return err_code;
 
 	/*
 	 * initialize the value of MI sensor...
@@ -326,6 +327,7 @@ static void sd_start(struct gspca_dev *gspca_dev)
 	data[0] = 0x00;
 	data[1] = 0x4d;		/* ISOC transfering enable... */
 	reg_w(gspca_dev, data[0], 2);
+	return err_code;
 }
 
 static void sd_stopN(struct gspca_dev *gspca_dev)

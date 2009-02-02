@@ -152,9 +152,9 @@ static int check_sticky(struct inode *dir, struct inode *inode)
 {
 	if (!(dir->i_mode & S_ISVTX))
 		return 0;
-	if (inode->i_uid == current->fsuid)
+	if (inode->i_uid == current_fsuid())
 		return 0;
-	if (dir->i_uid == current->fsuid)
+	if (dir->i_uid == current_fsuid())
 		return 0;
 	return !capable(CAP_FOWNER);
 }
@@ -327,7 +327,7 @@ ext3_xattr_set_nfs4acl(struct inode *inode, const char *name,
 		return -EOPNOTSUPP;
 	if (strcmp(name, "") != 0)
 		return -EINVAL;
-	if (current->fsuid != inode->i_uid &&
+	if (current_fsuid() != inode->i_uid &&
 	    ext3_nfs4acl_permission(inode, ACE4_WRITE_ACL) &&
 	    !capable(CAP_FOWNER))
 		return -EPERM;

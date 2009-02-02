@@ -5,11 +5,11 @@
  *
  * O_DIRECT
  *
- * 04Jul2002	akpm@zip.com.au
+ * 04Jul2002	Andrew Morton
  *		Initial version
  * 11Sep2002	janetinc@us.ibm.com
  * 		added readv/writev support.
- * 29Oct2002	akpm@zip.com.au
+ * 29Oct2002	Andrew Morton
  *		rewrote bio_add_page() support.
  * 30Oct2002	pbadari@us.ibm.com
  *		added support for non-aligned IO.
@@ -1208,6 +1208,19 @@ __blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode,
 
 	retval = direct_io_worker(rw, iocb, inode, iov, offset,
 				nr_segs, blkbits, get_block, end_io, dio);
+
+	/*
+	 * In case of error extending write may have instantiated a few
+	 * blocks outside i_size. Trim these off again for DIO_LOCKING.
+	 * NOTE: DIO_NO_LOCK/DIO_OWN_LOCK callers have to handle this by
+	 * it's own meaner.
+	 */
+	if (unlikely(retval < 0 && (rw & WRITE))) {
+		loff_t isize = i_size_read(inode);
+
+		if (end > isize && dio_lock_type == DIO_LOCKING)
+			vmtruncate(inode, isize);
+	}
 
 	if (rw == READ && dio_lock_type == DIO_LOCKING)
 		release_i_mutex = 0;

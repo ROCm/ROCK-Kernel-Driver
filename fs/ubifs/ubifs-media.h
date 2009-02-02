@@ -51,6 +51,13 @@
  */
 #define UBIFS_MIN_COMPR_LEN 128
 
+/*
+ * If compressed data length is less than %UBIFS_MIN_COMPRESS_DIFF bytes
+ * shorter than uncompressed data length, UBIFS preferes to leave this data
+ * node uncompress, because it'll be read faster.
+ */
+#define UBIFS_MIN_COMPRESS_DIFF 64
+
 /* Root inode number */
 #define UBIFS_ROOT_INO 1
 
@@ -75,7 +82,6 @@
  */
 #define UBIFS_BLOCK_SIZE  4096
 #define UBIFS_BLOCK_SHIFT 12
-#define UBIFS_BLOCK_MASK  0x00000FFF
 
 /* UBIFS padding byte pattern (must not be first or last byte of node magic) */
 #define UBIFS_PADDING_BYTE 0xCE

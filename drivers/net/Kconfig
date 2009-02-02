@@ -61,6 +61,7 @@ config DUMMY
 config BONDING
 	tristate "Bonding driver support"
 	depends on INET
+	depends on IPV6 || IPV6=n
 	---help---
 	  Say 'Y' or 'M' if you wish to be able to 'bond' multiple Ethernet
 	  Channels together. This is called 'Etherchannel' by Cisco,
@@ -464,6 +465,12 @@ config MIPS_JAZZ_SONIC
 	  This is the driver for the onboard card of MIPS Magnum 4000,
 	  Acer PICA, Olivetti M700-10 and a few other identical OEM systems.
 
+config XTENSA_XT2000_SONIC
+	tristate "Xtensa XT2000 onboard SONIC Ethernet support"
+	depends on XTENSA_PLATFORM_XT2000
+	help
+	  This is the driver for the onboard card of the Xtensa XT2000 board.
+
 config MIPS_AU1X00_ENET
 	bool "MIPS AU1000 Ethernet support"
 	depends on SOC_AU1X00
@@ -823,7 +830,7 @@ config ULTRA32
 
 config BFIN_MAC
 	tristate "Blackfin on-chip MAC support"
-	depends on NET_ETHERNET && (BF526 || BF527 || BF536 || BF537)
+	depends on NET_ETHERNET && (BF516 || BF518 || BF526 || BF527 || BF536 || BF537)
 	select CRC32
 	select MII
 	select PHYLIB
@@ -888,7 +895,7 @@ config SMC91X
 	select CRC32
 	select MII
 	depends on ARM || REDWOOD_5 || REDWOOD_6 || M32R || SUPERH || \
-		SOC_AU1X00 || BLACKFIN || MN10300
+		MIPS || BLACKFIN || MN10300
 	help
 	  This is a driver for SMC's 91x series of Ethernet chipsets,
 	  including the SMC91C94 and the SMC91C111. Say Y if you want it
@@ -960,7 +967,7 @@ config SMC911X
 	tristate "SMSC LAN911[5678] support"
 	select CRC32
 	select MII
-	depends on ARCH_PXA || SUPERH
+	depends on ARM || SUPERH
 	help
 	  This is a driver for SMSC's LAN911x series of Ethernet chipsets
 	  including the new LAN9115, LAN9116, LAN9117, and LAN9118.
@@ -971,6 +978,20 @@ config SMC911X
 	  This driver is also available as a module. The module will be 
 	  called smc911x.  If you want to compile it as a module, say M 
 	  here and read <file:Documentation/kbuild/modules.txt>
+
+config SMSC911X
+	tristate "SMSC LAN911x/LAN921x families embedded ethernet support"
+	depends on ARM || SUPERH
+	select CRC32
+	select MII
+	select PHYLIB
+	---help---
+	  Say Y here if you want support for SMSC LAN911x and LAN921x families
+	  of ethernet controllers.
+
+	  To compile this driver as a module, choose M here and read
+	  <file:Documentation/networking/net-modules.txt>. The module
+	  will be called smsc911x.
 
 config NET_VENDOR_RACAL
 	bool "Racal-Interlan (Micom) NI cards"
@@ -1386,7 +1407,8 @@ config FORCEDETH_NAPI
 
 config CS89x0
 	tristate "CS89x0 support"
-	depends on NET_PCI && (ISA || MACH_IXDP2351 || ARCH_IXDP2X01 || ARCH_PNX010X)
+	depends on NET_ETHERNET && (ISA || EISA || MACH_IXDP2351 \
+		|| ARCH_IXDP2X01 || ARCH_PNX010X || MACH_MX31ADS)
 	---help---
 	  Support for CS89x0 chipset based Ethernet cards. If you have a
 	  network (Ethernet) card of this type, say Y and read the
@@ -1397,23 +1419,15 @@ config CS89x0
 	  To compile this driver as a module, choose M here. The module
 	  will be called cs89x0.
 
+config CS89x0_NONISA_IRQ
+	def_bool y
+	depends on CS89x0 != n
+	depends on MACH_IXDP2351 || ARCH_IXDP2X01 || ARCH_PNX010X || MACH_MX31ADS
+
 config TC35815
 	tristate "TOSHIBA TC35815 Ethernet support"
 	depends on NET_PCI && PCI && MIPS
 	select PHYLIB
-
-config EEPRO100
-	tristate "EtherExpressPro/100 support (eepro100, original Becker driver)"
-	depends on NET_PCI && PCI
-	select MII
-	help
-	  If you have an Intel EtherExpress PRO/100 PCI network (Ethernet)
-	  card, say Y and read the Ethernet-HOWTO, available from
-	  <http://www.tldp.org/docs.html#howto>.
-
-	  To compile this driver as a module, choose M here. The module
-	  will be called eepro100.
-
 
 config E100
 	tristate "Intel(R) PRO/100+ support"
@@ -1586,7 +1600,7 @@ config 8139_OLD_RX_RESET
 	  old RX-reset behavior.  If unsure, say N.
 
 config R6040
-	tristate "RDC R6040 Fast Ethernet Adapter support (EXPERIMENTAL)"
+	tristate "RDC R6040 Fast Ethernet Adapter support"
 	depends on NET_PCI && PCI
 	select CRC32
 	select MII
@@ -1623,6 +1637,22 @@ config EPIC100
 	  which is based on the SMC83c17x (EPIC/100).
 	  More specific information and updates are available from
 	  <http://www.scyld.com/network/epic100.html>.
+
+config SMSC9420
+	tristate "SMSC LAN9420 PCI ethernet adapter support"
+	depends on NET_PCI && PCI
+	select CRC32
+	select PHYLIB
+	select SMSC_PHY
+	help
+	  This is a driver for SMSC's LAN9420 PCI ethernet adapter.
+	  Say Y if you want it compiled into the kernel,
+	  and read the Ethernet-HOWTO, available from
+	  <http://www.linuxdoc.org/docs.html#howto>.
+
+	  This driver is also available as a module. The module will be
+	  called smsc9420.  If you want to compile it as a module, say M
+	  here and read <file:Documentation/kbuild/modules.txt>
 
 config SUNDANCE
 	tristate "Sundance Alta support"
@@ -1799,7 +1829,7 @@ config 68360_ENET
 
 config FEC
 	bool "FEC ethernet controller (of ColdFire CPUs)"
-	depends on M523x || M527x || M5272 || M528x || M520x
+	depends on M523x || M527x || M5272 || M528x || M520x || M532x
 	help
 	  Say Y here if you want to use the built-in 10/100 Fast ethernet
 	  controller on some Motorola ColdFire processors.
@@ -1813,9 +1843,10 @@ config FEC2
 
 config FEC_MPC52xx
 	tristate "MPC52xx FEC driver"
-	depends on PPC_MERGE && PPC_MPC52xx && PPC_BESTCOMM_FEC
+	depends on PPC_MPC52xx && PPC_BESTCOMM
 	select CRC32
 	select PHYLIB
+	select PPC_BESTCOMM_FEC
 	---help---
 	  This option enables support for the MPC5200's on-chip
 	  Fast Ethernet Controller
@@ -1938,15 +1969,6 @@ config E1000
 	  To compile this driver as a module, choose M here. The module
 	  will be called e1000.
 
-config E1000_DISABLE_PACKET_SPLIT
-	bool "Disable Packet Split for PCI express adapters"
-	depends on E1000
-	help
-	  Say Y here if you want to use the legacy receive path for PCI express
-	  hardware.
-
-	  If in doubt, say N.
-
 config E1000E
 	tristate "Intel(R) PRO/1000 PCI-Express Gigabit Ethernet support"
 	depends on PCI && (!SPARC32 || BROKEN)
@@ -1977,10 +1999,10 @@ config IP1000
 	  will be called ipg.  This is recommended.
 
 config IGB
-       tristate "Intel(R) 82575 PCI-Express Gigabit Ethernet support"
+       tristate "Intel(R) 82575/82576 PCI-Express Gigabit Ethernet support"
        depends on PCI
        ---help---
-         This driver supports Intel(R) 82575 gigabit ethernet family of
+         This driver supports Intel(R) 82575/82576 gigabit ethernet family of
          adapters.  For more information on how to identify your adapter, go
          to the Adapter & Driver ID Guide at:
 
@@ -2005,6 +2027,15 @@ config IGB_LRO
 	  Say Y here if you want to use large receive offload. 
 
 	  If in doubt, say N.
+
+config IGB_DCA
+	bool "Direct Cache Access (DCA) Support"
+	default y
+	depends on IGB && DCA && !(IGB=y && DCA=m)
+	---help---
+	  Say Y here if you want to use Direct Cache Access (DCA) in the
+	  driver.  DCA is a method for warming the CPU cache before data
+	  is used, with the intent of lessening the impact of cache misses.
 
 source "drivers/net/ixp2000/Kconfig"
 
@@ -2263,10 +2294,6 @@ config UGETH_MAGIC_PACKET
 	bool "Magic Packet detection support"
 	depends on UCC_GETH
 
-config UGETH_FILTERING
-	bool "Mac address filtering support"
-	depends on UCC_GETH
-
 config UGETH_TX_ON_DEMAND
 	bool "Transmit on Demand support"
 	depends on UCC_GETH
@@ -2274,7 +2301,7 @@ config UGETH_TX_ON_DEMAND
 config MV643XX_ETH
 	tristate "Marvell Discovery (643XX) and Orion ethernet support"
 	depends on MV64360 || MV64X60 || (PPC_MULTIPLATFORM && PPC32) || PLAT_ORION
-	select MII
+	select PHYLIB
 	help
 	  This driver supports the gigabit ethernet MACs in the
 	  Marvell Discovery PPC/MIPS chipset family (MV643XX) and
@@ -2293,12 +2320,13 @@ config QLA3XXX
 	  will be called qla3xxx.
 
 config ATL1
-	tristate "Attansic L1 Gigabit Ethernet support (EXPERIMENTAL)"
-	depends on PCI && EXPERIMENTAL
+	tristate "Atheros/Attansic L1 Gigabit Ethernet support"
+	depends on PCI
 	select CRC32
 	select MII
 	help
-	  This driver supports the Attansic L1 gigabit ethernet adapter.
+	  This driver supports the Atheros/Attansic L1 gigabit ethernet
+	  adapter.
 
 	  To compile this driver as a module, choose M here.  The module
 	  will be called atl1.
@@ -2313,6 +2341,18 @@ config ATL1E
 
 	  To compile this driver as a module, choose M here.  The module
 	  will be called atl1e.
+
+config JME
+	tristate "JMicron(R) PCI-Express Gigabit Ethernet support"
+	depends on PCI
+	select CRC32
+	select MII
+	---help---
+	  This driver supports the PCI-Express gigabit ethernet adapters
+	  based on JMicron JMC250 chipset.
+
+	  To compile this driver as a module, choose M here. The module
+	  will be called jme.
 
 endif # NETDEV_1000
 
@@ -2359,9 +2399,14 @@ config CHELSIO_T1_1G
           Enables support for Chelsio's gigabit Ethernet PCI cards.  If you
           are using only 10G cards say 'N' here.
 
+config CHELSIO_T3_DEPENDS
+	tristate
+	depends on PCI && INET
+	default y
+
 config CHELSIO_T3
 	tristate "Chelsio Communications T3 10Gb Ethernet support"
-	depends on PCI && INET
+	depends on CHELSIO_T3_DEPENDS
 	select FW_LOADER
 	select INET_LRO
 	help
@@ -2389,9 +2434,17 @@ config EHEA
 	  To compile the driver as a module, choose M here. The module
 	  will be called ehea.
 
+config ENIC
+	tristate "Cisco 10G Ethernet NIC support"
+	depends on PCI && INET
+	select INET_LRO
+	help
+	  This enables the support for the Cisco 10G Ethernet card.
+
 config IXGBE
 	tristate "Intel(R) 10GbE PCI Express adapters support"
 	depends on PCI && INET
+	select INET_LRO
 	---help---
 	  This driver supports Intel(R) 10GbE PCI Express family of
 	  adapters.  For more information on how to identify your adapter, go
@@ -2407,25 +2460,24 @@ config IXGBE
 	  To compile this driver as a module, choose M here. The module
 	  will be called ixgbe.
 
-config IXGBE_LRO
-	bool "Use software LRO"
-	depends on IXGBE && INET
-	select INET_LRO
+config IXGBE_DCA
+	bool "Direct Cache Access (DCA) Support"
 	default y
+	depends on IXGBE && DCA && !(IXGBE=y && DCA=m)
 	---help---
-	  Say Y here if you want to use large receive offload.
-
-	  If in doubt, say N.
+	  Say Y here if you want to use Direct Cache Access (DCA) in the
+	  driver.  DCA is a method for warming the CPU cache before data
+	  is used, with the intent of lessening the impact of cache misses.
 
 config IXGBE_DCB
 	bool "Data Center Bridging (DCB) Support"
 	default n
 	depends on IXGBE && DCB
 	---help---
-	 Say Y here if you want to use Data Center Bridging (DCB) in the
-	 driver.
+	  Say Y here if you want to use Data Center Bridging (DCB) in the
+	  driver.
 
-	 If unsure, say N.
+	  If unsure, say N.
 
 config IXGB
 	tristate "Intel(R) PRO/10GbE support"
@@ -2474,6 +2526,15 @@ config MYRI10GE
 	  To compile this driver as a module, choose M here. The module
 	  will be called myri10ge.
 
+config MYRI10GE_DCA
+	bool "Direct Cache Access (DCA) Support"
+	default y
+	depends on MYRI10GE && DCA && !(MYRI10GE=y && DCA=m)
+	---help---
+	  Say Y here if you want to use Direct Cache Access (DCA) in the
+	  driver.  DCA is a method for warming the CPU cache before data
+	  is used, with the intent of lessening the impact of cache misses.
+
 config NETXEN_NIC
 	tristate "NetXen Multi port (1/10) Gigabit Ethernet NIC"
 	depends on PCI
@@ -2495,6 +2556,15 @@ config PASEMI_MAC
 	help
 	  This driver supports the on-chip 1/10Gbit Ethernet controller on
 	  PA Semi's PWRficient line of chips.
+
+config MLX4_EN
+	tristate "Mellanox Technologies 10Gbit Ethernet support"
+	depends on PCI && INET
+	select MLX4_CORE
+	select INET_LRO
+	help
+	  This driver supports Mellanox Technologies ConnectX Ethernet
+	  devices.
 
 config MLX4_CORE
 	tristate
@@ -2527,6 +2597,15 @@ config BNX2X
 	  To compile this driver as a module, choose M here: the module
 	  will be called bnx2x.  This is recommended.
 
+config QLGE
+	tristate "QLogic QLGE 10Gb Ethernet Driver Support"
+	depends on PCI
+	help
+	  This driver supports QLogic ISP8XXX 10Gb Ethernet cards.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called qlge.
+
 source "drivers/net/sfc/Kconfig"
 
 endif # NETDEV_10000
@@ -2534,6 +2613,8 @@ endif # NETDEV_10000
 source "drivers/net/tokenring/Kconfig"
 
 source "drivers/net/wireless/Kconfig"
+
+source "drivers/net/wimax/Kconfig"
 
 source "drivers/net/usb/Kconfig"
 
@@ -2545,9 +2626,9 @@ source "drivers/atm/Kconfig"
 
 source "drivers/s390/net/Kconfig"
 
-config XEN_NETFRONT
+config XEN_NETDEV_FRONTEND
 	tristate "Xen network device frontend driver"
-	depends on PARAVIRT_XEN
+	depends on XEN
 	default y
 	help
 	  The network device frontend driver allows the kernel to
@@ -2576,7 +2657,7 @@ config RIONET_RX_SIZE
 	default "128"
 
 config FDDI
-	bool "FDDI driver support"
+	tristate "FDDI driver support"
 	depends on (PCI || EISA || TC)
 	help
 	  Fiber Distributed Data Interface is a high speed local area network

@@ -5,10 +5,6 @@
  * @remark Read the file COPYING
  *
  * @author John Levon <levon@movementarian.org>
- *
- * Modified by Aravind Menon for Xen
- * These modifications are:
- * Copyright (C) 2005 Hewlett-Packard Co.
  */
 
 #include <linux/kernel.h>
@@ -23,11 +19,11 @@
 #include "cpu_buffer.h"
 #include "buffer_sync.h"
 #include "oprofile_stats.h"
- 
+
 struct oprofile_operations oprofile_ops;
 
 unsigned long oprofile_started;
-unsigned long backtrace_depth;
+unsigned long oprofile_backtrace_depth;
 static unsigned long is_setup;
 static DEFINE_MUTEX(start_mutex);
 
@@ -37,38 +33,10 @@ static DEFINE_MUTEX(start_mutex);
  */
 static int timer = 0;
 
-#ifdef CONFIG_XEN
-int oprofile_set_active(int active_domains[], unsigned int adomains)
-{
-	int err;
-
-	if (!oprofile_ops.set_active)
-		return -EINVAL;
-
-	mutex_lock(&start_mutex);
-	err = oprofile_ops.set_active(active_domains, adomains);
-	mutex_unlock(&start_mutex);
-	return err;
-}
-
-int oprofile_set_passive(int passive_domains[], unsigned int pdomains)
-{
-	int err;
-
-	if (!oprofile_ops.set_passive)
-		return -EINVAL;
-
-	mutex_lock(&start_mutex);
-	err = oprofile_ops.set_passive(passive_domains, pdomains);
-	mutex_unlock(&start_mutex);
-	return err;
-}
-#endif
-
 int oprofile_setup(void)
 {
 	int err;
- 
+
 	mutex_lock(&start_mutex);
 
 	if ((err = alloc_cpu_buffers()))
@@ -76,10 +44,10 @@ int oprofile_setup(void)
 
 	if ((err = alloc_event_buffer()))
 		goto out1;
- 
+
 	if (oprofile_ops.setup && (err = oprofile_ops.setup()))
 		goto out2;
- 
+
 	/* Note even though this starts part of the
 	 * profiling overhead, it's necessary to prevent
 	 * us missing task deaths and eventually oopsing
@@ -106,7 +74,7 @@ post_sync:
 	is_setup = 1;
 	mutex_unlock(&start_mutex);
 	return 0;
- 
+
 out3:
 	if (oprofile_ops.shutdown)
 		oprofile_ops.shutdown();
@@ -124,17 +92,17 @@ out:
 int oprofile_start(void)
 {
 	int err = -EINVAL;
- 
+
 	mutex_lock(&start_mutex);
- 
+
 	if (!is_setup)
 		goto out;
 
-	err = 0; 
- 
+	err = 0;
+
 	if (oprofile_started)
 		goto out;
- 
+
 	oprofile_reset_stats();
 
 	if ((err = oprofile_ops.start()))
@@ -146,7 +114,7 @@ out:
 	return err;
 }
 
- 
+
 /* echo 0>/dev/oprofile/enable */
 void oprofile_stop(void)
 {
@@ -204,7 +172,7 @@ int oprofile_set_backtrace(unsigned long val)
 		goto out;
 	}
 
-	backtrace_depth = val;
+	oprofile_backtrace_depth = val;
 
 out:
 	mutex_unlock(&start_mutex);
@@ -236,13 +204,13 @@ static void __exit oprofile_exit(void)
 	oprofile_arch_exit();
 }
 
- 
+
 module_init(oprofile_init);
 module_exit(oprofile_exit);
 
 module_param_named(timer, timer, int, 0644);
 MODULE_PARM_DESC(timer, "force use of timer interrupt");
- 
+
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("John Levon <levon@movementarian.org>");
 MODULE_DESCRIPTION("OProfile system profiler");

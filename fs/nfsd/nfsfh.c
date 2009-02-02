@@ -186,9 +186,14 @@ static __be32 nfsd_set_fh_dentry(struct svc_rqst *rqstp, struct svc_fh *fhp)
 		 * access control settings being in effect, we cannot
 		 * fix that case easily.
 		 */
-		current->cap_effective =
-			cap_raise_nfsd_set(current->cap_effective,
-					   current->cap_permitted);
+		struct cred *new = prepare_creds();
+		if (!new)
+			return nfserrno(-ENOMEM);
+		new->cap_effective =
+			cap_raise_nfsd_set(new->cap_effective,
+					   new->cap_permitted);
+		put_cred(override_creds(new));
+		put_cred(new);
 	} else {
 		error = nfsd_setuser_and_check_port(rqstp, exp);
 		if (error)
@@ -253,14 +258,32 @@ out:
 	return error;
 }
 
-/*
- * Perform sanity checks on the dentry in a client's file handle.
+/**
+ * fh_verify - filehandle lookup and access checking
+ * @rqstp: pointer to current rpc request
+ * @fhp: filehandle to be verified
+ * @type: expected type of object pointed to by filehandle
+ * @access: type of access needed to object
  *
- * Note that the file handle dentry may need to be freed even after
- * an error return.
+ * Look up a dentry from the on-the-wire filehandle, check the client's
+ * access to the export, and set the current task's credentials.
  *
- * This is only called at the start of an nfsproc call, so fhp points to
- * a svc_fh which is all 0 except for the over-the-wire file handle.
+ * Regardless of success or failure of fh_verify(), fh_put() should be
+ * called on @fhp when the caller is finished with the filehandle.
+ *
+ * fh_verify() may be called multiple times on a given filehandle, for
+ * example, when processing an NFSv4 compound.  The first call will look
+ * up a dentry using the on-the-wire filehandle.  Subsequent calls will
+ * skip the lookup and just perform the other checks and possibly change
+ * the current task's credentials.
+ *
+ * @type specifies the type of object expected using one of the S_IF*
+ * constants defined in include/linux/stat.h.  The caller may use zero
+ * to indicate that it doesn't care, or a negative integer to indicate
+ * that it expects something not of the given type.
+ *
+ * @access is formed from the NFSD_MAY_* constants defined in
+ * include/linux/nfsd/nfsd.h.
  */
 __be32
 fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
@@ -302,17 +325,27 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 	if (error)
 		goto out;
 
-	if (!(access & NFSD_MAY_LOCK)) {
-		/*
-		 * pseudoflavor restrictions are not enforced on NLM,
-		 * which clients virtually always use auth_sys for,
-		 * even while using RPCSEC_GSS for NFS.
-		 */
-		error = check_nfsd_access(exp, rqstp);
-		if (error)
-			goto out;
-	}
+	/*
+	 * pseudoflavor restrictions are not enforced on NLM,
+	 * which clients virtually always use auth_sys for,
+	 * even while using RPCSEC_GSS for NFS.
+	 */
+	if (access & NFSD_MAY_LOCK)
+		goto skip_pseudoflavor_check;
+	/*
+	 * Clients may expect to be able to use auth_sys during mount,
+	 * even if they use gss for everything else; see section 2.3.2
+	 * of rfc 2623.
+	 */
+	if (access & NFSD_MAY_BYPASS_GSS_ON_ROOT
+			&& exp->ex_path.dentry == dentry)
+		goto skip_pseudoflavor_check;
 
+	error = check_nfsd_access(exp, rqstp);
+	if (error)
+		goto out;
+
+skip_pseudoflavor_check:
 	/* Finally, check access permissions. */
 	error = nfsd_permission(rqstp, exp, dentry, access);
 
@@ -451,6 +484,8 @@ fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry,
 				goto retry;
 			break;
 		}
+	} else if (exp->ex_flags & NFSEXP_FSID) {
+		fsid_type = FSID_NUM;
 	} else if (exp->ex_uuid) {
 		if (fhp->fh_maxsize >= 64) {
 			if (root_export)
@@ -463,9 +498,7 @@ fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry,
 			else
 				fsid_type = FSID_UUID4_INUM;
 		}
-	} else if (exp->ex_flags & NFSEXP_FSID)
-		fsid_type = FSID_NUM;
-	else if (!old_valid_dev(ex_dev))
+	} else if (!old_valid_dev(ex_dev))
 		/* for newer device numbers, we must use a newer fsid format */
 		fsid_type = FSID_ENCODE_DEV;
 	else

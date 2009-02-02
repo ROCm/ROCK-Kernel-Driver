@@ -32,6 +32,7 @@
  */
 
 #define KMSG_COMPONENT "netiucv"
+#define pr_fmt(fmt) KMSG_COMPONENT ": " fmt
 
 #undef DEBUG
 
@@ -1734,7 +1735,7 @@ static int netiucv_register_device(struct net_device *ndev)
 	IUCV_DBF_TEXT(trace, 3, __func__);
 
 	if (dev) {
-		snprintf(dev->bus_id, BUS_ID_SIZE, "net%s", ndev->name);
+		dev_set_name(dev, "net%s", ndev->name);
 		dev->bus = &iucv_bus;
 		dev->parent = iucv_root;
 		/*

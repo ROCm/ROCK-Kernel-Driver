@@ -17,6 +17,7 @@
 #include <linux/swap.h>
 #include <linux/profile.h>
 #include <linux/delay.h>
+#include <linux/cpu.h>
 
 #include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
@@ -53,7 +54,8 @@ extern int __smp4m_processor_id(void);
 #define SMP_PRINTK(x)
 #endif
 
-static inline unsigned long swap(volatile unsigned long *ptr, unsigned long val)
+static inline unsigned long
+swap_ulong(volatile unsigned long *ptr, unsigned long val)
 {
 	__asm__ __volatile__("swap [%1], %0\n\t" :
 			     "=&r" (val), "=&r" (ptr) :
@@ -71,6 +73,8 @@ void __cpuinit smp4m_callin(void)
 	local_flush_cache_all();
 	local_flush_tlb_all();
 
+	notify_cpu_starting(cpuid);
+
 	/* Get our local ticker going. */
 	smp_setup_percpu_timer();
 
@@ -87,7 +91,7 @@ void __cpuinit smp4m_callin(void)
 	 * to call the scheduler code.
 	 */
 	/* Allow master to continue. */
-	swap(&cpu_callin_map[cpuid], 1);
+	swap_ulong(&cpu_callin_map[cpuid], 1);
 
 	/* XXX: What's up with all the flushes? */
 	local_flush_cache_all();
@@ -313,6 +317,8 @@ void smp4m_cross_call_irq(void)
 	ccall_info.processors_out[i] = 1;
 }
 
+extern void sun4m_clear_profile_irq(int cpu);
+
 void smp4m_percpu_timer_interrupt(struct pt_regs *regs)
 {
 	struct pt_regs *old_regs;
@@ -320,7 +326,7 @@ void smp4m_percpu_timer_interrupt(struct pt_regs *regs)
 
 	old_regs = set_irq_regs(regs);
 
-	clear_profile_irq(cpu);
+	sun4m_clear_profile_irq(cpu);
 
 	profile_tick(CPU_PROFILING);
 
@@ -338,7 +344,7 @@ void smp4m_percpu_timer_interrupt(struct pt_regs *regs)
 
 extern unsigned int lvl14_resolution;
 
-static void __init smp_setup_percpu_timer(void)
+static void __cpuinit smp_setup_percpu_timer(void)
 {
 	int cpu = smp_processor_id();
 

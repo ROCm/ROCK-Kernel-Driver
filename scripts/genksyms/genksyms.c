@@ -171,7 +171,7 @@ static int is_unknown_symbol(struct symbol *sym)
 		(defn = sym->defn)  && defn->tag == SYM_NORMAL &&
 			strcmp(defn->string, "}") == 0 &&
 		(defn = defn->next) && defn->tag == SYM_NORMAL &&
-	    		strcmp(defn->string, "UNKNOWN") == 0 &&
+			strcmp(defn->string, "UNKNOWN") == 0 &&
 		(defn = defn->next) && defn->tag == SYM_NORMAL &&
 			strcmp(defn->string, "{") == 0);
 }

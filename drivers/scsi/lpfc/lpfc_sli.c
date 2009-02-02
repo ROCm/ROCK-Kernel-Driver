@@ -420,7 +420,7 @@ lpfc_sli_next_iocb_slot (struct lpfc_hba *phba, struct lpfc_sli_ring *pring)
 		if (unlikely(pring->local_getidx >= max_cmd_idx)) {
 			lpfc_printf_log(phba, KERN_ERR, LOG_SLI,
 					"0315 Ring %d issue: portCmdGet %d "
-					"is bigger then cmd ring %d\n",
+					"is bigger than cmd ring %d\n",
 					pring->ringno,
 					pring->local_getidx, max_cmd_idx);
 
@@ -541,6 +541,7 @@ lpfc_sli_submit_iocb(struct lpfc_hba *phba, struct lpfc_sli_ring *pring,
 	 * Set up an iotag
 	 */
 	nextiocb->iocb.ulpIoTag = (nextiocb->iocb_cmpl) ? nextiocb->iotag : 0;
+
 
 	if (pring->ringno == LPFC_ELS_RING) {
 		lpfc_debugfs_slow_ring_trc(phba,
@@ -796,7 +797,7 @@ lpfc_sli_hbq_to_firmware(struct lpfc_hba *phba, uint32_t hbqno,
 		hbqe->bde.addrHigh = le32_to_cpu(putPaddrHigh(physaddr));
 		hbqe->bde.addrLow  = le32_to_cpu(putPaddrLow(physaddr));
 		hbqe->bde.tus.f.bdeSize = hbq_buf->size;
-		hbqe->bde.tus.f.bdeFlags = BUFF_TYPE_BDE_64;
+		hbqe->bde.tus.f.bdeFlags = 0;
 		hbqe->bde.tus.w = le32_to_cpu(hbqe->bde.tus.w);
 		hbqe->buffer_tag = le32_to_cpu(hbq_buf->tag);
 				/* Sync SLIM */
@@ -817,8 +818,8 @@ static struct lpfc_hbq_init lpfc_els_hbq = {
 	.profile = 0,
 	.ring_mask = (1 << LPFC_ELS_RING),
 	.buffer_count = 0,
-	.init_count = 40,
-	.add_count = 40,
+	.init_count = 20,
+	.add_count = 5,
 };
 
 /* HBQ for the extra ring if needed */
@@ -1051,9 +1052,6 @@ lpfc_sli_chk_mbx_command(uint8_t mbxCommand)
 	case MBX_REG_VPI:
 	case MBX_UNREG_VPI:
 	case MBX_HEARTBEAT:
-	case MBX_READ_EVENT_LOG_STATUS:
-	case MBX_READ_EVENT_LOG:
-	case MBX_WRITE_EVENT_LOG:
 	case MBX_PORT_CAPABILITIES:
 	case MBX_PORT_IOV_CONTROL:
 		ret = mbxCommand;
@@ -1630,12 +1628,12 @@ lpfc_sli_rsp_pointers_error(struct lpfc_hba *phba, struct lpfc_sli_ring *pring)
 {
 	struct lpfc_pgp *pgp = &phba->port_gp[pring->ringno];
 	/*
-	 * Ring <ringno> handler: portRspPut <portRspPut> is bigger then
+	 * Ring <ringno> handler: portRspPut <portRspPut> is bigger than
 	 * rsp ring <portRspMax>
 	 */
 	lpfc_printf_log(phba, KERN_ERR, LOG_SLI,
 			"0312 Ring %d handler: portRspPut %d "
-			"is bigger then rsp ring %d\n",
+			"is bigger than rsp ring %d\n",
 			pring->ringno, le32_to_cpu(pgp->rspPutInx),
 			pring->numRiocb);
 
@@ -2085,12 +2083,12 @@ lpfc_sli_handle_slow_ring_event(struct lpfc_hba *phba,
 	portRspPut = le32_to_cpu(pgp->rspPutInx);
 	if (portRspPut >= portRspMax) {
 		/*
-		 * Ring <ringno> handler: portRspPut <portRspPut> is bigger then
+		 * Ring <ringno> handler: portRspPut <portRspPut> is bigger than
 		 * rsp ring <portRspMax>
 		 */
 		lpfc_printf_log(phba, KERN_ERR, LOG_SLI,
 				"0303 Ring %d handler: portRspPut %d "
-				"is bigger then rsp ring %d\n",
+				"is bigger than rsp ring %d\n",
 				pring->ringno, portRspPut, portRspMax);
 
 		phba->link_state = LPFC_HBA_ERROR;
@@ -2716,86 +2714,6 @@ lpfc_sli_brdreset(struct lpfc_hba *phba)
 }
 
 /**
- * lpfc_sli_set_dma_length: Set the HBA's max DMA length.
- * @phba: Pointer to HBA context object.
- * @polling: flag that indicates if interrupts are enabled.
- *
- * This function sets the HBA's max dma length by issuing a set variable
- * mailbox command. The dma length is taking from the cfg_pci_max_read
- * configuration parameter. This parameter is passed as a module parameter
- * during the driver load. If the HBA does not support this set variable
- * mbox command the failure status will reset the cfg_pci_max_read to the
- * default(2048).
- * If interrupts are not enabled yet then the polling flag = 1  should be
- * be used so that the right mailbox routine is called.
- * This function returns 0 for success, non 0 returned for failure.
- **/
-int
-lpfc_sli_set_dma_length(struct lpfc_hba *phba, uint32_t polling)
-{
-	uint32_t dma_length;
-	LPFC_MBOXQ_t *mbox;
-	int ret = 0;
-
-	switch (phba->cfg_pci_max_read) {
-	case 512:
-		dma_length = SLIM_VAL_MAX_DMA_512;
-		break;
-	case 1024:
-		dma_length = SLIM_VAL_MAX_DMA_1024;
-		break;
-	case 2048:
-		dma_length = SLIM_VAL_MAX_DMA_2048;
-		break;
-	case 4096:
-		dma_length = SLIM_VAL_MAX_DMA_4096;
-		break;
-	default:
-		return -EINVAL;
-	}
-
-	mbox = mempool_alloc(phba->mbox_mem_pool, GFP_KERNEL);
-	if (!mbox)
-		goto failed;
-
-	lpfc_set_var(phba, mbox, SLIM_VAR_MAX_DMA_LENGTH, dma_length);
-
-	if (polling)
-		ret = lpfc_sli_issue_mbox(phba, mbox, MBX_POLL);
-	else
-		ret = lpfc_sli_issue_mbox_wait(phba, mbox,
-			LPFC_MBOX_TMO * 2);
-
-	if (ret != MBX_SUCCESS) {
-		if (mbox->mb.mbxStatus != MBXERR_UNKNOWN_CMD)
-			lpfc_printf_log(phba, KERN_ERR, LOG_INIT,
-				"%d:0443 Adapter failed to set maximum"
-				" DMA length mbxStatus x%x \n",
-				phba->brd_no, mbox->mb.mbxStatus);
-		else
-			lpfc_printf_log(phba, KERN_INFO, LOG_INIT,
-				"%d:0447 Adapter failed to set maximum"
-				" DMA length mbxStatus x%x \n",
-				phba->brd_no, mbox->mb.mbxStatus);
-		goto failed;
-	}
-
-	mempool_free(mbox, phba->mbox_mem_pool);
-	return 0;
-
-failed:
-	/* If mailbox command failed, reset the value to default value */
-	phba->cfg_pci_max_read = 2048;
-	if (ret == MBX_TIMEOUT) {
-		mbox->mbox_cmpl = lpfc_sli_def_mbox_cmpl;
-		return -EPERM;
-	} else if (mbox) {
-		mempool_free(mbox, phba->mbox_mem_pool);
-		return -EPERM;
-	} else
-		return -ENOMEM;
-}
-/**
  * lpfc_sli_brdrestart: Restart the HBA.
  * @phba: Pointer to HBA context object.
  *
@@ -3127,7 +3045,8 @@ lpfc_sli_config_port(struct lpfc_hba *phba, int sli_mode)
 		phba->sli3_options &= ~(LPFC_SLI3_NPIV_ENABLED |
 					LPFC_SLI3_HBQ_ENABLED |
 					LPFC_SLI3_CRP_ENABLED |
-					LPFC_SLI3_INB_ENABLED);
+					LPFC_SLI3_INB_ENABLED |
+					LPFC_SLI3_BG_ENABLED);
 		if (rc != MBX_SUCCESS) {
 			lpfc_printf_log(phba, KERN_ERR, LOG_INIT,
 				"0442 Adapter failed to init, mbxCmd x%x "
@@ -3171,6 +3090,15 @@ lpfc_sli_config_port(struct lpfc_hba *phba, int sli_mode)
 			phba->port_gp = phba->mbox->us.s3_pgp.port;
 			phba->inb_ha_copy = NULL;
 			phba->inb_counter = NULL;
+		}
+
+		if (phba->cfg_enable_bg) {
+			if (pmb->mb.un.varCfgPort.gbg)
+				phba->sli3_options |= LPFC_SLI3_BG_ENABLED;
+			else
+				lpfc_printf_log(phba, KERN_ERR, LOG_INIT,
+						"0443 Adapter did not grant "
+						"BlockGuard\n");
 		}
 	} else {
 		phba->hbq_get = NULL;
@@ -3249,9 +3177,6 @@ lpfc_sli_hba_setup(struct lpfc_hba *phba)
 	lpfc_printf_log(phba, KERN_INFO, LOG_INIT,
 			"0444 Firmware in SLI %x mode. Max_vpi %d\n",
 			phba->sli_rev, phba->max_vpi);
-
-	lpfc_sli_set_dma_length(phba, 1);
-
 	rc = lpfc_sli_ring_map(phba);
 
 	if (rc)
@@ -3327,21 +3252,6 @@ lpfc_mbox_timeout_handler(struct lpfc_hba *phba)
 	struct lpfc_sli *psli = &phba->sli;
 	struct lpfc_sli_ring *pring;
 
-	/* Check the pmbox pointer first.  There is a race condition
-	 * between the mbox timeout handler getting executed in the
-	 * worklist and the mailbox actually completing. When this
-	 * race condition occurs, the mbox_active will be NULL.
-	 */
-	spin_lock_irq(&phba->hbalock);
-	if (pmbox == NULL) {
-		lpfc_printf_log(phba, KERN_WARNING,
-				LOG_MBOX | LOG_SLI,
-				"0353 Active Mailbox cleared - mailbox timeout "
-				"exiting\n");
-		spin_unlock_irq(&phba->hbalock);
-		return;
-	}
-
 	/* Mbox cmd <mbxCommand> timeout */
 	lpfc_printf_log(phba, KERN_ERR, LOG_MBOX | LOG_SLI,
 			"0310 Mailbox command x%x timeout Data: x%x x%x x%p\n",
@@ -3349,7 +3259,6 @@ lpfc_mbox_timeout_handler(struct lpfc_hba *phba)
 			phba->pport->port_state,
 			phba->sli.sli_flag,
 			phba->sli.mbox_active);
-	spin_unlock_irq(&phba->hbalock);
 
 	/* Setting state unknown so lpfc_sli_abort_iocb_ring
 	 * would get IOCB_ERROR from lpfc_sli_issue_iocb, allowing
@@ -3580,35 +3489,9 @@ lpfc_sli_issue_mbox(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmbox, uint32_t flag)
 	mb->mbxOwner = OWN_CHIP;
 
 	if (psli->sli_flag & LPFC_SLI2_ACTIVE) {
-		/* Populate mbox extension offset word. */
-		if (pmbox->in_ext_byte_len || pmbox->out_ext_byte_len) {
-			*(((uint32_t *)mb) + pmbox->mbox_offset_word)
-				= (uint8_t *)phba->mbox_ext
-				  - (uint8_t *)phba->mbox;
-		}
-
-		/* Copy the mailbox extension data */
-		if (pmbox->in_ext_byte_len && pmbox->context2) {
-			lpfc_sli_pcimem_bcopy(pmbox->context2,
-				(uint8_t*)phba->mbox_ext,
-				pmbox->in_ext_byte_len);
-		}
-		/* Copy command data to host SLIM area */
+		/* First copy command data to host SLIM area */
 		lpfc_sli_pcimem_bcopy(mb, phba->mbox, MAILBOX_CMD_SIZE);
-
 	} else {
-		/* Populate mbox extension offset word. */
-		if (pmbox->in_ext_byte_len || pmbox->out_ext_byte_len)
-			*(((uint32_t *)mb) + pmbox->mbox_offset_word)
-				= MAILBOX_HBA_EXT_OFFSET;
-
-		/* Copy the mailbox extension data */
-		if (pmbox->in_ext_byte_len && pmbox->context2) {
-			lpfc_memcpy_to_slim(phba->MBslimaddr +
-				MAILBOX_HBA_EXT_OFFSET,
-				pmbox->context2, pmbox->in_ext_byte_len);
-
-		}
 		if (mb->mbxCommand == MBX_CONFIG_PORT) {
 			/* copy command data into host mbox for cmpl */
 			lpfc_sli_pcimem_bcopy(mb, phba->mbox, MAILBOX_CMD_SIZE);
@@ -3718,22 +3601,15 @@ lpfc_sli_issue_mbox(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmbox, uint32_t flag)
 		if (psli->sli_flag & LPFC_SLI2_ACTIVE) {
 			/* copy results back to user */
 			lpfc_sli_pcimem_bcopy(phba->mbox, mb, MAILBOX_CMD_SIZE);
-			/* Copy the mailbox extension data */
-			if (pmbox->out_ext_byte_len && pmbox->context2) {
-				lpfc_sli_pcimem_bcopy(phba->mbox_ext,
-						      pmbox->context2,
-						      pmbox->out_ext_byte_len);
-			}
 		} else {
 			/* First copy command data */
 			lpfc_memcpy_from_slim(mb, phba->MBslimaddr,
 							MAILBOX_CMD_SIZE);
-			/* Copy the mailbox extension data */
-			if (pmbox->out_ext_byte_len && pmbox->context2) {
-				lpfc_memcpy_from_slim(pmbox->context2,
-					phba->MBslimaddr +
-					MAILBOX_HBA_EXT_OFFSET,
-					pmbox->out_ext_byte_len);
+			if ((mb->mbxCommand == MBX_DUMP_MEMORY) &&
+				pmbox->context2) {
+				lpfc_memcpy_from_slim((void *)pmbox->context2,
+				      phba->MBslimaddr + DMP_RSP_OFFSET,
+						      mb->un.varDmp.word_cnt);
 			}
 		}
 
@@ -5467,15 +5343,6 @@ lpfc_sp_intr_handler(int irq, void *dev_id)
 				if (pmb->mbox_cmpl) {
 					lpfc_sli_pcimem_bcopy(mbox, pmbox,
 							MAILBOX_CMD_SIZE);
-					/* Copy the mailbox extension data */
-					if (pmb->out_ext_byte_len &&
-						pmb->context2) {
-						lpfc_sli_pcimem_bcopy(
-							phba->mbox_ext,
-							pmb->context2,
-							pmb->out_ext_byte_len);
-					}
-
 				}
 				if (pmb->mbox_flag & LPFC_MBX_IMED_UNREG) {
 					pmb->mbox_flag &= ~LPFC_MBX_IMED_UNREG;

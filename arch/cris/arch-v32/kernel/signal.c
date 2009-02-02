@@ -18,8 +18,8 @@
 #include <asm/processor.h>
 #include <asm/ucontext.h>
 #include <asm/uaccess.h>
-#include <asm/arch/ptrace.h>
-#include <asm/arch/hwregs/cpu_vect.h>
+#include <arch/ptrace.h>
+#include <arch/hwregs/cpu_vect.h>
 
 extern unsigned long cris_signal_return_page;
 
@@ -456,7 +456,7 @@ give_sigsegv:
 	return -EFAULT;
 }
 
-/* Invoke a singal handler to, well, handle the signal. */
+/* Invoke a signal handler to, well, handle the signal. */
 static inline int
 handle_signal(int canrestart, unsigned long sig,
 	      siginfo_t *info, struct k_sigaction *ka,

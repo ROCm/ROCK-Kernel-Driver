@@ -125,6 +125,7 @@ static void adjust_lpt_heap(struct ubifs_info *c, struct ubifs_lpt_heap *heap,
 			}
 		}
 	}
+
 	/* Not greater than parent, so compare to children */
 	while (1) {
 		/* Compare to left child */
@@ -460,18 +461,6 @@ static void change_category(struct ubifs_info *c, struct ubifs_lprops *lprops)
 }
 
 /**
- * ubifs_get_lprops - get reference to LEB properties.
- * @c: the UBIFS file-system description object
- *
- * This function locks lprops. Lprops have to be unlocked by
- * 'ubifs_release_lprops()'.
- */
-void ubifs_get_lprops(struct ubifs_info *c)
-{
-	mutex_lock(&c->lp_mutex);
-}
-
-/**
  * calc_dark - calculate LEB dark space size.
  * @c: the UBIFS file-system description object
  * @spc: amount of free and dirty space in the LEB
@@ -531,13 +520,13 @@ static int is_lprops_dirty(struct ubifs_info *c, struct ubifs_lprops *lprops)
  * @flags: new flags
  * @idx_gc_cnt: change to the count of idx_gc list
  *
- * This function changes LEB properties. This function does not change a LEB
- * property (@free, @dirty or @flag) if the value passed is %LPROPS_NC.
+ * This function changes LEB properties (@free, @dirty or @flag). However, the
+ * property which has the %LPROPS_NC value is not changed. Returns a pointer to
+ * the updated LEB properties on success and a negative error code on failure.
  *
- * This function returns a pointer to the updated LEB properties on success
- * and a negative error code on failure. N.B. the LEB properties may have had to
- * be copied (due to COW) and consequently the pointer returned may not be the
- * same as the pointer passed.
+ * Note, the LEB properties may have had to be copied (due to COW) and
+ * consequently the pointer returned may not be the same as the pointer
+ * passed.
  */
 const struct ubifs_lprops *ubifs_change_lp(struct ubifs_info *c,
 					   const struct ubifs_lprops *lp,
@@ -576,7 +565,6 @@ const struct ubifs_lprops *ubifs_change_lp(struct ubifs_info *c,
 	ubifs_assert(!(lprops->free & 7) && !(lprops->dirty & 7));
 
 	spin_lock(&c->space_lock);
-
 	if ((lprops->flags & LPROPS_TAKEN) && lprops->free == c->leb_size)
 		c->lst.taken_empty_lebs -= 1;
 
@@ -637,28 +625,9 @@ const struct ubifs_lprops *ubifs_change_lp(struct ubifs_info *c,
 		c->lst.taken_empty_lebs += 1;
 
 	change_category(c, lprops);
-
 	c->idx_gc_cnt += idx_gc_cnt;
-
 	spin_unlock(&c->space_lock);
-
 	return lprops;
-}
-
-/**
- * ubifs_release_lprops - release lprops lock.
- * @c: the UBIFS file-system description object
- *
- * This function has to be called after each 'ubifs_get_lprops()' call to
- * unlock lprops.
- */
-void ubifs_release_lprops(struct ubifs_info *c)
-{
-	ubifs_assert(mutex_is_locked(&c->lp_mutex));
-	ubifs_assert(c->lst.empty_lebs >= 0 &&
-		     c->lst.empty_lebs <= c->main_lebs);
-
-	mutex_unlock(&c->lp_mutex);
 }
 
 /**
@@ -1119,7 +1088,7 @@ static int scan_check_cb(struct ubifs_info *c,
 		}
 	}
 
-	sleb = ubifs_scan(c, lnum, 0, c->dbg_buf);
+	sleb = ubifs_scan(c, lnum, 0, c->dbg->buf);
 	if (IS_ERR(sleb)) {
 		/*
 		 * After an unclean unmount, empty and freeable LEBs
@@ -1262,7 +1231,6 @@ static int scan_check_cb(struct ubifs_info *c,
 	}
 
 	ubifs_scan_destroy(sleb);
-
 	return LPT_SCAN_CONTINUE;
 
 out_print:

@@ -115,8 +115,7 @@ static void ocfs2_dump_meta_lvb_info(u64 level,
 				     unsigned int line,
 				     struct ocfs2_lock_res *lockres)
 {
-	struct ocfs2_meta_lvb *lvb =
-		(struct ocfs2_meta_lvb *)ocfs2_dlm_lvb(&lockres->l_lksb);
+	struct ocfs2_meta_lvb *lvb = ocfs2_dlm_lvb(&lockres->l_lksb);
 
 	mlog(level, "LVB information for %s (called from %s:%u):\n",
 	     lockres->l_name, function, line);
@@ -1325,7 +1324,7 @@ again:
 			goto out;
 		}
 
-		mlog(0, "lock %s, successfull return from ocfs2_dlm_lock\n",
+		mlog(0, "lock %s, successful return from ocfs2_dlm_lock\n",
 		     lockres->l_name);
 
 		/* At this point we've gone inside the dlm and need to
@@ -1864,7 +1863,7 @@ static void __ocfs2_stuff_meta_lvb(struct inode *inode)
 
 	mlog_entry_void();
 
-	lvb = (struct ocfs2_meta_lvb *)ocfs2_dlm_lvb(&lockres->l_lksb);
+	lvb = ocfs2_dlm_lvb(&lockres->l_lksb);
 
 	/*
 	 * Invalidate the LVB of a deleted inode - this way other
@@ -1916,7 +1915,7 @@ static void ocfs2_refresh_inode_from_lvb(struct inode *inode)
 
 	mlog_meta_lvb(0, lockres);
 
-	lvb = (struct ocfs2_meta_lvb *)ocfs2_dlm_lvb(&lockres->l_lksb);
+	lvb = ocfs2_dlm_lvb(&lockres->l_lksb);
 
 	/* We're safe here without the lockres lock... */
 	spin_lock(&oi->ip_lock);
@@ -1951,8 +1950,7 @@ static void ocfs2_refresh_inode_from_lvb(struct inode *inode)
 static inline int ocfs2_meta_lvb_is_trustable(struct inode *inode,
 					      struct ocfs2_lock_res *lockres)
 {
-	struct ocfs2_meta_lvb *lvb =
-		(struct ocfs2_meta_lvb *)ocfs2_dlm_lvb(&lockres->l_lksb);
+	struct ocfs2_meta_lvb *lvb = ocfs2_dlm_lvb(&lockres->l_lksb);
 
 	if (lvb->lvb_version == OCFS2_LVB_VERSION
 	    && be32_to_cpu(lvb->lvb_igeneration) == inode->i_generation)
@@ -2059,7 +2057,7 @@ static int ocfs2_inode_lock_update(struct inode *inode,
 	} else {
 		/* Boo, we have to go to disk. */
 		/* read bh, cast, ocfs2_refresh_inode */
-		status = ocfs2_read_block(inode, oi->ip_blkno, bh);
+		status = ocfs2_read_inode_block(inode, bh);
 		if (status < 0) {
 			mlog_errno(status);
 			goto bail_refresh;
@@ -2067,18 +2065,14 @@ static int ocfs2_inode_lock_update(struct inode *inode,
 		fe = (struct ocfs2_dinode *) (*bh)->b_data;
 
 		/* This is a good chance to make sure we're not
-		 * locking an invalid object.
+		 * locking an invalid object.  ocfs2_read_inode_block()
+		 * already checked that the inode block is sane.
 		 *
 		 * We bug on a stale inode here because we checked
 		 * above whether it was wiped from disk. The wiping
 		 * node provides a guarantee that we receive that
 		 * message and can mark the inode before dropping any
 		 * locks associated with it. */
-		if (!OCFS2_IS_VALID_DINODE(fe)) {
-			OCFS2_RO_ON_INVALID_DINODE(inode->i_sb, fe);
-			status = -EIO;
-			goto bail_refresh;
-		}
 		mlog_bug_on_msg(inode->i_generation !=
 				le32_to_cpu(fe->i_generation),
 				"Invalid dinode %llu disk generation: %u "
@@ -2120,7 +2114,7 @@ static int ocfs2_assign_bh(struct inode *inode,
 		return 0;
 	}
 
-	status = ocfs2_read_block(inode, OCFS2_I(inode)->ip_blkno, ret_bh);
+	status = ocfs2_read_inode_block(inode, ret_bh);
 	if (status < 0)
 		mlog_errno(status);
 
@@ -2876,9 +2870,8 @@ static void ocfs2_unlock_ast(void *opaque, int error)
 
 	lockres_clear_flags(lockres, OCFS2_LOCK_BUSY);
 	lockres->l_unlock_action = OCFS2_UNLOCK_INVALID;
-	spin_unlock_irqrestore(&lockres->l_lock, flags);
-
 	wake_up(&lockres->l_event);
+	spin_unlock_irqrestore(&lockres->l_lock, flags);
 
 	mlog_exit_void();
 }
@@ -2958,7 +2951,7 @@ static int ocfs2_drop_lock(struct ocfs2_super *osb,
 		ocfs2_dlm_dump_lksb(&lockres->l_lksb);
 		BUG();
 	}
-	mlog(0, "lock %s, successfull return from ocfs2_dlm_unlock\n",
+	mlog(0, "lock %s, successful return from ocfs2_dlm_unlock\n",
 	     lockres->l_name);
 
 	ocfs2_wait_on_busy_lock(lockres);
@@ -3494,8 +3487,8 @@ static void ocfs2_set_qinfo_lvb(struct ocfs2_lock_res *lockres)
 
 	mlog_entry_void();
 
-	lvb = (struct ocfs2_qinfo_lvb *)ocfs2_dlm_lvb(&lockres->l_lksb);
-	lvb->lvb_version   = OCFS2_LVB_VERSION;
+	lvb = ocfs2_dlm_lvb(&lockres->l_lksb);
+	lvb->lvb_version = OCFS2_QINFO_LVB_VERSION;
 	lvb->lvb_bgrace = cpu_to_be32(info->dqi_bgrace);
 	lvb->lvb_igrace = cpu_to_be32(info->dqi_igrace);
 	lvb->lvb_syncms = cpu_to_be32(oinfo->dqi_syncms);
@@ -3518,24 +3511,59 @@ void ocfs2_qinfo_unlock(struct ocfs2_mem_dqinfo *oinfo, int ex)
 	mlog_exit_void();
 }
 
-/* Lock quota info, this function expects at least shared lock on the quota file
- * so that we can safely refresh quota info from disk. */
-int ocfs2_qinfo_lock(struct ocfs2_mem_dqinfo *oinfo, int ex)
+static int ocfs2_refresh_qinfo(struct ocfs2_mem_dqinfo *oinfo)
 {
 	struct mem_dqinfo *info = sb_dqinfo(oinfo->dqi_gi.dqi_sb,
 					    oinfo->dqi_gi.dqi_type);
 	struct ocfs2_lock_res *lockres = &oinfo->dqi_gqlock;
+	struct ocfs2_qinfo_lvb *lvb = ocfs2_dlm_lvb(&lockres->l_lksb);
+	struct buffer_head *bh = NULL;
+	struct ocfs2_global_disk_dqinfo *gdinfo;
+	int status = 0;
+
+	if (lvb->lvb_version == OCFS2_QINFO_LVB_VERSION) {
+		info->dqi_bgrace = be32_to_cpu(lvb->lvb_bgrace);
+		info->dqi_igrace = be32_to_cpu(lvb->lvb_igrace);
+		oinfo->dqi_syncms = be32_to_cpu(lvb->lvb_syncms);
+		oinfo->dqi_gi.dqi_blocks = be32_to_cpu(lvb->lvb_blocks);
+		oinfo->dqi_gi.dqi_free_blk = be32_to_cpu(lvb->lvb_free_blk);
+		oinfo->dqi_gi.dqi_free_entry =
+					be32_to_cpu(lvb->lvb_free_entry);
+	} else {
+		status = ocfs2_read_quota_block(oinfo->dqi_gqinode, 0, &bh);
+		if (status) {
+			mlog_errno(status);
+			goto bail;
+		}
+		gdinfo = (struct ocfs2_global_disk_dqinfo *)
+					(bh->b_data + OCFS2_GLOBAL_INFO_OFF);
+		info->dqi_bgrace = le32_to_cpu(gdinfo->dqi_bgrace);
+		info->dqi_igrace = le32_to_cpu(gdinfo->dqi_igrace);
+		oinfo->dqi_syncms = le32_to_cpu(gdinfo->dqi_syncms);
+		oinfo->dqi_gi.dqi_blocks = le32_to_cpu(gdinfo->dqi_blocks);
+		oinfo->dqi_gi.dqi_free_blk = le32_to_cpu(gdinfo->dqi_free_blk);
+		oinfo->dqi_gi.dqi_free_entry =
+					le32_to_cpu(gdinfo->dqi_free_entry);
+		brelse(bh);
+		ocfs2_track_lock_refresh(lockres);
+	}
+
+bail:
+	return status;
+}
+
+/* Lock quota info, this function expects at least shared lock on the quota file
+ * so that we can safely refresh quota info from disk. */
+int ocfs2_qinfo_lock(struct ocfs2_mem_dqinfo *oinfo, int ex)
+{
+	struct ocfs2_lock_res *lockres = &oinfo->dqi_gqlock;
 	struct ocfs2_super *osb = OCFS2_SB(oinfo->dqi_gi.dqi_sb);
-	struct ocfs2_qinfo_lvb *lvb;
 	int level = ex ? DLM_LOCK_EX : DLM_LOCK_PR;
 	int status = 0;
-	struct buffer_head *bh;
-	struct ocfs2_global_disk_dqinfo *gdinfo;
 
 	mlog_entry_void();
 
-	/* We'll allow faking a readonly metadata lock for
-	 * rodevices. */
+	/* On RO devices, locking really isn't needed... */
 	if (ocfs2_is_hard_readonly(osb)) {
 		if (ex)
 			status = -EROFS;
@@ -3552,35 +3580,9 @@ int ocfs2_qinfo_lock(struct ocfs2_mem_dqinfo *oinfo, int ex)
 	if (!ocfs2_should_refresh_lock_res(lockres))
 		goto bail;
 	/* OK, we have the lock but we need to refresh the quota info */
-	lvb = ocfs2_dlm_lvb(&lockres->l_lksb);
-	if (lvb->lvb_version == OCFS2_LVB_VERSION) {
-		info->dqi_bgrace = be32_to_cpu(lvb->lvb_bgrace);
-		info->dqi_igrace = be32_to_cpu(lvb->lvb_igrace);
-		oinfo->dqi_syncms = be32_to_cpu(lvb->lvb_syncms);
-		oinfo->dqi_gi.dqi_blocks = be32_to_cpu(lvb->lvb_blocks);
-		oinfo->dqi_gi.dqi_free_blk = be32_to_cpu(lvb->lvb_free_blk);
-		oinfo->dqi_gi.dqi_free_entry =
-					be32_to_cpu(lvb->lvb_free_entry);
-	} else {
-		bh = ocfs2_bread(oinfo->dqi_gqinode, 0, &status, 0);
-		if (!bh) {
-			ocfs2_qinfo_unlock(oinfo, ex);
-			mlog_errno(status);
-			goto bail_refresh;
-		}
-		gdinfo = (struct ocfs2_global_disk_dqinfo *)
-					(bh->b_data + OCFS2_GLOBAL_INFO_OFF);
-		info->dqi_bgrace = le32_to_cpu(gdinfo->dqi_bgrace);
-		info->dqi_igrace = le32_to_cpu(gdinfo->dqi_igrace);
-		oinfo->dqi_syncms = le32_to_cpu(gdinfo->dqi_syncms);
-		oinfo->dqi_gi.dqi_blocks = le32_to_cpu(gdinfo->dqi_blocks);
-		oinfo->dqi_gi.dqi_free_blk = le32_to_cpu(gdinfo->dqi_free_blk);
-		oinfo->dqi_gi.dqi_free_entry =
-					le32_to_cpu(gdinfo->dqi_free_entry);
-		brelse(bh);
-		ocfs2_track_lock_refresh(lockres);
-	}
-bail_refresh:
+	status = ocfs2_refresh_qinfo(oinfo);
+	if (status)
+		ocfs2_qinfo_unlock(oinfo, ex);
 	ocfs2_complete_lock_res_refresh(lockres, status);
 bail:
 	mlog_exit(status);

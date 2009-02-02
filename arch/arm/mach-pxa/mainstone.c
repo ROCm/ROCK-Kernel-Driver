@@ -128,6 +128,10 @@ static unsigned long mainstone_pin_config[] = {
 	GPIO108_KP_MKOUT_5,
 	GPIO96_KP_MKOUT_6,
 
+	/* I2C */
+	GPIO117_I2C_SCL,
+	GPIO118_I2C_SDA,
+
 	/* GPIO */
 	GPIO1_GPIO | WAKEUP_ON_EDGE_BOTH,
 };
@@ -162,8 +166,7 @@ static void mainstone_irq_handler(unsigned int irq, struct irq_desc *desc)
 		GEDR(0) = GPIO_bit(0);  /* clear useless edge notification */
 		if (likely(pending)) {
 			irq = MAINSTONE_IRQ(0) + __ffs(pending);
-			desc = irq_desc + irq;
-			desc_handle_irq(irq, desc);
+			generic_handle_irq(irq);
 		}
 		pending = MST_INTSETCLR & mainstone_irq_enabled;
 	} while (pending);
@@ -508,19 +511,9 @@ static struct platform_device *platform_devices[] __initdata = {
 	&mst_gpio_keys_device,
 };
 
-static int mainstone_ohci_init(struct device *dev)
-{
-	/* Set the Power Control Polarity Low and Power Sense
-	   Polarity Low to active low. */
-	UHCHR = (UHCHR | UHCHR_PCPL | UHCHR_PSPL) &
-		~(UHCHR_SSEP1 | UHCHR_SSEP2 | UHCHR_SSEP3 | UHCHR_SSE);
-
-	return 0;
-}
-
 static struct pxaohci_platform_data mainstone_ohci_platform_data = {
 	.port_mode	= PMM_PERPORT_MODE,
-	.init		= mainstone_ohci_init,
+	.flags		= ENABLE_PORT_ALL | POWER_CONTROL_LOW | POWER_SENSE_LOW,
 };
 
 #if defined(CONFIG_KEYBOARD_PXA27x) || defined(CONFIG_KEYBOARD_PXA27x_MODULE)

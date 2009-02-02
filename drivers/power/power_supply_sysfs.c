@@ -30,7 +30,7 @@
 
 #define POWER_SUPPLY_ATTR(_name)					\
 {									\
-	.attr = { .name = #_name, .mode = 0444, .owner = THIS_MODULE },	\
+	.attr = { .name = #_name, .mode = 0444 },	\
 	.show = power_supply_show_property,				\
 	.store = NULL,							\
 }
@@ -45,7 +45,7 @@ static ssize_t power_supply_show_property(struct device *dev,
 	};
 	static char *health_text[] = {
 		"Unknown", "Good", "Overheat", "Dead", "Over voltage",
-		"Unspecified failure"
+		"Unspecified failure", "Cold",
 	};
 	static char *technology_text[] = {
 		"Unknown", "NiMH", "Li-ion", "Li-poly", "LiFe", "NiCd",

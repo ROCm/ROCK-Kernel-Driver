@@ -210,8 +210,8 @@ struct super_operations {
         void (*put_super) (struct super_block *);
         void (*write_super) (struct super_block *);
         int (*sync_fs)(struct super_block *sb, int wait);
-        void (*write_super_lockfs) (struct super_block *);
-        void (*unlockfs) (struct super_block *);
+        int (*freeze_fs) (struct super_block *);
+        int (*unfreeze_fs) (struct super_block *);
         int (*statfs) (struct dentry *, struct kstatfs *);
         int (*remount_fs) (struct super_block *, int *, char *);
         void (*clear_inode) (struct inode *);
@@ -270,11 +270,11 @@ or bottom half).
   	a superblock. The second parameter indicates whether the method
 	should wait until the write out has been completed. Optional.
 
-  write_super_lockfs: called when VFS is locking a filesystem and
+  freeze_fs: called when VFS is locking a filesystem and
   	forcing it into a consistent state.  This method is currently
   	used by the Logical Volume Manager (LVM).
 
-  unlockfs: called when VFS is unlocking a filesystem and making it writable
+  unfreeze_fs: called when VFS is unlocking a filesystem and making it writable
   	again.
 
   statfs: called when the VFS needs to get filesystem statistics. This
@@ -492,7 +492,7 @@ written-back to storage typically in whole pages, however the
 address_space has finer control of write sizes.
 
 The read process essentially only requires 'readpage'.  The write
-process is more complicated and uses prepare_write/commit_write or
+process is more complicated and uses write_begin/write_end or
 set_page_dirty to write data into the address_space, and writepage,
 sync_page, and writepages to writeback data to storage.
 
@@ -521,8 +521,6 @@ struct address_space_operations {
 	int (*set_page_dirty)(struct page *page);
 	int (*readpages)(struct file *filp, struct address_space *mapping,
 			struct list_head *pages, unsigned nr_pages);
-	int (*prepare_write)(struct file *, struct page *, unsigned, unsigned);
-	int (*commit_write)(struct file *, struct page *, unsigned, unsigned);
 	int (*write_begin)(struct file *, struct address_space *mapping,
 				loff_t pos, unsigned len, unsigned flags,
 				struct page **pagep, void **fsdata);
@@ -603,37 +601,7 @@ struct address_space_operations {
 	readpages is only used for read-ahead, so read errors are
   	ignored.  If anything goes wrong, feel free to give up.
 
-  prepare_write: called by the generic write path in VM to set up a write
-  	request for a page.  This indicates to the address space that
-  	the given range of bytes is about to be written.  The
-  	address_space should check that the write will be able to
-  	complete, by allocating space if necessary and doing any other
-  	internal housekeeping.  If the write will update parts of
-  	any basic-blocks on storage, then those blocks should be
-  	pre-read (if they haven't been read already) so that the
-  	updated blocks can be written out properly.
-	The page will be locked.
-
-	Note: the page _must not_ be marked uptodate in this function
-	(or anywhere else) unless it actually is uptodate right now. As
-	soon as a page is marked uptodate, it is possible for a concurrent
-	read(2) to copy it to userspace.
-
-  commit_write: If prepare_write succeeds, new data will be copied
-        into the page and then commit_write will be called.  It will
-        typically update the size of the file (if appropriate) and
-        mark the inode as dirty, and do any other related housekeeping
-        operations.  It should avoid returning an error if possible -
-        errors should have been handled by prepare_write.
-
-  write_begin: This is intended as a replacement for prepare_write. The
-	key differences being that:
-		- it returns a locked page (in *pagep) rather than being
-		  given a pre locked page;
-		- it must be able to cope with short writes (where the
-		  length passed to write_begin is greater than the number
-		  of bytes copied into the page).
-
+  write_begin:
 	Called by the generic buffered write code to ask the filesystem to
 	prepare to write len bytes at the given offset in the file. The
 	address_space should check that the write will be able to complete,
@@ -644,6 +612,9 @@ struct address_space_operations {
 
         The filesystem must return the locked pagecache page for the specified
 	offset, in *pagep, for the caller to write into.
+
+	It must be able to cope with short writes (where the length passed to
+	write_begin is greater than the number of bytes copied into the page).
 
 	flags is a field for AOP_FLAG_xxx flags, described in
 	include/linux/fs.h.
@@ -780,7 +751,6 @@ struct file_operations {
 	ssize_t (*sendpage) (struct file *, struct page *, int, size_t, loff_t *, int);
 	unsigned long (*get_unmapped_area)(struct file *, unsigned long, unsigned long, unsigned long, unsigned long);
 	int (*check_flags)(int);
-	int (*dir_notify)(struct file *filp, unsigned long arg);
 	int (*flock) (struct file *, int, struct file_lock *);
 	ssize_t (*splice_write)(struct pipe_inode_info *, struct file *, size_t, unsigned int);
 	ssize_t (*splice_read)(struct file *, struct pipe_inode_info *, size_t, unsigned int);
@@ -846,8 +816,6 @@ otherwise noted.
   get_unmapped_area: called by the mmap(2) system call
 
   check_flags: called by the fcntl(2) system call for F_SETFL command
-
-  dir_notify: called by the fcntl(2) system call for F_NOTIFY command
 
   flock: called by the flock(2) system call
 
@@ -978,7 +946,7 @@ manipulate dentries:
   d_lookup: look up a dentry given its parent and path name component
 	It looks up the child of that given name from the dcache
 	hash table. If it is found, the reference count is incremented
-	and the dentry is returned. The caller must use d_put()
+	and the dentry is returned. The caller must use dput()
 	to free the dentry when it finishes using it.
 
 For further information on dentry locking, please refer to the document

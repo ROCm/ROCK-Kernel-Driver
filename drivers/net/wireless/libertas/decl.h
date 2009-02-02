@@ -34,7 +34,6 @@ int lbs_process_event(struct lbs_private *priv, u32 event);
 void lbs_queue_event(struct lbs_private *priv, u32 event);
 void lbs_notify_command_response(struct lbs_private *priv, u8 resp_idx);
 
-int lbs_set_radio_control(struct lbs_private *priv);
 u32 lbs_fw_index_to_data_rate(u8 index);
 u8 lbs_data_rate_to_fw_index(u32 rate);
 
@@ -74,9 +73,5 @@ void lbs_stop_card(struct lbs_private *priv);
 void lbs_host_to_card_done(struct lbs_private *priv);
 
 int lbs_update_channel(struct lbs_private *priv);
-
-#ifndef CONFIG_IEEE80211
-const char *escape_essid(const char *essid, u8 essid_len);
-#endif
 
 #endif

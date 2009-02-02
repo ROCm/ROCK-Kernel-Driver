@@ -943,9 +943,6 @@ BOOLEAN RTMP_FillTxBlkInfo(
 	}
 
 	return TRUE;
-
-FillTxBlkErr:
-	return FALSE;
 }
 
 
@@ -2790,7 +2787,7 @@ BOOLEAN MacTableDeleteEntry(
 		}
 		else
 		{
-			printk("\n%s: Impossible Wcid = %d !!!!!\n", __FUNCTION__, wcid);
+			printk("\n%s: Impossible Wcid = %d !!!!!\n", __func__, wcid);
 		}
 	}
 

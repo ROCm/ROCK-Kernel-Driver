@@ -226,7 +226,7 @@ static struct ctrl sd_ctrls[] = {
 	},
 };
 
-static struct v4l2_pix_format vga_mode[] = {
+static const struct v4l2_pix_format vga_mode[] = {
 	{160, 120, V4L2_PIX_FMT_PJPG, V4L2_FIELD_NONE,
 		.bytesperline = 160,
 		.sizeimage = 160 * 120 * 3 / 8 + 590,
@@ -675,7 +675,7 @@ static int sd_init(struct gspca_dev *gspca_dev)
 	return 0;
 }
 
-static void sd_start(struct gspca_dev *gspca_dev)
+static int sd_start(struct gspca_dev *gspca_dev)
 {
 	struct sd *sd = (struct sd *) gspca_dev;
 
@@ -724,6 +724,7 @@ static void sd_start(struct gspca_dev *gspca_dev)
 		reg_w(gspca_dev, 0x78, 0x01);
 	else
 		reg_w(gspca_dev, 0x78, 0x05);
+	return 0;
 }
 
 static void sd_stopN(struct gspca_dev *gspca_dev)
@@ -748,10 +749,13 @@ static void sd_stopN(struct gspca_dev *gspca_dev)
 	reg_w(gspca_dev, 0x78, 0x44); /* Bit_0=start stream, Bit_6=LED */
 }
 
+/* called on streamoff with alt 0 and on disconnect */
 static void sd_stop0(struct gspca_dev *gspca_dev)
 {
 	struct sd *sd = (struct sd *) gspca_dev;
 
+	if (!gspca_dev->present)
+		return;
 	if (sd->sensor == SENSOR_PAC7302) {
 		reg_w(gspca_dev, 0xff, 0x01);
 		reg_w(gspca_dev, 0x78, 0x40);
@@ -1060,10 +1064,13 @@ static __devinitdata struct usb_device_id device_table[] = {
 	{USB_DEVICE(0x093a, 0x2608), .driver_info = SENSOR_PAC7311},
 	{USB_DEVICE(0x093a, 0x260e), .driver_info = SENSOR_PAC7311},
 	{USB_DEVICE(0x093a, 0x260f), .driver_info = SENSOR_PAC7311},
+	{USB_DEVICE(0x093a, 0x2620), .driver_info = SENSOR_PAC7302},
 	{USB_DEVICE(0x093a, 0x2621), .driver_info = SENSOR_PAC7302},
+	{USB_DEVICE(0x093a, 0x2622), .driver_info = SENSOR_PAC7302},
 	{USB_DEVICE(0x093a, 0x2624), .driver_info = SENSOR_PAC7302},
 	{USB_DEVICE(0x093a, 0x2626), .driver_info = SENSOR_PAC7302},
 	{USB_DEVICE(0x093a, 0x262a), .driver_info = SENSOR_PAC7302},
+	{USB_DEVICE(0x093a, 0x262c), .driver_info = SENSOR_PAC7302},
 	{}
 };
 MODULE_DEVICE_TABLE(usb, device_table);

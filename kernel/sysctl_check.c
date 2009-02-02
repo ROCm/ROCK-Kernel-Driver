@@ -4,7 +4,6 @@
 #include <linux/sunrpc/debug.h>
 #include <linux/string.h>
 #include <net/ip_vs.h>
-#include <xen/sysctl.h>
 
 struct trans_ctl_table {
 	int			ctl_name;
@@ -735,7 +734,6 @@ static const struct trans_ctl_table trans_fs_quota_table[] = {
 };
 
 static const struct trans_ctl_table trans_fs_xfs_table[] = {
-	{ XFS_RESTRICT_CHOWN,	"restrict_chown" },
 	{ XFS_SGID_INHERIT,	"irix_sgid_inherit" },
 	{ XFS_SYMLINK_MODE,	"irix_symlink_mode" },
 	{ XFS_PANIC_MASK,	"panic_mask" },
@@ -897,14 +895,6 @@ static const struct trans_ctl_table trans_bus_table[] = {
 	{ CTL_BUS_ISA,	"isa",	trans_bus_isa_table },
 	{}
 };
-
-#ifdef CONFIG_XEN
-static const struct trans_ctl_table trans_xen_table[] = {
-	{ CTL_XEN_INDEPENDENT_WALLCLOCK,	"independent_wallclock" },
-	{ CTL_XEN_PERMITTED_CLOCK_JITTER,	"permitted_clock_jitter" },
-	{}
-};
-#endif
 
 static const struct trans_ctl_table trans_arlan_conf_table0[] = {
 	{ 1,	"spreadingCode" },
@@ -1241,9 +1231,6 @@ static const struct trans_ctl_table trans_root_table[] = {
 	{ CTL_BUS,	"bus",		trans_bus_table },
 	{ CTL_ABI,	"abi" },
 	/* CTL_CPU not used */
-#ifdef CONFIG_XEN
-	{ CTL_XEN,	"xen",		trans_xen_table },
-#endif
 	{ CTL_ARLAN,	"arlan",	trans_arlan_table },
 	{ CTL_S390DBF,	"s390dbf",	trans_s390dbf_table },
 	{ CTL_SUNRPC,	"sunrpc",	trans_sunrpc_table },

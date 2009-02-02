@@ -2,8 +2,7 @@
  * wm9713.c  --  ALSA Soc WM9713 codec support
  *
  * Copyright 2006 Wolfson Microelectronics PLC.
- * Author: Liam Girdwood
- *         liam.girdwood@wolfsonmicro.com or linux@wolfsonmicro.com
+ * Author: Liam Girdwood <lrg@slimlogic.co.uk>
  *
  *  This program is free software; you can redistribute  it and/or modify it
  *  under  the terms of  the GNU General  Public License as published by the
@@ -141,7 +140,7 @@ SOC_SINGLE("Capture ADC Boost (+20dB) Switch", AC97_VIDEO, 6, 1, 0),
 
 SOC_SINGLE("ALC Target Volume", AC97_CODEC_CLASS_REV, 12, 15, 0),
 SOC_SINGLE("ALC Hold Time", AC97_CODEC_CLASS_REV, 8, 15, 0),
-SOC_SINGLE("ALC Decay Time ", AC97_CODEC_CLASS_REV, 4, 15, 0),
+SOC_SINGLE("ALC Decay Time", AC97_CODEC_CLASS_REV, 4, 15, 0),
 SOC_SINGLE("ALC Attack Time", AC97_CODEC_CLASS_REV, 0, 15, 0),
 SOC_ENUM("ALC Function", wm9713_enum[6]),
 SOC_SINGLE("ALC Max Volume", AC97_PCI_SVID, 11, 7, 0),
@@ -419,8 +418,12 @@ SND_SOC_DAPM_MIXER("Line Mixer", SND_SOC_NOPM, 0, 0, NULL, 0),
 SND_SOC_DAPM_MIXER("Capture Mixer", SND_SOC_NOPM, 0, 0, NULL, 0),
 SND_SOC_DAPM_DAC("Voice DAC", "Voice Playback", AC97_EXTENDED_MID, 12, 1),
 SND_SOC_DAPM_DAC("Aux DAC", "Aux Playback", AC97_EXTENDED_MID, 11, 1),
-SND_SOC_DAPM_ADC("Left ADC", "Left HiFi Capture", AC97_EXTENDED_MID, 5, 1),
-SND_SOC_DAPM_ADC("Right ADC", "Right HiFi Capture", AC97_EXTENDED_MID, 4, 1),
+SND_SOC_DAPM_PGA("Left ADC", AC97_EXTENDED_MID, 5, 1, NULL, 0),
+SND_SOC_DAPM_PGA("Right ADC", AC97_EXTENDED_MID, 4, 1, NULL, 0),
+SND_SOC_DAPM_ADC("Left HiFi ADC", "Left HiFi Capture", SND_SOC_NOPM, 0, 0),
+SND_SOC_DAPM_ADC("Right HiFi ADC", "Right HiFi Capture", SND_SOC_NOPM, 0, 0),
+SND_SOC_DAPM_ADC("Left Voice ADC", "Left Voice Capture", SND_SOC_NOPM, 0, 0),
+SND_SOC_DAPM_ADC("Right Voice ADC", "Right Voice Capture", SND_SOC_NOPM, 0, 0),
 SND_SOC_DAPM_PGA("Left Headphone", AC97_EXTENDED_MSTATUS, 10, 1, NULL, 0),
 SND_SOC_DAPM_PGA("Right Headphone", AC97_EXTENDED_MSTATUS, 9, 1, NULL, 0),
 SND_SOC_DAPM_PGA("Left Speaker", AC97_EXTENDED_MSTATUS, 8, 1, NULL, 0),
@@ -583,9 +586,13 @@ static const struct snd_soc_dapm_route audio_map[] = {
 
 	/* left ADC */
 	{"Left ADC", NULL, "Left Capture Source"},
+	{"Left Voice ADC", NULL, "Left ADC"},
+	{"Left HiFi ADC", NULL, "Left ADC"},
 
 	/* right ADC */
 	{"Right ADC", NULL, "Right Capture Source"},
+	{"Right Voice ADC", NULL, "Right ADC"},
+	{"Right HiFi ADC", NULL, "Right ADC"},
 
 	/* mic */
 	{"Mic A Pre Amp", NULL, "Mic A Source"},
@@ -921,11 +928,10 @@ static int wm9713_set_dai_fmt(struct snd_soc_dai *codec_dai,
 }
 
 static int wm9713_pcm_hw_params(struct snd_pcm_substream *substream,
-	struct snd_pcm_hw_params *params)
+				struct snd_pcm_hw_params *params,
+				struct snd_soc_dai *dai)
 {
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_device *socdev = rtd->socdev;
-	struct snd_soc_codec *codec = socdev->codec;
+	struct snd_soc_codec *codec = dai->codec;
 	u16 reg = ac97_read(codec, AC97_CENTER_LFE_MASTER) & 0xfff3;
 
 	switch (params_format(params)) {
@@ -947,27 +953,25 @@ static int wm9713_pcm_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static void wm9713_voiceshutdown(struct snd_pcm_substream *substream)
+static void wm9713_voiceshutdown(struct snd_pcm_substream *substream,
+				 struct snd_soc_dai *dai)
 {
-    struct snd_soc_pcm_runtime *rtd = substream->private_data;
-    struct snd_soc_device *socdev = rtd->socdev;
-    struct snd_soc_codec *codec = socdev->codec;
-    u16 status;
+	struct snd_soc_codec *codec = dai->codec;
+	u16 status;
 
-    /* Gracefully shut down the voice interface. */
-    status = ac97_read(codec, AC97_EXTENDED_STATUS) | 0x1000;
-    ac97_write(codec, AC97_HANDSET_RATE, 0x0280);
-    schedule_timeout_interruptible(msecs_to_jiffies(1));
-    ac97_write(codec, AC97_HANDSET_RATE, 0x0F80);
-    ac97_write(codec, AC97_EXTENDED_MID, status);
+	/* Gracefully shut down the voice interface. */
+	status = ac97_read(codec, AC97_EXTENDED_STATUS) | 0x1000;
+	ac97_write(codec, AC97_HANDSET_RATE, 0x0280);
+	schedule_timeout_interruptible(msecs_to_jiffies(1));
+	ac97_write(codec, AC97_HANDSET_RATE, 0x0F80);
+	ac97_write(codec, AC97_EXTENDED_MID, status);
 }
 
-static int ac97_hifi_prepare(struct snd_pcm_substream *substream)
+static int ac97_hifi_prepare(struct snd_pcm_substream *substream,
+			     struct snd_soc_dai *dai)
 {
+	struct snd_soc_codec *codec = dai->codec;
 	struct snd_pcm_runtime *runtime = substream->runtime;
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_device *socdev = rtd->socdev;
-	struct snd_soc_codec *codec = socdev->codec;
 	int reg;
 	u16 vra;
 
@@ -982,12 +986,11 @@ static int ac97_hifi_prepare(struct snd_pcm_substream *substream)
 	return ac97_write(codec, reg, runtime->rate);
 }
 
-static int ac97_aux_prepare(struct snd_pcm_substream *substream)
+static int ac97_aux_prepare(struct snd_pcm_substream *substream,
+			    struct snd_soc_dai *dai)
 {
+	struct snd_soc_codec *codec = dai->codec;
 	struct snd_pcm_runtime *runtime = substream->runtime;
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_device *socdev = rtd->socdev;
-	struct snd_soc_codec *codec = socdev->codec;
 	u16 vra, xsle;
 
 	vra = ac97_read(codec, AC97_EXTENDED_STATUS);
@@ -1021,7 +1024,7 @@ static int ac97_aux_prepare(struct snd_pcm_substream *substream)
 struct snd_soc_dai wm9713_dai[] = {
 {
 	.name = "AC97 HiFi",
-	.type = SND_SOC_DAI_AC97_BUS,
+	.ac97_control = 1,
 	.playback = {
 		.stream_name = "HiFi Playback",
 		.channels_min = 1,
@@ -1035,8 +1038,7 @@ struct snd_soc_dai wm9713_dai[] = {
 		.rates = WM9713_RATES,
 		.formats = SNDRV_PCM_FMTBIT_S16_LE,},
 	.ops = {
-		.prepare = ac97_hifi_prepare,},
-	.dai_ops = {
+		.prepare = ac97_hifi_prepare,
 		.set_clkdiv = wm9713_set_dai_clkdiv,
 		.set_pll = wm9713_set_dai_pll,},
 	},
@@ -1049,8 +1051,7 @@ struct snd_soc_dai wm9713_dai[] = {
 		.rates = WM9713_RATES,
 		.formats = SNDRV_PCM_FMTBIT_S16_LE,},
 	.ops = {
-		.prepare = ac97_aux_prepare,},
-	.dai_ops = {
+		.prepare = ac97_aux_prepare,
 		.set_clkdiv = wm9713_set_dai_clkdiv,
 		.set_pll = wm9713_set_dai_pll,},
 	},
@@ -1070,8 +1071,7 @@ struct snd_soc_dai wm9713_dai[] = {
 		.formats = WM9713_PCM_FORMATS,},
 	.ops = {
 		.hw_params = wm9713_pcm_hw_params,
-		.shutdown = wm9713_voiceshutdown,},
-	.dai_ops = {
+		.shutdown = wm9713_voiceshutdown,
 		.set_clkdiv = wm9713_set_dai_clkdiv,
 		.set_pll = wm9713_set_dai_pll,
 		.set_fmt = wm9713_set_dai_fmt,
@@ -1090,6 +1090,8 @@ int wm9713_reset(struct snd_soc_codec *codec, int try_warm)
 	}
 
 	soc_ac97_ops.reset(codec->ac97);
+	if (soc_ac97_ops.warm_reset)
+		soc_ac97_ops.warm_reset(codec->ac97);
 	if (ac97_read(codec, 0) != wm9713_reg[0])
 		return -EIO;
 	return 0;
@@ -1233,7 +1235,7 @@ static int wm9713_soc_probe(struct platform_device *pdev)
 	wm9713_reset(codec, 0);
 	ret = wm9713_reset(codec, 1);
 	if (ret < 0) {
-		printk(KERN_ERR "AC97 link error\n");
+		printk(KERN_ERR "Failed to reset WM9713: AC97 link error\n");
 		goto reset_err;
 	}
 
@@ -1245,7 +1247,7 @@ static int wm9713_soc_probe(struct platform_device *pdev)
 
 	wm9713_add_controls(codec);
 	wm9713_add_widgets(codec);
-	ret = snd_soc_register_card(socdev);
+	ret = snd_soc_init_card(socdev);
 	if (ret < 0)
 		goto reset_err;
 	return 0;
@@ -1281,7 +1283,6 @@ static int wm9713_soc_remove(struct platform_device *pdev)
 	snd_soc_free_ac97_codec(codec);
 	kfree(codec->private_data);
 	kfree(codec->reg_cache);
-	kfree(codec->dai);
 	kfree(codec);
 	return 0;
 }

@@ -14,7 +14,6 @@
 #include "chsc.h"
 
 #define QDIO_BUSY_BIT_PATIENCE		100	/* 100 microseconds */
-#define QDIO_BUSY_BIT_GIVE_UP		2000000	/* 2 seconds = eternity */
 #define QDIO_INPUT_THRESHOLD		500	/* 500 microseconds */
 
 /*
@@ -195,14 +194,11 @@ struct qdio_input_q {
 };
 
 struct qdio_output_q {
-	/* failed siga-w attempts*/
-	atomic_t busy_siga_counter;
-
-	/* start time of busy condition */
-	u64 timestamp;
-
 	/* PCIs are enabled for the queue */
 	int pci_out_enabled;
+
+	/* IQDIO: output multiple buffers (enhanced SIGA) */
+	int use_enh_siga;
 
 	/* timer to check for more outbound work */
 	struct timer_list timer;
@@ -248,6 +244,7 @@ struct qdio_q {
 
 	struct qdio_irq *irq_ptr;
 	struct tasklet_struct tasklet;
+	spinlock_t lock;
 
 	/* error condition during a data transfer */
 	unsigned int qdio_error;
@@ -304,7 +301,7 @@ struct qdio_irq {
 
 /* helper functions */
 #define queue_type(q)	q->irq_ptr->qib.qfmt
-#define SCH_NO(q)       (q->irq_ptr->schid.sch_no)
+#define SCH_NO(q)	(q->irq_ptr->schid.sch_no)
 
 #define is_thinint_irq(irq) \
 	(irq->qib.qfmt == QDIO_IQDIO_QFMT || \

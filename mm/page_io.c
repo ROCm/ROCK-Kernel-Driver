@@ -101,7 +101,7 @@ int swap_writepage(struct page *page, struct writeback_control *wbc)
 	int ret = 0, rw = WRITE;
 	struct swap_info_struct *sis = page_swap_info(page);
 
-	if (remove_exclusive_swap_page(page)) {
+	if (try_to_free_swap(page)) {
 		unlock_page(page);
 		goto out;
 	}
@@ -170,8 +170,8 @@ int swap_readpage(struct file *file, struct page *page)
 	int ret = 0;
 	struct swap_info_struct *sis = page_swap_info(page);
 
-	BUG_ON(!PageLocked(page));
-	BUG_ON(PageUptodate(page));
+	VM_BUG_ON(!PageLocked(page));
+	VM_BUG_ON(PageUptodate(page));
 
 	if (sis->flags & SWP_FILE) {
 		struct file *swap_file = sis->swap_file;
@@ -195,3 +195,5 @@ int swap_readpage(struct file *file, struct page *page)
 out:
 	return ret;
 }
+
+DEFINE_TRACE(swap_out);

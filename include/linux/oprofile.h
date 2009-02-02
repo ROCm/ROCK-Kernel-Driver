@@ -16,9 +16,6 @@
 #include <linux/types.h>
 #include <linux/spinlock.h>
 #include <asm/atomic.h>
-#ifdef CONFIG_XEN
-#include <xen/interface/xenoprof.h>
-#endif
  
 /* Each escaped entry is prefixed by ESCAPE_CODE
  * then one of the following codes, then the
@@ -31,7 +28,7 @@
 #define CPU_SWITCH_CODE			2
 #define COOKIE_SWITCH_CODE		3
 #define KERNEL_ENTER_SWITCH_CODE	4
-#define USER_ENTER_SWITCH_CODE		5
+#define KERNEL_EXIT_SWITCH_CODE		5
 #define MODULE_LOADED_CODE		6
 #define CTX_TGID_CODE			7
 #define TRACE_BEGIN_CODE		8
@@ -39,7 +36,8 @@
 #define XEN_ENTER_SWITCH_CODE		10
 #define SPU_PROFILING_CODE		11
 #define SPU_CTX_SWITCH_CODE		12
-#define DOMAIN_SWITCH_CODE		13
+#define IBS_FETCH_CODE			13
+#define IBS_OP_CODE			14
 
 struct super_block;
 struct dentry;
@@ -51,12 +49,6 @@ struct oprofile_operations {
 	/* create any necessary configuration files in the oprofile fs.
 	 * Optional. */
 	int (*create_files)(struct super_block * sb, struct dentry * root);
-#ifdef CONFIG_XEN
-	/* setup active domains with Xen */
-	int (*set_active)(int *active_domains, unsigned int adomains);
-        /* setup passive domains with Xen */
-        int (*set_passive)(int *passive_domains, unsigned int pdomains);
-#endif
 	/* Do any necessary interrupt setup. Optional. */
 	int (*setup)(void);
 	/* Do any necessary interrupt shutdown. Optional. */
@@ -94,8 +86,7 @@ int oprofile_arch_init(struct oprofile_operations * ops);
 void oprofile_arch_exit(void);
 
 /**
- * Add a sample. This may be called from any context. Pass
- * smp_processor_id() as cpu.
+ * Add a sample. This may be called from any context.
  */
 void oprofile_add_sample(struct pt_regs * const regs, unsigned long event);
 
@@ -116,8 +107,6 @@ void oprofile_add_pc(unsigned long pc, int is_kernel, unsigned long event);
 /* add a backtrace entry, to be called from the ->backtrace callback */
 void oprofile_add_trace(unsigned long eip);
 
-/* add a domain switch entry */
-int oprofile_add_domain_switch(int32_t domain_id);
 
 /**
  * Create a file of the given name as a child of the given root, with
@@ -175,4 +164,22 @@ void oprofile_put_buff(unsigned long *buf, unsigned int start,
 unsigned long oprofile_get_cpu_buffer_size(void);
 void oprofile_cpu_buffer_inc_smpl_lost(void);
  
+/* cpu buffer functions */
+
+struct op_sample;
+
+struct op_entry {
+	struct ring_buffer_event *event;
+	struct op_sample *sample;
+	unsigned long irq_flags;
+	unsigned long size;
+	unsigned long *data;
+};
+
+void oprofile_write_reserve(struct op_entry *entry,
+			    struct pt_regs * const regs,
+			    unsigned long pc, int code, int size);
+int oprofile_add_data(struct op_entry *entry, unsigned long val);
+int oprofile_write_commit(struct op_entry *entry);
+
 #endif /* OPROFILE_H */

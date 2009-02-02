@@ -358,8 +358,7 @@ void afs_clear_inode(struct inode *inode)
 /*
  * set the attributes of an inode
  */
-static int afs_do_setattr(struct dentry *dentry, struct iattr *attr,
-		   struct file *file)
+int afs_setattr(struct dentry *dentry, struct iattr *attr)
 {
 	struct afs_vnode *vnode = AFS_FS_I(dentry->d_inode);
 	struct key *key;
@@ -381,8 +380,8 @@ static int afs_do_setattr(struct dentry *dentry, struct iattr *attr,
 		afs_writeback_all(vnode);
 	}
 
-	if (file) {
-		key = file->private_data;
+	if (attr->ia_valid & ATTR_FILE) {
+		key = attr->ia_file->private_data;
 	} else {
 		key = afs_request_key(vnode->volume->cell);
 		if (IS_ERR(key)) {
@@ -392,20 +391,10 @@ static int afs_do_setattr(struct dentry *dentry, struct iattr *attr,
 	}
 
 	ret = afs_vnode_setattr(vnode, key, attr);
-	if (!file)
+	if (!(attr->ia_valid & ATTR_FILE))
 		key_put(key);
 
 error:
 	_leave(" = %d", ret);
 	return ret;
-}
-
-int afs_setattr(struct dentry *dentry, struct iattr *attr)
-{
-	return afs_do_setattr(dentry, attr, NULL);
-}
-
-int afs_fsetattr(struct file *file, struct iattr *attr)
-{
-	return afs_do_setattr(file->f_path.dentry, attr, file);
 }

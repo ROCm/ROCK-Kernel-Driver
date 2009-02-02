@@ -47,7 +47,7 @@ modalias_show(struct device *dev, struct device_attribute *a, char *buf)
 {
 	const struct spi_device	*spi = to_spi_device(dev);
 
-	return snprintf(buf, BUS_ID_SIZE + 1, "%s\n", spi->modalias);
+	return sprintf(buf, "%s\n", spi->modalias);
 }
 
 static struct device_attribute spi_dev_attrs[] = {
@@ -63,7 +63,7 @@ static int spi_match_device(struct device *dev, struct device_driver *drv)
 {
 	const struct spi_device	*spi = to_spi_device(dev);
 
-	return strncmp(spi->modalias, drv->name, BUS_ID_SIZE) == 0;
+	return strcmp(spi->modalias, drv->name) == 0;
 }
 
 static int spi_uevent(struct device *dev, struct kobj_uevent_env *env)
@@ -243,8 +243,7 @@ int spi_add_device(struct spi_device *spi)
 	}
 
 	/* Set the bus ID string */
-	snprintf(spi->dev.bus_id, sizeof spi->dev.bus_id,
-			"%s.%u", spi->master->dev.bus_id,
+	dev_set_name(&spi->dev, "%s.%u", dev_name(&spi->master->dev),
 			spi->chip_select);
 
 
@@ -254,7 +253,7 @@ int spi_add_device(struct spi_device *spi)
 	 */
 	mutex_lock(&spi_add_lock);
 
-	if (bus_find_device_by_name(&spi_bus_type, NULL, spi->dev.bus_id)
+	if (bus_find_device_by_name(&spi_bus_type, NULL, dev_name(&spi->dev))
 			!= NULL) {
 		dev_err(dev, "chipselect %d already in use\n",
 				spi->chip_select);
@@ -269,7 +268,7 @@ int spi_add_device(struct spi_device *spi)
 	status = spi->master->setup(spi);
 	if (status < 0) {
 		dev_err(dev, "can't %s %s, status %d\n",
-				"setup", spi->dev.bus_id, status);
+				"setup", dev_name(&spi->dev), status);
 		goto done;
 	}
 
@@ -277,9 +276,9 @@ int spi_add_device(struct spi_device *spi)
 	status = device_add(&spi->dev);
 	if (status < 0)
 		dev_err(dev, "can't %s %s, status %d\n",
-				"add", spi->dev.bus_id, status);
+				"add", dev_name(&spi->dev), status);
 	else
-		dev_dbg(dev, "registered child %s\n", spi->dev.bus_id);
+		dev_dbg(dev, "registered child %s\n", dev_name(&spi->dev));
 
 done:
 	mutex_unlock(&spi_add_lock);
@@ -504,12 +503,11 @@ int spi_register_master(struct spi_master *master)
 	/* register the device, then userspace will see it.
 	 * registration fails if the bus ID is in use.
 	 */
-	snprintf(master->dev.bus_id, sizeof master->dev.bus_id,
-		"spi%u", master->bus_num);
+	dev_set_name(&master->dev, "spi%u", master->bus_num);
 	status = device_add(&master->dev);
 	if (status < 0)
 		goto done;
-	dev_dbg(dev, "registered master %s%s\n", master->dev.bus_id,
+	dev_dbg(dev, "registered master %s%s\n", dev_name(&master->dev),
 			dynamic ? " (dynamic)" : "");
 
 	/* populate children from any spi device tables */
@@ -660,7 +658,7 @@ int spi_write_then_read(struct spi_device *spi,
 
 	int			status;
 	struct spi_message	message;
-	struct spi_transfer	x[2];
+	struct spi_transfer	x;
 	u8			*local_buf;
 
 	/* Use preallocated DMA-safe buffer.  We can't avoid copying here,
@@ -671,15 +669,9 @@ int spi_write_then_read(struct spi_device *spi,
 		return -EINVAL;
 
 	spi_message_init(&message);
-	memset(x, 0, sizeof x);
-	if (n_tx) {
-		x[0].len = n_tx;
-		spi_message_add_tail(&x[0], &message);
-	}
-	if (n_rx) {
-		x[1].len = n_rx;
-		spi_message_add_tail(&x[1], &message);
-	}
+	memset(&x, 0, sizeof x);
+	x.len = n_tx + n_rx;
+	spi_message_add_tail(&x, &message);
 
 	/* ... unless someone else is using the pre-allocated buffer */
 	if (!mutex_trylock(&lock)) {
@@ -690,15 +682,15 @@ int spi_write_then_read(struct spi_device *spi,
 		local_buf = buf;
 
 	memcpy(local_buf, txbuf, n_tx);
-	x[0].tx_buf = local_buf;
-	x[1].rx_buf = local_buf + n_tx;
+	x.tx_buf = local_buf;
+	x.rx_buf = local_buf;
 
 	/* do the i/o */
 	status = spi_sync(spi, &message);
 	if (status == 0)
-		memcpy(rxbuf, x[1].rx_buf, n_rx);
+		memcpy(rxbuf, x.rx_buf + n_tx, n_rx);
 
-	if (x[0].tx_buf == buf)
+	if (x.tx_buf == buf)
 		mutex_unlock(&lock);
 	else
 		kfree(local_buf);
@@ -744,5 +736,5 @@ err0:
  * driver registration) _could_ be dynamically linked (modular) ... costs
  * include needing to have boardinfo data structures be much more public.
  */
-subsys_initcall(spi_init);
+postcore_initcall(spi_init);
 

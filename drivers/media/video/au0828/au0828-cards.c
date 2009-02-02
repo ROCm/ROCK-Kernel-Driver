@@ -46,7 +46,7 @@ struct au0828_board au0828_boards[] = {
 /* Tuner callback function for au0828 boards. Currently only needed
  * for HVR1500Q, which has an xc5000 tuner.
  */
-int au0828_tuner_callback(void *priv, int command, int arg)
+int au0828_tuner_callback(void *priv, int component, int command, int arg)
 {
 	struct au0828_dev *dev = priv;
 
@@ -186,7 +186,7 @@ void au0828_gpio_setup(struct au0828_dev *dev)
 }
 
 /* table of devices that work with this driver */
-struct usb_device_id au0828_usb_id_table [] = {
+struct usb_device_id au0828_usb_id_table[] = {
 	{ USB_DEVICE(0x2040, 0x7200),
 		.driver_info = AU0828_BOARD_HAUPPAUGE_HVR950Q },
 	{ USB_DEVICE(0x2040, 0x7240),

@@ -123,6 +123,10 @@ static unsigned long magician_pin_config[] __initdata = {
 	GPIO107_GPIO,	/* DS1WM_IRQ */
 	GPIO108_GPIO,	/* GSM_READY */
 	GPIO115_GPIO,	/* nPEN_IRQ */
+
+	/* I2C */
+	GPIO117_I2C_SCL,
+	GPIO118_I2C_SDA,
 };
 
 /*
@@ -332,8 +336,7 @@ static struct pxafb_mach_info toppoly_info = {
 	.modes           = toppoly_modes,
 	.num_modes       = 1,
 	.fixed_modes     = 1,
-	.lccr0           = LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-	.lccr3           = LCCR3_PixRsEdg,
+	.lcd_conn	= LCD_COLOR_TFT_16BPP,
 	.pxafb_lcd_power = toppoly_lcd_power,
 };
 
@@ -341,8 +344,8 @@ static struct pxafb_mach_info samsung_info = {
 	.modes           = samsung_modes,
 	.num_modes       = 1,
 	.fixed_modes     = 1,
-	.lccr0           = LCCR0_LDDALT | LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-	.lccr3           = LCCR3_PixFlEdg,
+	.lcd_conn	 = LCD_COLOR_TFT_16BPP | LCD_PCLK_EDGE_FALL |\
+			   LCD_ALTERNATE_MAPPING,
 	.pxafb_lcd_power = samsung_lcd_power,
 };
 
@@ -409,7 +412,7 @@ static struct platform_device backlight = {
  * LEDs
  */
 
-struct gpio_led gpio_leds[] = {
+static struct gpio_led gpio_leds[] = {
 	{
 		.name = "magician::vibra",
 		.default_trigger = "none",
@@ -669,18 +672,10 @@ static struct pxamci_platform_data magician_mci_info = {
  * USB OHCI
  */
 
-static int magician_ohci_init(struct device *dev)
-{
-	UHCHR = (UHCHR | UHCHR_SSEP2 | UHCHR_PCPL | UHCHR_CGR) &
-	    ~(UHCHR_SSEP1 | UHCHR_SSEP3 | UHCHR_SSE);
-
-	return 0;
-}
-
 static struct pxaohci_platform_data magician_ohci_info = {
-	.port_mode    = PMM_PERPORT_MODE,
-	.init         = magician_ohci_init,
-	.power_budget = 0,
+	.port_mode	= PMM_PERPORT_MODE,
+	.flags		= ENABLE_PORT1 | ENABLE_PORT3 | POWER_CONTROL_LOW,
+	.power_budget	= 0,
 };
 
 

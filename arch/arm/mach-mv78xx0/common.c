@@ -167,6 +167,7 @@ void __init mv78xx0_map_io(void)
  ****************************************************************************/
 static struct orion_ehci_data mv78xx0_ehci_data = {
 	.dram		= &mv78xx0_mbus_dram_info,
+	.phy_version	= EHCI_PHY_NA,
 };
 
 static u64 ehci_dmamask = 0xffffffffUL;
@@ -285,6 +286,11 @@ static struct resource mv78xx0_ge00_shared_resources[] = {
 		.start	= GE00_PHYS_BASE + 0x2000,
 		.end	= GE00_PHYS_BASE + 0x3fff,
 		.flags	= IORESOURCE_MEM,
+	}, {
+		.name	= "ge err irq",
+		.start	= IRQ_MV78XX0_GE_ERR,
+		.end	= IRQ_MV78XX0_GE_ERR,
+		.flags	= IORESOURCE_IRQ,
 	},
 };
 
@@ -294,7 +300,7 @@ static struct platform_device mv78xx0_ge00_shared = {
 	.dev		= {
 		.platform_data	= &mv78xx0_ge00_shared_data,
 	},
-	.num_resources	= 1,
+	.num_resources	= ARRAY_SIZE(mv78xx0_ge00_shared_resources),
 	.resource	= mv78xx0_ge00_shared_resources,
 };
 
@@ -330,6 +336,7 @@ void __init mv78xx0_ge00_init(struct mv643xx_eth_platform_data *eth_data)
 struct mv643xx_eth_shared_platform_data mv78xx0_ge01_shared_data = {
 	.t_clk		= 0,
 	.dram		= &mv78xx0_mbus_dram_info,
+	.shared_smi	= &mv78xx0_ge00_shared,
 };
 
 static struct resource mv78xx0_ge01_shared_resources[] = {
@@ -370,7 +377,6 @@ static struct platform_device mv78xx0_ge01 = {
 void __init mv78xx0_ge01_init(struct mv643xx_eth_platform_data *eth_data)
 {
 	eth_data->shared = &mv78xx0_ge01_shared;
-	eth_data->shared_smi = &mv78xx0_ge00_shared;
 	mv78xx0_ge01.dev.platform_data = eth_data;
 
 	platform_device_register(&mv78xx0_ge01_shared);
@@ -384,6 +390,7 @@ void __init mv78xx0_ge01_init(struct mv643xx_eth_platform_data *eth_data)
 struct mv643xx_eth_shared_platform_data mv78xx0_ge10_shared_data = {
 	.t_clk		= 0,
 	.dram		= &mv78xx0_mbus_dram_info,
+	.shared_smi	= &mv78xx0_ge00_shared,
 };
 
 static struct resource mv78xx0_ge10_shared_resources[] = {
@@ -424,7 +431,6 @@ static struct platform_device mv78xx0_ge10 = {
 void __init mv78xx0_ge10_init(struct mv643xx_eth_platform_data *eth_data)
 {
 	eth_data->shared = &mv78xx0_ge10_shared;
-	eth_data->shared_smi = &mv78xx0_ge00_shared;
 	mv78xx0_ge10.dev.platform_data = eth_data;
 
 	platform_device_register(&mv78xx0_ge10_shared);
@@ -438,6 +444,7 @@ void __init mv78xx0_ge10_init(struct mv643xx_eth_platform_data *eth_data)
 struct mv643xx_eth_shared_platform_data mv78xx0_ge11_shared_data = {
 	.t_clk		= 0,
 	.dram		= &mv78xx0_mbus_dram_info,
+	.shared_smi	= &mv78xx0_ge00_shared,
 };
 
 static struct resource mv78xx0_ge11_shared_resources[] = {
@@ -478,7 +485,6 @@ static struct platform_device mv78xx0_ge11 = {
 void __init mv78xx0_ge11_init(struct mv643xx_eth_platform_data *eth_data)
 {
 	eth_data->shared = &mv78xx0_ge11_shared;
-	eth_data->shared_smi = &mv78xx0_ge00_shared;
 	mv78xx0_ge11.dev.platform_data = eth_data;
 
 	platform_device_register(&mv78xx0_ge11_shared);

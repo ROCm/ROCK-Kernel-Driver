@@ -66,12 +66,28 @@ struct key_type cifs_spnego_key_type = {
 	.describe	= user_describe,
 };
 
-#define MAX_VER_STR_LEN   8 /* length of longest version string e.g.
-				strlen("ver=0xFF") */
-#define MAX_MECH_STR_LEN 13 /* length of longest security mechanism name, eg
-			       in future could have strlen(";sec=ntlmsspi") */
+/* length of longest version string e.g.  strlen("ver=0xFF") */
+#define MAX_VER_STR_LEN		8
+
+/* length of longest security mechanism name, eg in future could have
+ * strlen(";sec=ntlmsspi") */
+#define MAX_MECH_STR_LEN	13
+
 /* max possible addr len eg FEDC:BA98:7654:3210:FEDC:BA98:7654:3210/128 */
 #define MAX_IPV6_ADDR_LEN	43
+
+/* strlen of "host=" */
+#define HOST_KEY_LEN		5
+
+/* strlen of ";ip4=" or ";ip6=" */
+#define IP_KEY_LEN		5
+
+/* strlen of ";uid=0x" */
+#define UID_KEY_LEN		7
+
+/* strlen of ";user=" */
+#define USER_KEY_LEN		6
+
 /* get a key struct with a SPNEGO security blob, suitable for session setup */
 struct key *
 cifs_get_spnego_key(struct cifsSesInfo *sesInfo)
@@ -85,11 +101,11 @@ cifs_get_spnego_key(struct cifsSesInfo *sesInfo)
 	/* length of fields (with semicolons): ver=0xyz ip4=ipaddress
 	   host=hostname sec=mechanism uid=0xFF user=username */
 	desc_len = MAX_VER_STR_LEN +
-		   6 /* len of "host=" */ + strlen(hostname) +
-		   5 /* len of ";ipv4=" */ + MAX_IPV6_ADDR_LEN +
+		   HOST_KEY_LEN + strlen(hostname) +
+		   IP_KEY_LEN + MAX_IPV6_ADDR_LEN +
 		   MAX_MECH_STR_LEN +
-		   7 /* len of ";uid=0x" */ + (sizeof(uid_t) * 2) +
-		   6 /* len of ";user=" */ + strlen(sesInfo->userName) + 1;
+		   UID_KEY_LEN + (sizeof(uid_t) * 2) +
+		   USER_KEY_LEN + strlen(sesInfo->userName) + 1;
 
 	spnego_key = ERR_PTR(-ENOMEM);
 	description = kzalloc(desc_len, GFP_KERNEL);
@@ -105,11 +121,9 @@ cifs_get_spnego_key(struct cifsSesInfo *sesInfo)
 
 	/* add the server address */
 	if (server->addr.sockAddr.sin_family == AF_INET)
-		sprintf(dp, "ip4=" NIPQUAD_FMT,
-			NIPQUAD(server->addr.sockAddr.sin_addr));
+		sprintf(dp, "ip4=%pI4", &server->addr.sockAddr.sin_addr);
 	else if (server->addr.sockAddr.sin_family == AF_INET6)
-		sprintf(dp, "ip6=" NIP6_SEQFMT,
-			NIP6(server->addr.sockAddr6.sin6_addr));
+		sprintf(dp, "ip6=%pi6", &server->addr.sockAddr6.sin6_addr);
 	else
 		goto out;
 

@@ -1,9 +1,9 @@
 /*
  * Initial register settings functions
  *
- * Copyright (c) 2004, 2005, 2006, 2007 Reyk Floeter <reyk@openbsd.org>
- * Copyright (c) 2006, 2007 Nick Kossifidis <mickflemm@gmail.com>
- * Copyright (c) 2007 Jiri Slaby <jirislaby@gmail.com>
+ * Copyright (c) 2004-2007 Reyk Floeter <reyk@openbsd.org>
+ * Copyright (c) 2006-2007 Nick Kossifidis <mickflemm@gmail.com>
+ * Copyright (c) 2007-2008 Jiri Slaby <jirislaby@gmail.com>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -20,13 +20,9 @@
  */
 
 #include "ath5k.h"
-#include "base.h"
 #include "reg.h"
-
-/*
- * MAC/PHY REGISTERS
- */
-
+#include "debug.h"
+#include "base.h"
 
 /*
  * Mode-independent initial register writes
@@ -65,10 +61,10 @@ static const struct ath5k_ini ar5210_ini[] = {
 	{ AR5K_TXCFG,		AR5K_DMASIZE_128B },
 	{ AR5K_RXCFG,		AR5K_DMASIZE_128B },
 	{ AR5K_CFG,		AR5K_INIT_CFG },
-	{ AR5K_TOPS,		AR5K_INIT_TOPS },
-	{ AR5K_RXNOFRM,		AR5K_INIT_RXNOFRM },
-	{ AR5K_RPGTO,		AR5K_INIT_RPGTO },
-	{ AR5K_TXNOFRM,		AR5K_INIT_TXNOFRM },
+	{ AR5K_TOPS,		8 },
+	{ AR5K_RXNOFRM,		8 },
+	{ AR5K_RPGTO,		0 },
+	{ AR5K_TXNOFRM,		0 },
 	{ AR5K_SFR,		0 },
 	{ AR5K_MIBC,		0 },
 	{ AR5K_MISC,		0 },
@@ -1685,7 +1681,7 @@ int ath5k_hw_write_initvals(struct ath5k_hw *ah, u8 mode, bool change_channel)
 	 */
 
 	/* For AR5212 and combatible */
-	if (ah->ah_version == AR5K_AR5212){
+	if (ah->ah_version == AR5K_AR5212) {
 
 		/* First set of mode-specific settings */
 		ath5k_hw_ini_mode_registers(ah,
@@ -1699,7 +1695,7 @@ int ath5k_hw_write_initvals(struct ath5k_hw *ah, u8 mode, bool change_channel)
 					ar5212_ini, change_channel);
 
 		/* Second set of mode-specific settings */
-		if (ah->ah_radio == AR5K_RF5111){
+		if (ah->ah_radio == AR5K_RF5111) {
 
 			ath5k_hw_ini_mode_registers(ah,
 					ARRAY_SIZE(ar5212_rf5111_ini_mode_end),
@@ -1710,7 +1706,7 @@ int ath5k_hw_write_initvals(struct ath5k_hw *ah, u8 mode, bool change_channel)
 					ARRAY_SIZE(rf5111_ini_bbgain),
 					rf5111_ini_bbgain, change_channel);
 
-		} else if (ah->ah_radio == AR5K_RF5112){
+		} else if (ah->ah_radio == AR5K_RF5112) {
 
 			ath5k_hw_ini_mode_registers(ah,
 					ARRAY_SIZE(ar5212_rf5112_ini_mode_end),
@@ -1720,7 +1716,7 @@ int ath5k_hw_write_initvals(struct ath5k_hw *ah, u8 mode, bool change_channel)
 					ARRAY_SIZE(rf5112_ini_bbgain),
 					rf5112_ini_bbgain, change_channel);
 
-		} else if (ah->ah_radio == AR5K_RF5413){
+		} else if (ah->ah_radio == AR5K_RF5413) {
 
 			ath5k_hw_ini_mode_registers(ah,
 					ARRAY_SIZE(rf5413_ini_mode_end),

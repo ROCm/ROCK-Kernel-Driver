@@ -19,7 +19,6 @@
 #include <linux/notifier.h>
 #include <linux/lmb.h>
 #include <linux/of.h>
-#include <linux/pfn.h>
 #include <asm/sparsemem.h>
 #include <asm/prom.h>
 #include <asm/system.h>
@@ -529,11 +528,9 @@ static unsigned long __init numa_enforce_memory_limit(unsigned long start,
 	/*
 	 * We use lmb_end_of_DRAM() in here instead of memory_limit because
 	 * we've already adjusted it for the limit and it takes care of
-	 * having memory holes below the limit.
+	 * having memory holes below the limit.  Also, in the case of
+	 * iommu_is_off, memory_limit is not set but is implicitly enforced.
 	 */
-
-	if (! memory_limit)
-		return size;
 
 	if (start + size <= lmb_end_of_DRAM())
 		return size;
@@ -825,42 +822,50 @@ static void __init dump_numa_memory_topology(void)
  * required. nid is the preferred node and end is the physical address of
  * the highest address in the node.
  *
- * Returns the physical address of the memory.
+ * Returns the virtual address of the memory.
  */
-static void __init *careful_allocation(int nid, unsigned long size,
+static void __init *careful_zallocation(int nid, unsigned long size,
 				       unsigned long align,
 				       unsigned long end_pfn)
 {
+	void *ret;
 	int new_nid;
-	unsigned long ret = __lmb_alloc_base(size, align, end_pfn << PAGE_SHIFT);
+	unsigned long ret_paddr;
+
+	ret_paddr = __lmb_alloc_base(size, align, end_pfn << PAGE_SHIFT);
 
 	/* retry over all memory */
-	if (!ret)
-		ret = __lmb_alloc_base(size, align, lmb_end_of_DRAM());
+	if (!ret_paddr)
+		ret_paddr = __lmb_alloc_base(size, align, lmb_end_of_DRAM());
 
-	if (!ret)
-		panic("numa.c: cannot allocate %lu bytes on node %d",
+	if (!ret_paddr)
+		panic("numa.c: cannot allocate %lu bytes for node %d",
 		      size, nid);
 
+	ret = __va(ret_paddr);
+
 	/*
-	 * If the memory came from a previously allocated node, we must
-	 * retry with the bootmem allocator.
+	 * We initialize the nodes in numeric order: 0, 1, 2...
+	 * and hand over control from the LMB allocator to the
+	 * bootmem allocator.  If this function is called for
+	 * node 5, then we know that all nodes <5 are using the
+	 * bootmem allocator instead of the LMB allocator.
+	 *
+	 * So, check the nid from which this allocation came
+	 * and double check to see if we need to use bootmem
+	 * instead of the LMB.  We don't free the LMB memory
+	 * since it would be useless.
 	 */
-	new_nid = early_pfn_to_nid(ret >> PAGE_SHIFT);
+	new_nid = early_pfn_to_nid(ret_paddr >> PAGE_SHIFT);
 	if (new_nid < nid) {
-		ret = (unsigned long)__alloc_bootmem_node(NODE_DATA(new_nid),
+		ret = __alloc_bootmem_node(NODE_DATA(new_nid),
 				size, align, 0);
 
-		if (!ret)
-			panic("numa.c: cannot allocate %lu bytes on node %d",
-			      size, new_nid);
-
-		ret = __pa(ret);
-
-		dbg("alloc_bootmem %lx %lx\n", ret, size);
+		dbg("alloc_bootmem %p %lx\n", ret, size);
 	}
 
-	return (void *)ret;
+	memset(ret, 0, size);
+	return ret;
 }
 
 static struct notifier_block __cpuinitdata ppc64_numa_nb = {
@@ -873,12 +878,11 @@ static void mark_reserved_regions_for_nid(int nid)
 	struct pglist_data *node = NODE_DATA(nid);
 	int i;
 
-	dbg("mark_reserved_regions_for_nid(%d) NODE_DATA: %p\n", nid, node);
 	for (i = 0; i < lmb.reserved.cnt; i++) {
 		unsigned long physbase = lmb.reserved.region[i].base;
 		unsigned long size = lmb.reserved.region[i].size;
 		unsigned long start_pfn = physbase >> PAGE_SHIFT;
-		unsigned long end_pfn = PFN_UP(physbase + size);
+		unsigned long end_pfn = ((physbase + size) >> PAGE_SHIFT);
 		struct node_active_region node_ar;
 		unsigned long node_end_pfn = node->node_start_pfn +
 					     node->node_spanned_pages;
@@ -904,15 +908,18 @@ static void mark_reserved_regions_for_nid(int nid)
 			 */
 			if (end_pfn > node_ar.end_pfn)
 				reserve_size = (node_ar.end_pfn << PAGE_SHIFT)
-					- physbase;
+					- (start_pfn << PAGE_SHIFT);
 			/*
 			 * Only worry about *this* node, others may not
 			 * yet have valid NODE_DATA().
 			 */
-			if (node_ar.nid == nid)
+			if (node_ar.nid == nid) {
+				dbg("reserve_bootmem %lx %lx nid=%d\n",
+					physbase, reserve_size, node_ar.nid);
 				reserve_bootmem_node(NODE_DATA(node_ar.nid),
 						physbase, reserve_size,
 						BOOTMEM_DEFAULT);
+			}
 			/*
 			 * if reserved region is contained in the active region
 			 * then done.
@@ -953,10 +960,9 @@ void __init do_init_bootmem(void)
 
 	for_each_online_node(nid) {
 		unsigned long start_pfn, end_pfn;
-		unsigned long bootmem_paddr;
+		void *bootmem_vaddr;
 		unsigned long bootmap_pages;
 
-		dbg("node %d is online\n", nid);
 		get_pfn_range_for_nid(nid, &start_pfn, &end_pfn);
 
 		/*
@@ -966,11 +972,9 @@ void __init do_init_bootmem(void)
 		 * previous nodes' bootmem to be initialized and have
 		 * all reserved areas marked.
 		 */
-		NODE_DATA(nid) = careful_allocation(nid,
+		NODE_DATA(nid) = careful_zallocation(nid,
 					sizeof(struct pglist_data),
 					SMP_CACHE_BYTES, end_pfn);
-		NODE_DATA(nid) = __va(NODE_DATA(nid));
-		memset(NODE_DATA(nid), 0, sizeof(struct pglist_data));
 
   		dbg("node %d\n", nid);
 		dbg("NODE_DATA() = %p\n", NODE_DATA(nid));
@@ -986,20 +990,20 @@ void __init do_init_bootmem(void)
   		dbg("end_paddr = %lx\n", end_pfn << PAGE_SHIFT);
 
 		bootmap_pages = bootmem_bootmap_pages(end_pfn - start_pfn);
-		bootmem_paddr = (unsigned long)careful_allocation(nid,
+		bootmem_vaddr = careful_zallocation(nid,
 					bootmap_pages << PAGE_SHIFT,
 					PAGE_SIZE, end_pfn);
-		memset(__va(bootmem_paddr), 0, bootmap_pages << PAGE_SHIFT);
 
-		dbg("bootmap_paddr = %lx\n", bootmem_paddr);
+		dbg("bootmap_vaddr = %p\n", bootmem_vaddr);
 
-		init_bootmem_node(NODE_DATA(nid), bootmem_paddr >> PAGE_SHIFT,
+		init_bootmem_node(NODE_DATA(nid),
+				  __pa(bootmem_vaddr) >> PAGE_SHIFT,
 				  start_pfn, end_pfn);
 
 		free_bootmem_with_active_regions(nid, end_pfn);
 		/*
 		 * Be very careful about moving this around.  Future
-		 * calls to careful_allocation() depend on this getting
+		 * calls to careful_zallocation() depend on this getting
 		 * done correctly.
 		 */
 		mark_reserved_regions_for_nid(nid);

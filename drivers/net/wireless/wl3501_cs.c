@@ -79,7 +79,7 @@ static int pc_debug = PCMCIA_DEBUG;
 module_param(pc_debug, int, 0);
 #define dprintk(n, format, args...) \
 	{ if (pc_debug > (n)) \
-		printk(KERN_INFO "%s: " format "\n", __FUNCTION__ , ##args); }
+		printk(KERN_INFO "%s: " format "\n", __func__ , ##args); }
 #else
 #define dprintk(n, format, args...)
 #endif
@@ -470,7 +470,7 @@ static int wl3501_pwr_mgmt(struct wl3501_card *this, int suspend)
 			spin_unlock_irqrestore(&this->lock, flags);
 			rc = wait_event_interruptible(this->wait,
 				this->sig_pwr_mgmt_confirm.status != 255);
-			printk(KERN_INFO "%s: %s status=%d\n", __FUNCTION__,
+			printk(KERN_INFO "%s: %s status=%d\n", __func__,
 			       suspend ? "suspend" : "resume",
 			       this->sig_pwr_mgmt_confirm.status);
 			goto out;
@@ -860,10 +860,9 @@ static int wl3501_esbq_confirm(struct wl3501_card *this)
 static void wl3501_online(struct net_device *dev)
 {
 	struct wl3501_card *this = netdev_priv(dev);
-	DECLARE_MAC_BUF(mac);
 
-	printk(KERN_INFO "%s: Wireless LAN online. BSSID: %s\n",
-	       dev->name, print_mac(mac, this->bssid));
+	printk(KERN_INFO "%s: Wireless LAN online. BSSID: %pM\n",
+	       dev->name, this->bssid);
 	netif_wake_queue(dev);
 }
 
@@ -1014,7 +1013,6 @@ static inline void wl3501_md_ind_interrupt(struct net_device *dev,
 		wl3501_receive(this, skb->data, pkt_len);
 		skb_put(skb, pkt_len);
 		skb->protocol	= eth_type_trans(skb, dev);
-		dev->last_rx	= jiffies;
 		this->stats.rx_packets++;
 		this->stats.rx_bytes += skb->len;
 		netif_rx(skb);
@@ -1199,7 +1197,7 @@ static int wl3501_reset_board(struct wl3501_card *this)
 		}
 		WL3501_NOPLOOP(10);
 	}
-	printk(KERN_WARNING "%s: failed to reset the board!\n", __FUNCTION__);
+	printk(KERN_WARNING "%s: failed to reset the board!\n", __func__);
 	rc = -ENODEV;
 out:
 	return rc;
@@ -1250,7 +1248,7 @@ static int wl3501_init_firmware(struct wl3501_card *this)
 out:
 	return rc;
 fail:
-	printk(KERN_WARNING "%s: failed!\n", __FUNCTION__);
+	printk(KERN_WARNING "%s: failed!\n", __func__);
 	goto out;
 }
 
@@ -1917,7 +1915,7 @@ static int wl3501_probe(struct pcmcia_device *p_dev)
 	p_dev->io.IOAddrLines	= 5;
 
 	/* Interrupt setup */
-	p_dev->irq.Attributes	= IRQ_TYPE_EXCLUSIVE | IRQ_HANDLE_PRESENT;
+	p_dev->irq.Attributes	= IRQ_TYPE_DYNAMIC_SHARING | IRQ_HANDLE_PRESENT;
 	p_dev->irq.IRQInfo1	= IRQ_LEVEL_ID;
 	p_dev->irq.Handler = wl3501_interrupt;
 
@@ -1965,7 +1963,6 @@ static int wl3501_config(struct pcmcia_device *link)
 	struct net_device *dev = link->priv;
 	int i = 0, j, last_fn, last_ret;
 	struct wl3501_card *this;
-	DECLARE_MAC_BUF(mac);
 
 	/* Try allocating IO ports.  This tries a few fixed addresses.  If you
 	 * want, you can also read the card's config table to pick addresses --
@@ -1977,10 +1974,10 @@ static int wl3501_config(struct pcmcia_device *link)
 		link->io.BasePort1 = j;
 		link->io.BasePort2 = link->io.BasePort1 + 0x10;
 		i = pcmcia_request_io(link, &link->io);
-		if (i == CS_SUCCESS)
+		if (i == 0)
 			break;
 	}
-	if (i != CS_SUCCESS) {
+	if (i != 0) {
 		cs_error(link, RequestIO, i);
 		goto failed;
 	}
@@ -2024,9 +2021,9 @@ static int wl3501_config(struct pcmcia_device *link)
 
 	/* print probe information */
 	printk(KERN_INFO "%s: wl3501 @ 0x%3.3x, IRQ %d, "
-	       "MAC addr in flash ROM:%s\n",
+	       "MAC addr in flash ROM:%pM\n",
 	       dev->name, this->base_addr, (int)dev->irq,
-	       print_mac(mac, dev->dev_addr));
+	       dev->dev_addr);
 	/*
 	 * Initialize card parameters - added by jss
 	 */

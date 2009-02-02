@@ -57,7 +57,9 @@
 #define CSR_REG_SIZE			0x0100
 #define EEPROM_BASE			0x0000
 #define EEPROM_SIZE			0x006a
+#define BBP_BASE			0x0000
 #define BBP_SIZE			0x0060
+#define RF_BASE				0x0000
 #define RF_SIZE				0x0014
 
 /*
@@ -445,6 +447,9 @@
 #define SEC_CSR30			0x04bc
 #define SEC_CSR31			0x04be
 
+#define KEY_ENTRY(__idx) \
+	( SEC_CSR0 + ((__idx) * 16) )
+
 /*
  * PHY control registers.
  */
@@ -825,17 +830,10 @@
 #define MAX_TXPOWER	31
 #define DEFAULT_TXPOWER	24
 
-#define TXPOWER_FROM_DEV(__txpower)		\
-({						\
-	((__txpower) > MAX_TXPOWER) ?		\
-		DEFAULT_TXPOWER : (__txpower);	\
-})
+#define TXPOWER_FROM_DEV(__txpower) \
+	(((u8)(__txpower)) > MAX_TXPOWER) ? DEFAULT_TXPOWER : (__txpower)
 
-#define TXPOWER_TO_DEV(__txpower)			\
-({							\
-	((__txpower) <= MIN_TXPOWER) ? MIN_TXPOWER :	\
-	(((__txpower) >= MAX_TXPOWER) ? MAX_TXPOWER :	\
-	(__txpower));					\
-})
+#define TXPOWER_TO_DEV(__txpower) \
+	clamp_t(char, __txpower, MIN_TXPOWER, MAX_TXPOWER)
 
 #endif /* RT2500USB_H */

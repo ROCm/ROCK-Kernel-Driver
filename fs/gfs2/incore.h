@@ -68,12 +68,6 @@ struct gfs2_bitmap {
 	u32 bi_len;
 };
 
-struct gfs2_rgrp_host {
-	u32 rg_free;
-	u32 rg_dinodes;
-	u64 rg_igeneration;
-};
-
 struct gfs2_rgrpd {
 	struct list_head rd_list;	/* Link with superblock */
 	struct list_head rd_list_mru;
@@ -83,14 +77,16 @@ struct gfs2_rgrpd {
 	u32 rd_length;			/* length of rgrp header in fs blocks */
 	u32 rd_data;			/* num of data blocks in rgrp */
 	u32 rd_bitbytes;		/* number of bytes in data bitmaps */
-	struct gfs2_rgrp_host rd_rg;
-	struct gfs2_bitmap *rd_bits;
-	unsigned int rd_bh_count;
-	struct mutex rd_mutex;
+	u32 rd_free;
 	u32 rd_free_clone;
+	u32 rd_dinodes;
+	u64 rd_igeneration;
+	struct gfs2_bitmap *rd_bits;
+	struct mutex rd_mutex;
 	struct gfs2_log_element rd_le;
-	u32 rd_last_alloc;
 	struct gfs2_sbd *rd_sbd;
+	unsigned int rd_bh_count;
+	u32 rd_last_alloc;
 	unsigned char rd_flags;
 #define GFS2_RDF_CHECK        0x01      /* Need to check for unlinked inodes */
 #define GFS2_RDF_NOALLOC      0x02      /* rg prohibits allocation */
@@ -129,7 +125,7 @@ struct gfs2_glock_operations {
 	void (*go_xmote_th) (struct gfs2_glock *gl);
 	int (*go_xmote_bh) (struct gfs2_glock *gl, struct gfs2_holder *gh);
 	void (*go_inval) (struct gfs2_glock *gl, int flags);
-	int (*go_demote_ok) (struct gfs2_glock *gl);
+	int (*go_demote_ok) (const struct gfs2_glock *gl);
 	int (*go_lock) (struct gfs2_holder *gh);
 	void (*go_unlock) (struct gfs2_holder *gh);
 	int (*go_dump)(struct seq_file *seq, const struct gfs2_glock *gl);
@@ -159,7 +155,6 @@ struct gfs2_holder {
 
 enum {
 	GLF_LOCK			= 1,
-	GLF_STICKY			= 2,
 	GLF_DEMOTE			= 3,
 	GLF_PENDING_DEMOTE		= 4,
 	GLF_DEMOTE_IN_PROGRESS		= 5,
@@ -194,7 +189,7 @@ struct gfs2_glock {
 	unsigned long gl_tchange;
 	void *gl_object;
 
-	struct list_head gl_reclaim;
+	struct list_head gl_lru;
 
 	struct gfs2_sbd *gl_sbd;
 
@@ -233,29 +228,24 @@ enum {
 	GIF_USER                = 4, /* user inode, not metadata addr space */
 };
 
-struct gfs2_dinode_host {
-	u64 di_size;		/* number of bytes in file */
-	u64 di_generation;	/* generation number for NFS */
-	u32 di_flags;		/* GFS2_DIF_... */
-	/* These only apply to directories  */
-	u32 di_entries;		/* The number of entries in the directory */
-	u64 di_eattr;		/* extended attribute block number */
-};
 
 struct gfs2_inode {
 	struct inode i_inode;
 	u64 i_no_addr;
 	u64 i_no_formal_ino;
+	u64 i_generation;
+	u64 i_eattr;
+	loff_t i_disksize;
 	unsigned long i_flags;		/* GIF_... */
-
-	struct gfs2_dinode_host i_di; /* To be replaced by ref to block */
-
 	struct gfs2_glock *i_gl; /* Move into i_gh? */
 	struct gfs2_holder i_iopen_gh;
 	struct gfs2_holder i_gh; /* for prepare/commit_write only */
 	struct gfs2_alloc *i_alloc;
 	u64 i_goal;	/* goal block for allocations */
 	struct rw_semaphore i_rw_mutex;
+	struct list_head i_trunc_list;
+	u32 i_entries;
+	u32 i_diskflags;
 	u8 i_height;
 	u8 i_depth;
 };
@@ -386,32 +376,31 @@ struct gfs2_statfs_change_host {
 #define GFS2_DATA_ORDERED	2
 
 struct gfs2_args {
-	char ar_lockproto[GFS2_LOCKNAME_LEN]; /* Name of the Lock Protocol */
-	char ar_locktable[GFS2_LOCKNAME_LEN]; /* Name of the Lock Table */
-	char ar_hostdata[GFS2_LOCKNAME_LEN]; /* Host specific data */
-	int ar_spectator; /* Don't get a journal because we're always RO */
-	int ar_ignore_local_fs; /* Don't optimize even if local_fs is 1 */
-	int ar_localflocks; /* Let the VFS do flock|fcntl locks for us */
-	int ar_localcaching; /* Local-style caching (dangerous on multihost) */
-	int ar_debug; /* Oops on errors instead of trying to be graceful */
-	int ar_upgrade; /* Upgrade ondisk/multihost format */
-	unsigned int ar_num_glockd; /* Number of glockd threads */
-	int ar_posix_acl; /* Enable posix acls */
-	int ar_quota; /* off/account/on */
-	int ar_suiddir; /* suiddir support */
-	int ar_data; /* ordered/writeback */
+	char ar_lockproto[GFS2_LOCKNAME_LEN];	/* Name of the Lock Protocol */
+	char ar_locktable[GFS2_LOCKNAME_LEN];	/* Name of the Lock Table */
+	char ar_hostdata[GFS2_LOCKNAME_LEN];	/* Host specific data */
+	unsigned int ar_spectator:1;		/* Don't get a journal */
+	unsigned int ar_ignore_local_fs:1;	/* Ignore optimisations */
+	unsigned int ar_localflocks:1;		/* Let the VFS do flock|fcntl */
+	unsigned int ar_localcaching:1;		/* Local caching */
+	unsigned int ar_debug:1;		/* Oops on errors */
+	unsigned int ar_upgrade:1;		/* Upgrade ondisk format */
+	unsigned int ar_posix_acl:1;		/* Enable posix acls */
+	unsigned int ar_quota:2;		/* off/account/on */
+	unsigned int ar_suiddir:1;		/* suiddir support */
+	unsigned int ar_data:2;			/* ordered/writeback */
+	unsigned int ar_meta:1;			/* mount metafs */
+	unsigned int ar_num_glockd;		/* Number of glockd threads */
 };
 
 struct gfs2_tune {
 	spinlock_t gt_spin;
 
-	unsigned int gt_demote_secs; /* Cache retention for unheld glock */
 	unsigned int gt_incore_log_blocks;
 	unsigned int gt_log_flush_secs;
 
 	unsigned int gt_recoverd_secs;
 	unsigned int gt_logd_secs;
-	unsigned int gt_quotad_secs;
 
 	unsigned int gt_quota_simul_sync; /* Max quotavals to sync at once */
 	unsigned int gt_quota_warn_period; /* Secs between quota warn msgs */
@@ -419,7 +408,6 @@ struct gfs2_tune {
 	unsigned int gt_quota_scale_den; /* Denominator */
 	unsigned int gt_quota_cache_secs;
 	unsigned int gt_quota_quantum; /* Secs between syncs to quota file */
-	unsigned int gt_atime_quantum; /* Min secs between atime updates */
 	unsigned int gt_new_files_jdata;
 	unsigned int gt_max_readahead; /* Max bytes to read-ahead from disk */
 	unsigned int gt_stall_secs; /* Detects trouble! */
@@ -432,7 +420,7 @@ enum {
 	SDF_JOURNAL_CHECKED	= 0,
 	SDF_JOURNAL_LIVE	= 1,
 	SDF_SHUTDOWN		= 2,
-	SDF_NOATIME		= 3,
+	SDF_NOBARRIERS		= 3,
 };
 
 #define GFS2_FSNAME_LEN		256
@@ -461,7 +449,6 @@ struct gfs2_sb_host {
 
 struct gfs2_sbd {
 	struct super_block *sd_vfs;
-	struct super_block *sd_vfs_meta;
 	struct kobject sd_kobj;
 	unsigned long sd_flags;	/* SDF_... */
 	struct gfs2_sb_host sd_sb;
@@ -489,17 +476,15 @@ struct gfs2_sbd {
 	/* Lock Stuff */
 
 	struct lm_lockstruct sd_lockstruct;
-	struct list_head sd_reclaim_list;
-	spinlock_t sd_reclaim_lock;
-	wait_queue_head_t sd_reclaim_wq;
-	atomic_t sd_reclaim_count;
 	struct gfs2_holder sd_live_gh;
 	struct gfs2_glock *sd_rename_gl;
 	struct gfs2_glock *sd_trans_gl;
 
 	/* Inode Stuff */
 
-	struct inode *sd_master_dir;
+	struct dentry *sd_master_dir;
+	struct dentry *sd_root_dir;
+
 	struct inode *sd_jindex;
 	struct inode *sd_inum_inode;
 	struct inode *sd_statfs_inode;
@@ -518,7 +503,6 @@ struct gfs2_sbd {
 	spinlock_t sd_statfs_spin;
 	struct gfs2_statfs_change_host sd_statfs_master;
 	struct gfs2_statfs_change_host sd_statfs_local;
-	unsigned long sd_statfs_sync_time;
 
 	/* Resource group stuff */
 
@@ -551,8 +535,6 @@ struct gfs2_sbd {
 	struct task_struct *sd_recoverd_process;
 	struct task_struct *sd_logd_process;
 	struct task_struct *sd_quotad_process;
-	struct task_struct *sd_glockd_process[GFS2_GLOCKD_MAX];
-	unsigned int sd_glockd_num;
 
 	/* Quota stuff */
 
@@ -560,13 +542,15 @@ struct gfs2_sbd {
 	atomic_t sd_quota_count;
 	spinlock_t sd_quota_spin;
 	struct mutex sd_quota_mutex;
+	wait_queue_head_t sd_quota_wait;
+	struct list_head sd_trunc_list;
+	spinlock_t sd_trunc_lock;
 
 	unsigned int sd_quota_slots;
 	unsigned int sd_quota_chunks;
 	unsigned char **sd_quota_bitmap;
 
 	u64 sd_quota_sync_gen;
-	unsigned long sd_quota_sync_time;
 
 	/* Log stuff */
 
@@ -623,10 +607,6 @@ struct gfs2_sbd {
 	struct mutex sd_freeze_lock;
 	unsigned int sd_freeze_count;
 
-	/* Counters */
-
-	atomic_t sd_reclaimed;
-
 	char sd_fsname[GFS2_FSNAME_LEN];
 	char sd_table_name[GFS2_FSNAME_LEN];
 	char sd_proto_name[GFS2_FSNAME_LEN];
@@ -634,7 +614,6 @@ struct gfs2_sbd {
 	/* Debugging crud */
 
 	unsigned long sd_last_warning;
-	struct vfsmount *sd_gfs2mnt;
 	struct dentry *debugfs_dir;    /* debugfs directory */
 	struct dentry *debugfs_dentry_glocks; /* for debugfs */
 };

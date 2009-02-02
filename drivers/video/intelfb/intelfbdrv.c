@@ -2,7 +2,7 @@
  * intelfb
  *
  * Linux framebuffer driver for Intel(R) 830M/845G/852GM/855GM/865G/915G/915GM/
- * 945G/945GM/965G/965GM integrated graphics chips.
+ * 945G/945GM/945GME/965G/965GM integrated graphics chips.
  *
  * Copyright © 2002, 2003 David Dawes <dawes@xfree86.org>
  *                   2004 Sylvain Meyer
@@ -102,6 +102,9 @@
  *
  *    04/2008 - Version 0.9.5
  *              Add support for 965G/965GM. (Maik Broemme <mbroemme@plusserver.de>)
+ *
+ *    08/2008 - Version 0.9.6
+ *              Add support for 945GME. (Phil Endecott <spam_from_intelfb@chezphil.org>)
  */
 
 #include <linux/module.h>
@@ -183,6 +186,7 @@ static struct pci_device_id intelfb_pci_table[] __devinitdata = {
 	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_915GM, PCI_ANY_ID, PCI_ANY_ID, PCI_CLASS_DISPLAY_VGA << 8, INTELFB_CLASS_MASK, INTEL_915GM },
 	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_945G, PCI_ANY_ID, PCI_ANY_ID, PCI_CLASS_DISPLAY_VGA << 8, INTELFB_CLASS_MASK, INTEL_945G },
 	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_945GM, PCI_ANY_ID, PCI_ANY_ID, PCI_CLASS_DISPLAY_VGA << 8, INTELFB_CLASS_MASK, INTEL_945GM },
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_945GME, PCI_ANY_ID, PCI_ANY_ID, PCI_CLASS_DISPLAY_VGA << 8, INTELFB_CLASS_MASK, INTEL_945GME },
 	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_965G, PCI_ANY_ID, PCI_ANY_ID, PCI_CLASS_DISPLAY_VGA << 8, INTELFB_CLASS_MASK, INTEL_965G },
 	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_965GM, PCI_ANY_ID, PCI_ANY_ID, PCI_CLASS_DISPLAY_VGA << 8, INTELFB_CLASS_MASK, INTEL_965GM },
 	{ 0, }
@@ -555,6 +559,7 @@ static int __devinit intelfb_pci_register(struct pci_dev *pdev,
 	    (ent->device == PCI_DEVICE_ID_INTEL_915GM) ||
 	    (ent->device == PCI_DEVICE_ID_INTEL_945G)  ||
 	    (ent->device == PCI_DEVICE_ID_INTEL_945GM) ||
+	    (ent->device == PCI_DEVICE_ID_INTEL_945GME) ||
 	    (ent->device == PCI_DEVICE_ID_INTEL_965G) ||
 	    (ent->device == PCI_DEVICE_ID_INTEL_965GM)) {
 
@@ -1488,8 +1493,10 @@ static void intelfb_fillrect (struct fb_info *info,
 	DBG_MSG("intelfb_fillrect\n");
 #endif
 
-	if (!ACCEL(dinfo, info) || dinfo->depth == 4)
-		return cfb_fillrect(info, rect);
+	if (!ACCEL(dinfo, info) || dinfo->depth == 4) {
+		cfb_fillrect(info, rect);
+		return;
+	}
 
 	if (rect->rop == ROP_COPY)
 		rop = PAT_ROP_GXCOPY;
@@ -1516,8 +1523,10 @@ static void intelfb_copyarea(struct fb_info *info,
 	DBG_MSG("intelfb_copyarea\n");
 #endif
 
-	if (!ACCEL(dinfo, info) || dinfo->depth == 4)
-		return cfb_copyarea(info, region);
+	if (!ACCEL(dinfo, info) || dinfo->depth == 4) {
+		cfb_copyarea(info, region);
+		return;
+	}
 
 	intelfbhw_do_bitblt(dinfo, region->sx, region->sy, region->dx,
 			    region->dy, region->width, region->height,
@@ -1535,8 +1544,10 @@ static void intelfb_imageblit(struct fb_info *info,
 #endif
 
 	if (!ACCEL(dinfo, info) || dinfo->depth == 4
-	    || image->depth != 1)
-		return cfb_imageblit(info, image);
+	    || image->depth != 1) {
+		cfb_imageblit(info, image);
+		return;
+	}
 
 	if (dinfo->depth != 8) {
 		fgcolor = dinfo->pseudo_palette[image->fg_color];
@@ -1549,8 +1560,10 @@ static void intelfb_imageblit(struct fb_info *info,
 	if (!intelfbhw_do_drawglyph(dinfo, fgcolor, bgcolor, image->width,
 				    image->height, image->data,
 				    image->dx, image->dy,
-				    dinfo->pitch, info->var.bits_per_pixel))
-		return cfb_imageblit(info, image);
+				    dinfo->pitch, info->var.bits_per_pixel)) {
+		cfb_imageblit(info, image);
+		return;
+	}
 }
 
 static int intelfb_cursor(struct fb_info *info, struct fb_cursor *cursor)

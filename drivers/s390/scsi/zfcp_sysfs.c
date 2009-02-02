@@ -7,6 +7,7 @@
  */
 
 #define KMSG_COMPONENT "zfcp"
+#define pr_fmt(fmt) KMSG_COMPONENT ": " fmt
 
 #include "zfcp_ext.h"
 
@@ -383,7 +384,7 @@ static ssize_t zfcp_sysfs_scsi_##_name##_show(struct device *dev,	\
 static DEVICE_ATTR(_name, S_IRUGO, zfcp_sysfs_scsi_##_name##_show, NULL);
 
 ZFCP_DEFINE_SCSI_ATTR(hba_id, "%s\n",
-	unit->port->adapter->ccw_device->dev.bus_id);
+		      dev_name(&unit->port->adapter->ccw_device->dev));
 ZFCP_DEFINE_SCSI_ATTR(wwpn, "0x%016llx\n",
 		      (unsigned long long) unit->port->wwpn);
 ZFCP_DEFINE_SCSI_ATTR(fcp_lun, "0x%016llx\n",
@@ -486,8 +487,7 @@ static ssize_t zfcp_sysfs_adapter_q_full_show(struct device *dev,
 	struct zfcp_adapter *adapter =
 		(struct zfcp_adapter *) scsi_host->hostdata[0];
 
-	return sprintf(buf, "%d %llu\n", atomic_read(&adapter->qdio_outb_full),
-		       (unsigned long long)adapter->req_q_util);
+	return sprintf(buf, "%d\n", atomic_read(&adapter->qdio_outb_full));
 }
 static DEVICE_ATTR(queue_full, S_IRUGO, zfcp_sysfs_adapter_q_full_show, NULL);
 

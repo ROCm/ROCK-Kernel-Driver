@@ -42,7 +42,6 @@
 #include "lpfc_crtn.h"
 #include "lpfc_version.h"
 #include "lpfc_vport.h"
-#include "lpfc_auth_access.h"
 
 inline void lpfc_vport_set_state(struct lpfc_vport *vport,
 				 enum fc_vport_state new_state)
@@ -379,21 +378,6 @@ lpfc_vport_create(struct fc_vport *fc_vport, bool disable)
 		goto error_out;
 	}
 
-	shost = lpfc_shost_from_vport(vport);
-
-	if ((lpfc_get_security_enabled)(shost)) {
-		spin_lock_irq(&fc_security_user_lock);
-
-		list_add_tail(&vport->sc_users, &fc_security_user_list);
-
-		spin_unlock_irq(&fc_security_user_lock);
-
-		if (fc_service_state == FC_SC_SERVICESTATE_ONLINE) {
-			lpfc_fc_queue_security_work(vport,
-				&vport->sc_online_work);
-		}
-	}
-
 	/* Create binary sysfs attribute for vport */
 	lpfc_alloc_sysfs_attr(vport);
 
@@ -681,6 +665,8 @@ lpfc_vport_delete(struct fc_vport *fc_vport)
 		}
 		vport->unreg_vpi_cmpl = VPORT_INVAL;
 		timeout = msecs_to_jiffies(phba->fc_ratov * 2000);
+		if (ndlp->nlp_state == NLP_STE_UNUSED_NODE)
+			goto skip_logo;
 		if (!lpfc_issue_els_npiv_logo(vport, ndlp))
 			while (vport->unreg_vpi_cmpl == VPORT_INVAL && timeout)
 				timeout = schedule_timeout(timeout);

@@ -70,6 +70,7 @@ static int mbp_get_intensity(struct backlight_device *bd)
 }
 
 static struct backlight_ops mbp_ops = {
+	.options = BL_CORE_SUSPENDRESUME,
 	.get_brightness = mbp_get_intensity,
 	.update_status  = mbp_send_intensity,
 };
@@ -111,6 +112,4 @@ module_exit(mbp_exit);
 MODULE_AUTHOR("Matthew Garrett <mjg@redhat.com>");
 MODULE_DESCRIPTION("Nvidia-based Macbook Pro Backlight Driver");
 MODULE_LICENSE("GPL");
-MODULE_ALIAS("svnAppleInc.:pnMacBookPro3,1");
-MODULE_ALIAS("svnAppleInc.:pnMacBookPro3,2");
-MODULE_ALIAS("svnAppleInc.:pnMacBookPro4,1");
+MODULE_DEVICE_TABLE(dmi, mbp_device_table);

@@ -73,7 +73,7 @@ EXPORT_SYMBOL_GPL(pcibios_find_pci_bus);
  */
 void pcibios_remove_pci_devices(struct pci_bus *bus)
 {
-	struct pci_dev *dev, *tmp;
+ 	struct pci_dev *dev, *tmp;
 	struct pci_bus *child_bus;
 
 	/* First go down child busses */
@@ -85,27 +85,10 @@ void pcibios_remove_pci_devices(struct pci_bus *bus)
 	list_for_each_entry_safe(dev, tmp, &bus->devices, bus_list) {
 		pr_debug("     * Removing %s...\n", pci_name(dev));
 		eeh_remove_bus_device(dev);
-		pci_remove_bus_device(dev);
-	}
+ 		pci_remove_bus_device(dev);
+ 	}
 }
 EXPORT_SYMBOL_GPL(pcibios_remove_pci_devices);
-
-void pcibios_finish_adding_new_bus(struct pci_bus *bus)
-{
-	pr_debug("PCI: Finishing adding hotplug bus %04x:%02x\n",
-		 pci_domain_nr(bus), bus->number);
-
-	/* Allocate bus and devices resources */
-	pcibios_allocate_bus_resources(bus);
-	pcibios_claim_one_bus(bus);
-
-	/* Add new devices to global lists.  Register in proc, sysfs. */
-	pci_bus_add_devices(bus);
-
-	/* Fixup EEH */
-	eeh_add_device_tree_late(bus);
-}
-EXPORT_SYMBOL_GPL(pcibios_finish_adding_new_bus);
 
 /**
  * pcibios_add_pci_devices - adds new pci devices to bus
@@ -131,16 +114,14 @@ void pcibios_add_pci_devices(struct pci_bus * bus)
 
 	if (mode == PCI_PROBE_DEVTREE) {
 		/* use ofdt-based probe */
-		of_scan_bus(dn, bus, 1);
-		if (!list_empty(&bus->devices))
-			pcibios_finish_adding_new_bus(bus);
+		of_rescan_bus(dn, bus);
 	} else if (mode == PCI_PROBE_NORMAL) {
 		/* use legacy probe */
 		slotno = PCI_SLOT(PCI_DN(dn->child)->devfn);
 		num = pci_scan_slot(bus, PCI_DEVFN(slotno, 0));
 		if (!num)
 			return;
-		pcibios_fixup_bus_devices(bus);
+		pcibios_setup_bus_devices(bus);
 		max = bus->secondary;
 		for (pass=0; pass < 2; pass++)
 			list_for_each_entry(dev, &bus->devices, bus_list) {
@@ -148,8 +129,8 @@ void pcibios_add_pci_devices(struct pci_bus * bus)
 			    dev->hdr_type == PCI_HEADER_TYPE_CARDBUS)
 				max = pci_scan_bridge(bus, dev, max, pass);
 		}
-		pcibios_finish_adding_new_bus(bus);
 	}
+	pcibios_finish_adding_to_bus(bus);
 }
 EXPORT_SYMBOL_GPL(pcibios_add_pci_devices);
 
@@ -173,14 +154,11 @@ struct pci_controller * __devinit init_phb_dynamic(struct device_node *dn)
 		eeh_add_device_tree_early(dn);
 
 	scan_phb(phb);
-	pcibios_finish_adding_new_bus(phb->bus);
+	pcibios_finish_adding_to_bus(phb->bus);
 
 	return phb;
 }
 EXPORT_SYMBOL_GPL(init_phb_dynamic);
-
-
-
 
 /* RPA-specific bits for removing PHBs */
 int remove_phb_dynamic(struct pci_controller *phb)
@@ -189,7 +167,12 @@ int remove_phb_dynamic(struct pci_controller *phb)
 	struct resource *res;
 	int rc, i;
 
-	pr_debug("PCI: Removing PHB %04x:%02x... \n", pci_domain_nr(b), b->number);
+	pr_debug("PCI: Removing PHB %04x:%02x... \n",
+		 pci_domain_nr(b), b->number);
+
+	/* We cannot to remove a root bus that has children */
+	if (!(list_empty(&b->children) && list_empty(&b->devices)))
+		return -EBUSY;
 
 	/* We -know- there aren't any child devices anymore at this stage
 	 * and thus, we can safely unmap the IO space as it's not in use

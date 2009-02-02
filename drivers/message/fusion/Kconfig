@@ -61,25 +61,13 @@ config FUSION_SAS
 	  LSISAS1078
 
 config FUSION_MAX_SGE
-	int "Maximum number of scatter gather entries for SAS and SPI (16 - 128)"
+	int "Maximum number of scatter gather entries (16 - 128)"
 	default "128"
 	range 16 128
 	help
 	  This option allows you to specify the maximum number of scatter-
 	  gather entries per I/O. The driver default is 128, which matches
-	  SAFE_PHYS_SEGMENTS.  However, it may decreased down to 16.
-	  Decreasing this parameter will reduce memory requirements
-	  on a per controller instance.
-
-config FUSION_MAX_FC_SGE
-	int "Maximum number of scatter gather entries for FC (16 - 256)"
-	depends on FUSION_FC
-	default "256"
-	range 16 256
-	help
-	  This option allows you to specify the maximum number of scatter-
-	  gather entries per I/O. The driver default is 256, which matches
-	  MAX_PHYS_SEGMENTS.  However, it may decreased down to 16.
+	  SCSI_MAX_PHYS_SEGMENTS. However, it may decreased down to 16.
 	  Decreasing this parameter will reduce memory requirements
 	  on a per controller instance.
 

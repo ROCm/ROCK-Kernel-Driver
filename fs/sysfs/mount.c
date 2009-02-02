@@ -16,13 +16,14 @@
 #include <linux/mount.h>
 #include <linux/pagemap.h>
 #include <linux/init.h>
+#include <linux/module.h>
 
 #include "sysfs.h"
 
 /* Random magic number */
 #define SYSFS_MAGIC 0x62656572
 
-struct vfsmount *sysfs_mount;
+static struct vfsmount *sysfs_mount;
 struct super_block * sysfs_sb = NULL;
 struct kmem_cache *sysfs_dir_cachep;
 
@@ -115,3 +116,17 @@ out_err:
 	sysfs_dir_cachep = NULL;
 	goto out;
 }
+
+#undef sysfs_get
+struct sysfs_dirent *sysfs_get(struct sysfs_dirent *sd)
+{
+	return __sysfs_get(sd);
+}
+EXPORT_SYMBOL_GPL(sysfs_get);
+
+#undef sysfs_put
+void sysfs_put(struct sysfs_dirent *sd)
+{
+	__sysfs_put(sd);
+}
+EXPORT_SYMBOL_GPL(sysfs_put);

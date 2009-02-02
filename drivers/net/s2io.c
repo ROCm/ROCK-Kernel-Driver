@@ -352,12 +352,13 @@ static void do_s2io_copy_mac_addr(struct s2io_nic *sp, int offset, u64 mac_addr)
 	sp->def_mac_addr[offset].mac_addr[1] = (u8) (mac_addr >> 32);
 	sp->def_mac_addr[offset].mac_addr[0] = (u8) (mac_addr >> 40);
 }
+
 /* Add the vlan */
 static void s2io_vlan_rx_register(struct net_device *dev,
-					struct vlan_group *grp)
+				  struct vlan_group *grp)
 {
 	int i;
-	struct s2io_nic *nic = dev->priv;
+	struct s2io_nic *nic = netdev_priv(dev);
 	unsigned long flags[MAX_TX_FIFOS];
 	struct mac_info *mac_control = &nic->mac_control;
 	struct config_param *config = &nic->config;
@@ -371,14 +372,11 @@ static void s2io_vlan_rx_register(struct net_device *dev,
 				flags[i]);
 }
 
-/* A flag indicating whether 'RX_PA_CFG_STRIP_VLAN_TAG' bit is set or not */
-static int vlan_strip_flag;
-
 /* Unregister the vlan */
-static void s2io_vlan_rx_kill_vid(struct net_device *dev, unsigned long vid)
+static void s2io_vlan_rx_kill_vid(struct net_device *dev, unsigned short vid)
 {
 	int i;
-	struct s2io_nic *nic = dev->priv;
+	struct s2io_nic *nic = netdev_priv(dev);
 	unsigned long flags[MAX_TX_FIFOS];
 	struct mac_info *mac_control = &nic->mac_control;
 	struct config_param *config = &nic->config;
@@ -2303,7 +2301,7 @@ static int start_nic(struct s2io_nic *nic)
 		val64 = readq(&bar0->rx_pa_cfg);
 		val64 &= ~RX_PA_CFG_STRIP_VLAN_TAG;
 		writeq(val64, &bar0->rx_pa_cfg);
-		vlan_strip_flag = 0;
+		nic->vlan_strip_flag = 0;
 	}
 
 	/*
@@ -2840,7 +2838,7 @@ static int s2io_poll_msix(struct napi_struct *napi, int budget)
 	int pkts_processed = 0;
 	u8 __iomem *addr = NULL;
 	u8 val8 = 0;
-	struct s2io_nic *nic = dev->priv;
+	struct s2io_nic *nic = netdev_priv(dev);
 	struct XENA_dev_config __iomem *bar0 = nic->bar0;
 	int budget_org = budget;
 
@@ -2854,7 +2852,7 @@ static int s2io_poll_msix(struct napi_struct *napi, int budget)
 	s2io_chk_rx_buffers(nic, ring);
 
 	if (pkts_processed < budget_org) {
-		netif_rx_complete(dev, napi);
+		netif_rx_complete(napi);
 		/*Re Enable MSI-Rx Vector*/
 		addr = (u8 __iomem *)&bar0->xmsi_mask_reg;
 		addr += 7 - ring->ring_no;
@@ -2868,7 +2866,6 @@ static int s2io_poll_inta(struct napi_struct *napi, int budget)
 {
 	struct s2io_nic *nic = container_of(napi, struct s2io_nic, napi);
 	struct ring_info *ring;
-	struct net_device *dev = nic->dev;
 	struct config_param *config;
 	struct mac_info *mac_control;
 	int pkts_processed = 0;
@@ -2892,7 +2889,7 @@ static int s2io_poll_inta(struct napi_struct *napi, int budget)
 			break;
 	}
 	if (pkts_processed < budget_org) {
-		netif_rx_complete(dev, napi);
+		netif_rx_complete(napi);
 		/* Re enable the Rx interrupts for the ring */
 		writeq(0, &bar0->rx_traffic_mask);
 		readl(&bar0->rx_traffic_mask);
@@ -2912,7 +2909,7 @@ static int s2io_poll_inta(struct napi_struct *napi, int budget)
  */
 static void s2io_netpoll(struct net_device *dev)
 {
-	struct s2io_nic *nic = dev->priv;
+	struct s2io_nic *nic = netdev_priv(dev);
 	struct mac_info *mac_control;
 	struct config_param *config;
 	struct XENA_dev_config __iomem *bar0 = nic->bar0;
@@ -3136,7 +3133,7 @@ static void tx_intr_handler(struct fifo_info *fifo_data)
 		if (skb == NULL) {
 			spin_unlock_irqrestore(&fifo_data->tx_lock, flags);
 			DBG_PRINT(ERR_DBG, "%s: Null skb ",
-			__FUNCTION__);
+			__func__);
 			DBG_PRINT(ERR_DBG, "in Tx Free Intr\n");
 			return;
 		}
@@ -3174,7 +3171,7 @@ static void tx_intr_handler(struct fifo_info *fifo_data)
 static void s2io_mdio_write(u32 mmd_type, u64 addr, u16 value, struct net_device *dev)
 {
 	u64 val64 = 0x0;
-	struct s2io_nic *sp = dev->priv;
+	struct s2io_nic *sp = netdev_priv(dev);
 	struct XENA_dev_config __iomem *bar0 = sp->bar0;
 
 	//address transaction
@@ -3223,7 +3220,7 @@ static u64 s2io_mdio_read(u32 mmd_type, u64 addr, struct net_device *dev)
 {
 	u64 val64 = 0x0;
 	u64 rval64 = 0x0;
-	struct s2io_nic *sp = dev->priv;
+	struct s2io_nic *sp = netdev_priv(dev);
 	struct XENA_dev_config __iomem *bar0 = sp->bar0;
 
 	/* address transaction */
@@ -3327,7 +3324,7 @@ static void s2io_updt_xpak_counter(struct net_device *dev)
 	u64 val64 = 0x0;
 	u64 addr  = 0x0;
 
-	struct s2io_nic *sp = dev->priv;
+	struct s2io_nic *sp = netdev_priv(dev);
 	struct stat_block *stat_info = sp->mac_control.stats_info;
 
 	/* Check the communication with the MDIO slave */
@@ -3496,7 +3493,7 @@ static void s2io_reset(struct s2io_nic * sp)
 	unsigned long long mem_alloc_cnt, mem_free_cnt, watchdog_cnt;
 
 	DBG_PRINT(INIT_DBG,"%s - Resetting XFrame card %s\n",
-			__FUNCTION__, sp->dev->name);
+			__func__, sp->dev->name);
 
 	/* Back up  the PCI-X CMD reg, dont want to lose MMRBC, OST settings */
 	pci_read_config_word(sp->pdev, PCIX_COMMAND_REGISTER, &(pci_cmd));
@@ -3518,7 +3515,7 @@ static void s2io_reset(struct s2io_nic * sp)
 	}
 
 	if (check_pci_device_id(val16) == (u16)PCI_ANY_ID) {
-		DBG_PRINT(ERR_DBG,"%s SW_Reset failed!\n", __FUNCTION__);
+		DBG_PRINT(ERR_DBG,"%s SW_Reset failed!\n", __func__);
 	}
 
 	pci_write_config_word(sp->pdev, PCIX_COMMAND_REGISTER, pci_cmd);
@@ -3768,7 +3765,7 @@ static void restore_xmsi_data(struct s2io_nic *nic)
 		val64 = (s2BIT(7) | s2BIT(15) | vBIT(msix_index, 26, 6));
 		writeq(val64, &bar0->xmsi_access);
 		if (wait_for_msix_trans(nic, msix_index)) {
-			DBG_PRINT(ERR_DBG, "failed in %s\n", __FUNCTION__);
+			DBG_PRINT(ERR_DBG, "failed in %s\n", __func__);
 			continue;
 		}
 	}
@@ -3789,7 +3786,7 @@ static void store_xmsi_data(struct s2io_nic *nic)
 		val64 = (s2BIT(15) | vBIT(msix_index, 26, 6));
 		writeq(val64, &bar0->xmsi_access);
 		if (wait_for_msix_trans(nic, msix_index)) {
-			DBG_PRINT(ERR_DBG, "failed in %s\n", __FUNCTION__);
+			DBG_PRINT(ERR_DBG, "failed in %s\n", __func__);
 			continue;
 		}
 		addr = readq(&bar0->xmsi_address);
@@ -3812,7 +3809,7 @@ static int s2io_enable_msi_x(struct s2io_nic *nic)
 			       GFP_KERNEL);
 	if (!nic->entries) {
 		DBG_PRINT(INFO_DBG, "%s: Memory allocation failed\n", \
-			__FUNCTION__);
+			__func__);
 		nic->mac_control.stats_info->sw_stat.mem_alloc_fail_cnt++;
 		return -ENOMEM;
 	}
@@ -3826,7 +3823,7 @@ static int s2io_enable_msi_x(struct s2io_nic *nic)
 				   GFP_KERNEL);
 	if (!nic->s2io_entries) {
 		DBG_PRINT(INFO_DBG, "%s: Memory allocation failed\n",
-			__FUNCTION__);
+			__func__);
 		nic->mac_control.stats_info->sw_stat.mem_alloc_fail_cnt++;
 		kfree(nic->entries);
 		nic->mac_control.stats_info->sw_stat.mem_freed
@@ -3993,7 +3990,7 @@ static void remove_inta_isr(struct s2io_nic *sp)
 
 static int s2io_open(struct net_device *dev)
 {
-	struct s2io_nic *sp = dev->priv;
+	struct s2io_nic *sp = netdev_priv(dev);
 	int err = 0;
 
 	/*
@@ -4051,7 +4048,7 @@ hw_init_failed:
 
 static int s2io_close(struct net_device *dev)
 {
-	struct s2io_nic *sp = dev->priv;
+	struct s2io_nic *sp = netdev_priv(dev);
 	struct config_param *config = &sp->config;
 	u64 tmp64;
 	int offset;
@@ -4090,7 +4087,7 @@ static int s2io_close(struct net_device *dev)
 
 static int s2io_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct s2io_nic *sp = dev->priv;
+	struct s2io_nic *sp = netdev_priv(dev);
 	u16 frg_cnt, frg_len, i, queue, queue_len, put_off, get_off;
 	register u64 val64;
 	struct TxD *txdp;
@@ -4332,7 +4329,6 @@ static irqreturn_t s2io_msix_ring_handle(int irq, void *dev_id)
 	struct ring_info *ring = (struct ring_info *)dev_id;
 	struct s2io_nic *sp = ring->nic;
 	struct XENA_dev_config __iomem *bar0 = sp->bar0;
-	struct net_device *dev = sp->dev;
 
 	if (unlikely(!is_s2io_card_up(sp)))
 		return IRQ_HANDLED;
@@ -4346,7 +4342,7 @@ static irqreturn_t s2io_msix_ring_handle(int irq, void *dev_id)
 		val8 = (ring->ring_no == 0) ? 0x7f : 0xff;
 		writeb(val8, addr);
 		val8 = readb(addr);
-		netif_rx_schedule(dev, &ring->napi);
+		netif_rx_schedule(&ring->napi);
 	} else {
 		rx_intr_handler(ring, 0);
 		s2io_chk_rx_buffers(sp, ring);
@@ -4488,7 +4484,7 @@ static int do_s2io_chk_alarm_bit(u64 value, void __iomem * addr,
 static void s2io_handle_errors(void * dev_id)
 {
 	struct net_device *dev = (struct net_device *) dev_id;
-	struct s2io_nic *sp = dev->priv;
+	struct s2io_nic *sp = netdev_priv(dev);
 	struct XENA_dev_config __iomem *bar0 = sp->bar0;
 	u64 temp64 = 0,val64=0;
 	int i = 0;
@@ -4755,7 +4751,7 @@ reset:
 static irqreturn_t s2io_isr(int irq, void *dev_id)
 {
 	struct net_device *dev = (struct net_device *) dev_id;
-	struct s2io_nic *sp = dev->priv;
+	struct s2io_nic *sp = netdev_priv(dev);
 	struct XENA_dev_config __iomem *bar0 = sp->bar0;
 	int i;
 	u64 reason = 0;
@@ -4793,7 +4789,7 @@ static irqreturn_t s2io_isr(int irq, void *dev_id)
 
 		if (config->napi) {
 			if (reason & GEN_INTR_RXTRAFFIC) {
-				netif_rx_schedule(dev, &sp->napi);
+				netif_rx_schedule(&sp->napi);
 				writeq(S2IO_MINUS_ONE, &bar0->rx_traffic_mask);
 				writeq(S2IO_MINUS_ONE, &bar0->rx_traffic_int);
 				readl(&bar0->rx_traffic_int);
@@ -4884,7 +4880,7 @@ static void s2io_updt_stats(struct s2io_nic *sp)
 
 static struct net_device_stats *s2io_get_stats(struct net_device *dev)
 {
-	struct s2io_nic *sp = dev->priv;
+	struct s2io_nic *sp = netdev_priv(dev);
 	struct mac_info *mac_control;
 	struct config_param *config;
 	int i;
@@ -4951,7 +4947,7 @@ static void s2io_set_multicast(struct net_device *dev)
 {
 	int i, j, prev_cnt;
 	struct dev_mc_list *mclist;
-	struct s2io_nic *sp = dev->priv;
+	struct s2io_nic *sp = netdev_priv(dev);
 	struct XENA_dev_config __iomem *bar0 = sp->bar0;
 	u64 val64 = 0, multi_mac = 0x010203040506ULL, mask =
 	    0xfeffffffffffULL;
@@ -5010,7 +5006,7 @@ static void s2io_set_multicast(struct net_device *dev)
 			val64 = readq(&bar0->rx_pa_cfg);
 			val64 &= ~RX_PA_CFG_STRIP_VLAN_TAG;
 			writeq(val64, &bar0->rx_pa_cfg);
-			vlan_strip_flag = 0;
+			sp->vlan_strip_flag = 0;
 		}
 
 		val64 = readq(&bar0->mac_cfg);
@@ -5032,7 +5028,7 @@ static void s2io_set_multicast(struct net_device *dev)
 			val64 = readq(&bar0->rx_pa_cfg);
 			val64 |= RX_PA_CFG_STRIP_VLAN_TAG;
 			writeq(val64, &bar0->rx_pa_cfg);
-			vlan_strip_flag = 1;
+			sp->vlan_strip_flag = 1;
 		}
 
 		val64 = readq(&bar0->mac_cfg);
@@ -5115,7 +5111,7 @@ static void s2io_set_multicast(struct net_device *dev)
 /* read from CAM unicast & multicast addresses and store it in
  * def_mac_addr structure
  */
-void do_s2io_store_unicast_mc(struct s2io_nic *sp)
+static void do_s2io_store_unicast_mc(struct s2io_nic *sp)
 {
 	int offset;
 	u64 mac_addr = 0x0;
@@ -5280,7 +5276,7 @@ static int s2io_set_mac_addr(struct net_device *dev, void *p)
 
 static int do_s2io_prog_unicast(struct net_device *dev, u8 *addr)
 {
-	struct s2io_nic *sp = dev->priv;
+	struct s2io_nic *sp = netdev_priv(dev);
 	register u64 mac_addr = 0, perm_addr = 0;
 	int i;
 	u64 tmp64;
@@ -5339,7 +5335,7 @@ static int do_s2io_prog_unicast(struct net_device *dev, u8 *addr)
 static int s2io_ethtool_sset(struct net_device *dev,
 			     struct ethtool_cmd *info)
 {
-	struct s2io_nic *sp = dev->priv;
+	struct s2io_nic *sp = netdev_priv(dev);
 	if ((info->autoneg == AUTONEG_ENABLE) ||
 	    (info->speed != SPEED_10000) || (info->duplex != DUPLEX_FULL))
 		return -EINVAL;
@@ -5365,7 +5361,7 @@ static int s2io_ethtool_sset(struct net_device *dev,
 
 static int s2io_ethtool_gset(struct net_device *dev, struct ethtool_cmd *info)
 {
-	struct s2io_nic *sp = dev->priv;
+	struct s2io_nic *sp = netdev_priv(dev);
 	info->supported = (SUPPORTED_10000baseT_Full | SUPPORTED_FIBRE);
 	info->advertising = (SUPPORTED_10000baseT_Full | SUPPORTED_FIBRE);
 	info->port = PORT_FIBRE;
@@ -5400,7 +5396,7 @@ static int s2io_ethtool_gset(struct net_device *dev, struct ethtool_cmd *info)
 static void s2io_ethtool_gdrvinfo(struct net_device *dev,
 				  struct ethtool_drvinfo *info)
 {
-	struct s2io_nic *sp = dev->priv;
+	struct s2io_nic *sp = netdev_priv(dev);
 
 	strncpy(info->driver, s2io_driver_name, sizeof(info->driver));
 	strncpy(info->version, s2io_driver_version, sizeof(info->version));
@@ -5430,7 +5426,7 @@ static void s2io_ethtool_gregs(struct net_device *dev,
 	int i;
 	u64 reg;
 	u8 *reg_space = (u8 *) space;
-	struct s2io_nic *sp = dev->priv;
+	struct s2io_nic *sp = netdev_priv(dev);
 
 	regs->len = XENA_REG_SPACE;
 	regs->version = sp->pdev->subsystem_device;
@@ -5490,7 +5486,7 @@ static void s2io_phy_id(unsigned long data)
 static int s2io_ethtool_idnic(struct net_device *dev, u32 data)
 {
 	u64 val64 = 0, last_gpio_ctrl_val;
-	struct s2io_nic *sp = dev->priv;
+	struct s2io_nic *sp = netdev_priv(dev);
 	struct XENA_dev_config __iomem *bar0 = sp->bar0;
 	u16 subid;
 
@@ -5528,7 +5524,7 @@ static int s2io_ethtool_idnic(struct net_device *dev, u32 data)
 static void s2io_ethtool_gringparam(struct net_device *dev,
                                     struct ethtool_ringparam *ering)
 {
-	struct s2io_nic *sp = dev->priv;
+	struct s2io_nic *sp = netdev_priv(dev);
 	int i,tx_desc_count=0,rx_desc_count=0;
 
 	if (sp->rxd_mode == RXD_MODE_1)
@@ -5571,7 +5567,7 @@ static void s2io_ethtool_getpause_data(struct net_device *dev,
 				       struct ethtool_pauseparam *ep)
 {
 	u64 val64;
-	struct s2io_nic *sp = dev->priv;
+	struct s2io_nic *sp = netdev_priv(dev);
 	struct XENA_dev_config __iomem *bar0 = sp->bar0;
 
 	val64 = readq(&bar0->rmac_pause_cfg);
@@ -5598,7 +5594,7 @@ static int s2io_ethtool_setpause_data(struct net_device *dev,
 			       struct ethtool_pauseparam *ep)
 {
 	u64 val64;
-	struct s2io_nic *sp = dev->priv;
+	struct s2io_nic *sp = netdev_priv(dev);
 	struct XENA_dev_config __iomem *bar0 = sp->bar0;
 
 	val64 = readq(&bar0->rmac_pause_cfg);
@@ -5828,7 +5824,7 @@ static int s2io_ethtool_geeprom(struct net_device *dev,
 {
 	u32 i, valid;
 	u64 data;
-	struct s2io_nic *sp = dev->priv;
+	struct s2io_nic *sp = netdev_priv(dev);
 
 	eeprom->magic = sp->pdev->vendor | (sp->pdev->device << 16);
 
@@ -5866,7 +5862,7 @@ static int s2io_ethtool_seeprom(struct net_device *dev,
 {
 	int len = eeprom->len, cnt = 0;
 	u64 valid = 0, data;
-	struct s2io_nic *sp = dev->priv;
+	struct s2io_nic *sp = netdev_priv(dev);
 
 	if (eeprom->magic != (sp->pdev->vendor | (sp->pdev->device << 16))) {
 		DBG_PRINT(ERR_DBG,
@@ -6246,7 +6242,7 @@ static void s2io_ethtool_test(struct net_device *dev,
 			      struct ethtool_test *ethtest,
 			      uint64_t * data)
 {
-	struct s2io_nic *sp = dev->priv;
+	struct s2io_nic *sp = netdev_priv(dev);
 	int orig_state = netif_running(sp->dev);
 
 	if (ethtest->flags == ETH_TEST_FL_OFFLINE) {
@@ -6302,7 +6298,7 @@ static void s2io_get_ethtool_stats(struct net_device *dev,
 				   u64 * tmp_stats)
 {
 	int i = 0, k;
-	struct s2io_nic *sp = dev->priv;
+	struct s2io_nic *sp = netdev_priv(dev);
 	struct stat_block *stat_info = sp->mac_control.stats_info;
 
 	s2io_updt_stats(sp);
@@ -6581,14 +6577,14 @@ static int s2io_ethtool_get_regs_len(struct net_device *dev)
 
 static u32 s2io_ethtool_get_rx_csum(struct net_device * dev)
 {
-	struct s2io_nic *sp = dev->priv;
+	struct s2io_nic *sp = netdev_priv(dev);
 
 	return (sp->rx_csum);
 }
 
 static int s2io_ethtool_set_rx_csum(struct net_device *dev, u32 data)
 {
-	struct s2io_nic *sp = dev->priv;
+	struct s2io_nic *sp = netdev_priv(dev);
 
 	if (data)
 		sp->rx_csum = 1;
@@ -6605,7 +6601,7 @@ static int s2io_get_eeprom_len(struct net_device *dev)
 
 static int s2io_get_sset_count(struct net_device *dev, int sset)
 {
-	struct s2io_nic *sp = dev->priv;
+	struct s2io_nic *sp = netdev_priv(dev);
 
 	switch (sset) {
 	case ETH_SS_TEST:
@@ -6628,7 +6624,7 @@ static void s2io_ethtool_get_strings(struct net_device *dev,
 				     u32 stringset, u8 * data)
 {
 	int stat_size = 0;
-	struct s2io_nic *sp = dev->priv;
+	struct s2io_nic *sp = netdev_priv(dev);
 
 	switch (stringset) {
 	case ETH_SS_TEST:
@@ -6730,7 +6726,7 @@ static int s2io_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 static int s2io_change_mtu(struct net_device *dev, int new_mtu)
 {
-	struct s2io_nic *sp = dev->priv;
+	struct s2io_nic *sp = netdev_priv(dev);
 	int ret = 0;
 
 	if ((new_mtu < MIN_MTU) || (new_mtu > S2IO_JUMBO_SIZE)) {
@@ -6746,7 +6742,7 @@ static int s2io_change_mtu(struct net_device *dev, int new_mtu)
 		ret = s2io_card_up(sp);
 		if (ret) {
 			DBG_PRINT(ERR_DBG, "%s: Device bring up failed\n",
-				  __FUNCTION__);
+				  __func__);
 			return ret;
 		}
 		s2io_wake_all_tx_queue(sp);
@@ -7334,7 +7330,7 @@ out_unlock:
 
 static void s2io_tx_watchdog(struct net_device *dev)
 {
-	struct s2io_nic *sp = dev->priv;
+	struct s2io_nic *sp = netdev_priv(dev);
 
 	if (netif_carrier_ok(dev)) {
 		sp->mac_control.stats_info->sw_stat.watchdog_timer_cnt++;
@@ -7369,7 +7365,7 @@ static int rx_osm_handler(struct ring_info *ring_data, struct RxD_t * rxdp)
 	int ring_no = ring_data->ring_no;
 	u16 l3_csum, l4_csum;
 	unsigned long long err = rxdp->Control_1 & RXD_T_CODE;
-	struct lro *lro;
+	struct lro *uninitialized_var(lro);
 	u8 err_mask;
 
 	skb->dev = dev;
@@ -7530,7 +7526,7 @@ static int rx_osm_handler(struct ring_info *ring_data, struct RxD_t * rxdp)
 					default:
 						DBG_PRINT(ERR_DBG,
 							"%s: Samadhana!!\n",
-							 __FUNCTION__);
+							 __func__);
 						BUG();
 				}
 			}
@@ -7547,7 +7543,6 @@ static int rx_osm_handler(struct ring_info *ring_data, struct RxD_t * rxdp)
 	sp->mac_control.stats_info->sw_stat.mem_freed += skb->truesize;
 send_up:
 	queue_rx_frame(skb, RXD_GET_VLAN_TAG(rxdp->Control_2));
-	dev->last_rx = jiffies;
 aggregate:
 	sp->mac_control.rings[ring_no].rx_bufs_left -= 1;
 	return SUCCESS;
@@ -7721,6 +7716,24 @@ static int rts_ds_steer(struct s2io_nic *nic, u8 ds_codepoint, u8 ring)
 				S2IO_BIT_RESET);
 }
 
+static const struct net_device_ops s2io_netdev_ops = {
+	.ndo_open	        = s2io_open,
+	.ndo_stop	        = s2io_close,
+	.ndo_get_stats	        = s2io_get_stats,
+	.ndo_start_xmit    	= s2io_xmit,
+	.ndo_validate_addr	= eth_validate_addr,
+	.ndo_set_multicast_list = s2io_set_multicast,
+	.ndo_do_ioctl	   	= s2io_ioctl,
+	.ndo_set_mac_address    = s2io_set_mac_addr,
+	.ndo_change_mtu	   	= s2io_change_mtu,
+	.ndo_vlan_rx_register   = s2io_vlan_rx_register,
+	.ndo_vlan_rx_kill_vid   = s2io_vlan_rx_kill_vid,
+	.ndo_tx_timeout	   	= s2io_tx_watchdog,
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	.ndo_poll_controller    = s2io_netpoll,
+#endif
+};
+
 /**
  *  s2io_init_nic - Initialization of the adapter .
  *  @pdev : structure containing the PCI related information of the device.
@@ -7751,7 +7764,6 @@ s2io_init_nic(struct pci_dev *pdev, const struct pci_device_id *pre)
 	int mode;
 	u8 dev_intr_type = intr_type;
 	u8 dev_multiq = 0;
-	DECLARE_MAC_BUF(mac);
 
 	ret = s2io_verify_parm(pdev, &dev_intr_type, &dev_multiq);
 	if (ret)
@@ -7781,7 +7793,7 @@ s2io_init_nic(struct pci_dev *pdev, const struct pci_device_id *pre)
 		return -ENOMEM;
 	}
 	if ((ret = pci_request_regions(pdev, s2io_driver_name))) {
-		DBG_PRINT(ERR_DBG, "%s: Request Regions failed - %x \n", __FUNCTION__, ret);
+		DBG_PRINT(ERR_DBG, "%s: Request Regions failed - %x \n", __func__, ret);
 		pci_disable_device(pdev);
 		return -ENODEV;
 	}
@@ -7801,7 +7813,7 @@ s2io_init_nic(struct pci_dev *pdev, const struct pci_device_id *pre)
 	SET_NETDEV_DEV(dev, &pdev->dev);
 
 	/*  Private member variable initialized to s2io NIC structure */
-	sp = dev->priv;
+	sp = netdev_priv(dev);
 	memset(sp, 0, sizeof(struct s2io_nic));
 	sp->dev = dev;
 	sp->pdev = pdev;
@@ -7921,8 +7933,7 @@ s2io_init_nic(struct pci_dev *pdev, const struct pci_device_id *pre)
 		goto mem_alloc_failed;
 	}
 
-	sp->bar0 = ioremap(pci_resource_start(pdev, 0),
-				     pci_resource_len(pdev, 0));
+	sp->bar0 = pci_ioremap_bar(pdev, 0);
 	if (!sp->bar0) {
 		DBG_PRINT(ERR_DBG, "%s: Neterion: cannot remap io mem1\n",
 			  dev->name);
@@ -7930,8 +7941,7 @@ s2io_init_nic(struct pci_dev *pdev, const struct pci_device_id *pre)
 		goto bar0_remap_failed;
 	}
 
-	sp->bar1 = ioremap(pci_resource_start(pdev, 2),
-				     pci_resource_len(pdev, 2));
+	sp->bar1 = pci_ioremap_bar(pdev, 2);
 	if (!sp->bar1) {
 		DBG_PRINT(ERR_DBG, "%s: Neterion: cannot remap io mem2\n",
 			  dev->name);
@@ -7949,26 +7959,9 @@ s2io_init_nic(struct pci_dev *pdev, const struct pci_device_id *pre)
 	}
 
 	/*  Driver entry points */
-	dev->open = &s2io_open;
-	dev->stop = &s2io_close;
-	dev->hard_start_xmit = &s2io_xmit;
-	dev->get_stats = &s2io_get_stats;
-	dev->set_multicast_list = &s2io_set_multicast;
-	dev->do_ioctl = &s2io_ioctl;
-	dev->set_mac_address = &s2io_set_mac_addr;
-	dev->change_mtu = &s2io_change_mtu;
+	dev->netdev_ops = &s2io_netdev_ops;
 	SET_ETHTOOL_OPS(dev, &netdev_ethtool_ops);
 	dev->features |= NETIF_F_HW_VLAN_TX | NETIF_F_HW_VLAN_RX;
-	dev->vlan_rx_register = s2io_vlan_rx_register;
-	dev->vlan_rx_kill_vid = (void *)s2io_vlan_rx_kill_vid;
-
-	/*
-	 * will use eth_mac_addr() for  dev->set_mac_address
-	 * mac address will be set every time dev->open() is called
-	 */
-#ifdef CONFIG_NET_POLL_CONTROLLER
-	dev->poll_controller = s2io_netpoll;
-#endif
 
 	dev->features |= NETIF_F_SG | NETIF_F_IP_CSUM;
 	if (sp->high_dma_flag == TRUE)
@@ -7979,7 +7972,6 @@ s2io_init_nic(struct pci_dev *pdev, const struct pci_device_id *pre)
 		dev->features |= NETIF_F_UFO;
 		dev->features |= NETIF_F_HW_CSUM;
 	}
-	dev->tx_timeout = &s2io_tx_watchdog;
 	dev->watchdog_timeo = WATCH_DOG_TIMEOUT;
 	INIT_WORK(&sp->rst_timer_task, s2io_restart_nic);
 	INIT_WORK(&sp->set_link_task, s2io_set_link);
@@ -7998,7 +7990,7 @@ s2io_init_nic(struct pci_dev *pdev, const struct pci_device_id *pre)
 	if (sp->device_type & XFRAME_II_DEVICE) {
 		mode = s2io_verify_pci_mode(sp);
 		if (mode < 0) {
-			DBG_PRINT(ERR_DBG, "%s: ", __FUNCTION__);
+			DBG_PRINT(ERR_DBG, "%s: ", __func__);
 			DBG_PRINT(ERR_DBG, " Unsupported PCI bus mode\n");
 			ret = -EBADSLT;
 			goto set_swap_failed;
@@ -8128,8 +8120,7 @@ s2io_init_nic(struct pci_dev *pdev, const struct pci_device_id *pre)
 		  sp->product_name, pdev->revision);
 	DBG_PRINT(ERR_DBG, "%s: Driver version %s\n", dev->name,
 		  s2io_driver_version);
-	DBG_PRINT(ERR_DBG, "%s: MAC ADDR: %s\n",
-		  dev->name, print_mac(mac, dev->dev_addr));
+	DBG_PRINT(ERR_DBG, "%s: MAC ADDR: %pM\n", dev->name, dev->dev_addr);
 	DBG_PRINT(ERR_DBG, "SERIAL NUMBER: %s\n", sp->serial_num);
 	if (sp->device_type & XFRAME_II_DEVICE) {
 		mode = s2io_print_pci_mode(sp);
@@ -8175,8 +8166,8 @@ s2io_init_nic(struct pci_dev *pdev, const struct pci_device_id *pre)
 		    break;
 	}
 	if (sp->config.multiq) {
-	for (i = 0; i < sp->config.tx_fifo_num; i++)
-		mac_control->fifos[i].multiq = config->multiq;
+		for (i = 0; i < sp->config.tx_fifo_num; i++)
+			mac_control->fifos[i].multiq = config->multiq;
 		DBG_PRINT(ERR_DBG, "%s: Multiqueue support enabled\n",
 			dev->name);
 	} else
@@ -8205,6 +8196,11 @@ s2io_init_nic(struct pci_dev *pdev, const struct pci_device_id *pre)
 					" enabled\n", dev->name);
 	/* Initialize device name */
 	sprintf(sp->name, "%s Neterion %s", dev->name, sp->product_name);
+
+	if (vlan_tag_strip)
+		sp->vlan_strip_flag = 1;
+	else
+		sp->vlan_strip_flag = 0;
 
 	/*
 	 * Make Link state as off at this point, when the Link change
@@ -8253,7 +8249,7 @@ static void __devexit s2io_rem_nic(struct pci_dev *pdev)
 
 	flush_scheduled_work();
 
-	sp = dev->priv;
+	sp = netdev_priv(dev);
 	unregister_netdev(dev);
 
 	free_shared_mem(sp);
@@ -8299,7 +8295,7 @@ static int check_L2_lro_capable(u8 *buffer, struct iphdr **ip,
 
 	if (!(rxdp->Control_1 & RXD_FRAME_PROTO_TCP)) {
 		DBG_PRINT(INIT_DBG,"%s: Non-TCP frames not supported for LRO\n",
-			  __FUNCTION__);
+			  __func__);
 		return -1;
 	}
 
@@ -8311,7 +8307,7 @@ static int check_L2_lro_capable(u8 *buffer, struct iphdr **ip,
 		 * If vlan stripping is disabled and the frame is VLAN tagged,
 		 * shift the offset by the VLAN header size bytes.
 		 */
-		if ((!vlan_strip_flag) &&
+		if ((!sp->vlan_strip_flag) &&
 			(rxdp->Control_1 & RXD_FRAME_VLAN_TAG))
 			ip_off += HEADER_VLAN_SIZE;
 	} else {
@@ -8330,7 +8326,7 @@ static int check_L2_lro_capable(u8 *buffer, struct iphdr **ip,
 static int check_for_socket_match(struct lro *lro, struct iphdr *ip,
 				  struct tcphdr *tcp)
 {
-	DBG_PRINT(INFO_DBG,"%s: Been here...\n", __FUNCTION__);
+	DBG_PRINT(INFO_DBG,"%s: Been here...\n", __func__);
 	if ((lro->iph->saddr != ip->saddr) || (lro->iph->daddr != ip->daddr) ||
 	   (lro->tcph->source != tcp->source) || (lro->tcph->dest != tcp->dest))
 		return -1;
@@ -8345,7 +8341,7 @@ static inline int get_l4_pyld_length(struct iphdr *ip, struct tcphdr *tcp)
 static void initiate_new_session(struct lro *lro, u8 *l2h,
 	struct iphdr *ip, struct tcphdr *tcp, u32 tcp_pyld_len, u16 vlan_tag)
 {
-	DBG_PRINT(INFO_DBG,"%s: Been here...\n", __FUNCTION__);
+	DBG_PRINT(INFO_DBG,"%s: Been here...\n", __func__);
 	lro->l2h = l2h;
 	lro->iph = ip;
 	lro->tcph = tcp;
@@ -8375,7 +8371,7 @@ static void update_L3L4_header(struct s2io_nic *sp, struct lro *lro)
 	struct tcphdr *tcp = lro->tcph;
 	__sum16 nchk;
 	struct stat_block *statinfo = sp->mac_control.stats_info;
-	DBG_PRINT(INFO_DBG,"%s: Been here...\n", __FUNCTION__);
+	DBG_PRINT(INFO_DBG,"%s: Been here...\n", __func__);
 
 	/* Update L3 header */
 	ip->tot_len = htons(lro->total_len);
@@ -8403,7 +8399,7 @@ static void update_L3L4_header(struct s2io_nic *sp, struct lro *lro)
 static void aggregate_new_rx(struct lro *lro, struct iphdr *ip,
 		struct tcphdr *tcp, u32 l4_pyld)
 {
-	DBG_PRINT(INFO_DBG,"%s: Been here...\n", __FUNCTION__);
+	DBG_PRINT(INFO_DBG,"%s: Been here...\n", __func__);
 	lro->total_len += l4_pyld;
 	lro->frags_len += l4_pyld;
 	lro->tcp_next_seq += l4_pyld;
@@ -8427,7 +8423,7 @@ static int verify_l3_l4_lro_capable(struct lro *l_lro, struct iphdr *ip,
 {
 	u8 *ptr;
 
-	DBG_PRINT(INFO_DBG,"%s: Been here...\n", __FUNCTION__);
+	DBG_PRINT(INFO_DBG,"%s: Been here...\n", __func__);
 
 	if (!tcp_pyld_len) {
 		/* Runt frame or a pure ack */
@@ -8509,7 +8505,7 @@ s2io_club_tcp_session(struct ring_info *ring_data, u8 *buffer, u8 **tcp,
 
 			if ((*lro)->tcp_next_seq != ntohl(tcph->seq)) {
 				DBG_PRINT(INFO_DBG, "%s:Out of order. expected "
-					  "0x%x, actual 0x%x\n", __FUNCTION__,
+					  "0x%x, actual 0x%x\n", __func__,
 					  (*lro)->tcp_next_seq,
 					  ntohl(tcph->seq));
 
@@ -8549,7 +8545,7 @@ s2io_club_tcp_session(struct ring_info *ring_data, u8 *buffer, u8 **tcp,
 
 	if (ret == 0) { /* sessions exceeded */
 		DBG_PRINT(INFO_DBG,"%s:All LRO sessions already in use\n",
-			  __FUNCTION__);
+			  __func__);
 		*lro = NULL;
 		return ret;
 	}
@@ -8571,7 +8567,7 @@ s2io_club_tcp_session(struct ring_info *ring_data, u8 *buffer, u8 **tcp,
 			break;
 		default:
 			DBG_PRINT(ERR_DBG,"%s:Dont know, can't say!!\n",
-				__FUNCTION__);
+				__func__);
 			break;
 	}
 
@@ -8588,11 +8584,11 @@ static void clear_lro_session(struct lro *lro)
 static void queue_rx_frame(struct sk_buff *skb, u16 vlan_tag)
 {
 	struct net_device *dev = skb->dev;
-	struct s2io_nic *sp = dev->priv;
+	struct s2io_nic *sp = netdev_priv(dev);
 
 	skb->protocol = eth_type_trans(skb, dev);
 	if (sp->vlgrp && vlan_tag
-		&& (vlan_strip_flag)) {
+		&& (sp->vlan_strip_flag)) {
 		/* Queueing the vlan frame to the upper layer */
 		if (sp->config.napi)
 			vlan_hwaccel_receive_skb(skb, sp->vlgrp, vlan_tag);
@@ -8637,7 +8633,7 @@ static pci_ers_result_t s2io_io_error_detected(struct pci_dev *pdev,
                                                pci_channel_state_t state)
 {
 	struct net_device *netdev = pci_get_drvdata(pdev);
-	struct s2io_nic *sp = netdev->priv;
+	struct s2io_nic *sp = netdev_priv(netdev);
 
 	netif_device_detach(netdev);
 
@@ -8662,7 +8658,7 @@ static pci_ers_result_t s2io_io_error_detected(struct pci_dev *pdev,
 static pci_ers_result_t s2io_io_slot_reset(struct pci_dev *pdev)
 {
 	struct net_device *netdev = pci_get_drvdata(pdev);
-	struct s2io_nic *sp = netdev->priv;
+	struct s2io_nic *sp = netdev_priv(netdev);
 
 	if (pci_enable_device(pdev)) {
 		printk(KERN_ERR "s2io: "
@@ -8686,7 +8682,7 @@ static pci_ers_result_t s2io_io_slot_reset(struct pci_dev *pdev)
 static void s2io_io_resume(struct pci_dev *pdev)
 {
 	struct net_device *netdev = pci_get_drvdata(pdev);
-	struct s2io_nic *sp = netdev->priv;
+	struct s2io_nic *sp = netdev_priv(netdev);
 
 	if (netif_running(netdev)) {
 		if (s2io_card_up(sp)) {

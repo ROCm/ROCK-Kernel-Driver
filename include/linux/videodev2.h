@@ -293,6 +293,7 @@ struct v4l2_pix_format {
 #define V4L2_PIX_FMT_YVU420  v4l2_fourcc('Y', 'V', '1', '2') /* 12  YVU 4:2:0     */
 #define V4L2_PIX_FMT_YUYV    v4l2_fourcc('Y', 'U', 'Y', 'V') /* 16  YUV 4:2:2     */
 #define V4L2_PIX_FMT_UYVY    v4l2_fourcc('U', 'Y', 'V', 'Y') /* 16  YUV 4:2:2     */
+#define V4L2_PIX_FMT_VYUY    v4l2_fourcc('V', 'Y', 'U', 'Y') /* 16  YUV 4:2:2     */
 #define V4L2_PIX_FMT_YUV422P v4l2_fourcc('4', '2', '2', 'P') /* 16  YVU422 planar */
 #define V4L2_PIX_FMT_YUV411P v4l2_fourcc('4', '1', '1', 'P') /* 16  YVU411 planar */
 #define V4L2_PIX_FMT_Y41P    v4l2_fourcc('Y', '4', '1', 'P') /* 12  YUV 4:1:1     */
@@ -304,6 +305,8 @@ struct v4l2_pix_format {
 /* two planes -- one Y, one Cr + Cb interleaved  */
 #define V4L2_PIX_FMT_NV12    v4l2_fourcc('N', 'V', '1', '2') /* 12  Y/CbCr 4:2:0  */
 #define V4L2_PIX_FMT_NV21    v4l2_fourcc('N', 'V', '2', '1') /* 12  Y/CrCb 4:2:0  */
+#define V4L2_PIX_FMT_NV16    v4l2_fourcc('N', 'V', '1', '6') /* 16  Y/CbCr 4:2:2  */
+#define V4L2_PIX_FMT_NV61    v4l2_fourcc('N', 'V', '6', '1') /* 16  Y/CrCb 4:2:2  */
 
 /*  The following formats are not defined in the V4L2 specification */
 #define V4L2_PIX_FMT_YUV410  v4l2_fourcc('Y', 'U', 'V', '9') /*  9  YUV 4:1:0     */
@@ -315,6 +318,13 @@ struct v4l2_pix_format {
 /* see http://www.siliconimaging.com/RGB%20Bayer.htm */
 #define V4L2_PIX_FMT_SBGGR8  v4l2_fourcc('B', 'A', '8', '1') /*  8  BGBG.. GRGR.. */
 #define V4L2_PIX_FMT_SGBRG8  v4l2_fourcc('G', 'B', 'R', 'G') /*  8  GBGB.. RGRG.. */
+/*
+ * 10bit raw bayer, expanded to 16 bits
+ * xxxxrrrrrrrrrrxxxxgggggggggg xxxxggggggggggxxxxbbbbbbbbbb...
+ */
+#define V4L2_PIX_FMT_SGRBG10 v4l2_fourcc('B', 'A', '1', '0')
+/* 10bit raw bayer DPCM compressed to 8 bits */
+#define V4L2_PIX_FMT_SGRBG10DPCM8 v4l2_fourcc('B', 'D', '1', '0')
 #define V4L2_PIX_FMT_SBGGR16 v4l2_fourcc('B', 'Y', 'R', '2') /* 16  BGBG.. GRGR.. */
 
 /* compressed formats */
@@ -910,6 +920,8 @@ enum v4l2_mpeg_audio_encoding {
 	V4L2_MPEG_AUDIO_ENCODING_LAYER_1 = 0,
 	V4L2_MPEG_AUDIO_ENCODING_LAYER_2 = 1,
 	V4L2_MPEG_AUDIO_ENCODING_LAYER_3 = 2,
+	V4L2_MPEG_AUDIO_ENCODING_AAC     = 3,
+	V4L2_MPEG_AUDIO_ENCODING_AC3     = 4,
 };
 #define V4L2_CID_MPEG_AUDIO_L1_BITRATE 		(V4L2_CID_MPEG_BASE+102)
 enum v4l2_mpeg_audio_l1_bitrate {
@@ -988,12 +1000,36 @@ enum v4l2_mpeg_audio_crc {
 	V4L2_MPEG_AUDIO_CRC_CRC16 = 1,
 };
 #define V4L2_CID_MPEG_AUDIO_MUTE 		(V4L2_CID_MPEG_BASE+109)
+#define V4L2_CID_MPEG_AUDIO_AAC_BITRATE		(V4L2_CID_MPEG_BASE+110)
+#define V4L2_CID_MPEG_AUDIO_AC3_BITRATE		(V4L2_CID_MPEG_BASE+111)
+enum v4l2_mpeg_audio_ac3_bitrate {
+	V4L2_MPEG_AUDIO_AC3_BITRATE_32K  = 0,
+	V4L2_MPEG_AUDIO_AC3_BITRATE_40K  = 1,
+	V4L2_MPEG_AUDIO_AC3_BITRATE_48K  = 2,
+	V4L2_MPEG_AUDIO_AC3_BITRATE_56K  = 3,
+	V4L2_MPEG_AUDIO_AC3_BITRATE_64K  = 4,
+	V4L2_MPEG_AUDIO_AC3_BITRATE_80K  = 5,
+	V4L2_MPEG_AUDIO_AC3_BITRATE_96K  = 6,
+	V4L2_MPEG_AUDIO_AC3_BITRATE_112K = 7,
+	V4L2_MPEG_AUDIO_AC3_BITRATE_128K = 8,
+	V4L2_MPEG_AUDIO_AC3_BITRATE_160K = 9,
+	V4L2_MPEG_AUDIO_AC3_BITRATE_192K = 10,
+	V4L2_MPEG_AUDIO_AC3_BITRATE_224K = 11,
+	V4L2_MPEG_AUDIO_AC3_BITRATE_256K = 12,
+	V4L2_MPEG_AUDIO_AC3_BITRATE_320K = 13,
+	V4L2_MPEG_AUDIO_AC3_BITRATE_384K = 14,
+	V4L2_MPEG_AUDIO_AC3_BITRATE_448K = 15,
+	V4L2_MPEG_AUDIO_AC3_BITRATE_512K = 16,
+	V4L2_MPEG_AUDIO_AC3_BITRATE_576K = 17,
+	V4L2_MPEG_AUDIO_AC3_BITRATE_640K = 18,
+};
 
 /*  MPEG video */
 #define V4L2_CID_MPEG_VIDEO_ENCODING 		(V4L2_CID_MPEG_BASE+200)
 enum v4l2_mpeg_video_encoding {
-	V4L2_MPEG_VIDEO_ENCODING_MPEG_1 = 0,
-	V4L2_MPEG_VIDEO_ENCODING_MPEG_2 = 1,
+	V4L2_MPEG_VIDEO_ENCODING_MPEG_1     = 0,
+	V4L2_MPEG_VIDEO_ENCODING_MPEG_2     = 1,
+	V4L2_MPEG_VIDEO_ENCODING_MPEG_4_AVC = 2,
 };
 #define V4L2_CID_MPEG_VIDEO_ASPECT 		(V4L2_CID_MPEG_BASE+201)
 enum v4l2_mpeg_video_aspect {
@@ -1017,7 +1053,7 @@ enum v4l2_mpeg_video_bitrate_mode {
 #define V4L2_CID_MPEG_VIDEO_MUTE 		(V4L2_CID_MPEG_BASE+210)
 #define V4L2_CID_MPEG_VIDEO_MUTE_YUV 		(V4L2_CID_MPEG_BASE+211)
 
-/*  MPEG-class control IDs specific to the CX2584x driver as defined by V4L2 */
+/*  MPEG-class control IDs specific to the CX2341x driver as defined by V4L2 */
 #define V4L2_CID_MPEG_CX2341X_BASE 				(V4L2_CTRL_CLASS_MPEG | 0x1000)
 #define V4L2_CID_MPEG_CX2341X_VIDEO_SPATIAL_FILTER_MODE 	(V4L2_CID_MPEG_CX2341X_BASE+0)
 enum v4l2_mpeg_cx2341x_video_spatial_filter_mode {
@@ -1083,6 +1119,12 @@ enum  v4l2_exposure_auto_type {
 #define V4L2_CID_FOCUS_ABSOLUTE			(V4L2_CID_CAMERA_CLASS_BASE+10)
 #define V4L2_CID_FOCUS_RELATIVE			(V4L2_CID_CAMERA_CLASS_BASE+11)
 #define V4L2_CID_FOCUS_AUTO			(V4L2_CID_CAMERA_CLASS_BASE+12)
+
+#define V4L2_CID_ZOOM_ABSOLUTE			(V4L2_CID_CAMERA_CLASS_BASE+13)
+#define V4L2_CID_ZOOM_RELATIVE			(V4L2_CID_CAMERA_CLASS_BASE+14)
+#define V4L2_CID_ZOOM_CONTINUOUS		(V4L2_CID_CAMERA_CLASS_BASE+15)
+
+#define V4L2_CID_PRIVACY			(V4L2_CID_CAMERA_CLASS_BASE+16)
 
 /*
  *	T U N I N G
@@ -1328,24 +1370,41 @@ struct v4l2_streamparm {
 /*
  *	A D V A N C E D   D E B U G G I N G
  *
- *	NOTE: EXPERIMENTAL API
+ *	NOTE: EXPERIMENTAL API, NEVER RELY ON THIS IN APPLICATIONS!
+ *	FOR DEBUGGING, TESTING AND INTERNAL USE ONLY!
  */
 
 /* VIDIOC_DBG_G_REGISTER and VIDIOC_DBG_S_REGISTER */
 
 #define V4L2_CHIP_MATCH_HOST       0  /* Match against chip ID on host (0 for the host) */
-#define V4L2_CHIP_MATCH_I2C_DRIVER 1  /* Match against I2C driver ID */
+#define V4L2_CHIP_MATCH_I2C_DRIVER 1  /* Match against I2C driver name */
 #define V4L2_CHIP_MATCH_I2C_ADDR   2  /* Match against I2C 7-bit address */
+#define V4L2_CHIP_MATCH_AC97       3  /* Match against anciliary AC97 chip */
 
-struct v4l2_register {
-	__u32 match_type; /* Match type */
-	__u32 match_chip; /* Match this chip, meaning determined by match_type */
+struct v4l2_dbg_match {
+	__u32 type; /* Match type */
+	union {     /* Match this chip, meaning determined by type */
+		__u32 addr;
+		char name[32];
+	};
+} __attribute__ ((packed));
+
+struct v4l2_dbg_register {
+	struct v4l2_dbg_match match;
+	__u32 size;	/* register size in bytes */
 	__u64 reg;
 	__u64 val;
-};
+} __attribute__ ((packed));
 
-/* VIDIOC_G_CHIP_IDENT */
-struct v4l2_chip_ident {
+/* VIDIOC_DBG_G_CHIP_IDENT */
+struct v4l2_dbg_chip_ident {
+	struct v4l2_dbg_match match;
+	__u32 ident;       /* chip identifier as specified in <media/v4l2-chip-ident.h> */
+	__u32 revision;    /* chip revision, chip specific */
+} __attribute__ ((packed));
+
+/* VIDIOC_G_CHIP_IDENT_OLD: Deprecated, do not use */
+struct v4l2_chip_ident_old {
 	__u32 match_type;  /* Match type */
 	__u32 match_chip;  /* Match this chip, meaning determined by match_type */
 	__u32 ident;       /* chip identifier as specified in <media/v4l2-chip-ident.h> */
@@ -1417,14 +1476,25 @@ struct v4l2_chip_ident {
 #define VIDIOC_G_ENC_INDEX       _IOR('V', 76, struct v4l2_enc_idx)
 #define VIDIOC_ENCODER_CMD      _IOWR('V', 77, struct v4l2_encoder_cmd)
 #define VIDIOC_TRY_ENCODER_CMD  _IOWR('V', 78, struct v4l2_encoder_cmd)
-
-/* Experimental, only implemented if CONFIG_VIDEO_ADV_DEBUG is defined */
-#define	VIDIOC_DBG_S_REGISTER 	 _IOW('V', 79, struct v4l2_register)
-#define	VIDIOC_DBG_G_REGISTER 	_IOWR('V', 80, struct v4l2_register)
-
-#define VIDIOC_G_CHIP_IDENT     _IOWR('V', 81, struct v4l2_chip_ident)
 #endif
+
+#if 1
+/* Experimental, meant for debugging, testing and internal use.
+   Only implemented if CONFIG_VIDEO_ADV_DEBUG is defined.
+   You must be root to use these ioctls. Never use these in applications! */
+#define	VIDIOC_DBG_S_REGISTER 	 _IOW('V', 79, struct v4l2_dbg_register)
+#define	VIDIOC_DBG_G_REGISTER 	_IOWR('V', 80, struct v4l2_dbg_register)
+
+/* Experimental, meant for debugging, testing and internal use.
+   Never use this ioctl in applications! */
+#define VIDIOC_DBG_G_CHIP_IDENT _IOWR('V', 81, struct v4l2_dbg_chip_ident)
+/* This is deprecated and will go away in 2.6.30 */
+#define VIDIOC_G_CHIP_IDENT_OLD _IOWR('V', 81, struct v4l2_chip_ident_old)
+#endif
+
 #define VIDIOC_S_HW_FREQ_SEEK	 _IOW('V', 82, struct v4l2_hw_freq_seek)
+/* Reminder: when adding new ioctls please add support for them to
+   drivers/media/video/v4l2-compat-ioctl32.c as well! */
 
 #ifdef __OLD_VIDIOC_
 /* for compatibility, will go away some day */

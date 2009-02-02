@@ -29,7 +29,7 @@
 struct mpc8610_hpcd_data {
 	struct snd_soc_device sound_devdata;
 	struct snd_soc_dai_link dai;
-	struct snd_soc_machine machine;
+	struct snd_soc_card machine;
 	unsigned int dai_format;
 	unsigned int codec_clk_direction;
 	unsigned int cpu_clk_direction;
@@ -67,10 +67,6 @@ static int mpc8610_hpcd_machine_probe(struct platform_device *sound_device)
 		machine_data->dma_channel_id[0], 0);
 	guts_set_pmuxcr_dma(machine_data->guts, machine_data->dma_id,
 		machine_data->dma_channel_id[1], 0);
-
-	guts_set_pmuxcr_dma(machine_data->guts, 1, 0, 0);
-	guts_set_pmuxcr_dma(machine_data->guts, 1, 3, 0);
-	guts_set_pmuxcr_dma(machine_data->guts, 0, 3, 0);
 
 	switch (machine_data->ssi_id) {
 	case 0:
@@ -187,16 +183,6 @@ static struct snd_soc_ops mpc8610_hpcd_ops = {
 };
 
 /**
- * mpc8610_hpcd_machine: ASoC machine data
- */
-static struct snd_soc_machine mpc8610_hpcd_machine = {
-	.probe = mpc8610_hpcd_machine_probe,
-	.remove = mpc8610_hpcd_machine_remove,
-	.name = "MPC8610 HPCD",
-	.num_links = 1,
-};
-
-/**
  * mpc8610_hpcd_probe: OF probe function for the fabric driver
  *
  * This function gets called when an SSI node is found in the device tree.
@@ -230,6 +216,8 @@ static int mpc8610_hpcd_probe(struct of_device *ofdev,
 	struct fsl_ssi_info ssi_info;
 	struct fsl_dma_info dma_info;
 	int ret = -ENODEV;
+	unsigned int playback_dma_channel;
+	unsigned int capture_dma_channel;
 
 	machine_data = kzalloc(sizeof(struct mpc8610_hpcd_data), GFP_KERNEL);
 	if (!machine_data)
@@ -381,8 +369,9 @@ static int mpc8610_hpcd_probe(struct of_device *ofdev,
 		goto error;
 	}
 
-	/* Find the DMA channels to use.  For now, we always use the first DMA
-	   controller. */
+	/* Find the DMA channels to use.  Both SSIs need to use the same DMA
+	 * controller, so let's use DMA#1.
+	 */
 	for_each_compatible_node(dma_np, NULL, "fsl,mpc8610-dma") {
 		iprop = of_get_property(dma_np, "cell-index", NULL);
 		if (iprop && (*iprop == 0)) {
@@ -397,14 +386,19 @@ static int mpc8610_hpcd_probe(struct of_device *ofdev,
 	}
 	machine_data->dma_id = *iprop;
 
+	/* SSI1 needs to use DMA Channels 0 and 1, and SSI2 needs to use DMA
+	 * channels 2 and 3.  This is just how the MPC8610 is wired
+	 * internally.
+	 */
+	playback_dma_channel = (machine_data->ssi_id == 0) ? 0 : 2;
+	capture_dma_channel = (machine_data->ssi_id == 0) ? 1 : 3;
+
 	/*
-	 * Find the DMA channels to use.  For now, we always use DMA channel 0
-	 * for playback, and DMA channel 1 for capture.
+	 * Find the DMA channels to use.
 	 */
 	while ((dma_channel_np = of_get_next_child(dma_np, dma_channel_np))) {
 		iprop = of_get_property(dma_channel_np, "cell-index", NULL);
-		/* Is it DMA channel 0? */
-		if (iprop && (*iprop == 0)) {
+		if (iprop && (*iprop == playback_dma_channel)) {
 			/* dma_channel[0] and dma_irq[0] are for playback */
 			dma_info.dma_channel[0] = of_iomap(dma_channel_np, 0);
 			dma_info.dma_irq[0] =
@@ -412,7 +406,7 @@ static int mpc8610_hpcd_probe(struct of_device *ofdev,
 			machine_data->dma_channel_id[0] = *iprop;
 			continue;
 		}
-		if (iprop && (*iprop == 1)) {
+		if (iprop && (*iprop == capture_dma_channel)) {
 			/* dma_channel[1] and dma_irq[1] are for capture */
 			dma_info.dma_channel[1] = of_iomap(dma_channel_np, 0);
 			dma_info.dma_irq[1] =
@@ -451,7 +445,11 @@ static int mpc8610_hpcd_probe(struct of_device *ofdev,
 	machine_data->dai.codec_dai = &cs4270_dai; /* The codec_dai we want */
 	machine_data->dai.ops = &mpc8610_hpcd_ops;
 
-	mpc8610_hpcd_machine.dai_link = &machine_data->dai;
+	machine_data->machine.probe = mpc8610_hpcd_machine_probe;
+	machine_data->machine.remove = mpc8610_hpcd_machine_remove;
+	machine_data->machine.name = "MPC8610 HPCD";
+	machine_data->machine.num_links = 1;
+	machine_data->machine.dai_link = &machine_data->dai;
 
 	/* Allocate a new audio platform device structure */
 	sound_device = platform_device_alloc("soc-audio", -1);
@@ -461,9 +459,9 @@ static int mpc8610_hpcd_probe(struct of_device *ofdev,
 		goto error;
 	}
 
-	machine_data->sound_devdata.machine = &mpc8610_hpcd_machine;
+	machine_data->sound_devdata.card = &machine_data->machine;
 	machine_data->sound_devdata.codec_dev = &soc_codec_device_cs4270;
-	machine_data->sound_devdata.platform = &fsl_soc_platform;
+	machine_data->machine.platform = &fsl_soc_platform;
 
 	sound_device->dev.platform_data = machine_data;
 

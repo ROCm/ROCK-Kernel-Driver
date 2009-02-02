@@ -30,6 +30,11 @@
 #define DBG(f, x...) \
 	pr_debug(DRIVER_NAME " [%s()]: " f, __func__,## x)
 
+#if defined(CONFIG_LEDS_CLASS) || (defined(CONFIG_LEDS_CLASS_MODULE) && \
+	defined(CONFIG_MMC_SDHCI_MODULE))
+#define SDHCI_USE_LEDS_CLASS
+#endif
+
 static unsigned int debug_quirks = 0;
 
 static void sdhci_prepare_data(struct sdhci_host *, struct mmc_data *);
@@ -149,7 +154,7 @@ static void sdhci_deactivate_led(struct sdhci_host *host)
 	writeb(ctrl, host->ioaddr + SDHCI_HOST_CONTROL);
 }
 
-#ifdef CONFIG_LEDS_CLASS
+#ifdef SDHCI_USE_LEDS_CLASS
 static void sdhci_led_control(struct led_classdev *led,
 	enum led_brightness brightness)
 {
@@ -177,7 +182,7 @@ static void sdhci_read_block_pio(struct sdhci_host *host)
 {
 	unsigned long flags;
 	size_t blksize, len, chunk;
-	u32 scratch;
+	u32 uninitialized_var(scratch);
 	u8 *buf;
 
 	DBG("PIO reading\n");
@@ -994,7 +999,7 @@ static void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 
 	WARN_ON(host->mrq != NULL);
 
-#ifndef CONFIG_LEDS_CLASS
+#ifndef SDHCI_USE_LEDS_CLASS
 	sdhci_activate_led(host);
 #endif
 
@@ -1154,7 +1159,7 @@ static void sdhci_tasklet_card(unsigned long param)
 
 	spin_unlock_irqrestore(&host->lock, flags);
 
-	mmc_detect_change(host->mmc, msecs_to_jiffies(500));
+	mmc_detect_change(host->mmc, msecs_to_jiffies(200));
 }
 
 static void sdhci_tasklet_finish(unsigned long param)
@@ -1201,7 +1206,7 @@ static void sdhci_tasklet_finish(unsigned long param)
 	host->cmd = NULL;
 	host->data = NULL;
 
-#ifndef CONFIG_LEDS_CLASS
+#ifndef SDHCI_USE_LEDS_CLASS
 	sdhci_deactivate_led(host);
 #endif
 
@@ -1266,9 +1271,31 @@ static void sdhci_cmd_irq(struct sdhci_host *host, u32 intmask)
 			SDHCI_INT_INDEX))
 		host->cmd->error = -EILSEQ;
 
-	if (host->cmd->error)
+	if (host->cmd->error) {
 		tasklet_schedule(&host->finish_tasklet);
-	else if (intmask & SDHCI_INT_RESPONSE)
+		return;
+	}
+
+	/*
+	 * The host can send and interrupt when the busy state has
+	 * ended, allowing us to wait without wasting CPU cycles.
+	 * Unfortunately this is overloaded on the "data complete"
+	 * interrupt, so we need to take some care when handling
+	 * it.
+	 *
+	 * Note: The 1.0 specification is a bit ambiguous about this
+	 *       feature so there might be some problems with older
+	 *       controllers.
+	 */
+	if (host->cmd->flags & MMC_RSP_BUSY) {
+		if (host->cmd->data)
+			DBG("Cannot wait for busy signal when also "
+				"doing a data transfer");
+		else
+			return;
+	}
+
+	if (intmask & SDHCI_INT_RESPONSE)
 		sdhci_finish_command(host);
 }
 
@@ -1278,11 +1305,16 @@ static void sdhci_data_irq(struct sdhci_host *host, u32 intmask)
 
 	if (!host->data) {
 		/*
-		 * A data end interrupt is sent together with the response
-		 * for the stop command.
+		 * The "data complete" interrupt is also used to
+		 * indicate that a busy state has ended. See comment
+		 * above in sdhci_cmd_irq().
 		 */
-		if (intmask & SDHCI_INT_DATA_END)
-			return;
+		if (host->cmd && (host->cmd->flags & MMC_RSP_BUSY)) {
+			if (intmask & SDHCI_INT_DATA_END) {
+				sdhci_finish_command(host);
+				return;
+			}
+		}
 
 		printk(KERN_ERR "%s: Got data interrupt 0x%08x even "
 			"though no data operation was in progress.\n",
@@ -1604,7 +1636,8 @@ int sdhci_add_host(struct sdhci_host *host)
 	mmc->f_max = host->max_clk;
 	mmc->caps = MMC_CAP_4_BIT_DATA | MMC_CAP_SDIO_IRQ;
 
-	if (caps & SDHCI_CAN_DO_HISPD)
+	if ((caps & SDHCI_CAN_DO_HISPD) ||
+		(host->quirks & SDHCI_QUIRK_FORCE_HIGHSPEED))
 		mmc->caps |= MMC_CAP_SD_HIGHSPEED;
 
 	mmc->ocr_avail = 0;
@@ -1689,7 +1722,7 @@ int sdhci_add_host(struct sdhci_host *host)
 	sdhci_dumpregs(host);
 #endif
 
-#ifdef CONFIG_LEDS_CLASS
+#ifdef SDHCI_USE_LEDS_CLASS
 	host->led.name = mmc_hostname(mmc);
 	host->led.brightness = LED_OFF;
 	host->led.default_trigger = mmc_hostname(mmc);
@@ -1705,13 +1738,13 @@ int sdhci_add_host(struct sdhci_host *host)
 	mmc_add_host(mmc);
 
 	printk(KERN_INFO "%s: SDHCI controller on %s [%s] using %s%s\n",
-		mmc_hostname(mmc), host->hw_name, mmc_dev(mmc)->bus_id,
+		mmc_hostname(mmc), host->hw_name, dev_name(mmc_dev(mmc)),
 		(host->flags & SDHCI_USE_ADMA)?"A":"",
 		(host->flags & SDHCI_USE_DMA)?"DMA":"PIO");
 
 	return 0;
 
-#ifdef CONFIG_LEDS_CLASS
+#ifdef SDHCI_USE_LEDS_CLASS
 reset:
 	sdhci_reset(host, SDHCI_RESET_ALL);
 	free_irq(host->irq, host);
@@ -1747,7 +1780,7 @@ void sdhci_remove_host(struct sdhci_host *host, int dead)
 
 	mmc_remove_host(host->mmc);
 
-#ifdef CONFIG_LEDS_CLASS
+#ifdef SDHCI_USE_LEDS_CLASS
 	led_classdev_unregister(&host->led);
 #endif
 

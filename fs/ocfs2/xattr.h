@@ -3,24 +3,16 @@
  *
  * xattr.h
  *
- * Function prototypes
- *
- * Copyright (C) 2008 Oracle.  All rights reserved.
+ * Copyright (C) 2004, 2008 Oracle.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public
- * License as published by the Free Software Foundation; either
- * version 2 of the License, or (at your option) any later version.
+ * License version 2 as published by the Free Software Foundation.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public
- * License along with this program; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 021110-1307, USA.
  */
 
 #ifndef OCFS2_XATTR_H
@@ -38,6 +30,13 @@ enum ocfs2_xattr_type {
 	OCFS2_XATTR_MAX
 };
 
+struct ocfs2_security_xattr_info {
+	int enable;
+	char *name;
+	void *value;
+	size_t value_len;
+};
+
 extern struct xattr_handler ocfs2_xattr_user_handler;
 extern struct xattr_handler ocfs2_xattr_trusted_handler;
 extern struct xattr_handler ocfs2_xattr_security_handler;
@@ -53,9 +52,36 @@ int ocfs2_xattr_get_nolock(struct inode *, struct buffer_head *, int,
 int ocfs2_xattr_set(struct inode *, int, const char *, const void *,
 		    size_t, int);
 int ocfs2_xattr_set_handle(handle_t *, struct inode *, struct buffer_head *,
-			   int, const char *, const void *, size_t, int);
+			   int, const char *, const void *, size_t, int,
+			   struct ocfs2_alloc_context *,
+			   struct ocfs2_alloc_context *);
 int ocfs2_xattr_remove(struct inode *, struct buffer_head *);
-int ocfs2_init_security(handle_t *, struct inode *, struct inode *,
-			struct buffer_head *);
+int ocfs2_init_security_get(struct inode *, struct inode *,
+			    struct ocfs2_security_xattr_info *);
+int ocfs2_init_security_set(handle_t *, struct inode *,
+			    struct buffer_head *,
+			    struct ocfs2_security_xattr_info *,
+			    struct ocfs2_alloc_context *,
+			    struct ocfs2_alloc_context *);
+int ocfs2_calc_security_init(struct inode *,
+			     struct ocfs2_security_xattr_info *,
+			     int *, int *, struct ocfs2_alloc_context **);
+int ocfs2_calc_xattr_init(struct inode *, struct buffer_head *,
+			  int, struct ocfs2_security_xattr_info *,
+			  int *, int *, struct ocfs2_alloc_context **);
+
+/*
+ * xattrs can live inside an inode, as part of an external xattr block,
+ * or inside an xattr bucket, which is the leaf of a tree rooted in an
+ * xattr block.  Some of the xattr calls, especially the value setting
+ * functions, want to treat each of these locations as equal.  Let's wrap
+ * them in a structure that we can pass around instead of raw buffer_heads.
+ */
+struct ocfs2_xattr_value_buf {
+	struct buffer_head		*vb_bh;
+	ocfs2_journal_access_func	vb_access;
+	struct ocfs2_xattr_value_root	*vb_xv;
+};
+
 
 #endif /* OCFS2_XATTR_H */

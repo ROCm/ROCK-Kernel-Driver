@@ -231,7 +231,6 @@ int get_sb_pseudo(struct file_system_type *fs_type, char *name,
 	 */
 	root->i_ino = 1;
 	root->i_mode = S_IFDIR | S_IRUSR | S_IWUSR;
-	root->i_uid = root->i_gid = 0;
 	root->i_atime = root->i_mtime = root->i_ctime = CURRENT_TIME;
 	dentry = d_alloc(NULL, &d_name);
 	if (!dentry) {
@@ -436,8 +435,6 @@ int simple_fill_super(struct super_block *s, int magic, struct tree_descr *files
 	 */
 	inode->i_ino = 1;
 	inode->i_mode = S_IFDIR | 0755;
-	inode->i_uid = inode->i_gid = 0;
-	inode->i_blocks = 0;
 	inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
 	inode->i_op = &simple_dir_inode_operations;
 	inode->i_fop = &simple_dir_operations;
@@ -464,8 +461,6 @@ int simple_fill_super(struct super_block *s, int magic, struct tree_descr *files
 		if (!inode)
 			goto out;
 		inode->i_mode = S_IFREG | files->mode;
-		inode->i_uid = inode->i_gid = 0;
-		inode->i_blocks = 0;
 		inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
 		inode->i_fop = files->ops;
 		inode->i_ino = i;
@@ -732,28 +727,6 @@ out:
 	return ret;
 }
 
-/*
- * This is what d_alloc_anon should have been.  Once the exportfs
- * argument transition has been finished I will update d_alloc_anon
- * to this prototype and this wrapper will go away.   --hch
- */
-static struct dentry *exportfs_d_alloc(struct inode *inode)
-{
-	struct dentry *dentry;
-
-	if (!inode)
-		return NULL;
-	if (IS_ERR(inode))
-		return ERR_PTR(PTR_ERR(inode));
-
-	dentry = d_alloc_anon(inode);
-	if (!dentry) {
-		iput(inode);
-		dentry = ERR_PTR(-ENOMEM);
-	}
-	return dentry;
-}
-
 /**
  * generic_fh_to_dentry - generic helper for the fh_to_dentry export operation
  * @sb:		filesystem to do the file handle conversion on
@@ -782,7 +755,7 @@ struct dentry *generic_fh_to_dentry(struct super_block *sb, struct fid *fid,
 		break;
 	}
 
-	return exportfs_d_alloc(inode);
+	return d_obtain_alias(inode);
 }
 EXPORT_SYMBOL_GPL(generic_fh_to_dentry);
 
@@ -815,7 +788,7 @@ struct dentry *generic_fh_to_parent(struct super_block *sb, struct fid *fid,
 		break;
 	}
 
-	return exportfs_d_alloc(inode);
+	return d_obtain_alias(inode);
 }
 EXPORT_SYMBOL_GPL(generic_fh_to_parent);
 
@@ -836,7 +809,7 @@ EXPORT_SYMBOL(simple_getattr);
 EXPORT_SYMBOL(simple_link);
 EXPORT_SYMBOL(simple_lookup);
 EXPORT_SYMBOL(simple_pin_fs);
-EXPORT_SYMBOL(simple_prepare_write);
+EXPORT_UNUSED_SYMBOL(simple_prepare_write);
 EXPORT_SYMBOL(simple_readpage);
 EXPORT_SYMBOL(simple_release_fs);
 EXPORT_SYMBOL(simple_rename);

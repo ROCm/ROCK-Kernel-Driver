@@ -20,7 +20,6 @@
  *  08-08-01  01.02.01  Original release for v1.2 work.
  *  05-11-04  01.03.01  Original release for MPI v1.3.
  *  08-19-04  01.05.01  Original release for MPI v1.5.
- *  08-30-05  01.05.02  Added PowerPC option to #ifdef's.
  *  --------------------------------------------------------------------------
  */
 

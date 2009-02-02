@@ -24,9 +24,10 @@
 #include <linux/errno.h>
 #include <linux/mm.h>
 #include <linux/vmalloc.h>
+#include <linux/io.h>
 
+#include <asm/cputype.h>
 #include <asm/cacheflush.h>
-#include <asm/io.h>
 #include <asm/mmu_context.h>
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
@@ -55,8 +56,7 @@ static int remap_area_pte(pmd_t *pmd, unsigned long addr, unsigned long end,
 		if (!pte_none(*pte))
 			goto bad;
 
-		set_pte_ext(pte, pfn_pte(phys_addr >> PAGE_SHIFT, prot),
-			    type->prot_pte_ext);
+		set_pte_ext(pte, pfn_pte(phys_addr >> PAGE_SHIFT, prot), 0);
 		phys_addr += PAGE_SIZE;
 	} while (pte++, addr += PAGE_SIZE, addr != end);
 	return 0;
@@ -138,7 +138,7 @@ void __check_kvm_seq(struct mm_struct *mm)
  */
 static void unmap_area_sections(unsigned long virt, unsigned long size)
 {
-	unsigned long addr = virt, end = virt + (size & ~SZ_1M);
+	unsigned long addr = virt, end = virt + (size & ~(SZ_1M - 1));
 	pgd_t *pgd;
 
 	flush_cache_vunmap(addr, end);
@@ -332,16 +332,12 @@ __arm_ioremap(unsigned long phys_addr, size_t size, unsigned int mtype)
 }
 EXPORT_SYMBOL(__arm_ioremap);
 
-void __iounmap(volatile void __iomem *addr)
+void __iounmap(volatile void __iomem *io_addr)
 {
+	void *addr = (void *)(PAGE_MASK & (unsigned long)io_addr);
 #ifndef CONFIG_SMP
 	struct vm_struct **p, *tmp;
-#endif
-	unsigned int section_mapping = 0;
 
-	addr = (volatile void __iomem *)(PAGE_MASK & (unsigned long)addr);
-
-#ifndef CONFIG_SMP
 	/*
 	 * If this is a section based mapping we need to handle it
 	 * specially as the VM subsystem does not know how to handle
@@ -351,13 +347,10 @@ void __iounmap(volatile void __iomem *addr)
 	 */
 	write_lock(&vmlist_lock);
 	for (p = &vmlist ; (tmp = *p) ; p = &tmp->next) {
-		if((tmp->flags & VM_IOREMAP) && (tmp->addr == addr)) {
+		if ((tmp->flags & VM_IOREMAP) && (tmp->addr == addr)) {
 			if (tmp->flags & VM_ARM_SECTION_MAPPING) {
-				*p = tmp->next;
 				unmap_area_sections((unsigned long)tmp->addr,
 						    tmp->size);
-				kfree(tmp);
-				section_mapping = 1;
 			}
 			break;
 		}
@@ -365,7 +358,6 @@ void __iounmap(volatile void __iomem *addr)
 	write_unlock(&vmlist_lock);
 #endif
 
-	if (!section_mapping)
-		vunmap((void __force *)addr);
+	vunmap(addr);
 }
 EXPORT_SYMBOL(__iounmap);

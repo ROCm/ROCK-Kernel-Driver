@@ -31,14 +31,14 @@
  * from ext4_file_open: open gets called at every open, but release
  * gets called only when /all/ the files are closed.
  */
-static int ext4_release_file (struct inode * inode, struct file * filp)
+static int ext4_release_file(struct inode *inode, struct file *filp)
 {
 	/* if we are the last writer on the inode, drop the block reservation */
 	if ((filp->f_mode & FMODE_WRITE) &&
 			(atomic_read(&inode->i_writecount) == 1))
 	{
 		down_write(&EXT4_I(inode)->i_data_sem);
-		ext4_discard_reservation(inode);
+		ext4_discard_preallocations(inode);
 		up_write(&EXT4_I(inode)->i_data_sem);
 	}
 	if (is_dx(inode) && filp->private_data)
@@ -162,7 +162,7 @@ const struct inode_operations ext4_file_inode_operations = {
 	.truncate	= ext4_truncate,
 	.setattr	= ext4_setattr,
 	.getattr	= ext4_getattr,
-#ifdef CONFIG_EXT4DEV_FS_XATTR
+#ifdef CONFIG_EXT4_FS_XATTR
 	.setxattr	= generic_setxattr,
 	.getxattr	= generic_getxattr,
 	.listxattr	= ext4_listxattr,
@@ -170,5 +170,6 @@ const struct inode_operations ext4_file_inode_operations = {
 #endif
 	.permission	= ext4_permission,
 	.fallocate	= ext4_fallocate,
+	.fiemap		= ext4_fiemap,
 };
 

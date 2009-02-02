@@ -340,8 +340,15 @@ static int ipath_post_one_send(struct ipath_qp *qp, struct ib_send_wr *wr)
 	int acc;
 	int ret;
 	unsigned long flags;
+	struct ipath_devdata *dd = to_idev(qp->ibqp.device)->dd;
 
 	spin_lock_irqsave(&qp->s_lock, flags);
+
+	if (qp->ibqp.qp_type != IB_QPT_SMI &&
+	    !(dd->ipath_flags & IPATH_LINKACTIVE)) {
+		ret = -ENETDOWN;
+		goto bail;
+	}
 
 	/* Check that state is OK to post send. */
 	if (unlikely(!(ib_ipath_state_ops[qp->state] & IPATH_POST_SEND_OK)))
@@ -1845,7 +1852,7 @@ unsigned ipath_get_npkeys(struct ipath_devdata *dd)
 }
 
 /**
- * ipath_get_pkey - return the indexed PKEY from the port 0 PKEY table
+ * ipath_get_pkey - return the indexed PKEY from the port PKEY table
  * @dd: the infinipath device
  * @index: the PKEY index
  */
@@ -1853,6 +1860,7 @@ unsigned ipath_get_pkey(struct ipath_devdata *dd, unsigned index)
 {
 	unsigned ret;
 
+	/* always a kernel port, no locking needed */
 	if (index >= ARRAY_SIZE(dd->ipath_pd[0]->port_pkeys))
 		ret = 0;
 	else

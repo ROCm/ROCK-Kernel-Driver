@@ -7,8 +7,23 @@
  */
 
 #define KMSG_COMPONENT "zfcp"
+#define pr_fmt(fmt) KMSG_COMPONENT ": " fmt
 
 #include "zfcp_ext.h"
+
+enum rscn_address_format {
+	RSCN_PORT_ADDRESS	= 0x0,
+	RSCN_AREA_ADDRESS	= 0x1,
+	RSCN_DOMAIN_ADDRESS	= 0x2,
+	RSCN_FABRIC_ADDRESS	= 0x3,
+};
+
+static u32 rscn_range_mask[] = {
+	[RSCN_PORT_ADDRESS]		= 0xFFFFFF,
+	[RSCN_AREA_ADDRESS]		= 0xFFFF00,
+	[RSCN_DOMAIN_ADDRESS]		= 0xFF0000,
+	[RSCN_FABRIC_ADDRESS]		= 0x000000,
+};
 
 struct gpn_ft_resp_acc {
 	u8 control;
@@ -154,22 +169,7 @@ static void zfcp_fc_incoming_rscn(struct zfcp_fsf_req *fsf_req)
 	for (i = 1; i < no_entries; i++) {
 		/* skip head and start with 1st element */
 		fcp_rscn_element++;
-		switch (fcp_rscn_element->addr_format) {
-		case ZFCP_PORT_ADDRESS:
-			range_mask = ZFCP_PORTS_RANGE_PORT;
-			break;
-		case ZFCP_AREA_ADDRESS:
-			range_mask = ZFCP_PORTS_RANGE_AREA;
-			break;
-		case ZFCP_DOMAIN_ADDRESS:
-			range_mask = ZFCP_PORTS_RANGE_DOMAIN;
-			break;
-		case ZFCP_FABRIC_ADDRESS:
-			range_mask = ZFCP_PORTS_RANGE_FABRIC;
-			break;
-		default:
-			continue;
-		}
+		range_mask = rscn_range_mask[fcp_rscn_element->addr_format];
 		_zfcp_fc_incoming_rscn(fsf_req, range_mask, fcp_rscn_element);
 	}
 	schedule_work(&fsf_req->adapter->scan_work);
@@ -260,7 +260,6 @@ static void zfcp_fc_ns_gid_pn_eval(unsigned long data)
 		return;
 	/* looks like a valid d_id */
 	port->d_id = ct_iu_resp->d_id & ZFCP_DID_MASK;
-	atomic_set_mask(ZFCP_STATUS_PORT_DID_DID, &port->status);
 }
 
 int static zfcp_fc_ns_gid_pn_request(struct zfcp_erp_action *erp_action,
@@ -582,7 +581,6 @@ static int zfcp_scan_eval_gpn_ft(struct zfcp_gpn_ft *gpn_ft, int max_entries)
 		}
 
 		port = zfcp_port_enqueue(adapter, acc->wwpn,
-					 ZFCP_STATUS_PORT_DID_DID |
 					 ZFCP_STATUS_COMMON_NOESC, d_id);
 		if (IS_ERR(port))
 			ret = PTR_ERR(port);
@@ -612,7 +610,6 @@ int zfcp_scan_ports(struct zfcp_adapter *adapter)
 	max_entries = chain ? ZFCP_GPN_FT_MAX_ENTRIES : ZFCP_GPN_FT_ENTRIES;
 	max_bytes = chain ? ZFCP_GPN_FT_MAX_SIZE : ZFCP_CT_SIZE_ONE_PAGE;
 
-	zfcp_erp_wait(adapter); /* wait until adapter is finished with ERP */
 	if (fc_host_port_type(adapter->scsi_host) != FC_PORTTYPE_NPORT)
 		return 0;
 

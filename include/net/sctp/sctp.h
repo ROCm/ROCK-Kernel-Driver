@@ -138,6 +138,7 @@ void sctp_write_space(struct sock *sk);
 unsigned int sctp_poll(struct file *file, struct socket *sock,
 		poll_table *wait);
 void sctp_sock_rfree(struct sk_buff *skb);
+extern struct percpu_counter sctp_sockets_allocated;
 
 /*
  * sctp/primitive.c
@@ -285,15 +286,15 @@ extern int sctp_debug_flag;
 	if (sctp_debug_flag) { \
 		if (saddr->sa.sa_family == AF_INET6) { \
 			printk(KERN_DEBUG \
-			       lead NIP6_FMT trail, \
+			       lead "%pI6" trail, \
 			       leadparm, \
-			       NIP6(saddr->v6.sin6_addr), \
+			       &saddr->v6.sin6_addr, \
 			       otherparms); \
 		} else { \
 			printk(KERN_DEBUG \
-			       lead NIPQUAD_FMT trail, \
+			       lead "%pI4" trail, \
 			       leadparm, \
-			       NIPQUAD(saddr->v4.sin_addr.s_addr), \
+			       &saddr->v4.sin_addr.s_addr, \
 			       otherparms); \
 		} \
 	}
@@ -303,7 +304,7 @@ extern int sctp_debug_flag;
 #define SCTP_ASSERT(expr, str, func) \
 	if (!(expr)) { \
 		SCTP_DEBUG_PRINTK("Assertion Failed: %s(%s) at %s:%s:%d\n", \
-			str, (#expr), __FILE__, __FUNCTION__, __LINE__); \
+			str, (#expr), __FILE__, __func__, __LINE__); \
 		func; \
 	}
 
@@ -406,10 +407,7 @@ struct sctp_association *sctp_id2assoc(struct sock *sk, sctp_assoc_t id);
 
 /* A macro to walk a list of skbs.  */
 #define sctp_skb_for_each(pos, head, tmp) \
-for (pos = (head)->next;\
-     tmp = (pos)->next, pos != ((struct sk_buff *)(head));\
-     pos = tmp)
-
+	skb_queue_walk_safe(head, pos, tmp)
 
 /* A helper to append an entire skb list (list) to another (head). */
 static inline void sctp_skb_list_tail(struct sk_buff_head *list,
@@ -420,10 +418,7 @@ static inline void sctp_skb_list_tail(struct sk_buff_head *list,
 	sctp_spin_lock_irqsave(&head->lock, flags);
 	sctp_spin_lock(&list->lock);
 
-	list_splice((struct list_head *)list, (struct list_head *)head->prev);
-
-	head->qlen += list->qlen;
-	list->qlen = 0;
+	skb_queue_splice_tail_init(list, head);
 
 	sctp_spin_unlock(&list->lock);
 	sctp_spin_unlock_irqrestore(&head->lock, flags);

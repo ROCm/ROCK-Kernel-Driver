@@ -20,8 +20,9 @@ extern int number_of_cpusets;	/* How many cpusets are defined in system? */
 extern int cpuset_init_early(void);
 extern int cpuset_init(void);
 extern void cpuset_init_smp(void);
-extern void cpuset_cpus_allowed(struct task_struct *p, cpumask_t *mask);
-extern void cpuset_cpus_allowed_locked(struct task_struct *p, cpumask_t *mask);
+extern void cpuset_cpus_allowed(struct task_struct *p, struct cpumask *mask);
+extern void cpuset_cpus_allowed_locked(struct task_struct *p,
+				       struct cpumask *mask);
 extern nodemask_t cpuset_mems_allowed(struct task_struct *p);
 #define cpuset_current_mems_allowed (current->mems_allowed)
 void cpuset_init_current_mems_allowed(void);
@@ -74,11 +75,11 @@ static inline int cpuset_do_slab_mem_spread(void)
 	return current->flags & PF_SPREAD_SLAB;
 }
 
-extern void cpuset_track_online_nodes(void);
-
 extern int current_cpuset_is_being_rebound(void);
 
 extern void rebuild_sched_domains(void);
+
+extern void cpuset_print_task_mems_allowed(struct task_struct *p);
 
 #else /* !CONFIG_CPUSETS */
 
@@ -86,12 +87,13 @@ static inline int cpuset_init_early(void) { return 0; }
 static inline int cpuset_init(void) { return 0; }
 static inline void cpuset_init_smp(void) {}
 
-static inline void cpuset_cpus_allowed(struct task_struct *p, cpumask_t *mask)
+static inline void cpuset_cpus_allowed(struct task_struct *p,
+				       struct cpumask *mask)
 {
 	*mask = cpu_possible_map;
 }
 static inline void cpuset_cpus_allowed_locked(struct task_struct *p,
-								cpumask_t *mask)
+					      struct cpumask *mask)
 {
 	*mask = cpu_possible_map;
 }
@@ -151,8 +153,6 @@ static inline int cpuset_do_slab_mem_spread(void)
 	return 0;
 }
 
-static inline void cpuset_track_online_nodes(void) {}
-
 static inline int current_cpuset_is_being_rebound(void)
 {
 	return 0;
@@ -161,6 +161,10 @@ static inline int current_cpuset_is_being_rebound(void)
 static inline void rebuild_sched_domains(void)
 {
 	partition_sched_domains(1, NULL, NULL);
+}
+
+static inline void cpuset_print_task_mems_allowed(struct task_struct *p)
+{
 }
 
 #endif /* !CONFIG_CPUSETS */

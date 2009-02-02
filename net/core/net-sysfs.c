@@ -209,9 +209,44 @@ static ssize_t store_tx_queue_len(struct device *dev,
 	return netdev_store(dev, attr, buf, len, change_tx_queue_len);
 }
 
+static ssize_t store_ifalias(struct device *dev, struct device_attribute *attr,
+			     const char *buf, size_t len)
+{
+	struct net_device *netdev = to_net_dev(dev);
+	size_t count = len;
+	ssize_t ret;
+
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+
+	/* ignore trailing newline */
+	if (len >  0 && buf[len - 1] == '\n')
+		--count;
+
+	rtnl_lock();
+	ret = dev_set_alias(netdev, buf, count);
+	rtnl_unlock();
+
+	return ret < 0 ? ret : len;
+}
+
+static ssize_t show_ifalias(struct device *dev,
+			    struct device_attribute *attr, char *buf)
+{
+	const struct net_device *netdev = to_net_dev(dev);
+	ssize_t ret = 0;
+
+	rtnl_lock();
+	if (netdev->ifalias)
+		ret = sprintf(buf, "%s\n", netdev->ifalias);
+	rtnl_unlock();
+	return ret;
+}
+
 static struct device_attribute net_class_attributes[] = {
 	__ATTR(addr_len, S_IRUGO, show_addr_len, NULL),
 	__ATTR(dev_id, S_IRUGO, show_dev_id, NULL),
+	__ATTR(ifalias, S_IRUGO | S_IWUSR, show_ifalias, store_ifalias),
 	__ATTR(iflink, S_IRUGO, show_iflink, NULL),
 	__ATTR(ifindex, S_IRUGO, show_ifindex, NULL),
 	__ATTR(features, S_IRUGO, show_features, NULL),
@@ -235,7 +270,6 @@ static ssize_t netstat_show(const struct device *d,
 			    unsigned long offset)
 {
 	struct net_device *dev = to_net_dev(d);
-	struct net_device_stats *stats;
 	ssize_t ret = -EINVAL;
 
 	WARN_ON(offset > sizeof(struct net_device_stats) ||
@@ -243,7 +277,7 @@ static ssize_t netstat_show(const struct device *d,
 
 	read_lock(&dev_base_lock);
 	if (dev_isalive(dev)) {
-		stats = dev->get_stats(dev);
+		const struct net_device_stats *stats = dev_get_stats(dev);
 		ret = sprintf(buf, fmt_ulong,
 			      *(unsigned long *)(((u8 *) stats) + offset));
 	}
@@ -393,6 +427,9 @@ static int netdev_uevent(struct device *d, struct kobj_uevent_env *env)
 	struct net_device *dev = to_net_dev(d);
 	int retval;
 
+	if (!net_eq(dev_net(dev), &init_net))
+		return 0;
+
 	/* pass interface to uevent. */
 	retval = add_uevent_var(env, "INTERFACE=%s", dev->name);
 	if (retval)
@@ -418,6 +455,7 @@ static void netdev_release(struct device *d)
 
 	BUG_ON(dev->reg_state != NETREG_RELEASED);
 
+	kfree(dev->ifalias);
 	kfree((char *)dev - dev->padded);
 }
 
@@ -440,6 +478,10 @@ void netdev_unregister_kobject(struct net_device * net)
 	struct device *dev = &(net->dev);
 
 	kobject_get(&dev->kobj);
+
+	if (dev_net(net) != &init_net)
+		return;
+
 	device_del(dev);
 }
 
@@ -454,7 +496,7 @@ int netdev_register_kobject(struct net_device *net)
 	dev->groups = groups;
 
 	BUILD_BUG_ON(BUS_ID_SIZE < IFNAMSIZ);
-	strlcpy(dev->bus_id, net->name, BUS_ID_SIZE);
+	dev_set_name(dev, net->name);
 
 #ifdef CONFIG_SYSFS
 	*groups++ = &netstat_group;
@@ -464,6 +506,9 @@ int netdev_register_kobject(struct net_device *net)
 		*groups++ = &wireless_group;
 #endif
 #endif /* CONFIG_SYSFS */
+
+	if (dev_net(net) != &init_net)
+		return 0;
 
 	return device_add(dev);
 }

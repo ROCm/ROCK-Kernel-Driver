@@ -105,7 +105,6 @@ static void atlx_check_for_link(struct atlx_adapter *adapter)
 				netdev->name);
 			adapter->link_speed = SPEED_0;
 			netif_carrier_off(netdev);
-			netif_stop_queue(netdev);
 		}
 	}
 	schedule_work(&adapter->link_chg_task);
@@ -180,19 +179,6 @@ static void atlx_clear_phy_int(struct atlx_adapter *adapter)
 	spin_lock_irqsave(&adapter->lock, flags);
 	atlx_read_phy_reg(&adapter->hw, 19, &phy_data);
 	spin_unlock_irqrestore(&adapter->lock, flags);
-}
-
-/*
- * atlx_get_stats - Get System Network Statistics
- * @netdev: network interface device structure
- *
- * Returns the address of the device statistics structure.
- * The statistics are actually updated from the timer callback.
- */
-static struct net_device_stats *atlx_get_stats(struct net_device *netdev)
-{
-	struct atlx_adapter *adapter = netdev_priv(netdev);
-	return &adapter->net_stats;
 }
 
 /*

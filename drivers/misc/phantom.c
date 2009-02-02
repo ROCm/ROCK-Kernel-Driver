@@ -6,7 +6,7 @@
  *  the Free Software Foundation; either version 2 of the License, or
  *  (at your option) any later version.
  *
- *  You need an userspace library to cooperate with this driver. It (and other
+ *  You need a userspace library to cooperate with this driver. It (and other
  *  info) may be obtained here:
  *  http://www.fi.muni.cz/~xslaby/phantom.html
  *  or alternatively, you might use OpenHaptics provided by Sensable.
@@ -399,9 +399,9 @@ static int __devinit phantom_probe(struct pci_dev *pdev,
 		goto err_irq;
 	}
 
-	if (IS_ERR(device_create_drvdata(phantom_class, &pdev->dev,
-					 MKDEV(phantom_major, minor),
-					 NULL, "phantom%u", minor)))
+	if (IS_ERR(device_create(phantom_class, &pdev->dev,
+				 MKDEV(phantom_major, minor), NULL,
+				 "phantom%u", minor)))
 		dev_err(&pdev->dev, "can't create device\n");
 
 	pci_set_drvdata(pdev, pht);

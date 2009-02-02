@@ -16,16 +16,20 @@
 #include <linux/slab.h>
 #include <linux/fsnotify.h>
 #include <linux/namei.h>
-#include <linux/limits.h>
 #include <linux/poll.h>
 #include <linux/list.h>
 #include <linux/mutex.h>
+#include <linux/limits.h>
 #include <asm/uaccess.h>
 
 #include "sysfs.h"
 
 /* used in crash dumps to help with debugging */
 static char last_sysfs_file[PATH_MAX];
+void sysfs_printk_last_file(void)
+{
+	printk(KERN_EMERG "last sysfs file: %s\n", last_sysfs_file);
+}
 
 /*
  * There's one sysfs_buffer for each open file and one
@@ -398,11 +402,6 @@ static int sysfs_open_file(struct inode *inode, struct file *file)
 	return error;
 }
 
-void sysfs_printk_last_file(void)
-{
-	printk(KERN_EMERG "last sysfs file: %s\n", last_sysfs_file);
-}
-
 static int sysfs_release(struct inode *inode, struct file *filp)
 {
 	struct sysfs_dirent *sd = filp->f_path.dentry->d_fsdata;
@@ -454,7 +453,23 @@ static unsigned int sysfs_poll(struct file *filp, poll_table *wait)
 	return POLLERR|POLLPRI;
 }
 
-void sysfs_notify(struct kobject *k, char *dir, char *attr)
+void sysfs_notify_dirent(struct sysfs_dirent *sd)
+{
+	struct sysfs_open_dirent *od;
+
+	spin_lock(&sysfs_open_dirent_lock);
+
+	od = sd->s_attr.open;
+	if (od) {
+		atomic_inc(&od->event);
+		wake_up_interruptible(&od->poll);
+	}
+
+	spin_unlock(&sysfs_open_dirent_lock);
+}
+EXPORT_SYMBOL_GPL(sysfs_notify_dirent);
+
+void sysfs_notify(struct kobject *k, const char *dir, const char *attr)
 {
 	struct sysfs_dirent *sd = k->sd;
 
@@ -464,19 +479,8 @@ void sysfs_notify(struct kobject *k, char *dir, char *attr)
 		sd = sysfs_find_dirent(sd, dir);
 	if (sd && attr)
 		sd = sysfs_find_dirent(sd, attr);
-	if (sd) {
-		struct sysfs_open_dirent *od;
-
-		spin_lock(&sysfs_open_dirent_lock);
-
-		od = sd->s_attr.open;
-		if (od) {
-			atomic_inc(&od->event);
-			wake_up_interruptible(&od->poll);
-		}
-
-		spin_unlock(&sysfs_open_dirent_lock);
-	}
+	if (sd)
+		sysfs_notify_dirent(sd);
 
 	mutex_unlock(&sysfs_mutex);
 }

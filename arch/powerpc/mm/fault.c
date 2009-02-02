@@ -284,7 +284,7 @@ good_area:
 				}
 				pte_update(ptep, 0, _PAGE_HWEXEC |
 					   _PAGE_ACCESSED);
-				_tlbie(address, mm->context.id);
+				local_flush_tlb_page(vma, address);
 				pte_unmap_unlock(ptep, ptl);
 				up_read(&mm->mmap_sem);
 				return 0;
@@ -347,7 +347,7 @@ bad_area_nosemaphore:
 	    && printk_ratelimit())
 		printk(KERN_CRIT "kernel tried to execute NX-protected"
 		       " page (%lx) - exploit attempt? (uid: %d)\n",
-		       address, current->uid);
+		       address, current_uid());
 
 	return SIGSEGV;
 

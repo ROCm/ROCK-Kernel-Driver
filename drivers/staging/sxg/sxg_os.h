@@ -44,11 +44,10 @@
 #define FALSE	(0)
 #define TRUE	(1)
 
-
-typedef struct _LIST_ENTRY {
-	struct _LIST_ENTRY *nle_flink;
-	struct _LIST_ENTRY *nle_blink;
-} list_entry, LIST_ENTRY, *PLIST_ENTRY;
+struct LIST_ENTRY {
+	struct LIST_ENTRY *nle_flink;
+	struct LIST_ENTRY *nle_blink;
+};
 
 #define InitializeListHead(l)                   \
         (l)->nle_flink = (l)->nle_blink = (l)
@@ -69,38 +68,35 @@ typedef struct _LIST_ENTRY {
 
 /* These two have to be inlined since they return things. */
 
-static __inline PLIST_ENTRY
-RemoveHeadList(list_entry *l)
+static __inline struct LIST_ENTRY *RemoveHeadList(struct LIST_ENTRY *l)
 {
-        list_entry              *f;
-        list_entry              *e;
+	struct LIST_ENTRY *f;
+	struct LIST_ENTRY *e;
 
-        e = l->nle_flink;
-        f = e->nle_flink;
-        l->nle_flink = f;
-        f->nle_blink = l;
+	e = l->nle_flink;
+	f = e->nle_flink;
+	l->nle_flink = f;
+	f->nle_blink = l;
 
-        return (e);
+	return (e);
 }
 
-static __inline PLIST_ENTRY
-RemoveTailList(list_entry *l)
+static __inline struct LIST_ENTRY *RemoveTailList(struct LIST_ENTRY *l)
 {
-        list_entry              *b;
-        list_entry              *e;
+	struct LIST_ENTRY *b;
+	struct LIST_ENTRY *e;
 
-        e = l->nle_blink;
-        b = e->nle_blink;
-        l->nle_blink = b;
-        b->nle_flink = l;
+	e = l->nle_blink;
+	b = e->nle_blink;
+	l->nle_blink = b;
+	b->nle_flink = l;
 
-        return (e);
+	return (e);
 }
-
 
 #define InsertTailList(l, e)                    \
         do {                                    \
-                list_entry              *b;     \
+                struct LIST_ENTRY       *b;     \
                                                 \
                 b = (l)->nle_blink;             \
                 (e)->nle_flink = (l);           \
@@ -111,7 +107,7 @@ RemoveTailList(list_entry *l)
 
 #define InsertHeadList(l, e)                    \
         do {                                    \
-                list_entry              *f;     \
+                struct LIST_ENTRY       *f;     \
                                                 \
                 f = (l)->nle_flink;             \
                 (e)->nle_flink = f;             \
@@ -119,7 +115,6 @@ RemoveTailList(list_entry *l)
                 f->nle_blink = (e);             \
                 (l)->nle_flink = (e);           \
         } while (0)
-
 
 #define ATK_DEBUG  1
 
@@ -132,7 +127,6 @@ RemoveTailList(list_entry *l)
 #else
 #define SLIC_TIMESTAMP(value)
 #endif
-
 
 /******************  SXG DEFINES  *****************************************/
 
@@ -150,5 +144,4 @@ RemoveTailList(list_entry *l)
 #define WRITE_REG64(a,reg,value,cpu)                sxg_reg64_write((a),(&reg),(value),(cpu))
 #define READ_REG(reg,value)   (value) = readl((void __iomem *)(&reg))
 
-#endif  /* _SLIC_OS_SPECIFIC_H_  */
-
+#endif /* _SLIC_OS_SPECIFIC_H_  */

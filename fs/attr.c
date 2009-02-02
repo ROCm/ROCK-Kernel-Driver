@@ -29,13 +29,13 @@ int inode_change_ok(struct inode *inode, struct iattr *attr)
 
 	/* Make sure a caller can chown. */
 	if ((ia_valid & ATTR_UID) &&
-	    (current->fsuid != inode->i_uid ||
+	    (current_fsuid() != inode->i_uid ||
 	     attr->ia_uid != inode->i_uid) && !capable(CAP_CHOWN))
 		goto error;
 
 	/* Make sure caller can chgrp. */
 	if ((ia_valid & ATTR_GID) &&
-	    (current->fsuid != inode->i_uid ||
+	    (current_fsuid() != inode->i_uid ||
 	    (!in_group_p(attr->ia_gid) && attr->ia_gid != inode->i_gid)) &&
 	    !capable(CAP_CHOWN))
 		goto error;
@@ -100,8 +100,7 @@ int inode_setattr(struct inode * inode, struct iattr * attr)
 }
 EXPORT_SYMBOL(inode_setattr);
 
-int fnotify_change(struct dentry *dentry, struct vfsmount *mnt,
-		   struct iattr *attr, struct file *file)
+int notify_change(struct dentry * dentry, struct iattr * attr)
 {
 	struct inode *inode = dentry->d_inode;
 	mode_t mode = inode->i_mode;
@@ -160,32 +159,17 @@ int fnotify_change(struct dentry *dentry, struct vfsmount *mnt,
 	if (!(attr->ia_valid & ~(ATTR_KILL_SUID | ATTR_KILL_SGID)))
 		return 0;
 
+	error = security_inode_setattr(dentry, attr);
+	if (error)
+		return error;
+
 	if (ia_valid & ATTR_SIZE)
 		down_write(&dentry->d_inode->i_alloc_sem);
 
 	if (inode->i_op && inode->i_op->setattr) {
-		error = security_inode_setattr(dentry, mnt, attr);
-		if (!error) {
-			if (file && file->f_op && file->f_op->fsetattr)
-				error = file->f_op->fsetattr(file, attr);
-			else {
-				/* External file system still expect to be
-				 * passed a file pointer via ia_file and
-				 * have it announced via ATTR_FILE. This
-				 * just makes it so they don't need to
-				 * change their API just for us. External
-				 * callers will have set these themselves. */
-				if (file) {
-					attr->ia_valid |= ATTR_FILE;
-					attr->ia_file = file;
-				}
-				error = inode->i_op->setattr(dentry, attr);
-			}
-		}
+		error = inode->i_op->setattr(dentry, attr);
 	} else {
 		error = inode_change_ok(inode, attr);
-		if (!error)
-			error = security_inode_setattr(dentry, mnt, attr);
 		if (!error) {
 			if ((ia_valid & ATTR_UID && attr->ia_uid != inode->i_uid) ||
 			    (ia_valid & ATTR_GID && attr->ia_gid != inode->i_gid))
@@ -202,13 +186,6 @@ int fnotify_change(struct dentry *dentry, struct vfsmount *mnt,
 		fsnotify_change(dentry, ia_valid);
 
 	return error;
-}
-EXPORT_SYMBOL_GPL(fnotify_change);
-
-int notify_change(struct dentry *dentry, struct vfsmount *mnt,
-		  struct iattr *attr)
-{
-	return fnotify_change(dentry, mnt, attr, NULL);
 }
 
 EXPORT_SYMBOL(notify_change);

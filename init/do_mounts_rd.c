@@ -5,11 +5,11 @@
 #include <linux/ext2_fs.h>
 #include <linux/romfs_fs.h>
 #include <linux/cramfs_fs.h>
-#include <linux/squashfs_fs.h>
 #include <linux/initrd.h>
 #include <linux/string.h>
 
 #include "do_mounts.h"
+#include "../fs/squashfs/squashfs_fs.h"
 
 int __initdata rd_prompt = 1;/* 1 = prompt for RAM disk, 0 = don't prompt */
 
@@ -38,11 +38,11 @@ static int __init crd_load(int in_fd, int out_fd);
  * numbers could not be found.
  *
  * We currently check for the following magic numbers:
- *      squashfs
  * 	minix
  * 	ext2
  *	romfs
  *	cramfs
+ *	squashfs
  * 	gzip
  */
 static int __init 
@@ -75,7 +75,7 @@ identify_ramdisk_image(int fd, int start_block)
 	sys_read(fd, buf, size);
 
 	/*
-	 * If it matches the gzip magic numbers, return -1
+	 * If it matches the gzip magic numbers, return 0
 	 */
 	if (buf[0] == 037 && ((buf[1] == 0213) || (buf[1] == 0236))) {
 		printk(KERN_NOTICE
@@ -104,14 +104,12 @@ identify_ramdisk_image(int fd, int start_block)
 	}
 
 	/* squashfs is at block zero too */
-	if (squashfsb->s_magic == SQUASHFS_MAGIC) {
+	if (le32_to_cpu(squashfsb->s_magic) == SQUASHFS_MAGIC) {
 		printk(KERN_NOTICE
 		       "RAMDISK: squashfs filesystem found at block %d\n",
 		       start_block);
-		if (squashfsb->s_major < 3)
-			nblocks = (squashfsb->bytes_used_2+BLOCK_SIZE-1)>>BLOCK_SIZE_BITS;
-		else
-			nblocks = (squashfsb->bytes_used+BLOCK_SIZE-1)>>BLOCK_SIZE_BITS;
+		nblocks = (le64_to_cpu(squashfsb->bytes_used) + BLOCK_SIZE - 1)
+			 >> BLOCK_SIZE_BITS;
 		goto done;
 	}
 

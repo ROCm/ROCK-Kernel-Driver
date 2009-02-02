@@ -32,6 +32,8 @@
 #include <scsi/libfc.h>
 #include <scsi/fc_encode.h>
 
+#define	  FC_DEF_R_A_TOV      (10 * 1000) /* resource allocation timeout */
+
 /*
  * fc_exch_debug can be set in debugger or at compile time to get more logs.
  */
@@ -1094,7 +1096,7 @@ static void fc_exch_recv_abts(struct fc_exch *ep, struct fc_frame *rx_fp)
 		ap->ba_high_seq_cnt = fh->fh_seq_cnt;
 		ap->ba_low_seq_cnt = htons(sp->cnt);
 	}
-	sp = fc_seq_start_next_locked(sp);
+	sp = fc_seq_start_next(sp);
 	spin_unlock_bh(&ep->ex_lock);
 	fc_seq_send_last(sp, fp, FC_RCTL_BA_ACC, FC_TYPE_BLS);
 	fc_frame_free(rx_fp);

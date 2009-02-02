@@ -36,6 +36,8 @@
 #include <linux/skbuff.h>
 #include <linux/ethtool.h>
 #include <linux/if_ether.h>
+#include <linux/tcp.h>
+#include <linux/udp.h>
 #include <linux/moduleparam.h>
 #include <linux/mm.h>
 #include <net/ip.h>
@@ -194,7 +196,7 @@ static void rx_refill_timeout(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
 	struct netfront_info *np = netdev_priv(dev);
-	netif_rx_schedule(dev, &np->napi);
+	netif_rx_schedule(&np->napi);
 }
 
 static int netfront_tx_slot_available(struct netfront_info *np)
@@ -237,10 +239,13 @@ static void xennet_alloc_rx_buffers(struct net_device *dev)
 	 */
 	batch_target = np->rx_target - (req_prod - np->rx.rsp_cons);
 	for (i = skb_queue_len(&np->rx_batch); i < batch_target; i++) {
-		skb = __netdev_alloc_skb(dev, RX_COPY_THRESHOLD,
+		skb = __netdev_alloc_skb(dev, RX_COPY_THRESHOLD + NET_IP_ALIGN,
 					 GFP_ATOMIC | __GFP_NOWARN);
 		if (unlikely(!skb))
 			goto no_skb;
+
+		/* Align ip header to a 16 bytes boundary */
+		skb_reserve(skb, NET_IP_ALIGN);
 
 		page = alloc_page(GFP_ATOMIC | __GFP_NOWARN);
 		if (!page) {
@@ -323,7 +328,7 @@ static int xennet_open(struct net_device *dev)
 		xennet_alloc_rx_buffers(dev);
 		np->rx.sring->rsp_event = np->rx.rsp_cons + 1;
 		if (RING_HAS_UNCONSUMED_RESPONSES(&np->rx))
-			netif_rx_schedule(dev, &np->napi);
+			netif_rx_schedule(&np->napi);
 	}
 	spin_unlock_bh(&np->rx_lock);
 
@@ -469,7 +474,7 @@ static int xennet_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	unsigned int offset = offset_in_page(data);
 	unsigned int len = skb_headlen(skb);
 
-	frags += (offset + len + PAGE_SIZE - 1) / PAGE_SIZE;
+	frags += DIV_ROUND_UP(offset + len, PAGE_SIZE);
 	if (unlikely(frags > MAX_SKB_FRAGS + 1)) {
 		printk(KERN_ALERT "xennet: skb rides the rocket: %d frags\n",
 		       frags);
@@ -763,6 +768,45 @@ static RING_IDX xennet_fill_frags(struct netfront_info *np,
 	return cons;
 }
 
+static int skb_checksum_setup(struct sk_buff *skb)
+{
+	struct iphdr *iph;
+	unsigned char *th;
+	int err = -EPROTO;
+
+	if (skb->protocol != htons(ETH_P_IP))
+		goto out;
+
+	iph = (void *)skb->data;
+	th = skb->data + 4 * iph->ihl;
+	if (th >= skb_tail_pointer(skb))
+		goto out;
+
+	skb->csum_start = th - skb->head;
+	switch (iph->protocol) {
+	case IPPROTO_TCP:
+		skb->csum_offset = offsetof(struct tcphdr, check);
+		break;
+	case IPPROTO_UDP:
+		skb->csum_offset = offsetof(struct udphdr, check);
+		break;
+	default:
+		if (net_ratelimit())
+			printk(KERN_ERR "Attempting to checksum a non-"
+			       "TCP/UDP packet, dropping a protocol"
+			       " %d packet", iph->protocol);
+		goto out;
+	}
+
+	if ((th + skb->csum_offset + 2) > skb_tail_pointer(skb))
+		goto out;
+
+	err = 0;
+
+out:
+	return err;
+}
+
 static int handle_incoming_queue(struct net_device *dev,
 				 struct sk_buff_head *rxq)
 {
@@ -797,7 +841,6 @@ static int handle_incoming_queue(struct net_device *dev,
 
 		/* Pass it up. */
 		netif_receive_skb(skb);
-		dev->last_rx = jiffies;
 	}
 
 	return packets_dropped;
@@ -936,7 +979,7 @@ err:
 
 		RING_FINAL_CHECK_FOR_RESPONSES(&np->rx, more_to_do);
 		if (!more_to_do)
-			__netif_rx_complete(dev, napi);
+			__netif_rx_complete(napi);
 
 		local_irq_restore(flags);
 	}
@@ -1062,6 +1105,16 @@ static void xennet_uninit(struct net_device *dev)
 	gnttab_free_grant_references(np->gref_rx_head);
 }
 
+static const struct net_device_ops xennet_netdev_ops = {
+	.ndo_open            = xennet_open,
+	.ndo_uninit          = xennet_uninit,
+	.ndo_stop            = xennet_close,
+	.ndo_start_xmit      = xennet_start_xmit,
+	.ndo_change_mtu	     = xennet_change_mtu,
+	.ndo_set_mac_address = eth_mac_addr,
+	.ndo_validate_addr   = eth_validate_addr,
+};
+
 static struct net_device * __devinit xennet_create_dev(struct xenbus_device *dev)
 {
 	int i, err;
@@ -1118,12 +1171,9 @@ static struct net_device * __devinit xennet_create_dev(struct xenbus_device *dev
 		goto exit_free_tx;
 	}
 
-	netdev->open            = xennet_open;
-	netdev->hard_start_xmit = xennet_start_xmit;
-	netdev->stop            = xennet_close;
+	netdev->netdev_ops	= &xennet_netdev_ops;
+
 	netif_napi_add(netdev, &np->napi, xennet_poll, 64);
-	netdev->uninit          = xennet_uninit;
-	netdev->change_mtu	= xennet_change_mtu;
 	netdev->features        = NETIF_F_IP_CSUM;
 
 	SET_ETHTOOL_OPS(netdev, &xennet_ethtool_ops);
@@ -1267,7 +1317,7 @@ static irqreturn_t xennet_interrupt(int irq, void *dev_id)
 		xennet_tx_buf_gc(dev);
 		/* Under tx_lock: protects access to rx shared-ring indexes. */
 		if (RING_HAS_UNCONSUMED_RESPONSES(&np->rx))
-			netif_rx_schedule(dev, &np->napi);
+			netif_rx_schedule(&np->napi);
 	}
 
 	spin_unlock_irqrestore(&np->tx_lock, flags);
@@ -1741,8 +1791,9 @@ static int __devexit xennet_remove(struct xenbus_device *dev)
 	return 0;
 }
 
-static struct xenbus_driver netfront = {
+static struct xenbus_driver netfront_driver = {
 	.name = "vif",
+	.owner = THIS_MODULE,
 	.ids = netfront_ids,
 	.probe = netfront_probe,
 	.remove = __devexit_p(xennet_remove),
@@ -1752,25 +1803,25 @@ static struct xenbus_driver netfront = {
 
 static int __init netif_init(void)
 {
-	if (!is_running_on_xen())
+	if (!xen_domain())
 		return -ENODEV;
 
-	if (is_initial_xendomain())
+	if (xen_initial_domain())
 		return 0;
 
 	printk(KERN_INFO "Initialising Xen virtual ethernet driver.\n");
 
-	return xenbus_register_frontend(&netfront);
+	return xenbus_register_frontend(&netfront_driver);
 }
 module_init(netif_init);
 
 
 static void __exit netif_exit(void)
 {
-	if (is_initial_xendomain())
+	if (xen_initial_domain())
 		return;
 
-	xenbus_unregister_driver(&netfront);
+	xenbus_unregister_driver(&netfront_driver);
 }
 module_exit(netif_exit);
 

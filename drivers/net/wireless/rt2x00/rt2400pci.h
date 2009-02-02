@@ -46,7 +46,9 @@
 #define CSR_REG_SIZE			0x014c
 #define EEPROM_BASE			0x0000
 #define EEPROM_SIZE			0x0100
+#define BBP_BASE			0x0000
 #define BBP_SIZE			0x0020
+#define RF_BASE				0x0000
 #define RF_SIZE				0x0010
 
 /*
@@ -938,19 +940,13 @@
 #define MAX_TXPOWER	62
 #define DEFAULT_TXPOWER	39
 
-#define TXPOWER_FROM_DEV(__txpower)					\
-({									\
-	((__txpower) > MAX_TXPOWER) ? DEFAULT_TXPOWER - MIN_TXPOWER :	\
-	((__txpower) < MIN_TXPOWER) ? DEFAULT_TXPOWER - MIN_TXPOWER :	\
-	(((__txpower) - MAX_TXPOWER) + MIN_TXPOWER);			\
-})
+#define __CLAMP_TX(__txpower) \
+	clamp_t(char, (__txpower), MIN_TXPOWER, MAX_TXPOWER)
 
-#define TXPOWER_TO_DEV(__txpower)			\
-({							\
-	(__txpower) += MIN_TXPOWER;			\
-	((__txpower) <= MIN_TXPOWER) ? MAX_TXPOWER :	\
-	(((__txpower) >= MAX_TXPOWER) ? MIN_TXPOWER :	\
-	(MAX_TXPOWER - ((__txpower) - MIN_TXPOWER)));	\
-})
+#define TXPOWER_FROM_DEV(__txpower) \
+	((__CLAMP_TX(__txpower) - MAX_TXPOWER) + MIN_TXPOWER)
+
+#define TXPOWER_TO_DEV(__txpower) \
+	MAX_TXPOWER - (__CLAMP_TX(__txpower) - MIN_TXPOWER)
 
 #endif /* RT2400PCI_H */

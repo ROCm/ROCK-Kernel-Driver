@@ -20,6 +20,7 @@
 #include <linux/list.h>
 #include <linux/netdevice.h>
 #include <linux/scatterlist.h>
+#include <scsi/libiscsi_tcp.h>
 
 /* from cxgb3 LLD */
 #include "common.h"
@@ -28,77 +29,19 @@
 #include "cxgb3_ctl_defs.h"
 #include "cxgb3_offload.h"
 #include "firmware_exports.h"
+
 #include "cxgb3i_offload.h"
-/* from iscsi */
-#include "../iscsi_tcp.h"
+#include "cxgb3i_ddp.h"
 
 #define CXGB3I_SCSI_QDEPTH_DFLT	128
 #define CXGB3I_MAX_TARGET	CXGB3I_MAX_CONN
 #define CXGB3I_MAX_LUN		512
-#define ISCSI_PDU_HEADER_MAX	(56 + 256) /* bhs + digests + ahs */
+#define ISCSI_PDU_NONPAYLOAD_MAX \
+	(sizeof(struct iscsi_hdr) + ISCSI_MAX_AHS_SIZE + 2*ISCSI_DIGEST_SIZE)
 
 struct cxgb3i_adapter;
 struct cxgb3i_hba;
 struct cxgb3i_endpoint;
-
-/**
- * struct cxgb3i_tag_format - cxgb3i ulp tag for steering pdu payload
- *
- * @idx_bits:	# of bits used to store itt (from iscsi laryer)
- * @age_bits:	# of bits used to store age (from iscsi laryer)
- * @rsvd_bits:	# of bits used by h/w
- * @rsvd_shift:	shift left
- * @rsvd_mask:  bit mask
- * @rsvd_tag_mask:  h/w tag bit mask
- *
- */
-struct cxgb3i_tag_format {
-	unsigned char idx_bits;
-	unsigned char age_bits;
-	unsigned char rsvd_bits;
-	unsigned char rsvd_shift;
-	u32 rsvd_mask;
-	u32 rsvd_tag_mask;
-};
-
-/**
- * struct cxgb3i_gather_list - cxgb3i direct data placement memory
- *
- * @tag:	ddp tag
- * @length:	total data buffer length
- * @offset:	initial offset to the 1st page
- * @nelem:	# of pages
- * @pages:	pages
- * @phys_addr:	physical address
- */
-struct cxgb3i_gather_list {
-	u32 tag;
-	unsigned int length;
-	unsigned int offset;
-	unsigned int nelem;
-	struct page **pages;
-	dma_addr_t phys_addr[0];
-};
-
-/**
- * struct cxgb3i_ddp_info - cxgb3i direct data placement for pdu payload
- *
- * @llimit:	lower bound of the page pod memory
- * @ulimit:	upper bound of the page pod memory
- * @nppods:	# of page pod entries
- * @idx_last:	page pod entry last used
- * @map_lock:	lock to synchonize access to the page pod map
- * @map:	page pod map
- */
-struct cxgb3i_ddp_info {
-	unsigned int llimit;
-	unsigned int ulimit;
-	unsigned int nppods;
-	unsigned int idx_last;
-	spinlock_t map_lock;
-	struct cxgb3i_gather_list **gl_map;
-	struct sk_buff **gl_skb;
-};
 
 /**
  * struct cxgb3i_hba - cxgb3i iscsi structure (per port)
@@ -124,8 +67,7 @@ struct cxgb3i_hba {
  * @hba:	all the hbas on this adapter
  * @tx_max_size: max. tx packet size supported
  * @rx_max_size: max. rx packet size supported
- * @tag_format: ulp tag format settings
- * @ddp:	ulp ddp state
+ * @tag_format: ddp tag format settings
  */
 struct cxgb3i_adapter {
 	struct list_head list_head;
@@ -139,23 +81,23 @@ struct cxgb3i_adapter {
 	unsigned int rx_max_size;
 
 	struct cxgb3i_tag_format tag_format;
-	struct cxgb3i_ddp_info *ddp;
 };
 
 /**
  * struct cxgb3i_conn - cxgb3i iscsi connection
  *
- * @tcp_conn:	pointer to iscsi_tcp_conn structure
  * @listhead:	list head to link elements
+ * @cep:	pointer to iscsi_endpoint structure
  * @conn:	pointer to iscsi_conn structure
  * @hba:	pointer to the hba this conn. is going through
+ * @task_idx_bits: # of bits needed for session->cmds_max
  */
 struct cxgb3i_conn {
-	struct iscsi_tcp_conn tcp_conn;
 	struct list_head list_head;
 	struct cxgb3i_endpoint *cep;
 	struct iscsi_conn *conn;
 	struct cxgb3i_hba *hba;
+	unsigned int task_idx_bits;
 };
 
 /**
@@ -171,9 +113,6 @@ struct cxgb3i_endpoint {
 	struct cxgb3i_conn *cconn;
 };
 
-/*
- * Function Prototypes
- */
 int cxgb3i_iscsi_init(void);
 void cxgb3i_iscsi_cleanup(void);
 
@@ -187,13 +126,14 @@ struct cxgb3i_hba *cxgb3i_hba_host_add(struct cxgb3i_adapter *,
 				       struct net_device *);
 void cxgb3i_hba_host_remove(struct cxgb3i_hba *);
 
-int cxgb3i_ulp2_init(void);
-void cxgb3i_ulp2_cleanup(void);
-int cxgb3i_conn_ulp_setup(struct cxgb3i_conn *, int, int);
-void cxgb3i_ddp_tag_release(struct cxgb3i_adapter *, u32,
-			    struct scatterlist *, unsigned int);
-u32 cxgb3i_ddp_tag_reserve(struct cxgb3i_adapter *, unsigned int,
-			   u32, unsigned int, struct scatterlist *,
-			   unsigned int, int);
-int cxgb3i_conn_ulp2_xmit(struct iscsi_conn *);
+int cxgb3i_pdu_init(void);
+void cxgb3i_pdu_cleanup(void);
+void cxgb3i_conn_cleanup_task(struct iscsi_task *);
+int cxgb3i_conn_alloc_pdu(struct iscsi_task *, u8);
+int cxgb3i_conn_init_pdu(struct iscsi_task *, unsigned int, unsigned int);
+int cxgb3i_conn_xmit_pdu(struct iscsi_task *);
+
+void cxgb3i_release_itt(struct iscsi_task *task, itt_t hdr_itt);
+int cxgb3i_reserve_itt(struct iscsi_task *task, itt_t *hdr_itt);
+
 #endif

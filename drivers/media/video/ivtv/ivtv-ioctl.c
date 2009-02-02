@@ -101,18 +101,15 @@ void ivtv_expand_service_set(struct v4l2_sliced_vbi_format *fmt, int is_pal)
 	}
 }
 
-static int check_service_set(struct v4l2_sliced_vbi_format *fmt, int is_pal)
+static void check_service_set(struct v4l2_sliced_vbi_format *fmt, int is_pal)
 {
 	int f, l;
-	u16 set = 0;
 
 	for (f = 0; f < 2; f++) {
 		for (l = 0; l < 24; l++) {
 			fmt->service_lines[f][l] = select_service_from_set(f, l, fmt->service_lines[f][l], is_pal);
-			set |= fmt->service_lines[f][l];
 		}
 	}
-	return set != 0;
 }
 
 u16 ivtv_get_service_set(struct v4l2_sliced_vbi_format *fmt)
@@ -396,7 +393,7 @@ static int ivtv_g_fmt_sliced_vbi_cap(struct file *file, void *fh, struct v4l2_fo
 		return 0;
 	}
 
-	itv->video_dec_func(itv, VIDIOC_G_FMT, fmt);
+	v4l2_subdev_call(itv->sd_video, video, s_fmt, fmt);
 	vbifmt->service_set = ivtv_get_service_set(vbifmt);
 	return 0;
 }
@@ -474,7 +471,7 @@ static int ivtv_try_fmt_vid_cap(struct file *file, void *fh, struct v4l2_format 
 	int h = fmt->fmt.pix.height;
 
 	w = min(w, 720);
-	w = max(w, 1);
+	w = max(w, 2);
 	h = min(h, itv->is_50hz ? 576 : 480);
 	h = max(h, 2);
 	ivtv_g_fmt_vid_cap(file, fh, fmt);
@@ -512,27 +509,34 @@ static int ivtv_try_fmt_sliced_vbi_cap(struct file *file, void *fh, struct v4l2_
 static int ivtv_try_fmt_vid_out(struct file *file, void *fh, struct v4l2_format *fmt)
 {
 	struct ivtv_open_id *id = fh;
-	s32 w, h;
-	int field;
-	int ret;
+	s32 w = fmt->fmt.pix.width;
+	s32 h = fmt->fmt.pix.height;
+	int field = fmt->fmt.pix.field;
+	int ret = ivtv_g_fmt_vid_out(file, fh, fmt);
 
-	w = fmt->fmt.pix.width;
-	h = fmt->fmt.pix.height;
-	field = fmt->fmt.pix.field;
-	ret = ivtv_g_fmt_vid_out(file, fh, fmt);
+	w = min(w, 720);
+	w = max(w, 2);
+	/* Why can the height be 576 even when the output is NTSC?
+
+	   Internally the buffers of the PVR350 are always set to 720x576. The
+	   decoded video frame will always be placed in the top left corner of
+	   this buffer. For any video which is not 720x576, the buffer will
+	   then be cropped to remove the unused right and lower areas, with
+	   the remaining image being scaled by the hardware to fit the display
+	   area. The video can be scaled both up and down, so a 720x480 video
+	   can be displayed full-screen on PAL and a 720x576 video can be
+	   displayed without cropping on NTSC.
+
+	   Note that the scaling only occurs on the video stream, the osd
+	   resolution is locked to the broadcast standard and not scaled.
+
+	   Thanks to Ian Armstrong for this explanation. */
+	h = min(h, 576);
+	h = max(h, 2);
+	if (id->type == IVTV_DEC_STREAM_TYPE_YUV)
+		fmt->fmt.pix.field = field;
 	fmt->fmt.pix.width = w;
 	fmt->fmt.pix.height = h;
-	if (!ret && id->type == IVTV_DEC_STREAM_TYPE_YUV) {
-		fmt->fmt.pix.field = field;
-		if (fmt->fmt.pix.width < 2)
-			fmt->fmt.pix.width = 2;
-		if (fmt->fmt.pix.width > 720)
-			fmt->fmt.pix.width = 720;
-		if (fmt->fmt.pix.height < 2)
-			fmt->fmt.pix.height = 2;
-		if (fmt->fmt.pix.height > 576)
-			fmt->fmt.pix.height = 576;
-	}
 	return ret;
 }
 
@@ -560,9 +564,9 @@ static int ivtv_s_fmt_vid_cap(struct file *file, void *fh, struct v4l2_format *f
 	struct ivtv_open_id *id = fh;
 	struct ivtv *itv = id->itv;
 	struct cx2341x_mpeg_params *p = &itv->params;
+	int ret = ivtv_try_fmt_vid_cap(file, fh, fmt);
 	int w = fmt->fmt.pix.width;
 	int h = fmt->fmt.pix.height;
-	int ret = ivtv_try_fmt_vid_cap(file, fh, fmt);
 
 	if (ret)
 		return ret;
@@ -577,7 +581,7 @@ static int ivtv_s_fmt_vid_cap(struct file *file, void *fh, struct v4l2_format *f
 	p->height = h;
 	if (p->video_encoding == V4L2_MPEG_VIDEO_ENCODING_MPEG_1)
 		fmt->fmt.pix.width /= 2;
-	itv->video_dec_func(itv, VIDIOC_S_FMT, fmt);
+	v4l2_subdev_call(itv->sd_video, video, s_fmt, fmt);
 	return ivtv_g_fmt_vid_cap(file, fh, fmt);
 }
 
@@ -585,8 +589,11 @@ static int ivtv_s_fmt_vbi_cap(struct file *file, void *fh, struct v4l2_format *f
 {
 	struct ivtv *itv = ((struct ivtv_open_id *)fh)->itv;
 
+	if (!ivtv_raw_vbi(itv) && atomic_read(&itv->capturing) > 0)
+		return -EBUSY;
 	itv->vbi.sliced_in->service_set = 0;
-	itv->video_dec_func(itv, VIDIOC_S_FMT, &itv->vbi.in);
+	itv->vbi.in.type = V4L2_BUF_TYPE_VBI_CAPTURE;
+	v4l2_subdev_call(itv->sd_video, video, s_fmt, fmt);
 	return ivtv_g_fmt_vbi_cap(file, fh, fmt);
 }
 
@@ -600,11 +607,11 @@ static int ivtv_s_fmt_sliced_vbi_cap(struct file *file, void *fh, struct v4l2_fo
 	if (ret || id->type == IVTV_DEC_STREAM_TYPE_VBI)
 		return ret;
 
-	if (check_service_set(vbifmt, itv->is_50hz) == 0)
-		return -EINVAL;
-	if (atomic_read(&itv->capturing) > 0)
+	check_service_set(vbifmt, itv->is_50hz);
+	if (ivtv_raw_vbi(itv) && atomic_read(&itv->capturing) > 0)
 		return -EBUSY;
-	itv->video_dec_func(itv, VIDIOC_S_FMT, fmt);
+	itv->vbi.in.type = V4L2_BUF_TYPE_SLICED_VBI_CAPTURE;
+	v4l2_subdev_call(itv->sd_video, video, s_fmt, fmt);
 	memcpy(itv->vbi.sliced_in, vbifmt, sizeof(*itv->vbi.sliced_in));
 	return 0;
 }
@@ -651,8 +658,6 @@ static int ivtv_s_fmt_vid_out(struct file *file, void *fh, struct v4l2_format *f
 		itv->dma_data_req_size =
 			1080 * ((yi->v4l2_src_h + 31) & ~31);
 
-	/* Force update of yuv registers */
-	yi->yuv_forced_update = 1;
 	return 0;
 }
 
@@ -669,29 +674,28 @@ static int ivtv_s_fmt_vid_out_overlay(struct file *file, void *fh, struct v4l2_f
 	return ret;
 }
 
-static int ivtv_g_chip_ident(struct file *file, void *fh, struct v4l2_chip_ident *chip)
+static int ivtv_g_chip_ident(struct file *file, void *fh, struct v4l2_dbg_chip_ident *chip)
 {
 	struct ivtv *itv = ((struct ivtv_open_id *)fh)->itv;
 
 	chip->ident = V4L2_IDENT_NONE;
 	chip->revision = 0;
-	if (chip->match_type == V4L2_CHIP_MATCH_HOST) {
-		if (v4l2_chip_match_host(chip->match_type, chip->match_chip))
+	if (chip->match.type == V4L2_CHIP_MATCH_HOST) {
+		if (v4l2_chip_match_host(&chip->match))
 			chip->ident = itv->has_cx23415 ? V4L2_IDENT_CX23415 : V4L2_IDENT_CX23416;
 		return 0;
 	}
-	if (chip->match_type == V4L2_CHIP_MATCH_I2C_DRIVER)
-		return ivtv_i2c_id(itv, chip->match_chip, VIDIOC_G_CHIP_IDENT, chip);
-	if (chip->match_type == V4L2_CHIP_MATCH_I2C_ADDR)
-		return ivtv_call_i2c_client(itv, chip->match_chip, VIDIOC_G_CHIP_IDENT, chip);
-	return -EINVAL;
+	if (chip->match.type != V4L2_CHIP_MATCH_I2C_DRIVER &&
+	    chip->match.type != V4L2_CHIP_MATCH_I2C_ADDR)
+		return -EINVAL;
+	/* TODO: is this correct? */
+	return ivtv_call_all_err(itv, core, g_chip_ident, chip);
 }
 
 #ifdef CONFIG_VIDEO_ADV_DEBUG
 static int ivtv_itvc(struct ivtv *itv, unsigned int cmd, void *arg)
 {
-	struct v4l2_register *regs = arg;
-	unsigned long flags;
+	struct v4l2_dbg_register *regs = arg;
 	volatile u8 __iomem *reg_start;
 
 	if (!capable(CAP_SYS_ADMIN))
@@ -706,35 +710,36 @@ static int ivtv_itvc(struct ivtv *itv, unsigned int cmd, void *arg)
 	else
 		return -EINVAL;
 
-	spin_lock_irqsave(&ivtv_cards_lock, flags);
+	regs->size = 4;
 	if (cmd == VIDIOC_DBG_G_REGISTER)
 		regs->val = readl(regs->reg + reg_start);
 	else
 		writel(regs->val, regs->reg + reg_start);
-	spin_unlock_irqrestore(&ivtv_cards_lock, flags);
 	return 0;
 }
 
-static int ivtv_g_register(struct file *file, void *fh, struct v4l2_register *reg)
+static int ivtv_g_register(struct file *file, void *fh, struct v4l2_dbg_register *reg)
 {
 	struct ivtv *itv = ((struct ivtv_open_id *)fh)->itv;
 
-	if (v4l2_chip_match_host(reg->match_type, reg->match_chip))
+	if (v4l2_chip_match_host(&reg->match))
 		return ivtv_itvc(itv, VIDIOC_DBG_G_REGISTER, reg);
-	if (reg->match_type == V4L2_CHIP_MATCH_I2C_DRIVER)
-		return ivtv_i2c_id(itv, reg->match_chip, VIDIOC_DBG_G_REGISTER, reg);
-	return ivtv_call_i2c_client(itv, reg->match_chip, VIDIOC_DBG_G_REGISTER, reg);
+	/* TODO: subdev errors should not be ignored, this should become a
+	   subdev helper function. */
+	ivtv_call_all(itv, core, g_register, reg);
+	return 0;
 }
 
-static int ivtv_s_register(struct file *file, void *fh, struct v4l2_register *reg)
+static int ivtv_s_register(struct file *file, void *fh, struct v4l2_dbg_register *reg)
 {
 	struct ivtv *itv = ((struct ivtv_open_id *)fh)->itv;
 
-	if (v4l2_chip_match_host(reg->match_type, reg->match_chip))
+	if (v4l2_chip_match_host(&reg->match))
 		return ivtv_itvc(itv, VIDIOC_DBG_S_REGISTER, reg);
-	if (reg->match_type == V4L2_CHIP_MATCH_I2C_DRIVER)
-		return ivtv_i2c_id(itv, reg->match_chip, VIDIOC_DBG_S_REGISTER, reg);
-	return ivtv_call_i2c_client(itv, reg->match_chip, VIDIOC_DBG_S_REGISTER, reg);
+	/* TODO: subdev errors should not be ignored, this should become a
+	   subdev helper function. */
+	ivtv_call_all(itv, core, s_register, reg);
+	return 0;
 }
 #endif
 
@@ -761,7 +766,7 @@ static int ivtv_querycap(struct file *file, void *fh, struct v4l2_capability *vc
 
 	strlcpy(vcap->driver, IVTV_DRIVER_NAME, sizeof(vcap->driver));
 	strlcpy(vcap->card, itv->card_name, sizeof(vcap->card));
-	strlcpy(vcap->bus_info, pci_name(itv->dev), sizeof(vcap->bus_info));
+	snprintf(vcap->bus_info, sizeof(vcap->bus_info), "PCI:%s", pci_name(itv->dev));
 	vcap->version = IVTV_DRIVER_VERSION; 	    /* version */
 	vcap->capabilities = itv->v4l2_cap; 	    /* capabilities */
 	return 0;
@@ -878,12 +883,6 @@ static int ivtv_s_crop(struct file *file, void *fh, struct v4l2_crop *crop)
 	int streamtype;
 
 	streamtype = id->type;
-
-	if (ivtv_debug & IVTV_DBGFLG_IOCTL) {
-		printk(KERN_INFO "ivtv%d ioctl: ", itv->num);
-		/* Should be replaced */
-		/* v4l_printk_ioctl(VIDIOC_S_CROP); */
-	}
 
 	if (crop->type == V4L2_BUF_TYPE_VIDEO_OUTPUT &&
 	    (itv->v4l2_cap & V4L2_CAP_VIDEO_OUTPUT)) {
@@ -1045,7 +1044,7 @@ static int ivtv_s_output(struct file *file, void *fh, unsigned int outp)
 	itv->active_output = outp;
 	route.input = SAA7127_INPUT_TYPE_NORMAL;
 	route.output = itv->card->video_outputs[outp].video_output;
-	ivtv_saa7127(itv, VIDIOC_INT_S_VIDEO_ROUTING, &route);
+	ivtv_call_hw(itv, IVTV_HW_SAA7127, video, s_routing, &route);
 
 	return 0;
 }
@@ -1057,7 +1056,7 @@ static int ivtv_g_frequency(struct file *file, void *fh, struct v4l2_frequency *
 	if (vf->tuner != 0)
 		return -EINVAL;
 
-	ivtv_call_i2c_clients(itv, VIDIOC_G_FREQUENCY, vf);
+	ivtv_call_all(itv, tuner, g_frequency, vf);
 	return 0;
 }
 
@@ -1070,7 +1069,7 @@ int ivtv_s_frequency(struct file *file, void *fh, struct v4l2_frequency *vf)
 
 	ivtv_mute(itv);
 	IVTV_DEBUG_INFO("v4l2 ioctl: set frequency %d\n", vf->frequency);
-	ivtv_call_i2c_clients(itv, VIDIOC_S_FREQUENCY, vf);
+	ivtv_call_all(itv, tuner, s_frequency, vf);
 	ivtv_unmute(itv);
 	return 0;
 }
@@ -1118,14 +1117,14 @@ int ivtv_s_std(struct file *file, void *fh, v4l2_std_id *std)
 	IVTV_DEBUG_INFO("Switching standard to %llx.\n", (unsigned long long)itv->std);
 
 	/* Tuner */
-	ivtv_call_i2c_clients(itv, VIDIOC_S_STD, &itv->std);
+	ivtv_call_all(itv, tuner, s_std, itv->std);
 
 	if (itv->v4l2_cap & V4L2_CAP_VIDEO_OUTPUT) {
 		/* set display standard */
 		itv->std_out = *std;
 		itv->is_out_60hz = itv->is_60hz;
 		itv->is_out_50hz = itv->is_50hz;
-		ivtv_call_i2c_clients(itv, VIDIOC_INT_S_STD_OUTPUT, &itv->std_out);
+		ivtv_call_all(itv, video, s_std_output, itv->std_out);
 		ivtv_vapi(itv, CX2341X_DEC_SET_STANDARD, 1, itv->is_out_50hz);
 		itv->main_rect.left = itv->main_rect.top = 0;
 		itv->main_rect.width = 720;
@@ -1149,7 +1148,7 @@ static int ivtv_s_tuner(struct file *file, void *fh, struct v4l2_tuner *vt)
 	if (vt->index != 0)
 		return -EINVAL;
 
-	ivtv_call_i2c_clients(itv, VIDIOC_S_TUNER, vt);
+	ivtv_call_all(itv, tuner, s_tuner, vt);
 
 	return 0;
 }
@@ -1161,7 +1160,7 @@ static int ivtv_g_tuner(struct file *file, void *fh, struct v4l2_tuner *vt)
 	if (vt->index != 0)
 		return -EINVAL;
 
-	ivtv_call_i2c_clients(itv, VIDIOC_G_TUNER, vt);
+	ivtv_call_all(itv, tuner, g_tuner, vt);
 
 	if (test_bit(IVTV_F_I_RADIO_USER, &itv->i_flags)) {
 		strlcpy(vt->name, "ivtv Radio Tuner", sizeof(vt->name));
@@ -1370,6 +1369,9 @@ static int ivtv_g_fbuf(struct file *file, void *fh, struct v4l2_framebuffer *fb)
 	if (itv->osd_global_alpha_state)
 		fb->flags |= V4L2_FBUF_FLAG_GLOBAL_ALPHA;
 
+	if (yi->track_osd)
+		fb->flags |= V4L2_FBUF_FLAG_OVERLAY;
+
 	pixfmt &= 7;
 
 	/* no local alpha for RGB565 or unknown formats */
@@ -1389,8 +1391,6 @@ static int ivtv_g_fbuf(struct file *file, void *fh, struct v4l2_framebuffer *fb)
 		else
 			fb->flags |= V4L2_FBUF_FLAG_LOCAL_ALPHA;
 	}
-	if (yi->track_osd)
-		fb->flags |= V4L2_FBUF_FLAG_OVERLAY;
 
 	return 0;
 }
@@ -1438,14 +1438,15 @@ static int ivtv_log_status(struct file *file, void *fh)
 	struct v4l2_audio audin;
 	int i;
 
-	IVTV_INFO("=================  START STATUS CARD #%d  =================\n", itv->num);
+	IVTV_INFO("=================  START STATUS CARD #%d  =================\n",
+		       itv->instance);
 	IVTV_INFO("Version: %s Card: %s\n", IVTV_VERSION, itv->card_name);
 	if (itv->hw_flags & IVTV_HW_TVEEPROM) {
 		struct tveeprom tv;
 
 		ivtv_read_eeprom(itv, &tv);
 	}
-	ivtv_call_i2c_clients(itv, VIDIOC_LOG_STATUS, NULL);
+	ivtv_call_all(itv, core, log_status);
 	ivtv_get_input(itv, itv->active_input, &vidin);
 	ivtv_get_audio_input(itv, itv->audio_input, &audin);
 	IVTV_INFO("Video Input:  %s\n", vidin.name);
@@ -1512,7 +1513,7 @@ static int ivtv_log_status(struct file *file, void *fh)
 	}
 	IVTV_INFO("Tuner:  %s\n",
 		test_bit(IVTV_F_I_RADIO_USER, &itv->i_flags) ? "Radio" : "TV");
-	cx2341x_log_status(&itv->params, itv->name);
+	cx2341x_log_status(&itv->params, itv->device.name);
 	IVTV_INFO("Status flags:    0x%08lx\n", itv->i_flags);
 	for (i = 0; i < IVTV_MAX_STREAMS; i++) {
 		struct ivtv_stream *s = &itv->streams[i];
@@ -1524,8 +1525,11 @@ static int ivtv_log_status(struct file *file, void *fh)
 				(s->buffers * s->buf_size) / 1024, s->buffers);
 	}
 
-	IVTV_INFO("Read MPG/VBI: %lld/%lld bytes\n", (long long)itv->mpg_data_received, (long long)itv->vbi_data_inserted);
-	IVTV_INFO("==================  END STATUS CARD #%d  ==================\n", itv->num);
+	IVTV_INFO("Read MPG/VBI: %lld/%lld bytes\n",
+			(long long)itv->mpg_data_received,
+			(long long)itv->vbi_data_inserted);
+	IVTV_INFO("==================  END STATUS CARD #%d  ==================\n",
+			itv->instance);
 
 	return 0;
 }
@@ -1722,7 +1726,7 @@ static int ivtv_decoder_ioctls(struct file *filp, unsigned int cmd, void *arg)
 	return 0;
 }
 
-static int ivtv_default(struct file *file, void *fh, int cmd, void *arg)
+static long ivtv_default(struct file *file, void *fh, int cmd, void *arg)
 {
 	struct ivtv *itv = ((struct ivtv_open_id *)fh)->itv;
 
@@ -1730,7 +1734,7 @@ static int ivtv_default(struct file *file, void *fh, int cmd, void *arg)
 	case VIDIOC_INT_S_AUDIO_ROUTING: {
 		struct v4l2_routing *route = arg;
 
-		ivtv_i2c_hw(itv, itv->card->hw_audio, VIDIOC_INT_S_AUDIO_ROUTING, route);
+		ivtv_call_hw(itv, itv->card->hw_audio, audio, s_routing, route);
 		break;
 	}
 
@@ -1740,7 +1744,7 @@ static int ivtv_default(struct file *file, void *fh, int cmd, void *arg)
 		if ((val == 0 && itv->options.newi2c) || (val & 0x01))
 			ivtv_reset_ir_gpio(itv);
 		if (val & 0x02)
-			itv->video_dec_func(itv, cmd, NULL);
+			v4l2_subdev_call(itv->sd_video, core, reset, 0);
 		break;
 	}
 
@@ -1750,12 +1754,12 @@ static int ivtv_default(struct file *file, void *fh, int cmd, void *arg)
 	return 0;
 }
 
-static int ivtv_serialized_ioctl(struct ivtv *itv, struct inode *inode, struct file *filp,
+static long ivtv_serialized_ioctl(struct ivtv *itv, struct file *filp,
 		unsigned int cmd, unsigned long arg)
 {
 	struct video_device *vfd = video_devdata(filp);
 	struct ivtv_open_id *id = (struct ivtv_open_id *)filp->private_data;
-	int ret;
+	long ret;
 
 	/* Filter dvb ioctls that cannot be handled by the v4l ioctl framework */
 	switch (cmd) {
@@ -1824,20 +1828,19 @@ static int ivtv_serialized_ioctl(struct ivtv *itv, struct inode *inode, struct f
 
 	if (ivtv_debug & IVTV_DBGFLG_IOCTL)
 		vfd->debug = V4L2_DEBUG_IOCTL | V4L2_DEBUG_IOCTL_ARG;
-	ret = video_ioctl2(inode, filp, cmd, arg);
+	ret = video_ioctl2(filp, cmd, arg);
 	vfd->debug = 0;
 	return ret;
 }
 
-int ivtv_v4l2_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
-		    unsigned long arg)
+long ivtv_v4l2_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	struct ivtv_open_id *id = (struct ivtv_open_id *)filp->private_data;
 	struct ivtv *itv = id->itv;
-	int res;
+	long res;
 
 	mutex_lock(&itv->serialize_lock);
-	res = ivtv_serialized_ioctl(itv, inode, filp, cmd, arg);
+	res = ivtv_serialized_ioctl(itv, filp, cmd, arg);
 	mutex_unlock(&itv->serialize_lock);
 	return res;
 }

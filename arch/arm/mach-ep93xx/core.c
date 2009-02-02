@@ -26,12 +26,16 @@
 #include <linux/serial_core.h>
 #include <linux/device.h>
 #include <linux/mm.h>
+#include <linux/dma-mapping.h>
 #include <linux/time.h>
 #include <linux/timex.h>
 #include <linux/delay.h>
 #include <linux/termios.h>
 #include <linux/amba/bus.h>
 #include <linux/amba/serial.h>
+#include <linux/io.h>
+#include <linux/i2c.h>
+#include <linux/i2c-gpio.h>
 
 #include <asm/types.h>
 #include <asm/setup.h>
@@ -41,7 +45,6 @@
 #include <asm/system.h>
 #include <asm/tlbflush.h>
 #include <asm/pgtable.h>
-#include <asm/io.h>
 
 #include <asm/mach/map.h>
 #include <asm/mach/time.h>
@@ -152,12 +155,14 @@ static unsigned char gpio_int_unmasked[3];
 static unsigned char gpio_int_enabled[3];
 static unsigned char gpio_int_type1[3];
 static unsigned char gpio_int_type2[3];
+static unsigned char gpio_int_debouce[3];
 
 /* Port ordering is: A B F */
 static const u8 int_type1_register_offset[3]	= { 0x90, 0xac, 0x4c };
 static const u8 int_type2_register_offset[3]	= { 0x94, 0xb0, 0x50 };
 static const u8 eoi_register_offset[3]		= { 0x98, 0xb4, 0x54 };
-static const u8 int_en_register_offset[3]	= { 0x9c, 0xb8, 0x5c };
+static const u8 int_en_register_offset[3]	= { 0x9c, 0xb8, 0x58 };
+static const u8 int_debounce_register_offset[3]	= { 0xa8, 0xc4, 0x64 };
 
 void ep93xx_gpio_update_int_params(unsigned port)
 {
@@ -180,6 +185,22 @@ void ep93xx_gpio_int_mask(unsigned line)
 	gpio_int_unmasked[line >> 3] &= ~(1 << (line & 7));
 }
 
+void ep93xx_gpio_int_debounce(unsigned int irq, int enable)
+{
+	int line = irq_to_gpio(irq);
+	int port = line >> 3;
+	int port_mask = 1 << (line & 7);
+
+	if (enable)
+		gpio_int_debouce[port] |= port_mask;
+	else
+		gpio_int_debouce[port] &= ~port_mask;
+
+	__raw_writeb(gpio_int_debouce[port],
+		EP93XX_GPIO_REG(int_debounce_register_offset[port]));
+}
+EXPORT_SYMBOL(ep93xx_gpio_int_debounce);
+
 /*************************************************************************
  * EP93xx IRQ handling
  *************************************************************************/
@@ -192,8 +213,7 @@ static void ep93xx_gpio_ab_irq_handler(unsigned int irq, struct irq_desc *desc)
 	for (i = 0; i < 8; i++) {
 		if (status & (1 << i)) {
 			int gpio_irq = gpio_to_irq(EP93XX_GPIO_LINE_A(0)) + i;
-			desc = irq_desc + gpio_irq;
-			desc_handle_irq(gpio_irq, desc);
+			generic_handle_irq(gpio_irq);
 		}
 	}
 
@@ -202,7 +222,7 @@ static void ep93xx_gpio_ab_irq_handler(unsigned int irq, struct irq_desc *desc)
 		if (status & (1 << i)) {
 			int gpio_irq = gpio_to_irq(EP93XX_GPIO_LINE_B(0)) + i;
 			desc = irq_desc + gpio_irq;
-			desc_handle_irq(gpio_irq, desc);
+			generic_handle_irq(gpio_irq);
 		}
 	}
 }
@@ -217,7 +237,7 @@ static void ep93xx_gpio_f_irq_handler(unsigned int irq, struct irq_desc *desc)
 	int port_f_idx = ((irq + 1) & 7) ^ 4; /* {19..22,47..50} -> {0..7} */
 	int gpio_irq = gpio_to_irq(EP93XX_GPIO_LINE_F(0)) + port_f_idx;
 
-	desc_handle_irq(gpio_irq, irq_desc + gpio_irq);
+	generic_handle_irq(gpio_irq);
 }
 
 static void ep93xx_gpio_irq_ack(unsigned int irq)
@@ -389,7 +409,7 @@ static struct amba_pl010_data ep93xx_uart_data = {
 
 static struct amba_device uart1_device = {
 	.dev		= {
-		.bus_id		= "apb:uart1",
+		.init_name	= "apb:uart1",
 		.platform_data	= &ep93xx_uart_data,
 	},
 	.res		= {
@@ -403,7 +423,7 @@ static struct amba_device uart1_device = {
 
 static struct amba_device uart2_device = {
 	.dev		= {
-		.bus_id		= "apb:uart2",
+		.init_name	= "apb:uart2",
 		.platform_data	= &ep93xx_uart_data,
 	},
 	.res		= {
@@ -417,7 +437,7 @@ static struct amba_device uart2_device = {
 
 static struct amba_device uart3_device = {
 	.dev		= {
-		.bus_id		= "apb:uart3",
+		.init_name	= "apb:uart3",
 		.platform_data	= &ep93xx_uart_data,
 	},
 	.res		= {
@@ -450,16 +470,72 @@ static struct resource ep93xx_ohci_resources[] = {
 	},
 };
 
+
 static struct platform_device ep93xx_ohci_device = {
 	.name		= "ep93xx-ohci",
 	.id		= -1,
 	.dev		= {
-		.dma_mask		= (void *)0xffffffff,
-		.coherent_dma_mask	= 0xffffffff,
+		.dma_mask		= &ep93xx_ohci_device.dev.coherent_dma_mask,
+		.coherent_dma_mask	= DMA_BIT_MASK(32),
 	},
 	.num_resources	= ARRAY_SIZE(ep93xx_ohci_resources),
 	.resource	= ep93xx_ohci_resources,
 };
+
+static struct ep93xx_eth_data ep93xx_eth_data;
+
+static struct resource ep93xx_eth_resource[] = {
+	{
+		.start	= EP93XX_ETHERNET_PHYS_BASE,
+		.end	= EP93XX_ETHERNET_PHYS_BASE + 0xffff,
+		.flags	= IORESOURCE_MEM,
+	}, {
+		.start	= IRQ_EP93XX_ETHERNET,
+		.end	= IRQ_EP93XX_ETHERNET,
+		.flags	= IORESOURCE_IRQ,
+	}
+};
+
+static struct platform_device ep93xx_eth_device = {
+	.name		= "ep93xx-eth",
+	.id		= -1,
+	.dev		= {
+		.platform_data	= &ep93xx_eth_data,
+	},
+	.num_resources	= ARRAY_SIZE(ep93xx_eth_resource),
+	.resource	= ep93xx_eth_resource,
+};
+
+void __init ep93xx_register_eth(struct ep93xx_eth_data *data, int copy_addr)
+{
+	if (copy_addr) {
+		memcpy(data->dev_addr,
+			(void *)(EP93XX_ETHERNET_BASE + 0x50), 6);
+	}
+
+	ep93xx_eth_data = *data;
+	platform_device_register(&ep93xx_eth_device);
+}
+
+static struct i2c_gpio_platform_data ep93xx_i2c_data = {
+	.sda_pin		= EP93XX_GPIO_LINE_EEDAT,
+	.sda_is_open_drain	= 0,
+	.scl_pin		= EP93XX_GPIO_LINE_EECLK,
+	.scl_is_open_drain	= 0,
+	.udelay			= 2,
+};
+
+static struct platform_device ep93xx_i2c_device = {
+	.name			= "i2c-gpio",
+	.id			= 0,
+	.dev.platform_data	= &ep93xx_i2c_data,
+};
+
+void __init ep93xx_register_i2c(struct i2c_board_info *devices, int num)
+{
+	i2c_register_board_info(0, devices, num);
+	platform_device_register(&ep93xx_i2c_device);
+}
 
 extern void ep93xx_gpio_init(void);
 

@@ -15,7 +15,7 @@
     incorporated herein by reference.
     Donald Becker may be reached at becker@scyld.com
     
-    Updated for 2.5.x by Alan Cox <alan@redhat.com>
+    Updated for 2.5.x by Alan Cox <alan@lxorguk.ukuu.org.uk>
 
 ======================================================================*/
 
@@ -255,7 +255,6 @@ static int tc589_config(struct pcmcia_device *link)
     int last_fn, last_ret, i, j, multi = 0, fifo;
     unsigned int ioaddr;
     char *ram_split[] = {"5:3", "3:1", "1:1", "3:5"};
-    DECLARE_MAC_BUF(mac);
     
     DEBUG(0, "3c589_config(0x%p)\n", link);
 
@@ -278,9 +277,10 @@ static int tc589_config(struct pcmcia_device *link)
 	if (multi && (j & 0x80)) continue;
 	link->io.BasePort1 = j ^ 0x300;
 	i = pcmcia_request_io(link, &link->io);
-	if (i == CS_SUCCESS) break;
+	if (i == 0)
+		break;
     }
-    if (i != CS_SUCCESS) {
+    if (i != 0) {
 	cs_error(link, RequestIO, i);
 	goto failed;
     }
@@ -295,7 +295,7 @@ static int tc589_config(struct pcmcia_device *link)
     /* The 3c589 has an extra EEPROM for configuration info, including
        the hardware address.  The 3c562 puts the address in the CIS. */
     tuple.DesiredTuple = 0x88;
-    if (pcmcia_get_first_tuple(link, &tuple) == CS_SUCCESS) {
+    if (pcmcia_get_first_tuple(link, &tuple) == 0) {
 	pcmcia_get_tuple_data(link, &tuple);
 	for (i = 0; i < 3; i++)
 	    phys_addr[i] = htons(le16_to_cpu(buf[i]));
@@ -332,9 +332,9 @@ static int tc589_config(struct pcmcia_device *link)
     strcpy(lp->node.dev_name, dev->name);
 
     printk(KERN_INFO "%s: 3Com 3c%s, io %#3lx, irq %d, "
-	   "hw_addr %s\n",
+	   "hw_addr %pM\n",
 	   dev->name, (multi ? "562" : "589"), dev->base_addr, dev->irq,
-	   print_mac(mac, dev->dev_addr));
+	   dev->dev_addr);
     printk(KERN_INFO "  %dK FIFO split %s Rx:Tx, %s xcvr\n",
 	   (fifo & 7) ? 32 : 8, ram_split[(fifo >> 16) & 3],
 	   if_names[dev->if_port]);
@@ -883,7 +883,6 @@ static int el3_rx(struct net_device *dev)
 			(pkt_len+3)>>2);
 		skb->protocol = eth_type_trans(skb, dev);
 		netif_rx(skb);
-		dev->last_rx = jiffies;
 		dev->stats.rx_packets++;
 		dev->stats.rx_bytes += pkt_len;
 	    } else {

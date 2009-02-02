@@ -59,7 +59,7 @@ static const struct super_operations autofs_sops = {
 
 enum {Opt_err, Opt_fd, Opt_uid, Opt_gid, Opt_pgrp, Opt_minproto, Opt_maxproto};
 
-static match_table_t autofs_tokens = {
+static const match_table_t autofs_tokens = {
 	{Opt_fd, "fd=%u"},
 	{Opt_uid, "uid=%u"},
 	{Opt_gid, "gid=%u"},
@@ -76,8 +76,8 @@ static int parse_options(char *options, int *pipefd, uid_t *uid, gid_t *gid,
 	substring_t args[MAX_OPT_ARGS];
 	int option;
 
-	*uid = current->uid;
-	*gid = current->gid;
+	*uid = current_uid();
+	*gid = current_gid();
 	*pgrp = task_pgrp_nr(current);
 
 	*minproto = *maxproto = AUTOFS_PROTO_VERSION;
@@ -251,13 +251,11 @@ struct inode *autofs_iget(struct super_block *sb, unsigned long ino)
 	inode->i_mode = S_IFDIR | S_IRUGO | S_IXUGO;
 	inode->i_nlink = 2;
 	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
-	inode->i_blocks = 0;
 
 	if (ino == AUTOFS_ROOT_INO) {
 		inode->i_mode = S_IFDIR | S_IRUGO | S_IXUGO | S_IWUSR;
 		inode->i_op = &autofs_root_inode_operations;
 		inode->i_fop = &autofs_root_operations;
-		inode->i_uid = inode->i_gid = 0; /* Changed in read_super */
 		goto done;
 	} 
 	

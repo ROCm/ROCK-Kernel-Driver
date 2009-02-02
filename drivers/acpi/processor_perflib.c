@@ -39,10 +39,14 @@
 #include <asm/uaccess.h>
 #endif
 
+#ifdef CONFIG_X86
+#include <asm/cpufeature.h>
+#endif
+
 #include <acpi/acpi_bus.h>
+#include <acpi/acpi_drivers.h>
 #include <acpi/processor.h>
 
-#define ACPI_PROCESSOR_COMPONENT	0x01000000
 #define ACPI_PROCESSOR_CLASS		"processor"
 #define ACPI_PROCESSOR_FILE_PERFORMANCE	"performance"
 #define _COMPONENT		ACPI_PROCESSOR_COMPONENT
@@ -80,7 +84,6 @@ MODULE_PARM_DESC(ignore_ppc, "If the frequency of your machine gets wrongly" \
 
 static int acpi_processor_ppc_status;
 
-#ifdef CONFIG_CPU_FREQ
 static int acpi_processor_ppc_notifier(struct notifier_block *nb,
 				       unsigned long event, void *data)
 {
@@ -123,12 +126,11 @@ static int acpi_processor_ppc_notifier(struct notifier_block *nb,
 static struct notifier_block acpi_ppc_notifier_block = {
 	.notifier_call = acpi_processor_ppc_notifier,
 };
-#endif	/* CONFIG_CPU_FREQ */
 
 static int acpi_processor_get_platform_limit(struct acpi_processor *pr)
 {
 	acpi_status status = 0;
-	unsigned long ppc = 0;
+	unsigned long long ppc = 0;
 
 
 	if (!pr)
@@ -168,15 +170,9 @@ int acpi_processor_ppc_has_changed(struct acpi_processor *pr)
 	if (ret < 0)
 		return (ret);
 	else
-#ifdef CONFIG_CPU_FREQ
 		return cpufreq_update_policy(pr->id);
-#elif CONFIG_PROCESSOR_EXTERNAL_CONTROL
-		return processor_notify_external(pr,
-				PROCESSOR_PM_CHANGE, PM_TYPE_PERF);
-#endif
 }
 
-#ifdef CONFIG_CPU_FREQ
 void acpi_processor_ppc_init(void)
 {
 	if (!cpufreq_register_notifier
@@ -195,7 +191,6 @@ void acpi_processor_ppc_exit(void)
 
 	acpi_processor_ppc_status &= ~PPC_REGISTERED;
 }
-#endif	/* CONFIG_CPU_FREQ */
 
 static int acpi_processor_get_performance_control(struct acpi_processor *pr)
 {
@@ -337,15 +332,11 @@ static int acpi_processor_get_performance_states(struct acpi_processor *pr)
 	return result;
 }
 
-#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
-static
-#endif
-int acpi_processor_get_performance_info(struct acpi_processor *pr)
+static int acpi_processor_get_performance_info(struct acpi_processor *pr)
 {
 	int result = 0;
 	acpi_status status = AE_OK;
 	acpi_handle handle = NULL;
-
 
 	if (!pr || !pr->performance || !pr->handle)
 		return -EINVAL;
@@ -359,16 +350,29 @@ int acpi_processor_get_performance_info(struct acpi_processor *pr)
 
 	result = acpi_processor_get_performance_control(pr);
 	if (result)
-		return result;
+		goto update_bios;
 
 	result = acpi_processor_get_performance_states(pr);
 	if (result)
-		return result;
+		goto update_bios;
 
 	return 0;
+
+	/*
+	 * Having _PPC but missing frequencies (_PSS, _PCT) is a very good hint that
+	 * the BIOS is older than the CPU and does not know its frequencies
+	 */
+ update_bios:
+#ifdef CONFIG_X86
+	if (ACPI_SUCCESS(acpi_get_handle(pr->handle, "_PPC", &handle))){
+		if(boot_cpu_has(X86_FEATURE_EST))
+			printk(KERN_WARNING FW_BUG "BIOS needs update for CPU "
+			       "frequency support\n");
+	}
+#endif
+	return result;
 }
 
-#ifdef CONFIG_CPU_FREQ
 int acpi_processor_notify_smm(struct module *calling_module)
 {
 	acpi_status status;
@@ -429,7 +433,6 @@ int acpi_processor_notify_smm(struct module *calling_module)
 }
 
 EXPORT_SYMBOL(acpi_processor_notify_smm);
-#endif	/* CONFIG_CPU_FREQ */
 
 #ifdef CONFIG_X86_ACPI_CPUFREQ_PROC_INTF
 /* /proc/acpi/processor/../performance interface (DEPRECATED) */
@@ -521,10 +524,7 @@ static void acpi_cpufreq_remove_file(struct acpi_processor *pr)
 }
 #endif				/* CONFIG_X86_ACPI_CPUFREQ_PROC_INTF */
 
-#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
-static
-#endif
-int acpi_processor_get_psd(struct acpi_processor *pr)
+static int acpi_processor_get_psd(struct acpi_processor	*pr)
 {
 	int result = 0;
 	acpi_status status = AE_OK;
@@ -541,13 +541,13 @@ int acpi_processor_get_psd(struct acpi_processor *pr)
 
 	psd = buffer.pointer;
 	if (!psd || (psd->type != ACPI_TYPE_PACKAGE)) {
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid _PSD data\n"));
+		printk(KERN_ERR PREFIX "Invalid _PSD data\n");
 		result = -EFAULT;
 		goto end;
 	}
 
 	if (psd->package.count != 1) {
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid _PSD data\n"));
+		printk(KERN_ERR PREFIX "Invalid _PSD data\n");
 		result = -EFAULT;
 		goto end;
 	}
@@ -560,19 +560,19 @@ int acpi_processor_get_psd(struct acpi_processor *pr)
 	status = acpi_extract_package(&(psd->package.elements[0]),
 		&format, &state);
 	if (ACPI_FAILURE(status)) {
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid _PSD data\n"));
+		printk(KERN_ERR PREFIX "Invalid _PSD data\n");
 		result = -EFAULT;
 		goto end;
 	}
 
 	if (pdomain->num_entries != ACPI_PSD_REV0_ENTRIES) {
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Unknown _PSD:num_entries\n"));
+		printk(KERN_ERR PREFIX "Unknown _PSD:num_entries\n");
 		result = -EFAULT;
 		goto end;
 	}
 
 	if (pdomain->revision != ACPI_PSD_REV0_REVISION) {
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Unknown _PSD:revision\n"));
+		printk(KERN_ERR PREFIX "Unknown _PSD:revision\n");
 		result = -EFAULT;
 		goto end;
 	}
@@ -588,11 +588,14 @@ int acpi_processor_preregister_performance(
 	int count, count_target;
 	int retval = 0;
 	unsigned int i, j;
-	cpumask_t covered_cpus;
+	cpumask_var_t covered_cpus;
 	struct acpi_processor *pr;
 	struct acpi_psd_package *pdomain;
 	struct acpi_processor *match_pr;
 	struct acpi_psd_package *match_pdomain;
+
+	if (!alloc_cpumask_var(&covered_cpus, GFP_KERNEL))
+		return -ENOMEM;
 
 	mutex_lock(&performance_mutex);
 
@@ -617,7 +620,7 @@ int acpi_processor_preregister_performance(
 		}
 
 		pr->performance = percpu_ptr(performance, i);
-		cpu_set(i, pr->performance->shared_cpu_map);
+		cpumask_set_cpu(i, pr->performance->shared_cpu_map);
 		if (acpi_processor_get_psd(pr)) {
 			retval = -EINVAL;
 			continue;
@@ -650,18 +653,18 @@ int acpi_processor_preregister_performance(
 		}
 	}
 
-	cpus_clear(covered_cpus);
+	cpumask_clear(covered_cpus);
 	for_each_possible_cpu(i) {
 		pr = per_cpu(processors, i);
 		if (!pr)
 			continue;
 
-		if (cpu_isset(i, covered_cpus))
+		if (cpumask_test_cpu(i, covered_cpus))
 			continue;
 
 		pdomain = &(pr->performance->domain_info);
-		cpu_set(i, pr->performance->shared_cpu_map);
-		cpu_set(i, covered_cpus);
+		cpumask_set_cpu(i, pr->performance->shared_cpu_map);
+		cpumask_set_cpu(i, covered_cpus);
 		if (pdomain->num_processors <= 1)
 			continue;
 
@@ -699,8 +702,8 @@ int acpi_processor_preregister_performance(
 				goto err_ret;
 			}
 
-			cpu_set(j, covered_cpus);
-			cpu_set(j, pr->performance->shared_cpu_map);
+			cpumask_set_cpu(j, covered_cpus);
+			cpumask_set_cpu(j, pr->performance->shared_cpu_map);
 			count++;
 		}
 
@@ -718,8 +721,8 @@ int acpi_processor_preregister_performance(
 
 			match_pr->performance->shared_type = 
 					pr->performance->shared_type;
-			match_pr->performance->shared_cpu_map =
-				pr->performance->shared_cpu_map;
+			cpumask_copy(match_pr->performance->shared_cpu_map,
+				     pr->performance->shared_cpu_map);
 		}
 	}
 
@@ -731,14 +734,15 @@ err_ret:
 
 		/* Assume no coordination on any error parsing domain info */
 		if (retval) {
-			cpus_clear(pr->performance->shared_cpu_map);
-			cpu_set(i, pr->performance->shared_cpu_map);
+			cpumask_clear(pr->performance->shared_cpu_map);
+			cpumask_set_cpu(i, pr->performance->shared_cpu_map);
 			pr->performance->shared_type = CPUFREQ_SHARED_TYPE_ALL;
 		}
 		pr->performance = NULL; /* Will be set for real in register */
 	}
 
 	mutex_unlock(&performance_mutex);
+	free_cpumask_var(covered_cpus);
 	return retval;
 }
 EXPORT_SYMBOL(acpi_processor_preregister_performance);

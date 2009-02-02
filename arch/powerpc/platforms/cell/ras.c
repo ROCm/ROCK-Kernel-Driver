@@ -13,11 +13,13 @@
 #include <linux/kernel.h>
 #include <linux/smp.h>
 #include <linux/reboot.h>
+#include <linux/kexec.h>
+#include <linux/crash_dump.h>
 
+#include <asm/kexec.h>
 #include <asm/reg.h>
 #include <asm/io.h>
 #include <asm/prom.h>
-#include <asm/kexec.h>
 #include <asm/machdep.h>
 #include <asm/rtas.h>
 #include <asm/cell-regs.h>
@@ -36,16 +38,16 @@ static void dump_fir(int cpu)
 	/* Todo: do some nicer parsing of bits and based on them go down
 	 * to other sub-units FIRs and not only IIC
 	 */
-	printk(KERN_ERR "Global Checkstop FIR    : 0x%016lx\n",
+	printk(KERN_ERR "Global Checkstop FIR    : 0x%016llx\n",
 	       in_be64(&pregs->checkstop_fir));
-	printk(KERN_ERR "Global Recoverable FIR  : 0x%016lx\n",
+	printk(KERN_ERR "Global Recoverable FIR  : 0x%016llx\n",
 	       in_be64(&pregs->checkstop_fir));
-	printk(KERN_ERR "Global MachineCheck FIR : 0x%016lx\n",
+	printk(KERN_ERR "Global MachineCheck FIR : 0x%016llx\n",
 	       in_be64(&pregs->spec_att_mchk_fir));
 
 	if (iregs == NULL)
 		return;
-	printk(KERN_ERR "IOC FIR                 : 0x%016lx\n",
+	printk(KERN_ERR "IOC FIR                 : 0x%016llx\n",
 	       in_be64(&iregs->ioc_fir));
 
 }
@@ -111,9 +113,8 @@ static int __init cbe_ptcal_enable_on_node(int nid, int order)
 	int ret = -ENOMEM;
 	unsigned long addr;
 
-#ifdef CONFIG_CRASH_DUMP
-	rtas_call(ptcal_stop_tok, 1, 1, NULL, nid);
-#endif
+	if (is_kdump_kernel())
+		rtas_call(ptcal_stop_tok, 1, 1, NULL, nid);
 
 	area = kmalloc(sizeof(*area), GFP_KERNEL);
 	if (!area)

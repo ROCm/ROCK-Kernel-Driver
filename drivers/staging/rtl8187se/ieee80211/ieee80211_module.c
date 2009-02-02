@@ -51,6 +51,7 @@
 #include <linux/etherdevice.h>
 #include <asm/uaccess.h>
 #include <net/arp.h>
+#include <net/net_namespace.h>
 
 #include "ieee80211.h"
 
@@ -211,7 +212,8 @@ void free_ieee80211(struct net_device *dev)
 	free_netdev(dev);
 }
 
-#ifdef CONFIG_IEEE80211_DEBUG
+//#ifdef CONFIG_IEEE80211_DEBUG
+#if 0
 
 static int debug = 0;
 u32 ieee80211_debug_level = 0;

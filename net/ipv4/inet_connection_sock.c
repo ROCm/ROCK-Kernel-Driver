@@ -30,20 +30,22 @@ EXPORT_SYMBOL(inet_csk_timer_bug_msg);
 #endif
 
 /*
- * This array holds the first and last local port number.
+ * This struct holds the first and last local port number.
  */
-int sysctl_local_port_range[2] = { 32768, 61000 };
-DEFINE_SEQLOCK(sysctl_port_range_lock);
+struct local_ports sysctl_local_ports __read_mostly = {
+	.lock = SEQLOCK_UNLOCKED,
+	.range = { 32768, 61000 },
+};
 
 void inet_get_local_port_range(int *low, int *high)
 {
 	unsigned seq;
 	do {
-		seq = read_seqbegin(&sysctl_port_range_lock);
+		seq = read_seqbegin(&sysctl_local_ports.lock);
 
-		*low = sysctl_local_port_range[0];
-		*high = sysctl_local_port_range[1];
-	} while (read_seqretry(&sysctl_port_range_lock, seq));
+		*low = sysctl_local_ports.range[0];
+		*high = sysctl_local_ports.range[1];
+	} while (read_seqretry(&sysctl_local_ports.lock, seq));
 }
 EXPORT_SYMBOL(inet_get_local_port_range);
 
@@ -107,7 +109,7 @@ int inet_csk_get_port(struct sock *sk, unsigned short snum)
 					hashinfo->bhash_size)];
 			spin_lock(&head->lock);
 			inet_bind_bucket_for_each(tb, node, &head->chain)
-				if (tb->ib_net == net && tb->port == rover)
+				if (ib_net(tb) == net && tb->port == rover)
 					goto next;
 			break;
 		next:
@@ -135,7 +137,7 @@ int inet_csk_get_port(struct sock *sk, unsigned short snum)
 				hashinfo->bhash_size)];
 		spin_lock(&head->lock);
 		inet_bind_bucket_for_each(tb, node, &head->chain)
-			if (tb->ib_net == net && tb->port == snum)
+			if (ib_net(tb) == net && tb->port == snum)
 				goto tb_found;
 	}
 	tb = NULL;
@@ -321,7 +323,7 @@ void inet_csk_reset_keepalive_timer(struct sock *sk, unsigned long len)
 
 EXPORT_SYMBOL(inet_csk_reset_keepalive_timer);
 
-struct dst_entry* inet_csk_route_req(struct sock *sk,
+struct dst_entry *inet_csk_route_req(struct sock *sk,
 				     const struct request_sock *req)
 {
 	struct rtable *rt;
@@ -335,22 +337,24 @@ struct dst_entry* inet_csk_route_req(struct sock *sk,
 					.saddr = ireq->loc_addr,
 					.tos = RT_CONN_FLAGS(sk) } },
 			    .proto = sk->sk_protocol,
+			    .flags = inet_sk_flowi_flags(sk),
 			    .uli_u = { .ports =
 				       { .sport = inet_sk(sk)->sport,
 					 .dport = ireq->rmt_port } } };
 	struct net *net = sock_net(sk);
 
 	security_req_classify_flow(req, &fl);
-	if (ip_route_output_flow(net, &rt, &fl, sk, 0)) {
-		IP_INC_STATS_BH(net, IPSTATS_MIB_OUTNOROUTES);
-		return NULL;
-	}
-	if (opt && opt->is_strictroute && rt->rt_dst != rt->rt_gateway) {
-		ip_rt_put(rt);
-		IP_INC_STATS_BH(net, IPSTATS_MIB_OUTNOROUTES);
-		return NULL;
-	}
+	if (ip_route_output_flow(net, &rt, &fl, sk, 0))
+		goto no_route;
+	if (opt && opt->is_strictroute && rt->rt_dst != rt->rt_gateway)
+		goto route_err;
 	return &rt->u.dst;
+
+route_err:
+	ip_rt_put(rt);
+no_route:
+	IP_INC_STATS_BH(net, IPSTATS_MIB_OUTNOROUTES);
+	return NULL;
 }
 
 EXPORT_SYMBOL_GPL(inet_csk_route_req);
@@ -515,6 +519,8 @@ struct sock *inet_csk_clone(struct sock *sk, const struct request_sock *req,
 		newicsk->icsk_bind_hash = NULL;
 
 		inet_sk(newsk)->dport = inet_rsk(req)->rmt_port;
+		inet_sk(newsk)->num = ntohs(inet_rsk(req)->loc_port);
+		inet_sk(newsk)->sport = inet_rsk(req)->loc_port;
 		newsk->sk_write_space = sk_stream_write_space;
 
 		newicsk->icsk_retransmits = 0;
@@ -556,7 +562,7 @@ void inet_csk_destroy_sock(struct sock *sk)
 
 	sk_refcnt_debug_release(sk);
 
-	atomic_dec(sk->sk_prot->orphan_count);
+	percpu_counter_dec(sk->sk_prot->orphan_count);
 	sock_put(sk);
 }
 
@@ -636,7 +642,7 @@ void inet_csk_listen_stop(struct sock *sk)
 
 		sock_orphan(child);
 
-		atomic_inc(sk->sk_prot->orphan_count);
+		percpu_counter_inc(sk->sk_prot->orphan_count);
 
 		inet_csk_destroy_sock(child);
 

@@ -23,7 +23,6 @@
 #include <linux/fs.h>
 #include <linux/root_dev.h>
 #include <linux/console.h>
-#include <linux/kexec.h>
 #include <linux/bootmem.h>
 
 #include <asm/machdep.h>
@@ -187,7 +186,7 @@ early_param("ps3flash", early_parse_ps3flash);
 #define prealloc_ps3flash_bounce_buffer()	do { } while (0)
 #endif
 
-static int ps3_set_dabr(u64 dabr)
+static int ps3_set_dabr(unsigned long dabr)
 {
 	enum {DABR_USER = 1, DABR_KERNEL = 2,};
 
@@ -281,8 +280,5 @@ define_machine(ps3) {
 	.halt				= ps3_halt,
 #if defined(CONFIG_KEXEC)
 	.kexec_cpu_down			= ps3_kexec_cpu_down,
-	.machine_kexec			= default_machine_kexec,
-	.machine_kexec_prepare		= default_machine_kexec_prepare,
-	.machine_crash_shutdown		= default_machine_crash_shutdown,
 #endif
 };

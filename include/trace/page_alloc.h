@@ -6,10 +6,10 @@
 /*
  * mm_page_alloc : page can be NULL.
  */
-DEFINE_TRACE(page_alloc,
+DECLARE_TRACE(page_alloc,
 	TPPROTO(struct page *page, unsigned int order),
 	TPARGS(page, order));
-DEFINE_TRACE(page_free,
+DECLARE_TRACE(page_free,
 	TPPROTO(struct page *page, unsigned int order),
 	TPARGS(page, order));
 

@@ -28,6 +28,7 @@
 
 /*
  * 82571EB Gigabit Ethernet Controller
+ * 82571EB Gigabit Ethernet Controller (Copper)
  * 82571EB Gigabit Ethernet Controller (Fiber)
  * 82571EB Dual Port Gigabit Mezzanine Adapter
  * 82571EB Quad Port Gigabit Mezzanine Adapter
@@ -331,8 +332,9 @@ static s32 e1000_get_variants_82571(struct e1000_adapter *adapter)
 
 	case e1000_82573:
 		if (pdev->device == E1000_DEV_ID_82573L) {
-			e1000_read_nvm(&adapter->hw, NVM_INIT_3GIO_3, 1,
-				       &eeprom_data);
+			if (e1000_read_nvm(&adapter->hw, NVM_INIT_3GIO_3, 1,
+				       &eeprom_data) < 0)
+				break;
 			if (eeprom_data & NVM_WORD1A_ASPM_MASK)
 				adapter->flags &= ~FLAG_HAS_JUMBO_FRAMES;
 		}
@@ -979,11 +981,15 @@ static void e1000_initialize_hw_bits_82571(struct e1000_hw *hw)
 		ew32(PBA_ECC, reg);
 	}
 
-	/* PCI-Ex Control Register */
+	/* PCI-Ex Control Registers */
 	if (hw->mac.type == e1000_82574) {
 		reg = er32(GCR);
 		reg |= (1 << 22);
 		ew32(GCR, reg);
+
+		reg = er32(GCR2);
+		reg |= 1;
+		ew32(GCR2, reg);
 	}
 
 	return;
@@ -1117,8 +1123,8 @@ static s32 e1000_setup_link_82571(struct e1000_hw *hw)
 	 * set it to full.
 	 */
 	if ((hw->mac.type == e1000_82573 || hw->mac.type == e1000_82574) &&
-	    hw->fc.type == e1000_fc_default)
-		hw->fc.type = e1000_fc_full;
+	    hw->fc.requested_mode == e1000_fc_default)
+		hw->fc.requested_mode = e1000_fc_full;
 
 	return e1000e_setup_link(hw);
 }
@@ -1393,6 +1399,7 @@ static struct e1000_phy_operations e82_phy_ops_igp = {
 	.set_d0_lplu_state	= e1000_set_d0_lplu_state_82571,
 	.set_d3_lplu_state	= e1000e_set_d3_lplu_state,
 	.write_phy_reg		= e1000e_write_phy_reg_igp,
+	.cfg_on_link_up      	= NULL,
 };
 
 static struct e1000_phy_operations e82_phy_ops_m88 = {
@@ -1409,6 +1416,7 @@ static struct e1000_phy_operations e82_phy_ops_m88 = {
 	.set_d0_lplu_state	= e1000_set_d0_lplu_state_82571,
 	.set_d3_lplu_state	= e1000e_set_d3_lplu_state,
 	.write_phy_reg		= e1000e_write_phy_reg_m88,
+	.cfg_on_link_up      	= NULL,
 };
 
 static struct e1000_phy_operations e82_phy_ops_bm = {
@@ -1425,6 +1433,7 @@ static struct e1000_phy_operations e82_phy_ops_bm = {
 	.set_d0_lplu_state	= e1000_set_d0_lplu_state_82571,
 	.set_d3_lplu_state	= e1000e_set_d3_lplu_state,
 	.write_phy_reg		= e1000e_write_phy_reg_bm2,
+	.cfg_on_link_up      	= NULL,
 };
 
 static struct e1000_nvm_operations e82571_nvm_ops = {

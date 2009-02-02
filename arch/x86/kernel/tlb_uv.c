@@ -6,7 +6,7 @@
  *	This code is released under the GNU General Public License version 2 or
  *	later.
  */
-#include <linux/mc146818rtc.h>
+#include <linux/seq_file.h>
 #include <linux/proc_fs.h>
 #include <linux/kernel.h>
 
@@ -200,6 +200,7 @@ static int uv_wait_completion(struct bau_desc *bau_desc,
 				destination_timeouts = 0;
 			}
 		}
+		cpu_relax();
 	}
 	return FLUSH_COMPLETE;
 }

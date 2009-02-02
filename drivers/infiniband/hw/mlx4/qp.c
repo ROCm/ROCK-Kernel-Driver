@@ -451,6 +451,7 @@ static int create_qp_common(struct mlx4_ib_dev *dev, struct ib_pd *pd,
 			    struct ib_qp_init_attr *init_attr,
 			    struct ib_udata *udata, int sqpn, struct mlx4_ib_qp *qp)
 {
+	int qpn;
 	int err;
 
 	mutex_init(&qp->mutex);
@@ -545,9 +546,17 @@ static int create_qp_common(struct mlx4_ib_dev *dev, struct ib_pd *pd,
 		}
 	}
 
-	err = mlx4_qp_alloc(dev->dev, sqpn, &qp->mqp);
+	if (sqpn) {
+		qpn = sqpn;
+	} else {
+		err = mlx4_qp_reserve_range(dev->dev, 1, 1, &qpn);
+		if (err)
+			goto err_wrid;
+	}
+
+	err = mlx4_qp_alloc(dev->dev, qpn, &qp->mqp);
 	if (err)
-		goto err_wrid;
+		goto err_qpn;
 
 	/*
 	 * Hardware wants QPN written in big-endian order (after
@@ -559,6 +568,10 @@ static int create_qp_common(struct mlx4_ib_dev *dev, struct ib_pd *pd,
 	qp->mqp.event = mlx4_ib_qp_event;
 
 	return 0;
+
+err_qpn:
+	if (!sqpn)
+		mlx4_qp_release_range(dev->dev, qpn, 1);
 
 err_wrid:
 	if (pd->uobject) {
@@ -655,6 +668,10 @@ static void destroy_qp_common(struct mlx4_ib_dev *dev, struct mlx4_ib_qp *qp,
 	mlx4_ib_unlock_cqs(send_cq, recv_cq);
 
 	mlx4_qp_free(dev->dev, &qp->mqp);
+
+	if (!is_sqp(dev, qp))
+		mlx4_qp_release_range(dev->dev, qp->mqp.qpn, 1);
+
 	mlx4_mtt_cleanup(dev->dev, &qp->mtt);
 
 	if (is_user) {
@@ -1058,6 +1075,9 @@ static int __mlx4_ib_modify_qp(struct ib_qp *ibqp,
 	else
 		sqd_event = 0;
 
+	if (!ibqp->uobject && cur_state == IB_QPS_RESET && new_state == IB_QPS_INIT)
+		context->rlkey |= (1 << 4);
+
 	/*
 	 * Before passing a kernel QP to the HW, make sure that the
 	 * ownership bits of the send queue are set and the SQ
@@ -1442,7 +1462,8 @@ static void __set_data_seg(struct mlx4_wqe_data_seg *dseg, struct ib_sge *sg)
 }
 
 static int build_lso_seg(struct mlx4_wqe_lso_seg *wqe, struct ib_send_wr *wr,
-			 struct mlx4_ib_qp *qp, unsigned *lso_seg_len)
+			 struct mlx4_ib_qp *qp, unsigned *lso_seg_len,
+			 __be32 *lso_hdr_sz)
 {
 	unsigned halign = ALIGN(sizeof *wqe + wr->wr.ud.hlen, 16);
 
@@ -1459,12 +1480,8 @@ static int build_lso_seg(struct mlx4_wqe_lso_seg *wqe, struct ib_send_wr *wr,
 
 	memcpy(wqe->header, wr->wr.ud.header, wr->wr.ud.hlen);
 
-	/* make sure LSO header is written before overwriting stamping */
-	wmb();
-
-	wqe->mss_hdr_size = cpu_to_be32((wr->wr.ud.mss - wr->wr.ud.hlen) << 16 |
-					wr->wr.ud.hlen);
-
+	*lso_hdr_sz  = cpu_to_be32((wr->wr.ud.mss - wr->wr.ud.hlen) << 16 |
+				   wr->wr.ud.hlen);
 	*lso_seg_len = halign;
 	return 0;
 }
@@ -1498,6 +1515,9 @@ int mlx4_ib_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
 	int uninitialized_var(stamp);
 	int uninitialized_var(size);
 	unsigned uninitialized_var(seglen);
+	__be32 dummy;
+	__be32 *lso_wqe;
+	__be32 uninitialized_var(lso_hdr_sz);
 	int i;
 
 	spin_lock_irqsave(&qp->sq.lock, flags);
@@ -1505,6 +1525,8 @@ int mlx4_ib_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
 	ind = qp->sq_next_wqe;
 
 	for (nreq = 0; wr; ++nreq, wr = wr->next) {
+		lso_wqe = &dummy;
+
 		if (mlx4_wq_overflow(&qp->sq, nreq, qp->ibqp.send_cq)) {
 			err = -ENOMEM;
 			*bad_wr = wr;
@@ -1586,11 +1608,12 @@ int mlx4_ib_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
 			size += sizeof (struct mlx4_wqe_datagram_seg) / 16;
 
 			if (wr->opcode == IB_WR_LSO) {
-				err = build_lso_seg(wqe, wr, qp, &seglen);
+				err = build_lso_seg(wqe, wr, qp, &seglen, &lso_hdr_sz);
 				if (unlikely(err)) {
 					*bad_wr = wr;
 					goto out;
 				}
+				lso_wqe = (__be32 *) wqe;
 				wqe  += seglen;
 				size += seglen / 16;
 			}
@@ -1632,6 +1655,14 @@ int mlx4_ib_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
 		for (i = wr->num_sge - 1; i >= 0; --i, --dseg)
 			set_data_seg(dseg, wr->sg_list + i);
 
+		/*
+		 * Possibly overwrite stamping in cacheline with LSO
+		 * segment only after making sure all data segments
+		 * are written.
+		 */
+		wmb();
+		*lso_wqe = lso_hdr_sz;
+
 		ctrl->fence_size = (wr->send_flags & IB_SEND_FENCE ?
 				    MLX4_WQE_CTRL_FENCE : 0) | size;
 
@@ -1666,7 +1697,6 @@ int mlx4_ib_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
 			stamp_send_wqe(qp, stamp, size * 16);
 			ind = pad_wraparound(qp, ind);
 		}
-
 	}
 
 out:

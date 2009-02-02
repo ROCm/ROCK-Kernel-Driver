@@ -30,6 +30,20 @@ config BLK_DEV_MD
 
 	  If unsure, say N.
 
+config MD_AUTODETECT
+	bool "Autodetect RAID arrays during kernel boot"
+	depends on BLK_DEV_MD=y
+	default y
+	---help---
+	  If you say Y here, then the kernel will try to autodetect raid
+	  arrays as part of its boot process. 
+
+	  If you don't use raid and say Y, this autodetection can cause 
+	  a several-second delay in the boot time due to various
+	  synchronisation steps that are part of this step.
+
+	  If unsure, say Y.
+
 config MD_LINEAR
 	tristate "Linear (append) mode"
 	depends on BLK_DEV_MD
@@ -106,7 +120,6 @@ config MD_RAID10
 
 config MD_RAID456
 	tristate "RAID-4/RAID-5/RAID-6 mode"
-	depends on BLK_DEV_MD
 	select ASYNC_MEMCPY
 	select ASYNC_XOR
 	---help---
@@ -235,9 +248,14 @@ config DM_SNAPSHOT
        ---help---
          Allow volume managers to take writable snapshots of a device.
 
+config DM_RAID
+       tristate
+       depends on BLK_DEV_DM
+
 config DM_MIRROR
        tristate "Mirror target"
        depends on BLK_DEV_DM
+       select DM_RAID
        ---help---
          Allow volume managers to mirror logical volumes, also
          needed for live data migration tools such as 'pvmove'.
@@ -271,6 +289,7 @@ config DM_DELAY
 
 config DM_RAID45
 	tristate "RAID 4/5 target (EXPERIMENTAL)"
+	depends on DM_RAID
 	depends on BLK_DEV_DM && EXPERIMENTAL
 	---help---
 	A target that supports RAID4 and RAID5 mappings.

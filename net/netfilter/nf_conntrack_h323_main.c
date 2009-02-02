@@ -709,7 +709,8 @@ static int expect_h245(struct sk_buff *skb, struct nf_conn *ct,
 /* If the calling party is on the same side of the forward-to party,
  * we don't need to track the second call */
 static int callforward_do_filter(const union nf_inet_addr *src,
-                                 const union nf_inet_addr *dst, int family)
+				 const union nf_inet_addr *dst,
+				 u_int8_t family)
 {
 	const struct nf_afinfo *afinfo;
 	struct flowi fl1, fl2;
@@ -849,10 +850,8 @@ static int process_setup(struct sk_buff *skb, struct nf_conn *ct,
 	    get_h225_addr(ct, *data, &setup->destCallSignalAddress,
 			  &addr, &port) &&
 	    memcmp(&addr, &ct->tuplehash[!dir].tuple.src.u3, sizeof(addr))) {
-		pr_debug("nf_ct_q931: set destCallSignalAddress "
-			 NIP6_FMT ":%hu->" NIP6_FMT ":%hu\n",
-			 NIP6(*(struct in6_addr *)&addr), ntohs(port),
-			 NIP6(*(struct in6_addr *)&ct->tuplehash[!dir].tuple.src.u3),
+		pr_debug("nf_ct_q931: set destCallSignalAddress %pI6:%hu->%pI6:%hu\n",
+			 &addr, ntohs(port), &ct->tuplehash[!dir].tuple.src.u3,
 			 ntohs(ct->tuplehash[!dir].tuple.src.u.tcp.port));
 		ret = set_h225_addr(skb, data, dataoff,
 				    &setup->destCallSignalAddress,
@@ -867,10 +866,8 @@ static int process_setup(struct sk_buff *skb, struct nf_conn *ct,
 	    get_h225_addr(ct, *data, &setup->sourceCallSignalAddress,
 			  &addr, &port) &&
 	    memcmp(&addr, &ct->tuplehash[!dir].tuple.dst.u3, sizeof(addr))) {
-		pr_debug("nf_ct_q931: set sourceCallSignalAddress "
-			 NIP6_FMT ":%hu->" NIP6_FMT ":%hu\n",
-			 NIP6(*(struct in6_addr *)&addr), ntohs(port),
-			 NIP6(*(struct in6_addr *)&ct->tuplehash[!dir].tuple.dst.u3),
+		pr_debug("nf_ct_q931: set sourceCallSignalAddress %pI6:%hu->%pI6:%hu\n",
+			 &addr, ntohs(port), &ct->tuplehash[!dir].tuple.dst.u3,
 			 ntohs(ct->tuplehash[!dir].tuple.dst.u.tcp.port));
 		ret = set_h225_addr(skb, data, dataoff,
 				    &setup->sourceCallSignalAddress,
@@ -1209,6 +1206,7 @@ static struct nf_conntrack_expect *find_expect(struct nf_conn *ct,
 					       union nf_inet_addr *addr,
 					       __be16 port)
 {
+	struct net *net = nf_ct_net(ct);
 	struct nf_conntrack_expect *exp;
 	struct nf_conntrack_tuple tuple;
 
@@ -1218,7 +1216,7 @@ static struct nf_conntrack_expect *find_expect(struct nf_conn *ct,
 	tuple.dst.u.tcp.port = port;
 	tuple.dst.protonum = IPPROTO_TCP;
 
-	exp = __nf_ct_expect_find(&tuple);
+	exp = __nf_ct_expect_find(net, &tuple);
 	if (exp && exp->master == ct)
 		return exp;
 	return NULL;
@@ -1829,3 +1827,4 @@ MODULE_AUTHOR("Jing Min Zhao <zhaojingmin@users.sourceforge.net>");
 MODULE_DESCRIPTION("H.323 connection tracking helper");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("ip_conntrack_h323");
+MODULE_ALIAS_NFCT_HELPER("h323");

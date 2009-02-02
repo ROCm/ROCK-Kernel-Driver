@@ -120,7 +120,7 @@ static __init void early_serial_init(char *s)
 		if (!strncmp(s, "0x", 2)) {
 			early_serial_base = simple_strtoul(s, &e, 16);
 		} else {
-			static int bases[] = { 0x3f8, 0x2f8 };
+			static const int __initconst bases[] = { 0x3f8, 0x2f8 };
 
 			if (!strncmp(s, "ttyS", 4))
 				s += 4;
@@ -401,9 +401,9 @@ static int dbgp_control_msg(unsigned devnum, int requesttype, int request,
 	/* Compute the control message */
 	req.bRequestType = requesttype;
 	req.bRequest = request;
-	req.wValue = value;
-	req.wIndex = index;
-	req.wLength = size;
+	req.wValue = cpu_to_le16(value);
+	req.wIndex = cpu_to_le16(index);
+	req.wLength = cpu_to_le16(size);
 
 	pids = DBGP_PID_SET(USB_PID_DATA0, USB_PID_SETUP);
 	addr = DBGP_EPADDR(devnum, 0);
@@ -842,7 +842,7 @@ static int __init early_dbgp_init(char *s)
 	ret = ehci_setup();
 	if (ret < 0) {
 		dbgp_printk("ehci_setup failed\n");
-		ehci_debug = 0;
+		ehci_debug = NULL;
 
 		return -1;
 	}
@@ -875,52 +875,9 @@ static struct console early_dbgp_console = {
 };
 #endif
 
-/* Console interface to a host file on AMD's SimNow! */
-
-static int simnow_fd;
-
-enum {
-	MAGIC1 = 0xBACCD00A,
-	MAGIC2 = 0xCA110000,
-	XOPEN = 5,
-	XWRITE = 4,
-};
-
-static noinline long simnow(long cmd, long a, long b, long c)
-{
-	long ret;
-
-	asm volatile("cpuid" :
-		     "=a" (ret) :
-		     "b" (a), "c" (b), "d" (c), "0" (MAGIC1), "D" (cmd + MAGIC2));
-	return ret;
-}
-
-static void __init simnow_init(char *str)
-{
-	char *fn = "klog";
-
-	if (*str == '=')
-		fn = ++str;
-	/* error ignored */
-	simnow_fd = simnow(XOPEN, (unsigned long)fn, O_WRONLY|O_APPEND|O_CREAT, 0644);
-}
-
-static void simnow_write(struct console *con, const char *s, unsigned n)
-{
-	simnow(XWRITE, simnow_fd, (unsigned long)s, n);
-}
-
-static struct console simnow_console = {
-	.name =		"simnow",
-	.write =	simnow_write,
-	.flags =	CON_PRINTBUFFER,
-	.index =	-1,
-};
-
 /* Direct interface for emergencies */
 static struct console *early_console = &early_vga_console;
-static int early_console_initialized;
+static int __initdata early_console_initialized;
 
 asmlinkage void early_printk(const char *fmt, ...)
 {
@@ -929,7 +886,7 @@ asmlinkage void early_printk(const char *fmt, ...)
 	va_list ap;
 
 	va_start(ap, fmt);
-	n = vscnprintf(buf, 512, fmt, ap);
+	n = vscnprintf(buf, sizeof(buf), fmt, ap);
 	early_console->write(early_console, buf, n);
 	va_end(ap);
 }
@@ -960,10 +917,6 @@ static int __init setup_early_printk(char *buf)
 		max_ypos = boot_params.screen_info.orig_video_lines;
 		current_ypos = boot_params.screen_info.orig_y;
 		early_console = &early_vga_console;
-	} else if (!strncmp(buf, "simnow", 6)) {
-		simnow_init(buf + 6);
-		early_console = &simnow_console;
-		keep_early = 1;
 #ifdef CONFIG_EARLY_PRINTK_DBGP
 	} else if (!strncmp(buf, "dbgp", 4)) {
 		if (early_dbgp_init(buf+4) < 0)
@@ -987,24 +940,6 @@ static int __init setup_early_printk(char *buf)
 		early_console->flags |= CON_BOOT;
 	register_console(early_console);
 	return 0;
-}
-
-void __init enable_debug_console(char *buf)
-{
-#ifdef DBGP_DEBUG
-	struct console *old_early_console = NULL;
-
-	if (early_console_initialized && early_console) {
-		old_early_console = early_console;
-		unregister_console(early_console);
-		early_console_initialized = 0;
-	}
-
-	setup_early_printk(buf);
-
-	if (early_console == old_early_console && old_early_console)
-		register_console(old_early_console);
-#endif
 }
 
 early_param("earlyprintk", setup_early_printk);

@@ -40,7 +40,7 @@
 
 static inline u16 extract_value(const char *data, int offset)
 {
-	return be16_to_cpup((u16 *)&data[offset]);
+	return be16_to_cpup((__be16 *)&data[offset]);
 }
 
 #define TEMP_SENSOR		1
@@ -608,3 +608,9 @@ MODULE_LICENSE("GPL");
 
 module_init(ibmpex_init);
 module_exit(ibmpex_exit);
+
+MODULE_ALIAS("dmi:bvnIBM:*:pnIBMSystemx3350-*");
+MODULE_ALIAS("dmi:bvnIBM:*:pnIBMSystemx3550-*");
+MODULE_ALIAS("dmi:bvnIBM:*:pnIBMSystemx3650-*");
+MODULE_ALIAS("dmi:bvnIBM:*:pnIBMSystemx3655-*");
+MODULE_ALIAS("dmi:bvnIBM:*:pnIBMSystemx3755-*");

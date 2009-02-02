@@ -29,11 +29,7 @@
 spinlock_t cris_atomic_locks[] = { [0 ... LOCK_COUNT - 1] = SPIN_LOCK_UNLOCKED};
 
 /* CPU masks */
-cpumask_t cpu_online_map = CPU_MASK_NONE;
-EXPORT_SYMBOL(cpu_online_map);
 cpumask_t phys_cpu_present_map = CPU_MASK_NONE;
-cpumask_t cpu_possible_map;
-EXPORT_SYMBOL(cpu_possible_map);
 EXPORT_SYMBOL(phys_cpu_present_map);
 
 /* Variables used during SMP boot */
@@ -178,6 +174,7 @@ void __init smp_callin(void)
 	unmask_irq(IPI_INTR_VECT);
 	unmask_irq(TIMER0_INTR_VECT);
 	preempt_disable();
+	notify_cpu_starting(cpu);
 	local_irq_enable();
 
 	cpu_set(cpu, cpu_online_map);

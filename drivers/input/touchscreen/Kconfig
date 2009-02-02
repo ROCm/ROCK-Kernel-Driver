@@ -42,8 +42,9 @@ config TOUCHSCREEN_BITSY
 	  module will be called h3600_ts_input.
 
 config TOUCHSCREEN_CORGI
-	tristate "SharpSL (Corgi and Spitz series) touchscreen driver"
+	tristate "SharpSL (Corgi and Spitz series) touchscreen driver (DEPRECATED)"
 	depends on PXA_SHARPSL
+	select CORGI_SSP_DEPRECATED
 	default y
 	help
 	  Say Y here to enable the driver for the touchscreen on the
@@ -53,6 +54,17 @@ config TOUCHSCREEN_CORGI
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called corgi_ts.
+
+	  NOTE: this driver is deprecated, try enable SPI and generic
+	  ADS7846-based touchscreen driver.
+
+config TOUCHSCREEN_DA9034
+	tristate "Touchscreen support for Dialog Semiconductor DA9034"
+	depends on PMIC_DA903X
+	default y
+	help
+	  Say Y here to enable the support for the touchscreen found
+	  on Dialog Semiconductor DA9034 PMIC.
 
 config TOUCHSCREEN_FUJITSU
 	tristate "Fujitsu serial touchscreen"
@@ -102,6 +114,19 @@ config TOUCHSCREEN_ELOUSB
 
          To compile this driver as a module, choose M here: the
          module will be called elousb.
+
+config TOUCHSCREEN_WACOM_W8001
+	tristate "Wacom W8001 penabled serial touchscreen"
+	select SERIO
+	help
+	  Say Y here if you have an Wacom W8001 penabled serial touchscreen
+	  connected to your system.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called wacom_w8001.
+
 
 config TOUCHSCREEN_MTOUCH
 	tristate "MicroTouch serial touchscreens"
@@ -231,7 +256,8 @@ config TOUCHSCREEN_ATMEL_TSADCC
 
 config TOUCHSCREEN_UCB1400
 	tristate "Philips UCB1400 touchscreen"
-	select AC97_BUS
+	depends on AC97_BUS
+	depends on UCB1400_CORE
 	help
 	  This enables support for the Philips UCB1400 touchscreen interface.
 	  The UCB1400 is an AC97 audio codec.  The touchscreen interface
@@ -382,5 +408,16 @@ config TOUCHSCREEN_TOUCHIT213
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called touchit213.
+
+config TOUCHSCREEN_TSC2007
+	tristate "TSC2007 based touchscreens"
+	depends on I2C
+	help
+	  Say Y here if you have a TSC2007 based touchscreen.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called tsc2007.
 
 endif

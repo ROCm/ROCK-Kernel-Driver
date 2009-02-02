@@ -292,7 +292,7 @@ static int __init elousb_init(void)
 {
 	int retval = usb_register(&elousb_driver);
 	if (retval == 0)
-		info(DRIVER_VERSION ":" DRIVER_DESC);
+		printk(KERN_INFO KBUILD_MODNAME ": " DRIVER_VERSION ":" DRIVER_DESC);
 	return retval;
 }
 

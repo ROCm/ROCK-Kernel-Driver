@@ -34,6 +34,8 @@
 #include <mach/iomux-mx1-mx2.h>
 #include <mach/board-mx27ads.h>
 
+#include "devices.h"
+
 /* ADS's NOR flash */
 static struct physmap_flash_data mx27ads_flash_data = {
 	.width = 2,
@@ -66,15 +68,14 @@ static int mxc_uart0_pins[] = {
 static int uart_mxc_port0_init(struct platform_device *pdev)
 {
 	return mxc_gpio_setup_multiple_pins(mxc_uart0_pins,
-			ARRAY_SIZE(mxc_uart0_pins),
-			MXC_GPIO_ALLOC_MODE_NORMAL, "UART0");
+			ARRAY_SIZE(mxc_uart0_pins), "UART0");
 }
 
 static int uart_mxc_port0_exit(struct platform_device *pdev)
 {
-	return mxc_gpio_setup_multiple_pins(mxc_uart0_pins,
-			ARRAY_SIZE(mxc_uart0_pins),
-			MXC_GPIO_ALLOC_MODE_RELEASE, "UART0");
+	mxc_gpio_release_multiple_pins(mxc_uart0_pins,
+			ARRAY_SIZE(mxc_uart0_pins));
+	return 0;
 }
 
 static int mxc_uart1_pins[] = {
@@ -87,15 +88,14 @@ static int mxc_uart1_pins[] = {
 static int uart_mxc_port1_init(struct platform_device *pdev)
 {
 	return mxc_gpio_setup_multiple_pins(mxc_uart1_pins,
-			ARRAY_SIZE(mxc_uart1_pins),
-			MXC_GPIO_ALLOC_MODE_NORMAL, "UART1");
+			ARRAY_SIZE(mxc_uart1_pins), "UART1");
 }
 
 static int uart_mxc_port1_exit(struct platform_device *pdev)
 {
-	return mxc_gpio_setup_multiple_pins(mxc_uart1_pins,
-			ARRAY_SIZE(mxc_uart1_pins),
-			MXC_GPIO_ALLOC_MODE_RELEASE, "UART1");
+	mxc_gpio_release_multiple_pins(mxc_uart1_pins,
+			ARRAY_SIZE(mxc_uart1_pins));
+	return 0;
 }
 
 static int mxc_uart2_pins[] = {
@@ -108,15 +108,14 @@ static int mxc_uart2_pins[] = {
 static int uart_mxc_port2_init(struct platform_device *pdev)
 {
 	return mxc_gpio_setup_multiple_pins(mxc_uart2_pins,
-			ARRAY_SIZE(mxc_uart2_pins),
-			MXC_GPIO_ALLOC_MODE_NORMAL, "UART2");
+			ARRAY_SIZE(mxc_uart2_pins), "UART2");
 }
 
 static int uart_mxc_port2_exit(struct platform_device *pdev)
 {
-	return mxc_gpio_setup_multiple_pins(mxc_uart2_pins,
-			ARRAY_SIZE(mxc_uart2_pins),
-			MXC_GPIO_ALLOC_MODE_RELEASE, "UART2");
+	mxc_gpio_release_multiple_pins(mxc_uart2_pins,
+			ARRAY_SIZE(mxc_uart2_pins));
+	return 0;
 }
 
 static int mxc_uart3_pins[] = {
@@ -129,15 +128,13 @@ static int mxc_uart3_pins[] = {
 static int uart_mxc_port3_init(struct platform_device *pdev)
 {
 	return mxc_gpio_setup_multiple_pins(mxc_uart3_pins,
-			ARRAY_SIZE(mxc_uart3_pins),
-			MXC_GPIO_ALLOC_MODE_NORMAL, "UART3");
+			ARRAY_SIZE(mxc_uart3_pins), "UART3");
 }
 
 static int uart_mxc_port3_exit(struct platform_device *pdev)
 {
-	return mxc_gpio_setup_multiple_pins(mxc_uart3_pins,
-			ARRAY_SIZE(mxc_uart3_pins),
-			MXC_GPIO_ALLOC_MODE_RELEASE, "UART3");
+	mxc_gpio_release_multiple_pins(mxc_uart3_pins,
+			ARRAY_SIZE(mxc_uart3_pins));
 }
 
 static int mxc_uart4_pins[] = {
@@ -150,15 +147,14 @@ static int mxc_uart4_pins[] = {
 static int uart_mxc_port4_init(struct platform_device *pdev)
 {
 	return mxc_gpio_setup_multiple_pins(mxc_uart4_pins,
-			ARRAY_SIZE(mxc_uart4_pins),
-			MXC_GPIO_ALLOC_MODE_NORMAL, "UART4");
+			ARRAY_SIZE(mxc_uart4_pins), "UART4");
 }
 
 static int uart_mxc_port4_exit(struct platform_device *pdev)
 {
-	return mxc_gpio_setup_multiple_pins(mxc_uart4_pins,
-			ARRAY_SIZE(mxc_uart4_pins),
-			MXC_GPIO_ALLOC_MODE_RELEASE, "UART4");
+	mxc_gpio_release_multiple_pins(mxc_uart4_pins,
+			ARRAY_SIZE(mxc_uart4_pins));
+	return 0;
 }
 
 static int mxc_uart5_pins[] = {
@@ -171,15 +167,14 @@ static int mxc_uart5_pins[] = {
 static int uart_mxc_port5_init(struct platform_device *pdev)
 {
 	return mxc_gpio_setup_multiple_pins(mxc_uart5_pins,
-			ARRAY_SIZE(mxc_uart5_pins),
-			MXC_GPIO_ALLOC_MODE_NORMAL, "UART5");
+			ARRAY_SIZE(mxc_uart5_pins), "UART5");
 }
 
 static int uart_mxc_port5_exit(struct platform_device *pdev)
 {
-	return mxc_gpio_setup_multiple_pins(mxc_uart5_pins,
-			ARRAY_SIZE(mxc_uart5_pins),
-			MXC_GPIO_ALLOC_MODE_RELEASE, "UART5");
+	mxc_gpio_release_multiple_pins(mxc_uart5_pins,
+			ARRAY_SIZE(mxc_uart5_pins));
+	return 0;
 }
 
 static struct platform_device *platform_devices[] __initdata = {
@@ -210,15 +205,13 @@ static int mxc_fec_pins[] = {
 static void gpio_fec_active(void)
 {
 	mxc_gpio_setup_multiple_pins(mxc_fec_pins,
-			ARRAY_SIZE(mxc_fec_pins),
-			MXC_GPIO_ALLOC_MODE_NORMAL, "FEC");
+			ARRAY_SIZE(mxc_fec_pins), "FEC");
 }
 
 static void gpio_fec_inactive(void)
 {
-	mxc_gpio_setup_multiple_pins(mxc_fec_pins,
-			ARRAY_SIZE(mxc_fec_pins),
-			MXC_GPIO_ALLOC_MODE_RELEASE, "FEC");
+	mxc_gpio_release_multiple_pins(mxc_fec_pins,
+			ARRAY_SIZE(mxc_fec_pins));
 }
 
 static struct imxuart_platform_data uart_pdata[] = {
@@ -251,12 +244,14 @@ static struct imxuart_platform_data uart_pdata[] = {
 
 static void __init mx27ads_board_init(void)
 {
-	int i;
-
 	gpio_fec_active();
 
-	for (i = 0; i < 6; i++)
-		imx_init_uart(i, &uart_pdata[i]);
+	mxc_register_device(&mxc_uart_device0, &uart_pdata[0]);
+	mxc_register_device(&mxc_uart_device1, &uart_pdata[1]);
+	mxc_register_device(&mxc_uart_device2, &uart_pdata[2]);
+	mxc_register_device(&mxc_uart_device3, &uart_pdata[3]);
+	mxc_register_device(&mxc_uart_device4, &uart_pdata[4]);
+	mxc_register_device(&mxc_uart_device5, &uart_pdata[5]);
 
 	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
 }

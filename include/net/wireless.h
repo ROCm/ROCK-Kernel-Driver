@@ -10,6 +10,7 @@
 #include <linux/netdevice.h>
 #include <linux/debugfs.h>
 #include <linux/list.h>
+#include <linux/ieee80211.h>
 #include <net/cfg80211.h>
 
 /**
@@ -60,6 +61,7 @@ enum ieee80211_channel_flags {
  * with cfg80211.
  *
  * @center_freq: center frequency in MHz
+ * @max_bandwidth: maximum allowed bandwidth for this channel, in MHz
  * @hw_value: hardware-specific value for the channel
  * @flags: channel flags from &enum ieee80211_channel_flags.
  * @orig_flags: channel flags at registration time, used by regulatory
@@ -73,6 +75,7 @@ enum ieee80211_channel_flags {
 struct ieee80211_channel {
 	enum ieee80211_band band;
 	u16 center_freq;
+	u8 max_bandwidth;
 	u16 hw_value;
 	u32 flags;
 	int max_antenna_gain;
@@ -131,23 +134,23 @@ struct ieee80211_rate {
 };
 
 /**
- * struct ieee80211_ht_info - describing STA's HT capabilities
+ * struct ieee80211_sta_ht_cap - STA's HT capabilities
  *
  * This structure describes most essential parameters needed
  * to describe 802.11n HT capabilities for an STA.
  *
- * @ht_supported: is HT supported by STA, 0: no, 1: yes
+ * @ht_supported: is HT supported by the STA
  * @cap: HT capabilities map as described in 802.11n spec
  * @ampdu_factor: Maximum A-MPDU length factor
  * @ampdu_density: Minimum A-MPDU spacing
- * @supp_mcs_set: Supported MCS set as described in 802.11n spec
+ * @mcs: Supported MCS rates
  */
-struct ieee80211_ht_info {
+struct ieee80211_sta_ht_cap {
 	u16 cap; /* use IEEE80211_HT_CAP_ */
-	u8 ht_supported;
+	bool ht_supported;
 	u8 ampdu_factor;
 	u8 ampdu_density;
-	u8 supp_mcs_set[16];
+	struct ieee80211_mcs_info mcs;
 };
 
 /**
@@ -171,19 +174,30 @@ struct ieee80211_supported_band {
 	enum ieee80211_band band;
 	int n_channels;
 	int n_bitrates;
-	struct ieee80211_ht_info ht_info;
+	struct ieee80211_sta_ht_cap ht_cap;
 };
 
 /**
  * struct wiphy - wireless hardware description
  * @idx: the wiphy index assigned to this item
  * @class_dev: the class device representing /sys/class/ieee80211/<wiphy-name>
+ * @fw_handles_regulatory: tells us the firmware for this device
+ * 	has its own regulatory solution and cannot identify the
+ * 	ISO / IEC 3166 alpha2 it belongs to. When this is enabled
+ * 	we will disregard the first regulatory hint (when the
+ * 	initiator is %REGDOM_SET_BY_CORE).
+ * @reg_notifier: the driver's regulatory notification callback
  */
 struct wiphy {
 	/* assign these fields before you register the wiphy */
 
 	/* permanent MAC address */
 	u8 perm_addr[ETH_ALEN];
+
+	/* Supported interface modes, OR together BIT(NL80211_IFTYPE_...) */
+	u16 interface_modes;
+
+	bool fw_handles_regulatory;
 
 	/* If multiple wiphys are registered and you're handed e.g.
 	 * a regular netdev with assigned ieee80211_ptr, you won't
@@ -193,6 +207,9 @@ struct wiphy {
 	void *privid;
 
 	struct ieee80211_supported_band *bands[IEEE80211_NUM_BANDS];
+
+	/* Lets us get back the wiphy on the callback */
+	int (*reg_notifier)(struct wiphy *wiphy, enum reg_set_by setby);
 
 	/* fields below are read-only, assigned by cfg80211 */
 
@@ -214,9 +231,11 @@ struct wiphy {
  * the netdev.)
  *
  * @wiphy: pointer to hardware description
+ * @iftype: interface type
  */
 struct wireless_dev {
 	struct wiphy *wiphy;
+	enum nl80211_iftype iftype;
 
 	/* private to the generic wireless code */
 	struct list_head list;
@@ -251,9 +270,9 @@ static inline struct device *wiphy_dev(struct wiphy *wiphy)
 /**
  * wiphy_name - get wiphy name
  */
-static inline char *wiphy_name(struct wiphy *wiphy)
+static inline const char *wiphy_name(struct wiphy *wiphy)
 {
-	return wiphy->dev.bus_id;
+	return dev_name(&wiphy->dev);
 }
 
 /**
@@ -319,7 +338,6 @@ extern int ieee80211_frequency_to_channel(int freq);
  */
 extern struct ieee80211_channel *__ieee80211_get_channel(struct wiphy *wiphy,
 							 int freq);
-
 /**
  * ieee80211_get_channel - get channel struct from wiphy for specified frequency
  */
@@ -328,4 +346,53 @@ ieee80211_get_channel(struct wiphy *wiphy, int freq)
 {
 	return __ieee80211_get_channel(wiphy, freq);
 }
+
+/**
+ * ieee80211_get_response_rate - get basic rate for a given rate
+ *
+ * @sband: the band to look for rates in
+ * @basic_rates: bitmap of basic rates
+ * @bitrate: the bitrate for which to find the basic rate
+ *
+ * This function returns the basic rate corresponding to a given
+ * bitrate, that is the next lower bitrate contained in the basic
+ * rate map, which is, for this function, given as a bitmap of
+ * indices of rates in the band's bitrate table.
+ */
+struct ieee80211_rate *
+ieee80211_get_response_rate(struct ieee80211_supported_band *sband,
+			    u64 basic_rates, int bitrate);
+
+/**
+ * regulatory_hint - driver hint to the wireless core a regulatory domain
+ * @wiphy: the wireless device giving the hint (used only for reporting
+ *	conflicts)
+ * @alpha2: the ISO/IEC 3166 alpha2 the driver claims its regulatory domain
+ * 	should be in. If @rd is set this should be NULL. Note that if you
+ * 	set this to NULL you should still set rd->alpha2 to some accepted
+ * 	alpha2.
+ *
+ * Wireless drivers can use this function to hint to the wireless core
+ * what it believes should be the current regulatory domain by
+ * giving it an ISO/IEC 3166 alpha2 country code it knows its regulatory
+ * domain should be in or by providing a completely build regulatory domain.
+ * If the driver provides an ISO/IEC 3166 alpha2 userspace will be queried
+ * for a regulatory domain structure for the respective country.
+ */
+extern void regulatory_hint(struct wiphy *wiphy, const char *alpha2);
+
+/**
+ * regulatory_hint_11d - hints a country IE as a regulatory domain
+ * @wiphy: the wireless device giving the hint (used only for reporting
+ *	conflicts)
+ * @country_ie: pointer to the country IE
+ * @country_ie_len: length of the country IE
+ *
+ * We will intersect the rd with the what CRDA tells us should apply
+ * for the alpha2 this country IE belongs to, this prevents APs from
+ * sending us incorrect or outdated information against a country.
+ */
+extern void regulatory_hint_11d(struct wiphy *wiphy,
+				u8 *country_ie,
+				u8 country_ie_len);
 #endif /* __NET_WIRELESS_H */

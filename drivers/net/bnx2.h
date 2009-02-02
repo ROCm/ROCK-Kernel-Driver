@@ -378,6 +378,9 @@ struct l2_fhdr {
  *  pci_config_l definition
  *  offset: 0000
  */
+#define BNX2_PCICFG_MSI_CONTROL				0x00000058
+#define BNX2_PCICFG_MSI_CONTROL_ENABLE			 (1L<<16)
+
 #define BNX2_PCICFG_MISC_CONFIG				0x00000068
 #define BNX2_PCICFG_MISC_CONFIG_TARGET_BYTE_SWAP	 (1L<<2)
 #define BNX2_PCICFG_MISC_CONFIG_TARGET_MB_WORD_SWAP	 (1L<<3)
@@ -4199,7 +4202,14 @@ struct l2_fhdr {
 
 #define BNX2_RBUF_CONFIG				0x0020000c
 #define BNX2_RBUF_CONFIG_XOFF_TRIP			 (0x3ffL<<0)
+#define BNX2_RBUF_CONFIG_XOFF_TRIP_VAL(mtu)		 \
+	((((mtu) - 1500) * 31 / 1000) + 54)
 #define BNX2_RBUF_CONFIG_XON_TRIP			 (0x3ffL<<16)
+#define BNX2_RBUF_CONFIG_XON_TRIP_VAL(mtu)		 \
+	((((mtu) - 1500) * 39 / 1000) + 66)
+#define BNX2_RBUF_CONFIG_VAL(mtu)			 \
+	(BNX2_RBUF_CONFIG_XOFF_TRIP_VAL(mtu) |		 \
+	(BNX2_RBUF_CONFIG_XON_TRIP_VAL(mtu) << 16))
 
 #define BNX2_RBUF_FW_BUF_ALLOC				0x00200010
 #define BNX2_RBUF_FW_BUF_ALLOC_VALUE			 (0x1ffL<<7)
@@ -4221,11 +4231,25 @@ struct l2_fhdr {
 
 #define BNX2_RBUF_CONFIG2				0x0020001c
 #define BNX2_RBUF_CONFIG2_MAC_DROP_TRIP			 (0x3ffL<<0)
+#define BNX2_RBUF_CONFIG2_MAC_DROP_TRIP_VAL(mtu)	 \
+	((((mtu) - 1500) * 4 / 1000) + 5)
 #define BNX2_RBUF_CONFIG2_MAC_KEEP_TRIP			 (0x3ffL<<16)
+#define BNX2_RBUF_CONFIG2_MAC_KEEP_TRIP_VAL(mtu)	 \
+	((((mtu) - 1500) * 2 / 100) + 30)
+#define BNX2_RBUF_CONFIG2_VAL(mtu)			 \
+	(BNX2_RBUF_CONFIG2_MAC_DROP_TRIP_VAL(mtu) |	 \
+	(BNX2_RBUF_CONFIG2_MAC_KEEP_TRIP_VAL(mtu) << 16))
 
 #define BNX2_RBUF_CONFIG3				0x00200020
 #define BNX2_RBUF_CONFIG3_CU_DROP_TRIP			 (0x3ffL<<0)
+#define BNX2_RBUF_CONFIG3_CU_DROP_TRIP_VAL(mtu)		 \
+	((((mtu) - 1500) * 12 / 1000) + 18)
 #define BNX2_RBUF_CONFIG3_CU_KEEP_TRIP			 (0x3ffL<<16)
+#define BNX2_RBUF_CONFIG3_CU_KEEP_TRIP_VAL(mtu)		 \
+	((((mtu) - 1500) * 2 / 100) + 30)
+#define BNX2_RBUF_CONFIG3_VAL(mtu)			 \
+	(BNX2_RBUF_CONFIG3_CU_DROP_TRIP_VAL(mtu) |	 \
+	(BNX2_RBUF_CONFIG3_CU_KEEP_TRIP_VAL(mtu) << 16))
 
 #define BNX2_RBUF_PKT_DATA				0x00208000
 #define BNX2_RBUF_CLIST_DATA				0x00210000
@@ -6526,10 +6550,14 @@ struct sw_pg {
 	DECLARE_PCI_UNMAP_ADDR(mapping)
 };
 
+struct sw_tx_bd {
+	struct sk_buff		*skb;
+};
+
 #define SW_RXBD_RING_SIZE (sizeof(struct sw_bd) * RX_DESC_CNT)
 #define SW_RXPG_RING_SIZE (sizeof(struct sw_pg) * RX_DESC_CNT)
 #define RXBD_RING_SIZE (sizeof(struct rx_bd) * RX_DESC_CNT)
-#define SW_TXBD_RING_SIZE (sizeof(struct sw_bd) * TX_DESC_CNT)
+#define SW_TXBD_RING_SIZE (sizeof(struct sw_tx_bd) * TX_DESC_CNT)
 #define TXBD_RING_SIZE (sizeof(struct tx_bd) * TX_DESC_CNT)
 
 /* Buffered flash (Atmel: AT45DB011B) specific information */
@@ -6599,7 +6627,7 @@ struct bnx2_irq {
 	irq_handler_t	handler;
 	unsigned int	vector;
 	u8		requested;
-	char		name[16];
+	char		name[IFNAMSIZ + 2];
 };
 
 struct bnx2_tx_ring_info {
@@ -6609,7 +6637,7 @@ struct bnx2_tx_ring_info {
 	u32			tx_bseq_addr;
 
 	struct tx_bd		*tx_desc_ring;
-	struct sw_bd		*tx_buf_ring;
+	struct sw_tx_bd		*tx_buf_ring;
 
 	u16			tx_cons;
 	u16			hw_tx_cons;
@@ -6701,10 +6729,11 @@ struct bnx2 {
 
 	/* End of fields used in the performance code paths. */
 
-	char			*name;
+	unsigned int		current_interval;
+#define BNX2_TIMER_INTERVAL		HZ
+#define BNX2_SERDES_AN_TIMEOUT		(HZ / 3)
+#define BNX2_SERDES_FORCED_TIMEOUT	(HZ / 10)
 
-	int			timer_interval;
-	int			current_interval;
 	struct			timer_list timer;
 	struct work_struct	reset_task;
 
@@ -6819,9 +6848,6 @@ struct bnx2 {
 	u8			flow_ctrl;	/* actual flow ctrl settings */
 						/* may be different from     */
 						/* req_flow_ctrl if autoneg  */
-#define FLOW_CTRL_TX		1
-#define FLOW_CTRL_RX		2
-
 	u32			advertising;
 
 	u8			req_flow_ctrl;	/* flow ctrl advertisement */
@@ -6836,8 +6862,6 @@ struct bnx2 {
 #define PHY_LOOPBACK		2
 
 	u8			serdes_an_pending;
-#define SERDES_AN_TIMEOUT	(HZ / 3)
-#define SERDES_FORCED_TIMEOUT	(HZ / 10)
 
 	u8			mac_addr[8];
 
@@ -6847,8 +6871,6 @@ struct bnx2 {
 
 	int			pm_cap;
 	int			pcix_cap;
-
-	struct net_device_stats net_stats;
 
 	struct flash_spec	*flash_info;
 	u32			flash_size;
@@ -6860,6 +6882,9 @@ struct bnx2 {
 
 	u8			num_tx_rings;
 	u8			num_rx_rings;
+
+	u32			idle_chk_status_idx;
+
 };
 
 #define REG_RD(bp, offset)					\
@@ -6935,14 +6960,14 @@ struct fw_info {
 /* This value (in milliseconds) determines the frequency of the driver
  * issuing the PULSE message code.  The firmware monitors this periodic
  * pulse to determine when to switch to an OS-absent mode. */
-#define DRV_PULSE_PERIOD_MS                 250
+#define BNX2_DRV_PULSE_PERIOD_MS                 250
 
 /* This value (in milliseconds) determines how long the driver should
  * wait for an acknowledgement from the firmware before timing out.  Once
  * the firmware has timed out, the driver will assume there is no firmware
  * running and there won't be any firmware-driver synchronization during a
  * driver reset. */
-#define FW_ACK_TIME_OUT_MS                  1000
+#define BNX2_FW_ACK_TIME_OUT_MS                  1000
 
 
 #define BNX2_DRV_RESET_SIGNATURE		0x00000000

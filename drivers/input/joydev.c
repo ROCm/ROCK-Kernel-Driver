@@ -244,7 +244,6 @@ static int joydev_release(struct inode *inode, struct file *file)
 	struct joydev_client *client = file->private_data;
 	struct joydev *joydev = client->joydev;
 
-	joydev_fasync(-1, file, 0);
 	joydev_detach_client(joydev, client);
 	kfree(client);
 
@@ -801,7 +800,7 @@ static int joydev_connect(struct input_handler *handler, struct input_dev *dev,
 		}
 	}
 
-	strlcpy(joydev->dev.bus_id, joydev->name, sizeof(joydev->dev.bus_id));
+	dev_set_name(&joydev->dev, joydev->name);
 	joydev->dev.devt = MKDEV(INPUT_MAJOR, JOYDEV_MINOR_BASE + minor);
 	joydev->dev.class = &input_class;
 	joydev->dev.parent = &dev->dev;

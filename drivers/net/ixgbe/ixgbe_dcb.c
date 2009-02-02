@@ -134,7 +134,7 @@ err_config:
  * ixgbe_dcb_check_config().
  */
 s32 ixgbe_dcb_calculate_tc_credits(struct ixgbe_dcb_config *dcb_config,
-				   u8 direction)
+                                   u8 direction)
 {
 	struct tc_bw_alloc *p;
 	s32 ret_val = 0;
@@ -210,7 +210,7 @@ out:
  * This function returns the status data for each of the Traffic Classes in use.
  */
 s32 ixgbe_dcb_get_tc_stats(struct ixgbe_hw *hw, struct ixgbe_hw_stats *stats,
-			   u8 tc_count)
+                           u8 tc_count)
 {
 	s32 ret = 0;
 	if (hw->mac.type == ixgbe_mac_82598EB)
@@ -227,7 +227,7 @@ s32 ixgbe_dcb_get_tc_stats(struct ixgbe_hw *hw, struct ixgbe_hw_stats *stats,
  * This function returns the CBFC status data for each of the Traffic Classes.
  */
 s32 ixgbe_dcb_get_pfc_stats(struct ixgbe_hw *hw, struct ixgbe_hw_stats *stats,
-			    u8 tc_count)
+                            u8 tc_count)
 {
 	s32 ret = 0;
 	if (hw->mac.type == ixgbe_mac_82598EB)
@@ -243,7 +243,7 @@ s32 ixgbe_dcb_get_pfc_stats(struct ixgbe_hw *hw, struct ixgbe_hw_stats *stats,
  * Configure Rx Data Arbiter and credits for each traffic class.
  */
 s32 ixgbe_dcb_config_rx_arbiter(struct ixgbe_hw *hw,
-				struct ixgbe_dcb_config *dcb_config)
+                                struct ixgbe_dcb_config *dcb_config)
 {
 	s32 ret = 0;
 	if (hw->mac.type == ixgbe_mac_82598EB)
@@ -259,7 +259,7 @@ s32 ixgbe_dcb_config_rx_arbiter(struct ixgbe_hw *hw,
  * Configure Tx Descriptor Arbiter and credits for each traffic class.
  */
 s32 ixgbe_dcb_config_tx_desc_arbiter(struct ixgbe_hw *hw,
-				     struct ixgbe_dcb_config *dcb_config)
+                                     struct ixgbe_dcb_config *dcb_config)
 {
 	s32 ret = 0;
 	if (hw->mac.type == ixgbe_mac_82598EB)
@@ -275,7 +275,7 @@ s32 ixgbe_dcb_config_tx_desc_arbiter(struct ixgbe_hw *hw,
  * Configure Tx Data Arbiter and credits for each traffic class.
  */
 s32 ixgbe_dcb_config_tx_data_arbiter(struct ixgbe_hw *hw,
-				     struct ixgbe_dcb_config *dcb_config)
+                                     struct ixgbe_dcb_config *dcb_config)
 {
 	s32 ret = 0;
 	if (hw->mac.type == ixgbe_mac_82598EB)
@@ -291,7 +291,7 @@ s32 ixgbe_dcb_config_tx_data_arbiter(struct ixgbe_hw *hw,
  * Configure Priority Flow Control for each traffic class.
  */
 s32 ixgbe_dcb_config_pfc(struct ixgbe_hw *hw,
-			 struct ixgbe_dcb_config *dcb_config)
+                         struct ixgbe_dcb_config *dcb_config)
 {
 	s32 ret = 0;
 	if (hw->mac.type == ixgbe_mac_82598EB)
@@ -322,7 +322,7 @@ s32 ixgbe_dcb_config_tc_stats(struct ixgbe_hw *hw)
  * Configure dcb settings and enable dcb mode.
  */
 s32 ixgbe_dcb_hw_config(struct ixgbe_hw *hw,
-			struct ixgbe_dcb_config *dcb_config)
+                        struct ixgbe_dcb_config *dcb_config)
 {
 	s32 ret = 0;
 	if (hw->mac.type == ixgbe_mac_82598EB)

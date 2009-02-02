@@ -36,8 +36,7 @@
 
   Alan Cox          : Removed 1.2 support, added 2.1 extra counters.
 
-  Andrew Morton     : andrewm@uow.edu.au
-                    : Kernel 2.3.48
+  Andrew Morton     : Kernel 2.3.48
                     : Handle kmalloc() failures
                     : Other resource allocation fixes
                     : Add SMP locks
@@ -49,7 +48,7 @@
                     : Fixed an out-of-mem bug in dma_rx()
                     : Updated Documentation/networking/cs89x0.txt
 
-  Andrew Morton     : andrewm@uow.edu.au / Kernel 2.3.99-pre1
+  Andrew Morton     : Kernel 2.3.99-pre1
                     : Use skb_reserve to longword align IP header (two places)
                     : Remove a delay loop from dma_rx()
                     : Replace '100' with HZ
@@ -57,11 +56,11 @@
                     : Added 'cs89x0_dma=N' kernel boot option
                     : Correctly initialise lp->lock in non-module compile
 
-  Andrew Morton     : andrewm@uow.edu.au / Kernel 2.3.99-pre4-1
+  Andrew Morton     : Kernel 2.3.99-pre4-1
                     : MOD_INC/DEC race fix (see
                     : http://www.uwsg.indiana.edu/hypermail/linux/kernel/0003.3/1532.html)
 
-  Andrew Morton     : andrewm@uow.edu.au / Kernel 2.4.0-test7-pre2
+  Andrew Morton     : Kernel 2.4.0-test7-pre2
                     : Enhanced EEPROM support to cover more devices,
                     :   abstracted IRQ mapping to support CONFIG_ARCH_CLPS7500 arch
                     :   (Jason Gunthorpe <jgg@ualberta.ca>)
@@ -156,7 +155,7 @@
 #include "cs89x0.h"
 
 static char version[] __initdata =
-"cs89x0.c: v2.4.3-pre1 Russell Nelson <nelson@crynwr.com>, Andrew Morton <andrewm@uow.edu.au>\n";
+"cs89x0.c: v2.4.3-pre1 Russell Nelson <nelson@crynwr.com>, Andrew Morton\n";
 
 #define DRV_NAME "cs89x0"
 
@@ -171,11 +170,7 @@ static char version[] __initdata =
 /* The cs8900 has 4 IRQ pins, software selectable. cs8900_irq_map maps
    them to system IRQ numbers. This mapping is card specific and is set to
    the configuration of the Cirrus Eval board for this chip. */
-#ifdef CONFIG_ARCH_CLPS7500
-static unsigned int netcard_portlist[] __used __initdata =
-   { 0x80090303, 0x300, 0x320, 0x340, 0x360, 0x200, 0x220, 0x240, 0x260, 0x280, 0x2a0, 0x2c0, 0x2e0, 0};
-static unsigned int cs8900_irq_map[] = {12,0,0,0};
-#elif defined(CONFIG_SH_HICOSH4)
+#if defined(CONFIG_SH_HICOSH4)
 static unsigned int netcard_portlist[] __used __initdata =
    { 0x0300, 0};
 static unsigned int cs8900_irq_map[] = {1,0,0,0};
@@ -194,6 +189,12 @@ static unsigned int cs8900_irq_map[] = {IRQ_IXDP2X01_CS8900, 0, 0, 0};
 #define CIRRUS_DEFAULT_IRQ	VH_INTC_INT_NUM_CASCADED_INTERRUPT_1 /* Event inputs bank 1 - ID 35/bit 3 */
 static unsigned int netcard_portlist[] __used __initdata = {CIRRUS_DEFAULT_BASE, 0};
 static unsigned int cs8900_irq_map[] = {CIRRUS_DEFAULT_IRQ, 0, 0, 0};
+#elif defined(CONFIG_MACH_MX31ADS)
+#include <mach/board-mx31ads.h>
+static unsigned int netcard_portlist[] __used __initdata = {
+	PBC_BASE_ADDRESS + PBC_CS8900A_IOBASE + 0x300, 0
+};
+static unsigned cs8900_irq_map[] = {EXPIO_INT_ENET_INT, 0, 0, 0};
 #else
 static unsigned int netcard_portlist[] __used __initdata =
    { 0x300, 0x320, 0x340, 0x360, 0x200, 0x220, 0x240, 0x260, 0x280, 0x2a0, 0x2c0, 0x2e0, 0};
@@ -516,7 +517,6 @@ cs89x0_probe1(struct net_device *dev, int ioaddr, int modular)
 	unsigned rev_type = 0;
 	int eeprom_buff[CHKSUM_LEN];
 	int retval;
-	DECLARE_MAC_BUF(mac);
 
 	/* Initialize the device structure. */
 	if (!modular) {
@@ -802,7 +802,7 @@ cs89x0_probe1(struct net_device *dev, int ioaddr, int modular)
 	} else {
 		i = lp->isa_config & INT_NO_MASK;
 		if (lp->chip_type == CS8900) {
-#if defined(CONFIG_MACH_IXDP2351) || defined(CONFIG_ARCH_IXDP2X01) || defined(CONFIG_ARCH_PNX010X)
+#ifdef CONFIG_CS89x0_NONISA_IRQ
 		        i = cs8900_irq_map[0];
 #else
 			/* Translate the IRQ using the IRQ mapping table. */
@@ -841,7 +841,7 @@ cs89x0_probe1(struct net_device *dev, int ioaddr, int modular)
 	}
 
 	/* print the ethernet address. */
-	printk(", MAC %s", print_mac(mac, dev->dev_addr));
+	printk(", MAC %pM", dev->dev_addr);
 
 	dev->open		= net_open;
 	dev->stop		= net_close;
@@ -1020,15 +1020,15 @@ skip_this_frame:
 	}
         skb->protocol=eth_type_trans(skb,dev);
 	netif_rx(skb);
-	dev->last_rx = jiffies;
 	lp->stats.rx_packets++;
 	lp->stats.rx_bytes += length;
 }
 
 #endif	/* ALLOW_DMA */
 
-void  __init reset_chip(struct net_device *dev)
+static void __init reset_chip(struct net_device *dev)
 {
+#if !defined(CONFIG_MACH_MX31ADS)
 #if !defined(CONFIG_MACH_IXDP2351) && !defined(CONFIG_ARCH_IXDP2X01)
 	struct net_local *lp = netdev_priv(dev);
 	int ioaddr = dev->base_addr;
@@ -1057,6 +1057,7 @@ void  __init reset_chip(struct net_device *dev)
 	reset_start_time = jiffies;
 	while( (readreg(dev, PP_SelfST) & INIT_DONE) == 0 && jiffies - reset_start_time < 2)
 		;
+#endif /* !CONFIG_MACH_MX31ADS */
 }
 
 
@@ -1304,7 +1305,7 @@ net_open(struct net_device *dev)
 	else
 #endif
 	{
-#if !defined(CONFIG_MACH_IXDP2351) && !defined(CONFIG_ARCH_IXDP2X01) && !defined(CONFIG_ARCH_PNX010X)
+#ifndef CONFIG_CS89x0_NONISA_IRQ
 		if (((1 << dev->irq) & lp->irq_map) == 0) {
 			printk(KERN_ERR "%s: IRQ %d is not in our map of allowable IRQs, which is %x\n",
                                dev->name, dev->irq, lp->irq_map);
@@ -1397,9 +1398,7 @@ net_open(struct net_device *dev)
 release_dma:
 #if ALLOW_DMA
 		free_dma(dev->dma);
-#endif
 release_irq:
-#if ALLOW_DMA
 		release_dma_buff(lp);
 #endif
                 writereg(dev, PP_LineCTL, readreg(dev, PP_LineCTL) & ~(SERIAL_TX_ON | SERIAL_RX_ON));
@@ -1714,7 +1713,6 @@ net_rx(struct net_device *dev)
 
         skb->protocol=eth_type_trans(skb,dev);
 	netif_rx(skb);
-	dev->last_rx = jiffies;
 	lp->stats.rx_packets++;
 	lp->stats.rx_bytes += length;
 }
@@ -1812,11 +1810,10 @@ static int set_mac_address(struct net_device *dev, void *p)
 
 	memcpy(dev->dev_addr, addr->sa_data, dev->addr_len);
 
-	if (net_debug) {
-		DECLARE_MAC_BUF(mac);
-		printk("%s: Setting MAC address to %s.\n",
-		       dev->name, print_mac(mac, dev->dev_addr));
-	}
+	if (net_debug)
+		printk("%s: Setting MAC address to %pM.\n",
+		       dev->name, dev->dev_addr);
+
 	/* set the Ethernet address */
 	for (i=0; i < ETH_ALEN/2; i++)
 		writereg(dev, PP_IA+i*2, dev->dev_addr[i*2] | (dev->dev_addr[i*2+1] << 8));
@@ -1871,7 +1868,7 @@ MODULE_PARM_DESC(dmasize , "(ignored)");
 MODULE_PARM_DESC(use_dma , "(ignored)");
 #endif
 
-MODULE_AUTHOR("Mike Cruse, Russwll Nelson <nelson@crynwr.com>, Andrew Morton <andrewm@uow.edu.au>");
+MODULE_AUTHOR("Mike Cruse, Russwll Nelson <nelson@crynwr.com>, Andrew Morton");
 MODULE_LICENSE("GPL");
 
 

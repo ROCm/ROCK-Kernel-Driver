@@ -4,6 +4,7 @@
  *  Derived from ivtv-gpio.h
  *
  *  Copyright (C) 2007  Hans Verkuil <hverkuil@xs4all.nl>
+ *  Copyright (C) 2008  Andy Walls <awalls@radix.net>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -23,5 +24,5 @@
 void cx18_gpio_init(struct cx18 *cx);
 void cx18_reset_i2c_slaves_gpio(struct cx18 *cx);
 void cx18_reset_ir_gpio(void *data);
-int cx18_reset_tuner_gpio(void *dev, int cmd, int value);
+int cx18_reset_tuner_gpio(void *dev, int component, int cmd, int value);
 int cx18_gpio(struct cx18 *cx, unsigned int command, void *arg);

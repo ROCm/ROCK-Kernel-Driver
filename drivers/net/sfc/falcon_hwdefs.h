@@ -92,6 +92,17 @@
 /* SPI host data register */
 #define EE_SPI_HDATA_REG_KER 0x0120
 
+/* SPI/VPD config register */
+#define EE_VPD_CFG_REG_KER 0x0140
+#define EE_VPD_EN_LBN 0
+#define EE_VPD_EN_WIDTH 1
+#define EE_VPD_EN_AD9_MODE_LBN 1
+#define EE_VPD_EN_AD9_MODE_WIDTH 1
+#define EE_EE_CLOCK_DIV_LBN 112
+#define EE_EE_CLOCK_DIV_WIDTH 7
+#define EE_SF_CLOCK_DIV_LBN 120
+#define EE_SF_CLOCK_DIV_WIDTH 7
+
 /* PCIE CORE ACCESS REG */
 #define PCIE_CORE_ADDR_PCIE_DEVICE_CTRL_STAT 0x68
 #define PCIE_CORE_ADDR_PCIE_LINK_CTRL_STAT 0x70
@@ -100,13 +111,18 @@
 
 /* NIC status register */
 #define NIC_STAT_REG 0x0200
+#define EE_STRAP_EN_LBN 31
+#define EE_STRAP_EN_WIDTH 1
+#define EE_STRAP_OVR_LBN 24
+#define EE_STRAP_OVR_WIDTH 4
 #define ONCHIP_SRAM_LBN 16
 #define ONCHIP_SRAM_WIDTH 1
 #define SF_PRST_LBN 9
 #define SF_PRST_WIDTH 1
 #define EE_PRST_LBN 8
 #define EE_PRST_WIDTH 1
-/* See pic_mode_t for decoding of this field */
+#define STRAP_PINS_LBN 0
+#define STRAP_PINS_WIDTH 3
 /* These bit definitions are extrapolated from the list of numerical
  * values for STRAP_PINS.
  */
@@ -115,8 +131,13 @@
 #define STRAP_PCIE_LBN 0
 #define STRAP_PCIE_WIDTH 1
 
+#define BOOTED_USING_NVDEVICE_LBN 3
+#define BOOTED_USING_NVDEVICE_WIDTH 1
+
 /* GPIO control register */
 #define GPIO_CTL_REG_KER 0x0210
+#define GPIO_USE_NIC_CLK_LBN (30)
+#define GPIO_USE_NIC_CLK_WIDTH (1)
 #define GPIO_OUTPUTS_LBN   (16)
 #define GPIO_OUTPUTS_WIDTH (4)
 #define GPIO_INPUTS_LBN (8)
@@ -479,18 +500,109 @@
 #define MAC_MCAST_HASH_REG0_KER 0xca0
 #define MAC_MCAST_HASH_REG1_KER 0xcb0
 
-/* GMAC registers */
-#define FALCON_GMAC_REGBANK 0xe00
-#define FALCON_GMAC_REGBANK_SIZE 0x200
-#define FALCON_GMAC_REG_SIZE 0x10
+/* GMAC configuration register 1 */
+#define GM_CFG1_REG 0xe00
+#define GM_SW_RST_LBN 31
+#define GM_SW_RST_WIDTH 1
+#define GM_LOOP_LBN 8
+#define GM_LOOP_WIDTH 1
+#define GM_RX_FC_EN_LBN 5
+#define GM_RX_FC_EN_WIDTH 1
+#define GM_TX_FC_EN_LBN 4
+#define GM_TX_FC_EN_WIDTH 1
+#define GM_RX_EN_LBN 2
+#define GM_RX_EN_WIDTH 1
+#define GM_TX_EN_LBN 0
+#define GM_TX_EN_WIDTH 1
 
-/* XMAC registers */
-#define FALCON_XMAC_REGBANK 0x1200
-#define FALCON_XMAC_REGBANK_SIZE 0x200
-#define FALCON_XMAC_REG_SIZE 0x10
+/* GMAC configuration register 2 */
+#define GM_CFG2_REG 0xe10
+#define GM_PAMBL_LEN_LBN 12
+#define GM_PAMBL_LEN_WIDTH 4
+#define GM_IF_MODE_LBN 8
+#define GM_IF_MODE_WIDTH 2
+#define GM_LEN_CHK_LBN 4
+#define GM_LEN_CHK_WIDTH 1
+#define GM_PAD_CRC_EN_LBN 2
+#define GM_PAD_CRC_EN_WIDTH 1
+#define GM_FD_LBN 0
+#define GM_FD_WIDTH 1
+
+/* GMAC maximum frame length register */
+#define GM_MAX_FLEN_REG 0xe40
+#define GM_MAX_FLEN_LBN 0
+#define GM_MAX_FLEN_WIDTH 16
+
+/* GMAC station address register 1 */
+#define GM_ADR1_REG 0xf00
+#define GM_HWADDR_5_LBN 24
+#define GM_HWADDR_5_WIDTH 8
+#define GM_HWADDR_4_LBN 16
+#define GM_HWADDR_4_WIDTH 8
+#define GM_HWADDR_3_LBN 8
+#define GM_HWADDR_3_WIDTH 8
+#define GM_HWADDR_2_LBN 0
+#define GM_HWADDR_2_WIDTH 8
+
+/* GMAC station address register 2 */
+#define GM_ADR2_REG 0xf10
+#define GM_HWADDR_1_LBN 24
+#define GM_HWADDR_1_WIDTH 8
+#define GM_HWADDR_0_LBN 16
+#define GM_HWADDR_0_WIDTH 8
+
+/* GMAC FIFO configuration register 0 */
+#define GMF_CFG0_REG 0xf20
+#define GMF_FTFENREQ_LBN 12
+#define GMF_FTFENREQ_WIDTH 1
+#define GMF_STFENREQ_LBN 11
+#define GMF_STFENREQ_WIDTH 1
+#define GMF_FRFENREQ_LBN 10
+#define GMF_FRFENREQ_WIDTH 1
+#define GMF_SRFENREQ_LBN 9
+#define GMF_SRFENREQ_WIDTH 1
+#define GMF_WTMENREQ_LBN 8
+#define GMF_WTMENREQ_WIDTH 1
+
+/* GMAC FIFO configuration register 1 */
+#define GMF_CFG1_REG 0xf30
+#define GMF_CFGFRTH_LBN 16
+#define GMF_CFGFRTH_WIDTH 5
+#define GMF_CFGXOFFRTX_LBN 0
+#define GMF_CFGXOFFRTX_WIDTH 16
+
+/* GMAC FIFO configuration register 2 */
+#define GMF_CFG2_REG 0xf40
+#define GMF_CFGHWM_LBN 16
+#define GMF_CFGHWM_WIDTH 6
+#define GMF_CFGLWM_LBN 0
+#define GMF_CFGLWM_WIDTH 6
+
+/* GMAC FIFO configuration register 3 */
+#define GMF_CFG3_REG 0xf50
+#define GMF_CFGHWMFT_LBN 16
+#define GMF_CFGHWMFT_WIDTH 6
+#define GMF_CFGFTTH_LBN 0
+#define GMF_CFGFTTH_WIDTH 6
+
+/* GMAC FIFO configuration register 4 */
+#define GMF_CFG4_REG 0xf60
+#define GMF_HSTFLTRFRM_PAUSE_LBN 12
+#define GMF_HSTFLTRFRM_PAUSE_WIDTH 12
+
+/* GMAC FIFO configuration register 5 */
+#define GMF_CFG5_REG 0xf70
+#define GMF_CFGHDPLX_LBN 22
+#define GMF_CFGHDPLX_WIDTH 1
+#define GMF_CFGBYTMODE_LBN 19
+#define GMF_CFGBYTMODE_WIDTH 1
+#define GMF_HSTDRPLT64_LBN 18
+#define GMF_HSTDRPLT64_WIDTH 1
+#define GMF_HSTFLTRFRMDC_PAUSE_LBN 12
+#define GMF_HSTFLTRFRMDC_PAUSE_WIDTH 1
 
 /* XGMAC address register low */
-#define XM_ADR_LO_REG_MAC 0x00
+#define XM_ADR_LO_REG 0x1200
 #define XM_ADR_3_LBN 24
 #define XM_ADR_3_WIDTH 8
 #define XM_ADR_2_LBN 16
@@ -501,14 +613,14 @@
 #define XM_ADR_0_WIDTH 8
 
 /* XGMAC address register high */
-#define XM_ADR_HI_REG_MAC 0x01
+#define XM_ADR_HI_REG 0x1210
 #define XM_ADR_5_LBN 8
 #define XM_ADR_5_WIDTH 8
 #define XM_ADR_4_LBN 0
 #define XM_ADR_4_WIDTH 8
 
 /* XGMAC global configuration */
-#define XM_GLB_CFG_REG_MAC 0x02
+#define XM_GLB_CFG_REG 0x1220
 #define XM_RX_STAT_EN_LBN 11
 #define XM_RX_STAT_EN_WIDTH 1
 #define XM_TX_STAT_EN_LBN 10
@@ -521,7 +633,7 @@
 #define XM_CORE_RST_WIDTH 1
 
 /* XGMAC transmit configuration */
-#define XM_TX_CFG_REG_MAC 0x03
+#define XM_TX_CFG_REG 0x1230
 #define XM_IPG_LBN 16
 #define XM_IPG_WIDTH 4
 #define XM_FCNTL_LBN 10
@@ -536,7 +648,7 @@
 #define XM_TXEN_WIDTH 1
 
 /* XGMAC receive configuration */
-#define XM_RX_CFG_REG_MAC 0x04
+#define XM_RX_CFG_REG 0x1240
 #define XM_PASS_CRC_ERR_LBN 25
 #define XM_PASS_CRC_ERR_WIDTH 1
 #define XM_ACPT_ALL_MCAST_LBN 11
@@ -549,7 +661,7 @@
 #define XM_RXEN_WIDTH 1
 
 /* XGMAC management interrupt mask register */
-#define XM_MGT_INT_MSK_REG_MAC_B0 0x5
+#define XM_MGT_INT_MSK_REG_B0 0x1250
 #define XM_MSK_PRMBLE_ERR_LBN 2
 #define XM_MSK_PRMBLE_ERR_WIDTH 1
 #define XM_MSK_RMTFLT_LBN 1
@@ -558,29 +670,29 @@
 #define XM_MSK_LCLFLT_WIDTH 1
 
 /* XGMAC flow control register */
-#define XM_FC_REG_MAC 0x7
+#define XM_FC_REG 0x1270
 #define XM_PAUSE_TIME_LBN 16
 #define XM_PAUSE_TIME_WIDTH 16
 #define XM_DIS_FCNTL_LBN 0
 #define XM_DIS_FCNTL_WIDTH 1
 
 /* XGMAC pause time count register */
-#define XM_PAUSE_TIME_REG_MAC 0x9
+#define XM_PAUSE_TIME_REG 0x1290
 
 /* XGMAC transmit parameter register */
-#define XM_TX_PARAM_REG_MAC 0x0d
+#define XM_TX_PARAM_REG 0x012d0
 #define XM_TX_JUMBO_MODE_LBN 31
 #define XM_TX_JUMBO_MODE_WIDTH 1
 #define XM_MAX_TX_FRM_SIZE_LBN 16
 #define XM_MAX_TX_FRM_SIZE_WIDTH 14
 
 /* XGMAC receive parameter register */
-#define XM_RX_PARAM_REG_MAC 0x0e
+#define XM_RX_PARAM_REG 0x12e0
 #define XM_MAX_RX_FRM_SIZE_LBN 0
 #define XM_MAX_RX_FRM_SIZE_WIDTH 14
 
 /* XGMAC management interrupt status register */
-#define XM_MGT_INT_REG_MAC_B0 0x0f
+#define XM_MGT_INT_REG_B0 0x12f0
 #define XM_PRMBLE_ERR 2
 #define XM_PRMBLE_WIDTH 1
 #define XM_RMTFLT_LBN 1
@@ -589,7 +701,7 @@
 #define XM_LCLFLT_WIDTH 1
 
 /* XGXS/XAUI powerdown/reset register */
-#define XX_PWR_RST_REG_MAC 0x10
+#define XX_PWR_RST_REG 0x1300
 
 #define XX_PWRDND_EN_LBN 15
 #define XX_PWRDND_EN_WIDTH 1
@@ -619,7 +731,7 @@
 #define XX_RST_XX_EN_WIDTH 1
 
 /* XGXS/XAUI powerdown/reset control register */
-#define XX_SD_CTL_REG_MAC 0x11
+#define XX_SD_CTL_REG 0x1310
 #define XX_HIDRVD_LBN 15
 #define XX_HIDRVD_WIDTH 1
 #define XX_LODRVD_LBN 14
@@ -645,7 +757,7 @@
 #define XX_LPBKA_LBN 0
 #define XX_LPBKA_WIDTH 1
 
-#define XX_TXDRV_CTL_REG_MAC 0x12
+#define XX_TXDRV_CTL_REG 0x1320
 #define XX_DEQD_LBN 28
 #define XX_DEQD_WIDTH 4
 #define XX_DEQC_LBN 24
@@ -664,7 +776,7 @@
 #define XX_DTXA_WIDTH 4
 
 /* XAUI XGXS core status register */
-#define XX_CORE_STAT_REG_MAC 0x16
+#define XX_CORE_STAT_REG 0x1360
 #define XX_FORCE_SIG_LBN 24
 #define XX_FORCE_SIG_WIDTH 8
 #define XX_FORCE_SIG_DECODE_FORCED 0xff
@@ -941,6 +1053,8 @@
 #define XG_MNT_INTR_B0_WIDTH 1
 #define RX_RECOVERY_A1_LBN 11
 #define RX_RECOVERY_A1_WIDTH 1
+#define XFP_PHY_INTR_LBN 10
+#define XFP_PHY_INTR_WIDTH 1
 #define XG_PHY_INTR_LBN 9
 #define XG_PHY_INTR_WIDTH 1
 #define G_PHY1_INTR_LBN 8
@@ -959,54 +1073,103 @@
  **************************************************************************
  *
  */
+
 #define GRxGoodOct_offset 0x0
+#define GRxGoodOct_WIDTH 48
 #define GRxBadOct_offset 0x8
+#define GRxBadOct_WIDTH 48
 #define GRxMissPkt_offset 0x10
+#define GRxMissPkt_WIDTH 32
 #define GRxFalseCRS_offset 0x14
+#define GRxFalseCRS_WIDTH 32
 #define GRxPausePkt_offset 0x18
+#define GRxPausePkt_WIDTH 32
 #define GRxBadPkt_offset 0x1C
+#define GRxBadPkt_WIDTH 32
 #define GRxUcastPkt_offset 0x20
+#define GRxUcastPkt_WIDTH 32
 #define GRxMcastPkt_offset 0x24
+#define GRxMcastPkt_WIDTH 32
 #define GRxBcastPkt_offset 0x28
+#define GRxBcastPkt_WIDTH 32
 #define GRxGoodLt64Pkt_offset 0x2C
+#define GRxGoodLt64Pkt_WIDTH 32
 #define GRxBadLt64Pkt_offset 0x30
+#define GRxBadLt64Pkt_WIDTH 32
 #define GRx64Pkt_offset 0x34
+#define GRx64Pkt_WIDTH 32
 #define GRx65to127Pkt_offset 0x38
+#define GRx65to127Pkt_WIDTH 32
 #define GRx128to255Pkt_offset 0x3C
+#define GRx128to255Pkt_WIDTH 32
 #define GRx256to511Pkt_offset 0x40
+#define GRx256to511Pkt_WIDTH 32
 #define GRx512to1023Pkt_offset 0x44
+#define GRx512to1023Pkt_WIDTH 32
 #define GRx1024to15xxPkt_offset 0x48
+#define GRx1024to15xxPkt_WIDTH 32
 #define GRx15xxtoJumboPkt_offset 0x4C
+#define GRx15xxtoJumboPkt_WIDTH 32
 #define GRxGtJumboPkt_offset 0x50
+#define GRxGtJumboPkt_WIDTH 32
 #define GRxFcsErr64to15xxPkt_offset 0x54
+#define GRxFcsErr64to15xxPkt_WIDTH 32
 #define GRxFcsErr15xxtoJumboPkt_offset 0x58
+#define GRxFcsErr15xxtoJumboPkt_WIDTH 32
 #define GRxFcsErrGtJumboPkt_offset 0x5C
+#define GRxFcsErrGtJumboPkt_WIDTH 32
 #define GTxGoodBadOct_offset 0x80
+#define GTxGoodBadOct_WIDTH 48
 #define GTxGoodOct_offset 0x88
+#define GTxGoodOct_WIDTH 48
 #define GTxSglColPkt_offset 0x90
+#define GTxSglColPkt_WIDTH 32
 #define GTxMultColPkt_offset 0x94
+#define GTxMultColPkt_WIDTH 32
 #define GTxExColPkt_offset 0x98
+#define GTxExColPkt_WIDTH 32
 #define GTxDefPkt_offset 0x9C
+#define GTxDefPkt_WIDTH 32
 #define GTxLateCol_offset 0xA0
+#define GTxLateCol_WIDTH 32
 #define GTxExDefPkt_offset 0xA4
+#define GTxExDefPkt_WIDTH 32
 #define GTxPausePkt_offset 0xA8
+#define GTxPausePkt_WIDTH 32
 #define GTxBadPkt_offset 0xAC
+#define GTxBadPkt_WIDTH 32
 #define GTxUcastPkt_offset 0xB0
+#define GTxUcastPkt_WIDTH 32
 #define GTxMcastPkt_offset 0xB4
+#define GTxMcastPkt_WIDTH 32
 #define GTxBcastPkt_offset 0xB8
+#define GTxBcastPkt_WIDTH 32
 #define GTxLt64Pkt_offset 0xBC
+#define GTxLt64Pkt_WIDTH 32
 #define GTx64Pkt_offset 0xC0
+#define GTx64Pkt_WIDTH 32
 #define GTx65to127Pkt_offset 0xC4
+#define GTx65to127Pkt_WIDTH 32
 #define GTx128to255Pkt_offset 0xC8
+#define GTx128to255Pkt_WIDTH 32
 #define GTx256to511Pkt_offset 0xCC
+#define GTx256to511Pkt_WIDTH 32
 #define GTx512to1023Pkt_offset 0xD0
+#define GTx512to1023Pkt_WIDTH 32
 #define GTx1024to15xxPkt_offset 0xD4
+#define GTx1024to15xxPkt_WIDTH 32
 #define GTx15xxtoJumboPkt_offset 0xD8
+#define GTx15xxtoJumboPkt_WIDTH 32
 #define GTxGtJumboPkt_offset 0xDC
+#define GTxGtJumboPkt_WIDTH 32
 #define GTxNonTcpUdpPkt_offset 0xE0
+#define GTxNonTcpUdpPkt_WIDTH 16
 #define GTxMacSrcErrPkt_offset 0xE4
+#define GTxMacSrcErrPkt_WIDTH 16
 #define GTxIpSrcErrPkt_offset 0xE8
+#define GTxIpSrcErrPkt_WIDTH 16
 #define GDmaDone_offset 0xEC
+#define GDmaDone_WIDTH 32
 
 #define XgRxOctets_offset 0x0
 #define XgRxOctets_WIDTH 48
@@ -1127,7 +1290,27 @@ struct falcon_nvconfig_board_v2 {
 	__le16 board_revision;
 } __packed;
 
-#define NVCONFIG_BASE 0x300
+/* Board configuration v3 extra information */
+struct falcon_nvconfig_board_v3 {
+	__le32 spi_device_type[2];
+} __packed;
+
+/* Bit numbers for spi_device_type */
+#define SPI_DEV_TYPE_SIZE_LBN 0
+#define SPI_DEV_TYPE_SIZE_WIDTH 5
+#define SPI_DEV_TYPE_ADDR_LEN_LBN 6
+#define SPI_DEV_TYPE_ADDR_LEN_WIDTH 2
+#define SPI_DEV_TYPE_ERASE_CMD_LBN 8
+#define SPI_DEV_TYPE_ERASE_CMD_WIDTH 8
+#define SPI_DEV_TYPE_ERASE_SIZE_LBN 16
+#define SPI_DEV_TYPE_ERASE_SIZE_WIDTH 5
+#define SPI_DEV_TYPE_BLOCK_SIZE_LBN 24
+#define SPI_DEV_TYPE_BLOCK_SIZE_WIDTH 5
+#define SPI_DEV_TYPE_FIELD(type, field)					\
+	(((type) >> EFX_LOW_BIT(field)) & EFX_MASK32(EFX_WIDTH(field)))
+
+#define NVCONFIG_OFFSET 0x300
+
 #define NVCONFIG_BOARD_MAGIC_NUM 0xFA1C
 struct falcon_nvconfig {
 	efx_oword_t ee_vpd_cfg_reg;			/* 0x300 */
@@ -1144,6 +1327,8 @@ struct falcon_nvconfig {
 	__le16 board_struct_ver;
 	__le16 board_checksum;
 	struct falcon_nvconfig_board_v2 board_v2;
+	efx_oword_t ee_base_page_reg;			/* 0x3B0 */
+	struct falcon_nvconfig_board_v3 board_v3;
 } __packed;
 
 #endif /* EFX_FALCON_HWDEFS_H */

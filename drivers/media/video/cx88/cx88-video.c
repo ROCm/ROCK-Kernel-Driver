@@ -426,24 +426,7 @@ int cx88_video_mux(struct cx88_core *core, unsigned int input)
 
 	/* if there are audioroutes defined, we have an external
 	   ADC to deal with audio */
-
 	if (INPUT(input).audioroute) {
-
-		/* cx2388's C-ADC is connected to the tuner only.
-		   When used with S-Video, that ADC is busy dealing with
-		   chroma, so an external must be used for baseband audio */
-
-		if (INPUT(input).type != CX88_VMUX_TELEVISION &&
-			INPUT(input).type != CX88_RADIO) {
-			/* "ADC mode" */
-			cx_write(AUD_I2SCNTL, 0x1);
-			cx_set(AUD_CTL, EN_I2SIN_ENABLE);
-		} else {
-			/* Normal mode */
-			cx_write(AUD_I2SCNTL, 0x0);
-			cx_clear(AUD_CTL, EN_I2SIN_ENABLE);
-		}
-
 		/* The wm8775 module has the "2" route hardwired into
 		   the initialization. Some boards may use different
 		   routes for different inputs. HVR-1300 surely does */
@@ -454,9 +437,19 @@ int cx88_video_mux(struct cx88_core *core, unsigned int input)
 			route.input = INPUT(input).audioroute;
 			cx88_call_i2c_clients(core,
 				VIDIOC_INT_S_AUDIO_ROUTING, &route);
-
 		}
-
+		/* cx2388's C-ADC is connected to the tuner only.
+		   When used with S-Video, that ADC is busy dealing with
+		   chroma, so an external must be used for baseband audio */
+		if (INPUT(input).type != CX88_VMUX_TELEVISION ) {
+			/* "I2S ADC mode" */
+			core->tvaudio = WW_I2SADC;
+			cx88_set_tvaudio(core);
+		} else {
+			/* Normal mode */
+			cx_write(AUD_I2SCNTL, 0x0);
+			cx_clear(AUD_CTL, EN_I2SIN_ENABLE);
+		}
 	}
 
 	return 0;
@@ -764,15 +757,16 @@ static int get_ressource(struct cx8800_fh *fh)
 	}
 }
 
-static int video_open(struct inode *inode, struct file *file)
+static int video_open(struct file *file)
 {
-	int minor = iminor(inode);
+	int minor = video_devdata(file)->minor;
 	struct cx8800_dev *h,*dev = NULL;
 	struct cx88_core *core;
 	struct cx8800_fh *fh;
 	enum v4l2_buf_type type = 0;
 	int radio = 0;
 
+	lock_kernel();
 	list_for_each_entry(h, &cx8800_devlist, devlist) {
 		if (h->video_dev->minor == minor) {
 			dev  = h;
@@ -788,8 +782,10 @@ static int video_open(struct inode *inode, struct file *file)
 			dev   = h;
 		}
 	}
-	if (NULL == dev)
+	if (NULL == dev) {
+		unlock_kernel();
 		return -ENODEV;
+	}
 
 	core = dev->core;
 
@@ -798,8 +794,10 @@ static int video_open(struct inode *inode, struct file *file)
 
 	/* allocate + initialize per filehandle data */
 	fh = kzalloc(sizeof(*fh),GFP_KERNEL);
-	if (NULL == fh)
+	if (NULL == fh) {
+		unlock_kernel();
 		return -ENOMEM;
+	}
 	file->private_data = fh;
 	fh->dev      = dev;
 	fh->radio    = radio;
@@ -827,11 +825,29 @@ static int video_open(struct inode *inode, struct file *file)
 		cx_write(MO_GP0_IO, core->board.radio.gpio0);
 		cx_write(MO_GP1_IO, core->board.radio.gpio1);
 		cx_write(MO_GP2_IO, core->board.radio.gpio2);
-		core->tvaudio = WW_FM;
-		cx88_set_tvaudio(core);
-		cx88_set_stereo(core,V4L2_TUNER_MODE_STEREO,1);
+		if (core->board.radio.audioroute) {
+			if(core->board.audio_chip &&
+				core->board.audio_chip == V4L2_IDENT_WM8775) {
+				struct v4l2_routing route;
+
+				route.input = core->board.radio.audioroute;
+				cx88_call_i2c_clients(core,
+					VIDIOC_INT_S_AUDIO_ROUTING, &route);
+			}
+			/* "I2S ADC mode" */
+			core->tvaudio = WW_I2SADC;
+			cx88_set_tvaudio(core);
+		} else {
+			/* FM Mode */
+			core->tvaudio = WW_FM;
+			cx88_set_tvaudio(core);
+			cx88_set_stereo(core,V4L2_TUNER_MODE_STEREO,1);
+		}
 		cx88_call_i2c_clients(core,AUDC_SET_RADIO,NULL);
 	}
+	unlock_kernel();
+
+	atomic_inc(&core->users);
 
 	return 0;
 }
@@ -888,7 +904,7 @@ video_poll(struct file *file, struct poll_table_struct *wait)
 	return 0;
 }
 
-static int video_release(struct inode *inode, struct file *file)
+static int video_release(struct file *file)
 {
 	struct cx8800_fh  *fh  = file->private_data;
 	struct cx8800_dev *dev = fh->dev;
@@ -920,7 +936,8 @@ static int video_release(struct inode *inode, struct file *file)
 	file->private_data = NULL;
 	kfree(fh);
 
-	cx88_call_i2c_clients (dev->core, TUNER_SET_STANDBY, NULL);
+	if(atomic_dec_and_test(&dev->core->users))
+		cx88_call_i2c_clients (dev->core, TUNER_SET_STANDBY, NULL);
 
 	return 0;
 }
@@ -1199,8 +1216,12 @@ static int vidioc_streamon(struct file *file, void *priv, enum v4l2_buf_type i)
 	struct cx8800_fh  *fh   = priv;
 	struct cx8800_dev *dev  = fh->dev;
 
-	if (unlikely(fh->type != V4L2_BUF_TYPE_VIDEO_CAPTURE))
+	/* We should remember that this driver also supports teletext,  */
+	/* so we have to test if the v4l2_buf_type is VBI capture data. */
+	if (unlikely((fh->type != V4L2_BUF_TYPE_VIDEO_CAPTURE) &&
+		     (fh->type != V4L2_BUF_TYPE_VBI_CAPTURE)))
 		return -EINVAL;
+
 	if (unlikely(i != fh->type))
 		return -EINVAL;
 
@@ -1215,8 +1236,10 @@ static int vidioc_streamoff(struct file *file, void *priv, enum v4l2_buf_type i)
 	struct cx8800_dev *dev  = fh->dev;
 	int               err, res;
 
-	if (fh->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
+	if ((fh->type != V4L2_BUF_TYPE_VIDEO_CAPTURE) &&
+	    (fh->type != V4L2_BUF_TYPE_VBI_CAPTURE))
 		return -EINVAL;
+
 	if (i != fh->type)
 		return -EINVAL;
 
@@ -1424,25 +1447,26 @@ static int vidioc_s_frequency (struct file *file, void *priv,
 
 #ifdef CONFIG_VIDEO_ADV_DEBUG
 static int vidioc_g_register (struct file *file, void *fh,
-				struct v4l2_register *reg)
+				struct v4l2_dbg_register *reg)
 {
 	struct cx88_core *core = ((struct cx8800_fh*)fh)->dev->core;
 
-	if (!v4l2_chip_match_host(reg->match_type, reg->match_chip))
+	if (!v4l2_chip_match_host(&reg->match))
 		return -EINVAL;
 	/* cx2388x has a 24-bit register space */
-	reg->val = cx_read(reg->reg&0xffffff);
+	reg->val = cx_read(reg->reg & 0xffffff);
+	reg->size = 4;
 	return 0;
 }
 
 static int vidioc_s_register (struct file *file, void *fh,
-				struct v4l2_register *reg)
+				struct v4l2_dbg_register *reg)
 {
 	struct cx88_core *core = ((struct cx8800_fh*)fh)->dev->core;
 
-	if (!v4l2_chip_match_host(reg->match_type, reg->match_chip))
+	if (!v4l2_chip_match_host(&reg->match))
 		return -EINVAL;
-	cx_write(reg->reg&0xffffff, reg->val);
+	cx_write(reg->reg & 0xffffff, reg->val);
 	return 0;
 }
 #endif
@@ -1670,7 +1694,7 @@ static irqreturn_t cx8800_irq(int irq, void *dev_id)
 /* ----------------------------------------------------------- */
 /* exported stuff                                              */
 
-static const struct file_operations video_fops =
+static const struct v4l2_file_operations video_fops =
 {
 	.owner	       = THIS_MODULE,
 	.open	       = video_open,
@@ -1679,8 +1703,6 @@ static const struct file_operations video_fops =
 	.poll          = video_poll,
 	.mmap	       = video_mmap,
 	.ioctl	       = video_ioctl2,
-	.compat_ioctl  = v4l_compat_ioctl32,
-	.llseek        = no_llseek,
 };
 
 static const struct v4l2_ioctl_ops video_ioctl_ops = {
@@ -1729,14 +1751,12 @@ static struct video_device cx8800_video_template = {
 	.current_norm         = V4L2_STD_NTSC_M,
 };
 
-static const struct file_operations radio_fops =
+static const struct v4l2_file_operations radio_fops =
 {
 	.owner         = THIS_MODULE,
 	.open          = video_open,
 	.release       = video_release,
 	.ioctl         = video_ioctl2,
-	.compat_ioctl  = v4l_compat_ioctl32,
-	.llseek        = no_llseek,
 };
 
 static const struct v4l2_ioctl_ops radio_ioctl_ops = {
@@ -1894,7 +1914,7 @@ static int __devinit cx8800_initdev(struct pci_dev *pci_dev,
 		goto fail_unreg;
 	}
 	printk(KERN_INFO "%s/0: registered device video%d [v4l2]\n",
-	       core->name,dev->video_dev->minor & 0x1f);
+	       core->name, dev->video_dev->num);
 
 	dev->vbi_dev = cx88_vdev_init(core,dev->pci,&cx8800_vbi_template,"vbi");
 	err = video_register_device(dev->vbi_dev,VFL_TYPE_VBI,
@@ -1905,7 +1925,7 @@ static int __devinit cx8800_initdev(struct pci_dev *pci_dev,
 		goto fail_unreg;
 	}
 	printk(KERN_INFO "%s/0: registered device vbi%d\n",
-	       core->name,dev->vbi_dev->minor & 0x1f);
+	       core->name, dev->vbi_dev->num);
 
 	if (core->board.radio.type == CX88_RADIO) {
 		dev->radio_dev = cx88_vdev_init(core,dev->pci,
@@ -1918,7 +1938,7 @@ static int __devinit cx8800_initdev(struct pci_dev *pci_dev,
 			goto fail_unreg;
 		}
 		printk(KERN_INFO "%s/0: registered device radio%d\n",
-		       core->name,dev->radio_dev->minor & 0x1f);
+		       core->name, dev->radio_dev->num);
 	}
 
 	/* everything worked */

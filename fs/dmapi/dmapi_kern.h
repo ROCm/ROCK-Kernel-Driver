@@ -79,7 +79,6 @@ struct filesystem_dmapi_operations {
 	int (*get_fsys_vector)(struct super_block *sb, void *addr);
 	int (*fh_to_inode)(struct super_block *sb, struct inode **ip,
 			   dm_fid_t *fid);
-	const struct file_operations * (*get_invis_ops)(struct inode *ip);
 	int (*inode_to_fh)(struct inode *ip, dm_fid_t *fid,
 			   dm_fsid_t *fsid );
 	void (*get_fsid)(struct super_block *sb, dm_fsid_t *fsid);

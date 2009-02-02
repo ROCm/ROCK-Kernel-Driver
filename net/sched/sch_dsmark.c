@@ -68,7 +68,8 @@ static int dsmark_graft(struct Qdisc *sch, unsigned long arg,
 	}
 
 	sch_tree_lock(sch);
-	*old = xchg(&p->q, new);
+	*old = p->q;
+	p->q = new;
 	qdisc_tree_decrease_qlen(*old, (*old)->q.qlen);
 	qdisc_reset(*old);
 	sch_tree_unlock(sch);
@@ -202,7 +203,7 @@ static int dsmark_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 
 	if (p->set_tc_index) {
 		switch (skb->protocol) {
-		case __constant_htons(ETH_P_IP):
+		case htons(ETH_P_IP):
 			if (skb_cow_head(skb, sizeof(struct iphdr)))
 				goto drop;
 
@@ -210,7 +211,7 @@ static int dsmark_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 				& ~INET_ECN_MASK;
 			break;
 
-		case __constant_htons(ETH_P_IPV6):
+		case htons(ETH_P_IPV6):
 			if (skb_cow_head(skb, sizeof(struct ipv6hdr)))
 				goto drop;
 
@@ -289,11 +290,11 @@ static struct sk_buff *dsmark_dequeue(struct Qdisc *sch)
 	pr_debug("index %d->%d\n", skb->tc_index, index);
 
 	switch (skb->protocol) {
-	case __constant_htons(ETH_P_IP):
+	case htons(ETH_P_IP):
 		ipv4_change_dsfield(ip_hdr(skb), p->mask[index],
 				    p->value[index]);
 			break;
-	case __constant_htons(ETH_P_IPV6):
+	case htons(ETH_P_IPV6):
 		ipv6_change_dsfield(ipv6_hdr(skb), p->mask[index],
 				    p->value[index]);
 			break;
@@ -313,24 +314,13 @@ static struct sk_buff *dsmark_dequeue(struct Qdisc *sch)
 	return skb;
 }
 
-static int dsmark_requeue(struct sk_buff *skb, struct Qdisc *sch)
+static struct sk_buff *dsmark_peek(struct Qdisc *sch)
 {
 	struct dsmark_qdisc_data *p = qdisc_priv(sch);
-	int err;
 
-	pr_debug("dsmark_requeue(skb %p,sch %p,[qdisc %p])\n", skb, sch, p);
+	pr_debug("dsmark_peek(sch %p,[qdisc %p])\n", sch, p);
 
-	err = p->q->ops->requeue(skb, p->q);
-	if (err != NET_XMIT_SUCCESS) {
-		if (net_xmit_drop_count(err))
-			sch->qstats.drops++;
-		return err;
-	}
-
-	sch->q.qlen++;
-	sch->qstats.requeues++;
-
-	return NET_XMIT_SUCCESS;
+	return p->q->ops->peek(p->q);
 }
 
 static unsigned int dsmark_drop(struct Qdisc *sch)
@@ -496,7 +486,7 @@ static struct Qdisc_ops dsmark_qdisc_ops __read_mostly = {
 	.priv_size	=	sizeof(struct dsmark_qdisc_data),
 	.enqueue	=	dsmark_enqueue,
 	.dequeue	=	dsmark_dequeue,
-	.requeue	=	dsmark_requeue,
+	.peek		=	dsmark_peek,
 	.drop		=	dsmark_drop,
 	.init		=	dsmark_init,
 	.reset		=	dsmark_reset,

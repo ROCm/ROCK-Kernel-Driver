@@ -17,7 +17,7 @@
 	Annapolis MD 21403
 
     Fixed (again!) the missing interrupt locking on TX/RX shifting.
-	Alan Cox <Alan.Cox@linux.org>
+	Alan Cox <alan@lxorguk.ukuu.org.uk>
 
     Removed calls to init_etherdev since they are no longer needed, and
     cleaned up modularization just a bit. The driver still allows only
@@ -29,16 +29,16 @@
     the board. Now getting 150K/second FTP with a 3c501 card. Still playing
     with a TX-TX optimisation to see if we can touch 180-200K/second as seems
     theoretically maximum.
-		19950402 Alan Cox <Alan.Cox@linux.org>
+		19950402 Alan Cox <alan@lxorguk.ukuu.org.uk>
 
     Cleaned up for 2.3.x because we broke SMP now.
-		20000208 Alan Cox <alan@redhat.com>
+		20000208 Alan Cox <alan@lxorguk.ukuu.org.uk>
 
     Check up pass for 2.5. Nothing significant changed
-		20021009 Alan Cox <alan@redhat.com>
+		20021009 Alan Cox <alan@lxorguk.ukuu.org.uk>
 
     Fixed zero fill corner case
-		20030104 Alan Cox <alan@redhat.com>
+		20030104 Alan Cox <alan@lxorguk.ukuu.org.uk>
 
 
    For the avoidance of doubt the "preferred form" of this code is one which
@@ -104,7 +104,7 @@
 
 
 static const char version[] =
-	DRV_NAME ".c: " DRV_VERSION " Alan Cox (alan@redhat.com).\n";
+	DRV_NAME ".c: " DRV_VERSION " Alan Cox (alan@lxorguk.ukuu.org.uk).\n";
 
 /*
  *	Braindamage remaining:
@@ -297,8 +297,8 @@ static int __init el1_probe1(struct net_device *dev, int ioaddr)
 	if (el_debug)
 		printk(KERN_DEBUG "%s", version);
 
-	memset(dev->priv, 0, sizeof(struct net_local));
 	lp = netdev_priv(dev);
+	memset(lp, 0, sizeof(struct net_local));
 	spin_lock_init(&lp->lock);
 
 	/*
@@ -725,7 +725,6 @@ static void el_receive(struct net_device *dev)
 		insb(DATAPORT, skb_put(skb, pkt_len), pkt_len);
 		skb->protocol = eth_type_trans(skb, dev);
 		netif_rx(skb);
-		dev->last_rx = jiffies;
 		dev->stats.rx_packets++;
 		dev->stats.rx_bytes += pkt_len;
 	}

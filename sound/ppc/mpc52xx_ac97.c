@@ -19,6 +19,7 @@
 #include <sound/pcm_params.h>
 #include <sound/ac97_codec.h>
 
+#include <linux/of_platform.h>
 #include <asm/of_platform.h>
 #include <linux/dma-mapping.h>
 #include <asm/mpc52xx_psc.h>

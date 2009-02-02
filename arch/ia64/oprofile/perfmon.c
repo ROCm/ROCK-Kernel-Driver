@@ -57,7 +57,7 @@ static struct pfm_smpl_fmt oprofile_fmt = {
 	.owner = THIS_MODULE
 };
 
-static char * get_cpu_type(void)
+static char *get_cpu_type(void)
 {
 	__u8 family = local_cpu_data->family;
 
@@ -76,7 +76,7 @@ static char * get_cpu_type(void)
 
 static int using_perfmon;
 
-int __init op_perfmon_init(struct oprofile_operations * ops)
+int __init op_perfmon_init(struct oprofile_operations *ops)
 {
 	int ret = pfm_fmt_register(&oprofile_fmt);
 	if (ret)
@@ -91,7 +91,7 @@ int __init op_perfmon_init(struct oprofile_operations * ops)
 }
 
 
-void op_perfmon_exit(void)
+void __exit op_perfmon_exit(void)
 {
 	if (!using_perfmon)
 		return;

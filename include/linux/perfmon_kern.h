@@ -513,7 +513,6 @@ void pfm_cpu_disable(void);
 
 #else /* !CONFIG_PERFMON */
 
-
 /*
  * perfmon hooks are nops when CONFIG_PERFMON is undefined
  */

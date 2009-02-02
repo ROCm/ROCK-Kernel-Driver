@@ -43,7 +43,7 @@
 #define ext3_debug(f, a...)						\
 	do {								\
 		printk (KERN_DEBUG "EXT3-fs DEBUG (%s, %d): %s:",	\
-			__FILE__, __LINE__, __FUNCTION__);		\
+			__FILE__, __LINE__, __func__);		\
 		printk (KERN_DEBUG f, ## a);				\
 	} while (0)
 #else
@@ -177,6 +177,30 @@ struct ext3_group_desc
 
 #define EXT3_FL_USER_VISIBLE		0x0003DFFF /* User visible flags */
 #define EXT3_FL_USER_MODIFIABLE		0x000380FF /* User modifiable flags */
+
+/* Flags that should be inherited by new inodes from their parent. */
+#define EXT3_FL_INHERITED (EXT3_SECRM_FL | EXT3_UNRM_FL | EXT3_COMPR_FL |\
+			   EXT3_SYNC_FL | EXT3_IMMUTABLE_FL | EXT3_APPEND_FL |\
+			   EXT3_NODUMP_FL | EXT3_NOATIME_FL | EXT3_COMPRBLK_FL|\
+			   EXT3_NOCOMPR_FL | EXT3_JOURNAL_DATA_FL |\
+			   EXT3_NOTAIL_FL | EXT3_DIRSYNC_FL)
+
+/* Flags that are appropriate for regular files (all but dir-specific ones). */
+#define EXT3_REG_FLMASK (~(EXT3_DIRSYNC_FL | EXT3_TOPDIR_FL))
+
+/* Flags that are appropriate for non-directories/regular files. */
+#define EXT3_OTHER_FLMASK (EXT3_NODUMP_FL | EXT3_NOATIME_FL)
+
+/* Mask out flags that are inappropriate for the given type of inode. */
+static inline __u32 ext3_mask_flags(umode_t mode, __u32 flags)
+{
+	if (S_ISDIR(mode))
+		return flags;
+	else if (S_ISREG(mode))
+		return flags & EXT3_REG_FLMASK;
+	else
+		return flags & EXT3_OTHER_FLMASK;
+}
 
 /*
  * Inode dynamic state flags
@@ -354,6 +378,13 @@ struct ext3_inode {
 #define	EXT3_ORPHAN_FS			0x0004	/* Orphans being recovered */
 
 /*
+ * Misc. filesystem flags
+ */
+#define EXT2_FLAGS_SIGNED_HASH		0x0001  /* Signed dirhash in use */
+#define EXT2_FLAGS_UNSIGNED_HASH	0x0002  /* Unsigned dirhash in use */
+#define EXT2_FLAGS_TEST_FILESYS		0x0004	/* to test development code */
+
+/*
  * Mount flags
  */
 #define EXT3_MOUNT_CHECK		0x00001	/* Do mount-time checks */
@@ -380,7 +411,9 @@ struct ext3_inode {
 #define EXT3_MOUNT_QUOTA		0x80000 /* Some quota option set */
 #define EXT3_MOUNT_USRQUOTA		0x100000 /* "old" user quota */
 #define EXT3_MOUNT_GRPQUOTA		0x200000 /* "old" group quota */
-#define EXT3_MOUNT_NFS4ACL		0x400000 /* NFS version 4 ACLs */
+#define EXT3_MOUNT_DATA_ERR_ABORT	0x400000 /* Abort on file data write
+						  * error in ordered mode */
+#define EXT3_MOUNT_NFS4ACL		0x800000 /* NFS version 4 ACLs */
 
 /* Compatibility, for having both ext2_fs.h and ext3_fs.h included at once */
 #ifndef _LINUX_EXT2_FS_H
@@ -488,7 +521,23 @@ struct ext3_super_block {
 	__u16	s_reserved_word_pad;
 	__le32	s_default_mount_opts;
 	__le32	s_first_meta_bg;	/* First metablock block group */
-	__u32	s_reserved[190];	/* Padding to the end of the block */
+	__le32	s_mkfs_time;		/* When the filesystem was created */
+	__le32	s_jnl_blocks[17];	/* Backup of the journal inode */
+	/* 64bit support valid if EXT4_FEATURE_COMPAT_64BIT */
+/*150*/	__le32	s_blocks_count_hi;	/* Blocks count */
+	__le32	s_r_blocks_count_hi;	/* Reserved blocks count */
+	__le32	s_free_blocks_count_hi;	/* Free blocks count */
+	__le16	s_min_extra_isize;	/* All inodes have at least # bytes */
+	__le16	s_want_extra_isize; 	/* New inodes should reserve # bytes */
+	__le32	s_flags;		/* Miscellaneous flags */
+	__le16  s_raid_stride;		/* RAID stride */
+	__le16  s_mmp_interval;         /* # seconds to wait in MMP checking */
+	__le64  s_mmp_block;            /* Block for multi-mount protection */
+	__le32  s_raid_stripe_width;    /* blocks on all data disks (N*stride)*/
+	__u8	s_log_groups_per_flex;  /* FLEX_BG group size */
+	__u8	s_reserved_char_pad2;
+	__le16  s_reserved_pad;
+	__u32   s_reserved[162];        /* Padding to the end of the block */
 };
 
 #ifdef __KERNEL__
@@ -693,6 +742,9 @@ static inline __le16 ext3_rec_len_to_disk(unsigned len)
 #define DX_HASH_LEGACY		0
 #define DX_HASH_HALF_MD4	1
 #define DX_HASH_TEA		2
+#define DX_HASH_LEGACY_UNSIGNED	3
+#define DX_HASH_HALF_MD4_UNSIGNED	4
+#define DX_HASH_TEA_UNSIGNED		5
 
 #ifdef __KERNEL__
 
@@ -838,6 +890,8 @@ extern void ext3_truncate (struct inode *);
 extern void ext3_set_inode_flags(struct inode *);
 extern void ext3_get_inode_flags(struct ext3_inode_info *);
 extern void ext3_set_aops(struct inode *inode);
+extern int ext3_fiemap(struct inode *inode, struct fiemap_extent_info *fieinfo,
+		       u64 start, u64 len);
 
 /* ioctl.c */
 extern int ext3_ioctl (struct inode *, struct file *, unsigned int,
@@ -870,7 +924,7 @@ extern void ext3_update_dynamic_rev (struct super_block *sb);
 #define ext3_std_error(sb, errno)				\
 do {								\
 	if ((errno))						\
-		__ext3_std_error((sb), __FUNCTION__, (errno));	\
+		__ext3_std_error((sb), __func__, (errno));	\
 } while (0)
 
 /*

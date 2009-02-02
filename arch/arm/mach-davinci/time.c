@@ -15,8 +15,8 @@
 #include <linux/clocksource.h>
 #include <linux/clockchips.h>
 #include <linux/spinlock.h>
+#include <linux/io.h>
 
-#include <asm/io.h>
 #include <mach/hardware.h>
 #include <asm/system.h>
 #include <asm/irq.h>
@@ -322,7 +322,7 @@ static void __init davinci_timer_init(void)
 	clockevent_davinci.min_delta_ns =
 		clockevent_delta2ns(1, &clockevent_davinci);
 
-	clockevent_davinci.cpumask = cpumask_of_cpu(0);
+	clockevent_davinci.cpumask = cpumask_of(0);
 	clockevents_register_device(&clockevent_davinci);
 }
 

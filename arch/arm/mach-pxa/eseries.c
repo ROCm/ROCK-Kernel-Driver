@@ -12,6 +12,9 @@
 
 #include <linux/kernel.h>
 #include <linux/init.h>
+#include <linux/gpio.h>
+#include <linux/delay.h>
+#include <linux/platform_device.h>
 
 #include <asm/setup.h>
 #include <asm/mach/arch.h>
@@ -19,68 +22,15 @@
 
 #include <mach/mfp-pxa25x.h>
 #include <mach/hardware.h>
+#include <mach/eseries-gpio.h>
+#include <mach/udc.h>
+#include <mach/irda.h>
 
 #include "generic.h"
-
-static unsigned long e740_pin_config[] __initdata = {
-	/* Chip selects */
-	GPIO15_nCS_1,   /* CS1 - Flash */
-	GPIO79_nCS_3,   /* CS3 - IMAGEON */
-	GPIO80_nCS_4,   /* CS4 - TMIO */
-
-	/* Clocks */
-	GPIO12_32KHz,
-
-	/* BTUART */
-	GPIO42_BTUART_RXD,
-	GPIO43_BTUART_TXD,
-	GPIO44_BTUART_CTS,
-	GPIO45_GPIO, /* Used by TMIO for #SUSPEND */
-
-	/* PC Card */
-	GPIO8_GPIO,   /* CD0 */
-	GPIO44_GPIO,  /* CD1 */
-	GPIO11_GPIO,  /* IRQ0 */
-	GPIO6_GPIO,   /* IRQ1 */
-	GPIO27_GPIO,  /* RST0 */
-	GPIO24_GPIO,  /* RST1 */
-	GPIO20_GPIO,  /* PWR0 */
-	GPIO23_GPIO,  /* PWR1 */
-	GPIO48_nPOE,
-	GPIO49_nPWE,
-	GPIO50_nPIOR,
-	GPIO51_nPIOW,
-	GPIO52_nPCE_1,
-	GPIO53_nPCE_2,
-	GPIO54_nPSKTSEL,
-	GPIO55_nPREG,
-	GPIO56_nPWAIT,
-	GPIO57_nIOIS16,
-
-	/* wakeup */
-	GPIO0_GPIO | WAKEUP_ON_EDGE_RISE,
-};
-
-static unsigned long e400_pin_config[] __initdata = {
-	/* Chip selects */
-	GPIO15_nCS_1,   /* CS1 - Flash */
-	GPIO80_nCS_4,   /* CS4 - TMIO */
-
-	/* Clocks */
-	GPIO12_32KHz,
-
-	/* BTUART */
-	GPIO42_BTUART_RXD,
-	GPIO43_BTUART_TXD,
-	GPIO44_BTUART_CTS,
-	GPIO45_GPIO, /* Used by TMIO for #SUSPEND */
-
-	/* wakeup */
-	GPIO0_GPIO | WAKEUP_ON_EDGE_RISE,
-};
+#include "clock.h"
 
 /* Only e800 has 128MB RAM */
-static void __init eseries_fixup(struct machine_desc *desc,
+void __init eseries_fixup(struct machine_desc *desc,
 	struct tag *tags, char **cmdline, struct meminfo *mi)
 {
 	mi->nr_banks=1;
@@ -92,95 +42,128 @@ static void __init eseries_fixup(struct machine_desc *desc,
 		mi->bank[0].size = (64*1024*1024);
 }
 
-static void __init e740_init(void)
+struct pxa2xx_udc_mach_info e7xx_udc_mach_info = {
+	.gpio_vbus   = GPIO_E7XX_USB_DISC,
+	.gpio_pullup = GPIO_E7XX_USB_PULLUP,
+	.gpio_pullup_inverted = 1
+};
+
+static void e7xx_irda_transceiver_mode(struct device *dev, int mode)
 {
-	pxa2xx_mfp_config(ARRAY_AND_SIZE(e740_pin_config));
+	if (mode & IR_OFF) {
+		gpio_set_value(GPIO_E7XX_IR_OFF, 1);
+		pxa2xx_transceiver_mode(dev, mode);
+	} else {
+		pxa2xx_transceiver_mode(dev, mode);
+		gpio_set_value(GPIO_E7XX_IR_OFF, 0);
+	}
 }
 
-static void __init e400_init(void)
+int e7xx_irda_init(void)
 {
-	pxa2xx_mfp_config(ARRAY_AND_SIZE(e400_pin_config));
+	int ret;
+
+	ret = gpio_request(GPIO_E7XX_IR_OFF, "IrDA power");
+	if (ret)
+		goto out;
+
+	ret = gpio_direction_output(GPIO_E7XX_IR_OFF, 0);
+	if (ret)
+		goto out;
+
+	e7xx_irda_transceiver_mode(NULL, IR_SIRMODE | IR_OFF);
+out:
+	return ret;
 }
 
-/* e-series machine definitions */
+static void e7xx_irda_shutdown(struct device *dev)
+{
+	e7xx_irda_transceiver_mode(dev, IR_SIRMODE | IR_OFF);
+	gpio_free(GPIO_E7XX_IR_OFF);
+}
 
-#ifdef CONFIG_MACH_E330
-MACHINE_START(E330, "Toshiba e330")
-	/* Maintainer: Ian Molton (spyro@f2s.com) */
-	.phys_io	= 0x40000000,
-	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
-	.boot_params	= 0xa0000100,
-	.map_io		= pxa_map_io,
-	.init_irq	= pxa25x_init_irq,
-	.fixup		= eseries_fixup,
-	.timer		= &pxa_timer,
-MACHINE_END
-#endif
+struct pxaficp_platform_data e7xx_ficp_platform_data = {
+	.transceiver_cap  = IR_SIRMODE | IR_OFF,
+	.transceiver_mode = e7xx_irda_transceiver_mode,
+	.shutdown = e7xx_irda_shutdown,
+};
 
-#ifdef CONFIG_MACH_E350
-MACHINE_START(E350, "Toshiba e350")
-	/* Maintainer: Ian Molton (spyro@f2s.com) */
-	.phys_io	= 0x40000000,
-	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
-	.boot_params	= 0xa0000100,
-	.map_io		= pxa_map_io,
-	.init_irq	= pxa25x_init_irq,
-	.fixup		= eseries_fixup,
-	.timer		= &pxa_timer,
-MACHINE_END
-#endif
+int eseries_tmio_enable(struct platform_device *dev)
+{
+	/* Reset - bring SUSPEND high before PCLR */
+	gpio_set_value(GPIO_ESERIES_TMIO_SUSPEND, 0);
+	gpio_set_value(GPIO_ESERIES_TMIO_PCLR, 0);
+	msleep(1);
+	gpio_set_value(GPIO_ESERIES_TMIO_SUSPEND, 1);
+	msleep(1);
+	gpio_set_value(GPIO_ESERIES_TMIO_PCLR, 1);
+	msleep(1);
+	return 0;
+}
 
-#ifdef CONFIG_MACH_E740
-MACHINE_START(E740, "Toshiba e740")
-	/* Maintainer: Ian Molton (spyro@f2s.com) */
-	.phys_io	= 0x40000000,
-	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
-	.boot_params	= 0xa0000100,
-	.map_io		= pxa_map_io,
-	.init_irq	= pxa25x_init_irq,
-	.fixup		= eseries_fixup,
-	.init_machine	= e740_init,
-	.timer		= &pxa_timer,
-MACHINE_END
-#endif
+int eseries_tmio_disable(struct platform_device *dev)
+{
+	gpio_set_value(GPIO_ESERIES_TMIO_SUSPEND, 0);
+	gpio_set_value(GPIO_ESERIES_TMIO_PCLR, 0);
+	return 0;
+}
 
-#ifdef CONFIG_MACH_E750
-MACHINE_START(E750, "Toshiba e750")
-	/* Maintainer: Ian Molton (spyro@f2s.com) */
-	.phys_io	= 0x40000000,
-	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
-	.boot_params	= 0xa0000100,
-	.map_io		= pxa_map_io,
-	.init_irq	= pxa25x_init_irq,
-	.fixup		= eseries_fixup,
-	.timer		= &pxa_timer,
-MACHINE_END
-#endif
+int eseries_tmio_suspend(struct platform_device *dev)
+{
+	gpio_set_value(GPIO_ESERIES_TMIO_SUSPEND, 0);
+	return 0;
+}
 
-#ifdef CONFIG_MACH_E400
-MACHINE_START(E400, "Toshiba e400")
-	/* Maintainer: Ian Molton (spyro@f2s.com) */
-	.phys_io	= 0x40000000,
-	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
-	.boot_params	= 0xa0000100,
-	.map_io		= pxa_map_io,
-	.init_irq	= pxa25x_init_irq,
-	.fixup		= eseries_fixup,
-	.init_machine	= e400_init,
-	.timer		= &pxa_timer,
-MACHINE_END
-#endif
+int eseries_tmio_resume(struct platform_device *dev)
+{
+	gpio_set_value(GPIO_ESERIES_TMIO_SUSPEND, 1);
+	msleep(1);
+	return 0;
+}
 
-#ifdef CONFIG_MACH_E800
-MACHINE_START(E800, "Toshiba e800")
-	/* Maintainer: Ian Molton (spyro@f2s.com) */
-	.phys_io	= 0x40000000,
-	.io_pg_offst	= (io_p2v(0x40000000) >> 18) & 0xfffc,
-	.boot_params	= 0xa0000100,
-	.map_io		= pxa_map_io,
-	.init_irq	= pxa25x_init_irq,
-	.fixup		= eseries_fixup,
-	.timer		= &pxa_timer,
-MACHINE_END
-#endif
+void eseries_get_tmio_gpios(void)
+{
+	gpio_request(GPIO_ESERIES_TMIO_SUSPEND, NULL);
+	gpio_request(GPIO_ESERIES_TMIO_PCLR, NULL);
+	gpio_direction_output(GPIO_ESERIES_TMIO_SUSPEND, 0);
+	gpio_direction_output(GPIO_ESERIES_TMIO_PCLR, 0);
+}
+
+/* TMIO controller uses the same resources on all e-series machines. */
+struct resource eseries_tmio_resources[] = {
+	[0] = {
+		.start  = PXA_CS4_PHYS,
+		.end    = PXA_CS4_PHYS + 0x1fffff,
+		.flags  = IORESOURCE_MEM,
+	},
+	[1] = {
+		.start  = IRQ_GPIO(GPIO_ESERIES_TMIO_IRQ),
+		.end    = IRQ_GPIO(GPIO_ESERIES_TMIO_IRQ),
+		.flags  = IORESOURCE_IRQ,
+	},
+};
+
+/* Some e-series hardware cannot control the 32K clock */
+static void clk_32k_dummy(struct clk *clk)
+{
+}
+
+static const struct clkops clk_32k_dummy_ops = {
+	.enable         = clk_32k_dummy,
+	.disable        = clk_32k_dummy,
+};
+
+static struct clk tmio_dummy_clk = {
+	.ops	= &clk_32k_dummy_ops,
+	.rate	= 32768,
+};
+
+static struct clk_lookup eseries_clkregs[] = {
+	INIT_CLKREG(&tmio_dummy_clk, NULL, "CLK_CK32K"),
+};
+
+void eseries_register_clks(void)
+{
+	clks_register(eseries_clkregs, ARRAY_SIZE(eseries_clkregs));
+}
 

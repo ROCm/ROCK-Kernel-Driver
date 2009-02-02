@@ -121,6 +121,7 @@ validate_paddr_page(u64 paddr)
 	return 0;
 }
 
+extern int isolate_lru_page(page);
 static int
 ia64_mca_cpe_move_page(u64 paddr, u32 node)
 {
@@ -138,13 +139,13 @@ ia64_mca_cpe_move_page(u64 paddr, u32 node)
 	page = phys_to_page(paddr);
 
 	migrate_prep();
-	ret = isolate_lru_page(page, &pagelist);
+	ret = isolate_lru_page(page);
 	if (ret) {
 		mstat_cannot_isolate++;
 		return ret;
 	}
 
-	SetPageMemError(page);		/* Mark the page as bad */
+	list_add(&page->lru, &pagelist);
 	ret = migrate_pages(&pagelist, alloc_migrate_page, node);
 	if (ret == 0) {
 		total_badpages++;
@@ -471,4 +472,3 @@ MODULE_PARM_DESC(cpe_polling_enabled,
 
 MODULE_AUTHOR("Russ Anderson <rja@sgi.com>");
 MODULE_DESCRIPTION("ia64 Corrected Error page migration driver");
-MODULE_LICENSE("GPL");

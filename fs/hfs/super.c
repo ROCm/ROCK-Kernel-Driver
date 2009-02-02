@@ -173,7 +173,7 @@ enum {
 	opt_err
 };
 
-static match_table_t tokens = {
+static const match_table_t tokens = {
 	{ opt_uid, "uid=%u" },
 	{ opt_gid, "gid=%u" },
 	{ opt_umask, "umask=%o" },
@@ -210,8 +210,8 @@ static int parse_options(char *options, struct hfs_sb_info *hsb)
 	int tmp, token;
 
 	/* initialize the sb with defaults */
-	hsb->s_uid = current->uid;
-	hsb->s_gid = current->gid;
+	hsb->s_uid = current_uid();
+	hsb->s_gid = current_gid();
 	hsb->s_file_umask = 0133;
 	hsb->s_dir_umask = 0022;
 	hsb->s_type = hsb->s_creator = cpu_to_be32(0x3f3f3f3f);	/* == '????' */

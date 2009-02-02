@@ -372,7 +372,10 @@ extern char *novfs_scope_get_username(void);
  * profile.c functions
  */
 extern u64 get_nanosecond_time(void);
-extern int DbgPrint(char *Fmt, ...);
+extern int ___DbgPrint(const char *site, const char *Fmt, ...);
+#define DbgPrint(fmt, args...)	___DbgPrint(__func__, ": " fmt "\n", ##args)
+#define __DbgPrint(fmt, args...)	___DbgPrint("", fmt, ##args)
+
 extern void novfs_profile_init(void);
 extern void novfs_profile_exit(void);
 

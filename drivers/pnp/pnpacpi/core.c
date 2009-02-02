@@ -23,7 +23,6 @@
 #include <linux/pnp.h>
 #include <linux/mod_devicetable.h>
 #include <acpi/acpi_bus.h>
-#include <acpi/actypes.h>
 
 #include "../base.h"
 #include "pnpacpi.h"
@@ -75,7 +74,7 @@ static int __init ispnpidacpi(char *id)
 
 static int pnpacpi_get_resources(struct pnp_dev *dev)
 {
-	dev_dbg(&dev->dev, "get resources\n");
+	pnp_dbg(&dev->dev, "get resources\n");
 	return pnpacpi_parse_allocated_resource(dev);
 }
 
@@ -86,7 +85,7 @@ static int pnpacpi_set_resources(struct pnp_dev *dev)
 	int ret;
 	acpi_status status;
 
-	dev_dbg(&dev->dev, "set resources\n");
+	pnp_dbg(&dev->dev, "set resources\n");
 	ret = pnpacpi_build_resource_template(dev, &buffer);
 	if (ret)
 		return ret;
@@ -259,20 +258,20 @@ int pnpacpi_disabled __initdata;
 static int __init pnpacpi_init(void)
 {
 	if (acpi_disabled || pnpacpi_disabled) {
-		pnp_info("PnP ACPI: disabled");
+		printk(KERN_INFO "pnp: PnP ACPI: disabled\n");
 		return 0;
 	}
-	pnp_info("PnP ACPI init");
+	printk(KERN_INFO "pnp: PnP ACPI init\n");
 	pnp_register_protocol(&pnpacpi_protocol);
 	register_acpi_bus_type(&acpi_pnp_bus);
 	acpi_get_devices(NULL, pnpacpi_add_device_handler, NULL, NULL);
-	pnp_info("PnP ACPI: found %d devices", num);
+	printk(KERN_INFO "pnp: PnP ACPI: found %d devices\n", num);
 	unregister_acpi_bus_type(&acpi_pnp_bus);
 	pnp_platform_devices = 1;
 	return 0;
 }
 
-subsys_initcall(pnpacpi_init);
+fs_initcall(pnpacpi_init);
 
 static int __init pnpacpi_setup(char *str)
 {

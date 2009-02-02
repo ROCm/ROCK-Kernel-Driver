@@ -19,7 +19,7 @@
  *		Auvo Häkkinen <Auvo.Hakkinen@cs.Helsinki.FI>
  *		Deepak Saxena <deepak@plexity.net>
  *		Boji T Kannanthanam <boji.t.kannanthanam@intel.com>
- *		Alan Cox <alan@redhat.com>:
+ *		Alan Cox <alan@lxorguk.ukuu.org.uk>:
  *			Ported to Linux 2.5.
  *		Markus Lidel <Markus.Lidel@shadowconnect.com>:
  *			Minor fixes for 2.6.
@@ -49,7 +49,6 @@ static int i2o_hrt_get(struct i2o_controller *c);
 /**
  *	i2o_msg_get_wait - obtain an I2O message from the IOP
  *	@c: I2O controller
- *	@msg: pointer to a I2O message pointer
  *	@wait: how long to wait until timeout
  *
  *	This function waits up to wait seconds for a message slot to be
@@ -1004,7 +1003,7 @@ static int i2o_hrt_get(struct i2o_controller *c)
 
 		size = hrt->num_entries * hrt->entry_len << 2;
 		if (size > c->hrt.len) {
-			if (i2o_dma_realloc(dev, &c->hrt, size, GFP_KERNEL))
+			if (i2o_dma_realloc(dev, &c->hrt, size))
 				return -ENOMEM;
 			else
 				hrt = c->hrt.virt;
@@ -1073,7 +1072,7 @@ struct i2o_controller *i2o_iop_alloc(void)
 
 	c->device.release = &i2o_iop_release;
 
-	snprintf(c->device.bus_id, BUS_ID_SIZE, "iop%d", c->unit);
+	dev_set_name(&c->device, "iop%d", c->unit);
 
 #if BITS_PER_LONG == 64
 	spin_lock_init(&c->context_list_lock);

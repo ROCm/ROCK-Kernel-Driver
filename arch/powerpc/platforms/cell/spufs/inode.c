@@ -95,9 +95,8 @@ spufs_new_inode(struct super_block *sb, int mode)
 		goto out;
 
 	inode->i_mode = mode;
-	inode->i_uid = current->fsuid;
-	inode->i_gid = current->fsgid;
-	inode->i_blocks = 0;
+	inode->i_uid = current_fsuid();
+	inode->i_gid = current_fsgid();
 	inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
 out:
 	return inode;
@@ -323,7 +322,7 @@ static int spufs_context_open(struct dentry *dentry, struct vfsmount *mnt)
 		goto out;
 	}
 
-	filp = dentry_open(dentry, mnt, O_RDONLY);
+	filp = dentry_open(dentry, mnt, O_RDONLY, current_cred());
 	if (IS_ERR(filp)) {
 		put_unused_fd(ret);
 		ret = PTR_ERR(filp);
@@ -562,7 +561,7 @@ static int spufs_gang_open(struct dentry *dentry, struct vfsmount *mnt)
 		goto out;
 	}
 
-	filp = dentry_open(dentry, mnt, O_RDONLY);
+	filp = dentry_open(dentry, mnt, O_RDONLY, current_cred());
 	if (IS_ERR(filp)) {
 		put_unused_fd(ret);
 		ret = PTR_ERR(filp);
@@ -661,7 +660,7 @@ enum {
 	Opt_uid, Opt_gid, Opt_mode, Opt_debug, Opt_err,
 };
 
-static match_table_t spufs_tokens = {
+static const match_table_t spufs_tokens = {
 	{ Opt_uid,   "uid=%d" },
 	{ Opt_gid,   "gid=%d" },
 	{ Opt_mode,  "mode=%o" },
@@ -757,6 +756,7 @@ spufs_create_root(struct super_block *sb, void *data)
 	inode->i_op = &simple_dir_inode_operations;
 	inode->i_fop = &simple_dir_operations;
 	SPUFS_I(inode)->i_ctx = NULL;
+	inc_nlink(inode);
 
 	ret = -EINVAL;
 	if (!spufs_parse_options(sb, data, inode))

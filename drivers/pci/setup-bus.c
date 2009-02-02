@@ -26,7 +26,6 @@
 #include <linux/cache.h>
 #include <linux/slab.h>
 
-#include "pci.h"
 
 static void pbus_assign_resources_sorted(struct pci_bus *bus)
 {
@@ -300,7 +299,7 @@ static void pbus_size_io(struct pci_bus *bus)
 
 			if (r->parent || !(r->flags & IORESOURCE_IO))
 				continue;
-			r_size = r->end - r->start + 1;
+			r_size = resource_size(r);
 
 			if (r_size < 0x400)
 				/* Might be re-aligned for ISA */
@@ -344,28 +343,20 @@ static int pbus_size_mem(struct pci_bus *bus, unsigned long mask, unsigned long 
 
 	list_for_each_entry(dev, &bus->devices, bus_list) {
 		int i;
-		int reassign = is_reassigndev(dev);
-
+		
 		for (i = 0; i < PCI_NUM_RESOURCES; i++) {
 			struct resource *r = &dev->resource[i];
 			resource_size_t r_size;
 
 			if (r->parent || (r->flags & mask) != type)
 				continue;
-			r_size = r->end - r->start + 1;
-
-			if ((i < PCI_BRIDGE_RESOURCES) && reassign)
-				r_size = ALIGN(r_size, PAGE_SIZE);
-
+			r_size = resource_size(r);
 			/* For bridges size != alignment */
 			align = resource_alignment(r);
 			order = __ffs(align) - 20;
 			if (order > 11) {
 				dev_warn(&dev->dev, "BAR %d bad alignment %llx: "
-				       "%#016llx-%#016llx\n", i,
-				       (unsigned long long)align,
-				       (unsigned long long)r->start,
-				       (unsigned long long)r->end);
+					 "%pR\n", i, (unsigned long long)align, r);
 				r->flags = 0;
 				continue;
 			}
@@ -384,11 +375,10 @@ static int pbus_size_mem(struct pci_bus *bus, unsigned long mask, unsigned long 
 	align = 0;
 	min_align = 0;
 	for (order = 0; order <= max_order; order++) {
-#ifdef CONFIG_RESOURCES_64BIT
-		resource_size_t align1 = 1ULL << (order + 20);
-#else
-		resource_size_t align1 = 1U << (order + 20);
-#endif
+		resource_size_t align1 = 1;
+
+		align1 <<= (order + 20);
+
 		if (!align)
 			min_align = align1;
 		else if (ALIGN(align + min_align, min_align) < align1)
@@ -546,11 +536,8 @@ static void pci_bus_dump_res(struct pci_bus *bus)
                 if (!res)
                         continue;
 
-		printk(KERN_INFO "bus: %02x index %x %s: [%llx, %llx]\n",
-			bus->number, i,
-			(res->flags & IORESOURCE_IO) ? "io port" : "mmio",
-			(unsigned long long) res->start,
-			(unsigned long long) res->end);
+		dev_printk(KERN_DEBUG, &bus->dev, "resource %d %s %pR\n", i,
+			   (res->flags & IORESOURCE_IO) ? "io: " : "mem:", res);
         }
 }
 

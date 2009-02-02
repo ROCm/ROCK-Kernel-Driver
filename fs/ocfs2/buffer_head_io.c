@@ -39,6 +39,18 @@
 
 #include "buffer_head_io.h"
 
+/*
+ * Bits on bh->b_state used by ocfs2.
+ *
+ * These MUST be after the JBD2 bits.  Hence, we use BH_JBDPrivateStart.
+ */
+enum ocfs2_state_bits {
+	BH_NeedsValidate = BH_JBDPrivateStart,
+};
+
+/* Expand the magic b_state functions */
+BUFFER_FNS(NeedsValidate, needs_validate);
+
 int ocfs2_write_block(struct ocfs2_super *osb, struct buffer_head *bh,
 		      struct inode *inode)
 {
@@ -112,7 +124,7 @@ int ocfs2_read_blocks_sync(struct ocfs2_super *osb, u64 block,
 		bh = bhs[i];
 
 		if (buffer_jbd(bh)) {
-			mlog(ML_ERROR,
+			mlog(ML_BH_IO,
 			     "trying to sync read a jbd "
 			     "managed bh (blocknr = %llu), skipping\n",
 			     (unsigned long long)bh->b_blocknr);
@@ -147,15 +159,10 @@ int ocfs2_read_blocks_sync(struct ocfs2_super *osb, u64 block,
 	for (i = nr; i > 0; i--) {
 		bh = bhs[i - 1];
 
-		if (buffer_jbd(bh)) {
-			mlog(ML_ERROR,
-			     "the journal got the buffer while it was "
-			     "locked for io! (blocknr = %llu)\n",
-			     (unsigned long long)bh->b_blocknr);
-			BUG();
-		}
+		/* No need to wait on the buffer if it's managed by JBD. */
+		if (!buffer_jbd(bh))
+			wait_on_buffer(bh);
 
-		wait_on_buffer(bh);
 		if (!buffer_uptodate(bh)) {
 			/* Status won't be cleared from here on out,
 			 * so we can safely record this and loop back
@@ -171,7 +178,9 @@ bail:
 }
 
 int ocfs2_read_blocks(struct inode *inode, u64 block, int nr,
-		      struct buffer_head *bhs[], int flags)
+		      struct buffer_head *bhs[], int flags,
+		      int (*validate)(struct super_block *sb,
+				      struct buffer_head *bh))
 {
 	int status = 0;
 	int i, ignore_cache = 0;
@@ -251,8 +260,6 @@ int ocfs2_read_blocks(struct inode *inode, u64 block, int nr,
 			ignore_cache = 1;
 		}
 
-		/* XXX: Can we ever get this and *not* have the cached
-		 * flag set? */
 		if (buffer_jbd(bh)) {
 			if (ignore_cache)
 				mlog(ML_BH_IO, "trying to sync read a jbd "
@@ -305,6 +312,8 @@ int ocfs2_read_blocks(struct inode *inode, u64 block, int nr,
 
 			clear_buffer_uptodate(bh);
 			get_bh(bh); /* for end_buffer_read_sync() */
+			if (validate)
+				set_buffer_needs_validate(bh);
 			bh->b_end_io = end_buffer_read_sync;
 			submit_bh(READ, bh);
 			continue;
@@ -334,6 +343,20 @@ int ocfs2_read_blocks(struct inode *inode, u64 block, int nr,
 				put_bh(bh);
 				bhs[i] = NULL;
 				continue;
+			}
+
+			if (buffer_needs_validate(bh)) {
+				/* We never set NeedsValidate if the
+				 * buffer was held by the journal, so
+				 * that better not have changed */
+				BUG_ON(buffer_jbd(bh));
+				clear_buffer_needs_validate(bh);
+				status = validate(inode->i_sb, bh);
+				if (status) {
+					put_bh(bh);
+					bhs[i] = NULL;
+					continue;
+				}
 			}
 		}
 

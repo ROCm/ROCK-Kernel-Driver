@@ -26,11 +26,12 @@
 #include <linux/clk.h>
 #include <linux/err.h>
 #include <linux/mmc/host.h>
+#include <linux/io.h>
 
-#include <asm/dma.h>
-#include <asm/io.h>
 #include <asm/sizes.h>
 
+#include <mach/dma.h>
+#include <mach/hardware.h>
 #include <mach/pxa-regs.h>
 #include <mach/mmc.h>
 
@@ -282,7 +283,7 @@ static int pxamci_data_done(struct pxamci_host *host, unsigned int stat)
 		return 0;
 
 	DCSR(host->dma) = 0;
-	dma_unmap_sg(mmc_dev(host->mmc), data->sg, host->dma_len,
+	dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
 		     host->dma_dir);
 
 	if (stat & STAT_READ_TIME_OUT)
@@ -520,7 +521,7 @@ static int pxamci_probe(struct platform_device *pdev)
 	/*
 	 * Block length register is only 10 bits before PXA27x.
 	 */
-	mmc->max_blk_size = (cpu_is_pxa21x() || cpu_is_pxa25x()) ? 1023 : 2048;
+	mmc->max_blk_size = cpu_is_pxa25x() ? 1023 : 2048;
 
 	/*
 	 * Block count register is 16 bits.
@@ -533,7 +534,7 @@ static int pxamci_probe(struct platform_device *pdev)
 	host->pdata = pdev->dev.platform_data;
 	host->clkrt = CLKRT_OFF;
 
-	host->clk = clk_get(&pdev->dev, "MMCCLK");
+	host->clk = clk_get(&pdev->dev, NULL);
 	if (IS_ERR(host->clk)) {
 		ret = PTR_ERR(host->clk);
 		host->clk = NULL;
@@ -554,7 +555,7 @@ static int pxamci_probe(struct platform_device *pdev)
 			 MMC_VDD_32_33|MMC_VDD_33_34;
 	mmc->caps = 0;
 	host->cmdat = 0;
-	if (!cpu_is_pxa21x() && !cpu_is_pxa25x()) {
+	if (!cpu_is_pxa25x()) {
 		mmc->caps |= MMC_CAP_4_BIT_DATA | MMC_CAP_SDIO_IRQ;
 		host->cmdat |= CMDAT_SDIO_INT_EN;
 		if (cpu_is_pxa300() || cpu_is_pxa310())

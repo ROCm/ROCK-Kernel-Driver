@@ -91,6 +91,8 @@ static struct usb_device_id id_table [] = {
 	{ USB_DEVICE(WS002IN_VENDOR_ID, WS002IN_PRODUCT_ID) },
 	{ USB_DEVICE(COREGA_VENDOR_ID, COREGA_PRODUCT_ID) },
 	{ USB_DEVICE(YCCABLE_VENDOR_ID, YCCABLE_PRODUCT_ID) },
+	{ USB_DEVICE(SUPERIAL_VENDOR_ID, SUPERIAL_PRODUCT_ID) },
+	{ USB_DEVICE(HP_VENDOR_ID, HP_LD220_PRODUCT_ID) },
 	{ }					/* Terminating entry */
 };
 
@@ -154,7 +156,6 @@ struct pl2303_private {
 	wait_queue_head_t delta_msr_wait;
 	u8 line_control;
 	u8 line_status;
-	u8 termios_initialized;
 	enum pl2303_type type;
 };
 
@@ -525,16 +526,6 @@ static void pl2303_set_termios(struct tty_struct *tty,
 	u8 control;
 
 	dbg("%s -  port %d", __func__, port->number);
-
-	spin_lock_irqsave(&priv->lock, flags);
-	if (!priv->termios_initialized) {
-		*(tty->termios) = tty_std_termios;
-		tty->termios->c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-		tty->termios->c_ispeed = 9600;
-		tty->termios->c_ospeed = 9600;
-		priv->termios_initialized = 1;
-	}
-	spin_unlock_irqrestore(&priv->lock, flags);
 
 	/* The PL2303 is reported to lose bytes if you change
 	   serial settings even to the same values as before. Thus
@@ -1057,7 +1048,7 @@ static void pl2303_read_bulk_callback(struct urb *urb)
 		tty_flag = TTY_FRAME;
 	dbg("%s - tty_flag = %d", __func__, tty_flag);
 
-	tty = port->port.tty;
+	tty = tty_port_tty_get(&port->port);
 	if (tty && urb->actual_length) {
 		tty_buffer_request_room(tty, urb->actual_length + 1);
 		/* overrun is special, not associated with a char */
@@ -1067,7 +1058,7 @@ static void pl2303_read_bulk_callback(struct urb *urb)
 			tty_insert_flip_char(tty, data[i], tty_flag);
 		tty_flip_buffer_push(tty);
 	}
-
+	tty_kref_put(tty);
 	/* Schedule the next read _if_ we are still open */
 	if (port->port.count) {
 		urb->dev = port->serial->dev;
@@ -1158,7 +1149,7 @@ static int __init pl2303_init(void)
 	retval = usb_register(&pl2303_driver);
 	if (retval)
 		goto failed_usb_register;
-	info(DRIVER_DESC);
+	printk(KERN_INFO KBUILD_MODNAME ": " DRIVER_DESC "\n");
 	return 0;
 failed_usb_register:
 	usb_serial_deregister(&pl2303_device);

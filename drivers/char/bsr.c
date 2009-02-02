@@ -104,7 +104,7 @@ static ssize_t
 bsr_len_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	struct bsr_dev *bsr_dev = dev_get_drvdata(dev);
-	return sprintf(buf, "%lu\n", bsr_dev->bsr_len);
+	return sprintf(buf, "%llu\n", bsr_dev->bsr_len);
 }
 
 static struct device_attribute bsr_dev_attrs[] = {
@@ -242,9 +242,8 @@ static int bsr_add_node(struct device_node *bn)
 			goto out_err;
 		}
 
-		cur->bsr_device = device_create_drvdata(bsr_class, NULL,
-							cur->bsr_dev,
-							cur, cur->bsr_name);
+		cur->bsr_device = device_create(bsr_class, NULL, cur->bsr_dev,
+						cur, cur->bsr_name);
 		if (!cur->bsr_device) {
 			printk(KERN_ERR "device_create failed for %s\n",
 			       cur->bsr_name);

@@ -3,9 +3,6 @@
  * macros expand to the right source-code.
  *
  * Author:  Marco van Wieringen <mvw@planets.elm.net>
- *
- * Version: $Id: quotaops.h,v 1.2 1998/01/15 16:22:26 ecd Exp $
- *
  */
 #ifndef _LINUX_QUOTAOPS_
 #define _LINUX_QUOTAOPS_
@@ -27,13 +24,13 @@ void sync_dquots(struct super_block *sb, int type);
 
 int dquot_initialize(struct inode *inode, int type);
 int dquot_drop(struct inode *inode);
-int dquot_drop_locked(struct inode *inode);
 struct dquot *dqget(struct super_block *sb, unsigned int id, int type);
 void dqput(struct dquot *dquot);
-int dquot_is_cached(struct super_block *sb, unsigned int id, int type);
 int dquot_scan_active(struct super_block *sb,
 		      int (*fn)(struct dquot *dquot, unsigned long priv),
 		      unsigned long priv);
+struct dquot *dquot_alloc(struct super_block *sb, int type);
+void dquot_destroy(struct dquot *dquot);
 
 int dquot_alloc_space(struct inode *inode, qsize_t number, int prealloc);
 int dquot_alloc_inode(const struct inode *inode, qsize_t number);
@@ -260,6 +257,11 @@ static inline int sb_has_quota_loaded(struct super_block *sb, int type)
 }
 
 static inline int sb_any_quota_loaded(struct super_block *sb)
+{
+	return 0;
+}
+
+static inline int sb_has_quota_active(struct super_block *sb, int type)
 {
 	return 0;
 }

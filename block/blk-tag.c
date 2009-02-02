@@ -158,7 +158,6 @@ fail:
 /**
  * blk_init_tags - initialize the tag info for an external tag map
  * @depth:	the maximum queue depth supported
- * @tags: the tag to use
  **/
 struct blk_queue_tag *blk_init_tags(int depth)
 {
@@ -337,6 +336,7 @@ EXPORT_SYMBOL(blk_queue_end_tag);
 int blk_queue_start_tag(struct request_queue *q, struct request *rq)
 {
 	struct blk_queue_tag *bqt = q->queue_tags;
+	unsigned max_depth, offset;
 	int tag;
 
 	if (unlikely((rq->cmd_flags & REQ_QUEUED))) {
@@ -350,10 +350,19 @@ int blk_queue_start_tag(struct request_queue *q, struct request *rq)
 	/*
 	 * Protect against shared tag maps, as we may not have exclusive
 	 * access to the tag map.
+	 *
+	 * We reserve a few tags just for sync IO, since we don't want
+	 * to starve sync IO on behalf of flooding async IO.
 	 */
+	max_depth = bqt->max_depth;
+	if (rq_is_sync(rq))
+		offset = 0;
+	else
+		offset = max_depth >> 2;
+
 	do {
-		tag = find_first_zero_bit(bqt->tag_map, bqt->max_depth);
-		if (tag >= bqt->max_depth)
+		tag = find_next_zero_bit(bqt->tag_map, max_depth, offset);
+		if (tag >= max_depth)
 			return 1;
 
 	} while (test_and_set_bit_lock(tag, bqt->tag_map));

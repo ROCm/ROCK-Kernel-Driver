@@ -43,7 +43,8 @@
 #if defined(CONFIG_ARCH_LUBBOCK) ||\
     defined(CONFIG_MACH_MAINSTONE) ||\
     defined(CONFIG_MACH_ZYLONITE) ||\
-    defined(CONFIG_MACH_LITTLETON)
+    defined(CONFIG_MACH_LITTLETON) ||\
+    defined(CONFIG_ARCH_VIPER)
 
 #include <asm/mach-types.h>
 
@@ -86,49 +87,28 @@ static inline void SMC_outw(u16 val, void __iomem *ioaddr, int reg)
 #define RPC_LSA_DEFAULT		RPC_LED_100_10
 #define RPC_LSB_DEFAULT		RPC_LED_TX_RX
 
-# if defined (CONFIG_BFIN561_EZKIT)
 #define SMC_CAN_USE_8BIT	0
 #define SMC_CAN_USE_16BIT	1
+# if defined(CONFIG_BF561)
 #define SMC_CAN_USE_32BIT	1
-#define SMC_IO_SHIFT		0
-#define SMC_NOWAIT      	1
-#define SMC_USE_BFIN_DMA	0
-
-
-#define SMC_inw(a, r)       	readw((a) + (r))
-#define SMC_outw(v, a, r)   	writew(v, (a) + (r))
-#define SMC_inl(a, r)       	readl((a) + (r))
-#define SMC_outl(v, a, r)   	writel(v, (a) + (r))
-#define SMC_outsl(a, r, p, l)	outsl((unsigned long *)((a) + (r)), p, l)
-#define SMC_insl(a, r, p, l) 	insl ((unsigned long *)((a) + (r)), p, l)
 # else
-#define SMC_CAN_USE_8BIT	0
-#define SMC_CAN_USE_16BIT	1
 #define SMC_CAN_USE_32BIT	0
+# endif
 #define SMC_IO_SHIFT		0
 #define SMC_NOWAIT      	1
 #define SMC_USE_BFIN_DMA	0
 
-
-#define SMC_inw(a, r)       	readw((a) + (r))
-#define SMC_outw(v, a, r)   	writew(v, (a) + (r))
-#define SMC_outsw(a, r, p, l)	outsw((unsigned long *)((a) + (r)), p, l)
-#define SMC_insw(a, r, p, l) 	insw ((unsigned long *)((a) + (r)), p, l)
+#define SMC_inw(a, r)		readw((a) + (r))
+#define SMC_outw(v, a, r)	writew(v, (a) + (r))
+#define SMC_insw(a, r, p, l)	readsw((a) + (r), p, l)
+#define SMC_outsw(a, r, p, l)	writesw((a) + (r), p, l)
+# if SMC_CAN_USE_32BIT
+#define SMC_inl(a, r)		readl((a) + (r))
+#define SMC_outl(v, a, r)	writel(v, (a) + (r))
+#define SMC_insl(a, r, p, l)	readsl((a) + (r), p, l)
+#define SMC_outsl(a, r, p, l)	writesl((a) + (r), p, l)
 # endif
-/* check if the mac in reg is valid */
-#define SMC_GET_MAC_ADDR(lp, addr)				\
-	do {							\
-		unsigned int __v;				\
-		__v = SMC_inw(ioaddr, ADDR0_REG(lp));		\
-		addr[0] = __v; addr[1] = __v >> 8;		\
-		__v = SMC_inw(ioaddr, ADDR1_REG(lp));		\
-		addr[2] = __v; addr[3] = __v >> 8;		\
-		__v = SMC_inw(ioaddr, ADDR2_REG(lp));		\
-		addr[4] = __v; addr[5] = __v >> 8;		\
-		if (*(u32 *)(&addr[0]) == 0xFFFFFFFF) {		\
-			random_ether_addr(addr);		\
-		}						\
-	} while (0)
+
 #elif defined(CONFIG_REDWOOD_5) || defined(CONFIG_REDWOOD_6)
 
 /* We can only do 16-bit reads and writes in the static memory space. */
@@ -285,19 +265,6 @@ SMC_outw(u16 val, void __iomem *ioaddr, int reg)
 
 #define SMC_IRQ_FLAGS		(0)
 
-#elif	defined(CONFIG_ISA)
-
-#define SMC_CAN_USE_8BIT	1
-#define SMC_CAN_USE_16BIT	1
-#define SMC_CAN_USE_32BIT	0
-
-#define SMC_inb(a, r)		inb((a) + (r))
-#define SMC_inw(a, r)		inw((a) + (r))
-#define SMC_outb(v, a, r)	outb(v, (a) + (r))
-#define SMC_outw(v, a, r)	outw(v, (a) + (r))
-#define SMC_insw(a, r, p, l)	insw((a) + (r), p, l)
-#define SMC_outsw(a, r, p, l)	outsw((a) + (r), p, l)
-
 #elif   defined(CONFIG_M32R)
 
 #define SMC_CAN_USE_8BIT	0
@@ -446,6 +413,8 @@ static inline void LPD7_SMC_outsw (unsigned char* a, int r,
 #define SMC_CAN_USE_32BIT	1
 #define SMC_NOWAIT		1
 
+#define SMC_IO_SHIFT		(lp->io_shift)
+
 #define SMC_inb(a, r)		readb((a) + (r))
 #define SMC_inw(a, r)		readw((a) + (r))
 #define SMC_inl(a, r)		readl((a) + (r))
@@ -524,7 +493,8 @@ struct smc_local {
  * as RX which can overrun memory and lose packets.
  */
 #include <linux/dma-mapping.h>
-#include <asm/dma.h>
+#include <mach/dma.h>
+#include <mach/hardware.h>
 #include <mach/pxa-regs.h>
 
 #ifdef SMC_insl
@@ -778,14 +748,6 @@ smc_pxa_dma_irq(int dma, void *dummy)
 #define RPC_ANEG	0x0800	// When 1 PHY is in Auto-Negotiate Mode
 #define RPC_LSXA_SHFT	5	// Bits to shift LS2A,LS1A,LS0A to lsb
 #define RPC_LSXB_SHFT	2	// Bits to get LS2B,LS1B,LS0B to lsb
-#define RPC_LED_100_10	(0x00)	// LED = 100Mbps OR's with 10Mbps link detect
-#define RPC_LED_RES	(0x01)	// LED = Reserved
-#define RPC_LED_10	(0x02)	// LED = 10Mbps link detect
-#define RPC_LED_FD	(0x03)	// LED = Full Duplex Mode
-#define RPC_LED_TX_RX	(0x04)	// LED = TX or RX packet occurred
-#define RPC_LED_100	(0x05)	// LED = 100Mbps link dectect
-#define RPC_LED_TX	(0x06)	// LED = TX packet occurred
-#define RPC_LED_RX	(0x07)	// LED = RX packet occurred
 
 #ifndef RPC_LSA_DEFAULT
 #define RPC_LSA_DEFAULT	RPC_LED_100
@@ -794,7 +756,7 @@ smc_pxa_dma_irq(int dma, void *dummy)
 #define RPC_LSB_DEFAULT RPC_LED_FD
 #endif
 
-#define RPC_DEFAULT (RPC_ANEG | (RPC_LSA_DEFAULT << RPC_LSXA_SHFT) | (RPC_LSB_DEFAULT << RPC_LSXB_SHFT) | RPC_SPEED | RPC_DPLX)
+#define RPC_DEFAULT (RPC_ANEG | RPC_SPEED | RPC_DPLX)
 
 
 /* Bank 0 0x0C is reserved */

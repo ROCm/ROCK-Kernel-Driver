@@ -93,7 +93,7 @@ static struct ctrl sd_ctrls[] = {
 	},
 };
 
-static struct v4l2_pix_format vga_mode[] = {
+static const struct v4l2_pix_format vga_mode[] = {
 	{176, 144, V4L2_PIX_FMT_JPEG, V4L2_FIELD_NONE,
 		.bytesperline = 176,
 		.sizeimage = 176 * 144 * 3 / 8 + 590,
@@ -837,18 +837,22 @@ static int sd_init(struct gspca_dev *gspca_dev)
 	return 0;
 }
 
-static void sd_start(struct gspca_dev *gspca_dev)
+static int sd_start(struct gspca_dev *gspca_dev)
 {
 	cx11646_initsize(gspca_dev);
 	cx11646_fw(gspca_dev);
 	cx_sensor(gspca_dev);
 	cx11646_jpeg(gspca_dev);
+	return 0;
 }
 
+/* called on streamoff with alt 0 and on disconnect */
 static void sd_stop0(struct gspca_dev *gspca_dev)
 {
 	int retry = 50;
 
+	if (!gspca_dev->present)
+		return;
 	reg_w_val(gspca_dev, 0x0000, 0x00);
 	reg_r(gspca_dev, 0x0002, 1);
 	reg_w_val(gspca_dev, 0x0053, 0x00);

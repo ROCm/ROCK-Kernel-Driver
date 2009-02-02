@@ -21,6 +21,7 @@
 #include <linux/file.h>
 #include <linux/pagemap.h>
 #include <linux/splice.h>
+#include <linux/memcontrol.h>
 #include <linux/mm_inline.h>
 #include <linux/swap.h>
 #include <linux/writeback.h>
@@ -731,8 +732,8 @@ ssize_t splice_from_pipe(struct pipe_inode_info *pipe, struct file *out,
 	};
 
 	/*
-	 * The actor worker might be calling ->prepare_write and
-	 * ->commit_write. Most of the time, these expect i_mutex to
+	 * The actor worker might be calling ->write_begin and
+	 * ->write_end. Most of the time, these expect i_mutex to
 	 * be held. Since this may result in an ABBA deadlock with
 	 * pipe->inode, we have to order lock acquiry here.
 	 */

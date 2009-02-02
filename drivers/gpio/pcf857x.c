@@ -188,8 +188,10 @@ static int pcf857x_probe(struct i2c_client *client,
 	int				status;
 
 	pdata = client->dev.platform_data;
-	if (!pdata)
-		return -ENODEV;
+	if (!pdata) {
+		dev_dbg(&client->dev, "no platform data\n");
+		return -EINVAL;
+	}
 
 	/* Allocate, initialize, and register this gpio_chip. */
 	gpio = kzalloc(sizeof *gpio, GFP_KERNEL);
@@ -248,8 +250,10 @@ static int pcf857x_probe(struct i2c_client *client,
 		else
 			status = i2c_read_le16(client);
 
-	} else
-		status = -ENODEV;
+	} else {
+		dev_dbg(&client->dev, "unsupported number of gpios\n");
+		status = -EINVAL;
+	}
 
 	if (status < 0)
 		goto fail;
@@ -351,7 +355,10 @@ static int __init pcf857x_init(void)
 {
 	return i2c_add_driver(&pcf857x_driver);
 }
-module_init(pcf857x_init);
+/* register after i2c postcore initcall and before
+ * subsys initcalls that may rely on these GPIOs
+ */
+subsys_initcall(pcf857x_init);
 
 static void __exit pcf857x_exit(void)
 {

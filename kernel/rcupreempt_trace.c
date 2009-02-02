@@ -149,12 +149,12 @@ static void rcupreempt_trace_sum(struct rcupreempt_trace *sp)
 		sp->done_length += cp->done_length;
 		sp->done_add += cp->done_add;
 		sp->done_remove += cp->done_remove;
-		atomic_set(&sp->done_invoked, atomic_read(&cp->done_invoked));
+		atomic_add(atomic_read(&cp->done_invoked), &sp->done_invoked);
 		sp->rcu_check_callbacks += cp->rcu_check_callbacks;
-		atomic_set(&sp->rcu_try_flip_1,
-			   atomic_read(&cp->rcu_try_flip_1));
-		atomic_set(&sp->rcu_try_flip_e1,
-			   atomic_read(&cp->rcu_try_flip_e1));
+		atomic_add(atomic_read(&cp->rcu_try_flip_1),
+			   &sp->rcu_try_flip_1);
+		atomic_add(atomic_read(&cp->rcu_try_flip_e1),
+			   &sp->rcu_try_flip_e1);
 		sp->rcu_try_flip_i1 += cp->rcu_try_flip_i1;
 		sp->rcu_try_flip_ie1 += cp->rcu_try_flip_ie1;
 		sp->rcu_try_flip_g1 += cp->rcu_try_flip_g1;
@@ -308,11 +308,16 @@ out:
 
 static int __init rcupreempt_trace_init(void)
 {
+	int ret;
+
 	mutex_init(&rcupreempt_trace_mutex);
 	rcupreempt_trace_buf = kmalloc(RCUPREEMPT_TRACE_BUF_SIZE, GFP_KERNEL);
 	if (!rcupreempt_trace_buf)
 		return 1;
-	return rcupreempt_debugfs_init();
+	ret = rcupreempt_debugfs_init();
+	if (ret)
+		kfree(rcupreempt_trace_buf);
+	return ret;
 }
 
 static void __exit rcupreempt_trace_cleanup(void)

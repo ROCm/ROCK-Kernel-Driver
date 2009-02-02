@@ -75,14 +75,22 @@ full_name_hash(const unsigned char *name, unsigned int len)
 	return end_name_hash(hash);
 }
 
-struct dcookie_struct;
-
-#define DNAME_INLINE_LEN_MIN 36
+/*
+ * Try to keep struct dentry aligned on 64 byte cachelines (this will
+ * give reasonable cacheline footprint with larger lines without the
+ * large memory footprint increase).
+ */
+#ifdef CONFIG_64BIT
+#define DNAME_INLINE_LEN_MIN 32 /* 192 bytes */
+#else
+#define DNAME_INLINE_LEN_MIN 40 /* 128 bytes */
+#endif
 
 struct dentry {
 	atomic_t d_count;
 	unsigned int d_flags;		/* protected by d_lock */
 	spinlock_t d_lock;		/* per dentry lock */
+	int d_mounted;
 	struct inode *d_inode;		/* Where the name belongs to - NULL is
 					 * negative */
 	/*
@@ -107,10 +115,7 @@ struct dentry {
 	struct dentry_operations *d_op;
 	struct super_block *d_sb;	/* The root of the dentry tree */
 	void *d_fsdata;			/* fs-specific data */
-#ifdef CONFIG_PROFILING
-	struct dcookie_struct *d_cookie; /* cookie, if any */
-#endif
-	int d_mounted;
+
 	unsigned char d_iname[DNAME_INLINE_LEN_MIN];	/* small names */
 };
 
@@ -177,6 +182,8 @@ d_iput:		no		no		no       yes
 
 #define DCACHE_INOTIFY_PARENT_WATCHED	0x0020 /* Parent inode is watched */
 
+#define DCACHE_COOKIE		0x0040	/* For use by dcookie subsystem */
+
 extern spinlock_t dcache_lock;
 extern seqlock_t rename_lock;
 
@@ -228,9 +235,9 @@ extern void d_delete(struct dentry *);
 
 /* allocate/de-allocate */
 extern struct dentry * d_alloc(struct dentry *, const struct qstr *);
-extern struct dentry * d_alloc_anon(struct inode *);
 extern struct dentry * d_splice_alias(struct inode *, struct dentry *);
 extern struct dentry * d_add_ci(struct dentry *, struct inode *, struct qstr *);
+extern struct dentry * d_obtain_alias(struct inode *);
 extern void shrink_dcache_sb(struct super_block *);
 extern void shrink_dcache_parent(struct dentry *);
 extern void shrink_dcache_for_umount(struct super_block *);
@@ -287,6 +294,7 @@ static inline struct dentry *d_add_unique(struct dentry *entry, struct inode *in
 
 /* used for rename() and baskets */
 extern void d_move(struct dentry *, struct dentry *);
+extern struct dentry *d_ancestor(struct dentry *, struct dentry *);
 
 /* appendix may either be NULL or be used for transname suffixes */
 extern struct dentry * d_lookup(struct dentry *, struct qstr *);
@@ -299,12 +307,9 @@ extern int d_validate(struct dentry *, struct dentry *);
 /*
  * helper function for dentry_operations.d_dname() members
  */
-#define D_PATH_FAIL_DELETED 1
-#define D_PATH_DISCONNECT   2
 extern char *dynamic_dname(struct dentry *, char *, int, const char *, ...);
 
-extern char *__d_path(const struct path *path, struct path *root, char *, int,
-		      int);
+extern char *__d_path(const struct path *path, struct path *root, char *, int);
 extern char *d_path(const struct path *, char *, int);
 extern char *dentry_path(struct dentry *, char *, int);
 

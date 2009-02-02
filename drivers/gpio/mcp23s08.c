@@ -310,8 +310,10 @@ static int mcp23s08_probe(struct spi_device *spi)
 	unsigned			base;
 
 	pdata = spi->dev.platform_data;
-	if (!pdata || !gpio_is_valid(pdata->base))
-		return -ENODEV;
+	if (!pdata || !gpio_is_valid(pdata->base)) {
+		dev_dbg(&spi->dev, "invalid or missing platform data\n");
+		return -EINVAL;
+	}
 
 	for (addr = 0; addr < 4; addr++) {
 		if (!pdata->chip[addr].is_present)
@@ -419,7 +421,10 @@ static int __init mcp23s08_init(void)
 {
 	return spi_register_driver(&mcp23s08_driver);
 }
-module_init(mcp23s08_init);
+/* register after spi postcore initcall and before
+ * subsys initcalls that may rely on these GPIOs
+ */
+subsys_initcall(mcp23s08_init);
 
 static void __exit mcp23s08_exit(void)
 {

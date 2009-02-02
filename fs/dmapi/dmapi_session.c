@@ -526,7 +526,7 @@ dm_create_session(
 			return(error);
 		}
 		unlink_session(s);
-		mutex_spinunlock(&dm_session_lock, lc); 
+		mutex_spinunlock(&dm_session_lock, lc);
 #ifdef CONFIG_PROC_FS
 		{
 		char buf[100];
@@ -538,7 +538,7 @@ dm_create_session(
 	memcpy(s->sn_info, sessinfo, len);
 	s->sn_info[len-1] = 0;		/* if not NULL, then now 'tis */
 	s->sn_sessid = sid;
-	lc = mutex_spinlock(&dm_session_lock); 
+	lc = mutex_spinlock(&dm_session_lock);
 	link_session(s);
 	mutex_spinunlock(&dm_session_lock, lc);
 #ifdef CONFIG_PROC_FS

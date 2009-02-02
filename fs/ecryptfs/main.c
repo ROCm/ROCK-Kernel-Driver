@@ -30,7 +30,6 @@
 #include <linux/namei.h>
 #include <linux/skbuff.h>
 #include <linux/crypto.h>
-#include <linux/netlink.h>
 #include <linux/mount.h>
 #include <linux/pagemap.h>
 #include <linux/key.h>
@@ -49,8 +48,7 @@ MODULE_PARM_DESC(ecryptfs_verbosity,
 		 "0, which is Quiet)");
 
 /**
- * Module parameter that defines the number of netlink message buffer
- * elements
+ * Module parameter that defines the number of message buffer elements
  */
 unsigned int ecryptfs_message_buf_len = ECRYPTFS_DEFAULT_MSG_CTX_ELEMS;
 
@@ -60,9 +58,9 @@ MODULE_PARM_DESC(ecryptfs_message_buf_len,
 
 /**
  * Module parameter that defines the maximum guaranteed amount of time to wait
- * for a response through netlink.  The actual sleep time will be, more than
+ * for a response from ecryptfsd.  The actual sleep time will be, more than
  * likely, a small amount greater than this specified value, but only less if
- * the netlink message successfully arrives.
+ * the message successfully arrives.
  */
 signed long ecryptfs_message_wait_timeout = ECRYPTFS_MAX_MSG_CTX_TTL / HZ;
 
@@ -82,8 +80,6 @@ unsigned int ecryptfs_number_of_users = ECRYPTFS_DEFAULT_NUM_USERS;
 module_param(ecryptfs_number_of_users, uint, 0);
 MODULE_PARM_DESC(ecryptfs_number_of_users, "An estimate of the number of "
 		 "concurrent users of eCryptfs");
-
-unsigned int ecryptfs_transport = ECRYPTFS_DEFAULT_TRANSPORT;
 
 void __ecryptfs_printk(const char *fmt, ...)
 {
@@ -119,6 +115,7 @@ void __ecryptfs_printk(const char *fmt, ...)
  */
 int ecryptfs_init_persistent_file(struct dentry *ecryptfs_dentry)
 {
+	const struct cred *cred = current_cred();
 	struct ecryptfs_inode_info *inode_info =
 		ecryptfs_inode_to_private(ecryptfs_dentry->d_inode);
 	int rc = 0;
@@ -131,7 +128,7 @@ int ecryptfs_init_persistent_file(struct dentry *ecryptfs_dentry)
 
 		lower_dentry = ecryptfs_dentry_to_lower(ecryptfs_dentry);
 		rc = ecryptfs_privileged_open(&inode_info->lower_file,
-						     lower_dentry, lower_mnt);
+					      lower_dentry, lower_mnt, cred);
 		if (rc || IS_ERR(inode_info->lower_file)) {
 			printk(KERN_ERR "Error opening lower persistent file "
 			       "for lower_dentry [0x%p] and lower_mnt [0x%p]; "
@@ -209,9 +206,11 @@ enum { ecryptfs_opt_sig, ecryptfs_opt_ecryptfs_sig,
        ecryptfs_opt_cipher, ecryptfs_opt_ecryptfs_cipher,
        ecryptfs_opt_ecryptfs_key_bytes,
        ecryptfs_opt_passthrough, ecryptfs_opt_xattr_metadata,
-       ecryptfs_opt_encrypted_view, ecryptfs_opt_err };
+       ecryptfs_opt_encrypted_view, ecryptfs_opt_fnek_sig,
+       ecryptfs_opt_fn_cipher, ecryptfs_opt_fn_cipher_key_bytes,
+       ecryptfs_opt_err };
 
-static match_table_t tokens = {
+static const match_table_t tokens = {
 	{ecryptfs_opt_sig, "sig=%s"},
 	{ecryptfs_opt_ecryptfs_sig, "ecryptfs_sig=%s"},
 	{ecryptfs_opt_cipher, "cipher=%s"},
@@ -220,6 +219,9 @@ static match_table_t tokens = {
 	{ecryptfs_opt_passthrough, "ecryptfs_passthrough"},
 	{ecryptfs_opt_xattr_metadata, "ecryptfs_xattr_metadata"},
 	{ecryptfs_opt_encrypted_view, "ecryptfs_encrypted_view"},
+	{ecryptfs_opt_fnek_sig, "ecryptfs_fnek_sig=%s"},
+	{ecryptfs_opt_fn_cipher, "ecryptfs_fn_cipher=%s"},
+	{ecryptfs_opt_fn_cipher_key_bytes, "ecryptfs_fn_key_bytes=%u"},
 	{ecryptfs_opt_err, NULL}
 };
 
@@ -284,8 +286,11 @@ static int ecryptfs_parse_options(struct super_block *sb, char *options)
 	int rc = 0;
 	int sig_set = 0;
 	int cipher_name_set = 0;
+	int fn_cipher_name_set = 0;
 	int cipher_key_bytes;
 	int cipher_key_bytes_set = 0;
+	int fn_cipher_key_bytes;
+	int fn_cipher_key_bytes_set = 0;
 	struct ecryptfs_mount_crypt_stat *mount_crypt_stat =
 		&ecryptfs_superblock_to_private(sb)->mount_crypt_stat;
 	substring_t args[MAX_OPT_ARGS];
@@ -293,7 +298,12 @@ static int ecryptfs_parse_options(struct super_block *sb, char *options)
 	char *sig_src;
 	char *cipher_name_dst;
 	char *cipher_name_src;
+	char *fn_cipher_name_dst;
+	char *fn_cipher_name_src;
+	char *fnek_dst;
+	char *fnek_src;
 	char *cipher_key_bytes_src;
+	char *fn_cipher_key_bytes_src;
 
 	if (!options) {
 		rc = -EINVAL;
@@ -325,10 +335,7 @@ static int ecryptfs_parse_options(struct super_block *sb, char *options)
 				global_default_cipher_name;
 			strncpy(cipher_name_dst, cipher_name_src,
 				ECRYPTFS_MAX_CIPHER_NAME_SIZE);
-			ecryptfs_printk(KERN_DEBUG,
-					"The mount_crypt_stat "
-					"global_default_cipher_name set to: "
-					"[%s]\n", cipher_name_dst);
+			cipher_name_dst[ECRYPTFS_MAX_CIPHER_NAME_SIZE] = '\0';
 			cipher_name_set = 1;
 			break;
 		case ecryptfs_opt_ecryptfs_key_bytes:
@@ -338,11 +345,6 @@ static int ecryptfs_parse_options(struct super_block *sb, char *options)
 						   &cipher_key_bytes_src, 0);
 			mount_crypt_stat->global_default_cipher_key_size =
 				cipher_key_bytes;
-			ecryptfs_printk(KERN_DEBUG,
-					"The mount_crypt_stat "
-					"global_default_cipher_key_size "
-					"set to: [%d]\n", mount_crypt_stat->
-					global_default_cipher_key_size);
 			cipher_key_bytes_set = 1;
 			break;
 		case ecryptfs_opt_passthrough:
@@ -359,11 +361,51 @@ static int ecryptfs_parse_options(struct super_block *sb, char *options)
 			mount_crypt_stat->flags |=
 				ECRYPTFS_ENCRYPTED_VIEW_ENABLED;
 			break;
+		case ecryptfs_opt_fnek_sig:
+			fnek_src = args[0].from;
+			fnek_dst =
+				mount_crypt_stat->global_default_fnek_sig;
+			strncpy(fnek_dst, fnek_src, ECRYPTFS_SIG_SIZE_HEX);
+			mount_crypt_stat->global_default_fnek_sig[
+				ECRYPTFS_SIG_SIZE_HEX] = '\0';
+			rc = ecryptfs_add_global_auth_tok(
+				mount_crypt_stat,
+				mount_crypt_stat->global_default_fnek_sig);
+			if (rc) {
+				printk(KERN_ERR "Error attempting to register "
+				       "global fnek sig [%s]; rc = [%d]\n",
+				       mount_crypt_stat->global_default_fnek_sig,
+				       rc);
+				goto out;
+			}
+			mount_crypt_stat->flags |=
+				(ECRYPTFS_GLOBAL_ENCRYPT_FILENAMES
+				 | ECRYPTFS_GLOBAL_ENCFN_USE_MOUNT_FNEK);
+			break;
+		case ecryptfs_opt_fn_cipher:
+			fn_cipher_name_src = args[0].from;
+			fn_cipher_name_dst =
+				mount_crypt_stat->global_default_fn_cipher_name;
+			strncpy(fn_cipher_name_dst, fn_cipher_name_src,
+				ECRYPTFS_MAX_CIPHER_NAME_SIZE);
+			mount_crypt_stat->global_default_fn_cipher_name[
+				ECRYPTFS_MAX_CIPHER_NAME_SIZE] = '\0';
+			fn_cipher_name_set = 1;
+			break;
+		case ecryptfs_opt_fn_cipher_key_bytes:
+			fn_cipher_key_bytes_src = args[0].from;
+			fn_cipher_key_bytes =
+				(int)simple_strtol(fn_cipher_key_bytes_src,
+						   &fn_cipher_key_bytes_src, 0);
+			mount_crypt_stat->global_default_fn_cipher_key_bytes =
+				fn_cipher_key_bytes;
+			fn_cipher_key_bytes_set = 1;
+			break;
 		case ecryptfs_opt_err:
 		default:
-			ecryptfs_printk(KERN_WARNING,
-					"eCryptfs: unrecognized option '%s'\n",
-					p);
+			printk(KERN_WARNING
+			       "%s: eCryptfs: unrecognized option [%s]\n",
+			       __func__, p);
 		}
 	}
 	if (!sig_set) {
@@ -377,33 +419,60 @@ static int ecryptfs_parse_options(struct super_block *sb, char *options)
 		int cipher_name_len = strlen(ECRYPTFS_DEFAULT_CIPHER);
 
 		BUG_ON(cipher_name_len >= ECRYPTFS_MAX_CIPHER_NAME_SIZE);
-
 		strcpy(mount_crypt_stat->global_default_cipher_name,
 		       ECRYPTFS_DEFAULT_CIPHER);
 	}
-	if (!cipher_key_bytes_set) {
+	if ((mount_crypt_stat->flags & ECRYPTFS_GLOBAL_ENCRYPT_FILENAMES)
+	    && !fn_cipher_name_set)
+		strcpy(mount_crypt_stat->global_default_fn_cipher_name,
+		       mount_crypt_stat->global_default_cipher_name);
+	if (!cipher_key_bytes_set)
 		mount_crypt_stat->global_default_cipher_key_size = 0;
-	}
+	if ((mount_crypt_stat->flags & ECRYPTFS_GLOBAL_ENCRYPT_FILENAMES)
+	    && !fn_cipher_key_bytes_set)
+		mount_crypt_stat->global_default_fn_cipher_key_bytes =
+			mount_crypt_stat->global_default_cipher_key_size;
 	mutex_lock(&key_tfm_list_mutex);
 	if (!ecryptfs_tfm_exists(mount_crypt_stat->global_default_cipher_name,
-				 NULL))
+				 NULL)) {
 		rc = ecryptfs_add_new_key_tfm(
 			NULL, mount_crypt_stat->global_default_cipher_name,
 			mount_crypt_stat->global_default_cipher_key_size);
-	mutex_unlock(&key_tfm_list_mutex);
-	if (rc) {
-		printk(KERN_ERR "Error attempting to initialize cipher with "
-		       "name = [%s] and key size = [%td]; rc = [%d]\n",
-		       mount_crypt_stat->global_default_cipher_name,
-		       mount_crypt_stat->global_default_cipher_key_size, rc);
-		rc = -EINVAL;
-		goto out;
+		if (rc) {
+			printk(KERN_ERR "Error attempting to initialize "
+			       "cipher with name = [%s] and key size = [%td]; "
+			       "rc = [%d]\n",
+			       mount_crypt_stat->global_default_cipher_name,
+			       mount_crypt_stat->global_default_cipher_key_size,
+			       rc);
+			rc = -EINVAL;
+			mutex_unlock(&key_tfm_list_mutex);
+			goto out;
+		}
 	}
+	if ((mount_crypt_stat->flags & ECRYPTFS_GLOBAL_ENCRYPT_FILENAMES)
+	    && !ecryptfs_tfm_exists(
+		    mount_crypt_stat->global_default_fn_cipher_name, NULL)) {
+		rc = ecryptfs_add_new_key_tfm(
+			NULL, mount_crypt_stat->global_default_fn_cipher_name,
+			mount_crypt_stat->global_default_fn_cipher_key_bytes);
+		if (rc) {
+			printk(KERN_ERR "Error attempting to initialize "
+			       "cipher with name = [%s] and key size = [%td]; "
+			       "rc = [%d]\n",
+			       mount_crypt_stat->global_default_fn_cipher_name,
+			       mount_crypt_stat->global_default_fn_cipher_key_bytes,
+			       rc);
+			rc = -EINVAL;
+			mutex_unlock(&key_tfm_list_mutex);
+			goto out;
+		}
+	}
+	mutex_unlock(&key_tfm_list_mutex);
 	rc = ecryptfs_init_global_auth_toks(mount_crypt_stat);
-	if (rc) {
+	if (rc)
 		printk(KERN_WARNING "One or more global auth toks could not "
 		       "properly register; rc = [%d]\n", rc);
-	}
 out:
 	return rc;
 }
@@ -475,31 +544,26 @@ out:
  */
 static int ecryptfs_read_super(struct super_block *sb, const char *dev_name)
 {
+	struct path path;
 	int rc;
-	struct nameidata nd;
-	struct dentry *lower_root;
-	struct vfsmount *lower_mnt;
 
-	memset(&nd, 0, sizeof(struct nameidata));
-	rc = path_lookup(dev_name, LOOKUP_FOLLOW | LOOKUP_DIRECTORY, &nd);
+	rc = kern_path(dev_name, LOOKUP_FOLLOW | LOOKUP_DIRECTORY, &path);
 	if (rc) {
 		ecryptfs_printk(KERN_WARNING, "path_lookup() failed\n");
 		goto out;
 	}
-	lower_root = nd.path.dentry;
-	lower_mnt = nd.path.mnt;
-	ecryptfs_set_superblock_lower(sb, lower_root->d_sb);
-	sb->s_maxbytes = lower_root->d_sb->s_maxbytes;
-	sb->s_blocksize = lower_root->d_sb->s_blocksize;
-	ecryptfs_set_dentry_lower(sb->s_root, lower_root);
-	ecryptfs_set_dentry_lower_mnt(sb->s_root, lower_mnt);
-	rc = ecryptfs_interpose(lower_root, sb->s_root, sb, 0);
+	ecryptfs_set_superblock_lower(sb, path.dentry->d_sb);
+	sb->s_maxbytes = path.dentry->d_sb->s_maxbytes;
+	sb->s_blocksize = path.dentry->d_sb->s_blocksize;
+	ecryptfs_set_dentry_lower(sb->s_root, path.dentry);
+	ecryptfs_set_dentry_lower_mnt(sb->s_root, path.mnt);
+	rc = ecryptfs_interpose(path.dentry, sb->s_root, sb, 0);
 	if (rc)
 		goto out_free;
 	rc = 0;
 	goto out;
 out_free:
-	path_put(&nd.path);
+	path_put(&path);
 out:
 	return rc;
 }
@@ -779,10 +843,11 @@ static int __init ecryptfs_init(void)
 		       "rc = [%d]\n", __func__, rc);
 		goto out_do_sysfs_unregistration;
 	}
-	rc = ecryptfs_init_messaging(ecryptfs_transport);
+	rc = ecryptfs_init_messaging();
 	if (rc) {
 		printk(KERN_ERR "Failure occured while attempting to "
-				"initialize the eCryptfs netlink socket\n");
+				"initialize the communications channel to "
+				"ecryptfsd\n");
 		goto out_destroy_kthread;
 	}
 	rc = ecryptfs_init_crypto();
@@ -797,7 +862,7 @@ static int __init ecryptfs_init(void)
 
 	goto out;
 out_release_messaging:
-	ecryptfs_release_messaging(ecryptfs_transport);
+	ecryptfs_release_messaging();
 out_destroy_kthread:
 	ecryptfs_destroy_kthread();
 out_do_sysfs_unregistration:
@@ -818,7 +883,7 @@ static void __exit ecryptfs_exit(void)
 	if (rc)
 		printk(KERN_ERR "Failure whilst attempting to destroy crypto; "
 		       "rc = [%d]\n", rc);
-	ecryptfs_release_messaging(ecryptfs_transport);
+	ecryptfs_release_messaging();
 	ecryptfs_destroy_kthread();
 	do_sysfs_unregistration();
 	unregister_filesystem(&ecryptfs_fs_type);

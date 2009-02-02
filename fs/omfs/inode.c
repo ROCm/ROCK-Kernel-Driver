@@ -37,9 +37,8 @@ struct inode *omfs_new_inode(struct inode *dir, int mode)
 
 	inode->i_ino = new_block;
 	inode->i_mode = mode;
-	inode->i_uid = current->fsuid;
-	inode->i_gid = current->fsgid;
-	inode->i_blocks = 0;
+	inode->i_uid = current_fsuid();
+	inode->i_gid = current_fsgid();
 	inode->i_mapping->a_ops = &omfs_aops;
 
 	inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
@@ -346,7 +345,7 @@ enum {
 	Opt_uid, Opt_gid, Opt_umask, Opt_dmask, Opt_fmask
 };
 
-static match_table_t tokens = {
+static const match_table_t tokens = {
 	{Opt_uid, "uid=%u"},
 	{Opt_gid, "gid=%u"},
 	{Opt_umask, "umask=%o"},
@@ -420,8 +419,8 @@ static int omfs_fill_super(struct super_block *sb, void *data, int silent)
 
 	sb->s_fs_info = sbi;
 
-	sbi->s_uid = current->uid;
-	sbi->s_gid = current->gid;
+	sbi->s_uid = current_uid();
+	sbi->s_gid = current_gid();
 	sbi->s_dmask = sbi->s_fmask = current->fs->umask;
 
 	if (!parse_options((char *) data, sbi))

@@ -20,11 +20,13 @@
 #include <linux/string.h>
 #include <linux/init.h>
 #include <linux/bootmem.h>
+#include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/module.h>
 #include <linux/initrd.h>
 
 #include <asm/bootinfo.h>
+#include <asm/sections.h>
 #include <asm/setup.h>
 #include <asm/fpu.h>
 #include <asm/irq.h>
@@ -61,7 +63,6 @@ EXPORT_SYMBOL(vme_brdtype);
 int m68k_is040or060;
 EXPORT_SYMBOL(m68k_is040or060);
 
-extern int end;
 extern unsigned long availmem;
 
 int m68k_num_memory;
@@ -80,7 +81,7 @@ void (*mach_sched_init) (irq_handler_t handler) __initdata = NULL;
 /* machine dependent irq functions */
 void (*mach_init_IRQ) (void) __initdata = NULL;
 void (*mach_get_model) (char *model);
-int (*mach_get_hardware_list) (char *buffer);
+void (*mach_get_hardware_list) (struct seq_file *m);
 /* machine dependent timer functions */
 unsigned long (*mach_gettimeoffset) (void);
 int (*mach_hwclk) (int, struct rtc_time*);
@@ -214,11 +215,10 @@ static void __init m68k_parse_bootinfo(const struct bi_record *record)
 
 void __init setup_arch(char **cmdline_p)
 {
-	extern int _etext, _edata, _end;
 	int i;
 
 	/* The bootinfo is located right after the kernel bss */
-	m68k_parse_bootinfo((const struct bi_record *)&_end);
+	m68k_parse_bootinfo((const struct bi_record *)_end);
 
 	if (CPU_IS_040)
 		m68k_is040or060 = 4;
@@ -251,9 +251,9 @@ void __init setup_arch(char **cmdline_p)
 	}
 
 	init_mm.start_code = PAGE_OFFSET;
-	init_mm.end_code = (unsigned long) &_etext;
-	init_mm.end_data = (unsigned long) &_edata;
-	init_mm.brk = (unsigned long) &_end;
+	init_mm.end_code = (unsigned long)_etext;
+	init_mm.end_data = (unsigned long)_edata;
+	init_mm.brk = (unsigned long)_end;
 
 	*cmdline_p = m68k_command_line;
 	memcpy(boot_command_line, *cmdline_p, CL_SIZE);
@@ -467,9 +467,9 @@ const struct seq_operations cpuinfo_op = {
 	.show	= show_cpuinfo,
 };
 
-int get_hardware_list(char *buffer)
+#ifdef CONFIG_PROC_HARDWARE
+static int hardware_proc_show(struct seq_file *m, void *v)
 {
-	int len = 0;
 	char model[80];
 	unsigned long mem;
 	int i;
@@ -479,16 +479,36 @@ int get_hardware_list(char *buffer)
 	else
 		strcpy(model, "Unknown m68k");
 
-	len += sprintf(buffer + len, "Model:\t\t%s\n", model);
+	seq_printf(m, "Model:\t\t%s\n", model);
 	for (mem = 0, i = 0; i < m68k_num_memory; i++)
 		mem += m68k_memory[i].size;
-	len += sprintf(buffer + len, "System Memory:\t%ldK\n", mem >> 10);
+	seq_printf(m, "System Memory:\t%ldK\n", mem >> 10);
 
 	if (mach_get_hardware_list)
-		len += mach_get_hardware_list(buffer + len);
+		mach_get_hardware_list(m);
 
-	return len;
+	return 0;
 }
+
+static int hardware_proc_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, hardware_proc_show, NULL);
+}
+
+static const struct file_operations hardware_proc_fops = {
+	.open		= hardware_proc_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static int __init proc_hardware_init(void)
+{
+	proc_create("hardware", 0, NULL, &hardware_proc_fops);
+	return 0;
+}
+module_init(proc_hardware_init);
+#endif
 
 void check_bugs(void)
 {

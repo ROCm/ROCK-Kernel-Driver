@@ -4,6 +4,16 @@
 
 obj-$(CONFIG_SERIAL_CORE) += serial_core.o
 obj-$(CONFIG_SERIAL_21285) += 21285.o
+
+# These Sparc drivers have to appear before others such as 8250
+# which share ttySx minor node space.  Otherwise console device
+# names change and other unplesantries.
+obj-$(CONFIG_SERIAL_SUNCORE) += suncore.o
+obj-$(CONFIG_SERIAL_SUNHV) += sunhv.o
+obj-$(CONFIG_SERIAL_SUNZILOG) += sunzilog.o
+obj-$(CONFIG_SERIAL_SUNSU) += sunsu.o
+obj-$(CONFIG_SERIAL_SUNSAB) += sunsab.o
+
 obj-$(CONFIG_SERIAL_8250) += 8250.o
 obj-$(CONFIG_SERIAL_8250_PNP) += 8250_pnp.o
 obj-$(CONFIG_SERIAL_8250_GSC) += 8250_gsc.o
@@ -31,16 +41,12 @@ obj-$(CONFIG_SERIAL_S3C2400) += s3c2400.o
 obj-$(CONFIG_SERIAL_S3C2410) += s3c2410.o
 obj-$(CONFIG_SERIAL_S3C2412) += s3c2412.o
 obj-$(CONFIG_SERIAL_S3C2440) += s3c2440.o
-obj-$(CONFIG_SERIAL_SUNCORE) += suncore.o
-obj-$(CONFIG_SERIAL_SUNHV) += sunhv.o
-obj-$(CONFIG_SERIAL_SUNZILOG) += sunzilog.o
+obj-$(CONFIG_SERIAL_S3C24A0) += s3c24a0.o
+obj-$(CONFIG_SERIAL_S3C6400) += s3c6400.o
 obj-$(CONFIG_SERIAL_IP22_ZILOG) += ip22zilog.o
-obj-$(CONFIG_SERIAL_SUNSU) += sunsu.o
-obj-$(CONFIG_SERIAL_SUNSAB) += sunsab.o
 obj-$(CONFIG_SERIAL_MUX) += mux.o
 obj-$(CONFIG_SERIAL_68328) += 68328serial.o
 obj-$(CONFIG_SERIAL_68360) += 68360serial.o
-obj-$(CONFIG_SERIAL_COLDFIRE) += mcfserial.o
 obj-$(CONFIG_SERIAL_MCF) += mcf.o
 obj-$(CONFIG_SERIAL_PMACZILOG) += pmac_zilog.o
 obj-$(CONFIG_SERIAL_LH7A40X) += serial_lh7a40x.o
@@ -66,6 +72,7 @@ obj-$(CONFIG_SERIAL_ATMEL) += atmel_serial.o
 obj-$(CONFIG_SERIAL_UARTLITE) += uartlite.o
 obj-$(CONFIG_SERIAL_NETX) += netx-serial.o
 obj-$(CONFIG_SERIAL_OF_PLATFORM) += of_serial.o
+obj-$(CONFIG_SERIAL_OF_PLATFORM_NWPSERIAL) += nwpserial.o
 obj-$(CONFIG_SERIAL_KS8695) += serial_ks8695.o
 obj-$(CONFIG_KGDB_SERIAL_CONSOLE) += kgdboc.o
 obj-$(CONFIG_SERIAL_QE) += ucc_uart.o

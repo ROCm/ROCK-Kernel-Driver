@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2006-2007 Chelsio, Inc. All rights reserved.
+ * Copyright (c) 2006-2008 Chelsio, Inc. All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -193,29 +193,47 @@ static int cxgb_ulp_iscsi_ctl(struct adapter *adapter, unsigned int req,
 		uiip->llimit = t3_read_reg(adapter, A_ULPRX_ISCSI_LLIMIT);
 		uiip->ulimit = t3_read_reg(adapter, A_ULPRX_ISCSI_ULIMIT);
 		uiip->tagmask = t3_read_reg(adapter, A_ULPRX_ISCSI_TAGMASK);
+
 		val = t3_read_reg(adapter, A_ULPRX_ISCSI_PSZ);
 		for (i = 0; i < 4; i++, val >>= 8)
 			uiip->pgsz_factor[i] = val & 0xFF;
+
+		val = t3_read_reg(adapter, A_TP_PARA_REG7);
+		uiip->max_txsz =
+		uiip->max_rxsz = min((val >> S_PMMAXXFERLEN0)&M_PMMAXXFERLEN0,
+				     (val >> S_PMMAXXFERLEN1)&M_PMMAXXFERLEN1);
 		/*
 		 * On tx, the iscsi pdu has to be <= tx page size and has to
 		 * fit into the Tx PM FIFO.
 		 */
-		uiip->max_txsz = min(adapter->params.tp.tx_pg_size,
-				     t3_read_reg(adapter, A_PM1_TX_CFG) >> 17);
+		val = min(adapter->params.tp.tx_pg_size,
+			  t3_read_reg(adapter, A_PM1_TX_CFG) >> 17);
+		uiip->max_txsz = min(val, uiip->max_txsz);
+
+		/* set MaxRxData to 16224 */
+		val = t3_read_reg(adapter, A_TP_PARA_REG2);
+		if ((val >> S_MAXRXDATA) != 0x3f60) {
+			val &= (M_RXCOALESCESIZE << S_RXCOALESCESIZE);
+			val |= V_MAXRXDATA(0x3f60);
+			printk(KERN_INFO
+				"%s, iscsi set MaxRxData to 16224 (0x%x).\n",
+				adapter->name, val);
+			t3_write_reg(adapter, A_TP_PARA_REG2, val);
+		}
+
 		/*
 		 * on rx, the iscsi pdu has to be < rx page size and the
 		 * the max rx data length programmed in TP
 		 */
-		uiip->max_rxsz = min(adapter->params.tp.rx_pg_size,
-				     ((t3_read_reg(adapter, A_TP_PARA_REG2))
-					>> S_MAXRXDATA) & M_MAXRXDATA);
+		val = min(adapter->params.tp.rx_pg_size,
+			  ((t3_read_reg(adapter, A_TP_PARA_REG2)) >>
+				S_MAXRXDATA) & M_MAXRXDATA);
+		uiip->max_rxsz = min(val, uiip->max_rxsz);
 		break;
 	case ULP_ISCSI_SET_PARAMS:
 		t3_write_reg(adapter, A_ULPRX_ISCSI_TAGMASK, uiip->tagmask);
-		/* set MaxRxData and MaxCoalesceSize to 16224 */
-		t3_write_reg(adapter, A_TP_PARA_REG2, 0x3f603f60);
 		/* program the ddp page sizes */
-		for (val = 0, i = 0; i < 4; i++)
+		for (i = 0; i < 4; i++)
 			val |= (uiip->pgsz_factor[i] & 0xF) << (8 * i);
 		if (val && (val != t3_read_reg(adapter, A_ULPRX_ISCSI_PSZ))) {
 			printk(KERN_INFO
@@ -223,7 +241,7 @@ static int cxgb_ulp_iscsi_ctl(struct adapter *adapter, unsigned int req,
 				adapter->name, val, uiip->pgsz_factor[0],
 				uiip->pgsz_factor[1], uiip->pgsz_factor[2],
 				uiip->pgsz_factor[3]);
-				t3_write_reg(adapter, A_ULPRX_ISCSI_PSZ, val);
+			t3_write_reg(adapter, A_ULPRX_ISCSI_PSZ, val);
 		}
 		break;
 	default:
@@ -420,10 +438,13 @@ static int cxgb_offload_ctl(struct t3cdev *tdev, unsigned int req, void *data)
 		p->ipv4addr = pi->iscsi_ipv4addr;
 		break;
 	}
-	case SET_ISCSI_IPV4ADDR: {
-		struct iscsi_ipv4addr *p = data;
-		struct port_info *pi = netdev_priv(p->dev);
-		pi->iscsi_ipv4addr = p->ipv4addr;
+	case GET_EMBEDDED_INFO: {
+		struct ch_embedded_info *e = data;
+
+		spin_lock(&adapter->stats_lock);
+		t3_get_fw_version(adapter, &e->fw_vers);
+		t3_get_tp_version(adapter, &e->tp_vers);
+		spin_unlock(&adapter->stats_lock);
 		break;
 	}
 	default:
@@ -1037,7 +1058,7 @@ static void set_l2t_ix(struct t3cdev *tdev, u32 tid, struct l2t_entry *e)
 
 	skb = alloc_skb(sizeof(*req), GFP_ATOMIC);
 	if (!skb) {
-		printk(KERN_ERR "%s: cannot allocate skb!\n", __FUNCTION__);
+		printk(KERN_ERR "%s: cannot allocate skb!\n", __func__);
 		return;
 	}
 	skb->priority = CPL_PRIORITY_CONTROL;
@@ -1068,14 +1089,14 @@ void cxgb_redirect(struct dst_entry *old, struct dst_entry *new)
 		return;
 	if (!is_offloading(newdev)) {
 		printk(KERN_WARNING "%s: Redirect to non-offload "
-		       "device ignored.\n", __FUNCTION__);
+		       "device ignored.\n", __func__);
 		return;
 	}
 	tdev = dev2t3cdev(olddev);
 	BUG_ON(!tdev);
 	if (tdev != dev2t3cdev(newdev)) {
 		printk(KERN_WARNING "%s: Redirect to different "
-		       "offload device ignored.\n", __FUNCTION__);
+		       "offload device ignored.\n", __func__);
 		return;
 	}
 
@@ -1083,7 +1104,7 @@ void cxgb_redirect(struct dst_entry *old, struct dst_entry *new)
 	e = t3_l2t_get(tdev, new->neighbour, newdev);
 	if (!e) {
 		printk(KERN_ERR "%s: couldn't allocate new l2t entry!\n",
-		       __FUNCTION__);
+		       __func__);
 		return;
 	}
 

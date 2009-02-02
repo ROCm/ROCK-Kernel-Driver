@@ -36,6 +36,7 @@
 #include <asm/arch_hooks.h>
 #include <asm/hpet.h>
 #include <asm/time.h>
+#include <asm/timer.h>
 
 #include "do_timer.h"
 
@@ -46,10 +47,9 @@ unsigned long profile_pc(struct pt_regs *regs)
 	unsigned long pc = instruction_pointer(regs);
 
 #ifdef CONFIG_SMP
-	if (!v8086_mode(regs) && SEGMENT_IS_KERNEL_CODE(regs->cs) &&
-	    in_lock_functions(pc)) {
+	if (!user_mode_vm(regs) && in_lock_functions(pc)) {
 #ifdef CONFIG_FRAME_POINTER
-		return *(unsigned long *)(regs->bp + 4);
+		return *(unsigned long *)(regs->bp + sizeof(long));
 #else
 		unsigned long *sp = (unsigned long *)&regs->sp;
 
@@ -75,7 +75,7 @@ EXPORT_SYMBOL(profile_pc);
 irqreturn_t timer_interrupt(int irq, void *dev_id)
 {
 	/* Keep nmi watchdog up to date */
-	per_cpu(irq_stat, smp_processor_id()).irq0_irqs++;
+	inc_irq_stat(irq0_irqs);
 
 #ifdef CONFIG_X86_IO_APIC
 	if (timer_ack) {
@@ -94,6 +94,7 @@ irqreturn_t timer_interrupt(int irq, void *dev_id)
 
 	do_timer_interrupt_hook();
 
+#ifdef CONFIG_MCA
 	if (MCA_bus) {
 		/* The PS/2 uses level-triggered interrupts.  You can't
 		turn them off, nor would you want to (any attempt to
@@ -104,9 +105,10 @@ irqreturn_t timer_interrupt(int irq, void *dev_id)
 		high bit of the PPI port B (0x61).  Note that some PS/2s,
 		notably the 55SX, work fine if this is removed.  */
 
-		u8 irq_v = inb_p( 0x61 );	/* read the current state */
-		outb_p( irq_v|0x80, 0x61 );	/* reset the IRQ */
+		u8 irq_v = inb_p(0x61);		/* read the current state */
+		outb_p(irq_v | 0x80, 0x61);	/* reset the IRQ */
 	}
+#endif
 
 	return IRQ_HANDLED;
 }

@@ -265,7 +265,7 @@ static void frame_prepare(struct video_card *video, unsigned int this_frame)
 	/* these flags denote packets that need special attention */
 	int empty_packet, first_packet, last_packet, mid_packet;
 
-	u32 *branch_address, *last_branch_address = NULL;
+	__le32 *branch_address, *last_branch_address = NULL;
 	unsigned long data_p;
 	int first_packet_empty = 0;
 	u32 cycleTimer, ct_sec, ct_cyc, ct_off;
@@ -848,7 +848,7 @@ static void receive_packets(struct video_card *video)
 	dma_addr_t block_dma = 0;
 	struct packet *data = NULL;
 	dma_addr_t data_dma = 0;
-	u32 *last_branch_address = NULL;
+	__le32 *last_branch_address = NULL;
 	unsigned long irq_flags;
 	int want_interrupt = 0;
 	struct frame *f = NULL;
@@ -918,7 +918,7 @@ static int do_dv1394_init(struct video_card *video, struct dv1394_init *init)
 		/* default SYT offset is 3 cycles */
 		init->syt_offset = 3;
 
-	if ( (init->channel > 63) || (init->channel < 0) )
+	if (init->channel > 63)
 		init->channel = 63;
 
 	chan_mask = (u64)1 << init->channel;
@@ -1270,8 +1270,14 @@ static int dv1394_mmap(struct file *file, struct vm_area_struct *vma)
 	struct video_card *video = file_to_video_card(file);
 	int retval = -EINVAL;
 
-	/* serialize mmap */
-	mutex_lock(&video->mtx);
+	/*
+	 * We cannot use the blocking variant mutex_lock here because .mmap
+	 * is called with mmap_sem held, while .ioctl, .read, .write acquire
+	 * video->mtx and subsequently call copy_to/from_user which will
+	 * grab mmap_sem in case of a page fault.
+	 */
+	if (!mutex_trylock(&video->mtx))
+		return -EAGAIN;
 
 	if ( ! video_card_initialized(video) ) {
 		retval = do_dv1394_init_default(video);
@@ -1828,9 +1834,6 @@ static int dv1394_release(struct inode *inode, struct file *file)
 	/* OK to free the DMA buffer, no more mappings can exist */
 	do_dv1394_shutdown(video, 1);
 
-	/* clean up async I/O users */
-	dv1394_fasync(-1, file, 0);
-
 	/* give someone else a turn */
 	clear_bit(0, &video->open);
 
@@ -2107,17 +2110,17 @@ static void ir_tasklet_func(unsigned long data)
 			f = video->frames[next_i / MAX_PACKETS];
 			next = &(f->descriptor_pool[next_i % MAX_PACKETS]);
 			next_dma = ((unsigned long) block - (unsigned long) f->descriptor_pool) + f->descriptor_pool_dma;
-			next->u.in.il.q[0] |= 3 << 20; /* enable interrupt */
-			next->u.in.il.q[2] = 0; /* disable branch */
+			next->u.in.il.q[0] |= cpu_to_le32(3 << 20); /* enable interrupt */
+			next->u.in.il.q[2] = cpu_to_le32(0); /* disable branch */
 
 			/* link previous to next */
 			prev_i = (next_i == 0) ? (MAX_PACKETS * video->n_frames - 1) : (next_i - 1);
 			f = video->frames[prev_i / MAX_PACKETS];
 			prev = &(f->descriptor_pool[prev_i % MAX_PACKETS]);
 			if (prev_i % (MAX_PACKETS/2)) {
-				prev->u.in.il.q[0] &= ~(3 << 20); /* no interrupt */
+				prev->u.in.il.q[0] &= ~cpu_to_le32(3 << 20); /* no interrupt */
 			} else {
-				prev->u.in.il.q[0] |= 3 << 20; /* enable interrupt */
+				prev->u.in.il.q[0] |= cpu_to_le32(3 << 20); /* enable interrupt */
 			}
 			prev->u.in.il.q[2] = cpu_to_le32(next_dma | 1); /* set Z=1 */
 			wmb();
@@ -2296,10 +2299,10 @@ static void dv1394_add_host(struct hpsb_host *host)
 
 	ohci = (struct ti_ohci *)host->hostdata;
 
-	device_create_drvdata(hpsb_protocol_class, NULL,
-			      MKDEV(IEEE1394_MAJOR,
-				    IEEE1394_MINOR_BLOCK_DV1394 * 16 + (id<<2)), NULL,
-			      "dv1394-%d", id);
+	device_create(hpsb_protocol_class, NULL,
+		      MKDEV(IEEE1394_MAJOR,
+			    IEEE1394_MINOR_BLOCK_DV1394 * 16 + (id<<2)),
+		      NULL, "dv1394-%d", id);
 
 	dv1394_init(ohci, DV1394_NTSC, MODE_RECEIVE);
 	dv1394_init(ohci, DV1394_NTSC, MODE_TRANSMIT);

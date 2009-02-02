@@ -28,9 +28,9 @@
 
 #include <linux/pci.h>
 #include <linux/dmar.h>
+#include <linux/iova.h>
+#include <linux/intel-iommu.h>
 #include <linux/timer.h>
-#include "iova.h"
-#include "intel-iommu.h"
 
 #undef PREFIX
 #define PREFIX "DMAR:"
@@ -188,30 +188,20 @@ dmar_parse_one_drhd(struct acpi_dmar_header *header)
 	return 0;
 }
 
-static int __init
-dmar_parse_dev(struct dmar_drhd_unit *dmaru)
+static int __init dmar_parse_dev(struct dmar_drhd_unit *dmaru)
 {
 	struct acpi_dmar_hardware_unit *drhd;
-	static int include_all;
 	int ret = 0;
 
 	drhd = (struct acpi_dmar_hardware_unit *) dmaru->hdr;
 
-	if (!dmaru->include_all)
-		ret = dmar_parse_dev_scope((void *)(drhd + 1),
+	if (dmaru->include_all)
+		return 0;
+
+	ret = dmar_parse_dev_scope((void *)(drhd + 1),
 				((void *)drhd) + drhd->header.length,
 				&dmaru->devices_cnt, &dmaru->devices,
 				drhd->segment);
-	else {
-		/* Only allow one INCLUDE_ALL */
-		if (include_all) {
-			printk(KERN_WARNING PREFIX "Only one INCLUDE_ALL "
-				"device scope is allowed\n");
-			ret = -EINVAL;
-		}
-		include_all = 1;
-	}
-
 	if (ret) {
 		list_del(&dmaru->list);
 		kfree(dmaru);
@@ -277,14 +267,15 @@ dmar_table_print_dmar_entry(struct acpi_dmar_header *header)
 		drhd = (struct acpi_dmar_hardware_unit *)header;
 		printk (KERN_INFO PREFIX
 			"DRHD (flags: 0x%08x)base: 0x%016Lx\n",
-			drhd->flags, drhd->address);
+			drhd->flags, (unsigned long long)drhd->address);
 		break;
 	case ACPI_DMAR_TYPE_RESERVED_MEMORY:
 		rmrr = (struct acpi_dmar_reserved_memory *)header;
 
 		printk (KERN_INFO PREFIX
 			"RMRR base: 0x%016Lx end: 0x%016Lx\n",
-			rmrr->base_address, rmrr->end_address);
+			(unsigned long long)rmrr->base_address,
+			(unsigned long long)rmrr->end_address);
 		break;
 	}
 }
@@ -328,7 +319,7 @@ parse_dmar_table(void)
 	if (!dmar)
 		return -ENODEV;
 
-	if (dmar->width < PAGE_SHIFT_4K - 1) {
+	if (dmar->width < PAGE_SHIFT - 1) {
 		printk(KERN_WARNING PREFIX "Invalid DMAR haw\n");
 		return -EINVAL;
 	}
@@ -384,12 +375,21 @@ int dmar_pci_device_match(struct pci_dev *devices[], int cnt,
 struct dmar_drhd_unit *
 dmar_find_matched_drhd_unit(struct pci_dev *dev)
 {
-	struct dmar_drhd_unit *drhd = NULL;
+	struct dmar_drhd_unit *dmaru = NULL;
+	struct acpi_dmar_hardware_unit *drhd;
 
-	list_for_each_entry(drhd, &dmar_drhd_units, list) {
-		if (drhd->include_all || dmar_pci_device_match(drhd->devices,
-						drhd->devices_cnt, dev))
-			return drhd;
+	list_for_each_entry(dmaru, &dmar_drhd_units, list) {
+		drhd = container_of(dmaru->hdr,
+				    struct acpi_dmar_hardware_unit,
+				    header);
+
+		if (dmaru->include_all &&
+		    drhd->segment == pci_domain_nr(dev->bus))
+			return dmaru;
+
+		if (dmar_pci_device_match(dmaru->devices,
+					  dmaru->devices_cnt, dev))
+			return dmaru;
 	}
 
 	return NULL;
@@ -444,10 +444,8 @@ int __init dmar_table_init(void)
 	}
 
 #ifdef CONFIG_DMAR
-	if (list_empty(&dmar_rmrr_units)) {
+	if (list_empty(&dmar_rmrr_units))
 		printk(KERN_INFO PREFIX "No RMRR found\n");
- 		return -ENODEV;
-	}
 #endif
 
 #ifdef CONFIG_INTR_REMAP
@@ -462,8 +460,8 @@ void __init detect_intel_iommu(void)
 
 	ret = dmar_table_detect();
 
-#ifdef CONFIG_DMAR
 	{
+#ifdef CONFIG_INTR_REMAP
 		struct acpi_table_dmar *dmar;
 		/*
 		 * for now we will disable dma-remapping when interrupt
@@ -472,29 +470,17 @@ void __init detect_intel_iommu(void)
 		 * is added, we will not need this any more.
 		 */
 		dmar = (struct acpi_table_dmar *) dmar_tbl;
-		if (ret && cpu_has_x2apic && dmar->flags & 0x1) {
+		if (ret && cpu_has_x2apic && dmar->flags & 0x1)
 			printk(KERN_INFO
 			       "Queued invalidation will be enabled to support "
 			       "x2apic and Intr-remapping.\n");
-			printk(KERN_INFO
-			       "Disabling IOMMU detection, because of missing "
-			       "queued invalidation support for IOTLB "
-			       "invalidation\n");
-			printk(KERN_INFO
-			       "Use \"nox2apic\", if you want to use Intel "
-			       " IOMMU for DMA-remapping and don't care about "
-			       " x2apic support\n");
-
-			dmar_disabled = 1;
-			goto end;
-		}
-
+#endif
+#ifdef CONFIG_DMAR
 		if (ret && !no_iommu && !iommu_detected && !swiotlb &&
 		    !dmar_disabled)
 			iommu_detected = 1;
-	}
-end:
 #endif
+	}
 	dmar_tbl = NULL;
 }
 
@@ -505,6 +491,7 @@ int alloc_iommu(struct dmar_drhd_unit *drhd)
 	int map_size;
 	u32 ver;
 	static int iommu_allocated = 0;
+	int agaw;
 
 	iommu = kzalloc(sizeof(*iommu), GFP_KERNEL);
 	if (!iommu)
@@ -512,7 +499,7 @@ int alloc_iommu(struct dmar_drhd_unit *drhd)
 
 	iommu->seq_id = iommu_allocated++;
 
-	iommu->reg = ioremap(drhd->reg_base_addr, PAGE_SIZE_4K);
+	iommu->reg = ioremap(drhd->reg_base_addr, VTD_PAGE_SIZE);
 	if (!iommu->reg) {
 		printk(KERN_ERR "IOMMU: can't map the region\n");
 		goto error;
@@ -520,11 +507,20 @@ int alloc_iommu(struct dmar_drhd_unit *drhd)
 	iommu->cap = dmar_readq(iommu->reg + DMAR_CAP_REG);
 	iommu->ecap = dmar_readq(iommu->reg + DMAR_ECAP_REG);
 
+	agaw = iommu_calculate_agaw(iommu);
+	if (agaw < 0) {
+		printk(KERN_ERR
+			"Cannot get a valid agaw for iommu (seq_id = %d)\n",
+			iommu->seq_id);
+		goto error;
+	}
+	iommu->agaw = agaw;
+
 	/* the registers might be more than one page */
 	map_size = max_t(int, ecap_max_iotlb_offset(iommu->ecap),
 		cap_max_fault_reg_offset(iommu->cap));
-	map_size = PAGE_ALIGN_4K(map_size);
-	if (map_size > PAGE_SIZE_4K) {
+	map_size = VTD_PAGE_ALIGN(map_size);
+	if (map_size > VTD_PAGE_SIZE) {
 		iounmap(iommu->reg);
 		iommu->reg = ioremap(drhd->reg_base_addr, map_size);
 		if (!iommu->reg) {
@@ -535,8 +531,10 @@ int alloc_iommu(struct dmar_drhd_unit *drhd)
 
 	ver = readl(iommu->reg + DMAR_VER_REG);
 	pr_debug("IOMMU %llx: ver %d:%d cap %llx ecap %llx\n",
-		drhd->reg_base_addr, DMAR_VER_MAJOR(ver), DMAR_VER_MINOR(ver),
-		iommu->cap, iommu->ecap);
+		(unsigned long long)drhd->reg_base_addr,
+		DMAR_VER_MAJOR(ver), DMAR_VER_MINOR(ver),
+		(unsigned long long)iommu->cap,
+		(unsigned long long)iommu->ecap);
 
 	spin_lock_init(&iommu->register_lock);
 
@@ -589,11 +587,11 @@ void qi_submit_sync(struct qi_desc *desc, struct intel_iommu *iommu)
 
 	hw = qi->desc;
 
-	spin_lock(&qi->q_lock);
+	spin_lock_irqsave(&qi->q_lock, flags);
 	while (qi->free_cnt < 3) {
-		spin_unlock(&qi->q_lock);
+		spin_unlock_irqrestore(&qi->q_lock, flags);
 		cpu_relax();
-		spin_lock(&qi->q_lock);
+		spin_lock_irqsave(&qi->q_lock, flags);
 	}
 
 	index = qi->free_head;
@@ -614,15 +612,22 @@ void qi_submit_sync(struct qi_desc *desc, struct intel_iommu *iommu)
 	qi->free_head = (qi->free_head + 2) % QI_LENGTH;
 	qi->free_cnt -= 2;
 
-	spin_lock_irqsave(&iommu->register_lock, flags);
+	spin_lock(&iommu->register_lock);
 	/*
 	 * update the HW tail register indicating the presence of
 	 * new descriptors.
 	 */
 	writel(qi->free_head << 4, iommu->reg + DMAR_IQT_REG);
-	spin_unlock_irqrestore(&iommu->register_lock, flags);
+	spin_unlock(&iommu->register_lock);
 
 	while (qi->desc_status[wait_index] != QI_DONE) {
+		/*
+		 * We will leave the interrupts disabled, to prevent interrupt
+		 * context to queue another cmd while a cmd is already submitted
+		 * and waiting for completion on this cpu. This is to avoid
+		 * a deadlock where the interrupt context can wait indefinitely
+		 * for free slots in the queue.
+		 */
 		spin_unlock(&qi->q_lock);
 		cpu_relax();
 		spin_lock(&qi->q_lock);
@@ -631,7 +636,7 @@ void qi_submit_sync(struct qi_desc *desc, struct intel_iommu *iommu)
 	qi->desc_status[index] = QI_DONE;
 
 	reclaim_free_desc(qi);
-	spin_unlock(&qi->q_lock);
+	spin_unlock_irqrestore(&qi->q_lock, flags);
 }
 
 /*
@@ -645,6 +650,62 @@ void qi_global_iec(struct intel_iommu *iommu)
 	desc.high = 0;
 
 	qi_submit_sync(&desc, iommu);
+}
+
+int qi_flush_context(struct intel_iommu *iommu, u16 did, u16 sid, u8 fm,
+		     u64 type, int non_present_entry_flush)
+{
+
+	struct qi_desc desc;
+
+	if (non_present_entry_flush) {
+		if (!cap_caching_mode(iommu->cap))
+			return 1;
+		else
+			did = 0;
+	}
+
+	desc.low = QI_CC_FM(fm) | QI_CC_SID(sid) | QI_CC_DID(did)
+			| QI_CC_GRAN(type) | QI_CC_TYPE;
+	desc.high = 0;
+
+	qi_submit_sync(&desc, iommu);
+
+	return 0;
+
+}
+
+int qi_flush_iotlb(struct intel_iommu *iommu, u16 did, u64 addr,
+		   unsigned int size_order, u64 type,
+		   int non_present_entry_flush)
+{
+	u8 dw = 0, dr = 0;
+
+	struct qi_desc desc;
+	int ih = 0;
+
+	if (non_present_entry_flush) {
+		if (!cap_caching_mode(iommu->cap))
+			return 1;
+		else
+			did = 0;
+	}
+
+	if (cap_write_drain(iommu->cap))
+		dw = 1;
+
+	if (cap_read_drain(iommu->cap))
+		dr = 1;
+
+	desc.low = QI_IOTLB_DID(did) | QI_IOTLB_DR(dr) | QI_IOTLB_DW(dw)
+		| QI_IOTLB_GRAN(type) | QI_IOTLB_TYPE;
+	desc.high = QI_IOTLB_ADDR(addr) | QI_IOTLB_IH(ih)
+		| QI_IOTLB_AM(size_order);
+
+	qi_submit_sync(&desc, iommu);
+
+	return 0;
+
 }
 
 /*

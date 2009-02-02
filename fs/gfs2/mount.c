@@ -32,7 +32,6 @@ enum {
 	Opt_debug,
 	Opt_nodebug,
 	Opt_upgrade,
-	Opt_num_glockd,
 	Opt_acl,
 	Opt_noacl,
 	Opt_quota_off,
@@ -42,10 +41,11 @@ enum {
 	Opt_nosuiddir,
 	Opt_data_writeback,
 	Opt_data_ordered,
+	Opt_meta,
 	Opt_err,
 };
 
-static match_table_t tokens = {
+static const match_table_t tokens = {
 	{Opt_lockproto, "lockproto=%s"},
 	{Opt_locktable, "locktable=%s"},
 	{Opt_hostdata, "hostdata=%s"},
@@ -56,7 +56,6 @@ static match_table_t tokens = {
 	{Opt_debug, "debug"},
 	{Opt_nodebug, "nodebug"},
 	{Opt_upgrade, "upgrade"},
-	{Opt_num_glockd, "num_glockd=%d"},
 	{Opt_acl, "acl"},
 	{Opt_noacl, "noacl"},
 	{Opt_quota_off, "quota=off"},
@@ -66,6 +65,7 @@ static match_table_t tokens = {
 	{Opt_nosuiddir, "nosuiddir"},
 	{Opt_data_writeback, "data=writeback"},
 	{Opt_data_ordered, "data=ordered"},
+	{Opt_meta, "meta"},
 	{Opt_err, NULL}
 };
 
@@ -85,16 +85,7 @@ int gfs2_mount_args(struct gfs2_sbd *sdp, char *data_arg, int remount)
 	int error = 0;
 
 	if (!remount) {
-		/*  If someone preloaded options, use those instead  */
-		spin_lock(&gfs2_sys_margs_lock);
-		if (gfs2_sys_margs) {
-			data = gfs2_sys_margs;
-			gfs2_sys_margs = NULL;
-		}
-		spin_unlock(&gfs2_sys_margs_lock);
-
 		/*  Set some defaults  */
-		args->ar_num_glockd = GFS2_GLOCKD_DEFAULT;
 		args->ar_quota = GFS2_QUOTA_DEFAULT;
 		args->ar_data = GFS2_DATA_DEFAULT;
 	}
@@ -103,7 +94,7 @@ int gfs2_mount_args(struct gfs2_sbd *sdp, char *data_arg, int remount)
 	   process them */
 
 	for (options = data; (o = strsep(&options, ",")); ) {
-		int token, option;
+		int token;
 		substring_t tmp[MAX_OPT_ARGS];
 
 		if (!*o)
@@ -194,22 +185,6 @@ int gfs2_mount_args(struct gfs2_sbd *sdp, char *data_arg, int remount)
 				goto cant_remount;
 			args->ar_upgrade = 1;
 			break;
-		case Opt_num_glockd:
-			if ((error = match_int(&tmp[0], &option))) {
-				fs_info(sdp, "problem getting num_glockd\n");
-				goto out_error;
-			}
-
-			if (remount && option != args->ar_num_glockd)
-				goto cant_remount;
-			if (!option || option > GFS2_GLOCKD_MAX) {
-				fs_info(sdp, "0 < num_glockd <= %u  (not %u)\n",
-				        GFS2_GLOCKD_MAX, option);
-				error = -EINVAL;
-				goto out_error;
-			}
-			args->ar_num_glockd = option;
-			break;
 		case Opt_acl:
 			args->ar_posix_acl = 1;
 			sdp->sd_vfs->s_flags |= MS_POSIXACL;
@@ -238,6 +213,11 @@ int gfs2_mount_args(struct gfs2_sbd *sdp, char *data_arg, int remount)
 			break;
 		case Opt_data_ordered:
 			args->ar_data = GFS2_DATA_ORDERED;
+			break;
+		case Opt_meta:
+			if (remount && args->ar_meta != 1)
+				goto cant_remount;
+			args->ar_meta = 1;
 			break;
 		case Opt_err:
 		default:

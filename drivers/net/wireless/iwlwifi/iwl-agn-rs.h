@@ -19,7 +19,7 @@
  * file called LICENSE.
  *
  * Contact Information:
- * James P. Ketrenos <ipw2100-admin@linux.intel.com>
+ *  Intel Linux Wireless <ilw@linux.intel.com>
  * Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
  *
  *****************************************************************************/
@@ -206,23 +206,30 @@ enum {
 #define IWL_RATE_DECREASE_TH		1920	/*  15% */
 
 /* possible actions when in legacy mode */
-#define IWL_LEGACY_SWITCH_ANTENNA	0
-#define IWL_LEGACY_SWITCH_SISO		1
-#define IWL_LEGACY_SWITCH_MIMO2		2
+#define IWL_LEGACY_SWITCH_ANTENNA1      0
+#define IWL_LEGACY_SWITCH_ANTENNA2      1
+#define IWL_LEGACY_SWITCH_SISO          2
+#define IWL_LEGACY_SWITCH_MIMO2_AB      3
+#define IWL_LEGACY_SWITCH_MIMO2_AC      4
+#define IWL_LEGACY_SWITCH_MIMO2_BC      5
 
 /* possible actions when in siso mode */
-#define IWL_SISO_SWITCH_ANTENNA		0
-#define IWL_SISO_SWITCH_MIMO2		1
-#define IWL_SISO_SWITCH_GI		2
+#define IWL_SISO_SWITCH_ANTENNA1        0
+#define IWL_SISO_SWITCH_ANTENNA2        1
+#define IWL_SISO_SWITCH_MIMO2_AB        2
+#define IWL_SISO_SWITCH_MIMO2_AC        3
+#define IWL_SISO_SWITCH_MIMO2_BC        4
+#define IWL_SISO_SWITCH_GI              5
 
 /* possible actions when in mimo mode */
-#define IWL_MIMO_SWITCH_ANTENNA_A	0
-#define IWL_MIMO_SWITCH_ANTENNA_B	1
-#define IWL_MIMO_SWITCH_GI		2
+#define IWL_MIMO2_SWITCH_ANTENNA1       0
+#define IWL_MIMO2_SWITCH_ANTENNA2       1
+#define IWL_MIMO2_SWITCH_SISO_A         2
+#define IWL_MIMO2_SWITCH_SISO_B         3
+#define IWL_MIMO2_SWITCH_SISO_C         4
+#define IWL_MIMO2_SWITCH_GI             5
 
-/*FIXME:RS:separate MIMO2/3 transitions*/
-
-/*FIXME:RS:add posible acctions for MIMO3*/
+/*FIXME:RS:add possible actions for MIMO3*/
 
 #define IWL_ACTION_LIMIT		3	/* # possible actions */
 
@@ -277,7 +284,17 @@ static inline u8 num_of_ant(u8 mask)
 		!!((mask) & ANT_C);
 }
 
-static inline u8 iwl4965_get_prev_ieee_rate(u8 rate_index)
+static inline u8 first_antenna(u8 mask)
+{
+	if (mask & ANT_A)
+		return ANT_A;
+	if (mask & ANT_B)
+		return ANT_B;
+	return ANT_C;
+}
+
+
+static inline u8 iwl_get_prev_ieee_rate(u8 rate_index)
 {
 	u8 rate = iwl_rates[rate_index].prev_ieee;
 
@@ -287,11 +304,11 @@ static inline u8 iwl4965_get_prev_ieee_rate(u8 rate_index)
 }
 
 /**
- * iwl4965_rate_control_register - Register the rate control algorithm callbacks
+ * iwl_rate_control_register - Register the rate control algorithm callbacks
  *
  * Since the rate control algorithm is hardware specific, there is no need
  * or reason to place it as a stand alone module.  The driver can call
- * iwl4965_rate_control_register in order to register the rate control callbacks
+ * iwl_rate_control_register in order to register the rate control callbacks
  * with the mac80211 subsystem.  This should be performed prior to calling
  * ieee80211_register_hw
  *
@@ -299,7 +316,7 @@ static inline u8 iwl4965_get_prev_ieee_rate(u8 rate_index)
 extern int iwlagn_rate_control_register(void);
 
 /**
- * iwl4965_rate_control_unregister - Unregister the rate control callbacks
+ * iwl_rate_control_unregister - Unregister the rate control callbacks
  *
  * This should be called after calling ieee80211_unregister_hw, but before
  * the driver is unloaded.

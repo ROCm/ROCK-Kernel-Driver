@@ -1020,7 +1020,6 @@ wv_82593_reconfig(struct net_device *	dev)
 static void
 wv_psa_show(psa_t *	p)
 {
-  DECLARE_MAC_BUF(mac);
   printk(KERN_DEBUG "##### wavelan psa contents: #####\n");
   printk(KERN_DEBUG "psa_io_base_addr_1: 0x%02X %02X %02X %02X\n",
 	 p->psa_io_base_addr_1,
@@ -1034,13 +1033,10 @@ wv_psa_show(psa_t *	p)
   printk(KERN_DEBUG "psa_holi_params: 0x%02x, ", p->psa_holi_params);
   printk("psa_int_req_no: %d\n", p->psa_int_req_no);
 #ifdef DEBUG_SHOW_UNUSED
-  printk(KERN_DEBUG "psa_unused0[]: %s\n",
-	 print_mac(mac, p->psa_unused0));
+  printk(KERN_DEBUG "psa_unused0[]: %pM\n", p->psa_unused0);
 #endif	/* DEBUG_SHOW_UNUSED */
-  printk(KERN_DEBUG "psa_univ_mac_addr[]: %s\n",
-	 print_mac(mac, p->psa_univ_mac_addr));
-  printk(KERN_DEBUG "psa_local_mac_addr[]: %s\n",
-	 print_mac(mac, p->psa_local_mac_addr));
+  printk(KERN_DEBUG "psa_univ_mac_addr[]: %pM\n", p->psa_univ_mac_addr);
+  printk(KERN_DEBUG "psa_local_mac_addr[]: %pM\n", p->psa_local_mac_addr);
   printk(KERN_DEBUG "psa_univ_local_sel: %d, ", p->psa_univ_local_sel);
   printk("psa_comp_number: %d, ", p->psa_comp_number);
   printk("psa_thr_pre_set: 0x%02x\n", p->psa_thr_pre_set);
@@ -1238,12 +1234,11 @@ wv_packet_info(u_char *		p,		/* Packet to dump */
 {
   int		i;
   int		maxi;
-  DECLARE_MAC_BUF(mac);
 
-  printk(KERN_DEBUG "%s: %s(): dest %s, length %d\n",
-	 msg1, msg2, print_mac(mac, p), length);
-  printk(KERN_DEBUG "%s: %s(): src %s, type 0x%02X%02X\n",
-	 msg1, msg2, print_mac(mac, &p[6]), p[12], p[13]);
+  printk(KERN_DEBUG "%s: %s(): dest %pM, length %d\n",
+	 msg1, msg2, p, length);
+  printk(KERN_DEBUG "%s: %s(): src %pM, type 0x%02X%02X\n",
+	 msg1, msg2, &p[6], p[12], p[13]);
 
 #ifdef DEBUG_PACKET_DUMP
 
@@ -1274,7 +1269,6 @@ wv_init_info(struct net_device *	dev)
 {
   unsigned int	base = dev->base_addr;
   psa_t		psa;
-  DECLARE_MAC_BUF(mac);
 
   /* Read the parameter storage area */
   psa_read(dev, 0, (unsigned char *) &psa, sizeof(psa));
@@ -1291,10 +1285,8 @@ wv_init_info(struct net_device *	dev)
 
 #ifdef DEBUG_BASIC_SHOW
   /* Now, let's go for the basic stuff */
-  printk(KERN_NOTICE "%s: WaveLAN: port %#x, irq %d, "
-	 "hw_addr %s",
-	 dev->name, base, dev->irq,
-	 print_mac(mac, dev->dev_addr));
+  printk(KERN_NOTICE "%s: WaveLAN: port %#x, irq %d, hw_addr %pM",
+	 dev->name, base, dev->irq, dev->dev_addr);
 
   /* Print current network id */
   if(psa.psa_nwid_select)
@@ -2243,13 +2235,7 @@ static int wavelan_set_wap(struct net_device *dev,
 			   char *extra)
 {
 #ifdef DEBUG_IOCTL_INFO
-	printk(KERN_DEBUG "Set AP to : %02X:%02X:%02X:%02X:%02X:%02X\n",
-	       wrqu->ap_addr.sa_data[0],
-	       wrqu->ap_addr.sa_data[1],
-	       wrqu->ap_addr.sa_data[2],
-	       wrqu->ap_addr.sa_data[3],
-	       wrqu->ap_addr.sa_data[4],
-	       wrqu->ap_addr.sa_data[5]);
+	printk(KERN_DEBUG "Set AP to : %pM\n", wrqu->ap_addr.sa_data);
 #endif	/* DEBUG_IOCTL_INFO */
 
 	return -EOPNOTSUPP;
@@ -2892,7 +2878,6 @@ wv_packet_read(struct net_device *		dev,
   netif_rx(skb);
 
   /* Keep stats up to date */
-  dev->last_rx = jiffies;
   lp->stats.rx_packets++;
   lp->stats.rx_bytes += sksize;
 
@@ -3647,12 +3632,10 @@ wv_82593_config(struct net_device *	dev)
       int			addrs_len = WAVELAN_ADDR_SIZE * lp->mc_count;
 
 #ifdef DEBUG_CONFIG_INFO
-      DECLARE_MAC_BUF(mac);
       printk(KERN_DEBUG "%s: wv_hw_config(): set %d multicast addresses:\n",
 	     dev->name, lp->mc_count);
       for(dmi=dev->mc_list; dmi; dmi=dmi->next)
-	printk(KERN_DEBUG " %s\n",
-	       print_mac(mac, dmi->dmi_addr));
+	printk(KERN_DEBUG " %pM\n", dmi->dmi_addr);
 #endif
 
       /* Initialize adapter's ethernet multicast addresses */
@@ -3702,7 +3685,7 @@ wv_pcmcia_reset(struct net_device *	dev)
 #endif
 
   i = pcmcia_access_configuration_register(link, &reg);
-  if(i != CS_SUCCESS)
+  if (i != 0)
     {
       cs_error(link, AccessConfigurationRegister, i);
       return FALSE;
@@ -3716,7 +3699,7 @@ wv_pcmcia_reset(struct net_device *	dev)
   reg.Action = CS_WRITE;
   reg.Value = reg.Value | COR_SW_RESET;
   i = pcmcia_access_configuration_register(link, &reg);
-  if(i != CS_SUCCESS)
+  if (i != 0)
     {
       cs_error(link, AccessConfigurationRegister, i);
       return FALSE;
@@ -3725,7 +3708,7 @@ wv_pcmcia_reset(struct net_device *	dev)
   reg.Action = CS_WRITE;
   reg.Value = COR_LEVEL_IRQ | COR_CONFIG;
   i = pcmcia_access_configuration_register(link, &reg);
-  if(i != CS_SUCCESS)
+  if (i != 0)
     {
       cs_error(link, AccessConfigurationRegister, i);
       return FALSE;
@@ -3903,7 +3886,7 @@ wv_pcmcia_config(struct pcmcia_device *	link)
   do
     {
       i = pcmcia_request_io(link, &link->io);
-      if(i != CS_SUCCESS)
+      if (i != 0)
 	{
 	  cs_error(link, RequestIO, i);
 	  break;
@@ -3914,7 +3897,7 @@ wv_pcmcia_config(struct pcmcia_device *	link)
        * actually assign a handler to the interrupt.
        */
       i = pcmcia_request_irq(link, &link->irq);
-      if(i != CS_SUCCESS)
+      if (i != 0)
 	{
 	  cs_error(link, RequestIRQ, i);
 	  break;
@@ -3926,7 +3909,7 @@ wv_pcmcia_config(struct pcmcia_device *	link)
        */
       link->conf.ConfigIndex = 1;
       i = pcmcia_request_configuration(link, &link->conf);
-      if(i != CS_SUCCESS)
+      if (i != 0)
 	{
 	  cs_error(link, RequestConfiguration, i);
 	  break;
@@ -3942,7 +3925,7 @@ wv_pcmcia_config(struct pcmcia_device *	link)
       req.Base = req.Size = 0;
       req.AccessSpeed = mem_speed;
       i = pcmcia_request_window(&link, &req, &link->win);
-      if(i != CS_SUCCESS)
+      if (i != 0)
 	{
 	  cs_error(link, RequestWindow, i);
 	  break;
@@ -3954,7 +3937,7 @@ wv_pcmcia_config(struct pcmcia_device *	link)
 
       mem.CardOffset = 0; mem.Page = 0;
       i = pcmcia_map_mem_page(link->win, &mem);
-      if(i != CS_SUCCESS)
+      if (i != 0)
 	{
 	  cs_error(link, MapMemPage, i);
 	  break;
@@ -4496,7 +4479,7 @@ wavelan_probe(struct pcmcia_device *p_dev)
   p_dev->io.IOAddrLines = 3;
 
   /* Interrupt setup */
-  p_dev->irq.Attributes = IRQ_TYPE_EXCLUSIVE | IRQ_HANDLE_PRESENT;
+  p_dev->irq.Attributes = IRQ_TYPE_DYNAMIC_SHARING | IRQ_HANDLE_PRESENT;
   p_dev->irq.IRQInfo1 = IRQ_LEVEL_ID;
   p_dev->irq.Handler = wavelan_interrupt;
 

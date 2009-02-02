@@ -43,10 +43,10 @@
 #include <linux/err.h>
 #include <linux/clocksource.h>
 #include <linux/clockchips.h>
+#include <linux/io.h>
 
 #include <asm/system.h>
 #include <mach/hardware.h>
-#include <asm/io.h>
 #include <asm/leds.h>
 #include <asm/irq.h>
 #include <asm/mach/irq.h>
@@ -173,7 +173,7 @@ static __init void omap_init_mpu_timer(unsigned long rate)
 	clockevent_mpu_timer1.min_delta_ns =
 		clockevent_delta2ns(1, &clockevent_mpu_timer1);
 
-	clockevent_mpu_timer1.cpumask = cpumask_of_cpu(0);
+	clockevent_mpu_timer1.cpumask = cpumask_of(0);
 	clockevents_register_device(&clockevent_mpu_timer1);
 }
 

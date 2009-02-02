@@ -6,6 +6,7 @@ menuconfig TCG_TPM
 	tristate "TPM Hardware Support"
 	depends on HAS_IOMEM
 	depends on EXPERIMENTAL
+	select SECURITYFS
 	---help---
 	  If you have a TPM security chip in your system, which
 	  implements the Trusted Computing Group's specification,
@@ -56,14 +57,5 @@ config TCG_INFINEON
 	  will be called tpm_infineon.
 	  Further information on this driver and the supported hardware
 	  can be found at http://www.prosec.rub.de/tpm
-
-config TCG_XEN
-	tristate "XEN TPM Interface"
-	depends on XEN
-	---help---
-	  If you want to make TPM support available to a Xen user domain,
-	  say Yes and it will be accessible from within Linux.
-	  To compile this driver as a module, choose M here; the module
-	  will be called tpm_xenu.
 
 endif # TCG_TPM

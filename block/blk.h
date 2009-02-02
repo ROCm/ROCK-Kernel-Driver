@@ -20,6 +20,7 @@ void blk_unplug_timeout(unsigned long data);
 void blk_rq_timed_out_timer(unsigned long data);
 void blk_delete_timer(struct request *);
 void blk_add_timer(struct request *);
+void __generic_unplug_device(struct request_queue *);
 
 /*
  * Internal atomic flags for request handling
@@ -41,6 +42,18 @@ static inline void blk_clear_rq_complete(struct request *rq)
 {
 	clear_bit(REQ_ATOM_COMPLETE, &rq->atomic_flags);
 }
+
+#ifdef CONFIG_FAIL_IO_TIMEOUT
+int blk_should_fake_timeout(struct request_queue *);
+ssize_t part_timeout_show(struct device *, struct device_attribute *, char *);
+ssize_t part_timeout_store(struct device *, struct device_attribute *,
+				const char *, size_t);
+#else
+static inline int blk_should_fake_timeout(struct request_queue *q)
+{
+	return 0;
+}
+#endif
 
 struct io_context *current_io_context(gfp_t gfp_flags, int node);
 
@@ -86,8 +99,8 @@ static inline int queue_congestion_off_threshold(struct request_queue *q)
 static inline int blk_cpu_to_group(int cpu)
 {
 #ifdef CONFIG_SCHED_MC
-	cpumask_t mask = cpu_coregroup_map(cpu);
-	return first_cpu(mask);
+	const struct cpumask *mask = cpu_coregroup_mask(cpu);
+	return cpumask_first(mask);
 #elif defined(CONFIG_SCHED_SMT)
 	return first_cpu(per_cpu(cpu_sibling_map, cpu));
 #else

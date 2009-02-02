@@ -109,7 +109,7 @@ static struct ctrl sd_ctrls[] = {
 	},
 };
 
-static struct v4l2_pix_format vga_mode[] = {
+static const struct v4l2_pix_format vga_mode[] = {
 	{320, 240, V4L2_PIX_FMT_JPEG, V4L2_FIELD_NONE,
 		.bytesperline = 320,
 		.sizeimage = 320 * 240 * 3 / 8 + 590,
@@ -324,7 +324,7 @@ static int sd_init(struct gspca_dev *gspca_dev)
 }
 
 /* -- start the camera -- */
-static void sd_start(struct gspca_dev *gspca_dev)
+static int sd_start(struct gspca_dev *gspca_dev)
 {
 	int ret, value;
 
@@ -374,9 +374,10 @@ static void sd_start(struct gspca_dev *gspca_dev)
 	set_par(gspca_dev, 0x01000000);
 	set_par(gspca_dev, 0x01000000);
 	PDEBUG(D_STREAM, "camera started alt: 0x%02x", gspca_dev->alt);
-	return;
+	return 0;
 out:
 	PDEBUG(D_ERR|D_STREAM, "camera start err %d", ret);
+	return ret;
 }
 
 static void sd_stopN(struct gspca_dev *gspca_dev)
@@ -423,10 +424,8 @@ static void sd_pkt_scan(struct gspca_dev *gspca_dev,
 
 		/* beginning of the frame */
 #define STKHDRSZ 12
-		gspca_frame_add(gspca_dev, INTER_PACKET, frame,
-				data + STKHDRSZ, len - STKHDRSZ);
-#undef STKHDRSZ
-		return;
+		data += STKHDRSZ;
+		len -= STKHDRSZ;
 	}
 	gspca_frame_add(gspca_dev, INTER_PACKET, frame, data, len);
 }

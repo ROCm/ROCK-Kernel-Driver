@@ -13,6 +13,7 @@
  */
 
 #define KMSG_COMPONENT "time"
+#define pr_fmt(fmt) KMSG_COMPONENT ": " fmt
 
 #include <linux/errno.h>
 #include <linux/module.h>
@@ -40,6 +41,7 @@
 #include <asm/delay.h>
 #include <asm/s390_ext.h>
 #include <asm/div64.h>
+#include <asm/vdso.h>
 #include <asm/irq.h>
 #include <asm/irq_regs.h>
 #include <asm/timer.h>
@@ -63,7 +65,7 @@
 
 static ext_int_info_t ext_int_info_cc;
 static ext_int_info_t ext_int_etr_cc;
-static u64 jiffies_timer_cc;
+static u64 sched_clock_base_cc;
 
 static DEFINE_PER_CPU(struct clock_event_device, comparators);
 
@@ -72,7 +74,7 @@ static DEFINE_PER_CPU(struct clock_event_device, comparators);
  */
 unsigned long long sched_clock(void)
 {
-	return ((get_clock_xt() - jiffies_timer_cc) * 125) >> 9;
+	return ((get_clock_xt() - sched_clock_base_cc) * 125) >> 9;
 }
 
 /*
@@ -158,7 +160,7 @@ void init_cpu_timer(void)
 	cd->min_delta_ns	= 1;
 	cd->max_delta_ns	= LONG_MAX;
 	cd->rating		= 400;
-	cd->cpumask		= cpumask_of_cpu(cpu);
+	cd->cpumask		= cpumask_of(cpu);
 	cd->set_next_event	= s390_next_event;
 	cd->set_mode		= s390_set_mode;
 
@@ -227,19 +229,46 @@ static struct clocksource clocksource_tod = {
 };
 
 
+void update_vsyscall(struct timespec *wall_time, struct clocksource *clock)
+{
+	if (clock != &clocksource_tod)
+		return;
+
+	/* Make userspace gettimeofday spin until we're done. */
+	++vdso_data->tb_update_count;
+	smp_wmb();
+	vdso_data->xtime_tod_stamp = clock->cycle_last;
+	vdso_data->xtime_clock_sec = xtime.tv_sec;
+	vdso_data->xtime_clock_nsec = xtime.tv_nsec;
+	vdso_data->wtom_clock_sec = wall_to_monotonic.tv_sec;
+	vdso_data->wtom_clock_nsec = wall_to_monotonic.tv_nsec;
+	smp_wmb();
+	++vdso_data->tb_update_count;
+}
+
+extern struct timezone sys_tz;
+
+void update_vsyscall_tz(void)
+{
+	/* Make userspace gettimeofday spin until we're done. */
+	++vdso_data->tb_update_count;
+	smp_wmb();
+	vdso_data->tz_minuteswest = sys_tz.tz_minuteswest;
+	vdso_data->tz_dsttime = sys_tz.tz_dsttime;
+	smp_wmb();
+	++vdso_data->tb_update_count;
+}
+
 /*
  * Initialize the TOD clock and the CPU timer of
  * the boot cpu.
  */
 void __init time_init(void)
 {
-	u64 init_timer_cc;
-
-	init_timer_cc = reset_tod_clock();
-	jiffies_timer_cc = init_timer_cc - jiffies_64 * CLK_TICKS_PER_JIFFY;
+	sched_clock_base_cc = reset_tod_clock();
 
 	/* set xtime */
-	tod_to_timeval(init_timer_cc - TOD_UNIX_EPOCH, &xtime);
+	tod_to_timeval(sched_clock_base_cc - TOD_UNIX_EPOCH, &xtime);
         set_normalized_timespec(&wall_to_monotonic,
                                 -xtime.tv_sec, -xtime.tv_nsec);
 
@@ -260,10 +289,8 @@ void __init time_init(void)
 
 	/* Enable TOD clock interrupts on the boot cpu. */
 	init_cpu_timer();
-
-#ifdef CONFIG_VIRT_TIMER
+	/* Enable cpu timer interrupts on the boot cpu. */
 	vtime_init();
-#endif
 }
 
 /*
@@ -293,7 +320,7 @@ static unsigned long long adjust_time(unsigned long long old,
 		delta = -delta;
 		adjust.offset = -ticks * (1000000 / HZ);
 	}
-	jiffies_timer_cc += delta;
+	sched_clock_base_cc += delta;
 	if (adjust.offset != 0) {
 		pr_notice("The ETR interface has adjusted the clock "
 			  "by %li microseconds\n", adjust.offset);
@@ -372,8 +399,10 @@ static struct workqueue_struct *time_sync_wq;
 
 static void __init time_init_wq(void)
 {
-	if (!time_sync_wq)
-		time_sync_wq = create_singlethread_workqueue("timesync");
+	if (time_sync_wq)
+		return;
+	time_sync_wq = create_singlethread_workqueue("timesync");
+	stop_machine_create();
 }
 
 /*
@@ -1445,7 +1474,7 @@ void stp_sync_check(void)
 	if (!test_bit(CLOCK_SYNC_STP, &clock_sync_flags))
 		return;
 	disable_sync_clock(NULL);
-	schedule_work(&stp_work);
+	queue_work(time_sync_wq, &stp_work);
 }
 
 /*

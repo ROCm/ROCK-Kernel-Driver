@@ -227,7 +227,8 @@ register struct thread_info *current_thread_info_reg asm("g6");
 #define TIF_ABI_PENDING		12
 #define TIF_MEMDIE		13
 #define TIF_POLLING_NRFLAG	14
-#define TIF_PERFMON_CTXSW	15	/* perfmon needs ctxsw calls */
+#define TIF_FREEZE		15	/* is freezing for suspend */
+#define TIF_PERFMON_CTXSW	16	/* perfmon needs ctxsw calls */
 
 #define _TIF_SYSCALL_TRACE	(1<<TIF_SYSCALL_TRACE)
 #define _TIF_NOTIFY_RESUME	(1<<TIF_NOTIFY_RESUME)
@@ -240,6 +241,7 @@ register struct thread_info *current_thread_info_reg asm("g6");
 #define _TIF_SYSCALL_AUDIT	(1<<TIF_SYSCALL_AUDIT)
 #define _TIF_ABI_PENDING	(1<<TIF_ABI_PENDING)
 #define _TIF_POLLING_NRFLAG	(1<<TIF_POLLING_NRFLAG)
+#define _TIF_FREEZE		(1<<TIF_FREEZE)
 #define _TIF_PERFMON_CTXSW	(1<<TIF_PERFMON_CTXSW)
 
 #define _TIF_USER_WORK_MASK	((0xff << TI_FLAG_WSAVED_SHIFT) | \

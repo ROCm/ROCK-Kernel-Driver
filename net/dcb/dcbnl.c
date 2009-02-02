@@ -1,8 +1,20 @@
 /*
- * This is the Data Center Bridging configuration interface.
+ * Copyright (c) 2008, Intel Corporation.
  *
- * Copyright 2008, Lucy Liu <lucy.liu@intel.com>
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms and conditions of the GNU General Public License,
+ * version 2, as published by the Free Software Foundation.
  *
+ * This program is distributed in the hope it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+ * Place - Suite 330, Boston, MA 02111-1307 USA.
+ *
+ * Author: Lucy Liu <lucy.liu@intel.com>
  */
 
 #include <linux/netdevice.h>
@@ -13,8 +25,30 @@
 #include <linux/rtnetlink.h>
 #include <net/sock.h>
 
+/**
+ * Data Center Bridging (DCB) is a collection of Ethernet enhancements
+ * intended to allow network traffic with differing requirements
+ * (highly reliable, no drops vs. best effort vs. low latency) to operate
+ * and co-exist on Ethernet.  Current DCB features are:
+ *
+ * Enhanced Transmission Selection (aka Priority Grouping [PG]) - provides a
+ *   framework for assigning bandwidth guarantees to traffic classes.
+ *
+ * Priority-based Flow Control (PFC) - provides a flow control mechanism which
+ *   can work independently for each 802.1p priority.
+ *
+ * Congestion Notification - provides a mechanism for end-to-end congestion
+ *   control for protocols which do not have built-in congestion management.
+ *
+ * More information about the emerging standards for these Ethernet features
+ * can be found at: http://www.ieee802.org/1/pages/dcbridges.html
+ *
+ * This file implements an rtnetlink interface to allow configuration of DCB
+ * features for capable devices.
+ */
+
 MODULE_AUTHOR("Lucy Liu, <lucy.liu@intel.com>");
-MODULE_DESCRIPTION("Data Center Bridging generic netlink interface");
+MODULE_DESCRIPTION("Data Center Bridging netlink interface");
 MODULE_LICENSE("GPL");
 
 /**************** DCB attribute policies *************************************/
@@ -126,7 +160,7 @@ static struct nla_policy dcbnl_bcn_nest[DCB_BCN_ATTR_MAX + 1] = {
 
 /* standard netlink reply call */
 static int dcbnl_reply(u8 value, u8 event, u8 cmd, u8 attr, u32 pid,
-			u32 seq, u16 flags)
+                       u32 seq, u16 flags)
 {
 	struct sk_buff *dcbnl_skb;
 	struct dcbmsg *dcb;
@@ -157,12 +191,12 @@ static int dcbnl_reply(u8 value, u8 event, u8 cmd, u8 attr, u32 pid,
 	return 0;
 nlmsg_failure:
 err:
-	kfree(dcbnl_skb);
+	kfree_skb(dcbnl_skb);
 	return ret;
 }
 
 static int dcbnl_getstate(struct net_device *netdev, struct nlattr **tb,
-				u32 pid, u32 seq, u16 flags)
+                          u32 pid, u32 seq, u16 flags)
 {
 	int ret = -EINVAL;
 
@@ -171,13 +205,13 @@ static int dcbnl_getstate(struct net_device *netdev, struct nlattr **tb,
 		return ret;
 
 	ret = dcbnl_reply(netdev->dcbnl_ops->getstate(netdev), RTM_GETDCB,
-			  DCB_CMD_GSTATE, DCB_ATTR_STATE, pid, seq, flags);
+	                  DCB_CMD_GSTATE, DCB_ATTR_STATE, pid, seq, flags);
 
 	return ret;
 }
 
 static int dcbnl_getpfccfg(struct net_device *netdev, struct nlattr **tb,
-				u32 pid, u32 seq, u16 flags)
+                           u32 pid, u32 seq, u16 flags)
 {
 	struct sk_buff *dcbnl_skb;
 	struct nlmsghdr *nlh;
@@ -192,8 +226,8 @@ static int dcbnl_getpfccfg(struct net_device *netdev, struct nlattr **tb,
 		return ret;
 
 	ret = nla_parse_nested(data, DCB_PFC_UP_ATTR_MAX,
-			       tb[DCB_ATTR_PFC_CFG],
-			       dcbnl_pfc_up_nest);
+	                       tb[DCB_ATTR_PFC_CFG],
+	                       dcbnl_pfc_up_nest);
 	if (ret)
 		goto err_out;
 
@@ -219,7 +253,7 @@ static int dcbnl_getpfccfg(struct net_device *netdev, struct nlattr **tb,
 			continue;
 
 		netdev->dcbnl_ops->getpfccfg(netdev, i - DCB_PFC_UP_ATTR_0,
-					     &value);
+		                             &value);
 		ret = nla_put_u8(dcbnl_skb, i, value);
 
 		if (ret) {
@@ -238,13 +272,13 @@ static int dcbnl_getpfccfg(struct net_device *netdev, struct nlattr **tb,
 	return 0;
 nlmsg_failure:
 err:
-	kfree(dcbnl_skb);
+	kfree_skb(dcbnl_skb);
 err_out:
 	return -EINVAL;
 }
 
 static int dcbnl_getperm_hwaddr(struct net_device *netdev, struct nlattr **tb,
-				u32 pid, u32 seq, u16 flags)
+                                u32 pid, u32 seq, u16 flags)
 {
 	struct sk_buff *dcbnl_skb;
 	struct nlmsghdr *nlh;
@@ -268,7 +302,7 @@ static int dcbnl_getperm_hwaddr(struct net_device *netdev, struct nlattr **tb,
 	netdev->dcbnl_ops->getpermhwaddr(netdev, perm_addr);
 
 	ret = nla_put(dcbnl_skb, DCB_ATTR_PERM_HWADDR, sizeof(perm_addr),
-		      perm_addr);
+	              perm_addr);
 
 	nlmsg_end(dcbnl_skb, nlh);
 
@@ -280,13 +314,13 @@ static int dcbnl_getperm_hwaddr(struct net_device *netdev, struct nlattr **tb,
 
 nlmsg_failure:
 err:
-	kfree(dcbnl_skb);
+	kfree_skb(dcbnl_skb);
 err_out:
 	return -EINVAL;
 }
 
 static int dcbnl_getcap(struct net_device *netdev, struct nlattr **tb,
-				u32 pid, u32 seq, u16 flags)
+                        u32 pid, u32 seq, u16 flags)
 {
 	struct sk_buff *dcbnl_skb;
 	struct nlmsghdr *nlh;
@@ -301,7 +335,7 @@ static int dcbnl_getcap(struct net_device *netdev, struct nlattr **tb,
 		return ret;
 
 	ret = nla_parse_nested(data, DCB_CAP_ATTR_MAX, tb[DCB_ATTR_CAP],
-			       dcbnl_cap_nest);
+	                       dcbnl_cap_nest);
 	if (ret)
 		goto err_out;
 
@@ -346,13 +380,13 @@ static int dcbnl_getcap(struct net_device *netdev, struct nlattr **tb,
 	return 0;
 nlmsg_failure:
 err:
-	kfree(dcbnl_skb);
+	kfree_skb(dcbnl_skb);
 err_out:
 	return -EINVAL;
 }
 
 static int dcbnl_getnumtcs(struct net_device *netdev, struct nlattr **tb,
-				u32 pid, u32 seq, u16 flags)
+                           u32 pid, u32 seq, u16 flags)
 {
 	struct sk_buff *dcbnl_skb;
 	struct nlmsghdr *nlh;
@@ -367,7 +401,7 @@ static int dcbnl_getnumtcs(struct net_device *netdev, struct nlattr **tb,
 		return ret;
 
 	ret = nla_parse_nested(data, DCB_NUMTCS_ATTR_MAX, tb[DCB_ATTR_NUMTCS],
-			       dcbnl_numtcs_nest);
+	                       dcbnl_numtcs_nest);
 	if (ret) {
 		ret = -EINVAL;
 		goto err_out;
@@ -424,13 +458,13 @@ static int dcbnl_getnumtcs(struct net_device *netdev, struct nlattr **tb,
 	return 0;
 nlmsg_failure:
 err:
-	kfree(dcbnl_skb);
+	kfree_skb(dcbnl_skb);
 err_out:
 	return ret;
 }
 
 static int dcbnl_setnumtcs(struct net_device *netdev, struct nlattr **tb,
-				u32 pid, u32 seq, u16 flags)
+                           u32 pid, u32 seq, u16 flags)
 {
 	struct nlattr *data[DCB_NUMTCS_ATTR_MAX + 1];
 	int ret = -EINVAL;
@@ -441,7 +475,7 @@ static int dcbnl_setnumtcs(struct net_device *netdev, struct nlattr **tb,
 		return ret;
 
 	ret = nla_parse_nested(data, DCB_NUMTCS_ATTR_MAX, tb[DCB_ATTR_NUMTCS],
-			       dcbnl_numtcs_nest);
+	                       dcbnl_numtcs_nest);
 
 	if (ret) {
 		ret = -EINVAL;
@@ -462,14 +496,14 @@ static int dcbnl_setnumtcs(struct net_device *netdev, struct nlattr **tb,
 
 operr:
 	ret = dcbnl_reply(!!ret, RTM_SETDCB, DCB_CMD_SNUMTCS,
-				DCB_ATTR_NUMTCS, pid, seq, flags);
+	                  DCB_ATTR_NUMTCS, pid, seq, flags);
 
 err:
 	return ret;
 }
 
 static int dcbnl_getpfcstate(struct net_device *netdev, struct nlattr **tb,
-				u32 pid, u32 seq, u16 flags)
+                             u32 pid, u32 seq, u16 flags)
 {
 	int ret = -EINVAL;
 
@@ -477,14 +511,14 @@ static int dcbnl_getpfcstate(struct net_device *netdev, struct nlattr **tb,
 		return ret;
 
 	ret = dcbnl_reply(netdev->dcbnl_ops->getpfcstate(netdev), RTM_GETDCB,
-			DCB_CMD_PFC_GSTATE, DCB_ATTR_PFC_STATE,
-			pid, seq, flags);
+	                  DCB_CMD_PFC_GSTATE, DCB_ATTR_PFC_STATE,
+	                  pid, seq, flags);
 
 	return ret;
 }
 
 static int dcbnl_setpfcstate(struct net_device *netdev, struct nlattr **tb,
-				u32 pid, u32 seq, u16 flags)
+                             u32 pid, u32 seq, u16 flags)
 {
 	int ret = -EINVAL;
 	u8 value;
@@ -497,13 +531,13 @@ static int dcbnl_setpfcstate(struct net_device *netdev, struct nlattr **tb,
 	netdev->dcbnl_ops->setpfcstate(netdev, value);
 
 	ret = dcbnl_reply(0, RTM_SETDCB, DCB_CMD_PFC_SSTATE, DCB_ATTR_PFC_STATE,
-				pid, seq, flags);
+	                  pid, seq, flags);
 
 	return ret;
 }
 
 static int __dcbnl_pg_getcfg(struct net_device *netdev, struct nlattr **tb,
-				u32 pid, u32 seq, u16 flags, int dir)
+                             u32 pid, u32 seq, u16 flags, int dir)
 {
 	struct sk_buff *dcbnl_skb;
 	struct nlmsghdr *nlh;
@@ -524,7 +558,7 @@ static int __dcbnl_pg_getcfg(struct net_device *netdev, struct nlattr **tb,
 		return ret;
 
 	ret = nla_parse_nested(pg_tb, DCB_PG_ATTR_MAX,
-			       tb[DCB_ATTR_PG_CFG], dcbnl_pg_nest);
+	                       tb[DCB_ATTR_PG_CFG], dcbnl_pg_nest);
 
 	if (ret)
 		goto err_out;
@@ -583,28 +617,28 @@ static int __dcbnl_pg_getcfg(struct net_device *netdev, struct nlattr **tb,
 		if (param_tb[DCB_TC_ATTR_PARAM_PGID] ||
 		    param_tb[DCB_TC_ATTR_PARAM_ALL]) {
 			ret = nla_put_u8(dcbnl_skb,
-					 DCB_TC_ATTR_PARAM_PGID, pgid);
+			                 DCB_TC_ATTR_PARAM_PGID, pgid);
 			if (ret)
 				goto err_param;
 		}
 		if (param_tb[DCB_TC_ATTR_PARAM_UP_MAPPING] ||
 		    param_tb[DCB_TC_ATTR_PARAM_ALL]) {
 			ret = nla_put_u8(dcbnl_skb,
-					 DCB_TC_ATTR_PARAM_UP_MAPPING, up_map);
+			                 DCB_TC_ATTR_PARAM_UP_MAPPING, up_map);
 			if (ret)
 				goto err_param;
 		}
 		if (param_tb[DCB_TC_ATTR_PARAM_STRICT_PRIO] ||
 		    param_tb[DCB_TC_ATTR_PARAM_ALL]) {
 			ret = nla_put_u8(dcbnl_skb,
-					 DCB_TC_ATTR_PARAM_STRICT_PRIO, prio);
+			                 DCB_TC_ATTR_PARAM_STRICT_PRIO, prio);
 			if (ret)
 				goto err_param;
 		}
 		if (param_tb[DCB_TC_ATTR_PARAM_BW_PCT] ||
 		    param_tb[DCB_TC_ATTR_PARAM_ALL]) {
 			ret = nla_put_u8(dcbnl_skb, DCB_TC_ATTR_PARAM_BW_PCT,
-					 tc_pct);
+			                 tc_pct);
 			if (ret)
 				goto err_param;
 		}
@@ -653,26 +687,26 @@ err_pg:
 	nla_nest_cancel(dcbnl_skb, pg_nest);
 nlmsg_failure:
 err:
-	kfree(dcbnl_skb);
+	kfree_skb(dcbnl_skb);
 err_out:
 	ret  = -EINVAL;
 	return ret;
 }
 
 static int dcbnl_pgtx_getcfg(struct net_device *netdev, struct nlattr **tb,
-				u32 pid, u32 seq, u16 flags)
+                             u32 pid, u32 seq, u16 flags)
 {
 	return __dcbnl_pg_getcfg(netdev, tb, pid, seq, flags, 0);
 }
 
 static int dcbnl_pgrx_getcfg(struct net_device *netdev, struct nlattr **tb,
-				u32 pid, u32 seq, u16 flags)
+                             u32 pid, u32 seq, u16 flags)
 {
 	return __dcbnl_pg_getcfg(netdev, tb, pid, seq, flags, 1);
 }
 
 static int dcbnl_setstate(struct net_device *netdev, struct nlattr **tb,
-				u32 pid, u32 seq, u16 flags)
+                          u32 pid, u32 seq, u16 flags)
 {
 	int ret = -EINVAL;
 	u8 value;
@@ -683,13 +717,14 @@ static int dcbnl_setstate(struct net_device *netdev, struct nlattr **tb,
 	value = nla_get_u8(tb[DCB_ATTR_STATE]);
 
 	ret = dcbnl_reply(netdev->dcbnl_ops->setstate(netdev, value),
-		RTM_SETDCB, DCB_CMD_SSTATE, DCB_ATTR_STATE, pid, seq, flags);
+	                  RTM_SETDCB, DCB_CMD_SSTATE, DCB_ATTR_STATE,
+	                  pid, seq, flags);
 
 	return ret;
 }
 
 static int dcbnl_setpfccfg(struct net_device *netdev, struct nlattr **tb,
-				u32 pid, u32 seq, u16 flags)
+                           u32 pid, u32 seq, u16 flags)
 {
 	struct nlattr *data[DCB_PFC_UP_ATTR_MAX + 1];
 	int i;
@@ -700,8 +735,8 @@ static int dcbnl_setpfccfg(struct net_device *netdev, struct nlattr **tb,
 		return ret;
 
 	ret = nla_parse_nested(data, DCB_PFC_UP_ATTR_MAX,
-			       tb[DCB_ATTR_PFC_CFG],
-			       dcbnl_pfc_up_nest);
+	                       tb[DCB_ATTR_PFC_CFG],
+	                       dcbnl_pfc_up_nest);
 	if (ret)
 		goto err;
 
@@ -714,13 +749,13 @@ static int dcbnl_setpfccfg(struct net_device *netdev, struct nlattr **tb,
 	}
 
 	ret = dcbnl_reply(0, RTM_SETDCB, DCB_CMD_PFC_SCFG, DCB_ATTR_PFC_CFG,
-				pid, seq, flags);
+	                  pid, seq, flags);
 err:
 	return ret;
 }
 
 static int dcbnl_setall(struct net_device *netdev, struct nlattr **tb,
-				u32 pid, u32 seq, u16 flags)
+                        u32 pid, u32 seq, u16 flags)
 {
 	int ret = -EINVAL;
 
@@ -728,13 +763,13 @@ static int dcbnl_setall(struct net_device *netdev, struct nlattr **tb,
 		return ret;
 
 	ret = dcbnl_reply(netdev->dcbnl_ops->setall(netdev), RTM_SETDCB,
-			  DCB_CMD_SET_ALL, DCB_ATTR_SET_ALL, pid, seq, flags);
+	                  DCB_CMD_SET_ALL, DCB_ATTR_SET_ALL, pid, seq, flags);
 
 	return ret;
 }
 
 static int __dcbnl_pg_setcfg(struct net_device *netdev, struct nlattr **tb,
-				u32 pid, u32 seq, u16 flags, int dir)
+                             u32 pid, u32 seq, u16 flags, int dir)
 {
 	struct nlattr *pg_tb[DCB_PG_ATTR_MAX + 1];
 	struct nlattr *param_tb[DCB_TC_ATTR_PARAM_MAX + 1];
@@ -753,7 +788,7 @@ static int __dcbnl_pg_setcfg(struct net_device *netdev, struct nlattr **tb,
 		return ret;
 
 	ret = nla_parse_nested(pg_tb, DCB_PG_ATTR_MAX,
-			       tb[DCB_ATTR_PG_CFG], dcbnl_pg_nest);
+	                       tb[DCB_ATTR_PG_CFG], dcbnl_pg_nest);
 	if (ret)
 		goto err;
 
@@ -762,7 +797,7 @@ static int __dcbnl_pg_setcfg(struct net_device *netdev, struct nlattr **tb,
 			continue;
 
 		ret = nla_parse_nested(param_tb, DCB_TC_ATTR_PARAM_MAX,
-				       pg_tb[i], dcbnl_tc_param_nest);
+		                       pg_tb[i], dcbnl_tc_param_nest);
 		if (ret)
 			goto err;
 
@@ -826,19 +861,19 @@ err:
 }
 
 static int dcbnl_pgtx_setcfg(struct net_device *netdev, struct nlattr **tb,
-				u32 pid, u32 seq, u16 flags)
+                             u32 pid, u32 seq, u16 flags)
 {
 	return __dcbnl_pg_setcfg(netdev, tb, pid, seq, flags, 0);
 }
 
 static int dcbnl_pgrx_setcfg(struct net_device *netdev, struct nlattr **tb,
-				u32 pid, u32 seq, u16 flags)
+                             u32 pid, u32 seq, u16 flags)
 {
 	return __dcbnl_pg_setcfg(netdev, tb, pid, seq, flags, 1);
 }
 
 static int dcbnl_bcn_getcfg(struct net_device *netdev, struct nlattr **tb,
-				u32 pid, u32 seq, u16 flags)
+                            u32 pid, u32 seq, u16 flags)
 {
 	struct sk_buff *dcbnl_skb;
 	struct nlmsghdr *nlh;
@@ -856,7 +891,7 @@ static int dcbnl_bcn_getcfg(struct net_device *netdev, struct nlattr **tb,
 		return ret;
 
 	ret = nla_parse_nested(bcn_tb, DCB_BCN_ATTR_MAX,
-			       tb[DCB_ATTR_BCN], dcbnl_bcn_nest);
+	                       tb[DCB_ATTR_BCN], dcbnl_bcn_nest);
 
 	if (ret)
 		goto err_out;
@@ -883,7 +918,7 @@ static int dcbnl_bcn_getcfg(struct net_device *netdev, struct nlattr **tb,
 			continue;
 
 		netdev->dcbnl_ops->getbcnrp(netdev, i - DCB_BCN_ATTR_RP_0,
-					     &value_byte);
+		                            &value_byte);
 		ret = nla_put_u8(dcbnl_skb, i, value_byte);
 		if (ret)
 			goto err_bcn;
@@ -894,7 +929,7 @@ static int dcbnl_bcn_getcfg(struct net_device *netdev, struct nlattr **tb,
 			continue;
 
 		netdev->dcbnl_ops->getbcncfg(netdev, i,
-					    &value_integer);
+		                             &value_integer);
 		ret = nla_put_u32(dcbnl_skb, i, value_integer);
 		if (ret)
 			goto err_bcn;
@@ -914,14 +949,14 @@ err_bcn:
 	nla_nest_cancel(dcbnl_skb, bcn_nest);
 nlmsg_failure:
 err:
-	kfree(dcbnl_skb);
+	kfree_skb(dcbnl_skb);
 err_out:
 	ret  = -EINVAL;
 	return ret;
 }
 
 static int dcbnl_bcn_setcfg(struct net_device *netdev, struct nlattr **tb,
-				u32 pid, u32 seq, u16 flags)
+                            u32 pid, u32 seq, u16 flags)
 {
 	struct nlattr *data[DCB_BCN_ATTR_MAX + 1];
 	int i;
@@ -934,8 +969,8 @@ static int dcbnl_bcn_setcfg(struct net_device *netdev, struct nlattr **tb,
 		return ret;
 
 	ret = nla_parse_nested(data, DCB_BCN_ATTR_MAX,
-			       tb[DCB_ATTR_BCN],
-			       dcbnl_pfc_up_nest);
+	                       tb[DCB_ATTR_BCN],
+	                       dcbnl_pfc_up_nest);
 	if (ret)
 		goto err;
 
@@ -952,11 +987,11 @@ static int dcbnl_bcn_setcfg(struct net_device *netdev, struct nlattr **tb,
 			continue;
 		value_int = nla_get_u32(data[i]);
 		netdev->dcbnl_ops->setbcncfg(netdev,
-			i, value_int);
+	                                     i, value_int);
 	}
 
 	ret = dcbnl_reply(0, RTM_SETDCB, DCB_CMD_BCN_SCFG, DCB_ATTR_BCN,
-				pid, seq, flags);
+	                  pid, seq, flags);
 err:
 	return ret;
 }
@@ -991,72 +1026,72 @@ static int dcb_doit(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 	switch (dcb->cmd) {
 	case DCB_CMD_GSTATE:
 		ret = dcbnl_getstate(netdev, tb, pid, nlh->nlmsg_seq,
-					nlh->nlmsg_flags);
+		                     nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_PFC_GCFG:
 		ret = dcbnl_getpfccfg(netdev, tb, pid, nlh->nlmsg_seq,
-					nlh->nlmsg_flags);
+		                      nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_GPERM_HWADDR:
 		ret = dcbnl_getperm_hwaddr(netdev, tb, pid, nlh->nlmsg_seq,
-					nlh->nlmsg_flags);
+		                           nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_PGTX_GCFG:
 		ret = dcbnl_pgtx_getcfg(netdev, tb, pid, nlh->nlmsg_seq,
-					nlh->nlmsg_flags);
+		                        nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_PGRX_GCFG:
 		ret = dcbnl_pgrx_getcfg(netdev, tb, pid, nlh->nlmsg_seq,
-					nlh->nlmsg_flags);
+		                        nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_BCN_GCFG:
 		ret = dcbnl_bcn_getcfg(netdev, tb, pid, nlh->nlmsg_seq,
-					nlh->nlmsg_flags);
+		                       nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_SSTATE:
 		ret = dcbnl_setstate(netdev, tb, pid, nlh->nlmsg_seq,
-					nlh->nlmsg_flags);
+		                     nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_PFC_SCFG:
 		ret = dcbnl_setpfccfg(netdev, tb, pid, nlh->nlmsg_seq,
-					nlh->nlmsg_flags);
+		                      nlh->nlmsg_flags);
 		goto out;
 
 	case DCB_CMD_SET_ALL:
 		ret = dcbnl_setall(netdev, tb, pid, nlh->nlmsg_seq,
-					nlh->nlmsg_flags);
+		                   nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_PGTX_SCFG:
 		ret = dcbnl_pgtx_setcfg(netdev, tb, pid, nlh->nlmsg_seq,
-					nlh->nlmsg_flags);
+		                        nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_PGRX_SCFG:
 		ret = dcbnl_pgrx_setcfg(netdev, tb, pid, nlh->nlmsg_seq,
-					nlh->nlmsg_flags);
+		                        nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_GCAP:
 		ret = dcbnl_getcap(netdev, tb, pid, nlh->nlmsg_seq,
-					nlh->nlmsg_flags);
+		                   nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_GNUMTCS:
 		ret = dcbnl_getnumtcs(netdev, tb, pid, nlh->nlmsg_seq,
-					nlh->nlmsg_flags);
+		                      nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_SNUMTCS:
 		ret = dcbnl_setnumtcs(netdev, tb, pid, nlh->nlmsg_seq,
-					nlh->nlmsg_flags);
+		                      nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_PFC_GSTATE:
 		ret = dcbnl_getpfcstate(netdev, tb, pid, nlh->nlmsg_seq,
-					nlh->nlmsg_flags);
+		                        nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_PFC_SSTATE:
 		ret = dcbnl_setpfcstate(netdev, tb, pid, nlh->nlmsg_seq,
-					nlh->nlmsg_flags);
+		                        nlh->nlmsg_flags);
 		goto out;
 	case DCB_CMD_BCN_SCFG:
 		ret = dcbnl_bcn_setcfg(netdev, tb, pid, nlh->nlmsg_seq,
-					nlh->nlmsg_flags);
+		                       nlh->nlmsg_flags);
 		goto out;
 	default:
 		goto errout;

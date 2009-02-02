@@ -52,7 +52,7 @@ static int Novfs_Get_Version(char *page, char **start, off_t off, int count, int
 					    novfs_current_mnt);
 			}
 		}
-		DbgPrint("Novfs_Get_Version:\n%s\n", buf);
+		DbgPrint("%s", buf);
 	}
 	*eof = 1;
 	return (len);
@@ -136,18 +136,18 @@ int novfs_proc_init(void)
 void novfs_proc_exit(void)
 {
 
-	DbgPrint("Uninit_Procfs_Interface remove_proc_entry(Version, NULL)\n");
+	DbgPrint("remove_proc_entry(Version, NULL)\n");
 	remove_proc_entry("Version", novfs_procfs_dir);
 
-	DbgPrint("Uninit_Procfs_Interface remove_proc_entry(Control, NULL)\n");
+	DbgPrint("remove_proc_entry(Control, NULL)\n");
 	remove_proc_entry("Control", novfs_procfs_dir);
 
-	DbgPrint("Uninit_Procfs_Interface remove_proc_entry(Library, NULL)\n");
+	DbgPrint("remove_proc_entry(Library, NULL)\n");
 	remove_proc_entry("Library", novfs_procfs_dir);
 
-	DbgPrint("Uninit_Procfs_Interface remove_proc_entry(%s, NULL)\n",
+	DbgPrint("remove_proc_entry(%s, NULL)\n",
 		 MODULE_NAME);
 	remove_proc_entry(MODULE_NAME, NULL);
 
-	DbgPrint("Uninit_Procfs_Interface done\n");
+	DbgPrint("done\n");
 }

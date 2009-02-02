@@ -276,7 +276,7 @@ static inline int isAbortTrfCmnd(const unsigned char *buf)
 static void send_to_tty(struct usb_serial_port *port,
 			char *data, unsigned int actual_length)
 {
-	struct tty_struct *tty = port->port.tty;
+	struct tty_struct *tty = tty_port_tty_get(&port->port);
 
 	if (tty && actual_length) {
 
@@ -287,6 +287,7 @@ static void send_to_tty(struct usb_serial_port *port,
 		tty_insert_flip_string(tty, data, actual_length);
 		tty_flip_buffer_push(tty);
 	}
+	tty_kref_put(tty);
 }
 
 
@@ -1055,7 +1056,7 @@ static void garmin_write_bulk_callback(struct urb *urb)
 
 		if (status) {
 			dbg("%s - nonzero write bulk status received: %d",
-			    __func__, urb->status);
+			    __func__, status);
 			spin_lock_irqsave(&garmin_data_p->lock, flags);
 			garmin_data_p->flags |= CLEAR_HALT_REQUIRED;
 			spin_unlock_irqrestore(&garmin_data_p->lock, flags);
@@ -1584,7 +1585,8 @@ static int __init garmin_init(void)
 	retval = usb_register(&garmin_driver);
 	if (retval)
 		goto failed_usb_register;
-	info(DRIVER_DESC " " DRIVER_VERSION);
+	printk(KERN_INFO KBUILD_MODNAME ": " DRIVER_VERSION ":"
+	       DRIVER_DESC "\n");
 
 	return 0;
 failed_usb_register:

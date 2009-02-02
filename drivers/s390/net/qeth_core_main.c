@@ -9,6 +9,7 @@
  */
 
 #define KMSG_COMPONENT "qeth"
+#define pr_fmt(fmt) KMSG_COMPONENT ": " fmt
 
 #include <linux/module.h>
 #include <linux/moduleparam.h>
@@ -23,7 +24,6 @@
 
 #include <asm/ebcdic.h>
 #include <asm/io.h>
-#include <asm/s390_rdev.h>
 
 #include "qeth_core.h"
 #include "qeth_core_offl.h"
@@ -286,8 +286,15 @@ int qeth_set_large_send(struct qeth_card *card,
 	card->options.large_send = type;
 	switch (card->options.large_send) {
 	case QETH_LARGE_SEND_EDDP:
-		card->dev->features |= NETIF_F_TSO | NETIF_F_SG |
+		if (card->info.type != QETH_CARD_TYPE_IQD) {
+			card->dev->features |= NETIF_F_TSO | NETIF_F_SG |
 					NETIF_F_HW_CSUM;
+		} else {
+			card->dev->features &= ~(NETIF_F_TSO | NETIF_F_SG |
+						NETIF_F_HW_CSUM);
+			card->options.large_send = QETH_LARGE_SEND_NO;
+			rc = -EOPNOTSUPP;
+		}
 		break;
 	case QETH_LARGE_SEND_TSO:
 		if (qeth_is_supported(card, IPA_OUTBOUND_TSO)) {
@@ -1152,6 +1159,14 @@ static int qeth_setup_card(struct qeth_card *card)
 	return 0;
 }
 
+static void qeth_core_sl_print(struct seq_file *m, struct service_level *slr)
+{
+	struct qeth_card *card = container_of(slr, struct qeth_card,
+					qeth_service_level);
+	seq_printf(m, "qeth: %s firmware level %s\n", CARD_BUS_ID(card),
+			card->info.mcl_level);
+}
+
 static struct qeth_card *qeth_alloc_card(void)
 {
 	struct qeth_card *card;
@@ -1171,6 +1186,8 @@ static struct qeth_card *qeth_alloc_card(void)
 		return NULL;
 	}
 	card->options.layer2 = -1;
+	card->qeth_service_level.seq_print = qeth_core_sl_print;
+	register_service_level(&card->qeth_service_level);
 	return card;
 }
 
@@ -1674,6 +1691,7 @@ int qeth_send_control_data(struct qeth_card *card, int len,
 	unsigned long flags;
 	struct qeth_reply *reply = NULL;
 	unsigned long timeout;
+	struct qeth_ipa_cmd *cmd;
 
 	QETH_DBF_TEXT(TRACE, 2, "sendctl");
 
@@ -1720,17 +1738,34 @@ int qeth_send_control_data(struct qeth_card *card, int len,
 		wake_up(&card->wait_q);
 		return rc;
 	}
-	while (!atomic_read(&reply->received)) {
-		if (time_after(jiffies, timeout)) {
-			spin_lock_irqsave(&reply->card->lock, flags);
-			list_del_init(&reply->list);
-			spin_unlock_irqrestore(&reply->card->lock, flags);
-			reply->rc = -ETIME;
-			atomic_inc(&reply->received);
-			wake_up(&reply->wait_q);
-		}
-		cpu_relax();
-	};
+
+	/* we have only one long running ipassist, since we can ensure
+	   process context of this command we can sleep */
+	cmd = (struct qeth_ipa_cmd *)(iob->data+IPA_PDU_HEADER_SIZE);
+	if ((cmd->hdr.command == IPA_CMD_SETIP) &&
+	    (cmd->hdr.prot_version == QETH_PROT_IPV4)) {
+		if (!wait_event_timeout(reply->wait_q,
+		    atomic_read(&reply->received), timeout))
+			goto time_err;
+	} else {
+		while (!atomic_read(&reply->received)) {
+			if (time_after(jiffies, timeout))
+				goto time_err;
+			cpu_relax();
+		};
+	}
+
+	rc = reply->rc;
+	qeth_put_reply(reply);
+	return rc;
+
+time_err:
+	spin_lock_irqsave(&reply->card->lock, flags);
+	list_del_init(&reply->list);
+	spin_unlock_irqrestore(&reply->card->lock, flags);
+	reply->rc = -ETIME;
+	atomic_inc(&reply->received);
+	wake_up(&reply->wait_q);
 	rc = reply->rc;
 	qeth_put_reply(reply);
 	return rc;
@@ -2339,7 +2374,6 @@ static int qeth_init_input_buffer(struct qeth_card *card,
 	 * the QETH_IN_BUF_REQUEUE_THRESHOLD we should never run  out off
 	 * buffers
 	 */
-	BUG_ON(!pool_entry);
 
 	buf->pool_entry = pool_entry;
 	for (i = 0; i < QETH_MAX_BUFFER_ELEMENTS(card); ++i) {
@@ -3743,6 +3777,7 @@ static void qeth_core_free_card(struct qeth_card *card)
 		free_netdev(card->dev);
 	kfree(card->ip_tbd_list);
 	qeth_free_qdio_buffers(card);
+	unregister_service_level(&card->qeth_service_level);
 	kfree(card);
 }
 
@@ -4107,7 +4142,7 @@ static int qeth_core_probe_device(struct ccwgroup_device *gdev)
 	if (!get_device(dev))
 		return -ENODEV;
 
-	QETH_DBF_TEXT_(SETUP, 2, "%s", gdev->dev.bus_id);
+	QETH_DBF_TEXT_(SETUP, 2, "%s", dev_name(&gdev->dev));
 
 	card = qeth_alloc_card();
 	if (!card) {
@@ -4489,7 +4524,7 @@ static int __init qeth_core_init(void)
 				&driver_attr_group);
 	if (rc)
 		goto driver_err;
-	qeth_core_root_dev = s390_root_dev_register("qeth");
+	qeth_core_root_dev = root_device_register("qeth");
 	rc = IS_ERR(qeth_core_root_dev) ? PTR_ERR(qeth_core_root_dev) : 0;
 	if (rc)
 		goto register_err;
@@ -4503,7 +4538,7 @@ static int __init qeth_core_init(void)
 
 	return 0;
 slab_err:
-	s390_root_dev_unregister(qeth_core_root_dev);
+	root_device_unregister(qeth_core_root_dev);
 register_err:
 	driver_remove_file(&qeth_core_ccwgroup_driver.driver,
 			   &driver_attr_group);
@@ -4521,7 +4556,7 @@ out_err:
 
 static void __exit qeth_core_exit(void)
 {
-	s390_root_dev_unregister(qeth_core_root_dev);
+	root_device_unregister(qeth_core_root_dev);
 	driver_remove_file(&qeth_core_ccwgroup_driver.driver,
 			   &driver_attr_group);
 	ccwgroup_driver_unregister(&qeth_core_ccwgroup_driver);

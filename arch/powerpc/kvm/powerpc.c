@@ -27,7 +27,9 @@
 #include <asm/cputable.h>
 #include <asm/uaccess.h>
 #include <asm/kvm_ppc.h>
-
+#include <asm/tlbflush.h>
+#include "timing.h"
+#include "../mm/mmu_decl.h"
 
 gfn_t unalias_gfn(struct kvm *kvm, gfn_t gfn)
 {
@@ -97,14 +99,7 @@ void kvm_arch_hardware_unsetup(void)
 
 void kvm_arch_check_processor_compat(void *rtn)
 {
-	int r;
-
-	if (strcmp(cur_cpu_spec->platform, "ppc440") == 0)
-		r = 0;
-	else
-		r = -ENOTSUPP;
-
-	*(int *)rtn = r;
+	*(int *)rtn = kvmppc_core_check_processor_compat();
 }
 
 struct kvm *kvm_arch_create_vm(void)
@@ -142,9 +137,6 @@ int kvm_dev_ioctl_check_extension(long ext)
 	int r;
 
 	switch (ext) {
-	case KVM_CAP_USER_MEMORY:
-		r = 1;
-		break;
 	case KVM_CAP_COALESCED_MMIO:
 		r = KVM_COALESCED_MMIO_PAGE_OFFSET;
 		break;
@@ -177,30 +169,15 @@ void kvm_arch_flush_shadow(struct kvm *kvm)
 struct kvm_vcpu *kvm_arch_vcpu_create(struct kvm *kvm, unsigned int id)
 {
 	struct kvm_vcpu *vcpu;
-	int err;
-
-	vcpu = kmem_cache_zalloc(kvm_vcpu_cache, GFP_KERNEL);
-	if (!vcpu) {
-		err = -ENOMEM;
-		goto out;
-	}
-
-	err = kvm_vcpu_init(vcpu, kvm, id);
-	if (err)
-		goto free_vcpu;
-
+	vcpu = kvmppc_core_vcpu_create(kvm, id);
+	kvmppc_create_vcpu_debugfs(vcpu, id);
 	return vcpu;
-
-free_vcpu:
-	kmem_cache_free(kvm_vcpu_cache, vcpu);
-out:
-	return ERR_PTR(err);
 }
 
 void kvm_arch_vcpu_free(struct kvm_vcpu *vcpu)
 {
-	kvm_vcpu_uninit(vcpu);
-	kmem_cache_free(kvm_vcpu_cache, vcpu);
+	kvmppc_remove_vcpu_debugfs(vcpu);
+	kvmppc_core_vcpu_free(vcpu);
 }
 
 void kvm_arch_vcpu_destroy(struct kvm_vcpu *vcpu)
@@ -210,16 +187,14 @@ void kvm_arch_vcpu_destroy(struct kvm_vcpu *vcpu)
 
 int kvm_cpu_has_pending_timer(struct kvm_vcpu *vcpu)
 {
-	unsigned int priority = exception_priority[BOOKE_INTERRUPT_DECREMENTER];
-
-	return test_bit(priority, &vcpu->arch.pending_exceptions);
+	return kvmppc_core_pending_dec(vcpu);
 }
 
 static void kvmppc_decrementer_func(unsigned long data)
 {
 	struct kvm_vcpu *vcpu = (struct kvm_vcpu *)data;
 
-	kvmppc_queue_exception(vcpu, BOOKE_INTERRUPT_DECREMENTER);
+	kvmppc_core_queue_dec(vcpu);
 
 	if (waitqueue_active(&vcpu->wq)) {
 		wake_up_interruptible(&vcpu->wq);
@@ -237,33 +212,59 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
 
 void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu)
 {
+	kvmppc_core_destroy_mmu(vcpu);
 }
 
 void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 {
+	if (vcpu->guest_debug.enabled)
+		kvmppc_core_load_guest_debugstate(vcpu);
+
+	kvmppc_core_vcpu_load(vcpu, cpu);
 }
 
 void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
 {
+	if (vcpu->guest_debug.enabled)
+		kvmppc_core_load_host_debugstate(vcpu);
+
+	/* Don't leave guest TLB entries resident when being de-scheduled. */
+	/* XXX It would be nice to differentiate between heavyweight exit and
+	 * sched_out here, since we could avoid the TLB flush for heavyweight
+	 * exits. */
+	_tlbil_all();
+	kvmppc_core_vcpu_put(vcpu);
 }
 
 int kvm_arch_vcpu_ioctl_debug_guest(struct kvm_vcpu *vcpu,
                                     struct kvm_debug_guest *dbg)
 {
-	return -ENOTSUPP;
+	int i;
+
+	vcpu->guest_debug.enabled = dbg->enabled;
+	if (vcpu->guest_debug.enabled) {
+		for (i=0; i < ARRAY_SIZE(vcpu->guest_debug.bp); i++) {
+			if (dbg->breakpoints[i].enabled)
+				vcpu->guest_debug.bp[i] = dbg->breakpoints[i].address;
+			else
+				vcpu->guest_debug.bp[i] = 0;
+		}
+	}
+
+	return 0;
 }
 
 static void kvmppc_complete_dcr_load(struct kvm_vcpu *vcpu,
                                      struct kvm_run *run)
 {
-	u32 *gpr = &vcpu->arch.gpr[vcpu->arch.io_gpr];
+	ulong *gpr = &vcpu->arch.gpr[vcpu->arch.io_gpr];
 	*gpr = run->dcr.data;
 }
 
 static void kvmppc_complete_mmio_load(struct kvm_vcpu *vcpu,
                                       struct kvm_run *run)
 {
-	u32 *gpr = &vcpu->arch.gpr[vcpu->arch.io_gpr];
+	ulong *gpr = &vcpu->arch.gpr[vcpu->arch.io_gpr];
 
 	if (run->mmio.len > sizeof(*gpr)) {
 		printk(KERN_ERR "bad MMIO length: %d\n", run->mmio.len);
@@ -361,7 +362,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
 		vcpu->arch.dcr_needed = 0;
 	}
 
-	kvmppc_check_and_deliver_interrupts(vcpu);
+	kvmppc_core_deliver_interrupts(vcpu);
 
 	local_irq_disable();
 	kvm_guest_enter();
@@ -379,7 +380,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
 
 int kvm_vcpu_ioctl_interrupt(struct kvm_vcpu *vcpu, struct kvm_interrupt *irq)
 {
-	kvmppc_queue_exception(vcpu, BOOKE_INTERRUPT_EXTERNAL);
+	kvmppc_core_queue_external(vcpu, irq);
 
 	if (waitqueue_active(&vcpu->wq)) {
 		wake_up_interruptible(&vcpu->wq);

@@ -146,6 +146,7 @@ enum {
 	ATA_DFLAG_SPUNDOWN	= (1 << 14), /* XXX: for spindown_compat */
 	ATA_DFLAG_SLEEPING	= (1 << 15), /* device is sleeping */
 	ATA_DFLAG_DUBIOUS_XFER	= (1 << 16), /* data transfer not verified */
+	ATA_DFLAG_NO_UNLOAD	= (1 << 17), /* device doesn't support unload */
 	ATA_DFLAG_INIT_MASK	= (1 << 24) - 1,
 
 	ATA_DFLAG_DETACH	= (1 << 24),
@@ -214,10 +215,11 @@ enum {
 	ATA_PFLAG_FROZEN	= (1 << 2), /* port is frozen */
 	ATA_PFLAG_RECOVERED	= (1 << 3), /* recovery action performed */
 	ATA_PFLAG_LOADING	= (1 << 4), /* boot/loading probe */
-	ATA_PFLAG_UNLOADING	= (1 << 5), /* module is unloading */
 	ATA_PFLAG_SCSI_HOTPLUG	= (1 << 6), /* SCSI hotplug scheduled */
 	ATA_PFLAG_INITIALIZING	= (1 << 7), /* being initialized, don't touch */
 	ATA_PFLAG_RESETTING	= (1 << 8), /* reset in progress */
+	ATA_PFLAG_UNLOADING	= (1 << 9), /* driver is being unloaded */
+	ATA_PFLAG_UNLOADED	= (1 << 10), /* driver is unloaded */
 
 	ATA_PFLAG_SUSPENDED	= (1 << 17), /* port is suspended (power) */
 	ATA_PFLAG_PM_PENDING	= (1 << 18), /* PM operation pending */
@@ -239,6 +241,7 @@ enum {
 	/* host set flags */
 	ATA_HOST_SIMPLEX	= (1 << 0),	/* Host is simplex, one DMA channel per host only */
 	ATA_HOST_STARTED	= (1 << 1),	/* Host started */
+	ATA_HOST_PARALLEL_SCAN	= (1 << 2),	/* Ports on this host can be scanned in parallel */
 
 	/* bits 24:31 of host->flags are reserved for LLD specific flags */
 
@@ -246,6 +249,7 @@ enum {
 	ATA_TMOUT_BOOT		= 30000,	/* heuristic */
 	ATA_TMOUT_BOOT_QUICK	=  7000,	/* heuristic */
 	ATA_TMOUT_INTERNAL_QUICK = 5000,
+	ATA_TMOUT_MAX_PARK	= 30000,
 
 	/* FIXME: GoVault needs 2s but we can't afford that without
 	 * parallel probing.  800ms is enough for iVDR disk
@@ -321,8 +325,9 @@ enum {
 	ATA_EH_RESET		= ATA_EH_SOFTRESET | ATA_EH_HARDRESET,
 	ATA_EH_ENABLE_LINK	= (1 << 3),
 	ATA_EH_LPM		= (1 << 4),  /* link power management action */
+	ATA_EH_PARK		= (1 << 5), /* unload heads and stop I/O */
 
-	ATA_EH_PERDEV_MASK	= ATA_EH_REVALIDATE,
+	ATA_EH_PERDEV_MASK	= ATA_EH_REVALIDATE | ATA_EH_PARK,
 	ATA_EH_ALL_ACTIONS	= ATA_EH_REVALIDATE | ATA_EH_RESET |
 				  ATA_EH_ENABLE_LINK | ATA_EH_LPM,
 
@@ -398,12 +403,14 @@ enum {
 				  ATA_TIMING_CYC8B,
 	ATA_TIMING_ACTIVE	= (1 << 4),
 	ATA_TIMING_RECOVER	= (1 << 5),
-	ATA_TIMING_CYCLE	= (1 << 6),
-	ATA_TIMING_UDMA		= (1 << 7),
+	ATA_TIMING_DMACK_HOLD	= (1 << 6),
+	ATA_TIMING_CYCLE	= (1 << 7),
+	ATA_TIMING_UDMA		= (1 << 8),
 	ATA_TIMING_ALL		= ATA_TIMING_SETUP | ATA_TIMING_ACT8B |
 				  ATA_TIMING_REC8B | ATA_TIMING_CYC8B |
 				  ATA_TIMING_ACTIVE | ATA_TIMING_RECOVER |
-				  ATA_TIMING_CYCLE | ATA_TIMING_UDMA,
+				  ATA_TIMING_DMACK_HOLD | ATA_TIMING_CYCLE |
+				  ATA_TIMING_UDMA,
 };
 
 enum ata_xfer_mask {
@@ -463,6 +470,7 @@ enum link_pm {
 	MEDIUM_POWER,
 };
 extern struct device_attribute dev_attr_link_power_management_policy;
+extern struct device_attribute dev_attr_unload_heads;
 extern struct device_attribute dev_attr_em_message_type;
 extern struct device_attribute dev_attr_em_message;
 extern struct device_attribute dev_attr_sw_activity;
@@ -565,8 +573,8 @@ struct ata_ering {
 struct ata_device {
 	struct ata_link		*link;
 	unsigned int		devno;		/* 0 or 1 */
-	unsigned long		flags;		/* ATA_DFLAG_xxx */
 	unsigned int		horkage;	/* List of broken features */
+	unsigned long		flags;		/* ATA_DFLAG_xxx */
 	struct scsi_device	*sdev;		/* attached SCSI device */
 #ifdef CONFIG_ATA_ACPI
 	acpi_handle		acpi_handle;
@@ -575,6 +583,7 @@ struct ata_device {
 	/* n_sector is used as CLEAR_OFFSET, read comment above CLEAR_OFFSET */
 	u64			n_sectors;	/* size of device, if ATA */
 	unsigned int		class;		/* ATA_DEV_xxx */
+	unsigned long		unpark_deadline;
 
 	u8			pio_mode;
 	u8			dma_mode;
@@ -632,6 +641,7 @@ struct ata_eh_context {
 					       [ATA_EH_CMD_TIMEOUT_TABLE_SIZE];
 	unsigned int		classes[ATA_MAX_DEVICES];
 	unsigned int		did_probe_mask;
+	unsigned int		unloaded_mask;
 	unsigned int		saved_ncq_enabled;
 	u8			saved_xfer_mode[ATA_MAX_DEVICES];
 	/* timestamp for the last reset attempt or success */
@@ -721,6 +731,7 @@ struct ata_port {
 	struct list_head	eh_done_q;
 	wait_queue_head_t	eh_wait_q;
 	int			eh_tries;
+	struct completion	park_req_pending;
 
 	pm_message_t		pm_mesg;
 	int			*pm_result;
@@ -859,6 +870,7 @@ struct ata_timing {
 	unsigned short cyc8b;		/* t0 for 8-bit I/O */
 	unsigned short active;		/* t2 or tD */
 	unsigned short recover;		/* t2i or tK */
+	unsigned short dmack_hold;	/* tj */
 	unsigned short cycle;		/* t0 */
 	unsigned short udma;		/* t2CYCTYP/2 */
 };
@@ -920,6 +932,8 @@ extern void ata_host_init(struct ata_host *, struct device *,
 extern int ata_scsi_detect(struct scsi_host_template *sht);
 extern int ata_scsi_ioctl(struct scsi_device *dev, int cmd, void __user *arg);
 extern int ata_scsi_queuecmd(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *));
+extern int ata_sas_scsi_ioctl(struct ata_port *ap, struct scsi_device *dev,
+			    int cmd, void __user *arg);
 extern void ata_sas_port_destroy(struct ata_port *);
 extern struct ata_port *ata_sas_port_alloc(struct ata_host *,
 					   struct ata_port_info *, struct Scsi_Host *);
@@ -1111,6 +1125,7 @@ extern void ata_std_error_handler(struct ata_port *ap);
  */
 extern const struct ata_port_operations ata_base_port_ops;
 extern const struct ata_port_operations sata_port_ops;
+extern struct device_attribute *ata_common_sdev_attrs[];
 
 #define ATA_BASE_SHT(drv_name)					\
 	.module			= THIS_MODULE,			\
@@ -1125,7 +1140,8 @@ extern const struct ata_port_operations sata_port_ops;
 	.proc_name		= drv_name,			\
 	.slave_configure	= ata_scsi_slave_config,	\
 	.slave_destroy		= ata_scsi_slave_destroy,	\
-	.bios_param		= ata_std_bios_param
+	.bios_param		= ata_std_bios_param,		\
+	.sdev_attrs		= ata_common_sdev_attrs
 
 #define ATA_NCQ_SHT(drv_name)					\
 	ATA_BASE_SHT(drv_name),					\
@@ -1278,26 +1294,62 @@ static inline int ata_link_active(struct ata_link *link)
 	return ata_tag_valid(link->active_tag) || link->sactive;
 }
 
-extern struct ata_link *__ata_port_next_link(struct ata_port *ap,
-					     struct ata_link *link,
-					     bool dev_only);
+/*
+ * Iterators
+ *
+ * ATA_LITER_* constants are used to select link iteration mode and
+ * ATA_DITER_* device iteration mode.
+ *
+ * For a custom iteration directly using ata_{link|dev}_next(), if
+ * @link or @dev, respectively, is NULL, the first element is
+ * returned.  @dev and @link can be any valid device or link and the
+ * next element according to the iteration mode will be returned.
+ * After the last element, NULL is returned.
+ */
+enum ata_link_iter_mode {
+	ATA_LITER_EDGE,		/* if present, PMP links only; otherwise,
+				 * host link.  no slave link */
+	ATA_LITER_HOST_FIRST,	/* host link followed by PMP or slave links */
+	ATA_LITER_PMP_FIRST,	/* PMP links followed by host link,
+				 * slave link still comes after host link */
+};
 
-#define __ata_port_for_each_link(link, ap) \
-	for ((link) = __ata_port_next_link((ap), NULL, false); (link); \
-	     (link) = __ata_port_next_link((ap), (link), false))
+enum ata_dev_iter_mode {
+	ATA_DITER_ENABLED,
+	ATA_DITER_ENABLED_REVERSE,
+	ATA_DITER_ALL,
+	ATA_DITER_ALL_REVERSE,
+};
 
-#define ata_port_for_each_link(link, ap) \
-	for ((link) = __ata_port_next_link((ap), NULL, true); (link); \
-	     (link) = __ata_port_next_link((ap), (link), true))
+extern struct ata_link *ata_link_next(struct ata_link *link,
+				      struct ata_port *ap,
+				      enum ata_link_iter_mode mode);
 
-#define ata_link_for_each_dev(dev, link) \
-	for ((dev) = (link)->device; \
-	     (dev) < (link)->device + ata_link_max_devices(link) || ((dev) = NULL); \
-	     (dev)++)
+extern struct ata_device *ata_dev_next(struct ata_device *dev,
+				       struct ata_link *link,
+				       enum ata_dev_iter_mode mode);
 
-#define ata_link_for_each_dev_reverse(dev, link) \
-	for ((dev) = (link)->device + ata_link_max_devices(link) - 1; \
-	     (dev) >= (link)->device || ((dev) = NULL); (dev)--)
+/*
+ * Shortcut notation for iterations
+ *
+ * ata_for_each_link() iterates over each link of @ap according to
+ * @mode.  @link points to the current link in the loop.  @link is
+ * NULL after loop termination.  ata_for_each_dev() works the same way
+ * except that it iterates over each device of @link.
+ *
+ * Note that the mode prefixes ATA_{L|D}ITER_ shouldn't need to be
+ * specified when using the following shorthand notations.  Only the
+ * mode itself (EDGE, HOST_FIRST, ENABLED, etc...) should be
+ * specified.  This not only increases brevity but also makes it
+ * impossible to use ATA_LITER_* for device iteration or vice-versa.
+ */
+#define ata_for_each_link(link, ap, mode) \
+	for ((link) = ata_link_next(NULL, (ap), ATA_LITER_##mode); (link); \
+	     (link) = ata_link_next((link), (ap), ATA_LITER_##mode))
+
+#define ata_for_each_dev(dev, link, mode) \
+	for ((dev) = ata_dev_next(NULL, (link), ATA_DITER_##mode); (dev); \
+	     (dev) = ata_dev_next((dev), (link), ATA_DITER_##mode))
 
 /**
  *	ata_ncq_enabled - Test whether NCQ is enabled
@@ -1474,6 +1526,7 @@ extern void sata_pmp_error_handler(struct ata_port *ap);
 
 extern const struct ata_port_operations ata_sff_port_ops;
 extern const struct ata_port_operations ata_bmdma_port_ops;
+extern const struct ata_port_operations ata_bmdma32_port_ops;
 
 /* PIO only, sg_tablesize and dma_boundary limits can be removed */
 #define ATA_PIO_SHT(drv_name)					\
@@ -1500,6 +1553,8 @@ extern void ata_sff_tf_read(struct ata_port *ap, struct ata_taskfile *tf);
 extern void ata_sff_exec_command(struct ata_port *ap,
 				 const struct ata_taskfile *tf);
 extern unsigned int ata_sff_data_xfer(struct ata_device *dev,
+			unsigned char *buf, unsigned int buflen, int rw);
+extern unsigned int ata_sff_data_xfer32(struct ata_device *dev,
 			unsigned char *buf, unsigned int buflen, int rw);
 extern unsigned int ata_sff_data_xfer_noirq(struct ata_device *dev,
 			unsigned char *buf, unsigned int buflen, int rw);

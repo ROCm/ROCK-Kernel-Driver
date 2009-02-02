@@ -65,7 +65,7 @@ struct bus_type {
 	int (*resume_early)(struct device *dev);
 	int (*resume)(struct device *dev);
 
-	struct pm_ext_ops *pm;
+	struct dev_pm_ops *pm;
 
 	struct bus_type_private *p;
 };
@@ -90,6 +90,9 @@ int __must_check bus_for_each_drv(struct bus_type *bus,
 				  struct device_driver *start, void *data,
 				  int (*fn)(struct device_driver *, void *));
 
+void bus_sort_breadthfirst(struct bus_type *bus,
+			   int (*compare)(const struct device *a,
+					  const struct device *b));
 /*
  * Bus notifiers: Get notified of addition/removal of devices
  * and binding/unbinding of drivers to devices.
@@ -130,7 +133,7 @@ struct device_driver {
 	int (*resume) (struct device *dev);
 	struct attribute_group **groups;
 
-	struct pm_ops *pm;
+	struct dev_pm_ops *pm;
 
 	struct driver_private *p;
 };
@@ -195,8 +198,13 @@ struct class {
 	int (*suspend)(struct device *dev, pm_message_t state);
 	int (*resume)(struct device *dev);
 
-	struct pm_ops *pm;
+	struct dev_pm_ops *pm;
 	struct class_private *p;
+};
+
+struct class_dev_iter {
+	struct klist_iter		ki;
+	const struct device_type	*type;
 };
 
 extern struct kobject *sysfs_dev_block_kobj;
@@ -212,6 +220,13 @@ extern void class_unregister(struct class *class);
 	static struct lock_class_key __key;	\
 	__class_register(class, &__key);	\
 })
+
+extern void class_dev_iter_init(struct class_dev_iter *iter,
+				struct class *class,
+				struct device *start,
+				const struct device_type *type);
+extern struct device *class_dev_iter_next(struct class_dev_iter *iter);
+extern void class_dev_iter_exit(struct class_dev_iter *iter);
 
 extern int class_for_each_device(struct class *class, struct device *start,
 				 void *data,
@@ -276,7 +291,7 @@ struct device_type {
 	int (*suspend)(struct device *dev, pm_message_t state);
 	int (*resume)(struct device *dev);
 
-	struct pm_ops *pm;
+	struct dev_pm_ops *pm;
 };
 
 /* interface for exporting device attributes */
@@ -358,9 +373,9 @@ struct device {
 
 	struct kobject kobj;
 	char	bus_id[BUS_ID_SIZE];	/* position on parent bus */
+	unsigned		uevent_suppress:1;
 	const char		*init_name; /* initial name of the device */
 	struct device_type	*type;
-	unsigned		uevent_suppress:1;
 
 	struct semaphore	sem;	/* semaphore to synchronize calls to
 					 * its driver.
@@ -393,12 +408,13 @@ struct device {
 	/* arch specific additions */
 	struct dev_archdata	archdata;
 
+	dev_t			devt;	/* dev_t, creates the sysfs "dev" */
+
 	spinlock_t		devres_lock;
 	struct list_head	devres_head;
 
-	struct list_head	node;
+	struct klist_node	knode_class;
 	struct class		*class;
-	dev_t			devt;	/* dev_t, creates the sysfs "dev" */
 	struct attribute_group	**groups;	/* optional groups */
 
 	void	(*release)(struct device *dev);
@@ -435,7 +451,7 @@ static inline void set_dev_node(struct device *dev, int node)
 }
 #endif
 
-static inline void *dev_get_drvdata(struct device *dev)
+static inline void *dev_get_drvdata(const struct device *dev)
 {
 	return dev->driver_data;
 }
@@ -468,6 +484,17 @@ extern int device_rename(struct device *dev, char *new_name);
 extern int device_move(struct device *dev, struct device *new_parent);
 
 /*
+ * Root device objects for grouping under /sys/devices
+ */
+extern struct device *__root_device_register(const char *name,
+					     struct module *owner);
+static inline struct device *root_device_register(const char *name)
+{
+	return __root_device_register(name, THIS_MODULE);
+}
+extern void root_device_unregister(struct device *root);
+
+/*
  * Manual binding of a device to driver. See drivers/base/bus.c
  * for information on use.
  */
@@ -490,7 +517,6 @@ extern struct device *device_create(struct class *cls, struct device *parent,
 				    dev_t devt, void *drvdata,
 				    const char *fmt, ...)
 				    __attribute__((format(printf, 5, 6)));
-#define device_create_drvdata	device_create
 extern void device_destroy(struct class *cls, dev_t devt);
 
 /*
@@ -524,42 +550,28 @@ extern const char *dev_driver_string(const struct device *dev);
 	printk(level "%s %s: " format , dev_driver_string(dev) , \
 	       dev_name(dev) , ## arg)
 
-/* dev_printk_hash for message documentation */
-#if defined(__KMSG_CHECKER) && defined(KMSG_COMPONENT)
-/* generate magic string for scripts/kmsg-doc to parse */
-#define dev_printk_hash(level, dev, format, arg...) \
-	__KMSG_DEV(level _FMT_ format _ARGS_ dev, ## arg _END_)
-#elif defined(CONFIG_KMSG_IDS) && defined(KMSG_COMPONENT)
-int printk_dev_hash(const char *, const char *, const char *, ...);
-#define dev_printk_hash(level, dev, format, arg...) \
-	printk_dev_hash(level "%s.%06x: ", dev_driver_string(dev), \
-			"%s: " format, dev_name(dev), ## arg)
-#else /* !defined(CONFIG_KMSG_IDS) */
-#define dev_printk_hash dev_printk
-#endif
-
 #define dev_emerg(dev, format, arg...)		\
-	dev_printk_hash(KERN_EMERG , dev , format , ## arg)
+	dev_printk(KERN_EMERG , dev , format , ## arg)
 #define dev_alert(dev, format, arg...)		\
-	dev_printk_hash(KERN_ALERT , dev , format , ## arg)
+	dev_printk(KERN_ALERT , dev , format , ## arg)
 #define dev_crit(dev, format, arg...)		\
-	dev_printk_hash(KERN_CRIT , dev , format , ## arg)
+	dev_printk(KERN_CRIT , dev , format , ## arg)
 #define dev_err(dev, format, arg...)		\
-	dev_printk_hash(KERN_ERR , dev , format , ## arg)
+	dev_printk(KERN_ERR , dev , format , ## arg)
 #define dev_warn(dev, format, arg...)		\
-	dev_printk_hash(KERN_WARNING , dev , format , ## arg)
+	dev_printk(KERN_WARNING , dev , format , ## arg)
 #define dev_notice(dev, format, arg...)		\
-	dev_printk_hash(KERN_NOTICE , dev , format , ## arg)
+	dev_printk(KERN_NOTICE , dev , format , ## arg)
 #define dev_info(dev, format, arg...)		\
-	dev_printk_hash(KERN_INFO , dev , format , ## arg)
+	dev_printk(KERN_INFO , dev , format , ## arg)
 
-#if defined(CONFIG_DYNAMIC_PRINTK_DEBUG)
+#if defined(DEBUG)
+#define dev_dbg(dev, format, arg...)		\
+	dev_printk(KERN_DEBUG , dev , format , ## arg)
+#elif defined(CONFIG_DYNAMIC_PRINTK_DEBUG)
 #define dev_dbg(dev, format, ...) do { \
 	dynamic_dev_dbg(dev, format, ##__VA_ARGS__); \
 	} while (0)
-#elif defined(DEBUG)
-#define dev_dbg(dev, format, arg...)		\
-	dev_printk(KERN_DEBUG , dev , format , ## arg)
 #else
 #define dev_dbg(dev, format, arg...)		\
 	({ if (0) dev_printk(KERN_DEBUG, dev, format, ##arg); 0; })
@@ -572,6 +584,14 @@ int printk_dev_hash(const char *, const char *, const char *, ...);
 #define dev_vdbg(dev, format, arg...)		\
 	({ if (0) dev_printk(KERN_DEBUG, dev, format, ##arg); 0; })
 #endif
+
+/*
+ * dev_WARN() acts like dev_printk(), but with the key difference
+ * of using a WARN/WARN_ON to get the message out, including the
+ * file/line information and a backtrace.
+ */
+#define dev_WARN(dev, format, arg...) \
+	WARN(1, "Device: %s\n" format, dev_driver_string(dev), ## arg);
 
 /* Create alias, so I can be autoloaded. */
 #define MODULE_ALIAS_CHARDEV(major,minor) \

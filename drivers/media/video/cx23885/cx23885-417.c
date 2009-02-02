@@ -2,7 +2,7 @@
  *
  *  Support for a cx23417 mpeg encoder via cx23885 host port.
  *
- *    (c) 2004 Jelle Foks <jelle@foks.8m.com>
+ *    (c) 2004 Jelle Foks <jelle@foks.us>
  *    (c) 2004 Gerd Knorr <kraxel@bytesex.org>
  *    (c) 2008 Steven Toth <stoth@linuxtv.org>
  *      - CX23885/7/8 support
@@ -36,7 +36,6 @@
 #include <media/cx2341x.h>
 
 #include "cx23885.h"
-#include "media/cx2341x.h"
 
 #define CX23885_FIRM_IMAGE_SIZE 376836
 #define CX23885_FIRM_IMAGE_NAME "v4l-cx23885-enc.fw"
@@ -632,7 +631,7 @@ int mc417_memory_read(struct cx23885_dev *dev, u32 address, u32 *value)
 /* ------------------------------------------------------------------ */
 
 /* MPEG encoder API */
-char *cmd_to_str(int cmd)
+static char *cmd_to_str(int cmd)
 {
 	switch (cmd) {
 	case CX2341X_ENC_PING_FW:
@@ -1028,12 +1027,13 @@ static int cx23885_initialize_codec(struct cx23885_dev *dev)
 			printk(KERN_ERR "%s() f/w load failed\n", __func__);
 			return retval;
 		}
-		dev->cx23417_mailbox = cx23885_find_mailbox(dev);
-		if (dev->cx23417_mailbox < 0) {
+		retval = cx23885_find_mailbox(dev);
+		if (retval < 0) {
 			printk(KERN_ERR "%s() mailbox < 0, error\n",
 				__func__);
 			return -1;
 		}
+		dev->cx23417_mailbox = retval;
 		retval = cx23885_api_cmd(dev, CX2341X_ENC_PING_FW, 0, 0);
 		if (retval < 0) {
 			printk(KERN_ERR
@@ -1574,15 +1574,16 @@ static int vidioc_queryctrl(struct file *file, void *priv,
 	return cx23885_queryctrl(dev, c);
 }
 
-static int mpeg_open(struct inode *inode, struct file *file)
+static int mpeg_open(struct file *file)
 {
-	int minor = iminor(inode);
+	int minor = video_devdata(file)->minor;
 	struct cx23885_dev *h, *dev = NULL;
 	struct list_head *list;
 	struct cx23885_fh *fh;
 
 	dprintk(2, "%s()\n", __func__);
 
+	lock_kernel();
 	list_for_each(list, &cx23885_devlist) {
 		h = list_entry(list, struct cx23885_dev, devlist);
 		if (h->v4l_device->minor == minor) {
@@ -1591,13 +1592,17 @@ static int mpeg_open(struct inode *inode, struct file *file)
 		}
 	}
 
-	if (dev == NULL)
+	if (dev == NULL) {
+		unlock_kernel();
 		return -ENODEV;
+	}
 
 	/* allocate + initialize per filehandle data */
 	fh = kzalloc(sizeof(*fh), GFP_KERNEL);
-	if (NULL == fh)
+	if (NULL == fh) {
+		unlock_kernel();
 		return -ENOMEM;
+	}
 
 	file->private_data = fh;
 	fh->dev      = dev;
@@ -1608,11 +1613,12 @@ static int mpeg_open(struct inode *inode, struct file *file)
 			    V4L2_FIELD_INTERLACED,
 			    sizeof(struct cx23885_buffer),
 			    fh);
+	unlock_kernel();
 
 	return 0;
 }
 
-static int mpeg_release(struct inode *inode, struct file *file)
+static int mpeg_release(struct file *file)
 {
 	struct cx23885_fh  *fh  = file->private_data;
 	struct cx23885_dev *dev = fh->dev;
@@ -1689,15 +1695,13 @@ static int mpeg_mmap(struct file *file, struct vm_area_struct *vma)
 	return videobuf_mmap_mapper(&fh->mpegq, vma);
 }
 
-static struct file_operations mpeg_fops = {
+static struct v4l2_file_operations mpeg_fops = {
 	.owner	       = THIS_MODULE,
 	.open	       = mpeg_open,
 	.release       = mpeg_release,
 	.read	       = mpeg_read,
 	.poll          = mpeg_poll,
 	.mmap	       = mpeg_mmap,
-	.ioctl	       = video_ioctl2,
-	.llseek        = no_llseek,
 };
 
 static const struct v4l2_ioctl_ops mpeg_ioctl_ops = {
@@ -1810,7 +1814,7 @@ int cx23885_417_register(struct cx23885_dev *dev)
 	cx23885_mc417_init(dev);
 
 	printk(KERN_INFO "%s: registered device video%d [mpeg]\n",
-	       dev->name, dev->v4l_device->minor & 0x1f);
+	       dev->name, dev->v4l_device->num);
 
 	return 0;
 }

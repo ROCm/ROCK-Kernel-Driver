@@ -264,7 +264,7 @@ int nfs4acl_permission(struct inode *inode, const struct nfs4acl *acl,
 		if (nfs4ace_is_inherit_only(ace))
 			continue;
 		if (nfs4ace_is_owner(ace)) {
-			if (current->fsuid != inode->i_uid)
+			if (current_fsuid() != inode->i_uid)
 				continue;
 			goto is_owner;
 		} else if (nfs4ace_is_group(ace)) {
@@ -275,7 +275,7 @@ int nfs4acl_permission(struct inode *inode, const struct nfs4acl *acl,
 				if (!in_group_p(ace->u.e_id))
 					continue;
 			} else {
-				if (current->fsuid != ace->u.e_id)
+				if (current_fsuid() != ace->u.e_id)
 					continue;
 			}
 		} else
@@ -316,7 +316,7 @@ int nfs4acl_permission(struct inode *inode, const struct nfs4acl *acl,
 	 * Clear write-through if the process is in the file group class but
 	 * not in the owning group, and so the denied permissions apply.
 	 */
-	if (current->fsuid == inode->i_uid)
+	if (current_fsuid() == inode->i_uid)
 		file_mask = acl->a_owner_mask;
 	else if (in_owning_group || owner_or_group_class)
 		file_mask = acl->a_group_mask;
@@ -345,7 +345,7 @@ int nfs4acl_generic_permission(struct inode *inode, unsigned int mask)
 {
 	int mode = inode->i_mode;
 
-	if (current->fsuid == inode->i_uid)
+	if (current_fsuid() == inode->i_uid)
 		mode >>= 6;
 	else if (in_group_p(inode->i_gid))
 		mode >>= 3;

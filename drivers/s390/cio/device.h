@@ -76,6 +76,7 @@ extern wait_queue_head_t ccw_device_init_wq;
 extern atomic_t ccw_device_init_count;
 
 void io_subchannel_recog_done(struct ccw_device *cdev);
+void io_subchannel_init_config(struct subchannel *sch);
 
 int ccw_device_cancel_halt_clear(struct ccw_device *);
 
@@ -86,6 +87,7 @@ int ccw_device_is_orphan(struct ccw_device *);
 int ccw_device_recognition(struct ccw_device *);
 int ccw_device_online(struct ccw_device *);
 int ccw_device_offline(struct ccw_device *);
+int ccw_purge_blacklisted(void);
 
 /* Function prototypes for device status and basic sense stuff. */
 void ccw_device_accumulate_irb(struct ccw_device *, struct irb *);

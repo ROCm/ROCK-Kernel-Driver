@@ -24,13 +24,8 @@ if NET
 
 menu "Networking options"
 
-config NET_NS
-	bool "Network namespace support"
-	default n
-	depends on EXPERIMENTAL && !SYSFS && NAMESPACES
-	help
-	  Allow user space to create what appear to be multiple instances
-	  of the network stack.
+config COMPAT_NET_DEV_OPS
+       def_bool y
 
 source "net/packet/Kconfig"
 source "net/unix/Kconfig"
@@ -180,6 +175,7 @@ source "net/tipc/Kconfig"
 source "net/atm/Kconfig"
 source "net/802/Kconfig"
 source "net/bridge/Kconfig"
+source "net/dsa/Kconfig"
 source "net/8021q/Kconfig"
 source "net/decnet/Kconfig"
 source "net/llc/Kconfig"
@@ -233,18 +229,24 @@ source "net/can/Kconfig"
 source "net/irda/Kconfig"
 source "net/bluetooth/Kconfig"
 source "net/rxrpc/Kconfig"
+source "net/phonet/Kconfig"
 
 config FIB_RULES
 	bool
 
-menu "Wireless"
+menuconfig WIRELESS
+	bool "Wireless"
 	depends on !S390
+	default y
+
+if WIRELESS
 
 source "net/wireless/Kconfig"
 source "net/mac80211/Kconfig"
-source "net/ieee80211/Kconfig"
 
-endmenu
+endif # WIRELESS
+
+source "net/wimax/Kconfig"
 
 source "net/rfkill/Kconfig"
 source "net/9p/Kconfig"

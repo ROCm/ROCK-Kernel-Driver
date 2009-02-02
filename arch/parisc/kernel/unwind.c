@@ -170,7 +170,7 @@ void unwind_table_remove(struct unwind_table *table)
 }
 
 /* Called from setup_arch to import the kernel unwind info */
-static int unwind_init(void)
+int unwind_init(void)
 {
 	long start, stop;
 	register unsigned long gp __asm__ ("r27");
@@ -372,7 +372,7 @@ void unwind_frame_init_from_blocked_task(struct unwind_frame_info *info, struct 
 	struct pt_regs *r = &t->thread.regs;
 	struct pt_regs *r2;
 
-	r2 = kmalloc(sizeof(struct pt_regs), GFP_KERNEL);
+	r2 = kmalloc(sizeof(struct pt_regs), GFP_ATOMIC);
 	if (!r2)
 		return;
 	*r2 = *r;
@@ -417,5 +417,3 @@ int unwind_to_user(struct unwind_frame_info *info)
 
 	return ret;
 }
-
-module_init(unwind_init);

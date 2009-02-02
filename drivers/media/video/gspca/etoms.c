@@ -112,7 +112,7 @@ static struct ctrl sd_ctrls[] = {
 	 },
 };
 
-static struct v4l2_pix_format vga_mode[] = {
+static const struct v4l2_pix_format vga_mode[] = {
 	{320, 240, V4L2_PIX_FMT_SBGGR8, V4L2_FIELD_NONE,
 		.bytesperline = 320,
 		.sizeimage = 320 * 240,
@@ -125,7 +125,7 @@ static struct v4l2_pix_format vga_mode[] = {
 		.priv = 0}, */
 };
 
-static struct v4l2_pix_format sif_mode[] = {
+static const struct v4l2_pix_format sif_mode[] = {
 	{176, 144, V4L2_PIX_FMT_SBGGR8, V4L2_FIELD_NONE,
 		.bytesperline = 176,
 		.sizeimage = 176 * 144,
@@ -691,7 +691,7 @@ static int sd_init(struct gspca_dev *gspca_dev)
 }
 
 /* -- start the camera -- */
-static void sd_start(struct gspca_dev *gspca_dev)
+static int sd_start(struct gspca_dev *gspca_dev)
 {
 	struct sd *sd = (struct sd *) gspca_dev;
 
@@ -704,6 +704,7 @@ static void sd_start(struct gspca_dev *gspca_dev)
 
 	reg_w_val(gspca_dev, ET_RESET_ALL, 0x08);
 	et_video(gspca_dev, 1);		/* video on */
+	return 0;
 }
 
 static void sd_stopN(struct gspca_dev *gspca_dev)

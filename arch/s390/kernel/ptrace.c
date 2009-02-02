@@ -204,7 +204,6 @@ static unsigned long __peek_user(struct task_struct *child, addr_t addr)
 static int
 peek_user(struct task_struct *child, addr_t addr, addr_t data)
 {
-	struct user *dummy = NULL;
 	addr_t tmp, mask;
 
 	/*
@@ -213,8 +212,8 @@ peek_user(struct task_struct *child, addr_t addr, addr_t data)
 	 */
 	mask = __ADDR_MASK;
 #ifdef CONFIG_64BIT
-	if (addr >= (addr_t) &dummy->regs.acrs &&
-	    addr < (addr_t) &dummy->regs.orig_gpr2)
+	if (addr >= (addr_t) &((struct user *) NULL)->regs.acrs &&
+	    addr < (addr_t) &((struct user *) NULL)->regs.orig_gpr2)
 		mask = 3;
 #endif
 	if ((addr & mask) || addr > sizeof(struct user) - __ADDR_MASK)
@@ -312,7 +311,6 @@ static int __poke_user(struct task_struct *child, addr_t addr, addr_t data)
 static int
 poke_user(struct task_struct *child, addr_t addr, addr_t data)
 {
-	struct user *dummy = NULL;
 	addr_t mask;
 
 	/*
@@ -321,8 +319,8 @@ poke_user(struct task_struct *child, addr_t addr, addr_t data)
 	 */
 	mask = __ADDR_MASK;
 #ifdef CONFIG_64BIT
-	if (addr >= (addr_t) &dummy->regs.acrs &&
-	    addr < (addr_t) &dummy->regs.orig_gpr2)
+	if (addr >= (addr_t) &((struct user *) NULL)->regs.acrs &&
+	    addr < (addr_t) &((struct user *) NULL)->regs.orig_gpr2)
 		mask = 3;
 #endif
 	if ((addr & mask) || addr > sizeof(struct user) - __ADDR_MASK)
@@ -648,24 +646,10 @@ asmlinkage long do_syscall_trace_enter(struct pt_regs *regs)
 	 * The sysc_tracesys code in entry.S stored the system
 	 * call number to gprs[2].
 	 */
-
-	if (is_self_ptracing(regs->gprs[2])) {
-		struct siginfo info;
-
-		memset(&info, 0, sizeof(struct siginfo));
-		info.si_signo = SIGSYS;
-		info.si_code = SYS_SYSCALL;
-		info.si_errno = regs->gprs[2];
-		info.si_addr = (void *)regs->orig_gpr2;
-		send_sig_info(SIGSYS, &info, current);
-		regs->gprs[2] = -1;
-		return -1L;
-	}
-
 	ret = regs->gprs[2];
 	if (test_thread_flag(TIF_SYSCALL_TRACE) &&
-		(tracehook_report_syscall_entry(regs) ||
-		 regs->gprs[2] >= NR_syscalls)) {
+	    (tracehook_report_syscall_entry(regs) ||
+	     regs->gprs[2] >= NR_syscalls)) {
 		/*
 		 * Tracing decided this syscall should not happen or the
 		 * debugger stored an invalid system call number. Skip
@@ -677,10 +661,10 @@ asmlinkage long do_syscall_trace_enter(struct pt_regs *regs)
 
 	if (unlikely(current->audit_context))
 		audit_syscall_entry(test_thread_flag(TIF_31BIT) ?
-				AUDIT_ARCH_S390 : AUDIT_ARCH_S390X,
-			regs->gprs[2], regs->orig_gpr2,
-			regs->gprs[3], regs->gprs[4],
-			regs->gprs[5]);
+					AUDIT_ARCH_S390 : AUDIT_ARCH_S390X,
+				    regs->gprs[2], regs->orig_gpr2,
+				    regs->gprs[3], regs->gprs[4],
+				    regs->gprs[5]);
 	return ret;
 }
 
@@ -688,7 +672,7 @@ asmlinkage void do_syscall_trace_exit(struct pt_regs *regs)
 {
 	if (unlikely(current->audit_context))
 		audit_syscall_exit(AUDITSC_RESULT(regs->gprs[2]),
-				regs->gprs[2]);
+				   regs->gprs[2]);
 
 	if (test_thread_flag(TIF_SYSCALL_TRACE))
 		tracehook_report_syscall_exit(regs, 0);

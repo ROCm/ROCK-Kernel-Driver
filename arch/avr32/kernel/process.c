@@ -9,6 +9,7 @@
 #include <linux/module.h>
 #include <linux/kallsyms.h>
 #include <linux/fs.h>
+#include <linux/pm.h>
 #include <linux/ptrace.h>
 #include <linux/reboot.h>
 #include <linux/tick.h>
@@ -17,10 +18,11 @@
 
 #include <asm/sysreg.h>
 #include <asm/ocd.h>
+#include <asm/syscalls.h>
 
 #include <mach/pm.h>
 
-void (*pm_power_off)(void) = NULL;
+void (*pm_power_off)(void);
 EXPORT_SYMBOL(pm_power_off);
 
 /*

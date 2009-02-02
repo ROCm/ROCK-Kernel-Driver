@@ -664,10 +664,14 @@ struct snd_ca0106_pcm {
 struct snd_ca0106_details {
         u32 serial;
         char * name;
-        int ac97;
-	int gpio_type;
-	int i2c_adc;
-	int spi_dac;
+	int ac97;	/* ac97 = 0 -> Select MIC, Line in, TAD in, AUX in.
+			   ac97 = 1 -> Default to AC97 in. */
+	int gpio_type;	/* gpio_type = 1 -> shared mic-in/line-in
+			   gpio_type = 2 -> shared side-out/line-in. */
+	int i2c_adc;	/* with i2c_adc=1, the driver adds some capture volume
+			   controls, phone, mic, line-in and aux. */
+	int spi_dac;	/* spi_dac=1 adds the mute switch for each analog
+			   output, front, rear, etc. */
 };
 
 // definition of the chip-specific record
@@ -690,7 +694,8 @@ struct snd_ca0106 {
 
 	struct snd_ca0106_channel playback_channels[4];
 	struct snd_ca0106_channel capture_channels[4];
-	u32 spdif_bits[4];             /* s/pdif out setup */
+	u32 spdif_bits[4];             /* s/pdif out default setup */
+	u32 spdif_str_bits[4];         /* s/pdif out per-stream setup */
 	int spdif_enable;
 	int capture_source;
 	int i2c_capture_source;

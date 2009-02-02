@@ -47,7 +47,11 @@
  */
 #define CIFS_MAX_REQ 50
 
-#define SERVER_NAME_LENGTH 15
+#define RFC1001_NAME_LEN 15
+#define RFC1001_NAME_LEN_WITH_NULL (RFC1001_NAME_LEN + 1)
+
+/* currently length of NIP6_FMT */
+#define SERVER_NAME_LENGTH 40
 #define SERVER_NAME_LEN_WITH_NULL     (SERVER_NAME_LENGTH + 1)
 
 /* used to define string lengths for reversing unicode strings */
@@ -125,8 +129,7 @@ struct TCP_Server_Info {
 	struct list_head smb_ses_list;
 	int srv_count; /* reference counter */
 	/* 15 character server name + 0x20 16th byte indicating type = srv */
-	char server_RFC1001_name[SERVER_NAME_LEN_WITH_NULL];
-	char unicode_server_Name[SERVER_NAME_LEN_WITH_NULL * 2];
+	char server_RFC1001_name[RFC1001_NAME_LEN_WITH_NULL];
 	char *hostname; /* hostname portion of UNC string */
 	struct socket *ssocket;
 	union {
@@ -151,7 +154,7 @@ struct TCP_Server_Info {
 	atomic_t num_waiters;   /* blocked waiting to get in sendrecv */
 #endif
 	enum statusEnum tcpStatus; /* what we think the status is */
-	struct semaphore tcpSem;
+	struct mutex srv_mutex;
 	struct task_struct *tsk;
 	char server_GUID[16];
 	char secMode;
@@ -171,7 +174,7 @@ struct TCP_Server_Info {
 	__u16 CurrentMid;         /* multiplex id - rotating counter */
 	char cryptKey[CIFS_CRYPTO_KEY_SIZE];
 	/* 16th byte of RFC1001 workstation name is always null */
-	char workstation_RFC1001_name[SERVER_NAME_LEN_WITH_NULL];
+	char workstation_RFC1001_name[RFC1001_NAME_LEN_WITH_NULL];
 	__u32 sequence_number; /* needed for CIFS PDU signature */
 	struct mac_key mac_signing_key;
 	char ntlmv2_hash[16];
@@ -239,6 +242,7 @@ struct cifsTconInfo {
 	struct cifsSesInfo *ses;	/* pointer to session associated with */
 	char treeName[MAX_TREE_SIZE + 1]; /* UNC name of resource in ASCII */
 	char *nativeFileSystem;
+	char *password;		/* for share-level security */
 	__u16 tid;		/* The 2 byte tree id */
 	__u16 Flags;		/* optional support bits */
 	enum statusEnum tidStatus;
@@ -289,6 +293,7 @@ struct cifsTconInfo {
 	bool seal:1;      /* transport encryption for this mounted share */
 	bool unix_ext:1;  /* if false disable Linux extensions to CIFS protocol
 				for this mount even if server would support */
+	bool local_lease:1; /* check leases (only) on local system not remote */
 	bool need_reconnect:1; /* connection reset, tid now invalid */
 	/* BB add field for back pointer to sb struct(s)? */
 };
@@ -358,6 +363,7 @@ struct cifsInodeInfo {
 	bool clientCanCacheRead:1;	/* read oplock */
 	bool clientCanCacheAll:1;	/* read and writebehind oplock */
 	bool oplockPending:1;
+	bool delete_pending:1;		/* DELETE_ON_CLOSE is set */
 	struct inode vfs_inode;
 };
 
@@ -420,7 +426,6 @@ struct mid_q_entry {
 	unsigned long when_sent; /* time when smb send finished */
 	unsigned long when_received; /* when demux complete (taken off wire) */
 #endif
-	struct cifsSesInfo *ses;	/* smb was sent to this server */
 	struct task_struct *tsk;	/* task waiting for response */
 	struct smb_hdr *resp_buf;	/* response buffer */
 	int midState;	/* wish this were enum but can not pass to wait_event */
@@ -604,7 +609,15 @@ GLOBAL_EXTERN struct list_head		cifs_tcp_ses_list;
  * changes to the tcon->tidStatus should be done while holding this lock.
  */
 GLOBAL_EXTERN rwlock_t		cifs_tcp_ses_lock;
-GLOBAL_EXTERN rwlock_t GlobalSMBSeslock;  /* protects list inserts on 3 above */
+
+/*
+ * This lock protects the cifs_file->llist and cifs_file->flist
+ * list operations, and updates to some flags (cifs_file->invalidHandle)
+ * It will be moved to either use the tcon->stat_lock or equivalent later.
+ * If cifs_tcp_ses_lock and the lock below are both needed to be held, then
+ * the cifs_tcp_ses_lock must be grabbed first and released last.
+ */
+GLOBAL_EXTERN rwlock_t GlobalSMBSeslock;
 
 GLOBAL_EXTERN struct list_head GlobalOplock_Q;
 

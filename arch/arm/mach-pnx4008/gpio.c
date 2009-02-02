@@ -17,7 +17,8 @@
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
-#include <asm/io.h>
+#include <linux/io.h>
+#include <mach/hardware.h>
 #include <mach/platform.h>
 #include <mach/gpio.h>
 

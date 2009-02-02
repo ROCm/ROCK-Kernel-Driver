@@ -25,6 +25,7 @@
 #include <linux/fcntl.h>
 #include <linux/slab.h>
 #include <linux/pagemap.h>
+#include <linux/security.h>
 #include <linux/highmem.h>
 #include <linux/highuid.h>
 #include <linux/personality.h>
@@ -167,9 +168,6 @@ static int load_elf_fdpic_binary(struct linux_binprm *bprm,
 	struct elf_fdpic_params exec_params, interp_params;
 	struct elf_phdr *phdr;
 	unsigned long stack_size, entryaddr;
-#ifndef CONFIG_MMU
-	unsigned long fullsize;
-#endif
 #ifdef ELF_FDPIC_PLAT_INIT
 	unsigned long dynaddr;
 #endif
@@ -389,11 +387,6 @@ static int load_elf_fdpic_binary(struct linux_binprm *bprm,
 		goto error_kill;
 	}
 
-	/* expand the stack mapping to use up the entire allocation granule */
-	fullsize = kobjsize((char *) current->mm->start_brk);
-	if (!IS_ERR_VALUE(do_mremap(current->mm->start_brk, stack_size,
-				    fullsize, 0, 0)))
-		stack_size = fullsize;
 	up_write(&current->mm->mmap_sem);
 
 	current->mm->brk = current->mm->start_brk;
@@ -403,7 +396,7 @@ static int load_elf_fdpic_binary(struct linux_binprm *bprm,
 	current->mm->start_stack = current->mm->start_brk + stack_size;
 #endif
 
-	compute_creds(bprm);
+	install_exec_creds(bprm);
 	current->flags &= ~PF_FORKNOEXEC;
 	if (create_elf_fdpic_tables(bprm, current->mm,
 				    &exec_params, &interp_params) < 0)
@@ -455,26 +448,42 @@ error_kill:
 }
 
 /*****************************************************************************/
+
+#ifndef ELF_BASE_PLATFORM
 /*
- * present useful information to the program
+ * AT_BASE_PLATFORM indicates the "real" hardware/microarchitecture.
+ * If the arch defines ELF_BASE_PLATFORM (in asm/elf.h), the value
+ * will be copied to the user stack in the same manner as AT_PLATFORM.
+ */
+#define ELF_BASE_PLATFORM NULL
+#endif
+
+/*
+ * present useful information to the program by shovelling it onto the new
+ * process's stack
  */
 static int create_elf_fdpic_tables(struct linux_binprm *bprm,
 				   struct mm_struct *mm,
 				   struct elf_fdpic_params *exec_params,
 				   struct elf_fdpic_params *interp_params)
 {
+	const struct cred *cred = current_cred();
 	unsigned long sp, csp, nitems;
 	elf_caddr_t __user *argv, *envp;
 	size_t platform_len = 0, len;
-	char *k_platform;
-	char __user *u_platform, *p;
+	char *k_platform, *k_base_platform;
+	char __user *u_platform, *u_base_platform, *p;
 	long hwcap;
 	int loop;
 	int nr;	/* reset for each csp adjustment */
 
-	/* we're going to shovel a whole load of stuff onto the stack */
 #ifdef CONFIG_MMU
-	sp = bprm->p;
+	/* In some cases (e.g. Hyper-Threading), we want to avoid L1 evictions
+	 * by the processes running on the same package. One thing we can do is
+	 * to shuffle the initial stack for them, so we give the architecture
+	 * an opportunity to do so here.
+	 */
+	sp = arch_align_stack(bprm->p);
 #else
 	sp = mm->start_stack;
 
@@ -483,11 +492,14 @@ static int create_elf_fdpic_tables(struct linux_binprm *bprm,
 		return -EFAULT;
 #endif
 
-	/* get hold of platform and hardware capabilities masks for the machine
-	 * we are running on.  In some cases (Sparc), this info is impossible
-	 * to get, in others (i386) it is merely difficult.
-	 */
 	hwcap = ELF_HWCAP;
+
+	/*
+	 * If this architecture has a platform capability string, copy it
+	 * to userspace.  In some cases (Sparc), this info is impossible
+	 * for userspace to get any other way, in others (i386) it is
+	 * merely difficult.
+	 */
 	k_platform = ELF_PLATFORM;
 	u_platform = NULL;
 
@@ -499,19 +511,20 @@ static int create_elf_fdpic_tables(struct linux_binprm *bprm,
 			return -EFAULT;
 	}
 
-#if defined(__i386__) && defined(CONFIG_SMP)
-	/* in some cases (e.g. Hyper-Threading), we want to avoid L1 evictions
-	 * by the processes running on the same package. One thing we can do is
-	 * to shuffle the initial stack for them.
-	 *
-	 * the conditionals here are unneeded, but kept in to make the code
-	 * behaviour the same as pre change unless we have hyperthreaded
-	 * processors. This keeps Mr Marcelo Person happier but should be
-	 * removed for 2.5
+	/*
+	 * If this architecture has a "base" platform capability
+	 * string, copy it to userspace.
 	 */
-	if (smp_num_siblings > 1)
-		sp = sp - ((current->pid % 64) << 7);
-#endif
+	k_base_platform = ELF_BASE_PLATFORM;
+	u_base_platform = NULL;
+
+	if (k_base_platform) {
+		platform_len = strlen(k_base_platform) + 1;
+		sp -= platform_len;
+		u_base_platform = (char __user *) sp;
+		if (__copy_to_user(u_base_platform, k_base_platform, platform_len) != 0)
+			return -EFAULT;
+	}
 
 	sp &= ~7UL;
 
@@ -541,9 +554,13 @@ static int create_elf_fdpic_tables(struct linux_binprm *bprm,
 	}
 
 	/* force 16 byte _final_ alignment here for generality */
-#define DLINFO_ITEMS 13
+#define DLINFO_ITEMS 15
 
-	nitems = 1 + DLINFO_ITEMS + (k_platform ? 1 : 0) + AT_VECTOR_SIZE_ARCH;
+	nitems = 1 + DLINFO_ITEMS + (k_platform ? 1 : 0) +
+		(k_base_platform ? 1 : 0) + AT_VECTOR_SIZE_ARCH;
+
+	if (bprm->interp_flags & BINPRM_FLAGS_EXECFD)
+		nitems++;
 
 	csp = sp;
 	sp -= nitems * 2 * sizeof(unsigned long);
@@ -575,6 +592,19 @@ static int create_elf_fdpic_tables(struct linux_binprm *bprm,
 			    (elf_addr_t) (unsigned long) u_platform);
 	}
 
+	if (k_base_platform) {
+		nr = 0;
+		csp -= 2 * sizeof(unsigned long);
+		NEW_AUX_ENT(AT_BASE_PLATFORM,
+			    (elf_addr_t) (unsigned long) u_base_platform);
+	}
+
+	if (bprm->interp_flags & BINPRM_FLAGS_EXECFD) {
+		nr = 0;
+		csp -= 2 * sizeof(unsigned long);
+		NEW_AUX_ENT(AT_EXECFD, bprm->interp_data);
+	}
+
 	nr = 0;
 	csp -= DLINFO_ITEMS * 2 * sizeof(unsigned long);
 	NEW_AUX_ENT(AT_HWCAP,	hwcap);
@@ -586,10 +616,12 @@ static int create_elf_fdpic_tables(struct linux_binprm *bprm,
 	NEW_AUX_ENT(AT_BASE,	interp_params->elfhdr_addr);
 	NEW_AUX_ENT(AT_FLAGS,	0);
 	NEW_AUX_ENT(AT_ENTRY,	exec_params->entry_addr);
-	NEW_AUX_ENT(AT_UID,	(elf_addr_t) current->uid);
-	NEW_AUX_ENT(AT_EUID,	(elf_addr_t) current->euid);
-	NEW_AUX_ENT(AT_GID,	(elf_addr_t) current->gid);
-	NEW_AUX_ENT(AT_EGID,	(elf_addr_t) current->egid);
+	NEW_AUX_ENT(AT_UID,	(elf_addr_t) cred->uid);
+	NEW_AUX_ENT(AT_EUID,	(elf_addr_t) cred->euid);
+	NEW_AUX_ENT(AT_GID,	(elf_addr_t) cred->gid);
+	NEW_AUX_ENT(AT_EGID,	(elf_addr_t) cred->egid);
+	NEW_AUX_ENT(AT_SECURE,	security_bprm_secureexec(bprm));
+	NEW_AUX_ENT(AT_EXECFN,	bprm->exec);
 
 #ifdef ARCH_DLINFO
 	nr = 0;
@@ -1351,20 +1383,15 @@ static void fill_prstatus(struct elf_prstatus *prstatus,
 	prstatus->pr_pgrp = task_pgrp_vnr(p);
 	prstatus->pr_sid = task_session_vnr(p);
 	if (thread_group_leader(p)) {
+		struct task_cputime cputime;
+
 		/*
-		 * This is the record for the group leader.  Add in the
-		 * cumulative times of previous dead threads.  This total
-		 * won't include the time of each live thread whose state
-		 * is included in the core dump.  The final total reported
-		 * to our parent process when it calls wait4 will include
-		 * those sums as well as the little bit more time it takes
-		 * this and each other thread to finish dying after the
-		 * core dump synchronization phase.
+		 * This is the record for the group leader.  It shows the
+		 * group-wide total, not its individual thread total.
 		 */
-		cputime_to_timeval(cputime_add(p->utime, p->signal->utime),
-				   &prstatus->pr_utime);
-		cputime_to_timeval(cputime_add(p->stime, p->signal->stime),
-				   &prstatus->pr_stime);
+		thread_group_cputime(p, &cputime);
+		cputime_to_timeval(cputime.utime, &prstatus->pr_utime);
+		cputime_to_timeval(cputime.stime, &prstatus->pr_stime);
 	} else {
 		cputime_to_timeval(p->utime, &prstatus->pr_utime);
 		cputime_to_timeval(p->stime, &prstatus->pr_stime);
@@ -1379,6 +1406,7 @@ static void fill_prstatus(struct elf_prstatus *prstatus,
 static int fill_psinfo(struct elf_prpsinfo *psinfo, struct task_struct *p,
 		       struct mm_struct *mm)
 {
+	const struct cred *cred;
 	unsigned int i, len;
 
 	/* first copy the parameters from user space */
@@ -1406,8 +1434,11 @@ static int fill_psinfo(struct elf_prpsinfo *psinfo, struct task_struct *p,
 	psinfo->pr_zomb = psinfo->pr_sname == 'Z';
 	psinfo->pr_nice = task_nice(p);
 	psinfo->pr_flag = p->flags;
-	SET_UID(psinfo->pr_uid, p->uid);
-	SET_GID(psinfo->pr_gid, p->gid);
+	rcu_read_lock();
+	cred = __task_cred(p);
+	SET_UID(psinfo->pr_uid, cred->uid);
+	SET_GID(psinfo->pr_gid, cred->gid);
+	rcu_read_unlock();
 	strncpy(psinfo->pr_fname, p->comm, sizeof(psinfo->pr_fname));
 
 	return 0;
@@ -1528,11 +1559,9 @@ end_coredump:
 static int elf_fdpic_dump_segments(struct file *file, size_t *size,
 			   unsigned long *limit, unsigned long mm_flags)
 {
-	struct vm_list_struct *vml;
+	struct vm_area_struct *vma;
 
-	for (vml = current->mm->context.vmlist; vml; vml = vml->next) {
-	struct vm_area_struct *vma = vml->vma;
-
+	for (vma = current->mm->mmap; vma; vma = vma->vm_next) {
 		if (!maydump(vma, mm_flags))
 			continue;
 
@@ -1578,9 +1607,6 @@ static int elf_fdpic_core_dump(long signr, struct pt_regs *regs,
 	elf_fpxregset_t *xfpu = NULL;
 #endif
 	int thread_status_size = 0;
-#ifndef CONFIG_MMU
-	struct vm_list_struct *vml;
-#endif
 	elf_addr_t *auxv;
 	unsigned long mm_flags;
 
@@ -1646,13 +1672,7 @@ static int elf_fdpic_core_dump(long signr, struct pt_regs *regs,
 	fill_prstatus(prstatus, current, signr);
 	elf_core_copy_regs(&prstatus->pr_reg, regs);
 
-#ifdef CONFIG_MMU
 	segs = current->mm->map_count;
-#else
-	segs = 0;
-	for (vml = current->mm->context.vmlist; vml; vml = vml->next)
-	    segs++;
-#endif
 #ifdef ELF_CORE_EXTRA_PHDRS
 	segs += ELF_CORE_EXTRA_PHDRS;
 #endif
@@ -1727,19 +1747,9 @@ static int elf_fdpic_core_dump(long signr, struct pt_regs *regs,
 	mm_flags = current->mm->flags;
 
 	/* write program headers for segments dump */
-	for (
-#ifdef CONFIG_MMU
-		vma = current->mm->mmap; vma; vma = vma->vm_next
-#else
-			vml = current->mm->context.vmlist; vml; vml = vml->next
-#endif
-	     ) {
+	for (vma = current->mm->mmap; vma; vma = vma->vm_next) {
 		struct elf_phdr phdr;
 		size_t sz;
-
-#ifndef CONFIG_MMU
-		vma = vml->vma;
-#endif
 
 		sz = vma->vm_end - vma->vm_start;
 

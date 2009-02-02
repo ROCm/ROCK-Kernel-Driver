@@ -48,8 +48,7 @@ static bool nsec_valid(long nsec)
 	return nsec >= 0 && nsec <= 999999999;
 }
 
-static int utimes_common(struct path *path, struct timespec *times,
-			 struct file *f)
+static int utimes_common(struct path *path, struct timespec *times)
 {
 	int error;
 	struct iattr newattrs;
@@ -103,7 +102,7 @@ static int utimes_common(struct path *path, struct timespec *times,
 		}
 	}
 	mutex_lock(&inode->i_mutex);
-	error = fnotify_change(path->dentry, path->mnt, &newattrs, f);
+	error = notify_change(path->dentry, &newattrs);
 	mutex_unlock(&inode->i_mutex);
 
 mnt_drop_write_and_out:
@@ -150,7 +149,7 @@ long do_utimes(int dfd, char __user *filename, struct timespec *times, int flags
 		if (!file)
 			goto out;
 
-		error = utimes_common(&file->f_path, times, file);
+		error = utimes_common(&file->f_path, times);
 		fput(file);
 	} else {
 		struct path path;
@@ -163,7 +162,7 @@ long do_utimes(int dfd, char __user *filename, struct timespec *times, int flags
 		if (error)
 			goto out;
 
-		error = utimes_common(&path, times, NULL);
+		error = utimes_common(&path, times);
 		path_put(&path);
 	}
 

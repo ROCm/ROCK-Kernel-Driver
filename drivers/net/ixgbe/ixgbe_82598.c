@@ -47,7 +47,7 @@ static s32 ixgbe_setup_copper_link_speed_82598(struct ixgbe_hw *hw,
                                                bool autoneg,
                                                bool autoneg_wait_to_complete);
 static s32 ixgbe_read_i2c_eeprom_82598(struct ixgbe_hw *hw, u8 byte_offset,
-				       u8 *eeprom_data);
+                                       u8 *eeprom_data);
 
 /**
  */
@@ -63,6 +63,11 @@ static s32 ixgbe_get_invariants_82598(struct ixgbe_hw *hw)
 
 	/* PHY Init */
 	switch (phy->type) {
+	case ixgbe_phy_tn:
+		phy->ops.check_link = &ixgbe_check_phy_link_tnx;
+		phy->ops.get_firmware_version =
+		             &ixgbe_get_phy_firmware_version_tnx;
+		break;
 	case ixgbe_phy_nl:
 		phy->ops.reset = &ixgbe_reset_phy_nl;
 
@@ -77,17 +82,12 @@ static s32 ixgbe_get_invariants_82598(struct ixgbe_hw *hw)
 
 		/* Check to see if SFP+ module is supported */
 		ret_val = ixgbe_get_sfp_init_sequence_offsets(hw,
-							      &list_offset,
-							      &data_offset);
+		                                              &list_offset,
+		                                              &data_offset);
 		if (ret_val != 0) {
 			ret_val = IXGBE_ERR_SFP_NOT_SUPPORTED;
 			goto out;
 		}
-		break;
-	case ixgbe_phy_tn:
-		phy->ops.check_link = &ixgbe_check_phy_link_tnx;
-		phy->ops.get_firmware_version =
-		             &ixgbe_get_phy_firmware_version_tnx;
 		break;
 	default:
 		break;
@@ -177,9 +177,9 @@ static s32 ixgbe_get_link_capabilities_82598(struct ixgbe_hw *hw,
  *
  *  Determines the link capabilities by reading the AUTOC register.
  **/
-s32 ixgbe_get_copper_link_capabilities_82598(struct ixgbe_hw *hw,
-                                             ixgbe_link_speed *speed,
-                                             bool *autoneg)
+static s32 ixgbe_get_copper_link_capabilities_82598(struct ixgbe_hw *hw,
+						    ixgbe_link_speed *speed,
+						    bool *autoneg)
 {
 	s32 status = IXGBE_ERR_LINK_SETUP;
 	u16 speed_ability;
@@ -242,7 +242,7 @@ static enum ixgbe_media_type ixgbe_get_media_type_82598(struct ixgbe_hw *hw)
  *  Configures the flow control settings based on SW configuration.  This
  *  function is used for 802.3x flow control configuration only.
  **/
-s32 ixgbe_setup_fc_82598(struct ixgbe_hw *hw, s32 packetbuf_num)
+static s32 ixgbe_setup_fc_82598(struct ixgbe_hw *hw, s32 packetbuf_num)
 {
 	u32 frctl_reg;
 	u32 rmcs_reg;
@@ -433,14 +433,14 @@ static s32 ixgbe_check_mac_link_82598(struct ixgbe_hw *hw,
 	/*
 	 * SERDES PHY requires us to read link status from register 0xC79F.
 	 * Bit 0 set indicates link is up/ready; clear indicates link down.
-	 * OxC00C is read to check that the XAUI lanes are active.  Bit 0
+	 * 0xC00C is read to check that the XAUI lanes are active.  Bit 0
 	 * clear indicates active; set indicates inactive.
 	 */
 	if (hw->phy.type == ixgbe_phy_nl) {
 		hw->phy.ops.read_reg(hw, 0xC79F, IXGBE_TWINAX_DEV, &link_reg);
 		hw->phy.ops.read_reg(hw, 0xC79F, IXGBE_TWINAX_DEV, &link_reg);
 		hw->phy.ops.read_reg(hw, 0xC00C, IXGBE_TWINAX_DEV,
-				     &adapt_comp_reg);
+		                     &adapt_comp_reg);
 		if (link_up_wait_to_complete) {
 			for (i = 0; i < IXGBE_LINK_UP_TIME; i++) {
 				if ((link_reg & 1) &&
@@ -452,15 +452,14 @@ static s32 ixgbe_check_mac_link_82598(struct ixgbe_hw *hw,
 				}
 				msleep(100);
 				hw->phy.ops.read_reg(hw, 0xC79F,
-						     IXGBE_TWINAX_DEV,
-						     &link_reg);
+				                     IXGBE_TWINAX_DEV,
+				                     &link_reg);
 				hw->phy.ops.read_reg(hw, 0xC00C,
-						     IXGBE_TWINAX_DEV,
-						     &adapt_comp_reg);
+				                     IXGBE_TWINAX_DEV,
+				                     &adapt_comp_reg);
 			}
 		} else {
-			if ((link_reg & 1) &&
-			    ((adapt_comp_reg & 1) == 0))
+			if ((link_reg & 1) && ((adapt_comp_reg & 1) == 0))
 				*link_up = true;
 			else
 				*link_up = false;
@@ -727,7 +726,7 @@ static s32 ixgbe_reset_hw_82598(struct ixgbe_hw *hw)
  *  @rar: receive address register index to associate with a VMDq index
  *  @vmdq: VMDq set index
  **/
-s32 ixgbe_set_vmdq_82598(struct ixgbe_hw *hw, u32 rar, u32 vmdq)
+static s32 ixgbe_set_vmdq_82598(struct ixgbe_hw *hw, u32 rar, u32 vmdq)
 {
 	u32 rar_high;
 
@@ -771,8 +770,8 @@ static s32 ixgbe_clear_vmdq_82598(struct ixgbe_hw *hw, u32 rar, u32 vmdq)
  *
  *  Turn on/off specified VLAN in the VLAN filter table.
  **/
-s32 ixgbe_set_vfta_82598(struct ixgbe_hw *hw, u32 vlan, u32 vind,
-                         bool vlan_on)
+static s32 ixgbe_set_vfta_82598(struct ixgbe_hw *hw, u32 vlan, u32 vind,
+				bool vlan_on)
 {
 	u32 regindex;
 	u32 bitindex;
@@ -895,7 +894,7 @@ static s32 ixgbe_blink_led_stop_82598(struct ixgbe_hw *hw, u32 index)
  *
  *  Performs read operation to Atlas analog register specified.
  **/
-s32 ixgbe_read_analog_reg8_82598(struct ixgbe_hw *hw, u32 reg, u8 *val)
+static s32 ixgbe_read_analog_reg8_82598(struct ixgbe_hw *hw, u32 reg, u8 *val)
 {
 	u32  atlas_ctl;
 
@@ -917,7 +916,7 @@ s32 ixgbe_read_analog_reg8_82598(struct ixgbe_hw *hw, u32 reg, u8 *val)
  *
  *  Performs write operation to Atlas analog register specified.
  **/
-s32 ixgbe_write_analog_reg8_82598(struct ixgbe_hw *hw, u32 reg, u8 val)
+static s32 ixgbe_write_analog_reg8_82598(struct ixgbe_hw *hw, u32 reg, u8 val)
 {
 	u32  atlas_ctl;
 
@@ -930,7 +929,7 @@ s32 ixgbe_write_analog_reg8_82598(struct ixgbe_hw *hw, u32 reg, u8 val)
 }
 
 /**
- *  ixgbe_read_i2c_eeprom_82598 - Reads 8 bit EEPROM word of an SFP+ module
+ *  ixgbe_read_i2c_eeprom_82598 - Read 8 bit EEPROM word of an SFP+ module
  *  over I2C interface through an intermediate phy.
  *  @hw: pointer to hardware structure
  *  @byte_offset: EEPROM byte offset to read
@@ -938,8 +937,8 @@ s32 ixgbe_write_analog_reg8_82598(struct ixgbe_hw *hw, u32 reg, u8 val)
  *
  *  Performs byte read operation to SFP module's EEPROM over I2C interface.
  **/
-s32 ixgbe_read_i2c_eeprom_82598(struct ixgbe_hw *hw, u8 byte_offset,
-				u8 *eeprom_data)
+static s32 ixgbe_read_i2c_eeprom_82598(struct ixgbe_hw *hw, u8 byte_offset,
+				       u8 *eeprom_data)
 {
 	s32 status = 0;
 	u16 sfp_addr = 0;
@@ -950,22 +949,22 @@ s32 ixgbe_read_i2c_eeprom_82598(struct ixgbe_hw *hw, u8 byte_offset,
 	if (hw->phy.type == ixgbe_phy_nl) {
 		/*
 		 * phy SDA/SCL registers are at addresses 0xC30A to
-		 * 0xC30D. These registers are used to talk to the SFP+
+		 * 0xC30D.  These registers are used to talk to the SFP+
 		 * module's EEPROM through the SDA/SCL (I2C) interface.
 		 */
 		sfp_addr = (IXGBE_I2C_EEPROM_DEV_ADDR << 8) + byte_offset;
 		sfp_addr = (sfp_addr | IXGBE_I2C_EEPROM_READ_MASK);
 		hw->phy.ops.write_reg(hw,
-				      IXGBE_MDIO_PMA_PMD_SDA_SCL_ADDR,
-				      IXGBE_MDIO_PMA_PMD_DEV_TYPE,
-				      sfp_addr);
+		                      IXGBE_MDIO_PMA_PMD_SDA_SCL_ADDR,
+		                      IXGBE_MDIO_PMA_PMD_DEV_TYPE,
+		                      sfp_addr);
 
 		/* Poll status */
 		for (i = 0; i < 100; i++) {
 			hw->phy.ops.read_reg(hw,
-					     IXGBE_MDIO_PMA_PMD_SDA_SCL_STAT,
-					     IXGBE_MDIO_PMA_PMD_DEV_TYPE,
-					     &sfp_stat);
+			                     IXGBE_MDIO_PMA_PMD_SDA_SCL_STAT,
+			                     IXGBE_MDIO_PMA_PMD_DEV_TYPE,
+			                     &sfp_stat);
 			sfp_stat = sfp_stat & IXGBE_I2C_EEPROM_STATUS_MASK;
 			if (sfp_stat != IXGBE_I2C_EEPROM_STATUS_IN_PROGRESS)
 				break;
@@ -980,7 +979,7 @@ s32 ixgbe_read_i2c_eeprom_82598(struct ixgbe_hw *hw, u8 byte_offset,
 
 		/* Read data */
 		hw->phy.ops.read_reg(hw, IXGBE_MDIO_PMA_PMD_SDA_SCL_DATA,
-				     IXGBE_MDIO_PMA_PMD_DEV_TYPE, &sfp_data);
+		                     IXGBE_MDIO_PMA_PMD_DEV_TYPE, &sfp_data);
 
 		*eeprom_data = (u8)(sfp_data >> 8);
 	} else {
@@ -998,7 +997,7 @@ out:
  *
  *  Determines physical layer capabilities of the current configuration.
  **/
-s32 ixgbe_get_supported_physical_layer_82598(struct ixgbe_hw *hw)
+static s32 ixgbe_get_supported_physical_layer_82598(struct ixgbe_hw *hw)
 {
 	s32 physical_layer = IXGBE_PHYSICAL_LAYER_UNKNOWN;
 
@@ -1018,6 +1017,10 @@ s32 ixgbe_get_supported_physical_layer_82598(struct ixgbe_hw *hw)
 	case IXGBE_DEV_ID_82598EB_XF_LR:
 		physical_layer = IXGBE_PHYSICAL_LAYER_10GBASE_LR;
 		break;
+	case IXGBE_DEV_ID_82598AT:
+		physical_layer = (IXGBE_PHYSICAL_LAYER_10GBASE_T |
+		                  IXGBE_PHYSICAL_LAYER_1000BASE_T);
+		break;
 	case IXGBE_DEV_ID_82598EB_SFP_LOM:
 		hw->phy.ops.identify_sfp(hw);
 
@@ -1035,10 +1038,6 @@ s32 ixgbe_get_supported_physical_layer_82598(struct ixgbe_hw *hw)
 			physical_layer = IXGBE_PHYSICAL_LAYER_UNKNOWN;
 			break;
 		}
-		break;
-	case IXGBE_DEV_ID_82598AT:
-		physical_layer = (IXGBE_PHYSICAL_LAYER_10GBASE_T |
-		                  IXGBE_PHYSICAL_LAYER_1000BASE_T);
 		break;
 
 	default:

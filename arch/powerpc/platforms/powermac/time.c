@@ -93,11 +93,14 @@ static void to_rtc_time(unsigned long now, struct rtc_time *tm)
 }
 #endif
 
+#if defined(CONFIG_ADB_CUDA) || defined(CONFIG_ADB_PMU) || \
+    defined(CONFIG_PMAC_SMU)
 static unsigned long from_rtc_time(struct rtc_time *tm)
 {
 	return mktime(tm->tm_year+1900, tm->tm_mon+1, tm->tm_mday,
 		      tm->tm_hour, tm->tm_min, tm->tm_sec);
 }
+#endif
 
 #ifdef CONFIG_ADB_CUDA
 static unsigned long cuda_get_time(void)
@@ -262,12 +265,15 @@ int __init via_calibrate_decr(void)
 	struct resource rsrc;
 
 	vias = of_find_node_by_name(NULL, "via-cuda");
-	if (vias == 0)
+	if (vias == NULL)
 		vias = of_find_node_by_name(NULL, "via-pmu");
-	if (vias == 0)
+	if (vias == NULL)
 		vias = of_find_node_by_name(NULL, "via");
-	if (vias == 0 || of_address_to_resource(vias, 0, &rsrc))
+	if (vias == NULL || of_address_to_resource(vias, 0, &rsrc)) {
+	        of_node_put(vias);
 		return 0;
+	}
+	of_node_put(vias);
 	via = ioremap(rsrc.start, rsrc.end - rsrc.start + 1);
 	if (via == NULL) {
 		printk(KERN_ERR "Failed to map VIA for timer calibration !\n");
@@ -294,7 +300,7 @@ int __init via_calibrate_decr(void)
 	ppc_tb_freq = (dstart - dend) * 100 / 6;
 
 	iounmap(via);
-	
+
 	return 1;
 }
 #endif

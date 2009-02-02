@@ -413,7 +413,8 @@ static void driver_disconnect(struct usb_interface *intf)
 	if (likely(ifnum < 8*sizeof(ps->ifclaimed)))
 		clear_bit(ifnum, &ps->ifclaimed);
 	else
-		warn("interface number %u out of range", ifnum);
+		dev_warn(&intf->dev, "interface number %u out of range\n",
+			 ifnum);
 
 	usb_set_intfdata(intf, NULL);
 
@@ -573,6 +574,7 @@ static int usbdev_open(struct inode *inode, struct file *file)
 {
 	struct usb_device *dev = NULL;
 	struct dev_state *ps;
+	const struct cred *cred = current_cred();
 	int ret;
 
 	lock_kernel();
@@ -616,14 +618,16 @@ static int usbdev_open(struct inode *inode, struct file *file)
 	init_waitqueue_head(&ps->wait);
 	ps->discsignr = 0;
 	ps->disc_pid = get_pid(task_pid(current));
-	ps->disc_uid = current->uid;
-	ps->disc_euid = current->euid;
+	ps->disc_uid = cred->uid;
+	ps->disc_euid = cred->euid;
 	ps->disccontext = NULL;
 	ps->ifclaimed = 0;
 	security_task_getsecid(current, &ps->secid);
 	smp_wmb();
 	list_add_tail(&ps->list, &dev->filelist);
 	file->private_data = ps;
+	snoop(&dev->dev, "opened by process %d: %s\n", task_pid_nr(current),
+			current->comm);
  out:
 	if (ret) {
 		kfree(ps);
@@ -964,6 +968,7 @@ static int proc_do_submiturb(struct dev_state *ps, struct usbdevfs_urb *uurb,
 	struct usb_host_endpoint *ep;
 	struct async *as;
 	struct usb_ctrlrequest *dr = NULL;
+	const struct cred *cred = current_cred();
 	unsigned int u, totlen, isofrmlen;
 	int ret, ifnum = -1;
 	int is_in;
@@ -975,9 +980,6 @@ static int proc_do_submiturb(struct dev_state *ps, struct usbdevfs_urb *uurb,
 				USBDEVFS_URB_NO_INTERRUPT))
 		return -EINVAL;
 	if (!uurb->buffer)
-		return -EINVAL;
-	if (uurb->signr != 0 && (uurb->signr < SIGRTMIN ||
-				 uurb->signr > SIGRTMAX))
 		return -EINVAL;
 	if (!(uurb->type == USBDEVFS_URB_TYPE_CONTROL &&
 	    (uurb->endpoint & ~USB_ENDPOINT_DIR_MASK) == 0)) {
@@ -1171,8 +1173,8 @@ static int proc_do_submiturb(struct dev_state *ps, struct usbdevfs_urb *uurb,
 	as->signr = uurb->signr;
 	as->ifnum = ifnum;
 	as->pid = get_pid(task_pid(current));
-	as->uid = current->uid;
-	as->euid = current->euid;
+	as->uid = cred->uid;
+	as->euid = cred->euid;
 	security_task_getsecid(current, &as->secid);
 	if (!is_in) {
 		if (copy_from_user(as->urb->transfer_buffer, uurb->buffer,
@@ -1315,7 +1317,7 @@ static int get_urb32(struct usbdevfs_urb *kurb,
 	if (__get_user(uptr, &uurb->buffer))
 		return -EFAULT;
 	kurb->buffer = compat_ptr(uptr);
-	if (__get_user(uptr, &uurb->buffer))
+	if (__get_user(uptr, &uurb->usercontext))
 		return -EFAULT;
 	kurb->usercontext = compat_ptr(uptr);
 
@@ -1396,8 +1398,6 @@ static int proc_disconnectsignal(struct dev_state *ps, void __user *arg)
 
 	if (copy_from_user(&ds, arg, sizeof(ds)))
 		return -EFAULT;
-	if (ds.signr != 0 && (ds.signr < SIGRTMIN || ds.signr > SIGRTMAX))
-		return -EINVAL;
 	ps->discsignr = ds.signr;
 	ps->disccontext = ds.context;
 	return 0;
@@ -1729,9 +1729,9 @@ static int usb_classdev_add(struct usb_device *dev)
 {
 	struct device *cldev;
 
-	cldev = device_create_drvdata(usb_classdev_class, &dev->dev,
-				      dev->dev.devt, NULL, "usbdev%d.%d",
-				      dev->bus->busnum, dev->devnum);
+	cldev = device_create(usb_classdev_class, &dev->dev, dev->dev.devt,
+			      NULL, "usbdev%d.%d", dev->bus->busnum,
+			      dev->devnum);
 	if (IS_ERR(cldev))
 		return PTR_ERR(cldev);
 	dev->usb_classdev = cldev;
@@ -1779,19 +1779,20 @@ int __init usb_devio_init(void)
 	retval = register_chrdev_region(USB_DEVICE_DEV, USB_DEVICE_MAX,
 					"usb_device");
 	if (retval) {
-		err("unable to register minors for usb_device");
+		printk(KERN_ERR "Unable to register minors for usb_device\n");
 		goto out;
 	}
 	cdev_init(&usb_device_cdev, &usbdev_file_operations);
 	retval = cdev_add(&usb_device_cdev, USB_DEVICE_DEV, USB_DEVICE_MAX);
 	if (retval) {
-		err("unable to get usb_device major %d", USB_DEVICE_MAJOR);
+		printk(KERN_ERR "Unable to get usb_device major %d\n",
+		       USB_DEVICE_MAJOR);
 		goto error_cdev;
 	}
 #ifdef CONFIG_USB_DEVICE_CLASS
 	usb_classdev_class = class_create(THIS_MODULE, "usb_device");
 	if (IS_ERR(usb_classdev_class)) {
-		err("unable to register usb_device class");
+		printk(KERN_ERR "Unable to register usb_device class\n");
 		retval = PTR_ERR(usb_classdev_class);
 		cdev_del(&usb_device_cdev);
 		usb_classdev_class = NULL;

@@ -398,7 +398,7 @@ static int netwave_probe(struct pcmcia_device *link)
     link->io.IOAddrLines = 5;
     
     /* Interrupt setup */
-    link->irq.Attributes = IRQ_TYPE_EXCLUSIVE | IRQ_HANDLE_PRESENT;
+    link->irq.Attributes = IRQ_TYPE_DYNAMIC_SHARING | IRQ_HANDLE_PRESENT;
     link->irq.IRQInfo1 = IRQ_LEVEL_ID;
     link->irq.Handler = &netwave_interrupt;
     
@@ -737,7 +737,6 @@ static int netwave_pcmcia_config(struct pcmcia_device *link) {
     win_req_t req;
     memreq_t mem;
     u_char __iomem *ramBase = NULL;
-    DECLARE_MAC_BUF(mac);
 
     DEBUG(0, "netwave_pcmcia_config(0x%p)\n", link);
 
@@ -749,9 +748,10 @@ static int netwave_pcmcia_config(struct pcmcia_device *link) {
     for (i = j = 0x0; j < 0x400; j += 0x20) {
 	link->io.BasePort1 = j ^ 0x300;
 	i = pcmcia_request_io(link, &link->io);
-	if (i == CS_SUCCESS) break;
+	if (i == 0)
+		break;
     }
-    if (i != CS_SUCCESS) {
+    if (i != 0) {
 	cs_error(link, RequestIO, i);
 	goto failed;
     }
@@ -807,12 +807,12 @@ static int netwave_pcmcia_config(struct pcmcia_device *link) {
 	dev->dev_addr[i] = readb(ramBase + NETWAVE_EREG_PA + i);
 
     printk(KERN_INFO "%s: Netwave: port %#3lx, irq %d, mem %lx, "
-	   "id %c%c, hw_addr %s\n",
+	   "id %c%c, hw_addr %pM\n",
 	   dev->name, dev->base_addr, dev->irq,
 	   (u_long) ramBase,
 	   (int) readb(ramBase+NETWAVE_EREG_NI),
 	   (int) readb(ramBase+NETWAVE_EREG_NI+1),
-	   print_mac(mac, dev->dev_addr));
+	   dev->dev_addr);
 
     /* get revision words */
     printk(KERN_DEBUG "Netwave_reset: revision %04x %04x\n", 
@@ -1307,7 +1307,6 @@ static int netwave_rx(struct net_device *dev)
 	/* Queue packet for network layer */
 	netif_rx(skb);
 
-	dev->last_rx = jiffies;
 	priv->stats.rx_packets++;
 	priv->stats.rx_bytes += rcvLen;
 

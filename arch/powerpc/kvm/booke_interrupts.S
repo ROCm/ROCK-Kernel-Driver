@@ -42,7 +42,8 @@
 #define HOST_STACK_LR   (HOST_STACK_SIZE + 4) /* In caller stack frame. */
 
 #define NEED_INST_MASK ((1<<BOOKE_INTERRUPT_PROGRAM) | \
-                        (1<<BOOKE_INTERRUPT_DTLB_MISS))
+                        (1<<BOOKE_INTERRUPT_DTLB_MISS) | \
+                        (1<<BOOKE_INTERRUPT_DEBUG))
 
 #define NEED_DEAR_MASK ((1<<BOOKE_INTERRUPT_DATA_STORAGE) | \
                         (1<<BOOKE_INTERRUPT_DTLB_MISS))
@@ -105,6 +106,18 @@ _GLOBAL(kvmppc_resume_host)
 
 	li	r6, 1
 	slw	r6, r6, r5
+
+#ifdef CONFIG_KVM_EXIT_TIMING
+	/* save exit time */
+1:
+	mfspr	r7, SPRN_TBRU
+	mfspr	r8, SPRN_TBRL
+	mfspr	r9, SPRN_TBRU
+	cmpw	r9, r7
+	bne	1b
+	stw	r8, VCPU_TIMING_EXIT_TBL(r4)
+	stw	r9, VCPU_TIMING_EXIT_TBU(r4)
+#endif
 
 	/* Save the faulting instruction and all GPRs for emulation. */
 	andi.	r7, r6, NEED_INST_MASK
@@ -331,50 +344,8 @@ lightweight_exit:
 
 	mfspr	r3, SPRN_PID
 	stw	r3, VCPU_HOST_PID(r4)
-	lwz	r3, VCPU_PID(r4)
+	lwz	r3, VCPU_SHADOW_PID(r4)
 	mtspr	SPRN_PID, r3
-
-	/* Prevent all TLB updates. */
-	mfmsr	r5
-	lis	r6, (MSR_EE|MSR_CE|MSR_ME|MSR_DE)@h
-	ori	r6, r6, (MSR_EE|MSR_CE|MSR_ME|MSR_DE)@l
-	andc	r6, r5, r6
-	mtmsr	r6
-
-	/* Save the host's non-pinned TLB mappings, and load the guest mappings
-	 * over them. Leave the host's "pinned" kernel mappings in place. */
-	/* XXX optimization: use generation count to avoid swapping unmodified
-	 * entries. */
-	mfspr	r10, SPRN_MMUCR			/* Save host MMUCR. */
-	lis	r8, tlb_44x_hwater@ha
-	lwz	r8, tlb_44x_hwater@l(r8)
-	addi	r3, r4, VCPU_HOST_TLB - 4
-	addi	r9, r4, VCPU_SHADOW_TLB - 4
-	li	r6, 0
-1:
-	/* Save host entry. */
-	tlbre	r7, r6, PPC44x_TLB_PAGEID
-	mfspr	r5, SPRN_MMUCR
-	stwu	r5, 4(r3)
-	stwu	r7, 4(r3)
-	tlbre	r7, r6, PPC44x_TLB_XLAT
-	stwu	r7, 4(r3)
-	tlbre	r7, r6, PPC44x_TLB_ATTRIB
-	stwu	r7, 4(r3)
-	/* Load guest entry. */
-	lwzu	r7, 4(r9)
-	mtspr	SPRN_MMUCR, r7
-	lwzu	r7, 4(r9)
-	tlbwe	r7, r6, PPC44x_TLB_PAGEID
-	lwzu	r7, 4(r9)
-	tlbwe	r7, r6, PPC44x_TLB_XLAT
-	lwzu	r7, 4(r9)
-	tlbwe	r7, r6, PPC44x_TLB_ATTRIB
-	/* Increment index. */
-	addi	r6, r6, 1
-	cmpw	r6, r8
-	blt	1b
-	mtspr	SPRN_MMUCR, r10			/* Restore host MMUCR. */
 
 	iccci	0, 0 /* XXX hack */
 
@@ -416,6 +387,18 @@ lightweight_exit:
 	lwz	r3, VCPU_SPRG7(r4)
 	mtspr	SPRN_SPRG7, r3
 
+#ifdef CONFIG_KVM_EXIT_TIMING
+	/* save enter time */
+1:
+	mfspr	r6, SPRN_TBRU
+	mfspr	r7, SPRN_TBRL
+	mfspr	r8, SPRN_TBRU
+	cmpw	r8, r6
+	bne	1b
+	stw	r7, VCPU_TIMING_LAST_ENTER_TBL(r4)
+	stw	r8, VCPU_TIMING_LAST_ENTER_TBU(r4)
+#endif
+
 	/* Finish loading guest volatiles and jump to guest. */
 	lwz	r3, VCPU_CTR(r4)
 	mtctr	r3
@@ -431,6 +414,14 @@ lightweight_exit:
 	oris	r3, r3, KVMPPC_MSR_MASK@h
 	ori	r3, r3, KVMPPC_MSR_MASK@l
 	mtsrr1	r3
+
+	/* Clear any debug events which occurred since we disabled MSR[DE].
+	 * XXX This gives us a 3-instruction window in which a breakpoint
+	 * intended for guest context could fire in the host instead. */
+	lis	r3, 0xffff
+	ori	r3, r3, 0xffff
+	mtspr	SPRN_DBSR, r3
+
 	lwz	r3, VCPU_GPR(r3)(r4)
 	lwz	r4, VCPU_GPR(r4)(r4)
 	rfi

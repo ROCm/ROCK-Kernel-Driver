@@ -11,16 +11,15 @@
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/init.h>
-#include <asm/mach-numaq/mach_apicdef.h>
+#include <asm/numaq/apicdef.h>
 #include <linux/smp.h>
-#include <asm/mach-numaq/mach_apic.h>
-#include <asm/mach-numaq/mach_ipi.h>
-#include <asm/mach-numaq/mach_mpparse.h>
-#include <asm/mach-numaq/mach_wakecpu.h>
+#include <asm/numaq/apic.h>
+#include <asm/numaq/ipi.h>
+#include <asm/numaq/mpparse.h>
+#include <asm/numaq/wakecpu.h>
 #include <asm/numaq.h>
 
-static int mps_oem_check(struct mp_config_table *mpc, char *oem,
-		char *productid)
+static int mps_oem_check(struct mpc_table *mpc, char *oem, char *productid)
 {
 	numaq_mps_oem_check(mpc, oem, productid);
 	return found_numaq;
@@ -36,6 +35,19 @@ static int probe_numaq(void)
 static int acpi_madt_oem_check(char *oem_id, char *oem_table_id)
 {
 	return 0;
+}
+
+static void vector_allocation_domain(int cpu, cpumask_t *retmask)
+{
+	/* Careful. Some cpus do not strictly honor the set of cpus
+	 * specified in the interrupt destination when using lowest
+	 * priority interrupt delivery mode.
+	 *
+	 * In particular there was a hyperthreading cpu observed to
+	 * deliver interrupts to the wrong hyperthread when only one
+	 * hyperthread was specified in the interrupt desitination.
+	 */
+	*retmask = (cpumask_t){ { [0] = APIC_ALL_CPUS, } };
 }
 
 struct genapic apic_numaq = APIC_INIT("NUMAQ", probe_numaq);

@@ -1397,7 +1397,7 @@ static struct dasd_ccw_req *dasd_3990_erp_inspect_alias(
 			DEV_MESSAGE(KERN_ERR, cqr->startdev,
 				    "ERP on alias device for request %p,"
 				    " recover on base device %s", cqr,
-				    cqr->block->base->cdev->dev.bus_id);
+				    dev_name(&cqr->block->base->cdev->dev));
 		}
 		dasd_eckd_reset_ccw_to_base_io(cqr);
 		erp->startdev = cqr->block->base;
@@ -2621,7 +2621,7 @@ dasd_3990_erp_action(struct dasd_ccw_req * cqr)
 		}
 	}
 
-	/* double-check if current erp/cqr was successfull */
+	/* double-check if current erp/cqr was successful */
 	if ((cqr->irb.scsw.cmd.cstat == 0x00) &&
 	    (cqr->irb.scsw.cmd.dstat ==
 	     (DEV_STAT_CHN_END | DEV_STAT_DEV_END))) {

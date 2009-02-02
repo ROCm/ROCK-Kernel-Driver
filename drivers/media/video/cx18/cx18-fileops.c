@@ -4,6 +4,7 @@
  *  Derived from ivtv-fileops.c
  *
  *  Copyright (C) 2007  Hans Verkuil <hverkuil@xs4all.nl>
+ *  Copyright (C) 2008  Andy Walls <awalls@radix.net>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -66,12 +67,11 @@ static int cx18_claim_stream(struct cx18_open_id *id, int type)
 	}
 	s->id = id->open_id;
 
-	/* CX18_DEC_STREAM_TYPE_MPG needs to claim CX18_DEC_STREAM_TYPE_VBI,
-	   CX18_ENC_STREAM_TYPE_MPG needs to claim CX18_ENC_STREAM_TYPE_VBI
+	/* CX18_ENC_STREAM_TYPE_MPG needs to claim CX18_ENC_STREAM_TYPE_VBI
 	   (provided VBI insertion is on and sliced VBI is selected), for all
 	   other streams we're done */
 	if (type == CX18_ENC_STREAM_TYPE_MPG &&
-		   cx->vbi.insert_mpeg && cx->vbi.sliced_in->service_set) {
+	    cx->vbi.insert_mpeg && !cx18_raw_vbi(cx)) {
 		vbi_type = CX18_ENC_STREAM_TYPE_VBI;
 	} else {
 		return 0;
@@ -132,6 +132,7 @@ static void cx18_dualwatch(struct cx18 *cx)
 	u16 new_stereo_mode;
 	const u16 stereo_mask = 0x0300;
 	const u16 dual = 0x0200;
+	u32 h;
 
 	new_stereo_mode = cx->params.audio_properties & stereo_mask;
 	memset(&vt, 0, sizeof(vt));
@@ -143,13 +144,21 @@ static void cx18_dualwatch(struct cx18 *cx)
 	if (new_stereo_mode == cx->dualwatch_stereo_mode)
 		return;
 
-	new_bitmap = new_stereo_mode | (cx->params.audio_properties & ~stereo_mask);
+	new_bitmap = new_stereo_mode
+			| (cx->params.audio_properties & ~stereo_mask);
 
-	CX18_DEBUG_INFO("dualwatch: change stereo flag from 0x%x to 0x%x. new audio_bitmask=0x%ux\n",
-			   cx->dualwatch_stereo_mode, new_stereo_mode, new_bitmap);
+	CX18_DEBUG_INFO("dualwatch: change stereo flag from 0x%x to 0x%x. "
+			"new audio_bitmask=0x%ux\n",
+			cx->dualwatch_stereo_mode, new_stereo_mode, new_bitmap);
 
-	if (cx18_vapi(cx, CX18_CPU_SET_AUDIO_PARAMETERS, 2,
-				cx18_find_handle(cx), new_bitmap) == 0) {
+	h = cx18_find_handle(cx);
+	if (h == CX18_INVALID_TASK_HANDLE) {
+		CX18_DEBUG_INFO("dualwatch: can't find valid task handle\n");
+		return;
+	}
+
+	if (cx18_vapi(cx,
+		      CX18_CPU_SET_AUDIO_PARAMETERS, 2, h, new_bitmap) == 0) {
 		cx->dualwatch_stereo_mode = new_stereo_mode;
 		return;
 	}
@@ -176,19 +185,16 @@ static struct cx18_buffer *cx18_get_buffer(struct cx18_stream *s, int non_block,
 			    !test_bit(CX18_F_S_APPL_IO, &s_vbi->s_flags)) {
 				while ((buf = cx18_dequeue(s_vbi, &s_vbi->q_full))) {
 					/* byteswap and process VBI data */
-/*					cx18_process_vbi_data(cx, buf, s_vbi->dma_pts, s_vbi->type); */
-					cx18_enqueue(s_vbi, buf, &s_vbi->q_free);
+					cx18_process_vbi_data(cx, buf,
+							      s_vbi->dma_pts,
+							      s_vbi->type);
+					cx18_stream_put_buf_fw(s_vbi, buf);
 				}
 			}
 			buf = &cx->vbi.sliced_mpeg_buf;
 			if (buf->readpos != buf->bytesused)
 				return buf;
 		}
-
-		/* do we have leftover data? */
-		buf = cx18_dequeue(s, &s->q_io);
-		if (buf)
-			return buf;
 
 		/* do we have new data? */
 		buf = cx18_dequeue(s, &s->q_full);
@@ -223,7 +229,7 @@ static struct cx18_buffer *cx18_get_buffer(struct cx18_stream *s, int non_block,
 		prepare_to_wait(&s->waitq, &wait, TASK_INTERRUPTIBLE);
 		/* New buffers might have become available before we were added
 		   to the waitqueue */
-		if (!s->q_full.buffers)
+		if (!atomic_read(&s->q_full.buffers))
 			schedule();
 		finish_wait(&s->waitq, &wait);
 		if (signal_pending(current)) {
@@ -253,7 +259,7 @@ static size_t cx18_copy_buf_to_user(struct cx18_stream *s,
 	if (len > ucount)
 		len = ucount;
 	if (cx->vbi.insert_mpeg && s->type == CX18_ENC_STREAM_TYPE_MPG &&
-	    cx->vbi.sliced_in->service_set && buf != &cx->vbi.sliced_mpeg_buf) {
+	    !cx18_raw_vbi(cx) && buf != &cx->vbi.sliced_mpeg_buf) {
 		const char *start = buf->buf + buf->readpos;
 		const char *p = start + 1;
 		const u8 *q;
@@ -328,8 +334,7 @@ static ssize_t cx18_read(struct cx18_stream *s, char __user *ubuf,
 	/* Each VBI buffer is one frame, the v4l2 API says that for VBI the
 	   frames should arrive one-by-one, so make sure we never output more
 	   than one VBI frame at a time */
-	if (s->type == CX18_ENC_STREAM_TYPE_VBI &&
-	    cx->vbi.sliced_in->service_set)
+	if (s->type == CX18_ENC_STREAM_TYPE_VBI && !cx18_raw_vbi(cx))
 		single_frame = 1;
 
 	for (;;) {
@@ -356,16 +361,10 @@ static ssize_t cx18_read(struct cx18_stream *s, char __user *ubuf,
 				tot_count - tot_written);
 
 		if (buf != &cx->vbi.sliced_mpeg_buf) {
-			if (buf->readpos == buf->bytesused) {
-				cx18_buf_sync_for_device(s, buf);
-				cx18_enqueue(s, buf, &s->q_free);
-				cx18_vapi(cx, CX18_CPU_DE_SET_MDL, 5,
-					s->handle,
-					(void __iomem *)&cx->scb->cpu_mdl[buf->id] -
-					  cx->enc_mem,
-					1, buf->id, s->buf_size);
-			} else
-				cx18_enqueue(s, buf, &s->q_io);
+			if (buf->readpos == buf->bytesused)
+				cx18_stream_put_buf_fw(s, buf);
+			else
+				cx18_push(s, buf, &s->q_full);
 		} else if (buf->readpos == buf->bytesused) {
 			int idx = cx->vbi.inserted_frame % CX18_VBI_FRAMES;
 
@@ -509,7 +508,7 @@ unsigned int cx18_v4l2_enc_poll(struct file *filp, poll_table *wait)
 	CX18_DEBUG_HI_FILE("Encoder poll\n");
 	poll_wait(filp, &s->waitq, wait);
 
-	if (s->q_full.length || s->q_io.length)
+	if (atomic_read(&s->q_full.buffers))
 		return POLLIN | POLLRDNORM;
 	if (eof)
 		return POLLHUP;
@@ -553,7 +552,7 @@ void cx18_stop_capture(struct cx18_open_id *id, int gop_end)
 	}
 }
 
-int cx18_v4l2_close(struct inode *inode, struct file *filp)
+int cx18_v4l2_close(struct file *filp)
 {
 	struct cx18_open_id *id = filp->private_data;
 	struct cx18 *cx = id->cx;
@@ -651,12 +650,12 @@ static int cx18_serialized_open(struct cx18_stream *s, struct file *filp)
 	return 0;
 }
 
-int cx18_v4l2_open(struct inode *inode, struct file *filp)
+int cx18_v4l2_open(struct file *filp)
 {
 	int res, x, y = 0;
 	struct cx18 *cx = NULL;
 	struct cx18_stream *s = NULL;
-	int minor = iminor(inode);
+	int minor = video_devdata(filp)->minor;
 
 	/* Find which card this open was on */
 	spin_lock(&cx18_cards_lock);
@@ -695,20 +694,28 @@ int cx18_v4l2_open(struct inode *inode, struct file *filp)
 
 void cx18_mute(struct cx18 *cx)
 {
-	if (atomic_read(&cx->ana_capturing))
-		cx18_vapi(cx, CX18_CPU_SET_AUDIO_MUTE, 2,
-				cx18_find_handle(cx), 1);
+	u32 h;
+	if (atomic_read(&cx->ana_capturing)) {
+		h = cx18_find_handle(cx);
+		if (h != CX18_INVALID_TASK_HANDLE)
+			cx18_vapi(cx, CX18_CPU_SET_AUDIO_MUTE, 2, h, 1);
+		else
+			CX18_ERR("Can't find valid task handle for mute\n");
+	}
 	CX18_DEBUG_INFO("Mute\n");
 }
 
 void cx18_unmute(struct cx18 *cx)
 {
+	u32 h;
 	if (atomic_read(&cx->ana_capturing)) {
-		cx18_msleep_timeout(100, 0);
-		cx18_vapi(cx, CX18_CPU_SET_MISC_PARAMETERS, 2,
-				cx18_find_handle(cx), 12);
-		cx18_vapi(cx, CX18_CPU_SET_AUDIO_MUTE, 2,
-				cx18_find_handle(cx), 0);
+		h = cx18_find_handle(cx);
+		if (h != CX18_INVALID_TASK_HANDLE) {
+			cx18_msleep_timeout(100, 0);
+			cx18_vapi(cx, CX18_CPU_SET_MISC_PARAMETERS, 2, h, 12);
+			cx18_vapi(cx, CX18_CPU_SET_AUDIO_MUTE, 2, h, 0);
+		} else
+			CX18_ERR("Can't find valid task handle for unmute\n");
 	}
 	CX18_DEBUG_INFO("Unmute\n");
 }

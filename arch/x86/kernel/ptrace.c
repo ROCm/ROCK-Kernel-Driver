@@ -40,7 +40,9 @@ enum x86_regset {
 	REGSET_GENERAL,
 	REGSET_FP,
 	REGSET_XFP,
+	REGSET_IOPERM64 = REGSET_XFP,
 	REGSET_TLS,
+	REGSET_IOPERM32,
 };
 
 /*
@@ -70,7 +72,7 @@ static inline bool invalid_selector(u16 value)
 
 #define FLAG_MASK		FLAG_MASK_32
 
-static long *pt_regs_access(struct pt_regs *regs, unsigned long regno)
+static unsigned long *pt_regs_access(struct pt_regs *regs, unsigned long regno)
 {
 	BUILD_BUG_ON(offsetof(struct pt_regs, bx) != 0);
 	regno >>= 2;
@@ -555,92 +557,115 @@ static int ptrace_set_debugreg(struct task_struct *child,
 	return 0;
 }
 
-#ifdef X86_BTS
-
-static int ptrace_bts_get_size(struct task_struct *child)
+/*
+ * These access the current or another (stopped) task's io permission
+ * bitmap for debugging or core dump.
+ */
+static int ioperm_active(struct task_struct *target,
+			 const struct user_regset *regset)
 {
-	if (!child->thread.ds_area_msr)
-		return -ENXIO;
-
-	return ds_get_bts_index((void *)child->thread.ds_area_msr);
+	return target->thread.io_bitmap_max / regset->size;
 }
 
-static int ptrace_bts_read_record(struct task_struct *child,
-				  long index,
+static int ioperm_get(struct task_struct *target,
+		      const struct user_regset *regset,
+		      unsigned int pos, unsigned int count,
+		      void *kbuf, void __user *ubuf)
+{
+	if (!target->thread.io_bitmap_ptr)
+		return -ENXIO;
+
+	return user_regset_copyout(&pos, &count, &kbuf, &ubuf,
+				   target->thread.io_bitmap_ptr,
+				   0, IO_BITMAP_BYTES);
+}
+
+#ifdef CONFIG_X86_PTRACE_BTS
+static int ptrace_bts_read_record(struct task_struct *child, size_t index,
 				  struct bts_struct __user *out)
 {
-	struct bts_struct ret;
-	int retval;
-	int bts_end;
-	int bts_index;
+	const struct bts_trace *trace;
+	struct bts_struct bts;
+	const unsigned char *at;
+	int error;
 
-	if (!child->thread.ds_area_msr)
-		return -ENXIO;
+	trace = ds_read_bts(child->bts);
+	if (!trace)
+		return -EPERM;
 
-	if (index < 0)
-		return -EINVAL;
+	at = trace->ds.top - ((index + 1) * trace->ds.size);
+	if ((void *)at < trace->ds.begin)
+		at += (trace->ds.n * trace->ds.size);
 
-	bts_end = ds_get_bts_end((void *)child->thread.ds_area_msr);
-	if (bts_end <= index)
-		return -EINVAL;
+	if (!trace->read)
+		return -EOPNOTSUPP;
 
-	/* translate the ptrace bts index into the ds bts index */
-	bts_index = ds_get_bts_index((void *)child->thread.ds_area_msr);
-	bts_index -= (index + 1);
-	if (bts_index < 0)
-		bts_index += bts_end;
+	error = trace->read(child->bts, at, &bts);
+	if (error < 0)
+		return error;
 
-	retval = ds_read_bts((void *)child->thread.ds_area_msr,
-			     bts_index, &ret);
-	if (retval < 0)
-		return retval;
-
-	if (copy_to_user(out, &ret, sizeof(ret)))
+	if (copy_to_user(out, &bts, sizeof(bts)))
 		return -EFAULT;
 
-	return sizeof(ret);
-}
-
-static int ptrace_bts_clear(struct task_struct *child)
-{
-	if (!child->thread.ds_area_msr)
-		return -ENXIO;
-
-	return ds_clear((void *)child->thread.ds_area_msr);
+	return sizeof(bts);
 }
 
 static int ptrace_bts_drain(struct task_struct *child,
 			    long size,
 			    struct bts_struct __user *out)
 {
-	int end, i;
-	void *ds = (void *)child->thread.ds_area_msr;
+	const struct bts_trace *trace;
+	const unsigned char *at;
+	int error, drained = 0;
 
-	if (!ds)
-		return -ENXIO;
+	trace = ds_read_bts(child->bts);
+	if (!trace)
+		return -EPERM;
 
-	end = ds_get_bts_index(ds);
-	if (end <= 0)
-		return end;
+	if (!trace->read)
+		return -EOPNOTSUPP;
 
-	if (size < (end * sizeof(struct bts_struct)))
+	if (size < (trace->ds.top - trace->ds.begin))
 		return -EIO;
 
-	for (i = 0; i < end; i++, out++) {
-		struct bts_struct ret;
-		int retval;
+	for (at = trace->ds.begin; (void *)at < trace->ds.top;
+	     out++, drained++, at += trace->ds.size) {
+		struct bts_struct bts;
+		int error;
 
-		retval = ds_read_bts(ds, i, &ret);
-		if (retval < 0)
-			return retval;
+		error = trace->read(child->bts, at, &bts);
+		if (error < 0)
+			return error;
 
-		if (copy_to_user(out, &ret, sizeof(ret)))
+		if (copy_to_user(out, &bts, sizeof(bts)))
 			return -EFAULT;
 	}
 
-	ds_clear(ds);
+	memset(trace->ds.begin, 0, trace->ds.n * trace->ds.size);
 
-	return end;
+	error = ds_reset_bts(child->bts);
+	if (error < 0)
+		return error;
+
+	return drained;
+}
+
+static int ptrace_bts_allocate_buffer(struct task_struct *child, size_t size)
+{
+	child->bts_buffer = alloc_locked_buffer(size);
+	if (!child->bts_buffer)
+		return -ENOMEM;
+
+	child->bts_size = size;
+
+	return 0;
+}
+
+static void ptrace_bts_free_buffer(struct task_struct *child)
+{
+	free_locked_buffer(child->bts_buffer, child->bts_size);
+	child->bts_buffer = NULL;
+	child->bts_size = 0;
 }
 
 static int ptrace_bts_config(struct task_struct *child,
@@ -648,8 +673,7 @@ static int ptrace_bts_config(struct task_struct *child,
 			     const struct ptrace_bts_config __user *ucfg)
 {
 	struct ptrace_bts_config cfg;
-	int bts_size, ret = 0;
-	void *ds;
+	unsigned int flags = 0;
 
 	if (cfg_size < sizeof(cfg))
 		return -EIO;
@@ -657,87 +681,79 @@ static int ptrace_bts_config(struct task_struct *child,
 	if (copy_from_user(&cfg, ucfg, sizeof(cfg)))
 		return -EFAULT;
 
-	if ((int)cfg.size < 0)
-		return -EINVAL;
-
-	bts_size = 0;
-	ds = (void *)child->thread.ds_area_msr;
-	if (ds) {
-		bts_size = ds_get_bts_size(ds);
-		if (bts_size < 0)
-			return bts_size;
-	}
-	cfg.size = PAGE_ALIGN(cfg.size);
-
-	if (bts_size != cfg.size) {
-		ret = ptrace_bts_realloc(child, cfg.size,
-					 cfg.flags & PTRACE_BTS_O_CUT_SIZE);
-		if (ret < 0)
-			goto errout;
-
-		ds = (void *)child->thread.ds_area_msr;
+	if (child->bts) {
+		ds_release_bts(child->bts);
+		child->bts = NULL;
 	}
 
-	if (cfg.flags & PTRACE_BTS_O_SIGNAL)
-		ret = ds_set_overflow(ds, DS_O_SIGNAL);
-	else
-		ret = ds_set_overflow(ds, DS_O_WRAP);
-	if (ret < 0)
-		goto errout;
+	if (cfg.flags & PTRACE_BTS_O_SIGNAL) {
+		if (!cfg.signal)
+			return -EINVAL;
+
+		return -EOPNOTSUPP;
+
+		child->thread.bts_ovfl_signal = cfg.signal;
+	}
+
+	if ((cfg.flags & PTRACE_BTS_O_ALLOC) &&
+	    (cfg.size != child->bts_size)) {
+		int error;
+
+		ptrace_bts_free_buffer(child);
+
+		error = ptrace_bts_allocate_buffer(child, cfg.size);
+		if (error < 0)
+			return error;
+	}
 
 	if (cfg.flags & PTRACE_BTS_O_TRACE)
-		child->thread.debugctlmsr |= ds_debugctl_mask();
-	else
-		child->thread.debugctlmsr &= ~ds_debugctl_mask();
+		flags |= BTS_USER;
 
 	if (cfg.flags & PTRACE_BTS_O_SCHED)
-		set_tsk_thread_flag(child, TIF_BTS_TRACE_TS);
-	else
-		clear_tsk_thread_flag(child, TIF_BTS_TRACE_TS);
+		flags |= BTS_TIMESTAMPS;
 
-	ret = sizeof(cfg);
+	child->bts = ds_request_bts(child, child->bts_buffer, child->bts_size,
+				    /* ovfl = */ NULL, /* th = */ (size_t)-1,
+				    flags);
+	if (IS_ERR(child->bts)) {
+		int error = PTR_ERR(child->bts);
 
-out:
-	if (child->thread.debugctlmsr)
-		set_tsk_thread_flag(child, TIF_DEBUGCTLMSR);
-	else
-		clear_tsk_thread_flag(child, TIF_DEBUGCTLMSR);
+		ptrace_bts_free_buffer(child);
+		child->bts = NULL;
 
-	return ret;
+		return error;
+	}
 
-errout:
-	child->thread.debugctlmsr &= ~ds_debugctl_mask();
-	clear_tsk_thread_flag(child, TIF_BTS_TRACE_TS);
-	goto out;
+	return sizeof(cfg);
 }
 
 static int ptrace_bts_status(struct task_struct *child,
 			     long cfg_size,
 			     struct ptrace_bts_config __user *ucfg)
 {
-	void *ds = (void *)child->thread.ds_area_msr;
+	const struct bts_trace *trace;
 	struct ptrace_bts_config cfg;
 
 	if (cfg_size < sizeof(cfg))
 		return -EIO;
 
+	trace = ds_read_bts(child->bts);
+	if (!trace)
+		return -EPERM;
+
 	memset(&cfg, 0, sizeof(cfg));
-
-	if (ds) {
-		cfg.size = ds_get_bts_size(ds);
-
-		if (ds_get_overflow(ds) == DS_O_SIGNAL)
-			cfg.flags |= PTRACE_BTS_O_SIGNAL;
-
-		if (test_tsk_thread_flag(child, TIF_DEBUGCTLMSR) &&
-		    child->thread.debugctlmsr & ds_debugctl_mask())
-			cfg.flags |= PTRACE_BTS_O_TRACE;
-
-		if (test_tsk_thread_flag(child, TIF_BTS_TRACE_TS))
-			cfg.flags |= PTRACE_BTS_O_SCHED;
-	}
-
+	cfg.size = trace->ds.end - trace->ds.begin;
+	cfg.signal = child->thread.bts_ovfl_signal;
 	cfg.bts_size = sizeof(struct bts_struct);
+
+	if (cfg.signal)
+		cfg.flags |= PTRACE_BTS_O_SIGNAL;
+
+	if (trace->ds.flags & BTS_USER)
+		cfg.flags |= PTRACE_BTS_O_TRACE;
+
+	if (trace->ds.flags & BTS_TIMESTAMPS)
+		cfg.flags |= PTRACE_BTS_O_SCHED;
 
 	if (copy_to_user(ucfg, &cfg, sizeof(cfg)))
 		return -EFAULT;
@@ -745,102 +761,77 @@ static int ptrace_bts_status(struct task_struct *child,
 	return sizeof(cfg);
 }
 
-
-static int ptrace_bts_write_record(struct task_struct *child,
-				   const struct bts_struct *in)
+static int ptrace_bts_clear(struct task_struct *child)
 {
-	int retval;
+	const struct bts_trace *trace;
 
-	if (!child->thread.ds_area_msr)
-		return -ENXIO;
+	trace = ds_read_bts(child->bts);
+	if (!trace)
+		return -EPERM;
 
-	retval = ds_write_bts((void *)child->thread.ds_area_msr, in);
-	if (retval)
-		return retval;
+	memset(trace->ds.begin, 0, trace->ds.n * trace->ds.size);
 
-	return sizeof(*in);
+	return ds_reset_bts(child->bts);
 }
 
-static int ptrace_bts_realloc(struct task_struct *child,
-			      int size, int reduce_size)
+static int ptrace_bts_size(struct task_struct *child)
 {
-	unsigned long rlim, vm;
-	int ret, old_size;
+	const struct bts_trace *trace;
 
-	if (size < 0)
-		return -EINVAL;
+	trace = ds_read_bts(child->bts);
+	if (!trace)
+		return -EPERM;
 
-	old_size = ds_get_bts_size((void *)child->thread.ds_area_msr);
-	if (old_size < 0)
-		return old_size;
+	return (trace->ds.top - trace->ds.begin) / trace->ds.size;
+}
 
-	ret = ds_free((void **)&child->thread.ds_area_msr);
-	if (ret < 0)
-		goto out;
+static void ptrace_bts_fork(struct task_struct *tsk)
+{
+	tsk->bts = NULL;
+	tsk->bts_buffer = NULL;
+	tsk->bts_size = 0;
+	tsk->thread.bts_ovfl_signal = 0;
+}
 
-	size >>= PAGE_SHIFT;
-	old_size >>= PAGE_SHIFT;
+static void ptrace_bts_untrace(struct task_struct *child)
+{
+	if (unlikely(child->bts)) {
+		ds_release_bts(child->bts);
+		child->bts = NULL;
 
-	current->mm->total_vm  -= old_size;
-	current->mm->locked_vm -= old_size;
-
-	if (size == 0)
-		goto out;
-
-	rlim = current->signal->rlim[RLIMIT_AS].rlim_cur >> PAGE_SHIFT;
-	vm = current->mm->total_vm  + size;
-	if (rlim < vm) {
-		ret = -ENOMEM;
-
-		if (!reduce_size)
-			goto out;
-
-		size = rlim - current->mm->total_vm;
-		if (size <= 0)
-			goto out;
+		/* We cannot update total_vm and locked_vm since
+		   child's mm is already gone. But we can reclaim the
+		   memory. */
+		kfree(child->bts_buffer);
+		child->bts_buffer = NULL;
+		child->bts_size = 0;
 	}
-
-	rlim = current->signal->rlim[RLIMIT_MEMLOCK].rlim_cur >> PAGE_SHIFT;
-	vm = current->mm->locked_vm  + size;
-	if (rlim < vm) {
-		ret = -ENOMEM;
-
-		if (!reduce_size)
-			goto out;
-
-		size = rlim - current->mm->locked_vm;
-		if (size <= 0)
-			goto out;
-	}
-
-	ret = ds_allocate((void **)&child->thread.ds_area_msr,
-			  size << PAGE_SHIFT);
-	if (ret < 0)
-		goto out;
-
-	current->mm->total_vm  += size;
-	current->mm->locked_vm += size;
-
-out:
-	if (child->thread.ds_area_msr)
-		set_tsk_thread_flag(child, TIF_DS_AREA_MSR);
-	else
-		clear_tsk_thread_flag(child, TIF_DS_AREA_MSR);
-
-	return ret;
 }
 
-void ptrace_bts_take_timestamp(struct task_struct *tsk,
-			       enum bts_qualifier qualifier)
+static void ptrace_bts_detach(struct task_struct *child)
 {
-	struct bts_struct rec = {
-		.qualifier = qualifier,
-		.variant.jiffies = jiffies_64
-	};
+	if (unlikely(child->bts)) {
+		ds_release_bts(child->bts);
+		child->bts = NULL;
 
-	ptrace_bts_write_record(tsk, &rec);
+		ptrace_bts_free_buffer(child);
+	}
 }
-#endif /* X86_BTS */
+#else
+static inline void ptrace_bts_fork(struct task_struct *tsk) {}
+static inline void ptrace_bts_detach(struct task_struct *child) {}
+static inline void ptrace_bts_untrace(struct task_struct *child) {}
+#endif /* CONFIG_X86_PTRACE_BTS */
+
+void x86_ptrace_fork(struct task_struct *child, unsigned long clone_flags)
+{
+	ptrace_bts_fork(child);
+}
+
+void x86_ptrace_untrace(struct task_struct *child)
+{
+	ptrace_bts_untrace(child);
+}
 
 /*
  * Called by kernel/ptrace.c when detaching..
@@ -853,15 +844,7 @@ void ptrace_disable(struct task_struct *child)
 #ifdef TIF_SYSCALL_EMU
 	clear_tsk_thread_flag(child, TIF_SYSCALL_EMU);
 #endif
-	if (child->thread.ds_area_msr) {
-#ifdef X86_BTS
-		ptrace_bts_realloc(child, 0, 0);
-#endif
-		child->thread.debugctlmsr &= ~ds_debugctl_mask();
-		if (!child->thread.debugctlmsr)
-			clear_tsk_thread_flag(child, TIF_DEBUGCTLMSR);
-		clear_tsk_thread_flag(child, TIF_BTS_TRACE_TS);
-	}
+	ptrace_bts_detach(child);
 }
 
 #if defined CONFIG_X86_32 || defined CONFIG_IA32_EMULATION
@@ -981,7 +964,7 @@ long arch_ptrace(struct task_struct *child, long request, long addr, long data)
 	/*
 	 * These bits need more cooking - not enabled yet:
 	 */
-#ifdef X86_BTS
+#ifdef CONFIG_X86_PTRACE_BTS
 	case PTRACE_BTS_CONFIG:
 		ret = ptrace_bts_config
 			(child, data, (struct ptrace_bts_config __user *)addr);
@@ -993,7 +976,7 @@ long arch_ptrace(struct task_struct *child, long request, long addr, long data)
 		break;
 
 	case PTRACE_BTS_SIZE:
-		ret = ptrace_bts_get_size(child);
+		ret = ptrace_bts_size(child);
 		break;
 
 	case PTRACE_BTS_GET:
@@ -1009,7 +992,7 @@ long arch_ptrace(struct task_struct *child, long request, long addr, long data)
 		ret = ptrace_bts_drain
 			(child, data, (struct bts_struct __user *) addr);
 		break;
-#endif
+#endif /* CONFIG_X86_PTRACE_BTS */
 
 	default:
 		ret = ptrace_request(child, request, addr, data);
@@ -1265,6 +1248,14 @@ long compat_arch_ptrace(struct task_struct *child, compat_long_t request,
 
 	case PTRACE_GET_THREAD_AREA:
 	case PTRACE_SET_THREAD_AREA:
+#ifdef CONFIG_X86_PTRACE_BTS
+	case PTRACE_BTS_CONFIG:
+	case PTRACE_BTS_STATUS:
+	case PTRACE_BTS_SIZE:
+	case PTRACE_BTS_GET:
+	case PTRACE_BTS_CLEAR:
+	case PTRACE_BTS_DRAIN:
+#endif /* CONFIG_X86_PTRACE_BTS */
 		return arch_ptrace(child, request, addr, data);
 
 	default:
@@ -1290,6 +1281,12 @@ static const struct user_regset x86_64_regsets[] = {
 		.n = sizeof(struct user_i387_struct) / sizeof(long),
 		.size = sizeof(long), .align = sizeof(long),
 		.active = xfpregs_active, .get = xfpregs_get, .set = xfpregs_set
+	},
+	[REGSET_IOPERM64] = {
+		.core_note_type = NT_386_IOPERM,
+		.n = IO_BITMAP_LONGS,
+		.size = sizeof(long), .align = sizeof(long),
+		.active = ioperm_active, .get = ioperm_get
 	},
 };
 
@@ -1337,6 +1334,12 @@ static const struct user_regset x86_32_regsets[] = {
 		.active = regset_tls_active,
 		.get = regset_tls_get, .set = regset_tls_set
 	},
+	[REGSET_IOPERM32] = {
+		.core_note_type = NT_386_IOPERM,
+		.n = IO_BITMAP_BYTES / sizeof(u32),
+		.size = sizeof(u32), .align = sizeof(u32),
+		.active = ioperm_active, .get = ioperm_get
+	},
 };
 
 static const struct user_regset_view user_x86_32_view = {
@@ -1358,7 +1361,8 @@ const struct user_regset_view *task_user_regset_view(struct task_struct *task)
 #endif
 }
 
-void send_sigtrap(struct task_struct *tsk, struct pt_regs *regs, int error_code)
+void send_sigtrap(struct task_struct *tsk, struct pt_regs *regs,
+					 int error_code, int si_code)
 {
 	struct siginfo info;
 
@@ -1367,7 +1371,7 @@ void send_sigtrap(struct task_struct *tsk, struct pt_regs *regs, int error_code)
 
 	memset(&info, 0, sizeof(info));
 	info.si_signo = SIGTRAP;
-	info.si_code = TRAP_BRKPT;
+	info.si_code = si_code;
 
 	/* User-mode ip? */
 	info.si_addr = user_mode_vm(regs) ? (void __user *) regs->ip : NULL;
@@ -1468,5 +1472,5 @@ asmregparm void syscall_trace_leave(struct pt_regs *regs)
 	 */
 	if (test_thread_flag(TIF_SINGLESTEP) &&
 	    tracehook_consider_fatal_signal(current, SIGTRAP, SIG_DFL))
-		send_sigtrap(current, regs, 0);
+		send_sigtrap(current, regs, 0, TRAP_BRKPT);
 }

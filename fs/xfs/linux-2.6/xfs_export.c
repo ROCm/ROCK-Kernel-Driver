@@ -29,7 +29,6 @@
 #include "xfs_vnodeops.h"
 #include "xfs_bmap_btree.h"
 #include "xfs_inode.h"
-#include "xfs_vfsops.h"
 
 /*
  * Note that we only accept fileids which are long enough rather than allow
@@ -127,11 +126,26 @@ xfs_nfs_get_inode(
 	if (ino == 0)
 		return ERR_PTR(-ESTALE);
 
-	error = xfs_iget(mp, NULL, ino, 0, XFS_ILOCK_SHARED, &ip, 0);
-	if (error)
+	/*
+	 * The XFS_IGET_BULKSTAT means that an invalid inode number is just
+	 * fine and not an indication of a corrupted filesystem.  Because
+	 * clients can send any kind of invalid file handle, e.g. after
+	 * a restore on the server we have to deal with this case gracefully.
+	 */
+	error = xfs_iget(mp, NULL, ino, XFS_IGET_BULKSTAT,
+			 XFS_ILOCK_SHARED, &ip, 0);
+	if (error) {
+		/*
+		 * EINVAL means the inode cluster doesn't exist anymore.
+		 * This implies the filehandle is stale, so we should
+		 * translate it here.
+		 * We don't use ESTALE directly down the chain to not
+		 * confuse applications using bulkstat that expect EINVAL.
+		 */
+		if (error == EINVAL)
+			error = ESTALE;
 		return ERR_PTR(-error);
-	if (!ip)
-		return ERR_PTR(-EIO);
+	}
 
 	if (ip->i_d.di_gen != generation) {
 		xfs_iput_new(ip, XFS_ILOCK_SHARED);
@@ -148,7 +162,6 @@ xfs_fs_fh_to_dentry(struct super_block *sb, struct fid *fid,
 {
 	struct xfs_fid64	*fid64 = (struct xfs_fid64 *)fid;
 	struct inode		*inode = NULL;
-	struct dentry		*result;
 
 	if (fh_len < xfs_fileid_length(fileid_type))
 		return NULL;
@@ -164,16 +177,7 @@ xfs_fs_fh_to_dentry(struct super_block *sb, struct fid *fid,
 		break;
 	}
 
-	if (!inode)
-		return NULL;
-	if (IS_ERR(inode))
-		return ERR_CAST(inode);
-	result = d_alloc_anon(inode);
-	if (!result) {
-		iput(inode);
-		return ERR_PTR(-ENOMEM);
-	}
-	return result;
+	return d_obtain_alias(inode);
 }
 
 STATIC struct dentry *
@@ -182,7 +186,6 @@ xfs_fs_fh_to_parent(struct super_block *sb, struct fid *fid,
 {
 	struct xfs_fid64	*fid64 = (struct xfs_fid64 *)fid;
 	struct inode		*inode = NULL;
-	struct dentry		*result;
 
 	switch (fileid_type) {
 	case FILEID_INO32_GEN_PARENT:
@@ -195,16 +198,7 @@ xfs_fs_fh_to_parent(struct super_block *sb, struct fid *fid,
 		break;
 	}
 
-	if (!inode)
-		return NULL;
-	if (IS_ERR(inode))
-		return ERR_CAST(inode);
-	result = d_alloc_anon(inode);
-	if (!result) {
-		iput(inode);
-		return ERR_PTR(-ENOMEM);
-	}
-	return result;
+	return d_obtain_alias(inode);
 }
 
 STATIC struct dentry *
@@ -213,18 +207,12 @@ xfs_fs_get_parent(
 {
 	int			error;
 	struct xfs_inode	*cip;
-	struct dentry		*parent;
 
 	error = xfs_lookup(XFS_I(child->d_inode), &xfs_name_dotdot, &cip, NULL);
 	if (unlikely(error))
 		return ERR_PTR(-error);
 
-	parent = d_alloc_anon(VFS_I(cip));
-	if (unlikely(!parent)) {
-		iput(VFS_I(cip));
-		return ERR_PTR(-ENOMEM);
-	}
-	return parent;
+	return d_obtain_alias(VFS_I(cip));
 }
 
 const struct export_operations xfs_export_operations = {

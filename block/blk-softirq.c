@@ -154,12 +154,14 @@ do_local:
  **/
 void blk_complete_request(struct request *req)
 {
+	if (unlikely(blk_should_fake_timeout(req->q)))
+		return;
 	if (!blk_mark_rq_complete(req))
 		__blk_complete_request(req);
 }
 EXPORT_SYMBOL(blk_complete_request);
 
-__init int blk_softirq_init(void)
+static __init int blk_softirq_init(void)
 {
 	int i;
 

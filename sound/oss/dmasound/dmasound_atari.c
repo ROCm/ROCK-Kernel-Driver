@@ -143,7 +143,7 @@ static int AtaMixerIoctl(u_int cmd, u_long arg);
 static int TTMixerIoctl(u_int cmd, u_long arg);
 static int FalconMixerIoctl(u_int cmd, u_long arg);
 static int AtaWriteSqSetup(void);
-static int AtaSqOpen(mode_t mode);
+static int AtaSqOpen(fmode_t mode);
 static int TTStateInfo(char *buffer, size_t space);
 static int FalconStateInfo(char *buffer, size_t space);
 
@@ -851,8 +851,9 @@ static int __init AtaIrqInit(void)
 	mfp.tim_dt_a = 1;	/* Cause interrupt after first event. */
 	mfp.tim_ct_a = 8;	/* Turn on event counting. */
 	/* Register interrupt handler. */
-	request_irq(IRQ_MFP_TIMA, AtaInterrupt, IRQ_TYPE_SLOW, "DMA sound",
-		    AtaInterrupt);
+	if (request_irq(IRQ_MFP_TIMA, AtaInterrupt, IRQ_TYPE_SLOW, "DMA sound",
+			AtaInterrupt))
+		return 0;
 	mfp.int_en_a |= 0x20;	/* Turn interrupt on. */
 	mfp.int_mk_a |= 0x20;
 	return 1;
@@ -1461,7 +1462,7 @@ static int AtaWriteSqSetup(void)
 	return 0 ;
 }
 
-static int AtaSqOpen(mode_t mode)
+static int AtaSqOpen(fmode_t mode)
 {
 	write_sq_ignore_int = 1;
 	return 0 ;

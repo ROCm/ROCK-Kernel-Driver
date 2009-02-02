@@ -40,8 +40,8 @@
  * This function returns the status data for each of the Traffic Classes in use.
  */
 s32 ixgbe_dcb_get_tc_stats_82598(struct ixgbe_hw *hw,
-				 struct ixgbe_hw_stats *stats,
-				 u8 tc_count)
+                                 struct ixgbe_hw_stats *stats,
+                                 u8 tc_count)
 {
 	int tc;
 
@@ -72,8 +72,8 @@ s32 ixgbe_dcb_get_tc_stats_82598(struct ixgbe_hw *hw,
  * This function returns the CBFC status data for each of the Traffic Classes.
  */
 s32 ixgbe_dcb_get_pfc_stats_82598(struct ixgbe_hw *hw,
-				  struct ixgbe_hw_stats *stats,
-				  u8 tc_count)
+                                  struct ixgbe_hw_stats *stats,
+                                  u8 tc_count)
 {
 	int tc;
 
@@ -97,8 +97,8 @@ s32 ixgbe_dcb_get_pfc_stats_82598(struct ixgbe_hw *hw,
  *
  * Configure packet buffers for DCB mode.
  */
-s32 ixgbe_dcb_config_packet_buffers_82598(struct ixgbe_hw *hw,
-					  struct ixgbe_dcb_config *dcb_config)
+static s32 ixgbe_dcb_config_packet_buffers_82598(struct ixgbe_hw *hw,
+						 struct ixgbe_dcb_config *dcb_config)
 {
 	s32 ret_val = 0;
 	u32 value = IXGBE_RXPBSIZE_64KB;
@@ -138,7 +138,7 @@ s32 ixgbe_dcb_config_packet_buffers_82598(struct ixgbe_hw *hw,
  * Configure Rx Data Arbiter and credits for each traffic class.
  */
 s32 ixgbe_dcb_config_rx_arbiter_82598(struct ixgbe_hw *hw,
-				      struct ixgbe_dcb_config *dcb_config)
+                                      struct ixgbe_dcb_config *dcb_config)
 {
 	struct tc_bw_alloc    *p;
 	u32    reg           = 0;
@@ -195,7 +195,7 @@ s32 ixgbe_dcb_config_rx_arbiter_82598(struct ixgbe_hw *hw,
  * Configure Tx Descriptor Arbiter and credits for each traffic class.
  */
 s32 ixgbe_dcb_config_tx_desc_arbiter_82598(struct ixgbe_hw *hw,
-					   struct ixgbe_dcb_config *dcb_config)
+                                           struct ixgbe_dcb_config *dcb_config)
 {
 	struct tc_bw_alloc *p;
 	u32    reg, max_credits;
@@ -243,7 +243,7 @@ s32 ixgbe_dcb_config_tx_desc_arbiter_82598(struct ixgbe_hw *hw,
  * Configure Tx Data Arbiter and credits for each traffic class.
  */
 s32 ixgbe_dcb_config_tx_data_arbiter_82598(struct ixgbe_hw *hw,
-					   struct ixgbe_dcb_config *dcb_config)
+                                           struct ixgbe_dcb_config *dcb_config)
 {
 	struct tc_bw_alloc *p;
 	u32 reg;
@@ -289,7 +289,7 @@ s32 ixgbe_dcb_config_tx_data_arbiter_82598(struct ixgbe_hw *hw,
  * Configure Priority Flow Control for each traffic class.
  */
 s32 ixgbe_dcb_config_pfc_82598(struct ixgbe_hw *hw,
-			       struct ixgbe_dcb_config *dcb_config)
+                               struct ixgbe_dcb_config *dcb_config)
 {
 	u32 reg, rx_pba_size;
 	u8  i;
@@ -385,7 +385,7 @@ s32 ixgbe_dcb_config_tc_stats_82598(struct ixgbe_hw *hw)
  * Configure dcb settings and enable dcb mode.
  */
 s32 ixgbe_dcb_hw_config_82598(struct ixgbe_hw *hw,
-			      struct ixgbe_dcb_config *dcb_config)
+                              struct ixgbe_dcb_config *dcb_config)
 {
 	ixgbe_dcb_config_packet_buffers_82598(hw, dcb_config);
 	ixgbe_dcb_config_rx_arbiter_82598(hw, dcb_config);

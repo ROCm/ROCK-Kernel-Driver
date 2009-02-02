@@ -4,7 +4,7 @@
  *      - Jay Schulist <jschlst@samba.org>
  *
  *	With more than a little help from;
- *	- Alan Cox <Alan.Cox@linux.org> 
+ *	- Alan Cox <alan@lxorguk.ukuu.org.uk>
  *
  *      Derived from:
  *      - skeleton.c: A network driver outline for linux.
@@ -851,7 +851,6 @@ static void cops_rx(struct net_device *dev)
 
         /* Send packet to a higher place. */
         netif_rx(skb);
-	dev->last_rx = jiffies;
 }
 
 static void cops_timeout(struct net_device *dev)
@@ -1025,11 +1024,3 @@ static void __exit cops_module_exit(void)
 module_init(cops_module_init);
 module_exit(cops_module_exit);
 #endif /* MODULE */
-
-/*
- * Local variables:
- *  compile-command: "gcc -DMODVERSIONS -DMODULE -D__KERNEL__ -Wall -Wstrict-prototypes -O2 -c cops.c"
- *  c-basic-offset: 4
- *  c-file-offsets: ((substatement-open . 0))
- * End:
- */

@@ -125,24 +125,28 @@
 			dma-channel@0 {
 				compatible = "fsl,mpc8360-dma-channel", "fsl,elo-dma-channel";
 				reg = <0 0x80>;
+				cell-index = <0>;
 				interrupt-parent = <&ipic>;
 				interrupts = <71 8>;
 			};
 			dma-channel@80 {
 				compatible = "fsl,mpc8360-dma-channel", "fsl,elo-dma-channel";
 				reg = <0x80 0x80>;
+				cell-index = <1>;
 				interrupt-parent = <&ipic>;
 				interrupts = <71 8>;
 			};
 			dma-channel@100 {
 				compatible = "fsl,mpc8360-dma-channel", "fsl,elo-dma-channel";
 				reg = <0x100 0x80>;
+				cell-index = <2>;
 				interrupt-parent = <&ipic>;
 				interrupts = <71 8>;
 			};
 			dma-channel@180 {
 				compatible = "fsl,mpc8360-dma-channel", "fsl,elo-dma-channel";
 				reg = <0x180 0x28>;
+				cell-index = <3>;
 				interrupt-parent = <&ipic>;
 				interrupts = <71 8>;
 			};
@@ -214,8 +218,23 @@
 				reg = <0x440 0x40>;
 				interrupts = <12 13 14 15>;
 				interrupt-parent = <&qeic>;
-				/* filled by u-boot */
-				clock-frequency = <0>;
+				clock-frequency = <166666666>;
+			};
+
+			usb@6c0 {
+				compatible = "fsl,mpc8360-qe-usb",
+					     "fsl,mpc8323-qe-usb";
+				reg = <0x6c0 0x40 0x8b00 0x100>;
+				interrupts = <11>;
+				interrupt-parent = <&qeic>;
+				fsl,fullspeed-clock = "clk21";
+				gpios = <&qe_pio_b  2 0 /* USBOE */
+					 &qe_pio_b  3 0 /* USBTP */
+					 &qe_pio_b  8 0 /* USBTN */
+					 &qe_pio_b  9 0 /* USBRP */
+					 &qe_pio_b 11 0 /* USBRN */
+					 &qe_pio_e 20 0 /* SPEED */
+					 &qe_pio_e 21 1 /* POWER */>;
 			};
 
 			spi@4c0 {
@@ -383,6 +402,18 @@
 			device-width = <1>;
 		};
 
+		upm@1,0 {
+			compatible = "fsl,upm-nand";
+			reg = <1 0 1>;
+			fsl,upm-addr-offset = <16>;
+			fsl,upm-cmd-offset = <8>;
+			gpios = <&qe_pio_e 18 0>;
+
+			flash {
+				compatible = "stm,nand512-a";
+			};
+		};
+
 		display@2,0 {
 			device_type = "display";
 			compatible = "fujitsu,MB86277", "fujitsu,mint";
@@ -405,7 +436,8 @@
 		#interrupt-cells = <1>;
 		device_type = "pci";
 		compatible = "fsl,mpc8360-pci", "fsl,mpc8349-pci";
-		reg = <0xe0008500 0x100>;
+		reg = <0xe0008500 0x100		/* internal registers */
+		       0xe0008300 0x8>;		/* config space access registers */
 		ranges = <0x02000000 0 0x90000000 0x90000000 0 0x10000000
 			  0x42000000 0 0x80000000 0x80000000 0 0x10000000
 			  0x01000000 0 0xe0300000 0xe0300000 0 0x00100000>;

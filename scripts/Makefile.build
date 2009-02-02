@@ -73,20 +73,6 @@ ifndef obj
 $(warning kbuild: Makefile.build is included improperly)
 endif
 
-ifeq ($(CONFIG_XEN),y)
-$(objtree)/scripts/Makefile.xen: $(srctree)/scripts/Makefile.xen.awk $(srctree)/scripts/Makefile.build
-	@echo '  Updating $@'
-	$(if $(shell echo a | $(AWK) '{ print gensub(/a/, "AA", "g"); }'),\
-        ,$(error 'Your awk program does not define gensub.  Use gawk or another awk with gensub'))
-	@$(AWK) -f $< $(filter-out $<,$^) >$@
-
-xen-src-single-used-m	:= $(patsubst $(srctree)/%,%,$(wildcard $(addprefix $(srctree)/,$(single-used-m:.o=-xen.c))))
-xen-single-used-m	:= $(xen-src-single-used-m:-xen.c=.o)
-single-used-m		:= $(filter-out $(xen-single-used-m),$(single-used-m))
-
--include $(objtree)/scripts/Makefile.xen
-endif
-
 # ===========================================================================
 
 ifneq ($(strip $(lib-y) $(lib-m) $(lib-n) $(lib-)),)
@@ -165,18 +151,18 @@ cmd_cc_i_c       = $(CPP) $(c_flags)   -o $@ $<
 $(obj)/%.i: $(src)/%.c FORCE
 	$(call if_changed_dep,cc_i_c)
 
+cmd_gensymtypes =                                                           \
+    $(CPP) -D__GENKSYMS__ $(c_flags) $< |                                   \
+    $(GENKSYMS) -T $@ -a $(ARCH)                                            \
+     $(if $(KBUILD_PRESERVE),-p)                                            \
+     $(if $(KBUILD_OVERRIDE),-o)                                            \
+     $(if $(1),-r $(firstword $(wildcard $(@:.symtypes=.symref) /dev/null)))
+
 quiet_cmd_cc_symtypes_c = SYM $(quiet_modtag) $@
-cmd_cc_symtypes_c	   = \
-		set -e;							\
-		$(CPP) -D__GENKSYMS__ $(c_flags) $<			\
-		| $(GENKSYMS) -T $@					\
-			      -r $(firstword $(wildcard			\
-			      	     $(@:.symtypes=.symref) /dev/null))	\
-			      $(if $(KBUILD_PRESERVE),-p)		\
-			      $(if $(KBUILD_OVERRIDE),-o)		\
-			      -a $(ARCH)				\
-		  >/dev/null;						\
-		test -s $@ || rm -f $@
+cmd_cc_symtypes_c =                                                         \
+    set -e;                                                                 \
+    $(call cmd_gensymtypes, true) >/dev/null;                               \
+    test -s $@ || rm -f $@
 
 $(obj)/%.symtypes : $(src)/%.c FORCE
 	$(call cmd,cc_symtypes_c)
@@ -206,15 +192,8 @@ else
 cmd_cc_o_c = $(CC) $(c_flags) -c -o $(@D)/.tmp_$(@F) $<
 cmd_modversions =							\
 	if $(OBJDUMP) -h $(@D)/.tmp_$(@F) | grep -q __ksymtab; then	\
-		$(CPP) -D__GENKSYMS__ $(c_flags) $<			\
-		| $(GENKSYMS) $(if $(KBUILD_SYMTYPES),			\
-			           -T $(@:.o=.symtypes))		\
-			      -r $(firstword $(wildcard			\
-			      	     $(@:.o=.symref) /dev/null))	\
-			      $(if $(KBUILD_PRESERVE),-p)		\
-			      $(if $(KBUILD_OVERRIDE),-o)		\
-			      -a $(ARCH)				\
-		> $(@D)/.tmp_$(@F:.o=.ver);				\
+		$(call cmd_gensymtypes, $(KBUILD_SYMTYPES))		\
+		    > $(@D)/.tmp_$(@F:.o=.ver);				\
 									\
 		$(LD) $(LDFLAGS) -r -o $@ $(@D)/.tmp_$(@F) 		\
 			-T $(@D)/.tmp_$(@F:.o=.ver);			\
@@ -224,10 +203,17 @@ cmd_modversions =							\
 	fi;
 endif
 
+ifdef CONFIG_FTRACE_MCOUNT_RECORD
+cmd_record_mcount = perl $(srctree)/scripts/recordmcount.pl "$(ARCH)" \
+	"$(if $(CONFIG_64BIT),64,32)" \
+	"$(OBJDUMP)" "$(OBJCOPY)" "$(CC)" "$(LD)" "$(NM)" "$(RM)" "$(MV)" "$(@)";
+endif
+
 define rule_cc_o_c
 	$(call echo-cmd,checksrc) $(cmd_checksrc)			  \
 	$(call echo-cmd,cc_o_c) $(cmd_cc_o_c);				  \
 	$(cmd_modversions)						  \
+	$(cmd_record_mcount)						  \
 	scripts/basic/fixdep $(depfile) $@ '$(call make-cmd,cc_o_c)' >    \
 	                                              $(dot-target).tmp;  \
 	rm -f $(depfile);						  \
@@ -237,14 +223,12 @@ endef
 # Built-in and composite module parts
 $(obj)/%.o: $(src)/%.c FORCE
 	$(call cmd,force_checksrc)
-	$(call cmd,force_check_kmsg)
 	$(call if_changed_rule,cc_o_c)
 
 # Single-part modules are special since we need to mark them in $(MODVERDIR)
 
 $(single-used-m): $(obj)/%.o: $(src)/%.c FORCE
 	$(call cmd,force_checksrc)
-	$(call cmd,force_check_kmsg)
 	$(call if_changed_rule,cc_o_c)
 	@{ echo $(@:.o=.ko); echo $@; } > $(MODVERDIR)/$(@F:.o=.mod)
 
@@ -367,18 +351,6 @@ $(multi-used-m) : %.o: $(multi-objs-m) FORCE
 
 targets += $(multi-used-y) $(multi-used-m)
 
-# kmsg check tool
-ifneq ($(KBUILD_KMSG_CHECK),0)
-  ifeq ($(KBUILD_KMSG_CHECK),2)
-    kmsg_cmd := print
-    quiet_cmd_force_check_kmsg = KMSG_PRINT $<
-    $(shell [ -d $(objtree)/man ] || mkdir -p $(objtree)/man)
-  else
-    kmsg_cmd := check
-    quiet_cmd_force_check_kmsg = KMSG_CHECK $<
-  endif
-  cmd_force_check_kmsg = $(KMSG_CHECK) $(kmsg_cmd) $(CC) $(c_flags) $< ;
-endif
 
 # Descending
 # ---------------------------------------------------------------------------

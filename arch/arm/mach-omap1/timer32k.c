@@ -44,10 +44,10 @@
 #include <linux/clk.h>
 #include <linux/clocksource.h>
 #include <linux/clockchips.h>
+#include <linux/io.h>
 
 #include <asm/system.h>
 #include <mach/hardware.h>
-#include <asm/io.h>
 #include <asm/leds.h>
 #include <asm/irq.h>
 #include <asm/mach/irq.h>
@@ -187,7 +187,7 @@ static __init void omap_init_32k_timer(void)
 	clockevent_32k_timer.min_delta_ns =
 		clockevent_delta2ns(1, &clockevent_32k_timer);
 
-	clockevent_32k_timer.cpumask = cpumask_of_cpu(0);
+	clockevent_32k_timer.cpumask = cpumask_of(0);
 	clockevents_register_device(&clockevent_32k_timer);
 }
 

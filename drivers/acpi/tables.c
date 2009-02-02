@@ -32,7 +32,6 @@
 #include <linux/errno.h>
 #include <linux/acpi.h>
 #include <linux/bootmem.h>
-#include <linux/dmi.h>
 
 #define PREFIX			"ACPI: "
 
@@ -283,37 +282,6 @@ static void __init check_multiple_madt(void)
 	return;
 }
 
-static struct dmi_system_id __initdata acpi_rsdt_dmi_table[] = {
-	{
-	    .ident = "ThinkPad ", /* R40e, broken C-states */
-	    .matches = {
-		DMI_MATCH(DMI_BIOS_VENDOR, "IBM"),
-		DMI_MATCH(DMI_BIOS_VERSION, "1SET")},
-	},
-	{
-	    .ident = "ThinkPad ", /* R50e, slow booting */
-	    .matches = {
-		DMI_MATCH(DMI_BIOS_VENDOR, "IBM"),
-		DMI_MATCH(DMI_BIOS_VERSION, "1WET")},
-	},
-	{
-	    .ident = "ThinkPad ", /* T40, T40p, T41, T41p, T42, T42p
-				     R50, R50p */
-	    .matches = {
-		DMI_MATCH(DMI_BIOS_VENDOR, "IBM"),
-		DMI_MATCH(DMI_BIOS_VERSION, "1RET")},
-	},
-	{}
-};
-
-static int __init acpi_force_rsdt(char *opt)
-{
-	if (!strcmp(opt, "rsdt"))
-		acpi_gbl_force_rsdt = 1;
-	return 0;
-}
-early_param("acpi_root_table", acpi_force_rsdt);
-
 /*
  * acpi_table_init()
  *
@@ -325,9 +293,7 @@ early_param("acpi_root_table", acpi_force_rsdt);
 
 int __init acpi_table_init(void)
 {
-	if (dmi_check_system(acpi_rsdt_dmi_table))
-		acpi_gbl_force_rsdt = 1;
-	if (acpi_gbl_force_rsdt)
+	if (acpi_rsdt_forced)
 		printk(KERN_INFO "Using RSDT as ACPI root table\n");
 
 	acpi_initialize_tables(initial_tables, ACPI_MAX_TABLES, 0);

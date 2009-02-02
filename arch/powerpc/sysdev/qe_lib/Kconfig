@@ -22,14 +22,6 @@ config UCC
 
 config QE_USB
 	bool
+	default y if USB_GADGET_FSL_QE
 	help
-	  QE USB Host Controller support
-
-config QE_GPIO
-	bool "QE GPIO support"
-	depends on QUICC_ENGINE
-	select GENERIC_GPIO
-	select ARCH_REQUIRE_GPIOLIB
-	help
-	  Say Y here if you're going to use hardware that connects to the
-	  QE GPIOs.
+	  QE USB Controller support

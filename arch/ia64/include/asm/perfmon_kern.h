@@ -289,25 +289,16 @@ static inline int pfm_smpl_buf_alloc_compat(struct pfm_context *ctx,
 
 static inline void pfm_arch_arm_handle_work(struct task_struct *task)
 {
-	/*
-	 * On IA-64, we ran out of bits in the bottom 7 bits of the
-	 * threadinfo bitmask.Thus we used a 2-stage approach by piggybacking
-	 * on NOTIFY_RESUME and then in do_notify_resume() we demultiplex and
-	 * call pfm_handle_work() if needed
-	 */
 	set_tsk_thread_flag(task, TIF_NOTIFY_RESUME);
 }
 
 static inline void pfm_arch_disarm_handle_work(struct task_struct *task)
 {
 	/*
-	 * we cannot just clear TIF_NOTIFY_RESUME because other TIF flags are
-	 * piggybackedonto it: TIF_PERFMON_WORK, TIF_RESTORE_RSE
-	 *
-	 * The tsk_clear_notify_resume() checks if any of those are set before
-	 * clearing the * bit
+	 * since 2.6.28, we do not need this function anymore because
+	 * TIF_NOTIFY_RESUME, it automatically cleared by do_notify_resume_user()
+	 * so worst case we have a spurious call to this function
 	 */
-	tsk_clear_notify_resume(task);
 }
 
 static inline int pfm_arch_pmu_config_init(struct pfm_pmu_config *cfg)

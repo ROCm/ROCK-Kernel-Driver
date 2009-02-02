@@ -6,6 +6,7 @@
  */
 
 #define KMSG_COMPONENT "sclp_sdias"
+#define pr_fmt(fmt) KMSG_COMPONENT ": " fmt
 
 #include <linux/sched.h>
 #include <asm/sclp.h>

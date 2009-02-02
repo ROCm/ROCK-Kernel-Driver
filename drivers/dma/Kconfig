@@ -33,7 +33,6 @@ config INTEL_IOATDMA
 config INTEL_IOP_ADMA
 	tristate "Intel IOP ADMA support"
 	depends on ARCH_IOP32X || ARCH_IOP33X || ARCH_IOP13XX
-	select ASYNC_CORE
 	select DMA_ENGINE
 	help
 	  Enable support for the Intel(R) IOP Series RAID engines.
@@ -48,21 +47,39 @@ config DW_DMAC
 	  can be integrated in chips such as the Atmel AT32ap7000.
 
 config FSL_DMA
-	bool "Freescale MPC85xx/MPC83xx DMA support"
-	depends on PPC
+	tristate "Freescale Elo and Elo Plus DMA support"
+	depends on FSL_SOC
 	select DMA_ENGINE
 	---help---
-	  Enable support for the Freescale DMA engine. Now, it support
-	  MPC8560/40, MPC8555, MPC8548 and MPC8641 processors.
-	  The MPC8349, MPC8360 is also supported.
+	  Enable support for the Freescale Elo and Elo Plus DMA controllers.
+	  The Elo is the DMA controller on some 82xx and 83xx parts, and the
+	  Elo Plus is the DMA controller on 85xx and 86xx parts.
 
 config MV_XOR
 	bool "Marvell XOR engine support"
 	depends on PLAT_ORION
-	select ASYNC_CORE
 	select DMA_ENGINE
 	---help---
 	  Enable support for the Marvell XOR engine.
+
+config MX3_IPU
+	bool "MX3x Image Processing Unit support"
+	depends on ARCH_MX3
+	select DMA_ENGINE
+	default y
+	help
+	  If you plan to use the Image Processing unit in the i.MX3x, say
+	  Y here. If unsure, select Y.
+
+config MX3_IPU_IRQS
+	int "Number of dynamically mapped interrupts for IPU"
+	depends on MX3_IPU
+	range 2 137
+	default 4
+	help
+	  Out of 137 interrupt sources on i.MX31 IPU only very few are used.
+	  To avoid bloating the irq_desc[] array we allocate a sufficient
+	  number of IRQ slots and map them dynamically to specific sources.
 
 config DMA_ENGINE
 	bool

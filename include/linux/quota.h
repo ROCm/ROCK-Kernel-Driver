@@ -28,8 +28,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * Version: $Id: quota.h,v 2.0 1996/11/17 16:48:14 mvw Exp mvw $
  */
 
 #ifndef _LINUX_QUOTA_
@@ -38,8 +36,7 @@
 #include <linux/errno.h>
 #include <linux/types.h>
 
-#define __DQUOT_VERSION__	"dquot_6.5.1"
-#define __DQUOT_NUM_VERSION__	6*10000+5*100+1
+#define __DQUOT_VERSION__	"dquot_6.5.2"
 
 #define MAXQUOTAS 2
 #define USRQUOTA  0		/* element used for user quotas */
@@ -72,6 +69,10 @@
 #define Q_SETINFO  0x800006	/* set information about quota files */
 #define Q_GETQUOTA 0x800007	/* get user quota structure */
 #define Q_SETQUOTA 0x800008	/* set user quota structure */
+
+/* Quota format type IDs */
+#define	QFMT_VFS_OLD 1
+#define	QFMT_VFS_V0 2
 
 /* Size of block in which space limits are passed through the quota
  * interface */
@@ -179,7 +180,7 @@ enum {
 #include <asm/atomic.h>
 
 typedef __kernel_uid32_t qid_t; /* Type in which we store ids in memory */
-typedef __s64 qsize_t;          /* Type in which we store sizes */
+typedef long long qsize_t;	/* Type in which we store sizes */
 
 extern spinlock_t dq_data_lock;
 
@@ -301,8 +302,8 @@ struct dquot_operations {
 	int (*free_inode) (const struct inode *, qsize_t);
 	int (*transfer) (struct inode *, struct iattr *);
 	int (*write_dquot) (struct dquot *);		/* Ordinary dquot write */
-	struct dquot *(*alloc_dquot)(struct super_block *, int);	/* Allocate memory for new dquot (can be NULL if no special entries dquot are needed) */
-	void (*destroy_dquot)(struct dquot *);		/* Free memory for dquot (can be NULL if alloc_dquot is NULL) */
+	struct dquot *(*alloc_dquot)(struct super_block *, int);	/* Allocate memory for new dquot */
+	void (*destroy_dquot)(struct dquot *);		/* Free memory for dquot */
 	int (*acquire_dquot) (struct dquot *);		/* Quota is going to be created on disk */
 	int (*release_dquot) (struct dquot *);		/* Quota is going to be deleted from disk */
 	int (*mark_dirty) (struct dquot *);		/* Dquot is marked dirty */

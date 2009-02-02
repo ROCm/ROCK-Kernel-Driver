@@ -23,11 +23,11 @@
 #include <linux/reboot.h>
 #include <linux/i2c.h>
 #include <linux/i2c-gpio.h>
+#include <linux/io.h>
 
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/flash.h>
-#include <asm/io.h>
 #include <asm/gpio.h>
 
 static struct flash_platform_data fsg_flash_data = {
@@ -177,7 +177,6 @@ static irqreturn_t fsg_reset_handler(int irq, void *dev_id)
 
 static void __init fsg_init(void)
 {
-	DECLARE_MAC_BUF(mac_buf);
 	uint8_t __iomem *f;
 
 	ixp4xx_sys_init();
@@ -256,10 +255,10 @@ static void __init fsg_init(void)
 #endif
 		iounmap(f);
 	}
-	printk(KERN_INFO "FSG: Using MAC address %s for port 0\n",
-	       print_mac(mac_buf, fsg_plat_eth[0].hwaddr));
-	printk(KERN_INFO "FSG: Using MAC address %s for port 1\n",
-	       print_mac(mac_buf, fsg_plat_eth[1].hwaddr));
+	printk(KERN_INFO "FSG: Using MAC address %pM for port 0\n",
+	       fsg_plat_eth[0].hwaddr);
+	printk(KERN_INFO "FSG: Using MAC address %pM for port 1\n",
+	       fsg_plat_eth[1].hwaddr);
 
 }
 

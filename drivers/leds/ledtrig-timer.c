@@ -70,9 +70,7 @@ static ssize_t led_delay_on_show(struct device *dev,
 	struct led_classdev *led_cdev = dev_get_drvdata(dev);
 	struct timer_trig_data *timer_data = led_cdev->trigger_data;
 
-	sprintf(buf, "%lu\n", timer_data->delay_on);
-
-	return strlen(buf) + 1;
+	return sprintf(buf, "%lu\n", timer_data->delay_on);
 }
 
 static ssize_t led_delay_on_store(struct device *dev,
@@ -116,9 +114,7 @@ static ssize_t led_delay_off_show(struct device *dev,
 	struct led_classdev *led_cdev = dev_get_drvdata(dev);
 	struct timer_trig_data *timer_data = led_cdev->trigger_data;
 
-	sprintf(buf, "%lu\n", timer_data->delay_off);
-
-	return strlen(buf) + 1;
+	return sprintf(buf, "%lu\n", timer_data->delay_off);
 }
 
 static ssize_t led_delay_off_store(struct device *dev,
@@ -203,6 +199,7 @@ err_out:
 static void timer_trig_deactivate(struct led_classdev *led_cdev)
 {
 	struct timer_trig_data *timer_data = led_cdev->trigger_data;
+	unsigned long on = 0, off = 0;
 
 	if (timer_data) {
 		device_remove_file(led_cdev->dev, &dev_attr_delay_on);
@@ -210,6 +207,10 @@ static void timer_trig_deactivate(struct led_classdev *led_cdev)
 		del_timer_sync(&timer_data->timer);
 		kfree(timer_data);
 	}
+
+	/* If there is hardware support for blinking, stop it */
+	if (led_cdev->blink_set)
+		led_cdev->blink_set(led_cdev, &on, &off);
 }
 
 static struct led_trigger timer_led_trigger = {

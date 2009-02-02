@@ -3,13 +3,13 @@
 
 #include <linux/tracepoint.h>
 
-DEFINE_TRACE(ipc_msg_create,
+DECLARE_TRACE(ipc_msg_create,
 	TPPROTO(long id, int flags),
 	TPARGS(id, flags));
-DEFINE_TRACE(ipc_sem_create,
+DECLARE_TRACE(ipc_sem_create,
 	TPPROTO(long id, int flags),
 	TPARGS(id, flags));
-DEFINE_TRACE(ipc_shm_create,
+DECLARE_TRACE(ipc_shm_create,
 	TPPROTO(long id, int flags),
 	TPARGS(id, flags));
 #endif

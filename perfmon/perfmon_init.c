@@ -67,20 +67,6 @@ void __pfm_init_percpu(void *dummy)
 	 * initialize per-cpu high res timer
 	 */
 	hrtimer_init(h, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-#ifdef CONFIG_HIGH_RES_TIMERS
-	/*
-	 * avoid potential deadlock on the runqueue lock
-	 * during context switch when multiplexing. Situation
-	 * arises on architectures which run switch_to() with
-	 * the runqueue lock held, e.g., x86. On others, e.g.,
-	 * IA-64, the problem does not exist.
-	 * Setting the callback mode to HRTIMER_CB_IRQSAFE_UNOCKED
-	 * such that the callback routine is only called on hardirq
-	 * context not on softirq, thus the context switch will not
-	 * end up trying to wakeup the softirqd
-	 */
-	h->cb_mode = HRTIMER_CB_IRQSAFE_UNLOCKED;
-#endif
 	h->function = pfm_handle_switch_timeout;
 }
 

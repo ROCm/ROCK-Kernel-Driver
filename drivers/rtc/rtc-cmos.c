@@ -35,6 +35,7 @@
 #include <linux/spinlock.h>
 #include <linux/platform_device.h>
 #include <linux/mod_devicetable.h>
+#include <linux/log2.h>
 
 /* this is for "generic access to PC-style RTC" using CMOS_READ/CMOS_WRITE */
 #include <asm-generic/rtc.h>
@@ -58,7 +59,7 @@ struct cmos_rtc {
 };
 
 /* both platform and pnp busses use negative numbers for invalid irqs */
-#define is_valid_irq(n)		((n) >= 0)
+#define is_valid_irq(n)		((n) > 0)
 
 static const char driver_name[] = "rtc_cmos";
 
@@ -143,6 +144,43 @@ static inline int hpet_unregister_irq_handler(irq_handler_t handler)
 
 /*----------------------------------------------------------------*/
 
+#ifdef RTC_PORT
+
+/* Most newer x86 systems have two register banks, the first used
+ * for RTC and NVRAM and the second only for NVRAM.  Caller must
+ * own rtc_lock ... and we won't worry about access during NMI.
+ */
+#define can_bank2	true
+
+static inline unsigned char cmos_read_bank2(unsigned char addr)
+{
+	outb(addr, RTC_PORT(2));
+	return inb(RTC_PORT(3));
+}
+
+static inline void cmos_write_bank2(unsigned char val, unsigned char addr)
+{
+	outb(addr, RTC_PORT(2));
+	outb(val, RTC_PORT(2));
+}
+
+#else
+
+#define can_bank2	false
+
+static inline unsigned char cmos_read_bank2(unsigned char addr)
+{
+	return 0;
+}
+
+static inline void cmos_write_bank2(unsigned char val, unsigned char addr)
+{
+}
+
+#endif
+
+/*----------------------------------------------------------------*/
+
 static int cmos_read_time(struct device *dev, struct rtc_time *t)
 {
 	/* REVISIT:  if the clock has a "century" register, use
@@ -203,26 +241,26 @@ static int cmos_read_alarm(struct device *dev, struct rtc_wkalrm *t)
 	/* REVISIT this assumes PC style usage:  always BCD */
 
 	if (((unsigned)t->time.tm_sec) < 0x60)
-		t->time.tm_sec = BCD2BIN(t->time.tm_sec);
+		t->time.tm_sec = bcd2bin(t->time.tm_sec);
 	else
 		t->time.tm_sec = -1;
 	if (((unsigned)t->time.tm_min) < 0x60)
-		t->time.tm_min = BCD2BIN(t->time.tm_min);
+		t->time.tm_min = bcd2bin(t->time.tm_min);
 	else
 		t->time.tm_min = -1;
 	if (((unsigned)t->time.tm_hour) < 0x24)
-		t->time.tm_hour = BCD2BIN(t->time.tm_hour);
+		t->time.tm_hour = bcd2bin(t->time.tm_hour);
 	else
 		t->time.tm_hour = -1;
 
 	if (cmos->day_alrm) {
 		if (((unsigned)t->time.tm_mday) <= 0x31)
-			t->time.tm_mday = BCD2BIN(t->time.tm_mday);
+			t->time.tm_mday = bcd2bin(t->time.tm_mday);
 		else
 			t->time.tm_mday = -1;
 		if (cmos->mon_alrm) {
 			if (((unsigned)t->time.tm_mon) <= 0x12)
-				t->time.tm_mon = BCD2BIN(t->time.tm_mon) - 1;
+				t->time.tm_mon = bcd2bin(t->time.tm_mon) - 1;
 			else
 				t->time.tm_mon = -1;
 		}
@@ -294,19 +332,19 @@ static int cmos_set_alarm(struct device *dev, struct rtc_wkalrm *t)
 	/* Writing 0xff means "don't care" or "match all".  */
 
 	mon = t->time.tm_mon + 1;
-	mon = (mon <= 12) ? BIN2BCD(mon) : 0xff;
+	mon = (mon <= 12) ? bin2bcd(mon) : 0xff;
 
 	mday = t->time.tm_mday;
-	mday = (mday >= 1 && mday <= 31) ? BIN2BCD(mday) : 0xff;
+	mday = (mday >= 1 && mday <= 31) ? bin2bcd(mday) : 0xff;
 
 	hrs = t->time.tm_hour;
-	hrs = (hrs < 24) ? BIN2BCD(hrs) : 0xff;
+	hrs = (hrs < 24) ? bin2bcd(hrs) : 0xff;
 
 	min = t->time.tm_min;
-	min = (min < 60) ? BIN2BCD(min) : 0xff;
+	min = (min < 60) ? bin2bcd(min) : 0xff;
 
 	sec = t->time.tm_sec;
-	sec = (sec < 60) ? BIN2BCD(sec) : 0xff;
+	sec = (sec < 60) ? bin2bcd(sec) : 0xff;
 
 	spin_lock_irq(&rtc_lock);
 
@@ -347,6 +385,8 @@ static int cmos_irq_set_freq(struct device *dev, int freq)
 	if (!is_valid_irq(cmos->irq))
 		return -ENXIO;
 
+	if (!is_power_of_2(freq))
+		return -EINVAL;
 	/* 0 = no irqs; 1 = 2^15 Hz ... 15 = 2^0 Hz */
 	f = ffs(freq);
 	if (f-- > 16)
@@ -491,12 +531,21 @@ cmos_nvram_read(struct kobject *kobj, struct bin_attribute *attr,
 
 	if (unlikely(off >= attr->size))
 		return 0;
+	if (unlikely(off < 0))
+		return -EINVAL;
 	if ((off + count) > attr->size)
 		count = attr->size - off;
 
+	off += NVRAM_OFFSET;
 	spin_lock_irq(&rtc_lock);
-	for (retval = 0, off += NVRAM_OFFSET; count--; retval++, off++)
-		*buf++ = CMOS_READ(off);
+	for (retval = 0; count; count--, off++, retval++) {
+		if (off < 128)
+			*buf++ = CMOS_READ(off);
+		else if (can_bank2)
+			*buf++ = cmos_read_bank2(off);
+		else
+			break;
+	}
 	spin_unlock_irq(&rtc_lock);
 
 	return retval;
@@ -512,6 +561,8 @@ cmos_nvram_write(struct kobject *kobj, struct bin_attribute *attr,
 	cmos = dev_get_drvdata(container_of(kobj, struct device, kobj));
 	if (unlikely(off >= attr->size))
 		return -EFBIG;
+	if (unlikely(off < 0))
+		return -EINVAL;
 	if ((off + count) > attr->size)
 		count = attr->size - off;
 
@@ -520,15 +571,20 @@ cmos_nvram_write(struct kobject *kobj, struct bin_attribute *attr,
 	 * here.  If userspace is smart enough to know what fields of
 	 * NVRAM to update, updating checksums is also part of its job.
 	 */
+	off += NVRAM_OFFSET;
 	spin_lock_irq(&rtc_lock);
-	for (retval = 0, off += NVRAM_OFFSET; count--; retval++, off++) {
+	for (retval = 0; count; count--, off++, retval++) {
 		/* don't trash RTC registers */
 		if (off == cmos->day_alrm
 				|| off == cmos->mon_alrm
 				|| off == cmos->century)
 			buf++;
-		else
+		else if (off < 128)
 			CMOS_WRITE(*buf++, off);
+		else if (can_bank2)
+			cmos_write_bank2(*buf++, off);
+		else
+			break;
 	}
 	spin_unlock_irq(&rtc_lock);
 
@@ -539,7 +595,6 @@ static struct bin_attribute nvram = {
 	.attr = {
 		.name	= "nvram",
 		.mode	= S_IRUGO | S_IWUSR,
-		.owner	= THIS_MODULE,
 	},
 
 	.read	= cmos_nvram_read,
@@ -631,17 +686,19 @@ cmos_do_probe(struct device *dev, struct resource *ports, int rtc_irq)
 
 	/* Heuristic to deduce NVRAM size ... do what the legacy NVRAM
 	 * driver did, but don't reject unknown configs.   Old hardware
-	 * won't address 128 bytes, and for now we ignore the way newer
-	 * chips can address 256 bytes (using two more i/o ports).
+	 * won't address 128 bytes.  Newer chips have multiple banks,
+	 * though they may not be listed in one I/O resource.
 	 */
 #if	defined(CONFIG_ATARI)
 	address_space = 64;
-#elif defined(__i386__) || defined(__x86_64__) || defined(__arm__)
+#elif defined(__i386__) || defined(__x86_64__) || defined(__arm__) || defined(__sparc__)
 	address_space = 128;
 #else
 #warning Assuming 128 bytes of RTC+NVRAM address space, not 64 bytes.
 	address_space = 128;
 #endif
+	if (can_bank2 && ports->end > (ports->start + 1))
+		address_space = 256;
 
 	/* For ACPI systems extension info comes from the FADT.  On others,
 	 * board specific setup provides it as appropriate.  Systems where
@@ -675,7 +732,7 @@ cmos_do_probe(struct device *dev, struct resource *ports, int rtc_irq)
 
 	cmos_rtc.dev = dev;
 	dev_set_drvdata(dev, &cmos_rtc);
-	rename_region(ports, cmos_rtc.rtc->dev.bus_id);
+	rename_region(ports, dev_name(&cmos_rtc.rtc->dev));
 
 	spin_lock_irq(&rtc_lock);
 
@@ -699,7 +756,8 @@ cmos_do_probe(struct device *dev, struct resource *ports, int rtc_irq)
 	/* FIXME teach the alarm code how to handle binary mode;
 	 * <asm-generic/rtc.h> doesn't know 12-hour mode either.
 	 */
-	if (!(rtc_control & RTC_24H) || (rtc_control & (RTC_DM_BINARY))) {
+	if (is_valid_irq(rtc_irq) &&
+	    (!(rtc_control & RTC_24H) || (rtc_control & (RTC_DM_BINARY)))) {
 		dev_dbg(dev, "only 24-hr BCD mode supported\n");
 		retval = -ENXIO;
 		goto cleanup1;
@@ -722,7 +780,7 @@ cmos_do_probe(struct device *dev, struct resource *ports, int rtc_irq)
 			rtc_cmos_int_handler = cmos_interrupt;
 
 		retval = request_irq(rtc_irq, rtc_cmos_int_handler,
-				IRQF_DISABLED, cmos_rtc.rtc->dev.bus_id,
+				IRQF_DISABLED, dev_name(&cmos_rtc.rtc->dev),
 				cmos_rtc.rtc);
 		if (retval < 0) {
 			dev_dbg(dev, "IRQ %d is already in use\n", rtc_irq);
@@ -739,8 +797,8 @@ cmos_do_probe(struct device *dev, struct resource *ports, int rtc_irq)
 		goto cleanup2;
 	}
 
-	pr_info("%s: alarms up to one %s%s%s\n",
-			cmos_rtc.rtc->dev.bus_id,
+	pr_info("%s: alarms up to one %s%s, %zd bytes nvram%s\n",
+			dev_name(&cmos_rtc.rtc->dev),
 			is_valid_irq(rtc_irq)
 				?  (cmos_rtc.mon_alrm
 					? "year"
@@ -748,6 +806,7 @@ cmos_do_probe(struct device *dev, struct resource *ports, int rtc_irq)
 						? "month" : "day"))
 				: "no",
 			cmos_rtc.century ? ", y3k" : "",
+			nvram.size,
 			is_hpet_enabled() ? ", hpet irqs" : "");
 
 	return 0;
@@ -829,7 +888,7 @@ static int cmos_suspend(struct device *dev, pm_message_t mesg)
 	}
 
 	pr_debug("%s: suspend%s, ctrl %02x\n",
-			cmos_rtc.rtc->dev.bus_id,
+			dev_name(&cmos_rtc.rtc->dev),
 			(tmp & RTC_AIE) ? ", alarm may wake" : "",
 			tmp);
 
@@ -885,7 +944,7 @@ static int cmos_resume(struct device *dev)
 	}
 
 	pr_debug("%s: resume, ctrl %02x\n",
-			cmos_rtc.rtc->dev.bus_id,
+			dev_name(&cmos_rtc.rtc->dev),
 			tmp);
 
 	return 0;
@@ -912,6 +971,92 @@ static inline int cmos_poweroff(struct device *dev)
  * predate even PNPBIOS should set up platform_bus devices.
  */
 
+#ifdef	CONFIG_ACPI
+
+#include <linux/acpi.h>
+
+#ifdef	CONFIG_PM
+static u32 rtc_handler(void *context)
+{
+	acpi_clear_event(ACPI_EVENT_RTC);
+	acpi_disable_event(ACPI_EVENT_RTC, 0);
+	return ACPI_INTERRUPT_HANDLED;
+}
+
+static inline void rtc_wake_setup(void)
+{
+	acpi_install_fixed_event_handler(ACPI_EVENT_RTC, rtc_handler, NULL);
+	/*
+	 * After the RTC handler is installed, the Fixed_RTC event should
+	 * be disabled. Only when the RTC alarm is set will it be enabled.
+	 */
+	acpi_clear_event(ACPI_EVENT_RTC);
+	acpi_disable_event(ACPI_EVENT_RTC, 0);
+}
+
+static void rtc_wake_on(struct device *dev)
+{
+	acpi_clear_event(ACPI_EVENT_RTC);
+	acpi_enable_event(ACPI_EVENT_RTC, 0);
+}
+
+static void rtc_wake_off(struct device *dev)
+{
+	acpi_disable_event(ACPI_EVENT_RTC, 0);
+}
+#else
+#define rtc_wake_setup()	do{}while(0)
+#define rtc_wake_on		NULL
+#define rtc_wake_off		NULL
+#endif
+
+/* Every ACPI platform has a mc146818 compatible "cmos rtc".  Here we find
+ * its device node and pass extra config data.  This helps its driver use
+ * capabilities that the now-obsolete mc146818 didn't have, and informs it
+ * that this board's RTC is wakeup-capable (per ACPI spec).
+ */
+static struct cmos_rtc_board_info acpi_rtc_info;
+
+static void __devinit
+cmos_wake_setup(struct device *dev)
+{
+	if (acpi_disabled)
+		return;
+
+	rtc_wake_setup();
+	acpi_rtc_info.wake_on = rtc_wake_on;
+	acpi_rtc_info.wake_off = rtc_wake_off;
+
+	/* workaround bug in some ACPI tables */
+	if (acpi_gbl_FADT.month_alarm && !acpi_gbl_FADT.day_alarm) {
+		dev_dbg(dev, "bogus FADT month_alarm (%d)\n",
+			acpi_gbl_FADT.month_alarm);
+		acpi_gbl_FADT.month_alarm = 0;
+	}
+
+	acpi_rtc_info.rtc_day_alarm = acpi_gbl_FADT.day_alarm;
+	acpi_rtc_info.rtc_mon_alarm = acpi_gbl_FADT.month_alarm;
+	acpi_rtc_info.rtc_century = acpi_gbl_FADT.century;
+
+	/* NOTE:  S4_RTC_WAKE is NOT currently useful to Linux */
+	if (acpi_gbl_FADT.flags & ACPI_FADT_S4_RTC_WAKE)
+		dev_info(dev, "RTC can wake from S4\n");
+
+	dev->platform_data = &acpi_rtc_info;
+
+	/* RTC always wakes from S1/S2/S3, and often S4/STD */
+	device_init_wakeup(dev, 1);
+}
+
+#else
+
+static void __devinit
+cmos_wake_setup(struct device *dev)
+{
+}
+
+#endif
+
 #ifdef	CONFIG_PNP
 
 #include <linux/pnp.h>
@@ -919,6 +1064,8 @@ static inline int cmos_poweroff(struct device *dev)
 static int __devinit
 cmos_pnp_probe(struct pnp_dev *pnp, const struct pnp_device_id *id)
 {
+	cmos_wake_setup(&pnp->dev);
+
 	if (pnp_port_start(pnp,0) == 0x70 && !pnp_irq_valid(pnp,0))
 		/* Some machines contain a PNP entry for the RTC, but
 		 * don't define the IRQ. It should always be safe to
@@ -996,6 +1143,7 @@ static struct pnp_driver cmos_pnp_driver = {
 
 static int __init cmos_platform_probe(struct platform_device *pdev)
 {
+	cmos_wake_setup(&pdev->dev);
 	return cmos_do_probe(&pdev->dev,
 			platform_get_resource(pdev, IORESOURCE_IO, 0),
 			platform_get_irq(pdev, 0));

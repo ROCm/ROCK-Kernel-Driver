@@ -18,9 +18,10 @@
 #include <linux/ata_platform.h>
 #include <linux/types.h>
 #include <linux/i2c.h>
+#include <linux/irq.h>
 #include <net/ax88796.h>
 #include <asm/machvec.h>
-#include <asm/r7780rp.h>
+#include <mach/highlander.h>
 #include <asm/clock.h>
 #include <asm/heartbeat.h>
 #include <asm/io.h>
@@ -293,6 +294,8 @@ static void __init highlander_setup(char **cmdline_p)
 			 "FPGA version: %d (revision %d)\n",
 			 (ver >> 12) & 0xf, (ver >> 8) & 0xf,
 			 (ver >>  4) & 0xf, ver & 0xf);
+
+	highlander_plat_pinmux_setup();
 
 	/*
 	 * Enable the important clocks right away..

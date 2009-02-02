@@ -712,8 +712,8 @@ int pfm_alloc_fd(struct file **cfile)
 
 	inode->i_sb = pfmfs_mnt->mnt_sb;
 	inode->i_mode = S_IFCHR|S_IRUGO;
-	inode->i_uid = current->fsuid;
-	inode->i_gid = current->fsgid;
+	inode->i_uid = current_fsuid();
+	inode->i_gid = current_fsgid();
 
 	sprintf(name, "[%lu]", inode->i_ino);
 	this.name = name;

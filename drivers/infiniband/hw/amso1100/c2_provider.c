@@ -272,7 +272,6 @@ static struct ib_qp *c2_create_qp(struct ib_pd *pd,
 		pr_debug("%s: Invalid QP type: %d\n", __func__,
 			init_attr->qp_type);
 		return ERR_PTR(-EINVAL);
-		break;
 	}
 
 	if (err) {
@@ -654,7 +653,7 @@ static int c2_service_destroy(struct iw_cm_id *cm_id)
 static int c2_pseudo_up(struct net_device *netdev)
 {
 	struct in_device *ind;
-	struct c2_dev *c2dev = netdev->priv;
+	struct c2_dev *c2dev = netdev->ml_priv;
 
 	ind = in_dev_get(netdev);
 	if (!ind)
@@ -679,7 +678,7 @@ static int c2_pseudo_up(struct net_device *netdev)
 static int c2_pseudo_down(struct net_device *netdev)
 {
 	struct in_device *ind;
-	struct c2_dev *c2dev = netdev->priv;
+	struct c2_dev *c2dev = netdev->ml_priv;
 
 	ind = in_dev_get(netdev);
 	if (!ind)
@@ -747,14 +746,14 @@ static struct net_device *c2_pseudo_netdev_init(struct c2_dev *c2dev)
 	/* change ethxxx to iwxxx */
 	strcpy(name, "iw");
 	strcat(name, &c2dev->netdev->name[3]);
-	netdev = alloc_netdev(sizeof(*netdev), name, setup);
+	netdev = alloc_netdev(0, name, setup);
 	if (!netdev) {
 		printk(KERN_ERR PFX "%s -  etherdev alloc failed",
 			__func__);
 		return NULL;
 	}
 
-	netdev->priv = c2dev;
+	netdev->ml_priv = c2dev;
 
 	SET_NETDEV_DEV(netdev, &c2dev->pcidev->dev);
 

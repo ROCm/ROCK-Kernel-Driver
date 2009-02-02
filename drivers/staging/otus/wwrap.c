@@ -31,10 +31,6 @@
 #include <net/iw_handler.h>
 #endif
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0))
-#define URB_ZERO_PACKET USB_ZERO_PACKET
-#endif
-
 extern void zfiRecv80211(zdev_t* dev, zbuf_t* buf, struct zsAdditionInfo* addInfo);
 extern void zfCoreRecv(zdev_t* dev, zbuf_t* buf, struct zsAdditionInfo* addInfo);
 extern void zfIdlChkRsp(zdev_t* dev, u32_t* rsp, u16_t rspLen);
@@ -56,11 +52,11 @@ u32_t zfLnxUsbSubmitIntUrb(urb_t *urb, struct usb_device *usb, u16_t epnum, u16_
 
 u16_t zfLnxGetFreeTxUrb(zdev_t *dev)
 {
-    struct usbdrv_private *macp = (struct usbdrv_private *)dev->priv;
+    struct usbdrv_private *macp = dev->ml_priv;
     u16_t idx;
     unsigned long irqFlag;
 
-    spin_lock_irqsave(&(((struct usbdrv_private *)(dev->priv))->cs_lock), irqFlag);
+    spin_lock_irqsave(&macp->cs_lock, irqFlag);
 
     //idx = ((macp->TxUrbTail + 1) & (ZM_MAX_TX_URB_NUM - 1));
 
@@ -77,17 +73,17 @@ u16_t zfLnxGetFreeTxUrb(zdev_t *dev)
         idx = 0xffff;
     }
 
-    spin_unlock_irqrestore(&(((struct usbdrv_private *)(dev->priv))->cs_lock), irqFlag);
+    spin_unlock_irqrestore(&macp->cs_lock, irqFlag);
     return idx;
 }
 
 void zfLnxPutTxUrb(zdev_t *dev)
 {
-    struct usbdrv_private *macp = (struct usbdrv_private *)dev->priv;
+    struct usbdrv_private *macp = dev->ml_priv;
     u16_t idx;
     unsigned long irqFlag;
 
-    spin_lock_irqsave(&(((struct usbdrv_private *)(dev->priv))->cs_lock), irqFlag);
+    spin_lock_irqsave(&macp->cs_lock, irqFlag);
 
     idx = ((macp->TxUrbHead + 1) & (ZM_MAX_TX_URB_NUM - 1));
 
@@ -103,31 +99,31 @@ void zfLnxPutTxUrb(zdev_t *dev)
                 macp->TxUrbHead, macp->TxUrbTail);
     }
 
-    spin_unlock_irqrestore(&(((struct usbdrv_private *)(dev->priv))->cs_lock), irqFlag);
+    spin_unlock_irqrestore(&macp->cs_lock, irqFlag);
 }
 
 u16_t zfLnxCheckTxBufferCnt(zdev_t *dev)
 {
-    struct usbdrv_private *macp = (struct usbdrv_private *)dev->priv;
+    struct usbdrv_private *macp = dev->ml_priv;
     u16_t TxBufCnt;
     unsigned long irqFlag;
 
-    spin_lock_irqsave(&(((struct usbdrv_private *)(dev->priv))->cs_lock), irqFlag);
+    spin_lock_irqsave(&macp->cs_lock, irqFlag);
 
     TxBufCnt = macp->TxBufCnt;
 
-    spin_unlock_irqrestore(&(((struct usbdrv_private *)(dev->priv))->cs_lock), irqFlag);
+    spin_unlock_irqrestore(&macp->cs_lock, irqFlag);
     return TxBufCnt;
 }
 
 UsbTxQ_t *zfLnxGetUsbTxBuffer(zdev_t *dev)
 {
-    struct usbdrv_private *macp = (struct usbdrv_private *)dev->priv;
+    struct usbdrv_private *macp = dev->ml_priv;
     u16_t idx;
     UsbTxQ_t *TxQ;
     unsigned long irqFlag;
 
-    spin_lock_irqsave(&(((struct usbdrv_private *)(dev->priv))->cs_lock), irqFlag);
+    spin_lock_irqsave(&macp->cs_lock, irqFlag);
 
     idx = ((macp->TxBufHead+1) & (ZM_MAX_TX_BUF_NUM - 1));
 
@@ -147,11 +143,11 @@ UsbTxQ_t *zfLnxGetUsbTxBuffer(zdev_t *dev)
                     macp->TxBufHead, macp->TxBufTail);
         }
 
-        spin_unlock_irqrestore(&(((struct usbdrv_private *)(dev->priv))->cs_lock), irqFlag);
+        spin_unlock_irqrestore(&macp->cs_lock, irqFlag);
         return NULL;
     }
 
-    spin_unlock_irqrestore(&(((struct usbdrv_private *)(dev->priv))->cs_lock), irqFlag);
+    spin_unlock_irqrestore(&macp->cs_lock, irqFlag);
     return TxQ;
 }
 
@@ -159,12 +155,12 @@ u16_t zfLnxPutUsbTxBuffer(zdev_t *dev, u8_t *hdr, u16_t hdrlen,
         u8_t *snap, u16_t snapLen, u8_t *tail, u16_t tailLen,
         zbuf_t *buf, u16_t offset)
 {
-    struct usbdrv_private *macp = (struct usbdrv_private *)dev->priv;
+    struct usbdrv_private *macp = dev->ml_priv;
     u16_t idx;
     UsbTxQ_t *TxQ;
     unsigned long irqFlag;
 
-    spin_lock_irqsave(&(((struct usbdrv_private *)(dev->priv))->cs_lock), irqFlag);
+    spin_lock_irqsave(&macp->cs_lock, irqFlag);
 
     idx = ((macp->TxBufTail+1) & (ZM_MAX_TX_BUF_NUM - 1));
 
@@ -192,22 +188,22 @@ u16_t zfLnxPutUsbTxBuffer(zdev_t *dev, u8_t *hdr, u16_t hdrlen,
     {
         printk(KERN_ERR "zfLnxPutUsbTxBuffer UsbTxBufQ inconsistent: TxBufHead: %d, TxBufTail: %d, TxBufCnt: %d\n",
             macp->TxBufHead, macp->TxBufTail, macp->TxBufCnt);
-        spin_unlock_irqrestore(&(((struct usbdrv_private *)(dev->priv))->cs_lock), irqFlag);
+        spin_unlock_irqrestore(&macp->cs_lock, irqFlag);
         return 0xffff;
     }
 
-    spin_unlock_irqrestore(&(((struct usbdrv_private *)(dev->priv))->cs_lock), irqFlag);
+    spin_unlock_irqrestore(&macp->cs_lock, irqFlag);
     return 0;
 }
 
 zbuf_t *zfLnxGetUsbRxBuffer(zdev_t *dev)
 {
-    struct usbdrv_private *macp = (struct usbdrv_private *)dev->priv;
+    struct usbdrv_private *macp = dev->ml_priv;
     //u16_t idx;
     zbuf_t *buf;
     unsigned long irqFlag;
 
-    spin_lock_irqsave(&(((struct usbdrv_private *)(dev->priv))->cs_lock), irqFlag);
+    spin_lock_irqsave(&macp->cs_lock, irqFlag);
 
     //idx = ((macp->RxBufHead+1) & (ZM_MAX_RX_URB_NUM - 1));
 
@@ -222,21 +218,21 @@ zbuf_t *zfLnxGetUsbRxBuffer(zdev_t *dev)
     {
         printk("RxBufQ inconsistent: RxBufHead: %d, RxBufTail: %d\n",
                 macp->RxBufHead, macp->RxBufTail);
-        spin_unlock_irqrestore(&(((struct usbdrv_private *)(dev->priv))->cs_lock), irqFlag);
+        spin_unlock_irqrestore(&macp->cs_lock, irqFlag);
         return NULL;
     }
 
-    spin_unlock_irqrestore(&(((struct usbdrv_private *)(dev->priv))->cs_lock), irqFlag);
+    spin_unlock_irqrestore(&macp->cs_lock, irqFlag);
     return buf;
 }
 
 u32_t zfLnxPutUsbRxBuffer(zdev_t *dev, zbuf_t *buf)
 {
-    struct usbdrv_private *macp = (struct usbdrv_private *)dev->priv;
+    struct usbdrv_private *macp = dev->ml_priv;
     u16_t idx;
     unsigned long irqFlag;
 
-    spin_lock_irqsave(&(((struct usbdrv_private *)(dev->priv))->cs_lock), irqFlag);
+    spin_lock_irqsave(&macp->cs_lock, irqFlag);
 
     idx = ((macp->RxBufTail+1) & (ZM_MAX_RX_URB_NUM - 1));
 
@@ -251,19 +247,15 @@ u32_t zfLnxPutUsbRxBuffer(zdev_t *dev, zbuf_t *buf)
     {
         printk("RxBufQ inconsistent: RxBufHead: %d, RxBufTail: %d\n",
                 macp->RxBufHead, macp->RxBufTail);
-        spin_unlock_irqrestore(&(((struct usbdrv_private *)(dev->priv))->cs_lock), irqFlag);
+        spin_unlock_irqrestore(&macp->cs_lock, irqFlag);
         return 0xffff;
     }
 
-    spin_unlock_irqrestore(&(((struct usbdrv_private *)(dev->priv))->cs_lock), irqFlag);
+    spin_unlock_irqrestore(&macp->cs_lock, irqFlag);
     return 0;
 }
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0))
 void zfLnxUsbDataOut_callback(urb_t *urb)
-#else
-void zfLnxUsbDataOut_callback(urb_t *urb, struct pt_regs *regs)
-#endif
 {
     zdev_t* dev = urb->context;
     //UsbTxQ_t *TxData;
@@ -289,14 +281,10 @@ void zfLnxUsbDataOut_callback(urb_t *urb, struct pt_regs *regs)
     }
 }
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0))
 void zfLnxUsbDataIn_callback(urb_t *urb)
-#else
-void zfLnxUsbDataIn_callback(urb_t *urb, struct pt_regs *regs)
-#endif
 {
     zdev_t* dev = urb->context;
-    struct usbdrv_private *macp = (struct usbdrv_private *)dev->priv;
+    struct usbdrv_private *macp = dev->ml_priv;
     zbuf_t *buf;
     zbuf_t *new_buf;
     int status;
@@ -318,10 +306,6 @@ void zfLnxUsbDataIn_callback(urb_t *urb, struct pt_regs *regs)
         if ((urb->status != -ENOENT) && (urb->status != -ECONNRESET)
             && (urb->status != -ESHUTDOWN))
         {
-            #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0))
-                if (urb->status == USB_ST_INTERNALERROR)
-                    status = -1;
-            #else
                 if (urb->status == -EPIPE){
                     //printk(KERN_ERR "nonzero read bulk status received: -EPIPE");
                     status = -1;
@@ -331,7 +315,6 @@ void zfLnxUsbDataIn_callback(urb_t *urb, struct pt_regs *regs)
                     //printk(KERN_ERR "nonzero read bulk status received: -EPROTO");
                     status = -1;
                 }
-            #endif
         }
 
         //printk(KERN_ERR "urb->status: 0x%08x\n", urb->status);
@@ -526,27 +509,19 @@ void zfLnxUsbDataIn_callback(urb_t *urb, struct pt_regs *regs)
 #endif
 }
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0))
 void zfLnxUsbRegOut_callback(urb_t *urb)
-#else
-void zfLnxUsbRegOut_callback(urb_t *urb, struct pt_regs *regs)
-#endif
 {
     //dev_t* dev = urb->context;
 
     //printk(KERN_ERR "zfwUsbRegOut_callback\n");
 }
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0))
 void zfLnxUsbRegIn_callback(urb_t *urb)
-#else
-void zfLnxUsbRegIn_callback(urb_t *urb, struct pt_regs *regs)
-#endif
 {
     zdev_t* dev = urb->context;
     u32_t rsp[64/4];
     int status;
-    struct usbdrv_private *macp = (struct usbdrv_private *)dev->priv;
+    struct usbdrv_private *macp = dev->ml_priv;
 
     /* Check status for URB */
     if (urb->status != 0){
@@ -554,10 +529,6 @@ void zfLnxUsbRegIn_callback(urb_t *urb, struct pt_regs *regs)
         if ((urb->status != -ENOENT) && (urb->status != -ECONNRESET)
             && (urb->status != -ESHUTDOWN))
         {
-            #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0))
-                if (urb->status == USB_ST_INTERNALERROR)
-                    status = -1;
-            #else
                 if (urb->status == -EPIPE){
                     //printk(KERN_ERR "nonzero read bulk status received: -EPIPE");
                     status = -1;
@@ -567,7 +538,6 @@ void zfLnxUsbRegIn_callback(urb_t *urb, struct pt_regs *regs)
                     //printk(KERN_ERR "nonzero read bulk status received: -EPROTO");
                     status = -1;
                 }
-            #endif
         }
 
         //printk(KERN_ERR "urb->status: 0x%08x\n", urb->status);
@@ -595,7 +565,7 @@ void zfLnxUsbRegIn_callback(urb_t *urb, struct pt_regs *regs)
 u32_t zfLnxSubmitRegInUrb(zdev_t *dev)
 {
     u32_t ret;
-    struct usbdrv_private *macp = (struct usbdrv_private *)dev->priv;
+    struct usbdrv_private *macp = dev->ml_priv;
 
     /* Submit a rx urb */
     //ret = zfLnxUsbSubmitBulkUrb(macp->RegInUrb, macp->udev,
@@ -620,7 +590,7 @@ u32_t zfLnxUsbSubmitTxData(zdev_t* dev)
     u8_t *puTxBuf = NULL;
     UsbTxQ_t *TxData;
     int len = 0;
-    struct usbdrv_private *macp = (struct usbdrv_private *)dev->priv;
+    struct usbdrv_private *macp = dev->ml_priv;
 #if ZM_USB_TX_STREAM_MODE == 1
     u8_t               ii;
     u16_t              offset = 0;
@@ -797,7 +767,7 @@ u32_t zfLnxUsbSubmitTxData(zdev_t* dev)
 u32_t zfLnxUsbIn(zdev_t* dev, urb_t *urb, zbuf_t *buf)
 {
     u32_t ret;
-    struct usbdrv_private *macp = (struct usbdrv_private *)dev->priv;
+    struct usbdrv_private *macp = dev->ml_priv;
 
     /* Submit a rx urb */
     ret = zfLnxUsbSubmitBulkUrb(urb, macp->udev, USB_WLAN_RX_PIPE,
@@ -812,7 +782,7 @@ u32_t zfLnxUsbIn(zdev_t* dev, urb_t *urb, zbuf_t *buf)
 
 u32_t zfLnxUsbWriteReg(zdev_t* dev, u32_t* cmd, u16_t cmdLen)
 {
-    struct usbdrv_private *macp = (struct usbdrv_private *)dev->priv;
+    struct usbdrv_private *macp = dev->ml_priv;
     u32_t ret;
 
 #ifdef ZM_CONFIG_BIG_ENDIAN
@@ -826,15 +796,9 @@ u32_t zfLnxUsbWriteReg(zdev_t* dev, u32_t* cmd, u16_t cmdLen)
 
     /* Issue an USB Out transfer */
     /* Submit a tx urb */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,24)
-    ret = zfLnxUsbSubmitBulkUrb(macp->RegOutUrb, macp->udev,
-            USB_REG_OUT_PIPE, USB_DIR_OUT, macp->regUsbWriteBuf,
-            cmdLen, zfLnxUsbRegOut_callback, dev);
-#else
     ret = zfLnxUsbSubmitIntUrb(macp->RegOutUrb, macp->udev,
             USB_REG_OUT_PIPE, USB_DIR_OUT, macp->regUsbWriteBuf,
             cmdLen, zfLnxUsbRegOut_callback, dev, 1);
-#endif
 
     return ret;
 }
@@ -844,7 +808,7 @@ u32_t zfLnxUsbOut(zdev_t* dev, u8_t *hdr, u16_t hdrlen, u8_t *snap, u16_t snapLe
         u8_t *tail, u16_t tailLen, zbuf_t *buf, u16_t offset)
 {
     u32_t ret;
-    struct usbdrv_private *macp = (struct usbdrv_private *)dev->priv;
+    struct usbdrv_private *macp = dev->ml_priv;
 
     /* Check length of tail buffer */
     //zm_assert((tailLen <= 16));
@@ -867,7 +831,7 @@ u32_t zfLnxUsbOut(zdev_t* dev, u8_t *hdr, u16_t hdrlen, u8_t *snap, u16_t snapLe
 
 void zfLnxInitUsbTxQ(zdev_t* dev)
 {
-    struct usbdrv_private *macp = (struct usbdrv_private *)dev->priv;
+    struct usbdrv_private *macp = dev->ml_priv;
 
     printk(KERN_ERR "zfwInitUsbTxQ\n");
 
@@ -885,7 +849,7 @@ void zfLnxInitUsbRxQ(zdev_t* dev)
 {
     u16_t i;
     zbuf_t *buf;
-    struct usbdrv_private *macp = (struct usbdrv_private *)dev->priv;
+    struct usbdrv_private *macp = dev->ml_priv;
 
     /* Zero memory for UsbRxBufQ */
     memset(macp->UsbRxBufQ, 0, sizeof(zbuf_t *) * ZM_MAX_RX_URB_NUM);
@@ -930,10 +894,6 @@ u32_t zfLnxUsbSubmitBulkUrb(urb_t *urb, struct usb_device *usb, u16_t epnum, u16
                 transfer_buffer, buffer_length, complete, context);
     }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,15)
-    urb->transfer_flags |= URB_ASYNC_UNLINK;
-#endif
-
     if (epnum == 4)
     {
         if (urb->hcpriv)
@@ -943,11 +903,7 @@ u32_t zfLnxUsbSubmitBulkUrb(urb_t *urb, struct usb_device *usb, u16_t epnum, u16
         }
     }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
     ret = usb_submit_urb(urb, GFP_ATOMIC);
-#else
-    ret = usb_submit_urb(urb);
-#endif
     if ((epnum == 4) & (ret != 0))
     {
         //printk("CWY - ret = %x\n", ret);
@@ -972,15 +928,7 @@ u32_t zfLnxUsbSubmitIntUrb(urb_t *urb, struct usb_device *usb, u16_t epnum, u16_
                 transfer_buffer, buffer_length, complete, context, interval);
     }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,15)
-    urb->transfer_flags |= URB_ASYNC_UNLINK;
-#endif
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
     ret = usb_submit_urb(urb, GFP_ATOMIC);
-#else
-    ret = usb_submit_urb(urb);
-#endif
 
     return ret;
 }
@@ -1017,11 +965,7 @@ int zfLnxCencSendMsg(struct sock *netlink_sk, u_int8_t *msg, int len)
 	memcpy(pos, msg,  len);
 	/*计算经过字节对其后的数据实际长度*/
 	nlh->nlmsg_len = skb->tail - old_tail;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,14)
-    NETLINK_CB(skb).dst_groups = COMMTYPE_GROUP;
-#else
 	NETLINK_CB(skb).dst_group = COMMTYPE_GROUP;
-#endif
 	netlink_broadcast(netlink_sk, skb, 0, COMMTYPE_GROUP, GFP_ATOMIC);
 	ret = 0;
 out:
@@ -1059,11 +1003,7 @@ u32_t zfwReadReg(zdev_t* dev, u32_t offset)
 #ifndef INIT_WORK
 #define work_struct tq_struct
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0))
-#define schedule_work(a)   queue_task(a, &tq_scheduler)
-#else
 #define schedule_work(a)  schedule_task(a)
-#endif
 
 #define flush_scheduled_work  flush_scheduled_tasks
 #define INIT_WORK(_wq, _routine, _data)  INIT_TQUEUE(_wq, _routine, _data)
@@ -1074,20 +1014,11 @@ u32_t zfwReadReg(zdev_t* dev, u32_t offset)
 
 u32_t smp_kevent_Lock = 0;
 
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,20))
 void kevent(struct work_struct *work)
-#else
-void kevent(void *data)
-#endif
 {
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,20))
     struct usbdrv_private *macp =
                container_of(work, struct usbdrv_private, kevent);
     zdev_t *dev = macp->device;
-#else
-    zdev_t *dev = (zdev_t *) data;
-    struct usbdrv_private *macp = (struct usbdrv_private *)dev->priv;
-#endif
 
     if (macp == NULL)
     {
@@ -1133,14 +1064,10 @@ void kevent(void *data)
 /************************************************************************/
 u8_t zfLnxCreateThread(zdev_t *dev)
 {
-    struct usbdrv_private *macp = (struct usbdrv_private *)dev->priv;
+    struct usbdrv_private *macp = dev->ml_priv;
 
     /* Create Mutex and keventd */
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,20))
-    INIT_WORK(&macp->kevent, kevent, dev);
-#else
     INIT_WORK(&macp->kevent, kevent);
-#endif
     init_MUTEX(&macp->ioctl_sem);
 
     return 0;
@@ -1164,7 +1091,7 @@ u8_t zfLnxCreateThread(zdev_t *dev)
 /************************************************************************/
 void zfLnxSignalThread(zdev_t *dev, int flag)
 {
-    struct usbdrv_private *macp = (struct usbdrv_private *)dev->priv;
+    struct usbdrv_private *macp = dev->ml_priv;
 
     if (macp == NULL)
     {

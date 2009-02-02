@@ -83,7 +83,6 @@ struct raparm_hbucket {
 	spinlock_t		pb_lock;
 } ____cacheline_aligned_in_smp;
 
-static struct raparms *		raparml;
 #define RAPARM_HASH_BITS	4
 #define RAPARM_HASH_SIZE	(1<<RAPARM_HASH_BITS)
 #define RAPARM_HASH_MASK	(RAPARM_HASH_SIZE-1)
@@ -397,7 +396,7 @@ nfsd_setattr(struct svc_rqst *rqstp, struct svc_fh *fhp, struct iattr *iap,
 	err = nfserr_notsync;
 	if (!check_guard || guardtime == inode->i_ctime.tv_sec) {
 		fh_lock(fhp);
-		host_err = notify_change(dentry, fhp->fh_export->ex_path.mnt, iap);
+		host_err = notify_change(dentry, iap);
 		/* to get NFSERR_JUKEBOX on the wire, need -ETIMEDOUT */
 		if (host_err == -EAGAIN)
 			host_err = -ETIMEDOUT;
@@ -420,12 +419,12 @@ out_nfserr:
 #if defined(CONFIG_NFSD_V2_ACL) || \
     defined(CONFIG_NFSD_V3_ACL) || \
     defined(CONFIG_NFSD_V4)
-static ssize_t nfsd_getxattr(struct dentry *dentry, struct vfsmount *mnt,
-			     char *key, void **buf)
+static ssize_t nfsd_getxattr(struct dentry *dentry, char *key, void **buf)
 {
 	ssize_t buflen;
+	ssize_t ret;
 
-	buflen = vfs_getxattr(dentry, mnt, key, NULL, 0, NULL);
+	buflen = vfs_getxattr(dentry, key, NULL, 0);
 	if (buflen <= 0)
 		return buflen;
 
@@ -433,14 +432,16 @@ static ssize_t nfsd_getxattr(struct dentry *dentry, struct vfsmount *mnt,
 	if (!*buf)
 		return -ENOMEM;
 
-	return vfs_getxattr(dentry, mnt, key, *buf, buflen, NULL);
+	ret = vfs_getxattr(dentry, key, *buf, buflen);
+	if (ret < 0)
+		kfree(*buf);
+	return ret;
 }
 #endif
 
 #if defined(CONFIG_NFSD_V4)
 static int
-set_nfsv4_acl_one(struct dentry *dentry, struct vfsmount *mnt,
-		  struct posix_acl *pacl, char *key)
+set_nfsv4_acl_one(struct dentry *dentry, struct posix_acl *pacl, char *key)
 {
 	int len;
 	size_t buflen;
@@ -459,7 +460,7 @@ set_nfsv4_acl_one(struct dentry *dentry, struct vfsmount *mnt,
 		goto out;
 	}
 
-	error = vfs_setxattr(dentry, mnt, key, buf, len, 0, NULL);
+	error = vfs_setxattr(dentry, key, buf, len, 0);
 out:
 	kfree(buf);
 	return error;
@@ -472,7 +473,6 @@ nfsd4_set_nfs4_acl(struct svc_rqst *rqstp, struct svc_fh *fhp,
 	__be32 error;
 	int host_error;
 	struct dentry *dentry;
-	struct vfsmount *mnt;
 	struct inode *inode;
 	struct posix_acl *pacl = NULL, *dpacl = NULL;
 	unsigned int flags = 0;
@@ -483,7 +483,6 @@ nfsd4_set_nfs4_acl(struct svc_rqst *rqstp, struct svc_fh *fhp,
 		return error;
 
 	dentry = fhp->fh_dentry;
-	mnt = fhp->fh_export->ex_path.mnt;
 	inode = dentry->d_inode;
 	if (S_ISDIR(inode->i_mode))
 		flags = NFS4_ACL_DIR;
@@ -494,14 +493,12 @@ nfsd4_set_nfs4_acl(struct svc_rqst *rqstp, struct svc_fh *fhp,
 	} else if (host_error < 0)
 		goto out_nfserr;
 
-	host_error = set_nfsv4_acl_one(dentry, mnt, pacl,
-				       POSIX_ACL_XATTR_ACCESS);
+	host_error = set_nfsv4_acl_one(dentry, pacl, POSIX_ACL_XATTR_ACCESS);
 	if (host_error < 0)
 		goto out_release;
 
 	if (S_ISDIR(inode->i_mode))
-		host_error = set_nfsv4_acl_one(dentry, mnt, dpacl,
-					       POSIX_ACL_XATTR_DEFAULT);
+		host_error = set_nfsv4_acl_one(dentry, dpacl, POSIX_ACL_XATTR_DEFAULT);
 
 out_release:
 	posix_acl_release(pacl);
@@ -514,13 +511,13 @@ out_nfserr:
 }
 
 static struct posix_acl *
-_get_posix_acl(struct dentry *dentry, struct vfsmount *mnt, char *key)
+_get_posix_acl(struct dentry *dentry, char *key)
 {
 	void *buf = NULL;
 	struct posix_acl *pacl = NULL;
 	int buflen;
 
-	buflen = nfsd_getxattr(dentry, mnt, key, &buf);
+	buflen = nfsd_getxattr(dentry, key, &buf);
 	if (!buflen)
 		buflen = -ENODATA;
 	if (buflen <= 0)
@@ -532,15 +529,14 @@ _get_posix_acl(struct dentry *dentry, struct vfsmount *mnt, char *key)
 }
 
 int
-nfsd4_get_nfs4_acl(struct svc_rqst *rqstp, struct dentry *dentry,
-		   struct vfsmount *mnt, struct nfs4_acl **acl)
+nfsd4_get_nfs4_acl(struct svc_rqst *rqstp, struct dentry *dentry, struct nfs4_acl **acl)
 {
 	struct inode *inode = dentry->d_inode;
 	int error = 0;
 	struct posix_acl *pacl = NULL, *dpacl = NULL;
 	unsigned int flags = 0;
 
-	pacl = _get_posix_acl(dentry, mnt, POSIX_ACL_XATTR_ACCESS);
+	pacl = _get_posix_acl(dentry, POSIX_ACL_XATTR_ACCESS);
 	if (IS_ERR(pacl) && PTR_ERR(pacl) == -ENODATA)
 		pacl = posix_acl_from_mode(inode->i_mode, GFP_KERNEL);
 	if (IS_ERR(pacl)) {
@@ -550,7 +546,7 @@ nfsd4_get_nfs4_acl(struct svc_rqst *rqstp, struct dentry *dentry,
 	}
 
 	if (S_ISDIR(inode->i_mode)) {
-		dpacl = _get_posix_acl(dentry, mnt, POSIX_ACL_XATTR_DEFAULT);
+		dpacl = _get_posix_acl(dentry, POSIX_ACL_XATTR_DEFAULT);
 		if (IS_ERR(dpacl) && PTR_ERR(dpacl) == -ENODATA)
 			dpacl = NULL;
 		else if (IS_ERR(dpacl)) {
@@ -687,6 +683,7 @@ __be32
 nfsd_open(struct svc_rqst *rqstp, struct svc_fh *fhp, int type,
 			int access, struct file **filp)
 {
+	const struct cred *cred = current_cred();
 	struct dentry	*dentry;
 	struct inode	*inode;
 	int		flags = O_RDONLY|O_LARGEFILE;
@@ -741,7 +738,7 @@ nfsd_open(struct svc_rqst *rqstp, struct svc_fh *fhp, int type,
 		DQUOT_INIT(inode);
 	}
 	*filp = dentry_open(dget(dentry), mntget(fhp->fh_export->ex_path.mnt),
-				flags);
+			    flags, cred);
 	if (IS_ERR(*filp))
 		host_err = PTR_ERR(*filp);
 out_nfserr:
@@ -779,7 +776,6 @@ static inline int nfsd_dosync(struct file *filp, struct dentry *dp,
 
 	return err;
 }
-	
 
 static int
 nfsd_sync(struct file *filp)
@@ -971,13 +967,13 @@ out:
 	return err;
 }
 
-static void kill_suid(struct dentry *dentry, struct vfsmount *mnt)
+static void kill_suid(struct dentry *dentry)
 {
 	struct iattr	ia;
 	ia.ia_valid = ATTR_KILL_SUID | ATTR_KILL_SGID | ATTR_KILL_PRIV;
 
 	mutex_lock(&dentry->d_inode->i_mutex);
-	notify_change(dentry, mnt, &ia);
+	notify_change(dentry, &ia);
 	mutex_unlock(&dentry->d_inode->i_mutex);
 }
 
@@ -1040,7 +1036,7 @@ nfsd_vfs_write(struct svc_rqst *rqstp, struct svc_fh *fhp, struct file *file,
 
 	/* clear setuid/setgid flag after write */
 	if (host_err >= 0 && (inode->i_mode & (S_ISUID | S_ISGID)))
-		kill_suid(dentry, exp->ex_path.mnt);
+		kill_suid(dentry);
 
 	if (host_err >= 0 && stable) {
 		static ino_t	last_ino;
@@ -1201,7 +1197,7 @@ nfsd_create_setattr(struct svc_rqst *rqstp, struct svc_fh *resfhp,
 	 * send along the gid on create when it tries to implement
 	 * setgid directories via NFS:
 	 */
-	if (current->fsuid != 0)
+	if (current_fsuid() != 0)
 		iap->ia_valid &= ~(ATTR_UID|ATTR_GID);
 	if (iap->ia_valid)
 		return nfsd_setattr(rqstp, resfhp, iap, 0, (time_t)0);
@@ -1222,7 +1218,6 @@ nfsd_create(struct svc_rqst *rqstp, struct svc_fh *fhp,
 		int type, dev_t rdev, struct svc_fh *resfhp)
 {
 	struct dentry	*dentry, *dchild = NULL;
-	struct svc_export *exp;
 	struct inode	*dirp;
 	__be32		err;
 	__be32		err2;
@@ -1240,11 +1235,10 @@ nfsd_create(struct svc_rqst *rqstp, struct svc_fh *fhp,
 		goto out;
 
 	dentry = fhp->fh_dentry;
-	exp = fhp->fh_export;
 	dirp = dentry->d_inode;
 
 	err = nfserr_notdir;
-	if(!dirp->i_op || !dirp->i_op->lookup)
+	if (!dirp->i_op->lookup)
 		goto out;
 	/*
 	 * Check whether the response file handle has been verified yet.
@@ -1257,7 +1251,7 @@ nfsd_create(struct svc_rqst *rqstp, struct svc_fh *fhp,
 		host_err = PTR_ERR(dchild);
 		if (IS_ERR(dchild))
 			goto out_nfserr;
-		err = fh_compose(resfhp, exp, dchild, fhp);
+		err = fh_compose(resfhp, fhp->fh_export, dchild, fhp);
 		if (err)
 			goto out;
 	} else {
@@ -1307,14 +1301,13 @@ nfsd_create(struct svc_rqst *rqstp, struct svc_fh *fhp,
 		host_err = vfs_create(dirp, dchild, iap->ia_mode, NULL);
 		break;
 	case S_IFDIR:
-		host_err = vfs_mkdir(dirp, dchild, exp->ex_path.mnt, iap->ia_mode);
+		host_err = vfs_mkdir(dirp, dchild, iap->ia_mode);
 		break;
 	case S_IFCHR:
 	case S_IFBLK:
 	case S_IFIFO:
 	case S_IFSOCK:
-		host_err = vfs_mknod(dirp, dchild, exp->ex_path.mnt,
-				     iap->ia_mode, rdev);
+		host_err = vfs_mknod(dirp, dchild, iap->ia_mode, rdev);
 		break;
 	}
 	if (host_err < 0) {
@@ -1322,7 +1315,7 @@ nfsd_create(struct svc_rqst *rqstp, struct svc_fh *fhp,
 		goto out_nfserr;
 	}
 
-	if (EX_ISSYNC(exp)) {
+	if (EX_ISSYNC(fhp->fh_export)) {
 		err = nfserrno(nfsd_sync_dir(dentry));
 		write_inode_now(dchild->d_inode, 1);
 	}
@@ -1381,7 +1374,7 @@ nfsd_create_v3(struct svc_rqst *rqstp, struct svc_fh *fhp,
 	/* Get all the sanity checks out of the way before
 	 * we lock the parent. */
 	err = nfserr_notdir;
-	if(!dirp->i_op || !dirp->i_op->lookup)
+	if (!dirp->i_op->lookup)
 		goto out;
 	fh_lock_nested(fhp, I_MUTEX_PARENT);
 
@@ -1516,7 +1509,7 @@ nfsd_readlink(struct svc_rqst *rqstp, struct svc_fh *fhp, char *buf, int *lenp)
 	inode = dentry->d_inode;
 
 	err = nfserr_inval;
-	if (!inode->i_op || !inode->i_op->readlink)
+	if (!inode->i_op->readlink)
 		goto out;
 
 	touch_atime(fhp->fh_export->ex_path.mnt, dentry);
@@ -1552,7 +1545,6 @@ nfsd_symlink(struct svc_rqst *rqstp, struct svc_fh *fhp,
 				struct iattr *iap)
 {
 	struct dentry	*dentry, *dnew;
-	struct svc_export *exp;
 	__be32		err, cerr;
 	int		host_err;
 
@@ -1577,7 +1569,6 @@ nfsd_symlink(struct svc_rqst *rqstp, struct svc_fh *fhp,
 	if (host_err)
 		goto out_nfserr;
 
-	exp = fhp->fh_export;
 	if (unlikely(path[plen] != 0)) {
 		char *path_alloced = kmalloc(plen+1, GFP_KERNEL);
 		if (path_alloced == NULL)
@@ -1585,16 +1576,14 @@ nfsd_symlink(struct svc_rqst *rqstp, struct svc_fh *fhp,
 		else {
 			strncpy(path_alloced, path, plen);
 			path_alloced[plen] = 0;
-			host_err = vfs_symlink(dentry->d_inode, dnew,
-					       exp->ex_path.mnt, path_alloced);
+			host_err = vfs_symlink(dentry->d_inode, dnew, path_alloced);
 			kfree(path_alloced);
 		}
 	} else
-		host_err = vfs_symlink(dentry->d_inode, dnew, exp->ex_path.mnt,
-				       path);
+		host_err = vfs_symlink(dentry->d_inode, dnew, path);
 
 	if (!host_err) {
-		if (EX_ISSYNC(exp))
+		if (EX_ISSYNC(fhp->fh_export))
 			host_err = nfsd_sync_dir(dentry);
 	}
 	err = nfserrno(host_err);
@@ -1602,7 +1591,7 @@ nfsd_symlink(struct svc_rqst *rqstp, struct svc_fh *fhp,
 
 	mnt_drop_write(fhp->fh_export->ex_path.mnt);
 
-	cerr = fh_compose(resfhp, exp, dnew, fhp);
+	cerr = fh_compose(resfhp, fhp->fh_export, dnew, fhp);
 	dput(dnew);
 	if (err==0) err = cerr;
 out:
@@ -1657,8 +1646,7 @@ nfsd_link(struct svc_rqst *rqstp, struct svc_fh *ffhp,
 		err = nfserrno(host_err);
 		goto out_dput;
 	}
-	host_err = vfs_link(dold, tfhp->fh_export->ex_path.mnt, dirp,
-			    dnew, ffhp->fh_export->ex_path.mnt);
+	host_err = vfs_link(dold, dirp, dnew);
 	if (!host_err) {
 		if (EX_ISSYNC(ffhp->fh_export)) {
 			err = nfserrno(nfsd_sync_dir(ddir));
@@ -1759,8 +1747,7 @@ nfsd_rename(struct svc_rqst *rqstp, struct svc_fh *ffhp, char *fname, int flen,
 	if (host_err)
 		goto out_dput_new;
 
-	host_err = vfs_rename(fdir, odentry, ffhp->fh_export->ex_path.mnt,
-			      tdir, ndentry, tfhp->fh_export->ex_path.mnt);
+	host_err = vfs_rename(fdir, odentry, tdir, ndentry);
 	if (!host_err && EX_ISSYNC(tfhp->fh_export)) {
 		host_err = nfsd_sync_dir(tdentry);
 		if (!host_err)
@@ -1798,7 +1785,6 @@ nfsd_unlink(struct svc_rqst *rqstp, struct svc_fh *fhp, int type,
 				char *fname, int flen)
 {
 	struct dentry	*dentry, *rdentry;
-	struct svc_export *exp;
 	struct inode	*dirp;
 	__be32		err;
 	int		host_err;
@@ -1813,7 +1799,6 @@ nfsd_unlink(struct svc_rqst *rqstp, struct svc_fh *fhp, int type,
 	fh_lock_nested(fhp, I_MUTEX_PARENT);
 	dentry = fhp->fh_dentry;
 	dirp = dentry->d_inode;
-	exp = fhp->fh_export;
 
 	rdentry = lookup_one_len(fname, dentry, flen);
 	host_err = PTR_ERR(rdentry);
@@ -1835,21 +1820,21 @@ nfsd_unlink(struct svc_rqst *rqstp, struct svc_fh *fhp, int type,
 
 	if (type != S_IFDIR) { /* It's UNLINK */
 #ifdef MSNFS
-		if ((exp->ex_flags & NFSEXP_MSNFS) &&
+		if ((fhp->fh_export->ex_flags & NFSEXP_MSNFS) &&
 			(atomic_read(&rdentry->d_count) > 1)) {
 			host_err = -EPERM;
 		} else
 #endif
-		host_err = vfs_unlink(dirp, rdentry, exp->ex_path.mnt);
+		host_err = vfs_unlink(dirp, rdentry);
 	} else { /* It's RMDIR */
-		host_err = vfs_rmdir(dirp, rdentry, exp->ex_path.mnt);
+		host_err = vfs_rmdir(dirp, rdentry);
 	}
 
 	dput(rdentry);
 
 	if (host_err)
 		goto out_drop;
-	if (EX_ISSYNC(exp))
+	if (EX_ISSYNC(fhp->fh_export))
 		host_err = nfsd_sync_dir(dentry);
 
 out_drop:
@@ -1861,6 +1846,113 @@ out:
 }
 
 /*
+ * We do this buffering because we must not call back into the file
+ * system's ->lookup() method from the filldir callback. That may well
+ * deadlock a number of file systems.
+ *
+ * This is based heavily on the implementation of same in XFS.
+ */
+struct buffered_dirent {
+	u64		ino;
+	loff_t		offset;
+	int		namlen;
+	unsigned int	d_type;
+	char		name[];
+};
+
+struct readdir_data {
+	char		*dirent;
+	size_t		used;
+	int		full;
+};
+
+static int nfsd_buffered_filldir(void *__buf, const char *name, int namlen,
+				 loff_t offset, u64 ino, unsigned int d_type)
+{
+	struct readdir_data *buf = __buf;
+	struct buffered_dirent *de = (void *)(buf->dirent + buf->used);
+	unsigned int reclen;
+
+	reclen = ALIGN(sizeof(struct buffered_dirent) + namlen, sizeof(u64));
+	if (buf->used + reclen > PAGE_SIZE) {
+		buf->full = 1;
+		return -EINVAL;
+	}
+
+	de->namlen = namlen;
+	de->offset = offset;
+	de->ino = ino;
+	de->d_type = d_type;
+	memcpy(de->name, name, namlen);
+	buf->used += reclen;
+
+	return 0;
+}
+
+static int nfsd_buffered_readdir(struct file *file, filldir_t func,
+				 struct readdir_cd *cdp, loff_t *offsetp)
+{
+	struct readdir_data buf;
+	struct buffered_dirent *de;
+	int host_err;
+	int size;
+	loff_t offset;
+
+	buf.dirent = (void *)__get_free_page(GFP_KERNEL);
+	if (!buf.dirent)
+		return -ENOMEM;
+
+	offset = *offsetp;
+
+	while (1) {
+		unsigned int reclen;
+
+		cdp->err = nfserr_eof; /* will be cleared on successful read */
+		buf.used = 0;
+		buf.full = 0;
+
+		host_err = vfs_readdir(file, nfsd_buffered_filldir, &buf);
+		if (buf.full)
+			host_err = 0;
+
+		if (host_err < 0)
+			break;
+
+		size = buf.used;
+
+		if (!size)
+			break;
+
+		de = (struct buffered_dirent *)buf.dirent;
+		while (size > 0) {
+			offset = de->offset;
+
+			if (func(cdp, de->name, de->namlen, de->offset,
+				 de->ino, de->d_type))
+				goto done;
+
+			if (cdp->err != nfs_ok)
+				goto done;
+
+			reclen = ALIGN(sizeof(*de) + de->namlen,
+				       sizeof(u64));
+			size -= reclen;
+			de = (struct buffered_dirent *)((char *)de + reclen);
+		}
+		offset = vfs_llseek(file, 0, SEEK_CUR);
+	}
+
+ done:
+	free_page((unsigned long)(buf.dirent));
+
+	if (host_err)
+		return nfserrno(host_err);
+
+	*offsetp = offset;
+	return cdp->err;
+}
+
+/*
  * Read entries from a directory.
  * The  NFSv3/4 verifier we ignore for now.
  */
@@ -1869,7 +1961,6 @@ nfsd_readdir(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t *offsetp,
 	     struct readdir_cd *cdp, filldir_t func)
 {
 	__be32		err;
-	int 		host_err;
 	struct file	*file;
 	loff_t		offset = *offsetp;
 
@@ -1883,21 +1974,7 @@ nfsd_readdir(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t *offsetp,
 		goto out_close;
 	}
 
-	/*
-	 * Read the directory entries. This silly loop is necessary because
-	 * readdir() is not guaranteed to fill up the entire buffer, but
-	 * may choose to do less.
-	 */
-
-	do {
-		cdp->err = nfserr_eof; /* will be cleared on successful read */
-		host_err = vfs_readdir(file, func, cdp);
-	} while (host_err >=0 && cdp->err == nfs_ok);
-	if (host_err)
-		err = nfserrno(host_err);
-	else
-		err = cdp->err;
-	*offsetp = vfs_llseek(file, 0, 1);
+	err = nfsd_buffered_readdir(file, func, cdp, offsetp);
 
 	if (err == nfserr_eof || err == nfserr_toosmall)
 		err = nfs_ok; /* can still be found in ->err */
@@ -1912,9 +1989,9 @@ out:
  * N.B. After this call fhp needs an fh_put
  */
 __be32
-nfsd_statfs(struct svc_rqst *rqstp, struct svc_fh *fhp, struct kstatfs *stat)
+nfsd_statfs(struct svc_rqst *rqstp, struct svc_fh *fhp, struct kstatfs *stat, int access)
 {
-	__be32 err = fh_verify(rqstp, fhp, 0, NFSD_MAY_NOP);
+	__be32 err = fh_verify(rqstp, fhp, 0, NFSD_MAY_NOP | access);
 	if (!err && vfs_statfs(fhp->fh_dentry,stat))
 		err = nfserr_io;
 	return err;
@@ -1952,7 +2029,7 @@ nfsd_permission(struct svc_rqst *rqstp, struct svc_export *exp,
 		IS_APPEND(inode)?	" append" : "",
 		__mnt_is_readonly(exp->ex_path.mnt)?	" ro" : "");
 	dprintk("      owner %d/%d user %d/%d\n",
-		inode->i_uid, inode->i_gid, current->fsuid, current->fsgid);
+		inode->i_uid, inode->i_gid, current_fsuid(), current_fsgid());
 #endif
 
 	/* Normally we reject any write/sattr etc access on a read-only file
@@ -1995,7 +2072,7 @@ nfsd_permission(struct svc_rqst *rqstp, struct svc_export *exp,
 	 * with NFSv3.
 	 */
 	if ((acc & NFSD_MAY_OWNER_OVERRIDE) &&
-	    inode->i_uid == current->fsuid)
+	    inode->i_uid == current_fsuid())
 		return 0;
 
 	/* This assumes  NFSD_MAY_{READ,WRITE,EXEC} == MAY_{READ,WRITE,EXEC} */
@@ -2012,11 +2089,20 @@ nfsd_permission(struct svc_rqst *rqstp, struct svc_export *exp,
 void
 nfsd_racache_shutdown(void)
 {
-	if (!raparml)
-		return;
+	struct raparms *raparm, *last_raparm;
+	unsigned int i;
+
 	dprintk("nfsd: freeing readahead buffers.\n");
-	kfree(raparml);
-	raparml = NULL;
+
+	for (i = 0; i < RAPARM_HASH_SIZE; i++) {
+		raparm = raparm_hash[i].pb_head;
+		while(raparm) {
+			last_raparm = raparm;
+			raparm = raparm->p_next;
+			kfree(last_raparm);
+		}
+		raparm_hash[i].pb_head = NULL;
+	}
 }
 /*
  * Initialize readahead param cache
@@ -2027,35 +2113,38 @@ nfsd_racache_init(int cache_size)
 	int	i;
 	int	j = 0;
 	int	nperbucket;
+	struct raparms **raparm = NULL;
 
 
-	if (raparml)
+	if (raparm_hash[0].pb_head)
 		return 0;
-	if (cache_size < 2*RAPARM_HASH_SIZE)
-		cache_size = 2*RAPARM_HASH_SIZE;
-	raparml = kcalloc(cache_size, sizeof(struct raparms), GFP_KERNEL);
-
-	if (!raparml) {
-		printk(KERN_WARNING
-			"nfsd: Could not allocate memory read-ahead cache.\n");
-		return -ENOMEM;
-	}
+	nperbucket = DIV_ROUND_UP(cache_size, RAPARM_HASH_SIZE);
+	if (nperbucket < 2)
+		nperbucket = 2;
+	cache_size = nperbucket * RAPARM_HASH_SIZE;
 
 	dprintk("nfsd: allocating %d readahead buffers.\n", cache_size);
-	for (i = 0 ; i < RAPARM_HASH_SIZE ; i++) {
-		raparm_hash[i].pb_head = NULL;
+
+	for (i = 0; i < RAPARM_HASH_SIZE; i++) {
 		spin_lock_init(&raparm_hash[i].pb_lock);
-	}
-	nperbucket = DIV_ROUND_UP(cache_size, RAPARM_HASH_SIZE);
-	for (i = 0; i < cache_size - 1; i++) {
-		if (i % nperbucket == 0)
-			raparm_hash[j++].pb_head = raparml + i;
-		if (i % nperbucket < nperbucket-1)
-			raparml[i].p_next = raparml + i + 1;
+
+		raparm = &raparm_hash[i].pb_head;
+		for (j = 0; j < nperbucket; j++) {
+			*raparm = kzalloc(sizeof(struct raparms), GFP_KERNEL);
+			if (!*raparm)
+				goto out_nomem;
+			raparm = &(*raparm)->p_next;
+		}
+		*raparm = NULL;
 	}
 
 	nfsdstats.ra_size = cache_size;
 	return 0;
+
+out_nomem:
+	dprintk("nfsd: kmalloc failed, freeing readahead buffers\n");
+	nfsd_racache_shutdown();
+	return -ENOMEM;
 }
 
 #if defined(CONFIG_NFSD_V2_ACL) || defined(CONFIG_NFSD_V3_ACL)
@@ -2082,8 +2171,7 @@ nfsd_get_posix_acl(struct svc_fh *fhp, int type)
 		return ERR_PTR(-EOPNOTSUPP);
 	}
 
-	size = nfsd_getxattr(fhp->fh_dentry, fhp->fh_export->ex_path.mnt, name,
-			     &value);
+	size = nfsd_getxattr(fhp->fh_dentry, name, &value);
 	if (size < 0)
 		return ERR_PTR(size);
 
@@ -2095,14 +2183,13 @@ nfsd_get_posix_acl(struct svc_fh *fhp, int type)
 int
 nfsd_set_posix_acl(struct svc_fh *fhp, int type, struct posix_acl *acl)
 {
-	struct vfsmount *mnt;
 	struct inode *inode = fhp->fh_dentry->d_inode;
 	char *name;
 	void *value = NULL;
 	size_t size;
 	int error;
 
-	if (!IS_POSIXACL(inode) || !inode->i_op ||
+	if (!IS_POSIXACL(inode) ||
 	    !inode->i_op->setxattr || !inode->i_op->removexattr)
 		return -EOPNOTSUPP;
 	switch(type) {
@@ -2128,24 +2215,21 @@ nfsd_set_posix_acl(struct svc_fh *fhp, int type, struct posix_acl *acl)
 	} else
 		size = 0;
 
-	mnt = fhp->fh_export->ex_path.mnt;
-	error = mnt_want_write(mnt);
+	error = mnt_want_write(fhp->fh_export->ex_path.mnt);
 	if (error)
 		goto getout;
 	if (size)
-		error = vfs_setxattr(fhp->fh_dentry, mnt, name, value, size, 0,
-				     NULL);
+		error = vfs_setxattr(fhp->fh_dentry, name, value, size, 0);
 	else {
 		if (!S_ISDIR(inode->i_mode) && type == ACL_TYPE_DEFAULT)
 			error = 0;
 		else {
-			error = vfs_removexattr(fhp->fh_dentry, mnt, name,
-						NULL);
+			error = vfs_removexattr(fhp->fh_dentry, name);
 			if (error == -ENODATA)
 				error = 0;
 		}
 	}
-	mnt_drop_write(mnt);
+	mnt_drop_write(fhp->fh_export->ex_path.mnt);
 
 getout:
 	kfree(value);

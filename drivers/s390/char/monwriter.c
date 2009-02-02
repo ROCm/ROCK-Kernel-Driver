@@ -9,6 +9,7 @@
  */
 
 #define KMSG_COMPONENT "monwriter"
+#define pr_fmt(fmt) KMSG_COMPONENT ": " fmt
 
 #include <linux/module.h>
 #include <linux/moduleparam.h>

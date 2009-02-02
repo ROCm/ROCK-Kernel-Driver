@@ -9,12 +9,14 @@
 #include <linux/irq.h>
 #include <linux/sched.h>
 #include <linux/serial_8250.h>
+#include <linux/io.h>
 
 #include <asm/setup.h>
 #include <asm/mach-types.h>
-#include <asm/io.h>
 #include <asm/leds.h>
 #include <asm/param.h>
+
+#include <mach/hardware.h>
 
 #include <asm/mach/map.h>
 #include <asm/mach/arch.h>

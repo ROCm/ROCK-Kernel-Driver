@@ -27,6 +27,7 @@
  */
 
 #define KMSG_COMPONENT		"lcs"
+#define pr_fmt(fmt) KMSG_COMPONENT ": " fmt
 
 #include <linux/module.h>
 #include <linux/if.h>
@@ -69,7 +70,9 @@ static char debug_buffer[255];
 static void lcs_tasklet(unsigned long);
 static void lcs_start_kernel_thread(struct work_struct *);
 static void lcs_get_frames_cb(struct lcs_channel *, struct lcs_buffer *);
+#ifdef CONFIG_IP_MULTICAST
 static int lcs_send_delipm(struct lcs_card *, struct lcs_ipm_list *);
+#endif /* CONFIG_IP_MULTICAST */
 static int lcs_recovery(void *ptr);
 
 /**
@@ -492,7 +495,7 @@ lcs_start_channel(struct lcs_channel *channel)
 	unsigned long flags;
 	int rc;
 
-	LCS_DBF_TEXT_(4,trace,"ssch%s", channel->ccwdev->dev.bus_id);
+	LCS_DBF_TEXT_(4, trace,"ssch%s", dev_name(&channel->ccwdev->dev));
 	spin_lock_irqsave(get_ccwdev_lock(channel->ccwdev), flags);
 	rc = ccw_device_start(channel->ccwdev,
 			      channel->ccws + channel->io_idx, 0, 0,
@@ -501,7 +504,8 @@ lcs_start_channel(struct lcs_channel *channel)
 		channel->state = LCS_CH_STATE_RUNNING;
 	spin_unlock_irqrestore(get_ccwdev_lock(channel->ccwdev), flags);
 	if (rc) {
-		LCS_DBF_TEXT_(4,trace,"essh%s", channel->ccwdev->dev.bus_id);
+		LCS_DBF_TEXT_(4,trace,"essh%s",
+			      dev_name(&channel->ccwdev->dev));
 		dev_err(&channel->ccwdev->dev,
 			"Starting an LCS device resulted in an error,"
 			" rc=%d!\n", rc);
@@ -516,12 +520,13 @@ lcs_clear_channel(struct lcs_channel *channel)
 	int rc;
 
 	LCS_DBF_TEXT(4,trace,"clearch");
-	LCS_DBF_TEXT_(4,trace,"%s", channel->ccwdev->dev.bus_id);
+	LCS_DBF_TEXT_(4, trace, "%s", dev_name(&channel->ccwdev->dev));
 	spin_lock_irqsave(get_ccwdev_lock(channel->ccwdev), flags);
 	rc = ccw_device_clear(channel->ccwdev, (addr_t) channel);
 	spin_unlock_irqrestore(get_ccwdev_lock(channel->ccwdev), flags);
 	if (rc) {
-		LCS_DBF_TEXT_(4,trace,"ecsc%s", channel->ccwdev->dev.bus_id);
+		LCS_DBF_TEXT_(4, trace, "ecsc%s",
+			      dev_name(&channel->ccwdev->dev));
 		return rc;
 	}
 	wait_event(channel->wait_q, (channel->state == LCS_CH_STATE_CLEARED));
@@ -542,13 +547,14 @@ lcs_stop_channel(struct lcs_channel *channel)
 	if (channel->state == LCS_CH_STATE_STOPPED)
 		return 0;
 	LCS_DBF_TEXT(4,trace,"haltsch");
-	LCS_DBF_TEXT_(4,trace,"%s", channel->ccwdev->dev.bus_id);
+	LCS_DBF_TEXT_(4, trace, "%s", dev_name(&channel->ccwdev->dev));
 	channel->state = LCS_CH_STATE_INIT;
 	spin_lock_irqsave(get_ccwdev_lock(channel->ccwdev), flags);
 	rc = ccw_device_halt(channel->ccwdev, (addr_t) channel);
 	spin_unlock_irqrestore(get_ccwdev_lock(channel->ccwdev), flags);
 	if (rc) {
-		LCS_DBF_TEXT_(4,trace,"ehsc%s", channel->ccwdev->dev.bus_id);
+		LCS_DBF_TEXT_(4, trace, "ehsc%s",
+			      dev_name(&channel->ccwdev->dev));
 		return rc;
 	}
 	/* Asynchronous halt initialted. Wait for its completion. */
@@ -634,11 +640,12 @@ __lcs_resume_channel(struct lcs_channel *channel)
 		return 0;
 	if (channel->ccws[channel->io_idx].flags & CCW_FLAG_SUSPEND)
 		return 0;
-	LCS_DBF_TEXT_(5, trace, "rsch%s", channel->ccwdev->dev.bus_id);
+	LCS_DBF_TEXT_(5, trace, "rsch%s", dev_name(&channel->ccwdev->dev));
 	rc = ccw_device_resume(channel->ccwdev);
 	if (rc) {
-		LCS_DBF_TEXT_(4, trace, "ersc%s", channel->ccwdev->dev.bus_id);
-		dev_warn(&channel->ccwdev->dev,
+		LCS_DBF_TEXT_(4, trace, "ersc%s",
+			      dev_name(&channel->ccwdev->dev));
+		dev_err(&channel->ccwdev->dev,
 			"Sending data from the LCS device to the LAN failed"
 			" with rc=%d\n",rc);
 	} else
@@ -1280,6 +1287,8 @@ out:
 	lcs_clear_thread_running_bit(card, LCS_SET_MC_THREAD);
 	return 0;
 }
+#endif /* CONFIG_IP_MULTICAST */
+
 /**
  * function called by net device to
  * handle multicast address relevant things
@@ -1287,16 +1296,16 @@ out:
 static void
 lcs_set_multicast_list(struct net_device *dev)
 {
+#ifdef CONFIG_IP_MULTICAST
         struct lcs_card *card;
 
         LCS_DBF_TEXT(4, trace, "setmulti");
-        card = (struct lcs_card *) dev->priv;
+        card = (struct lcs_card *) dev->ml_priv;
 
         if (!lcs_set_thread_start_bit(card, LCS_SET_MC_THREAD))
 		schedule_work(&card->kernel_thread_starter);
-}
-
 #endif /* CONFIG_IP_MULTICAST */
+}
 
 static long
 lcs_check_irb_error(struct ccw_device *cdev, struct irb *irb)
@@ -1397,7 +1406,7 @@ lcs_irq(struct ccw_device *cdev, unsigned long intparm, struct irb *irb)
 
 	cstat = irb->scsw.cmd.cstat;
 	dstat = irb->scsw.cmd.dstat;
-	LCS_DBF_TEXT_(5, trace, "Rint%s",cdev->dev.bus_id);
+	LCS_DBF_TEXT_(5, trace, "Rint%s", dev_name(&cdev->dev));
 	LCS_DBF_TEXT_(5, trace, "%4x%4x", irb->scsw.cmd.cstat,
 		      irb->scsw.cmd.dstat);
 	LCS_DBF_TEXT_(5, trace, "%4x%4x", irb->scsw.cmd.fctl,
@@ -1472,7 +1481,7 @@ lcs_tasklet(unsigned long data)
 	int rc;
 
 	channel = (struct lcs_channel *) data;
-	LCS_DBF_TEXT_(5, trace, "tlet%s",channel->ccwdev->dev.bus_id);
+	LCS_DBF_TEXT_(5, trace, "tlet%s", dev_name(&channel->ccwdev->dev));
 
 	/* Check for processed buffers. */
 	iob = channel->iob;
@@ -1612,7 +1621,7 @@ lcs_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	int rc;
 
 	LCS_DBF_TEXT(5, trace, "pktxmit");
-	card = (struct lcs_card *) dev->priv;
+	card = (struct lcs_card *) dev->ml_priv;
 	rc = __lcs_start_xmit(card, skb, dev);
 	return rc;
 }
@@ -1869,7 +1878,7 @@ lcs_getstats(struct net_device *dev)
 	struct lcs_card *card;
 
 	LCS_DBF_TEXT(4, trace, "netstats");
-	card = (struct lcs_card *) dev->priv;
+	card = (struct lcs_card *) dev->ml_priv;
 	return &card->stats;
 }
 
@@ -1884,7 +1893,7 @@ lcs_stop_device(struct net_device *dev)
 	int rc;
 
 	LCS_DBF_TEXT(2, trace, "stopdev");
-	card   = (struct lcs_card *) dev->priv;
+	card   = (struct lcs_card *) dev->ml_priv;
 	netif_carrier_off(dev);
 	netif_tx_disable(dev);
 	dev->flags &= ~IFF_UP;
@@ -1908,7 +1917,7 @@ lcs_open_device(struct net_device *dev)
 	int rc;
 
 	LCS_DBF_TEXT(2, trace, "opendev");
-	card = (struct lcs_card *) dev->priv;
+	card = (struct lcs_card *) dev->ml_priv;
 	/* initialize statistics */
 	rc = lcs_detect(card);
 	if (rc) {
@@ -2120,7 +2129,7 @@ lcs_new_device(struct ccwgroup_device *ccwgdev)
 	rc = lcs_detect(card);
 	if (rc) {
 		LCS_DBF_TEXT(2, setup, "dtctfail");
-		dev_warn(&card->dev->dev,
+		dev_err(&card->dev->dev,
 			"Detecting a network adapter for LCS devices"
 			" failed with rc=%d (0x%x)\n", rc, rc);
 		lcs_stopcard(card);
@@ -2158,7 +2167,7 @@ lcs_new_device(struct ccwgroup_device *ccwgdev)
 	if (!dev)
 		goto out;
 	card->dev = dev;
-	card->dev->priv = card;
+	card->dev->ml_priv = card;
 	card->dev->open = lcs_open_device;
 	card->dev->stop = lcs_stop_device;
 	card->dev->hard_start_xmit = lcs_start_xmit;

@@ -56,9 +56,6 @@ struct sockaddr;
  *			is not supported, and a -Exx value on other error
  * @start_conn:		set connection to be operational
  * @stop_conn:		suspend/recover/terminate connection
- * @parse_itt:		parse the itt rcv'ed in BHS
- * @reserve_itt:	construct a task itt to be sent in BHS
- * @release_itt:	release a itt (constructed by reserve_itt)
  * @send_pdu:		send iSCSI PDU, Login, Logout, NOP-Out, Reject, Text.
  * @session_recovery_timedout: notify LLD a block during recovery timed out
  * @init_task:		Initialize a iscsi_task and any internal structs.
@@ -112,18 +109,22 @@ struct iscsi_transport {
 	int (*set_host_param) (struct Scsi_Host *shost,
 			       enum iscsi_host_param param, char *buf,
 			       int buflen);
-	void (*parse_itt)(struct iscsi_conn *conn, itt_t hdr_itt,
-			  int *idx, int *age);
-	int (*reserve_itt)(struct iscsi_task *task, itt_t *hdr_itt);
-	void (*release_itt)(struct iscsi_task *task, itt_t hdr_itt);
 	int (*send_pdu) (struct iscsi_cls_conn *conn, struct iscsi_hdr *hdr,
 			 char *data, uint32_t data_size);
 	void (*get_stats) (struct iscsi_cls_conn *conn,
 			   struct iscsi_stats *stats);
+
 	int (*init_task) (struct iscsi_task *task);
 	int (*xmit_task) (struct iscsi_task *task);
-	void (*cleanup_task) (struct iscsi_conn *conn,
-				  struct iscsi_task *task);
+	void (*cleanup_task) (struct iscsi_task *task);
+
+	int (*alloc_pdu) (struct iscsi_task *task, uint8_t opcode);
+	int (*xmit_pdu) (struct iscsi_task *task);
+	int (*init_pdu) (struct iscsi_task *task, unsigned int offset,
+			 unsigned int count);
+	void (*parse_pdu_itt) (struct iscsi_conn *conn, itt_t itt,
+			       int *index, int *age);
+
 	void (*session_recovery_timedout) (struct iscsi_cls_session *session);
 	struct iscsi_endpoint *(*ep_connect) (struct sockaddr *dst_addr,
 					      int non_blocking);
@@ -142,7 +143,8 @@ extern int iscsi_unregister_transport(struct iscsi_transport *tt);
 /*
  * control plane upcalls
  */
-extern void iscsi_conn_error(struct iscsi_cls_conn *conn, enum iscsi_err error);
+extern void iscsi_conn_error_event(struct iscsi_cls_conn *conn,
+				   enum iscsi_err error);
 extern int iscsi_recv_pdu(struct iscsi_cls_conn *conn, struct iscsi_hdr *hdr,
 			  char *data, uint32_t data_size);
 

@@ -237,14 +237,6 @@ struct fw_card {
 	int link_speed;
 	int config_rom_generation;
 
-	/*
-	 * We need to store up to 4 self ID for a maximum of 63
-	 * devices plus 3 words for the topology map header.
-	 */
-	int self_id_count;
-	u32 topology_map[252 + 3];
-	u32 broadcast_channel;
-
 	spinlock_t lock; /* Take this lock when handling the lists in
 			  * this struct. */
 	struct fw_node *local_node;
@@ -262,6 +254,9 @@ struct fw_card {
 	struct delayed_work work;
 	int bm_retries;
 	int bm_generation;
+
+	u32 broadcast_channel;
+	u32 topology_map[(CSR_TOPOLOGY_MAP_END - CSR_TOPOLOGY_MAP) / 4];
 };
 
 static inline struct fw_card *fw_card_get(struct fw_card *card)
@@ -277,6 +272,8 @@ static inline void fw_card_put(struct fw_card *card)
 {
 	kref_put(&card->kref, fw_card_release);
 }
+
+extern void fw_schedule_bm_work(struct fw_card *card, unsigned long delay);
 
 /*
  * The iso packet format allows for an immediate header/payload part
@@ -428,10 +425,13 @@ fw_core_initiate_bus_reset(struct fw_card *card, int short_reset);
 
 void
 fw_send_request(struct fw_card *card, struct fw_transaction *t,
-		int tcode, int node_id, int generation, int speed,
-		unsigned long long offset,
-		void *data, size_t length,
+		int tcode, int destination_id, int generation, int speed,
+		unsigned long long offset, void *data, size_t length,
 		fw_transaction_callback_t callback, void *callback_data);
+
+int fw_run_transaction(struct fw_card *card, int tcode, int destination_id,
+		       int generation, int speed, unsigned long long offset,
+		       void *data, size_t length);
 
 int fw_cancel_transaction(struct fw_card *card,
 			  struct fw_transaction *transaction);

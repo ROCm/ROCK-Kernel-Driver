@@ -111,7 +111,7 @@ void bio_integrity_free(struct bio *bio, struct bio_set *bs)
 	    && bip->bip_buf != NULL)
 		kfree(bip->bip_buf);
 
-	mempool_free(bip->bip_vec, bs->bvec_pools[bip->bip_pool]);
+	bvec_free_bs(bs, bip->bip_vec, bip->bip_pool);
 	mempool_free(bip, bs->bio_integrity_pool);
 
 	bio->bi_integrity = NULL;
@@ -150,6 +150,24 @@ int bio_integrity_add_page(struct bio *bio, struct page *page,
 	return len;
 }
 EXPORT_SYMBOL(bio_integrity_add_page);
+
+static int bdev_integrity_enabled(struct block_device *bdev, int rw)
+{
+	struct blk_integrity *bi = bdev_get_integrity(bdev);
+
+	if (bi == NULL)
+		return 0;
+
+	if (rw == READ && bi->verify_fn != NULL &&
+	    (bi->flags & INTEGRITY_FLAG_READ))
+		return 1;
+
+	if (rw == WRITE && bi->generate_fn != NULL &&
+	    (bi->flags & INTEGRITY_FLAG_WRITE))
+		return 1;
+
+	return 0;
+}
 
 /**
  * bio_integrity_enabled - Check whether integrity can be passed
@@ -312,6 +330,14 @@ static void bio_integrity_generate(struct bio *bio)
 
 		kunmap_atomic(kaddr, KM_USER0);
 	}
+}
+
+static inline unsigned short blk_integrity_tuple_size(struct blk_integrity *bi)
+{
+	if (bi)
+		return bi->tuple_size;
+
+	return 0;
 }
 
 /**

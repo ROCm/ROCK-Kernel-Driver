@@ -18,7 +18,8 @@
 #include <linux/ioport.h>
 #include <linux/mtd/physmap.h>
 #include <linux/platform_device.h>
-#include <asm/io.h>
+#include <linux/io.h>
+#include <linux/i2c.h>
 #include <mach/hardware.h>
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
@@ -28,8 +29,8 @@ static struct physmap_flash_data edb9302_flash_data = {
 };
 
 static struct resource edb9302_flash_resource = {
-	.start		= 0x60000000,
-	.end		= 0x60ffffff,
+	.start		= EP93XX_CS6_PHYS_BASE,
+	.end		= EP93XX_CS6_PHYS_BASE + SZ_16M - 1,
 	.flags		= IORESOURCE_MEM,
 };
 
@@ -43,17 +44,23 @@ static struct platform_device edb9302_flash = {
 	.resource	= &edb9302_flash_resource,
 };
 
+static struct ep93xx_eth_data edb9302_eth_data = {
+	.phy_id		= 1,
+};
+
 static void __init edb9302_init_machine(void)
 {
 	ep93xx_init_devices();
 	platform_device_register(&edb9302_flash);
+
+	ep93xx_register_eth(&edb9302_eth_data, 1);
 }
 
 MACHINE_START(EDB9302, "Cirrus Logic EDB9302 Evaluation Board")
 	/* Maintainer: George Kashperko <george@chas.com.ua> */
 	.phys_io	= EP93XX_APB_PHYS_BASE,
 	.io_pg_offst	= ((EP93XX_APB_VIRT_BASE) >> 18) & 0xfffc,
-	.boot_params	= 0x00000100,
+	.boot_params	= EP93XX_SDCE3_PHYS_BASE_SYNC + 0x100,
 	.map_io		= ep93xx_map_io,
 	.init_irq	= ep93xx_init_irq,
 	.timer		= &ep93xx_timer,

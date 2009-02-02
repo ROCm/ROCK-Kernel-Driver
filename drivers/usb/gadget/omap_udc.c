@@ -2313,6 +2313,13 @@ static int proc_otg_show(struct seq_file *s)
 
 	tmp = omap_readl(OTG_REV);
 	if (cpu_is_omap24xx()) {
+		/*
+		 * REVISIT: Not clear how this works on OMAP2.  trans
+		 * is ANDed to produce bits 7 and 8, which might make
+		 * sense for USB_TRANSCEIVER_CTRL on OMAP1,
+		 * but with CONTROL_DEVCONF, these bits have something to
+		 * do with the frame adjustment counter and McBSP2.
+		 */
 		ctrl_name = "control_devconf";
 		trans = omap_ctrl_readl(OMAP2_CONTROL_DEVCONF0);
 	} else {
@@ -2999,7 +3006,7 @@ cleanup1:
 
 cleanup0:
 	if (xceiv)
-		put_device(xceiv->dev);
+		otg_put_transceiver(xceiv);
 
 	if (cpu_is_omap16xx() || cpu_is_omap24xx()) {
 		clk_disable(hhc_clk);
@@ -3027,7 +3034,7 @@ static int __exit omap_udc_remove(struct platform_device *pdev)
 
 	pullup_disable(udc);
 	if (udc->transceiver) {
-		put_device(udc->transceiver->dev);
+		otg_put_transceiver(udc->transceiver);
 		udc->transceiver = NULL;
 	}
 	omap_writew(0, UDC_SYSCON1);

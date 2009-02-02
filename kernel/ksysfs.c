@@ -14,6 +14,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/kexec.h>
+#include <linux/profile.h>
 #include <linux/sched.h>
 
 #define KERNEL_ATTR_RO(_name) \
@@ -23,7 +24,7 @@ static struct kobj_attribute _name##_attr = __ATTR_RO(_name)
 static struct kobj_attribute _name##_attr = \
 	__ATTR(_name, 0644, _name##_show, _name##_store)
 
-#if defined(CONFIG_HOTPLUG) && defined(CONFIG_NET)
+#if defined(CONFIG_HOTPLUG)
 /* current uevent sequence number */
 static ssize_t uevent_seqnum_show(struct kobject *kobj,
 				  struct kobj_attribute *attr, char *buf)
@@ -51,6 +52,37 @@ static ssize_t uevent_helper_store(struct kobject *kobj,
 	return count;
 }
 KERNEL_ATTR_RW(uevent_helper);
+#endif
+
+#ifdef CONFIG_PROFILING
+static ssize_t profiling_show(struct kobject *kobj,
+				  struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "%d\n", prof_on);
+}
+static ssize_t profiling_store(struct kobject *kobj,
+				   struct kobj_attribute *attr,
+				   const char *buf, size_t count)
+{
+	int ret;
+
+	if (prof_on)
+		return -EEXIST;
+	/*
+	 * This eventually calls into get_option() which
+	 * has a ton of callers and is not const.  It is
+	 * easiest to cast it away here.
+	 */
+	profile_setup((char *)buf);
+	ret = profile_init();
+	if (ret)
+		return ret;
+	ret = create_proc_profile();
+	if (ret)
+		return ret;
+	return count;
+}
+KERNEL_ATTR_RW(profiling);
 #endif
 
 #ifdef CONFIG_KEXEC
@@ -117,14 +149,17 @@ const char *supported_printable(int taint)
 static ssize_t supported_show(struct kobject *kobj,
 			      struct kobj_attribute *attr, char *buf)
 {
-	return sprintf(buf, "%s\n", supported_printable(tainted));
+	return sprintf(buf, "%s\n", supported_printable(get_taint()));
 }
 KERNEL_ATTR_RO(supported);
 
 static struct attribute * kernel_attrs[] = {
-#if defined(CONFIG_HOTPLUG) && defined(CONFIG_NET)
+#if defined(CONFIG_HOTPLUG)
 	&uevent_seqnum_attr.attr,
 	&uevent_helper_attr.attr,
+#endif
+#ifdef CONFIG_PROFILING
+	&profiling_attr.attr,
 #endif
 #ifdef CONFIG_KEXEC
 	&kexec_loaded_attr.attr,

@@ -10,6 +10,7 @@
 #ifndef __INODE_DOT_H__
 #define __INODE_DOT_H__
 
+#include <linux/fs.h>
 #include "util.h"
 
 static inline int gfs2_is_stuffed(const struct gfs2_inode *ip)
@@ -19,7 +20,7 @@ static inline int gfs2_is_stuffed(const struct gfs2_inode *ip)
 
 static inline int gfs2_is_jdata(const struct gfs2_inode *ip)
 {
-	return ip->i_di.di_flags & GFS2_DIF_JDATA;
+	return ip->i_diskflags & GFS2_DIF_JDATA;
 }
 
 static inline int gfs2_is_writeback(const struct gfs2_inode *ip)
@@ -91,13 +92,21 @@ int gfs2_rmdiri(struct gfs2_inode *dip, const struct qstr *name,
 int gfs2_unlink_ok(struct gfs2_inode *dip, const struct qstr *name,
 		   const struct gfs2_inode *ip);
 int gfs2_permission(struct inode *inode, int mask);
-int gfs2_ok_to_move(struct gfs2_inode *this, struct gfs2_inode *to);
 int gfs2_readlinki(struct gfs2_inode *ip, char **buf, unsigned int *len);
-int gfs2_glock_nq_atime(struct gfs2_holder *gh);
 int gfs2_setattr_simple(struct gfs2_inode *ip, struct iattr *attr);
 struct inode *gfs2_lookup_simple(struct inode *dip, const char *name);
 void gfs2_dinode_out(const struct gfs2_inode *ip, void *buf);
 void gfs2_dinode_print(const struct gfs2_inode *ip);
+
+extern const struct inode_operations gfs2_file_iops;
+extern const struct inode_operations gfs2_dir_iops;
+extern const struct inode_operations gfs2_symlink_iops;
+extern const struct file_operations gfs2_file_fops;
+extern const struct file_operations gfs2_dir_fops;
+extern const struct file_operations gfs2_file_fops_nolock;
+extern const struct file_operations gfs2_dir_fops_nolock;
+
+extern void gfs2_set_inode_flags(struct inode *inode);
 
 #endif /* __INODE_DOT_H__ */
 

@@ -26,29 +26,6 @@ static void *get_ipc(ctl_table *table)
 	return which;
 }
 
-/*
- * Routine that is called when the file "auto_msgmni" has successfully been
- * written.
- * Two values are allowed:
- * 0: unregister msgmni's callback routine from the ipc namespace notifier
- *    chain. This means that msgmni won't be recomputed anymore upon memory
- *    add/remove or ipc namespace creation/removal.
- * 1: register back the callback routine.
- */
-static void ipc_auto_callback(int val)
-{
-	if (!val)
-		unregister_ipcns_notifier(current->nsproxy->ipc_ns);
-	else {
-		/*
-		 * Re-enable automatic recomputing only if not already
-		 * enabled.
-		 */
-		recompute_msgmni(current->nsproxy->ipc_ns);
-		cond_register_ipcns_notifier(current->nsproxy->ipc_ns);
-	}
-}
-
 #ifdef CONFIG_PROC_FS
 static int proc_ipc_dointvec(ctl_table *table, int write, struct file *filp,
 	void __user *buffer, size_t *lenp, loff_t *ppos)
@@ -94,6 +71,29 @@ static int proc_ipc_doulongvec_minmax(ctl_table *table, int write,
 					lenp, ppos);
 }
 
+/*
+ * Routine that is called when the file "auto_msgmni" has successfully been
+ * written.
+ * Two values are allowed:
+ * 0: unregister msgmni's callback routine from the ipc namespace notifier
+ *    chain. This means that msgmni won't be recomputed anymore upon memory
+ *    add/remove or ipc namespace creation/removal.
+ * 1: register back the callback routine.
+ */
+static void ipc_auto_callback(int val)
+{
+	if (!val)
+		unregister_ipcns_notifier(current->nsproxy->ipc_ns);
+	else {
+		/*
+		 * Re-enable automatic recomputing only if not already
+		 * enabled.
+		 */
+		recompute_msgmni(current->nsproxy->ipc_ns);
+		cond_register_ipcns_notifier(current->nsproxy->ipc_ns);
+	}
+}
+
 static int proc_ipcauto_dointvec_minmax(ctl_table *table, int write,
 	struct file *filp, void __user *buffer, size_t *lenp, loff_t *ppos)
 {
@@ -131,7 +131,7 @@ static int proc_ipcauto_dointvec_minmax(ctl_table *table, int write,
 
 #ifdef CONFIG_SYSCTL_SYSCALL
 /* The generic sysctl ipc data routine. */
-static int sysctl_ipc_data(ctl_table *table, int __user *name, int nlen,
+static int sysctl_ipc_data(ctl_table *table,
 		void __user *oldval, size_t __user *oldlenp,
 		void __user *newval, size_t newlen)
 {
@@ -169,14 +169,13 @@ static int sysctl_ipc_data(ctl_table *table, int __user *name, int nlen,
 	return 1;
 }
 
-static int sysctl_ipc_registered_data(ctl_table *table, int __user *name,
-		int nlen, void __user *oldval, size_t __user *oldlenp,
+static int sysctl_ipc_registered_data(ctl_table *table,
+		void __user *oldval, size_t __user *oldlenp,
 		void __user *newval, size_t newlen)
 {
 	int rc;
 
-	rc = sysctl_ipc_data(table, name, nlen, oldval, oldlenp, newval,
-		newlen);
+	rc = sysctl_ipc_data(table, oldval, oldlenp, newval, newlen);
 
 	if (newval && newlen && rc > 0)
 		/*

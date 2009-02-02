@@ -27,8 +27,10 @@
 #include <linux/spi/spi.h>
 #include <linux/spi/at73c213.h>
 #include <linux/clk.h>
+#include <linux/i2c/at24.h>
+#include <linux/gpio_keys.h>
+#include <linux/input.h>
 
-#include <mach/hardware.h>
 #include <asm/setup.h>
 #include <asm/mach-types.h>
 #include <asm/irq.h>
@@ -37,9 +39,13 @@
 #include <asm/mach/map.h>
 #include <asm/mach/irq.h>
 
+#include <mach/hardware.h>
 #include <mach/board.h>
 #include <mach/gpio.h>
+#include <mach/at91sam9_smc.h>
+#include <mach/at91_shdwc.h>
 
+#include "sam9_smc.h"
 #include "generic.h"
 
 
@@ -163,11 +169,11 @@ static struct mtd_partition __initdata ek_nand_partition[] = {
 	{
 		.name	= "Partition 1",
 		.offset	= 0,
-		.size	= 256 * 1024,
+		.size	= SZ_256K,
 	},
 	{
 		.name	= "Partition 2",
-		.offset	= 256 * 1024,
+		.offset	= MTDPART_OFS_NXTBLK,
 		.size	= MTDPART_SIZ_FULL,
 	},
 };
@@ -191,6 +197,38 @@ static struct atmel_nand_data __initdata ek_nand_data = {
 	.bus_width_16	= 0,
 #endif
 };
+
+static struct sam9_smc_config __initdata ek_nand_smc_config = {
+	.ncs_read_setup		= 0,
+	.nrd_setup		= 1,
+	.ncs_write_setup	= 0,
+	.nwe_setup		= 1,
+
+	.ncs_read_pulse		= 3,
+	.nrd_pulse		= 3,
+	.ncs_write_pulse	= 3,
+	.nwe_pulse		= 3,
+
+	.read_cycle		= 5,
+	.write_cycle		= 5,
+
+	.mode			= AT91_SMC_READMODE | AT91_SMC_WRITEMODE | AT91_SMC_EXNWMODE_DISABLE,
+	.tdf_cycles		= 2,
+};
+
+static void __init ek_add_device_nand(void)
+{
+	/* setup bus-width (8 or 16) */
+	if (ek_nand_data.bus_width_16)
+		ek_nand_smc_config.mode |= AT91_SMC_DBW_16;
+	else
+		ek_nand_smc_config.mode |= AT91_SMC_DBW_8;
+
+	/* configure chip-select 3 (NAND) */
+	sam9_smc_configure(3, &ek_nand_smc_config);
+
+	at91_add_device_nand(&ek_nand_data);
+}
 
 
 /*
@@ -222,6 +260,73 @@ static struct gpio_led ek_leds[] = {
 	}
 };
 
+/*
+ * I2C devices
+ */
+static struct at24_platform_data at24c512 = {
+	.byte_len	= SZ_512K / 8,
+	.page_size	= 128,
+	.flags		= AT24_FLAG_ADDR16,
+};
+
+static struct i2c_board_info __initdata ek_i2c_devices[] = {
+	{
+		I2C_BOARD_INFO("24c512", 0x50),
+		.platform_data = &at24c512,
+	},
+	/* more devices can be added using expansion connectors */
+};
+
+
+/*
+ * GPIO Buttons
+ */
+#if defined(CONFIG_KEYBOARD_GPIO) || defined(CONFIG_KEYBOARD_GPIO_MODULE)
+static struct gpio_keys_button ek_buttons[] = {
+	{
+		.gpio		= AT91_PIN_PA30,
+		.code		= BTN_3,
+		.desc		= "Button 3",
+		.active_low	= 1,
+		.wakeup		= 1,
+	},
+	{
+		.gpio		= AT91_PIN_PA31,
+		.code		= BTN_4,
+		.desc		= "Button 4",
+		.active_low	= 1,
+		.wakeup		= 1,
+	}
+};
+
+static struct gpio_keys_platform_data ek_button_data = {
+	.buttons	= ek_buttons,
+	.nbuttons	= ARRAY_SIZE(ek_buttons),
+};
+
+static struct platform_device ek_button_device = {
+	.name		= "gpio-keys",
+	.id		= -1,
+	.num_resources	= 0,
+	.dev		= {
+		.platform_data	= &ek_button_data,
+	}
+};
+
+static void __init ek_add_device_buttons(void)
+{
+	at91_set_gpio_input(AT91_PIN_PA30, 1);	/* btn3 */
+	at91_set_deglitch(AT91_PIN_PA30, 1);
+	at91_set_gpio_input(AT91_PIN_PA31, 1);	/* btn4 */
+	at91_set_deglitch(AT91_PIN_PA31, 1);
+
+	platform_device_register(&ek_button_device);
+}
+#else
+static void __init ek_add_device_buttons(void) {}
+#endif
+
+
 static void __init ek_board_init(void)
 {
 	/* Serial */
@@ -233,18 +338,20 @@ static void __init ek_board_init(void)
 	/* SPI */
 	at91_add_device_spi(ek_spi_devices, ARRAY_SIZE(ek_spi_devices));
 	/* NAND */
-	at91_add_device_nand(&ek_nand_data);
+	ek_add_device_nand();
 	/* Ethernet */
 	at91_add_device_eth(&ek_macb_data);
 	/* MMC */
 	at91_add_device_mmc(0, &ek_mmc_data);
 	/* I2C */
-	at91_add_device_i2c(NULL, 0);
+	at91_add_device_i2c(ek_i2c_devices, ARRAY_SIZE(ek_i2c_devices));
 	/* SSC (to AT73C213) */
 	at73c213_set_clk(&at73c213_data);
 	at91_add_device_ssc(AT91SAM9260_ID_SSC, ATMEL_SSC_TX);
 	/* LEDs */
 	at91_gpio_leds(ek_leds, ARRAY_SIZE(ek_leds));
+	/* Push Buttons */
+	ek_add_device_buttons();
 }
 
 MACHINE_START(AT91SAM9260EK, "Atmel AT91SAM9260-EK")

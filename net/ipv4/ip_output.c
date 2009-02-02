@@ -340,6 +340,7 @@ int ip_queue_xmit(struct sk_buff *skb, int ipfragok)
 							.saddr = inet->saddr,
 							.tos = RT_CONN_FLAGS(sk) } },
 					    .proto = sk->sk_protocol,
+					    .flags = inet_sk_flowi_flags(sk),
 					    .uli_u = { .ports =
 						       { .sport = inet->sport,
 							 .dport = inet->dport } } };
@@ -429,7 +430,7 @@ static void ip_copy_metadata(struct sk_buff *to, struct sk_buff *from)
  *	single device frame, and queue such a frame for sending.
  */
 
-int ip_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
+int ip_fragment(struct sk_buff *skb, int (*output)(struct sk_buff *))
 {
 	struct iphdr *iph;
 	int raw = 0;
@@ -719,7 +720,7 @@ static inline int ip_ufo_append_data(struct sock *sk,
 			int getfrag(void *from, char *to, int offset, int len,
 			       int odd, struct sk_buff *skb),
 			void *from, int length, int hh_len, int fragheaderlen,
-			int transhdrlen, int mtu,unsigned int flags)
+			int transhdrlen, int mtu, unsigned int flags)
 {
 	struct sk_buff *skb;
 	int err;
@@ -740,7 +741,7 @@ static inline int ip_ufo_append_data(struct sock *sk,
 		skb_reserve(skb, hh_len);
 
 		/* create space for UDP/IP header */
-		skb_put(skb,fragheaderlen + transhdrlen);
+		skb_put(skb, fragheaderlen + transhdrlen);
 
 		/* initialize network header pointer */
 		skb_reset_network_header(skb);
@@ -777,7 +778,7 @@ int ip_append_data(struct sock *sk,
 		   int getfrag(void *from, char *to, int offset, int len,
 			       int odd, struct sk_buff *skb),
 		   void *from, int length, int transhdrlen,
-		   struct ipcm_cookie *ipc, struct rtable *rt,
+		   struct ipcm_cookie *ipc, struct rtable **rtp,
 		   unsigned int flags)
 {
 	struct inet_sock *inet = inet_sk(sk);
@@ -792,6 +793,7 @@ int ip_append_data(struct sock *sk,
 	int offset = 0;
 	unsigned int maxfraglen, fragheaderlen;
 	int csummode = CHECKSUM_NONE;
+	struct rtable *rt;
 
 	if (flags&MSG_PROBE)
 		return 0;
@@ -811,7 +813,11 @@ int ip_append_data(struct sock *sk,
 			inet->cork.flags |= IPCORK_OPT;
 			inet->cork.addr = ipc->addr;
 		}
-		dst_hold(&rt->u.dst);
+		rt = *rtp;
+		/*
+		 * We steal reference to this route, caller should not release it
+		 */
+		*rtp = NULL;
 		inet->cork.fragsize = mtu = inet->pmtudisc == IP_PMTUDISC_PROBE ?
 					    rt->u.dst.dev->mtu :
 					    dst_mtu(rt->u.dst.path);
@@ -1278,7 +1284,12 @@ int ip_push_pending_frames(struct sock *sk)
 
 	skb->priority = sk->sk_priority;
 	skb->mark = sk->sk_mark;
-	skb->dst = dst_clone(&rt->u.dst);
+	/*
+	 * Steal rt from cork.dst to avoid a pair of atomic_inc/atomic_dec
+	 * on dst refcount
+	 */
+	inet->cork.dst = NULL;
+	skb->dst = &rt->u.dst;
 
 	if (iph->protocol == IPPROTO_ICMP)
 		icmp_out_count(net, ((struct icmphdr *)
@@ -1371,7 +1382,8 @@ void ip_send_reply(struct sock *sk, struct sk_buff *skb, struct ip_reply_arg *ar
 				    .uli_u = { .ports =
 					       { .sport = tcp_hdr(skb)->dest,
 						 .dport = tcp_hdr(skb)->source } },
-				    .proto = sk->sk_protocol };
+				    .proto = sk->sk_protocol,
+				    .flags = ip_reply_arg_flowi_flags(arg) };
 		security_skb_classify_flow(skb, &fl);
 		if (ip_route_output_key(sock_net(sk), &rt, &fl))
 			return;
@@ -1389,7 +1401,7 @@ void ip_send_reply(struct sock *sk, struct sk_buff *skb, struct ip_reply_arg *ar
 	sk->sk_protocol = ip_hdr(skb)->protocol;
 	sk->sk_bound_dev_if = arg->bound_dev_if;
 	ip_append_data(sk, ip_reply_glue_bits, arg->iov->iov_base, len, 0,
-		       &ipc, rt, MSG_DONTWAIT);
+		       &ipc, &rt, MSG_DONTWAIT);
 	if ((skb = skb_peek(&sk->sk_write_queue)) != NULL) {
 		if (arg->csumoffset >= 0)
 			*((__sum16 *)skb_transport_header(skb) +

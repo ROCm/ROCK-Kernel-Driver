@@ -156,7 +156,8 @@ static inline int process_nic_rx_completion(struct be_net_object *pnob,
 	va = page_address(rx_page_info->page) + rx_page_info->page_offset;
 	prefetch(va);
 
-	skb->len = skb->data_len = n;
+	skb->len = n;
+	skb->data_len = n;
 	if (n <= BE_HDR_LEN) {
 		memcpy(skb->data, va, n);
 		put_page(rx_page_info->page);
@@ -622,25 +623,14 @@ void be_post_eth_rx_buffs(struct be_net_object *pnob)
 	 */
 	INIT_LIST_HEAD(&rxbl);
 
-	for (num_bufs = 0; num_bufs < max_bufs; ++num_bufs) {
+	for (num_bufs = 0; num_bufs < max_bufs &&
+		!pnob->rx_page_info[pnob->rx_pg_info_hd].page; ++num_bufs) {
 
 		rxbp = &pnob->eth_rx_bufs[num_bufs];
 		pg_hd = pnob->rx_pg_info_hd;
 		rx_page_info = &pnob->rx_page_info[pg_hd];
 
 		if (!page) {
-			/*
-			 * before we allocate a page make sure that we
-			 * have space in the RX queue to post the buffer.
-			 * We check for two vacant slots since with
-			 * 2K frags, we will need two slots.
-			 */
-			if ((pnob->rx_ctxt[(pnob->rx_q_hd + num_bufs) &
-					   (pnob->rx_q_len - 1)] != NULL)
-			    || (pnob->rx_ctxt[(pnob->rx_q_hd + num_bufs + 1) %
-					      pnob->rx_q_len] != NULL)) {
-				break;
-			}
 			page = alloc_pages(alloc_flags, page_order);
 			if (unlikely(page == NULL)) {
 				adapter->be_stat.bes_ethrx_post_fail++;
@@ -691,7 +681,7 @@ void be_post_eth_rx_buffs(struct be_net_object *pnob)
 irqreturn_t be_int(int irq, void *dev)
 {
 	struct net_device *netdev = dev;
-	struct be_net_object *pnob = (struct be_net_object *)(netdev->priv);
+	struct be_net_object *pnob = netdev_priv(netdev);
 	struct be_adapter *adapter = pnob->adapter;
 	u32 isr;
 
@@ -717,7 +707,8 @@ irqreturn_t be_int(int irq, void *dev)
  */
 int be_poll(struct napi_struct *napi, int budget)
 {
-	struct be_net_object *pnob = container_of(napi, struct be_net_object, napi);
+	struct be_net_object *pnob =
+			container_of(napi, struct be_net_object, napi);
 	u32 work_done;
 
 	pnob->adapter->be_stat.bes_polls++;
@@ -726,7 +717,7 @@ int be_poll(struct napi_struct *napi, int budget)
 
 	/* All consumed */
 	if (work_done < budget) {
-		netif_rx_complete(pnob->netdev, napi);
+		netif_rx_complete(napi);
 		/* enable intr */
 		be_notify_cmpl(pnob, work_done, pnob->rx_cq_id, 1);
 	} else {
@@ -761,7 +752,7 @@ static inline u32 process_events(struct be_net_object *pnob)
 		rid = AMAP_GET_BITS_PTR(EQ_ENTRY, ResourceID, eqp);
 		if (rid == pnob->rx_cq_id) {
 			adapter->be_stat.bes_rx_events++;
-			netif_rx_schedule(netdev, &pnob->napi);
+			netif_rx_schedule(&pnob->napi);
 		} else if (rid == pnob->tx_cq_id) {
 			process_nic_tx_completions(pnob);
 		} else if (rid == pnob->mcc_cq_id) {

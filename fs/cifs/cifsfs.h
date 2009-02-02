@@ -41,7 +41,7 @@ extern int cifs_create(struct inode *, struct dentry *, int,
 		       struct nameidata *);
 extern struct dentry *cifs_lookup(struct inode *, struct dentry *,
 				  struct nameidata *);
-extern int cifs_unlink(struct inode *, struct dentry *);
+extern int cifs_unlink(struct inode *dir, struct dentry *dentry);
 extern int cifs_hardlink(struct dentry *, struct inode *, struct dentry *);
 extern int cifs_mknod(struct inode *, struct dentry *, int, dev_t);
 extern int cifs_mkdir(struct inode *, struct dentry *, int);
@@ -76,7 +76,6 @@ extern int cifs_file_mmap(struct file * , struct vm_area_struct *);
 extern const struct file_operations cifs_dir_ops;
 extern int cifs_dir_open(struct inode *inode, struct file *file);
 extern int cifs_readdir(struct file *file, void *direntry, filldir_t filldir);
-extern int cifs_dir_notify(struct file *, unsigned long arg);
 
 /* Functions related to dir entries */
 extern struct dentry_operations cifs_dentry_ops;
@@ -101,5 +100,5 @@ extern long cifs_ioctl(struct file *filep, unsigned int cmd, unsigned long arg);
 extern const struct export_operations cifs_export_ops;
 #endif /* EXPERIMENTAL */
 
-#define CIFS_VERSION   "1.54"
+#define CIFS_VERSION   "1.56"
 #endif				/* _CIFSFS_H */

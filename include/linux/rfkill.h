@@ -49,6 +49,7 @@ enum rfkill_state {
 	RFKILL_STATE_SOFT_BLOCKED = 0,	/* Radio output blocked */
 	RFKILL_STATE_UNBLOCKED    = 1,	/* Radio output allowed */
 	RFKILL_STATE_HARD_BLOCKED = 2,	/* Output blocked, non-overrideable */
+	RFKILL_STATE_MAX,		/* marker for last valid state */
 };
 
 /*
@@ -107,15 +108,18 @@ struct rfkill {
 
 	struct device dev;
 	struct list_head node;
+	enum rfkill_state state_for_resume;
 };
 #define to_rfkill(d)	container_of(d, struct rfkill, dev)
 
-struct rfkill *rfkill_allocate(struct device *parent, enum rfkill_type type);
+struct rfkill * __must_check rfkill_allocate(struct device *parent,
+					     enum rfkill_type type);
 void rfkill_free(struct rfkill *rfkill);
-int rfkill_register(struct rfkill *rfkill);
+int __must_check rfkill_register(struct rfkill *rfkill);
 void rfkill_unregister(struct rfkill *rfkill);
 
 int rfkill_force_state(struct rfkill *rfkill, enum rfkill_state state);
+int rfkill_set_default(enum rfkill_type type, enum rfkill_state state);
 
 /**
  * rfkill_state_complement - return complementar state
@@ -144,12 +148,5 @@ static inline char *rfkill_get_led_name(struct rfkill *rfkill)
 	return NULL;
 #endif
 }
-
-/* rfkill notification chain */
-#define RFKILL_STATE_CHANGED		0x0001	/* state of a normal rfkill
-						   switch has changed */
-
-int register_rfkill_notifier(struct notifier_block *nb);
-int unregister_rfkill_notifier(struct notifier_block *nb);
 
 #endif /* RFKILL_H */

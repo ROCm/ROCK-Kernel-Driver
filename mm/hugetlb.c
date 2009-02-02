@@ -7,6 +7,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/mm.h>
+#include <linux/seq_file.h>
 #include <linux/sysctl.h>
 #include <linux/highmem.h>
 #include <linux/mmu_notifier.h>
@@ -220,6 +221,35 @@ static pgoff_t vma_hugecache_offset(struct hstate *h,
 }
 
 /*
+ * Return the size of the pages allocated when backing a VMA. In the majority
+ * cases this will be same size as used by the page table entries.
+ */
+unsigned long vma_kernel_pagesize(struct vm_area_struct *vma)
+{
+	struct hstate *hstate;
+
+	if (!is_vm_hugetlb_page(vma))
+		return PAGE_SIZE;
+
+	hstate = hstate_vma(vma);
+
+	return 1UL << (hstate->order + PAGE_SHIFT);
+}
+
+/*
+ * Return the page size being used by the MMU to back a VMA. In the majority
+ * of cases, the page size used by the kernel matches the MMU size. On
+ * architectures where it differs, an architecture-specific version of this
+ * function is required.
+ */
+#ifndef vma_mmu_pagesize
+unsigned long vma_mmu_pagesize(struct vm_area_struct *vma)
+{
+	return vma_kernel_pagesize(vma);
+}
+#endif
+
+/*
  * Flags for MAP_PRIVATE reservations.  These are stored in the bottom
  * bits of the reservation map pointer, which are always clear due to
  * alignment.
@@ -263,7 +293,7 @@ struct resv_map {
 	struct list_head regions;
 };
 
-struct resv_map *resv_map_alloc(void)
+static struct resv_map *resv_map_alloc(void)
 {
 	struct resv_map *resv_map = kmalloc(sizeof(*resv_map), GFP_KERNEL);
 	if (!resv_map)
@@ -275,7 +305,7 @@ struct resv_map *resv_map_alloc(void)
 	return resv_map;
 }
 
-void resv_map_release(struct kref *ref)
+static void resv_map_release(struct kref *ref)
 {
 	struct resv_map *resv_map = container_of(ref, struct resv_map, refs);
 
@@ -290,7 +320,7 @@ static struct resv_map *vma_resv_map(struct vm_area_struct *vma)
 	if (!(vma->vm_flags & VM_SHARED))
 		return (struct resv_map *)(get_vma_private_data(vma) &
 							~HPAGE_RESV_MASK);
-	return 0;
+	return NULL;
 }
 
 static void set_vma_resv_map(struct vm_area_struct *vma, struct resv_map *map)
@@ -371,8 +401,10 @@ static void clear_huge_page(struct page *page,
 {
 	int i;
 
-	if (unlikely(sz > MAX_ORDER_NR_PAGES))
-		return clear_gigantic_page(page, addr, sz);
+	if (unlikely(sz > MAX_ORDER_NR_PAGES)) {
+		clear_gigantic_page(page, addr, sz);
+		return;
+	}
 
 	might_sleep();
 	for (i = 0; i < sz/PAGE_SIZE; i++) {
@@ -404,8 +436,10 @@ static void copy_huge_page(struct page *dst, struct page *src,
 	int i;
 	struct hstate *h = hstate_vma(vma);
 
-	if (unlikely(pages_per_huge_page(h) > MAX_ORDER_NR_PAGES))
-		return copy_gigantic_page(dst, src, addr, vma);
+	if (unlikely(pages_per_huge_page(h) > MAX_ORDER_NR_PAGES)) {
+		copy_gigantic_page(dst, src, addr, vma);
+		return;
+	}
 
 	might_sleep();
 	for (i = 0; i < pages_per_huge_page(h); i++) {
@@ -981,7 +1015,7 @@ static struct page *alloc_huge_page(struct vm_area_struct *vma,
 	return page;
 }
 
-__attribute__((weak)) int alloc_bootmem_huge_page(struct hstate *h)
+int __weak alloc_bootmem_huge_page(struct hstate *h)
 {
 	struct huge_bootmem_page *m;
 	int nr_nodes = nodes_weight(node_online_map);
@@ -1000,8 +1034,7 @@ __attribute__((weak)) int alloc_bootmem_huge_page(struct hstate *h)
 			 * puts them into the mem_map).
 			 */
 			m = addr;
-			if (m)
-				goto found;
+			goto found;
 		}
 		hstate_next_node(h);
 		nr_nodes--;
@@ -1532,15 +1565,15 @@ kdb_hugetlb_report_meminfo(void)
 }
 #endif	/* CONFIG_KDB */
 
-int hugetlb_report_meminfo(char *buf)
+void hugetlb_report_meminfo(struct seq_file *m)
 {
 	struct hstate *h = &default_hstate;
-	return sprintf(buf,
-			"HugePages_Total: %5lu\n"
-			"HugePages_Free:  %5lu\n"
-			"HugePages_Rsvd:  %5lu\n"
-			"HugePages_Surp:  %5lu\n"
-			"Hugepagesize:    %5lu kB\n",
+	seq_printf(m,
+			"HugePages_Total:   %5lu\n"
+			"HugePages_Free:    %5lu\n"
+			"HugePages_Rsvd:    %5lu\n"
+			"HugePages_Surp:    %5lu\n"
+			"Hugepagesize:   %8lu kB\n",
 			h->nr_huge_pages,
 			h->free_huge_pages,
 			h->resv_huge_pages,
@@ -1824,10 +1857,8 @@ void unmap_hugepage_range(struct vm_area_struct *vma, unsigned long start,
  * from other VMAs and let the children be SIGKILLed if they are faulting the
  * same region.
  */
-int unmap_ref_private(struct mm_struct *mm,
-					struct vm_area_struct *vma,
-					struct page *page,
-					unsigned long address)
+static int unmap_ref_private(struct mm_struct *mm, struct vm_area_struct *vma,
+				struct page *page, unsigned long address)
 {
 	struct hstate *h = hstate_vma(vma);
 	struct vm_area_struct *iter_vma;
@@ -2086,7 +2117,7 @@ int hugetlb_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 	entry = huge_ptep_get(ptep);
 	if (huge_pte_none(entry)) {
 		ret = hugetlb_no_page(mm, vma, address, ptep, write_access);
-		goto out_unlock;
+		goto out_mutex;
 	}
 
 	ret = 0;
@@ -2102,7 +2133,7 @@ int hugetlb_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 	if (write_access && !pte_write(entry)) {
 		if (vma_needs_reservation(h, vma, address) < 0) {
 			ret = VM_FAULT_OOM;
-			goto out_unlock;
+			goto out_mutex;
 		}
 
 		if (!(vma->vm_flags & VM_SHARED))
@@ -2112,10 +2143,23 @@ int hugetlb_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 
 	spin_lock(&mm->page_table_lock);
 	/* Check for a racing update before calling hugetlb_cow */
-	if (likely(pte_same(entry, huge_ptep_get(ptep))))
-		if (write_access && !pte_write(entry))
+	if (unlikely(!pte_same(entry, huge_ptep_get(ptep))))
+		goto out_page_table_lock;
+
+
+	if (write_access) {
+		if (!pte_write(entry)) {
 			ret = hugetlb_cow(mm, vma, address, ptep, entry,
 							pagecache_page);
+			goto out_page_table_lock;
+		}
+		entry = pte_mkdirty(entry);
+	}
+	entry = pte_mkyoung(entry);
+	if (huge_ptep_set_access_flags(vma, address, ptep, entry, write_access))
+		update_mmu_cache(vma, address, entry);
+
+out_page_table_lock:
 	spin_unlock(&mm->page_table_lock);
 
 	if (pagecache_page) {
@@ -2123,7 +2167,7 @@ int hugetlb_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 		put_page(pagecache_page);
 	}
 
-out_unlock:
+out_mutex:
 	mutex_unlock(&hugetlb_instantiation_mutex);
 
 	return ret;
@@ -2138,6 +2182,14 @@ follow_huge_pud(struct mm_struct *mm, unsigned long address,
 	return NULL;
 }
 
+static int huge_zeropage_ok(pte_t *ptep, int write, int shared)
+{
+	if (!ptep || write || shared)
+		return 0;
+	else
+		return huge_pte_none(huge_ptep_get(ptep));
+}
+
 int follow_hugetlb_page(struct mm_struct *mm, struct vm_area_struct *vma,
 			struct page **pages, struct vm_area_struct **vmas,
 			unsigned long *position, int *length, int i,
@@ -2147,6 +2199,8 @@ int follow_hugetlb_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	unsigned long vaddr = *position;
 	int remainder = *length;
 	struct hstate *h = hstate_vma(vma);
+	int zeropage_ok = 0;
+	int shared = vma->vm_flags & VM_SHARED;
 
 	spin_lock(&mm->page_table_lock);
 	while (vaddr < vma->vm_end && remainder) {
@@ -2159,8 +2213,11 @@ int follow_hugetlb_page(struct mm_struct *mm, struct vm_area_struct *vma,
 		 * first, for the page indexing below to work.
 		 */
 		pte = huge_pte_offset(mm, vaddr & huge_page_mask(h));
+		if (huge_zeropage_ok(pte, write, shared))
+			zeropage_ok = 1;
 
-		if (!pte || huge_pte_none(huge_ptep_get(pte)) ||
+		if (!pte ||
+		    (huge_pte_none(huge_ptep_get(pte)) && !zeropage_ok) ||
 		    (write && !pte_write(huge_ptep_get(pte)))) {
 			int ret;
 
@@ -2180,8 +2237,11 @@ int follow_hugetlb_page(struct mm_struct *mm, struct vm_area_struct *vma,
 		page = pte_page(huge_ptep_get(pte));
 same_page:
 		if (pages) {
-			get_page(page);
-			pages[i] = mem_map_offset(page, pfn_offset);
+			if (zeropage_ok)
+				pages[i] = ZERO_PAGE(0);
+			else
+				pages[i] = mem_map_offset(page, pfn_offset);
+			get_page(pages[i]);
 		}
 
 		if (vmas)
@@ -2306,3 +2366,11 @@ void hugetlb_unreserve_pages(struct inode *inode, long offset, long freed)
 	hugetlb_put_quota(inode->i_mapping, (chg - freed));
 	hugetlb_acct_memory(h, -(chg - freed));
 }
+
+DEFINE_TRACE(hugetlb_page_release);
+DEFINE_TRACE(hugetlb_page_grab);
+DEFINE_TRACE(hugetlb_buddy_pgalloc);
+DEFINE_TRACE(hugetlb_page_alloc);
+DEFINE_TRACE(hugetlb_page_free);
+DEFINE_TRACE(hugetlb_pages_reserve);
+DEFINE_TRACE(hugetlb_pages_unreserve);

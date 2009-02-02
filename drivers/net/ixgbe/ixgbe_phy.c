@@ -446,16 +446,16 @@ s32 ixgbe_reset_phy_nl(struct ixgbe_hw *hw)
 	u32 i;
 
 	hw->phy.ops.read_reg(hw, IXGBE_MDIO_PHY_XS_CONTROL,
-			     IXGBE_MDIO_PHY_XS_DEV_TYPE, &phy_data);
+	                     IXGBE_MDIO_PHY_XS_DEV_TYPE, &phy_data);
 
 	/* reset the PHY and poll for completion */
 	hw->phy.ops.write_reg(hw, IXGBE_MDIO_PHY_XS_CONTROL,
-			      IXGBE_MDIO_PHY_XS_DEV_TYPE,
-			      (phy_data | IXGBE_MDIO_PHY_XS_RESET));
+	                      IXGBE_MDIO_PHY_XS_DEV_TYPE,
+	                      (phy_data | IXGBE_MDIO_PHY_XS_RESET));
 
 	for (i = 0; i < 100; i++) {
 		hw->phy.ops.read_reg(hw, IXGBE_MDIO_PHY_XS_CONTROL,
-				     IXGBE_MDIO_PHY_XS_DEV_TYPE, &phy_data);
+		                     IXGBE_MDIO_PHY_XS_DEV_TYPE, &phy_data);
 		if ((phy_data & IXGBE_MDIO_PHY_XS_RESET) == 0)
 			break;
 		msleep(10);
@@ -469,7 +469,7 @@ s32 ixgbe_reset_phy_nl(struct ixgbe_hw *hw)
 
 	/* Get init offsets */
 	ret_val = ixgbe_get_sfp_init_sequence_offsets(hw, &list_offset,
-						      &data_offset);
+	                                              &data_offset);
 	if (ret_val != 0)
 		goto out;
 
@@ -481,7 +481,7 @@ s32 ixgbe_reset_phy_nl(struct ixgbe_hw *hw)
 		 */
 		ret_val = hw->eeprom.ops.read(hw, data_offset, &eword);
 		control = (eword & IXGBE_CONTROL_MASK_NL) >>
-				IXGBE_CONTROL_SHIFT_NL;
+		           IXGBE_CONTROL_SHIFT_NL;
 		edata = eword & IXGBE_DATA_MASK_NL;
 		switch (control) {
 		case IXGBE_DELAY_NL:
@@ -493,11 +493,11 @@ s32 ixgbe_reset_phy_nl(struct ixgbe_hw *hw)
 			hw_dbg(hw, "DATA:  \n");
 			data_offset++;
 			hw->eeprom.ops.read(hw, data_offset++,
-					    &phy_offset);
+			                    &phy_offset);
 			for (i = 0; i < edata; i++) {
 				hw->eeprom.ops.read(hw, data_offset, &eword);
 				hw->phy.ops.write_reg(hw, phy_offset,
-						      IXGBE_TWINAX_DEV, eword);
+				                      IXGBE_TWINAX_DEV, eword);
 				hw_dbg(hw, "Wrote %4.4x to %4.4x\n", eword,
 				       phy_offset);
 				data_offset++;
@@ -534,7 +534,7 @@ out:
  *                                      the PHY type.
  *  @hw: pointer to hardware structure
  *
- *  Searches for and identifies the SFP module.  Assigns appropriate PHY type.
+ *  Searches for and indentifies the SFP module.  Assings appropriate PHY type.
  **/
 s32 ixgbe_identify_sfp_module_generic(struct ixgbe_hw *hw)
 {
@@ -547,7 +547,7 @@ s32 ixgbe_identify_sfp_module_generic(struct ixgbe_hw *hw)
 	u8 transmission_media = 0;
 
 	status = hw->phy.ops.read_i2c_eeprom(hw, IXGBE_SFF_IDENTIFIER,
-					     &identifier);
+	                                     &identifier);
 
 	if (status == IXGBE_ERR_SFP_NOT_PRESENT) {
 		hw->phy.sfp_type = ixgbe_sfp_type_not_present;
@@ -556,14 +556,14 @@ s32 ixgbe_identify_sfp_module_generic(struct ixgbe_hw *hw)
 
 	if (identifier == IXGBE_SFF_IDENTIFIER_SFP) {
 		hw->phy.ops.read_i2c_eeprom(hw, IXGBE_SFF_1GBE_COMP_CODES,
-					    &comp_codes_1g);
+		                            &comp_codes_1g);
 		hw->phy.ops.read_i2c_eeprom(hw, IXGBE_SFF_10GBE_COMP_CODES,
-					    &comp_codes_10g);
+		                            &comp_codes_10g);
 		hw->phy.ops.read_i2c_eeprom(hw, IXGBE_SFF_TRANSMISSION_MEDIA,
-					    &transmission_media);
+		                            &transmission_media);
 
-		 /* ID	Module
-		 * ============
+		/* ID Module
+		 * =========
 		 * 0	SFP_DA_CU
 		 * 1	SFP_SR
 		 * 2	SFP_LR
@@ -581,19 +581,19 @@ s32 ixgbe_identify_sfp_module_generic(struct ixgbe_hw *hw)
 		if (hw->phy.type == ixgbe_phy_unknown) {
 			hw->phy.id = identifier;
 			hw->phy.ops.read_i2c_eeprom(hw,
-						    IXGBE_SFF_VENDOR_OUI_BYTE0,
-						    &oui_bytes[0]);
+			                            IXGBE_SFF_VENDOR_OUI_BYTE0,
+			                            &oui_bytes[0]);
 			hw->phy.ops.read_i2c_eeprom(hw,
-						    IXGBE_SFF_VENDOR_OUI_BYTE1,
-						    &oui_bytes[1]);
+			                            IXGBE_SFF_VENDOR_OUI_BYTE1,
+			                            &oui_bytes[1]);
 			hw->phy.ops.read_i2c_eeprom(hw,
-						    IXGBE_SFF_VENDOR_OUI_BYTE2,
-						    &oui_bytes[2]);
+			                            IXGBE_SFF_VENDOR_OUI_BYTE2,
+			                            &oui_bytes[2]);
 
 			vendor_oui =
-			   ((oui_bytes[0] << IXGBE_SFF_VENDOR_OUI_BYTE0_SHIFT) |
-			    (oui_bytes[1] << IXGBE_SFF_VENDOR_OUI_BYTE1_SHIFT) |
-			    (oui_bytes[2] << IXGBE_SFF_VENDOR_OUI_BYTE2_SHIFT));
+			  ((oui_bytes[0] << IXGBE_SFF_VENDOR_OUI_BYTE0_SHIFT) |
+			   (oui_bytes[1] << IXGBE_SFF_VENDOR_OUI_BYTE1_SHIFT) |
+			   (oui_bytes[2] << IXGBE_SFF_VENDOR_OUI_BYTE2_SHIFT));
 
 			switch (vendor_oui) {
 			case IXGBE_SFF_VENDOR_OUI_TYCO:
@@ -632,8 +632,8 @@ out:
  *  @data_offset: offset to the SFP data block
  **/
 s32 ixgbe_get_sfp_init_sequence_offsets(struct ixgbe_hw *hw,
-					u16 *list_offset,
-					u16 *data_offset)
+                                        u16 *list_offset,
+                                        u16 *data_offset)
 {
 	u16 sfp_id;
 

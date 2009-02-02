@@ -16,71 +16,75 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
- * Foundation, 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+ * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * squashfs.h
  */
 
-#ifdef CONFIG_SQUASHFS_1_0_COMPATIBILITY
-#undef CONFIG_SQUASHFS_1_0_COMPATIBILITY
-#endif
+#define TRACE(s, args...)	pr_debug("SQUASHFS: "s, ## args)
 
-#ifdef SQUASHFS_TRACE
-#define TRACE(s, args...)	printk(KERN_NOTICE "SQUASHFS: "s, ## args)
-#else
-#define TRACE(s, args...)	{}
-#endif
+#define ERROR(s, args...)	pr_err("SQUASHFS error: "s, ## args)
 
-#define ERROR(s, args...)	printk(KERN_ERR "SQUASHFS error: "s, ## args)
+#define WARNING(s, args...)	pr_warning("SQUASHFS: "s, ## args)
 
-#define SERROR(s, args...)	do { \
-				if (!silent) \
-				printk(KERN_ERR "SQUASHFS error: "s, ## args);\
-				} while(0)
-
-#define WARNING(s, args...)	printk(KERN_WARNING "SQUASHFS: "s, ## args)
-
-static inline struct squashfs_inode_info *SQUASHFS_I(struct inode *inode)
+static inline struct squashfs_inode_info *squashfs_i(struct inode *inode)
 {
 	return list_entry(inode, struct squashfs_inode_info, vfs_inode);
 }
 
-#if defined(CONFIG_SQUASHFS_1_0_COMPATIBILITY ) || defined(CONFIG_SQUASHFS_2_0_COMPATIBILITY)
-#define SQSH_EXTERN
-extern unsigned int squashfs_read_data(struct super_block *s, char *buffer,
-				long long index, unsigned int length,
-				long long *next_index, int srclength);
-extern int squashfs_get_cached_block(struct super_block *s, void *buffer,
-				long long block, unsigned int offset,
-				int length, long long *next_block,
-				unsigned int *next_offset);
-extern void release_cached_fragment(struct squashfs_sb_info *msblk, struct
-					squashfs_cache_entry *fragment);
-extern struct squashfs_cache_entry *get_cached_fragment(struct super_block
-					*s, long long start_block,
-					int length);
-extern struct inode *squashfs_iget(struct super_block *s, squashfs_inode_t inode, unsigned int inode_number);
-extern const struct address_space_operations squashfs_symlink_aops;
+/* block.c */
+extern int squashfs_read_data(struct super_block *, void **, u64, int, u64 *,
+				int);
+
+/* cache.c */
+extern struct squashfs_cache *squashfs_cache_init(char *, int, int);
+extern void squashfs_cache_delete(struct squashfs_cache *);
+extern struct squashfs_cache_entry *squashfs_cache_get(struct super_block *,
+				struct squashfs_cache *, u64, int);
+extern void squashfs_cache_put(struct squashfs_cache_entry *);
+extern int squashfs_copy_data(void *, struct squashfs_cache_entry *, int, int);
+extern int squashfs_read_metadata(struct super_block *, void *, u64 *,
+				int *, int);
+extern struct squashfs_cache_entry *squashfs_get_fragment(struct super_block *,
+				u64, int);
+extern struct squashfs_cache_entry *squashfs_get_datablock(struct super_block *,
+				u64, int);
+extern int squashfs_read_table(struct super_block *, void *, u64, int);
+
+/* export.c */
+extern __le64 *squashfs_read_inode_lookup_table(struct super_block *, u64,
+				unsigned int);
+
+/* fragment.c */
+extern int squashfs_frag_lookup(struct super_block *, unsigned int, u64 *);
+extern __le64 *squashfs_read_fragment_index_table(struct super_block *,
+				u64, unsigned int);
+
+/* id.c */
+extern int squashfs_get_id(struct super_block *, unsigned int, unsigned int *);
+extern __le64 *squashfs_read_id_index_table(struct super_block *, u64,
+				unsigned short);
+
+/* inode.c */
+extern struct inode *squashfs_iget(struct super_block *, long long,
+				unsigned int);
+extern int squashfs_read_inode(struct inode *, long long);
+
+/*
+ * Inodes and files operations
+ */
+
+/* dir.c */
+extern const struct file_operations squashfs_dir_ops;
+
+/* export.c */
+extern const struct export_operations squashfs_export_ops;
+
+/* file.c */
 extern const struct address_space_operations squashfs_aops;
-extern struct inode_operations squashfs_dir_inode_ops;
-#else
-#define SQSH_EXTERN static
-#endif
 
-#ifdef CONFIG_SQUASHFS_1_0_COMPATIBILITY
-extern int squashfs_1_0_supported(struct squashfs_sb_info *msblk);
-#else
-static inline int squashfs_1_0_supported(struct squashfs_sb_info *msblk)
-{
-	return 0;
-}
-#endif
+/* namei.c */
+extern const struct inode_operations squashfs_dir_inode_ops;
 
-#ifdef CONFIG_SQUASHFS_2_0_COMPATIBILITY
-extern int squashfs_2_0_supported(struct squashfs_sb_info *msblk);
-#else
-static inline int squashfs_2_0_supported(struct squashfs_sb_info *msblk)
-{
-	return 0;
-}
-#endif
+/* symlink.c */
+extern const struct address_space_operations squashfs_symlink_aops;

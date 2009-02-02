@@ -168,7 +168,7 @@ static int carmine_setcolreg(unsigned regno, unsigned red, unsigned green,
 	blue >>= 8;
 	transp >>= 8;
 
-	((u32 *)info->pseudo_palette)[regno] = be32_to_cpu(transp << 24 |
+	((__be32 *)info->pseudo_palette)[regno] = cpu_to_be32(transp << 24 |
 		red << 0 | green << 8 | blue << 16);
 	return 0;
 }
@@ -535,9 +535,8 @@ static struct fb_ops carminefb_ops = {
 	.fb_setcolreg	= carmine_setcolreg,
 };
 
-static int __devinit alloc_carmine_fb(void __iomem *regs,
-		void __iomem *smem_base, int smem_offset,
-		struct device *device, struct fb_info **rinfo)
+static int __devinit alloc_carmine_fb(void __iomem *regs, void __iomem *smem_base,
+		int smem_offset, struct device *device, struct fb_info **rinfo)
 {
 	int ret;
 	struct fb_info *info;

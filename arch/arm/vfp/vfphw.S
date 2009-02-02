@@ -68,8 +68,7 @@
 @  r11 = CPU number
 @  lr  = failure return
 
-	.globl	vfp_support_entry
-vfp_support_entry:
+ENTRY(vfp_support_entry)
 	DBGSTR3	"instr %08x pc %08x state %p", r0, r2, r10
 
 	VFPFMRX	r1, FPEXC		@ Is the VFP enabled?
@@ -102,9 +101,12 @@ vfp_support_entry:
 	VFPFSTMIA r4, r5		@ save the working registers
 	VFPFMRX	r5, FPSCR		@ current status
 	tst	r1, #FPEXC_EX		@ is there additional state to save?
-	VFPFMRX	r6, FPINST, NE		@ FPINST (only if FPEXC.EX is set)
-	tstne	r1, #FPEXC_FP2V		@ is there an FPINST2 to read?
-	VFPFMRX	r8, FPINST2, NE		@ FPINST2 if needed (and present)
+	beq	1f
+	VFPFMRX	r6, FPINST		@ FPINST (only if FPEXC.EX is set)
+	tst	r1, #FPEXC_FP2V		@ is there an FPINST2 to read?
+	beq	1f
+	VFPFMRX	r8, FPINST2		@ FPINST2 if needed (and present)
+1:
 	stmia	r4, {r1, r5, r6, r8}	@ save FPEXC, FPSCR, FPINST, FPINST2
 					@ and point r4 at the word at the
 					@ start of the register dump
@@ -118,9 +120,12 @@ no_old_VFP_process:
 					@ FPEXC is in a safe state
 	ldmia	r10, {r1, r5, r6, r8}	@ load FPEXC, FPSCR, FPINST, FPINST2
 	tst	r1, #FPEXC_EX		@ is there additional state to restore?
-	VFPFMXR	FPINST, r6, NE		@ restore FPINST (only if FPEXC.EX is set)
-	tstne	r1, #FPEXC_FP2V		@ is there an FPINST2 to write?
-	VFPFMXR	FPINST2, r8, NE		@ FPINST2 if needed (and present)
+	beq	1f
+	VFPFMXR	FPINST, r6		@ restore FPINST (only if FPEXC.EX is set)
+	tst	r1, #FPEXC_FP2V		@ is there an FPINST2 to write?
+	beq	1f
+	VFPFMXR	FPINST2, r8		@ FPINST2 if needed (and present)
+1:
 	VFPFMXR	FPSCR, r5		@ restore status
 
 check_for_exception:
@@ -165,11 +170,10 @@ process_exception:
 					@ code will raise an exception if
 					@ required. If not, the user code will
 					@ retry the faulted instruction
+ENDPROC(vfp_support_entry)
 
-#ifdef CONFIG_SMP
-	.globl	vfp_save_state
-	.type	vfp_save_state, %function
-vfp_save_state:
+#if defined(CONFIG_SMP) || defined(CONFIG_PM)
+ENTRY(vfp_save_state)
 	@ Save the current VFP state
 	@ r0 - save location
 	@ r1 - FPEXC
@@ -177,18 +181,21 @@ vfp_save_state:
 	VFPFSTMIA r0, r2		@ save the working registers
 	VFPFMRX	r2, FPSCR		@ current status
 	tst	r1, #FPEXC_EX		@ is there additional state to save?
-	VFPFMRX	r3, FPINST, NE		@ FPINST (only if FPEXC.EX is set)
-	tstne	r1, #FPEXC_FP2V		@ is there an FPINST2 to read?
-	VFPFMRX	r12, FPINST2, NE	@ FPINST2 if needed (and present)
+	beq	1f
+	VFPFMRX	r3, FPINST		@ FPINST (only if FPEXC.EX is set)
+	tst	r1, #FPEXC_FP2V		@ is there an FPINST2 to read?
+	beq	1f
+	VFPFMRX	r12, FPINST2		@ FPINST2 if needed (and present)
+1:
 	stmia	r0, {r1, r2, r3, r12}	@ save FPEXC, FPSCR, FPINST, FPINST2
 	mov	pc, lr
+ENDPROC(vfp_save_state)
 #endif
 
 last_VFP_context_address:
 	.word	last_VFP_context
 
-	.globl	vfp_get_float
-vfp_get_float:
+ENTRY(vfp_get_float)
 	add	pc, pc, r0, lsl #3
 	mov	r0, r0
 	.irp	dr,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
@@ -197,9 +204,9 @@ vfp_get_float:
 	mrc	p10, 0, r0, c\dr, c0, 4	@ fmrs	r0, s1
 	mov	pc, lr
 	.endr
+ENDPROC(vfp_get_float)
 
-	.globl	vfp_put_float
-vfp_put_float:
+ENTRY(vfp_put_float)
 	add	pc, pc, r1, lsl #3
 	mov	r0, r0
 	.irp	dr,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
@@ -208,9 +215,9 @@ vfp_put_float:
 	mcr	p10, 0, r0, c\dr, c0, 4	@ fmsr	r0, s1
 	mov	pc, lr
 	.endr
+ENDPROC(vfp_put_float)
 
-	.globl	vfp_get_double
-vfp_get_double:
+ENTRY(vfp_get_double)
 	add	pc, pc, r0, lsl #3
 	mov	r0, r0
 	.irp	dr,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
@@ -229,9 +236,9 @@ vfp_get_double:
 	mov	r0, #0
 	mov	r1, #0
 	mov	pc, lr
+ENDPROC(vfp_get_double)
 
-	.globl	vfp_put_double
-vfp_put_double:
+ENTRY(vfp_put_double)
 	add	pc, pc, r2, lsl #3
 	mov	r0, r0
 	.irp	dr,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15
@@ -245,3 +252,4 @@ vfp_put_double:
 	mov	pc, lr
 	.endr
 #endif
+ENDPROC(vfp_put_double)

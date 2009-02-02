@@ -5,12 +5,12 @@
  */
 
 #include "dm.h"
-
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/blkdev.h>
 #include <linux/bio.h>
 #include <linux/slab.h>
+#include <linux/device-mapper.h>
 
 #define DM_MSG_PREFIX "linear"
 
@@ -52,7 +52,6 @@ static int linear_ctr(struct dm_target *ti, unsigned int argc, char **argv)
 		ti->error = "dm-linear: Device lookup failed";
 		goto bad;
 	}
-	dm_table_support_barrier(ti->table);
 
 	ti->private = lc;
 	return 0;
@@ -111,20 +110,11 @@ static int linear_status(struct dm_target *ti, status_type_t type,
 	return 0;
 }
 
-static int linear_ioctl(struct dm_target *ti, struct inode *inode,
-			struct file *filp, unsigned int cmd,
+static int linear_ioctl(struct dm_target *ti, unsigned int cmd,
 			unsigned long arg)
 {
 	struct linear_c *lc = (struct linear_c *) ti->private;
-	struct block_device *bdev = lc->dev->bdev;
-	struct file fake_file = {};
-	struct dentry fake_dentry = {};
-
-	fake_file.f_mode = lc->dev->mode;
-	fake_file.f_path.dentry = &fake_dentry;
-	fake_dentry.d_inode = bdev->bd_inode;
-
-	return blkdev_driver_ioctl(bdev->bd_inode, &fake_file, bdev->bd_disk, cmd, arg);
+	return __blkdev_driver_ioctl(lc->dev->bdev, lc->dev->mode, cmd, arg);
 }
 
 static int linear_merge(struct dm_target *ti, struct bvec_merge_data *bvm,
@@ -152,6 +142,7 @@ static struct target_type linear_target = {
 	.status = linear_status,
 	.ioctl  = linear_ioctl,
 	.merge  = linear_merge,
+	.features = DM_TARGET_SUPPORTS_BARRIERS,
 };
 
 int __init dm_linear_init(void)
@@ -166,8 +157,5 @@ int __init dm_linear_init(void)
 
 void dm_linear_exit(void)
 {
-	int r = dm_unregister_target(&linear_target);
-
-	if (r < 0)
-		DMERR("unregister failed %d", r);
+	dm_unregister_target(&linear_target);
 }

@@ -29,8 +29,10 @@ struct lpfc_sli2_slim;
 #define LPFC_MAX_NS_RETRY	3	/* Number of retry attempts to contact
 					   the NameServer  before giving up. */
 #define LPFC_CMD_PER_LUN	3	/* max outstanding cmds per lun */
-#define LPFC_DEFAULT_SG_SEG_CNT	64	/* sg element count per scsi cmnd */
-#define LPFC_MAX_SG_SEG_CNT	256	/* sg element count per scsi cmnd */
+#define LPFC_DEFAULT_SG_SEG_CNT 64	/* sg element count per scsi cmnd */
+#define LPFC_DEFAULT_PROT_SG_SEG_CNT 4096 /* sg protection elements count */
+#define LPFC_MAX_SG_SEG_CNT	4096	/* sg element count per scsi cmnd */
+#define LPFC_MAX_PROT_SG_SEG_CNT 4096	/* prot sg element count per scsi cmd*/
 #define LPFC_IOCB_LIST_CNT	2250	/* list of IOCBs for fast-path usage. */
 #define LPFC_Q_RAMP_UP_INTERVAL 120     /* lun q_depth ramp up interval */
 #define LPFC_VNAME_LEN		100	/* vport symbolic name length */
@@ -72,9 +74,6 @@ struct lpfc_sli2_slim;
 
 /* Number of MSI-X vectors the driver uses */
 #define LPFC_MSIX_VECTORS	2
-
-/* Active interrupt test threshold */
-#define LPFC_INTR_THRESHOLD	1
 
 /* lpfc wait event data ready flag */
 #define LPFC_DATA_READY		(1<<0)
@@ -220,80 +219,17 @@ struct lpfc_stats {
 	uint32_t fcpLocalErr;
 };
 
-struct lpfc_dmabufext {
-	struct lpfc_dmabuf dma;
-	uint32_t size;
-	uint32_t flag;
-};
-
 enum sysfs_mbox_state {
 	SMBOX_IDLE,
 	SMBOX_WRITING,
-	SMBOX_WRITING_MBEXT,
-	SMBOX_READING_MBEXT,
-	SMBOX_READING,
-	SMBOX_WRITING_BUFF,
-	SMBOX_READING_BUFF
-};
-
-struct lpfc_sysfs_mbox_data {
-	MAILBOX_t mbox;
-	uint32_t  mboffset;
-	uint32_t  in_ext_wlen;
-	uint32_t  out_ext_wlen;
+	SMBOX_READING
 };
 
 struct lpfc_sysfs_mbox {
-	struct lpfc_sysfs_mbox_data mbox_data;
 	enum sysfs_mbox_state state;
 	size_t                offset;
 	struct lpfcMboxq *    mbox;
-	/* process id of the mgmt application */
-	pid_t		      pid;
-	struct list_head      list;
-	uint8_t *             mbext;
-	uint32_t              extoff;
-	struct lpfc_dmabuf *  txmit_buff;
-	struct lpfc_dmabuf *  rcv_buff;
 };
-#define MENLO_DID 0x0000FC0E
-
-enum sysfs_menlo_state {
-	SMENLO_IDLE,
-	SMENLO_WRITING,
-	SMENLO_WRITING_MBEXT,
-	SMENLO_READING
-};
-
-struct lpfc_sysfs_menlo_hdr {
-	uint32_t cmd;
-	uint32_t cmdsize;
-	uint32_t rspsize;
-};
-
-struct lpfc_menlo_genreq64 {
-	size_t				offset;
-	struct lpfc_iocbq		*cmdiocbq;
-	struct lpfc_iocbq		*rspiocbq;
-	struct lpfc_dmabuf		*bmp;
-	struct lpfc_dmabufext		*indmp;
-	struct ulp_bde64		*cmdbpl;
-	struct lpfc_dmabufext		*outdmp;
-	uint32_t			timeout;
-	struct list_head		inhead;
-	struct list_head		outhead;
-};
-
-struct lpfc_sysfs_menlo {
-	enum sysfs_menlo_state		state;
-	/* process id of the mgmt application */
-	struct lpfc_sysfs_menlo_hdr	cmdhdr;
-	struct lpfc_menlo_genreq64	cr;
-	struct lpfc_menlo_genreq64	cx;
-	pid_t				pid;
-	struct list_head		list;
-};
-
 
 struct lpfc_hba;
 
@@ -325,57 +261,6 @@ enum hba_state {
 				       * CLEAR_LA */
 	LPFC_HBA_READY       =  32,
 	LPFC_HBA_ERROR       =  -1
-};
-
-enum auth_state {
-	LPFC_AUTH_UNKNOWN		=  0,
-	LPFC_AUTH_SUCCESS		=  1,
-	LPFC_AUTH_FAIL			=  2,
-	LPFC_AUTH_FAIL_ELS_TMO		=  3,
-	LPFC_AUTH_FAIL_TRANS_TMO	=  4,
-	LPFC_AUTH_FAIL_LS_RJT_GEN	=  5,
-	LPFC_AUTH_FAIL_LS_RJT_BUSY	=  6,
-	LPFC_AUTH_FAIL_AUTH_RJT		=  7,
-};
-enum auth_msg_state {
-	LPFC_AUTH_NONE			=  0,
-	LPFC_AUTH_REJECT		=  1,	/* Sent a Reject */
-	LPFC_AUTH_NEGOTIATE		=  2,	/* Auth Negotiate */
-	LPFC_DHCHAP_CHALLENGE		=  3,	/* Challenge */
-	LPFC_DHCHAP_REPLY		=  4,	/* Reply */
-	LPFC_DHCHAP_SUCCESS_REPLY	=  5,	/* Success with Reply */
-	LPFC_DHCHAP_SUCCESS		=  6,	/* Success */
-	LPFC_AUTH_DONE			=  7,
-};
-
-struct lpfc_auth {
-	uint8_t auth_mode;
-	uint8_t bidirectional;
-	uint8_t hash_priority[4];
-	uint32_t hash_len;
-	uint8_t dh_group_priority[8];
-	uint32_t dh_group_len;
-	uint32_t reauth_interval;
-
-	uint8_t security_active;
-	enum auth_state auth_state;
-	enum auth_msg_state auth_msg_state;
-	uint32_t trans_id;              /* current transaction id. Can be set
-					   by incomming transactions as well */
-	uint32_t group_id;
-	uint32_t hash_id;
-	uint32_t direction;
-#define AUTH_DIRECTION_NONE	0
-#define AUTH_DIRECTION_REMOTE	0x1
-#define AUTH_DIRECTION_LOCAL	0x2
-#define AUTH_DIRECTION_BIDI	(AUTH_DIRECTION_LOCAL|AUTH_DIRECTION_REMOTE)
-
-	uint8_t *challenge;
-	uint32_t challenge_len;
-	uint8_t *dh_pub_key;
-	uint32_t dh_pub_key_len;
-
-	unsigned long last_auth;
 };
 
 struct lpfc_vport {
@@ -471,15 +356,6 @@ struct lpfc_vport {
 	uint8_t load_flag;
 #define FC_LOADING		0x1	/* HBA in process of loading drvr */
 #define FC_UNLOADING		0x2	/* HBA in process of unloading drvr */
-	/* Fields used for accessing auth service */
-	struct lpfc_auth auth;
-	uint32_t sc_tran_id;
-	struct list_head sc_response_wait_queue;
-	struct list_head sc_users;
-	struct work_struct sc_online_work;
-	struct work_struct sc_offline_work;
-	uint8_t security_service_state;
-
 	/* Vport Config Parameters */
 	uint32_t cfg_scan_down;
 	uint32_t cfg_lun_queue_depth;
@@ -495,13 +371,12 @@ struct lpfc_vport {
 	uint32_t cfg_max_luns;
 	uint32_t cfg_enable_da_id;
 	uint32_t cfg_max_scsicmpl_time;
-	uint32_t cfg_enable_auth;
 
 	uint32_t dev_loss_tmo_changed;
 
 	struct fc_vport *fc_vport;
 
-#ifdef CONFIG_LPFC_DEBUG_FS
+#ifdef CONFIG_SCSI_LPFC_DEBUG_FS
 	struct dentry *debug_disc_trc;
 	struct dentry *debug_nodelist;
 	struct dentry *vport_debugfs_root;
@@ -553,6 +428,7 @@ struct lpfc_hba {
 #define LPFC_SLI3_VPORT_TEARDOWN	0x04
 #define LPFC_SLI3_CRP_ENABLED		0x08
 #define LPFC_SLI3_INB_ENABLED		0x10
+#define LPFC_SLI3_BG_ENABLED		0x20
 	uint32_t iocb_cmd_size;
 	uint32_t iocb_rsp_size;
 
@@ -570,7 +446,6 @@ struct lpfc_hba {
 	struct lpfc_dmabuf slim2p;
 
 	MAILBOX_t *mbox;
-	uint32_t *mbox_ext;
 	uint32_t *inb_ha_copy;
 	uint32_t *inb_counter;
 	uint32_t inb_last_counter;
@@ -627,14 +502,14 @@ struct lpfc_hba {
 	uint32_t cfg_poll_tmo;
 	uint32_t cfg_use_msi;
 	uint32_t cfg_sg_seg_cnt;
+	uint32_t cfg_prot_sg_seg_cnt;
 	uint32_t cfg_sg_dma_buf_size;
 	uint64_t cfg_soft_wwnn;
 	uint64_t cfg_soft_wwpn;
 	uint32_t cfg_hba_queue_depth;
 	uint32_t cfg_enable_hba_reset;
 	uint32_t cfg_enable_hba_heartbeat;
-	uint32_t cfg_pci_max_read;
-	uint32_t cfg_hostmem_hgp;
+	uint32_t cfg_enable_bg;
 
 	lpfc_vpd_t vpd;		/* vital product data */
 
@@ -700,10 +575,11 @@ struct lpfc_hba {
 	uint64_t fc4InputRequests;
 	uint64_t fc4OutputRequests;
 	uint64_t fc4ControlRequests;
+	uint64_t bg_guard_err_cnt;
+	uint64_t bg_apptag_err_cnt;
+	uint64_t bg_reftag_err_cnt;
 
-	/* List of mailbox commands issued through sysfs */
-	struct list_head sysfs_mbox_list;
-	struct list_head sysfs_menlo_list;
+	struct lpfc_sysfs_mbox sysfs_mbox;
 
 	/* fastpath list. */
 	spinlock_t scsi_buf_list_lock;
@@ -727,13 +603,11 @@ struct lpfc_hba {
 	uint32_t intr_mode;
 #define LPFC_INTR_ERROR	0xFFFFFFFF
 	struct msix_entry msix_entries[LPFC_MSIX_VECTORS];
-	struct lpfcdfc_host *dfc_host;
 
 	struct list_head port_list;
 	struct lpfc_vport *pport;	/* physical lpfc_vport pointer */
 	uint16_t max_vpi;		/* Maximum virtual nports */
-#define LPFC_MAX_VPI	0xFFFF		/* Max number of VPI supported */
-#define LPFC_INTR_VPI	100		/* Intermediate VPI supported */
+#define LPFC_MAX_VPI 0xFFFF		/* Max number of VPI supported */
 	unsigned long *vpi_bmask;	/* vpi allocation table */
 
 	/* Data structure used by fabric iocb scheduler */
@@ -747,12 +621,14 @@ struct lpfc_hba {
 	unsigned long last_rsrc_error_time;
 	unsigned long last_ramp_down_time;
 	unsigned long last_ramp_up_time;
-#ifdef CONFIG_LPFC_DEBUG_FS
+#ifdef CONFIG_SCSI_LPFC_DEBUG_FS
 	struct dentry *hba_debugfs_root;
 	atomic_t debugfs_vport_count;
 	struct dentry *debug_hbqinfo;
 	struct dentry *debug_dumpHostSlim;
 	struct dentry *debug_dumpHBASlim;
+	struct dentry *debug_dumpData;   /* BlockGuard BPL*/
+	struct dentry *debug_dumpDif;    /* BlockGuard BPL*/
 	struct dentry *debug_slow_ring_trc;
 	struct lpfc_debugfs_trc *slow_ring_trc;
 	atomic_t slow_ring_trc_cnt;

@@ -21,9 +21,6 @@ config PCI_MSI
 
 	   If you don't know what to do here, say N.
 
-config PCI_REASSIGN
-	bool
-
 config PCI_LEGACY
 	bool "Enable deprecated pci_find_* API"
 	depends on PCI
@@ -45,10 +42,19 @@ config PCI_DEBUG
 
 	  When in doubt, say N.
 
+config PCI_STUB
+	tristate "PCI Stub driver"
+	depends on PCI
+	help
+	  Say Y or M here if you want be able to reserve a PCI device
+	  when it is going to be assigned to a guest operating system.
+
+	  When in doubt, say N.
+
 config HT_IRQ
 	bool "Interrupts on hypertransport devices"
 	default y
-	depends on PCI && X86_LOCAL_APIC && X86_IO_APIC && !XEN
+	depends on PCI && X86_LOCAL_APIC && X86_IO_APIC
 	help
 	   This allows native hypertransport devices to use interrupts.
 

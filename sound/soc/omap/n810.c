@@ -70,8 +70,12 @@ static void n810_ext_control(struct snd_soc_codec *codec)
 
 static int n810_startup(struct snd_pcm_substream *substream)
 {
+	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_codec *codec = rtd->socdev->codec;
+
+	snd_pcm_hw_constraint_minmax(runtime,
+				     SNDRV_PCM_HW_PARAM_CHANNELS, 2, 2);
 
 	n810_ext_control(codec);
 	return clk_enable(sys_clkout2);
@@ -247,9 +251,9 @@ static int n810_aic33_init(struct snd_soc_codec *codec)
 	int i, err;
 
 	/* Not connected */
-	snd_soc_dapm_disable_pin(codec, "MONO_LOUT");
-	snd_soc_dapm_disable_pin(codec, "HPLCOM");
-	snd_soc_dapm_disable_pin(codec, "HPRCOM");
+	snd_soc_dapm_nc_pin(codec, "MONO_LOUT");
+	snd_soc_dapm_nc_pin(codec, "HPLCOM");
+	snd_soc_dapm_nc_pin(codec, "HPRCOM");
 
 	/* Add N810 specific controls */
 	for (i = 0; i < ARRAY_SIZE(aic33_n810_controls); i++) {
@@ -282,14 +286,16 @@ static struct snd_soc_dai_link n810_dai = {
 };
 
 /* Audio machine driver */
-static struct snd_soc_machine snd_soc_machine_n810 = {
+static struct snd_soc_card snd_soc_n810 = {
 	.name = "N810",
+	.platform = &omap_soc_platform,
 	.dai_link = &n810_dai,
 	.num_links = 1,
 };
 
 /* Audio private data */
 static struct aic3x_setup_data n810_aic33_setup = {
+	.i2c_bus = 2,
 	.i2c_address = 0x18,
 	.gpio_func[0] = AIC3X_GPIO1_FUNC_DISABLED,
 	.gpio_func[1] = AIC3X_GPIO2_FUNC_DIGITAL_MIC_INPUT,
@@ -297,8 +303,7 @@ static struct aic3x_setup_data n810_aic33_setup = {
 
 /* Audio subsystem */
 static struct snd_soc_device n810_snd_devdata = {
-	.machine = &snd_soc_machine_n810,
-	.platform = &omap_soc_platform,
+	.card = &snd_soc_n810,
 	.codec_dev = &soc_codec_dev_aic3x,
 	.codec_data = &n810_aic33_setup,
 };

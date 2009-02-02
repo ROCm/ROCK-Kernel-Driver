@@ -41,6 +41,7 @@
 #include <linux/pm_qos_params.h>
 #include <linux/clockchips.h>
 #include <linux/cpuidle.h>
+#include <linux/irqflags.h>
 
 /*
  * Include the apic definitions for x86 to have the APIC timer related defines
@@ -59,7 +60,6 @@
 #include <acpi/processor.h>
 #include <asm/processor.h>
 
-#define ACPI_PROCESSOR_COMPONENT        0x01000000
 #define ACPI_PROCESSOR_CLASS            "processor"
 #define _COMPONENT              ACPI_PROCESSOR_COMPONENT
 ACPI_MODULE_NAME("processor_idle");
@@ -324,15 +324,15 @@ static int tsc_halts_in_c(int state)
 {
 	switch (boot_cpu_data.x86_vendor) {
 	case X86_VENDOR_AMD:
+	case X86_VENDOR_INTEL:
 		/*
 		 * AMD Fam10h TSC will tick in all
 		 * C/P/S0/S1 states when this bit is set.
 		 */
-		if (boot_cpu_has(X86_FEATURE_CONSTANT_TSC))
+		if (boot_cpu_has(X86_FEATURE_NONSTOP_TSC))
 			return 0;
+
 		/*FALL THROUGH*/
-	case X86_VENDOR_INTEL:
-		/* Several cases known where TSC halts in C2 too */
 	default:
 		return state > ACPI_STATE_C1;
 	}
@@ -905,8 +905,7 @@ static int acpi_processor_get_power_info_cst(struct acpi_processor *pr)
 				 */
 				cx.entry_method = ACPI_CSTATE_HALT;
 				snprintf(cx.desc, ACPI_CX_DESC_LEN, "ACPI HLT");
-			/* This doesn't apply to external control case */
-			} else if (!processor_pm_external()) {
+			} else {
 				continue;
 			}
 			if (cx.type == ACPI_STATE_C1 &&
@@ -944,12 +943,6 @@ static int acpi_processor_get_power_info_cst(struct acpi_processor *pr)
 			continue;
 
 		cx.power = obj->integer.value;
-
-#ifdef CONFIG_PROCESSOR_EXTERNAL_CONTROL
-		/* cache control methods to notify external logic */
-		if (processor_pm_external())
-			memcpy(&cx.reg, reg, sizeof(*reg));
-#endif
 
 		current_count++;
 		memcpy(&(pr->power.states[current_count]), &cx, sizeof(cx));
@@ -1292,18 +1285,14 @@ int acpi_processor_cst_has_changed(struct acpi_processor *pr)
 	 * been initialized.
 	 */
 	if (pm_idle_save) {
-		if (!processor_pm_external())
-			pm_idle = pm_idle_save;
+		pm_idle = pm_idle_save;
 		/* Relies on interrupts forcing exit from idle. */
 		synchronize_sched();
 	}
 
 	pr->flags.power = 0;
 	result = acpi_processor_get_power_info(pr);
-	if (processor_pm_external())
-		processor_notify_external(pr,
-			PROCESSOR_PM_CHANGE, PM_TYPE_IDLE);
-	else if ((pr->flags.power == 1) && (pr->flags.power_setup_done))
+	if ((pr->flags.power == 1) && (pr->flags.power_setup_done))
 		pm_idle = acpi_processor_idle;
 
 	return result;
@@ -1547,6 +1536,7 @@ static int acpi_idle_enter_bm(struct cpuidle_device *dev,
 
 	if (acpi_idle_bm_check()) {
 		if (dev->safe_state) {
+			dev->last_state = dev->safe_state;
 			return dev->safe_state->enter(dev, dev->safe_state);
 		} else {
 			local_irq_disable();
@@ -1742,13 +1732,6 @@ int acpi_processor_cst_has_changed(struct acpi_processor *pr)
 	if (!pr->flags.power_setup_done)
 		return -ENODEV;
 
-	if (processor_pm_external()) {
-		acpi_processor_get_power_info(pr);
-		processor_notify_external(pr,
-			PROCESSOR_PM_CHANGE, PM_TYPE_IDLE);
-		return ret;
-	}
-
 	cpuidle_pause_and_lock();
 	cpuidle_disable_device(&pr->power.dev);
 	acpi_processor_get_power_info(pr);
@@ -1832,7 +1815,7 @@ int __cpuinit acpi_processor_power_init(struct acpi_processor *pr,
 		printk(")\n");
 
 #ifndef CONFIG_CPU_IDLE
-		if (!processor_pm_external() && (pr->id == 0)) {
+		if (pr->id == 0) {
 			pm_idle_save = pm_idle;
 			pm_idle = acpi_processor_idle;
 		}
@@ -1846,11 +1829,6 @@ int __cpuinit acpi_processor_power_init(struct acpi_processor *pr,
 				 acpi_driver_data(device));
 	if (!entry)
 		return -EIO;
-
-	if (processor_pm_external())
-		processor_notify_external(pr,
-			PROCESSOR_PM_INIT, PM_TYPE_IDLE);
-
 	return 0;
 }
 

@@ -45,6 +45,7 @@ enum {
 	POWER_SUPPLY_HEALTH_DEAD,
 	POWER_SUPPLY_HEALTH_OVERVOLTAGE,
 	POWER_SUPPLY_HEALTH_UNSPEC_FAILURE,
+	POWER_SUPPLY_HEALTH_COLD,
 };
 
 enum {
@@ -164,6 +165,12 @@ struct power_supply_info {
 
 extern void power_supply_changed(struct power_supply *psy);
 extern int power_supply_am_i_supplied(struct power_supply *psy);
+
+#if defined(CONFIG_POWER_SUPPLY) || defined(CONFIG_POWER_SUPPLY_MODULE)
+extern int power_supply_is_system_supplied(void);
+#else
+static inline int power_supply_is_system_supplied(void) { return -ENOSYS; }
+#endif
 
 extern int power_supply_register(struct device *parent,
 				 struct power_supply *psy);

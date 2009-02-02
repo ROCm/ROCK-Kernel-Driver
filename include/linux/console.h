@@ -63,7 +63,6 @@ extern const struct consw dummy_con;	/* dummy console buffer */
 extern const struct consw vga_con;	/* VGA text console */
 extern const struct consw newport_con;	/* SGI Newport console  */
 extern const struct consw prom_con;	/* SPARC PROM console */
-extern int console_use_vt;
 
 int con_is_bound(const struct consw *csw);
 int register_con_driver(const struct consw *csw, int first, int last);
@@ -158,5 +157,9 @@ void vcs_remove_sysfs(struct tty_struct *tty);
 #define VESA_VSYNC_SUSPEND      1
 #define VESA_HSYNC_SUSPEND      2
 #define VESA_POWERDOWN          3
+
+#ifdef CONFIG_VGA_CONSOLE
+extern bool vgacon_text_force(void);
+#endif
 
 #endif /* _LINUX_CONSOLE_H */

@@ -569,7 +569,6 @@ static int cafe_smbus_setup(struct cafe_camera *cam)
 
 	cafe_smbus_enable_irq(cam);
 	adap->id = I2C_HW_SMBUS_CAFE;
-	adap->class = I2C_CLASS_CAM_DIGITAL;
 	adap->owner = THIS_MODULE;
 	adap->client_register = cafe_smbus_attach;
 	adap->client_unregister = cafe_smbus_detach;
@@ -859,7 +858,7 @@ static int __cafe_cam_reset(struct cafe_camera *cam)
  */
 static int cafe_cam_init(struct cafe_camera *cam)
 {
-	struct v4l2_chip_ident chip = { V4L2_CHIP_MATCH_I2C_ADDR, 0, 0, 0 };
+	struct v4l2_dbg_chip_ident chip;
 	int ret;
 
 	mutex_lock(&cam->s_mutex);
@@ -869,8 +868,9 @@ static int cafe_cam_init(struct cafe_camera *cam)
 	ret = __cafe_cam_reset(cam);
 	if (ret)
 		goto out;
-	chip.match_chip = cam->sensor->addr;
-	ret = __cafe_cam_cmd(cam, VIDIOC_G_CHIP_IDENT, &chip);
+	chip.match.type = V4L2_CHIP_MATCH_I2C_ADDR;
+	chip.match.addr = cam->sensor->addr;
+	ret = __cafe_cam_cmd(cam, VIDIOC_DBG_G_CHIP_IDENT, &chip);
 	if (ret)
 		goto out;
 	cam->sensor_type = chip.ident;
@@ -1472,11 +1472,11 @@ static int cafe_v4l_mmap(struct file *filp, struct vm_area_struct *vma)
 
 
 
-static int cafe_v4l_open(struct inode *inode, struct file *filp)
+static int cafe_v4l_open(struct file *filp)
 {
 	struct cafe_camera *cam;
 
-	cam = cafe_find_dev(iminor(inode));
+	cam = cafe_find_dev(video_devdata(filp)->minor);
 	if (cam == NULL)
 		return -ENODEV;
 	filp->private_data = cam;
@@ -1494,7 +1494,7 @@ static int cafe_v4l_open(struct inode *inode, struct file *filp)
 }
 
 
-static int cafe_v4l_release(struct inode *inode, struct file *filp)
+static int cafe_v4l_release(struct file *filp)
 {
 	struct cafe_camera *cam = filp->private_data;
 
@@ -1759,7 +1759,7 @@ static void cafe_v4l_dev_release(struct video_device *vd)
  * clone it for specific real devices.
  */
 
-static const struct file_operations cafe_v4l_fops = {
+static const struct v4l2_file_operations cafe_v4l_fops = {
 	.owner = THIS_MODULE,
 	.open = cafe_v4l_open,
 	.release = cafe_v4l_release,
@@ -1767,7 +1767,6 @@ static const struct file_operations cafe_v4l_fops = {
 	.poll = cafe_v4l_poll,
 	.mmap = cafe_v4l_mmap,
 	.ioctl = video_ioctl2,
-	.llseek = no_llseek,
 };
 
 static const struct v4l2_ioctl_ops cafe_v4l_ioctl_ops = {
@@ -2055,10 +2054,10 @@ static void cafe_dfs_cam_setup(struct cafe_camera *cam)
 
 	if (!cafe_dfs_root)
 		return;
-	sprintf(fname, "regs-%d", cam->v4ldev.minor);
+	sprintf(fname, "regs-%d", cam->v4ldev.num);
 	cam->dfs_regs = debugfs_create_file(fname, 0444, cafe_dfs_root,
 			cam, &cafe_dfs_reg_ops);
-	sprintf(fname, "cam-%d", cam->v4ldev.minor);
+	sprintf(fname, "cam-%d", cam->v4ldev.num);
 	cam->dfs_cam_regs = debugfs_create_file(fname, 0444, cafe_dfs_root,
 			cam, &cafe_dfs_cam_ops);
 }
@@ -2092,15 +2091,8 @@ static int cafe_pci_probe(struct pci_dev *pdev,
 		const struct pci_device_id *id)
 {
 	int ret;
-	u16 classword;
 	struct cafe_camera *cam;
-	/*
-	 * Make sure we have a camera here - we'll get calls for
-	 * the other cafe devices as well.
-	 */
-	pci_read_config_word(pdev, PCI_CLASS_DEVICE, &classword);
-	if (classword != PCI_CLASS_MULTIMEDIA_VIDEO)
-		return -ENODEV;
+
 	/*
 	 * Start putting together one of our big camera structures.
 	 */
@@ -2288,8 +2280,8 @@ static int cafe_pci_resume(struct pci_dev *pdev)
 
 
 static struct pci_device_id cafe_ids[] = {
-	{ PCI_DEVICE(0x11ab, 0x4100) }, /* Eventual real ID */
-	{ PCI_DEVICE(0x11ab, 0x4102) }, /* Really eventual real ID */
+	{ PCI_DEVICE(PCI_VENDOR_ID_MARVELL,
+		     PCI_DEVICE_ID_MARVELL_88ALP01_CCIC) },
 	{ 0, }
 };
 

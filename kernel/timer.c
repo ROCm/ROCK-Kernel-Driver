@@ -884,7 +884,7 @@ static inline void __run_timers(struct tvec_base *base)
 	spin_unlock_irq(&base->lock);
 }
 
-#if defined(CONFIG_NO_HZ) || defined(CONFIG_NO_IDLE_HZ)
+#ifdef CONFIG_NO_HZ
 /*
  * Find out when the next timer event is due to happen. This
  * is used on S/390 to stop all activity when a cpus is idle.
@@ -1021,21 +1021,6 @@ unsigned long get_next_timer_interrupt(unsigned long now)
 }
 #endif
 
-#ifndef CONFIG_VIRT_CPU_ACCOUNTING
-void account_process_tick(struct task_struct *p, int user_tick)
-{
-	cputime_t one_jiffy = jiffies_to_cputime(1);
-
-	if (user_tick) {
-		account_user_time(p, one_jiffy);
-		account_user_time_scaled(p, cputime_to_scaled(one_jiffy));
-	} else {
-		account_system_time(p, HARDIRQ_OFFSET, one_jiffy);
-		account_system_time_scaled(p, cputime_to_scaled(one_jiffy));
-	}
-}
-#endif
-
 /*
  * Called from the timer interrupt handler to charge one tick to the current
  * process.  user_tick is 1 if the tick is user time, 0 for system.
@@ -1050,6 +1035,7 @@ void update_process_times(int user_tick)
 	run_local_timers();
 	if (rcu_pending(cpu))
 		rcu_check_callbacks(cpu, user_tick);
+	printk_tick();
 	scheduler_tick();
 	run_posix_cpu_timers(p);
 }
@@ -1195,25 +1181,25 @@ SYSCALL_DEFINE0(getppid)
 SYSCALL_DEFINE0(getuid)
 {
 	/* Only we change this so SMP safe */
-	return current->uid;
+	return current_uid();
 }
 
 SYSCALL_DEFINE0(geteuid)
 {
 	/* Only we change this so SMP safe */
-	return current->euid;
+	return current_euid();
 }
 
 SYSCALL_DEFINE0(getgid)
 {
 	/* Only we change this so SMP safe */
-	return current->gid;
+	return current_gid();
 }
 
 SYSCALL_DEFINE0(getegid)
 {
 	/* Only we change this so SMP safe */
-	return  current->egid;
+	return  current_egid();
 }
 
 #endif
@@ -1510,9 +1496,11 @@ static void __cpuinit migrate_timers(int cpu)
 	BUG_ON(cpu_online(cpu));
 	old_base = per_cpu(tvec_bases, cpu);
 	new_base = get_cpu_var(tvec_bases);
-
-	local_irq_disable();
-	spin_lock(&new_base->lock);
+	/*
+	 * The caller is globally serialized and nobody else
+	 * takes two locks at once, deadlock is not possible.
+	 */
+	spin_lock_irq(&new_base->lock);
 	spin_lock_nested(&old_base->lock, SINGLE_DEPTH_NESTING);
 
 	BUG_ON(old_base->running_timer);
@@ -1527,8 +1515,7 @@ static void __cpuinit migrate_timers(int cpu)
 	}
 
 	spin_unlock(&old_base->lock);
-	spin_unlock(&new_base->lock);
-	local_irq_enable();
+	spin_unlock_irq(&new_base->lock);
 	put_cpu_var(tvec_bases);
 }
 #endif /* CONFIG_HOTPLUG_CPU */
@@ -1600,3 +1587,7 @@ unsigned long msleep_interruptible(unsigned int msecs)
 }
 
 EXPORT_SYMBOL(msleep_interruptible);
+
+DEFINE_TRACE(timer_set);
+DEFINE_TRACE(timer_update_time);
+DEFINE_TRACE(timer_timeout);

@@ -93,10 +93,12 @@ int novfs_dir_fsync(struct file *file, struct dentry *dentry, int datasync);
 int novfs_a_writepage(struct page *page, struct writeback_control *wbc);
 int novfs_a_writepages(struct address_space *mapping,
 		       struct writeback_control *wbc);
-int novfs_a_prepare_write(struct file *file, struct page *page, unsigned from,
-			  unsigned to);
-int novfs_a_commit_write(struct file *file, struct page *page, unsigned offset,
-			 unsigned to);
+int novfs_a_write_begin(struct file *file, struct address_space *mapping,
+			loff_t pos, unsigned len, unsigned flags,
+			struct page **pagep, void **fsdata);
+int novfs_a_write_end(struct file *file, struct address_space *mapping,
+			  loff_t pos, unsigned len, unsigned copied,
+			  struct page *pagep, void *fsdata);
 int novfs_a_readpage(struct file *file, struct page *page);
 int novfs_a_readpages(struct file *file, struct address_space *mapping,
 		      struct list_head *page_lst, unsigned nr_pages);
@@ -246,8 +248,8 @@ static struct address_space_operations novfs_aops = {
 	.readpages = novfs_a_readpages,
 	.writepage = novfs_a_writepage,
 	.writepages = novfs_a_writepages,
-	.prepare_write = novfs_a_prepare_write,
-	.commit_write = novfs_a_commit_write,
+	.write_begin = novfs_a_write_begin,
+	.write_end = novfs_a_write_end,
 	.set_page_dirty = __set_page_dirty_nobuffers,
 	.direct_IO = novfs_a_direct_IO,
 };
@@ -319,39 +321,39 @@ struct file_private {
 
 static void PRINT_DENTRY(const char *s, struct dentry *d)
 {
-	DbgPrint("%s: 0x%p\n", s, d);
-	DbgPrint("   d_count:      0x%x\n", d->d_count);
-	DbgPrint("   d_lock:       0x%x\n", d->d_lock);
-	DbgPrint("   d_inode:      0x%x\n", d->d_inode);
-	DbgPrint("   d_lru:        0x%p\n"
-		 "      next:      0x%p\n"
-		 "      prev:      0x%p\n", &d->d_lru, d->d_lru.next,
-		 d->d_lru.prev);
-	DbgPrint("   d_child:      0x%p\n" "      next:      0x%p\n"
-		 "      prev:      0x%p\n", &d->d_u.d_child,
-		 d->d_u.d_child.next, d->d_u.d_child.prev);
-	DbgPrint("   d_subdirs:    0x%p\n" "      next:      0x%p\n"
-		 "      prev:      0x%p\n", &d->d_subdirs, d->d_subdirs.next,
-		 d->d_subdirs.prev);
-	DbgPrint("   d_alias:      0x%p\n" "      next:      0x%p\n"
-		 "      prev:      0x%p\n", &d->d_alias, d->d_alias.next,
-		 d->d_alias.prev);
-	DbgPrint("   d_time:       0x%x\n", d->d_time);
-	DbgPrint("   d_op:         0x%p\n", d->d_op);
-	DbgPrint("   d_sb:         0x%p\n", d->d_sb);
-	DbgPrint("   d_flags:      0x%x\n", d->d_flags);
-	DbgPrint("   d_mounted:    0x%x\n", d->d_mounted);
-	DbgPrint("   d_fsdata:     0x%p\n", d->d_fsdata);
+	__DbgPrint("%s: 0x%p\n", s, d);
+	__DbgPrint("   d_count:      0x%x\n", d->d_count);
+	__DbgPrint("   d_lock:       0x%x\n", d->d_lock);
+	__DbgPrint("   d_inode:      0x%x\n", d->d_inode);
+	__DbgPrint("   d_lru:        0x%p\n"
+		   "      next:      0x%p\n"
+		   "      prev:      0x%p\n", &d->d_lru, d->d_lru.next,
+		   d->d_lru.prev);
+	__DbgPrint("   d_child:      0x%p\n" "      next:      0x%p\n"
+		   "      prev:      0x%p\n", &d->d_u.d_child,
+		   d->d_u.d_child.next, d->d_u.d_child.prev);
+	__DbgPrint("   d_subdirs:    0x%p\n" "      next:      0x%p\n"
+		   "      prev:      0x%p\n", &d->d_subdirs, d->d_subdirs.next,
+		   d->d_subdirs.prev);
+	__DbgPrint("   d_alias:      0x%p\n" "      next:      0x%p\n"
+		   "      prev:      0x%p\n", &d->d_alias, d->d_alias.next,
+		   d->d_alias.prev);
+	__DbgPrint("   d_time:       0x%x\n", d->d_time);
+	__DbgPrint("   d_op:         0x%p\n", d->d_op);
+	__DbgPrint("   d_sb:         0x%p\n", d->d_sb);
+	__DbgPrint("   d_flags:      0x%x\n", d->d_flags);
+	__DbgPrint("   d_mounted:    0x%x\n", d->d_mounted);
+	__DbgPrint("   d_fsdata:     0x%p\n", d->d_fsdata);
 /*   DbgPrint("   d_cookie:     0x%x\n", d->d_cookie); */
-	DbgPrint("   d_parent:     0x%p\n", d->d_parent);
-	DbgPrint("   d_name:       0x%p %.*s\n", &d->d_name, d->d_name.len,
-		 d->d_name.name);
-	DbgPrint("      name:      0x%p\n" "      len:       %d\n"
-		 "      hash:      0x%x\n", d->d_name.name, d->d_name.len,
-		 d->d_name.hash);
-	DbgPrint("   d_hash:       0x%x\n" "      next:      0x%x\n"
-		 "      pprev:     0x%x\n", d->d_hash, d->d_hash.next,
-		 d->d_hash.pprev);
+	__DbgPrint("   d_parent:     0x%p\n", d->d_parent);
+	__DbgPrint("   d_name:       0x%p %.*s\n", &d->d_name, d->d_name.len,
+		   d->d_name.name);
+	__DbgPrint("      name:      0x%p\n" "      len:       %d\n"
+		   "      hash:      0x%x\n", d->d_name.name, d->d_name.len,
+		   d->d_name.hash);
+	__DbgPrint("   d_hash:       0x%x\n" "      next:      0x%x\n"
+		   "      pprev:     0x%x\n", d->d_hash, d->d_hash.next,
+		   d->d_hash.pprev);
 }
 
 /*++======================================================================*/
@@ -361,7 +363,7 @@ int novfs_remove_from_root(char *RemoveName)
 	struct dentry *dentry;
 	struct inode *dir;
 
-	DbgPrint("novfs_Remove_from_Root: %s\n", RemoveName);
+	DbgPrint("%s", RemoveName);
 	name.len = strlen(RemoveName);
 	name.name = RemoveName;
 	novfs_d_hash(novfs_root, &name);
@@ -393,7 +395,7 @@ int novfs_add_to_root(char *AddName)
 	struct novfs_entry_info info;
 	ino_t ino;
 
-	DbgPrint("novfs_Add_to_Root: %s\n", AddName);
+	DbgPrint("%s", AddName);
 	name.len = strlen(AddName);
 	name.name = AddName;
 	novfs_d_hash(novfs_root, &name);
@@ -426,19 +428,19 @@ int novfs_Add_to_Root2(char *AddName)
 	struct inode *inode;
 	void *scope;
 
-	DbgPrint("novfs_Add_to_Root: %s\n", AddName);
+	DbgPrint("%s", AddName);
 	name.len = strlen(AddName);
 	name.name = AddName;
 
 	novfs_d_hash(novfs_root, &name);
 
 	entry = d_lookup(novfs_root, &name);
-	DbgPrint("novfs_Add_to_Root: novfs_d_lookup 0x%p\n", entry);
+	DbgPrint("novfs_d_lookup 0x%p", entry);
 	if (NULL == entry) {
 		scope = novfs_scope_lookup();
 
 		entry = d_alloc(novfs_root, &name);
-		DbgPrint("novfs_Add_to_Root: d_alloc 0x%p\n", entry);
+		DbgPrint("d_alloc 0x%p", entry);
 		if (entry) {
 			entry->d_op = &novfs_dentry_operations;
 			entry->d_time = jiffies + (novfs_update_timeout * HZ);
@@ -447,7 +449,7 @@ int novfs_Add_to_Root2(char *AddName)
 			 */
 			inode =
 			    novfs_get_inode(novfs_root->d_sb, S_IFDIR | 0700, 0, novfs_scope_get_uid(scope), 0, &name);
-			DbgPrint("novfs_Add_to_Root: Inode=0x%p\n", inode);
+			DbgPrint("Inode=0x%p", inode);
 			if (inode) {
 				inode->i_atime =
 				    inode->i_ctime =
@@ -499,7 +501,7 @@ char *novfs_dget_path(struct dentry *Dentry, char *Buf, unsigned int Buflen)
 	}
 
 	if (retval)
-		DbgPrint("novfs_dget_path: %s\n", retval);
+		DbgPrint("%s", retval);
 	return (retval);
 }
 
@@ -519,7 +521,7 @@ int verify_dentry(struct dentry *dentry, int Flags)
 	struct inode *inode;
 
 	if (IS_ROOT(dentry)) {
-		DbgPrint("verify_dentry: Root entry\n");
+		DbgPrint("Root entry");
 		return (0);
 	}
 
@@ -576,7 +578,7 @@ int verify_dentry(struct dentry *dentry, int Flags)
 			retVal = 0;
 
 			if (IS_ROOT(dentry->d_parent)) {
-				DbgPrint("verify_dentry: parent is Root directory\n");
+				DbgPrint("parent is Root directory");
 				list = novfs_get_scopeusers();
 
 				iLock = novfs_lock_inode_cache(dir);
@@ -694,7 +696,7 @@ int verify_dentry(struct dentry *dentry, int Flags)
 	if (info)
 		kfree(info);
 
-	DbgPrint("verify_dentry: return=0x%x\n", retVal);
+	DbgPrint("return=0x%x", retVal);
 
 	return (retVal);
 }
@@ -711,7 +713,7 @@ static int novfs_d_add(struct dentry *Parent, struct dentry *d, struct inode *i,
 	if (buf) {
 		path = novfs_dget_path(d, buf, PATH_LENGTH_BUFFER);
 		if (path) {
-			DbgPrint("novfs_d_add: inode=0x%p ino=%d path %s\n", i,
+			DbgPrint("inode=0x%p ino=%d path %s", i,
 				 i->i_ino, path);
 		}
 		kfree(buf);
@@ -746,9 +748,9 @@ int novfs_d_revalidate(struct dentry *dentry, struct nameidata *nd)
 	struct inode_data *id;
 	struct qstr name;
 
-	DbgPrint("novfs_d_revalidate: 0x%p %.*s\n"
-		 "   d_count: %d\n"
-		 "   d_inode: 0x%p\n",
+	__DbgPrint("%s: 0x%p %.*s\n"
+		   "   d_count: %d\n"
+		   "   d_inode: 0x%p\n", __func__,
 		 dentry, dentry->d_name.len, dentry->d_name.name,
 		 dentry->d_count, dentry->d_inode);
 
@@ -799,7 +801,7 @@ int novfs_d_revalidate(struct dentry *dentry, struct nameidata *nd)
 */
 	}
 
-	DbgPrint("novfs_d_revalidate: return 0x%x %.*s\n", retCode,
+	DbgPrint("return 0x%x %.*s", retCode,
 		 dentry->d_name.len, dentry->d_name.name);
 
 	return (retCode);
@@ -823,7 +825,7 @@ static unsigned long novfs_internal_hash(struct qstr *name)
 
 int novfs_d_hash(struct dentry *dentry, struct qstr *name)
 {
-	DbgPrint("novfs_d_hash: %.*s\n", name->len, name->name);
+	DbgPrint("%.*s", name->len, name->name);
 
 	name->hash = novfs_internal_hash(name);
 
@@ -836,7 +838,7 @@ int novfs_d_strcmp(struct qstr *s1, struct qstr *s2)
 	unsigned char *str1, *str2;
 	unsigned int len;
 
-	DbgPrint("novfs_d_strcmp: s1=%.*s s2=%.*s\n", s1->len, s1->name,
+	DbgPrint("s1=%.*s s2=%.*s", s1->len, s1->name,
 		 s2->len, s2->name);
 
 	if (s1->len && (s1->len == s2->len) && (s1->hash == s2->hash)) {
@@ -853,7 +855,7 @@ int novfs_d_strcmp(struct qstr *s1, struct qstr *s2)
 		}
 	}
 
-	DbgPrint("novfs_d_strcmp: retCode=0x%x\n", retCode);
+	DbgPrint("retCode=0x%x", retCode);
 	return (retCode);
 }
 
@@ -863,7 +865,7 @@ int novfs_d_compare(struct dentry *parent, struct qstr *s1, struct qstr *s2)
 
 	retCode = novfs_d_strcmp(s1, s2);
 
-	DbgPrint("novfs_d_compare: retCode=0x%x\n", retCode);
+	DbgPrint("retCode=0x%x", retCode);
 	return (retCode);
 }
 
@@ -871,9 +873,7 @@ int novfs_d_delete(struct dentry *dentry)
 {
 	int retVal = 0;
 
-	DbgPrint("novfs_d_delete: 0x%p %.*s\n"
-		 "   d_count: %d\n"
-		 "   d_inode: 0x%p\n",
+	DbgPrint("0x%p %.*s; d_count: %d; d_inode: 0x%p",
 		 dentry, dentry->d_name.len, dentry->d_name.name,
 		 dentry->d_count, dentry->d_inode);
 
@@ -888,14 +888,13 @@ int novfs_d_delete(struct dentry *dentry)
 
 void novfs_d_release(struct dentry *dentry)
 {
-	DbgPrint("novfs_d_release: 0x%p %.*s\n", dentry, dentry->d_name.len,
+	DbgPrint("0x%p %.*s", dentry, dentry->d_name.len,
 		 dentry->d_name.name);
 }
 
 void novfs_d_iput(struct dentry *dentry, struct inode *inode)
 {
-	DbgPrint
-	    ("novfs_d_iput: Inode=0x%p Ino=%d Dentry=0x%p i_state=%d Name=%.*s\n",
+	DbgPrint("Inode=0x%p Ino=%d Dentry=0x%p i_state=%d Name=%.*s",
 	     inode, inode->i_ino, dentry, inode->i_state, dentry->d_name.len,
 	     dentry->d_name.name);
 
@@ -908,14 +907,14 @@ int novfs_dir_open(struct inode *dir, struct file *file)
 	char *path, *buf;
 	struct file_private *file_private = NULL;
 
-	DbgPrint("novfs_dir_open: Inode 0x%p %d Name %.*s\n", dir, dir->i_ino,
+	DbgPrint("Inode 0x%p %d Name %.*s", dir, dir->i_ino,
 		 file->f_dentry->d_name.len, file->f_dentry->d_name.name);
 
 	buf = kmalloc(PATH_LENGTH_BUFFER, GFP_KERNEL);
 	if (buf) {
 		path = novfs_dget_path(file->f_dentry, buf, PATH_LENGTH_BUFFER);
 		if (path) {
-			DbgPrint("novfs_dir_open: path %s\n", path);
+			DbgPrint("path %s", path);
 		}
 		kfree(buf);
 	}
@@ -935,9 +934,8 @@ int novfs_dir_release(struct inode *dir, struct file *file)
 	struct inode *inode = file->f_dentry->d_inode;
 	struct novfs_schandle sessionId;
 
-	DbgPrint("novfs_dir_release: Inode 0x%p %d Name %.*s\n", dir,
-		 dir->i_ino, file->f_dentry->d_name.len,
-		 file->f_dentry->d_name.name);
+	DbgPrint("Inode 0x%p %d Name %.*s", dir, dir->i_ino,
+		 file->f_dentry->d_name.len, file->f_dentry->d_name.name);
 
 	if (file_private) {
 		if (file_private->enumHandle && (file_private->enumHandle != ((void *)-1))) {
@@ -959,7 +957,7 @@ loff_t novfs_dir_lseek(struct file * file, loff_t offset, int origin)
 {
 	struct file_private *file_private = NULL;
 
-	DbgPrint("novfs_dir_lseek: offset %lld %d Name %.*s\n", offset, origin,
+	DbgPrint("offset %lld %d Name %.*s", offset, origin,
 		 file->f_dentry->d_name.len, file->f_dentry->d_name.name);
 	//printk("<1> seekdir file = %.*s offset = %i\n", file->f_dentry->d_name.len, file->f_dentry->d_name.name, (int)offset);
 
@@ -992,7 +990,7 @@ ssize_t novfs_dir_read(struct file * file, char *buf, size_t len, loff_t * off)
 /*
    int rlen = 0;
 
-   DbgPrint("novfs_dir_readdir: dentry path %.*s buf=0x%p len=%d off=%lld\n", file->f_dentry->d_name.len, file->f_dentry->d_name.name, buf, len, *off);
+   DbgPrint("dentry path %.*s buf=0x%p len=%d off=%lld", file->f_dentry->d_name.len, file->f_dentry->d_name.name, buf, len, *off);
 
    if (0 == *off)
    {
@@ -1002,7 +1000,7 @@ ssize_t novfs_dir_read(struct file * file, char *buf, size_t len, loff_t * off)
    }
    return(rlen);
 */
-	DbgPrint("novfs_dir_read: %lld %d Name %.*s\n", *off, len,
+	DbgPrint("%lld %d Name %.*s", *off, len,
 		 file->f_dentry->d_name.len, file->f_dentry->d_name.name);
 	return (generic_read_dir(file, buf, len, off));
 }
@@ -1014,7 +1012,7 @@ static void novfs_Dump_Info(struct novfs_entry_info *info)
 	int len = 0;
 
 	if (info == NULL) {
-		DbgPrint("novfs_dir_readdir : Dump_Info info == NULL\n");
+		DbgPrint("Dump_Info info == NULL");
 		return;
 	}
 
@@ -1030,16 +1028,16 @@ static void novfs_Dump_Info(struct novfs_entry_info *info)
 	ctime_r(&info->atime.tv_sec, atime_buf);
 	ctime_r(&info->mtime.tv_sec, mtime_buf);
 	ctime_r(&info->ctime.tv_sec, ctime_buf);
-	DbgPrint("novfs_dir_readdir : type = %i\n", info->type);
-	DbgPrint("novfs_dir_readdir : mode = %x\n", info->mode);
-	DbgPrint("novfs_dir_readdir : uid = %d\n", info->uid);
-	DbgPrint("novfs_dir_readdir : gid = %d\n", info->gid);
-	DbgPrint("novfs_dir_readdir : size = %i\n", info->size);
-	DbgPrint("novfs_dir_readdir : atime = %s\n", atime_buf);
-	DbgPrint("novfs_dir_readdir : mtime = %s\n", mtime_buf);
-	DbgPrint("novfs_dir_readdir : ctime = %s\n", ctime_buf);
-	DbgPrint("novfs_dir_readdir : namelength = %i\n", info->namelength);
-	DbgPrint("novfs_dir_readdir : name = %s\n", namebuf);
+	DbgPrint("type = %i", info->type);
+	DbgPrint("mode = %x", info->mode);
+	DbgPrint("uid = %d", info->uid);
+	DbgPrint("gid = %d", info->gid);
+	DbgPrint("size = %i", info->size);
+	DbgPrint("atime = %s", atime_buf);
+	DbgPrint("mtime = %s", mtime_buf);
+	DbgPrint("ctime = %s", ctime_buf);
+	DbgPrint("namelength = %i", info->namelength);
+	DbgPrint("name = %s", namebuf);
 }
 
 void processList(struct file *file, void *dirent, filldir_t filldir, char *list,
@@ -1064,8 +1062,7 @@ void processList(struct file *file, void *dirent, filldir_t filldir, char *list,
 		cp = list;
 		while (*cp) {
 			name.name = cp;
-			DbgPrint("novfs_dir_readdir : name.name = %s\n",
-				 name.name);
+			DbgPrint("name.name = %s", name.name);
 			name.len = strlen(cp);
 			name.hash = novfs_internal_hash(&name);
 			cp += (name.len + 1);
@@ -1151,7 +1148,7 @@ int novfs_dir_readdir(struct file *file, void *dirent, filldir_t filldir)
 	int lComm;
 
 	file_private = (struct file_private *) file->private_data;
-	DbgPrint("novfs_dir_readdir: Name %.*s\n", file->f_dentry->d_name.len,
+	DbgPrint("Name %.*s", file->f_dentry->d_name.len,
 		 file->f_dentry->d_name.name);
 
 	//printk("<1> file = %.*s\n", file->f_dentry->d_name.len, file->f_dentry->d_name.name);
@@ -1226,7 +1223,7 @@ int novfs_dir_readdir(struct file *file, void *dirent, filldir_t filldir)
 		uid = novfs_scope_get_uid(((struct inode_data *) inode->i_private)->Scope);
 	} else {
 		SC_INITIALIZE(sessionId);
-		uid = current->euid;
+		uid = current_euid();
 	}
 
 	if (IS_ROOT(file->f_dentry) ||	// Root
@@ -1234,17 +1231,15 @@ int novfs_dir_readdir(struct file *file, void *dirent, filldir_t filldir)
 	    IS_ROOT(file->f_dentry->d_parent->d_parent))	// Server
 	{
 		if (IS_ROOT(file->f_dentry)) {
-			DbgPrint("novfs_dir_readdir: Root directory\n");
+			DbgPrint("Root directory");
 			list = novfs_get_scopeusers();
 			type = USER_LIST;
 		} else if (IS_ROOT(file->f_dentry->d_parent)) {
-			DbgPrint
-			    ("novfs_dir_readdir: Parent is Root directory\n");
+			DbgPrint("Parent is Root directory");
 			novfs_get_servers(&list, sessionId);
 			type = SERVER_LIST;
 		} else {
-			DbgPrint
-			    ("novfs_dir_readdir: Parent-Parent is Root directory\n");
+			DbgPrint("Parent-Parent is Root directory");
 			novfs_get_vols(&file->f_dentry->d_name,
 						     &list, sessionId);
 			type = VOLUME_LIST;
@@ -1286,7 +1281,7 @@ int novfs_dir_readdir(struct file *file, void *dirent, filldir_t filldir)
 
 int novfs_dir_fsync(struct file *file, struct dentry *dentry, int datasync)
 {
-	DbgPrint("novfs_dir_fsync: Name %.*s\n", file->f_dentry->d_name.len,
+	DbgPrint("Name %.*s", file->f_dentry->d_name.len,
 		 file->f_dentry->d_name.name);
 	return (simple_sync_file(file, dentry, datasync));
 }
@@ -1303,7 +1298,7 @@ ssize_t novfs_f_read(struct file * file, char *buf, size_t len, loff_t * off)
 	    (inode = file->f_dentry->d_inode) &&
 	    (id = (struct inode_data *) inode->i_private)) {
 
-		DbgPrint("novfs_f_read(0x%p 0x%p %d %lld %.*s)\n",
+		DbgPrint("(0x%p 0x%p %d %lld %.*s)",
 			 file->private_data,
 			 buf, len, offset,
 			 file->f_dentry->d_name.len,
@@ -1332,8 +1327,7 @@ ssize_t novfs_f_read(struct file * file, char *buf, size_t len, loff_t * off)
 					}
 					break;
 				}
-				DbgPrint("novfs_f_read thisread = 0x%x\n",
-					 thisread);
+				DbgPrint("thisread = 0x%x", thisread);
 				len -= thisread;
 				buf += thisread;
 				offset += thisread;
@@ -1342,7 +1336,7 @@ ssize_t novfs_f_read(struct file * file, char *buf, size_t len, loff_t * off)
 			*off = offset;
 		}
 	}
-	DbgPrint("novfs_f_read return = %d\n", totalread);
+	DbgPrint("return = %d", totalread);
 
 	return (totalread);
 }
@@ -1360,7 +1354,7 @@ ssize_t novfs_f_write(struct file * file, const char *buf, size_t len,
 	if (file->f_dentry &&
 	    (inode = file->f_dentry->d_inode) &&
 	    (id = file->f_dentry->d_inode->i_private)) {
-		DbgPrint("novfs_f_write(0x%p 0x%p 0x%p %d %lld %.*s)\n",
+		DbgPrint("(0x%p 0x%p 0x%p %d %lld %.*s)",
 			 file->private_data, inode, id->FileHandle, len, offset,
 			 file->f_dentry->d_name.len,
 			 file->f_dentry->d_name.name);
@@ -1372,8 +1366,7 @@ ssize_t novfs_f_write(struct file * file, const char *buf, size_t len,
 		} else {
 			if (file->f_flags & O_APPEND) {
 				offset = i_size_read(inode);
-				DbgPrint
-				    ("novfs_f_write appending to end %lld %.*s\n",
+				DbgPrint("appending to end %lld %.*s",
 				     offset, file->f_dentry->d_name.len,
 				     file->f_dentry->d_name.name);
 			}
@@ -1395,7 +1388,7 @@ ssize_t novfs_f_write(struct file * file, const char *buf, size_t len,
 					totalwrite = status;
 					break;
 				}
-				DbgPrint("novfs_f_write thiswrite = 0x%x\n",
+				DbgPrint("thiswrite = 0x%x",
 					 thiswrite);
 				len -= thiswrite;
 				buf += thiswrite;
@@ -1414,7 +1407,7 @@ ssize_t novfs_f_write(struct file * file, const char *buf, size_t len,
 			*off = offset;
 		}
 	}
-	DbgPrint("novfs_f_write return = 0x%x\n", totalwrite);
+	DbgPrint("return = 0x%x", totalwrite);
 
 	return (totalwrite);
 }
@@ -1427,8 +1420,7 @@ int novfs_f_readdir(struct file *file, void *data, filldir_t fill)
 int novfs_f_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		  unsigned long arg)
 {
-	DbgPrint("novfs_f_ioctl: file=0x%p cmd=0x%x arg=0x%p\n", file, cmd,
-		 arg);
+	DbgPrint("file=0x%p cmd=0x%x arg=0x%p", file, cmd, arg);
 
 	return -ENOSYS;
 }
@@ -1437,12 +1429,12 @@ int novfs_f_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	int retCode = -EINVAL;
 
-	DbgPrint("novfs_f_mmap: file=0x%p %.*s\n", file,
-		 file->f_dentry->d_name.len, file->f_dentry->d_name.name);
+	DbgPrint("file=0x%p %.*s", file, file->f_dentry->d_name.len,
+		 file->f_dentry->d_name.name);
 
 	retCode = generic_file_mmap(file, vma);
 
-	DbgPrint("novfs_f_mmap: retCode=0x%x\n", retCode);
+	DbgPrint("retCode=0x%x", retCode);
 	return (retCode);
 }
 
@@ -1457,15 +1449,14 @@ int novfs_f_open(struct inode *inode, struct file *file)
 	struct inode_data *id;
 	int errInfo;
 
-	DbgPrint
-	    ("novfs_f_open: inode=0x%p file=0x%p dentry=0x%p dentry->d_inode=0x%p %.*s\n",
-	     inode, file, file->f_dentry, file->f_dentry->d_inode,
+	DbgPrint("inode=0x%p file=0x%p dentry=0x%p dentry->d_inode=0x%p %.*s",
+		 inode, file, file->f_dentry, file->f_dentry->d_inode,
 	     file->f_dentry->d_name.len, file->f_dentry->d_name.name);
 	if (file->f_dentry) {
-		DbgPrint
-		    ("novfs_f_open: %.*s f_flags=0%o f_mode=0%o i_mode=0%o\n",
-		     file->f_dentry->d_name.len, file->f_dentry->d_name.name,
-		     file->f_flags, file->f_mode, inode->i_mode);
+		DbgPrint("%.*s f_flags=0%o f_mode=0%o i_mode=0%o",
+			 file->f_dentry->d_name.len,
+			 file->f_dentry->d_name.name,
+			 file->f_flags, file->f_mode, inode->i_mode);
 	}
 
 	if (inode && inode->i_private) {
@@ -1495,7 +1486,7 @@ int novfs_f_open(struct inode *inode, struct file *file)
 					}
 				}
 
-				DbgPrint("novfs_f_open: %s\n", path);
+				DbgPrint("%s", path);
 				retCode = novfs_open_file(path,
 							  file->
 							  f_flags & ~O_EXCL,
@@ -1503,7 +1494,7 @@ int novfs_f_open(struct inode *inode, struct file *file)
 							  &file->private_data,
 							  session);
 
-				DbgPrint("novfs_f_open: 0x%x 0x%p\n", retCode,
+				DbgPrint("0x%x 0x%p", retCode,
 					 file->private_data);
 				if (!retCode) {
 					/*
@@ -1543,7 +1534,7 @@ int novfs_f_open(struct inode *inode, struct file *file)
 			kfree(info);
 		}
 	}
-	DbgPrint("novfs_f_open: retCode=0x%x\n", retCode);
+	DbgPrint("retCode=0x%x", retCode);
 	return (retCode);
 }
 
@@ -1568,14 +1559,13 @@ int novfs_flush_mapping(void *Handle, struct address_space *mapping,
 			struct page *page;
 			int i;
 
-			DbgPrint("novfs_flush_mapping: %u\n", nrpages);
+			DbgPrint("%u", nrpages);
 
 			done = 0;
 			for (i = 0; !rc && (i < nrpages); i++) {
 				page = pagevec.pages[i];
 
-				DbgPrint("novfs_flush_mapping: page 0x%p %lu\n",
-					 page, page->index);
+				DbgPrint("page 0x%p %lu", page, page->index);
 
 				lock_page(page);
 				page_cache_get(page);
@@ -1602,7 +1592,7 @@ int novfs_flush_mapping(void *Handle, struct address_space *mapping,
 		}
 	} while (!rc && !done);
 
-	DbgPrint("novfs_flush_mapping: return %d\n", rc);
+	DbgPrint("return %d", rc);
 
 	return (rc);
 }
@@ -1616,18 +1606,16 @@ int novfs_f_flush(struct file *file, fl_owner_t ownid)
 	struct novfs_schandle session;
 	struct inode_data *id;
 
-	DbgPrint("novfs_f_flush: Called from 0x%p\n",
-		 __builtin_return_address(0));
+	DbgPrint("Called from 0x%p", __builtin_return_address(0));
 	if (file->f_dentry && (inode = file->f_dentry->d_inode)
 	    && (id = file->f_dentry->d_inode->i_private)) {
 
 		if ((file->f_flags & O_ACCMODE) != O_RDONLY) {
 			inode = file->f_dentry->d_inode;
-			DbgPrint
-			    ("novfs_f_flush: %.*s f_flags=0%o f_mode=0%o i_mode=0%o\n",
-			     file->f_dentry->d_name.len,
-			     file->f_dentry->d_name.name, file->f_flags,
-			     file->f_mode, inode->i_mode);
+			DbgPrint("%.*s f_flags=0%o f_mode=0%o i_mode=0%o",
+				 file->f_dentry->d_name.len,
+				 file->f_dentry->d_name.name, file->f_flags,
+				 file->f_mode, inode->i_mode);
 
 			session = novfs_scope_get_sessionId(id->Scope);
 			if (0 == SC_PRESENT(session)) {
@@ -1639,7 +1627,7 @@ int novfs_f_flush(struct file *file, fl_owner_t ownid)
 			if (inode &&
 			    inode->i_mapping && inode->i_mapping->nrpages) {
 
-				DbgPrint("novfs_f_flush: %.*s pages=%lu\n",
+				DbgPrint("%.*s pages=%lu",
 					 file->f_dentry->d_name.len,
 					 file->f_dentry->d_name.name,
 					 inode->i_mapping->nrpages);
@@ -1675,7 +1663,7 @@ int novfs_f_release(struct inode *inode, struct file *file)
 	struct novfs_schandle session;
 	struct inode_data *id;
 
-	DbgPrint("novfs_f_release: path=%.*s handle=%p\n",
+	DbgPrint("path=%.*s handle=%p",
 		 file->f_dentry->d_name.len,
 		 file->f_dentry->d_name.name, file->private_data);
 
@@ -1687,15 +1675,14 @@ int novfs_f_release(struct inode *inode, struct file *file)
 		}
 
 		if ((file->f_flags & O_ACCMODE) != O_RDONLY) {
-			DbgPrint
-			    ("novfs_f_release: %.*s f_flags=0%o f_mode=0%o i_mode=0%o\n",
+			DbgPrint("%.*s f_flags=0%o f_mode=0%o i_mode=0%o",
 			     file->f_dentry->d_name.len,
 			     file->f_dentry->d_name.name, file->f_flags,
 			     file->f_mode, inode->i_mode);
 
 			if (inode->i_mapping && inode->i_mapping->nrpages) {
 
-				DbgPrint("novfs_f_release: %.*s pages=%lu\n",
+				DbgPrint("%.*s pages=%lu",
 					 file->f_dentry->d_name.len,
 					 file->f_dentry->d_name.name,
 					 inode->i_mapping->nrpages);
@@ -1730,7 +1717,7 @@ int novfs_f_fsync(struct file *file, struct dentry *dentry, int datasync)
 
 int novfs_f_llseek(struct file *file, loff_t offset, int origin)
 {
-	DbgPrint("novfs_f_llseek: File=0x%p Name=%.*s offset=%lld origin=%d\n",
+	DbgPrint("File=0x%p Name=%.*s offset=%lld origin=%d",
 		 file, file->f_dentry->d_name.len, file->f_dentry->d_name.name,
 		 offset, origin);
 	return (generic_file_llseek(file, offset, origin));
@@ -1770,14 +1757,12 @@ int novfs_f_lock(struct file *file, int cmd, struct file_lock *lock)
 	struct inode_data *id;
 	loff_t len;
 
-	DbgPrint("novfs_f_lock(0x%p): begin in novfs_f_lock 0x%p\n",
+	DbgPrint("(0x%p): begin in novfs_f_lock 0x%p",
 		 __builtin_return_address(0), file->private_data);
-	DbgPrint
-	    ("novfs_f_lock: cmd = %d, F_GETLK = %d, F_SETLK = %d, F_SETLKW = %d\n",
-	     cmd, F_GETLK, F_SETLK, F_SETLKW);
-	DbgPrint
-	    ("novfs_f_lock: lock->fl_start = 0x%llX, lock->fl_end = 0x%llX\n",
-	     lock->fl_start, lock->fl_end);
+	DbgPrint("cmd = %d, F_GETLK = %d, F_SETLK = %d, F_SETLKW = %d",
+		 cmd, F_GETLK, F_SETLK, F_SETLKW);
+	DbgPrint("lock->fl_start = 0x%llX, lock->fl_end = 0x%llX",
+		 lock->fl_start, lock->fl_end);
 
 	err_code = -1;
 	if (lock->fl_start <= lock->fl_end) {
@@ -1790,7 +1775,7 @@ int novfs_f_lock(struct file *file, int cmd, struct file_lock *lock)
 		if (file->f_dentry &&
 		    (inode = file->f_dentry->d_inode) &&
 		    (id = (struct inode_data *) inode->i_private)) {
-			DbgPrint("novfs_f_lock: (0x%p 0x%p %.*s)\n",
+			DbgPrint("(0x%p 0x%p %.*s)",
 				 file->private_data, inode,
 				 file->f_dentry->d_name.len,
 				 file->f_dentry->d_name.name);
@@ -1841,14 +1826,13 @@ int novfs_f_lock(struct file *file, int cmd, struct file_lock *lock)
 				printk
 				    ("<1> novfs in novfs_f_lock, not implemented cmd = %d\n",
 				     cmd);
-				DbgPrint
-				    ("novfs_f_lock: novfs in novfs_f_lock, not implemented cmd = %d\n",
+				DbgPrint("novfs in novfs_f_lock, not implemented cmd = %d",
 				     cmd);
 				break;
 			}
 		}
 
-		DbgPrint("novfs_f_lock: lock->fl_type = %u, err_code 0x%X\n",
+		DbgPrint("lock->fl_type = %u, err_code 0x%X",
 			 lock->fl_type, err_code);
 
 		if ((err_code != 0) && (err_code != -1)
@@ -1902,7 +1886,7 @@ static void novfs_copy_cache_pages(struct address_space *mapping,
 		SetPageUptodate(page);
 		unlock_page(page);
 		if (!pagevec_add(plru_pvec, page))
-			__pagevec_lru_add(plru_pvec);
+			__pagevec_lru_add_file(plru_pvec);
 		data += PAGE_CACHE_SIZE;
 	}
 	return;
@@ -1970,12 +1954,11 @@ int novfs_a_writepages(struct address_space *mapping,
 	size_t tsize;
 
 	SC_INITIALIZE(session);
-	DbgPrint
-	    ("novfs_a_writepages: inode=0x%p mapping=0x%p wbc=0x%p nr_to_write=%d\n",
+	DbgPrint("inode=0x%p mapping=0x%p wbc=0x%p nr_to_write=%d",
 	     inode, mapping, wbc, wbc->nr_to_write);
 
 	if (inode) {
-		DbgPrint(" Inode=0x%p Ino=%d Id=0x%p\n", inode, inode->i_ino,
+		DbgPrint("Inode=0x%p Ino=%d Id=0x%p", inode, inode->i_ino,
 			 inode->i_private);
 
 		if (NULL != (id = inode->i_private)) {
@@ -1991,12 +1974,10 @@ int novfs_a_writepages(struct address_space *mapping,
 	    kmalloc(sizeof(struct page *) * max_page_lookup, GFP_KERNEL);
 
 	if (id)
-		DbgPrint
-		    ("novfs_a_writepages: inode=0x%p fh=0x%p dlist=0x%p pages=0x%p %s\n",
+		DbgPrint("inode=0x%p fh=0x%p dlist=0x%p pages=0x%p %s",
 		     inode, fh, dlist, pages, id->Name);
 	else
-		DbgPrint
-		    ("novfs_a_writepages: inode=0x%p fh=0x%p dlist=0x%p pages=0x%p\n",
+		DbgPrint("inode=0x%p fh=0x%p dlist=0x%p pages=0x%p",
 		     inode, fh, dlist, pages);
 
 	if (dlist && pages) {
@@ -2023,8 +2004,7 @@ int novfs_a_writepages(struct address_space *mapping,
 			dlist_idx = 0;
 			dlptr = &dlist[1];
 
-			DbgPrint("novfs_a_writepages1: nr_pages=%d\n",
-				 nr_pages);
+			DbgPrint("nr_pages=%d", nr_pages);
 			if (!nr_pages) {
 				memset(pages, 0,
 				       sizeof(struct page *) * max_page_lookup);
@@ -2045,8 +2025,7 @@ int novfs_a_writepages(struct address_space *mapping,
 							       1,
 							       PAGECACHE_TAG_DIRTY);
 
-				DbgPrint("novfs_a_writepages2: nr_pages=%d\n",
-					 nr_pages);
+				DbgPrint("2; nr_pages=%d\n", nr_pages);
 				/*
 				 * Check to see if there are dirty pages and there is a valid
 				 * file handle.
@@ -2054,8 +2033,7 @@ int novfs_a_writepages(struct address_space *mapping,
 				if (nr_pages && !fh) {
 					set_bit(AS_EIO, &mapping->flags);
 					done = 1;
-					DbgPrint
-					    ("novfs_a_writepage: set_bit AS_EIO\n");
+					DbgPrint("set_bit AS_EIO");
 					break;
 				}
 
@@ -2129,13 +2107,11 @@ int novfs_a_writepages(struct address_space *mapping,
 				dlptr[dlist_idx].len = PAGE_CACHE_SIZE;
 				dlptr[dlist_idx].rwflag = DLREAD;
 				dlist_idx++;
-				DbgPrint
-				    ("novfs_a_writepages: Add page=0x%p index=0x%lx\n",
+				DbgPrint("Add page=0x%p index=0x%lx",
 				     page, page->index);
 			}
 
-			DbgPrint("novfs_a_writepages: dlist_idx=%d\n",
-				 dlist_idx);
+			DbgPrint("dlist_idx=%d", dlist_idx);
 			if (dlist_idx) {
 				tsize = dlist_idx * PAGE_CACHE_SIZE;
 				/*
@@ -2171,8 +2147,7 @@ int novfs_a_writepages(struct address_space *mapping,
 					page_cache_release((struct page *)
 							   dlptr[dlist_idx -
 								 1].page);
-					DbgPrint
-					    ("novfs_a_writepages: release page=0x%p index=0x%lx\n",
+					DbgPrint("release page=0x%p index=0x%lx",
 					     dlptr[dlist_idx - 1].page,
 					     ((struct page *)
 					      dlptr[dlist_idx -
@@ -2191,7 +2166,7 @@ int novfs_a_writepages(struct address_space *mapping,
 		mapping->writeback_index = index;
 
 	} else {
-		DbgPrint("novfs_a_writepage: set_bit AS_EIO\n");
+		DbgPrint("set_bit AS_EIO");
 		set_bit(AS_EIO, &mapping->flags);
 	}
 	if (dlist)
@@ -2199,7 +2174,7 @@ int novfs_a_writepages(struct address_space *mapping,
 	if (pages)
 		kfree(pages);
 
-	DbgPrint("novfs_a_writepage: retCode=%d\n", retCode);
+	DbgPrint("retCode=%d", retCode);
 	return (0);
 
 }
@@ -2215,13 +2190,13 @@ int novfs_a_readpage(struct file *file, struct page *page)
 	struct novfs_schandle session;
 
 	SC_INITIALIZE(session);
-	DbgPrint("novfs_a_readpage: File=0x%p Name=%.*s Page=0x%p", file,
+	DbgPrint("File=0x%p Name=%.*s Page=0x%p", file,
 		 file->f_dentry->d_name.len, file->f_dentry->d_name.name, page);
 
 	dentry = file->f_dentry;
 
 	if (dentry) {
-		DbgPrint(" Dentry=0x%p Name=%.*s", dentry, dentry->d_name.len,
+		DbgPrint("Dentry=0x%p Name=%.*s", dentry, dentry->d_name.len,
 			 dentry->d_name.name);
 		if (dentry->d_inode) {
 			inode = dentry->d_inode;
@@ -2229,7 +2204,7 @@ int novfs_a_readpage(struct file *file, struct page *page)
 	}
 
 	if (inode) {
-		DbgPrint(" Inode=0x%p Ino=%d", inode, inode->i_ino);
+		DbgPrint("Inode=0x%p Ino=%d", inode, inode->i_ino);
 
 		if (inode->i_private) {
 			session =
@@ -2245,8 +2220,6 @@ int novfs_a_readpage(struct file *file, struct page *page)
 		}
 	}
 
-	DbgPrint("\n");
-
 	if (!PageUptodate(page)) {
 		struct novfs_data_list dlst[2];
 
@@ -2261,7 +2234,7 @@ int novfs_a_readpage(struct file *file, struct page *page)
 		dlst[1].len = PAGE_CACHE_SIZE;
 		dlst[1].rwflag = DLWRITE;
 
-		DbgPrint("novfs_a_readpage: calling= novfs_Read_Pages %lld\n",
+		DbgPrint("calling= novfs_Read_Pages %lld",
 			 offset);
 		retCode =
 		    novfs_read_pages(file->private_data, dlst, 2, &len, &offset,
@@ -2277,7 +2250,7 @@ int novfs_a_readpage(struct file *file, struct page *page)
 	}
 	unlock_page(page);
 
-	DbgPrint("novfs_a_readpage: retCode=%d\n", retCode);
+	DbgPrint("retCode=%d", retCode);
 	return (retCode);
 
 }
@@ -2299,14 +2272,14 @@ int novfs_a_readpages(struct file *file, struct address_space *mapping,
 	char *rbuf, done = 0;
 	SC_INITIALIZE(session);
 
-	DbgPrint("novfs_a_readpages: File=0x%p Name=%.*s Pages=%d\n", file,
+	DbgPrint("File=0x%p Name=%.*s Pages=%d", file,
 		 file->f_dentry->d_name.len, file->f_dentry->d_name.name,
 		 nr_pages);
 
 	dentry = file->f_dentry;
 
 	if (dentry) {
-		DbgPrint(" Dentry=0x%p Name=%.*s\n", dentry, dentry->d_name.len,
+		DbgPrint("Dentry=0x%p Name=%.*s", dentry, dentry->d_name.len,
 			 dentry->d_name.name);
 		if (dentry->d_inode) {
 			inode = dentry->d_inode;
@@ -2314,7 +2287,7 @@ int novfs_a_readpages(struct file *file, struct address_space *mapping,
 	}
 
 	if (inode) {
-		DbgPrint(" Inode=0x%p Ino=%d\n", inode, inode->i_ino);
+		DbgPrint("Inode=0x%p Ino=%d", inode, inode->i_ino);
 
 		if (inode->i_private) {
 			session =
@@ -2365,8 +2338,7 @@ int novfs_a_readpages(struct file *file, struct address_space *mapping,
 				dllst[1].len = len;
 				dllst[1].rwflag = DLWRITE;
 
-				DbgPrint
-				    ("novfs_a_readpages: calling novfs_Read_Pages %lld\n",
+				DbgPrint("calling novfs_Read_Pages %lld",
 				     offset);
 				if (!novfs_read_pages
 				    (file->private_data, dllst, 2, &len,
@@ -2398,32 +2370,44 @@ int novfs_a_readpages(struct file *file, struct address_space *mapping,
 			page_cache_release(page);
 		}
 
-		pagevec_lru_add(&lru_pvec);
+		pagevec_lru_add_file(&lru_pvec);
 		kfree(rbuf);
 	} else {
 		retCode = -ENOMEM;
 	}
 
-	DbgPrint("novfs_a_readpages: retCode=%d\n", retCode);
+	DbgPrint("retCode=%d", retCode);
 	return (retCode);
 
 }
 
-int novfs_a_prepare_write(struct file *file, struct page *page, unsigned from,
-			  unsigned to)
+int novfs_a_write_begin(struct file *file, struct address_space *mapping,
+			loff_t pos, unsigned len, unsigned flags,
+			struct page **pagep, void **fsdata)
 {
 	int retVal = 0;
-	loff_t offset = (loff_t) page->index << PAGE_CACHE_SHIFT;
-	size_t len = PAGE_CACHE_SIZE;
+	loff_t offset = pos;
 	struct novfs_schandle session;
 	struct novfs_data_list dllst[2];
 	struct inode *inode = file->f_dentry->d_inode;
+	struct page *page;
+	pgoff_t index;
+	unsigned from, to;
 	SC_INITIALIZE(session);
 
-	DbgPrint
-	    ("novfs_a_prepare_write: File=0x%p Page=0x%p offset=0x%llx From=%u To=%u filesize=%lld\n",
-	     file, page, offset, from, to,
-	     i_size_read(file->f_dentry->d_inode));
+	index = pos >> PAGE_CACHE_SHIFT;
+	from = pos & (PAGE_CACHE_SIZE - 1);
+	to = from + len;
+
+	page = grab_cache_page_write_begin(mapping, index, flags);
+	if (!page)
+		return -ENOMEM;
+
+	*pagep = page;
+
+	DbgPrint("File=0x%p Page=0x%p offset=0x%llx From=%u To=%u "
+		 "filesize=%lld\n", file, page, offset, from, to,
+		 i_size_read(file->f_dentry->d_inode));
 	if (!PageUptodate(page)) {
 		/*
 		 * Check to see if whole page
@@ -2473,8 +2457,7 @@ int novfs_a_prepare_write(struct file *file, struct page *page, unsigned from,
 				dllst[1].len = len;
 				dllst[1].rwflag = DLWRITE;
 
-				DbgPrint
-				    ("novfs_a_prepare_write: calling novfs_Read_Pages %lld\n",
+				DbgPrint("calling novfs_Read_Pages %lld",
 				     offset);
 				novfs_read_pages(file->private_data, dllst, 2,
 						 &len, &offset, session);
@@ -2498,31 +2481,36 @@ int novfs_a_prepare_write(struct file *file, struct page *page, unsigned from,
 			memset(adr + to, 0, PAGE_CACHE_SIZE - to);
 			kunmap_atomic(adr, KM_USER0);
 
-			DbgPrint("novfs_a_prepare_write: memset 0x%p\n", adr);
+			DbgPrint("memset 0x%p", adr);
 		}
 		flush_dcache_page(page);
 		SetPageUptodate(page);
 	}
-//   DbgPrint("novfs_a_prepare_write: return %d\n", retVal);
+//   DbgPrint("return %d", retVal);
 	return (retVal);
 }
 
-int novfs_a_commit_write(struct file *file, struct page *page, unsigned offset,
-			 unsigned to)
+int novfs_a_write_end(struct file *file, struct address_space *mapping,
+		      loff_t pos, unsigned len, unsigned copied,
+		      struct page *page, void *fsdata)
 {
 	int retCode = 0;
 	struct inode *inode = page->mapping->host;
-	loff_t pos = ((loff_t) page->index << PAGE_CACHE_SHIFT) + to;
+	loff_t offset = pos;
 	struct novfs_schandle session;
 	struct inode_data *id;
 	struct novfs_data_list dlst[1];
-	size_t len = to - offset;
-
+	pgoff_t index;
+	unsigned from, to;
 	SC_INITIALIZE(session);
 
-	DbgPrint
-	    ("novfs_a_commit_write: File=0x%p Page=0x%p offset=0x%x To=%u filesize=%lld\n",
-	     file, page, offset, to, i_size_read(file->f_dentry->d_inode));
+	index = pos >> PAGE_CACHE_SHIFT;
+	from = pos & (PAGE_CACHE_SIZE - 1);
+	to = from + len;
+
+
+	DbgPrint("File=0x%p Page=0x%p offset=0x%x To=%u filesize=%lld",
+		 file, page, offset, to, i_size_read(file->f_dentry->d_inode));
 	if (file->f_dentry->d_inode
 	    && (id = file->f_dentry->d_inode->i_private)) {
 		session = novfs_scope_get_sessionId(id->Scope);
@@ -2590,7 +2578,7 @@ int novfs_i_create(struct inode *dir, struct dentry *dentry, int mode,
 	struct novfs_schandle session;
 	int retCode = -EACCES;
 
-	DbgPrint("novfs_i_create: mode=0%o flags=0%o %.*s\n", mode,
+	DbgPrint("mode=0%o flags=0%o %.*s", mode,
 		 nd->NDOPENFLAGS, dentry->d_name.len, dentry->d_name.name);
 
 	if (IS_ROOT(dentry) ||	/* Root */
@@ -2652,29 +2640,24 @@ void update_inode(struct inode *Inode, struct novfs_entry_info *Info)
 {
 	static char dbuf[128];
 
-	DbgPrint("update_inode: Inode=0x%p I_ino=%d\n", Inode, Inode->i_ino);
+	DbgPrint("Inode=0x%p I_ino=%d", Inode, Inode->i_ino);
 
-	DbgPrint("update_inode: atime=%s\n",
-		 ctime_r(&Info->atime.tv_sec, dbuf));
-	DbgPrint("update_inode: ctime=%s\n",
-		 ctime_r(&Info->ctime.tv_sec, dbuf));
-	DbgPrint("update_inode: mtime=%s %d\n",
-		 ctime_r(&Info->mtime.tv_sec, dbuf), Info->mtime.tv_nsec);
-	DbgPrint("update_inode: size=%lld\n", Info->size);
-	DbgPrint("update_inode: mode=0%o\n", Info->mode);
+	DbgPrint("atime=%s", ctime_r(&Info->atime.tv_sec, dbuf));
+	DbgPrint("ctime=%s", ctime_r(&Info->ctime.tv_sec, dbuf));
+	DbgPrint("mtime=%s %d", ctime_r(&Info->mtime.tv_sec, dbuf),
+		 Info->mtime.tv_nsec);
+	DbgPrint("size=%lld", Info->size);
+	DbgPrint("mode=0%o", Info->mode);
 
 	if (Inode &&
 	    ((Inode->i_size != Info->size) ||
 	     (Inode->i_mtime.tv_sec != Info->mtime.tv_sec) ||
 	     (Inode->i_mtime.tv_nsec != Info->mtime.tv_nsec))) {
-		DbgPrint
-		    ("update_inode: calling invalidate_remote_inode sz  %d %d\n",
+		DbgPrint ("calling invalidate_remote_inode sz  %d %d",
 		     Inode->i_size, Info->size);
-		DbgPrint
-		    ("update_inode: calling invalidate_remote_inode sec %d %d\n",
+		DbgPrint ("calling invalidate_remote_inode sec %d %d",
 		     Inode->i_mtime.tv_sec, Info->mtime.tv_sec);
-		DbgPrint
-		    ("update_inode: calling invalidate_remote_inode ns  %d %d\n",
+		DbgPrint ("calling invalidate_remote_inode ns  %d %d",
 		     Inode->i_mtime.tv_nsec, Info->mtime.tv_nsec);
 
 		if (Inode && Inode->i_mapping) {
@@ -2693,11 +2676,10 @@ void update_inode(struct inode *Inode, struct novfs_entry_info *Info)
 		    (unsigned long) (Info->size >> (loff_t) Inode->i_blkbits);
 		Inode->i_bytes = Info->size & (Inode->i_sb->s_blocksize - 1);
 
-		DbgPrint("update_inode: i_sb->s_blocksize=%d\n",
-			 Inode->i_sb->s_blocksize);
-		DbgPrint("update_inode: i_blkbits=%d\n", Inode->i_blkbits);
-		DbgPrint("update_inode: i_blocks=%d\n", Inode->i_blocks);
-		DbgPrint("update_inode: i_bytes=%d\n", Inode->i_bytes);
+		DbgPrint("i_sb->s_blocksize=%d", Inode->i_sb->s_blocksize);
+		DbgPrint("i_blkbits=%d", Inode->i_blkbits);
+		DbgPrint("i_blocks=%d", Inode->i_blocks);
+		DbgPrint("i_bytes=%d", Inode->i_bytes);
 	}
 }
 
@@ -2709,7 +2691,7 @@ struct dentry *novfs_i_lookup(struct inode *dir, struct dentry *dentry,
 	struct novfs_entry_info *info = NULL;
 	struct inode_data *id;
 	struct inode *inode = NULL;
-	uid_t uid = current->euid;
+	uid_t uid = current_euid();
 	ino_t ino = 0;
 	struct qstr name;
 	char *buf;
@@ -2719,15 +2701,13 @@ struct dentry *novfs_i_lookup(struct inode *dir, struct dentry *dentry,
 		char *path;
 		path = novfs_dget_path(dentry, buf, PATH_LENGTH_BUFFER);
 		if (path) {
-			DbgPrint
-			    ("novfs_i_lookup: dir 0x%p %d hash %d inode 0x%0p %s\n",
+			DbgPrint("dir 0x%p %d hash %d inode 0x%0p %s",
 			     dir, dir->i_ino, dentry->d_name.hash,
 			     dentry->d_inode, path);
 		}
 		kfree(buf);
 	} else {
-		DbgPrint
-		    ("novfs_i_lookup: dir 0x%p %d name %.*s hash %d inode 0x%0p\n",
+		DbgPrint("dir 0x%p %d name %.*s hash %d inode 0x%0p",
 		     dir, dir->i_ino, dentry->d_name.len, dentry->d_name.name,
 		     dentry->d_name.hash, dentry->d_inode);
 	}
@@ -2750,8 +2730,7 @@ struct dentry *novfs_i_lookup(struct inode *dir, struct dentry *dentry,
 	if (dir && (id = dir->i_private)) {
 		retVal = 0;
 		if (IS_ROOT(dentry)) {
-			DbgPrint("novfs_i_lookup: Root entry=0x%p\n",
-				 novfs_root);
+			DbgPrint("Root entry=0x%p", novfs_root);
 			inode = novfs_root->d_inode;
 			return (0);
 		} else {
@@ -2815,8 +2794,7 @@ struct dentry *novfs_i_lookup(struct inode *dir, struct dentry *dentry,
 	if (info)
 		kfree(info);
 
-	DbgPrint
-	    ("novfs_i_lookup: inode=0x%p dentry->d_inode=0x%p return=0x%p\n",
+	DbgPrint("inode=0x%p dentry->d_inode=0x%p return=0x%p",
 	     dir, dentry->d_inode, retVal);
 
 	return (retVal);
@@ -2830,15 +2808,14 @@ int novfs_i_unlink(struct inode *dir, struct dentry *dentry)
 	char *path, *buf;
 	uint64_t t64;
 
-	DbgPrint("novfs_i_unlink: dir=0x%p dir->i_ino=%d %.*s\n", dir,
+	DbgPrint("dir=0x%p dir->i_ino=%d %.*s", dir,
 		 dir->i_ino, dentry->d_name.len, dentry->d_name.name);
-	DbgPrint("novfs_i_unlink: IS_ROOT(dentry)=%d\n", IS_ROOT(dentry));
-	DbgPrint("novfs_i_unlink: IS_ROOT(dentry->d_parent)=%d\n",
+	DbgPrint("IS_ROOT(dentry)=%d", IS_ROOT(dentry));
+	DbgPrint("IS_ROOT(dentry->d_parent)=%d",
 		 IS_ROOT(dentry->d_parent));
-	DbgPrint("novfs_i_unlink: IS_ROOT(dentry->d_parent->d_parent)=%d\n",
+	DbgPrint("IS_ROOT(dentry->d_parent->d_parent)=%d",
 		 IS_ROOT(dentry->d_parent->d_parent));
-	DbgPrint
-	    ("novfs_i_unlink: IS_ROOT(dentry->d_parent->d_parent->d_parent)=%d\n",
+	DbgPrint("IS_ROOT(dentry->d_parent->d_parent->d_parent)=%d",
 	     IS_ROOT(dentry->d_parent->d_parent->d_parent));
 
 	if (IS_ROOT(dentry) ||	/* Root */
@@ -2850,8 +2827,7 @@ int novfs_i_unlink(struct inode *dir, struct dentry *dentry)
 
 	inode = dentry->d_inode;
 	if (inode) {
-		DbgPrint
-		    ("novfs_i_unlink: dir=0x%p dir->i_ino=%d inode=0x%p ino=%d\n",
+		DbgPrint("dir=0x%p dir->i_ino=%d inode=0x%p ino=%d",
 		     dir, dir->i_ino, inode, inode->i_ino);
 		if (inode->i_private) {
 			session =
@@ -2871,9 +2847,8 @@ int novfs_i_unlink(struct inode *dir, struct dentry *dentry)
 				    novfs_dget_path(dentry, buf,
 						    PATH_LENGTH_BUFFER);
 				if (path) {
-					DbgPrint
-					    ("novfs_i_unlink: path %s mode 0%o\n",
-					     path, inode->i_mode);
+					DbgPrint("path %s mode 0%o",
+						 path, inode->i_mode);
 					if (IS_ROOT(dentry->d_parent->d_parent)) {
 						retCode = novfs_daemon_logout(&dentry->d_name, &session);
 					} else {
@@ -2906,7 +2881,7 @@ int novfs_i_unlink(struct inode *dir, struct dentry *dentry)
 		}
 	}
 
-	DbgPrint("novfs_i_unlink: retCode 0x%x\n", retCode);
+	DbgPrint("retCode 0x%x", retCode);
 	return (retCode);
 }
 
@@ -2919,7 +2894,7 @@ int novfs_i_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	struct novfs_entry_info info;
 	uid_t uid;
 
-	DbgPrint("novfs_i_mkdir: dir=0x%p ino=%d dentry=0x%p %.*s mode=0%lo\n",
+	DbgPrint("dir=0x%p ino=%d dentry=0x%p %.*s mode=0%lo",
 		 dir, dir->i_ino, dentry, dentry->d_name.len,
 		 dentry->d_name.name, mode);
 
@@ -2948,7 +2923,7 @@ int novfs_i_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 		if (buf) {
 			path = novfs_dget_path(dentry, buf, PATH_LENGTH_BUFFER);
 			if (path) {
-				DbgPrint("novfs_i_mkdir: path %s\n", path);
+				DbgPrint("path %s", path);
 				retCode =
 				    novfs_create(path, S_ISDIR(mode), session);
 				if (!retCode) {
@@ -3043,7 +3018,7 @@ int novfs_i_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
 
 		retCode = 0;
 	}
-	DbgPrint("novfs_i_mknod: return 0x%x\n", retCode);
+	DbgPrint("return 0x%x", retCode);
 	return retCode;
 }
 
@@ -3066,7 +3041,7 @@ int novfs_i_rename(struct inode *odir, struct dentry *od, struct inode *ndir,
 		return (-EACCES);
 	}
 
-	DbgPrint("novfs_i_rename: odir=0x%p ino=%d ndir=0x%p ino=%d\n", odir,
+	DbgPrint("odir=0x%p ino=%d ndir=0x%p ino=%d", odir,
 		 odir->i_ino, ndir, ndir->i_ino);
 
 	oldbuf = kmalloc(PATH_LENGTH_BUFFER * 2, GFP_KERNEL);
@@ -3078,17 +3053,14 @@ int novfs_i_rename(struct inode *odir, struct dentry *od, struct inode *ndir,
 			oldlen = PATH_LENGTH_BUFFER - (int)(oldpath - oldbuf);
 			newlen = PATH_LENGTH_BUFFER - (int)(newpath - newbuf);
 
-			DbgPrint
-			    ("novfs_i_rename: od=0x%p od->inode=0x%p od->inode->i_ino=%d %s\n",
+			DbgPrint("od=0x%p od->inode=0x%p od->inode->i_ino=%d %s",
 			     od, od->d_inode, od->d_inode->i_ino, oldpath);
 			if (nd->d_inode) {
-				DbgPrint
-				    ("novfs_i_rename: nd=0x%p nd->inode=0x%p nd->inode->i_ino=%d %s\n",
+				DbgPrint("nd=0x%p nd->inode=0x%p nd->inode->i_ino=%d %s",
 				     nd, nd->d_inode, nd->d_inode->i_ino,
 				     newpath);
 			} else {
-				DbgPrint
-				    ("novfs_i_rename: nd=0x%p nd->inode=0x%p %s\n",
+				DbgPrint("nd=0x%p nd->inode=0x%p %s",
 				     nd, nd->d_inode, newpath);
 			}
 
@@ -3097,18 +3069,18 @@ int novfs_i_rename(struct inode *odir, struct dentry *od, struct inode *ndir,
 			 */
 			newcon = strchr(newpath + 1, '\\');
 			oldcon = strchr(oldpath + 1, '\\');
-			DbgPrint("novfs_i_rename: newcon=0x%p newpath=0x%p\n",
-				 newcon, newpath);
-			DbgPrint("novfs_i_rename: oldcon=0x%p oldpath=0x%p\n",
-				 oldcon, oldpath);
+			DbgPrint("newcon=0x%p newpath=0x%p", newcon, newpath);
+			DbgPrint("oldcon=0x%p oldpath=0x%p", oldcon, oldpath);
 			retCode = -EXDEV;
 			if (newcon && oldcon
 			    && ((int)(newcon - newpath) ==
 				(int)(oldcon - oldpath))) {
 				newcon = strchr(newcon + 1, '\\');
 				oldcon = strchr(oldcon + 1, '\\');
-				DbgPrint("novfs_i_rename2: newcon=0x%p newpath=0x%p\n", newcon, newpath);
-				DbgPrint("novfs_i_rename2: oldcon=0x%p oldpath=0x%p\n", oldcon, oldpath);
+				DbgPrint("2; newcon=0x%p newpath=0x%p",
+					 newcon, newpath);
+				DbgPrint("2; oldcon=0x%p oldpath=0x%p",
+					 oldcon, oldpath);
 				if (newcon && oldcon &&
 				    ((int)(newcon - newpath) == (int)(oldcon - oldpath))) {
 					newname.name = newpath;
@@ -3184,7 +3156,7 @@ int novfs_i_rename(struct inode *odir, struct dentry *od, struct inode *ndir,
 	if (oldbuf)
 		kfree(oldbuf);
 
-	DbgPrint("novfs_i_rename: return %d\n", retCode);
+	DbgPrint("return %d", retCode);
 	return (retCode);
 }
 
@@ -3240,7 +3212,7 @@ int novfs_i_setattr(struct dentry *dentry, struct iattr *attr)
 						ctime_buf);
 				}
 				/* Removed for Bug 132374. jlt */
-				DbgPrint("novfs_i_setattr: %s\n"
+				__DbgPrint("%s: %s\n"
 					 "   ia_valid:      0x%x\n"
 					 "   ia_mode:       0%o\n"
 					 "   ia_uid:        %d\n"
@@ -3248,7 +3220,7 @@ int novfs_i_setattr(struct dentry *dentry, struct iattr *attr)
 					 "   ia_size:       %lld\n"
 					 "   ia_atime:      %s\n"
 					 "   ia_mtime:      %s\n"
-					 "   ia_ctime:      %s\n",
+					 "   ia_ctime:      %s\n", __func__,
 					 path,
 					 attr->ia_valid,
 					 attr->ia_mode,
@@ -3304,7 +3276,7 @@ int novfs_i_setattr(struct dentry *dentry, struct iattr *attr)
 		}
 		kfree(buf);
 	}
-	DbgPrint("novfs_i_setattr: return 0x%x\n", retVal);
+	DbgPrint("return 0x%x", retVal);
 
 	return (retVal);
 }
@@ -3374,7 +3346,7 @@ int novfs_i_getattr(struct vfsmount *mnt, struct dentry *dentry,
 	ctime_r(&kstat->mtime.tv_sec, mtime_buf);
 	ctime_r(&kstat->ctime.tv_sec, ctime_buf);
 
-	DbgPrint("novfs_i_getattr: 0x%x 0x%p <%.*s>\n"
+	__DbgPrint("%s: 0x%x 0x%p <%.*s>\n"
 		 "   ino: %d\n"
 		 "   dev: 0x%x\n"
 		 "   mode: 0%o\n"
@@ -3387,7 +3359,7 @@ int novfs_i_getattr(struct vfsmount *mnt, struct dentry *dentry,
 		 "   mtime: %s\n"
 		 "   ctime: %s\n"
 		 "   blksize: 0x%x\n"
-		 "   blocks: 0x%x\n",
+		 "   blocks: 0x%x\n", __func__,
 		 retCode, dentry, dentry->d_name.len, dentry->d_name.name,
 		 kstat->ino,
 		 kstat->dev,
@@ -3414,18 +3386,17 @@ ssize_t novfs_i_getxattr(struct dentry *dentry, const char *name, void *buffer,
 
 	SC_INITIALIZE(sessionId);
 
-	DbgPrint("novfs_i_getxattr: Ian\n");	/*%.*s\n", dentry->d_name.len, dentry->d_name.name); */
-	DbgPrint
-	    ("novfs_i_getxattr: dentry->d_name.len %u, dentry->d_name.name %s\n",
+	DbgPrint("Ian");	/*%.*s\n", dentry->d_name.len, dentry->d_name.name); */
+	DbgPrint("dentry->d_name.len %u, dentry->d_name.name %s",
 	     dentry->d_name.len, dentry->d_name.name);
-	DbgPrint("novfs_i_getxattr: name %s\n", name);
-	DbgPrint("novfs_i_getxattr: size %u\n", buffer_size);
+	DbgPrint("name %s", name);
+	DbgPrint("size %u", buffer_size);
 
 	if (inode && inode->i_private) {
 		sessionId =
 		    novfs_scope_get_sessionId(((struct inode_data *) inode->i_private)->
 					Scope);
-		DbgPrint("novfs_i_getxattr: SessionId = %u\n", sessionId);
+		DbgPrint("SessionId = %u", sessionId);
 		//if (0 == sessionId)
 		if (0 == SC_PRESENT(sessionId)) {
 			((struct inode_data *) inode->i_private)->Scope =
@@ -3433,8 +3404,7 @@ ssize_t novfs_i_getxattr(struct dentry *dentry, const char *name, void *buffer,
 			sessionId =
 			    novfs_scope_get_sessionId(((struct inode_data *) inode->
 						 i_private)->Scope);
-			DbgPrint("novfs_i_getxattr: SessionId = %u\n",
-				 sessionId);
+			DbgPrint("SessionId = %u", sessionId);
 		}
 	}
 
@@ -3449,8 +3419,7 @@ ssize_t novfs_i_getxattr(struct dentry *dentry, const char *name, void *buffer,
 				    novfs_getx_file_info(path, name, bufRead,
 							 XA_BUFFER, &dataLen,
 							 sessionId);
-				DbgPrint
-				    ("novfs_i_getxattr: after novfs_GetX_File_Info retxcode = %d\n",
+				DbgPrint("after novfs_GetX_File_Info retxcode = %d",
 				     retxcode);
 				if (!retxcode) {
 					novfs_dump(64, bufRead);
@@ -3459,8 +3428,7 @@ ssize_t novfs_i_getxattr(struct dentry *dentry, const char *name, void *buffer,
 							memcpy(buffer, bufRead,
 							       dataLen);
 						} else {
-							DbgPrint
-							    ("novfs_i_getxattr: (!!!) not enough buffer_size. buffer_size = %d, dataLen = %d\n",
+							DbgPrint("(!!!) not enough buffer_size. buffer_size = %d, dataLen = %d",
 							     buffer_size,
 							     dataLen);
 							retxcode = -ERANGE;
@@ -3500,19 +3468,18 @@ int novfs_i_setxattr(struct dentry *dentry, const char *name, const void *value,
 
 	SC_INITIALIZE(sessionId);
 
-	DbgPrint("novfs_i_setxattr: Ian\n");	/*%.*s\n", dentry->d_name.len, dentry->d_name.name); */
-	DbgPrint
-	    ("novfs_i_setxattr: dentry->d_name.len %u, dentry->d_name.name %s\n",
-	     dentry->d_name.len, dentry->d_name.name);
-	DbgPrint("novfs_i_setxattr: name %s\n", name);
-	DbgPrint("novfs_i_setxattr: value_size %u\n", value_size);
-	DbgPrint("novfs_i_setxattr: flags %d\n", flags);
+	DbgPrint("Ian");	/*%.*s\n", dentry->d_name.len, dentry->d_name.name); */
+	DbgPrint("dentry->d_name.len %u, dentry->d_name.name %s",
+		 dentry->d_name.len, dentry->d_name.name);
+	DbgPrint("name %s", name);
+	DbgPrint("value_size %u", value_size);
+	DbgPrint("flags %d", flags);
 
 	if (inode && inode->i_private) {
 		sessionId =
 		    novfs_scope_get_sessionId(((struct inode_data *) inode->i_private)->
 					Scope);
-		DbgPrint("novfs_i_setxattr: SessionId = %u\n", sessionId);
+		DbgPrint("SessionId = %u", sessionId);
 		//if (0 == sessionId)
 		if (0 == SC_PRESENT(sessionId)) {
 			((struct inode_data *) inode->i_private)->Scope =
@@ -3520,8 +3487,7 @@ int novfs_i_setxattr(struct dentry *dentry, const char *name, const void *value,
 			sessionId =
 			    novfs_scope_get_sessionId(((struct inode_data *) inode->
 						 i_private)->Scope);
-			DbgPrint("novfs_i_setxattr: SessionId = %u\n",
-				 sessionId);
+			DbgPrint("SessionId = %u", sessionId);
 		}
 	}
 
@@ -3534,9 +3500,7 @@ int novfs_i_setxattr(struct dentry *dentry, const char *name, const void *value,
 						 &bytesWritten, flags,
 						 sessionId);
 			if (!retxcode) {
-				DbgPrint
-				    ("novfs_i_setxattr: bytesWritten = %u\n",
-				     bytesWritten);
+				DbgPrint("bytesWritten = %u", bytesWritten);
 			}
 		}
 		kfree(buf);
@@ -3562,17 +3526,16 @@ ssize_t novfs_i_listxattr(struct dentry *dentry, char *buffer, size_t buffer_siz
 
 	SC_INITIALIZE(sessionId);
 
-	DbgPrint("novfs_i_listxattr: Ian\n");	//%.*s\n", dentry->d_name.len, dentry->d_name.name);
-	DbgPrint
-	    ("novfs_i_listxattr: dentry->d_name.len %u, dentry->d_name.name %s\n",
+	DbgPrint("Ian");	//%.*s\n", dentry->d_name.len, dentry->d_name.name);
+	DbgPrint("dentry->d_name.len %u, dentry->d_name.name %s",
 	     dentry->d_name.len, dentry->d_name.name);
-	DbgPrint("novfs_i_listxattr: size %u\n", buffer_size);
+	DbgPrint("size %u", buffer_size);
 
 	if (inode && inode->i_private) {
 		sessionId =
 		    novfs_scope_get_sessionId(((struct inode_data *) inode->i_private)->
 					Scope);
-		DbgPrint("novfs_i_listxattr: SessionId = %u\n", sessionId);
+		DbgPrint("SessionId = %u", sessionId);
 		//if (0 == sessionId)
 		if (0 == SC_PRESENT(sessionId)) {
 			((struct inode_data *) inode->i_private)->Scope =
@@ -3580,8 +3543,7 @@ ssize_t novfs_i_listxattr(struct dentry *dentry, char *buffer, size_t buffer_siz
 			sessionId =
 			    novfs_scope_get_sessionId(((struct inode_data *) inode->
 						 i_private)->Scope);
-			DbgPrint("novfs_i_listxattr: SessionId = %u\n",
-				 sessionId);
+			DbgPrint("SessionId = %u", sessionId);
 		}
 	}
 
@@ -3603,8 +3565,7 @@ ssize_t novfs_i_listxattr(struct dentry *dentry, char *buffer, size_t buffer_siz
 						memcpy(buffer, bufList,
 						       dataLen);
 					} else {
-						DbgPrint
-						    ("novfs_i_listxattr: (!!!) not enough buffer_size. buffer_size = %d, dataLen = %d\n",
+						DbgPrint("(!!!) not enough buffer_size. buffer_size = %d, dataLen = %d",
 						     buffer_size, dataLen);
 						retxcode = -1;
 					}
@@ -3633,28 +3594,26 @@ ssize_t novfs_i_listxattr(struct dentry *dentry, char *buffer, size_t buffer_siz
 int novfs_i_revalidate(struct dentry *dentry)
 {
 
-	DbgPrint("novfs_i_revalidate: name %.*s\n", dentry->d_name.len,
-		 dentry->d_name.name);
+	DbgPrint("name %.*s", dentry->d_name.len, dentry->d_name.name);
 
 	return (0);
 }
 
 void novfs_read_inode(struct inode *inode)
 {
-	DbgPrint("novfs_read_inode: 0x%p %d\n", inode, inode->i_ino);
+	DbgPrint("0x%p %d", inode, inode->i_ino);
 }
 
 void novfs_write_inode(struct inode *inode)
 {
-	DbgPrint("novfs_write_inode: Inode=0x%p Ino=%d\n", inode, inode->i_ino);
+	DbgPrint("Inode=0x%p Ino=%d", inode, inode->i_ino);
 }
 
 int novfs_notify_change(struct dentry *dentry, struct iattr *attr)
 {
 	struct inode *inode = dentry->d_inode;
 
-	DbgPrint
-	    ("novfs_notify_change: Dentry=0x%p Name=%.*s Inode=0x%p Ino=%d ia_valid=0x%x\n",
+	DbgPrint("Dentry=0x%p Name=%.*s Inode=0x%p Ino=%d ia_valid=0x%x",
 	     dentry, dentry->d_name.len, dentry->d_name.name, inode,
 	     inode->i_ino, attr->ia_valid);
 	return (0);
@@ -3667,8 +3626,7 @@ void novfs_clear_inode(struct inode *inode)
 	if (inode->i_private) {
 		struct inode_data *id = inode->i_private;
 
-		DbgPrint
-		    ("novfs_clear_inode: inode=0x%p ino=%d Scope=0x%p Name=%s\n",
+		DbgPrint("inode=0x%p ino=%d Scope=0x%p Name=%s",
 		     inode, inode->i_ino, id->Scope, id->Name);
 
 		novfs_free_inode_cache(inode);
@@ -3683,8 +3641,7 @@ void novfs_clear_inode(struct inode *inode)
 		remove_inode_hash(inode);
 
 	} else {
-		DbgPrint("novfs_clear_inode: inode=0x%p ino=%d\n", inode,
-			 inode->i_ino);
+		DbgPrint("inode=0x%p ino=%d", inode, inode->i_ino);
 	}
 }
 
@@ -3703,7 +3660,7 @@ int novfs_show_options(struct seq_file *s, struct vfsmount *m)
 			if (!novfs_current_mnt
 			    || (novfs_current_mnt
 				&& strcmp(novfs_current_mnt, path))) {
-				DbgPrint("novfs_show_options: %.*s %.*s %s\n",
+				DbgPrint("%.*s %.*s %s",
 					 m->mnt_root->d_name.len,
 					 m->mnt_root->d_name.name,
 					 m->mnt_mountpoint->d_name.len,
@@ -3734,16 +3691,16 @@ int novfs_statfs(struct dentry *de, struct kstatfs *buf)
 	uint64_t td, fd, te, fe;
 	struct super_block *sb = de->d_sb;
 
-	DbgPrint("novfs_statfs:\n");
+	DbgPrint("");
 
 	td = fd = te = fe = 0;
 
 	novfs_scope_get_userspace(&td, &fd, &te, &fe);
 
-	DbgPrint("td=%llu\n", td);
-	DbgPrint("fd=%llu\n", fd);
-	DbgPrint("te=%llu\n", te);
-	DbgPrint("fe=%llu\n", fd);
+	DbgPrint("td=%llu", td);
+	DbgPrint("fd=%llu", fd);
+	DbgPrint("te=%llu", te);
+	DbgPrint("fe=%llu", fd);
 	/* fix for Nautilus */
 	if (sb->s_blocksize == 0)
 		sb->s_blocksize = 4096;
@@ -3766,15 +3723,15 @@ int novfs_statfs(struct dentry *de, struct kstatfs *buf)
 	if (fe > 0xffffffff)
 		buf->f_ffree = 0xffffffff;
 
-	DbgPrint("f_type:    0x%x\n", buf->f_type);
-	DbgPrint("f_bsize:   %u\n", buf->f_bsize);
-	DbgPrint("f_namelen: %d\n", buf->f_namelen);
-	DbgPrint("f_blocks:  %llu\n", buf->f_blocks);
-	DbgPrint("f_bfree:   %llu\n", buf->f_bfree);
-	DbgPrint("f_bavail:  %llu\n", buf->f_bavail);
-	DbgPrint("f_files:   %llu\n", buf->f_files);
-	DbgPrint("f_ffree:   %llu\n", buf->f_ffree);
-	DbgPrint("f_frsize:  %u\n", buf->f_frsize);
+	DbgPrint("f_type:    0x%x", buf->f_type);
+	DbgPrint("f_bsize:   %u", buf->f_bsize);
+	DbgPrint("f_namelen: %d", buf->f_namelen);
+	DbgPrint("f_blocks:  %llu", buf->f_blocks);
+	DbgPrint("f_bfree:   %llu", buf->f_bfree);
+	DbgPrint("f_bavail:  %llu", buf->f_bavail);
+	DbgPrint("f_files:   %llu", buf->f_files);
+	DbgPrint("f_ffree:   %llu", buf->f_ffree);
+	DbgPrint("f_frsize:  %u", buf->f_frsize);
 
 	return 0;
 }
@@ -3803,8 +3760,8 @@ struct inode *novfs_get_inode(struct super_block *sb, int mode, int dev,
 		inode->i_atime.tv_nsec = 0;
 		inode->i_mtime = inode->i_ctime = inode->i_atime;
 
-		DbgPrint("novfs_get_inode: Inode=0x%p I_ino=%d len=%d\n", inode,
-			 inode->i_ino, name->len);
+		DbgPrint("Inode=0x%p I_ino=%d len=%d",
+			 inode, inode->i_ino, name->len);
 
 		if (NULL !=
 		    (inode->i_private =
@@ -3813,7 +3770,7 @@ struct inode *novfs_get_inode(struct super_block *sb, int mode, int dev,
 			struct inode_data *id;
 			id = inode->i_private;
 
-			DbgPrint("novfs_get_inode: i_private 0x%p\n", id);
+			DbgPrint("i_private 0x%p", id);
 
 			id->Scope = NULL;
 			id->Flags = 0;
@@ -3837,7 +3794,7 @@ struct inode *novfs_get_inode(struct super_block *sb, int mode, int dev,
 			memcpy(id->Name, name->name, name->len);
 			id->Name[name->len] = '\0';
 
-			DbgPrint("novfs_get_inode: name %s\n", id->Name);
+			DbgPrint("name %s", id->Name);
 		}
 
 		insert_inode_hash(inode);
@@ -3860,16 +3817,15 @@ struct inode *novfs_get_inode(struct super_block *sb, int mode, int dev,
 			break;
 		}
 
-		DbgPrint("novfs_get_inode: size=%lld\n", inode->i_size);
-		DbgPrint("novfs_get_inode: mode=0%o\n", inode->i_mode);
-		DbgPrint("novfs_get_inode: i_sb->s_blocksize=%d\n",
-			 inode->i_sb->s_blocksize);
-		DbgPrint("novfs_get_inode: i_blkbits=%d\n", inode->i_blkbits);
-		DbgPrint("novfs_get_inode: i_blocks=%d\n", inode->i_blocks);
-		DbgPrint("novfs_get_inode: i_bytes=%d\n", inode->i_bytes);
+		DbgPrint("size=%lld", inode->i_size);
+		DbgPrint("mode=0%o", inode->i_mode);
+		DbgPrint("i_sb->s_blocksize=%d", inode->i_sb->s_blocksize);
+		DbgPrint("i_blkbits=%d", inode->i_blkbits);
+		DbgPrint("i_blocks=%d", inode->i_blocks);
+		DbgPrint("i_bytes=%d", inode->i_bytes);
 	}
 
-	DbgPrint("novfs_get_inode: 0x%p %d\n", inode, inode->i_ino);
+	DbgPrint("0x%p %d", inode, inode->i_ino);
 	return (inode);
 }
 
@@ -3907,7 +3863,7 @@ int novfs_fill_super(struct super_block *SB, void *Data, int Silent)
 
 	SB->s_root = novfs_root;
 
-	DbgPrint("novfs_fill_super: root 0x%p\n", novfs_root);
+	DbgPrint("root 0x%p", novfs_root);
 
 	if (novfs_root) {
 		novfs_root->d_op = &novfs_dentry_operations;
@@ -3932,7 +3888,7 @@ int novfs_fill_super(struct super_block *SB, void *Data, int Silent)
 				server->d_op = &novfs_dentry_operations;
 				server->d_time = 0xffffffff;
 				d_add(server, inode);
-				DbgPrint("novfs_fill_super: d_add %s 0x%p\n",
+				DbgPrint("d_add %s 0x%p",
 					 SERVER_DIRECTORY_NAME, server);
 				novfs_add_inode_entry(novfs_root->d_inode,
 						      &name, inode->i_ino,
@@ -3960,7 +3916,7 @@ int novfs_fill_super(struct super_block *SB, void *Data, int Silent)
 				tree->d_time = 0xffffffff;
 
 				d_add(tree, inode);
-				DbgPrint("novfs_fill_super: d_add %s 0x%p\n",
+				DbgPrint("d_add %s 0x%p",
 					 TREE_DIRECTORY_NAME, tree);
 				novfs_add_inode_entry(novfs_root->d_inode,
 						      &name, inode->i_ino,
@@ -3975,7 +3931,7 @@ int novfs_fill_super(struct super_block *SB, void *Data, int Silent)
 static int novfs_get_sb(struct file_system_type *Fstype, int Flags,
 		 const char *Dev_name, void *Data, struct vfsmount *Mnt)
 {
-	DbgPrint("novfs_get_sb: Fstype=0x%x Dev_name=%s\n", Fstype, Dev_name);
+	DbgPrint("Fstype=0x%x Dev_name=%s", Fstype, Dev_name);
 	return get_sb_nodev(Fstype, Flags, Data, novfs_fill_super, Mnt);
 }
 
@@ -3990,7 +3946,7 @@ ssize_t novfs_Control_read(struct file *file, char *buf, size_t nbytes,
 {
 	ssize_t retval = 0;
 
-	DbgPrint("novfs_Control_read: kernel_locked 0x%x\n", kernel_locked());
+	DbgPrint("kernel_locked 0x%x", kernel_locked());
 
 	return retval;
 }
@@ -4000,7 +3956,7 @@ ssize_t novfs_Control_write(struct file * file, const char *buf, size_t nbytes,
 {
 	ssize_t retval = 0;
 
-	DbgPrint("novfs_Control_write: kernel_locked 0x%x\n", kernel_locked());
+	DbgPrint("kernel_locked 0x%x", kernel_locked());
 	if (buf && nbytes) {
 	}
 
@@ -4012,7 +3968,7 @@ int novfs_Control_ioctl(struct inode *inode, struct file *file,
 {
 	int retval = 0;
 
-	DbgPrint("novfs_Control_ioctl: kernel_locked 0x%x\n", kernel_locked());
+	DbgPrint("kernel_locked 0x%x", kernel_locked());
 
 	return (retval);
 }
@@ -4039,8 +3995,7 @@ int __init init_novfs(void)
 	novfs_profile_init();
 
 	if (!retCode) {
-		DbgPrint("init_novfs: %s %s %s\n", __DATE__, __TIME__,
-			 NOVFS_VERSION_STRING);
+		DbgPrint("%s %s %s", __DATE__, __TIME__, NOVFS_VERSION_STRING);
 		novfs_daemon_queue_init();
 		novfs_scope_init();
 		retCode = register_filesystem(&novfs_fs_type);
@@ -4072,12 +4027,12 @@ int novfs_lock_inode_cache(struct inode *i)
 	struct inode_data *id;
 	int retVal = 0;
 
-	DbgPrint("novfs_lock_inode_cache: 0x%p\n", i);
+	DbgPrint("0x%p", i);
 	if (i && (id = i->i_private) && id->DirCache.next) {
 		down(&id->DirCacheLock);
 		retVal = 1;
 	}
-	DbgPrint("novfs_lock_inode_cache: return %d\n", retVal);
+	DbgPrint("return %d", retVal);
 	return (retVal);
 }
 
@@ -4172,11 +4127,9 @@ int novfs_get_entry(struct inode *i, struct qstr *name, ino_t * ino,
 			retVal = 0;
 		}
 
-		DbgPrint("novfs_get_entry:\n"
-			 "   inode: 0x%p\n"
-			 "   name:  %.*s\n" "   ino:   %d\n", i, nl, n, *ino);
+		DbgPrint("inode: 0x%p; name: %.*s; ino: %d\n", i, nl, n, *ino);
 	}
-	DbgPrint("novfs_get_entry: return %d\n", retVal);
+	DbgPrint("return %d", retVal);
 	return (retVal);
 }
 
@@ -4189,9 +4142,7 @@ int novfs_get_entry_by_pos(struct inode *i, loff_t pos, ino_t * ino,
 	loff_t i_pos = pos - 2;
 	struct list_head *inter = NULL;
 	while (!novfs_enumerate_inode_cache(i, &inter, ino, info)) {
-		DbgPrint
-		    ("novfs_dir_readdir : novfs_get_entry_by_pos : info->name = %s\n",
-		     info->name);
+		DbgPrint("info->name = %s", info->name);
 		if (count == i_pos) {
 			retVal = 0;
 			break;
@@ -4217,9 +4168,7 @@ int novfs_get_entry_time(struct inode *i, struct qstr *name, ino_t * ino,
 			n = (char *)name->name;
 			nl = name->len;
 		}
-		DbgPrint("novfs_get_entry_time:\n"
-			 "   inode: 0x%p\n"
-			 "   name:  %.*s\n" "   ino:   %d\n", i, nl, n, *ino);
+		DbgPrint("inode: 0x%p; name:  %.*s; ino: %d", i, nl, n, *ino);
 
 		dc = novfs_lookup_inode_cache(i, name, *ino);
 		if (dc) {
@@ -4240,7 +4189,7 @@ int novfs_get_entry_time(struct inode *i, struct qstr *name, ino_t * ino,
 			retVal = 0;
 		}
 	}
-	DbgPrint("novfs_get_entry_time: return %d\n", retVal);
+	DbgPrint("return %d", retVal);
 	return (retVal);
 }
 
@@ -4334,12 +4283,8 @@ struct novfs_dir_cache *novfs_lookup_inode_cache(struct inode *i, struct qstr *n
 			n = (char *)name->name;
 			hash = name->hash;
 		}
-		DbgPrint("novfs_lookup_inode_cache:\n"
-			 "   inode: 0x%p\n"
-			 "   name:  %.*s\n"
-			 "   hash:  0x%x\n"
-			 "   len:   %d\n"
-			 "   ino:   %d\n", i, nl, n, hash, nl, ino);
+		DbgPrint("inode: 0x%p; name:  %.*s; hash:  0x%x;\n"
+			 "   len:   %d; ino:   %d", i, nl, n, hash, nl, ino);
 
 		list_for_each(l, &id->DirCache) {
 			dc = list_entry(l, struct novfs_dir_cache, list);
@@ -4368,7 +4313,7 @@ struct novfs_dir_cache *novfs_lookup_inode_cache(struct inode *i, struct qstr *n
 		}
 	}
 
-	DbgPrint("novfs_lookup_inode_cache: return 0x%p\n", retVal);
+	DbgPrint("return 0x%p", retVal);
 	return (retVal);
 }
 
@@ -4391,9 +4336,7 @@ int novfs_lookup_validate(struct inode *i, struct qstr *name, ino_t ino)
 			n = (char *)name->name;
 			nl = name->len;
 		}
-		DbgPrint("novfs_update_entry:\n"
-			 "   inode: 0x%p\n"
-			 "   name:  %.*s\n" "   ino:   %d\n", i, nl, n, ino);
+		DbgPrint("inode: 0x%p; name:  %.*s; ino:   %d", i, nl, n, ino);
 
 		dc = novfs_lookup_inode_cache(i, name, ino);
 		if (dc) {
@@ -4419,12 +4362,11 @@ int novfs_add_inode_entry(struct inode *i,
 	struct list_head *todeltmp;
 
 	//SClark
-	DbgPrint("novfs_add_inode_entry:\n" "   i: %u\n", i);
+	DbgPrint("i: %p", i);
 	if ((id = i->i_private)) {
-		DbgPrint("   i->i_private: %p\n", id);
+		DbgPrint("i->i_private: %p", id);
 		if (id->DirCache.next)
-			DbgPrint("   id->DirCache.next: %p\n",
-				 id->DirCache.next);
+			DbgPrint("id->DirCache.next: %p", id->DirCache.next);
 	}
 	//SClark
 
@@ -4434,15 +4376,8 @@ int novfs_add_inode_entry(struct inode *i,
 			id->cntDC++;
 
 			DCCount++;
-			DbgPrint("novfs_add_inode_entry:\n"
-				 "   inode: 0x%p\n"
-				 "   id:    0x%p\n"
-				 "   DC:    0x%p\n"
-				 "   new:   0x%p\n"
-				 "   name:  %.*s\n"
-				 "   ino:   %d\n"
-				 "   size:  %lld\n"
-				 "   mode:  0x%x\n",
+			DbgPrint("inode: 0x%p; id: 0x%p; DC: 0x%p; new: 0x%p; "
+				 "name:  %.*s; ino: %d; size: %lld; mode: 0x%x",
 				 i, id, &id->DirCache, new, name->len,
 				 name->name, ino, info->size, info->mode);
 
@@ -4502,14 +4437,8 @@ int novfs_update_entry(struct inode *i, struct qstr *name, ino_t ino,
 		ctime_r(&info->atime.tv_sec, atime_buf);
 		ctime_r(&info->mtime.tv_sec, mtime_buf);
 		ctime_r(&info->ctime.tv_sec, ctime_buf);
-		DbgPrint("novfs_update_entry:\n"
-			 "   inode: 0x%p\n"
-			 "   name:  %.*s\n"
-			 "   ino:   %d\n"
-			 "   size:  %lld\n"
-			 "   atime: %s\n"
-			 "   mtime: %s\n"
-			 "   ctime: %s\n",
+		DbgPrint("inode: 0x%p; name: %.*s; ino: %d; size: %lld; "
+			 "atime: %s; mtime: %s; ctime: %s",
 			 i, nl, n, ino, info->size, atime_buf, mtime_buf,
 			 ctime_buf);
 
@@ -4527,25 +4456,17 @@ int novfs_update_entry(struct inode *i, struct qstr *name, ino_t ino,
 			ctime_r(&dc->atime.tv_sec, atime_buf);
 			ctime_r(&dc->mtime.tv_sec, mtime_buf);
 			ctime_r(&dc->ctime.tv_sec, ctime_buf);
-			DbgPrint("novfs_update_entry entry: 0x%p\n"
-				 "   flags:   0x%x\n"
-				 "   jiffies: %lld\n"
-				 "   ino:     %d\n"
-				 "   size:    %lld\n"
-				 "   mode:    0%o\n"
-				 "   atime:   %s\n"
-				 "   mtime:   %s %d\n"
-				 "   ctime:   %s\n"
-				 "   hash:    0x%x\n"
-				 "   nameLen: %d\n"
-				 "   name:    %s\n",
+			DbgPrint("entry: 0x%p; flags: 0x%x; jiffies: %lld; "
+				 "ino: %d; size: %lld; mode: 0%o; atime: %s; "
+				 "mtime: %s %d; ctime: %s; hash: 0x%x; "
+				 " nameLen: %d; name: %s",
 				 dc, dc->flags, dc->jiffies, dc->ino, dc->size,
 				 dc->mode, atime_buf, mtime_buf,
 				 dc->mtime.tv_nsec, ctime_buf, dc->hash,
 				 dc->nameLen, dc->name);
 		}
 	}
-	DbgPrint("novfs_update_entry: return %d\n", retVal);
+	DbgPrint("return %d", retVal);
 	return (retVal);
 }
 
@@ -4569,17 +4490,10 @@ void novfs_remove_inode_entry(struct inode *i, struct qstr *name, ino_t ino)
 				nl = name->len;
 				n = (char *)name->name;
 			}
-			DbgPrint("novfs_remove_inode_entry:\n"
-				 "   inode: 0x%p\n"
-				 "   id:    0x%p\n"
-				 "   DC:    0x%p\n"
-				 "   name:  %.*s\n"
-				 "   ino:   %d\n"
-				 "   entry: 0x%p\n"
-				 "      name: %.*s\n"
-				 "      ino:  %d\n"
-				 "      next: 0x%p\n"
-				 "      prev: 0x%p\n",
+			DbgPrint("inode: 0x%p; id: 0x%p; DC: 0x%p; "
+				 "name: %.*s; ino: %d entry: 0x%p "
+				 "[name: %.*s; ino: %d; next: 0x%p; "
+				 "prev: 0x%p]",
 				 i, id, &id->DirCache, nl, n, ino, dc,
 				 dc->nameLen, dc->name, dc->ino, dc->list.next,
 				 dc->list.prev);
@@ -4607,12 +4521,8 @@ void novfs_free_invalid_entries(struct inode *i)
 		list_for_each(l, &id->DirCache) {
 			dc = list_entry(l, struct novfs_dir_cache, list);
 			if (0 == (dc->flags & ENTRY_VALID)) {
-				DbgPrint("novfs_free_invalid_entries:\n"
-					 "   inode: 0x%p\n"
-					 "   id:    0x%p\n"
-					 "   entry:    0x%p\n"
-					 "   name:  %.*s\n"
-					 "   ino:   %d\n",
+				DbgPrint("inode: 0x%p; id: 0x%p; entry: 0x%p; "
+					 "name: %.*s; ino: %d",
 					 i, id, dc, dc->nameLen, dc->name,
 					 dc->ino);
 				l = l->prev;

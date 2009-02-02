@@ -130,7 +130,7 @@ int ide_pci_check_simplex(ide_hwif_t *hwif, const struct ide_port_info *d)
 	 * we tune the drive then try to grab DMA ownership if we want to be
 	 * the DMA end.  This has to be become dynamic to handle hot-plug.
 	 */
-	dma_stat = hwif->tp_ops->read_sff_dma_status(hwif);
+	dma_stat = hwif->dma_ops->dma_sff_read_status(hwif);
 	if ((dma_stat & 0x80) && hwif->mate && hwif->mate->dma_base) {
 		printk(KERN_INFO "%s %s: simplex device: DMA disabled\n",
 			d->name, pci_name(dev));
@@ -377,6 +377,9 @@ int ide_hwif_setup_dma(ide_hwif_t *hwif, const struct ide_port_info *d)
 
 		hwif->dma_base = base;
 
+		if (hwif->dma_ops == NULL)
+			hwif->dma_ops = &sff_dma_ops;
+
 		if (ide_pci_check_simplex(hwif, d) < 0)
 			return -1;
 
@@ -393,8 +396,6 @@ int ide_hwif_setup_dma(ide_hwif_t *hwif, const struct ide_port_info *d)
 
 		if (ide_allocate_dma_engine(hwif))
 			return -1;
-
-		hwif->dma_ops = &sff_dma_ops;
 	}
 
 	return 0;
@@ -471,7 +472,7 @@ void ide_pci_setup_ports(struct pci_dev *dev, const struct ide_port_info *d,
 	 */
 
 	for (port = 0; port < channels; ++port) {
-		const ide_pci_enablebit_t *e = &(d->enablebits[port]);
+		const struct ide_pci_enablebit *e = &d->enablebits[port];
 
 		if (e->reg && (pci_read_config_byte(dev, e->reg, &tmp) ||
 		    (tmp & e->mask) != e->val)) {
@@ -519,8 +520,7 @@ static int do_ide_setup_pci_device(struct pci_dev *dev,
 	if (ret < 0)
 		goto out;
 
-	/* Is it an "IDE storage" device in non-PCI mode? */
-	if ((dev->class >> 8) == PCI_CLASS_STORAGE_IDE && (dev->class & 5) != 5) {
+	if (ide_pci_is_in_compatibility_mode(dev)) {
 		if (noisy)
 			printk(KERN_INFO "%s %s: not 100%% native mode: will "
 				"probe irqs later\n", d->name, pci_name(dev));
@@ -659,3 +659,36 @@ void ide_pci_remove(struct pci_dev *dev)
 	pci_disable_device(dev);
 }
 EXPORT_SYMBOL_GPL(ide_pci_remove);
+
+#ifdef CONFIG_PM
+int ide_pci_suspend(struct pci_dev *dev, pm_message_t state)
+{
+	pci_save_state(dev);
+	pci_disable_device(dev);
+	pci_set_power_state(dev, pci_choose_state(dev, state));
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(ide_pci_suspend);
+
+int ide_pci_resume(struct pci_dev *dev)
+{
+	struct ide_host *host = pci_get_drvdata(dev);
+	int rc;
+
+	pci_set_power_state(dev, PCI_D0);
+
+	rc = pci_enable_device(dev);
+	if (rc)
+		return rc;
+
+	pci_restore_state(dev);
+	pci_set_master(dev);
+
+	if (host->init_chipset)
+		host->init_chipset(dev);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(ide_pci_resume);
+#endif

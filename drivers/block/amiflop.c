@@ -156,7 +156,7 @@ static volatile int fdc_busy = -1;
 static volatile int fdc_nested;
 static DECLARE_WAIT_QUEUE_HEAD(fdc_wait);
  
-static DECLARE_WAIT_QUEUE_HEAD(motor_wait);
+static DECLARE_COMPLETION(motor_on_completion);
 
 static volatile int selected = -1;	/* currently selected drive */
 
@@ -184,8 +184,7 @@ static unsigned char mfmencode[16]={
 static unsigned char mfmdecode[128];
 
 /* floppy internal millisecond timer stuff */
-static volatile int ms_busy = -1;
-static DECLARE_WAIT_QUEUE_HEAD(ms_wait);
+static DECLARE_COMPLETION(ms_wait_completion);
 #define MS_TICKS ((amiga_eclock+50)/1000)
 
 /*
@@ -211,8 +210,7 @@ static int fd_device[4] = { 0, 0, 0, 0 };
 
 static irqreturn_t ms_isr(int irq, void *dummy)
 {
-	ms_busy = -1;
-	wake_up(&ms_wait);
+	complete(&ms_wait_completion);
 	return IRQ_HANDLED;
 }
 
@@ -220,19 +218,17 @@ static irqreturn_t ms_isr(int irq, void *dummy)
    A more generic routine would do a schedule a la timer.device */
 static void ms_delay(int ms)
 {
-	unsigned long flags;
 	int ticks;
+	static DEFINE_MUTEX(mutex);
+
 	if (ms > 0) {
-		local_irq_save(flags);
-		while (ms_busy == 0)
-			sleep_on(&ms_wait);
-		ms_busy = 0;
-		local_irq_restore(flags);
+		mutex_lock(&mutex);
 		ticks = MS_TICKS*ms-1;
 		ciaa.tblo=ticks%256;
 		ciaa.tbhi=ticks/256;
 		ciaa.crb=0x19; /*count eclock, force load, one-shoot, start */
-		sleep_on(&ms_wait);
+		wait_for_completion(&ms_wait_completion);
+		mutex_unlock(&mutex);
 	}
 }
 
@@ -254,8 +250,7 @@ static void get_fdc(int drive)
 	printk("get_fdc: drive %d  fdc_busy %d  fdc_nested %d\n",drive,fdc_busy,fdc_nested);
 #endif
 	local_irq_save(flags);
-	while (!try_fdc(drive))
-		sleep_on(&fdc_wait);
+	wait_event(fdc_wait, try_fdc(drive));
 	fdc_busy = drive;
 	fdc_nested++;
 	local_irq_restore(flags);
@@ -330,7 +325,7 @@ static void fd_deselect (int drive)
 static void motor_on_callback(unsigned long nr)
 {
 	if (!(ciaa.pra & DSKRDY) || --on_attempts == 0) {
-		wake_up (&motor_wait);
+		complete_all(&motor_on_completion);
 	} else {
 		motor_on_timer.expires = jiffies + HZ/10;
 		add_timer(&motor_on_timer);
@@ -347,11 +342,12 @@ static int fd_motor_on(int nr)
 		unit[nr].motor = 1;
 		fd_select(nr);
 
+		INIT_COMPLETION(motor_on_completion);
 		motor_on_timer.data = nr;
 		mod_timer(&motor_on_timer, jiffies + HZ/2);
 
 		on_attempts = 10;
-		sleep_on (&motor_wait);
+		wait_for_completion(&motor_on_completion);
 		fd_deselect(nr);
 	}
 
@@ -582,8 +578,7 @@ static void raw_read(int drive)
 {
 	drive&=3;
 	get_fdc(drive);
-	while (block_flag)
-		sleep_on(&wait_fd_block);
+	wait_event(wait_fd_block, !block_flag);
 	fd_select(drive);
 	/* setup adkcon bits correctly */
 	custom.adkcon = ADK_MSBSYNC;
@@ -598,8 +593,7 @@ static void raw_read(int drive)
 
 	block_flag = 1;
 
-	while (block_flag)
-		sleep_on (&wait_fd_block);
+	wait_event(wait_fd_block, !block_flag);
 
 	custom.dsklen = 0;
 	fd_deselect(drive);
@@ -616,8 +610,7 @@ static int raw_write(int drive)
 		rel_fdc();
 		return 0;
 	}
-	while (block_flag)
-		sleep_on(&wait_fd_block);
+	wait_event(wait_fd_block, !block_flag);
 	fd_select(drive);
 	/* clear adkcon bits */
 	custom.adkcon = ADK_PRECOMP1|ADK_PRECOMP0|ADK_WORDSYNC|ADK_MSBSYNC;
@@ -1294,8 +1287,7 @@ static int non_int_flush_track (unsigned long nr)
 			writepending = 0;
 			return 0;
 		}
-		while (block_flag == 2)
-			sleep_on (&wait_fd_block);
+		wait_event(wait_fd_block, block_flag != 2);
 	}
 	else {
 		local_irq_restore(flags);
@@ -1437,10 +1429,11 @@ static int fd_getgeo(struct block_device *bdev, struct hd_geometry *geo)
 	return 0;
 }
 
-static int fd_ioctl(struct inode *inode, struct file *filp,
+static int fd_ioctl(struct block_device *bdev, fmode_t mode,
 		    unsigned int cmd, unsigned long param)
 {
-	int drive = iminor(inode) & 3;
+	struct amiga_floppy_struct *p = bdev->bd_disk->private_data;
+	int drive = p - unit;
 	static struct floppy_struct getprm;
 	void __user *argp = (void __user *)param;
 
@@ -1451,7 +1444,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 			rel_fdc();
 			return -EBUSY;
 		}
-		fsync_bdev(inode->i_bdev);
+		fsync_bdev(bdev);
 		if (fd_motor_on(drive) == 0) {
 			rel_fdc();
 			return -ENODEV;
@@ -1464,12 +1457,12 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 		rel_fdc();
 		break;
 	case FDFMTTRK:
-		if (param < unit[drive].type->tracks * unit[drive].type->heads)
+		if (param < p->type->tracks * p->type->heads)
 		{
 			get_fdc(drive);
 			if (fd_seek(drive,param) != 0){
-				memset(unit[drive].trackbuf, FD_FILL_BYTE,
-				       unit[drive].dtype->sects * unit[drive].type->sect_mult * 512);
+				memset(p->trackbuf, FD_FILL_BYTE,
+				       p->dtype->sects * p->type->sect_mult * 512);
 				non_int_flush_track(drive);
 			}
 			floppy_off(drive);
@@ -1480,14 +1473,14 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 		break;
 	case FDFMTEND:
 		floppy_off(drive);
-		invalidate_bdev(inode->i_bdev);
+		invalidate_bdev(bdev);
 		break;
 	case FDGETPRM:
 		memset((void *)&getprm, 0, sizeof (getprm));
-		getprm.track=unit[drive].type->tracks;
-		getprm.head=unit[drive].type->heads;
-		getprm.sect=unit[drive].dtype->sects * unit[drive].type->sect_mult;
-		getprm.size=unit[drive].blocks;
+		getprm.track=p->type->tracks;
+		getprm.head=p->type->heads;
+		getprm.sect=p->dtype->sects * p->type->sect_mult;
+		getprm.size=p->blocks;
 		if (copy_to_user(argp, &getprm, sizeof(struct floppy_struct)))
 			return -EFAULT;
 		break;
@@ -1500,10 +1493,10 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 		break;
 #ifdef RAW_IOCTL
 	case IOCTL_RAW_TRACK:
-		if (copy_to_user(argp, raw_buf, unit[drive].type->read_size))
+		if (copy_to_user(argp, raw_buf, p->type->read_size))
 			return -EFAULT;
 		else
-			return unit[drive].type->read_size;
+			return p->type->read_size;
 #endif
 	default:
 		printk(KERN_DEBUG "fd_ioctl: unknown cmd %d for drive %d.",
@@ -1548,10 +1541,10 @@ static void fd_probe(int dev)
  * /dev/PS0 etc), and disallows simultaneous access to the same
  * drive with different device numbers.
  */
-static int floppy_open(struct inode *inode, struct file *filp)
+static int floppy_open(struct block_device *bdev, fmode_t mode)
 {
-	int drive = iminor(inode) & 3;
-	int system =  (iminor(inode) & 4) >> 2;
+	int drive = MINOR(bdev->bd_dev) & 3;
+	int system =  (MINOR(bdev->bd_dev) & 4) >> 2;
 	int old_dev;
 	unsigned long flags;
 
@@ -1560,9 +1553,9 @@ static int floppy_open(struct inode *inode, struct file *filp)
 	if (fd_ref[drive] && old_dev != system)
 		return -EBUSY;
 
-	if (filp && filp->f_mode & 3) {
-		check_disk_change(inode->i_bdev);
-		if (filp->f_mode & 2 ) {
+	if (mode & (FMODE_READ|FMODE_WRITE)) {
+		check_disk_change(bdev);
+		if (mode & FMODE_WRITE) {
 			int wrprot;
 
 			get_fdc(drive);
@@ -1592,9 +1585,10 @@ static int floppy_open(struct inode *inode, struct file *filp)
 	return 0;
 }
 
-static int floppy_release(struct inode * inode, struct file * filp)
+static int floppy_release(struct gendisk *disk, fmode_t mode)
 {
-	int drive = iminor(inode) & 3;
+	struct amiga_floppy_struct *p = disk->private_data;
+	int drive = p - unit;
 
 	if (unit[drive].dirty == 1) {
 		del_timer (flush_track_timer + drive);
@@ -1650,7 +1644,7 @@ static struct block_device_operations floppy_fops = {
 	.owner		= THIS_MODULE,
 	.open		= floppy_open,
 	.release	= floppy_release,
-	.ioctl		= fd_ioctl,
+	.locked_ioctl	= fd_ioctl,
 	.getgeo		= fd_getgeo,
 	.media_changed	= amiga_floppy_change,
 };

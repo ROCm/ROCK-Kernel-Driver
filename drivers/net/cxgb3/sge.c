@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2005-2007 Chelsio, Inc. All rights reserved.
+ * Copyright (c) 2005-2008 Chelsio, Inc. All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -550,16 +550,15 @@ static void *alloc_ring(struct pci_dev *pdev, size_t nelem, size_t elem_size,
 
 	if (!p)
 		return NULL;
-	if (sw_size) {
+	if (sw_size && metadata) {
 		s = kcalloc(nelem, sw_size, GFP_KERNEL);
 
 		if (!s) {
 			dma_free_coherent(&pdev->dev, len, p, *phys);
 			return NULL;
 		}
-	}
-	if (metadata)
 		*(void **)metadata = s;
+	}
 	memset(p, 0, len);
 	return p;
 }
@@ -1122,10 +1121,10 @@ static void write_tx_pkt_wr(struct adapter *adap, struct sk_buff *skb,
 			 htonl(V_WR_TID(q->token)));
 }
 
-static inline void t3_stop_queue(struct net_device *dev, struct sge_qset *qs,
-				 struct sge_txq *q)
+static inline void t3_stop_tx_queue(struct netdev_queue *txq,
+				    struct sge_qset *qs, struct sge_txq *q)
 {
-	netif_stop_queue(dev);
+	netif_tx_stop_queue(txq);
 	set_bit(TXQ_ETH, &qs->txq_stopped);
 	q->stops++;
 }
@@ -1139,11 +1138,13 @@ static inline void t3_stop_queue(struct net_device *dev, struct sge_qset *qs,
  */
 int t3_eth_xmit(struct sk_buff *skb, struct net_device *dev)
 {
+	int qidx;
 	unsigned int ndesc, pidx, credits, gen, compl;
 	const struct port_info *pi = netdev_priv(dev);
 	struct adapter *adap = pi->adapter;
-	struct sge_qset *qs = pi->qs;
-	struct sge_txq *q = &qs->txq[TXQ_ETH];
+	struct netdev_queue *txq;
+	struct sge_qset *qs;
+	struct sge_txq *q;
 
 	/*
 	 * The chip min packet length is 9 octets but play safe and reject
@@ -1154,6 +1155,11 @@ int t3_eth_xmit(struct sk_buff *skb, struct net_device *dev)
 		return NETDEV_TX_OK;
 	}
 
+	qidx = skb_get_queue_mapping(skb);
+	qs = &pi->qs[qidx];
+	q = &qs->txq[TXQ_ETH];
+	txq = netdev_get_tx_queue(dev, qidx);
+
 	spin_lock(&q->lock);
 	reclaim_completed_tx(adap, q);
 
@@ -1161,7 +1167,7 @@ int t3_eth_xmit(struct sk_buff *skb, struct net_device *dev)
 	ndesc = calc_tx_descs(skb);
 
 	if (unlikely(credits < ndesc)) {
-		t3_stop_queue(dev, qs, q);
+		t3_stop_tx_queue(txq, qs, q);
 		dev_err(&adap->pdev->dev,
 			"%s: Tx ring %u full while queue awake!\n",
 			dev->name, q->cntxt_id & 7);
@@ -1171,12 +1177,12 @@ int t3_eth_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	q->in_use += ndesc;
 	if (unlikely(credits - ndesc < q->stop_thres)) {
-		t3_stop_queue(dev, qs, q);
+		t3_stop_tx_queue(txq, qs, q);
 
 		if (should_restart_tx(q) &&
 		    test_and_clear_bit(TXQ_ETH, &qs->txq_stopped)) {
 			q->restarts++;
-			netif_wake_queue(dev);
+			netif_tx_wake_queue(txq);
 		}
 	}
 
@@ -1703,16 +1709,15 @@ int t3_offload_tx(struct t3cdev *tdev, struct sk_buff *skb)
  */
 static inline void offload_enqueue(struct sge_rspq *q, struct sk_buff *skb)
 {
-	skb->next = skb->prev = NULL;
-	if (q->rx_tail)
-		q->rx_tail->next = skb;
-	else {
+	int was_empty = skb_queue_empty(&q->rx_queue);
+
+	__skb_queue_tail(&q->rx_queue, skb);
+
+	if (was_empty) {
 		struct sge_qset *qs = rspq_to_qset(q);
 
 		napi_schedule(&qs->napi);
-		q->rx_head = skb;
 	}
-	q->rx_tail = skb;
 }
 
 /**
@@ -1753,26 +1758,29 @@ static int ofld_poll(struct napi_struct *napi, int budget)
 	int work_done = 0;
 
 	while (work_done < budget) {
-		struct sk_buff *head, *tail, *skbs[RX_BUNDLE_SIZE];
+		struct sk_buff *skb, *tmp, *skbs[RX_BUNDLE_SIZE];
+		struct sk_buff_head queue;
 		int ngathered;
 
 		spin_lock_irq(&q->lock);
-		head = q->rx_head;
-		if (!head) {
+		__skb_queue_head_init(&queue);
+		skb_queue_splice_init(&q->rx_queue, &queue);
+		if (skb_queue_empty(&queue)) {
 			napi_complete(napi);
 			spin_unlock_irq(&q->lock);
 			return work_done;
 		}
-
-		tail = q->rx_tail;
-		q->rx_head = q->rx_tail = NULL;
 		spin_unlock_irq(&q->lock);
 
-		for (ngathered = 0; work_done < budget && head; work_done++) {
-			prefetch(head->data);
-			skbs[ngathered] = head;
-			head = head->next;
-			skbs[ngathered]->next = NULL;
+		ngathered = 0;
+		skb_queue_walk_safe(&queue, skb, tmp) {
+			if (work_done >= budget)
+				break;
+			work_done++;
+
+			__skb_unlink(skb, &queue);
+			prefetch(skb->data);
+			skbs[ngathered] = skb;
 			if (++ngathered == RX_BUNDLE_SIZE) {
 				q->offload_bundles++;
 				adapter->tdev.recv(&adapter->tdev, skbs,
@@ -1780,12 +1788,10 @@ static int ofld_poll(struct napi_struct *napi, int budget)
 				ngathered = 0;
 			}
 		}
-		if (head) {	/* splice remaining packets back onto Rx queue */
+		if (!skb_queue_empty(&queue)) {
+			/* splice remaining packets back onto Rx queue */
 			spin_lock_irq(&q->lock);
-			tail->next = q->rx_head;
-			if (!q->rx_head)
-				q->rx_tail = tail;
-			q->rx_head = head;
+			skb_queue_splice(&queue, &q->rx_queue);
 			spin_unlock_irq(&q->lock);
 		}
 		deliver_partial_bundle(&adapter->tdev, q, skbs, ngathered);
@@ -1840,7 +1846,7 @@ static void restart_tx(struct sge_qset *qs)
 	    test_and_clear_bit(TXQ_ETH, &qs->txq_stopped)) {
 		qs->txq[TXQ_ETH].restarts++;
 		if (netif_running(qs->netdev))
-			netif_wake_queue(qs->netdev);
+			netif_tx_wake_queue(qs->tx_q);
 	}
 
 	if (test_bit(TXQ_OFLD, &qs->txq_stopped) &&
@@ -1897,6 +1903,7 @@ static void cxgb3_arp_process(struct adapter *adapter, struct sk_buff *skb)
 
 	arp_send(ARPOP_REPLY, ETH_P_ARP, sip, dev, tip, sha,
 		 dev->dev_addr, sha);
+
 }
 
 static inline int is_arp(struct sk_buff *skb)
@@ -1924,9 +1931,8 @@ static void rx_eth(struct adapter *adap, struct sge_rspq *rq,
 
 	skb_pull(skb, sizeof(*p) + pad);
 	skb->protocol = eth_type_trans(skb, adap->port[p->iff]);
-	skb->dev->last_rx = jiffies;
 	pi = netdev_priv(skb->dev);
-	if (pi->rx_csum_offload && p->csum_valid && p->csum == htons(0xffff) &&
+	if ((pi->rx_offload & T3_RX_CSUM) && p->csum_valid && p->csum == htons(0xffff) &&
 	    !p->fragment) {
 		qs->port_stats[SGE_PSTAT_RX_CSUM_GOOD]++;
 		skb->ip_summed = CHECKSUM_UNNECESSARY;
@@ -1947,13 +1953,13 @@ static void rx_eth(struct adapter *adap, struct sge_rspq *rq,
 				if (unlikely(pi->iscsi_ipv4addr &&
 				    is_arp(skb))) {
 					unsigned short vtag = ntohs(p->vlan) &
-							VLAN_VID_MASK;
+								VLAN_VID_MASK;
 					skb->dev = vlan_group_get_device(grp,
 									 vtag);
 					cxgb3_arp_process(adap, skb);
 				}
 				__vlan_hwaccel_rx(skb, grp, ntohs(p->vlan),
-						  rq->polling);
+					  	  rq->polling);
 			}
 		else
 			dev_kfree_skb_any(skb);
@@ -2098,6 +2104,7 @@ static void init_lro_mgr(struct sge_qset *qs, struct net_lro_mgr *lro_mgr)
 {
 	lro_mgr->dev = qs->netdev;
 	lro_mgr->features = LRO_F_NAPI;
+	lro_mgr->frag_align_pad = NET_IP_ALIGN;
 	lro_mgr->ip_summed = CHECKSUM_UNNECESSARY;
 	lro_mgr->ip_summed_aggr = CHECKSUM_UNNECESSARY;
 	lro_mgr->max_desc = T3_MAX_LRO_SES;
@@ -2368,7 +2375,7 @@ next_fl:
 
 static inline int is_pure_response(const struct rsp_desc *r)
 {
-	u32 n = ntohl(r->flags) & (F_RSPD_ASYNC_NOTIF | F_RSPD_IMM_DATA_VALID);
+	__be32 n = r->flags & htonl(F_RSPD_ASYNC_NOTIF | F_RSPD_IMM_DATA_VALID);
 
 	return (n | r->len_cq) == 0;
 }
@@ -2886,6 +2893,7 @@ void t3_update_qset_coalesce(struct sge_qset *qs, const struct qset_params *p)
  *	@p: configuration parameters for this queue set
  *	@ntxq: number of Tx queues for the queue set
  *	@netdev: net device associated with this queue set
+ *	@netdevq: net device TX queue associated with this queue set
  *
  *	Allocate resources and initialize an SGE queue set.  A queue set
  *	comprises a response queue, two Rx free-buffer queues, and up to 3
@@ -2894,7 +2902,8 @@ void t3_update_qset_coalesce(struct sge_qset *qs, const struct qset_params *p)
  */
 int t3_sge_alloc_qset(struct adapter *adapter, unsigned int id, int nports,
 		      int irq_vec_idx, const struct qset_params *p,
-		      int ntxq, struct net_device *dev)
+		      int ntxq, struct net_device *dev,
+		      struct netdev_queue *netdevq)
 {
 	int i, avail, ret = -ENOMEM;
 	struct sge_qset *q = &adapter->sge.qs[id];
@@ -2955,6 +2964,7 @@ int t3_sge_alloc_qset(struct adapter *adapter, unsigned int id, int nports,
 	q->rspq.gen = 1;
 	q->rspq.size = p->rspq_size;
 	spin_lock_init(&q->rspq.lock);
+	skb_queue_head_init(&q->rspq.rx_queue);
 
 	q->txq[TXQ_ETH].stop_thres = nports *
 	    flits_to_desc(sgl_len(MAX_SKB_FRAGS + 1) + 3);
@@ -3029,6 +3039,7 @@ int t3_sge_alloc_qset(struct adapter *adapter, unsigned int id, int nports,
 
 	q->adap = adapter;
 	q->netdev = dev;
+	q->tx_q = netdevq;
 	t3_update_qset_coalesce(q, p);
 
 	init_lro_mgr(q, lro_mgr);

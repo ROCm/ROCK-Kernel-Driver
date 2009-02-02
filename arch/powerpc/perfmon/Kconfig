@@ -59,6 +59,7 @@ config PERFMON_CELL
 	tristate "Support for Cell hardware performance counters"
 	depends on PERFMON && PPC_CELL
 	select PS3_LPM if PPC_PS3
+	select SPU_BASE
 	default n
 	help
 	Enables support for the Cell hardware performance counters.

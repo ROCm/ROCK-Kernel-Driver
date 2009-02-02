@@ -3,10 +3,10 @@
 
 #include <linux/tracepoint.h>
 
-DEFINE_TRACE(kernel_module_free,
+DECLARE_TRACE(kernel_module_free,
 	TPPROTO(struct module *mod),
 	TPARGS(mod));
-DEFINE_TRACE(kernel_module_load,
+DECLARE_TRACE(kernel_module_load,
 	TPPROTO(struct module *mod),
 	TPARGS(mod));
 

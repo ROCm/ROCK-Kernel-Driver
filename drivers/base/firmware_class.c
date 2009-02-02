@@ -164,8 +164,7 @@ static ssize_t firmware_loading_store(struct device *dev,
 		}
 		/* fallthrough */
 	default:
-		printk(KERN_ERR "%s: unexpected value (%d)\n", __func__,
-		       loading);
+		dev_err(dev, "%s: unexpected value (%d)\n", __func__, loading);
 		/* fallthrough */
 	case -1:
 		fw_load_abort(fw_priv);
@@ -292,12 +291,6 @@ firmware_class_timeout(u_long data)
 	fw_load_abort(fw_priv);
 }
 
-static inline void fw_setup_device_id(struct device *f_dev, struct device *dev)
-{
-	/* XXX warning we should watch out for name collisions */
-	strlcpy(f_dev->bus_id, dev->bus_id, BUS_ID_SIZE);
-}
-
 static int fw_register_device(struct device **dev_p, const char *fw_name,
 			      struct device *device)
 {
@@ -309,7 +302,7 @@ static int fw_register_device(struct device **dev_p, const char *fw_name,
 	*dev_p = NULL;
 
 	if (!fw_priv || !f_dev) {
-		printk(KERN_ERR "%s: kmalloc failed\n", __func__);
+		dev_err(device, "%s: kmalloc failed\n", __func__);
 		retval = -ENOMEM;
 		goto error_kfree;
 	}
@@ -322,15 +315,14 @@ static int fw_register_device(struct device **dev_p, const char *fw_name,
 	fw_priv->timeout.data = (u_long) fw_priv;
 	init_timer(&fw_priv->timeout);
 
-	fw_setup_device_id(f_dev, device);
+	dev_set_name(f_dev, dev_name(device));
 	f_dev->parent = device;
 	f_dev->class = &firmware_class;
 	dev_set_drvdata(f_dev, fw_priv);
 	f_dev->uevent_suppress = 1;
 	retval = device_register(f_dev);
 	if (retval) {
-		printk(KERN_ERR "%s: device_register failed\n",
-		       __func__);
+		dev_err(device, "%s: device_register failed\n", __func__);
 		goto error_kfree;
 	}
 	*dev_p = f_dev;
@@ -363,15 +355,13 @@ static int fw_setup_device(struct firmware *fw, struct device **dev_p,
 	fw_priv->fw = fw;
 	retval = sysfs_create_bin_file(&f_dev->kobj, &fw_priv->attr_data);
 	if (retval) {
-		printk(KERN_ERR "%s: sysfs_create_bin_file failed\n",
-		       __func__);
+		dev_err(device, "%s: sysfs_create_bin_file failed\n", __func__);
 		goto error_unreg;
 	}
 
 	retval = device_create_file(f_dev, &dev_attr_loading);
 	if (retval) {
-		printk(KERN_ERR "%s: device_create_file failed\n",
-		       __func__);
+		dev_err(device, "%s: device_create_file failed\n", __func__);
 		goto error_unreg;
 	}
 
@@ -401,8 +391,8 @@ _request_firmware(const struct firmware **firmware_p, const char *name,
 
 	*firmware_p = firmware = kzalloc(sizeof(*firmware), GFP_KERNEL);
 	if (!firmware) {
-		printk(KERN_ERR "%s: kmalloc(struct firmware) failed\n",
-		       __func__);
+		dev_err(device, "%s: kmalloc(struct firmware) failed\n",
+			__func__);
 		retval = -ENOMEM;
 		goto out;
 	}
@@ -411,15 +401,15 @@ _request_firmware(const struct firmware **firmware_p, const char *name,
 	     builtin++) {
 		if (strcmp(name, builtin->name))
 			continue;
-		printk(KERN_INFO "firmware: using built-in firmware %s\n",
-		       name);
+		dev_info(device, "firmware: using built-in firmware %s\n",
+			 name);
 		firmware->size = builtin->size;
 		firmware->data = builtin->data;
 		return 0;
 	}
 
 	if (uevent)
-		printk(KERN_INFO "firmware: requesting %s\n", name);
+		dev_info(device, "firmware: requesting %s\n", name);
 
 	retval = fw_setup_device(firmware, &f_dev, name, device, uevent);
 	if (retval)

@@ -53,7 +53,6 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v3.0"
 #define DRIVER_AUTHOR "Linus 'Frodo Rabbit' Torvalds, Johannes Erdfelt, \
 Randy Dunlap, Georg Acher, Deti Fliegl, Thomas Sailer, Roman Weissgaerber, \
 Alan Stern"
@@ -943,6 +942,7 @@ static struct pci_driver uhci_pci_driver = {
 
 #ifdef	CONFIG_PM
 	.suspend =	usb_hcd_pci_suspend,
+	.resume_early =	usb_hcd_pci_resume_early,
 	.resume =	usb_hcd_pci_resume,
 #endif	/* PM */
 };
@@ -951,12 +951,12 @@ static int __init uhci_hcd_init(void)
 {
 	int retval = -ENOMEM;
 
-	printk(KERN_INFO DRIVER_DESC " " DRIVER_VERSION "%s\n",
-			ignore_oc ? ", overcurrent ignored" : "");
-	set_bit(USB_UHCI_LOADED, &usb_hcds_loaded);
-
 	if (usb_disabled())
 		return -ENODEV;
+
+	printk(KERN_INFO "uhci_hcd: " DRIVER_DESC "%s\n",
+			ignore_oc ? ", overcurrent ignored" : "");
+	set_bit(USB_UHCI_LOADED, &usb_hcds_loaded);
 
 	if (DEBUG_CONFIGURED) {
 		errbuf = kmalloc(ERRBUF_LEN, GFP_KERNEL);

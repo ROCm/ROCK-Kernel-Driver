@@ -21,12 +21,6 @@
 typedef int (*node_filter)(struct lpfc_nodelist *, void *);
 
 struct fc_rport;
-int lpfc_issue_els_auth(struct lpfc_vport *, struct lpfc_nodelist *,
-			uint8_t message_code, uint8_t *payload,
-			uint32_t payload_len);
-int lpfc_issue_els_auth_reject(struct lpfc_vport *vport,
-			       struct lpfc_nodelist *ndlp,
-			       uint8_t reason, uint8_t explanation);
 void lpfc_dump_mem(struct lpfc_hba *, LPFC_MBOXQ_t *, uint16_t);
 void lpfc_dump_wakeup_param(struct lpfc_hba *, LPFC_MBOXQ_t *);
 void lpfc_read_nv(struct lpfc_hba *, LPFC_MBOXQ_t *);
@@ -43,7 +37,6 @@ void lpfc_read_config(struct lpfc_hba *, LPFC_MBOXQ_t *);
 void lpfc_read_lnk_stat(struct lpfc_hba *, LPFC_MBOXQ_t *);
 int lpfc_reg_login(struct lpfc_hba *, uint16_t, uint32_t, uint8_t *,
 		   LPFC_MBOXQ_t *, uint32_t);
-void lpfc_set_var(struct lpfc_hba *, LPFC_MBOXQ_t *, uint32_t, uint32_t);
 void lpfc_unreg_login(struct lpfc_hba *, uint16_t, uint32_t, LPFC_MBOXQ_t *);
 void lpfc_unreg_did(struct lpfc_hba *, uint16_t, uint32_t, LPFC_MBOXQ_t *);
 void lpfc_reg_vpi(struct lpfc_hba *, uint16_t, uint32_t, LPFC_MBOXQ_t *);
@@ -88,10 +81,7 @@ void lpfc_cleanup(struct lpfc_vport *);
 void lpfc_disc_timeout(unsigned long);
 
 struct lpfc_nodelist *__lpfc_findnode_rpi(struct lpfc_vport *, uint16_t);
-struct lpfc_nodelist *lpfc_findnode_wwnn(struct lpfc_vport *,
-					 struct lpfc_name *);
 
-void lpfc_port_auth_failed(struct lpfc_nodelist *, enum auth_state);
 void lpfc_worker_wake_up(struct lpfc_hba *);
 int lpfc_workq_post_event(struct lpfc_hba *, void *, void *, uint32_t);
 int lpfc_do_work(void *);
@@ -106,9 +96,6 @@ void lpfc_more_plogi(struct lpfc_vport *);
 void lpfc_more_adisc(struct lpfc_vport *);
 void lpfc_end_rscn(struct lpfc_vport *);
 int lpfc_els_chk_latt(struct lpfc_vport *);
-struct lpfc_iocbq *lpfc_prep_els_iocb(struct lpfc_vport *, uint8_t, uint16_t,
-				      uint8_t, struct lpfc_nodelist *, uint32_t,
-				      uint32_t);
 int lpfc_els_abort_flogi(struct lpfc_hba *);
 int lpfc_initial_flogi(struct lpfc_vport *);
 int lpfc_initial_fdisc(struct lpfc_vport *);
@@ -131,8 +118,6 @@ int lpfc_els_rsp_prli_acc(struct lpfc_vport *, struct lpfc_iocbq *,
 void lpfc_cancel_retry_delay_tmo(struct lpfc_vport *, struct lpfc_nodelist *);
 void lpfc_els_retry_delay(unsigned long);
 void lpfc_els_retry_delay_handler(struct lpfc_nodelist *);
-void lpfc_reauth_node(unsigned long);
-void lpfc_reauthentication_handler(struct lpfc_nodelist *);
 void lpfc_els_unsol_event(struct lpfc_hba *, struct lpfc_sli_ring *,
 			  struct lpfc_iocbq *);
 int lpfc_els_handle_rscn(struct lpfc_vport *);
@@ -167,8 +152,6 @@ void lpfc_offline(struct lpfc_hba *);
 
 int lpfc_sli_setup(struct lpfc_hba *);
 int lpfc_sli_queue_setup(struct lpfc_hba *);
-int  lpfc_sli_set_dma_length(struct lpfc_hba *, uint32_t);
-
 
 void lpfc_handle_eratt(struct lpfc_hba *);
 void lpfc_handle_latt(struct lpfc_hba *);
@@ -294,22 +277,6 @@ void destroy_port(struct lpfc_vport *);
 int lpfc_get_instance(void);
 void lpfc_host_attrib_init(struct Scsi_Host *);
 
-int lpfc_selective_reset(struct lpfc_hba *);
-int lpfc_security_wait(struct lpfc_vport *);
-int  lpfc_get_security_enabled(struct Scsi_Host *);
-void lpfc_security_service_online(struct Scsi_Host *);
-void lpfc_security_service_offline(struct Scsi_Host *);
-void lpfc_security_config(struct Scsi_Host *, int status, void *);
-int lpfc_security_config_wait(struct lpfc_vport *vport);
-void lpfc_dhchap_make_challenge(struct Scsi_Host *, int , void *, uint32_t);
-void lpfc_dhchap_make_response(struct Scsi_Host *, int , void *, uint32_t);
-void lpfc_dhchap_authenticate(struct Scsi_Host *, int , void *, uint32_t);
-int lpfc_start_node_authentication(struct lpfc_nodelist *);
-int lpfc_get_auth_config(struct lpfc_nodelist *, struct lpfc_name *);
-void lpfc_start_discovery(struct lpfc_vport *vport);
-void lpfc_start_authentication(struct lpfc_vport *, struct lpfc_nodelist *);
-int lpfc_rcv_nl_msg(struct Scsi_Host *, void *, uint32_t, uint32_t);
-
 extern void lpfc_debugfs_initialize(struct lpfc_vport *);
 extern void lpfc_debugfs_terminate(struct lpfc_vport *);
 extern void lpfc_debugfs_disc_trc(struct lpfc_vport *, int, char *, uint32_t,
@@ -318,9 +285,17 @@ extern void lpfc_debugfs_slow_ring_trc(struct lpfc_hba *, char *, uint32_t,
 	uint32_t, uint32_t);
 extern struct lpfc_hbq_init *lpfc_hbq_defs[];
 
-extern spinlock_t fc_security_user_lock;
-extern struct list_head fc_security_user_list;
-extern int fc_service_state;
+/* externs BlockGuard */
+extern char *_dump_buf_data;
+extern unsigned long _dump_buf_data_order;
+extern char *_dump_buf_dif;
+extern unsigned long _dump_buf_dif_order;
+extern spinlock_t _dump_buf_lock;
+extern int _dump_buf_done;
+extern spinlock_t pgcnt_lock;
+extern unsigned int pgcnt;
+extern unsigned int lpfc_prot_mask;
+extern unsigned char lpfc_prot_guard;
 
 /* Interface exported by fabric iocb scheduler */
 void lpfc_fabric_abort_nport(struct lpfc_nodelist *);

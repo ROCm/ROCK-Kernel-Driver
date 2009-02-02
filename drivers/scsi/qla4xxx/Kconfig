@@ -3,5 +3,5 @@ config SCSI_QLA_ISCSI
 	depends on PCI && SCSI
 	select SCSI_ISCSI_ATTRS
 	---help---
-	This driver supports the QLogic 40xx (ISP4XXX) iSCSI host 
+	This driver supports the QLogic 40xx (ISP4XXX) iSCSI host
 	adapter family.

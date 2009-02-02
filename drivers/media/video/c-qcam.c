@@ -51,6 +51,7 @@ struct qcam_device {
 	int contrast, brightness, whitebal;
 	int top, left;
 	unsigned int bidirectional;
+	unsigned long in_use;
 	struct mutex lock;
 };
 
@@ -499,8 +500,7 @@ static long qc_capture(struct qcam_device *q, char __user *buf, unsigned long le
  *	Video4linux interfacing
  */
 
-static int qcam_do_ioctl(struct inode *inode, struct file *file,
-			 unsigned int cmd, void *arg)
+static long qcam_do_ioctl(struct file *file, unsigned int cmd, void *arg)
 {
 	struct video_device *dev = video_devdata(file);
 	struct qcam_device *qcam=(struct qcam_device *)dev;
@@ -665,10 +665,10 @@ static int qcam_do_ioctl(struct inode *inode, struct file *file,
 	return 0;
 }
 
-static int qcam_ioctl(struct inode *inode, struct file *file,
-		     unsigned int cmd, unsigned long arg)
+static long qcam_ioctl(struct file *file,
+		      unsigned int cmd, unsigned long arg)
 {
-	return video_usercopy(inode, file, cmd, arg, qcam_do_ioctl);
+	return video_usercopy(file, cmd, arg, qcam_do_ioctl);
 }
 
 static ssize_t qcam_read(struct file *file, char __user *buf,
@@ -687,23 +687,37 @@ static ssize_t qcam_read(struct file *file, char __user *buf,
 	return len;
 }
 
+static int qcam_exclusive_open(struct file *file)
+{
+	struct video_device *dev = video_devdata(file);
+	struct qcam_device *qcam = (struct qcam_device *)dev;
+
+	return test_and_set_bit(0, &qcam->in_use) ? -EBUSY : 0;
+}
+
+static int qcam_exclusive_release(struct file *file)
+{
+	struct video_device *dev = video_devdata(file);
+	struct qcam_device *qcam = (struct qcam_device *)dev;
+
+	clear_bit(0, &qcam->in_use);
+	return 0;
+}
+
 /* video device template */
-static const struct file_operations qcam_fops = {
+static const struct v4l2_file_operations qcam_fops = {
 	.owner		= THIS_MODULE,
-	.open           = video_exclusive_open,
-	.release        = video_exclusive_release,
+	.open           = qcam_exclusive_open,
+	.release        = qcam_exclusive_release,
 	.ioctl          = qcam_ioctl,
-#ifdef CONFIG_COMPAT
-	.compat_ioctl	= v4l_compat_ioctl32,
-#endif
 	.read		= qcam_read,
-	.llseek         = no_llseek,
 };
 
 static struct video_device qcam_template=
 {
 	.name		= "Colour QuickCam",
 	.fops           = &qcam_fops,
+	.release 	= video_device_release_empty,
 };
 
 /* Initialize the QuickCam driver control structure. */
@@ -796,7 +810,7 @@ static int init_cqcam(struct parport *port)
 	}
 
 	printk(KERN_INFO "video%d: Colour QuickCam found on %s\n",
-	       qcam->vdev.minor, qcam->pport->name);
+	       qcam->vdev.num, qcam->pport->name);
 
 	qcams[num_cams++] = qcam;
 

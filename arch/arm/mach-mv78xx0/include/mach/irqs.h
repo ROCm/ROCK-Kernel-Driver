@@ -11,8 +11,6 @@
 #ifndef __ASM_ARCH_IRQS_H
 #define __ASM_ARCH_IRQS_H
 
-#include "mv78xx0.h"	/* need GPIO_MAX */
-
 /*
  * MV78xx0 Low Interrupt Controller
  */
@@ -80,10 +78,15 @@
 #define IRQ_MV78XX0_DB_OUT	61
 
 /*
+ * MV78xx0 Error Interrupt Controller
+ */
+#define IRQ_MV78XX0_GE_ERR	70
+
+/*
  * MV78XX0 General Purpose Pins
  */
-#define IRQ_MV78XX0_GPIO_START	64
-#define NR_GPIO_IRQS		GPIO_MAX
+#define IRQ_MV78XX0_GPIO_START	96
+#define NR_GPIO_IRQS		32
 
 #define NR_IRQS			(IRQ_MV78XX0_GPIO_START + NR_GPIO_IRQS)
 

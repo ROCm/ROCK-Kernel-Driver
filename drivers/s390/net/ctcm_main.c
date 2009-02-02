@@ -22,6 +22,7 @@
 #undef DEBUGCCW
 
 #define KMSG_COMPONENT "ctcm"
+#define pr_fmt(fmt) KMSG_COMPONENT ": " fmt
 
 #include <linux/module.h>
 #include <linux/init.h>
@@ -279,7 +280,7 @@ static long ctcm_check_irb_error(struct ccw_device *cdev, struct irb *irb)
 
 	CTCM_DBF_TEXT_(ERROR, CTC_DBF_WARN,
 			"irb error %ld on device %s\n",
-				PTR_ERR(irb), cdev->dev.bus_id);
+				PTR_ERR(irb), dev_name(&cdev->dev));
 
 	switch (PTR_ERR(irb)) {
 	case -EIO:
@@ -1188,7 +1189,7 @@ static void ctcm_irq_handler(struct ccw_device *cdev,
 	int dstat;
 
 	CTCM_DBF_TEXT_(TRACE, CTC_DBF_DEBUG,
-		"Enter %s(%s)", CTCM_FUNTAIL, &cdev->dev.bus_id);
+		"Enter %s(%s)", CTCM_FUNTAIL, dev_name(&cdev->dev));
 
 	if (ctcm_check_irb_error(cdev, irb))
 		return;
@@ -1341,7 +1342,7 @@ static int add_channel(struct ccw_device *cdev, enum channel_types type,
 
 	CTCM_DBF_TEXT_(SETUP, CTC_DBF_INFO,
 		"%s(%s), type %d, proto %d",
-			__func__, cdev->dev.bus_id,	type, priv->protocol);
+			__func__, dev_name(&cdev->dev),	type, priv->protocol);
 
 	ch = kzalloc(sizeof(struct channel), GFP_KERNEL);
 	if (ch == NULL)
@@ -1370,7 +1371,7 @@ static int add_channel(struct ccw_device *cdev, enum channel_types type,
 					goto nomem_return;
 
 	ch->cdev = cdev;
-	snprintf(ch->id, CTCM_ID_SIZE, "ch-%s", cdev->dev.bus_id);
+	snprintf(ch->id, CTCM_ID_SIZE, "ch-%s", dev_name(&cdev->dev));
 	ch->type = type;
 
 	/**
@@ -1530,8 +1531,8 @@ static int ctcm_new_device(struct ccwgroup_device *cgdev)
 
 	type = get_channel_type(&cdev0->id);
 
-	snprintf(read_id, CTCM_ID_SIZE, "ch-%s", cdev0->dev.bus_id);
-	snprintf(write_id, CTCM_ID_SIZE, "ch-%s", cdev1->dev.bus_id);
+	snprintf(read_id, CTCM_ID_SIZE, "ch-%s", dev_name(&cdev0->dev));
+	snprintf(write_id, CTCM_ID_SIZE, "ch-%s", dev_name(&cdev1->dev));
 
 	ret = add_channel(cdev0, type, priv);
 	if (ret)

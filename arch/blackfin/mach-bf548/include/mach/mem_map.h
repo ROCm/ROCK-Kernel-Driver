@@ -94,18 +94,24 @@
 #endif /*CONFIG_BFIN_DCACHE*/
 
 /* Level 2 Memory */
-#if !defined(CONFIG_BF542)
-# define L2_START          0xFEB00000
-# if defined(CONFIG_BF544)
-#  define L2_LENGTH        0x10000
-# else
-#  define L2_LENGTH        0x20000
-# endif
+#define L2_START            0xFEB00000
+#if defined(CONFIG_BF542)
+# define L2_LENGTH          0
+#elif defined(CONFIG_BF544)
+# define L2_LENGTH          0x10000
+#else
+# define L2_LENGTH          0x20000
 #endif
 
 /* Scratch Pad Memory */
 
 #define L1_SCRATCH_START	0xFFB00000
 #define L1_SCRATCH_LENGTH	0x1000
+
+#define GET_PDA_SAFE(preg)		\
+	preg.l = _cpu_pda;		\
+	preg.h = _cpu_pda;
+
+#define GET_PDA(preg, dreg)	GET_PDA_SAFE(preg)
 
 #endif/* _MEM_MAP_548_H_ */

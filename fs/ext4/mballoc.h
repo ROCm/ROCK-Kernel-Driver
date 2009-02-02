@@ -18,6 +18,9 @@
 #include <linux/pagemap.h>
 #include <linux/seq_file.h>
 #include <linux/version.h>
+#include <linux/blkdev.h>
+#include <linux/marker.h>
+#include <linux/mutex.h>
 #include "ext4_jbd2.h"
 #include "ext4.h"
 #include "group.h"
@@ -96,41 +99,24 @@
  */
 #define MB_DEFAULT_GROUP_PREALLOC	512
 
-static struct kmem_cache *ext4_pspace_cachep;
-static struct kmem_cache *ext4_ac_cachep;
 
-#ifdef EXT4_BB_MAX_BLOCKS
-#undef EXT4_BB_MAX_BLOCKS
-#endif
-#define EXT4_BB_MAX_BLOCKS	30
+struct ext4_free_data {
+	/* this links the free block information from group_info */
+	struct rb_node node;
 
-struct ext4_free_metadata {
-	ext4_group_t group;
-	unsigned short num;
-	ext4_grpblk_t  blocks[EXT4_BB_MAX_BLOCKS];
+	/* this links the free block information from ext4_sb_info */
 	struct list_head list;
+
+	/* group which free block extent belongs */
+	ext4_group_t group;
+
+	/* free block extent */
+	ext4_grpblk_t start_blk;
+	ext4_grpblk_t count;
+
+	/* transaction which freed this extent */
+	tid_t	t_tid;
 };
-
-struct ext4_group_info {
-	unsigned long	bb_state;
-	unsigned long	bb_tid;
-	struct ext4_free_metadata *bb_md_cur;
-	unsigned short	bb_first_free;
-	unsigned short	bb_free;
-	unsigned short	bb_fragments;
-	struct		list_head bb_prealloc_list;
-#ifdef DOUBLE_CHECK
-	void		*bb_bitmap;
-#endif
-	unsigned short	bb_counters[];
-};
-
-#define EXT4_GROUP_INFO_NEED_INIT_BIT	0
-#define EXT4_GROUP_INFO_LOCKED_BIT	1
-
-#define EXT4_MB_GRP_NEED_INIT(grp)	\
-	(test_bit(EXT4_GROUP_INFO_NEED_INIT_BIT, &((grp)->bb_state)))
-
 
 struct ext4_prealloc_space {
 	struct list_head	pa_inode_list;
@@ -209,6 +195,11 @@ struct ext4_allocation_context {
 	__u8 ac_op;		/* operation, for history only */
 	struct page *ac_bitmap_page;
 	struct page *ac_buddy_page;
+	/*
+	 * pointer to the held semaphore upon successful
+	 * block allocation
+	 */
+	struct rw_semaphore *alloc_semp;
 	struct ext4_prealloc_space *ac_pa;
 	struct ext4_locality_group *ac_lg;
 };
@@ -242,6 +233,7 @@ struct ext4_buddy {
 	struct super_block *bd_sb;
 	__u16 bd_blkbits;
 	ext4_group_t bd_group;
+	struct rw_semaphore *alloc_semp;
 };
 #define EXT4_MB_BITMAP(e4b)	((e4b)->bd_bitmap)
 #define EXT4_MB_BUDDY(e4b)	((e4b)->bd_buddy)
@@ -251,53 +243,12 @@ static inline void ext4_mb_store_history(struct ext4_allocation_context *ac)
 {
 	return;
 }
-#else
-static void ext4_mb_store_history(struct ext4_allocation_context *ac);
 #endif
 
 #define in_range(b, first, len)	((b) >= (first) && (b) <= (first) + (len) - 1)
 
-static struct proc_dir_entry *proc_root_ext4;
 struct buffer_head *read_block_bitmap(struct super_block *, ext4_group_t);
-
-static void ext4_mb_generate_from_pa(struct super_block *sb, void *bitmap,
-					ext4_group_t group);
-static void ext4_mb_poll_new_transaction(struct super_block *, handle_t *);
-static void ext4_mb_free_committed_blocks(struct super_block *);
-static void ext4_mb_return_to_preallocation(struct inode *inode,
-					struct ext4_buddy *e4b, sector_t block,
-					int count);
-static void ext4_mb_put_pa(struct ext4_allocation_context *,
-			struct super_block *, struct ext4_prealloc_space *pa);
-static int ext4_mb_init_per_dev_proc(struct super_block *sb);
-static int ext4_mb_destroy_per_dev_proc(struct super_block *sb);
-
-
-static inline void ext4_lock_group(struct super_block *sb, ext4_group_t group)
-{
-	struct ext4_group_info *grinfo = ext4_get_group_info(sb, group);
-
-	bit_spin_lock(EXT4_GROUP_INFO_LOCKED_BIT, &(grinfo->bb_state));
-}
-
-static inline void ext4_unlock_group(struct super_block *sb,
-					ext4_group_t group)
-{
-	struct ext4_group_info *grinfo = ext4_get_group_info(sb, group);
-
-	bit_spin_unlock(EXT4_GROUP_INFO_LOCKED_BIT, &(grinfo->bb_state));
-}
-
-static inline int ext4_is_group_locked(struct super_block *sb,
-					ext4_group_t group)
-{
-	struct ext4_group_info *grinfo = ext4_get_group_info(sb, group);
-
-	return bit_spin_is_locked(EXT4_GROUP_INFO_LOCKED_BIT,
-						&(grinfo->bb_state));
-}
-
-static ext4_fsblk_t ext4_grp_offs_to_block(struct super_block *sb,
+static inline ext4_fsblk_t ext4_grp_offs_to_block(struct super_block *sb,
 					struct ext4_free_extent *fex)
 {
 	ext4_fsblk_t block;

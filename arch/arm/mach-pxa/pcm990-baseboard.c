@@ -55,6 +55,10 @@ static unsigned long pcm990_pin_config[] __initdata = {
 	GPIO89_USBH1_PEN,
 	/* PWM0 */
 	GPIO16_PWM0_OUT,
+
+	/* I2C */
+	GPIO117_I2C_SCL,
+	GPIO118_I2C_SDA,
 };
 
 /*
@@ -100,8 +104,7 @@ static struct pxafb_mode_info fb_info_sharp_lq084v1dg21 = {
 static struct pxafb_mach_info pcm990_fbinfo __initdata = {
 	.modes			= &fb_info_sharp_lq084v1dg21,
 	.num_modes		= 1,
-	.lccr0			= LCCR0_PAS,
-	.lccr3			= LCCR3_PCP,
+	.lcd_conn		= LCD_COLOR_TFT_16BPP | LCD_PCLK_EDGE_FALL,
 	.pxafb_lcd_power	= pcm990_lcd_power,
 };
 #elif defined(CONFIG_PCM990_DISPLAY_NEC)
@@ -123,8 +126,7 @@ struct pxafb_mode_info fb_info_nec_nl6448bc20_18d = {
 static struct pxafb_mach_info pcm990_fbinfo __initdata = {
 	.modes			= &fb_info_nec_nl6448bc20_18d,
 	.num_modes		= 1,
-	.lccr0			= LCCR0_Act,
-	.lccr3			= LCCR3_PixFlEdg,
+	.lcd_conn		= LCD_COLOR_TFT_16BPP | LCD_PCLK_EDGE_FALL,
 	.pxafb_lcd_power	= pcm990_lcd_power,
 };
 #endif
@@ -262,8 +264,7 @@ static void pcm990_irq_handler(unsigned int irq, struct irq_desc *desc)
 					GPIO_bit(PCM990_CTRL_INT_IRQ_GPIO);
 		if (likely(pending)) {
 			irq = PCM027_IRQ(0) + __ffs(pending);
-			desc = irq_desc + irq;
-			desc_handle_irq(irq, desc);
+			generic_handle_irq(irq);
 		}
 		pending = (~PCM990_INTSETCLR) & pcm990_irq_enabled;
 	} while (pending);
@@ -328,36 +329,10 @@ static struct pxamci_platform_data pcm990_mci_platform_data = {
 	.exit		= pcm990_mci_exit,
 };
 
-/*
- * init OHCI hardware to work with
- *
- * Note: Only USB port 1 (host only) is connected
- *
- * GPIO88 (USBHPWR#1): overcurrent in, overcurrent when low
- * GPIO89 (USBHPEN#1): power-on out, on when low
- */
-static int pcm990_ohci_init(struct device *dev)
-{
-	/*
-	 * disable USB port 2 and 3
-	 * power sense is active low
-	 */
-	UHCHR = ((UHCHR) | UHCHR_PCPL | UHCHR_PSPL | UHCHR_SSEP2 |
-				UHCHR_SSEP3) & ~(UHCHR_SSEP1 | UHCHR_SSE);
-	/*
-	 * wait 10ms after Power on
-	 * overcurrent per port
-	 * power switch per port
-	 */
-	UHCRHDA = (5<<24) | (1<<11) | (1<<8);	/* FIXME: Required? */
-
-	return 0;
-}
-
 static struct pxaohci_platform_data pcm990_ohci_platform_data = {
 	.port_mode	= PMM_PERPORT_MODE,
-	.init		= pcm990_ohci_init,
-	.exit		= NULL,
+	.flags		= ENABLE_PORT1 | POWER_CONTROL_LOW | POWER_SENSE_LOW,
+	.power_on_delay	= 10,
 };
 
 /*
@@ -412,6 +387,7 @@ static struct soc_camera_link iclink[] = {
 		.gpio	= NR_BUILTIN_GPIO + 1,
 	}, {
 		.bus_id	= 0, /* Must match with the camera ID above */
+		.gpio	= -ENXIO,
 	}
 };
 

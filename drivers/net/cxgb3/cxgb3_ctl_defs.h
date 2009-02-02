@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003-2007 Chelsio, Inc. All rights reserved.
+ * Copyright (c) 2003-2008 Chelsio, Inc. All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -57,9 +57,9 @@ enum {
 	RDMA_GET_MIB		= 19,
 
 	GET_RX_PAGE_INFO	= 50,
-
 	GET_ISCSI_IPV4ADDR	= 51,
-	SET_ISCSI_IPV4ADDR	= 52,
+
+	GET_EMBEDDED_INFO	= 70,
 };
 
 /*
@@ -177,5 +177,13 @@ struct rdma_ctrlqp_setup {
 struct ofld_page_info {
 	unsigned int page_size;  /* Page size, should be a power of 2 */
 	unsigned int num;        /* Number of pages */
+};
+
+/*
+ * Structure used to get firmware and protocol engine versions.
+ */
+struct ch_embedded_info {
+	u32 fw_vers;
+	u32 tp_vers;
 };
 #endif				/* _CXGB3_OFFLOAD_CTL_DEFS_H */

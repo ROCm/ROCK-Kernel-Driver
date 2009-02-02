@@ -9,6 +9,7 @@
  */
 
 #define KMSG_COMPONENT "qeth"
+#define pr_fmt(fmt) KMSG_COMPONENT ": " fmt
 
 #include <linux/module.h>
 #include <linux/moduleparam.h>
@@ -18,8 +19,6 @@
 #include <linux/etherdevice.h>
 #include <linux/mii.h>
 #include <linux/ip.h>
-
-#include <asm/s390_rdev.h>
 
 #include "qeth_core.h"
 #include "qeth_core_offl.h"
@@ -133,17 +132,13 @@ static int qeth_l2_send_setgroupmac_cb(struct qeth_card *card,
 	mac = &cmd->data.setdelmac.mac[0];
 	/* MAC already registered, needed in couple/uncouple case */
 	if (cmd->hdr.return_code == 0x2005) {
-		QETH_DBF_MESSAGE(2, "Group MAC %02x:%02x:%02x:%02x:%02x:%02x "
-			  "already existing on %s \n",
-			  mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
-			  QETH_CARD_IFNAME(card));
+		QETH_DBF_MESSAGE(2, "Group MAC %pM already existing on %s \n",
+			  mac, QETH_CARD_IFNAME(card));
 		cmd->hdr.return_code = 0;
 	}
 	if (cmd->hdr.return_code)
-		QETH_DBF_MESSAGE(2, "Could not set group MAC "
-			  "%02x:%02x:%02x:%02x:%02x:%02x on %s: %x\n",
-			  mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
-			  QETH_CARD_IFNAME(card), cmd->hdr.return_code);
+		QETH_DBF_MESSAGE(2, "Could not set group MAC %pM on %s: %x\n",
+			  mac, QETH_CARD_IFNAME(card), cmd->hdr.return_code);
 	return 0;
 }
 
@@ -165,10 +160,8 @@ static int qeth_l2_send_delgroupmac_cb(struct qeth_card *card,
 	cmd = (struct qeth_ipa_cmd *) data;
 	mac = &cmd->data.setdelmac.mac[0];
 	if (cmd->hdr.return_code)
-		QETH_DBF_MESSAGE(2, "Could not delete group MAC "
-			  "%02x:%02x:%02x:%02x:%02x:%02x on %s: %x\n",
-			  mac[0], mac[1], mac[2], mac[3], mac[4], mac[5],
-			  QETH_CARD_IFNAME(card), cmd->hdr.return_code);
+		QETH_DBF_MESSAGE(2, "Could not delete group MAC %pM on %s: %x\n",
+			  mac, QETH_CARD_IFNAME(card), cmd->hdr.return_code);
 	return 0;
 }
 
@@ -375,8 +368,6 @@ static int qeth_l2_stop_card(struct qeth_card *card, int recovery_mode)
 	QETH_DBF_HEX(SETUP, 2, &card, sizeof(void *));
 
 	qeth_set_allowed_threads(card, 0, 1);
-	if (qeth_wait_for_threads(card, ~QETH_RECOVER_THREAD))
-		return -ERESTARTSYS;
 	if (card->read.state == CH_STATE_UP &&
 	    card->write.state == CH_STATE_UP &&
 	    (card->state == CARD_STATE_UP)) {
@@ -566,7 +557,7 @@ static int qeth_l2_request_initial_mac(struct qeth_card *card)
 			"device %s: x%x\n", CARD_BUS_ID(card), rc);
 	}
 
-	if ((card->info.type == QETH_CARD_TYPE_IQD) ||
+	if ((card->info.type == QETH_CARD_TYPE_IQD) || 
 	    (card->info.guestlan)) {
 		rc = qeth_setadpparms_change_macaddr(card);
 		if (rc) {
@@ -925,6 +916,21 @@ static struct ethtool_ops qeth_l2_osn_ops = {
 	.get_drvinfo = qeth_core_get_drvinfo,
 };
 
+static const struct net_device_ops qeth_l2_netdev_ops = {
+	.ndo_open		= qeth_l2_open,
+	.ndo_stop		= qeth_l2_stop,
+	.ndo_get_stats		= qeth_get_stats,
+	.ndo_start_xmit		= qeth_l2_hard_start_xmit,
+	.ndo_validate_addr	= eth_validate_addr,
+	.ndo_set_multicast_list = qeth_l2_set_multicast_list,
+	.ndo_do_ioctl	   	= qeth_l2_do_ioctl,
+	.ndo_set_mac_address    = qeth_l2_set_mac_address,
+	.ndo_change_mtu	   	= qeth_change_mtu,
+	.ndo_vlan_rx_add_vid	= qeth_l2_vlan_rx_add_vid,
+	.ndo_vlan_rx_kill_vid   = qeth_l2_vlan_rx_kill_vid,
+	.ndo_tx_timeout	   	= qeth_tx_timeout,
+};
+
 static int qeth_l2_setup_netdev(struct qeth_card *card)
 {
 	switch (card->info.type) {
@@ -946,19 +952,9 @@ static int qeth_l2_setup_netdev(struct qeth_card *card)
 		return -ENODEV;
 
 	card->dev->ml_priv = card;
-	card->dev->tx_timeout = &qeth_tx_timeout;
 	card->dev->watchdog_timeo = QETH_TX_TIMEOUT;
-	card->dev->open = qeth_l2_open;
-	card->dev->stop = qeth_l2_stop;
-	card->dev->hard_start_xmit = qeth_l2_hard_start_xmit;
-	card->dev->do_ioctl = qeth_l2_do_ioctl;
-	card->dev->get_stats = qeth_get_stats;
-	card->dev->change_mtu = qeth_change_mtu;
-	card->dev->set_multicast_list = qeth_l2_set_multicast_list;
-	card->dev->vlan_rx_kill_vid = qeth_l2_vlan_rx_kill_vid;
-	card->dev->vlan_rx_add_vid = qeth_l2_vlan_rx_add_vid;
-	card->dev->set_mac_address = qeth_l2_set_mac_address;
 	card->dev->mtu = card->info.initial_mtu;
+	card->dev->netdev_ops = &qeth_l2_netdev_ops;
 	if (card->info.type != QETH_CARD_TYPE_OSN)
 		SET_ETHTOOL_OPS(card->dev, &qeth_l2_ethtool_ops);
 	else
@@ -981,10 +977,6 @@ static int __qeth_l2_set_online(struct ccwgroup_device *gdev, int recovery_mode)
 	QETH_DBF_HEX(SETUP, 2, &card, sizeof(void *));
 
 	qeth_set_allowed_threads(card, QETH_RECOVER_THREAD, 1);
-	if (qeth_wait_for_threads(card, ~QETH_RECOVER_THREAD)) {
-		return -ERESTARTSYS;
-	}
-
 	recover_flag = card->state;
 	rc = ccw_device_set_online(CARD_RDEV(card));
 	if (rc) {
@@ -1094,9 +1086,7 @@ static int __qeth_l2_set_offline(struct ccwgroup_device *cgdev,
 	if (card->dev && netif_carrier_ok(card->dev))
 		netif_carrier_off(card->dev);
 	recover_flag = card->state;
-	if (qeth_l2_stop_card(card, recovery_mode) == -ERESTARTSYS) {
-		return -ERESTARTSYS;
-	}
+	qeth_l2_stop_card(card, recovery_mode);
 	rc  = ccw_device_set_offline(CARD_DDEV(card));
 	rc2 = ccw_device_set_offline(CARD_WDEV(card));
 	rc3 = ccw_device_set_offline(CARD_RDEV(card));

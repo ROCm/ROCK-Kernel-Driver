@@ -22,18 +22,18 @@ static int x2apic_acpi_madt_oem_check(char *oem_id, char *oem_table_id)
 
 /* Start with all IRQs pointing to boot CPU.  IRQ balancing will shift them. */
 
-static const cpumask_t *x2apic_target_cpus(void)
+static const struct cpumask *x2apic_target_cpus(void)
 {
-	return &cpumask_of_cpu(0);
+	return cpumask_of(0);
 }
 
 /*
  * for now each logical cpu is in its own vector allocation domain.
  */
-static void x2apic_vector_allocation_domain(int cpu, cpumask_t *retmask)
+static void x2apic_vector_allocation_domain(int cpu, struct cpumask *retmask)
 {
-	cpus_clear(*retmask);
-	cpu_set(cpu, *retmask);
+	cpumask_clear(retmask);
+	cpumask_set_cpu(cpu, retmask);
 }
 
 static void __x2apic_send_IPI_dest(unsigned int apicid, int vector,
@@ -55,27 +55,28 @@ static void __x2apic_send_IPI_dest(unsigned int apicid, int vector,
  * at once. We have 16 cpu's in a cluster. This will minimize IPI register
  * writes.
  */
-static void x2apic_send_IPI_mask(const cpumask_t *mask, int vector)
+static void x2apic_send_IPI_mask(const struct cpumask *mask, int vector)
 {
 	unsigned long flags;
 	unsigned long query_cpu;
 
 	local_irq_save(flags);
-	for_each_cpu_mask_and(query_cpu, *mask, cpu_online_map)
+	for_each_cpu(query_cpu, mask)
 		__x2apic_send_IPI_dest(
 			per_cpu(x86_cpu_to_logical_apicid, query_cpu),
 			vector, APIC_DEST_LOGICAL);
 	local_irq_restore(flags);
 }
 
-static void x2apic_send_IPI_mask_allbutself(const cpumask_t *mask, int vector)
+static void x2apic_send_IPI_mask_allbutself(const struct cpumask *mask,
+					    int vector)
 {
 	unsigned long flags;
 	unsigned long query_cpu;
 	unsigned long this_cpu = smp_processor_id();
 
 	local_irq_save(flags);
-	for_each_cpu_mask_and(query_cpu, *mask, cpu_online_map)
+	for_each_cpu(query_cpu, mask)
 		if (query_cpu != this_cpu)
 			__x2apic_send_IPI_dest(
 				per_cpu(x86_cpu_to_logical_apicid, query_cpu),
@@ -100,7 +101,7 @@ static void x2apic_send_IPI_allbutself(int vector)
 
 static void x2apic_send_IPI_all(int vector)
 {
-	x2apic_send_IPI_mask(&cpu_online_map, vector);
+	x2apic_send_IPI_mask(cpu_online_mask, vector);
 }
 
 static int x2apic_apic_id_registered(void)
@@ -108,19 +109,36 @@ static int x2apic_apic_id_registered(void)
 	return 1;
 }
 
-static unsigned int x2apic_cpu_mask_to_apicid(const cpumask_t *cpumask)
+static unsigned int x2apic_cpu_mask_to_apicid(const struct cpumask *cpumask)
 {
 	int cpu;
 
 	/*
-	 * We're using fixed IRQ delivery, can only return one phys APIC ID.
+	 * We're using fixed IRQ delivery, can only return one logical APIC ID.
 	 * May as well be the first.
 	 */
-	cpu = first_cpu(*cpumask);
+	cpu = cpumask_first(cpumask);
 	if ((unsigned)cpu < nr_cpu_ids)
 		return per_cpu(x86_cpu_to_logical_apicid, cpu);
 	else
 		return BAD_APICID;
+}
+
+static unsigned int x2apic_cpu_mask_to_apicid_and(const struct cpumask *cpumask,
+						  const struct cpumask *andmask)
+{
+	int cpu;
+
+	/*
+	 * We're using fixed IRQ delivery, can only return one logical APIC ID.
+	 * May as well be the first.
+	 */
+	for_each_cpu_and(cpu, cpumask, andmask)
+		if (cpumask_test_cpu(cpu, cpu_online_mask))
+			break;
+	if (cpu < nr_cpu_ids)
+		return per_cpu(x86_cpu_to_logical_apicid, cpu);
+	return BAD_APICID;
 }
 
 static unsigned int get_apic_id(unsigned long x)
@@ -172,6 +190,7 @@ struct genapic apic_x2apic_cluster = {
 	.send_IPI_mask_allbutself = x2apic_send_IPI_mask_allbutself,
 	.send_IPI_self = x2apic_send_IPI_self,
 	.cpu_mask_to_apicid = x2apic_cpu_mask_to_apicid,
+	.cpu_mask_to_apicid_and = x2apic_cpu_mask_to_apicid_and,
 	.phys_pkg_id = phys_pkg_id,
 	.get_apic_id = get_apic_id,
 	.set_apic_id = set_apic_id,

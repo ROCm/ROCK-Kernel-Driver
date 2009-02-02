@@ -226,6 +226,7 @@ static const struct quirk_printer_struct quirk_printers[] = {
 	{ 0x0409, 0xf0be, USBLP_QUIRK_BIDIR }, /* NEC Picty920 (HP OEM) */
 	{ 0x0409, 0xf1be, USBLP_QUIRK_BIDIR }, /* NEC Picty800 (HP OEM) */
 	{ 0x0482, 0x0010, USBLP_QUIRK_BIDIR }, /* Kyocera Mita FS 820, by zut <kernel@zut.de> */
+	{ 0x04f9, 0x000d, USBLP_QUIRK_BIDIR }, /* Brother Industries, Ltd HL-1440 Laser Printer */
 	{ 0x04b8, 0x0202, USBLP_QUIRK_BAD_CLASS }, /* Seiko Epson Receipt Printer M129C */
 	{ 0, 0 }
 };
@@ -593,8 +594,9 @@ static long usblp_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 				err = usblp_hp_channel_change_request(usblp,
 					arg, &newChannel);
 				if (err < 0) {
-					err("usblp%d: error = %d setting "
-						"HP channel",
+					dev_err(&usblp->dev->dev,
+						"usblp%d: error = %d setting "
+						"HP channel\n",
 						usblp->minor, err);
 					retval = -EIO;
 					goto done;
@@ -1076,15 +1078,16 @@ static int usblp_probe(struct usb_interface *intf,
 		       const struct usb_device_id *id)
 {
 	struct usb_device *dev = interface_to_usbdev (intf);
-	struct usblp *usblp = NULL;
+	struct usblp *usblp;
 	int protocol;
 	int retval;
 
 	/* Malloc and start initializing usblp structure so we can use it
 	 * directly. */
-	if (!(usblp = kzalloc(sizeof(struct usblp), GFP_KERNEL))) {
+	usblp = kzalloc(sizeof(struct usblp), GFP_KERNEL);
+	if (!usblp) {
 		retval = -ENOMEM;
-		goto abort;
+		goto abort_ret;
 	}
 	usblp->dev = dev;
 	mutex_init(&usblp->wmut);
@@ -1179,12 +1182,11 @@ abort_intfdata:
 	usb_set_intfdata (intf, NULL);
 	device_remove_file(&intf->dev, &dev_attr_ieee1284_id);
 abort:
-	if (usblp) {
-		kfree(usblp->readbuf);
-		kfree(usblp->statusbuf);
-		kfree(usblp->device_id_string);
-		kfree(usblp);
-	}
+	kfree(usblp->readbuf);
+	kfree(usblp->statusbuf);
+	kfree(usblp->device_id_string);
+	kfree(usblp);
+abort_ret:
 	return retval;
 }
 
@@ -1345,7 +1347,7 @@ static void usblp_disconnect(struct usb_interface *intf)
 	usb_deregister_dev(intf, &usblp_class);
 
 	if (!usblp || !usblp->dev) {
-		err("bogus disconnect");
+		dev_err(&intf->dev, "bogus disconnect\n");
 		BUG ();
 	}
 

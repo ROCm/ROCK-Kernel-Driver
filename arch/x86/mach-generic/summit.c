@@ -11,16 +11,30 @@
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/init.h>
-#include <asm/mach-summit/mach_apicdef.h>
+#include <asm/summit/apicdef.h>
 #include <linux/smp.h>
-#include <asm/mach-summit/mach_apic.h>
-#include <asm/mach-summit/mach_ipi.h>
-#include <asm/mach-summit/mach_mpparse.h>
+#include <asm/summit/apic.h>
+#include <asm/summit/ipi.h>
+#include <asm/summit/mpparse.h>
+#include <asm/mach-default/mach_wakecpu.h>
 
 static int probe_summit(void)
 {
 	/* probed later in mptable/ACPI hooks */
 	return 0;
+}
+
+static void vector_allocation_domain(int cpu, cpumask_t *retmask)
+{
+	/* Careful. Some cpus do not strictly honor the set of cpus
+	 * specified in the interrupt destination when using lowest
+	 * priority interrupt delivery mode.
+	 *
+	 * In particular there was a hyperthreading cpu observed to
+	 * deliver interrupts to the wrong hyperthread when only one
+	 * hyperthread was specified in the interrupt desitination.
+	 */
+	*retmask = (cpumask_t){ { [0] = APIC_ALL_CPUS, } };
 }
 
 struct genapic apic_summit = APIC_INIT("summit", probe_summit);

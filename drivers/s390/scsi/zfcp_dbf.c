@@ -7,6 +7,7 @@
  */
 
 #define KMSG_COMPONENT "zfcp"
+#define pr_fmt(fmt) KMSG_COMPONENT ": " fmt
 
 #include <linux/ctype.h>
 #include <asm/debug.h>
@@ -620,7 +621,7 @@ static const char *zfcp_rec_dbf_ids[] = {
 	[125]	= "need newer zfcp",
 	[126]	= "need newer microcode",
 	[127]	= "arbitrated loop not supported",
-	[128]	= "unknown topology",
+	[128]	= "",
 	[129]	= "qtcb size mismatch",
 	[130]	= "unknown fsf status ecd",
 	[131]	= "fcp request too big",
@@ -1250,7 +1251,7 @@ int zfcp_adapter_debug_register(struct zfcp_adapter *adapter)
 	char dbf_name[DEBUG_MAX_NAME_LEN];
 
 	/* debug feature area which records recovery activity */
-	sprintf(dbf_name, "zfcp_%s_rec", zfcp_get_busid_by_adapter(adapter));
+	sprintf(dbf_name, "zfcp_%s_rec", dev_name(&adapter->ccw_device->dev));
 	adapter->rec_dbf = debug_register(dbf_name, dbfsize, 1,
 					  sizeof(struct zfcp_rec_dbf_record));
 	if (!adapter->rec_dbf)
@@ -1260,7 +1261,7 @@ int zfcp_adapter_debug_register(struct zfcp_adapter *adapter)
 	debug_set_level(adapter->rec_dbf, 3);
 
 	/* debug feature area which records HBA (FSF and QDIO) conditions */
-	sprintf(dbf_name, "zfcp_%s_hba", zfcp_get_busid_by_adapter(adapter));
+	sprintf(dbf_name, "zfcp_%s_hba", dev_name(&adapter->ccw_device->dev));
 	adapter->hba_dbf = debug_register(dbf_name, dbfsize, 1,
 					  sizeof(struct zfcp_hba_dbf_record));
 	if (!adapter->hba_dbf)
@@ -1270,7 +1271,7 @@ int zfcp_adapter_debug_register(struct zfcp_adapter *adapter)
 	debug_set_level(adapter->hba_dbf, 3);
 
 	/* debug feature area which records SAN command failures and recovery */
-	sprintf(dbf_name, "zfcp_%s_san", zfcp_get_busid_by_adapter(adapter));
+	sprintf(dbf_name, "zfcp_%s_san", dev_name(&adapter->ccw_device->dev));
 	adapter->san_dbf = debug_register(dbf_name, dbfsize, 1,
 					  sizeof(struct zfcp_san_dbf_record));
 	if (!adapter->san_dbf)
@@ -1280,7 +1281,7 @@ int zfcp_adapter_debug_register(struct zfcp_adapter *adapter)
 	debug_set_level(adapter->san_dbf, 6);
 
 	/* debug feature area which records SCSI command failures and recovery */
-	sprintf(dbf_name, "zfcp_%s_scsi", zfcp_get_busid_by_adapter(adapter));
+	sprintf(dbf_name, "zfcp_%s_scsi", dev_name(&adapter->ccw_device->dev));
 	adapter->scsi_dbf = debug_register(dbf_name, dbfsize, 1,
 					   sizeof(struct zfcp_scsi_dbf_record));
 	if (!adapter->scsi_dbf)

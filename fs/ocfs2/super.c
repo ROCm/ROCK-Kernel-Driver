@@ -52,6 +52,7 @@
 #include "ocfs1_fs_compat.h"
 
 #include "alloc.h"
+#include "blockcheck.h"
 #include "dlmglue.h"
 #include "export.h"
 #include "extent_map.h"
@@ -174,7 +175,7 @@ enum {
 	Opt_err,
 };
 
-static match_table_t tokens = {
+static const match_table_t tokens = {
 	{Opt_barrier, "barrier=%u"},
 	{Opt_err_panic, "errors=panic"},
 	{Opt_err_ro, "errors=remount-ro"},
@@ -523,8 +524,6 @@ unlock_osb:
 		 * remount. */
 		if (!(osb->s_feature_incompat & OCFS2_FEATURE_INCOMPAT_XATTR))
 			parsed_options.mount_opt &= ~OCFS2_MOUNT_POSIX_ACL;
-		if (parsed_options.mount_opt & OCFS2_MOUNT_POSIX_ACL)
-			sb->s_flags |= MS_POSIXACL;
 		osb->s_mount_opt = parsed_options.mount_opt;
 		osb->s_atime_quantum = parsed_options.atime_quantum;
 		osb->preferred_slot = parsed_options.slot;
@@ -868,9 +867,8 @@ static int ocfs2_fill_super(struct super_block *sb, void *data, int silent)
 
 	sb->s_magic = OCFS2_SUPER_MAGIC;
 
-	sb->s_flags &= ~MS_POSIXACL;
-	if (osb->s_mount_opt & OCFS2_MOUNT_POSIX_ACL)
-		sb->s_flags |= MS_POSIXACL;
+	sb->s_flags = (sb->s_flags & ~MS_POSIXACL) |
+		((osb->s_mount_opt & OCFS2_MOUNT_POSIX_ACL) ? MS_POSIXACL : 0);
 
 	/* Hard readonly mode only if: bdev_read_only, MS_RDONLY,
 	 * heartbeat=none */
@@ -1175,19 +1173,6 @@ static int ocfs2_parse_options(struct super_block *sb,
 		case Opt_inode64:
 			mopt->mount_opt |= OCFS2_MOUNT_INODE64;
 			break;
-#ifdef CONFIG_OCFS2_FS_POSIX_ACL
-		case Opt_acl:
-			mopt->mount_opt |= OCFS2_MOUNT_POSIX_ACL;
-			break;
-		case Opt_noacl:
-			mopt->mount_opt &= ~OCFS2_MOUNT_POSIX_ACL;
-			break;
-#else
-		case Opt_acl:
-		case Opt_noacl:
-			printk(KERN_INFO "ocfs2 (no)acl options not supported\n");
-			break;
-#endif
 		case Opt_usrquota:
 			/* We check only on remount, otherwise features
 			 * aren't yet initialized. */
@@ -1210,6 +1195,19 @@ static int ocfs2_parse_options(struct super_block *sb,
 			}
 			mopt->mount_opt |= OCFS2_MOUNT_GRPQUOTA;
 			break;
+#ifdef CONFIG_OCFS2_FS_POSIX_ACL
+		case Opt_acl:
+			mopt->mount_opt |= OCFS2_MOUNT_POSIX_ACL;
+			break;
+		case Opt_noacl:
+			mopt->mount_opt &= ~OCFS2_MOUNT_POSIX_ACL;
+			break;
+#else
+		case Opt_acl:
+		case Opt_noacl:
+			printk(KERN_INFO "ocfs2 (no)acl options not supported\n");
+			break;
+#endif
 		default:
 			mlog(ML_ERROR,
 			     "Unrecognized mount option \"%s\" "
@@ -1273,6 +1271,10 @@ static int ocfs2_show_options(struct seq_file *s, struct vfsmount *mnt)
 	if (osb->osb_cluster_stack[0])
 		seq_printf(s, ",cluster_stack=%.*s", OCFS2_STACK_LABEL_LEN,
 			   osb->osb_cluster_stack);
+	if (opts & OCFS2_MOUNT_USRQUOTA)
+		seq_printf(s, ",usrquota");
+	if (opts & OCFS2_MOUNT_GRPQUOTA)
+		seq_printf(s, ",grpquota");
 
 	if (opts & OCFS2_MOUNT_NOUSERXATTR)
 		seq_printf(s, ",nouser_xattr");
@@ -1288,10 +1290,6 @@ static int ocfs2_show_options(struct seq_file *s, struct vfsmount *mnt)
 	else
 		seq_printf(s, ",noacl");
 #endif
-	if (opts & OCFS2_MOUNT_USRQUOTA)
-		seq_printf(s, ",usrquota");
-	if (opts & OCFS2_MOUNT_GRPQUOTA)
-		seq_printf(s, ",grpquota");
 
 	return 0;
 }
@@ -1299,7 +1297,6 @@ static int ocfs2_show_options(struct seq_file *s, struct vfsmount *mnt)
 static int __init ocfs2_init(void)
 {
 	int status;
-	int added_format = 0;
 
 	mlog_entry_void();
 
@@ -1317,13 +1314,6 @@ static int __init ocfs2_init(void)
 		goto leave;
 	}
 
-	status = init_ocfs2_quota_format();
-	if (status < 0) {
-		mlog_errno(status);
-		goto leave;
-	}
-	added_format = 1;
-
 	ocfs2_wq = create_singlethread_workqueue("ocfs2_wq");
 	if (!ocfs2_wq) {
 		status = -ENOMEM;
@@ -1336,14 +1326,18 @@ static int __init ocfs2_init(void)
 		mlog(ML_ERROR, "Unable to create ocfs2 debugfs root.\n");
 	}
 
+	status = ocfs2_quota_setup();
+	if (status)
+		goto leave;
+
 	ocfs2_set_locking_protocol();
 
+	status = register_quota_format(&ocfs2_quota_format);
 leave:
 	if (status < 0) {
+		ocfs2_quota_shutdown();
 		ocfs2_free_mem_caches();
 		exit_ocfs2_uptodate_cache();
-		if (added_format)
-			exit_ocfs2_quota_format();
 	}
 
 	mlog_exit(status);
@@ -1358,12 +1352,14 @@ static void __exit ocfs2_exit(void)
 {
 	mlog_entry_void();
 
+	ocfs2_quota_shutdown();
+
 	if (ocfs2_wq) {
 		flush_workqueue(ocfs2_wq);
 		destroy_workqueue(ocfs2_wq);
 	}
 
-	exit_ocfs2_quota_format();
+	unregister_quota_format(&ocfs2_quota_format);
 
 	debugfs_remove(ocfs2_debugfs_root);
 
@@ -1994,6 +1990,15 @@ static int ocfs2_verify_volume(struct ocfs2_dinode *di,
 
 	if (memcmp(di->i_signature, OCFS2_SUPER_BLOCK_SIGNATURE,
 		   strlen(OCFS2_SUPER_BLOCK_SIGNATURE)) == 0) {
+		/* We have to do a raw check of the feature here */
+		if (le32_to_cpu(di->id2.i_super.s_feature_incompat) &
+		    OCFS2_FEATURE_INCOMPAT_META_ECC) {
+			status = ocfs2_block_check_validate(bh->b_data,
+							    bh->b_size,
+							    &di->i_check);
+			if (status)
+				goto out;
+		}
 		status = -EINVAL;
 		if ((1 << le32_to_cpu(di->id2.i_super.s_blocksize_bits)) != blksz) {
 			mlog(ML_ERROR, "found superblock with incorrect block "
@@ -2035,6 +2040,7 @@ static int ocfs2_verify_volume(struct ocfs2_dinode *di,
 		}
 	}
 
+out:
 	mlog_exit(status);
 	return status;
 }

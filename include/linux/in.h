@@ -75,9 +75,14 @@ struct in_addr {
 #define IP_IPSEC_POLICY	16
 #define IP_XFRM_POLICY	17
 #define IP_PASSSEC	18
+#define IP_TRANSPARENT	19
 
 /* BSD compatibility */
 #define IP_RECVRETOPTS	IP_RETOPTS
+
+/* TProxy original addresses */
+#define IP_ORIGDSTADDR       20
+#define IP_RECVORIGDSTADDR   IP_ORIGDSTADDR
 
 /* IP_MTU_DISCOVER values */
 #define IP_PMTUDISC_DONT		0	/* Never send DF frames */

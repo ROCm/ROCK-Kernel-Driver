@@ -285,6 +285,8 @@ static void init_once(void *foo)
 	INIT_LIST_HEAD(&bdev->bd_holder_list);
 #endif
 	inode_init_once(&ei->vfs_inode);
+	/* Initialize mutex for freeze. */
+	mutex_init(&bdev->bd_fsfreeze_mutex);
 }
 
 static inline void __bd_forget(struct inode *inode)
@@ -326,12 +328,13 @@ static struct file_system_type bd_type = {
 	.kill_sb	= kill_anon_super,
 };
 
-static struct vfsmount *bd_mnt __read_mostly;
-struct super_block *blockdev_superblock;
+struct super_block *blockdev_superblock __read_mostly;
 
 void __init bdev_cache_init(void)
 {
 	int err;
+	struct vfsmount *bd_mnt;
+
 	bdev_cachep = kmem_cache_create("bdev_cache", sizeof(struct bdev_inode),
 			0, (SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT|
 				SLAB_MEM_SPREAD|SLAB_PANIC),
@@ -373,7 +376,7 @@ struct block_device *bdget(dev_t dev)
 	struct block_device *bdev;
 	struct inode *inode;
 
-	inode = iget5_locked(bd_mnt->mnt_sb, hash(dev),
+	inode = iget5_locked(blockdev_superblock, hash(dev),
 			bdev_test, bdev_set, &dev);
 
 	if (!inode)
@@ -463,7 +466,7 @@ void bd_forget(struct inode *inode)
 
 	spin_lock(&bdev_lock);
 	if (inode->i_bdev) {
-		if (inode->i_sb != blockdev_superblock)
+		if (!sb_is_blkdev_sb(inode->i_sb))
 			bdev = inode->i_bdev;
 		__bd_forget(inode);
 	}
@@ -540,22 +543,6 @@ EXPORT_SYMBOL(bd_release);
  *           /sys/block/sda/holders/dm-0 --> /sys/block/dm-0
  */
 
-static struct kobject *bdev_get_kobj(struct block_device *bdev)
-{
-	if (bdev->bd_contains != bdev)
-		return kobject_get(&bdev->bd_part->dev.kobj);
-	else
-		return kobject_get(&bdev->bd_disk->dev.kobj);
-}
-
-static struct kobject *bdev_get_holder(struct block_device *bdev)
-{
-	if (bdev->bd_contains != bdev)
-		return kobject_get(bdev->bd_part->holder_dir);
-	else
-		return kobject_get(bdev->bd_disk->holder_dir);
-}
-
 static int add_symlink(struct kobject *from, struct kobject *to)
 {
 	if (!from || !to)
@@ -604,11 +591,11 @@ static int bd_holder_grab_dirs(struct block_device *bdev,
 	if (!bo->hdev)
 		goto fail_put_sdir;
 
-	bo->sdev = bdev_get_kobj(bdev);
+	bo->sdev = kobject_get(&part_to_dev(bdev->bd_part)->kobj);
 	if (!bo->sdev)
 		goto fail_put_hdev;
 
-	bo->hdir = bdev_get_holder(bdev);
+	bo->hdir = kobject_get(bdev->bd_part->holder_dir);
 	if (!bo->hdir)
 		goto fail_put_sdev;
 
@@ -856,13 +843,12 @@ EXPORT_SYMBOL_GPL(bd_release_from_disk);
  * to be used for internal purposes.  If you ever need it - reconsider
  * your API.
  */
-struct block_device *open_by_devnum(dev_t dev, unsigned mode)
+struct block_device *open_by_devnum(dev_t dev, fmode_t mode)
 {
 	struct block_device *bdev = bdget(dev);
 	int err = -ENOMEM;
-	int flags = mode & FMODE_WRITE ? O_RDWR : O_RDONLY;
 	if (bdev)
-		err = blkdev_get(bdev, mode, flags);
+		err = blkdev_get(bdev, mode);
 	return err ? ERR_PTR(err) : bdev;
 }
 
@@ -890,14 +876,12 @@ static void flush_disk(struct block_device *bdev)
 
 	if (!bdev->bd_disk)
 		return;
-	if (bdev->bd_disk->minors > 1)
+	if (disk_partitionable(bdev->bd_disk))
 		bdev->bd_invalidated = 1;
 }
 
 /**
- * check_disk_size_change - checks for disk size change and adjusts
- *                          bdev size.
- *
+ * check_disk_size_change - checks for disk size change and adjusts bdev size.
  * @disk: struct gendisk to check
  * @bdev: struct bdev to adjust.
  *
@@ -924,9 +908,7 @@ void check_disk_size_change(struct gendisk *disk, struct block_device *bdev)
 EXPORT_SYMBOL(check_disk_size_change);
 
 /**
- * revalidate_disk - wrapper for lower-level driver's revalidate_disk
- *                   call-back
- *
+ * revalidate_disk - wrapper for lower-level driver's revalidate_disk call-back
  * @disk: struct gendisk to be revalidated
  *
  * This routine is a wrapper for lower-level driver's revalidate_disk
@@ -995,9 +977,7 @@ void bd_set_size(struct block_device *bdev, loff_t size)
 }
 EXPORT_SYMBOL(bd_set_size);
 
-static int __blkdev_get(struct block_device *bdev, mode_t mode, unsigned flags,
-			int for_part);
-static int __blkdev_put(struct block_device *bdev, int for_part);
+static int __blkdev_put(struct block_device *bdev, fmode_t mode, int for_part);
 
 /*
  * bd_mutex locking:
@@ -1006,17 +986,16 @@ static int __blkdev_put(struct block_device *bdev, int for_part);
  *    mutex_lock_nested(whole->bd_mutex, 1)
  */
 
-static int do_open(struct block_device *bdev, struct file *file, int for_part)
+static int __blkdev_get(struct block_device *bdev, fmode_t mode, int for_part)
 {
-	struct module *owner = NULL;
 	struct gendisk *disk;
 	int ret;
-	int part;
+	int partno;
 	int perm = 0;
 
-	if (file->f_mode & FMODE_READ)
+	if (mode & FMODE_READ)
 		perm |= MAY_READ;
-	if (file->f_mode & FMODE_WRITE)
+	if (mode & FMODE_WRITE)
 		perm |= MAY_WRITE;
 	/*
 	 * hooks: /n/, see "layering violations".
@@ -1027,27 +1006,43 @@ static int do_open(struct block_device *bdev, struct file *file, int for_part)
 		return ret;
 	}
 
-	ret = -ENXIO;
-	file->f_mapping = bdev->bd_inode->i_mapping;
 	lock_kernel();
-	disk = get_gendisk(bdev->bd_dev, &part);
-	if (!disk) {
-		unlock_kernel();
-		bdput(bdev);
-		return ret;
-	}
-	owner = disk->fops->owner;
+ restart:
+
+	ret = -ENXIO;
+	disk = get_gendisk(bdev->bd_dev, &partno);
+	if (!disk)
+		goto out_unlock_kernel;
 
 	mutex_lock_nested(&bdev->bd_mutex, for_part);
 	if (!bdev->bd_openers) {
 		bdev->bd_disk = disk;
 		bdev->bd_contains = bdev;
-		if (!part) {
+		if (!partno) {
 			struct backing_dev_info *bdi;
+
+			ret = -ENXIO;
+			bdev->bd_part = disk_get_part(disk, partno);
+			if (!bdev->bd_part)
+				goto out_clear;
+
 			if (disk->fops->open) {
-				ret = disk->fops->open(bdev->bd_inode, file);
+				ret = disk->fops->open(bdev, mode);
+				if (ret == -ERESTARTSYS) {
+					/* Lost a race with 'disk' being
+					 * deleted, try again.
+					 * See md.c
+					 */
+					disk_put_part(bdev->bd_part);
+					bdev->bd_part = NULL;
+					module_put(disk->fops->owner);
+					put_disk(disk);
+					bdev->bd_disk = NULL;
+					mutex_unlock(&bdev->bd_mutex);
+					goto restart;
+				}
 				if (ret)
-					goto out_first;
+					goto out_clear;
 			}
 			if (!bdev->bd_openers) {
 				bd_set_size(bdev,(loff_t)get_capacity(disk)<<9);
@@ -1059,36 +1054,35 @@ static int do_open(struct block_device *bdev, struct file *file, int for_part)
 			if (bdev->bd_invalidated)
 				rescan_partitions(disk, bdev);
 		} else {
-			struct hd_struct *p;
 			struct block_device *whole;
 			whole = bdget_disk(disk, 0);
 			ret = -ENOMEM;
 			if (!whole)
-				goto out_first;
+				goto out_clear;
 			BUG_ON(for_part);
-			ret = __blkdev_get(whole, file->f_mode, file->f_flags, 1);
+			ret = __blkdev_get(whole, mode, 1);
 			if (ret)
-				goto out_first;
+				goto out_clear;
 			bdev->bd_contains = whole;
-			p = disk->part[part - 1];
 			bdev->bd_inode->i_data.backing_dev_info =
 			   whole->bd_inode->i_data.backing_dev_info;
-			if (!(disk->flags & GENHD_FL_UP) || !p || !p->nr_sects) {
+			bdev->bd_part = disk_get_part(disk, partno);
+			if (!(disk->flags & GENHD_FL_UP) ||
+			    !bdev->bd_part || !bdev->bd_part->nr_sects) {
 				ret = -ENXIO;
-				goto out_first;
+				goto out_clear;
 			}
-			kobject_get(&p->dev.kobj);
-			bdev->bd_part = p;
-			bd_set_size(bdev, (loff_t) p->nr_sects << 9);
+			bd_set_size(bdev, (loff_t)bdev->bd_part->nr_sects << 9);
 		}
 	} else {
 		put_disk(disk);
-		module_put(owner);
+		module_put(disk->fops->owner);
+		disk = NULL;
 		if (bdev->bd_contains == bdev) {
 			if (bdev->bd_disk->fops->open) {
-				ret = bdev->bd_disk->fops->open(bdev->bd_inode, file);
+				ret = bdev->bd_disk->fops->open(bdev, mode);
 				if (ret)
-					goto out;
+					goto out_unlock_bdev;
 			}
 			if (bdev->bd_invalidated)
 				rescan_partitions(bdev->bd_disk, bdev);
@@ -1101,44 +1095,30 @@ static int do_open(struct block_device *bdev, struct file *file, int for_part)
 	unlock_kernel();
 	return 0;
 
-out_first:
+ out_clear:
+	disk_put_part(bdev->bd_part);
 	bdev->bd_disk = NULL;
+	bdev->bd_part = NULL;
 	bdev->bd_inode->i_data.backing_dev_info = &default_backing_dev_info;
 	if (bdev != bdev->bd_contains)
-		__blkdev_put(bdev->bd_contains, 1);
+		__blkdev_put(bdev->bd_contains, mode, 1);
 	bdev->bd_contains = NULL;
-	put_disk(disk);
-	module_put(owner);
-out:
+ out_unlock_bdev:
 	mutex_unlock(&bdev->bd_mutex);
+ out_unlock_kernel:
 	unlock_kernel();
-	if (ret)
-		bdput(bdev);
+
+	if (disk)
+		module_put(disk->fops->owner);
+	put_disk(disk);
+	bdput(bdev);
+
 	return ret;
 }
 
-static int __blkdev_get(struct block_device *bdev, mode_t mode, unsigned flags,
-			int for_part)
+int blkdev_get(struct block_device *bdev, fmode_t mode)
 {
-	/*
-	 * This crockload is due to bad choice of ->open() type.
-	 * It will go away.
-	 * For now, block device ->open() routine must _not_
-	 * examine anything in 'inode' argument except ->i_rdev.
-	 */
-	struct file fake_file = {};
-	struct dentry fake_dentry = {};
-	fake_file.f_mode = mode;
-	fake_file.f_flags = flags;
-	fake_file.f_path.dentry = &fake_dentry;
-	fake_dentry.d_inode = bdev->bd_inode;
-
-	return do_open(bdev, &fake_file, for_part);
-}
-
-int blkdev_get(struct block_device *bdev, mode_t mode, unsigned flags)
-{
-	return __blkdev_get(bdev, mode, flags, 0);
+	return __blkdev_get(bdev, mode, 0);
 }
 EXPORT_SYMBOL(blkdev_get);
 
@@ -1155,28 +1135,39 @@ static int blkdev_open(struct inode * inode, struct file * filp)
 	 */
 	filp->f_flags |= O_LARGEFILE;
 
+	if (filp->f_flags & O_NDELAY)
+		filp->f_mode |= FMODE_NDELAY;
+	if (filp->f_flags & O_EXCL)
+		filp->f_mode |= FMODE_EXCL;
+	if ((filp->f_flags & O_ACCMODE) == 3)
+		filp->f_mode |= FMODE_WRITE_IOCTL;
+
 	bdev = bd_acquire(inode);
 	if (bdev == NULL)
 		return -ENOMEM;
 
-	res = do_open(bdev, filp, 0);
+	filp->f_mapping = bdev->bd_inode->i_mapping;
+
+	res = blkdev_get(bdev, filp->f_mode);
 	if (res)
 		return res;
 
-	if (!(filp->f_flags & O_EXCL) )
-		return 0;
+	if (filp->f_mode & FMODE_EXCL) {
+		res = bd_claim(bdev, filp);
+		if (res)
+			goto out_blkdev_put;
+	}
 
-	if (!(res = bd_claim(bdev, filp)))
-		return 0;
+	return 0;
 
-	blkdev_put(bdev);
+ out_blkdev_put:
+	blkdev_put(bdev, filp->f_mode);
 	return res;
 }
 
-static int __blkdev_put(struct block_device *bdev, int for_part)
+static int __blkdev_put(struct block_device *bdev, fmode_t mode, int for_part)
 {
 	int ret = 0;
-	struct inode *bd_inode = bdev->bd_inode;
 	struct gendisk *disk = bdev->bd_disk;
 	struct block_device *victim = NULL;
 
@@ -1191,18 +1182,15 @@ static int __blkdev_put(struct block_device *bdev, int for_part)
 	}
 	if (bdev->bd_contains == bdev) {
 		if (disk->fops->release)
-			ret = disk->fops->release(bd_inode, NULL);
+			ret = disk->fops->release(disk, mode);
 	}
 	if (!bdev->bd_openers) {
 		struct module *owner = disk->fops->owner;
 
 		put_disk(disk);
 		module_put(owner);
-
-		if (bdev->bd_contains != bdev) {
-			kobject_put(&bdev->bd_part->dev.kobj);
-			bdev->bd_part = NULL;
-		}
+		disk_put_part(bdev->bd_part);
+		bdev->bd_part = NULL;
 		bdev->bd_disk = NULL;
 		bdev->bd_inode->i_data.backing_dev_info = &default_backing_dev_info;
 		if (bdev != bdev->bd_contains)
@@ -1213,13 +1201,13 @@ static int __blkdev_put(struct block_device *bdev, int for_part)
 	mutex_unlock(&bdev->bd_mutex);
 	bdput(bdev);
 	if (victim)
-		__blkdev_put(victim, 1);
+		__blkdev_put(victim, mode, 1);
 	return ret;
 }
 
-int blkdev_put(struct block_device *bdev)
+int blkdev_put(struct block_device *bdev, fmode_t mode)
 {
-	return __blkdev_put(bdev, 0);
+	return __blkdev_put(bdev, mode, 0);
 }
 EXPORT_SYMBOL(blkdev_put);
 
@@ -1228,12 +1216,38 @@ static int blkdev_close(struct inode * inode, struct file * filp)
 	struct block_device *bdev = I_BDEV(filp->f_mapping->host);
 	if (bdev->bd_holder == filp)
 		bd_release(bdev);
-	return blkdev_put(bdev);
+	return blkdev_put(bdev, filp->f_mode);
 }
 
 static long block_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 {
-	return blkdev_ioctl(file->f_mapping->host, file, cmd, arg);
+	struct block_device *bdev = I_BDEV(file->f_mapping->host);
+	fmode_t mode = file->f_mode;
+
+	/*
+	 * O_NDELAY can be altered using fcntl(.., F_SETFL, ..), so we have
+	 * to updated it before every ioctl.
+	 */
+	if (file->f_flags & O_NDELAY)
+		mode |= FMODE_NDELAY;
+	else
+		mode &= ~FMODE_NDELAY;
+
+	return blkdev_ioctl(bdev, mode, cmd, arg);
+}
+
+/*
+ * Try to release a page associated with block device when the system
+ * is under memory pressure.
+ */
+static int blkdev_releasepage(struct page *page, gfp_t wait)
+{
+	struct super_block *super = BDEV_I(page->mapping->host)->bdev.bd_super;
+
+	if (super && super->s_op->bdev_try_to_free_page)
+		return super->s_op->bdev_try_to_free_page(super, page, wait);
+
+	return try_to_free_buffers(page);
 }
 
 static const struct address_space_operations def_blk_aops = {
@@ -1243,6 +1257,7 @@ static const struct address_space_operations def_blk_aops = {
 	.write_begin	= blkdev_write_begin,
 	.write_end	= blkdev_write_end,
 	.writepages	= generic_writepages,
+	.releasepage	= blkdev_releasepage,
 	.direct_IO	= blkdev_direct_IO,
 };
 
@@ -1269,7 +1284,7 @@ int ioctl_by_bdev(struct block_device *bdev, unsigned cmd, unsigned long arg)
 	int res;
 	mm_segment_t old_fs = get_fs();
 	set_fs(KERNEL_DS);
-	res = blkdev_ioctl(bdev->bd_inode, NULL, cmd, arg);
+	res = blkdev_ioctl(bdev, 0, cmd, arg);
 	set_fs(old_fs);
 	return res;
 }
@@ -1278,40 +1293,39 @@ EXPORT_SYMBOL(ioctl_by_bdev);
 
 /**
  * lookup_bdev  - lookup a struct block_device by name
+ * @pathname:	special file representing the block device
  *
- * @path:	special file representing the block device
- *
- * Get a reference to the blockdevice at @path in the current
+ * Get a reference to the blockdevice at @pathname in the current
  * namespace if possible and return it.  Return ERR_PTR(error)
  * otherwise.
  */
-struct block_device *lookup_bdev(const char *path)
+struct block_device *lookup_bdev(const char *pathname)
 {
 	struct block_device *bdev;
 	struct inode *inode;
-	struct nameidata nd;
+	struct path path;
 	int error;
 
-	if (!path || !*path)
+	if (!pathname || !*pathname)
 		return ERR_PTR(-EINVAL);
 
-	error = path_lookup(path, LOOKUP_FOLLOW, &nd);
+	error = kern_path(pathname, LOOKUP_FOLLOW, &path);
 	if (error)
 		return ERR_PTR(error);
 
-	inode = nd.path.dentry->d_inode;
+	inode = path.dentry->d_inode;
 	error = -ENOTBLK;
 	if (!S_ISBLK(inode->i_mode))
 		goto fail;
 	error = -EACCES;
-	if (nd.path.mnt->mnt_flags & MNT_NODEV)
+	if (path.mnt->mnt_flags & MNT_NODEV)
 		goto fail;
 	error = -ENOMEM;
 	bdev = bd_acquire(inode);
 	if (!bdev)
 		goto fail;
 out:
-	path_put(&nd.path);
+	path_put(&path);
 	return bdev;
 fail:
 	bdev = ERR_PTR(error);
@@ -1320,32 +1334,29 @@ fail:
 EXPORT_SYMBOL(lookup_bdev);
 
 /**
- * open_bdev_excl  -  open a block device by name and set it up for use
+ * open_bdev_exclusive  -  open a block device by name and set it up for use
  *
  * @path:	special file representing the block device
- * @flags:	%MS_RDONLY for opening read-only
+ * @mode:	FMODE_... combination to pass be used
  * @holder:	owner for exclusion
  *
  * Open the blockdevice described by the special file at @path, claim it
  * for the @holder.
  */
-struct block_device *open_bdev_excl(const char *path, int flags, void *holder)
+struct block_device *open_bdev_exclusive(const char *path, fmode_t mode, void *holder)
 {
 	struct block_device *bdev;
-	mode_t mode = FMODE_READ;
 	int error = 0;
 
 	bdev = lookup_bdev(path);
 	if (IS_ERR(bdev))
 		return bdev;
 
-	if (!(flags & MS_RDONLY))
-		mode |= FMODE_WRITE;
-	error = blkdev_get(bdev, mode, 0);
+	error = blkdev_get(bdev, mode);
 	if (error)
 		return ERR_PTR(error);
 	error = -EACCES;
-	if (!(flags & MS_RDONLY) && bdev_read_only(bdev))
+	if ((mode & FMODE_WRITE) && bdev_read_only(bdev))
 		goto blkdev_put;
 	error = bd_claim(bdev, holder);
 	if (error)
@@ -1354,26 +1365,27 @@ struct block_device *open_bdev_excl(const char *path, int flags, void *holder)
 	return bdev;
 	
 blkdev_put:
-	blkdev_put(bdev);
+	blkdev_put(bdev, mode);
 	return ERR_PTR(error);
 }
 
-EXPORT_SYMBOL(open_bdev_excl);
+EXPORT_SYMBOL(open_bdev_exclusive);
 
 /**
- * close_bdev_excl  -  release a blockdevice openen by open_bdev_excl()
+ * close_bdev_exclusive  -  close a blockdevice opened by open_bdev_exclusive()
  *
  * @bdev:	blockdevice to close
+ * @mode:	mode, must match that used to open.
  *
- * This is the counterpart to open_bdev_excl().
+ * This is the counterpart to open_bdev_exclusive().
  */
-void close_bdev_excl(struct block_device *bdev)
+void close_bdev_exclusive(struct block_device *bdev, fmode_t mode)
 {
 	bd_release(bdev);
-	blkdev_put(bdev);
+	blkdev_put(bdev, mode);
 }
 
-EXPORT_SYMBOL(close_bdev_excl);
+EXPORT_SYMBOL(close_bdev_exclusive);
 
 int __invalidate_device(struct block_device *bdev)
 {

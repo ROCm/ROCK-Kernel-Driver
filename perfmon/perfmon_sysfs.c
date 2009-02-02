@@ -96,6 +96,8 @@ static struct kobj_type pfm_fmt_ktype = {
 
 static ssize_t pfm_controls_show(struct kobject *kobj, struct kobj_attribute *attr, char *buf)
 {
+	int base;
+
 	if (is_attr_name(attr, "version"))
 		return snprintf(buf, PAGE_SIZE, "%u.%u\n",  PFM_VERSION_MAJ, PFM_VERSION_MIN);
 

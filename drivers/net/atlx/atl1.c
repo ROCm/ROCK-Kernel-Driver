@@ -24,16 +24,12 @@
  * file called COPYING.
  *
  * Contact Information:
- * Xiong Huang <xiong_huang@attansic.com>
- * Attansic Technology Corp. 3F 147, Xianzheng 9th Road, Zhubei,
- * Xinzhu  302, TAIWAN, REPUBLIC OF CHINA
- *
+ * Xiong Huang <xiong.huang@atheros.com>
+ * Jie Yang <jie.yang@atheros.com>
  * Chris Snook <csnook@redhat.com>
  * Jay Cliburn <jcliburn@gmail.com>
  *
- * This version is adapted from the Attansic reference driver for
- * inclusion in the Linux kernel.  It is currently under heavy development.
- * A very incomplete list of things that need to be dealt with:
+ * This version is adapted from the Attansic reference driver.
  *
  * TODO:
  * Add more ethtool functions.
@@ -199,7 +195,7 @@ static int __devinit atl1_validate_option(int *value, struct atl1_option *opt,
  * value exists, a default value is used.  The final value is stored
  * in a variable in the adapter structure.
  */
-void __devinit atl1_check_options(struct atl1_adapter *adapter)
+static void __devinit atl1_check_options(struct atl1_adapter *adapter)
 {
 	struct pci_dev *pdev = adapter->pdev;
 	int bd = adapter->bd_number;
@@ -527,7 +523,7 @@ static int atl1_get_permanent_address(struct atl1_hw *hw)
  * Reads the adapter's MAC address from the EEPROM
  * hw - Struct containing variables accessed by shared code
  */
-s32 atl1_read_mac_addr(struct atl1_hw *hw)
+static s32 atl1_read_mac_addr(struct atl1_hw *hw)
 {
 	u16 i;
 
@@ -1394,7 +1390,8 @@ static u32 atl1_check_link(struct atl1_adapter *adapter)
 	/* auto-neg, insert timer to re-config phy */
 	if (!adapter->phy_timer_pending) {
 		adapter->phy_timer_pending = true;
-		mod_timer(&adapter->phy_config_timer, jiffies + 3 * HZ);
+		mod_timer(&adapter->phy_config_timer,
+			  round_jiffies(jiffies + 3 * HZ));
 	}
 
 	return 0;
@@ -1666,6 +1663,7 @@ static void atl1_via_workaround(struct atl1_adapter *adapter)
 
 static void atl1_inc_smb(struct atl1_adapter *adapter)
 {
+	struct net_device *netdev = adapter->netdev;
 	struct stats_msg_block *smb = adapter->smb.smb;
 
 	/* Fill out the OS statistics structure */
@@ -1708,30 +1706,30 @@ static void atl1_inc_smb(struct atl1_adapter *adapter)
 	adapter->soft_stats.tx_trunc += smb->tx_trunc;
 	adapter->soft_stats.tx_pause += smb->tx_pause;
 
-	adapter->net_stats.rx_packets = adapter->soft_stats.rx_packets;
-	adapter->net_stats.tx_packets = adapter->soft_stats.tx_packets;
-	adapter->net_stats.rx_bytes = adapter->soft_stats.rx_bytes;
-	adapter->net_stats.tx_bytes = adapter->soft_stats.tx_bytes;
-	adapter->net_stats.multicast = adapter->soft_stats.multicast;
-	adapter->net_stats.collisions = adapter->soft_stats.collisions;
-	adapter->net_stats.rx_errors = adapter->soft_stats.rx_errors;
-	adapter->net_stats.rx_over_errors =
+	netdev->stats.rx_packets = adapter->soft_stats.rx_packets;
+	netdev->stats.tx_packets = adapter->soft_stats.tx_packets;
+	netdev->stats.rx_bytes = adapter->soft_stats.rx_bytes;
+	netdev->stats.tx_bytes = adapter->soft_stats.tx_bytes;
+	netdev->stats.multicast = adapter->soft_stats.multicast;
+	netdev->stats.collisions = adapter->soft_stats.collisions;
+	netdev->stats.rx_errors = adapter->soft_stats.rx_errors;
+	netdev->stats.rx_over_errors =
 		adapter->soft_stats.rx_missed_errors;
-	adapter->net_stats.rx_length_errors =
+	netdev->stats.rx_length_errors =
 		adapter->soft_stats.rx_length_errors;
-	adapter->net_stats.rx_crc_errors = adapter->soft_stats.rx_crc_errors;
-	adapter->net_stats.rx_frame_errors =
+	netdev->stats.rx_crc_errors = adapter->soft_stats.rx_crc_errors;
+	netdev->stats.rx_frame_errors =
 		adapter->soft_stats.rx_frame_errors;
-	adapter->net_stats.rx_fifo_errors = adapter->soft_stats.rx_fifo_errors;
-	adapter->net_stats.rx_missed_errors =
+	netdev->stats.rx_fifo_errors = adapter->soft_stats.rx_fifo_errors;
+	netdev->stats.rx_missed_errors =
 		adapter->soft_stats.rx_missed_errors;
-	adapter->net_stats.tx_errors = adapter->soft_stats.tx_errors;
-	adapter->net_stats.tx_fifo_errors = adapter->soft_stats.tx_fifo_errors;
-	adapter->net_stats.tx_aborted_errors =
+	netdev->stats.tx_errors = adapter->soft_stats.tx_errors;
+	netdev->stats.tx_fifo_errors = adapter->soft_stats.tx_fifo_errors;
+	netdev->stats.tx_aborted_errors =
 		adapter->soft_stats.tx_aborted_errors;
-	adapter->net_stats.tx_window_errors =
+	netdev->stats.tx_window_errors =
 		adapter->soft_stats.tx_window_errors;
-	adapter->net_stats.tx_carrier_errors =
+	netdev->stats.tx_carrier_errors =
 		adapter->soft_stats.tx_carrier_errors;
 }
 
@@ -1864,7 +1862,7 @@ static u16 atl1_alloc_rx_buffers(struct atl1_adapter *adapter)
 				       adapter->rx_buffer_len + NET_IP_ALIGN);
 		if (unlikely(!skb)) {
 			/* Better luck next round */
-			adapter->net_stats.rx_dropped++;
+			adapter->netdev->stats.rx_dropped++;
 			break;
 		}
 
@@ -2030,8 +2028,6 @@ rrd_ok:
 		buffer_info->skb = NULL;
 		buffer_info->alloced = 0;
 		rrd->xsz.valid = 0;
-
-		adapter->netdev->last_rx = jiffies;
 	}
 
 	atomic_set(&rrd_ring->next_to_clean, rrd_next_to_clean);
@@ -2109,7 +2105,6 @@ static u16 atl1_tpd_avail(struct atl1_tpd_ring *tpd_ring)
 static int atl1_tso(struct atl1_adapter *adapter, struct sk_buff *skb,
 	struct tx_packet_desc *ptpd)
 {
-	/* spinlock held */
 	u8 hdr_len, ip_off;
 	u32 real_len;
 	int err;
@@ -2196,7 +2191,6 @@ static int atl1_tx_csum(struct atl1_adapter *adapter, struct sk_buff *skb,
 static void atl1_tx_map(struct atl1_adapter *adapter, struct sk_buff *skb,
 	struct tx_packet_desc *ptpd)
 {
-	/* spinlock held */
 	struct atl1_tpd_ring *tpd_ring = &adapter->tpd_ring;
 	struct atl1_buffer *buffer_info;
 	u16 buf_len = skb->len;
@@ -2303,7 +2297,6 @@ static void atl1_tx_map(struct atl1_adapter *adapter, struct sk_buff *skb,
 static void atl1_tx_queue(struct atl1_adapter *adapter, u16 count,
        struct tx_packet_desc *ptpd)
 {
-	/* spinlock held */
 	struct atl1_tpd_ring *tpd_ring = &adapter->tpd_ring;
 	struct atl1_buffer *buffer_info;
 	struct tx_packet_desc *tpd;
@@ -2362,7 +2355,6 @@ static int atl1_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 	struct tx_packet_desc *ptpd;
 	u16 frag_size;
 	u16 vlan_tag;
-	unsigned long flags;
 	unsigned int nr_frags = 0;
 	unsigned int mss = 0;
 	unsigned int f;
@@ -2400,18 +2392,9 @@ static int atl1_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 		}
 	}
 
-	if (!spin_trylock_irqsave(&adapter->lock, flags)) {
-		/* Can't get lock - tell upper layer to requeue */
-		if (netif_msg_tx_queued(adapter))
-			dev_printk(KERN_DEBUG, &adapter->pdev->dev,
-				"tx locked\n");
-		return NETDEV_TX_LOCKED;
-	}
-
 	if (atl1_tpd_avail(&adapter->tpd_ring) < count) {
 		/* not enough descriptors */
 		netif_stop_queue(netdev);
-		spin_unlock_irqrestore(&adapter->lock, flags);
 		if (netif_msg_tx_queued(adapter))
 			dev_printk(KERN_DEBUG, &adapter->pdev->dev,
 				"tx busy\n");
@@ -2433,7 +2416,6 @@ static int atl1_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 
 	tso = atl1_tso(adapter, skb, ptpd);
 	if (tso < 0) {
-		spin_unlock_irqrestore(&adapter->lock, flags);
 		dev_kfree_skb_any(skb);
 		return NETDEV_TX_OK;
 	}
@@ -2441,7 +2423,6 @@ static int atl1_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 	if (!tso) {
 		ret_val = atl1_tx_csum(adapter, skb, ptpd);
 		if (ret_val < 0) {
-			spin_unlock_irqrestore(&adapter->lock, flags);
 			dev_kfree_skb_any(skb);
 			return NETDEV_TX_OK;
 		}
@@ -2450,7 +2431,7 @@ static int atl1_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 	atl1_tx_map(adapter, skb, ptpd);
 	atl1_tx_queue(adapter, count, ptpd);
 	atl1_update_mailbox(adapter);
-	spin_unlock_irqrestore(&adapter->lock, flags);
+	mmiowb();
 	netdev->trans_start = jiffies;
 	return NETDEV_TX_OK;
 }
@@ -2543,17 +2524,6 @@ static irqreturn_t atl1_intr(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
-/*
- * atl1_watchdog - Timer Call-back
- * @data: pointer to netdev cast into an unsigned long
- */
-static void atl1_watchdog(unsigned long data)
-{
-	struct atl1_adapter *adapter = (struct atl1_adapter *)data;
-
-	/* Reset the timer */
-	mod_timer(&adapter->watchdog_timer, jiffies + 2 * HZ);
-}
 
 /*
  * atl1_phy_config - Timer Call-back
@@ -2626,7 +2596,6 @@ static s32 atl1_up(struct atl1_adapter *adapter)
 	if (unlikely(err))
 		goto err_up;
 
-	mod_timer(&adapter->watchdog_timer, jiffies);
 	atlx_irq_enable(adapter);
 	atl1_check_link(adapter);
 	netif_start_queue(netdev);
@@ -2643,7 +2612,7 @@ static void atl1_down(struct atl1_adapter *adapter)
 {
 	struct net_device *netdev = adapter->netdev;
 
-	del_timer_sync(&adapter->watchdog_timer);
+	netif_stop_queue(netdev);
 	del_timer_sync(&adapter->phy_config_timer);
 	adapter->phy_timer_pending = false;
 
@@ -2656,7 +2625,6 @@ static void atl1_down(struct atl1_adapter *adapter)
 	adapter->link_speed = SPEED_0;
 	adapter->link_duplex = -1;
 	netif_carrier_off(netdev);
-	netif_stop_queue(netdev);
 
 	atl1_clean_tx_ring(adapter);
 	atl1_clean_rx_ring(adapter);
@@ -2724,6 +2692,8 @@ static int atl1_open(struct net_device *netdev)
 {
 	struct atl1_adapter *adapter = netdev_priv(netdev);
 	int err;
+
+	netif_carrier_off(netdev);
 
 	/* allocate transmit descriptors */
 	err = atl1_setup_ring_resources(adapter);
@@ -2910,6 +2880,22 @@ static void atl1_poll_controller(struct net_device *netdev)
 }
 #endif
 
+static const struct net_device_ops atl1_netdev_ops = {
+	.ndo_open		= atl1_open,
+	.ndo_stop		= atl1_close,
+	.ndo_start_xmit		= atl1_xmit_frame,
+	.ndo_set_multicast_list	= atlx_set_multi,
+	.ndo_validate_addr	= eth_validate_addr,
+	.ndo_set_mac_address	= atl1_set_mac,
+	.ndo_change_mtu		= atl1_change_mtu,
+	.ndo_do_ioctl		= atlx_ioctl,
+	.ndo_tx_timeout		= atlx_tx_timeout,
+	.ndo_vlan_rx_register	= atlx_vlan_rx_register,
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	.ndo_poll_controller	= atl1_poll_controller,
+#endif
+};
+
 /*
  * atl1_probe - Device Initialization Routine
  * @pdev: PCI device information struct
@@ -2997,20 +2983,8 @@ static int __devinit atl1_probe(struct pci_dev *pdev,
 	adapter->mii.phy_id_mask = 0x1f;
 	adapter->mii.reg_num_mask = 0x1f;
 
-	netdev->open = &atl1_open;
-	netdev->stop = &atl1_close;
-	netdev->hard_start_xmit = &atl1_xmit_frame;
-	netdev->get_stats = &atlx_get_stats;
-	netdev->set_multicast_list = &atlx_set_multi;
-	netdev->set_mac_address = &atl1_set_mac;
-	netdev->change_mtu = &atl1_change_mtu;
-	netdev->do_ioctl = &atlx_ioctl;
-	netdev->tx_timeout = &atlx_tx_timeout;
+	netdev->netdev_ops = &atl1_netdev_ops;
 	netdev->watchdog_timeo = 5 * HZ;
-#ifdef CONFIG_NET_POLL_CONTROLLER
-	netdev->poll_controller = atl1_poll_controller;
-#endif
-	netdev->vlan_rx_register = atlx_vlan_rx_register;
 
 	netdev->ethtool_ops = &atl1_ethtool_ops;
 	adapter->bd_number = cards_found;
@@ -3023,7 +2997,6 @@ static int __devinit atl1_probe(struct pci_dev *pdev,
 	netdev->features = NETIF_F_HW_CSUM;
 	netdev->features |= NETIF_F_SG;
 	netdev->features |= (NETIF_F_HW_VLAN_TX | NETIF_F_HW_VLAN_RX);
-	netdev->features |= NETIF_F_LLTX;
 
 	/*
 	 * patch for some L1 of old version,
@@ -3067,13 +3040,8 @@ static int __devinit atl1_probe(struct pci_dev *pdev,
 	netif_carrier_off(netdev);
 	netif_stop_queue(netdev);
 
-	init_timer(&adapter->watchdog_timer);
-	adapter->watchdog_timer.function = &atl1_watchdog;
-	adapter->watchdog_timer.data = (unsigned long)adapter;
-
-	init_timer(&adapter->phy_config_timer);
-	adapter->phy_config_timer.function = &atl1_phy_config;
-	adapter->phy_config_timer.data = (unsigned long)adapter;
+	setup_timer(&adapter->phy_config_timer, &atl1_phy_config,
+		    (unsigned long)adapter);
 	adapter->phy_timer_pending = false;
 
 	INIT_WORK(&adapter->tx_timeout_task, atl1_tx_timeout_task);
@@ -3191,8 +3159,6 @@ static struct atl1_stats atl1_gstrings_stats[] = {
 	{"tx_bytes", ATL1_STAT(soft_stats.tx_bytes)},
 	{"rx_errors", ATL1_STAT(soft_stats.rx_errors)},
 	{"tx_errors", ATL1_STAT(soft_stats.tx_errors)},
-	{"rx_dropped", ATL1_STAT(net_stats.rx_dropped)},
-	{"tx_dropped", ATL1_STAT(net_stats.tx_dropped)},
 	{"multicast", ATL1_STAT(soft_stats.multicast)},
 	{"collisions", ATL1_STAT(soft_stats.collisions)},
 	{"rx_length_errors", ATL1_STAT(soft_stats.rx_length_errors)},
@@ -3422,14 +3388,8 @@ static void atl1_get_wol(struct net_device *netdev,
 {
 	struct atl1_adapter *adapter = netdev_priv(netdev);
 
-	wol->supported = WAKE_UCAST | WAKE_MCAST | WAKE_BCAST | WAKE_MAGIC;
+	wol->supported = WAKE_MAGIC;
 	wol->wolopts = 0;
-	if (adapter->wol & ATLX_WUFC_EX)
-		wol->wolopts |= WAKE_UCAST;
-	if (adapter->wol & ATLX_WUFC_MC)
-		wol->wolopts |= WAKE_MCAST;
-	if (adapter->wol & ATLX_WUFC_BC)
-		wol->wolopts |= WAKE_BCAST;
 	if (adapter->wol & ATLX_WUFC_MAG)
 		wol->wolopts |= WAKE_MAGIC;
 	return;
@@ -3440,15 +3400,10 @@ static int atl1_set_wol(struct net_device *netdev,
 {
 	struct atl1_adapter *adapter = netdev_priv(netdev);
 
-	if (wol->wolopts & (WAKE_PHY | WAKE_ARP | WAKE_MAGICSECURE))
+	if (wol->wolopts & (WAKE_PHY | WAKE_UCAST | WAKE_MCAST | WAKE_BCAST |
+		WAKE_ARP | WAKE_MAGICSECURE))
 		return -EOPNOTSUPP;
 	adapter->wol = 0;
-	if (wol->wolopts & WAKE_UCAST)
-		adapter->wol |= ATLX_WUFC_EX;
-	if (wol->wolopts & WAKE_MCAST)
-		adapter->wol |= ATLX_WUFC_MC;
-	if (wol->wolopts & WAKE_BCAST)
-		adapter->wol |= ATLX_WUFC_BC;
 	if (wol->wolopts & WAKE_MAGIC)
 		adapter->wol |= ATLX_WUFC_MAG;
 	return 0;

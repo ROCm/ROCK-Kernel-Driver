@@ -37,6 +37,29 @@
 #define MEM_DISCARD(sec) *(.mem##sec)
 #endif
 
+#ifdef CONFIG_FTRACE_MCOUNT_RECORD
+#define MCOUNT_REC()	VMLINUX_SYMBOL(__start_mcount_loc) = .; \
+			*(__mcount_loc)				\
+			VMLINUX_SYMBOL(__stop_mcount_loc) = .;
+#else
+#define MCOUNT_REC()
+#endif
+
+#ifdef CONFIG_TRACE_BRANCH_PROFILING
+#define LIKELY_PROFILE()	VMLINUX_SYMBOL(__start_annotated_branch_profile) = .; \
+				*(_ftrace_annotated_branch)			      \
+				VMLINUX_SYMBOL(__stop_annotated_branch_profile) = .;
+#else
+#define LIKELY_PROFILE()
+#endif
+
+#ifdef CONFIG_PROFILE_ALL_BRANCHES
+#define BRANCH_PROFILE()	VMLINUX_SYMBOL(__start_branch_profile) = .;   \
+				*(_ftrace_branch)			      \
+				VMLINUX_SYMBOL(__stop_branch_profile) = .;
+#else
+#define BRANCH_PROFILE()
+#endif
 
 /* .data section */
 #define DATA_DATA							\
@@ -53,9 +76,12 @@
 	VMLINUX_SYMBOL(__start___markers) = .;				\
 	*(__markers)							\
 	VMLINUX_SYMBOL(__stop___markers) = .;				\
+	. = ALIGN(32);							\
 	VMLINUX_SYMBOL(__start___tracepoints) = .;			\
 	*(__tracepoints)						\
-	VMLINUX_SYMBOL(__stop___tracepoints) = .;
+	VMLINUX_SYMBOL(__stop___tracepoints) = .;			\
+	LIKELY_PROFILE()		       				\
+	BRANCH_PROFILE()
 
 #define RO_DATA(align)							\
 	. = ALIGN((align));						\
@@ -192,6 +218,7 @@
 	/* __*init sections */						\
 	__init_rodata : AT(ADDR(__init_rodata) - LOAD_OFFSET) {		\
 		*(.ref.rodata)						\
+		MCOUNT_REC()						\
 		DEV_KEEP(init.rodata)					\
 		DEV_KEEP(exit.rodata)					\
 		CPU_KEEP(init.rodata)					\
@@ -262,6 +289,16 @@
 		VMLINUX_SYMBOL(__kprobes_text_start) = .;		\
 		*(.kprobes.text)					\
 		VMLINUX_SYMBOL(__kprobes_text_end) = .;
+
+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+#define IRQENTRY_TEXT							\
+		ALIGN_FUNCTION();					\
+		VMLINUX_SYMBOL(__irqentry_text_start) = .;		\
+		*(.irqentry.text)					\
+		VMLINUX_SYMBOL(__irqentry_text_end) = .;
+#else
+#define IRQENTRY_TEXT
+#endif
 
 /* Section used for early init (in .S files) */
 #define HEAD_TEXT  *(.head.text)
@@ -419,6 +456,7 @@
 	. = ALIGN(align);						\
 	VMLINUX_SYMBOL(__per_cpu_start) = .;				\
 	.data.percpu  : AT(ADDR(.data.percpu) - LOAD_OFFSET) {		\
+		*(.data.percpu.page_aligned)				\
 		*(.data.percpu)						\
 		*(.data.percpu.shared_aligned)				\
 	}								\

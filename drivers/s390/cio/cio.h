@@ -45,6 +45,19 @@ struct pmcw {
 				/*  ... in an operand exception.       */
 } __attribute__ ((packed));
 
+/* Target SCHIB configuration. */
+struct schib_config {
+	u64 mba;
+	u32 intparm;
+	u16 mbi;
+	u32 isc:3;
+	u32 ena:1;
+	u32 mme:2;
+	u32 mp:1;
+	u32 csense:1;
+	u32 mbfc:1;
+} __attribute__ ((packed));
+
 /*
  * subchannel information block
  */
@@ -83,6 +96,7 @@ struct subchannel {
 	struct css_driver *driver;
 	void *private; /* private per subchannel type data */
 	struct work_struct work;
+	struct schib_config config;
 } __attribute__ ((aligned(8)));
 
 #define IO_INTERRUPT_TYPE	   0 /* I/O interrupt type */
@@ -101,7 +115,8 @@ extern int cio_start_key (struct subchannel *, struct ccw1 *, __u8, __u8);
 extern int cio_cancel (struct subchannel *);
 extern int cio_set_options (struct subchannel *, int);
 extern int cio_get_options (struct subchannel *);
-extern int cio_modify (struct subchannel *);
+extern int cio_update_schib(struct subchannel *sch);
+extern int cio_commit_config(struct subchannel *sch);
 
 int cio_tm_start_key(struct subchannel *sch, struct tcw *tcw, u8 lpm, u8 key);
 int cio_tm_intrg(struct subchannel *sch);
@@ -118,11 +133,15 @@ extern int cio_is_console(struct subchannel_id);
 extern struct subchannel *cio_get_console_subchannel(void);
 extern spinlock_t * cio_get_console_lock(void);
 extern void *cio_get_console_priv(void);
+extern const char *cio_get_console_sch_name(struct subchannel_id schid);
+extern const char *cio_get_console_cdev_name(struct subchannel *sch);
 #else
 #define cio_is_console(schid) 0
 #define cio_get_console_subchannel() NULL
 #define cio_get_console_lock() NULL
 #define cio_get_console_priv() NULL
+#define cio_get_console_sch_name(schid) NULL
+#define cio_get_console_cdev_name(sch) NULL
 #endif
 
 #endif

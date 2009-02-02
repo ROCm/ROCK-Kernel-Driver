@@ -28,7 +28,6 @@
 
 #include "zd_def.h"
 #include "zd_chip.h"
-#include "zd_ieee80211.h"
 #include "zd_mac.h"
 #include "zd_rf.h"
 
@@ -379,7 +378,6 @@ int zd_write_mac_addr(struct zd_chip *chip, const u8 *mac_addr)
 		[0] = { .addr = CR_MAC_ADDR_P1 },
 		[1] = { .addr = CR_MAC_ADDR_P2 },
 	};
-	DECLARE_MAC_BUF(mac);
 
 	if (mac_addr) {
 		reqs[0].value = (mac_addr[3] << 24)
@@ -388,8 +386,7 @@ int zd_write_mac_addr(struct zd_chip *chip, const u8 *mac_addr)
 			      |  mac_addr[0];
 		reqs[1].value = (mac_addr[5] <<  8)
 			      |  mac_addr[4];
-		dev_dbg_f(zd_chip_dev(chip),
-			"mac addr %s\n", print_mac(mac, mac_addr));
+		dev_dbg_f(zd_chip_dev(chip), "mac addr %pM\n", mac_addr);
 	} else {
 		dev_dbg_f(zd_chip_dev(chip), "set NULL mac\n");
 	}

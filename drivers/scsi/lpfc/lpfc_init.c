@@ -44,22 +44,13 @@
 #include "lpfc_crtn.h"
 #include "lpfc_vport.h"
 #include "lpfc_version.h"
-#include "lpfc_auth_access.h"
-#include "lpfc_security.h"
-#include <net/sock.h>
-#include <linux/netlink.h>
 
-/* vendor ID used in SCSI netlink calls */
-#define LPFC_NL_VENDOR_ID (SCSI_NL_VID_TYPE_PCI | PCI_VENDOR_ID_EMULEX)
-const char *security_work_q_name = "fc_sc_wq";
-extern struct workqueue_struct *security_work_q;
-extern struct list_head fc_security_user_list;
-extern int fc_service_state;
-void lpfc_fc_sc_security_online(struct work_struct *work);
-void lpfc_fc_sc_security_offline(struct work_struct *work);
-int lpfc_fc_queue_security_work(struct lpfc_vport *, struct work_struct *);
-void lpfc_rcv_nl_event(struct notifier_block *, unsigned long , void *);
-#include "lpfc_ioctl.h"
+char *_dump_buf_data;
+unsigned long _dump_buf_data_order;
+char *_dump_buf_dif;
+unsigned long _dump_buf_dif_order;
+spinlock_t _dump_buf_lock;
+
 static int lpfc_parse_vpd(struct lpfc_hba *, uint8_t *, int);
 static void lpfc_get_hba_model_desc(struct lpfc_hba *, uint8_t *, uint8_t *);
 static int lpfc_post_rcv_buf(struct lpfc_hba *);
@@ -67,26 +58,6 @@ static int lpfc_post_rcv_buf(struct lpfc_hba *);
 static struct scsi_transport_template *lpfc_transport_template = NULL;
 static struct scsi_transport_template *lpfc_vport_transport_template = NULL;
 static DEFINE_IDR(lpfc_hba_index);
-
-/**
- * lpfc_hba_max_vpi - Get the maximum supported VPI for an HBA
- * @device: The PCI device ID for this HBA
- *
- * Description:
- * This routine will return the maximum supported VPI limit for each HBA. In
- * most cases the maximum VPI limit will be 0xFFFF, which indicates that the
- * driver supports whatever the HBA can support. In some cases the driver
- * supports fewer VPI that the HBA supports.
- */
-static inline uint16_t
-lpfc_hba_max_vpi(unsigned short device)
-{
-	if ((device == PCI_DEVICE_ID_HELIOS) ||
-	    (device == PCI_DEVICE_ID_ZEPHYR))
-		return LPFC_INTR_VPI;
-	else
-		return LPFC_MAX_VPI;
-}
 
 /**
  * lpfc_config_port_prep: Perform lpfc initialization prior to config port.
@@ -332,7 +303,6 @@ int
 lpfc_config_port_post(struct lpfc_hba *phba)
 {
 	struct lpfc_vport *vport = phba->pport;
-	struct Scsi_Host *shost = lpfc_shost_from_vport(vport);
 	LPFC_MBOXQ_t *pmb;
 	MAILBOX_t *mb;
 	struct lpfc_dmabuf *mp;
@@ -390,11 +360,6 @@ lpfc_config_port_post(struct lpfc_hba *phba)
 	       sizeof (struct lpfc_name));
 	memcpy(&vport->fc_portname, &vport->fc_sparam.portName,
 	       sizeof (struct lpfc_name));
-
-	/* Update the fc_host data structures with new wwn. */
-	fc_host_node_name(shost) = wwn_to_u64(vport->fc_nodename.u.wwn);
-	fc_host_port_name(shost) = wwn_to_u64(vport->fc_portname.u.wwn);
-
 	/* If no serial number in VPD data, use low 6 bytes of WWNN */
 	/* This should be consolidated into parse_vpd ? - mr */
 	if (phba->SerialNumber[0] == 0) {
@@ -530,41 +495,11 @@ lpfc_config_port_post(struct lpfc_hba *phba)
 	/* Set up error attention (ERATT) polling timer */
 	mod_timer(&phba->eratt_poll, jiffies + HZ * LPFC_ERATT_POLL_INTERVAL);
 
-	/* Use the existing MBOX buffer, it will be freed in mbox compl */
-	lpfc_config_async(phba, pmb, LPFC_ELS_RING);
-	pmb->mbox_cmpl = lpfc_config_async_cmpl;
-	pmb->vport = phba->pport;
-	rc = lpfc_sli_issue_mbox(phba, pmb, MBX_NOWAIT);
-	if ((rc != MBX_BUSY) && (rc != MBX_SUCCESS)) {
-		lpfc_printf_log(phba, KERN_ERR, LOG_INIT,
-				"0456 Adapter failed to issue "
-				"ASYNCEVT_ENABLE mbox status x%x \n.", rc);
-		mempool_free(pmb, phba->mbox_mem_pool);
-	}
-
-	/* Allocate new MBOX buffer, it will be freed in mbox compl */
-	pmb = mempool_alloc(phba->mbox_mem_pool, GFP_KERNEL);
-	lpfc_dump_wakeup_param(phba, pmb);
-	pmb->mbox_cmpl = lpfc_dump_wakeup_param_cmpl;
-	pmb->vport = phba->pport;
-	rc = lpfc_sli_issue_mbox(phba, pmb, MBX_NOWAIT);
-	if ((rc != MBX_BUSY) && (rc != MBX_SUCCESS)) {
-		lpfc_printf_log(phba, KERN_ERR, LOG_INIT,
-				"0435 Adapter failed to get Option "
-				"ROM version status x%x\n.", rc);
-		mempool_free(pmb, phba->mbox_mem_pool);
-	}
-
-	if (vport->cfg_enable_auth &&
-	    vport->security_service_state == SECURITY_OFFLINE)
-			vport->auth.auth_mode = FC_AUTHMODE_UNKNOWN;
-
-	/* Allocate new MBOX buffer, will be freed in mbox compl */
-	pmb = mempool_alloc(phba->mbox_mem_pool, GFP_KERNEL);
 	lpfc_init_link(phba, pmb, phba->cfg_topology, phba->cfg_link_speed);
 	pmb->mbox_cmpl = lpfc_sli_def_mbox_cmpl;
+	lpfc_set_loopback_flag(phba);
 	rc = lpfc_sli_issue_mbox(phba, pmb, MBX_NOWAIT);
-	if ((rc != MBX_BUSY) && (rc != MBX_SUCCESS)) {
+	if (rc != MBX_SUCCESS) {
 		lpfc_printf_log(phba, KERN_ERR, LOG_INIT,
 				"0454 Adapter failed to init, mbxCmd x%x "
 				"INIT_LINK, mbxStatus x%x\n",
@@ -578,9 +513,40 @@ lpfc_config_port_post(struct lpfc_hba *phba)
 		readl(phba->HAregaddr); /* flush */
 
 		phba->link_state = LPFC_HBA_ERROR;
-		mempool_free(pmb, phba->mbox_mem_pool);
+		if (rc != MBX_BUSY)
+			mempool_free(pmb, phba->mbox_mem_pool);
 		return -EIO;
 	}
+	/* MBOX buffer will be freed in mbox compl */
+	pmb = mempool_alloc(phba->mbox_mem_pool, GFP_KERNEL);
+	lpfc_config_async(phba, pmb, LPFC_ELS_RING);
+	pmb->mbox_cmpl = lpfc_config_async_cmpl;
+	pmb->vport = phba->pport;
+	rc = lpfc_sli_issue_mbox(phba, pmb, MBX_NOWAIT);
+
+	if ((rc != MBX_BUSY) && (rc != MBX_SUCCESS)) {
+		lpfc_printf_log(phba,
+				KERN_ERR,
+				LOG_INIT,
+				"0456 Adapter failed to issue "
+				"ASYNCEVT_ENABLE mbox status x%x \n.",
+				rc);
+		mempool_free(pmb, phba->mbox_mem_pool);
+	}
+
+	/* Get Option rom version */
+	pmb = mempool_alloc(phba->mbox_mem_pool, GFP_KERNEL);
+	lpfc_dump_wakeup_param(phba, pmb);
+	pmb->mbox_cmpl = lpfc_dump_wakeup_param_cmpl;
+	pmb->vport = phba->pport;
+	rc = lpfc_sli_issue_mbox(phba, pmb, MBX_NOWAIT);
+
+	if ((rc != MBX_BUSY) && (rc != MBX_SUCCESS)) {
+		lpfc_printf_log(phba, KERN_ERR, LOG_INIT, "0435 Adapter failed "
+				"to get Option ROM version status x%x\n.", rc);
+		mempool_free(pmb, phba->mbox_mem_pool);
+	}
+
 	return 0;
 }
 
@@ -979,7 +945,8 @@ lpfc_handle_eratt(struct lpfc_hba *phba)
 		fc_host_post_vendor_event(shost, fc_get_event_number(),
 					  sizeof(temp_event_data),
 					  (char *) &temp_event_data,
-					  LPFC_NL_VENDOR_ID);
+					  SCSI_NL_VID_TYPE_PCI
+					  | PCI_VENDOR_ID_EMULEX);
 
 		spin_lock_irq(&phba->hbalock);
 		phba->over_temp_state = HBA_OVER_TEMP;
@@ -1001,7 +968,7 @@ lpfc_handle_eratt(struct lpfc_hba *phba)
 		shost = lpfc_shost_from_vport(vport);
 		fc_host_post_vendor_event(shost, fc_get_event_number(),
 				sizeof(event_data), (char *) &event_data,
-				LPFC_NL_VENDOR_ID);
+				SCSI_NL_VID_TYPE_PCI | PCI_VENDOR_ID_EMULEX);
 
 		lpfc_offline_eratt(phba);
 	}
@@ -1767,17 +1734,8 @@ lpfc_cleanup(struct lpfc_vport *vport)
 void
 lpfc_stop_vport_timers(struct lpfc_vport *vport)
 {
-	struct fc_security_request *fc_sc_req;
 	del_timer_sync(&vport->els_tmofunc);
 	del_timer_sync(&vport->fc_fdmitmo);
-	while (!list_empty(&vport->sc_response_wait_queue)) {
-		list_remove_head(&vport->sc_response_wait_queue, fc_sc_req,
-					   struct fc_security_request, rlist);
-		if (!fc_sc_req)
-			continue;
-		del_timer_sync(&fc_sc_req->timer);
-		kfree(fc_sc_req);
-	}
 	lpfc_can_disctmo(vport);
 	return;
 }
@@ -1837,12 +1795,13 @@ lpfc_block_mgmt_io(struct lpfc_hba * phba)
 int
 lpfc_online(struct lpfc_hba *phba)
 {
-	struct lpfc_vport *vport = phba->pport;
+	struct lpfc_vport *vport;
 	struct lpfc_vport **vports;
 	int i;
 
 	if (!phba)
 		return 0;
+	vport = phba->pport;
 
 	if (!(vport->fc_flag & FC_OFFLINE_MODE))
 		return 0;
@@ -2085,6 +2044,7 @@ lpfc_create_port(struct lpfc_hba *phba, int instance, struct device *dev)
 	shost->max_lun = vport->cfg_max_luns;
 	shost->this_id = -1;
 	shost->max_cmd_len = 16;
+
 	/*
 	 * Set initial can_queue value since 0 is no longer supported and
 	 * scsi_add_host will fail. This will be adjusted later based on the
@@ -2118,16 +2078,6 @@ lpfc_create_port(struct lpfc_hba *phba, int instance, struct device *dev)
 	error = scsi_add_host(shost, dev);
 	if (error)
 		goto out_put_shost;
-	vport->auth.challenge = NULL;
-	vport->auth.challenge_len = 0;
-	vport->auth.dh_pub_key = NULL;
-	vport->auth.dh_pub_key_len = 0;
-
-	INIT_WORK(&vport->sc_online_work, lpfc_fc_sc_security_online);
-	INIT_WORK(&vport->sc_offline_work, lpfc_fc_sc_security_offline);
-	INIT_LIST_HEAD(&vport->sc_users);
-	INIT_LIST_HEAD(&vport->sc_response_wait_queue);
-	vport->security_service_state = SECURITY_OFFLINE;
 
 	spin_lock_irq(&phba->hbalock);
 	list_add_tail(&vport->listentry, &phba->port_list);
@@ -2300,51 +2250,6 @@ void lpfc_host_attrib_init(struct Scsi_Host *shost)
 	vport->load_flag &= ~FC_LOADING;
 	spin_unlock_irq(shost->host_lock);
 }
-
-/**
- * lpfc_setup_max_dma_length: Check the host's chipset and adjust HBA's
- * max DMA length.
- * @phba: pointer to lpfc hba data structure.
- *
- * This routine is invoked to test the machines chipsets. Some of Emulex's
- * HBA models expose bugs in these chipsets. To work around these bugs we
- * tell the HBA to use a smaller maxium DMA length.
- * This routine is only called during module init. The DMA length is passed
- * to the driver as a module parameter(lpfc_pci_max_read).
- *
- * return: NONE.
- **/
-void
-lpfc_setup_max_dma_length(struct lpfc_hba *phba)
-{
-	struct pci_dev *pdev = phba->pcidev;
-	struct pci_bus *bus = pdev->bus;
-	uint8_t rev;
-
-	while (bus) {
-		/*
-		 * 0x7450 == PCI_DEVICE_ID_AMD_8131_BRIDGE for 2.6 kernels
-		 * 0x7450 == PCI_DEVICE_ID_AMD_8131_APIC   for 2.4 kernels
-		 */
-		if (bus->self &&
-			(bus->self->vendor == PCI_VENDOR_ID_AMD) &&
-			(bus->self->device == 0x7450)) {
-			pci_read_config_byte(bus->self, 0x08, &rev);
-			if (rev == 0x13) {
-				/*
-				 * If set a value in module paramter,
-				 * use that value.
-				 */
-				if (phba->cfg_pci_max_read == 2048)
-					phba->cfg_pci_max_read = 1024;
-				return;
-			}
-		}
-		bus = bus->parent;
-	}
-	return;
-}
-
 
 /**
  * lpfc_enable_msix: Enable MSI-X interrupt mode.
@@ -2730,10 +2635,7 @@ lpfc_pci_probe_one(struct pci_dev *pdev, const struct pci_device_id *pid)
 	 * establish the host.
 	 */
 	lpfc_get_cfgparam(phba);
-	/* Check if we need to change the DMA length */
-	lpfc_setup_max_dma_length(phba);
-
-	phba->max_vpi = lpfc_hba_max_vpi(phba->pcidev->device);
+	phba->max_vpi = LPFC_MAX_VPI;
 
 	/* Initialize timers used by driver */
 	init_timer(&phba->hb_tmofunc);
@@ -2800,8 +2702,6 @@ lpfc_pci_probe_one(struct pci_dev *pdev, const struct pci_device_id *pid)
 
 	memset(phba->slim2p.virt, 0, SLI2_SLIM_SIZE);
 	phba->mbox = phba->slim2p.virt + offsetof(struct lpfc_sli2_slim, mbx);
-	phba->mbox_ext = (phba->slim2p.virt +
-			  offsetof(struct lpfc_sli2_slim, mbx_ext_words));
 	phba->pcb = (phba->slim2p.virt + offsetof(struct lpfc_sli2_slim, pcb));
 	phba->IOCBs = (phba->slim2p.virt +
 		       offsetof(struct lpfc_sli2_slim, IOCBs));
@@ -2897,17 +2797,11 @@ lpfc_pci_probe_one(struct pci_dev *pdev, const struct pci_device_id *pid)
 	/* Initialize list to save ELS buffers */
 	INIT_LIST_HEAD(&phba->elsbuf);
 
-	/* Initialize list of sysfs mailbox commands */
-	INIT_LIST_HEAD(&phba->sysfs_mbox_list);
-	/* Initialize list of sysfs menlo commands */
-	INIT_LIST_HEAD(&phba->sysfs_menlo_list);
-
 	vport = lpfc_create_port(phba, phba->brd_no, &phba->pcidev->dev);
 	if (!vport)
 		goto out_kthread_stop;
 
 	shost = lpfc_shost_from_vport(vport);
-
 	phba->pport = vport;
 	lpfc_debugfs_initialize(vport);
 
@@ -2919,20 +2813,12 @@ lpfc_pci_probe_one(struct pci_dev *pdev, const struct pci_device_id *pid)
 	phba->HSregaddr = phba->ctrl_regs_memmap_p + HS_REG_OFFSET;
 	phba->HCregaddr = phba->ctrl_regs_memmap_p + HC_REG_OFFSET;
 
-	/* Confiugre sysfs attributes */
-	phba->dfc_host = lpfcdfc_host_add(pdev, shost, phba);
-	if (!phba->dfc_host) {
-		lpfc_printf_log(phba, KERN_ERR, LOG_LIBDFC,
-				"1201 Failed to allocate dfc_host \n");
-		error = -ENOMEM;
-		goto out_destroy_port;
-	}
-
+	/* Configure sysfs attributes */
 	if (lpfc_alloc_sysfs_attr(vport)) {
 		lpfc_printf_log(phba, KERN_ERR, LOG_INIT,
 				"1476 Failed to allocate sysfs attr\n");
 		error = -ENOMEM;
-		goto out_del_dfc_host;
+		goto out_destroy_port;
 	}
 
 	cfg_mode = phba->cfg_use_msi;
@@ -2955,7 +2841,7 @@ lpfc_pci_probe_one(struct pci_dev *pdev, const struct pci_device_id *pid)
 		/* Wait 50ms for the interrupts of previous mailbox commands */
 		msleep(50);
 		/* Check active interrupts received */
-		if (phba->sli.slistat.sli_intr > LPFC_INTR_THRESHOLD) {
+		if (phba->sli.slistat.sli_intr > LPFC_MSIX_VECTORS) {
 			/* Log the current active interrupt mode */
 			phba->intr_mode = intr_mode;
 			lpfc_log_intr_mode(phba, intr_mode);
@@ -2981,20 +2867,80 @@ lpfc_pci_probe_one(struct pci_dev *pdev, const struct pci_device_id *pid)
 		}
 	}
 
-	if ((lpfc_get_security_enabled)(shost)) {
-		unsigned long flags;
-		spin_lock_irqsave(&fc_security_user_lock, flags);
-		list_add_tail(&vport->sc_users, &fc_security_user_list);
-		spin_unlock_irqrestore(&fc_security_user_lock, flags);
-		/* Triggers fcauthd to register if it is running */
-		fc_host_post_event(shost, fc_get_event_number(),
-				   FCH_EVT_PORT_ONLINE, shost->host_no);
-	}
 	/*
 	 * hba setup may have changed the hba_queue_depth so we need to adjust
 	 * the value of can_queue.
 	 */
 	shost->can_queue = phba->cfg_hba_queue_depth - 10;
+	if (phba->sli3_options & LPFC_SLI3_BG_ENABLED) {
+
+		if (lpfc_prot_mask && lpfc_prot_guard) {
+			lpfc_printf_log(phba, KERN_INFO, LOG_INIT,
+					"1478 Registering BlockGuard with the "
+					"SCSI layer\n");
+
+			scsi_host_set_prot(shost, lpfc_prot_mask);
+			scsi_host_set_guard(shost, lpfc_prot_guard);
+		}
+	}
+
+	if (!_dump_buf_data) {
+		int pagecnt = 10;
+		while (pagecnt) {
+			spin_lock_init(&_dump_buf_lock);
+			_dump_buf_data =
+				(char *) __get_free_pages(GFP_KERNEL, pagecnt);
+			if (_dump_buf_data) {
+				printk(KERN_ERR "BLKGRD allocated %d pages for "
+						"_dump_buf_data at 0x%p\n",
+						(1 << pagecnt), _dump_buf_data);
+				_dump_buf_data_order = pagecnt;
+				memset(_dump_buf_data, 0, ((1 << PAGE_SHIFT)
+							   << pagecnt));
+				break;
+			} else {
+				--pagecnt;
+			}
+
+		}
+
+		if (!_dump_buf_data_order)
+			printk(KERN_ERR "BLKGRD ERROR unable to allocate "
+					"memory for hexdump\n");
+
+	} else {
+		printk(KERN_ERR "BLKGRD already allocated _dump_buf_data=0x%p"
+		       "\n", _dump_buf_data);
+	}
+
+
+	if (!_dump_buf_dif) {
+		int pagecnt = 10;
+		while (pagecnt) {
+			_dump_buf_dif =
+				(char *) __get_free_pages(GFP_KERNEL, pagecnt);
+			if (_dump_buf_dif) {
+				printk(KERN_ERR "BLKGRD allocated %d pages for "
+						"_dump_buf_dif at 0x%p\n",
+						(1 << pagecnt), _dump_buf_dif);
+				_dump_buf_dif_order = pagecnt;
+				memset(_dump_buf_dif, 0, ((1 << PAGE_SHIFT)
+							  << pagecnt));
+				break;
+			} else {
+				--pagecnt;
+			}
+
+		}
+
+		if (!_dump_buf_dif_order)
+			printk(KERN_ERR "BLKGRD ERROR unable to allocate "
+					"memory for hexdump\n");
+
+	} else {
+		printk(KERN_ERR "BLKGRD already allocated _dump_buf_dif=0x%p\n",
+				_dump_buf_dif);
+	}
 
 	lpfc_host_attrib_init(shost);
 
@@ -3014,8 +2960,6 @@ lpfc_pci_probe_one(struct pci_dev *pdev, const struct pci_device_id *pid)
 		(char *) &adapter_event,
 		LPFC_NL_VENDOR_ID);
 
-	scsi_scan_host(shost);
-
 	return 0;
 
 out_remove_device:
@@ -3029,9 +2973,6 @@ out_remove_device:
 	lpfc_sli_brdrestart(phba);
 out_free_sysfs_attr:
 	lpfc_free_sysfs_attr(vport);
-out_del_dfc_host:
-	if (phba->dfc_host)
-		lpfcdfc_host_del(phba->dfc_host);
 out_destroy_port:
 	destroy_port(vport);
 out_kthread_stop:
@@ -3086,14 +3027,13 @@ lpfc_pci_remove_one(struct pci_dev *pdev)
 	int i;
 	int bars = pci_select_bars(pdev, IORESOURCE_MEM);
 
-	lpfcdfc_host_del(phba->dfc_host);
-	phba->dfc_host = NULL;
-
 	spin_lock_irq(&phba->hbalock);
 	vport->load_flag |= FC_UNLOADING;
 	spin_unlock_irq(&phba->hbalock);
 
 	lpfc_free_sysfs_attr(vport);
+
+	kthread_stop(phba->worker_thread);
 
 	/* Release all the vports against this physical port */
 	vports = lpfc_create_vport_work_array(phba);
@@ -3112,12 +3052,7 @@ lpfc_pci_remove_one(struct pci_dev *pdev)
 	 * clears the rings, discards all mailbox commands, and resets
 	 * the HBA.
 	 */
-
-	/* HBA interrupt will be diabled after this call */
 	lpfc_sli_hba_down(phba);
-	/* Stop kthread signal shall trigger work_done one more time */
-	kthread_stop(phba->worker_thread);
-	/* Final cleanup of txcmplq and reset the HBA */
 	lpfc_sli_brdrestart(phba);
 
 	lpfc_stop_phba_timers(phba);
@@ -3526,34 +3461,12 @@ lpfc_init(void)
 			return -ENOMEM;
 		}
 	}
-	error = scsi_nl_add_driver(LPFC_NL_VENDOR_ID, &lpfc_template,
-				   lpfc_rcv_nl_msg, lpfc_rcv_nl_event);
-	if (error)
-		goto out_release_transport;
-	security_work_q = create_singlethread_workqueue(security_work_q_name);
-	if (!security_work_q)
-		goto out_nl_remove_driver;
-	INIT_LIST_HEAD(&fc_security_user_list);
 	error = pci_register_driver(&lpfc_driver);
-	if (error)
-		goto out_destroy_workqueue;
-	error = lpfc_cdev_init();
-	if (error)
-		goto out_pci_unregister;
-
-	return error;
-
-out_pci_unregister:
-	pci_unregister_driver(&lpfc_driver);
-out_destroy_workqueue:
-	destroy_workqueue(security_work_q);
-	security_work_q = NULL;
-out_nl_remove_driver:
-	scsi_nl_remove_driver(LPFC_NL_VENDOR_ID);
-out_release_transport:
-	fc_release_transport(lpfc_transport_template);
-	if (lpfc_enable_npiv)
-		fc_release_transport(lpfc_vport_transport_template);
+	if (error) {
+		fc_release_transport(lpfc_transport_template);
+		if (lpfc_enable_npiv)
+			fc_release_transport(lpfc_vport_transport_template);
+	}
 
 	return error;
 }
@@ -3569,14 +3482,22 @@ static void __exit
 lpfc_exit(void)
 {
 	pci_unregister_driver(&lpfc_driver);
-	if (security_work_q)
-		destroy_workqueue(security_work_q);
-	security_work_q = NULL;
-	scsi_nl_remove_driver(LPFC_NL_VENDOR_ID);
 	fc_release_transport(lpfc_transport_template);
 	if (lpfc_enable_npiv)
 		fc_release_transport(lpfc_vport_transport_template);
-	lpfc_cdev_exit();
+	if (_dump_buf_data) {
+		printk(KERN_ERR "BLKGRD freeing %lu pages for _dump_buf_data "
+				"at 0x%p\n",
+				(1L << _dump_buf_data_order), _dump_buf_data);
+		free_pages((unsigned long)_dump_buf_data, _dump_buf_data_order);
+	}
+
+	if (_dump_buf_dif) {
+		printk(KERN_ERR "BLKGRD freeing %lu pages for _dump_buf_dif "
+				"at 0x%p\n",
+				(1L << _dump_buf_dif_order), _dump_buf_dif);
+		free_pages((unsigned long)_dump_buf_dif, _dump_buf_dif_order);
+	}
 }
 
 module_init(lpfc_init);

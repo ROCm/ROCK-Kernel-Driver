@@ -13,7 +13,7 @@
  * Fixed SMP synchronization, 08/08/99, Manfred Spraul
  *     manfred@colorfullife.com
  * Rewrote bits to get rid of console_lock
- *	01Mar01 Andrew Morton <andrewm@uow.edu.au>
+ *	01Mar01 Andrew Morton
  */
 
 #include <linux/kernel.h>
@@ -32,8 +32,6 @@
 #include <linux/security.h>
 #include <linux/bootmem.h>
 #include <linux/syscalls.h>
-#include <linux/jhash.h>
-#include <linux/device.h>
 
 #include <asm/uaccess.h>
 
@@ -233,45 +231,6 @@ static inline void boot_delay_msec(void)
 {
 }
 #endif
-
-/*
- * Return the number of unread characters in the log buffer.
- */
-static int log_buf_get_len(void)
-{
-	return logged_chars;
-}
-
-/*
- * Copy a range of characters from the log buffer.
- */
-int log_buf_copy(char *dest, int idx, int len)
-{
-	int ret, max;
-	bool took_lock = false;
-
-	if (!oops_in_progress) {
-		spin_lock_irq(&logbuf_lock);
-		took_lock = true;
-	}
-
-	max = log_buf_get_len();
-	if (idx < 0 || idx >= max) {
-		ret = -1;
-	} else {
-		if (len > max)
-			len = max;
-		ret = len;
-		idx += (log_end - max);
-		while (len-- > 0)
-			dest[len] = LOG_BUF(idx + len);
-	}
-
-	if (took_lock)
-		spin_unlock_irq(&logbuf_lock);
-
-	return ret;
-}
 
 /*
  * Commands to do_syslog:
@@ -608,9 +567,6 @@ static int have_callable_console(void)
  * @fmt: format string
  *
  * This is printk().  It can be called from any context.  We want it to work.
- * Be aware of the fact that if oops_in_progress is not set, we might try to
- * wake klogd up which could deadlock on runqueue lock if printk() is called
- * from scheduler code.
  *
  * We try to grab the console_sem.  If we succeed, it's easy - we log the output and
  * call the console drivers.  If we fail to get the semaphore we place the output
@@ -624,6 +580,8 @@ static int have_callable_console(void)
  *
  * See also:
  * printf(3)
+ *
+ * See the vsnprintf() documentation for format string extensions over C99.
  */
 
 asmlinkage int printk(const char *fmt, ...)
@@ -690,7 +648,7 @@ static int acquire_console_semaphore_for_printk(unsigned int cpu)
 static const char recursion_bug_msg [] =
 		KERN_CRIT "BUG: recent printk recursion!\n";
 static int recursion_bug;
-	static int new_text_line = 1;
+static int new_text_line = 1;
 static char printk_buf[1024];
 
 asmlinkage int vprintk(const char *fmt, va_list args)
@@ -733,7 +691,7 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 	if (recursion_bug) {
 		recursion_bug = 0;
 		strcpy(printk_buf, recursion_bug_msg);
-		printed_len = sizeof(recursion_bug_msg);
+		printed_len = strlen(recursion_bug_msg);
 	}
 	/* Emit the output into the temporary buffer */
 	printed_len += vscnprintf(printk_buf + printed_len,
@@ -1008,10 +966,25 @@ int is_console_locked(void)
 	return console_locked;
 }
 
+static DEFINE_PER_CPU(int, printk_pending);
+
+void printk_tick(void)
+{
+	if (__get_cpu_var(printk_pending)) {
+		__get_cpu_var(printk_pending) = 0;
+		wake_up_interruptible(&log_wait);
+	}
+}
+
+int printk_needs_cpu(int cpu)
+{
+	return per_cpu(printk_pending, cpu);
+}
+
 void wake_up_klogd(void)
 {
-	if (!oops_in_progress && waitqueue_active(&log_wait))
-		wake_up_interruptible(&log_wait);
+	if (waitqueue_active(&log_wait))
+		__raw_get_cpu_var(printk_pending) = 1;
 }
 
 /**
@@ -1317,22 +1290,6 @@ static int __init disable_boot_consoles(void)
 }
 late_initcall(disable_boot_consoles);
 
-/**
- * tty_write_message - write a message to a certain tty, not just the console.
- * @tty: the destination tty_struct
- * @msg: the message to write
- *
- * This is used for messages that need to be redirected to a specific tty.
- * We don't put it into the syslog queue right now maybe in the future if
- * really needed.
- */
-void tty_write_message(struct tty_struct *tty, char *msg)
-{
-	if (tty && tty->ops->write)
-		tty->ops->write(tty, msg, strlen(msg));
-	return;
-}
-
 #if defined CONFIG_PRINTK
 
 /*
@@ -1368,47 +1325,4 @@ bool printk_timed_ratelimit(unsigned long *caller_jiffies,
 	return false;
 }
 EXPORT_SYMBOL(printk_timed_ratelimit);
-#endif
-
-#if defined CONFIG_PRINTK && defined CONFIG_KMSG_IDS
-
-/**
- * printk_hash - print a kernel message include a hash over the message
- * @prefix: message prefix including the ".%06x" for the hash
- * @fmt: format string
- */
-asmlinkage int printk_hash(const char *prefix, const char *fmt, ...)
-{
-	va_list args;
-	int r;
-
-	r = printk(prefix, jhash(fmt, strlen(fmt), 0) & 0xffffff);
-	va_start(args, fmt);
-	r += vprintk(fmt, args);
-	va_end(args);
-
-	return r;
-}
-EXPORT_SYMBOL(printk_hash);
-
-/**
- * printk_dev_hash - print a kernel message include a hash over the message
- * @prefix: message prefix including the ".%06x" for the hash
- * @dev: device this printk is all about
- * @fmt: format string
- */
-asmlinkage int printk_dev_hash(const char *prefix, const char *driver_name,
-			       const char *fmt, ...)
-{
-	va_list args;
-	int r;
-
-	r = printk(prefix, driver_name, jhash(fmt, strlen(fmt), 0) & 0xffffff);
-	va_start(args, fmt);
-	r += vprintk(fmt, args);
-	va_end(args);
-
-	return r;
-}
-EXPORT_SYMBOL(printk_dev_hash);
 #endif

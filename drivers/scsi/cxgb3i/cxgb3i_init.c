@@ -12,7 +12,7 @@
 #include "cxgb3i.h"
 
 #define DRV_MODULE_NAME         "cxgb3i"
-#define DRV_MODULE_VERSION	"0.1.0"
+#define DRV_MODULE_VERSION	"1.0.0"
 #define DRV_MODULE_RELDATE	"Jun. 1, 2008"
 
 static char version[] =
@@ -80,7 +80,7 @@ static int __init cxgb3i_init_module(void)
 	if (err < 0)
 		return err;
 
-	err = cxgb3i_ulp2_init();
+	err = cxgb3i_pdu_init();
 	if (err < 0)
 		return err;
 
@@ -98,7 +98,7 @@ static int __init cxgb3i_init_module(void)
 static void __exit cxgb3i_exit_module(void)
 {
 	cxgb3_unregister_client(&t3c_client);
-	cxgb3i_ulp2_cleanup();
+	cxgb3i_pdu_cleanup();
 	cxgb3i_iscsi_cleanup();
 	cxgb3i_sdev_cleanup();
 }

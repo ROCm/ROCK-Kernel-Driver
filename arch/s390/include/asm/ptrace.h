@@ -272,12 +272,15 @@ typedef struct
 #define PSW_ASC_SECONDARY	0x0000800000000000UL
 #define PSW_ASC_HOME		0x0000C00000000000UL
 
-extern long psw_user32_bits;
-
 #endif /* __s390x__ */
 
+#ifdef __KERNEL__
 extern long psw_kernel_bits;
 extern long psw_user_bits;
+#ifdef CONFIG_64BIT
+extern long psw_user32_bits;
+#endif
+#endif
 
 /* This macro merges a NEW PSW mask specified by the user into
    the currently active PSW mask CURRENT, modifying only those
@@ -485,8 +488,6 @@ struct user_regs_struct
 struct task_struct;
 extern void user_enable_single_step(struct task_struct *);
 extern void user_disable_single_step(struct task_struct *);
-
-#define __ARCH_WANT_COMPAT_SYS_PTRACE
 
 #define user_mode(regs) (((regs)->psw.mask & PSW_MASK_PSTATE) != 0)
 #define instruction_pointer(regs) ((regs)->psw.addr & PSW_ADDR_INSN)

@@ -26,7 +26,7 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
  *  Stripped of 2.4 stuff ready for main kernel submit by
- *		Alan Cox <alan@redhat.com>
+ *		Alan Cox <alan@lxorguk.ukuu.org.uk>
  ****************************************************************************/
 
 #include <linux/version.h>
@@ -239,10 +239,9 @@ static struct v4l2_queryctrl controls[] = {
  *  cpia2_open
  *
  *****************************************************************************/
-static int cpia2_open(struct inode *inode, struct file *file)
+static int cpia2_open(struct file *file)
 {
-	struct video_device *dev = video_devdata(file);
-	struct camera_data *cam = video_get_drvdata(dev);
+	struct camera_data *cam = video_drvdata(file);
 	int retval = 0;
 
 	if (!cam) {
@@ -303,7 +302,7 @@ err_return:
  *  cpia2_close
  *
  *****************************************************************************/
-static int cpia2_close(struct inode *inode, struct file *file)
+static int cpia2_close(struct file *file)
 {
 	struct video_device *dev = video_devdata(file);
 	struct camera_data *cam = video_get_drvdata(dev);
@@ -357,8 +356,7 @@ static int cpia2_close(struct inode *inode, struct file *file)
 static ssize_t cpia2_v4l_read(struct file *file, char __user *buf, size_t count,
 			      loff_t *off)
 {
-	struct video_device *dev = video_devdata(file);
-	struct camera_data *cam = video_get_drvdata(dev);
+	struct camera_data *cam = video_drvdata(file);
 	int noblock = file->f_flags&O_NONBLOCK;
 
 	struct cpia2_fh *fh = file->private_data;
@@ -382,9 +380,7 @@ static ssize_t cpia2_v4l_read(struct file *file, char __user *buf, size_t count,
  *****************************************************************************/
 static unsigned int cpia2_v4l_poll(struct file *filp, struct poll_table_struct *wait)
 {
-	struct video_device *dev = video_devdata(filp);
-	struct camera_data *cam = video_get_drvdata(dev);
-
+	struct camera_data *cam = video_drvdata(filp);
 	struct cpia2_fh *fh = filp->private_data;
 
 	if(!cam)
@@ -1576,12 +1572,10 @@ static int ioctl_dqbuf(void *arg,struct camera_data *cam, struct file *file)
  *  cpia2_ioctl
  *
  *****************************************************************************/
-static int cpia2_do_ioctl(struct inode *inode, struct file *file,
-			  unsigned int ioctl_nr, void *arg)
+static long cpia2_do_ioctl(struct file *file, unsigned int cmd, void *arg)
 {
-	struct video_device *dev = video_devdata(file);
-	struct camera_data *cam = video_get_drvdata(dev);
-	int retval = 0;
+	struct camera_data *cam = video_drvdata(file);
+	long retval = 0;
 
 	if (!cam)
 		return -ENOTTY;
@@ -1596,7 +1590,7 @@ static int cpia2_do_ioctl(struct inode *inode, struct file *file,
 	}
 
 	/* Priority check */
-	switch (ioctl_nr) {
+	switch (cmd) {
 	case VIDIOCSWIN:
 	case VIDIOCMCAPTURE:
 	case VIDIOC_S_FMT:
@@ -1623,7 +1617,7 @@ static int cpia2_do_ioctl(struct inode *inode, struct file *file,
 		break;
 	}
 
-	switch (ioctl_nr) {
+	switch (cmd) {
 	case VIDIOCGCAP:	/* query capabilities */
 		retval = ioctl_cap_query(arg, cam);
 		break;
@@ -1688,7 +1682,7 @@ static int cpia2_do_ioctl(struct inode *inode, struct file *file,
 	case VIDIOC_ENUMINPUT:
 	case VIDIOC_G_INPUT:
 	case VIDIOC_S_INPUT:
-		retval = ioctl_input(ioctl_nr, arg,cam);
+		retval = ioctl_input(cmd, arg, cam);
 		break;
 
 	case VIDIOC_ENUM_FMT:
@@ -1847,10 +1841,10 @@ static int cpia2_do_ioctl(struct inode *inode, struct file *file,
 	return retval;
 }
 
-static int cpia2_ioctl(struct inode *inode, struct file *file,
-		       unsigned int ioctl_nr, unsigned long iarg)
+static long cpia2_ioctl(struct file *file,
+		       unsigned int cmd, unsigned long arg)
 {
-	return video_usercopy(inode, file, ioctl_nr, iarg, cpia2_do_ioctl);
+	return video_usercopy(file, cmd, arg, cpia2_do_ioctl);
 }
 
 /******************************************************************************
@@ -1860,9 +1854,8 @@ static int cpia2_ioctl(struct inode *inode, struct file *file,
  *****************************************************************************/
 static int cpia2_mmap(struct file *file, struct vm_area_struct *area)
 {
+	struct camera_data *cam = video_drvdata(file);
 	int retval;
-	struct video_device *dev = video_devdata(file);
-	struct camera_data *cam = video_get_drvdata(dev);
 
 	/* Priority check */
 	struct cpia2_fh *fh = file->private_data;
@@ -1919,17 +1912,13 @@ static void reset_camera_struct_v4l(struct camera_data *cam)
 /***
  * The v4l video device structure initialized for this device
  ***/
-static const struct file_operations fops_template = {
+static const struct v4l2_file_operations fops_template = {
 	.owner		= THIS_MODULE,
 	.open		= cpia2_open,
 	.release	= cpia2_close,
 	.read		= cpia2_v4l_read,
 	.poll		= cpia2_v4l_poll,
 	.ioctl		= cpia2_ioctl,
-	.llseek		= no_llseek,
-#ifdef CONFIG_COMPAT
-	.compat_ioctl	= v4l_compat_ioctl32,
-#endif
 	.mmap		= cpia2_mmap,
 };
 
@@ -1979,7 +1968,7 @@ void cpia2_unregister_camera(struct camera_data *cam)
 	} else {
 		LOG("/dev/video%d removed while open, "
 		    "deferring video_unregister_device\n",
-		    cam->vdev->minor);
+		    cam->vdev->num);
 	}
 }
 

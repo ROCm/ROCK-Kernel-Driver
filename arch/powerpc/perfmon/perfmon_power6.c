@@ -24,6 +24,7 @@
  */
 #include <linux/module.h>
 #include <linux/perfmon_kern.h>
+#include <asm/time.h>
 
 MODULE_AUTHOR("Corey Ashford <cjashfor@us.ibm.com>");
 MODULE_DESCRIPTION("POWER6 PMU description table");

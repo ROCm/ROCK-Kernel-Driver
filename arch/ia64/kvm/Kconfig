@@ -33,6 +33,8 @@ config KVM_KMP
 config KVM
 	tristate "Kernel-based Virtual Machine (KVM) support"
 	depends on HAVE_KVM && EXPERIMENTAL
+	# for device assignment:
+	depends on PCI
 	select PREEMPT_NOTIFIERS
 	select ANON_INODES
 	---help---
@@ -58,5 +60,7 @@ config KVM_INTEL
 
 config KVM_TRACE
        bool
+
+source drivers/virtio/Kconfig
 
 endif # VIRTUALIZATION

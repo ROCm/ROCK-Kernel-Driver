@@ -345,7 +345,6 @@ static int tc574_config(struct pcmcia_device *link)
 	__be16 *phys_addr;
 	char *cardname;
 	__u32 config;
-	DECLARE_MAC_BUF(mac);
 
 	phys_addr = (__be16 *)dev->dev_addr;
 
@@ -355,9 +354,10 @@ static int tc574_config(struct pcmcia_device *link)
 	for (i = j = 0; j < 0x400; j += 0x20) {
 		link->io.BasePort1 = j ^ 0x300;
 		i = pcmcia_request_io(link, &link->io);
-		if (i == CS_SUCCESS) break;
+		if (i == 0)
+			break;
 	}
-	if (i != CS_SUCCESS) {
+	if (i != 0) {
 		cs_error(link, RequestIO, i);
 		goto failed;
 	}
@@ -377,7 +377,7 @@ static int tc574_config(struct pcmcia_device *link)
 	tuple.TupleDataMax = 64;
 	tuple.TupleOffset = 0;
 	tuple.DesiredTuple = 0x88;
-	if (pcmcia_get_first_tuple(link, &tuple) == CS_SUCCESS) {
+	if (pcmcia_get_first_tuple(link, &tuple) == 0) {
 		pcmcia_get_tuple_data(link, &tuple);
 		for (i = 0; i < 3; i++)
 			phys_addr[i] = htons(le16_to_cpu(buf[i]));
@@ -462,9 +462,9 @@ static int tc574_config(struct pcmcia_device *link)
 	strcpy(lp->node.dev_name, dev->name);
 
 	printk(KERN_INFO "%s: %s at io %#3lx, irq %d, "
-	       "hw_addr %s.\n",
+	       "hw_addr %pM.\n",
 	       dev->name, cardname, dev->base_addr, dev->irq,
-	       print_mac(mac, dev->dev_addr));
+	       dev->dev_addr);
 	printk(" %dK FIFO split %s Rx:Tx, %sMII interface.\n",
 		   8 << config & Ram_size,
 		   ram_split[(config & Ram_split) >> Ram_split_shift],
@@ -1061,7 +1061,6 @@ static int el3_rx(struct net_device *dev, int worklimit)
 						((pkt_len+3)>>2));
 				skb->protocol = eth_type_trans(skb, dev);
 				netif_rx(skb);
-				dev->last_rx = jiffies;
 				dev->stats.rx_packets++;
 				dev->stats.rx_bytes += pkt_len;
 			} else {

@@ -3,25 +3,20 @@
  *
  * acl.c
  *
- * Copyright (C) 2008 Oracle.  All rights reserved.
+ * Copyright (C) 2004, 2008 Oracle.  All rights reserved.
  *
  * CREDITS:
- * Lots of code in this file is taken from ext3.
+ * Lots of code in this file is copy from linux/fs/ext3/acl.c.
+ * Copyright (C) 2001-2003 Andreas Gruenbacher, <agruen@suse.de>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public
- * License as published by the Free Software Foundation; either
- * version 2 of the License, or (at your option) any later version.
+ * License version 2 as published by the Free Software Foundation.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public
- * License along with this program; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 021110-1307, USA.
  */
 
 #include <linux/init.h>
@@ -134,7 +129,7 @@ static struct posix_acl *ocfs2_get_acl_nolock(struct inode *inode,
 
 	if (retval > 0)
 		acl = ocfs2_acl_from_xattr(value, retval);
-	else if (retval == -ENODATA || retval == -ENOSYS)
+	else if (retval == -ENODATA || retval == 0)
 		acl = NULL;
 	else
 		acl = ERR_PTR(retval);
@@ -174,63 +169,16 @@ static struct posix_acl *ocfs2_get_acl(struct inode *inode, int type)
 	return acl;
 }
 
-static int ocfs2_set_acl_handle(handle_t *handle,
-				struct inode *inode,
-				struct buffer_head *di_bh,
-				int type,
-				struct posix_acl *acl)
-{
-	int name_index;
-	void *value = NULL;
-	size_t size = 0;
-	int ret;
-
-	if (S_ISLNK(inode->i_mode))
-		return -EOPNOTSUPP;
-
-	switch (type) {
-	case ACL_TYPE_ACCESS:
-		name_index = OCFS2_XATTR_INDEX_POSIX_ACL_ACCESS;
-		if (acl) {
-			mode_t mode = inode->i_mode;
-			ret = posix_acl_equiv_mode(acl, &mode);
-			if (ret < 0)
-				return ret;
-			else {
-				inode->i_mode = mode;
-				if (ret == 0)
-					acl = NULL;
-			}
-		}
-		break;
-	case ACL_TYPE_DEFAULT:
-		name_index = OCFS2_XATTR_INDEX_POSIX_ACL_DEFAULT;
-		if (!S_ISDIR(inode->i_mode))
-			return acl ? -EACCES : 0;
-		break;
-	default:
-		return -EINVAL;
-	}
-
-	if (acl) {
-		value = ocfs2_acl_to_xattr(acl, &size);
-		if (IS_ERR(value))
-			return (int)PTR_ERR(value);
-	}
-
-	ret = ocfs2_xattr_set_handle(handle, inode, di_bh, name_index,
-					 "", value, size, 0);
-
-	kfree(value);
-
-	return ret;
-}
-
-
 /*
  * Set the access or default ACL of an inode.
  */
-static int ocfs2_set_acl(struct inode *inode, int type, struct posix_acl *acl)
+static int ocfs2_set_acl(handle_t *handle,
+			 struct inode *inode,
+			 struct buffer_head *di_bh,
+			 int type,
+			 struct posix_acl *acl,
+			 struct ocfs2_alloc_context *meta_ac,
+			 struct ocfs2_alloc_context *data_ac)
 {
 	int name_index;
 	void *value = NULL;
@@ -270,7 +218,12 @@ static int ocfs2_set_acl(struct inode *inode, int type, struct posix_acl *acl)
 			return (int)PTR_ERR(value);
 	}
 
-	ret = ocfs2_xattr_set(inode, name_index, "", value, size, 0);
+	if (handle)
+		ret = ocfs2_xattr_set_handle(handle, inode, di_bh, name_index,
+					     "", value, size, 0,
+					     meta_ac, data_ac);
+	else
+		ret = ocfs2_xattr_set(inode, name_index, "", value, size, 0);
 
 	kfree(value);
 
@@ -292,6 +245,33 @@ int ocfs2_check_acl(struct inode *inode, int mask)
 	return -EAGAIN;
 }
 
+int ocfs2_acl_chmod(struct inode *inode)
+{
+	struct ocfs2_super *osb = OCFS2_SB(inode->i_sb);
+	struct posix_acl *acl, *clone;
+	int ret;
+
+	if (S_ISLNK(inode->i_mode))
+		return -EOPNOTSUPP;
+
+	if (!(osb->s_mount_opt & OCFS2_MOUNT_POSIX_ACL))
+		return 0;
+
+	acl = ocfs2_get_acl(inode, ACL_TYPE_ACCESS);
+	if (IS_ERR(acl) || !acl)
+		return PTR_ERR(acl);
+	clone = posix_acl_clone(acl, GFP_KERNEL);
+	posix_acl_release(acl);
+	if (!clone)
+		return -ENOMEM;
+	ret = posix_acl_chmod_masq(clone, inode->i_mode);
+	if (!ret)
+		ret = ocfs2_set_acl(NULL, inode, NULL, ACL_TYPE_ACCESS,
+				    clone, NULL, NULL);
+	posix_acl_release(clone);
+	return ret;
+}
+
 /*
  * Initialize the ACLs of a new inode. If parent directory has default ACL,
  * then clone to new inode. Called from ocfs2_mknod.
@@ -300,7 +280,9 @@ int ocfs2_init_acl(handle_t *handle,
 		   struct inode *inode,
 		   struct inode *dir,
 		   struct buffer_head *di_bh,
-		   struct buffer_head *dir_bh)
+		   struct buffer_head *dir_bh,
+		   struct ocfs2_alloc_context *meta_ac,
+		   struct ocfs2_alloc_context *data_ac)
 {
 	struct ocfs2_super *osb = OCFS2_SB(inode->i_sb);
 	struct posix_acl *acl = NULL;
@@ -321,8 +303,9 @@ int ocfs2_init_acl(handle_t *handle,
 		mode_t mode;
 
 		if (S_ISDIR(inode->i_mode)) {
-			ret = ocfs2_set_acl_handle(handle, inode, di_bh,
-						   ACL_TYPE_DEFAULT, acl);
+			ret = ocfs2_set_acl(handle, inode, di_bh,
+					    ACL_TYPE_DEFAULT, acl,
+					    meta_ac, data_ac);
 			if (ret)
 				goto cleanup;
 		}
@@ -336,47 +319,15 @@ int ocfs2_init_acl(handle_t *handle,
 		if (ret >= 0) {
 			inode->i_mode = mode;
 			if (ret > 0) {
-				ret = ocfs2_set_acl_handle(handle, inode,
-							   di_bh,
-							   ACL_TYPE_ACCESS,
-							   clone);
+				ret = ocfs2_set_acl(handle, inode,
+						    di_bh, ACL_TYPE_ACCESS,
+						    clone, meta_ac, data_ac);
 			}
 		}
 		posix_acl_release(clone);
 	}
 cleanup:
 	posix_acl_release(acl);
-	return ret;
-}
-
-int ocfs2_acl_chmod(handle_t *handle,
-		    struct inode *inode,
-		    struct buffer_head *di_bh)
-{
-	struct ocfs2_super *osb = OCFS2_SB(inode->i_sb);
-	struct posix_acl *acl, *clone;
-	int ret;
-
-	if (S_ISLNK(inode->i_mode))
-		return -EOPNOTSUPP;
-
-	if (!(osb->s_mount_opt & OCFS2_MOUNT_POSIX_ACL))
-		return 0;
-
-	acl = ocfs2_get_acl_nolock(inode, ACL_TYPE_ACCESS, di_bh);
-	if (IS_ERR(acl) || !acl)
-		return PTR_ERR(acl);
-	clone = posix_acl_clone(acl, GFP_KERNEL);
-	posix_acl_release(acl);
-	if (!clone)
-		return -ENOMEM;
-	ret = posix_acl_chmod_masq(clone, inode->i_mode);
-	if (!ret) {
-		ret = ocfs2_set_acl_handle(handle, inode, di_bh,
-					   ACL_TYPE_ACCESS, clone);
-	}
-
-	posix_acl_release(clone);
 	return ret;
 }
 
@@ -484,7 +435,7 @@ static int ocfs2_xattr_set_acl(struct inode *inode,
 	} else
 		acl = NULL;
 
-	ret = ocfs2_set_acl(inode, type, acl);
+	ret = ocfs2_set_acl(NULL, inode, NULL, type, acl, NULL, NULL);
 
 cleanup:
 	posix_acl_release(acl);

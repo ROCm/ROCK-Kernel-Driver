@@ -372,14 +372,8 @@ static void remove_from_rx_queue(struct r3964_info *pInfo,
 static void put_char(struct r3964_info *pInfo, unsigned char ch)
 {
 	struct tty_struct *tty = pInfo->tty;
-
-	if (tty == NULL)
-		return;
-
 	/* FIXME: put_char should not be called from an IRQ */
-	if (tty->ops->put_char) {
-		tty->ops->put_char(tty, ch);
-	}
+	tty_put_char(tty, ch);
 	pInfo->bcc ^= ch;
 }
 
@@ -1009,7 +1003,7 @@ static int r3964_open(struct tty_struct *tty)
 
 static void r3964_close(struct tty_struct *tty)
 {
-	struct r3964_info *pInfo = (struct r3964_info *)tty->disc_data;
+	struct r3964_info *pInfo = tty->disc_data;
 	struct r3964_client_info *pClient, *pNext;
 	struct r3964_message *pMsg;
 	struct r3964_block_header *pHeader, *pNextHeader;
@@ -1064,7 +1058,7 @@ static void r3964_close(struct tty_struct *tty)
 static ssize_t r3964_read(struct tty_struct *tty, struct file *file,
 			  unsigned char __user * buf, size_t nr)
 {
-	struct r3964_info *pInfo = (struct r3964_info *)tty->disc_data;
+	struct r3964_info *pInfo = tty->disc_data;
 	struct r3964_client_info *pClient;
 	struct r3964_message *pMsg;
 	struct r3964_client_message theMsg;
@@ -1119,7 +1113,7 @@ static ssize_t r3964_read(struct tty_struct *tty, struct file *file,
 static ssize_t r3964_write(struct tty_struct *tty, struct file *file,
 			   const unsigned char *data, size_t count)
 {
-	struct r3964_info *pInfo = (struct r3964_info *)tty->disc_data;
+	struct r3964_info *pInfo = tty->disc_data;
 	struct r3964_block_header *pHeader;
 	struct r3964_client_info *pClient;
 	unsigned char *new_data;
@@ -1188,7 +1182,7 @@ static ssize_t r3964_write(struct tty_struct *tty, struct file *file,
 static int r3964_ioctl(struct tty_struct *tty, struct file *file,
 		unsigned int cmd, unsigned long arg)
 {
-	struct r3964_info *pInfo = (struct r3964_info *)tty->disc_data;
+	struct r3964_info *pInfo = tty->disc_data;
 	if (pInfo == NULL)
 		return -EINVAL;
 	switch (cmd) {
@@ -1222,7 +1216,7 @@ static void r3964_set_termios(struct tty_struct *tty, struct ktermios *old)
 static unsigned int r3964_poll(struct tty_struct *tty, struct file *file,
 			struct poll_table_struct *wait)
 {
-	struct r3964_info *pInfo = (struct r3964_info *)tty->disc_data;
+	struct r3964_info *pInfo = tty->disc_data;
 	struct r3964_client_info *pClient;
 	struct r3964_message *pMsg = NULL;
 	unsigned long flags;
@@ -1247,7 +1241,7 @@ static unsigned int r3964_poll(struct tty_struct *tty, struct file *file,
 static void r3964_receive_buf(struct tty_struct *tty, const unsigned char *cp,
 			char *fp, int count)
 {
-	struct r3964_info *pInfo = (struct r3964_info *)tty->disc_data;
+	struct r3964_info *pInfo = tty->disc_data;
 	const unsigned char *p;
 	char *f, flags = 0;
 	int i;

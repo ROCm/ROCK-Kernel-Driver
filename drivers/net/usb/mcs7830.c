@@ -94,10 +94,18 @@ static int mcs7830_get_reg(struct usbnet *dev, u16 index, u16 size, void *data)
 {
 	struct usb_device *xdev = dev->udev;
 	int ret;
+	void *buffer;
+
+	buffer = kmalloc(size, GFP_NOIO);
+	if (buffer == NULL)
+		return -ENOMEM;
 
 	ret = usb_control_msg(xdev, usb_rcvctrlpipe(xdev, 0), MCS7830_RD_BREQ,
-			      MCS7830_RD_BMREQ, 0x0000, index, data,
+			      MCS7830_RD_BMREQ, 0x0000, index, buffer,
 			      size, MCS7830_CTRL_TIMEOUT);
+	memcpy(data, buffer, size);
+	kfree(buffer);
+
 	return ret;
 }
 
@@ -105,20 +113,29 @@ static int mcs7830_set_reg(struct usbnet *dev, u16 index, u16 size, void *data)
 {
 	struct usb_device *xdev = dev->udev;
 	int ret;
+	void *buffer;
+
+	buffer = kmalloc(size, GFP_NOIO);
+	if (buffer == NULL)
+		return -ENOMEM;
+
+	memcpy(buffer, data, size);
 
 	ret = usb_control_msg(xdev, usb_sndctrlpipe(xdev, 0), MCS7830_WR_BREQ,
-			      MCS7830_WR_BMREQ, 0x0000, index, data,
+			      MCS7830_WR_BMREQ, 0x0000, index, buffer,
 			      size, MCS7830_CTRL_TIMEOUT);
+	kfree(buffer);
 	return ret;
 }
 
 static void mcs7830_async_cmd_callback(struct urb *urb)
 {
 	struct usb_ctrlrequest *req = (struct usb_ctrlrequest *)urb->context;
+	int status = urb->status;
 
-	if (urb->status < 0)
+	if (status < 0)
 		printk(KERN_DEBUG "%s() failed with %d\n",
-		       __FUNCTION__, urb->status);
+		       __func__, status);
 
 	kfree(req);
 	usb_free_urb(urb);
@@ -344,14 +361,14 @@ out:
 static int mcs7830_mdio_read(struct net_device *netdev, int phy_id,
 			     int location)
 {
-	struct usbnet *dev = netdev->priv;
+	struct usbnet *dev = netdev_priv(netdev);
 	return mcs7830_read_phy(dev, location);
 }
 
 static void mcs7830_mdio_write(struct net_device *netdev, int phy_id,
 				int location, int val)
 {
-	struct usbnet *dev = netdev->priv;
+	struct usbnet *dev = netdev_priv(netdev);
 	mcs7830_write_phy(dev, location, val);
 }
 

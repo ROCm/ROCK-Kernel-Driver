@@ -90,6 +90,7 @@ new_segment:
 		rq->bio->bi_seg_front_size = seg_size;
 	if (seg_size > rq->biotail->bi_seg_back_size)
 		rq->biotail->bi_seg_back_size = seg_size;
+
 	rq->nr_phys_segments = nr_phys_segs;
 }
 
@@ -124,7 +125,7 @@ static int blk_phys_contig_segment(struct request_queue *q, struct bio *bio,
 		return 0;
 
 	/*
-	 * bio and nxt are contiguous in memory, check if the queue allows
+	 * bio and nxt are contiguous in memory; check if the queue allows
 	 * these two to be merged into one
 	 */
 	if (BIO_SEG_BOUNDARY(q, bio, nxt))
@@ -220,27 +221,6 @@ new_segment:
 	return nsegs;
 }
 EXPORT_SYMBOL(blk_rq_map_sg);
-
-static inline int ll_new_mergeable(struct request_queue *q,
-				   struct request *req,
-				   struct bio *bio)
-{
-	int nr_phys_segs = bio_phys_segments(q, bio);
-
-	if (req->nr_phys_segments + nr_phys_segs > q->max_phys_segments) {
-		req->cmd_flags |= REQ_NOMERGE;
-		if (req == q->last_merge)
-			q->last_merge = NULL;
-		return 0;
-	}
-
-	/*
-	 * A hw segment is just getting larger, bump just the phys
-	 * counter.
-	 */
-	req->nr_phys_segments += nr_phys_segs;
-	return 1;
-}
 
 static inline int ll_new_hw_segment(struct request_queue *q,
 				    struct request *req,
@@ -402,14 +382,16 @@ static int attempt_merge(struct request_queue *q, struct request *req,
 	elv_merge_requests(q, req, next);
 
 	if (req->rq_disk) {
-		struct hd_struct *part
-			= get_part(req->rq_disk, req->sector);
-		disk_round_stats(req->rq_disk);
-		req->rq_disk->in_flight--;
-		if (part) {
-			part_round_stats(part);
-			part->in_flight--;
-		}
+		struct hd_struct *part;
+		int cpu;
+
+		cpu = part_stat_lock();
+		part = disk_map_sector_rcu(req->rq_disk, req->sector);
+
+		part_round_stats(cpu, part);
+		part_dec_in_flight(part);
+
+		part_stat_unlock();
 	}
 
 	req->ioprio = ioprio_best(req->ioprio, next->ioprio);

@@ -31,18 +31,13 @@
 #include <linux/types.h>
 #include <linux/pci.h>
 #include <linux/netdevice.h>
-
-#ifdef CONFIG_IXGBE_LRO
 #include <linux/inet_lro.h>
-#define IXGBE_MAX_LRO_AGGREGATE         32
-#define IXGBE_MAX_LRO_DESCRIPTORS       8
-#endif
+#include <linux/aer.h>
 
 #include "ixgbe_type.h"
 #include "ixgbe_common.h"
 #include "ixgbe_dcb.h"
-
-#if defined(CONFIG_DCA) || defined(CONFIG_DCA_MODULE)
+#ifdef CONFIG_IXGBE_DCA
 #include <linux/dca.h>
 #endif
 
@@ -50,7 +45,7 @@
 #define DPRINTK(nlevel, klevel, fmt, args...) \
 	((void)((NETIF_MSG_##nlevel & adapter->msg_enable) && \
 	printk(KERN_##klevel PFX "%s: %s: " fmt, adapter->netdev->name, \
-		__FUNCTION__ , ## args)))
+		__func__ , ## args)))
 
 /* TX/RX descriptor defines */
 #define IXGBE_DEFAULT_TXD		   1024
@@ -90,8 +85,11 @@
 #define IXGBE_TX_FLAGS_TSO		(u32)(1 << 2)
 #define IXGBE_TX_FLAGS_IPV4		(u32)(1 << 3)
 #define IXGBE_TX_FLAGS_VLAN_MASK	0xffff0000
-#define IXGBE_TX_FLAGS_VLAN_PRIO_MASK	0x0000e000
+#define IXGBE_TX_FLAGS_VLAN_PRIO_MASK   0x0000e000
 #define IXGBE_TX_FLAGS_VLAN_SHIFT	16
+
+#define IXGBE_MAX_LRO_DESCRIPTORS       8
+#define IXGBE_MAX_LRO_AGGREGATE         32
 
 /* wrapper around a pointer to a socket buffer,
  * so a DMA handle can be stored along with the buffer */
@@ -140,14 +138,12 @@ struct ixgbe_ring {
 		      * offset associated with this ring, which is different
 		      * for DCB and RSS modes */
 
-#if defined(CONFIG_DCA) || defined(CONFIG_DCA_MODULE)
+#ifdef CONFIG_IXGBE_DCA
 	/* cpu for tx queue */
 	int cpu;
 #endif
-#ifdef CONFIG_IXGBE_LRO
 	struct net_lro_mgr lro_mgr;
 	bool lro_used;
-#endif
 	struct ixgbe_queue_stats stats;
 	u16 v_idx; /* maps directly to the index for this ring in the hardware
 	           * vector array, can also be used for finding the bit in EICR
@@ -173,7 +169,7 @@ struct ixgbe_ring_feature {
 #define MAX_TX_QUEUES 32
 
 #define MAX_RX_PACKET_BUFFERS ((adapter->flags & IXGBE_FLAG_DCB_ENABLED) \
-			       ? 8 : 1)
+                              ? 8 : 1)
 #define MAX_TX_PACKET_BUFFERS MAX_RX_PACKET_BUFFERS
 
 /* MAX_MSIX_Q_VECTORS of these are allocated,
@@ -305,11 +301,9 @@ struct ixgbe_adapter {
 
 	unsigned long state;
 	u64 tx_busy;
-#ifndef IXGBE_NO_INET_LRO
 	u64 lro_aggregated;
 	u64 lro_flushed;
 	u64 lro_no_desc;
-#endif
 	unsigned int tx_ring_count;
 	unsigned int rx_ring_count;
 
@@ -334,13 +328,12 @@ enum ixgbe_boards {
 };
 
 extern struct ixgbe_info ixgbe_82598_info;
-#ifdef CONFIG_DCBNL
+#ifdef CONFIG_IXGBE_DCB
 extern struct dcbnl_rtnl_ops dcbnl_ops;
 extern int ixgbe_copy_dcb_cfg(struct ixgbe_dcb_config *src_dcb_cfg,
-			      struct ixgbe_dcb_config *dst_dcb_cfg, int tc_max);
+                              struct ixgbe_dcb_config *dst_dcb_cfg,
+                              int tc_max);
 #endif
-
-
 
 extern char ixgbe_driver_name[];
 extern const char ixgbe_driver_version[];
@@ -359,4 +352,5 @@ extern void ixgbe_reset_interrupt_capability(struct ixgbe_adapter *adapter);
 extern int ixgbe_init_interrupt_scheme(struct ixgbe_adapter *adapter);
 void ixgbe_napi_add_all(struct ixgbe_adapter *adapter);
 void ixgbe_napi_del_all(struct ixgbe_adapter *adapter);
+
 #endif /* _IXGBE_H_ */

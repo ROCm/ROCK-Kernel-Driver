@@ -40,7 +40,6 @@
  * alignment requirements and potentially different initial
  * setup.
  */
-static struct fs_struct init_fs = INIT_FS;
 static struct signal_struct init_signals = INIT_SIGNALS(init_signals);
 static struct sighand_struct init_sighand = INIT_SIGHAND(init_sighand);
 struct mm_struct init_mm = INIT_MM(init_mm);
@@ -78,7 +77,7 @@ unsigned long thread_saved_pc(struct task_struct *tsk)
 static void default_idle(void)
 {
 	if (!need_resched())
-#if defined(MACH_ATARI_ONLY) && !defined(CONFIG_HADES)
+#if defined(MACH_ATARI_ONLY)
 		/* block out HSYNC on the atari (falcon) */
 		__asm__("stop #0x2200" : : : "cc");
 #else
