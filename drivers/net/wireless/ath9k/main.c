@@ -1022,7 +1022,7 @@ static void ath_init_leds(struct ath_softc *sc)
 
 	trigger = ieee80211_get_radio_led_name(sc->hw);
 	snprintf(sc->radio_led.name, sizeof(sc->radio_led.name),
-		"ath9k-%s:radio", wiphy_name(sc->hw->wiphy));
+		"ath9k-%s::radio", wiphy_name(sc->hw->wiphy));
 	ret = ath_register_led(sc, &sc->radio_led, trigger);
 	sc->radio_led.led_type = ATH_LED_RADIO;
 	if (ret)
@@ -1030,7 +1030,7 @@ static void ath_init_leds(struct ath_softc *sc)
 
 	trigger = ieee80211_get_assoc_led_name(sc->hw);
 	snprintf(sc->assoc_led.name, sizeof(sc->assoc_led.name),
-		"ath9k-%s:assoc", wiphy_name(sc->hw->wiphy));
+		"ath9k-%s::assoc", wiphy_name(sc->hw->wiphy));
 	ret = ath_register_led(sc, &sc->assoc_led, trigger);
 	sc->assoc_led.led_type = ATH_LED_ASSOC;
 	if (ret)
@@ -1038,7 +1038,7 @@ static void ath_init_leds(struct ath_softc *sc)
 
 	trigger = ieee80211_get_tx_led_name(sc->hw);
 	snprintf(sc->tx_led.name, sizeof(sc->tx_led.name),
-		"ath9k-%s:tx", wiphy_name(sc->hw->wiphy));
+		"ath9k-%s::tx", wiphy_name(sc->hw->wiphy));
 	ret = ath_register_led(sc, &sc->tx_led, trigger);
 	sc->tx_led.led_type = ATH_LED_TX;
 	if (ret)
@@ -1046,7 +1046,7 @@ static void ath_init_leds(struct ath_softc *sc)
 
 	trigger = ieee80211_get_rx_led_name(sc->hw);
 	snprintf(sc->rx_led.name, sizeof(sc->rx_led.name),
-		"ath9k-%s:rx", wiphy_name(sc->hw->wiphy));
+		"ath9k-%s::rx", wiphy_name(sc->hw->wiphy));
 	ret = ath_register_led(sc, &sc->rx_led, trigger);
 	sc->rx_led.led_type = ATH_LED_RX;
 	if (ret)
@@ -1238,7 +1238,7 @@ static int ath_init_sw_rfkill(struct ath_softc *sc)
 	}
 
 	snprintf(sc->rf_kill.rfkill_name, sizeof(sc->rf_kill.rfkill_name),
-		"ath9k-%s:rfkill", wiphy_name(sc->hw->wiphy));
+		"ath9k-%s::rfkill", wiphy_name(sc->hw->wiphy));
 	sc->rf_kill.rfkill->name = sc->rf_kill.rfkill_name;
 	sc->rf_kill.rfkill->data = sc;
 	sc->rf_kill.rfkill->toggle_radio = ath_sw_toggle_radio;
