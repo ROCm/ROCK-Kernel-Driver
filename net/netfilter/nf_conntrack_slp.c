@@ -51,11 +51,12 @@ static int help(struct sk_buff *skb, unsigned int protoff,
 	struct rtable *rt = skb->rtable;
 	struct in_device *in_dev;
 	__be32 mask = 0;
+	__be32 src = 0;
 
 	/* we're only interested in locally generated packets */
 	if (skb->sk == NULL)
 		goto out;
-	if (rt == NULL || !(rt->rt_flags & RTCF_BROADCAST))
+	if (rt == NULL || !(rt->rt_flags & (RTCF_MULTICAST|RTCF_BROADCAST)))
 		goto out;
 	if (CTINFO2DIR(ctinfo) != IP_CT_DIR_ORIGINAL)
 		goto out;
@@ -64,15 +65,18 @@ static int help(struct sk_buff *skb, unsigned int protoff,
 	in_dev = __in_dev_get_rcu(rt->u.dst.dev);
 	if (in_dev != NULL) {
 		for_primary_ifa(in_dev) {
-			if (ifa->ifa_broadcast == iph->daddr) {
-				mask = ifa->ifa_mask;
-				break;
-			}
+			/* this is a hack as slp uses multicast we can't match
+			 * the destination address to some broadcast address. So
+			 * just take the first one. Better would be to install
+			 * expectations for all addresses */
+			mask = ifa->ifa_mask;
+			src = ifa->ifa_broadcast;
+			break;
 		} endfor_ifa(in_dev);
 	}
 	rcu_read_unlock();
 
-	if (mask == 0)
+	if (mask == 0 || src == 0)
 		goto out;
 
 	exp = nf_ct_expect_alloc(ct);
@@ -80,6 +84,7 @@ static int help(struct sk_buff *skb, unsigned int protoff,
 		goto out;
 
 	exp->tuple                = ct->tuplehash[IP_CT_DIR_REPLY].tuple;
+	exp->tuple.src.u3.ip      = src;
 	exp->tuple.src.u.udp.port = htons(SLP_PORT);
 
 	exp->mask.src.u3.ip       = mask;
