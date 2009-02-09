@@ -29,7 +29,7 @@
 #include <linux/cpu.h>
 #include <linux/elfcore.h>
 #include <linux/sysrq.h>
-#include <linux/perfmon_kern.h>
+#include <linux/nmi.h>
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
@@ -53,8 +53,10 @@
 
 static void sparc64_yield(int cpu)
 {
-	if (tlb_type != hypervisor)
+	if (tlb_type != hypervisor) {
+		touch_nmi_watchdog();
 		return;
+	}
 
 	clear_thread_flag(TIF_POLLING_NRFLAG);
 	smp_mb__after_clear_bit();
@@ -351,7 +353,11 @@ void exit_thread(void)
 			t->utraps[0]--;
 	}
 
-	pfm_exit_thread();
+	if (test_and_clear_thread_flag(TIF_PERFCTR)) {
+		t->user_cntd0 = t->user_cntd1 = NULL;
+		t->pcr_reg = 0;
+		write_pcr(0);
+	}
 }
 
 void flush_thread(void)
@@ -372,6 +378,13 @@ void flush_thread(void)
 		tsb_context_switch(mm);
 
 	set_thread_wsaved(0);
+
+	/* Turn off performance counters if on. */
+	if (test_and_clear_thread_flag(TIF_PERFCTR)) {
+		t->user_cntd0 = t->user_cntd1 = NULL;
+		t->pcr_reg = 0;
+		write_pcr(0);
+	}
 
 	/* Clear FPU register state. */
 	t->fpsaved[0] = 0;
@@ -586,6 +599,16 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 		t->kregs->u_regs[UREG_FP] =
 		  ((unsigned long) child_sf) - STACK_BIAS;
 
+		/* Special case, if we are spawning a kernel thread from
+		 * a userspace task (usermode helper, NFS or similar), we
+		 * must disable performance counters in the child because
+		 * the address space and protection realm are changing.
+		 */
+		if (t->flags & _TIF_PERFCTR) {
+			t->user_cntd0 = t->user_cntd1 = NULL;
+			t->pcr_reg = 0;
+			t->flags &= ~_TIF_PERFCTR;
+		}
 		t->flags |= ((long)ASI_P << TI_FLAG_CURRENT_DS_SHIFT);
 		t->kregs->u_regs[UREG_G6] = (unsigned long) t;
 		t->kregs->u_regs[UREG_G4] = (unsigned long) t->task;
@@ -617,8 +640,6 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 
 	if (clone_flags & CLONE_SETTLS)
 		t->kregs->u_regs[UREG_G7] = regs->u_regs[UREG_I3];
-
-	pfm_copy_thread(p);
 
 	return 0;
 }

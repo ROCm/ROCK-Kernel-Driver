@@ -520,8 +520,6 @@ source "drivers/sbus/char/Kconfig"
 
 source "fs/Kconfig"
 
-source "arch/sparc/perfmon/Kconfig"
-
 source "arch/sparc/Kconfig.debug"
 
 source "security/Kconfig"

@@ -392,20 +392,8 @@
 #define __NR_pipe2		321
 #define __NR_inotify_init1	322
 #define __NR_accept4		323
-#define __NR_pfm_create_context 324
-#define __NR_pfm_write_pmcs	325
-#define __NR_pfm_write_pmds	326
-#define __NR_pfm_read_pmds	327
-#define __NR_pfm_load_context	328
-#define __NR_pfm_start		329
-#define __NR_pfm_stop		330
-#define __NR_pfm_restart	331
-#define __NR_pfm_create_evtsets	332
-#define __NR_pfm_getinfo_evtsets 333
-#define __NR_pfm_delete_evtsets	334
-#define __NR_pfm_unload_context	335
 
-#define NR_SYSCALLS		336
+#define NR_SYSCALLS		324
 
 #ifdef __32bit_syscall_numbers__
 /* Sparc 32-bit only has the "setresuid32", "getresuid32" variants,
