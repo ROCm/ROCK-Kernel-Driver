@@ -21,6 +21,11 @@ config RWSEM_XCHGADD_ALGORITHM
 	bool
 	default n
 
+config GENERIC_LOCKBREAK
+        bool
+        default y
+        depends on SMP
+
 config BLACKFIN
 	bool
 	default y

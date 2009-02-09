@@ -25,6 +25,11 @@ config MMU
 config RWSEM_GENERIC_SPINLOCK
 	bool
 
+config GENERIC_LOCKBREAK
+        bool
+        default y
+        depends on SMP
+
 config RWSEM_XCHGADD_ALGORITHM
 	bool
 	default y

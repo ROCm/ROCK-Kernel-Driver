@@ -63,7 +63,7 @@ config NO_DMA
 config GENERIC_LOCKBREAK
 	bool
 	default y
-	depends on SMP && PREEMPT
+	depends on SMP
 
 config PGSTE
 	bool

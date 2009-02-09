@@ -298,7 +298,7 @@ config US3_MC
 config GENERIC_LOCKBREAK
 	bool
 	default y
-	depends on SPARC64 && SMP && PREEMPT
+	depends on SMP
 
 choice
 	prompt "SPARC64 Huge TLB Page Size"
