@@ -26,7 +26,7 @@ EXPORT_PER_CPU_SYMBOL(__cpu_data);
 struct cpu_info {
 	int psr_vers;
 	const char *name;
-	char *pmu_name;
+	const char *pmu_name;
 };
 
 struct fpu_info {
@@ -44,9 +44,9 @@ struct manufacturer_info {
 };
 
 #define CPU(ver, _name) \
-{ .psr_vers = ver, .name = _name, .pmu_name = NULL }
+{ .psr_vers = ver, .name = _name }
 
-#define CPUPMU(ver, _name, _pmu_name) \
+#define CPU_PMU(ver, _name, _pmu_name)	\
 { .psr_vers = ver, .name = _name, .pmu_name = _pmu_name }
 
 #define FPU(ver, _name) \
@@ -187,10 +187,10 @@ static const struct manufacturer_info __initconst manufacturer_info[] = {
 },{
 	0x17,
 	.cpu_info = {
-		CPUPMU(0x10, "TI UltraSparc I   (SpitFire)", "ultra12"),
-		CPUPMU(0x11, "TI UltraSparc II  (BlackBird)", "ultra12"),
-		CPUPMU(0x12, "TI UltraSparc IIi (Sabre)", "ultra12"),
-		CPUPMU(0x13, "TI UltraSparc IIe (Hummingbird)", "ultra12"),
+		CPU_PMU(0x10, "TI UltraSparc I   (SpitFire)", "ultra12"),
+		CPU_PMU(0x11, "TI UltraSparc II  (BlackBird)", "ultra12"),
+		CPU_PMU(0x12, "TI UltraSparc IIi (Sabre)", "ultra12"),
+		CPU_PMU(0x13, "TI UltraSparc IIe (Hummingbird)", "ultra12"),
 		CPU(-1, NULL)
 	},
 	.fpu_info = {
@@ -203,7 +203,7 @@ static const struct manufacturer_info __initconst manufacturer_info[] = {
 },{
 	0x22,
 	.cpu_info = {
-		CPUPMU(0x10, "TI UltraSparc I   (SpitFire)", "ultra12"),
+		CPU_PMU(0x10, "TI UltraSparc I   (SpitFire)", "ultra12"),
 		CPU(-1, NULL)
 	},
 	.fpu_info = {
@@ -213,12 +213,12 @@ static const struct manufacturer_info __initconst manufacturer_info[] = {
 },{
 	0x3e,
 	.cpu_info = {
-		CPUPMU(0x14, "TI UltraSparc III (Cheetah)", "ultra3"),
-		CPUPMU(0x15, "TI UltraSparc III+ (Cheetah+)", "ultra3+"),
-		CPUPMU(0x16, "TI UltraSparc IIIi (Jalapeno)", "ultra3i"),
-		CPUPMU(0x18, "TI UltraSparc IV (Jaguar)", "ultra4"),
-		CPUPMU(0x19, "TI UltraSparc IV+ (Panther)", "ultra4+"),
-		CPUPMU(0x22, "TI UltraSparc IIIi+ (Serrano)", "ultra3+"),
+		CPU_PMU(0x14, "TI UltraSparc III (Cheetah)", "ultra3"),
+		CPU_PMU(0x15, "TI UltraSparc III+ (Cheetah+)", "ultra3+"),
+		CPU_PMU(0x16, "TI UltraSparc IIIi (Jalapeno)", "ultra3i"),
+		CPU_PMU(0x18, "TI UltraSparc IV (Jaguar)", "ultra3+"),
+		CPU_PMU(0x19, "TI UltraSparc IV+ (Panther)", "ultra4+"),
+		CPU_PMU(0x22, "TI UltraSparc IIIi+ (Serrano)", "ultra3i"),
 		CPU(-1, NULL)
 	},
 	.fpu_info = {
@@ -249,6 +249,7 @@ static void set_cpu_and_fpu(int psr_impl, int psr_vers, int fpu_vers)
 
 	sparc_cpu_type = NULL;
 	sparc_fpu_type = NULL;
+	sparc_pmu_type = NULL;
 	manuf = NULL;
 
 	for (i = 0; i < ARRAY_SIZE(manufacturer_info); i++)
@@ -290,18 +291,14 @@ static void set_cpu_and_fpu(int psr_impl, int psr_vers, int fpu_vers)
 		       psr_impl, psr_vers);
 		sparc_cpu_type = "Unknown CPU";
 	}
-	if (sparc_pmu_type == NULL)
-	{
-		printk(KERN_ERR "PMU: Unknown chip, impl[0x%x] vers[0x%x]\n",
-		       psr_impl, psr_vers);
-		sparc_pmu_type = "Unknown PMU";
-	}
 	if (sparc_fpu_type == NULL)
 	{
 		printk(KERN_ERR "FPU: Unknown chip, impl[0x%x] vers[0x%x]\n",
 		       psr_impl, fpu_vers);
 		sparc_fpu_type = "Unknown FPU";
 	}
+	if (sparc_pmu_type == NULL)
+		sparc_pmu_type = "Unknown PMU";
 }
 
 #ifdef CONFIG_SPARC32
@@ -341,7 +338,6 @@ static void __init sun4v_cpu_probe(void)
 		       prom_cpu_compatible);
 		sparc_cpu_type = "Unknown SUN4V CPU";
 		sparc_fpu_type = "Unknown SUN4V FPU";
-		sparc_pmu_type = "Unknown SUN4V PMU";
 		break;
 	}
 }

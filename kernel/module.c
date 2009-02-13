@@ -586,28 +586,17 @@ static char last_unloaded_module[MODULE_NAME_LEN+1];
 
 #ifdef CONFIG_MODULE_UNLOAD
 /* Init the unload section of the module. */
-static int module_unload_init(struct module *mod)
+static void module_unload_init(struct module *mod)
 {
-	unsigned int i;
-	size_t refsize = nr_cpu_ids * sizeof(*mod->ref);
+	int cpu;
 
 	INIT_LIST_HEAD(&mod->modules_which_use_me);
-
-	mod->ref = kzalloc(refsize, GFP_KERNEL);
-	if (!mod->ref) {
-		mod->ref = vmalloc(refsize);
-		if (!mod->ref)
-			return -ENOMEM;
-		memset(mod->ref, 0, refsize);
-	}
-	for (i = 0; i < nr_cpu_ids; i++)
-		local_set(&mod->ref[i].count, 0);
+	for_each_possible_cpu(cpu)
+		local_set(__module_ref_addr(mod, cpu), 0);
 	/* Hold reference count during initialization. */
-	local_set(&mod->ref[raw_smp_processor_id()].count, 1);
+	local_set(__module_ref_addr(mod, raw_smp_processor_id()), 1);
 	/* Backwards compatibility macros put refcount during init. */
 	mod->waiter = current;
-
-	return 0;
 }
 
 /* modules using other modules */
@@ -687,10 +676,6 @@ static void module_unload_free(struct module *mod)
 			}
 		}
 	}
-	if (is_vmalloc_addr(mod->ref))
-		vfree(mod->ref);
-	else
-		kfree(mod->ref);
 }
 
 #ifdef CONFIG_MODULE_FORCE_UNLOAD
@@ -747,10 +732,11 @@ static int try_stop_module(struct module *mod, int flags, int *forced)
 
 unsigned int module_refcount(struct module *mod)
 {
-	unsigned int i, total = 0;
+	unsigned int total = 0;
+	int cpu;
 
-	for (i = 0; i < nr_cpu_ids; i++)
-		total += local_read(&mod->ref[i].count);
+	for_each_possible_cpu(cpu)
+		total += local_read(__module_ref_addr(mod, cpu));
 	return total;
 }
 EXPORT_SYMBOL(module_refcount);
@@ -924,7 +910,7 @@ void module_put(struct module *module)
 {
 	if (module) {
 		unsigned int cpu = get_cpu();
-		local_dec(&module->ref[cpu].count);
+		local_dec(__module_ref_addr(module, cpu));
 		/* Maybe they're waiting for us to drop reference? */
 		if (unlikely(!module_is_live(module)))
 			wake_up_process(module->waiter);
@@ -949,9 +935,8 @@ static inline int use_module(struct module *a, struct module *b)
 	return strong_try_module_get(b) == 0;
 }
 
-static inline int module_unload_init(struct module *mod)
+static inline void module_unload_init(struct module *mod)
 {
-	return 0;
 }
 #endif /* CONFIG_MODULE_UNLOAD */
 
@@ -1523,7 +1508,10 @@ static void free_module(struct module *mod)
 	kfree(mod->args);
 	if (mod->percpu)
 		percpu_modfree(mod->percpu);
-
+#if defined(CONFIG_MODULE_UNLOAD) && defined(CONFIG_SMP)
+	if (mod->refptr)
+		percpu_modfree(mod->refptr);
+#endif
 	/* Free lock-classes: */
 	lockdep_free_key_range(mod->module_core, mod->core_size);
 
@@ -2070,6 +2058,14 @@ static noinline struct module *load_module(void __user *umod,
 	if (err < 0)
 		goto free_mod;
 
+#if defined(CONFIG_MODULE_UNLOAD) && defined(CONFIG_SMP)
+	mod->refptr = percpu_modalloc(sizeof(local_t), __alignof__(local_t),
+				      mod->name);
+	if (!mod->refptr) {
+		err = -ENOMEM;
+		goto free_mod;
+	}
+#endif
 	if (pcpuindex) {
 		/* We have a special allocation for this section. */
 		percpu = percpu_modalloc(sechdrs[pcpuindex].sh_size,
@@ -2077,7 +2073,7 @@ static noinline struct module *load_module(void __user *umod,
 					 mod->name);
 		if (!percpu) {
 			err = -ENOMEM;
-			goto free_mod;
+			goto free_percpu;
 		}
 		sechdrs[pcpuindex].sh_flags &= ~(unsigned long)SHF_ALLOC;
 		mod->percpu = percpu;
@@ -2130,9 +2126,7 @@ static noinline struct module *load_module(void __user *umod,
 	mod = (void *)sechdrs[modindex].sh_addr;
 
 	/* Now we've moved module, initialize linked lists, etc. */
-	err = module_unload_init(mod);
-	if (err)
-		goto free_unload;
+	module_unload_init(mod);
 
 	/* add kobject, so we can reference it. */
 	err = mod_sysfs_init(mod);
@@ -2365,6 +2359,9 @@ static noinline struct module *load_module(void __user *umod,
  free_percpu:
 	if (percpu)
 		percpu_modfree(percpu);
+#if defined(CONFIG_MODULE_UNLOAD) && defined(CONFIG_SMP)
+	percpu_modfree(mod->refptr);
+#endif
  free_mod:
 	kfree(args);
  free_hdr:

@@ -78,8 +78,6 @@ libs-y                 += arch/sparc/lib/
 
 drivers-$(CONFIG_OPROFILE)	+= arch/sparc/oprofile/
 
-core-$(CONFIG_PERFMON)		+= arch/sparc/perfmon/
-
 # Export what is needed by arch/sparc/boot/Makefile
 export VMLINUX_INIT VMLINUX_MAIN
 VMLINUX_INIT := $(head-y) $(init-y)

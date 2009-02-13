@@ -8170,6 +8170,7 @@ static int iwl3945_pci_suspend(struct pci_dev *pdev, pm_message_t state)
 		iwl3945_mac_stop(priv->hw);
 		priv->is_open = 1;
 	}
+
 	pci_save_state(pdev);
 	pci_disable_device(pdev);
 	pci_set_power_state(pdev, PCI_D3hot);

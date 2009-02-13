@@ -99,15 +99,17 @@ static void show_raw_backtrace(unsigned long reg29)
 #ifdef CONFIG_KALLSYMS
 	printk("\n");
 #endif
-#define IS_KVA01(a) ((((unsigned long)a) & 0xc0000000) == 0x80000000)
-	if (IS_KVA01(sp)) {
-		while (!kstack_end(sp)) {
-			addr = *sp++;
-			if (__kernel_text_address(addr))
-				print_ip_sym(addr);
+	while (!kstack_end(sp)) {
+		unsigned long __user *p =
+			(unsigned long __user *)(unsigned long)sp++;
+		if (__get_user(addr, p)) {
+			printk(" (Bad stack address)");
+			break;
 		}
-		printk("\n");
+		if (__kernel_text_address(addr))
+			print_ip_sym(addr);
 	}
+	printk("\n");
 }
 
 #ifdef CONFIG_KALLSYMS
@@ -942,6 +944,9 @@ asmlinkage void do_mdmx(struct pt_regs *regs)
 	force_sig(SIGILL, current);
 }
 
+/*
+ * Called with interrupts disabled.
+ */
 asmlinkage void do_watch(struct pt_regs *regs)
 {
 	u32 cause;
@@ -961,9 +966,12 @@ asmlinkage void do_watch(struct pt_regs *regs)
 	 */
 	if (test_tsk_thread_flag(current, TIF_LOAD_WATCH)) {
 		mips_read_watch_registers();
+		local_irq_enable();
 		force_sig(SIGTRAP, current);
-	} else
+	} else {
 		mips_clear_watch_registers();
+		local_irq_enable();
+	}
 }
 
 asmlinkage void do_mcheck(struct pt_regs *regs)
@@ -1580,7 +1588,11 @@ void __init set_handler(unsigned long offset, void *addr, unsigned long size)
 static char panic_null_cerr[] __cpuinitdata =
 	"Trying to set NULL cache error exception handler";
 
-/* Install uncached CPU exception handler */
+/*
+ * Install uncached CPU exception handler.
+ * This is suitable only for the cache error exception which is the only
+ * exception handler that is being run uncached.
+ */
 void __cpuinit set_uncached_handler(unsigned long offset, void *addr,
 	unsigned long size)
 {
@@ -1591,7 +1603,7 @@ void __cpuinit set_uncached_handler(unsigned long offset, void *addr,
 	unsigned long uncached_ebase = TO_UNCAC(ebase);
 #endif
 	if (cpu_has_mips_r2)
-		ebase += (read_c0_ebase() & 0x3ffff000);
+		uncached_ebase += (read_c0_ebase() & 0x3ffff000);
 
 	if (!addr)
 		panic(panic_null_cerr);
