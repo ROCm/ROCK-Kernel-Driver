@@ -851,7 +851,7 @@ static int tg3_bmcr_reset(struct tg3 *tp)
 		}
 		udelay(10);
 	}
-	if (limit <= 0)
+	if (limit < 0)
 		return -EBUSY;
 
 	return 0;
@@ -1602,7 +1602,7 @@ static int tg3_wait_macro_done(struct tg3 *tp)
 				break;
 		}
 	}
-	if (limit <= 0)
+	if (limit < 0)
 		return -EBUSY;
 
 	return 0;

@@ -943,14 +943,16 @@ static int get_transition_latency(struct powernow_k8_data *data)
 {
 	int max_latency = 0;
 	int i;
-        for (i = 0; i < data->acpi_data.state_count; i++) {
+	for (i = 0; i < data->acpi_data.state_count; i++) {
 		int cur_latency = data->acpi_data.states[i].transition_latency
 			+ data->acpi_data.states[i].bus_master_latency;
 		if (cur_latency > max_latency)
 			max_latency = cur_latency;
 	}
-	return max_latency;
+	/* value in usecs, needs to be in nanoseconds */
+	return 1000 * max_latency;
 }
+
 #else
 static int powernow_k8_cpu_init_acpi(struct powernow_k8_data *data) { return -ENODEV; }
 static void powernow_k8_cpu_exit_acpi(struct powernow_k8_data *data) { return; }
@@ -1186,17 +1188,13 @@ static int __cpuinit powernowk8_cpu_init(struct cpufreq_policy *pol)
 		if (rc) {
 			goto err_out;
 		}
-
-	        /* Take a crude guess here.
-	         * That guess was in microseconds, so multiply with 1000 */
+		/* Take a crude guess here.
+		 * That guess was in microseconds, so multiply with 1000 */
 		pol->cpuinfo.transition_latency = (
-			( (data->rvo + 8) * data->vstable * VST_UNITS_20US) +
-			(  (1 << data->irt) * 30)
-			) * 1000;
-	}
-	else /* ACPI _PSS objects available */
-		pol->cpuinfo.transition_latency =
-			get_transition_latency(data) * 1000;
+			 ((data->rvo + 8) * data->vstable * VST_UNITS_20US) +
+			 ((1 << data->irt) * 30)) * 1000;
+	} else /* ACPI _PSS objects available */
+		pol->cpuinfo.transition_latency = get_transition_latency(data);
 
 	/* only run on specific CPU from here on */
 	oldmask = current->cpus_allowed;
