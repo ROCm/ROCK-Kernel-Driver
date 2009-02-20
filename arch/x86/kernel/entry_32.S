@@ -874,16 +874,16 @@ ENTRY(arch_unwind_init_running)
 	movl	$__USER_DS, PT_DS(%edx)
 	movl	$__USER_DS, PT_ES(%edx)
 	movl	$__KERNEL_PERCPU, PT_FS(%edx)
+	movl	%eax, PT_OLDESP(%edx)
+	movl	16(%esp), %eax
 	movl	%ebx, PT_ORIG_EAX(%edx)
 	movl	%ecx, PT_EIP(%edx)
-	movl	16(%esp), %eax
 	movl	12(%esp), %ecx
 	movl	$__KERNEL_CS, PT_CS(%edx)
-	movl	%ebx, PT_EFLAGS(%edx)
 	movl	%eax, 12(%esp)
-	movl	%eax, PT_OLDESP(%edx)
 	movl	8(%esp), %eax
 	movl	%ecx, 8(%esp)
+	movl	%ebx, PT_EFLAGS(%edx)
 	movl	PT_EBX(%edx), %ebx
 	movl	$__KERNEL_DS, PT_OLDSS(%edx)
 	jmpl	*%eax
