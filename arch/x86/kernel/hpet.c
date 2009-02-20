@@ -337,6 +337,8 @@ static void hpet_set_mode(enum clock_event_mode mode,
 		now = hpet_read_value(HPET_COUNTER);
 		cmp = now + (unsigned long) delta;
 		cfg = hpet_readl(HPET_Tn_CFG(timer));
+		/* Make sure we use edge triggered interrupts */
+		cfg &= ~HPET_TN_LEVEL;
 		cfg |= HPET_TN_ENABLE | HPET_TN_PERIODIC |
 		       HPET_TN_SETVAL |
 		       (hpet_legacy_use_64_bits ? 0 : HPET_TN_32BIT);
