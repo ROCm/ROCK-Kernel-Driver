@@ -2,7 +2,7 @@
 #define _LINUX_UNWIND_H
 
 /*
- * Copyright (C) 2002-2006 Novell, Inc.
+ * Copyright (C) 2002-2009 Novell, Inc.
  *     Jan Beulich <jbeulich@novell.com>
  * This code is released under version 2 of the GNU GPL.
  *
@@ -11,14 +11,19 @@
  * full-blown stack unwinding with all the bells and whistles, so there
  * is not much point in implementing the full Dwarf2 unwind API.
  */
-#ifdef CONFIG_STACK_UNWIND
+
+#include <linux/linkage.h>
 
 struct module;
 struct stacktrace_ops;
 struct unwind_frame_info;
 
+typedef asmlinkage int (*unwind_callback_fn)(struct unwind_frame_info *,
+					     const struct stacktrace_ops *,
+					     void *);
 
-typedef int (*unwind_callback_fn)(struct unwind_frame_info *, const struct stacktrace_ops *, void *);
+#ifdef CONFIG_STACK_UNWIND
+
 #include <asm/unwind.h>
 #include <asm/stacktrace.h>
 
@@ -56,8 +61,8 @@ extern int unwind_init_blocked(struct unwind_frame_info *,
  * Prepare to unwind the currently running thread.
  */
 extern int unwind_init_running(struct unwind_frame_info *,
-			       asmlinkage unwind_callback_fn callback,
-			       const struct stacktrace_ops *ops,
+			       unwind_callback_fn,
+			       const struct stacktrace_ops *,
                                void *data);
 
 /*
@@ -72,5 +77,59 @@ extern int unwind(struct unwind_frame_info *);
  * error.
  */
 extern int unwind_to_user(struct unwind_frame_info *);
+
+#else /* CONFIG_STACK_UNWIND */
+
+struct unwind_frame_info {};
+
+static inline void unwind_init(void) {}
+static inline void unwind_setup(void) {}
+
+#ifdef CONFIG_MODULES
+
+static inline void *unwind_add_table(struct module *mod,
+                                     const void *table_start,
+                                     unsigned long table_size)
+{
+	return NULL;
+}
+
+#endif
+
+static inline void unwind_remove_table(void *handle, int init_only)
+{
+}
+
+static inline int unwind_init_frame_info(struct unwind_frame_info *info,
+                                         struct task_struct *tsk,
+                                         const struct pt_regs *regs)
+{
+	return -ENOSYS;
+}
+
+static inline int unwind_init_blocked(struct unwind_frame_info *info,
+                                      struct task_struct *tsk)
+{
+	return -ENOSYS;
+}
+
+static inline int unwind_init_running(struct unwind_frame_info *info,
+			       unwind_callback_fn cb,
+			       const struct stacktrace_ops *ops,
+                                      void *data)
+{
+	return -ENOSYS;
+}
+
+static inline int unwind(struct unwind_frame_info *info)
+{
+	return -ENOSYS;
+}
+
+static inline int unwind_to_user(struct unwind_frame_info *info)
+{
+	return -ENOSYS;
+}
+
 #endif /* CONFIG_STACK_UNWIND */
 #endif /* _LINUX_UNWIND_H */

@@ -2,7 +2,7 @@
 #define _ASM_X86_UNWIND_H
 
 /*
- * Copyright (C) 2002-2007 Novell, Inc.
+ * Copyright (C) 2002-2009 Novell, Inc.
  *	Jan Beulich <jbeulich@novell.com>
  * This code is released under version 2 of the GNU GPL.
  */
@@ -20,33 +20,34 @@ struct unwind_frame_info
 	unsigned call_frame:1;
 };
 
-extern int try_stack_unwind(struct task_struct *task, struct pt_regs *regs,
+extern int try_stack_unwind(struct task_struct *, struct pt_regs *,
 			    unsigned long **stack, unsigned long *bp,
-			    const struct stacktrace_ops *ops, void *data);
+			    const struct stacktrace_ops *, void *data);
 
-#ifdef CONFIG_X86_64
-
-#include <asm/vsyscall.h>
-
-#define UNW_PC(frame)        (frame)->regs.ip
-#define UNW_SP(frame)        (frame)->regs.sp
+#define UNW_PC(frame)      (frame)->regs.ip
+#define UNW_SP(frame)      (frame)->regs.sp
 #ifdef CONFIG_FRAME_POINTER
-#define UNW_FP(frame)        (frame)->regs.bp
-#define FRAME_RETADDR_OFFSET 8
-#define FRAME_LINK_OFFSET    0
-#define STACK_BOTTOM(tsk)    (((tsk)->thread.sp0 - 1) & ~(THREAD_SIZE - 1))
-#define TSK_STACK_TOP(tsk)       ((tsk)->thread.sp0)
+#define UNW_FP(frame)      (frame)->regs.bp
+#define FRAME_LINK_OFFSET  0
+#define STACK_BOTTOM(tsk)  STACK_LIMIT((tsk)->thread.sp0)
+#define TSK_STACK_TOP(tsk) ((tsk)->thread.sp0)
 #else
-#define UNW_FP(frame) ((void)(frame), 0UL)
+#define UNW_FP(frame)      ((void)(frame), 0UL)
 #endif
-/* Might need to account for the special exception and interrupt handling
-   stacks here, since normally
+/* On x86-64, might need to account for the special exception and interrupt
+   handling stacks here, since normally
 	EXCEPTION_STACK_ORDER < THREAD_ORDER < IRQSTACK_ORDER,
    but the construct is needed only for getting across the stack switch to
    the interrupt stack - thus considering the IRQ stack itself is unnecessary,
    and the overhead of comparing against all exception handling stacks seems
    not desirable. */
-#define STACK_LIMIT(ptr)     (((ptr) - 1) & ~(THREAD_SIZE - 1))
+#define STACK_LIMIT(ptr)   (((ptr) - 1) & ~(THREAD_SIZE - 1))
+
+#ifdef CONFIG_X86_64
+
+#include <asm/vsyscall.h>
+
+#define FRAME_RETADDR_OFFSET 8
 
 #define UNW_REGISTER_INFO \
 	PTREGS_INFO(ax), \
@@ -67,22 +68,11 @@ extern int try_stack_unwind(struct task_struct *task, struct pt_regs *regs,
 	PTREGS_INFO(r15), \
 	PTREGS_INFO(ip)
 
-#else
+#else /* X86_32 */
 
 #include <asm/fixmap.h>
 
-#define UNW_PC(frame)        (frame)->regs.ip
-#define UNW_SP(frame)        (frame)->regs.sp
-#ifdef CONFIG_FRAME_POINTER
-#define UNW_FP(frame)        (frame)->regs.bp
 #define FRAME_RETADDR_OFFSET 4
-#define FRAME_LINK_OFFSET    0
-#define STACK_BOTTOM(tsk)    STACK_LIMIT((tsk)->thread.sp0)
-#define TSK_STACK_TOP(tsk)       ((tsk)->thread.sp0)
-#else
-#define UNW_FP(frame) ((void)(frame), 0UL)
-#endif
-#define STACK_LIMIT(ptr)     (((ptr) - 1) & ~(THREAD_SIZE - 1))
 
 #define UNW_REGISTER_INFO \
 	PTREGS_INFO(ax), \
@@ -142,8 +132,8 @@ static inline void arch_unw_init_blocked(struct unwind_frame_info *info)
 
 extern asmlinkage int
 arch_unwind_init_running(struct unwind_frame_info *,
-			 asmlinkage unwind_callback_fn,
-			 const struct stacktrace_ops *ops, void *data);
+			 unwind_callback_fn,
+			 const struct stacktrace_ops *, void *data);
 
 static inline int arch_unw_user_mode(/*const*/ struct unwind_frame_info *info)
 {
@@ -160,6 +150,18 @@ static inline int arch_unw_user_mode(/*const*/ struct unwind_frame_info *info)
 	       || info->regs.sp < PAGE_OFFSET;
 #endif
 }
+
+#else
+
+#define UNW_PC(frame) ((void)(frame), 0UL)
+#define UNW_SP(frame) ((void)(frame), 0UL)
+#define UNW_FP(frame) ((void)(frame), 0UL)
+
+static inline int arch_unw_user_mode(const void *info)
+{
+	return 0;
+}
+
 #endif
 
 #endif /* _ASM_X86_UNWIND_H */

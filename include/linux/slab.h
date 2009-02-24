@@ -129,6 +129,7 @@ unsigned kmem_alloc_estimate(struct kmem_cache *cachep,
 void * __must_check __krealloc(const void *, size_t, gfp_t);
 void * __must_check krealloc(const void *, size_t, gfp_t);
 void kfree(const void *);
+void kzfree(const void *);
 size_t ksize(const void *);
 unsigned kmalloc_estimate_objs(size_t, gfp_t, int);
 unsigned kmalloc_estimate_bytes(gfp_t, size_t);
