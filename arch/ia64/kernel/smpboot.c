@@ -729,14 +729,15 @@ int __cpu_disable(void)
 			return -EBUSY;
 	}
 
+	cpu_clear(cpu, cpu_online_map);
+
 	if (migrate_platform_irqs(cpu)) {
 		cpu_set(cpu, cpu_online_map);
-		return (-EBUSY);
+		return -EBUSY;
 	}
 
 	remove_siblinginfo(cpu);
 	fixup_irqs();
-	cpu_clear(cpu, cpu_online_map);
 	local_flush_tlb_all();
 	cpu_clear(cpu, cpu_callin_map);
 	pfm_cpu_disable();

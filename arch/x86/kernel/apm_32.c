@@ -1193,6 +1193,7 @@ static int suspend(int vetoable)
 	device_suspend(PMSG_SUSPEND);
 	local_irq_disable();
 	device_power_down(PMSG_SUSPEND);
+	sysdev_suspend(PMSG_SUSPEND);
 
 	local_irq_enable();
 
@@ -1209,6 +1210,7 @@ static int suspend(int vetoable)
 	if (err != APM_SUCCESS)
 		apm_error("suspend", err);
 	err = (err == APM_SUCCESS) ? 0 : -EIO;
+	sysdev_resume();
 	device_power_up(PMSG_RESUME);
 	local_irq_enable();
 	device_resume(PMSG_RESUME);
@@ -1229,6 +1231,7 @@ static void standby(void)
 
 	local_irq_disable();
 	device_power_down(PMSG_SUSPEND);
+	sysdev_suspend(PMSG_SUSPEND);
 	local_irq_enable();
 
 	err = set_system_power_state(APM_STATE_STANDBY);
@@ -1236,6 +1239,7 @@ static void standby(void)
 		apm_error("standby", err);
 
 	local_irq_disable();
+	sysdev_resume();
 	device_power_up(PMSG_RESUME);
 	local_irq_enable();
 }

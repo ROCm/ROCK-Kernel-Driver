@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 29
-EXTRAVERSION = -rc5-git3
+EXTRAVERSION = -rc6-git1
 NAME = Erotic Pickled Herring
 
 # *DOCUMENTATION*
