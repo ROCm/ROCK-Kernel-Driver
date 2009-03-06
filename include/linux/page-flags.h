@@ -103,14 +103,23 @@ enum pageflags {
 #ifdef CONFIG_IA64_UNCACHED_ALLOCATOR
 	PG_uncached,		/* Page has been mapped as uncached */
 #endif
+#ifdef CONFIG_XEN
+	PG_foreign,		/* Page is owned by foreign allocator. */
+	PG_pinned,		/* Cannot alias with PG_owner_priv_1 since
+				 * bad_page() checks include this bit.
+				 * Should not use PG_arch_1 as that may have
+				 * a different purpose elsewhere. */
+#endif
 	__NR_PAGEFLAGS,
 
 	/* Filesystems */
 	PG_checked = PG_owner_priv_1,
 
+#ifdef CONFIG_PARAVIRT_XEN
 	/* XEN */
 	PG_pinned = PG_owner_priv_1,
 	PG_savepinned = PG_dirty,
+#endif
 
 	/* SLOB */
 	PG_slob_page = PG_active,
@@ -198,8 +207,12 @@ PAGEFLAG(Active, active) __CLEARPAGEFLAG(Active, active)
 	TESTCLEARFLAG(Active, active)
 __PAGEFLAG(Slab, slab)
 PAGEFLAG(Checked, checked)		/* Used by some filesystems */
+#if defined(CONFIG_XEN) || defined(CONFIG_PARAVIRT_XEN)
 PAGEFLAG(Pinned, pinned) TESTSCFLAG(Pinned, pinned)	/* Xen */
+#endif
+#ifdef CONFIG_PARAVIRT_XEN
 PAGEFLAG(SavePinned, savepinned);			/* Xen */
+#endif
 PAGEFLAG(Reserved, reserved) __CLEARPAGEFLAG(Reserved, reserved)
 PAGEFLAG(Private, private) __CLEARPAGEFLAG(Private, private)
 	__SETPAGEFLAG(Private, private)
@@ -310,6 +323,26 @@ static inline void SetPageUptodate(struct page *page)
 
 CLEARPAGEFLAG(Uptodate, uptodate)
 
+#ifdef CONFIG_XEN
+TESTPAGEFLAG(Foreign, foreign)
+static inline void SetPageForeign(struct page *page,
+				  void (*dtor)(struct page *, unsigned int))
+{
+	BUG_ON(!dtor);
+	set_bit(PG_foreign, &page->flags);
+	page->index = (long)dtor;
+}
+static inline void ClearPageForeign(struct page *page)
+{
+	clear_bit(PG_foreign, &page->flags);
+	page->index = 0;
+}
+static inline void PageForeignDestructor(struct page *page, unsigned int order)
+{
+	((void (*)(struct page *, unsigned int))page->index)(page, order);
+}
+#endif
+
 extern void cancel_dirty_page(struct page *page, unsigned int account_size);
 
 int test_clear_page_writeback(struct page *page);
@@ -388,6 +421,14 @@ PAGEFLAG_FALSE(MemError)
 #define __PG_MLOCKED		0
 #endif
 
+#if !defined(CONFIG_XEN)
+# define __PG_XEN		0
+#elif defined(CONFIG_X86)
+# define __PG_XEN		((1 << PG_pinned) | (1 << PG_foreign))
+#else
+# define __PG_XEN		(1 << PG_foreign)
+#endif
+
 /*
  * Flags checked when a page is freed.  Pages being freed should not have
  * these flags set.  It they are, there is a problem.
@@ -396,7 +437,7 @@ PAGEFLAG_FALSE(MemError)
 	(1 << PG_lru   | 1 << PG_private   | 1 << PG_locked | \
 	 1 << PG_buddy | 1 << PG_writeback | 1 << PG_reserved | \
 	 1 << PG_slab  | 1 << PG_swapcache | 1 << PG_active | \
-	 1 << PG_waiters | __PG_UNEVICTABLE | __PG_MLOCKED)
+	 1 << PG_waiters | __PG_UNEVICTABLE | __PG_MLOCKED | __PG_XEN)
 
 /*
  * Flags checked when a page is prepped for return by the page allocator.

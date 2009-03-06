@@ -375,11 +375,23 @@ int efx_hard_start_xmit(struct sk_buff *skb, struct net_device *net_dev)
 {
 	struct efx_nic *efx = netdev_priv(net_dev);
 	struct efx_tx_queue *tx_queue;
+	enum efx_veto veto;
 
 	if (likely(skb->ip_summed == CHECKSUM_PARTIAL))
 		tx_queue = &efx->tx_queue[EFX_TX_QUEUE_OFFLOAD_CSUM];
 	else
 		tx_queue = &efx->tx_queue[EFX_TX_QUEUE_NO_CSUM];
+
+	/* See if driverlink wants to veto the packet. */
+	veto = EFX_DL_CALLBACK(efx, tx_packet, skb);
+	if (unlikely(veto)) {
+		EFX_DL_LOG(efx, "TX queue %d packet vetoed by "
+			   "driverlink %s driver\n", tx_queue->queue,
+			   efx->dl_cb_dev.tx_packet->driver->name);
+		/* Free the skb; nothing else will do it */
+		dev_kfree_skb_any(skb);
+		return NETDEV_TX_OK;
+	}
 
 	return efx_xmit(efx, tx_queue, skb);
 }

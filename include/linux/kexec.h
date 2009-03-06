@@ -46,6 +46,13 @@
 			    KEXEC_CORE_NOTE_NAME_BYTES +		\
 			    KEXEC_CORE_NOTE_DESC_BYTES )
 
+#ifndef KEXEC_ARCH_HAS_PAGE_MACROS
+#define kexec_page_to_pfn(page)  page_to_pfn(page)
+#define kexec_pfn_to_page(pfn)   pfn_to_page(pfn)
+#define kexec_virt_to_phys(addr) virt_to_phys(addr)
+#define kexec_phys_to_virt(addr) phys_to_virt(addr)
+#endif
+
 /*
  * This structure is used to hold the arguments that are used when loading
  * kernel binaries.
@@ -112,6 +119,12 @@ struct kimage {
 extern void machine_kexec(struct kimage *image);
 extern int machine_kexec_prepare(struct kimage *image);
 extern void machine_kexec_cleanup(struct kimage *image);
+#ifdef CONFIG_XEN
+extern int xen_machine_kexec_load(struct kimage *image);
+extern void xen_machine_kexec_unload(struct kimage *image);
+extern void xen_machine_kexec_setup_resources(void);
+extern void xen_machine_kexec_register_resources(struct resource *res);
+#endif
 extern asmlinkage long sys_kexec_load(unsigned long entry,
 					unsigned long nr_segments,
 					struct kexec_segment __user *segments,
@@ -193,8 +206,15 @@ extern int dump_after_notifier;
 #define VMCOREINFO_BYTES           (4096)
 #define VMCOREINFO_NOTE_NAME       "VMCOREINFO"
 #define VMCOREINFO_NOTE_NAME_BYTES ALIGN(sizeof(VMCOREINFO_NOTE_NAME), 4)
+#if !defined(CONFIG_XEN) || !defined(CONFIG_X86)
 #define VMCOREINFO_NOTE_SIZE       (KEXEC_NOTE_HEAD_BYTES*2 + VMCOREINFO_BYTES \
 				    + VMCOREINFO_NOTE_NAME_BYTES)
+#else
+#define VMCOREINFO_NOTE_SIZE       ALIGN(KEXEC_NOTE_HEAD_BYTES*2 \
+					 + VMCOREINFO_BYTES \
+					 + VMCOREINFO_NOTE_NAME_BYTES, \
+					 PAGE_SIZE)
+#endif
 
 /* Location of a reserved region to hold the crash kernel.
  */

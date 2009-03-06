@@ -107,6 +107,9 @@ struct tpm_chip {
 	struct dentry **bios_dir;
 
 	struct list_head list;
+#ifdef CONFIG_XEN
+	void *priv;
+#endif
 	void (*release) (struct device *);
 };
 
@@ -123,6 +126,18 @@ static inline void tpm_write_index(int base, int index, int value)
 	outb(index, base);
 	outb(value & 0xFF, base+1);
 }
+
+#ifdef CONFIG_XEN
+static inline void *chip_get_private(const struct tpm_chip *chip)
+{
+	return chip->priv;
+}
+
+static inline void chip_set_private(struct tpm_chip *chip, void *priv)
+{
+	chip->priv = priv;
+}
+#endif
 
 extern void tpm_get_timeouts(struct tpm_chip *);
 extern void tpm_gen_interrupt(struct tpm_chip *);

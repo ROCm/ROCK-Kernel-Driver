@@ -62,7 +62,7 @@ struct cpu_user_regs {
     uint16_t fs, _pad4;
     uint16_t gs, _pad5;
 };
-DEFINE_GUEST_HANDLE_STRUCT(cpu_user_regs);
+DEFINE_XEN_GUEST_HANDLE_STRUCT(cpu_user_regs);
 
 typedef uint64_t tsc_timestamp_t; /* RDTSC timestamp */
 

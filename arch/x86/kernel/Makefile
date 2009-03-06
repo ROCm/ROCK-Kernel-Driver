@@ -111,11 +111,14 @@ obj-$(CONFIG_X86_CHECK_BIOS_CORRUPTION) += check.o
 
 obj-$(CONFIG_SWIOTLB)			+= pci-swiotlb_64.o # NB rename without _64
 
+obj-$(CONFIG_X86_XEN)		+= fixup.o
+
 ###
 # 64 bit specific files
 ifeq ($(CONFIG_X86_64),y)
-        obj-y				+= genapic_64.o genapic_flat_64.o genx2apic_uv_x.o tlb_uv.o
-	obj-y				+= bios_uv.o uv_irq.o uv_sysfs.o
+	obj-$(CONFIG_X86_LOCAL_APIC)	+= genapic_64.o genapic_flat_64.o genx2apic_uv_x.o
+	obj-$(CONFIG_X86_XEN_GENAPIC)	+= genapic_64.o genapic_xen_64.o
+	obj-y				+= tlb_uv.o bios_uv.o uv_irq.o uv_sysfs.o
         obj-y				+= genx2apic_cluster.o
         obj-y				+= genx2apic_phys.o
         obj-$(CONFIG_X86_PM_TIMER)	+= pmtimer_64.o
@@ -126,4 +129,11 @@ ifeq ($(CONFIG_X86_64),y)
         obj-$(CONFIG_AMD_IOMMU)		+= amd_iommu_init.o amd_iommu.o
 
         obj-$(CONFIG_PCI_MMCONFIG)	+= mmconf-fam10h_64.o
+
+	time_64-$(CONFIG_XEN)		+= time_32.o
 endif
+
+disabled-obj-$(CONFIG_XEN) := %_uv.o crash.o early-quirks.o genapic_flat_64.o \
+	genx2apic_%.o hpet.o i8253.o i8259.o irqinit_$(BITS).o \
+	pci-swiotlb_64.o reboot.o smpboot.o tlb_$(BITS).o tsc.o tsc_sync.o \
+	uv_%.o vsmp_64.o

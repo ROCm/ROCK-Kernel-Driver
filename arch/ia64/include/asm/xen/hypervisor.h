@@ -33,7 +33,7 @@
 #ifndef _ASM_IA64_XEN_HYPERVISOR_H
 #define _ASM_IA64_XEN_HYPERVISOR_H
 
-#ifdef CONFIG_XEN
+#ifdef CONFIG_PARAVIRT_XEN
 
 #include <linux/init.h>
 #include <xen/interface/xen.h>

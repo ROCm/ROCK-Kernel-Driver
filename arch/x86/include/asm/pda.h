@@ -26,9 +26,13 @@ struct x8664_pda {
 	short in_bootmem;		/* pda lives in bootmem */
 	unsigned int __softirq_pending;
 	unsigned int __nmi_count;	/* number of NMI on this CPUs */
+#ifndef CONFIG_XEN
 	short mmu_state;
 	short isidle;
 	struct mm_struct *active_mm;
+#else
+	short isidle;
+#endif
 	unsigned apic_timer_irqs;
 	unsigned irq0_irqs;
 	unsigned irq_resched_count;

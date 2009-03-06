@@ -1,6 +1,8 @@
 #ifndef _ASM_X86_IPI_H
 #define _ASM_X86_IPI_H
 
+#ifndef CONFIG_XEN
+
 /*
  * Copyright 2004 James Cleverdon, IBM.
  * Subject to the GNU Public License, v.2
@@ -153,5 +155,7 @@ static inline void send_IPI_mask_allbutself(const struct cpumask *mask,
 				vector, APIC_DEST_PHYSICAL);
 	local_irq_restore(flags);
 }
+
+#endif /* CONFIG_XEN */
 
 #endif /* _ASM_X86_IPI_H */

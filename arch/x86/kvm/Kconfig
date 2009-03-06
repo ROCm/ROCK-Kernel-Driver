@@ -7,6 +7,7 @@ config HAVE_KVM
 menuconfig VIRTUALIZATION
 	bool "Virtualization"
 	depends on HAVE_KVM || X86
+	depends on !XEN
 	default y
 	---help---
 	  Say Y here to get to see options for using your Linux host to run other

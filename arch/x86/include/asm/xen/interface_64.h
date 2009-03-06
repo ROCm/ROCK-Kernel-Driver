@@ -136,7 +136,7 @@ struct cpu_user_regs {
     uint16_t fs, _pad5[3]; /* Non-zero => takes precedence over fs_base.     */
     uint16_t gs, _pad6[3]; /* Non-zero => takes precedence over gs_base_usr. */
 };
-DEFINE_GUEST_HANDLE_STRUCT(cpu_user_regs);
+DEFINE_XEN_GUEST_HANDLE_STRUCT(cpu_user_regs);
 
 #undef __DECL_REG
 

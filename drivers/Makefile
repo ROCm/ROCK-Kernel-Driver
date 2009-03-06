@@ -16,7 +16,7 @@ obj-$(CONFIG_ACPI)		+= acpi/
 obj-$(CONFIG_PNP)		+= pnp/
 obj-$(CONFIG_ARM_AMBA)		+= amba/
 
-obj-$(CONFIG_XEN)		+= xen/
+obj-$(CONFIG_PARAVIRT_XEN)	+= xen/
 
 # regulators early, since some subsystems rely on them to initialize
 obj-$(CONFIG_REGULATOR)		+= regulator/
@@ -40,6 +40,7 @@ obj-y				+= base/ block/ misc/ mfd/ net/ media/
 obj-$(CONFIG_NUBUS)		+= nubus/
 obj-$(CONFIG_ATM)		+= atm/
 obj-y				+= macintosh/
+obj-$(CONFIG_XEN)		+= xen/
 obj-$(CONFIG_SCSI)		+= scsi/
 obj-$(CONFIG_ATA)		+= ata/
 obj-$(CONFIG_IDE)		+= ide/

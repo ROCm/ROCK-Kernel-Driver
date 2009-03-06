@@ -120,6 +120,21 @@ int pci_claim_resource(struct pci_dev *dev, int resource)
 	return err;
 }
 
+#ifdef CONFIG_PCI_REASSIGN
+void pci_disable_bridge_window(struct pci_dev *dev)
+{
+	dev_dbg(&dev->dev, "disable bridge window\n");
+
+	/* MMIO Base/Limit */
+	pci_write_config_dword(dev, PCI_MEMORY_BASE, 0x0000fff0);
+
+	/* Prefetchable MMIO Base/Limit */
+	pci_write_config_dword(dev, PCI_PREF_LIMIT_UPPER32, 0);
+	pci_write_config_dword(dev, PCI_PREF_MEMORY_BASE, 0x0000fff0);
+	pci_write_config_dword(dev, PCI_PREF_BASE_UPPER32, 0xffffffff);
+}
+#endif
+
 int pci_assign_resource(struct pci_dev *dev, int resno)
 {
 	struct pci_bus *bus = dev->bus;
@@ -137,6 +152,10 @@ int pci_assign_resource(struct pci_dev *dev, int resno)
 			resno, res, res->flags);
 		return -EINVAL;
 	}
+	if (resno < PCI_BRIDGE_RESOURCES
+	    && is_reassigndev(dev)
+	    && (res->flags & IORESOURCE_MEM))
+		align = ALIGN(align, PAGE_SIZE);
 
 	/* First, try exact prefetching match.. */
 	ret = pci_bus_alloc_resource(bus, res, size, align, min,
@@ -159,8 +178,13 @@ int pci_assign_resource(struct pci_dev *dev, int resno)
 			resno, res->flags & IORESOURCE_IO ? "I/O" : "mem", res);
 	} else {
 		res->flags &= ~IORESOURCE_STARTALIGN;
-		if (resno < PCI_BRIDGE_RESOURCES)
+		if (resno < PCI_BRIDGE_RESOURCES) {
+#ifdef CONFIG_PCI_REASSIGN
+			dev_dbg(&dev->dev, "assign resource(%d) %pR\n",
+			        resno, res);
+#endif
 			pci_update_resource(dev, resno);
+		}
 	}
 
 	return ret;
@@ -195,6 +219,9 @@ int pci_assign_resource_fixed(struct pci_dev *dev, int resno)
 		dev_err(&dev->dev, "BAR %d: can't allocate %s resource %pR\n",
 			resno, res->flags & IORESOURCE_IO ? "I/O" : "mem", res);
 	} else if (resno < PCI_BRIDGE_RESOURCES) {
+#ifdef CONFIG_PCI_REASSIGN
+		dev_dbg(&dev->dev, "assign resource(%d) %pR\n", resno, res);
+#endif
 		pci_update_resource(dev, resno);
 	}
 
@@ -207,6 +234,7 @@ EXPORT_SYMBOL_GPL(pci_assign_resource_fixed);
 void pdev_sort_resources(struct pci_dev *dev, struct resource_list *head)
 {
 	int i;
+	int reassigndev = is_reassigndev(dev);
 
 	for (i = 0; i < PCI_NUM_RESOURCES; i++) {
 		struct resource *r;
@@ -228,12 +256,22 @@ void pdev_sort_resources(struct pci_dev *dev, struct resource_list *head)
 				i, r, r->flags);
 			continue;
 		}
+		if (i < PCI_BRIDGE_RESOURCES && (r->flags & IORESOURCE_MEM) &&
+		    reassigndev)
+			r_align = ALIGN(r_align, PAGE_SIZE);
+
 		for (list = head; ; list = list->next) {
 			resource_size_t align = 0;
 			struct resource_list *ln = list->next;
 
-			if (ln)
+			if (ln) {
 				align = resource_alignment(ln->res);
+				if (ln->res - ln->dev->resource <
+				    PCI_BRIDGE_RESOURCES &&
+				    (ln->res->flags & IORESOURCE_MEM) &&
+				    is_reassigndev(ln->dev))
+					align = ALIGN(align, PAGE_SIZE);
+			}
 
 			if (r_align > align) {
 				tmp = kmalloc(sizeof(*tmp), GFP_KERNEL);
