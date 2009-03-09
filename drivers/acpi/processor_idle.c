@@ -128,7 +128,7 @@ static inline u32 ticks_elapsed_in_us(u32 t1, u32 t2)
 		return PM_TIMER_TICKS_TO_US((0xFFFFFFFF - t1) + t2);
 }
 
-#ifdef CONFIG_CPU_IDLE
+#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
 /*
  * Callers should disable interrupts before the call and enable
  * interrupts after return.
@@ -230,7 +230,8 @@ int acpi_processor_resume(struct acpi_device * device)
 	return 0;
 }
 
-#if defined (CONFIG_GENERIC_TIME) && defined (CONFIG_X86) && defined(CONFIG_CPU_IDLE)
+#if defined (CONFIG_GENERIC_TIME) && defined (CONFIG_X86) \
+    && !defined(CONFIG_PROCESSOR_EXTERNAL_CONTROL)
 static int tsc_halts_in_c(int state)
 {
 	switch (boot_cpu_data.x86_vendor) {
@@ -499,10 +500,10 @@ static void acpi_processor_power_verify_c2(struct acpi_processor_cx *cx)
 	 */
 	cx->valid = 1;
 
-#ifndef CONFIG_CPU_IDLE
-	cx->latency_ticks = US_TO_PM_TIMER_TICKS(cx->latency);
-#else
+#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
 	cx->latency_ticks = cx->latency;
+#else
+	cx->latency_ticks = US_TO_PM_TIMER_TICKS(cx->latency);
 #endif
 
 	return;
@@ -583,10 +584,10 @@ static void acpi_processor_power_verify_c3(struct acpi_processor *pr,
 	 */
 	cx->valid = 1;
 
-#ifndef CONFIG_CPU_IDLE
-	cx->latency_ticks = US_TO_PM_TIMER_TICKS(cx->latency);
-#else
+#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
 	cx->latency_ticks = cx->latency;
+#else
+	cx->latency_ticks = US_TO_PM_TIMER_TICKS(cx->latency);
 #endif
 	/*
 	 * On older chipsets, BM_RLD needs to be set
@@ -661,7 +662,7 @@ static int acpi_processor_get_power_info(struct acpi_processor *pr)
 
 	pr->power.count = acpi_processor_power_verify(pr);
 
-#ifndef CONFIG_CPU_IDLE
+#ifdef CONFIG_PROCESSOR_EXTERNAL_CONTROL
 	/*
 	 * Set Default Policy
 	 * ------------------
@@ -773,7 +774,7 @@ static const struct file_operations acpi_processor_power_fops = {
 };
 
 
-#ifdef CONFIG_CPU_IDLE
+#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
 /**
  * acpi_idle_bm_check - checks if bus master activity was detected
  */
@@ -1137,7 +1138,12 @@ static int acpi_processor_setup_cpuidle(struct acpi_processor *pr)
 	return 0;
 }
 
-#endif /* CONFIG_CPU_IDLE */
+#else /* CONFIG_PROCESSOR_EXTERNAL_CONTROL */
+static inline int acpi_processor_setup_cpuidle(struct acpi_processor *pr)
+{
+	return 0;
+}
+#endif /* CONFIG_PROCESSOR_EXTERNAL_CONTROL */
 
 int acpi_processor_cst_has_changed(struct acpi_processor *pr)
 {
@@ -1164,7 +1170,6 @@ int acpi_processor_cst_has_changed(struct acpi_processor *pr)
 		return ret;
 	}
 
-#ifdef CONFIG_CPU_IDLE
 	cpuidle_pause_and_lock();
 	cpuidle_disable_device(&pr->power.dev);
 	acpi_processor_get_power_info(pr);
@@ -1173,7 +1178,6 @@ int acpi_processor_cst_has_changed(struct acpi_processor *pr)
 		ret = cpuidle_enable_device(&pr->power.dev);
 	}
 	cpuidle_resume_and_unlock();
-#endif /* CONFIG_CPU_IDLE */
 
 	return ret;
 }
@@ -1206,7 +1210,7 @@ int __cpuinit acpi_processor_power_init(struct acpi_processor *pr,
 			       "ACPI: processor limited to max C-state %d\n",
 			       max_cstate);
 		first_run++;
-#if !defined(CONFIG_CPU_IDLE) && defined(CONFIG_SMP)
+#if defined(CONFIG_PROCESSOR_EXTERNAL_CONTROL) && defined(CONFIG_SMP)
 		pm_qos_add_notifier(PM_QOS_CPU_DMA_LATENCY,
 				    &acpi_processor_latency_notifier);
 #endif
@@ -1233,11 +1237,9 @@ int __cpuinit acpi_processor_power_init(struct acpi_processor *pr,
 	 * platforms that only support C1.
 	 */
 	if (pr->flags.power) {
-#ifdef CONFIG_CPU_IDLE
 		acpi_processor_setup_cpuidle(pr);
 		if (cpuidle_register_device(&pr->power.dev))
 			return -EIO;
-#endif
 
 		printk(KERN_INFO PREFIX "CPU%d (power states:", pr->id);
 		for (i = 1; i <= pr->power.count; i++)
@@ -1268,16 +1270,14 @@ int acpi_processor_power_exit(struct acpi_processor *pr,
 	if (boot_option_idle_override)
 		return 0;
 
-#ifdef CONFIG_CPU_IDLE
 	cpuidle_unregister_device(&pr->power.dev);
-#endif
 	pr->flags.power_setup_done = 0;
 
 	if (acpi_device_dir(device))
 		remove_proc_entry(ACPI_PROCESSOR_FILE_POWER,
 				  acpi_device_dir(device));
 
-#if !defined(CONFIG_CPU_IDLE) && defined(CONFIG_SMP)
+#if defined(CONFIG_PROCESSOR_EXTERNAL_CONTROL) && defined(CONFIG_SMP)
 	/* Unregister the idle handler when processor #0 is removed. */
 	if (pr->id == 0)
 		pm_qos_remove_notifier(PM_QOS_CPU_DMA_LATENCY,
