@@ -29,9 +29,9 @@ const char nfs4ace_owner_who[]	  = "OWNER@";
 const char nfs4ace_group_who[]	  = "GROUP@";
 const char nfs4ace_everyone_who[] = "EVERYONE@";
 
-EXPORT_SYMBOL_GPL(nfs4ace_owner_who);
-EXPORT_SYMBOL_GPL(nfs4ace_group_who);
-EXPORT_SYMBOL_GPL(nfs4ace_everyone_who);
+EXPORT_SYMBOL(nfs4ace_owner_who);
+EXPORT_SYMBOL(nfs4ace_group_who);
+EXPORT_SYMBOL(nfs4ace_everyone_who);
 
 /**
  * nfs4acl_alloc  -  allocate an acl
@@ -50,7 +50,7 @@ nfs4acl_alloc(int count)
 	}
 	return acl;
 }
-EXPORT_SYMBOL_GPL(nfs4acl_alloc);
+EXPORT_SYMBOL(nfs4acl_alloc);
 
 /**
  * nfs4acl_clone  -  create a copy of an acl
@@ -113,7 +113,7 @@ nfs4acl_masks_to_mode(const struct nfs4acl *acl)
 	       nfs4acl_mask_to_mode(acl->a_group_mask) << 3 |
 	       nfs4acl_mask_to_mode(acl->a_other_mask);
 }
-EXPORT_SYMBOL_GPL(nfs4acl_masks_to_mode);
+EXPORT_SYMBOL(nfs4acl_masks_to_mode);
 
 static unsigned int
 nfs4acl_mode_to_mask(mode_t mode)
@@ -172,7 +172,7 @@ nfs4acl_chmod(struct nfs4acl *acl, mode_t mode)
 	}
 	return clone;
 }
-EXPORT_SYMBOL_GPL(nfs4acl_chmod);
+EXPORT_SYMBOL(nfs4acl_chmod);
 
 /**
  * nfs4acl_want_to_mask  - convert permission want argument to a mask
@@ -196,7 +196,7 @@ nfs4acl_want_to_mask(int want)
 
 	return mask;
 }
-EXPORT_SYMBOL_GPL(nfs4acl_want_to_mask);
+EXPORT_SYMBOL(nfs4acl_want_to_mask);
 
 /**
  * nfs4acl_capability_check  -  check for capabilities overriding read/write access
@@ -328,7 +328,7 @@ int nfs4acl_permission(struct inode *inode, const struct nfs4acl *acl,
 		return 0;
 	return nfs4acl_capability_check(inode, requested);
 }
-EXPORT_SYMBOL_GPL(nfs4acl_permission);
+EXPORT_SYMBOL(nfs4acl_permission);
 
 /**
  * nfs4acl_generic_permission  -  permission check algorithm without explicit acl
@@ -353,7 +353,7 @@ int nfs4acl_generic_permission(struct inode *inode, unsigned int mask)
 		return 0;
 	return nfs4acl_capability_check(inode, mask);
 }
-EXPORT_SYMBOL_GPL(nfs4acl_generic_permission);
+EXPORT_SYMBOL(nfs4acl_generic_permission);
 
 /*
  * nfs4ace_is_same_who  -  do both acl entries refer to the same identifier?
@@ -393,7 +393,7 @@ nfs4ace_set_who(struct nfs4ace *ace, const char *who)
 	ace->e_flags &= ~ACE4_IDENTIFIER_GROUP;
 	return 0;
 }
-EXPORT_SYMBOL_GPL(nfs4ace_set_who);
+EXPORT_SYMBOL(nfs4ace_set_who);
 
 /**
  * nfs4acl_allowed_to_who  -  mask flags allowed to a specific who value
@@ -570,4 +570,4 @@ nfs4acl_inherit(const struct nfs4acl *dir_acl, mode_t mode)
 
 	return acl;
 }
-EXPORT_SYMBOL_GPL(nfs4acl_inherit);
+EXPORT_SYMBOL(nfs4acl_inherit);

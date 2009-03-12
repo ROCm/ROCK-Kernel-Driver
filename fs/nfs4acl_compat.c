@@ -733,7 +733,7 @@ nfs4acl_apply_masks(struct nfs4acl **acl)
 	*acl = x.acl;
 	return retval;
 }
-EXPORT_SYMBOL_GPL(nfs4acl_apply_masks);
+EXPORT_SYMBOL(nfs4acl_apply_masks);
 
 int nfs4acl_write_through(struct nfs4acl **acl)
 {

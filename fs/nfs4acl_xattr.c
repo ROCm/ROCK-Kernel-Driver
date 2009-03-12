@@ -91,7 +91,7 @@ fail_einval:
 	nfs4acl_put(acl);
 	return ERR_PTR(-EINVAL);
 }
-EXPORT_SYMBOL_GPL(nfs4acl_from_xattr);
+EXPORT_SYMBOL(nfs4acl_from_xattr);
 
 size_t
 nfs4acl_xattr_size(const struct nfs4acl *acl)
@@ -106,7 +106,7 @@ nfs4acl_xattr_size(const struct nfs4acl *acl)
 	}
 	return size;
 }
-EXPORT_SYMBOL_GPL(nfs4acl_xattr_size);
+EXPORT_SYMBOL(nfs4acl_xattr_size);
 
 void
 nfs4acl_to_xattr(const struct nfs4acl *acl, void *buffer)
@@ -143,4 +143,4 @@ nfs4acl_to_xattr(const struct nfs4acl *acl, void *buffer)
 		}
 	}
 }
-EXPORT_SYMBOL_GPL(nfs4acl_to_xattr);
+EXPORT_SYMBOL(nfs4acl_to_xattr);
