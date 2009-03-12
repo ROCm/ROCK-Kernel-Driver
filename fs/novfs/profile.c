@@ -208,9 +208,7 @@ int ___DbgPrint(const char *site, const char *Fmt, ...)
 
 		if (buf) {
 			va_start(args, Fmt);
-			len = sprintf(buf, "[%d] ", current->pid);
-			len += strncat(buf + len, site, DBG_BUFFER_SIZE - len);
-
+			len = snprintf(buf, DBG_BUFFER_SIZE, "[%d] %s ", current->pid, site);
 			len += vsnprintf(buf + len, DBG_BUFFER_SIZE - len, Fmt,
 				      args);
 			if (-1 == len) {

@@ -92,11 +92,11 @@ static struct novfs_scope_list *Scope_Find_Scope(int Create)
 
 	task = current;
 
-	DbgPrint("Scope_Find_Scope: %d %d %d %d\n", task->uid, task->euid,
-		 task->suid, task->fsuid);
+	DbgPrint("Scope_Find_Scope: %d %d %d %d\n", current_uid(),
+		current_euid(), current_suid(), current_fsuid());
 
 	//scopeId = task->euid;
-	UID_TO_SCHANDLE(scopeId, task->euid);
+	UID_TO_SCHANDLE(scopeId, current_euid());
 
 	scope = Scope_Search4Scope(scopeId, 0, 0);
 
@@ -108,17 +108,17 @@ static struct novfs_scope_list *Scope_Find_Scope(int Create)
 			scope->ScopePid = task->pid;
 			scope->ScopeTask = task;
 			scope->ScopeHash = 0;
-			scope->ScopeUid = task->euid;
+			scope->ScopeUid = current_euid();
 			scope->ScopeUserName[0] = '\0';
 
 			if (!novfs_daemon_create_sessionId(&scope->SessionId)) {
 				DbgPrint("Scope_Find_Scope2: %d %d %d %d\n",
-					 task->uid, task->euid, task->suid,
-					 task->fsuid);
+					 current_uid(), current_euid(),
+					 current_suid(), current_fsuid());
 				memset(scope->ScopeUserName, 0,
 				       sizeof(scope->ScopeUserName));
 				scope->ScopeUserNameLength = 0;
-				novfs_daemon_getpwuid(task->euid,
+				novfs_daemon_getpwuid(current_euid(),
 						sizeof(scope->ScopeUserName),
 						scope->ScopeUserName);
 				scope->ScopeUserNameLength =
@@ -477,8 +477,8 @@ static int Scope_Cleanup_Thread(void *Args)
 			rscope = NULL;
 			rcu_read_lock();
 			for_each_process(task) {
-				if ((task->uid == scope->ScopeUid)
-				    || (task->euid == scope->ScopeUid)) {
+				if ((task->cred->uid == scope->ScopeUid)
+				    || (task->cred->euid == scope->ScopeUid)) {
 					rscope = scope;
 					break;
 				}
