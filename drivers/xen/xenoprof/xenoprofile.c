@@ -29,7 +29,6 @@
 #include <xen/driver_util.h>
 #include <xen/interface/xen.h>
 #include <xen/interface/xenoprof.h>
-#include "../../../drivers/oprofile/cpu_buffer.h"
 #include "../../../drivers/oprofile/event_buffer.h"
 
 #define MAX_XENOPROF_SAMPLES 16
@@ -51,7 +50,7 @@ static int xenoprof_enabled = 0;
 static int xenoprof_is_primary = 0;
 static int active_defined;
 
-extern unsigned long backtrace_depth;
+extern unsigned long oprofile_backtrace_depth;
 
 /* Number of buffers in shared area (one per VCPU) */
 static int nbuf;
@@ -142,8 +141,7 @@ static void xenoprof_add_pc(xenoprof_buf_t *buf, int is_passive)
 		if (xenoprof_is_escape(buf, tail) &&
 		    xenoprof_get_event(buf, tail) == XENOPROF_TRACE_BEGIN) {
 			tracing=1;
-			oprofile_add_pc(ESCAPE_CODE, buf->event_log[tail].mode, 
-					CPU_TRACE_BEGIN); 
+			oprofile_add_mode(buf->event_log[tail].mode);
 			if (!is_passive)
 				oprofile_samples++;
 			else
@@ -312,11 +310,11 @@ static int xenoprof_setup(void)
 			active_defined = 1;
 		}
 
-		if (backtrace_depth > 0) {
+		if (oprofile_backtrace_depth > 0) {
 			ret = HYPERVISOR_xenoprof_op(XENOPROF_set_backtrace, 
-						     &backtrace_depth);
+						     &oprofile_backtrace_depth);
 			if (ret)
-				backtrace_depth = 0;
+				oprofile_backtrace_depth = 0;
 		}
 
 		ret = HYPERVISOR_xenoprof_op(XENOPROF_reserve_counters, NULL);

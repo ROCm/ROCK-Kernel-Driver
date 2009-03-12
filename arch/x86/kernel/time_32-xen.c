@@ -566,10 +566,12 @@ irqreturn_t timer_interrupt(int irq, void *dev_id)
 		if (user_mode_vm(get_irq_regs()))
 			account_user_time(current, (cputime_t)delta_cpu,
 					  (cputime_t)delta_cpu);
-		else
+		else if (current != idle_task(cpu))
 			account_system_time(current, HARDIRQ_OFFSET,
 					    (cputime_t)delta_cpu,
 					    (cputime_t)delta_cpu);
+		else
+			account_idle_time((cputime_t)delta_cpu);
 	}
 
 	/* Offlined for more than a few seconds? Avoid lockup warnings. */
@@ -580,6 +582,7 @@ irqreturn_t timer_interrupt(int irq, void *dev_id)
 	run_local_timers();
 	if (rcu_pending(cpu))
 		rcu_check_callbacks(cpu, user_mode_vm(get_irq_regs()));
+	printk_tick();
 	scheduler_tick();
 	run_posix_cpu_timers(current);
 	profile_tick(CPU_PROFILING);
@@ -815,7 +818,8 @@ static void stop_hz_timer(void)
 	smp_mb();
 
 	/* Leave ourselves in tick mode if rcu or softirq or timer pending. */
-	if (rcu_needs_cpu(cpu) || local_softirq_pending() ||
+	if (rcu_needs_cpu(cpu) || printk_needs_cpu(cpu) ||
+	    local_softirq_pending() ||
 	    (j = get_next_timer_interrupt(jiffies),
 	     time_before_eq(j, jiffies))) {
 		cpumask_clear_cpu(cpu, nohz_cpu_mask);

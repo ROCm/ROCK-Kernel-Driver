@@ -37,6 +37,7 @@
 #include <linux/kernel_stat.h>
 #include <linux/sysdev.h>
 #include <linux/bootmem.h>
+#include <linux/ftrace.h>
 #include <linux/version.h>
 #include <asm/atomic.h>
 #include <asm/system.h>
@@ -323,7 +324,7 @@ static DEFINE_PER_CPU(unsigned int, last_processed_l1i) = { BITS_PER_LONG - 1 };
 static DEFINE_PER_CPU(unsigned int, last_processed_l2i) = { BITS_PER_LONG - 1 };
 
 /* NB. Interrupts are disabled on entry. */
-asmlinkage void evtchn_do_upcall(struct pt_regs *regs)
+asmlinkage void __irq_entry evtchn_do_upcall(struct pt_regs *regs)
 {
 	unsigned long       l1, l2;
 	unsigned long       masked_l1, masked_l2;
