@@ -7918,7 +7918,7 @@ static int iwl3945_pci_probe(struct pci_dev *pdev, const struct pci_device_id *e
 				CSR_GP_CNTRL_REG_FLAG_MAC_CLOCK_READY, 25000);
 	if (err < 0) {
 		IWL_DEBUG_INFO("Failed to init the card\n");
-		goto out_remove_sysfs;
+		goto out_iounmap;
 	}
 
 	/***********************
@@ -7928,7 +7928,7 @@ static int iwl3945_pci_probe(struct pci_dev *pdev, const struct pci_device_id *e
 	err = iwl3945_eeprom_init(priv);
 	if (err) {
 		IWL_ERROR("Unable to init EEPROM\n");
-		goto out_remove_sysfs;
+		goto out_iounmap;
 	}
 	/* MAC Address location in EEPROM same for 3945/4965 */
 	get_eeprom_mac(priv, priv->mac_addr);
@@ -7982,7 +7982,7 @@ static int iwl3945_pci_probe(struct pci_dev *pdev, const struct pci_device_id *e
 	err = iwl3945_init_channel_map(priv);
 	if (err) {
 		IWL_ERROR("initializing regulatory failed: %d\n", err);
-		goto out_release_irq;
+		goto out_unset_hw_setting;
 	}
 
 	err = iwl3945_init_geos(priv);
@@ -8026,7 +8026,7 @@ static int iwl3945_pci_probe(struct pci_dev *pdev, const struct pci_device_id *e
 	err = sysfs_create_group(&pdev->dev.kobj, &iwl3945_attribute_group);
 	if (err) {
 		IWL_ERROR("failed to create sysfs device attributes\n");
-		goto out_free_geos;
+		goto out_release_irq;
 	}
 
 	iwl3945_set_rxon_channel(priv, IEEE80211_BAND_2GHZ, 6);
@@ -8065,28 +8065,25 @@ static int iwl3945_pci_probe(struct pci_dev *pdev, const struct pci_device_id *e
 	return 0;
 
  out_remove_sysfs:
+	destroy_workqueue(priv->workqueue);
+	priv->workqueue = NULL;
 	sysfs_remove_group(&pdev->dev.kobj, &iwl3945_attribute_group);
- out_free_geos:
+ out_release_irq:
+	free_irq(priv->pci_dev->irq, priv);
+ out_disable_msi:
+	pci_disable_msi(priv->pci_dev);
 	iwl3945_free_geos(priv);
  out_free_channel_map:
 	iwl3945_free_channel_map(priv);
-
-
- out_release_irq:
-	free_irq(priv->pci_dev->irq, priv);
-	destroy_workqueue(priv->workqueue);
-	priv->workqueue = NULL;
+ out_unset_hw_setting:
 	iwl3945_unset_hw_setting(priv);
- out_disable_msi:
-	pci_disable_msi(priv->pci_dev);
-
  out_iounmap:
 	pci_iounmap(pdev, priv->hw_base);
  out_pci_release_regions:
 	pci_release_regions(pdev);
  out_pci_disable_device:
-	pci_disable_device(pdev);
 	pci_set_drvdata(pdev, NULL);
+	pci_disable_device(pdev);
  out_ieee80211_free_hw:
 	ieee80211_free_hw(priv->hw);
  out:
