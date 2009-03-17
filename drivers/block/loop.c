@@ -202,38 +202,6 @@ lo_do_transfer(struct loop_device *lo, int cmd,
 	return lo->transfer(lo, cmd, rpage, roffs, lpage, loffs, size, rblock);
 }
 
-/*
- * This is best effort. We really wouldn't know what to do with a returned
- * error. This code is taken from the implementation of fsync.
- */
-static int sync_file(struct file * file, int full_sync)
-{
-	struct address_space *mapping;
-	int ret;
-
-	if (!file->f_op || !file->f_op->fsync)
-		return -EOPNOTSUPP;
-
-	mapping = file->f_mapping;
-
-	ret = filemap_fdatawrite(mapping);
-	if (!ret) {
-		int ret2;
-		/*
-		 * We need to protect against concurrent writers,
-		 * which could cause livelocks in fsync_buffers_list
-		 */
-		if (full_sync)
-			ret = file->f_op->fsync(file, file->f_dentry, 1);
-
-		ret2 = filemap_fdatawait(mapping);
-		if (!ret)
-			ret = ret2;
-	}
-
-	return ret;
-}
-
 /**
  * do_lo_send_aops - helper for writing data to a loop device
  *
@@ -245,18 +213,11 @@ static int do_lo_send_aops(struct loop_device *lo, struct bio_vec *bvec,
 {
 	struct file *file = lo->lo_backing_file; /* kudos to NFsckingS */
 	struct address_space *mapping = file->f_mapping;
-	struct inode *inode = file->f_dentry->d_inode;
 	pgoff_t index;
 	unsigned offset, bv_offs;
 	int len, ret;
-	unsigned long old_blocks;
 
 	mutex_lock(&mapping->host->i_mutex);
-
-	spin_lock(&inode->i_lock);
-	old_blocks = inode->i_blocks;
-	spin_unlock(&inode->i_lock);
-
 	index = pos >> PAGE_CACHE_SHIFT;
 	offset = pos & ((pgoff_t)PAGE_CACHE_SIZE - 1);
 	bv_offs = bvec->bv_offset;
@@ -299,15 +260,6 @@ static int do_lo_send_aops(struct loop_device *lo, struct bio_vec *bvec,
 		pos += copied;
 	}
 	ret = 0;
-
-	if (file->f_flags & O_SYNC) {
-		int full_sync = 0;
-		spin_lock(&inode->i_lock);
-		if (inode->i_blocks > old_blocks)
-			full_sync = 1;
-		spin_unlock(&inode->i_lock);
-		ret = sync_file(file, full_sync);
-	}
 out:
 	mutex_unlock(&mapping->host->i_mutex);
 	return ret;
@@ -520,24 +472,12 @@ static int do_bio_filebacked(struct loop_device *lo, struct bio *bio)
 {
 	loff_t pos;
 	int ret;
-	int sync = bio_sync(bio);
-	int barrier = bio_barrier(bio);
-
-	if (barrier) {
-		ret = sync_file(lo->lo_backing_file, 1);
-		if (unlikely(ret))
-			return ret;
-	}
 
 	pos = ((loff_t) bio->bi_sector << 9) + lo->lo_offset;
 	if (bio_rw(bio) == WRITE)
 		ret = lo_send(lo, bio, pos);
 	else
 		ret = lo_receive(lo, bio, lo->lo_blocksize, pos);
-
-	if ((barrier || sync) && !ret)
-		ret = sync_file(lo->lo_backing_file, 1);
-
 	return ret;
 }
 
@@ -831,9 +771,6 @@ static int loop_set_fd(struct loop_device *lo, fmode_t mode,
 
 	if (!(file->f_mode & FMODE_WRITE))
 		lo_flags |= LO_FLAGS_READ_ONLY;
-
-	if ((file->f_flags & O_SYNC) && (!file->f_op || !file->f_op->fsync))
-		return -EINVAL;
 
 	error = -EINVAL;
 	if (S_ISREG(inode->i_mode) || S_ISBLK(inode->i_mode)) {
