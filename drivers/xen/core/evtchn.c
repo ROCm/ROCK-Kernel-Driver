@@ -1664,7 +1664,7 @@ int assign_irq_vector(int irq, struct irq_cfg *cfg, const struct cpumask *mask)
 
 void evtchn_register_pirq(int irq)
 {
-	BUG_ON(irq < PIRQ_BASE || irq - PIRQ_BASE > NR_PIRQS);
+	BUG_ON(irq < PIRQ_BASE || irq - PIRQ_BASE >= NR_PIRQS);
 	if (identity_mapped_irq(irq) || type_from_irq(irq) != IRQT_UNBOUND)
 		return;
 	irq_cfg(irq)->info = mk_irq_info(IRQT_PIRQ, irq, 0);
@@ -1747,7 +1747,7 @@ void __init xen_init_IRQ(void)
 
 	pirq_needs_eoi = alloc_bootmem_pages(sizeof(unsigned long)
 		* BITS_TO_LONGS(ALIGN(NR_PIRQS, PAGE_SIZE * 8)));
-	eoi_gmfn.gmfn = virt_to_machine(pirq_needs_eoi) >> PAGE_SHIFT;
+ 	eoi_gmfn.gmfn = virt_to_machine(pirq_needs_eoi) >> PAGE_SHIFT;
 	if (HYPERVISOR_physdev_op(PHYSDEVOP_pirq_eoi_gmfn, &eoi_gmfn) == 0)
 		pirq_eoi_does_unmask = true;
 

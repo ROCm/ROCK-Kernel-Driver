@@ -22,6 +22,8 @@ struct pci_dev_entry {
 
 #define _PDEVF_op_active 	(0)
 #define PDEVF_op_active 	(1<<(_PDEVF_op_active))
+#define _PCIB_op_pending	(1)
+#define PCIB_op_pending		(1<<(_PCIB_op_pending))
 
 struct pciback_device {
 	void *pci_dev_data;
@@ -81,6 +83,16 @@ void pciback_release_pci_dev(struct pciback_device *pdev, struct pci_dev *dev);
 struct pci_dev *pciback_get_pci_dev(struct pciback_device *pdev,
 				    unsigned int domain, unsigned int bus,
 				    unsigned int devfn);
+
+/** 
+* Add for domain0 PCIE-AER handling. Get guest domain/bus/devfn in pciback
+* before sending aer request to pcifront, so that guest could identify 
+* device, coopearte with pciback to finish aer recovery job if device driver
+* has the capability
+*/
+
+int pciback_get_pcifront_dev(struct pci_dev *pcidev, struct pciback_device *pdev, 
+				unsigned int *domain, unsigned int *bus, unsigned int *devfn);
 int pciback_init_devices(struct pciback_device *pdev);
 int pciback_publish_pci_roots(struct pciback_device *pdev,
 			      publish_pci_root_cb cb);
@@ -108,4 +120,7 @@ int pciback_disable_msix(struct pciback_device *pdev,
                         struct pci_dev *dev, struct xen_pci_op *op);
 #endif
 extern int verbose_request;
+
+void test_and_schedule_op(struct pciback_device *pdev);
 #endif
+

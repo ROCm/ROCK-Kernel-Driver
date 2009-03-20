@@ -196,10 +196,14 @@ static inline int pci_ari_enabled(struct pci_bus *bus)
 }
 
 #ifdef CONFIG_PCI_REASSIGN
-extern int is_reassigndev(struct pci_dev *dev);
+extern int pci_is_reassigndev(struct pci_dev *dev);
 extern void pci_disable_bridge_window(struct pci_dev *dev);
 #else
-#define is_reassigndev(dev) 0
+#define pci_is_reassigndev(dev) 0
 #endif
+
+#ifdef CONFIG_PCI_GUESTDEV
+int pci_is_guestdev_to_reassign(struct pci_dev *dev);
+#endif /* CONFIG_PCI_GUESTDEV */
 
 #endif /* DRIVERS_PCI_H */

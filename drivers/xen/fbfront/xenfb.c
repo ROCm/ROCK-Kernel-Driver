@@ -63,7 +63,6 @@ struct xenfb_info
 	int			irq;
 	struct xenfb_page	*page;
 	unsigned long 		*mfns;
-	int			update_wanted; /* XENFB_TYPE_UPDATE wanted */
 	int			feature_resize; /* Backend has resize feature */
 	struct xenfb_resize	resize;
 	int			resize_dpy;
@@ -210,20 +209,25 @@ static void xenfb_update_screen(struct xenfb_info *info)
 	int y1, y2, x1, x2;
 	struct xenfb_mapping *map;
 
-	if (!info->update_wanted)
-		return;
 	if (xenfb_queue_full(info))
 		return;
 
 	mutex_lock(&info->mm_lock);
 
 	spin_lock_irqsave(&info->dirty_lock, flags);
-	y1 = info->y1;
-	y2 = info->y2;
-	x1 = info->x1;
-	x2 = info->x2;
-	info->x1 = info->y1 = INT_MAX;
-	info->x2 = info->y2 = 0;
+	if (info->dirty){
+		info->dirty = 0;
+		y1 = info->y1;
+		y2 = info->y2;
+		x1 = info->x1;
+		x2 = info->x2;
+		info->x1 = info->y1 = INT_MAX;
+		info->x2 = info->y2 = 0;
+	} else {
+		spin_unlock_irqrestore(&info->dirty_lock, flags);
+		mutex_unlock(&info->mm_lock);
+		return;
+	}
 	spin_unlock_irqrestore(&info->dirty_lock, flags);
 
 	list_for_each_entry(map, &info->mappings, link) {
@@ -264,10 +268,7 @@ static int xenfb_thread(void *data)
 
 	while (!kthread_should_stop()) {
 		xenfb_handle_resize_dpy(info);
-		if (info->dirty) {
-			info->dirty = 0;
-			xenfb_update_screen(info);
-		}
+		xenfb_update_screen(info);
 		wait_event_interruptible(info->wq,
 			kthread_should_stop() || info->dirty);
 		try_to_freeze();
@@ -687,15 +688,6 @@ static int __devinit xenfb_probe(struct xenbus_device *dev,
 	if (ret < 0)
 		goto error;
 
-	/* FIXME should this be delayed until backend XenbusStateConnected? */
-	info->kthread = kthread_run(xenfb_thread, info, "xenfb thread");
-	if (IS_ERR(info->kthread)) {
-		ret = PTR_ERR(info->kthread);
-		info->kthread = NULL;
-		xenbus_dev_fatal(dev, ret, "register_framebuffer");
-		goto error;
-	}
-
 	xenfb_make_preferred_console();
 	return 0;
 
@@ -851,16 +843,25 @@ static void xenfb_backend_changed(struct xenbus_device *dev,
 		if (dev->state != XenbusStateConnected)
 			goto InitWait; /* no InitWait seen yet, fudge it */
 
-		if (xenbus_scanf(XBT_NIL, info->xbdev->otherend,
-				 "request-update", "%d", &val) < 0)
-			val = 0;
-		if (val)
-			info->update_wanted = 1;
 
 		if (xenbus_scanf(XBT_NIL, dev->otherend,
 					"feature-resize", "%d", &val) < 0)
 			val = 0;
 		info->feature_resize = val;
+
+		if (xenbus_scanf(XBT_NIL, info->xbdev->otherend,
+				 "request-update", "%d", &val) < 0)
+			val = 0;
+
+		if (val){
+			info->kthread = kthread_run(xenfb_thread, info,
+						    "xenfb thread");
+			if (IS_ERR(info->kthread)) {
+				info->kthread = NULL;
+				xenbus_dev_fatal(dev, PTR_ERR(info->kthread),
+						"xenfb_thread");
+			}
+		}
 		break;
 
 	case XenbusStateClosing:

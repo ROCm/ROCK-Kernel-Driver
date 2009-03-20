@@ -301,6 +301,7 @@ static int scsiback_probe(struct xenbus_device *dev,
 			   const struct xenbus_device_id *id)
 {
 	int err;
+	unsigned val = 0;
 
 	struct backend_info *be = kzalloc(sizeof(struct backend_info),
 					  GFP_KERNEL);
@@ -325,8 +326,17 @@ static int scsiback_probe(struct xenbus_device *dev,
 
 	be->info->dev = dev;
 	be->info->irq = 0;
+	be->info->feature = 0;	/*default not HOSTMODE.*/
 
 	scsiback_init_translation_table(be->info);
+
+	err = xenbus_scanf(XBT_NIL, dev->nodename,
+				"feature-host", "%d", &val);
+	if (XENBUS_EXIST_ERR(err))
+		val = 0;
+
+	if (val)
+		be->info->feature = VSCSI_TYPE_HOST;
 
 	err = xenbus_switch_state(dev, XenbusStateInitWait);
 	if (err)

@@ -57,7 +57,7 @@ void __init xen_machine_kexec_setup_resources(void)
 
 	/* allocate xen_phys_cpus */
 
-	xen_phys_cpus = alloc_bootmem_low(k * sizeof(struct resource));
+	xen_phys_cpus = alloc_bootmem(k * sizeof(struct resource));
 	BUG_ON(xen_phys_cpus == NULL);
 
 	/* fill in xen_phys_cpus with per-cpu crash note information */

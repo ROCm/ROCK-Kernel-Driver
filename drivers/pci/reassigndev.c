@@ -26,20 +26,27 @@
 
 static char param_reassigndev[REASSIGNDEV_PARAM_MAX] = {0};
 
-static int __init reassigndev_setup(char *str)
+static int __init pci_reassigndev_setup(char *str)
 {
 	strncpy(param_reassigndev, str, REASSIGNDEV_PARAM_MAX);
 	param_reassigndev[REASSIGNDEV_PARAM_MAX - 1] = '\0';
 	return 1;
 }
-__setup("reassigndev=", reassigndev_setup);
+__setup("reassigndev=", pci_reassigndev_setup);
 
-int is_reassigndev(struct pci_dev *dev)
+int pci_is_reassigndev(struct pci_dev *dev)
 {
 	char dev_str[TOKEN_MAX+1];
 	int seg, bus, slot, func;
 	int len;
 	char *p, *next_str;
+	int result;
+
+#ifdef CONFIG_PCI_GUESTDEV
+	result = pci_is_guestdev_to_reassign(dev);
+	if (result)
+		return	result;
+#endif /* CONFIG_PCI_GUESTDEV */
 
 	p = param_reassigndev;
 	for (; p; p = next_str + 1) {

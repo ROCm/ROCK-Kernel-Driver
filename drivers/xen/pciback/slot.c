@@ -155,3 +155,33 @@ void pciback_release_devices(struct pciback_device *pdev)
 	kfree(slot_dev);
 	pdev->pci_dev_data = NULL;
 }
+
+int pciback_get_pcifront_dev(struct pci_dev *pcidev, struct pciback_device *pdev, 
+		unsigned int *domain, unsigned int *bus, unsigned int *devfn)
+{
+	int slot, busnr;
+	struct slot_dev_data *slot_dev = pdev->pci_dev_data;
+	struct pci_dev *dev;
+	int found = 0;
+	unsigned long flags;
+
+	spin_lock_irqsave(&slot_dev->lock, flags);
+
+	for (busnr = 0; busnr < PCI_BUS_NBR; bus++)
+		for (slot = 0; slot < PCI_SLOT_MAX; slot++) {
+			dev = slot_dev->slots[busnr][slot];
+			if (dev && dev->bus->number == pcidev->bus->number
+				&& dev->devfn == pcidev->devfn
+				&& pci_domain_nr(dev->bus) == pci_domain_nr(pcidev->bus)) {
+				found = 1;
+				*domain = 0;
+				*bus = busnr;
+				*devfn = PCI_DEVFN(slot,0);
+				goto out;
+			}
+		}
+out:
+	spin_unlock_irqrestore(&slot_dev->lock, flags);
+	return found;
+
+}

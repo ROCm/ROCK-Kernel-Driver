@@ -534,10 +534,22 @@ static int split_large_page(pte_t *kpte, unsigned long address)
 	 * pagetable protections, the actual ptes set above control the
 	 * primary protection behavior:
 	 */
-	if (HYPERVISOR_update_va_mapping((unsigned long)pbase,
+	if (!xen_feature(XENFEAT_writable_page_tables) &&
+	    HYPERVISOR_update_va_mapping((unsigned long)pbase,
 					 mk_pte(base, PAGE_KERNEL_RO), 0))
 		BUG();
 	__set_pmd_pte(kpte, address, level, mk_pte(base, __pgprot(_KERNPG_TABLE)));
+
+	/*
+	 * Intel Atom errata AAH41 workaround.
+	 *
+	 * The real fix should be in hw or in a microcode update, but
+	 * we also probabilistically try to reduce the window of having
+	 * a large TLB mixed with 4K TLBs while instruction fetches are
+	 * going on.
+	 */
+	__flush_tlb_all();
+
 	base = NULL;
 
 out_unlock:

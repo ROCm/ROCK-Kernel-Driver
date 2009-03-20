@@ -992,7 +992,7 @@ void __cpuinit syscall_init(void)
 #ifdef CONFIG_IA32_EMULATION
 	syscall32_cpu_init();
 #elif defined(CONFIG_XEN)
-	static /*const*/ struct callback_register __cpuinitdata cstar = {
+	static const struct callback_register __cpuinitconst cstar = {
 		.type = CALLBACKTYPE_syscall32,
 		.address = (unsigned long)ignore_sysret
 	};

@@ -59,8 +59,8 @@ struct oprofile_operations {
 #ifdef CONFIG_XEN
 	/* setup active domains with Xen */
 	int (*set_active)(int *active_domains, unsigned int adomains);
-        /* setup passive domains with Xen */
-        int (*set_passive)(int *passive_domains, unsigned int pdomains);
+	/* setup passive domains with Xen */
+	int (*set_passive)(int *passive_domains, unsigned int pdomains);
 #endif
 	/* Do any necessary interrupt setup. Optional. */
 	int (*setup)(void);

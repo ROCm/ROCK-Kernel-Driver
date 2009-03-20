@@ -12,6 +12,7 @@
 #include "pciback.h"
 
 #define INVALID_EVTCHN_IRQ  (-1)
+struct workqueue_struct *pciback_wq;
 
 static struct pciback_device *alloc_pdev(struct xenbus_device *xdev)
 {
@@ -52,9 +53,9 @@ static void pciback_disconnect(struct pciback_device *pdev)
 		pdev->evtchn_irq = INVALID_EVTCHN_IRQ;
 	}
 
-	/* If the driver domain started an op, make sure we complete it or
-	 * delete it before releasing the shared memory */
-	flush_scheduled_work();
+	/* If the driver domain started an op, make sure we complete it
+	 * before releasing the shared memory */
+	flush_workqueue(pciback_wq);
 
 	if (pdev->sh_info != NULL) {
 		xenbus_unmap_ring_vfree(pdev->xdev, pdev->sh_area);
@@ -692,11 +693,17 @@ int __init pciback_xenbus_register(void)
 {
 	if (!is_running_on_xen())
 		return -ENODEV;
-
+	pciback_wq = create_workqueue("pciback_workqueue");
+	if (!pciback_wq) {
+		printk(KERN_ERR "pciback_xenbus_register: create"
+			"pciback_workqueue failed\n");
+		return -EFAULT;
+	}
 	return xenbus_register_backend(&xenbus_pciback_driver);
 }
 
 void __exit pciback_xenbus_unregister(void)
 {
+	destroy_workqueue(pciback_wq);
 	xenbus_unregister_driver(&xenbus_pciback_driver);
 }

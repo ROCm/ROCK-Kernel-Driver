@@ -747,7 +747,6 @@ static int __cpuinit acpi_processor_start(struct acpi_device *device)
 		acpi_processor_get_limit_info(pr);
 	}
 
-
 	acpi_processor_power_init(pr, device);
 
 	result = processor_extcntl_prepare(pr);

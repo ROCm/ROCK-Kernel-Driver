@@ -2189,6 +2189,8 @@ static struct xenbus_driver netfront_driver = {
 
 static int __init netif_init(void)
 {
+	int err;
+
 	if (!is_running_on_xen())
 		return -ENODEV;
 
@@ -2210,7 +2212,13 @@ static int __init netif_init(void)
 	(void)register_inetaddr_notifier(&notifier_inetdev);
 #endif
 
-	return xenbus_register_frontend(&netfront_driver);
+	err = xenbus_register_frontend(&netfront_driver);
+	if (err) {
+#ifdef CONFIG_INET
+		unregister_inetaddr_notifier(&notifier_inetdev);
+#endif
+	}
+	return err;
 }
 module_init(netif_init);
 

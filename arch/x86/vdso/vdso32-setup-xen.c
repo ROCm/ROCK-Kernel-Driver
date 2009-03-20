@@ -204,11 +204,11 @@ static struct page *vdso32_pages[1];
 
 void __cpuinit syscall32_cpu_init(void)
 {
-	static /*const*/ struct callback_register __cpuinitdata cstar = {
+	static const struct callback_register __cpuinitconst cstar = {
 		.type = CALLBACKTYPE_syscall32,
 		.address = (unsigned long)ia32_cstar_target
 	};
-	static /*const*/ struct callback_register __cpuinitdata sysenter = {
+	static const struct callback_register __cpuinitconst sysenter = {
 		.type = CALLBACKTYPE_sysenter,
 		.address = (unsigned long)ia32_sysenter_target
 	};
@@ -231,7 +231,7 @@ static inline void map_compat_vdso(int map)
 #define vdso32_syscall()	(boot_cpu_has(X86_FEATURE_SYSCALL32))
 
 extern asmlinkage void ia32pv_cstar_target(void);
-static /*const*/ struct callback_register __cpuinitdata cstar = {
+static const struct callback_register __cpuinitconst cstar = {
 	.type = CALLBACKTYPE_syscall32,
 	.address = { __KERNEL_CS, (unsigned long)ia32pv_cstar_target },
 };

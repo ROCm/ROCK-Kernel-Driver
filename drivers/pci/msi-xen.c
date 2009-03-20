@@ -35,6 +35,8 @@ struct msi_dev_list {
 	struct list_head list;
 	spinlock_t pirq_list_lock;
 	struct list_head pirq_list_head;
+	/* Store default pre-assigned irq */
+	unsigned int default_irq;
 };
 
 struct msi_pirq_entry {
@@ -220,8 +222,7 @@ static int msi_get_dev_owner(struct pci_dev *dev)
 
 	BUG_ON(!is_initial_xendomain());
 	if (get_owner && (owner = get_owner(dev)) >= 0) {
-		printk(KERN_INFO "get owner for dev %x get %x \n",
-		       dev->devfn, owner);
+		dev_info(&dev->dev, "get owner: %x \n", owner);
 		return owner;
 	}
 
@@ -241,7 +242,7 @@ static int msi_unmap_pirq(struct pci_dev *dev, int pirq)
 		? pirq : evtchn_get_xen_pirq(pirq);
 
 	if ((rc = HYPERVISOR_physdev_op(PHYSDEVOP_unmap_pirq, &unmap)))
-		printk(KERN_WARNING "unmap irq %x failed\n", pirq);
+		dev_warn(&dev->dev, "unmap irq %x failed\n", pirq);
 
 	if (rc < 0)
 		return rc;
@@ -289,7 +290,7 @@ static int msi_map_vector(struct pci_dev *dev, int entry_nr, u64 table_base)
 	map_irq.table_base = table_base;
 
 	if ((rc = HYPERVISOR_physdev_op(PHYSDEVOP_map_pirq, &map_irq)))
-		printk(KERN_WARNING "map irq failed\n");
+		dev_warn(&dev->dev, "map irq failed\n");
 
 	if (rc < 0)
 		return rc;
@@ -400,10 +401,9 @@ static int msix_capability_init(struct pci_dev *dev,
 		mapped = 0;
 		list_for_each_entry(pirq_entry, &msi_dev_entry->pirq_list_head, list) {
 			if (pirq_entry->entry_nr == entries[i].entry) {
-				printk(KERN_WARNING "msix entry %d for dev %02x:%02x:%01x are \
-				       not freed before acquire again.\n", entries[i].entry,
-					   dev->bus->number, PCI_SLOT(dev->devfn),
-					   PCI_FUNC(dev->devfn));
+				dev_warn(&dev->dev,
+					 "msix entry %d was not freed\n",
+					 entries[i].entry);
 				(entries + i)->vector = pirq_entry->pirq;
 				mapped = 1;
 				break;
@@ -502,6 +502,7 @@ int pci_enable_msi(struct pci_dev* dev)
 {
 	struct pci_bus *bus;
 	int temp, status;
+	struct msi_dev_list *msi_dev_entry = get_msi_dev_pirq_list(dev);
 
 	for (bus = dev->bus; bus; bus = bus->parent)
 		if (bus->bus_flags & PCI_BUS_FLAGS_NO_MSI)
@@ -522,7 +523,7 @@ int pci_enable_msi(struct pci_dev* dev)
 			return ret;
 
 		dev->irq = evtchn_map_pirq(-1, dev->irq);
-		dev->irq_old = temp;
+		msi_dev_entry->default_irq = temp;
 
 		return ret;
 	}
@@ -539,7 +540,7 @@ int pci_enable_msi(struct pci_dev* dev)
 
 	status = msi_capability_init(dev);
 	if ( !status )
-		dev->irq_old = temp;
+		msi_dev_entry->default_irq = temp;
 
 	return status;
 }
@@ -549,6 +550,7 @@ extern void pci_frontend_disable_msi(struct pci_dev* dev);
 void pci_msi_shutdown(struct pci_dev* dev)
 {
 	int pirq;
+	struct msi_dev_list *msi_dev_entry = get_msi_dev_pirq_list(dev);
 
 	if (!pci_msi_enable || !dev)
 		return;
@@ -557,7 +559,7 @@ void pci_msi_shutdown(struct pci_dev* dev)
 	if (!is_initial_xendomain()) {
 		evtchn_map_pirq(dev->irq, 0);
 		pci_frontend_disable_msi(dev);
-		dev->irq = dev->irq_old;
+		dev->irq = msi_dev_entry->default_irq;
 		return;
 	}
 #endif
@@ -567,7 +569,7 @@ void pci_msi_shutdown(struct pci_dev* dev)
 
 	pirq = dev->irq;
 	/* Restore dev->irq to its default pin-assertion vector */
-	dev->irq = dev->irq_old;
+	dev->irq = msi_dev_entry->default_irq;
 	msi_unmap_pirq(dev, pirq);
 
 	/* Disable MSI mode */
@@ -603,6 +605,7 @@ int pci_enable_msix(struct pci_dev* dev, struct msix_entry *entries, int nvec)
 	int status, pos, nr_entries;
 	int i, j, temp;
 	u16 control;
+	struct msi_dev_list *msi_dev_entry = get_msi_dev_pirq_list(dev);
 
 	if (!entries)
  		return -EINVAL;
@@ -613,11 +616,14 @@ int pci_enable_msix(struct pci_dev* dev, struct msix_entry *entries, int nvec)
 		struct msi_pirq_entry *pirq_entry;
 		int ret, irq;
 
+		temp = dev->irq;
 		ret = pci_frontend_enable_msix(dev, entries, nvec);
 		if (ret) {
-			printk("get %x from pci_frontend_enable_msix\n", ret);
+			dev_warn(&dev->dev,
+				 "got %x from frontend_enable_msix\n", ret);
 			return ret;
 		}
+		msi_dev_entry->default_irq = temp;
 
 		msi_dev_entry = get_msi_dev_pirq_list(dev);
 		for (i = 0; i < nvec; i++) {
@@ -673,7 +679,7 @@ int pci_enable_msix(struct pci_dev* dev, struct msix_entry *entries, int nvec)
 	status = msix_capability_init(dev, entries, nvec);
 
 	if ( !status )
-		dev->irq_old = temp;
+		msi_dev_entry->default_irq = temp;
 
 	return status;
 }
@@ -682,6 +688,8 @@ EXPORT_SYMBOL(pci_enable_msix);
 extern void pci_frontend_disable_msix(struct pci_dev* dev);
 void pci_msix_shutdown(struct pci_dev* dev)
 {
+	struct msi_dev_list *msi_dev_entry = get_msi_dev_pirq_list(dev);
+
 	if (!pci_msi_enable)
 		return;
 	if (!dev)
@@ -702,7 +710,7 @@ void pci_msix_shutdown(struct pci_dev* dev)
 			kfree(pirq_entry);
 		}
 
-		dev->irq = dev->irq_old;
+		dev->irq = msi_dev_entry->default_irq;
 		return;
 	}
 #endif
@@ -745,19 +753,14 @@ void msi_remove_pci_irq_vectors(struct pci_dev* dev)
 
 	spin_lock_irqsave(&msi_dev_entry->pirq_list_lock, flags);
 	if (!list_empty(&msi_dev_entry->pirq_list_head))
-	{
-		printk(KERN_WARNING "msix pirqs for dev %02x:%02x:%01x are not freed \
-		       before acquire again.\n", dev->bus->number, PCI_SLOT(dev->devfn),
-			   PCI_FUNC(dev->devfn));
 		list_for_each_entry_safe(pirq_entry, tmp,
 		                         &msi_dev_entry->pirq_list_head, list) {
 			msi_unmap_pirq(dev, pirq_entry->pirq);
 			list_del(&pirq_entry->list);
 			kfree(pirq_entry);
 		}
-	}
 	spin_unlock_irqrestore(&msi_dev_entry->pirq_list_lock, flags);
-	dev->irq = dev->irq_old;
+	dev->irq = msi_dev_entry->default_irq;
 }
 
 void pci_no_msi(void)

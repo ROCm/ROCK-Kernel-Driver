@@ -113,7 +113,7 @@ __setup("swiotlb=", setup_io_tlb_npages);
 
 void * __weak __init swiotlb_alloc_boot(size_t size, unsigned long nslabs)
 {
-	return alloc_bootmem_low_pages(size);
+	return alloc_bootmem_pages(size);
 }
 
 void * __weak swiotlb_alloc(unsigned order, unsigned long nslabs)
@@ -227,7 +227,7 @@ swiotlb_init_with_default_size(size_t default_size)
 	/*
 	 * Get the overflow emergency buffer
 	 */
-	io_tlb_overflow_buffer = alloc_bootmem_low(io_tlb_overflow);
+	io_tlb_overflow_buffer = alloc_bootmem(io_tlb_overflow);
 	if (!io_tlb_overflow_buffer)
 		panic("Cannot allocate SWIOTLB overflow buffer!\n");
 

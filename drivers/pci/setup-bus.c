@@ -344,7 +344,7 @@ static int pbus_size_mem(struct pci_bus *bus, unsigned long mask, unsigned long 
 
 	list_for_each_entry(dev, &bus->devices, bus_list) {
 		int i;
-		int reassign = is_reassigndev(dev);
+		int reassign = pci_is_reassigndev(dev);
 
 		for (i = 0; i < PCI_NUM_RESOURCES; i++) {
 			struct resource *r = &dev->resource[i];

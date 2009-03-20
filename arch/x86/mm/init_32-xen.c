@@ -806,8 +806,8 @@ void __init setup_bootmem_allocator(void)
 	 */
 	bootmap_size = bootmem_bootmap_pages(end_pfn)<<PAGE_SHIFT;
 	bootmap = find_e820_area(min_low_pfn<<PAGE_SHIFT,
-				 max_pfn_mapped<<PAGE_SHIFT, bootmap_size,
-				 PAGE_SIZE);
+				 min(max_pfn_mapped, xen_start_info->nr_pages)<<PAGE_SHIFT,
+				 bootmap_size, PAGE_SIZE);
 	if (bootmap == -1L)
 		panic("Cannot find bootmem map of size %ld\n", bootmap_size);
 	reserve_early(bootmap, bootmap + bootmap_size, "BOOTMAP");

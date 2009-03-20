@@ -48,6 +48,8 @@
 /* NUMA node to allocate from. */
 #define XENMEMF_node(x)     (((x) + 1) << 8)
 #define XENMEMF_get_node(x) ((((x) >> 8) - 1) & 0xffu)
+/* Flag to populate physmap with populate-on-demand entries */
+#define XENMEMF_populate_on_demand (1<<16)
 #endif
 
 struct xen_memory_reservation {
@@ -206,7 +208,7 @@ struct xen_add_to_physmap {
     /* Source mapping space. */
 #define XENMAPSPACE_shared_info 0 /* shared info page */
 #define XENMAPSPACE_grant_table 1 /* grant table page */
-#define XENMAPSPACE_mfn         2 /* usual MFN */
+#define XENMAPSPACE_gmfn        2 /* GMFN */
     unsigned int space;
 
     /* Index into source mapping space. */
@@ -219,46 +221,8 @@ DEFINE_XEN_GUEST_HANDLE_STRUCT(xen_add_to_physmap);
 typedef struct xen_add_to_physmap xen_add_to_physmap_t;
 DEFINE_XEN_GUEST_HANDLE(xen_add_to_physmap_t);
 
-/*
- * Unmaps the page appearing at a particular GPFN from the specified guest's
- * pseudophysical address space.
- * arg == addr of xen_remove_from_physmap_t.
- */
-#define XENMEM_remove_from_physmap      15
-struct xen_remove_from_physmap {
-    /* Which domain to change the mapping for. */
-    domid_t domid;
-
-    /* GPFN of the current mapping of the page. */
-    xen_pfn_t     gpfn;
-};
-typedef struct xen_remove_from_physmap xen_remove_from_physmap_t;
-DEFINE_XEN_GUEST_HANDLE(xen_remove_from_physmap_t);
-
-/*
- * Translates a list of domain-specific GPFNs into MFNs. Returns a -ve error
- * code on failure. This call only works for auto-translated guests.
- */
-#define XENMEM_translate_gpfn_list  8
-struct xen_translate_gpfn_list {
-    /* Which domain to translate for? */
-    domid_t domid;
-
-    /* Length of list. */
-    xen_ulong_t nr_gpfns;
-
-    /* List of GPFNs to translate. */
-    XEN_GUEST_HANDLE(xen_pfn_t) gpfn_list;
-
-    /*
-     * Output list to contain MFN translations. May be the same as the input
-     * list (in which case each input GPFN is overwritten with the output MFN).
-     */
-    XEN_GUEST_HANDLE(xen_pfn_t) mfn_list;
-};
-DEFINE_XEN_GUEST_HANDLE_STRUCT(xen_translate_gpfn_list);
-typedef struct xen_translate_gpfn_list xen_translate_gpfn_list_t;
-DEFINE_XEN_GUEST_HANDLE(xen_translate_gpfn_list_t);
+/*** REMOVED ***/
+/*#define XENMEM_translate_gpfn_list  8*/
 
 /*
  * Returns the pseudo-physical memory map as it was when the domain
@@ -303,6 +267,19 @@ struct xen_foreign_memory_map {
 typedef struct xen_foreign_memory_map xen_foreign_memory_map_t;
 DEFINE_XEN_GUEST_HANDLE(xen_foreign_memory_map_t);
 
+#define XENMEM_set_pod_target       16
+#define XENMEM_get_pod_target       17
+struct xen_pod_target {
+    /* IN */
+    uint64_t target_pages;
+    /* OUT */
+    uint64_t tot_pages;
+    uint64_t pod_cache_pages;
+    uint64_t pod_entries;
+    /* IN */
+    domid_t domid;
+};
+typedef struct xen_pod_target xen_pod_target_t;
 #endif /* __XEN_PUBLIC_MEMORY_H__ */
 
 /*

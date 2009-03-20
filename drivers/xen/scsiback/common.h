@@ -86,6 +86,8 @@ struct vscsibk_info {
 	unsigned int evtchn;
 	unsigned int irq;
 
+	int feature;
+
 	struct vscsiif_back_ring  ring;
 	struct vm_struct *ring_area;
 	grant_handle_t shmem_handle;
@@ -112,6 +114,8 @@ typedef struct {
 
 	uint16_t rqid;
 	
+	uint16_t v_chn, v_tgt;
+
 	uint8_t nr_segments;
 	uint8_t cmnd[VSCSIIF_MAX_COMMAND_SIZE];
 	uint8_t cmd_len;
@@ -141,6 +145,7 @@ typedef struct {
 
 #define VSCSIIF_TIMEOUT		(900*HZ)
 
+#define VSCSI_TYPE_HOST		1
 
 irqreturn_t scsiback_intr(int, void *);
 int scsiback_init_sring(struct vscsibk_info *info,

@@ -164,3 +164,13 @@ void pciback_release_devices(struct pciback_device *pdev)
 	kfree(dev_data);
 	pdev->pci_dev_data = NULL;
 }
+
+int pciback_get_pcifront_dev(struct pci_dev *pcidev, struct pciback_device *pdev, 
+		unsigned int *domain, unsigned int *bus, unsigned int *devfn)
+
+{
+	*domain = pci_domain_nr(pcidev->bus);
+	*bus = pcidev->bus->number;
+	*devfn = pcidev->devfn;
+	return 1;
+}

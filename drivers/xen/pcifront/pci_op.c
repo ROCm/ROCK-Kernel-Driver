@@ -8,6 +8,7 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/spinlock.h>
+#include <asm/bitops.h>
 #include <linux/time.h>
 #include <xen/evtchn.h>
 #include "pcifront.h"
@@ -153,6 +154,15 @@ static int errno_to_pcibios_err(int errno)
 	return errno;
 }
 
+static inline void schedule_pcifront_aer_op(struct pcifront_device *pdev)
+{
+	if (test_bit(_XEN_PCIB_active, (unsigned long *)&pdev->sh_info->flags)
+		&& !test_and_set_bit(_PDEVB_op_active, &pdev->flags)) {
+		dev_dbg(&pdev->xdev->dev, "schedule aer frontend job\n");
+		schedule_work(&pdev->op_work);
+	}
+}
+
 static int do_pci_op(struct pcifront_device *pdev, struct xen_pci_op *op)
 {
 	int err = 0;
@@ -197,6 +207,18 @@ static int do_pci_op(struct pcifront_device *pdev, struct xen_pci_op *op)
 			err = XEN_PCI_ERR_dev_not_found;
 			goto out;
 		}
+	}
+
+	/*
+	* We might lose backend service request since we 
+	* reuse same evtchn with pci_conf backend response. So re-schedule
+	* aer pcifront service.
+	*/
+	if (test_bit(_XEN_PCIB_active, 
+			(unsigned long*)&pdev->sh_info->flags)) {
+		dev_err(&pdev->xdev->dev, 
+			"schedule aer pcifront service\n");
+		schedule_pcifront_aer_op(pdev);
 	}
 
 	memcpy(op, active_op, sizeof(struct xen_pci_op));
@@ -554,4 +576,97 @@ void pcifront_free_roots(struct pcifront_device *pdev)
 
 		kfree(bus_entry);
 	}
+}
+
+static pci_ers_result_t pcifront_common_process( int cmd, struct pcifront_device *pdev,
+	pci_channel_state_t state)
+{
+	pci_ers_result_t result;
+	struct pci_driver *pdrv;
+	int bus = pdev->sh_info->aer_op.bus;
+	int devfn = pdev->sh_info->aer_op.devfn;
+	struct pci_dev *pcidev;
+	int flag = 0;
+
+	dev_dbg(&pdev->xdev->dev, 
+		"pcifront AER process: cmd %x (bus:%x, devfn%x)",
+		cmd, bus, devfn);
+	result = PCI_ERS_RESULT_NONE;
+
+	pcidev = pci_get_bus_and_slot(bus, devfn);
+	if (!pcidev || !pcidev->driver){
+		dev_err(&pcidev->dev, 
+			"device or driver is NULL\n");
+		return result;
+	}
+	pdrv = pcidev->driver;
+
+	if (get_driver(&pdrv->driver)) {
+		if (pdrv->err_handler && pdrv->err_handler->error_detected) {
+			dev_dbg(&pcidev->dev,
+				"trying to call AER service\n");
+			if (pcidev) {
+				flag = 1;
+				switch(cmd) {
+				case XEN_PCI_OP_aer_detected:
+					result = pdrv->err_handler->error_detected(pcidev, state);
+					break;
+				case XEN_PCI_OP_aer_mmio:
+					result = pdrv->err_handler->mmio_enabled(pcidev);
+					break;
+				case XEN_PCI_OP_aer_slotreset:
+					result = pdrv->err_handler->slot_reset(pcidev);
+					break;
+				case XEN_PCI_OP_aer_resume:
+					pdrv->err_handler->resume(pcidev);
+					break;
+				default:
+					dev_err(&pdev->xdev->dev,
+						"bad request in aer recovery operation!\n");
+
+				}
+			}
+		}
+		put_driver(&pdrv->driver);
+	}
+	if (!flag)
+		result = PCI_ERS_RESULT_NONE;
+
+	return result;
+}
+
+
+void pcifront_do_aer(struct work_struct *data)
+{
+	struct pcifront_device *pdev = container_of(data, struct pcifront_device, op_work);
+	int cmd = pdev->sh_info->aer_op.cmd;
+	pci_channel_state_t state = 
+		(pci_channel_state_t)pdev->sh_info->aer_op.err;
+
+	/*If a pci_conf op is in progress, 
+		we have to wait until it is done before service aer op*/
+	dev_dbg(&pdev->xdev->dev, 
+		"pcifront service aer bus %x devfn %x\n", pdev->sh_info->aer_op.bus,
+		pdev->sh_info->aer_op.devfn);
+
+	pdev->sh_info->aer_op.err = pcifront_common_process(cmd, pdev, state);
+
+	wmb();
+	clear_bit(_XEN_PCIB_active, (unsigned long*)&pdev->sh_info->flags);
+	notify_remote_via_evtchn(pdev->evtchn);
+
+	/*in case of we lost an aer request in four lines time_window*/
+	smp_mb__before_clear_bit();
+	clear_bit( _PDEVB_op_active, &pdev->flags);
+	smp_mb__after_clear_bit();
+
+	schedule_pcifront_aer_op(pdev);
+
+}
+
+irqreturn_t pcifront_handler_aer(int irq, void *dev)
+{
+	struct pcifront_device *pdev = dev;
+	schedule_pcifront_aer_op(pdev);
+	return IRQ_HANDLED;
 }

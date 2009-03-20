@@ -153,7 +153,7 @@ int pci_assign_resource(struct pci_dev *dev, int resno)
 		return -EINVAL;
 	}
 	if (resno < PCI_BRIDGE_RESOURCES
-	    && is_reassigndev(dev)
+	    && pci_is_reassigndev(dev)
 	    && (res->flags & IORESOURCE_MEM))
 		align = ALIGN(align, PAGE_SIZE);
 
@@ -234,7 +234,7 @@ EXPORT_SYMBOL_GPL(pci_assign_resource_fixed);
 void pdev_sort_resources(struct pci_dev *dev, struct resource_list *head)
 {
 	int i;
-	int reassigndev = is_reassigndev(dev);
+	int reassigndev = pci_is_reassigndev(dev);
 
 	for (i = 0; i < PCI_NUM_RESOURCES; i++) {
 		struct resource *r;
@@ -269,7 +269,7 @@ void pdev_sort_resources(struct pci_dev *dev, struct resource_list *head)
 				if (ln->res - ln->dev->resource <
 				    PCI_BRIDGE_RESOURCES &&
 				    (ln->res->flags & IORESOURCE_MEM) &&
-				    is_reassigndev(ln->dev))
+				    pci_is_reassigndev(ln->dev))
 					align = ALIGN(align, PAGE_SIZE);
 			}
 

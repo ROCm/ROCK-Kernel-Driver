@@ -13,13 +13,25 @@
 
 LIST_HEAD(pciback_quirks);
 
+static inline const struct pci_device_id *
+match_one_device(const struct pci_device_id *id, const struct pci_dev *dev)
+{
+	if ((id->vendor == PCI_ANY_ID || id->vendor == dev->vendor) &&
+	    (id->device == PCI_ANY_ID || id->device == dev->device) &&
+	    (id->subvendor == PCI_ANY_ID || id->subvendor == dev->subsystem_vendor) &&
+	    (id->subdevice == PCI_ANY_ID || id->subdevice == dev->subsystem_device) &&
+	    !((id->class ^ dev->class) & id->class_mask))
+		return id;
+	return NULL;
+}
+
 struct pciback_config_quirk *pciback_find_quirk(struct pci_dev *dev)
 {
 	struct pciback_config_quirk *tmp_quirk;
 
 	list_for_each_entry(tmp_quirk, &pciback_quirks, quirks_list)
-	    if (pci_match_id(&tmp_quirk->devid, dev))
-		goto out;
+		if (match_one_device(&tmp_quirk->devid, dev) != NULL)
+			goto out;
 	tmp_quirk = NULL;
 	printk(KERN_DEBUG
 	       "quirk didn't match any device pciback knows about\n");

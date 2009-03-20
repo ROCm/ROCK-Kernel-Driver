@@ -4,6 +4,7 @@
  *   Author: Ryan Wilson <hap9@epoch.ncsc.mil>
  */
 #include <linux/module.h>
+#include <linux/wait.h>
 #include <asm/bitops.h>
 #include <xen/evtchn.h>
 #include "pciback.h"
@@ -37,14 +38,29 @@ void pciback_reset_device(struct pci_dev *dev)
 		}
 	}
 }
-
-static inline void test_and_schedule_op(struct pciback_device *pdev)
+extern wait_queue_head_t aer_wait_queue;
+extern struct workqueue_struct *pciback_wq;
+/*
+* Now the same evtchn is used for both pcifront conf_read_write request
+* as well as pcie aer front end ack. We use a new work_queue to schedule
+* pciback conf_read_write service for avoiding confict with aer_core 
+* do_recovery job which also use the system default work_queue
+*/
+void test_and_schedule_op(struct pciback_device *pdev)
 {
 	/* Check that frontend is requesting an operation and that we are not
 	 * already processing a request */
 	if (test_bit(_XEN_PCIF_active, (unsigned long *)&pdev->sh_info->flags)
 	    && !test_and_set_bit(_PDEVF_op_active, &pdev->flags))
-		schedule_work(&pdev->op_work);
+	{
+		queue_work(pciback_wq, &pdev->op_work);
+	}
+	/*_XEN_PCIB_active should have been cleared by pcifront. And also make
+	sure pciback is waiting for ack by checking _PCIB_op_pending*/
+	if (!test_bit(_XEN_PCIB_active,(unsigned long *)&pdev->sh_info->flags)
+	    &&test_bit(_PCIB_op_pending, &pdev->flags)) {
+		wake_up(&aer_wait_queue);
+	}
 }
 
 /* Performing the configuration space reads/writes must not be done in atomic
@@ -103,7 +119,8 @@ void pciback_do_op(struct work_struct *work)
 	smp_mb__after_clear_bit(); /* /before/ final check for work */
 
 	/* Check to see if the driver domain tried to start another request in
-	 * between clearing _XEN_PCIF_active and clearing _PDEVF_op_active. */
+	 * between clearing _XEN_PCIF_active and clearing _PDEVF_op_active. 
+	*/
 	test_and_schedule_op(pdev);
 }
 

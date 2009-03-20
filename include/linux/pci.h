@@ -239,9 +239,6 @@ struct pci_dev {
 	 * directly, use the values stored here. They might be different!
 	 */
 	unsigned int	irq;
-#ifdef CONFIG_XEN
-	unsigned int    irq_old;
-#endif
 	struct resource resource[DEVICE_COUNT_RESOURCE]; /* I/O and memory regions + expansion ROMs */
 
 	/* These fields are used by common fixups */
@@ -1208,6 +1205,10 @@ static inline void pci_mmcfg_late_init(void) { }
 int pci_ext_cfg_avail(struct pci_dev *dev);
 
 void __iomem *pci_ioremap_bar(struct pci_dev *pdev, int bar);
+
+#ifdef CONFIG_PCI_GUESTDEV
+int pci_is_guestdev(struct pci_dev *dev);
+#endif /* CONFIG_PCI_GUESTDEV */
 
 #endif /* __KERNEL__ */
 #endif /* LINUX_PCI_H */

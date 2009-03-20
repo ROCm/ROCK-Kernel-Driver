@@ -7,6 +7,7 @@
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <xen/xenbus.h>
+#include <xen/evtchn.h>
 #include <xen/gnttab.h>
 #include "pcifront.h"
 
@@ -30,6 +31,9 @@ static struct pcifront_device *alloc_pdev(struct xenbus_device *xdev)
 	}
 	pdev->sh_info->flags = 0;
 
+	/*Flag for registering PV AER handler*/
+	set_bit(_XEN_PCIB_AERHANDLER, (void*)&pdev->sh_info->flags);
+
 	xdev->dev.driver_data = pdev;
 	pdev->xdev = xdev;
 
@@ -40,6 +44,8 @@ static struct pcifront_device *alloc_pdev(struct xenbus_device *xdev)
 
 	pdev->evtchn = INVALID_EVTCHN;
 	pdev->gnt_ref = INVALID_GRANT_REF;
+
+	INIT_WORK(&pdev->op_work, pcifront_do_aer);
 
 	dev_dbg(&xdev->dev, "Allocated pdev @ 0x%p pdev->sh_info @ 0x%p\n",
 		pdev, pdev->sh_info);
@@ -52,6 +58,10 @@ static void free_pdev(struct pcifront_device *pdev)
 	dev_dbg(&pdev->xdev->dev, "freeing pdev @ 0x%p\n", pdev);
 
 	pcifront_free_roots(pdev);
+
+	/*For PCIE_AER error handling job*/
+	flush_scheduled_work();
+	unbind_from_irqhandler(pdev->evtchn, pdev);
 
 	if (pdev->evtchn != INVALID_EVTCHN)
 		xenbus_free_evtchn(pdev->xdev, pdev->evtchn);
@@ -79,6 +89,9 @@ static int pcifront_publish_info(struct pcifront_device *pdev)
 	err = xenbus_alloc_evtchn(pdev->xdev, &pdev->evtchn);
 	if (err)
 		goto out;
+
+	bind_caller_port_to_irqhandler(pdev->evtchn, pcifront_handler_aer, 
+		IRQF_SAMPLE_RANDOM, "pcifront", pdev); 
 
       do_publish:
 	err = xenbus_transaction_start(&trans);

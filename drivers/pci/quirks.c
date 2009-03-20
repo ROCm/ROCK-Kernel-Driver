@@ -46,7 +46,7 @@ static void __devinit quirk_release_resources(struct pci_dev *dev)
 	int i;
 	struct resource *r;
 
-	if (is_reassigndev(dev)) {
+	if (pci_is_reassigndev(dev)) {
 		if (dev->hdr_type == PCI_HEADER_TYPE_NORMAL &&
 		    (dev->class >> 8) == PCI_CLASS_BRIDGE_HOST) {
 			/* PCI Host Bridge isn't a target device */
@@ -78,7 +78,7 @@ static void __devinit quirk_release_resources(struct pci_dev *dev)
 	}
 }
 DECLARE_PCI_FIXUP_HEADER(PCI_ANY_ID, PCI_ANY_ID, quirk_release_resources);
-#endif
+#endif  /* CONFIG_PCI_REASSIGN */
 
 /* The Mellanox Tavor device gives false positive parity errors
  * Mark this device with a broken_parity_status, to allow

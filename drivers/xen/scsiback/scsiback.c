@@ -148,6 +148,7 @@ void scsiback_do_resp_with_sense(char *sense_buffer, int32_t result,
 	struct vscsibk_info *info = pending_req->info;
 	int notify;
 	int more_to_do = 1;
+	struct scsi_sense_hdr sshdr;
 	unsigned long flags;
 
 	DPRINTK("%s\n",__FUNCTION__);
@@ -161,9 +162,17 @@ void scsiback_do_resp_with_sense(char *sense_buffer, int32_t result,
 	ring_res->rqid   = pending_req->rqid;
 
 	if (sense_buffer != NULL) {
-		memcpy(ring_res->sense_buffer, sense_buffer,
-				VSCSIIF_SENSE_BUFFERSIZE);
-		ring_res->sense_len = VSCSIIF_SENSE_BUFFERSIZE;
+		if (scsi_normalize_sense(sense_buffer,
+			sizeof(sense_buffer), &sshdr)) {
+
+			int len = 8 + sense_buffer[7];
+
+			if (len > VSCSIIF_SENSE_BUFFERSIZE)
+				len = VSCSIIF_SENSE_BUFFERSIZE;
+
+			memcpy(ring_res->sense_buffer, sense_buffer, len);
+			ring_res->sense_len = len;
+		}
 	} else {
 		ring_res->sense_len = 0;
 	}
@@ -207,21 +216,25 @@ static void scsiback_print_status(char *sense_buffer, int errors,
 }
 
 
-static void scsiback_cmd_done(struct request *req, int errors)
+static void scsiback_cmd_done(struct request *req, int uptodate)
 {
 	pending_req_t *pending_req = req->end_io_data;
 	unsigned char *sense_buffer;
 	unsigned int resid;
+	int errors;
 
 	sense_buffer = req->sense;
 	resid        = req->data_len;
+	errors       = req->errors;
 
 	if (errors != 0) {
 		if (log_print_stat)
 			scsiback_print_status(sense_buffer, errors, pending_req);
 	}
 
-	scsiback_rsp_emulation(pending_req);
+	/* The Host mode is through as for Emulation. */
+	if (pending_req->info->feature != VSCSI_TYPE_HOST)
+		scsiback_rsp_emulation(pending_req);
 
 	scsiback_fast_flush_area(pending_req);
 	scsiback_do_resp_with_sense(sense_buffer, errors, resid, pending_req);
@@ -493,8 +506,8 @@ static int prepare_pending_reqs(struct vscsibk_info *info,
 
 	pending_req->info       = info;
 
-	vir.chn = ring_req->channel;
-	vir.tgt = ring_req->id;
+	pending_req->v_chn = vir.chn = ring_req->channel;
+	pending_req->v_tgt = vir.tgt = ring_req->id;
 	vir.lun = ring_req->lun;
 
 	rmb();
@@ -594,7 +607,13 @@ static int scsiback_do_cmd_fn(struct vscsibk_info *info)
 		}
 
 		if (pending_req->act == VSCSIIF_ACT_SCSI_CDB) {
-			scsiback_req_emulation_or_cmdexec(pending_req);
+
+			/* The Host mode is through as for Emulation. */
+			if (info->feature == VSCSI_TYPE_HOST)
+				scsiback_cmd_exec(pending_req);
+			else
+				scsiback_req_emulation_or_cmdexec(pending_req);
+
 		} else if (pending_req->act == VSCSIIF_ACT_SCSI_RESET) {
 			scsiback_device_reset_exec(pending_req);
 		} else {
@@ -689,6 +708,7 @@ out_of_memory:
 	return -ENOMEM;
 }
 
+#if 0
 static void __exit scsiback_exit(void)
 {
 	scsiback_xenbus_unregister();
@@ -698,9 +718,13 @@ static void __exit scsiback_exit(void)
 	free_empty_pages_and_pagevec(pending_pages, (vscsiif_reqs * VSCSIIF_SG_TABLESIZE));
 
 }
+#endif
 
 module_init(scsiback_init);
+
+#if 0
 module_exit(scsiback_exit);
+#endif
 
 MODULE_DESCRIPTION("Xen SCSI backend driver");
 MODULE_LICENSE("Dual BSD/GPL");

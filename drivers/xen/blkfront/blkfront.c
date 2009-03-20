@@ -652,27 +652,26 @@ static int blkif_queue_request(struct request *req)
 
 	ring_req->nr_segments = blk_rq_map_sg(req->q, req, info->sg);
 	BUG_ON(ring_req->nr_segments > BLKIF_MAX_SEGMENTS_PER_REQUEST);
-
 	for_each_sg(info->sg, sg, ring_req->nr_segments, i) {
-		buffer_mfn = page_to_phys(sg_page(sg)) >> PAGE_SHIFT;
-		fsect = sg->offset >> 9;
-		lsect = fsect + (sg->length >> 9) - 1;
-		/* install a grant reference. */
-		ref = gnttab_claim_grant_reference(&gref_head);
-		BUG_ON(ref == -ENOSPC);
+			buffer_mfn = page_to_phys(sg_page(sg)) >> PAGE_SHIFT;
+			fsect = sg->offset >> 9;
+			lsect = fsect + (sg->length >> 9) - 1;
+			/* install a grant reference. */
+			ref = gnttab_claim_grant_reference(&gref_head);
+			BUG_ON(ref == -ENOSPC);
 
-		gnttab_grant_foreign_access_ref(
-			ref,
-			info->xbdev->otherend_id,
-			buffer_mfn,
-			rq_data_dir(req) ? GTF_readonly : 0 );
+			gnttab_grant_foreign_access_ref(
+				ref,
+				info->xbdev->otherend_id,
+				buffer_mfn,
+				rq_data_dir(req) ? GTF_readonly : 0 );
 
-		info->shadow[id].frame[i] = mfn_to_pfn(buffer_mfn);
-		ring_req->seg[i] =
-			(struct blkif_request_segment) {
-				.gref       = ref,
-				.first_sect = fsect,
-				.last_sect  = lsect };
+			info->shadow[id].frame[i] = mfn_to_pfn(buffer_mfn);
+			ring_req->seg[i] =
+				(struct blkif_request_segment) {
+					.gref       = ref,
+					.first_sect = fsect,
+					.last_sect  = lsect };
 	}
 
 	info->ring.req_prod_pvt++;

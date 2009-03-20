@@ -930,7 +930,11 @@ inline static void net_tx_action_dealloc(void)
 			if (time_after(inuse->alloc_time + HZ / 2, jiffies))
 				break;
 
-			switch (copy_pending_req(inuse - pending_inuse)) {
+			pending_idx = inuse - pending_inuse;
+
+			pending_tx_info[pending_idx].netif->nr_copied_skbs++;
+
+			switch (copy_pending_req(pending_idx)) {
 			case 0:
 				list_move_tail(&inuse->list, &list);
 				continue;

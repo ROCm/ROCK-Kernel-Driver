@@ -49,7 +49,7 @@
  * blocked.
  */
 static unsigned long netbk_queue_length = 32;
-module_param_named(queue_length, netbk_queue_length, ulong, 0);
+module_param_named(queue_length, netbk_queue_length, ulong, 0644);
 
 static void __netif_up(netif_t *netif)
 {
@@ -116,8 +116,52 @@ static int netbk_set_tso(struct net_device *dev, u32 data)
 	return ethtool_op_set_tso(dev, data);
 }
 
+static void netbk_get_drvinfo(struct net_device *dev,
+			      struct ethtool_drvinfo *info)
+{
+	strcpy(info->driver, "netbk");
+	strcpy(info->bus_info, dev->dev.parent->bus_id);
+}
+
+static const struct netif_stat {
+	char name[ETH_GSTRING_LEN];
+	u16 offset;
+} netbk_stats[] = {
+	{ "copied_skbs", offsetof(netif_t, nr_copied_skbs) },
+};
+
+static int netbk_get_stats_count(struct net_device *dev)
+{
+	return ARRAY_SIZE(netbk_stats);
+}
+
+static void netbk_get_ethtool_stats(struct net_device *dev,
+				   struct ethtool_stats *stats, u64 * data)
+{
+	void *netif = netdev_priv(dev);
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(netbk_stats); i++)
+		data[i] = *(int *)(netif + netbk_stats[i].offset);
+}
+
+static void netbk_get_strings(struct net_device *dev, u32 stringset, u8 * data)
+{
+	int i;
+
+	switch (stringset) {
+	case ETH_SS_STATS:
+		for (i = 0; i < ARRAY_SIZE(netbk_stats); i++)
+			memcpy(data + i * ETH_GSTRING_LEN,
+			       netbk_stats[i].name, ETH_GSTRING_LEN);
+		break;
+	}
+}
+
 static struct ethtool_ops network_ethtool_ops =
 {
+	.get_drvinfo = netbk_get_drvinfo,
+
 	.get_tx_csum = ethtool_op_get_tx_csum,
 	.set_tx_csum = ethtool_op_set_tx_csum,
 	.get_sg = ethtool_op_get_sg,
@@ -125,9 +169,13 @@ static struct ethtool_ops network_ethtool_ops =
 	.get_tso = ethtool_op_get_tso,
 	.set_tso = netbk_set_tso,
 	.get_link = ethtool_op_get_link,
+
+	.get_stats_count = netbk_get_stats_count,
+	.get_ethtool_stats = netbk_get_ethtool_stats,
+	.get_strings = netbk_get_strings,
 };
 
-netif_t *netif_alloc(domid_t domid, unsigned int handle)
+netif_t *netif_alloc(struct device *parent, domid_t domid, unsigned int handle)
 {
 	int err = 0;
 	struct net_device *dev;
@@ -140,6 +188,8 @@ netif_t *netif_alloc(domid_t domid, unsigned int handle)
 		DPRINTK("Could not create netif: out of memory\n");
 		return ERR_PTR(-ENOMEM);
 	}
+
+	SET_NETDEV_DEV(dev, parent);
 
 	netif = netdev_priv(dev);
 	memset(netif, 0, sizeof(*netif));

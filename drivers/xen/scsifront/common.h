@@ -51,8 +51,15 @@
 #include <xen/interface/xen.h>
 #include <xen/interface/io/ring.h>
 #include <xen/interface/io/vscsiif.h>
+#include <xen/interface/grant_table.h>
+#include <xen/interface/io/protocols.h>
 #include <asm/delay.h>
+#include <asm/hypervisor.h>
+#include <asm/maddr.h>
 
+#ifdef HAVE_XEN_PLATFORM_COMPAT_H
+#include <xen/platform-compat.h>
+#endif
 
 #define GRANT_INVALID_REF	0
 #define VSCSI_IN_ABORT		1

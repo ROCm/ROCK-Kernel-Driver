@@ -189,7 +189,7 @@ static void backend_create_netif(struct backend_info *be)
 		return;
 	}
 
-	be->netif = netif_alloc(dev->otherend_id, handle);
+	be->netif = netif_alloc(&dev->dev, dev->otherend_id, handle);
 	if (IS_ERR(be->netif)) {
 		err = PTR_ERR(be->netif);
 		be->netif = NULL;

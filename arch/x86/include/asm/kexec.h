@@ -5,8 +5,18 @@
 # define PA_CONTROL_PAGE	0
 # define VA_CONTROL_PAGE	1
 # define PA_PGD			2
+# ifndef CONFIG_XEN
 # define PA_SWAP_PAGE		3
 # define PAGES_NR		4
+# else /* CONFIG_XEN */
+/*
+ * The hypervisor interface implicitly requires that all entries (except
+ * for possibly the final one) are arranged in matching PA_/VA_ pairs.
+#  define VA_PGD		3
+ */
+#  define PA_SWAP_PAGE		4
+#  define PAGES_NR		5
+# endif /* CONFIG_XEN */
 #else
 # define PA_CONTROL_PAGE	0
 # define VA_CONTROL_PAGE	1
