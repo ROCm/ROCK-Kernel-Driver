@@ -453,6 +453,7 @@ err:
 static int ip6_frag_reasm(struct frag_queue *fq, struct sk_buff *prev,
 			  struct net_device *dev)
 {
+	struct net *net = container_of(fq->q.net, struct net, ipv6.frags);
 	struct sk_buff *fp, *head = fq->q.fragments;
 	int    payload_len;
 	unsigned int nhoff;
@@ -552,8 +553,7 @@ static int ip6_frag_reasm(struct frag_queue *fq, struct sk_buff *prev,
 					  head->csum);
 
 	rcu_read_lock();
-	IP6_INC_STATS_BH(dev_net(dev),
-			 __in6_dev_get(dev), IPSTATS_MIB_REASMOKS);
+	IP6_INC_STATS_BH(net, __in6_dev_get(dev), IPSTATS_MIB_REASMOKS);
 	rcu_read_unlock();
 	fq->q.fragments = NULL;
 	return 1;
@@ -567,8 +567,7 @@ out_oom:
 		printk(KERN_DEBUG "ip6_frag_reasm: no memory for reassembly\n");
 out_fail:
 	rcu_read_lock();
-	IP6_INC_STATS_BH(dev_net(dev),
-			 __in6_dev_get(dev), IPSTATS_MIB_REASMFAILS);
+	IP6_INC_STATS_BH(net, __in6_dev_get(dev), IPSTATS_MIB_REASMFAILS);
 	rcu_read_unlock();
 	return -1;
 }

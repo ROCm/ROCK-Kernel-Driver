@@ -578,9 +578,12 @@ static int __noflush_suspending(struct mapped_device *md)
 static void dec_pending(struct dm_io *io, int error)
 {
 	unsigned long flags;
+	int io_error;
+	struct bio *bio;
+	struct mapped_device *md = io->md;
 
 	/* Push-back supersedes any I/O errors */
-	if (error && !(io->error > 0 && __noflush_suspending(io->md)))
+	if (error && !(io->error > 0 && __noflush_suspending(md)))
 		io->error = error;
 
 	if (atomic_dec_and_test(&io->io_count)) {
@@ -590,24 +593,27 @@ static void dec_pending(struct dm_io *io, int error)
 			 * This must be handled before the sleeper on
 			 * suspend queue merges the pushback list.
 			 */
-			spin_lock_irqsave(&io->md->pushback_lock, flags);
-			if (__noflush_suspending(io->md))
-				bio_list_add(&io->md->pushback, io->bio);
+			spin_lock_irqsave(&md->pushback_lock, flags);
+			if (__noflush_suspending(md))
+				bio_list_add(&md->pushback, io->bio);
 			else
 				/* noflush suspend was interrupted. */
 				io->error = -EIO;
-			spin_unlock_irqrestore(&io->md->pushback_lock, flags);
+			spin_unlock_irqrestore(&md->pushback_lock, flags);
 		}
 
 		end_io_acct(io);
 
-		if (io->error != DM_ENDIO_REQUEUE) {
-			trace_block_bio_complete(io->md->queue, io->bio);
+		io_error = io->error;
+		bio = io->bio;
 
-			bio_endio(io->bio, io->error);
+		free_io(md, io);
+
+		if (io_error != DM_ENDIO_REQUEUE) {
+			trace_block_bio_complete(md->queue, bio);
+
+			bio_endio(bio, io_error);
 		}
-
-		free_io(io->md, io);
 	}
 }
 
@@ -615,6 +621,7 @@ static void clone_endio(struct bio *bio, int error)
 {
 	int r = 0;
 	struct dm_target_io *tio = bio->bi_private;
+	struct dm_io *io = tio->io;
 	struct mapped_device *md = tio->io->md;
 	dm_endio_fn endio = tio->ti->type->end_io;
 
@@ -638,15 +645,14 @@ static void clone_endio(struct bio *bio, int error)
 		}
 	}
 
-	dec_pending(tio->io, error);
-
 	/*
 	 * Store md for cleanup instead of tio which is about to get freed.
 	 */
 	bio->bi_private = md->bs;
 
-	bio_put(bio);
 	free_tio(md, tio);
+	bio_put(bio);
+	dec_pending(io, error);
 }
 
 /*
@@ -1017,12 +1023,6 @@ static struct bio *split_bvec(struct bio *bio, sector_t sector,
 	clone->bi_io_vec->bv_len = clone->bi_size;
 	clone->bi_flags |= 1 << BIO_CLONED;
 
-	if (bio_integrity(bio)) {
-		bio_integrity_clone(clone, bio, GFP_NOIO, bs);
-		bio_integrity_trim(clone,
-				   bio_sector_offset(bio, idx, offset), len);
-	}
-
 	return clone;
 }
 
@@ -1043,14 +1043,6 @@ static struct bio *clone_bio(struct bio *bio, sector_t sector,
 	clone->bi_vcnt = idx + bv_count;
 	clone->bi_size = to_bytes(len);
 	clone->bi_flags &= ~(1 << BIO_SEG_VALID);
-
-	if (bio_integrity(bio)) {
-		bio_integrity_clone(clone, bio, GFP_NOIO, bs);
-
-		if (idx != bio->bi_idx || clone->bi_size < bio->bi_size)
-			bio_integrity_trim(clone,
-					   bio_sector_offset(bio, idx, 0), len);
-	}
 
 	return clone;
 }
@@ -1376,11 +1368,6 @@ static int clone_request_bios(struct request *clone, struct request *rq,
 		}
 
 		__bio_clone(clone_bio, bio);
-		if (bio_integrity(bio))
-			if (bio_integrity_clone(clone_bio, bio, GFP_ATOMIC,
-						md->bs) < 0)
-				goto free_and_out;
-
 		clone_bio->bi_destructor = dm_bio_destructor;
 		clone_bio->bi_end_io = end_clone_bio;
 		info->rq = clone;
@@ -1855,7 +1842,6 @@ static void free_dev(struct mapped_device *md)
 		mempool_destroy(md->io_pool);
 	if (md->bs)
 		bioset_free(md->bs);
-	blk_integrity_unregister(md->disk);
 	del_gendisk(md->disk);
 	free_minor(minor);
 
@@ -1933,7 +1919,6 @@ static int __bind(struct mapped_device *md, struct dm_table *t)
 	write_lock(&md->map_lock);
 	md->map = t;
 	dm_table_set_restrictions(t, q);
-	dm_table_set_integrity(t, md);
 	if (!(dm_table_get_mode(t) & FMODE_WRITE)) {
 		set_disk_ro(md->disk, 1);
 	} else {
