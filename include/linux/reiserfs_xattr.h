@@ -104,6 +104,11 @@ static inline size_t reiserfs_xattr_jcreate_nblocks(struct inode *inode)
 	return nblocks;
 }
 
+static inline void reiserfs_init_xattr_rwsem(struct inode *inode)
+{
+	init_rwsem(&REISERFS_I(inode)->i_xattr_sem);
+}
+
 #else
 
 #define reiserfs_getxattr NULL
@@ -113,6 +118,9 @@ static inline size_t reiserfs_xattr_jcreate_nblocks(struct inode *inode)
 
 #define reiserfs_permission NULL
 
+static inline void reiserfs_init_xattr_rwsem(struct inode *inode)
+{
+}
 #endif  /*  CONFIG_REISERFS_FS_XATTR  */
 
 #ifndef CONFIG_REISERFS_FS_SECURITY

@@ -525,17 +525,8 @@ static void init_once(void *foo)
 {
 	struct reiserfs_inode_info *ei = (struct reiserfs_inode_info *)foo;
 
-	inode_init_once(&ei->vfs_inode);
 	INIT_LIST_HEAD(&ei->i_prealloc_list);
-	mutex_init(&ei->i_mmap);
-#ifdef CONFIG_REISERFS_FS_XATTR
-	init_rwsem(&ei->i_xattr_sem);
-#endif
-	ei->i_flags = 0;
-	ei->i_prealloc_block = 0;
-	ei->i_prealloc_count = 0;
-	ei->i_trans_id = 0;
-	ei->i_jl = NULL;
+	inode_init_once(&ei->vfs_inode);
 #ifdef CONFIG_REISERFS_FS_POSIX_ACL
 	ei->i_acl_access = NULL;
 	ei->i_acl_default = NULL;
