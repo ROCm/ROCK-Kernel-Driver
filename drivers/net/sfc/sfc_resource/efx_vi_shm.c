@@ -498,7 +498,7 @@ efx_vi_filter(struct efx_vi_state *vih, int protocol,
 	      struct filter_resource_t **fh_out)
 {
 	struct efx_vi_state *efx_state = vih;
-	struct filter_resource *frs;
+	struct filter_resource * uninitialized_var(frs);
 	int rc;
 
 #if EFX_VI_STATIC_FILTERS
