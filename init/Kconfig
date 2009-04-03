@@ -1,3 +1,7 @@
+config SUSE_KERNEL
+	bool
+	default y
+
 config ARCH
 	string
 	option env="ARCH"
@@ -100,10 +104,6 @@ config LOCALVERSION_AUTO
 	    $ git rev-parse --verify HEAD
 
 	  which is done within the script "scripts/setlocalversion".)
-
-config SUSE_KERNEL
-	bool
-	default y
 
 config SWAP
 	bool "Support for paging of anonymous memory (swap)"
