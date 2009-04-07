@@ -107,6 +107,7 @@ assfail(char *expr, char *file, int line)
 	printk("Assertion failed: %s, file: %s, line: %d\n", expr, file, line);
 	BUG();
 }
+EXPORT_SYMBOL_GPL(assfail);
 
 void
 xfs_hex_dump(void *p, int length)

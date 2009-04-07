@@ -1,3 +1,19 @@
+config SUSE_KERNEL
+	bool
+	default y
+
+config SPLIT_PACKAGE
+	bool "Split the kernel package into multiple RPMs"
+	depends on SUSE_KERNEL && MODULES
+	help
+	  This is an option used by the kernel packaging infrastructure
+	  to split kernel modules into different packages. It isn't used
+	  by the kernel itself, but allows the the packager to make
+	  decisions on a per-config basis.
+
+	  If you aren't packaging a kernel for distribution, it's safe to
+	  say n.
+
 config ARCH
 	string
 	option env="ARCH"
@@ -100,10 +116,6 @@ config LOCALVERSION_AUTO
 	    $ git rev-parse --verify HEAD
 
 	  which is done within the script "scripts/setlocalversion".)
-
-config SUSE_KERNEL
-	bool
-	default y
 
 config SWAP
 	bool "Support for paging of anonymous memory (swap)"
