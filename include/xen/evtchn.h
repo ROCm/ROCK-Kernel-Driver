@@ -223,20 +223,6 @@ void notify_remote_via_irq(int irq);
 int multi_notify_remote_via_irq(multicall_entry_t *, int irq);
 int irq_to_evtchn_port(int irq);
 
-#define PIRQ_SET_MAPPING 0x0
-#define PIRQ_CLEAR_MAPPING 0x1
-#define PIRQ_GET_MAPPING 0x3
-int pirq_mapstatus(int pirq, int action);
-int set_pirq_hw_action(int pirq, int (*action)(int pirq, int action));
-int clear_pirq_hw_action(int pirq);
-
-#define PIRQ_STARTUP 1
-#define PIRQ_SHUTDOWN 2
-#define PIRQ_ENABLE 3
-#define PIRQ_DISABLE 4
-#define PIRQ_END 5
-#define PIRQ_ACK 6
-
 #if defined(CONFIG_SMP) && !defined(MODULE) && defined(CONFIG_X86)
 void notify_remote_via_ipi(unsigned int ipi, unsigned int cpu);
 #endif

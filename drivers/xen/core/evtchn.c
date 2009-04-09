@@ -67,7 +67,7 @@ static struct per_cpu_irqaction {
 } *virq_actions[NR_VIRQS];
 /* IRQ <-> VIRQ mapping. */
 static DECLARE_BITMAP(virq_per_cpu, NR_VIRQS) __read_mostly;
-static DEFINE_PER_CPU(int[NR_VIRQS], virq_to_evtchn) = {[0 ... NR_VIRQS-1] = -1};
+static DEFINE_PER_CPU(int[NR_VIRQS], virq_to_evtchn);
 #define BUG_IF_VIRQ_PER_CPU(irq) \
 	BUG_ON(type_from_irq(irq) == IRQT_VIRQ \
 	       && test_bit(index_from_irq(irq), virq_per_cpu))
@@ -82,7 +82,7 @@ static DEFINE_PER_CPU(int[NR_VIRQS], virq_to_evtchn) = {[0 ... NR_VIRQS-1] = -1}
 #endif
 #if defined(CONFIG_SMP) && defined(CONFIG_X86)
 static int ipi_to_irq[NR_IPIS] __read_mostly = {[0 ... NR_IPIS-1] = -1};
-static DEFINE_PER_CPU(int[NR_IPIS], ipi_to_evtchn) = {[0 ... NR_IPIS-1] = -1};
+static DEFINE_PER_CPU(int[NR_IPIS], ipi_to_evtchn);
 #else
 #define PER_CPU_IPI_IRQ
 #endif
@@ -179,6 +179,7 @@ static inline unsigned int evtchn_from_per_cpu_irq(unsigned int irq,
 #endif
 	}
 	BUG();
+	return 0;
 }
 
 static inline unsigned int evtchn_from_irq(unsigned int irq)
@@ -618,7 +619,7 @@ static void unbind_from_irq(unsigned int irq)
 #ifndef PER_CPU_VIRQ_IRQ
 			for_each_possible_cpu(cpu)
 				per_cpu(virq_to_evtchn, cpu)
-					[index_from_irq(irq)] = -1;
+					[index_from_irq(irq)] = 0;
 #endif
 			break;
 #if defined(CONFIG_SMP) && defined(PER_CPU_IPI_IRQ)
@@ -701,12 +702,12 @@ void unbind_from_per_cpu_irq(unsigned int irq, unsigned int cpu,
 		switch (type_from_irq(irq)) {
 #ifndef PER_CPU_VIRQ_IRQ
 		case IRQT_VIRQ:
-			per_cpu(virq_to_evtchn, cpu)[index_from_irq(irq)] = -1;
+			per_cpu(virq_to_evtchn, cpu)[index_from_irq(irq)] = 0;
 			break;
 #endif
 #ifndef PER_CPU_IPI_IRQ
 		case IRQT_IPI:
-			per_cpu(ipi_to_evtchn, cpu)[index_from_irq(irq)] = -1;
+			per_cpu(ipi_to_evtchn, cpu)[index_from_irq(irq)] = 0;
 			break;
 #endif
 		default:
@@ -888,7 +889,8 @@ int bind_virq_to_irqaction(
 		irq_cfg(irq)->info = mk_irq_info(IRQT_VIRQ, virq, 0);
 	}
 
-	if ((evtchn = per_cpu(virq_to_evtchn, cpu)[virq]) == -1) {
+	evtchn = per_cpu(virq_to_evtchn, cpu)[virq];
+	if (!VALID_EVTCHN(evtchn)) {
 		bind_virq.virq = virq;
 		bind_virq.vcpu = cpu;
 		if (HYPERVISOR_event_channel_op(EVTCHNOP_bind_virq,
@@ -963,7 +965,7 @@ int __cpuinit bind_ipi_to_irqaction(
 
 	spin_lock(&irq_mapping_update_lock);
 
-	if (per_cpu(ipi_to_evtchn, cpu)[ipi] != -1) {
+	if (VALID_EVTCHN(per_cpu(ipi_to_evtchn, cpu)[ipi])) {
 		spin_unlock(&irq_mapping_update_lock);
 		return -EBUSY;
 	}
@@ -1443,15 +1445,9 @@ static void restore_cpu_virqs(unsigned int cpu)
 			continue;
 
 #ifndef PER_CPU_VIRQ_IRQ
-		if (test_bit(virq, virq_per_cpu)) {
-			const struct per_cpu_irqaction *cur;
-
-			for (cur = virq_actions[virq]; cur; cur = cur->next)
-				if (cpu_isset(cpu, cur->cpus))
-					break;
-			if (!cur)
-				continue;
-		}
+		if (test_bit(virq, virq_per_cpu)
+		    && !VALID_EVTCHN(per_cpu(virq_to_evtchn, cpu)[virq]))
+			continue;
 #endif
 
 		BUG_ON(irq_cfg(irq)->info != mk_irq_info(IRQT_VIRQ, virq, 0));
@@ -1497,7 +1493,8 @@ static void restore_cpu_ipis(unsigned int cpu)
 #ifdef PER_CPU_IPI_IRQ
 		if ((irq = per_cpu(ipi_to_irq, cpu)[ipi]) == -1)
 #else
-		if ((irq = ipi_to_irq[ipi]) == -1)
+		if ((irq = ipi_to_irq[ipi]) == -1
+		    || !VALID_EVTCHN(per_cpu(ipi_to_evtchn, cpu)[ipi]))
 #endif
 			continue;
 

@@ -36,12 +36,18 @@
 
 /**
  * struct falcon_nic_data - Falcon NIC state
+ * @sram_cfg: SRAM configuration value
+ * @tx_dc_base: Base address in SRAM of TX queue descriptor caches
+ * @rx_dc_base: Base address in SRAM of RX queue descriptor caches
  * @next_buffer_table: First available buffer table id
  * @resources: Resource information for driverlink client
  * @pci_dev2: The secondary PCI device if present
  * @i2c_data: Operations and state for I2C bit-bashing algorithm
  */
 struct falcon_nic_data {
+	int sram_cfg;
+	unsigned tx_dc_base;
+	unsigned rx_dc_base;
 #ifndef CONFIG_SFC_DRIVERLINK
 	unsigned next_buffer_table;
 #else
@@ -69,11 +75,11 @@ static int disable_dma_stats;
  */
 #define TX_DC_ENTRIES 16
 #define TX_DC_ENTRIES_ORDER 0
-#define TX_DC_BASE 0x130000
+#define TX_DC_INTERNAL_BASE 0x130000
 
 #define RX_DC_ENTRIES 64
 #define RX_DC_ENTRIES_ORDER 2
-#define RX_DC_BASE 0x100000
+#define RX_DC_INTERNAL_BASE 0x100000
 
 static const unsigned int
 /* "Large" EEPROM device: Atmel AT25640 or similar
@@ -466,9 +472,17 @@ void falcon_push_buffers(struct efx_tx_queue *tx_queue)
 int falcon_probe_tx(struct efx_tx_queue *tx_queue)
 {
 	struct efx_nic *efx = tx_queue->efx;
-	return falcon_alloc_special_buffer(efx, &tx_queue->txd,
-					   FALCON_TXD_RING_SIZE *
-					   sizeof(efx_qword_t));
+	int rc = falcon_alloc_special_buffer(efx, &tx_queue->txd,
+					    FALCON_TXD_RING_SIZE *
+					    sizeof(efx_qword_t));
+#ifdef CONFIG_SFC_DRIVERLINK
+	if (rc == 0) {
+		struct falcon_nic_data *nic_data = efx->nic_data;
+		nic_data->resources.txq_min = max(nic_data->resources.txq_min,
+						  (unsigned)tx_queue->queue + 1);
+	}
+#endif
+	return rc;
 }
 
 void falcon_init_tx(struct efx_tx_queue *tx_queue)
@@ -608,9 +622,17 @@ void falcon_notify_rx_desc(struct efx_rx_queue *rx_queue)
 int falcon_probe_rx(struct efx_rx_queue *rx_queue)
 {
 	struct efx_nic *efx = rx_queue->efx;
-	return falcon_alloc_special_buffer(efx, &rx_queue->rxd,
-					   FALCON_RXD_RING_SIZE *
-					   sizeof(efx_qword_t));
+	int rc = falcon_alloc_special_buffer(efx, &rx_queue->rxd,
+					    FALCON_RXD_RING_SIZE *
+					    sizeof(efx_qword_t));
+#ifdef CONFIG_SFC_DRIVERLINK
+	if (rc == 0) {
+		struct falcon_nic_data *nic_data = efx->nic_data;
+		nic_data->resources.rxq_min = max(nic_data->resources.rxq_min,
+						  (unsigned)rx_queue->queue + 1);
+	}
+#endif
+	return rc;
 }
 
 void falcon_init_rx(struct efx_rx_queue *rx_queue)
@@ -1112,9 +1134,18 @@ int falcon_probe_eventq(struct efx_channel *channel)
 {
 	struct efx_nic *efx = channel->efx;
 	unsigned int evq_size;
+	int rc;
 
 	evq_size = FALCON_EVQ_SIZE * sizeof(efx_qword_t);
-	return falcon_alloc_special_buffer(efx, &channel->eventq, evq_size);
+	rc = falcon_alloc_special_buffer(efx, &channel->eventq, evq_size);
+#ifdef CONFIG_SFC_DRIVERLINK
+	if (rc == 0) {
+		struct falcon_nic_data *nic_data = efx->nic_data;
+		nic_data->resources.evq_int_min = max(nic_data->resources.evq_int_min,
+						      (unsigned)channel->channel + 1);
+	}
+#endif
+	return rc;
 }
 
 void falcon_init_eventq(struct efx_channel *channel)
@@ -2667,19 +2698,22 @@ fail5:
  */
 static int falcon_reset_sram(struct efx_nic *efx)
 {
+	struct falcon_nic_data *nic_data = efx->nic_data;
 	efx_oword_t srm_cfg_reg_ker, gpio_cfg_reg_ker;
-	int count;
+	int count, onchip, sram_cfg_val;
 
 	/* Set the SRAM wake/sleep GPIO appropriately. */
+	onchip = (nic_data->sram_cfg == SRM_NB_BSZ_ONCHIP_ONLY);
 	falcon_read(efx, &gpio_cfg_reg_ker, GPIO_CTL_REG_KER);
 	EFX_SET_OWORD_FIELD(gpio_cfg_reg_ker, GPIO1_OEN, 1);
-	EFX_SET_OWORD_FIELD(gpio_cfg_reg_ker, GPIO1_OUT, 1);
+	EFX_SET_OWORD_FIELD(gpio_cfg_reg_ker, GPIO1_OUT, onchip);
 	falcon_write(efx, &gpio_cfg_reg_ker, GPIO_CTL_REG_KER);
 
 	/* Initiate SRAM reset */
+	sram_cfg_val = onchip ? 0 : nic_data->sram_cfg;
 	EFX_POPULATE_OWORD_2(srm_cfg_reg_ker,
 			     SRAM_OOB_BT_INIT_EN, 1,
-			     SRM_NUM_BANKS_AND_BANK_SIZE, 0);
+			     SRM_NUM_BANKS_AND_BANK_SIZE, sram_cfg_val);
 	falcon_write(efx, &srm_cfg_reg_ker, SRM_CFG_REG_KER);
 
 	/* Wait for SRAM reset to complete */
@@ -2751,8 +2785,10 @@ static void falcon_remove_spi_devices(struct efx_nic *efx)
 /* Extract non-volatile configuration */
 static int falcon_probe_nvconfig(struct efx_nic *efx)
 {
+	struct falcon_nic_data *nic_data = efx->nic_data;
 	struct falcon_nvconfig *nvconfig;
 	int board_rev;
+	bool onchip_sram;
 	int rc;
 
 	nvconfig = kmalloc(sizeof(*nvconfig), GFP_KERNEL);
@@ -2765,6 +2801,7 @@ static int falcon_probe_nvconfig(struct efx_nic *efx)
 		efx->phy_type = PHY_TYPE_NONE;
 		efx->mii.phy_id = PHY_ADDR_INVALID;
 		board_rev = 0;
+		onchip_sram = true;
 		rc = 0;
 	} else if (rc) {
 		goto fail1;
@@ -2775,6 +2812,13 @@ static int falcon_probe_nvconfig(struct efx_nic *efx)
 		efx->phy_type = v2->port0_phy_type;
 		efx->mii.phy_id = v2->port0_phy_addr;
 		board_rev = le16_to_cpu(v2->board_revision);
+#ifdef CONFIG_SFC_DRIVERLINK
+		onchip_sram = EFX_OWORD_FIELD(nvconfig->nic_stat_reg,
+					      ONCHIP_SRAM);
+#else
+		/* We have no use for external SRAM */
+		onchip_sram = true;
+#endif
 
 		if (le16_to_cpu(nvconfig->board_struct_ver) >= 3) {
 			__le32 fl = v3->spi_device_type[EE_SPI_FLASH];
@@ -2799,6 +2843,21 @@ static int falcon_probe_nvconfig(struct efx_nic *efx)
 
 	efx_set_board_info(efx, board_rev);
 
+	/* Read the SRAM configuration.  The register is initialised
+	 * automatically but might may been reset since boot.
+	 */
+	if (onchip_sram) {
+		nic_data->sram_cfg = SRM_NB_BSZ_ONCHIP_ONLY;
+	} else {
+		nic_data->sram_cfg =
+			EFX_OWORD_FIELD(nvconfig->srm_cfg_reg,
+					SRM_NUM_BANKS_AND_BANK_SIZE);
+		WARN_ON(nic_data->sram_cfg == SRM_NB_BSZ_RESERVED);
+		/* Replace invalid setting with the smallest defaults */
+		if (nic_data->sram_cfg == SRM_NB_BSZ_DEFAULT)
+			nic_data->sram_cfg = SRM_NB_BSZ_1BANKS_2M;
+	}
+
 	kfree(nvconfig);
 	return 0;
 
@@ -2814,9 +2873,9 @@ static int falcon_probe_nvconfig(struct efx_nic *efx)
  * should live. */
 static int falcon_dimension_resources(struct efx_nic *efx)
 {
+	struct falcon_nic_data *nic_data = efx->nic_data;
 #ifdef CONFIG_SFC_DRIVERLINK
 	unsigned internal_dcs_entries;
-	struct falcon_nic_data *nic_data = efx->nic_data;
 	struct efx_dl_falcon_resources *res = &nic_data->resources;
 
 	/* Fill out the driverlink resource list */
@@ -2849,16 +2908,64 @@ static int falcon_dimension_resources(struct efx_nic *efx)
 		break;
 	}
 
-	/* Internal SRAM only for now */
-	res->rxq_lim = internal_dcs_entries / RX_DC_ENTRIES;
-	res->txq_lim = internal_dcs_entries / TX_DC_ENTRIES;
-	res->buffer_table_lim = 8192;
+	if (nic_data->sram_cfg == SRM_NB_BSZ_ONCHIP_ONLY) {
+		res->rxq_lim = internal_dcs_entries / RX_DC_ENTRIES;
+		res->txq_lim = internal_dcs_entries / TX_DC_ENTRIES;
+		res->buffer_table_lim = 8192;
+		nic_data->tx_dc_base = TX_DC_INTERNAL_BASE;
+		nic_data->rx_dc_base = RX_DC_INTERNAL_BASE;
+	} else {
+		unsigned sram_bytes, vnic_bytes, max_vnics, n_vnics, dcs;
+
+		/* Determine how much SRAM we have to play with.  We have
+		 * to fit buffer table and descriptor caches in.
+		 */
+		switch (nic_data->sram_cfg) {
+		case SRM_NB_BSZ_1BANKS_2M:
+		default:
+			sram_bytes = 2 * 1024 * 1024;
+			break;
+		case SRM_NB_BSZ_1BANKS_4M:
+		case SRM_NB_BSZ_2BANKS_4M:
+			sram_bytes = 4 * 1024 * 1024;
+			break;
+		case SRM_NB_BSZ_1BANKS_8M:
+		case SRM_NB_BSZ_2BANKS_8M:
+			sram_bytes = 8 * 1024 * 1024;
+			break;
+		case SRM_NB_BSZ_2BANKS_16M:
+			sram_bytes = 16 * 1024 * 1024;
+			break;
+		}
+		/* For each VNIC allow at least 512 buffer table entries
+		 * and descriptor cache for an rxq and txq.  Buffer table
+		 * space for evqs and dmaqs is relatively trivial, so not
+		 * considered in this calculation.
+		 */
+		vnic_bytes = 512 * 8 + RX_DC_ENTRIES * 8 + TX_DC_ENTRIES * 8;
+		max_vnics = sram_bytes / vnic_bytes;
+		for (n_vnics = 1; n_vnics < res->evq_timer_min + max_vnics;)
+			n_vnics *= 2;
+		res->rxq_lim = n_vnics;
+		res->txq_lim = n_vnics;
+
+		dcs = n_vnics * TX_DC_ENTRIES * 8;
+		nic_data->tx_dc_base = sram_bytes - dcs;
+		dcs = n_vnics * RX_DC_ENTRIES * 8;
+		nic_data->rx_dc_base = nic_data->tx_dc_base - dcs;
+		res->buffer_table_lim = nic_data->rx_dc_base / 8;
+	}
 
 	if (FALCON_IS_DUAL_FUNC(efx))
 		res->flags |= EFX_DL_FALCON_DUAL_FUNC;
 
 	if (EFX_INT_MODE_USE_MSI(efx))
 		res->flags |= EFX_DL_FALCON_USE_MSI;
+#else
+	/* We ignore external SRAM */
+	EFX_BUG_ON_PARANOID(nic_data->sram_cfg != SRM_NB_BSZ_ONCHIP_ONLY);
+	nic_data->tx_dc_base = TX_DC_INTERNAL_BASE;
+	nic_data->rx_dc_base = RX_DC_INTERNAL_BASE;
 #endif
 
 	return 0;
@@ -3047,13 +3154,15 @@ int falcon_probe_nic(struct efx_nic *efx)
  */
 int falcon_init_nic(struct efx_nic *efx)
 {
+	struct falcon_nic_data *nic_data = efx->nic_data;
 	efx_oword_t temp;
 	unsigned thresh;
 	int rc;
 
-	/* Use on-chip SRAM */
+	/* Use on-chip SRAM if wanted. */
 	falcon_read(efx, &temp, NIC_STAT_REG);
-	EFX_SET_OWORD_FIELD(temp, ONCHIP_SRAM, 1);
+	EFX_SET_OWORD_FIELD(temp, ONCHIP_SRAM,
+			    nic_data->sram_cfg == SRM_NB_BSZ_ONCHIP_ONLY);
 	falcon_write(efx, &temp, NIC_STAT_REG);
 
 	/* Set the source of the GMAC clock */
@@ -3072,9 +3181,9 @@ int falcon_init_nic(struct efx_nic *efx)
 		return rc;
 
 	/* Set positions of descriptor caches in SRAM. */
-	EFX_POPULATE_OWORD_1(temp, SRM_TX_DC_BASE_ADR, TX_DC_BASE / 8);
+	EFX_POPULATE_OWORD_1(temp, SRM_TX_DC_BASE_ADR, nic_data->tx_dc_base / 8);
 	falcon_write(efx, &temp, SRM_TX_DC_CFG_REG_KER);
-	EFX_POPULATE_OWORD_1(temp, SRM_RX_DC_BASE_ADR, RX_DC_BASE / 8);
+	EFX_POPULATE_OWORD_1(temp, SRM_RX_DC_BASE_ADR, nic_data->rx_dc_base / 8);
 	falcon_write(efx, &temp, SRM_RX_DC_CFG_REG_KER);
 
 	/* Set TX descriptor cache size. */

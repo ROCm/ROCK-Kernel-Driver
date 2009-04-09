@@ -6,6 +6,7 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <xen/interface/physdev.h>
+#include "../../pci/pci.h"
 
 static int (*pci_bus_probe)(struct device *dev);
 static int (*pci_bus_remove)(struct device *dev);
@@ -15,10 +16,33 @@ static int pci_bus_probe_wrapper(struct device *dev)
 	int r;
 	struct pci_dev *pci_dev = to_pci_dev(dev);
 	struct physdev_manage_pci manage_pci;
-	manage_pci.bus = pci_dev->bus->number;
-	manage_pci.devfn = pci_dev->devfn;
+	struct physdev_manage_pci_ext manage_pci_ext;
 
-	r = HYPERVISOR_physdev_op(PHYSDEVOP_manage_pci_add, &manage_pci);
+#ifdef CONFIG_PCI_IOV
+	if (pci_dev->is_virtfn) {
+		memset(&manage_pci_ext, 0, sizeof(manage_pci_ext));
+		manage_pci_ext.bus = pci_dev->bus->number;
+		manage_pci_ext.devfn = pci_dev->devfn;
+		manage_pci_ext.is_virtfn = 1;
+		manage_pci_ext.physfn.bus = pci_dev->physfn->bus->number;
+		manage_pci_ext.physfn.devfn = pci_dev->physfn->devfn;
+		r = HYPERVISOR_physdev_op(PHYSDEVOP_manage_pci_add_ext,
+					  &manage_pci_ext);
+	} else
+#endif
+	if (pci_ari_enabled(pci_dev->bus) && PCI_SLOT(pci_dev->devfn)) {
+		memset(&manage_pci_ext, 0, sizeof(manage_pci_ext));
+		manage_pci_ext.bus = pci_dev->bus->number;
+		manage_pci_ext.devfn = pci_dev->devfn;
+		manage_pci_ext.is_extfn = 1;
+		r = HYPERVISOR_physdev_op(PHYSDEVOP_manage_pci_add_ext,
+					  &manage_pci_ext);
+	} else {
+		manage_pci.bus = pci_dev->bus->number;
+		manage_pci.devfn = pci_dev->devfn;
+		r = HYPERVISOR_physdev_op(PHYSDEVOP_manage_pci_add,
+					  &manage_pci);
+	}
 	if (r && r != -ENOSYS)
 		return r;
 

@@ -60,7 +60,8 @@
 #define TRC_TRACE_WRAP_BUFFER  (TRC_GEN + 2)
 #define TRC_TRACE_CPU_CHANGE    (TRC_GEN + 3)
 
-#define TRC_SCHED_RUNSTATE_CHANGE (TRC_SCHED_MIN + 1)
+#define TRC_SCHED_RUNSTATE_CHANGE   (TRC_SCHED_MIN + 1)
+#define TRC_SCHED_CONTINUE_RUNNING  (TRC_SCHED_MIN + 2)
 #define TRC_SCHED_DOM_ADD        (TRC_SCHED_VERBOSE +  1)
 #define TRC_SCHED_DOM_REM        (TRC_SCHED_VERBOSE +  2)
 #define TRC_SCHED_SLEEP          (TRC_SCHED_VERBOSE +  3)
@@ -148,6 +149,7 @@
 #define TRC_HVM_CLTS            (TRC_HVM_HANDLER + 0x18)
 #define TRC_HVM_LMSW            (TRC_HVM_HANDLER + 0x19)
 #define TRC_HVM_LMSW64          (TRC_HVM_HANDLER + TRC_64_FLAG + 0x19)
+#define TRC_HVM_INTR_WINDOW     (TRC_HVM_HANDLER + 0X20)
 
 /* trace subclasses for power management */
 #define TRC_PM_FREQ     0x00801000      /* xen cpu freq events */

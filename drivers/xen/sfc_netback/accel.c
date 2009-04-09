@@ -38,7 +38,9 @@ static int netback_accel_netdev_event(struct notifier_block *nb,
 	struct net_device *net_dev = (struct net_device *)ptr;
 	struct netback_accel *bend;
 
-	if ((event == NETDEV_UP) || (event == NETDEV_DOWN)) {
+	if ((event == NETDEV_UP) || 
+	    (event == NETDEV_DOWN) ||
+	    (event == NETDEV_CHANGE)) {
 		mutex_lock(&bend_list_mutex);
 		bend = bend_list;
 		while (bend != NULL) {
@@ -51,9 +53,16 @@ static int netback_accel_netdev_event(struct notifier_block *nb,
 			if (bend->shared_page == NULL)
 				goto next;
 
-			if (bend->net_dev->ifindex == net_dev->ifindex)
-				netback_accel_set_interface_state
-					(bend, event == NETDEV_UP);
+			if (bend->net_dev->ifindex == net_dev->ifindex) {
+				int ok;
+				if (event == NETDEV_CHANGE)
+					ok = (netif_carrier_ok(net_dev) && 
+					      (net_dev->flags & IFF_UP));
+				else
+					ok = (netif_carrier_ok(net_dev) && 
+					      (event == NETDEV_UP));
+				netback_accel_set_interface_state(bend, ok);
+			}
 
 		next:
 			mutex_unlock(&bend->bend_mutex);
@@ -86,22 +95,31 @@ static int __init netback_accel_init(void)
 #endif
 
 	rc = netback_accel_init_fwd();
+	if (rc != 0)
+		goto fail0;
 
-	if (rc == 0)
-		netback_accel_debugfs_init();
+	netback_accel_debugfs_init();
 
-	if (rc == 0)
-		rc = netback_accel_sf_init();
+	rc = netback_accel_sf_init();
+	if (rc != 0)
+		goto fail1;
 
-	if (rc == 0)
-		rc = register_netdevice_notifier
-			(&netback_accel_netdev_notifier);
+	rc = register_netdevice_notifier
+		(&netback_accel_netdev_notifier);
+	if (rc != 0)
+		goto fail2;
 
-	/*
-	 * What if no device was found, shouldn't we clean up stuff
-	 * we've allocated for acceleration subsystem?
-	 */
+	return 0;
 
+ fail2:
+	netback_accel_sf_shutdown();
+ fail1:
+	netback_accel_debugfs_fini();
+	netback_accel_shutdown_fwd();
+ fail0:
+#ifdef EFX_GCOV
+	gcov_provider_fini(THIS_MODULE);
+#endif
 	return rc;
 }
 

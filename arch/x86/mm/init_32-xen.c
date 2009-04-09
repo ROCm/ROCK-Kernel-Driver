@@ -1066,8 +1066,6 @@ void __init mem_init(void)
 
 	pci_iommu_alloc();
 
-	pci_iommu_alloc();
-
 #ifdef CONFIG_FLATMEM
 	BUG_ON(!mem_map);
 #endif

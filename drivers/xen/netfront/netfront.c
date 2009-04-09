@@ -2228,10 +2228,9 @@ static void __exit netif_exit(void)
 #ifdef CONFIG_INET
 	unregister_inetaddr_notifier(&notifier_inetdev);
 #endif
+	xenbus_unregister_driver(&netfront_driver);
 
 	netif_exit_accel();
-
-	return xenbus_unregister_driver(&netfront_driver);
 }
 module_exit(netif_exit);
 

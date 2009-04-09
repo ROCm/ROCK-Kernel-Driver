@@ -146,6 +146,18 @@ int netfront_accel_debugfs_create(netfront_accel_vnic *vnic)
 	vnic->dbfs.fastpath_frm_trunc = debugfs_create_u64
 		("fastpath_frm_trunc", S_IRUSR | S_IRGRP | S_IROTH,
 		 vnic->dbfs_dir, &vnic->stats.fastpath_frm_trunc);
+	vnic->dbfs.fastpath_crc_bad = debugfs_create_u64
+		("fastpath_crc_bad", S_IRUSR | S_IRGRP | S_IROTH,
+		 vnic->dbfs_dir, &vnic->stats.fastpath_crc_bad);
+	vnic->dbfs.fastpath_csum_bad = debugfs_create_u64
+		("fastpath_csum_bad", S_IRUSR | S_IRGRP | S_IROTH,
+		 vnic->dbfs_dir, &vnic->stats.fastpath_csum_bad);
+	vnic->dbfs.fastpath_rights_bad = debugfs_create_u64
+		("fastpath_rights_bad", S_IRUSR | S_IRGRP | S_IROTH,
+		 vnic->dbfs_dir, &vnic->stats.fastpath_rights_bad);
+	vnic->dbfs.fastpath_discard_other = debugfs_create_u64
+		("fastpath_discard_other", S_IRUSR | S_IRGRP | S_IROTH,
+		 vnic->dbfs_dir, &vnic->stats.fastpath_discard_other);
 	vnic->dbfs.rx_no_desc_trunc = debugfs_create_u64
 		("rx_no_desc_trunc", S_IRUSR | S_IRGRP | S_IROTH,
 		 vnic->dbfs_dir, &vnic->stats.rx_no_desc_trunc);
@@ -199,6 +211,10 @@ int netfront_accel_debugfs_remove(netfront_accel_vnic *vnic)
 		debugfs_remove(vnic->dbfs.event_count_since_irq);
 		debugfs_remove(vnic->dbfs.events_per_irq_max);
 		debugfs_remove(vnic->dbfs.fastpath_frm_trunc);
+		debugfs_remove(vnic->dbfs.fastpath_crc_bad);
+		debugfs_remove(vnic->dbfs.fastpath_csum_bad);
+		debugfs_remove(vnic->dbfs.fastpath_rights_bad);
+		debugfs_remove(vnic->dbfs.fastpath_discard_other);
 		debugfs_remove(vnic->dbfs.rx_no_desc_trunc);
 		debugfs_remove(vnic->dbfs.events_per_poll_max);
 		debugfs_remove(vnic->dbfs.events_per_poll_rx_max);

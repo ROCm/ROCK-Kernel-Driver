@@ -41,6 +41,10 @@
 
 #include <ci/efhw/common_sysdep.h>
 
+enum efhw_arch {
+	EFHW_ARCH_FALCON,
+};
+
 typedef uint32_t efhw_buffer_addr_t;
 #define EFHW_BUFFER_ADDR_FMT	"[ba:%"PRIx32"]"
 

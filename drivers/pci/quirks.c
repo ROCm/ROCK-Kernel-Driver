@@ -36,15 +36,16 @@ EXPORT_SYMBOL(pcie_mch_quirk);
 #ifdef CONFIG_PCI_QUIRKS
 #ifdef CONFIG_PCI_REASSIGN
 /*
- * This quirk function disables the device and releases resources
- * which is specified by kernel's boot parameter 'reassigndev'.
+ * This quirk function disables memory decoding and releases memory
+ * resources which is specified by kernel's boot parameter 'reassigndev'.
  * Later on, kernel will assign page-aligned memory resource back
- * to that device.
+ * to the device.
  */
 static void __devinit quirk_release_resources(struct pci_dev *dev)
 {
 	int i;
 	struct resource *r;
+	u16 command;
 
 	if (pci_is_reassigndev(dev)) {
 		if (dev->hdr_type == PCI_HEADER_TYPE_NORMAL &&
@@ -52,8 +53,11 @@ static void __devinit quirk_release_resources(struct pci_dev *dev)
 			/* PCI Host Bridge isn't a target device */
 			return;
 		}
-		dev_info(&dev->dev, "disable device and release resources\n");
-		pci_disable_device(dev);
+		dev_info(&dev->dev,
+			 "disable memory decoding and release memory resources\n");
+		pci_read_config_word(dev, PCI_COMMAND, &command);
+		command &= ~PCI_COMMAND_MEMORY;
+		pci_write_config_word(dev, PCI_COMMAND, command);
 
 		for (i=0; i < PCI_NUM_RESOURCES; i++) {
 			r = &dev->resource[i];

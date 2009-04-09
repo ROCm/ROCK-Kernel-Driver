@@ -45,14 +45,6 @@
 
 /*--------------------------------------------------------------------
  *
- * hardware limits used in the types
- *
- *--------------------------------------------------------------------*/
-
-#define EFHW_KEVENTQ_MAX    8
-
-/*--------------------------------------------------------------------
- *
  * forward type declarations
  *
  *--------------------------------------------------------------------*/
@@ -72,7 +64,7 @@ struct efhw_buffer_table_allocation{
 
 struct eventq_resource_hardware {
 	/*!iobuffer allocated for eventq - can be larger than eventq */
-	efhw_iopages_t iobuff;
+	struct efhw_iopages iobuff;
 	unsigned iobuff_off;
 	struct efhw_buffer_table_allocation buf_tbl_alloc;
 	int capacity;		/*!< capacity of event queue */
@@ -85,7 +77,7 @@ struct eventq_resource_hardware {
  *--------------------------------------------------------------------*/
 
 struct efhw_keventq {
-	volatile int lock;
+	int lock;
 	caddr_t evq_base;
 	int32_t evq_ptr;
 	uint32_t evq_mask;
@@ -93,6 +85,37 @@ struct efhw_keventq {
 	struct eventq_resource_hardware hw;
 	struct efhw_ev_handler *ev_handlers;
 };
+
+/*--------------------------------------------------------------------
+ *
+ * filters
+ *
+ *--------------------------------------------------------------------*/
+
+struct efhw_filter_spec {
+	uint dmaq_id;
+	uint32_t saddr_le32;
+	uint32_t daddr_le32;
+	uint16_t sport_le16;
+	uint16_t dport_le16;
+	unsigned tcp     : 1;
+	unsigned full    : 1;
+	unsigned rss     : 1;  /* not supported on A1 */
+	unsigned scatter : 1;  /* not supported on A1 */
+};
+
+struct efhw_filter_depth {
+	unsigned needed;
+	unsigned max;
+};
+
+struct efhw_filter_search_limits {
+	unsigned tcp_full;
+	unsigned tcp_wild;
+	unsigned udp_full;
+	unsigned udp_wild;
+};
+
 
 /**********************************************************************
  * Portable HW interface. ***************************************
@@ -115,7 +138,7 @@ struct efhw_func_ops {
 	/*! initialise all hardware functional units */
 	int (*init_hardware) (struct efhw_nic *nic,
 			      struct efhw_ev_handler *,
-			      const uint8_t *mac_addr);
+			      const uint8_t *mac_addr, int non_irq_evq);
 
   /*-------------- Interrupt support  ------------ */
 
@@ -130,17 +153,17 @@ struct efhw_func_ops {
 	 */
 	int (*interrupt) (struct efhw_nic *nic);
 
-	/*! Enable given interrupt mask for the given IRQ unit */
-	void (*interrupt_enable) (struct efhw_nic *nic, uint idx);
+	/*! Enable the interrupt */
+	void (*interrupt_enable) (struct efhw_nic *nic);
 
-	/*! Disable given interrupt mask for the given IRQ unit */
-	void (*interrupt_disable) (struct efhw_nic *nic, uint idx);
+	/*! Disable the interrupt */
+	void (*interrupt_disable) (struct efhw_nic *nic);
 
 	/*! Set interrupt moderation strategy for the given IRQ unit
 	 ** val is in usec
 	 */
-	void (*set_interrupt_moderation)(struct efhw_nic *nic,
-					 uint idx, uint val);
+	void (*set_interrupt_moderation)(struct efhw_nic *nic, int evq,
+					 uint val);
 
   /*-------------- Event support  ------------ */
 
@@ -152,7 +175,8 @@ struct efhw_func_ops {
 	void (*event_queue_enable) (struct efhw_nic *nic,
 				    uint evq,	/* evnt queue index */
 				    uint evq_size,	/* units of #entries */
-				    dma_addr_t q_base_addr, uint buf_base_id);
+				    dma_addr_t q_base_addr, uint buf_base_id,
+				    int interrupting);
 
 	/*! Disable the given event queue (and any associated timer) */
 	void (*event_queue_disable) (struct efhw_nic *nic, uint evq,
@@ -165,7 +189,7 @@ struct efhw_func_ops {
 	/*! Push a SW event on a given eventQ */
 	void (*sw_event) (struct efhw_nic *nic, int data, int evq);
 
-  /*-------------- Filter support  ------------ */
+  /*-------------- IP Filter API  ------------ */
 
 	/*! Setup a given filter - The software can request a filter_i,
 	 * but some EtherFabric implementations will override with
@@ -175,13 +199,6 @@ struct efhw_func_ops {
 			     int *filter_i, int dmaq,
 			     unsigned saddr_be32, unsigned sport_be16,
 			     unsigned daddr_be32, unsigned dport_be16);
-
-	/*! Attach a given filter to a DMAQ */
-	void (*ipfilter_attach) (struct efhw_nic *nic, int filter_idx,
-				 int dmaq_idx);
-
-	/*! Detach a filter from its DMAQ */
-	void (*ipfilter_detach) (struct efhw_nic *nic, int filter_idx);
 
 	/*! Clear down a given filter */
 	void (*ipfilter_clear) (struct efhw_nic *nic, int filter_idx);
@@ -231,6 +248,14 @@ struct efhw_func_ops {
 	/*! Commit a buffer table update  */
 	void (*buffer_table_commit) (struct efhw_nic *nic);
 
+  /*-------------- New filter API ------------ */
+
+	/*! Set a given filter */
+	int (*filter_set) (struct efhw_nic *nic, struct efhw_filter_spec *spec,
+			   int *filter_idx_out);
+
+	/*! Clear a given filter */
+	void (*filter_clear) (struct efhw_nic *nic, int filter_idx);
 };
 
 
@@ -255,12 +280,10 @@ struct efhw_device_type {
 
 /*! */
 struct efhw_nic {
-	/*! zero base index in efrm_nic_table.nic array */
-	volatile int index;
+	/*! zero base index in efrm_nic_tablep->nic array */
+	int index;
 	int ifindex;		/*!< OS level nic index */
-#ifdef HAS_NET_NAMESPACE
 	struct net *nd_net;
-#endif
 
 	struct efhw_device_type devtype;
 
@@ -276,14 +299,13 @@ struct efhw_nic {
 # define NIC_FLAG_TRY_MSI               0x02
 # define NIC_FLAG_MSI                   0x04
 # define NIC_FLAG_OS_IRQ_EN             0x08
-# define NIC_FLAG_10G                   0x10
 
 	unsigned mtu;		/*!< MAC MTU (includes MAC hdr) */
 
 	/* hardware resources */
 
 	/*! I/O address of the start of the bar */
-	efhw_ioaddr_t bar_ioaddr;
+	volatile char __iomem *bar_ioaddr;
 
 	/*! Bar number of control aperture. */
 	unsigned ctr_ap_bar;
@@ -294,9 +316,6 @@ struct efhw_nic {
 
 	/*! EtherFabric Functional Units -- functions */
 	const struct efhw_func_ops *efhw_func;
-
-	/* Value read from FPGA version register.  Zero for asic. */
-	unsigned fpga_version;
 
 	/*! This lock protects a number of misc NIC resources.  It should
 	 * only be used for things that can be at the bottom of the lock
@@ -312,14 +331,17 @@ struct efhw_nic {
 	void (*irq_handler) (struct efhw_nic *, int unit);
 
 	/*! event queues per driver */
-	struct efhw_keventq evq[EFHW_KEVENTQ_MAX];
+	struct efhw_keventq interrupting_evq;
 
 /* for marking when we are not using an IRQ unit
       - 0 is a valid offset to an IRQ unit on EF1! */
 #define EFHW_IRQ_UNIT_UNUSED  0xffff
-	/*! interrupt unit in use  */
-	unsigned int irq_unit[EFHW_KEVENTQ_MAX];
-	efhw_iopage_t irq_iobuff;	/*!<  Falcon SYSERR interrupt */
+	/*! interrupt unit in use for the interrupting event queue  */
+	unsigned int irq_unit;
+
+	struct efhw_keventq non_interrupting_evq;
+
+	struct efhw_iopage irq_iobuff;	/*!<  Falcon SYSERR interrupt */
 
 	/* The new driverlink infrastructure. */
 	struct efx_dl_device *net_driver_dev;
@@ -331,8 +353,26 @@ struct efhw_nic {
 	unsigned rxq_sizes;
 	unsigned txq_sizes;
 
-	/* Size of filter table (including odd and even banks). */
-	unsigned filter_tbl_size;
+	/* Size of filter table. */
+	unsigned ip_filter_tbl_size;
+
+	/* Number of filters currently used */
+	unsigned ip_filter_tbl_used;
+
+	/* Dynamically allocated filter state. */
+	uint8_t *filter_in_use;
+	struct efhw_filter_spec *filter_spec_cache;
+
+	/* Currently required and maximum filter table search depths. */
+	struct efhw_filter_depth tcp_full_srch;
+	struct efhw_filter_depth tcp_wild_srch;
+	struct efhw_filter_depth udp_full_srch;
+	struct efhw_filter_depth udp_wild_srch;
+
+	/* Number of event queues, DMA queues and timers. */
+	unsigned num_evqs;
+	unsigned num_dmaqs;
+	unsigned num_timers;
 };
 
 

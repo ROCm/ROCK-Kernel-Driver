@@ -76,7 +76,7 @@ static inline void efrm_nic_table_rele(void)
 
 static inline int efrm_nic_table_held(void)
 {
-	return (atomic_read(&efrm_nic_tablep->ref_count) != 0);
+	return atomic_read(&efrm_nic_tablep->ref_count) != 0;
 }
 
 /* Run code block _x multiple times with variable nic set to each

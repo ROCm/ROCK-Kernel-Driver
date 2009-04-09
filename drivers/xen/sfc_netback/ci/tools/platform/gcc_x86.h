@@ -116,6 +116,15 @@ ci_inline void ci_atomic32_and(volatile ci_uint32* p, ci_uint32 mask)
 ci_inline void ci_atomic32_add(volatile ci_uint32* p, ci_uint32 v)
 { __asm__ __volatile__("lock; addl %1, %0" : "+m" (*p) : "ir" (v)); }
 
+ci_inline void ci_atomic32_inc(volatile ci_uint32* p)
+{ __asm__ __volatile__("lock; incl %0" : "+m" (*p)); }
+
+ci_inline int ci_atomic32_dec_and_test(volatile ci_uint32* p) {
+  char r;
+  __asm__ __volatile__("lock; decl %0; sete %1" : "+m" (*p), "=qm" (r));
+  return r;
+}
+
 #define ci_atomic_or(a, v)   ci_atomic32_or ((ci_uint32*) &(a)->n, (v))
 #define ci_atomic_and(a, v)  ci_atomic32_and((ci_uint32*) &(a)->n, (v))
 #define ci_atomic_add(a, v)  ci_atomic32_add((ci_uint32*) &(a)->n, (v))

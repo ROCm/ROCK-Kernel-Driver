@@ -127,7 +127,6 @@ void vnic_stop_fastpath(netfront_accel_vnic *vnic)
 
 static void netfront_accel_interface_up(netfront_accel_vnic *vnic)
 {
-
 	if (!vnic->backend_netdev_up) {
 		vnic->backend_netdev_up = 1;
 		
@@ -139,7 +138,6 @@ static void netfront_accel_interface_up(netfront_accel_vnic *vnic)
 
 static void netfront_accel_interface_down(netfront_accel_vnic *vnic)
 {
-
 	if (vnic->backend_netdev_up) {
 		vnic->backend_netdev_up = 0;
 		

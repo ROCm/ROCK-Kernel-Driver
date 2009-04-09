@@ -254,8 +254,6 @@ static void __update_wallclock(time_t sec, long nsec)
 
 	set_normalized_timespec(&xtime, xtime_sec, xtime_nsec);
 	set_normalized_timespec(&wall_to_monotonic, wtm_sec, wtm_nsec);
-
-	ntp_clear();
 }
 
 static void update_wallclock(void)

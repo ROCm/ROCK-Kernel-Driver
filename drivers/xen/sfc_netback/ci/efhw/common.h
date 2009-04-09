@@ -43,7 +43,6 @@
 
 enum efhw_arch {
 	EFHW_ARCH_FALCON,
-	EFHW_ARCH_SIENA,
 };
 
 typedef uint32_t efhw_buffer_addr_t;
@@ -56,25 +55,21 @@ typedef union {
 		uint32_t a;
 		uint32_t b;
 	} opaque;
-	struct {
-		uint32_t code;
-		uint32_t status;
-	} ev1002;
 } efhw_event_t;
 
 /* Flags for TX/RX queues */
-#define EFHW_VI_JUMBO_EN           0x01  /*! scatter RX over multiple desc */
-#define EFHW_VI_ISCSI_RX_HDIG_EN   0x02  /*! iscsi rx header digest */
-#define EFHW_VI_ISCSI_TX_HDIG_EN   0x04  /*! iscsi tx header digest */
-#define EFHW_VI_ISCSI_RX_DDIG_EN   0x08  /*! iscsi rx data digest */
-#define EFHW_VI_ISCSI_TX_DDIG_EN   0x10  /*! iscsi tx data digest */
-#define EFHW_VI_TX_PHYS_ADDR_EN    0x20  /*! TX physical address mode */
-#define EFHW_VI_RX_PHYS_ADDR_EN    0x40  /*! RX physical address mode */
-#define EFHW_VI_RM_WITH_INTERRUPT  0x80  /*! VI with an interrupt */
-#define EFHW_VI_TX_IP_CSUM_DIS     0x100 /*! enable ip checksum generation */
-#define EFHW_VI_TX_TCPUDP_CSUM_DIS 0x200 /*! enable tcp/udp checksum
-					   generation */
-#define EFHW_VI_TX_TCPUDP_ONLY     0x400 /*! drop non-tcp/udp packets */
+#define EFHW_VI_JUMBO_EN           0x01    /*! scatter RX over multiple desc */
+#define EFHW_VI_ISCSI_RX_HDIG_EN   0x02    /*! iscsi rx header digest */
+#define EFHW_VI_ISCSI_TX_HDIG_EN   0x04    /*! iscsi tx header digest */
+#define EFHW_VI_ISCSI_RX_DDIG_EN   0x08    /*! iscsi rx data digest */
+#define EFHW_VI_ISCSI_TX_DDIG_EN   0x10    /*! iscsi tx data digest */
+#define EFHW_VI_TX_PHYS_ADDR_EN    0x20    /*! TX physical address mode */
+#define EFHW_VI_RX_PHYS_ADDR_EN    0x40    /*! RX physical address mode */
+#define EFHW_VI_RM_WITH_INTERRUPT  0x80    /*! VI with an interrupt */
+#define EFHW_VI_TX_IP_CSUM_DIS     0x100   /*! enable ip checksum generation */
+#define EFHW_VI_TX_TCPUDP_CSUM_DIS 0x200   /*! enable tcp/udp checksum
+					       generation */
+#define EFHW_VI_TX_TCPUDP_ONLY     0x400   /*! drop non-tcp/udp packets */
 
 /* Types of hardware filter */
 /* Each of these values implicitly selects scatter filters on B0 - or in

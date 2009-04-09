@@ -305,8 +305,16 @@ static int msi_map_vector(struct pci_dev *dev, int entry_nr, u64 table_base)
 	 * dev->irq in dom0 will be 'Xen pirq' if this device belongs to
 	 * to another domain, and will be 'Linux irq' if it belongs to dom0.
 	 */
-	return ((domid != DOMID_SELF) ?
-		map_irq.pirq : evtchn_map_pirq(-1, map_irq.pirq));
+	if (domid == DOMID_SELF) {
+		rc = evtchn_map_pirq(-1, map_irq.pirq);
+		dev_printk(KERN_DEBUG, &dev->dev,
+			   "irq %d (%d) for MSI/MSI-X\n",
+			   rc, map_irq.pirq);
+		return rc;
+	}
+	dev_printk(KERN_DEBUG, &dev->dev, "irq %d for dom%d MSI/MSI-X\n",
+		   map_irq.pirq, domid);
+	return map_irq.pirq;
 }
 
 static void pci_intx_for_msi(struct pci_dev *dev, int enable)
@@ -612,7 +620,6 @@ int pci_enable_msix(struct pci_dev* dev, struct msix_entry *entries, int nvec)
 
 #ifdef CONFIG_XEN_PCIDEV_FRONTEND
 	if (!is_initial_xendomain()) {
-		struct msi_dev_list *msi_dev_entry;
 		struct msi_pirq_entry *pirq_entry;
 		int ret, irq;
 
@@ -625,7 +632,6 @@ int pci_enable_msix(struct pci_dev* dev, struct msix_entry *entries, int nvec)
 		}
 		msi_dev_entry->default_irq = temp;
 
-		msi_dev_entry = get_msi_dev_pirq_list(dev);
 		for (i = 0; i < nvec; i++) {
 			int mapped = 0;
 
@@ -688,8 +694,6 @@ EXPORT_SYMBOL(pci_enable_msix);
 extern void pci_frontend_disable_msix(struct pci_dev* dev);
 void pci_msix_shutdown(struct pci_dev* dev)
 {
-	struct msi_dev_list *msi_dev_entry = get_msi_dev_pirq_list(dev);
-
 	if (!pci_msi_enable)
 		return;
 	if (!dev)

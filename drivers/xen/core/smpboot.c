@@ -125,7 +125,7 @@ static int __cpuinit xen_smp_intr_init(unsigned int cpu)
 				   cpu,
 				   &resched_action);
 	if (rc < 0)
-		goto fail;
+		return rc;
 	if (resched_irq < 0)
 		resched_irq = rc;
 	else
@@ -135,7 +135,7 @@ static int __cpuinit xen_smp_intr_init(unsigned int cpu)
 				   cpu,
 				   &callfunc_action);
 	if (rc < 0)
-		goto fail;
+		goto unbind_resched;
 	if (callfunc_irq < 0)
 		callfunc_irq = rc;
 	else
@@ -145,7 +145,7 @@ static int __cpuinit xen_smp_intr_init(unsigned int cpu)
 				   cpu,
 				   &call1func_action);
 	if (rc < 0)
-		goto fail;
+		goto unbind_call;
 	if (call1func_irq < 0)
 		call1func_irq = rc;
 	else
@@ -153,7 +153,7 @@ static int __cpuinit xen_smp_intr_init(unsigned int cpu)
 
 	rc = xen_spinlock_init(cpu);
 	if (rc < 0)
-		goto fail;
+		goto unbind_call1;
 
 	if ((cpu != 0) && ((rc = local_setup_timer(cpu)) != 0))
 		goto fail;
@@ -161,13 +161,13 @@ static int __cpuinit xen_smp_intr_init(unsigned int cpu)
 	return 0;
 
  fail:
-	if (resched_irq >= 0)
-		unbind_from_per_cpu_irq(resched_irq, cpu, NULL);
-	if (callfunc_irq >= 0)
-		unbind_from_per_cpu_irq(callfunc_irq, cpu, NULL);
-	if (call1func_irq >= 0)
-		unbind_from_per_cpu_irq(call1func_irq, cpu, NULL);
 	xen_spinlock_cleanup(cpu);
+ unbind_call1:
+	unbind_from_per_cpu_irq(call1func_irq, cpu, NULL);
+ unbind_call:
+	unbind_from_per_cpu_irq(callfunc_irq, cpu, NULL);
+ unbind_resched:
+	unbind_from_per_cpu_irq(resched_irq, cpu, NULL);
 	return rc;
 }
 

@@ -163,6 +163,13 @@ extern int ci_format_ip4_addr(char* buf, unsigned addr_be32) CI_HF;
   ** must be at least 16 bytes long.
   */
 
+#if defined(__unix__) && ! defined(__KERNEL__)
+extern int ci_format_select_set(char* s, int len_s, int nfds, const fd_set*);
+extern int ci_format_select(char* s, int len_s,
+			    int nfds, const fd_set* rds, const fd_set* wrs,
+			    const fd_set* exs, struct timeval* timeout);
+#endif
+
 
 /**********************************************************************
  * Error checking.

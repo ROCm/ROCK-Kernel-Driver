@@ -49,11 +49,11 @@ struct efx_vi_state;
  * Allocate an efx_vi, including event queue and pt_endpoint
  *
  * \param vih_out Pointer to a handle that is set on success
- * \param nic_index Index of NIC to apply this resource to
+ * \param ifindex Index of the network interface desired
  * \return Zero on success (and vih_out set), non-zero on failure.
  */
 extern int
-efx_vi_alloc(struct efx_vi_state **vih_out, int nic_index);
+efx_vi_alloc(struct efx_vi_state **vih_out, int ifindex);
 
 /*!
  * Free a previously allocated efx_vi
@@ -190,8 +190,6 @@ efx_vi_filter_stop(struct efx_vi_state *vih, struct filter_resource_t *fh);
 /*! Constants for the type field in efx_vi_hw_resource */
 #define EFX_VI_HW_RESOURCE_TXDMAQ    0x0	/* PFN of TX DMA Q */
 #define EFX_VI_HW_RESOURCE_RXDMAQ    0x1	/* PFN of RX DMA Q */
-#define EFX_VI_HW_RESOURCE_TXBELL    0x2	/* PFN of TX Doorbell (EF1) */
-#define EFX_VI_HW_RESOURCE_RXBELL    0x3	/* PFN of RX Doorbell (EF1) */
 #define EFX_VI_HW_RESOURCE_EVQTIMER  0x4	/* Address of event q timer */
 
 /* Address of event q pointer (EF1) */
@@ -229,7 +227,6 @@ struct efx_vi_hw_resource {
  * Metadata concerning the list of hardware resource mappings
  */
 struct efx_vi_hw_resource_metadata {
-	int version;
 	int evq_order;
 	int evq_offs;
 	int evq_capacity;

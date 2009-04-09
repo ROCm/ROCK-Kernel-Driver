@@ -124,8 +124,6 @@ struct netback_accel {
 	enum net_accel_hw_type hw_type;
 	/*! State of allocation */	       
 	int hw_state;
-	/*! Index into ci_driver.nics[] for this interface */
-	int nic_index;
 	/*! How to set up the acceleration for this hardware */
 	int (*accel_setup)(struct netback_accel *); 
 	/*! And how to stop it. */

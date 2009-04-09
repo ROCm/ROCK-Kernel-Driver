@@ -70,11 +70,32 @@ int efhw_nic_event_queue_alloc_iobuffer(struct efhw_nic *nic,
 extern void falcon_nic_set_rx_usr_buf_size(struct efhw_nic *,
 					   int rx_usr_buf_size);
 
+/*! Get RX filter search limits from RX_FILTER_CTL_REG.
+ *  use_raw_values = 0 to get actual depth of search, or 1 to get raw values
+ *  from register.
+ */
+extern void
+falcon_nic_get_rx_filter_search_limits(struct efhw_nic *nic,
+				       struct efhw_filter_search_limits *lim,
+				       int use_raw_values);
+
+/*! Set RX filter search limits in RX_FILTER_CTL_REG.
+ *  use_raw_values = 0 if specifying actual depth of search, or 1 if specifying
+ *  raw values to write to the register.
+ */
+extern void
+falcon_nic_set_rx_filter_search_limits(struct efhw_nic *nic,
+				       struct efhw_filter_search_limits *lim,
+				       int use_raw_values);
+
+
+/*! Legacy RX IP filter search depth control interface */
 extern void
 falcon_nic_rx_filter_ctl_set(struct efhw_nic *nic, uint32_t tcp_full,
 			     uint32_t tcp_wild,
 			     uint32_t udp_full, uint32_t udp_wild);
 
+/*! Legacy RX IP filter search depth control interface */
 extern void
 falcon_nic_rx_filter_ctl_get(struct efhw_nic *nic, uint32_t *tcp_full,
 			     uint32_t *tcp_wild,

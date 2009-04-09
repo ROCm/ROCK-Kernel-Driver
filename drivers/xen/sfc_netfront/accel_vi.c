@@ -941,18 +941,29 @@ static int netfront_accel_vi_poll_process_rx(netfront_accel_vnic *vnic,
 				" buffer %d RX_DISCARD_OTHER q_id %d\n",
 				__FUNCTION__, EF_EVENT_PRI_ARG(*ev), id,
 				EF_EVENT_RX_DISCARD_Q_ID(*ev) );
-			/*
-			 * Probably tail of packet for which error has
-			 * already been logged, so don't count in
-			 * stats
-			 */
-		} else {
-			EPRINTK("%s: " EF_EVENT_FMT 
-				" buffer %d rx discard type %d q_id %d\n",
+			NETFRONT_ACCEL_STATS_OP(++vnic->stats.fastpath_discard_other);
+		} else if (EF_EVENT_RX_DISCARD_TYPE(*ev) ==
+			   EF_EVENT_RX_DISCARD_CSUM_BAD) {
+			DPRINTK("%s: " EF_EVENT_FMT 
+				" buffer %d DISCARD CSUM_BAD q_id %d\n",
 				__FUNCTION__, EF_EVENT_PRI_ARG(*ev), id,
-				EF_EVENT_RX_DISCARD_TYPE(*ev), 
 				EF_EVENT_RX_DISCARD_Q_ID(*ev) );
-			NETFRONT_ACCEL_STATS_OP(++vnic->stats.bad_event_count);
+			NETFRONT_ACCEL_STATS_OP(++vnic->stats.fastpath_csum_bad);
+		} else if (EF_EVENT_RX_DISCARD_TYPE(*ev) ==
+			   EF_EVENT_RX_DISCARD_CRC_BAD) {
+			DPRINTK("%s: " EF_EVENT_FMT 
+				" buffer %d DISCARD CRC_BAD q_id %d\n",
+				__FUNCTION__, EF_EVENT_PRI_ARG(*ev), id,
+				EF_EVENT_RX_DISCARD_Q_ID(*ev) );
+			NETFRONT_ACCEL_STATS_OP(++vnic->stats.fastpath_crc_bad);
+		} else {
+			BUG_ON(EF_EVENT_RX_DISCARD_TYPE(*ev) !=
+			       EF_EVENT_RX_DISCARD_RIGHTS);
+			DPRINTK("%s: " EF_EVENT_FMT 
+				" buffer %d DISCARD RIGHTS q_id %d\n",
+				__FUNCTION__, EF_EVENT_PRI_ARG(*ev), id,
+				EF_EVENT_RX_DISCARD_Q_ID(*ev) );
+			NETFRONT_ACCEL_STATS_OP(++vnic->stats.fastpath_rights_bad);
 		}
 	}
 
@@ -983,39 +994,35 @@ static void netfront_accel_vi_not_busy(netfront_accel_vnic *vnic)
 {
 	struct netfront_info *np = ((struct netfront_info *)
 				    netdev_priv(vnic->net_dev));
-	struct sk_buff *skb;
 	int handled;
 	unsigned long flags;
-	
+
 	/*
-	 * TODO if we could safely check tx_skb == NULL and return
-	 * early without taking the lock, that would obviously help
-	 * performance
+	 * We hold the vnic tx_lock which is sufficient to exclude
+	 * writes to tx_skb
 	 */
 
-	/* Take the netfront lock which protects tx_skb. */
-	spin_lock_irqsave(&np->tx_lock, flags);
 	if (vnic->tx_skb != NULL) {
 		DPRINTK("%s trying to send spare buffer\n", __FUNCTION__);
 		
-		skb = vnic->tx_skb;
-		vnic->tx_skb = NULL;
-
-		spin_unlock_irqrestore(&np->tx_lock, flags);
-
-		handled = netfront_accel_vi_tx_post(vnic, skb);
+		handled = netfront_accel_vi_tx_post(vnic, vnic->tx_skb);
 		
-		spin_lock_irqsave(&np->tx_lock, flags);
-
 		if (handled != NETFRONT_ACCEL_STATUS_BUSY) {
 			DPRINTK("%s restarting tx\n", __FUNCTION__);
+
+			/* Need netfront tx_lock and vnic tx_lock to
+			 * write tx_skb */
+			spin_lock_irqsave(&np->tx_lock, flags);
+
+			vnic->tx_skb = NULL;
+
 			if (netfront_check_queue_ready(vnic->net_dev)) {
 				netif_wake_queue(vnic->net_dev);
 				NETFRONT_ACCEL_STATS_OP
 					(vnic->stats.queue_wakes++);
 			}
-		} else {
-			vnic->tx_skb = skb;
+			spin_unlock_irqrestore(&np->tx_lock, flags);
+
 		}
 		
 		/*
@@ -1024,7 +1031,6 @@ static void netfront_accel_vi_not_busy(netfront_accel_vnic *vnic)
 		 */
 		BUG_ON(handled == NETFRONT_ACCEL_STATUS_CANT);
 	}
-	spin_unlock_irqrestore(&np->tx_lock, flags);
 }
 
 

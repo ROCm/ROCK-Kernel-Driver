@@ -53,8 +53,7 @@ int __cpuinit xen_spinlock_init(unsigned int cpu)
 
 void __cpuinit xen_spinlock_cleanup(unsigned int cpu)
 {
-	if (spinlock_irq >= 0)
-		unbind_from_per_cpu_irq(spinlock_irq, cpu, NULL);
+	unbind_from_per_cpu_irq(spinlock_irq, cpu, NULL);
 }
 
 int xen_spin_wait(raw_spinlock_t *lock, unsigned int token)

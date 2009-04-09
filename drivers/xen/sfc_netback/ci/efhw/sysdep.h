@@ -39,34 +39,17 @@
 #ifndef __CI_EFHW_SYSDEP_LINUX_H__
 #define __CI_EFHW_SYSDEP_LINUX_H__
 
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/spinlock.h>
 #include <linux/delay.h>
+#include <linux/vmalloc.h>
 #include <linux/if_ether.h>
 
 #include <linux/netdevice.h> /* necessary for etherdevice.h on some kernels */
 #include <linux/etherdevice.h>
 
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,21)
-static inline int is_local_ether_addr(const u8 *addr)
-{
-	return (0x02 & addr[0]);
-}
-#endif
-
 typedef unsigned long irq_flags_t;
 
 #define spin_lock_destroy(l_)  do {} while (0)
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24)
-#define HAS_NET_NAMESPACE
-#endif
-
-/* Funny, but linux has round_up for x86 only, defined in
- * x86-specific header */
-#ifndef round_up
-#define round_up(x, y) (((x) + (y) - 1) & ~((y)-1))
-#endif
 
 #endif /* __CI_EFHW_SYSDEP_LINUX_H__ */

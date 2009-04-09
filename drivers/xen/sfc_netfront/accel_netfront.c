@@ -65,7 +65,7 @@ static int netfront_accel_netdev_start_xmit(struct sk_buff *skb,
 		BUG_ON(vnic->net_dev != net_dev);
 		DPRINTK("%s stopping queue\n", __FUNCTION__);
 
-		/* Netfront's lock protects tx_skb */
+		/* Need netfront's tx_lock and vnic tx_lock to write tx_skb */
 		spin_lock_irqsave(&np->tx_lock, flags2);
 		BUG_ON(vnic->tx_skb != NULL);
 		vnic->tx_skb = skb;
@@ -183,7 +183,7 @@ static int netfront_accel_check_ready(struct net_device *net_dev)
 
 	BUG_ON(vnic == NULL);
 
-	/* This is protected by netfront's lock */ 
+	/* Read of tx_skb is protected by netfront's tx_lock */ 
 	return vnic->tx_skb == NULL;
 }
 
@@ -274,7 +274,7 @@ static int __init netfront_accel_init(void)
 
 	if (rc < 0) {
 		EPRINTK("Xen netfront accelerator version mismatch\n");
-		return -EINVAL;
+		goto fail;
 	}
 
 	if (rc > 0) {
@@ -283,10 +283,19 @@ static int __init netfront_accel_init(void)
 		 * and accept certain subsets of previous versions
 		 */
 		EPRINTK("Xen netfront accelerator version mismatch\n");
-		return -EINVAL;
+		goto fail;
 	}
 
 	return 0;
+
+ fail:
+	netfront_accel_debugfs_fini();
+	flush_workqueue(netfront_accel_workqueue);
+	destroy_workqueue(netfront_accel_workqueue);
+#ifdef EFX_GCOV
+ 	gcov_provider_fini(THIS_MODULE);
+#endif
+	return -EINVAL;
 }
 module_init(netfront_accel_init);
 

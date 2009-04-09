@@ -33,6 +33,10 @@
 #ifndef __CI_CIUL_SYSDEP_LINUX_H__
 #define __CI_CIUL_SYSDEP_LINUX_H__
 
+
+#define ef_vi_wiob()  mmiowb()
+
+
 /**********************************************************************
  * Kernel version compatability
  */
@@ -72,12 +76,19 @@
 
 # if defined(__i386__) || defined(__x86_64__)  /* GCC x86/x64 */
    typedef unsigned long long ef_vi_dma_addr_t; 
-#  if __GNUC__ >= 3 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 96)
-#   define ef_vi_wiob()  __asm__ __volatile__ ("sfence")
-#  else
-#   define ef_vi_wiob()  __asm__ __volatile__ (".byte 0x0F, 0xAE, 0xF8")
-#  endif
+# endif
+#endif
 
+#ifndef mmiowb
+# if defined(__i386__) || defined(__x86_64__)
+#  define mmiowb()
+# elif defined(__ia64__)
+#  ifndef ia64_mfa
+#   define ia64_mfa() asm volatile ("mf.a" ::: "memory")
+#  endif
+#  define mmiowb ia64_mfa
+# else
+#  error "Need definition for mmiowb"
 # endif
 #endif
 
@@ -88,7 +99,6 @@
 #if !defined(__GNUC__)
 # if defined(__PPC__)  /* GCC, PPC */
    typedef unsigned long     ef_vi_dma_addr_t;
-#  define ef_vi_wiob()  wmb()
 
 #  ifdef __powerpc64__
 #   ifdef CONFIG_SMP
@@ -110,8 +120,6 @@
 
 # elif defined(__ia64__)  /* GCC, IA64 */
    typedef unsigned long     ef_vi_dma_addr_t;
-#  define ef_vi_wiob()  __asm__ __volatile__("mf.a": : :"memory")
-
 # else
 #  error Unknown processor - GNU C
 # endif
@@ -127,13 +135,6 @@
 #   define EF_VI_LIKELY(t)    __builtin_expect((t), 1)
 #   define EF_VI_UNLIKELY(t)  __builtin_expect((t), 0)
 #  endif
-
-#  if __GNUC__ >= 3 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 96)
-#   define ef_vi_wiob()  __asm__ __volatile__ ("sfence")
-#  else
-#   define ef_vi_wiob()  __asm__ __volatile__ (".byte 0x0F, 0xAE, 0xF8")
-#  endif
-
 # else
 #  error Old Intel compiler not supported.
 # endif

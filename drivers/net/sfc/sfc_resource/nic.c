@@ -47,6 +47,7 @@ int efhw_device_type_init(struct efhw_device_type *dt,
 	switch (device_id) {
 	case 0x0703:
 	case 0x6703:
+		dt->arch = EFHW_ARCH_FALCON;
 		dt->variant = 'A';
 		switch (class_revision) {
 		case 0:
@@ -60,6 +61,7 @@ int efhw_device_type_init(struct efhw_device_type *dt,
 		}
 		break;
 	case 0x0710:
+		dt->arch = EFHW_ARCH_FALCON;
 		dt->variant = 'B';
 		switch (class_revision) {
 		case 2:

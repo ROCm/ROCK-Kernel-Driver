@@ -51,11 +51,14 @@ struct xen_domctl_createdomain {
     uint32_t ssidref;
     xen_domain_handle_t handle;
  /* Is this an HVM guest (as opposed to a PV guest)? */
-#define _XEN_DOMCTL_CDF_hvm_guest 0
-#define XEN_DOMCTL_CDF_hvm_guest  (1U<<_XEN_DOMCTL_CDF_hvm_guest)
+#define _XEN_DOMCTL_CDF_hvm_guest     0
+#define XEN_DOMCTL_CDF_hvm_guest      (1U<<_XEN_DOMCTL_CDF_hvm_guest)
  /* Use hardware-assisted paging if available? */
-#define _XEN_DOMCTL_CDF_hap       1
-#define XEN_DOMCTL_CDF_hap        (1U<<_XEN_DOMCTL_CDF_hap)
+#define _XEN_DOMCTL_CDF_hap           1
+#define XEN_DOMCTL_CDF_hap            (1U<<_XEN_DOMCTL_CDF_hap)
+ /* Should domain memory integrity be verifed by tboot during Sx? */
+#define _XEN_DOMCTL_CDF_s3_integrity  2
+#define XEN_DOMCTL_CDF_s3_integrity   (1U<<_XEN_DOMCTL_CDF_s3_integrity)
     uint32_t flags;
 };
 typedef struct xen_domctl_createdomain xen_domctl_createdomain_t;
@@ -466,6 +469,7 @@ typedef enum pt_irq_type_e {
     PT_IRQ_TYPE_PCI,
     PT_IRQ_TYPE_ISA,
     PT_IRQ_TYPE_MSI,
+    PT_IRQ_TYPE_MSI_TRANSLATE,
 } pt_irq_type_t;
 struct xen_domctl_bind_pt_irq {
     uint32_t machine_irq;
@@ -484,6 +488,7 @@ struct xen_domctl_bind_pt_irq {
         struct {
             uint8_t gvec;
             uint32_t gflags;
+            uint64_aligned_t gtable;
         } msi;
     } u;
 };
@@ -619,6 +624,28 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_subscribe_t);
  */
 #define XEN_DOMCTL_suppress_spurious_page_faults 53
 
+#define XEN_DOMCTL_debug_op    54
+#define XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_OFF         0
+#define XEN_DOMCTL_DEBUG_OP_SINGLE_STEP_ON          1
+struct xen_domctl_debug_op {
+    uint32_t op;   /* IN */
+    uint32_t vcpu; /* IN */
+};
+typedef struct xen_domctl_debug_op xen_domctl_debug_op_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_debug_op_t);
+
+/*
+ * Request a particular record from the HVM context
+ */
+#define XEN_DOMCTL_gethvmcontext_partial   55
+typedef struct xen_domctl_hvmcontext_partial {
+    uint32_t type;                      /* IN: Type of record required */
+    uint32_t instance;                  /* IN: Instance of that type */
+    XEN_GUEST_HANDLE_64(uint8) buffer;  /* OUT: buffer to write record into */
+} xen_domctl_hvmcontext_partial_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_hvmcontext_partial_t);
+
+
 struct xen_domctl {
     uint32_t cmd;
     uint32_t interface_version; /* XEN_DOMCTL_INTERFACE_VERSION */
@@ -646,6 +673,7 @@ struct xen_domctl {
         struct xen_domctl_settimeoffset     settimeoffset;
         struct xen_domctl_real_mode_area    real_mode_area;
         struct xen_domctl_hvmcontext        hvmcontext;
+        struct xen_domctl_hvmcontext_partial hvmcontext_partial;
         struct xen_domctl_address_size      address_size;
         struct xen_domctl_sendtrigger       sendtrigger;
         struct xen_domctl_get_device_group  get_device_group;
@@ -658,6 +686,7 @@ struct xen_domctl {
         struct xen_domctl_set_opt_feature   set_opt_feature;
         struct xen_domctl_set_target        set_target;
         struct xen_domctl_subscribe         subscribe;
+        struct xen_domctl_debug_op          debug_op;
 #if defined(__i386__) || defined(__x86_64__)
         struct xen_domctl_cpuid             cpuid;
 #endif

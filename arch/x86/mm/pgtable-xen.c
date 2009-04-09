@@ -579,8 +579,10 @@ static void free_pmds(pmd_t *pmds[], struct mm_struct *mm, bool contig)
 {
 	int i;
 
+#ifdef CONFIG_X86_PAE
 	if (contig)
 		xen_destroy_contiguous_region((unsigned long)mm->pgd, 0);
+#endif
 
 	for(i = 0; i < PREALLOCATED_PMDS; i++)
 		if (pmds[i])
@@ -630,8 +632,10 @@ static void pgd_mop_up_pmds(struct mm_struct *mm, pgd_t *pgdp)
 		}
 	}
 
+#ifdef CONFIG_X86_PAE
 	if (!xen_feature(XENFEAT_pae_pgdir_above_4gb))
 		xen_destroy_contiguous_region((unsigned long)pgdp, 0);
+#endif
 }
 
 static void pgd_prepopulate_pmd(struct mm_struct *mm, pgd_t *pgd, pmd_t *pmds[])

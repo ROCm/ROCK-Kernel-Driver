@@ -41,7 +41,6 @@
 #define __CI_EFHW_COMMON_LINUX_H__
 
 #include <linux/types.h>
-#include <linux/version.h>
 
 /* Dirty hack, but Linux kernel does not provide DMA_ADDR_T_FMT */
 #if BITS_PER_LONG == 64 || defined(CONFIG_HIGHMEM64G)
@@ -52,16 +51,11 @@
 
 /* Linux kernel also does not provide PRIx32... Sigh. */
 #define PRIx32 "x"
-#define PRIx64 "llx"
 
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,19)
-enum {
-	false = 0,
-	true = 1
-};
-
-typedef _Bool bool;
-#endif /* LINUX_VERSION_CODE < 2.6.19 */
+#ifdef __ia64__
+# define PRIx64 "lx"
+#else
+# define PRIx64 "llx"
+#endif
 
 #endif /* __CI_EFHW_COMMON_LINUX_H__ */

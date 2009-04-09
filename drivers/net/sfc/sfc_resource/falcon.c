@@ -2090,7 +2090,7 @@ static inline struct efhw_filter_spec *
 filter_spec_cache_entry(struct efhw_nic *nic, int filter_idx)
 {
 	EFHW_ASSERT(nic->filter_spec_cache);
-	return &nic->filter_spec_cache[FALCON_FILTER_TBL_NUM + filter_idx];
+	return &nic->filter_spec_cache[filter_idx];
 }
 #endif
 

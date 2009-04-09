@@ -803,7 +803,7 @@ and is between 256 and 4096 characters. It is defined in the file
 	gpt		[EFI] Forces disk with valid GPT signature but
 			invalid Protective MBR to be treated as GPT.
 
-	guestdev=	[XEN]
+	guestdev=	[PCI,ACPI,XEN]
 			Format: <device path>[,<device path>[,...]]
 			Format of device path: <hid>[:<uid>]-<dev>.<func>[-<dev>.<func>[...]]
 			Specifies PCI device for guest domain.
@@ -1941,13 +1941,13 @@ and is between 256 and 4096 characters. It is defined in the file
 			Run specified binary instead of /init from the ramdisk,
 			used for early userspace startup. See initrd.
 
-	reassigndev=	[XEN]
+	reassigndev=	[PCI,XEN]
 			Format: [<segment>:]<bus>:<dev>.<func>[,...]
 			Specifies device to reassign page-aligned memory
 			resources. PCI-PCI bridge can be specified, if
 			resource windows need to be expanded.
 
-	reassign_resources	[XEN]
+	reassign_resources	[PCI,ACPI,XEN]
 			Use guestdev= parameter to reassign device's
 			resources.
 

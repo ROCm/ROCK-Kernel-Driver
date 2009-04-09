@@ -111,15 +111,48 @@ setup_io_tlb_npages(char *str)
 __setup("swiotlb=", setup_io_tlb_npages);
 /* make io_tlb_overflow tunable too? */
 
-void * __weak __init swiotlb_alloc_boot(size_t size, unsigned long nslabs)
+void *__init swiotlb_alloc_boot(size_t size, unsigned long nslabs)
 {
-	return alloc_bootmem_pages(size);
+	void *start = alloc_bootmem_pages(size);
+	unsigned int i;
+	int rc;
+
+	dma_bits = get_order(IO_TLB_SEGSIZE << IO_TLB_SHIFT) + PAGE_SHIFT;
+	for (i = 0; i < nslabs; i += IO_TLB_SEGSIZE) {
+		do {
+			rc = xen_create_contiguous_region(
+				(unsigned long)start + (i << IO_TLB_SHIFT),
+				get_order(IO_TLB_SEGSIZE << IO_TLB_SHIFT),
+				dma_bits);
+		} while (rc && dma_bits++ < max_dma_bits);
+		if (rc) {
+			if (i == 0)
+				panic("No suitable physical memory available for SWIOTLB buffer!\n"
+				      "Use dom0_mem Xen boot parameter to reserve\n"
+				      "some DMA memory (e.g., dom0_mem=-128M).\n");
+			io_tlb_nslabs = i;
+			i <<= IO_TLB_SHIFT;
+			free_bootmem(__pa(start + i), size - i);
+			size = i;
+			for (dma_bits = 0; i > 0; i -= IO_TLB_SEGSIZE << IO_TLB_SHIFT) {
+				unsigned int bits = fls64(virt_to_bus(start + i - 1));
+
+				if (bits > dma_bits)
+					dma_bits = bits;
+			}
+			break;
+		}
+	}
+
+	return start;
 }
 
+#ifndef CONFIG_XEN
 void * __weak swiotlb_alloc(unsigned order, unsigned long nslabs)
 {
 	return (void *)__get_free_pages(GFP_DMA | __GFP_NOWARN, order);
 }
+#endif
 
 dma_addr_t swiotlb_phys_to_bus(struct device *hwdev, phys_addr_t paddr)
 {
@@ -185,33 +218,7 @@ swiotlb_init_with_default_size(size_t default_size)
 	io_tlb_start = swiotlb_alloc_boot(bytes, io_tlb_nslabs);
 	if (!io_tlb_start)
 		panic("Cannot allocate SWIOTLB buffer!\n");
-
-	dma_bits = get_order(IO_TLB_SEGSIZE << IO_TLB_SHIFT) + PAGE_SHIFT;
-	for (i = 0; i < io_tlb_nslabs; i += IO_TLB_SEGSIZE) {
-		do {
-			rc = xen_create_contiguous_region(
-				(unsigned long)io_tlb_start + (i << IO_TLB_SHIFT),
-				get_order(IO_TLB_SEGSIZE << IO_TLB_SHIFT),
-				dma_bits);
-		} while (rc && dma_bits++ < max_dma_bits);
-		if (rc) {
-			if (i == 0)
-				panic("No suitable physical memory available for SWIOTLB buffer!\n"
-				      "Use dom0_mem Xen boot parameter to reserve\n"
-				      "some DMA memory (e.g., dom0_mem=-128M).\n");
-			io_tlb_nslabs = i;
-			i <<= IO_TLB_SHIFT;
-			free_bootmem(__pa(io_tlb_start + i), bytes - i);
-			bytes = i;
-			for (dma_bits = 0; i > 0; i -= IO_TLB_SEGSIZE << IO_TLB_SHIFT) {
-				unsigned int bits = fls64(virt_to_bus(io_tlb_start + i - 1));
-
-				if (bits > dma_bits)
-					dma_bits = bits;
-			}
-			break;
-		}
-	}
+	bytes = io_tlb_nslabs << IO_TLB_SHIFT;
 	io_tlb_end = io_tlb_start + bytes;
 
 	/*

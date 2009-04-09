@@ -95,7 +95,7 @@ ef_vi_inline int falcon_rx_check_dup(ef_vi* evq, ef_event* ev_out,
 				     const ef_vi_qword* ev)
 {
 	unsigned q_id = QWORD_GET_U(RX_EV_Q_LABEL, *ev);
-	unsigned desc_ptr = QWORD_GET_U(RX_EV_DESC_PTR, *ev);
+	uint16_t desc_ptr = QWORD_GET_U(RX_EV_DESC_PTR, *ev);
 	ef_rx_dup_state_t* rx_dup_state = &evq->evq_state->rx_dup_state[q_id];
 
 	if(likely( desc_ptr != rx_dup_state->rx_last_desc_ptr )) {

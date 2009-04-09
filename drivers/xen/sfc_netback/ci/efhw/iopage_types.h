@@ -3,7 +3,8 @@
  *          resource management for Xen backend, OpenOnload, etc
  *           (including support for SFE4001 10GBT NIC)
  *
- * This file provides efhw_page_t and efhw_iopage_t for Linux kernel.
+ * This file provides struct efhw_page and struct efhw_iopage for Linux
+ * kernel.
  *
  * Copyright 2005-2007: Solarflare Communications Inc,
  *                      9501 Jeronimo Road, Suite 250,
@@ -40,75 +41,76 @@
 
 #include <linux/gfp.h>
 #include <linux/hardirq.h>
+#include <linux/errno.h>
 #include <ci/efhw/debug.h>
 
 /*--------------------------------------------------------------------
  *
- * efhw_page_t: A single page of memory.  Directly mapped in the driver,
- * and can be mapped to userlevel.
+ * struct efhw_page: A single page of memory.  Directly mapped in the
+ * driver, and can be mapped to userlevel.
  *
  *--------------------------------------------------------------------*/
 
-typedef struct {
+struct efhw_page {
 	unsigned long kva;
-} efhw_page_t;
+};
 
-static inline int efhw_page_alloc(efhw_page_t *p)
+static inline int efhw_page_alloc(struct efhw_page *p)
 {
 	p->kva = __get_free_page(in_interrupt()? GFP_ATOMIC : GFP_KERNEL);
 	return p->kva ? 0 : -ENOMEM;
 }
 
-static inline int efhw_page_alloc_zeroed(efhw_page_t *p)
+static inline int efhw_page_alloc_zeroed(struct efhw_page *p)
 {
 	p->kva = get_zeroed_page(in_interrupt()? GFP_ATOMIC : GFP_KERNEL);
 	return p->kva ? 0 : -ENOMEM;
 }
 
-static inline void efhw_page_free(efhw_page_t *p)
+static inline void efhw_page_free(struct efhw_page *p)
 {
 	free_page(p->kva);
 	EFHW_DO_DEBUG(memset(p, 0, sizeof(*p)));
 }
 
-static inline char *efhw_page_ptr(efhw_page_t *p)
+static inline char *efhw_page_ptr(struct efhw_page *p)
 {
 	return (char *)p->kva;
 }
 
-static inline unsigned efhw_page_pfn(efhw_page_t *p)
+static inline unsigned efhw_page_pfn(struct efhw_page *p)
 {
 	return (unsigned)(__pa(p->kva) >> PAGE_SHIFT);
 }
 
-static inline void efhw_page_mark_invalid(efhw_page_t *p)
+static inline void efhw_page_mark_invalid(struct efhw_page *p)
 {
 	p->kva = 0;
 }
 
-static inline int efhw_page_is_valid(efhw_page_t *p)
+static inline int efhw_page_is_valid(struct efhw_page *p)
 {
 	return p->kva != 0;
 }
 
-static inline void efhw_page_init_from_va(efhw_page_t *p, void *va)
+static inline void efhw_page_init_from_va(struct efhw_page *p, void *va)
 {
 	p->kva = (unsigned long)va;
 }
 
 /*--------------------------------------------------------------------
  *
- * efhw_iopage_t: A single page of memory.  Directly mapped in the driver,
+ * struct efhw_iopage: A single page of memory.  Directly mapped in the driver,
  * and can be mapped to userlevel.  Can also be accessed by the NIC.
  *
  *--------------------------------------------------------------------*/
 
-typedef struct {
-	efhw_page_t p;
+struct efhw_iopage {
+	struct efhw_page p;
 	dma_addr_t dma_addr;
-} efhw_iopage_t;
+};
 
-static inline dma_addr_t efhw_iopage_dma_addr(efhw_iopage_t *p)
+static inline dma_addr_t efhw_iopage_dma_addr(struct efhw_iopage *p)
 {
 	return p->dma_addr;
 }
@@ -120,9 +122,9 @@ static inline dma_addr_t efhw_iopage_dma_addr(efhw_iopage_t *p)
 
 /*--------------------------------------------------------------------
  *
- * efhw_iopages_t: A set of pages that are contiguous in physical memory.
- * Directly mapped in the driver, and can be mapped to userlevel.  Can also
- * be accessed by the NIC.
+ * struct efhw_iopages: A set of pages that are contiguous in physical
+ * memory.  Directly mapped in the driver, and can be mapped to userlevel.
+ * Can also be accessed by the NIC.
  *
  * NB. The O/S may be unwilling to allocate many, or even any of these.  So
  * only use this type where the NIC really needs a physically contiguous
@@ -130,44 +132,44 @@ static inline dma_addr_t efhw_iopage_dma_addr(efhw_iopage_t *p)
  *
  *--------------------------------------------------------------------*/
 
-typedef struct {
+struct efhw_iopages {
 	caddr_t kva;
 	unsigned order;
 	dma_addr_t dma_addr;
-} efhw_iopages_t;
+};
 
-static inline caddr_t efhw_iopages_ptr(efhw_iopages_t *p)
+static inline caddr_t efhw_iopages_ptr(struct efhw_iopages *p)
 {
 	return p->kva;
 }
 
-static inline unsigned efhw_iopages_pfn(efhw_iopages_t *p)
+static inline unsigned efhw_iopages_pfn(struct efhw_iopages *p)
 {
 	return (unsigned)(__pa(p->kva) >> PAGE_SHIFT);
 }
 
-static inline dma_addr_t efhw_iopages_dma_addr(efhw_iopages_t *p)
+static inline dma_addr_t efhw_iopages_dma_addr(struct efhw_iopages *p)
 {
 	return p->dma_addr;
 }
 
-static inline unsigned efhw_iopages_size(efhw_iopages_t *p)
+static inline unsigned efhw_iopages_size(struct efhw_iopages *p)
 {
 	return 1u << (p->order + PAGE_SHIFT);
 }
 
-/* efhw_iopage_t <-> efhw_iopages_t conversions for handling physically
- * contiguous allocations in iobufsets for iSCSI.  This allows the
- * essential information about contiguous allocations from
- * efhw_iopages_alloc() to be saved away in the efhw_iopage_t array in an
- * iobufset.  (Changing the iobufset resource to use a union type would
+/* struct efhw_iopage <-> struct efhw_iopages conversions for handling
+ * physically contiguous allocations in iobufsets for iSCSI.  This allows
+ * the essential information about contiguous allocations from
+ * efhw_iopages_alloc() to be saved away in the struct efhw_iopage array in
+ * an iobufset.  (Changing the iobufset resource to use a union type would
  * involve a lot of code changes, and make the iobufset's metadata larger
  * which could be bad as it's supposed to fit into a single page on some
  * platforms.)
  */
 static inline void
-efhw_iopage_init_from_iopages(efhw_iopage_t *iopage,
-			    efhw_iopages_t *iopages, unsigned pageno)
+efhw_iopage_init_from_iopages(struct efhw_iopage *iopage,
+			      struct efhw_iopages *iopages, unsigned pageno)
 {
 	iopage->p.kva = ((unsigned long)efhw_iopages_ptr(iopages))
 	    + (pageno * PAGE_SIZE);
@@ -176,8 +178,8 @@ efhw_iopage_init_from_iopages(efhw_iopage_t *iopage,
 }
 
 static inline void
-efhw_iopages_init_from_iopage(efhw_iopages_t *iopages,
-			    efhw_iopage_t *iopage, unsigned order)
+efhw_iopages_init_from_iopage(struct efhw_iopages *iopages,
+			      struct efhw_iopage *iopage, unsigned order)
 {
 	iopages->kva = (caddr_t) efhw_iopage_ptr(iopage);
 	EFHW_ASSERT(iopages->kva);

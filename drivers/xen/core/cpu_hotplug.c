@@ -144,8 +144,11 @@ void __ref smp_resume(void)
 {
 	unsigned int cpu;
 
-	for_each_possible_cpu(cpu)
+	for_each_possible_cpu(cpu) {
+		if (cpu == 0)
+			continue;
 		vcpu_hotplug(cpu);
+	}
 }
 
 int cpu_up_check(unsigned int cpu)

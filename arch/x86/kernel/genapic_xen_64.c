@@ -27,7 +27,11 @@
 
 static inline void __send_IPI_one(unsigned int cpu, int vector)
 {
+#ifdef CONFIG_SMP
 	notify_remote_via_ipi(vector, cpu);
+#else
+	BUG();
+#endif
 }
 
 void xen_send_IPI_shortcut(unsigned int shortcut, int vector)

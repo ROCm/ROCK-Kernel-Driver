@@ -87,7 +87,6 @@ struct driverlink_port {
 	enum net_accel_hw_type type;
 	struct net_device *net_dev;
 	struct efx_dl_device *efx_dl_dev;
-	int nic_index;
 	void *fwd_priv;
 };
 
@@ -164,34 +163,6 @@ static struct netback_accel_hooks accel_hooks = {
 };
 
 
-/*
- * Handy helper which given an efx_dl_device works out which
- * efab_nic_t index into efrm_nic_table.nics[] it corresponds to 
- */
-static int efx_device_to_efab_nic_index(struct efx_dl_device *efx_dl_dev) 
-{
-	int i;
-
-	for (i = 0; i < EFHW_MAX_NR_DEVS; i++) {
-		struct efhw_nic *nic = efrm_nic_tablep->nic[i];
-
-		/*
-		 * It's possible for the nic structure to have not
-		 * been initialised if the resource driver failed its
-		 * driverlink probe
-		 */ 
-		if (nic == NULL || nic->net_driver_dev == NULL)
-			continue;
-
-		/* Work out if these are talking about the same NIC */
-		if (nic->net_driver_dev->pci_dev == efx_dl_dev->pci_dev)
-			return i;
-	}
-
-	return -1;
-}
-
-
 /* Driver link probe - register our callbacks */
 static int bend_dl_probe(struct efx_dl_device *efx_dl_dev,
 			 const struct net_device *net_dev,
@@ -224,17 +195,6 @@ static int bend_dl_probe(struct efx_dl_device *efx_dl_dev,
 
 	port->efx_dl_dev = efx_dl_dev;
 	efx_dl_dev->priv = port;
-
-	port->nic_index = efx_device_to_efab_nic_index(efx_dl_dev);
-	if (port->nic_index < 0) {
-		/*
-		 * This can happen in theory if the resource driver
-		 * failed to initialise properly
-		 */
-		EPRINTK("%s: nic structure not found\n", __FUNCTION__);
-		rc = -EINVAL;
-		goto fail2;
-	}
 
 	port->fwd_priv = netback_accel_init_fwd_port();
 	if (port->fwd_priv == NULL) {
@@ -377,8 +337,6 @@ int netback_accel_sf_hwtype(struct netback_accel *bend)
 			bend->accel_setup = netback_accel_setup_vnic_hw;
 			bend->accel_shutdown = netback_accel_shutdown_vnic_hw;
 			bend->fwd_priv = port->fwd_priv;
-			/* This is just needed to pass to efx_vi_alloc */
-			bend->nic_index = port->nic_index;
 			bend->net_dev = port->net_dev;
 			mutex_unlock(&accel_mutex);
 			return 0;
@@ -505,7 +463,7 @@ static int ef_get_vnic(struct netback_accel *bend)
 
 	accel_hw_priv = bend->accel_hw_priv;
 
-	rc = efx_vi_alloc(&accel_hw_priv->efx_vih, bend->nic_index);
+	rc = efx_vi_alloc(&accel_hw_priv->efx_vih, bend->net_dev->ifindex);
 	if (rc != 0) {
 		EPRINTK("%s: efx_vi_alloc failed %d\n", __FUNCTION__, rc);
 		free_page_state(bend);
@@ -600,9 +558,6 @@ static int ef_bend_hwinfo_falcon_common(struct netback_accel *bend,
 		return rc;
 	}
 
-	if (res_mdata.version != 0)
-		return -EPROTO;
-
 	hwinfo->nic_arch = res_mdata.nic_arch;
 	hwinfo->nic_variant = res_mdata.nic_variant;
 	hwinfo->nic_revision = res_mdata.nic_revision;
@@ -648,38 +603,57 @@ static int ef_bend_hwinfo_falcon_common(struct netback_accel *bend,
 	}
 
 	VPRINTK("Passing txdmaq page pfn %lx\n", txdmaq_pfn);
-	accel_hw_priv->txdmaq_gnt = hwinfo->txdmaq_gnt = 
-		net_accel_grant_page(bend->hdev_data, pfn_to_mfn(txdmaq_pfn), 
-				     0);
+	rc = net_accel_grant_page(bend->hdev_data, pfn_to_mfn(txdmaq_pfn), 0);
+	if (rc < 0)
+		goto fail0;
+	accel_hw_priv->txdmaq_gnt = hwinfo->txdmaq_gnt = rc;
 
 	VPRINTK("Passing rxdmaq page pfn %lx\n", rxdmaq_pfn);
-	accel_hw_priv->rxdmaq_gnt = hwinfo->rxdmaq_gnt = 
-		net_accel_grant_page(bend->hdev_data, pfn_to_mfn(rxdmaq_pfn), 
-				     0);
+	rc = net_accel_grant_page(bend->hdev_data, pfn_to_mfn(rxdmaq_pfn), 0);
+	if (rc < 0)
+		goto fail1;
+	accel_hw_priv->rxdmaq_gnt = hwinfo->rxdmaq_gnt = rc;
 
 	VPRINTK("Passing doorbell page mfn %x\n", hwinfo->doorbell_mfn);
 	/* Make the relevant H/W pages mappable by the far end */
-	accel_hw_priv->doorbell_gnt = hwinfo->doorbell_gnt = 
-		net_accel_grant_page(bend->hdev_data, hwinfo->doorbell_mfn, 1);
+	rc = net_accel_grant_page(bend->hdev_data, hwinfo->doorbell_mfn, 1);
+	if (rc < 0)
+		goto fail2;
+	accel_hw_priv->doorbell_gnt = hwinfo->doorbell_gnt = rc;
 	
 	/* Now do the same for the memory pages */
 	/* Convert the page + length we got back for the evq to grants. */
 	for (i = 0; i < accel_hw_priv->evq_npages; i++) {
-		accel_hw_priv->evq_mem_gnts[i] = hwinfo->evq_mem_gnts[i] =
-			net_accel_grant_page(bend->hdev_data, pfn_to_mfn(pfn), 0);
+		rc = net_accel_grant_page(bend->hdev_data, pfn_to_mfn(pfn), 0);
+		if (rc < 0)
+			goto fail3;
+		accel_hw_priv->evq_mem_gnts[i] = hwinfo->evq_mem_gnts[i] = rc;
+
 		VPRINTK("Got grant %u for evq pfn %x\n", hwinfo->evq_mem_gnts[i], 
 			pfn);
 		pfn++;
 	}
 
 	return 0;
+
+ fail3:
+	for (i = i - 1; i >= 0; i--) {
+		ungrant_or_crash(accel_hw_priv->evq_mem_gnts[i], bend->far_end);
+	}
+	ungrant_or_crash(accel_hw_priv->doorbell_gnt, bend->far_end);
+ fail2:
+	ungrant_or_crash(accel_hw_priv->rxdmaq_gnt, bend->far_end);
+ fail1:
+	ungrant_or_crash(accel_hw_priv->txdmaq_gnt, bend->far_end);	
+ fail0:
+	return rc;
 }
 
 
 static int ef_bend_hwinfo_falcon_a(struct netback_accel *bend, 
 				   struct net_accel_hw_falcon_a *hwinfo)
 {
-	int rc;
+	int rc, i;
 	struct falcon_bend_accel_priv *accel_hw_priv = bend->accel_hw_priv;
 
 	if ((rc = ef_bend_hwinfo_falcon_common(bend, &hwinfo->common)) != 0)
@@ -695,8 +669,17 @@ static int ef_bend_hwinfo_falcon_a(struct netback_accel *bend,
 		hwinfo->common.evq_rptr);
 	rc = net_accel_grant_page(bend->hdev_data, 
 				  hwinfo->common.evq_rptr >> PAGE_SHIFT, 0);
-	if (rc < 0)
+	if (rc < 0) {
+		/* Undo ef_bend_hwinfo_falcon_common() */
+		ungrant_or_crash(accel_hw_priv->txdmaq_gnt, bend->far_end);
+		ungrant_or_crash(accel_hw_priv->rxdmaq_gnt, bend->far_end);
+		ungrant_or_crash(accel_hw_priv->doorbell_gnt, bend->far_end);
+		for (i = 0; i < accel_hw_priv->evq_npages; i++) {
+			ungrant_or_crash(accel_hw_priv->evq_mem_gnts[i],
+					 bend->far_end);
+		}
 		return rc;
+	}
 
 	accel_hw_priv->evq_rptr_gnt = hwinfo->evq_rptr_gnt = rc;
 	VPRINTK("evq_rptr_gnt got %d\n", hwinfo->evq_rptr_gnt);

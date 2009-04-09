@@ -41,14 +41,6 @@
 /* Spinlocks are defined in efhw/sysdep.h */
 #include <ci/efhw/sysdep.h>
 
-#if defined(__linux__) && defined(__KERNEL__)
-
-# include <ci/efrm/sysdep_linux.h>
-
-#else
-
-# include <ci/efrm/sysdep_ci2linux.h>
-
-#endif
+#include <ci/efrm/sysdep_linux.h>
 
 #endif /* __CI_EFRM_SYSDEP_H__ */

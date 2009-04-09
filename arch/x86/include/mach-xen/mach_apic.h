@@ -1,7 +1,7 @@
 #ifndef _ASM_X86_MACH_XEN_MACH_APIC_H
 #define _ASM_X86_MACH_XEN_MACH_APIC_H
 
-#include <linux/cpumask.h>
+#include <asm/smp.h>
 
 #ifdef CONFIG_X86_64
 

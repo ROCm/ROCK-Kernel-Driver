@@ -617,6 +617,19 @@ int xen_create_contiguous_region(
 	if (unlikely(order > MAX_CONTIG_ORDER))
 		return -ENOMEM;
 
+#ifdef CONFIG_64BIT
+	if (unlikely(vstart + (PAGE_SIZE << order) > PAGE_OFFSET + MAXMEM + 1)) {
+		if (vstart < __START_KERNEL
+		    || vstart + (PAGE_SIZE << order) > (unsigned long)_end)
+			return -EINVAL;
+		if (order > MAX_CONTIG_ORDER - 1)
+			return -ENOMEM;
+	}
+#else
+	if (unlikely(vstart + (PAGE_SIZE << order) > (unsigned long)high_memory))
+		return -EINVAL;
+#endif
+
 	set_xen_guest_handle(exchange.in.extent_start, in_frames);
 	set_xen_guest_handle(exchange.out.extent_start, &out_frame);
 
@@ -629,9 +642,19 @@ int xen_create_contiguous_region(
 		in_frames[i] = pfn_to_mfn((__pa(vstart) >> PAGE_SHIFT) + i);
 		MULTI_update_va_mapping(cr_mcl + i, vstart + (i*PAGE_SIZE),
 					__pte_ma(0), 0);
+#ifdef CONFIG_64BIT
+		if (vstart > PAGE_OFFSET + MAXMEM)
+			MULTI_update_va_mapping(cr_mcl + i + (1U << order),
+				(unsigned long)__va(__pa(vstart)) + (i*PAGE_SIZE),
+				__pte_ma(0), 0);
+#endif
 		set_phys_to_machine((__pa(vstart)>>PAGE_SHIFT)+i,
 			INVALID_P2M_ENTRY);
 	}
+#ifdef CONFIG_64BIT
+	if (vstart > PAGE_OFFSET + MAXMEM)
+		i += i;
+#endif
 	if (HYPERVISOR_multicall_check(cr_mcl, i, NULL))
 		BUG();
 
@@ -665,9 +688,18 @@ int xen_create_contiguous_region(
 		frame = success ? (out_frame + i) : in_frames[i];
 		MULTI_update_va_mapping(cr_mcl + i, vstart + (i*PAGE_SIZE),
 					pfn_pte_ma(frame, PAGE_KERNEL), 0);
+#ifdef CONFIG_64BIT
+		if (vstart > PAGE_OFFSET + MAXMEM)
+			MULTI_update_va_mapping(cr_mcl + i + (1U << order),
+				(unsigned long)__va(__pa(vstart)) + (i*PAGE_SIZE),
+				pfn_pte_ma(frame, PAGE_KERNEL_RO), 0);
+#endif
 		set_phys_to_machine((__pa(vstart)>>PAGE_SHIFT)+i, frame);
 	}
-
+#ifdef CONFIG_64BIT
+	if (vstart > PAGE_OFFSET + MAXMEM)
+		i += i;
+#endif
 	cr_mcl[i - 1].args[MULTI_UVMFLAGS_INDEX] = order
 						   ? UVMF_TLB_FLUSH|UVMF_ALL
 						   : UVMF_INVLPG|UVMF_ALL;

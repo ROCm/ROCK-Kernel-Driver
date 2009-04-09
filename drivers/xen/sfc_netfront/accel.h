@@ -109,10 +109,22 @@ struct netfront_accel_stats {
 	/** Number of frame trunc events seen on fastpath */
 	u64 fastpath_frm_trunc;
 
+	/** Number of rx discard (bad crc) events seen on fastpath */
+	u64 fastpath_crc_bad;
+
+	/** Number of rx discard (bad csum) events seen on fastpath */
+	u64 fastpath_csum_bad;
+
+	/** Number of rx discard (bad rights) events seen on fastpath */
+	u64 fastpath_rights_bad;
+
+	/** Number of rx discard ("other") events seen on fastpath */
+	u64 fastpath_discard_other;
+
 	/** Number of no rx descriptor trunc events seen on fastpath */
 	u64 rx_no_desc_trunc;
 
-	/** The number of misc bad events (e.g. RX_DISCARD) processed. */
+	/** The number of misc bad events processed. */
 	u64 bad_event_count;
 
 	/** Number of events dealt with in poll loop */
@@ -164,6 +176,10 @@ struct netfront_accel_dbfs {
 	struct dentry *fastpath_tx_completions;
 	struct dentry *fastpath_tx_pending_max;
 	struct dentry *fastpath_frm_trunc;
+	struct dentry *fastpath_crc_bad;
+	struct dentry *fastpath_csum_bad;
+	struct dentry *fastpath_rights_bad;
+	struct dentry *fastpath_discard_other;
 	struct dentry *rx_no_desc_trunc;
 	struct dentry *event_count;
 	struct dentry *bad_event_count;
@@ -262,8 +278,10 @@ typedef struct netfront_accel_vnic {
 
 	int poll_enabled;
 
-	/** A spare slot for a TX packet.  This is treated as an extension
-	 * of the DMA queue. */
+	/** A spare slot for a TX packet.  This is treated as an
+	 * extension of the DMA queue.  Reads require either
+	 * netfront's tx_lock or the vnic tx_lock; writes require both
+	 * locks */
 	struct sk_buff *tx_skb;
 
 	/** Keep track of fragments of SSR packets */

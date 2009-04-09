@@ -156,7 +156,7 @@
 #define EFVI_FALCON_EVQTIMER_DISABLE  (EFVI_FALCON_TIMER_MODE_DIS  << TIMER_MODE_LBN) 
 
 
-/* ---- efhw_event_t helpers --- */
+/* ---- ef_vi_event helpers --- */
 
 #define EFVI_FALCON_EVENT_CODE(evp) \
        ((evp)->u64 & EFVI_FALCON_EVENT_CODE_MASK)

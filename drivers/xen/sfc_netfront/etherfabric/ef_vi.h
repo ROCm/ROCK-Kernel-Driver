@@ -225,24 +225,6 @@ typedef struct {
 /* Falcon constants */
 #define TX_EV_DESC_PTR_LBN 0
 
-/**********************************************************************
- * ef_iobufset ********************************************************
- **********************************************************************/
-
-/*! \i_ef_bufs An [ef_iobufset] is a collection of buffers to be used
-** with the NIC.
-*/
-typedef struct ef_iobufset {
-	unsigned                      magic;
-	unsigned                      bufs_mmap_bytes;
-	unsigned                      bufs_handle;
-	int                           bufs_ptr_off;
-	ef_addr                       bufs_addr;
-	unsigned                      bufs_size; /* size rounded to pow2 */
-	int                           bufs_num;
-	int                           faultonaccess;
-} ef_iobufset;
-
 
 /**********************************************************************
  * ef_vi **************************************************************

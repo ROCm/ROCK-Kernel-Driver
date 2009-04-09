@@ -431,6 +431,14 @@ int ef_vi_receive_init(ef_vi* vi, ef_addr addr, ef_request_id dma_id,
 }
 
 
+int ef_vi_receive_post(ef_vi* vi, ef_addr addr, ef_request_id dma_id)
+{
+  int rc = ef_vi_receive_init(vi, addr, dma_id, 0);
+  if( rc == 0 )  ef_vi_receive_push(vi);
+  return rc;
+}
+
+
 void ef_vi_receive_push(ef_vi* vi)
 {
 	ef_vi_wiob();

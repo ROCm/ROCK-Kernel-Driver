@@ -186,6 +186,14 @@ config XEN_SCSI_BACKEND
 	  The SCSI backend driver allows the kernel to export its SCSI Devices
 	  to other guests via a high-performance shared-memory interface.
 
+config XEN_USB_BACKEND
+	tristate "USB backend driver"
+	depends on USB && XEN_BACKEND
+	default m
+	help
+	  The USB backend driver allows the kernel to export its USB Devices
+	  to other guests.
+
 config XEN_BLKDEV_FRONTEND
 	tristate "Block-device frontend driver"
 	default y
@@ -218,6 +226,21 @@ config XEN_SCSI_FRONTEND
 	help
 	  The SCSI frontend driver allows the kernel to access SCSI Devices
 	  within another guest OS.
+
+config XEN_USB_FRONTEND
+	tristate "USB frontend driver"
+	depends on USB
+	default m
+	help
+	  The USB frontend driver allows the kernel to access USB Devices
+	  within another guest OS.
+
+config XEN_USB_FRONTEND_HCD_STATS
+	bool "Taking the HCD statistics (for debug)"
+	depends on XEN_USB_FRONTEND
+	default y
+	help
+	  Count the transferred urb status and the RING_FULL occurrence.
 
 config XEN_GRANT_DEV
 	tristate "User-space granted page access driver"

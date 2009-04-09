@@ -238,7 +238,8 @@ static int setup_vnic(struct xenbus_device *dev)
 
 	/* Initialise the shared page(s) used for comms */
 	net_accel_msg_init_page(bend->shared_page, PAGE_SIZE, 
-				bend->net_dev->flags & IFF_UP);
+				(bend->net_dev->flags & IFF_UP) && 
+				(netif_carrier_ok(bend->net_dev)));
 
 	msgs_per_queue = (PAGE_SIZE/2) / sizeof(struct net_accel_msg);
 

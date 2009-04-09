@@ -166,8 +166,8 @@
  * placed at by the hypervisor (Dom0) or the tools (DomU).
  * The kernel must be prepared for this mapping to be established using
  * large pages, despite such otherwise not being available to guests.
- * The kernel must also be prepared that the page table pages used for
- * this mapping may not be accessible through the initial mapping.
+ * The kernel must also be able to handle the page table pages used for
+ * this mapping not being accessible through the initial mapping.
  * (Only x86-64 supports this at present.)
  */
 #define XEN_ELFNOTE_INIT_P2M      15
