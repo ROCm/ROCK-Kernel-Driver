@@ -29,7 +29,7 @@
 #include <linux/rcupdate.h>
 #include <linux/audit.h>
 #include <linux/falloc.h>
-#include <trace/fs.h>
+#include <linux/fs_struct.h>
 
 int vfs_statfs(struct dentry *dentry, struct kstatfs *buf)
 {
@@ -274,7 +274,7 @@ static long do_sys_truncate(const char __user *pathname, loff_t length)
 	if (!error)
 		error = security_path_truncate(&path, length, 0);
 	if (!error) {
-		DQUOT_INIT(inode);
+		vfs_dq_init(inode);
 		error = do_truncate(path.dentry, length, 0, NULL);
 	}
 
@@ -1041,7 +1041,6 @@ long do_sys_open(int dfd, const char __user *filename, int flags, int mode)
 				fsnotify_open(f->f_path.dentry);
 				fd_install(fd, f);
 			}
-			trace_fs_open(fd, tmp);
 		}
 		putname(tmp);
 	}
@@ -1131,7 +1130,6 @@ SYSCALL_DEFINE1(close, unsigned int, fd)
 	filp = fdt->fd[fd];
 	if (!filp)
 		goto out_unlock;
-	trace_fs_close(fd);
 	rcu_assign_pointer(fdt->fd[fd], NULL);
 	FD_CLR(fd, fdt->close_on_exec);
 	__put_unused_fd(files, fd);
@@ -1192,5 +1190,3 @@ int nonseekable_open(struct inode *inode, struct file *filp)
 }
 
 EXPORT_SYMBOL(nonseekable_open);
-DEFINE_TRACE(fs_open);
-DEFINE_TRACE(fs_close);

@@ -5,8 +5,8 @@
 #include <linux/efi.h>
 #ifdef CONFIG_KDB
 #include <linux/kdb.h>
-#include <linux/kexec.h>
 #endif /* CONFIG_KDB */
+#include <linux/kexec.h>
 #include <acpi/reboot.h>
 #include <asm/io.h>
 #include <asm/apic.h>
@@ -18,6 +18,7 @@
 #include <asm/reboot.h>
 #include <asm/pci_x86.h>
 #include <asm/virtext.h>
+#include <asm/cpu.h>
 
 #ifdef CONFIG_X86_32
 # include <linux/dmi.h>
@@ -26,8 +27,6 @@
 #else
 # include <asm/iommu.h>
 #endif
-
-#include <mach_ipi.h>
 
 /*
  * Power off function, if any
@@ -227,6 +226,14 @@ static struct dmi_system_id __initdata reboot_dmi_table[] = {
 		.matches = {
 			DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
 			DMI_MATCH(DMI_PRODUCT_NAME, "Dell XPS710"),
+		},
+	},
+	{	/* Handle problems with rebooting on Dell DXP061 */
+		.callback = set_bios_reboot,
+		.ident = "Dell DXP061",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+			DMI_MATCH(DMI_PRODUCT_NAME, "Dell DXP061"),
 		},
 	},
 	{ }
@@ -644,7 +651,7 @@ void halt_current_cpu(struct pt_regs *regs)
 {
 #ifdef CONFIG_X86_32
 	struct pt_regs fixed_regs;
-#endif
+#endif 
 	local_irq_disable();
 #ifdef CONFIG_X86_32
 	if (!user_mode_vm(regs)) {
@@ -652,7 +659,7 @@ void halt_current_cpu(struct pt_regs *regs)
 		regs = &fixed_regs;
 	}
 #endif
-	crash_save_cpu(regs, raw_smp_processor_id());
+        crash_save_cpu(regs, raw_smp_processor_id());
 	disable_local_APIC();
 	atomic_dec(&waiting_for_crash_ipi);
 	/* Assume hlt works */
@@ -666,7 +673,6 @@ static int crash_nmi_callback(struct notifier_block *self,
 			unsigned long val, void *data)
 {
 	int cpu;
-	struct die_args *args = (struct die_args *)data;
 
 	if (val != DIE_NMI_IPI)
 		return NOTIFY_OK;
@@ -679,9 +685,6 @@ static int crash_nmi_callback(struct notifier_block *self,
 	 */
 	if (cpu == crashing_cpu)
 		return NOTIFY_STOP;
-#ifdef CONFIG_KDB_KDUMP
-	halt_current_cpu(args->regs);
-#else
 	local_irq_disable();
 
 	shootdown_callback(cpu, (struct die_args *)data);
@@ -691,14 +694,13 @@ static int crash_nmi_callback(struct notifier_block *self,
 	halt();
 	for (;;)
 		cpu_relax();
-#endif /* !CONFIG_KDB_KDUMP */
 
 	return 1;
 }
 
 static void smp_send_nmi_allbutself(void)
 {
-	send_IPI_allbutself(NMI_VECTOR);
+	apic->send_IPI_allbutself(NMI_VECTOR);
 }
 
 static struct notifier_block crash_nmi_nb = {
@@ -711,25 +713,9 @@ static struct notifier_block crash_nmi_nb = {
  * or emergency reboot time. The function passed as parameter
  * will be called inside a NMI handler on all CPUs.
  */
-static void wait_other_cpus(void)
-{
-	unsigned long msecs;
-
-	msecs = 1000; /* Wait at most a second for the other cpus to stop */
-	while ((atomic_read(&waiting_for_crash_ipi) > 0) && msecs) {
-		udelay(1000);
-		msecs--;
-	}
-}
-
-static void nmi_shootdown_cpus_init(void)
-{
-	atomic_set(&waiting_for_crash_ipi, num_online_cpus() - 1);
-}
-
 void nmi_shootdown_cpus(nmi_shootdown_cb callback)
 {
-	nmi_shootdown_cpus_init();
+	unsigned long msecs;
 	local_irq_disable();
 
 	/* Make a note of crashing cpu. Will be used in NMI callback.*/
@@ -737,7 +723,7 @@ void nmi_shootdown_cpus(nmi_shootdown_cb callback)
 
 	shootdown_callback = callback;
 
-
+	atomic_set(&waiting_for_crash_ipi, num_online_cpus() - 1);
 	/* Would it be better to replace the trap vector here? */
 	if (register_die_notifier(&crash_nmi_nb))
 		return;		/* return what? */
@@ -748,20 +734,17 @@ void nmi_shootdown_cpus(nmi_shootdown_cb callback)
 
 	smp_send_nmi_allbutself();
 
-	wait_other_cpus();
+	msecs = 1000; /* Wait at most a second for the other cpus to stop */
+	while ((atomic_read(&waiting_for_crash_ipi) > 0) && msecs) {
+		mdelay(1);
+		msecs--;
+	}
+
 	/* Leave the nmi callback set */
 }
-#else /* defined(CONFIG_SMP) && defined(CONFIG_X86_LOCAL_APIC) */
-
+#else /* !CONFIG_SMP */
 void nmi_shootdown_cpus(nmi_shootdown_cb callback)
 {
 	/* No other CPUs to shoot down */
 }
-
-#ifdef CONFIG_KDB_KDUMP
-static void nmi_shootdown_cpus_init(void) {};
-static void wait_other_cpus() {}
-static void halt_current_cpu(struct pt_regs *regs) {};
-#endif /* CONFIG_KDB_KDUMP */
-
-#endif /* defined(CONFIG_SMP) && defined(CONFIG_X86_LOCAL_APIC) */
+#endif

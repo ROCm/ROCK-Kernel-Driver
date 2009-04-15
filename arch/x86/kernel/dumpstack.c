@@ -10,14 +10,15 @@
 #include <linux/kdebug.h>
 #include <linux/module.h>
 #include <linux/ptrace.h>
+#include <linux/ftrace.h>
 #include <linux/kexec.h>
 #include <linux/bug.h>
 #include <linux/nmi.h>
 #include <linux/sysfs.h>
-
+#include <linux/ftrace.h>
 #ifdef CONFIG_KDB
 #include <linux/kdb.h>
-#endif /* CONFIG_KDB */
+#endif
 
 #include <asm/stacktrace.h>
 #include <linux/unwind.h>
@@ -175,7 +176,7 @@ print_context_stack(struct thread_info *tinfo,
 				frame = frame->next_frame;
 				bp = (unsigned long) frame;
 			} else {
-				ops->address(data, addr, bp == 0);
+				ops->address(data, addr, 0);
 			}
 			print_ftrace_graph_addr(addr, data, ops, tinfo, graph);
 		}
@@ -271,6 +272,11 @@ unsigned __kprobes long oops_begin(void)
 	int cpu;
 	unsigned long flags;
 
+	/* notify the hw-branch tracer so it may disable tracing and
+	   add the last trace to the trace buffer -
+	   the earlier this happens, the more useful the trace. */
+	trace_hw_branch_oops();
+
 	oops_enter();
 
 	/* racy, but better than risking deadlock. */
@@ -302,9 +308,9 @@ void __kprobes oops_end(unsigned long flags, struct pt_regs *regs, int signr)
 		/* Nest count reaches zero, release the lock. */
 		__raw_spin_unlock(&die_lock);
 	raw_local_irq_restore(flags);
-#ifdef CONFIG_KDB
+#ifdef CONFIG_KB
 	kdb(KDB_REASON_OOPS, signr, regs);
-#endif /* CONFIG_KDB */
+#endif
 	oops_exit();
 
 	if (!signr)
@@ -374,7 +380,7 @@ void die(const char *str, struct pt_regs *regs, long err)
 		sig = 0;
 #ifdef CONFIG_KDB
 	kdb_diemsg = str;
-#endif /* CONFIG_KDB */
+#endif
 	oops_end(flags, regs, sig);
 }
 
@@ -395,11 +401,9 @@ die_nmi(char *str, struct pt_regs *regs, int do_panic)
 	printk(" on CPU%d, ip %08lx, registers:\n",
 		smp_processor_id(), regs->ip);
 	show_registers(regs);
-	if (strncmp(str, "NMI Watchdog", 12) == 0)
-		notify_die(DIE_NMIWATCHDOG, "nmi_watchdog", regs, 0, 2, SIGINT);
 #ifdef CONFIG_KDB
 	kdb(KDB_REASON_NMI, 0, regs);
-#endif	/* CONFIG_KDB */
+#endif
 	oops_end(flags, regs, 0);
 	if (do_panic || panic_on_oops)
 		panic("Non maskable interrupt");

@@ -21,6 +21,8 @@
 
 #include <acpi/acpi_bus.h>
 #include <acpi/acpi_drivers.h>
+
+#include "internal.h"
 #include "sleep.h"
 
 u8 sleep_states[ACPI_S_STATE_COUNT];
@@ -58,7 +60,6 @@ static struct notifier_block tts_notifier = {
 static int acpi_sleep_prepare(u32 acpi_state)
 {
 #ifdef CONFIG_ACPI_SLEEP
-#ifndef CONFIG_ACPI_PV_SLEEP
 	/* do we have a wakeup address for S2 and S3? */
 	if (acpi_state == ACPI_STATE_S3) {
 		if (!acpi_wakeup_address) {
@@ -68,7 +69,6 @@ static int acpi_sleep_prepare(u32 acpi_state)
 				(acpi_physical_address)acpi_wakeup_address);
 
 	}
-#endif
 	ACPI_FLUSH_CPU_CACHE();
 	acpi_enable_wakeup_device_prep(acpi_state);
 #endif
@@ -244,20 +244,13 @@ static int acpi_suspend_enter(suspend_state_t pm_state)
 		break;
 
 	case ACPI_STATE_S3:
-#ifdef CONFIG_ACPI_PV_SLEEP
-		/* Hyperviosr will save and restore CPU context
-		 * and then we can skip low level housekeeping here.
-		 */
-		acpi_enter_sleep_state(acpi_state);
-#else
 		do_suspend_lowlevel();
-#endif
 		break;
 	}
 
 	/* If ACPI is not enabled by the BIOS, we need to enable it here. */
 	if (set_sci_en_on_resume)
-		acpi_set_register(ACPI_BITREG_SCI_ENABLE, 1);
+		acpi_write_bit_register(ACPI_BITREG_SCI_ENABLE, 1);
 	else
 		acpi_enable();
 
@@ -401,6 +394,15 @@ static struct dmi_system_id __initdata acpisleep_dmi_table[] = {
 	.matches = {
 		DMI_MATCH(DMI_SYS_VENDOR, "TOSHIBA"),
 		DMI_MATCH(DMI_PRODUCT_NAME, "Satellite L300"),
+		},
+	},
+	{
+	.callback = init_old_suspend_ordering,
+	.ident = "Panasonic CF51-2L",
+	.matches = {
+		DMI_MATCH(DMI_BOARD_VENDOR,
+				"Matsushita Electric Industrial Co.,Ltd."),
+		DMI_MATCH(DMI_BOARD_NAME, "CF51-2L"),
 		},
 	},
 	{},

@@ -11,4 +11,3 @@ obj-m += kdbm_debugtypes.o
 ifdef CONFIG_X86
 obj-$(CONFIG_KDB_MODULES) += kdbm_x86.o
 endif
-CFLAGS_kdbm_vm.o	+= -I$(srctree)/drivers/scsi

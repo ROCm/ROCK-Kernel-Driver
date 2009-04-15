@@ -22,6 +22,9 @@ config IA64
 	select HAVE_OPROFILE
 	select HAVE_KPROBES
 	select HAVE_KRETPROBES
+	select HAVE_FTRACE_MCOUNT_RECORD
+	select HAVE_DYNAMIC_FTRACE if (!ITANIUM)
+	select HAVE_FUNCTION_TRACER
 	select HAVE_DMA_ATTRS
 	select HAVE_KVM
 	select HAVE_ARCH_TRACEHOOK
@@ -222,7 +225,7 @@ config IA64_HP_SIM
 config IA64_XEN_GUEST
 	bool "Xen guest"
 	select SWIOTLB
-	depends on PARAVIRT_XEN
+	depends on XEN
 	help
 	  Build a kernel that runs on Xen guest domain. At this moment only
 	  16KB page size in supported.
@@ -518,6 +521,14 @@ config IA64_CPE_MIGRATE
 	  build this functionality as a kernel loadable module.  Installing
 	  the module will turn on the functionality.
 
+config PERFMON
+	bool "Performance monitor support"
+	help
+	  Selects whether support for the IA-64 performance monitor hardware
+	  is included in the kernel.  This makes some kernel data-structures a
+	  little bigger and slows down execution a bit, but it is generally
+	  a good idea to turn this on.  If you're unsure, say Y.
+
 config IA64_PALINFO
 	tristate "/proc/pal support"
 	help
@@ -589,8 +600,6 @@ config CRASH_DUMP
 source "drivers/firmware/Kconfig"
 
 source "fs/Kconfig.binfmt"
-
-source "arch/ia64/perfmon/Kconfig"
 
 endmenu
 

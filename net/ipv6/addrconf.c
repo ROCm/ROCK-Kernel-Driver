@@ -40,6 +40,7 @@
 
 #include <linux/errno.h>
 #include <linux/types.h>
+#include <linux/kernel.h>
 #include <linux/socket.h>
 #include <linux/sockios.h>
 #include <linux/net.h>
@@ -85,7 +86,6 @@
 
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
-#include <trace/ipv6.h>
 
 /* Set to 3 to get tracing... */
 #define ACONF_DEBUG 2
@@ -591,6 +591,7 @@ ipv6_add_addr(struct inet6_dev *idev, const struct in6_addr *addr, int pfxlen,
 {
 	struct inet6_ifaddr *ifa = NULL;
 	struct rt6_info *rt;
+	struct net *net = dev_net(idev->dev);
 	int hash;
 	int err = 0;
 	int addr_type = ipv6_addr_type(addr);
@@ -604,6 +605,11 @@ ipv6_add_addr(struct inet6_dev *idev, const struct in6_addr *addr, int pfxlen,
 	rcu_read_lock_bh();
 	if (idev->dead) {
 		err = -ENODEV;			/*XXX*/
+		goto out2;
+	}
+
+	if (idev->cnf.disable_ipv6 || net->ipv6.devconf_all->disable_ipv6) {
+		err = -EACCES;
 		goto out2;
 	}
 
@@ -656,8 +662,6 @@ ipv6_add_addr(struct inet6_dev *idev, const struct in6_addr *addr, int pfxlen,
 	in6_dev_hold(idev);
 	/* For caller */
 	in6_ifa_hold(ifa);
-
-	trace_ipv6_addr_add(ifa);
 
 	/* Add to big hash table */
 	hash = ipv6_addr_hash(addr);
@@ -1212,16 +1216,12 @@ int ipv6_dev_get_saddr(struct net *net, struct net_device *dst_dev,
 					}
 					break;
 				} else if (minihiscore < miniscore) {
-					struct ipv6_saddr_score *tmp;
-
 					if (hiscore->ifa)
 						in6_ifa_put(hiscore->ifa);
 
 					in6_ifa_hold(score->ifa);
 
-					tmp = hiscore;
-					hiscore = score;
-					score = tmp;
+					swap(hiscore, score);
 
 					/* restore our iterator */
 					score->ifa = hiscore->ifa;
@@ -1370,40 +1370,6 @@ struct inet6_ifaddr *ipv6_get_ifaddr(struct net *net, const struct in6_addr *add
 	return ifp;
 }
 
-int ipv6_rcv_saddr_equal(const struct sock *sk, const struct sock *sk2)
-{
-	const struct in6_addr *sk_rcv_saddr6 = &inet6_sk(sk)->rcv_saddr;
-	const struct in6_addr *sk2_rcv_saddr6 = inet6_rcv_saddr(sk2);
-	__be32 sk_rcv_saddr = inet_sk(sk)->rcv_saddr;
-	__be32 sk2_rcv_saddr = inet_rcv_saddr(sk2);
-	int sk_ipv6only = ipv6_only_sock(sk);
-	int sk2_ipv6only = inet_v6_ipv6only(sk2);
-	int addr_type = ipv6_addr_type(sk_rcv_saddr6);
-	int addr_type2 = sk2_rcv_saddr6 ? ipv6_addr_type(sk2_rcv_saddr6) : IPV6_ADDR_MAPPED;
-
-	if (!sk2_rcv_saddr && !sk_ipv6only)
-		return 1;
-
-	if (addr_type2 == IPV6_ADDR_ANY &&
-	    !(sk2_ipv6only && addr_type == IPV6_ADDR_MAPPED))
-		return 1;
-
-	if (addr_type == IPV6_ADDR_ANY &&
-	    !(sk_ipv6only && addr_type2 == IPV6_ADDR_MAPPED))
-		return 1;
-
-	if (sk2_rcv_saddr6 &&
-	    ipv6_addr_equal(sk_rcv_saddr6, sk2_rcv_saddr6))
-		return 1;
-
-	if (addr_type == IPV6_ADDR_MAPPED &&
-	    !sk2_ipv6only &&
-	    (!sk2_rcv_saddr || !sk_rcv_saddr || sk_rcv_saddr == sk2_rcv_saddr))
-		return 1;
-
-	return 0;
-}
-
 /* Gets referenced address, destroys ifaddr */
 
 static void addrconf_dad_stop(struct inet6_ifaddr *ifp)
@@ -1436,6 +1402,11 @@ static void addrconf_dad_stop(struct inet6_ifaddr *ifp)
 void addrconf_dad_failure(struct inet6_ifaddr *ifp)
 {
 	struct inet6_dev *idev = ifp->idev;
+
+	if (net_ratelimit())
+		printk(KERN_INFO "%s: IPv6 duplicate address detected!\n",
+			ifp->idev->dev->name);
+
 	if (idev->cnf.accept_dad > 1 && !idev->cnf.disable_ipv6) {
 		struct in6_addr addr;
 
@@ -1446,11 +1417,12 @@ void addrconf_dad_failure(struct inet6_ifaddr *ifp)
 		    ipv6_addr_equal(&ifp->addr, &addr)) {
 			/* DAD failed for link-local based on MAC address */
 			idev->cnf.disable_ipv6 = 1;
+
+			printk(KERN_INFO "%s: IPv6 being disabled!\n",
+				ifp->idev->dev->name);
 		}
 	}
 
-	if (net_ratelimit())
-		printk(KERN_INFO "%s: duplicate address detected!\n", ifp->idev->dev->name);
 	addrconf_dad_stop(ifp);
 }
 
@@ -2178,7 +2150,6 @@ static int inet6_addr_del(struct net *net, int ifindex, struct in6_addr *pfx,
 			in6_ifa_hold(ifp);
 			read_unlock_bh(&idev->lock);
 
-			trace_ipv6_addr_del(ifp);
 			ipv6_del_addr(ifp);
 
 			/* If the last address is deleted administratively,
@@ -2231,10 +2202,24 @@ int addrconf_del_ifaddr(struct net *net, void __user *arg)
 	return err;
 }
 
+static void add_addr(struct inet6_dev *idev, const struct in6_addr *addr,
+		     int plen, int scope)
+{
+	struct inet6_ifaddr *ifp;
+
+	ifp = ipv6_add_addr(idev, addr, plen, scope, IFA_F_PERMANENT);
+	if (!IS_ERR(ifp)) {
+		spin_lock_bh(&ifp->lock);
+		ifp->flags &= ~IFA_F_TENTATIVE;
+		spin_unlock_bh(&ifp->lock);
+		ipv6_ifa_notify(RTM_NEWADDR, ifp);
+		in6_ifa_put(ifp);
+	}
+}
+
 #if defined(CONFIG_IPV6_SIT) || defined(CONFIG_IPV6_SIT_MODULE)
 static void sit_add_v4_addrs(struct inet6_dev *idev)
 {
-	struct inet6_ifaddr * ifp;
 	struct in6_addr addr;
 	struct net_device *dev;
 	struct net *net = dev_net(idev->dev);
@@ -2253,14 +2238,7 @@ static void sit_add_v4_addrs(struct inet6_dev *idev)
 	}
 
 	if (addr.s6_addr32[3]) {
-		ifp = ipv6_add_addr(idev, &addr, 128, scope, IFA_F_PERMANENT);
-		if (!IS_ERR(ifp)) {
-			spin_lock_bh(&ifp->lock);
-			ifp->flags &= ~IFA_F_TENTATIVE;
-			spin_unlock_bh(&ifp->lock);
-			ipv6_ifa_notify(RTM_NEWADDR, ifp);
-			in6_ifa_put(ifp);
-		}
+		add_addr(idev, &addr, 128, scope);
 		return;
 	}
 
@@ -2288,15 +2266,7 @@ static void sit_add_v4_addrs(struct inet6_dev *idev)
 				else
 					plen = 96;
 
-				ifp = ipv6_add_addr(idev, &addr, plen, flag,
-						    IFA_F_PERMANENT);
-				if (!IS_ERR(ifp)) {
-					spin_lock_bh(&ifp->lock);
-					ifp->flags &= ~IFA_F_TENTATIVE;
-					spin_unlock_bh(&ifp->lock);
-					ipv6_ifa_notify(RTM_NEWADDR, ifp);
-					in6_ifa_put(ifp);
-				}
+				add_addr(idev, &addr, plen, flag);
 			}
 		}
 	}
@@ -2306,7 +2276,6 @@ static void sit_add_v4_addrs(struct inet6_dev *idev)
 static void init_loopback(struct net_device *dev)
 {
 	struct inet6_dev  *idev;
-	struct inet6_ifaddr * ifp;
 
 	/* ::1 */
 
@@ -2317,14 +2286,7 @@ static void init_loopback(struct net_device *dev)
 		return;
 	}
 
-	ifp = ipv6_add_addr(idev, &in6addr_loopback, 128, IFA_HOST, IFA_F_PERMANENT);
-	if (!IS_ERR(ifp)) {
-		spin_lock_bh(&ifp->lock);
-		ifp->flags &= ~IFA_F_TENTATIVE;
-		spin_unlock_bh(&ifp->lock);
-		ipv6_ifa_notify(RTM_NEWADDR, ifp);
-		in6_ifa_put(ifp);
-	}
+	add_addr(idev, &in6addr_loopback, 128, IFA_HOST);
 }
 
 static void addrconf_add_linklocal(struct inet6_dev *idev, struct in6_addr *addr)
@@ -2788,7 +2750,6 @@ static void addrconf_dad_start(struct inet6_ifaddr *ifp, u32 flags)
 	spin_lock_bh(&ifp->lock);
 
 	if (dev->flags&(IFF_NOARP|IFF_LOOPBACK) ||
-	    !(dev->flags&IFF_MULTICAST) ||
 	    idev->cnf.accept_dad < 1 ||
 	    !(ifp->flags&IFA_F_TENTATIVE) ||
 	    ifp->flags & IFA_F_NODAD) {
@@ -2837,11 +2798,6 @@ static void addrconf_dad_timer(unsigned long data)
 		read_unlock_bh(&idev->lock);
 		goto out;
 	}
-	if (idev->cnf.accept_dad > 1 && idev->cnf.disable_ipv6) {
-		read_unlock_bh(&idev->lock);
-		addrconf_dad_failure(ifp);
-		return;
-	}
 	spin_lock_bh(&ifp->lock);
 	if (ifp->probes == 0) {
 		/*
@@ -2886,7 +2842,6 @@ static void addrconf_dad_completed(struct inet6_ifaddr *ifp)
 	if (ifp->idev->cnf.forwarding == 0 &&
 	    ifp->idev->cnf.rtr_solicits > 0 &&
 	    (dev->flags&IFF_LOOPBACK) == 0 &&
-	    (dev->flags & IFF_MULTICAST) &&
 	    (ipv6_addr_type(&ifp->addr) & IPV6_ADDR_LINKLOCAL)) {
 		/*
 		 *	If a host as already performed a random delay
@@ -3653,7 +3608,8 @@ static void inet6_ifa_notify(int event, struct inet6_ifaddr *ifa)
 		kfree_skb(skb);
 		goto errout;
 	}
-	err = rtnl_notify(skb, net, 0, RTNLGRP_IPV6_IFADDR, NULL, GFP_ATOMIC);
+	rtnl_notify(skb, net, 0, RTNLGRP_IPV6_IFADDR, NULL, GFP_ATOMIC);
+	return;
 errout:
 	if (err < 0)
 		rtnl_set_sk_err(net, RTNLGRP_IPV6_IFADDR, err);
@@ -3864,7 +3820,8 @@ void inet6_ifinfo_notify(int event, struct inet6_dev *idev)
 		kfree_skb(skb);
 		goto errout;
 	}
-	err = rtnl_notify(skb, net, 0, RTNLGRP_IPV6_IFADDR, NULL, GFP_ATOMIC);
+	rtnl_notify(skb, net, 0, RTNLGRP_IPV6_IFADDR, NULL, GFP_ATOMIC);
+	return;
 errout:
 	if (err < 0)
 		rtnl_set_sk_err(net, RTNLGRP_IPV6_IFADDR, err);
@@ -3934,7 +3891,8 @@ static void inet6_prefix_notify(int event, struct inet6_dev *idev,
 		kfree_skb(skb);
 		goto errout;
 	}
-	err = rtnl_notify(skb, net, 0, RTNLGRP_IPV6_PREFIX, NULL, GFP_ATOMIC);
+	rtnl_notify(skb, net, 0, RTNLGRP_IPV6_PREFIX, NULL, GFP_ATOMIC);
+	return;
 errout:
 	if (err < 0)
 		rtnl_set_sk_err(net, RTNLGRP_IPV6_PREFIX, err);
@@ -4558,6 +4516,3 @@ void addrconf_cleanup(void)
 	del_timer(&addr_chk_timer);
 	rtnl_unlock();
 }
-
-DEFINE_TRACE(ipv6_addr_add);
-DEFINE_TRACE(ipv6_addr_del);

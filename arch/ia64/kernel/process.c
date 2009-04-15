@@ -29,7 +29,6 @@
 #include <linux/kdebug.h>
 #include <linux/utsname.h>
 #include <linux/tracehook.h>
-#include <linux/perfmon_kern.h>
 
 #include <asm/cpu.h>
 #include <asm/delay.h>
@@ -44,9 +43,12 @@
 #include <asm/uaccess.h>
 #include <asm/unwind.h>
 #include <asm/user.h>
-#include <asm/perfmon_kern.h>
 
 #include "entry.h"
+
+#ifdef CONFIG_PERFMON
+# include <asm/perfmon.h>
+#endif
 
 #include "sigframe.h"
 
@@ -172,9 +174,14 @@ do_notify_resume_user(sigset_t *unused, struct sigscratch *scr, long in_syscall)
 		return;
 	}
 
-	/* process perfmon asynchronous work (e.g. block thread or reset) */
-	if (test_thread_flag(TIF_PERFMON_WORK))
-		pfm_handle_work(task_pt_regs(current));
+#ifdef CONFIG_PERFMON
+	if (current->thread.pfm_needs_checking)
+		/*
+		 * Note: pfm_handle_work() allow us to call it with interrupts
+		 * disabled, and may enable interrupts within the function.
+		 */
+		pfm_handle_work();
+#endif
 
 	/* deal with pending signal delivery */
 	if (test_thread_flag(TIF_SIGPENDING)) {
@@ -196,14 +203,21 @@ do_notify_resume_user(sigset_t *unused, struct sigscratch *scr, long in_syscall)
 	local_irq_disable();	/* force interrupt disable */
 }
 
+static int pal_halt        = 1;
 static int can_do_pal_halt = 1;
 
 static int __init nohalt_setup(char * str)
 {
-	can_do_pal_halt = 0;
+	pal_halt = can_do_pal_halt = 0;
 	return 1;
 }
 __setup("nohalt", nohalt_setup);
+
+void
+update_pal_halt_status(int status)
+{
+	can_do_pal_halt = pal_halt && status;
+}
 
 /*
  * We use this if we don't have any better idle routine..
@@ -213,22 +227,6 @@ default_idle (void)
 {
 	local_irq_enable();
 	while (!need_resched()) {
-#ifdef CONFIG_PERFMON
-		u64 psr = 0;
-		/*
-		 * If requested, we stop the PMU to avoid
-		 * measuring across the core idle loop.
-		 *
-		 * dcr.pp is not modified on purpose
-		 * it is used when coming out of
-		 * safe_halt() via interrupt
-		 */
-		if ((__get_cpu_var(pfm_syst_info) & PFM_ITA_CPUINFO_IDLE_EXCL)) {
-			psr = ia64_getreg(_IA64_REG_PSR);
-			if (psr & IA64_PSR_PP)
-				ia64_rsm(IA64_PSR_PP);
-		}
-#endif
 		if (can_do_pal_halt) {
 			local_irq_disable();
 			if (!need_resched()) {
@@ -237,12 +235,6 @@ default_idle (void)
 			local_irq_enable();
 		} else
 			cpu_relax();
-#ifdef CONFIG_PERFMON
-		if ((__get_cpu_var(pfm_syst_info) & PFM_ITA_CPUINFO_IDLE_EXCL)) {
-			if (psr & IA64_PSR_PP)
-				ia64_ssm(IA64_PSR_PP);
-		}
-#endif
 	}
 }
 
@@ -342,8 +334,21 @@ cpu_idle (void)
 void
 ia64_save_extra (struct task_struct *task)
 {
+#ifdef CONFIG_PERFMON
+	unsigned long info;
+#endif
+
 	if ((task->thread.flags & IA64_THREAD_DBG_VALID) != 0)
 		ia64_save_debug_regs(&task->thread.dbr[0]);
+
+#ifdef CONFIG_PERFMON
+	if ((task->thread.flags & IA64_THREAD_PM_VALID) != 0)
+		pfm_save_regs(task);
+
+	info = __get_cpu_var(pfm_syst_info);
+	if (info & PFM_CPUINFO_SYST_WIDE)
+		pfm_syst_wide_update_task(task, info, 0);
+#endif
 
 #ifdef CONFIG_IA32_SUPPORT
 	if (IS_IA32_PROCESS(task_pt_regs(task)))
@@ -354,8 +359,21 @@ ia64_save_extra (struct task_struct *task)
 void
 ia64_load_extra (struct task_struct *task)
 {
+#ifdef CONFIG_PERFMON
+	unsigned long info;
+#endif
+
 	if ((task->thread.flags & IA64_THREAD_DBG_VALID) != 0)
 		ia64_load_debug_regs(&task->thread.dbr[0]);
+
+#ifdef CONFIG_PERFMON
+	if ((task->thread.flags & IA64_THREAD_PM_VALID) != 0)
+		pfm_load_regs(task);
+
+	info = __get_cpu_var(pfm_syst_info);
+	if (info & PFM_CPUINFO_SYST_WIDE) 
+		pfm_syst_wide_update_task(task, info, 1);
+#endif
 
 #ifdef CONFIG_IA32_SUPPORT
 	if (IS_IA32_PROCESS(task_pt_regs(task)))
@@ -395,7 +413,7 @@ ia64_load_extra (struct task_struct *task)
  * so there is nothing to worry about.
  */
 int
-copy_thread (int nr, unsigned long clone_flags,
+copy_thread(unsigned long clone_flags,
 	     unsigned long user_stack_base, unsigned long user_stack_size,
 	     struct task_struct *p, struct pt_regs *regs)
 {
@@ -482,7 +500,8 @@ copy_thread (int nr, unsigned long clone_flags,
 	 * call behavior where scratch registers are preserved across
 	 * system calls (unless used by the system call itself).
 	 */
-#	define THREAD_FLAGS_TO_CLEAR	(IA64_THREAD_FPH_VALID | IA64_THREAD_DBG_VALID)
+#	define THREAD_FLAGS_TO_CLEAR	(IA64_THREAD_FPH_VALID | IA64_THREAD_DBG_VALID \
+					 | IA64_THREAD_PM_VALID)
 #	define THREAD_FLAGS_TO_SET	0
 	p->thread.flags = ((current->thread.flags & ~THREAD_FLAGS_TO_CLEAR)
 			   | THREAD_FLAGS_TO_SET);
@@ -504,8 +523,10 @@ copy_thread (int nr, unsigned long clone_flags,
 	}
 #endif
 
-	pfm_copy_thread(p);
-
+#ifdef CONFIG_PERFMON
+	if (current->thread.pfm_context)
+		pfm_inherit(p, child_ptregs);
+#endif
 	return retval;
 }
 
@@ -714,13 +735,15 @@ exit_thread (void)
 {
 
 	ia64_drop_fpu(current);
-
-	/* if needed, stop monitoring and flush state to perfmon context */
-	pfm_exit_thread();
+#ifdef CONFIG_PERFMON
+       /* if needed, stop monitoring and flush state to perfmon context */
+	if (current->thread.pfm_context)
+		pfm_exit_thread(current);
 
 	/* free debug register resources */
-	pfm_release_dbregs(current);
-
+	if (current->thread.flags & IA64_THREAD_DBG_VALID)
+		pfm_release_debug_registers(current);
+#endif
 	if (IS_IA32_PROCESS(task_pt_regs(current)))
 		ia32_drop_ia64_partial_page_list(current);
 }

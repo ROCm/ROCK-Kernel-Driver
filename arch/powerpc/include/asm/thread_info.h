@@ -12,8 +12,10 @@
 
 /* We have 8k stacks on ppc32 and 16k on ppc64 */
 
-#ifdef CONFIG_PPC64
+#if defined(CONFIG_PPC64)
 #define THREAD_SHIFT		14
+#elif defined(CONFIG_PPC_256K_PAGES)
+#define THREAD_SHIFT		15
 #else
 #define THREAD_SHIFT		13
 #endif
@@ -130,12 +132,10 @@ static inline struct thread_info *current_thread_info(void)
 #define _TIF_FREEZE		(1<<TIF_FREEZE)
 #define _TIF_RUNLATCH		(1<<TIF_RUNLATCH)
 #define _TIF_ABI_PENDING	(1<<TIF_ABI_PENDING)
-#define _TIF_PERFMON_WORK	(1<<TIF_PERFMON_WORK)
-#define _TIF_PERFMON_CTXSW	(1<<TIF_PERFMON_CTXSW)
 #define _TIF_SYSCALL_T_OR_A	(_TIF_SYSCALL_TRACE|_TIF_SYSCALL_AUDIT|_TIF_SECCOMP)
 
 #define _TIF_USER_WORK_MASK	(_TIF_SIGPENDING | _TIF_NEED_RESCHED | \
-				 _TIF_NOTIFY_RESUME | _TIF_PERFMON_WORK)
+				 _TIF_NOTIFY_RESUME)
 #define _TIF_PERSYSCALL_MASK	(_TIF_RESTOREALL|_TIF_NOERROR)
 
 /* Bits in local_flags */
@@ -156,6 +156,13 @@ static inline void set_restore_sigmask(void)
 	ti->local_flags |= _TLF_RESTORE_SIGMASK;
 	set_bit(TIF_SIGPENDING, &ti->flags);
 }
+
+#ifdef CONFIG_PPC64
+#define is_32bit_task()	(test_thread_flag(TIF_32BIT))
+#else
+#define is_32bit_task()	(1)
+#endif
+
 #endif	/* !__ASSEMBLY__ */
 
 #endif /* __KERNEL__ */

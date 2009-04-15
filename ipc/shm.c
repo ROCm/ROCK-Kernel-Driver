@@ -39,7 +39,7 @@
 #include <linux/nsproxy.h>
 #include <linux/mount.h>
 #include <linux/ipc_namespace.h>
-#include <trace/ipc.h>
+#include <linux/ima.h>
 
 #include <asm/uaccess.h>
 
@@ -384,6 +384,7 @@ static int newseg(struct ipc_namespace *ns, struct ipc_params *params)
 	error = PTR_ERR(file);
 	if (IS_ERR(file))
 		goto no_file;
+	ima_shm_check(file);
 
 	id = ipc_addid(&shm_ids(ns), &shp->shm_perm, ns->shm_ctlmni);
 	if (id < 0) {
@@ -448,7 +449,6 @@ SYSCALL_DEFINE3(shmget, key_t, key, size_t, size, int, shmflg)
 	struct ipc_namespace *ns;
 	struct ipc_ops shm_ops;
 	struct ipc_params shm_params;
-	long err;
 
 	ns = current->nsproxy->ipc_ns;
 
@@ -460,9 +460,7 @@ SYSCALL_DEFINE3(shmget, key_t, key, size_t, size, int, shmflg)
 	shm_params.flg = shmflg;
 	shm_params.u.size = size;
 
-	err = ipcget(ns, &shm_ids(ns), &shm_ops, &shm_params);
-	trace_ipc_shm_create(err, shmflg);
-	return err;
+	return ipcget(ns, &shm_ids(ns), &shm_ops, &shm_params);
 }
 
 static inline unsigned long copy_shmid_to_user(void __user *buf, struct shmid64_ds *in, int version)
@@ -557,12 +555,14 @@ static void shm_get_stat(struct ipc_namespace *ns, unsigned long *rss,
 	in_use = shm_ids(ns).in_use;
 
 	for (total = 0, next_id = 0; total < in_use; next_id++) {
+		struct kern_ipc_perm *ipc;
 		struct shmid_kernel *shp;
 		struct inode *inode;
 
-		shp = idr_find(&shm_ids(ns).ipcs_idr, next_id);
-		if (shp == NULL)
+		ipc = idr_find(&shm_ids(ns).ipcs_idr, next_id);
+		if (ipc == NULL)
 			continue;
+		shp = container_of(ipc, struct shmid_kernel, shm_perm);
 
 		inode = shp->shm_file->f_path.dentry->d_inode;
 
@@ -891,6 +891,7 @@ long do_shmat(int shmid, char __user *shmaddr, int shmflg, ulong *raddr)
 	file = alloc_file(path.mnt, path.dentry, f_mode, &shm_file_operations);
 	if (!file)
 		goto out_free;
+	ima_shm_check(file);
 
 	file->private_data = sfd;
 	file->f_mapping = shp->shm_file->f_mapping;
@@ -1090,4 +1091,3 @@ static int sysvipc_shm_proc_show(struct seq_file *s, void *it)
 			  shp->shm_ctim);
 }
 #endif
-DEFINE_TRACE(ipc_shm_create);

@@ -38,7 +38,6 @@
 #include <linux/rwsem.h>
 #include <linux/nsproxy.h>
 #include <linux/ipc_namespace.h>
-#include <trace/ipc.h>
 
 #include <asm/current.h>
 #include <asm/uaccess.h>
@@ -315,7 +314,6 @@ SYSCALL_DEFINE2(msgget, key_t, key, int, msgflg)
 	struct ipc_namespace *ns;
 	struct ipc_ops msg_ops;
 	struct ipc_params msg_params;
-	long ret;
 
 	ns = current->nsproxy->ipc_ns;
 
@@ -326,9 +324,7 @@ SYSCALL_DEFINE2(msgget, key_t, key, int, msgflg)
 	msg_params.key = key;
 	msg_params.flg = msgflg;
 
-	ret = ipcget(ns, &msg_ids(ns), &msg_ops, &msg_params);
-	trace_ipc_msg_create(ret, msgflg);
-	return ret;
+	return ipcget(ns, &msg_ids(ns), &msg_ops, &msg_params);
 }
 
 static inline unsigned long
@@ -946,4 +942,3 @@ static int sysvipc_msg_proc_show(struct seq_file *s, void *it)
 			msq->q_ctime);
 }
 #endif
-DEFINE_TRACE(ipc_msg_create);

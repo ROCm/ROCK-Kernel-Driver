@@ -48,6 +48,7 @@
 #include <linux/acpi.h>
 #include <linux/reboot.h>
 #include <linux/ftrace.h>
+#include <linux/slow-work.h>
 
 #include <asm/uaccess.h>
 #include <asm/processor.h>
@@ -95,14 +96,12 @@ static int sixty = 60;
 static int neg_one = -1;
 #endif
 
-#if defined(CONFIG_MMU) && defined(CONFIG_FILE_LOCKING)
-static int two = 2;
-#endif
-
 static int zero;
-static int one = 1;
+static int __maybe_unused one = 1;
+static int __maybe_unused two = 2;
 static unsigned long one_ul = 1;
 static int one_hundred = 100;
+static int one_thousand = 1000;
 
 /* this is needed for the proc_dointvec_minmax for [fs_]overflow UID and GID */
 static int maxolduid = 65535;
@@ -715,7 +714,6 @@ static struct ctl_table kern_table[] = {
 		.mode           = 0644,
 		.proc_handler   = &proc_dointvec,
 	},
-#ifdef ARCH_HAS_NMI_WATCHDOG
 	{
 		.procname       = "nmi_watchdog",
 		.data           = &nmi_watchdog_enabled,
@@ -723,7 +721,6 @@ static struct ctl_table kern_table[] = {
 		.mode           = 0644,
 		.proc_handler   = &proc_nmi_enabled,
 	},
-#endif
 #endif
 #if defined(CONFIG_X86)
 	{
@@ -795,7 +792,7 @@ static struct ctl_table kern_table[] = {
 		.proc_handler	= &proc_dointvec,
 	},
 #endif
-#if defined(CONFIG_ACPI_SLEEP) && defined(CONFIG_X86) && !defined(CONFIG_ACPI_PV_SLEEP)
+#if	defined(CONFIG_ACPI_SLEEP) && defined(CONFIG_X86)
 	{
 		.procname	= "acpi_video_flags",
 		.data		= &acpi_realmode_flags,
@@ -845,6 +842,19 @@ static struct ctl_table kern_table[] = {
 		.extra1		= &neg_one,
 		.extra2		= &sixty,
 	},
+#endif
+#ifdef CONFIG_DETECT_HUNG_TASK
+	{
+		.ctl_name	= CTL_UNNUMBERED,
+		.procname	= "hung_task_panic",
+		.data		= &sysctl_hung_task_panic,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec_minmax,
+		.strategy	= &sysctl_intvec,
+		.extra1		= &zero,
+		.extra2		= &one,
+	},
 	{
 		.ctl_name	= CTL_UNNUMBERED,
 		.procname	= "hung_task_check_count",
@@ -860,7 +870,7 @@ static struct ctl_table kern_table[] = {
 		.data		= &sysctl_hung_task_timeout_secs,
 		.maxlen		= sizeof(unsigned long),
 		.mode		= 0644,
-		.proc_handler	= &proc_doulongvec_minmax,
+		.proc_handler	= &proc_dohung_task_timeout_secs,
 		.strategy	= &sysctl_intvec,
 	},
 	{
@@ -920,14 +930,12 @@ static struct ctl_table kern_table[] = {
 		.proc_handler   = &proc_dointvec,
 	},
 #endif
-#ifdef CONFIG_UNEVICTABLE_LRU
+#ifdef CONFIG_SLOW_WORK
 	{
 		.ctl_name	= CTL_UNNUMBERED,
-		.procname	= "scan_unevictable_pages",
-		.data		= &scan_unevictable_pages,
-		.maxlen		= sizeof(scan_unevictable_pages),
-		.mode		= 0644,
-		.proc_handler	= &scan_unevictable_handler,
+		.procname	= "slow-work",
+		.mode		= 0555,
+		.child		= slow_work_sysctls,
 	},
 #endif
 /*
@@ -1050,7 +1058,7 @@ static struct ctl_table vm_table[] = {
 		.data		= &dirty_expire_interval,
 		.maxlen		= sizeof(dirty_expire_interval),
 		.mode		= 0644,
-		.proc_handler	= &proc_dointvec_userhz_jiffies,
+		.proc_handler	= &proc_dointvec,
 	},
 	{
 		.ctl_name	= VM_NR_PDFLUSH_THREADS,
@@ -1059,6 +1067,28 @@ static struct ctl_table vm_table[] = {
 		.maxlen		= sizeof nr_pdflush_threads,
 		.mode		= 0444 /* read-only*/,
 		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= CTL_UNNUMBERED,
+		.procname	= "nr_pdflush_threads_min",
+		.data		= &nr_pdflush_threads_min,
+		.maxlen		= sizeof nr_pdflush_threads_min,
+		.mode		= 0644 /* read-write */,
+		.proc_handler	= &proc_dointvec_minmax,
+		.strategy	= &sysctl_intvec,
+		.extra1		= &one,
+		.extra2		= &nr_pdflush_threads_max,
+	},
+	{
+		.ctl_name	= CTL_UNNUMBERED,
+		.procname	= "nr_pdflush_threads_max",
+		.data		= &nr_pdflush_threads_max,
+		.maxlen		= sizeof nr_pdflush_threads_max,
+		.mode		= 0644 /* read-write */,
+		.proc_handler	= &proc_dointvec_minmax,
+		.strategy	= &sysctl_intvec,
+		.extra1		= &nr_pdflush_threads_min,
+		.extra2		= &one_thousand,
 	},
 	{
 		.ctl_name	= VM_SWAPPINESS,
@@ -1300,6 +1330,16 @@ static struct ctl_table vm_table[] = {
 		.extra2		= &one,
 	},
 #endif
+#ifdef CONFIG_UNEVICTABLE_LRU
+	{
+		.ctl_name	= CTL_UNNUMBERED,
+		.procname	= "scan_unevictable_pages",
+		.data		= &scan_unevictable_pages,
+		.maxlen		= sizeof(scan_unevictable_pages),
+		.mode		= 0644,
+		.proc_handler	= &scan_unevictable_handler,
+	},
+#endif
 	{
 		.ctl_name	= CTL_UNNUMBERED,
 		.procname	= "heap-stack-gap",
@@ -1421,10 +1461,7 @@ static struct ctl_table fs_table[] = {
 		.data		= &lease_break_time,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
-		.proc_handler	= &proc_dointvec_minmax,
-		.strategy	= &sysctl_intvec,
-		.extra1		= &zero,
-		.extra2		= &two,
+		.proc_handler	= &proc_dointvec,
 	},
 #endif
 #ifdef CONFIG_AIO
@@ -1465,7 +1502,10 @@ static struct ctl_table fs_table[] = {
 		.data		= &suid_dumpable,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
-		.proc_handler	= &proc_dointvec,
+		.proc_handler	= &proc_dointvec_minmax,
+		.strategy	= &sysctl_intvec,
+		.extra1		= &zero,
+		.extra2		= &two,
 	},
 #if defined(CONFIG_BINFMT_MISC) || defined(CONFIG_BINFMT_MISC_MODULE)
 	{

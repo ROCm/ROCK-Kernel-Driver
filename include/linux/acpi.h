@@ -79,6 +79,7 @@ typedef int (*acpi_table_handler) (struct acpi_table_header *table);
 typedef int (*acpi_table_entry_handler) (struct acpi_subtable_header *header, const unsigned long end);
 
 char * __acpi_map_table (unsigned long phys_addr, unsigned long size);
+void __acpi_unmap_table(char *map, unsigned long size);
 int early_acpi_boot_init(void);
 int acpi_boot_init (void);
 int acpi_boot_table_init (void);
@@ -96,6 +97,7 @@ void acpi_table_print_madt_entry (struct acpi_subtable_header *madt);
 /* the following four functions are architecture-dependent */
 void acpi_numa_slit_init (struct acpi_table_slit *slit);
 void acpi_numa_processor_affinity_init (struct acpi_srat_cpu_affinity *pa);
+void acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa);
 void acpi_numa_memory_affinity_init (struct acpi_srat_mem_affinity *ma);
 void acpi_numa_arch_fixup(void);
 
@@ -186,8 +188,6 @@ extern bool wmi_has_guid(const char *guid);
 #define ACPI_VIDEO_BACKLIGHT_DMI_VIDEO			0x0200
 #define ACPI_VIDEO_OUTPUT_SWITCHING_DMI_VENDOR		0x0400
 #define ACPI_VIDEO_OUTPUT_SWITCHING_DMI_VIDEO		0x0800
-/* Do not use the IGD define, this is a SUSE only ThinkPad workaround hack! */
-#define ACPI_VIDEO_IGD					0x1000
 
 #if defined(CONFIG_ACPI_VIDEO) || defined(CONFIG_ACPI_VIDEO_MODULE)
 
@@ -253,13 +253,45 @@ int acpi_check_region(resource_size_t start, resource_size_t n,
 int acpi_check_mem_region(resource_size_t start, resource_size_t n,
 		      const char *name);
 
-int acpi_pci_get_root_seg_bbn(char *hid, char *uid, int *seg, int *bbn);
-
 #ifdef CONFIG_PM_SLEEP
 void __init acpi_no_s4_hw_signature(void);
 void __init acpi_old_suspend_ordering(void);
 void __init acpi_s4_no_nvs(void);
 #endif /* CONFIG_PM_SLEEP */
+
+#define OSC_QUERY_TYPE			0
+#define OSC_SUPPORT_TYPE 		1
+#define OSC_CONTROL_TYPE		2
+#define OSC_SUPPORT_MASKS		0x1f
+
+/* _OSC DW0 Definition */
+#define OSC_QUERY_ENABLE		1
+#define OSC_REQUEST_ERROR		2
+#define OSC_INVALID_UUID_ERROR		4
+#define OSC_INVALID_REVISION_ERROR	8
+#define OSC_CAPABILITIES_MASK_ERROR	16
+
+/* _OSC DW1 Definition (OS Support Fields) */
+#define OSC_EXT_PCI_CONFIG_SUPPORT		1
+#define OSC_ACTIVE_STATE_PWR_SUPPORT 		2
+#define OSC_CLOCK_PWR_CAPABILITY_SUPPORT	4
+#define OSC_PCI_SEGMENT_GROUPS_SUPPORT		8
+#define OSC_MSI_SUPPORT				16
+
+/* _OSC DW1 Definition (OS Control Fields) */
+#define OSC_PCI_EXPRESS_NATIVE_HP_CONTROL	1
+#define OSC_SHPC_NATIVE_HP_CONTROL 		2
+#define OSC_PCI_EXPRESS_PME_CONTROL		4
+#define OSC_PCI_EXPRESS_AER_CONTROL		8
+#define OSC_PCI_EXPRESS_CAP_STRUCTURE_CONTROL	16
+
+#define OSC_CONTROL_MASKS 	(OSC_PCI_EXPRESS_NATIVE_HP_CONTROL | 	\
+				OSC_SHPC_NATIVE_HP_CONTROL | 		\
+				OSC_PCI_EXPRESS_PME_CONTROL |		\
+				OSC_PCI_EXPRESS_AER_CONTROL |		\
+				OSC_PCI_EXPRESS_CAP_STRUCTURE_CONTROL)
+
+extern acpi_status acpi_pci_osc_control_set(acpi_handle handle, u32 flags);
 #else	/* CONFIG_ACPI */
 
 static inline int early_acpi_boot_init(void)

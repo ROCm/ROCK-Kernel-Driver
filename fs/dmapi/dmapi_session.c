@@ -548,7 +548,6 @@ dm_create_session(
 
 	sprintf(buf, DMAPI_DBG_PROCFS "/sessions/0x%p", s);
 	entry = create_proc_read_entry(buf, 0, NULL, sessions_read_pfs, s);
-	entry->owner = THIS_MODULE;
 	}
 #endif
 	return(0);

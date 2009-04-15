@@ -47,7 +47,7 @@
 
 /*typedef struct drm_via_chrome9_shadow_map drm_via_chrome9_shadow_map_t;*/
 struct drm_via_chrome9_shadow_map {
-	struct drm_map  *shadow;
+	struct drm_local_map  *shadow;
 	unsigned int   shadow_size;
 	unsigned int   *shadow_handle;
 };
@@ -80,16 +80,16 @@ struct drm_via_chrome9_private {
 	/* bit[31]:0:indicate no alignment needed,1:indicate
 	alignment needed and size is bit[0:30]*/
 
-	struct drm_map *sarea;
+	struct drm_local_map *sarea;
 	struct drm_via_chrome9_sarea *sarea_priv;
 
-	struct drm_map  *mmio;
-	struct drm_map  *hostBlt;
-	struct drm_map  *fb;
-	struct drm_map  *front;
-	struct drm_map  *back;
-	struct drm_map  *depth;
-	struct drm_map  *agp_tex;
+	struct drm_local_map  *mmio;
+	struct drm_local_map  *hostBlt;
+	struct drm_local_map  *fb;
+	struct drm_local_map  *front;
+	struct drm_local_map  *back;
+	struct drm_local_map  *depth;
+	struct drm_local_map  *agp_tex;
 	unsigned int agp_size;
 	unsigned int agp_offset;
 

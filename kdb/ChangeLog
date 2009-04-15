@@ -1,3 +1,31 @@
+2008-11-26 Jay Lan  <jlan@sgi.com>
+
+	* kdb-v4.4-2.6.28-rc6-common-1.
+
+2008-11-12 Jay Lan  <jlan@sgi.com>
+
+	* kdb-v4.4-2.6.28-rc4-common-1.
+
+2008-11-04 Jay Lan  <jlan@sgi.com>
+
+	* medusa needs kdb to handle '\n' in kdb_read(),
+	   Cliff Wickman <cpw@sgi.com>
+	* kdb-v4.4-2.6.28-rc3-common-1.
+
+2008-10-29 Jay Lan  <jlan@sgi.com>
+
+	* "Commandeer vector 0xfe for KDB_VECTOR", version 2.
+	    Cliff Wickman <cpw@sgi.com>
+	* kdb-v4.4-2.6.28-rc2-common-2.
+
+2008-10-27 Jay Lan  <jlan@sgi.com>
+
+	* kdb-v4.4-2.6.28-rc2-common-1.
+
+2008-10-20 Jay Lan  <jlan@sgi.com>
+
+	* kdb-v4.4-2.6.27-common-1.
+
 2008-09-30 Jay Lan  <jlan@sgi.com>
 
 	* kdb-v4.4-2.6.27-rc8-common-1.

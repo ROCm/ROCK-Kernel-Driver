@@ -57,17 +57,19 @@
 /* Helpers for inode ops. We do this so that we don't have all the VFS
  * overhead and also for proper i_mutex annotation.
  * dir->i_mutex must be held for all of them. */
+#ifdef CONFIG_REISERFS_FS_XATTR
 static int xattr_create(struct inode *dir, struct dentry *dentry, int mode)
 {
 	BUG_ON(!mutex_is_locked(&dir->i_mutex));
-	DQUOT_INIT(dir);
+	vfs_dq_init(dir);
 	return dir->i_op->create(dir, dentry, mode, NULL);
 }
+#endif
 
 static int xattr_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 {
 	BUG_ON(!mutex_is_locked(&dir->i_mutex));
-	DQUOT_INIT(dir);
+	vfs_dq_init(dir);
 	return dir->i_op->mkdir(dir, dentry, mode);
 }
 
@@ -79,7 +81,7 @@ static int xattr_unlink(struct inode *dir, struct dentry *dentry)
 {
 	int error;
 	BUG_ON(!mutex_is_locked(&dir->i_mutex));
-	DQUOT_INIT(dir);
+	vfs_dq_init(dir);
 
 	mutex_lock_nested(&dentry->d_inode->i_mutex, I_MUTEX_CHILD);
 	error = dir->i_op->unlink(dir, dentry);
@@ -94,7 +96,7 @@ static int xattr_rmdir(struct inode *dir, struct dentry *dentry)
 {
 	int error;
 	BUG_ON(!mutex_is_locked(&dir->i_mutex));
-	DQUOT_INIT(dir);
+	vfs_dq_init(dir);
 
 	mutex_lock_nested(&dentry->d_inode->i_mutex, I_MUTEX_CHILD);
 	dentry_unhash(dentry);
@@ -958,7 +960,7 @@ xattr_lookup_poison(struct dentry *dentry, struct qstr *q1, struct qstr *name)
 	return 1;
 }
 
-static struct dentry_operations xattr_lookup_poison_ops = {
+static const struct dentry_operations xattr_lookup_poison_ops = {
 	.d_compare = xattr_lookup_poison,
 };
 

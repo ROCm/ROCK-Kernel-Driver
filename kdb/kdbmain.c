@@ -1787,7 +1787,7 @@ kdb_check_i8042(void)
 	KDB_FLAG_CLEAR(NO_I8042);
 #ifdef	CONFIG_ACPI
 	if (acpi_gbl_FADT.header.revision >= 3 &&
-	    (acpi_gbl_FADT.boot_flags & BAF_8042_KEYBOARD_CONTROLLER) == 0)
+	    (acpi_gbl_FADT.boot_flags & ACPI_FADT_8042) == 0)
 		KDB_FLAG_SET(NO_I8042);
 #endif	/* CONFIG_ACPI */
 }
@@ -3048,7 +3048,7 @@ kdb_dmesg(int argc, const char **argv)
 	}
 
 	/* syslog_data[0,1] physical start, end+1.  syslog_data[2,3] logical start, end+1. */
-	kdb_syslog_data(syslog_data);
+	debugger_syslog_data(syslog_data);
 	if (syslog_data[2] == syslog_data[3])
 		return 0;
 	logsize = syslog_data[1] - syslog_data[0];
@@ -3690,7 +3690,7 @@ kdb_summary(int argc, const char **argv)
 #undef LOAD_INT
 #undef LOAD_FRAC
 
-	kdb_meminfo_read_proc();	/* in fs/proc/proc_misc.c */
+	kdb_meminfo_proc_show();	/* in fs/proc/meminfo.c */
 
 	return 0;
 }

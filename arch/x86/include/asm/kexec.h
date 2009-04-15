@@ -5,42 +5,17 @@
 # define PA_CONTROL_PAGE	0
 # define VA_CONTROL_PAGE	1
 # define PA_PGD			2
-# ifndef CONFIG_XEN
 # define PA_SWAP_PAGE		3
 # define PAGES_NR		4
-# else /* CONFIG_XEN */
-/*
- * The hypervisor interface implicitly requires that all entries (except
- * for possibly the final one) are arranged in matching PA_/VA_ pairs.
-#  define VA_PGD		3
- */
-#  define PA_SWAP_PAGE		4
-#  define PAGES_NR		5
-# endif /* CONFIG_XEN */
 #else
 # define PA_CONTROL_PAGE	0
 # define VA_CONTROL_PAGE	1
-# define PA_PGD			2
-# define VA_PGD			3
-# define PA_PUD_0		4
-# define VA_PUD_0		5
-# define PA_PMD_0		6
-# define VA_PMD_0		7
-# define PA_PTE_0		8
-# define VA_PTE_0		9
-# define PA_PUD_1		10
-# define VA_PUD_1		11
-# define PA_PMD_1		12
-# define VA_PMD_1		13
-# define PA_PTE_1		14
-# define VA_PTE_1		15
-# define PA_TABLE_PAGE		16
-# define PAGES_NR		17
+# define PA_TABLE_PAGE		2
+# define PA_SWAP_PAGE		3
+# define PAGES_NR		4
 #endif
 
-#ifdef CONFIG_X86_32
 # define KEXEC_CONTROL_CODE_MAX_SIZE	2048
-#endif
 
 #ifndef __ASSEMBLY__
 
@@ -161,15 +136,16 @@ relocate_kernel(unsigned long indirection_page,
 		unsigned int has_pae,
 		unsigned int preserve_context);
 #else
-NORET_TYPE void
+unsigned long
 relocate_kernel(unsigned long indirection_page,
 		unsigned long page_list,
-		unsigned long start_address) ATTRIB_NORET;
+		unsigned long start_address,
+		unsigned int preserve_context);
 #endif
 
-#ifdef CONFIG_X86_32
 #define ARCH_HAS_KIMAGE_ARCH
 
+#ifdef CONFIG_X86_32
 struct kimage_arch {
 	pgd_t *pgd;
 #ifdef CONFIG_X86_PAE
@@ -179,19 +155,12 @@ struct kimage_arch {
 	pte_t *pte0;
 	pte_t *pte1;
 };
-#endif
-
-/* Under Xen we need to work with machine addresses. These macros give the
- * machine address of a certain page to the generic kexec code instead of
- * the pseudo physical address which would be given by the default macros.
- */
-
-#ifdef CONFIG_XEN
-#define KEXEC_ARCH_HAS_PAGE_MACROS
-#define kexec_page_to_pfn(page)  pfn_to_mfn(page_to_pfn(page))
-#define kexec_pfn_to_page(pfn)   pfn_to_page(mfn_to_pfn(pfn))
-#define kexec_virt_to_phys(addr) virt_to_machine(addr)
-#define kexec_phys_to_virt(addr) phys_to_virt(machine_to_phys(addr))
+#else
+struct kimage_arch {
+	pud_t *pud;
+	pmd_t *pmd;
+	pte_t *pte;
+};
 #endif
 
 #endif /* __ASSEMBLY__ */

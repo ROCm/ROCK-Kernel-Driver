@@ -39,6 +39,7 @@ typedef unsigned long kdb_machreg_t;
 #define kdb_bfd_vma_fmt0	"0x%08lx"
 #define kdb_elfw_addr_fmt	"0x%x"
 #define kdb_elfw_addr_fmt0	"0x%08x"
+#define kdb_f_count_fmt		"%d"
 
 #else	/* CONFIG_X86_32 */
 
@@ -48,6 +49,7 @@ typedef unsigned long kdb_machreg_t;
 #define kdb_bfd_vma_fmt0	"0x%016lx"
 #define kdb_elfw_addr_fmt	"0x%x"
 #define kdb_elfw_addr_fmt0	"0x%016x"
+#define kdb_f_count_fmt		"%ld"
 
 /*
  * Functions to safely read and write kernel areas.  The {to,from}_xxx

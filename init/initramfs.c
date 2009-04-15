@@ -5,6 +5,7 @@
 #include <linux/fcntl.h>
 #include <linux/delay.h>
 #include <linux/string.h>
+#include <linux/dirent.h>
 #include <linux/syscalls.h>
 #include <linux/utime.h>
 #ifdef CONFIG_ACPI_CUSTOM_DSDT_INITRD
@@ -176,8 +177,6 @@ static __initdata char *victim;
 static __initdata unsigned count;
 static __initdata loff_t this_header, next_header;
 
-static __initdata int dry_run;
-
 static inline void __init eat(unsigned n)
 {
 	victim += n;
@@ -239,10 +238,11 @@ static int __init do_header(void)
 	parse_header(collected);
 	next_header = this_header + N_ALIGN(name_len) + body_len;
 	next_header = (next_header + 3) & ~3;
-	if (dry_run) {
-		read_into(name_buf, N_ALIGN(name_len), GotName);
+	if (file_looked_for) {
+                read_into(name_buf, N_ALIGN(name_len), GotName);
 		return 0;
 	}
+
 	state = SkipIt;
 	if (name_len <= 0 || name_len > PATH_MAX)
 		return 0;
@@ -313,11 +313,12 @@ static int __init do_name(void)
 		free_hash();
 		return 0;
 	}
-	if (file_looked_for && S_ISREG(mode) &&
-		(strcmp(collected, file_looked_for) == 0))
-		state = CopyFileMem;
-	if (dry_run)
+	if (file_looked_for) {
+		if (S_ISREG(mode) &&
+		    (strcmp(collected, file_looked_for) == 0))
+			state = CopyFileMem;
 		return 0;
+	}
 	clean_path(collected, mode);
 	if (S_ISREG(mode)) {
 		int ml = maybe_link();
@@ -330,7 +331,8 @@ static int __init do_name(void)
 			if (wfd >= 0) {
 				sys_fchown(wfd, uid, gid);
 				sys_fchmod(wfd, mode);
-				sys_ftruncate(wfd, body_len);
+				if (body_len)
+					sys_ftruncate(wfd, body_len);
 				vcollected = kstrdup(collected, GFP_KERNEL);
 				state = CopyFile;
 			}
@@ -438,11 +440,13 @@ static int __init write_buffer(char *buf, unsigned len)
 	return len - count;
 }
 
-static void __init flush_buffer(char *buf, unsigned len)
+static int __init flush_buffer(void *bufv, unsigned len)
 {
+	char *buf = (char *) bufv;
 	int written;
+	int origLen = len;
 	if (message)
-		return;
+		return -1;
 	while ((written = write_buffer(buf, len)) < len && !message) {
 		char c = buf[written];
 		if (c == '0') {
@@ -456,84 +460,27 @@ static void __init flush_buffer(char *buf, unsigned len)
 		} else
 			error("junk in compressed archive");
 	}
+	return origLen;
 }
 
-/*
- * gzip declarations
- */
+static unsigned my_inptr;   /* index of next byte to be processed in inbuf */
 
-#define OF(args)  args
+#include <linux/decompress/generic.h>
 
-#ifndef memzero
-#define memzero(s, n)     memset ((s), 0, (n))
-#endif
-
-typedef unsigned char  uch;
-typedef unsigned short ush;
-typedef unsigned long  ulg;
-
-#define WSIZE 0x8000    /* window size--must be a power of two, and */
-			/*  at least 32K for zip's deflate method */
-
-static uch *inbuf;
-static uch *window;
-
-static unsigned insize;  /* valid bytes in inbuf */
-static unsigned inptr;   /* index of next byte to be processed in inbuf */
-static unsigned outcnt;  /* bytes in output buffer */
-static long bytes_out;
-
-#define get_byte()  (inptr < insize ? inbuf[inptr++] : -1)
-		
-/* Diagnostic functions (stubbed out) */
-#define Assert(cond,msg)
-#define Trace(x)
-#define Tracev(x)
-#define Tracevv(x)
-#define Tracec(c,x)
-#define Tracecv(c,x)
-
-#define STATIC static
-#define INIT __init
-
-static void __init flush_window(void);
-static void __init error(char *m);
-
-#define NO_INFLATE_MALLOC
-
-#include "../lib/inflate.c"
-
-/* ===========================================================================
- * Write the output window window[0..outcnt-1] and update crc and bytes_out.
- * (Used for the decompressed data only.)
- */
-static void __init flush_window(void)
-{
-	ulg c = crc;         /* temporary variable */
-	unsigned n;
-	uch *in, ch;
-
-	flush_buffer(window, outcnt);
-	in = window;
-	for (n = 0; n < outcnt; n++) {
-		ch = *in++;
-		c = crc_32_tab[((int)c ^ ch) & 0xff] ^ (c >> 8);
-	}
-	crc = c;
-	bytes_out += (ulg)outcnt;
-	outcnt = 0;
-}
-
-static char * __init unpack_to_rootfs(char *buf, unsigned len, int check_only)
+static char * __init unpack_to_rootfs(char *buf, unsigned len)
 {
 	int written;
-	dry_run = check_only;
+	decompress_fn decompress;
+	const char *compress_name;
+	static __initdata char msg_buf[64];
+
 	header_buf = kmalloc(110, GFP_KERNEL);
 	symlink_buf = kmalloc(PATH_MAX + N_ALIGN(PATH_MAX) + 1, GFP_KERNEL);
 	name_buf = kmalloc(N_ALIGN(PATH_MAX), GFP_KERNEL);
-	window = kmalloc(WSIZE, GFP_KERNEL);
-	if (!window || !header_buf || !symlink_buf || !name_buf)
+
+	if (!header_buf || !symlink_buf || !name_buf)
 		panic("can't allocate buffers");
+
 	state = Start;
 	this_header = 0;
 	message = NULL;
@@ -553,22 +500,25 @@ static char * __init unpack_to_rootfs(char *buf, unsigned len, int check_only)
 			continue;
 		}
 		this_header = 0;
-		insize = len;
-		inbuf = buf;
-		inptr = 0;
-		outcnt = 0;		/* bytes in output buffer */
-		bytes_out = 0;
-		crc = (ulg)0xffffffffL; /* shift register contents */
-		makecrc();
-		gunzip();
+		decompress = decompress_method(buf, len, &compress_name);
+		if (decompress)
+			decompress(buf, len, NULL, flush_buffer, NULL,
+				   &my_inptr, error);
+		else if (compress_name) {
+			if (!message) {
+				snprintf(msg_buf, sizeof msg_buf,
+					 "compression method %s not configured",
+					 compress_name);
+				message = msg_buf;
+			}
+		}
 		if (state != Reset)
-			error("junk in gzipped archive");
-		this_header = saved_offset + inptr;
-		buf += inptr;
-		len -= inptr;
+			error("junk in compressed archive");
+		this_header = saved_offset + my_inptr;
+		buf += my_inptr;
+		len -= my_inptr;
 	}
 	dir_utime();
-	kfree(window);
 	kfree(name_buf);
 	kfree(symlink_buf);
 	kfree(header_buf);
@@ -622,26 +572,78 @@ skip:
 	initrd_end = 0;
 }
 
+#ifdef CONFIG_BLK_DEV_RAM
+#define BUF_SIZE 1024
+static void __init clean_rootfs(void)
+{
+	int fd;
+	void *buf;
+	struct linux_dirent64 *dirp;
+	int count;
+
+	fd = sys_open("/", O_RDONLY, 0);
+	WARN_ON(fd < 0);
+	if (fd < 0)
+		return;
+	buf = kzalloc(BUF_SIZE, GFP_KERNEL);
+	WARN_ON(!buf);
+	if (!buf) {
+		sys_close(fd);
+		return;
+	}
+
+	dirp = buf;
+	count = sys_getdents64(fd, dirp, BUF_SIZE);
+	while (count > 0) {
+		while (count > 0) {
+			struct stat st;
+			int ret;
+
+			ret = sys_newlstat(dirp->d_name, &st);
+			WARN_ON_ONCE(ret);
+			if (!ret) {
+				if (S_ISDIR(st.st_mode))
+					sys_rmdir(dirp->d_name);
+				else
+					sys_unlink(dirp->d_name);
+			}
+
+			count -= dirp->d_reclen;
+			dirp = (void *)dirp + dirp->d_reclen;
+		}
+		dirp = buf;
+		memset(buf, 0, BUF_SIZE);
+		count = sys_getdents64(fd, dirp, BUF_SIZE);
+	}
+
+	sys_close(fd);
+	kfree(buf);
+}
+#endif
+
 static int __init populate_rootfs(void)
 {
 	char *err = unpack_to_rootfs(__initramfs_start,
-			 __initramfs_end - __initramfs_start, 0);
+			 __initramfs_end - __initramfs_start);
 	if (err)
-		panic(err);
+		panic(err);	/* Failed to decompress INTERNAL initramfs */
 	if (initrd_start) {
 #ifdef CONFIG_BLK_DEV_RAM
 		int fd;
-		printk(KERN_INFO "checking if image is initramfs...");
+		printk(KERN_INFO "checking if image is initramfs...\n");
 		err = unpack_to_rootfs((char *)initrd_start,
-			initrd_end - initrd_start, 1);
+			initrd_end - initrd_start);
 		if (!err) {
-			printk(" it is\n");
-			unpack_to_rootfs((char *)initrd_start,
-				initrd_end - initrd_start, 0);
+			printk(KERN_INFO "rootfs image is initramfs; unpacking...\n");
 			free_initrd();
 			return 0;
+		} else {
+			clean_rootfs();
+			unpack_to_rootfs(__initramfs_start,
+				 __initramfs_end - __initramfs_start);
 		}
-		printk("it isn't (%s); looks like an initrd\n", err);
+		printk(KERN_INFO "rootfs image is not initramfs (%s)"
+				"; looks like an initrd\n", err);
 		fd = sys_open("/initrd.image", O_WRONLY|O_CREAT, 0700);
 		if (fd >= 0) {
 			sys_write(fd, (char *)initrd_start,
@@ -652,10 +654,13 @@ static int __init populate_rootfs(void)
 #else
 		printk(KERN_INFO "Unpacking initramfs...");
 		err = unpack_to_rootfs((char *)initrd_start,
-			initrd_end - initrd_start, 0);
-		if (err)
-			panic(err);
-		printk(" done\n");
+			initrd_end - initrd_start);
+		if (err) {
+			printk(" failed!\n");
+			printk(KERN_EMERG "%s\n", err);
+		} else {
+			printk(" done\n");
+		}
 		free_initrd();
 #endif
 	}
@@ -672,7 +677,7 @@ struct acpi_table_header * __init acpi_find_dsdt_initrd(void)
 	file_mem = NULL;
 	file_looked_for = ramfs_dsdt_name;
 	err = unpack_to_rootfs((char *)initrd_start,
-			initrd_end - initrd_start, 1);
+			initrd_end - initrd_start);
 	file_looked_for = NULL;
 
 	if (err) {

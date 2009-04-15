@@ -27,6 +27,7 @@
 #include <linux/mnt_namespace.h>
 #include <linux/mount.h>
 #include <linux/namei.h>
+#include <linux/crc32.h>
 
 struct file_system_type reiserfs_fs_type;
 
@@ -248,7 +249,7 @@ static int finish_unfinished(struct super_block *s)
 			retval = remove_save_link_only(s, &save_link_key, 0);
 			continue;
 		}
-		DQUOT_INIT(inode);
+		vfs_dq_init(inode);
 
 		if (truncate && S_ISDIR(inode->i_mode)) {
 			/* We got a truncate request for a dir which is impossible.
@@ -628,8 +629,6 @@ static const struct super_operations reiserfs_sops = {
 #ifdef CONFIG_QUOTA
 #define QTYPE2NAME(t) ((t)==USRQUOTA?"user":"group")
 
-static int reiserfs_dquot_initialize(struct inode *, int);
-static int reiserfs_dquot_drop(struct inode *);
 static int reiserfs_write_dquot(struct dquot *);
 static int reiserfs_acquire_dquot(struct dquot *);
 static int reiserfs_release_dquot(struct dquot *);
@@ -638,8 +637,8 @@ static int reiserfs_write_info(struct super_block *, int);
 static int reiserfs_quota_on(struct super_block *, int, int, char *, int);
 
 static struct dquot_operations reiserfs_quota_operations = {
-	.initialize = reiserfs_dquot_initialize,
-	.drop = reiserfs_dquot_drop,
+	.initialize = dquot_initialize,
+	.drop = dquot_drop,
 	.alloc_space = dquot_alloc_space,
 	.alloc_inode = dquot_alloc_inode,
 	.free_space = dquot_free_space,
@@ -1641,6 +1640,9 @@ static int reiserfs_fill_super(struct super_block *s, void *data, int silent)
 	/* Set default values for options: non-aggressive tails, RO on errors */
 	REISERFS_SB(s)->s_mount_opt |= (1 << REISERFS_SMALLTAIL);
 	REISERFS_SB(s)->s_mount_opt |= (1 << REISERFS_ERROR_RO);
+#ifdef CONFIG_REISERFS_DEFAULTS_TO_BARRIERS_ENABLED
+	REISERFS_SB(s)->s_mount_opt |= (1 << REISERFS_BARRIER_FLUSH);
+#endif
 	/* no preallocation minimum, be smart in
 	   reiserfs_file_write instead */
 	REISERFS_SB(s)->s_alloc_options.preallocmin = 0;
@@ -1716,12 +1718,9 @@ static int reiserfs_fill_super(struct super_block *s, void *data, int silent)
 	} else {
 		reiserfs_info(s, "using writeback data mode\n");
 	}
-	/* make barrer=flush the default */
-
-	if (!reiserfs_barrier_none(s))
-		REISERFS_SB(s)->s_mount_opt |= (1 << REISERFS_BARRIER_FLUSH);
-	if (reiserfs_barrier_flush(s))
+	if (reiserfs_barrier_flush(s)) {
 		printk("reiserfs: using flush barriers\n");
+	}
 	// set_device_ro(s->s_dev, 1) ;
 	if (journal_init(s, jdev_name, old_format, commit_max_age)) {
 		SWARN(silent, s, "sh-2022",
@@ -1909,62 +1908,14 @@ static int reiserfs_statfs(struct dentry *dentry, struct kstatfs *buf)
 	buf->f_bsize = dentry->d_sb->s_blocksize;
 	/* changed to accommodate gcc folks. */
 	buf->f_type = REISERFS_SUPER_MAGIC;
+	buf->f_fsid.val[0] = (u32)crc32_le(0, rs->s_uuid, sizeof(rs->s_uuid)/2);
+	buf->f_fsid.val[1] = (u32)crc32_le(0, rs->s_uuid + sizeof(rs->s_uuid)/2,
+				sizeof(rs->s_uuid)/2);
+
 	return 0;
 }
 
 #ifdef CONFIG_QUOTA
-static int reiserfs_dquot_initialize(struct inode *inode, int type)
-{
-	struct reiserfs_transaction_handle th;
-	int ret, err;
-
-	/* We may create quota structure so we need to reserve enough blocks */
-	reiserfs_write_lock(inode->i_sb);
-	ret =
-	    journal_begin(&th, inode->i_sb,
-			  2 * REISERFS_QUOTA_INIT_BLOCKS(inode->i_sb));
-	if (ret)
-		goto out;
-	ret = dquot_initialize(inode, type);
-	err =
-	    journal_end(&th, inode->i_sb,
-			2 * REISERFS_QUOTA_INIT_BLOCKS(inode->i_sb));
-	if (!ret && err)
-		ret = err;
-      out:
-	reiserfs_write_unlock(inode->i_sb);
-	return ret;
-}
-
-static int reiserfs_dquot_drop(struct inode *inode)
-{
-	struct reiserfs_transaction_handle th;
-	int ret, err;
-
-	/* We may delete quota structure so we need to reserve enough blocks */
-	reiserfs_write_lock(inode->i_sb);
-	ret =
-	    journal_begin(&th, inode->i_sb,
-			  2 * REISERFS_QUOTA_DEL_BLOCKS(inode->i_sb));
-	if (ret) {
-		/*
-		 * We call dquot_drop() anyway to at least release references
-		 * to quota structures so that umount does not hang.
-		 */
-		dquot_drop(inode);
-		goto out;
-	}
-	ret = dquot_drop(inode);
-	err =
-	    journal_end(&th, inode->i_sb,
-			2 * REISERFS_QUOTA_DEL_BLOCKS(inode->i_sb));
-	if (!ret && err)
-		ret = err;
-      out:
-	reiserfs_write_unlock(inode->i_sb);
-	return ret;
-}
-
 static int reiserfs_write_dquot(struct dquot *dquot)
 {
 	struct reiserfs_transaction_handle th;

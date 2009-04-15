@@ -278,10 +278,7 @@ struct zone_reclaim_stat {
 
 struct zone {
 	/* Fields commonly accessed by the page allocator */
-	unsigned long		pages_high;	/* we stop kswapd */
-	unsigned long		pages_low;	/* we wake up kswapd */
-	unsigned long		pages_min;	/* we enter direct reclaim */
-	unsigned long		pages_emerg;	/* emergency pool */
+	unsigned long		pages_min, pages_low, pages_high;
 	/*
 	 * We don't know if the memory that we're going to allocate will be freeable
 	 * or/and it will be released eventually, so to avoid totally wasting several
@@ -761,18 +758,11 @@ int sysctl_min_unmapped_ratio_sysctl_handler(struct ctl_table *, int,
 			struct file *, void __user *, size_t *, loff_t *);
 int sysctl_min_slab_ratio_sysctl_handler(struct ctl_table *, int,
 			struct file *, void __user *, size_t *, loff_t *);
-int adjust_memalloc_reserve(int pages);
 
 extern int numa_zonelist_order_handler(struct ctl_table *, int,
 			struct file *, void __user *, size_t *, loff_t *);
 extern char numa_zonelist_order[];
 #define NUMA_ZONELIST_ORDER_LEN 16	/* string buffer size */
-
-#include <linux/topology.h>
-/* Returns the number of the current Node. */
-#ifndef numa_node_id
-#define numa_node_id()		(cpu_to_node(raw_smp_processor_id()))
-#endif
 
 #ifndef CONFIG_NEED_MULTIPLE_NODES
 
@@ -809,6 +799,14 @@ extern struct zone *next_zone(struct zone *zone);
 	for (zone = (first_online_pgdat())->node_zones; \
 	     zone;					\
 	     zone = next_zone(zone))
+
+#define for_each_populated_zone(zone)		        \
+	for (zone = (first_online_pgdat())->node_zones; \
+	     zone;					\
+	     zone = next_zone(zone))			\
+		if (!populated_zone(zone))		\
+			; /* do nothing */		\
+		else
 
 static inline struct zone *zonelist_zone(struct zoneref *zoneref)
 {

@@ -57,6 +57,7 @@
 #include <linux/scatterlist.h>
 #include <linux/io.h>
 #include <linux/async.h>
+#include <linux/log2.h>
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
 #include <scsi/scsi_host.h>
@@ -2389,6 +2390,7 @@ int ata_dev_configure(struct ata_device *dev)
 	dev->cylinders = 0;
 	dev->heads = 0;
 	dev->sectors = 0;
+	dev->multi_count = 0;
 
 	/*
 	 * common ATA, ATAPI feature tests
@@ -2426,8 +2428,15 @@ int ata_dev_configure(struct ata_device *dev)
 
 		dev->n_sectors = ata_id_n_sectors(id);
 
-		if (dev->id[59] & 0x100)
-			dev->multi_count = dev->id[59] & 0xff;
+		/* get current R/W Multiple count setting */
+		if ((dev->id[47] >> 8) == 0x80 && (dev->id[59] & 0x100)) {
+			unsigned int max = dev->id[47] & 0xff;
+			unsigned int cnt = dev->id[59] & 0xff;
+			/* only recognize/allow powers of two here */
+			if (is_power_of_2(max) && is_power_of_2(cnt))
+				if (cnt <= max)
+					dev->multi_count = cnt;
+		}
 
 		if (ata_id_has_lba(id)) {
 			const char *lba_desc;
@@ -6101,13 +6110,11 @@ int ata_host_register(struct ata_host *host, struct scsi_host_template *sht)
 			ata_port_printk(ap, KERN_INFO, "DUMMY\n");
 	}
 
-	/* perform each probe synchronously */
-	DPRINTK("probe begin\n");
+	/* perform each probe asynchronously */
 	for (i = 0; i < host->n_ports; i++) {
 		struct ata_port *ap = host->ports[i];
 		async_schedule(async_port_probe, ap);
 	}
-	DPRINTK("probe end\n");
 
 	return 0;
 }
@@ -6709,6 +6716,7 @@ EXPORT_SYMBOL_GPL(ata_id_c_string);
 EXPORT_SYMBOL_GPL(ata_do_dev_read_id);
 EXPORT_SYMBOL_GPL(ata_scsi_simulate);
 
+EXPORT_SYMBOL_GPL(ata_pio_queue_task);
 EXPORT_SYMBOL_GPL(ata_pio_need_iordy);
 EXPORT_SYMBOL_GPL(ata_timing_find_mode);
 EXPORT_SYMBOL_GPL(ata_timing_compute);

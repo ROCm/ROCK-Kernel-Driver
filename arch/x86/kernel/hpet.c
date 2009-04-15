@@ -37,7 +37,6 @@ unsigned long				hpet_address;
 static unsigned long			hpet_num_timers;
 #endif
 static void __iomem			*hpet_virt_address;
-static int hpet_legacy_use_64_bits;
 
 struct hpet_dev {
 	struct clock_event_device	evt;
@@ -60,33 +59,6 @@ static inline void hpet_writel(unsigned long d, unsigned long a)
 
 #ifdef CONFIG_X86_64
 #include <asm/pgtable.h>
-static inline unsigned long hpet_read_value(unsigned long a)
-{
-	if (hpet_legacy_use_64_bits)
-		return readq(hpet_virt_address + a);
-	else
-		return readl(hpet_virt_address + a);
-}
-
-static void hpet_write_value(unsigned long d, unsigned long a)
-{
-	if (hpet_legacy_use_64_bits)
-		writeq(d, hpet_virt_address + a);
-	else
-		writel(d, hpet_virt_address + a);
-}
-
-#else
-
-static inline unsigned long hpet_read_value(unsigned long a)
-{
-	return readl(hpet_virt_address + a);
-}
-
-static void hpet_write_value(unsigned long d, unsigned long a)
-{
-	writel(d, hpet_virt_address + a);
-}
 #endif
 
 static inline void hpet_set_mapping(void)
@@ -108,6 +80,7 @@ static inline void hpet_clear_mapping(void)
  */
 static int boot_hpet_disable;
 int hpet_force_user;
+static int hpet_verbose;
 
 static int __init hpet_setup(char *str)
 {
@@ -116,6 +89,8 @@ static int __init hpet_setup(char *str)
 			boot_hpet_disable = 1;
 		if (!strncmp("force", str, 5))
 			hpet_force_user = 1;
+		if (!strncmp("verbose", str, 7))
+			hpet_verbose = 1;
 	}
 	return 1;
 }
@@ -127,17 +102,6 @@ static int __init disable_hpet(char *str)
 	return 1;
 }
 __setup("nohpet", disable_hpet);
-
-#ifdef CONFIG_X86_64
-static int hpet64 = 0;
-static int __init hpet64_setup(char *str)
-{
-	hpet64 = 1;
-	return 1;
-}
-__setup("hpet64", hpet64_setup);
-#endif
-
 
 static inline int is_hpet_capable(void)
 {
@@ -157,6 +121,43 @@ int is_hpet_enabled(void)
 	return is_hpet_capable() && hpet_legacy_int_enabled;
 }
 EXPORT_SYMBOL_GPL(is_hpet_enabled);
+
+static void _hpet_print_config(const char *function, int line)
+{
+	u32 i, timers, l, h;
+	printk(KERN_INFO "hpet: %s(%d):\n", function, line);
+	l = hpet_readl(HPET_ID);
+	h = hpet_readl(HPET_PERIOD);
+	timers = ((l & HPET_ID_NUMBER) >> HPET_ID_NUMBER_SHIFT) + 1;
+	printk(KERN_INFO "hpet: ID: 0x%x, PERIOD: 0x%x\n", l, h);
+	l = hpet_readl(HPET_CFG);
+	h = hpet_readl(HPET_STATUS);
+	printk(KERN_INFO "hpet: CFG: 0x%x, STATUS: 0x%x\n", l, h);
+	l = hpet_readl(HPET_COUNTER);
+	h = hpet_readl(HPET_COUNTER+4);
+	printk(KERN_INFO "hpet: COUNTER_l: 0x%x, COUNTER_h: 0x%x\n", l, h);
+
+	for (i = 0; i < timers; i++) {
+		l = hpet_readl(HPET_Tn_CFG(i));
+		h = hpet_readl(HPET_Tn_CFG(i)+4);
+		printk(KERN_INFO "hpet: T%d: CFG_l: 0x%x, CFG_h: 0x%x\n",
+		       i, l, h);
+		l = hpet_readl(HPET_Tn_CMP(i));
+		h = hpet_readl(HPET_Tn_CMP(i)+4);
+		printk(KERN_INFO "hpet: T%d: CMP_l: 0x%x, CMP_h: 0x%x\n",
+		       i, l, h);
+		l = hpet_readl(HPET_Tn_ROUTE(i));
+		h = hpet_readl(HPET_Tn_ROUTE(i)+4);
+		printk(KERN_INFO "hpet: T%d ROUTE_l: 0x%x, ROUTE_h: 0x%x\n",
+		       i, l, h);
+	}
+}
+
+#define hpet_print_config()					\
+do {								\
+	if (hpet_verbose)					\
+		_hpet_print_config(__FUNCTION__, __LINE__);	\
+} while (0)
 
 /*
  * When the hpet driver (/dev/hpet) is enabled, we need to reserve
@@ -211,7 +212,6 @@ static void hpet_reserve_platform_timers(unsigned long id) { }
  * Common hpet info
  */
 static unsigned long hpet_period;
-static int hpet_legacy_use_64_bits; /* configure T0 in 64-bit mode? */
 
 static void hpet_legacy_set_mode(enum clock_event_mode mode,
 			  struct clock_event_device *evt);
@@ -231,16 +231,26 @@ static struct clock_event_device hpet_clockevent = {
 	.rating		= 50,
 };
 
-static void hpet_start_counter(void)
+static void hpet_stop_counter(void)
 {
 	unsigned long cfg = hpet_readl(HPET_CFG);
-
 	cfg &= ~HPET_CFG_ENABLE;
 	hpet_writel(cfg, HPET_CFG);
 	hpet_writel(0, HPET_COUNTER);
 	hpet_writel(0, HPET_COUNTER + 4);
+}
+
+static void hpet_start_counter(void)
+{
+	unsigned long cfg = hpet_readl(HPET_CFG);
 	cfg |= HPET_CFG_ENABLE;
 	hpet_writel(cfg, HPET_CFG);
+}
+
+static void hpet_restart_counter(void)
+{
+	hpet_stop_counter();
+	hpet_start_counter();
 }
 
 static void hpet_resume_device(void)
@@ -248,10 +258,10 @@ static void hpet_resume_device(void)
 	force_hpet_resume();
 }
 
-static void hpet_restart_counter(void)
+static void hpet_resume_counter(void)
 {
 	hpet_resume_device();
-	hpet_start_counter();
+	hpet_restart_counter();
 }
 
 static void hpet_enable_legacy_int(void)
@@ -263,38 +273,10 @@ static void hpet_enable_legacy_int(void)
 	hpet_legacy_int_enabled = 1;
 }
 
-static int timer0_use_64_bits(void)
-{
-#ifndef CONFIG_X86_64
-	/* using the HPET in 64-bit mode without atomic 64-bit
-	 * accesses is too inefficient
-	 */
-	return 0;
-#else
-
-	if (unlikely(hpet64)) {
-		u32 id, t0_cfg;
-		id = hpet_readl(HPET_ID);
-		t0_cfg = hpet_readl(HPET_Tn_CFG(0));
-
-		if ((id & HPET_ID_64BIT) && (t0_cfg & HPET_TN_64BIT_CAP)) {
-			printk(KERN_DEBUG "hpet timer0 configured in 64-bit mode\n");
-			return 1;
-		}
-		else {
-			printk(KERN_DEBUG "hpet timer0 does not support 64-bit mode\n");
-			return 0;
-		}
-	}
-	else return 0;
-#endif
-}
-
 static void hpet_legacy_clockevent_register(void)
 {
 	/* Start HPET legacy interrupts */
 	hpet_enable_legacy_int();
-	hpet_legacy_use_64_bits = timer0_use_64_bits();
 
 	/*
 	 * The mult factor is defined as (include/linux/clockchips.h)
@@ -327,37 +309,29 @@ static int hpet_setup_msi_irq(unsigned int irq);
 static void hpet_set_mode(enum clock_event_mode mode,
 			  struct clock_event_device *evt, int timer)
 {
-	unsigned long cfg, cmp, now;
+	unsigned long cfg;
 	uint64_t delta;
 
 	switch (mode) {
 	case CLOCK_EVT_MODE_PERIODIC:
+		hpet_stop_counter();
 		delta = ((uint64_t)(NSEC_PER_SEC/HZ)) * evt->mult;
 		delta >>= evt->shift;
-		now = hpet_read_value(HPET_COUNTER);
-		cmp = now + (unsigned long) delta;
 		cfg = hpet_readl(HPET_Tn_CFG(timer));
 		/* Make sure we use edge triggered interrupts */
 		cfg &= ~HPET_TN_LEVEL;
 		cfg |= HPET_TN_ENABLE | HPET_TN_PERIODIC |
-		       HPET_TN_SETVAL |
-		       (hpet_legacy_use_64_bits ? 0 : HPET_TN_32BIT);
+		       HPET_TN_SETVAL | HPET_TN_32BIT;
 		hpet_writel(cfg, HPET_Tn_CFG(timer));
-		/*
-		 * The first write after writing TN_SETVAL to the
-		 * config register sets the counter value, the second
-		 * write sets the period.
-		 */
-		hpet_write_value(cmp, HPET_Tn_CMP(timer));
-		udelay(1);
-		hpet_write_value((unsigned long) delta, HPET_Tn_CMP(timer));
+		hpet_writel((unsigned long) delta, HPET_Tn_CMP(timer));
+		hpet_start_counter();
+		hpet_print_config();
 		break;
 
 	case CLOCK_EVT_MODE_ONESHOT:
 		cfg = hpet_readl(HPET_Tn_CFG(timer));
 		cfg &= ~HPET_TN_PERIODIC;
-		cfg |= HPET_TN_ENABLE |
-		       (hpet_legacy_use_64_bits ? 0 : HPET_TN_32BIT);
+		cfg |= HPET_TN_ENABLE | HPET_TN_32BIT;
 		hpet_writel(cfg, HPET_Tn_CFG(timer));
 		break;
 
@@ -378,6 +352,7 @@ static void hpet_set_mode(enum clock_event_mode mode,
 			irq_set_affinity(hdev->irq, cpumask_of(hdev->cpu));
 			enable_irq(hdev->irq);
 		}
+		hpet_print_config();
 		break;
 	}
 }
@@ -385,11 +360,11 @@ static void hpet_set_mode(enum clock_event_mode mode,
 static int hpet_next_event(unsigned long delta,
 			   struct clock_event_device *evt, int timer)
 {
-	unsigned long cnt;
+	u32 cnt;
 
-	cnt = hpet_read_value(HPET_COUNTER);
+	cnt = hpet_readl(HPET_COUNTER);
 	cnt += (u32) delta;
-	hpet_write_value(cnt, HPET_Tn_CMP(timer));
+	hpet_writel(cnt, HPET_Tn_CMP(timer));
 
 	hpet_readl(HPET_Tn_CMP(timer)); /* pre-read for bnc#433746 */
 	/*
@@ -397,9 +372,9 @@ static int hpet_next_event(unsigned long delta,
 	 * what we wrote hit the chip before we compare it to the
 	 * counter.
 	 */
-	WARN_ON_ONCE((u32)hpet_readl(HPET_Tn_CMP(timer)) != (u32)cnt);
+	WARN_ON_ONCE((u32)hpet_readl(HPET_Tn_CMP(timer)) != cnt);
 
-	return (s32)((u32)hpet_readl(HPET_COUNTER) - (u32)cnt) >= 0 ? -ETIME : 0;
+	return (s32)((u32)hpet_readl(HPET_COUNTER) - cnt) >= 0 ? -ETIME : 0;
 }
 
 static void hpet_legacy_set_mode(enum clock_event_mode mode,
@@ -597,6 +572,7 @@ static void hpet_msi_capability_lookup(unsigned int start_timer)
 
 	num_timers = ((id & HPET_ID_NUMBER) >> HPET_ID_NUMBER_SHIFT);
 	num_timers++; /* Value read out starts from 0 */
+	hpet_print_config();
 
 	hpet_devs = kzalloc(sizeof(struct hpet_dev) * num_timers, GFP_KERNEL);
 	if (!hpet_devs)
@@ -766,7 +742,7 @@ static struct clocksource clocksource_hpet = {
 	.mask		= HPET_MASK,
 	.shift		= HPET_SHIFT,
 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
-	.resume		= hpet_restart_counter,
+	.resume		= hpet_resume_counter,
 #ifdef CONFIG_X86_64
 	.vread		= vread_hpet,
 #endif
@@ -778,7 +754,7 @@ static int hpet_clocksource_register(void)
 	cycle_t t1;
 
 	/* Start the counter */
-	hpet_start_counter();
+	hpet_restart_counter();
 
 	/* Verify whether hpet counter works */
 	t1 = read_hpet();
@@ -864,6 +840,7 @@ int __init hpet_enable(void)
 	 * information and the number of channels
 	 */
 	id = hpet_readl(HPET_ID);
+	hpet_print_config();
 
 #ifdef CONFIG_HPET_EMULATE_RTC
 	/*
@@ -916,6 +893,7 @@ static __init int hpet_late_init(void)
 		return -ENODEV;
 
 	hpet_reserve_platform_timers(hpet_readl(HPET_ID));
+	hpet_print_config();
 
 	for_each_online_cpu(cpu) {
 		hpet_cpuhp_notify(NULL, CPU_ONLINE, (void *)(long)cpu);

@@ -134,7 +134,7 @@ static inline void emac_report_timeout_error(struct emac_instance *dev,
 				  EMAC_FTR_440EP_PHY_CLK_FIX))
 		DBG(dev, "%s" NL, error);
 	else if (net_ratelimit())
-		printk(KERN_ERR "%s: %s\n", dev->ndev->name, error);
+		printk(KERN_ERR "%s: %s\n", dev->ofdev->node->full_name, error);
 }
 
 /* EMAC PHY clock workaround:
@@ -1229,7 +1229,7 @@ static int emac_link_differs(struct emac_instance *dev)
 static void emac_link_timer(struct work_struct *work)
 {
 	struct emac_instance *dev =
-		container_of((struct delayed_work *)work,
+		container_of(to_delayed_work(work),
 			     struct emac_instance, link_work);
 	int link_poll_interval;
 

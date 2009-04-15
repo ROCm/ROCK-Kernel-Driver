@@ -2310,9 +2310,12 @@ static void fbcon_generic_blank(struct vc_data *vc, struct fb_info *info,
 	}
 
 
+	if (!lock_fb_info(info))
+		return;
 	event.info = info;
 	event.data = &blank;
 	fb_notifier_call_chain(FB_EVENT_CONBLANK, &event);
+	unlock_fb_info(info);
 }
 
 static int fbcon_blank(struct vc_data *vc, int blank, int mode_switch)
@@ -3007,8 +3010,9 @@ static int fbcon_fb_unbind(int idx)
 
 static int fbcon_fb_unregistered(struct fb_info *info)
 {
-	int i, idx = info->node;
+	int i, idx;
 
+	idx = info->node;
 	for (i = first_fb_vc; i <= last_fb_vc; i++) {
 		if (con2fb_map[i] == idx)
 			con2fb_map[i] = -1;
@@ -3032,12 +3036,11 @@ static int fbcon_fb_unregistered(struct fb_info *info)
 		}
 	}
 
-	if (!num_registered_fb)
-		unregister_con_driver(&fb_con);
-
-
 	if (primary_device == idx)
 		primary_device = -1;
+
+	if (!num_registered_fb)
+		unregister_con_driver(&fb_con);
 
 	return 0;
 }
@@ -3074,8 +3077,9 @@ static inline void fbcon_select_primary(struct fb_info *info)
 
 static int fbcon_fb_registered(struct fb_info *info)
 {
-	int ret = 0, i, idx = info->node;
+	int ret = 0, i, idx;
 
+	idx = info->node;
 	fbcon_select_primary(info);
 
 	if (info_idx == -1) {
@@ -3177,7 +3181,7 @@ static void fbcon_get_requirement(struct fb_info *info,
 	}
 }
 
-static int fbcon_event_notify(struct notifier_block *self, 
+static int fbcon_event_notify(struct notifier_block *self,
 			      unsigned long action, void *data)
 {
 	struct fb_event *event = data;
@@ -3185,7 +3189,7 @@ static int fbcon_event_notify(struct notifier_block *self,
 	struct fb_videomode *mode;
 	struct fb_con2fbmap *con2fb;
 	struct fb_blit_caps *caps;
-	int ret = 0;
+	int idx, ret = 0;
 
 	/*
 	 * ignore all events except driver registration and deregistration
@@ -3213,7 +3217,8 @@ static int fbcon_event_notify(struct notifier_block *self,
 		ret = fbcon_mode_deleted(info, mode);
 		break;
 	case FB_EVENT_FB_UNBIND:
-		ret = fbcon_fb_unbind(info->node);
+		idx = info->node;
+		ret = fbcon_fb_unbind(idx);
 		break;
 	case FB_EVENT_FB_REGISTERED:
 		ret = fbcon_fb_registered(info);
@@ -3241,7 +3246,6 @@ static int fbcon_event_notify(struct notifier_block *self,
 		fbcon_get_requirement(info, caps);
 		break;
 	}
-
 done:
 	return ret;
 }

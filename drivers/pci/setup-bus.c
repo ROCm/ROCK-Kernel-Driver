@@ -26,9 +26,8 @@
 #include <linux/cache.h>
 #include <linux/slab.h>
 
-#include "pci.h"
 
-static void pbus_assign_resources_sorted(struct pci_bus *bus)
+static void pbus_assign_resources_sorted(const struct pci_bus *bus)
 {
 	struct pci_dev *dev;
 	struct resource *res;
@@ -144,6 +143,9 @@ static void pci_setup_bridge(struct pci_bus *bus)
 	struct pci_dev *bridge = bus->self;
 	struct pci_bus_region region;
 	u32 l, bu, lu, io_upper16;
+
+	if (pci_is_enabled(bridge))
+		return;
 
 	dev_info(&bridge->dev, "PCI bridge, secondary bus %04x:%02x\n",
 		 pci_domain_nr(bus), bus->number);
@@ -344,8 +346,7 @@ static int pbus_size_mem(struct pci_bus *bus, unsigned long mask, unsigned long 
 
 	list_for_each_entry(dev, &bus->devices, bus_list) {
 		int i;
-		int reassign = pci_is_reassigndev(dev);
-
+		
 		for (i = 0; i < PCI_NUM_RESOURCES; i++) {
 			struct resource *r = &dev->resource[i];
 			resource_size_t r_size;
@@ -353,10 +354,6 @@ static int pbus_size_mem(struct pci_bus *bus, unsigned long mask, unsigned long 
 			if (r->parent || (r->flags & mask) != type)
 				continue;
 			r_size = resource_size(r);
-
-			if ((i < PCI_BRIDGE_RESOURCES) && reassign)
-				r_size = ALIGN(r_size, PAGE_SIZE);
-
 			/* For bridges size != alignment */
 			align = resource_alignment(r);
 			order = __ffs(align) - 20;
@@ -501,7 +498,7 @@ void __ref pci_bus_size_bridges(struct pci_bus *bus)
 }
 EXPORT_SYMBOL(pci_bus_size_bridges);
 
-void __ref pci_bus_assign_resources(struct pci_bus *bus)
+void __ref pci_bus_assign_resources(const struct pci_bus *bus)
 {
 	struct pci_bus *b;
 	struct pci_dev *dev;

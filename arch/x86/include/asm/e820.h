@@ -72,7 +72,7 @@ extern int e820_all_mapped(u64 start, u64 end, unsigned type);
 extern void e820_add_region(u64 start, u64 size, int type);
 extern void e820_print_map(char *who);
 extern int
-sanitize_e820_map(struct e820entry *biosmap, int max_nr_map, int *pnr_map);
+sanitize_e820_map(struct e820entry *biosmap, int max_nr_map, u32 *pnr_map);
 extern u64 e820_update_range(u64 start, u64 size, unsigned old_type,
 			       unsigned new_type);
 extern u64 e820_remove_range(u64 start, u64 size, unsigned old_type,
@@ -131,11 +131,7 @@ extern char *memory_setup(void);
 #endif /* __KERNEL__ */
 #endif /* __ASSEMBLY__ */
 
-#ifndef CONFIG_XEN
 #define ISA_START_ADDRESS	0xa0000
-#else
-#define ISA_START_ADDRESS	0
-#endif
 #define ISA_END_ADDRESS		0x100000
 #define is_ISA_range(s, e) ((s) >= ISA_START_ADDRESS && (e) < ISA_END_ADDRESS)
 

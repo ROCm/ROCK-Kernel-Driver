@@ -39,7 +39,6 @@
 #include <linux/efi.h>
 #include <linux/percpu.h>
 #include <linux/bitops.h>
-#include <linux/perfmon_kern.h>
 
 #include <asm/atomic.h>
 #include <asm/cache.h>
@@ -376,6 +375,10 @@ smp_callin (void)
 	extern void ia64_init_itm(void);
 	extern volatile int time_keeper_id;
 
+#ifdef CONFIG_PERFMON
+	extern void pfm_init_percpu(void);
+#endif
+
 	cpuid = smp_processor_id();
 	phys_id = hard_smp_processor_id();
 	itc_master = time_keeper_id;
@@ -401,6 +404,10 @@ smp_callin (void)
 	smp_setup_percpu_timer();
 
 	ia64_mca_cmc_vector_setup();	/* Setup vector on AP */
+
+#ifdef CONFIG_PERFMON
+	pfm_init_percpu();
+#endif
 
 	local_irq_enable();
 
@@ -574,14 +581,14 @@ smp_build_cpu_map (void)
 
 	ia64_cpu_to_sapicid[0] = boot_cpu_id;
 	cpus_clear(cpu_present_map);
-	cpu_set(0, cpu_present_map);
-	cpu_set(0, cpu_possible_map);
+	set_cpu_present(0, true);
+	set_cpu_possible(0, true);
 	for (cpu = 1, i = 0; i < smp_boot_data.cpu_count; i++) {
 		sapicid = smp_boot_data.cpu_phys_id[i];
 		if (sapicid == boot_cpu_id)
 			continue;
-		cpu_set(cpu, cpu_present_map);
-		cpu_set(cpu, cpu_possible_map);
+		set_cpu_present(cpu, true);
+		set_cpu_possible(cpu, true);
 		ia64_cpu_to_sapicid[cpu] = sapicid;
 		cpu++;
 	}
@@ -619,12 +626,9 @@ smp_prepare_cpus (unsigned int max_cpus)
 	 */
 	if (!max_cpus) {
 		printk(KERN_INFO "SMP mode deactivated.\n");
-		cpus_clear(cpu_online_map);
-		cpus_clear(cpu_present_map);
-		cpus_clear(cpu_possible_map);
-		cpu_set(0, cpu_online_map);
-		cpu_set(0, cpu_present_map);
-		cpu_set(0, cpu_possible_map);
+		init_cpu_online(cpumask_of(0));
+		init_cpu_present(cpumask_of(0));
+		init_cpu_possible(cpumask_of(0));
 		return;
 	}
 }
@@ -740,7 +744,6 @@ int __cpu_disable(void)
 	fixup_irqs();
 	local_flush_tlb_all();
 	cpu_clear(cpu, cpu_callin_map);
-	pfm_cpu_disable();
 	return 0;
 }
 

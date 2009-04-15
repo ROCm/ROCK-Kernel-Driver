@@ -35,11 +35,6 @@
 #define RING_BUFFER_INIT_FLAG 1
 #define RING_BUFFER_CLEANUP_FLAG 2
 
-static int dri_library_name(struct drm_device *dev, char *buf)
-{
-	return snprintf(buf, PAGE_SIZE, "via_chrome9");
-}
-
 int via_chrome9_drm_authmagic(struct drm_device *dev, void *data,
 	struct drm_file *file_priv)
 {
@@ -167,7 +162,6 @@ static struct drm_driver driver = {
 	.load = via_chrome9_driver_load,
 	.unload = via_chrome9_driver_unload,
 	.device_is_agp = via_chrome9_is_agp,
-	.dri_library_name = dri_library_name,
 	.reclaim_buffers = drm_core_reclaim_buffers,
 	.reclaim_buffers_locked = NULL,
 	.reclaim_buffers_idlelocked = via_chrome9_reclaim_buffers_locked,

@@ -253,7 +253,7 @@ struct bb_name_state {
 		.skip_mem.bits[0] = iskip_mem, \
 		.skip_regs.bits[0] = iskip_regs, \
 		.osp_offset = iosp_offset, \
-       		.address = 0 \
+		.address = 0 \
 	}
 
 /* Shorter forms for the common cases */
@@ -576,6 +576,7 @@ static struct bb_name_state bb_special_cases[] = {
 	NS("general_protection", error_code, all_regs, 0, 0, 0),
 	NS("error_entry", error_code_rax, all_regs, 0, BB_SKIP(RAX), -0x10),
 	NS("common_interrupt", error_code, all_regs, 0, 0, -0x8),
+	NS("save_args", error_code, all_regs, 0, 0, -0x50),
 };
 
 static const char *bb_spurious[] = {
@@ -660,7 +661,7 @@ static const char *bb_spurious[] = {
 				/* relocate_kernel */
 	"relocate_new_kernel",
 #endif	/* CONFIG_KEXEC */
-#ifdef	CONFIG_PARAVIRT_XEN
+#ifdef	CONFIG_XEN
 				/* arch/i386/xen/xen-asm.S */
 	"xen_irq_enable_direct_end",
 	"xen_irq_disable_direct_end",
@@ -1352,7 +1353,8 @@ static struct bb_actual bb_actual[KDB_INT_REGISTERS];
 static bfd_vma bb_func_start, bb_func_end;
 static bfd_vma bb_common_interrupt, bb_error_entry, bb_ret_from_intr,
 	       bb_thread_return, bb_sync_regs, bb_save_v86_state,
-	       bb__sched_text_start, bb__sched_text_end;
+	       bb__sched_text_start, bb__sched_text_end,
+	       bb_save_args;
 
 /* Record jmp instructions, both conditional and unconditional.  These form the
  * arcs between the basic blocks.  This is also used to record the state when
@@ -3166,9 +3168,6 @@ bb_usage_mov(const struct bb_operand *src, const struct bb_operand *dst, int l)
 	    bb_is_int_reg(dst->base_rc) &&
 	    full_register_dst) {
 #ifdef	CONFIG_X86_32
-#ifndef TSS_sysenter_sp0
-#define TSS_sysenter_sp0 SYSENTER_stack_sp0
-#endif
 		/* mov from TSS_sysenter_sp0+offset to esp to fix up the
 		 * sysenter stack, it leaves esp well defined.  mov
 		 * TSS_ysenter_sp0+offset(%esp),%esp is followed by up to 5
@@ -3450,20 +3449,42 @@ bb_usage(void)
 		}
 		break;
 	case BBOU_CALL:
-		/* Invalidate the scratch registers.  Functions sync_regs and
-		 * save_v86_state are special, their return value is the new
-		 * stack pointer.
-		 */
 		bb_reg_state_print(bb_reg_state);
-		bb_invalidate_scratch_reg();
 		if (bb_is_static_disp(src)) {
+			/* Function sync_regs and save_v86_state are special.
+			 * Their return value is the new stack pointer
+			 */
 			if (src->disp == bb_sync_regs) {
 				bb_reg_set_reg(BBRG_RAX, BBRG_RSP);
 			} else if (src->disp == bb_save_v86_state) {
 				bb_reg_set_reg(BBRG_RAX, BBRG_RSP);
 				bb_adjust_osp(BBRG_RAX, +KDB_WORD_SIZE);
 			}
+			/* Function save_args is special also.  It saves
+			 * a partial pt_regs onto the stack and switches
+			 * to the interrupt stack.
+			 */
+			else if (src->disp == bb_save_args) {
+				bb_memory_set_reg(BBRG_RSP, BBRG_RDI, 0x48);
+				bb_memory_set_reg(BBRG_RSP, BBRG_RSI, 0x40);
+				bb_memory_set_reg(BBRG_RSP, BBRG_RDX, 0x38);
+				bb_memory_set_reg(BBRG_RSP, BBRG_RCX, 0x30);
+				bb_memory_set_reg(BBRG_RSP, BBRG_RAX, 0x28);
+				bb_memory_set_reg(BBRG_RSP, BBRG_R8,  0x20);
+				bb_memory_set_reg(BBRG_RSP, BBRG_R9,  0x18);
+				bb_memory_set_reg(BBRG_RSP, BBRG_R10, 0x10);
+				bb_memory_set_reg(BBRG_RSP, BBRG_R11, 0x08);
+				bb_memory_set_reg(BBRG_RSP, BBRG_RBP, 0);
+				/* This is actually on the interrupt stack,
+				 * but we fudge it so the unwind works.
+				 */
+				bb_memory_set_reg_value(BBRG_RSP, -0x8, BBRG_RBP, 0);
+				bb_reg_set_reg(BBRG_RBP, BBRG_RSP);
+				bb_adjust_osp(BBRG_RSP, -KDB_WORD_SIZE);
+			}
 		}
+		/* Invalidate the scratch registers */
+		bb_invalidate_scratch_reg();
 		usage = BBOU_NOP;
 		break;
 	case BBOU_CBW:
@@ -3787,7 +3808,8 @@ bb_usage(void)
 		    strcmp(bb_func_name, "relocate_kernel") == 0 ||
 		    strcmp(bb_func_name, "identity_mapped") == 0 ||
 		    strcmp(bb_func_name, "xen_iret_crit_fixup") == 0 ||
-		    strcmp(bb_func_name, "math_abort") == 0)
+		    strcmp(bb_func_name, "math_abort") == 0 ||
+		    strcmp(bb_func_name, "save_args") == 0)
 			break;
 		bb_sanity_check(0);
 		break;
@@ -4455,7 +4477,7 @@ bb_actual_rollback(const struct kdb_activation_record *ar)
 			   __FUNCTION__, bb_actual_value(BBRG_RSP));
 	i = BBRG_RSP;
 	if (!bb_is_osp_defined(i)) {
-	       	for (i = BBRG_RAX; i < BBRG_RAX + KDB_INT_REGISTERS; ++i) {
+		for (i = BBRG_RAX; i < BBRG_RAX + KDB_INT_REGISTERS; ++i) {
 			if (bb_is_osp_defined(i) && bb_actual_valid(i))
 				break;
 		}
@@ -4655,14 +4677,19 @@ kdb_bb(unsigned long exit)
 static int
 kdb_bb1(int argc, const char **argv)
 {
-	int diag;
-	unsigned long addr;
+	int diag, nextarg = 1;
+	kdb_machreg_t addr;
+	unsigned long offset;
+
 	bb_cleanup();	/* in case previous command was interrupted */
 	kdba_id_init(&kdb_di);
 	if (argc != 1)
 		return KDB_ARGCOUNT;
-	if ((diag = kdbgetularg((char *)argv[1], &addr)))
+	diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL);
+	if (diag)
 		return diag;
+	if (!addr)
+		return KDB_BADADDR;
 	kdb_save_flags();
 	kdb_flags |= KDB_DEBUG_FLAG_BB << KDB_DEBUG_FLAG_SHIFT;
 	kdb_bb(addr);
@@ -4716,7 +4743,7 @@ kdb_bb_all(int argc, const char **argv)
 #ifdef	CONFIG_MATH_EMULATION
 		   " CONFIG_MATH_EMULATION"
 #endif
-#ifdef	CONFIG_PARAVIRT_XEN
+#ifdef	CONFIG_XEN
 		   " CONFIG_XEN"
 #endif
 #ifdef	CONFIG_DEBUG_INFO
@@ -4883,7 +4910,7 @@ kdba_get_stack_info_alternate(kdb_machreg_t addr, int cpu,
 		[NMI_STACK - 1] =         { "nmi",           EXCEPTION_STKSZ, EXCEPTION_STKSZ, EXCEPTION_STKSZ - 2*sizeof(void *) },
 		[DEBUG_STACK - 1] =       { "debug",         DEBUG_STKSZ,     EXCEPTION_STKSZ, EXCEPTION_STKSZ - 2*sizeof(void *) },
 		[MCE_STACK - 1] =         { "machine check", EXCEPTION_STKSZ, EXCEPTION_STKSZ, EXCEPTION_STKSZ - 2*sizeof(void *) },
-		[INTERRUPT_STACK - 1] =   { "interrupt",     IRQSTACKSIZE,    IRQSTACKSIZE,    IRQSTACKSIZE    -   sizeof(void *) },
+		[INTERRUPT_STACK - 1] =   { "interrupt",     IRQ_STACK_SIZE,    IRQ_STACK_SIZE,    IRQ_STACK_SIZE    -   sizeof(void *) },
 	};
 	unsigned long total_start = 0, total_size, total_end;
 	int sd, found = 0;
@@ -4902,7 +4929,7 @@ kdba_get_stack_info_alternate(kdb_machreg_t addr, int cpu,
 			int c;
 			for_each_online_cpu(c) {
 				if (sd == INTERRUPT_STACK - 1)
-					total_end = (unsigned long)cpu_pda(c)->irqstackptr;
+					total_end = (unsigned long) per_cpu(irq_stack_ptr, c);
 				else
 					total_end = per_cpu(orig_ist, c).ist[sd];
 				total_start = total_end - total_size;
@@ -4917,7 +4944,7 @@ kdba_get_stack_info_alternate(kdb_machreg_t addr, int cpu,
 		}
 		/* Only check the supplied or found cpu */
 		if (sd == INTERRUPT_STACK - 1)
-			total_end = (unsigned long)cpu_pda(cpu)->irqstackptr;
+			total_end = (unsigned long) per_cpu(irq_stack_ptr, cpu);
 		else
 			total_end = per_cpu(orig_ist, cpu).ist[sd];
 		total_start = total_end - total_size;
@@ -5179,7 +5206,7 @@ static void
 kdba_bt_new_stack(struct kdb_activation_record *ar, kdb_machreg_t *rsp,
 		   int *count, int *suppress)
 {
-	/* Nasty: common_interrupt builds a partial pt_regs, with r15 through
+	/* Nasty: save_args builds a partial pt_regs, with r15 through
 	 * rbx not being filled in.  It passes struct pt_regs* to do_IRQ (in
 	 * rdi) but the stack pointer is not adjusted to account for r15
 	 * through rbx.  This has two effects :-
@@ -5576,6 +5603,7 @@ static int __init kdba_bt_x86_init(void)
 	bb_save_v86_state = kallsyms_lookup_name("save_v86_state");
 	bb__sched_text_start = kallsyms_lookup_name("__sched_text_start");
 	bb__sched_text_end = kallsyms_lookup_name("__sched_text_end");
+	bb_save_args = kallsyms_lookup_name("save_args");
 	for (i = 0, r = bb_special_cases;
 	     i < ARRAY_SIZE(bb_special_cases);
 	     ++i, ++r) {

@@ -14,6 +14,7 @@
 
 #include <linux/kernel.h>
 #include <linux/fs.h>
+#include <linux/fs_struct.h>
 #include <linux/ext3_jbd.h>
 #include <linux/ext3_fs.h>
 #include <linux/nfs4acl_xattr.h>
