@@ -23,7 +23,7 @@
 #include <linux/if.h>
 #include <linux/if_bridge.h>
 #include <linux/slab.h>
-#include <linux/raid/md.h>
+#include <linux/raid/md_u.h>
 #include <linux/kd.h>
 #include <linux/route.h>
 #include <linux/in6.h>
@@ -112,13 +112,6 @@
 
 #ifdef CONFIG_SPARC
 #include <asm/fbio.h>
-#endif
-
-#ifdef CONFIG_XEN
-#include <xen/interface/xen.h>
-#include <xen/public/evtchn.h>
-#include <xen/public/privcmd.h>
-#include <xen/compat_ioctl.h>
 #endif
 
 static int do_ioctl32_pointer(unsigned int fd, unsigned int cmd,
@@ -528,6 +521,11 @@ static int dev_ifsioc(unsigned int fd, unsigned int cmd, unsigned long arg)
 		err |= __get_user(ifr.ifr_map.port, &uifmap32->port);
 		if (err)
 			return -EFAULT;
+		break;
+	case SIOCSHWTSTAMP:
+		if (copy_from_user(&ifr, uifr32, sizeof(*uifr32)))
+			return -EFAULT;
+		ifr.ifr_data = compat_ptr(uifr32->ifr_ifru.ifru_data);
 		break;
 	default:
 		if (copy_from_user(&ifr, uifr32, sizeof(*uifr32)))
@@ -2001,6 +1999,8 @@ COMPATIBLE_IOCTL(TUNSETGROUP)
 COMPATIBLE_IOCTL(TUNGETFEATURES)
 COMPATIBLE_IOCTL(TUNSETOFFLOAD)
 COMPATIBLE_IOCTL(TUNSETTXFILTER)
+COMPATIBLE_IOCTL(TUNGETSNDBUF)
+COMPATIBLE_IOCTL(TUNSETSNDBUF)
 /* Big V */
 COMPATIBLE_IOCTL(VT_SETMODE)
 COMPATIBLE_IOCTL(VT_GETMODE)
@@ -2574,6 +2574,7 @@ HANDLE_IOCTL(SIOCSIFMAP, dev_ifsioc)
 HANDLE_IOCTL(SIOCGIFADDR, dev_ifsioc)
 HANDLE_IOCTL(SIOCSIFADDR, dev_ifsioc)
 HANDLE_IOCTL(SIOCSIFHWBROADCAST, dev_ifsioc)
+HANDLE_IOCTL(SIOCSHWTSTAMP, dev_ifsioc)
 
 /* ioctls used by appletalk ddp.c */
 HANDLE_IOCTL(SIOCATALKDIFADDR, dev_ifsioc)
@@ -2745,18 +2746,6 @@ IGNORE_IOCTL(FBIOPUTCMAP32)
 IGNORE_IOCTL(FBIOGETCMAP32)
 IGNORE_IOCTL(FBIOSCURSOR32)
 IGNORE_IOCTL(FBIOGCURSOR32)
-#endif
-
-#ifdef CONFIG_XEN
-HANDLE_IOCTL(IOCTL_PRIVCMD_MMAP_32, privcmd_ioctl_32)
-HANDLE_IOCTL(IOCTL_PRIVCMD_MMAPBATCH_32, privcmd_ioctl_32)
-COMPATIBLE_IOCTL(IOCTL_PRIVCMD_HYPERCALL)
-COMPATIBLE_IOCTL(IOCTL_EVTCHN_BIND_VIRQ)
-COMPATIBLE_IOCTL(IOCTL_EVTCHN_BIND_INTERDOMAIN)
-COMPATIBLE_IOCTL(IOCTL_EVTCHN_BIND_UNBOUND_PORT)
-COMPATIBLE_IOCTL(IOCTL_EVTCHN_UNBIND)
-COMPATIBLE_IOCTL(IOCTL_EVTCHN_NOTIFY)
-COMPATIBLE_IOCTL(IOCTL_EVTCHN_RESET)
 #endif
 };
 

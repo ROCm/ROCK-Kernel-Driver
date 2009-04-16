@@ -52,6 +52,7 @@
 #include <asm/atomic.h>
 #include <linux/device.h>
 #include <linux/io.h>
+#include <linux/irqreturn.h>
 
 /* Include the ID list */
 #include <linux/pci_ids.h>
@@ -92,6 +93,12 @@ enum {
 
 	/* #6: expansion ROM resource */
 	PCI_ROM_RESOURCE,
+
+	/* device specific resources */
+#ifdef CONFIG_PCI_IOV
+	PCI_IOV_RESOURCES,
+	PCI_IOV_RESOURCE_END = PCI_IOV_RESOURCES + PCI_SRIOV_NUM_BARS - 1,
+#endif
 
 	/* resources assigned to buses behind the bridge */
 #define PCI_BRIDGE_RESOURCE_NUM 4
@@ -180,6 +187,7 @@ struct pci_cap_saved_state {
 
 struct pcie_link_state;
 struct pci_vpd;
+struct pci_sriov;
 
 /*
  * The pci_dev structure is used to describe PCI devices.
@@ -257,6 +265,8 @@ struct pci_dev {
 	unsigned int	is_managed:1;
 	unsigned int	is_pcie:1;
 	unsigned int	state_saved:1;
+	unsigned int	is_physfn:1;
+	unsigned int	is_virtfn:1;
 	pci_dev_flags_t dev_flags;
 	atomic_t	enable_cnt;	/* pci_enable_device has been called */
 
@@ -266,10 +276,16 @@ struct pci_dev {
 	int rom_attr_enabled;		/* has display of the rom attribute been enabled? */
 	struct bin_attribute *res_attr[DEVICE_COUNT_RESOURCE]; /* sysfs file for resources */
 	struct bin_attribute *res_attr_wc[DEVICE_COUNT_RESOURCE]; /* sysfs file for WC mapping of resources */
-#if defined(CONFIG_PCI_MSI) && !defined(CONFIG_XEN)
+#ifdef CONFIG_PCI_MSI
 	struct list_head msi_list;
 #endif
 	struct pci_vpd *vpd;
+#ifdef CONFIG_PCI_IOV
+	union {
+		struct pci_sriov *sriov;	/* SR-IOV capability related */
+		struct pci_dev *physfn;	/* the PF this VF is associated with */
+	};
+#endif
 };
 
 extern struct pci_dev *alloc_pci_dev(void);
@@ -340,6 +356,15 @@ struct pci_bus {
 
 #define pci_bus_b(n)	list_entry(n, struct pci_bus, node)
 #define to_pci_bus(n)	container_of(n, struct pci_bus, dev)
+
+/*
+ * Returns true if the pci bus is root (behind host-pci bridge),
+ * false otherwise
+ */
+static inline bool pci_is_root_bus(struct pci_bus *pbus)
+{
+	return !(pbus->parent);
+}
 
 #ifdef CONFIG_PCI_MSI
 static inline bool pci_dev_msi_enabled(struct pci_dev *pci_dev)
@@ -528,7 +553,7 @@ void pcibios_update_irq(struct pci_dev *, int irq);
 /* Generic PCI functions used internally */
 
 extern struct pci_bus *pci_find_bus(int domain, int busnr);
-void pci_bus_add_devices(struct pci_bus *bus);
+void pci_bus_add_devices(const struct pci_bus *bus);
 struct pci_bus *pci_scan_bus_parented(struct device *parent, int bus,
 				      struct pci_ops *ops, void *sysdata);
 static inline struct pci_bus * __devinit pci_scan_bus(int bus, struct pci_ops *ops,
@@ -649,6 +674,11 @@ int __must_check pci_reenable_device(struct pci_dev *);
 int __must_check pcim_enable_device(struct pci_dev *pdev);
 void pcim_pin_device(struct pci_dev *pdev);
 
+static inline int pci_is_enabled(struct pci_dev *pdev)
+{
+	return (atomic_read(&pdev->enable_cnt) > 0);
+}
+
 static inline int pci_is_managed(struct pci_dev *pdev)
 {
 	return pdev->is_managed;
@@ -678,9 +708,6 @@ int pci_execute_reset_function(struct pci_dev *dev);
 void pci_update_resource(struct pci_dev *dev, int resno);
 int __must_check pci_assign_resource(struct pci_dev *dev, int i);
 int pci_select_bars(struct pci_dev *dev, unsigned long flags);
-#ifdef CONFIG_XEN
-void pci_restore_bars(struct pci_dev *);
-#endif
 
 /* ROM control related routines */
 int pci_enable_rom(struct pci_dev *pdev);
@@ -692,6 +719,7 @@ size_t pci_get_rom_size(struct pci_dev *pdev, void __iomem *rom, size_t size);
 /* Power management related routines */
 int pci_save_state(struct pci_dev *dev);
 int pci_restore_state(struct pci_dev *dev);
+int __pci_complete_power_transition(struct pci_dev *dev, pci_power_t state);
 int pci_set_power_state(struct pci_dev *dev, pci_power_t state);
 pci_power_t pci_choose_state(struct pci_dev *dev, pm_message_t state);
 bool pci_pme_capable(struct pci_dev *dev, pci_power_t state);
@@ -704,6 +732,9 @@ int pci_back_from_sleep(struct pci_dev *dev);
 
 /* Functions for PCI Hotplug drivers to use */
 int pci_bus_find_capability(struct pci_bus *bus, unsigned int devfn, int cap);
+#ifdef CONFIG_HOTPLUG
+unsigned int pci_rescan_bus(struct pci_bus *bus);
+#endif
 
 /* Vital product data routines */
 ssize_t pci_read_vpd(struct pci_dev *dev, loff_t pos, size_t count, void *buf);
@@ -711,7 +742,7 @@ ssize_t pci_write_vpd(struct pci_dev *dev, loff_t pos, size_t count, const void 
 int pci_vpd_truncate(struct pci_dev *dev, size_t size);
 
 /* Helper functions for low-level code (drivers/pci/setup-[bus,res].c) */
-void pci_bus_assign_resources(struct pci_bus *bus);
+void pci_bus_assign_resources(const struct pci_bus *bus);
 void pci_bus_size_bridges(struct pci_bus *bus);
 int pci_claim_resource(struct pci_dev *, int);
 void pci_assign_unassigned_resources(void);
@@ -792,7 +823,7 @@ struct msix_entry {
 
 
 #ifndef CONFIG_PCI_MSI
-static inline int pci_enable_msi(struct pci_dev *dev)
+static inline int pci_enable_msi_block(struct pci_dev *dev, unsigned int nvec)
 {
 	return -1;
 }
@@ -802,6 +833,10 @@ static inline void pci_msi_shutdown(struct pci_dev *dev)
 static inline void pci_disable_msi(struct pci_dev *dev)
 { }
 
+static inline int pci_msix_table_size(struct pci_dev *dev)
+{
+	return 0;
+}
 static inline int pci_enable_msix(struct pci_dev *dev,
 				  struct msix_entry *entries, int nvec)
 {
@@ -822,15 +857,11 @@ static inline int pci_msi_enabled(void)
 {
 	return 0;
 }
-
-#ifdef CONFIG_XEN
-#define register_msi_get_owner(func) 0
-#define unregister_msi_get_owner(func) 0
-#endif
 #else
-extern int pci_enable_msi(struct pci_dev *dev);
+extern int pci_enable_msi_block(struct pci_dev *dev, unsigned int nvec);
 extern void pci_msi_shutdown(struct pci_dev *dev);
 extern void pci_disable_msi(struct pci_dev *dev);
+extern int pci_msix_table_size(struct pci_dev *dev);
 extern int pci_enable_msix(struct pci_dev *dev,
 	struct msix_entry *entries, int nvec);
 extern void pci_msix_shutdown(struct pci_dev *dev);
@@ -838,10 +869,6 @@ extern void pci_disable_msix(struct pci_dev *dev);
 extern void msi_remove_pci_irq_vectors(struct pci_dev *dev);
 extern void pci_restore_msi_state(struct pci_dev *dev);
 extern int pci_msi_enabled(void);
-#ifdef CONFIG_XEN
-extern int register_msi_get_owner(int (*func)(struct pci_dev *dev));
-extern int unregister_msi_get_owner(int (*func)(struct pci_dev *dev));
-#endif
 #endif
 
 #ifndef CONFIG_PCIEASPM
@@ -852,6 +879,8 @@ static inline int pcie_aspm_enabled(void)
 #else
 extern int pcie_aspm_enabled(void);
 #endif
+
+#define pci_enable_msi(pdev)	pci_enable_msi_block(pdev, 1)
 
 #ifdef CONFIG_HT_IRQ
 /* The functions a driver should call */
@@ -1206,9 +1235,23 @@ int pci_ext_cfg_avail(struct pci_dev *dev);
 
 void __iomem *pci_ioremap_bar(struct pci_dev *pdev, int bar);
 
-#ifdef CONFIG_PCI_GUESTDEV
-int pci_is_guestdev(struct pci_dev *dev);
-#endif /* CONFIG_PCI_GUESTDEV */
+#ifdef CONFIG_PCI_IOV
+extern int pci_enable_sriov(struct pci_dev *dev, int nr_virtfn);
+extern void pci_disable_sriov(struct pci_dev *dev);
+extern irqreturn_t pci_sriov_migration(struct pci_dev *dev);
+#else
+static inline int pci_enable_sriov(struct pci_dev *dev, int nr_virtfn)
+{
+	return -ENODEV;
+}
+static inline void pci_disable_sriov(struct pci_dev *dev)
+{
+}
+static inline irqreturn_t pci_sriov_migration(struct pci_dev *dev)
+{
+	return IRQ_NONE;
+}
+#endif
 
 #endif /* __KERNEL__ */
 #endif /* LINUX_PCI_H */

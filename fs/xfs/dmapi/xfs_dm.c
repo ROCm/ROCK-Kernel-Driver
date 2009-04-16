@@ -414,7 +414,7 @@ xfs_ip_to_stat(
 	buf->dt_gid = dic->di_gid;
 	buf->dt_size = XFS_ISIZE(ip);
 	buf->dt_dev = new_encode_dev(mp->m_ddev_targp->bt_dev);
-	vn_atime_to_time_t(VFS_I(ip), &buf->dt_atime);
+	buf->dt_atime = VFS_I(ip)->i_atime.tv_sec;
 	buf->dt_mtime = dic->di_mtime.t_sec;
 	buf->dt_ctime = dic->di_ctime.t_sec;
 	buf->dt_xfs_xflags = xfs_ip2dmflags(ip);

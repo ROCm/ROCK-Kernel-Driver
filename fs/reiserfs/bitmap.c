@@ -425,7 +425,7 @@ static void _reiserfs_free_block(struct reiserfs_transaction_handle *th,
 
 	journal_mark_dirty(th, s, sbh);
 	if (for_unformatted)
-		DQUOT_FREE_BLOCK_NODIRTY(inode, 1);
+		vfs_dq_free_block_nodirty(inode, 1);
 }
 
 void reiserfs_free_block(struct reiserfs_transaction_handle *th,
@@ -1049,7 +1049,7 @@ static inline int blocknrs_and_prealloc_arrays_from_search_start
 			       amount_needed, hint->inode->i_uid);
 #endif
 		quota_ret =
-		    DQUOT_ALLOC_BLOCK_NODIRTY(hint->inode, amount_needed);
+		    vfs_dq_alloc_block_nodirty(hint->inode, amount_needed);
 		if (quota_ret)	/* Quota exceeded? */
 			return QUOTA_EXCEEDED;
 		if (hint->preallocate && hint->prealloc_size) {
@@ -1058,8 +1058,7 @@ static inline int blocknrs_and_prealloc_arrays_from_search_start
 				       "reiserquota: allocating (prealloc) %d blocks id=%u",
 				       hint->prealloc_size, hint->inode->i_uid);
 #endif
-			quota_ret =
-			    DQUOT_PREALLOC_BLOCK_NODIRTY(hint->inode,
+			quota_ret = vfs_dq_prealloc_block_nodirty(hint->inode,
 							 hint->prealloc_size);
 			if (quota_ret)
 				hint->preallocate = hint->prealloc_size = 0;
@@ -1092,7 +1091,10 @@ static inline int blocknrs_and_prealloc_arrays_from_search_start
 					       nr_allocated,
 					       hint->inode->i_uid);
 #endif
-				DQUOT_FREE_BLOCK_NODIRTY(hint->inode, amount_needed + hint->prealloc_size - nr_allocated);	/* Free not allocated blocks */
+				/* Free not allocated blocks */
+				vfs_dq_free_block_nodirty(hint->inode,
+					amount_needed + hint->prealloc_size -
+					nr_allocated);
 			}
 			while (nr_allocated--)
 				reiserfs_free_block(hint->th, hint->inode,
@@ -1123,7 +1125,7 @@ static inline int blocknrs_and_prealloc_arrays_from_search_start
 			       REISERFS_I(hint->inode)->i_prealloc_count,
 			       hint->inode->i_uid);
 #endif
-		DQUOT_FREE_BLOCK_NODIRTY(hint->inode, amount_needed +
+		vfs_dq_free_block_nodirty(hint->inode, amount_needed +
 					 hint->prealloc_size - nr_allocated -
 					 REISERFS_I(hint->inode)->
 					 i_prealloc_count);

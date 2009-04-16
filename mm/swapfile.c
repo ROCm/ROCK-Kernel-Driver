@@ -38,7 +38,6 @@
 #include <asm/tlbflush.h>
 #include <linux/swapops.h>
 #include <linux/page_cgroup.h>
-#include <trace/swap.h>
 
 static DEFINE_SPINLOCK(swap_lock);
 static unsigned int nr_swapfiles;
@@ -1214,14 +1213,6 @@ static void destroy_swap_extents(struct swap_info_struct *sis)
 		list_del(&se->list);
 		kfree(se);
 	}
-
-	if (sis->flags & SWP_FILE) {
-		struct file *swap_file = sis->swap_file;
-		struct address_space *mapping = swap_file->f_mapping;
-
-		sis->flags &= ~SWP_FILE;
-		mapping->a_ops->swapoff(swap_file);
-	}
 }
 
 /*
@@ -1296,9 +1287,7 @@ add_swap_extent(struct swap_info_struct *sis, unsigned long start_page,
  */
 static int setup_swap_extents(struct swap_info_struct *sis, sector_t *span)
 {
-	struct file *swap_file = sis->swap_file;
-	struct address_space *mapping = swap_file->f_mapping;
-	struct inode *inode = mapping->host;
+	struct inode *inode;
 	unsigned blocks_per_page;
 	unsigned long page_no;
 	unsigned blkbits;
@@ -1309,19 +1298,10 @@ static int setup_swap_extents(struct swap_info_struct *sis, sector_t *span)
 	int nr_extents = 0;
 	int ret;
 
+	inode = sis->swap_file->f_mapping->host;
 	if (S_ISBLK(inode->i_mode)) {
 		ret = add_swap_extent(sis, 0, sis->max, 0);
 		*span = sis->pages;
-		goto done;
-	}
-
-	if (mapping->a_ops->swapon) {
-		ret = mapping->a_ops->swapon(swap_file);
-		if (!ret) {
-			sis->flags |= SWP_FILE;
-			ret = add_swap_extent(sis, 0, sis->max, 0);
-			*span = sis->pages;
-		}
 		goto done;
 	}
 
@@ -1521,7 +1501,6 @@ SYSCALL_DEFINE1(swapoff, const char __user *, specialfile)
 	swap_map = p->swap_map;
 	p->swap_map = NULL;
 	p->flags = 0;
-	trace_swap_file_close(swap_file);
 	spin_unlock(&swap_lock);
 	mutex_unlock(&swapon_mutex);
 	vfree(swap_map);
@@ -1911,7 +1890,6 @@ SYSCALL_DEFINE2(swapon, const char __user *, specialfile, int, swap_flags)
 	} else {
 		swap_info[prev].next = p - swap_info;
 	}
-	trace_swap_file_open(swap_file, name);
 	spin_unlock(&swap_lock);
 	mutex_unlock(&swapon_mutex);
 	error = 0;
@@ -2029,38 +2007,6 @@ get_swap_info_struct(unsigned type)
 	return &swap_info[type];
 }
 
-struct swap_info_struct *page_swap_info(struct page *page)
-{
-	swp_entry_t swap = { .val = page_private(page) };
-	if (!PageSwapCache(page) || !swap.val) {
-		/* This should only happen from sync_page.
-		 * In other cases the page should be locked and
-		 * should be in a SwapCache
-		 */
-		return NULL;
-	}
-	return &swap_info[swp_type(swap)];
-}
-
-/*
- * out-of-line __page_file_ methods to avoid include hell.
- */
-
-struct address_space *__page_file_mapping(struct page *page)
-{
-	VM_BUG_ON(!PageSwapCache(page));
-	return page_swap_info(page)->swap_file->f_mapping;
-}
-EXPORT_SYMBOL_GPL(__page_file_mapping);
-
-pgoff_t __page_file_index(struct page *page)
-{
-	swp_entry_t swap = { .val = page_private(page) };
-	VM_BUG_ON(!PageSwapCache(page));
-	return swp_offset(swap);
-}
-EXPORT_SYMBOL_GPL(__page_file_index);
-
 /*
  * swap_lock prevents swap_map being freed. Don't grab an extra
  * reference on the swaphandle, it doesn't matter if it becomes unused.
@@ -2112,6 +2058,3 @@ int valid_swaphandles(swp_entry_t entry, unsigned long *offset)
 	*offset = ++toff;
 	return nr_pages? ++nr_pages: 0;
 }
-
-DEFINE_TRACE(swap_file_open);
-DEFINE_TRACE(swap_file_close);

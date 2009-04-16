@@ -33,9 +33,6 @@ asmlinkage void alignment_check(void);
 asmlinkage void machine_check(void);
 #endif /* CONFIG_X86_MCE */
 asmlinkage void simd_coprocessor_error(void);
-#ifdef CONFIG_X86_XEN
-asmlinkage void fixup_4gb_segment(void);
-#endif
 
 dotraplinkage void do_divide_error(struct pt_regs *, long);
 dotraplinkage void do_debug(struct pt_regs *, long);
@@ -44,7 +41,7 @@ dotraplinkage void do_int3(struct pt_regs *, long);
 dotraplinkage void do_overflow(struct pt_regs *, long);
 dotraplinkage void do_bounds(struct pt_regs *, long);
 dotraplinkage void do_invalid_op(struct pt_regs *, long);
-dotraplinkage void do_device_not_available(struct pt_regs);
+dotraplinkage void do_device_not_available(struct pt_regs *, long);
 dotraplinkage void do_coprocessor_segment_overrun(struct pt_regs *, long);
 dotraplinkage void do_invalid_TSS(struct pt_regs *, long);
 dotraplinkage void do_segment_not_present(struct pt_regs *, long);
@@ -64,9 +61,6 @@ dotraplinkage void do_machine_check(struct pt_regs *, long);
 dotraplinkage void do_simd_coprocessor_error(struct pt_regs *, long);
 #ifdef CONFIG_X86_32
 dotraplinkage void do_iret_error(struct pt_regs *, long);
-#ifdef CONFIG_XEN
-void do_fixup_4gb_segment(struct pt_regs *, long);
-#endif
 #endif
 
 static inline int get_si_code(unsigned long condition)

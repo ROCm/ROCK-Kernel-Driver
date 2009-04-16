@@ -51,7 +51,7 @@ struct pt_regs {
 	int  xds;
 	int  xes;
 	int  xfs;
-	/* int  gs; */
+	int  xgs;
 	long orig_eax;
 	long eip;
 	int  xcs;
@@ -73,7 +73,7 @@ struct pt_regs {
 	unsigned long ds;
 	unsigned long es;
 	unsigned long fs;
-	/* int  gs; */
+	unsigned long gs;
 	unsigned long orig_ax;
 	unsigned long ip;
 	unsigned long cs;
@@ -246,9 +246,7 @@ extern void user_enable_single_step(struct task_struct *);
 extern void user_disable_single_step(struct task_struct *);
 
 extern void user_enable_block_step(struct task_struct *);
-#if defined(CONFIG_XEN)
-#define arch_has_block_step()	(0)
-#elif defined(CONFIG_X86_DEBUGCTLMSR)
+#ifdef CONFIG_X86_DEBUGCTLMSR
 #define arch_has_block_step()	(1)
 #else
 #define arch_has_block_step()	(boot_cpu_data.x86 >= 6)

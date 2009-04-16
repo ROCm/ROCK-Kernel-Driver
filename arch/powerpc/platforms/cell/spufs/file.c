@@ -568,16 +568,17 @@ spufs_regs_write(struct file *file, const char __user *buffer,
 	struct spu_lscsa *lscsa = ctx->csa.lscsa;
 	int ret;
 
-	size = min_t(ssize_t, sizeof lscsa->gprs - *pos, size);
-	if (size <= 0)
+	if (*pos >= sizeof(lscsa->gprs))
 		return -EFBIG;
+
+	size = min_t(ssize_t, sizeof(lscsa->gprs) - *pos, size);
 	*pos += size;
 
 	ret = spu_acquire_saved(ctx);
 	if (ret)
 		return ret;
 
-	ret = copy_from_user(lscsa->gprs + *pos - size,
+	ret = copy_from_user((char *)lscsa->gprs + *pos - size,
 			     buffer, size) ? -EFAULT : size;
 
 	spu_release_saved(ctx);
@@ -628,9 +629,10 @@ spufs_fpcr_write(struct file *file, const char __user * buffer,
 	struct spu_lscsa *lscsa = ctx->csa.lscsa;
 	int ret;
 
-	size = min_t(ssize_t, sizeof(lscsa->fpcr) - *pos, size);
-	if (size <= 0)
+	if (*pos >= sizeof(lscsa->fpcr))
 		return -EFBIG;
+
+	size = min_t(ssize_t, sizeof(lscsa->fpcr) - *pos, size);
 
 	ret = spu_acquire_saved(ctx);
 	if (ret)
@@ -2670,7 +2672,7 @@ static const struct file_operations spufs_ctx_fops = {
 	.release        = single_release,
 };
 
-struct spufs_tree_descr spufs_dir_contents[] = {
+const struct spufs_tree_descr spufs_dir_contents[] = {
 	{ "capabilities", &spufs_caps_fops, 0444, },
 	{ "mem",  &spufs_mem_fops,  0666, LS_SIZE, },
 	{ "regs", &spufs_regs_fops,  0666, sizeof(struct spu_reg128[128]), },
@@ -2711,7 +2713,7 @@ struct spufs_tree_descr spufs_dir_contents[] = {
 	{},
 };
 
-struct spufs_tree_descr spufs_dir_nosched_contents[] = {
+const struct spufs_tree_descr spufs_dir_nosched_contents[] = {
 	{ "capabilities", &spufs_caps_fops, 0444, },
 	{ "mem",  &spufs_mem_fops,  0666, LS_SIZE, },
 	{ "mbox", &spufs_mbox_fops, 0444, },
@@ -2736,12 +2738,12 @@ struct spufs_tree_descr spufs_dir_nosched_contents[] = {
 	{},
 };
 
-struct spufs_tree_descr spufs_dir_debug_contents[] = {
+const struct spufs_tree_descr spufs_dir_debug_contents[] = {
 	{ ".ctx", &spufs_ctx_fops, 0444, },
 	{},
 };
 
-struct spufs_coredump_reader spufs_coredump_read[] = {
+const struct spufs_coredump_reader spufs_coredump_read[] = {
 	{ "regs", __spufs_regs_read, NULL, sizeof(struct spu_reg128[128])},
 	{ "fpcr", __spufs_fpcr_read, NULL, sizeof(struct spu_reg128) },
 	{ "lslr", NULL, spufs_lslr_get, 19 },

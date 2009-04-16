@@ -38,7 +38,7 @@ $(obj)/%.so: $(obj)/%.so.dbg FORCE
 	$(call if_changed,objcopy)
 
 CFL := $(PROFILING) -mcmodel=small -fPIC -O2 -fasynchronous-unwind-tables -m64 \
-       $(filter -g%,$(KBUILD_CFLAGS))
+       $(filter -g%,$(KBUILD_CFLAGS)) $(call cc-option, -fno-stack-protector)
 
 $(vobjs): KBUILD_CFLAGS += $(CFL)
 
@@ -65,7 +65,6 @@ obj-$(VDSO32-y)			+= vdso32-syms.lds
 vdso32.so-$(VDSO32-y)		+= int80
 vdso32.so-$(CONFIG_COMPAT)	+= syscall
 vdso32.so-$(VDSO32-y)		+= sysenter
-vdso32.so-$(CONFIG_X86_XEN)	+= syscall
 
 vdso32-images			= $(vdso32.so-y:%=vdso32-%.so)
 

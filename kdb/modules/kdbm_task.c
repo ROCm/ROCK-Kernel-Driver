@@ -45,7 +45,6 @@ kdbm_task(int argc, const char **argv)
 	int nextarg;
 	int e = 0;
 	struct task_struct *tp = NULL, *tp1;
-	const struct cred *cred;
 
 	if (argc != 1)
 		return KDB_ARGCOUNT;
@@ -102,14 +101,6 @@ kdbm_task(int argc, const char **argv)
 	kdb_printf(
 	    "  fs=0x%p files=0x%p mm=0x%p\n",
 	    tp->fs, tp->files, tp->mm);
-
-	cred = get_cred((struct cred *) __task_cred(tp));
-	kdb_printf(
-	    "  uid=%d euid=%d suid=%d fsuid=%d gid=%d egid=%d sgid=%d fsgid=%d\n",
-	    cred->uid, cred->euid, cred->suid, cred->fsuid, cred->gid, cred->egid, cred->sgid, cred->fsgid);
-
-	kdb_printf( "  user=0x%p\n", cred->user);
-	put_cred(cred);
 
 	if (tp->sysvsem.undo_list)
 		kdb_printf(

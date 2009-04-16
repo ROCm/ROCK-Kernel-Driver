@@ -692,20 +692,16 @@ dmapi_init_procfs(int dmapi_minor)
 
 	if ((entry = proc_mkdir( DMAPI_DBG_PROCFS, NULL)) == NULL )
 		return;
-	entry->owner = THIS_MODULE;
 	entry->mode = S_IFDIR | S_IRUSR | S_IXUSR;
 
 	if ((entry = proc_mkdir( DMAPI_DBG_PROCFS "/fsreg", NULL)) == NULL )
 		return;
-	entry->owner = THIS_MODULE;
 
 	if ((entry = proc_mkdir( DMAPI_DBG_PROCFS "/sessions", NULL)) == NULL )
 		return;
-	entry->owner = THIS_MODULE;
 
 	entry = create_proc_read_entry( DMAPI_DBG_PROCFS "/summary",
 			0, NULL, dmapi_summary, NULL);
-	entry->owner = THIS_MODULE;
 #endif
 }
 

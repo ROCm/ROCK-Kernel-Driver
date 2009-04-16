@@ -43,12 +43,12 @@
 #include <asm/irq.h>
 
 #include "8250.h"
-
 #ifdef CONFIG_SPARC
 #include "suncore.h"
 #endif
-#ifdef	CONFIG_KDB
+
 #include <linux/kdb.h>
+#ifdef	CONFIG_KDB
 /*
  * kdb_serial_line records the serial line number of the first serial console.
  * NOTE: The kernel ignores characters on the serial line unless a user space
@@ -59,8 +59,6 @@
 
 static int  kdb_serial_line = -1;
 static const char *kdb_serial_ptr = kdb_serial_str;
-#else
-#define KDB_8250() 0
 #endif	/* CONFIG_KDB */
 
 /*

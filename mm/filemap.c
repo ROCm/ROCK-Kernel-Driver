@@ -35,7 +35,6 @@
 #include <linux/memcontrol.h>
 #include <linux/mm_inline.h> /* for page_is_file_cache() */
 #include "internal.h"
-#include <trace/filemap.h>
 
 /*
  * FIXME: remove all knowledge of the buffer layer from the core VM
@@ -557,13 +556,29 @@ void wait_on_page_bit(struct page *page, int bit_nr)
 {
 	DEFINE_WAIT_BIT(wait, &page->flags, bit_nr);
 
-	trace_wait_on_page_start(page, bit_nr);
 	if (test_bit(bit_nr, &page->flags))
 		__wait_on_bit(page_waitqueue(page), &wait, sync_page,
 							TASK_UNINTERRUPTIBLE);
-	trace_wait_on_page_end(page, bit_nr);
 }
 EXPORT_SYMBOL(wait_on_page_bit);
+
+/**
+ * add_page_wait_queue - Add an arbitrary waiter to a page's wait queue
+ * @page: Page defining the wait queue of interest
+ * @waiter: Waiter to add to the queue
+ *
+ * Add an arbitrary @waiter to the wait queue for the nominated @page.
+ */
+void add_page_wait_queue(struct page *page, wait_queue_t *waiter)
+{
+	wait_queue_head_t *q = page_waitqueue(page);
+	unsigned long flags;
+
+	spin_lock_irqsave(&q->lock, flags);
+	__add_wait_queue(q, waiter);
+	spin_unlock_irqrestore(&q->lock, flags);
+}
+EXPORT_SYMBOL_GPL(add_page_wait_queue);
 
 /*
  * If PageWaiters was found to be set at unlock time, __wake_page_waiters
@@ -628,7 +643,7 @@ EXPORT_SYMBOL(end_page_writeback);
  * chances are that on the second loop, the block layer's plug list is empty,
  * so sync_page() will then return in state TASK_UNINTERRUPTIBLE.
  */
-void  __lock_page(struct page *page)
+void __lock_page(struct page *page)
 {
 	wait_queue_head_t *wq = page_waitqueue(page);
 	DEFINE_WAIT_BIT(wait, &page->flags, PG_locked);
@@ -643,7 +658,7 @@ void  __lock_page(struct page *page)
 }
 EXPORT_SYMBOL(__lock_page);
 
-int  __lock_page_killable(struct page *page)
+int __lock_page_killable(struct page *page)
 {
 	wait_queue_head_t *wq = page_waitqueue(page);
 	DEFINE_WAIT_BIT(wait, &page->flags, PG_locked);
@@ -662,6 +677,7 @@ int  __lock_page_killable(struct page *page)
 
 	return err;
 }
+EXPORT_SYMBOL_GPL(__lock_page_killable);
 
 void  __wait_on_page_locked(struct page *page)
 {
@@ -1885,7 +1901,7 @@ static size_t __iovec_copy_from_user_inatomic(char *vaddr,
 		int copy = min(bytes, iov->iov_len - base);
 
 		base = 0;
-		left = __copy_from_user_inatomic_nocache(vaddr, buf, copy);
+		left = __copy_from_user_inatomic(vaddr, buf, copy);
 		copied += copy;
 		bytes -= copy;
 		vaddr += copy;
@@ -1913,8 +1929,7 @@ size_t iov_iter_copy_from_user_atomic(struct page *page,
 	if (likely(i->nr_segs == 1)) {
 		int left;
 		char __user *buf = i->iov->iov_base + i->iov_offset;
-		left = __copy_from_user_inatomic_nocache(kaddr + offset,
-							buf, bytes);
+		left = __copy_from_user_inatomic(kaddr + offset, buf, bytes);
 		copied = bytes - left;
 	} else {
 		copied = __iovec_copy_from_user_inatomic(kaddr + offset,
@@ -1942,7 +1957,7 @@ size_t iov_iter_copy_from_user(struct page *page,
 	if (likely(i->nr_segs == 1)) {
 		int left;
 		char __user *buf = i->iov->iov_base + i->iov_offset;
-		left = __copy_from_user_nocache(kaddr + offset, buf, bytes);
+		left = __copy_from_user(kaddr + offset, buf, bytes);
 		copied = bytes - left;
 	} else {
 		copied = __iovec_copy_from_user_inatomic(kaddr + offset,
@@ -2539,6 +2554,9 @@ EXPORT_SYMBOL(generic_file_aio_write);
  * (presumably at page->private).  If the release was successful, return `1'.
  * Otherwise return zero.
  *
+ * This may also be called if PG_fscache is set on a page, indicating that the
+ * page is known to the local caching routines.
+ *
  * The @gfp_mask argument specifies whether I/O may be performed to release
  * this page (__GFP_IO), and whether the call may block (__GFP_WAIT & __GFP_FS).
  *
@@ -2557,6 +2575,3 @@ int try_to_release_page(struct page *page, gfp_t gfp_mask)
 }
 
 EXPORT_SYMBOL(try_to_release_page);
-
-DEFINE_TRACE(wait_on_page_start);
-DEFINE_TRACE(wait_on_page_end);

@@ -32,12 +32,11 @@
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
 
+#include <mach/pxa27x.h>
 #include <mach/audio.h>
 #include <mach/palmtx.h>
 #include <mach/mmc.h>
 #include <mach/pxafb.h>
-#include <mach/pxa-regs.h>
-#include <mach/mfp-pxa27x.h>
 #include <mach/irda.h>
 #include <mach/pxa27x_keypad.h>
 #include <mach/udc.h>
@@ -94,10 +93,10 @@ static unsigned long palmtx_pin_config[] __initdata = {
 	GPIO116_GPIO,	/* wifi ready */
 
 	/* MATRIX KEYPAD */
-	GPIO100_KP_MKIN_0,
-	GPIO101_KP_MKIN_1,
-	GPIO102_KP_MKIN_2,
-	GPIO97_KP_MKIN_3,
+	GPIO100_KP_MKIN_0 | WAKEUP_ON_LEVEL_HIGH,
+	GPIO101_KP_MKIN_1 | WAKEUP_ON_LEVEL_HIGH,
+	GPIO102_KP_MKIN_2 | WAKEUP_ON_LEVEL_HIGH,
+	GPIO97_KP_MKIN_3 | WAKEUP_ON_LEVEL_HIGH,
 	GPIO103_KP_MKOUT_0,
 	GPIO104_KP_MKOUT_1,
 	GPIO105_KP_MKOUT_2,
@@ -458,6 +457,33 @@ static struct pxafb_mach_info palmtx_lcd_screen = {
 	.num_modes	= ARRAY_SIZE(palmtx_lcd_modes),
 	.lcd_conn	= LCD_COLOR_TFT_16BPP | LCD_PCLK_EDGE_FALL,
 };
+
+/******************************************************************************
+ * Power management - standby
+ ******************************************************************************/
+#ifdef CONFIG_PM
+static u32 *addr __initdata;
+static u32 resume[3] __initdata = {
+	0xe3a00101,	/* mov	r0,	#0x40000000 */
+	0xe380060f,	/* orr	r0, r0, #0x00f00000 */
+	0xe590f008,	/* ldr	pc, [r0, #0x08] */
+};
+
+static int __init palmtx_pm_init(void)
+{
+	int i;
+
+	/* this is where the bootloader jumps */
+	addr = phys_to_virt(PALMTX_STR_BASE);
+
+	for (i = 0; i < 3; i++)
+		addr[i] = resume[i];
+
+	return 0;
+}
+
+device_initcall(palmtx_pm_init);
+#endif
 
 /******************************************************************************
  * Machine init

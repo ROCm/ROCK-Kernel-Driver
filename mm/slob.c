@@ -65,8 +65,8 @@
 #include <linux/module.h>
 #include <linux/rcupdate.h>
 #include <linux/list.h>
+#include <trace/kmemtrace.h>
 #include <asm/atomic.h>
-#include "internal.h"
 
 /*
  * slob_block has a field 'units', which indicates size of block if +ve,
@@ -127,9 +127,9 @@ static LIST_HEAD(free_slob_medium);
 static LIST_HEAD(free_slob_large);
 
 /*
- * slob_page: True for all slob pages (false for bigblock pages)
+ * is_slob_page: True for all slob pages (false for bigblock pages)
  */
-static inline int slob_page(struct slob_page *sp)
+static inline int is_slob_page(struct slob_page *sp)
 {
 	return PageSlobPage((struct page *)sp);
 }
@@ -142,6 +142,11 @@ static inline void set_slob_page(struct slob_page *sp)
 static inline void clear_slob_page(struct slob_page *sp)
 {
 	__ClearPageSlobPage((struct page *)sp);
+}
+
+static inline struct slob_page *slob_page(const void *addr)
+{
+	return (struct slob_page *)virt_to_page(addr);
 }
 
 /*
@@ -182,11 +187,6 @@ struct slob_rcu {
  * slob_lock protects all slob allocator structures.
  */
 static DEFINE_SPINLOCK(slob_lock);
-
-/*
- * tracks the reserve state for the allocator.
- */
-static int slob_reserve;
 
 /*
  * Encode the given size and next info into a free slob block s.
@@ -236,9 +236,9 @@ static int slob_last(slob_t *s)
 	return !((unsigned long)slob_next(s) & ~PAGE_MASK);
 }
 
-static void *slob_new_page(gfp_t gfp, int order, int node)
+static void *slob_new_pages(gfp_t gfp, int order, int node)
 {
-	struct page *page;
+	void *page;
 
 #ifdef CONFIG_NUMA
 	if (node != -1)
@@ -250,9 +250,12 @@ static void *slob_new_page(gfp_t gfp, int order, int node)
 	if (!page)
 		return NULL;
 
-	slob_reserve = page->reserve;
-
 	return page_address(page);
+}
+
+static void slob_free_pages(void *b, int order)
+{
+	free_pages((unsigned long)b, order);
 }
 
 /*
@@ -260,7 +263,7 @@ static void *slob_new_page(gfp_t gfp, int order, int node)
  */
 static void *slob_page_alloc(struct slob_page *sp, size_t size, int align)
 {
-	slob_t *prev, *cur, *aligned = 0;
+	slob_t *prev, *cur, *aligned = NULL;
 	int delta = 0, units = SLOB_UNITS(size);
 
 	for (prev = NULL, cur = sp->free; ; prev = cur, cur = slob_next(cur)) {
@@ -317,11 +320,6 @@ static void *slob_alloc(size_t size, gfp_t gfp, int align, int node)
 	slob_t *b = NULL;
 	unsigned long flags;
 
-	if (unlikely(slob_reserve)) {
-		if (!(gfp_to_alloc_flags(gfp) & ALLOC_NO_WATERMARKS))
-			goto grow;
-	}
-
 	if (size < SLOB_BREAK1)
 		slob_list = &free_slob_small;
 	else if (size < SLOB_BREAK2)
@@ -360,13 +358,12 @@ static void *slob_alloc(size_t size, gfp_t gfp, int align, int node)
 	}
 	spin_unlock_irqrestore(&slob_lock, flags);
 
-grow:
 	/* Not enough space: must allocate a new page */
 	if (!b) {
-		b = slob_new_page(gfp & ~__GFP_ZERO, 0, node);
+		b = slob_new_pages(gfp & ~__GFP_ZERO, 0, node);
 		if (!b)
-			return 0;
-		sp = (struct slob_page *)virt_to_page(b);
+			return NULL;
+		sp = slob_page(b);
 		set_slob_page(sp);
 
 		spin_lock_irqsave(&slob_lock, flags);
@@ -398,7 +395,7 @@ static void slob_free(void *block, int size)
 		return;
 	BUG_ON(!size);
 
-	sp = (struct slob_page *)virt_to_page(block);
+	sp = slob_page(block);
 	units = SLOB_UNITS(size);
 
 	spin_lock_irqsave(&slob_lock, flags);
@@ -407,10 +404,11 @@ static void slob_free(void *block, int size)
 		/* Go directly to page allocator. Do not pass slob allocator */
 		if (slob_page_free(sp))
 			clear_slob_page_free(sp);
+		spin_unlock_irqrestore(&slob_lock, flags);
 		clear_slob_page(sp);
 		free_slob_page(sp);
 		free_page((unsigned long)b);
-		goto out;
+		return;
 	}
 
 	if (!slob_page_free(sp)) {
@@ -477,27 +475,38 @@ void *__kmalloc_node(size_t size, gfp_t gfp, int node)
 {
 	unsigned int *m;
 	int align = max(ARCH_KMALLOC_MINALIGN, ARCH_SLAB_MINALIGN);
+	void *ret;
+
+	lockdep_trace_alloc(gfp);
 
 	if (size < PAGE_SIZE - align) {
 		if (!size)
 			return ZERO_SIZE_PTR;
 
 		m = slob_alloc(size + align, gfp, align, node);
+
 		if (!m)
 			return NULL;
 		*m = size;
-		return (void *)m + align;
-	} else {
-		void *ret;
+		ret = (void *)m + align;
 
-		ret = slob_new_page(gfp | __GFP_COMP, get_order(size), node);
+		trace_kmalloc_node(_RET_IP_, ret,
+				   size, size + align, gfp, node);
+	} else {
+		unsigned int order = get_order(size);
+
+		ret = slob_new_pages(gfp | __GFP_COMP, get_order(size), node);
 		if (ret) {
 			struct page *page;
 			page = virt_to_page(ret);
 			page->private = size;
 		}
-		return ret;
+
+		trace_kmalloc_node(_RET_IP_, ret,
+				   size, PAGE_SIZE << order, gfp, node);
 	}
+
+	return ret;
 }
 EXPORT_SYMBOL(__kmalloc_node);
 
@@ -505,11 +514,13 @@ void kfree(const void *block)
 {
 	struct slob_page *sp;
 
+	trace_kfree(_RET_IP_, block);
+
 	if (unlikely(ZERO_OR_NULL_PTR(block)))
 		return;
 
-	sp = (struct slob_page *)virt_to_page(block);
-	if (slob_page(sp)) {
+	sp = slob_page(block);
+	if (is_slob_page(sp)) {
 		int align = max(ARCH_KMALLOC_MINALIGN, ARCH_SLAB_MINALIGN);
 		unsigned int *m = (unsigned int *)(block - align);
 		slob_free(m, *m + align);
@@ -527,8 +538,8 @@ size_t ksize(const void *block)
 	if (unlikely(block == ZERO_SIZE_PTR))
 		return 0;
 
-	sp = (struct slob_page *)virt_to_page(block);
-	if (slob_page(sp)) {
+	sp = slob_page(block);
+	if (is_slob_page(sp)) {
 		int align = max(ARCH_KMALLOC_MINALIGN, ARCH_SLAB_MINALIGN);
 		unsigned int *m = (unsigned int *)(block - align);
 		return SLOB_UNITS(*m) * SLOB_UNIT;
@@ -584,10 +595,17 @@ void *kmem_cache_alloc_node(struct kmem_cache *c, gfp_t flags, int node)
 {
 	void *b;
 
-	if (c->size < PAGE_SIZE)
+	if (c->size < PAGE_SIZE) {
 		b = slob_alloc(c->size, flags, c->align, node);
-	else
-		b = slob_new_page(flags, get_order(c->size), node);
+		trace_kmem_cache_alloc_node(_RET_IP_, b, c->size,
+					    SLOB_UNITS(c->size) * SLOB_UNIT,
+					    flags, node);
+	} else {
+		b = slob_new_pages(flags, get_order(c->size), node);
+		trace_kmem_cache_alloc_node(_RET_IP_, b, c->size,
+					    PAGE_SIZE << get_order(c->size),
+					    flags, node);
+	}
 
 	if (c->ctor)
 		c->ctor(b);
@@ -601,7 +619,7 @@ static void __kmem_cache_free(void *b, int size)
 	if (size < PAGE_SIZE)
 		slob_free(b, size);
 	else
-		free_pages((unsigned long)b, get_order(size));
+		slob_free_pages(b, get_order(size));
 }
 
 static void kmem_rcu_free(struct rcu_head *head)
@@ -623,6 +641,8 @@ void kmem_cache_free(struct kmem_cache *c, void *b)
 	} else {
 		__kmem_cache_free(b, c->size);
 	}
+
+	trace_kmem_cache_free(_RET_IP_, b);
 }
 EXPORT_SYMBOL(kmem_cache_free);
 
@@ -660,70 +680,3 @@ void __init kmem_cache_init(void)
 {
 	slob_ready = 1;
 }
-
-static __slob_estimate(unsigned size, unsigned align, unsigned objects)
-{
-	unsigned nr_pages;
-
-	size = SLOB_UNIT * SLOB_UNITS(size + align - 1);
-
-	if (size <= PAGE_SIZE) {
-		nr_pages = DIV_ROUND_UP(objects, PAGE_SIZE / size);
-	} else {
-		nr_pages = objects << get_order(size);
-	}
-
-	return nr_pages;
-}
-
-/*
- * Calculate the upper bound of pages required to sequentially allocate
- * @objects objects from @cachep.
- */
-unsigned kmem_alloc_estimate(struct kmem_cache *c, gfp_t flags, int objects)
-{
-	unsigned size = c->size;
-
-	if (c->flags & SLAB_DESTROY_BY_RCU)
-		size += sizeof(struct slob_rcu);
-
-	return __slob_estimate(size, c->align, objects);
-}
-
-/*
- * Calculate the upper bound of pages required to sequentially allocate
- * @count objects of @size bytes from kmalloc given @flags.
- */
-unsigned kmalloc_estimate_objs(size_t size, gfp_t flags, int count)
-{
-	unsigned align = max(ARCH_KMALLOC_MINALIGN, ARCH_SLAB_MINALIGN);
-
-	return __slob_estimate(size, align, count);
-}
-EXPORT_SYMBOL_GPL(kmalloc_estimate_objs);
-
-/*
- * Calculate the upper bound of pages requires to sequentially allocate @bytes
- * from kmalloc in an unspecified number of allocations of nonuniform size.
- */
-unsigned kmalloc_estimate_bytes(gfp_t flags, size_t bytes)
-{
-	unsigned long pages;
-
-	/*
-	 * Multiply by two, in order to account the worst case slack space
-	 * due to the power-of-two allocation sizes.
-	 *
-	 * While not true for slob, it cannot do worse than that for sequential
-	 * allocations.
-	 */
-	pages = DIV_ROUND_UP(2 * bytes, PAGE_SIZE);
-
-	/*
-	 * Our power of two series starts at PAGE_SIZE, so add one page.
-	 */
-	pages++;
-
-	return pages;
-}
-EXPORT_SYMBOL_GPL(kmalloc_estimate_bytes);

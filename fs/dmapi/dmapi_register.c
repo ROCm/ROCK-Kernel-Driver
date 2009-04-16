@@ -258,7 +258,6 @@ dm_add_fsys_entry(
 
 		sprintf(buf, DMAPI_DBG_PROCFS "/fsreg/0x%p", fsrp);
 		entry = create_proc_read_entry(buf, 0, NULL, fsreg_read_pfs, fsrp);
-		entry->owner = THIS_MODULE;
 		}
 #endif
 		return(0);

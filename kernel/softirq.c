@@ -21,6 +21,7 @@
 #include <linux/freezer.h>
 #include <linux/kthread.h>
 #include <linux/rcupdate.h>
+#include <linux/ftrace.h>
 #include <linux/smp.h>
 #include <linux/tick.h>
 #include <trace/irq.h>
@@ -53,13 +54,18 @@ static struct softirq_action softirq_vec[NR_SOFTIRQS] __cacheline_aligned_in_smp
 
 static DEFINE_PER_CPU(struct task_struct *, ksoftirqd);
 
+char *softirq_to_name[NR_SOFTIRQS] = {
+	"HI", "TIMER", "NET_TX", "NET_RX", "BLOCK",
+	"TASKLET", "SCHED", "HRTIMER",	"RCU"
+};
+
 /*
  * we cannot loop indefinitely here to avoid userspace starvation,
  * but we also don't want to introduce a worst case 1/HZ latency
  * to the pending events, so lets the scheduler to balance
  * the softirq load for us.
  */
-static inline void wakeup_softirqd(void)
+void wakeup_softirqd(void)
 {
 	/* Interrupts are disabled: no need to stop preemption */
 	struct task_struct *tsk = __get_cpu_var(ksoftirqd);
@@ -80,13 +86,23 @@ static void __local_bh_disable(unsigned long ip)
 	WARN_ON_ONCE(in_irq());
 
 	raw_local_irq_save(flags);
-	add_preempt_count(SOFTIRQ_OFFSET);
+	/*
+	 * The preempt tracer hooks into add_preempt_count and will break
+	 * lockdep because it calls back into lockdep after SOFTIRQ_OFFSET
+	 * is set and before current->softirq_enabled is cleared.
+	 * We must manually increment preempt_count here and manually
+	 * call the trace_preempt_off later.
+	 */
+	preempt_count() += SOFTIRQ_OFFSET;
 	/*
 	 * Were softirqs turned off above:
 	 */
 	if (softirq_count() == SOFTIRQ_OFFSET)
 		trace_softirqs_off(ip);
 	raw_local_irq_restore(flags);
+
+	if (preempt_count() == SOFTIRQ_OFFSET)
+		trace_preempt_off(CALLER_ADDR0, get_parent_ip(CALLER_ADDR1));
 }
 #else /* !CONFIG_TRACE_IRQFLAGS */
 static inline void __local_bh_disable(unsigned long ip)
@@ -170,20 +186,21 @@ EXPORT_SYMBOL(local_bh_enable_ip);
  */
 #define MAX_SOFTIRQ_RESTART 10
 
+DEFINE_TRACE(softirq_entry);
+DEFINE_TRACE(softirq_exit);
+
 asmlinkage void __do_softirq(void)
 {
 	struct softirq_action *h;
 	__u32 pending;
 	int max_restart = MAX_SOFTIRQ_RESTART;
 	int cpu;
-	unsigned long pflags = current->flags;
-	current->flags &= ~PF_MEMALLOC;
 
 	pending = local_softirq_pending();
 	account_system_vtime(current);
 
 	__local_bh_disable((unsigned long)__builtin_return_address(0));
-	trace_softirq_enter();
+	lockdep_softirq_enter();
 
 	cpu = smp_processor_id();
 restart:
@@ -198,14 +215,14 @@ restart:
 		if (pending & 1) {
 			int prev_count = preempt_count();
 
-			trace_irq_softirq_entry(h, softirq_vec);
+			trace_softirq_entry(h, softirq_vec);
 			h->action(h);
-			trace_irq_softirq_exit(h, softirq_vec);
-
+			trace_softirq_exit(h, softirq_vec);
 			if (unlikely(prev_count != preempt_count())) {
-				printk(KERN_ERR "huh, entered softirq %td %p"
+				printk(KERN_ERR "huh, entered softirq %td %s %p"
 				       "with preempt_count %08x,"
 				       " exited with %08x?\n", h - softirq_vec,
+				       softirq_to_name[h - softirq_vec],
 				       h->action, prev_count, preempt_count());
 				preempt_count() = prev_count;
 			}
@@ -225,11 +242,10 @@ restart:
 	if (pending)
 		wakeup_softirqd();
 
-	trace_softirq_exit();
+	lockdep_softirq_exit();
 
 	account_system_vtime(current);
 	_local_bh_enable();
-	tsk_restore_flags(current, pflags, PF_MEMALLOC);
 }
 
 #ifndef __ARCH_HAS_DO_SOFTIRQ
@@ -300,7 +316,6 @@ void irq_exit(void)
  */
 inline void raise_softirq_irqoff(unsigned int nr)
 {
-	trace_irq_softirq_raise(nr);
 	__raise_softirq_irqoff(nr);
 
 	/*
@@ -387,9 +402,7 @@ static void tasklet_action(struct softirq_action *a)
 			if (!atomic_read(&t->count)) {
 				if (!test_and_clear_bit(TASKLET_STATE_SCHED, &t->state))
 					BUG();
-				trace_irq_tasklet_low_entry(t);
 				t->func(t->data);
-				trace_irq_tasklet_low_exit(t);
 				tasklet_unlock(t);
 				continue;
 			}
@@ -424,9 +437,7 @@ static void tasklet_hi_action(struct softirq_action *a)
 			if (!atomic_read(&t->count)) {
 				if (!test_and_clear_bit(TASKLET_STATE_SCHED, &t->state))
 					BUG();
-				trace_irq_tasklet_high_entry(t);
 				t->func(t->data);
-				trace_irq_tasklet_high_exit(t);
 				tasklet_unlock(t);
 				continue;
 			}
@@ -507,7 +518,7 @@ static int __try_remote_softirq(struct call_single_data *cp, int cpu, int softir
 		cp->flags = 0;
 		cp->priv = softirq;
 
-		__smp_call_function_single(cpu, cp);
+		__smp_call_function_single(cpu, cp, 0);
 		return 0;
 	}
 	return 1;
@@ -807,6 +818,11 @@ int __init __weak early_irq_init(void)
 	return 0;
 }
 
+int __init __weak arch_probe_nr_irqs(void)
+{
+	return 0;
+}
+
 int __init __weak arch_early_irq_init(void)
 {
 	return 0;
@@ -816,11 +832,3 @@ int __weak arch_init_chip_data(struct irq_desc *desc, int cpu)
 {
 	return 0;
 }
-
-DEFINE_TRACE(irq_softirq_entry);
-DEFINE_TRACE(irq_softirq_exit);
-DEFINE_TRACE(irq_softirq_raise);
-DEFINE_TRACE(irq_tasklet_low_entry);
-DEFINE_TRACE(irq_tasklet_low_exit);
-DEFINE_TRACE(irq_tasklet_high_entry);
-DEFINE_TRACE(irq_tasklet_high_exit);

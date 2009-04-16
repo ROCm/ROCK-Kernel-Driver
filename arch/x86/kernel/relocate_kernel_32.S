@@ -7,7 +7,7 @@
  */
 
 #include <linux/linkage.h>
-#include <asm/page.h>
+#include <asm/page_types.h>
 #include <asm/kexec.h>
 #include <asm/processor-flags.h>
 
@@ -17,7 +17,8 @@
 
 #define PTR(x) (x << 2)
 
-/* control_page + KEXEC_CONTROL_CODE_MAX_SIZE
+/*
+ * control_page + KEXEC_CONTROL_CODE_MAX_SIZE
  * ~ control_page + PAGE_SIZE are used as data storage and stack for
  * jumping back
  */
@@ -76,59 +77,31 @@ relocate_kernel:
 	movl	%eax, CP_PA_SWAP_PAGE(%edi)
 	movl	%ebx, CP_PA_BACKUP_PAGES_MAP(%edi)
 
-	/* get physical address of control page now */
-	/* this is impossible after page table switch */
+	/*
+	 * get physical address of control page now
+	 * this is impossible after page table switch
+	 */
 	movl	PTR(PA_CONTROL_PAGE)(%ebp), %edi
 
 	/* switch to new set of page tables */
 	movl	PTR(PA_PGD)(%ebp), %eax
 	movl	%eax, %cr3
 
-	/* setup idt */
-	movl	%edi, %eax
-	addl	$(idt_48 - relocate_kernel), %eax
-	lidtl	(%eax)
-
-	/* setup gdt */
-	movl	%edi, %eax
-	addl	$(gdt - relocate_kernel), %eax
-	movl	%edi, %esi
-	addl	$((gdt_48 - relocate_kernel) + 2), %esi
-	movl	%eax, (%esi)
-
-	movl	%edi, %eax
-	addl	$(gdt_48 - relocate_kernel), %eax
-	lgdtl	(%eax)
-
-	/* setup data segment registers */
-	mov	$(gdt_ds - gdt), %eax
-	mov	%eax, %ds
-	mov	%eax, %es
-	mov	%eax, %fs
-	mov	%eax, %gs
-	mov	%eax, %ss
-
 	/* setup a new stack at the end of the physical control page */
 	lea	PAGE_SIZE(%edi), %esp
 
-	/* load new code segment and jump to identity mapped page */
-	movl	%edi, %esi
-	xorl	%eax, %eax
-	pushl	%eax
-	pushl	%esi
-	pushl	%eax
-	movl	$(gdt_cs - gdt), %eax
-	pushl	%eax
-	movl	%edi, %eax
-	addl	$(identity_mapped - relocate_kernel),%eax
-	pushl	%eax
-	iretl
+	/* jump to identity mapped page */
+	movl    %edi, %eax
+	addl    $(identity_mapped - relocate_kernel), %eax
+	pushl   %eax
+	ret
 
 identity_mapped:
 	/* store the start address on the stack */
 	pushl   %edx
 
-	/* Set cr0 to a known state:
+	/*
+	 * Set cr0 to a known state:
 	 *  - Paging disabled
 	 *  - Alignment check disabled
 	 *  - Write protect disabled
@@ -144,7 +117,8 @@ identity_mapped:
 	/* clear cr4 if applicable */
 	testl	%ecx, %ecx
 	jz	1f
-	/* Set cr4 to a known state:
+	/*
+	 * Set cr4 to a known state:
 	 * Setting everything to zero seems safe.
 	 */
 	xorl	%eax, %eax
@@ -163,15 +137,18 @@ identity_mapped:
 	call	swap_pages
 	addl	$8, %esp
 
-	/* To be certain of avoiding problems with self-modifying code
+	/*
+	 * To be certain of avoiding problems with self-modifying code
 	 * I need to execute a serializing instruction here.
 	 * So I flush the TLB, it's handy, and not processor dependent.
 	 */
 	xorl	%eax, %eax
 	movl	%eax, %cr3
 
-	/* set all of the registers to known values */
-	/* leave %esp alone */
+	/*
+	 * set all of the registers to known values
+	 * leave %esp alone
+	 */
 
 	testl	%esi, %esi
 	jnz 1f
@@ -293,23 +270,6 @@ swap_pages:
 	popl	%ebx
 	popl	%ebp
 	ret
-
-	.align	16
-gdt:
-	.quad	0x0000000000000000	/* NULL descriptor */
-gdt_cs:
-	.quad	0x00cf9a000000ffff	/* kernel 4GB code at 0x00000000 */
-gdt_ds:
-	.quad	0x00cf92000000ffff	/* kernel 4GB data at 0x00000000 */
-gdt_end:
-
-gdt_48:
-	.word	gdt_end - gdt - 1	/* limit */
-	.long	0			/* base - filled in by code above */
-
-idt_48:
-	.word	0			/* limit */
-	.long	0			/* base */
 
 	.globl kexec_control_code_size
 .set kexec_control_code_size, . - relocate_kernel

@@ -73,20 +73,6 @@ ifndef obj
 $(warning kbuild: Makefile.build is included improperly)
 endif
 
-ifeq ($(CONFIG_XEN),y)
-$(objtree)/scripts/Makefile.xen: $(srctree)/scripts/Makefile.xen.awk $(srctree)/scripts/Makefile.build
-	@echo '  Updating $@'
-	$(if $(shell echo a | $(AWK) '{ print gensub(/a/, "AA", "g"); }'),\
-        ,$(error 'Your awk program does not define gensub.  Use gawk or another awk with gensub'))
-	@$(AWK) -f $< $(filter-out $<,$^) >$@
-
-xen-src-single-used-m	:= $(patsubst $(srctree)/%,%,$(wildcard $(addprefix $(srctree)/,$(single-used-m:.o=-xen.c))))
-xen-single-used-m	:= $(xen-src-single-used-m:-xen.c=.o)
-single-used-m		:= $(filter-out $(xen-single-used-m),$(single-used-m))
-
--include $(objtree)/scripts/Makefile.xen
-endif
-
 # ===========================================================================
 
 ifneq ($(strip $(lib-y) $(lib-m) $(lib-n) $(lib-)),)
@@ -126,13 +112,13 @@ endif
 # ---------------------------------------------------------------------------
 
 # Default is built-in, unless we know otherwise
-modkern_cflags := $(CFLAGS_KERNEL)
+modkern_cflags = $(if $(part-of-module), $(CFLAGS_MODULE), $(CFLAGS_KERNEL))
 quiet_modtag := $(empty)   $(empty)
 
-$(real-objs-m)        : modkern_cflags := $(CFLAGS_MODULE)
-$(real-objs-m:.o=.i)  : modkern_cflags := $(CFLAGS_MODULE)
-$(real-objs-m:.o=.s)  : modkern_cflags := $(CFLAGS_MODULE)
-$(real-objs-m:.o=.lst): modkern_cflags := $(CFLAGS_MODULE)
+$(real-objs-m)        : part-of-module := y
+$(real-objs-m:.o=.i)  : part-of-module := y
+$(real-objs-m:.o=.s)  : part-of-module := y
+$(real-objs-m:.o=.lst): part-of-module := y
 
 $(real-objs-m)        : quiet_modtag := [M]
 $(real-objs-m:.o=.i)  : quiet_modtag := [M]
@@ -220,7 +206,8 @@ endif
 ifdef CONFIG_FTRACE_MCOUNT_RECORD
 cmd_record_mcount = perl $(srctree)/scripts/recordmcount.pl "$(ARCH)" \
 	"$(if $(CONFIG_64BIT),64,32)" \
-	"$(OBJDUMP)" "$(OBJCOPY)" "$(CC)" "$(LD)" "$(NM)" "$(RM)" "$(MV)" "$(@)";
+	"$(OBJDUMP)" "$(OBJCOPY)" "$(CC)" "$(LD)" "$(NM)" "$(RM)" "$(MV)" \
+	"$(if $(part-of-module),1,0)" "$(@)";
 endif
 
 define rule_cc_o_c

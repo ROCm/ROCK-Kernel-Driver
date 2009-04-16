@@ -386,7 +386,7 @@ extern void kdba_check_pc(kdb_machreg_t *);
 	 * Miscellaneous functions and data areas
 	 */
 extern char *kdb_cmds[];
-extern void kdb_syslog_data(char *syslog_data[]);
+extern void debugger_syslog_data(char *syslog_data[]);
 extern unsigned long kdb_task_state_string(const char *);
 extern char kdb_task_state_char (const struct task_struct *);
 extern unsigned long kdb_task_state(const struct task_struct *p, unsigned long mask);
@@ -401,7 +401,7 @@ extern void kdb_si_swapinfo(struct sysinfo *);
 #include <linux/swap.h>
 #define kdb_si_swapinfo(x) si_swapinfo(x)
 #endif
-extern void kdb_meminfo_read_proc(void);
+extern void kdb_meminfo_proc_show(void);
 #ifdef	CONFIG_HUGETLB_PAGE
 extern void kdb_hugetlb_report_meminfo(void);
 #endif	/* CONFIG_HUGETLB_PAGE */

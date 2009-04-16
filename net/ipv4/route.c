@@ -107,7 +107,6 @@
 #ifdef CONFIG_SYSCTL
 #include <linux/sysctl.h>
 #endif
-#include <linux/reserve.h>
 
 #define RT_FL_TOS(oldflp) \
     ((u32)(oldflp->fl4_tos & (IPTOS_RT_MASK | RTO_ONLINK)))
@@ -152,7 +151,7 @@ static void rt_emergency_hash_rebuild(struct net *net);
 
 static struct dst_ops ipv4_dst_ops = {
 	.family =		AF_INET,
-	.protocol =		__constant_htons(ETH_P_IP),
+	.protocol =		cpu_to_be16(ETH_P_IP),
 	.gc =			rt_garbage_collect,
 	.check =		ipv4_dst_check,
 	.destroy =		ipv4_dst_destroy,
@@ -271,8 +270,6 @@ static inline int rt_genid(struct net *net)
 {
 	return atomic_read(&net->ipv4.rt_genid);
 }
-
-static struct mem_reserve ipv4_route_reserve;
 
 #ifdef CONFIG_PROC_FS
 struct rt_cache_iter_state {
@@ -401,61 +398,6 @@ static int rt_cache_seq_show(struct seq_file *seq, void *v)
 		seq_printf(seq, "%*s\n", 127 - len, "");
 	}
 	return 0;
-}
-
-static struct mutex ipv4_route_lock;
-
-static int proc_dointvec_route(struct ctl_table *table, int write,
-		struct file *filp, void __user *buffer, size_t *lenp,
-		loff_t *ppos)
-{
-	ctl_table tmp = *table;
-	int new_size, ret;
-
-	mutex_lock(&ipv4_route_lock);
-	if (write) {
-		tmp.data = &new_size;
-		table = &tmp;
-	}
-
-	ret = proc_dointvec(table, write, filp, buffer, lenp, ppos);
-
-	if (!ret && write) {
-		ret = mem_reserve_kmem_cache_set(&ipv4_route_reserve,
-				ipv4_dst_ops.kmem_cachep, new_size);
-		if (!ret)
-			ip_rt_max_size = new_size;
-	}
-	mutex_unlock(&ipv4_route_lock);
-
-	return ret;
-}
-
-static int sysctl_intvec_route(struct ctl_table *table,
-		void __user *oldval, size_t __user *oldlenp,
-		void __user *newval, size_t newlen)
-{
-	int write = (newval && newlen);
-	ctl_table tmp = *table;
-	int new_size, ret;
-
-	mutex_lock(&ipv4_route_lock);
-	if (write) {
-		tmp.data = &new_size;
-		table = &tmp;
-	}
-
-	ret = sysctl_intvec(table, oldval, oldlenp, newval, newlen);
-
-	if (!ret && write) {
-		ret = mem_reserve_kmem_cache_set(&ipv4_route_reserve,
-				ipv4_dst_ops.kmem_cachep, new_size);
-		if (!ret)
-			ip_rt_max_size = new_size;
-	}
-	mutex_unlock(&ipv4_route_lock);
-
-	return ret;
 }
 
 static const struct seq_operations rt_cache_seq_ops = {
@@ -2754,7 +2696,7 @@ static void ipv4_rt_blackhole_update_pmtu(struct dst_entry *dst, u32 mtu)
 
 static struct dst_ops ipv4_dst_blackhole_ops = {
 	.family			=	AF_INET,
-	.protocol		=	__constant_htons(ETH_P_IP),
+	.protocol		=	cpu_to_be16(ETH_P_IP),
 	.destroy		=	ipv4_dst_destroy,
 	.check			=	ipv4_dst_check,
 	.update_pmtu		=	ipv4_rt_blackhole_update_pmtu,
@@ -2837,7 +2779,8 @@ int ip_route_output_key(struct net *net, struct rtable **rp, struct flowi *flp)
 	return ip_route_output_flow(net, rp, flp, NULL, 0);
 }
 
-static int rt_fill_info(struct sk_buff *skb, u32 pid, u32 seq, int event,
+static int rt_fill_info(struct net *net,
+			struct sk_buff *skb, u32 pid, u32 seq, int event,
 			int nowait, unsigned int flags)
 {
 	struct rtable *rt = skb->rtable;
@@ -2902,8 +2845,8 @@ static int rt_fill_info(struct sk_buff *skb, u32 pid, u32 seq, int event,
 		__be32 dst = rt->rt_dst;
 
 		if (ipv4_is_multicast(dst) && !ipv4_is_local_multicast(dst) &&
-		    IPV4_DEVCONF_ALL(&init_net, MC_FORWARDING)) {
-			int err = ipmr_get_route(skb, r, nowait);
+		    IPV4_DEVCONF_ALL(net, MC_FORWARDING)) {
+			int err = ipmr_get_route(net, skb, r, nowait);
 			if (err <= 0) {
 				if (!nowait) {
 					if (err == 0)
@@ -3008,7 +2951,7 @@ static int inet_rtm_getroute(struct sk_buff *in_skb, struct nlmsghdr* nlh, void 
 	if (rtm->rtm_flags & RTM_F_NOTIFY)
 		rt->rt_flags |= RTCF_NOTIFY;
 
-	err = rt_fill_info(skb, NETLINK_CB(in_skb).pid, nlh->nlmsg_seq,
+	err = rt_fill_info(net, skb, NETLINK_CB(in_skb).pid, nlh->nlmsg_seq,
 			   RTM_NEWROUTE, 0, 0);
 	if (err <= 0)
 		goto errout_free;
@@ -3046,7 +2989,7 @@ int ip_rt_dump(struct sk_buff *skb,  struct netlink_callback *cb)
 			if (rt_is_expired(rt))
 				continue;
 			skb->dst = dst_clone(&rt->u.dst);
-			if (rt_fill_info(skb, NETLINK_CB(cb->skb).pid,
+			if (rt_fill_info(net, skb, NETLINK_CB(cb->skb).pid,
 					 cb->nlh->nlmsg_seq, RTM_NEWROUTE,
 					 1, NLM_F_MULTI) <= 0) {
 				dst_release(xchg(&skb->dst, NULL));
@@ -3182,8 +3125,7 @@ static ctl_table ipv4_route_table[] = {
 		.data		= &ip_rt_max_size,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
-		.proc_handler	= proc_dointvec_route,
-		.strategy	= sysctl_intvec_route,
+		.proc_handler	= proc_dointvec,
 	},
 	{
 		/*  Deprecated. Use gc_min_interval_ms */
@@ -3435,7 +3377,7 @@ int __init ip_rt_init(void)
 	int rc = 0;
 
 #ifdef CONFIG_NET_CLS_ROUTE
-	ip_rt_acct = __alloc_percpu(256 * sizeof(struct ip_rt_acct));
+	ip_rt_acct = __alloc_percpu(256 * sizeof(struct ip_rt_acct), __alignof__(struct ip_rt_acct));
 	if (!ip_rt_acct)
 		panic("IP: failed to allocate ip_rt_acct\n");
 #endif
@@ -3461,15 +3403,6 @@ int __init ip_rt_init(void)
 
 	ipv4_dst_ops.gc_thresh = (rt_hash_mask + 1);
 	ip_rt_max_size = (rt_hash_mask + 1) * 16;
-
-#ifdef CONFIG_PROC_FS
-	mutex_init(&ipv4_route_lock);
-#endif
-
-	mem_reserve_init(&ipv4_route_reserve, "IPv4 route cache",
-			&net_rx_reserve);
-	mem_reserve_kmem_cache_set(&ipv4_route_reserve,
-			ipv4_dst_ops.kmem_cachep, ip_rt_max_size);
 
 	devinet_init();
 	ip_fib_init();

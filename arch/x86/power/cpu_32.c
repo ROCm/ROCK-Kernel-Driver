@@ -12,6 +12,7 @@
 #include <asm/mtrr.h>
 #include <asm/mce.h>
 #include <asm/xcr.h>
+#include <asm/suspend.h>
 
 static struct saved_context saved_context;
 
@@ -66,7 +67,6 @@ static void do_fpu_end(void)
 
 static void fix_processor_context(void)
 {
-#ifndef CONFIG_X86_NO_TSS
 	int cpu = smp_processor_id();
 	struct tss_struct *t = &per_cpu(init_tss, cpu);
 
@@ -76,7 +76,6 @@ static void fix_processor_context(void)
 				 * 386 hardware has concept of busy TSS or some
 				 * similar stupidity.
 				 */
-#endif
 
 	load_TR_desc();				/* This does ltr */
 	load_LDT(&current->active_mm->context);	/* This does lldt */

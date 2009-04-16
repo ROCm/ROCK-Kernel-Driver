@@ -11,12 +11,12 @@
 #include <linux/hardirq.h>
 #include <linux/suspend.h>
 #include <linux/kbuild.h>
-#include <asm/pda.h>
 #include <asm/processor.h>
 #include <asm/segment.h>
 #include <asm/thread_info.h>
 #include <asm/ia32.h>
 #include <asm/bootparam.h>
+#include <asm/suspend.h>
 
 #include <xen/interface/xen.h>
 
@@ -46,16 +46,6 @@ int main(void)
 #ifdef CONFIG_IA32_EMULATION
 	ENTRY(sysenter_return);
 #endif
-	BLANK();
-#undef ENTRY
-#define ENTRY(entry) DEFINE(pda_ ## entry, offsetof(struct x8664_pda, entry))
-	ENTRY(kernelstack); 
-	ENTRY(oldrsp); 
-	ENTRY(pcurrent); 
-	ENTRY(irqcount);
-	ENTRY(cpunumber);
-	ENTRY(irqstackptr);
-	ENTRY(data_offset);
 	BLANK();
 #undef ENTRY
 #ifdef CONFIG_PARAVIRT
@@ -124,10 +114,8 @@ int main(void)
 	ENTRY(cr8);
 	BLANK();
 #undef ENTRY
-#ifndef CONFIG_X86_NO_TSS
 	DEFINE(TSS_ist, offsetof(struct tss_struct, x86_tss.ist));
 	BLANK();
-#endif
 	DEFINE(crypto_tfm_ctx_offset, offsetof(struct crypto_tfm, __crt_ctx));
 	BLANK();
 	DEFINE(__NR_syscall_max, sizeof(syscalls) - 1);
@@ -140,7 +128,7 @@ int main(void)
 
 	BLANK();
 	DEFINE(PAGE_SIZE_asm, PAGE_SIZE);
-#ifdef CONFIG_PARAVIRT_XEN
+#ifdef CONFIG_XEN
 	BLANK();
 	OFFSET(XEN_vcpu_info_mask, vcpu_info, evtchn_upcall_mask);
 	OFFSET(XEN_vcpu_info_pending, vcpu_info, evtchn_upcall_pending);

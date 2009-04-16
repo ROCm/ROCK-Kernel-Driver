@@ -290,7 +290,7 @@ void foo(void)
 	DEFINE(IA64_ITC_LASTCYCLE_OFFSET,
 		offsetof (struct itc_jitter_data_t, itc_lastcycle));
 
-#ifdef CONFIG_PARAVIRT_XEN
+#ifdef CONFIG_XEN
 	BLANK();
 
 	DEFINE(XEN_NATIVE_ASM, XEN_NATIVE);
@@ -316,5 +316,7 @@ void foo(void)
 	DEFINE_MAPPED_REG_OFS(XSI_BANK1_R16_OFS, bank1_regs[0]);
 	DEFINE_MAPPED_REG_OFS(XSI_B0NATS_OFS, vbnat);
 	DEFINE_MAPPED_REG_OFS(XSI_B1NATS_OFS, vnat);
+	DEFINE_MAPPED_REG_OFS(XSI_ITC_OFFSET_OFS, itc_offset);
+	DEFINE_MAPPED_REG_OFS(XSI_ITC_LAST_OFS, itc_last);
 #endif /* CONFIG_XEN */
 }

@@ -251,7 +251,7 @@ print_request(unsigned long addr)
 			rq.errors,
 			(unsigned long long)rq.sector, rq.nr_sectors);
 
-	kdb_printf("  hsect %llu hnrsect %lu nrseg %u currnrsect %u\n",
+	kdb_printf("  hsect %llu hnrsect %lu nrseg %u u currnrsect %u\n",
 			(unsigned long long)rq.hard_sector, rq.hard_nr_sectors,
 			rq.nr_phys_segments, rq.current_nr_sectors);
 

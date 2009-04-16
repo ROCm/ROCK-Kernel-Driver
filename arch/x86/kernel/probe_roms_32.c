@@ -18,7 +18,7 @@
 #include <asm/setup.h>
 #include <asm/sections.h>
 #include <asm/io.h>
-#include <setup_arch.h>
+#include <asm/setup_arch.h>
 
 static struct resource system_rom_resource = {
 	.name	= "System ROM",
@@ -99,11 +99,6 @@ void __init probe_roms(void)
 	unsigned char c;
 	int i;
 
-#ifdef CONFIG_XEN
-	if (!is_initial_xendomain())
-		return;
-#endif
-
 	/* video rom */
 	upper = adapter_rom_resources[0].start;
 	for (start = video_rom_resource.start; start < upper; start += 2048) {
@@ -136,7 +131,7 @@ void __init probe_roms(void)
 	upper = system_rom_resource.start;
 
 	/* check for extension rom (ignore length byte!) */
-	rom = isa_bus_to_virt((unsigned long)extension_rom_resource.start);
+	rom = isa_bus_to_virt(extension_rom_resource.start);
 	if (romsignature(rom)) {
 		length = extension_rom_resource.end - extension_rom_resource.start + 1;
 		if (romchecksum(rom, length)) {

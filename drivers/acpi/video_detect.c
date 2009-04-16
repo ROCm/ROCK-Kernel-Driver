@@ -55,6 +55,9 @@ acpi_backlight_cap_match(acpi_handle handle, u32 level, void *context,
 		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Found generic backlight "
 				  "support\n"));
 		*cap |= ACPI_VIDEO_BACKLIGHT;
+		if (ACPI_FAILURE(acpi_get_handle(handle, "_BQC", &h_dummy)))
+			printk(KERN_WARNING FW_BUG PREFIX "ACPI brightness "
+					"control misses _BQC function\n");
 		/* We have backlight support, no need to scan further */
 		return AE_CTRL_TERMINATE;
 	}
@@ -97,21 +100,6 @@ long acpi_is_video_device(struct acpi_device *device)
 		acpi_walk_namespace(ACPI_TYPE_DEVICE, device->handle,
 				    ACPI_UINT32_MAX, acpi_backlight_cap_match,
 				    &video_caps, NULL);
-
-	/* IGD detection is not perfect. It should use the same method as done
-	 * to identify an IGD device in the dri parts or video.ko
-	 */
-
-	/*
-	 * ThinkPads do need the IGD implementation, we detect ThinkPad IGD
-	 * devices here and specially workaround it in thinkpad_acpi as the
-	 * IGD parts are too experimental yet
-	*/
-	if (dmi_name_in_vendors("LENOVO") &&
-	    ACPI_SUCCESS(acpi_get_handle(device->handle, "DRDY", &h_dummy))) {
-		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Found IGD device\n"));
-		video_caps |= ACPI_VIDEO_IGD;
-	}
 
 	return video_caps;
 }
@@ -216,7 +204,7 @@ int acpi_video_backlight_support(void)
 		return 1;
 
 	/* Then go the default way */
-	return acpi_video_support & (ACPI_VIDEO_BACKLIGHT | ACPI_VIDEO_IGD);
+	return acpi_video_support & ACPI_VIDEO_BACKLIGHT;
 }
 EXPORT_SYMBOL(acpi_video_backlight_support);
 

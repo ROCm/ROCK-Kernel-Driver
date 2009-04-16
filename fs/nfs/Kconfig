@@ -85,13 +85,10 @@ config ROOT_NFS
 
 	  Most people say N here.
 
-config NFS_SWAP
-	bool "Provide swap over NFS support"
-	default n
-	depends on NFS_FS
-	select SUNRPC_SWAP
+config NFS_FSCACHE
+	bool "Provide NFS client caching support (EXPERIMENTAL)"
+	depends on EXPERIMENTAL
+	depends on NFS_FS=m && FSCACHE || NFS_FS=y && FSCACHE=y
 	help
-	  This option enables swapon to work on files located on NFS mounts.
-
-	  For more details, see Documentation/network-swap.txt
-
+	  Say Y here if you want NFS data to be cached locally on disc through
+	  the general filesystem cache manager

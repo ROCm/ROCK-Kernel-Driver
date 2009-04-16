@@ -117,9 +117,8 @@ struct cbe_pmd_regs {
 	u8	pad_0x0c1c_0x0c20 [4];				/* 0x0c1c */
 #define CBE_PMD_FIR_MODE_M8		0x00800
 	u64	fir_enable_mask;				/* 0x0c20 */
-	u8	pad_0x0c28_0x0c98 [0x0c98 - 0x0c28];		/* 0x0c28 */
-	u64	on_ramp_trace;					/* 0x0c98 */
-	u64	pad_0x0ca0;					/* 0x0ca0 */
+
+	u8	pad_0x0c28_0x0ca8 [0x0ca8 - 0x0c28];		/* 0x0c28 */
 	u64	ras_esc_0;					/* 0x0ca8 */
 	u8	pad_0x0cb0_0x1000 [0x1000 - 0x0cb0];		/* 0x0cb0 */
 };
@@ -219,11 +218,7 @@ extern struct cbe_iic_regs __iomem *cbe_get_cpu_iic_regs(int cpu);
 
 
 struct cbe_mic_tm_regs {
-	u8	pad_0x0000_0x0010[0x0010 - 0x0000];		/* 0x0000 */
-
-	u64	MBL_debug;					/* 0x0010 */
-
-	u8	pad_0x0018_0x0040[0x0040 - 0x0018];		/* 0x0018 */
+	u8	pad_0x0000_0x0040[0x0040 - 0x0000];		/* 0x0000 */
 
 	u64	mic_ctl_cnfg2;					/* 0x0040 */
 #define CBE_MIC_ENABLE_AUX_TRC		0x8000000000000000LL
@@ -307,25 +302,6 @@ struct cbe_mic_tm_regs {
 
 extern struct cbe_mic_tm_regs __iomem *cbe_get_mic_tm_regs(struct device_node *np);
 extern struct cbe_mic_tm_regs __iomem *cbe_get_cpu_mic_tm_regs(int cpu);
-
-/*
- *
- *  PPE Privileged MMIO Registers definition. (offset 0x500000 - 0x500fff)
- *
- */
-struct cbe_ppe_priv_regs {
-	u8	pad_0x0000_0x0858[0x0858 - 0x0000];		/* 0x0000 */
-
-	u64	L2_debug1;					/* 0x0858 */
-
-	u8	pad_0x0860_0x0958[0x0958 - 0x0860];		/* 0x0860 */
-
-	u64	ciu_dr1;					/* 0x0958 */
-
-	u8	pad_0x0960_0x1000[0x1000 - 0x0960];		/* 0x0960 */
-};
-
-extern struct cbe_ppe_priv_regs __iomem *cbe_get_cpu_ppe_priv_regs(int cpu);
 
 /* some utility functions to deal with SMT */
 extern u32 cbe_get_hw_thread_id(int cpu);

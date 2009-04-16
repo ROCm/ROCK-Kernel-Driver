@@ -104,24 +104,6 @@ static inline notrace void set_soft_enabled(unsigned long enable)
 	: : "r" (enable), "i" (offsetof(struct paca_struct, soft_enabled)));
 }
 
-#ifdef CONFIG_PERFMON
-static inline unsigned long get_pmu_except_pending(void)
-{
-	unsigned long pending;
-
-	__asm__ __volatile__("lbz %0,%1(13)"
-	: "=r" (pending) : "i" (offsetof(struct paca_struct, pmu_except_pending)));
-
-	return pending;
-}
-
-static inline void set_pmu_except_pending(unsigned long pending)
-{
-	__asm__ __volatile__("stb %0,%1(13)"
-	: : "r" (pending), "i" (offsetof(struct paca_struct, pmu_except_pending)));
-}
-#endif /* CONFIG_PERFMON */
-
 notrace void raw_local_irq_restore(unsigned long en)
 {
 	/*
@@ -180,19 +162,6 @@ notrace void raw_local_irq_restore(unsigned long en)
 		lv1_get_version_info(&tmp);
 	}
 
-#ifdef CONFIG_PERFMON
-	/*
-	 * If a PMU exception occurred while interrupts were soft disabled,
-	 * force a PMU exception.
-	 */
-	if (get_pmu_except_pending()) {
-		set_pmu_except_pending(0);
-		/* Make sure we trigger the edge detection circuitry */
-		mtspr(SPRN_MMCR0, mfspr(SPRN_MMCR0) & ~MMCR0_PMAO);
-		mtspr(SPRN_MMCR0, mfspr(SPRN_MMCR0) | MMCR0_PMAO);
-	}
-#endif /* CONFIG_PERFMON */
-
 	__hard_irq_enable();
 }
 EXPORT_SYMBOL(raw_local_irq_restore);
@@ -202,7 +171,7 @@ int show_interrupts(struct seq_file *p, void *v)
 {
 	int i = *(loff_t *)v, j;
 	struct irqaction *action;
-	irq_desc_t *desc;
+	struct irq_desc *desc;
 	unsigned long flags;
 
 	if (i == 0) {
@@ -221,7 +190,7 @@ int show_interrupts(struct seq_file *p, void *v)
 		seq_printf(p, "%3d: ", i);
 #ifdef CONFIG_SMP
 		for_each_online_cpu(j)
-			seq_printf(p, "%10u ", kstat_cpu(j).irqs[i]);
+			seq_printf(p, "%10u ", kstat_irqs_cpu(i, j));
 #else
 		seq_printf(p, "%10u ", kstat_irqs(i));
 #endif /* CONFIG_SMP */
@@ -262,7 +231,7 @@ void fixup_irqs(cpumask_t map)
 		if (irq_desc[irq].status & IRQ_PER_CPU)
 			continue;
 
-		cpus_and(mask, irq_desc[irq].affinity, map);
+		cpumask_and(&mask, irq_desc[irq].affinity, &map);
 		if (any_online_cpu(mask) == NR_CPUS) {
 			printk("Breaking affinity for irq %i\n", irq);
 			mask = map;
@@ -703,10 +672,12 @@ unsigned int irq_create_mapping(struct irq_host *host,
 			return NO_IRQ;
 		}
 	}
-	pr_debug("irq: -> obtained virq %d\n", virq);
 
 	if (irq_setup_virq(host, virq, hwirq))
 		return NO_IRQ;
+
+	printk(KERN_DEBUG "irq: irq %lu on host %s mapped to virtual irq %u\n",
+		hwirq, host->of_node ? host->of_node->full_name : "null", virq);
 
 	return virq;
 }
@@ -1069,7 +1040,7 @@ arch_initcall(irq_late_init);
 static int virq_debug_show(struct seq_file *m, void *private)
 {
 	unsigned long flags;
-	irq_desc_t *desc;
+	struct irq_desc *desc;
 	const char *p;
 	char none[] = "none";
 	int i;

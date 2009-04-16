@@ -13,6 +13,7 @@ lib-y := __divsi3.o __udivsi3.o __modsi3.o __umodsi3.o			\
 
 obj-$(CONFIG_ITANIUM)	+= copy_page.o copy_user.o memcpy.o
 obj-$(CONFIG_MCKINLEY)	+= copy_page_mck.o memcpy_mck.o
+lib-$(CONFIG_PERFMON)	+= carta_random.o
 
 AFLAGS___divdi3.o	=
 AFLAGS___udivdi3.o	= -DUNSIGNED

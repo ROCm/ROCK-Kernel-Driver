@@ -107,8 +107,6 @@ struct thread_info {
 #define TIF_DB_DISABLED		19	/* debug trap disabled for fsyscall */
 #define TIF_FREEZE		20	/* is freezing for suspend */
 #define TIF_RESTORE_RSE		21	/* user RBS is newer than kernel RBS */
-#define TIF_PERFMON_CTXSW	22	/* perfmon needs ctxsw calls */
-#define TIF_PERFMON_WORK	23	/* work for pfm_handle_work() */
 
 #define _TIF_SYSCALL_TRACE	(1 << TIF_SYSCALL_TRACE)
 #define _TIF_SYSCALL_AUDIT	(1 << TIF_SYSCALL_AUDIT)
@@ -122,8 +120,6 @@ struct thread_info {
 #define _TIF_DB_DISABLED	(1 << TIF_DB_DISABLED)
 #define _TIF_FREEZE		(1 << TIF_FREEZE)
 #define _TIF_RESTORE_RSE	(1 << TIF_RESTORE_RSE)
-#define _TIF_PERFMON_CTXSW	(1 << TIF_PERFMON_CTXSW)
-#define _TIF_PERFMON_WORK	(1 << TIF_PERFMON_WORK)
 
 /* "work to do on user-return" bits */
 #define TIF_ALLWORK_MASK	(_TIF_SIGPENDING|_TIF_NOTIFY_RESUME|_TIF_SYSCALL_AUDIT|\

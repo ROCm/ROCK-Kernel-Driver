@@ -64,12 +64,10 @@ int novfs_proc_init(void)
 
 	novfs_procfs_dir = proc_mkdir(MODULE_NAME, NULL);
 	if (novfs_procfs_dir) {
-		novfs_procfs_dir->owner = THIS_MODULE;
 
 		Novfs_Control = create_proc_entry("Control", 0600, novfs_procfs_dir);
 
 		if (Novfs_Control) {
-			Novfs_Control->owner = THIS_MODULE;
 			Novfs_Control->size = 0;
 			memcpy(&novfs_daemon_proc_fops,
 					Novfs_Control->proc_fops,
@@ -93,7 +91,6 @@ int novfs_proc_init(void)
 
 		Novfs_Library = create_proc_entry("Library", 0666, novfs_procfs_dir);
 		if (Novfs_Library) {
-			Novfs_Library->owner = THIS_MODULE;
 			Novfs_Library->size = 0;
 
 			/*
@@ -119,7 +116,6 @@ int novfs_proc_init(void)
 		    create_proc_read_entry("Version", 0444, novfs_procfs_dir,
 					   Novfs_Get_Version, NULL);
 		if (Novfs_Version) {
-			Novfs_Version->owner = THIS_MODULE;
 			Novfs_Version->size = 0;
 		} else {
 			remove_proc_entry("Library", novfs_procfs_dir);

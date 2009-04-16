@@ -533,8 +533,7 @@ static inline void syn_flood_warning(struct sk_buff *skb)
 
 static void tcp_v6_reqsk_destructor(struct request_sock *req)
 {
-	if (inet6_rsk(req)->pktopts)
-		kfree_skb(inet6_rsk(req)->pktopts);
+	kfree_skb(inet6_rsk(req)->pktopts);
 }
 
 #ifdef CONFIG_TCP_MD5SIG
@@ -585,8 +584,7 @@ static int tcp_v6_md5_do_add(struct sock *sk, struct in6_addr *peer,
 	} else {
 		/* reallocate new list if current one is full. */
 		if (!tp->md5sig_info) {
-			tp->md5sig_info = kzalloc(sizeof(*tp->md5sig_info),
-					sk_allocation(sk, GFP_ATOMIC));
+			tp->md5sig_info = kzalloc(sizeof(*tp->md5sig_info), GFP_ATOMIC);
 			if (!tp->md5sig_info) {
 				kfree(newkey);
 				return -ENOMEM;
@@ -599,8 +597,7 @@ static int tcp_v6_md5_do_add(struct sock *sk, struct in6_addr *peer,
 		}
 		if (tp->md5sig_info->alloced6 == tp->md5sig_info->entries6) {
 			keys = kmalloc((sizeof (tp->md5sig_info->keys6[0]) *
-				       (tp->md5sig_info->entries6 + 1)),
-				       sk_allocation(sk, GFP_ATOMIC));
+				       (tp->md5sig_info->entries6 + 1)), GFP_ATOMIC);
 
 			if (!keys) {
 				tcp_free_md5sig_pool();
@@ -724,8 +721,7 @@ static int tcp_v6_parse_md5_keys (struct sock *sk, char __user *optval,
 		struct tcp_sock *tp = tcp_sk(sk);
 		struct tcp_md5sig_info *p;
 
-		p = kzalloc(sizeof(struct tcp_md5sig_info),
-				   sk_allocation(sk, GFP_KERNEL));
+		p = kzalloc(sizeof(struct tcp_md5sig_info), GFP_KERNEL);
 		if (!p)
 			return -ENOMEM;
 
@@ -951,7 +947,7 @@ struct sk_buff **tcp6_gro_receive(struct sk_buff **head, struct sk_buff *skb)
 
 	switch (skb->ip_summed) {
 	case CHECKSUM_COMPLETE:
-		if (!tcp_v6_check(skb->len, &iph->saddr, &iph->daddr,
+		if (!tcp_v6_check(skb_gro_len(skb), &iph->saddr, &iph->daddr,
 				  skb->csum)) {
 			skb->ip_summed = CHECKSUM_UNNECESSARY;
 			break;
@@ -990,7 +986,6 @@ static void tcp_v6_send_response(struct sk_buff *skb, u32 seq, u32 ack, u32 win,
 	struct sock *ctl_sk = net->ipv6.tcp_sk;
 	unsigned int tot_len = sizeof(struct tcphdr);
 	__be32 *topt;
-	gfp_t gfp_mask = GFP_ATOMIC;
 
 	if (ts)
 		tot_len += TCPOLEN_TSTAMP_ALIGNED;
@@ -999,11 +994,8 @@ static void tcp_v6_send_response(struct sk_buff *skb, u32 seq, u32 ack, u32 win,
 		tot_len += TCPOLEN_MD5SIG_ALIGNED;
 #endif
 
-	if (skb->sk)
-		gfp_mask = sk_allocation(skb->sk, gfp_mask);
-
 	buff = alloc_skb(MAX_HEADER + sizeof(struct ipv6hdr) + tot_len,
-			 gfp_mask);
+			 GFP_ATOMIC);
 	if (buff == NULL)
 		return;
 
@@ -1618,8 +1610,7 @@ ipv6_pktoptions:
 		}
 	}
 
-	if (opt_skb)
-		kfree_skb(opt_skb);
+	kfree_skb(opt_skb);
 	return 0;
 }
 

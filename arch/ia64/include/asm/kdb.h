@@ -8,7 +8,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (c) 1999-2004 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 1999-2008 Silicon Graphics, Inc.  All Rights Reserved.
  */
 
 /*
@@ -34,6 +34,7 @@ typedef unsigned long kdb_machreg_t;
 #define kdb_bfd_vma_fmt0	"0x%016lx"
 #define kdb_elfw_addr_fmt	"0x%lx"
 #define kdb_elfw_addr_fmt0	"0x%016lx"
+#define kdb_f_count_fmt		"%ld"
 
 static inline unsigned long
 kdba_funcptr_value(void *fp)

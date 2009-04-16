@@ -126,7 +126,6 @@
 #include <linux/in.h>
 #include <linux/jhash.h>
 #include <linux/random.h>
-#include <trace/net.h>
 
 #include "net-sysfs.h"
 
@@ -135,12 +134,6 @@
 
 /* This should be increased if a protocol with a bigger head is added. */
 #define GRO_MAX_HEAD (MAX_HEADER + 128)
-
-#if defined(CONFIG_XEN) || defined(CONFIG_PARAVIRT_XEN)
-#include <net/ip.h>
-#include <linux/tcp.h>
-#include <linux/udp.h>
-#endif
 
 /*
  *	The list of packet types we will receive (as opposed to discard)
@@ -1469,7 +1462,9 @@ static bool can_checksum_protocol(unsigned long features, __be16 protocol)
 		((features & NETIF_F_IP_CSUM) &&
 		 protocol == htons(ETH_P_IP)) ||
 		((features & NETIF_F_IPV6_CSUM) &&
-		 protocol == htons(ETH_P_IPV6)));
+		 protocol == htons(ETH_P_IPV6)) ||
+		((features & NETIF_F_FCOE_CRC) &&
+		 protocol == htons(ETH_P_FCOE)));
 }
 
 static bool dev_can_checksum(struct net_device *dev, struct sk_buff *skb)
@@ -1680,8 +1675,8 @@ int dev_hard_start_xmit(struct sk_buff *skb, struct net_device *dev,
 			struct netdev_queue *txq)
 {
 	const struct net_device_ops *ops = dev->netdev_ops;
+	int rc;
 
-	prefetch(&dev->netdev_ops->ndo_start_xmit);
 	if (likely(!skb->next)) {
 		if (!list_empty(&ptype_all))
 			dev_queue_xmit_nit(skb, dev);
@@ -1693,13 +1688,27 @@ int dev_hard_start_xmit(struct sk_buff *skb, struct net_device *dev,
 				goto gso;
 		}
 
-		return ops->ndo_start_xmit(skb, dev);
+		rc = ops->ndo_start_xmit(skb, dev);
+		/*
+		 * TODO: if skb_orphan() was called by
+		 * dev->hard_start_xmit() (for example, the unmodified
+		 * igb driver does that; bnx2 doesn't), then
+		 * skb_tx_software_timestamp() will be unable to send
+		 * back the time stamp.
+		 *
+		 * How can this be prevented? Always create another
+		 * reference to the socket before calling
+		 * dev->hard_start_xmit()? Prevent that skb_orphan()
+		 * does anything in dev->hard_start_xmit() by clearing
+		 * the skb destructor before the call and restoring it
+		 * afterwards, then doing the skb_orphan() ourselves?
+		 */
+		return rc;
 	}
 
 gso:
 	do {
 		struct sk_buff *nskb = skb->next;
-		int rc;
 
 		skb->next = nskb->next;
 		nskb->next = NULL;
@@ -1720,59 +1729,24 @@ out_kfree_skb:
 	return 0;
 }
 
-static u32 simple_tx_hashrnd;
-static int simple_tx_hashrnd_initialized = 0;
+static u32 skb_tx_hashrnd;
 
-static u16 simple_tx_hash(struct net_device *dev, struct sk_buff *skb)
+u16 skb_tx_hash(const struct net_device *dev, const struct sk_buff *skb)
 {
-	u32 addr1, addr2, ports;
-	u32 hash, ihl;
-	u8 ip_proto = 0;
+	u32 hash;
 
-	if (unlikely(!simple_tx_hashrnd_initialized)) {
-		get_random_bytes(&simple_tx_hashrnd, 4);
-		simple_tx_hashrnd_initialized = 1;
-	}
+	if (skb_rx_queue_recorded(skb)) {
+		hash = skb_get_rx_queue(skb);
+	} else if (skb->sk && skb->sk->sk_hash) {
+		hash = skb->sk->sk_hash;
+	} else
+		hash = skb->protocol;
 
-	switch (skb->protocol) {
-	case htons(ETH_P_IP):
-		if (!(ip_hdr(skb)->frag_off & htons(IP_MF | IP_OFFSET)))
-			ip_proto = ip_hdr(skb)->protocol;
-		addr1 = ip_hdr(skb)->saddr;
-		addr2 = ip_hdr(skb)->daddr;
-		ihl = ip_hdr(skb)->ihl;
-		break;
-	case htons(ETH_P_IPV6):
-		ip_proto = ipv6_hdr(skb)->nexthdr;
-		addr1 = ipv6_hdr(skb)->saddr.s6_addr32[3];
-		addr2 = ipv6_hdr(skb)->daddr.s6_addr32[3];
-		ihl = (40 >> 2);
-		break;
-	default:
-		return 0;
-	}
-
-
-	switch (ip_proto) {
-	case IPPROTO_TCP:
-	case IPPROTO_UDP:
-	case IPPROTO_DCCP:
-	case IPPROTO_ESP:
-	case IPPROTO_AH:
-	case IPPROTO_SCTP:
-	case IPPROTO_UDPLITE:
-		ports = *((u32 *) (skb_network_header(skb) + (ihl * 4)));
-		break;
-
-	default:
-		ports = 0;
-		break;
-	}
-
-	hash = jhash_3words(addr1, addr2, ports, simple_tx_hashrnd);
+	hash = jhash_1word(hash, skb_tx_hashrnd);
 
 	return (u16) (((u64) hash * dev->real_num_tx_queues) >> 32);
 }
+EXPORT_SYMBOL(skb_tx_hash);
 
 static struct netdev_queue *dev_pick_tx(struct net_device *dev,
 					struct sk_buff *skb)
@@ -1783,63 +1757,11 @@ static struct netdev_queue *dev_pick_tx(struct net_device *dev,
 	if (ops->ndo_select_queue)
 		queue_index = ops->ndo_select_queue(dev, skb);
 	else if (dev->real_num_tx_queues > 1)
-		queue_index = simple_tx_hash(dev, skb);
+		queue_index = skb_tx_hash(dev, skb);
 
 	skb_set_queue_mapping(skb, queue_index);
 	return netdev_get_tx_queue(dev, queue_index);
 }
-
-#if defined(CONFIG_XEN) || defined(CONFIG_PARAVIRT_XEN)
-inline int skb_checksum_setup(struct sk_buff *skb)
-{
-	struct iphdr *iph;
-	unsigned char *th;
-	int err = -EPROTO;
-
-#ifdef CONFIG_XEN
-	if (!skb->proto_csum_blank)
-		return 0;
-#endif
-
-	if (skb->protocol != htons(ETH_P_IP))
-		goto out;
-
-	iph = ip_hdr(skb);
-	th = skb_network_header(skb) + 4 * iph->ihl;
-	if (th >= skb_tail_pointer(skb))
-		goto out;
-
-	skb->csum_start = th - skb->head;
-	switch (iph->protocol) {
-	case IPPROTO_TCP:
-		skb->csum_offset = offsetof(struct tcphdr, check);
-		break;
-	case IPPROTO_UDP:
-		skb->csum_offset = offsetof(struct udphdr, check);
-		break;
-	default:
-		if (net_ratelimit())
-			printk(KERN_ERR "Attempting to checksum a non-"
-			       "TCP/UDP packet, dropping a protocol"
-			       " %d packet", iph->protocol);
-		goto out;
-	}
-
-	if ((th + skb->csum_offset + 2) > skb_tail_pointer(skb))
-		goto out;
-
-#ifdef CONFIG_XEN
-	skb->ip_summed = CHECKSUM_PARTIAL;
-	skb->proto_csum_blank = 0;
-#endif
-
-	err = 0;
-
-out:
-	return err;
-}
-EXPORT_SYMBOL(skb_checksum_setup);
-#endif
 
 /**
  *	dev_queue_xmit - transmit a buffer
@@ -1873,12 +1795,6 @@ int dev_queue_xmit(struct sk_buff *skb)
 	struct Qdisc *q;
 	int rc = -ENOMEM;
 
- 	/* If a checksum-deferred packet is forwarded to a device that needs a
- 	 * checksum, correct the pointers and force checksumming.
- 	 */
- 	if (skb_checksum_setup(skb))
- 		goto out_kfree_skb;
-
 	/* GSO will handle the following emulations directly. */
 	if (netif_needs_gso(dev, skb))
 		goto gso;
@@ -1908,7 +1824,6 @@ int dev_queue_xmit(struct sk_buff *skb)
 	}
 
 gso:
-	trace_net_dev_xmit(skb);
 	/* Disable soft irqs for various locks below. Also
 	 * stops preemption for RCU.
 	 */
@@ -2283,30 +2198,6 @@ void netif_nit_deliver(struct sk_buff *skb)
 	rcu_read_unlock();
 }
 
-/*
- * Filter the protocols for which the reserves are adequate.
- *
- * Before adding a protocol make sure that it is either covered by the existing
- * reserves, or add reserves covering the memory need of the new protocol's
- * packet processing.
- */
-static int skb_emergency_protocol(struct sk_buff *skb)
-{
-	if (skb_emergency(skb))
-		switch (skb->protocol) {
-		case __constant_htons(ETH_P_ARP):
-		case __constant_htons(ETH_P_IP):
-		case __constant_htons(ETH_P_IPV6):
-		case __constant_htons(ETH_P_8021Q):
-			break;
-
-		default:
-			return 0;
-		}
-
-	return 1;
-}
-
 /**
  *	netif_receive_skb - process receive buffer from network
  *	@skb: buffer to process
@@ -2329,26 +2220,13 @@ int netif_receive_skb(struct sk_buff *skb)
 	struct net_device *null_or_orig;
 	int ret = NET_RX_DROP;
 	__be16 type;
-	unsigned long pflags = current->flags;
 
 	if (skb->vlan_tci && vlan_hwaccel_do_receive(skb))
 		return NET_RX_SUCCESS;
 
-	/* Emergency skb are special, they should
-	 *  - be delivered to SOCK_MEMALLOC sockets only
-	 *  - stay away from userspace
-	 *  - have bounded memory usage
-	 *
-	 * Use PF_MEMALLOC as a poor mans memory pool - the grouping kind.
-	 * This saves us from propagating the allocation context down to all
-	 * allocation sites.
-	 */
-	if (skb_emergency(skb))
-		current->flags |= PF_MEMALLOC;
-
 	/* if we've gotten here through NAPI, check netpoll */
 	if (netpoll_receive_skb(skb))
-		goto out;
+		return NET_RX_DROP;
 
 	if (!skb->tstamp.tv64)
 		net_timestamp(skb);
@@ -2367,7 +2245,6 @@ int netif_receive_skb(struct sk_buff *skb)
 
 	__get_cpu_var(netdev_rx_stat).total++;
 
-	trace_net_dev_receive(skb);
 	skb_reset_network_header(skb);
 	skb_reset_transport_header(skb);
 	skb->mac_len = skb->network_header - skb->mac_header;
@@ -2383,22 +2260,6 @@ int netif_receive_skb(struct sk_buff *skb)
 	}
 #endif
 
-#ifdef CONFIG_XEN
-	switch (skb->ip_summed) {
-	case CHECKSUM_UNNECESSARY:
-		skb->proto_data_valid = 1;
-		break;
-	case CHECKSUM_PARTIAL:
-		/* XXX Implement me. */
-	default:
-		skb->proto_data_valid = 0;
-		break;
-	}
-#endif
-
-	if (skb_emergency(skb))
-		goto skip_taps;
-
 	list_for_each_entry_rcu(ptype, &ptype_all, list) {
 		if (ptype->dev == null_or_orig || ptype->dev == skb->dev ||
 		    ptype->dev == orig_dev) {
@@ -2408,23 +2269,21 @@ int netif_receive_skb(struct sk_buff *skb)
 		}
 	}
 
-skip_taps:
 #ifdef CONFIG_NET_CLS_ACT
 	skb = handle_ing(skb, &pt_prev, &ret, orig_dev);
 	if (!skb)
-		goto unlock;
+		goto out;
 ncls:
 #endif
 
-	if (!skb_emergency_protocol(skb))
-		goto drop;
-
 	skb = handle_bridge(skb, &pt_prev, &ret, orig_dev);
 	if (!skb)
-		goto unlock;
+		goto out;
 	skb = handle_macvlan(skb, &pt_prev, &ret, orig_dev);
 	if (!skb)
-		goto unlock;
+		goto out;
+
+	skb_orphan(skb);
 
 	type = skb->protocol;
 	list_for_each_entry_rcu(ptype,
@@ -2441,7 +2300,6 @@ ncls:
 	if (pt_prev) {
 		ret = pt_prev->func(skb, skb->dev, pt_prev, orig_dev);
 	} else {
-drop:
 		kfree_skb(skb);
 		/* Jamal, now you will not able to escape explaining
 		 * me how you were going to use this. :-)
@@ -2449,10 +2307,8 @@ drop:
 		ret = NET_RX_DROP;
 	}
 
-unlock:
-	rcu_read_unlock();
 out:
-	tsk_restore_flags(current, pflags, PF_MEMALLOC);
+	rcu_read_unlock();
 	return ret;
 }
 
@@ -2498,7 +2354,6 @@ static int napi_gro_complete(struct sk_buff *skb)
 
 out:
 	skb_shinfo(skb)->gso_size = 0;
-	__skb_push(skb, -skb_network_offset(skb));
 	return netif_receive_skb(skb);
 }
 
@@ -2512,9 +2367,30 @@ void napi_gro_flush(struct napi_struct *napi)
 		napi_gro_complete(skb);
 	}
 
+	napi->gro_count = 0;
 	napi->gro_list = NULL;
 }
 EXPORT_SYMBOL(napi_gro_flush);
+
+void *skb_gro_header(struct sk_buff *skb, unsigned int hlen)
+{
+	unsigned int offset = skb_gro_offset(skb);
+
+	hlen += offset;
+	if (hlen <= skb_headlen(skb))
+		return skb->data + offset;
+
+	if (unlikely(!skb_shinfo(skb)->nr_frags ||
+		     skb_shinfo(skb)->frags[0].size <=
+		     hlen - skb_headlen(skb) ||
+		     PageHighMem(skb_shinfo(skb)->frags[0].page)))
+		return pskb_may_pull(skb, hlen) ? skb->data + offset : NULL;
+
+	return page_address(skb_shinfo(skb)->frags[0].page) +
+	       skb_shinfo(skb)->frags[0].page_offset +
+	       offset - skb_headlen(skb);
+}
+EXPORT_SYMBOL(skb_gro_header);
 
 int dev_gro_receive(struct napi_struct *napi, struct sk_buff *skb)
 {
@@ -2522,10 +2398,9 @@ int dev_gro_receive(struct napi_struct *napi, struct sk_buff *skb)
 	struct packet_type *ptype;
 	__be16 type = skb->protocol;
 	struct list_head *head = &ptype_base[ntohs(type) & PTYPE_HASH_MASK];
-	int count = 0;
 	int same_flow;
 	int mac_len;
-	int free;
+	int ret;
 
 	if (!(skb->dev->features & NETIF_F_GRO))
 		goto normal;
@@ -2535,29 +2410,15 @@ int dev_gro_receive(struct napi_struct *napi, struct sk_buff *skb)
 
 	rcu_read_lock();
 	list_for_each_entry_rcu(ptype, head, list) {
-		struct sk_buff *p;
-
 		if (ptype->type != type || ptype->dev || !ptype->gro_receive)
 			continue;
 
-		skb_reset_network_header(skb);
+		skb_set_network_header(skb, skb_gro_offset(skb));
 		mac_len = skb->network_header - skb->mac_header;
 		skb->mac_len = mac_len;
 		NAPI_GRO_CB(skb)->same_flow = 0;
 		NAPI_GRO_CB(skb)->flush = 0;
 		NAPI_GRO_CB(skb)->free = 0;
-
-		for (p = napi->gro_list; p; p = p->next) {
-			count++;
-
-			if (!NAPI_GRO_CB(p)->same_flow)
-				continue;
-
-			if (p->mac_len != mac_len ||
-			    memcmp(skb_mac_header(p), skb_mac_header(skb),
-				   mac_len))
-				NAPI_GRO_CB(p)->same_flow = 0;
-		}
 
 		pp = ptype->gro_receive(&napi->gro_list, skb);
 		break;
@@ -2568,7 +2429,7 @@ int dev_gro_receive(struct napi_struct *napi, struct sk_buff *skb)
 		goto normal;
 
 	same_flow = NAPI_GRO_CB(skb)->same_flow;
-	free = NAPI_GRO_CB(skb)->free;
+	ret = NAPI_GRO_CB(skb)->free ? GRO_MERGED_FREE : GRO_MERGED;
 
 	if (pp) {
 		struct sk_buff *nskb = *pp;
@@ -2576,27 +2437,35 @@ int dev_gro_receive(struct napi_struct *napi, struct sk_buff *skb)
 		*pp = nskb->next;
 		nskb->next = NULL;
 		napi_gro_complete(nskb);
-		count--;
+		napi->gro_count--;
 	}
 
 	if (same_flow)
 		goto ok;
 
-	if (NAPI_GRO_CB(skb)->flush || count >= MAX_GRO_SKBS) {
-		__skb_push(skb, -skb_network_offset(skb));
+	if (NAPI_GRO_CB(skb)->flush || napi->gro_count >= MAX_GRO_SKBS)
 		goto normal;
-	}
 
+	napi->gro_count++;
 	NAPI_GRO_CB(skb)->count = 1;
-	skb_shinfo(skb)->gso_size = skb->len;
+	skb_shinfo(skb)->gso_size = skb_gro_len(skb);
 	skb->next = napi->gro_list;
 	napi->gro_list = skb;
+	ret = GRO_HELD;
+
+pull:
+	if (unlikely(!pskb_may_pull(skb, skb_gro_offset(skb)))) {
+		if (napi->gro_list == skb)
+			napi->gro_list = skb->next;
+		ret = GRO_DROP;
+	}
 
 ok:
-	return free;
+	return ret;
 
 normal:
-	return -1;
+	ret = GRO_NORMAL;
+	goto pull;
 }
 EXPORT_SYMBOL(dev_gro_receive);
 
@@ -2604,29 +2473,45 @@ static int __napi_gro_receive(struct napi_struct *napi, struct sk_buff *skb)
 {
 	struct sk_buff *p;
 
+	if (netpoll_rx_on(skb))
+		return GRO_NORMAL;
+
 	for (p = napi->gro_list; p; p = p->next) {
-		NAPI_GRO_CB(p)->same_flow = 1;
+		NAPI_GRO_CB(p)->same_flow = (p->dev == skb->dev)
+			&& !compare_ether_header(skb_mac_header(p),
+						 skb_gro_mac_header(skb));
 		NAPI_GRO_CB(p)->flush = 0;
 	}
 
 	return dev_gro_receive(napi, skb);
 }
 
-int napi_gro_receive(struct napi_struct *napi, struct sk_buff *skb)
+int napi_skb_finish(int ret, struct sk_buff *skb)
 {
-	if (netpoll_receive_skb(skb))
-		return NET_RX_DROP;
+	int err = NET_RX_SUCCESS;
 
-	switch (__napi_gro_receive(napi, skb)) {
-	case -1:
+	switch (ret) {
+	case GRO_NORMAL:
 		return netif_receive_skb(skb);
 
-	case 1:
+	case GRO_DROP:
+		err = NET_RX_DROP;
+		/* fall through */
+
+	case GRO_MERGED_FREE:
 		kfree_skb(skb);
 		break;
 	}
 
-	return NET_RX_SUCCESS;
+	return err;
+}
+EXPORT_SYMBOL(napi_skb_finish);
+
+int napi_gro_receive(struct napi_struct *napi, struct sk_buff *skb)
+{
+	skb_gro_reset_offset(skb);
+
+	return napi_skb_finish(__napi_gro_receive(napi, skb), skb);
 }
 EXPORT_SYMBOL(napi_gro_receive);
 
@@ -2644,6 +2529,9 @@ struct sk_buff *napi_fraginfo_skb(struct napi_struct *napi,
 {
 	struct net_device *dev = napi->dev;
 	struct sk_buff *skb = napi->skb;
+	struct ethhdr *eth;
+	skb_frag_t *frag;
+	int i;
 
 	napi->skb = NULL;
 
@@ -2656,20 +2544,36 @@ struct sk_buff *napi_fraginfo_skb(struct napi_struct *napi,
 	}
 
 	BUG_ON(info->nr_frags > MAX_SKB_FRAGS);
+	frag = &info->frags[info->nr_frags - 1];
+
+	for (i = skb_shinfo(skb)->nr_frags; i < info->nr_frags; i++) {
+		skb_fill_page_desc(skb, i, frag->page, frag->page_offset,
+				   frag->size);
+		frag++;
+	}
 	skb_shinfo(skb)->nr_frags = info->nr_frags;
-	memcpy(skb_shinfo(skb)->frags, info->frags, sizeof(info->frags));
 
 	skb->data_len = info->len;
 	skb->len += info->len;
 	skb->truesize += info->len;
 
-	if (!pskb_may_pull(skb, ETH_HLEN)) {
+	skb_reset_mac_header(skb);
+	skb_gro_reset_offset(skb);
+
+	eth = skb_gro_header(skb, sizeof(*eth));
+	if (!eth) {
 		napi_reuse_skb(napi, skb);
 		skb = NULL;
 		goto out;
 	}
 
-	skb->protocol = eth_type_trans(skb, dev);
+	skb_gro_pull(skb, sizeof(*eth));
+
+	/*
+	 * This works because the only protocols we care about don't require
+	 * special handling.  We'll fix it up properly at the end.
+	 */
+	skb->protocol = eth->h_proto;
 
 	skb->ip_summed = info->ip_summed;
 	skb->csum = info->csum;
@@ -2679,31 +2583,42 @@ out:
 }
 EXPORT_SYMBOL(napi_fraginfo_skb);
 
+int napi_frags_finish(struct napi_struct *napi, struct sk_buff *skb, int ret)
+{
+	int err = NET_RX_SUCCESS;
+
+	switch (ret) {
+	case GRO_NORMAL:
+	case GRO_HELD:
+		skb->protocol = eth_type_trans(skb, napi->dev);
+
+		if (ret == GRO_NORMAL)
+			return netif_receive_skb(skb);
+
+		skb_gro_pull(skb, -ETH_HLEN);
+		break;
+
+	case GRO_DROP:
+		err = NET_RX_DROP;
+		/* fall through */
+
+	case GRO_MERGED_FREE:
+		napi_reuse_skb(napi, skb);
+		break;
+	}
+
+	return err;
+}
+EXPORT_SYMBOL(napi_frags_finish);
+
 int napi_gro_frags(struct napi_struct *napi, struct napi_gro_fraginfo *info)
 {
 	struct sk_buff *skb = napi_fraginfo_skb(napi, info);
-	int err = NET_RX_DROP;
 
 	if (!skb)
-		goto out;
+		return NET_RX_DROP;
 
-	if (netpoll_receive_skb(skb))
-		goto out;
-
-	err = NET_RX_SUCCESS;
-
-	switch (__napi_gro_receive(napi, skb)) {
-	case -1:
-		return netif_receive_skb(skb);
-
-	case 0:
-		goto out;
-	}
-
-	napi_reuse_skb(napi, skb);
-
-out:
-	return err;
+	return napi_frags_finish(napi, skb, __napi_gro_receive(napi, skb));
 }
 EXPORT_SYMBOL(napi_gro_frags);
 
@@ -2720,18 +2635,15 @@ static int process_backlog(struct napi_struct *napi, int quota)
 		local_irq_disable();
 		skb = __skb_dequeue(&queue->input_pkt_queue);
 		if (!skb) {
+			__napi_complete(napi);
 			local_irq_enable();
-			napi_complete(napi);
-			goto out;
+			break;
 		}
 		local_irq_enable();
 
-		napi_gro_receive(napi, skb);
+		netif_receive_skb(skb);
 	} while (++work < quota && jiffies == start_time);
 
-	napi_gro_flush(napi);
-
-out:
 	return work;
 }
 
@@ -2785,6 +2697,7 @@ void netif_napi_add(struct net_device *dev, struct napi_struct *napi,
 		    int (*poll)(struct napi_struct *, int), int weight)
 {
 	INIT_LIST_HEAD(&napi->poll_list);
+	napi->gro_count = 0;
 	napi->gro_list = NULL;
 	napi->skb = NULL;
 	napi->poll = poll;
@@ -2813,6 +2726,7 @@ void netif_napi_del(struct napi_struct *napi)
 	}
 
 	napi->gro_list = NULL;
+	napi->gro_count = 0;
 }
 EXPORT_SYMBOL(netif_napi_del);
 
@@ -4081,6 +3995,7 @@ static int dev_ifsioc(struct net *net, struct ifreq *ifr, unsigned int cmd)
 			    cmd == SIOCSMIIREG ||
 			    cmd == SIOCBRADDIF ||
 			    cmd == SIOCBRDELIF ||
+			    cmd == SIOCSHWTSTAMP ||
 			    cmd == SIOCWANDEV) {
 				err = -EOPNOTSUPP;
 				if (ops->ndo_do_ioctl) {
@@ -4235,6 +4150,7 @@ int dev_ioctl(struct net *net, unsigned int cmd, void __user *arg)
 		case SIOCBONDCHANGEACTIVE:
 		case SIOCBRADDIF:
 		case SIOCBRDELIF:
+		case SIOCSHWTSTAMP:
 			if (!capable(CAP_NET_ADMIN))
 				return -EPERM;
 			/* fall through */
@@ -5331,6 +5247,7 @@ static int __init net_dev_init(void)
 		queue->backlog.poll = process_backlog;
 		queue->backlog.weight = weight_p;
 		queue->backlog.gro_list = NULL;
+		queue->backlog.gro_count = 0;
 	}
 
 	dev_boot_phase = 0;
@@ -5362,6 +5279,14 @@ out:
 }
 
 subsys_initcall(net_dev_init);
+
+static int __init initialize_hashrnd(void)
+{
+	get_random_bytes(&skb_tx_hashrnd, sizeof(skb_tx_hashrnd));
+	return 0;
+}
+
+late_initcall_sync(initialize_hashrnd);
 
 EXPORT_SYMBOL(__dev_get_by_index);
 EXPORT_SYMBOL(__dev_get_by_name);
@@ -5407,6 +5332,3 @@ EXPORT_SYMBOL(br_fdb_put_hook);
 EXPORT_SYMBOL(dev_load);
 
 EXPORT_PER_CPU_SYMBOL(softnet_data);
-
-DEFINE_TRACE(net_dev_xmit);
-DEFINE_TRACE(net_dev_receive);

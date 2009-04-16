@@ -630,13 +630,11 @@ void novfs_profile_init()
 		dbg_dir = proc_mkdir(MODULE_NAME, NULL);
 
 	if (dbg_dir) {
-		dbg_dir->owner = THIS_MODULE;
 		dbg_file = create_proc_read_entry("Debug",
 						  0600,
 						  dbg_dir,
 						  proc_read_DbgBuffer, NULL);
 		if (dbg_file) {
-			dbg_file->owner = THIS_MODULE;
 			dbg_file->size = DBGBUFFERSIZE;
 			memcpy(&Dbg_proc_file_operations, dbg_file->proc_fops,
 			       sizeof(struct file_operations));
@@ -656,7 +654,6 @@ void novfs_profile_init()
 		if (dbg_dir) {
 			inode_file = create_proc_entry("inode", 0600, dbg_dir);
 			if (inode_file) {
-				inode_file->owner = THIS_MODULE;
 				inode_file->size = 0;
 				memcpy(&inode_proc_file_ops,
 				       inode_file->proc_fops,
@@ -670,7 +667,6 @@ void novfs_profile_init()
 			dentry_file = create_proc_entry("dentry",
 							0600, dbg_dir);
 			if (dentry_file) {
-				dentry_file->owner = THIS_MODULE;
 				dentry_file->size = 0;
 				memcpy(&dentry_proc_file_ops,
 				       dentry_file->proc_fops,

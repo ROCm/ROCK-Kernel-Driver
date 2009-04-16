@@ -15,7 +15,7 @@ static inline int irq_canonicalize(int irq)
 	return ((irq == 2) ? 9 : irq);
 }
 
-#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
+#ifdef CONFIG_X86_LOCAL_APIC
 # define ARCH_HAS_NMI_WATCHDOG
 #endif
 
@@ -36,9 +36,12 @@ static inline int irq_canonicalize(int irq)
 extern void fixup_irqs(void);
 #endif
 
-extern unsigned int do_IRQ(struct pt_regs *regs);
+extern void (*generic_interrupt_extension)(void);
 extern void init_IRQ(void);
 extern void native_init_IRQ(void);
+extern bool handle_irq(unsigned irq, struct pt_regs *regs);
+
+extern unsigned int do_IRQ(struct pt_regs *regs);
 
 /* Interrupt vector management */
 extern DECLARE_BITMAP(used_vectors, NR_VECTORS);

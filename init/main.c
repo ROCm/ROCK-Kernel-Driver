@@ -14,6 +14,7 @@
 #include <linux/proc_fs.h>
 #include <linux/kernel.h>
 #include <linux/syscalls.h>
+#include <linux/stackprotector.h>
 #include <linux/string.h>
 #include <linux/ctype.h>
 #include <linux/delay.h>
@@ -71,14 +72,11 @@
 #include <asm/setup.h>
 #include <asm/sections.h>
 #include <asm/cacheflush.h>
+#include <trace/kmemtrace.h>
 
 #ifdef CONFIG_X86_LOCAL_APIC
 #include <asm/smp.h>
 #endif
-
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#endif	/* CONFIG_KDB */
 
 static int kernel_init(void *);
 
@@ -104,6 +102,10 @@ extern void tc_init(void);
 
 enum system_states system_state __read_mostly;
 EXPORT_SYMBOL(system_state);
+
+#ifdef	CONFIG_KDB
+#include <linux/kdb.h>
+#endif	/* CONFIG_KDB */
 
 /*
  * Boot command-line arguments
@@ -140,14 +142,14 @@ unsigned int __initdata setup_max_cpus = NR_CPUS;
  * greater than 0, limits the maximum number of CPUs activated in
  * SMP mode to <NUM>.
  */
-#ifndef CONFIG_X86_IO_APIC
-static inline void disable_ioapic_setup(void) {};
-#endif
+
+void __weak arch_disable_smp_support(void) { }
 
 static int __init nosmp(char *str)
 {
 	setup_max_cpus = 0;
-	disable_ioapic_setup();
+	arch_disable_smp_support();
+
 	return 0;
 }
 
@@ -157,14 +159,14 @@ static int __init maxcpus(char *str)
 {
 	get_option(&str, &setup_max_cpus);
 	if (setup_max_cpus == 0)
-		disable_ioapic_setup();
+		arch_disable_smp_support();
 
 	return 0;
 }
 
 early_param("maxcpus", maxcpus);
 #else
-#define setup_max_cpus NR_CPUS
+const unsigned int setup_max_cpus = NR_CPUS;
 #endif
 
 /*
@@ -431,8 +433,7 @@ static void __init smp_init(void)
 	 * Set up the current CPU as possible to migrate to.
 	 * The other ones will be done by cpu_up/cpu_down()
 	 */
-	cpu = smp_processor_id();
-	cpu_set(cpu, cpu_active_map);
+	set_cpu_active(smp_processor_id(), true);
 
 	/* FIXME: This should be done in userspace --RR */
 	for_each_present_cpu(cpu) {
@@ -566,6 +567,12 @@ asmlinkage void __init start_kernel(void)
 	unwind_init();
 	lockdep_init();
 	debug_objects_early_init();
+
+	/*
+	 * Set up the the initial canary ASAP:
+	 */
+	boot_init_stack_canary();
+
 	cgroup_init_early();
 
 	local_irq_disable();
@@ -669,6 +676,7 @@ asmlinkage void __init start_kernel(void)
 	enable_debug_pagealloc();
 	cpu_hotplug_init();
 	kmem_cache_init();
+	kmemtrace_init();
 	debug_objects_mem_init();
 	idr_init_cache();
 	setup_per_cpu_pageset();
@@ -798,6 +806,7 @@ static void __init do_basic_setup(void)
 {
 	rcu_init_sched(); /* needed by module_init stage. */
 	init_workqueues();
+	cpuset_init_smp();
 	usermodehelper_init();
 	driver_init();
 	init_irq_proc();
@@ -822,6 +831,7 @@ static void run_init_process(char *init_filename)
  * makes it inline to init() and it becomes part of init.text section
  */
 static noinline int init_post(void)
+	__releases(kernel_lock)
 {
 	/* need to finish all async __init code before freeing the memory */
 	async_synchronize_full();
@@ -870,7 +880,7 @@ static int __init kernel_init(void * unused)
 	/*
 	 * init can run on any cpu.
 	 */
-	set_cpus_allowed_ptr(current, CPU_MASK_ALL_PTR);
+	set_cpus_allowed_ptr(current, cpu_all_mask);
 	/*
 	 * Tell the world that we're going to be the grim
 	 * reaper of innocent orphaned children.
@@ -890,8 +900,6 @@ static int __init kernel_init(void * unused)
 
 	smp_init();
 	sched_init_smp();
-
-	cpuset_init_smp();
 
 	do_basic_setup();
 

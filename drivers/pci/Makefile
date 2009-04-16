@@ -5,9 +5,7 @@
 obj-y		+= access.o bus.o probe.o remove.o pci.o quirks.o slot.o \
 			pci-driver.o search.o pci-sysfs.o rom.o setup-res.o \
 			irq.o
-obj-$(CONFIG_PCI_REASSIGN) += reassigndev.o
 obj-$(CONFIG_PROC_FS) += proc.o
-obj-$(CONFIG_PCI_GUESTDEV) += guestdev.o
 
 # Build PCI Express stuff if needed
 obj-$(CONFIG_PCIEPORTBUS) += pcie/
@@ -30,6 +28,8 @@ obj-$(CONFIG_HT_IRQ) += htirq.o
 obj-$(CONFIG_DMAR) += dmar.o iova.o intel-iommu.o
 
 obj-$(CONFIG_INTR_REMAP) += dmar.o intr_remapping.o
+
+obj-$(CONFIG_PCI_IOV) += iov.o
 
 #
 # Some architectures use the generic PCI setup functions
