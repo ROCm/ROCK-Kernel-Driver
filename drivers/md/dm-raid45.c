@@ -42,7 +42,6 @@
 static const char *version = "v0.2431";
 
 #include "dm.h"
-#include "dm-bio-list.h"
 #include "dm-memcache.h"
 #include "dm-message.h"
 #include "dm-raid45.h"

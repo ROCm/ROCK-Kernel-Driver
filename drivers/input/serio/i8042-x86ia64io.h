@@ -384,6 +384,24 @@ static struct dmi_system_id __initdata i8042_dmi_nomux_table[] = {
 	{ }
 };
 
+static struct dmi_system_id __initdata i8042_dmi_reset_table[] = {
+	{
+		.ident = "MSI Wind U-100",
+		.matches = {
+			DMI_MATCH(DMI_BOARD_NAME, "U-100"),
+			DMI_MATCH(DMI_BOARD_VENDOR, "MICRO-STAR INTERNATIONAL CO., LTD"),
+		},
+	},
+	{
+		.ident = "LG Electronics X110",
+		.matches = {
+			DMI_MATCH(DMI_BOARD_NAME, "X110"),
+			DMI_MATCH(DMI_BOARD_VENDOR, "LG Electronics Inc."),
+		},
+	},
+	{ }
+};
+
 #ifdef CONFIG_PNP
 static struct dmi_system_id __initdata i8042_dmi_nopnp_table[] = {
 	{
@@ -391,6 +409,13 @@ static struct dmi_system_id __initdata i8042_dmi_nopnp_table[] = {
 		.matches = {
 			DMI_MATCH(DMI_BOARD_NAME, "D845PESV"),
 			DMI_MATCH(DMI_BOARD_VENDOR, "Intel Corporation"),
+		},
+	},
+	{
+		.ident = "MSI Wind U-100",
+		.matches = {
+			DMI_MATCH(DMI_BOARD_NAME, "U-100"),
+			DMI_MATCH(DMI_BOARD_VENDOR, "MICRO-STAR INTERNATIONAL CO., LTD"),
 		},
 	},
 	{ }
@@ -705,6 +730,9 @@ static int __init i8042_platform_init(void)
 #endif
 
 #ifdef CONFIG_X86
+	if (dmi_check_system(i8042_dmi_reset_table))
+		i8042_reset = 1;
+
 	if (dmi_check_system(i8042_dmi_noloop_table))
 		i8042_noloop = 1;
 

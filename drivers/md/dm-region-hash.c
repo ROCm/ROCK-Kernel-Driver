@@ -6,7 +6,6 @@
  */
 
 #include <linux/dm-dirty-log.h>
-#include "dm-bio-list.h"
 #include <linux/dm-region-hash.h>
 
 #include <linux/ctype.h>

@@ -1435,7 +1435,7 @@ void netif_device_detach(struct net_device *dev)
 {
 	if (test_and_clear_bit(__LINK_STATE_PRESENT, &dev->state) &&
 	    netif_running(dev)) {
-		netif_stop_queue(dev);
+		netif_tx_stop_all_queues(dev);
 	}
 }
 EXPORT_SYMBOL(netif_device_detach);
@@ -1450,7 +1450,7 @@ void netif_device_attach(struct net_device *dev)
 {
 	if (!test_and_set_bit(__LINK_STATE_PRESENT, &dev->state) &&
 	    netif_running(dev)) {
-		netif_wake_queue(dev);
+		netif_tx_wake_all_queues(dev);
 		__netdev_watchdog_up(dev);
 	}
 }
@@ -2333,8 +2333,10 @@ static int napi_gro_complete(struct sk_buff *skb)
 	struct list_head *head = &ptype_base[ntohs(type) & PTYPE_HASH_MASK];
 	int err = -ENOENT;
 
-	if (NAPI_GRO_CB(skb)->count == 1)
+	if (NAPI_GRO_CB(skb)->count == 1) {
+		skb_shinfo(skb)->gso_size = 0;
 		goto out;
+	}
 
 	rcu_read_lock();
 	list_for_each_entry_rcu(ptype, head, list) {
@@ -2353,7 +2355,6 @@ static int napi_gro_complete(struct sk_buff *skb)
 	}
 
 out:
-	skb_shinfo(skb)->gso_size = 0;
 	return netif_receive_skb(skb);
 }
 
