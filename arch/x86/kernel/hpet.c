@@ -739,7 +739,7 @@ static int hpet_cpuhp_notify(struct notifier_block *n,
 /*
  * Clock source related code
  */
-static cycle_t read_hpet(void)
+static cycle_t read_hpet(struct clocksource *cs)
 {
 	return (cycle_t)hpet_readl(HPET_COUNTER);
 }
@@ -773,7 +773,7 @@ static int hpet_clocksource_register(void)
 	hpet_restart_counter();
 
 	/* Verify whether hpet counter works */
-	t1 = read_hpet();
+	t1 = hpet_readl(HPET_COUNTER);
 	rdtscll(start);
 
 	/*
@@ -787,7 +787,7 @@ static int hpet_clocksource_register(void)
 		rdtscll(now);
 	} while ((now - start) < 200000UL);
 
-	if (t1 == read_hpet()) {
+	if (t1 == hpet_readl(HPET_COUNTER)) {
 		printk(KERN_WARNING
 		       "HPET counter not counting. HPET disabled\n");
 		return -ENODEV;

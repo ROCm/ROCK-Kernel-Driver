@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 30
-EXTRAVERSION = -rc2-git6
+EXTRAVERSION = -rc3
 NAME = Temporary Tasmanian Devil
 
 # *DOCUMENTATION*
