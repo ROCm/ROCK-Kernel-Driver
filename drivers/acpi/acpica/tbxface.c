@@ -496,7 +496,7 @@ ACPI_EXPORT_SYMBOL(acpi_get_table_by_index)
  *              the RSDT/XSDT.
  *
  ******************************************************************************/
-static acpi_status __init acpi_tb_load_namespace(void)
+static acpi_status acpi_tb_load_namespace(void)
 {
 	acpi_status status;
 	u32 i;
@@ -590,7 +590,7 @@ static acpi_status __init acpi_tb_load_namespace(void)
  *
  ******************************************************************************/
 
-acpi_status __init acpi_load_tables(void)
+acpi_status acpi_load_tables(void)
 {
 	acpi_status status;
 
@@ -606,6 +606,9 @@ acpi_status __init acpi_load_tables(void)
 
 	return_ACPI_STATUS(status);
 }
+
+ACPI_EXPORT_SYMBOL(acpi_load_tables)
+
 
 /*******************************************************************************
  *
