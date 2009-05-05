@@ -998,6 +998,7 @@ ENTRY(arch_unwind_init_running)
 	movl	$__USER_DS, PT_DS(%edx)
 	movl	$__USER_DS, PT_ES(%edx)
 	movl	$__KERNEL_PERCPU, PT_FS(%edx)
+	movl	$__KERNEL_STACK_CANARY, PT_GS(%edx)
 	movl	%eax, PT_OLDESP(%edx)
 	movl	16(%esp), %eax
 	movl	%ebx, PT_ORIG_EAX(%edx)
