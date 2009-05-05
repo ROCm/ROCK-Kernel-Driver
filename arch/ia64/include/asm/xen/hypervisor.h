@@ -33,10 +33,12 @@
 #ifndef _ASM_IA64_XEN_HYPERVISOR_H
 #define _ASM_IA64_XEN_HYPERVISOR_H
 
+#ifdef CONFIG_PARAVIRT_XEN
 #include <xen/interface/xen.h>
 #include <xen/interface/version.h>	/* to compile feature.c */
 #include <xen/features.h>		/* to comiple xen-netfront.c */
 #include <asm/xen/hypercall.h>
+#endif
 
 /* xen_domain_type is set before executing any C code by early_xen_setup */
 enum xen_domain_type {
