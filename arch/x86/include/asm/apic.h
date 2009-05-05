@@ -10,12 +10,16 @@
 #include <asm/processor.h>
 #include <asm/apicdef.h>
 #include <asm/atomic.h>
+#ifndef CONFIG_XEN
 #include <asm/fixmap.h>
+#endif
 #include <asm/mpspec.h>
 #include <asm/system.h>
 #include <asm/msr.h>
 
+#ifndef CONFIG_XEN
 #define ARCH_APICTIMER_STOPS_ON_C3	1
+#endif
 
 /*
  * Debugging macros
@@ -47,6 +51,7 @@ static inline void generic_apic_probe(void)
 #ifdef CONFIG_X86_LOCAL_APIC
 
 extern unsigned int apic_verbosity;
+#ifndef CONFIG_XEN
 extern int local_apic_timer_c2_ok;
 
 extern int disable_apic;
@@ -106,6 +111,8 @@ extern void native_apic_wait_icr_idle(void);
 extern u32 native_safe_apic_wait_icr_idle(void);
 extern void native_apic_icr_write(u32 low, u32 id);
 extern u64 native_apic_icr_read(void);
+
+#endif /* CONFIG_XEN */
 
 #define EIM_8BIT_APIC_ID	0
 #define EIM_32BIT_APIC_ID	1
@@ -354,6 +361,8 @@ struct apic {
  */
 extern struct apic *apic;
 
+#ifndef CONFIG_XEN
+
 /*
  * APIC functionality to boot other CPUs - only used on SMP:
  */
@@ -447,6 +456,8 @@ static inline void default_wait_for_init_deassert(atomic_t *deassert)
 
 extern void generic_bigsmp_probe(void);
 
+#endif /* CONFIG_XEN */
+
 
 #ifdef CONFIG_X86_LOCAL_APIC
 
@@ -465,6 +476,8 @@ static inline const struct cpumask *default_target_cpus(void)
 
 DECLARE_EARLY_PER_CPU(u16, x86_bios_cpu_apicid);
 
+
+#ifndef CONFIG_XEN
 
 static inline unsigned int read_apic_id(void)
 {
@@ -573,6 +586,8 @@ static inline physid_mask_t default_apicid_to_cpu_present(int phys_apicid)
 {
 	return physid_mask_of_physid(phys_apicid);
 }
+
+#endif /* CONFIG_XEN */
 
 #endif /* CONFIG_X86_LOCAL_APIC */
 

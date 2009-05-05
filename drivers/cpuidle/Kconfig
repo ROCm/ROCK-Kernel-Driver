@@ -1,6 +1,7 @@
 
 config CPU_IDLE
 	bool "CPU idle PM support"
+	depends on !PROCESSOR_EXTERNAL_CONTROL
 	default ACPI
 	help
 	  CPU idle is a generic framework for supporting software-controlled

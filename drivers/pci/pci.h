@@ -259,4 +259,8 @@ static inline int pci_iov_bus_range(struct pci_bus *bus)
 }
 #endif /* CONFIG_PCI_IOV */
 
+#ifdef CONFIG_PCI_GUESTDEV
+int pci_is_guestdev_to_reassign(struct pci_dev *dev);
+#endif /* CONFIG_PCI_GUESTDEV */
+
 #endif /* DRIVERS_PCI_H */

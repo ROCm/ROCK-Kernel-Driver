@@ -45,7 +45,7 @@ enum xen_domain_type {
 	XEN_HVM_DOMAIN,	/* running in a Xen hvm domain*/
 };
 
-#ifdef CONFIG_XEN
+#ifdef CONFIG_PARAVIRT_XEN
 extern enum xen_domain_type xen_domain_type;
 #else
 #define xen_domain_type		XEN_NATIVE
@@ -65,7 +65,7 @@ extern enum xen_domain_type xen_domain_type;
 #endif
 
 
-#ifdef CONFIG_XEN
+#ifdef CONFIG_PARAVIRT_XEN
 extern struct shared_info *HYPERVISOR_shared_info;
 extern struct start_info *xen_start_info;
 

@@ -6,6 +6,11 @@ static __init int add_pcspkr(void)
 {
 	struct platform_device *pd;
 
+#ifdef CONFIG_XEN
+	if (!is_initial_xendomain())
+		return 0;
+#endif
+
 	pd = platform_device_register_simple("pcspkr", -1, NULL, 0);
 
 	return IS_ERR(pd) ? PTR_ERR(pd) : 0;

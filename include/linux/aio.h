@@ -201,6 +201,12 @@ struct kioctx {
 
 	struct delayed_work	wq;
 
+#ifdef CONFIG_EPOLL
+	/* poll integration */
+	wait_queue_head_t       poll_wait;
+	struct file		*file;
+#endif
+
 	struct rcu_head		rcu_head;
 };
 

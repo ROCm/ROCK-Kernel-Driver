@@ -2,7 +2,11 @@
  * Written by Martin Mares <mj@atrey.karlin.mff.cuni.cz>;
  */
 
+#if !defined(CONFIG_XEN) || CONFIG_XEN_COMPAT > 0x030002
 #define LOAD_OFFSET __START_KERNEL_map
+#else
+#define LOAD_OFFSET 0
+#endif
 
 #include <asm-generic/vmlinux.lds.h>
 #include <asm/asm-offsets.h>

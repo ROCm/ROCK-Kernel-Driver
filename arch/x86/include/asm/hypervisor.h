@@ -24,3 +24,7 @@ extern unsigned long get_hypervisor_tsc_freq(void);
 extern void init_hypervisor(struct cpuinfo_x86 *c);
 
 #endif
+
+#ifdef HAVE_XEN_PLATFORM_COMPAT_H
+#include_next <asm/hypervisor.h>
+#endif

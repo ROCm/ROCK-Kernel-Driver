@@ -5,12 +5,13 @@ config HAVE_KVM
        bool
 
 config HAVE_KVM_IRQCHIP
-       bool
-       default y
+	def_bool y
+	depends on !XEN
 
 menuconfig VIRTUALIZATION
 	bool "Virtualization"
 	depends on HAVE_KVM || X86
+	depends on !XEN
 	default y
 	---help---
 	  Say Y here to get to see options for using your Linux host to run other

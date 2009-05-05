@@ -779,6 +779,15 @@ and is between 256 and 4096 characters. It is defined in the file
 	gpt		[EFI] Forces disk with valid GPT signature but
 			invalid Protective MBR to be treated as GPT.
 
+	guestdev=	[PCI,ACPI,XEN]
+			Format: {<device path>|<sbdf>}][,{<device path>|<sbdf>}[,...]]
+			Format of device path: <hid>[:<uid>]-<dev>.<func>[-<dev>.<func>[,...]]
+			Format of sbdf: [<segment>:]<bus>:<dev>.<func>
+			Specifies PCI device for guest domain.
+			If PCI-PCI bridge is specified, all
+			PCI devices behind PCI-PCI bridge are
+			reserved.
+
 	gvp11=		[HW,SCSI]
 
 	hashdist=	[KNL,NUMA] Large hashes allocated during boot
@@ -1975,6 +1984,10 @@ and is between 256 and 4096 characters. It is defined in the file
 			Format: <full_path>
 			Run specified binary instead of /init from the ramdisk,
 			used for early userspace startup. See initrd.
+
+	reassign_resources	[PCI,ACPI,XEN]
+			Use guestdev= parameter to reassign device's
+			resources.
 
 	reboot=		[BUGS=X86-32,BUGS=ARM,BUGS=IA-64] Rebooting mode
 			Format: <reboot_mode>[,<reboot_mode2>[,...]]
