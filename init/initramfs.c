@@ -8,6 +8,7 @@
 #include <linux/dirent.h>
 #include <linux/syscalls.h>
 #include <linux/utime.h>
+#include <linux/device.h>
 
 static __initdata char *message;
 static void __init error(char *x)
@@ -604,6 +605,7 @@ static int __init populate_rootfs(void)
 			printk(KERN_EMERG "%s\n", err);
 		} else {
 			printk(" done\n");
+			devtmpfs_mount("dev");
 		}
 		free_initrd();
 #endif
