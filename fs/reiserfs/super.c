@@ -448,13 +448,11 @@ int remove_save_link(struct inode *inode, int truncate)
 static void reiserfs_kill_sb(struct super_block *s)
 {
 	if (REISERFS_SB(s)) {
-#ifdef CONFIG_REISERFS_FS_XATTR
 		if (REISERFS_SB(s)->xattr_root) {
 			d_invalidate(REISERFS_SB(s)->xattr_root);
 			dput(REISERFS_SB(s)->xattr_root);
 			REISERFS_SB(s)->xattr_root = NULL;
 		}
-#endif
 		if (REISERFS_SB(s)->priv_root) {
 			d_invalidate(REISERFS_SB(s)->priv_root);
 			dput(REISERFS_SB(s)->priv_root);
@@ -900,6 +898,7 @@ static int reiserfs_parse_options(struct super_block *s, char *options,	/* strin
 		{"conv",.setmask = 1 << REISERFS_CONVERT},
 		{"attrs",.setmask = 1 << REISERFS_ATTRS},
 		{"noattrs",.clrmask = 1 << REISERFS_ATTRS},
+		{"expose_privroot", .setmask = 1 << REISERFS_EXPOSE_PRIVROOT},
 #ifdef CONFIG_REISERFS_FS_XATTR
 		{"user_xattr",.setmask = 1 << REISERFS_XATTRS_USER},
 		{"nouser_xattr",.clrmask = 1 << REISERFS_XATTRS_USER},
@@ -1316,8 +1315,7 @@ static int reiserfs_remount(struct super_block *s, int *mount_flags, char *arg)
 	}
 
 out_ok:
-	kfree(s->s_options);
-	s->s_options = new_opts;
+	replace_mount_options(s, new_opts);
 	return 0;
 
 out_err:
@@ -1845,7 +1843,8 @@ static int reiserfs_fill_super(struct super_block *s, void *data, int silent)
 			goto error;
 		}
 
-		if ((errval = reiserfs_xattr_init(s, s->s_flags))) {
+		if ((errval = reiserfs_lookup_privroot(s)) ||
+		    (errval = reiserfs_xattr_init(s, s->s_flags))) {
 			dput(s->s_root);
 			s->s_root = NULL;
 			goto error;
@@ -1858,7 +1857,8 @@ static int reiserfs_fill_super(struct super_block *s, void *data, int silent)
 			reiserfs_info(s, "using 3.5.x disk format\n");
 		}
 
-		if ((errval = reiserfs_xattr_init(s, s->s_flags))) {
+		if ((errval = reiserfs_lookup_privroot(s)) ||
+		    (errval = reiserfs_xattr_init(s, s->s_flags))) {
 			dput(s->s_root);
 			s->s_root = NULL;
 			goto error;
