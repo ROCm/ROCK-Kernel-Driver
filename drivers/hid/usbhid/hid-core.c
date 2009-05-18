@@ -902,7 +902,7 @@ static int usbhid_parse(struct hid_device *hid)
 		goto err;
 	}
 
-	hid->quirks = quirks;
+	hid->quirks |= quirks;
 
 	return 0;
 err:

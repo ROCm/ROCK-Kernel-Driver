@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 30
-EXTRAVERSION = -rc5-git1
+EXTRAVERSION = -rc6-git3
 NAME = Vindictive Armadillo
 
 # *DOCUMENTATION*

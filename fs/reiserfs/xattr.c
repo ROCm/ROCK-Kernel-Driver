@@ -949,9 +949,8 @@ int reiserfs_permission(struct inode *inode, int mask)
 	 */
 	if (get_inode_sd_version(inode) != STAT_DATA_V1)
 		return generic_permission(inode, mask, reiserfs_check_acl);
-	else
 #endif
-		return generic_permission(inode, mask, NULL);
+	return generic_permission(inode, mask, NULL);
 }
 
 /* This will catch lookups from the fs root to .reiserfs_priv */
