@@ -222,7 +222,7 @@ archprepare: maketools
 
 PHONY += maketools FORCE
 maketools: include/linux/version.h FORCE
-	$(Q)$(MAKE) $(build)=arch/arm/tools include/asm-arm/mach-types.h
+	$(Q)$(MAKE) $(build)=arch/arm/tools arch/arm/include/asm/mach-types.h
 
 # Convert bzImage to zImage
 bzImage: zImage
@@ -233,7 +233,7 @@ zImage Image xipImage bootpImage uImage: vmlinux
 zinstall install: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $@
 
-CLEAN_FILES += include/asm-arm/mach-types.h \
+CLEAN_FILES += arch/arm/include/asm/mach-types.h \
 	       include/asm-arm/arch include/asm-arm/.arch
 
 # We use MRPROPER_FILES and CLEAN_FILES now
