@@ -42,9 +42,9 @@
 
 #include <linux/io.h>
 
-#ifdef __LITTLE_ENDIAN
+#if defined(__LITTLE_ENDIAN)
 #define EFHW_IS_LITTLE_ENDIAN
-#elif __BIG_ENDIAN
+#elif defined(__BIG_ENDIAN)
 #define EFHW_IS_BIG_ENDIAN
 #else
 #error Unknown endianness
