@@ -8,6 +8,7 @@
 #include <asm/page.h>
 #include <asm/page_types.h>
 #include <asm/sections.h>
+#include <asm/setup.h>
 #include <asm/system.h>
 #include <asm/tlbflush.h>
 

@@ -315,7 +315,7 @@ static pte_t blktap_clear_pte(struct vm_area_struct *vma,
 	pte_t copy;
 	tap_blkif_t *info = NULL;
 	int offset, seg, usr_idx, pending_idx, mmap_idx;
-	unsigned long uvstart;
+	unsigned long uvstart = 0;
 	unsigned long kvaddr;
 	struct page *pg;
 	struct grant_handle_pair *khandle;
@@ -329,9 +329,8 @@ static pte_t blktap_clear_pte(struct vm_area_struct *vma,
 	if (vma->vm_file != NULL) {
 		info = vma->vm_file->private_data;
 		uvstart = info->rings_vstart + (RING_PAGES << PAGE_SHIFT);
-	} else
-		uvstart = uvaddr;	/* make the following if clause true */
-	if (uvaddr < uvstart)
+	}
+	if (vma->vm_file == NULL || uvaddr < uvstart)
 		return xen_ptep_get_and_clear_full(vma, uvaddr, ptep,
 						   is_fullmm);
 

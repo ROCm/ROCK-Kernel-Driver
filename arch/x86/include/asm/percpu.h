@@ -82,7 +82,7 @@ do {							\
 	case 1:						\
 		asm(op "b %1,"__percpu_arg(0)		\
 		    : "+m" (var)			\
-		    : "ri" ((T__)val));			\
+		    : "qi" ((T__)val));			\
 		break;					\
 	case 2:						\
 		asm(op "w %1,"__percpu_arg(0)		\
@@ -109,7 +109,7 @@ do {							\
 	switch (sizeof(var)) {				\
 	case 1:						\
 		asm(op "b "__percpu_arg(1)",%0"		\
-		    : "=r" (ret__)			\
+		    : "=q" (ret__)			\
 		    : "m" (var));			\
 		break;					\
 	case 2:						\

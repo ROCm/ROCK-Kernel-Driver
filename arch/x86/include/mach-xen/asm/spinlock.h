@@ -215,8 +215,9 @@ static __always_inline void __ticket_spin_lock(raw_spinlock_t *lock)
 	bool free;
 
 	__ticket_spin_lock_preamble;
-	if (unlikely(!free))
-		token = xen_spin_adjust(lock, token);
+	if (likely(free))
+		return;
+	token = xen_spin_adjust(lock, token);
 	do {
 		count = 1 << 10;
 		__ticket_spin_lock_body;
@@ -230,8 +231,9 @@ static __always_inline void __ticket_spin_lock_flags(raw_spinlock_t *lock,
 	bool free;
 
 	__ticket_spin_lock_preamble;
-	if (unlikely(!free))
-		token = xen_spin_adjust(lock, token);
+	if (likely(free))
+		return;
+	token = xen_spin_adjust(lock, token);
 	do {
 		count = 1 << 10;
 		__ticket_spin_lock_body;

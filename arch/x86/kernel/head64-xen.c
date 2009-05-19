@@ -124,11 +124,6 @@ void __init x86_64_start_reservations(char *real_mode_data)
 
 	reserve_early(__pa_symbol(&_text), __pa_symbol(&__bss_stop), "TEXT DATA BSS");
 
-	reserve_early(round_up(__pa_symbol(&_end), PAGE_SIZE),
-		      __pa(xen_start_info->pt_base)
-		      + (xen_start_info->nr_pt_frames << PAGE_SHIFT),
-		      "Xen provided");
-
 	if (xen_feature(XENFEAT_auto_translated_physmap))
 		xen_start_info->mfn_list = ~0UL;
 	else if (xen_start_info->mfn_list < __START_KERNEL_map)

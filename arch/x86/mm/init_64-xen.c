@@ -52,6 +52,7 @@
 #include <asm/numa.h>
 #include <asm/cacheflush.h>
 #include <asm/init.h>
+#include <asm/setup.h>
 
 #include <xen/features.h>
 
@@ -476,7 +477,7 @@ static inline int __meminit make_readonly(unsigned long paddr)
 	 * mappings. Exclude the vsyscall area here, allowing alternative
 	 * instruction patching to work.
 	 */
-	if ((paddr >= __pa_symbol(&_text)) && (paddr < __pa_symbol(&_end))
+	if ((paddr >= __pa_symbol(&_text)) && (paddr < __pa(_brk_end))
 	    && !(paddr >= __pa_symbol(&__vsyscall_0)
 	         && paddr < __pa_symbol(&__vsyscall_0) + PAGE_SIZE))
 		readonly = 1;
@@ -819,7 +820,7 @@ void __init xen_finish_init_mapping(void)
 		BUG();
 
 	/* Destroy the Xen-created mappings beyond the kernel image. */
-	start = PAGE_ALIGN((unsigned long)_end);
+	start = PAGE_ALIGN(_brk_end);
 	end   = __START_KERNEL_map + (e820_table_start << PAGE_SHIFT);
 	for (; start < end; start += PAGE_SIZE)
 		if (HYPERVISOR_update_va_mapping(start, __pte_ma(0), 0))

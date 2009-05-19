@@ -588,8 +588,8 @@ extern int ptep_clear_flush_young(struct vm_area_struct *vma,
 	if (!pte_none(__res) &&					\
 	    ((vma)->vm_mm != current->mm ||			\
 	     HYPERVISOR_update_va_mapping(addr,	__pte(0),	\
-			(unsigned long)(vma)->vm_mm->cpu_vm_mask.bits| \
-				UVMF_INVLPG|UVMF_MULTI))) {	\
+			uvm_multi((vma)->vm_mm->cpu_vm_mask) |	\
+				UVMF_INVLPG))) {		\
 		__xen_pte_clear(__ptep);			\
 		flush_tlb_page(vma, addr);			\
 	}							\

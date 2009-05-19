@@ -658,9 +658,7 @@ restore_all_enable_events:
 scrit:	/**** START OF CRITICAL REGION ****/
 	__TEST_PENDING
 	jnz  14f			# process more events if necessary...
-	RESTORE_REGS
-	addl $4, %esp
-	CFI_ADJUST_CFA_OFFSET -4
+	RESTORE_REGS 4
 1:	INTERRUPT_RETURN
 .section __ex_table,"a"
 	.align 4
@@ -668,15 +666,13 @@ scrit:	/**** START OF CRITICAL REGION ****/
 .previous
 14:	__DISABLE_INTERRUPTS
 	TRACE_IRQS_OFF
-	jmp  11f
 ecrit:  /**** END OF CRITICAL REGION ****/
+	jmp  .Ldo_upcall
 
 	CFI_RESTORE_STATE
 hypervisor_iret:
 	andl $~NMI_MASK, PT_EFLAGS(%esp)
-	RESTORE_REGS
-	addl $4, %esp
-	CFI_ADJUST_CFA_OFFSET -4
+	RESTORE_REGS 4
 	jmp  hypercall_page + (__HYPERVISOR_iret * 32)
 #endif
 	CFI_ENDPROC
@@ -910,17 +906,25 @@ ENTRY(hypervisor_callback)
 	pushl %eax
 	CFI_ADJUST_CFA_OFFSET 4
 	SAVE_ALL
+	movl PT_CS(%esp),%ecx
 	movl PT_EIP(%esp),%eax
+	andl $SEGMENT_RPL_MASK,%ecx
+	cmpl $USER_RPL,%ecx
+	jae  .Ldo_upcall
 	cmpl $scrit,%eax
-	jb   11f
+	jb   0f
 	cmpl $ecrit,%eax
 	jb   critical_region_fixup
+0:
+#ifdef CONFIG_XEN_SUPERVISOR_MODE_KERNEL
 	cmpl $sysexit_scrit,%eax
-	jb   11f
+	jb   .Ldo_upcall
 	cmpl $sysexit_ecrit,%eax
-	ja   11f
+	ja   .Ldo_upcall
 	addl $PT_OLDESP,%esp		# Remove eflags...ebx from stack frame.
-11:	push %esp
+#endif
+.Ldo_upcall:
+	push %esp
 	CFI_ADJUST_CFA_OFFSET 4
 	call evtchn_do_upcall
 	add  $4,%esp
@@ -936,45 +940,41 @@ ENTRY(hypervisor_callback)
 # provides the number of bytes which have already been popped from the
 # interrupted stack frame.
 critical_region_fixup:
-	movzbl critical_fixup_table-scrit(%eax),%ecx # %eax contains num bytes popped
-	cmpb $0xff,%cl                  # 0xff => vcpu_info critical region
-	jne  15f
-	xorl %ecx,%ecx
-15:	leal (%esp,%ecx),%esi		# %esi points at end of src region
+	movsbl critical_fixup_table-scrit(%eax),%ecx # %ecx contains num slots popped
+	testl %ecx,%ecx
+	leal (%esp,%ecx,4),%esi		# %esi points at end of src region
 	leal PT_OLDESP(%esp),%edi	# %edi points at end of dst region
-	shrl $2,%ecx			# convert words to bytes
-	je   17f			# skip loop if nothing to copy
+	jle   17f			# skip loop if nothing to copy
 16:	subl $4,%esi			# pre-decrementing copy loop
 	subl $4,%edi
 	movl (%esi),%eax
 	movl %eax,(%edi)
 	loop 16b
 17:	movl %edi,%esp			# final %edi is top of merged stack
-	jmp  11b
+	jmp  .Ldo_upcall
 
 .section .rodata,"a"
 critical_fixup_table:
-	.byte 0xff,0xff,0xff		# testb $0xff,(%esi) = __TEST_PENDING
-	.byte 0xff,0xff			# jnz  14f
-	.byte 0x00			# pop  %ebx
-	.byte 0x04			# pop  %ecx
-	.byte 0x08			# pop  %edx
-	.byte 0x0c			# pop  %esi
-	.byte 0x10			# pop  %edi
-	.byte 0x14			# pop  %ebp
-	.byte 0x18			# pop  %eax
-	.byte 0x1c			# pop  %ds
-	.byte 0x20			# pop  %es
-	.byte 0x24,0x24			# pop  %fs
-#ifdef CONFIG_X86_32_LAZY_GS
-	.byte 0x28,0x28,0x28		# POP_GS
+	.byte -1,-1,-1			# testb $0xff,(%esi) = __TEST_PENDING
+	.byte -1,-1			# jnz  14f
+	.byte 0				# pop  %ebx
+	.byte 1				# pop  %ecx
+	.byte 2				# pop  %edx
+	.byte 3				# pop  %esi
+	.byte 4				# pop  %edi
+	.byte 5				# pop  %ebp
+	.byte 6				# pop  %eax
+	.byte 7				# pop  %ds
+	.byte 8				# pop  %es
+	.byte 9,9			# pop  %fs
+#ifndef CONFIG_X86_32_LAZY_GS
+	.byte 10,10			# pop  %gs
+	.byte 11,11,11			# add  $4,%esp
 #else
-	.byte 0x28,0x28			# POP_GS
+	.byte 10,10,10			# add  $8,%esp
 #endif
-	.byte 0x2c,0x2c,0x2c		# add  $4,%esp
-	.byte 0x30			# iret
-	.byte 0xff,0xff,0xff,0xff	# movb $1,1(%esi)
-	.byte 0x00,0x00			# jmp  11b
+	.byte 12			# iret
+	.byte -1,-1,-1,-1		# movb $1,1(%esi) = __DISABLE_INTERRUPTS
 .previous
 
 # Hypervisor uses this for application faults while it executes.

@@ -127,7 +127,10 @@ sysexit_scrit:	/**** START OF SYSEXIT CRITICAL REGION ****/		; \
 14:	__DISABLE_INTERRUPTS						; \
 	TRACE_IRQS_OFF							; \
 sysexit_ecrit:	/**** END OF SYSEXIT CRITICAL REGION ****/		; \
+	mov  $__KERNEL_PERCPU, %ecx					; \
 	push %esp							; \
+	mov  %ecx, %fs							; \
+	SET_KERNEL_GS %ecx						; \
 	call evtchn_do_upcall						; \
 	add  $4,%esp							; \
 	jmp  ret_from_intr

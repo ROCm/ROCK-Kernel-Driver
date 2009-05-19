@@ -87,7 +87,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 #define __HYPERVISOR_mmuext_op            26
 #define __HYPERVISOR_xsm_op               27
 #define __HYPERVISOR_nmi_op               28
-#define __HYPERVISOR_sched_op             29
+#define __HYPERVISOR_sched_op_new         29
 #define __HYPERVISOR_callback_op          30
 #define __HYPERVISOR_xenoprof_op          31
 #define __HYPERVISOR_event_channel_op     32
@@ -115,6 +115,8 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 #if __XEN_INTERFACE_VERSION__ < 0x00030101 || (defined(CONFIG_PARAVIRT_XEN) && !defined(HAVE_XEN_PLATFORM_COMPAT_H))
 #undef __HYPERVISOR_sched_op
 #define __HYPERVISOR_sched_op __HYPERVISOR_sched_op_compat
+#else
+#define __HYPERVISOR_sched_op __HYPERVISOR_sched_op_new
 #endif
 
 /* New event-channel and physdev hypercalls introduced in 0x00030202. */
@@ -277,9 +279,9 @@ struct mmuext_op {
         unsigned int nr_ents;
         /* TLB_FLUSH_MULTI, INVLPG_MULTI */
 #if __XEN_INTERFACE_VERSION__ >= 0x00030205
-        XEN_GUEST_HANDLE(void) vcpumask;
+        XEN_GUEST_HANDLE(const_void) vcpumask;
 #else
-        void *vcpumask;
+        const void *vcpumask;
 #endif
         /* COPY_PAGE */
         xen_pfn_t src_mfn;

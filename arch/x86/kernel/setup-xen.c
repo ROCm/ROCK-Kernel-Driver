@@ -118,9 +118,6 @@
 #include <xen/firmware.h>
 #include <xen/xencons.h>
 
-shared_info_t *HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
-EXPORT_SYMBOL(HYPERVISOR_shared_info);
-
 static int xen_panic_event(struct notifier_block *, unsigned long, void *);
 static struct notifier_block xen_panic_block = {
 	xen_panic_event, NULL, 0 /* try to go last */
