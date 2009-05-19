@@ -36,6 +36,7 @@
 #include <linux/vmalloc.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
+#include <asm/setup.h>
 #include <asm/hypervisor.h>
 #include <xen/balloon.h>
 #include <xen/features.h>
@@ -47,6 +48,9 @@
 #include <linux/highmem.h>
 
 EXPORT_SYMBOL(hypercall_page);
+
+shared_info_t *__read_mostly HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
+EXPORT_SYMBOL(HYPERVISOR_shared_info);
 
 #define NR_MC     BITS_PER_LONG
 #define NR_MMU    BITS_PER_LONG
@@ -493,13 +497,13 @@ void xen_tlb_flush_all(void)
 }
 EXPORT_SYMBOL_GPL(xen_tlb_flush_all);
 
-void xen_tlb_flush_mask(cpumask_t *mask)
+void xen_tlb_flush_mask(const cpumask_t *mask)
 {
 	struct mmuext_op op;
 	if ( cpus_empty(*mask) )
 		return;
 	op.cmd = MMUEXT_TLB_FLUSH_MULTI;
-	set_xen_guest_handle(op.arg2.vcpumask, mask->bits);
+	set_xen_guest_handle(op.arg2.vcpumask, cpus_addr(*mask));
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 
@@ -512,14 +516,14 @@ void xen_invlpg_all(unsigned long ptr)
 }
 EXPORT_SYMBOL_GPL(xen_invlpg_all);
 
-void xen_invlpg_mask(cpumask_t *mask, unsigned long ptr)
+void xen_invlpg_mask(const cpumask_t *mask, unsigned long ptr)
 {
 	struct mmuext_op op;
 	if ( cpus_empty(*mask) )
 		return;
 	op.cmd = MMUEXT_INVLPG_MULTI;
 	op.arg1.linear_addr = ptr & PAGE_MASK;
-	set_xen_guest_handle(op.arg2.vcpumask, mask->bits);
+	set_xen_guest_handle(op.arg2.vcpumask, cpus_addr(*mask));
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 
@@ -592,6 +596,9 @@ int xen_create_contiguous_region(
 	unsigned long  frame, flags;
 	unsigned int   i;
 	int            rc, success;
+#ifdef CONFIG_64BIT
+	pte_t         *ptep = NULL;
+#endif
 	struct xen_memory_exchange exchange = {
 		.in = {
 			.nr_extents   = 1UL << order,
@@ -618,9 +625,17 @@ int xen_create_contiguous_region(
 		return -ENOMEM;
 
 #ifdef CONFIG_64BIT
-	if (unlikely(vstart + (PAGE_SIZE << order) > PAGE_OFFSET + MAXMEM + 1)) {
-		if (vstart < __START_KERNEL
-		    || vstart + (PAGE_SIZE << order) > (unsigned long)_end)
+	if (unlikely(vstart > PAGE_OFFSET + MAXMEM)) {
+		unsigned int level;
+
+		if (vstart < __START_KERNEL_map
+		    || vstart + (PAGE_SIZE << order) > _brk_end)
+			return -EINVAL;
+		ptep = lookup_address((unsigned long)__va(__pa(vstart)),
+				      &level);
+		if (ptep && pte_none(*ptep))
+			ptep = NULL;
+		if (vstart < __START_KERNEL && ptep)
 			return -EINVAL;
 		if (order > MAX_CONTIG_ORDER - 1)
 			return -ENOMEM;
@@ -643,7 +658,7 @@ int xen_create_contiguous_region(
 		MULTI_update_va_mapping(cr_mcl + i, vstart + (i*PAGE_SIZE),
 					__pte_ma(0), 0);
 #ifdef CONFIG_64BIT
-		if (vstart > PAGE_OFFSET + MAXMEM)
+		if (ptep)
 			MULTI_update_va_mapping(cr_mcl + i + (1U << order),
 				(unsigned long)__va(__pa(vstart)) + (i*PAGE_SIZE),
 				__pte_ma(0), 0);
@@ -652,7 +667,7 @@ int xen_create_contiguous_region(
 			INVALID_P2M_ENTRY);
 	}
 #ifdef CONFIG_64BIT
-	if (vstart > PAGE_OFFSET + MAXMEM)
+	if (ptep)
 		i += i;
 #endif
 	if (HYPERVISOR_multicall_check(cr_mcl, i, NULL))
@@ -689,7 +704,7 @@ int xen_create_contiguous_region(
 		MULTI_update_va_mapping(cr_mcl + i, vstart + (i*PAGE_SIZE),
 					pfn_pte_ma(frame, PAGE_KERNEL), 0);
 #ifdef CONFIG_64BIT
-		if (vstart > PAGE_OFFSET + MAXMEM)
+		if (ptep)
 			MULTI_update_va_mapping(cr_mcl + i + (1U << order),
 				(unsigned long)__va(__pa(vstart)) + (i*PAGE_SIZE),
 				pfn_pte_ma(frame, PAGE_KERNEL_RO), 0);
@@ -697,7 +712,7 @@ int xen_create_contiguous_region(
 		set_phys_to_machine((__pa(vstart)>>PAGE_SHIFT)+i, frame);
 	}
 #ifdef CONFIG_64BIT
-	if (vstart > PAGE_OFFSET + MAXMEM)
+	if (ptep)
 		i += i;
 #endif
 	cr_mcl[i - 1].args[MULTI_UVMFLAGS_INDEX] = order

@@ -33,11 +33,6 @@ void __init i386_start_kernel(void)
 #endif
 	reserve_ebda_region();
 #else
-	reserve_early(ALIGN(__pa_symbol(&_end), PAGE_SIZE),
-		      __pa(xen_start_info->pt_base)
-		      + (xen_start_info->nr_pt_frames << PAGE_SHIFT),
-		      "Xen provided");
-
 	{
 		int max_cmdline;
 

@@ -206,39 +206,42 @@ u64 arch_irq_stat(void)
 }
 
 
+#ifndef CONFIG_XEN
 /*
  * do_IRQ handles all normal device IRQ's (the special
  * SMP cross-CPU interrupts have their own specific
  * handlers).
  */
-unsigned int /*__irq_entry*/ do_IRQ(struct pt_regs *regs)
+unsigned int __irq_entry do_IRQ(struct pt_regs *regs)
 {
 	struct pt_regs *old_regs = set_irq_regs(regs);
 
 	/* high bit used in ret_from_ code  */
-	unsigned irq = ~regs->orig_ax;
+	unsigned vector = ~regs->orig_ax;
+	unsigned irq;
 
-	/*exit_idle();*/
-	/*irq_enter();*/
+	exit_idle();
+	irq_enter();
+
+	irq = __get_cpu_var(vector_irq)[vector];
 
 	if (!handle_irq(irq, regs)) {
-#if defined(CONFIG_X86_64) && !defined(CONFIG_XEN)
+#ifdef CONFIG_X86_64
 		if (!disable_apic)
 			ack_APIC_irq();
 #endif
 
 		if (printk_ratelimit())
-			printk(KERN_EMERG "%s: %u.%u No irq handler for irq\n",
-			       __func__, smp_processor_id(), irq);
+			printk(KERN_EMERG "%s: %d.%d No irq handler for vector (irq %d)\n",
+			       __func__, smp_processor_id(), vector, irq);
 	}
 
-	/*irq_exit();*/
+	irq_exit();
 
 	set_irq_regs(old_regs);
 	return 1;
 }
 
-#ifndef CONFIG_XEN
 /*
  * Handler for GENERIC_INTERRUPT_VECTOR.
  */

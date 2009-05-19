@@ -1280,6 +1280,10 @@ void __cpuinit cpu_init(void)
 
 	load_LDT(&init_mm.context);
 
+#ifndef CONFIG_X86_NO_TSS
+	t->x86_tss.io_bitmap_base = offsetof(struct tss_struct, io_bitmap);
+#endif
+
 #ifdef CONFIG_DOUBLEFAULT
 	/* Set up doublefault TSS pointer in the GDT */
 	__set_tss_desc(cpu, GDT_ENTRY_DOUBLEFAULT_TSS, &doublefault_tss);

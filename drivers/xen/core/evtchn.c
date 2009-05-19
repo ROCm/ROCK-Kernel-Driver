@@ -210,13 +210,15 @@ DEFINE_PER_CPU(int, ipi_to_irq[NR_IPIS]) = {[0 ... NR_IPIS-1] = -1};
 #ifdef CONFIG_SMP
 
 static u8 cpu_evtchn[NR_EVENT_CHANNELS];
-static unsigned long cpu_evtchn_mask[NR_CPUS][NR_EVENT_CHANNELS/BITS_PER_LONG];
+static DEFINE_PER_CPU(unsigned long[BITS_TO_LONGS(NR_EVENT_CHANNELS)],
+		      cpu_evtchn_mask);
 
-static inline unsigned long active_evtchns(unsigned int cpu, shared_info_t *sh,
-					   unsigned int idx)
+static inline unsigned long active_evtchns(unsigned int idx)
 {
+	shared_info_t *sh = HYPERVISOR_shared_info;
+
 	return (sh->evtchn_pending[idx] &
-		cpu_evtchn_mask[cpu][idx] &
+		percpu_read(cpu_evtchn_mask[idx]) &
 		~sh->evtchn_mask[idx]);
 }
 
@@ -236,8 +238,8 @@ static void bind_evtchn_to_cpu(unsigned int chn, unsigned int cpu)
 			cpumask_set_cpu(cpu, desc->affinity);
 	}
 
-	clear_bit(chn, (unsigned long *)cpu_evtchn_mask[cpu_evtchn[chn]]);
-	set_bit(chn, (unsigned long *)cpu_evtchn_mask[cpu]);
+	clear_bit(chn, per_cpu(cpu_evtchn_mask, cpu_evtchn[chn]));
+	set_bit(chn, per_cpu(cpu_evtchn_mask, cpu));
 	cpu_evtchn[chn] = cpu;
 }
 
@@ -254,7 +256,7 @@ static void init_evtchn_cpu_bindings(void)
 	}
 
 	memset(cpu_evtchn, 0, sizeof(cpu_evtchn));
-	memset(cpu_evtchn_mask[0], ~0, sizeof(cpu_evtchn_mask[0]));
+	memset(per_cpu(cpu_evtchn_mask, 0), ~0, sizeof(per_cpu(cpu_evtchn_mask, 0)));
 }
 
 static inline unsigned int cpu_from_evtchn(unsigned int evtchn)
@@ -264,9 +266,10 @@ static inline unsigned int cpu_from_evtchn(unsigned int evtchn)
 
 #else
 
-static inline unsigned long active_evtchns(unsigned int cpu, shared_info_t *sh,
-					   unsigned int idx)
+static inline unsigned long active_evtchns(unsigned int idx)
 {
+	shared_info_t *sh = HYPERVISOR_shared_info;
+
 	return (sh->evtchn_pending[idx] & ~sh->evtchn_mask[idx]);
 }
 
@@ -285,24 +288,14 @@ static inline unsigned int cpu_from_evtchn(unsigned int evtchn)
 
 #endif
 
-/* Upcall to generic IRQ layer. */
 #ifdef CONFIG_X86
-extern unsigned int do_IRQ(struct pt_regs *regs);
 void __init xen_init_IRQ(void);
 void __init init_IRQ(void)
 {
 	irq_ctx_init(0);
 	xen_init_IRQ();
 }
-#if defined (__i386__)
-static inline void exit_idle(void) {}
-#elif defined (__x86_64__)
 #include <asm/idle.h>
-#endif
-#define do_IRQ(irq, regs) do {		\
-	(regs)->orig_ax = ~(irq);	\
-	do_IRQ((regs));			\
-} while (0)
 #endif
 
 /* Xen will never allocate port zero for any purpose. */
@@ -327,13 +320,12 @@ static DEFINE_PER_CPU(unsigned int, last_processed_l2i) = { BITS_PER_LONG - 1 };
 /* NB. Interrupts are disabled on entry. */
 asmlinkage void __irq_entry evtchn_do_upcall(struct pt_regs *regs)
 {
+	struct pt_regs     *old_regs = set_irq_regs(regs);
 	unsigned long       l1, l2;
 	unsigned long       masked_l1, masked_l2;
 	unsigned int        l1i, l2i, port, count;
 	int                 irq;
-	unsigned int        cpu = smp_processor_id();
-	shared_info_t      *s = HYPERVISOR_shared_info;
-	vcpu_info_t        *vcpu_info = &s->vcpu_info[cpu];
+	vcpu_info_t        *vcpu_info = current_vcpu_info();
 
 	exit_idle();
 	irq_enter();
@@ -343,7 +335,8 @@ asmlinkage void __irq_entry evtchn_do_upcall(struct pt_regs *regs)
 		vcpu_info->evtchn_upcall_pending = 0;
 
 		/* Nested invocations bail immediately. */
-		if (unlikely(per_cpu(upcall_count, cpu)++))
+		percpu_add(upcall_count, 1);
+		if (unlikely(percpu_read(upcall_count) != 1))
 			break;
 
 #ifndef CONFIG_X86 /* No need for a barrier -- XCHG is a barrier on x86. */
@@ -352,8 +345,8 @@ asmlinkage void __irq_entry evtchn_do_upcall(struct pt_regs *regs)
 #endif
 		l1 = xchg(&vcpu_info->evtchn_pending_sel, 0);
 
-		l1i = per_cpu(last_processed_l1i, cpu);
-		l2i = per_cpu(last_processed_l2i, cpu);
+		l1i = percpu_read(last_processed_l1i);
+		l2i = percpu_read(last_processed_l2i);
 
 		while (l1 != 0) {
 
@@ -368,7 +361,7 @@ asmlinkage void __irq_entry evtchn_do_upcall(struct pt_regs *regs)
 			l1i = __ffs(masked_l1);
 
 			do {
-				l2 = active_evtchns(cpu, s, l1i);
+				l2 = active_evtchns(l1i);
 
 				l2i = (l2i + 1) % BITS_PER_LONG;
 				masked_l2 = l2 & ((~0UL) << l2i);
@@ -382,29 +375,31 @@ asmlinkage void __irq_entry evtchn_do_upcall(struct pt_regs *regs)
 
 				/* process port */
 				port = (l1i * BITS_PER_LONG) + l2i;
-				if ((irq = evtchn_to_irq[port]) != -1)
-					do_IRQ(irq, regs);
-				else
+				if (unlikely((irq = evtchn_to_irq[port]) == -1))
 					evtchn_device_upcall(port);
+				else if (!handle_irq(irq, regs) && printk_ratelimit())
+					printk(KERN_EMERG "%s(%d): No handler for irq %d\n",
+					       __func__, smp_processor_id(), irq);
 
 				/* if this is the final port processed, we'll pick up here+1 next time */
-				per_cpu(last_processed_l1i, cpu) = l1i;
-				per_cpu(last_processed_l2i, cpu) = l2i;
+				percpu_write(last_processed_l1i, l1i);
+				percpu_write(last_processed_l2i, l2i);
 
 			} while (l2i != BITS_PER_LONG - 1);
 
-			l2 = active_evtchns(cpu, s, l1i);
+			l2 = active_evtchns(l1i);
 			if (l2 == 0) /* we handled all ports, so we can clear the selector bit */
 				l1 &= ~(1UL << l1i);
 
 		}
 
 		/* If there were nested callbacks then we have more to do. */
-		count = per_cpu(upcall_count, cpu);
-		per_cpu(upcall_count, cpu) = 0;
+		count = percpu_read(upcall_count);
+		percpu_write(upcall_count, 0);
 	} while (unlikely(count != 1));
 
 	irq_exit();
+	set_irq_regs(old_regs);
 }
 
 static struct irq_chip dynirq_chip;
@@ -1532,9 +1527,9 @@ static int evtchn_resume(struct sys_device *dev)
 	/* Avoid doing anything in the 'suspend cancelled' case. */
 	status.dom = DOMID_SELF;
 #ifdef PER_CPU_VIRQ_IRQ
-	status.port = evtchn_from_irq(__get_cpu_var(virq_to_irq)[VIRQ_TIMER]);
+	status.port = evtchn_from_irq(percpu_read(virq_to_irq[VIRQ_TIMER]));
 #else
-	status.port = __get_cpu_var(virq_to_evtchn)[VIRQ_TIMER];
+	status.port = percpu_read(virq_to_evtchn[VIRQ_TIMER]);
 #endif
 	if (HYPERVISOR_event_channel_op(EVTCHNOP_status, &status))
 		BUG();

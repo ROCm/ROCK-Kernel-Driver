@@ -348,11 +348,9 @@ struct xen_set_cpufreq_para {
 
     uint32_t ctrl_type;
     uint32_t ctrl_value;
-}
-;
+};
+
 /* Get physical CPU topology information. */
-
-
 #define INVALID_TOPOLOGY_ID  (~0U)
 struct xen_get_cputopo {
      /* IN: maximum addressable entry in
@@ -376,9 +374,21 @@ struct xen_sysctl_pm_op {
     #define GET_CPUFREQ_PARA           (CPUFREQ_PARA | 0x01)
     #define SET_CPUFREQ_GOV            (CPUFREQ_PARA | 0x02)
     #define SET_CPUFREQ_PARA           (CPUFREQ_PARA | 0x03)
+    #define GET_CPUFREQ_AVGFREQ        (CPUFREQ_PARA | 0x04)
 
     /* get CPU topology */
     #define XEN_SYSCTL_pm_op_get_cputopo  0x20
+
+    /* set/reset scheduler power saving option */
+    #define XEN_SYSCTL_pm_op_set_sched_opt_smt    0x21
+
+    /* cpuidle max_cstate access command */
+    #define XEN_SYSCTL_pm_op_get_max_cstate       0x22
+    #define XEN_SYSCTL_pm_op_set_max_cstate       0x23
+
+    /* set scheduler migration cost value */
+    #define XEN_SYSCTL_pm_op_set_vcpu_migration_delay   0x24
+    #define XEN_SYSCTL_pm_op_get_vcpu_migration_delay   0x25
 
     uint32_t cmd;
     uint32_t cpuid;
@@ -386,7 +396,13 @@ struct xen_sysctl_pm_op {
         struct xen_get_cpufreq_para get_para;
         struct xen_set_cpufreq_gov  set_gov;
         struct xen_set_cpufreq_para set_para;
+        uint64_t get_avgfreq;
         struct xen_get_cputopo      get_topo;
+        uint32_t                    set_sched_opt_smt;
+        uint32_t                    get_max_cstate;
+        uint32_t                    set_max_cstate;
+        uint32_t                    get_vcpu_migration_delay;
+        uint32_t                    set_vcpu_migration_delay;
     };
 };
 

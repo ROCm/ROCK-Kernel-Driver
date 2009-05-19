@@ -58,6 +58,7 @@ void __init reserve_ebda_region(void)
 #include <linux/module.h>
 #include <asm/fixmap.h>
 #include <asm/pgtable.h>
+#include <asm/sections.h>
 #include <asm/setup_arch.h>
 #include <xen/interface/callback.h>
 #include <xen/interface/memory.h>
@@ -94,6 +95,11 @@ void __init xen_start_kernel(void)
 
 	WARN_ON(HYPERVISOR_vm_assist(VMASST_CMD_enable,
 				     VMASST_TYPE_writable_pagetables));
+
+	reserve_early(ALIGN(__pa_symbol(&_end), PAGE_SIZE),
+		      __pa(xen_start_info->pt_base)
+		      + (xen_start_info->nr_pt_frames << PAGE_SHIFT),
+		      "Xen provided");
 
 #ifdef CONFIG_X86_32
 	WARN_ON(HYPERVISOR_vm_assist(VMASST_CMD_enable,

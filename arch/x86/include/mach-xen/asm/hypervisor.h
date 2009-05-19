@@ -106,8 +106,8 @@ void xen_set_ldt(const void *ptr, unsigned int ents);
 #include <linux/cpumask.h>
 void xen_tlb_flush_all(void);
 void xen_invlpg_all(unsigned long ptr);
-void xen_tlb_flush_mask(cpumask_t *mask);
-void xen_invlpg_mask(cpumask_t *mask, unsigned long ptr);
+void xen_tlb_flush_mask(const cpumask_t *mask);
+void xen_invlpg_mask(const cpumask_t *mask, unsigned long ptr);
 #endif
 
 /* Returns zero on success else negative errno. */
@@ -357,6 +357,8 @@ MULTI_grant_table_op(multicall_entry_t *mcl, unsigned int cmd,
 #define MULTI_grant_table_op(a,b,c,d) ((void)0)
 
 #endif
+
+#define uvm_multi(cpumask) ((unsigned long)cpus_addr(cpumask) | UVMF_MULTI)
 
 #ifdef LINUX
 /* drivers/staging/ use Windows-style types, including VOID */

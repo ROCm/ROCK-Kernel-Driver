@@ -71,10 +71,6 @@ void __init prefill_possible_map(void)
 	}
 }
 
-void __init smp_alloc_memory(void)
-{
-}
-
 static inline void
 set_cpu_sibling_map(unsigned int cpu)
 {
