@@ -1,8 +1,8 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 30
-EXTRAVERSION = -rc6-git3
-NAME = Vindictive Armadillo
+EXTRAVERSION = -rc7-git2
+NAME = Man-Eating Seals of Antiquity
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
