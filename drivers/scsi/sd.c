@@ -89,11 +89,7 @@ MODULE_ALIAS_SCSI_DEVICE(TYPE_DISK);
 MODULE_ALIAS_SCSI_DEVICE(TYPE_MOD);
 MODULE_ALIAS_SCSI_DEVICE(TYPE_RBC);
 
-#if !defined(CONFIG_DEBUG_BLOCK_EXT_DEVT)
 #define SD_MINORS	16
-#else
-#define SD_MINORS	0
-#endif
 
 static int  sd_revalidate_disk(struct gendisk *);
 static int  sd_probe(struct device *);
@@ -1922,7 +1918,7 @@ static void sd_probe_async(void *data, async_cookie_t cookie)
 	if (index < SD_MAX_DISKS) {
 		gd->major = sd_major((index & 0xf0) >> 4);
 		gd->first_minor = ((index & 0xf) << 4) | (index & 0xfff00);
-		gd->minors = SD_MINORS;
+		gd->minors = blk_mangle_devt ? 0 : SD_MINORS;
 	}
 	gd->fops = &sd_fops;
 	gd->private_data = &sdkp->driver;
@@ -1998,7 +1994,7 @@ static int sd_probe(struct device *dev)
 	if (!sdkp)
 		goto out;
 
-	gd = alloc_disk(SD_MINORS);
+	gd = alloc_disk(blk_mangle_devt ? 0 : SD_MINORS);
 	if (!gd)
 		goto out_free;
 
