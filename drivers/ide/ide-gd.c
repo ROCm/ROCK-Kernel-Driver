@@ -9,11 +9,7 @@
 #include <linux/hdreg.h>
 #include <linux/dmi.h>
 
-#if !defined(CONFIG_DEBUG_BLOCK_EXT_DEVT)
 #define IDE_DISK_MINORS		(1 << PARTN_BITS)
-#else
-#define IDE_DISK_MINORS		0
-#endif
 
 #include "ide-disk.h"
 #include "ide-floppy.h"
@@ -352,7 +348,8 @@ static int ide_gd_probe(ide_drive_t *drive)
 		goto failed;
 	}
 
-	g = alloc_disk_node(IDE_DISK_MINORS, hwif_to_node(drive->hwif));
+	g = alloc_disk_node(blk_mangle_devt ? 0 : IDE_DISK_MINORS,
+			    hwif_to_node(drive->hwif));
 	if (!g)
 		goto out_free_idkp;
 
@@ -379,7 +376,7 @@ static int ide_gd_probe(ide_drive_t *drive)
 
 	set_capacity(g, ide_gd_capacity(drive));
 
-	g->minors = IDE_DISK_MINORS;
+	g->minors = blk_mangle_devt ? 0 : IDE_DISK_MINORS;
 	g->driverfs_dev = &drive->gendev;
 	g->flags |= GENHD_FL_EXT_DEVT;
 	if (drive->dev_flags & IDE_DFLAG_REMOVABLE)
