@@ -20,10 +20,6 @@ struct unwind_frame_info
 	unsigned call_frame:1;
 };
 
-extern int try_stack_unwind(struct task_struct *, struct pt_regs *,
-			    unsigned long **stack, unsigned long *bp,
-			    const struct stacktrace_ops *, void *data);
-
 #define UNW_PC(frame)      (frame)->regs.ip
 #define UNW_SP(frame)      (frame)->regs.sp
 #ifdef CONFIG_FRAME_POINTER
