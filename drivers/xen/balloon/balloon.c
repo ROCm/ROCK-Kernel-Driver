@@ -188,7 +188,7 @@ static void balloon_alarm(unsigned long unused)
 
 static unsigned long current_target(void)
 {
-	unsigned long target = min(bs.target_pages, bs.hard_limit);
+	unsigned long target = bs.target_pages;
 	if (target > (bs.current_pages + bs.balloon_low + bs.balloon_high))
 		target = bs.current_pages + bs.balloon_low + bs.balloon_high;
 	return target;
@@ -255,26 +255,12 @@ static int increase_reservation(unsigned long nr_pages)
 	}
 
 	set_xen_guest_handle(reservation.extent_start, frame_list);
-	reservation.nr_extents   = nr_pages;
-	rc = HYPERVISOR_memory_op(
-		XENMEM_populate_physmap, &reservation);
-	if (rc < nr_pages) {
-		if (rc > 0) {
-			int ret;
-
-			/* We hit the Xen hard limit: reprobe. */
-			reservation.nr_extents = rc;
-			ret = HYPERVISOR_memory_op(XENMEM_decrease_reservation,
-					&reservation);
-			BUG_ON(ret != rc);
-		}
-		if (rc >= 0)
-			bs.hard_limit = (bs.current_pages + rc -
-					 bs.driver_pages);
+	reservation.nr_extents = nr_pages;
+	rc = HYPERVISOR_memory_op(XENMEM_populate_physmap, &reservation);
+	if (rc < 0)
 		goto out;
-	}
 
-	for (i = 0; i < nr_pages; i++) {
+	for (i = 0; i < rc; i++) {
 		page = balloon_retrieve();
 		BUG_ON(page == NULL);
 
@@ -302,13 +288,13 @@ static int increase_reservation(unsigned long nr_pages)
 		balloon_free_page(page);
 	}
 
-	bs.current_pages += nr_pages;
+	bs.current_pages += rc;
 	totalram_pages = bs.current_pages;
 
  out:
 	balloon_unlock(flags);
 
-	return 0;
+	return rc < 0 ? rc : rc != nr_pages;
 }
 
 static int decrease_reservation(unsigned long nr_pages)
@@ -420,7 +406,6 @@ static void balloon_process(struct work_struct *unused)
 void balloon_set_new_target(unsigned long target)
 {
 	/* No need for lock. Not read-modify-write updates. */
-	bs.hard_limit   = ~0UL;
 	bs.target_pages = max(target, balloon_minimum_target());
 	schedule_work(&balloon_worker);
 }
@@ -500,18 +485,12 @@ static int balloon_read(char *page, char **start, off_t off,
 		"Maximum target:     %8lu kB\n"
 		"Low-mem balloon:    %8lu kB\n"
 		"High-mem balloon:   %8lu kB\n"
-		"Driver pages:       %8lu kB\n"
-		"Xen hard limit:     ",
+		"Driver pages:       %8lu kB\n",
 		PAGES2KB(bs.current_pages), PAGES2KB(bs.target_pages), 
 		PAGES2KB(balloon_minimum_target()), PAGES2KB(num_physpages),
 		PAGES2KB(bs.balloon_low), PAGES2KB(bs.balloon_high),
 		PAGES2KB(bs.driver_pages));
 
-	if (bs.hard_limit != ~0UL)
-		len += sprintf(page + len, "%8lu kB\n",
-			       PAGES2KB(bs.hard_limit));
-	else
-		len += sprintf(page + len, "     ??? kB\n");
 
 	*eof = 1;
 	return len;
@@ -542,7 +521,6 @@ static int __init balloon_init(void)
 	bs.balloon_low   = 0;
 	bs.balloon_high  = 0;
 	bs.driver_pages  = 0UL;
-	bs.hard_limit    = ~0UL;
 
 	init_timer(&balloon_timer);
 	balloon_timer.data = 0;

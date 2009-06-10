@@ -16,6 +16,7 @@
 #include <xen/hypervisor_sysfs.h>
 #include <xen/xenbus.h>
 #include <xen/interface/kexec.h>
+#include "../xenbus/xenbus_comms.h"
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Mike D. Day <ncmike@us.ibm.com>");
@@ -104,9 +105,8 @@ static ssize_t uuid_show(struct hyp_sysfs_attr *attr, char *buffer)
 {
 	char *vm, *val;
 	int ret;
-	extern int xenstored_ready;
 
-	if (!xenstored_ready)
+	if (!is_xenstored_ready())
 		return -EBUSY;
 
 	vm = xenbus_read(XBT_NIL, "vm", "", NULL);

@@ -175,6 +175,7 @@ static void fast_flush_area(pending_req_t *req)
 		handle = pending_handle(req, i);
 		if (handle == BLKBACK_INVALID_HANDLE)
 			continue;
+		blkback_pagemap_clear(virt_to_page(vaddr(req, i)));
 		gnttab_set_unmap_op(&unmap[invcount], vaddr(req, i),
 				    GNTMAP_host_map, handle);
 		pending_handle(req, i) = BLKBACK_INVALID_HANDLE;
@@ -472,6 +473,10 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 			FOREIGN_FRAME(map[i].dev_bus_addr >> PAGE_SHIFT));
 		seg[i].buf  = map[i].dev_bus_addr | 
 			(req->seg[i].first_sect << 9);
+		blkback_pagemap_set(vaddr_pagenr(pending_req, i),
+				    virt_to_page(vaddr(pending_req, i)),
+				    blkif->domid, req->handle,
+				    req->seg[i].gref);
 	}
 
 	if (ret)
@@ -632,6 +637,9 @@ static int __init blkif_init(void)
 	pending_grant_handles = kmalloc(sizeof(pending_grant_handles[0]) *
 					mmap_pages, GFP_KERNEL);
 	pending_pages         = alloc_empty_pages_and_pagevec(mmap_pages);
+
+	if (blkback_pagemap_init(mmap_pages))
+		goto out_of_memory;
 
 	if (!pending_reqs || !pending_grant_handles || !pending_pages)
 		goto out_of_memory;

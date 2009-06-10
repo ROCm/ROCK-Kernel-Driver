@@ -43,6 +43,8 @@
 #include <xen/gnttab.h>
 #include <xen/driver_util.h>
 #include <xen/xenbus.h>
+#include "blkback-pagemap.h"
+
 
 #define DPRINTK(_f, _a...)			\
 	pr_debug("(file=%s, line=%d) " _f,	\

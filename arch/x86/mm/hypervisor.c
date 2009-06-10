@@ -506,6 +506,7 @@ void xen_tlb_flush_mask(const cpumask_t *mask)
 	set_xen_guest_handle(op.arg2.vcpumask, cpus_addr(*mask));
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
+EXPORT_SYMBOL_GPL(xen_tlb_flush_mask);
 
 void xen_invlpg_all(unsigned long ptr)
 {
@@ -526,6 +527,7 @@ void xen_invlpg_mask(const cpumask_t *mask, unsigned long ptr)
 	set_xen_guest_handle(op.arg2.vcpumask, cpus_addr(*mask));
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
+EXPORT_SYMBOL_GPL(xen_invlpg_mask);
 
 #endif /* CONFIG_SMP */
 

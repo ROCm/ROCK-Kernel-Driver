@@ -487,6 +487,10 @@ found:
 	iov->self = dev;
 	pci_read_config_dword(dev, pos + PCI_SRIOV_CAP, &iov->cap);
 	pci_read_config_byte(dev, pos + PCI_SRIOV_FUNC_LINK, &iov->link);
+#ifdef CONFIG_XEN /* should probably also be used for native */
+	if (!dev->bus->number)	/* Root Complex Integrated Endpoint */
+		iov->link = PCI_DEVFN(PCI_SLOT(dev->devfn), iov->link);
+#endif
 
 	if (pdev)
 		iov->dev = pci_dev_get(pdev);

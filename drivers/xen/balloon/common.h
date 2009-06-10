@@ -35,8 +35,6 @@ struct balloon_stats {
 	/* We aim for 'current allocation' == 'target allocation'. */
 	unsigned long current_pages;
 	unsigned long target_pages;
-	/* We may hit the hard limit in Xen. If we do then we remember it. */
-	unsigned long hard_limit;
 	/*
 	 * Drivers may alter the memory reservation independently, but they
 	 * must inform the balloon driver so we avoid hitting the hard limit.

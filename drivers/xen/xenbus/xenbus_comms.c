@@ -53,18 +53,39 @@
 static int xenbus_irq;
 
 extern void xenbus_probe(struct work_struct *);
-extern int xenstored_ready;
 static DECLARE_WORK(probe_work, xenbus_probe);
 
 static DECLARE_WAIT_QUEUE_HEAD(xb_waitq);
 
 static irqreturn_t wake_waiting(int irq, void *unused)
 {
-	if (unlikely(xenstored_ready == 0)) {
-		xenstored_ready = 1;
-		schedule_work(&probe_work);
+	int old, new;
+
+	old = atomic_read(&xenbus_xsd_state);
+	switch (old) {
+		case XENBUS_XSD_UNCOMMITTED:
+			BUG();
+			return IRQ_HANDLED;
+
+		case XENBUS_XSD_FOREIGN_INIT:
+			new = XENBUS_XSD_FOREIGN_READY;
+			break;
+
+		case XENBUS_XSD_LOCAL_INIT:
+			new = XENBUS_XSD_LOCAL_READY;
+			break;
+
+		case XENBUS_XSD_FOREIGN_READY:
+		case XENBUS_XSD_LOCAL_READY:
+		default:
+			goto wake;
 	}
 
+	old = atomic_cmpxchg(&xenbus_xsd_state, old, new);
+	if (old != new)
+		schedule_work(&probe_work);
+
+wake:
 	wake_up(&xb_waitq);
 	return IRQ_HANDLED;
 }

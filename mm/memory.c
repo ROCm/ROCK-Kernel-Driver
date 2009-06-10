@@ -1291,7 +1291,9 @@ int __get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 
 #ifdef CONFIG_XEN
 		if (vma && (vma->vm_flags & VM_FOREIGN)) {
-			struct page **map = vma->vm_private_data;
+			struct vm_foreign_map *foreign_map =
+				vma->vm_private_data;
+			struct page **map = foreign_map->map;
 			int offset = (start - vma->vm_start) >> PAGE_SHIFT;
 			if (map[offset] != NULL) {
 			        if (pages) {
@@ -1832,6 +1834,10 @@ int apply_to_page_range(struct mm_struct *mm, unsigned long addr,
 	unsigned long start = addr, end = addr + size;
 	int err;
 
+#ifdef CONFIG_XEN
+	if (!mm)
+		mm = &init_mm;
+#endif
 	BUG_ON(addr >= end);
 	mmu_notifier_invalidate_range_start(mm, start, end);
 	pgd = pgd_offset(mm, addr);

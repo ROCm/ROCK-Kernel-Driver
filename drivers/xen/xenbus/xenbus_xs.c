@@ -891,7 +891,6 @@ static int xenbus_thread(void *unused)
 
 int xs_init(void)
 {
-	int err;
 	struct task_struct *task;
 
 	INIT_LIST_HEAD(&xs_state.reply_list);
@@ -902,11 +901,6 @@ int xs_init(void)
 	mutex_init(&xs_state.response_mutex);
 	init_rwsem(&xs_state.transaction_mutex);
 	init_rwsem(&xs_state.watch_mutex);
-
-	/* Initialize the shared memory rings to talk to xenstored */
-	err = xb_init_comms();
-	if (err)
-		return err;
 
 	task = kthread_run(xenwatch_thread, NULL, "xenwatch");
 	if (IS_ERR(task))

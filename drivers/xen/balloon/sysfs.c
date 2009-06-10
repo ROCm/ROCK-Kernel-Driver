@@ -57,9 +57,6 @@ BALLOON_SHOW(min_kb, "%lu\n", PAGES2KB(balloon_minimum_target()));
 BALLOON_SHOW(max_kb, "%lu\n", PAGES2KB(num_physpages));
 BALLOON_SHOW(low_kb, "%lu\n", PAGES2KB(bs.balloon_low));
 BALLOON_SHOW(high_kb, "%lu\n", PAGES2KB(bs.balloon_high));
-BALLOON_SHOW(hard_limit_kb,
-	     (bs.hard_limit!=~0UL) ? "%lu\n" : "???\n",
-	     (bs.hard_limit!=~0UL) ? PAGES2KB(bs.hard_limit) : 0);
 BALLOON_SHOW(driver_kb, "%lu\n", PAGES2KB(bs.driver_pages));
 
 static ssize_t show_target_kb(struct sys_device *dev,
@@ -132,7 +129,6 @@ static struct attribute *balloon_info_attrs[] = {
 	&attr_max_kb.attr,
 	&attr_low_kb.attr,
 	&attr_high_kb.attr,
-	&attr_hard_limit_kb.attr,
 	&attr_driver_kb.attr,
 	NULL
 };

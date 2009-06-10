@@ -53,6 +53,8 @@
 #include <xen/platform-compat.h>
 #endif
 
+#include <xen/public/xenbus.h>
+
 struct xenbus_dev_transaction {
 	struct list_head list;
 	struct xenbus_transaction handle;
@@ -95,6 +97,9 @@ static ssize_t xenbus_dev_read(struct file *filp,
 	struct xenbus_dev_data *u = filp->private_data;
 	struct read_buffer *rb;
 	int i, ret;
+
+	if (!is_xenstored_ready())
+		return -ENODEV;
 
 	mutex_lock(&u->reply_mutex);
 	while (list_empty(&u->read_buffers)) {
@@ -206,6 +211,9 @@ static ssize_t xenbus_dev_write(struct file *filp,
 	struct watch_adapter *watch, *tmp_watch;
 	int err, rc = len;
 
+	if (!is_xenstored_ready())
+		return -ENODEV;
+
 	if ((len + u->len) > sizeof(u->u.buffer)) {
 		rc = -EINVAL;
 		goto out;
@@ -224,50 +232,6 @@ static ssize_t xenbus_dev_write(struct file *filp,
 	msg_type = u->u.msg.type;
 
 	switch (msg_type) {
-	case XS_TRANSACTION_START:
-	case XS_TRANSACTION_END:
-	case XS_DIRECTORY:
-	case XS_READ:
-	case XS_GET_PERMS:
-	case XS_RELEASE:
-	case XS_GET_DOMAIN_PATH:
-	case XS_WRITE:
-	case XS_MKDIR:
-	case XS_RM:
-	case XS_SET_PERMS:
-		if (msg_type == XS_TRANSACTION_START) {
-			trans = kmalloc(sizeof(*trans), GFP_KERNEL);
-			if (!trans) {
-				rc = -ENOMEM;
-				goto out;
-			}
-		}
-
-		reply = xenbus_dev_request_and_reply(&u->u.msg);
-		if (IS_ERR(reply)) {
-			kfree(trans);
-			rc = PTR_ERR(reply);
-			goto out;
-		}
-
-		if (msg_type == XS_TRANSACTION_START) {
-			trans->handle.id = simple_strtoul(reply, NULL, 0);
-			list_add(&trans->list, &u->transactions);
-		} else if (msg_type == XS_TRANSACTION_END) {
-			list_for_each_entry(trans, &u->transactions, list)
-				if (trans->handle.id == u->u.msg.tx_id)
-					break;
-			BUG_ON(&trans->list == &u->transactions);
-			list_del(&trans->list);
-			kfree(trans);
-		}
-		mutex_lock(&u->reply_mutex);
-		queue_reply(u, (char *)&u->u.msg, sizeof(u->u.msg));
-		queue_reply(u, (char *)reply, u->u.msg.len);
-		mutex_unlock(&u->reply_mutex);
-		kfree(reply);
-		break;
-
 	case XS_WATCH:
 	case XS_UNWATCH: {
 		static const char *XS_RESP = "OK";
@@ -323,7 +287,37 @@ static ssize_t xenbus_dev_write(struct file *filp,
 	}
 
 	default:
-		rc = -EINVAL;
+		if (msg_type == XS_TRANSACTION_START) {
+			trans = kmalloc(sizeof(*trans), GFP_KERNEL);
+			if (!trans) {
+				rc = -ENOMEM;
+				goto out;
+			}
+		}
+
+		reply = xenbus_dev_request_and_reply(&u->u.msg);
+		if (IS_ERR(reply)) {
+			kfree(trans);
+			rc = PTR_ERR(reply);
+			goto out;
+		}
+
+		if (msg_type == XS_TRANSACTION_START) {
+			trans->handle.id = simple_strtoul(reply, NULL, 0);
+			list_add(&trans->list, &u->transactions);
+		} else if (msg_type == XS_TRANSACTION_END) {
+			list_for_each_entry(trans, &u->transactions, list)
+				if (trans->handle.id == u->u.msg.tx_id)
+					break;
+			BUG_ON(&trans->list == &u->transactions);
+			list_del(&trans->list);
+			kfree(trans);
+		}
+		mutex_lock(&u->reply_mutex);
+		queue_reply(u, (char *)&u->u.msg, sizeof(u->u.msg));
+		queue_reply(u, (char *)reply, u->u.msg.len);
+		mutex_unlock(&u->reply_mutex);
+		kfree(reply);
 		break;
 	}
 
@@ -384,11 +378,66 @@ static unsigned int xenbus_dev_poll(struct file *file, poll_table *wait)
 {
 	struct xenbus_dev_data *u = file->private_data;
 
+	if (!is_xenstored_ready())
+		return -ENODEV;
+
 	poll_wait(file, &u->read_waitq, wait);
 	if (!list_empty(&u->read_buffers))
 		return POLLIN | POLLRDNORM;
 	return 0;
 }
+
+#ifdef HAVE_UNLOCKED_IOCTL
+static long xenbus_dev_ioctl(struct file *file,
+                             unsigned int cmd, unsigned long data)
+{
+	extern int xenbus_conn(domid_t remote_dom, int *grant_ref,
+	                       evtchn_port_t *local_port);
+	void __user *udata = (void __user *) data;
+	int ret = -ENOTTY;
+	
+	if (!is_initial_xendomain())
+		return -ENODEV;
+
+
+	switch (cmd) {
+	case IOCTL_XENBUS_ALLOC: {
+		xenbus_alloc_t xa;
+		int old;
+
+		old = atomic_cmpxchg(&xenbus_xsd_state,
+		                     XENBUS_XSD_UNCOMMITTED,
+		                     XENBUS_XSD_FOREIGN_INIT);
+		if (old != XENBUS_XSD_UNCOMMITTED)
+			return -EBUSY;
+
+		if (copy_from_user(&xa, udata, sizeof(xa))) {
+			ret = -EFAULT;
+			atomic_set(&xenbus_xsd_state, XENBUS_XSD_UNCOMMITTED);
+			break;
+		}
+
+		ret = xenbus_conn(xa.dom, &xa.grant_ref, &xa.port);
+		if (ret != 0) {
+			atomic_set(&xenbus_xsd_state, XENBUS_XSD_UNCOMMITTED);
+			break;
+		}
+
+		if (copy_to_user(udata, &xa, sizeof(xa))) {
+			ret = -EFAULT;
+			atomic_set(&xenbus_xsd_state, XENBUS_XSD_UNCOMMITTED);
+			break;
+		}
+	}
+	break;
+
+	default:
+		break;
+	}
+
+	return ret;
+}
+#endif
 
 static const struct file_operations xenbus_dev_file_ops = {
 	.read = xenbus_dev_read,
@@ -396,6 +445,9 @@ static const struct file_operations xenbus_dev_file_ops = {
 	.open = xenbus_dev_open,
 	.release = xenbus_dev_release,
 	.poll = xenbus_dev_poll,
+#ifdef HAVE_UNLOCKED_IOCTL
+	.unlocked_ioctl = xenbus_dev_ioctl
+#endif
 };
 
 int xenbus_dev_init(void)

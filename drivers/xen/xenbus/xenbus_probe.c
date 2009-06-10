@@ -55,6 +55,7 @@
 #include <xen/xen_proc.h>
 #include <xen/evtchn.h>
 #include <xen/features.h>
+#include <xen/gnttab.h>
 #ifdef MODULE
 #include <xen/hvm.h>
 #endif
@@ -372,7 +373,12 @@ static void xenbus_dev_shutdown(struct device *_dev)
 
 	DPRINTK("%s", dev->nodename);
 
+/* Commented out since xenstored stubdom is now minios based not linux based
+#define XENSTORE_DOMAIN_SHARES_THIS_KERNEL
+*/
+#ifndef XENSTORE_DOMAIN_SHARES_THIS_KERNEL
 	if (is_initial_xendomain())
+#endif
 		return;
 
 	get_device(&dev->dev);
@@ -882,14 +888,13 @@ void xenbus_suspend_cancel(void)
 EXPORT_SYMBOL_GPL(xenbus_suspend_cancel);
 
 /* A flag to determine if xenstored is 'ready' (i.e. has started) */
-int xenstored_ready = 0;
-
+atomic_t xenbus_xsd_state = ATOMIC_INIT(XENBUS_XSD_UNCOMMITTED);
 
 int register_xenstore_notifier(struct notifier_block *nb)
 {
 	int ret = 0;
 
-	if (xenstored_ready > 0)
+	if (is_xenstored_ready())
 		ret = nb->notifier_call(nb, 0, NULL);
 	else
 		blocking_notifier_chain_register(&xenstore_chain, nb);
@@ -907,7 +912,7 @@ EXPORT_SYMBOL_GPL(unregister_xenstore_notifier);
 
 void xenbus_probe(struct work_struct *unused)
 {
-	BUG_ON((xenstored_ready <= 0));
+	BUG_ON(!is_xenstored_ready());
 
 	/* Enumerate devices in xenstore and watch for changes. */
 	xenbus_probe_devices(&xenbus_frontend);
@@ -927,6 +932,28 @@ static struct proc_dir_entry *xsd_port_intf;
 static int xsd_kva_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	size_t size = vma->vm_end - vma->vm_start;
+	int old;
+	int rc;
+
+	old = atomic_cmpxchg(&xenbus_xsd_state,
+	                   XENBUS_XSD_UNCOMMITTED,
+	                   XENBUS_XSD_LOCAL_INIT);
+	switch (old) {
+		case XENBUS_XSD_UNCOMMITTED:
+			rc = xb_init_comms();
+			if (rc != 0)
+				return rc;
+			break;
+
+		case XENBUS_XSD_FOREIGN_INIT:
+		case XENBUS_XSD_FOREIGN_READY:
+			return -EBUSY;
+
+		case XENBUS_XSD_LOCAL_INIT:
+		case XENBUS_XSD_LOCAL_READY:
+		default:
+			break;
+	}
 
 	if ((size > PAGE_SIZE) || (vma->vm_pgoff != 0))
 		return -EINVAL;
@@ -956,6 +983,64 @@ static int xsd_port_read(char *page, char **start, off_t off,
 	len  = sprintf(page, "%d", xen_store_evtchn);
 	*eof = 1;
 	return len;
+}
+#endif
+
+#if defined(CONFIG_XEN) || defined(MODULE)
+static int xb_free_port(evtchn_port_t port)
+{
+	struct evtchn_close close;
+	close.port = port;
+	return HYPERVISOR_event_channel_op(EVTCHNOP_close, &close);
+}
+
+int xenbus_conn(domid_t remote_dom, unsigned long *grant_ref, evtchn_port_t *local_port)
+{
+	struct evtchn_alloc_unbound alloc_unbound;
+	int rc, rc2;
+
+	BUG_ON(atomic_read(&xenbus_xsd_state) != XENBUS_XSD_FOREIGN_INIT);
+	BUG_ON(!is_initial_xendomain());
+
+#if defined(CONFIG_PROC_FS) && defined(CONFIG_XEN_PRIVILEGED_GUEST)
+	remove_xen_proc_entry("xsd_kva");
+	remove_xen_proc_entry("xsd_port");
+#endif
+
+	rc = xb_free_port(xen_store_evtchn);
+	if (rc != 0)
+		goto fail0;
+
+	alloc_unbound.dom = DOMID_SELF;
+	alloc_unbound.remote_dom = remote_dom;
+	rc = HYPERVISOR_event_channel_op(EVTCHNOP_alloc_unbound,
+	                                 &alloc_unbound);
+	if (rc != 0)
+		goto fail0;
+	*local_port = xen_store_evtchn = alloc_unbound.port;
+
+	/* keep the old page (xen_store_mfn, xen_store_interface) */
+	rc = gnttab_grant_foreign_access(remote_dom, xen_store_mfn,
+	                                 GTF_permit_access);
+	if (rc < 0)
+		goto fail1;
+	*grant_ref = rc;
+
+	rc = xb_init_comms();
+	if (rc != 0)
+		goto fail1;
+
+	return 0;
+
+fail1:
+	rc2 = xb_free_port(xen_store_evtchn);
+	if (rc2 != 0)
+		printk(KERN_WARNING
+		       "XENBUS: Error freeing xenstore event channel: %d\n",
+		       rc2);
+fail0:
+	xen_store_evtchn = -1;
+	return rc;
 }
 #endif
 
@@ -1001,7 +1086,7 @@ static int __devinit xenbus_probe_init(void)
 
 		/* Next allocate a local port which xenstored can bind to */
 		alloc_unbound.dom        = DOMID_SELF;
-		alloc_unbound.remote_dom = 0;
+		alloc_unbound.remote_dom = DOMID_SELF;
 
 		err = HYPERVISOR_event_channel_op(EVTCHNOP_alloc_unbound,
 						  &alloc_unbound);
@@ -1030,7 +1115,7 @@ static int __devinit xenbus_probe_init(void)
 #endif
 		xen_store_interface = mfn_to_virt(xen_store_mfn);
 	} else {
-		xenstored_ready = 1;
+		atomic_set(&xenbus_xsd_state, XENBUS_XSD_FOREIGN_READY);
 #ifndef MODULE
 		xen_store_evtchn = xen_start_info->store_evtchn;
 		xen_store_mfn = xen_start_info->store_mfn;
@@ -1041,8 +1126,11 @@ static int __devinit xenbus_probe_init(void)
 		xen_store_interface = ioremap(xen_store_mfn << PAGE_SHIFT,
 					      PAGE_SIZE);
 #endif
+		/* Initialize the shared memory rings to talk to xenstored */
+		err = xb_init_comms();
+		if (err)
+			goto err;
 	}
-
 
 #if defined(CONFIG_XEN) || defined(MODULE)
 	xenbus_dev_init();

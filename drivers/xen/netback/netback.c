@@ -142,6 +142,9 @@ static unsigned int alloc_index = 0;
 static int MODPARM_copy_skb = 1;
 module_param_named(copy_skb, MODPARM_copy_skb, bool, 0);
 MODULE_PARM_DESC(copy_skb, "Copy data received from netfront without netloop");
+static int MODPARM_permute_returns = 0;
+module_param_named(permute_returns, MODPARM_permute_returns, bool, S_IRUSR|S_IWUSR);
+MODULE_PARM_DESC(permute_returns, "Randomly permute the order in which TX responses are sent to the frontend");
 
 int netbk_copy_skb_mode;
 
@@ -882,6 +885,25 @@ static inline int copy_pending_req(PEND_RING_IDX pending_idx)
 				      &mmap_pages[pending_idx]);
 }
 
+static void permute_dealloc_ring(PEND_RING_IDX dc, PEND_RING_IDX dp)
+{
+	static unsigned random_src = 0x12345678;
+	unsigned dst_offset;
+	PEND_RING_IDX dest;
+	u16 tmp;
+
+	while (dc != dp) {
+		dst_offset = (random_src / 256) % (dp - dc);
+		dest = dc + dst_offset;
+		tmp = dealloc_ring[MASK_PEND_IDX(dest)];
+		dealloc_ring[MASK_PEND_IDX(dest)] =
+			dealloc_ring[MASK_PEND_IDX(dc)];
+		dealloc_ring[MASK_PEND_IDX(dc)] = tmp;
+		dc++;
+		random_src *= 68389;
+	}
+}
+
 inline static void net_tx_action_dealloc(void)
 {
 	struct netbk_tx_pending_inuse *inuse, *n;
@@ -903,6 +925,9 @@ inline static void net_tx_action_dealloc(void)
 
 		/* Ensure we see all indices enqueued by netif_idx_release(). */
 		smp_rmb();
+
+		if (MODPARM_permute_returns)
+			permute_dealloc_ring(dc, dp);
 
 		while (dc != dp) {
 			unsigned long pfn;

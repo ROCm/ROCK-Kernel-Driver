@@ -498,9 +498,9 @@ phys_pte_init(pte_t *pte_page, unsigned long addr, unsigned long end,
 	for(i = pte_index(addr); i < PTRS_PER_PTE; i++, addr += PAGE_SIZE, pte++) {
 		unsigned long pteval = addr | pgprot_val(prot);
 
-		if (addr >= (after_bootmem
-			     ? end
-			     : xen_start_info->nr_pages << PAGE_SHIFT))
+		if (addr >= end ||
+		    (!after_bootmem &&
+		     (addr >> PAGE_SHIFT) >= xen_start_info->nr_pages))
 			break;
 
 		/*

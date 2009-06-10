@@ -1,5 +1,7 @@
 /*
  * Copyright (c) 2008, 2009 NEC Corporation.
+ * Copyright (c) 2009 Isaku Yamahata
+ *                    VA Linux Systems Japan K.K.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -38,8 +40,11 @@
 #define GUESTDEV_FLAG_DEVICEPATH 0x1
 #define GUESTDEV_FLAG_SBDF 0x2
 
+#define GUESTDEV_OPT_IOMUL	0x1
+
 struct guestdev {
 	int flags;
+	int options;
 	struct list_head root_list;
 	union {
 		struct devicepath {
@@ -97,8 +102,7 @@ static int __init pci_get_hid_uid(char *str, char *hid, char *uid)
 	if (len <= 0 || HID_LEN < len)
 		goto format_err_end;
 
-	strncpy(hid, sp, len);
-	hid[len] = '\0';
+	strlcpy(hid, sp, len);
 
 	if (*ep == '-') { /* no uid */
 		uid[0] = '\0';
@@ -115,8 +119,7 @@ static int __init pci_get_hid_uid(char *str, char *hid, char *uid)
 	if (len <= 0 || UID_LEN < len)
 		goto format_err_end;
 
-	strncpy(uid, sp, len);
-	uid[len] = '\0';
+	strlcpy(uid, sp, len);
 	return TRUE;
 
 format_err_end:
@@ -274,6 +277,7 @@ struct guestdev __init *pci_copy_guestdev(struct guestdev *gdev_src)
 	memset(gdev, 0, sizeof(*gdev));
 	INIT_LIST_HEAD(&gdev->root_list);
 	gdev->flags = gdev_src->flags;
+	gdev->options = gdev_src->options;
 	strcpy(gdev->u.devicepath.hid, gdev_src->u.devicepath.hid);
 	strcpy(gdev->u.devicepath.uid, gdev_src->u.devicepath.uid);
 	gdev->u.devicepath.seg = gdev_src->u.devicepath.seg;
@@ -307,7 +311,7 @@ allocate_err_end:
 }
 
 /* Make guestdev from path strings */
-static int __init pci_make_devicepath_guestdev(char *path_str)
+static int __init pci_make_devicepath_guestdev(char *path_str, int options)
 {
 	char hid[HID_LEN + 1], uid[UID_LEN + 1];
 	char *sp, *ep;
@@ -335,6 +339,7 @@ static int __init pci_make_devicepath_guestdev(char *path_str)
 	memset(gdev_org, 0, sizeof(*gdev_org));
 	INIT_LIST_HEAD(&gdev_org->root_list);
 	gdev_org->flags = GUESTDEV_FLAG_DEVICEPATH;
+	gdev_org->options = options;
 	strcpy(gdev_org->u.devicepath.hid, hid);
 	strcpy(gdev_org->u.devicepath.uid, uid);
 	gdev_org->u.devicepath.seg = INVALID_SEG;
@@ -434,7 +439,7 @@ end:
 	return ret_val;
 }
 
-static int __init pci_make_sbdf_guestdev(char* str)
+static int __init pci_make_sbdf_guestdev(char* str, int options)
 {
 	struct guestdev *gdev;
 	int seg, bus, dev, func;
@@ -451,6 +456,7 @@ static int __init pci_make_sbdf_guestdev(char* str)
 	}
 	INIT_LIST_HEAD(&gdev->root_list);
 	gdev->flags = GUESTDEV_FLAG_SBDF;
+	gdev->options = options;
 	gdev->u.sbdf.seg = seg;
 	gdev->u.sbdf.bus = bus;
 	gdev->u.sbdf.dev = dev;
@@ -459,11 +465,31 @@ static int __init pci_make_sbdf_guestdev(char* str)
 	return 0;
 }
 
+static int __init pci_parse_options(const char *str)
+{
+	int options = 0;
+	char *ep;
+
+	while (str) {
+		str++;
+		ep = strchr(str, '+');
+		if (ep)
+			ep = '\0';	/* Chop */
+
+		if (!strcmp(str, "iomul"))
+			options |= GUESTDEV_OPT_IOMUL;
+
+		str = ep;
+	}
+	return options;
+}
+
 /* Parse guestdev parameter */
 static int __init pci_parse_guestdev(void)
 {
 	int len;
-	char *sp, *ep;
+	char *sp, *ep, *op;
+	int options;
 	struct list_head *head;
 	struct guestdev *gdev;
 	char path_str[GUESTDEV_STR_MAX];
@@ -480,16 +506,26 @@ static int __init pci_parse_guestdev(void)
 		/* Chop */
 		if (ep)
 			*ep = '\0';
-		ret_val = pci_make_sbdf_guestdev(sp);
+		options = 0;
+		op = strchr(sp, '+');
+		if (op && (!ep || op < ep)) {
+			options = pci_parse_options(op);
+			*op = '\0';	/* Chop */
+		}
+		ret_val = pci_make_sbdf_guestdev(sp, options);
 		if (ret_val == -EINVAL) {
 			if (pci_check_extended_guestdev_format(sp)) {
-				ret_val = pci_make_devicepath_guestdev(sp);
+				ret_val = pci_make_devicepath_guestdev(
+					sp, options);
 				if (ret_val && ret_val != -EINVAL)
 					break;
 			}
 		} else if (ret_val)
 			break;
-		sp = ep + 1;
+
+		if (ep)
+			ep++;
+		sp = ep;
 	} while (ep);
 
 	list_for_each(head, &guestdev_list) {
@@ -509,7 +545,7 @@ static int __init pci_guestdev_setup(char *str)
 {
 	if (strlen(str) >= COMMAND_LINE_SIZE)
 		return 0;
-	strcpy(guestdev_param, str);
+	strlcpy(guestdev_param, str, sizeof(guestdev_param));
 	return 1;
 }
 
@@ -530,8 +566,21 @@ static void pci_free_sbdf(struct pcidev_sbdf *sbdf)
 }
 
 /* Does PCI device belong to sub tree specified by guestdev with device path? */
+typedef int (*pci_node_match_t)(const struct devicepath_node *gdev_node,
+				const struct pcidev_sbdf_node *sbdf_node,
+				int options);
+
+static int pci_node_match(const struct devicepath_node *gdev_node,
+			  const struct pcidev_sbdf_node *sbdf_node,
+			  int options_unused)
+{
+	return (gdev_node->dev == sbdf_node->dev &&
+		gdev_node->func == sbdf_node->func);
+}
+
 static int pci_is_in_devicepath_sub_tree(struct guestdev *gdev,
-					struct pcidev_sbdf *sbdf)
+					 struct pcidev_sbdf *sbdf,
+					 pci_node_match_t match)
 {
 	int seg, bbn;
 	struct devicepath_node *gdev_node;
@@ -564,8 +613,7 @@ static int pci_is_in_devicepath_sub_tree(struct guestdev *gdev,
 	while (gdev_node) {
 		if (!sbdf_node)
 			return FALSE;
-		if (gdev_node->dev != sbdf_node->dev ||
-		    gdev_node->func != sbdf_node->func)
+		if (!match(gdev_node, sbdf_node, gdev->options))
 			return FALSE;
 		gdev_node = gdev_node->child;
 		sbdf_node = sbdf_node->child;
@@ -614,16 +662,29 @@ err_end:
 }
 
 /* Does PCI device belong to sub tree specified by guestdev with sbdf? */
-static int pci_is_in_sbdf_sub_tree(struct guestdev *gdev, struct pci_dev *dev)
+typedef int (*pci_sbdf_match_t)(const struct guestdev *gdev,
+				const  struct pci_dev *dev);
+
+static int pci_sbdf_match(const struct guestdev *gdev,
+			  const struct pci_dev *dev)
 {
 	int seg, bus;
+
+	if (sscanf(dev_name(&dev->dev), "%04x:%02x", &seg, &bus) != 2)
+		return FALSE;
+
+	return gdev->u.sbdf.seg == seg &&
+		gdev->u.sbdf.bus == bus &&
+		gdev->u.sbdf.dev == PCI_SLOT(dev->devfn) &&
+		gdev->u.sbdf.func == PCI_FUNC(dev->devfn);
+}
+
+static int pci_is_in_sbdf_sub_tree(struct guestdev *gdev, struct pci_dev *dev,
+				   pci_sbdf_match_t match)
+{
 	BUG_ON(!(gdev->flags & GUESTDEV_FLAG_SBDF));
 	for (;;) {
-		if (sscanf(dev_name(&dev->dev), "%04x:%02x", &seg, &bus) != 2)
-			continue;
-		if (gdev->u.sbdf.seg == seg && gdev->u.sbdf.bus == bus &&
-			gdev->u.sbdf.dev == PCI_SLOT(dev->devfn) &&
-			gdev->u.sbdf.func == PCI_FUNC(dev->devfn))
+		if (match(gdev, dev))
 			return TRUE;
 		if (!dev->bus || !dev->bus->self)
 			break;
@@ -633,7 +694,8 @@ static int pci_is_in_sbdf_sub_tree(struct guestdev *gdev, struct pci_dev *dev)
 }
 
 /* Does PCI device belong to sub tree specified by guestdev parameter? */
-int pci_is_guestdev(struct pci_dev *dev)
+static int __pci_is_guestdev(struct pci_dev *dev, pci_node_match_t node_match,
+			     pci_sbdf_match_t sbdf_match)
 {
 	struct guestdev *gdev;
 	struct pcidev_sbdf pcidev_sbdf, *sbdf = NULL;
@@ -653,13 +715,14 @@ int pci_is_guestdev(struct pci_dev *dev)
 				if (!pci_get_sbdf_from_pcidev(dev, sbdf))
 					goto out;
 			}
-			if (pci_is_in_devicepath_sub_tree(gdev, sbdf)) {
+			if (pci_is_in_devicepath_sub_tree(gdev, sbdf,
+							  node_match)) {
 				result = TRUE;
 				goto out;
 			}
 			break;
 		case GUESTDEV_FLAG_SBDF:
-			if (pci_is_in_sbdf_sub_tree(gdev, dev)) {
+			if (pci_is_in_sbdf_sub_tree(gdev, dev, sbdf_match)) {
 				result = TRUE;
 				goto out;
 			}
@@ -672,6 +735,11 @@ out:
 	if (sbdf)
 		pci_free_sbdf(sbdf);
 	return result;
+}
+
+int pci_is_guestdev(struct pci_dev *dev)
+{
+	return __pci_is_guestdev(dev, pci_node_match, pci_sbdf_match);
 }
 EXPORT_SYMBOL_GPL(pci_is_guestdev);
 
@@ -691,6 +759,42 @@ int pci_is_guestdev_to_reassign(struct pci_dev *dev)
 		return pci_is_guestdev(dev);
 	return FALSE;
 }
+
+#ifdef CONFIG_PCI_IOMULTI
+static int pci_iomul_node_match(const struct devicepath_node *gdev_node,
+				const struct pcidev_sbdf_node *sbdf_node,
+				int options)
+{
+	return (options & GUESTDEV_OPT_IOMUL) &&
+		((gdev_node->child != NULL &&
+		  sbdf_node->child != NULL &&
+		  gdev_node->dev == sbdf_node->dev &&
+		  gdev_node->func == sbdf_node->func) ||
+		 (gdev_node->child == NULL &&
+		  sbdf_node->child == NULL &&
+		  gdev_node->dev == sbdf_node->dev));
+}
+
+static int pci_iomul_sbdf_match(const struct guestdev *gdev,
+				const struct pci_dev *dev)
+{
+	int seg, bus;
+
+	if (sscanf(dev_name(&dev->dev), "%04x:%02x", &seg, &bus) != 2)
+		return FALSE;
+
+	return (gdev->options & GUESTDEV_OPT_IOMUL) &&
+		gdev->u.sbdf.seg == seg &&
+		gdev->u.sbdf.bus == bus &&
+		gdev->u.sbdf.dev == PCI_SLOT(dev->devfn);
+}
+
+int pci_is_iomuldev(struct pci_dev *dev)
+{
+	return __pci_is_guestdev(dev,
+				 pci_iomul_node_match, pci_iomul_sbdf_match);
+}
+#endif /* CONFIG_PCI_IOMULTI */
 
 /* Check whether the devicepath exists under the pci root bus */
 static int __init pci_check_devicepath_exists(

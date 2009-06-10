@@ -240,7 +240,7 @@ static __always_inline void __ticket_spin_lock_flags(raw_spinlock_t *lock,
 	} while (unlikely(!count) && !xen_spin_wait_flags(lock, &token, flags));
 }
 
-#ifndef CONFIG_PARAVIRT
+#ifndef CONFIG_PARAVIRT_SPINLOCKS
 
 static inline int __raw_spin_is_locked(raw_spinlock_t *lock)
 {
@@ -274,7 +274,7 @@ static __always_inline void __raw_spin_lock_flags(raw_spinlock_t *lock,
 	__ticket_spin_lock_flags(lock, flags);
 }
 
-#endif
+#endif	/* CONFIG_PARAVIRT_SPINLOCKS */
 
 static inline void __raw_spin_unlock_wait(raw_spinlock_t *lock)
 {

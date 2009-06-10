@@ -1267,7 +1267,9 @@ static inline irqreturn_t pci_sriov_migration(struct pci_dev *dev)
 
 #ifdef CONFIG_PCI_GUESTDEV
 int pci_is_guestdev(struct pci_dev *dev);
-#endif /* CONFIG_PCI_GUESTDEV */
+#else
+#define pci_is_guestdev(dev)	0
+#endif
 
 #endif /* __KERNEL__ */
 #endif /* LINUX_PCI_H */

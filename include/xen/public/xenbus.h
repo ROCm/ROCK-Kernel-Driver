@@ -1,24 +1,26 @@
-/*
- * Private include for xenbus communications.
- *
- * Copyright (C) 2005 Rusty Russell, IBM Corporation
- *
+/******************************************************************************
+ * xenbus.h
+ * 
+ * Interface to /proc/xen/xenbus.
+ * 
+ * Copyright (c) 2008, Diego Ongaro <diego.ongaro@citrix.com>
+ * 
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License version 2
  * as published by the Free Software Foundation; or, when distributed
  * separately from the Linux kernel or incorporated into other
  * software packages, subject to the following license:
- *
+ * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this source file (the "Software"), to deal in the Software without
  * restriction, including without limitation the rights to use, copy, modify,
  * merge, publish, distribute, sublicense, and/or sell copies of the Software,
  * and to permit persons to whom the Software is furnished to do so, subject to
  * the following conditions:
- *
+ * 
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- *
+ * 
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -28,35 +30,27 @@
  * IN THE SOFTWARE.
  */
 
-#ifndef _XENBUS_COMMS_H
-#define _XENBUS_COMMS_H
+#ifndef __LINUX_PUBLIC_XENBUS_H__
+#define __LINUX_PUBLIC_XENBUS_H__
 
-int xs_init(void);
-int xb_init_comms(void);
+#include <linux/types.h>
 
-/* Low level routines. */
-int xb_write(const void *data, unsigned len);
-int xb_read(void *data, unsigned len);
-int xb_data_to_read(void);
-int xb_wait_for_data_to_read(void);
-int xs_input_avail(void);
-extern struct xenstore_domain_interface *xen_store_interface;
-extern int xen_store_evtchn;
+#ifndef __user
+#define __user
+#endif
 
-/* For xenbus internal use. */
-enum {
-	XENBUS_XSD_UNCOMMITTED = 0,
-	XENBUS_XSD_FOREIGN_INIT,
-	XENBUS_XSD_FOREIGN_READY,
-	XENBUS_XSD_LOCAL_INIT,
-	XENBUS_XSD_LOCAL_READY,
-};
-extern atomic_t xenbus_xsd_state;
+typedef struct xenbus_alloc {
+	domid_t dom;
+	__u32 port;
+	__u32 grant_ref;
+} xenbus_alloc_t;
 
-static inline int is_xenstored_ready(void)
-{
-	int s = atomic_read(&xenbus_xsd_state);
-	return s == XENBUS_XSD_FOREIGN_READY || s == XENBUS_XSD_LOCAL_READY;
-}
+/*
+ * @cmd: IOCTL_XENBUS_ALLOC
+ * @arg: &xenbus_alloc_t
+ * Return: 0, or -1 for error
+ */
+#define IOCTL_XENBUS_ALLOC					\
+	_IOC(_IOC_NONE, 'X', 0, sizeof(xenbus_alloc_t))
 
-#endif /* _XENBUS_COMMS_H */
+#endif /* __LINUX_PUBLIC_XENBUS_H__ */

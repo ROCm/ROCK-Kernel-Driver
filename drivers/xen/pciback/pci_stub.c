@@ -629,12 +629,22 @@ static pci_ers_result_t pciback_slot_reset(struct pci_dev *dev)
 				dev->bus->number,
 				PCI_SLOT(dev->devfn),
 				PCI_FUNC(dev->devfn));
-	if ( !psdev || !psdev->pdev || !psdev->pdev->sh_info )
+
+	if ( !psdev || !psdev->pdev )
 	{
 		dev_err(&dev->dev, 
-			"pciback device is not found/in use/connected!\n");
+			"pciback device is not found/assigned\n");
 		goto end;
 	}
+
+	if ( !psdev->pdev->sh_info )
+	{
+		dev_err(&dev->dev, "pciback device is not connected or owned"
+			" by HVM, kill it\n");
+		kill_domain_by_device(psdev);
+		goto release;
+	}
+
 	if ( !test_bit(_XEN_PCIB_AERHANDLER, 
 		(unsigned long *)&psdev->pdev->sh_info->flags) ) {
 		dev_err(&dev->dev, 
@@ -679,12 +689,22 @@ static pci_ers_result_t pciback_mmio_enabled(struct pci_dev *dev)
 				dev->bus->number,
 				PCI_SLOT(dev->devfn),
 				PCI_FUNC(dev->devfn));
-	if ( !psdev || !psdev->pdev || !psdev->pdev->sh_info)
+
+	if ( !psdev || !psdev->pdev )
 	{
 		dev_err(&dev->dev, 
-			"pciback device is not found/in use/connected!\n");
+			"pciback device is not found/assigned\n");
 		goto end;
 	}
+
+	if ( !psdev->pdev->sh_info )
+	{
+		dev_err(&dev->dev, "pciback device is not connected or owned"
+			" by HVM, kill it\n");
+		kill_domain_by_device(psdev);
+		goto release;
+	}
+
 	if ( !test_bit(_XEN_PCIB_AERHANDLER, 
 		(unsigned long *)&psdev->pdev->sh_info->flags) ) {
 		dev_err(&dev->dev, 
@@ -729,12 +749,22 @@ static pci_ers_result_t pciback_error_detected(struct pci_dev *dev,
 				dev->bus->number,
 				PCI_SLOT(dev->devfn),
 				PCI_FUNC(dev->devfn));
-	if ( !psdev || !psdev->pdev || !psdev->pdev->sh_info)
+
+	if ( !psdev || !psdev->pdev )
 	{
 		dev_err(&dev->dev, 
-			"pciback device is not found/in use/connected!\n");
+			"pciback device is not found/assigned\n");
 		goto end;
 	}
+
+	if ( !psdev->pdev->sh_info )
+	{
+		dev_err(&dev->dev, "pciback device is not connected or owned"
+			" by HVM, kill it\n");
+		kill_domain_by_device(psdev);
+		goto release;
+	}
+
 	/*Guest owns the device yet no aer handler regiested, kill guest*/
 	if ( !test_bit(_XEN_PCIB_AERHANDLER, 
 		(unsigned long *)&psdev->pdev->sh_info->flags) ) {
@@ -775,11 +805,20 @@ static void pciback_error_resume(struct pci_dev *dev)
 				dev->bus->number,
 				PCI_SLOT(dev->devfn),
 				PCI_FUNC(dev->devfn));
-	if ( !psdev || !psdev->pdev || !psdev->pdev->sh_info)
+
+	if ( !psdev || !psdev->pdev )
 	{
 		dev_err(&dev->dev, 
-			"pciback device is not found/in use/connected!\n");
+			"pciback device is not found/assigned\n");
 		goto end;
+	}
+
+	if ( !psdev->pdev->sh_info )
+	{
+		dev_err(&dev->dev, "pciback device is not connected or owned"
+			" by HVM, kill it\n");
+		kill_domain_by_device(psdev);
+		goto release;
 	}
 
 	if ( !test_bit(_XEN_PCIB_AERHANDLER, 

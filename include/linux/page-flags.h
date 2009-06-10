@@ -107,11 +107,13 @@ enum pageflags {
 	PG_uncached,		/* Page has been mapped as uncached */
 #endif
 #ifdef CONFIG_XEN
-	PG_foreign,		/* Page is owned by foreign allocator. */
 	PG_pinned,		/* Cannot alias with PG_owner_priv_1 since
 				 * bad_page() checks include this bit.
 				 * Should not use PG_arch_1 as that may have
 				 * a different purpose elsewhere. */
+	PG_foreign,		/* Page is owned by foreign allocator. */
+	PG_netback,		/* Page is owned by netback */
+	PG_blkback,		/* Page is owned by blkback */
 #endif
 	__NR_PAGEFLAGS,
 
@@ -358,6 +360,8 @@ static inline void PageForeignDestructor(struct page *page, unsigned int order)
 {
 	((void (*)(struct page *, unsigned int))page->index)(page, order);
 }
+PAGEFLAG(Netback, netback)
+PAGEFLAG(Blkback, blkback)
 #endif
 
 extern void cancel_dirty_page(struct page *page, unsigned int account_size);

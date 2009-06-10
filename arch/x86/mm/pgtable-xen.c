@@ -756,7 +756,8 @@ void pgd_free(struct mm_struct *mm, pgd_t *pgd)
 pte_t xen_ptep_get_and_clear_full(struct vm_area_struct *vma,
 				  unsigned long addr, pte_t *ptep, int full)
 {
-	return ptep_get_and_clear_full(vma->vm_mm, addr, ptep, full);
+	return ptep_get_and_clear_full(vma ? vma->vm_mm : &init_mm,
+				       addr, ptep, full);
 }
 EXPORT_SYMBOL_GPL(xen_ptep_get_and_clear_full);
 
