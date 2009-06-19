@@ -1,19 +1,14 @@
 /*
- * /dev tmpfs device nodes
+ * devtmpfs - kernel-maintained tmpfs-based /dev
  *
  * Copyright (C) 2009, Kay Sievers <kay.sievers@vrfy.org>
  *
- * During bootup, before any driver core device is registered, a tmpfs
- * filesystem is created. Every device which requests a devno, will
- * create a device node in this filesystem. The node is named after the
- * the nameof the device, or the susbsytem can provide a custom name
- * for the node.
- *
- * All devices are owned by root. This is intended to simplify bootup, and
- * make it possible to delay the initial coldplug done by udev in userspace.
- *
- * It should also provide a simpler way for rescue systems to bring up a
- * kernel with dynamic major/minor numbers.
+ * During bootup, before any driver core device is registered,
+ * devtmpfs, a tmpfs-based filesystem is created. Every driver-core
+ * device which requests a device node, will add a node in this
+ * filesystem. The node is named after the the name of the device,
+ * or the susbsytem can provide a custom name. All devices are
+ * owned by root and have a mode of 0600.
  */
 
 #include <linux/kernel.h>
@@ -23,8 +18,36 @@
 #include <linux/genhd.h>
 #include <linux/namei.h>
 #include <linux/fs.h>
+#include <linux/shmem_fs.h>
+#include <linux/cred.h>
+#include <linux/init_task.h>
 
 static struct vfsmount *dev_mnt;
+
+#if defined CONFIG_DEVTMPFS_MOUNT
+static int dev_mount = 1;
+#else
+static int dev_mount;
+#endif
+
+static int __init mount_param(char *str)
+{
+	dev_mount = simple_strtoul(str, NULL, 0);
+	return 1;
+}
+__setup("devtmpfs.mount=", mount_param);
+
+static int dev_get_sb(struct file_system_type *fs_type, int flags,
+		      const char *dev_name, void *data, struct vfsmount *mnt)
+{
+	return get_sb_single(fs_type, flags, data, shmem_fill_super, mnt);
+}
+
+static struct file_system_type dev_fs_type = {
+	.name = "devtmpfs",
+	.get_sb = dev_get_sb,
+	.kill_sb = kill_litter_super,
+};
 
 #ifdef CONFIG_BLOCK
 static inline int is_blockdev(struct device *dev)
@@ -52,28 +75,6 @@ static int dev_mkdir(const char *name, mode_t mode)
 		dput(dentry);
 	} else {
 		err = PTR_ERR(dentry);
-	}
-	mutex_unlock(&nd.path.dentry->d_inode->i_mutex);
-
-	path_put(&nd.path);
-	return err;
-}
-
-static int dev_symlink(const char *target, const char *name)
-{
-	struct nameidata nd;
-	struct dentry *dentry;
-	int err;
-
-	err = vfs_path_lookup(dev_mnt->mnt_root, dev_mnt,
-			      name, LOOKUP_PARENT, &nd);
-	if (err)
-		return err;
-
-	dentry = lookup_create(&nd, 0);
-	if (!IS_ERR(dentry)) {
-		err = vfs_symlink(nd.path.dentry->d_inode, dentry, target);
-		dput(dentry);
 	}
 	mutex_unlock(&nd.path.dentry->d_inode->i_mutex);
 
@@ -132,6 +133,7 @@ int devtmpfs_create_node(struct device *dev)
 {
 	const char *tmp = NULL;
 	const char *nodename;
+	const struct cred *curr_cred;
 	mode_t mode;
 	struct nameidata nd;
 	struct dentry *dentry;
@@ -149,6 +151,7 @@ int devtmpfs_create_node(struct device *dev)
 	else
 		mode = S_IFCHR|0600;
 
+	curr_cred = override_creds(&init_cred);
 	err = vfs_path_lookup(dev_mnt->mnt_root, dev_mnt,
 			      nodename, LOOKUP_PARENT, &nd);
 	if (err == -ENOENT) {
@@ -157,7 +160,7 @@ int devtmpfs_create_node(struct device *dev)
 		err = vfs_path_lookup(dev_mnt->mnt_root, dev_mnt,
 				      nodename, LOOKUP_PARENT, &nd);
 		if (err)
-			goto out_name;
+			goto out;
 	}
 
 	dentry = lookup_create(&nd, 0);
@@ -174,8 +177,9 @@ int devtmpfs_create_node(struct device *dev)
 	mutex_unlock(&nd.path.dentry->d_inode->i_mutex);
 
 	path_put(&nd.path);
-out_name:
+out:
 	kfree(tmp);
+	revert_creds(curr_cred);
 	return err;
 }
 
@@ -257,6 +261,7 @@ int devtmpfs_delete_node(struct device *dev)
 {
 	const char *tmp = NULL;
 	const char *nodename;
+	const struct cred *curr_cred;
 	struct nameidata nd;
 	struct dentry *dentry;
 	struct kstat stat;
@@ -270,10 +275,11 @@ int devtmpfs_delete_node(struct device *dev)
 	if (!nodename)
 		return -ENOMEM;
 
+	curr_cred = override_creds(&init_cred);
 	err = vfs_path_lookup(dev_mnt->mnt_root, dev_mnt,
 			      nodename, LOOKUP_PARENT, &nd);
 	if (err)
-		goto out_name;
+		goto out;
 
 	mutex_lock_nested(&nd.path.dentry->d_inode->i_mutex, I_MUTEX_PARENT);
 	dentry = lookup_one_len(nd.last.name, nd.path.dentry, nd.last.len);
@@ -298,18 +304,23 @@ int devtmpfs_delete_node(struct device *dev)
 	path_put(&nd.path);
 	if (deleted && strchr(nodename, '/'))
 		delete_path(nodename);
-out_name:
+out:
 	kfree(tmp);
+	revert_creds(curr_cred);
 	return err;
 }
 
-/* After the root filesystem is mounted by the kernel at /root, or the
- * initramfs in extracted at /root, this tmpfs will be mounted at /root/dev.
+/*
+ * If configured, or requested by the commandline, devtmpfs will be
+ * auto-mounted after the kernel mounted the root filesystem.
  */
 int devtmpfs_mount(const char *mountpoint)
 {
 	struct path path;
 	int err;
+
+	if (!dev_mount)
+		return 0;
 
 	if (!dev_mnt)
 		return 0;
@@ -327,28 +338,30 @@ int devtmpfs_mount(const char *mountpoint)
 }
 
 /*
- * Create tmpfs mount, created core devices will add their device device
+ * Create devtmpfs instance, driver-core devices will add their device
  * nodes here.
  */
-__init int devtmpfs_init(void)
+int __init devtmpfs_init(void)
 {
 	int err;
+	struct vfsmount *mnt;
 
-	dev_mnt = do_kern_mount("tmpfs", 0, "devtmpfs", NULL);
-	if (IS_ERR(dev_mnt)) {
-		err = PTR_ERR(dev_mnt);
-		printk(KERN_ERR "devtmpfs: unable to initialize %i\n", err);
-		dev_mnt = NULL;
-		return -1;
+	err = register_filesystem(&dev_fs_type);
+	if (err) {
+		printk(KERN_ERR "devtmpfs: unable to register devtmpfs "
+		       "type %i\n", err);
+		return err;
 	}
 
-	/* create common files/directories */
-	dev_mkdir("pts", 0755);
-	dev_mkdir("shm", 01755);
-	dev_symlink("/proc/self/fd", "fd");
-	dev_symlink("/proc/self/fd/0", "stdin");
-	dev_symlink("/proc/self/fd/1", "stdout");
-	dev_symlink("/proc/self/fd/2", "stderr");
+	mnt = kern_mount(&dev_fs_type);
+	if (IS_ERR(mnt)) {
+		err = PTR_ERR(mnt);
+		printk(KERN_ERR "devtmpfs: unable to create devtmpfs %i\n", err);
+		unregister_filesystem(&dev_fs_type);
+		return err;
+	}
+	dev_mnt = mnt;
+
 	printk(KERN_INFO "devtmpfs: initialized\n");
 	return 0;
 }

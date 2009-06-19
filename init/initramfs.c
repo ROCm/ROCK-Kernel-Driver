@@ -8,7 +8,6 @@
 #include <linux/dirent.h>
 #include <linux/syscalls.h>
 #include <linux/utime.h>
-#include <linux/device.h>
 
 static __initdata char *message;
 static void __init error(char *x)
@@ -601,8 +600,6 @@ static int __init populate_rootfs(void)
 			initrd_end - initrd_start);
 		if (err)
 			printk(KERN_EMERG "Initramfs unpacking failed: %s\n", err);
-		else
-			devtmpfs_mount("dev");
 		free_initrd();
 #endif
 	}

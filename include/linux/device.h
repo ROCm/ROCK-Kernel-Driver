@@ -371,7 +371,6 @@ struct device_dma_parameters {
 
 struct device {
 	struct device		*parent;
-	char *(*nodename)(struct device *dev);
 
 	struct device_private	*p;
 

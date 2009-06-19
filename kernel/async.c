@@ -67,7 +67,7 @@ static LIST_HEAD(async_pending);
 static LIST_HEAD(async_running);
 static DEFINE_SPINLOCK(async_lock);
 
-static int async_enabled = 0;
+static int async_enabled = 1;
 
 struct async_entry {
 	struct list_head list;

@@ -25,14 +25,7 @@ obj-$(CONFIG_REGULATOR)		+= regulator/
 # default.
 obj-y				+= char/
 
-# gpu/ comes after char for AGP vs DRM startup
-obj-y				+= gpu/
-
 obj-$(CONFIG_CONNECTOR)		+= connector/
-
-# i810fb and intelfb depend on char/agp/
-obj-$(CONFIG_FB_I810)           += video/i810/
-obj-$(CONFIG_FB_INTEL)          += video/intelfb/
 
 obj-y				+= serial/
 obj-$(CONFIG_PARPORT)		+= parport/
@@ -44,6 +37,13 @@ obj-$(CONFIG_SCSI)		+= scsi/
 obj-$(CONFIG_ATA)		+= ata/
 obj-$(CONFIG_IDE)		+= ide/
 obj-y				+= net/
+
+# gpu/ comes after char for AGP vs DRM startup
+obj-y				+= gpu/
+# i810fb and intelfb depend on char/agp/
+obj-$(CONFIG_FB_I810)           += video/i810/
+obj-$(CONFIG_FB_INTEL)          += video/intelfb/
+
 obj-$(CONFIG_ATM)		+= atm/
 obj-$(CONFIG_FUSION)		+= message/
 obj-$(CONFIG_FIREWIRE)		+= firewire/

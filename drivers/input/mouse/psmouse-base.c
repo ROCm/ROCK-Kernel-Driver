@@ -676,6 +676,9 @@ static int psmouse_extensions(struct psmouse *psmouse,
 
 		if (touchkit_ps2_detect(psmouse, set_properties) == 0)
 			return PSMOUSE_TOUCHKIT_PS2;
+
+		if (elftouch_ps2_detect(psmouse, set_properties) == 0)
+			return PSMOUSE_ELFTOUCH_PS2;
 	}
 
 /*
@@ -785,6 +788,12 @@ static const struct psmouse_protocol psmouse_protocols[] = {
 		.name		= "TPPS/2",
 		.alias		= "trackpoint",
 		.detect		= trackpoint_detect,
+	},
+	{
+		.type		= PSMOUSE_ELFTOUCH_PS2,
+		.name		= "elftouchPS2",
+		.alias		= "elftouch",
+		.detect		= elftouch_ps2_detect,
 	},
 #endif
 #ifdef CONFIG_MOUSE_PS2_TOUCHKIT

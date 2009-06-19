@@ -43,6 +43,7 @@ static inline struct shmem_inode_info *SHMEM_I(struct inode *inode)
 }
 
 extern int init_tmpfs(void);
+extern int shmem_fill_super(struct super_block *sb, void *data, int silent);
 
 #ifdef CONFIG_TMPFS_POSIX_ACL
 int shmem_permission(struct inode *, int);

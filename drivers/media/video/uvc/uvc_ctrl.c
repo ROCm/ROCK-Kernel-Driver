@@ -775,6 +775,10 @@ int uvc_query_v4l2_ctrl(struct uvc_video_device *video,
 	__u8 *data;
 	int ret;
 
+	if ((video->dev->quirks & UVC_QUIRK_HUE_EPIPE) &&
+		(v4l2_ctrl->id == V4L2_CID_HUE))
+		return -EINVAL;
+
 	ctrl = uvc_find_control(video, v4l2_ctrl->id, &mapping);
 	if (ctrl == NULL)
 		return -EINVAL;
