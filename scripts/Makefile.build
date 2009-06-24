@@ -77,7 +77,8 @@ $(warning kbuild: Makefile.build is included improperly)
 endif
 
 ifeq ($(CONFIG_XEN),y)
-$(objtree)/scripts/Makefile.xen: $(srctree)/scripts/Makefile.xen.awk $(srctree)/scripts/Makefile.build
+Makefile.xen := $(if $(KBUILD_EXTMOD),$(KBUILD_EXTMOD),$(objtree)/scripts)/Makefile.xen
+$(Makefile.xen): $(srctree)/scripts/Makefile.xen.awk $(srctree)/scripts/Makefile.build
 	@echo '  Updating $@'
 	$(if $(shell echo a | $(AWK) '{ print gensub(/a/, "AA", "g"); }'),\
         ,$(error 'Your awk program does not define gensub.  Use gawk or another awk with gensub'))
@@ -87,7 +88,7 @@ xen-src-single-used-m	:= $(patsubst $(srctree)/%,%,$(wildcard $(addprefix $(srct
 xen-single-used-m	:= $(xen-src-single-used-m:-xen.c=.o)
 single-used-m		:= $(filter-out $(xen-single-used-m),$(single-used-m))
 
--include $(objtree)/scripts/Makefile.xen
+-include $(Makefile.xen)
 endif
 
 # ===========================================================================

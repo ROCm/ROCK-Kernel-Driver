@@ -69,9 +69,6 @@ NEXT_PAGE(level3_kernel_pgt)
 NEXT_PAGE(level3_user_pgt)
         .fill	512,8,0
 
-NEXT_PAGE(level2_kernel_pgt)
-	.fill	512,8,0
-
 NEXT_PAGE(level2_fixmap_pgt)
 	.fill	512,8,0
 

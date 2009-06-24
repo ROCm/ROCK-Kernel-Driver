@@ -89,13 +89,13 @@ static int xen_cx_notifier(struct acpi_processor *pr, int action)
 		return -EINVAL;
 	}
 
-	op.u.set_pminfo.power.count = count;
-	op.u.set_pminfo.power.flags.bm_control = pr->flags.bm_control;
-	op.u.set_pminfo.power.flags.bm_check = pr->flags.bm_check;
-	op.u.set_pminfo.power.flags.has_cst = pr->flags.has_cst;
-	op.u.set_pminfo.power.flags.power_setup_done = pr->flags.power_setup_done;
+	op.u.set_pminfo.u.power.count = count;
+	op.u.set_pminfo.u.power.flags.bm_control = pr->flags.bm_control;
+	op.u.set_pminfo.u.power.flags.bm_check = pr->flags.bm_check;
+	op.u.set_pminfo.u.power.flags.has_cst = pr->flags.has_cst;
+	op.u.set_pminfo.u.power.flags.power_setup_done = pr->flags.power_setup_done;
 
-	set_xen_guest_handle(op.u.set_pminfo.power.states, buf);
+	set_xen_guest_handle(op.u.set_pminfo.u.power.states, buf);
 	ret = HYPERVISOR_platform_op(&op);
 	kfree(buf);
 	return ret;
@@ -118,7 +118,7 @@ static int xen_px_notifier(struct acpi_processor *pr, int action)
 	if (!pr)
 		return -EINVAL;
 
-	perf = &op.u.set_pminfo.perf;
+	perf = &op.u.set_pminfo.u.perf;
 	px = pr->performance;
 
 	switch(action) {

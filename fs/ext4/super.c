@@ -39,6 +39,7 @@
 #include <linux/marker.h>
 #include <linux/log2.h>
 #include <linux/crc16.h>
+#include <linux/precache.h>
 #include <asm/uaccess.h>
 
 #include "ext4.h"
@@ -1609,6 +1610,7 @@ static int ext4_setup_super(struct super_block *sb, struct ext4_super_block *es,
 	} else {
 		printk(KERN_INFO "EXT4 FS on %s, no journal\n", sb->s_id);
 	}
+	precache_init(sb);
 	return res;
 }
 

@@ -832,8 +832,8 @@ blktap_device_run_queue(struct blktap *tap)
 
 		BTDBG("req %p: dev %d cmd %p, sec 0x%llx, (0x%x/0x%lx) "
 		      "buffer:%p [%s], pending: %p\n", req, tap->minor,
-		      req->cmd, req->sector, req->current_nr_sectors,
-		      req->nr_sectors, req->buffer,
+		      req->cmd, (unsigned long long)req->sector,
+		      req->current_nr_sectors, req->nr_sectors, req->buffer,
 		      rq_data_dir(req) ? "write" : "read", request);
 
 		blkdev_dequeue_request(req);
@@ -887,7 +887,8 @@ blktap_device_do_request(struct request_queue *rq)
 fail:
 	while ((req = elv_next_request(rq))) {
 		BTERR("device closed: failing secs %llu - %llu\n",
-		      req->sector, req->sector + req->nr_sectors);
+		      (unsigned long long)req->sector,
+		      (unsigned long long)req->sector + req->nr_sectors);
 		end_request(req, 0);
 	}
 }

@@ -237,6 +237,15 @@ HYPERVISOR_platform_op(
 	return _hypercall1(int, platform_op, platform_op);
 }
 
+struct xen_mc;
+static inline int __must_check
+HYPERVISOR_mca(
+	struct xen_mc *mc_op)
+{
+	mc_op->interface_version = XEN_MCA_INTERFACE_VERSION;
+	return _hypercall1(int, mca, mc_op);
+}
+
 static inline int __must_check
 HYPERVISOR_set_debugreg(
 	unsigned int reg, unsigned long value)
@@ -409,6 +418,13 @@ HYPERVISOR_kexec_op(
 	unsigned long op, void *args)
 {
 	return _hypercall2(int, kexec_op, op, args);
+}
+
+static inline int __must_check
+HYPERVISOR_tmem_op(
+	struct tmem_op *op)
+{
+	return _hypercall1(int, tmem_op, op);
 }
 
 #endif /* __HYPERCALL_H__ */

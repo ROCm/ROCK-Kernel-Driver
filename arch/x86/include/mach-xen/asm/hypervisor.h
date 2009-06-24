@@ -42,6 +42,8 @@
 #include <xen/interface/physdev.h>
 #include <xen/interface/sched.h>
 #include <xen/interface/nmi.h>
+#include <xen/interface/tmem.h>
+#include <xen/interface/arch-x86/xen-mca.h>
 #include <asm/percpu.h>
 #include <asm/ptrace.h>
 #include <asm/pgtable_types.h>

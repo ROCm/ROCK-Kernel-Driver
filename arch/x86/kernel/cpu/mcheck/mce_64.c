@@ -450,9 +450,17 @@ void mce_log_therm_throt_event(__u64 status)
  * Periodic polling timer for "silent" machine check errors.  If the
  * poller finds an MCE, poll 2x faster.  When the poller finds no more
  * errors, poll 2x slower (up to check_interval seconds).
+ *
+ * We will disable polling in DOM0 since all CMCI/Polling
+ * mechanism will be done in XEN for Intel CPUs
  */
 
+#if defined (CONFIG_X86_XEN_MCE)
+static int check_interval = 0; /* disable polling */
+#else
 static int check_interval = 5 * 60; /* 5 minutes */
+#endif
+
 static DEFINE_PER_CPU(int, next_interval); /* in jiffies */
 static void mcheck_timer(unsigned long);
 static DEFINE_PER_CPU(struct timer_list, mce_timer);
@@ -619,6 +627,7 @@ static void mce_cpu_quirks(struct cpuinfo_x86 *c)
 
 static void mce_cpu_features(struct cpuinfo_x86 *c)
 {
+#ifndef CONFIG_X86_64_XEN
 	switch (c->x86_vendor) {
 	case X86_VENDOR_INTEL:
 		mce_intel_feature_init(c);
@@ -629,6 +638,7 @@ static void mce_cpu_features(struct cpuinfo_x86 *c)
 	default:
 		break;
 	}
+#endif
 }
 
 static void mce_init_timer(void)
@@ -1155,6 +1165,7 @@ nomem:
 	return -ENOMEM;
 }
 
+extern void bind_virq_for_mce(void);
 static __init int mce_init_device(void)
 {
 	int err;
@@ -1181,6 +1192,13 @@ static __init int mce_init_device(void)
 
 	register_hotcpu_notifier(&mce_cpu_notifier);
 	misc_register(&mce_log_device);
+
+#ifdef CONFIG_X86_XEN_MCE
+	/* Register vIRQ handler for MCE LOG processing */
+	printk(KERN_DEBUG "MCE: bind virq for DOM0 Logging\n");
+	bind_virq_for_mce();
+#endif
+
 	return err;
 }
 

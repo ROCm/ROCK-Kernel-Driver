@@ -1330,6 +1330,18 @@ static struct ctl_table vm_table[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
 	},
+#ifdef CONFIG_PRESWAP
+	{
+		.ctl_name	= CTL_UNNUMBERED,
+		.procname	= "preswap",
+		.data		= NULL,
+		.maxlen		= sizeof(unsigned long),
+		.mode		= 0644,
+		.proc_handler	= &preswap_sysctl_handler,
+		.extra1		= (void *)&preswap_zero,
+		.extra2		= (void *)&preswap_infinity,
+	},
+#endif
 /*
  * NOTE: do not add new entries to this table unless you have read
  * Documentation/sysctl/ctl_unnumbered.txt

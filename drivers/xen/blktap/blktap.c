@@ -733,7 +733,7 @@ static int blktap_mmap(struct file *filp, struct vm_area_struct *vma)
 		goto fail;
 	}
 
-	vma->vm_private_data = info->foreign_map.map;
+	vma->vm_private_data = &info->foreign_map;
 	vma->vm_flags |= VM_FOREIGN;
 	vma->vm_flags |= VM_DONTCOPY;
 

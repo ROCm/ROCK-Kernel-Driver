@@ -727,8 +727,6 @@ void __init xen_init_pt(void)
 	page = (unsigned long *)xen_start_info->pt_base;
 	addr = page[pgd_index(__START_KERNEL_map)];
 	addr_to_page(addr, page);
-	addr = page[pud_index(__START_KERNEL_map)];
-	addr_to_page(addr, page);
 
 #if CONFIG_XEN_COMPAT <= 0x030002
 	/* On Xen 3.0.2 and older we may need to explicitly specify _PAGE_USER
@@ -739,7 +737,9 @@ void __init xen_init_pt(void)
 
 		/* Mess with the initial mapping of page 0. It's not needed. */
 		BUILD_BUG_ON(__START_KERNEL <= __START_KERNEL_map);
-		addr = page[pmd_index(__START_KERNEL_map)];
+		addr = page[pud_index(__START_KERNEL_map)];
+		addr_to_page(addr, pg);
+		addr = pg[pmd_index(__START_KERNEL_map)];
 		addr_to_page(addr, pg);
 		pte.pte = pg[pte_index(__START_KERNEL_map)];
 		BUG_ON(!(pte.pte & _PAGE_PRESENT));
@@ -760,9 +760,10 @@ void __init xen_init_pt(void)
 	/* Construct mapping of initial pte page in our own directories. */
 	init_level4_pgt[pgd_index(__START_KERNEL_map)] = 
 		__pgd(__pa_symbol(level3_kernel_pgt) | _PAGE_TABLE);
-	level3_kernel_pgt[pud_index(__START_KERNEL_map)] = 
-		__pud(__pa_symbol(level2_kernel_pgt) | _PAGE_TABLE);
-	memcpy(level2_kernel_pgt, page, PAGE_SIZE);
+	memcpy(level3_kernel_pgt + pud_index(__START_KERNEL_map),
+	       page + pud_index(__START_KERNEL_map),
+	       (PTRS_PER_PUD - pud_index(__START_KERNEL_map))
+	       * sizeof(*level3_kernel_pgt));
 
 	/* Copy the initial P->M table mappings if necessary. */
 	addr = pgd_index(xen_start_info->mfn_list);
@@ -772,6 +773,12 @@ void __init xen_init_pt(void)
 
 	/* Do an early initialization of the fixmap area. */
 	addr = __fix_to_virt(FIX_EARLYCON_MEM_BASE);
+	if (pud_present(level3_kernel_pgt[pud_index(addr)])) {
+		unsigned long adr = page[pud_index(addr)];
+
+		addr_to_page(adr, page);
+		memcpy(level2_fixmap_pgt, page, PAGE_SIZE);
+	}
 	level3_kernel_pgt[pud_index(addr)] =
 		__pud(__pa_symbol(level2_fixmap_pgt) | _PAGE_TABLE);
 	level2_fixmap_pgt[pmd_index(addr)] =
@@ -782,8 +789,6 @@ void __init xen_init_pt(void)
 	early_make_page_readonly(level3_kernel_pgt,
 				 XENFEAT_writable_page_tables);
 	early_make_page_readonly(level3_user_pgt,
-				 XENFEAT_writable_page_tables);
-	early_make_page_readonly(level2_kernel_pgt,
 				 XENFEAT_writable_page_tables);
 	early_make_page_readonly(level2_fixmap_pgt,
 				 XENFEAT_writable_page_tables);

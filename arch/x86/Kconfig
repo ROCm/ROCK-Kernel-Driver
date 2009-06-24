@@ -814,7 +814,7 @@ config X86_REROUTE_FOR_BROKEN_BOOT_IRQS
 
 config X86_MCE
 	bool "Machine Check Exception"
-	depends on !XEN
+	depends on !X86_XEN && !XEN_UNPRIVILEGED_GUEST
 	---help---
 	  Machine Check Exception support allows the processor to notify the
 	  kernel if it detects a problem (e.g. overheating, component failure).
@@ -832,7 +832,7 @@ config X86_MCE
 config X86_MCE_INTEL
 	def_bool y
 	prompt "Intel MCE features"
-	depends on X86_64 && X86_MCE && X86_LOCAL_APIC
+	depends on X86_64 && X86_MCE && X86_LOCAL_APIC && !XEN
 	---help---
 	   Additional support for intel specific MCE features such as
 	   the thermal monitor.
@@ -840,7 +840,7 @@ config X86_MCE_INTEL
 config X86_MCE_AMD
 	def_bool y
 	prompt "AMD MCE features"
-	depends on X86_64 && X86_MCE && X86_LOCAL_APIC
+	depends on X86_64 && X86_MCE && X86_LOCAL_APIC && !XEN
 	---help---
 	   Additional support for AMD specific MCE features such as
 	   the DRAM Error Threshold.
@@ -869,6 +869,10 @@ config X86_MCE_P4THERMAL
 	---help---
 	  Enabling this feature will cause a message to be printed when the P4
 	  enters thermal throttling.
+
+config X86_XEN_MCE
+	def_bool y
+	depends on XEN && X86_MCE
 
 config VM86
 	bool "Enable VM86 support" if EMBEDDED
