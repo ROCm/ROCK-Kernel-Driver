@@ -839,7 +839,6 @@ static void run_init_process(char *init_filename)
 static noinline int init_post(void)
 	__releases(kernel_lock)
 {
-	int retry_count = 1;
 	/* need to finish all async __init code before freeing the memory */
 	async_synchronize_full();
 	free_initmem();
@@ -862,8 +861,6 @@ static noinline int init_post(void)
 				ramdisk_execute_command);
 	}
 
-retry:
-
 	/*
 	 * We try each of these until one succeeds.
 	 *
@@ -876,23 +873,6 @@ retry:
 					"defaults...\n", execute_command);
 	}
 	run_init_process("/sbin/init");
-
-        if (retry_count > 0) {
-               retry_count--;
-               /*
-                * We haven't found init yet... potentially because the device
-                * is still being probed. We need to
-                * - flush keventd and friends
-                * - wait for the known devices to complete their probing
-                * - try to mount the root fs again
-                */
-               flush_scheduled_work();
-               while (driver_probe_done() != 0)
-                       msleep(100);
-               prepare_namespace();
-               goto retry;
-        }
-
 	run_init_process("/etc/init");
 	run_init_process("/bin/init");
 	run_init_process("/bin/sh");
