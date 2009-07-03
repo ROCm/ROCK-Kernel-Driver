@@ -35,7 +35,7 @@
 static int rtas_read_config(struct pci_bus *bus, unsigned int devfn, int offset,
 			    int len, u32 * val)
 {
-	struct pci_controller *hose = bus->sysdata;
+	struct pci_controller *hose = pci_bus_to_host(bus);
 	unsigned long addr = (offset & 0xff) | ((devfn & 0xff) << 8)
 	    | (((bus->number - hose->first_busno) & 0xff) << 16)
 	    | (hose->global_number << 24);
@@ -50,7 +50,7 @@ static int rtas_read_config(struct pci_bus *bus, unsigned int devfn, int offset,
 static int rtas_write_config(struct pci_bus *bus, unsigned int devfn,
 			     int offset, int len, u32 val)
 {
-	struct pci_controller *hose = bus->sysdata;
+	struct pci_controller *hose = pci_bus_to_host(bus);
 	unsigned long addr = (offset & 0xff) | ((devfn & 0xff) << 8)
 	    | (((bus->number - hose->first_busno) & 0xff) << 16)
 	    | (hose->global_number << 24);

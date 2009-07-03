@@ -194,7 +194,7 @@ free_address(
 {
 	a_list_t	*aentry;
 
-#if defined(CONFIG_XEN) || defined(CONFIG_PARAVIRT_XEN)
+#ifdef CONFIG_XEN
 	/*
 	 * Xen needs to be able to make sure it can get an exclusive
 	 * RO mapping of pages it wants to turn into a pagetable.  If
@@ -1501,7 +1501,7 @@ xfs_setsize_buftarg_early(
 	struct block_device	*bdev)
 {
 	return xfs_setsize_buftarg_flags(btp,
-			PAGE_CACHE_SIZE, bdev_hardsect_size(bdev), 0);
+			PAGE_CACHE_SIZE, bdev_logical_block_size(bdev), 0);
 }
 
 int

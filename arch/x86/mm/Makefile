@@ -10,6 +10,8 @@ obj-$(CONFIG_X86_PTDUMP)	+= dump_pagetables.o
 
 obj-$(CONFIG_HIGHMEM)		+= highmem_32.o
 
+obj-$(CONFIG_KMEMCHECK)		+= kmemcheck/
+
 obj-$(CONFIG_MMIOTRACE)		+= mmiotrace.o
 mmiotrace-y			:= kmmio.o pf_in.o mmio-mod.o
 obj-$(CONFIG_MMIOTRACE_TEST)	+= testmmiotrace.o
@@ -17,8 +19,5 @@ obj-$(CONFIG_MMIOTRACE_TEST)	+= testmmiotrace.o
 obj-$(CONFIG_NUMA)		+= numa.o numa_$(BITS).o
 obj-$(CONFIG_K8_NUMA)		+= k8topology_64.o
 obj-$(CONFIG_ACPI_NUMA)		+= srat_$(BITS).o
-
-obj-$(CONFIG_XEN)		+= hypervisor.o
-disabled-obj-$(CONFIG_XEN)	:= tlb.o
 
 obj-$(CONFIG_MEMTEST)		+= memtest.o

@@ -50,16 +50,6 @@ static struct workqueue_struct *reset_workqueue;
  *************************************************************************/
 
 /*
- * Enable large receive offload (LRO) aka soft segment reassembly (SSR)
- *
- * This sets the default for new devices.  It can be controlled later
- * using ethtool.
- */
-static int lro = true;
-module_param(lro, int, 0644);
-MODULE_PARM_DESC(lro, "Large receive offload acceleration");
-
-/*
  * Use separate channels for TX and RX events
  *
  * Set this to 1 to use separate channels for TX and RX. It allows us
@@ -894,9 +884,9 @@ static int efx_wanted_rx_queues(void)
 	int count;
 	int cpu;
 
-	if (!alloc_cpumask_var(&core_mask, GFP_KERNEL)) {
+	if (unlikely(!alloc_cpumask_var(&core_mask, GFP_KERNEL))) {
 		printk(KERN_WARNING
-		       "efx.c: allocation failure, irq balancing hobbled\n");
+		       "sfc: RSS disabled due to allocation failure\n");
 		return 1;
 	}
 
@@ -1300,10 +1290,16 @@ out_requeue:
 static int efx_ioctl(struct net_device *net_dev, struct ifreq *ifr, int cmd)
 {
 	struct efx_nic *efx = netdev_priv(net_dev);
+	struct mii_ioctl_data *data = if_mii(ifr);
 
 	EFX_ASSERT_RESET_SERIALISED(efx);
 
-	return generic_mii_ioctl(&efx->mii, if_mii(ifr), cmd, NULL);
+	/* Convert phy_id from older PRTAD/DEVAD format */
+	if ((cmd == SIOCGMIIREG || cmd == SIOCSMIIREG) &&
+	    (data->phy_id & 0xfc00) == 0x0400)
+		data->phy_id ^= MDIO_PHY_ID_C45 | 0x0400;
+
+	return mdio_mii_ioctl(&efx->mdio, data, cmd);
 }
 
 /**************************************************************************
@@ -1490,21 +1486,12 @@ static int efx_change_mtu(struct net_device *net_dev, int new_mtu)
 
 	efx_stop_all(efx);
 
-	/* Ask driverlink client if we can change MTU */
-	rc = EFX_DL_CALLBACK(efx, request_mtu, new_mtu);
-	if (rc)
-		goto out;
-
 	EFX_LOG(efx, "changing MTU to %d\n", new_mtu);
 
 	efx_fini_channels(efx);
 	net_dev->mtu = new_mtu;
 	efx_init_channels(efx);
 
-	/* Notify driverlink client of new MTU */
-	EFX_DL_CALLBACK(efx, mtu_changed, new_mtu);
-
- out:
 	efx_start_all(efx);
 	return rc;
 }
@@ -1684,25 +1671,6 @@ static void efx_unregister_netdev(struct efx_nic *efx)
  * Device reset and suspend
  *
  **************************************************************************/
-#ifdef CONFIG_SFC_DRIVERLINK
-/* Serialise access to the driverlink callbacks, by quiescing event processing
- * (without flushing the descriptor queues), and acquiring the rtnl_lock */
-void efx_suspend(struct efx_nic *efx)
-{
-	EFX_LOG(efx, "suspending operations\n");
-
-	rtnl_lock();
-	efx_stop_all(efx);
-}
-
-void efx_resume(struct efx_nic *efx)
-{
-	EFX_LOG(efx, "resuming operations\n");
-
-	efx_start_all(efx);
-	rtnl_unlock();
-}
-#endif
 
 /* Tears down the entire software state and most of the hardware state
  * before reset.  */
@@ -1783,8 +1751,8 @@ static int efx_reset(struct efx_nic *efx)
 	enum reset_type method = efx->reset_pending;
 	int rc = 0;
 
+	/* Serialise with kernel interfaces */
 	rtnl_lock();
-	efx_dl_reset_suspend(efx);
 
 	/* If we're not RUNNING then don't reset. Leave the reset_pending
 	 * flag set so that efx_pci_probe_main will be retried */
@@ -1830,7 +1798,6 @@ out_disable:
 	}
 
 out_unlock:
-	efx_dl_reset_resume(efx, 1);
 	rtnl_unlock();
 	return rc;
 }
@@ -1974,12 +1941,7 @@ static int efx_init_struct(struct efx_nic *efx, struct efx_nic_type *type,
 	mutex_init(&efx->mac_lock);
 	efx->mac_op = &efx_dummy_mac_operations;
 	efx->phy_op = &efx_dummy_phy_operations;
-	efx->mii.dev = net_dev;
-#ifdef CONFIG_SFC_DRIVERLINK
-	INIT_LIST_HEAD(&efx->dl_node);
-	INIT_LIST_HEAD(&efx->dl_device_list);
-	efx->dl_cb = efx_default_callbacks;
-#endif
+	efx->mdio.dev = net_dev;
 	INIT_WORK(&efx->phy_work, efx_phy_work);
 	INIT_WORK(&efx->mac_work, efx_mac_work);
 	atomic_set(&efx->netif_stop_count, 1);
@@ -2083,7 +2045,6 @@ static void efx_pci_remove(struct pci_dev *pci_dev)
 	efx = pci_get_drvdata(pci_dev);
 	if (!efx)
 		return;
-	efx_dl_unregister_nic(efx);
 
 	/* Mark the NIC as fini, then stop the interface */
 	rtnl_lock();
@@ -2196,9 +2157,8 @@ static int __devinit efx_pci_probe(struct pci_dev *pci_dev,
 	if (!net_dev)
 		return -ENOMEM;
 	net_dev->features |= (NETIF_F_IP_CSUM | NETIF_F_SG |
-			      NETIF_F_HIGHDMA | NETIF_F_TSO);
-	if (lro)
-		net_dev->features |= NETIF_F_GRO;
+			      NETIF_F_HIGHDMA | NETIF_F_TSO |
+			      NETIF_F_GRO);
 	/* Mask for features that also apply to VLAN devices */
 	net_dev->vlan_features |= (NETIF_F_ALL_CSUM | NETIF_F_SG |
 				   NETIF_F_HIGHDMA | NETIF_F_TSO);
@@ -2261,16 +2221,9 @@ static int __devinit efx_pci_probe(struct pci_dev *pci_dev,
 	if (rc)
 		goto fail5;
 
-	/* Register with driverlink layer */
-	rc = efx_dl_register_nic(efx);
-	if (rc)
-		goto fail6;
-
 	EFX_LOG(efx, "initialisation successful\n");
 	return 0;
 
- fail6:
-	efx_unregister_netdev(efx);
  fail5:
 	efx_pci_remove_main(efx);
  fail4:

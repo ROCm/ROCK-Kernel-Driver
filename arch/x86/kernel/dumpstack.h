@@ -33,7 +33,6 @@ int try_stack_unwind(struct task_struct *task, struct pt_regs *regs,
                      const struct stacktrace_ops *ops, void *data);
 
 extern unsigned int code_bytes;
-extern int kstack_depth_to_print;
 
 /* The form of the top of the frame on the stack */
 struct stack_frame {

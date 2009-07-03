@@ -129,9 +129,10 @@ enum {
 
 #define SWAP_CLUSTER_MAX 32
 
-#define SWAP_MAP_MAX	0x7fff
-#define SWAP_MAP_BAD	0x8000
-
+#define SWAP_MAP_MAX	0x7ffe
+#define SWAP_MAP_BAD	0x7fff
+#define SWAP_HAS_CACHE  0x8000		/* There is a swap cache of entry. */
+#define SWAP_COUNT_MASK (~SWAP_HAS_CACHE)
 /*
  * The in-memory structure used to track swap areas.
  */
@@ -154,58 +155,7 @@ struct swap_info_struct {
 	unsigned int max;
 	unsigned int inuse_pages;
 	unsigned int old_block_size;
-#ifdef CONFIG_PRESWAP
-	unsigned long *preswap_map;
-	unsigned int preswap_pages;
-#endif
 };
-
-#ifdef CONFIG_PRESWAP
-
-#include <linux/sysctl.h>
-extern int preswap_sysctl_handler(struct ctl_table *, int, struct file *,
-	void __user *, size_t *, loff_t *);
-extern const unsigned long preswap_zero, preswap_infinity;
-
-extern void preswap_shrink(unsigned long);
-extern int preswap_test(struct swap_info_struct *, unsigned long);
-extern void preswap_init(unsigned);
-extern int preswap_put(struct page *);
-extern int preswap_get(struct page *);
-extern void preswap_flush(unsigned, unsigned long);
-extern void preswap_flush_area(unsigned);
-#else
-static inline void preswap_shrink(unsigned long target_pages)
-{
-}
-
-static inline int preswap_test(struct swap_info_struct *sis, unsigned long offset)
-{
-	return 0;
-}
-
-static inline void preswap_init(unsigned type)
-{
-}
-
-static inline int preswap_put(struct page *page)
-{
-	return 0;
-}
-
-static inline int preswap_get(struct page *get)
-{
-	return 0;
-}
-
-static inline void preswap_flush(unsigned type, unsigned long offset)
-{
-}
-
-static inline void preswap_flush_area(unsigned type)
-{
-}
-#endif /* CONFIG_PRESWAP */
 
 struct swap_list_t {
 	int head;	/* head of priority-ordered swapfile list */
@@ -286,7 +236,6 @@ static inline int zone_reclaim(struct zone *z, gfp_t mask, unsigned int order)
 }
 #endif
 
-#ifdef CONFIG_UNEVICTABLE_LRU
 extern int page_evictable(struct page *page, struct vm_area_struct *vma);
 extern void scan_mapping_unevictable_pages(struct address_space *);
 
@@ -295,24 +244,6 @@ extern int scan_unevictable_handler(struct ctl_table *, int, struct file *,
 					void __user *, size_t *, loff_t *);
 extern int scan_unevictable_register_node(struct node *node);
 extern void scan_unevictable_unregister_node(struct node *node);
-#else
-static inline int page_evictable(struct page *page,
-						struct vm_area_struct *vma)
-{
-	return 1;
-}
-
-static inline void scan_mapping_unevictable_pages(struct address_space *mapping)
-{
-}
-
-static inline int scan_unevictable_register_node(struct node *node)
-{
-	return 0;
-}
-
-static inline void scan_unevictable_unregister_node(struct node *node) { }
-#endif
 
 extern int kswapd_run(int nid);
 
@@ -325,7 +256,7 @@ extern void swap_unplug_io_fn(struct backing_dev_info *, struct page *);
 
 #ifdef CONFIG_SWAP
 /* linux/mm/page_io.c */
-extern int swap_readpage(struct file *, struct page *);
+extern int swap_readpage(struct page *);
 extern int swap_writepage(struct page *page, struct writeback_control *wbc);
 extern void end_swap_bio_read(struct bio *bio, int err);
 
@@ -351,9 +282,11 @@ extern long total_swap_pages;
 extern void si_swapinfo(struct sysinfo *);
 extern swp_entry_t get_swap_page(void);
 extern swp_entry_t get_swap_page_of_type(int);
-extern int swap_duplicate(swp_entry_t);
+extern void swap_duplicate(swp_entry_t);
+extern int swapcache_prepare(swp_entry_t);
 extern int valid_swaphandles(swp_entry_t, unsigned long *);
 extern void swap_free(swp_entry_t);
+extern void swapcache_free(swp_entry_t, struct page *page);
 extern int free_swap_and_cache(swp_entry_t);
 extern int swap_type_of(dev_t, sector_t, struct block_device **);
 extern unsigned int count_swap_pages(int, int);
@@ -365,8 +298,8 @@ extern int try_to_free_swap(struct page *);
 struct backing_dev_info;
 
 /* linux/mm/thrash.c */
-extern struct mm_struct * swap_token_mm;
-extern void grab_swap_token(void);
+extern struct mm_struct *swap_token_mm;
+extern void grab_swap_token(struct mm_struct *);
 extern void __put_swap_token(struct mm_struct *);
 
 static inline int has_swap_token(struct mm_struct *mm)
@@ -386,10 +319,11 @@ static inline void disable_swap_token(void)
 }
 
 #ifdef CONFIG_CGROUP_MEM_RES_CTLR
-extern void mem_cgroup_uncharge_swapcache(struct page *page, swp_entry_t ent);
+extern void
+mem_cgroup_uncharge_swapcache(struct page *page, swp_entry_t ent, bool swapout);
 #else
 static inline void
-mem_cgroup_uncharge_swapcache(struct page *page, swp_entry_t ent)
+mem_cgroup_uncharge_swapcache(struct page *page, swp_entry_t ent, bool swapout)
 {
 }
 #endif
@@ -421,9 +355,17 @@ static inline void show_swap_cache_info(void)
 }
 
 #define free_swap_and_cache(swp)	is_migration_entry(swp)
-#define swap_duplicate(swp)		is_migration_entry(swp)
+#define swapcache_prepare(swp)		is_migration_entry(swp)
+
+static inline void swap_duplicate(swp_entry_t swp)
+{
+}
 
 static inline void swap_free(swp_entry_t swp)
+{
+}
+
+static inline void swapcache_free(swp_entry_t swp, struct page *page)
 {
 }
 
@@ -477,16 +419,10 @@ static inline swp_entry_t get_swap_page(void)
 }
 
 /* linux/mm/thrash.c */
-#define put_swap_token(x) do { } while(0)
-#define grab_swap_token()  do { } while(0)
-#define has_swap_token(x) 0
-#define disable_swap_token() do { } while(0)
-
-static inline int mem_cgroup_cache_charge_swapin(struct page *page,
-			struct mm_struct *mm, gfp_t mask, bool locked)
-{
-	return 0;
-}
+#define put_swap_token(mm)	do { } while (0)
+#define grab_swap_token(mm)	do { } while (0)
+#define has_swap_token(mm)	0
+#define disable_swap_token()	do { } while (0)
 
 static inline void
 mem_cgroup_uncharge_swapcache(struct page *page, swp_entry_t ent)

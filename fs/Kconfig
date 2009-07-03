@@ -39,14 +39,6 @@ config FS_POSIX_ACL
 	bool
 	default n
 
-config FILE_LOCKING
-	bool "Enable POSIX file locking API" if EMBEDDED
-	default y
-	help
-	  This option enables standard file locking support, required
-          for filesystems like NFS and for the flock() system
-          call. Disabling this option saves about 11k.
-
 config FS_NFS4ACL
 	bool
 	default n
@@ -57,6 +49,14 @@ source "fs/ocfs2/Kconfig"
 source "fs/btrfs/Kconfig"
 
 endif # BLOCK
+
+config FILE_LOCKING
+	bool "Enable POSIX file locking API" if EMBEDDED
+	default y
+	help
+	  This option enables standard file locking support, required
+          for filesystems like NFS and for the flock() system
+          call. Disabling this option saves about 11k.
 
 source "fs/notify/Kconfig"
 
@@ -84,6 +84,16 @@ source "fs/quota/Kconfig"
 source "fs/autofs/Kconfig"
 source "fs/autofs4/Kconfig"
 source "fs/fuse/Kconfig"
+
+config CUSE
+	tristate "Character device in Userpace support"
+	depends on FUSE_FS
+	help
+	  This FUSE extension allows character devices to be
+	  implemented in userspace.
+
+	  If you want to develop or use userspace character device
+	  based on CUSE, answer Y or M.
 
 config GENERIC_ACL
 	bool
@@ -147,8 +157,7 @@ config TMPFS_POSIX_ACL
 config HUGETLBFS
 	bool "HugeTLB file system support"
 	depends on X86 || IA64 || PPC64 || SPARC64 || (SUPERH && MMU) || \
-		   (S390 && 64BIT) || BROKEN
-	depends on !XEN
+		   (S390 && 64BIT) || SYS_SUPPORTS_HUGETLBFS || BROKEN
 	help
 	  hugetlbfs is a filesystem backing for HugeTLB pages, based on
 	  ramfs. For architectures that support it, say Y here and read
@@ -250,10 +259,12 @@ source "fs/nfsd/Kconfig"
 
 config LOCKD
 	tristate
+	depends on FILE_LOCKING
 
 config LOCKD_V4
 	bool
 	depends on NFSD_V3 || NFS_V3
+	depends on FILE_LOCKING
 	default y
 
 config EXPORTFS

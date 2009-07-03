@@ -446,35 +446,31 @@ static void efx_rx_packet__check_len(struct efx_rx_queue *rx_queue,
 static void efx_rx_packet_lro(struct efx_channel *channel,
 			      struct efx_rx_buffer *rx_buf)
 {
-	struct efx_nic *efx = channel->efx;
 	struct napi_struct *napi = &channel->napi_str;
-	enum efx_veto veto;
-
-	/* It would be faster if we had access to packets at the
-	 * other side of generic LRO. Unfortunately, there isn't
-	 * an obvious interface to this, so veto packets before LRO */
-	veto = EFX_DL_CALLBACK(efx, rx_packet, rx_buf->data, rx_buf->len);
-	if (unlikely(veto)) {
-		EFX_DL_LOG(efx, "LRO RX vetoed by driverlink %s driver\n",
-			   efx->dl_cb_dev.rx_packet->driver->name);
-		/* Free the buffer now */
-		efx_free_rx_buffer(efx, rx_buf);
-		return;
-	}
 
 	/* Pass the skb/page into the LRO engine */
 	if (rx_buf->page) {
-		struct napi_gro_fraginfo info;
+		struct sk_buff *skb = napi_get_frags(napi);
 
-		info.frags[0].page = rx_buf->page;
-		info.frags[0].page_offset = efx_rx_buf_offset(rx_buf);
-		info.frags[0].size = rx_buf->len;
-		info.nr_frags = 1;
-		info.ip_summed = CHECKSUM_UNNECESSARY;
-		info.len = rx_buf->len;
+		if (!skb) {
+			put_page(rx_buf->page);
+			goto out;
+		}
 
-		napi_gro_frags(napi, &info);
+		skb_shinfo(skb)->frags[0].page = rx_buf->page;
+		skb_shinfo(skb)->frags[0].page_offset =
+			efx_rx_buf_offset(rx_buf);
+		skb_shinfo(skb)->frags[0].size = rx_buf->len;
+		skb_shinfo(skb)->nr_frags = 1;
 
+		skb->len = rx_buf->len;
+		skb->data_len = rx_buf->len;
+		skb->truesize += rx_buf->len;
+		skb->ip_summed = CHECKSUM_UNNECESSARY;
+
+		napi_gro_frags(napi);
+
+out:
 		EFX_BUG_ON_PARANOID(rx_buf->skb);
 		rx_buf->page = NULL;
 	} else {
@@ -551,7 +547,6 @@ void __efx_rx_packet(struct efx_channel *channel,
 		     struct efx_rx_buffer *rx_buf, bool checksummed)
 {
 	struct efx_nic *efx = channel->efx;
-	enum efx_veto veto;
 	struct sk_buff *skb;
 
 	/* If we're in loopback test, then pass the packet directly to the
@@ -559,16 +554,6 @@ void __efx_rx_packet(struct efx_channel *channel,
 	 */
 	if (unlikely(efx->loopback_selftest)) {
 		efx_loopback_rx_packet(efx, rx_buf->data, rx_buf->len);
-		efx_free_rx_buffer(efx, rx_buf);
-		goto done;
-	}
-
-	/* Allow callback to veto the packet */
-	veto = EFX_DL_CALLBACK(efx, rx_packet, rx_buf->data, rx_buf->len);
-	if (unlikely(veto)) {
-		EFX_DL_LOG(efx, "RX vetoed by driverlink %s driver\n",
-			   efx->dl_cb_dev.rx_packet->driver->name);
-		/* Free the buffer now */
 		efx_free_rx_buffer(efx, rx_buf);
 		goto done;
 	}

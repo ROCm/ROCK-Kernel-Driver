@@ -32,24 +32,16 @@
  */
 #define __PAGE_OFFSET           _AC(0xffff880000000000, UL)
 
-#define __PHYSICAL_START	CONFIG_PHYSICAL_START
-#define __KERNEL_ALIGN		0x200000
-
-/*
- * Make sure kernel is aligned to 2MB address. Catching it at compile
- * time is better. Change your config file and compile the kernel
- * for a 2MB aligned address (CONFIG_PHYSICAL_START)
- */
-#if (CONFIG_PHYSICAL_START % __KERNEL_ALIGN) != 0
-#error "CONFIG_PHYSICAL_START must be a multiple of 2MB"
-#endif
+#define __PHYSICAL_START	((CONFIG_PHYSICAL_START +	 	\
+				  (CONFIG_PHYSICAL_ALIGN - 1)) &	\
+				 ~(CONFIG_PHYSICAL_ALIGN - 1))
 
 #define __START_KERNEL		(__START_KERNEL_map + __PHYSICAL_START)
 #define __START_KERNEL_map	_AC(0xffffffff80000000, UL)
 
-/* See Documentation/x86_64/mm.txt for a description of the memory map. */
+/* See Documentation/x86/x86_64/mm.txt for a description of the memory map. */
 #define __PHYSICAL_MASK_SHIFT	46
-#define __VIRTUAL_MASK_SHIFT	48
+#define __VIRTUAL_MASK_SHIFT	47
 
 /*
  * Kernel image size is limited to 512 MB (see level2_kernel_pgt in
@@ -71,27 +63,13 @@ extern unsigned long __phys_addr(unsigned long);
 
 #define vmemmap ((struct page *)VMEMMAP_START)
 
-extern unsigned long init_memory_mapping(unsigned long start,
-					 unsigned long end);
-
-extern void initmem_init(unsigned long start_pfn, unsigned long end_pfn);
-extern void free_initmem(void);
-
 extern void init_extra_mapping_uc(unsigned long phys, unsigned long size);
 extern void init_extra_mapping_wb(unsigned long phys, unsigned long size);
 
 #endif	/* !__ASSEMBLY__ */
 
 #ifdef CONFIG_FLATMEM
-/*
- * While max_pfn is not exported, max_mapnr never gets initialized for non-Xen
- * other than for hotplugged memory.
- */
-#ifndef CONFIG_XEN
 #define pfn_valid(pfn)          ((pfn) < max_pfn)
-#else
-#define pfn_valid(pfn)          ((pfn) < max_mapnr)
-#endif
 #endif
 
 #endif /* _ASM_X86_PAGE_64_DEFS_H */

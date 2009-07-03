@@ -4,7 +4,6 @@
 #include <linux/sunrpc/debug.h>
 #include <linux/string.h>
 #include <net/ip_vs.h>
-#include <xen/sysctl.h>
 
 struct trans_ctl_table {
 	int			ctl_name;
@@ -105,7 +104,6 @@ static const struct trans_ctl_table trans_kern_table[] = {
 	{ KERN_MAX_LOCK_DEPTH,		"max_lock_depth" },
 	{ KERN_NMI_WATCHDOG,		"nmi_watchdog" },
 	{ KERN_PANIC_ON_NMI,		"panic_on_unrecovered_nmi" },
-	{ KERN_PANIC_ON_IO_NMI,		"panic_on_io_nmi" },
 	{ KERN_SETUID_DUMPABLE,		"suid_dumpable" },
 	{ KERN_KDB,			"kdb" },
 	{ KERN_DUMP_AFTER_NOTIFIER,	"dump_after_notifier" },
@@ -898,14 +896,6 @@ static const struct trans_ctl_table trans_bus_table[] = {
 	{}
 };
 
-#ifdef CONFIG_XEN
-static const struct trans_ctl_table trans_xen_table[] = {
-	{ CTL_XEN_INDEPENDENT_WALLCLOCK,	"independent_wallclock" },
-	{ CTL_XEN_PERMITTED_CLOCK_JITTER,	"permitted_clock_jitter" },
-	{}
-};
-#endif
-
 static const struct trans_ctl_table trans_arlan_conf_table0[] = {
 	{ 1,	"spreadingCode" },
 	{ 2,	"channelNumber" },
@@ -1241,9 +1231,6 @@ static const struct trans_ctl_table trans_root_table[] = {
 	{ CTL_BUS,	"bus",		trans_bus_table },
 	{ CTL_ABI,	"abi" },
 	/* CTL_CPU not used */
-#ifdef CONFIG_XEN
-	{ CTL_XEN,	"xen",		trans_xen_table },
-#endif
 	{ CTL_ARLAN,	"arlan",	trans_arlan_table },
 	{ CTL_S390DBF,	"s390dbf",	trans_s390dbf_table },
 	{ CTL_SUNRPC,	"sunrpc",	trans_sunrpc_table },

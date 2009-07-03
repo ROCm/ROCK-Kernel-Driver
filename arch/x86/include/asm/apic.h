@@ -10,16 +10,12 @@
 #include <asm/processor.h>
 #include <asm/apicdef.h>
 #include <asm/atomic.h>
-#ifndef CONFIG_XEN
 #include <asm/fixmap.h>
-#endif
 #include <asm/mpspec.h>
 #include <asm/system.h>
 #include <asm/msr.h>
 
-#ifndef CONFIG_XEN
 #define ARCH_APICTIMER_STOPS_ON_C3	1
-#endif
 
 /*
  * Debugging macros
@@ -51,7 +47,6 @@ static inline void generic_apic_probe(void)
 #ifdef CONFIG_X86_LOCAL_APIC
 
 extern unsigned int apic_verbosity;
-#ifndef CONFIG_XEN
 extern int local_apic_timer_c2_ok;
 
 extern int disable_apic;
@@ -112,10 +107,7 @@ extern u32 native_safe_apic_wait_icr_idle(void);
 extern void native_apic_icr_write(u32 low, u32 id);
 extern u64 native_apic_icr_read(void);
 
-#endif /* CONFIG_XEN */
-
-#define EIM_8BIT_APIC_ID	0
-#define EIM_32BIT_APIC_ID	1
+extern int x2apic_mode;
 
 #ifdef CONFIG_X86_X2APIC
 /*
@@ -173,10 +165,9 @@ static inline u64 native_x2apic_icr_read(void)
 	return val;
 }
 
-extern int x2apic, x2apic_phys;
+extern int x2apic_phys;
 extern void check_x2apic(void);
 extern void enable_x2apic(void);
-extern void enable_IR_x2apic(void);
 extern void x2apic_icr_write(u32 low, u32 id);
 static inline int x2apic_enabled(void)
 {
@@ -190,6 +181,8 @@ static inline int x2apic_enabled(void)
 		return 1;
 	return 0;
 }
+
+#define x2apic_supported()	(cpu_has_x2apic)
 #else
 static inline void check_x2apic(void)
 {
@@ -197,28 +190,20 @@ static inline void check_x2apic(void)
 static inline void enable_x2apic(void)
 {
 }
-static inline void enable_IR_x2apic(void)
-{
-}
 static inline int x2apic_enabled(void)
 {
 	return 0;
 }
 
-#define	x2apic	0
-
+#define	x2apic_preenabled 0
+#define	x2apic_supported()	0
 #endif
+
+extern void enable_IR_x2apic(void);
 
 extern int get_physical_broadcast(void);
 
-#ifdef CONFIG_X86_X2APIC
-static inline void ack_x2APIC_irq(void)
-{
-	/* Docs say use 0 for future compatibility */
-	native_apic_msr_write(APIC_EOI, 0);
-}
-#endif
-
+extern void apic_disable(void);
 extern int lapic_get_maxlvt(void);
 extern void clear_local_APIC(void);
 extern void connect_bsp_APIC(void);
@@ -259,7 +244,7 @@ static inline void lapic_shutdown(void) { }
 #define local_apic_timer_c2_ok		1
 static inline void init_apic_mappings(void) { }
 static inline void disable_local_APIC(void) { }
-
+static inline void apic_disable(void) { }
 #endif /* !CONFIG_X86_LOCAL_APIC */
 
 #ifdef CONFIG_X86_64
@@ -361,8 +346,6 @@ struct apic {
  */
 extern struct apic *apic;
 
-#ifndef CONFIG_XEN
-
 /*
  * APIC functionality to boot other CPUs - only used on SMP:
  */
@@ -419,7 +402,7 @@ static inline unsigned default_get_apic_id(unsigned long x)
 {
 	unsigned int ver = GET_APIC_VERSION(apic_read(APIC_LVR));
 
-	if (APIC_XAPIC(ver))
+	if (APIC_XAPIC(ver) || boot_cpu_has(X86_FEATURE_EXTD_APICID))
 		return (x >> 24) & 0xFF;
 	else
 		return (x >> 24) & 0x0F;
@@ -456,8 +439,6 @@ static inline void default_wait_for_init_deassert(atomic_t *deassert)
 
 extern void generic_bigsmp_probe(void);
 
-#endif /* CONFIG_XEN */
-
 
 #ifdef CONFIG_X86_LOCAL_APIC
 
@@ -477,8 +458,6 @@ static inline const struct cpumask *default_target_cpus(void)
 DECLARE_EARLY_PER_CPU(u16, x86_bios_cpu_apicid);
 
 
-#ifndef CONFIG_XEN
-
 static inline unsigned int read_apic_id(void)
 {
 	unsigned int reg;
@@ -491,6 +470,9 @@ static inline unsigned int read_apic_id(void)
 extern void default_setup_apic_routing(void);
 
 #ifdef CONFIG_X86_32
+
+extern struct apic apic_default;
+
 /*
  * Set up the logical destination ID.
  *
@@ -586,8 +568,6 @@ static inline physid_mask_t default_apicid_to_cpu_present(int phys_apicid)
 {
 	return physid_mask_of_physid(phys_apicid);
 }
-
-#endif /* CONFIG_XEN */
 
 #endif /* CONFIG_X86_LOCAL_APIC */
 

@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2004-2005 IBM Corp.  All Rights Reserved.
- * Copyright (C) 2006-2008 NEC Corporation.
+ * Copyright (C) 2006-2009 NEC Corporation.
  *
  * dm-queue-length.c
  *
@@ -9,7 +9,8 @@
  *
  * This file is released under the GPL.
  *
- * Load balancing path selector.
+ * queue-length path selector - choose a path with the least number of
+ * in-flight I/Os.
  */
 
 #include "dm.h"
@@ -33,13 +34,13 @@ struct selector {
 struct path_info {
 	struct list_head	list;
 	struct dm_path		*path;
-	unsigned int		repeat_count;
-	atomic_t		qlen;
+	unsigned		repeat_count;
+	atomic_t		qlen;	/* the number of in-flight I/Os */
 };
 
 static struct selector *alloc_selector(void)
 {
-	struct selector *s = kzalloc(sizeof(*s), GFP_KERNEL);
+	struct selector *s = kmalloc(sizeof(*s), GFP_KERNEL);
 
 	if (s) {
 		INIT_LIST_HEAD(&s->valid_paths);
@@ -57,24 +58,22 @@ static int ql_create(struct path_selector *ps, unsigned argc, char **argv)
 		return -ENOMEM;
 
 	ps->context = s;
-
 	return 0;
 }
 
 static void ql_free_paths(struct list_head *paths)
 {
-	struct path_info *cpi, *npi;
+	struct path_info *pi, *next;
 
-	list_for_each_entry_safe(cpi, npi, paths, list) {
-		list_del(&cpi->list);
-		cpi->path->pscontext = NULL;
-		kfree(cpi);
+	list_for_each_entry_safe(pi, next, paths, list) {
+		list_del(&pi->list);
+		kfree(pi);
 	}
 }
 
 static void ql_destroy(struct path_selector *ps)
 {
-	struct selector *s = (struct selector *) ps->context;
+	struct selector *s = ps->context;
 
 	ql_free_paths(&s->valid_paths);
 	ql_free_paths(&s->failed_paths);
@@ -82,20 +81,48 @@ static void ql_destroy(struct path_selector *ps)
 	ps->context = NULL;
 }
 
+static int ql_status(struct path_selector *ps, struct dm_path *path,
+		     status_type_t type, char *result, unsigned maxlen)
+{
+	unsigned sz = 0;
+	struct path_info *pi;
+
+	/* When called with NULL path, return selector status/args. */
+	if (!path)
+		DMEMIT("0 ");
+	else {
+		pi = path->pscontext;
+
+		switch (type) {
+		case STATUSTYPE_INFO:
+			DMEMIT("%d ", atomic_read(&pi->qlen));
+			break;
+		case STATUSTYPE_TABLE:
+			DMEMIT("%u ", pi->repeat_count);
+			break;
+		}
+	}
+
+	return sz;
+}
+
 static int ql_add_path(struct path_selector *ps, struct dm_path *path,
 		       int argc, char **argv, char **error)
 {
-	struct selector *s = (struct selector *) ps->context;
+	struct selector *s = ps->context;
 	struct path_info *pi;
-	unsigned int repeat_count = QL_MIN_IO;
+	unsigned repeat_count = QL_MIN_IO;
 
-	/* Parse the arguments */
+	/*
+	 * Arguments: [<repeat_count>]
+	 * 	<repeat_count>: The number of I/Os before switching path.
+	 * 			If not given, default (QL_MIN_IO) is used.
+	 */
 	if (argc > 1) {
 		*error = "queue-length ps: incorrect number of arguments";
 		return -EINVAL;
 	}
 
-	/* First path argument is number of I/Os before switching path. */
 	if ((argc == 1) && (sscanf(argv[0], "%u", &repeat_count) != 1)) {
 		*error = "queue-length ps: invalid repeat count";
 		return -EINVAL;
@@ -111,6 +138,7 @@ static int ql_add_path(struct path_selector *ps, struct dm_path *path,
 	pi->path = path;
 	pi->repeat_count = repeat_count;
 	atomic_set(&pi->qlen, 0);
+
 	path->pscontext = pi;
 
 	list_add_tail(&pi->list, &s->valid_paths);
@@ -120,7 +148,7 @@ static int ql_add_path(struct path_selector *ps, struct dm_path *path,
 
 static void ql_fail_path(struct path_selector *ps, struct dm_path *path)
 {
-	struct selector *s = (struct selector *) ps->context;
+	struct selector *s = ps->context;
 	struct path_info *pi = path->pscontext;
 
 	list_move(&pi->list, &s->failed_paths);
@@ -128,7 +156,7 @@ static void ql_fail_path(struct path_selector *ps, struct dm_path *path)
 
 static int ql_reinstate_path(struct path_selector *ps, struct dm_path *path)
 {
-	struct selector *s = (struct selector *) ps->context;
+	struct selector *s = ps->context;
 	struct path_info *pi = path->pscontext;
 
 	list_move_tail(&pi->list, &s->valid_paths);
@@ -136,16 +164,14 @@ static int ql_reinstate_path(struct path_selector *ps, struct dm_path *path)
 	return 0;
 }
 
-static inline int ql_compare_qlen(struct path_info *pi1, struct path_info *pi2)
-{
-	return atomic_read(&pi1->qlen) - atomic_read(&pi2->qlen);
-}
-
+/*
+ * Select a path having the minimum number of in-flight I/Os
+ */
 static struct dm_path *ql_select_path(struct path_selector *ps,
 				      unsigned *repeat_count, size_t nr_bytes)
 {
-	struct selector *s = (struct selector *) ps->context;
-	struct path_info *cpi = NULL, *spi = NULL;
+	struct selector *s = ps->context;
+	struct path_info *pi = NULL, *best = NULL;
 
 	if (list_empty(&s->valid_paths))
 		return NULL;
@@ -153,17 +179,21 @@ static struct dm_path *ql_select_path(struct path_selector *ps,
 	/* Change preferred (first in list) path to evenly balance. */
 	list_move_tail(s->valid_paths.next, &s->valid_paths);
 
-	list_for_each_entry(cpi, &s->valid_paths, list) {
-		if (!spi)
-			spi = cpi;
-		else if (ql_compare_qlen(cpi, spi) < 0)
-			spi = cpi;
+	list_for_each_entry(pi, &s->valid_paths, list) {
+		if (!best ||
+		    (atomic_read(&pi->qlen) < atomic_read(&best->qlen)))
+			best = pi;
+
+		if (!atomic_read(&best->qlen))
+			break;
 	}
 
-	if (spi)
-		*repeat_count = spi->repeat_count;
+	if (!best)
+		return NULL;
 
-	return spi ? spi->path : NULL;
+	*repeat_count = best->repeat_count;
+
+	return best->path;
 }
 
 static int ql_start_io(struct path_selector *ps, struct dm_path *path,
@@ -184,31 +214,6 @@ static int ql_end_io(struct path_selector *ps, struct dm_path *path,
 	atomic_dec(&pi->qlen);
 
 	return 0;
-}
-
-static int ql_status(struct path_selector *ps, struct dm_path *path,
-		     status_type_t type, char *result, unsigned int maxlen)
-{
-	int sz = 0;
-	struct path_info *pi;
-
-	/* When called with (path == NULL), return selector status/args. */
-	if (!path)
-		DMEMIT("0 ");
-	else {
-		pi = path->pscontext;
-
-		switch (type) {
-		case STATUSTYPE_INFO:
-			DMEMIT("%u ", atomic_read(&pi->qlen));
-			break;
-		case STATUSTYPE_TABLE:
-			DMEMIT("%u ", pi->repeat_count);
-			break;
-		}
-	}
-
-	return sz;
 }
 
 static struct path_selector_type ql_ps = {
@@ -253,7 +258,6 @@ module_exit(dm_ql_exit);
 MODULE_AUTHOR("Stefan Bader <Stefan.Bader at de.ibm.com>");
 MODULE_DESCRIPTION(
 	"(C) Copyright IBM Corp. 2004,2005   All Rights Reserved.\n"
-	DM_NAME " load balancing path selector (dm-queue-length.c version "
-	QL_VERSION ")"
+	DM_NAME " path selector to balance the number of in-flight I/Os"
 );
 MODULE_LICENSE("GPL");

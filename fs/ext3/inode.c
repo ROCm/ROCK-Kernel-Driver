@@ -821,7 +821,7 @@ int ext3_get_blocks_handle(handle_t *handle, struct inode *inode,
 		while (count < maxblocks && count <= blocks_to_boundary) {
 			ext3_fsblk_t blk;
 
-			if (!verify_chain(chain, partial)) {
+			if (!verify_chain(chain, chain + depth - 1)) {
 				/*
 				 * Indirect block might be removed by
 				 * truncate while we were reading it.
@@ -2375,7 +2375,7 @@ void ext3_truncate(struct inode *inode)
 	struct page *page;
 
 	if (!ext3_can_truncate(inode))
-		return;
+		goto out_notrans;
 
 	if (inode->i_size == 0 && ext3_should_writeback_data(inode))
 		ei->i_state |= EXT3_STATE_FLUSH_ON_CLOSE;
@@ -2391,7 +2391,7 @@ void ext3_truncate(struct inode *inode)
 		page = grab_cache_page(mapping,
 				inode->i_size >> PAGE_CACHE_SHIFT);
 		if (!page)
-			return;
+			goto out_notrans;
 	}
 
 	handle = start_transaction(inode);
@@ -2402,7 +2402,7 @@ void ext3_truncate(struct inode *inode)
 			unlock_page(page);
 			page_cache_release(page);
 		}
-		return;		/* AKPM: return what? */
+		goto out_notrans;
 	}
 
 	last_block = (inode->i_size + blocksize-1)
@@ -2526,6 +2526,14 @@ out_stop:
 		ext3_orphan_del(handle, inode);
 
 	ext3_journal_stop(handle);
+	return;
+out_notrans:
+	/*
+	 * Delete the inode from orphan list so that it doesn't stay there
+	 * forever and trigger assertion on umount.
+	 */
+	if (inode->i_nlink)
+		ext3_orphan_del(NULL, inode);
 }
 
 static ext3_fsblk_t ext3_get_inode_block(struct super_block *sb,
@@ -2745,10 +2753,6 @@ struct inode *ext3_iget(struct super_block *sb, unsigned long ino)
 		return inode;
 
 	ei = EXT3_I(inode);
-#ifdef CONFIG_EXT3_FS_POSIX_ACL
-	ei->i_acl = EXT3_ACL_NOT_CACHED;
-	ei->i_default_acl = EXT3_ACL_NOT_CACHED;
-#endif
 #ifdef CONFIG_EXT3_FS_NFS4ACL
 	ei->i_nfs4acl = EXT3_NFS4ACL_NOT_CACHED;
 #endif
@@ -2964,7 +2968,6 @@ static int ext3_do_update_inode(handle_t *handle,
 				ext3_update_dynamic_rev(sb);
 				EXT3_SET_RO_COMPAT_FEATURE(sb,
 					EXT3_FEATURE_RO_COMPAT_LARGE_FILE);
-				sb->s_dirt = 1;
 				handle->h_sync = 1;
 				err = ext3_journal_dirty_metadata(handle,
 						EXT3_SB(sb)->s_sbh);
@@ -3185,12 +3188,6 @@ int ext3_setattr(struct dentry *dentry, struct iattr *attr)
 	}
 
 	rc = inode_setattr(inode, attr);
-
-	/* If inode_setattr's call to ext3_truncate failed to get a
-	 * transaction handle at all, we need to clean up the in-core
-	 * orphan list manually. */
-	if (inode->i_nlink)
-		ext3_orphan_del(NULL, inode);
 
 	if (!rc && (ia_valid & ATTR_MODE)) {
 		if (test_opt(inode->i_sb, NFS4ACL))

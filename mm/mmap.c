@@ -28,6 +28,7 @@
 #include <linux/mempolicy.h>
 #include <linux/rmap.h>
 #include <linux/mmu_notifier.h>
+#include <linux/perf_counter.h>
 
 #include <asm/uaccess.h>
 #include <asm/cacheflush.h>
@@ -87,6 +88,9 @@ int sysctl_overcommit_ratio = 50;	/* default is 50% */
 int sysctl_max_map_count __read_mostly = DEFAULT_MAX_MAP_COUNT;
 struct percpu_counter vm_committed_as;
 int heap_stack_gap __read_mostly = 1;
+
+/* amount of vm to protect from userspace access */
+unsigned long mmap_min_addr = CONFIG_DEFAULT_MMAP_MIN_ADDR;
 
 /*
  * Check that a process has enough memory to allocate a new virtual
@@ -1220,6 +1224,8 @@ munmap_back:
 	if (correct_wcount)
 		atomic_inc(&inode->i_writecount);
 out:
+	perf_counter_mmap(vma);
+
 	mm->total_vm += len >> PAGE_SHIFT;
 	vm_stat_account(mm, vm_flags, file, len >> PAGE_SHIFT);
 	if (vm_flags & VM_LOCKED) {
@@ -1839,14 +1845,6 @@ static void unmap_region(struct mm_struct *mm,
 	tlb_finish_mmu(tlb, start, end);
 }
 
-static inline void unmap_vma(struct vm_area_struct *vma)
-{
-#ifdef CONFIG_XEN
-	if (unlikely(vma->vm_ops && vma->vm_ops->unmap))
-		vma->vm_ops->unmap(vma);
-#endif
-}
-
 /*
  * Create a list of vma's touched by the unmap, removing them from the mm's
  * vma list as we go..
@@ -1862,7 +1860,6 @@ detach_vmas_to_be_unmapped(struct mm_struct *mm, struct vm_area_struct *vma,
 	insertion_point = (prev ? &prev->vm_next : &mm->mmap);
 	do {
 		rb_erase(&vma->vm_rb, &mm->mm_rb);
-		unmap_vma(vma);
 		mm->map_count--;
 		tail_vma = vma;
 		vma = vma->vm_next;
@@ -2163,11 +2160,6 @@ void exit_mmap(struct mm_struct *mm)
 
 	arch_exit_mmap(mm);
 
-#ifdef CONFIG_XEN
-	for (vma = mm->mmap; vma; vma = vma->vm_next)
-		unmap_vma(vma);
-#endif
-
 	vma = mm->mmap;
 	if (!vma)	/* Can happen if dup_mmap() received an OOM */
 		return;
@@ -2375,6 +2367,8 @@ int install_special_mapping(struct mm_struct *mm,
 	}
 
 	mm->total_vm += len >> PAGE_SHIFT;
+
+	perf_counter_mmap(vma);
 
 	return 0;
 }
