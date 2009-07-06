@@ -3385,8 +3385,7 @@ kdb_pid(int argc, const char **argv)
 			if (diag)
 				return KDB_BADINT;
 
-			p = find_task_by_pid_type_ns(PIDTYPE_PID, (pid_t)val,
-				&init_pid_ns);
+			p = find_task_by_pid_ns((pid_t)val, &init_pid_ns);
 			if (!p) {
 				kdb_printf("No task with pid=%d\n", (pid_t)val);
 				return 0;
@@ -3556,7 +3555,7 @@ kdb_kill(int argc, const char **argv)
 	}
 
 	/* Find the process. */
-	if (!(p = find_task_by_pid_type_ns(PIDTYPE_PID, pid, &init_pid_ns))) {
+	if (!(p = find_task_by_pid_ns(pid, &init_pid_ns))) {
 		kdb_printf("The specified process isn't found.\n");
 		return 0;
 	}

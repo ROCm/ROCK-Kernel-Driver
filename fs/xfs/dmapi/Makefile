@@ -17,7 +17,7 @@
 #
 
 EXTRA_CFLAGS += -I$(src)/.. -I$(src)/../linux-2.6
-EXTRA_CFLAGS += -I$(TOPDIR)/fs/dmapi
+EXTRA_CFLAGS += -I$(srctree)/fs/dmapi
 
 ifeq ($(CONFIG_XFS_DEBUG),y)
 	EXTRA_CFLAGS += -g -DDEBUG

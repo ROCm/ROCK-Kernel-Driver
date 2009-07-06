@@ -2,8 +2,8 @@
  *  Driver for NEC VR4100 series General-purpose I/O Unit.
  *
  *  Copyright (C) 2002 MontaVista Software Inc.
- *	Author: Yoichi Yuasa <yyuasa@mvista.com or source@mvista.com>
- *  Copyright (C) 2003-2007  Yoichi Yuasa <yoichi_yuasa@tripeaks.co.jp>
+ *	Author: Yoichi Yuasa <source@mvista.com>
+ *  Copyright (C) 2003-2009  Yoichi Yuasa <yuasa@linux-mips.org>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -21,8 +21,10 @@
  */
 #include <linux/errno.h>
 #include <linux/fs.h>
+#include <linux/gpio.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
+#include <linux/io.h>
 #include <linux/irq.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -31,18 +33,13 @@
 #include <linux/spinlock.h>
 #include <linux/types.h>
 
-#include <asm/io.h>
 #include <asm/vr41xx/giu.h>
 #include <asm/vr41xx/irq.h>
 #include <asm/vr41xx/vr41xx.h>
 
-MODULE_AUTHOR("Yoichi Yuasa <yoichi_yuasa@tripeaks.co.jp>");
+MODULE_AUTHOR("Yoichi Yuasa <yuasa@linux-mips.org>");
 MODULE_DESCRIPTION("NEC VR4100 series General-purpose I/O Unit driver");
 MODULE_LICENSE("GPL");
-
-static int major;	/* default is dynamic major device number */
-module_param(major, int, 0);
-MODULE_PARM_DESC(major, "Major device number");
 
 #define GIUIOSELL	0x00
 #define GIUIOSELH	0x02
@@ -76,9 +73,13 @@ MODULE_PARM_DESC(major, "Major device number");
 #define GPIO_HAS_OUTPUT_ENABLE		0x0002
 #define GPIO_HAS_INTERRUPT_EDGE_SELECT	0x0100
 
-static spinlock_t giu_lock;
+enum {
+	GPIO_INPUT,
+	GPIO_OUTPUT,
+};
+
+static DEFINE_SPINLOCK(giu_lock);
 static unsigned long giu_flags;
-static unsigned int giu_nr_pins;
 
 static void __iomem *giu_base;
 
@@ -89,9 +90,9 @@ static void __iomem *giu_base;
 #define GIUINT_HIGH_OFFSET	16
 #define GIUINT_HIGH_MAX		32
 
-static inline uint16_t giu_set(uint16_t offset, uint16_t set)
+static inline u16 giu_set(u16 offset, u16 set)
 {
-	uint16_t data;
+	u16 data;
 
 	data = giu_read(offset);
 	data |= set;
@@ -100,9 +101,9 @@ static inline uint16_t giu_set(uint16_t offset, uint16_t set)
 	return data;
 }
 
-static inline uint16_t giu_clear(uint16_t offset, uint16_t clear)
+static inline u16 giu_clear(u16 offset, u16 clear)
 {
-	uint16_t data;
+	u16 data;
 
 	data = giu_read(offset);
 	data &= ~clear;
@@ -145,7 +146,8 @@ static struct irq_chip giuint_low_irq_chip = {
 
 static void ack_giuint_high(unsigned int irq)
 {
-	giu_write(GIUINTSTATH, 1 << (GPIO_PIN_OF_IRQ(irq) - GIUINT_HIGH_OFFSET));
+	giu_write(GIUINTSTATH,
+		  1 << (GPIO_PIN_OF_IRQ(irq) - GIUINT_HIGH_OFFSET));
 }
 
 static void mask_giuint_high(unsigned int irq)
@@ -177,7 +179,7 @@ static struct irq_chip giuint_high_irq_chip = {
 
 static int giu_get_irq(unsigned int irq)
 {
-	uint16_t pendl, pendh, maskl, maskh;
+	u16 pendl, pendh, maskl, maskh;
 	int i;
 
 	pendl = giu_read(GIUINTSTATL);
@@ -208,14 +210,15 @@ static int giu_get_irq(unsigned int irq)
 	return -EINVAL;
 }
 
-void vr41xx_set_irq_trigger(unsigned int pin, irq_trigger_t trigger, irq_signal_t signal)
+void vr41xx_set_irq_trigger(unsigned int pin, irq_trigger_t trigger,
+			    irq_signal_t signal)
 {
-	uint16_t mask;
+	u16 mask;
 
 	if (pin < GIUINT_HIGH_OFFSET) {
 		mask = 1 << pin;
 		if (trigger != IRQ_TRIGGER_LEVEL) {
-        		giu_set(GIUINTTYPL, mask);
+			giu_set(GIUINTTYPL, mask);
 			if (signal == IRQ_SIGNAL_HOLD)
 				giu_set(GIUINTHTSELL, mask);
 			else
@@ -237,14 +240,14 @@ void vr41xx_set_irq_trigger(unsigned int pin, irq_trigger_t trigger, irq_signal_
 				}
 			}
 			set_irq_chip_and_handler(GIU_IRQ(pin),
-			                         &giuint_low_irq_chip,
-			                         handle_edge_irq);
+						 &giuint_low_irq_chip,
+						 handle_edge_irq);
 		} else {
 			giu_clear(GIUINTTYPL, mask);
 			giu_clear(GIUINTHTSELL, mask);
 			set_irq_chip_and_handler(GIU_IRQ(pin),
-			                         &giuint_low_irq_chip,
-			                         handle_level_irq);
+						 &giuint_low_irq_chip,
+						 handle_level_irq);
 		}
 		giu_write(GIUINTSTATL, mask);
 	} else if (pin < GIUINT_HIGH_MAX) {
@@ -272,14 +275,14 @@ void vr41xx_set_irq_trigger(unsigned int pin, irq_trigger_t trigger, irq_signal_
 				}
 			}
 			set_irq_chip_and_handler(GIU_IRQ(pin),
-			                         &giuint_high_irq_chip,
-			                         handle_edge_irq);
+						 &giuint_high_irq_chip,
+						 handle_edge_irq);
 		} else {
 			giu_clear(GIUINTTYPH, mask);
 			giu_clear(GIUINTHTSELH, mask);
 			set_irq_chip_and_handler(GIU_IRQ(pin),
-			                         &giuint_high_irq_chip,
-			                         handle_level_irq);
+						 &giuint_high_irq_chip,
+						 handle_level_irq);
 		}
 		giu_write(GIUINTSTATH, mask);
 	}
@@ -288,7 +291,7 @@ EXPORT_SYMBOL_GPL(vr41xx_set_irq_trigger);
 
 void vr41xx_set_irq_level(unsigned int pin, irq_level_t level)
 {
-	uint16_t mask;
+	u16 mask;
 
 	if (pin < GIUINT_HIGH_OFFSET) {
 		mask = 1 << pin;
@@ -308,89 +311,24 @@ void vr41xx_set_irq_level(unsigned int pin, irq_level_t level)
 }
 EXPORT_SYMBOL_GPL(vr41xx_set_irq_level);
 
-gpio_data_t vr41xx_gpio_get_pin(unsigned int pin)
+static int giu_set_direction(struct gpio_chip *chip, unsigned pin, int dir)
 {
-	uint16_t reg, mask;
-
-	if (pin >= giu_nr_pins)
-		return GPIO_DATA_INVAL;
-
-	if (pin < 16) {
-		reg = giu_read(GIUPIODL);
-		mask = (uint16_t)1 << pin;
-	} else if (pin < 32) {
-		reg = giu_read(GIUPIODH);
-		mask = (uint16_t)1 << (pin - 16);
-	} else if (pin < 48) {
-		reg = giu_read(GIUPODATL);
-		mask = (uint16_t)1 << (pin - 32);
-	} else {
-		reg = giu_read(GIUPODATH);
-		mask = (uint16_t)1 << (pin - 48);
-	}
-
-	if (reg & mask)
-		return GPIO_DATA_HIGH;
-
-	return GPIO_DATA_LOW;
-}
-EXPORT_SYMBOL_GPL(vr41xx_gpio_get_pin);
-
-int vr41xx_gpio_set_pin(unsigned int pin, gpio_data_t data)
-{
-	uint16_t offset, mask, reg;
+	u16 offset, mask, reg;
 	unsigned long flags;
 
-	if (pin >= giu_nr_pins)
-		return -EINVAL;
-
-	if (pin < 16) {
-		offset = GIUPIODL;
-		mask = (uint16_t)1 << pin;
-	} else if (pin < 32) {
-		offset = GIUPIODH;
-		mask = (uint16_t)1 << (pin - 16);
-	} else if (pin < 48) {
-		offset = GIUPODATL;
-		mask = (uint16_t)1 << (pin - 32);
-	} else {
-		offset = GIUPODATH;
-		mask = (uint16_t)1 << (pin - 48);
-	}
-
-	spin_lock_irqsave(&giu_lock, flags);
-
-	reg = giu_read(offset);
-	if (data == GPIO_DATA_HIGH)
-		reg |= mask;
-	else
-		reg &= ~mask;
-	giu_write(offset, reg);
-
-	spin_unlock_irqrestore(&giu_lock, flags);
-
-	return 0;
-}
-EXPORT_SYMBOL_GPL(vr41xx_gpio_set_pin);
-
-int vr41xx_gpio_set_direction(unsigned int pin, gpio_direction_t dir)
-{
-	uint16_t offset, mask, reg;
-	unsigned long flags;
-
-	if (pin >= giu_nr_pins)
+	if (pin >= chip->ngpio)
 		return -EINVAL;
 
 	if (pin < 16) {
 		offset = GIUIOSELL;
-		mask = (uint16_t)1 << pin;
+		mask = 1 << pin;
 	} else if (pin < 32) {
 		offset = GIUIOSELH;
-		mask = (uint16_t)1 << (pin - 16);
+		mask = 1 << (pin - 16);
 	} else {
 		if (giu_flags & GPIO_HAS_OUTPUT_ENABLE) {
 			offset = GIUPODATEN;
-			mask = (uint16_t)1 << (pin - 32);
+			mask = 1 << (pin - 32);
 		} else {
 			switch (pin) {
 			case 48:
@@ -420,11 +358,10 @@ int vr41xx_gpio_set_direction(unsigned int pin, gpio_direction_t dir)
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(vr41xx_gpio_set_direction);
 
 int vr41xx_gpio_pullupdown(unsigned int pin, gpio_pull_t pull)
 {
-	uint16_t reg, mask;
+	u16 reg, mask;
 	unsigned long flags;
 
 	if ((giu_flags & GPIO_HAS_PULLUPDOWN_IO) != GPIO_HAS_PULLUPDOWN_IO)
@@ -433,7 +370,7 @@ int vr41xx_gpio_pullupdown(unsigned int pin, gpio_pull_t pull)
 	if (pin >= 15)
 		return -EINVAL;
 
-	mask = (uint16_t)1 << pin;
+	mask = 1 << pin;
 
 	spin_lock_irqsave(&giu_lock, flags);
 
@@ -460,146 +397,125 @@ int vr41xx_gpio_pullupdown(unsigned int pin, gpio_pull_t pull)
 }
 EXPORT_SYMBOL_GPL(vr41xx_gpio_pullupdown);
 
-static ssize_t gpio_read(struct file *file, char __user *buf, size_t len,
-                         loff_t *ppos)
+static int vr41xx_gpio_get(struct gpio_chip *chip, unsigned pin)
 {
-	unsigned int pin;
-	char value = '0';
+	u16 reg, mask;
 
-	pin = iminor(file->f_path.dentry->d_inode);
-	if (pin >= giu_nr_pins)
-		return -EBADF;
+	if (pin >= chip->ngpio)
+		return -EINVAL;
 
-	if (vr41xx_gpio_get_pin(pin) == GPIO_DATA_HIGH)
-		value = '1';
-
-	if (len <= 0)
-		return -EFAULT;
-
-	if (put_user(value, buf))
-		return -EFAULT;
-
-	return 1;
-}
-
-static ssize_t gpio_write(struct file *file, const char __user *data,
-                          size_t len, loff_t *ppos)
-{
-	unsigned int pin;
-	size_t i;
-	char c;
-	int retval = 0;
-
-	pin = iminor(file->f_path.dentry->d_inode);
-	if (pin >= giu_nr_pins)
-		return -EBADF;
-
-	for (i = 0; i < len; i++) {
-		if (get_user(c, data + i))
-			return -EFAULT;
-
-		switch (c) {
-		case '0':
-			retval = vr41xx_gpio_set_pin(pin, GPIO_DATA_LOW);
-			break;
-		case '1':
-			retval = vr41xx_gpio_set_pin(pin, GPIO_DATA_HIGH);
-			break;
-		case 'D':
-			printk(KERN_INFO "GPIO%d: pull down\n", pin);
-			retval = vr41xx_gpio_pullupdown(pin, GPIO_PULL_DOWN);
-			break;
-		case 'd':
-			printk(KERN_INFO "GPIO%d: pull up/down disable\n", pin);
-			retval = vr41xx_gpio_pullupdown(pin, GPIO_PULL_DISABLE);
-			break;
-		case 'I':
-			printk(KERN_INFO "GPIO%d: input\n", pin);
-			retval = vr41xx_gpio_set_direction(pin, GPIO_INPUT);
-			break;
-		case 'O':
-			printk(KERN_INFO "GPIO%d: output\n", pin);
-			retval = vr41xx_gpio_set_direction(pin, GPIO_OUTPUT);
-			break;
-		case 'o':
-			printk(KERN_INFO "GPIO%d: output disable\n", pin);
-			retval = vr41xx_gpio_set_direction(pin, GPIO_OUTPUT_DISABLE);
-			break;
-		case 'P':
-			printk(KERN_INFO "GPIO%d: pull up\n", pin);
-			retval = vr41xx_gpio_pullupdown(pin, GPIO_PULL_UP);
-			break;
-		case 'p':
-			printk(KERN_INFO "GPIO%d: pull up/down disable\n", pin);
-			retval = vr41xx_gpio_pullupdown(pin, GPIO_PULL_DISABLE);
-			break;
-		default:
-			break;
-		}
-
-		if (retval < 0)
-			break;
+	if (pin < 16) {
+		reg = giu_read(GIUPIODL);
+		mask = 1 << pin;
+	} else if (pin < 32) {
+		reg = giu_read(GIUPIODH);
+		mask = 1 << (pin - 16);
+	} else if (pin < 48) {
+		reg = giu_read(GIUPODATL);
+		mask = 1 << (pin - 32);
+	} else {
+		reg = giu_read(GIUPODATH);
+		mask = 1 << (pin - 48);
 	}
 
-	return i;
-}
-
-static int gpio_open(struct inode *inode, struct file *file)
-{
-	unsigned int pin;
-
-	cycle_kernel_lock();
-	pin = iminor(inode);
-	if (pin >= giu_nr_pins)
-		return -EBADF;
-
-	return nonseekable_open(inode, file);
-}
-
-static int gpio_release(struct inode *inode, struct file *file)
-{
-	unsigned int pin;
-
-	pin = iminor(inode);
-	if (pin >= giu_nr_pins)
-		return -EBADF;
+	if (reg & mask)
+		return 1;
 
 	return 0;
 }
 
-static const struct file_operations gpio_fops = {
-	.owner		= THIS_MODULE,
-	.read		= gpio_read,
-	.write		= gpio_write,
-	.open		= gpio_open,
-	.release	= gpio_release,
+static void vr41xx_gpio_set(struct gpio_chip *chip, unsigned pin,
+			    int value)
+{
+	u16 offset, mask, reg;
+	unsigned long flags;
+
+	if (pin >= chip->ngpio)
+		return;
+
+	if (pin < 16) {
+		offset = GIUPIODL;
+		mask = 1 << pin;
+	} else if (pin < 32) {
+		offset = GIUPIODH;
+		mask = 1 << (pin - 16);
+	} else if (pin < 48) {
+		offset = GIUPODATL;
+		mask = 1 << (pin - 32);
+	} else {
+		offset = GIUPODATH;
+		mask = 1 << (pin - 48);
+	}
+
+	spin_lock_irqsave(&giu_lock, flags);
+
+	reg = giu_read(offset);
+	if (value)
+		reg |= mask;
+	else
+		reg &= ~mask;
+	giu_write(offset, reg);
+
+	spin_unlock_irqrestore(&giu_lock, flags);
+}
+
+
+static int vr41xx_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
+{
+	return giu_set_direction(chip, offset, GPIO_INPUT);
+}
+
+static int vr41xx_gpio_direction_output(struct gpio_chip *chip, unsigned offset,
+				int value)
+{
+	vr41xx_gpio_set(chip, offset, value);
+
+	return giu_set_direction(chip, offset, GPIO_OUTPUT);
+}
+
+static int vr41xx_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
+{
+	if (offset >= chip->ngpio)
+		return -EINVAL;
+
+	return GIU_IRQ_BASE + offset;
+}
+
+static struct gpio_chip vr41xx_gpio_chip = {
+	.label			= "vr41xx",
+	.owner			= THIS_MODULE,
+	.direction_input	= vr41xx_gpio_direction_input,
+	.get			= vr41xx_gpio_get,
+	.direction_output	= vr41xx_gpio_direction_output,
+	.set			= vr41xx_gpio_set,
+	.to_irq			= vr41xx_gpio_to_irq,
 };
 
-static int __devinit giu_probe(struct platform_device *dev)
+static int __devinit giu_probe(struct platform_device *pdev)
 {
 	struct resource *res;
 	unsigned int trigger, i, pin;
 	struct irq_chip *chip;
 	int irq, retval;
 
-	switch (dev->id) {
+	switch (pdev->id) {
 	case GPIO_50PINS_PULLUPDOWN:
 		giu_flags = GPIO_HAS_PULLUPDOWN_IO;
-		giu_nr_pins = 50;
+		vr41xx_gpio_chip.ngpio = 50;
 		break;
 	case GPIO_36PINS:
-		giu_nr_pins = 36;
+		vr41xx_gpio_chip.ngpio = 36;
 		break;
 	case GPIO_48PINS_EDGE_SELECT:
 		giu_flags = GPIO_HAS_INTERRUPT_EDGE_SELECT;
-		giu_nr_pins = 48;
+		vr41xx_gpio_chip.ngpio = 48;
 		break;
 	default:
-		printk(KERN_ERR "GIU: unknown ID %d\n", dev->id);
+		dev_err(&pdev->dev, "GIU: unknown ID %d\n", pdev->id);
 		return -ENODEV;
 	}
 
-	res = platform_get_resource(dev, IORESOURCE_MEM, 0);
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res)
 		return -EBUSY;
 
@@ -607,19 +523,9 @@ static int __devinit giu_probe(struct platform_device *dev)
 	if (!giu_base)
 		return -ENOMEM;
 
-	retval = register_chrdev(major, "GIU", &gpio_fops);
-	if (retval < 0) {
-		iounmap(giu_base);
-		giu_base = NULL;
-		return retval;
-	}
+	vr41xx_gpio_chip.dev = &pdev->dev;
 
-	if (major == 0) {
-		major = retval;
-		printk(KERN_INFO "GIU: major number %d\n", major);
-	}
-
-	spin_lock_init(&giu_lock);
+	retval = gpiochip_add(&vr41xx_gpio_chip);
 
 	giu_write(GIUINTENL, 0);
 	giu_write(GIUINTENH, 0);
@@ -640,14 +546,14 @@ static int __devinit giu_probe(struct platform_device *dev)
 
 	}
 
-	irq = platform_get_irq(dev, 0);
+	irq = platform_get_irq(pdev, 0);
 	if (irq < 0 || irq >= nr_irqs)
 		return -EBUSY;
 
 	return cascade_irq(irq, giu_get_irq);
 }
 
-static int __devexit giu_remove(struct platform_device *dev)
+static int __devexit giu_remove(struct platform_device *pdev)
 {
 	if (giu_base) {
 		iounmap(giu_base);

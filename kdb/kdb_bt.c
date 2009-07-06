@@ -117,7 +117,7 @@ kdb_bt(int argc, const char **argv)
 			return KDB_ARGCOUNT;
 		if ((diag = kdbgetularg((char *)argv[1], &pid)))
 			return diag;
-		if ((p = find_task_by_pid_type_ns(PIDTYPE_PID, pid, &init_pid_ns))) {
+		if ((p = find_task_by_pid_ns(pid, &init_pid_ns))) {
 			kdba_set_current_task(p);
 			return kdb_bt1(p, ~0UL, argcount, 0);
 		}
