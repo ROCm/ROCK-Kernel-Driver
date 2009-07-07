@@ -36,7 +36,6 @@
 #include <linux/workqueue.h>
 #include <linux/io.h>
 #include <linux/netdevice.h>
-#include <asm/cacheflush.h>
 
 #include "hw.h"
 
