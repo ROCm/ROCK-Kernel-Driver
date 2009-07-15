@@ -344,7 +344,7 @@ static CHIP_INFO chip_info_table[]= {
 };
 
 static struct pci_device_id device_id_table[] __devinitdata = {
-{ 0x1106, 0x3253, PCI_ANY_ID, PCI_ANY_ID, 0, 0, (long)chip_info_table},
+{ 0x1106, 0x3253, PCI_ANY_ID, PCI_ANY_ID, 0, 0, (long)&chip_info_table[0]},
 { 0, }
 };
 #endif
@@ -946,7 +946,7 @@ static BOOL device_release_WPADEV(PSDevice pDevice)
                  wpahdr->req_ie_len = 0;
                  skb_put(pDevice->skb, sizeof(viawget_wpa_header));
                  pDevice->skb->dev = pDevice->wpadev;
-		 skb_reset_mac_header(pDevice->skb);
+                 pDevice->skb->mac_header = pDevice->skb->data;
                  pDevice->skb->pkt_type = PACKET_HOST;
                  pDevice->skb->protocol = htons(ETH_P_802_2);
                  memset(pDevice->skb->cb, 0, sizeof(pDevice->skb->cb));
@@ -1718,7 +1718,7 @@ static BOOL device_alloc_rx_buf(PSDevice pDevice, PSRxDesc pRD) {
         return FALSE;
     ASSERT(pRDInfo->skb);
     pRDInfo->skb->dev = pDevice->dev;
-    pRDInfo->skb_dma = pci_map_single(pDevice->pcid, skb_tail_pointer(pRDInfo->skb), pDevice->rx_buf_sz,
+    pRDInfo->skb_dma = pci_map_single(pDevice->pcid, pRDInfo->skb->tail, pDevice->rx_buf_sz,
                         PCI_DMA_FROMDEVICE);
 #endif
     *((PU32) &(pRD->m_rd0RD0)) = 0;
@@ -1843,7 +1843,7 @@ static int device_tx_srv(PSDevice pDevice, UINT uIdx) {
 #else
                     skb = pTD->pTDInfo->skb;
 	                skb->dev = pDevice->apdev;
-			skb_reset_mac_header(skb);
+			        skb->mac_header = skb->data;
 	                skb->pkt_type = PACKET_OTHERHOST;
     	            //skb->protocol = htons(ETH_P_802_2);
 	                memset(skb->cb, 0, sizeof(skb->cb));
@@ -2029,7 +2029,6 @@ static int  device_open(struct net_device *dev) {
 #endif
 	//printk("DEBUG1\n");
 #ifdef WPA_SM_Transtatus
-	{
      extern SWPAResult wpa_Result;
      memset(wpa_Result.ifname,0,sizeof(wpa_Result.ifname));
      wpa_Result.proto = 0;
@@ -2037,7 +2036,6 @@ static int  device_open(struct net_device *dev) {
      wpa_Result.eap_type = 0;
      wpa_Result.authenticated = FALSE;
      pDevice->fWPA_Authened = FALSE;
-	}
 #endif
 DEVICE_PRT(MSG_LEVEL_DEBUG, KERN_INFO "call device init rd0 ring\n");
 device_init_rd0_ring(pDevice);
@@ -3951,7 +3949,7 @@ device_notify_reboot(struct notifier_block *nb, unsigned long event, void *p)
 }
 
 static int
-viawget_suspend(struct pci_dev *pcid, pm_message_t mesg)
+viawget_suspend(struct pci_dev *pcid, pm_message_t state)
 {
     int power_status;   // to silence the compiler
 
@@ -3973,7 +3971,7 @@ viawget_suspend(struct pci_dev *pcid, pm_message_t mesg)
     memset(pMgmt->abyCurrBSSID, 0, 6);
     pMgmt->eCurrState = WMAC_STATE_IDLE;
     pci_disable_device(pcid);
-    power_status = pci_set_power_state(pcid, pci_choose_state(pcid, mesg));
+    power_status = pci_set_power_state(pcid, pci_choose_state(pcid, state));
     spin_unlock_irq(&pDevice->lock);
     return 0;
 }

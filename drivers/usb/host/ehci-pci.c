@@ -409,6 +409,8 @@ static const struct hc_driver ehci_pci_hc_driver = {
 	.relinquish_port =	ehci_relinquish_port,
 	.port_handed_over =	ehci_port_handed_over,
 
+	.clear_tt_buffer_complete	= ehci_clear_tt_buffer_complete,
+
 #ifdef CONFIG_KDB_USB
 	.kdb_poll_char = 	ehci_kdb_poll_char,
 #endif

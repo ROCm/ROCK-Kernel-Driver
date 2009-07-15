@@ -2235,7 +2235,6 @@ static void stlc45xx_op_remove_interface(struct ieee80211_hw *hw,
 	stlc45xx_debug(DEBUG_FUNC, "%s", __func__);
 }
 
-
 static int stlc45xx_op_config(struct ieee80211_hw *hw, u32 changed)
 {
 	struct stlc45xx *stlc = hw->priv;
@@ -2277,6 +2276,14 @@ static void stlc45xx_op_bss_info_changed(struct ieee80211_hw *hw,
 					 u32 changed)
 {
 	struct stlc45xx *stlc = hw->priv;
+
+	stlc45xx_debug(DEBUG_FUNC, "%s", __func__);
+	mutex_lock(&stlc->mutex);
+
+	memcpy(stlc->bssid, info->bssid, ETH_ALEN);
+	stlc45xx_tx_setup(stlc);
+
+	mutex_unlock(&stlc->mutex);
 
 	if (changed & BSS_CHANGED_ASSOC) {
 		stlc->associated = info->assoc;
