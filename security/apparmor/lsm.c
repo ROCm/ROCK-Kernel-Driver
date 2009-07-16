@@ -183,11 +183,13 @@ static int common_perm_rm(const char *op, struct path *dir,
 			  struct dentry *dentry, u16 mask)
 {
 	struct inode *inode = dentry->d_inode;
+	struct path_cond cond = {};
 
 	if (!dir->mnt || !inode || !mediated_filesystem(inode))
 		return 0;
 
-	struct path_cond cond = { inode->i_uid, inode->i_mode };
+	cond.uid = inode->i_uid;
+	cond.mode = inode->i_mode;
 
 	return common_perm_dentry(op, dir, dentry, mask, &cond);
 }
