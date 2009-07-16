@@ -60,6 +60,15 @@ config SECURITYFS
 
 	  If you are unsure how to answer this question, answer N.
 
+config SECURITY_DEFAULT
+	string "Default security module"
+	depends on SECURITY
+	default ""
+	help
+          This determines the security module used if the security=
+          boot parmater is not provided.  If a security module is not
+          specified the first module to register will be used.
+
 config SECURITY_NETWORK
 	bool "Socket and Networking Security Hooks"
 	depends on SECURITY

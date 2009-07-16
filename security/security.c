@@ -18,7 +18,7 @@
 #include <linux/security.h>
 
 /* Boot-time LSM user choice */
-static __initdata char chosen_lsm[SECURITY_NAME_MAX + 1];
+static __initdata char chosen_lsm[SECURITY_NAME_MAX + 1] = CONFIG_SECURITY_DEFAULT;
 
 /* things that live in capability.c */
 extern struct security_operations default_security_ops;
