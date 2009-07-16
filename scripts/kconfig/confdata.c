@@ -672,12 +672,27 @@ out:
 	return res;
 }
 
+int fprintf2(FILE *f1, FILE *f2, const char *fmt, ...)
+{
+	va_list ap;
+	int res;
+
+	va_start(ap, fmt);
+	vfprintf(f1, fmt, ap);
+	va_end(ap);
+	va_start(ap, fmt);
+	res = vfprintf(f2, fmt, ap);
+	va_end(ap);
+
+	return res;
+}
+
 int conf_write_autoconf(void)
 {
 	struct symbol *sym;
 	const char *str;
 	const char *name;
-	FILE *out, *out_h;
+	FILE *out, *out2, *out_h;
 	time_t now;
 	int i, l;
 
@@ -692,16 +707,23 @@ int conf_write_autoconf(void)
 	if (!out)
 		return 1;
 
+	out2 = fopen(".tmpconfig2", "w");
+	if (!out2) {
+		fclose(out);
+		return 1;
+	}
+
 	out_h = fopen(".tmpconfig.h", "w");
 	if (!out_h) {
 		fclose(out);
+		fclose(out2);
 		return 1;
 	}
 
 	sym = sym_lookup("KERNELVERSION", 0);
 	sym_calc_value(sym);
 	time(&now);
-	fprintf(out, "#\n"
+	fprintf2(out, out2, "#\n"
 		     "# Automatically generated make config: don't edit\n"
 		     "# Linux kernel version: %s\n"
 		     "# %s"
@@ -726,45 +748,51 @@ int conf_write_autoconf(void)
 			case no:
 				break;
 			case mod:
-				fprintf(out, "CONFIG_%s=m\n", sym->name);
+				fprintf2(out, out2, "CONFIG_%s=m\n",
+						sym->name);
 				fprintf(out_h, "#define CONFIG_%s_MODULE 1\n", sym->name);
 				break;
 			case yes:
 				fprintf(out, "CONFIG_%s=y\n", sym->name);
+				fprintf(out2, "CONFIG_%s=%c\n", sym->name,
+					sym->type == S_BOOLEAN ? 'y' : 'Y');
 				fprintf(out_h, "#define CONFIG_%s 1\n", sym->name);
 				break;
 			}
 			break;
 		case S_STRING:
 			str = sym_get_string_value(sym);
-			fprintf(out, "CONFIG_%s=\"", sym->name);
+			fprintf2(out, out2, "CONFIG_%s=\"", sym->name);
 			fprintf(out_h, "#define CONFIG_%s \"", sym->name);
 			while (1) {
 				l = strcspn(str, "\"\\");
 				if (l) {
 					fwrite(str, l, 1, out);
+					fwrite(str, l, 1, out2);
 					fwrite(str, l, 1, out_h);
 					str += l;
 				}
 				if (!*str)
 					break;
-				fprintf(out, "\\%c", *str);
+				fprintf2(out, out2, "\\%c", *str);
 				fprintf(out_h, "\\%c", *str);
 				str++;
 			}
 			fputs("\"\n", out);
+			fputs("\"\n", out2);
 			fputs("\"\n", out_h);
 			break;
 		case S_HEX:
 			str = sym_get_string_value(sym);
 			if (str[0] != '0' || (str[1] != 'x' && str[1] != 'X')) {
-				fprintf(out, "CONFIG_%s=%s\n", sym->name, str);
+				fprintf2(out, out2, "CONFIG_%s=%s\n",
+						sym->name, str);
 				fprintf(out_h, "#define CONFIG_%s 0x%s\n", sym->name, str);
 				break;
 			}
 		case S_INT:
 			str = sym_get_string_value(sym);
-			fprintf(out, "CONFIG_%s=%s\n", sym->name, str);
+			fprintf2(out, out2, "CONFIG_%s=%s\n", sym->name, str);
 			fprintf(out_h, "#define CONFIG_%s %s\n", sym->name, str);
 			break;
 		default:
@@ -772,6 +800,7 @@ int conf_write_autoconf(void)
 		}
 	}
 	fclose(out);
+	fclose(out2);
 	fclose(out_h);
 
 	name = getenv("KCONFIG_AUTOHEADER");
@@ -779,6 +808,13 @@ int conf_write_autoconf(void)
 		name = "include/linux/autoconf.h";
 	if (rename(".tmpconfig.h", name))
 		return 1;
+
+	name = getenv("KCONFIG_AUTOCONFIG2");
+	if (!name)
+		name = "include/config/auto2.conf";
+	if (rename(".tmpconfig2", name))
+		return 1;
+
 	name = conf_get_autoconfig_name();
 	/*
 	 * This must be the last step, kbuild has a dependency on auto.conf

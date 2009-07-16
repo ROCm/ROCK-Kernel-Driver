@@ -121,7 +121,7 @@ validate_paddr_page(u64 paddr)
 	return 0;
 }
 
-extern int isolate_lru_page(page);
+extern int isolate_lru_page(struct page *);
 static int
 ia64_mca_cpe_move_page(u64 paddr, u32 node)
 {

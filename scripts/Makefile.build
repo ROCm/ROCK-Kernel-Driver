@@ -156,10 +156,10 @@ $(obj)/%.i: $(src)/%.c FORCE
 
 cmd_gensymtypes =                                                           \
     $(CPP) -D__GENKSYMS__ $(c_flags) $< |                                   \
-    $(GENKSYMS) -T $@ -a $(ARCH)                                            \
+    $(GENKSYMS) $(if $(strip $(1)), -T $(@:.o=.symtypes)) -a $(ARCH)        \
      $(if $(KBUILD_PRESERVE),-p)                                            \
      $(if $(KBUILD_OVERRIDE),-o)                                            \
-     $(if $(1),-r $(firstword $(wildcard $(@:.symtypes=.symref) /dev/null)))
+     -r $(firstword $(wildcard $(basename $@).symref /dev/null))
 
 quiet_cmd_cc_symtypes_c = SYM $(quiet_modtag) $@
 cmd_cc_symtypes_c =                                                         \

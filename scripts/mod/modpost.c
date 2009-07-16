@@ -86,8 +86,7 @@ static int is_vmlinux(const char *modname)
 		myname = modname;
 
 	return (strcmp(myname, "vmlinux") == 0) ||
-	       (strcmp(myname, "vmlinux.o") == 0) ||
-	       (strcmp(myname, "built-in") == 0);
+	       (strcmp(myname, "vmlinux.o") == 0);
 }
 
 void *do_nofail(void *ptr, const char *expr)
