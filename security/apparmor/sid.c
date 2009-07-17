@@ -28,6 +28,8 @@
  */
 
 #include <linux/spinlock.h>
+#include <linux/err.h>
+#include <linux/errno.h>
 
 #include "include/sid.h"
 
