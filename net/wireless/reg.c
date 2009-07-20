@@ -389,6 +389,8 @@ static int call_crda(const char *alpha2)
 /* Used by nl80211 before kmalloc'ing our regulatory domain */
 bool reg_is_valid_request(const char *alpha2)
 {
+	assert_cfg80211_lock();
+
 	if (!last_request)
 		return false;
 
@@ -2042,7 +2044,13 @@ static int __set_regdom(const struct ieee80211_regdomain *rd)
 	 * the country IE rd with what CRDA believes that country should have
 	 */
 
-	BUG_ON(!country_ie_regdomain);
+	/*
+	 * Userspace could have sent two replies with only
+	 * one kernel request. By the second reply we would have
+	 * already processed and consumed the country_ie_regdomain.
+	 */
+	if (!country_ie_regdomain)
+		return -EALREADY;
 	BUG_ON(rd == country_ie_regdomain);
 
 	/*

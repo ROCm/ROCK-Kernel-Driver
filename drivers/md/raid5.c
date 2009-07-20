@@ -3696,13 +3696,15 @@ static int make_request(struct request_queue *q, struct bio * bi)
 				spin_unlock_irq(&conf->device_lock);
 				if (must_retry) {
 					release_stripe(sh);
+					schedule();
 					goto retry;
 				}
 			}
 			/* FIXME what if we get a false positive because these
 			 * are being updated.
 			 */
-			if (logical_sector >= mddev->suspend_lo &&
+			if (bio_data_dir(bi) == WRITE &&
+			    logical_sector >= mddev->suspend_lo &&
 			    logical_sector < mddev->suspend_hi) {
 				release_stripe(sh);
 				schedule();

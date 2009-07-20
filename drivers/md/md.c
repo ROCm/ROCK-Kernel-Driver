@@ -3589,7 +3589,8 @@ suspend_lo_store(mddev_t *mddev, const char *buf, size_t len)
 	char *e;
 	unsigned long long new = simple_strtoull(buf, &e, 10);
 
-	if (mddev->pers->quiesce == NULL)
+	if (mddev->pers == NULL ||
+	    mddev->pers->quiesce == NULL)
 		return -EINVAL;
 	if (buf == e || (*e && *e != '\n'))
 		return -EINVAL;
@@ -3617,7 +3618,8 @@ suspend_hi_store(mddev_t *mddev, const char *buf, size_t len)
 	char *e;
 	unsigned long long new = simple_strtoull(buf, &e, 10);
 
-	if (mddev->pers->quiesce == NULL)
+	if (mddev->pers == NULL ||
+	    mddev->pers->quiesce == NULL)
 		return -EINVAL;
 	if (buf == e || (*e && *e != '\n'))
 		return -EINVAL;
@@ -3876,6 +3878,8 @@ static int md_alloc(dev_t dev, char *name)
 			if (mddev2->gendisk &&
 			    strcmp(mddev2->gendisk->disk_name, name) == 0) {
 				spin_unlock(&all_mddevs_lock);
+				mutex_unlock(&disks_mutex);
+				mddev_put(mddev);
 				return -EEXIST;
 			}
 		spin_unlock(&all_mddevs_lock);
