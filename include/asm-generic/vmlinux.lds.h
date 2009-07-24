@@ -30,9 +30,7 @@
  *	EXCEPTION_TABLE(...)
  *	NOTES
  *
- *	__bss_start = .;
- *	BSS_SECTION(0, 0)
- *	__bss_stop = .;
+ *	BSS_SECTION(0, 0, 0)
  *	_end = .;
  *
  *	/DISCARD/ : {
@@ -491,7 +489,8 @@
  * bss (Block Started by Symbol) - uninitialized data
  * zeroed during startup
  */
-#define SBSS								\
+#define SBSS(sbss_align)						\
+	. = ALIGN(sbss_align);						\
 	.sbss : AT(ADDR(.sbss) - LOAD_OFFSET) {				\
 		*(.sbss)						\
 		*(.scommon)						\
@@ -500,33 +499,11 @@
 #define BSS(bss_align)							\
 	. = ALIGN(bss_align);						\
 	.bss : AT(ADDR(.bss) - LOAD_OFFSET) {				\
-		VMLINUX_SYMBOL(__bss_start) = .;			\
 		*(.bss.page_aligned)					\
 		*(.dynbss)						\
 		*(.bss)							\
 		*(COMMON)						\
-		VMLINUX_SYMBOL(__bss_stop) = .;				\
 	}
-
-#ifdef CONFIG_STACK_UNWIND
-#define EH_FRAME							\
-		/* Unwind data binary search table */			\
-		. = ALIGN(8);						\
-        	.eh_frame_hdr : AT(ADDR(.eh_frame_hdr) - LOAD_OFFSET) {	\
-			VMLINUX_SYMBOL(__start_unwind_hdr) = .;		\
-			*(.eh_frame_hdr)				\
-			VMLINUX_SYMBOL(__end_unwind_hdr) = .;		\
-		}							\
-		/* Unwind data */					\
-		. = ALIGN(8);						\
-		.eh_frame : AT(ADDR(.eh_frame) - LOAD_OFFSET) {		\
-			VMLINUX_SYMBOL(__start_unwind) = .;		\
-		  	*(.eh_frame)					\
-			VMLINUX_SYMBOL(__end_unwind) = .;		\
-		}
-#else
-#define EH_FRAME
-#endif
 
 /*
  * DWARF debug sections.
@@ -757,8 +734,30 @@
 		INIT_RAM_FS						\
 	}
 
-#define BSS_SECTION(sbss_align, bss_align)				\
-	SBSS								\
+#define BSS_SECTION(sbss_align, bss_align, stop_align)			\
+	. = ALIGN(sbss_align);						\
+	VMLINUX_SYMBOL(__bss_start) = .;				\
+	SBSS(sbss_align)						\
 	BSS(bss_align)							\
-	. = ALIGN(4);
+	. = ALIGN(stop_align);						\
+	VMLINUX_SYMBOL(__bss_stop) = .;
 
+#ifdef CONFIG_STACK_UNWIND
+#define EH_FRAME							\
+		/* Unwind data binary search table */			\
+		. = ALIGN(8);						\
+        	.eh_frame_hdr : AT(ADDR(.eh_frame_hdr) - LOAD_OFFSET) {	\
+			VMLINUX_SYMBOL(__start_unwind_hdr) = .;		\
+			*(.eh_frame_hdr)				\
+			VMLINUX_SYMBOL(__end_unwind_hdr) = .;		\
+		}							\
+		/* Unwind data */					\
+		. = ALIGN(8);						\
+		.eh_frame : AT(ADDR(.eh_frame) - LOAD_OFFSET) {		\
+			VMLINUX_SYMBOL(__start_unwind) = .;		\
+		  	*(.eh_frame)					\
+			VMLINUX_SYMBOL(__end_unwind) = .;		\
+		}
+#else
+#define EH_FRAME
+#endif
