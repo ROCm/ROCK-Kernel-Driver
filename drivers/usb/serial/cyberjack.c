@@ -62,8 +62,7 @@ static void cyberjack_disconnect(struct usb_serial *serial);
 static void cyberjack_release(struct usb_serial *serial);
 static int  cyberjack_open(struct tty_struct *tty,
 			struct usb_serial_port *port, struct file *filp);
-static void cyberjack_close(struct tty_struct *tty,
-			struct usb_serial_port *port, struct file *filp);
+static void cyberjack_close(struct usb_serial_port *port);
 static int cyberjack_write(struct tty_struct *tty,
 	struct usb_serial_port *port, const unsigned char *buf, int count);
 static int cyberjack_write_room(struct tty_struct *tty);
@@ -195,8 +194,7 @@ static int  cyberjack_open(struct tty_struct *tty,
 	return result;
 }
 
-static void cyberjack_close(struct tty_struct *tty,
-			struct usb_serial_port *port, struct file *filp)
+static void cyberjack_close(struct usb_serial_port *port)
 {
 	dbg("%s - port %d", __func__, port->number);
 

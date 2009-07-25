@@ -313,7 +313,6 @@ struct uvc_xu_control {
 #define UVC_QUIRK_BUILTIN_ISIGHT	0x00000008
 #define UVC_QUIRK_STREAM_NO_FID		0x00000010
 #define UVC_QUIRK_IGNORE_SELECTOR_UNIT	0x00000020
-#define UVC_QUIRK_PRUNE_CONTROLS	0x00000040
 #define UVC_QUIRK_FIX_BANDWIDTH		0x00000080
 #define UVC_QUIRK_HUE_EPIPE		0x00000100
 
@@ -635,6 +634,7 @@ struct uvc_device {
 	enum uvc_device_state state;
 	struct kref kref;
 	struct list_head list;
+	atomic_t users;
 
 	/* Video control interface */
 	__u16 uvc_version;
@@ -748,6 +748,7 @@ extern struct uvc_buffer *uvc_queue_next_buffer(struct uvc_video_queue *queue,
 		struct uvc_buffer *buf);
 extern unsigned int uvc_queue_poll(struct uvc_video_queue *queue,
 		struct file *file, poll_table *wait);
+extern int uvc_queue_allocated(struct uvc_video_queue *queue);
 static inline int uvc_queue_streaming(struct uvc_video_queue *queue)
 {
 	return queue->flags & UVC_QUEUE_STREAMING;
@@ -771,6 +772,8 @@ extern int uvc_query_ctrl(struct uvc_device *dev, __u8 query, __u8 unit,
 /* Status */
 extern int uvc_status_init(struct uvc_device *dev);
 extern void uvc_status_cleanup(struct uvc_device *dev);
+extern int uvc_status_start(struct uvc_device *dev);
+extern void uvc_status_stop(struct uvc_device *dev);
 extern int uvc_status_suspend(struct uvc_device *dev);
 extern int uvc_status_resume(struct uvc_device *dev);
 

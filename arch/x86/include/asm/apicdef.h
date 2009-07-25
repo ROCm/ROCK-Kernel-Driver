@@ -1,8 +1,6 @@
 #ifndef _ASM_X86_APICDEF_H
 #define _ASM_X86_APICDEF_H
 
-#ifndef CONFIG_XEN
-
 /*
  * Constants for various Intel APICs. (local APIC, IOAPIC, etc.)
  *
@@ -24,6 +22,7 @@
 #  define	APIC_INTEGRATED(x)	(1)
 #endif
 #define		APIC_XAPIC(x)		((x) >= 0x14)
+#define		APIC_EXT_SPACE(x)	((x) & 0x80000000)
 #define	APIC_TASKPRI	0x80
 #define		APIC_TPRI_MASK		0xFFu
 #define	APIC_ARBPRI	0x90
@@ -118,7 +117,9 @@
 #define		APIC_TDR_DIV_32		0x8
 #define		APIC_TDR_DIV_64		0x9
 #define		APIC_TDR_DIV_128	0xA
-#define	APIC_EILVT0     0x500
+#define	APIC_EFEAT	0x400
+#define	APIC_ECTRL	0x410
+#define APIC_EILVTn(n)	(0x500 + 0x10 * n)
 #define		APIC_EILVT_NR_AMD_K8	1	/* # of extended interrupts */
 #define		APIC_EILVT_NR_AMD_10H	4
 #define		APIC_EILVT_LVTOFF(x)	(((x) >> 4) & 0xF)
@@ -127,23 +128,10 @@
 #define		APIC_EILVT_MSG_NMI	0x4
 #define		APIC_EILVT_MSG_EXT	0x7
 #define		APIC_EILVT_MASKED	(1 << 16)
-#define	APIC_EILVT1     0x510
-#define	APIC_EILVT2     0x520
-#define	APIC_EILVT3     0x530
 
 #define APIC_BASE (fix_to_virt(FIX_APIC_BASE))
 #define APIC_BASE_MSR	0x800
 #define X2APIC_ENABLE	(1UL << 10)
-
-#else /* CONFIG_XEN */
-
-enum {
-	APIC_DEST_ALLBUT = 0x1,
-	APIC_DEST_SELF,
-	APIC_DEST_ALLINC
-};
-
-#endif /* CONFIG_XEN */
 
 #ifdef CONFIG_X86_32
 # define MAX_IO_APICS 64
@@ -151,8 +139,6 @@ enum {
 # define MAX_IO_APICS 128
 # define MAX_LOCAL_APIC 32768
 #endif
-
-#ifndef CONFIG_XEN
 
 /*
  * All x86-64 systems are xAPIC compatible.
@@ -423,8 +409,6 @@ struct local_apic {
 } __attribute__ ((packed));
 
 #undef u32
-
-#endif /* CONFIG_XEN */
 
 #ifdef CONFIG_X86_32
  #define BAD_APICID 0xFFu

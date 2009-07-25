@@ -38,9 +38,8 @@
 static int  keyspan_open		(struct tty_struct *tty,
 					 struct usb_serial_port *port,
 					 struct file *filp);
-static void keyspan_close		(struct tty_struct *tty,
-					 struct usb_serial_port *port,
-					 struct file *filp);
+static void keyspan_close		(struct usb_serial_port *port);
+static void keyspan_dtr_rts		(struct usb_serial_port *port, int on);
 static int  keyspan_startup		(struct usb_serial *serial);
 static void keyspan_disconnect		(struct usb_serial *serial);
 static void keyspan_release		(struct usb_serial *serial);
@@ -563,6 +562,7 @@ static struct usb_serial_driver keyspan_1port_device = {
 	.num_ports		= 1,
 	.open			= keyspan_open,
 	.close			= keyspan_close,
+	.dtr_rts		= keyspan_dtr_rts,
 	.write			= keyspan_write,
 	.write_room		= keyspan_write_room,
 	.set_termios		= keyspan_set_termios,
@@ -584,6 +584,7 @@ static struct usb_serial_driver keyspan_2port_device = {
 	.num_ports		= 2,
 	.open			= keyspan_open,
 	.close			= keyspan_close,
+	.dtr_rts		= keyspan_dtr_rts,
 	.write			= keyspan_write,
 	.write_room		= keyspan_write_room,
 	.set_termios		= keyspan_set_termios,
@@ -605,6 +606,7 @@ static struct usb_serial_driver keyspan_4port_device = {
 	.num_ports		= 4,
 	.open			= keyspan_open,
 	.close			= keyspan_close,
+	.dtr_rts		= keyspan_dtr_rts,
 	.write			= keyspan_write,
 	.write_room		= keyspan_write_room,
 	.set_termios		= keyspan_set_termios,

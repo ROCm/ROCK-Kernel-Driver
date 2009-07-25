@@ -136,7 +136,7 @@ static int ct_map_audio_buffer(struct ct_atc *atc, struct ct_atc_pcm *apcm)
 	struct snd_pcm_runtime *runtime;
 	struct ct_vm *vm;
 
-	if (!apcm->substream)
+	if (NULL == apcm->substream)
 		return 0;
 
 	runtime = apcm->substream->runtime;
@@ -144,7 +144,7 @@ static int ct_map_audio_buffer(struct ct_atc *atc, struct ct_atc_pcm *apcm)
 
 	apcm->vm_block = vm->map(vm, apcm->substream, runtime->dma_bytes);
 
-	if (!apcm->vm_block)
+	if (NULL == apcm->vm_block)
 		return -ENOENT;
 
 	return 0;
@@ -154,7 +154,7 @@ static void ct_unmap_audio_buffer(struct ct_atc *atc, struct ct_atc_pcm *apcm)
 {
 	struct ct_vm *vm;
 
-	if (!apcm->vm_block)
+	if (NULL == apcm->vm_block)
 		return;
 
 	vm = atc->vm;
@@ -231,16 +231,16 @@ atc_get_pitch(unsigned int input_rate, unsigned int output_rate)
 
 static int select_rom(unsigned int pitch)
 {
-	if (pitch > 0x00428f5c && pitch < 0x01b851ec) {
+	if ((pitch > 0x00428f5c) && (pitch < 0x01b851ec)) {
 		/* 0.26 <= pitch <= 1.72 */
 		return 1;
-	} else if (pitch == 0x01d66666 || pitch == 0x01d66667) {
+	} else if ((0x01d66666 == pitch) || (0x01d66667 == pitch)) {
 		/* pitch == 1.8375 */
 		return 2;
-	} else if (pitch == 0x02000000) {
+	} else if (0x02000000 == pitch) {
 		/* pitch == 2 */
 		return 3;
-	} else if (pitch >= 0x0 && pitch <= 0x08000000) {
+	} else if ((pitch >= 0x0) && (pitch <= 0x08000000)) {
 		/* 0 <= pitch <= 8 */
 		return 0;
 	} else {
@@ -283,7 +283,7 @@ static int atc_pcm_playback_prepare(struct ct_atc *atc, struct ct_atc_pcm *apcm)
 	/* Get AMIXER resource */
 	n_amixer = (n_amixer < 2) ? 2 : n_amixer;
 	apcm->amixers = kzalloc(sizeof(void *)*n_amixer, GFP_KERNEL);
-	if (!apcm->amixers) {
+	if (NULL == apcm->amixers) {
 		err = -ENOMEM;
 		goto error1;
 	}
@@ -311,7 +311,7 @@ static int atc_pcm_playback_prepare(struct ct_atc *atc, struct ct_atc_pcm *apcm)
 					INIT_VOL, atc->pcm[i+device*2]);
 		mutex_unlock(&atc->atc_mutex);
 		src = src->ops->next_interleave(src);
-		if (!src)
+		if (NULL == src)
 			src = apcm->src;
 	}
 
@@ -334,7 +334,7 @@ atc_pcm_release_resources(struct ct_atc *atc, struct ct_atc_pcm *apcm)
 	struct srcimp *srcimp;
 	int i;
 
-	if (apcm->srcimps) {
+	if (NULL != apcm->srcimps) {
 		for (i = 0; i < apcm->n_srcimp; i++) {
 			srcimp = apcm->srcimps[i];
 			srcimp->ops->unmap(srcimp);
@@ -345,7 +345,7 @@ atc_pcm_release_resources(struct ct_atc *atc, struct ct_atc_pcm *apcm)
 		apcm->srcimps = NULL;
 	}
 
-	if (apcm->srccs) {
+	if (NULL != apcm->srccs) {
 		for (i = 0; i < apcm->n_srcc; i++) {
 			src_mgr->put_src(src_mgr, apcm->srccs[i]);
 			apcm->srccs[i] = NULL;
@@ -354,7 +354,7 @@ atc_pcm_release_resources(struct ct_atc *atc, struct ct_atc_pcm *apcm)
 		apcm->srccs = NULL;
 	}
 
-	if (apcm->amixers) {
+	if (NULL != apcm->amixers) {
 		for (i = 0; i < apcm->n_amixer; i++) {
 			amixer_mgr->put_amixer(amixer_mgr, apcm->amixers[i]);
 			apcm->amixers[i] = NULL;
@@ -363,17 +363,17 @@ atc_pcm_release_resources(struct ct_atc *atc, struct ct_atc_pcm *apcm)
 		apcm->amixers = NULL;
 	}
 
-	if (apcm->mono) {
+	if (NULL != apcm->mono) {
 		sum_mgr->put_sum(sum_mgr, apcm->mono);
 		apcm->mono = NULL;
 	}
 
-	if (apcm->src) {
+	if (NULL != apcm->src) {
 		src_mgr->put_src(src_mgr, apcm->src);
 		apcm->src = NULL;
 	}
 
-	if (apcm->vm_block) {
+	if (NULL != apcm->vm_block) {
 		/* Undo device virtual mem map */
 		ct_unmap_audio_buffer(atc, apcm);
 		apcm->vm_block = NULL;
@@ -419,7 +419,7 @@ static int atc_pcm_stop(struct ct_atc *atc, struct ct_atc_pcm *apcm)
 	src->ops->set_state(src, SRC_STATE_OFF);
 	src->ops->commit_write(src);
 
-	if (apcm->srccs) {
+	if (NULL != apcm->srccs) {
 		for (i = 0; i < apcm->n_srcc; i++) {
 			src = apcm->srccs[i];
 			src->ops->set_bm(src, 0);
@@ -544,18 +544,18 @@ atc_pcm_capture_get_resources(struct ct_atc *atc, struct ct_atc_pcm *apcm)
 
 	if (n_srcc) {
 		apcm->srccs = kzalloc(sizeof(void *)*n_srcc, GFP_KERNEL);
-		if (!apcm->srccs)
+		if (NULL == apcm->srccs)
 			return -ENOMEM;
 	}
 	if (n_amixer) {
 		apcm->amixers = kzalloc(sizeof(void *)*n_amixer, GFP_KERNEL);
-		if (!apcm->amixers) {
+		if (NULL == apcm->amixers) {
 			err = -ENOMEM;
 			goto error1;
 		}
 	}
 	apcm->srcimps = kzalloc(sizeof(void *)*n_srcimp, GFP_KERNEL);
-	if (!apcm->srcimps) {
+	if (NULL == apcm->srcimps) {
 		err = -ENOMEM;
 		goto error1;
 	}
@@ -818,7 +818,7 @@ static int spdif_passthru_playback_get_resources(struct ct_atc *atc,
 	/* Get AMIXER resource */
 	n_amixer = (n_amixer < 2) ? 2 : n_amixer;
 	apcm->amixers = kzalloc(sizeof(void *)*n_amixer, GFP_KERNEL);
-	if (!apcm->amixers) {
+	if (NULL == apcm->amixers) {
 		err = -ENOMEM;
 		goto error1;
 	}
@@ -919,7 +919,7 @@ spdif_passthru_playback_prepare(struct ct_atc *atc, struct ct_atc_pcm *apcm)
 		amixer = apcm->amixers[i];
 		amixer->ops->setup(amixer, &src->rsc, INIT_VOL, NULL);
 		src = src->ops->next_interleave(src);
-		if (!src)
+		if (NULL == src)
 			src = apcm->src;
 	}
 	/* Connect to SPDIFOO */
@@ -1121,7 +1121,7 @@ static int atc_release_resources(struct ct_atc *atc)
 	struct ct_mixer *mixer = NULL;
 
 	/* disconnect internal mixer objects */
-	if (atc->mixer) {
+	if (NULL != atc->mixer) {
 		mixer = atc->mixer;
 		mixer->set_input_left(mixer, MIX_LINE_IN, NULL);
 		mixer->set_input_right(mixer, MIX_LINE_IN, NULL);
@@ -1131,7 +1131,7 @@ static int atc_release_resources(struct ct_atc *atc)
 		mixer->set_input_right(mixer, MIX_SPDIF_IN, NULL);
 	}
 
-	if (atc->daios) {
+	if (NULL != atc->daios) {
 		daio_mgr = (struct daio_mgr *)atc->rsc_mgrs[DAIO];
 		for (i = 0; i < atc->n_daio; i++) {
 			daio = atc->daios[i];
@@ -1149,7 +1149,7 @@ static int atc_release_resources(struct ct_atc *atc)
 		atc->daios = NULL;
 	}
 
-	if (atc->pcm) {
+	if (NULL != atc->pcm) {
 		sum_mgr = atc->rsc_mgrs[SUM];
 		for (i = 0; i < atc->n_pcm; i++)
 			sum_mgr->put_sum(sum_mgr, atc->pcm[i]);
@@ -1158,7 +1158,7 @@ static int atc_release_resources(struct ct_atc *atc)
 		atc->pcm = NULL;
 	}
 
-	if (atc->srcs) {
+	if (NULL != atc->srcs) {
 		src_mgr = atc->rsc_mgrs[SRC];
 		for (i = 0; i < atc->n_src; i++)
 			src_mgr->put_src(src_mgr, atc->srcs[i]);
@@ -1167,7 +1167,7 @@ static int atc_release_resources(struct ct_atc *atc)
 		atc->srcs = NULL;
 	}
 
-	if (atc->srcimps) {
+	if (NULL != atc->srcimps) {
 		srcimp_mgr = atc->rsc_mgrs[SRCIMP];
 		for (i = 0; i < atc->n_srcimp; i++) {
 			srcimp = atc->srcimps[i];
@@ -1185,7 +1185,7 @@ static int ct_atc_destroy(struct ct_atc *atc)
 {
 	int i = 0;
 
-	if (!atc)
+	if (NULL == atc)
 		return 0;
 
 	if (atc->timer) {
@@ -1196,20 +1196,21 @@ static int ct_atc_destroy(struct ct_atc *atc)
 	atc_release_resources(atc);
 
 	/* Destroy internal mixer objects */
-	if (atc->mixer)
+	if (NULL != atc->mixer)
 		ct_mixer_destroy(atc->mixer);
 
 	for (i = 0; i < NUM_RSCTYP; i++) {
-		if (rsc_mgr_funcs[i].destroy && atc->rsc_mgrs[i])
+		if ((NULL != rsc_mgr_funcs[i].destroy) &&
+		    (NULL != atc->rsc_mgrs[i]))
 			rsc_mgr_funcs[i].destroy(atc->rsc_mgrs[i]);
 
 	}
 
-	if (atc->hw)
+	if (NULL != atc->hw)
 		destroy_hw_obj((struct hw *)atc->hw);
 
 	/* Destroy device virtual memory manager object */
-	if (atc->vm) {
+	if (NULL != atc->vm) {
 		ct_vm_destroy(atc->vm);
 		atc->vm = NULL;
 	}
@@ -1274,7 +1275,7 @@ int __devinit ct_atc_create_alsa_devs(struct ct_atc *atc)
 	alsa_dev_funcs[MIXER].public_name = atc->chip_name;
 
 	for (i = 0; i < NUM_CTALSADEVS; i++) {
-		if (!alsa_dev_funcs[i].create)
+		if (NULL == alsa_dev_funcs[i].create)
 			continue;
 
 		err = alsa_dev_funcs[i].create(atc, i,
@@ -1311,7 +1312,7 @@ static int __devinit atc_create_hw_devs(struct ct_atc *atc)
 		return err;
 
 	for (i = 0; i < NUM_RSCTYP; i++) {
-		if (!rsc_mgr_funcs[i].create)
+		if (NULL == rsc_mgr_funcs[i].create)
 			continue;
 
 		err = rsc_mgr_funcs[i].create(atc->hw, &atc->rsc_mgrs[i]);
@@ -1338,19 +1339,19 @@ static int atc_get_resources(struct ct_atc *atc)
 	int err, i;
 
 	atc->daios = kzalloc(sizeof(void *)*(DAIONUM), GFP_KERNEL);
-	if (!atc->daios)
+	if (NULL == atc->daios)
 		return -ENOMEM;
 
 	atc->srcs = kzalloc(sizeof(void *)*(2*2), GFP_KERNEL);
-	if (!atc->srcs)
+	if (NULL == atc->srcs)
 		return -ENOMEM;
 
 	atc->srcimps = kzalloc(sizeof(void *)*(2*2), GFP_KERNEL);
-	if (!atc->srcimps)
+	if (NULL == atc->srcimps)
 		return -ENOMEM;
 
 	atc->pcm = kzalloc(sizeof(void *)*(2*4), GFP_KERNEL);
-	if (!atc->pcm)
+	if (NULL == atc->pcm)
 		return -ENOMEM;
 
 	daio_mgr = (struct daio_mgr *)atc->rsc_mgrs[DAIO];
@@ -1647,7 +1648,7 @@ int __devinit ct_atc_create(struct snd_card *card, struct pci_dev *pci,
 	*ratc = NULL;
 
 	atc = kzalloc(sizeof(*atc), GFP_KERNEL);
-	if (!atc)
+	if (NULL == atc)
 		return -ENOMEM;
 
 	/* Set operations */

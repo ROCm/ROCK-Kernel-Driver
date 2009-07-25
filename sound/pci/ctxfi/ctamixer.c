@@ -63,7 +63,7 @@ static int amixer_set_input(struct amixer *amixer, struct rsc *rsc)
 	hw = amixer->rsc.hw;
 	hw->amixer_set_mode(amixer->rsc.ctrl_blk, AMIXER_Y_IMMEDIATE);
 	amixer->input = rsc;
-	if (!rsc)
+	if (NULL == rsc)
 		hw->amixer_set_x(amixer->rsc.ctrl_blk, BLANK_SLOT);
 	else
 		hw->amixer_set_x(amixer->rsc.ctrl_blk,
@@ -99,7 +99,7 @@ static int amixer_set_sum(struct amixer *amixer, struct sum *sum)
 
 	hw = amixer->rsc.hw;
 	amixer->sum = sum;
-	if (!sum) {
+	if (NULL == sum) {
 		hw->amixer_set_se(amixer->rsc.ctrl_blk, 0);
 	} else {
 		hw->amixer_set_se(amixer->rsc.ctrl_blk, 1);
@@ -124,20 +124,20 @@ static int amixer_commit_write(struct amixer *amixer)
 
 	/* Program master and conjugate resources */
 	amixer->rsc.ops->master(&amixer->rsc);
-	if (input)
+	if (NULL != input)
 		input->ops->master(input);
 
-	if (sum)
+	if (NULL != sum)
 		sum->rsc.ops->master(&sum->rsc);
 
 	for (i = 0; i < amixer->rsc.msr; i++) {
 		hw->amixer_set_dirty_all(amixer->rsc.ctrl_blk);
-		if (input) {
+		if (NULL != input) {
 			hw->amixer_set_x(amixer->rsc.ctrl_blk,
 						input->ops->output_slot(input));
 			input->ops->next_conj(input);
 		}
-		if (sum) {
+		if (NULL != sum) {
 			hw->amixer_set_sadr(amixer->rsc.ctrl_blk,
 						sum->rsc.ops->index(&sum->rsc));
 			sum->rsc.ops->next_conj(&sum->rsc);
@@ -147,10 +147,10 @@ static int amixer_commit_write(struct amixer *amixer)
 		amixer->rsc.ops->next_conj(&amixer->rsc);
 	}
 	amixer->rsc.ops->master(&amixer->rsc);
-	if (input)
+	if (NULL != input)
 		input->ops->master(input);
 
-	if (sum)
+	if (NULL != sum)
 		sum->rsc.ops->master(&sum->rsc);
 
 	return 0;
@@ -242,12 +242,13 @@ static int get_amixer_rsc(struct amixer_mgr *mgr,
 
 	/* Allocate mem for amixer resource */
 	amixer = kzalloc(sizeof(*amixer), GFP_KERNEL);
-	if (!amixer)
-		return -ENOMEM;
+	if (NULL == amixer) {
+		err = -ENOMEM;
+		return err;
+	}
 
 	/* Check whether there are sufficient
 	 * amixer resources to meet request. */
-	err = 0;
 	spin_lock_irqsave(&mgr->mgr_lock, flags);
 	for (i = 0; i < desc->msr; i++) {
 		err = mgr_get_resource(&mgr->mgr, 1, &idx);
@@ -303,7 +304,7 @@ int amixer_mgr_create(void *hw, struct amixer_mgr **ramixer_mgr)
 
 	*ramixer_mgr = NULL;
 	amixer_mgr = kzalloc(sizeof(*amixer_mgr), GFP_KERNEL);
-	if (!amixer_mgr)
+	if (NULL == amixer_mgr)
 		return -ENOMEM;
 
 	err = rsc_mgr_init(&amixer_mgr->mgr, AMIXER, AMIXER_RESOURCE_NUM, hw);
@@ -396,11 +397,12 @@ static int get_sum_rsc(struct sum_mgr *mgr,
 
 	/* Allocate mem for sum resource */
 	sum = kzalloc(sizeof(*sum), GFP_KERNEL);
-	if (!sum)
-		return -ENOMEM;
+	if (NULL == sum) {
+		err = -ENOMEM;
+		return err;
+	}
 
 	/* Check whether there are sufficient sum resources to meet request. */
-	err = 0;
 	spin_lock_irqsave(&mgr->mgr_lock, flags);
 	for (i = 0; i < desc->msr; i++) {
 		err = mgr_get_resource(&mgr->mgr, 1, &idx);
@@ -456,7 +458,7 @@ int sum_mgr_create(void *hw, struct sum_mgr **rsum_mgr)
 
 	*rsum_mgr = NULL;
 	sum_mgr = kzalloc(sizeof(*sum_mgr), GFP_KERNEL);
-	if (!sum_mgr)
+	if (NULL == sum_mgr)
 		return -ENOMEM;
 
 	err = rsc_mgr_init(&sum_mgr->mgr, SUM, SUM_RESOURCE_NUM, hw);

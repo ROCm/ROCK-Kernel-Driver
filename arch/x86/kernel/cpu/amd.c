@@ -275,7 +275,7 @@ static void __cpuinit srat_detect_node(struct cpuinfo_x86 *c)
 #if defined(CONFIG_NUMA) && defined(CONFIG_X86_64)
 	int cpu = smp_processor_id();
 	int node;
-	unsigned apicid = hard_smp_processor_id();
+	unsigned apicid = cpu_has_apic ? hard_smp_processor_id() : c->apicid;
 
 	node = c->phys_proc_id;
 	if (apicid_to_node[apicid] != NUMA_NO_NODE)
@@ -478,7 +478,6 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 		fam10h_check_enable_mmcfg();
 	}
 
-#ifndef CONFIG_XEN
 	if (c == &boot_cpu_data && c->x86 >= 0xf && c->x86 <= 0x11) {
 		unsigned long long tseg;
 
@@ -497,7 +496,6 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 			set_memory_4k((unsigned long)__va(tseg), 1);
 		}
 	}
-#endif
 #endif
 }
 

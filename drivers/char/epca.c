@@ -36,6 +36,7 @@
 #include <linux/tty.h>
 #include <linux/tty_flip.h>
 #include <linux/slab.h>
+#include <linux/smp_lock.h>
 #include <linux/ioport.h>
 #include <linux/interrupt.h>
 #include <linux/uaccess.h>
@@ -745,7 +746,7 @@ static int epca_carrier_raised(struct tty_port *port)
 	return 0;
 }
 
-static void epca_raise_dtr_rts(struct tty_port *port)
+static void epca_dtr_rts(struct tty_port *port, int onoff)
 {
 }
 
@@ -925,7 +926,7 @@ static const struct tty_operations pc_ops = {
 
 static const struct tty_port_operations epca_port_ops = {
 	.carrier_raised = epca_carrier_raised,
-	.raise_dtr_rts = epca_raise_dtr_rts,
+	.dtr_rts = epca_dtr_rts,
 };
 
 static int info_open(struct tty_struct *tty, struct file *filp)
@@ -2114,8 +2115,8 @@ static int pc_ioctl(struct tty_struct *tty, struct file *file,
 			tty_wait_until_sent(tty, 0);
 		} else {
 			/* ldisc lock already held in ioctl */
-			if (tty->ldisc.ops->flush_buffer)
-				tty->ldisc.ops->flush_buffer(tty);
+			if (tty->ldisc->ops->flush_buffer)
+				tty->ldisc->ops->flush_buffer(tty);
 		}
 		unlock_kernel();
 		/* Fall Thru */

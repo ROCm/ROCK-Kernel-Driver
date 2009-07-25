@@ -172,7 +172,7 @@ static int lpp_reinstate_path(struct path_selector *ps, struct dm_path *p)
 }
 
 static struct dm_path *lpp_select_path(struct path_selector *ps,
-					unsigned *repeat_count, size_t nr_bytes)
+					unsigned *repeat_count)
 {
        struct selector *s = ps->context;
        struct path_info *pi, *next, *least_io_path = NULL;
@@ -199,8 +199,7 @@ static struct dm_path *lpp_select_path(struct path_selector *ps,
        return least_io_path->path;
 }
 
-static int lpp_end_io(struct path_selector *ps, struct dm_path *path,
-		      size_t nr_bytes)
+static int lpp_end_io(struct path_selector *ps, struct dm_path *path)
 {
        struct path_info *pi = NULL;
 

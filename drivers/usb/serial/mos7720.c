@@ -521,7 +521,7 @@ static int mos7720_chars_in_buffer(struct tty_struct *tty)
 	mos7720_port = usb_get_serial_port_data(port);
 	if (mos7720_port == NULL) {
 		dbg("%s:leaving ...........", __func__);
-		return -ENODEV;
+		return 0;
 	}
 
 	for (i = 0; i < NUM_URBS; ++i) {
@@ -533,8 +533,7 @@ static int mos7720_chars_in_buffer(struct tty_struct *tty)
 	return chars;
 }
 
-static void mos7720_close(struct tty_struct *tty,
-			struct usb_serial_port *port, struct file *filp)
+static void mos7720_close(struct usb_serial_port *port)
 {
 	struct usb_serial *serial;
 	struct moschip_port *mos7720_port;

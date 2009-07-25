@@ -25,8 +25,6 @@
 #include <asm/atomic.h>
 #include <asm/device.h>
 
-#define BUS_ID_SIZE		20
-
 struct device;
 struct device_private;
 struct device_driver;
@@ -62,8 +60,6 @@ struct bus_type {
 	void (*shutdown)(struct device *dev);
 
 	int (*suspend)(struct device *dev, pm_message_t state);
-	int (*suspend_late)(struct device *dev, pm_message_t state);
-	int (*resume_early)(struct device *dev);
 	int (*resume)(struct device *dev);
 
 	struct dev_pm_ops *pm;
@@ -116,6 +112,8 @@ extern int bus_unregister_notifier(struct bus_type *bus,
 #define BUS_NOTIFY_BOUND_DRIVER		0x00000003 /* driver bound to device */
 #define BUS_NOTIFY_UNBIND_DRIVER	0x00000004 /* driver about to be
 						      unbound */
+#define BUS_NOTIFY_UNBOUND_DRIVER	0x00000005 /* driver is unbound
+						      from the device */
 
 extern struct kset *bus_get_kset(struct bus_type *bus);
 extern struct klist *bus_get_device_klist(struct bus_type *bus);
@@ -292,9 +290,6 @@ struct device_type {
 	int (*uevent)(struct device *dev, struct kobj_uevent_env *env);
 	char *(*nodename)(struct device *dev);
 	void (*release)(struct device *dev);
-
-	int (*suspend)(struct device *dev, pm_message_t state);
-	int (*resume)(struct device *dev);
 
 	struct dev_pm_ops *pm;
 };

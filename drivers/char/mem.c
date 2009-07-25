@@ -110,7 +110,6 @@ void __attribute__((weak)) unxlate_dev_mem_ptr(unsigned long phys, void *addr)
 {
 }
 
-#ifndef ARCH_HAS_DEV_MEM
 /*
  * This funcion reads the *physical* memory. The f_pos points directly to the 
  * memory location. 
@@ -255,7 +254,6 @@ static ssize_t write_mem(struct file * file, const char __user * buf,
 	*ppos += written;
 	return written;
 }
-#endif
 
 int __attribute__((weak)) phys_mem_access_prot_allowed(struct file *file,
 	unsigned long pfn, unsigned long size, pgprot_t *vma_prot)
@@ -347,9 +345,6 @@ static int mmap_mem(struct file * file, struct vm_area_struct * vma)
 static int mmap_kmem(struct file * file, struct vm_area_struct * vma)
 {
 	unsigned long pfn;
-#ifdef CONFIG_XEN
-	unsigned long i, count;
-#endif
 
 	/* Turn a kernel-virtual address into a physical page frame */
 	pfn = __pa((u64)vma->vm_pgoff << PAGE_SHIFT) >> PAGE_SHIFT;
@@ -363,13 +358,6 @@ static int mmap_kmem(struct file * file, struct vm_area_struct * vma)
 	 */
 	if (!pfn_valid(pfn))
 		return -EIO;
-
-#ifdef CONFIG_XEN
-	count = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
-	for (i = 0; i < count; i++)
-		if ((pfn + i) != mfn_to_local_pfn(pfn_to_mfn(pfn + i)))
-			return -EIO;
-#endif
 
 	vma->vm_pgoff = pfn;
 	return mmap_mem(file, vma);
@@ -706,9 +694,8 @@ static ssize_t read_zero(struct file * file, char __user * buf,
 		written += chunk - unwritten;
 		if (unwritten)
 			break;
-		/* Consider changing this to just 'signal_pending()' with lots of testing */
-		if (fatal_signal_pending(current))
-			return written ? written : -EINTR;
+		if (signal_pending(current))
+			return written ? written : -ERESTARTSYS;
 		buf += chunk;
 		count -= chunk;
 		cond_resched();
@@ -787,7 +774,6 @@ static int open_port(struct inode * inode, struct file * filp)
 #define open_kmem	open_mem
 #define open_oldmem	open_mem
 
-#ifndef ARCH_HAS_DEV_MEM
 static const struct file_operations mem_fops = {
 	.llseek		= memory_lseek,
 	.read		= read_mem,
@@ -796,9 +782,6 @@ static const struct file_operations mem_fops = {
 	.open		= open_mem,
 	.get_unmapped_area = get_unmapped_area_mem,
 };
-#else
-extern const struct file_operations mem_fops;
-#endif
 
 #ifdef CONFIG_DEVKMEM
 static const struct file_operations kmem_fops = {
@@ -880,89 +863,64 @@ static const struct file_operations kmsg_fops = {
 	.write =	kmsg_write,
 };
 
-static int memory_open(struct inode * inode, struct file * filp)
+static const struct {
+	unsigned int		minor;
+	char			*name;
+	umode_t			mode;
+	const struct file_operations	*fops;
+	struct backing_dev_info	*dev_info;
+} devlist[] = { /* list of minor devices */
+	{1, "mem",     S_IRUSR | S_IWUSR | S_IRGRP, &mem_fops,
+		&directly_mappable_cdev_bdi},
+#ifdef CONFIG_DEVKMEM
+	{2, "kmem",    S_IRUSR | S_IWUSR | S_IRGRP, &kmem_fops,
+		&directly_mappable_cdev_bdi},
+#endif
+	{3, "null",    S_IRUGO | S_IWUGO,           &null_fops, NULL},
+#ifdef CONFIG_DEVPORT
+	{4, "port",    S_IRUSR | S_IWUSR | S_IRGRP, &port_fops, NULL},
+#endif
+	{5, "zero",    S_IRUGO | S_IWUGO,           &zero_fops, &zero_bdi},
+	{7, "full",    S_IRUGO | S_IWUGO,           &full_fops, NULL},
+	{8, "random",  S_IRUGO | S_IWUSR,           &random_fops, NULL},
+	{9, "urandom", S_IRUGO | S_IWUSR,           &urandom_fops, NULL},
+	{11,"kmsg",    S_IRUGO | S_IWUSR,           &kmsg_fops, NULL},
+#ifdef CONFIG_CRASH_DUMP
+	{12,"oldmem",    S_IRUSR | S_IWUSR | S_IRGRP, &oldmem_fops, NULL},
+#endif
+};
+
+static int memory_open(struct inode *inode, struct file *filp)
 {
 	int ret = 0;
+	int i;
 
 	lock_kernel();
-	switch (iminor(inode)) {
-		case 1:
-			filp->f_op = &mem_fops;
-			filp->f_mapping->backing_dev_info =
-				&directly_mappable_cdev_bdi;
+
+	for (i = 0; i < ARRAY_SIZE(devlist); i++) {
+		if (devlist[i].minor == iminor(inode)) {
+			filp->f_op = devlist[i].fops;
+			if (devlist[i].dev_info) {
+				filp->f_mapping->backing_dev_info =
+					devlist[i].dev_info;
+			}
+
 			break;
-#ifdef CONFIG_DEVKMEM
-		case 2:
-			filp->f_op = &kmem_fops;
-			filp->f_mapping->backing_dev_info =
-				&directly_mappable_cdev_bdi;
-			break;
-#endif
-		case 3:
-			filp->f_op = &null_fops;
-			break;
-#ifdef CONFIG_DEVPORT
-		case 4:
-			filp->f_op = &port_fops;
-			break;
-#endif
-		case 5:
-			filp->f_mapping->backing_dev_info = &zero_bdi;
-			filp->f_op = &zero_fops;
-			break;
-		case 7:
-			filp->f_op = &full_fops;
-			break;
-		case 8:
-			filp->f_op = &random_fops;
-			break;
-		case 9:
-			filp->f_op = &urandom_fops;
-			break;
-		case 11:
-			filp->f_op = &kmsg_fops;
-			break;
-#ifdef CONFIG_CRASH_DUMP
-		case 12:
-			filp->f_op = &oldmem_fops;
-			break;
-#endif
-		default:
-			unlock_kernel();
-			return -ENXIO;
+		}
 	}
-	if (filp->f_op && filp->f_op->open)
-		ret = filp->f_op->open(inode,filp);
+
+	if (i == ARRAY_SIZE(devlist))
+		ret = -ENXIO;
+	else
+		if (filp->f_op && filp->f_op->open)
+			ret = filp->f_op->open(inode, filp);
+
 	unlock_kernel();
 	return ret;
 }
 
 static const struct file_operations memory_fops = {
 	.open		= memory_open,	/* just a selector for the real open */
-};
-
-static const struct {
-	unsigned int		minor;
-	char			*name;
-	umode_t			mode;
-	const struct file_operations	*fops;
-} devlist[] = { /* list of minor devices */
-	{1, "mem",     S_IRUSR | S_IWUSR | S_IRGRP, &mem_fops},
-#ifdef CONFIG_DEVKMEM
-	{2, "kmem",    S_IRUSR | S_IWUSR | S_IRGRP, &kmem_fops},
-#endif
-	{3, "null",    S_IRUGO | S_IWUGO,           &null_fops},
-#ifdef CONFIG_DEVPORT
-	{4, "port",    S_IRUSR | S_IWUSR | S_IRGRP, &port_fops},
-#endif
-	{5, "zero",    S_IRUGO | S_IWUGO,           &zero_fops},
-	{7, "full",    S_IRUGO | S_IWUGO,           &full_fops},
-	{8, "random",  S_IRUGO | S_IWUSR,           &random_fops},
-	{9, "urandom", S_IRUGO | S_IWUSR,           &urandom_fops},
-	{11,"kmsg",    S_IRUGO | S_IWUSR,           &kmsg_fops},
-#ifdef CONFIG_CRASH_DUMP
-	{12,"oldmem",    S_IRUSR | S_IWUSR | S_IRGRP, &oldmem_fops},
-#endif
 };
 
 static struct class *mem_class;

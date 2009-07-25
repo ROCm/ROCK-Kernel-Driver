@@ -24,11 +24,15 @@ CFLAGS_vsyscall_64.o	:= $(PROFILING) -g0 $(nostackp)
 CFLAGS_hpet.o		:= $(nostackp)
 CFLAGS_tsc.o		:= $(nostackp)
 CFLAGS_paravirt.o	:= $(nostackp)
+GCOV_PROFILE_vsyscall_64.o	:= n
+GCOV_PROFILE_hpet.o		:= n
+GCOV_PROFILE_tsc.o		:= n
+GCOV_PROFILE_paravirt.o		:= n
 
 obj-y			:= process_$(BITS).o signal.o entry_$(BITS).o
 obj-y			+= traps.o irq.o irq_$(BITS).o dumpstack_$(BITS).o
 obj-y			+= time_$(BITS).o ioport.o ldt.o dumpstack.o
-obj-y			+= setup.o i8259.o irqinit_$(BITS).o
+obj-y			+= setup.o i8259.o irqinit.o
 obj-$(CONFIG_X86_VISWS)	+= visws_quirks.o
 obj-$(CONFIG_X86_32)	+= probe_roms_32.o
 obj-$(CONFIG_X86_32)	+= sys_i386_32.o i386_ksyms_32.o
@@ -44,6 +48,7 @@ obj-y				+= process.o
 obj-y				+= i387.o xsave.o
 obj-y				+= ptrace.o
 obj-$(CONFIG_X86_DS)		+= ds.o
+obj-$(CONFIG_X86_DS_SELFTEST)		+= ds_selftest.o
 obj-$(CONFIG_X86_32)		+= tls.o
 obj-$(CONFIG_IA32_EMULATION)	+= tls.o
 obj-y				+= step.o
@@ -72,7 +77,7 @@ obj-$(CONFIG_KEXEC)		+= machine_kexec_$(BITS).o
 obj-$(CONFIG_KEXEC)		+= relocate_kernel_$(BITS).o crash.o
 obj-$(CONFIG_CRASH_DUMP)	+= crash_dump_$(BITS).o
 obj-$(CONFIG_KPROBES)		+= kprobes.o
-obj-$(CONFIG_MODULES)		+= module_$(BITS).o
+obj-$(CONFIG_MODULES)		+= module.o
 obj-$(CONFIG_EFI) 		+= efi.o efi_$(BITS).o efi_stub_$(BITS).o
 obj-$(CONFIG_DOUBLEFAULT) 	+= doublefault_32.o
 obj-$(CONFIG_KGDB)		+= kgdb.o
@@ -109,8 +114,6 @@ obj-$(CONFIG_X86_CHECK_BIOS_CORRUPTION) += check.o
 
 obj-$(CONFIG_SWIOTLB)			+= pci-swiotlb.o
 
-obj-$(CONFIG_X86_XEN)		+= fixup.o
-
 ###
 # 64 bit specific files
 ifeq ($(CONFIG_X86_64),y)
@@ -124,10 +127,4 @@ ifeq ($(CONFIG_X86_64),y)
 
 	obj-$(CONFIG_PCI_MMCONFIG)	+= mmconf-fam10h_64.o
 	obj-y				+= vsmp_64.o
-
-	time_64-$(CONFIG_XEN)		+= time_32.o
 endif
-
-disabled-obj-$(CONFIG_XEN) := %_uv.o crash.o early-quirks.o hpet.o i8253.o \
-	i8259.o irqinit_$(BITS).o pci-swiotlb.o reboot.o smpboot.o tsc.o \
-	tsc_sync.o uv_%.o vsmp_64.o

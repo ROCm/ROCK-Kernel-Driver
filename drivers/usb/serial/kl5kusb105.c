@@ -77,8 +77,7 @@ static void klsi_105_disconnect(struct usb_serial *serial);
 static void klsi_105_release(struct usb_serial *serial);
 static int  klsi_105_open(struct tty_struct *tty,
 			struct usb_serial_port *port, struct file *filp);
-static void klsi_105_close(struct tty_struct *tty,
-			struct usb_serial_port *port, struct file *filp);
+static void klsi_105_close(struct usb_serial_port *port);
 static int  klsi_105_write(struct tty_struct *tty,
 	struct usb_serial_port *port, const unsigned char *buf, int count);
 static void klsi_105_write_bulk_callback(struct urb *urb);
@@ -452,8 +451,7 @@ exit:
 } /* klsi_105_open */
 
 
-static void klsi_105_close(struct tty_struct *tty,
-			struct usb_serial_port *port, struct file *filp)
+static void klsi_105_close(struct usb_serial_port *port)
 {
 	struct klsi_105_private *priv = usb_get_serial_port_data(port);
 	int rc;

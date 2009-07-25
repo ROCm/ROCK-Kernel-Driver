@@ -100,8 +100,9 @@ void x86_pci_root_bus_res_quirks(struct pci_bus *b)
 	int j;
 	struct pci_root_info *info;
 
-	/* don't go for it if _CRS is used */
-	if (pci_probe & PCI_USE__CRS)
+	/* don't go for it if _CRS is used already */
+	if (b->resource[0] != &ioport_resource ||
+	    b->resource[1] != &iomem_resource)
 		return;
 
 	/* if only one root bus, don't need to anything */
@@ -115,6 +116,9 @@ void x86_pci_root_bus_res_quirks(struct pci_bus *b)
 
 	if (i == pci_root_num)
 		return;
+
+	printk(KERN_DEBUG "PCI: peer root bus %02x res updated from pci conf\n",
+			b->number);
 
 	info = &pci_root_info[i];
 	for (j = 0; j < info->res_num; j++) {
@@ -611,14 +615,6 @@ static int __init pci_io_ecs_init(void)
 	for_each_online_cpu(cpu)
 		amd_cpu_notify(&amd_cpu_notifier, (unsigned long)CPU_ONLINE,
 			       (void *)(long)cpu);
-#ifdef CONFIG_XEN
-	{
-		u64 reg;
-		rdmsrl(MSR_AMD64_NB_CFG, reg);
-		if (!(reg & ENABLE_CF8_EXT_CFG))
-			return 0;
-	}
-#endif
 	pci_probe |= PCI_HAS_IO_ECS;
 
 	return 0;
@@ -626,10 +622,6 @@ static int __init pci_io_ecs_init(void)
 
 static int __init amd_postcore_init(void)
 {
-#ifdef CONFIG_XEN
-	if (!is_initial_xendomain())
-		return 0;
-#endif
 	if (boot_cpu_data.x86_vendor != X86_VENDOR_AMD)
 		return 0;
 

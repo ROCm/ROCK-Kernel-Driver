@@ -76,12 +76,13 @@ static struct class *bsr_class;
 static int bsr_major;
 
 enum {
-	BSR_8   = 0,
-	BSR_16  = 1,
-	BSR_64  = 2,
-	BSR_128 = 3,
-	BSR_UNKNOWN = 4,
-	BSR_MAX = 5,
+	BSR_8    = 0,
+	BSR_16   = 1,
+	BSR_64   = 2,
+	BSR_128  = 3,
+	BSR_4096 = 4,
+	BSR_UNKNOWN = 5,
+	BSR_MAX  = 6,
 };
 
 static unsigned bsr_types[BSR_MAX];
@@ -213,6 +214,11 @@ static int bsr_add_node(struct device_node *bn)
 		cur->bsr_stride = bsr_stride[i];
 		cur->bsr_dev    = MKDEV(bsr_major, i + total_bsr_devs);
 
+		/* if we have a bsr_len of > 4k and less then PAGE_SIZE (64k pages) */
+		/* we can only map 4k of it, so only advertise the 4k in sysfs */
+		if (cur->bsr_len > 4096 && cur->bsr_len < PAGE_SIZE)
+			cur->bsr_len = 4096;
+
 		switch(cur->bsr_bytes) {
 		case 8:
 			cur->bsr_type = BSR_8;
@@ -226,9 +232,11 @@ static int bsr_add_node(struct device_node *bn)
 		case 128:
 			cur->bsr_type = BSR_128;
 			break;
+		case 4096:
+			cur->bsr_type = BSR_4096;
+			break;
 		default:
 			cur->bsr_type = BSR_UNKNOWN;
-			printk(KERN_INFO "unknown BSR size %d\n",cur->bsr_bytes);
 		}
 
 		cur->bsr_num = bsr_types[cur->bsr_type];

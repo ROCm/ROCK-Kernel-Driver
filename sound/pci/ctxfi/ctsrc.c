@@ -441,7 +441,7 @@ get_src_rsc(struct src_mgr *mgr, const struct src_desc *desc, struct src **rsrc)
 	else
 		src = kzalloc(sizeof(*src), GFP_KERNEL);
 
-	if (!src) {
+	if (NULL == src) {
 		err = -ENOMEM;
 		goto error1;
 	}
@@ -550,7 +550,7 @@ int src_mgr_create(void *hw, struct src_mgr **rsrc_mgr)
 
 	*rsrc_mgr = NULL;
 	src_mgr = kzalloc(sizeof(*src_mgr), GFP_KERNEL);
-	if (!src_mgr)
+	if (NULL == src_mgr)
 		return -ENOMEM;
 
 	err = rsc_mgr_init(&src_mgr->mgr, SRC, SRC_RESOURCE_NUM, hw);
@@ -679,7 +679,7 @@ static int srcimp_rsc_init(struct srcimp *srcimp,
 	/* Reserve memory for imapper nodes */
 	srcimp->imappers = kzalloc(sizeof(struct imapper)*desc->msr,
 				   GFP_KERNEL);
-	if (!srcimp->imappers) {
+	if (NULL == srcimp->imappers) {
 		err = -ENOMEM;
 		goto error1;
 	}
@@ -724,11 +724,12 @@ static int get_srcimp_rsc(struct srcimp_mgr *mgr,
 
 	/* Allocate mem for SRCIMP resource */
 	srcimp = kzalloc(sizeof(*srcimp), GFP_KERNEL);
-	if (!srcimp)
-		return -ENOMEM;
+	if (NULL == srcimp) {
+		err = -ENOMEM;
+		return err;
+	}
 
 	/* Check whether there are sufficient SRCIMP resources. */
-	err = 0;
 	spin_lock_irqsave(&mgr->mgr_lock, flags);
 	for (i = 0; i < desc->msr; i++) {
 		err = mgr_get_resource(&mgr->mgr, 1, &idx);
@@ -833,7 +834,7 @@ int srcimp_mgr_create(void *hw, struct srcimp_mgr **rsrcimp_mgr)
 
 	*rsrcimp_mgr = NULL;
 	srcimp_mgr = kzalloc(sizeof(*srcimp_mgr), GFP_KERNEL);
-	if (!srcimp_mgr)
+	if (NULL == srcimp_mgr)
 		return -ENOMEM;
 
 	err = rsc_mgr_init(&srcimp_mgr->mgr, SRCIMP, SRCIMP_RESOURCE_NUM, hw);
@@ -844,7 +845,7 @@ int srcimp_mgr_create(void *hw, struct srcimp_mgr **rsrcimp_mgr)
 	spin_lock_init(&srcimp_mgr->imap_lock);
 	INIT_LIST_HEAD(&srcimp_mgr->imappers);
 	entry = kzalloc(sizeof(*entry), GFP_KERNEL);
-	if (!entry) {
+	if (NULL == entry) {
 		err = -ENOMEM;
 		goto error2;
 	}

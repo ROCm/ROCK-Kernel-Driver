@@ -26,7 +26,6 @@
 #include <linux/writeback.h>
 #include <linux/backing-dev.h>
 #include <linux/pagevec.h>
-#include <linux/precache.h>
 
 /*
  * I/O completion handler for multipage BIOs.
@@ -286,13 +285,6 @@ do_mpage_readpage(struct bio *bio, struct page *page, unsigned nr_pages,
 		SetPageMappedToDisk(page);
 	}
 
-	if (fully_mapped &&
-	    blocks_per_page == 1 && !PageUptodate(page) &&
-	    precache_get(page->mapping, page->index, page) == 1) {
-		SetPageUptodate(page);
-		goto confused;
-	}
-
 	/*
 	 * This page will go to BIO.  Do we need to send this BIO off first?
 	 */
@@ -387,7 +379,8 @@ mpage_readpages(struct address_space *mapping, struct list_head *pages,
 	struct buffer_head map_bh;
 	unsigned long first_logical_block = 0;
 
-	clear_buffer_mapped(&map_bh);
+	map_bh.b_state = 0;
+	map_bh.b_size = 0;
 	for (page_idx = 0; page_idx < nr_pages; page_idx++) {
 		struct page *page = list_entry(pages->prev, struct page, lru);
 
@@ -420,7 +413,8 @@ int mpage_readpage(struct page *page, get_block_t get_block)
 	struct buffer_head map_bh;
 	unsigned long first_logical_block = 0;
 
-	clear_buffer_mapped(&map_bh);
+	map_bh.b_state = 0;
+	map_bh.b_size = 0;
 	bio = do_mpage_readpage(bio, page, 1, &last_block_in_bio,
 			&map_bh, &first_logical_block, get_block);
 	if (bio)

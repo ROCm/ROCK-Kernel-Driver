@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007-2008 NEC Corporation.  All Rights Reserved.
+ * Copyright (C) 2007-2009 NEC Corporation.  All Rights Reserved.
  *
  * Module Author: Kiyoshi Ueda
  *
@@ -12,8 +12,11 @@
 #include "dm-path-selector.h"
 
 #define DM_MSG_PREFIX	"multipath service-time"
-#define ST_MIN_IO	2
-#define ST_VERSION	"0.1.0"
+#define ST_MIN_IO	1
+#define ST_MAX_RELATIVE_THROUGHPUT	100
+#define ST_MAX_RELATIVE_THROUGHPUT_SHIFT	7
+#define ST_MAX_INFLIGHT_SIZE	((size_t)-1 >> ST_MAX_RELATIVE_THROUGHPUT_SHIFT)
+#define ST_VERSION	"0.2.0"
 
 struct selector {
 	struct list_head valid_paths;
@@ -23,17 +26,14 @@ struct selector {
 struct path_info {
 	struct list_head list;
 	struct dm_path *path;
-	unsigned int repeat_count;
-
-	atomic_t in_flight;	/* Total size of in-flight I/Os */
-	size_t perf;		/* Recent performance of the path */
-	sector_t last_sectors;	/* Total sectors of the last part_stat_read */
-	size_t last_io_ticks;	/* io_ticks of the last part_stat_read */
+	unsigned repeat_count;
+	unsigned relative_throughput;
+	atomic_t in_flight_size;	/* Total size of in-flight I/Os */
 };
 
 static struct selector *alloc_selector(void)
 {
-	struct selector *s = kzalloc(sizeof(*s), GFP_KERNEL);
+	struct selector *s = kmalloc(sizeof(*s), GFP_KERNEL);
 
 	if (s) {
 		INIT_LIST_HEAD(&s->valid_paths);
@@ -60,14 +60,13 @@ static void free_paths(struct list_head *paths)
 
 	list_for_each_entry_safe(pi, next, paths, list) {
 		list_del(&pi->list);
-		pi->path->pscontext = NULL;
 		kfree(pi);
 	}
 }
 
 static void st_destroy(struct path_selector *ps)
 {
-	struct selector *s = (struct selector *) ps->context;
+	struct selector *s = ps->context;
 
 	free_paths(&s->valid_paths);
 	free_paths(&s->failed_paths);
@@ -76,9 +75,9 @@ static void st_destroy(struct path_selector *ps)
 }
 
 static int st_status(struct path_selector *ps, struct dm_path *path,
-		     status_type_t type, char *result, unsigned int maxlen)
+		     status_type_t type, char *result, unsigned maxlen)
 {
-	int sz = 0;
+	unsigned sz = 0;
 	struct path_info *pi;
 
 	if (!path)
@@ -88,12 +87,12 @@ static int st_status(struct path_selector *ps, struct dm_path *path,
 
 		switch (type) {
 		case STATUSTYPE_INFO:
-			DMEMIT("if:%08lu pf:%06lu ",
-			       (unsigned long) atomic_read(&pi->in_flight),
-			       pi->perf);
+			DMEMIT("%d %u ", atomic_read(&pi->in_flight_size),
+			       pi->relative_throughput);
 			break;
 		case STATUSTYPE_TABLE:
-			DMEMIT("%u ", pi->repeat_count);
+			DMEMIT("%u %u ", pi->repeat_count,
+			       pi->relative_throughput);
 			break;
 		}
 	}
@@ -104,19 +103,37 @@ static int st_status(struct path_selector *ps, struct dm_path *path,
 static int st_add_path(struct path_selector *ps, struct dm_path *path,
 		       int argc, char **argv, char **error)
 {
-	struct selector *s = (struct selector *) ps->context;
+	struct selector *s = ps->context;
 	struct path_info *pi;
-	unsigned int repeat_count = ST_MIN_IO;
-	struct gendisk *disk = path->dev->bdev->bd_disk;
+	unsigned repeat_count = ST_MIN_IO;
+	unsigned relative_throughput = 1;
 
-	if (argc > 1) {
+	/*
+	 * Arguments: [<repeat_count> [<relative_throughput>]]
+	 * 	<repeat_count>: The number of I/Os before switching path.
+	 * 			If not given, default (ST_MIN_IO) is used.
+	 * 	<relative_throughput>: The relative throughput value of
+	 *			the path among all paths in the path-group.
+	 * 			The valid range: 0-<ST_MAX_RELATIVE_THROUGHPUT>
+	 *			If not given, minimum value '1' is used.
+	 *			If '0' is given, the path isn't selected while
+	 * 			other paths having a positive value are
+	 * 			available.
+	 */
+	if (argc > 2) {
 		*error = "service-time ps: incorrect number of arguments";
 		return -EINVAL;
 	}
 
-	/* First path argument is number of I/Os before switching path. */
-	if ((argc == 1) && (sscanf(argv[0], "%u", &repeat_count) != 1)) {
+	if (argc && (sscanf(argv[0], "%u", &repeat_count) != 1)) {
 		*error = "service-time ps: invalid repeat count";
+		return -EINVAL;
+	}
+
+	if ((argc == 2) &&
+	    (sscanf(argv[1], "%u", &relative_throughput) != 1 ||
+	     relative_throughput > ST_MAX_RELATIVE_THROUGHPUT)) {
+		*error = "service-time ps: invalid relative_throughput value";
 		return -EINVAL;
 	}
 
@@ -129,12 +146,8 @@ static int st_add_path(struct path_selector *ps, struct dm_path *path,
 
 	pi->path = path;
 	pi->repeat_count = repeat_count;
-
-	pi->perf = 0;
-	pi->last_sectors = part_stat_read(&disk->part0, sectors[READ])
-			   + part_stat_read(&disk->part0, sectors[WRITE]);
-	pi->last_io_ticks = part_stat_read(&disk->part0, io_ticks);
-	atomic_set(&pi->in_flight, 0);
+	pi->relative_throughput = relative_throughput;
+	atomic_set(&pi->in_flight_size, 0);
 
 	path->pscontext = pi;
 
@@ -145,7 +158,7 @@ static int st_add_path(struct path_selector *ps, struct dm_path *path,
 
 static void st_fail_path(struct path_selector *ps, struct dm_path *path)
 {
-	struct selector *s = (struct selector *) ps->context;
+	struct selector *s = ps->context;
 	struct path_info *pi = path->pscontext;
 
 	list_move(&pi->list, &s->failed_paths);
@@ -153,7 +166,7 @@ static void st_fail_path(struct path_selector *ps, struct dm_path *path)
 
 static int st_reinstate_path(struct path_selector *ps, struct dm_path *path)
 {
-	struct selector *s = (struct selector *) ps->context;
+	struct selector *s = ps->context;
 	struct path_info *pi = path->pscontext;
 
 	list_move_tail(&pi->list, &s->valid_paths);
@@ -161,66 +174,87 @@ static int st_reinstate_path(struct path_selector *ps, struct dm_path *path)
 	return 0;
 }
 
-static void stats_update(struct path_info *pi)
-{
-	sector_t sectors;
-	size_t io_ticks, tmp;
-	struct gendisk *disk = pi->path->dev->bdev->bd_disk;
-
-	sectors = part_stat_read(&disk->part0, sectors[READ])
-		  + part_stat_read(&disk->part0, sectors[WRITE]);
-	io_ticks = part_stat_read(&disk->part0, io_ticks);
-
-	if ((sectors != pi->last_sectors) && (io_ticks != pi->last_io_ticks)) {
-		tmp = (sectors - pi->last_sectors) << 9;
-		do_div(tmp, jiffies_to_msecs((io_ticks - pi->last_io_ticks)));
-		pi->perf = tmp;
-
-		pi->last_sectors = sectors;
-		pi->last_io_ticks = io_ticks;
-	}
-}
-
+/*
+ * Compare the estimated service time of 2 paths, pi1 and pi2,
+ * for the incoming I/O.
+ *
+ * Returns:
+ * < 0 : pi1 is better
+ * 0   : no difference between pi1 and pi2
+ * > 0 : pi2 is better
+ *
+ * Description:
+ * Basically, the service time is estimated by:
+ *     ('pi->in-flight-size' + 'incoming') / 'pi->relative_throughput'
+ * To reduce the calculation, some optimizations are made.
+ * (See comments inline)
+ */
 static int st_compare_load(struct path_info *pi1, struct path_info *pi2,
-			   size_t new_io)
+			   size_t incoming)
 {
-	size_t if1, if2;
+	size_t sz1, sz2, st1, st2;
 
-	if1 = atomic_read(&pi1->in_flight);
-	if2 = atomic_read(&pi2->in_flight);
-
-	/*
-	 * Case 1: No performace data available. Choose less loaded path.
-	 */
-	if (!pi1->perf || !pi2->perf)
-		return if1 - if2;
+	sz1 = atomic_read(&pi1->in_flight_size);
+	sz2 = atomic_read(&pi2->in_flight_size);
 
 	/*
-	 * Case 2: Calculate service time. Choose faster path.
-	 *           if ((if1+new_io)/pi1->perf < (if2+new_io)/pi2->perf) pi1.
-	 *           if ((if1+new_io)/pi1->perf > (if2+new_io)/pi2->perf) pi2.
-	 *         To avoid do_div(), use
-	 *           if ((if1+new_io)*pi2->perf < (if2+new_io)*pi1->perf) pi1.
-	 *           if ((if1+new_io)*pi2->perf > (if2+new_io)*pi1->perf) pi2.
+	 * Case 1: Both have same throughput value. Choose less loaded path.
 	 */
-	if1 = (if1 + new_io) << 10;
-	if2 = (if2 + new_io) << 10;
-	do_div(if1, pi1->perf);
-	do_div(if2, pi2->perf);
-
-	if (if1 != if2)
-		return if1 - if2;
+	if (pi1->relative_throughput == pi2->relative_throughput)
+		return sz1 - sz2;
 
 	/*
-	 * Case 3: Service time is equal. Choose faster path.
+	 * Case 2a: Both have same load. Choose higher throughput path.
+	 * Case 2b: One path has no throughput value. Choose the other one.
 	 */
-	return pi2->perf - pi1->perf;
+	if (sz1 == sz2 ||
+	    !pi1->relative_throughput || !pi2->relative_throughput)
+		return pi2->relative_throughput - pi1->relative_throughput;
+
+	/*
+	 * Case 3: Calculate service time. Choose faster path.
+	 *         Service time using pi1:
+	 *             st1 = (sz1 + incoming) / pi1->relative_throughput
+	 *         Service time using pi2:
+	 *             st2 = (sz2 + incoming) / pi2->relative_throughput
+	 *
+	 *         To avoid the division, transform the expression to use
+	 *         multiplication.
+	 *         Because ->relative_throughput > 0 here, if st1 < st2,
+	 *         the expressions below are the same meaning:
+	 *             (sz1 + incoming) / pi1->relative_throughput <
+	 *                 (sz2 + incoming) / pi2->relative_throughput
+	 *             (sz1 + incoming) * pi2->relative_throughput <
+	 *                 (sz2 + incoming) * pi1->relative_throughput
+	 *         So use the later one.
+	 */
+	sz1 += incoming;
+	sz2 += incoming;
+	if (unlikely(sz1 >= ST_MAX_INFLIGHT_SIZE ||
+		     sz2 >= ST_MAX_INFLIGHT_SIZE)) {
+		/*
+		 * Size may be too big for multiplying pi->relative_throughput
+		 * and overflow.
+		 * To avoid the overflow and mis-selection, shift down both.
+		 */
+		sz1 >>= ST_MAX_RELATIVE_THROUGHPUT_SHIFT;
+		sz2 >>= ST_MAX_RELATIVE_THROUGHPUT_SHIFT;
+	}
+	st1 = sz1 * pi2->relative_throughput;
+	st2 = sz2 * pi1->relative_throughput;
+	if (st1 != st2)
+		return st1 - st2;
+
+	/*
+	 * Case 4: Service time is equal. Choose higher throughput path.
+	 */
+	return pi2->relative_throughput - pi1->relative_throughput;
 }
 
 static struct dm_path *st_select_path(struct path_selector *ps,
 				      unsigned *repeat_count, size_t nr_bytes)
 {
-	struct selector *s = (struct selector *) ps->context;
+	struct selector *s = ps->context;
 	struct path_info *pi = NULL, *best = NULL;
 
 	if (list_empty(&s->valid_paths))
@@ -229,23 +263,16 @@ static struct dm_path *st_select_path(struct path_selector *ps,
 	/* Change preferred (first in list) path to evenly balance. */
 	list_move_tail(s->valid_paths.next, &s->valid_paths);
 
-	/* Update performance information before best path selection */
 	list_for_each_entry(pi, &s->valid_paths, list)
-		stats_update(pi);
-
-	list_for_each_entry(pi, &s->valid_paths, list) {
-		if (!best)
+		if (!best || (st_compare_load(pi, best, nr_bytes) < 0))
 			best = pi;
-		else if (st_compare_load(pi, best, nr_bytes) < 0)
-			best = pi;
-	}
 
-	if (best) {
-		*repeat_count = best->repeat_count;
-		return best->path;
-	}
+	if (!best)
+		return NULL;
 
-	return NULL;
+	*repeat_count = best->repeat_count;
+
+	return best->path;
 }
 
 static int st_start_io(struct path_selector *ps, struct dm_path *path,
@@ -253,7 +280,7 @@ static int st_start_io(struct path_selector *ps, struct dm_path *path,
 {
 	struct path_info *pi = path->pscontext;
 
-	atomic_add(nr_bytes, &pi->in_flight);
+	atomic_add(nr_bytes, &pi->in_flight_size);
 
 	return 0;
 }
@@ -263,7 +290,7 @@ static int st_end_io(struct path_selector *ps, struct dm_path *path,
 {
 	struct path_info *pi = path->pscontext;
 
-	atomic_sub(nr_bytes, &pi->in_flight);
+	atomic_sub(nr_bytes, &pi->in_flight_size);
 
 	return 0;
 }
@@ -271,7 +298,7 @@ static int st_end_io(struct path_selector *ps, struct dm_path *path,
 static struct path_selector_type st_ps = {
 	.name		= "service-time",
 	.module		= THIS_MODULE,
-	.table_args	= 1,
+	.table_args	= 2,
 	.info_args	= 2,
 	.create		= st_create,
 	.destroy	= st_destroy,

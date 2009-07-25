@@ -97,7 +97,7 @@ static void ct_atc_pcm_interrupt(struct ct_atc_pcm *atc_pcm)
 {
 	struct ct_atc_pcm *apcm = atc_pcm;
 
-	if (!apcm->substream)
+	if (NULL == apcm->substream)
 		return;
 
 	snd_pcm_period_elapsed(apcm->substream);
@@ -123,7 +123,7 @@ static int ct_pcm_playback_open(struct snd_pcm_substream *substream)
 	int err;
 
 	apcm = kzalloc(sizeof(*apcm), GFP_KERNEL);
-	if (!apcm)
+	if (NULL == apcm)
 		return -ENOMEM;
 
 	apcm->substream = substream;
@@ -271,7 +271,7 @@ static int ct_pcm_capture_open(struct snd_pcm_substream *substream)
 	int err;
 
 	apcm = kzalloc(sizeof(*apcm), GFP_KERNEL);
-	if (!apcm)
+	if (NULL == apcm)
 		return -ENOMEM;
 
 	apcm->started = 0;

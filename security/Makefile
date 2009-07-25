@@ -17,6 +17,9 @@ obj-$(CONFIG_SECURITYFS)		+= inode.o
 # Must precede capability.o in order to stack properly.
 obj-$(CONFIG_SECURITY_SELINUX)		+= selinux/built-in.o
 obj-$(CONFIG_SECURITY_SMACK)		+= smack/built-in.o
+ifeq ($(CONFIG_AUDIT),y)
+obj-$(CONFIG_SECURITY_SMACK)		+= lsm_audit.o
+endif
 obj-$(CONFIG_SECURITY_TOMOYO)		+= tomoyo/built-in.o
 obj-$(CONFIG_SECURITY_APPARMOR)         += apparmor/built-in.o
 obj-$(CONFIG_SECURITY_ROOTPLUG)		+= root_plug.o

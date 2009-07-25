@@ -2,6 +2,7 @@
 #define _ASM_X86_TRAPS_H
 
 #include <asm/debugreg.h>
+#include <asm/siginfo.h>			/* TRAP_TRACE, ... */
 
 #ifdef CONFIG_X86_32
 #define dotraplinkage
@@ -13,6 +14,9 @@ asmlinkage void divide_error(void);
 asmlinkage void debug(void);
 asmlinkage void nmi(void);
 asmlinkage void int3(void);
+asmlinkage void xen_debug(void);
+asmlinkage void xen_int3(void);
+asmlinkage void xen_stack_segment(void);
 asmlinkage void overflow(void);
 asmlinkage void bounds(void);
 asmlinkage void invalid_op(void);
@@ -33,9 +37,6 @@ asmlinkage void alignment_check(void);
 asmlinkage void machine_check(void);
 #endif /* CONFIG_X86_MCE */
 asmlinkage void simd_coprocessor_error(void);
-#ifdef CONFIG_X86_XEN
-asmlinkage void fixup_4gb_segment(void);
-#endif
 
 dotraplinkage void do_divide_error(struct pt_regs *, long);
 dotraplinkage void do_debug(struct pt_regs *, long);
@@ -64,9 +65,6 @@ dotraplinkage void do_machine_check(struct pt_regs *, long);
 dotraplinkage void do_simd_coprocessor_error(struct pt_regs *, long);
 #ifdef CONFIG_X86_32
 dotraplinkage void do_iret_error(struct pt_regs *, long);
-#ifdef CONFIG_XEN
-void do_fixup_4gb_segment(struct pt_regs *, long);
-#endif
 #endif
 
 static inline int get_si_code(unsigned long condition)
@@ -80,7 +78,6 @@ static inline int get_si_code(unsigned long condition)
 }
 
 extern int panic_on_unrecovered_nmi;
-extern int kstack_depth_to_print;
 
 void math_error(void __user *);
 void math_emulate(struct math_emu_info *);

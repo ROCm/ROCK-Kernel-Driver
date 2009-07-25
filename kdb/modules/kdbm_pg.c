@@ -247,13 +247,12 @@ print_request(unsigned long addr)
 		return(0);
 
 	kdb_printf("struct request at 0x%lx\n", addr);
-	kdb_printf("  errors %d sector %llu nr_sectors %lu\n",
-			rq.errors,
-			(unsigned long long)rq.sector, rq.nr_sectors);
+	kdb_printf("  errors %d sector %llu nr_sectors %u\n",
+			rq.errors, (unsigned long long)blk_rq_pos(&rq),
+			blk_rq_sectors(&rq));
 
-	kdb_printf("  hsect %llu hnrsect %lu nrseg %u u currnrsect %u\n",
-			(unsigned long long)rq.hard_sector, rq.hard_nr_sectors,
-			rq.nr_phys_segments, rq.current_nr_sectors);
+	kdb_printf("  nrseg %u u currnrsect %u\n",
+			rq.nr_phys_segments, blk_rq_cur_sectors(&rq));
 
 	return (unsigned long) rq.queuelist.next;
 }
