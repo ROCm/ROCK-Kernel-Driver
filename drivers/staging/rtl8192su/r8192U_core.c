@@ -24,15 +24,6 @@
  * Jerry chuang <wlanfae@realtek.com>
  */
 
-#ifndef CONFIG_FORCE_HARD_FLOAT
-double __floatsidf (int i) { return i; }
-unsigned int __fixunsdfsi (double d) { return d; }
-double __adddf3(double a, double b) { return a+b; }
-double __addsf3(float a, float b) { return a+b; }
-double __subdf3(double a, double b) { return a-b; }
-double __extendsfdf2(float a) {return a;}
-#endif
-
 #undef LOOP_TEST
 #undef DUMP_RX
 #undef DUMP_TX
@@ -1715,7 +1706,7 @@ static int rtl8192_rx_initiate(struct net_device*dev)
                 }
 //		printk("nomal packet IN request!\n");
                 usb_fill_bulk_urb(entry, priv->udev,
-                                  usb_rcvbulkpipe(priv->udev, 3), skb->tail,
+                                  usb_rcvbulkpipe(priv->udev, 3), skb_tail_pointer(skb),
                                   RX_URB_SIZE, rtl8192_rx_isr, skb);
                 info = (struct rtl8192_rx_info *) skb->cb;
                 info->urb = entry;
@@ -1745,7 +1736,7 @@ static int rtl8192_rx_initiate(struct net_device*dev)
                         break;
                 }
                 usb_fill_bulk_urb(entry, priv->udev,
-                                  usb_rcvbulkpipe(priv->udev, 9), skb->tail,
+                                  usb_rcvbulkpipe(priv->udev, 9), skb_tail_pointer(skb),
                                   RX_URB_SIZE, rtl8192_rx_isr, skb);
                 info = (struct rtl8192_rx_info *) skb->cb;
                 info->urb = entry;
@@ -2135,7 +2126,8 @@ static void rtl8192_rx_isr(struct urb *urb)
         }
 
 	usb_fill_bulk_urb(urb, priv->udev,
-			usb_rcvbulkpipe(priv->udev, out_pipe), skb->tail,
+			usb_rcvbulkpipe(priv->udev, out_pipe),
+			skb_tail_pointer(skb),
 			RX_URB_SIZE, rtl8192_rx_isr, skb);
 
         info = (struct rtl8192_rx_info *) skb->cb;
@@ -2143,7 +2135,7 @@ static void rtl8192_rx_isr(struct urb *urb)
         info->dev = dev;
 	info->out_pipe = out_pipe;
 
-        urb->transfer_buffer = skb->tail;
+        urb->transfer_buffer = skb_tail_pointer(skb);
         urb->context = skb;
         skb_queue_tail(&priv->rx_queue, skb);
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
@@ -2356,8 +2348,8 @@ struct sk_buff *DrvAggr_Aggregation(struct net_device *dev, struct ieee80211_drv
 		/* Subframe drv Tx descriptor and firmware info setting */
 		skb = pSendList->tx_agg_frames[i];
 		tcb_desc = (cb_desc *)(skb->cb + MAX_DEV_ADDR_SIZE);
-		tx_agg_desc = (tx_desc_819x_usb_aggr_subframe *)agg_skb->tail;
-		tx_fwinfo = (tx_fwinfo_819x_usb *)(agg_skb->tail + sizeof(tx_desc_819x_usb_aggr_subframe));
+		tx_agg_desc = (tx_desc_819x_usb_aggr_subframe *)agg_skb_tail_pointer(skb);
+		tx_fwinfo = (tx_fwinfo_819x_usb *)(agg_skb_tail_pointer(skb) + sizeof(tx_desc_819x_usb_aggr_subframe));
 
 		memset(tx_fwinfo,0,sizeof(tx_fwinfo_819x_usb));
 		/* DWORD 0 */
