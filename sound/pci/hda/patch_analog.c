@@ -3754,7 +3754,7 @@ static int ad1884a_mobile_master_sw_put(struct snd_kcontrol *kcontrol,
 	int mute = (!ucontrol->value.integer.value[0] &&
 		    !ucontrol->value.integer.value[1]);
 	/* toggle GPIO1 according to the mute state */
-	snd_hda_codec_write(codec, 0x01, 0, AC_VERB_SET_GPIO_DATA,
+	snd_hda_codec_write_cache(codec, 0x01, 0, AC_VERB_SET_GPIO_DATA,
 			    mute ? 0x02 : 0x0);
 	return ret;
 }
@@ -4003,24 +4003,9 @@ static struct snd_pci_quirk ad1884a_cfg_tbl[] = {
 	SND_PCI_QUIRK(0x103c, 0x3037, "HP 2230s", AD1884A_LAPTOP),
 	SND_PCI_QUIRK(0x103c, 0x3056, "HP", AD1884A_MOBILE),
 	SND_PCI_QUIRK_MASK(0x103c, 0xfff0, 0x3070, "HP", AD1884A_MOBILE),
-	SND_PCI_QUIRK(0x103c, 0x3072, "HP", AD1884A_MOBILE),
-	SND_PCI_QUIRK(0x103c, 0x3073, "HP", AD1884A_MOBILE),
-	SND_PCI_QUIRK(0x103c, 0x3074, "HP", AD1884A_MOBILE),
-	SND_PCI_QUIRK(0x103c, 0x3075, "HP", AD1884A_MOBILE),
-	SND_PCI_QUIRK(0x103c, 0x3076, "HP", AD1884A_MOBILE),
-	SND_PCI_QUIRK(0x103c, 0x3077, "HP", AD1884A_MOBILE),
-	SND_PCI_QUIRK(0x103c, 0x3078, "HP", AD1884A_MOBILE),
-	SND_PCI_QUIRK(0x103c, 0x3079, "HP", AD1884A_MOBILE),
-	SND_PCI_QUIRK(0x103c, 0x307a, "HP", AD1884A_MOBILE),
 	SND_PCI_QUIRK_MASK(0x103c, 0xfff0, 0x30d0, "HP laptop", AD1884A_LAPTOP),
 	SND_PCI_QUIRK_MASK(0x103c, 0xfff0, 0x30e0, "HP laptop", AD1884A_LAPTOP),
-	SND_PCI_QUIRK(0x103c, 0x30e1, "HP 2530p", AD1884A_LAPTOP),
-	SND_PCI_QUIRK(0x103c, 0x30e6, "HP 6730b", AD1884A_LAPTOP),
-	SND_PCI_QUIRK(0x103c, 0x30e7, "HP EliteBook 8530p", AD1884A_LAPTOP),
 	SND_PCI_QUIRK_MASK(0x103c, 0xff00, 0x3600, "HP laptop", AD1884A_LAPTOP),
-	SND_PCI_QUIRK(0x103c, 0x360d, "HP 6530b", AD1884A_LAPTOP),
-	SND_PCI_QUIRK(0x103c, 0x3614, "HP 6730s", AD1884A_LAPTOP),
-	SND_PCI_QUIRK(0x103c, 0x3632, "HP", AD1884A_MOBILE),
 	SND_PCI_QUIRK(0x17aa, 0x20ac, "Thinkpad X300", AD1884A_THINKPAD),
 	{}
 };
