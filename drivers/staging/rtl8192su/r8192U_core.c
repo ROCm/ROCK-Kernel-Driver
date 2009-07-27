@@ -24,6 +24,8 @@
  * Jerry chuang <wlanfae@realtek.com>
  */
 
+#include <linux/vmalloc.h>
+
 #undef LOOP_TEST
 #undef DUMP_RX
 #undef DUMP_TX
