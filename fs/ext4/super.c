@@ -39,6 +39,7 @@
 #include <linux/ctype.h>
 #include <linux/log2.h>
 #include <linux/crc16.h>
+#include <linux/precache.h>
 #include <asm/uaccess.h>
 
 #include "ext4.h"
@@ -1653,6 +1654,7 @@ static int ext4_setup_super(struct super_block *sb, struct ext4_super_block *es,
 	} else {
 		ext4_msg(sb, KERN_INFO, "no journal");
 	}
+	precache_init(sb);
 	return res;
 }
 

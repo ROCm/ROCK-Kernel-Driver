@@ -61,3 +61,4 @@ obj-$(CONFIG_ACPI_SBS)		+= sbs.o
 processor-y			:= processor_core.o processor_throttling.o
 processor-y			+= processor_idle.o processor_thermal.o
 processor-$(CONFIG_CPU_FREQ)	+= processor_perflib.o
+processor-$(CONFIG_PROCESSOR_EXTERNAL_CONTROL) += processor_perflib.o processor_extcntl.o

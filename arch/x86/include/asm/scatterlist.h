@@ -24,7 +24,7 @@ struct scatterlist {
  * returns.
  */
 #define sg_dma_address(sg)	((sg)->dma_address)
-#ifdef CONFIG_X86_32
+#if defined(CONFIG_X86_32) && !defined(CONFIG_XEN)
 # define sg_dma_len(sg)		((sg)->length)
 #else
 # define sg_dma_len(sg)		((sg)->dma_length)

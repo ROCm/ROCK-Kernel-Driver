@@ -47,6 +47,14 @@
 #include <xen/xenbus.h>
 #include "xenbus_comms.h"
 
+#ifdef HAVE_XEN_PLATFORM_COMPAT_H
+#include <xen/platform-compat.h>
+#endif
+
+#ifndef PF_NOFREEZE /* Old kernel (pre-2.6.6). */
+#define PF_NOFREEZE	0
+#endif
+
 struct xs_stored_msg {
 	struct list_head list;
 
@@ -108,7 +116,7 @@ static DEFINE_SPINLOCK(watch_events_lock);
  * carrying out work.
  */
 static pid_t xenwatch_pid;
-static DEFINE_MUTEX(xenwatch_mutex);
+/* static */ DEFINE_MUTEX(xenwatch_mutex);
 static DECLARE_WAIT_QUEUE_HEAD(watch_events_waitq);
 
 static int get_error(const char *errorstring)
@@ -177,14 +185,16 @@ void *xenbus_dev_request_and_reply(struct xsd_sockmsg *msg)
 
 	mutex_unlock(&xs_state.request_mutex);
 
-	if ((msg->type == XS_TRANSACTION_END) ||
+	if ((req_msg.type == XS_TRANSACTION_END) ||
 	    ((req_msg.type == XS_TRANSACTION_START) &&
 	     (msg->type == XS_ERROR)))
 		up_read(&xs_state.transaction_mutex);
 
 	return ret;
 }
+#if !defined(CONFIG_XEN) && !defined(MODULE)
 EXPORT_SYMBOL(xenbus_dev_request_and_reply);
+#endif
 
 /* Send message to xs, get kmalloc'ed reply.  ERR_PTR() on error. */
 static void *xs_talkv(struct xenbus_transaction t,
@@ -295,7 +305,7 @@ static char **split(char *strings, unsigned int len, unsigned int *num)
 	char *p, **ret;
 
 	/* Count the strings. */
-	*num = count_strings(strings, len);
+	*num = count_strings(strings, len) + 1;
 
 	/* Transfer to one big alloc for easy freeing. */
 	ret = kmalloc(*num * sizeof(char *) + len, GFP_NOIO | __GFP_HIGH);
@@ -309,6 +319,7 @@ static char **split(char *strings, unsigned int len, unsigned int *num)
 	strings = (char *)&ret[*num];
 	for (p = strings, *num = 0; p < strings + len; p += strlen(p) + 1)
 		ret[(*num)++] = p;
+	ret[*num] = strings + len;
 
 	return ret;
 }
@@ -499,7 +510,7 @@ int xenbus_printf(struct xenbus_transaction t,
 #define PRINTF_BUFFER_SIZE 4096
 	char *printf_buffer;
 
-	printf_buffer = kmalloc(PRINTF_BUFFER_SIZE, GFP_KERNEL);
+	printf_buffer = kmalloc(PRINTF_BUFFER_SIZE, GFP_NOIO | __GFP_HIGH);
 	if (printf_buffer == NULL)
 		return -ENOMEM;
 
@@ -622,6 +633,10 @@ void unregister_xenbus_watch(struct xenbus_watch *watch)
 	char token[sizeof(watch) * 2 + 1];
 	int err;
 
+#if defined(CONFIG_XEN) || defined(MODULE)
+	BUG_ON(watch->flags & XBWF_new_thread);
+#endif
+
 	sprintf(token, "%lX", (long)watch);
 
 	down_read(&xs_state.watch_mutex);
@@ -673,7 +688,9 @@ void xs_resume(void)
 	struct xenbus_watch *watch;
 	char token[sizeof(watch) * 2 + 1];
 
+#if !defined(CONFIG_XEN) && !defined(MODULE)
 	xb_init_comms();
+#endif
 
 	mutex_unlock(&xs_state.response_mutex);
 	mutex_unlock(&xs_state.request_mutex);
@@ -696,11 +713,32 @@ void xs_suspend_cancel(void)
 	up_write(&xs_state.transaction_mutex);
 }
 
+#if defined(CONFIG_XEN) || defined(MODULE)
+static int xenwatch_handle_callback(void *data)
+{
+	struct xs_stored_msg *msg = data;
+
+	msg->u.watch.handle->callback(msg->u.watch.handle,
+				      (const char **)msg->u.watch.vec,
+				      msg->u.watch.vec_size);
+
+	kfree(msg->u.watch.vec);
+	kfree(msg);
+
+	/* Kill this kthread if we were spawned just for this callback. */
+	if (current->pid != xenwatch_pid)
+		do_exit(0);
+
+	return 0;
+}
+#endif
+
 static int xenwatch_thread(void *unused)
 {
 	struct list_head *ent;
 	struct xs_stored_msg *msg;
 
+	current->flags |= PF_NOFREEZE;
 	for (;;) {
 		wait_event_interruptible(watch_events_waitq,
 					 !list_empty(&watch_events));
@@ -716,17 +754,39 @@ static int xenwatch_thread(void *unused)
 			list_del(ent);
 		spin_unlock(&watch_events_lock);
 
-		if (ent != &watch_events) {
-			msg = list_entry(ent, struct xs_stored_msg, list);
-			msg->u.watch.handle->callback(
-				msg->u.watch.handle,
-				(const char **)msg->u.watch.vec,
-				msg->u.watch.vec_size);
-			kfree(msg->u.watch.vec);
-			kfree(msg);
+		if (ent == &watch_events) {
+			mutex_unlock(&xenwatch_mutex);
+			continue;
 		}
 
+		msg = list_entry(ent, struct xs_stored_msg, list);
+
+#if defined(CONFIG_XEN) || defined(MODULE)
+		/*
+		 * Unlock the mutex before running an XBWF_new_thread
+		 * handler. kthread_run can block which can deadlock
+		 * against unregister_xenbus_watch() if we need to
+		 * unregister other watches in order to make
+		 * progress. This can occur on resume before the swap
+		 * device is attached.
+		 */
+		if (msg->u.watch.handle->flags & XBWF_new_thread) {
+			mutex_unlock(&xenwatch_mutex);
+			kthread_run(xenwatch_handle_callback,
+				    msg, "xenwatch_cb");
+		} else {
+			xenwatch_handle_callback(msg);
+			mutex_unlock(&xenwatch_mutex);
+		}
+#else
+		msg->u.watch.handle->callback(
+			msg->u.watch.handle,
+			(const char **)msg->u.watch.vec,
+			msg->u.watch.vec_size);
 		mutex_unlock(&xenwatch_mutex);
+		kfree(msg->u.watch.vec);
+		kfree(msg);
+#endif
 	}
 
 	return 0;
@@ -820,6 +880,7 @@ static int xenbus_thread(void *unused)
 {
 	int err;
 
+	current->flags |= PF_NOFREEZE;
 	for (;;) {
 		err = process_msg();
 		if (err)
@@ -834,7 +895,6 @@ static int xenbus_thread(void *unused)
 
 int xs_init(void)
 {
-	int err;
 	struct task_struct *task;
 
 	INIT_LIST_HEAD(&xs_state.reply_list);
@@ -845,11 +905,6 @@ int xs_init(void)
 	mutex_init(&xs_state.response_mutex);
 	init_rwsem(&xs_state.transaction_mutex);
 	init_rwsem(&xs_state.watch_mutex);
-
-	/* Initialize the shared memory rings to talk to xenstored */
-	err = xb_init_comms();
-	if (err)
-		return err;
 
 	task = kthread_run(xenwatch_thread, NULL, "xenwatch");
 	if (IS_ERR(task))

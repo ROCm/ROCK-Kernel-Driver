@@ -187,6 +187,16 @@ acpi_device_hid_show(struct device *dev, struct device_attribute *attr, char *bu
 }
 static DEVICE_ATTR(hid, 0444, acpi_device_hid_show, NULL);
 
+#ifdef CONFIG_PCI_GUESTDEV
+static ssize_t
+acpi_device_uid_show(struct device *dev, struct device_attribute *attr, char *buf) {
+	struct acpi_device *acpi_dev = to_acpi_device(dev);
+
+	return sprintf(buf, "%s\n", acpi_dev->pnp.unique_id);
+}
+static DEVICE_ATTR(uid, 0444, acpi_device_uid_show, NULL);
+#endif
+
 static ssize_t
 acpi_device_path_show(struct device *dev, struct device_attribute *attr, char *buf) {
 	struct acpi_device *acpi_dev = to_acpi_device(dev);
@@ -231,6 +241,13 @@ static int acpi_device_setup_files(struct acpi_device *dev)
 			goto end;
 	}
 
+#ifdef CONFIG_PCI_GUESTDEV
+	if(dev->flags.unique_id) {
+		result = device_create_file(&dev->dev, &dev_attr_uid);
+		if(result)
+			goto end;
+	}
+#endif
         /*
          * If device has _EJ0, 'eject' file is created that is used to trigger
          * hot-removal function from userland.

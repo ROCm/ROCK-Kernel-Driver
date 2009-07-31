@@ -30,7 +30,9 @@ pcibios_bus_to_resource(struct pci_dev *dev, struct resource *res,
 	res->end = region->end;
 }
 
+#ifndef pcibios_scan_all_fns
 #define pcibios_scan_all_fns(a, b)	0
+#endif
 
 #ifndef HAVE_ARCH_PCI_GET_LEGACY_IDE_IRQ
 static inline int pci_get_legacy_ide_irq(struct pci_dev *dev, int channel)

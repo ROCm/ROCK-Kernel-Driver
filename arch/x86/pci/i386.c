@@ -228,12 +228,14 @@ void __init pcibios_resource_survey(void)
 	pcibios_allocate_resources(1);
 
 	e820_reserve_resources_late();
+#ifndef CONFIG_XEN
 	/*
 	 * Insert the IO APIC resources after PCI initialization has
 	 * occured to handle IO APICS that are mapped in on a BAR in
 	 * PCI space, but before trying to assign unassigned pci res.
 	 */
 	ioapic_insert_resources();
+#endif
 }
 
 /**
