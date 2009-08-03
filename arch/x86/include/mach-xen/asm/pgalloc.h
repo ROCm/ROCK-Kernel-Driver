@@ -51,7 +51,13 @@ static inline void pte_free(struct mm_struct *mm, struct page *pte)
 	__pte_free(pte);
 }
 
-extern void __pte_free_tlb(struct mmu_gather *tlb, struct page *pte);
+extern void ___pte_free_tlb(struct mmu_gather *tlb, struct page *pte);
+
+static inline void __pte_free_tlb(struct mmu_gather *tlb, struct page *pte,
+				  unsigned long address)
+{
+	___pte_free_tlb(tlb, pte);
+}
 
 static inline void pmd_populate_kernel(struct mm_struct *mm,
 				       pmd_t *pmd, pte_t *pte)
@@ -88,7 +94,13 @@ static inline void pmd_free(struct mm_struct *mm, pmd_t *pmd)
 	__pmd_free(virt_to_page(pmd));
 }
 
-extern void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmd);
+extern void ___pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmd);
+
+static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmd,
+				  unsigned long adddress)
+{
+	___pmd_free_tlb(tlb, pmd);
+}
 
 #ifdef CONFIG_X86_PAE
 extern void pud_populate(struct mm_struct *mm, pud_t *pudp, pmd_t *pmd);
@@ -128,7 +140,14 @@ static inline void pud_free(struct mm_struct *mm, pud_t *pud)
 	__pmd_free(virt_to_page(pud));
 }
 
-extern void __pud_free_tlb(struct mmu_gather *tlb, pud_t *pud);
+extern void ___pud_free_tlb(struct mmu_gather *tlb, pud_t *pud);
+
+static inline void __pud_free_tlb(struct mmu_gather *tlb, pud_t *pud,
+				  unsigned long address)
+{
+	___pud_free_tlb(tlb, pud);
+}
+
 #endif	/* PAGETABLE_LEVELS > 3 */
 #endif	/* PAGETABLE_LEVELS > 2 */
 
