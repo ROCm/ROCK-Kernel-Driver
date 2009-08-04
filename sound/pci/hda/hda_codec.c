@@ -44,6 +44,7 @@ struct hda_vendor_id {
 /* codec vendor labels */
 static struct hda_vendor_id hda_vendor_ids[] = {
 	{ 0x1002, "ATI" },
+	{ 0x1013, "Cirrus Logic" },
 	{ 0x1057, "Motorola" },
 	{ 0x1095, "Silicon Image" },
 	{ 0x10de, "Nvidia" },
@@ -184,7 +185,7 @@ static int codec_exec_verb(struct hda_codec *codec, unsigned int cmd,
 	mutex_lock(&bus->cmd_mutex);
 	err = bus->ops.command(bus, cmd);
 	if (!err && res)
-		*res = bus->ops.get_response(bus);
+		*res = bus->ops.get_response(bus, codec->addr);
 	mutex_unlock(&bus->cmd_mutex);
 	snd_hda_power_down(codec);
 	if (res && *res == -1 && bus->rirb_error) {
