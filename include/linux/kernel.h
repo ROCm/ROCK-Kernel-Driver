@@ -334,12 +334,14 @@ extern enum system_states {
 #define TAINT_WARN			9
 #define TAINT_CRAP			10
 
+#ifdef CONFIG_ENTERPRISE_SUPPORT
 /*
  * Take the upper bits to hopefully allow them
  * to stay the same for more than one release.
  */
 #define TAINT_NO_SUPPORT		30
 #define TAINT_EXTERNAL_SUPPORT		31
+#endif
 
 extern void dump_stack(void) __cold;
 

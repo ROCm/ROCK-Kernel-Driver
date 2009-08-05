@@ -2455,6 +2455,8 @@ and is between 256 and 4096 characters. It is defined in the file
 			1 = warn when loading unsupported modules,
 			2 = don't warn.
 
+			CONFIG_ENTERPRISE_SUPPORT must be enabled for this
+			to have any effect.
 
 	swiotlb=	[IA-64] Number of I/O TLB slabs
 

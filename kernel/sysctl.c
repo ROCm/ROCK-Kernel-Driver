@@ -620,7 +620,7 @@ static struct ctl_table kern_table[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
 	},
-#ifdef CONFIG_MODULES
+#if defined(CONFIG_MODULES) && defined(CONFIG_ENTERPRISE_SUPPORT)
 	{
 		.ctl_name	= CTL_UNNUMBERED,
 		.procname	= "unsupported",

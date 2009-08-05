@@ -182,8 +182,10 @@ static const struct tnt tnts[] = {
 	{ TAINT_OVERRIDDEN_ACPI_TABLE,	'A', ' ' },
 	{ TAINT_WARN,			'W', ' ' },
 	{ TAINT_CRAP,			'C', ' ' },
+#ifdef CONFIG_ENTERPRISE_SUPPORT
 	{ TAINT_NO_SUPPORT,		'N', ' ' },
 	{ TAINT_EXTERNAL_SUPPORT,	'X', ' ' },
+#endif
 };
 
 /**

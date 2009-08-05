@@ -136,6 +136,7 @@ static struct bin_attribute notes_attr = {
 struct kobject *kernel_kobj;
 EXPORT_SYMBOL_GPL(kernel_kobj);
 
+#ifdef CONFIG_ENTERPRISE_SUPPORT
 const char *supported_printable(int taint)
 {
 	if (taint & TAINT_NO_SUPPORT)
@@ -152,6 +153,7 @@ static ssize_t supported_show(struct kobject *kobj,
 	return sprintf(buf, "%s\n", supported_printable(get_taint()));
 }
 KERNEL_ATTR_RO(supported);
+#endif
 
 static struct attribute * kernel_attrs[] = {
 #if defined(CONFIG_HOTPLUG)
@@ -166,7 +168,9 @@ static struct attribute * kernel_attrs[] = {
 	&kexec_crash_loaded_attr.attr,
 	&vmcoreinfo_attr.attr,
 #endif
+#ifdef CONFIG_ENTERPRISE_SUPPORT
 	&supported_attr.attr,
+#endif
 	NULL
 };
 

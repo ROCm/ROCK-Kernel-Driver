@@ -69,6 +69,7 @@
 /* If this is set, the section belongs in the init part of the module */
 #define INIT_OFFSET_MASK (1UL << (BITS_PER_LONG-1))
 
+#ifdef CONFIG_ENTERPRISE_SUPPORT
 /* Allow unsupported modules switch. */
 #ifdef UNSUPPORTED_MODULES
 int unsupported = UNSUPPORTED_MODULES;
@@ -82,6 +83,7 @@ static int __init unsupported_setup(char *str)
 	return 1;
 }
 __setup("unsupported=", unsupported_setup);
+#endif
 
 /* List of modules, protected by module_mutex or preempt_disable
  * (delete uses stop_machine/add uses RCU list operations). */
@@ -1009,6 +1011,7 @@ static struct module_attribute initstate = {
 	.show = show_initstate,
 };
 
+#ifdef CONFIG_ENTERPRISE_SUPPORT
 static void setup_modinfo_supported(struct module *mod, const char *s)
 {
 	if (!s) {
@@ -1033,12 +1036,15 @@ static struct module_attribute modinfo_supported = {
 	.show = show_modinfo_supported,
 	.setup = setup_modinfo_supported,
 };
+#endif
 
 static struct module_attribute *modinfo_attrs[] = {
 	&modinfo_version,
 	&modinfo_srcversion,
 	&initstate,
+#ifdef CONFIG_ENTERPRISE_SUPPORT
 	&modinfo_supported,
+#endif
 #ifdef CONFIG_MODULE_UNLOAD
 	&refcnt,
 #endif
@@ -2404,6 +2410,7 @@ static noinline struct module *load_module(void __user *umod,
 	add_sect_attrs(mod, hdr->e_shnum, secstrings, sechdrs);
 	add_notes_attrs(mod, hdr->e_shnum, secstrings, sechdrs);
 
+#ifdef CONFIG_ENTERPRISE_SUPPORT
 	/* We don't use add_taint() here because it also disables lockdep. */
 	if (mod->taints & (1 << TAINT_EXTERNAL_SUPPORT))
 		add_nonfatal_taint(TAINT_EXTERNAL_SUPPORT);
@@ -2423,6 +2430,7 @@ static noinline struct module *load_module(void __user *umod,
 			       "fault.\n", mod->name);
 		}
 	}
+#endif
 
 	/* Size of section 0 is 0, so this works well if no unwind info. */
 	mod->unwind_info = unwind_add_table(mod,
@@ -2801,10 +2809,12 @@ static char *module_flags(struct module *mod, char *buf)
 			buf[bx++] = 'F';
 		if (mod->taints & (1 << TAINT_CRAP))
 			buf[bx++] = 'C';
+#ifdef CONFIG_ENTERPRISE_SUPPORT
 		if (mod->taints & (1 << TAINT_NO_SUPPORT))
 			buf[bx++] = 'N';
 		if (mod->taints & (1 << TAINT_EXTERNAL_SUPPORT))
 			buf[bx++] = 'X';
+#endif
 		/*
 		 * TAINT_FORCED_RMMOD: could be added.
 		 * TAINT_UNSAFE_SMP, TAINT_MACHINE_CHECK, TAINT_BAD_PAGE don't
@@ -3017,7 +3027,9 @@ void print_modules(void)
 	if (last_unloaded_module[0])
 		printk(" [last unloaded: %s]", last_unloaded_module);
 	printk("\n");
+#ifdef CONFIG_ENTERPRISE_SUPPORT
 	printk("Supported: %s\n", supported_printable(get_taint()));
+#endif
 }
 
 #ifdef CONFIG_MODVERSIONS
