@@ -3,6 +3,7 @@
 #include <linux/init.h>
 #include <linux/pm.h>
 #include <linux/efi.h>
+#include <linux/dmi.h>
 #ifdef CONFIG_KDB
 #include <linux/kdb.h>
 #endif /* CONFIG_KDB */
@@ -21,7 +22,6 @@
 #include <asm/cpu.h>
 
 #ifdef CONFIG_X86_32
-# include <linux/dmi.h>
 # include <linux/ctype.h>
 # include <linux/mc146818rtc.h>
 #else
@@ -407,6 +407,38 @@ EXPORT_SYMBOL(machine_real_restart);
 #endif
 
 #endif /* CONFIG_X86_32 */
+
+/*
+ * Apple MacBook5,2 (2009 MacBook) needs reboot=p
+ */
+static int __init set_pci_reboot(const struct dmi_system_id *d)
+{
+	if (reboot_type != BOOT_CF9) {
+		reboot_type = BOOT_CF9;
+		printk(KERN_INFO "%s series board detected. "
+		       "Selecting PCI-method for reboots.\n", d->ident);
+	}
+	return 0;
+}
+
+static struct dmi_system_id __initdata pci_reboot_dmi_table[] = {
+	{	/* Handle problems with rebooting on Apple MacBook5,2 */
+		.callback = set_pci_reboot,
+		.ident = "Apple MacBook",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Apple Inc."),
+			DMI_MATCH(DMI_PRODUCT_NAME, "MacBook5,2"),
+		},
+	},
+	{ }
+};
+
+static int __init pci_reboot_init(void)
+{
+	dmi_check_system(pci_reboot_dmi_table);
+	return 0;
+}
+core_initcall(pci_reboot_init);
 
 static inline void kb_wait(void)
 {

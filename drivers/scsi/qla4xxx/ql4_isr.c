@@ -6,11 +6,101 @@
  */
 
 #include "ql4_def.h"
-#include "ql4_version.h"
 #include "ql4_glbl.h"
 #include "ql4_dbg.h"
 #include "ql4_inline.h"
-#include "ql4_os.h"
+
+/**
+ * qla4xxx_copy_sense - copy sense data	into cmd sense buffer
+ * @ha: Pointer to host adapter structure.
+ * @sts_entry: Pointer to status entry structure.
+ * @srb: Pointer to srb structure.
+ **/
+static void qla4xxx_copy_sense(struct scsi_qla_host *ha,
+                               struct status_entry *sts_entry,
+                               struct srb *srb)
+{
+	struct scsi_cmnd *cmd = srb->cmd;
+	uint16_t sense_len;
+
+	memset(cmd->sense_buffer, 0, SCSI_SENSE_BUFFERSIZE);
+	sense_len = le16_to_cpu(sts_entry->senseDataByteCnt);
+	if (sense_len == 0)
+		return;
+
+	/* Save total available sense length,
+	 * not to exceed cmd's sense buffer size */
+	sense_len = min_t(uint16_t, sense_len, SCSI_SENSE_BUFFERSIZE);
+	srb->req_sense_ptr = cmd->sense_buffer;
+	srb->req_sense_len = sense_len;
+
+	/* Copy sense from sts_entry pkt */
+	sense_len = min_t(uint16_t, sense_len, IOCB_MAX_SENSEDATA_LEN);
+	memcpy(cmd->sense_buffer, sts_entry->senseData, sense_len);
+
+	DEBUG2(printk(KERN_INFO "scsi%ld:%d:%d:%d: %s: sense key = %x, "
+		"ASL= %02x, ASC/ASCQ = %02x/%02x\n", ha->host_no,
+		cmd->device->channel, cmd->device->id,
+		cmd->device->lun, __func__,
+		sts_entry->senseData[2] & 0x0f,
+		sts_entry->senseData[7],
+		sts_entry->senseData[12],
+		sts_entry->senseData[13]));
+
+	DEBUG5(qla4xxx_dump_buffer(cmd->sense_buffer, sense_len));
+	srb->flags |= SRB_GOT_SENSE;
+
+	/* Update srb, in case a sts_cont pkt follows */
+	srb->req_sense_ptr += sense_len;
+	srb->req_sense_len -= sense_len;
+	if (srb->req_sense_len != 0)
+		ha->status_srb = srb;
+	else
+		ha->status_srb = NULL;
+}
+
+/**
+ * qla4xxx_status_cont_entry - Process a Status Continuations entry.
+ * @ha: SCSI driver HA context
+ * @sts_cont: Entry pointer
+ *
+ * Extended sense data.
+ */
+static void
+qla4xxx_status_cont_entry(struct scsi_qla_host *ha,
+			  struct status_cont_entry *sts_cont)
+{
+	struct srb *srb = ha->status_srb;
+	struct scsi_cmnd *cmd;
+	uint8_t sense_len;
+
+	if (srb == NULL)
+		return;
+
+	cmd = srb->cmd;
+	if (cmd == NULL) {
+		DEBUG2(printk(KERN_INFO "scsi%ld: %s: Cmd already returned "
+			"back to OS srb=%p srb->state:%d\n", ha->host_no,
+			__func__, srb, srb->state));
+		ha->status_srb = NULL;
+		return;
+	}
+
+	/* Copy sense data. */
+	sense_len = min_t(uint16_t, srb->req_sense_len,
+			  IOCB_MAX_EXT_SENSEDATA_LEN);
+	memcpy(srb->req_sense_ptr, sts_cont->ext_sense_data, sense_len);
+	DEBUG5(qla4xxx_dump_buffer(srb->req_sense_ptr, sense_len));
+
+	srb->req_sense_ptr += sense_len;
+	srb->req_sense_len -= sense_len;
+
+	/* Place command on done queue. */
+	if (srb->req_sense_len == 0) {
+		qla4xxx_srb_compl(ha, srb);
+		ha->status_srb = NULL;
+	}
+}
 
 /**
  * qla4xxx_status_entry - processes status IOCBs
@@ -25,10 +115,14 @@ static void qla4xxx_status_entry(struct scsi_qla_host *ha,
 	struct srb *srb;
 	struct ddb_entry *ddb_entry;
 	uint32_t residual;
-	uint16_t sensebytecnt;
 
 	srb = qla4xxx_del_from_active_array(ha, le32_to_cpu(sts_entry->handle));
 	if (!srb) {
+		/* FIXMEdg: Don't we need to reset ISP in this case??? */
+		DEBUG2(printk(KERN_WARNING "scsi%ld: %s: Status Entry invalid "
+			      "handle 0x%x, sp=%p. This cmd may have already "
+			      "been completed.\n", ha->host_no, __func__,
+			      le32_to_cpu(sts_entry->handle), srb));
 		dev_warn(&ha->pdev->dev, "%s invalid status entry:"
 			" handle=0x%0x\n", __func__, sts_entry->handle);
 		set_bit(DPC_RESET_HA, &ha->dpc_flags);
@@ -37,9 +131,12 @@ static void qla4xxx_status_entry(struct scsi_qla_host *ha,
 
 	cmd = srb->cmd;
 	if (cmd == NULL) {
-		dev_warn(&ha->pdev->dev, "%s Command is NULL: srb=%p"
-			" sts_handle=0x%0x srb_state=0x%0x\n", __func__,
-			srb, sts_entry->handle, srb->state);
+		DEBUG2(printk("scsi%ld: %s: Command already returned back to "
+			      "OS pkt->handle=%d srb=%p srb->state:%d\n",
+			      ha->host_no, __func__, sts_entry->handle,
+			      srb, srb->state));
+		dev_warn(&ha->pdev->dev, "Command is NULL:"
+			" already returned to OS (srb=%p)\n", srb);
 		return;
 	}
 
@@ -55,15 +152,27 @@ static void qla4xxx_status_entry(struct scsi_qla_host *ha,
 	scsi_status = sts_entry->scsiStatus;
 	switch (sts_entry->completionStatus) {
 	case SCS_COMPLETE:
+
 		if (sts_entry->iscsiFlags & ISCSI_FLAG_RESIDUAL_OVER) {
 			cmd->result = DID_ERROR << 16;
 			break;
 		}
-		if (sts_entry->iscsiFlags & ISCSI_FLAG_RESIDUAL_UNDER) {
-			QL_SET_SCSI_RESID(cmd, residual);
-			if (!scsi_status && ((QL_SCSI_BUFFLEN(cmd) - residual) <
-				   cmd->underflow)) {
+
+		if (sts_entry->iscsiFlags &ISCSI_FLAG_RESIDUAL_UNDER) {
+			scsi_set_resid(cmd, residual);
+			if (!scsi_status && ((scsi_bufflen(cmd) - residual) <
+				cmd->underflow)) {
+
 				cmd->result = DID_ERROR << 16;
+
+				DEBUG2(printk("scsi%ld:%d:%d:%d: %s: "
+					"Mid-layer Data underrun0, "
+					"xferlen = 0x%x, "
+					"residual = 0x%x\n", ha->host_no,
+					cmd->device->channel,
+					cmd->device->id,
+					cmd->device->lun, __func__,
+					scsi_bufflen(cmd), residual));
 				break;
 			}
 		}
@@ -74,25 +183,7 @@ static void qla4xxx_status_entry(struct scsi_qla_host *ha,
 			break;
 
 		/* Copy Sense Data into sense buffer. */
-		memset(cmd->sense_buffer, 0, sizeof(cmd->sense_buffer));
-
-		sensebytecnt = le16_to_cpu(sts_entry->senseDataByteCnt);
-		if (sensebytecnt == 0)
-			break;
-
-		memcpy(cmd->sense_buffer, sts_entry->senseData,
-		       min(sensebytecnt,
-			   (uint16_t) sizeof(cmd->sense_buffer)));
-
-		DEBUG2(printk("scsi%ld:%d:%d:%d: %s: sense key = %x, "
-			      "ASC/ASCQ = %02x/%02x\n", ha->host_no,
-			      cmd->device->channel, cmd->device->id,
-			      cmd->device->lun, __func__,
-			      sts_entry->senseData[2] & 0x0f,
-			      sts_entry->senseData[12],
-			      sts_entry->senseData[13]));
-
-		srb->flags |= SRB_GOT_SENSE;
+		qla4xxx_copy_sense(ha, sts_entry, srb);
 		break;
 
 	case SCS_INCOMPLETE:
@@ -146,7 +237,7 @@ static void qla4xxx_status_entry(struct scsi_qla_host *ha,
 			break;
 		}
 
-		QL_SET_SCSI_RESID(cmd, residual);
+		scsi_set_resid(cmd, residual);
 
 		/*
 		 * If there is scsi_status, it takes precedense over
@@ -159,25 +250,7 @@ static void qla4xxx_status_entry(struct scsi_qla_host *ha,
 				break;
 
 			/* Copy Sense Data into sense buffer. */
-			memset(cmd->sense_buffer, 0,
-			       sizeof(cmd->sense_buffer));
-
-			sensebytecnt =
-				le16_to_cpu(sts_entry->senseDataByteCnt);
-			if (sensebytecnt == 0)
-				break;
-
-			memcpy(cmd->sense_buffer, sts_entry->senseData,
-			       min(sensebytecnt,
-				   (uint16_t) sizeof(cmd->sense_buffer)));
-
-			DEBUG2(printk("scsi%ld:%d:%d:%d: %s: sense key = %x, "
-				      "ASC/ASCQ = %02x/%02x\n", ha->host_no,
-				      cmd->device->channel, cmd->device->id,
-				      cmd->device->lun, __func__,
-				      sts_entry->senseData[2] & 0x0f,
-				      sts_entry->senseData[12],
-				      sts_entry->senseData[13]));
+			qla4xxx_copy_sense(ha, sts_entry, srb);
 		} else {
 			/*
 			 * If RISC reports underrun and target does not
@@ -188,7 +261,7 @@ static void qla4xxx_status_entry(struct scsi_qla_host *ha,
 			if ((sts_entry->iscsiFlags &
 			     ISCSI_FLAG_RESIDUAL_UNDER) == 0) {
 				cmd->result = DID_BUS_BUSY << 16;
-			} else if ((QL_SCSI_BUFFLEN(cmd) - residual) <
+			} else if ((scsi_bufflen(cmd) - residual) <
 				   cmd->underflow) {
 				/*
 				 * Handle mid-layer underflow???
@@ -203,13 +276,13 @@ static void qla4xxx_status_entry(struct scsi_qla_host *ha,
 				 * will return DID_ERROR.
 				 */
 				DEBUG2(printk("scsi%ld:%d:%d:%d: %s: "
-					"Mid-layer Data underrun len = 0x%x, "
-					"resid = 0x%x, compstat = 0x%x\n",
-					ha->host_no, cmd->device->channel,
-					cmd->device->id, cmd->device->lun,
-					__func__, QL_SCSI_BUFFLEN(cmd),
-					residual,
-					sts_entry->completionStatus));
+					"Mid-layer Data underrun1, "
+					"xferlen = 0x%x, "
+					"residual = 0x%x\n", ha->host_no,
+					cmd->device->channel,
+					cmd->device->id,
+					cmd->device->lun, __func__,
+					scsi_bufflen(cmd), residual));
 
 				cmd->result = DID_ERROR << 16;
 			} else {
@@ -253,9 +326,10 @@ static void qla4xxx_status_entry(struct scsi_qla_host *ha,
 
 status_entry_exit:
 
-	/* complete the request */
+	/* complete the request, if not waiting for status_continuation pkt */
 	srb->cc_stat = sts_entry->completionStatus;
-	qla4xxx_srb_compl(ha, srb);
+	if (ha->status_srb == NULL)
+		qla4xxx_srb_compl(ha, srb);
 }
 
 /**
@@ -290,10 +364,7 @@ static void qla4xxx_process_response_queue(struct scsi_qla_host * ha)
 		/* process entry */
 		switch (sts_entry->hdr.entryType) {
 		case ET_STATUS:
-			/*
-			 * Common status - Single completion posted in single
-			 * IOSB.
-			 */
+			/* Common status */
 			qla4xxx_status_entry(ha, sts_entry);
 			break;
 
@@ -301,9 +372,8 @@ static void qla4xxx_process_response_queue(struct scsi_qla_host * ha)
 			break;
 
 		case ET_STATUS_CONTINUATION:
-			/* Just throw away the status continuation entries */
-			DEBUG2(printk("scsi%ld: %s: Status Continuation entry "
-				      "- ignoring\n", ha->host_no, __func__));
+			qla4xxx_status_cont_entry(ha,
+				(struct status_cont_entry *) sts_entry);
 			break;
 
 		case ET_COMMAND:
@@ -399,15 +469,6 @@ static void qla4xxx_isr_decode_mailbox(struct scsi_qla_host * ha,
 	} else if (mbox_status >> 12 == MBOX_ASYNC_EVENT_STATUS) {
 		/* Immediately process the AENs that don't require much work.
 		 * Only queue the database_changed AENs */
-
-		DEBUG6(dev_info(&ha->pdev->dev, "%s mbx0 0x%08x mbx1 0x%08x"
-			" mbx2 0x%08x mbx3 0x%08x mbx4 0x%08x mbx5 0x%08x "
-			"mbx6 0x%08x mbx7 0x%08x\n", __func__,
-			readl(&ha->reg->mailbox[0]), readl(&ha->reg->mailbox[1]),
-			readl(&ha->reg->mailbox[2]), readl(&ha->reg->mailbox[3]),
-			readl(&ha->reg->mailbox[4]), readl(&ha->reg->mailbox[5]),
-			readl(&ha->reg->mailbox[6]), readl(&ha->reg->mailbox[7])));
-
 		if (ha->aen_log.count < MAX_AEN_ENTRIES) {
 			for (i = 0; i < MBOX_AEN_REG_COUNT; i++)
 				ha->aen_log.entry[ha->aen_log.count].mbox_sts[i] =
@@ -416,13 +477,11 @@ static void qla4xxx_isr_decode_mailbox(struct scsi_qla_host * ha,
 		}
 		switch (mbox_status) {
 		case MBOX_ASTS_SYSTEM_ERROR:
-			dev_info(&ha->pdev->dev, "%s: System Err\n", __func__);
 			/* Log Mailbox registers */
 			if (ql4xdontresethba) {
 				DEBUG2(printk("%s:Dont Reset HBA\n",
 					      __func__));
 			} else {
-				qla4xxx_hw_reset(ha, 0);
 				set_bit(AF_GET_CRASH_RECORD, &ha->flags);
 				set_bit(DPC_RESET_HA, &ha->dpc_flags);
 			}
@@ -439,13 +498,15 @@ static void qla4xxx_isr_decode_mailbox(struct scsi_qla_host * ha,
 			break;
 
 		case MBOX_ASTS_LINK_UP:
+			DEBUG2(printk("scsi%ld: AEN %04x Adapter LINK UP\n",
+				      ha->host_no, mbox_status));
 			set_bit(AF_LINK_UP, &ha->flags);
-			dev_info(&ha->pdev->dev, "%s: LINK UP\n", __func__);
 			break;
 
 		case MBOX_ASTS_LINK_DOWN:
+			DEBUG2(printk("scsi%ld: AEN %04x Adapter LINK DOWN\n",
+				      ha->host_no, mbox_status));
 			clear_bit(AF_LINK_UP, &ha->flags);
-			dev_info(&ha->pdev->dev, "%s: LINK DOWN\n", __func__);
 			break;
 
 		case MBOX_ASTS_HEARTBEAT:
@@ -595,9 +656,8 @@ void qla4xxx_interrupt_service_routine(struct scsi_qla_host * ha,
  * qla4xxx_intr_handler - hardware interrupt handler.
  * @irq: Unused
  * @dev_id: Pointer to host adapter structure
- * @regs: Unused
  **/
-QL_DECLARE_INTR_HANDLER(qla4xxx_intr_handler, irq, dev_id, regs)
+irqreturn_t qla4xxx_intr_handler(int irq, void *dev_id)
 {
 	struct scsi_qla_host *ha;
 	uint32_t intr_status;
@@ -629,7 +689,8 @@ QL_DECLARE_INTR_HANDLER(qla4xxx_intr_handler, irq, dev_id, regs)
 			intr_status = readl(&ha->reg->ctrl_status);
 
 		if ((intr_status &
-		     (CSR_SCSI_RESET_INTR|CSR_FATAL_ERROR|INTR_PENDING)) == 0) {
+		     (CSR_SCSI_RESET_INTR|CSR_FATAL_ERROR|INTR_PENDING)) ==
+		    0) {
 			if (reqs_count == 0)
 				ha->spurious_int_count++;
 			break;
@@ -665,8 +726,6 @@ QL_DECLARE_INTR_HANDLER(qla4xxx_intr_handler, irq, dev_id, regs)
 			break;
 		} else if (intr_status & CSR_SCSI_RESET_INTR) {
 			clear_bit(AF_ONLINE, &ha->flags);
-			dev_info(&ha->pdev->dev,"%s: adapter OFFLINE\n",
-				__func__);
 			__qla4xxx_disable_intrs(ha);
 
 			writel(set_rmask(CSR_SCSI_RESET_INTR),
@@ -710,17 +769,7 @@ void qla4xxx_process_aen(struct scsi_qla_host * ha, uint8_t process_aen)
 	int i;
 	unsigned long flags;
 
-	DEBUG6(dev_info(&ha->pdev->dev, "%s proc_aen 0x%x\n",
-		__func__, process_aen));
-
 	spin_lock_irqsave(&ha->hardware_lock, flags);
-	if (process_aen == FLUSH_DDB_CHANGED_AENS) {
-		ha->aen_q_count = MAX_AEN_ENTRIES;
-		ha->aen_out = ha->aen_in = 0;
-		spin_unlock_irqrestore(&ha->hardware_lock, flags);
-		return;
-	}
-
 	while (ha->aen_out != ha->aen_in) {
 		aen = &ha->aen_q[ha->aen_out];
 		/* copy aen information to local structure */
@@ -733,46 +782,60 @@ void qla4xxx_process_aen(struct scsi_qla_host * ha, uint8_t process_aen)
 		if (ha->aen_out == MAX_AEN_ENTRIES)
 			ha->aen_out = 0;
 
-		DEBUG6(dev_info(&ha->pdev->dev, "%s mbx0 0x%x mbx1 0x%x mbx2 "
-			"0x%x mbx3 0x%x ddb 0x%p\n", __func__, mbox_sts[0],
-			mbox_sts[1], mbox_sts[2], mbox_sts[3],
-			qla4xxx_lookup_ddb_by_fw_index(ha, mbox_sts[2])));
+		spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
-		if (process_aen == RELOGIN_DDB_CHANGED_AENS) {
-			/* for use during init time, we only want to
-			 * relogin non-active ddbs */
-			struct ddb_entry *ddb_entry;
+		DEBUG2(printk("qla4xxx(%ld): AEN[%d]=0x%08x, mbx1=0x%08x mbx2=0x%08x"
+			" mbx3=0x%08x mbx4=0x%08x\n", ha->host_no,
+			(ha->aen_out ? (ha->aen_out-1): (MAX_AEN_ENTRIES-1)),
+			mbox_sts[0], mbox_sts[1], mbox_sts[2],
+			mbox_sts[3], mbox_sts[4]));
 
-			ddb_entry = qla4xxx_lookup_ddb_by_fw_index(ha, mbox_sts[2]);
+		switch (mbox_sts[0]) {
+		case MBOX_ASTS_DATABASE_CHANGED:
+			if (process_aen == FLUSH_DDB_CHANGED_AENS) {
+				DEBUG2(printk("scsi%ld: AEN[%d] %04x, index "
+					      "[%d] state=%04x FLUSHED!\n",
+					      ha->host_no, ha->aen_out,
+					      mbox_sts[0], mbox_sts[2],
+					      mbox_sts[3]));
+				break;
+			} else if (process_aen == RELOGIN_DDB_CHANGED_AENS) {
+				/* for use during init time, we only want to
+				 * relogin non-active ddbs */
+				struct ddb_entry *ddb_entry;
 
-			if (ddb_entry) {
+				ddb_entry =
+					/* FIXME: name length? */
+					qla4xxx_lookup_ddb_by_fw_index(ha,
+								       mbox_sts[2]);
+				if (!ddb_entry)
+					break;
 
-				DEBUG6(dev_info(&ha->pdev->dev, "%s ddb 0x%p "
-					"sess 0x%p conn 0x%p state 0x%x\n",
-					__func__, ddb_entry, ddb_entry->sess,
-					ddb_entry->conn, ddb_entry->state));
-
-				ddb_entry->dev_scan_wait_to_complete_relogin = 0;
+				ddb_entry->dev_scan_wait_to_complete_relogin =
+					0;
 				ddb_entry->dev_scan_wait_to_start_relogin =
 					jiffies +
-					((ddb_entry->default_time2wait + 4) * HZ);
+					((ddb_entry->default_time2wait +
+					  4) * HZ);
 
 				DEBUG2(printk("scsi%ld: ddb index [%d] initate"
-				      " RELOGIN after %d seconds\n", ha->host_no,
-					ddb_entry->fw_ddb_index,
-					ddb_entry->default_time2wait + 4));
+					      " RELOGIN after %d seconds\n",
+					      ha->host_no,
+					      ddb_entry->fw_ddb_index,
+					      ddb_entry->default_time2wait +
+					      4));
+				break;
 			}
-		} else if (mbox_sts[0] == MBOX_ASTS_DATABASE_CHANGED) {
-			spin_unlock_irqrestore(&ha->hardware_lock, flags);
+
 			if (mbox_sts[1] == 0) {	/* Global DB change. */
 				qla4xxx_reinitialize_ddb_list(ha);
 			} else if (mbox_sts[1] == 1) {	/* Specific device. */
 				qla4xxx_process_ddb_changed(ha, mbox_sts[2],
-					mbox_sts[3],
-					((process_aen == PROCESS_FOR_PROBE) ? 1 : 0 ));
+							    mbox_sts[3]);
 			}
-			spin_lock_irqsave(&ha->hardware_lock, flags);
+			break;
 		}
+		spin_lock_irqsave(&ha->hardware_lock, flags);
 	}
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 }

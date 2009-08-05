@@ -6,11 +6,9 @@
  */
 
 #include "ql4_def.h"
-#include "ql4_version.h"
 #include "ql4_glbl.h"
 #include "ql4_dbg.h"
 #include "ql4_inline.h"
-#include "ql4_os.h"
 
 
 /**
@@ -25,9 +23,9 @@
  * If outCount is 0, this routine completes successfully WITHOUT waiting
  * for the mailbox command to complete.
  **/
-int qla4xxx_mailbox_command(struct scsi_qla_host *ha, uint8_t inCount,
-			    uint8_t outCount, uint32_t *mbx_cmd,
-			    uint32_t *mbx_sts)
+static int qla4xxx_mailbox_command(struct scsi_qla_host *ha, uint8_t inCount,
+				   uint8_t outCount, uint32_t *mbx_cmd,
+				   uint32_t *mbx_sts)
 {
 	int status = QLA_ERROR;
 	uint8_t i;
@@ -41,7 +39,6 @@ int qla4xxx_mailbox_command(struct scsi_qla_host *ha, uint8_t inCount,
 			      "pointer\n", ha->host_no, __func__));
 		return status;
 	}
-
 	/* Mailbox code active */
 	wait_count = MBOX_TOV * 100;
 
@@ -90,6 +87,8 @@ int qla4xxx_mailbox_command(struct scsi_qla_host *ha, uint8_t inCount,
 	readl(&ha->reg->ctrl_status);
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
+	/* Wait for completion */
+
 	/*
 	 * If we don't want status, don't wait for the mailbox command to
 	 * complete.  For example, MBOX_CMD_RESET_FW doesn't return status,
@@ -99,8 +98,6 @@ int qla4xxx_mailbox_command(struct scsi_qla_host *ha, uint8_t inCount,
 		status = QLA_SUCCESS;
 		goto mbox_exit;
 	}
-	/* Wait for completion */
-	set_current_state(TASK_UNINTERRUPTIBLE);
 	/* Wait for command to complete */
 	wait_count = jiffies + MBOX_TOV * HZ;
 	while (test_bit(AF_MBOX_COMMAND_DONE, &ha->flags) == 0) {
@@ -122,7 +119,6 @@ int qla4xxx_mailbox_command(struct scsi_qla_host *ha, uint8_t inCount,
 		spin_unlock_irqrestore(&ha->hardware_lock, flags);
 		msleep(10);
 	}
-	set_current_state(TASK_RUNNING);
 
 	/* Check for mailbox timeout. */
 	if (!test_bit(AF_MBOX_COMMAND_DONE, &ha->flags)) {
@@ -168,94 +164,12 @@ int qla4xxx_mailbox_command(struct scsi_qla_host *ha, uint8_t inCount,
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 mbox_exit:
-	if (status == QLA_SUCCESS)
-		qla4xxx_check_for_clear_ddb(ha, mbx_cmd);
 	mutex_lock(&ha->mbox_sem);
 	clear_bit(AF_MBOX_COMMAND, &ha->flags);
 	mutex_unlock(&ha->mbox_sem);
 	clear_bit(AF_MBOX_COMMAND_DONE, &ha->flags);
 
 	return status;
-}
-
-
-/**
- * qla4xxx_issue_iocb - issue mailbox iocb command
- * @ha: adapter state pointer.
- * @buffer: buffer pointer.
- * @phys_addr: physical address of buffer.
- * @size: size of buffer.
- *
- * Issues iocbs via mailbox commands.
- * TARGET_QUEUE_LOCK must be released.
- * ADAPTER_STATE_LOCK must be released.
- **/
-int
-qla4xxx_issue_iocb(struct scsi_qla_host * ha, void *buffer,
-		   dma_addr_t phys_addr, size_t size)
-{
-	uint32_t mbox_cmd[MBOX_REG_COUNT];
-	uint32_t mbox_sts[MBOX_REG_COUNT];
-	int status;
-
-	memset(&mbox_cmd, 0, sizeof(mbox_cmd));
-	memset(&mbox_sts, 0, sizeof(mbox_sts));
-
-	mbox_cmd[0] = MBOX_CMD_EXECUTE_IOCB_A64;
-	mbox_cmd[1] = 0;
-	mbox_cmd[2] = LSDW(phys_addr);
-	mbox_cmd[3] = MSDW(phys_addr);
-
-	status = qla4xxx_mailbox_command(ha, MBOX_REG_COUNT, 1, &mbox_cmd[0], &mbox_sts[0]);
-	return status;
-}
-
-int qla4xxx_conn_close_sess_logout(struct scsi_qla_host * ha,
-				   uint16_t fw_ddb_index,
-				   uint16_t connection_id,
-				   uint16_t option)
-{
-	uint32_t mbox_cmd[MBOX_REG_COUNT];
-	uint32_t mbox_sts[MBOX_REG_COUNT];
-
-	memset(&mbox_cmd, 0, sizeof(mbox_cmd));
-	memset(&mbox_sts, 0, sizeof(mbox_sts));
-
-	mbox_cmd[0] = MBOX_CMD_CONN_CLOSE_SESS_LOGOUT;
-	mbox_cmd[1] = fw_ddb_index;
-	mbox_cmd[2] = connection_id;
-	mbox_cmd[3] = LOGOUT_OPTION_RELOGIN;
-
-	if (qla4xxx_mailbox_command(ha, MBOX_REG_COUNT, 2, &mbox_cmd[0], &mbox_sts[0]) !=
-	    QLA_SUCCESS) {
-		DEBUG2(printk("scsi%ld: %s: MBOX_CMD_CONN_CLOSE_SESS_LOGOUT "
-			      "option %04x failed sts %04X %04X",
-			      ha->host_no, __func__,
-			      option, mbox_sts[0], mbox_sts[1]));
-		if (mbox_sts[0] == 0x4005)
-			DEBUG2(printk("%s reason %04X\n", __func__,
-				      mbox_sts[1]));
-	}
-	return QLA_SUCCESS;
-}
-
-int qla4xxx_clear_database_entry(struct scsi_qla_host * ha,
-				 uint16_t fw_ddb_index)
-{
-	uint32_t mbox_cmd[MBOX_REG_COUNT];
-	uint32_t mbox_sts[MBOX_REG_COUNT];
-
-	memset(&mbox_cmd, 0, sizeof(mbox_cmd));
-	memset(&mbox_sts, 0, sizeof(mbox_sts));
-
-	mbox_cmd[0] = MBOX_CMD_CLEAR_DATABASE_ENTRY;
-	mbox_cmd[1] = fw_ddb_index;
-
-	if (qla4xxx_mailbox_command(ha, MBOX_REG_COUNT, 5, &mbox_cmd[0], &mbox_sts[0]) !=
-	    QLA_SUCCESS)
-		return QLA_ERROR;
-
-	return QLA_SUCCESS;
 }
 
 /**
@@ -471,16 +385,6 @@ int qla4xxx_get_firmware_status(struct scsi_qla_host * ha)
 			      mbox_sts[0]));
 		return QLA_ERROR;
 	}
-
-	/* High-water mark of IOCBs */
-	ha->iocb_hiwat = mbox_sts[2];
-	if (ha->iocb_hiwat > IOCB_HIWAT_CUSHION)
-		ha->iocb_hiwat -= IOCB_HIWAT_CUSHION;
-	else
-		dev_info(&ha->pdev->dev, "WARNING!!!  You have less than %d "
-			   "firmware IOCBs available (%d).\n",
-			   IOCB_HIWAT_CUSHION, ha->iocb_hiwat);
-
 	return QLA_SUCCESS;
 }
 
@@ -536,16 +440,15 @@ int qla4xxx_get_fwddb_entry(struct scsi_qla_host *ha,
 			      mbox_sts[1]));
 		goto exit_get_fwddb;
 	}
-
 	if (fw_ddb_entry) {
-		DEBUG6(dev_info(&ha->pdev->dev, "%s: DDB[%d] MB0 %04x Tot %d Next %d "
-			   "State %04x ConnErr %08x %d.%d.%d.%d:%04d \"%s\"\n", __func__,
+		dev_info(&ha->pdev->dev, "DDB[%d] MB0 %04x Tot %d Next %d "
+			   "State %04x ConnErr %08x %d.%d.%d.%d:%04d \"%s\"\n",
 			   fw_ddb_index, mbox_sts[0], mbox_sts[2], mbox_sts[3],
 			   mbox_sts[4], mbox_sts[5], fw_ddb_entry->ip_addr[0],
 			   fw_ddb_entry->ip_addr[1], fw_ddb_entry->ip_addr[2],
 			   fw_ddb_entry->ip_addr[3],
 			   le16_to_cpu(fw_ddb_entry->port),
-			   fw_ddb_entry->iscsi_name));
+			   fw_ddb_entry->iscsi_name);
 	}
 	if (num_valid_ddb_entries)
 		*num_valid_ddb_entries = mbox_sts[2];
@@ -603,31 +506,6 @@ int qla4xxx_set_ddb_entry(struct scsi_qla_host * ha, uint16_t fw_ddb_index,
 	mbox_cmd[4] = sizeof(struct dev_db_entry);
 
 	return qla4xxx_mailbox_command(ha, MBOX_REG_COUNT, 1, &mbox_cmd[0], &mbox_sts[0]);
-}
-
-int qla4xxx_conn_open_session_login(struct scsi_qla_host * ha,
-				    uint16_t fw_ddb_index)
-{
-	int status = QLA_ERROR;
-	uint32_t mbox_cmd[MBOX_REG_COUNT];
-	uint32_t mbox_sts[MBOX_REG_COUNT];
-
-	/* Do not wait for completion. The firmware will send us an
-	 * ASTS_DATABASE_CHANGED (0x8014) to notify us of the login status.
-	 */
-	memset(&mbox_cmd, 0, sizeof(mbox_cmd));
-	memset(&mbox_sts, 0, sizeof(mbox_sts));
-
-	mbox_cmd[0] = MBOX_CMD_CONN_OPEN_SESS_LOGIN;
-	mbox_cmd[1] = (uint32_t) fw_ddb_index;
-	mbox_cmd[6] = 1;
-
-	status = qla4xxx_mailbox_command(ha, MBOX_REG_COUNT, 0, &mbox_cmd[0], &mbox_sts[0]);
-	DEBUG2(printk("%s fw_ddb_index=%d status=%d mbx0_1=0x%x :0x%x\n",
-		      __func__, fw_ddb_index, status, mbox_sts[0],
-		      mbox_sts[1]);)
-
-		return status;
 }
 
 /**
@@ -754,7 +632,7 @@ void qla4xxx_get_conn_event_log(struct scsi_qla_host * ha)
 	DEBUG3(printk("scsi%ld: Connection Event Log Dump (%d entries):\n",
 		      ha->host_no, num_valid_entries));
 
-	if (extended_error_logging == 3) {
+	if (ql4xextended_error_logging == 3) {
 		if (oldest_entry == 0) {
 			/* Circular Buffer has not wrapped around */
 			for (i=0; i < num_valid_entries; i++) {
@@ -825,6 +703,45 @@ int qla4xxx_reset_lun(struct scsi_qla_host * ha, struct ddb_entry * ddb_entry,
 	return status;
 }
 
+/**
+ * qla4xxx_reset_target - issues target Reset
+ * @ha: Pointer to host adapter structure.
+ * @db_entry: Pointer to device database entry
+ * @un_entry: Pointer to lun entry structure
+ *
+ * This routine performs a TARGET RESET on the specified target.
+ * The caller must ensure that the ddb_entry pointers
+ * are valid before calling this routine.
+ **/
+int qla4xxx_reset_target(struct scsi_qla_host *ha,
+			 struct ddb_entry *ddb_entry)
+{
+	uint32_t mbox_cmd[MBOX_REG_COUNT];
+	uint32_t mbox_sts[MBOX_REG_COUNT];
+	int status = QLA_SUCCESS;
+
+	DEBUG2(printk("scsi%ld:%d: target reset issued\n", ha->host_no,
+		      ddb_entry->os_target_id));
+
+	/*
+	 * Send target reset command to ISP, so that the ISP will return all
+	 * outstanding requests with RESET status
+	 */
+	memset(&mbox_cmd, 0, sizeof(mbox_cmd));
+	memset(&mbox_sts, 0, sizeof(mbox_sts));
+
+	mbox_cmd[0] = MBOX_CMD_TARGET_WARM_RESET;
+	mbox_cmd[1] = ddb_entry->fw_ddb_index;
+	mbox_cmd[5] = 0x01;	/* Immediate Command Enable */
+
+	qla4xxx_mailbox_command(ha, MBOX_REG_COUNT, 1, &mbox_cmd[0],
+				&mbox_sts[0]);
+	if (mbox_sts[0] != MBOX_STS_COMMAND_COMPLETE &&
+	    mbox_sts[0] != MBOX_STS_COMMAND_ERROR)
+		status = QLA_ERROR;
+
+	return status;
+}
 
 int qla4xxx_get_flash(struct scsi_qla_host * ha, dma_addr_t dma_addr,
 		      uint32_t offset, uint32_t len)
@@ -886,7 +803,8 @@ int qla4xxx_get_fw_version(struct scsi_qla_host * ha)
 	return QLA_SUCCESS;
 }
 
-int qla4xxx_get_default_ddb(struct scsi_qla_host *ha, dma_addr_t dma_addr)
+static int qla4xxx_get_default_ddb(struct scsi_qla_host *ha,
+				   dma_addr_t dma_addr)
 {
 	uint32_t mbox_cmd[MBOX_REG_COUNT];
 	uint32_t mbox_sts[MBOX_REG_COUNT];
@@ -907,7 +825,7 @@ int qla4xxx_get_default_ddb(struct scsi_qla_host *ha, dma_addr_t dma_addr)
 	return QLA_SUCCESS;
 }
 
-int qla4xxx_req_ddb_entry(struct scsi_qla_host *ha, uint32_t *ddb_index)
+static int qla4xxx_req_ddb_entry(struct scsi_qla_host *ha, uint32_t *ddb_index)
 {
 	uint32_t mbox_cmd[MBOX_REG_COUNT];
 	uint32_t mbox_sts[MBOX_REG_COUNT];
@@ -961,14 +879,14 @@ int qla4xxx_send_tgts(struct scsi_qla_host *ha, char *ip, uint16_t port)
 	if (ret_val != QLA_SUCCESS)
 		goto qla4xxx_send_tgts_exit;
 
-	memset((void *)fw_ddb_entry->iscsi_alias, 0,
+	memset(fw_ddb_entry->iscsi_alias, 0,
 	       sizeof(fw_ddb_entry->iscsi_alias));
 
-	memset((void *)fw_ddb_entry->iscsi_name, 0,
+	memset(fw_ddb_entry->iscsi_name, 0,
 	       sizeof(fw_ddb_entry->iscsi_name));
 
-	memset((void *)fw_ddb_entry->ip_addr, 0, sizeof(fw_ddb_entry->ip_addr));
-	memset((void *)fw_ddb_entry->tgt_addr, 0,
+	memset(fw_ddb_entry->ip_addr, 0, sizeof(fw_ddb_entry->ip_addr));
+	memset(fw_ddb_entry->tgt_addr, 0,
 	       sizeof(fw_ddb_entry->tgt_addr));
 
 	fw_ddb_entry->options = (DDB_OPT_DISC_SESSION | DDB_OPT_TARGET);
