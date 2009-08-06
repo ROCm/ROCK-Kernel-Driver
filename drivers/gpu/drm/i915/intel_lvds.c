@@ -552,7 +552,7 @@ static void intel_lvds_prepare(struct drm_encoder *encoder)
 	dev_priv->backlight_duty_cycle = (dev_priv->saveBLC_PWM_CTL &
 				       BACKLIGHT_DUTY_CYCLE_MASK);
 
-//	intel_lvds_set_power(dev, false);
+	intel_lvds_set_power(dev, false);
 }
 
 static void intel_lvds_commit( struct drm_encoder *encoder)
@@ -564,7 +564,7 @@ static void intel_lvds_commit( struct drm_encoder *encoder)
 		dev_priv->backlight_duty_cycle =
 			intel_lvds_get_max_backlight(dev);
 
-//	intel_lvds_set_power(dev, true);
+	intel_lvds_set_power(dev, true);
 }
 
 static void intel_lvds_mode_set(struct drm_encoder *encoder,
