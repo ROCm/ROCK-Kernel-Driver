@@ -616,6 +616,7 @@ struct rq {
 
 	unsigned char idle_at_tick;
 	/* For active balancing */
+	int post_schedule;
 	int active_balance;
 	int push_cpu;
 	/* cpu of this runqueue: */
@@ -2824,12 +2825,6 @@ static void finish_task_switch(struct rq *rq, struct task_struct *prev)
 {
 	struct mm_struct *mm = rq->prev_mm;
 	long prev_state;
-#ifdef CONFIG_SMP
-	int post_schedule = 0;
-
-	if (current->sched_class->needs_post_schedule)
-		post_schedule = current->sched_class->needs_post_schedule(rq);
-#endif
 
 	rq->prev_mm = NULL;
 
@@ -2848,10 +2843,6 @@ static void finish_task_switch(struct rq *rq, struct task_struct *prev)
 	finish_arch_switch(prev);
 	perf_counter_task_sched_in(current, cpu_of(rq));
 	finish_lock_switch(rq, prev);
-#ifdef CONFIG_SMP
-	if (post_schedule)
-		current->sched_class->post_schedule(rq);
-#endif
 
 	fire_sched_in_preempt_notifiers(current);
 	if (mm)
@@ -2866,6 +2857,42 @@ static void finish_task_switch(struct rq *rq, struct task_struct *prev)
 	}
 }
 
+#ifdef CONFIG_SMP
+
+/* assumes rq->lock is held */
+static inline void pre_schedule(struct rq *rq, struct task_struct *prev)
+{
+	if (prev->sched_class->pre_schedule)
+		prev->sched_class->pre_schedule(rq, prev);
+}
+
+/* rq->lock is NOT held, but preemption is disabled */
+static inline void post_schedule(struct rq *rq)
+{
+	if (rq->post_schedule) {
+		unsigned long flags;
+
+		spin_lock_irqsave(&rq->lock, flags);
+		if (rq->curr->sched_class->post_schedule)
+			rq->curr->sched_class->post_schedule(rq);
+		spin_unlock_irqrestore(&rq->lock, flags);
+
+		rq->post_schedule = 0;
+	}
+}
+
+#else
+
+static inline void pre_schedule(struct rq *rq, struct task_struct *p)
+{
+}
+
+static inline void post_schedule(struct rq *rq)
+{
+}
+
+#endif
+
 /**
  * schedule_tail - first thing a freshly forked thread must call.
  * @prev: the thread we just switched away from.
@@ -2876,6 +2903,13 @@ asmlinkage void schedule_tail(struct task_struct *prev)
 	struct rq *rq = this_rq();
 
 	finish_task_switch(rq, prev);
+
+	/*
+	 * FIXME: do we need to worry about rq being invalidated by the
+	 * task_switch?
+	 */
+	post_schedule(rq);
+
 #ifdef __ARCH_WANT_UNLOCKED_CTXSW
 	/* In this case, finish_task_switch does not reenable preemption */
 	preempt_enable();
@@ -5377,10 +5411,7 @@ need_resched_nonpreemptible:
 		switch_count = &prev->nvcsw;
 	}
 
-#ifdef CONFIG_SMP
-	if (prev->sched_class->pre_schedule)
-		prev->sched_class->pre_schedule(rq, prev);
-#endif
+	pre_schedule(rq, prev);
 
 	if (unlikely(!rq->nr_running))
 		idle_balance(cpu, rq);
@@ -5405,6 +5436,8 @@ need_resched_nonpreemptible:
 		rq = cpu_rq(cpu);
 	} else
 		spin_unlock_irq(&rq->lock);
+
+	post_schedule(rq);
 
 	if (unlikely(reacquire_kernel_lock(current) < 0))
 		goto need_resched_nonpreemptible;
@@ -7869,7 +7902,7 @@ static void rq_attach_root(struct rq *rq, struct root_domain *rd)
 	rq->rd = rd;
 
 	cpumask_set_cpu(rq->cpu, rd->span);
-	if (cpumask_test_cpu(rq->cpu, cpu_online_mask))
+	if (cpumask_test_cpu(rq->cpu, cpu_active_mask))
 		set_rq_online(rq);
 
 	spin_unlock_irqrestore(&rq->lock, flags);
@@ -9362,6 +9395,7 @@ void __init sched_init(void)
 #ifdef CONFIG_SMP
 		rq->sd = NULL;
 		rq->rd = NULL;
+		rq->post_schedule = 0;
 		rq->active_balance = 0;
 		rq->next_balance = jiffies;
 		rq->push_cpu = 0;

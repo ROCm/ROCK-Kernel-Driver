@@ -128,6 +128,11 @@ static void dequeue_pushable_task(struct rq *rq, struct task_struct *p)
 	plist_del(&p->pushable_tasks, &rq->rt.pushable_tasks);
 }
 
+static inline int has_pushable_tasks(struct rq *rq)
+{
+	return !plist_head_empty(&rq->rt.pushable_tasks);
+}
+
 #else
 
 static inline void enqueue_pushable_task(struct rq *rq, struct task_struct *p)
@@ -1064,6 +1069,14 @@ static struct task_struct *pick_next_task_rt(struct rq *rq)
 	if (p)
 		dequeue_pushable_task(rq, p);
 
+#ifdef CONFIG_SMP
+	/*
+	 * We detect this state here so that we can avoid taking the RQ
+	 * lock again later if there is no need to push
+	 */
+	rq->post_schedule = has_pushable_tasks(rq);
+#endif
+
 	return p;
 }
 
@@ -1162,13 +1175,6 @@ static int find_lowest_rq(struct task_struct *task)
 		return -1; /* No targets found */
 
 	/*
-	 * Only consider CPUs that are usable for migration.
-	 * I guess we might want to change cpupri_find() to ignore those
-	 * in the first place.
-	 */
-	cpumask_and(lowest_mask, lowest_mask, cpu_active_mask);
-
-	/*
 	 * At this point we have built a mask of cpus representing the
 	 * lowest priority tasks in the system.  Now we want to elect
 	 * the best one based on our affinity and topology.
@@ -1260,11 +1266,6 @@ static struct rq *find_lock_lowest_rq(struct task_struct *task, struct rq *rq)
 	}
 
 	return lowest_rq;
-}
-
-static inline int has_pushable_tasks(struct rq *rq)
-{
-	return !plist_head_empty(&rq->rt.pushable_tasks);
 }
 
 static struct task_struct *pick_next_pushable_task(struct rq *rq)
@@ -1466,23 +1467,9 @@ static void pre_schedule_rt(struct rq *rq, struct task_struct *prev)
 		pull_rt_task(rq);
 }
 
-/*
- * assumes rq->lock is held
- */
-static int needs_post_schedule_rt(struct rq *rq)
-{
-	return has_pushable_tasks(rq);
-}
-
 static void post_schedule_rt(struct rq *rq)
 {
-	/*
-	 * This is only called if needs_post_schedule_rt() indicates that
-	 * we need to push tasks away
-	 */
-	spin_lock_irq(&rq->lock);
 	push_rt_tasks(rq);
-	spin_unlock_irq(&rq->lock);
 }
 
 /*
@@ -1758,7 +1745,6 @@ static const struct sched_class rt_sched_class = {
 	.rq_online              = rq_online_rt,
 	.rq_offline             = rq_offline_rt,
 	.pre_schedule		= pre_schedule_rt,
-	.needs_post_schedule	= needs_post_schedule_rt,
 	.post_schedule		= post_schedule_rt,
 	.task_wake_up		= task_wake_up_rt,
 	.switched_from		= switched_from_rt,
