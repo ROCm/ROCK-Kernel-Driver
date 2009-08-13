@@ -1919,6 +1919,8 @@ static struct snd_pci_quirk stac92hd71bxx_cfg_tbl[] = {
 		      "HP mini 1000", STAC_HP_M4),
 	SND_PCI_QUIRK(PCI_VENDOR_ID_HP, 0x361b,
 		      "HP HDX", STAC_HP_HDX),  /* HDX16 */
+	SND_PCI_QUIRK_MASK(PCI_VENDOR_ID_HP, 0xfff0, 0x7010,
+		      "HP", STAC_HP_DV5),
 	SND_PCI_QUIRK(PCI_VENDOR_ID_DELL, 0x0233,
 				"unknown Dell", STAC_DELL_M4_1),
 	SND_PCI_QUIRK(PCI_VENDOR_ID_DELL, 0x0234,
@@ -4379,7 +4381,8 @@ static int stac92xx_init(struct hda_codec *codec)
 			hda_nid_t nid = cfg->hp_pins[i];
 			enable_pin_detect(codec, nid, STAC_HP_EVENT);
 		}
-		if (cfg->line_out_type == AUTO_PIN_LINE_OUT) {
+		if (cfg->line_out_type == AUTO_PIN_LINE_OUT &&
+		    cfg->speaker_outs > 0) {
 			/* enable pin-detect for line-outs as well */
 			for (i = 0; i < cfg->line_outs; i++) {
 				hda_nid_t nid = cfg->line_out_pins[i];
