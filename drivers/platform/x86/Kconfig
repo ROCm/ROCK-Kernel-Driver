@@ -425,4 +425,16 @@ config ACPI_TOSHIBA
 
 	  If you have a legacy free Toshiba laptop (such as the Libretto L1
 	  series), say Y.
+
+config SAMSUNG_BACKLIGHT
+	tristate "Samsung Backlight driver"
+	depends on BACKLIGHT_CLASS_DEVICE
+	depends on DMI
+	---help---
+	  This driver adds support to control the backlight on a number of
+	  Samsung laptops, like the N130.
+
+	  It will only be loaded on laptops that properly need it, so it is
+	  safe to say Y here.
+
 endif # X86_PLATFORM_DEVICES
