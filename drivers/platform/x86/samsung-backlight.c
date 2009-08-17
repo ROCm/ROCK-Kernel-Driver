@@ -7,6 +7,7 @@
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 as published by
  * the Free Software Foundation.
+ *
  */
 
 #include <linux/kernel.h>
@@ -17,8 +18,20 @@
 #include <linux/fb.h>
 #include <linux/dmi.h>
 
-#define MAX_BRIGHT	0xff
+#define MAX_BRIGHT	0x07
 #define OFFSET		0xf4
+
+/*
+ * HAL/gnome-display-manager really wants us to only set 8 different levels for
+ * the brightness control.  And since 256 different levels seems a bit
+ * overkill, that's fine.  So let's map the 256 values to 8 different ones:
+ *
+ * userspace	0    1    2    3    4    5    6    7
+ * hardware	0   36   72  108  144  180  216  252
+ *
+ * or hardware = (userspace * 36) - 1 iff userspace != 0
+ */
+
 
 static int offset = OFFSET;
 module_param(offset, int, S_IRUGO | S_IWUSR);
@@ -29,15 +42,23 @@ static struct backlight_device *backlight_device;
 
 static u8 read_brightness(void)
 {
-	u8 brightness;
+	u8 kernel_brightness;
+	u8 user_brightness = 0;
 
-	pci_read_config_byte(pci_device, offset, &brightness);
-	return brightness;
+	pci_read_config_byte(pci_device, offset, &kernel_brightness);
+	if (kernel_brightness != 0)
+		user_brightness = kernel_brightness / 36;
+
+	return user_brightness;
 }
 
-static void set_brightness(u8 brightness)
+static void set_brightness(u8 user_brightness)
 {
-	pci_write_config_byte(pci_device, offset, brightness);
+	u16 kernel_brightness = 0;
+
+	if (user_brightness != 0)
+		kernel_brightness = (user_brightness * 36) - 1;
+	pci_write_config_byte(pci_device, offset, (u8)kernel_brightness);
 }
 
 static int get_brightness(struct backlight_device *bd)
