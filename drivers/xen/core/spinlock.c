@@ -66,7 +66,7 @@ int xen_spin_wait(raw_spinlock_t *lock, unsigned int token)
 	struct spinning spinning;
 
 	/* If kicker interrupt not initialized yet, just spin. */
-	if (unlikely(irq < 0))
+	if (unlikely(irq < 0) || unlikely(!cpu_online(raw_smp_processor_id())))
 		return 0;
 
 	token >>= TICKET_SHIFT;
@@ -113,20 +113,17 @@ int xen_spin_wait(raw_spinlock_t *lock, unsigned int token)
 
 	return rc;
 }
-EXPORT_SYMBOL(xen_spin_wait);
 
 unsigned int xen_spin_adjust(raw_spinlock_t *lock, unsigned int token)
 {
 	return token;//todo
 }
-EXPORT_SYMBOL(xen_spin_adjust);
 
 int xen_spin_wait_flags(raw_spinlock_t *lock, unsigned int *token,
 			  unsigned int flags)
 {
 	return xen_spin_wait(lock, *token);//todo
 }
-EXPORT_SYMBOL(xen_spin_wait_flags);
 
 void xen_spin_kick(raw_spinlock_t *lock, unsigned int token)
 {

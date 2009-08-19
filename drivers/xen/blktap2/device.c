@@ -232,6 +232,8 @@ blktap_device_fast_flush(struct blktap *tap, struct blktap_request *request)
 	struct grant_handle_pair *khandle;
 	unsigned long kvaddr, uvaddr, offset;
 	struct gnttab_unmap_grant_ref unmap[BLKIF_MAX_SEGMENTS_PER_REQUEST * 2];
+	grant_handle_t self_gref[BLKIF_MAX_SEGMENTS_PER_REQUEST];
+	int self_gref_nr = 0;
 
 	cnt     = 0;
 	ring    = &tap->ring;
@@ -290,6 +292,10 @@ blktap_device_fast_flush(struct blktap *tap, struct blktap_request *request)
 			if (PageBlkback(page)) {
 				ClearPageBlkback(page);
 				set_page_private(page, 0);
+			} else if (
+				xen_feature(XENFEAT_auto_translated_physmap)) {
+				self_gref[self_gref_nr] = khandle->kernel;
+				self_gref_nr++;
 			}
 		}
 		map[offset] = NULL;
@@ -308,6 +314,11 @@ blktap_device_fast_flush(struct blktap *tap, struct blktap_request *request)
 		zap_page_range(ring->vma, 
 			       MMAP_VADDR(ring->user_vstart, usr_idx, 0), 
 			       request->nr_pages << PAGE_SHIFT, NULL);
+	else {
+		for (i = 0; i < self_gref_nr; i++) {
+			gnttab_end_foreign_access_ref(self_gref[i]);
+		}
+	}
 }
 
 /*
@@ -330,7 +341,8 @@ blktap_unmap(struct blktap *tap, struct blktap_request *request)
 		      MMAP_VADDR(tap->ring.user_vstart, usr_idx, i),
 		      request->handles[i].user);
 
-		if (request->handles[i].kernel == INVALID_GRANT_HANDLE) {
+		if (!xen_feature(XENFEAT_auto_translated_physmap) &&
+		    request->handles[i].kernel == INVALID_GRANT_HANDLE) {
 			kvaddr = request_to_kaddr(request, i);
 			if (blktap_umap_uaddr(NULL, kvaddr) == 0)
 				flush_tlb_kernel_page(kvaddr);
@@ -548,7 +560,7 @@ blktap_map_foreign(struct blktap *tap,
 	return err;
 }
 
-static void
+static int
 blktap_map(struct blktap *tap,
 	   struct blktap_request *request,
 	   unsigned int seg, struct page *page)
@@ -557,25 +569,68 @@ blktap_map(struct blktap *tap,
 	int usr_idx;
 	struct blktap_ring *ring;
 	unsigned long uvaddr, kvaddr;
+	int err = 0;
 
 	ring    = &tap->ring;
 	usr_idx = request->usr_idx;
 	uvaddr  = MMAP_VADDR(ring->user_vstart, usr_idx, seg);
 	kvaddr  = request_to_kaddr(request, seg);
 
-	pte = mk_pte(page, ring->vma->vm_page_prot);
-	blktap_map_uaddr(ring->vma, uvaddr, pte_mkwrite(pte));
-	flush_tlb_page(ring->vma, uvaddr);
-	blktap_map_uaddr(NULL, kvaddr, mk_pte(page, PAGE_KERNEL));
-	flush_tlb_kernel_page(kvaddr);
+	if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+		pte = mk_pte(page, ring->vma->vm_page_prot);
+		blktap_map_uaddr(ring->vma, uvaddr, pte_mkwrite(pte));
+		flush_tlb_page(ring->vma, uvaddr);
+		blktap_map_uaddr(NULL, kvaddr, mk_pte(page, PAGE_KERNEL));
+		flush_tlb_kernel_page(kvaddr);
 
-	set_phys_to_machine(__pa(kvaddr) >> PAGE_SHIFT, pte_mfn(pte));
-	request->handles[seg].kernel = INVALID_GRANT_HANDLE;
-	request->handles[seg].user   = INVALID_GRANT_HANDLE;
+		set_phys_to_machine(__pa(kvaddr) >> PAGE_SHIFT, pte_mfn(pte));
+		request->handles[seg].kernel = INVALID_GRANT_HANDLE;
+	} else {
+		/* grant this page access to self domain and map it. */
+		domid_t domid = 0; /* XXX my domian id: grant table hypercall
+				      doesn't understand DOMID_SELF */
+		int gref;
+		uint32_t flags;
+		struct gnttab_map_grant_ref map;
+		struct page *tap_page;
+
+		gref = gnttab_grant_foreign_access(
+			domid, page_to_pfn(page),
+			(request->operation == BLKIF_OP_WRITE)?
+			GTF_readonly: 0);
+
+		flags  = GNTMAP_host_map |
+			(request->operation == BLKIF_OP_WRITE ?
+			 GNTMAP_readonly : 0);
+
+		gnttab_set_map_op(&map, kvaddr, flags, gref, domid);
+
+		/* enable chained tap devices */
+		tap_page = pfn_to_page(__pa(kvaddr) >> PAGE_SHIFT);
+		set_page_private(tap_page, page_private(page));
+		SetPageBlkback(tap_page);
+
+		err = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref,
+						&map, 1);
+		BUG_ON(err);
+
+		err = vm_insert_page(ring->vma, uvaddr, tap_page);
+		if (err) {
+			struct gnttab_unmap_grant_ref unmap;
+			gnttab_set_unmap_op(&unmap, kvaddr,
+					    GNTMAP_host_map, gref);
+			VOID(HYPERVISOR_grant_table_op(
+				GNTTABOP_unmap_grant_ref, &unmap, 1));
+		} else
+			request->handles[seg].kernel = gref;
+	}
+	request->handles[seg].user = INVALID_GRANT_HANDLE;
 
 	BTDBG("pending_req: %p, seg: %d, page: %p, kvaddr: 0x%08lx, "
 	      "uvaddr: 0x%08lx\n", request, seg, page, kvaddr,
 	      uvaddr);
+
+	return err;
 }
 
 static int
@@ -637,10 +692,11 @@ blktap_device_process_request(struct blktap *tap,
 					goto out;
 			} else {
 				/* do it the old fashioned way */
-				blktap_map(tap,
-					   request,
-					   i,
-					   sg_page(sg));
+				if (blktap_map(tap,
+					       request,
+					       i,
+					       sg_page(sg)))
+					goto out;
 			}
 
 			uvaddr = MMAP_VADDR(ring->user_vstart, usr_idx, i);

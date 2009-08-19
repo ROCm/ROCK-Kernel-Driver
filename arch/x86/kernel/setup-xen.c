@@ -407,14 +407,10 @@ static void __init relocate_initrd(void)
 		ramdisk_image, ramdisk_image + ramdisk_size - 1,
 		ramdisk_here, ramdisk_here + ramdisk_size - 1);
 #else
-	unsigned long ramdisk_image = __pa(xen_start_info->mod_start);
-	unsigned long ramdisk_size  = xen_start_info->mod_len;
-	unsigned long ramdisk_end   = ramdisk_image + ramdisk_size;
-	unsigned long end_of_lowmem = max_low_pfn_mapped << PAGE_SHIFT;
-
 	printk(KERN_ERR "initrd extends beyond end of memory "
 	       "(0x%08lx > 0x%08lx)\ndisabling initrd\n",
-	       ramdisk_end, end_of_lowmem);
+	       __pa(xen_start_info->mod_start) + xen_start_info->mod_len,
+	       max_low_pfn_mapped << PAGE_SHIFT);
 	initrd_start = 0;
 #endif
 }

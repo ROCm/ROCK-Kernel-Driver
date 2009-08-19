@@ -1239,6 +1239,7 @@ static void mce_cpu_quirks(struct cpuinfo_x86 *c)
 {
 	/* This should be disabled by the BIOS, but isn't always */
 	if (c->x86_vendor == X86_VENDOR_AMD) {
+#ifndef CONFIG_XEN
 		if (c->x86 == 15 && banks > 4) {
 			/*
 			 * disable GART TBL walk error reporting, which
@@ -1247,6 +1248,7 @@ static void mce_cpu_quirks(struct cpuinfo_x86 *c)
 			 */
 			clear_bit(10, (unsigned long *)&bank[4]);
 		}
+#endif
 		if (c->x86 <= 17 && mce_bootlog < 0) {
 			/*
 			 * Lots of broken BIOS around that don't clear them
@@ -1970,7 +1972,6 @@ nomem:
 	return -ENOMEM;
 }
 
-extern void bind_virq_for_mce(void);
 static __init int mce_init_device(void)
 {
 	int err;
@@ -1999,9 +2000,13 @@ static __init int mce_init_device(void)
 	misc_register(&mce_log_device);
 
 #ifdef CONFIG_X86_XEN_MCE
-	/* Register vIRQ handler for MCE LOG processing */
-	printk(KERN_DEBUG "MCE: bind virq for DOM0 Logging\n");
-	bind_virq_for_mce();
+	if (is_initial_xendomain()) {
+		/* Register vIRQ handler for MCE LOG processing */
+		extern int bind_virq_for_mce(void);
+
+		printk(KERN_DEBUG "MCE: bind virq for DOM0 logging\n");
+		bind_virq_for_mce();
+	}
 #endif
 
 	return err;
