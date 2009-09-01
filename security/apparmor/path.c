@@ -20,7 +20,7 @@
 #include <linux/slab.h>
 #include <linux/fs_struct.h>
 
-#include "include/apparmor.h"
+#include "include/security/apparmor.h"
 #include "include/path.h"
 
 int aa_get_name_to_buffer(struct path *path, int is_dir, char *buffer, int size,

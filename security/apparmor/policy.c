@@ -47,7 +47,7 @@
 #include <linux/spinlock.h>
 #include <linux/string.h>
 
-#include "include/apparmor.h"
+#include "include/security/apparmor.h"
 #include "include/capability.h"
 #include "include/file.h"
 #include "include/ipc.h"
@@ -105,7 +105,7 @@ static void common_free(struct aa_policy_common *common)
 
 static struct aa_policy_common *__common_find(struct list_head *head,
 					      const char *name)
-
+					      
 {
 	struct aa_policy_common *common;
 
@@ -228,7 +228,7 @@ void free_aa_namespace(struct aa_namespace *ns)
 
 struct aa_namespace *__aa_find_namespace(struct list_head *head,
 					 const char *name)
-
+					 
 {
 	return (struct aa_namespace *) __common_find(head, name);
 }
@@ -276,7 +276,7 @@ struct aa_namespace *aa_find_namespace_by_strn(const char *name, int len)
 struct aa_namespace *aa_prepare_namespace(const char *name)
 {
 	struct aa_namespace *ns;
-
+ 
 	write_lock(&ns_list_lock);
 	if (name)
 		ns = aa_get_namespace(__aa_find_namespace(&ns_list, name));
@@ -417,12 +417,12 @@ struct aa_profile *alloc_aa_profile(const char *fqname)
 	profile = kzalloc(sizeof(*profile), GFP_KERNEL);
 	if (!profile)
 		return NULL;
-
+ 
 	if (!common_init(&profile->base, fqname)) {
 		kfree(profile);
 		return NULL;
 	}
-
+	
 	profile->fqname = profile->base.name;
 	profile->base.name = (char *) fqname_subname((const char *) profile->fqname);
 	return profile;
@@ -593,7 +593,7 @@ struct aa_policy_common *__aa_find_parent_by_fqname(struct aa_namespace *ns,
 
 	common = &ns->base;
 
-
+	
 	for (split = strstr(fqname, "//"); split; ) {
 		profile = __aa_find_profile_by_strn(&common->profiles, fqname,
 						    split - fqname);
@@ -670,8 +670,9 @@ static struct aa_profile *__aa_attach_match(const char *name,
 		if (profile->xmatch && profile->xmatch_len > len) {
 			unsigned int state = aa_dfa_match(profile->xmatch,
 							  DFA_START, name);
-			/* any accepting state means a valid match */
-			if (state > DFA_START) {
+			u16 perm = dfa_user_allow(profile->xmatch, state);
+			/* any accepting state means a valid match. */
+			if (perm & MAY_EXEC) {
 				candidate = profile;
 				len = profile->xmatch_len;
 			}
@@ -685,16 +686,17 @@ static struct aa_profile *__aa_attach_match(const char *name,
 
 /**
  * aa_sys_find_attach - do attachment search for sys unconfined processes
- * @ns: the namespace to search
+ * @base: the base to search
  * name: the executable name to match against
  */
-struct aa_profile *aa_sys_find_attach(struct aa_namespace *ns, const char *name)
+struct aa_profile *aa_sys_find_attach(struct aa_policy_common *base,
+				      const char *name)
 {
 	struct aa_profile *profile;
 
-	read_lock(&ns->base.lock);
-	profile = aa_get_profile(__aa_attach_match(name, &ns->base.profiles));
-	read_unlock(&ns->base.lock);
+	read_lock(&base->lock);
+	profile = aa_get_profile(__aa_attach_match(name, &base->profiles));
+	read_unlock(&base->lock);
 
 	return profile;
 }
@@ -719,7 +721,7 @@ struct aa_profile *aa_profile_newest(struct aa_profile *profile)
 				profile = NULL;
 				break;
 			}
-		}
+		} 
 	}
 
 	return profile;

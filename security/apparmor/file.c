@@ -12,7 +12,7 @@
  * License.
  */
 
-#include "include/apparmor.h"
+#include "include/security/apparmor.h"
 #include "include/audit.h"
 #include "include/file.h"
 #include "include/match.h"
@@ -31,11 +31,9 @@ static void aa_audit_file_sub_mask(struct audit_buffer *ab, char *buffer,
 
 	if (mask & AA_EXEC_MMAP)
 		*m++ = 'm';
-	if (mask & AA_MAY_CREATE)
-		*m++ = 'c';
 	if (mask & MAY_READ)
 		*m++ = 'r';
-	if (mask & MAY_WRITE)
+	if (mask & (MAY_WRITE | AA_MAY_CREATE))
 		*m++ = 'w';
 	else if (mask & MAY_APPEND)
 		*m++ = 'a';
@@ -139,6 +137,7 @@ int aa_audit_file(struct aa_profile *profile, struct aa_audit_file *sa)
 
 		if (likely(!sa->request))
 			return 0;
+		type = AUDIT_APPARMOR_AUDIT;
 	} else {
 		/* quiet auditing of specific known rejects */
 		u16 mask = sa->perms.quiet;
@@ -193,7 +192,7 @@ struct file_perms aa_compute_perms(struct aa_dfa *dfa, unsigned int state,
 		perms.allowed |= AA_LINK_SUBSET;
 
 	/* change_profile wasn't determined by ownership in old mapping */
-	if (ACCEPT_TABLE2(dfa)[state] & 0x80000000)
+	if (ACCEPT_TABLE(dfa)[state] & 0x80000000)
 		perms.allowed |= AA_MAY_CHANGE_PROFILE;
 
 	return perms;

@@ -16,12 +16,12 @@
 #include <linux/fdtable.h>
 #include <linux/file.h>
 #include <linux/mount.h>
-#include <linux/personality.h>
 #include <linux/syscalls.h>
 #include <linux/tracehook.h>
+#include <linux/personality.h>
 
 #include "include/audit.h"
-#include "include/apparmorfs.h"
+#include "include/security/apparmorfs.h"
 #include "include/context.h"
 #include "include/domain.h"
 #include "include/file.h"
@@ -90,8 +90,11 @@ static struct file_perms change_profile_perms(struct aa_profile *profile,
 		perms.allowed = AA_MAY_CHANGE_PROFILE;
 		perms.xindex = perms.dindex = 0;
 		perms.audit = perms.quiet = perms.kill = 0;
-		*rstate = 0;
+		if (rstate)
+			*rstate = 0;
 		return perms;
+	} else if (!profile->file.dfa) {
+		return nullperms;
 	} else if ((ns == profile->ns)) {
 		/* try matching against rules with out namespace prependend */
 		perms = aa_str_perms(profile->file.dfa, DFA_START, name, &cond,
@@ -101,9 +104,6 @@ static struct file_perms change_profile_perms(struct aa_profile *profile,
 	}
 
 	/* try matching with namespace name and then profile */
-	if (!profile->file.dfa)
-		return nullperms;
-
 	state = aa_dfa_match(profile->file.dfa, DFA_START, ns->base.name);
 	state = aa_dfa_null_transition(profile->file.dfa, state);
 	return aa_str_perms(profile->file.dfa, state, name, &cond, rstate);
@@ -157,7 +157,12 @@ static struct aa_profile *x_to_profile(struct aa_namespace *ns,
 		/* fail exec unless ix || ux fallback - handled by caller */
 		return ERR_PTR(-EACCES);
 	case AA_X_NAME:
-		break;
+		if (xindex & AA_X_CHILD)
+			new_profile = aa_sys_find_attach(&profile->base, name);
+		else
+			new_profile = aa_sys_find_attach(&ns->base, name);
+
+		goto out;
 	case AA_X_TABLE:
 		if (index > profile->file.trans.size) {
 			AA_ERROR("Invalid named transition\n");
@@ -203,6 +208,7 @@ static struct aa_profile *x_to_profile(struct aa_namespace *ns,
 		aa_put_namespace(new_ns);
 	}
 
+out:
 	if (!new_profile)
 		return ERR_PTR(-ENOENT);
 
@@ -218,7 +224,7 @@ int apparmor_bprm_set_creds(struct linux_binprm *bprm)
 	unsigned int state = DFA_START;
 	struct aa_audit_file sa;
 	struct path_cond cond = { bprm->file->f_path.dentry->d_inode->i_uid,
-				  bprm->file->f_path.dentry->d_inode->i_mode };
+				  bprm->file->f_path.dentry->d_inode->i_mode }; 
 
 	sa.base.error = cap_bprm_set_creds(bprm);
 	if (sa.base.error)
@@ -251,7 +257,7 @@ int apparmor_bprm_set_creds(struct linux_binprm *bprm)
 
 	if (!profile) {
 		/* unconfined task - attach profile if one matches */
-		new_profile = aa_sys_find_attach(ns, sa.name);
+		new_profile = aa_sys_find_attach(&ns->base, sa.name);
 		if (!new_profile)
 			goto cleanup;
 		goto apply;
@@ -335,6 +341,11 @@ int apparmor_bprm_set_creds(struct linux_binprm *bprm)
 		bprm->unsafe |= AA_SECURE_X_NEEDED;
 
 apply:
+	sa.name2 = new_profile->fqname;
+	/* When switching namespace ensure its part of audit message */
+	if (new_profile->ns != ns)
+		sa.name3 = new_profile->ns->base.name;
+
 	/* when transitioning profiles clear unsafe personality bits */
 	bprm->per_clear |= PER_CLEAR_ON_SETID;
 
@@ -363,7 +374,7 @@ int apparmor_bprm_secureexec(struct linux_binprm *bprm)
 
 	/* the decision to use secure exec is computed in set_creds
 	 * and stored in bprm->unsafe.  The AppArmor X_UNSAFE flag is
-	 * indicates don't
+	 * indicates don't 
 	 */
 	if (!ret && (bprm->unsafe & AA_SECURE_X_NEEDED))
 		ret = 1;
@@ -419,7 +430,7 @@ static void revalidate_file(struct aa_profile *profile, struct file *file,
 	}
 }
 
-/*
+/* 
  * derived from security/selinux/hooks.c: flush_unauthorized_files &&
  * fs/exec.c:flush_old_files
  */
@@ -459,7 +470,7 @@ static int revalidate_files(struct aa_profile *profile,
 		}
 		spin_lock(&files->file_lock);
 	}
-	spin_unlock(&files->file_lock);
+	spin_unlock(&files->file_lock);	
 	kfree(buffer);
 	return 0;
 }
@@ -614,12 +625,12 @@ int aa_change_profile(const char *ns_name, const char *fqname, int onexec,
 	struct aa_profile *profile, *target = NULL;
 	struct aa_namespace *ns = NULL;
 	struct aa_audit_file sa;
-	char *name = NULL;
 
-	if (!name && !ns_name)
+	if (!fqname && !ns_name)
 		return -EINVAL;
 
 	memset(&sa, 0, sizeof(sa));
+	sa.request = AA_MAY_CHANGE_PROFILE;
 	sa.base.gfp_mask = GFP_KERNEL;
 	if (onexec)
 		sa.base.operation = "change_onexec";
@@ -628,11 +639,9 @@ int aa_change_profile(const char *ns_name, const char *fqname, int onexec,
 
 	cred = aa_current_policy(&profile);
 	cxt = cred->security;
-	ns = aa_get_namespace(cxt->sys.profile->ns);
 
 	if (ns_name) {
 		sa.name2 = ns_name;
-		aa_put_namespace(ns);
 		ns = aa_find_namespace(ns_name);
 		if (!ns) {
 			/* we don't create new namespace in complain mode */
@@ -640,8 +649,10 @@ int aa_change_profile(const char *ns_name, const char *fqname, int onexec,
 			sa.base.error = -ENOENT;
 			goto audit;
 		}
-	} else
+	} else {
+		ns = aa_get_namespace(cxt->sys.profile->ns);
 		sa.name2 = ns->base.name;
+	}
 
 	/* if the name was not specified, use the name of the current profile */
 	if (!fqname) {
@@ -653,7 +664,6 @@ int aa_change_profile(const char *ns_name, const char *fqname, int onexec,
 	sa.name = fqname;
 
 	sa.perms = change_profile_perms(profile, ns, fqname, NULL);
-
 	if (!(sa.perms.allowed & AA_MAY_CHANGE_PROFILE)) {
 		sa.base.error = -EACCES;
 		goto audit;
@@ -667,7 +677,7 @@ int aa_change_profile(const char *ns_name, const char *fqname, int onexec,
 			goto audit;
 		target = aa_alloc_null_profile(profile, 0);
 	}
-
+	
 	/* check if tracing task is allowed to trace target domain */
 	sa.base.error = aa_may_change_ptraced_domain(current, target);
 	if (sa.base.error) {

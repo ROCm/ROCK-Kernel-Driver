@@ -19,7 +19,7 @@
 /* TODO: remove !!!! */
 // #include <linux/fs.h>
 
-#include "include/apparmor.h"
+#include "include/security/apparmor.h"
 #include "include/match.h"
 #include "include/file.h"
 

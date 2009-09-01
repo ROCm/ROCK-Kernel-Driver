@@ -16,7 +16,7 @@
 #include <linux/errno.h>
 #include <linux/gfp.h>
 
-#include "include/apparmor.h"
+#include "include/security/apparmor.h"
 #include "include/capability.h"
 #include "include/context.h"
 #include "include/policy.h"
@@ -58,6 +58,7 @@ static int aa_audit_caps(struct aa_profile *profile, struct aa_audit_caps *sa)
 		if (likely((PROFILE_AUDIT_MODE(profile) != AUDIT_ALL) &&
 			   !cap_raised(profile->caps.audit, sa->cap)))
 			return 0;
+		type = AUDIT_APPARMOR_AUDIT;
 	} else if (PROFILE_KILL(profile) ||
 		   cap_raised(profile->caps.kill, sa->cap)) {
 		type = AUDIT_APPARMOR_KILL;

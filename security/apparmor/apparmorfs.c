@@ -19,7 +19,7 @@
 #include <linux/uaccess.h>
 #include <linux/namei.h>
 
-#include "include/apparmor.h"
+#include "include/security/apparmor.h"
 #include "include/audit.h"
 #include "include/context.h"
 #include "include/policy.h"
@@ -74,34 +74,30 @@ out:
 
 static struct aa_profile *next_profile(struct aa_profile *profile)
 {
-	struct aa_profile *next = profile;
-	struct aa_namespace *ns;
+	struct aa_profile *parent;
+	struct aa_namespace *ns = profile->ns;
 
-	if (!list_empty(&profile->base.profiles)) {
-		list_for_each_entry(next, &profile->base.profiles, base.list)
-			return next;
-	}
+	if (!list_empty(&profile->base.profiles))
+		return list_first_entry(&profile->base.profiles,
+					struct aa_profile, base.list);
 
-	while (profile->parent) {
-		next = profile->parent;
-		list_for_each_entry_continue(next,
-					     &profile->parent->base.profiles,
+	parent = profile->parent;
+	while (parent) {
+		list_for_each_entry_continue(profile, &parent->base.profiles,
 					     base.list)
-			return next;
-		profile = profile->parent;
+			return profile;
+		profile = parent;
+		parent = parent->parent;
 	}
 
-	next = profile;
-	list_for_each_entry_continue(next, &profile->ns->base.profiles,
-				     base.list)
-		return next;
+	list_for_each_entry_continue(profile, &ns->base.profiles, base.list)
+		return profile;
 
-	ns = profile->ns;
 	read_unlock(&ns->base.lock);
 	list_for_each_entry_continue(ns, &ns_list, base.list) {
 		read_lock(&ns->base.lock);
-		list_for_each_entry(profile, &ns->base.profiles, base.list)
-			return profile;
+		return list_first_entry(&ns->base.profiles, struct aa_profile,
+					base.list);
 		read_unlock(&ns->base.lock);
 	}
 	return NULL;

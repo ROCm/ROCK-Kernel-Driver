@@ -22,7 +22,7 @@
 #include <linux/slab.h>
 #include <linux/socket.h>
 
-#include "apparmor.h"
+#include "security/apparmor.h"
 #include "audit.h"
 #include "capability.h"
 #include "domain.h"
@@ -189,7 +189,7 @@ extern rwlock_t ns_list_lock;
 
 extern struct aa_namespace *default_namespace;
 extern enum profile_mode g_profile_mode;
-
+ 
 
 void aa_add_profile(struct aa_policy_common *common,
 		    struct aa_profile *profile);
@@ -201,7 +201,7 @@ void free_aa_namespace_kref(struct kref *kref);
 void free_aa_namespace(struct aa_namespace *ns);
 struct aa_namespace *__aa_find_namespace(struct list_head *head,
 					 const char *name);
-
+					 
 struct aa_namespace *aa_find_namespace(const char *name);
 struct aa_namespace *aa_prepare_namespace(const char *name);
 void aa_remove_namespace(struct aa_namespace *ns);
@@ -249,7 +249,7 @@ struct aa_profile *aa_find_profile_by_fqname(struct aa_namespace *ns,
 					     const char *name);
 struct aa_profile *aa_match_profile(struct aa_namespace *ns, const char *name);
 struct aa_profile *aa_profile_newest(struct aa_profile *profile);
-struct aa_profile *aa_sys_find_attach(struct aa_namespace *ns,
+struct aa_profile *aa_sys_find_attach(struct aa_policy_common *base,
 				      const char *name);
 void __aa_add_profile(struct aa_policy_common *common,
 		      struct aa_profile *profile);

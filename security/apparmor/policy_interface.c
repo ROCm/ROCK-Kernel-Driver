@@ -20,7 +20,7 @@
 #include <asm/unaligned.h>
 #include <linux/errno.h>
 
-#include "include/apparmor.h"
+#include "include/security/apparmor.h"
 #include "include/audit.h"
 #include "include/context.h"
 #include "include/match.h"
@@ -97,8 +97,10 @@ static void audit_cb(struct audit_buffer *ab, void *va)
 		audit_log_format(ab, " name=%s", sa->name);
 	if (sa->name2)
 		audit_log_format(ab, " namespace=%s", sa->name2);
-	if (sa->base.error && sa->e)
-		audit_log_format(ab, " offset=%d", sa->e->pos - sa->e->start);
+	if (sa->base.error && sa->e) {
+		long len = sa->e->pos - sa->e->start;
+		audit_log_format(ab, " offset=%ld", len);
+	}
 }
 
 static int aa_audit_iface(struct aa_audit_iface *sa)
@@ -645,6 +647,7 @@ ssize_t aa_interface_add_profiles(void *data, size_t size)
 	if (__aa_find_profile(&common->profiles, profile->base.name)) {
 		/* A profile with this name exists already. */
 		sa.base.info = "profile already exists";
+		sa.base.error = -EEXIST;
 		goto fail2;
 	}
 	profile->sid = aa_alloc_sid(AA_ALLOC_SYS_SID);
@@ -660,7 +663,6 @@ ssize_t aa_interface_add_profiles(void *data, size_t size)
 
 fail2:
 	write_unlock(&ns->base.lock);
-	sa.base.error = -EEXIST;
 
 fail:
 	error = aa_audit_iface(&sa);
@@ -711,7 +713,7 @@ ssize_t aa_interface_replace_profiles(void *udata, size_t size)
 		sa.base.info = "failed to prepare namespace";
 		sa.base.error = -ENOMEM;
 		goto fail;
-	}
+	}		
 
 	sa.name = new_profile->fqname;
 
@@ -846,5 +848,5 @@ fail_ns_lock:
 fail_ns_list_lock:
 	write_unlock(&ns_list_lock);
 	aa_audit_iface(&sa);
-	return 0; //-ENOENT;
+	return -ENOENT;
 }

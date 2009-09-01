@@ -15,7 +15,7 @@
 #include <linux/audit.h>
 #include <linux/socket.h>
 
-#include "include/apparmor.h"
+#include "include/security/apparmor.h"
 #include "include/audit.h"
 #include "include/policy.h"
 
@@ -114,9 +114,11 @@ int aa_audit(int type, struct aa_profile *profile, struct aa_audit *sa,
 	audit_cxt = g_apparmor_logsyscall ? current->audit_context : NULL;
 
 	if (type == AUDIT_APPARMOR_AUTO) {
-		if (likely(!sa->error))
+		if (likely(!sa->error)) {
+			if (PROFILE_AUDIT_MODE(profile) != AUDIT_ALL)
+				return 0;
 			type = AUDIT_APPARMOR_AUDIT;
-		else if (PROFILE_COMPLAIN(profile))
+		} else if (PROFILE_COMPLAIN(profile))
 			type = AUDIT_APPARMOR_ALLOWED;
 		else
 			type = AUDIT_APPARMOR_DENIED;

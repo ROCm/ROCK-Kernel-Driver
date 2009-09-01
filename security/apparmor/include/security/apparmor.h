@@ -18,7 +18,7 @@
 #include <linux/fs.h>
 
 /* Control parameters settable thru module/boot flags or
- * via /sys/kernel/security/apparmor/control */
+ * via /sys/kernel/securitysecurity/apparmor/control */
 extern enum audit_mode g_apparmor_audit;
 extern int g_apparmor_audit_header;
 extern int g_apparmor_debug;
