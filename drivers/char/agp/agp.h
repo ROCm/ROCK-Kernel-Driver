@@ -31,6 +31,10 @@
 
 #include <asm/agp.h>	/* for flush_agp_cache() */
 
+#ifndef page_to_gart
+#define page_to_gart(x) phys_to_gart(page_to_phys(x))
+#endif
+
 #define PFX "agpgart: "
 
 //#define AGP_DEBUG 1

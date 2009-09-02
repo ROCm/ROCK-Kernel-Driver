@@ -397,7 +397,7 @@ static unsigned long
 hp_zx1_mask_memory (struct agp_bridge_data *bridge,
 		    struct page *page, int type)
 {
-	unsigned long addr = phys_to_gart(page_to_phys(page));
+	unsigned long addr = page_to_gart(page);
 	return HP_ZX1_PDIR_VALID_BIT | addr;
 }
 

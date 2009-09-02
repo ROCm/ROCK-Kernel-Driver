@@ -1349,7 +1349,7 @@ EXPORT_SYMBOL(global_cache_flush);
 unsigned long agp_generic_mask_memory(struct agp_bridge_data *bridge,
 				      struct page *page, int type)
 {
-	unsigned long addr = phys_to_gart(page_to_phys(page));
+	unsigned long addr = page_to_gart(page);
 	/* memory type is ignored in the generic routine */
 	if (bridge->driver->masks)
 		return addr | bridge->driver->masks[0].mask;

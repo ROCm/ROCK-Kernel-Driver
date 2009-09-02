@@ -179,6 +179,23 @@ static int take_machine_down(void *_suspend)
 		 * merely checkpointed, and 0 if it is resuming in a new domain.
 		 */
 		suspend_cancelled = HYPERVISOR_suspend(virt_to_mfn(xen_start_info));
+		if (!suspend_cancelled) {
+			unsigned int cpu;
+
+			for_each_possible_cpu(cpu) {
+				if (suspend->fast_suspend
+				    && cpu != smp_processor_id()
+				    && HYPERVISOR_vcpu_op(VCPUOP_down, cpu, NULL))
+					BUG();
+
+				setup_vcpu_info(cpu);
+
+				if (suspend->fast_suspend
+				    && cpu != smp_processor_id()
+				    && HYPERVISOR_vcpu_op(VCPUOP_up, cpu, NULL))
+					BUG();
+			}
+		}
 	} else
 		BUG_ON(suspend_cancelled > 0);
 	suspend->resume_notifier(suspend_cancelled);

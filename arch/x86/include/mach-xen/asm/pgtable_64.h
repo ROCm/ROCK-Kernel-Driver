@@ -124,6 +124,8 @@ static inline void xen_set_pgd(pgd_t *pgdp, pgd_t pgd)
 
 #define __pte_mfn(_pte) (((_pte).pte & PTE_PFN_MASK) >> PAGE_SHIFT)
 
+extern unsigned long early_arbitrary_virt_to_mfn(void *va);
+
 /*
  * Conversion functions: convert a page and protection to a page entry,
  * and a page entry and page directory to the page they refer to.

@@ -114,9 +114,9 @@ static int agp_find_max(void)
 	long memory, index, result;
 
 #if PAGE_SHIFT < 20
-	memory = num_physpages >> (20 - PAGE_SHIFT);
+	memory = totalram_pages >> (20 - PAGE_SHIFT);
 #else
-	memory = num_physpages << (PAGE_SHIFT - 20);
+	memory = totalram_pages << (PAGE_SHIFT - 20);
 #endif
 	index = 1;
 
@@ -149,7 +149,7 @@ static int agp_backend_initialize(struct agp_bridge_data *bridge)
 			return -ENOMEM;
 		}
 
-		bridge->scratch_page_real = phys_to_gart(page_to_phys(page));
+		bridge->scratch_page_real = page_to_gart(page);
 		bridge->scratch_page =
 		    bridge->driver->mask_memory(bridge, page, 0);
 	}

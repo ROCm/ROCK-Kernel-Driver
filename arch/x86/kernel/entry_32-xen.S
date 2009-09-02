@@ -463,6 +463,9 @@ sysenter_exit:
 	movl PT_EIP(%esp), %edx
 	movl PT_OLDESP(%esp), %ecx
 	xorl %ebp,%ebp
+#ifdef CONFIG_XEN_VCPU_INFO_PLACEMENT
+	GET_VCPU_INFO
+#endif
 	TRACE_IRQS_ON
 1:	mov  PT_FS(%esp), %fs
 	PTGS_TO_GS
@@ -975,7 +978,9 @@ critical_region_fixup:
 
 .section .rodata,"a"
 critical_fixup_table:
-	.byte -1,-1,-1			# testb $0xff,(%esi) = __TEST_PENDING
+	.rept __SIZEOF_TEST_PENDING
+	.byte -1
+	.endr
 	.byte -1,-1			# jnz  14f
 	.byte 0				# pop  %ebx
 	.byte 1				# pop  %ecx
@@ -994,7 +999,9 @@ critical_fixup_table:
 	.byte 10,10,10			# add  $8,%esp
 #endif
 	.byte 12			# iret
-	.byte -1,-1,-1,-1		# movb $1,1(%esi) = __DISABLE_INTERRUPTS
+	.rept __SIZEOF_DISABLE_INTERRUPTS
+	.byte -1
+	.endr
 .previous
 
 # Hypervisor uses this for application faults while it executes.

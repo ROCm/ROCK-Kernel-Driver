@@ -41,6 +41,7 @@
 #include <xen/balloon.h>
 #include <xen/features.h>
 #include <xen/interface/memory.h>
+#include <xen/interface/vcpu.h>
 #include <linux/module.h>
 #include <linux/percpu.h>
 #include <linux/highmem.h>
@@ -50,7 +51,91 @@
 EXPORT_SYMBOL(hypercall_page);
 
 shared_info_t *__read_mostly HYPERVISOR_shared_info = (shared_info_t *)empty_zero_page;
+#ifndef CONFIG_XEN_VCPU_INFO_PLACEMENT
 EXPORT_SYMBOL(HYPERVISOR_shared_info);
+#else
+DEFINE_PER_CPU(struct vcpu_info, vcpu_info) __aligned(sizeof(struct vcpu_info));
+EXPORT_PER_CPU_SYMBOL(vcpu_info);
+
+void __ref setup_vcpu_info(unsigned int cpu)
+{
+	struct vcpu_info *v = &per_cpu(vcpu_info, cpu);
+	struct vcpu_register_vcpu_info info;
+#ifdef CONFIG_X86_64
+	static bool first = true;
+
+	if (first) {
+		first = false;
+		info.mfn = early_arbitrary_virt_to_mfn(v);
+	} else
+#endif
+		info.mfn = arbitrary_virt_to_mfn(v);
+	info.offset = offset_in_page(v);
+
+	if (HYPERVISOR_vcpu_op(VCPUOP_register_vcpu_info,
+			       cpu, &info))
+		BUG();
+}
+
+void __init adjust_boot_vcpu_info(void)
+{
+	unsigned long lpfn, rpfn, lmfn, rmfn;
+	pte_t *lpte, *rpte;
+	unsigned int level;
+	mmu_update_t mmu[2];
+
+	/*
+	 * setup_vcpu_info() cannot be used more than once for a given (v)CPU,
+	 * hence we must swap the underlying MFNs of the two pages holding old
+	 * and new vcpu_info of the boot CPU.
+	 *
+	 * Do *not* use __get_cpu_var() or percpu_{write,...}() here, as the per-
+	 * CPU segment didn't get reloaded yet. Using percpu_read(), as in
+	 * arch_use_lazy_mmu_mode(), though undesirable, is safe except for the
+	 * accesses to variables that were updated in setup_percpu_areas().
+	 */
+	lpte = lookup_address((unsigned long)&per_cpu_var(vcpu_info)
+			      + (__per_cpu_load - __per_cpu_start),
+			      &level);
+	rpte = lookup_address((unsigned long)&per_cpu(vcpu_info, 0), &level);
+	BUG_ON(!lpte || !(pte_flags(*lpte) & _PAGE_PRESENT));
+	BUG_ON(!rpte || !(pte_flags(*rpte) & _PAGE_PRESENT));
+	lmfn = __pte_mfn(*lpte);
+	rmfn = __pte_mfn(*rpte);
+
+	if (lmfn == rmfn)
+		return;
+
+	lpfn = mfn_to_local_pfn(lmfn);
+	rpfn = mfn_to_local_pfn(rmfn);
+
+	printk(KERN_INFO
+	       "Swapping MFNs for PFN %lx and %lx (MFN %lx and %lx)\n",
+	       lpfn, rpfn, lmfn, rmfn);
+
+	xen_l1_entry_update(lpte, pfn_pte_ma(rmfn, pte_pgprot(*lpte)));
+	xen_l1_entry_update(rpte, pfn_pte_ma(lmfn, pte_pgprot(*rpte)));
+#ifdef CONFIG_X86_64
+	if (HYPERVISOR_update_va_mapping((unsigned long)__va(lpfn<<PAGE_SHIFT),
+					 pfn_pte_ma(rmfn, PAGE_KERNEL_RO), 0))
+		BUG();
+#endif
+	if (HYPERVISOR_update_va_mapping((unsigned long)__va(rpfn<<PAGE_SHIFT),
+					 pfn_pte_ma(lmfn, PAGE_KERNEL),
+					 UVMF_TLB_FLUSH))
+		BUG();
+
+	set_phys_to_machine(lpfn, rmfn);
+	set_phys_to_machine(rpfn, lmfn);
+
+	mmu[0].ptr = ((uint64_t)lmfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
+	mmu[0].val = rpfn;
+	mmu[1].ptr = ((uint64_t)rmfn << PAGE_SHIFT) | MMU_MACHPHYS_UPDATE;
+	mmu[1].val = lpfn;
+	if (HYPERVISOR_mmu_update(mmu, 2, NULL, DOMID_SELF))
+		BUG();
+}
+#endif
 
 #define NR_MC     BITS_PER_LONG
 #define NR_MMU    BITS_PER_LONG

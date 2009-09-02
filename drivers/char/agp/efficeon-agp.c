@@ -67,7 +67,7 @@ static const struct gatt_mask efficeon_generic_masks[] =
 /* This function does the same thing as mask_memory() for this chipset... */
 static inline unsigned long efficeon_mask_memory(struct page *page)
 {
-	unsigned long addr = phys_to_gart(page_to_phys(page));
+	unsigned long addr = page_to_gart(page);
 	return addr | 0x00000001;
 }
 

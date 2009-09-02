@@ -1601,7 +1601,7 @@ static void __init setup_IO_APIC_irqs(void)
 		irq = pin_2_irq(idx, apic_id, pin);
 
 #if defined(CONFIG_XEN)
-		if (irq < PIRQ_BASE || irq >= PIRQ_BASE + NR_PIRQS)
+		if (irq < PIRQ_BASE || irq >= PIRQ_BASE + nr_pirqs)
 			continue;
 #else
 		/*
@@ -2790,7 +2790,7 @@ static inline void init_IO_APIC_traps(void)
 	 */
 	for_each_irq_desc(irq, desc) {
 #ifdef CONFIG_XEN
-		if (irq < PIRQ_BASE || irq >= PIRQ_BASE + NR_PIRQS)
+		if (irq < PIRQ_BASE || irq >= PIRQ_BASE + nr_pirqs)
 			continue;
 #endif
 		cfg = desc->chip_data;
@@ -3999,7 +3999,7 @@ static int __io_apic_set_pci_routing(struct device *dev, int irq,
 
 	ioapic = irq_attr->ioapic;
 #ifdef CONFIG_XEN
-	if (irq < PIRQ_BASE || irq >= PIRQ_BASE + NR_PIRQS) {
+	if (irq < PIRQ_BASE || irq >= PIRQ_BASE + nr_pirqs) {
 		apic_printk(APIC_QUIET,KERN_ERR "IOAPIC[%d]: Invalid reference to IRQ %d\n",
 			    ioapic, irq);
 		return -EINVAL;

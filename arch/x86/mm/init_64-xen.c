@@ -116,6 +116,26 @@ void __meminit early_make_page_readonly(void *va, unsigned int feature)
 		BUG();
 }
 
+unsigned long __init early_arbitrary_virt_to_mfn(void *v)
+{
+	unsigned long va = (unsigned long)v, addr, *page;
+
+	BUG_ON(va < __START_KERNEL_map);
+
+	page = (void *)(xen_read_cr3() + __START_KERNEL_map);
+
+	addr = page[pgd_index(va)];
+	addr_to_page(addr, page);
+
+	addr = page[pud_index(va)];
+	addr_to_page(addr, page);
+
+	addr = page[pmd_index(va)];
+	addr_to_page(addr, page);
+
+	return (page[pte_index(va)] & PHYSICAL_PAGE_MASK) >> PAGE_SHIFT;
+}
+
 #ifndef CONFIG_XEN
 static int __init parse_direct_gbpages_off(char *arg)
 {
@@ -1082,7 +1102,7 @@ int __init reserve_bootmem_generic(unsigned long phys, unsigned long len,
 		return ret;
 
 #else
-	reserve_bootmem(phys, len, BOOTMEM_DEFAULT);
+	reserve_bootmem(phys, len, flags);
 #endif
 
 #ifndef CONFIG_XEN

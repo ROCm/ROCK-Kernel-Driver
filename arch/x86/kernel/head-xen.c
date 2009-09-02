@@ -63,6 +63,17 @@ void __init reserve_ebda_region(void)
 #include <xen/interface/callback.h>
 #include <xen/interface/memory.h>
 
+extern void hypervisor_callback(void);
+extern void failsafe_callback(void);
+extern void nmi(void);
+
+#ifdef CONFIG_X86_64
+#include <asm/proto.h>
+#define CALLBACK_ADDR(fn) ((unsigned long)(fn))
+#else
+#define CALLBACK_ADDR(fn) { __KERNEL_CS, (unsigned long)(fn) }
+#endif
+
 unsigned long *machine_to_phys_mapping = (void *)MACH2PHYS_VIRT_START;
 EXPORT_SYMBOL(machine_to_phys_mapping);
 unsigned int machine_to_phys_order;
@@ -122,6 +133,7 @@ void __init xen_start_kernel(void)
 			   addr),
 		__pmd(__pa_symbol(swapper_pg_fixmap) | _PAGE_TABLE));
 #else
+	check_efer();
 	xen_init_pt();
 #endif
 
@@ -140,6 +152,8 @@ void __init xen_start_kernel(void)
 	HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
 	memset(empty_zero_page, 0, sizeof(empty_zero_page));
 
+	setup_vcpu_info(0);
+
 	/* Set up mapping of lowest 1MB of physical memory. */
 	for (i = 0; i < NR_FIX_ISAMAPS; i++)
 		if (is_initial_xendomain())
@@ -150,17 +164,6 @@ void __init xen_start_kernel(void)
 				     PAGE_KERNEL_RO);
 
 }
-
-extern void hypervisor_callback(void);
-extern void failsafe_callback(void);
-extern void nmi(void);
-
-#ifdef CONFIG_X86_64
-#include <asm/proto.h>
-#define CALLBACK_ADDR(fn) ((unsigned long)(fn))
-#else
-#define CALLBACK_ADDR(fn) { __KERNEL_CS, (unsigned long)(fn) }
-#endif
 
 void __init machine_specific_arch_setup(void)
 {

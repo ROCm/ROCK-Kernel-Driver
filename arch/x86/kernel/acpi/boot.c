@@ -155,14 +155,12 @@ static void __cpuinit acpi_register_lapic(int id, u8 enabled)
 {
 #ifndef CONFIG_XEN
 	unsigned int ver = 0;
-#endif
 
 	if (!enabled) {
 		++disabled_cpus;
 		return;
 	}
 
-#ifndef CONFIG_XEN
 	if (boot_cpu_physical_apicid != -1U)
 		ver = apic_version[boot_cpu_physical_apicid];
 

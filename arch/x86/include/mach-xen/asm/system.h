@@ -260,8 +260,8 @@ static inline void xen_write_cr0(unsigned long val)
 	asm volatile("mov %0,%%cr0": : "r" (val), "m" (__force_order));
 }
 
-#define xen_read_cr2() (current_vcpu_info()->arch.cr2)
-#define xen_write_cr2(val) ((void)(current_vcpu_info()->arch.cr2 = (val)))
+#define xen_read_cr2() vcpu_info_read(arch.cr2)
+#define xen_write_cr2(val) vcpu_info_write(arch.cr2, val)
 
 static inline unsigned long xen_read_cr3(void)
 {

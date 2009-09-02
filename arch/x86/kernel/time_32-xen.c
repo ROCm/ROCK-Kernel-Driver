@@ -510,6 +510,7 @@ irqreturn_t timer_interrupt(int irq, void *dev_id)
 		do_div(delta, NS_PER_TICK);
 		processed_system_time += delta * NS_PER_TICK;
 		while (delta > HZ) {
+			clobber_induction_variable(delta);
 			do_timer(HZ);
 			delta -= HZ;
 		}

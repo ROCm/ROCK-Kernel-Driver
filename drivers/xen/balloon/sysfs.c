@@ -31,6 +31,7 @@
 #include <linux/capability.h>
 #include <linux/errno.h>
 #include <linux/init.h>
+#include <linux/mm.h>
 #include <linux/stat.h>
 #include <linux/string.h>
 #include <linux/sysdev.h>

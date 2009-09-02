@@ -45,7 +45,6 @@ struct balloon_stats {
 	unsigned long balloon_high;
 };
 
-extern unsigned long num_physpages;
 extern struct balloon_stats balloon_stats;
 #define bs balloon_stats
 

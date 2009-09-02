@@ -199,7 +199,7 @@ static unsigned long
 parisc_agp_page_mask_memory(struct agp_bridge_data *bridge, struct page *page,
 			    int type)
 {
-	unsigned long addr = phys_to_gart(page_to_phys(page));
+	unsigned long addr = page_to_gart(page);
 	return SBA_PDIR_VALID_BIT | addr;
 }
 

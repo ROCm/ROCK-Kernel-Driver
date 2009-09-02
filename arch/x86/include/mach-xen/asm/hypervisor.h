@@ -50,11 +50,25 @@
 
 extern shared_info_t *HYPERVISOR_shared_info;
 
+#ifdef CONFIG_XEN_VCPU_INFO_PLACEMENT
+DECLARE_PER_CPU(struct vcpu_info, vcpu_info);
+#define vcpu_info(cpu) (&per_cpu(vcpu_info, cpu))
+#define current_vcpu_info() (&__get_cpu_var(vcpu_info))
+#define vcpu_info_read(fld) percpu_read(vcpu_info.fld)
+#define vcpu_info_write(fld, val) percpu_write(vcpu_info.fld, val)
+#define vcpu_info_xchg(fld, val) percpu_xchg(vcpu_info.fld, val)
+void setup_vcpu_info(unsigned int cpu);
+void adjust_boot_vcpu_info(void);
+#else
 #define vcpu_info(cpu) (HYPERVISOR_shared_info->vcpu_info + (cpu))
 #ifdef CONFIG_SMP
 #define current_vcpu_info() vcpu_info(smp_processor_id())
 #else
 #define current_vcpu_info() vcpu_info(0)
+#endif
+#define vcpu_info_read(fld) (current_vcpu_info()->fld)
+#define vcpu_info_write(fld, val) (current_vcpu_info()->fld = (val))
+static inline void setup_vcpu_info(unsigned int cpu) {}
 #endif
 
 #ifdef CONFIG_X86_32

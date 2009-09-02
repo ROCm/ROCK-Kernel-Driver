@@ -336,8 +336,16 @@ static const char *__cpuinit table_lookup_model(struct cpuinfo_x86 *c)
 __u32 cpu_caps_cleared[NCAPINTS] __cpuinitdata;
 __u32 cpu_caps_set[NCAPINTS] __cpuinitdata;
 
-void load_percpu_segment(int cpu)
+void __ref load_percpu_segment(int cpu)
 {
+#ifdef CONFIG_XEN_VCPU_INFO_PLACEMENT
+	static bool done;
+
+	if (!done) {
+		done = true;
+		adjust_boot_vcpu_info();
+	}
+#endif
 #ifdef CONFIG_X86_32
 	loadsegment(fs, __KERNEL_PERCPU);
 #else

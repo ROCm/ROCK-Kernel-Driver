@@ -362,8 +362,13 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 
 void __init smp_prepare_boot_cpu(void)
 {
+	unsigned int cpu;
+
 	switch_to_new_gdt(smp_processor_id());
 	prefill_possible_map();
+	for_each_possible_cpu(cpu)
+		if (cpu != smp_processor_id())
+			setup_vcpu_info(cpu);
 }
 
 #ifdef CONFIG_HOTPLUG_CPU

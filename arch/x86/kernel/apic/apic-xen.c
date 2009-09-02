@@ -12,8 +12,6 @@
 
 unsigned int num_processors;
 
-unsigned disabled_cpus __cpuinitdata;
-
 /*
  * Map cpu index to physical APIC ID
  */

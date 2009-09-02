@@ -430,7 +430,11 @@ static struct agp_memory *alloc_agpphysmem_i8xx(size_t pg_count, int type)
 	new->page_count = pg_count;
 	new->num_scratch_pages = pg_count;
 	new->type = AGP_PHYS_MEMORY;
+#ifndef CONFIG_XEN
 	new->physical = page_to_phys(new->pages[0]);
+#else
+	new->physical = page_to_pseudophys(new->pages[0]);
+#endif
 	return new;
 }
 
@@ -477,7 +481,7 @@ static void intel_i810_free_by_type(struct agp_memory *curr)
 static unsigned long intel_i810_mask_memory(struct agp_bridge_data *bridge,
 					    struct page *page, int type)
 {
-	unsigned long addr = phys_to_gart(page_to_phys(page));
+	unsigned long addr = page_to_gart(page);
 	/* Type checking must be done elsewhere */
 	return addr | bridge->driver->masks[type].mask;
 }
@@ -1219,7 +1223,7 @@ static int intel_i915_create_gatt_table(struct agp_bridge_data *bridge)
 static unsigned long intel_i965_mask_memory(struct agp_bridge_data *bridge,
 					    struct page *page, int type)
 {
-	dma_addr_t addr = phys_to_gart(page_to_phys(page));
+	dma_addr_t addr = page_to_gart(page);
 	/* Shift high bits down */
 	addr |= (addr >> 28) & 0xf0;
 

@@ -347,6 +347,18 @@ config XEN_COMPAT
 	default 0x030002 if XEN_COMPAT_030002_AND_LATER
 	default 0
 
+config XEN_VCPU_INFO_PLACEMENT
+	bool "Place shared vCPU info in per-CPU storage"
+#	depends on X86 && (XEN_COMPAT >= 0x00030101)
+	depends on X86
+	depends on !XEN_COMPAT_030002_AND_LATER
+	depends on !XEN_COMPAT_030004_AND_LATER
+	depends on !XEN_COMPAT_030100_AND_LATER
+	default SMP
+	---help---
+	  This allows faster access to the per-vCPU shared info
+	  structure.
+
 endmenu
 
 config HAVE_IRQ_IGNORE_UNHANDLED

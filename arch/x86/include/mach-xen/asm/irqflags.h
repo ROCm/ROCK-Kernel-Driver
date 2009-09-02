@@ -12,7 +12,7 @@
  * includes these barriers, for example.
  */
 
-#define xen_save_fl(void) (current_vcpu_info()->evtchn_upcall_mask)
+#define xen_save_fl(void) vcpu_info_read(evtchn_upcall_mask)
 
 #define xen_restore_fl(f)					\
 do {								\
@@ -28,7 +28,7 @@ do {								\
 
 #define xen_irq_disable()					\
 do {								\
-	current_vcpu_info()->evtchn_upcall_mask = 1;		\
+	vcpu_info_write(evtchn_upcall_mask, 1);			\
 	barrier();						\
 } while (0)
 
@@ -90,8 +90,6 @@ static inline void halt(void)
 #define evtchn_upcall_pending		/* 0 */
 #define evtchn_upcall_mask		1
 
-#define sizeof_vcpu_shift		6
-
 #ifdef CONFIG_X86_64
 # define __REG_si %rsi
 # define __CPU_num PER_CPU_VAR(cpu_number)
@@ -99,6 +97,22 @@ static inline void halt(void)
 # define __REG_si %esi
 # define __CPU_num TI_cpu(%ebp)
 #endif
+
+#ifdef CONFIG_XEN_VCPU_INFO_PLACEMENT
+
+#define GET_VCPU_INFO		PER_CPU(vcpu_info, __REG_si)
+#define __DISABLE_INTERRUPTS	movb $1,PER_CPU_VAR(vcpu_info+evtchn_upcall_mask)
+#define __ENABLE_INTERRUPTS	movb $0,PER_CPU_VAR(vcpu_info+evtchn_upcall_mask)
+#define __TEST_PENDING		cmpb $0,PER_CPU_VAR(vcpu_info+evtchn_upcall_pending+0)
+#define DISABLE_INTERRUPTS(clb)	__DISABLE_INTERRUPTS
+#define ENABLE_INTERRUPTS(clb)	__ENABLE_INTERRUPTS
+
+#define __SIZEOF_DISABLE_INTERRUPTS 8
+#define __SIZEOF_TEST_PENDING	8
+
+#else /* CONFIG_XEN_VCPU_INFO_PLACEMENT */
+
+#define sizeof_vcpu_shift	6
 
 #ifdef CONFIG_SMP
 #define GET_VCPU_INFO		movl __CPU_num,%esi			; \
@@ -116,15 +130,21 @@ static inline void halt(void)
 #define ENABLE_INTERRUPTS(clb)	GET_VCPU_INFO				; \
 				__ENABLE_INTERRUPTS
 
+#define __SIZEOF_DISABLE_INTERRUPTS 4
+#define __SIZEOF_TEST_PENDING	3
+
+#endif /* CONFIG_XEN_VCPU_INFO_PLACEMENT */
+
 #ifndef CONFIG_X86_64
 #define INTERRUPT_RETURN		iret
-#define ENABLE_INTERRUPTS_SYSEXIT	__ENABLE_INTERRUPTS		; \
+#define ENABLE_INTERRUPTS_SYSEXIT					  \
+	movb $0,evtchn_upcall_mask(%esi) /* __ENABLE_INTERRUPTS */	; \
 sysexit_scrit:	/**** START OF SYSEXIT CRITICAL REGION ****/		; \
-	__TEST_PENDING							; \
+	cmpb $0,evtchn_upcall_pending(%esi) /* __TEST_PENDING */	; \
 	jnz  14f	/* process more events if necessary... */	; \
 	movl PT_ESI(%esp), %esi						; \
 	sysexit								; \
-14:	__DISABLE_INTERRUPTS						; \
+14:	movb $1,evtchn_upcall_mask(%esi) /* __DISABLE_INTERRUPTS */	; \
 	TRACE_IRQS_OFF							; \
 sysexit_ecrit:	/**** END OF SYSEXIT CRITICAL REGION ****/		; \
 	mov  $__KERNEL_PERCPU, %ecx					; \

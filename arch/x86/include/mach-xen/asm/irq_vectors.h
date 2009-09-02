@@ -78,7 +78,15 @@ static inline int invalid_vm86_irq(int irq)
 # define NR_PIRQS			NR_IRQS_LEGACY
 #endif
 
-#define DYNIRQ_BASE			(PIRQ_BASE + NR_PIRQS)
+#ifndef __ASSEMBLY__
+#if defined(CONFIG_X86_IO_APIC) && defined(CONFIG_SPARSE_IRQ)
+extern int nr_pirqs;
+#else
+# define nr_pirqs			NR_PIRQS
+#endif
+#endif
+
+#define DYNIRQ_BASE			(PIRQ_BASE + nr_pirqs)
 #define NR_DYNIRQS			(64 + CONFIG_XEN_NR_GUEST_DEVICES)
 
 #define NR_IRQS				(NR_PIRQS + NR_DYNIRQS)

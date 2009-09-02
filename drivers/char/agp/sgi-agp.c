@@ -73,7 +73,7 @@ static unsigned long
 sgi_tioca_mask_memory(struct agp_bridge_data *bridge,
 		      struct page *page, int type)
 {
-	unsigned long addr = phys_to_gart(page_to_phys(page));
+	unsigned long addr = page_to_gart(page);
 	return tioca_physpage_to_gart(addr);
 }
 

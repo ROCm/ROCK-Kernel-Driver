@@ -659,7 +659,12 @@ static int acpi_processor_get_info(struct acpi_device *device)
 	 * generated as the following format:
 	 * CPU+CPU ID.
 	 */
-	sprintf(acpi_device_bid(device), "CPU%X", pr->id);
+	if (pr->id != -1)
+		sprintf(acpi_device_bid(device), "CPU%X", pr->id);
+	else
+		snprintf(acpi_device_bid(device),
+			 ARRAY_SIZE(acpi_device_bid(device)),
+			 "CPUX%X", pr->acpi_id);
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Processor [%d:%d]\n", pr->id,
 			  pr->acpi_id));
 
