@@ -189,7 +189,7 @@ extern rwlock_t ns_list_lock;
 
 extern struct aa_namespace *default_namespace;
 extern enum profile_mode g_profile_mode;
- 
+
 
 void aa_add_profile(struct aa_policy_common *common,
 		    struct aa_profile *profile);
@@ -201,7 +201,7 @@ void free_aa_namespace_kref(struct kref *kref);
 void free_aa_namespace(struct aa_namespace *ns);
 struct aa_namespace *__aa_find_namespace(struct list_head *head,
 					 const char *name);
-					 
+
 struct aa_namespace *aa_find_namespace(const char *name);
 struct aa_namespace *aa_prepare_namespace(const char *name);
 void aa_remove_namespace(struct aa_namespace *ns);

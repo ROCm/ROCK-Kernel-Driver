@@ -50,13 +50,13 @@ u32 aa_alloc_sid(int is_usr)
 {
 	u32 sid;
 
-	/* 
+	/*
 	 * TODO FIXME: sid recycling - part of profile mapping table
 	 */
 	spin_lock(&sid_lock);
 	if (is_usr) {
 		sid = (++global_usr_sid) << 16;
-	        
+
 	} else {
 		sid = ++global_sys_sid;
 	}

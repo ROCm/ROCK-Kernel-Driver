@@ -54,7 +54,7 @@ struct aa_profile;
 #define AA_X_INDEX_MASK		0x03ff
 
 #define AA_X_TYPE_MASK		0x0c00
-#define AA_X_TYPE_SHIFT		10		
+#define AA_X_TYPE_SHIFT		10
 #define AA_X_NONE		0x0000
 #define AA_X_NAME		0x0400	/* use executable name px */
 #define AA_X_TABLE		0x0800	/* use a specified name ->n# */

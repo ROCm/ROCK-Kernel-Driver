@@ -105,7 +105,7 @@ static void common_free(struct aa_policy_common *common)
 
 static struct aa_policy_common *__common_find(struct list_head *head,
 					      const char *name)
-					      
+
 {
 	struct aa_policy_common *common;
 
@@ -228,7 +228,7 @@ void free_aa_namespace(struct aa_namespace *ns)
 
 struct aa_namespace *__aa_find_namespace(struct list_head *head,
 					 const char *name)
-					 
+
 {
 	return (struct aa_namespace *) __common_find(head, name);
 }
@@ -276,7 +276,7 @@ struct aa_namespace *aa_find_namespace_by_strn(const char *name, int len)
 struct aa_namespace *aa_prepare_namespace(const char *name)
 {
 	struct aa_namespace *ns;
- 
+
 	write_lock(&ns_list_lock);
 	if (name)
 		ns = aa_get_namespace(__aa_find_namespace(&ns_list, name));
@@ -417,12 +417,12 @@ struct aa_profile *alloc_aa_profile(const char *fqname)
 	profile = kzalloc(sizeof(*profile), GFP_KERNEL);
 	if (!profile)
 		return NULL;
- 
+
 	if (!common_init(&profile->base, fqname)) {
 		kfree(profile);
 		return NULL;
 	}
-	
+
 	profile->fqname = profile->base.name;
 	profile->base.name = (char *) fqname_subname((const char *) profile->fqname);
 	return profile;
@@ -593,7 +593,7 @@ struct aa_policy_common *__aa_find_parent_by_fqname(struct aa_namespace *ns,
 
 	common = &ns->base;
 
-	
+
 	for (split = strstr(fqname, "//"); split; ) {
 		profile = __aa_find_profile_by_strn(&common->profiles, fqname,
 						    split - fqname);
@@ -721,7 +721,7 @@ struct aa_profile *aa_profile_newest(struct aa_profile *profile)
 				profile = NULL;
 				break;
 			}
-		} 
+		}
 	}
 
 	return profile;

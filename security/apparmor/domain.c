@@ -224,7 +224,7 @@ int apparmor_bprm_set_creds(struct linux_binprm *bprm)
 	unsigned int state = DFA_START;
 	struct aa_audit_file sa;
 	struct path_cond cond = { bprm->file->f_path.dentry->d_inode->i_uid,
-				  bprm->file->f_path.dentry->d_inode->i_mode }; 
+				  bprm->file->f_path.dentry->d_inode->i_mode };
 
 	sa.base.error = cap_bprm_set_creds(bprm);
 	if (sa.base.error)
@@ -374,7 +374,7 @@ int apparmor_bprm_secureexec(struct linux_binprm *bprm)
 
 	/* the decision to use secure exec is computed in set_creds
 	 * and stored in bprm->unsafe.  The AppArmor X_UNSAFE flag is
-	 * indicates don't 
+	 * indicates don't
 	 */
 	if (!ret && (bprm->unsafe & AA_SECURE_X_NEEDED))
 		ret = 1;
@@ -430,7 +430,7 @@ static void revalidate_file(struct aa_profile *profile, struct file *file,
 	}
 }
 
-/* 
+/*
  * derived from security/selinux/hooks.c: flush_unauthorized_files &&
  * fs/exec.c:flush_old_files
  */
@@ -470,7 +470,7 @@ static int revalidate_files(struct aa_profile *profile,
 		}
 		spin_lock(&files->file_lock);
 	}
-	spin_unlock(&files->file_lock);	
+	spin_unlock(&files->file_lock);
 	kfree(buffer);
 	return 0;
 }
@@ -677,7 +677,7 @@ int aa_change_profile(const char *ns_name, const char *fqname, int onexec,
 			goto audit;
 		target = aa_alloc_null_profile(profile, 0);
 	}
-	
+
 	/* check if tracing task is allowed to trace target domain */
 	sa.base.error = aa_may_change_ptraced_domain(current, target);
 	if (sa.base.error) {
