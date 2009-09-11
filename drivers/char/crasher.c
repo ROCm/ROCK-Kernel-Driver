@@ -18,14 +18,14 @@ static struct completion startup = COMPLETION_INITIALIZER(startup);
 static unsigned long rand_seed = 152L;
 static unsigned long seed = 152L;
 static int threads = 1;
-static int call_panic;
-static int call_bug;
+static int call_panic, call_bug, call_warn;
 static int trap_null, call_null, jump_null;
 static long trap_read, trap_write, call_bad, jump_bad;
 
 module_param(seed, ulong, 0);
 module_param(call_panic, bool, 0);
 module_param(call_bug, bool, 0);
+module_param(call_warn, bool, 0);
 module_param(trap_null, bool, 0);
 module_param(trap_read, long, 0);
 module_param(trap_write, long, 0);
@@ -37,6 +37,7 @@ module_param(threads, int, 0);
 MODULE_PARM_DESC(seed, "random seed for memory tests");
 MODULE_PARM_DESC(call_panic, "test option. call panic() and render the system unusable.");
 MODULE_PARM_DESC(call_bug, "test option. call BUG() and render the system unusable.");
+MODULE_PARM_DESC(call_warn, "test option. call WARN() and leave the system usable.");
 MODULE_PARM_DESC(trap_null, "test option. dereference a NULL pointer to simulate a crash and render the system unusable.");
 MODULE_PARM_DESC(trap_read, "test option. read from an invalid address to simulate a crash and render the system unusable.");
 MODULE_PARM_DESC(trap_write, "test option. write to an invalid address to simulate a crash and render the system unusable.");
@@ -154,6 +155,8 @@ static int __init crasher_init(void)
 		BUG_ON(1);
 		return -EFAULT;
 	}
+	if (WARN(call_warn, "triggering WARN\n"))
+		return -EFAULT;
 
 	if (trap_null) {
 		volatile char *p = NULL;
