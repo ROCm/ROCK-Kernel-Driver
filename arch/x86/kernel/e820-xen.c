@@ -1350,11 +1350,7 @@ static int __init parse_memopt(char *p)
 
 	userdef = 1;
 	mem_size = memparse(p, &p);
-	e820_remove_range(mem_size, ULLONG_MAX - mem_size, E820_RAM, 1);
-
-	i = e820.nr_map - 1;
-	current_end = e820.map[i].addr + e820.map[i].size;
-
+#ifdef CONFIG_XEN
 	/*
 	 * A little less than 2% of available memory are needed for page
 	 * tables, p2m map, and mem_map. Hence the maximum amount of memory
@@ -1373,7 +1369,11 @@ static int __init parse_memopt(char *p)
 		       (unsigned long long)size << (PAGE_SHIFT - 10));
 		mem_size = size << PAGE_SHIFT;
 	}
+#endif
+	e820_remove_range(mem_size, ULLONG_MAX - mem_size, E820_RAM, 1);
 
+	i = e820.nr_map - 1;
+	current_end = e820.map[i].addr + e820.map[i].size;
 	if (current_end < mem_size) {
 		/*
 		 * The e820 map ends before our requested size so
@@ -1617,6 +1617,7 @@ char *__init __attribute__((weak)) machine_specific_memory_setup(void)
 char * __init memory_setup(void)
 {
 	int rc, nr_map;
+	unsigned long long maxmem;
 	struct xen_memory_map memmap;
 	/*
 	 * This is rather large for a stack variable but this early in
@@ -1646,6 +1647,22 @@ char * __init memory_setup(void)
 		BUG();
 
 #ifdef CONFIG_XEN
+	/* See the comment in parse_memopt(). */
+	for (maxmem = rc = 0; rc < e820.nr_map; ++rc)
+		if (e820.map[rc].type == E820_RAM)
+			maxmem += e820.map[rc].size;
+	if ((maxmem >> (PAGE_SHIFT + 5)) > xen_start_info->nr_pages) {
+		unsigned long long size = (u64)xen_start_info->nr_pages << 5;
+
+		printk(KERN_WARNING "maxmem of %LuM is invalid for an initial"
+				    " allocation of %luM, using %LuM\n",
+		       maxmem >> 20,
+		       xen_start_info->nr_pages >> (20 - PAGE_SHIFT),
+		       size >> (20 - PAGE_SHIFT));
+		size <<= PAGE_SHIFT;
+		e820_remove_range(size, ULLONG_MAX - size, E820_RAM, 1);
+	}
+
 	if (is_initial_xendomain()) {
 		memmap.nr_entries = E820MAX;
 		set_xen_guest_handle(memmap.buffer, machine_e820.map);

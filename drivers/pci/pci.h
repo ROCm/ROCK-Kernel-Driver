@@ -299,6 +299,18 @@ static inline int pci_ats_enabled(struct pci_dev *dev)
 }
 #endif /* CONFIG_PCI_IOV */
 
+static inline int pci_resource_alignment(struct pci_dev *dev,
+					 struct resource *res)
+{
+#ifdef CONFIG_PCI_IOV
+	int resno = res - dev->resource;
+
+	if (resno >= PCI_IOV_RESOURCES && resno <= PCI_IOV_RESOURCE_END)
+		return pci_sriov_resource_alignment(dev, resno);
+#endif
+	return resource_alignment(res);
+}
+
 #ifdef CONFIG_PCI_GUESTDEV
 extern int pci_is_guestdev_to_reassign(struct pci_dev *dev);
 extern int pci_is_iomuldev(struct pci_dev *dev);
@@ -320,17 +332,5 @@ static inline unsigned long pci_reserve_size_mem(struct pci_bus *bus)
 	return 0;
 }
 #endif /* CONFIG_PCI_RESERVE */
-
-static inline int pci_resource_alignment(struct pci_dev *dev,
-					 struct resource *res)
-{
-#ifdef CONFIG_PCI_IOV
-	int resno = res - dev->resource;
-
-	if (resno >= PCI_IOV_RESOURCES && resno <= PCI_IOV_RESOURCE_END)
-		return pci_sriov_resource_alignment(dev, resno);
-#endif
-	return resource_alignment(res);
-}
 
 #endif /* DRIVERS_PCI_H */

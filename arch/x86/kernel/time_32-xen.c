@@ -304,16 +304,10 @@ static void get_time_values_from_xen(unsigned int cpu)
 	local_irq_restore(flags);
 }
 
-static inline int time_values_up_to_date(unsigned int cpu)
+static inline int time_values_up_to_date(void)
 {
-	struct vcpu_time_info   *src;
-	struct shadow_time_info *dst;
-
-	src = &vcpu_info(cpu)->time;
-	dst = &per_cpu(shadow_time, cpu);
-
 	rmb();
-	return (dst->version == src->version);
+	return percpu_read(shadow_time.version) == vcpu_info_read(time.version);
 }
 
 static void sync_xen_wallclock(unsigned long dummy);
@@ -359,7 +353,7 @@ static unsigned long long local_clock(void)
 		local_time_version = shadow->version;
 		barrier();
 		time = shadow->system_timestamp + get_nsec_offset(shadow);
-		if (!time_values_up_to_date(cpu))
+		if (!time_values_up_to_date())
 			get_time_values_from_xen(cpu);
 		barrier();
 	} while (local_time_version != shadow->version);
@@ -488,7 +482,7 @@ irqreturn_t timer_interrupt(int irq, void *dev_id)
 		delta_cpu -= per_cpu(processed_system_time, cpu);
 
 		get_runstate_snapshot(&runstate);
-	} while (!time_values_up_to_date(cpu));
+	} while (!time_values_up_to_date());
 
 	if ((unlikely(delta < -(s64)permitted_clock_jitter) ||
 	     unlikely(delta_cpu < -(s64)permitted_clock_jitter))
