@@ -484,33 +484,6 @@ acpi_get_table_by_index(u32 table_index, struct acpi_table_header **table)
 
 ACPI_EXPORT_SYMBOL(acpi_get_table_by_index)
 
-static void
-acpi_dsdt_initrd_override(void)
-{
-#if defined(CONFIG_ACPI_CUSTOM_DSDT_INITRD)
-	struct acpi_table_header *new = NULL;
-	struct acpi_table_desc *table;
-	acpi_status status;
-
-	table = &acpi_gbl_root_table_list.tables[ACPI_TABLE_INDEX_DSDT];
-	status = acpi_os_table_override(table->pointer, &new);
-	if (ACPI_SUCCESS(status) && new) {
-		acpi_tb_delete_table(table);
-
-		/* This is the top part of acpi_table_load */
-		memset(table, 0, sizeof(*table));
-		table->address = ACPI_PTR_TO_PHYSADDR(new);
-		table->pointer = new;
-		table->length = new->length;
-		table->flags |= ACPI_TABLE_ORIGIN_OVERRIDE;
-		table->flags |= ACPI_TABLE_ORIGIN_ALLOCATED;
-		memcpy(table->signature.ascii, new->signature, ACPI_NAME_SIZE);
-		acpi_tb_print_table_header(table->address, new);
-	}
-#endif
-}
-
-
 /*******************************************************************************
  *
  * FUNCTION:    acpi_tb_load_namespace
@@ -523,7 +496,7 @@ acpi_dsdt_initrd_override(void)
  *              the RSDT/XSDT.
  *
  ******************************************************************************/
-static acpi_status __init acpi_tb_load_namespace(void)
+static acpi_status acpi_tb_load_namespace(void)
 {
 	acpi_status status;
 	u32 i;
@@ -548,8 +521,6 @@ static acpi_status __init acpi_tb_load_namespace(void)
 		status = AE_NO_ACPI_TABLES;
 		goto unlock_and_exit;
 	}
-
-	acpi_dsdt_initrd_override();
 
 	/* A valid DSDT is required */
 
@@ -619,7 +590,7 @@ static acpi_status __init acpi_tb_load_namespace(void)
  *
  ******************************************************************************/
 
-acpi_status __init acpi_load_tables(void)
+acpi_status acpi_load_tables(void)
 {
 	acpi_status status;
 
@@ -635,6 +606,9 @@ acpi_status __init acpi_load_tables(void)
 
 	return_ACPI_STATUS(status);
 }
+
+ACPI_EXPORT_SYMBOL(acpi_load_tables)
+
 
 /*******************************************************************************
  *
