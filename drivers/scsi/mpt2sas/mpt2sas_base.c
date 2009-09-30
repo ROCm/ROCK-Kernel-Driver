@@ -94,7 +94,7 @@ _base_fault_reset_work(struct work_struct *work)
 	int rc;
 
 	spin_lock_irqsave(&ioc->ioc_reset_in_progress_lock, flags);
-	if (ioc->ioc_reset_in_progress)
+	if (ioc->shost_recovery)
 		goto rearm_timer;
 	spin_unlock_irqrestore(&ioc->ioc_reset_in_progress_lock, flags);
 
@@ -1542,6 +1542,8 @@ _base_display_ioc_capabilities(struct MPT2SAS_ADAPTER *ioc)
 	   (ioc->bios_pg3.BiosVersion & 0x0000FF00) >> 8,
 	    ioc->bios_pg3.BiosVersion & 0x000000FF);
 
+	_base_display_dell_branding(ioc);
+
 	printk(MPT2SAS_INFO_FMT "Protocol=(", ioc->name);
 
 	if (ioc->facts.ProtocolFlags & MPI2_IOCFACTS_PROTOCOL_SCSI_INITIATOR) {
@@ -1553,8 +1555,6 @@ _base_display_ioc_capabilities(struct MPT2SAS_ADAPTER *ioc)
 		printk("%sTarget", i ? "," : "");
 		i++;
 	}
-
-	_base_display_dell_branding(ioc);
 
 	i = 0;
 	printk("), ");
@@ -1627,6 +1627,9 @@ _base_static_config_pages(struct MPT2SAS_ADAPTER *ioc)
 	u32 iounit_pg1_flags;
 
 	mpt2sas_config_get_manufacturing_pg0(ioc, &mpi_reply, &ioc->manu_pg0);
+	if (ioc->ir_firmware)
+		mpt2sas_config_get_manufacturing_pg10(ioc, &mpi_reply,
+		    &ioc->manu_pg10);
 	mpt2sas_config_get_bios_pg2(ioc, &mpi_reply, &ioc->bios_pg2);
 	mpt2sas_config_get_bios_pg3(ioc, &mpi_reply, &ioc->bios_pg3);
 	mpt2sas_config_get_ioc_pg8(ioc, &mpi_reply, &ioc->ioc_pg8);
@@ -3501,20 +3504,13 @@ mpt2sas_base_hard_reset_handler(struct MPT2SAS_ADAPTER *ioc, int sleep_flag,
 	    __func__));
 
 	spin_lock_irqsave(&ioc->ioc_reset_in_progress_lock, flags);
-	if (ioc->ioc_reset_in_progress) {
+	if (ioc->shost_recovery) {
 		spin_unlock_irqrestore(&ioc->ioc_reset_in_progress_lock, flags);
 		printk(MPT2SAS_ERR_FMT "%s: busy\n",
 		    ioc->name, __func__);
 		return -EBUSY;
 	}
-	ioc->ioc_reset_in_progress = 1;
 	ioc->shost_recovery = 1;
-	if (ioc->shost->shost_state == SHOST_RUNNING) {
-		/* set back to SHOST_RUNNING in mpt2sas_scsih.c */
-		scsi_host_set_state(ioc->shost, SHOST_RECOVERY);
-		printk(MPT2SAS_INFO_FMT "putting controller into "
-		    "SHOST_RECOVERY\n", ioc->name);
-	}
 	spin_unlock_irqrestore(&ioc->ioc_reset_in_progress_lock, flags);
 
 	_base_reset_handler(ioc, MPT2_IOC_PRE_RESET);
@@ -3534,7 +3530,10 @@ mpt2sas_base_hard_reset_handler(struct MPT2SAS_ADAPTER *ioc, int sleep_flag,
 	    ioc->name, __func__, ((r == 0) ? "SUCCESS" : "FAILED")));
 
 	spin_lock_irqsave(&ioc->ioc_reset_in_progress_lock, flags);
-	ioc->ioc_reset_in_progress = 0;
+	ioc->shost_recovery = 0;
 	spin_unlock_irqrestore(&ioc->ioc_reset_in_progress_lock, flags);
+
+	if (!r)
+		_base_reset_handler(ioc, MPT2_IOC_RUNNING);
 	return r;
 }
