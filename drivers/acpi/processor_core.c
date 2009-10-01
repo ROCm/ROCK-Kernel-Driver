@@ -664,7 +664,9 @@ static int acpi_processor_get_info(struct acpi_device *device)
 	else
 		snprintf(acpi_device_bid(device),
 			 ARRAY_SIZE(acpi_device_bid(device)),
-			 "CPUX%X", pr->acpi_id);
+			 "#%0*X",
+			 (int)ARRAY_SIZE(acpi_device_bid(device)) - 2,
+			 pr->acpi_id);
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Processor [%d:%d]\n", pr->id,
 			  pr->acpi_id));
 

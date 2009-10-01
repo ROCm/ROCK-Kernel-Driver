@@ -6,6 +6,9 @@
 #include <linux/compiler.h>
 #include <asm-generic/int-ll64.h>
 #include <asm/page.h>
+#ifdef __KERNEL__
+#include <asm/fixmap.h>
+#endif
 
 #define build_mmio_read(name, size, type, reg, barrier) \
 static inline type name(const volatile void __iomem *addr) \
@@ -132,9 +135,12 @@ static inline void *phys_to_virt(phys_addr_t address)
  * However, we truncate the address to unsigned int to avoid undesirable
  * promitions in legacy drivers.
  */
-#define isa_virt_to_bus(_x) ({ BUG(); virt_to_bus(_x); })
-#define isa_page_to_bus(_x) isa_page_to_bus_is_UNSUPPORTED->_x
-#define isa_bus_to_virt(_x) ((void *)__fix_to_virt(FIX_ISAMAP_BEGIN) + (_x))
+#define isa_virt_to_bus(_x) ({ \
+	unsigned long _va_ = (unsigned long)(_x); \
+	_va_ - fix_to_virt(FIX_ISAMAP_BEGIN) < (NR_FIX_ISAMAPS << PAGE_SHIFT) \
+	? _va_ - fix_to_virt(FIX_ISAMAP_BEGIN) \
+	: ({ BUG(); (unsigned long)virt_to_bus(_va_); }); })
+#define isa_bus_to_virt(_x) ((void *)fix_to_virt(FIX_ISAMAP_BEGIN) + (_x))
 
 /*
  * However PCI ones are not necessarily 1:1 and therefore these interfaces
@@ -194,10 +200,7 @@ extern void iounmap(volatile void __iomem *addr);
 	 && bvec_to_pseudophys(vec1) + (vec1)->bv_len \
 	    == bvec_to_pseudophys(vec2))
 
-#include <asm/fixmap.h>
-
 #undef __ISA_IO_base
-#define __ISA_IO_base ((char __iomem *)fix_to_virt(FIX_ISAMAP_BEGIN))
 
 #endif
 

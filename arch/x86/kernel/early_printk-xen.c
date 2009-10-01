@@ -16,10 +16,10 @@
 #include <asm/pgtable.h>
 #include <linux/usb/ehci_def.h>
 
+#ifndef CONFIG_XEN
 /* Simple VGA output */
 #define VGABASE		(__ISA_IO_base + 0xb8000)
 
-#ifndef CONFIG_XEN
 static int max_ypos = 25, max_xpos = 80;
 static int current_ypos = 25, current_xpos;
 
