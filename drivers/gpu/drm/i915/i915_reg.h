@@ -1733,6 +1733,7 @@
 #define   DISPPLANE_NO_LINE_DOUBLE		0
 #define   DISPPLANE_STEREO_POLARITY_FIRST	0
 #define   DISPPLANE_STEREO_POLARITY_SECOND	(1<<18)
+#define   DISPPLANE_TRICKLE_FEED_DISABLE	(1<<14) /* IGDNG */
 #define   DISPPLANE_TILED			(1<<10)
 #define DSPAADDR		0x70184
 #define DSPASTRIDE		0x70188
@@ -1867,6 +1868,8 @@
 #define  PF_ENABLE              (1<<31)
 #define PFA_WIN_SZ		0x68074
 #define PFB_WIN_SZ		0x68874
+#define PFA_WIN_POS		0x68070
+#define PFB_WIN_POS		0x68870
 
 /* legacy palette */
 #define LGC_PALETTE_A           0x4a000
@@ -1912,6 +1915,9 @@
 #define GTIMR   0x44014
 #define GTIIR   0x44018
 #define GTIER   0x4401c
+
+#define DISP_ARB_CTL	0x45000
+#define  DISP_TILE_SURFACE_SWIZZLING	(1<<13)
 
 /* PCH */
 

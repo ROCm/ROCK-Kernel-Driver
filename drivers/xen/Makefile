@@ -1,3 +1,4 @@
+obj-y	+= xenbus/
 obj-$(CONFIG_PARAVIRT_XEN)	+= grant-table.o features.o events.o manage.o
 xen-hotplug-$(CONFIG_PARAVIRT_XEN) := cpu_hotplug.o
 xen-xencomm-$(CONFIG_PARAVIRT_XEN) := xencomm.o
@@ -37,3 +38,6 @@ obj-$(CONFIG_XEN_GRANT_DEV)	+= gntdev/
 obj-$(CONFIG_XEN_NETDEV_ACCEL_SFC_UTIL)		+= sfc_netutil/
 obj-$(CONFIG_XEN_NETDEV_ACCEL_SFC_FRONTEND)	+= sfc_netfront/
 obj-$(CONFIG_XEN_NETDEV_ACCEL_SFC_BACKEND)	+= sfc_netback/
+
+nostackp := $(call cc-option, -fno-stack-protector)
+CFLAGS_features.o			:= $(nostackp)

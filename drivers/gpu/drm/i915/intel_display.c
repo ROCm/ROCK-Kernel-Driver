@@ -818,7 +818,7 @@ intel_igdng_find_best_PLL(const intel_limit_t *limit, struct drm_crtc *crtc,
 					       refclk, best_clock);
 
 	if (intel_pipe_has_type(crtc, INTEL_OUTPUT_LVDS)) {
-		if ((I915_READ(LVDS) & LVDS_CLKB_POWER_MASK) ==
+		if ((I915_READ(PCH_LVDS) & LVDS_CLKB_POWER_MASK) ==
 		    LVDS_CLKB_POWER_UP)
 			clock.p2 = limit->p2.p2_fast;
 		else
@@ -1008,6 +1008,10 @@ intel_pipe_set_base(struct drm_crtc *crtc, int x, int y,
 			dspcntr &= ~DISPPLANE_TILED;
 	}
 
+	if (IS_IGDNG(dev))
+		/* must disable */
+		dspcntr |= DISPPLANE_TRICKLE_FEED_DISABLE;
+
 	I915_WRITE(dspcntr_reg, dspcntr);
 
 	Start = obj_priv->gtt_offset;
@@ -1154,6 +1158,7 @@ static void igdng_crtc_dpms(struct drm_crtc *crtc, int mode)
 	int transconf_reg = (pipe == 0) ? TRANSACONF : TRANSBCONF;
 	int pf_ctl_reg = (pipe == 0) ? PFA_CTL_1 : PFB_CTL_1;
 	int pf_win_size = (pipe == 0) ? PFA_WIN_SZ : PFB_WIN_SZ;
+	int pf_win_pos = (pipe == 0) ? PFA_WIN_POS : PFB_WIN_POS;
 	int cpu_htot_reg = (pipe == 0) ? HTOTAL_A : HTOTAL_B;
 	int cpu_hblank_reg = (pipe == 0) ? HBLANK_A : HBLANK_B;
 	int cpu_hsync_reg = (pipe == 0) ? HSYNC_A : HSYNC_B;
@@ -1203,6 +1208,19 @@ static void igdng_crtc_dpms(struct drm_crtc *crtc, int mode)
 				I915_READ(fdi_tx_reg);
 				udelay(100);
 			}
+		}
+
+		/* Enable panel fitting for LVDS */
+		if (intel_pipe_has_type(crtc, INTEL_OUTPUT_LVDS)) {
+			temp = I915_READ(pf_ctl_reg);
+			I915_WRITE(pf_ctl_reg, temp | PF_ENABLE);
+
+			/* currently full aspect */
+			I915_WRITE(pf_win_pos, 0);
+
+			I915_WRITE(pf_win_size,
+				   (dev_priv->panel_fixed_mode->hdisplay << 16) |
+				   (dev_priv->panel_fixed_mode->vdisplay));
 		}
 
 		/* Enable CPU pipe */
@@ -1858,7 +1876,14 @@ static unsigned long intel_calculate_wm(unsigned long clock_in_khz,
 {
 	long entries_required, wm_size;
 
-	entries_required = (clock_in_khz * pixel_size * latency_ns) / 1000000;
+	/*
+	 * Note: we need to make sure we don't overflow for various clock &
+	 * latency values.
+	 * clocks go from a few thousand to several hundred thousand.
+	 * latency is usually a few thousand
+	 */
+	entries_required = ((clock_in_khz / 1000) * pixel_size * latency_ns) /
+		1000;
 	entries_required /= wm->cacheline_size;
 
 	DRM_DEBUG("FIFO entries required for mode: %d\n", entries_required);
@@ -2615,6 +2640,12 @@ static int intel_crtc_mode_set(struct drm_crtc *crtc,
 	I915_READ(pipeconf_reg);
 
 	intel_wait_for_vblank(dev);
+
+	if (IS_IGDNG(dev)) {
+		/* enable address swizzle for tiling buffer */
+		temp = I915_READ(DISP_ARB_CTL);
+		I915_WRITE(DISP_ARB_CTL, temp | DISP_TILE_SURFACE_SWIZZLING);
+	}
 
 	I915_WRITE(dspcntr_reg, dspcntr);
 

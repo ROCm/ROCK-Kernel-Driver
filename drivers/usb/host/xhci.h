@@ -581,6 +581,7 @@ struct xhci_ep_ctx {
 /* bit 15 is Linear Stream Array */
 /* Interval - period between requests to an endpoint - 125u increments. */
 #define EP_INTERVAL(p)		((p & 0xff) << 16)
+#define EP_INTERVAL_TO_UFRAMES(p)		(1 << (((p) >> 16) & 0xff))
 
 /* ep_info2 bitmasks */
 /*
@@ -589,6 +590,7 @@ struct xhci_ep_ctx {
  */
 #define	FORCE_EVENT	(0x1)
 #define ERROR_COUNT(p)	(((p) & 0x3) << 1)
+#define CTX_TO_EP_TYPE(p)	(((p) >> 3) & 0x7)
 #define EP_TYPE(p)	((p) << 3)
 #define ISOC_OUT_EP	1
 #define BULK_OUT_EP	2
@@ -601,6 +603,8 @@ struct xhci_ep_ctx {
 /* bit 7 is Host Initiate Disable - for disabling stream selection */
 #define MAX_BURST(p)	(((p)&0xff) << 8)
 #define MAX_PACKET(p)	(((p)&0xffff) << 16)
+#define MAX_PACKET_MASK		(0xffff << 16)
+#define MAX_PACKET_DECODED(p)	(((p) >> 16) & 0xffff)
 
 
 /**
@@ -926,6 +930,12 @@ struct xhci_td {
 	union xhci_trb		*last_trb;
 };
 
+struct xhci_dequeue_state {
+	struct xhci_segment *new_deq_seg;
+	union xhci_trb *new_deq_ptr;
+	int new_cycle_state;
+};
+
 struct xhci_ring {
 	struct xhci_segment	*first_seg;
 	union  xhci_trb		*enqueue;
@@ -950,12 +960,6 @@ struct xhci_ring {
 	 * if we own the TRB (if we are the consumer).  See section 4.9.1.
 	 */
 	u32			cycle_state;
-};
-
-struct xhci_dequeue_state {
-	struct xhci_segment *new_deq_seg;
-	union xhci_trb *new_deq_ptr;
-	int new_cycle_state;
 };
 
 struct xhci_erst_entry {
@@ -1058,6 +1062,9 @@ struct xhci_hcd {
 	int			noops_submitted;
 	int			noops_handled;
 	int			error_bitmask;
+	unsigned int		quirks;
+#define	XHCI_LINK_TRB_QUIRK	(1 << 0)
+#define XHCI_RESET_EP_QUIRK	(1 << 1)
 };
 
 /* For testing purposes */
@@ -1136,6 +1143,13 @@ static inline void xhci_write_64(struct xhci_hcd *xhci,
 	writel(val_hi, ptr + 1);
 }
 
+static inline int xhci_link_trb_quirk(struct xhci_hcd *xhci)
+{
+	u32 temp = xhci_readl(xhci, &xhci->cap_regs->hc_capbase);
+	return ((HC_VERSION(temp) == 0x95) &&
+			(xhci->quirks & XHCI_LINK_TRB_QUIRK));
+}
+
 /* xHCI debugging */
 void xhci_print_ir_set(struct xhci_hcd *xhci, struct xhci_intr_reg *ir_set, int set_num);
 void xhci_print_registers(struct xhci_hcd *xhci);
@@ -1158,7 +1172,12 @@ int xhci_alloc_virt_device(struct xhci_hcd *xhci, int slot_id, struct usb_device
 int xhci_setup_addressable_virt_dev(struct xhci_hcd *xhci, struct usb_device *udev);
 unsigned int xhci_get_endpoint_index(struct usb_endpoint_descriptor *desc);
 unsigned int xhci_get_endpoint_flag(struct usb_endpoint_descriptor *desc);
+unsigned int xhci_get_endpoint_flag_from_index(unsigned int ep_index);
+unsigned int xhci_last_valid_endpoint(u32 added_ctxs);
 void xhci_endpoint_zero(struct xhci_hcd *xhci, struct xhci_virt_device *virt_dev, struct usb_host_endpoint *ep);
+void xhci_endpoint_copy(struct xhci_hcd *xhci,
+		struct xhci_virt_device *vdev, unsigned int ep_index);
+void xhci_slot_copy(struct xhci_hcd *xhci, struct xhci_virt_device *vdev);
 int xhci_endpoint_init(struct xhci_hcd *xhci, struct xhci_virt_device *virt_dev,
 		struct usb_device *udev, struct usb_host_endpoint *ep,
 		gfp_t mem_flags);
@@ -1205,7 +1224,11 @@ int xhci_queue_ctrl_tx(struct xhci_hcd *xhci, gfp_t mem_flags, struct urb *urb,
 		int slot_id, unsigned int ep_index);
 int xhci_queue_bulk_tx(struct xhci_hcd *xhci, gfp_t mem_flags, struct urb *urb,
 		int slot_id, unsigned int ep_index);
+int xhci_queue_intr_tx(struct xhci_hcd *xhci, gfp_t mem_flags, struct urb *urb,
+		int slot_id, unsigned int ep_index);
 int xhci_queue_configure_endpoint(struct xhci_hcd *xhci, dma_addr_t in_ctx_ptr,
+		u32 slot_id);
+int xhci_queue_evaluate_context(struct xhci_hcd *xhci, dma_addr_t in_ctx_ptr,
 		u32 slot_id);
 int xhci_queue_reset_ep(struct xhci_hcd *xhci, int slot_id,
 		unsigned int ep_index);
@@ -1215,6 +1238,12 @@ void xhci_find_new_dequeue_state(struct xhci_hcd *xhci,
 void xhci_queue_new_dequeue_state(struct xhci_hcd *xhci,
 		struct xhci_ring *ep_ring, unsigned int slot_id,
 		unsigned int ep_index, struct xhci_dequeue_state *deq_state);
+void xhci_cleanup_stalled_ring(struct xhci_hcd *xhci,
+		struct usb_device *udev,
+		unsigned int ep_index, struct xhci_ring *ep_ring);
+void xhci_queue_config_ep_quirk(struct xhci_hcd *xhci,
+		unsigned int slot_id, unsigned int ep_index,
+		struct xhci_dequeue_state *deq_state);
 
 /* xHCI roothub code */
 int xhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue, u16 wIndex,

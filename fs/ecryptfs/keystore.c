@@ -416,7 +416,9 @@ ecryptfs_find_global_auth_tok_for_sig(
 			    &mount_crypt_stat->global_auth_tok_list,
 			    mount_crypt_stat_list) {
 		if (memcmp(walker->sig, sig, ECRYPTFS_SIG_SIZE_HEX) == 0) {
-			(*global_auth_tok) = walker;
+			rc = key_validate(walker->global_auth_tok_key);
+			if (!rc)
+				(*global_auth_tok) = walker;
 			goto out;
 		}
 	}
@@ -612,7 +614,12 @@ ecryptfs_write_tag_70_packet(char *dest, size_t *remaining_bytes,
 	}
 	/* TODO: Support other key modules than passphrase for
 	 * filename encryption */
-	BUG_ON(s->auth_tok->token_type != ECRYPTFS_PASSWORD);
+	if (s->auth_tok->token_type != ECRYPTFS_PASSWORD) {
+		rc = -EOPNOTSUPP;
+		printk(KERN_INFO "%s: Filename encryption only supports "
+		       "password tokens\n", __func__);
+		goto out_free_unlock;
+	}
 	sg_init_one(
 		&s->hash_sg,
 		(u8 *)s->auth_tok->token.password.session_key_encryption_key,
@@ -910,7 +917,12 @@ ecryptfs_parse_tag_70_packet(char **filename, size_t *filename_size,
 	}
 	/* TODO: Support other key modules than passphrase for
 	 * filename encryption */
-	BUG_ON(s->auth_tok->token_type != ECRYPTFS_PASSWORD);
+	if (s->auth_tok->token_type != ECRYPTFS_PASSWORD) {
+		rc = -EOPNOTSUPP;
+		printk(KERN_INFO "%s: Filename encryption only supports "
+		       "password tokens\n", __func__);
+		goto out_free_unlock;
+	}
 	rc = crypto_blkcipher_setkey(
 		s->desc.tfm,
 		s->auth_tok->token.password.session_key_encryption_key,
@@ -1316,8 +1328,10 @@ parse_tag_3_packet(struct ecryptfs_crypt_stat *crypt_stat,
 		rc = -EINVAL;
 		goto out_free;
 	}
-	ecryptfs_cipher_code_to_string(crypt_stat->cipher,
-				       (u16)data[(*packet_size)]);
+	rc = ecryptfs_cipher_code_to_string(crypt_stat->cipher,
+					    (u16)data[(*packet_size)]);
+	if (rc)
+		goto out_free;
 	/* A little extra work to differentiate among the AES key
 	 * sizes; see RFC2440 */
 	switch(data[(*packet_size)++]) {
@@ -1328,7 +1342,9 @@ parse_tag_3_packet(struct ecryptfs_crypt_stat *crypt_stat,
 		crypt_stat->key_size =
 			(*new_auth_tok)->session_key.encrypted_key_size;
 	}
-	ecryptfs_init_crypt_ctx(crypt_stat);
+	rc = ecryptfs_init_crypt_ctx(crypt_stat);
+	if (rc)
+		goto out_free;
 	if (unlikely(data[(*packet_size)++] != 0x03)) {
 		printk(KERN_WARNING "Only S2K ID 3 is currently supported\n");
 		rc = -ENOSYS;
