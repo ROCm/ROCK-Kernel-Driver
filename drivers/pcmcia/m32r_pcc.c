@@ -675,7 +675,7 @@ static struct pccard_operations pcc_operations = {
 static int pcc_drv_pcmcia_suspend(struct platform_device *dev,
 				     pm_message_t state)
 {
-	return pcmcia_socket_dev_suspend(&dev->dev);
+	return pcmcia_socket_dev_suspend(&dev->dev, state);
 }
 
 static int pcc_drv_pcmcia_resume(struct platform_device *dev)

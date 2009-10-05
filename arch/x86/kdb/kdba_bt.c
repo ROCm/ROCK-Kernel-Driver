@@ -3,7 +3,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (c) 2006, 2007-2008 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2006, 2007-2009 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * Common code for doing accurate backtraces on i386 and x86_64, including
  * printing the values of arguments.
@@ -338,6 +338,45 @@ static const struct bb_mem_contains full_pt_regs[] = {
 	{ 0x08, BBRG_R14 },
 	{ 0x00, BBRG_R15 },
 };
+static const struct bb_mem_contains full_pt_regs_plus_1[] = {
+	{ 0x78, BBRG_RDI },
+	{ 0x70, BBRG_RSI },
+	{ 0x68, BBRG_RDX },
+	{ 0x60, BBRG_RCX },
+	{ 0x58, BBRG_RAX },
+	{ 0x50, BBRG_R8  },
+	{ 0x48, BBRG_R9  },
+	{ 0x40, BBRG_R10 },
+	{ 0x38, BBRG_R11 },
+	{ 0x30, BBRG_RBX },
+	{ 0x28, BBRG_RBP },
+	{ 0x20, BBRG_R12 },
+	{ 0x18, BBRG_R13 },
+	{ 0x10, BBRG_R14 },
+	{ 0x08, BBRG_R15 },
+};
+/*
+ * Going into error_exit we have the hardware pushed error_code on the stack
+ * plus a full pt_regs
+ */
+static const struct bb_mem_contains error_code_full_pt_regs[] = {
+	{ 0x78, BBRG_UNDEFINED },
+	{ 0x70, BBRG_RDI },
+	{ 0x68, BBRG_RSI },
+	{ 0x60, BBRG_RDX },
+	{ 0x58, BBRG_RCX },
+	{ 0x50, BBRG_RAX },
+	{ 0x48, BBRG_R8  },
+	{ 0x40, BBRG_R9  },
+	{ 0x38, BBRG_R10 },
+	{ 0x30, BBRG_R11 },
+	{ 0x28, BBRG_RBX },
+	{ 0x20, BBRG_RBP },
+	{ 0x18, BBRG_R12 },
+	{ 0x10, BBRG_R13 },
+	{ 0x08, BBRG_R14 },
+	{ 0x00, BBRG_R15 },
+};
 static const struct bb_mem_contains partial_pt_regs[] = {
 	{ 0x40, BBRG_RDI },
 	{ 0x38, BBRG_RSI },
@@ -416,36 +455,31 @@ static struct bb_name_state bb_special_cases[] = {
 	NS_MEM("ia32_ptregs_common", partial_pt_regs_plus_1, 0),
 	NS_MEM("ia32_sysret", partial_pt_regs, 0),
 	NS_MEM("int_careful", partial_pt_regs, 0),
+	NS_MEM("ia32_badarg", partial_pt_regs, 0),
 	NS_MEM("int_restore_rest", full_pt_regs, 0),
 	NS_MEM("int_signal", full_pt_regs, 0),
 	NS_MEM("int_very_careful", partial_pt_regs, 0),
-	NS_MEM("int_with_check", partial_pt_regs, 0),
-#ifdef	CONFIG_TRACE_IRQFLAGS
-	NS_MEM("paranoid_exit0", full_pt_regs, 0),
-#endif	/* CONFIG_TRACE_IRQFLAGS */
-	NS_MEM("paranoid_exit1", full_pt_regs, 0),
-	NS_MEM("ptregscall_common", partial_pt_regs_plus_1, 0),
-	NS_MEM("restore_norax", partial_pt_regs, 0),
-	NS_MEM("restore", partial_pt_regs, 0),
+	NS_MEM("ptregscall_common", full_pt_regs_plus_1, 0),
 	NS_MEM("ret_from_intr", partial_pt_regs_plus_2, 0),
 	NS_MEM("stub32_clone", partial_pt_regs_plus_1, 0),
 	NS_MEM("stub32_execve", partial_pt_regs_plus_1, 0),
 	NS_MEM("stub32_fork", partial_pt_regs_plus_1, 0),
 	NS_MEM("stub32_iopl", partial_pt_regs_plus_1, 0),
 	NS_MEM("stub32_rt_sigreturn", partial_pt_regs_plus_1, 0),
-	NS_MEM("stub32_rt_sigsuspend", partial_pt_regs_plus_1, 0),
 	NS_MEM("stub32_sigaltstack", partial_pt_regs_plus_1, 0),
 	NS_MEM("stub32_sigreturn", partial_pt_regs_plus_1, 0),
-	NS_MEM("stub32_sigsuspend", partial_pt_regs_plus_1, 0),
 	NS_MEM("stub32_vfork", partial_pt_regs_plus_1, 0),
 	NS_MEM("stub_clone", partial_pt_regs_plus_1, 0),
 	NS_MEM("stub_execve", partial_pt_regs_plus_1, 0),
 	NS_MEM("stub_fork", partial_pt_regs_plus_1, 0),
 	NS_MEM("stub_iopl", partial_pt_regs_plus_1, 0),
 	NS_MEM("stub_rt_sigreturn", partial_pt_regs_plus_1, 0),
-	NS_MEM("stub_rt_sigsuspend", partial_pt_regs_plus_1, 0),
 	NS_MEM("stub_sigaltstack", partial_pt_regs_plus_1, 0),
 	NS_MEM("stub_vfork", partial_pt_regs_plus_1, 0),
+	NS_MEM("sysenter_auditsys", partial_pt_regs,
+		BB_SKIP(R8) | BB_SKIP(R9) | BB_SKIP(R10) | BB_SKIP(R11)),
+
+	NS_MEM("paranoid_exit", error_code_full_pt_regs, 0),
 
 	NS_MEM_FROM("ia32_badsys", "ia32_sysenter_target",
 		partial_pt_regs,
@@ -462,7 +496,20 @@ static struct bb_name_state bb_special_cases[] = {
 		 */
 		BB_SKIP(R8) | BB_SKIP(R9) | BB_SKIP(R10) | BB_SKIP(R11) |
 		BB_SKIP(RAX) | BB_SKIP(RCX)),
+	NS_MEM_FROM("ia32_badsys", "ia32_syscall",
+		partial_pt_regs,
+		BB_SKIP(R8) | BB_SKIP(R9) | BB_SKIP(R10) | BB_SKIP(R11)),
 	NS_MEM("ia32_badsys", partial_pt_regs, 0),
+
+#ifdef CONFIG_AUDITSYSCALL
+	NS_MEM_FROM("int_with_check", "sysexit_audit", partial_pt_regs,
+		BB_SKIP(R8) | BB_SKIP(R9) | BB_SKIP(R10) | BB_SKIP(R11) |
+		BB_SKIP(RAX)),
+	NS_MEM_FROM("int_with_check", "ia32_cstar_target", partial_pt_regs,
+		BB_SKIP(R8) | BB_SKIP(R9) | BB_SKIP(R10) | BB_SKIP(R11) |
+		BB_SKIP(RAX) | BB_SKIP(RCX)),
+#endif
+	NS_MEM("int_with_check", no_memory, 0),
 
 	/* Various bits of code branch to int_ret_from_sys_call, with slightly
 	 * different missing values in pt_regs.
@@ -499,6 +546,8 @@ static struct bb_name_state bb_special_cases[] = {
 		 */
 		BB_SKIP(R8) | BB_SKIP(R9) | BB_SKIP(R10) | BB_SKIP(R11) |
 		BB_SKIP(RAX) | BB_SKIP(RCX)),
+	NS_MEM_FROM("int_ret_from_sys_call", "ia32_badsys",
+		partial_pt_regs, BB_SKIP(RAX)),
 	NS_MEM("int_ret_from_sys_call", partial_pt_regs, 0),
 
 #ifdef	CONFIG_PREEMPT
@@ -516,10 +565,10 @@ static struct bb_name_state bb_special_cases[] = {
 	 * context_switch and __sched_text_start.
 	 */
 	NS_MEM_FROM("ret_from_fork", "schedule", no_memory, 0),
+	NS_MEM_FROM("ret_from_fork", "__schedule", no_memory, 0),
 	NS_MEM_FROM("ret_from_fork", "__sched_text_start", no_memory, 0),
 	NS_MEM_FROM("ret_from_fork", "context_switch", no_memory, 0),
 	NS_MEM("ret_from_fork", full_pt_regs, 0),
-
 
 	NS_MEM_FROM("ret_from_sys_call", "ret_from_fork",
 		partial_pt_regs,
@@ -539,12 +588,10 @@ static struct bb_name_state bb_special_cases[] = {
 	 */
 
 	NS_REG("bad_put_user",
-		all_regs,
-		BB_SKIP(RAX) | BB_SKIP(RCX) | BB_SKIP(R8)),
+		all_regs, BB_SKIP(RBX)),
 
 	NS_REG("bad_get_user",
-		all_regs,
-		BB_SKIP(RAX) | BB_SKIP(RCX) | BB_SKIP(R8)),
+		all_regs, BB_SKIP(RAX) | BB_SKIP(RDX)),
 
 	NS_REG("bad_to_user",
 		all_regs,
@@ -575,22 +622,27 @@ static struct bb_name_state bb_special_cases[] = {
 	NS("page_fault", error_code, all_regs, 0, 0, 0),
 	NS("general_protection", error_code, all_regs, 0, 0, 0),
 	NS("error_entry", error_code_rax, all_regs, 0, BB_SKIP(RAX), -0x10),
+	NS("error_exit", error_code_full_pt_regs, no_regs, 0, 0, 0x30),
 	NS("common_interrupt", error_code, all_regs, 0, 0, -0x8),
 	NS("save_args", error_code, all_regs, 0, 0, -0x50),
+	NS("int3", no_memory, all_regs, 0, 0, -0x80),
 };
 
 static const char *bb_spurious[] = {
 				/* schedule */
 	"thread_return",
-				/* ret_from_fork */
-	"rff_action",
-	"rff_trace",
 				/* system_call */
+	"system_call_after_swapgs",
+	"system_call_fastpath",
 	"ret_from_sys_call",
 	"sysret_check",
 	"sysret_careful",
 	"sysret_signal",
 	"badsys",
+#ifdef CONFIG_AUDITSYSCALL
+	"auditsys",
+	"sysret_audit",
+#endif
 	"tracesys",
 	"int_ret_from_sys_call",
 	"int_with_check",
@@ -613,39 +665,47 @@ static const char *bb_spurious[] = {
 #ifdef	CONFIG_PREEMPT
 	"retint_kernel",
 #endif	/* CONFIG_PREEMPT */
-				/* .macro paranoidexit */
-#ifdef	CONFIG_TRACE_IRQFLAGS
-	"paranoid_exit0",
-	"paranoid_userspace0",
-	"paranoid_restore0",
-	"paranoid_swapgs0",
-	"paranoid_schedule0",
-#endif	/* CONFIG_TRACE_IRQFLAGS */
-	"paranoid_exit1",
-	"paranoid_swapgs1",
-	"paranoid_restore1",
-	"paranoid_userspace1",
-	"paranoid_schedule1",
+				/* paranoid_exit */
+	"paranoid_swapgs",
+	"paranoid_restore",
+	"paranoid_userspace",
+	"paranoid_schedule",
 				/* error_entry */
 	"error_swapgs",
 	"error_sti",
-	"error_exit",
 	"error_kernelspace",
+				/* nmi */
+#ifdef CONFIG_TRACE_IRQFLAGS
+	"nmi_swapgs",
+	"nmi_restore",
+	"nmi_userspace",
+	"nmi_schedule",
+#endif
 				/* load_gs_index */
 	"gs_change",
 	"bad_gs",
 				/* ia32_sysenter_target */
 	"sysenter_do_call",
+	"sysenter_dispatch",
+	"sysexit_from_sys_call",
+#ifdef CONFIG_AUDITSYSCALL
+	"sysenter_auditsys",
+	"sysexit_audit",
+#endif
 	"sysenter_tracesys",
 				/* ia32_cstar_target */
 	"cstar_do_call",
+	"cstar_dispatch",
+	"sysretl_from_sys_call",
+#ifdef CONFIG_AUDITSYSCALL
+	"cstar_auditsys",
+	"sysretl_audit",
+#endif
 	"cstar_tracesys",
-	"ia32_badarg",
 				/* ia32_syscall */
-	"ia32_do_syscall",
+	"ia32_do_call",
 	"ia32_sysret",
 	"ia32_tracesys",
-	"ia32_badsys",
 #ifdef	CONFIG_HIBERNATION
 				/* restore_image */
 	"loop",
@@ -661,7 +721,7 @@ static const char *bb_spurious[] = {
 				/* relocate_kernel */
 	"relocate_new_kernel",
 #endif	/* CONFIG_KEXEC */
-#ifdef	CONFIG_PARAVIRT_XEN
+#ifdef	CONFIG_XEN
 				/* arch/i386/xen/xen-asm.S */
 	"xen_irq_enable_direct_end",
 	"xen_irq_disable_direct_end",
@@ -1354,7 +1414,7 @@ static bfd_vma bb_func_start, bb_func_end;
 static bfd_vma bb_common_interrupt, bb_error_entry, bb_ret_from_intr,
 	       bb_thread_return, bb_sync_regs, bb_save_v86_state,
 	       bb__sched_text_start, bb__sched_text_end,
-	       bb_save_args;
+	       bb_save_args, bb_save_rest, bb_save_paranoid;
 
 /* Record jmp instructions, both conditional and unconditional.  These form the
  * arcs between the basic blocks.  This is also used to record the state when
@@ -1807,6 +1867,7 @@ enum bb_operand_usage {
 	BBOU_RSRDWSWD,				/* 15 */
 		/* opcode specific entries */
 	BBOU_ADD,
+	BBOU_AND,
 	BBOU_CALL,
 	BBOU_CBW,
 	BBOU_CMOV,
@@ -1898,7 +1959,7 @@ static const struct bb_opcode_usage
 bb_opcode_usage_all[] = {
 	{3, BBOU_RSRDWD,  "adc"},
 	{3, BBOU_ADD,     "add"},
-	{3, BBOU_RSRDWD,  "and"},
+	{3, BBOU_AND,     "and"},
 	{3, BBOU_RSWD,    "bsf"},
 	{3, BBOU_RSWD,    "bsr"},
 	{5, BBOU_RSWS,    "bswap"},
@@ -2029,11 +2090,14 @@ bb_opcode_usage_all[] = {
 	{5, BBOU_RS,      "vmrun"},
 	{6, BBOU_RS,      "vmsave"},
 	{7, BBOU_WD,      "vmwrite"},	/* vmwrite src is an encoding, not a register */
+	{3, BBOU_NOP,     "vmxoff"},
 	{6, BBOU_NOP,     "wbinvd"},
 	{5, BBOU_WRMSR,   "wrmsr"},
 	{4, BBOU_XADD,    "xadd"},
 	{4, BBOU_XCHG,    "xchg"},
 	{3, BBOU_XOR,     "xor"},
+	{4, BBOU_NOP,	  "xrstor"},
+	{4, BBOU_NOP,	  "xsave"},
        {10, BBOU_WS,      "xstore-rng"},
 };
 
@@ -2954,6 +3018,17 @@ bb_sanity_check(int type)
 		      (strcmp(bb_func_name, "ptregscall_common") == 0 ||
 		       strcmp(bb_func_name, "ia32_ptregs_common") == 0))))
 			continue;
+		/* The put_user and save_paranoid functions are special.
+		 * %rbx gets clobbered */
+		if (expect == BBRG_RBX &&
+			(strncmp(bb_func_name, "__put_user_", 11) == 0 ||
+			 strcmp(bb_func_name, "save_paranoid") == 0))
+			continue;
+		/* Ignore rbp and rsp for error_entry */
+		if ((strcmp(bb_func_name, "error_entry") == 0) &&
+		    (expect == BBRG_RBX ||
+		     (expect == BBRG_RSP && bb_is_osp_defined(expect) && offset == -0x10)))
+			continue;
 		kdb_printf("%s: Expected %s, got %s",
 			   __FUNCTION__,
 			   bbrg_name[expect], bbrg_name[actual]);
@@ -3168,9 +3243,6 @@ bb_usage_mov(const struct bb_operand *src, const struct bb_operand *dst, int l)
 	    bb_is_int_reg(dst->base_rc) &&
 	    full_register_dst) {
 #ifdef	CONFIG_X86_32
-#ifndef TSS_sysenter_sp0
-#define TSS_sysenter_sp0 SYSENTER_stack_sp0
-#endif
 		/* mov from TSS_sysenter_sp0+offset to esp to fix up the
 		 * sysenter stack, it leaves esp well defined.  mov
 		 * TSS_ysenter_sp0+offset(%esp),%esp is followed by up to 5
@@ -3451,23 +3523,26 @@ bb_usage(void)
 			usage = BBOU_RSRDWD;
 		}
 		break;
+	case BBOU_AND:
+		/* Special case when trying to round the stack pointer
+		 * to achieve byte alignment
+		 */
+		if (dst->reg && dst->base_rc == BBRG_RSP &&
+			src->immediate && strncmp(bb_func_name, "efi_call", 8) == 0) {
+				usage = BBOU_NOP;
+		} else {
+			usage = BBOU_RSRDWD;
+		}
+		break;
 	case BBOU_CALL:
 		bb_reg_state_print(bb_reg_state);
+		usage = BBOU_NOP;
 		if (bb_is_static_disp(src)) {
-			/* Function sync_regs and save_v86_state are special.
-			 * Their return value is the new stack pointer
-			 */
-			if (src->disp == bb_sync_regs) {
-				bb_reg_set_reg(BBRG_RAX, BBRG_RSP);
-			} else if (src->disp == bb_save_v86_state) {
-				bb_reg_set_reg(BBRG_RAX, BBRG_RSP);
-				bb_adjust_osp(BBRG_RAX, +KDB_WORD_SIZE);
-			}
-			/* Function save_args is special also.  It saves
+			/* save_args is special.  It saves
 			 * a partial pt_regs onto the stack and switches
 			 * to the interrupt stack.
 			 */
-			else if (src->disp == bb_save_args) {
+			if (src->disp == bb_save_args) {
 				bb_memory_set_reg(BBRG_RSP, BBRG_RDI, 0x48);
 				bb_memory_set_reg(BBRG_RSP, BBRG_RSI, 0x40);
 				bb_memory_set_reg(BBRG_RSP, BBRG_RDX, 0x38);
@@ -3485,10 +3560,55 @@ bb_usage(void)
 				bb_reg_set_reg(BBRG_RBP, BBRG_RSP);
 				bb_adjust_osp(BBRG_RSP, -KDB_WORD_SIZE);
 			}
+			/* save_rest juggles the stack frame to append the
+			 * rest of the pt_regs onto a stack where SAVE_ARGS
+			 * or save_args has already been done.
+			 */
+			else if (src->disp == bb_save_rest) {
+				bb_memory_set_reg(BBRG_RSP, BBRG_RBX, 0x30);
+				bb_memory_set_reg(BBRG_RSP, BBRG_RBP, 0x28);
+				bb_memory_set_reg(BBRG_RSP, BBRG_R12, 0x20);
+				bb_memory_set_reg(BBRG_RSP, BBRG_R13, 0x18);
+				bb_memory_set_reg(BBRG_RSP, BBRG_R14, 0x10);
+				bb_memory_set_reg(BBRG_RSP, BBRG_R15, 0x08);
+			}
+			/* error_entry and save_paranoid save a full pt_regs.
+			 * Break out so the scratch registers aren't invalidated.
+			 */
+			else if (src->disp == bb_error_entry || src->disp == bb_save_paranoid) {
+				bb_memory_set_reg(BBRG_RSP, BBRG_RDI, 0x70);
+				bb_memory_set_reg(BBRG_RSP, BBRG_RSI, 0x68);
+				bb_memory_set_reg(BBRG_RSP, BBRG_RDX, 0x60);
+				bb_memory_set_reg(BBRG_RSP, BBRG_RCX, 0x58);
+				bb_memory_set_reg(BBRG_RSP, BBRG_RAX, 0x50);
+				bb_memory_set_reg(BBRG_RSP, BBRG_R8,  0x48);
+				bb_memory_set_reg(BBRG_RSP, BBRG_R9,  0x40);
+				bb_memory_set_reg(BBRG_RSP, BBRG_R10, 0x38);
+				bb_memory_set_reg(BBRG_RSP, BBRG_R11, 0x30);
+				bb_memory_set_reg(BBRG_RSP, BBRG_RBX, 0x28);
+				bb_memory_set_reg(BBRG_RSP, BBRG_RBP, 0x20);
+				bb_memory_set_reg(BBRG_RSP, BBRG_R12, 0x18);
+				bb_memory_set_reg(BBRG_RSP, BBRG_R13, 0x10);
+				bb_memory_set_reg(BBRG_RSP, BBRG_R14, 0x08);
+				bb_memory_set_reg(BBRG_RSP, BBRG_R15, 0);
+				break;
+			}
 		}
 		/* Invalidate the scratch registers */
 		bb_invalidate_scratch_reg();
-		usage = BBOU_NOP;
+
+		/* These special cases need scratch registers invalidated first */
+		if (bb_is_static_disp(src)) {
+			/* Function sync_regs and save_v86_state are special.
+			 * Their return value is the new stack pointer
+			 */
+			if (src->disp == bb_sync_regs) {
+				bb_reg_set_reg(BBRG_RAX, BBRG_RSP);
+			} else if (src->disp == bb_save_v86_state) {
+				bb_reg_set_reg(BBRG_RAX, BBRG_RSP);
+				bb_adjust_osp(BBRG_RAX, +KDB_WORD_SIZE);
+			}
+		}
 		break;
 	case BBOU_CBW:
 		/* Convert word in RAX.  Read RAX, write RAX */
@@ -3803,6 +3923,9 @@ bb_usage(void)
 		break;
 	case BBOU_RET:
 		usage = BBOU_NOP;
+		if (src->immediate && bb_is_osp_defined(BBRG_RSP)) {
+			bb_adjust_osp(BBRG_RSP, src->disp);
+		}
 		/* Functions that restore state which was saved by another
 		 * function or build new kernel stacks.  We cannot verify what
 		 * is being restored so skip the sanity check.
@@ -3812,7 +3935,8 @@ bb_usage(void)
 		    strcmp(bb_func_name, "identity_mapped") == 0 ||
 		    strcmp(bb_func_name, "xen_iret_crit_fixup") == 0 ||
 		    strcmp(bb_func_name, "math_abort") == 0 ||
-		    strcmp(bb_func_name, "save_args") == 0)
+		    strcmp(bb_func_name, "save_args") == 0 ||
+		    strcmp(bb_func_name, "kretprobe_trampoline_holder") == 0)
 			break;
 		bb_sanity_check(0);
 		break;
@@ -4746,7 +4870,7 @@ kdb_bb_all(int argc, const char **argv)
 #ifdef	CONFIG_MATH_EMULATION
 		   " CONFIG_MATH_EMULATION"
 #endif
-#ifdef	CONFIG_PARAVIRT_XEN
+#ifdef	CONFIG_XEN
 		   " CONFIG_XEN"
 #endif
 #ifdef	CONFIG_DEBUG_INFO
@@ -4888,10 +5012,10 @@ kdb_bb_all(int argc, const char **argv)
 #define ARCH_NORMAL_PADDING (16 * 8)
 
 /* x86_64 has multiple alternate stacks, with different sizes and different
- * offsets to get the link from one stack to the next.  Some of the stacks are
- * referenced via cpu_pda, some via per_cpu orig_ist.  Debug events can even
- * have multiple nested stacks within the single physical stack, each nested
- * stack has its own link and some of those links are wrong.
+ * offsets to get the link from one stack to the next.  All of the stacks are
+ * in the per_cpu area: either in the orig_ist or irq_stack_ptr. Debug events
+ * can even have multiple nested stacks within the single physical stack,
+ * each nested stack has its own link and some of those links are wrong.
  *
  * Consistent it's not!
  *
@@ -4913,7 +5037,7 @@ kdba_get_stack_info_alternate(kdb_machreg_t addr, int cpu,
 		[NMI_STACK - 1] =         { "nmi",           EXCEPTION_STKSZ, EXCEPTION_STKSZ, EXCEPTION_STKSZ - 2*sizeof(void *) },
 		[DEBUG_STACK - 1] =       { "debug",         DEBUG_STKSZ,     EXCEPTION_STKSZ, EXCEPTION_STKSZ - 2*sizeof(void *) },
 		[MCE_STACK - 1] =         { "machine check", EXCEPTION_STKSZ, EXCEPTION_STKSZ, EXCEPTION_STKSZ - 2*sizeof(void *) },
-		[INTERRUPT_STACK - 1] =   { "interrupt",     IRQ_STACK_SIZE,    IRQ_STACK_SIZE,    IRQ_STACK_SIZE    -   sizeof(void *) },
+		[INTERRUPT_STACK - 1] =   { "interrupt",     IRQ_STACK_SIZE,  IRQ_STACK_SIZE,  IRQ_STACK_SIZE  -   sizeof(void *) },
 	};
 	unsigned long total_start = 0, total_size, total_end;
 	int sd, found = 0;
@@ -4932,7 +5056,7 @@ kdba_get_stack_info_alternate(kdb_machreg_t addr, int cpu,
 			int c;
 			for_each_online_cpu(c) {
 				if (sd == INTERRUPT_STACK - 1)
-					total_end = (unsigned long) per_cpu(irq_stack_ptr, c);
+					total_end = (unsigned long)per_cpu(irq_stack_ptr, c);
 				else
 					total_end = per_cpu(orig_ist, c).ist[sd];
 				total_start = total_end - total_size;
@@ -4947,7 +5071,7 @@ kdba_get_stack_info_alternate(kdb_machreg_t addr, int cpu,
 		}
 		/* Only check the supplied or found cpu */
 		if (sd == INTERRUPT_STACK - 1)
-			total_end = (unsigned long) per_cpu(irq_stack_ptr, cpu);
+			total_end = (unsigned long)per_cpu(irq_stack_ptr, cpu);
 		else
 			total_end = per_cpu(orig_ist, cpu).ist[sd];
 		total_start = total_end - total_size;
@@ -5607,6 +5731,8 @@ static int __init kdba_bt_x86_init(void)
 	bb__sched_text_start = kallsyms_lookup_name("__sched_text_start");
 	bb__sched_text_end = kallsyms_lookup_name("__sched_text_end");
 	bb_save_args = kallsyms_lookup_name("save_args");
+	bb_save_rest = kallsyms_lookup_name("save_rest");
+	bb_save_paranoid = kallsyms_lookup_name("save_paranoid");
 	for (i = 0, r = bb_special_cases;
 	     i < ARRAY_SIZE(bb_special_cases);
 	     ++i, ++r) {

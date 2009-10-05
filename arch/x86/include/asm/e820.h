@@ -126,16 +126,10 @@ extern void e820_reserve_resources(void);
 extern void e820_reserve_resources_late(void);
 extern void setup_memory_map(void);
 extern char *default_machine_specific_memory_setup(void);
-extern char *machine_specific_memory_setup(void);
-extern char *memory_setup(void);
 #endif /* __KERNEL__ */
 #endif /* __ASSEMBLY__ */
 
-#ifndef CONFIG_XEN
 #define ISA_START_ADDRESS	0xa0000
-#else
-#define ISA_START_ADDRESS	0
-#endif
 #define ISA_END_ADDRESS		0x100000
 #define is_ISA_range(s, e) ((s) >= ISA_START_ADDRESS && (e) < ISA_END_ADDRESS)
 

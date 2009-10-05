@@ -3048,7 +3048,7 @@ kdb_dmesg(int argc, const char **argv)
 	}
 
 	/* syslog_data[0,1] physical start, end+1.  syslog_data[2,3] logical start, end+1. */
-	debugger_syslog_data(syslog_data);
+	kdb_syslog_data(syslog_data);
 	if (syslog_data[2] == syslog_data[3])
 		return 0;
 	logsize = syslog_data[1] - syslog_data[0];
@@ -4196,14 +4196,14 @@ kdb_panic(struct notifier_block *self, unsigned long command, void *ptr)
 static struct notifier_block kdb_block = { kdb_panic, NULL, 0 };
 
 #ifdef	CONFIG_SYSCTL
-static int proc_do_kdb(ctl_table *table, int write, struct file *filp,
-		       void __user *buffer, size_t *lenp, loff_t *ppos)
+static int proc_do_kdb(ctl_table *table, int write, void __user *buffer,
+		       size_t *lenp, loff_t *ppos)
 {
 	if (KDB_FLAG(NO_CONSOLE) && write) {
 		printk(KERN_ERR "kdb has no working console and has switched itself off\n");
 		return -EINVAL;
 	}
-	return proc_dointvec(table, write, filp, buffer, lenp, ppos);
+	return proc_dointvec(table, write, buffer, lenp, ppos);
 }
 
 static ctl_table kdb_kern_table[] = {

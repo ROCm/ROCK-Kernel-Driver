@@ -235,7 +235,7 @@ void note_interrupt(unsigned int irq, struct irq_desc *desc,
 		 */
 		if (time_after(jiffies, desc->last_unhandled + HZ/10))
 			desc->irqs_unhandled = 1;
-		else if (!irq_ignore_unhandled(irq))
+		else
 			desc->irqs_unhandled++;
 		desc->last_unhandled = jiffies;
 		if (unlikely(action_ret != IRQ_NONE))
@@ -297,7 +297,6 @@ static int __init irqfixup_setup(char *str)
 
 __setup("irqfixup", irqfixup_setup);
 module_param(irqfixup, int, 0644);
-MODULE_PARM_DESC("irqfixup", "0: No fixup, 1: irqfixup mode, 2: irqpoll mode");
 
 static int __init irqpoll_setup(char *str)
 {

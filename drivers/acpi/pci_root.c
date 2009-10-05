@@ -36,6 +36,8 @@
 #include <acpi/acpi_bus.h>
 #include <acpi/acpi_drivers.h>
 
+#define PREFIX "ACPI: "
+
 #define _COMPONENT		ACPI_PCI_COMPONENT
 ACPI_MODULE_NAME("pci_root");
 #define ACPI_PCI_ROOT_CLASS		"pci_bridge"
@@ -59,20 +61,6 @@ static struct acpi_driver acpi_pci_root_driver = {
 		.remove = acpi_pci_root_remove,
 		.start = acpi_pci_root_start,
 		},
-};
-
-struct acpi_pci_root {
-	struct list_head node;
-	struct acpi_device *device;
-	struct pci_bus *bus;
-	u16 segment;
-	u8 bus_nr;
-
-	u32 osc_support_set;	/* _OSC state of support bits */
-	u32 osc_control_set;	/* _OSC state of control bits */
-	u32 osc_control_qry;	/* the latest _OSC query result */
-
-	u32 osc_queried:1;	/* has _OSC control been queried? */
 };
 
 static LIST_HEAD(acpi_pci_roots);
@@ -317,7 +305,7 @@ static acpi_status acpi_pci_osc_support(struct acpi_pci_root *root, u32 flags)
 	return status;
 }
 
-static struct acpi_pci_root *acpi_pci_find_root(acpi_handle handle)
+struct acpi_pci_root *acpi_pci_find_root(acpi_handle handle)
 {
 	struct acpi_pci_root *root;
 
@@ -327,6 +315,7 @@ static struct acpi_pci_root *acpi_pci_find_root(acpi_handle handle)
 	}
 	return NULL;
 }
+EXPORT_SYMBOL_GPL(acpi_pci_find_root);
 
 struct acpi_handle_node {
 	struct list_head node;
@@ -465,40 +454,6 @@ out:
 }
 EXPORT_SYMBOL(acpi_pci_osc_control_set);
 
-#ifdef CONFIG_PCI_GUESTDEV
-#include <linux/sysfs.h>
-
-static ssize_t seg_show(struct device *dev,
-			struct device_attribute *attr, char *buf)
-{
-	struct list_head *entry;
-
-	list_for_each(entry, &acpi_pci_roots) {
-		struct acpi_pci_root *root;
-		root = list_entry(entry, struct acpi_pci_root, node);
-		if (&root->device->dev == dev)
-			return sprintf(buf, "%04x\n", root->segment);
-	}
-	return 0;
-}
-static DEVICE_ATTR(seg, 0444, seg_show, NULL);
-
-static ssize_t bbn_show(struct device *dev,
-			struct device_attribute *attr, char *buf)
-{
-	struct list_head *entry;
-
-	list_for_each(entry, &acpi_pci_roots) {
-		struct acpi_pci_root *root;
-		root = list_entry(entry, struct acpi_pci_root, node);
-		if (&root->device->dev == dev)
-			return sprintf(buf, "%02x\n", root->bus_nr);
-	}
-	return 0;
-}
-static DEVICE_ATTR(bbn, 0444, bbn_show, NULL);
-#endif
-
 static int __devinit acpi_pci_root_add(struct acpi_device *device)
 {
 	unsigned long long segment, bus;
@@ -610,13 +565,6 @@ static int __devinit acpi_pci_root_add(struct acpi_device *device)
 	if (flags != base_flags)
 		acpi_pci_osc_support(root, flags);
 
-#ifdef CONFIG_PCI_GUESTDEV
-	if (device_create_file(&device->dev, &dev_attr_seg))
-		dev_warn(&device->dev, "could not create seg attr\n");
-	if (device_create_file(&device->dev, &dev_attr_bbn))
-		dev_warn(&device->dev, "could not create bbn attr\n");
-#endif
-
 	return 0;
 
 end:
@@ -654,33 +602,3 @@ static int __init acpi_pci_root_init(void)
 }
 
 subsys_initcall(acpi_pci_root_init);
-
-#ifdef CONFIG_PCI_GUESTDEV
-int acpi_pci_get_root_seg_bbn(char *hid, char *uid, int *seg, int *bbn)
-{
-	struct list_head *entry;
-
-	list_for_each(entry, &acpi_pci_roots) {
-		struct acpi_pci_root *root;
-		root = list_entry(entry, struct acpi_pci_root, node);
-		if (!root->device->flags.hardware_id)
-			continue;
-
-		if (strcmp(root->device->pnp.hardware_id, hid))
-			continue;
-
-		if (!root->device->flags.unique_id) {
-			if (strlen(uid))
-				continue;
-		} else {
-			if (strcmp(root->device->pnp.unique_id, uid))
-				continue;
-		}
-
-		*seg = (int)root->segment;
-		*bbn = (int)root->bus_nr;
-		return TRUE;
-	}
-	return FALSE;
-}
-#endif

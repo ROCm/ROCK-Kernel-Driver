@@ -29,7 +29,6 @@
 
 #include "enum.h"
 #include "bitfield.h"
-#include "driverlink.h"
 
 /**************************************************************************
  *
@@ -755,12 +754,6 @@ union efx_multicast_hash {
  * @loopback_mode: Loopback status
  * @loopback_modes: Supported loopback mode bitmask
  * @loopback_selftest: Offline self-test private state
- * @silicon_rev: Silicon revision description for driverlink
- * @dl_info: Linked list of hardware parameters exposed through driverlink
- * @dl_node: Driverlink port list
- * @dl_device_list: Driverlink device list
- * @dl_cb: Driverlink callbacks table
- * @dl_cb_dev: Driverlink callback owner devices
  *
  * The @priv field of the corresponding &struct net_device points to
  * this.
@@ -851,15 +844,6 @@ struct efx_nic {
 	unsigned int loopback_modes;
 
 	void *loopback_selftest;
-
-	const char *silicon_rev;
-#ifdef CONFIG_SFC_DRIVERLINK
-	struct efx_dl_device_info *dl_info;
-	struct list_head dl_node;
-	struct list_head dl_device_list;
-	struct efx_dl_callbacks dl_cb;
-	struct efx_dl_cb_devices dl_cb_dev;
-#endif
 };
 
 static inline int efx_dev_registered(struct efx_nic *efx)
@@ -1000,9 +984,14 @@ static inline void clear_bit_le(unsigned nr, unsigned char *addr)
  *
  * The 10G MAC used in Falcon requires 8-byte alignment on the frame
  * length, so we round up to the nearest 8.
+ *
+ * Re-clocking by the XGXS on RX can reduce an IPG to 32 bits (half an
+ * XGMII cycle).  If the frame length reaches the maximum value in the
+ * same cycle, the XMAC can miss the IPG altogether.  We work around
+ * this by adding a further 16 bytes.
  */
 #define EFX_MAX_FRAME_LEN(mtu) \
-	((((mtu) + ETH_HLEN + VLAN_HLEN + 4/* FCS */) + 7) & ~7)
+	((((mtu) + ETH_HLEN + VLAN_HLEN + 4/* FCS */ + 7) & ~7) + 16)
 
 
 #endif /* EFX_NET_DRIVER_H */

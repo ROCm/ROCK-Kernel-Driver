@@ -1,8 +1,6 @@
 #ifndef _ASM_X86_APICDEF_H
 #define _ASM_X86_APICDEF_H
 
-#ifndef CONFIG_XEN
-
 /*
  * Constants for various Intel APICs. (local APIC, IOAPIC, etc.)
  *
@@ -10,12 +8,14 @@
  * Ingo Molnar <mingo@redhat.com>, 1999, 2000
  */
 
-#define	APIC_DEFAULT_PHYS_BASE	0xfee00000
+#define IO_APIC_DEFAULT_PHYS_BASE	0xfec00000
+#define	APIC_DEFAULT_PHYS_BASE		0xfee00000
 
 #define	APIC_ID		0x20
 
 #define	APIC_LVR	0x30
 #define		APIC_LVR_MASK		0xFF00FF
+#define		APIC_LVR_DIRECTED_EOI	(1 << 24)
 #define		GET_APIC_VERSION(x)	((x) & 0xFFu)
 #define		GET_APIC_MAXLVT(x)	(((x) >> 16) & 0xFFu)
 #ifdef CONFIG_X86_32
@@ -42,6 +42,7 @@
 #define		APIC_DFR_CLUSTER		0x0FFFFFFFul
 #define		APIC_DFR_FLAT			0xFFFFFFFFul
 #define	APIC_SPIV	0xF0
+#define		APIC_SPIV_DIRECTED_EOI		(1 << 12)
 #define		APIC_SPIV_FOCUS_DISABLED	(1 << 9)
 #define		APIC_SPIV_APIC_ENABLED		(1 << 8)
 #define	APIC_ISR	0x100
@@ -135,24 +136,12 @@
 #define APIC_BASE_MSR	0x800
 #define X2APIC_ENABLE	(1UL << 10)
 
-#else /* CONFIG_XEN */
-
-enum {
-	APIC_DEST_ALLBUT = 0x1,
-	APIC_DEST_SELF,
-	APIC_DEST_ALLINC
-};
-
-#endif /* CONFIG_XEN */
-
 #ifdef CONFIG_X86_32
 # define MAX_IO_APICS 64
 #else
 # define MAX_IO_APICS 128
 # define MAX_LOCAL_APIC 32768
 #endif
-
-#ifndef CONFIG_XEN
 
 /*
  * All x86-64 systems are xAPIC compatible.
@@ -423,8 +412,6 @@ struct local_apic {
 } __attribute__ ((packed));
 
 #undef u32
-
-#endif /* CONFIG_XEN */
 
 #ifdef CONFIG_X86_32
  #define BAD_APICID 0xFFu

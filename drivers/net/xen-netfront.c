@@ -36,6 +36,8 @@
 #include <linux/skbuff.h>
 #include <linux/ethtool.h>
 #include <linux/if_ether.h>
+#include <linux/tcp.h>
+#include <linux/udp.h>
 #include <linux/moduleparam.h>
 #include <linux/mm.h>
 #include <net/ip.h>
@@ -49,7 +51,7 @@
 #include <xen/interface/memory.h>
 #include <xen/interface/grant_table.h>
 
-static struct ethtool_ops xennet_ethtool_ops;
+static const struct ethtool_ops xennet_ethtool_ops;
 
 struct netfront_cb {
 	struct page *page;
@@ -556,12 +558,12 @@ static int xennet_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	spin_unlock_irq(&np->tx_lock);
 
-	return 0;
+	return NETDEV_TX_OK;
 
  drop:
 	dev->stats.tx_dropped++;
 	dev_kfree_skb(skb);
-	return 0;
+	return NETDEV_TX_OK;
 }
 
 static int xennet_close(struct net_device *dev)
@@ -764,6 +766,45 @@ static RING_IDX xennet_fill_frags(struct netfront_info *np,
 
 	shinfo->nr_frags = nr_frags;
 	return cons;
+}
+
+static int skb_checksum_setup(struct sk_buff *skb)
+{
+	struct iphdr *iph;
+	unsigned char *th;
+	int err = -EPROTO;
+
+	if (skb->protocol != htons(ETH_P_IP))
+		goto out;
+
+	iph = (void *)skb->data;
+	th = skb->data + 4 * iph->ihl;
+	if (th >= skb_tail_pointer(skb))
+		goto out;
+
+	skb->csum_start = th - skb->head;
+	switch (iph->protocol) {
+	case IPPROTO_TCP:
+		skb->csum_offset = offsetof(struct tcphdr, check);
+		break;
+	case IPPROTO_UDP:
+		skb->csum_offset = offsetof(struct udphdr, check);
+		break;
+	default:
+		if (net_ratelimit())
+			printk(KERN_ERR "Attempting to checksum a non-"
+			       "TCP/UDP packet, dropping a protocol"
+			       " %d packet", iph->protocol);
+		goto out;
+	}
+
+	if ((th + skb->csum_offset + 2) > skb_tail_pointer(skb))
+		goto out;
+
+	err = 0;
+
+out:
+	return err;
 }
 
 static int handle_incoming_queue(struct net_device *dev,
@@ -1586,7 +1627,7 @@ static void backend_changed(struct xenbus_device *dev,
 	}
 }
 
-static struct ethtool_ops xennet_ethtool_ops =
+static const struct ethtool_ops xennet_ethtool_ops =
 {
 	.set_tx_csum = ethtool_op_set_tx_csum,
 	.set_sg = xennet_set_sg,
@@ -1752,6 +1793,7 @@ static int __devexit xennet_remove(struct xenbus_device *dev)
 
 static struct xenbus_driver netfront_driver = {
 	.name = "vif",
+	.owner = THIS_MODULE,
 	.ids = netfront_ids,
 	.probe = netfront_probe,
 	.remove = __devexit_p(xennet_remove),

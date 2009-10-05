@@ -96,8 +96,7 @@ struct scsi_device {
 	void *hostdata;		/* available to low-level driver */
 	char type;
 	char scsi_level;
-	char inq_periph_qual;	/* PQ from INQUIRY data */
-	char tgps;		/* Target port group support */
+	char inq_periph_qual;	/* PQ from INQUIRY data */	
 	unsigned char inquiry_len;	/* valid bytes in 'inquiry' */
 	unsigned char * inquiry;	/* INQUIRY response data */
 	const char * vendor;		/* [back_compat] point into 'inquiry' ... */
@@ -173,7 +172,6 @@ struct scsi_device {
 struct scsi_dh_devlist {
 	char *vendor;
 	char *model;
-	char tgps;
 };
 
 struct scsi_device_handler {
@@ -194,6 +192,8 @@ struct scsi_device_handler {
 
 struct scsi_dh_data {
 	struct scsi_device_handler *scsi_dh;
+	struct scsi_device *sdev;
+	struct kref kref;
 	char buf[0];
 };
 

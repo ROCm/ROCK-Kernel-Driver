@@ -386,7 +386,7 @@ extern void kdba_check_pc(kdb_machreg_t *);
 	 * Miscellaneous functions and data areas
 	 */
 extern char *kdb_cmds[];
-extern void debugger_syslog_data(char *syslog_data[]);
+extern void kdb_syslog_data(char *syslog_data[]);
 extern unsigned long kdb_task_state_string(const char *);
 extern char kdb_task_state_char (const struct task_struct *);
 extern unsigned long kdb_task_state(const struct task_struct *p, unsigned long mask);
@@ -486,13 +486,28 @@ extern char kdb_prompt_str[];
 #ifdef CONFIG_KDB_USB
 #include <linux/usb.h>
 
+/* support up to 8 USB keyboards (probably excessive, but...) */
+#define KDB_USB_NUM_KEYBOARDS   8
+
 struct kdb_usb_kbd_info {
 	struct urb *urb;		/* pointer to the URB */
 	unsigned char *buffer;		/* pointer to the kbd char buffer */
 	int (*poll_func)(struct urb *urb); /* poll function to retrieve chars */
 	int	poll_ret;	/* return val from poll_func */
 	int	caps_lock;	/* state of the caps lock for this keyboard */
+	struct uhci_qh *qh;
+	int kdb_hid_event;
+	struct urb *hid_urb;    /* pointer to the HID URB */
+	/* USB Host Controller specific callbacks */
+	kdb_hc_keyboard_attach_t kdb_hc_keyboard_attach;
+	kdb_hc_keyboard_detach_t kdb_hc_keyboard_detach;
+	int (*kdb_hc_urb_complete)(struct urb *urb); /* called when URB int is
+							processed */
+
 };
+
+extern struct kdb_usb_kbd_info kdb_usb_kbds[KDB_USB_NUM_KEYBOARDS];
+
 #endif /* CONFIG_KDB_USB */
 
 #ifdef CONFIG_KDB_KDUMP

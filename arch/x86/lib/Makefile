@@ -9,6 +9,8 @@ lib-y += thunk_$(BITS).o
 lib-y += usercopy_$(BITS).o getuser.o putuser.o
 lib-y += memcpy_$(BITS).o
 
+obj-y += msr-reg.o msr-reg-export.o
+
 ifeq ($(CONFIG_X86_32),y)
         obj-y += atomic64_32.o
         lib-y += checksum_32.o
@@ -23,5 +25,3 @@ else
         lib-y += memmove_64.o memset_64.o
         lib-y += copy_user_64.o rwlock_64.o copy_user_nocache_64.o
 endif
-
-lib-$(CONFIG_XEN_SCRUB_PAGES) += scrub.o

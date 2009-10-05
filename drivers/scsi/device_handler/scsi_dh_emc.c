@@ -618,10 +618,10 @@ done:
 }
 
 static const struct scsi_dh_devlist clariion_dev_list[] = {
-	{"DGC", "RAID", 0},
-	{"DGC", "DISK", 0},
-	{"DGC", "VRAID", 0},
-	{NULL, NULL, 0},
+	{"DGC", "RAID"},
+	{"DGC", "DISK"},
+	{"DGC", "VRAID"},
+	{NULL, NULL},
 };
 
 static int clariion_bus_attach(struct scsi_device *sdev);

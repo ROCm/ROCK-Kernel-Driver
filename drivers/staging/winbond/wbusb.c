@@ -254,7 +254,6 @@ static int wbsoft_config(struct ieee80211_hw *dev, u32 changed)
 	ch.ChanNo = 1;
 
 	hal_set_current_channel(&priv->sHwData, ch);
-	hal_set_beacon_period(&priv->sHwData, conf->beacon_int);
 	hal_set_accept_broadcast(&priv->sHwData, 1);
 	hal_set_accept_promiscuous(&priv->sHwData, 1);
 	hal_set_accept_multicast(&priv->sHwData, 1);
@@ -715,11 +714,6 @@ static int wb35_hw_init(struct ieee80211_hw *hw)
 		else
 			priv->sLocalPara.region = REGION_USA;	/* default setting */
 	}
-
-	// Get Software setting flag from hal
-	priv->sLocalPara.boAntennaDiversity = false;
-	if (hal_software_set(pHwData) & 0x00000001)
-		priv->sLocalPara.boAntennaDiversity = true;
 
 	Mds_initial(priv);
 

@@ -15,12 +15,11 @@ void __init check_bugs(void)
 {
 	identify_boot_cpu();
 #if !defined(CONFIG_SMP)
-	printk("CPU: ");
+	printk(KERN_INFO "CPU: ");
 	print_cpu_info(&boot_cpu_data);
 #endif
 	alternative_instructions();
 
-#ifndef CONFIG_XEN
 	/*
 	 * Make sure the first 2MB area is not mapped by huge pages
 	 * There are typically fixed size MTRRs in there and overlapping
@@ -31,5 +30,4 @@ void __init check_bugs(void)
 	 */
 	if (!direct_gbpages)
 		set_memory_4k((unsigned long)__va(0), 1);
-#endif
 }

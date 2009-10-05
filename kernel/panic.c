@@ -205,7 +205,7 @@ static const struct tnt tnts[] = {
  *  'N' - Unsuported modules loaded.
  *  'X' - Modules with external support loaded.
  *
- *	The string is overwritten by the next call to print_taint().
+ *	The string is overwritten by the next call to print_tainted().
  */
 const char *print_tainted(void)
 {

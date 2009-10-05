@@ -201,12 +201,6 @@ struct kioctx {
 
 	struct delayed_work	wq;
 
-#ifdef CONFIG_EPOLL
-	/* poll integration */
-	wait_queue_head_t       poll_wait;
-	struct file		*file;
-#endif
-
 	struct rcu_head		rcu_head;
 };
 
@@ -230,8 +224,6 @@ static inline void exit_aio(struct mm_struct *mm) { }
 #endif /* CONFIG_AIO */
 
 #define io_wait_to_kiocb(wait) container_of(wait, struct kiocb, ki_wait)
-
-#include <linux/aio_abi.h>
 
 static inline struct kiocb *list_kiocb(struct list_head *h)
 {

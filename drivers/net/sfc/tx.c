@@ -138,8 +138,8 @@ static void efx_tsoh_free(struct efx_tx_queue *tx_queue,
  * Returns NETDEV_TX_OK or NETDEV_TX_BUSY
  * You must hold netif_tx_lock() to call this function.
  */
-static int efx_enqueue_skb(struct efx_tx_queue *tx_queue,
-			   struct sk_buff *skb)
+static netdev_tx_t efx_enqueue_skb(struct efx_tx_queue *tx_queue,
+					 struct sk_buff *skb)
 {
 	struct efx_nic *efx = tx_queue->efx;
 	struct pci_dev *pci_dev = efx->pci_dev;
@@ -152,7 +152,7 @@ static int efx_enqueue_skb(struct efx_tx_queue *tx_queue,
 	unsigned int dma_len;
 	bool unmap_single;
 	int q_space, i = 0;
-	int rc = NETDEV_TX_OK;
+	netdev_tx_t rc = NETDEV_TX_OK;
 
 	EFX_BUG_ON_PARANOID(tx_queue->write_count != tx_queue->insert_count);
 
@@ -353,14 +353,11 @@ static void efx_dequeue_buffers(struct efx_tx_queue *tx_queue,
  *
  * Context: netif_tx_lock held
  */
-inline int efx_xmit(struct efx_nic *efx,
-		    struct efx_tx_queue *tx_queue, struct sk_buff *skb)
+inline netdev_tx_t efx_xmit(struct efx_nic *efx,
+			   struct efx_tx_queue *tx_queue, struct sk_buff *skb)
 {
-	int rc;
-
 	/* Map fragments for DMA and add to TX queue */
-	rc = efx_enqueue_skb(tx_queue, skb);
-	return rc;
+	return efx_enqueue_skb(tx_queue, skb);
 }
 
 /* Initiate a packet transmission.  We use one channel per CPU
@@ -372,11 +369,11 @@ inline int efx_xmit(struct efx_nic *efx,
  * Note that returning anything other than NETDEV_TX_OK will cause the
  * OS to free the skb.
  */
-int efx_hard_start_xmit(struct sk_buff *skb, struct net_device *net_dev)
+netdev_tx_t efx_hard_start_xmit(struct sk_buff *skb,
+				      struct net_device *net_dev)
 {
 	struct efx_nic *efx = netdev_priv(net_dev);
 	struct efx_tx_queue *tx_queue;
-	enum efx_veto veto;
 
 	if (unlikely(efx->port_inhibited))
 		return NETDEV_TX_BUSY;
@@ -385,17 +382,6 @@ int efx_hard_start_xmit(struct sk_buff *skb, struct net_device *net_dev)
 		tx_queue = &efx->tx_queue[EFX_TX_QUEUE_OFFLOAD_CSUM];
 	else
 		tx_queue = &efx->tx_queue[EFX_TX_QUEUE_NO_CSUM];
-
-	/* See if driverlink wants to veto the packet. */
-	veto = EFX_DL_CALLBACK(efx, tx_packet, skb);
-	if (unlikely(veto)) {
-		EFX_DL_LOG(efx, "TX queue %d packet vetoed by "
-			   "driverlink %s driver\n", tx_queue->queue,
-			   efx->dl_cb_dev.tx_packet->driver->name);
-		/* Free the skb; nothing else will do it */
-		dev_kfree_skb_any(skb);
-		return NETDEV_TX_OK;
-	}
 
 	return efx_xmit(efx, tx_queue, skb);
 }

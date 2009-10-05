@@ -34,12 +34,10 @@
 #define _ASM_IA64_XEN_HYPERVISOR_H
 
 #include <linux/err.h>
-#ifdef CONFIG_PARAVIRT_XEN
 #include <xen/interface/xen.h>
 #include <xen/interface/version.h>	/* to compile feature.c */
 #include <xen/features.h>		/* to comiple xen-netfront.c */
 #include <asm/xen/hypercall.h>
-#endif
 
 /* xen_domain_type is set before executing any C code by early_xen_setup */
 enum xen_domain_type {
@@ -48,7 +46,7 @@ enum xen_domain_type {
 	XEN_HVM_DOMAIN,	/* running in a Xen hvm domain*/
 };
 
-#ifdef CONFIG_PARAVIRT_XEN
+#ifdef CONFIG_XEN
 extern enum xen_domain_type xen_domain_type;
 #else
 #define xen_domain_type		XEN_NATIVE
@@ -68,7 +66,7 @@ extern enum xen_domain_type xen_domain_type;
 #endif
 
 
-#ifdef CONFIG_PARAVIRT_XEN
+#ifdef CONFIG_XEN
 extern struct shared_info *HYPERVISOR_shared_info;
 extern struct start_info *xen_start_info;
 

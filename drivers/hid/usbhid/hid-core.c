@@ -4,8 +4,8 @@
  *  Copyright (c) 1999 Andreas Gal
  *  Copyright (c) 2000-2005 Vojtech Pavlik <vojtech@suse.cz>
  *  Copyright (c) 2005 Michael Haboustak <mike-@cinci.rr.com> for Concept2, Inc
- *  Copyright (c) 2006-2008 Jiri Kosina
  *  Copyright (c) 2007-2008 Oliver Neukum
+ *  Copyright (c) 2006-2009 Jiri Kosina
  */
 
 /*
@@ -493,7 +493,8 @@ static void hid_ctrl(struct urb *urb)
 	wake_up(&usbhid->wait);
 }
 
-void __usbhid_submit_report(struct hid_device *hid, struct hid_report *report, unsigned char dir)
+static void __usbhid_submit_report(struct hid_device *hid, struct hid_report *report,
+				   unsigned char dir)
 {
 	int head;
 	struct usbhid_device *usbhid = hid->driver_data;
@@ -889,11 +890,6 @@ static int usbhid_parse(struct hid_device *hid)
 		goto err;
 	}
 
-	dbg_hid("report descriptor (size %u, read %d) = ", rsize, n);
-	for (n = 0; n < rsize; n++)
-		dbg_hid_line(" %02x", (unsigned char) rdesc[n]);
-	dbg_hid_line("\n");
-
 	ret = hid_parse_report(hid, rdesc, rsize);
 	kfree(rdesc);
 	if (ret) {
@@ -990,7 +986,6 @@ static int usbhid_start(struct hid_device *hid)
 	setup_timer(&usbhid->io_retry, hid_retry_timeout, (unsigned long) hid);
 
 	spin_lock_init(&usbhid->lock);
-	spin_lock_init(&usbhid->lock);
 
 	usbhid->intf = intf;
 	usbhid->ifnum = interface->desc.bInterfaceNumber;
@@ -1008,7 +1003,6 @@ static int usbhid_start(struct hid_device *hid)
 	usbhid->urbctrl->transfer_flags |= (URB_NO_TRANSFER_DMA_MAP | URB_NO_SETUP_DMA_MAP);
 
 	usbhid_init_reports(hid);
-	hid_dump_device(hid);
 
 	set_bit(HID_STARTED, &usbhid->iofl);
 
@@ -1059,13 +1053,6 @@ static void usbhid_stop(struct hid_device *hid)
 
 	hid_cancel_delayed_stuff(usbhid);
 
-	if (hid->claimed & HID_CLAIMED_INPUT)
-		hidinput_disconnect(hid);
-	if (hid->claimed & HID_CLAIMED_HIDDEV)
-		hiddev_disconnect(hid);
-	if (hid->claimed & HID_CLAIMED_HIDRAW)
-		hidraw_disconnect(hid);
-
 	hid->claimed = 0;
 
 	usb_free_urb(usbhid->urbin);
@@ -1103,7 +1090,7 @@ static struct hid_ll_driver usb_hid_driver = {
 	.hidinput_input_event = usb_hidinput_input_event,
 };
 
-static int hid_probe(struct usb_interface *intf, const struct usb_device_id *id)
+static int usbhid_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
 	struct usb_host_interface *interface = intf->cur_altsetting;
 	struct usb_device *dev = interface_to_usbdev(intf);
@@ -1135,6 +1122,7 @@ static int hid_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	hid->ff_init = hid_pidff_init;
 #ifdef CONFIG_USB_HIDDEV
 	hid->hiddev_connect = hiddev_connect;
+	hid->hiddev_disconnect = hiddev_disconnect;
 	hid->hiddev_hid_event = hiddev_hid_event;
 	hid->hiddev_report_event = hiddev_report_event;
 #endif
@@ -1194,9 +1182,20 @@ static int hid_probe(struct usb_interface *intf, const struct usb_device_id *id)
 		int ret;
 		struct usbhid_device *usbhid = hid->driver_data;
 		extern void *usb_hcd_get_kdb_poll_func(struct usb_device *udev);
+		extern void * usb_hcd_get_kdb_completion_func(struct usb_device *udev);
+		extern int usb_hcd_check_uhci(struct usb_device *udev);
+		extern kdb_hc_keyboard_attach_t
+			usb_hcd_get_hc_keyboard_attach(struct usb_device *udev);
+		extern kdb_hc_keyboard_detach_t
+			usb_hcd_get_hc_keyboard_detach(struct usb_device *udev);
 
 		ret = kdb_usb_keyboard_attach(usbhid->urbin, usbhid->inbuf,
-		    usb_hcd_get_kdb_poll_func(interface_to_usbdev(intf)));
+					      usb_hcd_get_kdb_poll_func(interface_to_usbdev(intf)),
+					      usb_hcd_get_kdb_completion_func(interface_to_usbdev(intf)),
+					      usb_hcd_get_hc_keyboard_attach(interface_to_usbdev(intf)),
+					      usb_hcd_get_hc_keyboard_detach(interface_to_usbdev(intf)),
+					      usbhid->bufsize,
+					      NULL);
 
 		if (ret == -1)
 			printk(": FAILED to register keyboard (%s) "
@@ -1212,7 +1211,7 @@ err:
 	return ret;
 }
 
-static void hid_disconnect(struct usb_interface *intf)
+static void usbhid_disconnect(struct usb_interface *intf)
 {
 	struct hid_device *hid = usb_get_intfdata(intf);
 	struct usbhid_device *usbhid;
@@ -1394,8 +1393,8 @@ MODULE_DEVICE_TABLE (usb, hid_usb_ids);
 
 static struct usb_driver hid_driver = {
 	.name =		"usbhid",
-	.probe =	hid_probe,
-	.disconnect =	hid_disconnect,
+	.probe =	usbhid_probe,
+	.disconnect =	usbhid_disconnect,
 #ifdef CONFIG_PM
 	.suspend =	hid_suspend,
 	.resume =	hid_resume,

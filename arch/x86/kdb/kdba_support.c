@@ -28,7 +28,6 @@
 #include <asm/msr.h>
 #include <asm/uaccess.h>
 #include <asm/desc.h>
-#include <asm/tlbflush.h>
 
 static kdb_machreg_t
 kdba_getcr(int regnum)
@@ -1235,73 +1234,6 @@ kdba_stackdepth(int argc, const char **argv)
 }
 #else /* CONFIG_X86_32 */
 
-/*
- * kdba_cpu_pda
- *
- *	Format a struct cpu_pda
- *
- * Inputs:
- *	argc	argument count
- *	argv	argument vector
- * Outputs:
- *	None.
- * Returns:
- *	zero for success, a kdb diagnostic if error
- * Locking:
- *	none.
- * Remarks:
- *	If no cpu is supplied, it prints the current cpu.  If the cpu is '*'
- *	then it prints all cpus.
- */
-
-static int
-kdba_cpu_data(int argc, const char **argv)
-{
-	int diag, nextarg, all_cpus = 0;
-	long offset = 0;
-	unsigned long cpu;
-	static const char *fmtl = "  %-17.17s 0x%lx\n";
-	static const char *fmtd = "  %-17.17s %d\n";
-	static const char *fmtp = "  %-17.17s 0x%p\n";
-
-	if (argc == 0) {
-		cpu = smp_processor_id();
-	} else if (argc == 1) {
-		if (strcmp(argv[1], "*") == 0) {
-			all_cpus = 1;
-			cpu = 0;
-		} else {
-			nextarg = 1;
-			diag = kdbgetaddrarg(argc, argv, &nextarg, &cpu, &offset, NULL);
-			if (diag)
-				return diag;
-		}
-	} else {
-		return KDB_ARGCOUNT;
-	}
-
-	for (; cpu < NR_CPUS; ++cpu) {
-		if (cpu_online(cpu)) {
-			irq_cpustat_t *irq_stats = &per_cpu(irq_stat, cpu);
-			kdb_printf(fmtp, "current_task", per_cpu(current_task, cpu));
-			kdb_printf(fmtl, "offset", per_cpu(this_cpu_off, cpu));
-			kdb_printf(fmtl, "kernel_stack", per_cpu(kernel_stack, cpu));
-			kdb_printf(fmtl, "old_rsp", per_cpu(old_rsp, cpu));
-			kdb_printf(fmtd, "irq_count", per_cpu(irq_count, cpu));
-			kdb_printf(fmtd, "cpu_number", per_cpu(cpu_number, cpu));
-			kdb_printf(fmtp, "irq_stack_ptr", per_cpu(irq_stack_ptr, cpu));
-			kdb_printf(fmtp, "node_number", cpu_to_node(cpu));
-			kdb_printf(fmtd, "__softirq_pending", irq_stats->__softirq_pending);
-			kdb_printf(fmtd, "__nmi_count", irq_stats->__nmi_count);
-			kdb_printf(fmtd, "mmu_state", per_cpu(cpu_tlbstate.state, cpu));
-			kdb_printf(fmtp, "active_mm", per_cpu(cpu_tlbstate.active_mm, cpu));
-			kdb_printf(fmtd, "apic_timer_irqs", irq_stats->apic_timer_irqs);
-		}
-		if (!all_cpus)
-			break;
-	}
-	return 0;
-}
 
 /*
  * kdba_entry
@@ -1393,7 +1325,6 @@ kdba_init(void)
 #ifdef CONFIG_X86_32
 	kdb_register("stackdepth", kdba_stackdepth, "[percentage]", "Print processes using >= stack percentage", 0);
 #else
-	kdb_register("cpu_data", kdba_cpu_data, "<cpu>", "Format per-process data", 0);
 	register_die_notifier(&kdba_notifier);
 #endif
 	return;
@@ -1597,7 +1528,7 @@ extern void halt_current_cpu(struct pt_regs *);
 
 void kdba_kdump_shutdown_slave(struct pt_regs *regs)
 {
-#ifndef CONFIG_PARAVIRT_XEN
+#ifndef CONFIG_XEN
 	halt_current_cpu(regs);
 #endif /* CONFIG_XEN */
 }

@@ -884,13 +884,12 @@ static int efx_wanted_rx_queues(void)
 	int count;
 	int cpu;
 
-	if (unlikely(!alloc_cpumask_var(&core_mask, GFP_KERNEL))) {
+	if (unlikely(!zalloc_cpumask_var(&core_mask, GFP_KERNEL))) {
 		printk(KERN_WARNING
 		       "sfc: RSS disabled due to allocation failure\n");
 		return 1;
 	}
 
-	cpumask_clear(core_mask);
 	count = 0;
 	for_each_online_cpu(cpu) {
 		if (!cpumask_test_cpu(cpu, core_mask)) {
@@ -1179,6 +1178,8 @@ static void efx_stop_all(struct efx_nic *efx)
 
 	/* Isolate the MAC from the TX and RX engines, so that queue
 	 * flushes will complete in a timely fashion. */
+	falcon_deconfigure_mac_wrapper(efx);
+	msleep(10); /* Let the Rx FIFO drain */
 	falcon_drain_tx_fifo(efx);
 
 	/* Stop the kernel transmit interface late, so the watchdog
@@ -1486,21 +1487,12 @@ static int efx_change_mtu(struct net_device *net_dev, int new_mtu)
 
 	efx_stop_all(efx);
 
-	/* Ask driverlink client if we can change MTU */
-	rc = EFX_DL_CALLBACK(efx, request_mtu, new_mtu);
-	if (rc)
-		goto out;
-
 	EFX_LOG(efx, "changing MTU to %d\n", new_mtu);
 
 	efx_fini_channels(efx);
 	net_dev->mtu = new_mtu;
 	efx_init_channels(efx);
 
-	/* Notify driverlink client of new MTU */
-	EFX_DL_CALLBACK(efx, mtu_changed, new_mtu);
-
- out:
 	efx_start_all(efx);
 	return rc;
 }
@@ -1623,21 +1615,24 @@ static int efx_register_netdev(struct efx_nic *efx)
 	SET_NETDEV_DEV(net_dev, &efx->pci_dev->dev);
 	SET_ETHTOOL_OPS(net_dev, &efx_ethtool_ops);
 
-	/* Always start with carrier off; PHY events will detect the link */
-	netif_carrier_off(efx->net_dev);
-
 	/* Clear MAC statistics */
 	efx->mac_op->update_stats(efx);
 	memset(&efx->mac_stats, 0, sizeof(efx->mac_stats));
 
-	rc = register_netdev(net_dev);
-	if (rc) {
-		EFX_ERR(efx, "could not register net dev\n");
-		return rc;
-	}
-
 	rtnl_lock();
+
+	rc = dev_alloc_name(net_dev, net_dev->name);
+	if (rc < 0)
+		goto fail_locked;
 	efx_update_name(efx);
+
+	rc = register_netdevice(net_dev);
+	if (rc)
+		goto fail_locked;
+
+	/* Always start with carrier off; PHY events will detect the link */
+	netif_carrier_off(efx->net_dev);
+
 	rtnl_unlock();
 
 	rc = device_create_file(&efx->pci_dev->dev, &dev_attr_phy_type);
@@ -1647,6 +1642,11 @@ static int efx_register_netdev(struct efx_nic *efx)
 	}
 
 	return 0;
+
+fail_locked:
+	rtnl_unlock();
+	EFX_ERR(efx, "could not register net dev\n");
+	return rc;
 
 fail_registered:
 	unregister_netdev(net_dev);
@@ -1680,25 +1680,6 @@ static void efx_unregister_netdev(struct efx_nic *efx)
  * Device reset and suspend
  *
  **************************************************************************/
-#ifdef CONFIG_SFC_DRIVERLINK
-/* Serialise access to the driverlink callbacks, by quiescing event processing
- * (without flushing the descriptor queues), and acquiring the rtnl_lock */
-void efx_suspend(struct efx_nic *efx)
-{
-	EFX_LOG(efx, "suspending operations\n");
-
-	rtnl_lock();
-	efx_stop_all(efx);
-}
-
-void efx_resume(struct efx_nic *efx)
-{
-	EFX_LOG(efx, "resuming operations\n");
-
-	efx_start_all(efx);
-	rtnl_unlock();
-}
-#endif
 
 /* Tears down the entire software state and most of the hardware state
  * before reset.  */
@@ -1779,8 +1760,8 @@ static int efx_reset(struct efx_nic *efx)
 	enum reset_type method = efx->reset_pending;
 	int rc = 0;
 
+	/* Serialise with kernel interfaces */
 	rtnl_lock();
-	efx_dl_reset_suspend(efx);
 
 	/* If we're not RUNNING then don't reset. Leave the reset_pending
 	 * flag set so that efx_pci_probe_main will be retried */
@@ -1826,7 +1807,6 @@ out_disable:
 	}
 
 out_unlock:
-	efx_dl_reset_resume(efx, 1);
 	rtnl_unlock();
 	return rc;
 }
@@ -1971,11 +1951,6 @@ static int efx_init_struct(struct efx_nic *efx, struct efx_nic_type *type,
 	efx->mac_op = &efx_dummy_mac_operations;
 	efx->phy_op = &efx_dummy_phy_operations;
 	efx->mdio.dev = net_dev;
-#ifdef CONFIG_SFC_DRIVERLINK
-	INIT_LIST_HEAD(&efx->dl_node);
-	INIT_LIST_HEAD(&efx->dl_device_list);
-	efx->dl_cb = efx_default_callbacks;
-#endif
 	INIT_WORK(&efx->phy_work, efx_phy_work);
 	INIT_WORK(&efx->mac_work, efx_mac_work);
 	atomic_set(&efx->netif_stop_count, 1);
@@ -2079,7 +2054,6 @@ static void efx_pci_remove(struct pci_dev *pci_dev)
 	efx = pci_get_drvdata(pci_dev);
 	if (!efx)
 		return;
-	efx_dl_unregister_nic(efx);
 
 	/* Mark the NIC as fini, then stop the interface */
 	rtnl_lock();
@@ -2256,16 +2230,9 @@ static int __devinit efx_pci_probe(struct pci_dev *pci_dev,
 	if (rc)
 		goto fail5;
 
-	/* Register with driverlink layer */
-	rc = efx_dl_register_nic(efx);
-	if (rc)
-		goto fail6;
-
 	EFX_LOG(efx, "initialisation successful\n");
 	return 0;
 
- fail6:
-	efx_unregister_netdev(efx);
  fail5:
 	efx_pci_remove_main(efx);
  fail4:

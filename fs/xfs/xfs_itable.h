@@ -101,8 +101,8 @@ xfs_bulkstat_one(
 
 int
 xfs_internal_inum(
-	xfs_mount_t		*mp,
-	xfs_ino_t		ino);
+       xfs_mount_t             *mp,
+       xfs_ino_t               ino);
 
 typedef int (*inumbers_fmt_pf)(
 	void			__user *ubuffer, /* buffer to write to */

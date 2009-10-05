@@ -48,7 +48,7 @@
  * head_32 for boot CPU and setup_per_cpu_areas() for others.
  */
 #define GDT_STACK_CANARY_INIT						\
-	[GDT_ENTRY_STACK_CANARY] = { { { 0x00000018, 0x00409000 } } },
+	[GDT_ENTRY_STACK_CANARY] = GDT_ENTRY_INIT(0x4090, 0, 0x18),
 
 /*
  * Initialize the stackprotector canary value.
@@ -90,9 +90,7 @@ static inline void setup_stack_canary_segment(int cpu)
 	struct desc_struct desc;
 
 	desc = gdt_table[GDT_ENTRY_STACK_CANARY];
-	desc.base0 = canary & 0xffff;
-	desc.base1 = (canary >> 16) & 0xff;
-	desc.base2 = (canary >> 24) & 0xff;
+	set_desc_base(&desc, canary);
 	write_gdt_entry(gdt_table, GDT_ENTRY_STACK_CANARY, &desc, DESCTYPE_S);
 #endif
 }

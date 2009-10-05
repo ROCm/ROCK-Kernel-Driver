@@ -143,7 +143,16 @@ extern void smp_kdb_stop(void);
 
 #include <linux/usb.h>
 
-extern int kdb_usb_keyboard_attach(struct urb *urb, unsigned char *buffer, void *poll_func);
+typedef int (*kdb_hc_keyboard_attach_t)(int i, unsigned int bufsize);
+typedef int (*kdb_hc_keyboard_detach_t)(struct urb *urb, int i);
+
+extern int kdb_usb_keyboard_attach(struct urb *urb, unsigned char *buffer,
+				   void *poll_func, void *compl_func,
+				   kdb_hc_keyboard_attach_t kdb_hc_keyboard_attach,
+				   kdb_hc_keyboard_detach_t kdb_hc_keyboard_detach,
+				   unsigned int bufsize,
+				   struct urb *hid_urb);
+
 extern int kdb_usb_keyboard_detach(struct urb *urb);
 
 #endif /* CONFIG_KDB_USB */

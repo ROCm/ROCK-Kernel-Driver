@@ -110,7 +110,6 @@ void __attribute__((weak)) unxlate_dev_mem_ptr(unsigned long phys, void *addr)
 {
 }
 
-#ifndef ARCH_HAS_DEV_MEM
 /*
  * This funcion reads the *physical* memory. The f_pos points directly to the 
  * memory location. 
@@ -255,7 +254,6 @@ static ssize_t write_mem(struct file * file, const char __user * buf,
 	*ppos += written;
 	return written;
 }
-#endif
 
 int __attribute__((weak)) phys_mem_access_prot_allowed(struct file *file,
 	unsigned long pfn, unsigned long size, pgprot_t *vma_prot)
@@ -303,7 +301,7 @@ static inline int private_mapping_ok(struct vm_area_struct *vma)
 }
 #endif
 
-static struct vm_operations_struct mmap_mem_ops = {
+static const struct vm_operations_struct mmap_mem_ops = {
 #ifdef CONFIG_HAVE_IOREMAP_PROT
 	.access = generic_access_phys
 #endif
@@ -347,9 +345,6 @@ static int mmap_mem(struct file * file, struct vm_area_struct * vma)
 static int mmap_kmem(struct file * file, struct vm_area_struct * vma)
 {
 	unsigned long pfn;
-#ifdef CONFIG_XEN
-	unsigned long i, count;
-#endif
 
 	/* Turn a kernel-virtual address into a physical page frame */
 	pfn = __pa((u64)vma->vm_pgoff << PAGE_SHIFT) >> PAGE_SHIFT;
@@ -363,13 +358,6 @@ static int mmap_kmem(struct file * file, struct vm_area_struct * vma)
 	 */
 	if (!pfn_valid(pfn))
 		return -EIO;
-
-#ifdef CONFIG_XEN
-	count = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
-	for (i = 0; i < count; i++)
-		if ((pfn + i) != mfn_to_local_pfn(pfn_to_mfn(pfn + i)))
-			return -EIO;
-#endif
 
 	vma->vm_pgoff = pfn;
 	return mmap_mem(file, vma);
@@ -702,7 +690,7 @@ static ssize_t read_zero(struct file * file, char __user * buf,
 
 		if (chunk > PAGE_SIZE)
 			chunk = PAGE_SIZE;	/* Just for latency reasons */
-		unwritten = clear_user(buf, chunk);
+		unwritten = __clear_user(buf, chunk);
 		written += chunk - unwritten;
 		if (unwritten)
 			break;
@@ -786,7 +774,6 @@ static int open_port(struct inode * inode, struct file * filp)
 #define open_kmem	open_mem
 #define open_oldmem	open_mem
 
-#ifndef ARCH_HAS_DEV_MEM
 static const struct file_operations mem_fops = {
 	.llseek		= memory_lseek,
 	.read		= read_mem,
@@ -795,9 +782,6 @@ static const struct file_operations mem_fops = {
 	.open		= open_mem,
 	.get_unmapped_area = get_unmapped_area_mem,
 };
-#else
-extern const struct file_operations mem_fops;
-#endif
 
 #ifdef CONFIG_DEVKMEM
 static const struct file_operations kmem_fops = {
@@ -838,6 +822,7 @@ static const struct file_operations zero_fops = {
  * - permits private mappings, "copies" are taken of the source of zeros
  */
 static struct backing_dev_info zero_bdi = {
+	.name		= "char/mem",
 	.capabilities	= BDI_CAP_MAP_COPY,
 };
 
@@ -879,71 +864,75 @@ static const struct file_operations kmsg_fops = {
 	.write =	kmsg_write,
 };
 
-static const struct {
-	unsigned int		minor;
-	char			*name;
-	umode_t			mode;
-	const struct file_operations	*fops;
-	struct backing_dev_info	*dev_info;
-} devlist[] = { /* list of minor devices */
-	{1, "mem",     S_IRUSR | S_IWUSR | S_IRGRP, &mem_fops,
-		&directly_mappable_cdev_bdi},
+static const struct memdev {
+	const char *name;
+	mode_t mode;
+	const struct file_operations *fops;
+	struct backing_dev_info *dev_info;
+} devlist[] = {
+	 [1] = { "mem", 0, &mem_fops, &directly_mappable_cdev_bdi },
 #ifdef CONFIG_DEVKMEM
-	{2, "kmem",    S_IRUSR | S_IWUSR | S_IRGRP, &kmem_fops,
-		&directly_mappable_cdev_bdi},
+	 [2] = { "kmem", 0, &kmem_fops, &directly_mappable_cdev_bdi },
 #endif
-	{3, "null",    S_IRUGO | S_IWUGO,           &null_fops, NULL},
+	 [3] = { "null", 0666, &null_fops, NULL },
 #ifdef CONFIG_DEVPORT
-	{4, "port",    S_IRUSR | S_IWUSR | S_IRGRP, &port_fops, NULL},
+	 [4] = { "port", 0, &port_fops, NULL },
 #endif
-	{5, "zero",    S_IRUGO | S_IWUGO,           &zero_fops, &zero_bdi},
-	{7, "full",    S_IRUGO | S_IWUGO,           &full_fops, NULL},
-	{8, "random",  S_IRUGO | S_IWUSR,           &random_fops, NULL},
-	{9, "urandom", S_IRUGO | S_IWUSR,           &urandom_fops, NULL},
-	{11,"kmsg",    S_IRUGO | S_IWUSR,           &kmsg_fops, NULL},
+	 [5] = { "zero", 0666, &zero_fops, &zero_bdi },
+	 [7] = { "full", 0666, &full_fops, NULL },
+	 [8] = { "random", 0666, &random_fops, NULL },
+	 [9] = { "urandom", 0666, &urandom_fops, NULL },
+	[11] = { "kmsg", 0, &kmsg_fops, NULL },
 #ifdef CONFIG_CRASH_DUMP
-	{12,"oldmem",    S_IRUSR | S_IWUSR | S_IRGRP, &oldmem_fops, NULL},
+	[12] = { "oldmem", 0, &oldmem_fops, NULL },
 #endif
 };
 
 static int memory_open(struct inode *inode, struct file *filp)
 {
-	int ret = 0;
-	int i;
+	int minor;
+	const struct memdev *dev;
+	int ret = -ENXIO;
 
 	lock_kernel();
 
-	for (i = 0; i < ARRAY_SIZE(devlist); i++) {
-		if (devlist[i].minor == iminor(inode)) {
-			filp->f_op = devlist[i].fops;
-			if (devlist[i].dev_info) {
-				filp->f_mapping->backing_dev_info =
-					devlist[i].dev_info;
-			}
+	minor = iminor(inode);
+	if (minor >= ARRAY_SIZE(devlist))
+		goto out;
 
-			break;
-		}
-	}
+	dev = &devlist[minor];
+	if (!dev->fops)
+		goto out;
 
-	if (i == ARRAY_SIZE(devlist))
-		ret = -ENXIO;
+	filp->f_op = dev->fops;
+	if (dev->dev_info)
+		filp->f_mapping->backing_dev_info = dev->dev_info;
+
+	if (dev->fops->open)
+		ret = dev->fops->open(inode, filp);
 	else
-		if (filp->f_op && filp->f_op->open)
-			ret = filp->f_op->open(inode, filp);
-
+		ret = 0;
+out:
 	unlock_kernel();
 	return ret;
 }
 
 static const struct file_operations memory_fops = {
-	.open		= memory_open,	/* just a selector for the real open */
+	.open		= memory_open,
 };
+
+static char *mem_devnode(struct device *dev, mode_t *mode)
+{
+	if (mode && devlist[MINOR(dev->devt)].mode)
+		*mode = devlist[MINOR(dev->devt)].mode;
+	return NULL;
+}
 
 static struct class *mem_class;
 
 static int __init chr_dev_init(void)
 {
-	int i;
+	int minor;
 	int err;
 
 	err = bdi_init(&zero_bdi);
@@ -954,10 +943,13 @@ static int __init chr_dev_init(void)
 		printk("unable to get major %d for memory devs\n", MEM_MAJOR);
 
 	mem_class = class_create(THIS_MODULE, "mem");
-	for (i = 0; i < ARRAY_SIZE(devlist); i++)
-		device_create(mem_class, NULL,
-			      MKDEV(MEM_MAJOR, devlist[i].minor), NULL,
-			      devlist[i].name);
+	mem_class->devnode = mem_devnode;
+	for (minor = 1; minor < ARRAY_SIZE(devlist); minor++) {
+		if (!devlist[minor].name)
+			continue;
+		device_create(mem_class, NULL, MKDEV(MEM_MAJOR, minor),
+			      NULL, devlist[minor].name);
+	}
 
 	return 0;
 }

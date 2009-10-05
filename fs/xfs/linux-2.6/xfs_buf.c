@@ -194,7 +194,7 @@ free_address(
 {
 	a_list_t	*aentry;
 
-#if defined(CONFIG_XEN) || defined(CONFIG_PARAVIRT_XEN)
+#ifdef CONFIG_XEN
 	/*
 	 * Xen needs to be able to make sure it can get an exclusive
 	 * RO mapping of pages it wants to turn into a pagetable.  If

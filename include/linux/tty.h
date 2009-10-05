@@ -23,7 +23,7 @@
  */
 #define NR_UNIX98_PTY_DEFAULT	4096      /* Default maximum for Unix98 ptys */
 #define NR_UNIX98_PTY_MAX	(1 << MINORBITS) /* Absolute limit */
-#define NR_LDISCS		19
+#define NR_LDISCS		20
 
 /* line disciplines */
 #define N_TTY		0
@@ -46,6 +46,8 @@
 #define N_GIGASET_M101	16	/* Siemens Gigaset M101 serial DECT adapter */
 #define N_SLCAN		17	/* Serial / USB serial CAN Adaptors */
 #define N_PPS		18	/* Pulse per Second */
+
+#define N_V253		19	/* Codec control over voice modem */
 
 /*
  * This character is the same as _POSIX_VDISABLE: it cannot be used as
@@ -201,11 +203,12 @@ struct tty_port {
 	int			count;		/* Usage count */
 	wait_queue_head_t	open_wait;	/* Open waiters */
 	wait_queue_head_t	close_wait;	/* Close waiters */
+	wait_queue_head_t	delta_msr_wait;	/* Modem status change */
 	unsigned long		flags;		/* TTY flags ASY_*/
 	struct mutex		mutex;		/* Locking */
 	unsigned char		*xmit_buf;	/* Optional buffer */
-	int			close_delay;	/* Close port delay */
-	int			closing_wait;	/* Delay for output */
+	unsigned int		close_delay;	/* Close port delay */
+	unsigned int		closing_wait;	/* Delay for output */
 	int			drain_delay;	/* Set to zero if no pure time
 						   based drain is needed else
 						   set to size of fifo */
@@ -464,6 +467,11 @@ extern int tty_port_close_start(struct tty_port *port,
 extern void tty_port_close_end(struct tty_port *port, struct tty_struct *tty);
 extern void tty_port_close(struct tty_port *port,
 				struct tty_struct *tty, struct file *filp);
+extern inline int tty_port_users(struct tty_port *port)
+{
+	return port->count + port->blocked_open;
+}
+
 extern int tty_register_ldisc(int disc, struct tty_ldisc_ops *new_ldisc);
 extern int tty_unregister_ldisc(int disc);
 extern int tty_set_ldisc(struct tty_struct *tty, int ldisc);
@@ -523,14 +531,13 @@ extern void serial_console_init(void);
 
 extern int pcxe_open(struct tty_struct *tty, struct file *filp);
 
-/* printk.c */
-
-extern void console_print(const char *);
-
 /* vt.c */
 
 extern int vt_ioctl(struct tty_struct *tty, struct file *file,
 		    unsigned int cmd, unsigned long arg);
+
+extern long vt_compat_ioctl(struct tty_struct *tty, struct file * file,
+		     unsigned int cmd, unsigned long arg);
 
 #endif /* __KERNEL__ */
 #endif

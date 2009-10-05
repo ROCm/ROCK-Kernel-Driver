@@ -39,7 +39,7 @@
 #else
 # define IA32_SYSCALL_VECTOR		0x80
 #endif
-#define KDBENTER_VECTOR		0x81
+#define KDBENTER_VECTOR 	0x81
 
 /*
  * Reserve the lowest usable priority level 0x20 - 0x2f for triggering

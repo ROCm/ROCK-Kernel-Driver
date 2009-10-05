@@ -20,7 +20,7 @@
 
 #include <linux/kdb.h>
 #include <linux/kdbprivate.h>
-#include <pc_keyb.h>
+#include "pc_keyb.h"
 
 #ifdef	CONFIG_VT_CONSOLE
 #define KDB_BLINK_LED 1
@@ -30,9 +30,8 @@
 
 #ifdef	CONFIG_KDB_USB
 
-/* support up to 8 USB keyboards (probably excessive, but...) */
-#define KDB_USB_NUM_KEYBOARDS   8
 struct kdb_usb_kbd_info kdb_usb_kbds[KDB_USB_NUM_KEYBOARDS];
+EXPORT_SYMBOL(kdb_usb_kbds);
 
 extern int kdb_no_usb;
 
@@ -60,7 +59,12 @@ static unsigned char kdb_usb_keycode[256] = {
  * Attach a USB keyboard to kdb.
  */
 int
-kdb_usb_keyboard_attach(struct urb *urb, unsigned char *buffer, void *poll_func)
+kdb_usb_keyboard_attach(struct urb *urb, unsigned char *buffer,
+			void *poll_func, void *compl_func,
+			kdb_hc_keyboard_attach_t kdb_hc_keyboard_attach,
+			kdb_hc_keyboard_detach_t kdb_hc_keyboard_detach,
+			unsigned int bufsize,
+			struct urb *hid_urb)
 {
         int     i;
         int     rc = -1;
@@ -82,6 +86,16 @@ kdb_usb_keyboard_attach(struct urb *urb, unsigned char *buffer, void *poll_func)
                 kdb_usb_kbds[i].urb = urb;
                 kdb_usb_kbds[i].buffer = buffer;
                 kdb_usb_kbds[i].poll_func = poll_func;
+
+		kdb_usb_kbds[i].kdb_hc_urb_complete = compl_func;
+		kdb_usb_kbds[i].kdb_hc_keyboard_attach = kdb_hc_keyboard_attach;
+		kdb_usb_kbds[i].kdb_hc_keyboard_detach = kdb_hc_keyboard_detach;
+
+		/* USB Host Controller specific Keyboadr attach callback.
+		 * Currently only UHCI has this callback.
+		 */
+		if (kdb_usb_kbds[i].kdb_hc_keyboard_attach)
+			kdb_usb_kbds[i].kdb_hc_keyboard_attach(i, bufsize);
 
                 rc = 0; /* success */
 
@@ -112,14 +126,23 @@ kdb_usb_keyboard_detach(struct urb *urb)
          */
 
         for (i = 0; i < KDB_USB_NUM_KEYBOARDS; i++) {
-                if (kdb_usb_kbds[i].urb != urb)
+		if ((kdb_usb_kbds[i].urb != urb) &&
+		    (kdb_usb_kbds[i].hid_urb != urb))
                         continue;
 
                 /* found it, clear the index */
+
+		/* USB Host Controller specific Keyboard detach callback.
+		 * Currently only UHCI has this callback.
+		 */
+		if (kdb_usb_kbds[i].kdb_hc_keyboard_detach)
+			kdb_usb_kbds[i].kdb_hc_keyboard_detach(urb, i);
+
                 kdb_usb_kbds[i].urb = NULL;
                 kdb_usb_kbds[i].buffer = NULL;
                 kdb_usb_kbds[i].poll_func = NULL;
                 kdb_usb_kbds[i].caps_lock = 0;
+		kdb_usb_kbds[i].hid_urb = NULL;
 
                 rc = 0; /* success */
 
@@ -139,9 +162,10 @@ static int
 get_usb_char(void)
 {
         int     i;
-        int     ret;
         unsigned char keycode, spec;
         extern u_short plain_map[], shift_map[], ctrl_map[];
+        int     ret = 1;
+	int     ret_key = -1, j, max;
 
         if (kdb_no_usb)
                 return -1;
@@ -168,15 +192,24 @@ get_usb_char(void)
                 if (ret < 0) /* error or no characters, try the next kbd */
                         continue;
 
+		/* If 2 keys was pressed simultaneously,
+		 * both keycodes will be in buffer.
+		 * Last pressed key will be last non
+		 * zero byte.
+		 */
+		for (j=0; j<4; j++){
+			if (!kdb_usb_kbds[i].buffer[2+j])
+				break;
+		}
+		/* Last pressed key */
+		max = j + 1;
+
                 spec = kdb_usb_kbds[i].buffer[0];
                 keycode = kdb_usb_kbds[i].buffer[2];
                 kdb_usb_kbds[i].buffer[0] = (char)0;
                 kdb_usb_kbds[i].buffer[2] = (char)0;
 
-                if(kdb_usb_kbds[i].buffer[3]) {
-                        kdb_usb_kbds[i].buffer[3] = (char)0;
-                        continue;
-                }
+		ret_key = -1;
 
                 /* A normal key is pressed, decode it */
                 if(keycode)
@@ -188,10 +221,12 @@ get_usb_char(void)
                         {
                         case 0x2:
                         case 0x20: /* Shift */
-                                return shift_map[keycode];
+                                ret_key = shift_map[keycode];
+				break;
                         case 0x1:
                         case 0x10: /* Ctrl */
-                                return ctrl_map[keycode];
+                                ret_key = ctrl_map[keycode];
+				break;
                         case 0x4:
                         case 0x40: /* Alt */
                                 break;
@@ -200,27 +235,49 @@ get_usb_char(void)
                         switch(keycode)
                         {
                         case 0x1C: /* Enter */
-                                return 13;
+                                ret_key = 13;
+				break;
 
                         case 0x3A: /* Capslock */
                                 kdb_usb_kbds[i].caps_lock = !(kdb_usb_kbds[i].caps_lock);
                                 break;
                         case 0x0E: /* Backspace */
-                                return 8;
+                                ret_key = 8;
+				break;
                         case 0x0F: /* TAB */
-                                return 9;
+                                ret_key = 9;
+				break;
                         case 0x77: /* Pause */
                                 break ;
                         default:
                                 if(!kdb_usb_kbds[i].caps_lock) {
-                                        return plain_map[keycode];
+                                        ret_key = plain_map[keycode];
                                 }
                                 else {
-                                        return shift_map[keycode];
+                                        ret_key = shift_map[keycode];
                                 }
                         }
                 }
+
+		if (ret_key != 1) {
+			/* Key was pressed, return keycode */
+
+			/* Clear buffer before urb resending */
+			if (kdb_usb_kbds[i].buffer)
+				for(j=0; j<8; j++)
+					kdb_usb_kbds[i].buffer[j] = (char)0;
+
+			/* USB Host Controller specific Urb complete callback.
+			 * Currently only UHCI has this callback.
+			 */
+			if (kdb_usb_kbds[i].kdb_hc_urb_complete)
+				(*kdb_usb_kbds[i].kdb_hc_urb_complete)((struct urb *)kdb_usb_kbds[i].urb);
+
+			return ret_key;
+		}
         }
+
+
 
         /* no chars were returned from any of the USB keyboards */
 
