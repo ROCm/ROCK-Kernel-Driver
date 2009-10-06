@@ -142,24 +142,6 @@ static int __init __permitted_clock_jitter(char *str)
 }
 __setup("permitted_clock_jitter=", __permitted_clock_jitter);
 
-#if 0
-static void delay_tsc(unsigned long loops)
-{
-	unsigned long bclock, now;
-
-	rdtscl(bclock);
-	do {
-		rep_nop();
-		rdtscl(now);
-	} while ((now - bclock) < loops);
-}
-
-struct timer_opts timer_tsc = {
-	.name = "tsc",
-	.delay = delay_tsc,
-};
-#endif
-
 /*
  * Scale a 64-bit delta by scaling and multiplying by a 32-bit fraction,
  * yielding a 64-bit result.
@@ -351,7 +333,7 @@ static unsigned long long local_clock(void)
 
 	do {
 		local_time_version = shadow->version;
-		barrier();
+		rdtsc_barrier();
 		time = shadow->system_timestamp + get_nsec_offset(shadow);
 		if (!time_values_up_to_date())
 			get_time_values_from_xen(cpu);
