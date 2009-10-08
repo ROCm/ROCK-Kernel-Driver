@@ -94,6 +94,9 @@ static void xhci_link_segments(struct xhci_hcd *xhci, struct xhci_segment *prev,
 		val = prev->trbs[TRBS_PER_SEGMENT-1].link.control;
 		val &= ~TRB_TYPE_BITMASK;
 		val |= TRB_TYPE(TRB_LINK);
+		/* Always set the chain bit with 0.95 hardware */
+		if (xhci_link_trb_quirk(xhci))
+			val |= TRB_CHAIN;
 		prev->trbs[TRBS_PER_SEGMENT-1].link.control = val;
 	}
 	xhci_dbg(xhci, "Linking segment 0x%llx to segment 0x%llx (DMA)\n",
@@ -398,15 +401,28 @@ int xhci_setup_addressable_virt_dev(struct xhci_hcd *xhci, struct usb_device *ud
 	/* Step 5 */
 	ep0_ctx->ep_info2 = EP_TYPE(CTRL_EP);
 	/*
-	 * See section 4.3 bullet 6:
-	 * The default Max Packet size for ep0 is "8 bytes for a USB2
-	 * LS/FS/HS device or 512 bytes for a USB3 SS device"
 	 * XXX: Not sure about wireless USB devices.
 	 */
-	if (udev->speed == USB_SPEED_SUPER)
+	switch (udev->speed) {
+	case USB_SPEED_SUPER:
 		ep0_ctx->ep_info2 |= MAX_PACKET(512);
-	else
+		break;
+	case USB_SPEED_HIGH:
+	/* USB core guesses at a 64-byte max packet first for FS devices */
+	case USB_SPEED_FULL:
+		ep0_ctx->ep_info2 |= MAX_PACKET(64);
+		break;
+	case USB_SPEED_LOW:
 		ep0_ctx->ep_info2 |= MAX_PACKET(8);
+		break;
+	case USB_SPEED_VARIABLE:
+		xhci_dbg(xhci, "FIXME xHCI doesn't support wireless speeds\n");
+		return -EINVAL;
+		break;
+	default:
+		/* New speed? */
+		BUG();
+	}
 	/* EP 0 can handle "burst" sizes of 1, so Max Burst Size field is 0 */
 	ep0_ctx->ep_info2 |= MAX_BURST(0);
 	ep0_ctx->ep_info2 |= ERROR_COUNT(3);
@@ -596,6 +612,44 @@ void xhci_endpoint_zero(struct xhci_hcd *xhci,
 	/* Don't free the endpoint ring until the set interface or configuration
 	 * request succeeds.
 	 */
+}
+
+/* Copy output xhci_ep_ctx to the input xhci_ep_ctx copy.
+ * Useful when you want to change one particular aspect of the endpoint and then
+ * issue a configure endpoint command.
+ */
+void xhci_endpoint_copy(struct xhci_hcd *xhci,
+		struct xhci_virt_device *vdev, unsigned int ep_index)
+{
+	struct xhci_ep_ctx *out_ep_ctx;
+	struct xhci_ep_ctx *in_ep_ctx;
+
+	out_ep_ctx = xhci_get_ep_ctx(xhci, vdev->out_ctx, ep_index);
+	in_ep_ctx = xhci_get_ep_ctx(xhci, vdev->in_ctx, ep_index);
+
+	in_ep_ctx->ep_info = out_ep_ctx->ep_info;
+	in_ep_ctx->ep_info2 = out_ep_ctx->ep_info2;
+	in_ep_ctx->deq = out_ep_ctx->deq;
+	in_ep_ctx->tx_info = out_ep_ctx->tx_info;
+}
+
+/* Copy output xhci_slot_ctx to the input xhci_slot_ctx.
+ * Useful when you want to change one particular aspect of the endpoint and then
+ * issue a configure endpoint command.  Only the context entries field matters,
+ * but we'll copy the whole thing anyway.
+ */
+void xhci_slot_copy(struct xhci_hcd *xhci, struct xhci_virt_device *vdev)
+{
+	struct xhci_slot_ctx *in_slot_ctx;
+	struct xhci_slot_ctx *out_slot_ctx;
+
+	in_slot_ctx = xhci_get_slot_ctx(xhci, vdev->in_ctx);
+	out_slot_ctx = xhci_get_slot_ctx(xhci, vdev->out_ctx);
+
+	in_slot_ctx->dev_info = out_slot_ctx->dev_info;
+	in_slot_ctx->dev_info2 = out_slot_ctx->dev_info2;
+	in_slot_ctx->tt_info = out_slot_ctx->tt_info;
+	in_slot_ctx->dev_state = out_slot_ctx->dev_state;
 }
 
 /* Set up the scratchpad buffer array and scratchpad buffers, if needed. */

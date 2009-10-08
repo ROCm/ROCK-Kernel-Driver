@@ -1028,7 +1028,7 @@ static void part_round_stats_single(int cpu, struct hd_struct *part,
 	if (now == part->stamp)
 		return;
 
-	if (part->in_flight) {
+	if (part_in_flight(part)) {
 		__part_stat_add(cpu, part, time_in_queue,
 				part_in_flight(part) * (now - part->stamp));
 		__part_stat_add(cpu, part, io_ticks, (now - part->stamp));

@@ -1159,27 +1159,21 @@ int i915_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	mutex_lock(&dev->struct_mutex);
 	if (!obj_priv->gtt_space) {
 		ret = i915_gem_object_bind_to_gtt(obj, obj_priv->gtt_alignment);
-		if (ret) {
-			mutex_unlock(&dev->struct_mutex);
-			return VM_FAULT_SIGBUS;
-		}
-
-		ret = i915_gem_object_set_to_gtt_domain(obj, write);
-		if (ret) {
-			mutex_unlock(&dev->struct_mutex);
-			return VM_FAULT_SIGBUS;
-		}
+		if (ret)
+			goto unlock;
 
 		list_add_tail(&obj_priv->list, &dev_priv->mm.inactive_list);
+
+		ret = i915_gem_object_set_to_gtt_domain(obj, write);
+		if (ret)
+			goto unlock;
 	}
 
 	/* Need a new fence register? */
 	if (obj_priv->tiling_mode != I915_TILING_NONE) {
 		ret = i915_gem_object_get_fence_reg(obj);
-		if (ret) {
-			mutex_unlock(&dev->struct_mutex);
-			return VM_FAULT_SIGBUS;
-		}
+		if (ret)
+			goto unlock;
 	}
 
 	pfn = ((dev->agp->base + obj_priv->gtt_offset) >> PAGE_SHIFT) +
@@ -1187,18 +1181,18 @@ int i915_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 
 	/* Finally, remap it using the new GTT offset */
 	ret = vm_insert_pfn(vma, (unsigned long)vmf->virtual_address, pfn);
-
+unlock:
 	mutex_unlock(&dev->struct_mutex);
 
 	switch (ret) {
+	case 0:
+	case -ERESTARTSYS:
+		return VM_FAULT_NOPAGE;
 	case -ENOMEM:
 	case -EAGAIN:
 		return VM_FAULT_OOM;
-	case -EFAULT:
-	case -EINVAL:
-		return VM_FAULT_SIGBUS;
 	default:
-		return VM_FAULT_NOPAGE;
+		return VM_FAULT_SIGBUS;
 	}
 }
 
@@ -2514,16 +2508,6 @@ i915_gem_clflush_object(struct drm_gem_object *obj)
 	if (obj_priv->pages == NULL)
 		return;
 
-	/* XXX: The 865 in particular appears to be weird in how it handles
-	 * cache flushing.  We haven't figured it out, but the
-	 * clflush+agp_chipset_flush doesn't appear to successfully get the
-	 * data visible to the PGU, while wbinvd + agp_chipset_flush does.
-	 */
-	if (IS_I865G(obj->dev)) {
-		wbinvd();
-		return;
-	}
-
 	drm_clflush_pages(obj_priv->pages, obj->size / PAGE_SIZE);
 }
 
@@ -3010,6 +2994,16 @@ i915_gem_object_pin_and_relocate(struct drm_gem_object *obj,
 				  "obj %p target %d offset %d.\n",
 				  obj, reloc->target_handle,
 				  (int) reloc->offset);
+			drm_gem_object_unreference(target_obj);
+			i915_gem_object_unpin(obj);
+			return -EINVAL;
+		}
+
+		if (reloc->delta >= target_obj->size) {
+			DRM_ERROR("Relocation beyond target object bounds: "
+				  "obj %p target %d delta %d size %d.\n",
+				  obj, reloc->target_handle,
+				  (int) reloc->delta, (int) target_obj->size);
 			drm_gem_object_unreference(target_obj);
 			i915_gem_object_unpin(obj);
 			return -EINVAL;
@@ -3845,7 +3839,8 @@ void i915_gem_free_object(struct drm_gem_object *obj)
 
 	i915_gem_object_unbind(obj);
 
-	i915_gem_free_mmap_offset(obj);
+	if (obj_priv->mmap_offset)
+		i915_gem_free_mmap_offset(obj);
 
 	kfree(obj_priv->page_cpu_valid);
 	kfree(obj_priv->bit_17);

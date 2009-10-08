@@ -797,6 +797,7 @@ int ecryptfs_init_crypt_ctx(struct ecryptfs_crypt_stat *crypt_stat)
 	kfree(full_alg_name);
 	if (IS_ERR(crypt_stat->tfm)) {
 		rc = PTR_ERR(crypt_stat->tfm);
+		crypt_stat->tfm = NULL;
 		ecryptfs_printk(KERN_ERR, "cryptfs: init_crypt_ctx(): "
 				"Error initializing cipher [%s]\n",
 				crypt_stat->cipher);
@@ -1702,7 +1703,7 @@ ecryptfs_encrypt_filename(struct ecryptfs_filename *filename,
 	} else {
 		printk(KERN_ERR "%s: No support for requested filename "
 		       "encryption method in this release\n", __func__);
-		rc = -ENOTSUPP;
+		rc = -EOPNOTSUPP;
 		goto out;
 	}
 out:
@@ -2166,7 +2167,7 @@ int ecryptfs_encrypt_and_encode_filename(
 			(*encoded_name)[(*encoded_name_size)] = '\0';
 			(*encoded_name_size)++;
 		} else {
-			rc = -ENOTSUPP;
+			rc = -EOPNOTSUPP;
 		}
 		if (rc) {
 			printk(KERN_ERR "%s: Error attempting to encode "

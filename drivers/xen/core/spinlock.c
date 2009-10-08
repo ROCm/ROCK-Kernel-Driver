@@ -135,7 +135,7 @@ void xen_spin_kick(raw_spinlock_t *lock, unsigned int token)
 		unsigned long flags;
 		struct spinning *spinning;
 
-		if (cpu == raw_smp_processor_id())
+		if (cpu == raw_smp_processor_id() || !per_cpu(spinning, cpu))
 			continue;
 
 		rm_lock = &per_cpu(spinning_rm_lock, cpu);

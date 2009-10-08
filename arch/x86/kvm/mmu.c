@@ -2633,7 +2633,8 @@ EXPORT_SYMBOL_GPL(kvm_mmu_unprotect_page_virt);
 
 void __kvm_mmu_free_some_pages(struct kvm_vcpu *vcpu)
 {
-	while (vcpu->kvm->arch.n_free_mmu_pages < KVM_REFILL_PAGES) {
+	while (vcpu->kvm->arch.n_free_mmu_pages < KVM_REFILL_PAGES &&
+	       !list_empty(&vcpu->kvm->arch.active_mmu_pages)) {
 		struct kvm_mmu_page *sp;
 
 		sp = container_of(vcpu->kvm->arch.active_mmu_pages.prev,
@@ -2712,12 +2713,6 @@ static int alloc_mmu_pages(struct kvm_vcpu *vcpu)
 
 	ASSERT(vcpu);
 
-	if (vcpu->kvm->arch.n_requested_mmu_pages)
-		vcpu->kvm->arch.n_free_mmu_pages =
-					vcpu->kvm->arch.n_requested_mmu_pages;
-	else
-		vcpu->kvm->arch.n_free_mmu_pages =
-					vcpu->kvm->arch.n_alloc_mmu_pages;
 	/*
 	 * When emulating 32-bit mode, cr3 is only 32 bits even on x86_64.
 	 * Therefore we need to allocate shadow page tables in the first

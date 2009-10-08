@@ -10,7 +10,12 @@ obj-$(CONFIG_XEN)		+= evtchn/
 obj-y				+= xenbus/
 obj-$(CONFIG_XEN)		+= char/
 
-obj-$(CONFIG_XEN)		+= util.o
+nostackp := $(call cc-option, -fno-stack-protector)
+ifeq ($(CONFIG_PARAVIRT_XEN),y)
+CFLAGS_features.o			:= $(nostackp)
+endif
+
+obj-$(CONFIG_XEN)		+= features.o util.o
 obj-$(CONFIG_HOTPLUG_CPU)	+= $(xen-hotplug-y)
 obj-$(CONFIG_XEN_XENCOMM)	+= $(xen-xencomm-y)
 obj-$(CONFIG_XEN_BALLOON)	+= $(xen-balloon-y)

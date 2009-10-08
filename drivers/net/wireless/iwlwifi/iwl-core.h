@@ -116,6 +116,17 @@ struct iwl_temp_ops {
 	void (*set_ct_kill)(struct iwl_priv *priv);
 };
 
+struct iwl_ucode_ops {
+	u32 (*get_header_size)(u32);
+	u32 (*get_build)(const struct iwl_ucode_header *, u32);
+	u32 (*get_inst_size)(const struct iwl_ucode_header *, u32);
+	u32 (*get_data_size)(const struct iwl_ucode_header *, u32);
+	u32 (*get_init_size)(const struct iwl_ucode_header *, u32);
+	u32 (*get_init_data_size)(const struct iwl_ucode_header *, u32);
+	u32 (*get_boot_size)(const struct iwl_ucode_header *, u32);
+	u8 * (*get_data)(const struct iwl_ucode_header *, u32);
+};
+
 struct iwl_lib_ops {
 	/* set hw dependent parameters */
 	int (*set_hw_params)(struct iwl_priv *priv);
@@ -171,6 +182,7 @@ struct iwl_lib_ops {
 };
 
 struct iwl_ops {
+	const struct iwl_ucode_ops *ucode;
 	const struct iwl_lib_ops *lib;
 	const struct iwl_hcmd_ops *hcmd;
 	const struct iwl_hcmd_utils_ops *utils;
@@ -195,6 +207,8 @@ struct iwl_mod_params {
  * 	filename is constructed as fw_name_pre<api>.ucode.
  * @ucode_api_max: Highest version of uCode API supported by driver.
  * @ucode_api_min: Lowest version of uCode API supported by driver.
+ * @max_ll_items: max number of OTP blocks
+ * @shadow_ram_support: shadow support for OTP memory
  *
  * We enable the driver to be backward compatible wrt API version. The
  * driver specifies which APIs it supports (with @ucode_api_max being the
@@ -231,6 +245,8 @@ struct iwl_cfg {
 	u8   valid_rx_ant;
 	bool need_pll_cfg;
 	bool use_isr_legacy;
+	const u16 max_ll_items;
+	const bool shadow_ram_support;
 };
 
 /***************************

@@ -19,7 +19,11 @@
 #if defined(__i386__) || defined(__x86_64__) /* CONFIG_ARCH_I386 doesn't exit */
 #define MON_HAS_UNMAP 1
 
+#ifndef CONFIG_XEN
 #define phys_to_page(phys)	pfn_to_page((phys) >> PAGE_SHIFT)
+#else
+#define phys_to_page(phys)	pfn_to_page(mfn_to_local_pfn((phys) >> PAGE_SHIFT))
+#endif
 
 char mon_dmapeek(unsigned char *dst, dma_addr_t dma_addr, int len)
 {

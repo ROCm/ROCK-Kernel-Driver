@@ -178,6 +178,9 @@ int __init bind_virq_for_mce(void)
 		return ret;
 	}
 
+	/* Log the machine checks left over from the previous reset. */
+	mce_dom0_interrupt(VIRQ_MCA, NULL);
+
 	return 0;
 }
 

@@ -46,8 +46,8 @@
 #include "iwl-5000-hw.h"
 
 /* Highest firmware API version supported */
-#define IWL6000_UCODE_API_MAX 2
-#define IWL6050_UCODE_API_MAX 2
+#define IWL6000_UCODE_API_MAX 3
+#define IWL6050_UCODE_API_MAX 3
 
 /* Lowest firmware API version supported */
 #define IWL6000_UCODE_API_MIN 1
@@ -69,6 +69,7 @@ static struct iwl_hcmd_utils_ops iwl6000_hcmd_utils = {
 };
 
 static struct iwl_ops iwl6000_ops = {
+	.ucode = &iwl5000_ucode,
 	.lib = &iwl5000_lib,
 	.hcmd = &iwl5000_hcmd,
 	.utils = &iwl6000_hcmd_utils,
@@ -81,13 +82,15 @@ struct iwl_cfg iwl6000_2ag_cfg = {
 	.ucode_api_min = IWL6000_UCODE_API_MIN,
 	.sku = IWL_SKU_A|IWL_SKU_G,
 	.ops = &iwl6000_ops,
-	.eeprom_size = IWL_5000_EEPROM_IMG_SIZE,
+	.eeprom_size = OTP_LOW_IMAGE_SIZE,
 	.eeprom_ver = EEPROM_5000_EEPROM_VERSION,
 	.eeprom_calib_ver = EEPROM_5000_TX_POWER_VERSION,
 	.mod_params = &iwl50_mod_params,
 	.valid_tx_ant = ANT_BC,
 	.valid_rx_ant = ANT_BC,
 	.need_pll_cfg = false,
+	.max_ll_items = OTP_MAX_LL_ITEMS_6x00,
+	.shadow_ram_support = true,
 };
 
 struct iwl_cfg iwl6000_2agn_cfg = {
@@ -97,13 +100,15 @@ struct iwl_cfg iwl6000_2agn_cfg = {
 	.ucode_api_min = IWL6000_UCODE_API_MIN,
 	.sku = IWL_SKU_A|IWL_SKU_G|IWL_SKU_N,
 	.ops = &iwl6000_ops,
-	.eeprom_size = IWL_5000_EEPROM_IMG_SIZE,
+	.eeprom_size = OTP_LOW_IMAGE_SIZE,
 	.eeprom_ver = EEPROM_5000_EEPROM_VERSION,
 	.eeprom_calib_ver = EEPROM_5000_TX_POWER_VERSION,
 	.mod_params = &iwl50_mod_params,
 	.valid_tx_ant = ANT_AB,
 	.valid_rx_ant = ANT_AB,
 	.need_pll_cfg = false,
+	.max_ll_items = OTP_MAX_LL_ITEMS_6x00,
+	.shadow_ram_support = true,
 };
 
 struct iwl_cfg iwl6050_2agn_cfg = {
@@ -113,13 +118,15 @@ struct iwl_cfg iwl6050_2agn_cfg = {
 	.ucode_api_min = IWL6050_UCODE_API_MIN,
 	.sku = IWL_SKU_A|IWL_SKU_G|IWL_SKU_N,
 	.ops = &iwl6000_ops,
-	.eeprom_size = IWL_5000_EEPROM_IMG_SIZE,
+	.eeprom_size = OTP_LOW_IMAGE_SIZE,
 	.eeprom_ver = EEPROM_5000_EEPROM_VERSION,
 	.eeprom_calib_ver = EEPROM_5000_TX_POWER_VERSION,
 	.mod_params = &iwl50_mod_params,
 	.valid_tx_ant = ANT_AB,
 	.valid_rx_ant = ANT_AB,
 	.need_pll_cfg = false,
+	.max_ll_items = OTP_MAX_LL_ITEMS_6x00,
+	.shadow_ram_support = true,
 };
 
 struct iwl_cfg iwl6000_3agn_cfg = {
@@ -129,13 +136,15 @@ struct iwl_cfg iwl6000_3agn_cfg = {
 	.ucode_api_min = IWL6000_UCODE_API_MIN,
 	.sku = IWL_SKU_A|IWL_SKU_G|IWL_SKU_N,
 	.ops = &iwl6000_ops,
-	.eeprom_size = IWL_5000_EEPROM_IMG_SIZE,
+	.eeprom_size = OTP_LOW_IMAGE_SIZE,
 	.eeprom_ver = EEPROM_5000_EEPROM_VERSION,
 	.eeprom_calib_ver = EEPROM_5000_TX_POWER_VERSION,
 	.mod_params = &iwl50_mod_params,
 	.valid_tx_ant = ANT_ABC,
 	.valid_rx_ant = ANT_ABC,
 	.need_pll_cfg = false,
+	.max_ll_items = OTP_MAX_LL_ITEMS_6x00,
+	.shadow_ram_support = true,
 };
 
 struct iwl_cfg iwl6050_3agn_cfg = {
@@ -145,13 +154,15 @@ struct iwl_cfg iwl6050_3agn_cfg = {
 	.ucode_api_min = IWL6050_UCODE_API_MIN,
 	.sku = IWL_SKU_A|IWL_SKU_G|IWL_SKU_N,
 	.ops = &iwl6000_ops,
-	.eeprom_size = IWL_5000_EEPROM_IMG_SIZE,
+	.eeprom_size = OTP_LOW_IMAGE_SIZE,
 	.eeprom_ver = EEPROM_5000_EEPROM_VERSION,
 	.eeprom_calib_ver = EEPROM_5000_TX_POWER_VERSION,
 	.mod_params = &iwl50_mod_params,
 	.valid_tx_ant = ANT_ABC,
 	.valid_rx_ant = ANT_ABC,
 	.need_pll_cfg = false,
+	.max_ll_items = OTP_MAX_LL_ITEMS_6x00,
+	.shadow_ram_support = true,
 };
 
 MODULE_FIRMWARE(IWL6000_MODULE_FIRMWARE(IWL6000_UCODE_API_MAX));
