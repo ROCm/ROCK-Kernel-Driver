@@ -26,4 +26,4 @@ CFLAGS_kdba_bt.o += -DREGPARM=$(REGPARM) -DCCVERSION="$(CCVERSION)"
 
 override CFLAGS := $(CFLAGS:%-pg=% )
 
-CFLAGS_kdba_io.o += -I $(TOPDIR)/arch/$(SRCARCH)/kdb
+CFLAGS_kdba_io.o += -I $(srctree)/arch/$(SRCARCH)/kdb
