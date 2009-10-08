@@ -16,7 +16,9 @@
 #include <linux/swap.h>
 #include <linux/swapops.h>
 
-#include <scsi.h>
+#include <scsi/scsi.h>
+#include <scsi/scsi_cmnd.h>
+#include <scsi/scsi_device.h>
 #include <scsi/scsi_host.h>
 #include <asm/pgtable.h>
 
@@ -748,7 +750,7 @@ kdbm_filp(int argc, const char **argv)
 
 	kdb_printf(" f_count = " kdb_f_count_fmt
 			" f_flags = 0x%x f_mode = 0x%x\n",
-			atomic_read(&f.f_count), f.f_flags, f.f_mode);
+			atomic_long_read(&f.f_count), f.f_flags, f.f_mode);
 
 	kdb_printf(" f_pos = %Ld\n", f.f_pos);
 #ifdef	CONFIG_SECURITY
