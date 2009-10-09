@@ -543,6 +543,7 @@ sdev_rd_attr (scsi_level, "%d\n");
 sdev_rd_attr (vendor, "%.8s\n");
 sdev_rd_attr (model, "%.16s\n");
 sdev_rd_attr (rev, "%.4s\n");
+sdev_rd_attr (tgps, "%d\n");
 
 /*
  * TODO: can we make these symlinks to the block layer ones?
@@ -728,6 +729,7 @@ static struct attribute *scsi_sdev_attrs[] = {
 	&dev_attr_vendor.attr,
 	&dev_attr_model.attr,
 	&dev_attr_rev.attr,
+	&dev_attr_tgps.attr,
 	&dev_attr_rescan.attr,
 	&dev_attr_delete.attr,
 	&dev_attr_state.attr,
