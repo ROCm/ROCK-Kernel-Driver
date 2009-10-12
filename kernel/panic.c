@@ -101,6 +101,8 @@ NORET_TYPE void panic(const char * fmt, ...)
 
 	crash_kexec(NULL);
 
+	bust_spinlocks(0);
+
 	if (!panic_blink)
 		panic_blink = no_blink;
 
@@ -158,7 +160,6 @@ NORET_TYPE void panic(const char * fmt, ...)
 		mdelay(1);
 		i++;
 	}
-	bust_spinlocks(0);
 }
 
 EXPORT_SYMBOL(panic);

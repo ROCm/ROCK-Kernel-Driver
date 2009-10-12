@@ -32,7 +32,6 @@ struct wbsoft_priv {
 	struct sk_buff *packet_return;
 	s32 netif_state_stop;	// 1: stop  0: normal
 	struct iw_statistics iw_stats;
-	struct ieee80211_vif *vif;
 
 	u8 LinkName[WB_MAX_LINK_NAME_LEN];
 
