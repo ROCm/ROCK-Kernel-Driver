@@ -33,6 +33,7 @@
 #include <linux/cdev.h>
 #include <linux/list.h>
 #include <linux/poll.h>
+#include <linux/sched.h>
 #include <linux/wait.h>
 #include <linux/mm.h>
 #include <linux/uaccess.h>
