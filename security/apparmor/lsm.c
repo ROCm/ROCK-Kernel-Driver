@@ -68,7 +68,7 @@ static void apparmor_cred_free(struct cred *cred)
 }
 
 
-static int apparmor_ptrace_may_access(struct task_struct *child,
+static int apparmor_ptrace_access_check(struct task_struct *child,
 				      unsigned int mode)
 {
 	return aa_ptrace(current, child, mode);
@@ -673,7 +673,7 @@ static int apparmor_socket_shutdown(struct socket *sock, int how)
 static struct security_operations apparmor_ops = {
 	.name =				"apparmor",
 
-	.ptrace_may_access =		apparmor_ptrace_may_access,
+	.ptrace_access_check =		apparmor_ptrace_access_check,
 	.ptrace_traceme =		apparmor_ptrace_traceme,
 	.capget =			apparmor_capget,
 	.sysctl =			apparmor_sysctl,
