@@ -1083,7 +1083,7 @@ ktime_t hrtimer_get_remaining(const struct hrtimer *timer)
 }
 EXPORT_SYMBOL_GPL(hrtimer_get_remaining);
 
-#ifdef CONFIG_NO_HZ
+#if defined(CONFIG_NO_HZ) || defined(CONFIG_NO_IDLE_HZ)
 /**
  * hrtimer_get_next_event - get the time until next expiry event
  *

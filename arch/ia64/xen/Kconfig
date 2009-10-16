@@ -2,7 +2,7 @@
 # This Kconfig describes xen/ia64 options
 #
 
-config XEN
+config PARAVIRT_XEN
 	bool "Xen hypervisor support"
 	default y
 	depends on PARAVIRT && MCKINLEY && IA64_PAGE_SIZE_16KB && EXPERIMENTAL
@@ -17,9 +17,9 @@ config XEN
 	  both as a guest OS on Xen and natively on hardware.
 
 config XEN_XENCOMM
-	depends on XEN
+	depends on PARAVIRT_XEN
 	bool
 
 config NO_IDLE_HZ
-	depends on XEN
+	depends on PARAVIRT_XEN
 	bool

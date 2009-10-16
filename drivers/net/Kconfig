@@ -2784,9 +2784,9 @@ source "drivers/ieee802154/Kconfig"
 
 source "drivers/s390/net/Kconfig"
 
-config XEN_NETDEV_FRONTEND
+config XEN_NETFRONT
 	tristate "Xen network device frontend driver"
-	depends on XEN
+	depends on PARAVIRT_XEN
 	default y
 	help
 	  The network device frontend driver allows the kernel to

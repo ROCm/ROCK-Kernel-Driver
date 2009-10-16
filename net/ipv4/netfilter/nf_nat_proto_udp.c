@@ -60,6 +60,10 @@ udp_manip_pkt(struct sk_buff *skb,
 		newport = tuple->dst.u.udp.port;
 		portptr = &hdr->dest;
 	}
+
+	if (skb_checksum_setup(skb))
+		return false;
+
 	if (hdr->check || skb->ip_summed == CHECKSUM_PARTIAL) {
 		inet_proto_csum_replace4(&hdr->check, skb, oldip, newip, 1);
 		inet_proto_csum_replace2(&hdr->check, skb, *portptr, newport,

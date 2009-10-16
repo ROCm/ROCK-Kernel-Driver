@@ -11,6 +11,17 @@ config SFC
 
 	  To compile this driver as a module, choose M here.  The module
 	  will be called sfc.
+
+config SFC_DRIVERLINK
+	bool
+
+config SFC_RESOURCE
+	depends on SFC && X86
+	select SFC_DRIVERLINK
+	tristate "Solarflare Solarstorm SFC4000 resource driver"
+	help
+	  This module provides the SFC resource manager driver.
+
 config SFC_MTD
 	bool "Solarflare Solarstorm SFC4000 flash MTD support"
 	depends on SFC && MTD && !(SFC=y && MTD=m)

@@ -218,6 +218,16 @@ void __cpuinit fam10h_check_enable_mmcfg(void)
 	val |= fam10h_pci_mmconf_base | (8 << FAM10H_MMIO_CONF_BUSRANGE_SHIFT) |
 	       FAM10H_MMIO_CONF_ENABLE;
 	wrmsrl(address, val);
+
+#ifdef CONFIG_XEN
+	{
+		u64 val2;
+
+		rdmsrl(address, val2);
+		if (val2 != val)
+			pci_probe &= ~PCI_CHECK_ENABLE_AMD_MMCONF;
+	}
+#endif
 }
 
 static int __devinit set_check_enable_amd_mmconf(const struct dmi_system_id *d)

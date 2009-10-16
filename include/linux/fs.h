@@ -1371,6 +1371,9 @@ struct super_block {
 	/* Granularity of c/m/atime in ns.
 	   Cannot be worse than a second */
 	u32		   s_time_gran;
+#ifdef CONFIG_PRECACHE
+	u32                precache_poolid;
+#endif
 
 	/*
 	 * Filesystem subtype.  If non-empty the filesystem type field

@@ -224,7 +224,7 @@ void __init setup_per_cpu_areas(void)
 		 * are zeroed indicating that the static arrays are
 		 * gone.
 		 */
-#ifdef CONFIG_X86_LOCAL_APIC
+#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
 		per_cpu(x86_cpu_to_apicid, cpu) =
 			early_per_cpu_map(x86_cpu_to_apicid, cpu);
 		per_cpu(x86_bios_cpu_apicid, cpu) =
@@ -248,7 +248,7 @@ void __init setup_per_cpu_areas(void)
 	}
 
 	/* indicate the early static arrays will soon be gone */
-#ifdef CONFIG_X86_LOCAL_APIC
+#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
 	early_per_cpu_ptr(x86_cpu_to_apicid) = NULL;
 	early_per_cpu_ptr(x86_bios_cpu_apicid) = NULL;
 #endif
