@@ -59,17 +59,23 @@ static struct cpu_debug_base cpu_base[] = {
 	{ "misc",	CPU_MISC,	0	},
 	{ "debug",	CPU_DEBUG,	0	},
 	{ "pat",	CPU_PAT,	0	},
+#ifndef CONFIG_XEN
 	{ "vmx",	CPU_VMX,	0	},
+#endif
 	{ "call",	CPU_CALL,	0	},
 	{ "base",	CPU_BASE,	0	},
 	{ "ver",	CPU_VER,	0	},
 	{ "conf",	CPU_CONF,	0	},
 	{ "smm",	CPU_SMM,	0	},
+#ifndef CONFIG_XEN
 	{ "svm",	CPU_SVM,	0	},
 	{ "osvm",	CPU_OSVM,	0	},
+#endif
 	{ "tss",	CPU_TSS,	0	},
 	{ "cr",		CPU_CR,		0	},
+#ifndef CONFIG_XEN
 	{ "dt",		CPU_DT,		0	},
+#endif
 	{ "registers",	CPU_REG_ALL,	0	},
 };
 
@@ -298,6 +304,7 @@ static void print_cr(void *arg)
 #endif
 }
 
+#ifndef CONFIG_XEN
 static void print_desc_ptr(char *str, struct seq_file *seq, struct desc_ptr dt)
 {
 	seq_printf(seq, " %s\t: %016llx\n", str, (u64)(dt.address | dt.size));
@@ -324,6 +331,7 @@ static void print_dt(void *seq)
 	store_tr(ldt);
 	seq_printf(seq, " TR\t: %016lx\n", ldt);
 }
+#endif /* CONFIG_XEN */
 
 static void print_dr(void *arg)
 {
@@ -346,7 +354,7 @@ static void print_apic(void *arg)
 {
 	struct seq_file *seq = arg;
 
-#ifdef CONFIG_X86_LOCAL_APIC
+#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
 	seq_printf(seq, " LAPIC\t:\n");
 	seq_printf(seq, " ID\t\t: %08x\n",  apic_read(APIC_ID) >> 24);
 	seq_printf(seq, " LVR\t\t: %08x\n",  apic_read(APIC_LVR));
@@ -400,9 +408,11 @@ static int cpu_seq_show(struct seq_file *seq, void *v)
 	case CPU_CR:
 		smp_call_function_single(priv->cpu, print_cr, seq, 1);
 		break;
+#ifndef CONFIG_XEN
 	case CPU_DT:
 		smp_call_function_single(priv->cpu, print_dt, seq, 1);
 		break;
+#endif
 	case CPU_DEBUG:
 		if (priv->file == CPU_INDEX_BIT)
 			smp_call_function_single(priv->cpu, print_dr, seq, 1);
@@ -487,7 +497,11 @@ static int write_cpu_register(struct cpu_private *priv, const char *buf)
 		return ret;
 
 	/* Supporting only MSRs */
+#ifndef CONFIG_XEN
 	if (priv->type < CPU_TSS_BIT)
+#else
+	if (cpu_base[priv->type].flag < CPU_TSS)
+#endif
 		return write_msr(priv, val);
 
 	return ret;
@@ -617,7 +631,11 @@ static int cpu_init_allreg(unsigned cpu, struct dentry *dentry)
 		cpu_dentry = debugfs_create_dir(cpu_base[type].name, dentry);
 		per_cpu(cpu_arr[type].dentry, cpu) = cpu_dentry;
 
+#ifndef CONFIG_XEN
 		if (type < CPU_TSS_BIT)
+#else
+		if (cpu_base[type].flag < CPU_TSS)
+#endif
 			err = cpu_init_msr(cpu, type, cpu_dentry);
 		else
 			err = cpu_create_file(cpu, type, 0, CPU_INDEX_BIT,

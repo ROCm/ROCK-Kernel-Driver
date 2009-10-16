@@ -343,7 +343,7 @@ static void pbus_size_io(struct pci_bus *bus, resource_size_t min_size)
 #if defined(CONFIG_ISA) || defined(CONFIG_EISA)
 	size = (size & 0xff) + ((size & ~0xffUL) << 2);
 #endif
-	size = ALIGN(size + size1, 4096);
+	size = ALIGN(max(size + size1, pci_reserve_size_io(bus)), 4096);
 	if (!size) {
 		b_res->flags = 0;
 		return;
@@ -423,7 +423,8 @@ static int pbus_size_mem(struct pci_bus *bus, unsigned long mask,
 			min_align = align1 >> 1;
 		align += aligns[order];
 	}
-	size = ALIGN(size, min_align);
+	size = ALIGN(max(size, (resource_size_t)pci_reserve_size_mem(bus)),
+		     min_align);
 	if (!size) {
 		b_res->flags = 0;
 		return 1;

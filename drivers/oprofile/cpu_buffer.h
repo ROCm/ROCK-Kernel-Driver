@@ -40,7 +40,7 @@ struct op_entry;
 struct oprofile_cpu_buffer {
 	unsigned long buffer_size;
 	struct task_struct *last_task;
-	int last_is_kernel;
+	int last_cpu_mode;
 	int tracing;
 	unsigned long sample_received;
 	unsigned long sample_lost_overflow;
@@ -62,7 +62,7 @@ static inline void op_cpu_buffer_reset(int cpu)
 {
 	struct oprofile_cpu_buffer *cpu_buf = &per_cpu(cpu_buffer, cpu);
 
-	cpu_buf->last_is_kernel = -1;
+	cpu_buf->last_cpu_mode = -1;
 	cpu_buf->last_task = NULL;
 }
 
@@ -112,9 +112,13 @@ int op_cpu_buffer_get_data(struct op_entry *entry, unsigned long *val)
 }
 
 /* extra data flags */
-#define KERNEL_CTX_SWITCH	(1UL << 0)
-#define IS_KERNEL		(1UL << 1)
+#define CPU_MODE_USER		0
+#define CPU_MODE_KERNEL		1
+#define CPU_MODE_XEN		2
+#define CPU_MODE_MASK		3
 #define TRACE_BEGIN		(1UL << 2)
 #define USER_CTX_SWITCH		(1UL << 3)
+#define KERNEL_CTX_SWITCH	(1UL << 4)
+#define DOMAIN_SWITCH		(1UL << 5)
 
 #endif /* OPROFILE_CPU_BUFFER_H */

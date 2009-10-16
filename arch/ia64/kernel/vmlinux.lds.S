@@ -176,7 +176,7 @@ SECTIONS
 	  __start_gate_section = .;
 	  *(.data.gate)
 	  __stop_gate_section = .;
-#ifdef CONFIG_XEN
+#ifdef CONFIG_PARAVIRT_XEN
 	  . = ALIGN(PAGE_SIZE);
 	  __xen_start_gate_section = .;
 	  *(.data.gate.xen)

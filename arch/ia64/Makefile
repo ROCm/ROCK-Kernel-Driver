@@ -56,7 +56,7 @@ core-$(CONFIG_IA64_XEN_GUEST)	+= arch/ia64/dig/
 core-$(CONFIG_IA64_SGI_SN2)	+= arch/ia64/sn/
 core-$(CONFIG_IA64_SGI_UV)	+= arch/ia64/uv/
 core-$(CONFIG_KVM) 		+= arch/ia64/kvm/
-core-$(CONFIG_XEN)		+= arch/ia64/xen/
+core-$(CONFIG_PARAVIRT_XEN)	+= arch/ia64/xen/
 
 drivers-$(CONFIG_KDB)		+= arch/$(ARCH)/kdb/
 drivers-$(CONFIG_PCI)		+= arch/ia64/pci/

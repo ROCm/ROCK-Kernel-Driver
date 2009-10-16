@@ -37,6 +37,7 @@
 #include <linux/kobject.h>
 #include <linux/mutex.h>
 #include <linux/file.h>
+#include <linux/precache.h>
 #include <asm/uaccess.h>
 #include "internal.h"
 
@@ -104,6 +105,9 @@ static struct super_block *alloc_super(struct file_system_type *type)
 		s->s_qcop = sb_quotactl_ops;
 		s->s_op = &default_op;
 		s->s_time_gran = 1000000000;
+#ifdef CONFIG_PRECACHE
+		s->precache_poolid = -1;
+#endif
 	}
 out:
 	return s;
@@ -194,6 +198,7 @@ void deactivate_super(struct super_block *s)
 		vfs_dq_off(s, 0);
 		down_write(&s->s_umount);
 		fs->kill_sb(s);
+		precache_flush_filesystem(s);
 		put_filesystem(fs);
 		put_super(s);
 	}
@@ -881,6 +886,9 @@ int get_sb_nodev(struct file_system_type *fs_type,
 		return error;
 	}
 	s->s_flags |= MS_ACTIVE;
+#ifdef CONFIG_PRECACHE
+	s->precache_poolid = -2;
+#endif
 	simple_set_mnt(mnt, s);
 	return 0;
 }

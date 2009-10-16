@@ -133,6 +133,38 @@ do {							\
 	ret__;						\
 })
 
+#define percpu_xchg_op(op, var, val)			\
+({							\
+	typedef typeof(var) T__;			\
+	T__ ret__;					\
+	if (0)						\
+		ret__ = (val);				\
+	switch (sizeof(var)) {				\
+	case 1:						\
+		asm(op "b %0,"__percpu_arg(1)		\
+		    : "=q" (ret__), "+m" (var)		\
+		    : "0" ((T__)(val)));		\
+		break;					\
+	case 2:						\
+		asm(op "w %0,"__percpu_arg(1)		\
+		    : "=r" (ret__), "+m" (var)		\
+		    : "0" ((T__)(val)));		\
+		break;					\
+	case 4:						\
+		asm(op "l %0,"__percpu_arg(1)		\
+		    : "=r" (ret__), "+m" (var)		\
+		    : "0" ((T__)(val)));		\
+		break;					\
+	case 8:						\
+		asm(op "q %0,"__percpu_arg(1)		\
+		    : "=r" (ret__), "+m" (var)		\
+		    : "0" ((T__)(val)));		\
+		break;					\
+	default: __bad_percpu_size();			\
+	}						\
+	ret__;						\
+})
+
 /*
  * percpu_read() makes gcc load the percpu variable every time it is
  * accessed while percpu_read_stable() allows the value to be cached.
@@ -152,6 +184,10 @@ do {							\
 #define percpu_and(var, val)	percpu_to_op("and", per_cpu__##var, val)
 #define percpu_or(var, val)	percpu_to_op("or", per_cpu__##var, val)
 #define percpu_xor(var, val)	percpu_to_op("xor", per_cpu__##var, val)
+#define percpu_xchg(var, val)   percpu_xchg_op("xchg", per_cpu__##var, val)
+#if defined(CONFIG_X86_XADD) || defined(CONFIG_X86_64)
+#define percpu_xadd(var, val)   percpu_xchg_op("xadd", per_cpu__##var, val)
+#endif
 
 /* This is not atomic against other CPUs -- CPU preemption needs to be off */
 #define x86_test_and_clear_bit_percpu(bit, var)				\

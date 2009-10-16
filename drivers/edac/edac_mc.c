@@ -578,6 +578,10 @@ static void edac_mc_scrub_block(unsigned long page, unsigned long offset,
 
 	debugf3("%s()\n", __func__);
 
+#ifdef CONFIG_XEN
+	page = mfn_to_local_pfn(page);
+#endif
+
 	/* ECC error page was not in our memory. Ignore it. */
 	if (!pfn_valid(page))
 		return;

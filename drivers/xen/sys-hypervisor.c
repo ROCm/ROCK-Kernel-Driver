@@ -18,6 +18,8 @@
 #include <xen/interface/xen.h>
 #include <xen/interface/version.h>
 
+#include "xenbus/xenbus_comms.h"
+
 #define HYPERVISOR_ATTR_RO(_name) \
 static struct hyp_sysfs_attr  _name##_attr = __ATTR_RO(_name)
 
@@ -116,9 +118,8 @@ static ssize_t uuid_show(struct hyp_sysfs_attr *attr, char *buffer)
 {
 	char *vm, *val;
 	int ret;
-	extern int xenstored_ready;
 
-	if (!xenstored_ready)
+	if (!is_xenstored_ready())
 		return -EBUSY;
 
 	vm = xenbus_read(XBT_NIL, "vm", "", NULL);

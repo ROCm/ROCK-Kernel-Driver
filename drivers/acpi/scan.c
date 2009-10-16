@@ -168,6 +168,16 @@ acpi_device_hid_show(struct device *dev, struct device_attribute *attr, char *bu
 }
 static DEVICE_ATTR(hid, 0444, acpi_device_hid_show, NULL);
 
+#ifdef CONFIG_PCI_GUESTDEV
+static ssize_t
+acpi_device_uid_show(struct device *dev, struct device_attribute *attr, char *buf) {
+	struct acpi_device *acpi_dev = to_acpi_device(dev);
+
+	return sprintf(buf, "%s\n", acpi_dev->pnp.unique_id);
+}
+static DEVICE_ATTR(uid, 0444, acpi_device_uid_show, NULL);
+#endif
+
 static ssize_t
 acpi_device_path_show(struct device *dev, struct device_attribute *attr, char *buf) {
 	struct acpi_device *acpi_dev = to_acpi_device(dev);
@@ -208,6 +218,13 @@ static int acpi_device_setup_files(struct acpi_device *dev)
 	if (result)
 		goto end;
 
+#ifdef CONFIG_PCI_GUESTDEV
+	if(dev->pnp.unique_id) {
+		result = device_create_file(&dev->dev, &dev_attr_uid);
+		if(result)
+			goto end;
+	}
+#endif
         /*
          * If device has _EJ0, 'eject' file is created that is used to trigger
          * hot-removal function from userland.
@@ -271,6 +288,9 @@ static void acpi_free_ids(struct acpi_device *device)
 		kfree(id->id);
 		kfree(id);
 	}
+#ifdef CONFIG_PCI_GUESTDEV
+	kfree(device->pnp.unique_id);
+#endif
 }
 
 static void acpi_device_release(struct device *dev)
@@ -1047,6 +1067,11 @@ static void acpi_device_set_id(struct acpi_device *device)
 			for (i = 0; i < cid_list->count; i++)
 				acpi_add_id(device, cid_list->ids[i].string);
 		}
+#ifdef CONFIG_PCI_GUESTDEV
+		if (info->valid & ACPI_VALID_UID)
+			device->pnp.unique_id = kstrdup(info->unique_id.string,
+							GFP_KERNEL);
+#endif
 		if (info->valid & ACPI_VALID_ADR) {
 			device->pnp.bus_address = info->address;
 			device->flags.bus_address = 1;

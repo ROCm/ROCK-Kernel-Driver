@@ -479,6 +479,8 @@ static void vmap_debug_free_range(unsigned long start, unsigned long end)
 #ifdef CONFIG_DEBUG_PAGEALLOC
 	vunmap_page_range(start, end);
 	flush_tlb_kernel_range(start, end);
+#elif defined(CONFIG_XEN) && defined(CONFIG_X86)
+	vunmap_page_range(start, end);
 #endif
 }
 

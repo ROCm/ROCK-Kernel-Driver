@@ -553,6 +553,14 @@ static int __init pci_io_ecs_init(void)
 	for_each_online_cpu(cpu)
 		amd_cpu_notify(&amd_cpu_notifier, (unsigned long)CPU_ONLINE,
 			       (void *)(long)cpu);
+#ifdef CONFIG_XEN
+	{
+		u64 reg;
+		rdmsrl(MSR_AMD64_NB_CFG, reg);
+		if (!(reg & ENABLE_CF8_EXT_CFG))
+			return 0;
+	}
+#endif
 	pci_probe |= PCI_HAS_IO_ECS;
 
 	return 0;
@@ -560,6 +568,10 @@ static int __init pci_io_ecs_init(void)
 
 static int __init amd_postcore_init(void)
 {
+#ifdef CONFIG_XEN
+	if (!is_initial_xendomain())
+		return 0;
+#endif
 	if (boot_cpu_data.x86_vendor != X86_VENDOR_AMD)
 		return 0;
 

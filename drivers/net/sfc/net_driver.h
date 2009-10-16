@@ -29,6 +29,7 @@
 
 #include "enum.h"
 #include "bitfield.h"
+#include "driverlink.h"
 
 /**************************************************************************
  *
@@ -754,6 +755,12 @@ union efx_multicast_hash {
  * @loopback_mode: Loopback status
  * @loopback_modes: Supported loopback mode bitmask
  * @loopback_selftest: Offline self-test private state
+ * @silicon_rev: Silicon revision description for driverlink
+ * @dl_info: Linked list of hardware parameters exposed through driverlink
+ * @dl_node: Driverlink port list
+ * @dl_device_list: Driverlink device list
+ * @dl_cb: Driverlink callbacks table
+ * @dl_cb_dev: Driverlink callback owner devices
  *
  * The @priv field of the corresponding &struct net_device points to
  * this.
@@ -844,6 +851,15 @@ struct efx_nic {
 	unsigned int loopback_modes;
 
 	void *loopback_selftest;
+
+	const char *silicon_rev;
+#ifdef CONFIG_SFC_DRIVERLINK
+	struct efx_dl_device_info *dl_info;
+	struct list_head dl_node;
+	struct list_head dl_device_list;
+	struct efx_dl_callbacks dl_cb;
+	struct efx_dl_cb_devices dl_cb_dev;
+#endif
 };
 
 static inline int efx_dev_registered(struct efx_nic *efx)

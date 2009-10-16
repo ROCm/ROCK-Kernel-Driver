@@ -1312,7 +1312,7 @@ ENTRY(arch_unwind_init_running)
 END(arch_unwind_init_running)
 #endif
 
-#ifdef CONFIG_XEN
+#ifdef CONFIG_PARAVIRT_XEN
 zeroentry xen_hypervisor_callback xen_do_hypervisor_callback
 
 /*
@@ -1409,7 +1409,7 @@ ENTRY(xen_failsafe_callback)
 	CFI_ENDPROC
 END(xen_failsafe_callback)
 
-#endif /* CONFIG_XEN */
+#endif /* CONFIG_PARAVIRT_XEN */
 
 #ifdef	CONFIG_KDB
 
@@ -1446,7 +1446,7 @@ END(kdb_call)
 paranoidzeroentry_ist debug do_debug DEBUG_STACK
 paranoidzeroentry_ist int3 do_int3 DEBUG_STACK
 paranoiderrorentry stack_segment do_stack_segment
-#ifdef CONFIG_XEN
+#ifdef CONFIG_PARAVIRT_XEN
 zeroentry xen_debug do_debug
 zeroentry xen_int3 do_int3
 errorentry xen_stack_segment do_stack_segment
