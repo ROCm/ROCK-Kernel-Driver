@@ -28,6 +28,8 @@
  */
 #define flush_agp_cache() wbinvd()
 
+#define virt_to_gart virt_to_machine
+
 /* GATT allocation. Returns/accepts GATT kernel virtual address. */
 #define alloc_gatt_pages(order)	({                                          \
 	char *_t; dma_addr_t _d;                                            \
