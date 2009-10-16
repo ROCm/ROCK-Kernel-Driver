@@ -97,7 +97,7 @@ static ssize_t microcode_write(struct file *file, const char __user *buf,
 {
 	ssize_t ret = -EINVAL;
 
- 	if ((len >> PAGE_SHIFT) > totalram_pages) {
+	if ((len >> PAGE_SHIFT) > totalram_pages) {
 		pr_err("microcode: too much data (max %ld pages)\n", totalram_pages);
 		return ret;
  	}
@@ -121,7 +121,7 @@ static const struct file_operations microcode_fops = {
 static struct miscdevice microcode_dev = {
 	.minor			= MICROCODE_MINOR,
 	.name			= "microcode",
-	.devnode		= "cpu/microcode",
+	.nodename		= "cpu/microcode",
 	.fops			= &microcode_fops,
 };
 

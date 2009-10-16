@@ -26,8 +26,6 @@ kdb_cpus_allowed_string(struct task_struct *tp)
 	static char maskbuf[NR_CPUS * 8];
 	if (cpus_equal(tp->cpus_allowed, cpu_online_map))
 		strcpy(maskbuf, "ALL");
-	else if (cpus_full(tp->cpus_allowed))
-		strcpy(maskbuf, "ALL(NR_CPUS)");
 	else if (cpus_empty(tp->cpus_allowed))
 		strcpy(maskbuf, "NONE");
 	else if (cpus_weight(tp->cpus_allowed) == 1)

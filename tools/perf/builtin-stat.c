@@ -42,11 +42,13 @@
 #include "util/util.h"
 #include "util/parse-options.h"
 #include "util/parse-events.h"
+#include "util/event.h"
+#include "util/debug.h"
 
 #include <sys/prctl.h>
 #include <math.h>
 
-static struct perf_counter_attr default_attrs[] = {
+static struct perf_event_attr default_attrs[] = {
 
   { .type = PERF_TYPE_SOFTWARE, .config = PERF_COUNT_SW_TASK_CLOCK	},
   { .type = PERF_TYPE_SOFTWARE, .config = PERF_COUNT_SW_CONTEXT_SWITCHES},
@@ -60,51 +62,66 @@ static struct perf_counter_attr default_attrs[] = {
 
 };
 
-#define MAX_RUN			100
-
 static int			system_wide			=  0;
-static int			verbose				=  0;
 static unsigned int		nr_cpus				=  0;
 static int			run_idx				=  0;
 
 static int			run_count			=  1;
 static int			inherit				=  1;
 static int			scale				=  1;
-static int			target_pid			= -1;
+static pid_t			target_pid			= -1;
+static pid_t			child_pid			= -1;
 static int			null_run			=  0;
 
 static int			fd[MAX_NR_CPUS][MAX_COUNTERS];
 
-static u64			runtime_nsecs[MAX_RUN];
-static u64			walltime_nsecs[MAX_RUN];
-static u64			runtime_cycles[MAX_RUN];
-
-static u64			event_res[MAX_RUN][MAX_COUNTERS][3];
-static u64			event_scaled[MAX_RUN][MAX_COUNTERS];
+static int			event_scaled[MAX_COUNTERS];
 
 struct stats
 {
-	double sum;
-	double sum_sq;
+	double n, mean, M2;
 };
+
+static void update_stats(struct stats *stats, u64 val)
+{
+	double delta;
+
+	stats->n++;
+	delta = val - stats->mean;
+	stats->mean += delta / stats->n;
+	stats->M2 += delta*(val - stats->mean);
+}
 
 static double avg_stats(struct stats *stats)
 {
-	return stats->sum / run_count;
+	return stats->mean;
 }
 
 /*
- * stddev = sqrt(1/N (\Sum n_i^2) - avg(n)^2)
+ * http://en.wikipedia.org/wiki/Algorithms_for_calculating_variance
+ *
+ *       (\Sum n_i^2) - ((\Sum n_i)^2)/n
+ * s^2 = -------------------------------
+ *                  n - 1
+ *
+ * http://en.wikipedia.org/wiki/Stddev
+ *
+ * The std dev of the mean is related to the std dev by:
+ *
+ *             s
+ * s_mean = -------
+ *          sqrt(n)
+ *
  */
 static double stddev_stats(struct stats *stats)
 {
-	double avg = stats->sum / run_count;
+	double variance = stats->M2 / (stats->n - 1);
+	double variance_mean = variance / stats->n;
 
-	return sqrt(stats->sum_sq/run_count - avg*avg);
+	return sqrt(variance_mean);
 }
 
 struct stats			event_res_stats[MAX_COUNTERS][3];
-struct stats			event_scaled_stats[MAX_COUNTERS];
 struct stats			runtime_nsecs_stats;
 struct stats			walltime_nsecs_stats;
 struct stats			runtime_cycles_stats;
@@ -114,11 +131,11 @@ struct stats			runtime_cycles_stats;
 	 attrs[counter].config == PERF_COUNT_##c)
 
 #define ERR_PERF_OPEN \
-"Error: counter %d, sys_perf_counter_open() syscall returned with %d (%s)\n"
+"Error: counter %d, sys_perf_event_open() syscall returned with %d (%s)\n"
 
 static void create_perf_stat_counter(int counter, int pid)
 {
-	struct perf_counter_attr *attr = attrs + counter;
+	struct perf_event_attr *attr = attrs + counter;
 
 	if (scale)
 		attr->read_format = PERF_FORMAT_TOTAL_TIME_ENABLED |
@@ -128,7 +145,7 @@ static void create_perf_stat_counter(int counter, int pid)
 		unsigned int cpu;
 
 		for (cpu = 0; cpu < nr_cpus; cpu++) {
-			fd[cpu][counter] = sys_perf_counter_open(attr, -1, cpu, -1, 0);
+			fd[cpu][counter] = sys_perf_event_open(attr, -1, cpu, -1, 0);
 			if (fd[cpu][counter] < 0 && verbose)
 				fprintf(stderr, ERR_PERF_OPEN, counter,
 					fd[cpu][counter], strerror(errno));
@@ -138,7 +155,7 @@ static void create_perf_stat_counter(int counter, int pid)
 		attr->disabled	     = 1;
 		attr->enable_on_exec = 1;
 
-		fd[0][counter] = sys_perf_counter_open(attr, pid, -1, -1, 0);
+		fd[0][counter] = sys_perf_event_open(attr, pid, -1, -1, 0);
 		if (fd[0][counter] < 0 && verbose)
 			fprintf(stderr, ERR_PERF_OPEN, counter,
 				fd[0][counter], strerror(errno));
@@ -162,12 +179,11 @@ static inline int nsec_counter(int counter)
  */
 static void read_counter(int counter)
 {
-	u64 *count, single_count[3];
+	u64 count[3], single_count[3];
 	unsigned int cpu;
 	size_t res, nv;
 	int scaled;
-
-	count = event_res[run_idx][counter];
+	int i;
 
 	count[0] = count[1] = count[2] = 0;
 
@@ -192,24 +208,33 @@ static void read_counter(int counter)
 	scaled = 0;
 	if (scale) {
 		if (count[2] == 0) {
-			event_scaled[run_idx][counter] = -1;
+			event_scaled[counter] = -1;
 			count[0] = 0;
 			return;
 		}
 
 		if (count[2] < count[1]) {
-			event_scaled[run_idx][counter] = 1;
+			event_scaled[counter] = 1;
 			count[0] = (unsigned long long)
 				((double)count[0] * count[1] / count[2] + 0.5);
 		}
 	}
+
+	for (i = 0; i < 3; i++)
+		update_stats(&event_res_stats[counter][i], count[i]);
+
+	if (verbose) {
+		fprintf(stderr, "%s: %Ld %Ld %Ld\n", event_name(counter),
+				count[0], count[1], count[2]);
+	}
+
 	/*
 	 * Save the full runtime - to allow normalization during printout:
 	 */
 	if (MATCH_EVENT(SOFTWARE, SW_TASK_CLOCK, counter))
-		runtime_nsecs[run_idx] = count[0];
+		update_stats(&runtime_nsecs_stats, count[0]);
 	if (MATCH_EVENT(HARDWARE, HW_CPU_CYCLES, counter))
-		runtime_cycles[run_idx] = count[0];
+		update_stats(&runtime_cycles_stats, count[0]);
 }
 
 static int run_perf_stat(int argc __used, const char **argv)
@@ -261,6 +286,8 @@ static int run_perf_stat(int argc __used, const char **argv)
 		exit(-1);
 	}
 
+	child_pid = pid;
+
 	/*
 	 * Wait for the child to be ready to exec.
 	 */
@@ -283,7 +310,7 @@ static int run_perf_stat(int argc __used, const char **argv)
 
 	t1 = rdclock();
 
-	walltime_nsecs[run_idx] = t1 - t0;
+	update_stats(&walltime_nsecs_stats, t1 - t0);
 
 	for (counter = 0; counter < nr_counters; counter++)
 		read_counter(counter);
@@ -291,13 +318,16 @@ static int run_perf_stat(int argc __used, const char **argv)
 	return WEXITSTATUS(status);
 }
 
-static void print_noise(double avg, double stddev)
+static void print_noise(int counter, double avg)
 {
-	if (run_count > 1)
-		fprintf(stderr, "   ( +- %7.3f%% )", 100*stddev / avg);
+	if (run_count == 1)
+		return;
+
+	fprintf(stderr, "   ( +- %7.3f%% )",
+			100 * stddev_stats(&event_res_stats[counter][0]) / avg);
 }
 
-static void nsec_printout(int counter, double avg, double stddev)
+static void nsec_printout(int counter, double avg)
 {
 	double msecs = avg / 1e6;
 
@@ -307,21 +337,29 @@ static void nsec_printout(int counter, double avg, double stddev)
 		fprintf(stderr, " # %10.3f CPUs ",
 				avg / avg_stats(&walltime_nsecs_stats));
 	}
-	print_noise(avg, stddev);
 }
 
-static void abs_printout(int counter, double avg, double stddev)
+static void abs_printout(int counter, double avg)
 {
+	double total, ratio = 0.0;
+
 	fprintf(stderr, " %14.0f  %-24s", avg, event_name(counter));
 
 	if (MATCH_EVENT(HARDWARE, HW_INSTRUCTIONS, counter)) {
-		fprintf(stderr, " # %10.3f IPC  ",
-				avg / avg_stats(&runtime_cycles_stats));
+		total = avg_stats(&runtime_cycles_stats);
+
+		if (total)
+			ratio = avg / total;
+
+		fprintf(stderr, " # %10.3f IPC  ", ratio);
 	} else {
-		fprintf(stderr, " # %10.3f M/sec",
-				1000.0 * avg / avg_stats(&runtime_nsecs_stats));
+		total = avg_stats(&runtime_nsecs_stats);
+
+		if (total)
+			ratio = 1000.0 * avg / total;
+
+		fprintf(stderr, " # %10.3f M/sec", ratio);
 	}
-	print_noise(avg, stddev);
 }
 
 /*
@@ -329,12 +367,8 @@ static void abs_printout(int counter, double avg, double stddev)
  */
 static void print_counter(int counter)
 {
-	double avg, stddev;
-	int scaled;
-
-	avg    = avg_stats(&event_res_stats[counter][0]);
-	stddev = stddev_stats(&event_res_stats[counter][0]);
-	scaled = avg_stats(&event_scaled_stats[counter]);
+	double avg = avg_stats(&event_res_stats[counter][0]);
+	int scaled = event_scaled[counter];
 
 	if (scaled == -1) {
 		fprintf(stderr, " %14s  %-24s\n",
@@ -343,9 +377,11 @@ static void print_counter(int counter)
 	}
 
 	if (nsec_counter(counter))
-		nsec_printout(counter, avg, stddev);
+		nsec_printout(counter, avg);
 	else
-		abs_printout(counter, avg, stddev);
+		abs_printout(counter, avg);
+
+	print_noise(counter, avg);
 
 	if (scaled) {
 		double avg_enabled, avg_running;
@@ -360,51 +396,9 @@ static void print_counter(int counter)
 	fprintf(stderr, "\n");
 }
 
-static void update_stats(const char *name, int idx, struct stats *stats, u64 *val)
-{
-	double sq = *val;
-
-	stats->sum += *val;
-	stats->sum_sq += sq * sq;
-
-	if (verbose > 1)
-		fprintf(stderr, "debug: %20s[%d]: %Ld\n", name, idx, *val);
-}
-
-/*
- * Calculate the averages and noises:
- */
-static void calc_avg(void)
-{
-	int i, j;
-
-	if (verbose > 1)
-		fprintf(stderr, "\n");
-
-	for (i = 0; i < run_count; i++) {
-		update_stats("runtime", 0, &runtime_nsecs_stats, runtime_nsecs + i);
-		update_stats("walltime", 0, &walltime_nsecs_stats, walltime_nsecs + i);
-		update_stats("runtime_cycles", 0, &runtime_cycles_stats, runtime_cycles + i);
-
-		for (j = 0; j < nr_counters; j++) {
-			update_stats("counter/0", j,
-				event_res_stats[j]+0, event_res[i][j]+0);
-			update_stats("counter/1", j,
-				event_res_stats[j]+1, event_res[i][j]+1);
-			update_stats("counter/2", j,
-				event_res_stats[j]+2, event_res[i][j]+2);
-			if (event_scaled[i][j] != (u64)-1)
-				update_stats("scaled", j,
-					event_scaled_stats + j, event_scaled[i]+j);
-		}
-	}
-}
-
 static void print_stat(int argc, const char **argv)
 {
 	int i, counter;
-
-	calc_avg();
 
 	fflush(stdout);
 
@@ -442,6 +436,9 @@ static void skip_signal(int signo)
 
 static void sig_atexit(void)
 {
+	if (child_pid != -1)
+		kill(child_pid, SIGTERM);
+
 	if (signr == -1)
 		return;
 
@@ -483,7 +480,7 @@ int cmd_stat(int argc, const char **argv, const char *prefix __used)
 		PARSE_OPT_STOP_AT_NON_OPTION);
 	if (!argc)
 		usage_with_options(stat_usage, options);
-	if (run_count <= 0 || run_count > MAX_RUN)
+	if (run_count <= 0)
 		usage_with_options(stat_usage, options);
 
 	/* Set attrs and nr_counters if no event is selected and !null_run */

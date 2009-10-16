@@ -1,5 +1,6 @@
 #include <linux/mm.h>
 #include <linux/module.h>
+#include <linux/smp.h>
 #include <xen/features.h>
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
@@ -448,7 +449,7 @@ void arch_exit_mmap(struct mm_struct *mm)
 	leave_active_mm(tsk, mm);
 
 	preempt_disable();
-	smp_call_function_mask(mm->cpu_vm_mask, _leave_active_mm, mm, 1);
+	smp_call_function_many(mm_cpumask(mm), _leave_active_mm, mm, 1);
 	preempt_enable();
 
 	if (PagePinned(virt_to_page(mm->pgd))
@@ -773,8 +774,7 @@ int ptep_set_access_flags(struct vm_area_struct *vma,
 		if (likely(vma->vm_mm == current->mm)) {
 			if (HYPERVISOR_update_va_mapping(address,
 				entry,
-				uvm_multi(vma->vm_mm->cpu_vm_mask) |
-					UVMF_INVLPG))
+				uvm_multi(mm_cpumask(vma->vm_mm))|UVMF_INVLPG))
 				BUG();
 		} else {
 			xen_l1_entry_update(ptep, entry);

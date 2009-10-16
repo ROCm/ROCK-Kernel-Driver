@@ -53,7 +53,6 @@ static int __read_mostly reboot_irq = -1;
 
 DEFINE_PER_CPU(cpumask_var_t, cpu_sibling_map);
 DEFINE_PER_CPU(cpumask_var_t, cpu_core_map);
-EXPORT_PER_CPU_SYMBOL(cpu_core_map);
 
 void __init prefill_possible_map(void)
 {

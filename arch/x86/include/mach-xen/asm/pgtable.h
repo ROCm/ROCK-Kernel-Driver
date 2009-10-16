@@ -56,16 +56,6 @@ extern struct list_head pgd_list;
 #define pte_update(mm, addr, ptep)              do { } while (0)
 #define pte_update_defer(mm, addr, ptep)        do { } while (0)
 
-static inline void __init paravirt_pagetable_setup_start(pgd_t *base)
-{
-	xen_pagetable_setup_start(base);
-}
-
-static inline void __init paravirt_pagetable_setup_done(pgd_t *base)
-{
-	xen_pagetable_setup_done(base);
-}
-
 #define pgd_val(x)	xen_pgd_val(x)
 #define __pgd(x)	xen_make_pgd(x)
 
@@ -138,6 +128,11 @@ static inline int pte_special(pte_t pte)
 		       __pte_mfn(_pte))
 
 #define pte_page(pte)	pfn_to_page(pte_pfn(pte))
+
+static inline unsigned long pmd_pfn(pmd_t pmd)
+{
+	return (pmd_val(pmd) & PTE_PFN_MASK) >> PAGE_SHIFT;
+}
 
 static inline int pmd_large(pmd_t pte)
 {
@@ -368,7 +363,7 @@ static inline unsigned long pmd_page_vaddr(pmd_t pmd)
  * this macro returns the index of the entry in the pmd page which would
  * control the given virtual address
  */
-static inline unsigned pmd_index(unsigned long address)
+static inline unsigned long pmd_index(unsigned long address)
 {
 	return (address >> PMD_SHIFT) & (PTRS_PER_PMD - 1);
 }
@@ -388,7 +383,7 @@ static inline unsigned pmd_index(unsigned long address)
  * this function returns the index of the entry in the pte page which would
  * control the given virtual address
  */
-static inline unsigned pte_index(unsigned long address)
+static inline unsigned long pte_index(unsigned long address)
 {
 	return (address >> PAGE_SHIFT) & (PTRS_PER_PTE - 1);
 }
@@ -444,11 +439,6 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long address)
 	return (pmd_t *)pud_page_vaddr(*pud) + pmd_index(address);
 }
 
-static inline unsigned long pmd_pfn(pmd_t pmd)
-{
-	return (pmd_val(pmd) & PTE_PFN_MASK) >> PAGE_SHIFT;
-}
-
 static inline int pud_large(pud_t pud)
 {
 	return (__pud_val(pud) & (_PAGE_PSE | _PAGE_PRESENT)) ==
@@ -484,7 +474,7 @@ static inline unsigned long pgd_page_vaddr(pgd_t pgd)
 #define pgd_page(pgd)		pfn_to_page(pgd_val(pgd) >> PAGE_SHIFT)
 
 /* to find an entry in a page-table-directory. */
-static inline unsigned pud_index(unsigned long address)
+static inline unsigned long pud_index(unsigned long address)
 {
 	return (address >> PUD_SHIFT) & (PTRS_PER_PUD - 1);
 }
@@ -605,7 +595,7 @@ extern int ptep_clear_flush_young(struct vm_area_struct *vma,
 	if (!pte_none(__res) &&					\
 	    ((vma)->vm_mm != current->mm ||			\
 	     HYPERVISOR_update_va_mapping(addr,	__pte(0),	\
-			uvm_multi((vma)->vm_mm->cpu_vm_mask) |	\
+			uvm_multi(mm_cpumask((vma)->vm_mm)) |	\
 				UVMF_INVLPG))) {		\
 		__xen_pte_clear(__ptep);			\
 		flush_tlb_page(vma, addr);			\

@@ -101,6 +101,8 @@ NORET_TYPE void panic(const char * fmt, ...)
 
 	crash_kexec(NULL);
 
+	bust_spinlocks(0);
+
 	if (!panic_blink)
 		panic_blink = no_blink;
 
@@ -158,7 +160,6 @@ NORET_TYPE void panic(const char * fmt, ...)
 		mdelay(1);
 		i++;
 	}
-	bust_spinlocks(0);
 }
 
 EXPORT_SYMBOL(panic);
@@ -205,7 +206,7 @@ static const struct tnt tnts[] = {
  *  'N' - Unsuported modules loaded.
  *  'X' - Modules with external support loaded.
  *
- *	The string is overwritten by the next call to print_taint().
+ *	The string is overwritten by the next call to print_tainted().
  */
 const char *print_tainted(void)
 {

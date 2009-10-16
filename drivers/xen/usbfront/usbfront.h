@@ -66,8 +66,6 @@
 #include "../../usb/core/hcd.h"
 #include "../../usb/core/hub.h"
 
-#define DRIVER_DESC "Xen USB2.0 Virtual Host Controller driver (usbfront)"
-
 static inline struct usbfront_info *hcd_to_info(struct usb_hcd *hcd)
 {
 	return (struct usbfront_info *) (hcd->hcd_priv);
@@ -75,18 +73,17 @@ static inline struct usbfront_info *hcd_to_info(struct usb_hcd *hcd)
 
 static inline struct usb_hcd *info_to_hcd(struct usbfront_info *info)
 {
-	return container_of ((void *) info, struct usb_hcd, hcd_priv);
+	return container_of((void *) info, struct usb_hcd, hcd_priv);
 }
 
-/*
- * Private per-URB data
- */
+/* Private per-URB data */
 struct urb_priv {
 	struct list_head list;
 	struct urb *urb;
-	int req_id;	/* RING_REQUEST id */
+	int req_id;	/* RING_REQUEST id for submitting */
+	int unlink_req_id; /* RING_REQUEST id for unlinking */
 	int status;
-	unsigned unlinked:1; /* dequeued urb just marked */
+	unsigned unlinked:1; /* dequeued marker */
 };
 
 /* virtual roothub port status */
@@ -106,7 +103,7 @@ struct vdevice_status {
 
 /* RING request shadow */
 struct usb_shadow {
-	usbif_request_t req;
+	usbif_urb_request_t req;
 	struct urb *urb;
 };
 
@@ -118,62 +115,46 @@ struct xenhcd_stats {
 };
 
 struct usbfront_info {
-	/*
-	 * Virtual Host Controller has 3 queues.
-	 *
-	 * pending_urbs:
-	 * 	If xenhcd_urb_enqueue() called in RING_FULL state,
-	 * 	the enqueued urbs are added to this queue, and waits
-	 * 	to be sent to the backend.
-	 *
-	 * inprogress_urbs:
-	 * 	After xenhcd_urb_enqueue() called and RING_REQUEST sent,
-	 * 	the urbs are added to this queue and waits for RING_RESPONSE.
-	 *
-	 * unlinked_urbs:
-	 *	When xenhcd_urb_dequeue() called, if the dequeued urb is
-	 *	listed in pending_urbs, that urb is moved to this queue
-	 *	and waits to be given back to the USB core.
-	 */
-	struct list_head pending_urbs;
-	struct list_head inprogress_urbs;
-	struct list_head unlinked_urbs;
+	/* Virtual Host Controller has 4 urb queues */
+	struct list_head pending_submit_list;
+	struct list_head pending_unlink_list;
+	struct list_head in_progress_list;
+	struct list_head giveback_waiting_list;
+
 	spinlock_t lock;
 
-	/*
-	 * timer function that kick pending_urbs and unlink_urbs.
-	 */
-	unsigned long actions;
+	/* timer that kick pending and giveback waiting urbs */
 	struct timer_list watchdog;
+	unsigned long actions;
 
-	/*
-	 * Virtual roothub:
-	 * Emulates the hub ports and the attached devices status.
-	 * USB_MAXCHILDREN is defined (16) in include/linux/usb.h
-	 */
+	/* virtual root hub */
 	int rh_numports;
 	struct rhport_status ports[USB_MAXCHILDREN];
 	struct vdevice_status devices[USB_MAXCHILDREN];
 
-#ifdef XENHCD_STATS
-	struct xenhcd_stats stats;
-#define COUNT(x) do { (x)++; } while (0)
-#else
-#define COUNT(x) do {} while (0)
-#endif
-
 	/* Xen related staff */
 	struct xenbus_device *xbdev;
-	int ring_ref;
-	usbif_front_ring_t ring;
-	unsigned int irq;
-	struct usb_shadow shadow[USB_RING_SIZE];
+	int urb_ring_ref;
+	int conn_ring_ref;
+	usbif_urb_front_ring_t urb_ring;
+	usbif_conn_front_ring_t conn_ring;
+
+	unsigned int irq; /* event channel */
+	struct usb_shadow shadow[USB_URB_RING_SIZE];
 	unsigned long shadow_free;
 
 	/* RING_RESPONSE thread */
 	struct task_struct *kthread;
 	wait_queue_head_t wq;
 	unsigned int waiting_resp;
+
+	/* xmit statistics */
+#ifdef XENHCD_STATS
+	struct xenhcd_stats stats;
+#define COUNT(x) do { (x)++; } while (0)
+#else
+#define COUNT(x) do {} while (0)
+#endif
 };
 
 #define XENHCD_RING_JIFFIES (HZ/200)
@@ -200,7 +181,7 @@ timer_action(struct usbfront_info *info, enum xenhcd_timer_action action)
 	if (!test_and_set_bit(action, &info->actions)) {
 		unsigned long t;
 
-		switch(action) {
+		switch (action) {
 		case TIMER_RING_WATCHDOG:
 			t = XENHCD_RING_JIFFIES;
 			break;
@@ -212,6 +193,12 @@ timer_action(struct usbfront_info *info, enum xenhcd_timer_action action)
 	}
 }
 
+extern struct kmem_cache *xenhcd_urbp_cachep;
+extern struct hc_driver xen_usb20_hc_driver;
+extern struct hc_driver xen_usb11_hc_driver;
 irqreturn_t xenhcd_int(int irq, void *dev_id);
+void xenhcd_rhport_state_change(struct usbfront_info *info,
+				int port, enum usb_device_speed speed);
+int xenhcd_schedule(void *arg);
 
 #endif /* __XEN_USBFRONT_H__ */

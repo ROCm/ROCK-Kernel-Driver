@@ -79,8 +79,7 @@ static int debug;
 #define EMPEG_PRODUCT_ID		0x0001
 
 /* function prototypes for an empeg-car player */
-static int  empeg_open(struct tty_struct *tty, struct usb_serial_port *port,
-						struct file *filp);
+static int  empeg_open(struct tty_struct *tty, struct usb_serial_port *port);
 static void empeg_close(struct usb_serial_port *port);
 static int  empeg_write(struct tty_struct *tty, struct usb_serial_port *port,
 						const unsigned char *buf,
@@ -141,8 +140,7 @@ static int		bytes_out;
 /******************************************************************************
  * Empeg specific driver functions
  ******************************************************************************/
-static int empeg_open(struct tty_struct *tty, struct usb_serial_port *port,
-				struct file *filp)
+static int empeg_open(struct tty_struct *tty,struct usb_serial_port *port)
 {
 	struct usb_serial *serial = port->serial;
 	int result = 0;
@@ -393,7 +391,7 @@ static void empeg_unthrottle(struct tty_struct *tty)
 	dbg("%s - port %d", __func__, port->number);
 
 	port->read_urb->dev = port->serial->dev;
-	result = usb_submit_urb(port->read_urb, GFP_ATOMIC);
+	result = usb_submit_urb(port->read_urb, GFP_KERNEL);
 	if (result)
 		dev_err(&port->dev,
 			"%s - failed submitting read urb, error %d\n",

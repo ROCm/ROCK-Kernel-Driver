@@ -2456,7 +2456,7 @@ const struct inode_operations ext3_dir_inode_operations = {
 	.listxattr	= ext3_listxattr,
 	.removexattr	= generic_removexattr,
 #endif
-	.permission	= ext3_permission,
+	.check_acl	= ext3_check_acl,
 	.may_create	= ext3_may_create,
 	.may_delete	= ext3_may_delete,
 };
@@ -2469,7 +2469,7 @@ const struct inode_operations ext3_special_inode_operations = {
 	.listxattr	= ext3_listxattr,
 	.removexattr	= generic_removexattr,
 #endif
-	.permission	= ext3_permission,
+	.check_acl	= ext3_check_acl,
 	.may_create	= ext3_may_create,
 	.may_delete	= ext3_may_delete,
 };

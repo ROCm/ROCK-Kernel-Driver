@@ -124,7 +124,6 @@ static inline void arch_send_call_function_single_ipi(int cpu)
 	smp_ops.send_call_func_single_ipi(cpu);
 }
 
-#define arch_send_call_function_ipi_mask arch_send_call_function_ipi_mask
 static inline void arch_send_call_function_ipi_mask(const struct cpumask *mask)
 {
 	smp_ops.send_call_func_ipi(mask);
@@ -152,7 +151,7 @@ void xen_send_call_func_single_ipi(int cpu);
 #define smp_send_stop		xen_smp_send_stop
 #define smp_send_reschedule	xen_smp_send_reschedule
 #define arch_send_call_function_single_ipi	xen_send_call_func_single_ipi
-#define arch_send_call_function_ipi(m)		xen_send_call_func_ipi(&(m))
+#define arch_send_call_function_ipi_mask	xen_send_call_func_ipi
 
 void play_dead(void);
 
@@ -170,27 +169,7 @@ static inline int num_booting_cpus(void)
 
 extern unsigned disabled_cpus __cpuinitdata;
 
-#ifdef CONFIG_X86_32_SMP
-/*
- * This function is needed by all SMP systems. It must _always_ be valid
- * from the initial startup. We map APIC_BASE very early in page_setup(),
- * so this is correct in the x86 case.
- */
-#define raw_smp_processor_id() (percpu_read(cpu_number))
-#define safe_smp_processor_id() smp_processor_id()
-
-#elif defined(CONFIG_X86_64_SMP)
-#define raw_smp_processor_id() (percpu_read(cpu_number))
-
-#define stack_smp_processor_id()					\
-({								\
-	struct thread_info *ti;						\
-	__asm__("andq %%rsp,%0; ":"=r" (ti) : "0" (CURRENT_MASK));	\
-	ti->cpu;							\
-})
-#define safe_smp_processor_id()		smp_processor_id()
-
-#endif
+#include <asm/smp-processor-id.h>
 
 #if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
 

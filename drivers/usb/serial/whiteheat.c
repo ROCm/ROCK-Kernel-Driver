@@ -146,7 +146,7 @@ static int  whiteheat_firmware_attach(struct usb_serial *serial);
 static int  whiteheat_attach(struct usb_serial *serial);
 static void whiteheat_release(struct usb_serial *serial);
 static int  whiteheat_open(struct tty_struct *tty,
-			struct usb_serial_port *port, struct file *filp);
+			struct usb_serial_port *port);
 static void whiteheat_close(struct usb_serial_port *port);
 static int  whiteheat_write(struct tty_struct *tty,
 			struct usb_serial_port *port,
@@ -659,8 +659,7 @@ static void whiteheat_release(struct usb_serial *serial)
 	return;
 }
 
-static int whiteheat_open(struct tty_struct *tty,
-			struct usb_serial_port *port, struct file *filp)
+static int whiteheat_open(struct tty_struct *tty, struct usb_serial_port *port)
 {
 	int		retval = 0;
 
@@ -950,13 +949,12 @@ static void whiteheat_throttle(struct tty_struct *tty)
 {
 	struct usb_serial_port *port = tty->driver_data;
 	struct whiteheat_private *info = usb_get_serial_port_data(port);
-	unsigned long flags;
 
 	dbg("%s - port %d", __func__, port->number);
 
-	spin_lock_irqsave(&info->lock, flags);
+	spin_lock_irq(&info->lock);
 	info->flags |= THROTTLED;
-	spin_unlock_irqrestore(&info->lock, flags);
+	spin_unlock_irq(&info->lock);
 
 	return;
 }
@@ -967,14 +965,13 @@ static void whiteheat_unthrottle(struct tty_struct *tty)
 	struct usb_serial_port *port = tty->driver_data;
 	struct whiteheat_private *info = usb_get_serial_port_data(port);
 	int actually_throttled;
-	unsigned long flags;
 
 	dbg("%s - port %d", __func__, port->number);
 
-	spin_lock_irqsave(&info->lock, flags);
+	spin_lock_irq(&info->lock);
 	actually_throttled = info->flags & ACTUALLY_THROTTLED;
 	info->flags &= ~(THROTTLED | ACTUALLY_THROTTLED);
-	spin_unlock_irqrestore(&info->lock, flags);
+	spin_unlock_irq(&info->lock);
 
 	if (actually_throttled)
 		rx_data_softint(&info->rx_work);

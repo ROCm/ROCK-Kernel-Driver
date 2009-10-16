@@ -327,10 +327,8 @@ static int vnic_process_localmac_msg(netfront_accel_vnic *vnic,
 	cuckoo_hash_mac_key key;
 
 	if (msg->u.localmac.flags & NET_ACCEL_MSG_ADD) {
-		DECLARE_MAC_BUF(buf);
-
-		DPRINTK("MAC has moved, could be local: %s\n",
-			print_mac(buf, msg->u.localmac.mac));
+		DPRINTK("MAC has moved, could be local: %pM\n",
+			msg->u.localmac.mac);
 		key = cuckoo_mac_to_key(msg->u.localmac.mac);
 		spin_lock_irqsave(&vnic->table_lock, flags);
 		/* Try to remove it, not a big deal if not there */

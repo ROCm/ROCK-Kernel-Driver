@@ -45,36 +45,106 @@
 
 #include "usbback.h"
 
-static LIST_HEAD(usbstub_ids);
-static DEFINE_SPINLOCK(usbstub_ids_lock);
-static LIST_HEAD(grabbed_devices);
-static DEFINE_SPINLOCK(grabbed_devices_lock);
+static LIST_HEAD(port_list);
+static DEFINE_SPINLOCK(port_list_lock);
 
-struct usbstub *find_grabbed_device(int dom_id, int dev_id, int portnum)
+struct vusb_port_id *find_portid_by_busid(const char *busid)
 {
-	struct usbstub *stub;
+	struct vusb_port_id *portid;
 	int found = 0;
 	unsigned long flags;
 
-	spin_lock_irqsave(&grabbed_devices_lock, flags);
-	list_for_each_entry(stub, &grabbed_devices, grabbed_list) {
-		if (stub->id->dom_id == dom_id
-				&& stub->id->dev_id == dev_id
-				&& stub->id->portnum == portnum) {
+	spin_lock_irqsave(&port_list_lock, flags);
+	list_for_each_entry(portid, &port_list, id_list) {
+		if (!(strncmp(portid->phys_bus, busid, USBBACK_BUS_ID_SIZE))) {
 			found = 1;
 			break;
 		}
 	}
-	spin_unlock_irqrestore(&grabbed_devices_lock, flags);
+	spin_unlock_irqrestore(&port_list_lock, flags);
 
 	if (found)
-		return stub;
+		return portid;
 
 	return NULL;
 }
 
-static struct usbstub *usbstub_alloc(struct usb_interface *interface,
-						struct usbstub_id *stub_id)
+struct vusb_port_id *find_portid(const domid_t domid,
+						const unsigned int handle,
+						const int portnum)
+{
+	struct vusb_port_id *portid;
+	int found = 0;
+	unsigned long flags;
+
+	spin_lock_irqsave(&port_list_lock, flags);
+	list_for_each_entry(portid, &port_list, id_list) {
+		if ((portid->domid == domid)
+				&& (portid->handle == handle)
+				&& (portid->portnum == portnum)) {
+				found = 1;
+				break;
+		}
+	}
+	spin_unlock_irqrestore(&port_list_lock, flags);
+
+	if (found)
+		return portid;
+
+	return NULL;
+}
+
+int portid_add(const char *busid,
+					const domid_t domid,
+					const unsigned int handle,
+					const int portnum)
+{
+	struct vusb_port_id *portid;
+	unsigned long flags;
+
+	portid = kzalloc(sizeof(*portid), GFP_KERNEL);
+	if (!portid)
+		return -ENOMEM;
+
+	portid->domid = domid;
+	portid->handle = handle;
+	portid->portnum = portnum;
+
+	strncpy(portid->phys_bus, busid, USBBACK_BUS_ID_SIZE);
+
+	spin_lock_irqsave(&port_list_lock, flags);
+	list_add(&portid->id_list, &port_list);
+	spin_unlock_irqrestore(&port_list_lock, flags);
+
+	return 0;
+}
+
+int portid_remove(const domid_t domid,
+					const unsigned int handle,
+					const int portnum)
+{
+	struct vusb_port_id *portid, *tmp;
+	int err = -ENOENT;
+	unsigned long flags;
+
+	spin_lock_irqsave(&port_list_lock, flags);
+	list_for_each_entry_safe(portid, tmp, &port_list, id_list) {
+		if (portid->domid == domid
+				&& portid->handle == handle
+				&& portid->portnum == portnum) {
+			list_del(&portid->id_list);
+			kfree(portid);
+
+			err = 0;
+		}
+	}
+	spin_unlock_irqrestore(&port_list_lock, flags);
+
+	return err;
+}
+
+static struct usbstub *usbstub_alloc(struct usb_device *udev,
+						struct vusb_port_id *portid)
 {
 	struct usbstub *stub;
 
@@ -83,314 +153,135 @@ static struct usbstub *usbstub_alloc(struct usb_interface *interface,
 		printk(KERN_ERR "no memory for alloc usbstub\n");
 		return NULL;
 	}
-
-	stub->udev = usb_get_dev(interface_to_usbdev(interface));
-	stub->interface = interface;
-	stub->id = stub_id;
+	kref_init(&stub->kref);
+	stub->udev = usb_get_dev(udev);
+	stub->portid = portid;
 	spin_lock_init(&stub->submitting_lock);
 	INIT_LIST_HEAD(&stub->submitting_list);
 
 	return stub;
 }
 
-static int usbstub_free(struct usbstub *stub)
+static void usbstub_release(struct kref *kref)
 {
-	if (!stub)
-		return -EINVAL;
+	struct usbstub *stub;
+
+	stub = container_of(kref, struct usbstub, kref);
 
 	usb_put_dev(stub->udev);
-	stub->interface = NULL;
 	stub->udev = NULL;
-	stub->id = NULL;
+	stub->portid = NULL;
 	kfree(stub);
-
-	return 0;
 }
 
-static int usbstub_match_one(struct usb_interface *interface,
-		struct usbstub_id *stub_id)
+static inline void usbstub_get(struct usbstub *stub)
 {
-	const char *udev_busid = dev_name(interface->dev.parent);
-
-	if (!(strncmp(stub_id->bus_id, udev_busid, USBBACK_BUS_ID_SIZE))) {
-		return 1;
-	}
-
-	return 0;
+	kref_get(&stub->kref);
 }
 
-static struct usbstub_id *usbstub_match(struct usb_interface *interface)
+static inline void usbstub_put(struct usbstub *stub)
 {
-	struct usb_device *udev = interface_to_usbdev(interface);
-	struct usbstub_id *stub_id;
-	unsigned long flags;
-	int found = 0;
+	kref_put(&stub->kref, usbstub_release);
+}
+
+static int usbstub_probe(struct usb_interface *intf,
+		const struct usb_device_id *id)
+{
+	struct usb_device *udev = interface_to_usbdev(intf);
+	const char *busid = dev_name(intf->dev.parent);
+	struct vusb_port_id *portid = NULL;
+	struct usbstub *stub = NULL;
+	usbif_t *usbif = NULL;
+	int retval = -ENODEV;
 
 	/* hub currently not supported, so skip. */
 	if (udev->descriptor.bDeviceClass ==  USB_CLASS_HUB)
-		return NULL;
+		goto out;
 
-	spin_lock_irqsave(&usbstub_ids_lock, flags);
-	list_for_each_entry(stub_id, &usbstub_ids, id_list) {
-		if (usbstub_match_one(interface, stub_id)) {
-			found = 1;
+	portid = find_portid_by_busid(busid);
+	if (!portid)
+		goto out;
+
+	usbif = find_usbif(portid->domid, portid->handle);
+	if (!usbif)
+		goto out;
+
+	switch (udev->speed) {
+	case USB_SPEED_LOW:
+	case USB_SPEED_FULL:
+		break;
+	case USB_SPEED_HIGH:
+		if (usbif->usb_ver >= USB_VER_USB20)
 			break;
-		}
+		/* fall through */
+	default:
+		goto out;
 	}
-	spin_unlock_irqrestore(&usbstub_ids_lock, flags);
 
-	if (found)
-		return stub_id;
-
-	return NULL;
-}
-
-static void add_to_grabbed_devices(struct usbstub *stub)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&grabbed_devices_lock, flags);
-	list_add(&stub->grabbed_list, &grabbed_devices);
-	spin_unlock_irqrestore(&grabbed_devices_lock, flags);
-}
-
-static void remove_from_grabbed_devices(struct usbstub *stub)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&grabbed_devices_lock, flags);
-	list_del(&stub->grabbed_list);
-	spin_unlock_irqrestore(&grabbed_devices_lock, flags);
-}
-
-static int usbstub_probe(struct usb_interface *interface,
-		const struct usb_device_id *id)
-{
-	struct usbstub_id *stub_id = NULL;
-	struct usbstub *stub = NULL;
-	usbif_t *usbif = NULL;
-	int retval = 0;
-
-	if ((stub_id = usbstub_match(interface))) {
-		stub = usbstub_alloc(interface, stub_id);
+	stub = find_attached_device(usbif, portid->portnum);
+	if (!stub) {
+		/* new connection */
+		stub = usbstub_alloc(udev, portid);
 		if (!stub)
 			return -ENOMEM;
+		usbbk_attach_device(usbif, stub);
+		usbbk_hotplug_notify(usbif, portid->portnum, udev->speed);
+	} else {
+		/* maybe already called and connected by other intf */
+		if (strncmp(stub->portid->phys_bus, busid, USBBACK_BUS_ID_SIZE))
+			goto out; /* invalid call */
+	}
 
-		usb_set_intfdata(interface, stub);
-		add_to_grabbed_devices(stub);
-		usbif = find_usbif(stub_id->dom_id, stub_id->dev_id);
-		if (usbif) {
-			usbbk_plug_device(usbif, stub);
-			usbback_reconfigure(usbif);
-		}
+	usbstub_get(stub);
+	usb_set_intfdata(intf, stub);
+	retval = 0;
 
-	} else
-		retval = -ENODEV;
-
+out:
 	return retval;
 }
 
-static void usbstub_disconnect(struct usb_interface *interface)
+static void usbstub_disconnect(struct usb_interface *intf)
 {
 	struct usbstub *stub
-		= (struct usbstub *) usb_get_intfdata(interface);
+		= (struct usbstub *) usb_get_intfdata(intf);
 
-	usb_set_intfdata(interface, NULL);
+	usb_set_intfdata(intf, NULL);
 
 	if (!stub)
 		return;
 
 	if (stub->usbif) {
-		usbback_reconfigure(stub->usbif);
-		usbbk_unplug_device(stub->usbif, stub);
+		usbbk_hotplug_notify(stub->usbif, stub->portid->portnum, 0);
+		usbbk_detach_device(stub->usbif, stub);
 	}
-
 	usbbk_unlink_urbs(stub);
-
-	remove_from_grabbed_devices(stub);
-
-	usbstub_free(stub);
-
-	return;
+	usbstub_put(stub);
 }
 
-static inline int str_to_vport(const char *buf,
-					char *phys_bus,
-					int *dom_id,
-					int *dev_id,
-					int *port)
-{
-	char *p;
-	int len;
-	int err;
-
-	/* no physical bus */
-	if (!(p = strchr(buf, ':')))
-		return -EINVAL;
-
-	len = p - buf;
-
-	/* bad physical bus */
-	if (len + 1 > USBBACK_BUS_ID_SIZE)
-		return -EINVAL;
-
-	strlcpy(phys_bus, buf, len + 1);
-	err = sscanf(p + 1, "%d:%d:%d", dom_id, dev_id, port);
-	if (err == 3)
-		return 0;
-	else
-		return -EINVAL;
-}
-
-static int usbstub_id_add(const char *bus_id,
-					const int dom_id,
-					const int dev_id,
-					const int portnum)
-{
-	struct usbstub_id *stub_id;
-	unsigned long flags;
-
-	stub_id = kzalloc(sizeof(*stub_id), GFP_KERNEL);
-	if (!stub_id)
-		return -ENOMEM;
-
-	stub_id->dom_id = dom_id;
-	stub_id->dev_id = dev_id;
-	stub_id->portnum = portnum;
-
-	strncpy(stub_id->bus_id, bus_id, USBBACK_BUS_ID_SIZE);
-
-	spin_lock_irqsave(&usbstub_ids_lock, flags);
-	list_add(&stub_id->id_list, &usbstub_ids);
-	spin_unlock_irqrestore(&usbstub_ids_lock, flags);
-
-	return 0;
-}
-
-static int usbstub_id_remove(const char *phys_bus,
-					const int dom_id,
-					const int dev_id,
-					const int portnum)
-{
-	struct usbstub_id *stub_id, *tmp;
-	int err = -ENOENT;
-	unsigned long flags;
-
-	spin_lock_irqsave(&usbstub_ids_lock, flags);
-	list_for_each_entry_safe(stub_id, tmp, &usbstub_ids, id_list) {
-		if (stub_id->dom_id == dom_id
-				&& stub_id->dev_id == dev_id
-				&& stub_id->portnum == portnum) {
-			list_del(&stub_id->id_list);
-			kfree(stub_id);
-
-			err = 0;
-		}
-	}
-	spin_unlock_irqrestore(&usbstub_ids_lock, flags);
-
-	return err;
-}
-
-static ssize_t usbstub_vport_add(struct device_driver *driver,
-		const char *buf, size_t count)
-{
-	int err = 0;
-
-	char bus_id[USBBACK_BUS_ID_SIZE];
-	int dom_id;
-	int dev_id;
-	int portnum;
-
-	err = str_to_vport(buf, &bus_id[0], &dom_id, &dev_id, &portnum);
-	if (err)
-		goto out;
-
-	err = usbstub_id_add(&bus_id[0], dom_id, dev_id, portnum);
-
-out:
-	if (!err)
-		err = count;
-	return err;
-}
-
-DRIVER_ATTR(new_vport, S_IWUSR, NULL, usbstub_vport_add);
-
-static ssize_t usbstub_vport_remove(struct device_driver *driver,
-		const char *buf, size_t count)
-{
-	int err = 0;
-
-	char bus_id[USBBACK_BUS_ID_SIZE];
-	int dom_id;
-	int dev_id;
-	int portnum;
-
-	err = str_to_vport(buf, &bus_id[0], &dom_id, &dev_id, &portnum);
-	if (err)
-		goto out;
-
-	err = usbstub_id_remove(&bus_id[0], dom_id, dev_id, portnum);
-
-out:
-	if (!err)
-		err = count;
-	return err;
-}
-
-DRIVER_ATTR(remove_vport, S_IWUSR, NULL, usbstub_vport_remove);
-
-static ssize_t usbstub_vport_show(struct device_driver *driver,
+static ssize_t usbstub_show_portids(struct device_driver *driver,
 		char *buf)
 {
-	struct usbstub_id *stub_id;
+	struct vusb_port_id *portid;
 	size_t count = 0;
 	unsigned long flags;
 
-	spin_lock_irqsave(&usbstub_ids_lock, flags);
-	list_for_each_entry(stub_id, &usbstub_ids, id_list) {
+	spin_lock_irqsave(&port_list_lock, flags);
+	list_for_each_entry(portid, &port_list, id_list) {
 		if (count >= PAGE_SIZE)
 			break;
 		count += scnprintf((char *)buf + count, PAGE_SIZE - count,
 				"%s:%d:%d:%d\n",
-				&stub_id->bus_id[0],
-				stub_id->dom_id,
-				stub_id->dev_id,
-				stub_id->portnum);
+				&portid->phys_bus[0],
+				portid->domid,
+				portid->handle,
+				portid->portnum);
 	}
-	spin_unlock_irqrestore(&usbstub_ids_lock, flags);
+	spin_unlock_irqrestore(&port_list_lock, flags);
 
 	return count;
 }
 
-DRIVER_ATTR(vports, S_IRUSR, usbstub_vport_show, NULL);
-
-static ssize_t usbstub_devices_show(struct device_driver *driver,
-		char *buf)
-{
-	struct usbstub *stub;
-	size_t count = 0;
-	unsigned long flags;
-
-	spin_lock_irqsave(&grabbed_devices_lock, flags);
-	list_for_each_entry(stub, &grabbed_devices, grabbed_list) {
-		if (count >= PAGE_SIZE)
-			break;
-
-		count += scnprintf((char *)buf + count, PAGE_SIZE - count,
-					"%u-%s:%u.%u\n",
-					stub->udev->bus->busnum,
-					stub->udev->devpath,
-					stub->udev->config->desc.bConfigurationValue,
-					stub->interface->cur_altsetting->desc.bInterfaceNumber);
-
-	}
-	spin_unlock_irqrestore(&grabbed_devices_lock, flags);
-
-	return count;
-}
-
-DRIVER_ATTR(grabbed_devices, S_IRUSR, usbstub_devices_show, NULL);
+DRIVER_ATTR(port_ids, S_IRUSR, usbstub_show_portids, NULL);
 
 /* table of devices that matches any usbdevice */
 static const struct usb_device_id usbstub_table[] = {
@@ -404,29 +295,23 @@ static struct usb_driver usbback_usb_driver = {
 		.probe = usbstub_probe,
 		.disconnect = usbstub_disconnect,
 		.id_table = usbstub_table,
+		.no_dynamic_id = 1,
 };
 
 int __init usbstub_init(void)
 {
- 	int err;
+	int err;
 
 	err = usb_register(&usbback_usb_driver);
-	if (err < 0)
+	if (err < 0) {
+		printk(KERN_ERR "usbback: usb_register failed (error %d)\n", err);
 		goto out;
-	if (!err)
-		err = driver_create_file(&usbback_usb_driver.drvwrap.driver,
-				&driver_attr_new_vport);
-	if (!err)
-		err = driver_create_file(&usbback_usb_driver.drvwrap.driver,
-				&driver_attr_remove_vport);
-	if (!err)
-		err = driver_create_file(&usbback_usb_driver.drvwrap.driver,
-				&driver_attr_vports);
-	if (!err)
-		err = driver_create_file(&usbback_usb_driver.drvwrap.driver,
-				&driver_attr_grabbed_devices);
+	}
+
+	err = driver_create_file(&usbback_usb_driver.drvwrap.driver,
+				&driver_attr_port_ids);
 	if (err)
-		usbstub_exit();
+		usb_deregister(&usbback_usb_driver);
 
 out:
 	return err;
@@ -435,13 +320,6 @@ out:
 void usbstub_exit(void)
 {
 	driver_remove_file(&usbback_usb_driver.drvwrap.driver,
-			&driver_attr_new_vport);
-	driver_remove_file(&usbback_usb_driver.drvwrap.driver,
-			&driver_attr_remove_vport);
-	driver_remove_file(&usbback_usb_driver.drvwrap.driver,
-				&driver_attr_vports);
-	driver_remove_file(&usbback_usb_driver.drvwrap.driver,
-				&driver_attr_grabbed_devices);
-
+				&driver_attr_port_ids);
 	usb_deregister(&usbback_usb_driver);
 }

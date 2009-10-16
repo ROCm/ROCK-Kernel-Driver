@@ -42,6 +42,7 @@
 #include <linux/ctype.h>
 #include <linux/fcntl.h>
 #include <linux/mm.h>
+#include <linux/sched.h>
 #include <linux/proc_fs.h>
 #include <linux/notifier.h>
 #include <linux/mutex.h>

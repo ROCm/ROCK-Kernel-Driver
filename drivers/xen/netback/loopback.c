@@ -134,7 +134,7 @@ static int loopback_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (!skb_remove_foreign_references(skb)) {
 		np->stats.tx_dropped++;
 		dev_kfree_skb(skb);
-		return 0;
+		return NETDEV_TX_OK;
 	}
 
 	dst_release(skb_dst(skb));
@@ -173,7 +173,7 @@ static int loopback_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	netif_rx(skb);
 
-	return 0;
+	return NETDEV_TX_OK;
 }
 
 static struct net_device_stats *loopback_get_stats(struct net_device *dev)
@@ -182,7 +182,7 @@ static struct net_device_stats *loopback_get_stats(struct net_device *dev)
 	return &np->stats;
 }
 
-static struct ethtool_ops network_ethtool_ops =
+static const struct ethtool_ops network_ethtool_ops =
 {
 	.get_tx_csum = ethtool_op_get_tx_csum,
 	.set_tx_csum = ethtool_op_set_tx_csum,

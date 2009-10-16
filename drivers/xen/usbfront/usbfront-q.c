@@ -50,13 +50,13 @@ static struct urb_priv *alloc_urb_priv(struct urb *urb)
 	struct urb_priv *urbp;
 
 	urbp = kmem_cache_zalloc(xenhcd_urbp_cachep, GFP_ATOMIC);
-	if (!urbp) {
+	if (!urbp)
 		return NULL;
-	}
 
 	urbp->urb = urb;
 	urb->hcpriv = urbp;
 	urbp->req_id = ~0;
+	urbp->unlink_req_id = ~0;
 	INIT_LIST_HEAD(&urbp->list);
 
 	return urbp;
@@ -73,7 +73,7 @@ static inline int get_id_from_freelist(
 {
 	unsigned long free;
 	free = info->shadow_free;
-	BUG_ON(free > USB_RING_SIZE);
+	BUG_ON(free >= USB_URB_RING_SIZE);
 	info->shadow_free = info->shadow[free].req.id;
 	info->shadow[free].req.id = (unsigned int)0x0fff; /* debug */
 	return free;
@@ -90,7 +90,7 @@ static inline void add_id_to_freelist(
 static inline int count_pages(void *addr, int length)
 {
 	unsigned long start = (unsigned long) addr >> PAGE_SHIFT;
-	unsigned long end = (unsigned long) (addr + length + PAGE_SIZE -1) >> PAGE_SHIFT;
+	unsigned long end = (unsigned long) (addr + length + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	return end - start;
 }
 
@@ -108,7 +108,7 @@ static inline void xenhcd_gnttab_map(struct usbfront_info *info,
 
 	len = length;
 
-	for(i = 0;i < nr_pages;i++){
+	for (i = 0; i < nr_pages; i++) {
 		BUG_ON(!len);
 
 		page = virt_to_page(addr);
@@ -116,7 +116,7 @@ static inline void xenhcd_gnttab_map(struct usbfront_info *info,
 		offset = offset_in_page(addr);
 
 		bytes = PAGE_SIZE - offset;
-		if(bytes > len)
+		if (bytes > len)
 			bytes = len;
 
 		ref = gnttab_claim_grant_reference(gref_head);
@@ -132,7 +132,7 @@ static inline void xenhcd_gnttab_map(struct usbfront_info *info,
 }
 
 static int map_urb_for_request(struct usbfront_info *info, struct urb *urb,
-		usbif_request_t *req)
+		usbif_urb_request_t *req)
 {
 	grant_ref_t gref_head;
 	int nr_buff_pages = 0;
@@ -175,14 +175,12 @@ static int map_urb_for_request(struct usbfront_info *info, struct urb *urb,
 		req->u.isoc.start_frame = urb->start_frame;
 		req->u.isoc.number_of_packets = urb->number_of_packets;
 		req->u.isoc.nr_frame_desc_segs = nr_isodesc_pages;
-		/*
-		 * urb->number_of_packets must be > 0
-		 */
+		/* urb->number_of_packets must be > 0 */
 		if (unlikely(urb->number_of_packets <= 0))
 			BUG();
 		xenhcd_gnttab_map(info, &urb->iso_frame_desc[0],
-				sizeof(struct usb_iso_packet_descriptor) * urb->number_of_packets,
-				&gref_head, &req->seg[nr_buff_pages], nr_isodesc_pages, 0);
+			sizeof(struct usb_iso_packet_descriptor) * urb->number_of_packets,
+			&gref_head, &req->seg[nr_buff_pages], nr_isodesc_pages, 0);
 		gnttab_free_grant_references(gref_head);
 		break;
 	case PIPE_INTERRUPT:
@@ -213,9 +211,12 @@ static void xenhcd_gnttab_done(struct usb_shadow *shadow)
 
 	for (i = 0; i < nr_segs; i++)
 		gnttab_end_foreign_access(shadow->req.seg[i].gref, 0UL);
+
+	shadow->req.nr_buffer_segs = 0;
+	shadow->req.u.isoc.nr_frame_desc_segs = 0;
 }
 
-static void xenhcd_giveback_urb(struct usbfront_info *info, struct urb *urb)
+static void xenhcd_giveback_urb(struct usbfront_info *info, struct urb *urb, int status)
 __releases(info->lock)
 __acquires(info->lock)
 {
@@ -228,6 +229,9 @@ __acquires(info->lock)
 	case -ENOENT:
 		COUNT(info->stats.unlink);
 		break;
+	case -EINPROGRESS:
+		urb->status = status;
+		/* falling through */
 	default:
 		COUNT(info->stats.complete);
 	}
@@ -239,28 +243,35 @@ __acquires(info->lock)
 
 static inline int xenhcd_do_request(struct usbfront_info *info, struct urb_priv *urbp)
 {
-	usbif_request_t *ring_req;
+	usbif_urb_request_t *req;
 	struct urb *urb = urbp->urb;
 	uint16_t id;
 	int notify;
 	int ret = 0;
 
-	ring_req = RING_GET_REQUEST(&info->ring, info->ring.req_prod_pvt);
+	req = RING_GET_REQUEST(&info->urb_ring, info->urb_ring.req_prod_pvt);
 	id = get_id_from_freelist(info);
-	ring_req->id = id;
+	req->id = id;
 
-	ret = map_urb_for_request(info, urb, ring_req);
-	if (ret < 0) {
-		add_id_to_freelist(info, id);
-		return ret;
+	if (unlikely(urbp->unlinked)) {
+		req->u.unlink.unlink_id = urbp->req_id;
+		req->pipe = usbif_setunlink_pipe(usbif_setportnum_pipe(
+				urb->pipe, urb->dev->portnum));
+		urbp->unlink_req_id = id;
+	} else {
+		ret = map_urb_for_request(info, urb, req);
+		if (ret < 0) {
+			add_id_to_freelist(info, id);
+			return ret;
+		}
+		urbp->req_id = id;
 	}
 
-	info->ring.req_prod_pvt++;
+	info->urb_ring.req_prod_pvt++;
 	info->shadow[id].urb = urb;
-	info->shadow[id].req = *ring_req;
-	urbp->req_id = id;
+	info->shadow[id].req = *req;
 
-	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&info->ring, notify);
+	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&info->urb_ring, notify);
 	if (notify)
 		notify_remote_via_irq(info->irq);
 
@@ -272,19 +283,19 @@ static void xenhcd_kick_pending_urbs(struct usbfront_info *info)
 	struct urb_priv *urbp;
 	int ret;
 
-	while (!list_empty(&info->pending_urbs)) {
-		if (RING_FULL(&info->ring)) {
+	while (!list_empty(&info->pending_submit_list)) {
+		if (RING_FULL(&info->urb_ring)) {
 			COUNT(info->stats.ring_full);
 			timer_action(info, TIMER_RING_WATCHDOG);
 			goto done;
 		}
 
-		urbp = list_entry(info->pending_urbs.next, struct urb_priv, list);
+		urbp = list_entry(info->pending_submit_list.next, struct urb_priv, list);
 		ret = xenhcd_do_request(info, urbp);
 		if (ret == 0)
-			list_move_tail(&urbp->list, &info->inprogress_urbs);
+			list_move_tail(&urbp->list, &info->in_progress_list);
 		else
-			xenhcd_giveback_urb(info, urbp->urb);
+			xenhcd_giveback_urb(info, urbp->urb, -ESHUTDOWN);
 	}
 	timer_action_done(info, TIMER_SCAN_PENDING_URBS);
 
@@ -292,12 +303,41 @@ done:
 	return;
 }
 
+/*
+ * caller must lock info->lock
+ */
+static void xenhcd_cancel_all_enqueued_urbs(struct usbfront_info *info)
+{
+	struct urb_priv *urbp, *tmp;
+
+	list_for_each_entry_safe(urbp, tmp, &info->in_progress_list, list) {
+		if (!urbp->unlinked) {
+			xenhcd_gnttab_done(&info->shadow[urbp->req_id]);
+			barrier();
+			if (urbp->urb->status == -EINPROGRESS)	/* not dequeued */
+				xenhcd_giveback_urb(info, urbp->urb, -ESHUTDOWN);
+			else					/* dequeued */
+				xenhcd_giveback_urb(info, urbp->urb, urbp->urb->status);
+		}
+		info->shadow[urbp->req_id].urb = NULL;
+	}
+
+	list_for_each_entry_safe(urbp, tmp, &info->pending_submit_list, list) {
+		xenhcd_giveback_urb(info, urbp->urb, -ESHUTDOWN);
+	}
+
+	return;
+}
+
+/*
+ * caller must lock info->lock
+ */
 static void xenhcd_giveback_unlinked_urbs(struct usbfront_info *info)
 {
 	struct urb_priv *urbp, *tmp;
 
-	list_for_each_entry_safe(urbp, tmp, &info->unlinked_urbs, list) {
-		xenhcd_giveback_urb(info, urbp->urb);
+	list_for_each_entry_safe(urbp, tmp, &info->giveback_waiting_list, list) {
+		xenhcd_giveback_urb(info, urbp->urb, urbp->urb->status);
 	}
 }
 
@@ -305,22 +345,22 @@ static int xenhcd_submit_urb(struct usbfront_info *info, struct urb_priv *urbp)
 {
 	int ret = 0;
 
-	if (RING_FULL(&info->ring)) {
-		list_add_tail(&urbp->list, &info->pending_urbs);
+	if (RING_FULL(&info->urb_ring)) {
+		list_add_tail(&urbp->list, &info->pending_submit_list);
 		COUNT(info->stats.ring_full);
 		timer_action(info, TIMER_RING_WATCHDOG);
 		goto done;
 	}
 
-	if (!list_empty(&info->pending_urbs)) {
-		list_add_tail(&urbp->list, &info->pending_urbs);
+	if (!list_empty(&info->pending_submit_list)) {
+		list_add_tail(&urbp->list, &info->pending_submit_list);
 		timer_action(info, TIMER_SCAN_PENDING_URBS);
 		goto done;
 	}
 
 	ret = xenhcd_do_request(info, urbp);
 	if (ret == 0)
-		list_add_tail(&urbp->list, &info->inprogress_urbs);
+		list_add_tail(&urbp->list, &info->in_progress_list);
 
 done:
 	return ret;
@@ -328,26 +368,47 @@ done:
 
 static int xenhcd_unlink_urb(struct usbfront_info *info, struct urb_priv *urbp)
 {
+	int ret = 0;
+
+	/* already unlinked? */
 	if (urbp->unlinked)
 		return -EBUSY;
+
 	urbp->unlinked = 1;
 
-	/* if the urb is in pending_urbs */
+	/* the urb is still in pending_submit queue */
 	if (urbp->req_id == ~0) {
-		list_move_tail(&urbp->list, &info->unlinked_urbs);
+		list_move_tail(&urbp->list, &info->giveback_waiting_list);
 		timer_action(info, TIMER_SCAN_PENDING_URBS);
+		goto done;
 	}
 
-	/* TODO: send cancel request to backend */
+	/* send unlink request to backend */
+	if (RING_FULL(&info->urb_ring)) {
+		list_move_tail(&urbp->list, &info->pending_unlink_list);
+		COUNT(info->stats.ring_full);
+		timer_action(info, TIMER_RING_WATCHDOG);
+		goto done;
+	}
 
-	return 0;
+	if (!list_empty(&info->pending_unlink_list)) {
+		list_move_tail(&urbp->list, &info->pending_unlink_list);
+		timer_action(info, TIMER_SCAN_PENDING_URBS);
+		goto done;
+	}
+
+	ret = xenhcd_do_request(info, urbp);
+	if (ret == 0)
+		list_move_tail(&urbp->list, &info->in_progress_list);
+
+done:
+	return ret;
 }
 
-static int xenhcd_end_submit_urb(struct usbfront_info *info)
+static int xenhcd_urb_request_done(struct usbfront_info *info)
 {
-	usbif_response_t *ring_res;
+	usbif_urb_response_t *res;
 	struct urb *urb;
-	struct urb_priv *urbp;
 
 	RING_IDX i, rp;
 	uint16_t id;
@@ -355,35 +416,92 @@ static int xenhcd_end_submit_urb(struct usbfront_info *info)
 	unsigned long flags;
 
 	spin_lock_irqsave(&info->lock, flags);
-	rp = info->ring.sring->rsp_prod;
+
+	rp = info->urb_ring.sring->rsp_prod;
 	rmb(); /* ensure we see queued responses up to "rp" */
 
-	for (i = info->ring.rsp_cons; i != rp; i++) {
-		ring_res = RING_GET_RESPONSE(&info->ring, i);
-		id = ring_res->id;
-		xenhcd_gnttab_done(&info->shadow[id]);
-		urb = info->shadow[id].urb;
-		barrier();
-		add_id_to_freelist(info, id);
+	for (i = info->urb_ring.rsp_cons; i != rp; i++) {
+		res = RING_GET_RESPONSE(&info->urb_ring, i);
+		id = res->id;
 
-		urbp = (struct urb_priv *)urb->hcpriv;
-		if (likely(!urbp->unlinked)) {
-			urb->status = ring_res->status;
-			urb->actual_length = ring_res->actual_length;
-			urb->error_count = ring_res->error_count;
-			urb->start_frame = ring_res->start_frame;
+		if (likely(usbif_pipesubmit(info->shadow[id].req.pipe))) {
+			xenhcd_gnttab_done(&info->shadow[id]);
+			urb = info->shadow[id].urb;
+			barrier();
+			if (likely(urb)) {
+				urb->actual_length = res->actual_length;
+				urb->error_count = res->error_count;
+				urb->start_frame = res->start_frame;
+				barrier();
+				xenhcd_giveback_urb(info, urb, res->status);
+			}
 		}
-		barrier();
-		xenhcd_giveback_urb(info, urb);
-	}
-	info->ring.rsp_cons = i;
 
-	if (i != info->ring.req_prod_pvt)
-		RING_FINAL_CHECK_FOR_RESPONSES(&info->ring, more_to_do);
+		add_id_to_freelist(info, id);
+	}
+	info->urb_ring.rsp_cons = i;
+
+	if (i != info->urb_ring.req_prod_pvt)
+		RING_FINAL_CHECK_FOR_RESPONSES(&info->urb_ring, more_to_do);
 	else
-		info->ring.sring->rsp_event = i + 1;
+		info->urb_ring.sring->rsp_event = i + 1;
 
 	spin_unlock_irqrestore(&info->lock, flags);
+
+	cond_resched();
+
+	return more_to_do;
+}
+
+static int xenhcd_conn_notify(struct usbfront_info *info)
+{
+	usbif_conn_response_t *res;
+	usbif_conn_request_t *req;
+	RING_IDX rc, rp;
+	uint16_t id;
+	uint8_t portnum, speed;
+	int more_to_do = 0;
+	int notify;
+	int port_changed = 0;
+	unsigned long flags;
+
+	spin_lock_irqsave(&info->lock, flags);
+
+	rc = info->conn_ring.rsp_cons;
+	rp = info->conn_ring.sring->rsp_prod;
+	rmb(); /* ensure we see queued responses up to "rp" */
+
+	while (rc != rp) {
+		res = RING_GET_RESPONSE(&info->conn_ring, rc);
+		id = res->id;
+		portnum = res->portnum;
+		speed = res->speed;
+		info->conn_ring.rsp_cons = ++rc;
+
+		rhport_connect(info, portnum, speed);
+		if (info->ports[portnum-1].c_connection)
+			port_changed = 1;
+
+		barrier();
+
+		req = RING_GET_REQUEST(&info->conn_ring, info->conn_ring.req_prod_pvt);
+		req->id = id;
+		info->conn_ring.req_prod_pvt++;
+	}
+
+	if (rc != info->conn_ring.req_prod_pvt)
+		RING_FINAL_CHECK_FOR_RESPONSES(&info->conn_ring, more_to_do);
+	else
+		info->conn_ring.sring->rsp_event = rc + 1;
+
+	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&info->conn_ring, notify);
+	if (notify)
+		notify_remote_via_irq(info->irq);
+
+	spin_unlock_irqrestore(&info->lock, flags);
+
+	if (port_changed)
+		usb_hcd_poll_rh_status(info_to_hcd(info));
 
 	cond_resched();
 
@@ -401,7 +519,10 @@ int xenhcd_schedule(void *arg)
 		info->waiting_resp = 0;
 		smp_mb();
 
-		if (xenhcd_end_submit_urb(info))
+		if (xenhcd_urb_request_done(info))
+			info->waiting_resp = 1;
+
+		if (xenhcd_conn_notify(info))
 			info->waiting_resp = 1;
 	}
 

@@ -641,10 +641,7 @@ netfront_accel_vi_tx_post(netfront_accel_vnic *vnic, struct sk_buff *skb)
 					  (cuckoo_hash_key *)(&key), &value);
 
 	if (!try_fastpath) {
-		DECLARE_MAC_BUF(buf);
-
-		VPRINTK("try fast path false for mac: %s\n",
-			print_mac(buf, skb->data));
+		VPRINTK("try fast path false for mac: %pM\n", skb->data);
 		
 		return NETFRONT_ACCEL_STATUS_CANT;
 	}
@@ -770,10 +767,9 @@ static void  netfront_accel_vi_rx_complete(netfront_accel_vnic *vnic,
 	if (compare_ether_addr(skb->data, vnic->mac)) {
 		struct iphdr *ip = (struct iphdr *)(skb->data + ETH_HLEN);
 		u16 port;
-		DECLARE_MAC_BUF(buf);
 
-		DPRINTK("%s: saw wrong MAC address %s\n",
-			__FUNCTION__, print_mac(buf, skb->data));
+		DPRINTK("%s: saw wrong MAC address %pM\n",
+			__FUNCTION__, skb->data);
 
 		if (ip->protocol == IPPROTO_TCP) {
 			struct tcphdr *tcp = (struct tcphdr *)

@@ -1,10 +1,9 @@
-#include <linux/init.h>
-#include <linux/proc_fs.h>
-#include <linux/ctype.h>
+#define DEBUG
+
+#include <linux/uaccess.h>
 #include <linux/module.h>
-#include <linux/seq_file.h>
-#include <asm/uaccess.h>
 #include <linux/mutex.h>
+#include <linux/init.h>
 
 #include <asm/mtrr.h>
 #include "mtrr.h"
@@ -58,7 +57,7 @@ static void __init init_table(void)
 		mtrr_usage_table[i] = 0;
 }
 
-int mtrr_add_page(unsigned long base, unsigned long size, 
+int mtrr_add_page(unsigned long base, unsigned long size,
 		  unsigned int type, bool increment)
 {
 	int error;
@@ -88,25 +87,23 @@ int mtrr_add_page(unsigned long base, unsigned long size,
 static int mtrr_check(unsigned long base, unsigned long size)
 {
 	if ((base & (PAGE_SIZE - 1)) || (size & (PAGE_SIZE - 1))) {
-		printk(KERN_WARNING
-			"mtrr: size and base must be multiples of 4 kiB\n");
-		printk(KERN_DEBUG
-			"mtrr: size: 0x%lx  base: 0x%lx\n", size, base);
+		pr_warning("mtrr: size and base must be multiples of 4 kiB\n");
+		pr_debug("mtrr: size: 0x%lx  base: 0x%lx\n", size, base);
 		dump_stack();
 		return -1;
 	}
 	return 0;
 }
 
-int
-mtrr_add(unsigned long base, unsigned long size, unsigned int type,
-	 bool increment)
+int mtrr_add(unsigned long base, unsigned long size, unsigned int type,
+	     bool increment)
 {
 	if (mtrr_check(base, size))
 		return -EINVAL;
 	return mtrr_add_page(base >> PAGE_SHIFT, size >> PAGE_SHIFT, type,
 			     increment);
 }
+EXPORT_SYMBOL(mtrr_add);
 
 int mtrr_del_page(int reg, unsigned long base, unsigned long size)
 {
@@ -128,13 +125,13 @@ int mtrr_del_page(int reg, unsigned long base, unsigned long size)
 			}
 		}
 		if (reg < 0) {
-			printk(KERN_DEBUG "mtrr: no MTRR for %lx000,%lx000 found\n", base,
-			       size);
+			pr_debug("mtrr: no MTRR for %lx000,%lx000 found\n",
+				 base, size);
 			goto out;
 		}
 	}
 	if (mtrr_usage_table[reg] < 1) {
-		printk(KERN_WARNING "mtrr: reg: %d has count=0\n", reg);
+		pr_warning("mtrr: reg: %d has count=0\n", reg);
 		goto out;
 	}
 	if (--mtrr_usage_table[reg] < 1) {
@@ -153,15 +150,12 @@ int mtrr_del_page(int reg, unsigned long base, unsigned long size)
 	return error;
 }
 
-int
-mtrr_del(int reg, unsigned long base, unsigned long size)
+int mtrr_del(int reg, unsigned long base, unsigned long size)
 {
 	if (mtrr_check(base, size))
 		return -EINVAL;
 	return mtrr_del_page(reg, base >> PAGE_SHIFT, size >> PAGE_SHIFT);
 }
-
-EXPORT_SYMBOL(mtrr_add);
 EXPORT_SYMBOL(mtrr_del);
 
 /*

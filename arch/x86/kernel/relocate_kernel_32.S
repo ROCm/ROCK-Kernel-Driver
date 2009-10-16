@@ -88,20 +88,12 @@ relocate_kernel:
 	movl	%eax, %cr3
 
 	/* setup idt */
-	movl	%edi, %eax
-	addl	$(idt_48 - relocate_kernel), %eax
-	lidtl	(%eax)
+	lidtl	idt_48 - relocate_kernel(%edi)
 
 	/* setup gdt */
-	movl	%edi, %eax
-	addl	$(gdt - relocate_kernel), %eax
-	movl	%edi, %esi
-	addl	$((gdt_48 - relocate_kernel) + 2), %esi
-	movl	%eax, (%esi)
-
-	movl	%edi, %eax
-	addl	$(gdt_48 - relocate_kernel), %eax
-	lgdtl	(%eax)
+	leal	gdt - relocate_kernel(%edi), %eax
+	movl	%eax, (gdt_48 - relocate_kernel) + 2(%edi)
+	lgdtl	gdt_48 - relocate_kernel(%edi)
 
 	/* setup data segment registers */
 	mov	$(gdt_ds - gdt), %eax
@@ -115,16 +107,11 @@ relocate_kernel:
 	lea	PAGE_SIZE(%edi), %esp
 
 	/* load new code segment and jump to identity mapped page */
-	movl	%edi, %esi
-	xorl	%eax, %eax
-	pushl	%eax
-	pushl	%esi
-	pushl	%eax
-	movl	$(gdt_cs - gdt), %eax
-	pushl	%eax
-	movl	%edi, %eax
-	addl	$(identity_mapped - relocate_kernel),%eax
-	pushl	%eax
+	pushl	$0
+	pushl	$(gdt_cs - gdt)
+	movl    %edi, %eax
+	addl    $(identity_mapped - relocate_kernel), %eax
+	pushl   %eax
 	iretl
 
 identity_mapped:

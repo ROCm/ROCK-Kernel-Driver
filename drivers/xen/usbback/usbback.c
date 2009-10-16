@@ -107,7 +107,7 @@ static inline unsigned long vaddr(pending_req_t *req, int seg)
 #define pending_handle(_req, _seg) \
 	(pending_grant_handles[vaddr_pagenr(_req, _seg)])
 
-static pending_req_t* alloc_req(void)
+static pending_req_t *alloc_req(void)
 {
 	pending_req_t *req = NULL;
 	unsigned long flags;
@@ -222,7 +222,7 @@ static void copy_pages_to_buff(void *buff, pending_req_t *pending_req,
 	}
 }
 
-static int usbbk_alloc_urb(usbif_request_t *req, pending_req_t *pending_req)
+static int usbbk_alloc_urb(usbif_urb_request_t *req, pending_req_t *pending_req)
 {
 	int ret;
 
@@ -298,21 +298,21 @@ static void usbbk_do_response(pending_req_t *pending_req, int32_t status,
 					int32_t actual_length, int32_t error_count, uint16_t start_frame)
 {
 	usbif_t *usbif = pending_req->usbif;
-	usbif_response_t *ring_res;
+	usbif_urb_response_t *res;
 	unsigned long flags;
 	int notify;
 
-	spin_lock_irqsave(&usbif->ring_lock, flags);
-	ring_res = RING_GET_RESPONSE(&usbif->ring, usbif->ring.rsp_prod_pvt);
-	ring_res->id = pending_req->id;
-	ring_res->status = status;
-	ring_res->actual_length = actual_length;
-	ring_res->error_count = error_count;
-	ring_res->start_frame = start_frame;
-	usbif->ring.rsp_prod_pvt++;
+	spin_lock_irqsave(&usbif->urb_ring_lock, flags);
+	res = RING_GET_RESPONSE(&usbif->urb_ring, usbif->urb_ring.rsp_prod_pvt);
+	res->id = pending_req->id;
+	res->status = status;
+	res->actual_length = actual_length;
+	res->error_count = error_count;
+	res->start_frame = start_frame;
+	usbif->urb_ring.rsp_prod_pvt++;
 	barrier();
-	RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(&usbif->ring, notify);
-	spin_unlock_irqrestore(&usbif->ring_lock, flags);
+	RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(&usbif->urb_ring, notify);
+	spin_unlock_irqrestore(&usbif->urb_ring_lock, flags);
 
 	if (notify)
 		notify_remote_via_irq(usbif->irq);
@@ -346,7 +346,7 @@ static void usbbk_urb_complete(struct urb *urb)
 }
 
 static int usbbk_gnttab_map(usbif_t *usbif,
-			usbif_request_t *req, pending_req_t *pending_req)
+			usbif_urb_request_t *req, pending_req_t *pending_req)
 {
 	int i, ret;
 	unsigned int nr_segs;
@@ -434,7 +434,7 @@ fail:
 	return ret;
 }
 
-static void usbbk_init_urb(usbif_request_t *req, pending_req_t *pending_req)
+static void usbbk_init_urb(usbif_urb_request_t *req, pending_req_t *pending_req)
 {
 	unsigned int pipe;
 	struct usb_device *udev = pending_req->stub->udev;
@@ -674,14 +674,14 @@ struct usbstub *find_attached_device(usbif_t *usbif, int portnum)
 	int found = 0;
 	unsigned long flags;
 
-	spin_lock_irqsave(&usbif->plug_lock, flags);
-	list_for_each_entry(stub, &usbif->plugged_devices, plugged_list) {
-		if (stub->id->portnum == portnum) {
+	spin_lock_irqsave(&usbif->stub_lock, flags);
+	list_for_each_entry(stub, &usbif->stub_list, dev_list) {
+		if (stub->portid->portnum == portnum) {
 			found = 1;
 			break;
 		}
 	}
-	spin_unlock_irqrestore(&usbif->plug_lock, flags);
+	spin_unlock_irqrestore(&usbif->stub_lock, flags);
 
 	if (found)
 		return stub;
@@ -689,7 +689,47 @@ struct usbstub *find_attached_device(usbif_t *usbif, int portnum)
 	return NULL;
 }
 
-static int check_and_submit_special_ctrlreq(usbif_t *usbif, usbif_request_t *req, pending_req_t *pending_req)
+static void process_unlink_req(usbif_t *usbif,
+		usbif_urb_request_t *req, pending_req_t *pending_req)
+{
+	pending_req_t *unlink_req = NULL;
+	int devnum;
+	int ret = 0;
+	unsigned long flags;
+
+	devnum = usb_pipedevice(req->pipe);
+	if (unlikely(devnum == 0)) {
+		pending_req->stub = find_attached_device(usbif, usbif_pipeportnum(req->pipe));
+		if (unlikely(!pending_req->stub)) {
+			ret = -ENODEV;
+			goto fail_response;
+		}
+	} else {
+		if (unlikely(!usbif->addr_table[devnum])) {
+			ret = -ENODEV;
+			goto fail_response;
+		}
+		pending_req->stub = usbif->addr_table[devnum];
+	}
+
+	spin_lock_irqsave(&pending_req->stub->submitting_lock, flags);
+	list_for_each_entry(unlink_req, &pending_req->stub->submitting_list, urb_list) {
+		if (unlink_req->id == req->u.unlink.unlink_id) {
+			ret = usb_unlink_urb(unlink_req->urb);
+			break;
+		}
+	}
+	spin_unlock_irqrestore(&pending_req->stub->submitting_lock, flags);
+
+fail_response:
+	usbbk_do_response(pending_req, ret, 0, 0, 0);
+	usbif_put(usbif);
+	free_req(pending_req);
+	return;
+}
+
+static int check_and_submit_special_ctrlreq(usbif_t *usbif,
+		usbif_urb_request_t *req, pending_req_t *pending_req)
 {
 	int devnum;
 	struct usbstub *stub = NULL;
@@ -827,7 +867,7 @@ fail_response:
 }
 
 static void dispatch_request_to_pending_reqs(usbif_t *usbif,
-		usbif_request_t *req,
+		usbif_urb_request_t *req,
 		pending_req_t *pending_req)
 {
 	int ret;
@@ -837,17 +877,13 @@ static void dispatch_request_to_pending_reqs(usbif_t *usbif,
 
 	barrier();
 
-	/*
-	 * TODO:
-	 * receive unlink request and cancel the urb in backend
-	 */
-#if 0
-	if (unlikely(usb_pipeunlink(req->pipe))) {
-
-	}
-#endif
-
 	usbif_get(usbif);
+
+	/* unlink request */
+	if (unlikely(usbif_pipeunlink(req->pipe))) {
+		process_unlink_req(usbif, req, pending_req);
+		return;
+	}
 
 	if (usb_pipecontrol(req->pipe)) {
 		if (check_and_submit_special_ctrlreq(usbif, req, pending_req))
@@ -930,18 +966,18 @@ fail_response:
 
 static int usbbk_start_submit_urb(usbif_t *usbif)
 {
-	usbif_back_ring_t *usb_ring = &usbif->ring;
-	usbif_request_t *ring_req;
+	usbif_urb_back_ring_t *urb_ring = &usbif->urb_ring;
+	usbif_urb_request_t *req;
 	pending_req_t *pending_req;
 	RING_IDX rc, rp;
 	int more_to_do = 0;
 
-	rc = usb_ring->req_cons;
-	rp = usb_ring->sring->req_prod;
+	rc = urb_ring->req_cons;
+	rp = urb_ring->sring->req_prod;
 	rmb();
 
 	while (rc != rp) {
-		if (RING_REQUEST_CONS_OVERFLOW(usb_ring, rc)) {
+		if (RING_REQUEST_CONS_OVERFLOW(urb_ring, rc)) {
 			printk(KERN_WARNING "RING_REQUEST_CONS_OVERFLOW\n");
 			break;
 		}
@@ -952,73 +988,100 @@ static int usbbk_start_submit_urb(usbif_t *usbif)
 			break;
 		}
 
-		ring_req = RING_GET_REQUEST(usb_ring, rc);
-		usb_ring->req_cons = ++rc;
+		req = RING_GET_REQUEST(urb_ring, rc);
+		urb_ring->req_cons = ++rc;
 
-		dispatch_request_to_pending_reqs(usbif, ring_req,
+		dispatch_request_to_pending_reqs(usbif, req,
 							pending_req);
 	}
 
-	RING_FINAL_CHECK_FOR_REQUESTS(&usbif->ring, more_to_do);
+	RING_FINAL_CHECK_FOR_REQUESTS(&usbif->urb_ring, more_to_do);
 
 	cond_resched();
 
 	return more_to_do;
 }
 
+void usbbk_hotplug_notify(usbif_t *usbif, int portnum, int speed)
+{
+	usbif_conn_back_ring_t *ring = &usbif->conn_ring;
+	usbif_conn_request_t *req;
+	usbif_conn_response_t *res;
+	unsigned long flags;
+	u16 id;
+	int notify;
+
+	spin_lock_irqsave(&usbif->conn_ring_lock, flags);
+
+	req = RING_GET_REQUEST(ring, ring->req_cons);;
+	id = req->id;
+	ring->req_cons++;
+	ring->sring->req_event = ring->req_cons + 1;
+
+	res = RING_GET_RESPONSE(ring, ring->rsp_prod_pvt);
+	res->id = id;
+	res->portnum = portnum;
+	res->speed = speed;
+	ring->rsp_prod_pvt++;
+	RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(ring, notify);
+
+	spin_unlock_irqrestore(&usbif->conn_ring_lock, flags);
+
+	if (notify)
+		notify_remote_via_irq(usbif->irq);
+}
+
 int usbbk_schedule(void *arg)
 {
-        usbif_t *usbif = (usbif_t *)arg;
+	usbif_t *usbif = (usbif_t *) arg;
 
-        usbif_get(usbif);
+	usbif_get(usbif);
 
-        while(!kthread_should_stop()) {
-                wait_event_interruptible(
-                                usbif->wq,
-                                usbif->waiting_reqs || kthread_should_stop());
-                wait_event_interruptible(
-                                pending_free_wq,
-                                !list_empty(&pending_free) || kthread_should_stop());
-                usbif->waiting_reqs = 0;
-                smp_mb();
+	while (!kthread_should_stop()) {
+		wait_event_interruptible(
+			usbif->wq,
+			usbif->waiting_reqs || kthread_should_stop());
+		wait_event_interruptible(
+			pending_free_wq,
+			!list_empty(&pending_free) || kthread_should_stop());
+		usbif->waiting_reqs = 0;
+		smp_mb();
 
-                if (usbbk_start_submit_urb(usbif))
-                        usbif->waiting_reqs = 1;
-        }
+		if (usbbk_start_submit_urb(usbif))
+			usbif->waiting_reqs = 1;
+	}
 
-        usbif->xenusbd = NULL;
-        usbif_put(usbif);
+	usbif->xenusbd = NULL;
+	usbif_put(usbif);
 
-        return 0;
+	return 0;
 }
 
 /*
- * attach the grabbed device to usbif.
+ * attach usbstub device to usbif.
  */
-void usbbk_plug_device(usbif_t *usbif, struct usbstub *stub)
+void usbbk_attach_device(usbif_t *usbif, struct usbstub *stub)
 {
 	unsigned long flags;
 
-	spin_lock_irqsave(&usbif->plug_lock, flags);
-	list_add(&stub->plugged_list, &usbif->plugged_devices);
-	spin_unlock_irqrestore(&usbif->plug_lock, flags);
-	stub->plugged = 1;
+	spin_lock_irqsave(&usbif->stub_lock, flags);
+	list_add(&stub->dev_list, &usbif->stub_list);
+	spin_unlock_irqrestore(&usbif->stub_lock, flags);
 	stub->usbif = usbif;
 }
 
 /*
- * detach the grabbed device from usbif.
+ * detach usbstub device from usbif.
  */
-void usbbk_unplug_device(usbif_t *usbif, struct usbstub *stub)
+void usbbk_detach_device(usbif_t *usbif, struct usbstub *stub)
 {
 	unsigned long flags;
 
 	if (stub->addr)
 		usbbk_set_address(usbif, stub, stub->addr, 0);
-	spin_lock_irqsave(&usbif->plug_lock, flags);
-	list_del(&stub->plugged_list);
-	spin_unlock_irqrestore(&usbif->plug_lock, flags);
-	stub->plugged = 0;
+	spin_lock_irqsave(&usbif->stub_lock, flags);
+	list_del(&stub->dev_list);
+	spin_unlock_irqrestore(&usbif->stub_lock, flags);
 	stub->usbif = NULL;
 }
 
@@ -1026,8 +1089,7 @@ void detach_device_without_lock(usbif_t *usbif, struct usbstub *stub)
 {
 	if (stub->addr)
 		usbbk_set_address(usbif, stub, stub->addr, 0);
-	list_del(&stub->plugged_list);
-	stub->plugged = 0;
+	list_del(&stub->dev_list);
 	stub->usbif = NULL;
 }
 
@@ -1057,9 +1119,8 @@ static int __init usbback_init(void)
 	memset(pending_reqs, 0, sizeof(pending_reqs));
 	INIT_LIST_HEAD(&pending_free);
 
-	for (i = 0; i < usbif_reqs; i++) {
+	for (i = 0; i < usbif_reqs; i++)
 		list_add_tail(&pending_reqs[i].free_list, &pending_free);
-	}
 
 	rc = usbback_xenbus_init();
 	if (rc)

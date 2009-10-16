@@ -340,12 +340,12 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	skb_queue_tail(&rx_queue, skb);
 	tasklet_schedule(&net_rx_tasklet);
 
-	return 0;
+	return NETDEV_TX_OK;
 
  drop:
 	netif->stats.tx_dropped++;
 	dev_kfree_skb(skb);
-	return 0;
+	return NETDEV_TX_OK;
 }
 
 #if 0

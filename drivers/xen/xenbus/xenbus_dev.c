@@ -36,6 +36,7 @@
 #include <linux/errno.h>
 #include <linux/uio.h>
 #include <linux/notifier.h>
+#include <linux/sched.h>
 #include <linux/wait.h>
 #include <linux/fs.h>
 #include <linux/poll.h>

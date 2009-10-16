@@ -144,7 +144,6 @@ static struct xhci_ring *xhci_ring_alloc(struct xhci_hcd *xhci,
 		return 0;
 
 	INIT_LIST_HEAD(&ring->td_list);
-	INIT_LIST_HEAD(&ring->cancelled_td_list);
 	if (num_segs == 0)
 		return ring;
 
@@ -265,8 +264,8 @@ void xhci_free_virt_device(struct xhci_hcd *xhci, int slot_id)
 		return;
 
 	for (i = 0; i < 31; ++i)
-		if (dev->ep_rings[i])
-			xhci_ring_free(xhci, dev->ep_rings[i]);
+		if (dev->eps[i].ring)
+			xhci_ring_free(xhci, dev->eps[i].ring);
 
 	if (dev->in_ctx)
 		xhci_free_container_ctx(xhci, dev->in_ctx);
@@ -281,6 +280,7 @@ int xhci_alloc_virt_device(struct xhci_hcd *xhci, int slot_id,
 		struct usb_device *udev, gfp_t flags)
 {
 	struct xhci_virt_device *dev;
+	int i;
 
 	/* Slot ID 0 is reserved */
 	if (slot_id == 0 || xhci->devs[slot_id]) {
@@ -309,12 +309,17 @@ int xhci_alloc_virt_device(struct xhci_hcd *xhci, int slot_id,
 	xhci_dbg(xhci, "Slot %d input ctx = 0x%llx (dma)\n", slot_id,
 			(unsigned long long)dev->in_ctx->dma);
 
+	/* Initialize the cancellation list for each endpoint */
+	for (i = 0; i < 31; i++)
+		INIT_LIST_HEAD(&dev->eps[i].cancelled_td_list);
+
 	/* Allocate endpoint 0 ring */
-	dev->ep_rings[0] = xhci_ring_alloc(xhci, 1, true, flags);
-	if (!dev->ep_rings[0])
+	dev->eps[0].ring = xhci_ring_alloc(xhci, 1, true, flags);
+	if (!dev->eps[0].ring)
 		goto fail;
 
 	init_completion(&dev->cmd_completion);
+	INIT_LIST_HEAD(&dev->cmd_list);
 
 	/* Point to output device context in dcbaa. */
 	xhci->dcbaa->dev_context_ptrs[slot_id] = dev->out_ctx->dma;
@@ -355,9 +360,9 @@ int xhci_setup_addressable_virt_dev(struct xhci_hcd *xhci, struct usb_device *ud
 	/* 3) Only the control endpoint is valid - one endpoint context */
 	slot_ctx->dev_info |= LAST_CTX(1);
 
+	slot_ctx->dev_info |= (u32) udev->route;
 	switch (udev->speed) {
 	case USB_SPEED_SUPER:
-		slot_ctx->dev_info |= (u32) udev->route;
 		slot_ctx->dev_info |= (u32) SLOT_SPEED_SS;
 		break;
 	case USB_SPEED_HIGH:
@@ -385,14 +390,12 @@ int xhci_setup_addressable_virt_dev(struct xhci_hcd *xhci, struct usb_device *ud
 	xhci_dbg(xhci, "Set root hub portnum to %d\n", top_dev->portnum);
 
 	/* Is this a LS/FS device under a HS hub? */
-	/*
-	 * FIXME: I don't think this is right, where does the TT info for the
-	 * roothub or parent hub come from?
-	 */
 	if ((udev->speed == USB_SPEED_LOW || udev->speed == USB_SPEED_FULL) &&
 			udev->tt) {
 		slot_ctx->tt_info = udev->tt->hub->slot_id;
 		slot_ctx->tt_info |= udev->ttport << 8;
+		if (udev->tt->multi)
+			slot_ctx->dev_info |= DEV_MTT;
 	}
 	xhci_dbg(xhci, "udev->tt = %p\n", udev->tt);
 	xhci_dbg(xhci, "udev->ttport = 0x%x\n", udev->ttport);
@@ -428,8 +431,8 @@ int xhci_setup_addressable_virt_dev(struct xhci_hcd *xhci, struct usb_device *ud
 	ep0_ctx->ep_info2 |= ERROR_COUNT(3);
 
 	ep0_ctx->deq =
-		dev->ep_rings[0]->first_seg->dma;
-	ep0_ctx->deq |= dev->ep_rings[0]->cycle_state;
+		dev->eps[0].ring->first_seg->dma;
+	ep0_ctx->deq |= dev->eps[0].ring->cycle_state;
 
 	/* Steps 7 and 8 were done in xhci_alloc_virt_device() */
 
@@ -539,10 +542,11 @@ int xhci_endpoint_init(struct xhci_hcd *xhci,
 	ep_ctx = xhci_get_ep_ctx(xhci, virt_dev->in_ctx, ep_index);
 
 	/* Set up the endpoint ring */
-	virt_dev->new_ep_rings[ep_index] = xhci_ring_alloc(xhci, 1, true, mem_flags);
-	if (!virt_dev->new_ep_rings[ep_index])
+	virt_dev->eps[ep_index].new_ring =
+		xhci_ring_alloc(xhci, 1, true, mem_flags);
+	if (!virt_dev->eps[ep_index].new_ring)
 		return -ENOMEM;
-	ep_ring = virt_dev->new_ep_rings[ep_index];
+	ep_ring = virt_dev->eps[ep_index].new_ring;
 	ep_ctx->deq = ep_ring->first_seg->dma | ep_ring->cycle_state;
 
 	ep_ctx->ep_info = xhci_get_endpoint_interval(udev, ep);
@@ -619,13 +623,15 @@ void xhci_endpoint_zero(struct xhci_hcd *xhci,
  * issue a configure endpoint command.
  */
 void xhci_endpoint_copy(struct xhci_hcd *xhci,
-		struct xhci_virt_device *vdev, unsigned int ep_index)
+		struct xhci_container_ctx *in_ctx,
+		struct xhci_container_ctx *out_ctx,
+		unsigned int ep_index)
 {
 	struct xhci_ep_ctx *out_ep_ctx;
 	struct xhci_ep_ctx *in_ep_ctx;
 
-	out_ep_ctx = xhci_get_ep_ctx(xhci, vdev->out_ctx, ep_index);
-	in_ep_ctx = xhci_get_ep_ctx(xhci, vdev->in_ctx, ep_index);
+	out_ep_ctx = xhci_get_ep_ctx(xhci, out_ctx, ep_index);
+	in_ep_ctx = xhci_get_ep_ctx(xhci, in_ctx, ep_index);
 
 	in_ep_ctx->ep_info = out_ep_ctx->ep_info;
 	in_ep_ctx->ep_info2 = out_ep_ctx->ep_info2;
@@ -638,13 +644,15 @@ void xhci_endpoint_copy(struct xhci_hcd *xhci,
  * issue a configure endpoint command.  Only the context entries field matters,
  * but we'll copy the whole thing anyway.
  */
-void xhci_slot_copy(struct xhci_hcd *xhci, struct xhci_virt_device *vdev)
+void xhci_slot_copy(struct xhci_hcd *xhci,
+		struct xhci_container_ctx *in_ctx,
+		struct xhci_container_ctx *out_ctx)
 {
 	struct xhci_slot_ctx *in_slot_ctx;
 	struct xhci_slot_ctx *out_slot_ctx;
 
-	in_slot_ctx = xhci_get_slot_ctx(xhci, vdev->in_ctx);
-	out_slot_ctx = xhci_get_slot_ctx(xhci, vdev->out_ctx);
+	in_slot_ctx = xhci_get_slot_ctx(xhci, in_ctx);
+	out_slot_ctx = xhci_get_slot_ctx(xhci, out_ctx);
 
 	in_slot_ctx->dev_info = out_slot_ctx->dev_info;
 	in_slot_ctx->dev_info2 = out_slot_ctx->dev_info2;
@@ -747,6 +755,44 @@ static void scratchpad_free(struct xhci_hcd *xhci)
 			    xhci->scratchpad->sp_dma);
 	kfree(xhci->scratchpad);
 	xhci->scratchpad = NULL;
+}
+
+struct xhci_command *xhci_alloc_command(struct xhci_hcd *xhci,
+		bool allocate_completion, gfp_t mem_flags)
+{
+	struct xhci_command *command;
+
+	command = kzalloc(sizeof(*command), mem_flags);
+	if (!command)
+		return NULL;
+
+	command->in_ctx =
+		xhci_alloc_container_ctx(xhci, XHCI_CTX_TYPE_INPUT, mem_flags);
+	if (!command->in_ctx)
+		return NULL;
+
+	if (allocate_completion) {
+		command->completion =
+			kzalloc(sizeof(struct completion), mem_flags);
+		if (!command->completion) {
+			xhci_free_container_ctx(xhci, command->in_ctx);
+			return NULL;
+		}
+		init_completion(command->completion);
+	}
+
+	command->status = 0;
+	INIT_LIST_HEAD(&command->cmd_list);
+	return command;
+}
+
+void xhci_free_command(struct xhci_hcd *xhci,
+		struct xhci_command *command)
+{
+	xhci_free_container_ctx(xhci,
+			command->in_ctx);
+	kfree(command->completion);
+	kfree(command);
 }
 
 void xhci_mem_cleanup(struct xhci_hcd *xhci)

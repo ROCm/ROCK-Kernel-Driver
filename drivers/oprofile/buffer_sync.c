@@ -168,9 +168,8 @@ int sync_start(void)
 	}
 #endif
 
-	if (!alloc_cpumask_var(&marked_cpus, GFP_KERNEL))
+	if (!zalloc_cpumask_var(&marked_cpus, GFP_KERNEL))
 		return -ENOMEM;
-	cpumask_clear(marked_cpus);
 
 	start_cpu_work();
 

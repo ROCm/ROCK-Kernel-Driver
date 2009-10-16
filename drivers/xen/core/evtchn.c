@@ -199,11 +199,11 @@ static inline unsigned int evtchn_from_irq(unsigned int irq)
 }
 
 /* IRQ <-> VIRQ mapping. */
-DEFINE_PER_CPU(int, virq_to_irq[NR_VIRQS]) = {[0 ... NR_VIRQS-1] = -1};
+DEFINE_PER_CPU(int[NR_VIRQS], virq_to_irq) = {[0 ... NR_VIRQS-1] = -1};
 
 #if defined(CONFIG_SMP) && defined(PER_CPU_IPI_IRQ)
 /* IRQ <-> IPI mapping. */
-DEFINE_PER_CPU(int, ipi_to_irq[NR_IPIS]) = {[0 ... NR_IPIS-1] = -1};
+DEFINE_PER_CPU(int[NR_IPIS], ipi_to_irq) = {[0 ... NR_IPIS-1] = -1};
 #endif
 
 #ifdef CONFIG_SMP
@@ -415,6 +415,7 @@ asmlinkage void __irq_entry evtchn_do_upcall(struct pt_regs *regs)
 		percpu_write(upcall_count, 0);
 	} while (unlikely(count != 1));
 
+	run_local_timers();
 	irq_exit();
 	set_irq_regs(old_regs);
 }

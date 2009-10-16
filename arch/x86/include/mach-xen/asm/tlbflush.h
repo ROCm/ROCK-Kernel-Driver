@@ -74,9 +74,9 @@ static inline void reset_lazy_tlbstate(void)
 #define local_flush_tlb() __flush_tlb()
 
 #define flush_tlb_all xen_tlb_flush_all
-#define flush_tlb_current_task() xen_tlb_flush_mask(&current->mm->cpu_vm_mask)
-#define flush_tlb_mm(mm) xen_tlb_flush_mask(&(mm)->cpu_vm_mask)
-#define flush_tlb_page(vma, va) xen_invlpg_mask(&(vma)->vm_mm->cpu_vm_mask, va)
+#define flush_tlb_current_task() xen_tlb_flush_mask(mm_cpumask(current->mm))
+#define flush_tlb_mm(mm) xen_tlb_flush_mask(mm_cpumask(mm))
+#define flush_tlb_page(vma, va) xen_invlpg_mask(mm_cpumask((vma)->vm_mm), va)
 
 #define flush_tlb()	flush_tlb_current_task()
 

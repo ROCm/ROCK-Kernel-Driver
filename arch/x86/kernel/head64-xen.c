@@ -20,15 +20,14 @@
 #include <asm/proto.h>
 #include <asm/smp.h>
 #include <asm/setup.h>
-#include <asm/setup_arch.h>
 #include <asm/desc.h>
 #include <asm/pgtable.h>
 #include <asm/tlbflush.h>
 #include <asm/sections.h>
 #include <asm/kdebug.h>
 #include <asm/e820.h>
-#include <asm/bios_ebda.h>
 #include <asm/trampoline.h>
+#include <asm/bios_ebda.h>
 
 #ifndef CONFIG_XEN
 static void __init zap_identity_mappings(void)

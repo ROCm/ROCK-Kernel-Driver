@@ -12,6 +12,7 @@ defcmd archkdb "" "First line arch debugging"
   set BTARGS 9
   pid R
   -archkdbcommon
+  r
   -bta
 endefcmd
 

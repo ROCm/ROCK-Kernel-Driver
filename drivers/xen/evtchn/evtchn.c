@@ -549,14 +549,15 @@ static int __init evtchn_init(void)
 
 	return 0;
 }
+module_init(evtchn_init);
 
+#ifdef CONFIG_MODULE
 static void __exit evtchn_cleanup(void)
 {
 	misc_deregister(&evtchn_miscdev);
 	unregister_cpu_notifier(&evtchn_cpu_nfb);
 }
-
-module_init(evtchn_init);
 module_exit(evtchn_cleanup);
+#endif
 
 MODULE_LICENSE("Dual BSD/GPL");

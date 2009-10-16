@@ -92,37 +92,28 @@ relocate_kernel:
 	movq	%r9, %cr3
 
 	/* setup idt */
-	movq    %r8, %rax
-	addq    $(idt_80 - relocate_kernel), %rax
-	lidtq   (%rax)
+	lidtq	idt_80 - relocate_kernel(%r8)
 
 	/* setup gdt */
-	movq    %r8, %rax
-	addq    $(gdt - relocate_kernel), %rax
-	movq    %r8, %r9
-	addq    $((gdt_80 - relocate_kernel) + 2), %r9
-	movq    %rax, (%r9)
-
-	movq    %r8, %rax
-	addq    $(gdt_80 - relocate_kernel), %rax
-	lgdtq   (%rax)
+	leaq	gdt - relocate_kernel(%r8), %rax
+	movq	%rax, (gdt_80 - relocate_kernel) + 2(%r8)
+	lgdtq	gdt_80 - relocate_kernel(%r8)
 
 	/* setup data segment registers */
 	xorl	%eax, %eax
-	movl    %eax, %ds
-	movl    %eax, %es
-	movl    %eax, %fs
-	movl    %eax, %gs
-	movl    %eax, %ss
+	movl	%eax, %ds
+	movl	%eax, %es
+	movl	%eax, %fs
+	movl	%eax, %gs
+	movl	%eax, %ss
 
 	/* setup a new stack at the end of the physical control page */
 	lea	PAGE_SIZE(%r8), %rsp
 
 	/* load new code segment and jump to identity mapped page */
-	movq	%r8, %rax
-	addq    $(identity_mapped - relocate_kernel), %rax
+	addq	$(identity_mapped - relocate_kernel), %r8
 	pushq	$(gdt_cs - gdt)
-	pushq	%rax
+	pushq	%r8
 	lretq
 
 identity_mapped:

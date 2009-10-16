@@ -84,6 +84,7 @@ extern start_info_t *xen_start_info;
 #endif
 
 #define init_hypervisor(c) ((void)((c)->x86_hyper_vendor = X86_HYPER_VENDOR_XEN))
+#define init_hypervisor_platform() init_hypervisor(&boot_cpu_data)
 
 /* arch/xen/kernel/evtchn.c */
 /* Force a proper event-channel callback from Xen. */
@@ -377,7 +378,7 @@ MULTI_grant_table_op(multicall_entry_t *mcl, unsigned int cmd,
 
 #endif
 
-#define uvm_multi(cpumask) ((unsigned long)cpus_addr(cpumask) | UVMF_MULTI)
+#define uvm_multi(cpumask) ((unsigned long)cpumask_bits(cpumask) | UVMF_MULTI)
 
 #ifdef LINUX
 /* drivers/staging/ use Windows-style types, including VOID */

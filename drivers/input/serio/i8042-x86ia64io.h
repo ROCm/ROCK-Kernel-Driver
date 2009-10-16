@@ -464,6 +464,34 @@ static struct dmi_system_id __initdata i8042_dmi_nopnp_table[] = {
 	},
 	{ }
 };
+
+static struct dmi_system_id __initdata i8042_dmi_laptop_table[] = {
+	{
+		.ident = "Portable",
+		.matches = {
+			DMI_MATCH(DMI_CHASSIS_TYPE, "8"), /* Portable */
+		},
+	},
+	{
+		.ident = "Laptop",
+		.matches = {
+			DMI_MATCH(DMI_CHASSIS_TYPE, "9"), /* Laptop */
+		},
+	},
+	{
+		.ident = "Notebook",
+		.matches = {
+			DMI_MATCH(DMI_CHASSIS_TYPE, "10"), /* Notebook */
+		},
+	},
+	{
+		.ident = "Sub-Notebook",
+		.matches = {
+			DMI_MATCH(DMI_CHASSIS_TYPE, "14"), /* Sub-Notebook */
+		},
+	},
+	{ }
+};
 #endif
 
 /*
@@ -537,9 +565,9 @@ static struct dmi_system_id __initdata i8042_dmi_dritek_table[] = {
 #ifdef CONFIG_PNP
 #include <linux/pnp.h>
 
-static int i8042_pnp_kbd_registered;
+static bool i8042_pnp_kbd_registered;
 static unsigned int i8042_pnp_kbd_devices;
-static int i8042_pnp_aux_registered;
+static bool i8042_pnp_aux_registered;
 static unsigned int i8042_pnp_aux_devices;
 
 static int i8042_pnp_command_reg;
@@ -627,12 +655,12 @@ static struct pnp_driver i8042_pnp_aux_driver = {
 static void i8042_pnp_exit(void)
 {
 	if (i8042_pnp_kbd_registered) {
-		i8042_pnp_kbd_registered = 0;
+		i8042_pnp_kbd_registered = false;
 		pnp_unregister_driver(&i8042_pnp_kbd_driver);
 	}
 
 	if (i8042_pnp_aux_registered) {
-		i8042_pnp_aux_registered = 0;
+		i8042_pnp_aux_registered = false;
 		pnp_unregister_driver(&i8042_pnp_aux_driver);
 	}
 }
@@ -640,12 +668,12 @@ static void i8042_pnp_exit(void)
 static int __init i8042_pnp_init(void)
 {
 	char kbd_irq_str[4] = { 0 }, aux_irq_str[4] = { 0 };
-	int pnp_data_busted = 0;
+	int pnp_data_busted = false;
 	int err;
 
 #ifdef CONFIG_X86
 	if (dmi_check_system(i8042_dmi_nopnp_table))
-		i8042_nopnp = 1;
+		i8042_nopnp = true;
 #endif
 
 	if (i8042_nopnp) {
@@ -655,11 +683,11 @@ static int __init i8042_pnp_init(void)
 
 	err = pnp_register_driver(&i8042_pnp_kbd_driver);
 	if (!err)
-		i8042_pnp_kbd_registered = 1;
+		i8042_pnp_kbd_registered = true;
 
 	err = pnp_register_driver(&i8042_pnp_aux_driver);
 	if (!err)
-		i8042_pnp_aux_registered = 1;
+		i8042_pnp_aux_registered = true;
 
 	if (!i8042_pnp_kbd_devices && !i8042_pnp_aux_devices) {
 		i8042_pnp_exit();
@@ -687,9 +715,9 @@ static int __init i8042_pnp_init(void)
 
 #if defined(__ia64__)
 	if (!i8042_pnp_kbd_devices)
-		i8042_nokbd = 1;
+		i8042_nokbd = true;
 	if (!i8042_pnp_aux_devices)
-		i8042_noaux = 1;
+		i8042_noaux = true;
 #endif
 
 	if (((i8042_pnp_data_reg & ~0xf) == (i8042_data_reg & ~0xf) &&
@@ -700,7 +728,7 @@ static int __init i8042_pnp_init(void)
 			"using default %#x\n",
 			i8042_pnp_data_reg, i8042_data_reg);
 		i8042_pnp_data_reg = i8042_data_reg;
-		pnp_data_busted = 1;
+		pnp_data_busted = true;
 	}
 
 	if (((i8042_pnp_command_reg & ~0xf) == (i8042_command_reg & ~0xf) &&
@@ -711,7 +739,7 @@ static int __init i8042_pnp_init(void)
 			"using default %#x\n",
 			i8042_pnp_command_reg, i8042_command_reg);
 		i8042_pnp_command_reg = i8042_command_reg;
-		pnp_data_busted = 1;
+		pnp_data_busted = true;
 	}
 
 	if (!i8042_nokbd && !i8042_pnp_kbd_irq) {
@@ -719,7 +747,7 @@ static int __init i8042_pnp_init(void)
 			"PNP: PS/2 controller doesn't have KBD irq; "
 			"using default %d\n", i8042_kbd_irq);
 		i8042_pnp_kbd_irq = i8042_kbd_irq;
-		pnp_data_busted = 1;
+		pnp_data_busted = true;
 	}
 
 	if (!i8042_noaux && !i8042_pnp_aux_irq) {
@@ -728,7 +756,7 @@ static int __init i8042_pnp_init(void)
 				"PNP: PS/2 appears to have AUX port disabled, "
 				"if this is incorrect please boot with "
 				"i8042.nopnp\n");
-			i8042_noaux = 1;
+			i8042_noaux = true;
 		} else {
 			printk(KERN_WARNING
 				"PNP: PS/2 controller doesn't have AUX irq; "
@@ -741,6 +769,11 @@ static int __init i8042_pnp_init(void)
 	i8042_command_reg = i8042_pnp_command_reg;
 	i8042_kbd_irq = i8042_pnp_kbd_irq;
 	i8042_aux_irq = i8042_pnp_aux_irq;
+
+#ifdef CONFIG_X86
+	i8042_bypass_aux_irq_test = !pnp_data_busted &&
+				    dmi_check_system(i8042_dmi_laptop_table);
+#endif
 
 	return 0;
 }
@@ -770,21 +803,21 @@ static int __init i8042_platform_init(void)
 		return retval;
 
 #if defined(__ia64__)
-        i8042_reset = 1;
+        i8042_reset = true;
 #endif
 
 #ifdef CONFIG_X86
 	if (dmi_check_system(i8042_dmi_reset_table))
-		i8042_reset = 1;
+		i8042_reset = true;
 
 	if (dmi_check_system(i8042_dmi_noloop_table))
-		i8042_noloop = 1;
+		i8042_noloop = true;
 
 	if (dmi_check_system(i8042_dmi_nomux_table))
-		i8042_nomux = 1;
+		i8042_nomux = true;
 
 	if (dmi_check_system(i8042_dmi_dritek_table))
-		i8042_dritek = 1;
+		i8042_dritek = true;
 #endif /* CONFIG_X86 */
 
 	return retval;

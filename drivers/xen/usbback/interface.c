@@ -48,7 +48,7 @@
 static LIST_HEAD(usbif_list);
 static DEFINE_SPINLOCK(usbif_list_lock);
 
-usbif_t *find_usbif(int dom_id, int dev_id)
+usbif_t *find_usbif(domid_t domid, unsigned int handle)
 {
 	usbif_t *usbif;
 	int found = 0;
@@ -56,8 +56,8 @@ usbif_t *find_usbif(int dom_id, int dev_id)
 
 	spin_lock_irqsave(&usbif_list_lock, flags);
 	list_for_each_entry(usbif, &usbif_list, usbif_list) {
-		if (usbif->domid == dom_id
-			&& usbif->handle == dev_id) {
+		if (usbif->domid == domid
+			&& usbif->handle == handle) {
 			found = 1;
 			break;
 		}
@@ -82,16 +82,16 @@ usbif_t *usbif_alloc(domid_t domid, unsigned int handle)
 
 	usbif->domid = domid;
 	usbif->handle = handle;
-	spin_lock_init(&usbif->ring_lock);
+	spin_lock_init(&usbif->urb_ring_lock);
+	spin_lock_init(&usbif->conn_ring_lock);
 	atomic_set(&usbif->refcnt, 0);
 	init_waitqueue_head(&usbif->wq);
 	init_waitqueue_head(&usbif->waiting_to_free);
-	spin_lock_init(&usbif->plug_lock);
-	INIT_LIST_HEAD(&usbif->plugged_devices);
+	spin_lock_init(&usbif->stub_lock);
+	INIT_LIST_HEAD(&usbif->stub_list);
 	spin_lock_init(&usbif->addr_lock);
-	for (i = 0; i < USB_DEV_ADDR_SIZE; i++) {
+	for (i = 0; i < USB_DEV_ADDR_SIZE; i++)
 		usbif->addr_table[i] = NULL;
-	}
 
 	spin_lock_irqsave(&usbif_list_lock, flags);
 	list_add(&usbif->usbif_list, &usbif_list);
@@ -100,70 +100,109 @@ usbif_t *usbif_alloc(domid_t domid, unsigned int handle)
 	return usbif;
 }
 
-static int map_frontend_page(usbif_t *usbif, unsigned long shared_page)
+static int map_frontend_pages(usbif_t *usbif,
+				grant_ref_t urb_ring_ref,
+				grant_ref_t conn_ring_ref)
 {
 	struct gnttab_map_grant_ref op;
 
-	gnttab_set_map_op(&op, (unsigned long)usbif->ring_area->addr,
-			  GNTMAP_host_map, shared_page, usbif->domid);
+	gnttab_set_map_op(&op, (unsigned long)usbif->urb_ring_area->addr,
+			  GNTMAP_host_map, urb_ring_ref, usbif->domid);
 
 	if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1))
 		BUG();
 
 	if (op.status) {
-		printk(KERN_ERR "grant table operation failure\n");
+		printk(KERN_ERR "grant table failure mapping urb_ring_ref\n");
 		return op.status;
 	}
 
-	usbif->shmem_ref = shared_page;
-	usbif->shmem_handle = op.handle;
+	usbif->urb_shmem_ref = urb_ring_ref;
+	usbif->urb_shmem_handle = op.handle;
+
+	gnttab_set_map_op(&op, (unsigned long)usbif->conn_ring_area->addr,
+			  GNTMAP_host_map, conn_ring_ref, usbif->domid);
+
+	if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1))
+		BUG();
+
+	if (op.status) {
+		struct gnttab_unmap_grant_ref unop;
+		gnttab_set_unmap_op(&unop,
+				(unsigned long) usbif->urb_ring_area->addr,
+				GNTMAP_host_map, usbif->urb_shmem_handle);
+		VOID(HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &unop,
+				1));
+		printk(KERN_ERR "grant table failure mapping conn_ring_ref\n");
+		return op.status;
+	}
+
+	usbif->conn_shmem_ref = conn_ring_ref;
+	usbif->conn_shmem_handle = op.handle;
 
 	return 0;
 }
 
-static void unmap_frontend_page(usbif_t *usbif)
+static void unmap_frontend_pages(usbif_t *usbif)
 {
 	struct gnttab_unmap_grant_ref op;
 
-	gnttab_set_unmap_op(&op, (unsigned long)usbif->ring_area->addr,
-			    GNTMAP_host_map, usbif->shmem_handle);
+	gnttab_set_unmap_op(&op, (unsigned long)usbif->urb_ring_area->addr,
+			    GNTMAP_host_map, usbif->urb_shmem_handle);
+
+	if (HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1))
+		BUG();
+
+	gnttab_set_unmap_op(&op, (unsigned long)usbif->conn_ring_area->addr,
+			    GNTMAP_host_map, usbif->conn_shmem_handle);
 
 	if (HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &op, 1))
 		BUG();
 }
 
-int usbif_map(usbif_t *usbif, unsigned long shared_page, unsigned int evtchn)
+int usbif_map(usbif_t *usbif, unsigned long urb_ring_ref,
+		unsigned long conn_ring_ref, unsigned int evtchn)
 {
-	int err;
-	usbif_sring_t *sring;
+	int err = -ENOMEM;
+
+	usbif_urb_sring_t *urb_sring;
+	usbif_conn_sring_t *conn_sring;
 
 	if (usbif->irq)
 		return 0;
 
-	if ((usbif->ring_area = alloc_vm_area(PAGE_SIZE)) == NULL)
-		return -ENOMEM;
-
-	err = map_frontend_page(usbif, shared_page);
-	if (err) {
-		free_vm_area(usbif->ring_area);
+	if ((usbif->urb_ring_area = alloc_vm_area(PAGE_SIZE)) == NULL)
 		return err;
-	}
+	if ((usbif->conn_ring_area = alloc_vm_area(PAGE_SIZE)) == NULL)
+		goto fail_alloc;
 
-	sring = (usbif_sring_t *) usbif->ring_area->addr;
-	BACK_RING_INIT(&usbif->ring, sring, PAGE_SIZE);
+	err = map_frontend_pages(usbif, urb_ring_ref, conn_ring_ref);
+	if (err)
+		goto fail_map;
 
 	err = bind_interdomain_evtchn_to_irqhandler(
-			usbif->domid, evtchn, usbbk_be_int, 0, "usbif-backend", usbif);
+			usbif->domid, evtchn, usbbk_be_int, 0,
+			"usbif-backend", usbif);
 	if (err < 0)
-	{
-		unmap_frontend_page(usbif);
-		free_vm_area(usbif->ring_area);
-		usbif->ring.sring = NULL;
-		return err;
-	}
+		goto fail_evtchn;
 	usbif->irq = err;
 
+	urb_sring = (usbif_urb_sring_t *) usbif->urb_ring_area->addr;
+	BACK_RING_INIT(&usbif->urb_ring, urb_sring, PAGE_SIZE);
+
+	conn_sring = (usbif_conn_sring_t *) usbif->conn_ring_area->addr;
+	BACK_RING_INIT(&usbif->conn_ring, conn_sring, PAGE_SIZE);
+
 	return 0;
+
+fail_evtchn:
+	unmap_frontend_pages(usbif);
+fail_map:
+	free_vm_area(usbif->conn_ring_area);
+fail_alloc:
+	free_vm_area(usbif->urb_ring_area);
+
+	return err;
 }
 
 void usbif_disconnect(usbif_t *usbif)
@@ -176,12 +215,12 @@ void usbif_disconnect(usbif_t *usbif)
 		usbif->xenusbd = NULL;
 	}
 
-	spin_lock_irqsave(&usbif->plug_lock, flags);
-	list_for_each_entry_safe(stub, tmp, &usbif->plugged_devices, plugged_list) {
+	spin_lock_irqsave(&usbif->stub_lock, flags);
+	list_for_each_entry_safe(stub, tmp, &usbif->stub_list, dev_list) {
 		usbbk_unlink_urbs(stub);
 		detach_device_without_lock(usbif, stub);
 	}
-	spin_unlock_irqrestore(&usbif->plug_lock, flags);
+	spin_unlock_irqrestore(&usbif->stub_lock, flags);
 
 	wait_event(usbif->waiting_to_free, atomic_read(&usbif->refcnt) == 0);
 
@@ -190,10 +229,12 @@ void usbif_disconnect(usbif_t *usbif)
 		usbif->irq = 0;
 	}
 
-	if (usbif->ring.sring) {
-		unmap_frontend_page(usbif);
-		free_vm_area(usbif->ring_area);
-		usbif->ring.sring = NULL;
+	if (usbif->urb_ring.sring) {
+		unmap_frontend_pages(usbif);
+		free_vm_area(usbif->urb_ring_area);
+		free_vm_area(usbif->conn_ring_area);
+		usbif->urb_ring.sring = NULL;
+		usbif->conn_ring.sring = NULL;
 	}
 }
 

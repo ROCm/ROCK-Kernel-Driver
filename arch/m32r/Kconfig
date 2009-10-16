@@ -41,6 +41,12 @@ config HZ
 	int
 	default 100
 
+config GENERIC_TIME
+	def_bool y
+
+config ARCH_USES_GETTIMEOFFSET
+	def_bool y
+
 source "init/Kconfig"
 
 source "kernel/Kconfig.freezer"
@@ -243,7 +249,7 @@ config IRAM_SIZE
 config GENERIC_LOCKBREAK
 	bool
 	default y
-	depends on SMP
+	depends on SMP && PREEMPT
 
 config RWSEM_GENERIC_SPINLOCK
 	bool

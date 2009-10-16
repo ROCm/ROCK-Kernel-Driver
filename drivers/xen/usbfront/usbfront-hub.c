@@ -50,15 +50,16 @@ void set_connect_state(struct usbfront_info *info, int portnum)
 {
 	int port;
 
-	port = portnum -1;
+	port = portnum - 1;
 	if (info->ports[port].status & USB_PORT_STAT_POWER) {
 		switch (info->devices[port].speed) {
 		case USB_SPEED_UNKNOWN:
-			info->ports[port].status &= ~(USB_PORT_STAT_CONNECTION |
-							USB_PORT_STAT_ENABLE |
-							USB_PORT_STAT_LOW_SPEED |
-							USB_PORT_STAT_HIGH_SPEED |
-							USB_PORT_STAT_SUSPEND);
+			info->ports[port].status &=
+				~(USB_PORT_STAT_CONNECTION |
+					USB_PORT_STAT_ENABLE |
+					USB_PORT_STAT_LOW_SPEED |
+					USB_PORT_STAT_HIGH_SPEED |
+					USB_PORT_STAT_SUSPEND);
 			break;
 		case USB_SPEED_LOW:
 			info->ports[port].status |= USB_PORT_STAT_CONNECTION;
@@ -86,6 +87,9 @@ void rhport_connect(struct usbfront_info *info,
 {
 	int port;
 
+	if (portnum < 1 || portnum > info->rh_numports)
+		return; /* invalid port number */
+
 	port = portnum - 1;
 	if (info->devices[port].speed != speed) {
 		switch (speed) {
@@ -105,30 +109,6 @@ void rhport_connect(struct usbfront_info *info,
 
 		set_connect_state(info, portnum);
 	}
-}
-
-void rhport_disconnect(struct usbfront_info *info, int portnum)
-{
-	rhport_connect(info, portnum, USB_SPEED_UNKNOWN);
-}
-
-void xenhcd_rhport_state_change(struct usbfront_info *info,
-				int portnum, enum usb_device_speed speed)
-{
-	int changed = 0;
-	unsigned long flags;
-
-	if (portnum < 1 || portnum > info->rh_numports)
-		return; /* invalid port number */
-
-	spin_lock_irqsave(&info->lock, flags);
-	rhport_connect(info, portnum, speed);
-	if (info->ports[portnum-1].c_connection)
-		changed = 1;
-	spin_unlock_irqrestore(&info->lock, flags);
-
-	if (changed)
-		usb_hcd_poll_rh_status(info_to_hcd(info));
 }
 
 /*
@@ -214,7 +194,7 @@ void rhport_reset(struct usbfront_info *info, int portnum)
 {
 	int port;
 
-	port = portnum -1;
+	port = portnum - 1;
 	info->ports[port].status &= ~(USB_PORT_STAT_ENABLE
 					| USB_PORT_STAT_LOW_SPEED
 					| USB_PORT_STAT_HIGH_SPEED);
@@ -227,54 +207,50 @@ void rhport_reset(struct usbfront_info *info, int portnum)
 	info->ports[port].timeout = jiffies + msecs_to_jiffies(10);
 }
 
-#if 0
+#ifdef XENHCD_PM
 #ifdef CONFIG_PM
 static int xenhcd_bus_suspend(struct usb_hcd *hcd)
 {
 	struct usbfront_info *info = hcd_to_info(hcd);
+	int ret = 0;
 	int i, ports;
 
 	ports = info->rh_numports;
 
 	spin_lock_irq(&info->lock);
-
-	if (HC_IS_RUNNING(hcd->state)) {
-		/*
-		 * TODO:
-		 * clean queue,
-		 * stop all transfers,
-		 * ...
-		 */
-		hcd->state = HC_STATE_QUIESCING;
+	if (!test_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags))
+		ret = -ESHUTDOWN;
+	else {
+		/* suspend any active ports*/
+		for (i = 1; i <= ports; i++)
+			rhport_suspend(info, i);
 	}
-
-	/* suspend any active ports*/
-	for (i = 1; i <= ports; i++) {
-		rhport_suspend(info, i);
-	}
+	spin_unlock_irq(&info->lock);
 
 	del_timer_sync(&info->watchdog);
 
-	spin_unlock_irq(&info->lock);
-
-	return 0;
+	return ret;
 }
 
 static int xenhcd_bus_resume(struct usb_hcd *hcd)
 {
 	struct usbfront_info *info = hcd_to_info(hcd);
+	int ret = 0;
 	int i, ports;
 
 	ports = info->rh_numports;
 
 	spin_lock_irq(&info->lock);
-	/* resume any suspended ports*/
-	for (i = 1; i <= ports; i++) {
-		rhport_resume(info, i);
+	if (!test_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags))
+		ret = -ESHUTDOWN;
+	else {
+		/* resume any suspended ports*/
+		for (i = 1; i <= ports; i++)
+			rhport_resume(info, i);
 	}
-	hcd->state = HC_STATE_RUNNING;
 	spin_unlock_irq(&info->lock);
-	return 0;
+
+	return ret;
 }
 #endif
 #endif
@@ -295,8 +271,8 @@ static void xenhcd_hub_descriptor(struct usbfront_info *info,
 	desc->bDescLength = 7 + 2 * temp;
 
 	/* bitmaps for DeviceRemovable and PortPwrCtrlMask */
-	memset (&desc->bitmap[0], 0, temp);
-	memset (&desc->bitmap[temp], 0xff, temp);
+	memset(&desc->bitmap[0], 0, temp);
+	memset(&desc->bitmap[temp], 0xff, temp);
 
 	/* per-port over current reporting and no power switching */
 	temp = 0x000a;
@@ -380,11 +356,6 @@ static int xenhcd_hub_control(struct usb_hcd *hcd,
 	int i;
 	int changed = 0;
 
-#ifdef USBFRONT_DEBUG
-	WPRINTK("xenusb_hub_control(typeReq %x wValue %x wIndex %x)\n",
-	       typeReq, wValue, wIndex);
-#endif
-
 	spin_lock_irqsave(&info->lock, flags);
 	switch (typeReq) {
 	case ClearHubFeature:
@@ -394,7 +365,7 @@ static int xenhcd_hub_control(struct usb_hcd *hcd,
 		if (!wIndex || wIndex > ports)
 			goto error;
 
-		switch(wValue) {
+		switch (wValue) {
 		case USB_PORT_FEAT_SUSPEND:
 			rhport_resume(info, wIndex);
 			break;
@@ -414,7 +385,7 @@ static int xenhcd_hub_control(struct usb_hcd *hcd,
 		break;
 	case GetHubDescriptor:
 		xenhcd_hub_descriptor(info,
-				      (struct usb_hub_descriptor*) buf);
+				      (struct usb_hub_descriptor *) buf);
 		break;
 	case GetHubStatus:
 		/* always local power supply good and no over-current exists. */
@@ -444,7 +415,7 @@ static int xenhcd_hub_control(struct usb_hcd *hcd,
 				info->devices[wIndex].status = USB_STATE_DEFAULT;
 			}
 
-			switch(info->devices[wIndex].speed) {
+			switch (info->devices[wIndex].speed) {
 			case USB_SPEED_LOW:
 				info->ports[wIndex].status |= USB_PORT_STAT_LOW_SPEED;
 				break;
@@ -466,7 +437,7 @@ static int xenhcd_hub_control(struct usb_hcd *hcd,
 		if (!wIndex || wIndex > ports)
 			goto error;
 
-		switch(wValue) {
+		switch (wValue) {
 		case USB_PORT_FEAT_POWER:
 			rhport_power_on(info, wIndex);
 			break;
@@ -477,9 +448,8 @@ static int xenhcd_hub_control(struct usb_hcd *hcd,
 			rhport_suspend(info, wIndex);
 			break;
 		default:
-			if ((info->ports[wIndex-1].status & USB_PORT_STAT_POWER) != 0) {
+			if ((info->ports[wIndex-1].status & USB_PORT_STAT_POWER) != 0)
 				info->ports[wIndex-1].status |= (1 << wValue);
-			}
 		}
 		break;
 
@@ -491,9 +461,8 @@ error:
 
 	/* check status for each port */
 	for (i = 0; i < ports; i++) {
-		if (info->ports[i].status & PORT_C_MASK) {
+		if (info->ports[i].status & PORT_C_MASK)
 			changed = 1;
-		}
 	}
 	if (changed)
 		usb_hcd_poll_rh_status(hcd);

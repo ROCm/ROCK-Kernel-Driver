@@ -24,7 +24,7 @@
 #include <asm/percpu.h>
 #include <xen/interface/elfnote.h>
 
-	.section .text.head, "ax", @progbits
+	__HEAD
 	.code64
 	.globl startup_64
 startup_64:
@@ -52,7 +52,7 @@ startup_64:
 
 #define NEXT_PAGE(name) \
 	.balign	PAGE_SIZE; \
-	phys_##name = . - .text.head; \
+	phys_##name = . - .head.text; \
 ENTRY(name)
 
 NEXT_PAGE(init_level4_pgt)
@@ -97,7 +97,7 @@ NEXT_PAGE(hypercall_page)
 
 #undef NEXT_PAGE
 
-	.section .bss.page_aligned, "aw", @nobits
+	__PAGE_ALIGNED_BSS
 	.align PAGE_SIZE
 ENTRY(empty_zero_page)
 	.skip PAGE_SIZE

@@ -437,6 +437,12 @@ int agp_bind_memory(struct agp_memory *curr, off_t pg_start)
 		curr->bridge->driver->cache_flush();
 		curr->is_flushed = true;
 	}
+
+	if (curr->bridge->driver->agp_map_memory) {
+		ret_val = curr->bridge->driver->agp_map_memory(curr);
+		if (ret_val)
+			return ret_val;
+	}
 	ret_val = curr->bridge->driver->insert_memory(curr, pg_start, curr->type);
 
 	if (ret_val != 0)
@@ -477,6 +483,9 @@ int agp_unbind_memory(struct agp_memory *curr)
 
 	if (ret_val != 0)
 		return ret_val;
+
+	if (curr->bridge->driver->agp_unmap_memory)
+		curr->bridge->driver->agp_unmap_memory(curr);
 
 	curr->is_bound = false;
 	curr->pg_start = 0;
@@ -1132,7 +1141,9 @@ int agp_generic_insert_memory(struct agp_memory * mem, off_t pg_start, int type)
 	}
 
 	for (i = 0, j = pg_start; i < mem->page_count; i++, j++) {
-		writel(bridge->driver->mask_memory(bridge, mem->pages[i], mask_type),
+		writel(bridge->driver->mask_memory(bridge,
+						   page_to_phys(mem->pages[i]),
+						   mask_type),
 		       bridge->gatt_table+j);
 	}
 	readl(bridge->gatt_table+j-1);	/* PCI Posting. */
@@ -1347,9 +1358,8 @@ void global_cache_flush(void)
 EXPORT_SYMBOL(global_cache_flush);
 
 unsigned long agp_generic_mask_memory(struct agp_bridge_data *bridge,
-				      struct page *page, int type)
+				      dma_addr_t addr, int type)
 {
-	unsigned long addr = page_to_gart(page);
 	/* memory type is ignored in the generic routine */
 	if (bridge->driver->masks)
 		return addr | bridge->driver->masks[0].mask;

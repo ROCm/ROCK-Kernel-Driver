@@ -59,7 +59,6 @@ void __init reserve_ebda_region(void)
 #include <asm/fixmap.h>
 #include <asm/pgtable.h>
 #include <asm/sections.h>
-#include <asm/setup_arch.h>
 #include <xen/interface/callback.h>
 #include <xen/interface/memory.h>
 
@@ -165,7 +164,7 @@ void __init xen_start_kernel(void)
 
 }
 
-void __init machine_specific_arch_setup(void)
+void __init xen_arch_setup(void)
 {
 	int ret;
 	static const struct callback_register __initconst event = {

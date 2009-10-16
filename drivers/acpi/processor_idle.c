@@ -60,6 +60,8 @@
 #include <acpi/processor.h>
 #include <asm/processor.h>
 
+#define PREFIX "ACPI: "
+
 #define ACPI_PROCESSOR_CLASS            "processor"
 #define _COMPONENT              ACPI_PROCESSOR_COMPONENT
 ACPI_MODULE_NAME("processor_idle");
@@ -712,6 +714,7 @@ static int acpi_processor_get_power_info(struct acpi_processor *pr)
 	return 0;
 }
 
+#ifdef CONFIG_ACPI_PROCFS
 static int acpi_processor_power_seq_show(struct seq_file *seq, void *offset)
 {
 	struct acpi_processor *pr = seq->private;
@@ -791,7 +794,7 @@ static const struct file_operations acpi_processor_power_fops = {
 	.llseek = seq_lseek,
 	.release = single_release,
 };
-
+#endif
 
 #ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
 /**
@@ -1208,8 +1211,9 @@ int __cpuinit acpi_processor_power_init(struct acpi_processor *pr,
 {
 	acpi_status status = 0;
 	static int first_run;
+#ifdef CONFIG_ACPI_PROCFS
 	struct proc_dir_entry *entry = NULL;
-	unsigned int i;
+#endif
 
 	if (boot_option_idle_override)
 		return 0;
@@ -1261,15 +1265,8 @@ int __cpuinit acpi_processor_power_init(struct acpi_processor *pr,
 		acpi_processor_setup_cpuidle(pr);
 		if (cpuidle_register_device(&pr->power.dev))
 			return -EIO;
-
-		printk(KERN_INFO PREFIX "CPU%d (power states:", pr->id);
-		for (i = 1; i <= pr->power.count; i++)
-			if (pr->power.states[i].valid)
-				printk(" C%d[C%d]", i,
-				       pr->power.states[i].type);
-		printk(")\n");
 	}
-
+#ifdef CONFIG_ACPI_PROCFS
 	/* 'power' [R] */
 	entry = proc_create_data(ACPI_PROCESSOR_FILE_POWER,
 				 S_IRUGO, acpi_device_dir(device),
@@ -1277,6 +1274,7 @@ int __cpuinit acpi_processor_power_init(struct acpi_processor *pr,
 				 acpi_driver_data(device));
 	if (!entry)
 		return -EIO;
+#endif
 
 	if (processor_pm_external())
 		processor_notify_external(pr,
@@ -1294,9 +1292,11 @@ int acpi_processor_power_exit(struct acpi_processor *pr,
 	cpuidle_unregister_device(&pr->power.dev);
 	pr->flags.power_setup_done = 0;
 
+#ifdef CONFIG_ACPI_PROCFS
 	if (acpi_device_dir(device))
 		remove_proc_entry(ACPI_PROCESSOR_FILE_POWER,
 				  acpi_device_dir(device));
+#endif
 
 #if defined(CONFIG_PROCESSOR_EXTERNAL_CONTROL) && defined(CONFIG_SMP)
 	/* Unregister the idle handler when processor #0 is removed. */

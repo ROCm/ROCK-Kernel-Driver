@@ -77,6 +77,11 @@ static DEFINE_MUTEX(balloon_mutex);
  */
 DEFINE_SPINLOCK(balloon_lock);
 
+#ifndef MODULE
+#include <linux/pagevec.h>
+static struct pagevec free_pagevec;
+#endif
+
 struct balloon_stats balloon_stats;
 
 /* We increase/decrease in batches which fit in a page */
@@ -188,12 +193,25 @@ static struct page *balloon_next_page(struct page *page)
 static inline void balloon_free_page(struct page *page)
 {
 #ifndef MODULE
-	if (put_page_testzero(page))
-		free_cold_page(page);
+	if (put_page_testzero(page) && !pagevec_add(&free_pagevec, page)) {
+		__pagevec_free(&free_pagevec);
+		pagevec_reinit(&free_pagevec);
+	}
 #else
-	/* free_cold_page() is not being exported. */
+	/* pagevec interface is not being exported. */
 	__free_page(page);
 #endif
+}
+
+static inline void balloon_free_and_unlock(unsigned long flags)
+{
+#ifndef MODULE
+	if (pagevec_count(&free_pagevec)) {
+		__pagevec_free(&free_pagevec);
+		pagevec_reinit(&free_pagevec);
+	}
+#endif
+	balloon_unlock(flags);
 }
 
 static void balloon_alarm(unsigned long unused)
@@ -308,7 +326,7 @@ static int increase_reservation(unsigned long nr_pages)
 	totalram_pages = bs.current_pages;
 
  out:
-	balloon_unlock(flags);
+	balloon_free_and_unlock(flags);
 
 #ifndef MODULE
 	setup_per_zone_wmarks();
@@ -537,6 +555,7 @@ static int __init balloon_init(void)
 	IPRINTK("Initialising balloon driver.\n");
 
 #ifdef CONFIG_XEN
+	pagevec_init(&free_pagevec, true);
 	bs.current_pages = min(xen_start_info->nr_pages, max_pfn);
 	totalram_pages   = bs.current_pages;
 #else 
@@ -668,8 +687,8 @@ struct page **alloc_empty_pages_and_pagevec(int nr_pages)
 		}
 
 		if (ret != 0) {
-			balloon_unlock(flags);
 			balloon_free_page(page);
+			balloon_free_and_unlock(flags);
 			goto err;
 		}
 

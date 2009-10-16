@@ -11,6 +11,9 @@ obj-$(CONFIG_PCI_GUESTDEV) += guestdev.o
 obj-$(CONFIG_PCI_IOMULTI) += iomulti.o
 obj-$(CONFIG_PCI_RESERVE) += reserve.o
 
+obj-$(CONFIG_PCI_LEGACY) += legacy.o
+CFLAGS_legacy.o += -Wno-deprecated-declarations
+
 # Build PCI Express stuff if needed
 obj-$(CONFIG_PCIEPORTBUS) += pcie/
 

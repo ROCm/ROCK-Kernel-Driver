@@ -1,7 +1,7 @@
 #ifndef _X86_IRQFLAGS_H_
 #define _X86_IRQFLAGS_H_
 
-#include <asm/processor-flags.h>
+#include <asm/smp-processor-id.h>
 
 #ifndef __ASSEMBLY__
 /*

@@ -63,6 +63,8 @@ static int xhci_pci_setup(struct usb_hcd *hcd)
 	xhci->hcs_params1 = xhci_readl(xhci, &xhci->cap_regs->hcs_params1);
 	xhci->hcs_params2 = xhci_readl(xhci, &xhci->cap_regs->hcs_params2);
 	xhci->hcs_params3 = xhci_readl(xhci, &xhci->cap_regs->hcs_params3);
+	xhci->hcc_params = xhci_readl(xhci, &xhci->cap_regs->hc_capbase);
+	xhci->hci_version = HC_VERSION(xhci->hcc_params);
 	xhci->hcc_params = xhci_readl(xhci, &xhci->cap_regs->hcc_params);
 	xhci_print_registers(xhci);
 
@@ -134,6 +136,7 @@ static const struct hc_driver xhci_pci_hc_driver = {
 	.check_bandwidth =	xhci_check_bandwidth,
 	.reset_bandwidth =	xhci_reset_bandwidth,
 	.address_device =	xhci_address_device,
+	.update_hub_device =	xhci_update_hub_device,
 
 	/*
 	 * scheduling support

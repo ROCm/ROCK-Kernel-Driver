@@ -59,6 +59,7 @@
 #include <xen/gnttab.h>
 #include <xen/driver_util.h>
 #include <xen/interface/xen.h>
+#include <xen/xenbus.h>
 #include <xen/interface/io/usbif.h>
 
 struct usbstub;
@@ -72,89 +73,103 @@ struct usbstub;
 #define USB_DEV_ADDR_SIZE 128
 
 typedef struct usbif_st {
-	domid_t           domid;
-	unsigned int      handle;
+	domid_t domid;
+	unsigned int handle;
+	int num_ports;
+	enum usb_spec_version usb_ver;
+
 	struct xenbus_device *xbdev;
 	struct list_head usbif_list;
 
 	unsigned int      irq;
 
-	usbif_back_ring_t ring;
-	struct vm_struct *ring_area;
+	usbif_urb_back_ring_t urb_ring;
+	usbif_conn_back_ring_t conn_ring;
+	struct vm_struct *urb_ring_area;
+	struct vm_struct *conn_ring_area;
 
-	spinlock_t ring_lock;
+	spinlock_t urb_ring_lock;
+	spinlock_t conn_ring_lock;
 	atomic_t refcnt;
-	grant_handle_t shmem_handle;
-	grant_ref_t shmem_ref;
+
+	grant_handle_t urb_shmem_handle;
+	grant_ref_t urb_shmem_ref;
+	grant_handle_t conn_shmem_handle;
+	grant_ref_t conn_shmem_ref;
+
+	struct xenbus_watch backend_watch;
 
 	/* device address lookup table */
-	spinlock_t addr_lock;
 	struct usbstub *addr_table[USB_DEV_ADDR_SIZE];
+	spinlock_t addr_lock;
 
-	/* plugged device list */
-	unsigned plaggable:1;
-	spinlock_t plug_lock;
-	struct list_head plugged_devices;
+	/* connected device list */
+	struct list_head stub_list;
+	spinlock_t stub_lock;
 
 	/* request schedule */
 	struct task_struct *xenusbd;
 	unsigned int waiting_reqs;
 	wait_queue_head_t waiting_to_free;
 	wait_queue_head_t wq;
-
 } usbif_t;
 
-struct usbstub_id
-{
+struct vusb_port_id {
 	struct list_head id_list;
 
-	char bus_id[USBBACK_BUS_ID_SIZE];
-	int dom_id;
-	int dev_id;
+	char phys_bus[USBBACK_BUS_ID_SIZE];
+	domid_t domid;
+	unsigned int handle;
 	int portnum;
+	unsigned is_connected:1;
 };
 
-struct usbstub
-{
-	struct usbstub_id *id;
+struct usbstub {
+	struct kref kref;
+	struct list_head dev_list;
+
+	struct vusb_port_id *portid;
 	struct usb_device *udev;
-	struct usb_interface *interface;
 	usbif_t *usbif;
-
-	struct list_head grabbed_list;
-
-	unsigned plugged:1;
-	struct list_head plugged_list;
-
 	int addr;
 
-	spinlock_t submitting_lock;
 	struct list_head submitting_list;
+	spinlock_t submitting_lock;
 };
 
 usbif_t *usbif_alloc(domid_t domid, unsigned int handle);
 void usbif_disconnect(usbif_t *usbif);
 void usbif_free(usbif_t *usbif);
-int usbif_map(usbif_t *usbif, unsigned long shared_page, unsigned int evtchn);
+int usbif_map(usbif_t *usbif, unsigned long urb_ring_ref,
+		unsigned long conn_ring_ref, unsigned int evtchn);
 
 #define usbif_get(_b) (atomic_inc(&(_b)->refcnt))
 #define usbif_put(_b) \
 	do { \
 		if (atomic_dec_and_test(&(_b)->refcnt)) \
-		wake_up(&(_b)->waiting_to_free); \
+			wake_up(&(_b)->waiting_to_free); \
 	} while (0)
 
+usbif_t *find_usbif(domid_t domid, unsigned int handle);
 int usbback_xenbus_init(void);
 void usbback_xenbus_exit(void);
-
+struct vusb_port_id *find_portid_by_busid(const char *busid);
+struct vusb_port_id *find_portid(const domid_t domid,
+						const unsigned int handle,
+						const int portnum);
+int portid_add(const char *busid,
+					const domid_t domid,
+					const unsigned int handle,
+					const int portnum);
+int portid_remove(const domid_t domid,
+					const unsigned int handle,
+					const int portnum);
 irqreturn_t usbbk_be_int(int irq, void *dev_id);
 int usbbk_schedule(void *arg);
 struct usbstub *find_attached_device(usbif_t *usbif, int port);
-struct usbstub *find_grabbed_device(int dom_id, int dev_id, int port);
-usbif_t *find_usbif(int dom_id, int dev_id);
-void usbback_reconfigure(usbif_t *usbif);
-void usbbk_plug_device(usbif_t *usbif, struct usbstub *stub);
-void usbbk_unplug_device(usbif_t *usbif, struct usbstub *stub);
+void usbbk_attach_device(usbif_t *usbif, struct usbstub *stub);
+void usbbk_detach_device(usbif_t *usbif, struct usbstub *stub);
+void usbbk_hotplug_notify(usbif_t *usbif, int portnum, int speed);
 void detach_device_without_lock(usbif_t *usbif, struct usbstub *stub);
 void usbbk_unlink_urbs(struct usbstub *stub);
 

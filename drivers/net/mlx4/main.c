@@ -789,7 +789,7 @@ static int mlx4_init_hca(struct mlx4_dev *dev)
 	return 0;
 
 err_close:
-	mlx4_close_hca(dev);
+	mlx4_CLOSE_HCA(dev, 0);
 
 err_free_icm:
 	mlx4_free_icms(dev);
@@ -1073,16 +1073,10 @@ static int __mlx4_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto err_disable_pdev;
 	}
 
-	err = pci_request_region(pdev, 0, DRV_NAME);
+	err = pci_request_regions(pdev, DRV_NAME);
 	if (err) {
-		dev_err(&pdev->dev, "Cannot request control region, aborting.\n");
+		dev_err(&pdev->dev, "Couldn't get PCI resources, aborting\n");
 		goto err_disable_pdev;
-	}
-
-	err = pci_request_region(pdev, 2, DRV_NAME);
-	if (err) {
-		dev_err(&pdev->dev, "Cannot request UAR region, aborting.\n");
-		goto err_release_bar0;
 	}
 
 	pci_set_master(pdev);
@@ -1093,7 +1087,7 @@ static int __mlx4_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 		err = pci_set_dma_mask(pdev, DMA_BIT_MASK(32));
 		if (err) {
 			dev_err(&pdev->dev, "Can't set PCI DMA mask, aborting.\n");
-			goto err_release_bar2;
+			goto err_release_regions;
 		}
 	}
 	err = pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(64));
@@ -1104,7 +1098,7 @@ static int __mlx4_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 		if (err) {
 			dev_err(&pdev->dev, "Can't set consistent PCI DMA mask, "
 				"aborting.\n");
-			goto err_release_bar2;
+			goto err_release_regions;
 		}
 	}
 
@@ -1113,7 +1107,7 @@ static int __mlx4_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 		dev_err(&pdev->dev, "Device struct alloc failed, "
 			"aborting.\n");
 		err = -ENOMEM;
-		goto err_release_bar2;
+		goto err_release_regions;
 	}
 
 	dev       = &priv->dev;
@@ -1208,11 +1202,8 @@ err_cmd:
 err_free_dev:
 	kfree(priv);
 
-err_release_bar2:
-	pci_release_region(pdev, 2);
-
-err_release_bar0:
-	pci_release_region(pdev, 0);
+err_release_regions:
+	pci_release_regions(pdev);
 
 err_disable_pdev:
 	pci_disable_device(pdev);
@@ -1268,8 +1259,7 @@ static void mlx4_remove_one(struct pci_dev *pdev)
 			pci_disable_msix(pdev);
 
 		kfree(priv);
-		pci_release_region(pdev, 2);
-		pci_release_region(pdev, 0);
+		pci_release_regions(pdev);
 		pci_disable_device(pdev);
 		pci_set_drvdata(pdev, NULL);
 	}
@@ -1292,6 +1282,7 @@ static struct pci_device_id mlx4_pci_table[] = {
 	{ PCI_VDEVICE(MELLANOX, 0x6372) }, /* MT25458 ConnectX EN 10GBASE-T 10GigE */
 	{ PCI_VDEVICE(MELLANOX, 0x675a) }, /* MT25458 ConnectX EN 10GBASE-T+Gen2 10GigE */
 	{ PCI_VDEVICE(MELLANOX, 0x6764) }, /* MT26468 ConnectX EN 10GigE PCIe gen2*/
+	{ PCI_VDEVICE(MELLANOX, 0x676e) }, /* MT26478 ConnectX2 40GigE PCIe gen2 */
 	{ 0, }
 };
 

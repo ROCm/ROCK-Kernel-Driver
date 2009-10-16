@@ -27,6 +27,7 @@
 #include <linux/screen_info.h>
 #include <linux/ioport.h>
 #include <linux/acpi.h>
+#include <linux/sfi.h>
 #include <linux/apm_bios.h>
 #include <linux/initrd.h>
 #include <linux/bootmem.h>
@@ -66,6 +67,7 @@
 
 #include <linux/percpu.h>
 #include <linux/crash_dump.h>
+#include <linux/tboot.h>
 
 #include <video/edid.h>
 
@@ -133,10 +135,6 @@ start_info_t *xen_start_info;
 EXPORT_SYMBOL(xen_start_info);
 #endif
 
-#ifndef ARCH_SETUP
-#define ARCH_SETUP
-#endif
-
 /*
  * end_pfn only includes RAM, while max_pfn_mapped includes all e820 entries.
  * The direct mapping extends to max_pfn_mapped, so that we can directly access
@@ -159,9 +157,9 @@ int default_cpu_present_to_apicid(int mps_cpu)
 	return __default_cpu_present_to_apicid(mps_cpu);
 }
 
-int default_check_phys_apicid_present(int boot_cpu_physical_apicid)
+int default_check_phys_apicid_present(int phys_apicid)
 {
-	return __default_check_phys_apicid_present(boot_cpu_physical_apicid);
+	return __default_check_phys_apicid_present(phys_apicid);
 }
 #endif
 
@@ -198,13 +196,6 @@ static struct resource bss_resource = {
 
 
 #ifdef CONFIG_X86_32
-static struct resource video_ram_resource = {
-	.name	= "Video RAM area",
-	.start	= 0xa0000,
-	.end	= 0xbffff,
-	.flags	= IORESOURCE_BUSY | IORESOURCE_MEM
-};
-
 /* cpu data as detected by the assembly code in head.S */
 struct cpuinfo_x86 new_cpu_data __cpuinitdata = {0, 0, 0, 0, -1, 1, 0, 0, -1};
 /* common cpu data for all cpus */
@@ -665,7 +656,7 @@ static struct resource standard_io_resources[] = {
 		.flags = IORESOURCE_BUSY | IORESOURCE_IO }
 };
 
-static void __init reserve_standard_io_resources(void)
+void __init reserve_standard_io_resources(void)
 {
 	int i;
 
@@ -700,10 +691,6 @@ static int __init setup_elfcorehdr(char *arg)
 }
 early_param("elfcorehdr", setup_elfcorehdr);
 #endif
-
-static struct x86_quirks default_x86_quirks __initdata;
-
-struct x86_quirks *x86_quirks __initdata = &default_x86_quirks;
 
 #ifdef CONFIG_X86_RESERVE_LOW_64K
 static int __init dmi_low_memory_corruption(const struct dmi_system_id *d)
@@ -862,7 +849,7 @@ void __init setup_arch(char **cmdline_p)
 	copy_edid();
 #endif /* CONFIG_XEN */
 
-	ARCH_SETUP
+	x86_init.oem.arch_setup();
 
 	setup_memory_map();
 	parse_setup_data();
@@ -903,6 +890,16 @@ void __init setup_arch(char **cmdline_p)
 	strlcpy(command_line, boot_command_line, COMMAND_LINE_SIZE);
 	*cmdline_p = command_line;
 
+#ifdef CONFIG_X86_64
+	/*
+	 * Must call this twice: Once just to detect whether hardware doesn't
+	 * support NX (so that the early EHCI debug console setup can safely
+	 * call set_fixmap(), and then again after parsing early parameters to
+	 * honor the respective command line option.
+	 */
+	check_efer();
+#endif
+
 	parse_early_param();
 
 #ifdef CONFIG_X86_64
@@ -941,11 +938,9 @@ void __init setup_arch(char **cmdline_p)
 	 * VMware detection requires dmi to be available, so this
 	 * needs to be done after dmi_scan_machine, for the BP.
 	 */
-	init_hypervisor(&boot_cpu_data);
+	init_hypervisor_platform();
 
-#ifdef CONFIG_X86_32
-	probe_roms();
-#endif
+	x86_init.resources.probe_roms();
 
 #ifndef CONFIG_XEN
 	/* after parse_early_param, so could debug it */
@@ -1098,10 +1093,11 @@ void __init setup_arch(char **cmdline_p)
 	kvmclock_init();
 #endif
 
-	xen_pagetable_setup_start(swapper_pg_dir);
+	x86_init.paging.pagetable_setup_start(swapper_pg_dir);
 	paging_init();
-	xen_pagetable_setup_done(swapper_pg_dir);
-	paravirt_post_allocator_init();
+	x86_init.paging.pagetable_setup_done(swapper_pg_dir);
+
+	tboot_probe();
 
 #ifdef CONFIG_X86_64
 	map_vsyscall();
@@ -1275,13 +1271,13 @@ void __init setup_arch(char **cmdline_p)
 	 */
 	acpi_boot_init();
 
-#if defined(CONFIG_X86_MPPARSE) || defined(CONFIG_X86_VISWS)
+	sfi_init();
+
 	/*
 	 * get boot-time SMP configuration:
 	 */
 	if (smp_found_config)
 		get_smp_config();
-#endif
 
 	prefill_possible_map();
 
@@ -1305,10 +1301,7 @@ void __init setup_arch(char **cmdline_p)
 		e820_reserve_resources();
 #endif
 
-#ifdef CONFIG_X86_32
-	request_resource(&iomem_resource, &video_ram_resource);
-#endif
-	reserve_standard_io_resources();
+	x86_init.resources.reserve_resources();
 
 #ifndef CONFIG_XEN
 	e820_setup_gap();
@@ -1338,80 +1331,25 @@ void __init setup_arch(char **cmdline_p)
 #endif
 #endif
 #endif /* CONFIG_XEN */
+	x86_init.oem.banner();
 }
 
-#if defined(CONFIG_X86_32) && !defined(CONFIG_XEN)
+#ifdef CONFIG_X86_32
 
-/**
- * x86_quirk_intr_init - post gate setup interrupt initialisation
- *
- * Description:
- *	Fill in any interrupts that may have been left out by the general
- *	init_IRQ() routine.  interrupts having to do with the machine rather
- *	than the devices on the I/O bus (like APIC interrupts in intel MP
- *	systems) are started here.
- **/
-void __init x86_quirk_intr_init(void)
-{
-	if (x86_quirks->arch_intr_init) {
-		if (x86_quirks->arch_intr_init())
-			return;
-	}
-}
-
-/**
- * x86_quirk_trap_init - initialise system specific traps
- *
- * Description:
- *	Called as the final act of trap_init().  Used in VISWS to initialise
- *	the various board specific APIC traps.
- **/
-void __init x86_quirk_trap_init(void)
-{
-	if (x86_quirks->arch_trap_init) {
-		if (x86_quirks->arch_trap_init())
-			return;
-	}
-}
-
-static struct irqaction irq0  = {
-	.handler = timer_interrupt,
-	.flags = IRQF_DISABLED | IRQF_NOBALANCING | IRQF_IRQPOLL | IRQF_TIMER,
-	.name = "timer"
+static struct resource video_ram_resource = {
+	.name	= "Video RAM area",
+	.start	= 0xa0000,
+	.end	= 0xbffff,
+	.flags	= IORESOURCE_BUSY | IORESOURCE_MEM
 };
 
-/**
- * x86_quirk_pre_time_init - do any specific initialisations before.
- *
- **/
-void __init x86_quirk_pre_time_init(void)
+void __init i386_reserve_resources(void)
 {
-	if (x86_quirks->arch_pre_time_init)
-		x86_quirks->arch_pre_time_init();
+	if (is_initial_xendomain())
+		request_resource(&iomem_resource, &video_ram_resource);
+	reserve_standard_io_resources();
 }
 
-/**
- * x86_quirk_time_init - do any specific initialisations for the system timer.
- *
- * Description:
- *	Must plug the system timer interrupt source at HZ into the IRQ listed
- *	in irq_vectors.h:TIMER_IRQ
- **/
-void __init x86_quirk_time_init(void)
-{
-	if (x86_quirks->arch_time_init) {
-		/*
-		 * A nonzero return code does not mean failure, it means
-		 * that the architecture quirk does not want any
-		 * generic (timer) setup to be performed after this:
-		 */
-		if (x86_quirks->arch_time_init())
-			return;
-	}
-
-	irq0.mask = cpumask_of_cpu(0);
-	setup_irq(0, &irq0);
-}
 #endif /* CONFIG_X86_32 */
 
 #ifdef CONFIG_XEN

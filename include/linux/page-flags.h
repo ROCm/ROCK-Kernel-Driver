@@ -51,6 +51,9 @@
  * PG_buddy is set to indicate that the page is free and in the buddy system
  * (see mm/page_alloc.c).
  *
+ * PG_hwpoison indicates that a page got corrupted in hardware and contains
+ * data with incorrect ECC bits that triggered a machine check. Accessing is
+ * not safe since it may cause another machine check. Don't touch!
  */
 
 /*
@@ -101,16 +104,15 @@ enum pageflags {
 #ifdef CONFIG_HAVE_MLOCKED_PAGE_BIT
 	PG_mlocked,		/* Page is vma mlocked */
 #endif
-#ifdef CONFIG_IA64_UNCACHED_ALLOCATOR
+#ifdef CONFIG_ARCH_USES_PG_UNCACHED
 	PG_uncached,		/* Page has been mapped as uncached */
 #endif
+#ifdef CONFIG_MEMORY_FAILURE
+	PG_hwpoison,		/* hardware poisoned page. Don't touch */
+#endif
 #ifdef CONFIG_XEN
-	PG_pinned,		/* Cannot alias with PG_owner_priv_1 since
-				 * bad_page() checks include this bit.
-				 * Should not use PG_arch_1 as that may have
-				 * a different purpose elsewhere. */
 	PG_foreign,		/* Page is owned by foreign allocator. */
-	PG_netback,		/* Page is owned by netback */
+	/* PG_netback,		   Page is owned by netback */
 	PG_blkback,		/* Page is owned by blkback */
 #endif
 	__NR_PAGEFLAGS,
@@ -124,8 +126,13 @@ enum pageflags {
 	 */
 	PG_fscache = PG_private_2,	/* page backed by cache */
 
-#ifdef CONFIG_PARAVIRT_XEN
 	/* XEN */
+#if defined(CONFIG_XEN)
+	PG_pinned = PG_locked,	/* Cannot alias with PG_owner_priv_1 since
+				 * bad_page() checks should include this bit.
+				 * Should not use PG_arch_1 as that may have
+				 * a different purpose elsewhere. */
+#elif defined(CONFIG_PARAVIRT_XEN)
 	PG_pinned = PG_owner_priv_1,
 	PG_savepinned = PG_dirty,
 #endif
@@ -171,6 +178,10 @@ static inline int TestSetPage##uname(struct page *page)			\
 static inline int TestClearPage##uname(struct page *page)		\
 		{ return test_and_clear_bit(PG_##lname, &page->flags); }
 
+#define __TESTCLEARFLAG(uname, lname)					\
+static inline int __TestClearPage##uname(struct page *page)		\
+		{ return __test_and_clear_bit(PG_##lname, &page->flags); }
+
 #define PAGEFLAGMASK(uname, lname)					\
 static inline int PAGEMASK_##uname(void)				\
 		{ return (1 << PG_##lname); }
@@ -202,6 +213,9 @@ static inline void __ClearPage##uname(struct page *page) {  }
 
 #define TESTCLEARFLAG_FALSE(uname)					\
 static inline int TestClearPage##uname(struct page *page) { return 0; }
+
+#define __TESTCLEARFLAG_FALSE(uname)					\
+static inline int __TestClearPage##uname(struct page *page) { return 0; }
 
 struct page;	/* forward declaration */
 
@@ -274,17 +288,26 @@ PAGEFLAG(Unevictable, unevictable) __CLEARPAGEFLAG(Unevictable, unevictable)
 #ifdef CONFIG_HAVE_MLOCKED_PAGE_BIT
 #define MLOCK_PAGES 1
 PAGEFLAG(Mlocked, mlocked) __CLEARPAGEFLAG(Mlocked, mlocked)
-	TESTSCFLAG(Mlocked, mlocked)
+	TESTSCFLAG(Mlocked, mlocked) __TESTCLEARFLAG(Mlocked, mlocked)
 #else
 #define MLOCK_PAGES 0
-PAGEFLAG_FALSE(Mlocked)
-	SETPAGEFLAG_NOOP(Mlocked) TESTCLEARFLAG_FALSE(Mlocked)
+PAGEFLAG_FALSE(Mlocked) SETPAGEFLAG_NOOP(Mlocked)
+	TESTCLEARFLAG_FALSE(Mlocked) __TESTCLEARFLAG_FALSE(Mlocked)
 #endif
 
-#ifdef CONFIG_IA64_UNCACHED_ALLOCATOR
+#ifdef CONFIG_ARCH_USES_PG_UNCACHED
 PAGEFLAG(Uncached, uncached)
 #else
 PAGEFLAG_FALSE(Uncached)
+#endif
+
+#ifdef CONFIG_MEMORY_FAILURE
+PAGEFLAG(HWPoison, hwpoison)
+TESTSETFLAG(HWPoison, hwpoison)
+#define __PG_HWPOISON (1UL << PG_hwpoison)
+#else
+PAGEFLAG_FALSE(HWPoison)
+#define __PG_HWPOISON 0
 #endif
 
 static inline int PageUptodate(struct page *page)
@@ -350,7 +373,7 @@ static inline void PageForeignDestructor(struct page *page, unsigned int order)
 {
 	((void (*)(struct page *, unsigned int))page->index)(page, order);
 }
-PAGEFLAG(Netback, netback)
+/*PAGEFLAG(Netback, netback)*/
 PAGEFLAG(Blkback, blkback)
 #endif
 
@@ -430,10 +453,8 @@ PAGEFLAG_FALSE(MemError)
 #define __PG_MLOCKED		0
 #endif
 
-#if !defined(CONFIG_XEN)
+#ifndef CONFIG_XEN
 # define __PG_XEN		0
-#elif defined(CONFIG_X86)
-# define __PG_XEN		((1 << PG_pinned) | (1 << PG_foreign))
 #else
 # define __PG_XEN		(1 << PG_foreign)
 #endif
@@ -447,7 +468,8 @@ PAGEFLAG_FALSE(MemError)
 	 1 << PG_private | 1 << PG_private_2 | \
 	 1 << PG_buddy	 | 1 << PG_writeback | 1 << PG_reserved | \
 	 1 << PG_slab	 | 1 << PG_swapcache | 1 << PG_active | \
-	 1 << PG_unevictable | __PG_MLOCKED | __PG_XEN | 1 << PG_waiters)
+	 1 << PG_unevictable | __PG_MLOCKED | __PG_HWPOISON | \
+	 __PG_XEN | 1 << PG_waiters)
 
 /*
  * Flags checked when a page is prepped for return by the page allocator.
@@ -456,8 +478,8 @@ PAGEFLAG_FALSE(MemError)
  */
 #define PAGE_FLAGS_CHECK_AT_PREP	((1 << NR_PAGEFLAGS) - 1)
 
-#endif /* !__GENERATING_BOUNDS_H */
-
+#define PAGE_FLAGS_PRIVATE				\
+	(1 << PG_private | 1 << PG_private_2)
 /**
  * page_has_private - Determine if page has private stuff
  * @page: The page to be checked
@@ -465,8 +487,11 @@ PAGEFLAG_FALSE(MemError)
  * Determine if a page has private stuff, indicating that release routines
  * should be invoked upon it.
  */
-#define page_has_private(page)			\
-	((page)->flags & ((1 << PG_private) |	\
-			  (1 << PG_private_2)))
+static inline int page_has_private(struct page *page)
+{
+	return !!(page->flags & PAGE_FLAGS_PRIVATE);
+}
+
+#endif /* !__GENERATING_BOUNDS_H */
 
 #endif	/* PAGE_FLAGS_H */

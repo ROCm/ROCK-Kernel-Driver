@@ -165,7 +165,8 @@ static int discard_swap(struct swap_info_struct *si)
 		}
 
 		err = blkdev_issue_discard(si->bdev, start_block,
-						nr_blocks, GFP_KERNEL);
+						nr_blocks, GFP_KERNEL,
+						DISCARD_FL_BARRIER);
 		if (err)
 			break;
 
@@ -204,7 +205,8 @@ static void discard_swap_cluster(struct swap_info_struct *si,
 			start_block <<= PAGE_SHIFT - 9;
 			nr_blocks <<= PAGE_SHIFT - 9;
 			if (blkdev_issue_discard(si->bdev, start_block,
-							nr_blocks, GFP_NOIO))
+							nr_blocks, GFP_NOIO,
+							DISCARD_FL_BARRIER))
 				break;
 		}
 
@@ -702,7 +704,7 @@ int free_swap_and_cache(swp_entry_t entry)
 	struct swap_info_struct *p;
 	struct page *page = NULL;
 
-	if (is_migration_entry(entry))
+	if (non_swap_entry(entry))
 		return 1;
 
 	p = swap_info_get(entry);
@@ -1590,9 +1592,9 @@ SYSCALL_DEFINE1(swapoff, const char __user *, specialfile)
 	p->flags &= ~SWP_WRITEOK;
 	spin_unlock(&swap_lock);
 
-	current->flags |= PF_SWAPOFF;
+	current->flags |= PF_OOM_ORIGIN;
 	err = try_to_unuse(type, 0, 0);
-	current->flags &= ~PF_SWAPOFF;
+	current->flags &= ~PF_OOM_ORIGIN;
 
 	if (err) {
 		/* re-insert swap space back into swap_list */
@@ -2001,12 +2003,14 @@ SYSCALL_DEFINE2(swapon, const char __user *, specialfile, int, swap_flags)
 		goto bad_swap;
 	}
 
-	if (blk_queue_nonrot(bdev_get_queue(p->bdev))) {
-		p->flags |= SWP_SOLIDSTATE;
-		p->cluster_next = 1 + (random32() % p->highest_bit);
+	if (p->bdev) {
+		if (blk_queue_nonrot(bdev_get_queue(p->bdev))) {
+			p->flags |= SWP_SOLIDSTATE;
+			p->cluster_next = 1 + (random32() % p->highest_bit);
+		}
+		if (discard_swap(p) == 0)
+			p->flags |= SWP_DISCARDABLE;
 	}
-	if (discard_swap(p) == 0)
-		p->flags |= SWP_DISCARDABLE;
 
 	mutex_lock(&swapon_mutex);
 	spin_lock(&swap_lock);
@@ -2135,7 +2139,7 @@ static int __swap_duplicate(swp_entry_t entry, bool cache)
 	int count;
 	bool has_cache;
 
-	if (is_migration_entry(entry))
+	if (non_swap_entry(entry))
 		return -EINVAL;
 
 	type = swp_type(entry);
@@ -2324,9 +2328,9 @@ void preswap_shrink(unsigned long target_pages)
 		spin_unlock(&swap_lock);
 		if (type < 0)
 			return;
-		current->flags |= PF_SWAPOFF;
+		current->flags |= PF_OOM_ORIGIN;
 		(void)try_to_unuse(type, 1, unuse_pages);
-		current->flags &= ~PF_SWAPOFF;
+		current->flags &= ~PF_OOM_ORIGIN;
 		wrapped++;
 	} while (wrapped <= 3);
 }
@@ -2337,7 +2341,7 @@ void preswap_shrink(unsigned long target_pages)
  * across all swaptypes.  echo N > /sys/proc/vm/preswap attempts to shrink
  * preswap page usage to N (usually 0) */
 int preswap_sysctl_handler(ctl_table *table, int write,
-	struct file *file, void __user *buffer, size_t *length, loff_t *ppos)
+	void __user *buffer, size_t *length, loff_t *ppos)
 {
 	unsigned long npages;
 	int type;
@@ -2356,7 +2360,7 @@ int preswap_sysctl_handler(ctl_table *table, int write,
 	}
 	table->data = &npages;
 	table->maxlen = sizeof(unsigned long);
-	proc_doulongvec_minmax(table, write, file, buffer, length, ppos);
+	proc_doulongvec_minmax(table, write, buffer, length, ppos);
 
 	if (write)
 		preswap_shrink(npages);

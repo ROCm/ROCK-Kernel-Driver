@@ -28,10 +28,7 @@
  */
 #define flush_agp_cache() wbinvd()
 
-/* Convert a physical address to an address suitable for the GART. */
-#define phys_to_gart(x) phys_to_machine(x)
-#define gart_to_phys(x) machine_to_phys(x)
-#define page_to_gart(x) phys_to_gart(page_to_pseudophys(x))
+#define virt_to_gart virt_to_machine
 
 /* GATT allocation. Returns/accepts GATT kernel virtual address. */
 #define alloc_gatt_pages(order)	({                                          \

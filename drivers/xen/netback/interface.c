@@ -158,7 +158,7 @@ static void netbk_get_strings(struct net_device *dev, u32 stringset, u8 * data)
 	}
 }
 
-static struct ethtool_ops network_ethtool_ops =
+static const struct ethtool_ops network_ethtool_ops =
 {
 	.get_drvinfo = netbk_get_drvinfo,
 

@@ -141,7 +141,7 @@ blktap_device_ioctl(struct block_device *bd, fmode_t mode,
 	return 0;
 }
 
-static struct block_device_operations blktap_device_file_operations = {
+static const struct block_device_operations blktap_device_file_operations = {
 	.owner     = THIS_MODULE,
 	.open      = blktap_device_open,
 	.release   = blktap_device_release,

@@ -54,7 +54,7 @@ static void xenhcd_watchdog(unsigned long param)
 	unsigned long flags;
 
 	spin_lock_irqsave(&info->lock, flags);
-	if (HC_IS_RUNNING(info_to_hcd(info)->state)) {
+	if (likely(HC_IS_RUNNING(info_to_hcd(info)->state))) {
 		timer_action_done(info, TIMER_RING_WATCHDOG);
 		xenhcd_giveback_unlinked_urbs(info);
 		xenhcd_kick_pending_urbs(info);
@@ -70,9 +70,10 @@ static int xenhcd_setup(struct usb_hcd *hcd)
 	struct usbfront_info *info = hcd_to_info(hcd);
 
 	spin_lock_init(&info->lock);
-	INIT_LIST_HEAD(&info->pending_urbs);
-	INIT_LIST_HEAD(&info->inprogress_urbs);
-	INIT_LIST_HEAD(&info->unlinked_urbs);
+	INIT_LIST_HEAD(&info->pending_submit_list);
+	INIT_LIST_HEAD(&info->pending_unlink_list);
+	INIT_LIST_HEAD(&info->in_progress_list);
+	INIT_LIST_HEAD(&info->giveback_waiting_list);
 	init_timer(&info->watchdog);
 	info->watchdog.function = xenhcd_watchdog;
 	info->watchdog.data = (unsigned long) info;
@@ -101,68 +102,12 @@ static void xenhcd_stop(struct usb_hcd *hcd)
 	del_timer_sync(&info->watchdog);
 	remove_debug_file(info);
 	spin_lock_irq(&info->lock);
-	/*
-	 * TODO: port power off, cancel all urbs.
-	 */
-
-	if (HC_IS_RUNNING(hcd->state))
-		hcd->state = HC_STATE_HALT;
+	/* cancel all urbs */
+	hcd->state = HC_STATE_HALT;
+	xenhcd_cancel_all_enqueued_urbs(info);
+	xenhcd_giveback_unlinked_urbs(info);
 	spin_unlock_irq(&info->lock);
 }
-
-/*
- * TODO: incomplete suspend/resume functions!
- */
-#if 0
-#ifdef CONFIG_PM
-/*
- * suspend running HC
- */
-static int xenhcd_suspend(struct usb_hcd *hcd, pm_message_t message)
-{
-	struct usbfront_info *info = hcd_to_info(hcd);
-	unsigned long flags;
-	int ret = 0;
-
-	spin_lock_irqsave(&info->lock, flags);
-	if (hcd->state != HC_STATE_SUSPENDED) {
-		ret = -EINVAL;
-		goto done;
-	}
-
-	/*
-	 * TODO:
-	 * 	canceling all transfer, clear all hc queue,
-	 * 	stop kthread,
-	 */
-
-	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
-done:
-	spin_unlock_irqrestore(&info->lock, flags);
-
-	return ret;
-}
-
-/*
- * resume HC
- */
-static int xenhcd_resume(struct usb_hcd *hcd)
-{
-	struct usbfront_info *info = hcd_to_info(hcd);
-	int ret = -EINVAL;
-
-	set_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
-
-	/*
-	 * TODO:
-	 * 	re-init HC.
-	 * 	resume all roothub ports.
-	 */
-
-	return ret;
-}
-#endif
-#endif
 
 /*
  * called as .urb_enqueue()
@@ -197,11 +142,6 @@ done:
 
 /*
  * called as .urb_dequeue()
- *
- * just mark the urb as unlinked
- * if the urb is in pending_urbs, move to unlinked_urbs
- * TODO:
- * 	canceling the urb transfer in backend
  */
 static int xenhcd_urb_dequeue(struct usb_hcd *hcd,
 			      struct urb *urb, int status)
@@ -235,43 +175,55 @@ static int xenhcd_get_frame(struct usb_hcd *hcd)
 	return 0;
 }
 
-/*
- * TODO:
- * suspend/resume whole hcd and roothub
- */
 static const char hcd_name[] = "xen_hcd";
 
-struct hc_driver usbfront_hc_driver = {
+struct hc_driver xen_usb20_hc_driver = {
 	.description = hcd_name,
-	.product_desc = DRIVER_DESC,
+	.product_desc = "Xen USB2.0 Virtual Host Controller",
 	.hcd_priv_size = sizeof(struct usbfront_info),
 	.flags = HCD_USB2,
 
-	/*
-	 * basic HC lifecycle operations
-	 */
+	/* basic HC lifecycle operations */
 	.reset = xenhcd_setup,
 	.start = xenhcd_run,
 	.stop = xenhcd_stop,
-#if 0
-#ifdef CONFIG_PM
-	.suspend = xenhcd_suspend,
-	.resume = xenhcd_resume,
-#endif
-#endif
-	/*
-	 * managing urb I/O
-	 */
+
+	/* managing urb I/O */
 	.urb_enqueue = xenhcd_urb_enqueue,
 	.urb_dequeue = xenhcd_urb_dequeue,
 	.get_frame_number = xenhcd_get_frame,
 
-	/*
-	 * root hub operations
-	 */
+	/* root hub operations */
 	.hub_status_data = xenhcd_hub_status_data,
 	.hub_control = xenhcd_hub_control,
-#if 0
+#ifdef XENHCD_PM
+#ifdef CONFIG_PM
+	.bus_suspend = xenhcd_bus_suspend,
+	.bus_resume = xenhcd_bus_resume,
+#endif
+#endif
+};
+
+struct hc_driver xen_usb11_hc_driver = {
+	.description = hcd_name,
+	.product_desc = "Xen USB1.1 Virtual Host Controller",
+	.hcd_priv_size = sizeof(struct usbfront_info),
+	.flags = HCD_USB11,
+
+	/* basic HC lifecycle operations */
+	.reset = xenhcd_setup,
+	.start = xenhcd_run,
+	.stop = xenhcd_stop,
+
+	/* managing urb I/O */
+	.urb_enqueue = xenhcd_urb_enqueue,
+	.urb_dequeue = xenhcd_urb_dequeue,
+	.get_frame_number = xenhcd_get_frame,
+
+	/* root hub operations */
+	.hub_status_data = xenhcd_hub_status_data,
+	.hub_control = xenhcd_hub_control,
+#ifdef XENHCD_PM
 #ifdef CONFIG_PM
 	.bus_suspend = xenhcd_bus_suspend,
 	.bus_resume = xenhcd_bus_resume,

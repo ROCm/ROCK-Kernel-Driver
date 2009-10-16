@@ -361,8 +361,8 @@ config KDB_CONTINUE_CATASTROPHIC
 	  setting to 2.
 
 config KDB_USB
-	bool "Support for USB Keyboard in KDB (OHCI and/or EHCI only)"
-	depends on KDB && (USB_OHCI_HCD || USB_EHCI_HCD)
+	bool "Support for USB Keyboard in KDB"
+	depends on KDB && (USB_OHCI_HCD || USB_EHCI_HCD || USB_UHCI_HCD)
 	help
 	  If you want to use kdb from USB keyboards then say Y here.  If you
 	  say N then kdb can only be used from a PC (AT) keyboard or a serial

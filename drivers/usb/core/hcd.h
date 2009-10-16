@@ -22,6 +22,9 @@
 #ifdef __KERNEL__
 
 #include <linux/rwsem.h>
+#ifdef CONFIG_KDB_USB
+#include <linux/kdb.h>
+#endif
 
 #define MAX_TOPO_LEVEL		6
 
@@ -267,9 +270,18 @@ struct hc_driver {
 	void	(*reset_bandwidth)(struct usb_hcd *, struct usb_device *);
 		/* Returns the hardware-chosen device address */
 	int	(*address_device)(struct usb_hcd *, struct usb_device *udev);
+		/* Notifies the HCD after a hub descriptor is fetched.
+		 * Will block.
+		 */
+	int	(*update_hub_device)(struct usb_hcd *, struct usb_device *hdev,
+			struct usb_tt *tt, gfp_t mem_flags);
+
 #ifdef CONFIG_KDB_USB
 	/* KDB poll function for this HC */
 	int	(*kdb_poll_char)(struct urb *urb);
+	void	(*kdb_completion)(struct urb *urb);
+	kdb_hc_keyboard_attach_t	kdb_hc_keyboard_attach;
+	kdb_hc_keyboard_detach_t	kdb_hc_keyboard_detach;
 #endif /* CONFIG_KDB_USB */
 };
 

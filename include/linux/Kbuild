@@ -126,6 +126,7 @@ header-y += nfs_mount.h
 header-y += nl80211.h
 header-y += param.h
 header-y += pci_regs.h
+header-y += perf_event.h
 header-y += pfkeyv2.h
 header-y += pg.h
 header-y += phantom.h
@@ -267,6 +268,10 @@ unifdef-y += keyboard.h
 ifneq ($(wildcard $(srctree)/arch/$(SRCARCH)/include/asm/kvm.h \
       		  $(srctree)/include/asm-$(SRCARCH)/kvm.h),)
 unifdef-y += kvm.h
+endif
+ifneq ($(wildcard $(srctree)/arch/$(SRCARCH)/include/asm/kvm_para.h \
+		  $(srctree)/include/asm-$(SRCARCH)/kvm_para.h),)
+unifdef-y += kvm_para.h
 endif
 unifdef-y += llc.h
 unifdef-y += loop.h

@@ -1470,8 +1470,8 @@ static const struct dis386 grps[][8] = {
     { "fxrstor", Ev, XX, XX },
     { "ldmxcsr", Ev, XX, XX },
     { "stmxcsr", Ev, XX, XX },
-    { "(bad)",	XX, XX, XX },
-    { "lfence", OP_0fae, 0, XX, XX },
+    { "xsave",	Ev, XX, XX },
+    { "xrstor", OP_0fae, 0, XX, XX },
     { "mfence", OP_0fae, 0, XX, XX },
     { "clflush", OP_0fae, 0, XX, XX },
   },
@@ -4255,6 +4255,8 @@ OP_0fae (int bytemode, int sizeflag)
 {
   if (mod == 3)
     {
+      if (reg == 5)
+	strcpy (obuf + strlen (obuf) - sizeof ("xrstor") + 1, "lfence");
       if (reg == 7)
 	strcpy (obuf + strlen (obuf) - sizeof ("clflush") + 1, "sfence");
 
@@ -4264,9 +4266,9 @@ OP_0fae (int bytemode, int sizeflag)
 	  return;
 	}
     }
-  else if (reg != 7)
+  else if (reg != 5 && reg != 7)
     {
-      BadOp ();		/* bad clflush */
+      BadOp ();		/* bad xrstor or clflush */
       return;
     }
 

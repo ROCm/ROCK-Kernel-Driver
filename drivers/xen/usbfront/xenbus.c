@@ -45,50 +45,70 @@
 
 #include "usbfront.h"
 
-extern struct hc_driver usbfront_hc_driver;
-extern struct kmem_cache *xenhcd_urbp_cachep;
-extern void xenhcd_rhport_state_change(struct usbfront_info *info,
-					int port, enum usb_device_speed speed);
-extern int xenhcd_schedule(void *arg);
-
 #define GRANT_INVALID_REF 0
 
-static void usbif_free(struct usbfront_info *info)
+static void destroy_rings(struct usbfront_info *info)
 {
-	if (info->ring_ref != GRANT_INVALID_REF) {
-		gnttab_end_foreign_access(info->ring_ref,
-					  (unsigned long)info->ring.sring);
-		info->ring_ref = GRANT_INVALID_REF;
-		info->ring.sring = NULL;
-	}
 	if (info->irq)
 		unbind_from_irqhandler(info->irq, info);
 	info->irq = 0;
+
+	if (info->urb_ring_ref != GRANT_INVALID_REF) {
+		gnttab_end_foreign_access(info->urb_ring_ref,
+					  (unsigned long)info->urb_ring.sring);
+		info->urb_ring_ref = GRANT_INVALID_REF;
+	}
+	info->urb_ring.sring = NULL;
+
+	if (info->conn_ring_ref != GRANT_INVALID_REF) {
+		gnttab_end_foreign_access(info->conn_ring_ref,
+					  (unsigned long)info->conn_ring.sring);
+		info->conn_ring_ref = GRANT_INVALID_REF;
+	}
+	info->conn_ring.sring = NULL;
 }
 
-static int setup_usbring(struct xenbus_device *dev,
+static int setup_rings(struct xenbus_device *dev,
 			   struct usbfront_info *info)
 {
-	usbif_sring_t *sring;
+	usbif_urb_sring_t *urb_sring;
+	usbif_conn_sring_t *conn_sring;
 	int err;
 
-	info->ring_ref= GRANT_INVALID_REF;
+	info->urb_ring_ref = GRANT_INVALID_REF;
+	info->conn_ring_ref = GRANT_INVALID_REF;
 
-	sring = (usbif_sring_t *)get_zeroed_page(GFP_NOIO|__GFP_HIGH);
-	if (!sring) {
-		xenbus_dev_fatal(dev, -ENOMEM, "allocating shared ring");
+	urb_sring = (usbif_urb_sring_t *)get_zeroed_page(GFP_NOIO|__GFP_HIGH);
+	if (!urb_sring) {
+		xenbus_dev_fatal(dev, -ENOMEM, "allocating urb ring");
 		return -ENOMEM;
 	}
-	SHARED_RING_INIT(sring);
-	FRONT_RING_INIT(&info->ring, sring, PAGE_SIZE);
+	SHARED_RING_INIT(urb_sring);
+	FRONT_RING_INIT(&info->urb_ring, urb_sring, PAGE_SIZE);
 
-	err = xenbus_grant_ring(dev, virt_to_mfn(info->ring.sring));
+	err = xenbus_grant_ring(dev, virt_to_mfn(info->urb_ring.sring));
 	if (err < 0) {
-		free_page((unsigned long)sring);
-		info->ring.sring = NULL;
+		free_page((unsigned long)urb_sring);
+		info->urb_ring.sring = NULL;
 		goto fail;
 	}
-	info->ring_ref = err;
+	info->urb_ring_ref = err;
+
+	conn_sring = (usbif_conn_sring_t *)get_zeroed_page(GFP_NOIO|__GFP_HIGH);
+	if (!conn_sring) {
+		xenbus_dev_fatal(dev, -ENOMEM, "allocating conn ring");
+		return -ENOMEM;
+	}
+	SHARED_RING_INIT(conn_sring);
+	FRONT_RING_INIT(&info->conn_ring, conn_sring, PAGE_SIZE);
+
+	err = xenbus_grant_ring(dev, virt_to_mfn(info->conn_ring.sring));
+	if (err < 0) {
+		free_page((unsigned long)conn_sring);
+		info->conn_ring.sring = NULL;
+		goto fail;
+	}
+	info->conn_ring_ref = err;
 
 	err = bind_listening_port_to_irqhandler(
 		dev->otherend_id, xenhcd_int, IRQF_SAMPLE_RANDOM, "usbif", info);
@@ -101,7 +121,7 @@ static int setup_usbring(struct xenbus_device *dev,
 
 	return 0;
 fail:
-	usbif_free(info);
+	destroy_rings(info);
 	return err;
 }
 
@@ -112,7 +132,7 @@ static int talk_to_backend(struct xenbus_device *dev,
 	struct xenbus_transaction xbt;
 	int err;
 
-	err = setup_usbring(dev, info);
+	err = setup_rings(dev, info);
 	if (err)
 		goto out;
 
@@ -123,10 +143,17 @@ again:
 		goto destroy_ring;
 	}
 
-	err = xenbus_printf(xbt, dev->nodename, "ring-ref", "%u",
-			    info->ring_ref);
+	err = xenbus_printf(xbt, dev->nodename, "urb-ring-ref", "%u",
+			    info->urb_ring_ref);
 	if (err) {
-		message = "writing ring-ref";
+		message = "writing urb-ring-ref";
+		goto abort_transaction;
+	}
+
+	err = xenbus_printf(xbt, dev->nodename, "conn-ring-ref", "%u",
+			    info->conn_ring_ref);
+	if (err) {
+		message = "writing conn-ring-ref";
 		goto abort_transaction;
 	}
 
@@ -145,8 +172,6 @@ again:
 		goto destroy_ring;
 	}
 
-	xenbus_switch_state(dev, XenbusStateInitialised);
-
 	return 0;
 
 abort_transaction:
@@ -154,10 +179,37 @@ abort_transaction:
 	xenbus_dev_fatal(dev, err, "%s", message);
 
 destroy_ring:
-	usbif_free(info);
+	destroy_rings(info);
 
 out:
 	return err;
+}
+
+static int connect(struct xenbus_device *dev)
+{
+	struct usbfront_info *info = dev_get_drvdata(&dev->dev);
+
+	usbif_conn_request_t *req;
+	int i, idx, err;
+	int notify;
+
+	err = talk_to_backend(dev, info);
+	if (err)
+		return err;
+
+	/* prepare ring for hotplug notification */
+	for (idx = 0, i = 0; i < USB_CONN_RING_SIZE; i++) {
+		req = RING_GET_REQUEST(&info->conn_ring, idx);
+		req->id = idx;
+		idx++;
+	}
+	info->conn_ring.req_prod_pvt = idx;
+
+	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&info->conn_ring, notify);
+	if (notify)
+		notify_remote_via_irq(info->irq);
+
+	return 0;
 }
 
 static struct usb_hcd *create_hcd(struct xenbus_device *dev)
@@ -165,6 +217,7 @@ static struct usb_hcd *create_hcd(struct xenbus_device *dev)
 	int i;
 	int err = 0;
 	int num_ports;
+	int usb_ver;
 	struct usb_hcd *hcd = NULL;
 	struct usbfront_info *info = NULL;
 
@@ -179,20 +232,38 @@ static struct usb_hcd *create_hcd(struct xenbus_device *dev)
 		return ERR_PTR(-EINVAL);
 	}
 
-	hcd = usb_create_hcd(&usbfront_hc_driver, &dev->dev, dev_name(&dev->dev));
+	err = xenbus_scanf(XBT_NIL, dev->otherend,
+					"usb-ver", "%d", &usb_ver);
+	if (err != 1) {
+		xenbus_dev_fatal(dev, err, "reading usb-ver");
+		return ERR_PTR(-EINVAL);
+	}
+	switch (usb_ver) {
+	case USB_VER_USB11:
+		hcd = usb_create_hcd(&xen_usb11_hc_driver, &dev->dev, dev_name(&dev->dev));
+		break;
+	case USB_VER_USB20:
+		hcd = usb_create_hcd(&xen_usb20_hc_driver, &dev->dev, dev_name(&dev->dev));
+		break;
+	default:
+		xenbus_dev_fatal(dev, err, "invalid usb-ver");
+		return ERR_PTR(-EINVAL);
+	}
 	if (!hcd) {
-		xenbus_dev_fatal(dev, err, "fail to allocate USB host controller");
+		xenbus_dev_fatal(dev, err,
+				"fail to allocate USB host controller");
 		return ERR_PTR(-ENOMEM);
 	}
+
 	info = hcd_to_info(hcd);
 	info->xbdev = dev;
 	info->rh_numports = num_ports;
 
-	for (i = 0; i < USB_RING_SIZE; i++) {
-		info->shadow[i].req.id = i+1;
+	for (i = 0; i < USB_URB_RING_SIZE; i++) {
+		info->shadow[i].req.id = i + 1;
 		info->shadow[i].urb = NULL;
 	}
-	info->shadow[USB_RING_SIZE-1].req.id = 0x0fff;
+	info->shadow[USB_URB_RING_SIZE-1].req.id = 0x0fff;
 
 	return hcd;
 }
@@ -211,7 +282,8 @@ static int usbfront_probe(struct xenbus_device *dev,
 	hcd = create_hcd(dev);
 	if (IS_ERR(hcd)) {
 		err = PTR_ERR(hcd);
-		xenbus_dev_fatal(dev, err, "fail to create usb host controller");
+		xenbus_dev_fatal(dev, err,
+				"fail to create usb host controller");
 		goto fail;
 	}
 
@@ -220,22 +292,19 @@ static int usbfront_probe(struct xenbus_device *dev,
 
 	err = usb_add_hcd(hcd, 0, 0);
 	if (err != 0) {
-		xenbus_dev_fatal(dev, err, "fail to adding USB host controller");
+		xenbus_dev_fatal(dev, err,
+				"fail to adding USB host controller");
 		goto fail;
 	}
 
 	init_waitqueue_head(&info->wq);
 	snprintf(name, TASK_COMM_LEN, "xenhcd.%d", hcd->self.busnum);
 	info->kthread = kthread_run(xenhcd_schedule, info, name);
-        if (IS_ERR(info->kthread)) {
-                err = PTR_ERR(info->kthread);
-                info->kthread = NULL;
-                goto fail;
-        }
-
-	err = talk_to_backend(dev, info);
-	if (err)
+	if (IS_ERR(info->kthread)) {
+		err = PTR_ERR(info->kthread);
+		info->kthread = NULL;
 		goto fail;
+	}
 
 	return 0;
 
@@ -245,58 +314,41 @@ fail:
 	return err;
 }
 
-/*
- * 0=disconnected, 1=low_speed, 2=full_speed, 3=high_speed
- */
-static void usbfront_do_hotplug(struct usbfront_info *info)
+static void usbfront_disconnect(struct xenbus_device *dev)
 {
-	char port_str[8];
-	int i;
-	int err;
-	int state;
+	struct usbfront_info *info = dev_get_drvdata(&dev->dev);
+	struct usb_hcd *hcd = info_to_hcd(info);
 
-	for (i = 1; i <= info->rh_numports; i++) {
-		sprintf(port_str, "port-%d", i);
-		err = xenbus_scanf(XBT_NIL, info->xbdev->otherend,
-					port_str, "%d", &state);
-		if (err == 1)
-			xenhcd_rhport_state_change(info, i, state);
+	usb_remove_hcd(hcd);
+	if (info->kthread) {
+		kthread_stop(info->kthread);
+		info->kthread = NULL;
 	}
+	xenbus_frontend_closed(dev);
 }
 
 static void backend_changed(struct xenbus_device *dev,
 				     enum xenbus_state backend_state)
 {
-	struct usbfront_info *info = dev_get_drvdata(&dev->dev);
-
 	switch (backend_state) {
 	case XenbusStateInitialising:
-	case XenbusStateInitWait:
 	case XenbusStateInitialised:
+	case XenbusStateConnected:
+	case XenbusStateReconfiguring:
+	case XenbusStateReconfigured:
 	case XenbusStateUnknown:
 	case XenbusStateClosed:
 		break;
 
-	case XenbusStateConnected:
-		if (dev->state == XenbusStateConnected)
+	case XenbusStateInitWait:
+		if (dev->state != XenbusStateInitialising)
 			break;
-		if (dev->state == XenbusStateInitialised)
-			usbfront_do_hotplug(info);
+		connect(dev);
 		xenbus_switch_state(dev, XenbusStateConnected);
 		break;
 
 	case XenbusStateClosing:
-		xenbus_frontend_closed(dev);
-		break;
-
-	case XenbusStateReconfiguring:
-		if (dev->state == XenbusStateConnected)
-			xenbus_switch_state(dev, XenbusStateReconfiguring);
-		break;
-
-	case XenbusStateReconfigured:
-		usbfront_do_hotplug(info);
-		xenbus_switch_state(dev, XenbusStateConnected);
+		usbfront_disconnect(dev);
 		break;
 
 	default:
@@ -311,12 +363,7 @@ static int usbfront_remove(struct xenbus_device *dev)
 	struct usbfront_info *info = dev_get_drvdata(&dev->dev);
 	struct usb_hcd *hcd = info_to_hcd(info);
 
-	usb_remove_hcd(hcd);
-	if (info->kthread) {
-		kthread_stop(info->kthread);
-		info->kthread = NULL;
-	}
-	usbif_free(info);
+	destroy_rings(info);
 	usb_put_hcd(hcd);
 
 	return 0;
@@ -360,5 +407,5 @@ module_init(usbfront_init);
 module_exit(usbfront_exit);
 
 MODULE_AUTHOR("");
-MODULE_DESCRIPTION(DRIVER_DESC);
+MODULE_DESCRIPTION("Xen USB Virtual Host Controller driver (usbfront)");
 MODULE_LICENSE("Dual BSD/GPL");

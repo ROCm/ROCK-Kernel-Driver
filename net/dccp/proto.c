@@ -124,7 +124,7 @@ EXPORT_SYMBOL_GPL(dccp_done);
 
 const char *dccp_packet_name(const int type)
 {
-	static const char *dccp_packet_names[] = {
+	static const char *const dccp_packet_names[] = {
 		[DCCP_PKT_REQUEST]  = "REQUEST",
 		[DCCP_PKT_RESPONSE] = "RESPONSE",
 		[DCCP_PKT_DATA]	    = "DATA",
@@ -147,7 +147,7 @@ EXPORT_SYMBOL_GPL(dccp_packet_name);
 
 const char *dccp_state_name(const int state)
 {
-	static char *dccp_state_names[] = {
+	static const char *const dccp_state_names[] = {
 	[DCCP_OPEN]		= "OPEN",
 	[DCCP_REQUESTING]	= "REQUESTING",
 	[DCCP_PARTOPEN]		= "PARTOPEN",
@@ -393,7 +393,7 @@ out:
 EXPORT_SYMBOL_GPL(dccp_ioctl);
 
 static int dccp_setsockopt_service(struct sock *sk, const __be32 service,
-				   char __user *optval, int optlen)
+				   char __user *optval, unsigned int optlen)
 {
 	struct dccp_sock *dp = dccp_sk(sk);
 	struct dccp_service_list *sl = NULL;
@@ -464,7 +464,7 @@ static int dccp_setsockopt_cscov(struct sock *sk, int cscov, bool rx)
 }
 
 static int dccp_setsockopt_ccid(struct sock *sk, int type,
-				char __user *optval, int optlen)
+				char __user *optval, unsigned int optlen)
 {
 	u8 *val;
 	int rc = 0;
@@ -494,7 +494,7 @@ static int dccp_setsockopt_ccid(struct sock *sk, int type,
 }
 
 static int do_dccp_setsockopt(struct sock *sk, int level, int optname,
-		char __user *optval, int optlen)
+		char __user *optval, unsigned int optlen)
 {
 	struct dccp_sock *dp = dccp_sk(sk);
 	int val, err = 0;
@@ -546,7 +546,7 @@ static int do_dccp_setsockopt(struct sock *sk, int level, int optname,
 }
 
 int dccp_setsockopt(struct sock *sk, int level, int optname,
-		    char __user *optval, int optlen)
+		    char __user *optval, unsigned int optlen)
 {
 	if (level != SOL_DCCP)
 		return inet_csk(sk)->icsk_af_ops->setsockopt(sk, level,
@@ -559,7 +559,7 @@ EXPORT_SYMBOL_GPL(dccp_setsockopt);
 
 #ifdef CONFIG_COMPAT
 int compat_dccp_setsockopt(struct sock *sk, int level, int optname,
-			   char __user *optval, int optlen)
+			   char __user *optval, unsigned int optlen)
 {
 	if (level != SOL_DCCP)
 		return inet_csk_compat_setsockopt(sk, level, optname,

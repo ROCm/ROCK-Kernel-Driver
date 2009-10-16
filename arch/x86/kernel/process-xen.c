@@ -9,7 +9,7 @@
 #include <linux/pm.h>
 #include <linux/clockchips.h>
 #include <linux/random.h>
-#include <trace/power.h>
+#include <trace/events/power.h>
 #include <asm/system.h>
 #include <asm/apic.h>
 #include <asm/syscalls.h>
@@ -25,9 +25,6 @@ unsigned long idle_nomwait;
 EXPORT_SYMBOL(idle_nomwait);
 
 struct kmem_cache *task_xstate_cachep;
-
-DEFINE_TRACE(power_start);
-DEFINE_TRACE(power_end);
 
 int arch_dup_task_struct(struct task_struct *dst, struct task_struct *src)
 {
@@ -287,9 +284,7 @@ static inline int hlt_use_halt(void)
  */
 void xen_idle(void)
 {
-	struct power_trace it;
-
-	trace_power_start(&it, POWER_CSTATE, 1);
+	trace_power_start(POWER_CSTATE, 1);
 	current_thread_info()->status &= ~TS_POLLING;
 	/*
 	 * TS_POLLING-cleared state must be visible before we
@@ -302,7 +297,6 @@ void xen_idle(void)
 	else
 		local_irq_enable();
 	current_thread_info()->status |= TS_POLLING;
-	trace_power_end(&it);
 }
 #ifdef CONFIG_APM_MODULE
 EXPORT_SYMBOL(default_idle);
@@ -356,9 +350,7 @@ EXPORT_SYMBOL_GPL(cpu_idle_wait);
  */
 void mwait_idle_with_hints(unsigned long ax, unsigned long cx)
 {
-	struct power_trace it;
-
-	trace_power_start(&it, POWER_CSTATE, (ax>>4)+1);
+	trace_power_start(POWER_CSTATE, (ax>>4)+1);
 	if (!need_resched()) {
 		if (cpu_has(&current_cpu_data, X86_FEATURE_CLFLUSH_MONITOR))
 			clflush((void *)&current_thread_info()->flags);
@@ -368,15 +360,13 @@ void mwait_idle_with_hints(unsigned long ax, unsigned long cx)
 		if (!need_resched())
 			__mwait(ax, cx);
 	}
-	trace_power_end(&it);
 }
 
 /* Default MONITOR/MWAIT with no hints, used for default C1 state */
 static void mwait_idle(void)
 {
-	struct power_trace it;
 	if (!need_resched()) {
-		trace_power_start(&it, POWER_CSTATE, 1);
+		trace_power_start(POWER_CSTATE, 1);
 		if (cpu_has(&current_cpu_data, X86_FEATURE_CLFLUSH_MONITOR))
 			clflush((void *)&current_thread_info()->flags);
 
@@ -386,7 +376,6 @@ static void mwait_idle(void)
 			__sti_mwait(0, 0);
 		else
 			local_irq_enable();
-		trace_power_end(&it);
 	} else
 		local_irq_enable();
 }
@@ -399,13 +388,11 @@ static void mwait_idle(void)
  */
 static void poll_idle(void)
 {
-	struct power_trace it;
-
-	trace_power_start(&it, POWER_CSTATE, 0);
+	trace_power_start(POWER_CSTATE, 0);
 	local_irq_enable();
 	while (!need_resched())
 		cpu_relax();
-	trace_power_end(&it);
+	trace_power_end(0);
 }
 
 #ifndef CONFIG_XEN
@@ -558,10 +545,8 @@ void __init init_c1e_mask(void)
 {
 #ifndef CONFIG_XEN
 	/* If we're using c1e_idle, we need to allocate c1e_mask. */
-	if (pm_idle == c1e_idle) {
-		alloc_cpumask_var(&c1e_mask, GFP_KERNEL);
-		cpumask_clear(c1e_mask);
-	}
+	if (pm_idle == c1e_idle)
+		zalloc_cpumask_var(&c1e_mask, GFP_KERNEL);
 #endif
 }
 

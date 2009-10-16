@@ -16,11 +16,10 @@
 #include <linux/proc_fs.h>
 #include <linux/msi.h>
 #include <linux/smp.h>
+#include <linux/errno.h>
+#include <linux/io.h>
 
 #include <xen/evtchn.h>
-
-#include <asm/errno.h>
-#include <asm/io.h>
 
 #include "pci.h"
 #include "msi.h"
@@ -479,7 +478,7 @@ static int msix_capability_init(struct pci_dev *dev,
  * to determine if MSI/-X are supported for the device. If MSI/-X is
  * supported return 0, else return an error code.
  **/
-static int pci_msi_check_device(struct pci_dev* dev, int nvec, int type)
+static int pci_msi_check_device(struct pci_dev *dev, int nvec, int type)
 {
 	struct pci_bus *bus;
 	int ret;
@@ -496,8 +495,9 @@ static int pci_msi_check_device(struct pci_dev* dev, int nvec, int type)
 	if (nvec < 1)
 		return -ERANGE;
 
-	/* Any bridge which does NOT route MSI transactions from it's
-	 * secondary bus to it's primary bus must set NO_MSI flag on
+	/*
+	 * Any bridge which does NOT route MSI transactions from its
+	 * secondary bus to its primary bus must set NO_MSI flag on
 	 * the secondary pci_bus.
 	 * We expect only arch-specific PCI host bus controller driver
 	 * or quirks for specific PCI bridges to be setting NO_MSI.
@@ -616,7 +616,7 @@ void pci_msi_shutdown(struct pci_dev *dev)
 	dev->msi_enabled = 0;
 }
 
-void pci_disable_msi(struct pci_dev* dev)
+void pci_disable_msi(struct pci_dev *dev)
 {
 	pci_msi_shutdown(dev);
 }
@@ -656,14 +656,14 @@ int pci_msix_table_size(struct pci_dev *dev)
  **/
 extern int pci_frontend_enable_msix(struct pci_dev *dev,
 		struct msix_entry *entries, int nvec);
-int pci_enable_msix(struct pci_dev* dev, struct msix_entry *entries, int nvec)
+int pci_enable_msix(struct pci_dev *dev, struct msix_entry *entries, int nvec)
 {
 	int status, nr_entries;
 	int i, j, temp;
 	struct msi_dev_list *msi_dev_entry = get_msi_dev_pirq_list(dev);
 
 	if (!entries)
- 		return -EINVAL;
+		return -EINVAL;
 
 #ifdef CONFIG_XEN_PCIDEV_FRONTEND
 	if (!is_initial_xendomain()) {
@@ -737,7 +737,7 @@ int pci_enable_msix(struct pci_dev* dev, struct msix_entry *entries, int nvec)
 EXPORT_SYMBOL(pci_enable_msix);
 
 extern void pci_frontend_disable_msix(struct pci_dev* dev);
-void pci_msix_shutdown(struct pci_dev* dev)
+void pci_msix_shutdown(struct pci_dev *dev)
 {
 	if (!pci_msi_enable)
 		return;
@@ -774,7 +774,8 @@ void pci_msix_shutdown(struct pci_dev* dev)
 	pci_intx_for_msi(dev, 1);
 	dev->msix_enabled = 0;
 }
-void pci_disable_msix(struct pci_dev* dev)
+
+void pci_disable_msix(struct pci_dev *dev)
 {
 	pci_msix_shutdown(dev);
 }
@@ -789,14 +790,14 @@ EXPORT_SYMBOL(pci_disable_msix);
  * allocated for this device function, are reclaimed to unused state,
  * which may be used later on.
  **/
-void msi_remove_pci_irq_vectors(struct pci_dev* dev)
+void msi_remove_pci_irq_vectors(struct pci_dev *dev)
 {
 	unsigned long flags;
 	struct msi_dev_list *msi_dev_entry;
 	struct msi_pirq_entry *pirq_entry, *tmp;
 
 	if (!pci_msi_enable || !dev)
- 		return;
+		return;
 
 	msi_dev_entry = get_msi_dev_pirq_list(dev);
 

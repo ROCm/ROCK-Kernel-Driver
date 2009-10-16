@@ -30,7 +30,7 @@
 #define X86_CAPABILITY	new_cpu_data+CPUINFO_x86_capability
 #define X86_VENDOR_ID	new_cpu_data+CPUINFO_x86_vendor_id
 
-.section .text.head,"ax",@progbits
+__HEAD
 #define VIRT_ENTRY_OFFSET 0x0
 .org VIRT_ENTRY_OFFSET
 ENTRY(startup_32)
@@ -121,7 +121,7 @@ ENTRY(hypercall_page)
 /*
  * BSS section
  */
-.section ".bss.page_aligned","wa"
+__PAGE_ALIGNED_BSS
 	.align PAGE_SIZE_asm
 ENTRY(swapper_pg_fixmap)
 	.fill 1024,4,0

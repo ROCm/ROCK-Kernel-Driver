@@ -97,7 +97,7 @@ static struct xlbd_major_info *major_info[NUM_IDE_MAJORS + NUM_SCSI_MAJORS +
 #define XLBD_MAJOR_SCSI_RANGE	XLBD_MAJOR_SCSI_START ... XLBD_MAJOR_VBD_START - 1
 #define XLBD_MAJOR_VBD_RANGE	XLBD_MAJOR_VBD_START ... XLBD_MAJOR_VBD_START + NUM_VBD_MAJORS - 1
 
-static struct block_device_operations xlvbd_block_fops =
+static const struct block_device_operations xlvbd_block_fops =
 {
 	.owner = THIS_MODULE,
 	.open = blkif_open,
@@ -223,20 +223,6 @@ xlvbd_init_blk_queue(struct gendisk *gd, u16 sector_size)
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,29)
 	queue_flag_set_unlocked(QUEUE_FLAG_VIRT, rq);
-#elif LINUX_VERSION_CODE == KERNEL_VERSION(2,6,28)
-	{
-		elevator_t *old_e = rq->elevator;
-
-		if (IS_ERR_VALUE(elevator_init(rq, "noop")))
-			printk(KERN_WARNING "blkfront: "
-			       "Switch elevator failed, use default\n");
-		else
-			elevator_exit(old_e);
-	}
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,10)
-	elevator_init(rq, "noop");
-#else
-	elevator_init(rq, &elevator_noop);
 #endif
 
 	/* Hard sector size and max sectors impersonate the equiv. hardware. */

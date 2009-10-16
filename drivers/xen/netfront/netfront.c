@@ -953,7 +953,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
  	if (np->accel_vif_state.hooks && 
  	    np->accel_vif_state.hooks->start_xmit(skb, dev)) { 
  		/* Fast path has sent this packet */ 
- 		return 0; 
+ 		return NETDEV_TX_OK;
  	} 
 
 	frags += DIV_ROUND_UP(offset + len, PAGE_SIZE);
@@ -1042,12 +1042,12 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	spin_unlock_irq(&np->tx_lock);
 
-	return 0;
+	return NETDEV_TX_OK;
 
  drop:
 	np->stats.tx_dropped++;
 	dev_kfree_skb(skb);
-	return 0;
+	return NETDEV_TX_OK;
 }
 
 static irqreturn_t netif_int(int irq, void *dev_id)
@@ -1872,7 +1872,7 @@ static void netif_uninit(struct net_device *dev)
 	gnttab_free_grant_references(np->gref_rx_head);
 }
 
-static struct ethtool_ops network_ethtool_ops =
+static const struct ethtool_ops network_ethtool_ops =
 {
 	.get_tx_csum = ethtool_op_get_tx_csum,
 	.set_tx_csum = ethtool_op_set_tx_csum,

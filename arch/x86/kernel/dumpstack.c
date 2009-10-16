@@ -15,7 +15,6 @@
 #include <linux/bug.h>
 #include <linux/nmi.h>
 #include <linux/sysfs.h>
-#include <linux/ftrace.h>
 #ifdef CONFIG_KDB
 #include <linux/kdb.h>
 #endif

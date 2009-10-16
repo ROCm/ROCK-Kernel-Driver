@@ -64,9 +64,6 @@
 
 asmlinkage extern void ret_from_fork(void);
 
-DEFINE_PER_CPU(struct task_struct *, current_task) = &init_task;
-EXPORT_PER_CPU_SYMBOL(current_task);
-
 DEFINE_PER_CPU(unsigned long, old_rsp);
 static DEFINE_PER_CPU(unsigned char, is_idle);
 
@@ -402,6 +399,7 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 #ifndef CONFIG_X86_NO_TSS
 	struct tss_struct *tss = &per_cpu(init_tss, cpu);
 #endif
+	bool preload_fpu;
 #if CONFIG_XEN_COMPAT > 0x030002
 	struct physdev_set_iopl iopl_op;
 	struct physdev_set_iobitmap iobmp_op;
@@ -412,8 +410,15 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 #endif
 	multicall_entry_t _mcl[8], *mcl = _mcl;
 
+	/*
+	 * If the task has used fpu the last 5 timeslices, just do a full
+	 * restore of the math state immediately to avoid the trap; the
+	 * chances of needing FPU soon are obviously high now
+	 */
+	preload_fpu = tsk_used_math(next_p) && next_p->fpu_counter > 5;
+
 	/* we're going to use this soon, after a few expensive things */
-	if (next_p->fpu_counter > 5)
+	if (preload_fpu)
 		prefetch(next->xstate);
 
 	/*
@@ -425,11 +430,20 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	 */
 	if (task_thread_info(prev_p)->status & TS_USEDFPU) {
 		__save_init_fpu(prev_p); /* _not_ save_init_fpu() */
-		mcl->op      = __HYPERVISOR_fpu_taskswitch;
-		mcl->args[0] = 1;
-		mcl++;
+		if (!preload_fpu) {
+			mcl->op      = __HYPERVISOR_fpu_taskswitch;
+			mcl->args[0] = 1;
+			mcl++;
+		}
 	} else
 		prev_p->fpu_counter = 0;
+
+	/* Make sure cpu is ready for new context */
+	if (preload_fpu) {
+		mcl->op      = __HYPERVISOR_fpu_taskswitch;
+		mcl->args[0] = 0;
+		mcl++;
+	}
 
 	/*
 	 * Reload sp0.
@@ -550,15 +564,12 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 		     task_thread_info(prev_p)->flags & _TIF_WORK_CTXSW_PREV))
 		__switch_to_xtra(prev_p, next_p);
 
-	/* If the task has used fpu the last 5 timeslices, just do a full
-	 * restore of the math state immediately to avoid the trap; the
-	 * chances of needing FPU soon are obviously high now
-	 *
-	 * tsk_used_math() checks prevent calling math_state_restore(),
-	 * which can sleep in the case of !tsk_used_math()
+	/*
+	 * Preload the FPU context, now that we've determined that the
+	 * task is likely to be using it.
 	 */
-	if (tsk_used_math(next_p) && next_p->fpu_counter > 5)
-		math_state_restore();
+	if (preload_fpu)
+		__math_state_restore();
 	return prev_p;
 }
 

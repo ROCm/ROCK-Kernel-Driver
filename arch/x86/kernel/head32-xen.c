@@ -9,11 +9,25 @@
 #include <linux/start_kernel.h>
 
 #include <asm/setup.h>
-#include <asm/setup_arch.h>
 #include <asm/sections.h>
 #include <asm/e820.h>
-#include <asm/bios_ebda.h>
+#include <asm/page.h>
 #include <asm/trampoline.h>
+#include <asm/apic.h>
+#include <asm/io_apic.h>
+#include <asm/bios_ebda.h>
+
+static void __init i386_default_early_setup(void)
+{
+	/* Initilize 32bit specific setup functions */
+	x86_init.resources.probe_roms = probe_roms;
+	x86_init.resources.reserve_resources = i386_reserve_resources;
+#ifndef CONFIG_XEN
+	x86_init.mpparse.setup_ioapic_ids = setup_ioapic_ids_from_mpc;
+
+	reserve_ebda_region();
+#endif
+}
 
 void __init i386_start_kernel(void)
 {
@@ -31,7 +45,16 @@ void __init i386_start_kernel(void)
 		reserve_early(ramdisk_image, ramdisk_end, "RAMDISK");
 	}
 #endif
-	reserve_ebda_region();
+
+	/* Call the subarch specific early setup function */
+	switch (boot_params.hdr.hardware_subarch) {
+	case X86_SUBARCH_MRST:
+		x86_mrst_early_setup();
+		break;
+	default:
+		i386_default_early_setup();
+		break;
+	}
 #else
 	{
 		int max_cmdline;
@@ -42,6 +65,7 @@ void __init i386_start_kernel(void)
 		boot_command_line[max_cmdline-1] = '\0';
 	}
 
+	i386_default_early_setup();
 	xen_start_kernel();
 #endif
 

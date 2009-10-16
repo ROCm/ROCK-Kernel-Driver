@@ -158,10 +158,22 @@ static int scsi_dh_handler_attach(struct scsi_device *sdev,
 	if (sdev->scsi_dh_data) {
 		if (sdev->scsi_dh_data->scsi_dh != scsi_dh)
 			err = -EBUSY;
-	} else if (scsi_dh->attach)
+		else
+			kref_get(&sdev->scsi_dh_data->kref);
+	} else if (scsi_dh->attach) {
 		err = scsi_dh->attach(sdev);
-
+		if (!err) {
+			kref_init(&sdev->scsi_dh_data->kref);
+			sdev->scsi_dh_data->sdev = sdev;
+		}
+	}
 	return err;
+}
+
+static void __detach_handler (struct kref *kref)
+{
+	struct scsi_dh_data *scsi_dh_data = container_of(kref, struct scsi_dh_data, kref);
+	scsi_dh_data->scsi_dh->detach(scsi_dh_data->sdev);
 }
 
 /*
@@ -185,7 +197,7 @@ static void scsi_dh_handler_detach(struct scsi_device *sdev,
 		scsi_dh = sdev->scsi_dh_data->scsi_dh;
 
 	if (scsi_dh && scsi_dh->detach)
-		scsi_dh->detach(sdev);
+		kref_put(&sdev->scsi_dh_data->kref, __detach_handler);
 }
 
 /*
@@ -512,7 +524,6 @@ int scsi_dh_attach(struct request_queue *q, const char *name)
 
 	if (!err) {
 		err = scsi_dh_handler_attach(sdev, scsi_dh);
-
 		put_device(&sdev->sdev_gendev);
 	}
 	return err;
@@ -531,6 +542,7 @@ void scsi_dh_detach(struct request_queue *q)
 {
 	unsigned long flags;
 	struct scsi_device *sdev;
+	struct scsi_device_handler *scsi_dh = NULL;
 
 	spin_lock_irqsave(q->queue_lock, flags);
 	sdev = q->queuedata;
@@ -541,9 +553,10 @@ void scsi_dh_detach(struct request_queue *q)
 	if (!sdev)
 		return;
 
-	if (sdev->scsi_dh_data)
-		scsi_dh_handler_detach(sdev, sdev->scsi_dh_data->scsi_dh);
-
+	if (sdev->scsi_dh_data) {
+		scsi_dh = sdev->scsi_dh_data->scsi_dh;
+		scsi_dh_handler_detach(sdev, scsi_dh);
+	}
 	put_device(&sdev->sdev_gendev);
 }
 EXPORT_SYMBOL_GPL(scsi_dh_detach);

@@ -258,6 +258,13 @@ config XEN_USB_FRONTEND_HCD_STATS
 	help
 	  Count the transferred urb status and the RING_FULL occurrence.
 
+config XEN_USB_FRONTEND_HCD_PM
+	bool "HCD suspend/resume support (DO NOT USE)"
+	depends on XEN_USB_FRONTEND
+	default n
+	help
+	  Experimental bus suspend/resume feature support.
+
 config XEN_GRANT_DEV
 	tristate "User-space granted page access driver"
 	default XEN_PRIVILEGED_GUEST

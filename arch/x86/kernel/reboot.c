@@ -3,11 +3,13 @@
 #include <linux/init.h>
 #include <linux/pm.h>
 #include <linux/efi.h>
-#include <linux/dmi.h>
 #ifdef CONFIG_KDB
 #include <linux/kdb.h>
 #endif /* CONFIG_KDB */
 #include <linux/kexec.h>
+#include <linux/dmi.h>
+#include <linux/sched.h>
+#include <linux/tboot.h>
 #include <acpi/reboot.h>
 #include <asm/io.h>
 #include <asm/apic.h>
@@ -512,6 +514,8 @@ static void native_machine_emergency_restart(void)
 	if (reboot_emergency)
 		emergency_vmx_disable_all();
 
+	tboot_shutdown(TB_SHUTDOWN_REBOOT);
+
 	/* Tell the BIOS if we want cold or warm reboot */
 	*((unsigned short *)__va(0x472)) = reboot_mode;
 
@@ -646,6 +650,8 @@ static void native_machine_halt(void)
 	/* stop other cpus and apics */
 	machine_shutdown();
 
+	tboot_shutdown(TB_SHUTDOWN_HALT);
+
 	/* stop this cpu */
 	stop_this_cpu(NULL);
 }
@@ -657,6 +663,8 @@ static void native_machine_power_off(void)
 			machine_shutdown();
 		pm_power_off();
 	}
+	/* a fallback in case there is no PM info available */
+	tboot_shutdown(TB_SHUTDOWN_HALT);
 }
 
 struct machine_ops machine_ops = {

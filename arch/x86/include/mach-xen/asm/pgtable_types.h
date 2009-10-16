@@ -334,6 +334,7 @@ static inline pteval_t pte_flags(pte_t pte)
 typedef struct page *pgtable_t;
 
 extern pteval_t __supported_pte_mask;
+extern void set_nx(void);
 extern int nx_enabled;
 
 #define pgprot_writecombine	pgprot_writecombine
@@ -353,14 +354,6 @@ int phys_mem_access_prot_allowed(struct file *file, unsigned long pfn,
 
 /* Install a pte for a particular vaddr in kernel space. */
 void set_pte_vaddr(unsigned long vaddr, pte_t pte);
-
-#ifndef CONFIG_XEN
-extern void native_pagetable_setup_start(pgd_t *base);
-extern void native_pagetable_setup_done(pgd_t *base);
-#else
-static inline void xen_pagetable_setup_start(pgd_t *base) {}
-static inline void xen_pagetable_setup_done(pgd_t *base) {}
-#endif
 
 struct seq_file;
 extern void arch_report_meminfo(struct seq_file *m);

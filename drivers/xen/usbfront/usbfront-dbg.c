@@ -59,7 +59,7 @@ static ssize_t show_statistics(struct device *dev,
 
 	spin_lock_irqsave(&info->lock, flags);
 
-	temp = scnprintf (next, size,
+	temp = scnprintf(next, size,
 			"bus %s, device %s\n"
 			"%s\n"
 			"xenhcd, hcd state %d\n",
@@ -73,7 +73,8 @@ static ssize_t show_statistics(struct device *dev,
 #ifdef XENHCD_STATS
 	temp = scnprintf(next, size,
 		"complete %ld unlink %ld ring_full %ld\n",
-		info->stats.complete, info->stats.unlink, info->stats.ring_full);
+		info->stats.complete, info->stats.unlink,
+		info->stats.ring_full);
 	size -= temp;
 	next += temp;
 #endif
