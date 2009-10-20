@@ -648,6 +648,7 @@ config HPET_EMULATE_RTC
 config DMI
 	default y
 	bool "Enable DMI scanning" if EMBEDDED
+	depends on !XEN_UNPRIVILEGED_GUEST
 	---help---
 	  Enabled scanning of DMI to identify machine quirks. Say Y
 	  here unless you have verified that your setup is not
@@ -2178,7 +2179,9 @@ source "net/Kconfig"
 
 source "drivers/Kconfig"
 
+if !XEN_UNPRIVILEGED_GUEST
 source "drivers/firmware/Kconfig"
+endif
 
 source "fs/Kconfig"
 
