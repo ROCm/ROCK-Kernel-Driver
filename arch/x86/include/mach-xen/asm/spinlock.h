@@ -130,7 +130,7 @@ static __always_inline void __ticket_spin_unlock(raw_spinlock_t *lock)
 		asm(LOCK_PREFIX "xaddl %0, %2\n\t" \
 		    "shldl $16, %0, %3\n\t" \
 		    "cmpw %w3, %w0\n\t" \
-		    "sete %1"
+		    "sete %1" \
 		    : "=&r" (token), "=qm" (free), "+m" (lock->slock), \
 		      "=&g" (tmp) \
 		    : "0" (0x00010000) \
