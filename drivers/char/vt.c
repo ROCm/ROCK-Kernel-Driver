@@ -4066,7 +4066,7 @@ void vcs_scr_writew(struct vc_data *vc, u16 val, u16 *org)
 #ifdef CONFIG_BOOTSPLASH
 void con_remap_def_color(struct vc_data *vc, int new_color)
 {
-       unsigned short *sbuf = vc->vc_screenbuf;
+       unsigned short *sbuf = screenpos(vc, 0, 1);
        unsigned c, len = vc->vc_screenbuf_size >> 1;
        int old_color;
 
@@ -4074,11 +4074,13 @@ void con_remap_def_color(struct vc_data *vc, int new_color)
 	       old_color = vc->vc_def_color << 8;
 	       new_color <<= 8;
 	       while(len--) {
-		       c = *sbuf;
+		       c = scr_readw(sbuf);
 		       if (((c ^ old_color) & 0xf000) == 0)
-			       *sbuf ^= (old_color ^ new_color) & 0xf000;
+			     scr_writew(c ^ ((old_color ^ new_color) & 0xf000), sbuf);
+		       *sbuf ^= (old_color ^ new_color) & 0xf000;
 		       if (((c ^ old_color) & 0x0f00) == 0)
-			       *sbuf ^= (old_color ^ new_color) & 0x0f00;
+			     scr_writew(c ^ ((old_color ^ new_color) & 0x0f00), sbuf);
+		       *sbuf ^= (old_color ^ new_color) & 0x0f00;
 		       sbuf++;
 	       }
 	       new_color >>= 8;

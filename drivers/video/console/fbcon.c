@@ -2072,7 +2072,7 @@ static void fbcon_bmove_rec(struct vc_data *vc, struct display *p, int sy, int s
 #ifdef CONFIG_BOOTSPLASH
 	if (info->splash_data && sy == dy && height == 1) {
 		/* must use slower redraw bmove to keep background pic intact */
-		splash_bmove_redraw(info->splash_data, vc, info, sy, sx, dx, width);
+	    splash_bmove_redraw(vc, info, sy, sx, dx, width);
 		return;
 	}
 #endif
@@ -2323,7 +2323,7 @@ static void fbcon_generic_blank(struct vc_data *vc, struct fb_info *info,
 
 #ifdef CONFIG_BOOTSPLASH
 	if (info->splash_data) {
-		splash_blank(info->splash_data, vc, info, blank);
+		splash_blank(vc, info, blank);
 		return;
 	}
 #endif

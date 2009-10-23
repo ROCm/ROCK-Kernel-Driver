@@ -52,7 +52,7 @@ static void bit_bmove(struct vc_data *vc, struct fb_info *info, int sy,
 
 #ifdef CONFIG_BOOTSPLASH
 	if (info->splash_data) {
-		splash_bmove(info->splash_data, vc, info,
+		splash_bmove(vc, info,
 			sy, sx, dy, dx, height, width);
 		return;
 	}
@@ -75,8 +75,8 @@ static void bit_clear(struct vc_data *vc, struct fb_info *info, int sy,
 
 #ifdef CONFIG_BOOTSPLASH
 	if (info->splash_data) {
-		splash_clear(info->splash_data, vc, info,
-						sy, sx, height, width);
+		splash_clear(vc, info,
+			     sy, sx, height, width);
 		return;
 	}
 #endif
@@ -179,7 +179,7 @@ static void bit_putcs(struct vc_data *vc, struct fb_info *info,
 
 #ifdef CONFIG_BOOTSPLASH
 	if (info->splash_data) {
-		splash_putcs(info->splash_data, vc, info, s, count, yy, xx);
+		splash_putcs(vc, info, s, count, yy, xx);
 		return;
 	}
 #endif
@@ -239,7 +239,7 @@ static void bit_clear_margins(struct vc_data *vc, struct fb_info *info,
 
 #ifdef CONFIG_BOOTSPLASH
 	if (info->splash_data) {
-		splash_clear_margins(info->splash_data, vc, info, bottom_only);
+		splash_clear_margins(vc, info, bottom_only);
 		return;
 	}
 #endif
@@ -412,7 +412,7 @@ static void bit_cursor(struct vc_data *vc, struct fb_info *info, int mode,
 
 #ifdef CONFIG_BOOTSPLASH
 	if (info->splash_data) {
-		splash_cursor(info->splash_data, info, &cursor);
+		splash_cursor(info, &cursor);
 		ops->cursor_reset = 0;
 		return;
 	}

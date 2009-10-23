@@ -182,10 +182,7 @@ static void vesafb_destroy(struct fb_info *info)
 	framebuffer_release(info);
 }
 
-#ifndef CONFIG_BOOTSPLASH
-static
-#endif
-struct fb_ops vesafb_ops = {
+static struct fb_ops vesafb_ops = {
 	.owner		= THIS_MODULE,
 	.fb_destroy     = vesafb_destroy,
 	.fb_setcolreg	= vesafb_setcolreg,
@@ -270,9 +267,6 @@ static int __init vesafb_probe(struct platform_device *dev)
 	 *                 option to simply use size_total as that
 	 *                 wastes plenty of kernel address space. */
 	size_remap  = size_vmode * 2;
-#ifdef CONFIG_BOOTSPLASH
-	size_remap *= 2;	/* some more for the images */
-#endif
 	if (vram_remap)
 		size_remap = vram_remap * 1024 * 1024;
 	if (size_remap < size_vmode)

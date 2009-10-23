@@ -86,6 +86,7 @@ static void initcol __P((PREC[][64]));
 
 static void col221111 __P((int *, unsigned char *, int));
 static void col221111_16 __P((int *, unsigned char *, int));
+static void col221111_32 __P((int *, unsigned char *, int));
 
 /*********************************/
 
@@ -369,6 +370,9 @@ struct jpeg_decdata *decdata;
 			idct(decdata->dcts + 320, decdata->out + 320, decdata->dquant[2], IFIX(0.5), max[5]);
 
 			switch (depth) {
+			case 32:
+				col221111_32(decdata->out, pic + (my * 16 * mcusx + mx) * 16 * 4, mcusx * 16 * 4);
+				break;
 			case 24:
 				col221111(decdata->out, pic + (my * 16 * mcusx + mx) * 16 * 3, mcusx * 16 * 3);
 				break;
@@ -882,6 +886,15 @@ PREC q[][64];
 #endif
 #endif
 
+#define PIC_32(yin, xin, p, xout)		\
+(						\
+  y = outy[(yin) * 8 + xin],			\
+  STORECLAMP(p[(xout) * 4 + 0], y + cr),	\
+  STORECLAMP(p[(xout) * 4 + 1], y - cg),	\
+  STORECLAMP(p[(xout) * 4 + 2], y + cb),	\
+  p[(xout) * 4 + 3] = 0				\
+)
+
 #define PIC221111(xin)						\
 (								\
   CBCRCG(0, xin),						\
@@ -898,6 +911,15 @@ PREC q[][64];
   PIC_16(xin / 4 * 8 + 0, (xin & 3) * 2 + 1, pic0, xin * 2 + 1, 0),     \
   PIC_16(xin / 4 * 8 + 1, (xin & 3) * 2 + 0, pic1, xin * 2 + 0, 1),     \
   PIC_16(xin / 4 * 8 + 1, (xin & 3) * 2 + 1, pic1, xin * 2 + 1, 2)      \
+)
+
+#define PIC221111_32(xin)					\
+(								\
+  CBCRCG(0, xin),						\
+  PIC_32(xin / 4 * 8 + 0, (xin & 3) * 2 + 0, pic0, xin * 2 + 0),\
+  PIC_32(xin / 4 * 8 + 0, (xin & 3) * 2 + 1, pic0, xin * 2 + 1),\
+  PIC_32(xin / 4 * 8 + 1, (xin & 3) * 2 + 0, pic1, xin * 2 + 0),\
+  PIC_32(xin / 4 * 8 + 1, (xin & 3) * 2 + 1, pic1, xin * 2 + 1)	\
 )
 
 static void col221111(out, pic, width)
@@ -946,6 +968,34 @@ int width;
 		for (j = 4; j > 0; j--) {
 			for (k = 0; k < 8; k++) {
 			    PIC221111_16(k);
+			}
+			outc += 8;
+			outy += 16;
+			pic0 += 2 * width;
+			pic1 += 2 * width;
+		}
+		outy += 64 * 2 - 16 * 4;
+	}
+}
+
+static void col221111_32(out, pic, width)
+int *out;
+unsigned char *pic;
+int width;
+{
+	int i, j, k;
+	unsigned char *pic0, *pic1;
+	int *outy, *outc;
+	int cr, cg, cb, y;
+
+	pic0 = pic;
+	pic1 = pic + width;
+	outy = out;
+	outc = out + 64 * 4;
+	for (i = 2; i > 0; i--) {
+		for (j = 4; j > 0; j--) {
+			for (k = 0; k < 8; k++) {
+				PIC221111_32(k);
 			}
 			outc += 8;
 			outy += 16;
