@@ -9403,7 +9403,7 @@ void __init sched_init(void)
 #endif /* CONFIG_USER_SCHED */
 #endif /* CONFIG_GROUP_SCHED */
 
-#ifdef CONFIG_FAIR_GROUP_SCHED
+#if defined CONFIG_FAIR_GROUP_SCHED && defined CONFIG_SMP
 	update_shares_data = __alloc_percpu(nr_cpu_ids * sizeof(unsigned long),
 					    __alignof__(unsigned long));
 #endif
