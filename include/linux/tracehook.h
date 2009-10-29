@@ -163,8 +163,6 @@ static inline int tracehook_unsafe_exec(struct task_struct *task)
 		else
 			unsafe |= LSM_UNSAFE_PTRACE;
 	}
-	if (unlikely(task_utrace_flags(task)))
-		unsafe |= utrace_unsafe_exec(task);
 	return unsafe;
 }
 
@@ -183,8 +181,6 @@ static inline struct task_struct *tracehook_tracer_task(struct task_struct *tsk)
 {
 	if (task_ptrace(tsk) & PT_PTRACED)
 		return rcu_dereference(tsk->parent);
-	if (unlikely(task_utrace_flags(tsk)))
-		return utrace_tracer_task(tsk);
 	return NULL;
 }
 
@@ -329,6 +325,9 @@ static inline void tracehook_report_clone_complete(int trace,
 						   pid_t pid,
 						   struct task_struct *child)
 {
+	if (unlikely(task_utrace_flags(current) & UTRACE_EVENT(CLONE)) &&
+	    (clone_flags & CLONE_VFORK))
+		utrace_finish_vfork(current);
 	if (unlikely(trace))
 		ptrace_event(0, trace, pid);
 }
@@ -363,11 +362,10 @@ static inline void tracehook_report_vfork_done(struct task_struct *child,
  */
 static inline void tracehook_prepare_release_task(struct task_struct *task)
 {
-#ifdef CONFIG_UTRACE
+	/* see utrace_add_engine() about this barrier */
 	smp_mb();
-	if (task_utrace_struct(task) != NULL)
+	if (task_utrace_flags(task))
 		utrace_release_task(task);
-#endif
 }
 
 /**
@@ -381,25 +379,8 @@ static inline void tracehook_prepare_release_task(struct task_struct *task)
  */
 static inline void tracehook_finish_release_task(struct task_struct *task)
 {
-#ifdef CONFIG_UTRACE
-	int bad = 0;
-#endif
 	ptrace_release_task(task);
-#ifdef CONFIG_UTRACE
 	BUG_ON(task->exit_state != EXIT_DEAD);
-	if (unlikely(task_utrace_struct(task) != NULL)) {
-		/*
-		 * In a race condition, utrace_attach() will temporarily set
-		 * it, but then check @task->exit_state and clear it.  It does
-		 * all this under task_lock(), so we take the lock to check
-		 * that there is really a bug and not just that known race.
-		 */
-		task_lock(task);
-		bad = unlikely(task_utrace_struct(task) != NULL);
-		task_unlock(task);
-	}
-	BUG_ON(bad);
-#endif
 }
 
 /**
@@ -550,6 +531,8 @@ static inline int tracehook_notify_jctl(int notify, int why)
  */
 static inline void tracehook_finish_jctl(void)
 {
+	if (task_utrace_flags(current))
+		utrace_finish_jctl();
 }
 
 #define DEATH_REAP			-1
@@ -572,9 +555,7 @@ static inline void tracehook_finish_jctl(void)
 static inline int tracehook_notify_death(struct task_struct *task,
 					 void **death_cookie, int group_dead)
 {
-#ifdef CONFIG_UTRACE
 	*death_cookie = task_utrace_struct(task);
-#endif
 
 	if (task_detached(task))
 		return task->ptrace ? SIGCHLD : DEATH_REAP;
@@ -612,12 +593,20 @@ static inline void tracehook_report_death(struct task_struct *task,
 					  int signal, void *death_cookie,
 					  int group_dead)
 {
-#ifdef CONFIG_UTRACE
+	/*
+	 * This barrier ensures that our caller's setting of
+	 * @task->exit_state precedes checking @task->utrace_flags here.
+	 * If utrace_set_events() was just called to enable
+	 * UTRACE_EVENT(DEATH), then we are obliged to call
+	 * utrace_report_death() and not miss it.  utrace_set_events()
+	 * uses tasklist_lock to synchronize enabling the bit with the
+	 * actual change to @task->exit_state, but we need this barrier
+	 * to be sure we see a flags change made just before our caller
+	 * took the tasklist_lock.
+	 */
 	smp_mb();
-	if (task_utrace_flags(task) & (UTRACE_EVENT(DEATH) |
-				       UTRACE_EVENT(QUIESCE)))
+	if (task_utrace_flags(task) & _UTRACE_DEATH_EVENTS)
 		utrace_report_death(task, death_cookie, group_dead, signal);
-#endif
 }
 
 #ifdef TIF_NOTIFY_RESUME
@@ -653,6 +642,12 @@ static inline void set_notify_resume(struct task_struct *task)
 static inline void tracehook_notify_resume(struct pt_regs *regs)
 {
 	struct task_struct *task = current;
+	/*
+	 * This pairs with the barrier implicit in set_notify_resume().
+	 * It ensures that we read the nonzero utrace_flags set before
+	 * set_notify_resume() was called by utrace setup.
+	 */
+	smp_rmb();
 	if (task_utrace_flags(task))
 		utrace_resume(task, regs);
 }

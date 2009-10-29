@@ -63,7 +63,12 @@
   <para>
     Many engines can be attached to each thread.  When a thread has an
     event, each engine gets a callback if it has set the event flag for
-    that event type.  Engines are called in the order they attached.
+    that event type.  For most events, engines are called in the order they
+    attached.  Engines that attach after the event has occurred do not get
+    callbacks for that event.  This includes any new engines just attached
+    by an existing engine's callback function.  Once the sequence of
+    callbacks for that one event has completed, such new engines are then
+    eligible in the next sequence that starts when there is another event.
   </para>
 
   <para>
@@ -79,6 +84,25 @@
     <constant>UTRACE_STOP</constant> and return from the callback
     quickly.  When your i/o finishes or whatever, you can use
     <function>utrace_control</function> to resume the thread.
+  </para>
+
+  <para>
+    The <constant>UTRACE_EVENT(SYSCALL_ENTRY)</constant> event is a special
+    case.  While other events happen in the kernel when it will return to
+    user mode soon, this event happens when entering the kernel before it
+    will proceed with the work requested from user mode.  Because of this
+    difference, the <function>report_syscall_entry</function> callback is
+    special in two ways.  For this event, engines are called in reverse of
+    the normal order (this includes the <function>report_quiesce</function>
+    call that precedes a <function>report_syscall_entry</function> call).
+    This preserves the semantics that the last engine to attach is called
+    "closest to user mode"--the engine that is first to see a thread's user
+    state when it enters the kernel is also the last to see that state when
+    the thread returns to user mode.  For the same reason, if these
+    callbacks use <constant>UTRACE_STOP</constant> (see the next section),
+    the thread stops immediately after callbacks rather than only when it's
+    ready to return to user mode; when allowed to resume, it will actually
+    attempt the system call indicated by the register values at that time.
   </para>
 
   </sect1>
@@ -213,7 +237,7 @@
   <sect2 id="refcount"><title>Engine and task pointers</title>
   <para>
     The first sort of guarantee concerns the core data structures
-    themselves.  <structname>struct utrace_attached_engine</structname> is
+    themselves.  <structname>struct utrace_engine</structname> is
     a reference-counted data structure.  While you hold a reference, an
     engine pointer will always stay valid so that you can safely pass it to
     any <application>utrace</application> call.  Each call to
@@ -256,7 +280,7 @@
     <function>rcu_read_lock</function> nor any other lock is held while
     making a callback, it's always guaranteed that the <structname>struct
     task_struct</structname> and the <structname>struct
-    utrace_attached_engine</structname> passed as arguments remain valid
+    utrace_engine</structname> passed as arguments remain valid
     until the callback function returns.
   </para>
 
@@ -321,7 +345,7 @@
     <function>report_death</function> or <function>report_reap</function>
     callback will try to do the same.  <constant>utrace_detach</constant>
     returns <constant>-ESRCH</constant> when the <structname>struct
-    utrace_attached_engine</structname> has already been detached, but is
+    utrace_engine</structname> has already been detached, but is
     still a valid pointer because of its reference count.  A tracing engine
     can use this to safely synchronize its own independent multiple threads
     of control with each other and with its event callbacks that detach.
@@ -380,7 +404,7 @@
     <function>utrace_set_events</function> call (these do not block), you can
     call <function>utrace_barrier</function> to block until callbacks have
     finished.  This returns <constant>-ESRCH</constant> only if the engine is
-    completely detached (finished all callbacks).  Otherwise returns it waits
+    completely detached (finished all callbacks).  Otherwise it waits
     until the thread is definitely not in the midst of a callback to this
     engine and then returns zero, but can return
     <constant>-ERESTARTSYS</constant> if its wait is interrupted.
