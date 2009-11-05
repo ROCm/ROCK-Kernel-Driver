@@ -153,7 +153,10 @@ static int pcpu_reserved_chunk_limit;
  *
  * During allocation, pcpu_alloc_mutex is kept locked all the time and
  * pcpu_lock is grabbed and released as necessary.  All actual memory
- * allocations are done using GFP_KERNEL with pcpu_lock released.
+ * allocations are done using GFP_KERNEL with pcpu_lock released.  In
+ * general, percpu memory can't be allocated with irq off but
+ * irqsave/restore are still used in alloc path so that it can be used
+ * from early init path - sched_init() specifically.
  *
  * Free path accesses and alters only the index data structures, so it
  * can be safely called from atomic context.  When memory needs to be

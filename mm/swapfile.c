@@ -1166,8 +1166,7 @@ static int try_to_unuse(unsigned int type, unsigned int preswap,
 				} else
 					retval = unuse_mm(mm, entry, page);
 
-				if (set_start_mm &&
-				    swap_count(*swap_map) < swcount) {
+				if (set_start_mm && *swap_map < swcount) {
 					mmput(new_start_mm);
 					atomic_inc(&mm->mm_users);
 					new_start_mm = mm;

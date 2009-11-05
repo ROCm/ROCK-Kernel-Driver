@@ -1506,12 +1506,8 @@ config SECCOMP_DISABLE_TSC
 	  If you care most about performance say N. Say Y only if you're
 	  paranoid about covert channels.
 
-config CC_STACKPROTECTOR_ALL
-	bool
-
 config CC_STACKPROTECTOR
 	bool "Enable -fstack-protector buffer overflow detection (EXPERIMENTAL)"
-	select CC_STACKPROTECTOR_ALL
 	---help---
 	  This option turns on the -fstack-protector GCC feature. This
 	  feature puts, at the beginning of functions, a canary value on
