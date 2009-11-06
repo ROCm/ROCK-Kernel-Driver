@@ -180,7 +180,6 @@ void xen_smp_send_stop(void)
 irqreturn_t smp_reschedule_interrupt(int irq, void *dev_id)
 {
 	inc_irq_stat(irq_resched_count);
-	run_local_timers();
 	return IRQ_HANDLED;
 }
 

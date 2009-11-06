@@ -208,16 +208,6 @@ flush_tlb_kernel_page(unsigned long kvaddr)
 #endif
 }
 
-static void
-blktap_device_end_dequeued_request(struct blktap_device *dev,
-				   struct request *req, int uptodate, int ret)
-{
-	spin_lock_irq(&dev->lock);
-	ret = __blk_end_request(req, ret, blk_rq_bytes(req));
-	spin_unlock_irq(&dev->lock);
-	BUG_ON(ret);
-}
-
 /*
  * tap->tap_sem held on entry
  */
@@ -380,12 +370,13 @@ blktap_device_fail_pending_requests(struct blktap *tap)
 
 		BTERR("%u:%u: failing pending %s of %d pages\n",
 		      blktap_device_major, tap->minor,
-		      (request->operation == BLKIF_OP_READ ?
+		      (request->operation == BLKIF_OP_PACKET ?
+		       "packet" : request->operation == BLKIF_OP_READ ?
 		       "read" : "write"), request->nr_pages);
 
 		blktap_unmap(tap, request);
 		req = (struct request *)(unsigned long)request->id;
-		blktap_device_end_dequeued_request(dev, req, 0, -ENODEV);
+		blk_end_request_all(req, -ENODEV);
 		blktap_request_free(tap, request);
 	}
 
@@ -408,16 +399,11 @@ blktap_device_finish_request(struct blktap *tap,
 			     blkif_response_t *res,
 			     struct blktap_request *request)
 {
-	int uptodate;
 	struct request *req;
-	struct blktap_device *dev;
-
-	dev = &tap->device;
 
 	blktap_unmap(tap, request);
 
 	req = (struct request *)(unsigned long)request->id;
-	uptodate = (res->status == BLKIF_RSP_OKAY);
 
 	BTDBG("req %p res status %d operation %d/%d id %lld\n", req,
 	      res->status, res->operation, request->operation,
@@ -426,10 +412,11 @@ blktap_device_finish_request(struct blktap *tap,
 	switch (request->operation) {
 	case BLKIF_OP_READ:
 	case BLKIF_OP_WRITE:
+	case BLKIF_OP_PACKET:
 		if (unlikely(res->status != BLKIF_RSP_OKAY))
 			BTERR("Bad return from device data "
 				"request: %x\n", res->status);
-		blktap_device_end_dequeued_request(dev, req, uptodate,
+		blk_end_request_all(req,
 			res->status == BLKIF_RSP_OKAY ? 0 : -EIO);
 		break;
 	default:
@@ -660,6 +647,8 @@ blktap_device_process_request(struct blktap *tap,
 	blkif_req.handle = 0;
 	blkif_req.operation = rq_data_dir(req) ?
 		BLKIF_OP_WRITE : BLKIF_OP_READ;
+	if (unlikely(blk_pc_request(req)))
+		blkif_req.operation = BLKIF_OP_PACKET;
 
 	request->id        = (unsigned long)req;
 	request->operation = blkif_req.operation;
@@ -726,7 +715,9 @@ blktap_device_process_request(struct blktap *tap,
 	wmb(); /* blktap_poll() reads req_prod_pvt asynchronously */
 	ring->ring.req_prod_pvt++;
 
-	if (rq_data_dir(req)) {
+	if (unlikely(blk_pc_request(req)))
+		tap->stats.st_pk_req++;
+	else if (rq_data_dir(req)) {
 		tap->stats.st_wr_sect += nr_sects;
 		tap->stats.st_wr_req++;
 	} else {
@@ -871,7 +862,7 @@ blktap_device_run_queue(struct blktap *tap)
 		}
 
 		if (blk_barrier_rq(req)) {
-			__blk_end_request_all(req, 0);
+			__blk_end_request_all(req, -EOPNOTSUPP);
 			continue;
 		}
 
@@ -901,7 +892,7 @@ blktap_device_run_queue(struct blktap *tap)
 		if (!err)
 			queued++;
 		else {
-			blktap_device_end_dequeued_request(dev, req, 0, err);
+			blk_end_request_all(req, err);
 			blktap_request_free(tap, request);
 		}
 

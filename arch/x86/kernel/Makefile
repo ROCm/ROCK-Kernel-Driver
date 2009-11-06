@@ -137,3 +137,4 @@ endif
 disabled-obj-$(CONFIG_XEN) := %_uv.o crash.o early-quirks.o hpet.o i8253.o \
 	i8259.o irqinit.o pci-swiotlb.o reboot.o smpboot.o tsc.o tsc_sync.o \
 	uv_%.o vsmp_64.o
+disabled-obj-$(CONFIG_XEN_UNPRIVILEGED_GUEST) += probe_roms_32.o

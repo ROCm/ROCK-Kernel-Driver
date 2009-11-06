@@ -424,6 +424,11 @@ static bool dmi_matches(const struct dmi_system_id *dmi)
 {
 	int i;
 
+#ifdef CONFIG_XEN
+	if (!is_initial_xendomain())
+		return false;
+#endif
+
 	WARN(!dmi_initialized, KERN_ERR "dmi check: not initialized yet.\n");
 
 	for (i = 0; i < ARRAY_SIZE(dmi->matches); i++) {

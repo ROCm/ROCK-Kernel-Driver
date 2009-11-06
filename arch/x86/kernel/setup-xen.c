@@ -929,10 +929,11 @@ void __init setup_arch(char **cmdline_p)
 	if (efi_enabled)
 		efi_init();
 
-	if (is_initial_xendomain())
+	if (is_initial_xendomain()) {
 		dmi_scan_machine();
 
-	dmi_check_system(bad_bios_dmi_table);
+		dmi_check_system(bad_bios_dmi_table);
+	}
 
 	/*
 	 * VMware detection requires dmi to be available, so this

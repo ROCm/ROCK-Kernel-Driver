@@ -15,7 +15,8 @@
  * we don't want to have dependencies between dom0 kernel and
  * xen kernel versions.  Now we have one.  Ouch.
  */
-
+#undef __XEN_PUBLIC_XEN_H__
+#undef __XEN_TOOLS__
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <asm/hypervisor.h>
@@ -26,7 +27,6 @@
 /* stuff copied from xen/interface/domctl.h, which we can't
  * include directly for the reasons outlined above .... */
 
-#define XEN_DOMCTL_get_address_size 36
 typedef struct xen_domctl_address_size {
 	uint32_t size;
 } xen_domctl_address_size_t;
@@ -44,7 +44,7 @@ union xen_domctl {
 			struct xen_domctl_address_size       address_size;
 			uint64_t                             dummy_align;
 			uint8_t                              dummy_pad[128];
-		} u;
+		};
 	} v4;
 
 	/* v5: upstream: xen 3.1 */
@@ -56,7 +56,7 @@ union xen_domctl {
 			struct xen_domctl_address_size       address_size;
 			uint64_aligned_t                     dummy_align;
 			uint8_t                              dummy_pad[128];
-		} u;
+		};
 	} v5;
 };
 
@@ -77,7 +77,7 @@ int xen_guest_address_size(int domid)
 	domctl.v##ver.cmd = XEN_DOMCTL_get_address_size;		\
 	domctl.v##ver.interface_version = low = ver;			\
 	domctl.v##ver.domain = domid;					\
-	ret = hypervisor_domctl(&domctl) ?: domctl.v##ver.u.address_size.size; \
+	ret = hypervisor_domctl(&domctl) ?: domctl.v##ver.address_size.size; \
 	if (ret == 32 || ret == 64) {					\
 		printk("v" #ver " domctl worked ok: dom%d is %d-bit\n",	\
 		       domid, ret);					\
@@ -85,6 +85,7 @@ int xen_guest_address_size(int domid)
 	}								\
 } while (0)
 
+	BUILD_BUG_ON(XEN_DOMCTL_INTERFACE_VERSION > 5);
 	guest_address_size(5);
 #if CONFIG_XEN_COMPAT < 0x030100
 	guest_address_size(4);
@@ -111,3 +112,5 @@ int xen_guest_blkif_protocol(int domid)
 	return BLKIF_PROTOCOL_NATIVE;
 }
 EXPORT_SYMBOL_GPL(xen_guest_blkif_protocol);
+
+MODULE_LICENSE("GPL");

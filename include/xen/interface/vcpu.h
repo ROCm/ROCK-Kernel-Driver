@@ -87,7 +87,7 @@ struct vcpu_runstate_info {
      */
     uint64_t time[4];
 };
-DEFINE_XEN_GUEST_HANDLE_STRUCT(vcpu_runstate_info);
+DEFINE_GUEST_HANDLE_STRUCT(vcpu_runstate_info);
 typedef struct vcpu_runstate_info vcpu_runstate_info_t;
 DEFINE_XEN_GUEST_HANDLE(vcpu_runstate_info_t);
 
@@ -143,7 +143,7 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_register_runstate_memory_area_t);
 struct vcpu_set_periodic_timer {
     uint64_t period_ns;
 };
-DEFINE_XEN_GUEST_HANDLE_STRUCT(vcpu_set_periodic_timer);
+DEFINE_GUEST_HANDLE_STRUCT(vcpu_set_periodic_timer);
 typedef struct vcpu_set_periodic_timer vcpu_set_periodic_timer_t;
 DEFINE_XEN_GUEST_HANDLE(vcpu_set_periodic_timer_t);
 
@@ -157,7 +157,7 @@ struct vcpu_set_singleshot_timer {
     uint64_t timeout_abs_ns;   /* Absolute system time value in nanoseconds. */
     uint32_t flags;            /* VCPU_SSHOTTMR_??? */
 };
-DEFINE_XEN_GUEST_HANDLE_STRUCT(vcpu_set_singleshot_timer);
+DEFINE_GUEST_HANDLE_STRUCT(vcpu_set_singleshot_timer);
 typedef struct vcpu_set_singleshot_timer vcpu_set_singleshot_timer_t;
 DEFINE_XEN_GUEST_HANDLE(vcpu_set_singleshot_timer_t);
 
@@ -181,7 +181,7 @@ struct vcpu_register_vcpu_info {
     uint32_t offset; /* offset within page */
     uint32_t rsvd;   /* unused */
 };
-DEFINE_XEN_GUEST_HANDLE_STRUCT(vcpu_register_vcpu_info);
+DEFINE_GUEST_HANDLE_STRUCT(vcpu_register_vcpu_info);
 typedef struct vcpu_register_vcpu_info vcpu_register_vcpu_info_t;
 DEFINE_XEN_GUEST_HANDLE(vcpu_register_vcpu_info_t);
 

@@ -1095,12 +1095,10 @@ void detach_device_without_lock(usbif_t *usbif, struct usbstub *stub)
 
 static int __init usbback_init(void)
 {
-	int i, rc, mmap_pages;
+	int i, mmap_pages;
+	int err = 0;
 
 	if (!is_running_on_xen())
-		return -ENODEV;
-
-	if (usbstub_init())
 		return -ENODEV;
 
 	mmap_pages = usbif_reqs * USBIF_MAX_SEGMENTS_PER_REQUEST;
@@ -1110,8 +1108,10 @@ static int __init usbback_init(void)
 			mmap_pages, GFP_KERNEL);
 	pending_pages = alloc_empty_pages_and_pagevec(mmap_pages);
 
-	if (!pending_reqs || !pending_grant_handles || !pending_pages)
-		goto out_of_memory;
+	if (!pending_reqs || !pending_grant_handles || !pending_pages) {
+		err = -ENOMEM;
+		goto out_mem;
+	}
 
 	for (i = 0; i < mmap_pages; i++)
 		pending_grant_handles[i] = USBBACK_INVALID_HANDLE;
@@ -1122,21 +1122,23 @@ static int __init usbback_init(void)
 	for (i = 0; i < usbif_reqs; i++)
 		list_add_tail(&pending_reqs[i].free_list, &pending_free);
 
-	rc = usbback_xenbus_init();
-	if (rc)
-		goto fail;
+	err = usbstub_init();
+	if (err)
+		goto out_mem;
+
+	err = usbback_xenbus_init();
+	if (err)
+		goto out_xenbus;
 
 	return 0;
 
- out_of_memory:
-	printk("%s: out of memory\n", __FUNCTION__);
-	rc = -ENOMEM;
- fail:
+out_xenbus:
+	usbstub_exit();
+out_mem:
 	kfree(pending_reqs);
 	kfree(pending_grant_handles);
 	free_empty_pages_and_pagevec(pending_pages, mmap_pages);
-	usbstub_exit();
-	return rc;
+	return err;
 }
 
 static void __exit usbback_exit(void)

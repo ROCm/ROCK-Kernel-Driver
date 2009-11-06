@@ -99,11 +99,6 @@ void __init probe_roms(void)
 	unsigned char c;
 	int i;
 
-#ifdef CONFIG_XEN
-	if (!is_initial_xendomain())
-		return;
-#endif
-
 	/* video rom */
 	upper = adapter_rom_resources[0].start;
 	for (start = video_rom_resource.start; start < upper; start += 2048) {

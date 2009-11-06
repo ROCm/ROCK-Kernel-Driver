@@ -326,12 +326,12 @@ static struct xenbus_driver usbback_driver = {
 	.remove = usbback_remove,
 };
 
-int usbback_xenbus_init(void)
+int __init usbback_xenbus_init(void)
 {
 	return xenbus_register_backend(&usbback_driver);
 }
 
-void usbback_xenbus_exit(void)
+void __exit usbback_xenbus_exit(void)
 {
 	xenbus_unregister_driver(&usbback_driver);
 }

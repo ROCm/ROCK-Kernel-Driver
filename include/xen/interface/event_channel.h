@@ -250,7 +250,7 @@ struct evtchn_op {
         struct evtchn_unmask           unmask;
     } u;
 };
-DEFINE_XEN_GUEST_HANDLE_STRUCT(evtchn_op);
+DEFINE_GUEST_HANDLE_STRUCT(evtchn_op);
 typedef struct evtchn_op evtchn_op_t;
 DEFINE_XEN_GUEST_HANDLE(evtchn_op_t);
 

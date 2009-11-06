@@ -10,14 +10,17 @@
 #define _ASM_X86_XEN_INTERFACE_H
 
 #ifdef __XEN__
-#define __DEFINE_XEN_GUEST_HANDLE(name, type) \
+#define ___DEFINE_XEN_GUEST_HANDLE(name, type) \
     typedef struct { type *p; } __guest_handle_ ## name
 #else
-#define __DEFINE_XEN_GUEST_HANDLE(name, type) \
+#define ___DEFINE_XEN_GUEST_HANDLE(name, type) \
     typedef type * __guest_handle_ ## name
 #endif
 
-#define DEFINE_XEN_GUEST_HANDLE_STRUCT(name) \
+#define __DEFINE_XEN_GUEST_HANDLE(name, type) \
+    ___DEFINE_XEN_GUEST_HANDLE(name, type);   \
+    ___DEFINE_XEN_GUEST_HANDLE(const_##name, const type)
+#define DEFINE_GUEST_HANDLE_STRUCT(name) \
 	__DEFINE_XEN_GUEST_HANDLE(name, struct name)
 #define DEFINE_XEN_GUEST_HANDLE(name) __DEFINE_XEN_GUEST_HANDLE(name, name)
 #define XEN_GUEST_HANDLE(name)        __guest_handle_ ## name
@@ -97,7 +100,7 @@ struct trap_info {
     uint16_t      cs;      /* code selector                                 */
     unsigned long address; /* code offset                                   */
 };
-DEFINE_XEN_GUEST_HANDLE_STRUCT(trap_info);
+DEFINE_GUEST_HANDLE_STRUCT(trap_info);
 
 struct arch_shared_info {
     unsigned long max_pfn;                  /* max pfn that appears in table */
@@ -151,7 +154,7 @@ struct vcpu_guest_context {
     uint64_t      gs_base_user;
 #endif
 };
-DEFINE_XEN_GUEST_HANDLE_STRUCT(vcpu_guest_context);
+DEFINE_GUEST_HANDLE_STRUCT(vcpu_guest_context);
 #endif	/* !__ASSEMBLY__ */
 
 /*

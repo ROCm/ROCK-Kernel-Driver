@@ -288,7 +288,7 @@ struct mmuext_op {
         xen_pfn_t src_mfn;
     } arg2;
 };
-DEFINE_XEN_GUEST_HANDLE_STRUCT(mmuext_op);
+DEFINE_GUEST_HANDLE_STRUCT(mmuext_op);
 typedef struct mmuext_op mmuext_op_t;
 DEFINE_XEN_GUEST_HANDLE(mmuext_op_t);
 #endif
@@ -374,7 +374,7 @@ struct mmu_update {
     uint64_t ptr;       /* Machine address of PTE. */
     uint64_t val;       /* New contents of PTE.    */
 };
-DEFINE_XEN_GUEST_HANDLE_STRUCT(mmu_update);
+DEFINE_GUEST_HANDLE_STRUCT(mmu_update);
 typedef struct mmu_update mmu_update_t;
 DEFINE_XEN_GUEST_HANDLE(mmu_update_t);
 
@@ -391,7 +391,7 @@ struct multicall_entry {
 #endif
     unsigned long args[6];
 };
-DEFINE_XEN_GUEST_HANDLE_STRUCT(multicall_entry);
+DEFINE_GUEST_HANDLE_STRUCT(multicall_entry);
 typedef struct multicall_entry multicall_entry_t;
 DEFINE_XEN_GUEST_HANDLE(multicall_entry_t);
 

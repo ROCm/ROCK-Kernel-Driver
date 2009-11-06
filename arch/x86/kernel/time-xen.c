@@ -389,7 +389,8 @@ unsigned long profile_pc(struct pt_regs *regs)
 #ifdef CONFIG_FRAME_POINTER
 		return *(unsigned long *)(regs->bp + sizeof(long));
 #else
-		unsigned long *sp = (unsigned long *)kernel_stack_pointer(regs);
+		unsigned long *sp =
+			(unsigned long *)kernel_stack_pointer(regs);
 
 		/*
 		 * Return address is either directly at stack pointer

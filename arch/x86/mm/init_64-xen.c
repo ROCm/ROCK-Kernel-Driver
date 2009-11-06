@@ -796,8 +796,7 @@ void __init xen_finish_init_mapping(void)
 
 	/* Unpin the no longer used Xen provided page tables. */
 	mmuext.cmd = MMUEXT_UNPIN_TABLE;
-	mmuext.arg1.mfn = pfn_to_mfn(__pa(xen_start_info->pt_base)
-				     >> PAGE_SHIFT);
+	mmuext.arg1.mfn = virt_to_mfn(xen_start_info->pt_base);
 	if (HYPERVISOR_mmuext_op(&mmuext, 1, NULL, DOMID_SELF))
 		BUG();
 

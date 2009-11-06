@@ -100,15 +100,14 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 
 		/* Re-load page tables: load_cr3(next->pgd) */
 		op->cmd = MMUEXT_NEW_BASEPTR;
-		op->arg1.mfn = pfn_to_mfn(__pa(next->pgd) >> PAGE_SHIFT);
+		op->arg1.mfn = virt_to_mfn(next->pgd);
 		op++;
 
 		/* xen_new_user_pt(next->pgd) */
 #ifdef CONFIG_X86_64
 		op->cmd = MMUEXT_NEW_USER_BASEPTR;
 		upgd = __user_pgd(next->pgd);
-		op->arg1.mfn = likely(upgd)
-			       ? pfn_to_mfn(__pa(upgd) >> PAGE_SHIFT) : 0;
+		op->arg1.mfn = likely(upgd) ? virt_to_mfn(upgd) : 0;
 		op++;
 #endif
 

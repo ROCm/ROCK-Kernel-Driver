@@ -50,7 +50,7 @@
 #endif
 
 /* Allow co-existing Linux 2.6.23+ Xen interface definitions. */
-#define DEFINE_XEN_GUEST_HANDLE_STRUCT(name) struct name
+#define DEFINE_GUEST_HANDLE_STRUCT(name) struct name
 
 #if defined(__i386__)
 #include "xen-x86_32.h"

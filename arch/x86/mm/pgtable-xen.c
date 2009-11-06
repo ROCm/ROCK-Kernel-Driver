@@ -129,7 +129,7 @@ void ___pud_free_tlb(struct mmu_gather *tlb, pud_t *pud)
 static void _pin_lock(struct mm_struct *mm, int lock) {
 	if (lock)
 		spin_lock(&mm->page_table_lock);
-#if NR_CPUS >= CONFIG_SPLIT_PTLOCK_CPUS
+#if USE_SPLIT_PTLOCKS
 	/* While mm->page_table_lock protects us against insertions and
 	 * removals of higher level page table pages, it doesn't protect
 	 * against updates of pte-s. Such updates, however, require the

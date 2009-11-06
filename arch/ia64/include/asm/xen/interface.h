@@ -59,7 +59,7 @@
 #define __DEFINE_XEN_GUEST_HANDLE(name, type)	\
 	typedef struct { type *p; } __guest_handle_ ## name
 
-#define DEFINE_XEN_GUEST_HANDLE_STRUCT(name)	\
+#define DEFINE_GUEST_HANDLE_STRUCT(name)	\
 	__DEFINE_XEN_GUEST_HANDLE(name, struct name)
 #define DEFINE_XEN_GUEST_HANDLE(name)	__DEFINE_XEN_GUEST_HANDLE(name, name)
 #define XEN_GUEST_HANDLE(name)		__guest_handle_ ## name

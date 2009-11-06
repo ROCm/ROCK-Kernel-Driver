@@ -415,7 +415,6 @@ asmlinkage void __irq_entry evtchn_do_upcall(struct pt_regs *regs)
 		percpu_write(upcall_count, 0);
 	} while (unlikely(count != 1));
 
-	run_local_timers();
 	irq_exit();
 	set_irq_regs(old_regs);
 }

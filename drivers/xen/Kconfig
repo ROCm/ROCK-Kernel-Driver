@@ -28,6 +28,9 @@ config XEN_PRIVCMD
 	def_bool y
 	depends on PROC_FS
 
+config XEN_DOMCTL
+	tristate
+
 config XEN_XENBUS_DEV
 	def_bool y
 	depends on PROC_FS
@@ -47,6 +50,7 @@ config XEN_BLKDEV_BACKEND
 	tristate "Block-device backend driver"
         depends on XEN_BACKEND
 	default XEN_BACKEND
+	select XEN_DOMCTL
 	help
 	  The block-device backend driver allows the kernel to export its
 	  block devices to other guests via a high-performance shared-memory
@@ -56,6 +60,7 @@ config XEN_BLKDEV_TAP
 	tristate "Block-device tap backend driver"
 	depends on XEN_BACKEND
 	default XEN_BACKEND
+	select XEN_DOMCTL
 	help
 	  The block tap driver is an alternative to the block back driver
 	  and allows VM block requests to be redirected to userspace through
@@ -339,6 +344,9 @@ choice
 	config XEN_COMPAT_030300_AND_LATER
 		bool "3.3.0 and later"
 
+	config XEN_COMPAT_030400_AND_LATER
+		bool "3.4.0 and later"
+
 	config XEN_COMPAT_LATEST_ONLY
 		bool "no compatibility code"
 
@@ -347,6 +355,7 @@ endchoice
 config XEN_COMPAT
 	hex
 	default 0xffffff if XEN_COMPAT_LATEST_ONLY
+	default 0x030400 if XEN_COMPAT_030400_AND_LATER
 	default 0x030300 if XEN_COMPAT_030300_AND_LATER
 	default 0x030200 if XEN_COMPAT_030200_AND_LATER
 	default 0x030100 if XEN_COMPAT_030100_AND_LATER

@@ -67,7 +67,7 @@
 struct sched_shutdown {
     unsigned int reason; /* SHUTDOWN_* */
 };
-DEFINE_XEN_GUEST_HANDLE_STRUCT(sched_shutdown);
+DEFINE_GUEST_HANDLE_STRUCT(sched_shutdown);
 typedef struct sched_shutdown sched_shutdown_t;
 DEFINE_XEN_GUEST_HANDLE(sched_shutdown_t);
 
@@ -82,7 +82,7 @@ struct sched_poll {
     unsigned int nr_ports;
     uint64_t timeout;
 };
-DEFINE_XEN_GUEST_HANDLE_STRUCT(sched_poll);
+DEFINE_GUEST_HANDLE_STRUCT(sched_poll);
 typedef struct sched_poll sched_poll_t;
 DEFINE_XEN_GUEST_HANDLE(sched_poll_t);
 

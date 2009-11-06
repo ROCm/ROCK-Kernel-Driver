@@ -6,6 +6,7 @@
  */
 #include <linux/module.h>
 #include <linux/init.h>
+#include <linux/irq.h>
 #include <linux/pci.h>
 #include <asm/acpi.h>
 #include <asm/pci_x86.h>
@@ -15,6 +16,7 @@ static int pcifront_enable_irq(struct pci_dev *dev)
 {
 	u8 irq;
 	pci_read_config_byte(dev, PCI_INTERRUPT_LINE, &irq);
+	irq_to_desc_alloc_node(irq, numa_node_id());
 	evtchn_register_pirq(irq);
 	dev->irq = irq;
 

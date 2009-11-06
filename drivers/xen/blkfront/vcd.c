@@ -75,7 +75,7 @@ static void submit_message(struct blkfront_info *info, void *sp)
 	req->flags |= REQ_BLOCK_PC;
 #endif
 	req->__sector = 0;
-	req->__data_len = 512;
+	req->__data_len = PAGE_SIZE;
 	req->timeout = 60*HZ;
 
 	blk_execute_rq(req->q, info->gd, req, 1);
