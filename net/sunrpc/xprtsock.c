@@ -2309,7 +2309,7 @@ static struct rpc_xprt *xs_setup_xprt(struct xprt_create *args,
 	xprt = &new->xprt;
 
 	xprt->max_reqs = slot_table_size;
-	xprt->slot = kcalloc(xprt->max_reqs, sizeof(struct rpc_rqst), GFP_KERNEL);
+	xprt->slot = kcalloc(xprt->max_reqs, sizeof(struct rpc_rqst), GFP_KERNEL | __GFP_REPEAT);
 	if (xprt->slot == NULL) {
 		kfree(xprt);
 		dprintk("RPC:       xs_setup_xprt: couldn't allocate slot "
