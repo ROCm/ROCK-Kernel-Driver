@@ -59,7 +59,7 @@ void ima_file_free(struct file *file)
 		       "%s: %s open/free imbalance (r:%ld w:%ld o:%ld f:%ld)\n",
 		       __FUNCTION__, file->f_dentry->d_name.name,
 		       iint->readcount, iint->writecount,
-		       iint->opencount, atomic_long_read(&file->f_count));
+		       iint->opencount, file->f_count);
 		if (!(iint->flags & IMA_IINT_DUMP_STACK)) {
 			dump_stack();
 			iint->flags |= IMA_IINT_DUMP_STACK;

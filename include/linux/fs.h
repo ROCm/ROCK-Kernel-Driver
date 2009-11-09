@@ -921,9 +921,10 @@ struct file {
 #define f_dentry	f_path.dentry
 #define f_vfsmnt	f_path.mnt
 	const struct file_operations	*f_op;
-	spinlock_t		f_lock;  /* f_ep_links, f_flags, no IRQ */
-	atomic_long_t		f_count;
+	/* f_lock protects f_count, f_ep_links, f_flags, no IRQ */
+	spinlock_t		f_lock;
 	unsigned int 		f_flags;
+	long			f_count;
 	fmode_t			f_mode;
 	loff_t			f_pos;
 	struct fown_struct	f_owner;
@@ -950,8 +951,24 @@ extern spinlock_t files_lock;
 #define file_list_lock() spin_lock(&files_lock);
 #define file_list_unlock() spin_unlock(&files_lock);
 
-#define get_file(x)	atomic_long_inc(&(x)->f_count)
-#define file_count(x)	atomic_long_read(&(x)->f_count)
+static inline void get_file(struct file *f)
+{
+	spin_lock(&f->f_lock);
+	f->f_count++;
+	spin_unlock(&f->f_lock);
+}
+
+static inline int file_dec_and_test(struct file *f)
+{
+	int ret;
+
+	spin_lock(&f->f_lock);
+	f->f_count--;
+	ret = (f->f_count == 0);
+	spin_unlock(&f->f_lock);
+
+	return ret;
+}
 
 #ifdef CONFIG_DEBUG_WRITECOUNT
 static inline void file_take_write(struct file *f)
