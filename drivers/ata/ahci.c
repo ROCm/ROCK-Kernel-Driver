@@ -2743,6 +2743,37 @@ static bool ahci_sb600_enable_64bit(struct pci_dev *pdev)
 	}
 }
 
+static void ahci_aspire_3810t_workaround(struct ata_host *host)
+{
+	static const struct dmi_system_id sysids[] = {
+		/*
+		 * Aspire 3810T issues a bunch of SATA enable commands
+		 * via _GTF including an invalid one and one which is
+		 * rejected by the device.  Among the successful ones
+		 * is FPDMA non-zero offset enable which when enabled
+		 * only on the drive side leads to NCQ command
+		 * failures.  Disable NCQ.
+		 */
+		{
+			.ident = "Aspire 3810T",
+			.matches = {
+				DMI_MATCH(DMI_SYS_VENDOR, "Acer"),
+				DMI_MATCH(DMI_PRODUCT_NAME, "Aspire 3810T"),
+			},
+		},
+		{ }
+	};
+	int i;
+
+	if (dmi_check_system(sysids)) {
+		dev_printk(KERN_INFO, host->dev,
+			   "Aspire 3810T detected, disabling NCQ\n");
+
+		for (i = 0; i < host->n_ports; i++)
+			host->ports[i]->flags &= ~ATA_FLAG_NCQ;
+	}
+}
+
 static bool ahci_broken_system_poweroff(struct pci_dev *pdev)
 {
 	static const struct dmi_system_id broken_systems[] = {
@@ -3101,6 +3132,8 @@ static int ahci_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	/* apply gtf filter quirk */
 	ahci_gtf_filter_workaround(host);
+
+	ahci_aspire_3810t_workaround(host);
 
 	/* initialize adapter */
 	rc = ahci_configure_dma_masks(pdev, hpriv->cap & HOST_CAP_64);
