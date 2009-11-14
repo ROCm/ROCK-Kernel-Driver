@@ -116,10 +116,10 @@ void splash_putcs(struct vc_data *vc, struct fb_info *info,
        }
 }
 
-static void splash_renderc(struct fb_info *info, 
-			   int fg_color, int bg_color, 
-			   u8 *src, 
-			   int ypos, int xpos, 
+static void splash_renderc(struct fb_info *info,
+			   int fg_color, int bg_color,
+			   u8 *src,
+			   int ypos, int xpos,
 			   int height, int width)
 {
 	struct splash_data *sd;
@@ -256,9 +256,9 @@ static void splashset(u8 *dst, int height, int width, int dstbytes, u32 bgx, int
 static void splashfill(struct fb_info *info, int sy, int sx, int height, int width) {
         int octpp = (info->var.bits_per_pixel + 1) >> 3;
 
-        splashcopy((u8 *)(info->screen_base + sy * info->fix.line_length + sx * octpp), 
-		   (u8 *)(info->splash_pic + sy * info->splash_pic_stride + sx * octpp), 
-		   height, width, info->fix.line_length, info->splash_pic_stride, 
+        splashcopy((u8 *)(info->screen_base + sy * info->fix.line_length + sx * octpp),
+		   (u8 *)(info->splash_pic + sy * info->splash_pic_stride + sx * octpp),
+		   height, width, info->fix.line_length, info->splash_pic_stride,
 		   octpp);
 }
 
@@ -290,9 +290,9 @@ void splash_clear(struct vc_data *vc, struct fb_info *info, int sy,
 	}
         dst = (u8 *)(info->screen_base + sy * info->fix.line_length + sx * octpp);
 	bgx = ((u32 *)info->pseudo_palette)[bg_color];
-	splashset(dst, 
-		  height, width, 
-		  info->fix.line_length, 
+	splashset(dst,
+		  height, width,
+		  info->fix.line_length,
 		  bgx,
 		  (info->var.bits_per_pixel + 1) >> 3);
 }
@@ -337,28 +337,28 @@ void splash_clear_margins(struct vc_data *vc, struct fb_info *info,
 
 	if (!bottom_only) {
 		/* top margin */
-		splashfill(info, 
-			   0, 
-			   0, 
-			   sd->splash_text_yo, 
+		splashfill(info,
+			   0,
+			   0,
+			   sd->splash_text_yo,
 			   info->var.xres);
 		/* left margin */
-		splashfill(info, 
-			   sd->splash_text_yo, 
-			   0, 
-			   th, 
+		splashfill(info,
+			   sd->splash_text_yo,
+			   0,
+			   th,
 			   sd->splash_text_xo);
 		/* right margin */
-		splashfill(info, 
-			   sd->splash_text_yo, 
-			   sd->splash_text_xo + tw, 
-			   th, 
+		splashfill(info,
+			   sd->splash_text_yo,
+			   sd->splash_text_xo + tw,
+			   th,
 			   info->var.xres - sd->splash_text_xo - tw);
 	}
-	splashfill(info, 
-		   sd->splash_text_yo + th, 
-		   0, 
-		   info->var.yres - sd->splash_text_yo - th, 
+	splashfill(info,
+		   sd->splash_text_yo + th,
+		   0,
+		   info->var.yres - sd->splash_text_yo - th,
 		   info->var.xres);
 }
 
@@ -443,9 +443,9 @@ void splash_blank(struct vc_data *vc, struct fb_info *info, int blank)
 {
         SPLASH_DEBUG();
 	if (blank) {
-		splashset((u8 *)info->screen_base, 
-			  info->var.yres, info->var.xres, 
-			  info->fix.line_length, 
+		splashset((u8 *)info->screen_base,
+			  info->var.yres, info->var.xres,
+			  info->fix.line_length,
 			  0,
 			  (info->var.bits_per_pixel + 1) >> 3);
 	} else {

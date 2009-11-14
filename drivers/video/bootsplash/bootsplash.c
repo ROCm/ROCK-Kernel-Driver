@@ -807,7 +807,7 @@ static struct proc_dir_entry *proc_splash;
 
 static int splash_recolor(struct vc_data *vc)
 {
-	SPLASH_DEBUG();	
+	SPLASH_DEBUG();
 	if (!vc->vc_splash_data)
 	    return -1;
 	if (!vc->vc_splash_data->splash_state)
@@ -824,9 +824,9 @@ static int splash_recolor(struct vc_data *vc)
 static int splash_status(struct vc_data *vc)
 {
 	struct fb_info *info;
-	SPLASH_DEBUG("vc_num: %i",vc->vc_num);	
-	printk(KERN_INFO "bootsplash: status on console %d changed to %s\n", 
-	       vc->vc_num, 
+	SPLASH_DEBUG("vc_num: %i",vc->vc_num);
+	printk(KERN_INFO "bootsplash: status on console %d changed to %s\n",
+	       vc->vc_num,
 	       vc->vc_splash_data && vc->vc_splash_data->splash_state ? "on" : "off");
 
 	info = registered_fb[(int) con2fb_map[vc->vc_num]];
@@ -837,7 +837,7 @@ static int splash_status(struct vc_data *vc)
 	        if (info->splash_data) {
 			con_remap_def_color(vc, info->splash_data->splash_color << 4 | info->splash_data->splash_fg_color);
 			/* vc_resize also calls con_switch which resets yscroll */
-			vc_resize(vc, info->splash_data->splash_text_wi / vc->vc_font.width, 
+			vc_resize(vc, info->splash_data->splash_text_wi / vc->vc_font.width,
 				  info->splash_data->splash_text_he / vc->vc_font.height);
 			if (fg_console == vc->vc_num) {
 				update_region(vc,
@@ -882,7 +882,7 @@ void splash_set_percent(struct vc_data *vc, int pe)
 	struct fbcon_ops *ops;
 	int oldpe;
 
-	SPLASH_DEBUG();	
+	SPLASH_DEBUG();
 
 	if (pe < 0)
 		pe = 0;
@@ -943,7 +943,7 @@ static int splash_write_proc(struct file *file, const char *buffer,
         int new, unit;
 	struct vc_data *vc;
 
-	SPLASH_DEBUG();	
+	SPLASH_DEBUG();
 
 	if (!buffer || !splash_default)
 		return count;
@@ -1024,8 +1024,8 @@ static int splash_write_proc(struct file *file, const char *buffer,
 		int up = -1;
 
 		SPLASH_DEBUG( " BOOTSPL");
-		unit = splash_getraw((unsigned char *)buffer, 
-				     (unsigned char *)buffer + count, 
+		unit = splash_getraw((unsigned char *)buffer,
+				     (unsigned char *)buffer + count,
 				     &up);
 		SPLASH_DEBUG( " unit: %i up: %i",unit,up);
 		if (unit >= 0) {
@@ -1127,8 +1127,8 @@ void splash_init(void)
 		return;
 	vc = vc_cons[INIT_CONSOLE].d;
 	info = registered_fb[(int)con2fb_map[INIT_CONSOLE]];
-	if (!vc 
-	    || !info 
+	if (!vc
+	    || !info
 	    || info->var.bits_per_pixel == 24 /* not tested */
 	    || info->var.bits_per_pixel < 15) /* not supported */
 		return;
@@ -1161,8 +1161,8 @@ void splash_init(void)
 	mem = vmalloc(len);
 	if (mem) {
 		acquire_console_sem();
-		if ((int)sys_read(fd, mem, len) == len 
-		    && splash_getraw((unsigned char *)mem, (unsigned char *)mem + len, (int *)0) == INIT_CONSOLE 
+		if ((int)sys_read(fd, mem, len) == len
+		    && splash_getraw((unsigned char *)mem, (unsigned char *)mem + len, (int *)0) == INIT_CONSOLE
 		    && vc->vc_splash_data)
 			vc->vc_splash_data->splash_state = splash_default & 1;
 		release_console_sem();
