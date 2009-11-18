@@ -536,3 +536,4 @@ void __init usermodehelper_init(void)
 	khelper_wq = create_singlethread_workqueue("khelper");
 	BUG_ON(!khelper_wq);
 }
+rootfs_initcall(usermodehelper_init);
