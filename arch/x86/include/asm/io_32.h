@@ -109,7 +109,9 @@ extern void io_delay_init(void);
 
 #if defined(CONFIG_PARAVIRT)
 #include <asm/paravirt.h>
-#else
+#endif
+
+#ifndef CONFIG_PARAVIRT_CPU
 
 static inline void slow_down_io(void)
 {

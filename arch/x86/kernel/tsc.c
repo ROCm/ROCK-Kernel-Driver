@@ -66,7 +66,7 @@ u64 native_sched_clock(void)
 
 /* We need to define a real function for sched_clock, to override the
    weak default version */
-#ifdef CONFIG_PARAVIRT
+#ifdef CONFIG_PARAVIRT_TIME
 unsigned long long sched_clock(void)
 {
 	return paravirt_sched_clock();

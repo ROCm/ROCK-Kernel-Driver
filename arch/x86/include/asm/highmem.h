@@ -66,7 +66,7 @@ void *kmap_atomic_pfn(unsigned long pfn, enum km_type type);
 void *kmap_atomic_prot_pfn(unsigned long pfn, enum km_type type, pgprot_t prot);
 struct page *kmap_atomic_to_page(void *ptr);
 
-#ifndef CONFIG_PARAVIRT
+#ifndef CONFIG_PARAVIRT_MMU
 #define kmap_atomic_pte(page, type)	kmap_atomic(page, type)
 #endif
 

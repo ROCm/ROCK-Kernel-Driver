@@ -58,9 +58,11 @@ static inline void native_halt(void)
 
 #ifdef CONFIG_PARAVIRT
 #include <asm/paravirt.h>
-#else
+#endif
+
 #ifndef __ASSEMBLY__
 
+#ifndef CONFIG_PARAVIRT_IRQ
 static inline unsigned long __raw_local_save_flags(void)
 {
 	return native_save_fl();
@@ -110,12 +112,17 @@ static inline unsigned long __raw_local_irq_save(void)
 
 	return flags;
 }
-#else
+#endif  /* CONFIG_PARAVIRT_IRQ */
 
+#else   /* __ASSEMBLY__ */
+
+#ifndef CONFIG_PARAVIRT_IRQ
 #define ENABLE_INTERRUPTS(x)	sti
 #define DISABLE_INTERRUPTS(x)	cli
+#endif /* !CONFIG_PARAVIRT_IRQ */
 
 #ifdef CONFIG_X86_64
+#ifndef CONFIG_PARAVIRT_CPU
 #define SWAPGS	swapgs
 /*
  * Currently paravirt can't handle swapgs nicely when we
@@ -128,8 +135,6 @@ static inline unsigned long __raw_local_irq_save(void)
  */
 #define SWAPGS_UNSAFE_STACK	swapgs
 
-#define PARAVIRT_ADJUST_EXCEPTION_FRAME	/*  */
-
 #define INTERRUPT_RETURN	iretq
 #define USERGS_SYSRET64				\
 	swapgs;					\
@@ -141,16 +146,22 @@ static inline unsigned long __raw_local_irq_save(void)
 	swapgs;					\
 	sti;					\
 	sysexit
+#endif /* !CONFIG_PARAVIRT_CPU */
+
+#ifndef CONFIG_PARAVIRT_IRQ
+#define PARAVIRT_ADJUST_EXCEPTION_FRAME	/*  */
+#endif /* !CONFIG_PARAVIRT_IRQ */
 
 #else
+#ifndef CONFIG_PARAVIRT_CPU
 #define INTERRUPT_RETURN		iret
 #define ENABLE_INTERRUPTS_SYSEXIT	sti; sysexit
 #define GET_CR0_INTO_EAX		movl %cr0, %eax
+#endif /* !CONFIG_PARAVIRT_CPU */
 #endif
 
 
 #endif /* __ASSEMBLY__ */
-#endif /* CONFIG_PARAVIRT */
 
 #ifndef __ASSEMBLY__
 #define raw_local_save_flags(flags)				\

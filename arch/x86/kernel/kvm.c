@@ -29,6 +29,7 @@
 #include <linux/hardirq.h>
 #include <asm/timer.h>
 
+#ifdef CONFIG_KVM_MMU
 #define MMU_QUEUE_SIZE 1024
 
 struct kvm_para_state {
@@ -41,13 +42,6 @@ static DEFINE_PER_CPU(struct kvm_para_state, para_state);
 static struct kvm_para_state *kvm_para_state(void)
 {
 	return &per_cpu(para_state, raw_smp_processor_id());
-}
-
-/*
- * No need for any "IO delay" on KVM
- */
-static void kvm_io_delay(void)
-{
 }
 
 static void kvm_mmu_op(void *buffer, unsigned len)
@@ -194,15 +188,18 @@ static void kvm_leave_lazy_mmu(void)
 	mmu_queue_flush(state);
 	paravirt_leave_lazy_mmu();
 }
+#endif  /* CONFIG_KVM_MMU */
 
 static void __init paravirt_ops_setup(void)
 {
+	extern int io_delay_type;
 	pv_info.name = "KVM";
 	pv_info.paravirt_enabled = 1;
 
-	if (kvm_para_has_feature(KVM_FEATURE_NOP_IO_DELAY))
-		pv_cpu_ops.io_delay = kvm_io_delay;
+	/* Disable IO delay */
+	io_delay_type = CONFIG_IO_DELAY_TYPE_NONE;
 
+#ifdef CONFIG_KVM_MMU
 	if (kvm_para_has_feature(KVM_FEATURE_MMU_OP)) {
 		pv_mmu_ops.set_pte = kvm_set_pte;
 		pv_mmu_ops.set_pte_at = kvm_set_pte_at;
@@ -226,6 +223,7 @@ static void __init paravirt_ops_setup(void)
 		pv_mmu_ops.lazy_mode.enter = kvm_enter_lazy_mmu;
 		pv_mmu_ops.lazy_mode.leave = kvm_leave_lazy_mmu;
 	}
+#endif  /* CONFIG_KVM_MMU */
 #ifdef CONFIG_X86_IO_APIC
 	no_timer_check = 1;
 #endif

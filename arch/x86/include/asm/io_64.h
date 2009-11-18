@@ -40,7 +40,7 @@ extern void native_io_delay(void);
 extern int io_delay_type;
 extern void io_delay_init(void);
 
-#if defined(CONFIG_PARAVIRT)
+#if defined(CONFIG_PARAVIRT_CPU)
 #include <asm/paravirt.h>
 #else
 
