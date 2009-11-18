@@ -382,7 +382,7 @@ endif
 
 config X86_VSMP
 	bool "ScaleMP vSMP"
-	select PARAVIRT
+	select PARAVIRT_ALL
 	depends on X86_64 && PCI
 	depends on X86_EXTENDED_PLATFORM
 	---help---
@@ -526,7 +526,7 @@ source "arch/x86/xen/Kconfig"
 
 config VMI
 	bool "VMI Guest support (DEPRECATED)"
-	select PARAVIRT
+	select PARAVIRT_ALL
 	depends on X86_32
 	---help---
 	  VMI provides a paravirtualized interface to the VMware ESX server
@@ -545,7 +545,6 @@ config VMI
 
 config KVM_CLOCK
 	bool "KVM paravirtualized clock"
-	select PARAVIRT
 	select PARAVIRT_CLOCK
 	---help---
 	  Turning on this option will allow you to run a paravirtualized clock
@@ -560,6 +559,19 @@ config KVM_GUEST
 	---help---
 	  This option enables various optimizations for running under the KVM
 	  hypervisor.
+
+config KVM_MMU
+	bool "KVM PV MMU support"
+	depends on KVM_GUEST
+	select PARAVIRT_MMU
+	---help---
+	  This option enables the paravirtualized MMU for KVM. In most cases
+	  it's pretty useless and shouldn't be used.
+
+	  It will only cost you performance, because it drags in pv-ops for
+	  memory management.
+
+	  If in doubt, say N.
 
 source "arch/x86/lguest/Kconfig"
 
@@ -584,8 +596,48 @@ config PARAVIRT_SPINLOCKS
 
 	  If you are unsure how to answer this question, answer N.
 
+config PARAVIRT_CPU
+	bool
+	select PARAVIRT
+	default n
+
+config PARAVIRT_TIME
+	bool
+	select PARAVIRT
+	default n
+
+config PARAVIRT_IRQ
+	bool
+	select PARAVIRT
+	default n
+
+config PARAVIRT_APIC
+	bool
+	select PARAVIRT
+	default n
+
+config PARAVIRT_MMU
+	bool
+	select PARAVIRT
+	default n
+
+#
+# This is a placeholder to activate the old "include all pv-ops functionality"
+# behavior. If you're using this I'd recommend looking through your code to see
+# if you can be more specific. It probably saves you a few cycles!
+#
+config PARAVIRT_ALL
+	bool
+	select PARAVIRT_CPU
+	select PARAVIRT_TIME
+	select PARAVIRT_IRQ
+	select PARAVIRT_APIC
+	select PARAVIRT_MMU
+	default n
+
 config PARAVIRT_CLOCK
 	bool
+	select PARAVIRT_TIME
 	default n
 
 endif

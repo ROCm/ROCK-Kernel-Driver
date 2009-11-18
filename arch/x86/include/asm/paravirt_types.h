@@ -343,12 +343,24 @@ struct paravirt_patch_template {
 
 extern struct pv_info pv_info;
 extern struct pv_init_ops pv_init_ops;
+#ifdef CONFIG_PARAVIRT_TIME
 extern struct pv_time_ops pv_time_ops;
+#endif
+#ifdef CONFIG_PARAVIRT_CPU
 extern struct pv_cpu_ops pv_cpu_ops;
+#endif
+#ifdef CONFIG_PARAVIRT_IRQ
 extern struct pv_irq_ops pv_irq_ops;
+#endif
+#ifdef CONFIG_PARAVIRT_APIC
 extern struct pv_apic_ops pv_apic_ops;
+#endif
+#ifdef CONFIG_PARAVIRT_MMU
 extern struct pv_mmu_ops pv_mmu_ops;
+#endif
+#ifdef CONFIG_PARAVIRT_SPINLOCKS
 extern struct pv_lock_ops pv_lock_ops;
+#endif
 
 #define PARAVIRT_PATCH(x)					\
 	(offsetof(struct paravirt_patch_template, x) / sizeof(void *))

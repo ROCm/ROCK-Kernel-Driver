@@ -6,14 +6,14 @@
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
 #include <asm/paravirt.h>
-#ifndef CONFIG_PARAVIRT
+#ifndef CONFIG_PARAVIRT_MMU
 #include <asm-generic/mm_hooks.h>
 
 static inline void paravirt_activate_mm(struct mm_struct *prev,
 					struct mm_struct *next)
 {
 }
-#endif	/* !CONFIG_PARAVIRT */
+#endif	/* !CONFIG_PARAVIRT_MMU */
 
 /*
  * Used for LDT copy/destruction.

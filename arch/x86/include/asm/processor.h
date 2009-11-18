@@ -571,7 +571,7 @@ static inline void native_swapgs(void)
 #endif
 }
 
-#ifdef CONFIG_PARAVIRT
+#ifdef CONFIG_PARAVIRT_CPU
 #include <asm/paravirt.h>
 #else
 #define __cpuid			native_cpuid

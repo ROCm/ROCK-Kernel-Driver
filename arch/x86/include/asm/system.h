@@ -302,13 +302,18 @@ static inline void native_wbinvd(void)
 
 #ifdef CONFIG_PARAVIRT
 #include <asm/paravirt.h>
-#else
-#define read_cr0()	(native_read_cr0())
-#define write_cr0(x)	(native_write_cr0(x))
+#endif/* CONFIG_PARAVIRT */
+
+#ifndef CONFIG_PARAVIRT_MMU
 #define read_cr2()	(native_read_cr2())
 #define write_cr2(x)	(native_write_cr2(x))
 #define read_cr3()	(native_read_cr3())
 #define write_cr3(x)	(native_write_cr3(x))
+#endif  /* CONFIG_PARAVIRT_MMU */
+
+#ifndef CONFIG_PARAVIRT_CPU
+#define read_cr0()	(native_read_cr0())
+#define write_cr0(x)	(native_write_cr0(x))
 #define read_cr4()	(native_read_cr4())
 #define read_cr4_safe()	(native_read_cr4_safe())
 #define write_cr4(x)	(native_write_cr4(x))
@@ -322,7 +327,7 @@ static inline void native_wbinvd(void)
 /* Clear the 'TS' bit */
 #define clts()		(native_clts())
 
-#endif/* CONFIG_PARAVIRT */
+#endif  /* CONFIG_PARAVIRT_CPU */
 
 #define stts() write_cr0(read_cr0() | X86_CR0_TS)
 

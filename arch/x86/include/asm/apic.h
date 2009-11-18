@@ -86,7 +86,7 @@ static inline bool apic_from_smp_config(void)
 /*
  * Basic functions accessing APICs.
  */
-#ifdef CONFIG_PARAVIRT
+#ifdef CONFIG_PARAVIRT_APIC
 #include <asm/paravirt.h>
 #endif
 

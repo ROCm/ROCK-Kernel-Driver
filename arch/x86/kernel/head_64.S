@@ -20,7 +20,7 @@
 #include <asm/processor-flags.h>
 #include <asm/percpu.h>
 
-#ifdef CONFIG_PARAVIRT
+#ifdef CONFIG_PARAVIRT_MMU
 #include <asm/asm-offsets.h>
 #include <asm/paravirt.h>
 #else
