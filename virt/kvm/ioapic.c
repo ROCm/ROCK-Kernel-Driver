@@ -184,7 +184,8 @@ int kvm_ioapic_set_irq(struct kvm_ioapic *ioapic, int irq, int level)
 
 	if (irq >= 0 && irq < IOAPIC_NUM_PINS) {
 		entry = ioapic->redirtbl[irq];
-		level ^= entry.fields.polarity;
+// polarity is always active high in qemu
+//		level ^= entry.fields.polarity;
 		if (!level)
 			ioapic->irr &= ~mask;
 		else {

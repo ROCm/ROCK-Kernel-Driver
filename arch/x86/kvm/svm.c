@@ -1950,6 +1950,22 @@ static int invlpga_interception(struct vcpu_svm *svm, struct kvm_run *kvm_run)
 	return 1;
 }
 
+static int monitor_interception(struct vcpu_svm *svm, struct kvm_run *kvm_run)
+{
+	svm->next_rip = kvm_rip_read(&svm->vcpu) + 3;
+	skip_emulated_instruction(&svm->vcpu);
+
+	return 1;
+}
+
+static int mwait_interception(struct vcpu_svm *svm, struct kvm_run *kvm_run)
+{
+	svm->next_rip = kvm_rip_read(&svm->vcpu) + 3;
+	skip_emulated_instruction(&svm->vcpu);
+
+	return kvm_emulate_halt(&svm->vcpu);
+}
+
 static int invalid_op_interception(struct vcpu_svm *svm,
 				   struct kvm_run *kvm_run)
 {
@@ -2316,8 +2332,8 @@ static int (*svm_exit_handlers[])(struct vcpu_svm *svm,
 	[SVM_EXIT_CLGI]				= clgi_interception,
 	[SVM_EXIT_SKINIT]			= invalid_op_interception,
 	[SVM_EXIT_WBINVD]                       = emulate_on_interception,
-	[SVM_EXIT_MONITOR]			= invalid_op_interception,
-	[SVM_EXIT_MWAIT]			= invalid_op_interception,
+	[SVM_EXIT_MONITOR]			= monitor_interception,
+	[SVM_EXIT_MWAIT]			= mwait_interception,
 	[SVM_EXIT_NPF]				= pf_interception,
 };
 
