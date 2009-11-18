@@ -1440,8 +1440,8 @@ got_it:
 		}
 
  		/* remember the largest hole we saw so far */
- 		if (addr + guard + mm->cached_hole_size < vma->vm_start)
- 		        mm->cached_hole_size = vma->vm_start - (addr + guard);
+		if (addr + guard + mm->cached_hole_size < vma->vm_start)
+		        mm->cached_hole_size = vma->vm_start - (addr + guard);
 
 		/* try just below the current vma->vm_start */
 		addr = vma->vm_start - (len + guard);

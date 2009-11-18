@@ -191,7 +191,7 @@ lookup_mphys( kernel_vars_t *kv, fault_param_t *pb, const int ebits )
 	ulong ea = (pb->ea & ~0xfff);
 	mSEGREG segr;
 	mac_bat_t *bp;
-       	int sv_mode, i, sbits;
+	int sv_mode, i, sbits;
 	mPTE_t *mpte;
 
 	pb->mpte = NULL;

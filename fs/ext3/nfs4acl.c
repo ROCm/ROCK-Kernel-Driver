@@ -241,7 +241,7 @@ static int
 ext3_xattr_get_nfs4acl(struct inode *inode, const char *name, void *buffer,
 		       size_t buffer_size)
 {
- 	struct nfs4acl *acl;
+	struct nfs4acl *acl;
 	size_t size;
 
 	if (!test_opt(inode->i_sb, NFS4ACL))

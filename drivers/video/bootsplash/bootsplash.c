@@ -847,7 +847,7 @@ static int splash_status(struct vc_data *vc)
 			}
 		}
 	} else {
-	  	/* Switch bootsplash off */
+		/* Switch bootsplash off */
 		con_remap_def_color(vc, 0x07);
 		vc_resize(vc, info->var.xres / vc->vc_font.width, info->var.yres / vc->vc_font.height);
 	}

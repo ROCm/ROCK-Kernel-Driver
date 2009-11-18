@@ -44,7 +44,7 @@ flush_all_PTEs( kernel_vars_t *kv )
 		v = (v>>4) & CTX_MASK;
 
 		if( v >= MMU.first_mol_context && v <= MMU.last_mol_context ) {
- 			*pte = 0;
+			*pte = 0;
 			count++;
 		}
 	}

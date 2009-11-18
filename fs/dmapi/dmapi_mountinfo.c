@@ -129,7 +129,7 @@ dm_query_fsys_for_vector(
 	vecrq.count = 0;
 	vecrq.vecp = NULL;
 
-  	error = -ENOSYS;
+	error = -ENOSYS;
 	ASSERT(dmapiops);
 	if (dmapiops->get_fsys_vector)
 		error = dmapiops->get_fsys_vector(sb, (caddr_t)&vecrq);

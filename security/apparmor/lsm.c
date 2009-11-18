@@ -128,7 +128,7 @@ static int apparmor_sysctl(struct ctl_table *table, int op)
 		int mask;
 
 		mask = 0;
- 		if (op & 4)
+		if (op & 4)
 			mask |= MAY_READ;
 		if (op & 2)
 			mask |= MAY_WRITE;
@@ -369,7 +369,7 @@ static int common_file_perm(const char *op, struct file *file, u16 mask)
 
 	if (!fprofile || !file->f_path.mnt ||
 	    !mediated_filesystem(file->f_path.dentry->d_inode))
- 		return 0;
+		return 0;
 
 	profile = aa_current_profile_wupd();
 	if (profile && ((fprofile != profile) || (mask & ~fcxt->allowed)))

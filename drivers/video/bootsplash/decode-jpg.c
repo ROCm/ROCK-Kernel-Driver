@@ -242,7 +242,7 @@ static int dec_checkmarker(void)
 
 int jpeg_check_size(unsigned char *buf, int width, int height)
 {
-  	datap = buf;
+	datap = buf;
 	getbyte();
 	getbyte();
 	readtables(M_SOF0);
@@ -765,7 +765,7 @@ PREC *qout;
 	for (i = 0; i < 8; i++)
 		for (j = 0; j < 8; j++)
 			qout[zig[i * 8 + j]] = qin[zig[i * 8 + j]] *
-			  			IMULT(aaidct[i], aaidct[j]);
+						IMULT(aaidct[i], aaidct[j]);
 }
 
 static void scaleidctqtab(q, sc)

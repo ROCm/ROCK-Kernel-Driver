@@ -269,7 +269,7 @@ void splash_clear(struct vc_data *vc, struct fb_info *info, int sy,
 	int bgshift = (vc->vc_hi_font_mask) ? 13 : 12;
 	int bg_color = attr_bgcol_ec(bgshift, vc, info);
 	int transparent;
-        int octpp = (info->var.bits_per_pixel + 1) >> 3;
+	int octpp = (info->var.bits_per_pixel + 1) >> 3;
 	u32 bgx;
 	u8 *dst;
 
@@ -303,7 +303,7 @@ void splash_bmove(struct vc_data *vc, struct fb_info *info, int sy,
 	struct splash_data *sd;
 	struct fb_copyarea area;
 
-        if (!oops_in_progress && (console_blanked || info->splash_data->splash_dosilent))
+	if (!oops_in_progress && (console_blanked || info->splash_data->splash_dosilent))
 		return;
 
 	sd = info->splash_data;
@@ -330,7 +330,7 @@ void splash_clear_margins(struct vc_data *vc, struct fb_info *info,
 	unsigned int th = vc->vc_rows*vc->vc_font.height;
 	SPLASH_DEBUG();
 
-        if (!oops_in_progress && (console_blanked || info->splash_data->splash_dosilent))
+	if (!oops_in_progress && (console_blanked || info->splash_data->splash_dosilent))
 		return;
 
 	sd = info->splash_data;
@@ -407,7 +407,7 @@ void splash_bmove_redraw(struct vc_data *vc, struct fb_info *info, int y, int sx
 	int x = dx;
 	unsigned short attr = 1;
 
-        if (console_blanked || info->splash_data->splash_dosilent)
+	if (console_blanked || info->splash_data->splash_dosilent)
 	    return;
 
 	sd = info->splash_data;
