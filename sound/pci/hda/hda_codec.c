@@ -2885,43 +2885,26 @@ static int get_empty_pcm_device(struct hda_bus *bus, int type)
 	static const char *dev_name[HDA_PCM_NTYPES] = {
 		"Audio", "SPDIF", "HDMI", "Modem"
 	};
-	/* starting device index for each PCM type */
-	static int dev_idx[HDA_PCM_NTYPES] = {
-		[HDA_PCM_TYPE_AUDIO] = 0,
-		[HDA_PCM_TYPE_SPDIF] = 1,
-		[HDA_PCM_TYPE_HDMI] = 3,
-		[HDA_PCM_TYPE_MODEM] = 6
+	/* audio device indices; not linear to keep compatibility */
+	static int audio_idx[HDA_PCM_NTYPES][5] = {
+		[HDA_PCM_TYPE_AUDIO] = { 0, 2, 4, 5, -1 },
+		[HDA_PCM_TYPE_SPDIF] = { 1, -1 },
+		[HDA_PCM_TYPE_HDMI]  = { 3, 7, 8, 9, -1 },
+		[HDA_PCM_TYPE_MODEM] = { 6, -1 },
 	};
-	/* normal audio device indices; not linear to keep compatibility */
-	static int audio_idx[4] = { 0, 2, 4, 5 };
-	int i, dev;
+	int i;
 
-	switch (type) {
-	case HDA_PCM_TYPE_AUDIO:
-		for (i = 0; i < ARRAY_SIZE(audio_idx); i++) {
-			dev = audio_idx[i];
-			if (!test_bit(dev, bus->pcm_dev_bits))
-				goto ok;
-		}
-		snd_printk(KERN_WARNING "Too many audio devices\n");
-		return -EAGAIN;
-	case HDA_PCM_TYPE_SPDIF:
-	case HDA_PCM_TYPE_HDMI:
-	case HDA_PCM_TYPE_MODEM:
-		dev = dev_idx[type];
-		if (test_bit(dev, bus->pcm_dev_bits)) {
-			snd_printk(KERN_WARNING "%s already defined\n",
-				   dev_name[type]);
-			return -EAGAIN;
-		}
-		break;
-	default:
+	if (type >= HDA_PCM_NTYPES) {
 		snd_printk(KERN_WARNING "Invalid PCM type %d\n", type);
 		return -EINVAL;
 	}
- ok:
-	set_bit(dev, bus->pcm_dev_bits);
-	return dev;
+
+	for (i = 0; audio_idx[type][i] >= 0 ; i++)
+		if (!test_and_set_bit(audio_idx[type][i], bus->pcm_dev_bits))
+			return audio_idx[type][i];
+
+	snd_printk(KERN_WARNING "Too many %s devices\n", dev_name[type]);
+	return -EAGAIN;
 }
 
 /*
@@ -3420,6 +3403,24 @@ static void cleanup_dig_out_stream(struct hda_codec *codec, hda_nid_t nid)
 			snd_hda_codec_cleanup_stream(codec, *d);
 	}
 }
+
+/* call each reboot notifier */
+void snd_hda_bus_reboot_notify(struct hda_bus *bus)
+{
+	struct hda_codec *codec;
+
+	if (!bus)
+		return;
+	list_for_each_entry(codec, &bus->codec_list, list) {
+#ifdef CONFIG_SND_HDA_POWER_SAVE
+		if (!codec->power_on)
+			continue;
+#endif
+		if (codec->patch_ops.reboot_notify)
+			codec->patch_ops.reboot_notify(codec);
+	}
+}
+EXPORT_SYMBOL_HDA(snd_hda_bus_reboot_notify);
 
 /*
  * open the digital out in the exclusive mode

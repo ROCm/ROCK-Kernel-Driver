@@ -3629,6 +3629,26 @@ static void stac92xx_auto_init_hp_out(struct hda_codec *codec)
 	}
 }
 
+static int is_dual_headphones(struct hda_codec *codec)
+{
+	struct sigmatel_spec *spec = codec->spec;
+	int i, valid_hps;
+
+	if (spec->autocfg.line_out_type != AUTO_PIN_SPEAKER_OUT ||
+	    spec->autocfg.hp_outs <= 1)
+		return 0;
+	valid_hps = 0;
+	for (i = 0; i < spec->autocfg.hp_outs; i++) {
+		hda_nid_t nid = spec->autocfg.hp_pins[i];
+		unsigned int cfg = snd_hda_codec_get_pincfg(codec, nid);
+		if (get_defcfg_location(cfg) & AC_JACK_LOC_SEPARATE)
+			continue;
+		valid_hps++;
+	}
+	return (valid_hps > 1);
+}
+
+
 static int stac92xx_parse_auto_config(struct hda_codec *codec, hda_nid_t dig_out, hda_nid_t dig_in)
 {
 	struct sigmatel_spec *spec = codec->spec;
@@ -3645,8 +3665,7 @@ static int stac92xx_parse_auto_config(struct hda_codec *codec, hda_nid_t dig_out
 	/* If we have no real line-out pin and multiple hp-outs, HPs should
 	 * be set up as multi-channel outputs.
 	 */
-	if (spec->autocfg.line_out_type == AUTO_PIN_SPEAKER_OUT &&
-	    spec->autocfg.hp_outs > 1) {
+	if (is_dual_headphones(codec)) {
 		/* Copy hp_outs to line_outs, backup line_outs in
 		 * speaker_outs so that the following routines can handle
 		 * HP pins as primary outputs.
@@ -4327,6 +4346,28 @@ static void stac92xx_free_kctls(struct hda_codec *codec)
 	snd_array_free(&spec->kctls);
 }
 
+static void stac92xx_shutup(struct hda_codec *codec)
+{
+	struct sigmatel_spec *spec = codec->spec;
+	int i;
+	hda_nid_t nid;
+
+	/* reset each pin before powering down DAC/ADC to avoid click noise */
+	nid = codec->start_nid;
+	for (i = 0; i < codec->num_nodes; i++, nid++) {
+		unsigned int wcaps = get_wcaps(codec, nid);
+		unsigned int wid_type = get_wcaps_type(wcaps);
+		if (wid_type == AC_WID_PIN)
+			snd_hda_codec_read(codec, nid, 0,
+				AC_VERB_SET_PIN_WIDGET_CONTROL, 0);
+	}
+
+	if (spec->eapd_mask)
+		stac_gpio_set(codec, spec->gpio_mask,
+				spec->gpio_dir, spec->gpio_data &
+				~spec->eapd_mask);
+}
+
 static void stac92xx_free(struct hda_codec *codec)
 {
 	struct sigmatel_spec *spec = codec->spec;
@@ -4334,6 +4375,7 @@ static void stac92xx_free(struct hda_codec *codec)
 	if (! spec)
 		return;
 
+	stac92xx_shutup(codec);
 	stac92xx_free_jacks(codec);
 	snd_array_free(&spec->events);
 
@@ -4793,24 +4835,7 @@ static int stac92xx_hp_check_power_status(struct hda_codec *codec,
 
 static int stac92xx_suspend(struct hda_codec *codec, pm_message_t state)
 {
-	struct sigmatel_spec *spec = codec->spec;
-	int i;
-	hda_nid_t nid;
-
-	/* reset each pin before powering down DAC/ADC to avoid click noise */
-	nid = codec->start_nid;
-	for (i = 0; i < codec->num_nodes; i++, nid++) {
-		unsigned int wcaps = get_wcaps(codec, nid);
-		unsigned int wid_type = get_wcaps_type(wcaps);
-		if (wid_type == AC_WID_PIN)
-			snd_hda_codec_read(codec, nid, 0,
-				AC_VERB_SET_PIN_WIDGET_CONTROL, 0);
-	}
-
-	if (spec->eapd_mask)
-		stac_gpio_set(codec, spec->gpio_mask,
-				spec->gpio_dir, spec->gpio_data &
-				~spec->eapd_mask);
+	stac92xx_shutup(codec);
 	return 0;
 }
 #endif
@@ -4825,6 +4850,7 @@ static struct hda_codec_ops stac92xx_patch_ops = {
 	.suspend = stac92xx_suspend,
 	.resume = stac92xx_resume,
 #endif
+	.reboot_notify = stac92xx_shutup,
 };
 
 static int patch_stac9200(struct hda_codec *codec)
