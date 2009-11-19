@@ -12,6 +12,7 @@
 struct dm_dev;
 
 struct dm_path {
+	char pdev[16];		/* Requested physical device */
 	struct dm_dev *dev;	/* Read-only */
 	void *pscontext;	/* For path-selector use */
 };
