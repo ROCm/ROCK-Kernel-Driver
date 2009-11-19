@@ -19,6 +19,7 @@
 #include <linux/time.h>
 #include <linux/workqueue.h>
 #include <scsi/scsi_dh.h>
+#include <scsi/scsi_eh.h>
 #include <asm/atomic.h>
 
 #define DM_MSG_PREFIX "multipath"
@@ -101,6 +102,7 @@ struct multipath {
 struct dm_mpath_io {
 	struct pgpath *pgpath;
 	size_t nr_bytes;
+	char sense[SCSI_SENSE_BUFFERSIZE];
 };
 
 typedef int (*action_fn) (struct pgpath *pgpath);
@@ -911,6 +913,9 @@ static int multipath_map(struct dm_target *ti, struct request *clone,
 
 	map_context->ptr = mpio;
 	clone->cmd_flags |= REQ_FAILFAST_TRANSPORT;
+	/* Always attach a sense buffer */
+	if (!clone->sense)
+		clone->sense = mpio->sense;
 	r = map_io(m, clone, mpio, 0);
 	if (r < 0 || r == DM_MAPIO_REQUEUE)
 		mempool_free(mpio, m->mpio_pool);
@@ -1190,6 +1195,42 @@ static void activate_path(struct work_struct *work)
 }
 
 /*
+ * Evaluate scsi return code
+ */
+static int eval_scsi_error(int result, char *sense, int sense_len)
+{
+	struct scsi_sense_hdr sshdr;
+	int r = DM_ENDIO_REQUEUE;
+
+	if (host_byte(result) != DID_OK)
+		return r;
+
+	if (msg_byte(result) != COMMAND_COMPLETE)
+		return r;
+
+	if (status_byte(result) == RESERVATION_CONFLICT)
+		/* Do not retry here, possible data corruption */
+		return -EIO;
+
+	if (status_byte(result) == CHECK_CONDITION &&
+	    !scsi_normalize_sense(sense, sense_len, &sshdr)) {
+
+		switch (sshdr.sense_key) {
+		case MEDIUM_ERROR:
+		case DATA_PROTECT:
+		case BLANK_CHECK:
+		case COPY_ABORTED:
+		case VOLUME_OVERFLOW:
+		case MISCOMPARE:
+			r = -EIO;
+			break;
+		}
+	}
+
+	return r;
+}
+
+/*
  * end_io handling
  */
 static int do_end_io(struct multipath *m, struct request *clone,
@@ -1214,6 +1255,10 @@ static int do_end_io(struct multipath *m, struct request *clone,
 
 	if (error == -EOPNOTSUPP)
 		return error;
+
+	r = eval_scsi_error(clone->errors, clone->sense, clone->sense_len);
+	if (r != DM_ENDIO_REQUEUE)
+		return r;
 
 	if (mpio->pgpath)
 		fail_path(mpio->pgpath);
@@ -1240,6 +1285,10 @@ static int multipath_end_io(struct dm_target *ti, struct request *clone,
 		ps = &pgpath->pg->ps;
 		if (ps->type->end_io)
 			ps->type->end_io(ps, &pgpath->path, mpio->nr_bytes);
+	}
+	if (clone->sense == mpio->sense) {
+		clone->sense = NULL;
+		clone->sense_len = 0;
 	}
 	mempool_free(mpio, m->mpio_pool);
 
