@@ -8,6 +8,7 @@
 #include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/pm.h>
+#include <linux/cpuidle.h>
 
 #include <asm/elf.h>
 #include <asm/vdso.h>
@@ -151,6 +152,33 @@ void __cpuinit xen_enable_syscall(void)
 #endif /* CONFIG_X86_64 */
 }
 
+DEFINE_PER_CPU(struct cpuidle_device, xen_idle_devices);
+struct cpuidle_driver cpuidle_xen_driver = {
+	.name =         "cpuidle_xen",
+};
+
+static void xen_idle_loop(struct cpuidle_device *dev, struct cpuidle_state *st)
+{
+	xen_idle();
+}
+
+static void setup_cpuidle_xen(void)
+{
+	struct cpuidle_device *dev;
+	int cpu;
+
+	if (!cpuidle_curr_driver)
+		cpuidle_register_driver(&cpuidle_xen_driver);
+
+	for_each_online_cpu(cpu) {
+		dev = &per_cpu(xen_idle_devices, cpu);
+		dev->cpu = cpu;
+		dev->states[0].enter = xen_idle_loop;
+		dev->state_count = 1;
+		cpuidle_register_device(dev);
+	}
+}
+
 void __init xen_arch_setup(void)
 {
 	struct physdev_set_iopl set_iopl;
@@ -186,7 +214,7 @@ void __init xen_arch_setup(void)
 	       MAX_GUEST_CMDLINE > COMMAND_LINE_SIZE ?
 	       COMMAND_LINE_SIZE : MAX_GUEST_CMDLINE);
 
-	pm_idle = xen_idle;
+	setup_cpuidle_xen();
 
 	paravirt_disable_iospace();
 
