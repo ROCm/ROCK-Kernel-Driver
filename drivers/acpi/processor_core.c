@@ -1215,9 +1215,12 @@ static int __init acpi_processor_init(void)
 	 * should not use mwait for CPU-states.
 	 */
 	dmi_check_system(processor_idle_dmi_table);
-	result = cpuidle_register_driver(&acpi_idle_driver);
-	if (result < 0)
-		goto out_proc;
+
+	if (!boot_option_idle_override) {
+		result = cpuidle_register_driver(&acpi_idle_driver);
+		if (result < 0)
+			goto out_proc;
+	}
 
 	result = acpi_bus_register_driver(&acpi_processor_driver);
 	if (result < 0)

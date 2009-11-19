@@ -2270,6 +2270,46 @@ static struct dmi_system_id __initdata apm_dmi_table[] = {
 	{ }
 };
 
+DEFINE_PER_CPU(struct cpuidle_device, apm_idle_devices);
+
+struct cpuidle_driver cpuidle_apm_driver = {
+	.name =         "cpuidle_apm",
+};
+
+static void apm_idle_loop(struct cpuidle_device *dev, struct cpuidle_state *st)
+{
+	apm_cpu_idle();
+}
+
+static void setup_cpuidle_apm(void)
+{
+	struct cpuidle_device *dev;
+	int cpu;
+
+	if (!cpuidle_curr_driver)
+		cpuidle_register_driver(&cpuidle_apm_driver);
+
+	for_each_online_cpu(cpu) {
+		dev = &per_cpu(apm_idle_devices, cpu);
+		dev->cpu = cpu;
+		dev->states[0].enter = apm_idle_loop;
+		dev->state_count = 1;
+		cpuidle_register_device(dev);
+	}
+}
+
+void exit_cpuidle_apm(void)
+{
+	struct cpuidle_device *dev;
+	int cpu;
+
+	for_each_online_cpu(cpu) {
+		dev = &per_cpu(apm_idle_devices, cpu);
+		cpuidle_unregister_device(dev);
+	}
+}
+
+
 /*
  * Just start the APM thread. We do NOT want to do APM BIOS
  * calls from anything but the APM thread, if for no other reason
@@ -2407,8 +2447,7 @@ static int __init apm_init(void)
 	if (HZ != 100)
 		idle_period = (idle_period * HZ) / 100;
 	if (idle_threshold < 100) {
-		original_pm_idle = pm_idle;
-		pm_idle  = apm_cpu_idle;
+		setup_cpuidle_apm();
 		set_pm_idle = 1;
 	}
 
@@ -2420,7 +2459,7 @@ static void __exit apm_exit(void)
 	int error;
 
 	if (set_pm_idle) {
-		pm_idle = original_pm_idle;
+		exit_cpuidle_apm();
 		/*
 		 * We are about to unload the current idle thread pm callback
 		 * (pm_idle), Wait for all processors to update cached/local

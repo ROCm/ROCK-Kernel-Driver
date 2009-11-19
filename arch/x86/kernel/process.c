@@ -9,6 +9,7 @@
 #include <linux/pm.h>
 #include <linux/clockchips.h>
 #include <linux/random.h>
+#include <linux/cpuidle.h>
 #include <trace/events/power.h>
 #include <asm/system.h>
 #include <asm/apic.h>
@@ -256,12 +257,6 @@ int sys_vfork(struct pt_regs *regs)
 unsigned long boot_option_idle_override = 0;
 EXPORT_SYMBOL(boot_option_idle_override);
 
-/*
- * Powermanagement idle function, if any..
- */
-void (*pm_idle)(void);
-EXPORT_SYMBOL(pm_idle);
-
 #ifdef CONFIG_X86_32
 /*
  * This halt magic was a workaround for ancient floppy DMA
@@ -341,17 +336,15 @@ static void do_nothing(void *unused)
 }
 
 /*
- * cpu_idle_wait - Used to ensure that all the CPUs discard old value of
- * pm_idle and update to new pm_idle value. Required while changing pm_idle
- * handler on SMP systems.
+ * cpu_idle_wait - Required while changing idle routine handler on SMP systems.
  *
- * Caller must have changed pm_idle to the new value before the call. Old
- * pm_idle value will not be used by any CPU after the return of this function.
+ * Caller must have changed idle routine to the new value before the call. Old
+ * value will not be used by any CPU after the return of this function.
  */
 void cpu_idle_wait(void)
 {
 	smp_mb();
-	/* kick all the CPUs so that they exit out of pm_idle */
+	/* kick all the CPUs so that they exit out of idle loop */
 	smp_call_function(do_nothing, NULL, 1);
 }
 EXPORT_SYMBOL_GPL(cpu_idle_wait);
@@ -530,15 +523,58 @@ static void c1e_idle(void)
 		default_idle();
 }
 
+static void (*local_idle)(void);
+
+#ifndef CONFIG_CPU_IDLE
+void cpuidle_idle_call(void)
+{
+	if (local_idle)
+		local_idle();
+	else
+		default_idle();
+}
+#endif
+
+DEFINE_PER_CPU(struct cpuidle_device, idle_devices);
+
+struct cpuidle_driver cpuidle_default_driver = {
+	.name =         "cpuidle_default",
+};
+
+static void local_idle_loop(struct cpuidle_device *dev,
+				struct cpuidle_state *st)
+{
+	local_idle();
+}
+
+static int setup_cpuidle_simple(void)
+{
+	struct cpuidle_device *dev;
+	int cpu;
+
+	if (!cpuidle_curr_driver)
+		cpuidle_register_driver(&cpuidle_default_driver);
+
+	for_each_online_cpu(cpu) {
+		dev = &per_cpu(idle_devices, cpu);
+		dev->cpu = cpu;
+		dev->states[0].enter = local_idle_loop;
+		dev->state_count = 1;
+		cpuidle_register_device(dev);
+	}
+	return 0;
+}
+device_initcall(setup_cpuidle_simple);
+
 void __cpuinit select_idle_routine(const struct cpuinfo_x86 *c)
 {
 #ifdef CONFIG_SMP
-	if (pm_idle == poll_idle && smp_num_siblings > 1) {
+	if (local_idle == poll_idle && smp_num_siblings > 1) {
 		printk(KERN_WARNING "WARNING: polling idle and HT enabled,"
 			" performance may degrade.\n");
 	}
 #endif
-	if (pm_idle)
+	if (local_idle)
 		return;
 
 	if (cpu_has(c, X86_FEATURE_MWAIT) && mwait_usable(c)) {
@@ -546,18 +582,20 @@ void __cpuinit select_idle_routine(const struct cpuinfo_x86 *c)
 		 * One CPU supports mwait => All CPUs supports mwait
 		 */
 		printk(KERN_INFO "using mwait in idle threads.\n");
-		pm_idle = mwait_idle;
+		local_idle = mwait_idle;
 	} else if (check_c1e_idle(c)) {
 		printk(KERN_INFO "using C1E aware idle routine\n");
-		pm_idle = c1e_idle;
+		local_idle = c1e_idle;
 	} else
-		pm_idle = default_idle;
+		local_idle = default_idle;
+
+	return;
 }
 
 void __init init_c1e_mask(void)
 {
 	/* If we're using c1e_idle, we need to allocate c1e_mask. */
-	if (pm_idle == c1e_idle)
+	if (local_idle == c1e_idle)
 		zalloc_cpumask_var(&c1e_mask, GFP_KERNEL);
 }
 
@@ -568,7 +606,7 @@ static int __init idle_setup(char *str)
 
 	if (!strcmp(str, "poll")) {
 		printk("using polling idle threads.\n");
-		pm_idle = poll_idle;
+		local_idle = poll_idle;
 	} else if (!strcmp(str, "mwait"))
 		force_mwait = 1;
 	else if (!strcmp(str, "halt")) {
@@ -579,7 +617,7 @@ static int __init idle_setup(char *str)
 		 * To continue to load the CPU idle driver, don't touch
 		 * the boot_option_idle_override.
 		 */
-		pm_idle = default_idle;
+		local_idle = default_idle;
 		idle_halt = 1;
 		return 0;
 	} else if (!strcmp(str, "nomwait")) {
