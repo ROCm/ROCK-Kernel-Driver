@@ -1,0 +1,2 @@
+/*? Text: "request failed (status=0x%02x)\n" */
+/*? Text: "request failed with response code 0x%x\n" */

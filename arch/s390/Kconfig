@@ -577,6 +577,14 @@ bool "s390 guest support for KVM (EXPERIMENTAL)"
 	  virtio transport. If KVM is detected, the virtio console will be
 	  the default console.
 
+config KMSG_IDS
+	bool "Kernel message numbers"
+	default y
+	help
+	  Select this option if you want to include a message number to the
+	  prefix for kernel messages issued by the s390 architecture and
+	  driver code. See "Documentation/s390/kmsg.txt" for more details.
+
 config SECCOMP
 	bool "Enable seccomp to safely compute untrusted bytecode"
 	depends on PROC_FS

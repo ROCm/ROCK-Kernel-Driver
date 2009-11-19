@@ -33,6 +33,8 @@
 #include <linux/bootmem.h>
 #include <linux/syscalls.h>
 #include <linux/kexec.h>
+#include <linux/jhash.h>
+#include <linux/device.h>
 
 #include <asm/uaccess.h>
 
@@ -1433,4 +1435,47 @@ bool printk_timed_ratelimit(unsigned long *caller_jiffies,
 	return false;
 }
 EXPORT_SYMBOL(printk_timed_ratelimit);
+#endif
+
+#if defined CONFIG_PRINTK && defined CONFIG_KMSG_IDS
+
+/**
+ * printk_hash - print a kernel message include a hash over the message
+ * @prefix: message prefix including the ".%06x" for the hash
+ * @fmt: format string
+ */
+asmlinkage int printk_hash(const char *prefix, const char *fmt, ...)
+{
+	va_list args;
+	int r;
+
+	r = printk(prefix, jhash(fmt, strlen(fmt), 0) & 0xffffff);
+	va_start(args, fmt);
+	r += vprintk(fmt, args);
+	va_end(args);
+
+	return r;
+}
+EXPORT_SYMBOL(printk_hash);
+
+/**
+ * printk_dev_hash - print a kernel message include a hash over the message
+ * @prefix: message prefix including the ".%06x" for the hash
+ * @dev: device this printk is all about
+ * @fmt: format string
+ */
+asmlinkage int printk_dev_hash(const char *prefix, const char *driver_name,
+			       const char *fmt, ...)
+{
+	va_list args;
+	int r;
+
+	r = printk(prefix, driver_name, jhash(fmt, strlen(fmt), 0) & 0xffffff);
+	va_start(args, fmt);
+	r += vprintk(fmt, args);
+	va_end(args);
+
+	return r;
+}
+EXPORT_SYMBOL(printk_dev_hash);
 #endif
