@@ -54,6 +54,7 @@ core-$(CONFIG_IA64_HP_ZX1)	+= arch/ia64/dig/
 core-$(CONFIG_IA64_HP_ZX1_SWIOTLB) += arch/ia64/dig/
 core-$(CONFIG_IA64_XEN_GUEST)	+= arch/ia64/dig/
 core-$(CONFIG_IA64_SGI_SN2)	+= arch/ia64/sn/
+core-$(CONFIG_PERFMON)		+= arch/ia64/perfmon/
 core-$(CONFIG_IA64_SGI_UV)	+= arch/ia64/uv/
 core-$(CONFIG_KVM) 		+= arch/ia64/kvm/
 core-$(CONFIG_PARAVIRT_XEN)	+= arch/ia64/xen/

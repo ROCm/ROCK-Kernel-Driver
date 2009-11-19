@@ -1,0 +1,48 @@
+What:		/sys/kernel/perfmon/pmu
+Date:		Nov 2007
+KernelVersion:	2.6.24
+Contact:	eranian@gmail.com
+
+Description:	Provides information about the active PMU description
+		module.  The module contains the mapping of the actual
+		performance counter registers onto the logical PMU exposed by
+		perfmon.  There is at most one PMU description module loaded
+		at any time.
+
+		The sysfs PMU tree provides a description of the mapping for
+		each register. There is one subdir per config and data register
+		along an entry for the name of the PMU model.
+
+		The entries are as follows:
+
+	/sys/kernel/perfmon/pmu_desc/model (read-only):
+
+		Name of the PMU model is clear text and zero terminated.
+
+	Then, for each logical PMU register, XX, gets a subtree with the
+	following entries:
+
+	/sys/kernel/perfmon/pmu_desc/pm*XX/addr (read-only):
+
+		The physical address or index of the actual underlying hardware
+		register.  On Itanium, it corresponds to the index. But on X86
+		processor, this is the actual MSR address.
+
+	/sys/kernel/perfmon/pmu_desc/pm*XX/dfl_val (read-only):
+
+		The default value of the register in hexadecimal.
+
+	/sys/kernel/perfmon/pmu_desc/pm*XX/name (read-only):
+
+		The name of the hardware register.
+
+	/sys/kernel/perfmon/pmu_desc/pm*XX/rsvd_msk (read-only):
+
+		Bitmask of reserved bits, i.e., bits which cannot be changed
+		by applications. When a bit is set, it means the corresponding
+		bit in the actual register is reserved.
+
+	/sys/kernel/perfmon/pmu_desc/pm*XX/width (read-only):
+
+		The width in bits of the registers. This field is only
+		relevant for counter registers.
