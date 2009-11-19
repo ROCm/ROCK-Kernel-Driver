@@ -1043,15 +1043,19 @@ _scsih_build_scatter_gather(struct MPT2SAS_ADAPTER *ioc,
  * _scsih_change_queue_depth - setting device queue depth
  * @sdev: scsi device struct
  * @qdepth: requested queue depth
+ * @reason: calling context
  *
  * Returns queue depth.
  */
 static int
-_scsih_change_queue_depth(struct scsi_device *sdev, int qdepth)
+_scsih_change_queue_depth(struct scsi_device *sdev, int qdepth, int reason)
 {
 	struct Scsi_Host *shost = sdev->host;
 	int max_depth;
 	int tag_type;
+
+	if (reason != SCSI_QDEPTH_DEFAULT)
+		return -EOPNOTSUPP;
 
 	max_depth = shost->can_queue;
 	if (!sdev->tagged_supported)
@@ -1488,7 +1492,7 @@ _scsih_slave_configure(struct scsi_device *sdev)
 		    r_level, raid_device->handle,
 		    (unsigned long long)raid_device->wwid,
 		    raid_device->num_pds, ds);
-		_scsih_change_queue_depth(sdev, qdepth);
+		_scsih_change_queue_depth(sdev, qdepth, SCSI_QDEPTH_DEFAULT);
 		return 0;
 	}
 
@@ -1534,7 +1538,7 @@ _scsih_slave_configure(struct scsi_device *sdev)
 			_scsih_display_sata_capabilities(ioc, sas_device, sdev);
 	}
 
-	_scsih_change_queue_depth(sdev, qdepth);
+	_scsih_change_queue_depth(sdev, qdepth, SCSI_QDEPTH_DEFAULT);
 
 	if (ssp_target)
 		sas_read_port_mode_page(sdev);
