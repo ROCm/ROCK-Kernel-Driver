@@ -95,6 +95,7 @@ struct mount_options
 	unsigned int	atime_quantum;
 	signed short	slot;
 	unsigned int	localalloc_opt;
+	unsigned int	resv_level;
 	char		cluster_stack[OCFS2_STACK_LABEL_LEN + 1];
 };
 
@@ -174,6 +175,7 @@ enum {
 	Opt_noacl,
 	Opt_usrquota,
 	Opt_grpquota,
+	Opt_resv_level,
 	Opt_err,
 };
 
@@ -200,6 +202,7 @@ static const match_table_t tokens = {
 	{Opt_noacl, "noacl"},
 	{Opt_usrquota, "usrquota"},
 	{Opt_grpquota, "grpquota"},
+	{Opt_resv_level, "resv_level=%u"},
 	{Opt_err, NULL}
 };
 
@@ -1035,6 +1038,8 @@ static int ocfs2_fill_super(struct super_block *sb, void *data, int silent)
 		     "filesystem does not have the feature enabled.\n");
 		goto read_super_error;
 	}
+	osb->osb_resv_level = parsed_options.resv_level;
+
 
 	status = ocfs2_verify_userspace_stack(osb, &parsed_options);
 	if (status)
@@ -1261,6 +1266,7 @@ static int ocfs2_parse_options(struct super_block *sb,
 	mopt->slot = OCFS2_INVALID_SLOT;
 	mopt->localalloc_opt = OCFS2_DEFAULT_LOCAL_ALLOC_SIZE;
 	mopt->cluster_stack[0] = '\0';
+	mopt->resv_level = 3;
 
 	if (!options) {
 		status = 1;
@@ -1425,6 +1431,17 @@ static int ocfs2_parse_options(struct super_block *sb,
 			printk(KERN_INFO "ocfs2 (no)acl options not supported\n");
 			break;
 #endif
+		case Opt_resv_level:
+			if (is_remount)
+				break;
+			if (match_int(&args[0], &option)) {
+				status = 0;
+				goto bail;
+			}
+			if (option >= 0 && option < 6)
+				mopt->resv_level = option;
+			break;
+
 		default:
 			mlog(ML_ERROR,
 			     "Unrecognized mount option \"%s\" "
@@ -1677,6 +1694,8 @@ static void ocfs2_inode_init_once(void *data)
 
 	oi->ip_blkno = 0ULL;
 	oi->ip_clusters = 0;
+
+	ocfs2_resv_init_once(&oi->ip_la_data_resv);
 
 	ocfs2_lock_res_init_once(&oi->ip_rw_lockres);
 	ocfs2_lock_res_init_once(&oi->ip_inode_lockres);
@@ -2031,6 +2050,12 @@ static int ocfs2_initialize_super(struct super_block *sb,
 	INIT_DELAYED_WORK(&osb->la_enable_wq, ocfs2_la_enable_worker);
 
 	init_waitqueue_head(&osb->osb_mount_event);
+
+	status = ocfs2_resmap_init(osb, &osb->osb_la_resmap);
+	if (status) {
+		mlog_errno(status);
+		goto bail;
+	}
 
 	osb->vol_label = kmalloc(OCFS2_MAX_VOL_LABEL_LEN, GFP_KERNEL);
 	if (!osb->vol_label) {

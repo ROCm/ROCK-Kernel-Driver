@@ -52,7 +52,8 @@ static u32 ocfs2_local_alloc_count_bits(struct ocfs2_dinode *alloc);
 
 static int ocfs2_local_alloc_find_clear_bits(struct ocfs2_super *osb,
 					     struct ocfs2_dinode *alloc,
-					     u32 numbits);
+					     u32 numbits,
+					     struct ocfs2_alloc_reservation *resv);
 
 static void ocfs2_clear_local_alloc(struct ocfs2_dinode *alloc);
 
@@ -261,6 +262,8 @@ void ocfs2_shutdown_local_alloc(struct ocfs2_super *osb)
 	}
 
 	osb->local_alloc_state = OCFS2_LA_DISABLED;
+
+	ocfs2_resmap_uninit(&osb->osb_la_resmap);
 
 	main_bm_inode = ocfs2_get_system_file_inode(osb,
 						    GLOBAL_BITMAP_SYSTEM_INODE,
@@ -498,7 +501,7 @@ static int ocfs2_local_alloc_in_range(struct inode *inode,
 	alloc = (struct ocfs2_dinode *) osb->local_alloc_bh->b_data;
 	la = OCFS2_LOCAL_ALLOC(alloc);
 
-	start = ocfs2_local_alloc_find_clear_bits(osb, alloc, bits_wanted);
+	start = ocfs2_local_alloc_find_clear_bits(osb, alloc, bits_wanted, NULL);
 	if (start == -1) {
 		mlog_errno(-ENOSPC);
 		return 0;
@@ -664,7 +667,8 @@ int ocfs2_claim_local_alloc_bits(struct ocfs2_super *osb,
 	alloc = (struct ocfs2_dinode *) osb->local_alloc_bh->b_data;
 	la = OCFS2_LOCAL_ALLOC(alloc);
 
-	start = ocfs2_local_alloc_find_clear_bits(osb, alloc, bits_wanted);
+	start = ocfs2_local_alloc_find_clear_bits(osb, alloc, bits_wanted,
+						  ac->ac_resv);
 	if (start == -1) {
 		/* TODO: Shouldn't we just BUG here? */
 		status = -ENOSPC;
@@ -686,6 +690,9 @@ int ocfs2_claim_local_alloc_bits(struct ocfs2_super *osb,
 		mlog_errno(status);
 		goto bail;
 	}
+
+	ocfs2_resmap_claimed_bits(&osb->osb_la_resmap, ac->ac_resv, start,
+				  bits_wanted);
 
 	while(bits_wanted--)
 		ocfs2_set_bit(start++, bitmap);
@@ -722,11 +729,13 @@ static u32 ocfs2_local_alloc_count_bits(struct ocfs2_dinode *alloc)
 }
 
 static int ocfs2_local_alloc_find_clear_bits(struct ocfs2_super *osb,
-					     struct ocfs2_dinode *alloc,
-					     u32 numbits)
+				     struct ocfs2_dinode *alloc,
+				     u32 numbits,
+				     struct ocfs2_alloc_reservation *resv)
 {
 	int numfound, bitoff, left, startoff, lastzero;
 	void *bitmap = NULL;
+	struct ocfs2_reservation_map *resmap = &osb->osb_la_resmap;
 
 	mlog_entry("(numbits wanted = %u)\n", numbits);
 
@@ -737,6 +746,20 @@ static int ocfs2_local_alloc_find_clear_bits(struct ocfs2_super *osb,
 	}
 
 	bitmap = OCFS2_LOCAL_ALLOC(alloc)->la_bitmap;
+
+	/*
+	 * Ask the reservations code first whether this request can be
+	 * easily fulfilled. No errors here are fatal - if we didn't
+	 * find the number of bits needed, we'll just take the slow
+	 * path.
+	 */
+	if (ocfs2_resmap_resv_bits(resmap, resv, bitmap, &bitoff, &numfound)
+	    == 0) {
+		if (numfound >= numbits) {
+			numfound = numbits;
+			goto bail;
+		}
+	}
 
 	numfound = bitoff = startoff = 0;
 	lastzero = -1;
@@ -772,8 +795,10 @@ static int ocfs2_local_alloc_find_clear_bits(struct ocfs2_super *osb,
 
 	if (numfound == numbits)
 		bitoff = startoff - numfound;
-	else
+	else {
+		numfound = 0;
 		bitoff = -1;
+	}
 
 bail:
 	mlog_exit(bitoff);
@@ -1095,6 +1120,8 @@ retry_enospc:
 	alloc->id1.bitmap1.i_used = 0;
 	memset(OCFS2_LOCAL_ALLOC(alloc)->la_bitmap, 0,
 	       le16_to_cpu(la->la_size));
+
+	ocfs2_resmap_restart(&osb->osb_la_resmap, cluster_count);
 
 	mlog(0, "New window allocated:\n");
 	mlog(0, "window la_bm_off = %u\n",

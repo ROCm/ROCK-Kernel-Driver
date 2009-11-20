@@ -70,6 +70,12 @@ struct ocfs2_inode_info
 	/* Only valid if the inode is the dir. */
 	u32				ip_last_used_slot;
 	u64				ip_last_used_group;
+
+	struct ocfs2_alloc_reservation	ip_la_data_resv;
+	/*
+	 * TODO: Directories should get inode reservations from their
+	 * current inode allocator. --Mark
+	 */
 };
 
 /*

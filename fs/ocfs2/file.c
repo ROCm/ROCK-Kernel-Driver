@@ -483,6 +483,9 @@ static int ocfs2_truncate_file(struct inode *inode,
 	if (new_i_size == le64_to_cpu(fe->i_size))
 		goto bail;
 
+	ocfs2_resv_discard(&osb->osb_la_resmap,
+			   &OCFS2_I(inode)->ip_la_data_resv);
+
 	down_write(&OCFS2_I(inode)->ip_alloc_sem);
 
 	/*
