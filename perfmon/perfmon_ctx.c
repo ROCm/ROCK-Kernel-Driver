@@ -272,8 +272,8 @@ error_fd:
 error_alloc:
 	/*
 	 * free arch, sets, smpl_buffer
- 	 * conf, pmu
- 	 */
+	 * conf, pmu
+	 */
 	pfm_free_context(ctx);
 	return ret;
 error_smpl:

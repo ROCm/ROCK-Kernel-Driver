@@ -53,20 +53,20 @@ MODULE_LICENSE("GPL");
 static int sizes[]  = { 32, 64, 128, 192, 256, 1024, 2048, 4096 };
 
 struct mem_buf {
-    char *buf;
-    int size;
+	char *buf;
+	int size;
 };
 
 static unsigned long crasher_random(void)
 {
-        rand_seed = rand_seed*69069L+1;
-        return rand_seed^jiffies;
+	rand_seed = rand_seed*69069L+1;
+	return rand_seed^jiffies;
 }
 
 void crasher_srandom(unsigned long entropy)
 {
-        rand_seed ^= entropy;
-        crasher_random();
+	rand_seed ^= entropy;
+	crasher_random();
 }
 
 static char *mem_alloc(int size) {
@@ -84,7 +84,7 @@ static void mem_check(char *p, int size) {
 	if (!p)
 		return;
 	for (i = 0 ; i < size; i++) {
-        	if (p[i] != ((i % 119) + 8)) {
+		if (p[i] != ((i % 119) + 8)) {
 			printk(KERN_CRIT "verify error at %lX offset %d "
 			       " wanted %d found %d size %d\n",
 			       (unsigned long)(p + i), i, (i % 119) + 8,

@@ -3105,7 +3105,7 @@ kdb_dmesg(int argc, const char **argv)
 	c = '\n';
 	while (start != end) {
 		char buf[201];
-	       	p = buf;
+		p = buf;
 		while (start < end && (c = *KDB_WRAP(start)) && (p - buf) < sizeof(buf)-1) {
 			++start;
 			*p++ = c;

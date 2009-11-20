@@ -561,11 +561,11 @@ int pfm_pmu_acquire(struct pfm_context *ctx)
 		memset(unavail_pmds, 0, sizeof(unavail_pmds));
 
 		/*
- 		 * gather unavailable registers
- 		 *
- 		 * cannot use pfm_pmu_conf->regs_all as it
- 		 * is not yet initialized
- 		 */
+		 * gather unavailable registers
+		 *
+		 * cannot use pfm_pmu_conf->regs_all as it
+		 * is not yet initialized
+		 */
 		ret = pfm_arch_reserve_regs(unavail_pmcs, unavail_pmds);
 		if (ret) {
 			pfm_pmu_acquired = 0;

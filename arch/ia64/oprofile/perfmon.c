@@ -24,7 +24,7 @@ perfmon_handler(struct pfm_context *ctx,
 	struct pt_regs *regs;
 	struct pfm_ovfl_arg *arg;
 
- 	regs = data;
+	regs = data;
 	arg = &ctx->ovfl_arg;
  
 	arg->ovfl_ctrl = PFM_OVFL_CTRL_RESET;

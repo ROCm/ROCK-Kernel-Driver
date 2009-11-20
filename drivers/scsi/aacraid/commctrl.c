@@ -843,7 +843,7 @@ int aac_do_ioctl(struct aac_dev * dev, int cmd, void __user *arg)
 {
 	int status;
 	unsigned long mflags;
-	
+
 	/*
 	 *	HBA gets first crack
 	 */

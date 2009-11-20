@@ -155,7 +155,7 @@ static long pfm_control_create_evtsets(union pfm_control *cdata, int compat)
 
 	return sys_pfm_create_evtsets(d->fd,
 				(struct pfarg_setdesc __user *)_PTR(d->req),
-	     			d->count);
+				d->count);
 }
 
 static long pfm_control_getinfo_evtsets(union pfm_control *cdata, int compat)

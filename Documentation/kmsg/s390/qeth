@@ -449,7 +449,7 @@
  * or VSWITCH uses the network layer (layer 3).
  * User action:
  * If you are connecting to an ETHERNET guest LAN or VSWITCH, set the layer2 sysfs
- * attribute of the qeth device to 1. If you are connecting to an IP guest LAN or 
+ * attribute of the qeth device to 1. If you are connecting to an IP guest LAN or
  * VSWITCH, set the layer2 sysfs attribute of the qeth device to 0.
  */
 

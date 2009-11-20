@@ -761,7 +761,7 @@
 #define EH_FRAME							\
 		/* Unwind data binary search table */			\
 		. = ALIGN(8);						\
-        	.eh_frame_hdr : AT(ADDR(.eh_frame_hdr) - LOAD_OFFSET) {	\
+		.eh_frame_hdr : AT(ADDR(.eh_frame_hdr) - LOAD_OFFSET) {	\
 			VMLINUX_SYMBOL(__start_unwind_hdr) = .;		\
 			*(.eh_frame_hdr)				\
 			VMLINUX_SYMBOL(__end_unwind_hdr) = .;		\
@@ -770,7 +770,7 @@
 		. = ALIGN(8);						\
 		.eh_frame : AT(ADDR(.eh_frame) - LOAD_OFFSET) {		\
 			VMLINUX_SYMBOL(__start_unwind) = .;		\
-		  	*(.eh_frame)					\
+			*(.eh_frame)					\
 			VMLINUX_SYMBOL(__end_unwind) = .;		\
 		}
 #else

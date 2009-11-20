@@ -614,8 +614,8 @@ qh_completions_kdb(struct ehci_hcd *ehci, struct ehci_qh *qh, struct urb *kdburb
 		qtd = list_entry (entry, struct ehci_qtd, qtd_list);
 		urb = qtd->urb;
 
-                if (urb != kdburb)
-                        continue;
+		if (urb != kdburb)
+			continue;
 
 		/* clean up any state from previous QTD ...*/
 		if (last) {
@@ -631,12 +631,12 @@ qh_completions_kdb(struct ehci_hcd *ehci, struct ehci_qh *qh, struct urb *kdburb
 
 				ehci_urb_done(ehci, last->urb, last_status);
 
-                                /*
-                                 * ehci_urb_done() releases and reacquires
+				/*
+				 * ehci_urb_done() releases and reacquires
 				 * ehci->lock, so release it here.
-                                 */
-                                if (spin_is_locked(&ehci->lock))
-                                        spin_unlock (&ehci->lock);
+				 */
+				if (spin_is_locked(&ehci->lock))
+					spin_unlock (&ehci->lock);
 
 				count++;
 			}
@@ -748,8 +748,8 @@ halt:
 		 * ehci_urb_done() releases and reacquires
 		 * ehci->lock, so release it here.
 		 */
-                if (spin_is_locked(&ehci->lock))
-                	spin_unlock (&ehci->lock);
+		if (spin_is_locked(&ehci->lock))
+			spin_unlock (&ehci->lock);
 
 		count++;
 		ehci_qtd_free (ehci, last);
