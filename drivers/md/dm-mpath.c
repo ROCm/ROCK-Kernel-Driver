@@ -1261,6 +1261,7 @@ static int eval_scsi_error(int result, char *sense, int sense_len)
 		/* Do not retry here, possible data corruption */
 		return -EIO;
 
+#if defined(CONFIG_SCSI) || defined(CONFIG_SCSI_MODULE)
 	if (status_byte(result) == CHECK_CONDITION &&
 	    !scsi_normalize_sense(sense, sense_len, &sshdr)) {
 
@@ -1275,6 +1276,7 @@ static int eval_scsi_error(int result, char *sense, int sense_len)
 			break;
 		}
 	}
+#endif
 
 	return r;
 }
