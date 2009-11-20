@@ -31,6 +31,10 @@
 
 #include "e1000.h"
 
+int entropy = 0;
+module_param(entropy, int, 0);
+MODULE_PARM_DESC(entropy, "Allow e1000e to populate the /dev/random entropy pool");
+
 /*
  * This is the only thing that needs to be changed to adjust the
  * maximum number of ports that the driver can manage.

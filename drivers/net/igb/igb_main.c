@@ -60,6 +60,10 @@ static const struct e1000_info *igb_info_tbl[] = {
 	[board_82575] = &e1000_82575_info,
 };
 
+static int entropy = 0;
+module_param(entropy, int, 0);
+MODULE_PARM_DESC(entropy, "Allow igb to populate the /dev/random entropy pool");
+
 static struct pci_device_id igb_pci_tbl[] = {
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82576), board_82575 },
 	{ PCI_VDEVICE(INTEL, E1000_DEV_ID_82576_NS), board_82575 },
@@ -647,8 +651,8 @@ static int igb_request_msix(struct igb_adapter *adapter)
 		else
 			memcpy(ring->name, netdev->name, IFNAMSIZ);
 		err = request_irq(adapter->msix_entries[vector].vector,
-				  &igb_msix_rx, 0, ring->name,
-				  &(adapter->rx_ring[i]));
+				  &igb_msix_rx, entropy ? IRQF_SAMPLE_RANDOM : 0,
+				  ring->name, &(adapter->rx_ring[i]));
 		if (err)
 			goto out;
 		ring->itr_register = E1000_EITR(0) + (vector << 2);
@@ -750,6 +754,10 @@ static int igb_request_irq(struct igb_adapter *adapter)
 	struct net_device *netdev = adapter->netdev;
 	struct e1000_hw *hw = &adapter->hw;
 	int err = 0;
+	int irq_flags = 0;
+
+	if (entropy)
+		irq_flags = IRQF_SAMPLE_RANDOM;
 
 	if (adapter->msix_entries) {
 		err = igb_request_msix(adapter);
@@ -778,7 +786,7 @@ static int igb_request_irq(struct igb_adapter *adapter)
 	}
 
 	if (adapter->flags & IGB_FLAG_HAS_MSI) {
-		err = request_irq(adapter->pdev->irq, &igb_intr_msi, 0,
+		err = request_irq(adapter->pdev->irq, &igb_intr_msi, irq_flags,
 				  netdev->name, netdev);
 		if (!err)
 			goto request_done;
@@ -787,7 +795,8 @@ static int igb_request_irq(struct igb_adapter *adapter)
 		adapter->flags &= ~IGB_FLAG_HAS_MSI;
 	}
 
-	err = request_irq(adapter->pdev->irq, &igb_intr, IRQF_SHARED,
+	irq_flags |= IRQF_SHARED;
+	err = request_irq(adapter->pdev->irq, &igb_intr, irq_flags,
 			  netdev->name, netdev);
 
 	if (err)

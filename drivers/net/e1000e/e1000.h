@@ -457,6 +457,7 @@ extern void e1000e_set_interrupt_capability(struct e1000_adapter *adapter);
 extern void e1000e_reset_interrupt_capability(struct e1000_adapter *adapter);
 
 extern unsigned int copybreak;
+extern int entropy;
 
 extern char *e1000e_get_hw_dev_name(struct e1000_hw *hw);
 

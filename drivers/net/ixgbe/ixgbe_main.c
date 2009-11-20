@@ -54,6 +54,11 @@ static const char ixgbe_driver_string[] =
 const char ixgbe_driver_version[] = DRV_VERSION;
 static char ixgbe_copyright[] = "Copyright (c) 1999-2009 Intel Corporation.";
 
+static int entropy = 0;
+module_param(entropy, int, 0);
+MODULE_PARM_DESC(entropy, "Allow ixgbe to populate the /dev/random entropy pool");
+
+
 static const struct ixgbe_info *ixgbe_info_tbl[] = {
 	[board_82598] = &ixgbe_82598_info,
 	[board_82599] = &ixgbe_82599_info,
@@ -1627,6 +1632,7 @@ static int ixgbe_request_msix_irqs(struct ixgbe_adapter *adapter)
 	irqreturn_t (*handler)(int, void *);
 	int i, vector, q_vectors, err;
 	int ri=0, ti=0;
+	int irq_flags;
 
 	/* Decrement for Other and TCP Timer vectors */
 	q_vectors = adapter->num_msix_vectors - NON_Q_VECTORS;
@@ -1642,20 +1648,26 @@ static int ixgbe_request_msix_irqs(struct ixgbe_adapter *adapter)
 	for (vector = 0; vector < q_vectors; vector++) {
 		handler = SET_HANDLER(adapter->q_vector[vector]);
 
+		irq_flags = 0;
 		if(handler == &ixgbe_msix_clean_rx) {
 			sprintf(adapter->name[vector], "%s-%s-%d",
 				netdev->name, "rx", ri++);
+			if (entropy)
+				irq_flags = IRQF_SAMPLE_RANDOM;
 		}
 		else if(handler == &ixgbe_msix_clean_tx) {
 			sprintf(adapter->name[vector], "%s-%s-%d",
 				netdev->name, "tx", ti++);
 		}
-		else
+		else {
 			sprintf(adapter->name[vector], "%s-%s-%d",
 				netdev->name, "TxRx", vector);
+			if (entropy)
+				irq_flags = IRQF_SAMPLE_RANDOM;
+		}
 
 		err = request_irq(adapter->msix_entries[vector].vector,
-		                  handler, 0, adapter->name[vector],
+		                  handler, irq_flags, adapter->name[vector],
 		                  adapter->q_vector[vector]);
 		if (err) {
 			DPRINTK(PROBE, ERR,
@@ -1834,14 +1846,19 @@ static int ixgbe_request_irq(struct ixgbe_adapter *adapter)
 {
 	struct net_device *netdev = adapter->netdev;
 	int err;
+	int irq_flags = 0;
+
+	if (entropy)
+		irq_flags = IRQF_SAMPLE_RANDOM;
 
 	if (adapter->flags & IXGBE_FLAG_MSIX_ENABLED) {
 		err = ixgbe_request_msix_irqs(adapter);
 	} else if (adapter->flags & IXGBE_FLAG_MSI_ENABLED) {
-		err = request_irq(adapter->pdev->irq, &ixgbe_intr, 0,
+		err = request_irq(adapter->pdev->irq, &ixgbe_intr, irq_flags,
 		                  netdev->name, netdev);
 	} else {
-		err = request_irq(adapter->pdev->irq, &ixgbe_intr, IRQF_SHARED,
+		irq_flags |= IRQF_SHARED;
+		err = request_irq(adapter->pdev->irq, &ixgbe_intr, irq_flags,
 		                  netdev->name, netdev);
 	}
 

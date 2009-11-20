@@ -213,6 +213,10 @@ static int debug = NETIF_MSG_DRV | NETIF_MSG_PROBE;
 module_param(debug, int, 0);
 MODULE_PARM_DESC(debug, "Debug level (0=none,...,16=all)");
 
+static int entropy = 0;
+module_param(entropy, int, 0);
+MODULE_PARM_DESC(entropy, "Allow e1000 to populate the /dev/random entropy pool");
+
 /**
  * e1000_init_module - Driver Registration Routine
  *
@@ -261,6 +265,9 @@ static int e1000_request_irq(struct e1000_adapter *adapter)
 	irq_handler_t handler = e1000_intr;
 	int irq_flags = IRQF_SHARED;
 	int err;
+
+	if (entropy)
+		irq_flags |= IRQF_SAMPLE_RANDOM;
 
 	err = request_irq(adapter->pdev->irq, handler, irq_flags, netdev->name,
 	                  netdev);

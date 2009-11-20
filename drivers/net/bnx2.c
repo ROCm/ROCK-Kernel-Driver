@@ -85,6 +85,10 @@ MODULE_FIRMWARE(FW_MIPS_FILE_09);
 MODULE_FIRMWARE(FW_RV2P_FILE_09);
 MODULE_FIRMWARE(FW_RV2P_FILE_09_Ax);
 
+static int entropy = 0;
+module_param(entropy, int, 0);
+MODULE_PARM_DESC(entropy, "Allow bnx2 to populate the /dev/random entropy pool");
+
 static int disable_msi = 0;
 
 module_param(disable_msi, int, 0);
@@ -6059,6 +6063,9 @@ bnx2_request_irq(struct bnx2 *bp)
 		flags = 0;
 	else
 		flags = IRQF_SHARED;
+
+	if (entropy)
+		flags |= IRQF_SAMPLE_RANDOM;
 
 	for (i = 0; i < bp->irq_nvecs; i++) {
 		irq = &bp->irq_tbl[i];

@@ -15,7 +15,6 @@
  *	notice is accompanying it.
  */
 
-
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/kernel.h>
@@ -65,6 +64,10 @@
 #endif
 
 #include "tg3.h"
+
+static int entropy = 0;
+module_param(entropy, int, 0);
+MODULE_PARM_DESC(entropy, "Allow tg3 to populate the /dev/random entropy pool");
 
 #define DRV_MODULE_NAME		"tg3"
 #define PFX DRV_MODULE_NAME	": "
@@ -8020,9 +8023,12 @@ restart_timer:
 static int tg3_request_irq(struct tg3 *tp, int irq_num)
 {
 	irq_handler_t fn;
-	unsigned long flags;
+	unsigned long flags = 0;
 	char *name;
 	struct tg3_napi *tnapi = &tp->napi[irq_num];
+
+	if (entropy)
+		flags = IRQF_SAMPLE_RANDOM;
 
 	if (tp->irq_cnt == 1)
 		name = tp->dev->name;
@@ -8036,12 +8042,11 @@ static int tg3_request_irq(struct tg3 *tp, int irq_num)
 		fn = tg3_msi;
 		if (tp->tg3_flags2 & TG3_FLG2_1SHOT_MSI)
 			fn = tg3_msi_1shot;
-		flags = IRQF_SAMPLE_RANDOM;
 	} else {
 		fn = tg3_interrupt;
 		if (tp->tg3_flags & TG3_FLAG_TAGGED_STATUS)
 			fn = tg3_interrupt_tagged;
-		flags = IRQF_SHARED | IRQF_SAMPLE_RANDOM;
+		flags |= IRQF_SHARED;
 	}
 
 	return request_irq(tnapi->irq_vec, fn, flags, name, tnapi);

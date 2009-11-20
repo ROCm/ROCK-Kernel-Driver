@@ -1481,8 +1481,8 @@ static int e1000_request_msix(struct e1000_adapter *adapter)
 	else
 		memcpy(adapter->rx_ring->name, netdev->name, IFNAMSIZ);
 	err = request_irq(adapter->msix_entries[vector].vector,
-			  &e1000_intr_msix_rx, 0, adapter->rx_ring->name,
-			  netdev);
+			  &e1000_intr_msix_rx, entropy ? IRQF_SAMPLE_RANDOM : 0,
+			  adapter->rx_ring->name, netdev);
 	if (err)
 		goto out;
 	adapter->rx_ring->itr_register = E1000_EITR_82574(vector);
@@ -1523,6 +1523,7 @@ static int e1000_request_irq(struct e1000_adapter *adapter)
 {
 	struct net_device *netdev = adapter->netdev;
 	int err;
+	int irq_flags = 0;
 
 	if (adapter->msix_entries) {
 		err = e1000_request_msix(adapter);
@@ -1534,7 +1535,8 @@ static int e1000_request_irq(struct e1000_adapter *adapter)
 		e1000e_set_interrupt_capability(adapter);
 	}
 	if (adapter->flags & FLAG_MSI_ENABLED) {
-		err = request_irq(adapter->pdev->irq, &e1000_intr_msi, 0,
+		err = request_irq(adapter->pdev->irq, &e1000_intr_msi,
+				  entropy ? IRQF_SAMPLE_RANDOM : 0,
 				  netdev->name, netdev);
 		if (!err)
 			return err;
@@ -1544,7 +1546,9 @@ static int e1000_request_irq(struct e1000_adapter *adapter)
 		adapter->int_mode = E1000E_INT_MODE_LEGACY;
 	}
 
-	err = request_irq(adapter->pdev->irq, &e1000_intr, IRQF_SHARED,
+	if (entropy)
+		irq_flags |= IRQF_SAMPLE_RANDOM;
+	err = request_irq(adapter->pdev->irq, &e1000_intr, irq_flags,
 			  netdev->name, netdev);
 	if (err)
 		e_err("Unable to allocate interrupt, Error: %d\n", err);
