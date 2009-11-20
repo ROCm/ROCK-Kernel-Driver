@@ -138,7 +138,7 @@ ia64_brk (unsigned long brk)
 		goto out;
 
 	/* Check against rlimit.. */
-	rlim = current->signal->rlim[RLIMIT_DATA].rlim_cur;
+	rlim = rlim_get_cur(RLIMIT_DATA);
 	if (rlim < RLIM_INFINITY && brk - mm->start_data > rlim)
 		goto out;
 

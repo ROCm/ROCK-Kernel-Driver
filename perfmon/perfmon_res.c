@@ -111,11 +111,11 @@ int pfm_smpl_buf_space_acquire(struct pfm_context *ctx, size_t size)
 	locked  = mm->locked_vm << PAGE_SHIFT;
 	locked += size;
 
-	if (locked > current->signal->rlim[RLIMIT_MEMLOCK].rlim_cur) {
+	if (locked > rlim_get_cur(RLIMIT_MEMLOCK)) {
 
 		PFM_DBG("RLIMIT_MEMLOCK reached ask_locked=%lu rlim_cur=%lu",
 			locked,
-			current->signal->rlim[RLIMIT_MEMLOCK].rlim_cur);
+			rlim_get_cur(RLIMIT_MEMLOCK));
 
 		up_write(&mm->mmap_sem);
 		mmput(mm);
