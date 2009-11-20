@@ -4090,6 +4090,14 @@ F:	arch/*/lib/perf_event.c
 F:	arch/*/kernel/perf_callchain.c
 F:	tools/perf/
 
+PERFMON SUBSYSTEM
+P:	Stephane Eranian
+M:	eranian@gmail.com
+L:	perfmon2-devel@lists.sf.net
+W:	http://perfmon2.sf.net
+T:	git kernel.org:/pub/scm/linux/kernel/git/eranian/linux-2.6
+S:	Maintained
+
 PERSONALITY HANDLING
 M:	Christoph Hellwig <hch@infradead.org>
 L:	linux-abi-devel@lists.sourceforge.net

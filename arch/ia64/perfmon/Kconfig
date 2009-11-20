@@ -1,0 +1,67 @@
+menu "Hardware Performance Monitoring support"
+config PERFMON
+	bool "Perfmon2 performance monitoring interface"
+	default n
+	help
+	Enables the perfmon2 interface to access the hardware
+	performance counters. See <http://perfmon2.sf.net/> for
+	more details.
+
+config PERFMON_DEBUG
+	bool "Perfmon debugging"
+	default n
+	depends on PERFMON
+	help
+	Enables perfmon debugging support
+
+config PERFMON_DEBUG_FS
+	bool "Enable perfmon statistics reporting via debugfs"
+	default y
+	depends on PERFMON && DEBUG_FS
+	help
+	Enable collection and reporting of perfmon timing statistics under
+	debugfs. This is used for debugging and performance analysis of the
+	subsystem. The debugfs filesystem must be mounted.
+
+config IA64_PERFMON_COMPAT
+	bool "Enable old perfmon-2 compatbility mode"
+	default n
+	depends on PERFMON
+	help
+	Enable this option to allow performance tools which used the old
+	perfmon-2 interface to continue to work. Old tools are those using
+	the obsolete commands and arguments. Check your programs and look
+	in include/asm-ia64/perfmon_compat.h for more information.
+
+config IA64_PERFMON_GENERIC
+	tristate "Generic IA-64 PMU support"
+	depends on PERFMON
+	default n
+	help
+	Enables generic IA-64 PMU support.
+	The generic PMU is defined by the IA-64 architecture document.
+	This option should only be necessary when running with a PMU that
+	is not yet explicitely supported. Even then, there is no guarantee
+	that this support will work.
+
+config IA64_PERFMON_ITANIUM
+	tristate "Itanium (Merced) Performance Monitoring support"
+	depends on PERFMON
+	default n
+	help
+	Enables Itanium (Merced) PMU support.
+
+config IA64_PERFMON_MCKINLEY
+	tristate "Itanium 2 (McKinley) Performance Monitoring  support"
+	depends on PERFMON
+	default n
+	help
+	Enables Itanium 2 (McKinley, Madison, Deerfield) PMU support.
+
+config IA64_PERFMON_MONTECITO
+	tristate "Itanium 2 9000 (Montecito) Performance Monitoring  support"
+	depends on PERFMON
+	default n
+	help
+	Enables support for Itanium 2 9000 (Montecito) PMU.
+endmenu

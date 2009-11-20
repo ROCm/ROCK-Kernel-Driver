@@ -165,6 +165,10 @@ header-y += utime.h
 header-y += veth.h
 header-y += videotext.h
 header-y += x25.h
+ifeq ($(ARCH), "ia64")
+header-y += perfmon.h
+header-y += perfmon_dfl_smpl.h
+endif
 
 unifdef-y += acct.h
 unifdef-y += adb.h

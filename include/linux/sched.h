@@ -102,6 +102,7 @@ struct bio;
 struct fs_struct;
 struct bts_context;
 struct perf_event_context;
+struct pfm_context;
 
 /*
  * List of flags we want to share for kernel threads,
@@ -1546,6 +1547,9 @@ struct task_struct {
 #endif /* CONFIG_TRACING */
 	unsigned long stack_start;
 	u64	instrumentation;
+#ifdef CONFIG_PERFMON
+	struct pfm_context *pfm_context;
+#endif
 };
 
 /* Future-safe accessor for struct task_struct's cpus_allowed. */
