@@ -1546,7 +1546,6 @@ struct task_struct {
 	unsigned long trace_recursion;
 #endif /* CONFIG_TRACING */
 	unsigned long stack_start;
-	u64	instrumentation;
 #ifdef CONFIG_PERFMON
 	struct pfm_context *pfm_context;
 #endif

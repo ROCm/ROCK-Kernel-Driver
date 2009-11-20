@@ -760,11 +760,6 @@ handle_signal(unsigned long sig, siginfo_t *info, struct k_sigaction *ka,
 	tracehook_signal_handler(sig, info, ka, regs,
 				 test_thread_flag(TIF_SINGLESTEP));
 
-	if (current->instrumentation & PTS_SELF) {
-		clear_thread_flag(TIF_SYSCALL_TRACE);
-		current->instrumentation &= ~PTS_SELF;
-	}
-
 	return 0;
 }
 
