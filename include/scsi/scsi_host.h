@@ -683,6 +683,12 @@ struct Scsi_Host {
 	void *shost_data;
 
 	/*
+	 * Points to the physical bus device we'd use to do DMA
+	 * Needed just in case we have virtual hosts.
+	 */
+	struct device *dma_dev;
+
+	/*
 	 * We should ensure that this is aligned, both for better performance
 	 * and also because some compilers (m68k) don't automatically force
 	 * alignment to a long boundary.
@@ -704,10 +710,6 @@ static inline void *shost_priv(struct Scsi_Host *shost)
 
 int scsi_is_host_device(const struct device *);
 
-/*
- * walks object list backward, to find the first shost object.
- * Skips over transport objects that may not be stargets, etc
- */
 static inline struct Scsi_Host *dev_to_shost(struct device *dev)
 {
 	while (!scsi_is_host_device(dev)) {
@@ -716,26 +718,6 @@ static inline struct Scsi_Host *dev_to_shost(struct device *dev)
 		dev = dev->parent;
 	}
 	return container_of(dev, struct Scsi_Host, shost_gendev);
-}
-
-/*
- * walks object list backward, to find the first physical
- * device object. If none is found return the original device.
- */
-static inline struct device *dev_to_nonscsi_dev(struct device *dev)
-{
-	struct device *orig = dev;
-
-	while (dev && (dev->bus == NULL || scsi_is_host_device(dev))) {
-		if (dev->dma_parms) {
-			dev_printk(KERN_WARNING, dev,
-				   "dma_parms set, bus %p\n",
-				   dev->bus);
-			break;
-		}
-		dev = dev->parent;
-	}
-	return dev?dev:orig;
 }
 
 static inline int scsi_host_in_recovery(struct Scsi_Host *shost)
@@ -750,7 +732,9 @@ extern int scsi_queue_work(struct Scsi_Host *, struct work_struct *);
 extern void scsi_flush_work(struct Scsi_Host *);
 
 extern struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *, int);
-extern int __must_check scsi_add_host(struct Scsi_Host *, struct device *);
+extern int __must_check scsi_add_host_with_dma(struct Scsi_Host *,
+					       struct device *,
+					       struct device *);
 extern void scsi_scan_host(struct Scsi_Host *);
 extern void scsi_rescan_device(struct device *);
 extern void scsi_remove_host(struct Scsi_Host *);
@@ -760,6 +744,12 @@ extern struct Scsi_Host *scsi_host_lookup(unsigned short);
 extern const char *scsi_host_state_name(enum scsi_host_state);
 
 extern u64 scsi_calculate_bounce_limit(struct Scsi_Host *);
+
+static inline int __must_check scsi_add_host(struct Scsi_Host *host,
+					     struct device *dev)
+{
+	return scsi_add_host_with_dma(host, dev, dev);
+}
 
 static inline struct device *scsi_get_device(struct Scsi_Host *shost)
 {
