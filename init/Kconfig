@@ -32,6 +32,13 @@ config SPLIT_PACKAGE
 	  If you aren't packaging a kernel for distribution, it's safe to
 	  say n.
 
+config KERNEL_DESKTOP
+	bool "Kernel to suit desktop workloads"
+	default n
+	help
+	  This is an option used to tune kernel parameters to better suit
+	  desktop workloads.
+
 config ARCH
 	string
 	option env="ARCH"
@@ -1102,6 +1109,23 @@ config SLOB
 	   does not perform as well on large systems.
 
 endchoice
+
+config DEFAULT_VM_DIRTY_RATIO
+	int "Default VM dirty ratio (in %)"
+	default 20 if KERNEL_DESKTOP
+	default 40
+	help
+	  Allows to tune VM dirty ratio to suit different workloads. Increased
+	  VM dirty ratio improves performance of most server workloads that
+	  dirties a lot of memory (e.g. simple databases not using direct IO,
+	  workloads doing heavy writes). The latency-sensitive workloads like
+	  desktop and typical workstations perform better with a decreased
+	  VM dirty ratio.
+
+	  Recommended value for desktop workload is 20.
+	  Recommended value for server workload is 40.
+
+	  Only use this if you really know what you are doing.
 
 config PROFILING
 	bool "Profiling support (EXPERIMENTAL)"
