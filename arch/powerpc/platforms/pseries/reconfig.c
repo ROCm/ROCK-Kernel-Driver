@@ -96,7 +96,7 @@ static struct device_node *derive_parent(const char *path)
 	return parent;
 }
 
-BLOCKING_NOTIFIER_HEAD(pSeries_reconfig_chain);
+static BLOCKING_NOTIFIER_HEAD(pSeries_reconfig_chain);
 
 int pSeries_reconfig_notifier_register(struct notifier_block *nb)
 {

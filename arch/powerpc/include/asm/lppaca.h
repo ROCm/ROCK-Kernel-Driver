@@ -100,14 +100,7 @@ struct lppaca {
 	// Used to pass parms from the OS to PLIC for SetAsrAndRfid
 	u64	saved_gpr3;		// Saved GPR3                   x20-x27
 	u64	saved_gpr4;		// Saved GPR4                   x28-x2F
-	union {
-		u64	saved_gpr5;	/* Saved GPR5               x30-x37 */
-		struct {
-			u8	cede_latency_hint;  /*			x30 */
-			u8	reserved[7];        /*		    x31-x36 */
-		} fields;
-	} gpr5_dword;
-
+	u64	saved_gpr5;		// Saved GPR5                   x30-x37
 
 	u8	dtl_enable_mask;	// Dispatch Trace Log mask	x38-x38
 	u8	donate_dedicated_cpu;	// Donate dedicated CPU cycles  x39-x39

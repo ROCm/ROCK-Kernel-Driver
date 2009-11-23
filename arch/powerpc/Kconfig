@@ -91,12 +91,6 @@ config ARCH_HAS_ILOG2_U64
 	bool
 	default y if 64BIT
 
-config ARCH_HAS_CPU_IDLE_WAIT
-	def_bool y
-
-config ARCH_HAS_DEFAULT_IDLE
-	def_bool y
-
 config GENERIC_HWEIGHT
 	bool
 	default y
@@ -252,12 +246,6 @@ source "kernel/Kconfig.freezer"
 
 source "arch/powerpc/sysdev/Kconfig"
 source "arch/powerpc/platforms/Kconfig"
-
-menu "Power management options"
-
-source "drivers/cpuidle/Kconfig"
-
-endmenu
 
 menu "Kernel options"
 

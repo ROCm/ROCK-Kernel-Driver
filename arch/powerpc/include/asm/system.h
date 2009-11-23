@@ -218,7 +218,6 @@ extern unsigned long klimit;
 extern void *alloc_maybe_bootmem(size_t size, gfp_t mask);
 extern void *zalloc_maybe_bootmem(size_t size, gfp_t mask);
 
-extern void default_idle(void);
 extern int powersave_nap;	/* set if nap mode can be used in idle loop */
 
 /*
@@ -546,14 +545,6 @@ extern void account_system_vtime(struct task_struct *);
 #endif
 
 extern struct dentry *powerpc_debugfs_root;
-
-void cpu_idle_wait(void);
-
-#ifdef CONFIG_CPU_IDLE
-extern void update_smt_snooze_delay(int snooze);
-#else
-static inline void update_smt_snooze_delay(int snooze) {}
-#endif
 
 #endif /* __KERNEL__ */
 #endif /* _ASM_POWERPC_SYSTEM_H */

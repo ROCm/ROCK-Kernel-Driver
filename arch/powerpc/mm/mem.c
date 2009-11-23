@@ -111,19 +111,8 @@ EXPORT_SYMBOL(phys_mem_access_prot);
 #ifdef CONFIG_MEMORY_HOTPLUG
 
 #ifdef CONFIG_NUMA
-int __attribute ((weak)) platform_probe_memory(u64 start)
-{
-	return 0;
-}
-
 int memory_add_physaddr_to_nid(u64 start)
 {
-	int rc;
-
-	rc = platform_probe_memory(start);
-	if (rc)
-		return rc;
-
 	return hot_add_scn_to_nid(start);
 }
 #endif

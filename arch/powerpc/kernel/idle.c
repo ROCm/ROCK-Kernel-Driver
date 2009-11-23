@@ -25,7 +25,6 @@
 #include <linux/cpu.h>
 #include <linux/sysctl.h>
 #include <linux/tick.h>
-#include <linux/cpuidle.h>
 
 #include <asm/system.h>
 #include <asm/processor.h>
@@ -40,22 +39,12 @@
 #define cpu_should_die()	0
 #endif
 
-int boot_option_idle_override = 0;
-
 static int __init powersave_off(char *arg)
 {
-	boot_option_idle_override = 1;
+	ppc_md.power_save = NULL;
 	return 0;
 }
 __setup("powersave=off", powersave_off);
-
-#ifndef CONFIG_CPU_IDLE
-void cpuidle_idle_call(void)
-{
-	local_irq_enable();
-	cpu_relax();
-}
-#endif
 
 /*
  * The body of the idle task.
@@ -71,26 +60,35 @@ void cpu_idle(void)
 		while (!need_resched() && !cpu_should_die()) {
 			ppc64_runlatch_off();
 
-			clear_thread_flag(TIF_POLLING_NRFLAG);
-			/*
-			 * smp_mb is so clearing of TIF_POLLING_NRFLAG
-			 * is ordered w.r.t. need_resched() test.
-			 */
-			smp_mb();
-			local_irq_disable();
+			if (ppc_md.power_save) {
+				clear_thread_flag(TIF_POLLING_NRFLAG);
+				/*
+				 * smp_mb is so clearing of TIF_POLLING_NRFLAG
+				 * is ordered w.r.t. need_resched() test.
+				 */
+				smp_mb();
+				local_irq_disable();
 
-			/* Don't trace irqs off for idle */
-			stop_critical_timings();
+				/* Don't trace irqs off for idle */
+				stop_critical_timings();
 
-			/* check again after disabling irqs */
-			if (!need_resched() && !cpu_should_die())
-				cpuidle_idle_call();
+				/* check again after disabling irqs */
+				if (!need_resched() && !cpu_should_die())
+					ppc_md.power_save();
 
-			start_critical_timings();
+				start_critical_timings();
 
-			local_irq_enable();
-			set_thread_flag(TIF_POLLING_NRFLAG);
+				local_irq_enable();
+				set_thread_flag(TIF_POLLING_NRFLAG);
 
+			} else {
+				/*
+				 * Go into low thread priority and possibly
+				 * low power mode.
+				 */
+				HMT_low();
+				HMT_very_low();
+			}
 		}
 
 		HMT_medium();
@@ -102,31 +100,6 @@ void cpu_idle(void)
 		schedule();
 		preempt_disable();
 	}
-}
-
-static void do_nothing(void *unused)
-{
-}
-
-/*
- * cpu_idle_wait - Used to ensure that all the CPUs come out of the old
- * idle loop and start using the new idle loop.
- * Required while changing idle handler on SMP systems.
- * Caller must have changed idle handler to the new value before the call.
- */
-void cpu_idle_wait(void)
-{
-	/* Ensure that new value of idle is set */
-	smp_mb();
-	/* kick all the CPUs so that they exit out of old idle routine */
-	smp_call_function(do_nothing, NULL, 1);
-}
-EXPORT_SYMBOL_GPL(cpu_idle_wait);
-
-void default_idle(void)
-{
-	HMT_low();
-	HMT_very_low();
 }
 
 int powersave_nap;
