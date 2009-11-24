@@ -4,6 +4,7 @@
 
 choice
 	prompt "Timer frequency"
+	default HZ_1000 if KERNEL_DESKTOP
 	default HZ_250
 	help
 	 Allows the configuration of the timer frequency. It is customary

@@ -470,7 +470,8 @@ config HAVE_UNSTABLE_SCHED_CLOCK
 config GROUP_SCHED
 	bool "Group CPU scheduler"
 	depends on EXPERIMENTAL
-	default n
+	default n if KERNEL_DESKTOP
+	default y
 	help
 	  This feature lets CPU scheduler recognize task groups and control CPU
 	  bandwidth allocation to such task groups.
@@ -520,6 +521,8 @@ endchoice
 
 menuconfig CGROUPS
 	boolean "Control Group support"
+	default n if KERNEL_DESKTOP
+	default y
 	help
 	  This option adds support for grouping sets of processes together, for
 	  use with process control subsystems such as Cpusets, CFS, memory

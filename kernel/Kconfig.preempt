@@ -1,6 +1,7 @@
 
 choice
 	prompt "Preemption Model"
+	default PREEMPT if KERNEL_DESKTOP
 	default PREEMPT_NONE
 
 config PREEMPT_NONE
