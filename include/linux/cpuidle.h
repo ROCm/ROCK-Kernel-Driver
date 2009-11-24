@@ -41,7 +41,7 @@ struct cpuidle_state {
 	unsigned long long	usage;
 	unsigned long long	time; /* in US */
 
-	void (*enter)	(struct cpuidle_device *dev,
+	int (*enter)	(struct cpuidle_device *dev,
 			 struct cpuidle_state *state);
 };
 
@@ -92,7 +92,7 @@ struct cpuidle_device {
 	struct cpuidle_state_kobj *kobjs[CPUIDLE_STATE_MAX];
 	struct cpuidle_state	*last_state;
 
-	struct list_head	idle_list;
+	struct list_head 	device_list;
 	struct kobject		kobj;
 	struct completion	kobj_unregister;
 	void			*governor_data;
@@ -111,9 +111,6 @@ static inline int cpuidle_get_last_residency(struct cpuidle_device *dev)
 {
 	return dev->last_residency;
 }
-
-extern struct cpuidle_driver *cpuidle_curr_driver;
-extern void cpuidle_idle_call(void);
 
 
 /****************************
@@ -136,8 +133,6 @@ extern void cpuidle_pause_and_lock(void);
 extern void cpuidle_resume_and_unlock(void);
 extern int cpuidle_enable_device(struct cpuidle_device *dev);
 extern void cpuidle_disable_device(struct cpuidle_device *dev);
-extern int common_idle_loop(struct cpuidle_device *dev,
-			struct cpuidle_state *st, void (*idle)(void));
 
 #else
 
@@ -153,8 +148,6 @@ static inline void cpuidle_resume_and_unlock(void) { }
 static inline int cpuidle_enable_device(struct cpuidle_device *dev)
 {return 0;}
 static inline void cpuidle_disable_device(struct cpuidle_device *dev) { }
-static inline int common_idle_loop(struct cpuidle_device *dev,
-			struct cpuidle_state *st, void (*idle)(void)) { }
 
 #endif
 
