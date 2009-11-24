@@ -1,5 +1,5 @@
 /*
- *  linux/drivers/message/fusion/mptioctl.h
+ *  linux/drivers/message/fusion/mptctl.h
  *      Fusion MPT misc device (ioctl) driver.
  *      For use with PCI chip/adapter(s):
  *          LSIFC9xx/LSI409xx Fibre Channel
@@ -457,9 +457,6 @@ typedef struct _hp_target_info {
 #define HP_DEV_SPEED_ULTRA160	6
 #define HP_DEV_SPEED_SCSI1	7
 #define HP_DEV_SPEED_ULTRA320	8
-
-/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 

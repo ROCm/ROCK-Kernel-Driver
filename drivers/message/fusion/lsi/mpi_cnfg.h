@@ -6,7 +6,7 @@
  *          Title:  MPI Config message, structures, and Pages
  *  Creation Date:  July 27, 2000
  *
- *    mpi_cnfg.h Version:  01.05.18
+ *    mpi_cnfg.h Version:  01.05.19
  *
  *  Version History
  *  ---------------
@@ -322,6 +322,14 @@
  *  03-28-08  01.05.18  Defined new bits in Manufacturing Page 4 ExtFlags field
  *                      to control coercion size and the mixing of SAS and SATA
  *                      SSD drives.
+ *  07-11-08  01.05.19  Added defines MPI_MANPAGE4_EXTFLAGS_RAID0_SINGLE_DRIVE
+ *                      and MPI_MANPAGE4_EXTFLAGS_SSD_SCRUB_DISABLE for ExtFlags
+ *                      field of Manufacturing Page 4.
+ *                      Added defines for a new bit in BIOS Page 1 BiosOptions
+ *                      field to control adapter scan order.
+ *                      Added BootDeviceWaitTime field to SAS IO Unit Page 2.
+ *                      Added MPI_SAS_PHY0_PHYINFO_PHY_VACANT for use in PhyInfo
+ *                      field of SAS Expander Page 1.
  *  --------------------------------------------------------------------------
  */
 
@@ -700,6 +708,8 @@ typedef struct _CONFIG_PAGE_MANUFACTURING_4
 #define MPI_MANPAGE4_IR_NO_MIX_SAS_SATA                 (0x01)
 
 /* defines for the ExtFlags field */
+#define MPI_MANPAGE4_EXTFLAGS_RAID0_SINGLE_DRIVE        (0x0400)
+#define MPI_MANPAGE4_EXTFLAGS_SSD_SCRUB_DISABLE         (0x0200)
 #define MPI_MANPAGE4_EXTFLAGS_MASK_COERCION_SIZE        (0x0180)
 #define MPI_MANPAGE4_EXTFLAGS_SHIFT_COERCION_SIZE       (7)
 #define MPI_MANPAGE4_EXTFLAGS_1GB_COERCION_SIZE         (0)
@@ -1219,6 +1229,10 @@ typedef struct _CONFIG_PAGE_BIOS_1
 #define MPI_BIOSPAGE1_OPTIONS_SPI_ENABLE                (0x00000400)
 #define MPI_BIOSPAGE1_OPTIONS_FC_ENABLE                 (0x00000200)
 #define MPI_BIOSPAGE1_OPTIONS_SAS_ENABLE                (0x00000100)
+
+#define MPI_BIOSPAGE1_OPTIONS_SCAN_HIGH_TO_LOW          (0x00000002)
+#define MPI_BIOSPAGE1_OPTIONS_SCAN_LOW_TO_HIGH          (0x00000000)
+
 #define MPI_BIOSPAGE1_OPTIONS_DISABLE_BIOS              (0x00000001)
 
 /* values for the IOCSettings field */
@@ -2712,7 +2726,7 @@ typedef struct _CONFIG_PAGE_SAS_IO_UNIT_2
 {
     CONFIG_EXTENDED_PAGE_HEADER         Header;                 /* 00h */
     U8                                  NumDevsPerEnclosure;    /* 08h */
-    U8                                  Reserved1;              /* 09h */
+    U8                                  BootDeviceWaitTime;     /* 09h */
     U16                                 Reserved2;              /* 0Ah */
     U16                                 MaxPersistentIDs;       /* 0Ch */
     U16                                 NumPersistentIDsUsed;   /* 0Eh */
@@ -2722,7 +2736,7 @@ typedef struct _CONFIG_PAGE_SAS_IO_UNIT_2
 } CONFIG_PAGE_SAS_IO_UNIT_2, MPI_POINTER PTR_CONFIG_PAGE_SAS_IO_UNIT_2,
   SasIOUnitPage2_t, MPI_POINTER pSasIOUnitPage2_t;
 
-#define MPI_SASIOUNITPAGE2_PAGEVERSION      (0x06)
+#define MPI_SASIOUNITPAGE2_PAGEVERSION      (0x07)
 
 /* values for SAS IO Unit Page 2 Status field */
 #define MPI_SAS_IOUNIT2_STATUS_DEVICE_LIMIT_EXCEEDED        (0x08)
@@ -2997,6 +3011,7 @@ typedef struct _CONFIG_PAGE_SAS_PHY_0
 #define MPI_SAS_PHY0_FLAGS_SGPIO_DIRECT_ATTACH_ENC              (0x01)
 
 /* values for SAS PHY Page 0 PhyInfo field */
+#define MPI_SAS_PHY0_PHYINFO_PHY_VACANT                         (0x80000000)
 #define MPI_SAS_PHY0_PHYINFO_SATA_PORT_ACTIVE                   (0x00004000)
 #define MPI_SAS_PHY0_PHYINFO_SATA_PORT_SELECTOR                 (0x00002000)
 #define MPI_SAS_PHY0_PHYINFO_VIRTUAL_PHY                        (0x00001000)

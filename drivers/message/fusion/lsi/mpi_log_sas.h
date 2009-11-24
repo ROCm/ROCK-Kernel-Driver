@@ -161,11 +161,10 @@
 
 #define PL_LOGINFO_SUB_CODE_INVALID_SGL                      (0x00000200)
 #define PL_LOGINFO_SUB_CODE_WRONG_REL_OFF_OR_FRAME_LENGTH    (0x00000300)
-#define PL_LOGINFO_SUB_CODE_FRAME_XFER_ERROR                 (0x00000400)
-/* Bits 0-3 encode Transport Status Register (offset 0x08) */
-/* Bit 0 is Status Bit 0: FrameXferErr */
-/* Bit 1 & 2 are Status Bits 16 and 17: FrameXmitErrStatus */
-/* Bit 3 is Status Bit 18 WriteDataLenghtGTDataLengthErr */
+#define PL_LOGINFO_SUB_CODE_FRAME_XFER_ERROR                 (0x00000400) /* Bits 0-3 encode Transport Status Register (offset 0x08) */
+                                                                          /* Bit 0 is Status Bit 0: FrameXferErr */
+                                                                          /* Bit 1 & 2 are Status Bits 16 and 17: FrameXmitErrStatus */
+                                                                          /* Bit 3 is Status Bit 18 WriteDataLenghtGTDataLengthErr */
 
 #define PL_LOGINFO_SUB_CODE_TX_FM_CONNECTED_LOW              (0x00000500)
 #define PL_LOGINFO_SUB_CODE_SATA_NON_NCQ_RW_ERR_BIT_SET      (0x00000600)
@@ -180,8 +179,7 @@
 #define PL_LOGINFO_SUB_CODE_DISCOVERY_REMOTE_SEP_RESET       (0x00000E01)
 #define PL_LOGINFO_SUB_CODE_SECOND_OPEN                      (0x00000F00)
 #define PL_LOGINFO_SUB_CODE_DSCVRY_SATA_INIT_TIMEOUT         (0x00001000)
-#define PL_LOGINFO_SUB_CODE_BREAK_ON_SATA_CONNECTION         (0x00002000)
-/* not currently used in mainline */
+#define PL_LOGINFO_SUB_CODE_BREAK_ON_SATA_CONNECTION  		 (0x00002000) /* not currently used in mainline */
 #define PL_LOGINFO_SUB_CODE_BREAK_ON_STUCK_LINK              (0x00003000)
 #define PL_LOGINFO_SUB_CODE_BREAK_ON_STUCK_LINK_AIP          (0x00004000)
 #define PL_LOGINFO_SUB_CODE_BREAK_ON_INCOMPLETE_BREAK_RCVD   (0x00005000)
@@ -309,6 +307,8 @@
 #define IR_LOGINFO_DEV_FW_UPDATE_ERR_PORT_IO_TIMEOUTS_REQUIRED  (0x00010055)
 /* Device Firmware Update: Unable to allocate memory for page */
 #define IR_LOGINFO_DEV_FW_UPDATE_ERR_ALLOC_CFG_PAGE             (0x00010056)
+/* Device Firmware Update:  */
+//#define IR_LOGINFO_DEV_FW_UPDATE_ERR_                         (0x00010054)
 
 
 /****************************************************************************/

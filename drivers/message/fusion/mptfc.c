@@ -43,6 +43,7 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -52,8 +53,10 @@
 #include <linux/delay.h>	/* for mdelay */
 #include <linux/interrupt.h>	/* needed for in_interrupt() proto */
 #include <linux/reboot.h>	/* notifier code */
+#include <linux/sched.h>
 #include <linux/workqueue.h>
 #include <linux/sort.h>
+#include <linux/pci.h>
 
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
@@ -80,9 +83,17 @@ MODULE_VERSION(my_VERSION);
 static int mptfc_dev_loss_tmo = MPTFC_DEV_LOSS_TMO;	/* reasonable default */
 module_param(mptfc_dev_loss_tmo, int, 0);
 MODULE_PARM_DESC(mptfc_dev_loss_tmo, " Initial time the driver programs the "
-    				     " transport to wait for an rport to "
+				     " transport to wait for an rport to "
 				     " return following a device loss event."
 				     "  Default=60.");
+
+static int mpt_sdev_queue_depth = MPT_SCSI_CMD_PER_DEV_HIGH;
+static int mptfc_set_sdev_queue_depth(const char *val, struct kernel_param *kp);
+module_param_call(mpt_sdev_queue_depth, mptfc_set_sdev_queue_depth,
+    param_get_int,  &mpt_sdev_queue_depth, 0600);
+MODULE_PARM_DESC(mpt_sdev_queue_depth,
+    " Max Device Queue Depth (default="
+    __MODULE_STRING(MPT_SCSI_CMD_PER_DEV_HIGH) ")");
 
 /* scsi-mid layer global parmeter is max_report_luns, which is 511 */
 #define MPTFC_MAX_LUN (16895)
@@ -118,7 +129,7 @@ static struct scsi_host_template mptfc_driver_template = {
 	.slave_configure		= mptscsih_slave_configure,
 	.target_destroy			= mptfc_target_destroy,
 	.slave_destroy			= mptscsih_slave_destroy,
-	.change_queue_depth 		= mptscsih_change_queue_depth,
+	.change_queue_depth		= mptscsih_change_queue_depth,
 	.eh_abort_handler		= mptfc_abort,
 	.eh_device_reset_handler	= mptfc_dev_reset,
 	.eh_bus_reset_handler		= mptfc_bus_reset,
@@ -183,6 +194,35 @@ static struct fc_function_template mptfc_transport_functions = {
 	.show_host_symbolic_name = 1,
 };
 
+/**
+ *	mptfc_set_sdev_queue_depth - global setting of the mpt_sdev_queue_depth
+ *	found via /sys/module/mptfc/parameters/mpt_sdev_queue_depth
+ *	@val:
+ *	@kp:
+ *
+ *	Returns
+ **/
+static int
+mptfc_set_sdev_queue_depth(const char *val, struct kernel_param *kp)
+{
+	int ret = param_set_int(val, kp);
+	MPT_ADAPTER *ioc;
+	struct scsi_device	*sdev;
+
+	if (ret)
+		return ret;
+
+	list_for_each_entry(ioc, &ioc_list, list) {
+		if (ioc->bus_type != FC)
+			continue;
+		shost_for_each_device(sdev, ioc->sh)
+			mptscsih_change_queue_depth(sdev, mpt_sdev_queue_depth,
+						    SCSI_QDEPTH_DEFAULT);
+		ioc->sdev_queue_depth = mpt_sdev_queue_depth;
+	}
+	return 0;
+}
+
 static int
 mptfc_block_error_handler(struct scsi_cmnd *SCpnt,
 			  int (*func)(struct scsi_cmnd *SCpnt),
@@ -194,7 +234,7 @@ mptfc_block_error_handler(struct scsi_cmnd *SCpnt,
 	struct fc_rport		*rport = starget_to_rport(scsi_target(sdev));
 	unsigned long		flags;
 	int			ready;
-	MPT_ADAPTER 		*ioc;
+	MPT_ADAPTER		*ioc;
 
 	hd = shost_priv(SCpnt->device->host);
 	ioc = hd->ioc;
@@ -231,28 +271,28 @@ static int
 mptfc_abort(struct scsi_cmnd *SCpnt)
 {
 	return
-	    mptfc_block_error_handler(SCpnt, mptscsih_abort, __func__);
+	    mptfc_block_error_handler(SCpnt, mptscsih_abort, __FUNCTION__);
 }
 
 static int
 mptfc_dev_reset(struct scsi_cmnd *SCpnt)
 {
 	return
-	    mptfc_block_error_handler(SCpnt, mptscsih_dev_reset, __func__);
+	    mptfc_block_error_handler(SCpnt, mptscsih_dev_reset, __FUNCTION__);
 }
 
 static int
 mptfc_bus_reset(struct scsi_cmnd *SCpnt)
 {
 	return
-	    mptfc_block_error_handler(SCpnt, mptscsih_bus_reset, __func__);
+	    mptfc_block_error_handler(SCpnt, mptscsih_bus_reset, __FUNCTION__);
 }
 
 static int
 mptfc_host_reset(struct scsi_cmnd *SCpnt)
 {
 	return
-	    mptfc_block_error_handler(SCpnt, mptscsih_host_reset, __func__);
+	    mptfc_block_error_handler(SCpnt, mptscsih_host_reset, __FUNCTION__);
 }
 
 static void
@@ -335,7 +375,7 @@ mptfc_GetFcDevPage0(MPT_ADAPTER *ioc, int ioc_port,
 
 		data_sz = hdr.PageLength * 4;
 		ppage0_alloc = pci_alloc_consistent(ioc->pcidev, data_sz,
-		    					&page0_dma);
+							&page0_dma);
 		rc = -ENOMEM;
 		if (!ppage0_alloc)
 			break;
@@ -371,7 +411,7 @@ mptfc_GetFcDevPage0(MPT_ADAPTER *ioc, int ioc_port,
 			*p_pp0++ = p_p0++;	/* save addr */
 		}
 		pci_free_consistent(ioc->pcidev, data_sz,
-		    			(u8 *) ppage0_alloc, page0_dma);
+					(u8 *) ppage0_alloc, page0_dma);
 		if (rc != 0)
 			break;
 
@@ -476,6 +516,7 @@ mptfc_register_dev(MPT_ADAPTER *ioc, int channel, FCDevicePage0_t *pg0)
 				if (vtarget) {
 					vtarget->id = pg0->CurrentTargetID;
 					vtarget->channel = pg0->CurrentBus;
+					vtarget->deleted = 0;
 				}
 			}
 			*((struct mptfc_rport_info **)rport->dd_data) = ri;
@@ -513,6 +554,7 @@ mptfc_target_destroy(struct scsi_target *starget)
 	struct fc_rport		*rport;
 	struct mptfc_rport_info *ri;
 
+	printk("%s - starget=%p\n", __FUNCTION__, starget);
 	rport = starget_to_rport(starget);
 	if (rport) {
 		ri = *((struct mptfc_rport_info **)rport->dd_data);
@@ -560,6 +602,7 @@ mptfc_target_alloc(struct scsi_target *starget)
 
 	return rc;
 }
+
 /*
  *	mptfc_dump_lun_info
  *	@ioc
@@ -589,7 +632,6 @@ mptfc_dump_lun_info(MPT_ADAPTER *ioc, struct fc_rport *rport, struct scsi_device
 		(unsigned long long)nn));
 }
 
-
 /*
  *	OS entry point to allow host driver to alloc memory
  *	for each scsi device. Called once per device the bus scan.
@@ -604,7 +646,7 @@ mptfc_slave_alloc(struct scsi_device *sdev)
 	VirtDevice		*vdevice;
 	struct scsi_target	*starget;
 	struct fc_rport		*rport;
-	MPT_ADAPTER 		*ioc;
+	MPT_ADAPTER		*ioc;
 
 	starget = scsi_target(sdev);
 	rport = starget_to_rport(starget);
@@ -614,11 +656,10 @@ mptfc_slave_alloc(struct scsi_device *sdev)
 
 	hd = shost_priv(sdev->host);
 	ioc = hd->ioc;
-
 	vdevice = kzalloc(sizeof(VirtDevice), GFP_KERNEL);
 	if (!vdevice) {
 		printk(MYIOC_s_ERR_FMT "slave_alloc kmalloc(%zd) FAILED!\n",
-				ioc->name, sizeof(VirtDevice));
+		    ioc->name, sizeof(VirtDevice));
 		return -ENOMEM;
 	}
 
@@ -635,10 +676,7 @@ mptfc_slave_alloc(struct scsi_device *sdev)
 	vdevice->lun = sdev->lun;
 
 	vtarget->num_luns++;
-
-
 	mptfc_dump_lun_info(ioc, rport, sdev, vtarget);
-
 	return 0;
 }
 
@@ -944,11 +982,12 @@ start_over:
 	return rc;
 }
 
-static void
+static int
 mptfc_SetFcPortPage1_defaults(MPT_ADAPTER *ioc)
 {
 	int		ii;
 	FCPortPage1_t	*pp1;
+	int		rc;
 
 	#define MPTFC_FW_DEVICE_TIMEOUT	(1)
 	#define MPTFC_FW_IO_PEND_TIMEOUT (1)
@@ -956,8 +995,8 @@ mptfc_SetFcPortPage1_defaults(MPT_ADAPTER *ioc)
 	#define OFF_FLAGS (MPI_FCPORTPAGE1_FLAGS_VERBOSE_RESCAN_EVENTS)
 
 	for (ii=0; ii<ioc->facts.NumberOfPorts; ii++) {
-		if (mptfc_GetFcPortPage1(ioc, ii) != 0)
-			continue;
+		if ((rc = mptfc_GetFcPortPage1(ioc, ii)) < 0)
+			return rc;
 		pp1 = ioc->fc_data.fc_port_page1[ii].data;
 		if ((pp1->InitiatorDeviceTimeout == MPTFC_FW_DEVICE_TIMEOUT)
 		 && (pp1->InitiatorIoPendTimeout == MPTFC_FW_IO_PEND_TIMEOUT)
@@ -968,8 +1007,10 @@ mptfc_SetFcPortPage1_defaults(MPT_ADAPTER *ioc)
 		pp1->InitiatorIoPendTimeout = MPTFC_FW_IO_PEND_TIMEOUT;
 		pp1->Flags &= ~OFF_FLAGS;
 		pp1->Flags |= ON_FLAGS;
-		mptfc_WriteFcPortPage1(ioc, ii);
+		if ((rc = mptfc_WriteFcPortPage1(ioc, ii)) < 0)
+			return rc;
 	}
+	return 0;
 }
 
 
@@ -1003,10 +1044,10 @@ mptfc_init_host_attr(MPT_ADAPTER *ioc,int portnum)
 	fc_host_maxframe_size(sh) = pp0->MaxFrameSize;
 
 	fc_host_node_name(sh) =
-	    	(u64)pp0->WWNN.High << 32 | (u64)pp0->WWNN.Low;
+		(u64)pp0->WWNN.High << 32 | (u64)pp0->WWNN.Low;
 
 	fc_host_port_name(sh) =
-	    	(u64)pp0->WWPN.High << 32 | (u64)pp0->WWPN.Low;
+		(u64)pp0->WWPN.High << 32 | (u64)pp0->WWPN.Low;
 
 	fc_host_port_id(sh) = pp0->PortIdentifier;
 
@@ -1082,10 +1123,13 @@ mptfc_link_status_change(struct work_struct *work)
 static void
 mptfc_setup_reset(struct work_struct *work)
 {
-	MPT_ADAPTER		*ioc =
+	MPT_ADAPTER             *ioc =
 		container_of(work, MPT_ADAPTER, fc_setup_reset_work);
 	u64			pn;
 	struct mptfc_rport_info *ri;
+	struct scsi_target      *starget;
+	VirtTarget              *vtarget;
+
 
 	/* reset about to happen, delete (block) all rports */
 	list_for_each_entry(ri, &ioc->fc_rports, list) {
@@ -1093,6 +1137,12 @@ mptfc_setup_reset(struct work_struct *work)
 			ri->flags &= ~MPT_RPORT_INFO_FLAGS_REGISTERED;
 			fc_remote_port_delete(ri->rport);	/* won't sleep */
 			ri->rport = NULL;
+			starget = ri->starget;
+			if (starget) {
+				vtarget = starget->hostdata;
+				if (vtarget)
+					vtarget->deleted = 1;
+			}
 
 			pn = (u64)ri->pg0.WWPN.High << 32 |
 			     (u64)ri->pg0.WWPN.Low;
@@ -1111,8 +1161,22 @@ mptfc_rescan_devices(struct work_struct *work)
 	MPT_ADAPTER		*ioc =
 		container_of(work, MPT_ADAPTER, fc_rescan_work);
 	int			ii;
+	int			rc;
 	u64			pn;
 	struct mptfc_rport_info *ri;
+	struct scsi_target      *starget;
+	VirtTarget              *vtarget;
+
+	/*
+	 * if cannot set defaults, something's really wrong, bail out
+	 */
+
+	if ((rc = mptfc_SetFcPortPage1_defaults(ioc)) < 0) {
+		dfcprintk (ioc, printk(MYIOC_s_DEBUG_FMT
+		    "mptfc_rescan.%d: unable to set PP1 defaults, rc %d.\n",
+		    ioc->name, ioc->sh->host_no, rc));
+		return;
+	}
 
 	/* start by tagging all ports as missing */
 	list_for_each_entry(ri, &ioc->fc_rports, list) {
@@ -1140,6 +1204,12 @@ mptfc_rescan_devices(struct work_struct *work)
 				       MPT_RPORT_INFO_FLAGS_MISSING);
 			fc_remote_port_delete(ri->rport);	/* won't sleep */
 			ri->rport = NULL;
+			starget = ri->starget;
+			if (starget) {
+				vtarget = starget->hostdata;
+				if (vtarget)
+					vtarget->deleted = 1;
+			}
 
 			pn = (u64)ri->pg0.WWPN.High << 32 |
 			     (u64)ri->pg0.WWPN.Low;
@@ -1157,7 +1227,7 @@ mptfc_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	struct Scsi_Host	*sh;
 	MPT_SCSI_HOST		*hd;
-	MPT_ADAPTER 		*ioc;
+	MPT_ADAPTER		*ioc;
 	unsigned long		 flags;
 	int			 ii;
 	int			 numSGE = 0;
@@ -1215,7 +1285,7 @@ mptfc_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 			ioc->name);
 		error = -1;
 		goto out_mptfc_probe;
-        }
+	}
 
 	spin_lock_init(&ioc->fc_rescan_work_lock);
 	INIT_WORK(&ioc->fc_rescan_work, mptfc_rescan_devices);
@@ -1237,6 +1307,10 @@ mptfc_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	sh->max_id = ioc->pfacts->MaxDevices;
 	sh->max_lun = max_lun;
+
+	sh->this_id = ioc->pfacts[0].PortSCSIID;
+
+	ioc->sdev_queue_depth = mpt_sdev_queue_depth;
 
 	/* Required entry.
 	 */
@@ -1300,8 +1374,8 @@ mptfc_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	/* initialize workqueue */
 
-	snprintf(ioc->fc_rescan_work_q_name, sizeof(ioc->fc_rescan_work_q_name),
-		 "mptfc_wq_%d", sh->host_no);
+	snprintf(ioc->fc_rescan_work_q_name, MPT_KOBJ_NAME_LEN, "mptfc_wq_%d",
+		sh->host_no);
 	ioc->fc_rescan_work_q =
 		create_singlethread_workqueue(ioc->fc_rescan_work_q_name);
 	if (!ioc->fc_rescan_work_q)
@@ -1314,7 +1388,6 @@ mptfc_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	for (ii=0; ii < ioc->facts.NumberOfPorts; ii++) {
 		(void) mptfc_GetFcPortPage0(ioc, ii);
 	}
-	mptfc_SetFcPortPage1_defaults(ioc);
 
 	/*
 	 * scan for rports -
@@ -1352,8 +1425,8 @@ mptfc_event_process(MPT_ADAPTER *ioc, EventNotificationReply_t *pEvReply)
 	unsigned long flags;
 	int rc=1;
 
-	devtverboseprintk(ioc, printk(MYIOC_s_DEBUG_FMT "MPT event (=%02Xh) routed to SCSI host driver!\n",
-			ioc->name, event));
+	if (ioc->bus_type != FC)
+		return 0;
 
 	if (ioc->sh == NULL ||
 		((hd = shost_priv(ioc->sh)) == NULL))
@@ -1390,45 +1463,45 @@ mptfc_ioc_reset(MPT_ADAPTER *ioc, int reset_phase)
 	unsigned long	flags;
 
 	rc = mptscsih_ioc_reset(ioc,reset_phase);
-	if (rc == 0)
+	if ((ioc->bus_type != FC) || (!rc))
 		return rc;
 
-
-	dtmprintk(ioc, printk(MYIOC_s_DEBUG_FMT
-		": IOC %s_reset routed to FC host driver!\n",ioc->name,
-		reset_phase==MPT_IOC_SETUP_RESET ? "setup" : (
-		reset_phase==MPT_IOC_PRE_RESET ? "pre" : "post")));
-
-	if (reset_phase == MPT_IOC_SETUP_RESET) {
+	switch(reset_phase) {
+	case MPT_IOC_SETUP_RESET:
+		dtmprintk(ioc, printk(MYIOC_s_DEBUG_FMT
+		    "%s: MPT_IOC_SETUP_RESET\n", ioc->name, __FUNCTION__));
 		spin_lock_irqsave(&ioc->fc_rescan_work_lock, flags);
 		if (ioc->fc_rescan_work_q) {
 			queue_work(ioc->fc_rescan_work_q,
 				   &ioc->fc_setup_reset_work);
 		}
 		spin_unlock_irqrestore(&ioc->fc_rescan_work_lock, flags);
-	}
-
-	else if (reset_phase == MPT_IOC_PRE_RESET) {
-	}
-
-	else {	/* MPT_IOC_POST_RESET */
-		mptfc_SetFcPortPage1_defaults(ioc);
+		break;
+	case MPT_IOC_PRE_RESET:
+		dtmprintk(ioc, printk(MYIOC_s_DEBUG_FMT
+		    "%s: MPT_IOC_PRE_RESET\n", ioc->name, __FUNCTION__));
+		break;
+	case MPT_IOC_POST_RESET:
+		dtmprintk(ioc, printk(MYIOC_s_DEBUG_FMT
+		    "%s: MPT_IOC_POST_RESET\n",  ioc->name, __FUNCTION__));
 		spin_lock_irqsave(&ioc->fc_rescan_work_lock, flags);
 		if (ioc->fc_rescan_work_q) {
 			queue_work(ioc->fc_rescan_work_q,
 				   &ioc->fc_rescan_work);
 		}
 		spin_unlock_irqrestore(&ioc->fc_rescan_work_lock, flags);
+		break;
+	default:
+		break;
 	}
 	return 1;
 }
 
-/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /**
  *	mptfc_init - Register MPT adapter(s) as SCSI host(s) with SCSI mid-layer.
  *
  *	Returns 0 for success, non-zero for failure.
- */
+ **/
 static int __init
 mptfc_init(void)
 {
@@ -1460,12 +1533,11 @@ mptfc_init(void)
 	return error;
 }
 
-/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /**
  *	mptfc_remove - Remove fc infrastructure for devices
  *	@pdev: Pointer to pci_dev structure
  *
- */
+ **/
 static void __devexit
 mptfc_remove(struct pci_dev *pdev)
 {
@@ -1474,6 +1546,8 @@ mptfc_remove(struct pci_dev *pdev)
 	struct workqueue_struct *work_q;
 	unsigned long		flags;
 	int			ii;
+
+	printk("%s -pdev=%p\n", __FUNCTION__, pdev);
 
 	/* destroy workqueue */
 	if ((work_q=ioc->fc_rescan_work_q)) {
@@ -1517,7 +1591,6 @@ mptfc_exit(void)
 
 	mpt_reset_deregister(mptfcDoneCtx);
 	mpt_event_deregister(mptfcDoneCtx);
-
 	mpt_deregister(mptfcInternalCtx);
 	mpt_deregister(mptfcTaskCtx);
 	mpt_deregister(mptfcDoneCtx);

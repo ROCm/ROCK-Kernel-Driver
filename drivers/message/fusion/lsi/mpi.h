@@ -6,7 +6,7 @@
  *          Title:  MPI Message independent structures and definitions
  *  Creation Date:  July 27, 2000
  *
- *    mpi.h Version:  01.05.16
+ *    mpi.h Version:  01.05.17
  *
  *  Version History
  *  ---------------
@@ -82,6 +82,7 @@
  *  08-07-07  01.05.14  Bumped MPI_HEADER_VERSION_UNIT.
  *  01-15-08  01.05.15  Bumped MPI_HEADER_VERSION_UNIT.
  *  03-28-08  01.05.16  Bumped MPI_HEADER_VERSION_UNIT.
+ *  07-11-08  01.05.17  Bumped MPI_HEADER_VERSION_UNIT.
  *  --------------------------------------------------------------------------
  */
 
@@ -112,7 +113,7 @@
 /* Note: The major versions of 0xe0 through 0xff are reserved */
 
 /* versioning for this MPI header set */
-#define MPI_HEADER_VERSION_UNIT             (0x13)
+#define MPI_HEADER_VERSION_UNIT             (0x14)
 #define MPI_HEADER_VERSION_DEV              (0x00)
 #define MPI_HEADER_VERSION_UNIT_MASK        (0xFF00)
 #define MPI_HEADER_VERSION_UNIT_SHIFT       (8)

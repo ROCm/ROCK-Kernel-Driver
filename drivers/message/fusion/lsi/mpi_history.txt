@@ -6,15 +6,15 @@
  Copyright (c) 2000-2008 LSI Corporation.
 
  ---------------------------------------
- Header Set Release Version:    01.05.19
- Header Set Release Date:       03-28-08
+ Header Set Release Version:    01.05.20
+ Header Set Release Date:       07-11-08
  ---------------------------------------
 
  Filename               Current version     Prior version
  ----------             ---------------     -------------
- mpi.h                  01.05.16            01.05.15
- mpi_ioc.h              01.05.16            01.05.15
- mpi_cnfg.h             01.05.18            01.05.17
+ mpi.h                  01.05.17            01.05.16
+ mpi_ioc.h              01.05.16            01.05.16
+ mpi_cnfg.h             01.05.19            01.05.18
  mpi_init.h             01.05.09            01.05.09
  mpi_targ.h             01.05.06            01.05.06
  mpi_fc.h               01.05.01            01.05.01
@@ -24,7 +24,7 @@
  mpi_inb.h              01.05.01            01.05.01
  mpi_sas.h              01.05.05            01.05.05
  mpi_type.h             01.05.02            01.05.02
- mpi_history.txt        01.05.19            01.05.18
+ mpi_history.txt        01.05.20            01.05.19
 
 
  *  Date      Version   Description
@@ -99,6 +99,7 @@ mpi.h
  *  08-07-07  01.05.14  Bumped MPI_HEADER_VERSION_UNIT.
  *  01-15-08  01.05.15  Bumped MPI_HEADER_VERSION_UNIT.
  *  03-28-08  01.05.16  Bumped MPI_HEADER_VERSION_UNIT.
+ *  07-11-08  01.05.17  Bumped MPI_HEADER_VERSION_UNIT.
  *  --------------------------------------------------------------------------
 
 mpi_ioc.h
@@ -130,7 +131,7 @@ mpi_ioc.h
  *  08-08-01  01.02.01  Original release for v1.2 work.
  *                      New format for FWVersion and ProductId in
  *                      MSG_IOC_FACTS_REPLY and MPI_FW_HEADER.
- *  08-31-01  01.02.02  Added event MPI_EVENT_SCSI_DEVICE_STATUS_CHANGE and
+ *  08-31-01  01.02.02  Addded event MPI_EVENT_SCSI_DEVICE_STATUS_CHANGE and
  *                      related structure and defines.
  *                      Added event MPI_EVENT_ON_BUS_TIMER_EXPIRED.
  *                      Added MPI_IOCINIT_FLAGS_DISCARD_FW_IMAGE.
@@ -190,7 +191,7 @@ mpi_ioc.h
  *  10-11-06  01.05.12  Added MPI_IOCFACTS_EXCEPT_METADATA_UNSUPPORTED.
  *                      Added MaxInitiators field to PortFacts reply.
  *                      Added SAS Device Status Change ReasonCode for
- *                      asynchronous notification.
+ *                      asynchronous notificaiton.
  *                      Added MPI_EVENT_SAS_EXPANDER_STATUS_CHANGE and event
  *                      data structure.
  *                      Added new ImageType values for FWDownload and FWUpload
@@ -523,6 +524,14 @@ mpi_cnfg.h
  *  03-28-08  01.05.18  Defined new bits in Manufacturing Page 4 ExtFlags field
  *                      to control coercion size and the mixing of SAS and SATA
  *                      SSD drives.
+ *  07-11-08  01.05.19  Added defines MPI_MANPAGE4_EXTFLAGS_RAID0_SINGLE_DRIVE
+ *                      and MPI_MANPAGE4_EXTFLAGS_SSD_SCRUB_DISABLE for ExtFlags
+ *                      field of Manufacturing Page 4.
+ *                      Added defines for a new bit in BIOS Page 1 BiosOptions
+ *                      field to control adapter scan order.
+ *                      Added BootDeviceWaitTime field to SAS IO Unit Page 2.
+ *                      Added MPI_SAS_PHY0_PHYINFO_PHY_VACANT for use in PhyInfo
+ *                      field of SAS Expander Page 1.
  *  --------------------------------------------------------------------------
 
 mpi_init.h
@@ -623,7 +632,7 @@ mpi_fc.h
  *  11-02-00  01.01.01  Original release for post 1.0 work
  *  12-04-00  01.01.02  Added messages for Common Transport Send and
  *                      Primitive Send.
- *  01-09-01  01.01.03  Modified some of the new flags to have an MPI prefix
+ *  01-09-01  01.01.03  Modifed some of the new flags to have an MPI prefix
  *                      and modified the FcPrimitiveSend flags.
  *  01-25-01  01.01.04  Move InitiatorIndex in LinkServiceRsp reply to a larger
  *                      field.
@@ -743,20 +752,20 @@ mpi_type.h
 
 mpi_history.txt         Parts list history
 
-Filename    01.05.19   01.05.18   01.05.17   01.05.16   01.05.15
-----------  --------   --------   --------   --------   --------
-mpi.h       01.05.16   01.05.15   01.05.14   01.05.13   01.05.12
-mpi_ioc.h   01.05.16   01.05.15   01.05.15   01.05.14   01.05.13
-mpi_cnfg.h  01.05.18   01.05.17   01.05.16   01.05.15   01.05.14
-mpi_init.h  01.05.09   01.05.09   01.05.09   01.05.09   01.05.09
-mpi_targ.h  01.05.06   01.05.06   01.05.06   01.05.06   01.05.06
-mpi_fc.h    01.05.01   01.05.01   01.05.01   01.05.01   01.05.01
-mpi_lan.h   01.05.01   01.05.01   01.05.01   01.05.01   01.05.01
-mpi_raid.h  01.05.05   01.05.05   01.05.04   01.05.03   01.05.03
-mpi_tool.h  01.05.03   01.05.03   01.05.03   01.05.03   01.05.03
-mpi_inb.h   01.05.01   01.05.01   01.05.01   01.05.01   01.05.01
-mpi_sas.h   01.05.05   01.05.05   01.05.04   01.05.04   01.05.04
-mpi_type.h  01.05.02   01.05.02   01.05.02   01.05.02   01.05.02
+Filename    01.05.20   01.05.19   01.05.18   01.05.17   01.05.16   01.05.15
+----------  --------   --------   --------   --------   --------   --------
+mpi.h       01.05.17   01.05.16   01.05.15   01.05.14   01.05.13   01.05.12
+mpi_ioc.h   01.05.16   01.05.16   01.05.15   01.05.15   01.05.14   01.05.13
+mpi_cnfg.h  01.05.19   01.05.18   01.05.17   01.05.16   01.05.15   01.05.14
+mpi_init.h  01.05.09   01.05.09   01.05.09   01.05.09   01.05.09   01.05.09
+mpi_targ.h  01.05.06   01.05.06   01.05.06   01.05.06   01.05.06   01.05.06
+mpi_fc.h    01.05.01   01.05.01   01.05.01   01.05.01   01.05.01   01.05.01
+mpi_lan.h   01.05.01   01.05.01   01.05.01   01.05.01   01.05.01   01.05.01
+mpi_raid.h  01.05.05   01.05.05   01.05.05   01.05.04   01.05.03   01.05.03
+mpi_tool.h  01.05.03   01.05.03   01.05.03   01.05.03   01.05.03   01.05.03
+mpi_inb.h   01.05.01   01.05.01   01.05.01   01.05.01   01.05.01   01.05.01
+mpi_sas.h   01.05.05   01.05.05   01.05.05   01.05.04   01.05.04   01.05.04
+mpi_type.h  01.05.02   01.05.02   01.05.02   01.05.02   01.05.02   01.05.02
 
 Filename    01.05.14   01.05.13   01.05.12   01.05.11   01.05.10   01.05.09
 ----------  --------   --------   --------   --------   --------   --------
