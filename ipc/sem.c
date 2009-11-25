@@ -83,6 +83,7 @@
 #include <linux/rwsem.h>
 #include <linux/nsproxy.h>
 #include <linux/ipc_namespace.h>
+#include <trace/ipc.h>
 
 #include <asm/uaccess.h>
 #include "util.h"
@@ -114,6 +115,8 @@ static int sysvipc_sem_proc_show(struct seq_file *s, void *it);
 #define sc_semmns	sem_ctls[1]
 #define sc_semopm	sem_ctls[2]
 #define sc_semmni	sem_ctls[3]
+
+DEFINE_TRACE(ipc_sem_create);
 
 void sem_init_ns(struct ipc_namespace *ns)
 {
@@ -313,6 +316,7 @@ SYSCALL_DEFINE3(semget, key_t, key, int, nsems, int, semflg)
 	struct ipc_namespace *ns;
 	struct ipc_ops sem_ops;
 	struct ipc_params sem_params;
+	long err;
 
 	ns = current->nsproxy->ipc_ns;
 
@@ -327,7 +331,9 @@ SYSCALL_DEFINE3(semget, key_t, key, int, nsems, int, semflg)
 	sem_params.flg = semflg;
 	sem_params.u.nsems = nsems;
 
-	return ipcget(ns, &sem_ids(ns), &sem_ops, &sem_params);
+	err = ipcget(ns, &sem_ids(ns), &sem_ops, &sem_params);
+	trace_ipc_sem_create(err, semflg);
+	return err;
 }
 
 /*

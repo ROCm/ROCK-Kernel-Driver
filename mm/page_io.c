@@ -17,7 +17,10 @@
 #include <linux/bio.h>
 #include <linux/swapops.h>
 #include <linux/writeback.h>
+#include <trace/swap.h>
 #include <asm/pgtable.h>
+
+DEFINE_TRACE(swap_out);
 
 static struct bio *get_swap_bio(gfp_t gfp_flags, pgoff_t index,
 				struct page *page, bio_end_io_t end_io)
@@ -127,6 +130,7 @@ int swap_writepage(struct page *page, struct writeback_control *wbc)
 #ifndef CONFIG_PRECACHE
 	set_page_writeback(page);
 #endif
+	trace_swap_out(page);
 	unlock_page(page);
 	submit_bio(rw, bio);
 out:

@@ -38,6 +38,7 @@
 #include <linux/rwsem.h>
 #include <linux/nsproxy.h>
 #include <linux/ipc_namespace.h>
+#include <trace/ipc.h>
 
 #include <asm/current.h>
 #include <asm/uaccess.h>
@@ -71,6 +72,8 @@ struct msg_sender {
 #define msg_ids(ns)	((ns)->ids[IPC_MSG_IDS])
 
 #define msg_unlock(msq)		ipc_unlock(&(msq)->q_perm)
+
+DEFINE_TRACE(ipc_msg_create);
 
 static void freeque(struct ipc_namespace *, struct kern_ipc_perm *);
 static int newque(struct ipc_namespace *, struct ipc_params *);
@@ -314,6 +317,7 @@ SYSCALL_DEFINE2(msgget, key_t, key, int, msgflg)
 	struct ipc_namespace *ns;
 	struct ipc_ops msg_ops;
 	struct ipc_params msg_params;
+	long ret;
 
 	ns = current->nsproxy->ipc_ns;
 
@@ -324,7 +328,9 @@ SYSCALL_DEFINE2(msgget, key_t, key, int, msgflg)
 	msg_params.key = key;
 	msg_params.flg = msgflg;
 
-	return ipcget(ns, &msg_ids(ns), &msg_ops, &msg_params);
+	ret = ipcget(ns, &msg_ids(ns), &msg_ops, &msg_params);
+	trace_ipc_msg_create(ret, msgflg);
+	return ret;
 }
 
 static inline unsigned long
