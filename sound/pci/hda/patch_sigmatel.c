@@ -5233,7 +5233,7 @@ again:
 		codec->patch_ops.check_power_status =
 			idt92hd83xxx_hp_check_power_status;
 	}
-#endif	
+#endif
 
 	err = stac92xx_parse_auto_config(codec, 0x1d, 0);
 	if (!err) {
