@@ -31,7 +31,7 @@
 struct sysdev_class memory_sysdev_class = {
 	.name = MEMORY_CLASS_NAME,
 };
-EXPORT_SYMBOL(memory_sysdev_class);
+EXPORT_SYMBOL_GPL(memory_sysdev_class);
 
 static const char *memory_uevent_name(struct kset *kset, struct kobject *kobj)
 {
