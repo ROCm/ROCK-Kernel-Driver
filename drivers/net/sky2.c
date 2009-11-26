@@ -139,6 +139,7 @@ static DEFINE_PCI_DEVICE_TABLE(sky2_id_table) = {
 	{ PCI_DEVICE(PCI_VENDOR_ID_MARVELL, 0x436D) }, /* 88E8055 */
 	{ PCI_DEVICE(PCI_VENDOR_ID_MARVELL, 0x4370) }, /* 88E8075 */
 	{ PCI_DEVICE(PCI_VENDOR_ID_MARVELL, 0x4380) }, /* 88E8057 */
+	{ PCI_DEVICE(PCI_VENDOR_ID_MARVELL, 0x4381) }, /* 88E8059 */
 	{ 0 }
 };
 
@@ -602,6 +603,16 @@ static void sky2_phy_init(struct sky2_hw *hw, unsigned port)
 		/* apply workaround for integrated resistors calibration */
 		gm_phy_write(hw, port, PHY_MARV_PAGE_ADDR, 17);
 		gm_phy_write(hw, port, PHY_MARV_PAGE_DATA, 0x3f60);
+	} else if (hw->chip_id == CHIP_ID_YUKON_OPT && hw->chip_rev == 0) {
+		/* apply fixes in PHY AFE */
+		gm_phy_write(hw, port, PHY_MARV_EXT_ADR, 0x00ff);
+
+		/* apply RDAC termination workaround */
+		gm_phy_write(hw, port, 24, 0x2800);
+		gm_phy_write(hw, port, 23, 0x2001);
+
+		/* set page register back to 0 */
+		gm_phy_write(hw, port, PHY_MARV_EXT_ADR, 0);
 	} else if (hw->chip_id != CHIP_ID_YUKON_EX &&
 		   hw->chip_id < CHIP_ID_YUKON_SUPR) {
 		/* no effect on Yukon-XL */
@@ -2096,6 +2107,27 @@ out:
 	spin_unlock(&sky2->phy_lock);
 }
 
+/* Special quick link interrupt (Yukon-2 Optima only) */
+static void sky2_qlink_intr(struct sky2_hw *hw)
+{
+	struct sky2_port *sky2 = netdev_priv(hw->dev[0]);
+	u32 imask;
+	u16 phy;
+
+	/* disable irq */
+	imask = sky2_read32(hw, B0_IMSK);
+	imask &= ~Y2_IS_PHY_QLNK;
+	sky2_write32(hw, B0_IMSK, imask);
+
+	/* reset PHY Link Detect */
+	phy = sky2_pci_read16(hw, PSM_CONFIG_REG4);
+	sky2_write8(hw, B2_TST_CTRL1, TST_CFG_WRITE_ON);
+	sky2_pci_write16(hw, PSM_CONFIG_REG4, phy | 1);
+	sky2_write8(hw, B2_TST_CTRL1, TST_CFG_WRITE_OFF);
+
+	sky2_link_up(sky2);
+}
+
 /* Transmit timeout is only called if we are running, carrier is up
  * and tx queue is full (stopped).
  */
@@ -2766,6 +2798,9 @@ static int sky2_poll(struct napi_struct *napi, int work_limit)
 	if (status & Y2_IS_IRQ_PHY2)
 		sky2_phy_intr(hw, 1);
 
+	if (status & Y2_IS_PHY_QLNK)
+		sky2_qlink_intr(hw);
+
 	while ((idx = sky2_read16(hw, STAT_PUT_IDX)) != hw->st_idx) {
 		work_done += sky2_status_intr(hw, work_limit - work_done, idx);
 
@@ -2815,6 +2850,7 @@ static u32 sky2_mhz(const struct sky2_hw *hw)
 	case CHIP_ID_YUKON_EX:
 	case CHIP_ID_YUKON_SUPR:
 	case CHIP_ID_YUKON_UL_2:
+	case CHIP_ID_YUKON_OPT:
 		return 125;
 
 	case CHIP_ID_YUKON_FE:
@@ -2908,6 +2944,12 @@ static int __devinit sky2_init(struct sky2_hw *hw)
 			| SKY2_HW_ADV_POWER_CTL;
 		break;
 
+	case CHIP_ID_YUKON_OPT:
+		hw->flags = SKY2_HW_GIGABIT
+			| SKY2_HW_NEW_LE
+			| SKY2_HW_ADV_POWER_CTL;
+		break;
+
 	default:
 		dev_err(&hw->pdev->dev, "unsupported chip type 0x%x\n",
 			hw->chip_id);
@@ -2986,6 +3028,49 @@ static void sky2_reset(struct sky2_hw *hw)
 			sky2_write16(hw, SK_REG(i, GMAC_CTRL),
 				     GMC_BYP_MACSECRX_ON | GMC_BYP_MACSECTX_ON
 				     | GMC_BYP_RETR_ON);
+	}
+
+	if (hw->chip_id == CHIP_ID_YUKON_OPT) {
+		u16 reg;
+		u32 msk;
+
+		if (hw->chip_rev == 0) {
+			/* disable PCI-E PHY power down (set PHY reg 0x80, bit 7 */
+			sky2_write32(hw, Y2_PEX_PHY_DATA, (0x80UL << 16) | (1 << 7));
+
+			/* set PHY Link Detect Timer to 1.1 second (11x 100ms) */
+			reg = 10;
+		} else {
+			/* set PHY Link Detect Timer to 0.4 second (4x 100ms) */
+			reg = 3;
+		}
+
+		reg <<= PSM_CONFIG_REG4_TIMER_PHY_LINK_DETECT_BASE;
+
+		/* reset PHY Link Detect */
+		sky2_write8(hw, B2_TST_CTRL1, TST_CFG_WRITE_ON);
+		sky2_pci_write16(hw, PSM_CONFIG_REG4,
+				 reg | PSM_CONFIG_REG4_RST_PHY_LINK_DETECT);
+		sky2_pci_write16(hw, PSM_CONFIG_REG4, reg);
+
+
+		/* enable PHY Quick Link */
+		msk = sky2_read32(hw, B0_IMSK);
+		msk |= Y2_IS_PHY_QLNK;
+		sky2_write32(hw, B0_IMSK, msk);
+
+		/* check if PSMv2 was running before */
+		reg = sky2_pci_read16(hw, PSM_CONFIG_REG3);
+#define  PCI_EXP_LNKCTL_ASPMC	0x0003	/* ASPM Control */
+		if (reg & PCI_EXP_LNKCTL_ASPMC) {
+			int cap = pci_find_capability(pdev, PCI_CAP_ID_EXP);
+			/* restore the PCIe Link Control register */
+			sky2_pci_write16(hw, cap + PCI_EXP_LNKCTL, reg);
+		}
+		sky2_write8(hw, B2_TST_CTRL1, TST_CFG_WRITE_OFF);
+
+		/* re-enable PEX PM in PEX PHY debug reg. 8 (clear bit 12) */
+		sky2_write32(hw, Y2_PEX_PHY_DATA, PEX_DB_ACCESS | (0x08UL << 16));
 	}
 
 	/* Clear I2C IRQ noise */
@@ -4406,9 +4491,11 @@ static const char *sky2_name(u8 chipid, char *buf, int sz)
 		"FE+",		/* 0xb8 */
 		"Supreme",	/* 0xb9 */
 		"UL 2",		/* 0xba */
+		"Unknown",	/* 0xbb */
+		"Optima",	/* 0xbc */
 	};
 
-	if (chipid >= CHIP_ID_YUKON_XL && chipid < CHIP_ID_YUKON_UL_2)
+	if (chipid >= CHIP_ID_YUKON_XL && chipid < CHIP_ID_YUKON_OPT)
 		strncpy(buf, name[chipid - CHIP_ID_YUKON_XL], sz);
 	else
 		snprintf(buf, sz, "(chip %#x)", chipid);
