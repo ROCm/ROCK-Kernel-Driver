@@ -475,7 +475,7 @@ unsigned int __do_IRQ(unsigned int irq)
 		if (likely(!(desc->status & IRQ_DISABLED))) {
 			action_ret = handle_IRQ_event(irq, desc->action);
 			if (!noirqdebug)
-				note_interrupt(irq, desc, action_ret);
+				note_interrupt(irq, desc, action_ret, true);
 		}
 		desc->chip->end(irq);
 		return 1;
@@ -529,7 +529,7 @@ unsigned int __do_IRQ(unsigned int irq)
 
 		action_ret = handle_IRQ_event(irq, action);
 		if (!noirqdebug)
-			note_interrupt(irq, desc, action_ret);
+			note_interrupt(irq, desc, action_ret, false);
 
 		spin_lock(&desc->lock);
 		if (likely(!(desc->status & IRQ_PENDING)))
