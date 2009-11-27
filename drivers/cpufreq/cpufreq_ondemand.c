@@ -35,6 +35,7 @@
 #define MICRO_FREQUENCY_MIN_SAMPLE_RATE		(10000)
 #define MIN_FREQUENCY_UP_THRESHOLD		(11)
 #define MAX_FREQUENCY_UP_THRESHOLD		(100)
+#define MAX_DEFAULT_SAMPLING_RATE		(300 * 1000)
 
 /*
  * The polling frequency of this governor depends on the capability of
@@ -676,6 +677,29 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 			dbs_tuners_ins.sampling_rate =
 				max(min_sampling_rate,
 				    latency * LATENCY_MULTIPLIER);
+			/*
+			 * Cut def_sampling rate to 300ms if it was above,
+			 * still consider to not set it above latency
+			 * transition * 100
+			 */
+			if (dbs_tuners_ins.sampling_rate > MAX_DEFAULT_SAMPLING_RATE) {
+				dbs_tuners_ins.sampling_rate =
+					max(min_sampling_rate, MAX_DEFAULT_SAMPLING_RATE);
+				printk(KERN_INFO "CPUFREQ: ondemand sampling "
+				       "rate set to %d ms\n",
+				       dbs_tuners_ins.sampling_rate / 1000);
+			}
+			/*
+			 * Be conservative in respect to performance.
+			 * If an application calculates using two threads
+			 * depending on each other, they will be run on several
+			 * CPU cores resulting on 50% load on both.
+			 * SLED might still want to prefer 80% up_threshold
+			 * by default, but we cannot differ that here.
+			 */
+			if (num_online_cpus() > 1)
+				dbs_tuners_ins.up_threshold =
+					DEF_FREQUENCY_UP_THRESHOLD / 2;
 		}
 		mutex_unlock(&dbs_mutex);
 
