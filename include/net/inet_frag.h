@@ -1,6 +1,9 @@
 #ifndef __NET_FRAG_H__
 #define __NET_FRAG_H__
 
+#include <linux/reserve.h>
+#include <linux/mutex.h>
+
 struct netns_frags {
 	int			nqueues;
 	atomic_t		mem;
@@ -10,6 +13,10 @@ struct netns_frags {
 	int			timeout;
 	int			high_thresh;
 	int			low_thresh;
+
+	/* reserves */
+	struct mutex		lock;
+	struct mem_reserve	reserve;
 };
 
 struct inet_frag_queue {

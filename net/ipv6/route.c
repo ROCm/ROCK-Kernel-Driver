@@ -37,6 +37,7 @@
 #include <linux/mroute6.h>
 #include <linux/init.h>
 #include <linux/if_arp.h>
+#include <linux/reserve.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/nsproxy.h>
@@ -2537,6 +2538,63 @@ int ipv6_sysctl_rtcache_flush(ctl_table *ctl, int write,
 		return -EINVAL;
 }
 
+static int
+proc_dointvec_route(struct ctl_table *table, int write,
+		void __user *buffer, size_t *lenp, loff_t *ppos)
+{
+	struct net *net = container_of(table->data, struct net,
+				       ipv6.sysctl.ip6_rt_max_size);
+	ctl_table tmp = *table;
+	int new_size, ret;
+
+	mutex_lock(&net->ipv6.sysctl.ip6_rt_lock);
+	if (write) {
+		tmp.data = &new_size;
+		table = &tmp;
+	}
+
+	ret = proc_dointvec(table, write, buffer, lenp, ppos);
+
+	if (!ret && write) {
+		ret = mem_reserve_kmem_cache_set(&net->ipv6.ip6_rt_reserve,
+				net->ipv6.ip6_dst_ops.kmem_cachep, new_size);
+		if (!ret)
+			net->ipv6.sysctl.ip6_rt_max_size = new_size;
+	}
+	mutex_unlock(&net->ipv6.sysctl.ip6_rt_lock);
+
+	return ret;
+}
+
+static int sysctl_intvec_route(struct ctl_table *table,
+		void __user *oldval, size_t __user *oldlenp,
+		void __user *newval, size_t newlen)
+{
+	struct net *net = container_of(table->data, struct net,
+				       ipv6.sysctl.ip6_rt_max_size);
+	int write = (newval && newlen);
+	ctl_table tmp = *table;
+	int new_size, ret;
+
+	mutex_lock(&net->ipv6.sysctl.ip6_rt_lock);
+	if (write) {
+		tmp.data = &new_size;
+		table = &tmp;
+	}
+
+	ret = sysctl_intvec(table, oldval, oldlenp, newval, newlen);
+
+	if (!ret && write) {
+		ret = mem_reserve_kmem_cache_set(&net->ipv6.ip6_rt_reserve,
+				net->ipv6.ip6_dst_ops.kmem_cachep, new_size);
+		if (!ret)
+			net->ipv6.sysctl.ip6_rt_max_size = new_size;
+	}
+	mutex_unlock(&net->ipv6.sysctl.ip6_rt_lock);
+
+	return ret;
+}
+
 ctl_table ipv6_route_table_template[] = {
 	{
 		.procname	=	"flush",
@@ -2559,7 +2617,8 @@ ctl_table ipv6_route_table_template[] = {
 		.data		=	&init_net.ipv6.sysctl.ip6_rt_max_size,
 		.maxlen		=	sizeof(int),
 		.mode		=	0644,
-		.proc_handler	=	proc_dointvec,
+		.proc_handler	=	proc_dointvec_route,
+		.strategy	= 	&sysctl_intvec_route,
 	},
 	{
 		.ctl_name	=	NET_IPV6_ROUTE_GC_MIN_INTERVAL,
@@ -2647,6 +2706,8 @@ struct ctl_table *ipv6_route_sysctl_init(struct net *net)
 		table[8].data = &net->ipv6.sysctl.ip6_rt_min_advmss;
 	}
 
+	mutex_init(&net->ipv6.sysctl.ip6_rt_lock);
+
 	return table;
 }
 #endif
@@ -2696,6 +2757,14 @@ static int ip6_route_net_init(struct net *net)
 	net->ipv6.sysctl.ip6_rt_mtu_expires = 10*60*HZ;
 	net->ipv6.sysctl.ip6_rt_min_advmss = IPV6_MIN_MTU - 20 - 40;
 
+	mem_reserve_init(&net->ipv6.ip6_rt_reserve, "IPv6 route cache",
+			 &net_rx_reserve);
+	ret = mem_reserve_kmem_cache_set(&net->ipv6.ip6_rt_reserve,
+			net->ipv6.ip6_dst_ops.kmem_cachep,
+			net->ipv6.sysctl.ip6_rt_max_size);
+	if (ret)
+		goto out_reserve_fail;
+
 #ifdef CONFIG_PROC_FS
 	proc_net_fops_create(net, "ipv6_route", 0, &ipv6_route_proc_fops);
 	proc_net_fops_create(net, "rt6_stats", S_IRUGO, &rt6_stats_seq_fops);
@@ -2706,12 +2775,15 @@ static int ip6_route_net_init(struct net *net)
 out:
 	return ret;
 
+out_reserve_fail:
+	mem_reserve_disconnect(&net->ipv6.ip6_rt_reserve);
 #ifdef CONFIG_IPV6_MULTIPLE_TABLES
+	kfree(net->ipv6.ip6_blk_hole_entry);
 out_ip6_prohibit_entry:
 	kfree(net->ipv6.ip6_prohibit_entry);
 out_ip6_null_entry:
-	kfree(net->ipv6.ip6_null_entry);
 #endif
+	kfree(net->ipv6.ip6_null_entry);
 out_ip6_dst_ops:
 	goto out;
 }
@@ -2722,6 +2794,7 @@ static void ip6_route_net_exit(struct net *net)
 	proc_net_remove(net, "ipv6_route");
 	proc_net_remove(net, "rt6_stats");
 #endif
+	mem_reserve_disconnect(&net->ipv6.ip6_rt_reserve);
 	kfree(net->ipv6.ip6_null_entry);
 #ifdef CONFIG_IPV6_MULTIPLE_TABLES
 	kfree(net->ipv6.ip6_prohibit_entry);

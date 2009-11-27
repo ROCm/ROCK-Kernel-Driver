@@ -4688,7 +4688,7 @@ static bool igb_clean_rx_irq_adv(struct igb_ring *rx_ring,
 				       PAGE_SIZE / 2, PCI_DMA_FROMDEVICE);
 			buffer_info->page_dma = 0;
 
-			skb_fill_page_desc(skb, skb_shinfo(skb)->nr_frags++,
+			skb_add_rx_frag(skb, skb_shinfo(skb)->nr_frags++,
 						buffer_info->page,
 						buffer_info->page_offset,
 						length);
@@ -4698,11 +4698,6 @@ static bool igb_clean_rx_irq_adv(struct igb_ring *rx_ring,
 				buffer_info->page = NULL;
 			else
 				get_page(buffer_info->page);
-
-			skb->len += length;
-			skb->data_len += length;
-
-			skb->truesize += length;
 		}
 
 		if (!(staterr & E1000_RXD_STAT_EOP)) {
@@ -4827,7 +4822,7 @@ static void igb_alloc_rx_buffers_adv(struct igb_ring *rx_ring,
 
 		if (adapter->rx_ps_hdr_size && !buffer_info->page_dma) {
 			if (!buffer_info->page) {
-				buffer_info->page = alloc_page(GFP_ATOMIC);
+				buffer_info->page = netdev_alloc_page(netdev);
 				if (!buffer_info->page) {
 					adapter->alloc_rx_buff_failed++;
 					goto no_buffers;
