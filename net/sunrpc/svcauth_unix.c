@@ -659,8 +659,10 @@ static int unix_gid_find(uid_t uid, struct group_info **gip,
 			 struct svc_rqst *rqstp)
 {
 	struct unix_gid *ug = unix_gid_lookup(uid);
+	struct unix_gid *prevug;
 	if (!ug)
 		return -EAGAIN;
+ retry:
 	switch (cache_check(&unix_gid_cache, &ug->h, &rqstp->rq_chandle)) {
 	case -ENOENT:
 		*gip = NULL;
@@ -670,6 +672,13 @@ static int unix_gid_find(uid_t uid, struct group_info **gip,
 		get_group_info(*gip);
 		cache_put(&ug->h, &unix_gid_cache);
 		return 0;
+	case -ETIMEDOUT:
+		prevug = ug;
+		ug = unix_gid_lookup(uid);
+		if (ug != prevug)
+			goto retry;
+		if (ug)
+			cache_put(&ug->h, &unix_gid_cache);
 	default:
 		return -EAGAIN;
 	}
@@ -680,7 +689,7 @@ svcauth_unix_set_client(struct svc_rqst *rqstp)
 {
 	struct sockaddr_in *sin;
 	struct sockaddr_in6 *sin6, sin6_storage;
-	struct ip_map *ipm;
+	struct ip_map *ipm, *prev_ipm;
 
 	switch (rqstp->rq_addr.ss_family) {
 	case AF_INET:
@@ -705,14 +714,23 @@ svcauth_unix_set_client(struct svc_rqst *rqstp)
 		ipm = ip_map_lookup(rqstp->rq_server->sv_program->pg_class,
 				    &sin6->sin6_addr);
 
+ retry:
 	if (ipm == NULL)
 		return SVC_DENIED;
 
 	switch (cache_check(&ip_map_cache, &ipm->h, &rqstp->rq_chandle)) {
 		default:
 			BUG();
-		case -EAGAIN:
 		case -ETIMEDOUT:
+			prev_ipm = ipm;
+			ipm = ip_map_lookup(rqstp->rq_server->sv_program->pg_class,
+					    &sin6->sin6_addr);
+			if (ipm != prev_ipm)
+				goto retry;
+			if (ipm)
+				cache_put(&ipm->h, &ip_map_cache);
+
+		case -EAGAIN:
 			return SVC_DROP;
 		case -ENOENT:
 			return SVC_DENIED;

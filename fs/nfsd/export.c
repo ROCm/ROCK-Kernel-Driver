@@ -793,9 +793,18 @@ exp_find_key(svc_client *clp, int fsid_type, u32 *fsidv, struct cache_req *reqp)
 	memcpy(key.ek_fsid, fsidv, key_len(fsid_type));
 
 	ek = svc_expkey_lookup(&key);
+ again:
 	if (ek == NULL)
 		return ERR_PTR(-ENOMEM);
 	err = cache_check(&svc_expkey_cache, &ek->h, reqp);
+	if (err == -ETIMEDOUT) {
+		struct svc_expkey *prev_ek = ek;
+		ek = svc_expkey_lookup(&key);
+		if (ek != prev_ek)
+			goto again;
+		if (ek)
+			cache_put(&ek->h, &svc_expkey_cache);
+	}
 	if (err)
 		return ERR_PTR(err);
 	return ek;
@@ -865,9 +874,18 @@ static svc_export *exp_get_by_name(svc_client *clp, const struct path *path,
 	key.ex_path = *path;
 
 	exp = svc_export_lookup(&key);
+ retry:
 	if (exp == NULL)
 		return ERR_PTR(-ENOMEM);
 	err = cache_check(&svc_export_cache, &exp->h, reqp);
+	if (err == -ETIMEDOUT) {
+		struct svc_export *prev_exp = exp;
+		exp = svc_export_lookup(&key);
+		if (exp != prev_exp)
+			goto retry;
+		if (exp)
+			cache_put(&exp->h, &svc_export_cache);
+	}
 	if (err)
 		return ERR_PTR(err);
 	return exp;

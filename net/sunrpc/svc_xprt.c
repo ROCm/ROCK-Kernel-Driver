@@ -656,12 +656,14 @@ int svc_recv(struct svc_rqst *rqstp, long timeout)
 		pool->sp_nwaking--;
 		BUG_ON(pool->sp_nwaking < 0);
 	}
+
 	xprt = svc_xprt_dequeue(pool);
 	if (xprt) {
 		rqstp->rq_xprt = xprt;
 		svc_xprt_get(xprt);
 		rqstp->rq_reserved = serv->sv_max_mesg;
 		atomic_add(rqstp->rq_reserved, &xprt->xpt_reserved);
+
 	} else {
 		/* No data pending. Go to sleep */
 		svc_thread_enqueue(pool, rqstp);
