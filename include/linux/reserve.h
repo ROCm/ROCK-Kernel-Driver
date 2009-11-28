@@ -53,17 +53,17 @@ int mem_reserve_kmem_cache_set(struct mem_reserve *res,
 int mem_reserve_kmem_cache_charge(struct mem_reserve *res,
 				  struct kmem_cache *s, long objs);
 
-void *___kmalloc_reserve(size_t size, gfp_t flags, int node, void *ip,
+void *___kmalloc_reserve(size_t size, gfp_t flags, int node, unsigned long ip,
 			 struct mem_reserve *res, int *emerg);
 
 static inline
-void *__kmalloc_reserve(size_t size, gfp_t flags, int node, void *ip,
+void *__kmalloc_reserve(size_t size, gfp_t flags, int node, unsigned long ip,
 			struct mem_reserve *res, int *emerg)
 {
 	void *obj;
 
-	obj = __kmalloc_node_track_caller(size,
-			flags | __GFP_NOMEMALLOC | __GFP_NOWARN, node, ip);
+	obj = kmalloc_node_track_caller(size,
+			flags | __GFP_NOMEMALLOC | __GFP_NOWARN, node);
 	if (!obj)
 		obj = ___kmalloc_reserve(size, flags, node, ip, res, emerg);
 

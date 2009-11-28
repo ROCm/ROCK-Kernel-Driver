@@ -268,13 +268,12 @@ static inline void *kmem_cache_alloc_node(struct kmem_cache *cachep,
  */
 #if defined(CONFIG_DEBUG_SLAB) || defined(CONFIG_SLUB)
 extern void *__kmalloc_track_caller(size_t, gfp_t, unsigned long);
-#else
-#define __kmalloc_track_caller(size, flags, ip) \
-	__kmalloc(size, flags)
-#endif /* DEBUG_SLAB */
-
 #define kmalloc_track_caller(size, flags) \
 	__kmalloc_track_caller(size, flags, _RET_IP_)
+#else
+#define kmalloc_track_caller(size, flags) \
+	__kmalloc(size, flags)
+#endif /* DEBUG_SLAB */
 
 #ifdef CONFIG_NUMA
 /*
@@ -287,21 +286,21 @@ extern void *__kmalloc_track_caller(size_t, gfp_t, unsigned long);
  */
 #if defined(CONFIG_DEBUG_SLAB) || defined(CONFIG_SLUB)
 extern void *__kmalloc_node_track_caller(size_t, gfp_t, int, unsigned long);
+#define kmalloc_node_track_caller(size, flags, node) \
+	__kmalloc_node_track_caller(size, flags, node, \
+			_RET_IP_)
 #else
-#define __kmalloc_node_track_caller(size, flags, node, ip) \
+#define kmalloc_node_track_caller(size, flags, node) \
 	__kmalloc_node(size, flags, node)
 #endif
 
 #else /* CONFIG_NUMA */
 
-#define __kmalloc_node_track_caller(size, flags, node, ip) \
-	__kmalloc_track_caller(size, flags, ip)
+#define kmalloc_node_track_caller(size, flags, node) \
+	kmalloc_track_caller(size, flags)
 
 #endif /* CONFIG_NUMA */
 
-#define kmalloc_node_track_caller(size, flags, node) \
-	__kmalloc_node_track_caller(size, flags, node, \
-			_RET_IP_)
 /*
  * Shortcuts
  */

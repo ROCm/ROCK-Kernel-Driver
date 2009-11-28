@@ -467,7 +467,7 @@ EXPORT_SYMBOL_GPL(mem_reserve_kmem_cache_charge);
  * kmalloc/kfree
  */
 
-void *___kmalloc_reserve(size_t size, gfp_t flags, int node, void *ip,
+void *___kmalloc_reserve(size_t size, gfp_t flags, int node, unsigned long ip,
 			 struct mem_reserve *res, int *emerg)
 {
 	void *obj;
@@ -478,7 +478,7 @@ void *___kmalloc_reserve(size_t size, gfp_t flags, int node, void *ip,
 	 * to the reserves, fail.
 	 */
 	gfp = flags | __GFP_NOMEMALLOC | __GFP_NOWARN;
-	obj = __kmalloc_node_track_caller(size, gfp, node, ip);
+	obj = kmalloc_node_track_caller(size, gfp, node);
 
 	if (obj || !(gfp_to_alloc_flags(flags) & ALLOC_NO_WATERMARKS))
 		goto out;
@@ -506,7 +506,7 @@ void *___kmalloc_reserve(size_t size, gfp_t flags, int node, void *ip,
 		 * Pressure could have lifted during our sleep. If this
 		 * succeeds, uncharge the reserve.
 		 */
-		obj = __kmalloc_node_track_caller(size, gfp, node, ip);
+		obj = kmalloc_node_track_caller(size, gfp, node);
 		if (obj) {
 			mem_reserve_kmalloc_charge(res, -size);
 			goto out;
@@ -517,7 +517,7 @@ void *___kmalloc_reserve(size_t size, gfp_t flags, int node, void *ip,
 	 * Regular allocation failed, and we've successfully charged our
 	 * requested usage against the reserve. Do the emergency allocation.
 	 */
-	obj = __kmalloc_node_track_caller(size, flags, node, ip);
+	obj = kmalloc_node_track_caller(size, flags, node);
 	WARN_ON(!obj);
 	if (emerg)
 		*emerg = 1;
