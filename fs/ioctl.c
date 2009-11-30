@@ -16,8 +16,11 @@
 #include <linux/writeback.h>
 #include <linux/buffer_head.h>
 #include <linux/falloc.h>
+#include <trace/fs.h>
 
 #include <asm/ioctls.h>
+
+DEFINE_TRACE(fs_ioctl);
 
 /* So that the fiemap access checks can't overflow on 32 bit machines. */
 #define FIEMAP_MAX_EXTENTS	(UINT_MAX / sizeof(struct fiemap_extent))
@@ -616,6 +619,8 @@ SYSCALL_DEFINE3(ioctl, unsigned int, fd, unsigned int, cmd, unsigned long, arg)
 	filp = fget_light(fd, &fput_needed);
 	if (!filp)
 		goto out;
+
+	trace_fs_ioctl(fd, cmd, arg);
 
 	error = security_file_ioctl(filp, cmd, arg);
 	if (error)

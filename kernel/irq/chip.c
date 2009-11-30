@@ -356,7 +356,7 @@ void handle_nested_irq(unsigned int irq)
 
 	action_ret = action->thread_fn(action->irq, action->dev_id);
 	if (!noirqdebug)
-		note_interrupt(irq, desc, action_ret);
+		note_interrupt(irq, desc, action_ret, false);
 
 	spin_lock_irq(&desc->lock);
 	desc->status &= ~IRQ_INPROGRESS;
@@ -400,7 +400,7 @@ handle_simple_irq(unsigned int irq, struct irq_desc *desc)
 
 	action_ret = handle_IRQ_event(irq, action);
 	if (!noirqdebug)
-		note_interrupt(irq, desc, action_ret);
+		note_interrupt(irq, desc, action_ret, false);
 
 	spin_lock(&desc->lock);
 	desc->status &= ~IRQ_INPROGRESS;
@@ -445,7 +445,7 @@ handle_level_irq(unsigned int irq, struct irq_desc *desc)
 
 	action_ret = handle_IRQ_event(irq, action);
 	if (!noirqdebug)
-		note_interrupt(irq, desc, action_ret);
+		note_interrupt(irq, desc, action_ret, false);
 
 	spin_lock(&desc->lock);
 	desc->status &= ~IRQ_INPROGRESS;
@@ -501,7 +501,7 @@ handle_fasteoi_irq(unsigned int irq, struct irq_desc *desc)
 
 	action_ret = handle_IRQ_event(irq, action);
 	if (!noirqdebug)
-		note_interrupt(irq, desc, action_ret);
+		note_interrupt(irq, desc, action_ret, false);
 
 	spin_lock(&desc->lock);
 	desc->status &= ~IRQ_INPROGRESS;
@@ -579,7 +579,7 @@ handle_edge_irq(unsigned int irq, struct irq_desc *desc)
 		spin_unlock(&desc->lock);
 		action_ret = handle_IRQ_event(irq, action);
 		if (!noirqdebug)
-			note_interrupt(irq, desc, action_ret);
+			note_interrupt(irq, desc, action_ret, false);
 		spin_lock(&desc->lock);
 
 	} while ((desc->status & (IRQ_PENDING | IRQ_DISABLED)) == IRQ_PENDING);
@@ -608,7 +608,7 @@ handle_percpu_irq(unsigned int irq, struct irq_desc *desc)
 
 	action_ret = handle_IRQ_event(irq, desc->action);
 	if (!noirqdebug)
-		note_interrupt(irq, desc, action_ret);
+		note_interrupt(irq, desc, action_ret, false);
 
 	if (desc->chip->eoi)
 		desc->chip->eoi(irq);

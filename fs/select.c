@@ -26,6 +26,7 @@
 #include <linux/fs.h>
 #include <linux/rcupdate.h>
 #include <linux/hrtimer.h>
+#include <trace/fs.h>
 
 #include <asm/uaccess.h>
 
@@ -97,6 +98,9 @@ struct poll_table_page {
 
 #define POLL_TABLE_FULL(table) \
 	((unsigned long)((table)->entry+1) > PAGE_SIZE + (unsigned long)(table))
+
+DEFINE_TRACE(fs_select);
+DEFINE_TRACE(fs_poll);
 
 /*
  * Ok, Peter made a complicated, but straightforward multiple_wait() function.
@@ -448,6 +452,7 @@ int do_select(int n, fd_set_bits *fds, struct timespec *end_time)
 				file = fget_light(i, &fput_needed);
 				if (file) {
 					f_op = file->f_op;
+					trace_fs_select(i, end_time);
 					mask = DEFAULT_POLLMASK;
 					if (f_op && f_op->poll) {
 						wait_key_set(wait, in, out, bit);
@@ -720,6 +725,7 @@ static inline unsigned int do_pollfd(struct pollfd *pollfd, poll_table *pwait)
 		file = fget_light(fd, &fput_needed);
 		mask = POLLNVAL;
 		if (file != NULL) {
+			trace_fs_poll(fd);
 			mask = DEFAULT_POLLMASK;
 			if (file->f_op && file->f_op->poll) {
 				if (pwait)

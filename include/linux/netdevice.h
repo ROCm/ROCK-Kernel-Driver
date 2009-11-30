@@ -42,6 +42,7 @@
 #include <linux/rculist.h>
 #include <linux/dmaengine.h>
 #include <linux/workqueue.h>
+#include <trace/net.h>
 
 #include <linux/ethtool.h>
 #include <net/net_namespace.h>

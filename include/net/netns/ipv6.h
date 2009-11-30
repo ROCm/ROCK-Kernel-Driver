@@ -25,6 +25,8 @@ struct netns_sysctl_ipv6 {
 	int ip6_rt_mtu_expires;
 	int ip6_rt_min_advmss;
 	int icmpv6_time;
+
+	struct mutex ip6_rt_lock;
 };
 
 struct netns_ipv6 {
@@ -56,6 +58,8 @@ struct netns_ipv6 {
 	struct sock             *ndisc_sk;
 	struct sock             *tcp_sk;
 	struct sock             *igmp_sk;
+
+	struct mem_reserve	ip6_rt_reserve;
 #ifdef CONFIG_IPV6_MROUTE
 	struct sock		*mroute6_sk;
 	struct mfc6_cache	**mfc6_cache_array;

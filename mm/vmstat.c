@@ -716,9 +716,9 @@ static void zoneinfo_show_print(struct seq_file *m, pg_data_t *pgdat,
 		   "\n        spanned  %lu"
 		   "\n        present  %lu",
 		   zone_page_state(zone, NR_FREE_PAGES),
-		   min_wmark_pages(zone),
-		   low_wmark_pages(zone),
-		   high_wmark_pages(zone),
+		   zone->pages_emerg + min_wmark_pages(zone),
+		   zone->pages_emerg + min_wmark_pages(zone),
+		   zone->pages_emerg + high_wmark_pages(zone),
 		   zone->pages_scanned,
 		   zone->spanned_pages,
 		   zone->present_pages);
