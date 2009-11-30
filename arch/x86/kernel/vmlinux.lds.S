@@ -43,6 +43,32 @@ ENTRY(phys_startup_64)
 jiffies_64 = jiffies;
 #endif
 
+#if defined(CONFIG_X86_64) && defined(CONFIG_DEBUG_RODATA)
+/*
+ * On 64-bit, align RODATA to 2MB so that even with CONFIG_DEBUG_RODATA
+ * we retain large page mappings for boundaries spanning kernel text, rodata
+ * and data sections.
+ *
+ * However, kernel identity mappings will have different RWX permissions
+ * to the pages mapping to text and to the pages padding (which are freed) the
+ * text section. Hence kernel identity mappings will be broken to smaller
+ * pages. For 64-bit, kernel text and kernel identity mappings are different,
+ * so we can enable protection checks that come with CONFIG_DEBUG_RODATA,
+ * as well as retain 2MB large page mappings for kernel text.
+ */
+#define X64_ALIGN_DEBUG_RODATA_BEGIN	. = ALIGN(HPAGE_SIZE);
+
+#define X64_ALIGN_DEBUG_RODATA_END				\
+		. = ALIGN(HPAGE_SIZE);				\
+		__end_rodata_hpage_align = .;
+
+#else
+
+#define X64_ALIGN_DEBUG_RODATA_BEGIN
+#define X64_ALIGN_DEBUG_RODATA_END
+
+#endif
+
 PHDRS {
 	text PT_LOAD FLAGS(5);          /* R_E */
 	data PT_LOAD FLAGS(7);          /* RWE */
@@ -96,7 +122,9 @@ SECTIONS
 
 	EXCEPTION_TABLE(16) :text = 0x9090
 
+	X64_ALIGN_DEBUG_RODATA_BEGIN
 	RO_DATA(PAGE_SIZE)
+	X64_ALIGN_DEBUG_RODATA_END
 
 	/* Data */
 	.data : AT(ADDR(.data) - LOAD_OFFSET) {
