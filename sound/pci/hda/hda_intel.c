@@ -2222,7 +2222,9 @@ static int azx_dev_free(struct snd_device *device)
 static struct snd_pci_quirk position_fix_list[] __devinitdata = {
 	SND_PCI_QUIRK(0x1028, 0x01cc, "Dell D820", POS_FIX_LPIB),
 	SND_PCI_QUIRK(0x1028, 0x01de, "Dell Precision 390", POS_FIX_LPIB),
+	SND_PCI_QUIRK(0x103c, 0x306d, "HP dv3", POS_FIX_LPIB),
 	SND_PCI_QUIRK(0x1043, 0x813d, "ASUS P5AD2", POS_FIX_LPIB),
+	SND_PCI_QUIRK(0x1462, 0x1002, "MSI Wind U115", POS_FIX_LPIB),
 	{}
 };
 
@@ -2308,6 +2310,7 @@ static void __devinit check_probe_mask(struct azx *chip, int dev)
  * white-list for enable_msi
  */
 static struct snd_pci_quirk msi_white_list[] __devinitdata = {
+	SND_PCI_QUIRK(0x103c, 0x306d, "HP dv3", 1),
 	SND_PCI_QUIRK(0x103c, 0x30f7, "HP Pavilion dv4t-1300", 1),
 	SND_PCI_QUIRK(0x103c, 0x3607, "HP Compa CQ40", 1),
 	{}
