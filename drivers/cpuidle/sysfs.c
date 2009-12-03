@@ -311,6 +311,13 @@ int cpuidle_add_state_sysfs(struct cpuidle_device *device)
 	int i, ret = -ENOMEM;
 	struct cpuidle_state_kobj *kobj;
 
+	init_completion(&device->kobj_unregister);
+
+	ret = cpuidle_add_sysfs(device);
+	if (ret) {
+		module_put(cpuidle_curr_driver->owner);
+		return ret;
+	}
 	/* state statistics */
 	for (i = 0; i < device->state_count; i++) {
 		kobj = kzalloc(sizeof(struct cpuidle_state_kobj), GFP_KERNEL);
@@ -347,35 +354,32 @@ void cpuidle_remove_state_sysfs(struct cpuidle_device *device)
 
 	for (i = 0; i < device->state_count; i++)
 		cpuidle_free_state_kobj(device, i);
+
+	cpuidle_remove_sysfs(device);
 }
 
 /**
  * cpuidle_add_sysfs - creates a sysfs instance for the target device
- * @sysdev: the target device
+ * @device: the target device
  */
-int cpuidle_add_sysfs(struct sys_device *sysdev)
+int cpuidle_add_sysfs(struct cpuidle_device *device)
 {
-	int cpu = sysdev->id;
-	struct cpuidle_device *dev;
 	int error;
+	struct sys_device *sysdev = get_cpu_sysdev((unsigned long)device->cpu);
 
-	dev = per_cpu(cpuidle_devices, cpu);
-	error = kobject_init_and_add(&dev->kobj, &ktype_cpuidle, &sysdev->kobj,
-				     "cpuidle");
+	error = kobject_init_and_add(&device->kobj, &ktype_cpuidle,
+				&sysdev->kobj, "cpuidle");
 	if (!error)
-		kobject_uevent(&dev->kobj, KOBJ_ADD);
+		kobject_uevent(&device->kobj, KOBJ_ADD);
 	return error;
 }
 
 /**
  * cpuidle_remove_sysfs - deletes a sysfs instance on the target device
- * @sysdev: the target device
+ * @device: the target device
  */
-void cpuidle_remove_sysfs(struct sys_device *sysdev)
+void cpuidle_remove_sysfs(struct cpuidle_device *device)
 {
-	int cpu = sysdev->id;
-	struct cpuidle_device *dev;
-
-	dev = per_cpu(cpuidle_devices, cpu);
-	kobject_put(&dev->kobj);
+	kobject_put(&device->kobj);
+	wait_for_completion(&device->kobj_unregister);
 }

@@ -23,18 +23,19 @@ DEFINE_SPINLOCK(cpuidle_driver_lock);
  */
 int cpuidle_register_driver(struct cpuidle_driver *drv)
 {
+	int ret = 0;
+
 	if (!drv)
 		return -EINVAL;
 
 	spin_lock(&cpuidle_driver_lock);
-	if (cpuidle_curr_driver) {
-		spin_unlock(&cpuidle_driver_lock);
-		return -EBUSY;
-	}
-	cpuidle_curr_driver = drv;
+	if (!cpuidle_curr_driver)
+		cpuidle_curr_driver = drv;
+	else
+		ret = -EEXIST;
 	spin_unlock(&cpuidle_driver_lock);
 
-	return 0;
+	return ret;
 }
 
 EXPORT_SYMBOL_GPL(cpuidle_register_driver);
