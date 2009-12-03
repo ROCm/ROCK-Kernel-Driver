@@ -1042,7 +1042,6 @@ static int ocfs2_fill_super(struct super_block *sb, void *data, int silent)
 	}
 	osb->osb_resv_level = parsed_options.resv_level;
 
-
 	status = ocfs2_verify_userspace_stack(osb, &parsed_options);
 	if (status)
 		goto read_super_error;
@@ -1268,7 +1267,7 @@ static int ocfs2_parse_options(struct super_block *sb,
 	mopt->slot = OCFS2_INVALID_SLOT;
 	mopt->localalloc_opt = OCFS2_DEFAULT_LOCAL_ALLOC_SIZE;
 	mopt->cluster_stack[0] = '\0';
-	mopt->resv_level = 3;
+	mopt->resv_level = OCFS2_DEFAULT_RESV_LEVEL;
 
 	if (!options) {
 		status = 1;
@@ -1440,7 +1439,8 @@ static int ocfs2_parse_options(struct super_block *sb,
 				status = 0;
 				goto bail;
 			}
-			if (option >= 0 && option < 6)
+			if (option >= OCFS2_MIN_RESV_LEVEL &&
+			    option < OCFS2_MAX_RESV_LEVEL)
 				mopt->resv_level = option;
 			break;
 
@@ -1526,6 +1526,9 @@ static int ocfs2_show_options(struct seq_file *s, struct vfsmount *mnt)
 	else
 		seq_printf(s, ",noacl");
 #endif
+
+	if (osb->osb_resv_level != OCFS2_DEFAULT_RESV_LEVEL)
+		seq_printf(s, ",resv_level=%d", osb->osb_resv_level);
 
 	return 0;
 }

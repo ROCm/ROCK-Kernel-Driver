@@ -30,6 +30,10 @@
 
 struct ocfs2_bitmap_resv_ops;
 
+#define OCFS2_DEFAULT_RESV_LEVEL	3
+#define OCFS2_MAX_RESV_LEVEL	7
+#define OCFS2_MIN_RESV_LEVEL	0
+
 struct ocfs2_alloc_reservation {
 	struct rb_node	r_node;
 
@@ -87,7 +91,7 @@ int ocfs2_resmap_init(struct ocfs2_super *osb,
  *
  * Re-initialize the parameters of a reservation bitmap. This is
  * useful for local alloc window slides.
- *
+ * 
  * If any bitmap parameters have changed, this function will call
  * ocfs2_trunc_resv against all existing reservations. A future
  * version will recalculate existing reservations based on the new
