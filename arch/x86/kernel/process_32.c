@@ -40,7 +40,6 @@
 #include <linux/uaccess.h>
 #include <linux/io.h>
 #include <linux/kdebug.h>
-#include <linux/cpuidle.h>
 
 #include <asm/pgtable.h>
 #include <asm/system.h>
@@ -112,7 +111,7 @@ void cpu_idle(void)
 			local_irq_disable();
 			/* Don't trace irqs off for idle */
 			stop_critical_timings();
-			cpuidle_idle_call();
+			pm_idle();
 			start_critical_timings();
 		}
 		tick_nohz_restart_sched_tick();

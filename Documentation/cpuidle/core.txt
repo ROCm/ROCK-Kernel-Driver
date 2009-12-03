@@ -21,38 +21,3 @@ which can be used to switch governors at run time. This boot option
 is meant for developer testing only. In normal usage, kernel picks the
 best governor based on governor ratings.
 SEE ALSO: sysfs.txt in this directory.
-
-Design:
-
-Cpuidle allows for registration of multiple sets of idle routines.
-The latest registered set is used by cpuidle governors as the current
-active set to choose the right idle state. This set is managed as a
-list and each time the newly registered set is added to the head of the
-list and made the current active set.
-
-An example of how this would work on x86 is shown below.
-
------------------					-----------------
-|		|					|		|
-| choose b/w	|	mwait is chosen			|    mwait	|
-| mwait, poll,	|-------------------------------------> |(current active|
-| default, c1e	|	register to cpuidle		|    set)	|
-|		|	with mwait as the idle routine	|		|
------------------					-----------------
-
-
------------------					-----------------
-|		|					|  c1, c2, c3	|
-|     ACPI	|	register to cpuidle		|   (current)	|
-|   discovery	|-------------------------------------> |---------------|
-|		|	with c1, c2, c3			|     mwait	|
-|		|	as set of idle routines		|		|
------------------					-----------------
-
-With this mechanism, a module can register and unregister its set of
-idle routines at run time in a clean manner.
-
-The main idle routine called inside cpu_idle() of every arch is defined in
-driver/cpuidle/cpuidle.c which would in turn call the idle routine selected
-by the governor. If the CONFIG_CPU_IDLE is disabled, the arch needs to
-provide an alternate definition for cpuidle_idle_call().

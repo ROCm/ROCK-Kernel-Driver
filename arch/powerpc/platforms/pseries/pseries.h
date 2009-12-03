@@ -10,8 +10,6 @@
 #ifndef _PSERIES_PSERIES_H
 #define _PSERIES_PSERIES_H
 
-#include <linux/cpuidle.h>
-
 extern void __init fw_feature_init(const char *hypertas, unsigned long len);
 
 struct pt_regs;
@@ -41,9 +39,5 @@ extern void pSeries_final_fixup(void);
 extern unsigned long rtas_poweron_auto;
 
 extern void find_udbg_vterm(void);
-
-DECLARE_PER_CPU(unsigned long, smt_snooze_delay);
-
-extern struct cpuidle_driver pseries_idle_driver;
 
 #endif /* _PSERIES_PSERIES_H */
