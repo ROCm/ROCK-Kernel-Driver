@@ -41,7 +41,7 @@ struct cpuidle_state {
 	unsigned long long	usage;
 	unsigned long long	time; /* in US */
 
-	void (*enter)	(struct cpuidle_device *dev,
+	int (*enter)	(struct cpuidle_device *dev,
 			 struct cpuidle_state *state);
 };
 
