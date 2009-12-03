@@ -337,6 +337,15 @@ static const struct pnp_device_id pnp_dev_table[] = {
 	{       "WACF00A",              0       },
 	{       "WACF00B",              0       },
 	{       "WACF00C",              0       },
+	{       "WACF00D",              0       },
+	{       "WACF00E",              0       },
+	{       "WACF00F",              0       },
+	{       "WACF010",              0       },
+	{       "WACF011",              0       },
+	{       "WACF012",              0       },
+	{       "WACF013",              0       },
+	{       "WACF014",              0       },
+	{       "WACF015",              0       },
 	/* Compaq touchscreen */
 	{       "FPI2002",              0 },
 	/* Fujitsu Stylistic touchscreens */
@@ -354,6 +363,8 @@ static const struct pnp_device_id pnp_dev_table[] = {
 	{	"FUJ02E5",		0	},
 	/* Fujitsu P-series tablet PC device */
 	{	"FUJ02E6",		0	},
+	/* Fujitsu Wacom Tablet PC device */
+	{	"FUJ02E7",		0	},
 	/*
 	 * LG C1 EXPRESS DUAL (C1-PB11A3) touch screen (actually a FUJ02E6 in
 	 * disguise)
