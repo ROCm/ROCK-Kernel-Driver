@@ -16,7 +16,7 @@
 #include <linux/errno.h>
 #include <linux/gfp.h>
 
-#include "include/security/apparmor.h"
+#include "include/apparmor.h"
 #include "include/capability.h"
 #include "include/context.h"
 #include "include/policy.h"
@@ -72,6 +72,7 @@ static int aa_audit_caps(struct aa_profile *profile, struct aa_audit_caps *sa)
 	/* Do simple duplicate message elimination */
 	ent = &get_cpu_var(audit_cache);
 	if (sa->base.task == ent->task && cap_raised(ent->caps, sa->cap)) {
+		put_cpu_var(audit_cache);
 		if (PROFILE_COMPLAIN(profile))
 			return 0;
 		return sa->base.error;

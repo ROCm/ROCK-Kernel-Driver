@@ -15,7 +15,7 @@
 #include <linux/audit.h>
 #include <linux/socket.h>
 
-#include "include/security/apparmor.h"
+#include "include/apparmor.h"
 #include "include/audit.h"
 #include "include/policy.h"
 

@@ -19,7 +19,7 @@
 #include <linux/uaccess.h>
 #include <linux/namei.h>
 
-#include "include/security/apparmor.h"
+#include "include/apparmor.h"
 #include "include/audit.h"
 #include "include/context.h"
 #include "include/policy.h"
@@ -98,7 +98,6 @@ static struct aa_profile *next_profile(struct aa_profile *profile)
 		read_lock(&ns->base.lock);
 		return list_first_entry(&ns->base.profiles, struct aa_profile,
 					base.list);
-		read_unlock(&ns->base.lock);
 	}
 	return NULL;
 }

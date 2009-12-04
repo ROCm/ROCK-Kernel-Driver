@@ -12,7 +12,7 @@
  * License.
  */
 
-#include "include/security/apparmor.h"
+#include "include/apparmor.h"
 #include "include/audit.h"
 #include "include/context.h"
 #include "include/net.h"
@@ -62,7 +62,7 @@ static void audit_cb(struct audit_buffer *ab, void *va)
 
 		audit_log_format(ab, " protocol=%d", sa->protocol);
 	}
-
+	
 }
 
 static int aa_audit_net(struct aa_profile *profile, struct aa_audit_net *sa)
