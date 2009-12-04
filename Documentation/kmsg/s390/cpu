@@ -38,8 +38,8 @@
  * Text: "The CPU configuration topology of the machine is:"
  * Severity: Informational
  * Description:
- * The first six values of the topology information represent fields Mag1 to
- * Mag6 of system-information block (SYSIB) 15.1.2. These fields specify the
+ * The first six values of the topology information represent fields Mag6 to
+ * Mag1 of system-information block (SYSIB) 15.1.2. These fields specify the
  * maximum numbers of topology-list entries (TLE) at successive topology nesting
  * levels. The last value represents the MNest value of SYSIB 15.1.2 which
  * specifies the maximum possible nesting that can be configured through

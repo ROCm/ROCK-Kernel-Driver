@@ -35,12 +35,7 @@
 #include <linux/kref.h>
 #include <linux/mutex.h>
 #include <linux/lockdep.h>
-#ifndef CONFIG_OCFS2_COMPAT_JBD
-# include <linux/jbd2.h>
-#else
-# include <linux/jbd.h>
-# include "ocfs2_jbd_compat.h"
-#endif
+#include <linux/jbd2.h>
 
 /* For union ocfs2_dlm_lksb */
 #include "stackglue.h"
@@ -348,7 +343,7 @@ struct ocfs2_super
 
 	struct ocfs2_reservation_map	osb_la_resmap;
 
-	unsigned int osb_resv_level;
+	unsigned int	osb_resv_level;
 
 	/* Next three fields are for local node slot recovery during
 	 * mount. */

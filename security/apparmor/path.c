@@ -20,7 +20,7 @@
 #include <linux/slab.h>
 #include <linux/fs_struct.h>
 
-#include "include/security/apparmor.h"
+#include "include/apparmor.h"
 #include "include/path.h"
 
 int aa_get_name_to_buffer(struct path *path, int is_dir, char *buffer, int size,
@@ -88,6 +88,7 @@ int d_namespace_path(struct path *path, char *buf, int buflen, char **name)
 {
 	struct path root, tmp, ns_root = { };
 	char *res;
+	int deleted;
 	int error = 0;
 
 	read_lock(&current->fs->lock);
@@ -101,8 +102,12 @@ int d_namespace_path(struct path *path, char *buf, int buflen, char **name)
 		ns_root.dentry = dget(ns_root.mnt->mnt_root);
 	spin_unlock(&vfsmount_lock);
 	spin_lock(&dcache_lock);
-	tmp = ns_root;
-	res = __d_path(path, &tmp, buf, buflen);
+
+	do {
+		tmp = ns_root;
+		deleted = d_unlinked(path->dentry);
+		res = __d_path(path, &tmp, buf, buflen);
+	} while (deleted != d_unlinked(path->dentry));
 
 	*name = res;
 	/* handle error conditions - and still allow a partial path to
@@ -110,6 +115,29 @@ int d_namespace_path(struct path *path, char *buf, int buflen, char **name)
 	if (IS_ERR(res)) {
 		error = PTR_ERR(res);
 		*name = buf;
+	} else if (deleted) {
+		/* The stripping of (deleted) is a hack that could be removed
+		 * with an updated __d_path
+		 */
+
+		/* Currently 2 cases fall into here.  Fixing the mediation
+		 * of deleted files for things like trunc.
+		 * And the newly allocated dentry case.  The first case
+		 * means we strip deleted for everything so the new
+		 * dentry test case is commented out below.
+		 */
+		buf[buflen - 11] = 0;	/* - (len(" (deleted)") +\0) */
+
+		/* if (!path->dentry->d_inode) {
+		 * On some filesystems, newly allocated dentries appear
+		 * to the security_path hooks as a deleted
+		 * dentry except without an inode allocated.
+		 *
+		 * Remove the appended deleted text and return as a
+		 * string for normal mediation.  The (deleted) string
+		 * is guarenteed to be added in this case, so just
+		 * strip it.
+		 */
 	} else if (!IS_ROOT(path->dentry) && d_unhashed(path->dentry)) {
 		error = -ENOENT;
 #if 0

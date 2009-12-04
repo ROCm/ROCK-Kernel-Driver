@@ -1373,6 +1373,7 @@ extern int __memory_failure(unsigned long pfn, int trapno, int ref);
 extern int sysctl_memory_failure_early_kill;
 extern int sysctl_memory_failure_recovery;
 extern atomic_long_t mce_bad_pages;
+int soft_offline_page(struct page *page);
 
 #endif /* __KERNEL__ */
 #endif /* _LINUX_MM_H */

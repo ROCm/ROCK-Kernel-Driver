@@ -40,6 +40,7 @@
 #include <linux/pagemap.h>
 #include <linux/swap.h>
 #include <linux/backing-dev.h>
+#include <linux/migrate.h>
 #include "internal.h"
 
 int sysctl_memory_failure_early_kill __read_mostly = 0;
@@ -597,6 +598,8 @@ static struct page_state {
 	{ 0,		0,		"unknown page state",	me_unknown },
 };
 
+#undef lru
+
 static void action_result(unsigned long pfn, char *msg, int result)
 {
 	struct page *page = NULL;
@@ -769,7 +772,7 @@ int __memory_failure(unsigned long pfn, int trapno, int ref)
 	 */
 	if (!PageLRU(p))
 		lru_add_drain_all();
-	lru_flag = p->flags & lru;
+	lru_flag = p->flags & (1UL << PG_lru);
 	if (isolate_lru_page(p)) {
 		action_result(pfn, "non LRU", IGNORED);
 		put_page(p);
@@ -793,7 +796,7 @@ int __memory_failure(unsigned long pfn, int trapno, int ref)
 	/*
 	 * Torn down by someone else?
 	 */
-	if ((lru_flag & lru) && !PageSwapCache(p) && p->mapping == NULL) {
+	if (test_bit(PG_lru, &lru_flag) && !PageSwapCache(p) && p->mapping == NULL) {
 		action_result(pfn, "already truncated LRU", IGNORED);
 		res = 0;
 		goto out;
@@ -832,4 +835,130 @@ EXPORT_SYMBOL_GPL(__memory_failure);
 void memory_failure(unsigned long pfn, int trapno)
 {
 	__memory_failure(pfn, trapno, 0);
+}
+
+static struct page *new_page(struct page *p, unsigned long private, int **x)
+{
+	return alloc_pages(GFP_HIGHUSER_MOVABLE, 0);
+}
+
+/**
+ * soft_offline_page - Soft offline a page.
+ * @page: page to offline
+ *
+ * Returns 0 on success, otherwise negated errno.
+ *
+ * Soft offline a page, by migration or dropping,
+ * without killing anything. This is for the case when
+ * the case is not corrupted yet (so it's still ok to access),
+ * but has had a number of corrected errors and is better taken
+ * out. The page is put on the bad page list and poisoned.
+ *
+ * This should never impact any application or cause data loss.
+ *
+ * This is not a 100% solution for all memory, but tries to be
+ * ``good enough'' for the majority of memory.
+ *
+ * Only handles page cache and free pages for now.
+ */
+int soft_offline_page(struct page *page)
+{
+	int ret;
+	unsigned long pfn = page_to_pfn(page);
+
+	/*
+	 * Free Page. Just set the hwpoison bit in a race
+	 * free manner if it was free, and then the page allocator
+  	 * takes care of it by skipping it.
+	 */
+	if (PageTestBuddyAndSetHWPoison(page)) {
+		pr_debug("soft_offline: free page\n");
+		/* RED-PEN page wil have zero refcount as bad page */
+		atomic_long_add(1, &mce_bad_pages);
+		return 0;
+	}
+
+	/*
+	 * Page cache page we can handle?
+	 *
+	 * RED-PEN: Could do more draining like per cpu pagevecs or
+	 * slabs.
+ 	 */
+	if (!PageLRU(page))
+		lru_add_drain_all();
+	if (!PageLRU(page)) {
+		pr_debug("soft_offline: %lx: unknown non LRU page type %lx\n",
+				pfn, page->flags);
+		if (PageBuddy(page)) pr_debug("page was free\n");
+		return -EIO;
+	}
+
+	if (!get_page_unless_zero(compound_head(page))) {
+		pr_debug("soft_offline: %lx: zero refcount page\n", pfn);
+		/* RED-PEN Could loop here because it's likely free now? */
+		return -EIO;
+	}
+
+	lock_page(page);
+	wait_on_page_writeback(page);
+
+	/*
+	 * Synchronized using the page lock with m_f()
+	 */
+	if (PageHWPoison(page)) {
+		unlock_page(page);
+		put_page(page);
+		pr_debug("soft offline: %lx page already poisoned\n", pfn);
+		return -EBUSY;
+	}
+
+	/*
+	 * Try to invalidate first. This should work for
+	 * non dirty unmapped page cache pages.
+	 */
+	ret = invalidate_inode_page(page);
+	unlock_page(page);
+
+	/*
+	 * Drop count because page migration doesn't like raised
+	 * counts.
+	 * RED-PEN is this really safe?
+	 */
+	put_page(page);
+	if (ret == 1) {
+		ret = 0;
+		pr_debug("soft_offline: %lx: invalidated\n", pfn);
+		goto done;
+	}
+
+	/*
+	 * Simple invalidation didn't work.
+	 * Try to migrate to a new page instead. migrate.c
+	 * handles a large number of cases for us.
+	 */
+	ret = isolate_lru_page(page);
+	if (!ret) {
+		LIST_HEAD(pagelist);
+
+		list_add(&page->lru, &pagelist);
+		ret = migrate_pages(&pagelist, new_page, MPOL_MF_MOVE_ALL);
+		if (ret) {
+			pr_debug("soft offline: %lx: migration failed %d, type %lx\n",
+				pfn, ret, page->flags);
+			if (ret > 0)
+				ret = -EIO;
+		}
+	} else {
+		pr_debug("soft offline: %lx: isolation failed: %d, page count %d, type %lx\n",
+				pfn, ret, page_count(page), page->flags);
+	}
+	if (ret)
+		return ret;
+
+done:
+	atomic_long_add(1, &mce_bad_pages);
+	/* Only set poison bit when page is not used anymore */
+	SetPageHWPoison(page);
+	/* keep elevated page count for bad page */
+	return ret;
 }

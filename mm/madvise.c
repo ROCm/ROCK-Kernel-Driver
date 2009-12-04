@@ -222,7 +222,7 @@ static long madvise_remove(struct vm_area_struct *vma,
 /*
  * Error injection support for memory error handling.
  */
-static int madvise_hwpoison(unsigned long start, unsigned long end)
+static int madvise_hwpoison(int bhv, unsigned long start, unsigned long end)
 {
 	int ret = 0;
 
@@ -234,6 +234,17 @@ static int madvise_hwpoison(unsigned long start, unsigned long end)
 						0, 0, &p, NULL);
 		if (ret != 1)
 			return ret;
+		if (bhv == MADV_SOFT_OFFLINE) {
+			printk(KERN_INFO "Soft offlining page %lx at %lx\n",
+				page_to_pfn(p), start);
+			put_page(p);
+			// race window here but sop cannot deal with the
+			// inced page count. would need to fix page migration
+			ret = soft_offline_page(p);
+			if (ret)
+				break;
+			continue;
+		}
 		printk(KERN_INFO "Injecting memory failure for page %lx at %lx\n",
 		       page_to_pfn(p), start);
 		/* Ignore return value for now */
@@ -335,8 +346,8 @@ SYSCALL_DEFINE3(madvise, unsigned long, start, size_t, len_in, int, behavior)
 	size_t len;
 
 #ifdef CONFIG_MEMORY_FAILURE
-	if (behavior == MADV_HWPOISON)
-		return madvise_hwpoison(start, start+len_in);
+	if (behavior == MADV_HWPOISON || behavior == MADV_SOFT_OFFLINE)
+		return madvise_hwpoison(behavior, start, start+len_in);
 #endif
 	if (!madvise_behavior_valid(behavior))
 		return error;

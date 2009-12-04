@@ -28,14 +28,19 @@
  */
 
 /*?
- * Text: "%s: New DASD with %ld byte/block, total size %ld KB\n"
+ * Text: "%s: New DASD with %ld byte/block, total size %ld KB%s\n"
  * Severity: Informational
  * Parameter:
  *   @1: bus ID of the DASD
  *   @2: bytes per block
  *   @3: size
+ *   @4: access mode
  * Description:
  * A DASD with the indicated block size and total size has been set online.
+ * If the DASD is configured as read-only to the real or virtual hardware,
+ * the message includes an indication of this hardware access mode. The
+ * hardware access mode is independent from the 'readonly' attribute of
+ * the device in sysfs.
  * User action:
  * None.
  */
@@ -62,8 +67,8 @@
  *   @2: return code
  * Description:
  * Initializing the DASD with the DIAG discipline failed. Possible reasons for
- * this problem are that the device is read-only, has a device type other
- * than FBA or ECKD, or has a block size other than one of the supported sizes:
+ * this problem are that the device has a device type other than FBA or ECKD,
+ * or has a block size other than one of the supported sizes:
  * 512 byte, 1024 byte, 2048 byte, or 4096 byte.
  * User action:
  * Ensure that the device can be written to and has a supported device type
@@ -97,4 +102,17 @@
  * systems of the z/VM hypervisor.
  * User action:
  * Remove the unsupported discipline from the parameter string.
+ */
+
+/*?
+ * Text: "%s: The access mode of a DIAG device changed to read-only"
+ * Severity: Warning
+ * Parameter:
+ *   @1: bus ID of the DASD
+ * Description:
+ * A device changed its access mode from writeable to
+ * read-only while in use.
+ * User action:
+ * Set the device offline, ensure that the device is configured correctly in
+ * z/VM, then set the device online again.
  */

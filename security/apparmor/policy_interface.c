@@ -20,7 +20,7 @@
 #include <asm/unaligned.h>
 #include <linux/errno.h>
 
-#include "include/security/apparmor.h"
+#include "include/apparmor.h"
 #include "include/audit.h"
 #include "include/context.h"
 #include "include/match.h"
@@ -376,6 +376,7 @@ static int aa_unpack_trans_table(struct aa_ext *e, struct aa_profile *profile)
 		if (!profile->file.trans.table)
 			goto fail;
 
+		profile->file.trans.size = size;
 		for (i = 0; i < size; i++) {
 		    char *tmp;
 			if (!aa_is_dynstring(e, &tmp, NULL))
@@ -389,11 +390,15 @@ static int aa_unpack_trans_table(struct aa_ext *e, struct aa_profile *profile)
 			goto fail;
 		if (!aa_is_nameX(e, AA_STRUCTEND, NULL))
 			goto fail;
-		profile->file.trans.size = size;
 	}
 	return 1;
 
 fail:
+	if (profile->file.trans.table) {
+		int i;
+		for (i = 0; i < profile->file.trans.size; i++)
+			kfree(profile->file.trans.table[i]);
+	}
 	e->pos = pos;
 	return 0;
 }
@@ -658,7 +663,6 @@ ssize_t aa_interface_add_profiles(void *data, size_t size)
 
 	aa_audit_iface(&sa);
 	aa_put_namespace(ns);
-	kfree(e.ns_name);
 	return size;
 
 fail2:
@@ -668,7 +672,6 @@ fail:
 	error = aa_audit_iface(&sa);
 	aa_put_namespace(ns);
 	aa_put_profile(profile);
-	kfree(e.ns_name);
 	return error;
 }
 
@@ -713,7 +716,7 @@ ssize_t aa_interface_replace_profiles(void *udata, size_t size)
 		sa.base.info = "failed to prepare namespace";
 		sa.base.error = -ENOMEM;
 		goto fail;
-	}
+	}		
 
 	sa.name = new_profile->fqname;
 
@@ -771,7 +774,6 @@ ssize_t aa_interface_replace_profiles(void *udata, size_t size)
 	aa_audit_iface(&sa);
 	aa_put_namespace(ns);
 	aa_put_profile(old_profile);
-	kfree(e.ns_name);
 	return size;
 
 fail2:
@@ -781,7 +783,6 @@ fail:
 	aa_put_namespace(ns);
 	aa_put_profile(old_profile);
 	aa_put_profile(new_profile);
-	kfree(e.ns_name);
 	return error;
 }
 
@@ -822,7 +823,10 @@ ssize_t aa_interface_remove_profiles(char *name, size_t size)
 	write_lock(&ns->base.lock);
 	if (!name) {
 		/* remove namespace */
-	  //		__aa_remove_namespace(ns);
+		if (ns == default_namespace)
+			__aa_profile_list_release(&ns->base.profiles);
+		else
+			__aa_remove_namespace(ns);
 	} else {
 		/* remove profile */
 		profile = __aa_find_profile_by_fqname(ns, name);

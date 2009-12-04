@@ -37,11 +37,10 @@
  *   @1: bus ID of the unit record device
  *   @1: z/VM virtual unit record device driver
  * Description:
- * A request to suspend a unit record device being currently in use is
- * rejected.
+ * Linux cannot be suspended while a unit record device is in use.
  * User action:
- * Terminate applications working on z/VM spool files queues (e.g. the
- * vmur user space tool) and then try to suspend the system again.
+ * Stop all applications that work on z/VM spool file queues, for example, the
+ * vmur tool. Then try again to suspend Linux.
  */
 
 /*? Text: "%s loaded.\n" */

@@ -12,7 +12,7 @@
  * License.
  */
 
-#include "include/security/apparmor.h"
+#include "include/apparmor.h"
 #include "include/audit.h"
 #include "include/file.h"
 #include "include/match.h"
@@ -139,18 +139,17 @@ int aa_audit_file(struct aa_profile *profile, struct aa_audit_file *sa)
 			return 0;
 		type = AUDIT_APPARMOR_AUDIT;
 	} else {
-		/* quiet auditing of specific known rejects */
-		u16 mask = sa->perms.quiet;
-		u16 denied = sa->request & ~sa->perms.allowed;
+		/* only report permissions that were denied */
+		sa->request = sa->request & ~sa->perms.allowed;
 
-		if (denied & sa->perms.kill)
+		if (sa->request & sa->perms.kill)
 			type = AUDIT_APPARMOR_KILL;
 
-		/* assumes quiet and kill do not overlap */
-		if ((denied & mask) &&
+		/* quiet known rejects, assumes quiet and kill do not overlap */
+		if ((sa->request & sa->perms.quiet) &&
 		    PROFILE_AUDIT_MODE(profile) != AUDIT_NOQUIET &&
 		    PROFILE_AUDIT_MODE(profile) != AUDIT_ALL)
-			sa->request &= ~mask;
+			sa->request &= ~sa->perms.quiet;
 
 		if (!sa->request)
 			return PROFILE_COMPLAIN(profile) ? 0 : sa->base.error;

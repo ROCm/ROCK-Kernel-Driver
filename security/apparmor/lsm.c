@@ -24,8 +24,8 @@
 #include <linux/audit.h>
 #include <net/sock.h>
 
-#include "include/security/apparmor.h"
-#include "include/security/apparmorfs.h"
+#include "include/apparmor.h"
+#include "include/apparmorfs.h"
 #include "include/audit.h"
 #include "include/capability.h"
 #include "include/context.h"
@@ -128,7 +128,7 @@ static int apparmor_sysctl(struct ctl_table *table, int op)
 		int mask;
 
 		mask = 0;
-		if (op & 4)
+ 		if (op & 4)
 			mask |= MAY_READ;
 		if (op & 2)
 			mask |= MAY_WRITE;
@@ -138,7 +138,7 @@ static int apparmor_sysctl(struct ctl_table *table, int op)
 		if (!buffer)
 			goto out;
 
-		/*
+		/* 
 		 * TODO: convert this over to using a global or per
 		 * namespace control instead of a hard coded /proc
 		 */
@@ -171,7 +171,7 @@ static int common_perm(const char *op, struct path *path, u16 mask,
 }
 
 static int common_perm_dentry(const char *op, struct path *dir,
-			      struct dentry *dentry, u16 mask,
+			      struct dentry *dentry, u16 mask, 
 			      struct path_cond *cond)
 {
 	struct path path = { dir->mnt, dentry };
@@ -281,7 +281,7 @@ static int apparmor_path_rename(struct path *old_dir, struct dentry *old_dentry,
 		if (!error)
 			error = aa_path_perm(profile, "rename_dest", &new_path,
 					     AA_MAY_CREATE | MAY_WRITE, &cond);
-
+					     
 	}
 	return error;
 }
@@ -290,7 +290,7 @@ static int apparmor_dentry_open(struct file *file, const struct cred *cred)
 {
 	struct aa_profile *profile;
 	int error = 0;
-
+	  
 	/* If in exec permission is handled by bprm hooks */
 	if (current->in_execve ||
 	    !mediated_filesystem(file->f_path.dentry->d_inode))
@@ -299,7 +299,7 @@ static int apparmor_dentry_open(struct file *file, const struct cred *cred)
 	aa_cred_policy(cred, &profile);
 	if (profile) {
 		struct aa_file_cxt *fcxt = file->f_security;
-		struct inode *inode = file->f_path.dentry->d_inode;
+		struct inode *inode = file->f_path.dentry->d_inode; 
 		struct path_cond cond = { inode->i_uid, inode->i_mode };
 
 		error = aa_path_perm(profile, "open", &file->f_path,
@@ -369,7 +369,7 @@ static int common_file_perm(const char *op, struct file *file, u16 mask)
 
 	if (!fprofile || !file->f_path.mnt ||
 	    !mediated_filesystem(file->f_path.dentry->d_inode))
-		return 0;
+ 		return 0;
 
 	profile = aa_current_profile_wupd();
 	if (profile && ((fprofile != profile) || (mask & ~fcxt->allowed)))
@@ -391,7 +391,7 @@ static int apparmor_file_lock(struct file *file, unsigned int cmd)
 
 /*
  * AppArmor doesn't current use the fcntl hook.
- *
+ * 
  * FIXME - these are not implemented yet - REMOVE file_fcntl hook
  * NOTE: some of the file control commands are further mediated
  *       by other hooks
@@ -547,15 +547,16 @@ static int apparmor_setprocattr(struct task_struct *task, char *name,
 	return error;
 }
 
-static int apparmor_task_setrlimit(unsigned int resource,
+static int apparmor_task_setrlimit(struct task_struct *task,
+				   unsigned int resource,
 				   struct rlimit *new_rlim)
 {
+	struct rlimit *old_rlim = task->signal->rlim + resource;
 	struct aa_profile *profile = aa_current_profile_wupd();
 	int error = 0;
 
-	if (profile) {
+	if (profile && old_rlim->rlim_max != new_rlim->rlim_max)
 		error = aa_task_setrlimit(profile, resource, new_rlim);
-	}
 
 	return error;
 }
@@ -762,7 +763,7 @@ static int param_set_mode(const char *val, struct kernel_param *kp);
 static int param_get_mode(char *buffer, struct kernel_param *kp);
 #define param_check_mode(name, p) __param_check(name, p, int)
 
-/* Flag values, also controllable via /sys/modulesecurity/apparmor/parameters
+/* Flag values, also controllable via /sys/module/apparmor/parameters
  * We define special types as we want to do additional mediation.
  */
 

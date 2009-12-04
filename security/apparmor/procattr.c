@@ -12,7 +12,7 @@
  * License.
  */
 
-#include "include/security/apparmor.h"
+#include "include/apparmor.h"
 #include "include/policy.h"
 #include "include/domain.h"
 

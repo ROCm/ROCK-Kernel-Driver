@@ -381,15 +381,15 @@ struct sk_buff {
 #ifdef CONFIG_IPV6_NDISC_NODETYPE
 	__u8			ndisc_nodetype:2;
 #endif
+#ifdef	CONFIG_NETVM
+	__u8			emergency:1;
+#endif
 #ifdef CONFIG_XEN
 	__u8			proto_data_valid:1,
 				proto_csum_blank:1;
 #endif
 	kmemcheck_bitfield_end(flags2);
 
-#ifdef	CONFIG_NETVM
-	__u8			emergency:1;
-#endif
 	/* 0/14 bit hole */
 
 #ifdef CONFIG_NET_DMA

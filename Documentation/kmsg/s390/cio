@@ -90,3 +90,56 @@
  * See the errno man page to find out what caused the problem.
  */
  /*? Text: "%s: Got subchannel machine check but no sch_event handler provided.\n" */
+
+/*?
+ * Text: "%s: Setting the device online failed because it is boxed\n"
+ * Severity: Warning
+ * Parameter:
+ *   @1: Device bus-ID
+ * Description:
+ * Initialization of a device did not complete because it did not respond in
+ * time or it was reserved by another operating system.
+ * User action:
+ * Make sure that the device is working correctly, then try again to set it
+ * online. For devices that support the reserve/release mechanism (for example
+ * DASDs), you can try to override the reservation of the other system by
+ * writing 'force' to the 'online' sysfs attribute of the affected device.
+ */
+
+/*?
+ * Text: "%s: Setting the device online failed because it is not operational\n"
+ * Severity: Warning
+ * Parameter:
+ *   @1: Device bus-ID
+ * Description:
+ * Initialization of a device did not complete because it is not present or
+ * not operational.
+ * User action:
+ * Make sure that the device is present and working correctly, then try again
+ * to set it online.
+ */
+
+/*?
+ * Text: "%s: The device stopped operating while being set offline\n"
+ * Severity: Warning
+ * Parameter:
+ *   @1: Device bus-ID
+ * Description:
+ * While the device was set offline, it was not present or not operational.
+ * The device is now inactive, but setting it online again might fail.
+ * User action:
+ * None.
+ */
+
+/*?
+ * Text: "%s: The device entered boxed state while being set offline\n"
+ * Severity: Warning
+ * Parameter:
+ *   @1: Device bus-ID
+ * Description:
+ * While the device was set offline, it did not respond in time or it was
+ * reserved by another operating system. The device is now inactive, but
+ * setting it online again might fail.
+ * User action:
+ * None.
+ */

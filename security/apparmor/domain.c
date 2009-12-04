@@ -21,7 +21,7 @@
 #include <linux/personality.h>
 
 #include "include/audit.h"
-#include "include/security/apparmorfs.h"
+#include "include/apparmorfs.h"
 #include "include/context.h"
 #include "include/domain.h"
 #include "include/file.h"
@@ -64,11 +64,13 @@ static int aa_may_change_ptraced_domain(struct task_struct *task,
 		cred = aa_get_task_policy(tracer, &tracerp);
 	rcu_read_unlock();
 
-	if (!tracerp)
-		return error;
+	if (!tracer || !tracerp)
+		goto out;
 
 	error = aa_may_ptrace(tracer, tracerp, to_profile, PTRACE_MODE_ATTACH);
-	put_cred(cred);
+out:
+	if (cred)
+		put_cred(cred);
 
 	return error;
 }
@@ -224,7 +226,7 @@ int apparmor_bprm_set_creds(struct linux_binprm *bprm)
 	unsigned int state = DFA_START;
 	struct aa_audit_file sa;
 	struct path_cond cond = { bprm->file->f_path.dentry->d_inode->i_uid,
-				  bprm->file->f_path.dentry->d_inode->i_mode };
+				  bprm->file->f_path.dentry->d_inode->i_mode }; 
 
 	sa.base.error = cap_bprm_set_creds(bprm);
 	if (sa.base.error)
@@ -248,7 +250,7 @@ int apparmor_bprm_set_creds(struct linux_binprm *bprm)
 	sa.base.error = aa_get_name(&bprm->file->f_path, 0, &buffer,
 				    (char **) &sa.name);
 	if (sa.base.error) {
-		if (profile || profile->flags & PFLAG_IX_ON_NAME_ERROR)
+		if (!profile || profile->flags & PFLAG_IX_ON_NAME_ERROR)
 			sa.base.error = 0;
 		sa.base.info = "Exec failed name resolution";
 		sa.name = bprm->filename;
@@ -374,7 +376,7 @@ int apparmor_bprm_secureexec(struct linux_binprm *bprm)
 
 	/* the decision to use secure exec is computed in set_creds
 	 * and stored in bprm->unsafe.  The AppArmor X_UNSAFE flag is
-	 * indicates don't
+	 * indicates don't 
 	 */
 	if (!ret && (bprm->unsafe & AA_SECURE_X_NEEDED))
 		ret = 1;
@@ -430,7 +432,7 @@ static void revalidate_file(struct aa_profile *profile, struct file *file,
 	}
 }
 
-/*
+/* 
  * derived from security/selinux/hooks.c: flush_unauthorized_files &&
  * fs/exec.c:flush_old_files
  */
@@ -470,7 +472,7 @@ static int revalidate_files(struct aa_profile *profile,
 		}
 		spin_lock(&files->file_lock);
 	}
-	spin_unlock(&files->file_lock);
+	spin_unlock(&files->file_lock);	
 	kfree(buffer);
 	return 0;
 }
@@ -525,15 +527,16 @@ int aa_change_hat(const char *hat_name, u64 token, int permtest)
 	struct aa_task_context *cxt;
 	struct aa_profile *profile, *previous_profile, *hat = NULL;
 	struct aa_audit_file sa;
+	char *name = NULL;
 
 	memset(&sa, 0, sizeof(sa));
 	sa.base.gfp_mask = GFP_KERNEL;
 	sa.base.operation = "change_hat";
+	sa.request = AA_MAY_CHANGEHAT;
 
 	cred = aa_current_policy(&profile);
 	cxt = cred->security;
 	previous_profile = cxt->sys.previous;
-	token = cxt->sys.token;
 
 	if (!profile) {
 		sa.base.info = "unconfined";
@@ -542,32 +545,36 @@ int aa_change_hat(const char *hat_name, u64 token, int permtest)
 	}
 
 	if (hat_name) {
-		if (previous_profile)
-			sa.name = previous_profile->fqname;
-		else
-			sa.name = profile->fqname;
-
+		struct aa_profile *root;
+		root = PROFILE_IS_HAT(profile) ? profile->parent : profile;
 		sa.name2 = profile->ns->base.name;
 
-		if (PROFILE_IS_HAT(profile))
-			hat = aa_find_child(profile->parent, hat_name);
-		else
-			hat = aa_find_child(profile, hat_name);
+		hat = aa_find_child(root, hat_name);
 		if (!hat) {
+			if (permtest || !PROFILE_COMPLAIN(root))
+				/* probing is an expected unfortunate behavior
+				 * of the change_hat api is traditionally quiet
+				 */
+				goto out;
+
+			name = new_compound_name(root->fqname, hat_name);
+
+			sa.name = name;
 			sa.base.info = "hat not found";
 			sa.base.error = -ENOENT;
-			if (permtest || !PROFILE_COMPLAIN(profile))
-				goto audit;
 			hat = aa_alloc_null_profile(profile, 1);
 			if (!hat) {
 				sa.base.info = "failed null profile create";
 				sa.base.error = -ENOMEM;
 				goto audit;
 			}
-		} else if (!PROFILE_IS_HAT(hat)) {
-			sa.base.info = "target not hat";
-			sa.base.error = -EPERM;
-			goto audit;
+		} else {
+			sa.name = hat->fqname;
+			if (!PROFILE_IS_HAT(hat)) {
+				sa.base.info = "target not hat";
+				sa.base.error = -EPERM;
+				goto audit;
+			}
 		}
 
 		sa.base.error = aa_may_change_ptraced_domain(current, hat);
@@ -579,27 +586,27 @@ int aa_change_hat(const char *hat_name, u64 token, int permtest)
 
 		if (!permtest) {
 			sa.base.error = aa_set_current_hat(hat, token);
-			if (sa.base.error == -EACCES) {
-				(void)send_sig_info(SIGKILL, NULL, current);
-				sa.base.error = aa_audit(AUDIT_APPARMOR_KILL,
-							 profile, &sa.base,
-							 file_audit_cb);
-				goto out;
-			}
+			if (sa.base.error == -EACCES)
+				sa.perms.kill = AA_MAY_CHANGEHAT;
+			else if (name && !sa.base.error)
+				/* reset error for learning of new hats */
+				sa.base.error = -ENOENT;
 		}
-	} else if (previous_profile)
+	} else if (previous_profile) {
+		sa.name = previous_profile->fqname;
 		sa.base.error = aa_restore_previous_profile(token);
-	/* else
-		 ignore restores when there is no saved profile
-	*/
+		sa.perms.kill = AA_MAY_CHANGEHAT;
+	} else
+		/* ignore restores when there is no saved profile */
+		goto out;
 
 audit:
 	if (!permtest)
 		sa.base.error = aa_audit_file(profile, &sa);
 
-
 out:
 	aa_put_profile(hat);
+	kfree(name);
 
 	return sa.base.error;
 }
@@ -677,7 +684,7 @@ int aa_change_profile(const char *ns_name, const char *fqname, int onexec,
 			goto audit;
 		target = aa_alloc_null_profile(profile, 0);
 	}
-
+	
 	/* check if tracing task is allowed to trace target domain */
 	sa.base.error = aa_may_change_ptraced_domain(current, target);
 	if (sa.base.error) {

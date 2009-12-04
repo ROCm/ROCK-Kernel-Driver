@@ -144,6 +144,7 @@ leave:
 static int ocfs2_file_release(struct inode *inode, struct file *file)
 {
 	struct ocfs2_inode_info *oi = OCFS2_I(inode);
+	struct ocfs2_super *osb = OCFS2_SB(inode->i_sb);
 
 	mlog_entry("(0x%p, 0x%p, '%.*s')\n", inode, file,
 		       file->f_path.dentry->d_name.len,
@@ -153,6 +154,14 @@ static int ocfs2_file_release(struct inode *inode, struct file *file)
 	if (!--oi->ip_open_count)
 		oi->ip_flags &= ~OCFS2_INODE_OPEN_DIRECT;
 	spin_unlock(&oi->ip_lock);
+
+	if ((file->f_mode & FMODE_WRITE) &&
+	    (atomic_read(&inode->i_writecount) == 1)) {
+		down_write(&oi->ip_alloc_sem);
+		ocfs2_resv_discard(&osb->osb_la_resmap,
+				   &oi->ip_la_data_resv);
+		up_write(&oi->ip_alloc_sem);
+	}
 
 	ocfs2_free_file_private(inode, file);
 
@@ -483,10 +492,10 @@ static int ocfs2_truncate_file(struct inode *inode,
 	if (new_i_size == le64_to_cpu(fe->i_size))
 		goto bail;
 
+	down_write(&OCFS2_I(inode)->ip_alloc_sem);
+
 	ocfs2_resv_discard(&osb->osb_la_resmap,
 			   &OCFS2_I(inode)->ip_la_data_resv);
-
-	down_write(&OCFS2_I(inode)->ip_alloc_sem);
 
 	/*
 	 * The inode lock forced other nodes to sync and drop their
@@ -1715,7 +1724,8 @@ int ocfs2_check_range_for_refcount(struct inode *inode, loff_t pos,
 	struct super_block *sb = inode->i_sb;
 
 	if (!ocfs2_refcount_tree(OCFS2_SB(inode->i_sb)) ||
-	    !(OCFS2_I(inode)->ip_dyn_features & OCFS2_HAS_REFCOUNT_FL))
+	    !(OCFS2_I(inode)->ip_dyn_features & OCFS2_HAS_REFCOUNT_FL) ||
+	    OCFS2_I(inode)->ip_dyn_features & OCFS2_INLINE_DATA_FL)
 		return 0;
 
 	cpos = pos >> OCFS2_SB(sb)->s_clustersize_bits;

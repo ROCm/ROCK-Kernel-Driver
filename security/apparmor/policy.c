@@ -47,7 +47,7 @@
 #include <linux/spinlock.h>
 #include <linux/string.h>
 
-#include "include/security/apparmor.h"
+#include "include/apparmor.h"
 #include "include/capability.h"
 #include "include/file.h"
 #include "include/ipc.h"
@@ -105,7 +105,7 @@ static void common_free(struct aa_policy_common *common)
 
 static struct aa_policy_common *__common_find(struct list_head *head,
 					      const char *name)
-
+					      
 {
 	struct aa_policy_common *common;
 
@@ -228,7 +228,7 @@ void free_aa_namespace(struct aa_namespace *ns)
 
 struct aa_namespace *__aa_find_namespace(struct list_head *head,
 					 const char *name)
-
+					 
 {
 	return (struct aa_namespace *) __common_find(head, name);
 }
@@ -276,7 +276,7 @@ struct aa_namespace *aa_find_namespace_by_strn(const char *name, int len)
 struct aa_namespace *aa_prepare_namespace(const char *name)
 {
 	struct aa_namespace *ns;
-
+ 
 	write_lock(&ns_list_lock);
 	if (name)
 		ns = aa_get_namespace(__aa_find_namespace(&ns_list, name));
@@ -292,7 +292,7 @@ struct aa_namespace *aa_prepare_namespace(const char *name)
 		ns = __aa_find_namespace(&ns_list, name);
 		if (!ns) {
 			list_add(&new_ns->base.list, &ns_list);
-			ns = new_ns;
+			ns = aa_get_namespace(new_ns);
 		} else {
 			/* raced so free the new one */
 			free_aa_namespace(new_ns);
@@ -322,7 +322,7 @@ void __aa_remove_profile(struct aa_profile *profile,
 	if (replacement)
 		profile->replacedby = aa_get_profile(replacement);
 	else
-		profile->replacedby = ERR_PTR(-EINVAL);
+		profile->replacedby = aa_get_profile(profile->ns->unconfined);
 	list_del_init(&profile->base.list);
 	if (!(profile->flags & PFLAG_NO_LIST_REF))
 		aa_put_profile(profile);
@@ -417,12 +417,12 @@ struct aa_profile *alloc_aa_profile(const char *fqname)
 	profile = kzalloc(sizeof(*profile), GFP_KERNEL);
 	if (!profile)
 		return NULL;
-
+ 
 	if (!common_init(&profile->base, fqname)) {
 		kfree(profile);
 		return NULL;
 	}
-
+	
 	profile->fqname = profile->base.name;
 	profile->base.name = (char *) fqname_subname((const char *) profile->fqname);
 	return profile;
@@ -541,7 +541,7 @@ void free_aa_profile(struct aa_profile *profile)
 	aa_free_sid(profile->sid);
 	aa_match_free(profile->xmatch);
 
-	if (profile->replacedby && !PTR_ERR(profile->replacedby))
+	if (profile->replacedby)
 		aa_put_profile(profile->replacedby);
 
 	memset(profile, 0, sizeof(profile));
@@ -593,7 +593,7 @@ struct aa_policy_common *__aa_find_parent_by_fqname(struct aa_namespace *ns,
 
 	common = &ns->base;
 
-
+	
 	for (split = strstr(fqname, "//"); split; ) {
 		profile = __aa_find_profile_by_strn(&common->profiles, fqname,
 						    split - fqname);
@@ -715,13 +715,7 @@ struct aa_profile *aa_sys_find_attach(struct aa_policy_common *base,
 struct aa_profile *aa_profile_newest(struct aa_profile *profile)
 {
 	if (unlikely(profile && profile->replacedby)) {
-		for (;profile->replacedby; profile = profile->replacedby) {
-			if (IS_ERR(profile->replacedby)) {
-				/* profile has been removed */
-				profile = NULL;
-				break;
-			}
-		}
+		for (;profile->replacedby; profile = profile->replacedby) ;
 	}
 
 	return profile;
