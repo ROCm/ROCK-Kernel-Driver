@@ -844,3 +844,22 @@
  * adapter. Check your SAN setup and consider reducing the number of ports
  * visible to the FCP adapter by using more restrictive zoning in the SAN.
  */
+
+/*?
+ * Text: "%s: A port opened with WWPN 0x%016Lx returned data that identifies it as WWPN 0x%016Lx\n"
+ * Severity: Warning
+ * Parameter:
+ *   @1: bus ID of the zfcp device
+ *   @2: expected WWPN
+ *   @3: reported WWPN
+ * Description:
+ * A remote port was opened successfully, but it reported an
+ * unexpected WWPN in the returned port login (PLOGI) data. This
+ * condition might have been caused by a change applied to the SAN
+ * configuration while the port was being opened.
+ * User action:
+ * If this condition is only temporary and access to the remote port
+ * is possible, no action is required. If the condition persists,
+ * identify the storage system with the specified WWPN and contact the
+ * support organization of the storage system.
+ */

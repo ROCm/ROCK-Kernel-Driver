@@ -1839,3 +1839,63 @@
  * User action:
  * Look up the SRC in the storage server documentation.
  */
+
+/*?
+ * Text: "%s: Reading device feature codes failed with rc=%d\n"
+ * Severity: Warning
+ * Parameter:
+ *   @1: bus ID of the DASD
+ *   @2: return code
+ * Description:
+ * The device feature codes state which advanced features are supported by a
+ * device.
+ * Examples for advanced features are PAV or high performance FICON.
+ * Some early devices do not provide feature codes and no advanced features are
+ * available on these devices.
+ * User action:
+ * None, if the DASD does not provide feature codes. If the DASD provides
+ * feature codes, make sure that it is working correctly, then set it offline
+ * and back online.
+ */
+
+/*?
+ * Text: "%s: A channel path group could not be established\n"
+ * Severity: Warning
+ * Parameter:
+ *   @1: bus ID of the DASD
+ * Description:
+ * Initialization of a DASD did not complete because a channel path group
+ * could not be established.
+ * User action:
+ * Make sure that the DASD is working correctly, then try again to set it
+ * online. If initialization still fails, reboot.
+ */
+
+/*?
+ * Text: "%s: The DASD is not operating in multipath mode\n"
+ * Severity: Informational
+ * Parameter:
+ *   @1: bus ID of the DASD
+ * Description:
+ * The DASD channel path group could not be configured to use multipath mode.
+ * This might negatively affect I/O performance on this DASD.
+ * User action:
+ * Make sure that the DASD is working correctly, then try again to set it
+ * online. If initialization still fails, reboot.
+ */
+
+/*?
+ * Text: "%s: Detecting the DASD disk layout failed because of an I/O error\n"
+ * Severity: Error
+ * Parameter:
+ *   @1: bus ID of the DASD
+ * Description:
+ * The disk layout of the DASD could not be detected because of an unexpected
+ * I/O error. The DASD device driver treats the device like an unformatted DASD,
+ * and partitions on the device are not accessible.
+ * User action:
+ * If the DASD is formatted, make sure that the DASD is working correctly,
+ * then set it offline and back online. If the DASD is unformatted, format the
+ * DASD, for example, with dasdfmt.
+ * ATTENTION: Formatting irreversibly destroys all data on the DASD.
+ */

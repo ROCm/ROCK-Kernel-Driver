@@ -142,15 +142,6 @@
  */
 
 /*?
- * Text: "Linux is running under KVM in 64-bit mode\n"
- * Severity: Informational
- * Description:
- * The 64-bit kernel detected that it is running under the KVM hypervisor.
- * User action:
- * None.
- */
-
-/*?
  * Text: "Defining the Linux kernel NSS failed with rc=%d\n"
  * Severity: Error
  * Parameter:
@@ -185,3 +176,6 @@
  * For other return codes, see the help and message documentation for
  * the CP SAVESYS command.
  */
+
+/*? Text: "Linux is running under KVM in 64-bit mode\n" */
+
