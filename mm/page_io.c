@@ -150,6 +150,9 @@ out:
 	return ret;
 }
 
+/* this comment ensure the patch applies to swap_sync_page
+ * and not swap_set_page_dirty by mistake
+ */
 void swap_sync_page(struct page *page)
 {
 	struct swap_info_struct *sis = page_swap_info(page);
