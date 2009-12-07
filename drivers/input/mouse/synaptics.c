@@ -326,6 +326,45 @@ static void synaptics_pt_create(struct psmouse *psmouse)
  *	Functions to interpret the absolute mode packets
  ****************************************************************************/
 
+/* left and right clickpad button ranges;
+ * the gap between them is interpreted as a middle-button click
+ */
+#define CLICKPAD_LEFT_BTN_X \
+	((XMAX_NOMINAL - XMIN_NOMINAL) * 2 / 5 + XMIN_NOMINAL)
+#define CLICKPAD_RIGHT_BTN_X \
+	((XMAX_NOMINAL - XMIN_NOMINAL) * 3 / 5 + XMIN_NOMINAL)
+
+/* handle clickpad events */
+static void clickpad_process_packet(struct synaptics_data *priv,
+				    struct synaptics_hw_state *hw)
+{
+	/* clickpad mode reports Y range from 0 to YMAX_NOMINAL,
+	 * where the area Y < YMIN_NOMINAL is used as click buttons
+	 */
+	if (hw->y < YMIN_NOMINAL) {
+		/* button area */
+		hw->z = 0; /* don't move pointer */
+		/* clickpad reports only the middle button, and we need
+		 * to fake left/right buttons depending on the touch position
+		 */
+		if (hw->middle) { /* clicked? */
+			hw->middle = 0;
+			if (hw->x < CLICKPAD_LEFT_BTN_X)
+				hw->left = 1;
+			else if (hw->x > CLICKPAD_RIGHT_BTN_X)
+				hw->right = 1;
+			else
+				hw->middle = 1;
+		}
+	} else if (hw->middle) {
+		/* dragging */
+		hw->left = priv->prev_hw.left;
+		hw->right = priv->prev_hw.right;
+		hw->middle = priv->prev_hw.middle;
+	}
+	priv->prev_hw = *hw;
+}
+
 static void synaptics_parse_hw_state(unsigned char buf[], struct synaptics_data *priv, struct synaptics_hw_state *hw)
 {
 	memset(hw, 0, sizeof(struct synaptics_hw_state));
@@ -405,6 +444,9 @@ static void synaptics_process_packet(struct psmouse *psmouse)
 	int i;
 
 	synaptics_parse_hw_state(psmouse->packet, priv, &hw);
+
+	if (SYN_CAP_CLICKPAD(priv->ext_cap))
+		clickpad_process_packet(priv, &hw);
 
 	if (hw.scroll) {
 		priv->scroll += hw.scroll;
@@ -693,6 +735,12 @@ int synaptics_init(struct psmouse *psmouse)
 		SYN_ID_MODEL(priv->identity),
 		SYN_ID_MAJOR(priv->identity), SYN_ID_MINOR(priv->identity),
 		priv->model_id, priv->capabilities, priv->ext_cap);
+
+	if (SYN_CAP_CLICKPAD(priv->ext_cap)) {
+		printk(KERN_INFO "Synaptics: Clickpad mode enabled\n");
+		/* force to enable the middle button */
+		priv->capabilities |= (1 << 18);
+	}
 
 	set_input_params(psmouse->dev, priv);
 
