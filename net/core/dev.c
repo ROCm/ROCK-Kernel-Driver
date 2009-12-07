@@ -2444,9 +2444,6 @@ int netif_receive_skb(struct sk_buff *skb)
 	}
 #endif
 
-	if (skb_emergency(skb))
-		goto skip_taps;
-
 #ifdef CONFIG_XEN
 	switch (skb->ip_summed) {
 	case CHECKSUM_UNNECESSARY:
@@ -2459,6 +2456,9 @@ int netif_receive_skb(struct sk_buff *skb)
 		break;
 	}
 #endif
+
+	if (skb_emergency(skb))
+		goto skip_taps;
 
 	list_for_each_entry_rcu(ptype, &ptype_all, list) {
 		if (ptype->dev == null_or_orig || ptype->dev == skb->dev ||

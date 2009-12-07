@@ -168,7 +168,7 @@ int acpi_processor_ppc_has_changed(struct acpi_processor *pr)
 	else
 #ifdef CONFIG_CPU_FREQ
 		return cpufreq_update_policy(pr->id);
-#elif CONFIG_PROCESSOR_EXTERNAL_CONTROL
+#elif defined(CONFIG_PROCESSOR_EXTERNAL_CONTROL)
 		return processor_notify_external(pr,
 				PROCESSOR_PM_CHANGE, PM_TYPE_PERF);
 #endif

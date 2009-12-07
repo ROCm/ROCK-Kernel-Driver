@@ -86,6 +86,8 @@ extern start_info_t *xen_start_info;
 #define init_hypervisor(c) ((void)((c)->x86_hyper_vendor = X86_HYPER_VENDOR_XEN))
 #define init_hypervisor_platform() init_hypervisor(&boot_cpu_data)
 
+struct vcpu_runstate_info *setup_runstate_area(unsigned int cpu);
+
 /* arch/xen/kernel/evtchn.c */
 /* Force a proper event-channel callback from Xen. */
 void force_evtchn_callback(void);

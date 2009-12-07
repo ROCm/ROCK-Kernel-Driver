@@ -550,15 +550,7 @@ EXPORT_SYMBOL_GPL(mark_tsc_unstable);
 
 static void init_missing_ticks_accounting(unsigned int cpu)
 {
-	struct vcpu_register_runstate_memory_area area;
-	struct vcpu_runstate_info *runstate = &per_cpu(runstate, cpu);
-	int rc;
-
-	memset(runstate, 0, sizeof(*runstate));
-
-	area.addr.v = runstate;
-	rc = HYPERVISOR_vcpu_op(VCPUOP_register_runstate_memory_area, cpu, &area);
-	WARN_ON(rc && rc != -ENOSYS);
+	struct vcpu_runstate_info *runstate = setup_runstate_area(cpu);
 
 	per_cpu(processed_blocked_time, cpu) =
 		runstate->time[RUNSTATE_blocked];
@@ -642,6 +634,23 @@ static struct clocksource clocksource_xen = {
 	.flags			= CLOCK_SOURCE_IS_CONTINUOUS,
 	.resume			= xen_clocksource_resume,
 };
+
+struct vcpu_runstate_info *setup_runstate_area(unsigned int cpu)
+{
+	struct vcpu_register_runstate_memory_area area;
+	struct vcpu_runstate_info *runstate = &per_cpu(runstate, cpu);
+	int rc;
+
+	set_xen_guest_handle(area.addr.h, runstate);
+	rc = HYPERVISOR_vcpu_op(VCPUOP_register_runstate_memory_area, cpu, &area);
+	if (rc) {
+		BUILD_BUG_ON(RUNSTATE_running);
+		memset(runstate, 0, sizeof(*runstate));
+		WARN_ON(rc != -ENOSYS);
+	}
+
+	return runstate;
+}
 
 void xen_read_persistent_clock(struct timespec *ts)
 {

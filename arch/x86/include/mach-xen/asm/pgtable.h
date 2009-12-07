@@ -26,9 +26,6 @@ extern unsigned long empty_zero_page[PAGE_SIZE / sizeof(unsigned long)];
 extern spinlock_t pgd_lock;
 extern struct list_head pgd_list;
 
-#ifdef CONFIG_PARAVIRT
-#include <asm/paravirt.h>
-#else  /* !CONFIG_PARAVIRT */
 #define set_pte(ptep, pte)		xen_set_pte(ptep, pte)
 #define set_pte_at(mm, addr, ptep, pte)	xen_set_pte_at(mm, addr, ptep, pte)
 
@@ -73,8 +70,6 @@ extern struct list_head pgd_list;
 #define __pte(x)	xen_make_pte(x)
 
 #define arch_end_context_switch(prev)	do {} while(0)
-
-#endif	/* CONFIG_PARAVIRT */
 
 /*
  * The following only work if pte_present() is true.
@@ -486,7 +481,7 @@ static inline pud_t *pud_offset(pgd_t *pgd, unsigned long address)
 
 static inline int pgd_bad(pgd_t pgd)
 {
-	return (pgd_flags(pgd) & ~_PAGE_USER) != _KERNPG_TABLE;
+	return (pgd_flags(pgd) & ~(_PAGE_USER|_PAGE_NX)) != _KERNPG_TABLE;
 }
 
 static inline int pgd_none(pgd_t pgd)

@@ -1568,11 +1568,7 @@ char *__init default_machine_specific_memory_setup(void)
 	int rc, nr_map;
 	unsigned long long maxmem;
 	struct xen_memory_map memmap;
-	/*
-	 * This is rather large for a stack variable but this early in
-	 * the boot process we know we have plenty slack space.
-	 */
-	struct e820entry map[E820MAX];
+	static struct e820entry __initdata map[E820MAX];
 
 	memmap.nr_entries = E820MAX;
 	set_xen_guest_handle(memmap.buffer, map);

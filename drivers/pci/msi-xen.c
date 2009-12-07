@@ -560,6 +560,7 @@ int pci_enable_msi_block(struct pci_dev *dev, unsigned int nvec)
 			return ret;
 
 		dev->irq = evtchn_map_pirq(-1, dev->irq);
+		dev->msi_enabled = 1;
 		msi_dev_entry->default_irq = temp;
 
 		return ret;
@@ -589,7 +590,7 @@ void pci_msi_shutdown(struct pci_dev *dev)
 	int pirq, pos;
 	struct msi_dev_list *msi_dev_entry = get_msi_dev_pirq_list(dev);
 
-	if (!pci_msi_enable || !dev)
+	if (!pci_msi_enable || !dev || !dev->msi_enabled)
 		return;
 
 #ifdef CONFIG_XEN_PCIDEV_FRONTEND
@@ -597,12 +598,10 @@ void pci_msi_shutdown(struct pci_dev *dev)
 		evtchn_map_pirq(dev->irq, 0);
 		pci_frontend_disable_msi(dev);
 		dev->irq = msi_dev_entry->default_irq;
+		dev->msi_enabled = 0;
 		return;
 	}
 #endif
-
-	if (!dev->msi_enabled)
-		return;
 
 	pirq = dev->irq;
 	/* Restore dev->irq to its default pin-assertion vector */
@@ -677,6 +676,7 @@ int pci_enable_msix(struct pci_dev *dev, struct msix_entry *entries, int nvec)
 				 "got %x from frontend_enable_msix\n", ret);
 			return ret;
 		}
+		dev->msix_enabled = 1;
 		msi_dev_entry->default_irq = temp;
 
 		for (i = 0; i < nvec; i++) {
@@ -739,9 +739,7 @@ EXPORT_SYMBOL(pci_enable_msix);
 extern void pci_frontend_disable_msix(struct pci_dev* dev);
 void pci_msix_shutdown(struct pci_dev *dev)
 {
-	if (!pci_msi_enable)
-		return;
-	if (!dev)
+	if (!pci_msi_enable || !dev || !dev->msix_enabled)
 		return;
 
 #ifdef CONFIG_XEN_PCIDEV_FRONTEND
@@ -760,12 +758,10 @@ void pci_msix_shutdown(struct pci_dev *dev)
 		}
 
 		dev->irq = msi_dev_entry->default_irq;
+		dev->msix_enabled = 0;
 		return;
 	}
 #endif
-
-	if (!dev->msix_enabled)
-		return;
 
 	msi_remove_pci_irq_vectors(dev);
 

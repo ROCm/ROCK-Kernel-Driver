@@ -222,10 +222,10 @@ static pud_t *fill_pud(pgd_t *pgd, unsigned long vaddr)
 {
 	if (pgd_none(*pgd)) {
 		pud_t *pud = (pud_t *)spp_getpage();
-		make_page_readonly(pud, XENFEAT_writable_page_tables);
-		if (!after_bootmem)
+		if (!after_bootmem) {
+			make_page_readonly(pud, XENFEAT_writable_page_tables);
 			xen_l4_entry_update(pgd, __pgd(__pa(pud) | _PAGE_TABLE));
-		else
+		} else
 			pgd_populate(&init_mm, pgd, pud);
 		if (pud != pud_offset(pgd, 0))
 			printk(KERN_ERR "PAGETABLE BUG #00! %p <-> %p\n",
@@ -238,10 +238,10 @@ static pmd_t *fill_pmd(pud_t *pud, unsigned long vaddr)
 {
 	if (pud_none(*pud)) {
 		pmd_t *pmd = (pmd_t *) spp_getpage();
-		make_page_readonly(pmd, XENFEAT_writable_page_tables);
-		if (!after_bootmem)
+		if (!after_bootmem) {
+			make_page_readonly(pmd, XENFEAT_writable_page_tables);
 			xen_l3_entry_update(pud, __pud(__pa(pmd) | _PAGE_TABLE));
-		else
+		} else
 			pud_populate(&init_mm, pud, pmd);
 		if (pmd != pmd_offset(pud, 0))
 			printk(KERN_ERR "PAGETABLE BUG #01! %p <-> %p\n",
@@ -1003,7 +1003,7 @@ static int kernel_set_to_readonly;
 
 void set_kernel_text_rw(void)
 {
-	unsigned long start = PFN_ALIGN(_stext);
+	unsigned long start = PFN_ALIGN(_text);
 	unsigned long end = PFN_ALIGN(__start_rodata);
 
 	if (!kernel_set_to_readonly)
@@ -1017,7 +1017,7 @@ void set_kernel_text_rw(void)
 
 void set_kernel_text_ro(void)
 {
-	unsigned long start = PFN_ALIGN(_stext);
+	unsigned long start = PFN_ALIGN(_text);
 	unsigned long end = PFN_ALIGN(__start_rodata);
 
 	if (!kernel_set_to_readonly)
@@ -1031,9 +1031,13 @@ void set_kernel_text_ro(void)
 
 void mark_rodata_ro(void)
 {
-	unsigned long start = PFN_ALIGN(_stext), end = PFN_ALIGN(__end_rodata);
+	unsigned long start = PFN_ALIGN(_text);
 	unsigned long rodata_start =
 		((unsigned long)__start_rodata + PAGE_SIZE - 1) & PAGE_MASK;
+	unsigned long end = (unsigned long) &__end_rodata;
+	unsigned long text_end = PAGE_ALIGN((unsigned long) &__stop___ex_table);
+	unsigned long rodata_end = PAGE_ALIGN((unsigned long) &__end_rodata);
+	unsigned long data_start = (unsigned long) &_sdata;
 
 	printk(KERN_INFO "Write protecting the kernel read-only data: %luk\n",
 	       (end - start) >> 10);
@@ -1056,6 +1060,14 @@ void mark_rodata_ro(void)
 	printk(KERN_INFO "Testing CPA: again\n");
 	set_memory_ro(start, (end-start) >> PAGE_SHIFT);
 #endif
+
+	free_init_pages("unused kernel memory",
+			(unsigned long) page_address(virt_to_page(text_end)),
+			(unsigned long)
+				 page_address(virt_to_page(rodata_start)));
+	free_init_pages("unused kernel memory",
+			(unsigned long) page_address(virt_to_page(rodata_end)),
+			(unsigned long) page_address(virt_to_page(data_start)));
 }
 
 #endif

@@ -19,6 +19,8 @@
 #undef __XEN_TOOLS__
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/gfp.h>
+#include <linux/percpu.h>
 #include <asm/hypervisor.h>
 #include <xen/blkif.h>
 
@@ -33,6 +35,29 @@ typedef struct xen_domctl_address_size {
 
 typedef __attribute__((aligned(8))) uint64_t uint64_aligned_t;
 
+struct xenctl_cpumap_v4 {
+	XEN_GUEST_HANDLE(uint8) bitmap;
+	uint32_t nr_cpus;
+};
+
+struct xenctl_cpumap_v5 {
+	union {
+		XEN_GUEST_HANDLE(uint8) bitmap;
+		uint64_aligned_t _align;
+	};
+	uint32_t nr_cpus;
+};
+
+struct xen_domctl_vcpuaffinity_v4 {
+    uint32_t vcpu;
+    struct xenctl_cpumap_v4 cpumap;
+};
+
+struct xen_domctl_vcpuaffinity_v5 {
+    uint32_t vcpu;
+    struct xenctl_cpumap_v5 cpumap;
+};
+
 union xen_domctl {
 	/* v4: sles10 sp1: xen 3.0.4 + 32-on-64 patches */
 	struct {
@@ -42,6 +67,7 @@ union xen_domctl {
 		union {
 			/* left out lots of other struct xen_domctl_foobar */
 			struct xen_domctl_address_size       address_size;
+			struct xen_domctl_vcpuaffinity_v4    vcpu_affinity;
 			uint64_t                             dummy_align;
 			uint8_t                              dummy_pad[128];
 		};
@@ -54,6 +80,7 @@ union xen_domctl {
 		domid_t  domain;
 		union {
 			struct xen_domctl_address_size       address_size;
+			struct xen_domctl_vcpuaffinity_v5    vcpu_affinity;
 			uint64_aligned_t                     dummy_align;
 			uint8_t                              dummy_pad[128];
 		};
@@ -112,5 +139,103 @@ int xen_guest_blkif_protocol(int domid)
 	return BLKIF_PROTOCOL_NATIVE;
 }
 EXPORT_SYMBOL_GPL(xen_guest_blkif_protocol);
+
+#ifdef CONFIG_X86
+
+#define vcpuaffinity(what, ver) ({					\
+	memset(&domctl, 0, sizeof(domctl));				\
+	domctl.v##ver.cmd = XEN_DOMCTL_##what##vcpuaffinity;		\
+	domctl.v##ver.interface_version = ver;				\
+	/* domctl.v##ver.domain = 0; */					\
+	domctl.v##ver.vcpu_affinity.vcpu = smp_processor_id();		\
+	domctl.v##ver.vcpu_affinity.cpumap.nr_cpus = nr;		\
+	set_xen_guest_handle(domctl.v##ver.vcpu_affinity.cpumap.bitmap, \
+			     mask);					\
+	hypervisor_domctl(&domctl);					\
+})
+
+static inline int get_vcpuaffinity(unsigned int nr, void *mask)
+{
+	union xen_domctl domctl;
+	int rc;
+
+	BUILD_BUG_ON(XEN_DOMCTL_INTERFACE_VERSION > 5);
+	rc = vcpuaffinity(get, 5);
+#if CONFIG_XEN_COMPAT < 0x030100
+	if (rc)
+		rc = vcpuaffinity(get, 4);
+#endif
+	return rc;
+}
+
+static inline int set_vcpuaffinity(unsigned int nr, void *mask)
+{
+	union xen_domctl domctl;
+	int rc;
+
+	BUILD_BUG_ON(XEN_DOMCTL_INTERFACE_VERSION > 5);
+	rc = vcpuaffinity(set, 5);
+#if CONFIG_XEN_COMPAT < 0x030100
+	if (rc)
+		rc = vcpuaffinity(set, 4);
+#endif
+	return rc;
+}
+
+static DEFINE_PER_CPU(void *, saved_pcpu_affinity);
+
+#define BITS_PER_PAGE (PAGE_SIZE * BITS_PER_LONG / sizeof(long))
+
+int xen_set_physical_cpu_affinity(int pcpu)
+{
+	int rc;
+
+	if (!is_initial_xendomain())
+		return -EPERM;
+
+	if (pcpu >= 0) {
+		void *oldmap;
+
+		if (pcpu > BITS_PER_PAGE)
+			return -ERANGE;
+
+		if (percpu_read(saved_pcpu_affinity))
+			return -EBUSY;
+
+		oldmap = (void *)get_zeroed_page(GFP_KERNEL);
+		if (!oldmap)
+			return -ENOMEM;
+
+		rc = get_vcpuaffinity(BITS_PER_PAGE, oldmap);
+		if (!rc) {
+			void *newmap = kzalloc(BITS_TO_LONGS(pcpu + 1)
+					       * sizeof(long), GFP_KERNEL);
+
+			if (newmap) {
+				__set_bit(pcpu, newmap);
+				rc = set_vcpuaffinity(pcpu + 1, newmap);
+				kfree(newmap);
+			} else
+				rc = -ENOMEM;
+		}
+
+		if (!rc)
+			percpu_write(saved_pcpu_affinity, oldmap);
+		else
+			free_page((unsigned long)oldmap);
+	} else {
+		if (!percpu_read(saved_pcpu_affinity))
+			return 0;
+		rc = set_vcpuaffinity(BITS_PER_PAGE,
+				      percpu_read(saved_pcpu_affinity));
+		free_page((unsigned long)percpu_read(saved_pcpu_affinity));
+		percpu_write(saved_pcpu_affinity, NULL);
+	}
+
+	return rc;
+}
+EXPORT_SYMBOL_GPL(xen_set_physical_cpu_affinity);
+
+#endif /* CONFIG_X86 */
 
 MODULE_LICENSE("GPL");
