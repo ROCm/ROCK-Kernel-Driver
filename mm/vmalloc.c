@@ -398,10 +398,13 @@ overflow:
 			purged = 1;
 			goto retry;
 		}
-		if (printk_ratelimit())
+		if (printk_ratelimit()) {
 			printk(KERN_WARNING
-				"vmap allocation for size %lu failed: "
-				"use vmalloc=<size> to increase size.\n", size);
+				"vmap allocation failed - "
+				"use vmalloc=<size> to increase size.\n");
+			printk(KERN_WARNING "vmalloc size=%lx start=%lx end=%lx node=%d gfp=%lx\n", size, vstart, vend, node, (unsigned long)gfp_mask);
+			dump_stack();
+		}
 		kfree(va);
 		return ERR_PTR(-EBUSY);
 	}
