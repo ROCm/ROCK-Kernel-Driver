@@ -101,6 +101,20 @@ config IP_NF_MATCH_TTL
 	(e.g. when running oldconfig). It selects
 	CONFIG_NETFILTER_XT_MATCH_HL.
 
+config IP_NF_MATCH_IPV4OPTIONS
+	tristate  'IPV4OPTIONS match support'
+	depends on IP_NF_IPTABLES
+	help
+	  This option adds a IPV4OPTIONS match.
+	  It allows you to filter options like source routing,
+	  record route, timestamp and router-altert.
+
+	  If you say Y here, try iptables -m ipv4options --help for more information.
+
+	  If you want to compile it as a module, say M here and read
+	  Documentation/modules.txt.  If unsure, say 'N'.
+
+
 # `filter', generic and specific targets
 config IP_NF_FILTER
 	tristate "Packet filtering"
