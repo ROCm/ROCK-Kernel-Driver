@@ -52,9 +52,9 @@ startup_64:
 
 #define NEXT_PAGE(name) \
 	.balign	PAGE_SIZE; \
-	phys_##name = . - .head.text; \
 ENTRY(name)
 
+	__PAGE_ALIGNED_BSS
 NEXT_PAGE(init_level4_pgt)
 	.fill	512,8,0
 
@@ -74,7 +74,9 @@ NEXT_PAGE(level2_fixmap_pgt)
 NEXT_PAGE(level1_fixmap_pgt)
 	.fill	512,8,0
 
+	.previous
 NEXT_PAGE(hypercall_page)
+	phys_hypercall_page = . - .head.text
 	CFI_STARTPROC
 	.rept 0x1000 / 0x20
 	.skip 1 /* push %rcx */

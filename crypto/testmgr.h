@@ -1020,8 +1020,6 @@ static struct hash_testvec ghash_tv_template[] =
 
 /*
  * HMAC-MD5 test vectors from RFC2202
-/*
- * HMAC-MD5 test vectors from RFC2202
  * (These need to be fixed to not use strlen).
  */
 #define HMAC_MD5_TEST_VECTORS	7

@@ -38,13 +38,15 @@
 # define UNLOCK_LOCK_PREFIX
 #endif
 
+#ifdef TICKET_SHIFT
+
 int xen_spinlock_init(unsigned int cpu);
 void xen_spinlock_cleanup(unsigned int cpu);
-extern int xen_spin_wait(raw_spinlock_t *, unsigned int token);
-extern int xen_spin_wait_flags(raw_spinlock_t *, unsigned int *token,
-			       unsigned int flags);
-extern unsigned int xen_spin_adjust(raw_spinlock_t *, unsigned int token);
-extern void xen_spin_kick(raw_spinlock_t *, unsigned int token);
+int xen_spin_wait(raw_spinlock_t *, unsigned int token);
+int xen_spin_wait_flags(raw_spinlock_t *, unsigned int *token,
+			unsigned int flags);
+unsigned int xen_spin_adjust(raw_spinlock_t *, unsigned int token);
+void xen_spin_kick(raw_spinlock_t *, unsigned int token);
 
 /*
  * Ticket locks are conceptually two parts, one indicating the current head of
@@ -63,8 +65,7 @@ extern void xen_spin_kick(raw_spinlock_t *, unsigned int token);
  * save some instructions and make the code more elegant. There really isn't
  * much between them in performance though, especially as locks are out of line.
  */
-#if (NR_CPUS < 256)
-#define TICKET_SHIFT 8
+#if TICKET_SHIFT == 8
 #define __ticket_spin_lock_preamble \
 	asm(LOCK_PREFIX "xaddw %w0, %2\n\t" \
 	    "cmpb %h0, %b0\n\t" \
@@ -122,8 +123,7 @@ static __always_inline void __ticket_spin_unlock(raw_spinlock_t *lock)
 	if (kick)
 		xen_spin_kick(lock, token);
 }
-#else
-#define TICKET_SHIFT 16
+#elif TICKET_SHIFT == 16
 #define __ticket_spin_lock_preamble \
 	do { \
 		unsigned int tmp; \
@@ -240,41 +240,98 @@ static __always_inline void __ticket_spin_lock_flags(raw_spinlock_t *lock,
 	} while (unlikely(!count) && !xen_spin_wait_flags(lock, &token, flags));
 }
 
-#ifndef CONFIG_PARAVIRT_SPINLOCKS
+#undef __ticket_spin_lock_preamble
+#undef __ticket_spin_lock_body
+
+#define __raw_spin(n) __ticket_spin_##n
+
+#else /* TICKET_SHIFT */
+
+static inline int xen_spinlock_init(unsigned int cpu) { return 0; }
+static inline void xen_spinlock_cleanup(unsigned int cpu) {}
+
+static inline int __byte_spin_is_locked(raw_spinlock_t *lock)
+{
+	return lock->lock != 0;
+}
+
+static inline int __byte_spin_is_contended(raw_spinlock_t *lock)
+{
+	return lock->spinners != 0;
+}
+
+static inline void __byte_spin_lock(raw_spinlock_t *lock)
+{
+	s8 val = 1;
+
+	asm("1: xchgb %1, %0\n"
+	    "   test %1,%1\n"
+	    "   jz 3f\n"
+	    "   " LOCK_PREFIX "incb %2\n"
+	    "2: rep;nop\n"
+	    "   cmpb $1, %0\n"
+	    "   je 2b\n"
+	    "   " LOCK_PREFIX "decb %2\n"
+	    "   jmp 1b\n"
+	    "3:"
+	    : "+m" (lock->lock), "+q" (val), "+m" (lock->spinners): : "memory");
+}
+
+#define __byte_spin_lock_flags(lock, flags) __byte_spin_lock(lock)
+
+static inline int __byte_spin_trylock(raw_spinlock_t *lock)
+{
+	u8 old = 1;
+
+	asm("xchgb %1,%0"
+	    : "+m" (lock->lock), "+q" (old) : : "memory");
+
+	return old == 0;
+}
+
+static inline void __byte_spin_unlock(raw_spinlock_t *lock)
+{
+	smp_wmb();
+	lock->lock = 0;
+}
+
+#define __raw_spin(n) __byte_spin_##n
+
+#endif /* TICKET_SHIFT */
 
 static inline int __raw_spin_is_locked(raw_spinlock_t *lock)
 {
-	return __ticket_spin_is_locked(lock);
+	return __raw_spin(is_locked)(lock);
 }
 
 static inline int __raw_spin_is_contended(raw_spinlock_t *lock)
 {
-	return __ticket_spin_is_contended(lock);
+	return __raw_spin(is_contended)(lock);
 }
 #define __raw_spin_is_contended	__raw_spin_is_contended
 
 static __always_inline void __raw_spin_lock(raw_spinlock_t *lock)
 {
-	__ticket_spin_lock(lock);
+	__raw_spin(lock)(lock);
 }
 
 static __always_inline int __raw_spin_trylock(raw_spinlock_t *lock)
 {
-	return __ticket_spin_trylock(lock);
+	return __raw_spin(trylock)(lock);
 }
 
 static __always_inline void __raw_spin_unlock(raw_spinlock_t *lock)
 {
-	__ticket_spin_unlock(lock);
+	__raw_spin(unlock)(lock);
 }
 
 static __always_inline void __raw_spin_lock_flags(raw_spinlock_t *lock,
 						  unsigned long flags)
 {
-	__ticket_spin_lock_flags(lock, flags);
+	__raw_spin(lock_flags)(lock, flags);
 }
 
-#endif	/* CONFIG_PARAVIRT_SPINLOCKS */
+#undef __raw_spin
 
 static inline void __raw_spin_unlock_wait(raw_spinlock_t *lock)
 {

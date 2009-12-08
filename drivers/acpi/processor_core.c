@@ -834,13 +834,13 @@ static int __cpuinit acpi_processor_add(struct acpi_device *device)
 	}
 #ifndef CONFIG_XEN
 	per_cpu(processor_device_array, pr->id) = device;
+
+	per_cpu(processors, pr->id) = pr;
 #else
 	processor_device_array[pr->acpi_id] = device;
 	if (pr->id != -1)
 		per_cpu(processors, pr->id) = pr;
 #endif
-
-	per_cpu(processors, pr->id) = pr;
 
 	result = acpi_processor_add_fs(device);
 	if (result)

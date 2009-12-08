@@ -84,7 +84,7 @@ int xen_spin_wait(raw_spinlock_t *lock, unsigned int token)
 	do {
 		/* Check again to make sure it didn't become free while
 		 * we weren't looking. */
-		if ((lock->slock & ((1U << TICKET_SHIFT) - 1)) == token) {
+		if (lock->cur == token) {
 			/* If we interrupted another spinlock while it was
 			 * blocking, make sure it doesn't block (again)
 			 * without rechecking the lock. */

@@ -398,6 +398,10 @@ static void xenbus_dev_shutdown(struct device *_dev)
 		goto out;
 	}
 	xenbus_switch_state(dev, XenbusStateClosing);
+
+	if (!strcmp(dev->devicetype, "vfb"))
+		goto out;
+
 	timeout = wait_for_completion_timeout(&dev->down, timeout);
 	if (!timeout)
 		dev_info(&dev->dev, "%s: %s timeout closing device\n",
@@ -652,6 +656,9 @@ static int xenbus_probe_frontend(const char *type, const char *name)
 {
 	char *nodename;
 	int err;
+
+	if (!strcmp(type, "console"))
+		return 0;
 
 	nodename = kasprintf(GFP_KERNEL, "%s/%s/%s",
 			     xenbus_frontend.root, type, name);

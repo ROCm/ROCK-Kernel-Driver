@@ -73,7 +73,7 @@ static void pre_suspend(void)
 		mfn_to_pfn(xen_start_info->console.domU.mfn);
 }
 
-static void post_suspend(int suspend_cancelled)
+static void post_suspend(int suspend_cancelled, int fast_suspend)
 {
 	int i, j, k, fpp;
 	unsigned long shinfo_mfn;
@@ -90,6 +90,21 @@ static void post_suspend(int suspend_cancelled)
 #ifdef CONFIG_SMP
 		cpumask_copy(vcpu_initialized_mask, cpu_online_mask);
 #endif
+		for_each_possible_cpu(i) {
+			setup_runstate_area(i);
+
+#ifdef CONFIG_XEN_VCPU_INFO_PLACEMENT
+			if (fast_suspend && i != smp_processor_id()
+			    && HYPERVISOR_vcpu_op(VCPUOP_down, i, NULL))
+				BUG();
+
+			setup_vcpu_info(i);
+
+			if (fast_suspend && i != smp_processor_id()
+			    && HYPERVISOR_vcpu_op(VCPUOP_up, i, NULL))
+				BUG();
+#endif
+		}
 	}
 
 	shinfo_mfn = xen_start_info->shared_info >> PAGE_SHIFT;
@@ -131,7 +146,7 @@ static void post_suspend(int suspend_cancelled)
 #define switch_idle_mm()	((void)0)
 #define mm_pin_all()		((void)0)
 #define pre_suspend()		xen_pre_suspend()
-#define post_suspend(x)		xen_post_suspend(x)
+#define post_suspend(x, f)	xen_post_suspend(x)
 
 #endif
 
@@ -179,28 +194,11 @@ static int take_machine_down(void *_suspend)
 		 * merely checkpointed, and 0 if it is resuming in a new domain.
 		 */
 		suspend_cancelled = HYPERVISOR_suspend(virt_to_mfn(xen_start_info));
-		if (!suspend_cancelled) {
-			unsigned int cpu;
-
-			for_each_possible_cpu(cpu) {
-				if (suspend->fast_suspend
-				    && cpu != smp_processor_id()
-				    && HYPERVISOR_vcpu_op(VCPUOP_down, cpu, NULL))
-					BUG();
-
-				setup_vcpu_info(cpu);
-
-				if (suspend->fast_suspend
-				    && cpu != smp_processor_id()
-				    && HYPERVISOR_vcpu_op(VCPUOP_up, cpu, NULL))
-					BUG();
-			}
-		}
 	} else
 		BUG_ON(suspend_cancelled > 0);
 	suspend->resume_notifier(suspend_cancelled);
 	if (suspend_cancelled >= 0) {
-		post_suspend(suspend_cancelled);
+		post_suspend(suspend_cancelled, suspend->fast_suspend);
 		sysdev_resume();
 	}
 	if (!suspend_cancelled) {

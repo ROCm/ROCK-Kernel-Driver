@@ -43,7 +43,7 @@ ENTRY(phys_startup_64)
 jiffies_64 = jiffies;
 #endif
 
-#if defined(CONFIG_X86_64) && defined(CONFIG_DEBUG_RODATA)
+#if defined(CONFIG_X86_64) && defined(CONFIG_DEBUG_RODATA) && !defined(CONFIG_XEN)
 /*
  * On 64-bit, align RODATA to 2MB so that even with CONFIG_DEBUG_RODATA
  * we retain large page mappings for boundaries spanning kernel text, rodata

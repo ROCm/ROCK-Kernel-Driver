@@ -853,7 +853,7 @@ static void xenfb_backend_changed(struct xenbus_device *dev,
 				 "request-update", "%d", &val) < 0)
 			val = 0;
 
-		if (val){
+		if (val && !info->kthread) {
 			info->kthread = kthread_run(xenfb_thread, info,
 						    "xenfb thread");
 			if (IS_ERR(info->kthread)) {

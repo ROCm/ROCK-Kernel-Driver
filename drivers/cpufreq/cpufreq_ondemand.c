@@ -35,7 +35,7 @@
 #define MICRO_FREQUENCY_MIN_SAMPLE_RATE		(10000)
 #define MIN_FREQUENCY_UP_THRESHOLD		(11)
 #define MAX_FREQUENCY_UP_THRESHOLD		(100)
-#define MAX_DEFAULT_SAMPLING_RATE		(300 * 1000)
+#define MAX_DEFAULT_SAMPLING_RATE		(300 * 1000U)
 
 /*
  * The polling frequency of this governor depends on the capability of

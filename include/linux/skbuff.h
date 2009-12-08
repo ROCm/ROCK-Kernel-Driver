@@ -390,7 +390,7 @@ struct sk_buff {
 #endif
 	kmemcheck_bitfield_end(flags2);
 
-	/* 0/14 bit hole */
+	/* 0/9...15 bit hole */
 
 #ifdef CONFIG_NET_DMA
 	dma_cookie_t		dma_cookie;

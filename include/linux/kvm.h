@@ -116,6 +116,11 @@ struct kvm_run {
 	__u64 cr8;
 	__u64 apic_base;
 
+#ifdef __KVM_S390
+	/* the processor status word for s390 */
+	__u64 psw_mask; /* psw upper half */
+	__u64 psw_addr; /* psw lower half */
+#endif
 	union {
 		/* KVM_EXIT_UNKNOWN */
 		struct {
@@ -167,8 +172,6 @@ struct kvm_run {
 		/* KVM_EXIT_S390_SIEIC */
 		struct {
 			__u8 icptcode;
-			__u64 mask; /* psw upper half */
-			__u64 addr; /* psw lower half */
 			__u16 ipa;
 			__u32 ipb;
 		} s390_sieic;
@@ -436,6 +439,7 @@ struct kvm_ioeventfd {
 #endif
 #define KVM_CAP_IOEVENTFD 36
 #define KVM_CAP_SET_IDENTITY_MAP_ADDR 37
+#define KVM_CAP_S390_PSW 42
 
 #ifdef KVM_CAP_IRQ_ROUTING
 
