@@ -586,6 +586,9 @@ extern void		    audit_log(struct audit_context *ctx, gfp_t gfp_mask,
 				      __attribute__((format(printf,4,5)));
 
 extern struct audit_buffer *audit_log_start(struct audit_context *ctx, gfp_t gfp_mask, int type);
+extern void 		    audit_log_vformat(struct audit_buffer *ab,
+					const char *fmt, va_list args)
+			    __attribute__((format(printf,2,0)));
 extern void		    audit_log_format(struct audit_buffer *ab,
 					     const char *fmt, ...)
 			    __attribute__((format(printf,2,3)));
