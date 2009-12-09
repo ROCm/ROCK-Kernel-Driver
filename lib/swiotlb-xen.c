@@ -502,7 +502,8 @@ dma_addr_t swiotlb_map_page(struct device *dev, struct page *page,
 	 * we can safely return the device addr and not worry about bounce
 	 * buffering it.
 	 */
-	if (dma_capable(dev, dev_addr, size)/* && !swiotlb_force*/)
+	if (dma_capable(dev, dev_addr, size) &&
+	    !range_needs_mapping(phys, size))
 		return dev_addr;
 
 	/*
