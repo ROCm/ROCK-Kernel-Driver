@@ -7,9 +7,10 @@ src := $(obj)
 PHONY := __modbuiltin
 __modbuiltin:
 
-# Read auto2.conf which sets tristate variables to 'Y' instead of 'y'
+-include include/config/auto.conf
+# tristate.conf sets tristate variables to uppercase 'Y' or 'M'
 # That way, we get the list of built-in modules in obj-Y
--include include/config/auto2.conf
+-include include/config/tristate.conf
 
 include scripts/Kbuild.include
 
@@ -19,6 +20,11 @@ kbuild-file := $(if $(wildcard $(kbuild-dir)/Kbuild),$(kbuild-dir)/Kbuild,$(kbui
 include $(kbuild-file)
 
 include scripts/Makefile.lib
+__subdir-Y     := $(patsubst %/,%,$(filter %/, $(obj-Y)))
+subdir-Y       += $(__subdir-Y)
+subdir-ym      := $(sort $(subdir-y) $(subdir-Y) $(subdir-m))
+subdir-ym      := $(addprefix $(obj)/,$(subdir-ym))
+obj-Y          := $(addprefix $(obj)/,$(obj-Y))
 
 modbuiltin-subdirs := $(patsubst %,%/modules.builtin, $(subdir-ym))
 modbuiltin-mods    := $(filter %.ko, $(obj-Y:.o=.ko))
@@ -27,12 +33,9 @@ modbuiltin-target  := $(obj)/modules.builtin
 __modbuiltin: $(modbuiltin-target) $(subdir-ym)
 	@:
 
-modbuiltin-cmds =						\
-	for m in $(modbuiltin-mods); do echo kernel/$$m; done;	\
-	cat /dev/null $(modbuiltin-subdirs);
-
 $(modbuiltin-target): $(subdir-ym) FORCE
-	$(Q)($(modbuiltin-cmds)) > $@
+	$(Q)(for m in $(modbuiltin-mods); do echo kernel/$$m; done;	\
+	cat /dev/null $(modbuiltin-subdirs)) > $@
 
 PHONY += FORCE
 
