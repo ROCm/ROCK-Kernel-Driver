@@ -107,7 +107,6 @@ static const struct trans_ctl_table trans_kern_table[] = {
 	{ KERN_PANIC_ON_NMI,		"panic_on_unrecovered_nmi" },
 	{ KERN_PANIC_ON_IO_NMI,		"panic_on_io_nmi" },
 	{ KERN_SETUID_DUMPABLE,		"suid_dumpable" },
-	{ KERN_KDB,			"kdb" },
 	{ KERN_DUMP_AFTER_NOTIFIER,	"dump_after_notifier" },
 	{}
 };

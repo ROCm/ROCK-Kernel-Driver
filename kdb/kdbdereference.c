@@ -305,8 +305,8 @@ walk_structs(char *s, char *f, char *member, kaddr_t addr, int flags)
 	while(next && counter < iter_threshold) {
 		counter++;
 		if (counter > iter_threshold) {
-			kdb_printf("\nWARNING: Iteration threshold reached.\n");
-			kdb_printf("Current threshold: %lld\n", iter_threshold);
+                	kdb_printf("\nWARNING: Iteration threshold reached.\n");
+                        kdb_printf("Current threshold: %lld\n", iter_threshold);
 			break;
 		}
 		if(flags & C_LISTHEAD) {
@@ -658,24 +658,24 @@ int
 kdb_pxhelp(int argc, const char **argv)
 {
 	if (have_debug_file) {
-		kdb_printf ("Some examples of using the px command:\n");
-		kdb_printf (" the whole structure:\n");
-		kdb_printf ("  px *(task_struct *)0xe0000...\n");
-		kdb_printf (" one member:\n");
-		kdb_printf ("  px (*(task_struct *)0xe0000...)->comm\n");
-		kdb_printf (" the address of a member\n");
-		kdb_printf ("  px &((task_struct *)0xe0000...)->children\n");
-		kdb_printf (" a structure pointed to by a member:\n");
-		kdb_printf ("  px ((*(class_device *)0xe0000...)->class)->name\n");
-		kdb_printf (" array element:\n");
-		kdb_printf ("  px (cache_sizes *)0xa0000...[0]\n");
-		kdb_printf ("  px (task_struct *)(0xe0000...)->cpus_allowed.bits[0]\n");
+ kdb_printf ("Some examples of using the px command:\n");
+ kdb_printf (" the whole structure:\n");
+ kdb_printf ("  px *(task_struct *)0xe0000...\n");
+ kdb_printf (" one member:\n");
+ kdb_printf ("  px (*(task_struct *)0xe0000...)->comm\n");
+ kdb_printf (" the address of a member\n");
+ kdb_printf ("  px &((task_struct *)0xe0000...)->children\n");
+ kdb_printf (" a structure pointed to by a member:\n");
+ kdb_printf ("  px ((*(class_device *)0xe0000...)->class)->name\n");
+ kdb_printf (" array element:\n");
+ kdb_printf ("  px (cache_sizes *)0xa0000...[0]\n");
+ kdb_printf ("  px (task_struct *)(0xe0000...)->cpus_allowed.bits[0]\n");
 	} else {
-		kdb_printf ("There is no debug info file.\n");
-		kdb_printf ("The px/pd/print commands can only evaluate ");
-		kdb_printf ("arithmetic expressions.\n");
+ 		kdb_printf ("There is no debug info file.\n");
+ 		kdb_printf ("The px/pd/print commands can only evaluate ");
+ 		kdb_printf ("arithmetic expressions.\n");
 	}
-	return 0;
+ return 0;
 }
 
 /*
@@ -688,23 +688,23 @@ kdb_walkhelp(int argc, const char **argv)
 		kdb_printf("no debuginfo file\n");
 		return 0;
 	}
-	kdb_printf ("Using the walk command:\n");
-	kdb_printf (" (only the -s (symbolic) form is supported, so -s is ignored)\n");
-	kdb_printf ("\n");
-	kdb_printf (" If the list is not linked with list_head structures:\n");
-	kdb_printf ("  walk [-s] struct name-of-forward-pointer address\n");
-	kdb_printf ("  example: walk xyz_struct next 0xe00....\n");
-	kdb_printf ("\n");
-	kdb_printf (" If the list is linked with list_head structures, use -hn\n");
-	kdb_printf (" to walk the 'next' list, -hp for the 'prev' list\n");
-	kdb_printf ("  walk -h[n|p] struct name-of-forward-pointer [member-to-show] address-of-list-head\n");
-	kdb_printf ("  example, to show the entire task_struct:\n");
-	kdb_printf ("   walk -hn task_struct tasks 0xe000....\n");
-	kdb_printf ("  example, to show the task_struct member comm:\n");
-	kdb_printf ("   walk -hn task_struct tasks comm 0xe000....\n");
-	kdb_printf ("  (address is not the address of first member's list_head, ");
-	kdb_printf     ("but of the anchoring list_head\n");
-	return 0;
+ kdb_printf ("Using the walk command:\n");
+ kdb_printf (" (only the -s (symbolic) form is supported, so -s is ignored)\n");
+ kdb_printf ("\n");
+ kdb_printf (" If the list is not linked with list_head structures:\n");
+ kdb_printf ("  walk [-s] struct name-of-forward-pointer address\n");
+ kdb_printf ("  example: walk xyz_struct next 0xe00....\n");
+ kdb_printf ("\n");
+ kdb_printf (" If the list is linked with list_head structures, use -hn\n");
+ kdb_printf (" to walk the 'next' list, -hp for the 'prev' list\n");
+ kdb_printf ("  walk -h[n|p] struct name-of-forward-pointer [member-to-show] address-of-list-head\n");
+ kdb_printf ("  example, to show the entire task_struct:\n");
+ kdb_printf ("   walk -hn task_struct tasks 0xe000....\n");
+ kdb_printf ("  example, to show the task_struct member comm:\n");
+ kdb_printf ("   walk -hn task_struct tasks comm 0xe000....\n");
+ kdb_printf ("  (address is not the address of first member's list_head, ");
+ kdb_printf     ("but of the anchoring list_head\n");
+ return 0;
 }
 
 /*
@@ -2704,7 +2704,7 @@ kl_get_bit_value(void *ptr, unsigned int x, unsigned int y, unsigned int z)
 
 	/* mask bit size bits */
 	mask = (((uint64_t)1 << y) - 1);
-	return (value & mask);
+ 	return (value & mask);
 }
 
 /*
@@ -4565,7 +4565,7 @@ make_node(token_t *t, int flags)
 			char str[16];
 
 			/* Step over the back slash
-			 */
+		 	 */
 			cp++;
 			while (*cp != '\'') {
 				str[i++] = *cp++;
@@ -4835,7 +4835,7 @@ get_sizeof()
 	}
 
 	/* The next token should be a CAST or an open paren.
-	 * If it's something else, then return an error.
+ 	 * If it's something else, then return an error.
 	 */
 	if (curnp->operator == OPEN_PAREN) {
 		free_nodes(curnp);

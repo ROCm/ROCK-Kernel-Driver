@@ -247,8 +247,10 @@ print_request(unsigned long addr)
 		return(0);
 
 	kdb_printf("struct request at 0x%lx\n", addr);
-	kdb_printf("  errors %d sector %llu nr_sectors %lu\n",
-			rq.errors, blk_rq_pos(&rq), blk_rq_sectors(&rq));
+	kdb_printf("  errors %d sector %llu nr_sectors %llu\n",
+			rq.errors,
+			(unsigned long long)blk_rq_pos(&rq),
+			(unsigned long long)blk_rq_sectors(&rq));
 
 	return (unsigned long) rq.queuelist.next;
 }
@@ -529,8 +531,7 @@ kdbm_sb(int argc, const char **argv)
 	kdb_printf("struct super_block at  0x%lx\n", addr);
 	kdb_printf(" s_dev 0x%x blocksize 0x%lx\n", sb->s_dev, sb->s_blocksize);
 	kdb_printf(" s_flags 0x%lx s_root 0x%p\n", sb->s_flags, sb->s_root);
-	kdb_printf(" s_dirt %d s_frozen %d s_id [%s]\n",
-		   sb->s_dirt, sb->s_frozen, sb->s_id);
+	kdb_printf(" s_frozen %d s_id [%s]\n", sb->s_frozen, sb->s_id);
 out:
 	if (sb)
 		kfree(sb);

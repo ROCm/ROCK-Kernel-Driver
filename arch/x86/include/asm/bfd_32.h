@@ -182,7 +182,7 @@ extern void bfd_fprintf_vma (bfd *, void *, bfd_vma);
 
 typedef unsigned int flagword;	/* 32 bits of flags */
 typedef unsigned char bfd_byte;
-
+
 /* File formats.  */
 
 typedef enum bfd_format
@@ -258,7 +258,7 @@ bfd_format;
 /* This BFD has been created by the linker and doesn't correspond
    to any input file.  */
 #define BFD_LINKER_CREATED 0x2000
-
+
 /* Symbols and relocation.  */
 
 /* A count of carsyms (canonical archive symbols).  */
@@ -303,7 +303,7 @@ struct orl 			/* Output ranlib.  */
   } u;			/* bfd* or file position.  */
   int namidx;		/* Index into string table.  */
 };
-
+
 /* Linenumber stuff.  */
 typedef struct lineno_cache_entry
 {
@@ -315,7 +315,7 @@ typedef struct lineno_cache_entry
   } u;
 }
 alent;
-
+
 /* Object and core file sections.  */
 
 #define	align_power(addr, align)	\
@@ -347,7 +347,7 @@ typedef struct bfd_section *sec_ptr;
    / bfd_octets_per_byte (bfd))
 
 typedef struct stat stat_type;
-
+
 typedef enum bfd_print_symbol
 {
   bfd_print_symbol_name,
@@ -371,7 +371,7 @@ typedef struct _symbol_info
 /* Get the name of a stabs type code.  */
 
 extern const char *bfd_get_stab_name (int);
-
+
 /* Hash table routines.  There is no way to free up a hash table.  */
 
 /* An element in the hash table.  Most uses will actually use a larger
@@ -582,7 +582,7 @@ void bfd_put_bits (bfd_uint64_t, void *, int, bfd_boolean);
 
 extern bfd_boolean bfd_section_already_linked_table_init (void);
 extern void bfd_section_already_linked_table_free (void);
-
+
 /* Externally visible ECOFF routines.  */
 
 #if defined(__STDC__) || defined(ALMOST_STDC)

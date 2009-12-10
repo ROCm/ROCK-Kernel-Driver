@@ -343,8 +343,8 @@ static void usb_kbd_disconnect(struct usb_interface *intf)
 	usb_set_intfdata(intf, NULL);
 	if (kbd) {
 #ifdef CONFIG_KDB_USB
-		/* Detach the keyboard from kdb */
-		kdb_usb_keyboard_detach(kbd->irq);
+	       /* Detach the keyboard from kdb */
+        	kdb_usb_keyboard_detach(kbd->irq);
 #endif /* CONFIG_KDB_USB */
 		usb_kill_urb(kbd->irq);
 		input_unregister_device(kbd->dev);

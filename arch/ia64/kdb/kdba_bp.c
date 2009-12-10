@@ -355,7 +355,7 @@ kdba_printbp(kdb_bp_t *bp)
 {
 	kdb_printf("\n    is enabled");
 	if (bp->bp_hardtype) {
-		/* Note that bp->bp_hard[NR_CPU] is for x86.
+ 		/* Note that bp->bp_hard[NR_CPU] is for x86.
 		 * The ia64 uses bp->bp_hard[0] only.
 		 */
 		kdba_printbpreg(bp->bp_hard[0]);
@@ -558,7 +558,7 @@ kdba_allocbp(kdbhard_bp_t *bph, int *diagp)
 void
 kdba_alloc_hwbp(kdb_bp_t *bp, int *diagp)
 {
-	/* Note that bp->bp_hard[NR_CPU] is for x86.
+ 	/* Note that bp->bp_hard[NR_CPU] is for x86.
 	 * The ia64 uses bp->bp_hard[0] only.
 	 */
 	bp->bp_hard[0] = kdba_allocbp(&bp->bp_template, diagp);

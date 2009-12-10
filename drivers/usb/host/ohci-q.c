@@ -1143,7 +1143,7 @@ dl_done_list_kdb (struct ohci_hcd *ohci, struct urb *kdburb)
 {
 	struct td	*td = dl_reverse_done_list (ohci);
 
-	while (td) {
+  	while (td) {
 		struct td	*td_next = td->next_dl_td;
 		struct urb	*urb = td->urb;
 		urb_priv_t	*urb_priv = urb->hcpriv;
@@ -1155,11 +1155,11 @@ dl_done_list_kdb (struct ohci_hcd *ohci, struct urb *kdburb)
 		}
 
 		/* update URB's length and status from TD */
-		td_done (ohci, urb, td);
-		urb_priv->td_cnt++;
+   		td_done (ohci, urb, td);
+  		urb_priv->td_cnt++;
 
 		/* If all this urb's TDs are done, just resubmit it */
-		if (urb_priv->td_cnt == urb_priv->length) {
+  		if (urb_priv->td_cnt == urb_priv->length) {
 			urb->actual_length = 0;
 			urb->status = -EINPROGRESS;
 			td_submit_urb (ohci, urb);
@@ -1174,7 +1174,7 @@ dl_done_list_kdb (struct ohci_hcd *ohci, struct urb *kdburb)
 		} else if ((ed->hwINFO & cpu_to_hc32 (ohci, ED_SKIP | ED_DEQUEUE))
 					== cpu_to_hc32 (ohci, ED_SKIP)) {
 			td = list_entry (ed->td_list.next, struct td, td_list);
-			if (!(td->hwINFO & cpu_to_hc32 (ohci, TD_DONE))) {
+ 			if (!(td->hwINFO & cpu_to_hc32 (ohci, TD_DONE))) {
 				ed->hwINFO &= ~cpu_to_hc32 (ohci, ED_SKIP);
 				/* ... hc may need waking-up */
 				switch (ed->type) {
@@ -1190,8 +1190,8 @@ dl_done_list_kdb (struct ohci_hcd *ohci, struct urb *kdburb)
 			}
 		}
 
-		td = td_next;
-	}
+    		td = td_next;
+  	}
 }
 
 #endif /* CONFIG_KDB_USB */

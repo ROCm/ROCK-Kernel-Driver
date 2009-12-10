@@ -1786,12 +1786,12 @@ ia64_init_handler(struct pt_regs *regs, struct switch_stack *sw,
 #else
 		while (monarch_cpu == -1)
 			cpu_relax();	/* spin until monarch enters */
-#endif
 #ifdef CONFIG_KDB
 		KDB_ENTER_SLAVE();
 		if (kdba_recalcitrant)
 			monarch_cpu = -1;
 #endif /* CONFIG_KDB */
+#endif
 
 		NOTIFY_INIT(DIE_INIT_SLAVE_ENTER, regs, (long)&nd, 1);
 		NOTIFY_INIT(DIE_INIT_SLAVE_PROCESS, regs, (long)&nd, 1);

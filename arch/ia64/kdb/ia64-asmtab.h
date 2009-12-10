@@ -82,7 +82,7 @@ struct ia64_main_table
 
    Note that each completer needs to be applied in turn, so that if we
    have the instruction
-       cmp.lt.unc
+   	cmp.lt.unc
    the completer entries for both "lt" and "unc" would need to be applied
    to the opcode's value.
 

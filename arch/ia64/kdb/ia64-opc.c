@@ -101,7 +101,7 @@ get_opc_prefix (const char **ptr, char *dest)
       *ptr += l;
     }
 }
-
+
 /* Find the index of the entry in the string table corresponding to
    STR; return -1 if one does not exist. */
 
@@ -135,7 +135,7 @@ find_string_ent (const char *str)
     }
   return -1;
 }
-
+
 /* Find the opcode in the main opcode table whose name is STRINGINDEX, or
    return -1 if one does not exist. */
 
@@ -173,7 +173,7 @@ find_main_ent (short nameindex)
     }
   return -1;
 }
-
+
 /* Find the index of the entry in the completer table that is part of
    MAIN_ENT (starting from PREV_COMPLETER) that matches NAME, or
    return -1 if one does not exist. */
@@ -207,7 +207,7 @@ find_completer (short main_ent, short prev_completer, const char *name)
     }
   return -1;
 }
-
+
 /* Apply the completer referred to by COMPLETER_INDEX to OPCODE, and
    return the result. */
 
@@ -223,7 +223,7 @@ apply_completer (ia64_insn opcode, int completer_index)
   opcode = (opcode & ~mask) | bits;
   return opcode;
 }
-
+
 /* Extract BITS number of bits starting from OP_POINTER + BITOFFSET in
    the dis_table array, and return its value.  (BITOFFSET is numbered
    starting from MSB to LSB, so a BITOFFSET of 0 indicates the MSB of the
@@ -260,7 +260,7 @@ extract_op_bits (int op_pointer, int bitoffset, int bits)
     }
   return res;
 }
-
+
 /* Examine the state machine entry at OP_POINTER in the dis_table
    array, and extract its values into OPVAL and OP.  The length of the
    state entry in bits is returned. */
@@ -316,7 +316,7 @@ extract_op (int op_pointer, int *opval, unsigned int *op)
     }
   return oplen;
 }
-
+
 /* Returns a non-zero value if the opcode in the main_table list at
    PLACE matches OPCODE and is of type TYPE. */
 
@@ -357,7 +357,7 @@ opcode_verify (ia64_insn opcode, int place, enum ia64_insn_type type)
     }
   return 1;
 }
-
+
 /* Find an instruction entry in the ia64_dis_names array that matches
    opcode OPCODE and is of type TYPE.  Returns either a positive index
    into the array, or a negative value if an entry for OPCODE could
@@ -540,7 +540,7 @@ locate_opcode_ent (ia64_insn opcode, enum ia64_insn_type type)
 	}
     }
 }
-
+
 /* Construct an ia64_opcode entry based on OPCODE, NAME and PLACE. */
 
 static struct ia64_opcode *
@@ -563,7 +563,7 @@ make_ia64_opcode (ia64_insn opcode, const char *name, int place, int depind)
   res->dependencies = &op_dependencies[depind];
   return res;
 }
-
+
 /* Determine the ia64_opcode entry for the opcode specified by INSN
    and TYPE.  If a valid entry is not found, return NULL. */
 struct ia64_opcode *
@@ -621,7 +621,7 @@ ia64_dis_opcode (ia64_insn insn, enum ia64_insn_type type)
                                completer_table[ci].dependencies);
     }
 }
-
+
 /* Search the main_opcode table starting from PLACE for an opcode that
    matches NAME.  Return NULL if one is not found. */
 
@@ -679,7 +679,7 @@ ia64_find_matching_opcode (const char *name, short place)
     }
   return NULL;
 }
-
+
 /* Find the next opcode after PREV_ENT that matches PREV_ENT, or return NULL
    if one does not exist.
 

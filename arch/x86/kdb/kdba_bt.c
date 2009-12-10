@@ -5523,7 +5523,7 @@ kdba_bt_stack(kdb_machreg_t addr, int argcount, const struct task_struct *p,
 		}
 		kdbnearsym(rip, &symtab);
 		if (old_style) {
-			if (__kernel_text_address(rip) && !suppress) {
+		       	if (__kernel_text_address(rip) && !suppress) {
 				bt_print_one(rip, rsp, &ar, &symtab, 0);
 				++count;
 			}

@@ -540,6 +540,7 @@ kdb_printf(const char *fmt, ...)
 	} else {
 		__acquire(kdb_printf_lock);
 	}
+	atomic_inc(&kdb_8250);
 
 	diag = kdbgetintenv("LINES", &linecount);
 	if (diag || linecount <= 1)
@@ -774,6 +775,7 @@ kdb_print_out:
 	if (logging) {
 		console_loglevel = saved_loglevel;
 	}
+	atomic_dec(&kdb_8250);
 	if (KDB_STATE(PRINTF_LOCK) && got_printf_lock) {
 		got_printf_lock = 0;
 		spin_unlock_irqrestore(&kdb_printf_lock, flags);

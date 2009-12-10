@@ -366,7 +366,7 @@ display_gate_desc(kdb_gate_desc_t *d)
 	switch(d->type) {
 	case KDB_SYS_DESC_TYPE_LDT:
 		kdb_printf("base=");
-		kdb_symbol_print(kdb_seg_desc_base((kdb_desc_t *)d), NULL,
+	       	kdb_symbol_print(kdb_seg_desc_base((kdb_desc_t *)d), NULL,
 				 KDB_SP_DEFAULT);
 		kdb_printf(" limit=" kdb_machreg_fmt " dpl=%d\n",
 			   KDB_SEG_DESC_LIMIT((kdb_desc_t *)d), d->dpl);
@@ -380,7 +380,7 @@ display_gate_desc(kdb_gate_desc_t *d)
 			(struct tss_struct *)
 			kdb_seg_desc_base((kdb_desc_t *)d);
 		kdb_printf("base=");
-		kdb_symbol_print((unsigned long)tss, NULL, KDB_SP_DEFAULT);
+	       	kdb_symbol_print((unsigned long)tss, NULL, KDB_SP_DEFAULT);
 		kdb_printf(" limit=" kdb_machreg_fmt " dpl=%d\n",
 			   KDB_SEG_DESC_LIMIT((kdb_desc_t *)d), d->dpl);
 		display_tss(tss);
@@ -388,13 +388,13 @@ display_gate_desc(kdb_gate_desc_t *d)
 	}
 	case KDB_SYS_DESC_TYPE_CALLG16:
 		kdb_printf("segment=0x%4.4x off=", d->segment);
-		kdb_symbol_print(KDB_SYS_DESC_OFFSET(d), NULL, KDB_SP_DEFAULT);
+	       	kdb_symbol_print(KDB_SYS_DESC_OFFSET(d), NULL, KDB_SP_DEFAULT);
 		kdb_printf(" dpl=%d wc=%d\n",
 			   d->dpl, KDB_SYS_DESC_CALLG_COUNT(d));
 		break;
 	case KDB_SYS_DESC_TYPE_CALLG:
 		kdb_printf("segment=0x%4.4x off=", d->segment);
-		kdb_symbol_print(KDB_SYS_DESC_OFFSET(d), NULL, KDB_SP_DEFAULT);
+	       	kdb_symbol_print(KDB_SYS_DESC_OFFSET(d), NULL, KDB_SP_DEFAULT);
 		kdb_printf(" dpl=%d\n", d->dpl);
 		break;
 	default:

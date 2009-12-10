@@ -157,9 +157,9 @@ So instead we use the macro below and test it against specific values.  */
 
 /* PARAMS is often defined elsewhere (e.g. by libintl.h), so wrap it in
    a #ifndef.  */
-#ifndef PARAMS
-#define PARAMS(ARGS)		ARGS
-#endif
+//#ifndef PARAMS
+//#define PARAMS(ARGS)		ARGS
+//#endif
 
 #define VPARAMS(ARGS)		ARGS
 #define VA_START(VA_LIST, VAR)	va_start(VA_LIST, VAR)
@@ -217,7 +217,7 @@ So instead we use the macro below and test it against specific values.  */
 #define PTRCONST	PTR
 #define LONG_DOUBLE	double
 
-#define PARAMS(args)		()
+//#define PARAMS(args)		()
 #define VPARAMS(args)		(va_alist) va_dcl
 #define VA_START(va_list, var)	va_start(va_list)
 

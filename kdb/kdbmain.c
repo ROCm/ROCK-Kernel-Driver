@@ -3048,7 +3048,7 @@ kdb_dmesg(int argc, const char **argv)
 	}
 
 	/* syslog_data[0,1] physical start, end+1.  syslog_data[2,3] logical start, end+1. */
-	kdb_syslog_data(syslog_data);
+	debugger_syslog_data(syslog_data);
 	if (syslog_data[2] == syslog_data[3])
 		return 0;
 	logsize = syslog_data[1] - syslog_data[0];
@@ -3105,7 +3105,7 @@ kdb_dmesg(int argc, const char **argv)
 	c = '\n';
 	while (start != end) {
 		char buf[201];
-		p = buf;
+	       	p = buf;
 		while (start < end && (c = *KDB_WRAP(start)) && (p - buf) < sizeof(buf)-1) {
 			++start;
 			*p++ = c;
@@ -4197,7 +4197,7 @@ static struct notifier_block kdb_block = { kdb_panic, NULL, 0 };
 
 #ifdef	CONFIG_SYSCTL
 static int proc_do_kdb(ctl_table *table, int write, void __user *buffer,
-		       size_t *lenp, loff_t *ppos)
+		size_t *lenp, loff_t *ppos)
 {
 	if (KDB_FLAG(NO_CONSOLE) && write) {
 		printk(KERN_ERR "kdb has no working console and has switched itself off\n");
@@ -4208,7 +4208,7 @@ static int proc_do_kdb(ctl_table *table, int write, void __user *buffer,
 
 static ctl_table kdb_kern_table[] = {
 	{
-		.ctl_name	= KERN_KDB,
+		.ctl_name	= CTL_UNNUMBERED,
 		.procname	= "kdb",
 		.data		= &kdb_on,
 		.maxlen		= sizeof(int),
@@ -4297,7 +4297,8 @@ kdb_init(void)
 #endif	/* kdba_setjmp */
 
 	kdb_initial_cpu = -1;
-	kdb_wait_for_cpus_secs = max(10, 2*num_online_cpus());
+	kdb_wait_for_cpus_secs = 2*num_online_cpus();
+	kdb_wait_for_cpus_secs = max(kdb_wait_for_cpus_secs, 10);
 }
 
 #ifdef	CONFIG_SYSCTL

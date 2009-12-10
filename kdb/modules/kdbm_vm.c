@@ -185,7 +185,10 @@ kdbm_mpol(int argc, const char **argv)
 
 	  case MPOL_PREFERRED:
 		kdb_printf("  mode %d (MPOL_PREFERRED)\n", mp->mode);
-		kdb_printf("  preferred_node %d\n", mp->v.preferred_node);
+		if (mp->flags & MPOL_F_LOCAL)
+			kdb_printf("  preferred_node local\n");
+		else
+			kdb_printf("  preferred_node %d\n", mp->v.preferred_node);
 		break;
 
 	  case MPOL_BIND:
@@ -748,9 +751,8 @@ kdbm_filp(int argc, const char **argv)
 	kdb_printf(" f_dentry = 0x%p f_vfsmnt = 0x%p f_op = 0x%p\n",
 			f.f_dentry, f.f_vfsmnt, f.f_op);
 
-	kdb_printf(" f_count = " kdb_f_count_fmt
-			" f_flags = 0x%x f_mode = 0x%x\n",
-			atomic_long_read(&f.f_count), f.f_flags, f.f_mode);
+	kdb_printf(" f_count = %ld f_flags = 0x%x f_mode = 0x%x\n",
+			f.f_count, f.f_flags, f.f_mode);
 
 	kdb_printf(" f_pos = %Ld\n", f.f_pos);
 #ifdef	CONFIG_SECURITY

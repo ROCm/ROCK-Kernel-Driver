@@ -216,7 +216,7 @@ int kallsyms_symbol_complete(char *prefix_name, int max_len)
 			}
 		}
 	}
-	if (prev_len > prefix_len)
+ 	if (prev_len > prefix_len)
 		memcpy(prefix_name, ks_namebuf_prev, prev_len+1);
 	return number;
 }
