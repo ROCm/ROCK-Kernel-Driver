@@ -1,23 +1,52 @@
 #include "qlge.h"
 
-static void ql_display_mb_sts(struct ql_adapter *qdev,
-						struct mbox_params *mbcp)
+int ql_unpause_mpi_risc(struct ql_adapter *qdev)
 {
-	int i;
-	static char *err_sts[] = {
-		"Command Complete",
-		"Command Not Supported",
-		"Host Interface Error",
-		"Checksum Error",
-		"Unused Completion Status",
-		"Test Failed",
-		"Command Parameter Error"};
+	u32 tmp;
 
-	QPRINTK(qdev, DRV, DEBUG, "%s.\n",
-		err_sts[mbcp->mbox_out[0] & 0x0000000f]);
-	for (i = 0; i < mbcp->out_count; i++)
-		QPRINTK(qdev, DRV, DEBUG, "mbox_out[%d] = 0x%.08x.\n",
-				i, mbcp->mbox_out[i]);
+	/* Un-pause the RISC */
+	tmp = ql_read32(qdev, CSR);
+	if (!(tmp & CSR_RP))
+		return -EIO;
+
+	ql_write32(qdev, CSR, CSR_CMD_CLR_PAUSE);
+	return 0;
+}
+
+int ql_pause_mpi_risc(struct ql_adapter *qdev)
+{
+	u32 tmp;
+	int count = UDELAY_COUNT;
+
+	/* Pause the RISC */
+	ql_write32(qdev, CSR, CSR_CMD_SET_PAUSE);
+	do {
+		tmp = ql_read32(qdev, CSR);
+		if (tmp & CSR_RP)
+			break;
+		mdelay(UDELAY_DELAY);
+		count--;
+	} while (count);
+	return (count == 0) ? -ETIMEDOUT : 0;
+}
+
+int ql_hard_reset_mpi_risc(struct ql_adapter *qdev)
+{
+	u32 tmp;
+	int count = UDELAY_COUNT;
+
+	/* Reset the RISC */
+	ql_write32(qdev, CSR, CSR_CMD_SET_RST);
+	do {
+		tmp = ql_read32(qdev, CSR);
+		if (tmp & CSR_RR) {
+			ql_write32(qdev, CSR, CSR_CMD_CLR_RST);
+			break;
+		}
+		mdelay(UDELAY_DELAY);
+		count--;
+	} while (count);
+	return (count == 0) ? -ETIMEDOUT : 0;
 }
 
 int ql_read_mpi_reg(struct ql_adapter *qdev, u32 reg, u32 *data)
@@ -63,6 +92,35 @@ int ql_soft_reset_mpi_risc(struct ql_adapter *qdev)
 	int status;
 	status = ql_write_mpi_reg(qdev, 0x00001010, 1);
 	return status;
+}
+
+/* Determine if we are in charge of the firwmare. If
+ * we are the lower of the 2 NIC pcie functions, or if
+ * we are the higher function and the lower function
+ * is not enabled.
+ */
+int ql_own_firmware(struct ql_adapter *qdev)
+{
+	u32 temp;
+
+	/* If we are the lower of the 2 NIC functions
+	 * on the chip the we are responsible for
+	 * core dump and firmware reset after an error.
+	 */
+	if (qdev->func < qdev->alt_func)
+		return 1;
+
+	/* If we are the higher of the 2 NIC functions
+	 * on the chip and the lower function is not
+	 * enabled, then we are responsible for
+	 * core dump and firmware reset after an error.
+	 */
+	temp =  ql_read32(qdev, STS);
+	if (!(temp & (1 << (8 + qdev->alt_func))))
+		return 1;
+
+	return 0;
+
 }
 
 static int ql_get_mb_sts(struct ql_adapter *qdev, struct mbox_params *mbcp)
@@ -317,6 +375,7 @@ static void ql_init_fw_done(struct ql_adapter *qdev, struct mbox_params *mbcp)
 	} else {
 		QPRINTK(qdev, DRV, ERR, "Firmware Revision  = 0x%.08x.\n",
 			mbcp->mbox_out[1]);
+		qdev->fw_rev_id = mbcp->mbox_out[1];
 		status = ql_cam_route_initialize(qdev);
 		if (status)
 			QPRINTK(qdev, IFUP, ERR,
@@ -446,6 +505,9 @@ static int ql_mpi_handler(struct ql_adapter *qdev, struct mbox_params *mbcp)
 		ql_aen_lost(qdev, mbcp);
 		break;
 
+	case AEN_DCBX_CHG:
+		/* Need to support AEN 8110 */
+		break;
 	default:
 		QPRINTK(qdev, DRV, ERR,
 			"Unsupported AE %.08x.\n", mbcp->mbox_out[0]);
@@ -537,7 +599,6 @@ done:
 					MB_CMD_STS_GOOD) &&
 		((mbcp->mbox_out[0] & 0x0000f000) !=
 					MB_CMD_STS_INTRMDT)) {
-		ql_display_mb_sts(qdev, mbcp);
 		status = -EIO;
 	}
 end:
@@ -655,7 +716,7 @@ int ql_mb_idc_ack(struct ql_adapter *qdev)
  * for the current port.
  * Most likely will block.
  */
-static int ql_mb_set_port_cfg(struct ql_adapter *qdev)
+int ql_mb_set_port_cfg(struct ql_adapter *qdev)
 {
 	struct mbox_params mbc;
 	struct mbox_params *mbcp = &mbc;
@@ -686,11 +747,68 @@ static int ql_mb_set_port_cfg(struct ql_adapter *qdev)
 	return status;
 }
 
+int ql_mb_dump_ram(struct ql_adapter *qdev, u64 req_dma, u32 addr,
+	u32 size)
+{
+	int status = 0;
+	struct mbox_params mbc;
+	struct mbox_params *mbcp = &mbc;
+
+	memset(mbcp, 0, sizeof(struct mbox_params));
+
+	mbcp->in_count = 9;
+	mbcp->out_count = 1;
+
+	mbcp->mbox_in[0] = MB_CMD_DUMP_RISC_RAM;
+	mbcp->mbox_in[1] = LSW(addr);
+	mbcp->mbox_in[2] = MSW(req_dma);
+	mbcp->mbox_in[3] = LSW(req_dma);
+	mbcp->mbox_in[4] = MSW(size);
+	mbcp->mbox_in[5] = LSW(size);
+	mbcp->mbox_in[6] = MSW(MSD(req_dma));
+	mbcp->mbox_in[7] = LSW(MSD(req_dma));
+	mbcp->mbox_in[8] = MSW(addr);
+
+
+	status = ql_mailbox_command(qdev, mbcp);
+	if (status)
+		return status;
+
+	if (mbcp->mbox_out[0] != MB_CMD_STS_GOOD) {
+		QPRINTK(qdev, DRV, ERR,
+			"Failed to dump risc RAM.\n");
+		status = -EIO;
+	}
+	return status;
+}
+
+/* Issue a mailbox command to dump RISC RAM. */
+int ql_dump_risc_ram_area(struct ql_adapter *qdev, void *buf,
+		u32 ram_addr, int word_count)
+{
+	int status;
+	char *my_buf;
+	dma_addr_t buf_dma;
+
+	my_buf = pci_alloc_consistent(qdev->pdev, word_count * sizeof(u32),
+					&buf_dma);
+	if (!my_buf)
+		return -EIO;
+
+	status = ql_mb_dump_ram(qdev, buf_dma, ram_addr, word_count);
+	if (!status)
+		memcpy(buf, my_buf, word_count * sizeof(u32));
+
+	pci_free_consistent(qdev->pdev, word_count * sizeof(u32), my_buf,
+				buf_dma);
+	return status;
+}
+
 /* Get link settings and maximum frame size settings
  * for the current port.
  * Most likely will block.
  */
-static int ql_mb_get_port_cfg(struct ql_adapter *qdev)
+int ql_mb_get_port_cfg(struct ql_adapter *qdev)
 {
 	struct mbox_params mbc;
 	struct mbox_params *mbcp = &mbc;
@@ -716,6 +834,76 @@ static int ql_mb_get_port_cfg(struct ql_adapter *qdev)
 			"Passed Get Port Configuration.\n");
 		qdev->link_config = mbcp->mbox_out[1];
 		qdev->max_frame_size = mbcp->mbox_out[2];
+	}
+	return status;
+}
+
+int ql_mb_wol_mode(struct ql_adapter *qdev, u32 wol)
+{
+	struct mbox_params mbc;
+	struct mbox_params *mbcp = &mbc;
+	int status;
+
+	memset(mbcp, 0, sizeof(struct mbox_params));
+
+	mbcp->in_count = 2;
+	mbcp->out_count = 1;
+
+	mbcp->mbox_in[0] = MB_CMD_SET_WOL_MODE;
+	mbcp->mbox_in[1] = wol;
+
+
+	status = ql_mailbox_command(qdev, mbcp);
+	if (status)
+		return status;
+
+	if (mbcp->mbox_out[0] != MB_CMD_STS_GOOD) {
+		QPRINTK(qdev, DRV, ERR,
+			"Failed to set WOL mode.\n");
+		status = -EIO;
+	}
+	return status;
+}
+
+int ql_mb_wol_set_magic(struct ql_adapter *qdev, u32 enable_wol)
+{
+	struct mbox_params mbc;
+	struct mbox_params *mbcp = &mbc;
+	int status;
+	u8 *addr = qdev->ndev->dev_addr;
+
+	memset(mbcp, 0, sizeof(struct mbox_params));
+
+	mbcp->in_count = 8;
+	mbcp->out_count = 1;
+
+	mbcp->mbox_in[0] = MB_CMD_SET_WOL_MAGIC;
+	if (enable_wol) {
+		mbcp->mbox_in[1] = (u32)addr[0];
+		mbcp->mbox_in[2] = (u32)addr[1];
+		mbcp->mbox_in[3] = (u32)addr[2];
+		mbcp->mbox_in[4] = (u32)addr[3];
+		mbcp->mbox_in[5] = (u32)addr[4];
+		mbcp->mbox_in[6] = (u32)addr[5];
+		mbcp->mbox_in[7] = 0;
+	} else {
+		mbcp->mbox_in[1] = 0;
+		mbcp->mbox_in[2] = 1;
+		mbcp->mbox_in[3] = 1;
+		mbcp->mbox_in[4] = 1;
+		mbcp->mbox_in[5] = 1;
+		mbcp->mbox_in[6] = 1;
+		mbcp->mbox_in[7] = 0;
+	}
+
+	status = ql_mailbox_command(qdev, mbcp);
+	if (status)
+		return status;
+
+	if (mbcp->mbox_out[0] != MB_CMD_STS_GOOD) {
+		QPRINTK(qdev, DRV, ERR,
+			"Failed to set WOL mode.\n");
+		status = -EIO;
 	}
 	return status;
 }
@@ -765,6 +953,61 @@ static int ql_idc_wait(struct ql_adapter *qdev)
 			break;
 		}
 	} while (wait_time);
+
+	return status;
+}
+
+int ql_mb_set_led_cfg(struct ql_adapter *qdev, u32 led_config)
+{
+	struct mbox_params mbc;
+	struct mbox_params *mbcp = &mbc;
+	int status;
+
+	memset(mbcp, 0, sizeof(struct mbox_params));
+
+	mbcp->in_count = 2;
+	mbcp->out_count = 1;
+
+	mbcp->mbox_in[0] = MB_CMD_SET_LED_CFG;
+	mbcp->mbox_in[1] = led_config;
+
+
+	status = ql_mailbox_command(qdev, mbcp);
+	if (status)
+		return status;
+
+	if (mbcp->mbox_out[0] != MB_CMD_STS_GOOD) {
+		QPRINTK(qdev, DRV, ERR,
+			"Failed to set LED Configuration.\n");
+		status = -EIO;
+	}
+
+	return status;
+}
+
+int ql_mb_get_led_cfg(struct ql_adapter *qdev)
+{
+	struct mbox_params mbc;
+	struct mbox_params *mbcp = &mbc;
+	int status;
+
+	memset(mbcp, 0, sizeof(struct mbox_params));
+
+	mbcp->in_count = 1;
+	mbcp->out_count = 2;
+
+	mbcp->mbox_in[0] = MB_CMD_GET_LED_CFG;
+
+	status = ql_mailbox_command(qdev, mbcp);
+	if (status)
+		return status;
+
+	if (mbcp->mbox_out[0] != MB_CMD_STS_GOOD) {
+		QPRINTK(qdev, DRV, ERR,
+			"Failed to get LED Configuration.\n");
+		status = -EIO;
+	} else
+		qdev->led_config = mbcp->mbox_out[1];
 
 	return status;
 }
@@ -930,8 +1173,11 @@ void ql_mpi_idc_work(struct work_struct *work)
 	int status;
 	struct mbox_params *mbcp = &qdev->idc_mbc;
 	u32 aen;
+	int timeout;
 
+	rtnl_lock();
 	aen = mbcp->mbox_out[1] >> 16;
+	timeout = (mbcp->mbox_out[1] >> 8) & 0xf;
 
 	switch (aen) {
 	default:
@@ -939,22 +1185,61 @@ void ql_mpi_idc_work(struct work_struct *work)
 			"Bug: Unhandled IDC action.\n");
 		break;
 	case MB_CMD_PORT_RESET:
-	case MB_CMD_SET_PORT_CFG:
 	case MB_CMD_STOP_FW:
 		ql_link_off(qdev);
+	case MB_CMD_SET_PORT_CFG:
 		/* Signal the resulting link up AEN
 		 * that the frame routing and mac addr
 		 * needs to be set.
 		 * */
 		set_bit(QL_CAM_RT_SET, &qdev->flags);
-		rtnl_lock();
-		status = ql_mb_idc_ack(qdev);
-		rtnl_unlock();
-		if (status) {
-			QPRINTK(qdev, DRV, ERR,
-			"Bug: No pending IDC!\n");
+		/* Do ACK if required */
+		if (timeout) {
+			status = ql_mb_idc_ack(qdev);
+			if (status)
+				QPRINTK(qdev, DRV, ERR,
+					"Bug: No pending IDC!\n");
+		} else {
+			QPRINTK(qdev, DRV, DEBUG,
+				    "IDC ACK not required\n");
+			status = 0; /* success */
 		}
+		break;
+
+	/* These sub-commands issued by another (FCoE)
+	 * function are requesting to do an operation
+	 * on the shared resource (MPI environment).
+	 * We currently don't issue these so we just
+	 * ACK the request.
+	 */
+	case MB_CMD_IOP_RESTART_MPI:
+	case MB_CMD_IOP_PREP_LINK_DOWN:
+		/* Drop the link, reload the routing
+		 * table when link comes up.
+		 */
+		ql_link_off(qdev);
+		set_bit(QL_CAM_RT_SET, &qdev->flags);
+		/* Fall through. */
+	case MB_CMD_IOP_DVR_START:
+	case MB_CMD_IOP_FLASH_ACC:
+	case MB_CMD_IOP_CORE_DUMP_MPI:
+	case MB_CMD_IOP_PREP_UPDATE_MPI:
+	case MB_CMD_IOP_COMP_UPDATE_MPI:
+	case MB_CMD_IOP_NONE:	/*  an IDC without params */
+		/* Do ACK if required */
+		if (timeout) {
+			status = ql_mb_idc_ack(qdev);
+			if (status)
+				QPRINTK(qdev, DRV, ERR,
+				    "Bug: No pending IDC!\n");
+		} else {
+			QPRINTK(qdev, DRV, DEBUG,
+			    "IDC ACK not required\n");
+			status = 0; /* success */
+		}
+		break;
 	}
+	rtnl_unlock();
 }
 
 void ql_mpi_work(struct work_struct *work)
@@ -993,5 +1278,24 @@ void ql_mpi_reset_work(struct work_struct *work)
 	cancel_delayed_work_sync(&qdev->mpi_work);
 	cancel_delayed_work_sync(&qdev->mpi_port_cfg_work);
 	cancel_delayed_work_sync(&qdev->mpi_idc_work);
+	/* If we're not the dominant NIC function,
+	 * then there is nothing to do.
+	 */
+	if (!ql_own_firmware(qdev)) {
+		QPRINTK(qdev, DRV, ERR, "Don't own firmware!\n");
+		return;
+	}
+
+	/* If the dump completed successfully we
+	 * signal ethtool that there is information
+	 * available.
+	 */
+
+	if (!ql_core_dump(qdev, qdev->mpi_coredump)) {
+		QPRINTK(qdev, DRV, ERR, "Core is dumped!\n");
+		qdev->core_is_dumped = 1;
+		queue_delayed_work(qdev->workqueue,
+			&qdev->mpi_core_to_log, 5 * HZ);
+	}
 	ql_soft_reset_mpi_risc(qdev);
 }

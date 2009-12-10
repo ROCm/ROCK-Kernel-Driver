@@ -16,7 +16,7 @@
  */
 #define DRV_NAME  	"qlge"
 #define DRV_STRING 	"QLogic 10 Gigabit PCI-E Ethernet Driver "
-#define DRV_VERSION	"v1.00.00-b3"
+#define DRV_VERSION	"v1.00.00.23.00.00-01"
 
 #define PFX "qlge: "
 #define QPRINTK(qdev, nlevel, klevel, fmt, args...)     \
@@ -54,10 +54,8 @@
 #define RX_RING_SHADOW_SPACE	(sizeof(u64) + \
 		MAX_DB_PAGES_PER_BQ(NUM_SMALL_BUFFERS) * sizeof(u64) + \
 		MAX_DB_PAGES_PER_BQ(NUM_LARGE_BUFFERS) * sizeof(u64))
-#define SMALL_BUFFER_SIZE 256
-#define LARGE_BUFFER_SIZE	PAGE_SIZE
-#define MAX_SPLIT_SIZE 1023
-#define QLGE_SB_PAD 32
+#define LARGE_BUFFER_MAX_SIZE 16384
+#define LARGE_BUFFER_MIN_SIZE 2048
 
 #define MAX_CQ 128
 #define DFLT_COALESCE_WAIT 100	/* 100 usec wait for coalescing */
@@ -76,6 +74,16 @@
 #else /* all other page sizes */
 #define TX_DESC_PER_OAL 0
 #endif
+
+/* Word shifting for converting 64-bit
+ * address to a series of 16-bit words.
+ * This is used for some MPI firmware
+ * mailbox commands.
+ */
+#define LSW(x)  ((u16)(x))
+#define MSW(x)  ((u16)((u32)(x) >> 16))
+#define LSD(x)  ((u32)((u64)(x)))
+#define MSD(x)  ((u32)((((u64)(x)) >> 16) >> 16))
 
 /* MPI test register definitions. This register
  * is used for determining alternate NIC function's
@@ -466,7 +474,7 @@ enum {
 	MDIO_PORT = 0x00000440,
 	MDIO_STATUS = 0x00000450,
 
-	/* XGMAC AUX statistics  registers */
+	XGMAC_REGISTER_END = 0x00000740,
 };
 
 /*
@@ -666,6 +674,14 @@ enum {
 };
 
 /*
+ * Serdes Address Register (XG_SERDES_ADDR) bit definitions.
+ */
+enum {
+	XG_SERDES_ADDR_RDY = (1 << 31),
+	XG_SERDES_ADDR_R = (1 << 30),
+};
+
+/*
  * Control Register Set Map
  */
 enum {
@@ -735,6 +751,21 @@ enum {
 	PRB_MX_DATA = 0xfc,	/* Use semaphore */
 };
 
+#ifdef CONFIG_HAVE_EFFICIENT_UNALIGNED_ACCESS
+#define SMALL_BUFFER_SIZE 256
+#define SMALL_BUF_MAP_SIZE SMALL_BUFFER_SIZE
+#define SPLT_SETTING  FSC_DBRST_1024
+#define SPLT_LEN 0
+#define QLGE_SB_PAD 0
+#else
+#define SMALL_BUFFER_SIZE 512
+#define SMALL_BUF_MAP_SIZE (SMALL_BUFFER_SIZE / 2)
+#define SPLT_SETTING  FSC_SH
+#define SPLT_LEN (SPLT_HDR_EP | \
+	min(SMALL_BUF_MAP_SIZE, 1023))
+#define QLGE_SB_PAD 32
+#endif
+
 /*
  * CAM output format.
  */
@@ -795,6 +826,7 @@ enum {
 	MB_WOL_BCAST = (1 << 5),
 	MB_WOL_LINK_UP = (1 << 6),
 	MB_WOL_LINK_DOWN = (1 << 7),
+	MB_WOL_MODE_ON = (1 << 16),		/* Wake on Lan Mode on */
 	MB_CMD_SET_WOL_FLTR = 0x00000111,	/* Wake On Lan Filter */
 	MB_CMD_CLEAR_WOL_FLTR = 0x00000112, /* Wake On Lan Filter */
 	MB_CMD_SET_WOL_MAGIC = 0x00000113,	/* Wake On Lan Magic Packet */
@@ -804,12 +836,27 @@ enum {
 	MB_CMD_SET_PORT_CFG = 0x00000122,
 	MB_CMD_GET_PORT_CFG = 0x00000123,
 	MB_CMD_GET_LINK_STS = 0x00000124,
+	MB_CMD_SET_LED_CFG = 0x00000125, /* Set LED Configuration Register */
+		QL_LED_BLINK = 0x03e803e8,
+	MB_CMD_GET_LED_CFG = 0x00000126, /* Get LED Configuration Register */
 	MB_CMD_SET_MGMNT_TFK_CTL = 0x00000160, /* Set Mgmnt Traffic Control */
 	MB_SET_MPI_TFK_STOP = (1 << 0),
 	MB_SET_MPI_TFK_RESUME = (1 << 1),
 	MB_CMD_GET_MGMNT_TFK_CTL = 0x00000161, /* Get Mgmnt Traffic Control */
 	MB_GET_MPI_TFK_STOPPED = (1 << 0),
 	MB_GET_MPI_TFK_FIFO_EMPTY = (1 << 1),
+	/* Sub-commands for IDC request.
+	 * This describes the reason for the
+	 * IDC request.
+	 */
+	MB_CMD_IOP_NONE = 0x0000,
+	MB_CMD_IOP_PREP_UPDATE_MPI	= 0x0001,
+	MB_CMD_IOP_COMP_UPDATE_MPI	= 0x0002,
+	MB_CMD_IOP_PREP_LINK_DOWN	= 0x0010,
+	MB_CMD_IOP_DVR_START	 = 0x0100,
+	MB_CMD_IOP_FLASH_ACC	 = 0x0101,
+	MB_CMD_IOP_RESTART_MPI	= 0x0102,
+	MB_CMD_IOP_CORE_DUMP_MPI	= 0x0103,
 
 	/* Mailbox Command Status. */
 	MB_CMD_STS_GOOD = 0x00004000,	/* Success. */
@@ -1201,9 +1248,17 @@ struct tx_ring_desc {
 	struct tx_ring_desc *next;
 };
 
+struct page_chunk {
+	struct page *page;	/* master page */
+	char *va;		/* virt addr for this chunk */
+	u64 map;		/* mapping for master */
+	unsigned int offset;	/* offset for this chunk */
+	unsigned int last_flag; /* flag set for last chunk in page */
+};
+
 struct bq_desc {
 	union {
-		struct page *lbq_page;
+		struct page_chunk pg_chunk;
 		struct sk_buff *skb;
 	} p;
 	__le64 *addr;
@@ -1237,6 +1292,9 @@ struct tx_ring {
 	atomic_t queue_stopped;	/* Turns queue off when full. */
 	struct delayed_work tx_work;
 	struct ql_adapter *qdev;
+	u64 tx_packets;
+	u64 tx_bytes;
+	u64 tx_errors;
 };
 
 /*
@@ -1272,6 +1330,7 @@ struct rx_ring {
 	dma_addr_t lbq_base_dma;
 	void *lbq_base_indirect;
 	dma_addr_t lbq_base_indirect_dma;
+	struct page_chunk pg_chunk; /* current page for chunks */
 	struct bq_desc *lbq;	/* array of control blocks */
 	void __iomem *lbq_prod_idx_db_reg;	/* PCI doorbell mem area + 0x18 */
 	u32 lbq_prod_idx;	/* current sw prod idx */
@@ -1302,6 +1361,11 @@ struct rx_ring {
 	struct napi_struct napi;
 	u8 reserved;
 	struct ql_adapter *qdev;
+	u64 rx_packets;
+	u64 rx_multicast;
+	u64 rx_bytes;
+	u64 rx_dropped;
+	u64 rx_errors;
 };
 
 /*
@@ -1363,6 +1427,437 @@ struct nic_stats {
 	u64 rx_1024_to_1518_pkts;
 	u64 rx_1519_to_max_pkts;
 	u64 rx_len_err_pkts;
+	/*
+	 * These stats come from offset 500h to 5C8h
+	 * in the XGMAC register.
+	 */
+	u64 tx_cbfc_pause_frames0;
+	u64 tx_cbfc_pause_frames1;
+	u64 tx_cbfc_pause_frames2;
+	u64 tx_cbfc_pause_frames3;
+	u64 tx_cbfc_pause_frames4;
+	u64 tx_cbfc_pause_frames5;
+	u64 tx_cbfc_pause_frames6;
+	u64 tx_cbfc_pause_frames7;
+	u64 rx_cbfc_pause_frames0;
+	u64 rx_cbfc_pause_frames1;
+	u64 rx_cbfc_pause_frames2;
+	u64 rx_cbfc_pause_frames3;
+	u64 rx_cbfc_pause_frames4;
+	u64 rx_cbfc_pause_frames5;
+	u64 rx_cbfc_pause_frames6;
+	u64 rx_cbfc_pause_frames7;
+	u64 rx_nic_fifo_drop;
+};
+
+/* Address/Length pairs for the coredump. */
+enum {
+	MPI_CORE_REGS_ADDR = 0x00030000,
+	MPI_CORE_REGS_CNT = 127,
+	MPI_CORE_SH_REGS_CNT = 16,
+	TEST_REGS_ADDR = 0x00001000,
+	TEST_REGS_CNT = 23,
+	RMII_REGS_ADDR = 0x00001040,
+	RMII_REGS_CNT = 64,
+	FCMAC1_REGS_ADDR = 0x00001080,
+	FCMAC2_REGS_ADDR = 0x000010c0,
+	FCMAC_REGS_CNT = 64,
+	FC1_MBX_REGS_ADDR = 0x00001100,
+	FC2_MBX_REGS_ADDR = 0x00001240,
+	FC_MBX_REGS_CNT = 64,
+	IDE_REGS_ADDR = 0x00001140,
+	IDE_REGS_CNT = 64,
+	NIC1_MBX_REGS_ADDR = 0x00001180,
+	NIC2_MBX_REGS_ADDR = 0x00001280,
+	NIC_MBX_REGS_CNT = 64,
+	SMBUS_REGS_ADDR = 0x00001200,
+	SMBUS_REGS_CNT = 64,
+	I2C_REGS_ADDR = 0x00001fc0,
+	I2C_REGS_CNT = 64,
+	MEMC_REGS_ADDR = 0x00003000,
+	MEMC_REGS_CNT = 256,
+	PBUS_REGS_ADDR = 0x00007c00,
+	PBUS_REGS_CNT = 256,
+	MDE_REGS_ADDR = 0x00010000,
+	MDE_REGS_CNT = 6,
+	CODE_RAM_ADDR = 0x00020000,
+	CODE_RAM_CNT = 0x2000,
+	MEMC_RAM_ADDR = 0x00100000,
+	MEMC_RAM_CNT = 0x2000,
+};
+
+#define MPI_COREDUMP_COOKIE 0x5555aaaa
+struct mpi_coredump_global_header {
+	u32	cookie;
+	u8	idString[16];
+	u32	timeLo;
+	u32	timeHi;
+	u32	imageSize;
+	u32	headerSize;
+	u8	info[220];
+};
+
+struct mpi_coredump_segment_header {
+	u32	cookie;
+	u32	segNum;
+	u32	segSize;
+	u32	extra;
+	u8	description[16];
+};
+
+/* Reg dump segment numbers. */
+enum {
+	CORE_SEG_NUM = 1,
+	TEST_LOGIC_SEG_NUM = 2,
+	RMII_SEG_NUM = 3,
+	FCMAC1_SEG_NUM = 4,
+	FCMAC2_SEG_NUM = 5,
+	FC1_MBOX_SEG_NUM = 6,
+	IDE_SEG_NUM = 7,
+	NIC1_MBOX_SEG_NUM = 8,
+	SMBUS_SEG_NUM = 9,
+	FC2_MBOX_SEG_NUM = 10,
+	NIC2_MBOX_SEG_NUM = 11,
+	I2C_SEG_NUM = 12,
+	MEMC_SEG_NUM = 13,
+	PBUS_SEG_NUM = 14,
+	MDE_SEG_NUM = 15,
+	NIC1_CONTROL_SEG_NUM = 16,
+	NIC2_CONTROL_SEG_NUM = 17,
+	NIC1_XGMAC_SEG_NUM = 18,
+	NIC2_XGMAC_SEG_NUM = 19,
+	WCS_RAM_SEG_NUM = 20,
+	MEMC_RAM_SEG_NUM = 21,
+	XAUI_AN_SEG_NUM = 22,
+	XAUI_HSS_PCS_SEG_NUM = 23,
+	XFI_AN_SEG_NUM = 24,
+	XFI_TRAIN_SEG_NUM = 25,
+	XFI_HSS_PCS_SEG_NUM = 26,
+	XFI_HSS_TX_SEG_NUM = 27,
+	XFI_HSS_RX_SEG_NUM = 28,
+	XFI_HSS_PLL_SEG_NUM = 29,
+	MISC_NIC_INFO_SEG_NUM = 30,
+	INTR_STATES_SEG_NUM = 31,
+	CAM_ENTRIES_SEG_NUM = 32,
+	ROUTING_WORDS_SEG_NUM = 33,
+	ETS_SEG_NUM = 34,
+	PROBE_DUMP_SEG_NUM = 35,
+	ROUTING_INDEX_SEG_NUM = 36,
+	MAC_PROTOCOL_SEG_NUM = 37,
+	XAUI2_AN_SEG_NUM = 38,
+	XAUI2_HSS_PCS_SEG_NUM = 39,
+	XFI2_AN_SEG_NUM = 40,
+	XFI2_TRAIN_SEG_NUM = 41,
+	XFI2_HSS_PCS_SEG_NUM = 42,
+	XFI2_HSS_TX_SEG_NUM = 43,
+	XFI2_HSS_RX_SEG_NUM = 44,
+	XFI2_HSS_PLL_SEG_NUM = 45,
+	SEM_REGS_SEG_NUM = 50
+
+};
+
+/* Probe dump constants */
+/* 64 probes, 8 bytes per probe + 4 bytes to list the probe ID */
+#define PROBE_DATA_LENGTH_WORDS ((64*2) + 1)
+#define NUMBER_OF_PROBES 34
+#define NUMBER_ROUTING_REG_ENTRIES 48
+#define WORDS_PER_ROUTING_REG_ENTRY 4
+#define MAC_PROTOCOL_REGISTER_WORDS ((512 * 3) + (32 * 2) + (4096 * 1) + \
+(4096 * 1) + (4 * 2) + (8 * 2) + (16 * 1) + (4 * 1) + (4 * 4) + (4 * 1))
+
+/* Save both the address and data register */
+#define WORDS_PER_MAC_PROT_ENTRY 2
+#define MAX_SEMAPHORE_FUNCTIONS 5
+#define WQC_WORD_SIZE 6
+#define NUMBER_OF_WQCS 128
+#define CQC_WORD_SIZE 13
+#define NUMBER_OF_CQCS 128
+
+#define MPI_READ 0x00000000
+#define REG_BLOCK 0x00020000
+#define TEST_LOGIC_FUNC_PORT_CONFIG 0x1002
+#define NIC1_FUNCTION_ENABLE 0x00000001
+#define NIC1_FUNCTION_MASK 0x0000000e
+#define NIC1_FUNCTION_SHIFT 1
+#define NIC2_FUNCTION_ENABLE 0x00000010
+#define NIC2_FUNCTION_MASK 0x000000e0
+#define NIC2_FUNCTION_SHIFT 5
+#define FC1_FUNCTION_ENABLE 0x00000100
+#define FC1_FUNCTION_MASK 0x00000e00
+#define FC1_FUNCTION_SHIFT 9
+#define FC2_FUNCTION_ENABLE 0x00001000
+#define FC2_FUNCTION_MASK 0x0000e000
+#define FC2_FUNCTION_SHIFT 13
+#define FUNCTION_SHIFT 6
+
+#define XFI1_POWERED_UP 0x00000005
+#define XFI2_POWERED_UP	0x0000000A
+#define XAUI_POWERED_DOWN 0x00000001
+
+#define RISC_124 0x0003007c
+#define RISC_127 0x0003007f
+#define SHADOW_OFFSET 0xb0000000
+
+#define SYS_CLOCK (0x00)
+#define PCI_CLOCK (0x80)
+#define FC_CLOCK (0x140)
+#define XGM_CLOCK (0x180)
+#define ADDRESS_REGISTER_ENABLE 0x00010000
+#define UP 0x00008000
+#define MAX_MUX	0x40
+#define MAX_MODULES 0x1F
+#define RS_AND_ADR 0x06000000
+#define RS_ONLY	0x04000000
+#define NUM_TYPES 10
+
+struct ql_nic_misc {
+	u32 rx_ring_count;
+	u32 tx_ring_count;
+	u32 intr_count;
+	u32 function;
+};
+
+struct ql_reg_dump {
+
+	/* segment 0 */
+	struct mpi_coredump_global_header mpi_global_header;
+
+	/* segment 16 */
+	struct mpi_coredump_segment_header nic_regs_seg_hdr;
+	u32 nic_regs[64];
+
+	/* segment 30 */
+	struct mpi_coredump_segment_header misc_nic_seg_hdr;
+	struct ql_nic_misc misc_nic_info;
+
+	/* segment 31 */
+	/* one interrupt state for each CQ */
+	struct mpi_coredump_segment_header intr_states_seg_hdr;
+	u32 intr_states[MAX_CPUS];
+
+	/* segment 32 */
+	/* 3 cam words each for 16 unicast,
+	 * 2 cam words for each of 32 multicast.
+	 */
+	struct mpi_coredump_segment_header cam_entries_seg_hdr;
+	u32 cam_entries[(16 * 3) + (32 * 3)];
+
+	/* segment 33 */
+	struct mpi_coredump_segment_header nic_routing_words_seg_hdr;
+	u32 nic_routing_words[16];
+
+	/* segment 34 */
+	struct mpi_coredump_segment_header ets_seg_hdr;
+	u32 ets[8+2];
+};
+
+struct ql_mpi_coredump {
+	/* segment 0 */
+	struct mpi_coredump_global_header mpi_global_header;
+
+	/* segment 1 */
+	struct mpi_coredump_segment_header core_regs_seg_hdr;
+	u32 mpi_core_regs[MPI_CORE_REGS_CNT];
+	u32 mpi_core_sh_regs[MPI_CORE_SH_REGS_CNT];
+
+	/* segment 2 */
+	struct mpi_coredump_segment_header test_logic_regs_seg_hdr;
+	u32 test_logic_regs[TEST_REGS_CNT];
+
+	/* segment 3 */
+	struct mpi_coredump_segment_header rmii_regs_seg_hdr;
+	u32 rmii_regs[RMII_REGS_CNT];
+
+	/* segment 4 */
+	struct mpi_coredump_segment_header fcmac1_regs_seg_hdr;
+	u32 fcmac1_regs[FCMAC_REGS_CNT];
+
+	/* segment 5 */
+	struct mpi_coredump_segment_header fcmac2_regs_seg_hdr;
+	u32 fcmac2_regs[FCMAC_REGS_CNT];
+
+	/* segment 6 */
+	struct mpi_coredump_segment_header fc1_mbx_regs_seg_hdr;
+	u32 fc1_mbx_regs[FC_MBX_REGS_CNT];
+
+	/* segment 7 */
+	struct mpi_coredump_segment_header ide_regs_seg_hdr;
+	u32 ide_regs[IDE_REGS_CNT];
+
+	/* segment 8 */
+	struct mpi_coredump_segment_header nic1_mbx_regs_seg_hdr;
+	u32 nic1_mbx_regs[NIC_MBX_REGS_CNT];
+
+	/* segment 9 */
+	struct mpi_coredump_segment_header smbus_regs_seg_hdr;
+	u32 smbus_regs[SMBUS_REGS_CNT];
+
+	/* segment 10 */
+	struct mpi_coredump_segment_header fc2_mbx_regs_seg_hdr;
+	u32 fc2_mbx_regs[FC_MBX_REGS_CNT];
+
+	/* segment 11 */
+	struct mpi_coredump_segment_header nic2_mbx_regs_seg_hdr;
+	u32 nic2_mbx_regs[NIC_MBX_REGS_CNT];
+
+	/* segment 12 */
+	struct mpi_coredump_segment_header i2c_regs_seg_hdr;
+	u32 i2c_regs[I2C_REGS_CNT];
+
+	/* segment 13 */
+	struct mpi_coredump_segment_header memc_regs_seg_hdr;
+	u32 memc_regs[MEMC_REGS_CNT];
+
+	/* segment 14 */
+	struct mpi_coredump_segment_header pbus_regs_seg_hdr;
+	u32 pbus_regs[PBUS_REGS_CNT];
+
+	/* segment 15 */
+	struct mpi_coredump_segment_header mde_regs_seg_hdr;
+	u32 mde_regs[MDE_REGS_CNT];
+
+	/* segment 16 */
+	struct mpi_coredump_segment_header nic_regs_seg_hdr;
+	u32 nic_regs[64];
+
+	/* segment 17 */
+	struct mpi_coredump_segment_header nic2_regs_seg_hdr;
+	u32 nic2_regs[64];
+
+	/* segment 18 */
+	struct mpi_coredump_segment_header xgmac1_seg_hdr;
+	u32 xgmac1[XGMAC_REGISTER_END / 4];
+
+	/* segment 19 */
+	struct mpi_coredump_segment_header xgmac2_seg_hdr;
+	u32 xgmac2[XGMAC_REGISTER_END / 4];
+
+	/* segment 20 */
+	struct mpi_coredump_segment_header code_ram_seg_hdr;
+	u32 code_ram[CODE_RAM_CNT];
+
+	/* segment 21 */
+	struct mpi_coredump_segment_header memc_ram_seg_hdr;
+	u32 memc_ram[MEMC_RAM_CNT];
+
+	/* segment 22 */
+	struct mpi_coredump_segment_header xaui_an_hdr;
+	u32 serdes_xaui_an[14];
+
+	/* segment 23 */
+	struct mpi_coredump_segment_header xaui_hss_pcs_hdr;
+	u32 serdes_xaui_hss_pcs[33];
+
+	/* segment 24 */
+	struct mpi_coredump_segment_header xfi_an_hdr;
+	u32 serdes_xfi_an[14];
+
+	/* segment 25 */
+	struct mpi_coredump_segment_header xfi_train_hdr;
+	u32 serdes_xfi_train[12];
+
+	/* segment 26 */
+	struct mpi_coredump_segment_header xfi_hss_pcs_hdr;
+	u32 serdes_xfi_hss_pcs[15];
+
+	/* segment 27 */
+	struct mpi_coredump_segment_header xfi_hss_tx_hdr;
+	u32 serdes_xfi_hss_tx[32];
+
+	/* segment 28 */
+	struct mpi_coredump_segment_header xfi_hss_rx_hdr;
+	u32 serdes_xfi_hss_rx[32];
+
+	/* segment 29 */
+	struct mpi_coredump_segment_header xfi_hss_pll_hdr;
+	u32 serdes_xfi_hss_pll[32];
+
+	/* segment 30 */
+	struct mpi_coredump_segment_header misc_nic_seg_hdr;
+	struct ql_nic_misc misc_nic_info;
+
+	/* segment 31 */
+	/* one interrupt state for each CQ */
+	struct mpi_coredump_segment_header intr_states_seg_hdr;
+	u32 intr_states[MAX_RX_RINGS];
+
+	/* segment 32 */
+	/* 3 cam words each for 16 unicast,
+	 * 2 cam words for each of 32 multicast.
+	 */
+	struct mpi_coredump_segment_header cam_entries_seg_hdr;
+	u32 cam_entries[(16 * 3) + (32 * 3)];
+
+	/* segment 33 */
+	struct mpi_coredump_segment_header nic_routing_words_seg_hdr;
+	u32 nic_routing_words[16];
+
+	/* segment 34 */
+	struct mpi_coredump_segment_header ets_seg_hdr;
+	u32 ets[8+2];
+
+	/* segment 35 */
+	struct mpi_coredump_segment_header probe_dump_seg_hdr;
+	u32 probe_dump[PROBE_DATA_LENGTH_WORDS * NUMBER_OF_PROBES];
+
+	/* segment 36 */
+	struct mpi_coredump_segment_header routing_reg_seg_hdr;
+	u32 routing_regs[NUMBER_ROUTING_REG_ENTRIES *
+				WORDS_PER_ROUTING_REG_ENTRY];
+
+	/* segment 37 */
+	struct mpi_coredump_segment_header mac_prot_reg_seg_hdr;
+	u32 mac_prot_regs[MAC_PROTOCOL_REGISTER_WORDS *
+				WORDS_PER_MAC_PROT_ENTRY];
+
+	/* segment 38 */
+	struct mpi_coredump_segment_header xaui2_an_hdr;
+	u32 serdes2_xaui_an[14];
+
+	/* segment 39 */
+	struct mpi_coredump_segment_header xaui2_hss_pcs_hdr;
+	u32 serdes2_xaui_hss_pcs[33];
+
+	/* segment 40 */
+	struct mpi_coredump_segment_header xfi2_an_hdr;
+	u32 serdes2_xfi_an[14];
+
+	/* segment 41 */
+	struct mpi_coredump_segment_header xfi2_train_hdr;
+	u32 serdes2_xfi_train[12];
+
+	/* segment 42 */
+	struct mpi_coredump_segment_header xfi2_hss_pcs_hdr;
+	u32 serdes2_xfi_hss_pcs[15];
+
+	/* segment 43 */
+	struct mpi_coredump_segment_header xfi2_hss_tx_hdr;
+	u32 serdes2_xfi_hss_tx[32];
+
+	/* segment 44 */
+	struct mpi_coredump_segment_header xfi2_hss_rx_hdr;
+	u32 serdes2_xfi_hss_rx[32];
+
+	/* segment 45 */
+	struct mpi_coredump_segment_header xfi2_hss_pll_hdr;
+	u32 serdes2_xfi_hss_pll[32];
+
+	/* segment 50 */
+	/* semaphore register for all 5 functions */
+	struct mpi_coredump_segment_header sem_regs_seg_hdr;
+	u32 sem_regs[MAX_SEMAPHORE_FUNCTIONS];
+
+	struct mpi_coredump_segment_header wqc1_seg_hdr;
+	u32 wqc1[WQC_WORD_SIZE * NUMBER_OF_WQCS];
+
+	struct mpi_coredump_segment_header cqc1_seg_hdr;
+	u32 cqc1[CQC_WORD_SIZE * NUMBER_OF_CQCS];
+
+	struct mpi_coredump_segment_header wqc2_seg_hdr;
+	u32 wqc2[WQC_WORD_SIZE * NUMBER_OF_WQCS];
+
+	struct mpi_coredump_segment_header cqc2_seg_hdr;
+	u32 cqc2[CQC_WORD_SIZE * NUMBER_OF_CQCS];
 };
 
 /*
@@ -1398,6 +1893,8 @@ enum {
 	QL_ALLMULTI = 6,
 	QL_PORT_CFG = 7,
 	QL_CAM_RT_SET = 8,
+	QL_SELFTEST = 9,
+	QL_LB_LINK_UP = 10,
 };
 
 /* link_status bit definitions */
@@ -1505,6 +2002,7 @@ struct ql_adapter {
 
 	struct rx_ring rx_ring[MAX_RX_RINGS];
 	struct tx_ring tx_ring[MAX_TX_RINGS];
+	unsigned int lbq_buf_order;
 
 	int rx_csum;
 	u32 default_rx_queue;
@@ -1518,21 +2016,25 @@ struct ql_adapter {
 	u32 port_link_up;
 	u32 port_init;
 	u32 link_status;
+	struct ql_mpi_coredump *mpi_coredump;
+	u32 core_is_dumped;
 	u32 link_config;
+	u32 led_config;
 	u32 max_frame_size;
 
 	union flash_params flash;
 
-	struct net_device_stats stats;
 	struct workqueue_struct *workqueue;
 	struct delayed_work asic_reset_work;
 	struct delayed_work mpi_reset_work;
 	struct delayed_work mpi_work;
 	struct delayed_work mpi_port_cfg_work;
 	struct delayed_work mpi_idc_work;
+	struct delayed_work mpi_core_to_log;
 	struct completion ide_completion;
 	struct nic_operations *nic_ops;
 	u16 device_id;
+	atomic_t lb_count;
 };
 
 /*
@@ -1600,6 +2102,7 @@ extern int ql_write_cfg(struct ql_adapter *qdev, void *ptr, int size, u32 bit,
 void ql_queue_fw_error(struct ql_adapter *qdev);
 void ql_mpi_work(struct work_struct *work);
 void ql_mpi_reset_work(struct work_struct *work);
+void ql_mpi_core_to_log(struct work_struct *work);
 int ql_wait_reg_rdy(struct ql_adapter *qdev, u32 reg, u32 bit, u32 ebit);
 void ql_queue_asic_error(struct ql_adapter *qdev);
 u32 ql_enable_completion_interrupt(struct ql_adapter *qdev, u32 intr);
@@ -1610,11 +2113,31 @@ void ql_mpi_port_cfg_work(struct work_struct *work);
 int ql_mb_get_fw_state(struct ql_adapter *qdev);
 int ql_cam_route_initialize(struct ql_adapter *qdev);
 int ql_read_mpi_reg(struct ql_adapter *qdev, u32 reg, u32 *data);
+int ql_write_mpi_reg(struct ql_adapter *qdev, u32 reg, u32 data);
+int ql_unpause_mpi_risc(struct ql_adapter *qdev);
+int ql_pause_mpi_risc(struct ql_adapter *qdev);
+int ql_hard_reset_mpi_risc(struct ql_adapter *qdev);
+int ql_dump_risc_ram_area(struct ql_adapter *qdev, void *buf,
+		u32 ram_addr, int word_count);
+int ql_core_dump(struct ql_adapter *qdev,
+		struct ql_mpi_coredump *mpi_coredump);
 int ql_mb_about_fw(struct ql_adapter *qdev);
+int ql_wol(struct ql_adapter *qdev);
+int ql_mb_wol_set_magic(struct ql_adapter *qdev, u32 enable_wol);
+int ql_mb_wol_mode(struct ql_adapter *qdev, u32 wol);
+int ql_mb_set_led_cfg(struct ql_adapter *qdev, u32 led_config);
+int ql_mb_get_led_cfg(struct ql_adapter *qdev);
 void ql_link_on(struct ql_adapter *qdev);
 void ql_link_off(struct ql_adapter *qdev);
 int ql_mb_set_mgmnt_traffic_ctl(struct ql_adapter *qdev, u32 control);
+int ql_mb_get_port_cfg(struct ql_adapter *qdev);
+int ql_mb_set_port_cfg(struct ql_adapter *qdev);
 int ql_wait_fifo_empty(struct ql_adapter *qdev);
+void ql_gen_reg_dump(struct ql_adapter *qdev,
+			struct ql_reg_dump *mpi_coredump);
+netdev_tx_t ql_lb_send(struct sk_buff *skb, struct net_device *ndev);
+void ql_check_lb_frame(struct ql_adapter *, struct sk_buff *);
+int ql_clean_lb_rx_ring(struct rx_ring *rx_ring, int budget);
 
 #if 1
 #define QL_ALL_DUMP
