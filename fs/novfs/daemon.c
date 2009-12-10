@@ -1590,7 +1590,7 @@ int novfs_daemon_lib_ioctl(struct inode *inode, struct file *file, unsigned int 
 					break;
 
 				case NWC_SET_CONN_INFO:
-					DbgIocCall("NwGetConnInfo");
+					DbgIocCall("NwSetConnInfo");
 					retCode =
 					    novfs_set_conn_info(&data, dh->session);
 					break;
