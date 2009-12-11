@@ -9,7 +9,6 @@
 #ifndef __GENERATING_BOUNDS_H
 #include <linux/mm_types.h>
 #include <linux/bounds.h>
-#include <asm/system.h>
 #endif /* !__GENERATING_BOUNDS_H */
 
 /*
@@ -218,19 +217,6 @@ static inline int TestClearPage##uname(struct page *page) { return 0; }
 #define __TESTCLEARFLAG_FALSE(uname)					\
 static inline int __TestClearPage##uname(struct page *page) { return 0; }
 
-#define TESTSETOTHER(unamet, lnamet, unames, lnames) \
-static inline int PageTest##unamet##AndSet##unames(struct page *page) \
-{								\
-	unsigned long flags;					\
-	do {							\
-		flags = page->flags;				\
-		if (!(flags & (1UL << PG_ ## lnamet)))		\
-			return 0;				\
-	} while (cmpxchg(&page->flags, flags, flags | (1UL<<PG_##lnames)) != \
-			flags); 				\
-	return 1;						\
-}
-
 struct page;	/* forward declaration */
 
 TESTPAGEFLAG(Locked, locked) TESTSETFLAG(Locked, locked)
@@ -318,7 +304,6 @@ PAGEFLAG_FALSE(Uncached)
 #ifdef CONFIG_MEMORY_FAILURE
 PAGEFLAG(HWPoison, hwpoison)
 TESTSETFLAG(HWPoison, hwpoison)
-TESTSETOTHER(Buddy, buddy, HWPoison, hwpoison);
 #define __PG_HWPOISON (1UL << PG_hwpoison)
 #else
 PAGEFLAG_FALSE(HWPoison)

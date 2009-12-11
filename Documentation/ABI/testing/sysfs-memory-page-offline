@@ -1,4 +1,4 @@
-What:		/sys/devices/system/memory/soft_page_offline
+What:		/sys/devices/system/memory/soft_offline_page
 Date:		Sep 2009
 KernelVersion:	2.6.33
 Contact:	andi@firstfloor.org
@@ -20,7 +20,7 @@ Description:
 		number, or a error when the offlining failed.  Reading
 		the file is not allowed.
 
-What:		/sys/devices/system/memory/hard_page_offline
+What:		/sys/devices/system/memory/hard_offline_page
 Date:		Sep 2009
 KernelVersion:	2.6.33
 Contact:	andi@firstfloor.org

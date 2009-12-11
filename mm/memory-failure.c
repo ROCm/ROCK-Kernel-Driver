@@ -41,6 +41,8 @@
 #include <linux/swap.h>
 #include <linux/backing-dev.h>
 #include <linux/migrate.h>
+#include <linux/page-isolation.h>
+#include <linux/suspend.h>
 #include "internal.h"
 
 int sysctl_memory_failure_early_kill __read_mostly = 0;
@@ -82,6 +84,36 @@ static int kill_proc_ao(struct task_struct *t, unsigned long addr, int trapno,
 		       t->comm, t->pid, ret);
 	return ret;
 }
+
+/*
+ * When a unknown page type is encountered drain as many buffers as possible
+ * in the hope to turn the page into a LRU or free page, which we can handle.
+ */
+void shake_page(struct page *p, int access)
+{
+	if (!PageSlab(p)) {
+		lru_add_drain_all();
+		if (PageLRU(p))
+			return;
+		drain_all_pages();
+		if (PageLRU(p) || is_free_buddy_page(p))
+			return;
+	}
+
+	/*
+	 * Only all shrink_slab here (which would also
+	 * shrink other caches) if access is not potentially fatal.
+	 */
+	if (access) {
+		int nr;
+		do {
+			nr = shrink_slab(1000, GFP_KERNEL, 1000);
+			if (page_count(p) == 0)
+				break;
+		} while (nr > 10);
+	}
+}
+EXPORT_SYMBOL_GPL(shake_page);
 
 /*
  * Kill all processes that have a poisoned page mapped and then isolate
@@ -598,22 +630,31 @@ static struct page_state {
 	{ 0,		0,		"unknown page state",	me_unknown },
 };
 
+#undef dirty
+#undef sc
+#undef unevict
+#undef mlock
+#undef writeback
 #undef lru
+#undef swapbacked
+#undef head
+#undef tail
+#undef compound
+#undef slab
+#undef reserved
 
 static void action_result(unsigned long pfn, char *msg, int result)
 {
-	struct page *page = NULL;
-	if (pfn_valid(pfn))
-		page = pfn_to_page(pfn);
+	struct page *page = pfn_to_page(pfn);
 
 	printk(KERN_ERR "MCE %#lx: %s%s page recovery: %s\n",
 		pfn,
-		page && PageDirty(page) ? "dirty " : "",
+		PageDirty(page) ? "dirty " : "",
 		msg, action_name[result]);
 }
 
 static int page_action(struct page_state *ps, struct page *p,
-			unsigned long pfn, int ref)
+			unsigned long pfn)
 {
 	int result;
 	int count;
@@ -621,7 +662,7 @@ static int page_action(struct page_state *ps, struct page *p,
 	result = ps->action(p, pfn);
 	action_result(pfn, ps->msg, result);
 
-	count = page_count(p) - 1 - ref;
+	count = page_count(p) - 1;
 	if (count != 0)
 		printk(KERN_ERR
 		       "MCE %#lx: %s page still referenced by %d users\n",
@@ -723,7 +764,7 @@ static void hwpoison_user_mappings(struct page *p, unsigned long pfn,
 		      ret != SWAP_SUCCESS, pfn);
 }
 
-int __memory_failure(unsigned long pfn, int trapno, int ref)
+int __memory_failure(unsigned long pfn, int trapno, int flags)
 {
 	unsigned long lru_flag;
 	struct page_state *ps;
@@ -734,8 +775,10 @@ int __memory_failure(unsigned long pfn, int trapno, int ref)
 		panic("Memory failure from trap %d on page %lx", trapno, pfn);
 
 	if (!pfn_valid(pfn)) {
-		action_result(pfn, "memory outside kernel control", IGNORED);
-		return -EIO;
+		printk(KERN_ERR
+		       "MCE %#lx: memory outside kernel control\n",
+		       pfn);
+		return -ENXIO;
 	}
 
 	p = pfn_to_page(pfn);
@@ -757,9 +800,15 @@ int __memory_failure(unsigned long pfn, int trapno, int ref)
 	 * In fact it's dangerous to directly bump up page count from 0,
 	 * that may make page_freeze_refs()/page_unfreeze_refs() mismatch.
 	 */
-	if (!get_page_unless_zero(compound_head(p))) {
-		action_result(pfn, "free or high order kernel", IGNORED);
-		return PageBuddy(compound_head(p)) ? 0 : -EBUSY;
+	if (!(flags & MF_COUNT_INCREASED) &&
+		!get_page_unless_zero(compound_head(p))) {
+		if (is_free_buddy_page(p)) {
+			action_result(pfn, "free buddy", DELAYED);
+			return 0;
+		} else {
+			action_result(pfn, "high order kernel", IGNORED);
+			return -EBUSY;
+		}
 	}
 
 	/*
@@ -796,7 +845,7 @@ int __memory_failure(unsigned long pfn, int trapno, int ref)
 	/*
 	 * Torn down by someone else?
 	 */
-	if (test_bit(PG_lru, &lru_flag) && !PageSwapCache(p) && p->mapping == NULL) {
+	if ((lru_flag & (1UL << PG_lru)) && !PageSwapCache(p) && p->mapping == NULL) {
 		action_result(pfn, "already truncated LRU", IGNORED);
 		res = 0;
 		goto out;
@@ -805,7 +854,7 @@ int __memory_failure(unsigned long pfn, int trapno, int ref)
 	res = -EBUSY;
 	for (ps = error_states;; ps++) {
 		if (((p->flags | lru_flag)& ps->mask) == ps->res) {
-			res = page_action(ps, p, pfn, ref);
+			res = page_action(ps, p, pfn);
 			break;
 		}
 	}
@@ -837,65 +886,112 @@ void memory_failure(unsigned long pfn, int trapno)
 	__memory_failure(pfn, trapno, 0);
 }
 
+
 static struct page *new_page(struct page *p, unsigned long private, int **x)
 {
 	return alloc_pages(GFP_HIGHUSER_MOVABLE, 0);
 }
 
+/*
+ * Safely get reference count of an arbitrary page.
+ * Returns 0 for a free page, -EIO for a zero refcount page
+ * that is not free, and 1 for any other page type.
+ * For 1 the page is returned with increased page count, otherwise not.
+ */
+static int get_any_page(struct page *p, unsigned long pfn, int flags)
+{
+	int ret;
+
+	if (flags & MF_COUNT_INCREASED)
+		return 1;
+
+	/*
+	 * The lock_system_sleep prevents a race with memory hotplug,
+	 * because the isolation assumes there's only a single user.
+	 * This is a big hammer, a better would be nicer.
+	 */
+	lock_system_sleep();
+
+	/*
+	 * Isolate the page, so that it doesn't get reallocated if it
+	 * was free.
+	 */
+	set_migratetype_isolate(p);
+	if (!get_page_unless_zero(compound_head(p))) {
+		if (is_free_buddy_page(p)) {
+			pr_debug("get_any_page: %#lx free buddy page\n", pfn);
+			/* Set hwpoison bit while page is still isolated */
+			SetPageHWPoison(p);
+			ret = 0;
+		} else {
+			pr_debug("get_any_page: %#lx: unknown zero refcount page type %lx\n",
+				pfn, p->flags);
+			ret = -EIO;
+		}
+	} else {
+		/* Not a free page */
+		ret = 1;
+	}
+	unset_migratetype_isolate(p);
+	unlock_system_sleep();
+	return ret;
+}
+
 /**
  * soft_offline_page - Soft offline a page.
  * @page: page to offline
+ * @flags: flags. Same as memory_failure().
  *
  * Returns 0 on success, otherwise negated errno.
  *
- * Soft offline a page, by migration or dropping,
+ * Soft offline a page, by migration or invalidation,
  * without killing anything. This is for the case when
- * the case is not corrupted yet (so it's still ok to access),
+ * a page is not corrupted yet (so it's still valid to access),
  * but has had a number of corrected errors and is better taken
- * out. The page is put on the bad page list and poisoned.
+ * out.
  *
- * This should never impact any application or cause data loss.
+ * The actual policy on when to do that is maintained by
+ * user space.
+ *
+ * This should never impact any application or cause data loss,
+ * however it might take some time.
  *
  * This is not a 100% solution for all memory, but tries to be
  * ``good enough'' for the majority of memory.
- *
- * Only handles page cache and free pages for now.
  */
-int soft_offline_page(struct page *page)
+int soft_offline_page(struct page *page, int flags)
 {
 	int ret;
 	unsigned long pfn = page_to_pfn(page);
 
-	/*
-	 * Free Page. Just set the hwpoison bit in a race
-	 * free manner if it was free, and then the page allocator
-  	 * takes care of it by skipping it.
-	 */
-	if (PageTestBuddyAndSetHWPoison(page)) {
-		pr_debug("soft_offline: free page\n");
-		/* RED-PEN page wil have zero refcount as bad page */
-		atomic_long_add(1, &mce_bad_pages);
-		return 0;
-	}
+	ret = get_any_page(page, pfn, flags);
+	if (ret < 0)
+		return ret;
+	if (ret == 0)
+		goto done;
 
 	/*
 	 * Page cache page we can handle?
-	 *
-	 * RED-PEN: Could do more draining like per cpu pagevecs or
-	 * slabs.
- 	 */
-	if (!PageLRU(page))
-		lru_add_drain_all();
+	 */
 	if (!PageLRU(page)) {
-		pr_debug("soft_offline: %lx: unknown non LRU page type %lx\n",
-				pfn, page->flags);
-		if (PageBuddy(page)) pr_debug("page was free\n");
-		return -EIO;
-	}
+		/*
+		 * Try to free it.
+		 */
+		put_page(page);
+		shake_page(page, 1);
 
-	if (!get_page_unless_zero(compound_head(page))) {
-		pr_debug("soft_offline: %lx: zero refcount page\n", pfn);
-		/* RED-PEN Could loop here because it's likely free now? */
+		/*
+		 * Did it turn free?
+		 */
+		ret = get_any_page(page, pfn, 0);
+		if (ret < 0)
+			return ret;
+		if (ret == 0)
+			goto done;
+	}
+	if (!PageLRU(page)) {
+		pr_debug("soft_offline: %#lx: unknown non LRU page type %lx\n",
+				pfn, page->flags);
 		return -EIO;
 	}
 
@@ -903,12 +999,12 @@ int soft_offline_page(struct page *page)
 	wait_on_page_writeback(page);
 
 	/*
-	 * Synchronized using the page lock with m_f()
+	 * Synchronized using the page lock with memory_failure()
 	 */
 	if (PageHWPoison(page)) {
 		unlock_page(page);
 		put_page(page);
-		pr_debug("soft offline: %lx page already poisoned\n", pfn);
+		pr_debug("soft offline: %#lx page already poisoned\n", pfn);
 		return -EBUSY;
 	}
 
@@ -921,13 +1017,15 @@ int soft_offline_page(struct page *page)
 
 	/*
 	 * Drop count because page migration doesn't like raised
-	 * counts.
-	 * RED-PEN is this really safe?
+	 * counts. The page could get re-allocated, but if it becomes
+	 * LRU the isolation will just fail.
+	 * RED-PEN would be better to keep it isolated here, but we
+	 * would need to fix isolation locking first.
 	 */
 	put_page(page);
 	if (ret == 1) {
 		ret = 0;
-		pr_debug("soft_offline: %lx: invalidated\n", pfn);
+		pr_debug("soft_offline: %#lx: invalidated\n", pfn);
 		goto done;
 	}
 
@@ -943,13 +1041,13 @@ int soft_offline_page(struct page *page)
 		list_add(&page->lru, &pagelist);
 		ret = migrate_pages(&pagelist, new_page, MPOL_MF_MOVE_ALL);
 		if (ret) {
-			pr_debug("soft offline: %lx: migration failed %d, type %lx\n",
+			pr_debug("soft offline: %#lx: migration failed %d, type %lx\n",
 				pfn, ret, page->flags);
 			if (ret > 0)
 				ret = -EIO;
 		}
 	} else {
-		pr_debug("soft offline: %lx: isolation failed: %d, page count %d, type %lx\n",
+		pr_debug("soft offline: %#lx: isolation failed: %d, page count %d, type %lx\n",
 				pfn, ret, page_count(page), page->flags);
 	}
 	if (ret)
@@ -957,7 +1055,6 @@ int soft_offline_page(struct page *page)
 
 done:
 	atomic_long_add(1, &mce_bad_pages);
-	/* Only set poison bit when page is not used anymore */
 	SetPageHWPoison(page);
 	/* keep elevated page count for bad page */
 	return ret;
