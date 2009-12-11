@@ -43,6 +43,7 @@
 /* support up to 8 USB keyboards (probably excessive, but...) */
 #define KDB_USB_NUM_KEYBOARDS	8
 struct kdb_usb_kbd_info kdb_usb_kbds[KDB_USB_NUM_KEYBOARDS];
+EXPORT_SYMBOL(kdb_usb_kbds);
 
 extern int kdb_no_usb;
 
@@ -70,7 +71,11 @@ static unsigned char kdb_usb_keycode[256] = {
  * Attach a USB keyboard to kdb.
  */
 int
-kdb_usb_keyboard_attach(struct urb *urb, unsigned char *buffer, void *poll_func)
+kdb_usb_keyboard_attach(struct urb *urb, unsigned char *buffer,
+			void *poll_func, void *compl_func,
+                        kdb_hc_keyboard_attach_t kdb_hc_keyboard_attach,
+			kdb_hc_keyboard_detach_t kdb_hc_keyboard_detach,
+			unsigned int bufsize, struct urb *hid_urb)
 {
 	int	i;
 	int	rc = -1;
@@ -92,6 +97,17 @@ kdb_usb_keyboard_attach(struct urb *urb, unsigned char *buffer, void *poll_func)
 		kdb_usb_kbds[i].urb = urb;
 		kdb_usb_kbds[i].buffer = buffer;
 		kdb_usb_kbds[i].poll_func = poll_func;
+
+		kdb_usb_kbds[i].kdb_hc_urb_complete = compl_func;
+		kdb_usb_kbds[i].kdb_hc_keyboard_attach = kdb_hc_keyboard_attach;
+		kdb_usb_kbds[i].kdb_hc_keyboard_detach = kdb_hc_keyboard_detach;
+
+		/* USB Host Controller specific Keyboadr attach callback.
+		 * Currently only UHCI has this callback.
+		 */
+		if (kdb_usb_kbds[i].kdb_hc_keyboard_attach)
+			kdb_usb_kbds[i].kdb_hc_keyboard_attach(i, bufsize);
+
 
 		rc = 0;	/* success */
 
@@ -125,11 +141,19 @@ kdb_usb_keyboard_detach(struct urb *urb)
 		if (kdb_usb_kbds[i].urb != urb)
 			continue;
 
+		/* USB Host Controller specific Keyboard detach callback.
+		 * Currently only UHCI has this callback.
+		 */
+		if (kdb_usb_kbds[i].kdb_hc_keyboard_detach)
+			kdb_usb_kbds[i].kdb_hc_keyboard_detach(urb, i);
+
+
 		/* found it, clear the index */
 		kdb_usb_kbds[i].urb = NULL;
 		kdb_usb_kbds[i].buffer = NULL;
 		kdb_usb_kbds[i].poll_func = NULL;
 		kdb_usb_kbds[i].caps_lock = 0;
+		kdb_usb_kbds[i].hid_urb = NULL;
 
 		rc = 0;	/* success */
 

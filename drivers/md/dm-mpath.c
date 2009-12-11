@@ -57,6 +57,8 @@ struct priority_group {
 	struct list_head pgpaths;
 };
 
+#define FEATURE_NO_PARTITIONS 1
+
 /* Multipath context */
 struct multipath {
 	struct list_head list;
@@ -82,6 +84,7 @@ struct multipath {
 	unsigned saved_queue_if_no_path;/* Saved state during suspension */
 	unsigned pg_init_retries;	/* Number of times to retry pg_init */
 	unsigned pg_init_count;		/* Number of times pg_init called */
+	unsigned features;		/* Additional selected features */
 
 	struct work_struct process_queued_ios;
 	struct list_head queued_ios;
@@ -462,6 +465,9 @@ static void process_queued_ios(struct work_struct *work)
 		m->pg_init_count++;
 		m->pg_init_required = 0;
 		list_for_each_entry(tmp, &pgpath->pg->pgpaths, list) {
+			/* Skip disabled paths or failed paths */
+			if (!tmp->path.dev || !tmp->is_active)
+				continue;
 			if (queue_work(kmpath_handlerd, &tmp->activate_path))
 				m->pg_init_in_progress++;
 		}
@@ -836,6 +842,10 @@ static int parse_features(struct arg_set *as, struct multipath *m)
 			continue;
 		}
 
+		if (!strnicmp(param_name, MESG_STR("no_partitions"))) {
+			m->features |= FEATURE_NO_PARTITIONS;
+			continue;
+		}
 		if (!strnicmp(param_name, MESG_STR("pg_init_retries")) &&
 		    (argc >= 1)) {
 			r = read_param(_params + 1, shift(as),
@@ -1184,8 +1194,8 @@ static void pg_init_done(void *data, int errors)
 			errors = 0;
 			break;
 		}
-		DMERR("Cannot failover device because scsi_dh_%s was not "
-		      "loaded.", m->hw_handler_name);
+		DMERR("Cannot failover device %s because scsi_dh_%s was not "
+		      "loaded.", pgpath->path.pdev, m->hw_handler_name);
 		/*
 		 * Fail path for now, so we do not ping pong
 		 */
@@ -1197,6 +1207,10 @@ static void pg_init_done(void *data, int errors)
 		 * controller so try the other pg.
 		 */
 		bypass_pg(m, pg, 1);
+		break;
+	case SCSI_DH_DEV_OFFLINED:
+		DMWARN("Device %s offlined.", pgpath->path.pdev);
+		errors = 0;
 		break;
 	/* TODO: For SCSI_DH_RETRY we should wait a couple seconds */
 	case SCSI_DH_RETRY:
@@ -1218,7 +1232,8 @@ static void pg_init_done(void *data, int errors)
 	spin_lock_irqsave(&m->lock, flags);
 	if (errors) {
 		if (pgpath == m->current_pgpath) {
-			DMERR("Could not failover device. Error %d.", errors);
+			DMERR("Could not failover device %s, error %d.",
+			      pgpath->path.pdev, errors);
 			m->current_pgpath = NULL;
 			m->current_pg = NULL;
 		}
@@ -1406,11 +1421,14 @@ static int multipath_status(struct dm_target *ti, status_type_t type,
 		DMEMIT("2 %u %u ", m->queue_size, m->pg_init_count);
 	else {
 		DMEMIT("%u ", m->queue_if_no_path +
-			      (m->pg_init_retries > 0) * 2);
+			      (m->pg_init_retries > 0) * 2 +
+			      (m->features & FEATURE_NO_PARTITIONS));
 		if (m->queue_if_no_path)
 			DMEMIT("queue_if_no_path ");
 		if (m->pg_init_retries)
 			DMEMIT("pg_init_retries %u ", m->pg_init_retries);
+		if (m->features & FEATURE_NO_PARTITIONS)
+			DMEMIT("no_partitions ");
 	}
 
 	if (!m->hw_handler_name || type == STATUSTYPE_INFO)
