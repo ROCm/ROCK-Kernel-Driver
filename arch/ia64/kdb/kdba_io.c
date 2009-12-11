@@ -43,6 +43,7 @@
 /* support up to 8 USB keyboards (probably excessive, but...) */
 #define KDB_USB_NUM_KEYBOARDS	8
 struct kdb_usb_kbd_info kdb_usb_kbds[KDB_USB_NUM_KEYBOARDS];
+EXPORT_SYMBOL(kdb_usb_kbds);
 
 extern int kdb_no_usb;
 
