@@ -303,10 +303,10 @@ static void
 kdb_kbdsend(unsigned char byte)
 {
 	int timeout;
-	for (timeout = 200; timeout && (inb(KBD_STATUS_REG) & KBD_STAT_IBF); timeout--);
+	for (timeout = 200 * 1000; timeout && (inb(KBD_STATUS_REG) & KBD_STAT_IBF); timeout--);
 	outb(byte, KBD_DATA_REG);
 	udelay(40);
-	for (timeout = 200; timeout && (~inb(KBD_STATUS_REG) & KBD_STAT_OBF); timeout--);
+	for (timeout = 200 * 1000; timeout && (~inb(KBD_STATUS_REG) & KBD_STAT_OBF); timeout--);
 	inb(KBD_DATA_REG);
 	udelay(40);
 }
