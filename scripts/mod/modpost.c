@@ -1568,7 +1568,7 @@ static void get_markers(struct elf_info *info, struct module *mod)
 void *supported_file;
 unsigned long supported_size;
 
-const char *supported(struct module *mod)
+static const char *supported(struct module *mod)
 {
 	unsigned long pos = 0;
 	char *line;
@@ -1796,7 +1796,7 @@ static void add_staging_flag(struct buffer *b, const char *name)
 		buf_printf(b, "\nMODULE_INFO(staging, \"Y\");\n");
 }
 
-void add_supported_flag(struct buffer *b, struct module *mod)
+static void add_supported_flag(struct buffer *b, struct module *mod)
 {
 	const char *how = supported(mod);
 	if (how)
@@ -1943,7 +1943,7 @@ static void write_if_changed(struct buffer *b, const char *fname)
 	fclose(file);
 }
 
-void read_supported(const char *fname)
+static void read_supported(const char *fname)
 {
 	supported_file = grab_file(fname, &supported_size);
 	if (!supported_file)
