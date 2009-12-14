@@ -91,7 +91,7 @@ int ocfs2_resmap_init(struct ocfs2_super *osb,
  *
  * Re-initialize the parameters of a reservation bitmap. This is
  * useful for local alloc window slides.
- * 
+ *
  * If any bitmap parameters have changed, this function will call
  * ocfs2_trunc_resv against all existing reservations. A future
  * version will recalculate existing reservations based on the new
