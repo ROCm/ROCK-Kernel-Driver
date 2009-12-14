@@ -562,14 +562,28 @@ EXPORT_SYMBOL(fcoe_ctlr_els_send);
  * times its keep-alive period including fuzz.
  *
  * In addition, determine the time when an FCF selection can occur.
+ *
+ * Also, increment the MissDiscAdvCount when no advertisement is received
+ * for the corresponding FCF for 1.5 * FKA_ADV_PERIOD (FC-BB-5 LESB).
  */
 static void fcoe_ctlr_age_fcfs(struct fcoe_ctlr *fip)
 {
 	struct fcoe_fcf *fcf;
 	struct fcoe_fcf *next;
 	unsigned long sel_time = 0;
+	unsigned long mda_time = 0;
 
 	list_for_each_entry_safe(fcf, next, &fip->fcfs, list) {
+		mda_time = fcf->fka_period + (fcf->fka_period >> 1);
+		if ((fip->sel_fcf == fcf) &&
+		    (time_after(jiffies, fcf->time + mda_time))) {
+			mod_timer(&fip->timer, jiffies + mda_time);
+			fc_lport_get_stats(fip->lp)->MissDiscAdvCount++;
+			printk(KERN_INFO "libfcoe: host%d: Missing Discovery "
+			       "Advertisement for fab %llx count %lld\n",
+			       fip->lp->host->host_no, fcf->fabric_name,
+			       fc_lport_get_stats(fip->lp)->MissDiscAdvCount);
+		}
 		if (time_after(jiffies, fcf->time + fcf->fka_period * 3 +
 			       msecs_to_jiffies(FIP_FCF_FUZZ * 3))) {
 			if (fip->sel_fcf == fcf)
@@ -578,6 +592,7 @@ static void fcoe_ctlr_age_fcfs(struct fcoe_ctlr *fip)
 			WARN_ON(!fip->fcf_count);
 			fip->fcf_count--;
 			kfree(fcf);
+			fc_lport_get_stats(fip->lp)->VLinkFailureCount++;
 		} else if (fcoe_ctlr_mtu_valid(fcf) &&
 			   (!sel_time || time_before(sel_time, fcf->time))) {
 			sel_time = fcf->time;
@@ -665,6 +680,8 @@ static int fcoe_ctlr_parse_adv(struct fcoe_ctlr *fip,
 			if (dlen != sizeof(struct fip_fka_desc))
 				goto len_err;
 			fka = (struct fip_fka_desc *)desc;
+			if (fka->fd_flags & FIP_FKA_ADV_D)
+				fcf->fd_flags = 1;
 			t = ntohl(fka->fd_fka_period);
 			if (t >= FCOE_CTLR_MIN_FKA)
 				fcf->fka_period = msecs_to_jiffies(t);
@@ -988,6 +1005,7 @@ static void fcoe_ctlr_recv_clr_vlink(struct fcoe_ctlr *fip,
 		LIBFCOE_FIP_DBG(fip, "performing Clear Virtual Link\n");
 
 		spin_lock_bh(&fip->lock);
+		fc_lport_get_stats(lport)->VLinkFailureCount++;
 		fcoe_ctlr_reset(fip);
 		spin_unlock_bh(&fip->lock);
 
@@ -1160,7 +1178,7 @@ static void fcoe_ctlr_timeout(unsigned long arg)
 		}
 	}
 
-	if (sel) {
+	if (sel && !sel->fd_flags) {
 		if (time_after_eq(jiffies, fip->ctlr_ka_time)) {
 			fip->ctlr_ka_time = jiffies + sel->fka_period;
 			fip->send_ctlr_ka = 1;
