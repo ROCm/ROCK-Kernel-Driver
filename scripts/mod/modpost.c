@@ -515,7 +515,7 @@ static void handle_modversions(struct module *mod, struct elf_info *info,
 		break;
 	case SHN_ABS:
 		/* CRC'd symbol */
-		if (memcmp(symname, CRC_PFX, strlen(CRC_PFX)) == 0) {
+		if (strncmp(symname, CRC_PFX, strlen(CRC_PFX)) == 0) {
 			crc = (unsigned int) sym->st_value;
 			sym_update_crc(symname + strlen(CRC_PFX), mod, crc,
 					export);
@@ -559,7 +559,7 @@ static void handle_modversions(struct module *mod, struct elf_info *info,
 		break;
 	default:
 		/* All exported symbols */
-		if (memcmp(symname, KSYMTAB_PFX, strlen(KSYMTAB_PFX)) == 0) {
+		if (strncmp(symname, KSYMTAB_PFX, strlen(KSYMTAB_PFX)) == 0) {
 			sym_add_exported(symname + strlen(KSYMTAB_PFX), mod,
 					export);
 		}
@@ -1568,7 +1568,7 @@ static void get_markers(struct elf_info *info, struct module *mod)
 void *supported_file;
 unsigned long supported_size;
 
-const char *supported(struct module *mod)
+static const char *supported(struct module *mod)
 {
 	unsigned long pos = 0;
 	char *line;
@@ -1796,7 +1796,7 @@ static void add_staging_flag(struct buffer *b, const char *name)
 		buf_printf(b, "\nMODULE_INFO(staging, \"Y\");\n");
 }
 
-void add_supported_flag(struct buffer *b, struct module *mod)
+static void add_supported_flag(struct buffer *b, struct module *mod)
 {
 	const char *how = supported(mod);
 	if (how)
@@ -1943,7 +1943,7 @@ static void write_if_changed(struct buffer *b, const char *fname)
 	fclose(file);
 }
 
-void read_supported(const char *fname)
+static void read_supported(const char *fname)
 {
 	supported_file = grab_file(fname, &supported_size);
 	if (!supported_file)

@@ -231,6 +231,8 @@ struct fc_rport_priv {
  * @ControlRequests:       Number of control requests
  * @InputMegabytes:        Number of received megabytes
  * @OutputMegabytes:       Number of transmitted megabytes
+ * @VLinkFailureCount:     Number of virtual link failures
+ * @MissDiscAdvCount:      Number of missing FIP discovery advertisement
  */
 struct fcoe_dev_stats {
 	u64		SecondsSinceLastReset;
@@ -249,6 +251,8 @@ struct fcoe_dev_stats {
 	u64		ControlRequests;
 	u64		InputMegabytes;
 	u64		OutputMegabytes;
+	u64		VLinkFailureCount;
+	u64		MissDiscAdvCount;
 };
 
 /**
@@ -506,6 +510,12 @@ struct libfc_function_template {
 	 * STATUS: OPTIONAL
 	 */
 	int (*ddp_done)(struct fc_lport *, u16);
+	/*
+	 * Allow LLD to fill its own Link Error Status Block
+	 *
+	 * STATUS: OPTIONAL
+	 */
+	void (*get_lesb)(struct fc_lport *, struct fc_els_lesb *lesb);
 	/*
 	 * Send a frame using an existing sequence and exchange.
 	 *
