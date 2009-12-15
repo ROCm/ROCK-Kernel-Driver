@@ -21,6 +21,7 @@
  */
 
 #include <linux/latencytop.h>
+#include <linux/sched.h>
 
 /*
  * Targeted preemption latency for CPU-bound tasks:
@@ -34,13 +35,25 @@
  * (to see the precise effective timeslice length of your workload,
  *  run vmstat and monitor the context-switches (cs) field)
  */
-unsigned int sysctl_sched_latency = 20000000ULL;
+unsigned int normalized_sysctl_sched_latency = 20000000ULL;
+
+/*
+ * The initial- and re-scaling of tunables is configurable
+ * (default SCHED_TUNABLESCALING_LOG = *(1+ilog(ncpus))
+ *
+ * Options are:
+ * SCHED_TUNABLESCALING_NONE - unscaled, always *1
+ * SCHED_TUNABLESCALING_LOG - scaled logarithmical, *1+ilog(ncpus)
+ * SCHED_TUNABLESCALING_LINEAR - scaled linear, *ncpus
+ */
+enum sched_tunable_scaling sysctl_sched_tunable_scaling
+	= SCHED_TUNABLESCALING_LOG;
 
 /*
  * Minimal preemption granularity for CPU-bound tasks:
  * (default: 4 msec * (1 + ilog(ncpus)), units: nanoseconds)
  */
-unsigned int sysctl_sched_min_granularity = 4000000ULL;
+unsigned int normalized_sysctl_sched_min_granularity = 4000000ULL;
 
 /*
  * is kept at sysctl_sched_latency / sysctl_sched_min_granularity
@@ -69,7 +82,7 @@ unsigned int __read_mostly sysctl_sched_compat_yield;
  * and reduces their over-scheduling. Synchronous workloads will still
  * have immediate wakeup/sleep latencies.
  */
-unsigned int sysctl_sched_wakeup_granularity = 5000000UL;
+unsigned int normalized_sysctl_sched_wakeup_granularity = 5000000UL;
 
 const_debug unsigned int sysctl_sched_migration_cost = 500000UL;
 
@@ -383,17 +396,26 @@ static struct sched_entity *__pick_last_entity(struct cfs_rq *cfs_rq)
  */
 
 #ifdef CONFIG_SCHED_DEBUG
-int sched_nr_latency_handler(struct ctl_table *table, int write,
+int sched_proc_update_handler(struct ctl_table *table, int write,
 		void __user *buffer, size_t *lenp,
 		loff_t *ppos)
 {
 	int ret = proc_dointvec_minmax(table, write, buffer, lenp, ppos);
+	int factor = get_update_sysctl_factor();
 
 	if (ret || !write)
 		return ret;
 
 	sched_nr_latency = DIV_ROUND_UP(sysctl_sched_latency,
 					sysctl_sched_min_granularity);
+
+#define WRT_SYSCTL(name) \
+	(normalized_sysctl_##name = sysctl_##name / (factor))
+	WRT_SYSCTL(sched_min_granularity);
+	WRT_SYSCTL(sched_latency);
+	WRT_SYSCTL(sched_wakeup_granularity);
+	WRT_SYSCTL(sched_shares_ratelimit);
+#undef WRT_SYSCTL
 
 	return 0;
 }
@@ -1850,6 +1872,17 @@ move_one_task_fair(struct rq *this_rq, int this_cpu, struct rq *busiest,
 
 	return 0;
 }
+
+static void rq_online_fair(struct rq *rq)
+{
+	update_sysctl();
+}
+
+static void rq_offline_fair(struct rq *rq)
+{
+	update_sysctl();
+}
+
 #endif /* CONFIG_SMP */
 
 /*
@@ -1997,6 +2030,8 @@ static const struct sched_class fair_sched_class = {
 
 	.load_balance		= load_balance_fair,
 	.move_one_task		= move_one_task_fair,
+	.rq_online		= rq_online_fair,
+	.rq_offline		= rq_offline_fair,
 #endif
 
 	.set_curr_task          = set_curr_task_fair,
