@@ -1249,8 +1249,7 @@ static void net_tx_action(unsigned long unused)
 	unsigned int data_len;
 	int ret, work_to_do;
 
-	if (dealloc_cons != dealloc_prod)
-		net_tx_action_dealloc();
+	net_tx_action_dealloc();
 
 	mop = tx_map_ops;
 	BUILD_BUG_ON(MAX_SKB_FRAGS >= MAX_PENDING_REQS);
@@ -1404,7 +1403,7 @@ static void net_tx_action(unsigned long unused)
 	}
 
 	if (mop == tx_map_ops)
-		return;
+		goto out;
 
 	ret = HYPERVISOR_grant_table_op(
 		GNTTABOP_map_grant_ref, tx_map_ops, mop - tx_map_ops);
@@ -1471,6 +1470,7 @@ static void net_tx_action(unsigned long unused)
 		netif->dev->last_rx = jiffies;
 	}
 
+ out:
 	if (netbk_copy_skb_mode == NETBK_DELAYED_COPY_SKB &&
 	    !list_empty(&pending_inuse_head)) {
 		struct netbk_tx_pending_inuse *oldest;

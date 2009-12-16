@@ -586,7 +586,7 @@ blktap_ring_create(struct blktap *tap)
 	return blktap_sysfs_create(tap);
 }
 
-int
+int __init
 blktap_ring_init(int *major)
 {
 	int err;

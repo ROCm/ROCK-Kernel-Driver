@@ -271,7 +271,7 @@ blktap_request_pool_free(void)
 	spin_unlock_irqrestore(&pool.lock, flags);
 }
 
-int
+int __init
 blktap_request_pool_init(void)
 {
 	int i, err;

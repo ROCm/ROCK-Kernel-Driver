@@ -193,10 +193,10 @@ extern void iounmap(volatile void __iomem *addr);
 #define ARCH_HAS_DEV_MEM
 
 #define bvec_to_pseudophys(bv)	 (page_to_pseudophys((bv)->bv_page) + \
-				  (unsigned long) (bv)->bv_offset)
+				  (unsigned long)(bv)->bv_offset)
 
 #define BIOVEC_PHYS_MERGEABLE(vec1, vec2) \
-	(bvec_to_phys(vec1) + (vec1)->bv_len == bvec_to_phys(vec2) \
+	(__BIOVEC_PHYS_MERGEABLE(vec1, vec2) \
 	 && bvec_to_pseudophys(vec1) + (vec1)->bv_len \
 	    == bvec_to_pseudophys(vec2))
 

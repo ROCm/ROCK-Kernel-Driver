@@ -437,8 +437,6 @@ static inline unsigned int max_nr_grant_frames(void)
 
 #ifdef CONFIG_XEN
 
-static DEFINE_SEQLOCK(gnttab_dma_lock);
-
 #ifdef CONFIG_X86
 static int map_pte_fn(pte_t *pte, struct page *pmd_page,
 		      unsigned long addr, void *data)
@@ -508,11 +506,16 @@ static int gnttab_map(unsigned int start_idx, unsigned int end_idx)
 	return 0;
 }
 
+#if defined(CONFIG_XEN_BACKEND) || defined(CONFIG_XEN_BACKEND_MODULE)
+
+static DEFINE_SEQLOCK(gnttab_dma_lock);
+
 static void gnttab_page_free(struct page *page, unsigned int order)
 {
 	BUG_ON(order);
 	ClearPageForeign(page);
 	gnttab_reset_grant_page(page);
+	ClearPageReserved(page);
 	put_page(page);
 }
 
@@ -590,6 +593,8 @@ int gnttab_copy_grant_page(grant_ref_t ref, struct page **pagep)
 	new_page->mapping = page->mapping;
 	new_page->index = page->index;
 	set_bit(PG_foreign, &new_page->flags);
+	if (PageReserved(page))
+		SetPageReserved(new_page);
 	*pagep = new_page;
 
 	SetPageForeign(page, gnttab_page_free);
@@ -635,6 +640,8 @@ void __gnttab_dma_map_page(struct page *page)
 		smp_mb();
 	} while (unlikely(read_seqretry(&gnttab_dma_lock, seq)));
 }
+
+#endif /* CONFIG_XEN_BACKEND */
 
 #ifdef __HAVE_ARCH_PTE_SPECIAL
 
