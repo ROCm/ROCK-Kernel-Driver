@@ -272,6 +272,7 @@ config XEN_USB_FRONTEND_HCD_PM
 
 config XEN_GRANT_DEV
 	tristate "User-space granted page access driver"
+	depends on XEN_BACKEND != n
 	default XEN_PRIVILEGED_GUEST
 	help
 	  Device for accessing (in user-space) pages that have been granted

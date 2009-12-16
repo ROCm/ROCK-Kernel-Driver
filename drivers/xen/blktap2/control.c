@@ -203,7 +203,7 @@ blktap_control_destroy_device(struct blktap *tap)
 	return err;
 }
 
-static int
+static int __init
 blktap_control_init(void)
 {
 	int err;

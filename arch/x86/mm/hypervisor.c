@@ -476,7 +476,7 @@ void xen_l2_entry_update(pmd_t *ptr, pmd_t val)
 		if (unlikely(PagePinned(page)))
 			page = NULL;
 		else if (PageHighMem(page)) {
-#ifdef CONFIG_HIGHPTE
+#ifndef CONFIG_HIGHPTE
 			BUG();
 #endif
 			kmap_flush_unused();

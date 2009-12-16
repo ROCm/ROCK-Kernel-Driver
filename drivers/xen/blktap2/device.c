@@ -1162,7 +1162,7 @@ blktap_device_create(struct blktap *tap)
 	return err;
 }
 
-int
+int __init
 blktap_device_init(int *maj)
 {
 	int major;

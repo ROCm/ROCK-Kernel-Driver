@@ -724,6 +724,7 @@ void set_kernel_text_ro(void)
 	set_memory_ro(start, (end - start) >> PAGE_SHIFT);
 }
 
+static int initmem_freed __read_mostly = 0;
 void mark_rodata_ro(void)
 {
 	unsigned long start = PFN_ALIGN(_text);
@@ -756,15 +757,33 @@ void mark_rodata_ro(void)
 	set_memory_ro(start, (end-start) >> PAGE_SHIFT);
 #endif
 
-	free_init_pages("unused kernel memory",
-			(unsigned long) page_address(virt_to_page(text_end)),
-			(unsigned long)
+	if (!initmem_freed) {
+		initmem_freed = 1;
+		free_init_pages("unused kernel memory",
+				(unsigned long)
+				 page_address(virt_to_page(text_end)),
+				(unsigned long)
 				 page_address(virt_to_page(rodata_start)));
-	free_init_pages("unused kernel memory",
-			(unsigned long) page_address(virt_to_page(rodata_end)),
-			(unsigned long) page_address(virt_to_page(data_start)));
+		free_init_pages("unused kernel memory",
+				(unsigned long)
+				 page_address(virt_to_page(rodata_end)),
+				(unsigned long)
+				 page_address(virt_to_page(data_start)));
+	}
 }
+EXPORT_SYMBOL_GPL(mark_rodata_ro);
 
+void mark_rodata_rw(void)
+{
+	unsigned long rodata_start =
+		((unsigned long)__start_rodata + PAGE_SIZE - 1) & PAGE_MASK;
+	unsigned long end = (unsigned long) &__end_rodata_hpage_align;
+
+	printk(KERN_INFO "Write protecting the kernel read-only data: %luk\n",
+	       (end - rodata_start) >> 10);
+	set_memory_rw_force(rodata_start, (end - rodata_start) >> PAGE_SHIFT);
+}
+EXPORT_SYMBOL_GPL(mark_rodata_rw);
 #endif
 
 int __init reserve_bootmem_generic(unsigned long phys, unsigned long len,

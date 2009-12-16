@@ -245,6 +245,8 @@ static void cpa_flush_array(unsigned long *start, int numpages, int cache,
 	}
 }
 
+static int static_protections_allow_rodata __read_mostly;
+
 /*
  * Certain areas of memory on x86 require very specific protection flags,
  * for example the BIOS area or kernel text. Callers don't always get this
@@ -276,8 +278,10 @@ static inline pgprot_t static_protections(pgprot_t prot, unsigned long address,
 	 * catches all aliases.
 	 */
 	if (within(pfn, __pa((unsigned long)__start_rodata) >> PAGE_SHIFT,
-		   __pa((unsigned long)__end_rodata) >> PAGE_SHIFT))
-		pgprot_val(forbidden) |= _PAGE_RW;
+		   __pa((unsigned long)__end_rodata) >> PAGE_SHIFT)) {
+		if (!static_protections_allow_rodata)
+			pgprot_val(forbidden) |= _PAGE_RW;
+	}
 
 #if defined(CONFIG_X86_64) && defined(CONFIG_DEBUG_RODATA)
 	/*
@@ -1105,6 +1109,21 @@ int set_memory_rw(unsigned long addr, int numpages)
 }
 EXPORT_SYMBOL_GPL(set_memory_rw);
 
+/* hack: bypass kernel rodata section static_protections check. */
+int set_memory_rw_force(unsigned long addr, int numpages)
+{
+	static DEFINE_MUTEX(lock);
+	int ret;
+
+	mutex_lock(&lock);
+	static_protections_allow_rodata = 1;
+	ret = change_page_attr_set(&addr, numpages, __pgprot(_PAGE_RW), 0);
+	static_protections_allow_rodata = 0;
+	mutex_unlock(&lock);
+
+	return ret;
+}
+
 int set_memory_np(unsigned long addr, int numpages)
 {
 	return change_page_attr_clear(&addr, numpages, __pgprot(_PAGE_PRESENT), 0);
@@ -1217,6 +1236,13 @@ int set_pages_rw(struct page *page, int numpages)
 	unsigned long addr = (unsigned long)page_address(page);
 
 	return set_memory_rw(addr, numpages);
+}
+
+int set_pages_rw_force(struct page *page, int numpages)
+{
+	unsigned long addr = (unsigned long)page_address(page);
+
+	return set_memory_rw_force(addr, numpages);
 }
 
 #ifdef CONFIG_DEBUG_PAGEALLOC

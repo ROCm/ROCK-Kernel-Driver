@@ -241,8 +241,11 @@ static inline int range_needs_mapping(phys_addr_t pa, size_t size)
 	return range_straddles_page_boundary(pa, size);
 }
 
-static int is_swiotlb_buffer(phys_addr_t paddr)
+static int is_swiotlb_buffer(dma_addr_t addr)
 {
+	unsigned long pfn = mfn_to_local_pfn(PFN_DOWN(addr));
+	phys_addr_t paddr = (phys_addr_t)pfn << PAGE_SHIFT;
+
 	return paddr >= virt_to_phys(io_tlb_start) &&
 		paddr < virt_to_phys(io_tlb_end);
 }
@@ -289,8 +292,9 @@ static void swiotlb_bounce(phys_addr_t phys, char *dma_addr, size_t size,
 	} else {
 		if (dir == DMA_TO_DEVICE)
 			memcpy(dma_addr, phys_to_virt(phys), size);
-		else
-			memcpy(phys_to_virt(phys), dma_addr, size);
+		else if (__copy_to_user_inatomic(phys_to_virt(phys),
+						 dma_addr, size))
+			/* inaccessible */;
 	}
 }
 
@@ -536,7 +540,7 @@ static void unmap_single(struct device *hwdev, dma_addr_t dev_addr,
 
 	BUG_ON(dir == DMA_NONE);
 
-	if (is_swiotlb_buffer(paddr)) {
+	if (is_swiotlb_buffer(dev_addr)) {
 		do_unmap_single(hwdev, phys_to_virt(paddr), size, dir);
 		return;
 	}
@@ -570,7 +574,7 @@ swiotlb_sync_single_for_cpu(struct device *hwdev, dma_addr_t dev_addr,
 
 	BUG_ON(dir == DMA_NONE);
 
-	if (is_swiotlb_buffer(paddr))
+	if (is_swiotlb_buffer(dev_addr))
 		sync_single(hwdev, phys_to_virt(paddr), size, dir);
 }
 EXPORT_SYMBOL(swiotlb_sync_single_for_cpu);
@@ -583,7 +587,7 @@ swiotlb_sync_single_for_device(struct device *hwdev, dma_addr_t dev_addr,
 
 	BUG_ON(dir == DMA_NONE);
 
-	if (is_swiotlb_buffer(paddr))
+	if (is_swiotlb_buffer(dev_addr))
 		sync_single(hwdev, phys_to_virt(paddr), size, dir);
 }
 EXPORT_SYMBOL(swiotlb_sync_single_for_device);
