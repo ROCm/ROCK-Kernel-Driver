@@ -764,7 +764,19 @@ void mark_rodata_ro(void)
 			(unsigned long) page_address(virt_to_page(rodata_end)),
 			(unsigned long) page_address(virt_to_page(data_start)));
 }
+EXPORT_SYMBOL_GPL(mark_rodata_ro);
 
+void mark_rodata_rw(void)
+{
+	unsigned long rodata_start =
+		((unsigned long)__start_rodata + PAGE_SIZE - 1) & PAGE_MASK;
+	unsigned long end = (unsigned long) &__end_rodata_hpage_align;
+
+	printk(KERN_INFO "Write protecting the kernel read-only data: %luk\n",
+	       (end - rodata_start) >> 10);
+	set_memory_rw_force(rodata_start, (end - rodata_start) >> PAGE_SHIFT);
+}
+EXPORT_SYMBOL_GPL(mark_rodata_rw);
 #endif
 
 int __init reserve_bootmem_generic(unsigned long phys, unsigned long len,
