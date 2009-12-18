@@ -439,7 +439,6 @@ struct kvm_ioeventfd {
 #endif
 #define KVM_CAP_IOEVENTFD 36
 #define KVM_CAP_SET_IDENTITY_MAP_ADDR 37
-#define KVM_CAP_S390_PSW 42
 
 #ifdef KVM_CAP_IRQ_ROUTING
 
@@ -478,6 +477,7 @@ struct kvm_irq_routing {
 };
 
 #endif
+#define KVM_CAP_S390_PSW 42
 
 #ifdef KVM_CAP_MCE
 /* x86 MCE */
