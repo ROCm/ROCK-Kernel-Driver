@@ -103,9 +103,23 @@ static int zfcp_scsi_queuecommand(struct scsi_cmnd *scpnt,
 	}
 
 	status = atomic_read(&unit->status);
-	if (unlikely((status & ZFCP_STATUS_COMMON_ERP_FAILED) ||
-		     !(status & ZFCP_STATUS_COMMON_RUNNING))) {
+	if (unlikely(status & ZFCP_STATUS_COMMON_ERP_FAILED) &&
+		     !(atomic_read(&unit->port->status) &
+		       ZFCP_STATUS_COMMON_ERP_FAILED)) {
+		/* only unit access denied, but port is good
+		 * not covered by FC transport, have to fail here */
 		zfcp_scsi_command_fail(scpnt, DID_ERROR);
+		return 0;
+	}
+
+	if (unlikely(!(status & ZFCP_STATUS_COMMON_UNBLOCKED))) {
+		/* This could be either
+		 * open unit pending: this is temporary, will result in
+		 * 	open unit or ERP_FAILED, so retry command
+		 * call to rport_delete pending: mimic retry from
+		 * 	fc_remote_port_chkready until rport is BLOCKED
+		 */
+		zfcp_scsi_command_fail(scpnt, DID_IMM_RETRY);
 		return 0;
 	}
 
@@ -200,6 +214,7 @@ static int zfcp_scsi_eh_abort_handler(struct scsi_cmnd *scpnt)
 			break;
 
 		zfcp_erp_wait(adapter);
+		fc_block_scsi_eh(scpnt);
 		if (!(atomic_read(&adapter->status) &
 		      ZFCP_STATUS_COMMON_RUNNING)) {
 			zfcp_dbf_scsi_abort("nres", adapter->dbf, scpnt, NULL,
@@ -239,6 +254,7 @@ static int zfcp_task_mgmt_function(struct scsi_cmnd *scpnt, u8 tm_flags)
 			break;
 
 		zfcp_erp_wait(adapter);
+		fc_block_scsi_eh(scpnt);
 		if (!(atomic_read(&adapter->status) &
 		      ZFCP_STATUS_COMMON_RUNNING)) {
 			zfcp_dbf_scsi_devreset("nres", tm_flags, unit, scpnt);
@@ -280,6 +296,7 @@ static int zfcp_scsi_eh_host_reset_handler(struct scsi_cmnd *scpnt)
 
 	zfcp_erp_adapter_reopen(adapter, 0, "schrh_1", scpnt);
 	zfcp_erp_wait(adapter);
+	fc_block_scsi_eh(scpnt);
 
 	return SUCCESS;
 }
