@@ -677,6 +677,14 @@ static unsigned int azx_rirb_get_response(struct hda_bus *bus,
 		}
 	}
 
+	if (!chip->polling_mode) {
+		snd_printk(KERN_WARNING SFX "azx_get_response timeout, "
+			   "switching to polling mode: last cmd=0x%08x\n",
+			   chip->last_cmd[addr]);
+		chip->polling_mode = 1;
+		goto again;
+	}
+
 	if (chip->msi) {
 		snd_printk(KERN_WARNING SFX "No response from codec, "
 			   "disabling MSI: last cmd=0x%08x\n",
@@ -689,14 +697,6 @@ static unsigned int azx_rirb_get_response(struct hda_bus *bus,
 			bus->rirb_error = 1;
 			return -1;
 		}
-		goto again;
-	}
-
-	if (!chip->polling_mode) {
-		snd_printk(KERN_WARNING SFX "azx_get_response timeout, "
-			   "switching to polling mode: last cmd=0x%08x\n",
-			   chip->last_cmd[addr]);
-		chip->polling_mode = 1;
 		goto again;
 	}
 
@@ -2071,7 +2071,8 @@ static void azx_power_notify(struct hda_bus *bus)
 	}
 	if (power_on)
 		azx_init_chip(chip);
-	else if (chip->running && power_save_controller)
+	else if (chip->running && power_save_controller &&
+		 !bus->power_keep_link_on)
 		azx_stop_chip(chip);
 }
 #endif /* CONFIG_SND_HDA_POWER_SAVE */

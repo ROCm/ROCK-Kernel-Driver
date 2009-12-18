@@ -62,8 +62,6 @@ struct intel_hdmi_spec {
 	/*
 	 * HDMI sink attached to each pin
 	 */
-	bool		sink_present[INTEL_HDMI_PINS];
-	bool		sink_eldv[INTEL_HDMI_PINS];
 	struct hdmi_eld sink_eld[INTEL_HDMI_PINS];
 
 	/*
@@ -148,38 +146,78 @@ struct cea_channel_speaker_allocation {
 };
 
 /*
+ * ALSA sequence is:
+ *
+ *       surround40   surround41   surround50   surround51   surround71
+ * ch0   front left   =            =            =            =
+ * ch1   front right  =            =            =            =
+ * ch2   rear left    =            =            =            =
+ * ch3   rear right   =            =            =            =
+ * ch4                LFE          center       center       center
+ * ch5                                          LFE          LFE
+ * ch6                                                       side left
+ * ch7                                                       side right
+ *
+ * surround71 = {FL, FR, RLC, RRC, FC, LFE, RL, RR}
+ */
+static int hdmi_channel_mapping[0x32][8] = {
+	/* stereo */
+	[0x00] = { 0x00, 0x11, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7 },
+	/* 2.1 */
+	[0x01] = { 0x00, 0x11, 0x22, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7 },
+	/* Dolby Surround */
+	[0x02] = { 0x00, 0x11, 0x23, 0xf2, 0xf4, 0xf5, 0xf6, 0xf7 },
+	/* surround40 */
+	[0x08] = { 0x00, 0x11, 0x24, 0x35, 0xf3, 0xf2, 0xf6, 0xf7 },
+	/* 4ch */
+	[0x03] = { 0x00, 0x11, 0x23, 0x32, 0x44, 0xf5, 0xf6, 0xf7 },
+	/* surround41 */
+	[0x09] = { 0x00, 0x11, 0x24, 0x34, 0x43, 0xf2, 0xf6, 0xf7 },
+	/* surround50 */
+	[0x0a] = { 0x00, 0x11, 0x24, 0x35, 0x43, 0xf2, 0xf6, 0xf7 },
+	/* surround51 */
+	[0x0b] = { 0x00, 0x11, 0x24, 0x35, 0x43, 0x52, 0xf6, 0xf7 },
+	/* 7.1 */
+	[0x13] = { 0x00, 0x11, 0x26, 0x37, 0x43, 0x52, 0x64, 0x75 },
+};
+
+/*
  * This is an ordered list!
  *
  * The preceding ones have better chances to be selected by
  * hdmi_setup_channel_allocation().
  */
 static struct cea_channel_speaker_allocation channel_allocations[] = {
-/* 			  channel:   8     7    6    5    4     3    2    1  */
+/* 			  channel:   7     6    5    4    3     2    1    0  */
 { .ca_index = 0x00,  .speakers = {   0,    0,   0,   0,   0,    0,  FR,  FL } },
 				 /* 2.1 */
 { .ca_index = 0x01,  .speakers = {   0,    0,   0,   0,   0,  LFE,  FR,  FL } },
 				 /* Dolby Surround */
 { .ca_index = 0x02,  .speakers = {   0,    0,   0,   0,  FC,    0,  FR,  FL } },
+				 /* surround40 */
+{ .ca_index = 0x08,  .speakers = {   0,    0,  RR,  RL,   0,    0,  FR,  FL } },
+				 /* surround41 */
+{ .ca_index = 0x09,  .speakers = {   0,    0,  RR,  RL,   0,  LFE,  FR,  FL } },
+				 /* surround50 */
+{ .ca_index = 0x0a,  .speakers = {   0,    0,  RR,  RL,  FC,    0,  FR,  FL } },
+				 /* surround51 */
+{ .ca_index = 0x0b,  .speakers = {   0,    0,  RR,  RL,  FC,  LFE,  FR,  FL } },
+				 /* 6.1 */
+{ .ca_index = 0x0f,  .speakers = {   0,   RC,  RR,  RL,  FC,  LFE,  FR,  FL } },
+				 /* surround71 */
+{ .ca_index = 0x13,  .speakers = { RRC,  RLC,  RR,  RL,  FC,  LFE,  FR,  FL } },
+
 { .ca_index = 0x03,  .speakers = {   0,    0,   0,   0,  FC,  LFE,  FR,  FL } },
 { .ca_index = 0x04,  .speakers = {   0,    0,   0,  RC,   0,    0,  FR,  FL } },
 { .ca_index = 0x05,  .speakers = {   0,    0,   0,  RC,   0,  LFE,  FR,  FL } },
 { .ca_index = 0x06,  .speakers = {   0,    0,   0,  RC,  FC,    0,  FR,  FL } },
 { .ca_index = 0x07,  .speakers = {   0,    0,   0,  RC,  FC,  LFE,  FR,  FL } },
-{ .ca_index = 0x08,  .speakers = {   0,    0,  RR,  RL,   0,    0,  FR,  FL } },
-{ .ca_index = 0x09,  .speakers = {   0,    0,  RR,  RL,   0,  LFE,  FR,  FL } },
-{ .ca_index = 0x0a,  .speakers = {   0,    0,  RR,  RL,  FC,    0,  FR,  FL } },
-				 /* 5.1 */
-{ .ca_index = 0x0b,  .speakers = {   0,    0,  RR,  RL,  FC,  LFE,  FR,  FL } },
 { .ca_index = 0x0c,  .speakers = {   0,   RC,  RR,  RL,   0,    0,  FR,  FL } },
 { .ca_index = 0x0d,  .speakers = {   0,   RC,  RR,  RL,   0,  LFE,  FR,  FL } },
 { .ca_index = 0x0e,  .speakers = {   0,   RC,  RR,  RL,  FC,    0,  FR,  FL } },
-				 /* 6.1 */
-{ .ca_index = 0x0f,  .speakers = {   0,   RC,  RR,  RL,  FC,  LFE,  FR,  FL } },
 { .ca_index = 0x10,  .speakers = { RRC,  RLC,  RR,  RL,   0,    0,  FR,  FL } },
 { .ca_index = 0x11,  .speakers = { RRC,  RLC,  RR,  RL,   0,  LFE,  FR,  FL } },
 { .ca_index = 0x12,  .speakers = { RRC,  RLC,  RR,  RL,  FC,    0,  FR,  FL } },
-				 /* 7.1 */
-{ .ca_index = 0x13,  .speakers = { RRC,  RLC,  RR,  RL,  FC,  LFE,  FR,  FL } },
 { .ca_index = 0x14,  .speakers = { FRC,  FLC,   0,   0,   0,    0,  FR,  FL } },
 { .ca_index = 0x15,  .speakers = { FRC,  FLC,   0,   0,   0,  LFE,  FR,  FL } },
 { .ca_index = 0x16,  .speakers = { FRC,  FLC,   0,   0,  FC,    0,  FR,  FL } },
@@ -211,7 +249,6 @@ static struct cea_channel_speaker_allocation channel_allocations[] = {
 { .ca_index = 0x30,  .speakers = { FRW,  FLW,  RR,  RL,  FC,    0,  FR,  FL } },
 { .ca_index = 0x31,  .speakers = { FRW,  FLW,  RR,  RL,  FC,  LFE,  FR,  FL } },
 };
-
 
 /*
  * HDA/HDMI auto parsing
@@ -261,6 +298,25 @@ static int intel_hdmi_read_pin_conn(struct hda_codec *codec, hda_nid_t pin_nid)
 	return 0;
 }
 
+static void hdmi_get_show_eld(struct hda_codec *codec, hda_nid_t pin_nid,
+			      struct hdmi_eld *eld)
+{
+	if (!snd_hdmi_get_eld(eld, codec, pin_nid))
+		snd_hdmi_show_eld(eld);
+}
+
+static void hdmi_present_sense(struct hda_codec *codec, hda_nid_t pin_nid,
+			       struct hdmi_eld *eld)
+{
+	int present = snd_hda_pin_sense(codec, pin_nid);
+
+	eld->monitor_present	= !!(present & AC_PINSENSE_PRESENCE);
+	eld->eld_valid		= !!(present & AC_PINSENSE_ELDV);
+
+	if (present & AC_PINSENSE_ELDV)
+		hdmi_get_show_eld(codec, pin_nid, eld);
+}
+
 static int intel_hdmi_add_pin(struct hda_codec *codec, hda_nid_t pin_nid)
 {
 	struct intel_hdmi_spec *spec = codec->spec;
@@ -270,6 +326,8 @@ static int intel_hdmi_add_pin(struct hda_codec *codec, hda_nid_t pin_nid)
 			   "HDMI: no space for pin %d \n", pin_nid);
 		return -EINVAL;
 	}
+
+	hdmi_present_sense(codec, pin_nid, &spec->sink_eld[spec->num_pins]);
 
 	spec->pin[spec->num_pins] = pin_nid;
 	spec->num_pins++;
@@ -325,13 +383,24 @@ static int intel_hdmi_parse_codec(struct hda_codec *codec)
 			break;
 		case AC_WID_PIN:
 			caps = snd_hda_param_read(codec, nid, AC_PAR_PIN_CAP);
-			if (!(caps & AC_PINCAP_HDMI))
+			if (!(caps & (AC_PINCAP_HDMI | AC_PINCAP_DP)))
 				continue;
 			if (intel_hdmi_add_pin(codec, nid) < 0)
 				return -EINVAL;
 			break;
 		}
 	}
+
+	/*
+	 * G45/IbexPeak don't support EPSS: the unsolicited pin hot plug event
+	 * can be lost and presence sense verb will become inaccurate if the
+	 * HDA link is powered off at hot plug or hw initialization time.
+	 */
+#ifdef CONFIG_SND_HDA_POWER_SAVE
+	if (!(snd_hda_param_read(codec, codec->afg, AC_PAR_POWER_STATE) &
+	      AC_PWRST_EPSS))
+		codec->bus->power_keep_link_on = 1;
+#endif
 
 	return 0;
 }
@@ -403,48 +472,34 @@ static void hdmi_stop_infoframe_trans(struct hda_codec *codec,
 						AC_DIPXMIT_DISABLE);
 }
 
-#ifdef CONFIG_SND_DEBUG_VERBOSE
 static int hdmi_get_channel_count(struct hda_codec *codec, hda_nid_t nid)
 {
 	return 1 + snd_hda_codec_read(codec, nid, 0,
 					AC_VERB_GET_CVT_CHAN_COUNT, 0);
 }
-#endif
 
 static void hdmi_set_channel_count(struct hda_codec *codec,
 				   hda_nid_t nid, int chs)
 {
-	snd_hda_codec_write(codec, nid, 0, AC_VERB_SET_CVT_CHAN_COUNT, chs - 1);
-
-#ifdef CONFIG_SND_DEBUG_VERBOSE
 	if (chs != hdmi_get_channel_count(codec, nid))
-		snd_printd(KERN_INFO "HDMI channel count: expect %d, get %d\n",
-			   chs, hdmi_get_channel_count(codec, nid));
-#endif
+		snd_hda_codec_write(codec, nid, 0,
+				    AC_VERB_SET_CVT_CHAN_COUNT, chs - 1);
 }
 
-static void hdmi_debug_channel_mapping(struct hda_codec *codec, hda_nid_t nid)
+static void hdmi_debug_channel_mapping(struct hda_codec *codec,
+				       hda_nid_t pin_nid)
 {
 #ifdef CONFIG_SND_DEBUG_VERBOSE
 	int i;
 	int slot;
 
 	for (i = 0; i < 8; i++) {
-		slot = snd_hda_codec_read(codec, nid, 0,
+		slot = snd_hda_codec_read(codec, pin_nid, 0,
 						AC_VERB_GET_HDMI_CHAN_SLOT, i);
 		printk(KERN_DEBUG "HDMI: ASP channel %d => slot %d\n",
-						slot >> 4, slot & 0x7);
+						slot >> 4, slot & 0xf);
 	}
 #endif
-}
-
-static void hdmi_parse_eld(struct hda_codec *codec, int index)
-{
-	struct intel_hdmi_spec *spec = codec->spec;
-	struct hdmi_eld *eld = &spec->sink_eld[index];
-
-	if (!snd_hdmi_get_eld(eld, codec, spec->pin[index]))
-		snd_hdmi_show_eld(eld);
 }
 
 
@@ -498,24 +553,35 @@ static void hdmi_clear_dip_buffers(struct hda_codec *codec, hda_nid_t pin_nid)
 #endif
 }
 
+static void hdmi_checksum_audio_infoframe(struct hdmi_audio_infoframe *ai)
+{
+	u8 *bytes = (u8 *)ai;
+	u8 sum = 0;
+	int i;
+
+	ai->checksum = 0;
+
+	for (i = 0; i < sizeof(*ai); i++)
+		sum += bytes[i];
+
+	ai->checksum = - sum;
+}
+
 static void hdmi_fill_audio_infoframe(struct hda_codec *codec,
 				      hda_nid_t pin_nid,
 				      struct hdmi_audio_infoframe *ai)
 {
-	u8 *params = (u8 *)ai;
-	u8 sum = 0;
+	u8 *bytes = (u8 *)ai;
 	int i;
 
 	hdmi_debug_dip_size(codec, pin_nid);
 	hdmi_clear_dip_buffers(codec, pin_nid); /* be paranoid */
 
-	for (i = 0; i < sizeof(ai); i++)
-		sum += params[i];
-	ai->checksum = - sum;
+	hdmi_checksum_audio_infoframe(ai);
 
 	hdmi_set_dip_index(codec, pin_nid, 0x0, 0x0);
-	for (i = 0; i < sizeof(ai); i++)
-		hdmi_write_dip_byte(codec, pin_nid, params[i]);
+	for (i = 0; i < sizeof(*ai); i++)
+		hdmi_write_dip_byte(codec, pin_nid, bytes[i]);
 }
 
 /*
@@ -604,27 +670,55 @@ static int hdmi_setup_channel_allocation(struct hda_codec *codec, hda_nid_t nid,
 	return ai->CA;
 }
 
-static void hdmi_setup_channel_mapping(struct hda_codec *codec, hda_nid_t nid,
+static void hdmi_setup_channel_mapping(struct hda_codec *codec,
+				       hda_nid_t pin_nid,
 				       struct hdmi_audio_infoframe *ai)
 {
 	int i;
+	int ca = ai->CA;
+	int err;
 
-	if (!ai->CA)
-		return;
+	if (hdmi_channel_mapping[ca][1] == 0) {
+		for (i = 0; i < channel_allocations[ca].channels; i++)
+			hdmi_channel_mapping[ca][i] = i | (i << 4);
+		for (; i < 8; i++)
+			hdmi_channel_mapping[ca][i] = 0xf | (i << 4);
+	}
 
-	/*
-	 * TODO: adjust channel mapping if necessary
-	 * ALSA sequence is front/surr/clfe/side?
-	 */
+	for (i = 0; i < 8; i++) {
+		err = snd_hda_codec_write(codec, pin_nid, 0,
+					  AC_VERB_SET_HDMI_CHAN_SLOT,
+					  hdmi_channel_mapping[ca][i]);
+		if (err) {
+			snd_printdd(KERN_INFO "HDMI: channel mapping failed\n");
+			break;
+		}
+	}
 
-	for (i = 0; i < 8; i++)
-		snd_hda_codec_write(codec, nid, 0,
-				    AC_VERB_SET_HDMI_CHAN_SLOT,
-				    (i << 4) | i);
-
-	hdmi_debug_channel_mapping(codec, nid);
+	hdmi_debug_channel_mapping(codec, pin_nid);
 }
 
+static bool hdmi_infoframe_uptodate(struct hda_codec *codec, hda_nid_t pin_nid,
+				    struct hdmi_audio_infoframe *ai)
+{
+	u8 *bytes = (u8 *)ai;
+	u8 val;
+	int i;
+
+	if (snd_hda_codec_read(codec, pin_nid, 0, AC_VERB_GET_HDMI_DIP_XMIT, 0)
+							    != AC_DIPXMIT_BEST)
+		return false;
+
+	hdmi_set_dip_index(codec, pin_nid, 0x0, 0x0);
+	for (i = 0; i < sizeof(*ai); i++) {
+		val = snd_hda_codec_read(codec, pin_nid, 0,
+					 AC_VERB_GET_HDMI_DIP_DATA, 0);
+		if (val != bytes[i])
+			return false;
+	}
+
+	return true;
+}
 
 static void hdmi_setup_audio_infoframe(struct hda_codec *codec, hda_nid_t nid,
 					struct snd_pcm_substream *substream)
@@ -640,17 +734,20 @@ static void hdmi_setup_audio_infoframe(struct hda_codec *codec, hda_nid_t nid,
 	};
 
 	hdmi_setup_channel_allocation(codec, nid, &ai);
-	hdmi_setup_channel_mapping(codec, nid, &ai);
 
 	for (i = 0; i < spec->num_pins; i++) {
 		if (spec->pin_cvt[i] != nid)
 			continue;
-		if (spec->sink_present[i] != true)
+		if (!spec->sink_eld[i].monitor_present)
 			continue;
 
 		pin_nid = spec->pin[i];
-		hdmi_fill_audio_infoframe(codec, pin_nid, &ai);
-		hdmi_start_infoframe_trans(codec, pin_nid);
+		if (!hdmi_infoframe_uptodate(codec, pin_nid, &ai)) {
+			hdmi_setup_channel_mapping(codec, pin_nid, &ai);
+			hdmi_stop_infoframe_trans(codec, pin_nid);
+			hdmi_fill_audio_infoframe(codec, pin_nid, &ai);
+			hdmi_start_infoframe_trans(codec, pin_nid);
+		}
 	}
 }
 
@@ -675,11 +772,11 @@ static void hdmi_intrinsic_event(struct hda_codec *codec, unsigned int res)
 	if (index < 0)
 		return;
 
-	spec->sink_present[index] = pind;
-	spec->sink_eldv[index] = eldv;
+	spec->sink_eld[index].monitor_present = pind;
+	spec->sink_eld[index].eld_valid = eldv;
 
 	if (pind && eldv) {
-		hdmi_parse_eld(codec, index);
+		hdmi_get_show_eld(codec, spec->pin[index], &spec->sink_eld[index]);
 		/* TODO: do real things about ELD */
 	}
 }
@@ -727,6 +824,31 @@ static void intel_hdmi_unsol_event(struct hda_codec *codec, unsigned int res)
  * Callbacks
  */
 
+static void hdmi_setup_stream(struct hda_codec *codec, hda_nid_t nid,
+			      u32 stream_tag, int format)
+{
+	int tag;
+	int fmt;
+
+	tag = snd_hda_codec_read(codec, nid, 0, AC_VERB_GET_CONV, 0) >> 4;
+	fmt = snd_hda_codec_read(codec, nid, 0, AC_VERB_GET_STREAM_FORMAT, 0);
+
+	snd_printdd("hdmi_setup_stream: "
+		    "NID=0x%x, %sstream=0x%x, %sformat=0x%x\n",
+		    nid,
+		    tag == stream_tag ? "" : "new-",
+		    stream_tag,
+		    fmt == format ? "" : "new-",
+		    format);
+
+	if (tag != stream_tag)
+		snd_hda_codec_write(codec, nid, 0,
+				    AC_VERB_SET_CHANNEL_STREAMID, stream_tag << 4);
+	if (fmt != format)
+		snd_hda_codec_write(codec, nid, 0,
+				    AC_VERB_SET_STREAM_FORMAT, format);
+}
+
 static int intel_hdmi_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
 					   struct hda_codec *codec,
 					   unsigned int stream_tag,
@@ -738,7 +860,7 @@ static int intel_hdmi_playback_pcm_prepare(struct hda_pcm_stream *hinfo,
 
 	hdmi_setup_audio_infoframe(codec, hinfo->nid, substream);
 
-	snd_hda_codec_setup_stream(codec, hinfo->nid, stream_tag, 0, format);
+	hdmi_setup_stream(codec, hinfo->nid, stream_tag, format);
 	return 0;
 }
 
@@ -746,17 +868,6 @@ static int intel_hdmi_playback_pcm_cleanup(struct hda_pcm_stream *hinfo,
 					   struct hda_codec *codec,
 					   struct snd_pcm_substream *substream)
 {
-	struct intel_hdmi_spec *spec = codec->spec;
-	int i;
-
-	for (i = 0; i < spec->num_pins; i++) {
-		if (spec->pin_cvt[i] != hinfo->nid)
-			continue;
-
-		hdmi_stop_infoframe_trans(codec, spec->pin[i]);
-	}
-
-	snd_hda_codec_cleanup_stream(codec, hinfo->nid);
 	return 0;
 }
 
