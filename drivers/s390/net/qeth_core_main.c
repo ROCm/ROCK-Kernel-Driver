@@ -271,41 +271,6 @@ int qeth_realloc_buffer_pool(struct qeth_card *card, int bufcnt)
 }
 EXPORT_SYMBOL_GPL(qeth_realloc_buffer_pool);
 
-int qeth_set_large_send(struct qeth_card *card,
-		enum qeth_large_send_types type)
-{
-	int rc = 0;
-
-	if (card->dev == NULL) {
-		card->options.large_send = type;
-		return 0;
-	}
-	if (card->state == CARD_STATE_UP)
-		netif_tx_disable(card->dev);
-	card->options.large_send = type;
-	switch (card->options.large_send) {
-	case QETH_LARGE_SEND_TSO:
-		if (qeth_is_supported(card, IPA_OUTBOUND_TSO)) {
-			card->dev->features |= NETIF_F_TSO | NETIF_F_SG |
-						NETIF_F_HW_CSUM;
-		} else {
-			card->dev->features &= ~(NETIF_F_TSO | NETIF_F_SG |
-						NETIF_F_HW_CSUM);
-			card->options.large_send = QETH_LARGE_SEND_NO;
-			rc = -EOPNOTSUPP;
-		}
-		break;
-	default: /* includes QETH_LARGE_SEND_NO */
-		card->dev->features &= ~(NETIF_F_TSO | NETIF_F_SG |
-					NETIF_F_HW_CSUM);
-		break;
-	}
-	if (card->state == CARD_STATE_UP)
-		netif_wake_queue(card->dev);
-	return rc;
-}
-EXPORT_SYMBOL_GPL(qeth_set_large_send);
-
 static int qeth_issue_next_read(struct qeth_card *card)
 {
 	int rc;
@@ -1397,26 +1362,28 @@ static int qeth_read_conf_data(struct qeth_card *card, void **buffer,
 	return ret;
 }
 
-static int qeth_get_unitaddr(struct qeth_card *card)
+static void qeth_configure_unitaddr(struct qeth_card *card, char *prcd)
 {
-	int length;
-	char *prcd;
-	int rc;
-
-	QETH_DBF_TEXT(SETUP, 2, "getunit");
-	rc = qeth_read_conf_data(card, (void **) &prcd, &length);
-	if (rc) {
-		QETH_DBF_MESSAGE(2, "%s qeth_read_conf_data returned %i\n",
-			dev_name(&card->gdev->dev), rc);
-		return rc;
-	}
+	QETH_DBF_TEXT(SETUP, 2, "cfgunit");
 	card->info.chpid = prcd[30];
 	card->info.unit_addr2 = prcd[31];
 	card->info.cula = prcd[63];
 	card->info.guestlan = ((prcd[0x10] == _ascebc['V']) &&
 			       (prcd[0x11] == _ascebc['M']));
-	kfree(prcd);
-	return 0;
+}
+
+static void qeth_configure_blkt_default(struct qeth_card *card, char *prcd) {
+	QETH_DBF_TEXT(SETUP, 2, "cfgblkt");
+
+	if (prcd[74] == 0xF0 && prcd[75] == 0xF0 && prcd[76] == 0xF5) {
+		card->info.blkt.time_total = 250;
+		card->info.blkt.inter_packet = 5;
+		card->info.blkt.inter_packet_jumbo = 15;
+	} else {
+		card->info.blkt.time_total = 0;
+		card->info.blkt.inter_packet = 0;
+		card->info.blkt.inter_packet_jumbo = 0;
+	}
 }
 
 static void qeth_init_tokens(struct qeth_card *card)
@@ -4198,6 +4165,8 @@ void qeth_core_free_discipline(struct qeth_card *card)
 static void qeth_determine_capabilities(struct qeth_card *card)
 {
 	int rc;
+	int length;
+	char *prcd;
 
 	QETH_DBF_TEXT(SETUP, 2, "detcapab");
 	rc = ccw_device_set_online(CARD_DDEV(card));
@@ -4206,11 +4175,17 @@ static void qeth_determine_capabilities(struct qeth_card *card)
 		goto out;
 	}
 
-	rc = qeth_get_unitaddr(card);
+
+	rc = qeth_read_conf_data(card, (void **) &prcd, &length);
 	if (rc) {
+		QETH_DBF_MESSAGE(2, "%s qeth_read_conf_data returned %i\n",
+			dev_name(&card->gdev->dev), rc);
 		QETH_DBF_TEXT_(SETUP, 2, "5err%d", rc);
 		goto out_offline;
 	}
+	qeth_configure_unitaddr(card, prcd);
+	qeth_configure_blkt_default(card, prcd);
+	kfree(prcd);
 
 	rc = qdio_get_ssqd_desc(CARD_DDEV(card), &card->ssqd);
 	if (rc)
@@ -4472,6 +4447,7 @@ static struct {
 	{"tx do_QDIO time"},
 	{"tx do_QDIO count"},
 	{"tx csum"},
+	{"tx lin"},
 };
 
 int qeth_core_get_stats_count(struct net_device *dev)
@@ -4524,6 +4500,7 @@ void qeth_core_get_ethtool_stats(struct net_device *dev,
 	data[31] = card->perf_stats.outbound_do_qdio_time;
 	data[32] = card->perf_stats.outbound_do_qdio_cnt;
 	data[33] = card->perf_stats.tx_csum;
+	data[34] = card->perf_stats.tx_lin;
 }
 EXPORT_SYMBOL_GPL(qeth_core_get_ethtool_stats);
 

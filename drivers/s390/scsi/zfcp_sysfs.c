@@ -121,13 +121,15 @@ static ssize_t zfcp_sysfs_port_rescan_store(struct device *dev,
 					    const char *buf, size_t count)
 {
 	struct zfcp_adapter *adapter = dev_get_drvdata(dev);
-	int ret;
 
 	if (atomic_read(&adapter->status) & ZFCP_STATUS_COMMON_REMOVE)
 		return -EBUSY;
 
-	ret = zfcp_fc_scan_ports(adapter);
-	return ret ? ret : (ssize_t) count;
+	/* sync the user-space- with the kernel-invocation of scan_work */
+	queue_work(adapter->work_queue, &adapter->scan_work);
+	flush_work(&adapter->scan_work);
+
+	return (ssize_t) count;
 }
 static ZFCP_DEV_ATTR(adapter, port_rescan, S_IWUSR, NULL,
 		     zfcp_sysfs_port_rescan_store);

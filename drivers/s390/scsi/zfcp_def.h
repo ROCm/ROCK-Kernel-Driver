@@ -247,10 +247,8 @@ enum zfcp_wka_status {
 #define ZFCP_STATUS_FSFREQ_CLEANUP		0x00000010
 #define ZFCP_STATUS_FSFREQ_ABORTSUCCEEDED	0x00000040
 #define ZFCP_STATUS_FSFREQ_ABORTNOTNEEDED       0x00000080
-#define ZFCP_STATUS_FSFREQ_ABORTED              0x00000100
 #define ZFCP_STATUS_FSFREQ_TMFUNCFAILED         0x00000200
 #define ZFCP_STATUS_FSFREQ_TMFUNCNOTSUPP        0x00000400
-#define ZFCP_STATUS_FSFREQ_RETRY                0x00000800
 #define ZFCP_STATUS_FSFREQ_DISMISSED            0x00001000
 
 /************************* STRUCTURE DEFINITIONS *****************************/
@@ -363,6 +361,14 @@ struct zfcp_send_els {
 	struct completion *completion;
 	int ls_code;
 	int status;
+};
+
+struct zfcp_els_adisc {
+	struct zfcp_send_els els;
+	struct scatterlist req;
+	struct scatterlist resp;
+	struct zfcp_ls_adisc ls_adisc;
+	struct zfcp_ls_adisc ls_adisc_acc;
 };
 
 struct zfcp_wka_port {
@@ -609,6 +615,7 @@ struct zfcp_data {
 	struct kmem_cache	*qtcb_cache;
 	struct kmem_cache	*sr_buffer_cache;
 	struct kmem_cache	*gid_pn_cache;
+	struct kmem_cache	*adisc_cache;
 };
 
 /********************** ZFCP SPECIFIC DEFINES ********************************/
