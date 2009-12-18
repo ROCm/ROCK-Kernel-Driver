@@ -74,6 +74,7 @@ struct uv_rtc_timer_head {
  */
 static struct uv_rtc_timer_head		**blade_info __read_mostly;
 
+static int				uv_rtc_enable;
 static int				uv_rtc_evt_enable;
 
 /*
@@ -334,6 +335,14 @@ static void uv_rtc_interrupt(void)
 	ced->event_handler(ced);
 }
 
+static int __init uv_enable_rtc(char *str)
+{
+	uv_rtc_enable = 1;
+
+	return 1;
+}
+__setup("uvrtc", uv_enable_rtc);
+
 static int __init uv_enable_evt_rtc(char *str)
 {
 	uv_rtc_evt_enable = 1;
@@ -355,15 +364,11 @@ static __init int uv_rtc_setup_clock(void)
 {
 	int rc;
 
-	if (!is_uv_system())
+	if (!uv_rtc_enable || !is_uv_system() || x86_platform_ipi_callback)
 		return -ENODEV;
 
 	clocksource_uv.mult = clocksource_hz2mult(sn_rtc_cycles_per_second,
 				clocksource_uv.shift);
-
-	/* If single blade, prefer tsc */
-	if (uv_num_possible_blades() == 1)
-		clocksource_uv.rating = 250;
 
 	rc = clocksource_register(&clocksource_uv);
 	if (rc)
@@ -372,7 +377,7 @@ static __init int uv_rtc_setup_clock(void)
 		printk(KERN_INFO "UV RTC clocksource registered freq %lu MHz\n",
 			sn_rtc_cycles_per_second/(unsigned long)1E6);
 
-	if (rc || !uv_rtc_evt_enable || x86_platform_ipi_callback)
+	if (rc || !uv_rtc_evt_enable)
 		return rc;
 
 	/* Setup and register clockevents */
