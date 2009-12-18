@@ -103,7 +103,11 @@ void gnttab_grant_foreign_transfer_ref(grant_ref_t, domid_t domid,
 				       unsigned long pfn);
 
 int gnttab_copy_grant_page(grant_ref_t ref, struct page **pagep);
+#if defined(CONFIG_XEN_BACKEND) || defined(CONFIG_XEN_BACKEND_MODULE)
 void __gnttab_dma_map_page(struct page *page);
+#else
+#define __gnttab_dma_map_page __gnttab_dma_unmap_page
+#endif
 static inline void __gnttab_dma_unmap_page(struct page *page)
 {
 }

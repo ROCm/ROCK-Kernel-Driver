@@ -4,6 +4,7 @@
 #include <linux/fs.h>
 #include <linux/poll.h>
 #include <linux/cdev.h>
+#include <linux/init.h>
 #include <linux/scatterlist.h>
 #include <xen/blkif.h>
 #include <xen/gnttab.h>

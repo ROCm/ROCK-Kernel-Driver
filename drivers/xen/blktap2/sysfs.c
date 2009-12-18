@@ -300,6 +300,7 @@ blktap_sysfs_create(struct blktap *tap)
 {
 	struct blktap_ring *ring;
 	struct device *dev;
+	int err, state = 0;
 
 	if (!class)
 		return -ENODEV;
@@ -317,15 +318,44 @@ blktap_sysfs_create(struct blktap *tap)
 	atomic_set(&ring->sysfs_refcnt, 0);
 	set_bit(BLKTAP_SYSFS, &tap->dev_inuse);
 
-	if (device_create_file(dev, &dev_attr_name) ||
-	    device_create_file(dev, &dev_attr_remove) ||
-	    device_create_file(dev, &dev_attr_pause) ||
-	    device_create_file(dev, &dev_attr_debug))
-		printk(KERN_WARNING
-		       "One or more attibute files not created for blktap%d\n",
-		       tap->minor);
+	err = device_create_file(dev, &dev_attr_name);
+	if (!err) {
+		++state;
+		err = device_create_file(dev, &dev_attr_remove);
+	}
+	if (!err) {
+		++state;
+		err = device_create_file(dev, &dev_attr_pause);
+	}
+	if (!err) {
+		++state;
+		err = device_create_file(dev, &dev_attr_debug);
+	}
 
-	return 0;
+	switch (state * !!err) {
+	case 3: device_remove_file(dev, &dev_attr_pause);
+	case 2: device_remove_file(dev, &dev_attr_remove);
+	case 1: device_remove_file(dev, &dev_attr_name);
+	}
+
+	return err;
+}
+
+static void
+_blktap_sysfs_destroy(struct device *dev)
+{
+	struct blktap *tap = dev_get_drvdata(dev);
+
+	device_remove_file(dev, &dev_attr_name);
+	device_remove_file(dev, &dev_attr_remove);
+	device_remove_file(dev, &dev_attr_pause);
+	device_remove_file(dev, &dev_attr_resume);
+	device_remove_file(dev, &dev_attr_debug);
+
+	put_device(dev);
+	device_unregister(dev);
+
+	clear_bit(BLKTAP_SYSFS, &tap->dev_inuse);
 }
 
 int
@@ -344,17 +374,7 @@ blktap_sysfs_destroy(struct blktap *tap)
 				     !atomic_read(&tap->ring.sysfs_refcnt)))
 		return -EAGAIN;
 
-	/* XXX: is it safe to remove the class from a sysfs attribute? */
-	device_remove_file(dev, &dev_attr_name);
-	device_remove_file(dev, &dev_attr_remove);
-	device_remove_file(dev, &dev_attr_pause);
-	device_remove_file(dev, &dev_attr_resume);
-	device_remove_file(dev, &dev_attr_debug);
-	device_destroy(class, ring->devno);
-
-	clear_bit(BLKTAP_SYSFS, &tap->dev_inuse);
-
-	return 0;
+	return device_schedule_callback(dev, _blktap_sysfs_destroy);
 }
 
 static ssize_t
@@ -415,10 +435,11 @@ blktap_sysfs_free(void)
 	class_destroy(class);
 }
 
-int
+int __init
 blktap_sysfs_init(void)
 {
 	struct class *cls;
+	int err;
 
 	if (class)
 		return -EEXIST;
@@ -427,11 +448,16 @@ blktap_sysfs_init(void)
 	if (IS_ERR(cls))
 		return PTR_ERR(cls);
 
-	if (class_create_file(cls, &class_attr_verbosity) ||
-	    class_create_file(cls, &class_attr_devices))
-		printk(KERN_WARNING "blktap2: One or more "
-		       "class attribute files could not be created.\n");
+	err = class_create_file(cls, &class_attr_verbosity);
+	if (!err) {
+		err = class_create_file(cls, &class_attr_devices);
+		if (err)
+			class_remove_file(cls, &class_attr_verbosity);
+	}
+	if (!err)
+		class = cls;
+	else
+		class_destroy(cls);
 
-	class = cls;
-	return 0;
+	return err;
 }

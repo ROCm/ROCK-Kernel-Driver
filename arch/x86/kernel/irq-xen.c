@@ -79,7 +79,7 @@ static int show_other_interrupts(struct seq_file *p, int prec)
 	if (generic_interrupt_extension) {
 		seq_printf(p, "%*s: ", prec, "PLT");
 		for_each_online_cpu(j)
-			seq_printf(p, "%10u ", irq_stats(j)->generic_irqs);
+			seq_printf(p, "%10u ", irq_stats(j)->x86_platform_ipis);
 		seq_printf(p, "  Platform interrupts\n");
 	}
 #ifdef CONFIG_SMP
@@ -196,7 +196,7 @@ u64 arch_irq_stat_cpu(unsigned int cpu)
 	sum += irq_stats(cpu)->apic_pending_irqs;
 #endif
 	if (generic_interrupt_extension)
-		sum += irq_stats(cpu)->generic_irqs;
+		sum += irq_stats(cpu)->x86_platform_ipis;
 #ifdef CONFIG_SMP
 	sum += irq_stats(cpu)->irq_resched_count;
 	sum += irq_stats(cpu)->irq_call_count;
