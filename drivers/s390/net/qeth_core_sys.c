@@ -418,53 +418,6 @@ static ssize_t qeth_dev_layer2_store(struct device *dev,
 static DEVICE_ATTR(layer2, 0644, qeth_dev_layer2_show,
 		   qeth_dev_layer2_store);
 
-static ssize_t qeth_dev_large_send_show(struct device *dev,
-				struct device_attribute *attr, char *buf)
-{
-	struct qeth_card *card = dev_get_drvdata(dev);
-
-	if (!card)
-		return -EINVAL;
-
-	switch (card->options.large_send) {
-	case QETH_LARGE_SEND_NO:
-		return sprintf(buf, "%s\n", "no");
-	case QETH_LARGE_SEND_TSO:
-		return sprintf(buf, "%s\n", "TSO");
-	default:
-		return sprintf(buf, "%s\n", "N/A");
-	}
-}
-
-static ssize_t qeth_dev_large_send_store(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t count)
-{
-	struct qeth_card *card = dev_get_drvdata(dev);
-	enum qeth_large_send_types type;
-	int rc = 0;
-	char *tmp;
-
-	if (!card)
-		return -EINVAL;
-	tmp = strsep((char **) &buf, "\n");
-	if (!strcmp(tmp, "no")) {
-		type = QETH_LARGE_SEND_NO;
-	} else if (!strcmp(tmp, "TSO")) {
-		type = QETH_LARGE_SEND_TSO;
-	} else {
-		return -EINVAL;
-	}
-	if (card->options.large_send == type)
-		return count;
-	rc = qeth_set_large_send(card, type);
-	if (rc)
-		return rc;
-	return count;
-}
-
-static DEVICE_ATTR(large_send, 0644, qeth_dev_large_send_show,
-		   qeth_dev_large_send_store);
-
 #define ATTR_QETH_ISOLATION_NONE	("none")
 #define ATTR_QETH_ISOLATION_FWD		("forward")
 #define ATTR_QETH_ISOLATION_DROP	("drop")
@@ -586,7 +539,7 @@ static ssize_t qeth_dev_blkt_total_store(struct device *dev,
 	struct qeth_card *card = dev_get_drvdata(dev);
 
 	return qeth_dev_blkt_store(card, buf, count,
-				   &card->info.blkt.time_total, 1000);
+				   &card->info.blkt.time_total, 5000);
 }
 
 
@@ -608,7 +561,7 @@ static ssize_t qeth_dev_blkt_inter_store(struct device *dev,
 	struct qeth_card *card = dev_get_drvdata(dev);
 
 	return qeth_dev_blkt_store(card, buf, count,
-				   &card->info.blkt.inter_packet, 100);
+				   &card->info.blkt.inter_packet, 1000);
 }
 
 static DEVICE_ATTR(inter, 0644, qeth_dev_blkt_inter_show,
@@ -629,7 +582,7 @@ static ssize_t qeth_dev_blkt_inter_jumbo_store(struct device *dev,
 	struct qeth_card *card = dev_get_drvdata(dev);
 
 	return qeth_dev_blkt_store(card, buf, count,
-				   &card->info.blkt.inter_packet_jumbo, 100);
+				   &card->info.blkt.inter_packet_jumbo, 1000);
 }
 
 static DEVICE_ATTR(inter_jumbo, 0644, qeth_dev_blkt_inter_jumbo_show,
@@ -660,7 +613,6 @@ static struct attribute *qeth_device_attrs[] = {
 	&dev_attr_recover.attr,
 	&dev_attr_performance_stats.attr,
 	&dev_attr_layer2.attr,
-	&dev_attr_large_send.attr,
 	&dev_attr_isolation.attr,
 	NULL,
 };

@@ -189,6 +189,11 @@ static int __init zfcp_module_init(void)
 	mutex_init(&zfcp_data.config_mutex);
 	rwlock_init(&zfcp_data.config_lock);
 
+	zfcp_data.adisc_cache = zfcp_cache_hw_align("zfcp_adisc",
+					sizeof(struct zfcp_els_adisc));
+	if (!zfcp_data.adisc_cache)
+		goto out_adisc_cache;
+
 	zfcp_data.scsi_transport_template =
 		fc_attach_transport(&zfcp_transport_functions);
 	if (!zfcp_data.scsi_transport_template)
@@ -216,6 +221,8 @@ out_ccw_register:
 out_misc:
 	fc_release_transport(zfcp_data.scsi_transport_template);
 out_transport:
+	kmem_cache_destroy(zfcp_data.adisc_cache);
+out_adisc_cache:
 	kmem_cache_destroy(zfcp_data.gid_pn_cache);
 out_gid_cache:
 	kmem_cache_destroy(zfcp_data.sr_buffer_cache);
@@ -556,7 +563,7 @@ int zfcp_adapter_enqueue(struct ccw_device *ccw_device)
 		goto erp_thread_failed;
 
 	INIT_WORK(&adapter->stat_work, _zfcp_status_read_scheduler);
-	INIT_WORK(&adapter->scan_work, _zfcp_fc_scan_ports_later);
+	INIT_WORK(&adapter->scan_work, zfcp_fc_scan_ports);
 
 	adapter->service_level.seq_print = zfcp_print_sl;
 
