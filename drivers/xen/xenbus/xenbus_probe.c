@@ -544,31 +544,30 @@ static void xenbus_dev_release(struct device *dev)
 }
 
 static ssize_t xendev_show_nodename(struct device *dev,
-				    struct device_attribute *attr, char *buf)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,13)
+				    struct device_attribute *attr,
+#endif
+				    char *buf)
 {
 	return sprintf(buf, "%s\n", to_xenbus_device(dev)->nodename);
 }
 static DEVICE_ATTR(nodename, S_IRUSR | S_IRGRP | S_IROTH, xendev_show_nodename, NULL);
 
 static ssize_t xendev_show_devtype(struct device *dev,
-				   struct device_attribute *attr, char *buf)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,13)
+				   struct device_attribute *attr,
+#endif
+				   char *buf)
 {
 	return sprintf(buf, "%s\n", to_xenbus_device(dev)->devicetype);
 }
 static DEVICE_ATTR(devtype, S_IRUSR | S_IRGRP | S_IROTH, xendev_show_devtype, NULL);
 
-static ssize_t xendev_show_modalias(struct device *dev,
-				    struct device_attribute *attr, char *buf)
-{
-	return sprintf(buf, "xen:%s\n", to_xenbus_device(dev)->devicetype);
-}
-static DEVICE_ATTR(modalias, S_IRUSR | S_IRGRP | S_IROTH, xendev_show_modalias, NULL);
 
 int xenbus_probe_node(struct xen_bus_type *bus,
 		      const char *type,
 		      const char *nodename)
 {
-	char devname[XEN_BUS_ID_SIZE];
 	int err;
 	struct xenbus_device *xendev;
 	size_t stringlen;
