@@ -36,11 +36,7 @@ enum uv_bios_cmd {
 	UV_BIOS_WATCHLIST_ALLOC,
 	UV_BIOS_WATCHLIST_FREE,
 	UV_BIOS_MEMPROTECT,
-	UV_BIOS_GET_PARTITION_ADDR,
-	UV_BIOS_HWPERF,
-	UV_BIOS_GET_PCI_TOPOLOGY,
-	UV_BIOS_GET_PCIBUS_INFO,
-	UV_BIOS_GET_GEOINFO
+	UV_BIOS_GET_PARTITION_ADDR
 };
 
 /*
@@ -109,10 +105,6 @@ extern int uv_bios_mq_watchlist_alloc(int, unsigned long, unsigned int,
 extern int uv_bios_mq_watchlist_free(int, int);
 extern s64 uv_bios_change_memprotect(u64, u64, enum uv_memprotect);
 extern s64 uv_bios_reserved_page_pa(u64, u64 *, u64 *, u64 *);
-extern s64 uv_bios_hwperf(u64, u64 , u64 , u64, u64 *, int *);
-extern s64 uv_bios_get_pci_topology(u64, u64);
-extern s64 uv_bios_get_hubdev_info(u64, u64);
-extern s64 uv_bios_get_geoinfo(u64, u64, u64);
 
 extern void uv_bios_init(void);
 

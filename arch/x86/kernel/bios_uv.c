@@ -42,7 +42,7 @@ s64 uv_bios_call(enum uv_bios_cmd which, u64 a1, u64 a2, u64 a3, u64 a4, u64 a5)
 			a1, a2, a3, a4, a5);
 	return ret;
 }
-EXPORT_SYMBOL(uv_bios_call);
+EXPORT_SYMBOL_GPL(uv_bios_call);
 
 s64 uv_bios_call_irqsave(enum uv_bios_cmd which, u64 a1, u64 a2, u64 a3,
 					u64 a4, u64 a5)
@@ -167,47 +167,6 @@ s64 uv_bios_freq_base(u64 clock_type, u64 *ticks_per_second)
 }
 EXPORT_SYMBOL_GPL(uv_bios_freq_base);
 
-s64 uv_bios_hwperf(u64 nasid, u64 opcode, u64 arg0, u64 arg1,
-		   u64 *ptdata, int *v0)
-{
-	s64 ret;
-
-	ret = uv_bios_call(UV_BIOS_HWPERF, nasid, opcode,
-			   arg0, arg1, (u64)ptdata);
-
-	return ret;
-}
-EXPORT_SYMBOL_GPL(uv_bios_hwperf);
-
-s64 uv_bios_get_pci_topology(u64 buf, u64 len)
-{
-	s64 ret;
-
-	ret = uv_bios_call(UV_BIOS_GET_PCI_TOPOLOGY, buf, len, 0, 0, 0);
-
-	return ret;
-}
-EXPORT_SYMBOL_GPL(uv_bios_get_pci_topology);
-
-s64 uv_bios_get_geoinfo(u64 nasid, u64 buf, u64 len)
-{
-	s64 ret;
-
-	ret = uv_bios_call(UV_BIOS_GET_GEOINFO, nasid, buf, len, 0, 0);
-
-	return ret;
-}
-EXPORT_SYMBOL_GPL(uv_bios_get_geoinfo);
-
-s64 uv_bios_get_hubdev_info(u64 nasid, u64 buf)
-{
-	s64 ret;
-
-	ret = uv_bios_call(UV_BIOS_GET_PCIBUS_INFO, nasid, buf, 0, 0, 0);
-
-	return ret;
-}
-EXPORT_SYMBOL_GPL(uv_bios_get_hubdev_info);
 
 #ifdef CONFIG_EFI
 void uv_bios_init(void)
