@@ -156,6 +156,7 @@ static int scsi_debug_virtual_gb = DEF_VIRTUAL_GB;
 static int scsi_debug_fake_rw = DEF_FAKE_RW;
 static int scsi_debug_vpd_use_hostno = DEF_VPD_USE_HOSTNO;
 static int scsi_debug_sector_size = DEF_SECTOR_SIZE;
+static int scsi_debug_sector_size_bits = ilog2(DEF_SECTOR_SIZE);
 static int scsi_debug_dix = DEF_DIX;
 static int scsi_debug_dif = DEF_DIF;
 static int scsi_debug_guard = DEF_GUARD;
@@ -913,9 +914,11 @@ static int resp_start_stop(struct scsi_cmnd * scp,
 
 static sector_t get_sdebug_capacity(void)
 {
-	if (scsi_debug_virtual_gb > 0)
-		return 2048 * 1024 * (sector_t)scsi_debug_virtual_gb;
-	else
+	if (scsi_debug_virtual_gb > 0) {
+		sector_t sectors = 2 * 1024 * 1024;
+		sectors >>= (scsi_debug_sector_size_bits - 9);
+		return sectors * (sector_t)scsi_debug_virtual_gb;
+	} else
 		return sdebug_store_sectors;
 }
 
@@ -2897,6 +2900,7 @@ static int __init scsi_debug_init(void)
 	case 1024:
 	case 2048:
 	case 4096:
+		scsi_debug_sector_size_bits = ilog2(scsi_debug_sector_size);
 		break;
 	default:
 		printk(KERN_ERR "scsi_debug_init: invalid sector_size %d\n",
