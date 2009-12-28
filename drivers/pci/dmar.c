@@ -1417,5 +1417,5 @@ int dmar_ir_support(void)
 {
 	struct acpi_table_dmar *dmar;
 	dmar = (struct acpi_table_dmar *)dmar_tbl;
-	return dmar->flags & 0x1;
+	return dmar && dmar->flags & 0x1;
 }
