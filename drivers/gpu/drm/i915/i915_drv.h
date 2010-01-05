@@ -170,6 +170,8 @@ struct drm_i915_display_funcs {
 	/* clock gating init */
 };
 
+struct intel_overlay;
+
 typedef struct drm_i915_private {
 	struct drm_device *dev;
 
@@ -239,6 +241,9 @@ typedef struct drm_i915_private {
 	int irq_enabled;
 
 	struct intel_opregion opregion;
+
+	/* overlay */
+	struct intel_overlay *overlay;
 
 	/* LVDS info */
 	int backlight_duty_cycle;  /* restore backlight to this value */
@@ -820,6 +825,10 @@ int i915_gem_mmap(struct file *filp, struct vm_area_struct *vma);
 #else
 #define i915_gem_mmap drm_gem_mmap
 #endif
+uint32_t i915_add_request(struct drm_device *dev, struct drm_file *file_priv,
+			  uint32_t flush_domains);
+int i915_do_wait_request(struct drm_device *dev, uint32_t seqno, int interruptible);
+int i915_lp_ring_sync(struct drm_device *dev);
 int i915_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf);
 int i915_gem_object_set_to_gtt_domain(struct drm_gem_object *obj,
 				      int write);

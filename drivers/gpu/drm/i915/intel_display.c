@@ -1803,6 +1803,22 @@ static void igdng_crtc_dpms(struct drm_crtc *crtc, int mode)
 	}
 }
 
+static void intel_crtc_dpms_overlay(struct intel_crtc *intel_crtc, bool enable)
+{
+	struct intel_overlay *overlay;
+
+	if (!enable && intel_crtc->overlay) {
+		overlay = intel_crtc->overlay;
+		mutex_lock(&overlay->dev->struct_mutex);
+		intel_overlay_switch_off(overlay);
+		mutex_unlock(&overlay->dev->struct_mutex);
+	}
+	/* Let userspace switch the overlay on again. In most cases userspace
+	 * has to recompute where to put it anyway. */
+
+	return;
+}
+
 static void i9xx_crtc_dpms(struct drm_crtc *crtc, int mode)
 {
 	struct drm_device *dev = crtc->dev;
@@ -1861,12 +1877,13 @@ static void i9xx_crtc_dpms(struct drm_crtc *crtc, int mode)
 			intel_update_fbc(crtc, &crtc->mode);
 
 		/* Give the overlay scaler a chance to enable if it's on this pipe */
-		//intel_crtc_dpms_video(crtc, true); TODO
+		intel_crtc_dpms_overlay(intel_crtc, true);
 	break;
 	case DRM_MODE_DPMS_OFF:
 		intel_update_watermarks(dev);
+
 		/* Give the overlay scaler a chance to disable if it's on this pipe */
-		//intel_crtc_dpms_video(crtc, FALSE); TODO
+		intel_crtc_dpms_overlay(intel_crtc, false);
 		drm_vblank_off(dev, pipe);
 
 		if (dev_priv->cfb_plane == plane &&
@@ -2062,7 +2079,7 @@ static int i830_get_display_clock_speed(struct drm_device *dev)
  * Return the pipe currently connected to the panel fitter,
  * or -1 if the panel fitter is not present or not in use
  */
-static int intel_panel_fitter_pipe (struct drm_device *dev)
+int intel_panel_fitter_pipe (struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	u32  pfit_control;
@@ -4347,7 +4364,7 @@ static void intel_init_display(struct drm_device *dev)
 	}
 
 	/* Returns the core display clock speed */
-	if (IS_I945G(dev))
+	if (IS_I945G(dev) || (IS_G33(dev) && ! IS_IGDGM(dev)))
 		dev_priv->display.get_display_clock_speed =
 			i945_get_display_clock_speed;
 	else if (IS_I915G(dev))
@@ -4445,6 +4462,8 @@ void intel_modeset_init(struct drm_device *dev)
 	INIT_WORK(&dev_priv->idle_work, intel_idle_update);
 	setup_timer(&dev_priv->idle_timer, intel_gpu_idle_timer,
 		    (unsigned long)dev);
+
+	intel_setup_overlay(dev);
 }
 
 void intel_modeset_cleanup(struct drm_device *dev)
