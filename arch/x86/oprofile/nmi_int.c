@@ -27,21 +27,18 @@
 #include "op_counter.h"
 #include "op_x86_model.h"
 
-#define CTRL_IS_ACTIVE(n) (n & (1<<22) ? 1 : 0)
-#define CTRL_IS_P4_ACTIVE(cccr) (cccr & (1<<12) ? 1 : 0)
-#define RSVD_MSG "oprofile: counter #%d is already reserved\n"
+static const char RSVD_MSG[] =
+	KERN_INFO "oprofile: performance counter #%d may already be"
+	" reserved."
+	" For counter #%d, EvntSel 0x%lx has value: 0x%llx.\n";
 static const char PMC_MSG[] =
-       KERN_INFO "oprofile: consider using a different counter for your"
-       " event by deleting the already reserved counter #%d from the event"
-       " in the /usr/share/oprofile/<arch>/<cpu>/events file.\n";
-
-static const char PMC_P4_MSG[] =
-       KERN_INFO "oprofile: If possible, use a different counter on your"
-       " P4 platform to monitor the desired event by editing the"
-       " /usr/share/oprofile/<arch>/<cpu>/events file. If the event"
-       " cannot be monitored by any other counter, contact your"
-       " hardware or BIOS vendor.\n";
-
+	KERN_INFO "oprofile: if oprofile doesn't collect data, then"
+	" try using a different performance counter on your platform"
+	" to monitor the desired event."
+	" Delete counter #%d from the desired event by editing the"
+	" /usr/share/oprofile/%s/<cpu>/events file."
+	" If the event cannot be monitored by any other counter,"
+	" contact your hardware or BIOS vendor.\n";
 
 static struct op_x86_model_spec *model;
 static DEFINE_PER_CPU(struct op_msrs, cpu_msrs);
@@ -351,30 +348,48 @@ static struct notifier_block profile_exceptions_nb = {
 	.priority = 2
 };
 
+#define P4_CCCR_ENABLE	(1 << 12)
 
-/* check if the counter/evtsel is already enabled */
- static void nmi_is_counter_enabled(struct op_msrs * const msrs) {
-       __u8 vendor = boot_cpu_data.x86_vendor;
-       __u8 family = boot_cpu_data.x86;
-       struct op_msr *controls = msrs->controls;
-       unsigned int const nr_ctrls = model->num_controls;
-       unsigned int i, low, high;
+/* check if the counter/evtsel is already enabled, say, by firmware */
+static void nmi_is_counter_enabled(struct op_msrs * const msrs)
+{
+	__u8 vendor = boot_cpu_data.x86_vendor;
+	__u8 family = boot_cpu_data.x86;
+	u64 val;
+	unsigned int i;
+	char *arch = "arch";
 
-       for (i = 0; i < nr_ctrls; ++i) {
-               rdmsr(controls[i].addr, low, high);
-               if ((vendor == X86_VENDOR_INTEL) && (family == 0xf)) {
-                       if (counter_config[i].enabled &&
-                       (CTRL_IS_P4_ACTIVE(low))) {
-                               printk_once(KERN_INFO RSVD_MSG, i);
-                               printk_once(PMC_P4_MSG);
-                               return;
-                       }
-               }
-               if (counter_config[i].enabled && (CTRL_IS_ACTIVE(low))) {
-                       printk_once(KERN_INFO RSVD_MSG, i);
-                       printk_once(PMC_MSG, i);
-               }
-       }
+	/* Fill in at least the "arch" value to help the user */
+	if (vendor == X86_VENDOR_AMD) {
+		if (family == 6)
+			arch = "i386";
+		else
+			arch = "x86-64";
+	} else if (vendor == X86_VENDOR_INTEL) {
+		arch = "i386";
+	}
+
+	for (i = 0; i < model->num_controls; ++i) {
+		if (!counter_config[i].enabled)
+			continue;
+		rdmsrl(msrs->controls[i].addr, val);
+
+		/* P4 is special. Other Intel, and all AMD CPUs
+		** are consistent in using "bit 22" as "enable"
+		*/
+		if ((vendor == X86_VENDOR_INTEL) && (family == 0xf)) {
+			if (val & P4_CCCR_ENABLE)
+				goto err_rsvd;
+		} else if (val & ARCH_PERFMON_EVENTSEL0_ENABLE) {
+			goto err_rsvd;
+		}
+	}
+	return;
+
+err_rsvd:
+	printk(RSVD_MSG, i, i, msrs->controls[i].addr, val);
+	printk(PMC_MSG, i, arch);
+	return;
 }
 
 static int nmi_setup(void)
@@ -401,7 +416,7 @@ static int nmi_setup(void)
 
 	/* Assume saved/restored counters are the same on all CPUs */
 	model->fill_in_addresses(&per_cpu(cpu_msrs, 0));
-       nmi_is_counter_enabled(&per_cpu(cpu_msrs, 0));
+	nmi_is_counter_enabled(&per_cpu(cpu_msrs, 0));
 	for_each_possible_cpu(cpu) {
 		if (!cpu)
 			continue;
