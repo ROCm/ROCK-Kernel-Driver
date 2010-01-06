@@ -543,23 +543,41 @@ static void __init replace_pin_at_irq_node(struct irq_cfg *cfg, int node,
 	add_pin_to_irq_node(cfg, node, newapic, newpin);
 }
 
+static void __io_apic_modify_irq(struct irq_pin_list *entry,
+				 int mask_and, int mask_or,
+				 void (*final)(struct irq_pin_list *entry))
+{
+	unsigned int reg, pin;
+
+	pin = entry->pin;
+	reg = io_apic_read(entry->apic, 0x10 + pin * 2);
+	reg &= mask_and;
+	reg |= mask_or;
+	io_apic_modify(entry->apic, 0x10 + pin * 2, reg);
+	if (final)
+		final(entry);
+}
+
 static void io_apic_modify_irq(struct irq_cfg *cfg,
 			       int mask_and, int mask_or,
 			       void (*final)(struct irq_pin_list *entry))
 {
-	int pin;
 	struct irq_pin_list *entry;
 
-	for_each_irq_pin(entry, cfg->irq_2_pin) {
-		unsigned int reg;
-		pin = entry->pin;
-		reg = io_apic_read(entry->apic, 0x10 + pin * 2);
-		reg &= mask_and;
-		reg |= mask_or;
-		io_apic_modify(entry->apic, 0x10 + pin * 2, reg);
-		if (final)
-			final(entry);
-	}
+	for_each_irq_pin(entry, cfg->irq_2_pin)
+		__io_apic_modify_irq(entry, mask_and, mask_or, final);
+}
+
+static void __mask_and_edge_IO_APIC_irq(struct irq_pin_list *entry)
+{
+	__io_apic_modify_irq(entry, ~IO_APIC_REDIR_LEVEL_TRIGGER,
+			     IO_APIC_REDIR_MASKED, NULL);
+}
+
+static void __unmask_and_level_IO_APIC_irq(struct irq_pin_list *entry)
+{
+	__io_apic_modify_irq(entry, ~IO_APIC_REDIR_MASKED,
+			     IO_APIC_REDIR_LEVEL_TRIGGER, NULL);
 }
 
 static void __unmask_IO_APIC_irq(struct irq_cfg *cfg)
@@ -581,18 +599,6 @@ static void io_apic_sync(struct irq_pin_list *entry)
 static void __mask_IO_APIC_irq(struct irq_cfg *cfg)
 {
 	io_apic_modify_irq(cfg, ~0, IO_APIC_REDIR_MASKED, &io_apic_sync);
-}
-
-static void __mask_and_edge_IO_APIC_irq(struct irq_cfg *cfg)
-{
-	io_apic_modify_irq(cfg, ~IO_APIC_REDIR_LEVEL_TRIGGER,
-			IO_APIC_REDIR_MASKED, NULL);
-}
-
-static void __unmask_and_level_IO_APIC_irq(struct irq_cfg *cfg)
-{
-	io_apic_modify_irq(cfg, ~IO_APIC_REDIR_MASKED,
-			IO_APIC_REDIR_LEVEL_TRIGGER, NULL);
 }
 
 static void mask_IO_APIC_irq_desc(struct irq_desc *desc)
@@ -1165,7 +1171,7 @@ __assign_irq_vector(int irq, struct irq_cfg *cfg, const struct cpumask *mask)
 	int cpu, err;
 	cpumask_var_t tmp_mask;
 
-	if ((cfg->move_in_progress) || cfg->move_cleanup_count)
+	if (cfg->move_in_progress)
 		return -EBUSY;
 
 	if (!alloc_cpumask_var(&tmp_mask, GFP_ATOMIC))
@@ -2226,14 +2232,10 @@ void send_cleanup_vector(struct irq_cfg *cfg)
 
 	if (unlikely(!alloc_cpumask_var(&cleanup_mask, GFP_ATOMIC))) {
 		unsigned int i;
-		cfg->move_cleanup_count = 0;
-		for_each_cpu_and(i, cfg->old_domain, cpu_online_mask)
-			cfg->move_cleanup_count++;
 		for_each_cpu_and(i, cfg->old_domain, cpu_online_mask)
 			apic->send_IPI_mask(cpumask_of(i), IRQ_MOVE_CLEANUP_VECTOR);
 	} else {
 		cpumask_and(cleanup_mask, cfg->old_domain, cpu_online_mask);
-		cfg->move_cleanup_count = cpumask_weight(cleanup_mask);
 		apic->send_IPI_mask(cleanup_mask, IRQ_MOVE_CLEANUP_VECTOR);
 		free_cpumask_var(cleanup_mask);
 	}
@@ -2422,8 +2424,6 @@ asmlinkage void smp_irq_move_cleanup_interrupt(void)
 
 		cfg = irq_cfg(irq);
 		spin_lock(&desc->lock);
-		if (!cfg->move_cleanup_count)
-			goto unlock;
 
 		if (vector == cfg->vector && cpumask_test_cpu(me, cfg->domain))
 			goto unlock;
@@ -2441,7 +2441,6 @@ asmlinkage void smp_irq_move_cleanup_interrupt(void)
 			goto unlock;
 		}
 		__get_cpu_var(vector_irq)[vector] = -1;
-		cfg->move_cleanup_count--;
 unlock:
 		spin_unlock(&desc->lock);
 	}
@@ -2449,20 +2448,32 @@ unlock:
 	irq_exit();
 }
 
-static void irq_complete_move(struct irq_desc **descp)
+static void __irq_complete_move(struct irq_desc **descp, unsigned vector)
 {
 	struct irq_desc *desc = *descp;
 	struct irq_cfg *cfg = desc->chip_data;
-	unsigned vector, me;
+	unsigned me;
 
 	if (likely(!cfg->move_in_progress))
 		return;
 
-	vector = ~get_irq_regs()->orig_ax;
 	me = smp_processor_id();
 
 	if (vector == cfg->vector && cpumask_test_cpu(me, cfg->domain))
 		send_cleanup_vector(cfg);
+}
+
+static void irq_complete_move(struct irq_desc **descp)
+{
+	__irq_complete_move(descp, ~get_irq_regs()->orig_ax);
+}
+
+void irq_force_complete_move(int irq)
+{
+	struct irq_desc *desc = irq_to_desc(irq);
+	struct irq_cfg *cfg = desc->chip_data;
+
+	__irq_complete_move(&desc, cfg->vector);
 }
 #else
 static inline void irq_complete_move(struct irq_desc **descp) {}
@@ -2478,6 +2489,59 @@ static void ack_apic_edge(unsigned int irq)
 }
 
 atomic_t irq_mis_count;
+
+/*
+ * IO-APIC versions below 0x20 don't support EOI register.
+ * For the record, here is the information about various versions:
+ *     0Xh     82489DX
+ *     1Xh     I/OAPIC or I/O(x)APIC which are not PCI 2.2 Compliant
+ *     2Xh     I/O(x)APIC which is PCI 2.2 Compliant
+ *     30h-FFh Reserved
+ *
+ * Some of the Intel ICH Specs (ICH2 to ICH5) documents the io-apic
+ * version as 0x2. This is an error with documentation and these ICH chips
+ * use io-apic's of version 0x20.
+ *
+ * For IO-APIC's with EOI register, we use that to do an explicit EOI.
+ * Otherwise, we simulate the EOI message manually by changing the trigger
+ * mode to edge and then back to level, with RTE being masked during this.
+*/
+static void __eoi_ioapic_irq(unsigned int irq, struct irq_cfg *cfg)
+{
+	struct irq_pin_list *entry;
+
+	for_each_irq_pin(entry, cfg->irq_2_pin) {
+		if (mp_ioapics[entry->apic].apicver >= 0x20) {
+			/*
+			 * Intr-remapping uses pin number as the virtual vector
+			 * in the RTE. Actual vector is programmed in
+			 * intr-remapping table entry. Hence for the io-apic
+			 * EOI we use the pin number.
+			 */
+			if (irq_remapped(irq))
+				io_apic_eoi(entry->apic, entry->pin);
+			else
+				io_apic_eoi(entry->apic, cfg->vector);
+		} else {
+			__mask_and_edge_IO_APIC_irq(entry);
+			__unmask_and_level_IO_APIC_irq(entry);
+		}
+	}
+}
+
+static void eoi_ioapic_irq(struct irq_desc *desc)
+{
+	struct irq_cfg *cfg;
+	unsigned long flags;
+	unsigned int irq;
+
+	irq = desc->irq;
+	cfg = desc->chip_data;
+
+	spin_lock_irqsave(&ioapic_lock, flags);
+	__eoi_ioapic_irq(irq, cfg);
+	spin_unlock_irqrestore(&ioapic_lock, flags);
+}
 
 static void ack_apic_level(unsigned int irq)
 {
@@ -2514,6 +2578,19 @@ static void ack_apic_level(unsigned int irq)
 	 * level-triggered interrupt.  We mask the source for the time of the
 	 * operation to prevent an edge-triggered interrupt escaping meanwhile.
 	 * The idea is from Manfred Spraul.  --macro
+	 *
+	 * Also in the case when cpu goes offline, fixup_irqs() will forward
+	 * any unhandled interrupt on the offlined cpu to the new cpu
+	 * destination that is handling the corresponding interrupt. This
+	 * interrupt forwarding is done via IPI's. Hence, in this case also
+	 * level-triggered io-apic interrupt will be seen as an edge
+	 * interrupt in the IRR. And we can't rely on the cpu's EOI
+	 * to be broadcasted to the IO-APIC's which will clear the remoteIRR
+	 * corresponding to the level-triggered interrupt. Hence on IO-APIC's
+	 * supporting EOI register, we do an explicit EOI to clear the
+	 * remote IRR and on IO-APIC's which don't have an EOI register,
+	 * we use the above logic (mask+edge followed by unmask+level) from
+	 * Manfred Spraul to clear the remote IRR.
 	 */
 	cfg = desc->chip_data;
 	i = cfg->vector;
@@ -2524,6 +2601,19 @@ static void ack_apic_level(unsigned int irq)
 	 * not propagate properly.
 	 */
 	ack_APIC_irq();
+
+	/*
+	 * Tail end of clearing remote IRR bit (either by delivering the EOI
+	 * message via io-apic EOI register write or simulating it using
+	 * mask+edge followed by unnask+level logic) manually when the
+	 * level triggered interrupt is seen as the edge triggered interrupt
+	 * at the cpu.
+	 */
+	if (!(v & (1 << (i & 0x1f)))) {
+		atomic_inc(&irq_mis_count);
+
+		eoi_ioapic_irq(desc);
+	}
 
 	/* Now we can move and renable the irq */
 	if (unlikely(do_unmask_irq)) {
@@ -2558,41 +2648,9 @@ static void ack_apic_level(unsigned int irq)
 			move_masked_irq(irq);
 		unmask_IO_APIC_irq_desc(desc);
 	}
-
-	/* Tail end of version 0x11 I/O APIC bug workaround */
-	if (!(v & (1 << (i & 0x1f)))) {
-		atomic_inc(&irq_mis_count);
-		spin_lock(&ioapic_lock);
-		__mask_and_edge_IO_APIC_irq(cfg);
-		__unmask_and_level_IO_APIC_irq(cfg);
-		spin_unlock(&ioapic_lock);
-	}
 }
 
 #ifdef CONFIG_INTR_REMAP
-static void __eoi_ioapic_irq(unsigned int irq, struct irq_cfg *cfg)
-{
-	struct irq_pin_list *entry;
-
-	for_each_irq_pin(entry, cfg->irq_2_pin)
-		io_apic_eoi(entry->apic, entry->pin);
-}
-
-static void
-eoi_ioapic_irq(struct irq_desc *desc)
-{
-	struct irq_cfg *cfg;
-	unsigned long flags;
-	unsigned int irq;
-
-	irq = desc->irq;
-	cfg = desc->chip_data;
-
-	spin_lock_irqsave(&ioapic_lock, flags);
-	__eoi_ioapic_irq(irq, cfg);
-	spin_unlock_irqrestore(&ioapic_lock, flags);
-}
-
 static void ir_ack_apic_edge(unsigned int irq)
 {
 	ack_APIC_irq();
