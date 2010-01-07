@@ -716,7 +716,7 @@ ssize_t aa_interface_replace_profiles(void *udata, size_t size)
 		sa.base.info = "failed to prepare namespace";
 		sa.base.error = -ENOMEM;
 		goto fail;
-	}		
+	}
 
 	sa.name = new_profile->fqname;
 

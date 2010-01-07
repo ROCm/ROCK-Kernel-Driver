@@ -138,7 +138,7 @@ static int apparmor_sysctl(struct ctl_table *table, int op)
 		if (!buffer)
 			goto out;
 
-		/* 
+		/*
 		 * TODO: convert this over to using a global or per
 		 * namespace control instead of a hard coded /proc
 		 */
@@ -171,7 +171,7 @@ static int common_perm(const char *op, struct path *path, u16 mask,
 }
 
 static int common_perm_dentry(const char *op, struct path *dir,
-			      struct dentry *dentry, u16 mask, 
+			      struct dentry *dentry, u16 mask,
 			      struct path_cond *cond)
 {
 	struct path path = { dir->mnt, dentry };
@@ -281,7 +281,7 @@ static int apparmor_path_rename(struct path *old_dir, struct dentry *old_dentry,
 		if (!error)
 			error = aa_path_perm(profile, "rename_dest", &new_path,
 					     AA_MAY_CREATE | MAY_WRITE, &cond);
-					     
+
 	}
 	return error;
 }
@@ -290,7 +290,7 @@ static int apparmor_dentry_open(struct file *file, const struct cred *cred)
 {
 	struct aa_profile *profile;
 	int error = 0;
-	  
+
 	/* If in exec permission is handled by bprm hooks */
 	if (current->in_execve ||
 	    !mediated_filesystem(file->f_path.dentry->d_inode))
@@ -299,7 +299,7 @@ static int apparmor_dentry_open(struct file *file, const struct cred *cred)
 	aa_cred_policy(cred, &profile);
 	if (profile) {
 		struct aa_file_cxt *fcxt = file->f_security;
-		struct inode *inode = file->f_path.dentry->d_inode; 
+		struct inode *inode = file->f_path.dentry->d_inode;
 		struct path_cond cond = { inode->i_uid, inode->i_mode };
 
 		error = aa_path_perm(profile, "open", &file->f_path,
@@ -391,7 +391,7 @@ static int apparmor_file_lock(struct file *file, unsigned int cmd)
 
 /*
  * AppArmor doesn't current use the fcntl hook.
- * 
+ *
  * FIXME - these are not implemented yet - REMOVE file_fcntl hook
  * NOTE: some of the file control commands are further mediated
  *       by other hooks
