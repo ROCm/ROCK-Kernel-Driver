@@ -181,7 +181,7 @@ static inline void xen_cpuid(unsigned int *eax, unsigned int *ebx,
 			     unsigned int *ecx, unsigned int *edx)
 {
 	/* ecx is often an input as well as an output. */
-	asm(XEN_CPUID
+	asm volatile(XEN_CPUID
 	    : "=a" (*eax),
 	      "=b" (*ebx),
 	      "=c" (*ecx),

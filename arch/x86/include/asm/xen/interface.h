@@ -63,7 +63,7 @@ typedef unsigned long xen_ulong_t;
 #endif
 
 /* Maximum number of virtual CPUs in multi-processor guests. */
-#define MAX_VIRT_CPUS 32
+#define XEN_LEGACY_MAX_VCPUS 32
 
 /*
  * SEGMENT DESCRIPTOR TABLES

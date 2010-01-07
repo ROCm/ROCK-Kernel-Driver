@@ -499,13 +499,15 @@ static inline void netbk_free_pages(int nr_frags, struct netbk_rx_meta *meta)
    netrx_pending_operations, which have since been done.  Check that
    they didn't give any errors and advance over them. */
 static int netbk_check_gop(int nr_frags, domid_t domid,
-			   struct netrx_pending_operations *npo)
+			   struct netrx_pending_operations *npo, int *eagain)
 {
 	multicall_entry_t *mcl;
 	gnttab_transfer_t *gop;
 	gnttab_copy_t     *copy_op;
 	int status = NETIF_RSP_OKAY;
 	int i;
+
+    *eagain = 0;
 
 	for (i = 0; i <= nr_frags; i++) {
 		if (npo->meta[npo->meta_cons + i].copy) {
@@ -514,6 +516,8 @@ static int netbk_check_gop(int nr_frags, domid_t domid,
 				DPRINTK("Bad status %d from copy to DOM%d.\n",
 					copy_op->status, domid);
 				status = NETIF_RSP_ERROR;
+                if(copy_op->status == GNTST_eagain)
+                    *eagain = 1;
 			}
 		} else {
 			if (!xen_feature(XENFEAT_auto_translated_physmap)) {
@@ -533,6 +537,8 @@ static int netbk_check_gop(int nr_frags, domid_t domid,
 				 * a fatal error anyway.
 				 */
 				BUG_ON(gop->status == GNTST_bad_page);
+                if(gop->status == GNTST_eagain)
+                    *eagain = 1;
 				status = NETIF_RSP_ERROR;
 			}
 		}
@@ -574,6 +580,7 @@ static void net_rx_action(unsigned long unused)
 	int nr_frags;
 	int count;
 	unsigned long offset;
+    int eagain;
 
 	/*
 	 * Putting hundreds of bytes on the stack is considered rude.
@@ -680,6 +687,9 @@ static void net_rx_action(unsigned long unused)
 		nr_frags = *(int *)skb->cb;
 
 		netif = netdev_priv(skb->dev);
+
+		status = netbk_check_gop(nr_frags, netif->domid, &npo, &eagain);
+
 		/* We can't rely on skb_release_data to release the
 		   pages used by fragments for us, since it tries to
 		   touch the pages in the fraglist.  If we're in
@@ -689,16 +699,22 @@ static void net_rx_action(unsigned long unused)
 		/* (Freeing the fragments is safe since we copy
 		   non-linear skbs destined for flipping interfaces) */
 		if (!netif->copying_receiver) {
+            /* 
+             * Cannot handle failed grant transfers at the moment (because
+             * mmu_updates likely completed)
+             */
+            BUG_ON(eagain);
 			atomic_set(&(skb_shinfo(skb)->dataref), 1);
 			skb_shinfo(skb)->frag_list = NULL;
 			skb_shinfo(skb)->nr_frags = 0;
 			netbk_free_pages(nr_frags, meta + npo.meta_cons + 1);
 		}
 
-		netif->stats.tx_bytes += skb->len;
-		netif->stats.tx_packets++;
-
-		status = netbk_check_gop(nr_frags, netif->domid, &npo);
+        if(!eagain)
+        {
+		    netif->stats.tx_bytes += skb->len;
+		    netif->stats.tx_packets++;
+        }
 
 		id = meta[npo.meta_cons].id;
 		flags = nr_frags ? NETRXF_more_data : 0;
@@ -746,8 +762,19 @@ static void net_rx_action(unsigned long unused)
 		    !netbk_queue_full(netif))
 			netif_wake_queue(netif->dev);
 
-		netif_put(netif);
-		dev_kfree_skb(skb);
+        if(!eagain || netbk_queue_full(netif))
+        {
+		    netif_put(netif);
+		    dev_kfree_skb(skb);
+		    netif->stats.tx_dropped += !!eagain;
+        } 
+        else
+        {
+	        netif->rx_req_cons_peek += skb_shinfo(skb)->nr_frags + 1 +
+				   !!skb_shinfo(skb)->gso_size;
+            skb_queue_head(&rx_queue, skb);
+        }
+
 		npo.meta_cons += nr_frags + 1;
 	}
 
@@ -1102,8 +1129,7 @@ static int netbk_tx_check_mop(struct sk_buff *skb,
 		pending_ring[MASK_PEND_IDX(pending_prod++)] = pending_idx;
 		netif_put(netif);
 	} else {
-		set_phys_to_machine(
-			__pa(idx_to_kaddr(pending_idx)) >> PAGE_SHIFT,
+		set_phys_to_machine(idx_to_pfn(pending_idx),
 			FOREIGN_FRAME(mop->dev_bus_addr >> PAGE_SHIFT));
 		grant_tx_handle[pending_idx] = mop->handle;
 	}
@@ -1119,8 +1145,7 @@ static int netbk_tx_check_mop(struct sk_buff *skb,
 		/* Check error status: if okay then remember grant handle. */
 		newerr = (++mop)->status;
 		if (likely(!newerr)) {
-			set_phys_to_machine(
-				__pa(idx_to_kaddr(pending_idx))>>PAGE_SHIFT,
+			set_phys_to_machine(idx_to_pfn(pending_idx),
 				FOREIGN_FRAME(mop->dev_bus_addr>>PAGE_SHIFT));
 			grant_tx_handle[pending_idx] = mop->handle;
 			/* Had a previous error? Invalidate this fragment. */
@@ -1173,7 +1198,7 @@ static void netbk_fill_frags(struct sk_buff *skb)
 			      &pending_inuse_head);
 
 		txp = &pending_tx_info[pending_idx].req;
-		frag->page = virt_to_page(idx_to_kaddr(pending_idx));
+		frag->page = mmap_pages[pending_idx];
 		frag->size = txp->size;
 		frag->page_offset = txp->offset;
 
@@ -1405,6 +1430,11 @@ static void net_tx_action(unsigned long unused)
 	if (mop == tx_map_ops)
 		goto out;
 
+    /* NOTE: some maps may fail with GNTST_eagain, which could be successfully
+     * retried in the backend after a delay. However, we can also fail the tx
+     * req and let the frontend resend the relevant packet again. This is fine
+     * because it is unlikely that a network buffer will be paged out or shared,
+     * and therefore it is unlikely to fail with GNTST_eagain. */
 	ret = HYPERVISOR_grant_table_op(
 		GNTTABOP_map_grant_ref, tx_map_ops, mop - tx_map_ops);
 	BUG_ON(ret);

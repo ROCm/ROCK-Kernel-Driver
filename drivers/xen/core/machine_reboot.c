@@ -159,30 +159,9 @@ struct suspend {
 static int take_machine_down(void *_suspend)
 {
 	struct suspend *suspend = _suspend;
-	int suspend_cancelled, err;
+	int suspend_cancelled;
 
-	if (suspend->fast_suspend) {
-		BUG_ON(!irqs_disabled());
-	} else {
-		BUG_ON(irqs_disabled());
-
-		for (;;) {
-			err = smp_suspend();
-			if (err)
-				return err;
-
-			xenbus_suspend();
-			preempt_disable();
-
-			if (num_online_cpus() == 1)
-				break;
-
-			preempt_enable();
-			xenbus_suspend_cancel();
-		}
-
-		local_irq_disable();
-	}
+	BUG_ON(!irqs_disabled());
 
 	mm_pin_all();
 	suspend_cancelled = sysdev_suspend(PMSG_SUSPEND);
@@ -213,16 +192,19 @@ static int take_machine_down(void *_suspend)
 #endif
 	}
 
-	if (!suspend->fast_suspend)
-		local_irq_enable();
-
 	return suspend_cancelled;
 }
 
 int __xen_suspend(int fast_suspend, void (*resume_notifier)(int))
 {
 	int err, suspend_cancelled;
+	const char *what;
 	struct suspend suspend;
+
+#define _check(fn, args...) ({ \
+	what = #fn; \
+	err = (fn)(args); \
+})
 
 	BUG_ON(smp_processor_id() != 0);
 	BUG_ON(in_interrupt());
@@ -235,47 +217,95 @@ int __xen_suspend(int fast_suspend, void (*resume_notifier)(int))
 	}
 #endif
 
-	err = dpm_suspend_noirq(PMSG_SUSPEND);
-	if (err) {
-		printk(KERN_ERR "dpm_suspend_noirq() failed: %d\n", err);
-		return err;
-	}
-
 	/* If we are definitely UP then 'slow mode' is actually faster. */
 	if (num_possible_cpus() == 1)
 		fast_suspend = 0;
 
+	if (fast_suspend && _check(stop_machine_create)) {
+		printk(KERN_ERR "%s() failed: %d\n", what, err);
+		return err;
+	}
+
 	suspend.fast_suspend = fast_suspend;
 	suspend.resume_notifier = resume_notifier;
 
+	if (_check(dpm_suspend_start, PMSG_SUSPEND)) {
+		if (fast_suspend)
+			stop_machine_destroy();
+		printk(KERN_ERR "%s() failed: %d\n", what, err);
+		return err;
+	}
+
 	if (fast_suspend) {
 		xenbus_suspend();
+
+		if (_check(dpm_suspend_noirq, PMSG_SUSPEND)) {
+			xenbus_suspend_cancel();
+			dpm_resume_end(PMSG_RESUME);
+			stop_machine_destroy();
+			printk(KERN_ERR "%s() failed: %d\n", what, err);
+			return err;
+		}
+
 		err = stop_machine(take_machine_down, &suspend,
 				   &cpumask_of_cpu(0));
 		if (err < 0)
 			xenbus_suspend_cancel();
 	} else {
+		BUG_ON(irqs_disabled());
+
+		for (;;) {
+			xenbus_suspend();
+
+			if (!_check(dpm_suspend_noirq, PMSG_SUSPEND)
+			    && _check(smp_suspend))
+				dpm_resume_noirq(PMSG_RESUME);
+			if (err) {
+				xenbus_suspend_cancel();
+				dpm_resume_end(PMSG_RESUME);
+				printk(KERN_ERR "%s() failed: %d\n",
+				       what, err);
+				return err;
+			}
+
+			preempt_disable();
+
+			if (num_online_cpus() == 1)
+				break;
+
+			preempt_enable();
+
+			dpm_resume_noirq(PMSG_RESUME);
+
+			xenbus_suspend_cancel();
+		}
+
+		local_irq_disable();
 		err = take_machine_down(&suspend);
+		local_irq_enable();
 	}
-
-	if (err < 0) {
-		dpm_resume_noirq(PMSG_RESUME);
-		return err;
-	}
-
-	suspend_cancelled = err;
-	if (!suspend_cancelled) {
-		xencons_resume();
-		xenbus_resume();
-	} else {
-		xenbus_suspend_cancel();
-	}
-
-	if (!fast_suspend)
-		smp_resume();
 
 	dpm_resume_noirq(PMSG_RESUME);
 
-	return 0;
+	if (err >= 0) {
+		suspend_cancelled = err;
+		if (!suspend_cancelled) {
+			xencons_resume();
+			xenbus_resume();
+		} else {
+			xenbus_suspend_cancel();
+			err = 0;
+		}
+
+		if (!fast_suspend)
+			smp_resume();
+	}
+
+	dpm_resume_end(PMSG_RESUME);
+
+	if (fast_suspend)
+		stop_machine_destroy();
+
+	return err;
 }
 #endif

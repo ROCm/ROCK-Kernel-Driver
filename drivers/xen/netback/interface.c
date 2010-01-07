@@ -33,6 +33,7 @@
 #include "common.h"
 #include <linux/ethtool.h>
 #include <linux/rtnetlink.h>
+#include <linux/delay.h>
 
 /*
  * Module parameter 'queue_length':
@@ -254,9 +255,11 @@ static int map_frontend_pages(
 
 	gnttab_set_map_op(&op, (unsigned long)netif->tx_comms_area->addr,
 			  GNTMAP_host_map, tx_ring_ref, netif->domid);
-    
-	if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1))
-		BUG();
+    do {
+		if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1))
+			BUG();
+        msleep(10);
+    } while(op.status == GNTST_eagain);
 
 	if (op.status) { 
 		DPRINTK(" Gnttab failure mapping tx_ring_ref!\n");
@@ -268,9 +271,11 @@ static int map_frontend_pages(
 
 	gnttab_set_map_op(&op, (unsigned long)netif->rx_comms_area->addr,
 			  GNTMAP_host_map, rx_ring_ref, netif->domid);
-
-	if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1))
-		BUG();
+    do {
+	    if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1))
+		    BUG();
+        msleep(10);
+    } while(op.status == GNTST_eagain);
 
 	if (op.status) {
 		struct gnttab_unmap_grant_ref unop;

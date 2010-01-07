@@ -39,11 +39,11 @@ blktap_sysfs_exit(struct blktap *tap)
 static ssize_t blktap_sysfs_pause_device(struct device *,
 					 struct device_attribute *,
 					 const char *, size_t);
-DEVICE_ATTR(pause, S_IWUSR, NULL, blktap_sysfs_pause_device);
+static DEVICE_ATTR(pause, S_IWUSR, NULL, blktap_sysfs_pause_device);
 static ssize_t blktap_sysfs_resume_device(struct device *,
 					  struct device_attribute *,
 					  const char *, size_t);
-DEVICE_ATTR(resume, S_IWUSR, NULL, blktap_sysfs_resume_device);
+static DEVICE_ATTR(resume, S_IWUSR, NULL, blktap_sysfs_resume_device);
 
 static ssize_t
 blktap_sysfs_set_name(struct device *dev, struct device_attribute *attr,
@@ -103,8 +103,8 @@ blktap_sysfs_get_name(struct device *dev, struct device_attribute *attr,
 
 	return size;
 }
-DEVICE_ATTR(name, S_IRUSR | S_IWUSR,
-		  blktap_sysfs_get_name, blktap_sysfs_set_name);
+static DEVICE_ATTR(name, S_IRUSR | S_IWUSR,
+		   blktap_sysfs_get_name, blktap_sysfs_set_name);
 
 static ssize_t
 blktap_sysfs_remove_device(struct device *dev, struct device_attribute *attr,
@@ -123,7 +123,7 @@ blktap_sysfs_remove_device(struct device *dev, struct device_attribute *attr,
 
 	return (err ? : size);
 }
-DEVICE_ATTR(remove, S_IWUSR, NULL, blktap_sysfs_remove_device);
+static DEVICE_ATTR(remove, S_IWUSR, NULL, blktap_sysfs_remove_device);
 
 static ssize_t
 blktap_sysfs_pause_device(struct device *dev, struct device_attribute *attr,
@@ -293,7 +293,7 @@ out:
 
 	return ret;
 }
-DEVICE_ATTR(debug, S_IRUSR, blktap_sysfs_debug_device, NULL);
+static DEVICE_ATTR(debug, S_IRUSR, blktap_sysfs_debug_device, NULL);
 
 int
 blktap_sysfs_create(struct blktap *tap)

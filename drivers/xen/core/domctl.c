@@ -16,6 +16,7 @@
  * xen kernel versions.  Now we have one.  Ouch.
  */
 #undef __XEN_PUBLIC_XEN_H__
+#undef __XEN_PUBLIC_GRANT_TABLE_H__
 #undef __XEN_TOOLS__
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -73,7 +74,7 @@ union xen_domctl {
 		};
 	} v4;
 
-	/* v5: upstream: xen 3.1 */
+	/* v5: upstream: xen 3.1, v6: upstream: xen 4.0 */
 	struct {
 		uint32_t cmd;
 		uint32_t interface_version;
@@ -84,7 +85,7 @@ union xen_domctl {
 			uint64_aligned_t                     dummy_align;
 			uint8_t                              dummy_pad[128];
 		};
-	} v5;
+	} v5, v6;
 };
 
 /* The actual code comes here */
@@ -112,14 +113,17 @@ int xen_guest_address_size(int domid)
 	}								\
 } while (0)
 
-	BUILD_BUG_ON(XEN_DOMCTL_INTERFACE_VERSION > 5);
+	BUILD_BUG_ON(XEN_DOMCTL_INTERFACE_VERSION > 6);
+	guest_address_size(6);
+#if CONFIG_XEN_COMPAT < 0x040000
 	guest_address_size(5);
+#endif
 #if CONFIG_XEN_COMPAT < 0x030100
 	guest_address_size(4);
 #endif
 
 	ret = BITS_PER_LONG;
-	printk("v%d...5 domctls failed, assuming dom%d is native: %d\n",
+	printk("v%d...6 domctls failed, assuming dom%d is native: %d\n",
 	       low, domid, ret);
 
 	return ret;
@@ -159,8 +163,12 @@ static inline int get_vcpuaffinity(unsigned int nr, void *mask)
 	union xen_domctl domctl;
 	int rc;
 
-	BUILD_BUG_ON(XEN_DOMCTL_INTERFACE_VERSION > 5);
-	rc = vcpuaffinity(get, 5);
+	BUILD_BUG_ON(XEN_DOMCTL_INTERFACE_VERSION > 6);
+	rc = vcpuaffinity(get, 6);
+#if CONFIG_XEN_COMPAT < 0x040000
+	if (rc)
+		rc = vcpuaffinity(get, 5);
+#endif
 #if CONFIG_XEN_COMPAT < 0x030100
 	if (rc)
 		rc = vcpuaffinity(get, 4);
@@ -173,8 +181,12 @@ static inline int set_vcpuaffinity(unsigned int nr, void *mask)
 	union xen_domctl domctl;
 	int rc;
 
-	BUILD_BUG_ON(XEN_DOMCTL_INTERFACE_VERSION > 5);
-	rc = vcpuaffinity(set, 5);
+	BUILD_BUG_ON(XEN_DOMCTL_INTERFACE_VERSION > 6);
+	rc = vcpuaffinity(set, 6);
+#if CONFIG_XEN_COMPAT < 0x040000
+	if (rc)
+		rc = vcpuaffinity(set, 5);
+#endif
 #if CONFIG_XEN_COMPAT < 0x030100
 	if (rc)
 		rc = vcpuaffinity(set, 4);

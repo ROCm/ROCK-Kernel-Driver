@@ -74,6 +74,8 @@ static inline int invalid_vm86_irq(int irq)
 # else
 #  define NR_PIRQS			(NR_VECTORS + IO_APIC_VECTOR_LIMIT)
 # endif
+#elif defined(CONFIG_XEN_PCIDEV_FRONTEND)
+# define NR_PIRQS			(NR_VECTORS + CPU_VECTOR_LIMIT)
 #else /* !CONFIG_X86_IO_APIC: */
 # define NR_PIRQS			NR_IRQS_LEGACY
 #endif

@@ -35,10 +35,6 @@
 
 #include <linux/types.h>
 
-#ifndef __user
-#define __user
-#endif
-
 typedef struct privcmd_hypercall
 {
 	__u64 op;

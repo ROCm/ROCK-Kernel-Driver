@@ -213,6 +213,8 @@ struct xen_add_to_physmap {
 #define XENMAPSPACE_gmfn        2 /* GMFN */
     unsigned int space;
 
+#define XENMAPIDX_grant_table_status 0x80000000
+
     /* Index into source mapping space. */
     xen_ulong_t idx;
 
@@ -282,4 +284,11 @@ struct xen_pod_target {
     domid_t domid;
 };
 typedef struct xen_pod_target xen_pod_target_t;
+
+/*
+ * Get the number of MFNs saved through memory sharing.
+ * The call never fails.
+ */
+#define XENMEM_get_sharing_freed_pages    18
+
 #endif /* __XEN_PUBLIC_MEMORY_H__ */

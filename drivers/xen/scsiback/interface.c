@@ -37,6 +37,7 @@
 
 #include <xen/evtchn.h>
 #include <linux/kthread.h>
+#include <linux/delay.h>
 
 
 static struct kmem_cache *scsiback_cachep;
@@ -69,8 +70,11 @@ static int map_frontend_page( struct vscsibk_info *info,
 				GNTMAP_host_map, ring_ref,
 				info->domid);
 
-	err = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1);
-	BUG_ON(err);
+    do {
+	    err = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1);
+	    BUG_ON(err);
+        msleep(10);
+    } while(op.status == GNTST_eagain);
 
 	if (op.status) {
 		printk(KERN_ERR "scsiback: Grant table operation failure !\n");

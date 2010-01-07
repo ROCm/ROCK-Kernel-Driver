@@ -123,13 +123,12 @@ blktap_request_pool_free_bucket(struct blktap_request_bucket *bucket)
 	kfree(bucket);
 }
 
-unsigned long
-request_to_kaddr(struct blktap_request *req, int seg)
+struct page *
+request_to_page(struct blktap_request *req, int seg)
 {
 	struct blktap_request_handle *handle = blktap_request_to_handle(req);
 	int idx = handle->slot * BLKIF_MAX_SEGMENTS_PER_REQUEST + seg;
-	unsigned long pfn = page_to_pfn(handle->bucket->foreign_pages[idx]);
-	return (unsigned long)pfn_to_kaddr(pfn);
+	return handle->bucket->foreign_pages[idx];
 }
 
 int

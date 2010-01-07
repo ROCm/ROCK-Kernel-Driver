@@ -43,6 +43,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
+#include <linux/delay.h>
 #include "usbback.h"
 
 static LIST_HEAD(usbif_list);
@@ -109,8 +110,12 @@ static int map_frontend_pages(usbif_t *usbif,
 	gnttab_set_map_op(&op, (unsigned long)usbif->urb_ring_area->addr,
 			  GNTMAP_host_map, urb_ring_ref, usbif->domid);
 
-	if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1))
-		BUG();
+
+    do {
+	    if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1))
+		    BUG();
+        msleep(10);
+    } while (op.status == GNTST_eagain);
 
 	if (op.status) {
 		printk(KERN_ERR "grant table failure mapping urb_ring_ref\n");
@@ -123,8 +128,11 @@ static int map_frontend_pages(usbif_t *usbif,
 	gnttab_set_map_op(&op, (unsigned long)usbif->conn_ring_area->addr,
 			  GNTMAP_host_map, conn_ring_ref, usbif->domid);
 
-	if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1))
-		BUG();
+    do {
+	    if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1))
+		    BUG();
+        msleep(10);
+    } while (op.status == GNTST_eagain);
 
 	if (op.status) {
 		struct gnttab_unmap_grant_ref unop;

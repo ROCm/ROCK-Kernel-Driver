@@ -109,6 +109,7 @@
 #ifdef CONFIG_X86_64
 #include <asm/numa_64.h>
 #endif
+#include <asm/mce.h>
 
 #ifdef CONFIG_XEN
 #include <asm/hypervisor.h>
@@ -1340,6 +1341,8 @@ void __init setup_arch(char **cmdline_p)
 #endif
 #endif /* CONFIG_XEN */
 	x86_init.oem.banner();
+
+	mcheck_intel_therm_init();
 }
 
 #ifdef CONFIG_X86_32

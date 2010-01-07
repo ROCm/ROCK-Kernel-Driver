@@ -1975,13 +1975,15 @@ config PCI_GOBIOS
 
 config PCI_GOMMCONFIG
 	bool "MMConfig"
+	depends on !XEN_UNPRIVILEGED_GUEST
 
 config PCI_GODIRECT
 	bool "Direct"
+	depends on !XEN_UNPRIVILEGED_GUEST
 
 config PCI_GOOLPC
 	bool "OLPC"
-	depends on OLPC
+	depends on OLPC && !XEN_UNPRIVILEGED_GUEST
 
 config PCI_GOXEN_FE
 	bool "Xen PCI Frontend"
@@ -1992,6 +1994,7 @@ config PCI_GOXEN_FE
 
 config PCI_GOANY
 	bool "Any"
+	depends on !XEN_UNPRIVILEGED_GUEST
 
 endchoice
 
@@ -2022,7 +2025,7 @@ config PCI_MMCONFIG
 
 config XEN_PCIDEV_FRONTEND
 	def_bool y
-	prompt "Xen PCI Frontend" if X86_64
+	prompt "Xen PCI Frontend" if X86_64 && !XEN_UNPRIVILEGED_GUEST
 	depends on PCI && XEN && (PCI_GOXEN_FE || PCI_GOANY || X86_64)
  	select HOTPLUG
 	help

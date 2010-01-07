@@ -33,6 +33,7 @@
 #include "common.h"
 #include <xen/evtchn.h>
 #include <linux/kthread.h>
+#include <linux/delay.h>
 
 static struct kmem_cache *blkif_cachep;
 
@@ -62,8 +63,11 @@ static int map_frontend_page(blkif_t *blkif, unsigned long shared_page)
 	gnttab_set_map_op(&op, (unsigned long)blkif->blk_ring_area->addr,
 			  GNTMAP_host_map, shared_page, blkif->domid);
 
-	if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1))
-		BUG();
+    do {
+	    if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1))
+		    BUG();
+        msleep(100);
+    } while(op.status == GNTST_eagain);
 
 	if (op.status) {
 		DPRINTK(" Grant table operation failure !\n");

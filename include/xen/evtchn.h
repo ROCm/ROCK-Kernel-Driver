@@ -1,3 +1,6 @@
+#if defined(CONFIG_PARAVIRT_XEN) || !defined(__KERNEL__)
+#include "public/evtchn.h"
+#else
 /******************************************************************************
  * evtchn.h
  *
@@ -31,7 +34,7 @@
  * IN THE SOFTWARE.
  */
 
-#if !defined(__ASM_EVTCHN_H__) && defined(__KERNEL__) && !defined(CONFIG_PARAVIRT_XEN)
+#ifndef __ASM_EVTCHN_H__
 #define __ASM_EVTCHN_H__
 
 #include <linux/interrupt.h>
@@ -228,63 +231,4 @@ void notify_remote_via_ipi(unsigned int ipi, unsigned int cpu);
 #endif
 
 #endif /* __ASM_EVTCHN_H__ */
-
-/*
- * Interface to /dev/xen/evtchn.
- */
-#ifndef __LINUX_PUBLIC_EVTCHN_H__
-#define __LINUX_PUBLIC_EVTCHN_H__
-
-/*
- * Bind a fresh port to VIRQ @virq.
- * Return allocated port.
- */
-#define IOCTL_EVTCHN_BIND_VIRQ				\
-	_IOC(_IOC_NONE, 'E', 0, sizeof(struct ioctl_evtchn_bind_virq))
-struct ioctl_evtchn_bind_virq {
-	unsigned int virq;
-};
-
-/*
- * Bind a fresh port to remote <@remote_domain, @remote_port>.
- * Return allocated port.
- */
-#define IOCTL_EVTCHN_BIND_INTERDOMAIN			\
-	_IOC(_IOC_NONE, 'E', 1, sizeof(struct ioctl_evtchn_bind_interdomain))
-struct ioctl_evtchn_bind_interdomain {
-	unsigned int remote_domain, remote_port;
-};
-
-/*
- * Allocate a fresh port for binding to @remote_domain.
- * Return allocated port.
- */
-#define IOCTL_EVTCHN_BIND_UNBOUND_PORT			\
-	_IOC(_IOC_NONE, 'E', 2, sizeof(struct ioctl_evtchn_bind_unbound_port))
-struct ioctl_evtchn_bind_unbound_port {
-	unsigned int remote_domain;
-};
-
-/*
- * Unbind previously allocated @port.
- */
-#define IOCTL_EVTCHN_UNBIND				\
-	_IOC(_IOC_NONE, 'E', 3, sizeof(struct ioctl_evtchn_unbind))
-struct ioctl_evtchn_unbind {
-	unsigned int port;
-};
-
-/*
- * Unbind previously allocated @port.
- */
-#define IOCTL_EVTCHN_NOTIFY				\
-	_IOC(_IOC_NONE, 'E', 4, sizeof(struct ioctl_evtchn_notify))
-struct ioctl_evtchn_notify {
-	unsigned int port;
-};
-
-/* Clear and reinitialise the event buffer. Clear error condition. */
-#define IOCTL_EVTCHN_RESET				\
-	_IOC(_IOC_NONE, 'E', 5, 0)
-
-#endif /* __LINUX_PUBLIC_EVTCHN_H__ */
+#endif /* CONFIG_PARAVIRT_XEN */

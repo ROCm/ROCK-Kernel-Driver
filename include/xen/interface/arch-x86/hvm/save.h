@@ -38,7 +38,7 @@ struct hvm_save_header {
     uint32_t version;           /* File format version */
     uint64_t changeset;         /* Version of Xen that saved this file */
     uint32_t cpuid;             /* CPUID[0x01][%eax] on the saving machine */
-    uint32_t pad0;
+    uint32_t gtsc_khz;        /* Guest's TSC frequency in kHz */
 };
 
 DECLARE_HVM_SAVE_TYPE(HEADER, 1, struct hvm_save_header);
@@ -137,6 +137,7 @@ struct hvm_hw_cpu {
     uint64_t msr_cstar;
     uint64_t msr_syscall_mask;
     uint64_t msr_efer;
+    uint64_t msr_tsc_aux;
 
     /* guest's idea of what rdtsc() would return */
     uint64_t tsc;

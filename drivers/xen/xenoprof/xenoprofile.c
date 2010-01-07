@@ -34,12 +34,12 @@
 #define MAX_XENOPROF_SAMPLES 16
 
 /* sample buffers shared with Xen */
-static xenoprof_buf_t *xenoprof_buf[MAX_VIRT_CPUS];
+static xenoprof_buf_t **__read_mostly xenoprof_buf;
 /* Shared buffer area */
 static struct xenoprof_shared_buffer shared_buffer;
 
 /* Passive sample buffers shared with Xen */
-static xenoprof_buf_t *p_xenoprof_buf[MAX_OPROF_DOMAINS][MAX_VIRT_CPUS];
+static xenoprof_buf_t **__read_mostly p_xenoprof_buf[MAX_OPROF_DOMAINS];
 /* Passive shared buffer area */
 static struct xenoprof_shared_buffer p_shared_buffer[MAX_OPROF_DOMAINS];
 
@@ -249,11 +249,32 @@ static int bind_virq(void)
 }
 
 
+static xenoprof_buf_t **get_buffer_array(unsigned int nbuf)
+{
+	size_t size = nbuf * sizeof(xenoprof_buf_t);
+
+	if (size <= PAGE_SIZE)
+		return kmalloc(size, GFP_KERNEL);
+	return vmalloc(size);
+}
+
+static void release_buffer_array(xenoprof_buf_t **buf, unsigned int nbuf)
+{
+	if (nbuf * sizeof(xenoprof_buf_t) <= PAGE_SIZE)
+		kfree(buf);
+	else
+		vfree(buf);
+}
+
+
 static void unmap_passive_list(void)
 {
 	int i;
-	for (i = 0; i < pdomains; i++)
+	for (i = 0; i < pdomains; i++) {
 		xenoprof_arch_unmap_shared_buffer(&p_shared_buffer[i]);
+		release_buffer_array(p_xenoprof_buf[i],
+				     passive_domains[i].nbuf);
+	}
 	pdomains = 0;
 }
 
@@ -273,10 +294,16 @@ static int map_xenoprof_buffer(int max_samples)
 		return ret;
 	nbuf = get_buffer.nbuf;
 
+	xenoprof_buf = get_buffer_array(nbuf);
+	if (!xenoprof_buf) {
+		xenoprof_arch_unmap_shared_buffer(&shared_buffer);
+		return -ENOMEM;
+	}
+
 	for (i=0; i< nbuf; i++) {
 		buf = (struct xenoprof_buf*) 
 			&shared_buffer.buffer[i * get_buffer.bufsize];
-		BUG_ON(buf->vcpu_id >= MAX_VIRT_CPUS);
+		BUG_ON(buf->vcpu_id >= nbuf);
 		xenoprof_buf[buf->vcpu_id] = buf;
 	}
 
@@ -291,8 +318,10 @@ static int xenoprof_setup(void)
 	if ( (ret = map_xenoprof_buffer(MAX_XENOPROF_SAMPLES)) )
 		return ret;
 
-	if ( (ret = bind_virq()) )
+	if ( (ret = bind_virq()) ) {
+		release_buffer_array(xenoprof_buf, nbuf);
 		return ret;
+	}
 
 	if (xenoprof_is_primary) {
 		/* Define dom0 as an active domain if not done yet */
@@ -335,6 +364,7 @@ static int xenoprof_setup(void)
 	return 0;
  err:
 	unbind_virq();
+	release_buffer_array(xenoprof_buf, nbuf);
 	return ret;
 }
 
@@ -356,6 +386,7 @@ static void xenoprof_shutdown(void)
 	xenoprof_arch_unmap_shared_buffer(&shared_buffer);
 	if (xenoprof_is_primary)
 		unmap_passive_list();
+	release_buffer_array(xenoprof_buf, nbuf);
 }
 
 
@@ -448,11 +479,19 @@ static int xenoprof_set_passive(int * p_domains,
 						&p_shared_buffer[i]);
 		if (ret)
 			goto out;
+
+		p_xenoprof_buf[i] = get_buffer_array(passive_domains[i].nbuf);
+		if (!p_xenoprof_buf[i]) {
+			++i;
+			ret = -ENOMEM;
+			goto out;
+		}
+
 		for (j = 0; j < passive_domains[i].nbuf; j++) {
 			buf = (struct xenoprof_buf *)
 				&p_shared_buffer[i].buffer[
 				j * passive_domains[i].bufsize];
-			BUG_ON(buf->vcpu_id >= MAX_VIRT_CPUS);
+			BUG_ON(buf->vcpu_id >= passive_domains[i].nbuf);
 			p_xenoprof_buf[i][buf->vcpu_id] = buf;
 		}
 	}
@@ -461,8 +500,11 @@ static int xenoprof_set_passive(int * p_domains,
 	return 0;
 
 out:
-	for (j = 0; j < i; j++)
+	for (j = 0; j < i; j++) {
 		xenoprof_arch_unmap_shared_buffer(&p_shared_buffer[i]);
+		release_buffer_array(p_xenoprof_buf[i],
+				     passive_domains[i].nbuf);
+	}
 
 	return ret;
 }

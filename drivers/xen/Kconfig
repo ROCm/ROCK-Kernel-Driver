@@ -23,6 +23,7 @@ config XEN_UNPRIVILEGED_GUEST
 	select PM
 	select PM_SLEEP
 	select PM_SLEEP_SMP if SMP
+	select SUSPEND
 
 config XEN_PRIVCMD
 	def_bool y

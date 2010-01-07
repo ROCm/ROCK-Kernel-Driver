@@ -18,6 +18,7 @@
 #include <linux/list.h>
 #include <linux/miscdevice.h>
 #include <linux/poll.h>
+#include <linux/delay.h>
 #include <asm/uaccess.h>
 #include <xen/xenbus.h>
 #include <xen/interface/grant_table.h>
@@ -256,10 +257,12 @@ int _packet_write(struct packet *pak,
 		gnttab_set_map_op(&map_op, idx_to_kaddr(tpmif, i),
 				  GNTMAP_host_map, tx->ref, tpmif->domid);
 
-		if (unlikely(HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref,
-						       &map_op, 1))) {
-			BUG();
-		}
+        do {
+		    if (unlikely(HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref,
+						       &map_op, 1)))
+			    BUG();
+            if(map_op.status) msleep(10);
+		} while(map_op.status == GNTST_eagain);
 
 		handle = map_op.handle;
 
@@ -394,10 +397,12 @@ static int packet_read_shmem(struct packet *pak,
 		gnttab_set_map_op(&map_op, idx_to_kaddr(tpmif, i),
 				  GNTMAP_host_map, tx->ref, tpmif->domid);
 
-		if (unlikely(HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref,
-						       &map_op, 1))) {
-			BUG();
-		}
+        do {
+		    if (unlikely(HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref,
+						       &map_op, 1)))
+			    BUG();
+            if(map_op.status) msleep(10);
+		} while(map_op.status == GNTST_eagain);
 
 		if (map_op.status) {
 			DPRINTK(" Grant table operation failure !\n");

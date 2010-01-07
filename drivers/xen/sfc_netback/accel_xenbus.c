@@ -24,6 +24,7 @@
 
 #include <xen/evtchn.h>
 #include <linux/mutex.h>
+#include <linux/delay.h>
 
 /* drivers/xen/netback/common.h */
 #include "common.h"

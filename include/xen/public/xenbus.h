@@ -35,10 +35,6 @@
 
 #include <linux/types.h>
 
-#ifndef __user
-#define __user
-#endif
-
 typedef struct xenbus_alloc {
 	domid_t dom;
 	__u32 port;

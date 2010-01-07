@@ -12,6 +12,7 @@
  */
 
 #include "common.h"
+#include <linux/delay.h>
 #include <linux/err.h>
 #include <xen/balloon.h>
 #include <xen/gnttab.h>
@@ -85,8 +86,11 @@ static int map_frontend_page(tpmif_t *tpmif, unsigned long shared_page)
 	gnttab_set_map_op(&op, (unsigned long)tpmif->tx_area->addr,
 			  GNTMAP_host_map, shared_page, tpmif->domid);
 
-	if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1))
-		BUG();
+    do {
+	    if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1))
+		    BUG();
+        msleep(10);
+    } while(op.status == GNTST_eagain);
 
 	if (op.status) {
 		DPRINTK(" Grant table operation failure !\n");

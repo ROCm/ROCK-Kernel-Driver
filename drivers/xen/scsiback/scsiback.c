@@ -283,8 +283,21 @@ static int scsiback_gnttab_data_map(vscsiif_request_t *ring_req,
 
 		err = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, map, nr_segments);
 		BUG_ON(err);
+        /* Retry maps with GNTST_eagain */
+        for(i=0; i < nr_segments; i++) {
+            while(unlikely(map[i].status == GNTST_eagain))
+            {
+                msleep(10);
+		        err = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, 
+                                                &map[i], 
+                                                1);
+		        BUG_ON(err);
+            }
+        }
 
 		for_each_sg (pending_req->sgl, sg, nr_segments, i) {
+			struct page *pg;
+
 			if (unlikely(map[i].status != 0)) {
 				printk(KERN_ERR "scsiback: invalid buffer -- could not remap it\n");
 				map[i].handle = SCSIBACK_INVALID_HANDLE;
@@ -296,12 +309,12 @@ static int scsiback_gnttab_data_map(vscsiif_request_t *ring_req,
 			if (err)
 				continue;
 
-			set_phys_to_machine(__pa(vaddr(
-				pending_req, i)) >> PAGE_SHIFT,
+			pg = pending_pages[vaddr_pagenr(pending_req, i)];
+
+			set_phys_to_machine(page_to_pfn(pg),
 				FOREIGN_FRAME(map[i].dev_bus_addr >> PAGE_SHIFT));
 
-			sg_set_page(sg, virt_to_page(vaddr(pending_req, i)),
-				    ring_req->seg[i].length,
+			sg_set_page(sg, pg, ring_req->seg[i].length,
 				    ring_req->seg[i].offset);
 			data_len += sg->length;
 

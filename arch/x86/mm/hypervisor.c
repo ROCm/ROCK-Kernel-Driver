@@ -134,6 +134,20 @@ void __init adjust_boot_vcpu_info(void)
 	mmu[1].val = lpfn;
 	if (HYPERVISOR_mmu_update(mmu, 2, NULL, DOMID_SELF))
 		BUG();
+
+	/*
+	 * Copy over all contents of the page just replaced, except for the
+	 * vcpu_info itself, as it may have got updated after having been
+	 * copied from __per_cpu_load[].
+	 */
+	memcpy(__va(rpfn << PAGE_SHIFT),
+	       __va(lpfn << PAGE_SHIFT),
+	       (unsigned long)&per_cpu_var(vcpu_info) & (PAGE_SIZE - 1));
+	level = (unsigned long)(&per_cpu_var(vcpu_info) + 1) & (PAGE_SIZE - 1);
+	if (level)
+		memcpy(__va(rpfn << PAGE_SHIFT) + level,
+		       __va(lpfn << PAGE_SHIFT) + level,
+		       PAGE_SIZE - level);
 }
 #endif
 

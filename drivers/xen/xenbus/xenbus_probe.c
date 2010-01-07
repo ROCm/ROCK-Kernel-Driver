@@ -311,15 +311,6 @@ static int watch_otherend(struct xenbus_device *dev)
 #endif
 }
 
-static ssize_t xendev_show_modalias(struct device *dev,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,13)
-				    struct device_attribute *attr,
-#endif
-				    char *buf)
-{
-	return sprintf(buf, "xen:%s\n", to_xenbus_device(dev)->devicetype);
-}
-DEVICE_ATTR(modalias, S_IRUSR | S_IRGRP | S_IROTH, xendev_show_modalias, NULL);
 
 int xenbus_dev_probe(struct device *_dev)
 {
@@ -563,6 +554,15 @@ static ssize_t xendev_show_devtype(struct device *dev,
 }
 static DEVICE_ATTR(devtype, S_IRUSR | S_IRGRP | S_IROTH, xendev_show_devtype, NULL);
 
+static ssize_t xendev_show_modalias(struct device *dev,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,13)
+				    struct device_attribute *attr,
+#endif
+				    char *buf)
+{
+	return sprintf(buf, "xen:%s\n", to_xenbus_device(dev)->devicetype);
+}
+static DEVICE_ATTR(modalias, S_IRUSR | S_IRGRP | S_IROTH, xendev_show_modalias, NULL);
 
 int xenbus_probe_node(struct xen_bus_type *bus,
 		      const char *type,
@@ -1262,6 +1262,8 @@ static int is_device_connecting(struct device *dev, void *data)
 
 static int exists_connecting_device(struct device_driver *drv)
 {
+	if (xenbus_frontend.error)
+		return xenbus_frontend.error;
 	return bus_for_each_dev(&xenbus_frontend.bus, NULL, drv,
 				is_device_connecting);
 }
@@ -1280,7 +1282,10 @@ static int print_device_status(struct device *dev, void *data)
 		/* Information only: is this too noisy? */
 		printk(KERN_INFO "XENBUS: Device with no driver: %s\n",
 		       xendev->nodename);
-	} else if (xendev->state < XenbusStateConnected) {
+		return 0;
+	}
+
+	if (xendev->state < XenbusStateConnected) {
 		enum xenbus_state rstate = XenbusStateUnknown;
 		if (xendev->otherend)
 			rstate = xenbus_read_driver_state(xendev->otherend);
@@ -1288,6 +1293,11 @@ static int print_device_status(struct device *dev, void *data)
 		       "to device: %s (local state %d, remote state %d)\n",
 		       xendev->nodename, xendev->state, rstate);
 	}
+
+	xendrv = to_xenbus_driver(dev->driver);
+	if (xendrv->is_ready && !xendrv->is_ready(xendev))
+		printk(KERN_WARNING "XENBUS: Device not ready: %s\n",
+		       xendev->nodename);
 
 	return 0;
 }

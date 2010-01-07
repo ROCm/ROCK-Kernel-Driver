@@ -95,9 +95,11 @@ static inline int vaddr_pagenr(pending_req_t *req, int seg)
 	return (req - pending_reqs) * BLKIF_MAX_SEGMENTS_PER_REQUEST + seg;
 }
 
+#define pending_page(req, seg) pending_pages[vaddr_pagenr(req, seg)]
+
 static inline unsigned long vaddr(pending_req_t *req, int seg)
 {
-	unsigned long pfn = page_to_pfn(pending_pages[vaddr_pagenr(req, seg)]);
+	unsigned long pfn = page_to_pfn(pending_page(req, seg));
 	return (unsigned long)pfn_to_kaddr(pfn);
 }
 
@@ -106,7 +108,7 @@ static inline unsigned long vaddr(pending_req_t *req, int seg)
 
 
 static int do_block_io_op(blkif_t *blkif);
-static void dispatch_rw_block_io(blkif_t *blkif,
+static int dispatch_rw_block_io(blkif_t *blkif,
 				 blkif_request_t *req,
 				 pending_req_t *pending_req);
 static void make_response(blkif_t *blkif, u64 id,
@@ -175,7 +177,7 @@ static void fast_flush_area(pending_req_t *req)
 		handle = pending_handle(req, i);
 		if (handle == BLKBACK_INVALID_HANDLE)
 			continue;
-		blkback_pagemap_clear(virt_to_page(vaddr(req, i)));
+		blkback_pagemap_clear(pending_page(req, i));
 		gnttab_set_unmap_op(&unmap[invcount], vaddr(req, i),
 				    GNTMAP_host_map, handle);
 		pending_handle(req, i) = BLKBACK_INVALID_HANDLE;
@@ -308,13 +310,13 @@ static int do_block_io_op(blkif_t *blkif)
 	blkif_request_t req;
 	pending_req_t *pending_req;
 	RING_IDX rc, rp;
-	int more_to_do = 0;
+	int more_to_do = 0, ret;
 
 	rc = blk_rings->common.req_cons;
 	rp = blk_rings->common.sring->req_prod;
 	rmb(); /* Ensure we see queued requests up to 'rp'. */
 
-	while (rc != rp) {
+	while ((rc != rp) || (blkif->is_suspended_req)) {
 
 		if (RING_REQUEST_CONS_OVERFLOW(&blk_rings->common, rc))
 			break;
@@ -330,6 +332,14 @@ static int do_block_io_op(blkif_t *blkif)
 			more_to_do = 1;
 			break;
 		}
+
+        /* Handle the suspended request first, if one exists */
+        if(blkif->is_suspended_req)
+        {
+            memcpy(&req, &blkif->suspended_req, sizeof(req));
+            blkif->is_suspended_req = 0;
+            goto handle_request;
+        }
 
 		switch (blkif->blk_protocol) {
 		case BLKIF_PROTOCOL_NATIVE:
@@ -349,17 +359,19 @@ static int do_block_io_op(blkif_t *blkif)
 		/* Apply all sanity checks to /private copy/ of request. */
 		barrier();
 
+handle_request:
+        ret = 0;
 		switch (req.operation) {
 		case BLKIF_OP_READ:
 			blkif->st_rd_req++;
-			dispatch_rw_block_io(blkif, &req, pending_req);
+			ret = dispatch_rw_block_io(blkif, &req, pending_req); 
 			break;
 		case BLKIF_OP_WRITE_BARRIER:
 			blkif->st_br_req++;
 			/* fall through */
 		case BLKIF_OP_WRITE:
 			blkif->st_wr_req++;
-			dispatch_rw_block_io(blkif, &req, pending_req);
+			ret = dispatch_rw_block_io(blkif, &req, pending_req);
 			break;
 		case BLKIF_OP_PACKET:
 			DPRINTK("error: block operation BLKIF_OP_PACKET not implemented\n");
@@ -379,6 +391,17 @@ static int do_block_io_op(blkif_t *blkif)
 			free_req(pending_req);
 			break;
 		}
+        BUG_ON(ret != 0 && ret != -EAGAIN);
+        /* If we can't handle the request at the moment, save it, and break the
+         * loop */ 
+        if(ret == -EAGAIN)
+        {
+            memcpy(&blkif->suspended_req, &req, sizeof(req));
+            blkif->is_suspended_req = 1;
+            /* Return "no more work pending", restart will be handled 'out of
+             * band' */
+            return 0;
+        }
 
 		/* Yield point for this unbounded loop. */
 		cond_resched();
@@ -387,7 +410,7 @@ static int do_block_io_op(blkif_t *blkif)
 	return more_to_do;
 }
 
-static void dispatch_rw_block_io(blkif_t *blkif,
+static int dispatch_rw_block_io(blkif_t *blkif,
 				 blkif_request_t *req,
 				 pending_req_t *pending_req)
 {
@@ -456,14 +479,18 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 	ret = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, map, nseg);
 	BUG_ON(ret);
 
+#define GENERAL_ERR   (1<<0)
+#define EAGAIN_ERR    (1<<1)
 	for (i = 0; i < nseg; i++) {
 		if (unlikely(map[i].status != 0)) {
 			DPRINTK("invalid buffer -- could not remap it\n");
 			map[i].handle = BLKBACK_INVALID_HANDLE;
-			ret |= 1;
+			ret |= GENERAL_ERR;
+            if(map[i].status == GNTST_eagain)
+			    ret |= EAGAIN_ERR;
 		} else {
 			blkback_pagemap_set(vaddr_pagenr(pending_req, i),
-					    virt_to_page(vaddr(pending_req, i)),
+					    pending_page(pending_req, i),
 					    blkif->domid, req->handle,
 					    req->seg[i].gref);
 		}
@@ -473,12 +500,20 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 		if (ret)
 			continue;
 
-		set_phys_to_machine(__pa(vaddr(
-			pending_req, i)) >> PAGE_SHIFT,
+		set_phys_to_machine(
+			page_to_pfn(pending_page(pending_req, i)),
 			FOREIGN_FRAME(map[i].dev_bus_addr >> PAGE_SHIFT));
 		seg[i].buf  = map[i].dev_bus_addr | 
 			(req->seg[i].first_sect << 9);
 	}
+
+    /* If any of grant maps failed with GNTST_eagain, suspend and retry later */
+    if(ret & EAGAIN_ERR)
+    {
+        fast_flush_area(pending_req);
+        free_req(pending_req);
+        return -EAGAIN;
+    }
 
 	if (ret)
 		goto fail_flush;
@@ -505,7 +540,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 
 		while ((bio == NULL) ||
 		       (bio_add_page(bio,
-				     virt_to_page(vaddr(pending_req, i)),
+				     pending_page(pending_req, i),
 				     seg[i].nsec << 9,
 				     seg[i].buf & ~PAGE_MASK) == 0)) {
 			if (bio) {
@@ -545,7 +580,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 	else if (operation == WRITE || operation == WRITE_BARRIER)
 		blkif->st_wr_sect += preq.nr_sects;
 
-	return;
+	return 0;
 
  fail_flush:
 	fast_flush_area(pending_req);
@@ -553,7 +588,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 	make_response(blkif, req->id, req->operation, BLKIF_RSP_ERROR);
 	free_req(pending_req);
 	msleep(1); /* back off a bit */
-	return;
+	return 0;
 
  fail_put_bio:
 	__end_block_io_op(pending_req, -EINVAL);
@@ -561,7 +596,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 		bio_put(bio);
 	unplug_queue(blkif);
 	msleep(1); /* back off a bit */
-	return;
+	return 0;
 }
 
 

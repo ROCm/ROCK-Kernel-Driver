@@ -17,10 +17,10 @@
 
 #ifndef CONFIG_XEN
 atomic_t irq_err_count;
-#endif
 
 /* Function pointer for generic interrupt vector handling */
 void (*generic_interrupt_extension)(void) = NULL;
+#endif
 
 /*
  * 'what should we do if we get a hw irq event on an illegal vector'.
@@ -76,12 +76,14 @@ static int show_other_interrupts(struct seq_file *p, int prec)
 		seq_printf(p, "%10u ", irq_stats(j)->apic_pending_irqs);
 	seq_printf(p, "  Performance pending work\n");
 #endif
+#ifndef CONFIG_XEN
 	if (generic_interrupt_extension) {
 		seq_printf(p, "%*s: ", prec, "PLT");
 		for_each_online_cpu(j)
-			seq_printf(p, "%10u ", irq_stats(j)->x86_platform_ipis);
+			seq_printf(p, "%10u ", irq_stats(j)->generic_irqs);
 		seq_printf(p, "  Platform interrupts\n");
 	}
+#endif
 #ifdef CONFIG_SMP
 	seq_printf(p, "%*s: ", prec, "RES");
 	for_each_online_cpu(j)
@@ -195,8 +197,10 @@ u64 arch_irq_stat_cpu(unsigned int cpu)
 	sum += irq_stats(cpu)->apic_perf_irqs;
 	sum += irq_stats(cpu)->apic_pending_irqs;
 #endif
+#ifndef CONFIG_XEN
 	if (generic_interrupt_extension)
-		sum += irq_stats(cpu)->x86_platform_ipis;
+		sum += irq_stats(cpu)->generic_irqs;
+#endif
 #ifdef CONFIG_SMP
 	sum += irq_stats(cpu)->irq_resched_count;
 	sum += irq_stats(cpu)->irq_call_count;
@@ -286,5 +290,88 @@ void smp_generic_interrupt(struct pt_regs *regs)
 	irq_exit();
 
 	set_irq_regs(old_regs);
+}
+#endif
+
+#ifdef CONFIG_HOTPLUG_CPU
+#include <xen/evtchn.h>
+/* A cpu has been removed from cpu_online_mask.  Reset irq affinities. */
+void fixup_irqs(void)
+{
+	unsigned int irq;
+	static int warned;
+	struct irq_desc *desc;
+	static DECLARE_BITMAP(irqs_used, NR_IRQS);
+
+	for_each_irq_desc(irq, desc) {
+		int break_affinity = 0;
+		int set_affinity = 1;
+		const struct cpumask *affinity;
+
+		if (!desc)
+			continue;
+		if (irq == 2)
+			continue;
+
+		/* interrupt's are disabled at this point */
+		spin_lock(&desc->lock);
+
+		affinity = desc->affinity;
+		if (!irq_has_action(irq) ||
+		    (desc->status & IRQ_PER_CPU) ||
+		    cpumask_equal(affinity, cpu_online_mask)) {
+			spin_unlock(&desc->lock);
+			continue;
+		}
+
+		if (cpumask_test_cpu(smp_processor_id(), affinity))
+			__set_bit(irq, irqs_used);
+
+		if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids) {
+			break_affinity = 1;
+			affinity = cpu_all_mask;
+		}
+
+		if (!(desc->status & IRQ_MOVE_PCNTXT) && desc->chip->mask)
+			desc->chip->mask(irq);
+
+		if (desc->chip->set_affinity)
+			desc->chip->set_affinity(irq, affinity);
+		else if (!(warned++))
+			set_affinity = 0;
+
+		if (!(desc->status & IRQ_MOVE_PCNTXT) && desc->chip->unmask)
+			desc->chip->unmask(irq);
+
+		spin_unlock(&desc->lock);
+
+		if (break_affinity && set_affinity)
+			/*printk("Broke affinity for irq %i\n", irq)*/;
+		else if (!set_affinity)
+			printk("Cannot set affinity for irq %i\n", irq);
+	}
+
+	/*
+	 * We can remove mdelay() and then send spuriuous interrupts to
+	 * new cpu targets for all the irqs that were handled previously by
+	 * this cpu. While it works, I have seen spurious interrupt messages
+	 * (nothing wrong but still...).
+	 *
+	 * So for now, retain mdelay(1) and check the IRR and then send those
+	 * interrupts to new targets as this cpu is already offlined...
+	 */
+	mdelay(1);
+
+	for_each_irq_desc(irq, desc) {
+		if (!__test_and_clear_bit(irq, irqs_used))
+			continue;
+
+		if (xen_test_irq_pending(irq)) {
+			spin_lock(&desc->lock);
+			if (desc->chip->retrigger)
+				desc->chip->retrigger(irq);
+			spin_unlock(&desc->lock);
+		}
+	}
 }
 #endif

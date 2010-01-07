@@ -243,6 +243,13 @@ int blktap_request_pool_grow(void);
 int blktap_request_pool_shrink(void);
 struct blktap_request *blktap_request_allocate(struct blktap *);
 void blktap_request_free(struct blktap *, struct blktap_request *);
-unsigned long request_to_kaddr(struct blktap_request *, int);
+struct page *request_to_page(struct blktap_request *, int);
+
+static inline unsigned long
+request_to_kaddr(struct blktap_request *req, int seg)
+{
+	unsigned long pfn = page_to_pfn(request_to_page(req, seg));
+	return (unsigned long)pfn_to_kaddr(pfn);
+}
 
 #endif

@@ -501,7 +501,7 @@ static int gntdev_mmap (struct file *flip, struct vm_area_struct *vma)
 	unsigned long kernel_vaddr, user_vaddr;
 	uint32_t size = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
 	uint64_t ptep;
-	int ret;
+	int ret, exit_ret;
 	int flags;
 	int i;
 	struct page *page;
@@ -578,6 +578,7 @@ static int gntdev_mmap (struct file *flip, struct vm_area_struct *vma)
 	vma->vm_mm->context.has_foreign_mappings = 1;
 #endif
 
+    exit_ret = -ENOMEM;
 	for (i = 0; i < size; ++i) {
 
 		flags = GNTMAP_host_map;
@@ -586,7 +587,7 @@ static int gntdev_mmap (struct file *flip, struct vm_area_struct *vma)
 
 		kernel_vaddr = get_kernel_vaddr(private_data, slot_index + i);
 		user_vaddr = get_user_vaddr(vma, i);
-		page = pfn_to_page(__pa(kernel_vaddr) >> PAGE_SHIFT);
+		page = private_data->foreign_pages[slot_index + i];
 
 		gnttab_set_map_op(&op, kernel_vaddr, flags,   
 				  private_data->grants[slot_index+i]
@@ -599,13 +600,17 @@ static int gntdev_mmap (struct file *flip, struct vm_area_struct *vma)
 						&op, 1);
 		BUG_ON(ret);
 		if (op.status) {
-			printk(KERN_ERR "Error mapping the grant reference "
-			       "into the kernel (%d). domid = %d; ref = %d\n",
-			       op.status,
-			       private_data->grants[slot_index+i]
-			       .u.valid.domid,
-			       private_data->grants[slot_index+i]
-			       .u.valid.ref);
+            if(op.status != GNTST_eagain)
+				printk(KERN_ERR "Error mapping the grant reference "
+				       "into the kernel (%d). domid = %d; ref = %d\n",
+				       op.status,
+				       private_data->grants[slot_index+i]
+				       .u.valid.domid,
+				       private_data->grants[slot_index+i]
+				       .u.valid.ref);
+            else 
+                /* Propagate eagain instead of trying to fix it up */
+                exit_ret = -EAGAIN;
 			goto undo_map_out;
 		}
 
@@ -682,6 +687,9 @@ static int gntdev_mmap (struct file *flip, struct vm_area_struct *vma)
 				       .valid.domid,
 				       private_data->grants[slot_index+i].u
 				       .valid.ref);
+                /* This should never happen after we've mapped into 
+                 * the kernel space. */
+                BUG_ON(op.status == GNTST_eagain);
 				goto undo_map_out;
 			}
 			
@@ -705,9 +713,10 @@ static int gntdev_mmap (struct file *flip, struct vm_area_struct *vma)
 		}
 
 	}
+    exit_ret = 0;
 
 	up_write(&private_data->grants_sem);
-	return 0;
+	return exit_ret;
 
 undo_map_out:
 	/* If we have a mapping failure, the unmapping will be taken care of
@@ -725,7 +734,7 @@ undo_map_out:
 	
 	up_write(&private_data->grants_sem);
 
-	return -ENOMEM;
+	return exit_ret;
 }
 
 static pte_t gntdev_clear_pte(struct vm_area_struct *vma, unsigned long addr,
@@ -805,9 +814,9 @@ static pte_t gntdev_clear_pte(struct vm_area_struct *vma, unsigned long addr,
 			GNTDEV_SLOT_NOT_YET_MAPPED;
 
 		/* Invalidate the physical to machine mapping for this page. */
-		set_phys_to_machine(__pa(get_kernel_vaddr(private_data, 
-							  slot_index)) 
-				    >> PAGE_SHIFT, INVALID_P2M_ENTRY);
+		set_phys_to_machine(
+			page_to_pfn(private_data->foreign_pages[slot_index]),
+			INVALID_P2M_ENTRY);
 
 	} else {
 		copy = xen_ptep_get_and_clear_full(vma, addr, ptep, is_fullmm);

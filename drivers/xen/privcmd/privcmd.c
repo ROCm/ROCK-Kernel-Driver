@@ -37,7 +37,22 @@ static struct proc_dir_entry *capabilities_intf;
 #define HAVE_ARCH_PRIVCMD_MMAP
 #endif
 #ifndef HAVE_ARCH_PRIVCMD_MMAP
-static int privcmd_enforce_singleshot_mapping(struct vm_area_struct *vma);
+static int enforce_singleshot_mapping_fn(pte_t *pte, pgtable_t token,
+					 unsigned long addr, void *data)
+{
+	return pte_none(*pte) ? 0 : -EBUSY;
+}
+
+static inline int enforce_singleshot_mapping(struct vm_area_struct *vma,
+					     unsigned long addr,
+					     unsigned long npages)
+{
+	return apply_to_page_range(vma->vm_mm, addr, npages << PAGE_SHIFT,
+				   enforce_singleshot_mapping_fn, NULL) == 0;
+}
+#else
+#define enforce_singleshot_mapping(vma, addr, npages) \
+	privcmd_enforce_singleshot_mapping(vma)
 #endif
 
 static long privcmd_ioctl(struct file *file,
@@ -88,6 +103,9 @@ static long privcmd_ioctl(struct file *file,
 		if (copy_from_user(&mmapcmd, udata, sizeof(mmapcmd)))
 			return -EFAULT;
 
+		if (mmapcmd.num <= 0)
+			return -EINVAL;
+
 		p = mmapcmd.entry;
 		for (i = 0; i < mmapcmd.num;) {
 			int nr = min(mmapcmd.num - i, MMAP_NR_PER_PAGE);
@@ -115,8 +133,7 @@ static long privcmd_ioctl(struct file *file,
 
 		vma = find_vma(mm, msg->va);
 		rc = -EINVAL;
-		if (!vma || (msg->va != vma->vm_start) ||
-		    !privcmd_enforce_singleshot_mapping(vma))
+		if (!vma || (msg->va != vma->vm_start))
 			goto mmap_out;
 
 		va = vma->vm_start;
@@ -129,7 +146,6 @@ static long privcmd_ioctl(struct file *file,
 			while (i<nr) {
 
 				/* Do not allow range to wrap the address space. */
-				rc = -EINVAL;
 				if ((msg->npages > (LONG_MAX >> PAGE_SHIFT)) ||
 				    ((unsigned long)(msg->npages << PAGE_SHIFT) >= -va))
 					goto mmap_out;
@@ -139,6 +155,23 @@ static long privcmd_ioctl(struct file *file,
 				    ((msg->va+(msg->npages<<PAGE_SHIFT)) > vma->vm_end))
 					goto mmap_out;
 
+				va += msg->npages << PAGE_SHIFT;
+				msg++;
+				i++;
+			}
+		}
+
+		if (!enforce_singleshot_mapping(vma, vma->vm_start,
+						(va - vma->vm_start) >> PAGE_SHIFT))
+			goto mmap_out;
+
+		va = vma->vm_start;
+		i = 0;
+		list_for_each(l, &pagelist) {
+			int nr = i + min(mmapcmd.num - i, MMAP_NR_PER_PAGE);
+
+			msg = (privcmd_mmap_entry_t*)(l + 1);
+			while (i < nr) {
 				if ((rc = direct_remap_pfn_range(
 					     vma,
 					     msg->va & PAGE_MASK,
@@ -175,6 +208,7 @@ static long privcmd_ioctl(struct file *file,
 		int i;
 		LIST_HEAD(pagelist);
 		struct list_head *l, *l2;
+		int paged_out = 0;
 
 		if (!is_initial_xendomain())
 			return -EPERM;
@@ -183,7 +217,9 @@ static long privcmd_ioctl(struct file *file,
 			return -EFAULT;
 
 		nr_pages = m.num;
-		if ((m.num <= 0) || (nr_pages > (LONG_MAX >> PAGE_SHIFT)))
+		addr = m.addr;
+		if (m.num <= 0 || nr_pages > (LONG_MAX >> PAGE_SHIFT) ||
+		    addr != m.addr || nr_pages > (-addr >> PAGE_SHIFT))
 			return -EINVAL;
 
 		p = m.arr;
@@ -208,29 +244,36 @@ static long privcmd_ioctl(struct file *file,
 
 		down_write(&mm->mmap_sem);
 
-		vma = find_vma(mm, m.addr);
+		vma = find_vma(mm, addr);
 		ret = -EINVAL;
 		if (!vma ||
-		    (m.addr != vma->vm_start) ||
-		    ((m.addr + (nr_pages << PAGE_SHIFT)) != vma->vm_end) ||
-		    !privcmd_enforce_singleshot_mapping(vma)) {
+		    addr < vma->vm_start ||
+		    addr + (nr_pages << PAGE_SHIFT) > vma->vm_end ||
+		    !enforce_singleshot_mapping(vma, addr, nr_pages)) {
 			up_write(&mm->mmap_sem);
 			goto mmapbatch_out;
 		}
 
-		p = m.arr;
-		addr = m.addr;
 		i = 0;
 		ret = 0;
 		list_for_each(l, &pagelist) {
 			int nr = i + min(nr_pages - i, MMAPBATCH_NR_PER_PAGE);
+			int rc;
+
 			mfn = (unsigned long *)(l + 1);
 
 			while (i<nr) {
-				if(direct_remap_pfn_range(vma, addr & PAGE_MASK,
-							  *mfn, PAGE_SIZE,
-							  vma->vm_page_prot, m.dom) < 0) {
-					*mfn |= 0xf0000000U;
+				rc = direct_remap_pfn_range(vma, addr & PAGE_MASK,
+				                            *mfn, PAGE_SIZE,
+				                            vma->vm_page_prot, m.dom);
+				if(rc < 0) {
+					if (rc == -ENOENT)
+					{
+						*mfn |= 0x80000000U;
+						paged_out = 1;
+					}
+					else
+						*mfn |= 0xf0000000U;
 					ret++;
 				}
 				mfn++; i++; addr += PAGE_SIZE;
@@ -241,7 +284,10 @@ static long privcmd_ioctl(struct file *file,
 		if (ret > 0) {
 			p = m.arr;
 			i = 0;
-			ret = 0;
+			if (paged_out)
+				ret = -ENOENT;
+			else
+				ret = 0;
 			list_for_each(l, &pagelist) {
 				int nr = min(nr_pages - i, MMAPBATCH_NR_PER_PAGE);
 				mfn = (unsigned long *)(l + 1);
@@ -289,11 +335,6 @@ static int privcmd_mmap(struct file * file, struct vm_area_struct * vma)
 	vma->vm_private_data = NULL;
 
 	return 0;
-}
-
-static int privcmd_enforce_singleshot_mapping(struct vm_area_struct *vma)
-{
-	return (xchg(&vma->vm_private_data, (void *)1) == NULL);
 }
 #endif
 

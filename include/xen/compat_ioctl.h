@@ -23,6 +23,11 @@
 #define __LINUX_XEN_COMPAT_H__ 
 
 #include <linux/compat.h>
+#include <linux/compiler.h>
+
+#if defined(CONFIG_X86) || defined(CONFIG_IA64)
+#define xen_pfn32_t __u32
+#endif
 
 extern int privcmd_ioctl_32(int fd, unsigned int cmd, unsigned long arg);
 struct privcmd_mmap_32 {
@@ -34,7 +39,14 @@ struct privcmd_mmap_32 {
 struct privcmd_mmapbatch_32 {
 	int num;     /* number of pages to populate */
 	domid_t dom; /* target domain */
+#if defined(CONFIG_X86) || defined(CONFIG_IA64)
+	union {      /* virtual address */
+		__u64 addr __packed;
+		__u32 va; /* ensures union is 4-byte aligned */
+	};
+#else
 	__u64 addr;  /* virtual address */
+#endif
 	compat_uptr_t arr; /* array of mfns - top nibble set on err */
 };
 #define IOCTL_PRIVCMD_MMAP_32                   \

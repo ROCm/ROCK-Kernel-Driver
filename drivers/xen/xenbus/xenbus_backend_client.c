@@ -31,6 +31,7 @@
  */
 
 #include <linux/err.h>
+#include <linux/delay.h>
 #include <xen/gnttab.h>
 #include <xen/xenbus.h>
 #include <xen/driver_util.h>
@@ -48,8 +49,11 @@ struct vm_struct *xenbus_map_ring_valloc(struct xenbus_device *dev, int gnt_ref)
 	gnttab_set_map_op(&op, (unsigned long)area->addr, GNTMAP_host_map,
 			  gnt_ref, dev->otherend_id);
 	
-	if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1))
-		BUG();
+    do {
+	    if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1))
+		    BUG();
+        msleep(10);
+    } while(op.status == GNTST_eagain);
 
 	if (op.status != GNTST_okay) {
 		free_vm_area(area);
@@ -75,8 +79,11 @@ int xenbus_map_ring(struct xenbus_device *dev, int gnt_ref,
 	
 	gnttab_set_map_op(&op, (unsigned long)vaddr, GNTMAP_host_map,
 			  gnt_ref, dev->otherend_id);
-	if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1))
-		BUG();
+    do {
+	    if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1))
+		    BUG();
+        msleep(10);
+    } while(op.status == GNTST_eagain);
 
 	if (op.status != GNTST_okay) {
 		xenbus_dev_fatal(dev, op.status,

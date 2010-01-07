@@ -657,6 +657,17 @@ struct page **alloc_empty_pages_and_pagevec(int nr_pages)
 		return NULL;
 
 	for (i = 0; i < nr_pages; i++) {
+		balloon_lock(flags);
+		page = balloon_first_page();
+		if (page && !PageHighMem(page)) {
+			UNLIST_PAGE(page);
+			bs.balloon_low--;
+			balloon_unlock(flags);
+			pagevec[i] = page;
+			continue;
+		}
+		balloon_unlock(flags);
+
 		page = pagevec[i] = alloc_page(GFP_KERNEL|__GFP_COLD);
 		if (page == NULL)
 			goto err;

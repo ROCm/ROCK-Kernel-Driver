@@ -82,7 +82,7 @@ typedef unsigned long xen_pfn_t;
 /* Maximum number of virtual CPUs in multi-processor guests. */
 /* keep sizeof(struct shared_page) <= PAGE_SIZE.
  * this is checked in arch/ia64/xen/hypervisor.c. */
-#define MAX_VIRT_CPUS	64
+#define XEN_LEGACY_MAX_VCPUS 64
 
 #ifndef __ASSEMBLY__
 

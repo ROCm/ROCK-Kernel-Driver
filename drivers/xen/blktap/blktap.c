@@ -171,11 +171,16 @@ static inline unsigned int RTN_PEND_IDX(pending_req_t *req, int idx) {
 #define BLKBACK_INVALID_HANDLE (~0)
 
 static struct page **foreign_pages[MAX_DYNAMIC_MEM];
-static inline unsigned long idx_to_kaddr(
+static inline struct page *idx_to_page(
 	unsigned int mmap_idx, unsigned int req_idx, unsigned int sg_idx)
 {
 	unsigned int arr_idx = req_idx*BLKIF_MAX_SEGMENTS_PER_REQUEST + sg_idx;
-	unsigned long pfn = page_to_pfn(foreign_pages[mmap_idx][arr_idx]);
+	return foreign_pages[mmap_idx][arr_idx];
+}
+static inline unsigned long idx_to_kaddr(
+	unsigned int mmap_idx, unsigned int req_idx, unsigned int sg_idx)
+{
+	unsigned long pfn = page_to_pfn(idx_to_page(mmap_idx,req_idx,sg_idx));
 	return (unsigned long)pfn_to_kaddr(pfn);
 }
 
@@ -346,7 +351,7 @@ static pte_t blktap_clear_pte(struct vm_area_struct *vma,
 	mmap_idx = ID_TO_MIDX(info->idx_map[usr_idx]);
 
 	kvaddr = idx_to_kaddr(mmap_idx, pending_idx, seg);
-	pg = pfn_to_page(__pa(kvaddr) >> PAGE_SHIFT);
+	pg = idx_to_page(mmap_idx, pending_idx, seg);
 	ClearPageReserved(pg);
 	info->foreign_map.map[offset + RING_PAGES] = NULL;
 
@@ -1043,7 +1048,7 @@ static void fast_flush_area(pending_req_t *req, int k_idx, int u_idx,
 	struct grant_handle_pair *khandle;
 	uint64_t ptep;
 	int ret, mmap_idx;
-	unsigned long kvaddr, uvaddr;
+	unsigned long uvaddr;
 	tap_blkif_t *info;
 	struct mm_struct *mm;
 	
@@ -1069,7 +1074,6 @@ static void fast_flush_area(pending_req_t *req, int k_idx, int u_idx,
 	mmap_idx = req->mem_idx;
 
 	for (i = 0; i < req->nr_pages; i++) {
-		kvaddr = idx_to_kaddr(mmap_idx, k_idx, i);
 		uvaddr = MMAP_VADDR(info->user_vstart, u_idx, i);
 
 		khandle = &pending_handle(mmap_idx, k_idx, i);
@@ -1081,8 +1085,8 @@ static void fast_flush_area(pending_req_t *req, int k_idx, int u_idx,
 			invcount++;
 
 			set_phys_to_machine(
-				__pa(idx_to_kaddr(mmap_idx, k_idx, i))
-				>> PAGE_SHIFT, INVALID_P2M_ENTRY);
+				page_to_pfn(idx_to_page(mmap_idx, k_idx, i)),
+				INVALID_P2M_ENTRY);
 		}
 
 		if (khandle->user != INVALID_GRANT_HANDLE) {
@@ -1231,14 +1235,13 @@ static int blktap_read_ufe_ring(tap_blkif_t *info)
 
 		for (j = 0; j < pending_req->nr_pages; j++) {
 
-			unsigned long kvaddr, uvaddr;
+			unsigned long uvaddr;
 			struct page *pg;
 			int offset;
 
 			uvaddr = MMAP_VADDR(info->user_vstart, usr_idx, j);
-			kvaddr = idx_to_kaddr(mmap_idx, pending_idx, j);
 
-			pg = pfn_to_page(__pa(kvaddr) >> PAGE_SHIFT);
+			pg = idx_to_page(mmap_idx, pending_idx, j);
 			ClearPageReserved(pg);
 			offset = (uvaddr - info->rings_vstart) >> PAGE_SHIFT;
 			info->foreign_map.map[offset] = NULL;
@@ -1524,16 +1527,16 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 
 		for (i = 0; i < (nseg*2); i+=2) {
 			unsigned long uvaddr;
-			unsigned long kvaddr;
 			unsigned long offset;
 			struct page *pg;
 
 			uvaddr = MMAP_VADDR(info->user_vstart, usr_idx, i/2);
-			kvaddr = idx_to_kaddr(mmap_idx, pending_idx, i/2);
 
 			if (unlikely(map[i].status != 0)) {
 				WPRINTK("invalid kernel buffer -- "
 					"could not remap it\n");
+                if(map[i].status == GNTST_eagain)
+                    WPRINTK("grant GNTST_eagain: please use blktap2\n");
 				ret |= 1;
 				map[i].handle = INVALID_GRANT_HANDLE;
 			}
@@ -1553,26 +1556,26 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 			if (ret)
 				continue;
 
-			set_phys_to_machine(__pa(kvaddr) >> PAGE_SHIFT,
+			pg = idx_to_page(mmap_idx, pending_idx, i/2);
+			set_phys_to_machine(page_to_pfn(pg),
 					    FOREIGN_FRAME(map[i].dev_bus_addr
 							  >> PAGE_SHIFT));
 			offset = (uvaddr - info->rings_vstart) >> PAGE_SHIFT;
-			pg = pfn_to_page(__pa(kvaddr) >> PAGE_SHIFT);
 			info->foreign_map.map[offset] = pg;
 		}
 	} else {
 		for (i = 0; i < nseg; i++) {
 			unsigned long uvaddr;
-			unsigned long kvaddr;
 			unsigned long offset;
 			struct page *pg;
 
 			uvaddr = MMAP_VADDR(info->user_vstart, usr_idx, i);
-			kvaddr = idx_to_kaddr(mmap_idx, pending_idx, i);
 
 			if (unlikely(map[i].status != 0)) {
 				WPRINTK("invalid kernel buffer -- "
 					"could not remap it\n");
+                if(map[i].status == GNTST_eagain)
+                    WPRINTK("grant GNTST_eagain: please use blktap2\n");
 				ret |= 1;
 				map[i].handle = INVALID_GRANT_HANDLE;
 			}
@@ -1584,7 +1587,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 				continue;
 
 			offset = (uvaddr - info->rings_vstart) >> PAGE_SHIFT;
-			pg = pfn_to_page(__pa(kvaddr) >> PAGE_SHIFT);
+			pg = idx_to_page(mmap_idx, pending_idx, i);
 			info->foreign_map.map[offset] = pg;
 		}
 	}
@@ -1596,11 +1599,9 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 		down_write(&mm->mmap_sem);
 	/* Mark mapped pages as reserved: */
 	for (i = 0; i < req->nr_segments; i++) {
-		unsigned long kvaddr;
 		struct page *pg;
 
-		kvaddr = idx_to_kaddr(mmap_idx, pending_idx, i);
-		pg = pfn_to_page(__pa(kvaddr) >> PAGE_SHIFT);
+		pg = idx_to_page(mmap_idx, pending_idx, i);
 		SetPageReserved(pg);
 		if (xen_feature(XENFEAT_auto_translated_physmap)) {
 			unsigned long uvaddr = MMAP_VADDR(info->user_vstart,

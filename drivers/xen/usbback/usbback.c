@@ -392,6 +392,16 @@ static int usbbk_gnttab_map(usbif_t *usbif,
 		ret = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref,
 					map, nr_segs);
 		BUG_ON(ret);
+        /* Make sure than none of the map ops failed with GNTST_eagain */
+        for( i = 0; i < nr_segs; i++) {
+            while(map[i].status == GNTST_eagain) {
+                msleep(10);
+		        ret = HYPERVISOR_grant_table_op(
+                                GNTTABOP_map_grant_ref,
+				                &map[i], 1);
+		        BUG_ON(ret);
+            }
+        }
 
 		for (i = 0; i < nr_segs; i++) {
 			if (unlikely(map[i].status != 0)) {

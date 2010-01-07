@@ -23,6 +23,7 @@
  */
 
 #include <linux/if_ether.h>
+#include <linux/delay.h>
 #include <asm/io.h>
 #include <asm/pgtable.h>
 #include <asm/hypercall.h>
@@ -143,7 +144,7 @@ struct net_accel_valloc_grant_mapping {
 /* Map a series of grants into a contiguous virtual area */
 static void *net_accel_map_grants_valloc(struct xenbus_device *dev, 
 					 unsigned *grants, int npages, 
-					 unsigned flags, void **priv)
+					 unsigned flags, void **priv, int *errno)
 {
 	struct net_accel_valloc_grant_mapping *map;
 	struct vm_struct *vm;
@@ -171,11 +172,16 @@ static void *net_accel_map_grants_valloc(struct xenbus_device *dev,
 
 	/* Do the actual mapping */
 	addr = vm->addr;
+    if(errno != NULL) *errno = 0;
 	for (i = 0; i < npages; i++) {
 		rc = net_accel_map_grant(dev, grants[i], map->grant_handles + i, 
 					 addr, NULL, flags);
 		if (rc != 0)
+        {
+            if(errno != NULL) 
+                *errno = (rc == GNTST_eagain ? -EAGAIN : -EINVAL);
 			goto undo;
+        }
 		addr = (void*)((unsigned long)addr + PAGE_SIZE);
 	}
 
@@ -224,8 +230,16 @@ void *net_accel_map_grants_contig(struct xenbus_device *dev,
 				unsigned *grants, int npages, 
 				void **priv)
 {
-	return net_accel_map_grants_valloc(dev, grants, npages,
-					   GNTMAP_host_map, priv);
+    int errno;
+    void *ret;
+
+    do {
+	    ret = net_accel_map_grants_valloc(dev, grants, npages,
+					   GNTMAP_host_map, priv, &errno);
+        if(errno) msleep(10);
+    } while(errno == -EAGAIN);
+
+    return ret;
 }
 EXPORT_SYMBOL(net_accel_map_grants_contig);
 
@@ -241,8 +255,16 @@ EXPORT_SYMBOL(net_accel_unmap_grants_contig);
 void *net_accel_map_iomem_page(struct xenbus_device *dev, int gnt_ref,
 			     void **priv)
 {
-	return net_accel_map_grants_valloc(dev, &gnt_ref, 1, 
-					   GNTMAP_host_map, priv);
+    int errno;
+    void *ret;
+
+	do {
+        ret = net_accel_map_grants_valloc(dev, &gnt_ref, 1, 
+					   GNTMAP_host_map, priv, &errno);
+        if(errno) msleep(10);
+    } while(errno == -EAGAIN);
+
+    return ret;
 }
 EXPORT_SYMBOL(net_accel_map_iomem_page);
 
