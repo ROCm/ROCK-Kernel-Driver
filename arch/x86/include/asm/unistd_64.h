@@ -661,10 +661,6 @@ __SYSCALL(__NR_pwritev, sys_pwritev)
 __SYSCALL(__NR_rt_tgsigqueueinfo, sys_rt_tgsigqueueinfo)
 #define __NR_perf_event_open			298
 __SYSCALL(__NR_perf_event_open, sys_perf_event_open)
-#define __NR_getprlimit				299
-__SYSCALL(__NR_getprlimit, sys_getprlimit)
-#define __NR_setprlimit				300
-__SYSCALL(__NR_setprlimit, sys_setprlimit)
 
 #ifndef __NO_STUBS
 #define __ARCH_WANT_OLD_READDIR
