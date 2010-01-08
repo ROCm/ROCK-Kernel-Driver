@@ -43,7 +43,6 @@
 #include <linux/list.h>
 #include <linux/jiffies.h>
 #include <linux/semaphore.h>
-#include <linux/syscalls.h>
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
@@ -51,15 +50,6 @@
 #include <acpi/acpi.h>
 #include <acpi/acpi_bus.h>
 #include <acpi/processor.h>
-
-/* We need these to manipulate the global table array. The existing
- * accessors in acpica/ only pass back the table header and we need
- * the descriptor. */
-#include "acpica/acconfig.h"
-#include "acpica/aclocal.h"
-#include "acpica/acglobal.h"
-#include "acpica/acutils.h"
-#include "acpica/actables.h"
 
 #define _COMPONENT		ACPI_OS_SERVICES
 ACPI_MODULE_NAME("osl");
@@ -107,23 +97,6 @@ static DEFINE_SPINLOCK(acpi_res_lock);
 
 #define	OSI_STRING_LENGTH_MAX 64	/* arbitrary */
 static char osi_additional_string[OSI_STRING_LENGTH_MAX];
-
-#ifdef CONFIG_ACPI_CUSTOM_OVERRIDE_INITRAMFS
-static int acpi_no_initrd_override;
-static int __init acpi_no_initrd_override_setup(char *s)
-{
-	acpi_no_initrd_override = 1;
-	return 1;
-}
-
-static int __init acpi_no_initramfs_override_setup(char *s)
-{
-	return acpi_no_initrd_override_setup(s);
-}
-
-__setup("acpi_no_initrd_override", acpi_no_initrd_override_setup);
-__setup("acpi_no_initramfs_override", acpi_no_initramfs_override_setup);
-#endif
 
 /*
  * The story of _OSI(Linux)
@@ -379,144 +352,6 @@ acpi_os_predefined_override(const struct acpi_predefined_names *init_val,
 	return AE_OK;
 }
 
-#ifdef CONFIG_ACPI_CUSTOM_OVERRIDE_INITRAMFS
-struct acpi_override_table_entry
-{
-	const char *name;
-	struct acpi_table_header *table;
-};
-
-static struct acpi_override_table_entry acpi_override_table_entries[] = {
-	{ .name = "DSDT", },
-	{}
-};
-
-acpi_status __init
-acpi_load_one_override_table(struct acpi_override_table_entry *entry)
-{
-	int fd, ret;
-	acpi_status err = AE_OK;
-	char filename[10]; /* /DSDT.aml\0 */
-	struct kstat stat;
-
-	snprintf(filename, sizeof(filename), "/%.4s.aml", entry->name);
-
-	fd = sys_open(filename, O_RDONLY, 0);
-	if (fd < 0)
-		return AE_NOT_FOUND;
-
-	ret = vfs_fstat(fd, &stat);
-	if (ret < 0) {
-		printk(KERN_ERR "ACPI: fstat failed while trying to read %s\n",
-		       filename);
-		err = AE_ERROR;
-		goto out;
-	}
-
-	entry->table = kmalloc(stat.size, GFP_KERNEL);
-	if (!entry->table) {
-		printk(KERN_ERR "ACPI: Could not allocate memory to "
-		       "override %s\n", entry->name);
-		err = AE_NO_MEMORY;
-		goto out;
-	}
-
-	ret = sys_read(fd, (char *)entry->table, stat.size);
-	sys_close(fd);
-	if (ret != stat.size) {
-		printk(KERN_ERR "ACPI: Failed to read %s from initramfs\n",
-		       entry->name);
-		err = AE_ERROR;
-		goto out;
-	}
-
-out:
-	if (err != AE_OK) {
-		kfree(entry->table);
-		entry->table = NULL;
-	}
-	sys_close(fd);
-	return ret;
-}
-
-static void __init
-acpi_replace_table(struct acpi_table_desc *table, struct acpi_table_header *new)
-{
-	/* This is the top part of acpi_load_table */
-	memset(table, 0, sizeof(*table));
-	table->address = ACPI_PTR_TO_PHYSADDR(new);
-	table->pointer = new;
-	table->length = new->length;
-	table->flags |= ACPI_TABLE_ORIGIN_OVERRIDE;
-	table->flags |= ACPI_TABLE_ORIGIN_ALLOCATED;
-	memcpy(table->signature.ascii, new->signature, ACPI_NAME_SIZE);
-}
-
-/* This replaces tables already opportunistically loaded, but not used.
- * If the acpica code provided a table descriptor lookup then we wouldn't
- * need to open code this. */
-static void __init
-acpi_override_tables(void)
-{
-	struct acpi_table_header *new = NULL;
-	struct acpi_table_desc *table;
-	acpi_status status;
-	int i;
-
-	/* This is early enough that we don't need the mutex yet */
-	for (i = 0; i < acpi_gbl_root_table_list.count; ++i) {
-		if (acpi_tb_is_table_loaded(i))
-			continue;
-
-		table = &acpi_gbl_root_table_list.tables[i];
-		if (!table->pointer)
-			status = acpi_tb_verify_table(table);
-
-		if (ACPI_FAILURE(status) || !table->pointer)
-			continue;
-
-		status = acpi_os_table_override(table->pointer, &new);
-		if (ACPI_SUCCESS(status) && new) {
-			acpi_replace_table(table, new);
-			acpi_tb_print_table_header(table->address, new);
-		}
-	}
-}
-
-acpi_status __init
-acpi_load_override_tables(void)
-{
-	struct acpi_override_table_entry *entry = acpi_override_table_entries;
-	while (entry && entry->name) {
-		acpi_load_one_override_table(entry);
-		entry++;
-	}
-
-	acpi_override_tables();
-	return AE_OK;
-}
-
-static struct acpi_table_header *
-acpi_get_override_table(const char *name)
-{
-	struct acpi_override_table_entry *entry = acpi_override_table_entries;
-
-	while (entry && entry->name) {
-		if (!memcmp(name, entry->name, ACPI_NAME_SIZE))
-			return entry->table;;
-		entry++;
-	}
-
-	return NULL;
-}
-#else
-acpi_status
-acpi_load_override_tables(void)
-{
-	return AE_OK;
-}
-#endif
-
 acpi_status
 acpi_os_table_override(struct acpi_table_header * existing_table,
 		       struct acpi_table_header ** new_table)
@@ -529,10 +364,6 @@ acpi_os_table_override(struct acpi_table_header * existing_table,
 #ifdef CONFIG_ACPI_CUSTOM_DSDT
 	if (strncmp(existing_table->signature, "DSDT", 4) == 0)
 		*new_table = (struct acpi_table_header *)AmlCode;
-#endif
-#ifdef CONFIG_ACPI_CUSTOM_OVERRIDE_INITRAMFS
-	if (!acpi_no_initrd_override)
-		*new_table = acpi_get_override_table(existing_table->signature);
 #endif
 	if (*new_table != NULL) {
 		printk(KERN_WARNING PREFIX "Override [%4.4s-%8.8s], "
