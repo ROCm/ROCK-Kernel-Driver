@@ -274,39 +274,6 @@ asmlinkage long compat_sys_sigprocmask(int how, compat_old_sigset_t __user *set,
 	return ret;
 }
 
-static int get_compat_rlimit(struct rlimit *dst,
-		const struct compat_rlimit __user *src)
-{
-	if (!access_ok(VERIFY_READ, src, sizeof(*src)) ||
-			__get_user(dst->rlim_cur, &src->rlim_cur) ||
-			__get_user(dst->rlim_max, &src->rlim_max))
-		return -EFAULT;
-
-	if (dst->rlim_cur == COMPAT_RLIM_INFINITY)
-		dst->rlim_cur = RLIM_INFINITY;
-	if (dst->rlim_max == COMPAT_RLIM_INFINITY)
-		dst->rlim_max = RLIM_INFINITY;
-	return 0;
-}
-
-static int put_compat_rlimit(const struct rlimit *src,
-		struct compat_rlimit __user *dst)
-{
-	struct rlimit r = *src;
-
-	if (r.rlim_cur > COMPAT_RLIM_INFINITY)
-		r.rlim_cur = COMPAT_RLIM_INFINITY;
-	if (r.rlim_max > COMPAT_RLIM_INFINITY)
-		r.rlim_max = COMPAT_RLIM_INFINITY;
-
-	if (!access_ok(VERIFY_WRITE, dst, sizeof(*dst)) ||
-	    __put_user(r.rlim_cur, &dst->rlim_cur) ||
-	    __put_user(r.rlim_max, &dst->rlim_max))
-		return -EFAULT;
-
-	return 0;
-}
-
 asmlinkage long compat_sys_setrlimit(unsigned int resource,
 		struct compat_rlimit __user *rlim)
 {
@@ -317,12 +284,17 @@ asmlinkage long compat_sys_setrlimit(unsigned int resource,
 	if (resource >= RLIM_NLIMITS)
 		return -EINVAL;
 
-	ret = get_compat_rlimit(&r, rlim);
-	if (ret)
-		return ret;
+	if (!access_ok(VERIFY_READ, rlim, sizeof(*rlim)) ||
+	    __get_user(r.rlim_cur, &rlim->rlim_cur) ||
+	    __get_user(r.rlim_max, &rlim->rlim_max))
+		return -EFAULT;
 
+	if (r.rlim_cur == COMPAT_RLIM_INFINITY)
+		r.rlim_cur = RLIM_INFINITY;
+	if (r.rlim_max == COMPAT_RLIM_INFINITY)
+		r.rlim_max = RLIM_INFINITY;
 	set_fs(KERNEL_DS);
-	ret = sys_setrlimit(resource, (struct rlimit __force __user *)&r);
+	ret = sys_setrlimit(resource, (struct rlimit __user *) &r);
 	set_fs(old_fs);
 	return ret;
 }
@@ -364,42 +336,19 @@ asmlinkage long compat_sys_getrlimit (unsigned int resource,
 	mm_segment_t old_fs = get_fs();
 
 	set_fs(KERNEL_DS);
-	ret = sys_getrlimit(resource, (struct rlimit __force __user *)&r);
+	ret = sys_getrlimit(resource, (struct rlimit __user *) &r);
 	set_fs(old_fs);
-	if (!ret)
-		ret = put_compat_rlimit(&r, rlim);
-	return ret;
-}
+	if (!ret) {
+		if (r.rlim_cur > COMPAT_RLIM_INFINITY)
+			r.rlim_cur = COMPAT_RLIM_INFINITY;
+		if (r.rlim_max > COMPAT_RLIM_INFINITY)
+			r.rlim_max = COMPAT_RLIM_INFINITY;
 
-asmlinkage long compat_sys_setprlimit(pid_t pid, unsigned int resource,
-		struct compat_rlimit __user *rlim)
-{
-	mm_segment_t old_fs = get_fs ();
-	struct rlimit r;
-	int ret;
-
-	ret = get_compat_rlimit(&r, rlim);
-	if (ret)
-		return ret;
-
-	set_fs(KERNEL_DS);
-	ret = sys_setprlimit(pid, resource, (struct rlimit __force __user *)&r);
-	set_fs(old_fs);
-	return ret;
-}
-
-asmlinkage long compat_sys_getprlimit(pid_t pid, unsigned int resource,
-		struct compat_rlimit __user *rlim)
-{
-	mm_segment_t old_fs = get_fs();
-	struct rlimit r;
-	int ret;
-
-	set_fs(KERNEL_DS);
-	ret = sys_getprlimit(pid, resource, (struct rlimit __force __user *)&r);
-	set_fs(old_fs);
-	if (!ret)
-		ret = put_compat_rlimit(&r, rlim);
+		if (!access_ok(VERIFY_WRITE, rlim, sizeof(*rlim)) ||
+		    __put_user(r.rlim_cur, &rlim->rlim_cur) ||
+		    __put_user(r.rlim_max, &rlim->rlim_max))
+			return -EFAULT;
+	}
 	return ret;
 }
 
