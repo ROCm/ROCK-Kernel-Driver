@@ -376,7 +376,7 @@ void arch_pick_mmap_layout(struct mm_struct *mm)
 	 * Fall back to the standard layout if the personality
 	 * bit is set, or if the expected stack growth is unlimited:
 	 */
-	gap = rlim_get_cur(RLIMIT_STACK);
+	gap = rlimit(RLIMIT_STACK);
 	if (!test_thread_flag(TIF_32BIT) ||
 	    (current->personality & ADDR_COMPAT_LAYOUT) ||
 	    gap == RLIM_INFINITY ||

@@ -1485,7 +1485,7 @@ void set_process_cpu_timer(struct task_struct *tsk, unsigned int clock_idx,
 		 * If the RLIMIT_CPU timer will expire before the
 		 * ITIMER_PROF timer, we have nothing else to do.
 		 */
-		if (task_rlim_get_cur(tsk, RLIMIT_CPU)
+		if (task_rlimit(tsk, RLIMIT_CPU)
 		    < cputime_to_secs(*newval))
 			return;
 	}

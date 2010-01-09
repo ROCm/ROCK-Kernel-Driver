@@ -257,7 +257,7 @@ int expand_files(struct files_struct *files, int nr)
 	 * N.B. For clone tasks sharing a files structure, this test
 	 * will limit the total number of files that can be opened.
 	 */
-	if (nr >= rlim_get_cur(RLIMIT_NOFILE))
+	if (nr >= rlimit(RLIMIT_NOFILE))
 		return -EMFILE;
 
 	/* Do we need to expand? */

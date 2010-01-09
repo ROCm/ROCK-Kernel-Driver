@@ -54,7 +54,7 @@ static ssize_t do_coredump_read(int num, struct spu_context *ctx, void *buffer,
  */
 static int spufs_dump_write(struct file *file, const void *addr, int nr, loff_t *foffset)
 {
-	unsigned long limit = rlim_get_cur(RLIMIT_CORE);
+	unsigned long limit = rlimit(RLIMIT_CORE);
 	ssize_t written;
 
 	if (*foffset + nr > limit)

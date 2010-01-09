@@ -581,7 +581,7 @@ int setup_arg_pages(struct linux_binprm *bprm,
 
 #ifdef CONFIG_STACK_GROWSUP
 	/* Limit stack size to 1GB */
-	stack_base = rlim_get_max(RLIMIT_STACK);
+	stack_base = rlimit_max(RLIMIT_STACK);
 	if (stack_base > (1 << 30))
 		stack_base = 1 << 30;
 
@@ -1516,7 +1516,7 @@ static int format_corename(char *corename, long signr)
 			/* core limit size */
 			case 'c':
 				rc = snprintf(out_ptr, out_end - out_ptr,
-					"%lu", rlim_get_cur(RLIMIT_CORE));
+					      "%lu", rlimit(RLIMIT_CORE));
 				if (rc > out_end - out_ptr)
 					goto out;
 				out_ptr += rc;
@@ -1775,7 +1775,7 @@ void do_coredump(long signr, int exit_code, struct pt_regs *regs)
 	int retval = 0;
 	int flag = 0;
 	int ispipe = 0;
-	unsigned long core_limit = rlim_get_cur(RLIMIT_CORE);
+	unsigned long core_limit = rlimit(RLIMIT_CORE);
 	char **helper_argv = NULL;
 	int helper_argc = 0;
 	int dump_count = 0;

@@ -82,7 +82,7 @@ int inode_newsize_ok(const struct inode *inode, loff_t offset)
 	if (inode->i_size < offset) {
 		unsigned long limit;
 
-		limit = rlim_get_cur(RLIMIT_FSIZE);
+		limit = rlimit(RLIMIT_FSIZE);
 		if (limit != RLIM_INFINITY && offset > limit)
 			goto out_sig;
 		if (offset > inode->i_sb->s_maxbytes)

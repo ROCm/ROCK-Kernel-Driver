@@ -1684,8 +1684,8 @@ static void watchdog(struct rq *rq, struct task_struct *p)
 		return;
 
 	/* max may change after cur was read, this will be fixed next tick */
-	soft = task_rlim_get_cur(p, RLIMIT_RTTIME);
-	hard = task_rlim_get_max(p, RLIMIT_RTTIME);
+	soft = task_rlimit(p, RLIMIT_RTTIME);
+	hard = task_rlimit_max(p, RLIMIT_RTTIME);
 
 	if (soft != RLIM_INFINITY) {
 		unsigned long next;

@@ -3,8 +3,6 @@
 
 #include <linux/time.h>
 
-struct task_struct;
-
 /*
  * Resource control/accounting header file for linux
  */
@@ -70,8 +68,14 @@ struct rlimit {
  */
 #include <asm/resource.h>
 
+#ifdef __KERNEL__
+
+struct task_struct;
+
 int getrusage(struct task_struct *p, int who, struct rusage __user *ru);
 int do_setrlimit(struct task_struct *tsk, unsigned int resource,
 		struct rlimit *new_rlim);
+
+#endif /* __KERNEL__ */
 
 #endif
