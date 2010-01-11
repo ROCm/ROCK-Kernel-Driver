@@ -43,11 +43,11 @@ BFA_TRC_FILE(FCS, PORT);
 static void     bfa_fcs_port_aen_post(struct bfa_fcs_port_s *port,
 				      enum bfa_lport_aen_event event);
 static void     bfa_fcs_port_send_ls_rjt(struct bfa_fcs_port_s *port,
-			struct fchs_s *rx_fchs, u8 reason_code,
-			u8 reason_code_expl);
+					 struct fchs_s *rx_fchs, u8 reason_code,
+					 u8 reason_code_expl);
 static void     bfa_fcs_port_plogi(struct bfa_fcs_port_s *port,
-			struct fchs_s *rx_fchs,
-			struct fc_logi_s *plogi);
+				struct fchs_s *rx_fchs,
+				   struct fc_logi_s *plogi);
 static void     bfa_fcs_port_online_actions(struct bfa_fcs_port_s *port);
 static void     bfa_fcs_port_offline_actions(struct bfa_fcs_port_s *port);
 static void     bfa_fcs_port_unknown_init(struct bfa_fcs_port_s *port);
@@ -55,13 +55,14 @@ static void     bfa_fcs_port_unknown_online(struct bfa_fcs_port_s *port);
 static void     bfa_fcs_port_unknown_offline(struct bfa_fcs_port_s *port);
 static void     bfa_fcs_port_deleted(struct bfa_fcs_port_s *port);
 static void     bfa_fcs_port_echo(struct bfa_fcs_port_s *port,
-			struct fchs_s *rx_fchs,
-			struct fc_echo_s *echo, u16 len);
+					struct fchs_s *rx_fchs,
+				  struct fc_echo_s *echo, u16 len);
 static void     bfa_fcs_port_rnid(struct bfa_fcs_port_s *port,
-			struct fchs_s *rx_fchs,
-			struct fc_rnid_cmd_s *rnid, u16 len);
+					struct fchs_s *rx_fchs,
+				  struct fc_rnid_cmd_s *rnid, u16 len);
 static void     bfa_fs_port_get_gen_topo_data(struct bfa_fcs_port_s *port,
-			struct fc_rnid_general_topology_data_s *gen_topo_data);
+			struct fc_rnid_general_topology_data_s *
+					      gen_topo_data);
 
 static struct {
 	void            (*init) (struct bfa_fcs_port_s *port);
@@ -75,7 +76,7 @@ static struct {
 			bfa_fcs_port_fab_offline}, {
 	bfa_fcs_port_loop_init, bfa_fcs_port_loop_online,
 			bfa_fcs_port_loop_offline}, {
-bfa_fcs_port_n2n_init, bfa_fcs_port_n2n_online,
+	bfa_fcs_port_n2n_init, bfa_fcs_port_n2n_online,
 			bfa_fcs_port_n2n_offline},};
 
 /**
@@ -114,12 +115,13 @@ bfa_fcs_port_sm_uninit(struct bfa_fcs_port_s *port,
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(port->fcs, event);
 	}
 }
 
 static void
-bfa_fcs_port_sm_init(struct bfa_fcs_port_s *port, enum bfa_fcs_port_event event)
+bfa_fcs_port_sm_init(struct bfa_fcs_port_s *port,
+			enum bfa_fcs_port_event event)
 {
 	bfa_trc(port->fcs, port->port_cfg.pwwn);
 	bfa_trc(port->fcs, event);
@@ -136,16 +138,16 @@ bfa_fcs_port_sm_init(struct bfa_fcs_port_s *port, enum bfa_fcs_port_event event)
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(port->fcs, event);
 	}
 }
 
 static void
 bfa_fcs_port_sm_online(struct bfa_fcs_port_s *port,
-			enum bfa_fcs_port_event event)
+				enum bfa_fcs_port_event event)
 {
 	struct bfa_fcs_rport_s *rport;
-	struct list_head *qe, *qen;
+	struct list_head        *qe, *qen;
 
 	bfa_trc(port->fcs, port->port_cfg.pwwn);
 	bfa_trc(port->fcs, event);
@@ -166,7 +168,7 @@ bfa_fcs_port_sm_online(struct bfa_fcs_port_s *port,
 		} else {
 			bfa_sm_set_state(port, bfa_fcs_port_sm_deleting);
 			list_for_each_safe(qe, qen, &port->rport_q) {
-				rport = (struct bfa_fcs_rport_s *)qe;
+				rport = (struct bfa_fcs_rport_s *) qe;
 				bfa_fcs_rport_delete(rport);
 			}
 		}
@@ -176,7 +178,7 @@ bfa_fcs_port_sm_online(struct bfa_fcs_port_s *port,
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(port->fcs, event);
 	}
 }
 
@@ -185,7 +187,7 @@ bfa_fcs_port_sm_offline(struct bfa_fcs_port_s *port,
 			enum bfa_fcs_port_event event)
 {
 	struct bfa_fcs_rport_s *rport;
-	struct list_head *qe, *qen;
+	struct list_head        *qe, *qen;
 
 	bfa_trc(port->fcs, port->port_cfg.pwwn);
 	bfa_trc(port->fcs, event);
@@ -203,7 +205,7 @@ bfa_fcs_port_sm_offline(struct bfa_fcs_port_s *port,
 		} else {
 			bfa_sm_set_state(port, bfa_fcs_port_sm_deleting);
 			list_for_each_safe(qe, qen, &port->rport_q) {
-				rport = (struct bfa_fcs_rport_s *)qe;
+				rport = (struct bfa_fcs_rport_s *) qe;
 				bfa_fcs_rport_delete(rport);
 			}
 		}
@@ -214,13 +216,13 @@ bfa_fcs_port_sm_offline(struct bfa_fcs_port_s *port,
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(port->fcs, event);
 	}
 }
 
 static void
 bfa_fcs_port_sm_deleting(struct bfa_fcs_port_s *port,
-			 enum bfa_fcs_port_event event)
+			enum bfa_fcs_port_event event)
 {
 	bfa_trc(port->fcs, port->port_cfg.pwwn);
 	bfa_trc(port->fcs, event);
@@ -234,7 +236,7 @@ bfa_fcs_port_sm_deleting(struct bfa_fcs_port_s *port,
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(port->fcs, event);
 	}
 }
 
@@ -249,49 +251,26 @@ bfa_fcs_port_sm_deleting(struct bfa_fcs_port_s *port,
  */
 static void
 bfa_fcs_port_aen_post(struct bfa_fcs_port_s *port,
-		      enum bfa_lport_aen_event event)
+			enum bfa_lport_aen_event event)
 {
-	union bfa_aen_data_u aen_data;
+	union bfa_aen_data_u  aen_data;
 	struct bfa_log_mod_s *logmod = port->fcs->logm;
 	enum bfa_port_role role = port->port_cfg.roles;
-	wwn_t           lpwwn = bfa_fcs_port_get_pwwn(port);
-	char            lpwwn_ptr[BFA_STRING_32];
-	char           *role_str[BFA_PORT_ROLE_FCP_MAX / 2 + 1] =
-		{ "Initiator", "Target", "IPFC" };
+	wwn_t		lpwwn = bfa_fcs_port_get_pwwn(port);
+	char		lpwwn_ptr[BFA_STRING_32];
+	char		*role_str[BFA_PORT_ROLE_FCP_MAX/2 + 1] =
+				{"Initiator", "Target", "IPFC"};
 
 	wwn2str(lpwwn_ptr, lpwwn);
 
 	bfa_assert(role <= BFA_PORT_ROLE_FCP_MAX);
-
-	switch (event) {
-	case BFA_LPORT_AEN_ONLINE:
-		bfa_log(logmod, BFA_AEN_LPORT_ONLINE, lpwwn_ptr,
-			role_str[role / 2]);
-		break;
-	case BFA_LPORT_AEN_OFFLINE:
-		bfa_log(logmod, BFA_AEN_LPORT_OFFLINE, lpwwn_ptr,
-			role_str[role / 2]);
-		break;
-	case BFA_LPORT_AEN_NEW:
-		bfa_log(logmod, BFA_AEN_LPORT_NEW, lpwwn_ptr,
-			role_str[role / 2]);
-		break;
-	case BFA_LPORT_AEN_DELETE:
-		bfa_log(logmod, BFA_AEN_LPORT_DELETE, lpwwn_ptr,
-			role_str[role / 2]);
-		break;
-	case BFA_LPORT_AEN_DISCONNECT:
-		bfa_log(logmod, BFA_AEN_LPORT_DISCONNECT, lpwwn_ptr,
-			role_str[role / 2]);
-		break;
-	default:
-		break;
-	}
+	bfa_log(logmod, BFA_LOG_CREATE_ID(BFA_AEN_CAT_LPORT, event), lpwwn_ptr,
+			role_str[role/2]);
 
 	aen_data.lport.vf_id = port->fabric->vf_id;
 	aen_data.lport.roles = role;
 	aen_data.lport.ppwwn =
-		bfa_fcs_port_get_pwwn(bfa_fcs_get_base_port(port->fcs));
+			bfa_fcs_port_get_pwwn(bfa_fcs_get_base_port(port->fcs));
 	aen_data.lport.lpwwn = lpwwn;
 }
 
@@ -313,13 +292,13 @@ bfa_fcs_port_send_ls_rjt(struct bfa_fcs_port_s *port, struct fchs_s *rx_fchs,
 	if (!fcxp)
 		return;
 
-	len = fc_ls_rjt_build(&fchs, bfa_fcxp_get_reqbuf(fcxp), rx_fchs->s_id,
-			      bfa_fcs_port_get_fcid(port), rx_fchs->ox_id,
-			      reason_code, reason_code_expl);
+	len = fc_ls_rjt_build(&fchs, bfa_fcxp_get_reqbuf(fcxp),
+			      rx_fchs->s_id, bfa_fcs_port_get_fcid(port),
+			      rx_fchs->ox_id, reason_code, reason_code_expl);
 
 	bfa_fcxp_send(fcxp, bfa_rport, port->fabric->vf_id, port->lp_tag,
-		      BFA_FALSE, FC_CLASS_3, len, &fchs, NULL, NULL,
-		      FC_MAX_PDUSZ, 0);
+			  BFA_FALSE, FC_CLASS_3, len, &fchs, NULL, NULL,
+			  FC_MAX_PDUSZ, 0);
 }
 
 /**
@@ -354,23 +333,19 @@ bfa_fcs_port_plogi(struct bfa_fcs_port_s *port, struct fchs_s *rx_fchs,
 	}
 
 	/**
-* Direct Attach P2P mode : verify address assigned by the r-port.
+	 * Direct Attach P2P mode : verify address assigned by the r-port.
 	 */
-	if ((!bfa_fcs_fabric_is_switched(port->fabric))
-	    &&
-	    (memcmp
-	     ((void *)&bfa_fcs_port_get_pwwn(port), (void *)&plogi->port_name,
-	      sizeof(wwn_t)) < 0)) {
+	if ((!bfa_fcs_fabric_is_switched(port->fabric)) &&
+			(memcmp((void *)&bfa_fcs_port_get_pwwn(port),
+			   (void *)&plogi->port_name, sizeof(wwn_t)) < 0)) {
 		if (BFA_FCS_PID_IS_WKA(rx_fchs->d_id)) {
-			/*
-			 * Address assigned to us cannot be a WKA
-			 */
+			/* Address assigned to us cannot be a WKA */
 			bfa_fcs_port_send_ls_rjt(port, rx_fchs,
 					FC_LS_RJT_RSN_PROTOCOL_ERROR,
 					FC_LS_RJT_EXP_INVALID_NPORT_ID);
 			return;
 		}
-		port->pid = rx_fchs->d_id;
+		port->pid  = rx_fchs->d_id;
 	}
 
 	/**
@@ -379,15 +354,13 @@ bfa_fcs_port_plogi(struct bfa_fcs_port_s *port, struct fchs_s *rx_fchs,
 	rport = bfa_fcs_port_get_rport_by_pwwn(port, plogi->port_name);
 	if (rport) {
 		/**
-		 * Direct Attach P2P mode: handle address assigned by the rport.
+		 * Direct Attach P2P mode : handle address assigned by the r-port.
 		 */
-		if ((!bfa_fcs_fabric_is_switched(port->fabric))
-		    &&
-		    (memcmp
-		     ((void *)&bfa_fcs_port_get_pwwn(port),
-		      (void *)&plogi->port_name, sizeof(wwn_t)) < 0)) {
-			port->pid = rx_fchs->d_id;
-			rport->pid = rx_fchs->s_id;
+		if ((!bfa_fcs_fabric_is_switched(port->fabric)) &&
+			(memcmp((void *)&bfa_fcs_port_get_pwwn(port),
+			(void *)&plogi->port_name, sizeof(wwn_t)) < 0)) {
+				port->pid  = rx_fchs->d_id;
+				rport->pid = rx_fchs->s_id;
 		}
 		bfa_fcs_rport_plogi(rport, rx_fchs, plogi);
 		return;
@@ -436,7 +409,7 @@ bfa_fcs_port_plogi(struct bfa_fcs_port_s *port, struct fchs_s *rx_fchs,
  */
 static void
 bfa_fcs_port_echo(struct bfa_fcs_port_s *port, struct fchs_s *rx_fchs,
-			struct fc_echo_s *echo, u16 rx_len)
+		struct fc_echo_s *echo, u16 rx_len)
 {
 	struct fchs_s          fchs;
 	struct bfa_fcxp_s *fcxp;
@@ -451,8 +424,9 @@ bfa_fcs_port_echo(struct bfa_fcs_port_s *port, struct fchs_s *rx_fchs,
 	if (!fcxp)
 		return;
 
-	len = fc_ls_acc_build(&fchs, bfa_fcxp_get_reqbuf(fcxp), rx_fchs->s_id,
-			      bfa_fcs_port_get_fcid(port), rx_fchs->ox_id);
+	len = fc_ls_acc_build(&fchs, bfa_fcxp_get_reqbuf(fcxp),
+			      rx_fchs->s_id, bfa_fcs_port_get_fcid(port),
+			      rx_fchs->ox_id);
 
 	/*
 	 * Copy the payload (if any) from the echo frame
@@ -466,8 +440,8 @@ bfa_fcs_port_echo(struct bfa_fcs_port_s *port, struct fchs_s *rx_fchs,
 		       (pyld_len - sizeof(struct fc_echo_s)));
 
 	bfa_fcxp_send(fcxp, bfa_rport, port->fabric->vf_id, port->lp_tag,
-		      BFA_FALSE, FC_CLASS_3, pyld_len, &fchs, NULL, NULL,
-		      FC_MAX_PDUSZ, 0);
+			  BFA_FALSE, FC_CLASS_3, pyld_len, &fchs, NULL, NULL,
+			  FC_MAX_PDUSZ, 0);
 }
 
 /*
@@ -517,13 +491,14 @@ bfa_fcs_port_rnid(struct bfa_fcs_port_s *port, struct fchs_s *rx_fchs,
 	common_id_data.port_name = bfa_fcs_port_get_pwwn(port);
 	common_id_data.node_name = bfa_fcs_port_get_nwwn(port);
 
-	len = fc_rnid_acc_build(&fchs, bfa_fcxp_get_reqbuf(fcxp), rx_fchs->s_id,
-				bfa_fcs_port_get_fcid(port), rx_fchs->ox_id,
-				data_format, &common_id_data, &gen_topo_data);
+	len = fc_rnid_acc_build(&fchs, bfa_fcxp_get_reqbuf(fcxp),
+				rx_fchs->s_id, bfa_fcs_port_get_fcid(port),
+				rx_fchs->ox_id, data_format, &common_id_data,
+				&gen_topo_data);
 
 	bfa_fcxp_send(fcxp, bfa_rport, port->fabric->vf_id, port->lp_tag,
-		      BFA_FALSE, FC_CLASS_3, len, &fchs, NULL, NULL,
-		      FC_MAX_PDUSZ, 0);
+			  BFA_FALSE, FC_CLASS_3, len, &fchs, NULL, NULL,
+			  FC_MAX_PDUSZ, 0);
 
 	return;
 }
@@ -533,7 +508,7 @@ bfa_fcs_port_rnid(struct bfa_fcs_port_s *port, struct fchs_s *rx_fchs,
  */
 static void
 bfa_fs_port_get_gen_topo_data(struct bfa_fcs_port_s *port,
-			struct fc_rnid_general_topology_data_s *gen_topo_data)
+	struct fc_rnid_general_topology_data_s *gen_topo_data)
 {
 
 	bfa_os_memset(gen_topo_data, 0,
@@ -554,31 +529,33 @@ bfa_fcs_port_online_actions(struct bfa_fcs_port_s *port)
 
 	bfa_fcs_port_aen_post(port, BFA_LPORT_AEN_ONLINE);
 	bfa_fcb_port_online(port->fcs->bfad, port->port_cfg.roles,
-			port->fabric->vf_drv, (port->vport == NULL) ?
-			NULL : port->vport->vport_drv);
+			    port->fabric->vf_drv,
+			    (port->vport == NULL) ?
+				 NULL : port->vport->vport_drv);
 }
 
 static void
 bfa_fcs_port_offline_actions(struct bfa_fcs_port_s *port)
 {
-	struct list_head *qe, *qen;
+	struct list_head        *qe, *qen;
 	struct bfa_fcs_rport_s *rport;
 
 	bfa_trc(port->fcs, port->fabric->oper_type);
 
 	__port_action[port->fabric->fab_type].offline(port);
 
-	if (bfa_fcs_fabric_is_online(port->fabric) == BFA_TRUE) {
+	if (bfa_fcs_fabric_is_online(port->fabric) == BFA_TRUE)
 		bfa_fcs_port_aen_post(port, BFA_LPORT_AEN_DISCONNECT);
-	} else {
+	else
 		bfa_fcs_port_aen_post(port, BFA_LPORT_AEN_OFFLINE);
-	}
+
 	bfa_fcb_port_offline(port->fcs->bfad, port->port_cfg.roles,
-			port->fabric->vf_drv,
-			(port->vport == NULL) ? NULL : port->vport->vport_drv);
+			     port->fabric->vf_drv,
+			     (port->vport == NULL) ?
+				 NULL : port->vport->vport_drv);
 
 	list_for_each_safe(qe, qen, &port->rport_q) {
-		rport = (struct bfa_fcs_rport_s *)qe;
+		rport = (struct bfa_fcs_rport_s *) qe;
 		bfa_fcs_rport_offline(rport);
 	}
 }
@@ -606,16 +583,14 @@ bfa_fcs_port_deleted(struct bfa_fcs_port_s *port)
 {
 	bfa_fcs_port_aen_post(port, BFA_LPORT_AEN_DELETE);
 
-	/*
-	 * Base port will be deleted by the OS driver
-	 */
+	/* Base port will be deleted by the OS driver */
 	if (port->vport) {
 		bfa_fcb_port_delete(port->fcs->bfad, port->port_cfg.roles,
-			port->fabric->vf_drv,
-			port->vport ? port->vport->vport_drv : NULL);
+				port->fabric->vf_drv,
+				port->vport ? port->vport->vport_drv : NULL);
 		bfa_fcs_vport_delete_comp(port->vport);
 	} else {
-		bfa_fcs_fabric_port_delete_comp(port->fabric);
+		 bfa_fcs_fabric_port_delete_comp(port->fabric);
 	}
 }
 
@@ -647,7 +622,7 @@ bfa_fcs_port_modexit(struct bfa_fcs_s *fcs)
  */
 void
 bfa_fcs_port_uf_recv(struct bfa_fcs_port_s *lport, struct fchs_s *fchs,
-			u16 len)
+				u16 len)
 {
 	u32        pid = fchs->s_id;
 	struct bfa_fcs_rport_s *rport = NULL;
@@ -677,7 +652,7 @@ bfa_fcs_port_uf_recv(struct bfa_fcs_port_s *lport, struct fchs_s *fchs,
 	 */
 	if ((fchs->type == FC_TYPE_ELS) && (els_cmd->els_code == FC_ELS_ECHO)) {
 		bfa_fcs_port_echo(lport, fchs,
-			(struct fc_echo_s *) els_cmd, len);
+					(struct fc_echo_s *) els_cmd, len);
 		return;
 	}
 
@@ -686,7 +661,7 @@ bfa_fcs_port_uf_recv(struct bfa_fcs_port_s *lport, struct fchs_s *fchs,
 	 */
 	if ((fchs->type == FC_TYPE_ELS) && (els_cmd->els_code == FC_ELS_RNID)) {
 		bfa_fcs_port_rnid(lport, fchs,
-			(struct fc_rnid_cmd_s *) els_cmd, len);
+					(struct fc_rnid_cmd_s *) els_cmd, len);
 		return;
 	}
 
@@ -749,10 +724,10 @@ struct bfa_fcs_rport_s *
 bfa_fcs_port_get_rport_by_pid(struct bfa_fcs_port_s *port, u32 pid)
 {
 	struct bfa_fcs_rport_s *rport;
-	struct list_head *qe;
+	struct list_head        *qe;
 
 	list_for_each(qe, &port->rport_q) {
-		rport = (struct bfa_fcs_rport_s *)qe;
+		rport = (struct bfa_fcs_rport_s *) qe;
 		if (rport->pid == pid)
 			return rport;
 	}
@@ -768,16 +743,16 @@ struct bfa_fcs_rport_s *
 bfa_fcs_port_get_rport_by_pwwn(struct bfa_fcs_port_s *port, wwn_t pwwn)
 {
 	struct bfa_fcs_rport_s *rport;
-	struct list_head *qe;
+	struct list_head        *qe;
 
 	list_for_each(qe, &port->rport_q) {
-		rport = (struct bfa_fcs_rport_s *)qe;
+		rport = (struct bfa_fcs_rport_s *) qe;
 		if (wwn_is_equal(rport->pwwn, pwwn))
 			return rport;
 	}
 
 	bfa_trc(port->fcs, pwwn);
-	return (NULL);
+	return NULL;
 }
 
 /**
@@ -787,16 +762,16 @@ struct bfa_fcs_rport_s *
 bfa_fcs_port_get_rport_by_nwwn(struct bfa_fcs_port_s *port, wwn_t nwwn)
 {
 	struct bfa_fcs_rport_s *rport;
-	struct list_head *qe;
+	struct list_head        *qe;
 
 	list_for_each(qe, &port->rport_q) {
-		rport = (struct bfa_fcs_rport_s *)qe;
+		rport = (struct bfa_fcs_rport_s *) qe;
 		if (wwn_is_equal(rport->nwwn, nwwn))
 			return rport;
 	}
 
 	bfa_trc(port->fcs, nwwn);
-	return (NULL);
+	return NULL;
 }
 
 /**
@@ -804,7 +779,7 @@ bfa_fcs_port_get_rport_by_nwwn(struct bfa_fcs_port_s *port, wwn_t nwwn)
  */
 void
 bfa_fcs_port_add_rport(struct bfa_fcs_port_s *port,
-		       struct bfa_fcs_rport_s *rport)
+			struct bfa_fcs_rport_s *rport)
 {
 	list_add_tail(&rport->qe, &port->rport_q);
 	port->num_rports++;
@@ -815,7 +790,7 @@ bfa_fcs_port_add_rport(struct bfa_fcs_port_s *port,
  */
 void
 bfa_fcs_port_del_rport(struct bfa_fcs_port_s *port,
-		       struct bfa_fcs_rport_s *rport)
+			struct bfa_fcs_rport_s *rport)
 {
 	bfa_assert(bfa_q_is_on_q(&port->rport_q, rport));
 	list_del(&rport->qe);
@@ -870,32 +845,45 @@ bfa_fcs_port_lip(struct bfa_fcs_port_s *port)
 bfa_boolean_t
 bfa_fcs_port_is_online(struct bfa_fcs_port_s *port)
 {
-	return (bfa_sm_cmp_state(port, bfa_fcs_port_sm_online));
+	return bfa_sm_cmp_state(port, bfa_fcs_port_sm_online);
+}
+
+/**
+  * Attach time initialization of logical ports.
+ */
+void
+bfa_fcs_lport_attach(struct bfa_fcs_port_s *lport, struct bfa_fcs_s *fcs,
+		   u16 vf_id, struct bfa_fcs_vport_s *vport)
+{
+	lport->fcs = fcs;
+	lport->fabric = bfa_fcs_vf_lookup(fcs, vf_id);
+	lport->vport = vport;
+	lport->lp_tag = (vport) ? bfa_lps_get_tag(vport->lps) :
+				  bfa_lps_get_tag(lport->fabric->lps);
+
+	INIT_LIST_HEAD(&lport->rport_q);
+	lport->num_rports = 0;
 }
 
 /**
  * Logical port initialization of base or virtual port.
  * Called by fabric for base port or by vport for virtual ports.
  */
+
 void
-bfa_fcs_lport_init(struct bfa_fcs_port_s *lport, struct bfa_fcs_s *fcs,
-		   u16 vf_id, struct bfa_port_cfg_s *port_cfg,
-		   struct bfa_fcs_vport_s *vport)
+bfa_fcs_lport_init(struct bfa_fcs_port_s *lport,
+					struct bfa_port_cfg_s *port_cfg)
 {
-	lport->fcs = fcs;
-	lport->fabric = bfa_fcs_vf_lookup(fcs, vf_id);
+
+	struct bfa_fcs_vport_s *vport = lport->vport;
+
 	bfa_os_assign(lport->port_cfg, *port_cfg);
-	lport->vport = vport;
-	lport->lp_tag = (vport) ? bfa_lps_get_tag(vport->lps) :
-			 bfa_lps_get_tag(lport->fabric->lps);
 
-	INIT_LIST_HEAD(&lport->rport_q);
-	lport->num_rports = 0;
+	lport->bfad_port = bfa_fcb_port_new(lport->fcs->bfad, lport,
+					lport->port_cfg.roles,
+					lport->fabric->vf_drv,
+					vport ? vport->vport_drv : NULL);
 
-	lport->bfad_port =
-		bfa_fcb_port_new(fcs->bfad, lport, lport->port_cfg.roles,
-				lport->fabric->vf_drv,
-				vport ? vport->vport_drv : NULL);
 	bfa_fcs_port_aen_post(lport, BFA_LPORT_AEN_NEW);
 
 	bfa_sm_set_state(lport, bfa_fcs_port_sm_uninit);
@@ -910,7 +898,7 @@ bfa_fcs_lport_init(struct bfa_fcs_port_s *lport, struct bfa_fcs_s *fcs,
 
 void
 bfa_fcs_port_get_attr(struct bfa_fcs_port_s *port,
-		      struct bfa_port_attr_s *port_attr)
+			struct bfa_port_attr_s *port_attr)
 {
 	if (bfa_sm_cmp_state(port, bfa_fcs_port_sm_online))
 		port_attr->pid = port->pid;
@@ -922,19 +910,25 @@ bfa_fcs_port_get_attr(struct bfa_fcs_port_s *port,
 	if (port->fabric) {
 		port_attr->port_type = bfa_fcs_fabric_port_type(port->fabric);
 		port_attr->loopback = bfa_fcs_fabric_is_loopback(port->fabric);
-		port_attr->fabric_name = bfa_fcs_port_get_fabric_name(port);
+		port_attr->authfail =
+				bfa_fcs_fabric_is_auth_failed(port->fabric);
+		port_attr->fabric_name  = bfa_fcs_port_get_fabric_name(port);
 		memcpy(port_attr->fabric_ip_addr,
-		       bfa_fcs_port_get_fabric_ipaddr(port),
-		       BFA_FCS_FABRIC_IPADDR_SZ);
+			bfa_fcs_port_get_fabric_ipaddr(port),
+			BFA_FCS_FABRIC_IPADDR_SZ);
 
-		if (port->vport != NULL)
+		if (port->vport != NULL) {
 			port_attr->port_type = BFA_PPORT_TYPE_VPORT;
+			port_attr->fpma_mac =
+				bfa_lps_get_lp_mac(port->vport->lps);
+		} else
+			port_attr->fpma_mac =
+				bfa_lps_get_lp_mac(port->fabric->lps);
 
 	} else {
 		port_attr->port_type = BFA_PPORT_TYPE_UNKNOWN;
 		port_attr->state = BFA_PORT_UNINIT;
 	}
-
 }
 
 

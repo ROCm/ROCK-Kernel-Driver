@@ -43,24 +43,24 @@ static void __bfa_cb_ioim_pathtov(void *cbarg, bfa_boolean_t complete);
  * IO state machine events
  */
 enum bfa_ioim_event {
-	BFA_IOIM_SM_START = 1,		/*  io start request from host */
-	BFA_IOIM_SM_COMP_GOOD = 2,	/*  io good comp, resource free */
-	BFA_IOIM_SM_COMP = 3,		/*  io comp, resource is free */
-	BFA_IOIM_SM_COMP_UTAG = 4,	/*  io comp, resource is free */
-	BFA_IOIM_SM_DONE = 5,		/*  io comp, resource not free */
-	BFA_IOIM_SM_FREE = 6,		/*  io resource is freed */
-	BFA_IOIM_SM_ABORT = 7,		/*  abort request from scsi stack */
+	BFA_IOIM_SM_START	   = 1,	/*  io start request from host */
+	BFA_IOIM_SM_COMP_GOOD  = 2,	/*  io good comp, resource free */
+	BFA_IOIM_SM_COMP	   = 3,	/*  io comp, resource is free */
+	BFA_IOIM_SM_COMP_UTAG  = 4,	/*  io comp, resource is free */
+	BFA_IOIM_SM_DONE	   = 5,	/*  io comp, resource not free */
+	BFA_IOIM_SM_FREE	   = 6,	/*  io resource is freed */
+	BFA_IOIM_SM_ABORT	   = 7,	/*  abort request from scsi stack */
 	BFA_IOIM_SM_ABORT_COMP = 8,	/*  abort from f/w */
 	BFA_IOIM_SM_ABORT_DONE = 9,	/*  abort completion from f/w */
-	BFA_IOIM_SM_QRESUME = 10,	/*  CQ space available to queue IO */
-	BFA_IOIM_SM_SGALLOCED = 11,	/*  SG page allocation successful */
-	BFA_IOIM_SM_SQRETRY = 12,	/*  sequence recovery retry */
-	BFA_IOIM_SM_HCB	= 13,		/*  bfa callback complete */
-	BFA_IOIM_SM_CLEANUP = 14,	/*  IO cleanup from itnim */
-	BFA_IOIM_SM_TMSTART = 15,	/*  IO cleanup from tskim */
-	BFA_IOIM_SM_TMDONE = 16,	/*  IO cleanup from tskim */
-	BFA_IOIM_SM_HWFAIL = 17,	/*  IOC h/w failure event */
-	BFA_IOIM_SM_IOTOV = 18,		/*  ITN offline TOV       */
+	BFA_IOIM_SM_QRESUME	   = 10,/*  CQ space available to queue IO */
+	BFA_IOIM_SM_SGALLOCED  = 11,/*  SG page allocation successful */
+	BFA_IOIM_SM_SQRETRY	   = 12,/*  sequence recovery retry */
+	BFA_IOIM_SM_HCB	   = 13,/*  bfa callback complete */
+	BFA_IOIM_SM_CLEANUP	   = 14,/*  IO cleanup from itnim */
+	BFA_IOIM_SM_TMSTART	   = 15,/*  IO cleanup from tskim */
+	BFA_IOIM_SM_TMDONE	   = 16,/*  IO cleanup from tskim */
+	BFA_IOIM_SM_HWFAIL	   = 17,/*  IOC h/w failure event */
+	BFA_IOIM_SM_IOTOV	   = 18,/*  ITN offline TOV       */
 };
 
 /*
@@ -105,13 +105,13 @@ bfa_ioim_sm_uninit(struct bfa_ioim_s *ioim, enum bfa_ioim_event event)
 				bfa_sm_set_state(ioim, bfa_ioim_sm_hcb);
 				list_del(&ioim->qe);
 				list_add_tail(&ioim->qe,
-					&ioim->fcpim->ioim_comp_q);
+						&ioim->fcpim->ioim_comp_q);
 				bfa_cb_queue(ioim->bfa, &ioim->hcb_qe,
 						__bfa_cb_ioim_pathtov, ioim);
 			} else {
 				list_del(&ioim->qe);
 				list_add_tail(&ioim->qe,
-					&ioim->itnim->pending_q);
+						&ioim->itnim->pending_q);
 			}
 			break;
 		}
@@ -144,12 +144,12 @@ bfa_ioim_sm_uninit(struct bfa_ioim_s *ioim, enum bfa_ioim_event event)
 		 */
 		bfa_sm_set_state(ioim, bfa_ioim_sm_hcb);
 		bfa_assert(bfa_q_is_on_q(&ioim->itnim->pending_q, ioim));
-		bfa_cb_queue(ioim->bfa, &ioim->hcb_qe, __bfa_cb_ioim_abort,
-				ioim);
+		bfa_cb_queue(ioim->bfa, &ioim->hcb_qe,
+				__bfa_cb_ioim_abort, ioim);
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ioim->bfa, event);
 	}
 }
 
@@ -194,7 +194,7 @@ bfa_ioim_sm_sgalloc(struct bfa_ioim_s *ioim, enum bfa_ioim_event event)
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ioim->bfa, event);
 	}
 }
 
@@ -259,7 +259,7 @@ bfa_ioim_sm_active(struct bfa_ioim_s *ioim, enum bfa_ioim_event event)
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ioim->bfa, event);
 	}
 }
 
@@ -317,7 +317,7 @@ bfa_ioim_sm_abort(struct bfa_ioim_s *ioim, enum bfa_ioim_event event)
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ioim->bfa, event);
 	}
 }
 
@@ -377,7 +377,7 @@ bfa_ioim_sm_cleanup(struct bfa_ioim_s *ioim, enum bfa_ioim_event event)
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ioim->bfa, event);
 	}
 }
 
@@ -419,7 +419,7 @@ bfa_ioim_sm_qfull(struct bfa_ioim_s *ioim, enum bfa_ioim_event event)
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ioim->bfa, event);
 	}
 }
 
@@ -467,7 +467,7 @@ bfa_ioim_sm_abort_qfull(struct bfa_ioim_s *ioim, enum bfa_ioim_event event)
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ioim->bfa, event);
 	}
 }
 
@@ -516,7 +516,7 @@ bfa_ioim_sm_cleanup_qfull(struct bfa_ioim_s *ioim, enum bfa_ioim_event event)
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ioim->bfa, event);
 	}
 }
 
@@ -544,7 +544,7 @@ bfa_ioim_sm_hcb(struct bfa_ioim_s *ioim, enum bfa_ioim_event event)
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ioim->bfa, event);
 	}
 }
 
@@ -577,7 +577,7 @@ bfa_ioim_sm_hcb_free(struct bfa_ioim_s *ioim, enum bfa_ioim_event event)
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ioim->bfa, event);
 	}
 }
 
@@ -605,7 +605,7 @@ bfa_ioim_sm_resfree(struct bfa_ioim_s *ioim, enum bfa_ioim_event event)
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ioim->bfa, event);
 	}
 }
 

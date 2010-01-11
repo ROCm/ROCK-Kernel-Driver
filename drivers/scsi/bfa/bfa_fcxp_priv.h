@@ -29,15 +29,15 @@
 
 struct bfa_fcxp_mod_s {
 	struct bfa_s      *bfa;		/*  backpointer to BFA */
-	struct bfa_fcxp_s *fcxp_list;	/*  array of FCXPs */
+	struct bfa_fcxp_s	*fcxp_list;	/*  array of FCXPs */
 	u16        num_fcxps;	/*  max num FCXP requests */
-	struct list_head fcxp_free_q;	/*  free FCXPs */
-	struct list_head fcxp_active_q;	/*  active FCXPs */
-	void	*req_pld_list_kva;	/*  list of FCXP req pld */
-	u64 req_pld_list_pa;	/*  list of FCXP req pld */
-	void *rsp_pld_list_kva;		/*  list of FCXP resp pld */
-	u64 rsp_pld_list_pa;	/*  list of FCXP resp pld */
-	struct list_head  wait_q;		/*  wait queue for free fcxp */
+	struct list_head         fcxp_free_q;	/*  free FCXPs */
+	struct list_head         fcxp_active_q;	/*  active FCXPs */
+	void		*req_pld_list_kva; /*  list of FCXP req pld */
+	u64        req_pld_list_pa;	/*  list of FCXP req pld */
+	void		*rsp_pld_list_kva; /*  list of FCXP resp pld */
+	u64        rsp_pld_list_pa;	/*  list of FCXP resp pld */
+	struct list_head         wait_q;	/*  wait queue for free fcxp */
 	u32	req_pld_sz;
 	u32	rsp_pld_sz;
 };
@@ -60,18 +60,18 @@ struct bfa_fcxp_req_info_s {
 					 *FCXP interactions before the rport
 					 *nexus is established
 					 */
-	struct fchs_s   fchs;	/*  request FC header structure */
-	u8 cts;		/*  continous sequence */
-	u8 class;		/*  FC class for the request/response */
-	u16 max_frmsz;	/*  max send frame size */
-	u16 vf_id;		/*  vsan tag if applicable */
-	u8	lp_tag;		/*  lport tag */
-	u32 req_tot_len;	/*  request payload total length */
+	struct fchs_s          fchs;	/*  request FC header structure */
+	u8         cts;	/*  continous sequence */
+	u8         class;	/*  FC class for the request/response */
+	u16        max_frmsz;	/*  max send frame size */
+	u16        vf_id;	/*  vsan tag if applicable */
+	u8		lp_tag;	/*  lport tag */
+	u32        req_tot_len;	/*  request payload total length */
 };
 
 struct bfa_fcxp_rsp_info_s {
-	struct fchs_s rsp_fchs;		/*  Response frame's FC header will
-					 * be *sent back in this field */
+	struct fchs_s          rsp_fchs;/*  Response frame's FC header will
+					 *be *sent back in this field */
 	u8         rsp_timeout;	/*  timeout in seconds, 0-no response
 					 */
 	u8         rsvd2[3];

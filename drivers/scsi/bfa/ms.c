@@ -41,24 +41,24 @@ static void     bfa_fcs_port_ms_plogi_response(void *fcsarg,
 					       u32 resid_len,
 					       struct fchs_s *rsp_fchs);
 
-static void     bfa_fcs_port_ms_send_gmal(void *ms_cbarg,
-					  struct bfa_fcxp_s *fcxp_alloced);
+static void 	bfa_fcs_port_ms_send_gmal(void *ms_cbarg,
+					struct bfa_fcxp_s *fcxp_alloced);
 static void     bfa_fcs_port_ms_gmal_response(void *fcsarg,
-					      struct bfa_fcxp_s *fcxp,
-					      void *cbarg,
-					      bfa_status_t req_status,
-					      u32 rsp_len,
-					      u32 resid_len,
-					      struct fchs_s *rsp_fchs);
-static void     bfa_fcs_port_ms_send_gfn(void *ms_cbarg,
-					 struct bfa_fcxp_s *fcxp_alloced);
+					       struct bfa_fcxp_s *fcxp,
+					       void *cbarg,
+					       bfa_status_t req_status,
+					       u32 rsp_len,
+					       u32 resid_len,
+					       struct fchs_s *rsp_fchs);
+static void 	bfa_fcs_port_ms_send_gfn(void *ms_cbarg,
+					struct bfa_fcxp_s *fcxp_alloced);
 static void     bfa_fcs_port_ms_gfn_response(void *fcsarg,
-					     struct bfa_fcxp_s *fcxp,
-					     void *cbarg,
-					     bfa_status_t req_status,
-					     u32 rsp_len,
-					     u32 resid_len,
-					     struct fchs_s *rsp_fchs);
+					       struct bfa_fcxp_s *fcxp,
+					       void *cbarg,
+					       bfa_status_t req_status,
+					       u32 rsp_len,
+					       u32 resid_len,
+					       struct fchs_s *rsp_fchs);
 /**
  *  fcs_ms_sm FCS MS state machine
  */
@@ -85,17 +85,17 @@ static void     bfa_fcs_port_ms_sm_plogi(struct bfa_fcs_port_ms_s *ms,
 static void     bfa_fcs_port_ms_sm_plogi_retry(struct bfa_fcs_port_ms_s *ms,
 					       enum port_ms_event event);
 static void     bfa_fcs_port_ms_sm_gmal_sending(struct bfa_fcs_port_ms_s *ms,
-						enum port_ms_event event);
+						 enum port_ms_event event);
 static void     bfa_fcs_port_ms_sm_gmal(struct bfa_fcs_port_ms_s *ms,
-					enum port_ms_event event);
+					 enum port_ms_event event);
 static void     bfa_fcs_port_ms_sm_gmal_retry(struct bfa_fcs_port_ms_s *ms,
-					      enum port_ms_event event);
-static void     bfa_fcs_port_ms_sm_gfn_sending(struct bfa_fcs_port_ms_s *ms,
 					       enum port_ms_event event);
+static void     bfa_fcs_port_ms_sm_gfn_sending(struct bfa_fcs_port_ms_s *ms,
+						 enum port_ms_event event);
 static void     bfa_fcs_port_ms_sm_gfn(struct bfa_fcs_port_ms_s *ms,
-				       enum port_ms_event event);
+					 enum port_ms_event event);
 static void     bfa_fcs_port_ms_sm_gfn_retry(struct bfa_fcs_port_ms_s *ms,
-					     enum port_ms_event event);
+					       enum port_ms_event event);
 static void     bfa_fcs_port_ms_sm_online(struct bfa_fcs_port_ms_s *ms,
 					  enum port_ms_event event);
 /**
@@ -103,7 +103,7 @@ static void     bfa_fcs_port_ms_sm_online(struct bfa_fcs_port_ms_s *ms,
  */
 static void
 bfa_fcs_port_ms_sm_offline(struct bfa_fcs_port_ms_s *ms,
-			   enum port_ms_event event)
+				enum port_ms_event event)
 {
 	bfa_trc(ms->port->fcs, ms->port->port_cfg.pwwn);
 	bfa_trc(ms->port->fcs, event);
@@ -118,13 +118,13 @@ bfa_fcs_port_ms_sm_offline(struct bfa_fcs_port_ms_s *ms,
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ms->port->fcs, event);
 	}
 }
 
 static void
 bfa_fcs_port_ms_sm_plogi_sending(struct bfa_fcs_port_ms_s *ms,
-				 enum port_ms_event event)
+					enum port_ms_event event)
 {
 	bfa_trc(ms->port->fcs, ms->port->port_cfg.pwwn);
 	bfa_trc(ms->port->fcs, event);
@@ -137,11 +137,11 @@ bfa_fcs_port_ms_sm_plogi_sending(struct bfa_fcs_port_ms_s *ms,
 	case MSSM_EVENT_PORT_OFFLINE:
 		bfa_sm_set_state(ms, bfa_fcs_port_ms_sm_offline);
 		bfa_fcxp_walloc_cancel(BFA_FCS_GET_HAL_FROM_PORT(ms->port),
-				       &ms->fcxp_wqe);
+					   &ms->fcxp_wqe);
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ms->port->fcs, event);
 	}
 }
 
@@ -157,9 +157,9 @@ bfa_fcs_port_ms_sm_plogi(struct bfa_fcs_port_ms_s *ms, enum port_ms_event event)
 		 * Start timer for a delayed retry
 		 */
 		bfa_sm_set_state(ms, bfa_fcs_port_ms_sm_plogi_retry);
-		bfa_timer_start(BFA_FCS_GET_HAL_FROM_PORT(ms->port), &ms->timer,
-				bfa_fcs_port_ms_timeout, ms,
-				BFA_FCS_RETRY_TIMEOUT);
+		bfa_timer_start(BFA_FCS_GET_HAL_FROM_PORT(ms->port),
+				    &ms->timer, bfa_fcs_port_ms_timeout, ms,
+				    BFA_FCS_RETRY_TIMEOUT);
 		break;
 
 	case MSSM_EVENT_RSP_OK:
@@ -190,13 +190,13 @@ bfa_fcs_port_ms_sm_plogi(struct bfa_fcs_port_ms_s *ms, enum port_ms_event event)
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ms->port->fcs, event);
 	}
 }
 
 static void
 bfa_fcs_port_ms_sm_plogi_retry(struct bfa_fcs_port_ms_s *ms,
-			       enum port_ms_event event)
+					enum port_ms_event event)
 {
 	bfa_trc(ms->port->fcs, ms->port->port_cfg.pwwn);
 	bfa_trc(ms->port->fcs, event);
@@ -216,13 +216,13 @@ bfa_fcs_port_ms_sm_plogi_retry(struct bfa_fcs_port_ms_s *ms,
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ms->port->fcs, event);
 	}
 }
 
 static void
 bfa_fcs_port_ms_sm_online(struct bfa_fcs_port_ms_s *ms,
-			  enum port_ms_event event)
+				enum port_ms_event event)
 {
 	bfa_trc(ms->port->fcs, ms->port->port_cfg.pwwn);
 	bfa_trc(ms->port->fcs, event);
@@ -230,10 +230,6 @@ bfa_fcs_port_ms_sm_online(struct bfa_fcs_port_ms_s *ms,
 	switch (event) {
 	case MSSM_EVENT_PORT_OFFLINE:
 		bfa_sm_set_state(ms, bfa_fcs_port_ms_sm_offline);
-		/*
-		 * now invoke MS related sub-modules
-		 */
-		bfa_fcs_port_fdmi_offline(ms);
 		break;
 
 	case MSSM_EVENT_PORT_FABRIC_RSCN:
@@ -243,13 +239,13 @@ bfa_fcs_port_ms_sm_online(struct bfa_fcs_port_ms_s *ms,
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ms->port->fcs, event);
 	}
 }
 
 static void
 bfa_fcs_port_ms_sm_gmal_sending(struct bfa_fcs_port_ms_s *ms,
-				enum port_ms_event event)
+					enum port_ms_event event)
 {
 	bfa_trc(ms->port->fcs, ms->port->port_cfg.pwwn);
 	bfa_trc(ms->port->fcs, event);
@@ -262,11 +258,11 @@ bfa_fcs_port_ms_sm_gmal_sending(struct bfa_fcs_port_ms_s *ms,
 	case MSSM_EVENT_PORT_OFFLINE:
 		bfa_sm_set_state(ms, bfa_fcs_port_ms_sm_offline);
 		bfa_fcxp_walloc_cancel(BFA_FCS_GET_HAL_FROM_PORT(ms->port),
-				       &ms->fcxp_wqe);
+					   &ms->fcxp_wqe);
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ms->port->fcs, event);
 	}
 }
 
@@ -304,13 +300,13 @@ bfa_fcs_port_ms_sm_gmal(struct bfa_fcs_port_ms_s *ms, enum port_ms_event event)
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ms->port->fcs, event);
 	}
 }
 
 static void
 bfa_fcs_port_ms_sm_gmal_retry(struct bfa_fcs_port_ms_s *ms,
-			      enum port_ms_event event)
+					enum port_ms_event event)
 {
 	bfa_trc(ms->port->fcs, ms->port->port_cfg.pwwn);
 	bfa_trc(ms->port->fcs, event);
@@ -330,10 +326,9 @@ bfa_fcs_port_ms_sm_gmal_retry(struct bfa_fcs_port_ms_s *ms,
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ms->port->fcs, event);
 	}
 }
-
 /**
  *  ms_pvt MS local functions
  */
@@ -352,35 +347,36 @@ bfa_fcs_port_ms_send_gmal(void *ms_cbarg, struct bfa_fcxp_s *fcxp_alloced)
 	fcxp = fcxp_alloced ? fcxp_alloced : bfa_fcs_fcxp_alloc(port->fcs);
 	if (!fcxp) {
 		bfa_fcxp_alloc_wait(port->fcs->bfa, &ms->fcxp_wqe,
-				    bfa_fcs_port_ms_send_gmal, ms);
+					bfa_fcs_port_ms_send_gmal, ms);
 		return;
 	}
 	ms->fcxp = fcxp;
 
 	len = fc_gmal_req_build(&fchs, bfa_fcxp_get_reqbuf(fcxp),
-				bfa_fcs_port_get_fcid(port),
-				bfa_lps_get_peer_nwwn(port->fabric->lps));
+			     bfa_fcs_port_get_fcid(port),
+				 bfa_lps_get_peer_nwwn(port->fabric->lps));
 
 	bfa_fcxp_send(fcxp, NULL, port->fabric->vf_id, port->lp_tag, BFA_FALSE,
-		      FC_CLASS_3, len, &fchs, bfa_fcs_port_ms_gmal_response,
-		      (void *)ms, FC_MAX_PDUSZ, FC_RA_TOV);
+			  FC_CLASS_3, len, &fchs,
+			  bfa_fcs_port_ms_gmal_response, (void *)ms,
+			  FC_MAX_PDUSZ, FC_RA_TOV);
 
 	bfa_sm_send_event(ms, MSSM_EVENT_FCXP_SENT);
 }
 
 static void
 bfa_fcs_port_ms_gmal_response(void *fcsarg, struct bfa_fcxp_s *fcxp,
-			      void *cbarg, bfa_status_t req_status,
-			      u32 rsp_len, u32 resid_len,
-			      struct fchs_s *rsp_fchs)
+				void *cbarg, bfa_status_t req_status,
+				u32 rsp_len, u32 resid_len,
+				struct fchs_s *rsp_fchs)
 {
-	struct bfa_fcs_port_ms_s *ms = (struct bfa_fcs_port_ms_s *)cbarg;
+	struct bfa_fcs_port_ms_s *ms = (struct bfa_fcs_port_ms_s *) cbarg;
 	struct bfa_fcs_port_s *port = ms->port;
 	struct ct_hdr_s       *cthdr = NULL;
 	struct fcgs_gmal_resp_s *gmal_resp;
 	struct fc_gmal_entry_s *gmal_entry;
-	u32        num_entries;
-	u8        *rsp_str;
+	u32		num_entries;
+	u8 		*rsp_str;
 
 	bfa_trc(port->fcs, req_status);
 	bfa_trc(port->fcs, port->port_cfg.pwwn);
@@ -399,35 +395,34 @@ bfa_fcs_port_ms_gmal_response(void *fcsarg, struct bfa_fcxp_s *fcxp,
 
 	if (cthdr->cmd_rsp_code == CT_RSP_ACCEPT) {
 		gmal_resp = (struct fcgs_gmal_resp_s *)(cthdr + 1);
+
 		num_entries = bfa_os_ntohl(gmal_resp->ms_len);
 		if (num_entries == 0) {
 			bfa_sm_send_event(ms, MSSM_EVENT_RSP_ERROR);
 			return;
 		}
 		/*
-		 * The response could contain multiple Entries.
-		 * Entries for SNMP interface, etc.
-		 * We look for the entry with a telnet prefix.
-		 * First "http://" entry refers to IP addr
-		 */
+		* The response could contain multiple Entries.
+		* Entries for SNMP interface, etc.
+		* We look for the entry with a telnet prefix.
+		* First "http://" entry refers to IP addr
+		*/
 
 		gmal_entry = (struct fc_gmal_entry_s *)gmal_resp->ms_ma;
 		while (num_entries > 0) {
-			if (strncmp
-			    (gmal_entry->prefix, CT_GMAL_RESP_PREFIX_HTTP,
-			     sizeof(gmal_entry->prefix)) == 0) {
+			if (strncmp(gmal_entry->prefix,
+					CT_GMAL_RESP_PREFIX_HTTP,
+					sizeof(gmal_entry->prefix)) == 0) {
 
-				/*
-				 * if the IP address is terminating with a '/',
-				 * remove it. *Byte 0 consists of the length
+				/* If the IP address is terminating with a '/',
+				 * remove it. Byte 0 consists of the length
 				 * of the string.
 				 */
 				rsp_str = &(gmal_entry->prefix[0]);
-				if (rsp_str[gmal_entry->len - 1] == '/')
-					rsp_str[gmal_entry->len - 1] = 0;
-				/*
-				 * copy IP Address to fabric
-				 */
+				if (rsp_str[gmal_entry->len-1] == '/')
+					rsp_str[gmal_entry->len-1] = 0;
+
+				/* copy IP Address to fabric */
 				strncpy(bfa_fcs_port_get_fabric_ipaddr(port),
 					gmal_entry->ip_addr,
 					BFA_FCS_FABRIC_IPADDR_SZ);
@@ -449,7 +444,7 @@ bfa_fcs_port_ms_gmal_response(void *fcsarg, struct bfa_fcxp_s *fcxp,
 
 static void
 bfa_fcs_port_ms_sm_gfn_sending(struct bfa_fcs_port_ms_s *ms,
-			       enum port_ms_event event)
+					enum port_ms_event event)
 {
 	bfa_trc(ms->port->fcs, ms->port->port_cfg.pwwn);
 	bfa_trc(ms->port->fcs, event);
@@ -462,11 +457,11 @@ bfa_fcs_port_ms_sm_gfn_sending(struct bfa_fcs_port_ms_s *ms,
 	case MSSM_EVENT_PORT_OFFLINE:
 		bfa_sm_set_state(ms, bfa_fcs_port_ms_sm_offline);
 		bfa_fcxp_walloc_cancel(BFA_FCS_GET_HAL_FROM_PORT(ms->port),
-				       &ms->fcxp_wqe);
+					   &ms->fcxp_wqe);
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ms->port->fcs, event);
 	}
 }
 
@@ -484,8 +479,9 @@ bfa_fcs_port_ms_sm_gfn(struct bfa_fcs_port_ms_s *ms, enum port_ms_event event)
 		if (ms->retry_cnt++ < BFA_FCS_MS_CMD_MAX_RETRIES) {
 			bfa_sm_set_state(ms, bfa_fcs_port_ms_sm_gfn_retry);
 			bfa_timer_start(BFA_FCS_GET_HAL_FROM_PORT(ms->port),
-					&ms->timer, bfa_fcs_port_ms_timeout, ms,
-					BFA_FCS_RETRY_TIMEOUT);
+						&ms->timer,
+						bfa_fcs_port_ms_timeout, ms,
+						BFA_FCS_RETRY_TIMEOUT);
 		} else {
 			bfa_sm_set_state(ms, bfa_fcs_port_ms_sm_online);
 			ms->retry_cnt = 0;
@@ -502,13 +498,13 @@ bfa_fcs_port_ms_sm_gfn(struct bfa_fcs_port_ms_s *ms, enum port_ms_event event)
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ms->port->fcs, event);
 	}
 }
 
 static void
 bfa_fcs_port_ms_sm_gfn_retry(struct bfa_fcs_port_ms_s *ms,
-			     enum port_ms_event event)
+					enum port_ms_event event)
 {
 	bfa_trc(ms->port->fcs, ms->port->port_cfg.pwwn);
 	bfa_trc(ms->port->fcs, event);
@@ -528,10 +524,9 @@ bfa_fcs_port_ms_sm_gfn_retry(struct bfa_fcs_port_ms_s *ms,
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ms->port->fcs, event);
 	}
 }
-
 /**
  *  ms_pvt MS local functions
  */
@@ -550,31 +545,32 @@ bfa_fcs_port_ms_send_gfn(void *ms_cbarg, struct bfa_fcxp_s *fcxp_alloced)
 	fcxp = fcxp_alloced ? fcxp_alloced : bfa_fcs_fcxp_alloc(port->fcs);
 	if (!fcxp) {
 		bfa_fcxp_alloc_wait(port->fcs->bfa, &ms->fcxp_wqe,
-				    bfa_fcs_port_ms_send_gfn, ms);
+					bfa_fcs_port_ms_send_gfn, ms);
 		return;
 	}
 	ms->fcxp = fcxp;
 
 	len = fc_gfn_req_build(&fchs, bfa_fcxp_get_reqbuf(fcxp),
-			       bfa_fcs_port_get_fcid(port),
-			       bfa_lps_get_peer_nwwn(port->fabric->lps));
+			     bfa_fcs_port_get_fcid(port),
+				 bfa_lps_get_peer_nwwn(port->fabric->lps));
 
 	bfa_fcxp_send(fcxp, NULL, port->fabric->vf_id, port->lp_tag, BFA_FALSE,
-		      FC_CLASS_3, len, &fchs, bfa_fcs_port_ms_gfn_response,
-		      (void *)ms, FC_MAX_PDUSZ, FC_RA_TOV);
+			  FC_CLASS_3, len, &fchs,
+			  bfa_fcs_port_ms_gfn_response, (void *)ms,
+			  FC_MAX_PDUSZ, FC_RA_TOV);
 
 	bfa_sm_send_event(ms, MSSM_EVENT_FCXP_SENT);
 }
 
 static void
 bfa_fcs_port_ms_gfn_response(void *fcsarg, struct bfa_fcxp_s *fcxp, void *cbarg,
-			     bfa_status_t req_status, u32 rsp_len,
+			       bfa_status_t req_status, u32 rsp_len,
 			       u32 resid_len, struct fchs_s *rsp_fchs)
 {
-	struct bfa_fcs_port_ms_s *ms = (struct bfa_fcs_port_ms_s *)cbarg;
+	struct bfa_fcs_port_ms_s *ms = (struct bfa_fcs_port_ms_s *) cbarg;
 	struct bfa_fcs_port_s *port = ms->port;
 	struct ct_hdr_s       *cthdr = NULL;
-	wwn_t          *gfn_resp;
+	wwn_t	       *gfn_resp;
 
 	bfa_trc(port->fcs, req_status);
 	bfa_trc(port->fcs, port->port_cfg.pwwn);
@@ -592,14 +588,12 @@ bfa_fcs_port_ms_gfn_response(void *fcsarg, struct bfa_fcxp_s *fcxp, void *cbarg,
 	cthdr->cmd_rsp_code = bfa_os_ntohs(cthdr->cmd_rsp_code);
 
 	if (cthdr->cmd_rsp_code == CT_RSP_ACCEPT) {
-		gfn_resp = (wwn_t *) (cthdr + 1);
-		/*
-		 * check if it has actually changed
-		 */
-		if ((memcmp
-		     ((void *)&bfa_fcs_port_get_fabric_name(port), gfn_resp,
-		      sizeof(wwn_t)) != 0))
+		gfn_resp = (wwn_t *)(cthdr + 1);
+		/* check if it has actually changed */
+		if ((memcmp((void *)&bfa_fcs_port_get_fabric_name(port),
+				gfn_resp, sizeof(wwn_t)) != 0)) {
 			bfa_fcs_fabric_set_fabric_name(port->fabric, *gfn_resp);
+		}
 		bfa_sm_send_event(ms, MSSM_EVENT_RSP_OK);
 		return;
 	}
@@ -628,7 +622,7 @@ bfa_fcs_port_ms_send_plogi(void *ms_cbarg, struct bfa_fcxp_s *fcxp_alloced)
 	if (!fcxp) {
 		port->stats.ms_plogi_alloc_wait++;
 		bfa_fcxp_alloc_wait(port->fcs->bfa, &ms->fcxp_wqe,
-				    bfa_fcs_port_ms_send_plogi, ms);
+					bfa_fcs_port_ms_send_plogi, ms);
 		return;
 	}
 	ms->fcxp = fcxp;
@@ -637,11 +631,12 @@ bfa_fcs_port_ms_send_plogi(void *ms_cbarg, struct bfa_fcxp_s *fcxp_alloced)
 			     bfa_os_hton3b(FC_MGMT_SERVER),
 			     bfa_fcs_port_get_fcid(port), 0,
 			     port->port_cfg.pwwn, port->port_cfg.nwwn,
-			     bfa_pport_get_maxfrsize(port->fcs->bfa));
+				 bfa_fcport_get_maxfrsize(port->fcs->bfa));
 
 	bfa_fcxp_send(fcxp, NULL, port->fabric->vf_id, port->lp_tag, BFA_FALSE,
-		      FC_CLASS_3, len, &fchs, bfa_fcs_port_ms_plogi_response,
-		      (void *)ms, FC_MAX_PDUSZ, FC_RA_TOV);
+			  FC_CLASS_3, len, &fchs,
+			  bfa_fcs_port_ms_plogi_response, (void *)ms,
+			  FC_MAX_PDUSZ, FC_RA_TOV);
 
 	port->stats.ms_plogi_sent++;
 	bfa_sm_send_event(ms, MSSM_EVENT_FCXP_SENT);
@@ -649,12 +644,11 @@ bfa_fcs_port_ms_send_plogi(void *ms_cbarg, struct bfa_fcxp_s *fcxp_alloced)
 
 static void
 bfa_fcs_port_ms_plogi_response(void *fcsarg, struct bfa_fcxp_s *fcxp,
-			       void *cbarg, bfa_status_t req_status,
-			       u32 rsp_len, u32 resid_len,
-			       struct fchs_s *rsp_fchs)
+				void *cbarg, bfa_status_t req_status,
+				u32 rsp_len, u32 resid_len,
+				struct fchs_s *rsp_fchs)
 {
-	struct bfa_fcs_port_ms_s *ms = (struct bfa_fcs_port_ms_s *)cbarg;
-
+	struct bfa_fcs_port_ms_s *ms = (struct bfa_fcs_port_ms_s *) cbarg;
 	struct bfa_fcs_port_s *port = ms->port;
 	struct fc_els_cmd_s   *els_cmd;
 	struct fc_ls_rjt_s    *ls_rjt;
@@ -707,7 +701,7 @@ bfa_fcs_port_ms_plogi_response(void *fcsarg, struct bfa_fcxp_s *fcxp,
 static void
 bfa_fcs_port_ms_timeout(void *arg)
 {
-	struct bfa_fcs_port_ms_s *ms = (struct bfa_fcs_port_ms_s *)arg;
+	struct bfa_fcs_port_ms_s *ms = (struct bfa_fcs_port_ms_s *) arg;
 
 	ms->port->stats.ms_timeouts++;
 	bfa_sm_send_event(ms, MSSM_EVENT_TIMEOUT);
@@ -735,6 +729,7 @@ bfa_fcs_port_ms_offline(struct bfa_fcs_port_s *port)
 
 	ms->port = port;
 	bfa_sm_send_event(ms, MSSM_EVENT_PORT_OFFLINE);
+	bfa_fcs_port_fdmi_offline(ms);
 }
 
 void
@@ -745,15 +740,12 @@ bfa_fcs_port_ms_online(struct bfa_fcs_port_s *port)
 	ms->port = port;
 	bfa_sm_send_event(ms, MSSM_EVENT_PORT_ONLINE);
 }
-
 void
 bfa_fcs_port_ms_fabric_rscn(struct bfa_fcs_port_s *port)
 {
 	struct bfa_fcs_port_ms_s *ms = BFA_FCS_GET_MS_FROM_PORT(port);
 
-	/*
-	 * @todo.  Handle this only when in Online state
-	 */
+	/* todo.  Handle this only  when in Online state */
 	if (bfa_sm_cmp_state(ms, bfa_fcs_port_ms_sm_online))
 		bfa_sm_send_event(ms, MSSM_EVENT_PORT_FABRIC_RSCN);
 }

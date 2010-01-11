@@ -31,7 +31,7 @@ enum {
 /*
  * SRR FC-4 LS payload
  */
-struct fc_srr_s{
+struct fc_srr_s {
 	u32	ls_cmd;
 	u32        ox_id:16;	/* ox-id */
 	u32        rx_id:16;	/* rx-id */
@@ -40,14 +40,13 @@ struct fc_srr_s{
 	u32        res:24;
 };
 
-
 /*
  * FCP_CMND definitions
  */
 #define FCP_CMND_CDB_LEN    16
 #define FCP_CMND_LUN_LEN    8
 
-struct fcp_cmnd_s{
+struct fcp_cmnd_s {
 	lun_t           lun;		/* 64-bit LU number */
 	u8         crn;		/* command reference number */
 #ifdef __BIGENDIAN
@@ -81,7 +80,7 @@ struct fcp_cmnd_s{
 /*
  * fcp_cmnd_t.iodir field values
  */
-enum fcp_iodir{
+enum fcp_iodir {
 	FCP_IODIR_NONE	= 0,
 	FCP_IODIR_WRITE = 1,
 	FCP_IODIR_READ	= 2,
@@ -105,7 +104,7 @@ enum {
 #ifndef BIT
 #define BIT(_x)	(1 << (_x))
 #endif
-enum fcp_tm_cmnd{
+enum fcp_tm_cmnd {
 	FCP_TM_ABORT_TASK_SET	= BIT(1),
 	FCP_TM_CLEAR_TASK_SET	= BIT(2),
 	FCP_TM_LUN_RESET	= BIT(4),
@@ -116,7 +115,7 @@ enum fcp_tm_cmnd{
 /*
  * FCP_XFER_RDY IU defines
  */
-struct fcp_xfer_rdy_s{
+struct fcp_xfer_rdy_s {
 	u32        data_ro;
 	u32        burst_len;
 	u32        reserved;
@@ -125,7 +124,7 @@ struct fcp_xfer_rdy_s{
 /*
  * FCP_RSP residue flags
  */
-enum fcp_residue{
+enum fcp_residue {
 	FCP_NO_RESIDUE = 0,	/* no residue */
 	FCP_RESID_OVER = 1,	/* more data left that was not sent */
 	FCP_RESID_UNDER = 2,	/* less data than requested */
@@ -140,13 +139,13 @@ enum {
 	FCP_RSPINFO_TM_FAILED = 5,
 };
 
-struct fcp_rspinfo_s{
+struct fcp_rspinfo_s {
 	u32        res0:24;
 	u32        rsp_code:8;	/* response code (as above) */
 	u32        res1;
 };
 
-struct fcp_resp_s{
+struct fcp_resp_s {
 	u32        reserved[2];	/* 2 words reserved */
 	u16        reserved2;
 #ifdef __BIGENDIAN
@@ -176,7 +175,7 @@ struct fcp_resp_s{
 #define fcp_snsinfo(__fcprsp)	(((u8 *)fcp_rspinfo(__fcprsp)) + 	\
 						fcp_rsplen(__fcprsp))
 
-struct fcp_cmnd_fr_s{
+struct fcp_cmnd_fr_s {
 	struct fchs_s          fchs;
 	struct fcp_cmnd_s      fcp;
 };

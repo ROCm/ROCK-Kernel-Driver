@@ -61,17 +61,15 @@ struct bfa_cee_s {
 
 u32 bfa_cee_meminfo(void);
 void bfa_cee_mem_claim(struct bfa_cee_s *cee, u8 *dma_kva,
-			 u64 dma_pa);
+    u64 dma_pa);
 void bfa_cee_attach(struct bfa_cee_s *cee, struct bfa_ioc_s *ioc, void *dev,
-			struct bfa_trc_mod_s *trcmod,
-			struct bfa_log_mod_s *logmod);
+    struct bfa_trc_mod_s *trcmod, struct bfa_log_mod_s *logmod);
 void bfa_cee_detach(struct bfa_cee_s *cee);
 bfa_status_t bfa_cee_get_attr(struct bfa_cee_s *cee,
-			 struct bfa_cee_attr_s *attr,
-			bfa_cee_get_attr_cbfn_t cbfn, void *cbarg);
+    struct bfa_cee_attr_s *attr, bfa_cee_get_attr_cbfn_t cbfn, void *cbarg);
 bfa_status_t bfa_cee_get_stats(struct bfa_cee_s *cee,
-			struct bfa_cee_stats_s *stats,
-			bfa_cee_get_stats_cbfn_t cbfn, void *cbarg);
+    struct bfa_cee_stats_s *stats, bfa_cee_get_stats_cbfn_t cbfn, void *cbarg);
 bfa_status_t bfa_cee_reset_stats(struct bfa_cee_s *cee,
-			bfa_cee_reset_stats_cbfn_t cbfn, void *cbarg);
+    bfa_cee_reset_stats_cbfn_t cbfn, void *cbarg);
+
 #endif /* __BFA_CEE_H__ */

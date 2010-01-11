@@ -46,12 +46,14 @@ BFA_MODULE(rport);
  * forward declarations
  */
 static struct bfa_rport_s *bfa_rport_alloc(struct bfa_rport_mod_s *rp_mod);
-static void bfa_rport_free(struct bfa_rport_s *rport);
-static bfa_boolean_t bfa_rport_send_fwcreate(struct bfa_rport_s *rp);
-static bfa_boolean_t bfa_rport_send_fwdelete(struct bfa_rport_s *rp);
-static bfa_boolean_t bfa_rport_send_fwspeed(struct bfa_rport_s *rp);
-static void __bfa_cb_rport_online(void *cbarg, bfa_boolean_t complete);
-static void __bfa_cb_rport_offline(void *cbarg, bfa_boolean_t complete);
+static void		bfa_rport_free(struct bfa_rport_s *rport);
+static bfa_boolean_t 	bfa_rport_send_fwcreate(struct bfa_rport_s *rp);
+static bfa_boolean_t	bfa_rport_send_fwdelete(struct bfa_rport_s *rp);
+static bfa_boolean_t	bfa_rport_send_fwspeed(struct bfa_rport_s *rp);
+static void		__bfa_cb_rport_online(void *cbarg,
+							bfa_boolean_t complete);
+static void		__bfa_cb_rport_offline(void *cbarg,
+							bfa_boolean_t complete);
 
 /**
  *  bfa_rport_sm BFA rport state machine
@@ -114,7 +116,7 @@ bfa_rport_sm_uninit(struct bfa_rport_s *rp, enum bfa_rport_event event)
 
 	default:
 		bfa_stats(rp, sm_un_unexp);
-		bfa_assert(0);
+		bfa_sm_fault(rp->bfa, event);
 	}
 }
 
@@ -146,7 +148,7 @@ bfa_rport_sm_created(struct bfa_rport_s *rp, enum bfa_rport_event event)
 
 	default:
 		bfa_stats(rp, sm_cr_unexp);
-		bfa_assert(0);
+		bfa_sm_fault(rp->bfa, event);
 	}
 }
 
@@ -183,7 +185,7 @@ bfa_rport_sm_fwcreate(struct bfa_rport_s *rp, enum bfa_rport_event event)
 
 	default:
 		bfa_stats(rp, sm_fwc_unexp);
-		bfa_assert(0);
+		bfa_sm_fault(rp->bfa, event);
 	}
 }
 
@@ -224,7 +226,7 @@ bfa_rport_sm_fwcreate_qfull(struct bfa_rport_s *rp, enum bfa_rport_event event)
 
 	default:
 		bfa_stats(rp, sm_fwc_unexp);
-		bfa_assert(0);
+		bfa_sm_fault(rp->bfa, event);
 	}
 }
 
@@ -296,7 +298,7 @@ bfa_rport_sm_online(struct bfa_rport_s *rp, enum bfa_rport_event event)
 
 	default:
 		bfa_stats(rp, sm_on_unexp);
-		bfa_assert(0);
+		bfa_sm_fault(rp->bfa, event);
 	}
 }
 
@@ -329,7 +331,7 @@ bfa_rport_sm_fwdelete(struct bfa_rport_s *rp, enum bfa_rport_event event)
 
 	default:
 		bfa_stats(rp, sm_fwd_unexp);
-		bfa_assert(0);
+		bfa_sm_fault(rp->bfa, event);
 	}
 }
 
@@ -359,7 +361,7 @@ bfa_rport_sm_fwdelete_qfull(struct bfa_rport_s *rp, enum bfa_rport_event event)
 
 	default:
 		bfa_stats(rp, sm_fwd_unexp);
-		bfa_assert(0);
+		bfa_sm_fault(rp->bfa, event);
 	}
 }
 
@@ -394,7 +396,7 @@ bfa_rport_sm_offline(struct bfa_rport_s *rp, enum bfa_rport_event event)
 
 	default:
 		bfa_stats(rp, sm_off_unexp);
-		bfa_assert(0);
+		bfa_sm_fault(rp->bfa, event);
 	}
 }
 
@@ -421,7 +423,7 @@ bfa_rport_sm_deleting(struct bfa_rport_s *rp, enum bfa_rport_event event)
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(rp->bfa, event);
 	}
 }
 
@@ -446,7 +448,7 @@ bfa_rport_sm_deleting_qfull(struct bfa_rport_s *rp, enum bfa_rport_event event)
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(rp->bfa, event);
 	}
 }
 
@@ -477,7 +479,7 @@ bfa_rport_sm_delete_pending(struct bfa_rport_s *rp,
 
 	default:
 		bfa_stats(rp, sm_delp_unexp);
-		bfa_assert(0);
+		bfa_sm_fault(rp->bfa, event);
 	}
 }
 
@@ -512,7 +514,7 @@ bfa_rport_sm_offline_pending(struct bfa_rport_s *rp,
 
 	default:
 		bfa_stats(rp, sm_offp_unexp);
-		bfa_assert(0);
+		bfa_sm_fault(rp->bfa, event);
 	}
 }
 
@@ -550,7 +552,7 @@ bfa_rport_sm_iocdisable(struct bfa_rport_s *rp, enum bfa_rport_event event)
 
 	default:
 		bfa_stats(rp, sm_iocd_unexp);
-		bfa_assert(0);
+		bfa_sm_fault(rp->bfa, event);
 	}
 }
 
@@ -677,7 +679,7 @@ bfa_rport_alloc(struct bfa_rport_mod_s *mod)
 	if (rport)
 		list_add_tail(&rport->qe, &mod->rp_active_q);
 
-	return (rport);
+	return rport;
 }
 
 static void
@@ -834,7 +836,7 @@ bfa_rport_create(struct bfa_s *bfa, void *rport_drv)
 	rp = bfa_rport_alloc(BFA_RPORT_MOD(bfa));
 
 	if (rp == NULL)
-		return (NULL);
+		return NULL;
 
 	rp->bfa = bfa;
 	rp->rport_drv = rport_drv;
@@ -843,7 +845,7 @@ bfa_rport_create(struct bfa_s *bfa, void *rport_drv)
 	bfa_assert(bfa_sm_cmp_state(rp, bfa_rport_sm_uninit));
 	bfa_sm_send_event(rp, BFA_RPORT_SM_CREATE);
 
-	return (rp);
+	return rp;
 }
 
 void

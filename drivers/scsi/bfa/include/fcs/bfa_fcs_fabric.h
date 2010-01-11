@@ -70,12 +70,11 @@ struct bfa_fcs_fabric_s {
 	struct bfa_wc_s        wc;	/*  wait counter for delete	*/
 	struct bfa_vf_stats_s  stats; 	/*  fabric/vf stats		*/
 	struct bfa_lps_s	*lps;	/*  lport login services	*/
-	u8	fabric_ip_addr[BFA_FCS_FABRIC_IPADDR_SZ];  /*  attached
-							    * fabric's ip addr
-							    */
+	u8	fabric_ip_addr[BFA_FCS_FABRIC_IPADDR_SZ];
+					/*  attached fabric's ip addr  */
 };
 
-#define bfa_fcs_fabric_npiv_capable(__f)    (__f)->is_npiv
+#define bfa_fcs_fabric_npiv_capable(__f)    ((__f)->is_npiv)
 #define bfa_fcs_fabric_is_switched(__f)			\
 	((__f)->fab_type == BFA_FCS_FABRIC_SWITCHED)
 

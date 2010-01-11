@@ -112,7 +112,7 @@ struct fdmi_attr_s {
  * HBA Attribute Block
  */
 struct fdmi_hba_attr_s {
-	u32        attr_count;	/* # of attributes */
+	u32        attr_count;		/* # of attributes */
 	struct fdmi_attr_s     hba_attr;	/* n attributes */
 };
 
@@ -128,7 +128,7 @@ struct fdmi_port_list_s {
  * Port Attribute Block
  */
 struct fdmi_port_attr_s {
-	u32        attr_count;	/* # of attributes */
+	u32        attr_count;		/* # of attributes */
 	struct fdmi_attr_s     port_attr;	/* n attributes */
 };
 
@@ -136,7 +136,7 @@ struct fdmi_port_attr_s {
  * FDMI Register HBA Attributes
  */
 struct fdmi_rhba_s {
-	wwn_t           hba_id;		/* HBA Identifier */
+	wwn_t           hba_id;			/* HBA Identifier */
 	struct fdmi_port_list_s port_list;	/* Registered Port List */
 	struct fdmi_hba_attr_s hba_attr_blk;	/* HBA attribute block */
 };
@@ -145,8 +145,8 @@ struct fdmi_rhba_s {
  * FDMI Register Port
  */
 struct fdmi_rprt_s {
-	wwn_t           hba_id;		/* HBA Identifier */
-	wwn_t           port_name;	/* Port wwn */
+	wwn_t           hba_id;			/* HBA Identifier */
+	wwn_t           port_name;		/* Port wwn */
 	struct fdmi_port_attr_s port_attr_blk;	/* Port Attr Block */
 };
 
@@ -154,7 +154,7 @@ struct fdmi_rprt_s {
  * FDMI Register Port Attributes
  */
 struct fdmi_rpa_s {
-	wwn_t           port_name;	/* port wwn */
+	wwn_t           port_name;		/* port wwn */
 	struct fdmi_port_attr_s port_attr_blk;	/* Port Attr Block */
 };
 

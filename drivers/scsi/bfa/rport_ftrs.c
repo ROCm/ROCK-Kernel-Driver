@@ -34,12 +34,12 @@ BFA_TRC_FILE(FCS, RPORT_FTRS);
 #define BFA_FCS_RPF_RETRY_TIMEOUT  (1000) /* 1 sec (In millisecs) */
 
 static void     bfa_fcs_rpf_send_rpsc2(void *rport_cbarg,
-			struct bfa_fcxp_s *fcxp_alloced);
+					struct bfa_fcxp_s *fcxp_alloced);
 static void     bfa_fcs_rpf_rpsc2_response(void *fcsarg,
-			struct bfa_fcxp_s *fcxp, void *cbarg,
-			bfa_status_t req_status, u32 rsp_len,
-			u32 resid_len,
-			struct fchs_s *rsp_fchs);
+					struct bfa_fcxp_s *fcxp,
+					void *cbarg, bfa_status_t req_status,
+					u32 rsp_len, u32 resid_len,
+					struct fchs_s *rsp_fchs);
 static void     bfa_fcs_rpf_timeout(void *arg);
 
 /**
@@ -56,7 +56,7 @@ enum rpf_event {
 	RPFSM_EVENT_RPSC_ERROR     = 7,
 };
 
-static void	bfa_fcs_rpf_sm_uninit(struct bfa_fcs_rpf_s *rpf,
+static void		bfa_fcs_rpf_sm_uninit(struct bfa_fcs_rpf_s *rpf,
 					enum rpf_event event);
 static void     bfa_fcs_rpf_sm_rpsc_sending(struct bfa_fcs_rpf_s *rpf,
 					       enum rpf_event event);
@@ -79,7 +79,7 @@ bfa_fcs_rpf_sm_uninit(struct bfa_fcs_rpf_s *rpf, enum rpf_event event)
 	bfa_trc(rport->fcs, event);
 
 	switch (event) {
-	case RPFSM_EVENT_RPORT_ONLINE :
+	case RPFSM_EVENT_RPORT_ONLINE:
 		if (!BFA_FCS_PID_IS_WKA(rport->pid)) {
 			bfa_sm_set_state(rpf, bfa_fcs_rpf_sm_rpsc_sending);
 			rpf->rpsc_retries = 0;
@@ -87,11 +87,11 @@ bfa_fcs_rpf_sm_uninit(struct bfa_fcs_rpf_s *rpf, enum rpf_event event)
 			break;
 		};
 
-	case RPFSM_EVENT_RPORT_OFFLINE :
+	case RPFSM_EVENT_RPORT_OFFLINE:
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(rport->fcs, event);
 	}
 }
 
@@ -107,14 +107,14 @@ bfa_fcs_rpf_sm_rpsc_sending(struct bfa_fcs_rpf_s *rpf, enum rpf_event event)
 		bfa_sm_set_state(rpf, bfa_fcs_rpf_sm_rpsc);
 		break;
 
-	case RPFSM_EVENT_RPORT_OFFLINE :
+	case RPFSM_EVENT_RPORT_OFFLINE:
 		bfa_sm_set_state(rpf, bfa_fcs_rpf_sm_offline);
 		bfa_fcxp_walloc_cancel(rport->fcs->bfa, &rpf->fcxp_wqe);
 		rpf->rpsc_retries = 0;
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(rport->fcs, event);
 	}
 }
 
@@ -130,11 +130,11 @@ bfa_fcs_rpf_sm_rpsc(struct bfa_fcs_rpf_s *rpf, enum rpf_event event)
 	case RPFSM_EVENT_RPSC_COMP:
 		bfa_sm_set_state(rpf, bfa_fcs_rpf_sm_online);
 		/* Update speed info in f/w via BFA */
-		if (rpf->rpsc_speed != BFA_PPORT_SPEED_UNKNOWN) {
+		if (rpf->rpsc_speed != BFA_PPORT_SPEED_UNKNOWN)
 			bfa_rport_speed(rport->bfa_rport, rpf->rpsc_speed);
-		} else if (rpf->assigned_speed != BFA_PPORT_SPEED_UNKNOWN) {
+		else if (rpf->assigned_speed != BFA_PPORT_SPEED_UNKNOWN)
 			bfa_rport_speed(rport->bfa_rport, rpf->assigned_speed);
-		}
+
 		break;
 
 	case RPFSM_EVENT_RPSC_FAIL:
@@ -154,14 +154,14 @@ bfa_fcs_rpf_sm_rpsc(struct bfa_fcs_rpf_s *rpf, enum rpf_event event)
 		}
 		break;
 
-	case RPFSM_EVENT_RPORT_OFFLINE :
+	case RPFSM_EVENT_RPORT_OFFLINE:
 		bfa_sm_set_state(rpf, bfa_fcs_rpf_sm_offline);
 		bfa_fcxp_discard(rpf->fcxp);
 		rpf->rpsc_retries = 0;
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(rport->fcs, event);
 	}
 }
 
@@ -174,20 +174,20 @@ bfa_fcs_rpf_sm_rpsc_retry(struct bfa_fcs_rpf_s *rpf, enum rpf_event event)
 	bfa_trc(rport->fcs, event);
 
 	switch (event) {
-	case RPFSM_EVENT_TIMEOUT :
+	case RPFSM_EVENT_TIMEOUT:
 		/* re-send the RPSC */
 		bfa_sm_set_state(rpf, bfa_fcs_rpf_sm_rpsc_sending);
 		bfa_fcs_rpf_send_rpsc2(rpf, NULL);
 		break;
 
-	case RPFSM_EVENT_RPORT_OFFLINE :
+	case RPFSM_EVENT_RPORT_OFFLINE:
 		bfa_timer_stop(&rpf->timer);
 		bfa_sm_set_state(rpf, bfa_fcs_rpf_sm_offline);
 		rpf->rpsc_retries = 0;
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(rport->fcs, event);
 	}
 }
 
@@ -201,13 +201,13 @@ bfa_fcs_rpf_sm_online(struct bfa_fcs_rpf_s *rpf, enum rpf_event event)
 	bfa_trc(rport->fcs, event);
 
 	switch (event) {
-	case RPFSM_EVENT_RPORT_OFFLINE :
+	case RPFSM_EVENT_RPORT_OFFLINE:
 		bfa_sm_set_state(rpf, bfa_fcs_rpf_sm_offline);
 		rpf->rpsc_retries = 0;
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(rport->fcs, event);
 	}
 }
 
@@ -221,16 +221,16 @@ bfa_fcs_rpf_sm_offline(struct bfa_fcs_rpf_s *rpf, enum rpf_event event)
 	bfa_trc(rport->fcs, event);
 
 	switch (event) {
-	case RPFSM_EVENT_RPORT_ONLINE :
+	case RPFSM_EVENT_RPORT_ONLINE:
 		bfa_sm_set_state(rpf, bfa_fcs_rpf_sm_rpsc_sending);
 		bfa_fcs_rpf_send_rpsc2(rpf, NULL);
 		break;
 
-	case RPFSM_EVENT_RPORT_OFFLINE :
+	case RPFSM_EVENT_RPORT_OFFLINE:
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(rport->fcs, event);
 	}
 }
 /**
@@ -366,10 +366,9 @@ bfa_fcs_rpf_rpsc2_response(void *fcsarg, struct bfa_fcxp_s *fcxp, void *cbarg,
 		bfa_trc(rport->fcs, ls_rjt->reason_code);
 		bfa_trc(rport->fcs, ls_rjt->reason_code_expl);
 		rport->stats.rpsc_rejects++;
-		if (ls_rjt->reason_code == FC_LS_RJT_RSN_CMD_NOT_SUPP) {
+		if (ls_rjt->reason_code == FC_LS_RJT_RSN_CMD_NOT_SUPP)
 			bfa_sm_send_event(rpf, RPFSM_EVENT_RPSC_FAIL);
-		} else {
+		else
 			bfa_sm_send_event(rpf, RPFSM_EVENT_RPSC_ERROR);
-		}
 	}
 }

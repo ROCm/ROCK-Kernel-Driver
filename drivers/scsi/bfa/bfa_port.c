@@ -14,6 +14,12 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * General Public License for more details.
  */
+/*
+ *      Copyright (c) 2007-2009 Brocade Communications Systems, Inc.
+ *      All rights reserved.
+ *
+ *      @file bfa_port.c Port module source file.
+ */
 
 #include <defs/bfa_defs_port.h>
 #include <cs/bfa_trc.h>
@@ -33,12 +39,11 @@ BFA_TRC_FILE(CNA, PORT);
 static void
 bfa_port_stats_swap(struct bfa_port_s *port, union bfa_pport_stats_u *stats)
 {
-	u32       *dip = (u32 *) stats;
-	u32        t0, t1;
-	int             i;
+	u32    *dip = (u32 *) stats;
+	u32    t0, t1;
+	int         i;
 
-	for (i = 0; i < sizeof(union bfa_pport_stats_u) / sizeof(u32);
-	     i += 2) {
+	for (i = 0; i < sizeof(union bfa_pport_stats_u)/sizeof(u32); i += 2) {
 		t0 = dip[i];
 		t1 = dip[i + 1];
 #ifdef __BIGENDIAN
@@ -48,9 +53,9 @@ bfa_port_stats_swap(struct bfa_port_s *port, union bfa_pport_stats_u *stats)
 		dip[i] = bfa_os_ntohl(t1);
 		dip[i + 1] = bfa_os_ntohl(t0);
 #endif
-	}
+    }
 
-    /** todo
+    /** @todo
      * QoS stats r also swapped as 64bit; that structure also
      * has to use 64 bit counters
      */
@@ -103,7 +108,7 @@ bfa_port_get_stats_isr(struct bfa_port_s *port, bfa_status_t status)
 
 	if (status == BFA_STATUS_OK) {
 		memcpy(port->stats, port->stats_dma.kva,
-		       sizeof(union bfa_pport_stats_u));
+				sizeof(union bfa_pport_stats_u));
 		bfa_port_stats_swap(port, port->stats);
 	}
 
@@ -126,7 +131,7 @@ static void
 bfa_port_clear_stats_isr(struct bfa_port_s *port, bfa_status_t status)
 {
 	port->stats_status = status;
-	port->stats_busy = BFA_FALSE;
+	port->stats_busy   = BFA_FALSE;
 
 	if (port->stats_cbfn) {
 		port->stats_cbfn(port->stats_cbarg, status);
@@ -145,10 +150,10 @@ bfa_port_clear_stats_isr(struct bfa_port_s *port, bfa_status_t status)
 static void
 bfa_port_isr(void *cbarg, struct bfi_mbmsg_s *m)
 {
-	struct bfa_port_s *port = (struct bfa_port_s *)cbarg;
+	struct bfa_port_s *port = (struct bfa_port_s *) cbarg;
 	union bfi_port_i2h_msg_u *i2hmsg;
 
-	i2hmsg = (union bfi_port_i2h_msg_u *)m;
+	i2hmsg = (union bfi_port_i2h_msg_u *) m;
 	bfa_trc(port, m->mh.msg_id);
 
 	switch (m->mh.msg_id) {
@@ -165,9 +170,7 @@ bfa_port_isr(void *cbarg, struct bfi_mbmsg_s *m)
 		break;
 
 	case BFI_PORT_I2H_GET_STATS_RSP:
-		/*
-		 * Stats busy flag is still set? (may be cmd timed out)
-		 */
+		/* Stats busy flag is still set? (may be cmd timed out) */
 		if (port->stats_busy == BFA_FALSE)
 			break;
 		bfa_port_get_stats_isr(port, i2hmsg->getstats_rsp.status);
@@ -203,8 +206,8 @@ bfa_port_meminfo(void)
  *
  *
  * @param[in] port Port module pointer
- * 	      dma_kva Kernel Virtual Address of Port DMA Memory
- * 	      dma_pa  Physical Address of Port DMA Memory
+ *	      dma_kva Kernel Virtual Address of Port DMA Memory
+ *	      dma_pa  Physical Address of Port DMA Memory
  *
  * @return void
  */
@@ -212,7 +215,7 @@ void
 bfa_port_mem_claim(struct bfa_port_s *port, u8 *dma_kva, u64 dma_pa)
 {
 	port->stats_dma.kva = dma_kva;
-	port->stats_dma.pa = dma_pa;
+	port->stats_dma.pa  = dma_pa;
 }
 
 /**
@@ -226,11 +229,11 @@ bfa_port_mem_claim(struct bfa_port_s *port, u8 *dma_kva, u64 dma_pa)
  */
 bfa_status_t
 bfa_port_enable(struct bfa_port_s *port, bfa_port_endis_cbfn_t cbfn,
-		void *cbarg)
+		 void *cbarg)
 {
 	struct bfi_port_generic_req_s *m;
 
-	/** todo Not implemented */
+	/** @todo Not implemented */
 	bfa_assert(0);
 
 	if (!bfa_ioc_is_operational(port->ioc)) {
@@ -240,14 +243,14 @@ bfa_port_enable(struct bfa_port_s *port, bfa_port_endis_cbfn_t cbfn,
 
 	if (port->endis_pending) {
 		bfa_trc(port, BFA_STATUS_DEVBUSY);
-		return BFA_STATUS_DEVBUSY;
+		return 	BFA_STATUS_DEVBUSY;
 	}
 
-	m = (struct bfi_port_generic_req_s *)port->endis_mb.msg;
+	m = (struct bfi_port_generic_req_s *) port->endis_mb.msg;
 
 	port->msgtag++;
-	port->endis_cbfn = cbfn;
-	port->endis_cbarg = cbarg;
+	port->endis_cbfn    = cbfn;
+	port->endis_cbarg   = cbarg;
 	port->endis_pending = BFA_TRUE;
 
 	bfi_h2i_set(m->mh, BFI_MC_PORT, BFI_PORT_H2I_ENABLE_REQ,
@@ -268,11 +271,11 @@ bfa_port_enable(struct bfa_port_s *port, bfa_port_endis_cbfn_t cbfn,
  */
 bfa_status_t
 bfa_port_disable(struct bfa_port_s *port, bfa_port_endis_cbfn_t cbfn,
-		 void *cbarg)
+		  void *cbarg)
 {
 	struct bfi_port_generic_req_s *m;
 
-	/** todo Not implemented */
+	/** @todo Not implemented */
 	bfa_assert(0);
 
 	if (!bfa_ioc_is_operational(port->ioc)) {
@@ -282,14 +285,14 @@ bfa_port_disable(struct bfa_port_s *port, bfa_port_endis_cbfn_t cbfn,
 
 	if (port->endis_pending) {
 		bfa_trc(port, BFA_STATUS_DEVBUSY);
-		return BFA_STATUS_DEVBUSY;
+		return 	BFA_STATUS_DEVBUSY;
 	}
 
-	m = (struct bfi_port_generic_req_s *)port->endis_mb.msg;
+	m = (struct bfi_port_generic_req_s *) port->endis_mb.msg;
 
 	port->msgtag++;
-	port->endis_cbfn = cbfn;
-	port->endis_cbarg = cbarg;
+	port->endis_cbfn    = cbfn;
+	port->endis_cbarg   = cbarg;
 	port->endis_pending = BFA_TRUE;
 
 	bfi_h2i_set(m->mh, BFI_MC_PORT, BFI_PORT_H2I_DISABLE_REQ,
@@ -310,7 +313,7 @@ bfa_port_disable(struct bfa_port_s *port, bfa_port_endis_cbfn_t cbfn,
  */
 bfa_status_t
 bfa_port_get_stats(struct bfa_port_s *port, union bfa_pport_stats_u *stats,
-		   bfa_port_stats_cbfn_t cbfn, void *cbarg)
+		    bfa_port_stats_cbfn_t cbfn, void *cbarg)
 {
 	struct bfi_port_get_stats_req_s *m;
 
@@ -321,15 +324,15 @@ bfa_port_get_stats(struct bfa_port_s *port, union bfa_pport_stats_u *stats,
 
 	if (port->stats_busy) {
 		bfa_trc(port, BFA_STATUS_DEVBUSY);
-		return BFA_STATUS_DEVBUSY;
+		return 	BFA_STATUS_DEVBUSY;
 	}
 
-	m = (struct bfi_port_get_stats_req_s *)port->stats_mb.msg;
+	m = (struct bfi_port_get_stats_req_s *) port->stats_mb.msg;
 
-	port->stats = stats;
-	port->stats_cbfn = cbfn;
+	port->stats	  = stats;
+	port->stats_cbfn  = cbfn;
 	port->stats_cbarg = cbarg;
-	port->stats_busy = BFA_TRUE;
+	port->stats_busy  = BFA_TRUE;
 	bfa_dma_be_addr_set(m->dma_addr, port->stats_dma.pa);
 
 	bfi_h2i_set(m->mh, BFI_MC_PORT, BFI_PORT_H2I_GET_STATS_REQ,
@@ -349,7 +352,7 @@ bfa_port_get_stats(struct bfa_port_s *port, union bfa_pport_stats_u *stats,
  */
 bfa_status_t
 bfa_port_clear_stats(struct bfa_port_s *port, bfa_port_stats_cbfn_t cbfn,
-		     void *cbarg)
+		      void *cbarg)
 {
 	struct bfi_port_generic_req_s *m;
 
@@ -360,14 +363,14 @@ bfa_port_clear_stats(struct bfa_port_s *port, bfa_port_stats_cbfn_t cbfn,
 
 	if (port->stats_busy) {
 		bfa_trc(port, BFA_STATUS_DEVBUSY);
-		return BFA_STATUS_DEVBUSY;
+		return 	BFA_STATUS_DEVBUSY;
 	}
 
-	m = (struct bfi_port_generic_req_s *)port->stats_mb.msg;
+	m = (struct bfi_port_generic_req_s *) port->stats_mb.msg;
 
-	port->stats_cbfn = cbfn;
+	port->stats_cbfn  = cbfn;
 	port->stats_cbarg = cbarg;
-	port->stats_busy = BFA_TRUE;
+	port->stats_busy  = BFA_TRUE;
 
 	bfi_h2i_set(m->mh, BFI_MC_PORT, BFI_PORT_H2I_CLEAR_STATS_REQ,
 		    bfa_ioc_portid(port->ioc));
@@ -387,11 +390,9 @@ bfa_port_clear_stats(struct bfa_port_s *port, bfa_port_stats_cbfn_t cbfn,
 void
 bfa_port_hbfail(void *arg)
 {
-	struct bfa_port_s *port = (struct bfa_port_s *)arg;
+	struct bfa_port_s *port = (struct bfa_port_s *) arg;
 
-	/*
-	 * Fail any pending get_stats/clear_stats requests
-	 */
+	/* Fail any pending get_stats/clear_stats requests */
 	if (port->stats_busy) {
 		if (port->stats_cbfn)
 			port->stats_cbfn(port->dev, BFA_STATUS_FAILED);
@@ -399,9 +400,7 @@ bfa_port_hbfail(void *arg)
 		port->stats_busy = BFA_FALSE;
 	}
 
-	/*
-	 * Clear any enable/disable is pending
-	 */
+	/* Clear any enable/disable is pending */
 	if (port->endis_pending) {
 		if (port->endis_cbfn)
 			port->endis_cbfn(port->dev, BFA_STATUS_FAILED);
@@ -425,18 +424,21 @@ bfa_port_hbfail(void *arg)
  * @return void
  */
 void
-bfa_port_attach(struct bfa_port_s *port, struct bfa_ioc_s *ioc, void *dev,
-		struct bfa_trc_mod_s *trcmod, struct bfa_log_mod_s *logmod)
+bfa_port_attach(struct bfa_port_s *port, struct bfa_ioc_s *ioc,
+		 void *dev, struct bfa_trc_mod_s *trcmod,
+		 struct bfa_log_mod_s *logmod)
 {
 	bfa_assert(port);
 
-	port->dev = dev;
-	port->ioc = ioc;
+	port->dev    = dev;
+	port->ioc    = ioc;
 	port->trcmod = trcmod;
 	port->logmod = logmod;
 
-	port->stats_busy = port->endis_pending = BFA_FALSE;
-	port->stats_cbfn = port->endis_cbfn = NULL;
+	port->stats_busy =
+	port->endis_pending = BFA_FALSE;
+	port->stats_cbfn =
+	port->endis_cbfn = NULL;
 
 	bfa_ioc_mbox_regisr(port->ioc, BFI_MC_PORT, bfa_port_isr, port);
 	bfa_ioc_hbfail_init(&port->hbfail, bfa_port_hbfail, port);

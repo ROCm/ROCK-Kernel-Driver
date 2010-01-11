@@ -99,6 +99,7 @@ struct bfa_fcs_rport_s *bfa_fcs_rport_lookup(struct bfa_fcs_port_s *port,
 struct bfa_fcs_rport_s *bfa_fcs_rport_lookup_by_nwwn(
 			struct bfa_fcs_port_s *port, wwn_t rnwwn);
 void bfa_fcs_rport_set_del_timeout(u8 rport_tmo);
+
 void bfa_fcs_rport_set_speed(struct bfa_fcs_rport_s *rport,
-			enum bfa_pport_speed speed);
+				enum bfa_pport_speed speed);
 #endif /* __BFA_FCS_RPORT_H__ */

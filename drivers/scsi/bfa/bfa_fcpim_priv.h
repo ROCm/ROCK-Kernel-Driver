@@ -35,7 +35,7 @@
 #define BFA_FCPIM_PATHTOV_MAX	(90 * 1000)	/* in millisecs */
 
 #define bfa_fcpim_stats(__fcpim, __stats)   \
-    (__fcpim)->stats.__stats ++
+    ((__fcpim)->stats.__stats++)
 
 struct bfa_fcpim_mod_s {
 	struct bfa_s 	*bfa;
@@ -50,13 +50,13 @@ struct bfa_fcpim_mod_s {
 	u32		path_tov;
 	u16		q_depth;
 	u16		rsvd;
-	struct list_head 	itnim_q;        /*  queue of active itnim    */
-	struct list_head 	ioim_free_q;    /*  free IO resources        */
-	struct list_head 	ioim_resfree_q; /*  IOs waiting for f/w      */
-	struct list_head 	ioim_comp_q;    /*  IO global comp Q         */
-	struct list_head 	tskim_free_q;
-	u32	ios_active;	/*  current active IOs	      */
-	u32	delay_comp;
+	struct list_head 	itnim_q;        /*  queue of active itnim */
+	struct list_head 	ioim_free_q;    /*  free IO resources     */
+	struct list_head 	ioim_resfree_q; /*  IOs waiting for f/w   */
+	struct list_head 	ioim_comp_q;    /*  IO global comp Q      */
+	struct list_head	tskim_free_q;
+	u32		ios_active;	/*  current active IOs	*/
+	u32		delay_comp;
 	struct bfa_fcpim_stats_s stats;
 };
 
@@ -67,21 +67,21 @@ struct bfa_tskim_s;
  * BFA IO (initiator mode)
  */
 struct bfa_ioim_s {
-	struct list_head qe;		/*  queue elememt            */
-	bfa_sm_t		sm; 	/*  BFA ioim state machine   */
-	struct bfa_s 	        *bfa;	/*  BFA module               */
-	struct bfa_fcpim_mod_s	*fcpim;	/*  parent fcpim module      */
-	struct bfa_itnim_s 	*itnim;	/*  i-t-n nexus for this IO  */
-	struct bfad_ioim_s 	*dio;	/*  driver IO handle         */
-	u16	iotag;		/*  FWI IO tag               */
-	u16	abort_tag;	/*  unqiue abort request tag */
-	u16	nsges;		/*  number of SG elements    */
-	u16	nsgpgs;		/*  number of SG pages       */
-	struct bfa_sgpg_s *sgpg;	/*  first SG page            */
-	struct list_head sgpg_q;		/*  allocated SG pages       */
-	struct bfa_cb_qe_s hcb_qe;	/*  bfa callback qelem       */
-	bfa_cb_cbfn_t io_cbfn;		/*  IO completion handler    */
-	struct bfa_ioim_sp_s *iosp;	/*  slow-path IO handling    */
+	struct list_head 		qe;		/*  queue elememt */
+	bfa_sm_t		sm; 		/*  BFA ioim state machine   */
+	struct bfa_s 	        *bfa;		/*  BFA module               */
+	struct bfa_fcpim_mod_s	*fcpim;		/*  parent fcpim module      */
+	struct bfa_itnim_s 	*itnim;		/*  i-t-n nexus for this IO  */
+	struct bfad_ioim_s 	*dio;		/*  driver IO handle         */
+	u16		iotag;		/*  FWI IO tag               */
+	u16		abort_tag;	/*  unqiue abort request tag */
+	u16		nsges;		/*  number of SG elements    */
+	u16		nsgpgs;		/*  number of SG pages       */
+	struct bfa_sgpg_s	*sgpg;		/*  first SG page            */
+	struct list_head 		sgpg_q;	/*  allocated SG pages */
+	struct bfa_cb_qe_s	hcb_qe;		/*  bfa callback qelem       */
+	bfa_cb_cbfn_t		io_cbfn;	/*  IO completion handler    */
+	struct bfa_ioim_sp_s *iosp;		/*  slow-path IO handling    */
 };
 
 struct bfa_ioim_sp_s {
@@ -105,7 +105,7 @@ struct bfa_tskim_s {
 	struct bfad_tskim_s         *dtsk;   /*  driver task mgmt cmnd    */
 	bfa_boolean_t        notify;         /*  notify itnim on TM comp  */
 	lun_t                lun;            /*  lun if applicable        */
-	enum fcp_tm_cmnd        tm_cmnd;     /*  task management command  */
+	enum fcp_tm_cmnd     tm_cmnd;        /*  task management command  */
 	u16             tsk_tag;        /*  FWI IO tag               */
 	u8              tsecs;          /*  timeout in seconds       */
 	struct bfa_reqq_wait_s  reqq_wait;   /*  to wait for room in reqq */
@@ -143,7 +143,7 @@ struct bfa_itnim_s {
 	struct bfa_itnim_hal_stats_s	stats;
 };
 
-#define bfa_itnim_is_online(_itnim) (_itnim)->is_online
+#define bfa_itnim_is_online(_itnim) ((_itnim)->is_online)
 #define BFA_FCPIM_MOD(_hal) (&(_hal)->modules.fcpim_mod)
 #define BFA_IOIM_FROM_TAG(_fcpim, _iotag)	\
 	(&fcpim->ioim_arr[_iotag])

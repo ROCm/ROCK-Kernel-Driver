@@ -40,7 +40,7 @@ u16	bfa_fcpim_path_tov_get(struct bfa_s *bfa);
 void		bfa_fcpim_qdepth_set(struct bfa_s *bfa, u16 q_depth);
 u16	bfa_fcpim_qdepth_get(struct bfa_s *bfa);
 bfa_status_t bfa_fcpim_get_modstats(struct bfa_s *bfa,
-			struct bfa_fcpim_stats_s *modstats);
+				struct bfa_fcpim_stats_s *modstats);
 bfa_status_t bfa_fcpim_clr_modstats(struct bfa_s *bfa);
 
 /*

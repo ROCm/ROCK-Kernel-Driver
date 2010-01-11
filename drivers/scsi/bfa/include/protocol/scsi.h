@@ -26,7 +26,7 @@
  * generic SCSI cdb definition
  */
 #define SCSI_MAX_CDBLEN     16
-struct scsi_cdb_s{
+struct scsi_cdb_s {
 	u8         scsi_cdb[SCSI_MAX_CDBLEN];
 };
 
@@ -34,7 +34,7 @@ struct scsi_cdb_s{
  * scsi lun serial number definition
  */
 #define SCSI_LUN_SN_LEN     32
-struct scsi_lun_sn_s{
+struct scsi_lun_sn_s {
 	u8         lun_sn[SCSI_LUN_SN_LEN];
 };
 
@@ -81,7 +81,7 @@ enum {
 /*
  * SCSI START_STOP_UNIT command
  */
-struct scsi_start_stop_unit_s{
+struct scsi_start_stop_unit_s {
 	u8         opcode;
 #ifdef __BIGENDIAN
 	u8         lun:3;
@@ -111,7 +111,7 @@ struct scsi_start_stop_unit_s{
 /*
  * SCSI SEND_DIAGNOSTIC command
  */
-struct scsi_send_diagnostic_s{
+struct scsi_send_diagnostic_s {
 	u8         opcode;
 #ifdef __BIGENDIAN
 	u8         self_test_code:3;
@@ -138,7 +138,7 @@ struct scsi_send_diagnostic_s{
 /*
  * SCSI READ10/WRITE10 commands
  */
-struct scsi_rw10_s{
+struct scsi_rw10_s {
 	u8         opcode;
 #ifdef __BIGENDIAN
 	u8         lun:3;
@@ -184,7 +184,7 @@ struct scsi_rw10_s{
 /*
  * SCSI READ6/WRITE6 commands
  */
-struct scsi_rw6_s{
+struct scsi_rw6_s {
 	u8         opcode;
 #ifdef __BIGENDIAN
 	u8         lun:3;
@@ -211,7 +211,7 @@ struct scsi_rw6_s{
 /*
  * SCSI sequential (TAPE) wrtie command
  */
-struct scsi_tape_wr_s{
+struct scsi_tape_wr_s {
 	u8         opcode;
 #ifdef __BIGENDIAN
 	u8         rsvd:7;
@@ -244,7 +244,7 @@ struct scsi_tape_wr_s{
 /*
  * SCSI sense data format
  */
-struct scsi_sense_s{
+struct scsi_sense_s {
 #ifdef __BIGENDIAN
 	u8         valid:1;
 	u8         rsp_code:7;
@@ -386,7 +386,7 @@ struct scsi_sense_s{
  * SCSI INQUIRY
  * ------------------------------------------------------------*/
 
-struct scsi_inquiry_s{
+struct scsi_inquiry_s {
 	u8         opcode;
 #ifdef __BIGENDIAN
 	u8         lun:3;
@@ -405,19 +405,19 @@ struct scsi_inquiry_s{
 	u8         control;
 };
 
-struct scsi_inquiry_vendor_s{
+struct scsi_inquiry_vendor_s {
 	u8         vendor_id[8];
 };
 
-struct scsi_inquiry_prodid_s{
+struct scsi_inquiry_prodid_s {
 	u8         product_id[16];
 };
 
-struct scsi_inquiry_prodrev_s{
+struct scsi_inquiry_prodrev_s {
 	u8         product_rev[4];
 };
 
-struct scsi_inquiry_data_s{
+struct scsi_inquiry_data_s {
 #ifdef __BIGENDIAN
 	u8         peripheral_qual:3;	/* peripheral qualifier */
 	u8         device_type:5;		/* peripheral device type */
@@ -541,7 +541,7 @@ struct scsi_inquiry_data_s{
 /*
  * supported vital product data pages
  */
-struct scsi_inq_page_vpd_pages_s{
+struct scsi_inq_page_vpd_pages_s {
 #ifdef __BIGENDIAN
 	u8         peripheral_qual:3;
 	u8         device_type:5;
@@ -560,11 +560,11 @@ struct scsi_inq_page_vpd_pages_s{
  */
 #define SCSI_INQ_USN_LEN 32
 
-struct scsi_inq_usn_s{
+struct scsi_inq_usn_s {
 	char            usn[SCSI_INQ_USN_LEN];
 };
 
-struct scsi_inq_page_usn_s{
+struct scsi_inq_page_usn_s {
 #ifdef __BIGENDIAN
 	u8         peripheral_qual:3;
 	u8         device_type:5;
@@ -597,7 +597,7 @@ enum {
 	SCSI_INQ_ID_TYPE_OTHER = 4,
 };
 
-struct scsi_inq_dip_desc_s{
+struct scsi_inq_dip_desc_s {
 #ifdef __BIGENDIAN
 	u8         res0:4;
 	u8         code_set:4;
@@ -619,7 +619,7 @@ struct scsi_inq_dip_desc_s{
 /*
  * Device indentification page
  */
-struct scsi_inq_page_dev_ident_s{
+struct scsi_inq_page_dev_ident_s {
 #ifdef __BIGENDIAN
 	u8         peripheral_qual:3;
 	u8         device_type:5;
@@ -638,7 +638,7 @@ struct scsi_inq_page_dev_ident_s{
  * ------------------------------------------------------------
  */
 
-struct scsi_read_capacity_s{
+struct scsi_read_capacity_s {
 	u8         opcode;
 #ifdef __BIGENDIAN
 	u8         lun:3;
@@ -665,12 +665,12 @@ struct scsi_read_capacity_s{
 	u8         control;
 };
 
-struct scsi_read_capacity_data_s{
+struct scsi_read_capacity_data_s {
 	u32        max_lba;	/* maximum LBA available */
 	u32        block_length;	/* in bytes */
 };
 
-struct scsi_read_capacity16_data_s{
+struct scsi_read_capacity16_data_s {
 	u64        lba;	/* maximum LBA available */
 	u32        block_length;	/* in bytes */
 #ifdef __BIGENDIAN
@@ -678,18 +678,19 @@ struct scsi_read_capacity16_data_s{
 			p_type:3,
 			prot_en:1;
 	u8		reserved2:4,
-			lb_pbe:4;	/* logical blocks per physical block
-					 * exponent */
+			lb_pbe:4;	/* logical blocks per
+					 * physical block exponent */
 	u16	reserved3:2,
-			lba_align:14;	/* lowest aligned logical block
-					 * address */
+			lba_align:14;	/* lowest aligned logical
+					 * block address */
 #else
-	u16	lba_align:14,	/* lowest aligned logical block
-					 * address */
-			reserved3:2;
-	u8		lb_pbe:4,	/* logical blocks per physical block
-					 * exponent */
-			reserved2:4;
+	u16	lba_align:14,
+			reserved3:2;	/* lowest aligned logical
+					 * block address */
+
+	u8		lb_pbe:4,
+			reserved2:4;	/* logical blocks per
+					 * physical block exponent */
 	u8		prot_en:1,
 			p_type:3,
 			reserved1:4;
@@ -703,7 +704,7 @@ struct scsi_read_capacity16_data_s{
  * ------------------------------------------------------------
  */
 
-struct scsi_report_luns_s{
+struct scsi_report_luns_s {
 	u8         opcode;		/* A0h - REPORT LUNS opCode */
 	u8         reserved1[5];
 	u8         alloc_length[4];/* allocation length MSB first */
@@ -722,7 +723,7 @@ struct scsi_report_luns_s{
     (rl)->alloc_length[3] = (alloc_len) & 0xFF;     			\
 }
 
-struct scsi_report_luns_data_s{
+struct scsi_report_luns_data_s {
 	u32        lun_list_length;	/* length of LUN list length */
 	u32        reserved;
 	lun_t           lun[1];			/* first LUN in lun list */
@@ -741,7 +742,7 @@ enum {
 /*
  * SCSI Mode Select(6) cdb
  */
-struct scsi_mode_select6_s{
+struct scsi_mode_select6_s {
 	u8         opcode;
 #ifdef __BIGENDIAN
 	u8         reserved1:3;
@@ -762,7 +763,7 @@ struct scsi_mode_select6_s{
 /*
  * SCSI Mode Select(10) cdb
  */
-struct scsi_mode_select10_s{
+struct scsi_mode_select10_s {
 	u8         opcode;
 #ifdef __BIGENDIAN
 	u8         reserved1:3;
@@ -784,7 +785,7 @@ struct scsi_mode_select10_s{
 /*
  * SCSI Mode Sense(6) cdb
  */
-struct scsi_mode_sense6_s{
+struct scsi_mode_sense6_s {
 	u8         opcode;
 #ifdef __BIGENDIAN
 	u8         reserved1:4;
@@ -809,7 +810,7 @@ struct scsi_mode_sense6_s{
 /*
  * SCSI Mode Sense(10) cdb
  */
-struct scsi_mode_sense10_s{
+struct scsi_mode_sense10_s {
 	u8         opcode;
 #ifdef __BIGENDIAN
 	u8         reserved1:3;
@@ -877,7 +878,7 @@ struct scsi_mode_sense10_s{
 /*
  * mode parameter header
  */
-struct scsi_mode_param_header6_s{
+struct scsi_mode_param_header6_s {
 	u8         mode_datalen;
 	u8         medium_type;
 
@@ -901,7 +902,7 @@ struct scsi_mode_param_header6_s{
 	u8         block_desclen;
 };
 
-struct scsi_mode_param_header10_s{
+struct scsi_mode_param_header10_s {
 	u32        mode_datalen:16;
 	u32        medium_type:8;
 
@@ -936,7 +937,7 @@ struct scsi_mode_param_header10_s{
 /*
  * mode parameter block descriptor
  */
-struct scsi_mode_param_desc_s{
+struct scsi_mode_param_desc_s {
 	u32        nblks;
 	u32        density_code:8;
 	u32        block_length:24;
@@ -945,7 +946,7 @@ struct scsi_mode_param_desc_s{
 /*
  * Disconnect-reconnect mode page format
  */
-struct scsi_mp_disc_recn_s{
+struct scsi_mp_disc_recn_s {
 #ifdef __BIGENDIAN
 	u8         ps:1;
 	u8         reserved1:1;
@@ -991,7 +992,7 @@ struct scsi_mp_disc_recn_s{
 /*
  * SCSI format device mode page
  */
-struct scsi_mp_format_device_s{
+struct scsi_mp_format_device_s {
 #ifdef __BIGENDIAN
 	u32        ps:1;
 	u32        reserved1:1;
@@ -1035,7 +1036,7 @@ struct scsi_mp_format_device_s{
 /*
  * SCSI rigid disk device geometry page
  */
-struct scsi_mp_rigid_device_geometry_s{
+struct scsi_mp_rigid_device_geometry_s {
 #ifdef __BIGENDIAN
 	u32        ps:1;
 	u32        reserved1:1;
@@ -1081,7 +1082,7 @@ struct scsi_mp_rigid_device_geometry_s{
 /*
  * SCSI caching mode page
  */
-struct scsi_mp_caching_s{
+struct scsi_mp_caching_s {
 #ifdef __BIGENDIAN
 	u8         ps:1;
 	u8         res1:1;
@@ -1144,7 +1145,7 @@ struct scsi_mp_caching_s{
 /*
  * SCSI control mode page
  */
-struct scsi_mp_control_page_s{
+struct scsi_mp_control_page_s {
 #ifdef __BIGENDIAN
 u8         ps:1;
 u8         reserved1:1;
@@ -1211,7 +1212,7 @@ u8         ps:1;
 /*
  * SCSI medium types supported mode page
  */
-struct scsi_mp_medium_types_sup_s{
+struct scsi_mp_medium_types_sup_s {
 #ifdef __BIGENDIAN
 	u8         ps:1;
 	u8         reserved1:1;
@@ -1233,7 +1234,7 @@ struct scsi_mp_medium_types_sup_s{
 /*
  * SCSI informational exception control mode page
  */
-struct scsi_mp_info_excpt_cntl_s{
+struct scsi_mp_info_excpt_cntl_s {
 #ifdef __BIGENDIAN
 	u8         ps:1;
 	u8         reserved1:1;
@@ -1302,7 +1303,7 @@ struct scsi_mp_info_excpt_cntl_s{
 /*
  * SCSI flexible disk page
  */
-struct scsi_mp_flexible_disk_s{
+struct scsi_mp_flexible_disk_s {
 #ifdef __BIGENDIAN
 	u8         ps:1;
 	u8         reserved1:1;
@@ -1388,42 +1389,42 @@ struct scsi_mp_flexible_disk_s{
 	u8         reserved5[2];
 };
 
-struct scsi_mode_page_format_data6_s{
+struct scsi_mode_page_format_data6_s {
 	struct scsi_mode_param_header6_s mph;	/* mode page header */
 	struct scsi_mode_param_desc_s desc;	/* block descriptor */
 	struct scsi_mp_format_device_s format;	/* format device data */
 };
 
-struct scsi_mode_page_format_data10_s{
+struct scsi_mode_page_format_data10_s {
 	struct scsi_mode_param_header10_s mph;	/* mode page header */
 	struct scsi_mode_param_desc_s desc;	/* block descriptor */
 	struct scsi_mp_format_device_s format;	/* format device data */
 };
 
-struct scsi_mode_page_rdg_data6_s{
+struct scsi_mode_page_rdg_data6_s {
 	struct scsi_mode_param_header6_s mph;	/* mode page header */
 	struct scsi_mode_param_desc_s desc;	/* block descriptor */
 	struct scsi_mp_rigid_device_geometry_s rdg;
-					/* rigid geometry data */
+						/* rigid geometry data */
 };
 
-struct scsi_mode_page_rdg_data10_s{
+struct scsi_mode_page_rdg_data10_s {
 	struct scsi_mode_param_header10_s mph;	/* mode page header */
 	struct scsi_mode_param_desc_s desc;	/* block descriptor */
 	struct scsi_mp_rigid_device_geometry_s rdg;
-					/* rigid geometry data */
+						/* rigid geometry data */
 };
 
-struct scsi_mode_page_cache6_s{
+struct scsi_mode_page_cache6_s {
 	struct scsi_mode_param_header6_s mph;	/* mode page header */
 	struct scsi_mode_param_desc_s desc;	/* block descriptor */
-	struct scsi_mp_caching_s cache;	/* cache page data */
+	struct scsi_mp_caching_s cache;		/* cache page data */
 };
 
-struct scsi_mode_page_cache10_s{
+struct scsi_mode_page_cache10_s {
 	struct scsi_mode_param_header10_s mph;	/* mode page header */
 	struct scsi_mode_param_desc_s desc;	/* block descriptor */
-	struct scsi_mp_caching_s cache;	/* cache page data */
+	struct scsi_mp_caching_s cache;		/* cache page data */
 };
 
 /* --------------------------------------------------------------
@@ -1434,7 +1435,7 @@ struct scsi_mode_page_cache10_s{
 /*
  * Format Unit CDB
  */
-struct scsi_format_unit_s{
+struct scsi_format_unit_s {
 	u8         opcode;
 #ifdef __BIGENDIAN
 	u8         res1:3;
@@ -1464,7 +1465,7 @@ struct scsi_format_unit_s{
 /*
  * h
  */
-struct scsi_reserve6_s{
+struct scsi_reserve6_s {
 	u8         opcode;
 #ifdef __BIGENDIAN
 	u8         reserved:3;
@@ -1483,7 +1484,7 @@ struct scsi_reserve6_s{
 /*
  * h
  */
-struct scsi_release6_s{
+struct scsi_release6_s {
 	u8         opcode;
 #ifdef __BIGENDIAN
 	u8         reserved1:3;
@@ -1502,7 +1503,7 @@ struct scsi_release6_s{
 /*
  * h
  */
-struct scsi_reserve10_s{
+struct scsi_reserve10_s {
 	u8         opcode;
 #ifdef __BIGENDIAN
 	u8         reserved1:3;
@@ -1526,7 +1527,7 @@ struct scsi_reserve10_s{
 	u8         control;
 };
 
-struct scsi_release10_s{
+struct scsi_release10_s {
 	u8         opcode;
 #ifdef __BIGENDIAN
 	u8         reserved1:3;
@@ -1550,7 +1551,7 @@ struct scsi_release10_s{
 	u8         control;
 };
 
-struct scsi_verify10_s{
+struct scsi_verify10_s {
 	u8         opcode;
 #ifdef __BIGENDIAN
 	u8         lun:3;
@@ -1575,7 +1576,7 @@ struct scsi_verify10_s{
 	u8         control_byte;
 };
 
-struct scsi_request_sense_s{
+struct scsi_request_sense_s {
 	u8         opcode;
 #ifdef __BIGENDIAN
 	u8         lun:3;
@@ -1616,7 +1617,7 @@ struct scsi_request_sense_s{
 /*
  * SCSI WRITE-VERIFY(10) command
  */
-struct scsi_write_verify10_s{
+struct scsi_write_verify10_s {
 	u8         opcode;
 #ifdef __BIGENDIAN
 	u8         reserved1:3;

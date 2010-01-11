@@ -35,7 +35,6 @@
 
 #define MAC_ADDRLEN	(6)
 struct mac_s { u8 mac[MAC_ADDRLEN]; };
-#define mac_t struct mac_s
 
 #pragma pack()
 

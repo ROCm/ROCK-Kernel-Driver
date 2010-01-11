@@ -34,6 +34,10 @@
     u64    output_req;
     u64    input_words;
     u64    output_words;
+	u16	link_up;
+	u16	link_down;
+	u16	bootlun_online;
+	u16	bootlun_offline;
 } bfa_driver_stats_t;
 
 

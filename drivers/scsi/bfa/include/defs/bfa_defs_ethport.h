@@ -19,6 +19,7 @@
 #define __BFA_DEFS_ETHPORT_H__
 
 #include <defs/bfa_defs_status.h>
+#include <defs/bfa_defs_port.h>
 #include <protocol/types.h>
 #include <cna/pstats/phyport_defs.h>
 #include <cna/pstats/ethport_defs.h>
@@ -86,13 +87,21 @@ enum bfa_ethport_aen_event {
 	BFA_ETHPORT_AEN_LINKUP = 1, /*  Base Port Ethernet link up event */
 	BFA_ETHPORT_AEN_LINKDOWN = 2, /*  Base Port Ethernet link down event */
 	BFA_ETHPORT_AEN_ENABLE = 3, /*  Base Port Ethernet link enable event */
-	BFA_ETHPORT_AEN_DISABLE = 4, /*  Base Port Ethernet link disable
-				      * event */
+	BFA_ETHPORT_AEN_DISABLE = 4,/*  Base Port Ethernet link disable event*/
 };
 
 struct bfa_ethport_aen_data_s {
-	mac_t mac;	/*  MAC address of the physical port */
+	struct mac_s mac;	/*  MAC address of the physical port */
 };
 
+/**
+ * 		Ethernet port attribute values.
+ */
+struct bfa_ethport_attr_s {
+	u32 mtu; /*  maximum transfer unit */
+	enum bfa_pport_speed speed_supported; /*  supported speeds */
+	enum bfa_pport_states port_state; /*  current port state */
+	enum bfa_pport_speed speed; /*  current speed */
+};
 
 #endif /* __BFA_DEFS_ETHPORT_H__ */

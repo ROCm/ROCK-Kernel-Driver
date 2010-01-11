@@ -46,5 +46,3 @@ bfa_os_printf(struct bfa_log_mod_s *log_mod, u32 msg_id,
 
 	printk(tmp);
 }
-
-

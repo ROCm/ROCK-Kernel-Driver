@@ -27,14 +27,14 @@
  * Msg header common to all msgs
  */
 struct bfi_mhdr_s {
-	u8         msg_class;	/*  @ref bfi_mclass_t	    */
-	u8         msg_id;		/*  msg opcode with in the class   */
+	u8		msg_class;	/*  @ref bfi_mclass_t		    */
+	u8		msg_id;		/*  msg opcode with in the class   */
 	union {
 		struct {
-			u8         rsvd;
-			u8         lpu_id;	/*  msg destination	    */
+			u8	rsvd;
+			u8	lpu_id;	/*  msg destination		    */
 		} h2i;
-		u16        i2htok;	/*  token in msgs to host	    */
+		u16	i2htok;	/*  token in msgs to host	    */
 	} mtag;
 };
 
@@ -71,11 +71,11 @@ struct bfi_mhdr_s {
  * SG Flags
  */
 enum {
-	BFI_SGE_DATA	= 0,	/*  data address, not last	     */
+	BFI_SGE_DATA		= 0,	/*  data address, not last	     */
 	BFI_SGE_DATA_CPL	= 1,	/*  data addr, last in current page */
 	BFI_SGE_DATA_LAST	= 3,	/*  data address, last		     */
-	BFI_SGE_LINK	= 2,	/*  link address		     */
-	BFI_SGE_PGDLEN	= 2,	/*  cumulative data length for page */
+	BFI_SGE_LINK		= 2,	/*  link address		     */
+	BFI_SGE_PGDLEN		= 2,	/*  cumulative data length for page */
 };
 
 /**
@@ -83,8 +83,8 @@ enum {
  */
 union bfi_addr_u {
 	struct {
-		u32        addr_lo;
-		u32        addr_hi;
+		u32	addr_lo;
+		u32	addr_hi;
 	} a32;
 };
 
@@ -93,13 +93,13 @@ union bfi_addr_u {
  */
 struct bfi_sge_s {
 #ifdef __BIGENDIAN
-	u32        flags	: 2,
-			rsvd	: 2,
-			sg_len	: 28;
+	u32	flags:2,
+			rsvd:2,
+			sg_len:28;
 #else
-	u32        sg_len	: 28,
-			rsvd	: 2,
-			flags	: 2;
+	u32	sg_len:28,
+			rsvd:2,
+			flags:2;
 #endif
 	union bfi_addr_u sga;
 };
@@ -143,10 +143,10 @@ enum bfi_mclass {
 	BFI_MC_IOC		= 1,	/*  IO Controller (IOC)	    */
 	BFI_MC_DIAG		= 2,	/*  Diagnostic Msgs		    */
 	BFI_MC_FLASH		= 3,	/*  Flash message class	    */
-	BFI_MC_CEE		= 4,
-	BFI_MC_FC_PORT		= 5,	/*  FC port		   	    */
+	BFI_MC_CEE		= 4,	/*  CEE			    */
+	BFI_MC_FCPORT		= 5,	/*  FC port			    */
 	BFI_MC_IOCFC		= 6,	/*  FC - IO Controller (IOC)	    */
-	BFI_MC_LL		= 7,	/*  Link Layer		 	    */
+	BFI_MC_LL		= 7,	/*  Link Layer			    */
 	BFI_MC_UF		= 8,	/*  Unsolicited frame receive	    */
 	BFI_MC_FCXP		= 9,	/*  FC Transport		    */
 	BFI_MC_LPS		= 10,	/*  lport fc login services	    */
@@ -171,4 +171,3 @@ enum bfi_mclass {
 #pragma pack()
 
 #endif /* __BFI_H__ */
-

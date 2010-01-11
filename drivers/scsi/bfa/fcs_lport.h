@@ -77,38 +77,38 @@
 /*
  * handler for unsolicied frames
  */
-void bfa_fcs_port_uf_recv(struct bfa_fcs_port_s *lport, struct fchs_s *fchs,
-			u16 len);
+void	bfa_fcs_port_uf_recv(struct bfa_fcs_port_s *lport, struct fchs_s *fchs,
+				     u16 len);
 
 /*
  * Following routines will be called by Fabric to indicate port
  * online/offline to vport.
  */
-void bfa_fcs_lport_init(struct bfa_fcs_port_s *lport, struct bfa_fcs_s *fcs,
-			u16 vf_id, struct bfa_port_cfg_s *port_cfg,
-			struct bfa_fcs_vport_s *vport);
-void bfa_fcs_port_online(struct bfa_fcs_port_s *port);
-void bfa_fcs_port_offline(struct bfa_fcs_port_s *port);
-void bfa_fcs_port_delete(struct bfa_fcs_port_s *port);
-bfa_boolean_t   bfa_fcs_port_is_online(struct bfa_fcs_port_s *port);
+void bfa_fcs_lport_attach(struct bfa_fcs_port_s *lport, struct bfa_fcs_s *fcs,
+			  u16 vf_id, struct bfa_fcs_vport_s *vport);
+void bfa_fcs_lport_init(struct bfa_fcs_port_s *lport,
+			struct bfa_port_cfg_s *port_cfg);
+void            bfa_fcs_port_online(struct bfa_fcs_port_s *port);
+void            bfa_fcs_port_offline(struct bfa_fcs_port_s *port);
+void            bfa_fcs_port_delete(struct bfa_fcs_port_s *port);
 
 /*
  * Lookup rport based on PID
  */
-struct bfa_fcs_rport_s *bfa_fcs_port_get_rport_by_pid(
-			struct bfa_fcs_port_s *port, u32 pid);
+struct bfa_fcs_rport_s*
+bfa_fcs_port_get_rport_by_pid(struct bfa_fcs_port_s *port, u32 pid);
 
 /*
  * Lookup rport based on PWWN
  */
-struct bfa_fcs_rport_s *bfa_fcs_port_get_rport_by_pwwn(
-			struct bfa_fcs_port_s *port, wwn_t pwwn);
-struct bfa_fcs_rport_s *bfa_fcs_port_get_rport_by_nwwn(
-			struct bfa_fcs_port_s *port, wwn_t nwwn);
-void bfa_fcs_port_add_rport(struct bfa_fcs_port_s *port,
-			struct bfa_fcs_rport_s *rport);
-void bfa_fcs_port_del_rport(struct bfa_fcs_port_s *port,
-			struct bfa_fcs_rport_s *rport);
+struct bfa_fcs_rport_s*
+bfa_fcs_port_get_rport_by_pwwn(struct bfa_fcs_port_s *port, wwn_t pwwn);
+struct bfa_fcs_rport_s*
+bfa_fcs_port_get_rport_by_nwwn(struct bfa_fcs_port_s *port, wwn_t nwwn);
+void            bfa_fcs_port_add_rport(struct bfa_fcs_port_s *port,
+				       struct bfa_fcs_rport_s *rport);
+void            bfa_fcs_port_del_rport(struct bfa_fcs_port_s *port,
+				       struct bfa_fcs_rport_s *rport);
 
 void bfa_fcs_port_modinit(struct bfa_fcs_s *fcs);
 void bfa_fcs_port_modexit(struct bfa_fcs_s *fcs);

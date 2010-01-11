@@ -38,11 +38,9 @@ struct bfa_pcidev_s;
  * PCI devices supported by the current BFA
  */
 struct bfa_pciid_s {
-	u16        device_id;
-	u16        vendor_id;
+	u16	device_id;
+	u16	vendor_id;
 };
-
-extern char     bfa_version[];
 
 /**
  * BFA Power Mgmt Commands
@@ -58,36 +56,36 @@ enum bfa_pm_cmd {
  * BFA memory resources
  */
 enum bfa_mem_type {
-	BFA_MEM_TYPE_KVA = 1,	/*! Kernel Virtual Memory *(non-dma-able) */
-	BFA_MEM_TYPE_DMA = 2,	/*! DMA-able memory */
+	BFA_MEM_TYPE_KVA = 1,	/*  Kernel Virtual Memory *(non-dma-able) */
+	BFA_MEM_TYPE_DMA = 2,	/*  DMA-able memory */
 	BFA_MEM_TYPE_MAX = BFA_MEM_TYPE_DMA,
 };
 
 struct bfa_mem_elem_s {
 	enum bfa_mem_type mem_type;	/*  see enum bfa_mem_type 	*/
-	u32        mem_len;	/*  Total Length in Bytes	*/
-	u8       	*kva;		/*  kernel virtual address	*/
-	u64        dma;		/*  dma address if DMA memory	*/
-	u8       	*kva_curp;	/*  kva allocation cursor	*/
-	u64        dma_curp;	/*  dma allocation cursor	*/
+	u32	mem_len;	/*  Total Length in Bytes	*/
+	u8		*kva;		/*  kernel virtual address	*/
+	u64	dma;		/*  dma address if DMA memory	*/
+	u8		*kva_curp;	/*  kva allocation cursor	*/
+	u64	dma_curp;	/*  dma allocation cursor	*/
 };
 
 struct bfa_meminfo_s {
 	struct bfa_mem_elem_s meminfo[BFA_MEM_TYPE_MAX];
 };
 #define bfa_meminfo_kva(_m)	\
-	(_m)->meminfo[BFA_MEM_TYPE_KVA - 1].kva_curp
+	((_m)->meminfo[BFA_MEM_TYPE_KVA - 1].kva_curp)
 #define bfa_meminfo_dma_virt(_m)	\
-	(_m)->meminfo[BFA_MEM_TYPE_DMA - 1].kva_curp
+	((_m)->meminfo[BFA_MEM_TYPE_DMA - 1].kva_curp)
 #define bfa_meminfo_dma_phys(_m)	\
-	(_m)->meminfo[BFA_MEM_TYPE_DMA - 1].dma_curp
+	((_m)->meminfo[BFA_MEM_TYPE_DMA - 1].dma_curp)
 
 /**
  * Generic Scatter Gather Element used by driver
  */
 struct bfa_sge_s {
-	u32        sg_len;
-	void           *sg_addr;
+	u32	sg_len;
+	void		*sg_addr;
 };
 
 #define bfa_sge_to_be(__sge) do {                                          \
@@ -100,12 +98,32 @@ struct bfa_sge_s {
 /*
  * bfa stats interfaces
  */
-#define bfa_stats(_mod, _stats)	(_mod)->stats._stats ++
+#define bfa_stats(_mod, _stats)	((_mod)->stats._stats++)
 
 #define bfa_ioc_get_stats(__bfa, __ioc_stats)	\
 	bfa_ioc_fetch_stats(&(__bfa)->ioc, __ioc_stats)
 #define bfa_ioc_clear_stats(__bfa)	\
 	bfa_ioc_clr_stats(&(__bfa)->ioc)
+#define bfa_get_nports(__bfa)	\
+	bfa_ioc_get_nports(&(__bfa)->ioc)
+#define bfa_get_adapter_manufacturer(__bfa, __manufacturer)	\
+	bfa_ioc_get_adapter_manufacturer(&(__bfa)->ioc, __manufacturer)
+#define bfa_get_adapter_model(__bfa, __model)	\
+	bfa_ioc_get_adapter_model(&(__bfa)->ioc, __model)
+#define bfa_get_adapter_serial_num(__bfa, __serial_num)	\
+	bfa_ioc_get_adapter_serial_num(&(__bfa)->ioc, __serial_num)
+#define bfa_get_adapter_fw_ver(__bfa, __fw_ver)	\
+	bfa_ioc_get_adapter_fw_ver(&(__bfa)->ioc, __fw_ver)
+#define bfa_get_adapter_optrom_ver(__bfa, __optrom_ver)	\
+	bfa_ioc_get_adapter_optrom_ver(&(__bfa)->ioc, __optrom_ver)
+#define bfa_get_pci_chip_rev(__bfa, __chip_rev)	\
+	bfa_ioc_get_pci_chip_rev(&(__bfa)->ioc, __chip_rev)
+#define bfa_get_ioc_state(__bfa)	\
+	bfa_ioc_get_state(&(__bfa)->ioc)
+#define bfa_get_type(__bfa)	\
+	bfa_ioc_get_type(&(__bfa)->ioc)
+#define bfa_get_mac(__bfa)	\
+	bfa_ioc_get_mac(&(__bfa)->ioc)
 
 /*
  * bfa API functions
@@ -136,7 +154,7 @@ void bfa_isr_enable(struct bfa_s *bfa);
 void bfa_isr_disable(struct bfa_s *bfa);
 void bfa_msix_getvecs(struct bfa_s *bfa, u32 *msix_vecs_bmap,
 			u32 *num_vecs, u32 *max_vec_bit);
-#define bfa_msix(__bfa, __vec) (__bfa)->msix.handler[__vec](__bfa, __vec)
+#define bfa_msix(__bfa, __vec)	((__bfa)->msix.handler[__vec](__bfa, __vec))
 
 void bfa_comp_deq(struct bfa_s *bfa, struct list_head *comp_q);
 void bfa_comp_process(struct bfa_s *bfa, struct list_head *comp_q);
@@ -161,16 +179,17 @@ bfa_status_t bfa_iocfc_israttr_set(struct bfa_s *bfa,
 void bfa_iocfc_enable(struct bfa_s *bfa);
 void bfa_iocfc_disable(struct bfa_s *bfa);
 void bfa_ioc_auto_recover(bfa_boolean_t auto_recover);
+void bfa_chip_reset(struct bfa_s *bfa);
 void bfa_cb_ioc_disable(void *bfad);
 void bfa_timer_tick(struct bfa_s *bfa);
 #define bfa_timer_start(_bfa, _timer, _timercb, _arg, _timeout)	\
 	bfa_timer_begin(&(_bfa)->timer_mod, _timer, _timercb, _arg, _timeout)
-
 /*
  * BFA debug API functions
  */
 bfa_status_t bfa_debug_fwtrc(struct bfa_s *bfa, void *trcdata, int *trclen);
 bfa_status_t bfa_debug_fwsave(struct bfa_s *bfa, void *trcdata, int *trclen);
+void bfa_debug_fwsave_clear(struct bfa_s *bfa);
 
 #include "bfa_priv.h"
 

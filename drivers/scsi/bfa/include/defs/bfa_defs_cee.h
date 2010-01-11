@@ -28,10 +28,6 @@
 
 #define BFA_CEE_LLDP_MAX_STRING_LEN (128)
 
-
-/* FIXME: this is coming from the protocol spec. Can the host & apps share the
-   protocol .h files ?
- */
 #define BFA_CEE_LLDP_SYS_CAP_OTHER       0x0001
 #define BFA_CEE_LLDP_SYS_CAP_REPEATER    0x0002
 #define BFA_CEE_LLDP_SYS_CAP_MAC_BRIDGE  0x0004
@@ -40,9 +36,9 @@
 #define BFA_CEE_LLDP_SYS_CAP_TELEPHONE 	 0x0020
 #define BFA_CEE_LLDP_SYS_CAP_DOCSIS_CD   0x0040
 #define BFA_CEE_LLDP_SYS_CAP_STATION     0x0080
-#define BFA_CEE_LLDP_SYS_CAP_CVLAN	     0x0100
-#define BFA_CEE_LLDP_SYS_CAP_SVLAN 	     0x0200
-#define BFA_CEE_LLDP_SYS_CAP_TPMR		 0x0400
+#define BFA_CEE_LLDP_SYS_CAP_CVLAN	 0x0100
+#define BFA_CEE_LLDP_SYS_CAP_SVLAN	 0x0200
+#define BFA_CEE_LLDP_SYS_CAP_TPMR	 0x0400
 
 
 /* LLDP string type */
@@ -72,8 +68,7 @@ enum bfa_cee_dcbx_version_e {
 };
 
 enum bfa_cee_lls_e {
-	CEE_LLS_DOWN_NO_TLV = 0, /* LLS is down because the TLV not sent by
-				  * the peer */
+	CEE_LLS_DOWN_NO_TLV = 0, /* LLS is down bcoz TLV not sent by the peer */
 	CEE_LLS_DOWN        = 1, /* LLS is down as advertised by the peer */
 	CEE_LLS_UP          = 2,
 };
@@ -83,20 +78,20 @@ struct bfa_cee_dcbx_cfg_s {
 	u8 pgid[8];
 	u8 pg_percentage[8];
 	u8 pfc_enabled;          /* bitmap of priorties with PFC enabled */
-	u8 fcoe_user_priority;   /* bitmap of priorities used for FcoE
-				       * traffic */
-	u8 dcbx_version;	/* operating version:CEE or preCEE */
-	u8 lls_fcoe;	/* FCoE Logical Link Status */
-	u8 lls_lan;	/* LAN Logical Link Status */
+	u8 fcoe_user_priority;  /* bitmap of priorities for FcoE traffic */
+	u8 dcbx_version;		  /* operating version:CEE or preCEE */
+	u8 lls_fcoe;			  /* FCoE Logical Link Status */
+	u8 lls_lan;			  /* LAN Logical Link Status */
 	u8 rsvd[3];
 };
 
 /* CEE status */
 /* Making this to tri-state for the benefit of port list command */
 enum bfa_cee_status_e {
-    CEE_PHY_DOWN = 0,
+    CEE_UP = 0,
     CEE_PHY_UP = 1,
-    CEE_UP = 2,
+	CEE_LOOPBACK = 2,
+    CEE_PHY_DOWN = 3,
 };
 
 /* CEE Query */
@@ -105,9 +100,10 @@ struct bfa_cee_attr_s {
 	u8                   error_reason;
 	struct bfa_cee_lldp_cfg_s lldp_remote;
 	struct bfa_cee_dcbx_cfg_s dcbx_remote;
-	mac_t src_mac;
+	struct mac_s src_mac;
 	u8 link_speed;
-	u8 filler[3];
+	u8 nw_priority;
+	u8 filler[2];
 };
 
 

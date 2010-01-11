@@ -23,7 +23,7 @@ bfa_hwcb_reginit(struct bfa_s *bfa)
 {
 	struct bfa_iocfc_regs_s	*bfa_regs = &bfa->iocfc.bfa_regs;
 	bfa_os_addr_t		kva = bfa_ioc_bar0(&bfa->ioc);
-	int             	i, q, fn = bfa_ioc_pcifn(&bfa->ioc);
+	int			i, q, fn = bfa_ioc_pcifn(&bfa->ioc);
 
 	if (fn == 0) {
 		bfa_regs->intr_status = (kva + HOSTFN0_INT_STATUS);
@@ -50,6 +50,18 @@ bfa_hwcb_reginit(struct bfa_s *bfa)
 		bfa_regs->rme_q_ci[i] = (kva + RME_Q_CI(q));
 		bfa_regs->rme_q_depth[i] = (kva + RME_Q_DEPTH(q));
 	}
+}
+
+void
+bfa_hwcb_reqq_ack(struct bfa_s *bfa, int reqq)
+{
+}
+
+static void
+bfa_hwcb_reqq_ack_msix(struct bfa_s *bfa, int reqq)
+{
+	bfa_reg_write(bfa->iocfc.bfa_regs.intr_status,
+		__HFN_INT_CPE_Q0 << CPE_Q_NUM(bfa_ioc_pcifn(&bfa->ioc), reqq));
 }
 
 void
@@ -136,6 +148,7 @@ bfa_hwcb_msix_uninstall(struct bfa_s *bfa)
 void
 bfa_hwcb_isr_mode_set(struct bfa_s *bfa, bfa_boolean_t msix)
 {
+	bfa->iocfc.hwif.hw_reqq_ack = bfa_hwcb_reqq_ack_msix;
 	bfa->iocfc.hwif.hw_rspq_ack = bfa_hwcb_rspq_ack_msix;
 }
 

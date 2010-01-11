@@ -29,13 +29,13 @@
 #include <fcb/bfa_fcb_vport.h>
 
 struct bfa_fcs_vport_s {
-	struct list_head		qe;		/*  queue elem	 */
+	struct list_head	qe;		/*  queue elem	*/
 	bfa_sm_t		sm;		/*  state machine	*/
 	bfa_fcs_lport_t		lport;		/*  logical port	*/
-	struct bfa_timer_s	timer;		/*  general purpose timer */
+	struct bfa_timer_s	timer;		/*  general purpose timer*/
 	struct bfad_vport_s	*vport_drv;	/*  Driver private	*/
 	struct bfa_vport_stats_s vport_stats;	/*  vport statistics	*/
-	struct bfa_lps_s	*lps;		/*  Lport login service */
+	struct bfa_lps_s	*lps;		/*  Lport login service*/
 	int			fdisc_retries;
 };
 

@@ -35,13 +35,6 @@ struct bfa_fcs_fabric_s;
 
 /*
 * @todo : need to move to a global config file.
- * Maximum Vports supported per physical port or vf.
- */
-#define BFA_FCS_MAX_VPORTS_SUPP_CB  255
-#define BFA_FCS_MAX_VPORTS_SUPP_CT  191
-
-/*
-* @todo : need to move to a global config file.
  * Maximum Rports supported per port (physical/logical).
  */
 #define BFA_FCS_MAX_RPORTS_SUPP  256	/* @todo : tentative value */
@@ -128,10 +121,10 @@ struct bfa_fcs_port_s {
 	struct bfa_fcs_fabric_s *fabric;	/*  parent fabric */
 	struct bfa_port_cfg_s  port_cfg;	/*  port configuration */
 	struct bfa_timer_s link_timer;	/*  timer for link offline */
-	u32        pid : 24;	/*  FC address */
+	u32        pid:24;		/*  FC address */
 	u8         lp_tag;		/*  lport tag */
 	u16        num_rports;	/*  Num of r-ports */
-	struct list_head rport_q;	/*  queue of discovered r-ports */
+	struct list_head	rport_q;/*  queue of discovered r-ports */
 	struct bfa_fcs_s *fcs;	/*  FCS instance */
 	union bfa_fcs_port_topo_u port_topo;	/*  fabric/loop/n2n details */
 	struct bfad_port_s *bfad_port;	/*  driver peer instance */
@@ -188,17 +181,20 @@ bfa_fcs_port_get_drvport(struct bfa_fcs_port_s *port)
 }
 
 
-#define bfa_fcs_port_get_opertype(_lport)	(_lport)->fabric->oper_type
+#define bfa_fcs_port_get_opertype(_lport)	((_lport)->fabric->oper_type)
 
 
-#define bfa_fcs_port_get_fabric_name(_lport)	(_lport)->fabric->fabric_name
+#define bfa_fcs_port_get_fabric_name(_lport)	((_lport)->fabric->fabric_name)
 
 
-#define bfa_fcs_port_get_fabric_ipaddr(_lport)	(_lport)->fabric->fabric_ip_addr
+#define bfa_fcs_port_get_fabric_ipaddr(_lport) \
+		((_lport)->fabric->fabric_ip_addr)
 
 /**
  * bfa fcs port public functions
  */
+
+bfa_boolean_t   bfa_fcs_port_is_online(struct bfa_fcs_port_s *port);
 void bfa_fcs_cfg_base_port(struct bfa_fcs_s *fcs,
 			struct bfa_port_cfg_s *port_cfg);
 struct bfa_fcs_port_s *bfa_fcs_get_base_port(struct bfa_fcs_s *fcs);
@@ -218,8 +214,8 @@ void bfa_fcs_port_get_attr(struct bfa_fcs_port_s *port,
 void bfa_fcs_port_get_stats(struct bfa_fcs_port_s *fcs_port,
 			struct bfa_port_stats_s *port_stats);
 void bfa_fcs_port_clear_stats(struct bfa_fcs_port_s *fcs_port);
-enum bfa_pport_speed bfa_fcs_port_get_rport_max_speed(
-			struct bfa_fcs_port_s *port);
+enum bfa_pport_speed
+bfa_fcs_port_get_rport_max_speed(struct bfa_fcs_port_s *port);
 void bfa_fcs_port_enable_ipfc_roles(struct bfa_fcs_port_s *fcs_port);
 void bfa_fcs_port_disable_ipfc_roles(struct bfa_fcs_port_s *fcs_port);
 

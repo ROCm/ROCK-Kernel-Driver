@@ -30,7 +30,7 @@
 BFA_TRC_FILE(FCS, UF);
 
 /**
- * 		BFA callback for unsolicited frame receive handler.
+ *		BFA callback for unsolicited frame receive handler.
  *
  * @param[in]		cbarg		callback arg for receive handler
  * @param[in]		uf		unsolicited frame descriptor
@@ -41,8 +41,8 @@ static void
 bfa_fcs_uf_recv(void *cbarg, struct bfa_uf_s *uf)
 {
 	struct bfa_fcs_s      *fcs = (struct bfa_fcs_s *) cbarg;
-	struct fchs_s         *fchs = bfa_uf_get_frmbuf(uf);
-	u16        len = bfa_uf_get_frmlen(uf);
+	struct fchs_s	       *fchs = bfa_uf_get_frmbuf(uf);
+	u16	len = bfa_uf_get_frmlen(uf);
 	struct fc_vft_s       *vft;
 	struct bfa_fcs_fabric_s *fabric;
 
@@ -50,7 +50,7 @@ bfa_fcs_uf_recv(void *cbarg, struct bfa_uf_s *uf)
 	 * check for VFT header
 	 */
 	if (fchs->routing == FC_RTG_EXT_HDR &&
-		fchs->cat_info == FC_CAT_VFT_HDR) {
+	    fchs->cat_info == FC_CAT_VFT_HDR) {
 		bfa_stats(fcs, uf.tagged);
 		vft = bfa_uf_get_frmbuf(uf);
 		if (fcs->port_vfid == vft->vf_id)
@@ -93,13 +93,8 @@ bfa_fcs_uf_recv(void *cbarg, struct bfa_uf_s *uf)
 }
 
 void
-bfa_fcs_uf_modinit(struct bfa_fcs_s *fcs)
+bfa_fcs_uf_attach(struct bfa_fcs_s *fcs)
 {
 	bfa_uf_recv_register(fcs->bfa, bfa_fcs_uf_recv, fcs);
 }
 
-void
-bfa_fcs_uf_modexit(struct bfa_fcs_s *fcs)
-{
-	bfa_fcs_modexit_comp(fcs);
-}

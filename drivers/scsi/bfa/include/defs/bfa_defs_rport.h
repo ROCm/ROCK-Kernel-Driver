@@ -146,8 +146,8 @@ struct bfa_rport_qos_attr_s {
  * FCS remote port attributes returned in queries
  */
 struct bfa_rport_attr_s {
-	wwn_t           	nwwn;	/*  node wwn */
-	wwn_t           	pwwn;	/*  port wwn */
+	wwn_t       nwwn;		/*  node wwn */
+	wwn_t       pwwn;		/*  port wwn */
 	enum fc_cos cos_supported;	/*  supported class of services */
 	u32        	pid;	/*  port ID */
 	u32        	df_sz;	/*  Max payload size */

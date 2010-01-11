@@ -61,7 +61,7 @@ enum bfa_pport_speed {
  * 		Port operational type (in sync with SNIA port type).
  */
 enum bfa_pport_type {
-	BFA_PPORT_TYPE_UNKNOWN = 1,	/*  port type is unkown */
+	BFA_PPORT_TYPE_UNKNOWN = 1,	/*  port type is unknown */
 	BFA_PPORT_TYPE_TRUNKED = 2,	/*  Trunked mode */
 	BFA_PPORT_TYPE_NPORT   = 5,	/*  P2P with switched fabric */
 	BFA_PPORT_TYPE_NLPORT  = 6,	/*  public loop */
@@ -201,10 +201,10 @@ struct bfa_pport_attr_s {
 	/*
 	 * Static fields
 	 */
-	wwn_t           nwwn;		/*  node wwn */
-	wwn_t           pwwn;		/*  port wwn */
-	enum fc_cos     cos_supported;	/*  supported class of services */
-	u32        rsvd;
+	wwn_t       nwwn;		/*  node wwn */
+	wwn_t       pwwn;		/*  port wwn */
+	enum fc_cos cos_supported;	/*  supported class of services */
+	u32    rsvd;
 	struct fc_symname_s    port_symname;	/*  port symbolic name */
 	enum bfa_pport_speed speed_supported; /*  supported speeds */
 	bfa_boolean_t   pbind_enabled;	/*  Will be set if Persistent binding
@@ -232,81 +232,87 @@ struct bfa_pport_attr_s {
 	u32        	pid;		/*  port ID */
 	enum bfa_pport_type 	port_type;	/*  current topology */
 	u32        	loopback;	/*  external loopback */
-	u32		rsvd1;
+	u32		authfail;	/*  auth fail state */
 	u32		rsvd2;		/*  padding for 64 bit */
 };
 
 /**
- * 		FC Port statistics.
+ * FC physical port statistics.
  */
 struct bfa_pport_fc_stats_s {
-	u64        secs_reset;	/*  seconds since stats is reset */
-	u64        tx_frames;	/*  transmitted frames */
-	u64        tx_words;	/*  transmitted words */
-	u64        rx_frames;	/*  received frames */
-	u64        rx_words;	/*  received words */
-	u64        lip_count;	/*  LIPs seen */
-	u64        nos_count;	/*  NOS count */
-	u64        error_frames;	/*  errored frames (sent?) */
-	u64        dropped_frames;	/*  dropped frames */
-	u64        link_failures;	/*  link failure count */
-	u64        loss_of_syncs;	/*  loss of sync count */
-	u64        loss_of_signals;/*  loss of signal count */
-	u64        primseq_errs;	/*  primitive sequence protocol */
-	u64        bad_os_count;	/*  invalid ordered set */
-	u64        err_enc_out;	/*  Encoding error outside frame */
-	u64        invalid_crcs;	/*  frames received with invalid CRC*/
-	u64	undersized_frm; /*  undersized frames */
-	u64	oversized_frm;	/*  oversized frames */
-	u64	bad_eof_frm;	/*  frames with bad EOF */
-	struct bfa_qos_stats_s	qos_stats;	/*  QoS statistics */
+	u64	secs_reset;	/*  Seconds since stats is reset     */
+	u64	tx_frames;	/*  Tx frames			      */
+	u64	tx_words;	/*  Tx words			      */
+	u64	tx_lip;		/*  TX LIP			      */
+	u64	tx_nos;		/*  Tx NOS			      */
+	u64	tx_ols;		/*  Tx OLS			      */
+	u64	tx_lr;		/*  Tx LR			      */
+	u64	tx_lrr;		/*  Tx LRR			      */
+	u64	rx_frames;	/*  Rx frames			      */
+	u64	rx_words;	/*  Rx words			      */
+	u64	lip_count;	/*  Rx LIP 			      */
+	u64	nos_count;	/*  Rx NOS			      */
+	u64	ols_count;	/*  Rx OLS			      */
+	u64	lr_count;	/*  Rx LR			      */
+	u64	lrr_count;	/*  Rx LRR			      */
+	u64	invalid_crcs;	/*  Rx CRC err frames		      */
+	u64	invalid_crc_gd_eof; /*  Rx CRC err good EOF frames   */
+	u64	undersized_frm; /*  Rx undersized frames	      */
+	u64	oversized_frm;  /*  Rx oversized frames	      */
+	u64	bad_eof_frm;	/*  Rx frames with bad EOF	      */
+	u64	error_frames;	/*  Errored frames		      */
+	u64	dropped_frames;	/*  Dropped frames		      */
+	u64	link_failures;	/*  Link Failure (LF) count	      */
+	u64	loss_of_syncs;	/*  Loss of sync count		      */
+	u64	loss_of_signals;/*  Loss of signal count	      */
+	u64	primseq_errs;	/*  Primitive sequence protocol err. */
+	u64	bad_os_count;	/*  Invalid ordered sets	      */
+	u64	err_enc_out;	/*  Encoding err nonframe_8b10b      */
+	u64	err_enc;	/*  Encoding err frame_8b10b	      */
 };
 
 /**
- * 		Eth Port statistics.
+ * Eth Physical Port statistics.
  */
 struct bfa_pport_eth_stats_s {
-	u64	secs_reset;	/*  seconds since stats is reset */
-	u64	frame_64;      /*  both rx and tx counter */
-	u64	frame_65_127;      /* both rx and tx counter */
-	u64	frame_128_255;     /* both rx and tx counter */
-	u64	frame_256_511;     /* both rx and tx counter */
-	u64	frame_512_1023;    /* both rx and tx counter */
-	u64	frame_1024_1518;   /* both rx and tx counter */
-	u64	frame_1519_1522;   /* both rx and tx counter */
-
-	u64	tx_bytes;
-	u64	tx_packets;
-	u64	tx_mcast_packets;
-	u64	tx_bcast_packets;
-	u64	tx_control_frame;
-	u64	tx_drop;
-	u64	tx_jabber;
-	u64	tx_fcs_error;
-	u64	tx_fragments;
-
-	u64	rx_bytes;
-	u64	rx_packets;
-	u64	rx_mcast_packets;
-	u64	rx_bcast_packets;
-	u64	rx_control_frames;
-	u64	rx_unknown_opcode;
-	u64	rx_drop;
-	u64	rx_jabber;
-	u64	rx_fcs_error;
-	u64	rx_alignment_error;
-	u64	rx_frame_length_error;
-	u64	rx_code_error;
-	u64	rx_fragments;
-
-	u64	rx_pause; /* BPC */
-	u64	rx_zero_pause; /*  BPC Pause cancellation */
-	u64	tx_pause;      /* BPC */
-	u64	tx_zero_pause; /*  BPC Pause cancellation */
-	u64	rx_fcoe_pause; /* BPC */
-	u64	rx_fcoe_zero_pause; /*  BPC Pause cancellation */
-	u64	tx_fcoe_pause;      /* BPC */
-	u64	tx_fcoe_zero_pause; /*  BPC Pause cancellation */
+	u64	secs_reset;	  /*  Seconds since stats is reset   */
+	u64	frame_64;	  /*  Frames 64 bytes		      */
+	u64	frame_65_127;	  /*  Frames 65-127 bytes	      */
+	u64	frame_128_255;	  /*  Frames 128-255 bytes	      */
+	u64	frame_256_511;	  /*  Frames 256-511 bytes	      */
+	u64	frame_512_1023;	  /*  Frames 512-1023 bytes	      */
+	u64	frame_1024_1518;  /*  Frames 1024-1518 bytes	      */
+	u64	frame_1519_1522;  /*  Frames 1519-1522 bytes	      */
+	u64	tx_bytes;	  /*  Tx bytes			      */
+	u64	tx_packets;	  /*  Tx packets		      */
+	u64	tx_mcast_packets; /*  Tx multicast packets	      */
+	u64	tx_bcast_packets; /*  Tx broadcast packets	      */
+	u64	tx_control_frame; /*  Tx control frame		      */
+	u64	tx_drop;	  /*  Tx drops			      */
+	u64	tx_jabber;	  /*  Tx jabber		      */
+	u64	tx_fcs_error;	  /*  Tx FCS error		      */
+	u64	tx_fragments;	  /*  Tx fragments		      */
+	u64	rx_bytes;	  /*  Rx bytes			      */
+	u64	rx_packets;	  /*  Rx packets		      */
+	u64	rx_mcast_packets; /*  Rx multicast packets	      */
+	u64	rx_bcast_packets; /*  Rx broadcast packets	      */
+	u64	rx_control_frames; /*  Rx control frames	      */
+	u64	rx_unknown_opcode; /*  Rx unknown opcode	      */
+	u64	rx_drop;	  /*  Rx drops			      */
+	u64	rx_jabber;	  /*  Rx jabber		      */
+	u64	rx_fcs_error;	  /*  Rx FCS errors		      */
+	u64	rx_alignment_error; /*  Rx alignment errors	      */
+	u64	rx_frame_length_error; /*  Rx frame len errors       */
+	u64	rx_code_error;	  /*  Rx code errors		      */
+	u64	rx_fragments;	  /*  Rx fragments		      */
+	u64	rx_pause;	  /*  Rx pause			      */
+	u64	rx_zero_pause;	  /*  Rx zero pause		      */
+	u64	tx_pause;	  /*  Tx pause			      */
+	u64	tx_zero_pause;	  /*  Tx zero pause		      */
+	u64	rx_fcoe_pause;	  /*  Rx fcoe pause		      */
+	u64	rx_fcoe_zero_pause; /*  Rx FCoE zero pause	      */
+	u64	tx_fcoe_pause;	  /*  Tx FCoE pause		      */
+	u64	tx_fcoe_zero_pause; /*  Tx FCoE zero pause	      */
 };
 
 /**
@@ -314,7 +320,7 @@ struct bfa_pport_eth_stats_s {
  */
 union bfa_pport_stats_u {
 	struct bfa_pport_fc_stats_s	fc;
-	struct bfa_pport_eth_stats_s 	eth;
+	struct bfa_pport_eth_stats_s	eth;
 };
 
 /**
@@ -347,6 +353,23 @@ struct bfa_pport_rnid_s {
 	u16          topologydiscoveryflags;
 };
 
+struct bfa_fcport_fcf_s {
+	wwn_t           name;           /*  FCF name                 */
+	wwn_t           fabric_name;    /*  Fabric Name              */
+	u8		fipenabled;	/*  FIP enabled or not       */
+	u8		fipfailed;	/*  FIP failed or not        */
+	u8		resv[2];
+	u8         pri;            /*  FCF priority             */
+	u8         version;        /*  FIP version used         */
+	u8         available;      /*  Available  for  login    */
+	u8         fka_disabled;   /*  FKA is disabled          */
+	u8         maxsz_verified; /*  FCoE max size verified   */
+	u8         fc_map[3];      /*  FC map                   */
+	u16        vlan;           /*  FCoE vlan tag/priority   */
+	u32        fka_adv_per;    /*  FIP  ka advert. period   */
+	struct mac_s    mac;            /*  FCF mac                  */
+};
+
 /**
  * 		Link state information
  */
@@ -355,7 +378,7 @@ struct bfa_pport_link_s {
 	u8         linkstate_rsn;	/*  bfa_pport_linkstate_rsn_t */
 	u8         topology;	/*  P2P/LOOP bfa_pport_topology */
 	u8         speed;		/*  Link speed (1/2/4/8 G) */
-	u32        linkstate_opt;	/*  Linkstate optional data (debug) */
+	u32        linkstate_opt;  /*  Linkstate optional data (debug) */
 	u8         trunked;	/*  Trunked or not (1 or 0) */
 	u8         resvd[3];
 	struct bfa_qos_attr_s  qos_attr;   /* QoS Attributes */
@@ -378,6 +401,7 @@ struct bfa_pport_link_s {
 			struct fc_alpabm_s     alpabm;	   /*  alpa bitmap */
 		} loop_info;
 	} tl;
+	struct bfa_fcport_fcf_s fcf;	/*  FCF information (for FCoE) */
 };
 
 #endif /* __BFA_DEFS_PPORT_H__ */

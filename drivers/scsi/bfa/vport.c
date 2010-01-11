@@ -31,13 +31,13 @@
 
 BFA_TRC_FILE(FCS, VPORT);
 
-#define __vport_fcs(__vp)       (__vp)->lport.fcs
-#define __vport_pwwn(__vp)      (__vp)->lport.port_cfg.pwwn
-#define __vport_nwwn(__vp)      (__vp)->lport.port_cfg.nwwn
-#define __vport_bfa(__vp)       (__vp)->lport.fcs->bfa
-#define __vport_fcid(__vp)      (__vp)->lport.pid
-#define __vport_fabric(__vp)    (__vp)->lport.fabric
-#define __vport_vfid(__vp)      (__vp)->lport.fabric->vf_id
+#define __vport_fcs(__vp)       ((__vp)->lport.fcs)
+#define __vport_pwwn(__vp)      ((__vp)->lport.port_cfg.pwwn)
+#define __vport_nwwn(__vp)      ((__vp)->lport.port_cfg.nwwn)
+#define __vport_bfa(__vp)       ((__vp)->lport.fcs->bfa)
+#define __vport_fcid(__vp)      ((__vp)->lport.pid)
+#define __vport_fabric(__vp)    ((__vp)->lport.fabric)
+#define __vport_vfid(__vp)      ((__vp)->lport.fabric->vf_id)
 
 #define BFA_FCS_VPORT_MAX_RETRIES  5
 /*
@@ -67,7 +67,7 @@ enum bfa_fcs_vport_event {
 	BFA_FCS_VPORT_SM_RSP_ERROR = 9,	/*  error/bad response */
 	BFA_FCS_VPORT_SM_TIMEOUT = 10,	/*  delay timer event */
 	BFA_FCS_VPORT_SM_DELCOMP = 11,	/*  lport delete completion */
-	BFA_FCS_VPORT_SM_RSP_DUP_WWN = 12,	/*  Dup wnn error */
+	BFA_FCS_VPORT_SM_RSP_DUP_WWN = 12,	/*  Dup wnn error*/
 	BFA_FCS_VPORT_SM_RSP_FAILED = 13,	/*  non-retryable failure */
 };
 
@@ -90,9 +90,9 @@ static void     bfa_fcs_vport_sm_cleanup(struct bfa_fcs_vport_s *vport,
 static void     bfa_fcs_vport_sm_logo(struct bfa_fcs_vport_s *vport,
 				      enum bfa_fcs_vport_event event);
 static void     bfa_fcs_vport_sm_error(struct bfa_fcs_vport_s *vport,
-				       enum bfa_fcs_vport_event event);
+				      enum bfa_fcs_vport_event event);
 
-static struct bfa_sm_table_s vport_sm_table[] = {
+static struct bfa_sm_table_s  vport_sm_table[] = {
 	{BFA_SM(bfa_fcs_vport_sm_uninit), BFA_FCS_VPORT_UNINIT},
 	{BFA_SM(bfa_fcs_vport_sm_created), BFA_FCS_VPORT_CREATED},
 	{BFA_SM(bfa_fcs_vport_sm_offline), BFA_FCS_VPORT_OFFLINE},
@@ -110,7 +110,7 @@ static struct bfa_sm_table_s vport_sm_table[] = {
  */
 static void
 bfa_fcs_vport_sm_uninit(struct bfa_fcs_vport_s *vport,
-			enum bfa_fcs_vport_event event)
+				enum bfa_fcs_vport_event event)
 {
 	bfa_trc(__vport_fcs(vport), __vport_pwwn(vport));
 	bfa_trc(__vport_fcs(vport), event);
@@ -122,7 +122,7 @@ bfa_fcs_vport_sm_uninit(struct bfa_fcs_vport_s *vport,
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(__vport_fcs(vport), event);
 	}
 }
 
@@ -131,7 +131,7 @@ bfa_fcs_vport_sm_uninit(struct bfa_fcs_vport_s *vport,
  */
 static void
 bfa_fcs_vport_sm_created(struct bfa_fcs_vport_s *vport,
-			 enum bfa_fcs_vport_event event)
+				enum bfa_fcs_vport_event event)
 {
 	bfa_trc(__vport_fcs(vport), __vport_pwwn(vport));
 	bfa_trc(__vport_fcs(vport), event);
@@ -165,7 +165,7 @@ bfa_fcs_vport_sm_created(struct bfa_fcs_vport_s *vport,
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(__vport_fcs(vport), event);
 	}
 }
 
@@ -174,7 +174,7 @@ bfa_fcs_vport_sm_created(struct bfa_fcs_vport_s *vport,
  */
 static void
 bfa_fcs_vport_sm_offline(struct bfa_fcs_vport_s *vport,
-			 enum bfa_fcs_vport_event event)
+				enum bfa_fcs_vport_event event)
 {
 	bfa_trc(__vport_fcs(vport), __vport_pwwn(vport));
 	bfa_trc(__vport_fcs(vport), event);
@@ -202,16 +202,17 @@ bfa_fcs_vport_sm_offline(struct bfa_fcs_vport_s *vport,
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(__vport_fcs(vport), event);
 	}
 }
+
 
 /**
  * FDISC is sent and awaiting reply from fabric.
  */
 static void
 bfa_fcs_vport_sm_fdisc(struct bfa_fcs_vport_s *vport,
-		       enum bfa_fcs_vport_event event)
+				enum bfa_fcs_vport_event event)
 {
 	bfa_trc(__vport_fcs(vport), __vport_pwwn(vport));
 	bfa_trc(__vport_fcs(vport), event);
@@ -236,8 +237,8 @@ bfa_fcs_vport_sm_fdisc(struct bfa_fcs_vport_s *vport,
 	case BFA_FCS_VPORT_SM_RSP_ERROR:
 		bfa_sm_set_state(vport, bfa_fcs_vport_sm_fdisc_retry);
 		bfa_timer_start(__vport_bfa(vport), &vport->timer,
-				bfa_fcs_vport_timeout, vport,
-				BFA_FCS_RETRY_TIMEOUT);
+				    bfa_fcs_vport_timeout, vport,
+				    BFA_FCS_RETRY_TIMEOUT);
 		break;
 
 	case BFA_FCS_VPORT_SM_RSP_FAILED:
@@ -249,7 +250,7 @@ bfa_fcs_vport_sm_fdisc(struct bfa_fcs_vport_s *vport,
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(__vport_fcs(vport), event);
 	}
 }
 
@@ -283,7 +284,7 @@ bfa_fcs_vport_sm_fdisc_retry(struct bfa_fcs_vport_s *vport,
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(__vport_fcs(vport), event);
 	}
 }
 
@@ -292,7 +293,7 @@ bfa_fcs_vport_sm_fdisc_retry(struct bfa_fcs_vport_s *vport,
  */
 static void
 bfa_fcs_vport_sm_online(struct bfa_fcs_vport_s *vport,
-			enum bfa_fcs_vport_event event)
+				enum bfa_fcs_vport_event event)
 {
 	bfa_trc(__vport_fcs(vport), __vport_pwwn(vport));
 	bfa_trc(__vport_fcs(vport), event);
@@ -310,7 +311,7 @@ bfa_fcs_vport_sm_online(struct bfa_fcs_vport_s *vport,
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(__vport_fcs(vport), event);
 	}
 }
 
@@ -320,7 +321,7 @@ bfa_fcs_vport_sm_online(struct bfa_fcs_vport_s *vport,
  */
 static void
 bfa_fcs_vport_sm_deleting(struct bfa_fcs_vport_s *vport,
-			  enum bfa_fcs_vport_event event)
+				enum bfa_fcs_vport_event event)
 {
 	bfa_trc(__vport_fcs(vport), __vport_pwwn(vport));
 	bfa_trc(__vport_fcs(vport), event);
@@ -339,18 +340,19 @@ bfa_fcs_vport_sm_deleting(struct bfa_fcs_vport_s *vport,
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(__vport_fcs(vport), event);
 	}
 }
 
 /**
- * Error State.
- * This state will be set when the Vport Creation fails due to errors like
- * Dup WWN. In this state only operation allowed is a Vport Delete.
+ *  Error State.
+ *  This state will be set when the Vport Creation fails due
+ *  to errors like Dup WWN.
+ *  In this state only operation allowed is a Vport Delete.
  */
 static void
 bfa_fcs_vport_sm_error(struct bfa_fcs_vport_s *vport,
-		       enum bfa_fcs_vport_event event)
+				enum bfa_fcs_vport_event event)
 {
 	bfa_trc(__vport_fcs(vport), __vport_pwwn(vport));
 	bfa_trc(__vport_fcs(vport), event);
@@ -372,7 +374,7 @@ bfa_fcs_vport_sm_error(struct bfa_fcs_vport_s *vport,
  */
 static void
 bfa_fcs_vport_sm_cleanup(struct bfa_fcs_vport_s *vport,
-			 enum bfa_fcs_vport_event event)
+				enum bfa_fcs_vport_event event)
 {
 	bfa_trc(__vport_fcs(vport), __vport_pwwn(vport));
 	bfa_trc(__vport_fcs(vport), event);
@@ -387,7 +389,7 @@ bfa_fcs_vport_sm_cleanup(struct bfa_fcs_vport_s *vport,
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(__vport_fcs(vport), event);
 	}
 }
 
@@ -397,7 +399,7 @@ bfa_fcs_vport_sm_cleanup(struct bfa_fcs_vport_s *vport,
  */
 static void
 bfa_fcs_vport_sm_logo(struct bfa_fcs_vport_s *vport,
-		      enum bfa_fcs_vport_event event)
+				enum bfa_fcs_vport_event event)
 {
 	bfa_trc(__vport_fcs(vport), __vport_pwwn(vport));
 	bfa_trc(__vport_fcs(vport), event);
@@ -419,7 +421,7 @@ bfa_fcs_vport_sm_logo(struct bfa_fcs_vport_s *vport,
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(__vport_fcs(vport), event);
 	}
 }
 
@@ -435,34 +437,19 @@ bfa_fcs_vport_sm_logo(struct bfa_fcs_vport_s *vport,
 static void
 bfa_fcs_vport_aen_post(bfa_fcs_lport_t *port, enum bfa_lport_aen_event event)
 {
-	union bfa_aen_data_u aen_data;
-	struct bfa_log_mod_s *logmod = port->fcs->logm;
+	union bfa_aen_data_u  aen_data;
+	struct bfa_log_mod_s   *logmod = port->fcs->logm;
 	enum bfa_port_role role = port->port_cfg.roles;
 	wwn_t           lpwwn = bfa_fcs_port_get_pwwn(port);
 	char            lpwwn_ptr[BFA_STRING_32];
-	char           *role_str[BFA_PORT_ROLE_FCP_MAX / 2 + 1] =
-		{ "Initiator", "Target", "IPFC" };
+	char            *role_str[BFA_PORT_ROLE_FCP_MAX/2 + 1] =
+				{"Initiator", "Target", "IPFC"};
 
 	wwn2str(lpwwn_ptr, lpwwn);
 
 	bfa_assert(role <= BFA_PORT_ROLE_FCP_MAX);
-
-	switch (event) {
-	case BFA_LPORT_AEN_NPIV_DUP_WWN:
-		bfa_log(logmod, BFA_AEN_LPORT_NPIV_DUP_WWN, lpwwn_ptr,
-			role_str[role / 2]);
-		break;
-	case BFA_LPORT_AEN_NPIV_FABRIC_MAX:
-		bfa_log(logmod, BFA_AEN_LPORT_NPIV_FABRIC_MAX, lpwwn_ptr,
-			role_str[role / 2]);
-		break;
-	case BFA_LPORT_AEN_NPIV_UNKNOWN:
-		bfa_log(logmod, BFA_AEN_LPORT_NPIV_UNKNOWN, lpwwn_ptr,
-			role_str[role / 2]);
-		break;
-	default:
-		break;
-	}
+	bfa_log(logmod, BFA_LOG_CREATE_ID(BFA_AEN_CAT_LPORT, event), lpwwn_ptr,
+			role_str[role/2]);
 
 	aen_data.lport.vf_id = port->fabric->vf_id;
 	aen_data.lport.roles = role;
@@ -478,36 +465,34 @@ static void
 bfa_fcs_vport_do_fdisc(struct bfa_fcs_vport_s *vport)
 {
 	bfa_lps_fdisc(vport->lps, vport,
-		      bfa_pport_get_maxfrsize(__vport_bfa(vport)),
-		      __vport_pwwn(vport), __vport_nwwn(vport));
+		bfa_fcport_get_maxfrsize(__vport_bfa(vport)),
+		__vport_pwwn(vport), __vport_nwwn(vport));
 	vport->vport_stats.fdisc_sent++;
 }
 
 static void
 bfa_fcs_vport_fdisc_rejected(struct bfa_fcs_vport_s *vport)
 {
-	u8         lsrjt_rsn = bfa_lps_get_lsrjt_rsn(vport->lps);
-	u8         lsrjt_expl = bfa_lps_get_lsrjt_expl(vport->lps);
+	u8		lsrjt_rsn = bfa_lps_get_lsrjt_rsn(vport->lps);
+	u8		lsrjt_expl = bfa_lps_get_lsrjt_expl(vport->lps);
 
 	bfa_trc(__vport_fcs(vport), lsrjt_rsn);
 	bfa_trc(__vport_fcs(vport), lsrjt_expl);
 
-	/*
-	 * For certain reason codes, we don't want to retry.
-	 */
+	/* For certain reason codes, we don't want to retry. */
 	switch (bfa_lps_get_lsrjt_expl(vport->lps)) {
-	case FC_LS_RJT_EXP_INV_PORT_NAME:	/* by brocade */
-	case FC_LS_RJT_EXP_INVALID_NPORT_ID:	/* by Cisco */
+	case  FC_LS_RJT_EXP_INV_PORT_NAME: /* by brocade */
+	case  FC_LS_RJT_EXP_INVALID_NPORT_ID: /* by Cisco */
 		if (vport->fdisc_retries < BFA_FCS_VPORT_MAX_RETRIES)
 			bfa_sm_send_event(vport, BFA_FCS_VPORT_SM_RSP_ERROR);
 		else {
 			bfa_fcs_vport_aen_post(&vport->lport,
-					       BFA_LPORT_AEN_NPIV_DUP_WWN);
+				BFA_LPORT_AEN_NPIV_DUP_WWN);
 			bfa_sm_send_event(vport, BFA_FCS_VPORT_SM_RSP_DUP_WWN);
 		}
 		break;
 
-	case FC_LS_RJT_EXP_INSUFF_RES:
+	case  FC_LS_RJT_EXP_INSUFF_RES:
 		/*
 		 * This means max logins per port/switch setting on the
 		 * switch was exceeded.
@@ -516,15 +501,15 @@ bfa_fcs_vport_fdisc_rejected(struct bfa_fcs_vport_s *vport)
 			bfa_sm_send_event(vport, BFA_FCS_VPORT_SM_RSP_ERROR);
 		else {
 			bfa_fcs_vport_aen_post(&vport->lport,
-					       BFA_LPORT_AEN_NPIV_FABRIC_MAX);
+				BFA_LPORT_AEN_NPIV_FABRIC_MAX);
 			bfa_sm_send_event(vport, BFA_FCS_VPORT_SM_RSP_FAILED);
 		}
 		break;
 
 	default:
-		if (vport->fdisc_retries == 0)	/* Print only once */
+		if (vport->fdisc_retries == 0) 	/* Print only once */
 			bfa_fcs_vport_aen_post(&vport->lport,
-					       BFA_LPORT_AEN_NPIV_UNKNOWN);
+					BFA_LPORT_AEN_NPIV_UNKNOWN);
 		bfa_sm_send_event(vport, BFA_FCS_VPORT_SM_RSP_ERROR);
 	}
 }
@@ -542,6 +527,7 @@ bfa_fcs_vport_do_logo(struct bfa_fcs_vport_s *vport)
 	bfa_lps_fdisclogo(vport->lps);
 }
 
+
 /**
  *     This routine will be called by bfa_timer on timer timeouts.
  *
@@ -551,14 +537,14 @@ bfa_fcs_vport_do_logo(struct bfa_fcs_vport_s *vport)
  * 	return
  * 		void
  *
-* 	Special Considerations:
+ * 	Special Considerations:
  *
  * 	note
  */
 static void
 bfa_fcs_vport_timeout(void *vport_arg)
 {
-	struct bfa_fcs_vport_s *vport = (struct bfa_fcs_vport_s *)vport_arg;
+	struct bfa_fcs_vport_s *vport = (struct bfa_fcs_vport_s *) vport_arg;
 
 	vport->vport_stats.fdisc_timeouts++;
 	bfa_sm_send_event(vport, BFA_FCS_VPORT_SM_TIMEOUT);
@@ -616,36 +602,6 @@ bfa_fcs_vport_delete_comp(struct bfa_fcs_vport_s *vport)
 	bfa_sm_send_event(vport, BFA_FCS_VPORT_SM_DELCOMP);
 }
 
-/**
- *   Module initialization
- */
-void
-bfa_fcs_vport_modinit(struct bfa_fcs_s *fcs)
-{
-}
-
-/**
- *   Module cleanup
- */
-void
-bfa_fcs_vport_modexit(struct bfa_fcs_s *fcs)
-{
-	bfa_fcs_modexit_comp(fcs);
-}
-
-u32
-bfa_fcs_vport_get_max(struct bfa_fcs_s *fcs)
-{
-	struct bfa_ioc_attr_s ioc_attr;
-
-	bfa_get_attr(fcs->bfa, &ioc_attr);
-
-	if (ioc_attr.pci_attr.device_id == BFA_PCI_DEVICE_ID_CT)
-		return (BFA_FCS_MAX_VPORTS_SUPP_CT);
-	else
-		return (BFA_FCS_MAX_VPORTS_SUPP_CB);
-}
-
 
 
 /**
@@ -658,7 +614,7 @@ bfa_fcs_vport_get_max(struct bfa_fcs_s *fcs)
  * 	done in vport_start() call)
  *
  * 	param[in] vport	- 	pointer to bfa_fcs_vport_t. This space
- * 					needs to be allocated by the driver.
+ *					needs to be allocated by the driver.
  * 	param[in] fcs 		- 	FCS instance
  * 	param[in] vport_cfg	- 	vport configuration
  * 	param[in] vf_id    	- 	VF_ID if vport is created within a VF.
@@ -671,11 +627,11 @@ bfa_fcs_vport_get_max(struct bfa_fcs_s *fcs)
  */
 bfa_status_t
 bfa_fcs_vport_create(struct bfa_fcs_vport_s *vport, struct bfa_fcs_s *fcs,
-		     u16 vf_id, struct bfa_port_cfg_s *vport_cfg,
-		     struct bfad_vport_s *vport_drv)
+			u16 vf_id, struct bfa_port_cfg_s *vport_cfg,
+			struct bfad_vport_s *vport_drv)
 {
 	if (vport_cfg->pwwn == 0)
-		return (BFA_STATUS_INVALID_WWN);
+		return BFA_STATUS_INVALID_WWN;
 
 	if (bfa_fcs_port_get_pwwn(&fcs->fabric.bport) == vport_cfg->pwwn)
 		return BFA_STATUS_VPORT_WWN_BP;
@@ -684,7 +640,7 @@ bfa_fcs_vport_create(struct bfa_fcs_vport_s *vport, struct bfa_fcs_s *fcs,
 		return BFA_STATUS_VPORT_EXISTS;
 
 	if (bfa_fcs_fabric_vport_count(&fcs->fabric) ==
-	    bfa_fcs_vport_get_max(fcs))
+			bfa_lps_get_max_vport(fcs->bfa))
 		return BFA_STATUS_VPORT_MAX;
 
 	vport->lps = bfa_lps_alloc(fcs->bfa);
@@ -693,9 +649,8 @@ bfa_fcs_vport_create(struct bfa_fcs_vport_s *vport, struct bfa_fcs_s *fcs,
 
 	vport->vport_drv = vport_drv;
 	bfa_sm_set_state(vport, bfa_fcs_vport_sm_uninit);
-
-	bfa_fcs_lport_init(&vport->lport, fcs, vf_id, vport_cfg, vport);
-
+	bfa_fcs_lport_attach(&vport->lport, fcs, vf_id, vport);
+	bfa_fcs_lport_init(&vport->lport, vport_cfg);
 	bfa_sm_send_event(vport, BFA_FCS_VPORT_SM_CREATE);
 
 	return BFA_STATUS_OK;
@@ -759,7 +714,7 @@ bfa_fcs_vport_delete(struct bfa_fcs_vport_s *vport)
  */
 void
 bfa_fcs_vport_get_attr(struct bfa_fcs_vport_s *vport,
-		       struct bfa_vport_attr_s *attr)
+			struct bfa_vport_attr_s *attr)
 {
 	if (vport == NULL || attr == NULL)
 		return;
@@ -842,9 +797,7 @@ bfa_cb_lps_fdisc_comp(void *bfad, void *uarg, bfa_status_t status)
 		break;
 
 	case BFA_STATUS_INVALID_MAC:
-		/*
-		 * Only for CNA
-		 */
+		/* Only for CNA */
 		vport->vport_stats.fdisc_acc_bad++;
 		bfa_sm_send_event(vport, BFA_FCS_VPORT_SM_RSP_ERROR);
 
@@ -886,6 +839,19 @@ bfa_cb_lps_fdisclogo_comp(void *bfad, void *uarg)
 {
 	struct bfa_fcs_vport_s *vport = uarg;
 	bfa_sm_send_event(vport, BFA_FCS_VPORT_SM_RSP_OK);
+}
+
+/**
+ * Received clear virtual link
+ */
+void
+bfa_cb_lps_cvl_event(void *bfad, void *uarg)
+{
+	struct bfa_fcs_vport_s *vport = uarg;
+
+	/* Send an Offline followed by an ONLINE */
+	bfa_sm_send_event(vport, BFA_FCS_VPORT_SM_OFFLINE);
+	bfa_sm_send_event(vport, BFA_FCS_VPORT_SM_ONLINE);
 }
 
 

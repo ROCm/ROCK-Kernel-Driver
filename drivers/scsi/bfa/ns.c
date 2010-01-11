@@ -88,7 +88,7 @@ static void     bfa_fcs_port_ns_process_gidft_pids(struct bfa_fcs_port_s *port,
 						   u32 *pid_buf,
 						   u32 n_pids);
 
-static void     bfa_fcs_port_ns_boot_target_disc(struct bfa_fcs_port_s *port);
+static void bfa_fcs_port_ns_boot_target_disc(struct bfa_fcs_port_s *port);
 /**
  *  fcs_ns_sm FCS nameserver interface state machine
  */
@@ -149,7 +149,7 @@ static void     bfa_fcs_port_ns_sm_online(struct bfa_fcs_port_ns_s *ns,
  */
 static void
 bfa_fcs_port_ns_sm_offline(struct bfa_fcs_port_ns_s *ns,
-			   enum vport_ns_event event)
+			enum vport_ns_event event)
 {
 	bfa_trc(ns->port->fcs, ns->port->port_cfg.pwwn);
 	bfa_trc(ns->port->fcs, event);
@@ -164,13 +164,13 @@ bfa_fcs_port_ns_sm_offline(struct bfa_fcs_port_ns_s *ns,
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ns->port->fcs, event);
 	}
 }
 
 static void
 bfa_fcs_port_ns_sm_plogi_sending(struct bfa_fcs_port_ns_s *ns,
-				 enum vport_ns_event event)
+					enum vport_ns_event event)
 {
 	bfa_trc(ns->port->fcs, ns->port->port_cfg.pwwn);
 	bfa_trc(ns->port->fcs, event);
@@ -183,17 +183,17 @@ bfa_fcs_port_ns_sm_plogi_sending(struct bfa_fcs_port_ns_s *ns,
 	case NSSM_EVENT_PORT_OFFLINE:
 		bfa_sm_set_state(ns, bfa_fcs_port_ns_sm_offline);
 		bfa_fcxp_walloc_cancel(BFA_FCS_GET_HAL_FROM_PORT(ns->port),
-				       &ns->fcxp_wqe);
+					   &ns->fcxp_wqe);
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ns->port->fcs, event);
 	}
 }
 
 static void
 bfa_fcs_port_ns_sm_plogi(struct bfa_fcs_port_ns_s *ns,
-			 enum vport_ns_event event)
+				enum vport_ns_event event)
 {
 	bfa_trc(ns->port->fcs, ns->port->port_cfg.pwwn);
 	bfa_trc(ns->port->fcs, event);
@@ -205,9 +205,9 @@ bfa_fcs_port_ns_sm_plogi(struct bfa_fcs_port_ns_s *ns,
 		 */
 		bfa_sm_set_state(ns, bfa_fcs_port_ns_sm_plogi_retry);
 		ns->port->stats.ns_retries++;
-		bfa_timer_start(BFA_FCS_GET_HAL_FROM_PORT(ns->port), &ns->timer,
-				bfa_fcs_port_ns_timeout, ns,
-				BFA_FCS_RETRY_TIMEOUT);
+		bfa_timer_start(BFA_FCS_GET_HAL_FROM_PORT(ns->port),
+				    &ns->timer, bfa_fcs_port_ns_timeout, ns,
+				    BFA_FCS_RETRY_TIMEOUT);
 		break;
 
 	case NSSM_EVENT_RSP_OK:
@@ -221,13 +221,13 @@ bfa_fcs_port_ns_sm_plogi(struct bfa_fcs_port_ns_s *ns,
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ns->port->fcs, event);
 	}
 }
 
 static void
 bfa_fcs_port_ns_sm_plogi_retry(struct bfa_fcs_port_ns_s *ns,
-			       enum vport_ns_event event)
+				enum vport_ns_event event)
 {
 	bfa_trc(ns->port->fcs, ns->port->port_cfg.pwwn);
 	bfa_trc(ns->port->fcs, event);
@@ -247,7 +247,7 @@ bfa_fcs_port_ns_sm_plogi_retry(struct bfa_fcs_port_ns_s *ns,
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ns->port->fcs, event);
 	}
 }
 
@@ -266,17 +266,17 @@ bfa_fcs_port_ns_sm_sending_rspn_id(struct bfa_fcs_port_ns_s *ns,
 	case NSSM_EVENT_PORT_OFFLINE:
 		bfa_sm_set_state(ns, bfa_fcs_port_ns_sm_offline);
 		bfa_fcxp_walloc_cancel(BFA_FCS_GET_HAL_FROM_PORT(ns->port),
-				       &ns->fcxp_wqe);
+					   &ns->fcxp_wqe);
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ns->port->fcs, event);
 	}
 }
 
 static void
 bfa_fcs_port_ns_sm_rspn_id(struct bfa_fcs_port_ns_s *ns,
-			   enum vport_ns_event event)
+				enum vport_ns_event event)
 {
 	bfa_trc(ns->port->fcs, ns->port->port_cfg.pwwn);
 	bfa_trc(ns->port->fcs, event);
@@ -288,9 +288,9 @@ bfa_fcs_port_ns_sm_rspn_id(struct bfa_fcs_port_ns_s *ns,
 		 */
 		bfa_sm_set_state(ns, bfa_fcs_port_ns_sm_rspn_id_retry);
 		ns->port->stats.ns_retries++;
-		bfa_timer_start(BFA_FCS_GET_HAL_FROM_PORT(ns->port), &ns->timer,
-				bfa_fcs_port_ns_timeout, ns,
-				BFA_FCS_RETRY_TIMEOUT);
+		bfa_timer_start(BFA_FCS_GET_HAL_FROM_PORT(ns->port),
+				    &ns->timer, bfa_fcs_port_ns_timeout, ns,
+				    BFA_FCS_RETRY_TIMEOUT);
 		break;
 
 	case NSSM_EVENT_RSP_OK:
@@ -304,13 +304,13 @@ bfa_fcs_port_ns_sm_rspn_id(struct bfa_fcs_port_ns_s *ns,
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ns->port->fcs, event);
 	}
 }
 
 static void
 bfa_fcs_port_ns_sm_rspn_id_retry(struct bfa_fcs_port_ns_s *ns,
-				 enum vport_ns_event event)
+					enum vport_ns_event event)
 {
 	bfa_trc(ns->port->fcs, ns->port->port_cfg.pwwn);
 	bfa_trc(ns->port->fcs, event);
@@ -330,7 +330,7 @@ bfa_fcs_port_ns_sm_rspn_id_retry(struct bfa_fcs_port_ns_s *ns,
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ns->port->fcs, event);
 	}
 }
 
@@ -349,26 +349,24 @@ bfa_fcs_port_ns_sm_sending_rft_id(struct bfa_fcs_port_ns_s *ns,
 	case NSSM_EVENT_PORT_OFFLINE:
 		bfa_sm_set_state(ns, bfa_fcs_port_ns_sm_offline);
 		bfa_fcxp_walloc_cancel(BFA_FCS_GET_HAL_FROM_PORT(ns->port),
-				       &ns->fcxp_wqe);
+					   &ns->fcxp_wqe);
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ns->port->fcs, event);
 	}
 }
 
 static void
 bfa_fcs_port_ns_sm_rft_id(struct bfa_fcs_port_ns_s *ns,
-			  enum vport_ns_event event)
+					enum vport_ns_event event)
 {
 	bfa_trc(ns->port->fcs, ns->port->port_cfg.pwwn);
 	bfa_trc(ns->port->fcs, event);
 
 	switch (event) {
 	case NSSM_EVENT_RSP_OK:
-		/*
-		 * Now move to register FC4 Features
-		 */
+		/* Now move to register FC4 Features */
 		bfa_sm_set_state(ns, bfa_fcs_port_ns_sm_sending_rff_id);
 		bfa_fcs_port_ns_send_rff_id(ns, NULL);
 		break;
@@ -379,9 +377,9 @@ bfa_fcs_port_ns_sm_rft_id(struct bfa_fcs_port_ns_s *ns,
 		 */
 		bfa_sm_set_state(ns, bfa_fcs_port_ns_sm_rft_id_retry);
 		ns->port->stats.ns_retries++;
-		bfa_timer_start(BFA_FCS_GET_HAL_FROM_PORT(ns->port), &ns->timer,
-				bfa_fcs_port_ns_timeout, ns,
-				BFA_FCS_RETRY_TIMEOUT);
+		bfa_timer_start(BFA_FCS_GET_HAL_FROM_PORT(ns->port),
+				    &ns->timer, bfa_fcs_port_ns_timeout, ns,
+				    BFA_FCS_RETRY_TIMEOUT);
 		break;
 
 	case NSSM_EVENT_PORT_OFFLINE:
@@ -390,13 +388,13 @@ bfa_fcs_port_ns_sm_rft_id(struct bfa_fcs_port_ns_s *ns,
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ns->port->fcs, event);
 	}
 }
 
 static void
 bfa_fcs_port_ns_sm_rft_id_retry(struct bfa_fcs_port_ns_s *ns,
-				enum vport_ns_event event)
+					enum vport_ns_event event)
 {
 	bfa_trc(ns->port->fcs, ns->port->port_cfg.pwwn);
 	bfa_trc(ns->port->fcs, event);
@@ -413,7 +411,7 @@ bfa_fcs_port_ns_sm_rft_id_retry(struct bfa_fcs_port_ns_s *ns,
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ns->port->fcs, event);
 	}
 }
 
@@ -432,17 +430,17 @@ bfa_fcs_port_ns_sm_sending_rff_id(struct bfa_fcs_port_ns_s *ns,
 	case NSSM_EVENT_PORT_OFFLINE:
 		bfa_sm_set_state(ns, bfa_fcs_port_ns_sm_offline);
 		bfa_fcxp_walloc_cancel(BFA_FCS_GET_HAL_FROM_PORT(ns->port),
-				       &ns->fcxp_wqe);
+					   &ns->fcxp_wqe);
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ns->port->fcs, event);
 	}
 }
 
 static void
 bfa_fcs_port_ns_sm_rff_id(struct bfa_fcs_port_ns_s *ns,
-			  enum vport_ns_event event)
+				enum vport_ns_event event)
 {
 	bfa_trc(ns->port->fcs, ns->port->port_cfg.pwwn);
 	bfa_trc(ns->port->fcs, event);
@@ -483,9 +481,9 @@ bfa_fcs_port_ns_sm_rff_id(struct bfa_fcs_port_ns_s *ns,
 		 */
 		bfa_sm_set_state(ns, bfa_fcs_port_ns_sm_rff_id_retry);
 		ns->port->stats.ns_retries++;
-		bfa_timer_start(BFA_FCS_GET_HAL_FROM_PORT(ns->port), &ns->timer,
-				bfa_fcs_port_ns_timeout, ns,
-				BFA_FCS_RETRY_TIMEOUT);
+		bfa_timer_start(BFA_FCS_GET_HAL_FROM_PORT(ns->port),
+				    &ns->timer, bfa_fcs_port_ns_timeout, ns,
+				    BFA_FCS_RETRY_TIMEOUT);
 		break;
 
 	case NSSM_EVENT_PORT_OFFLINE:
@@ -494,7 +492,7 @@ bfa_fcs_port_ns_sm_rff_id(struct bfa_fcs_port_ns_s *ns,
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ns->port->fcs, event);
 	}
 }
 
@@ -517,7 +515,7 @@ bfa_fcs_port_ns_sm_rff_id_retry(struct bfa_fcs_port_ns_s *ns,
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ns->port->fcs, event);
 	}
 }
 static void
@@ -535,17 +533,17 @@ bfa_fcs_port_ns_sm_sending_gid_ft(struct bfa_fcs_port_ns_s *ns,
 	case NSSM_EVENT_PORT_OFFLINE:
 		bfa_sm_set_state(ns, bfa_fcs_port_ns_sm_offline);
 		bfa_fcxp_walloc_cancel(BFA_FCS_GET_HAL_FROM_PORT(ns->port),
-				       &ns->fcxp_wqe);
+					   &ns->fcxp_wqe);
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ns->port->fcs, event);
 	}
 }
 
 static void
 bfa_fcs_port_ns_sm_gid_ft(struct bfa_fcs_port_ns_s *ns,
-			  enum vport_ns_event event)
+					enum vport_ns_event event)
 {
 	bfa_trc(ns->port->fcs, ns->port->port_cfg.pwwn);
 	bfa_trc(ns->port->fcs, event);
@@ -564,9 +562,9 @@ bfa_fcs_port_ns_sm_gid_ft(struct bfa_fcs_port_ns_s *ns,
 		 */
 		bfa_sm_set_state(ns, bfa_fcs_port_ns_sm_gid_ft_retry);
 		ns->port->stats.ns_retries++;
-		bfa_timer_start(BFA_FCS_GET_HAL_FROM_PORT(ns->port), &ns->timer,
-				bfa_fcs_port_ns_timeout, ns,
-				BFA_FCS_RETRY_TIMEOUT);
+		bfa_timer_start(BFA_FCS_GET_HAL_FROM_PORT(ns->port),
+				    &ns->timer, bfa_fcs_port_ns_timeout, ns,
+				    BFA_FCS_RETRY_TIMEOUT);
 		break;
 
 	case NSSM_EVENT_PORT_OFFLINE:
@@ -575,7 +573,7 @@ bfa_fcs_port_ns_sm_gid_ft(struct bfa_fcs_port_ns_s *ns,
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ns->port->fcs, event);
 	}
 }
 
@@ -598,13 +596,13 @@ bfa_fcs_port_ns_sm_gid_ft_retry(struct bfa_fcs_port_ns_s *ns,
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ns->port->fcs, event);
 	}
 }
 
 static void
 bfa_fcs_port_ns_sm_online(struct bfa_fcs_port_ns_s *ns,
-			  enum vport_ns_event event)
+				enum vport_ns_event event)
 {
 	bfa_trc(ns->port->fcs, ns->port->port_cfg.pwwn);
 	bfa_trc(ns->port->fcs, event);
@@ -626,7 +624,7 @@ bfa_fcs_port_ns_sm_online(struct bfa_fcs_port_ns_s *ns,
 		break;
 
 	default:
-		bfa_assert(0);
+		bfa_sm_fault(ns->port->fcs, event);
 	}
 }
 
@@ -651,7 +649,7 @@ bfa_fcs_port_ns_send_plogi(void *ns_cbarg, struct bfa_fcxp_s *fcxp_alloced)
 	if (!fcxp) {
 		port->stats.ns_plogi_alloc_wait++;
 		bfa_fcxp_alloc_wait(port->fcs->bfa, &ns->fcxp_wqe,
-				    bfa_fcs_port_ns_send_plogi, ns);
+					bfa_fcs_port_ns_send_plogi, ns);
 		return;
 	}
 	ns->fcxp = fcxp;
@@ -660,11 +658,12 @@ bfa_fcs_port_ns_send_plogi(void *ns_cbarg, struct bfa_fcxp_s *fcxp_alloced)
 			     bfa_os_hton3b(FC_NAME_SERVER),
 			     bfa_fcs_port_get_fcid(port), 0,
 			     port->port_cfg.pwwn, port->port_cfg.nwwn,
-			     bfa_pport_get_maxfrsize(port->fcs->bfa));
+				 bfa_fcport_get_maxfrsize(port->fcs->bfa));
 
 	bfa_fcxp_send(fcxp, NULL, port->fabric->vf_id, port->lp_tag, BFA_FALSE,
-		      FC_CLASS_3, len, &fchs, bfa_fcs_port_ns_plogi_response,
-		      (void *)ns, FC_MAX_PDUSZ, FC_RA_TOV);
+			  FC_CLASS_3, len, &fchs,
+			  bfa_fcs_port_ns_plogi_response, (void *)ns,
+			  FC_MAX_PDUSZ, FC_RA_TOV);
 	port->stats.ns_plogi_sent++;
 
 	bfa_sm_send_event(ns, NSSM_EVENT_PLOGI_SENT);
@@ -672,11 +671,11 @@ bfa_fcs_port_ns_send_plogi(void *ns_cbarg, struct bfa_fcxp_s *fcxp_alloced)
 
 static void
 bfa_fcs_port_ns_plogi_response(void *fcsarg, struct bfa_fcxp_s *fcxp,
-			       void *cbarg, bfa_status_t req_status,
-			       u32 rsp_len, u32 resid_len,
-			       struct fchs_s *rsp_fchs)
+				void *cbarg, bfa_status_t req_status,
+				u32 rsp_len, u32 resid_len,
+				struct fchs_s *rsp_fchs)
 {
-	struct bfa_fcs_port_ns_s *ns = (struct bfa_fcs_port_ns_s *)cbarg;
+	struct bfa_fcs_port_ns_s *ns = (struct bfa_fcs_port_ns_s *) cbarg;
 	struct bfa_fcs_port_s *port = ns->port;
 	/* struct fc_logi_s *plogi_resp; */
 	struct fc_els_cmd_s   *els_cmd;
@@ -740,7 +739,7 @@ bfa_fcs_port_ns_send_rspn_id(void *ns_cbarg, struct bfa_fcxp_s *fcxp_alloced)
 	int             len;
 	struct bfa_fcxp_s *fcxp;
 	u8         symbl[256];
-	u8        *psymbl = &symbl[0];
+	u8         *psymbl = &symbl[0];
 
 	bfa_os_memset(symbl, 0, sizeof(symbl));
 
@@ -750,7 +749,7 @@ bfa_fcs_port_ns_send_rspn_id(void *ns_cbarg, struct bfa_fcxp_s *fcxp_alloced)
 	if (!fcxp) {
 		port->stats.ns_rspnid_alloc_wait++;
 		bfa_fcxp_alloc_wait(port->fcs->bfa, &ns->fcxp_wqe,
-				    bfa_fcs_port_ns_send_rspn_id, ns);
+					bfa_fcs_port_ns_send_rspn_id, ns);
 		return;
 	}
 	ns->fcxp = fcxp;
@@ -764,24 +763,21 @@ bfa_fcs_port_ns_send_rspn_id(void *ns_cbarg, struct bfa_fcxp_s *fcxp_alloced)
 		 */
 
 		strncpy((char *)psymbl,
-			(char *)
-			&(bfa_fcs_port_get_psym_name
-			  (bfa_fcs_get_base_port(port->fcs))),
-			strlen((char *)
-			       &bfa_fcs_port_get_psym_name(bfa_fcs_get_base_port
-							   (port->fcs))));
+			(char *) &
+			(bfa_fcs_port_get_psym_name
+			 (bfa_fcs_get_base_port(port->fcs))),
+			strlen((char *) &
+			       bfa_fcs_port_get_psym_name(bfa_fcs_get_base_port
+							  (port->fcs))));
 
-		/*
-		 * Ensure we have a null terminating string.
-		 */
-		((char *)
-		 psymbl)[strlen((char *)
-				&bfa_fcs_port_get_psym_name
-				(bfa_fcs_get_base_port(port->fcs)))] = 0;
+	/* Ensure we have a null terminating string. */
+	((char *)psymbl)[strlen((char *) &
+			bfa_fcs_port_get_psym_name(bfa_fcs_get_base_port
+							  (port->fcs)))] = 0;
 
 		strncat((char *)psymbl,
-			(char *)&(bfa_fcs_port_get_psym_name(port)),
-			strlen((char *)&bfa_fcs_port_get_psym_name(port)));
+			(char *) &(bfa_fcs_port_get_psym_name(port)),
+			strlen((char *) &bfa_fcs_port_get_psym_name(port)));
 	} else {
 		psymbl = (u8 *) &(bfa_fcs_port_get_psym_name(port));
 	}
@@ -790,8 +786,9 @@ bfa_fcs_port_ns_send_rspn_id(void *ns_cbarg, struct bfa_fcxp_s *fcxp_alloced)
 			      bfa_fcs_port_get_fcid(port), 0, psymbl);
 
 	bfa_fcxp_send(fcxp, NULL, port->fabric->vf_id, port->lp_tag, BFA_FALSE,
-		      FC_CLASS_3, len, &fchs, bfa_fcs_port_ns_rspn_id_response,
-		      (void *)ns, FC_MAX_PDUSZ, FC_RA_TOV);
+			  FC_CLASS_3, len, &fchs,
+			  bfa_fcs_port_ns_rspn_id_response, (void *)ns,
+			  FC_MAX_PDUSZ, FC_RA_TOV);
 
 	port->stats.ns_rspnid_sent++;
 
@@ -804,7 +801,7 @@ bfa_fcs_port_ns_rspn_id_response(void *fcsarg, struct bfa_fcxp_s *fcxp,
 				 u32 rsp_len, u32 resid_len,
 				 struct fchs_s *rsp_fchs)
 {
-	struct bfa_fcs_port_ns_s *ns = (struct bfa_fcs_port_ns_s *)cbarg;
+	struct bfa_fcs_port_ns_s *ns = (struct bfa_fcs_port_ns_s *) cbarg;
 	struct bfa_fcs_port_s *port = ns->port;
 	struct ct_hdr_s       *cthdr = NULL;
 
@@ -854,18 +851,19 @@ bfa_fcs_port_ns_send_rft_id(void *ns_cbarg, struct bfa_fcxp_s *fcxp_alloced)
 	if (!fcxp) {
 		port->stats.ns_rftid_alloc_wait++;
 		bfa_fcxp_alloc_wait(port->fcs->bfa, &ns->fcxp_wqe,
-				    bfa_fcs_port_ns_send_rft_id, ns);
+					bfa_fcs_port_ns_send_rft_id, ns);
 		return;
 	}
 	ns->fcxp = fcxp;
 
 	len = fc_rftid_build(&fchs, bfa_fcxp_get_reqbuf(fcxp),
-			     bfa_fcs_port_get_fcid(port), 0,
-			     port->port_cfg.roles);
+				bfa_fcs_port_get_fcid(port), 0,
+				port->port_cfg.roles);
 
 	bfa_fcxp_send(fcxp, NULL, port->fabric->vf_id, port->lp_tag, BFA_FALSE,
-		      FC_CLASS_3, len, &fchs, bfa_fcs_port_ns_rft_id_response,
-		      (void *)ns, FC_MAX_PDUSZ, FC_RA_TOV);
+			  FC_CLASS_3, len, &fchs,
+			  bfa_fcs_port_ns_rft_id_response, (void *)ns,
+			  FC_MAX_PDUSZ, FC_RA_TOV);
 
 	port->stats.ns_rftid_sent++;
 	bfa_sm_send_event(ns, NSSM_EVENT_RFTID_SENT);
@@ -877,7 +875,7 @@ bfa_fcs_port_ns_rft_id_response(void *fcsarg, struct bfa_fcxp_s *fcxp,
 				u32 rsp_len, u32 resid_len,
 				struct fchs_s *rsp_fchs)
 {
-	struct bfa_fcs_port_ns_s *ns = (struct bfa_fcs_port_ns_s *)cbarg;
+	struct bfa_fcs_port_ns_s *ns = (struct bfa_fcs_port_ns_s *) cbarg;
 	struct bfa_fcs_port_s *port = ns->port;
 	struct ct_hdr_s       *cthdr = NULL;
 
@@ -909,7 +907,7 @@ bfa_fcs_port_ns_rft_id_response(void *fcsarg, struct bfa_fcxp_s *fcxp,
 }
 
 /**
-* Register FC4-Features : Should be done after RFT_ID
+ * Register FC4-Features : Should be done after RFT_ID
  */
 static void
 bfa_fcs_port_ns_send_rff_id(void *ns_cbarg, struct bfa_fcxp_s *fcxp_alloced)
@@ -919,7 +917,7 @@ bfa_fcs_port_ns_send_rff_id(void *ns_cbarg, struct bfa_fcxp_s *fcxp_alloced)
 	struct fchs_s          fchs;
 	int             len;
 	struct bfa_fcxp_s *fcxp;
-	u8         fc4_ftrs = 0;
+	u8			fc4_ftrs = 0;
 
 	bfa_trc(port->fcs, port->port_cfg.pwwn);
 
@@ -927,24 +925,24 @@ bfa_fcs_port_ns_send_rff_id(void *ns_cbarg, struct bfa_fcxp_s *fcxp_alloced)
 	if (!fcxp) {
 		port->stats.ns_rffid_alloc_wait++;
 		bfa_fcxp_alloc_wait(port->fcs->bfa, &ns->fcxp_wqe,
-				    bfa_fcs_port_ns_send_rff_id, ns);
+					bfa_fcs_port_ns_send_rff_id, ns);
 		return;
 	}
 	ns->fcxp = fcxp;
 
-	if (BFA_FCS_VPORT_IS_INITIATOR_MODE(ns->port)) {
+	if (BFA_FCS_VPORT_IS_INITIATOR_MODE(ns->port))
 		fc4_ftrs = FC_GS_FCP_FC4_FEATURE_INITIATOR;
-	} else if (BFA_FCS_VPORT_IS_TARGET_MODE(ns->port)) {
+	else if (BFA_FCS_VPORT_IS_TARGET_MODE(ns->port))
 		fc4_ftrs = FC_GS_FCP_FC4_FEATURE_TARGET;
-	}
 
 	len = fc_rffid_build(&fchs, bfa_fcxp_get_reqbuf(fcxp),
-			     bfa_fcs_port_get_fcid(port), 0, FC_TYPE_FCP,
-			     fc4_ftrs);
+			     bfa_fcs_port_get_fcid(port), 0,
+				 FC_TYPE_FCP, fc4_ftrs);
 
 	bfa_fcxp_send(fcxp, NULL, port->fabric->vf_id, port->lp_tag, BFA_FALSE,
-		      FC_CLASS_3, len, &fchs, bfa_fcs_port_ns_rff_id_response,
-		      (void *)ns, FC_MAX_PDUSZ, FC_RA_TOV);
+			  FC_CLASS_3, len, &fchs,
+			  bfa_fcs_port_ns_rff_id_response, (void *)ns,
+			  FC_MAX_PDUSZ, FC_RA_TOV);
 
 	port->stats.ns_rffid_sent++;
 	bfa_sm_send_event(ns, NSSM_EVENT_RFFID_SENT);
@@ -956,7 +954,7 @@ bfa_fcs_port_ns_rff_id_response(void *fcsarg, struct bfa_fcxp_s *fcxp,
 				u32 rsp_len, u32 resid_len,
 				struct fchs_s *rsp_fchs)
 {
-	struct bfa_fcs_port_ns_s *ns = (struct bfa_fcs_port_ns_s *)cbarg;
+	struct bfa_fcs_port_ns_s *ns = (struct bfa_fcs_port_ns_s *) cbarg;
 	struct bfa_fcs_port_s *port = ns->port;
 	struct ct_hdr_s       *cthdr = NULL;
 
@@ -986,19 +984,16 @@ bfa_fcs_port_ns_rff_id_response(void *fcsarg, struct bfa_fcxp_s *fcxp,
 	bfa_trc(port->fcs, cthdr->exp_code);
 
 	if (cthdr->reason_code == CT_RSN_NOT_SUPP) {
-		/*
-		 * if this command is not supported, we don't retry
-		 */
+		/* if this command is not supported, we don't retry */
 		bfa_sm_send_event(ns, NSSM_EVENT_RSP_OK);
 	} else {
 		bfa_sm_send_event(ns, NSSM_EVENT_RSP_ERROR);
 	}
 }
-
 /**
  * Query Fabric for FC4-Types Devices.
  *
-*  TBD : Need to use a local (FCS private) response buffer, since the response
+* TBD : Need to use a local (FCS private) response buffer, since the response
  * can be larger than 2K.
  */
 static void
@@ -1016,7 +1011,7 @@ bfa_fcs_port_ns_send_gid_ft(void *ns_cbarg, struct bfa_fcxp_s *fcxp_alloced)
 	if (!fcxp) {
 		port->stats.ns_gidft_alloc_wait++;
 		bfa_fcxp_alloc_wait(port->fcs->bfa, &ns->fcxp_wqe,
-				    bfa_fcs_port_ns_send_gid_ft, ns);
+					bfa_fcs_port_ns_send_gid_ft, ns);
 		return;
 	}
 	ns->fcxp = fcxp;
@@ -1024,13 +1019,13 @@ bfa_fcs_port_ns_send_gid_ft(void *ns_cbarg, struct bfa_fcxp_s *fcxp_alloced)
 	/*
 	 * This query is only initiated for FCP initiator mode.
 	 */
-	len = fc_gid_ft_build(&fchs, bfa_fcxp_get_reqbuf(fcxp), ns->port->pid,
-			      FC_TYPE_FCP);
+	len = fc_gid_ft_build(&fchs, bfa_fcxp_get_reqbuf(fcxp),
+			      ns->port->pid, FC_TYPE_FCP);
 
 	bfa_fcxp_send(fcxp, NULL, port->fabric->vf_id, port->lp_tag, BFA_FALSE,
-		      FC_CLASS_3, len, &fchs, bfa_fcs_port_ns_gid_ft_response,
-		      (void *)ns, bfa_fcxp_get_maxrsp(port->fcs->bfa),
-		      FC_RA_TOV);
+			  FC_CLASS_3, len, &fchs,
+			  bfa_fcs_port_ns_gid_ft_response, (void *)ns,
+			  bfa_fcxp_get_maxrsp(port->fcs->bfa), FC_RA_TOV);
 
 	port->stats.ns_gidft_sent++;
 
@@ -1043,7 +1038,7 @@ bfa_fcs_port_ns_gid_ft_response(void *fcsarg, struct bfa_fcxp_s *fcxp,
 				u32 rsp_len, u32 resid_len,
 				struct fchs_s *rsp_fchs)
 {
-	struct bfa_fcs_port_ns_s *ns = (struct bfa_fcs_port_ns_s *)cbarg;
+	struct bfa_fcs_port_ns_s *ns = (struct bfa_fcs_port_ns_s *) cbarg;
 	struct bfa_fcs_port_s *port = ns->port;
 	struct ct_hdr_s       *cthdr = NULL;
 	u32        n_pids;
@@ -1118,19 +1113,19 @@ bfa_fcs_port_ns_gid_ft_response(void *fcsarg, struct bfa_fcxp_s *fcxp,
 /**
  *     This routine will be called by bfa_timer on timer timeouts.
  *
- * 	param[in] 	port 	- pointer to bfa_fcs_port_t.
+ * 	param[in] 	port 	- pointer to struct bfa_fcs_port_s.
  *
  * 	return
  * 		void
  *
-* 	Special Considerations:
+ * 	Special Considerations:
  *
  * 	note
  */
 static void
 bfa_fcs_port_ns_timeout(void *arg)
 {
-	struct bfa_fcs_port_ns_s *ns = (struct bfa_fcs_port_ns_s *)arg;
+	struct bfa_fcs_port_ns_s *ns = (struct bfa_fcs_port_ns_s *) arg;
 
 	ns->port->stats.ns_timeouts++;
 	bfa_sm_send_event(ns, NSSM_EVENT_TIMEOUT);
@@ -1140,8 +1135,8 @@ bfa_fcs_port_ns_timeout(void *arg)
  * Process the PID list in GID_FT response
  */
 static void
-bfa_fcs_port_ns_process_gidft_pids(struct bfa_fcs_port_s *port,
-				   u32 *pid_buf, u32 n_pids)
+bfa_fcs_port_ns_process_gidft_pids(struct bfa_fcs_port_s *port, u32 *pid_buf,
+				   u32 n_pids)
 {
 	struct fcgs_gidft_resp_s *gidft_entry;
 	struct bfa_fcs_rport_s *rport;
@@ -1228,13 +1223,13 @@ bfa_fcs_port_ns_boot_target_disc(struct bfa_fcs_port_s *port)
 {
 
 	struct bfa_fcs_rport_s *rport;
-	u8         nwwns;
-	wwn_t          *wwns;
-	int             ii;
+	u8 nwwns;
+	wwn_t  *wwns;
+	int ii;
 
 	bfa_iocfc_get_bootwwns(port->fcs->bfa, &nwwns, &wwns);
 
-	for (ii = 0; ii < nwwns; ++ii) {
+	for (ii = 0 ; ii < nwwns; ++ii) {
 		rport = bfa_fcs_rport_create_by_wwn(port, wwns[ii]);
 		bfa_assert(rport);
 	}

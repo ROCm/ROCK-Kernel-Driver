@@ -22,7 +22,7 @@
 
 #pragma pack(1)
 
-struct ct_hdr_s{
+struct ct_hdr_s {
 	u32	rev_id:8;	/* Revision of the CT */
 	u32	in_id:24;	/* Initiator Id */
 	u32	gs_type:8;	/* Generic service Type */
@@ -36,6 +36,7 @@ struct ct_hdr_s{
 	u32	exp_code:8;	/* explanation code */
 	u32	vendor_unq:8;	/* vendor unique */
 };
+
 
 /*
  * defines for the Revision
@@ -159,19 +160,20 @@ enum {
 	GS_RFF_ID	= 0x021F,	/* Register FC4 Feature		*/
 };
 
-struct fcgs_id_req_s{
+struct fcgs_id_req_s {
 	u32	rsvd:8;
 	u32	dap:24;	/* port identifier */
 };
+
 #define fcgs_gpnid_req_t struct fcgs_id_req_s
 #define fcgs_gnnid_req_t struct fcgs_id_req_s
 #define fcgs_gspnid_req_t struct fcgs_id_req_s
 
-struct fcgs_gidpn_req_s{
+struct fcgs_gidpn_req_s {
 	wwn_t	port_name;	/* port wwn */
 };
 
-struct fcgs_gidpn_resp_s{
+struct fcgs_gidpn_resp_s {
 	u32	rsvd:8;
 	u32	dap:24;	/* port identifier */
 };
@@ -192,23 +194,23 @@ struct fcgs_rftid_req_s {
 #define FC_GS_FCP_FC4_FEATURE_INITIATOR  0x02
 #define FC_GS_FCP_FC4_FEATURE_TARGET	 0x01
 
-struct fcgs_rffid_req_s{
-    u32    rsvd          :8;
-    u32    dap        	  :24;		/* port identifier	*/
-    u32    rsvd1         :16;
-    u32    fc4ftr_bits   :8;		/* fc4 feature bits	*/
-    u32    fc4_type      :8;		/* corresponding FC4 Type */
+struct fcgs_rffid_req_s {
+    u32    rsvd:8;
+    u32    dap:24;		/* port identifier	*/
+    u32    rsvd1:16;
+    u32    fc4ftr_bits:8;		/* fc4 feature bits	*/
+    u32    fc4_type:8;		/* corresponding FC4 Type */
 };
 
 /**
  * GID_FT Request
  */
-struct fcgs_gidft_req_s{
+struct fcgs_gidft_req_s {
 	u8	reserved;
 	u8	domain_id;	/* domain, 0 - all fabric */
 	u8	area_id;	/* area, 0 - whole domain */
 	u8	fc4_type;	/* FC_TYPE_FCP for SCSI devices */
-};				/* GID_FT Request */
+};						/* GID_FT Request */
 
 /**
  * GID_FT Response
@@ -217,12 +219,12 @@ struct fcgs_gidft_resp_s {
 	u8		last:1;	/* last port identifier flag */
 	u8		reserved:7;
 	u32	pid:24;	/* port identifier */
-};				/* GID_FT Response */
+};						/* GID_FT Response */
 
 /**
  * RSPN_ID
  */
-struct fcgs_rspnid_req_s{
+struct fcgs_rspnid_req_s {
 	u32	rsvd:8;
 	u32	dap:24;		/* port identifier */
 	u8		spn_len;	/* symbolic port name length */
@@ -232,7 +234,7 @@ struct fcgs_rspnid_req_s{
 /**
  * RPN_ID
  */
-struct fcgs_rpnid_req_s{
+struct fcgs_rpnid_req_s {
 	u32	rsvd:8;
 	u32	port_id:24;
 	wwn_t		port_name;
@@ -241,7 +243,7 @@ struct fcgs_rpnid_req_s{
 /**
  * RNN_ID
  */
-struct fcgs_rnnid_req_s{
+struct fcgs_rnnid_req_s {
 	u32	rsvd:8;
 	u32	port_id:24;
 	wwn_t		node_name;
@@ -250,7 +252,7 @@ struct fcgs_rnnid_req_s{
 /**
  * RCS_ID
  */
-struct fcgs_rcsid_req_s{
+struct fcgs_rcsid_req_s {
 	u32	rsvd:8;
 	u32	port_id:24;
 	u32	cos;
@@ -259,7 +261,7 @@ struct fcgs_rcsid_req_s{
 /**
  * RPT_ID
  */
-struct fcgs_rptid_req_s{
+struct fcgs_rptid_req_s {
 	u32	rsvd:8;
 	u32	port_id:24;
 	u32	port_type:8;
@@ -269,7 +271,7 @@ struct fcgs_rptid_req_s{
 /**
  * GA_NXT Request
  */
-struct fcgs_ganxt_req_s{
+struct fcgs_ganxt_req_s {
 	u32	rsvd:8;
 	u32	port_id:24;
 };
@@ -277,7 +279,7 @@ struct fcgs_ganxt_req_s{
 /**
  * GA_NXT Response
  */
-struct fcgs_ganxt_rsp_s{
+struct fcgs_ganxt_rsp_s {
 	u32	port_type:8;	/* Port Type */
 	u32	port_id:24;	/* Port Identifier */
 	wwn_t		port_name;	/* Port Name */
@@ -321,7 +323,7 @@ enum {
 /*
 * Port Value : Could be a Port id or wwn
  */
-union fcgs_port_val_u{
+union fcgs_port_val_u {
 	u32	nport_id;
 	wwn_t		nport_wwn;
 };
@@ -355,7 +357,7 @@ enum {
 /*
  * Ftrace Request
  */
-struct fcgs_ftrace_req_s{
+struct fcgs_ftrace_req_s {
 	u32	revision;
 	u16	src_port_tag;	/* Source Port tag */
 	u16	src_port_len;	/* Source Port len */
@@ -372,7 +374,7 @@ struct fcgs_ftrace_req_s{
 /*
  * Path info structure
  */
-struct fcgs_ftrace_path_info_s{
+struct fcgs_ftrace_path_info_s {
 	wwn_t		switch_name;		/* Switch WWN */
 	u32	domain_id;
 	wwn_t		ingress_port_name;	/* Ingress ports wwn */
@@ -388,7 +390,7 @@ struct fcgs_ftrace_path_info_s{
 /*
  * Ftrace Acc Response
  */
-struct fcgs_ftrace_resp_s{
+struct fcgs_ftrace_resp_s {
 	u32	revision;
 	u32	token;
 	u8		vendor_id[8];		/* T10 Vendor Identifier */
@@ -409,7 +411,7 @@ struct fcgs_ftrace_resp_s{
 /*
  * FC Ping Request
  */
-struct fcgs_fcping_req_s{
+struct fcgs_fcping_req_s {
 	u32	revision;
 	u16	port_tag;
 	u16	port_len;	/* Port len */
@@ -420,7 +422,7 @@ struct fcgs_fcping_req_s{
 /*
  * FC Ping Response
  */
-struct fcgs_fcping_resp_s{
+struct fcgs_fcping_resp_s {
 	u32	token;
 };
 
@@ -435,26 +437,26 @@ enum {
  * ZS GZME request
  */
 #define ZS_GZME_ZNAMELEN	32
-struct zs_gzme_req_s{
+struct zs_gzme_req_s {
 	u8	znamelen;
 	u8	rsvd[3];
 	u8	zname[ZS_GZME_ZNAMELEN];
 };
 
-enum zs_mbr_type{
+enum zs_mbr_type {
 	ZS_MBR_TYPE_PWWN	= 1,
 	ZS_MBR_TYPE_DOMPORT	= 2,
 	ZS_MBR_TYPE_PORTID	= 3,
 	ZS_MBR_TYPE_NWWN	= 4,
 };
 
-struct zs_mbr_wwn_s{
+struct  zs_mbr_wwn_s {
 	u8	mbr_type;
 	u8	rsvd[3];
 	wwn_t	wwn;
 };
 
-struct zs_query_resp_s{
+struct zs_query_resp_s {
 	u32	nmbrs;	/*  number of zone members */
 	struct zs_mbr_wwn_s	mbr[1];
 };

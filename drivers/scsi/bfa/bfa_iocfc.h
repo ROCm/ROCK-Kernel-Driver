@@ -54,6 +54,7 @@ struct bfa_msix_s {
  */
 struct bfa_hwif_s {
 	void (*hw_reginit)(struct bfa_s *bfa);
+	void (*hw_reqq_ack)(struct bfa_s *bfa, int reqq);
 	void (*hw_rspq_ack)(struct bfa_s *bfa, int rspq);
 	void (*hw_msix_init)(struct bfa_s *bfa, int nvecs);
 	void (*hw_msix_install)(struct bfa_s *bfa);
@@ -69,8 +70,8 @@ struct bfa_iocfc_s {
 	struct bfa_iocfc_cfg_s 	cfg;
 	int			action;
 
-	u32        	req_cq_pi[BFI_IOC_MAX_CQS];
-	u32        	rsp_cq_ci[BFI_IOC_MAX_CQS];
+	u32		req_cq_pi[BFI_IOC_MAX_CQS];
+	u32		rsp_cq_ci[BFI_IOC_MAX_CQS];
 
 	struct bfa_cb_qe_s	init_hcb_qe;
 	struct bfa_cb_qe_s	stop_hcb_qe;
@@ -92,7 +93,7 @@ struct bfa_iocfc_s {
 	bfa_status_t		stats_status;	/*  stats/statsclr status */
 	bfa_boolean_t   	stats_busy;	/*  outstanding stats */
 	bfa_cb_ioc_t		stats_cbfn;	/*  driver callback function */
-	void           		*stats_cbarg;	/*  user callback arg */
+	void			*stats_cbarg;	/*  user callback arg */
 
 	struct bfa_dma_s   	req_cq_ba[BFI_IOC_MAX_CQS];
 	struct bfa_dma_s   	req_cq_shadow_ci[BFI_IOC_MAX_CQS];
@@ -102,20 +103,21 @@ struct bfa_iocfc_s {
 	struct bfa_hwif_s	hwif;
 
 	bfa_cb_iocfc_t		updateq_cbfn; /*  bios callback function */
-	void				*updateq_cbarg;	/*  bios callback arg */
+	void			*updateq_cbarg;	/*  bios callback arg */
 };
 
 #define bfa_lpuid(__bfa)		bfa_ioc_portid(&(__bfa)->ioc)
 #define bfa_msix_init(__bfa, __nvecs)	\
-	(__bfa)->iocfc.hwif.hw_msix_init(__bfa, __nvecs)
+	((__bfa)->iocfc.hwif.hw_msix_init(__bfa, __nvecs))
 #define bfa_msix_install(__bfa)	\
-	(__bfa)->iocfc.hwif.hw_msix_install(__bfa)
+	((__bfa)->iocfc.hwif.hw_msix_install(__bfa))
 #define bfa_msix_uninstall(__bfa)	\
-	(__bfa)->iocfc.hwif.hw_msix_uninstall(__bfa)
+	((__bfa)->iocfc.hwif.hw_msix_uninstall(__bfa))
 #define bfa_isr_mode_set(__bfa, __msix)	\
-	(__bfa)->iocfc.hwif.hw_isr_mode_set(__bfa, __msix)
+	((__bfa)->iocfc.hwif.hw_isr_mode_set(__bfa, __msix))
 #define bfa_msix_getvecs(__bfa, __vecmap, __nvecs, __maxvec)	\
-	(__bfa)->iocfc.hwif.hw_msix_getvecs(__bfa, __vecmap, __nvecs, __maxvec)
+	((__bfa)->iocfc.hwif.hw_msix_getvecs(__bfa, __vecmap,	\
+					__nvecs, __maxvec))
 
 /*
  * FC specific IOC functions.
@@ -134,8 +136,7 @@ void bfa_iocfc_set_snsbase(struct bfa_s *bfa, u64 snsbase_pa);
 bfa_boolean_t bfa_iocfc_is_operational(struct bfa_s *bfa);
 void bfa_iocfc_reset_queues(struct bfa_s *bfa);
 void bfa_iocfc_updateq(struct bfa_s *bfa, u32 reqq_ba, u32 rspq_ba,
-			u32 reqq_sci, u32 rspq_spi,
-			bfa_cb_iocfc_t cbfn, void *cbarg);
+	u32 reqq_sci, u32 rspq_spi, bfa_cb_iocfc_t cbfn, void *cbarg);
 
 void bfa_msix_all(struct bfa_s *bfa, int vec);
 void bfa_msix_reqq(struct bfa_s *bfa, int vec);
@@ -143,21 +144,23 @@ void bfa_msix_rspq(struct bfa_s *bfa, int vec);
 void bfa_msix_lpu_err(struct bfa_s *bfa, int vec);
 
 void bfa_hwcb_reginit(struct bfa_s *bfa);
+void bfa_hwcb_reqq_ack(struct bfa_s *bfa, int rspq);
 void bfa_hwcb_rspq_ack(struct bfa_s *bfa, int rspq);
 void bfa_hwcb_msix_init(struct bfa_s *bfa, int nvecs);
 void bfa_hwcb_msix_install(struct bfa_s *bfa);
 void bfa_hwcb_msix_uninstall(struct bfa_s *bfa);
 void bfa_hwcb_isr_mode_set(struct bfa_s *bfa, bfa_boolean_t msix);
-void bfa_hwcb_msix_getvecs(struct bfa_s *bfa, u32 *vecmap,
-			u32 *nvecs, u32 *maxvec);
+void bfa_hwcb_msix_getvecs(struct bfa_s *bfa, u32 *vecmap, u32 *nvecs,
+	u32 *maxvec);
 void bfa_hwct_reginit(struct bfa_s *bfa);
+void bfa_hwct_reqq_ack(struct bfa_s *bfa, int rspq);
 void bfa_hwct_rspq_ack(struct bfa_s *bfa, int rspq);
 void bfa_hwct_msix_init(struct bfa_s *bfa, int nvecs);
 void bfa_hwct_msix_install(struct bfa_s *bfa);
 void bfa_hwct_msix_uninstall(struct bfa_s *bfa);
 void bfa_hwct_isr_mode_set(struct bfa_s *bfa, bfa_boolean_t msix);
-void bfa_hwct_msix_getvecs(struct bfa_s *bfa, u32 *vecmap,
-			u32 *nvecs, u32 *maxvec);
+void bfa_hwct_msix_getvecs(struct bfa_s *bfa, u32 *vecmap, u32 *nvecs,
+	u32 *maxvec);
 
 void bfa_com_meminfo(bfa_boolean_t mincfg, u32 *dm_len);
 void bfa_com_attach(struct bfa_s *bfa, struct bfa_meminfo_s *mi,
@@ -165,4 +168,3 @@ void bfa_com_attach(struct bfa_s *bfa, struct bfa_meminfo_s *mi,
 void bfa_iocfc_get_bootwwns(struct bfa_s *bfa, u8 *nwwns, wwn_t **wwns);
 
 #endif /* __BFA_IOCFC_H__ */
-

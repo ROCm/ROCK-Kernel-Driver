@@ -36,19 +36,18 @@
  * FCS sub-modules
  */
 struct bfa_fcs_mod_s {
-	void            (*modinit) (struct bfa_fcs_s *fcs);
-	void            (*modexit) (struct bfa_fcs_s *fcs);
+	void		(*attach) (struct bfa_fcs_s *fcs);
+	void		(*modinit) (struct bfa_fcs_s *fcs);
+	void		(*modexit) (struct bfa_fcs_s *fcs);
 };
 
 #define BFA_FCS_MODULE(_mod) { _mod ## _modinit, _mod ## _modexit }
 
 static struct bfa_fcs_mod_s fcs_modules[] = {
-	BFA_FCS_MODULE(bfa_fcs_pport),
-	BFA_FCS_MODULE(bfa_fcs_uf),
-	BFA_FCS_MODULE(bfa_fcs_fabric),
-	BFA_FCS_MODULE(bfa_fcs_vport),
-	BFA_FCS_MODULE(bfa_fcs_rport),
-	BFA_FCS_MODULE(bfa_fcs_fcpim),
+	{ bfa_fcs_pport_attach, NULL, NULL },
+	{ bfa_fcs_uf_attach, NULL, NULL },
+	{ bfa_fcs_fabric_attach, bfa_fcs_fabric_modinit,
+	  bfa_fcs_fabric_modexit },
 };
 
 /**
@@ -58,7 +57,7 @@ static struct bfa_fcs_mod_s fcs_modules[] = {
 static void
 bfa_fcs_exit_comp(void *fcs_cbarg)
 {
-	struct bfa_fcs_s *fcs = fcs_cbarg;
+	struct bfa_fcs_s      *fcs = fcs_cbarg;
 	struct bfad_s *bfad = fcs->bfad;
 
 	complete(&bfad->comp);
@@ -71,19 +70,13 @@ bfa_fcs_exit_comp(void *fcs_cbarg)
  */
 
 /**
- * 		FCS instance initialization.
- *
- * 	param[in]		fcs		FCS instance
- * 	param[in]		bfa		BFA instance
- * 	param[in]		bfad		BFA driver instance
- *
- * 	return None
+ * fcs attach -- called once to initialize data structures at driver attach time
  */
 void
-bfa_fcs_init(struct bfa_fcs_s *fcs, struct bfa_s *bfa, struct bfad_s *bfad,
-			bfa_boolean_t min_cfg)
+bfa_fcs_attach(struct bfa_fcs_s *fcs, struct bfa_s *bfa, struct bfad_s *bfad,
+	       bfa_boolean_t min_cfg)
 {
-	int             i;
+	int		i;
 	struct bfa_fcs_mod_s  *mod;
 
 	fcs->bfa = bfa;
@@ -95,7 +88,24 @@ bfa_fcs_init(struct bfa_fcs_s *fcs, struct bfa_s *bfa, struct bfad_s *bfad,
 
 	for (i = 0; i < sizeof(fcs_modules) / sizeof(fcs_modules[0]); i++) {
 		mod = &fcs_modules[i];
-		mod->modinit(fcs);
+		if (mod->attach)
+			mod->attach(fcs);
+	}
+}
+
+/**
+ * fcs initialization, called once after bfa initialization is complete
+ */
+void
+bfa_fcs_init(struct bfa_fcs_s *fcs)
+{
+	int		i;
+	struct bfa_fcs_mod_s  *mod;
+
+	for (i = 0; i < sizeof(fcs_modules) / sizeof(fcs_modules[0]); i++) {
+		mod = &fcs_modules[i];
+		if (mod->modinit)
+			mod->modinit(fcs);
 	}
 }
 
@@ -109,16 +119,17 @@ bfa_fcs_start(struct bfa_fcs_s *fcs)
 }
 
 /**
- * 		FCS driver details initialization.
+ *	brief
+ *		FCS driver details initialization.
  *
- * 	param[in]		fcs		FCS instance
- * 	param[in]		driver_info	Driver Details
+ *	param[in]		fcs		FCS instance
+ *	param[in]		driver_info	Driver Details
  *
- * 	return None
+ *	return None
  */
 void
 bfa_fcs_driver_info_init(struct bfa_fcs_s *fcs,
-			struct bfa_fcs_driver_info_s *driver_info)
+				struct bfa_fcs_driver_info_s *driver_info)
 {
 
 	fcs->driver_info = *driver_info;
@@ -127,26 +138,45 @@ bfa_fcs_driver_info_init(struct bfa_fcs_s *fcs,
 }
 
 /**
- * 		FCS instance cleanup and exit.
+ *	brief
+ *		FCS FDMI Driver Parameter Initialization
  *
- * 	param[in]		fcs			FCS instance
- * 	return None
+ *	param[in]		fcs		FCS instance
+ *	param[in]		fdmi_enable	TRUE/FALSE
+ *
+ *	return None
+ */
+void
+bfa_fcs_set_fdmi_param(struct bfa_fcs_s *fcs, bfa_boolean_t fdmi_enable)
+{
+
+	fcs->fdmi_enabled = fdmi_enable;
+
+}
+/**
+ *	brief
+ *		FCS instance cleanup and exit.
+ *
+ *	param[in]		fcs			FCS instance
+ *	return None
  */
 void
 bfa_fcs_exit(struct bfa_fcs_s *fcs)
 {
 	struct bfa_fcs_mod_s  *mod;
-	int             nmods, i;
+	int		nmods, i;
 
 	bfa_wc_init(&fcs->wc, bfa_fcs_exit_comp, fcs);
 
 	nmods = sizeof(fcs_modules) / sizeof(fcs_modules[0]);
 
 	for (i = 0; i < nmods; i++) {
-		bfa_wc_up(&fcs->wc);
 
 		mod = &fcs_modules[i];
-		mod->modexit(fcs);
+		if (mod->modexit) {
+			bfa_wc_up(&fcs->wc);
+			mod->modexit(fcs);
+		}
 	}
 
 	bfa_wc_wait(&fcs->wc);

@@ -40,26 +40,21 @@ enum bfa_vf_state {
  * VF statistics
  */
 struct bfa_vf_stats_s {
-	u32        flogi_sent;	/*  Num FLOGIs sent 		*/
-	u32        flogi_rsp_err;	/*  FLOGI response errors 	*/
-	u32        flogi_acc_err;	/*  FLOGI accept errors 	*/
-	u32        flogi_accepts;	/*  FLOGI accepts received 	*/
-	u32        flogi_rejects;	/*  FLOGI rejects received 	*/
+	u32        flogi_sent;	/*  Num FLOGIs sent */
+	u32        flogi_rsp_err;	/*  FLOGI response errors */
+	u32        flogi_acc_err;	/*  FLOGI accept errors */
+	u32        flogi_accepts;	/*  FLOGI accepts received */
+	u32        flogi_rejects;	/*  FLOGI rejects received */
 	u32        flogi_unknown_rsp; /*  Unknown responses for FLOGI */
-	u32        flogi_alloc_wait; /*  Allocation waits prior to
-					   * sending FLOGI
-					   */
+	u32        flogi_alloc_wait;  /*  Allocation wait
+					    * prior to sending FLOGI */
 	u32        flogi_rcvd;	/*  FLOGIs received */
 	u32        flogi_rejected;	/*  Incoming FLOGIs rejected */
-	u32        fabric_onlines;	/*  Internal fabric online
-					 * notification sent to other
-					 * modules
-					 */
-	u32        fabric_offlines; /*  Internal fabric offline
-					  * notification sent to other
-					  * modules
-					  */
-	u32        resvd;
+	u32        fabric_onlines;	/*  Internal fabric online notification
+					 * sent to other modules */
+	u32        fabric_offlines; /*  Internal fabric offline notification
+					 * sent to other modules */
+	u32        resvd; /*  padding for 64 bit alignment */
 };
 
 /**

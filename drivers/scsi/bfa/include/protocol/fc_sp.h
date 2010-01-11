@@ -22,7 +22,7 @@
 
 #pragma pack(1)
 
-enum auth_els_flags{
+enum auth_els_flags {
 	FC_AUTH_ELS_MORE_FRAGS_FLAG 	= 0x80,	/*! bit-7. More Fragments
 						 * Follow
 						 */
@@ -30,7 +30,7 @@ enum auth_els_flags{
 	FC_AUTH_ELS_SEQ_NUM_FLAG 	= 0x01 	/*! bit-0. Sequence Number */
 };
 
-enum auth_msg_codes{
+enum auth_msg_codes {
 	FC_AUTH_MC_AUTH_RJT		= 0x0A,	/*! Auth Reject */
 	FC_AUTH_MC_AUTH_NEG 		= 0x0B, /*! Auth Negotiate */
 	FC_AUTH_MC_AUTH_DONE 		= 0x0C, /*! Auth Done */
@@ -53,7 +53,7 @@ enum auth_msg_codes{
 	FC_AUTH_MC_IKE_INFO 		= 0x25, /*! IKE informational */
 };
 
-enum auth_proto_version{
+enum auth_proto_version {
 	FC_AUTH_PROTO_VER_1 	= 1,	/*! Protocol Version 1 */
 };
 
@@ -77,7 +77,7 @@ enum {
 	FC_START_TXN_ID         = 2,	/*! Starting transaction ID */
 };
 
-enum auth_proto_id{
+enum auth_proto_id {
 	FC_AUTH_PROTO_DHCHAP		= 0x00000001,
 	FC_AUTH_PROTO_FCAP 		= 0x00000002,
 	FC_AUTH_PROTO_FCPAP 		= 0x00000003,
@@ -85,20 +85,19 @@ enum auth_proto_id{
 	FC_AUTH_PROTO_IKEv2_AUTH 	= 0x00000005,
 };
 
-struct auth_name_s{
+struct auth_name_s {
 	u16	name_tag;	/*! Name Tag = 1 for Authentication */
 	u16	name_len;	/*! Name Length = 8 for Authentication
 					 */
 	wwn_t		name;  		/*! Name. TODO - is this PWWN */
 };
 
-
-enum auth_hash_func{
+enum auth_hash_func {
 	FC_AUTH_HASH_FUNC_MD5 		= 0x00000005,
 	FC_AUTH_HASH_FUNC_SHA_1 	= 0x00000006,
 };
 
-enum auth_dh_gid{
+enum auth_dh_gid {
 	FC_AUTH_DH_GID_0_DHG_NULL	= 0x00000000,
 	FC_AUTH_DH_GID_1_DHG_1024	= 0x00000001,
 	FC_AUTH_DH_GID_2_DHG_1280	= 0x00000002,
@@ -127,7 +126,6 @@ enum auth_neg_param_tags {
 	FC_AUTH_NEG_DHCHAP_DHG_ID_LIST 	= 0x0002,
 };
 
-
 struct dhchap_param_format_s {
 	u16	tag;		/*! Parameter Tag. See
 					 * auth_neg_param_tags_t
@@ -148,11 +146,11 @@ struct auth_proto_params_s {
 };
 
 struct auth_neg_msg_s {
-	struct auth_name_s	auth_ini_name;
+	struct auth_name_s		auth_ini_name;
 	u32		usable_auth_protos;
-	struct auth_proto_params_s proto_params[1]; /*! (1..usable_auth_proto)
-						     * protocol params
-						     */
+	struct auth_proto_params_s proto_params[1];/*! (1..usable_auth_proto)
+						    * protocol params
+						    */
 };
 
 struct auth_dh_val_s {
@@ -173,7 +171,6 @@ struct auth_dhchap_chal_msg_s {
 	/* ...followed by variable Challenge length/value and DH length/value */
 };
 
-
 enum auth_rjt_codes {
 	FC_AUTH_RJT_CODE_AUTH_FAILURE 	= 0x01,
 	FC_AUTH_RJT_CODE_LOGICAL_ERR	= 0x02,
@@ -184,7 +181,7 @@ enum auth_rjt_code_exps {
 	FC_AUTH_CEXP_DH_GROUP_NOT_USABLE 	= 0x02,
 	FC_AUTH_CEXP_HASH_FUNC_NOT_USABLE 	= 0x03,
 	FC_AUTH_CEXP_AUTH_XACT_STARTED		= 0x04,
-	FC_AUTH_CEXP_AUTH_FAILED 		= 0x05,
+	FC_AUTH_CEXP_AUTH_FAILED 			= 0x05,
 	FC_AUTH_CEXP_INCORRECT_PLD 		= 0x06,
 	FC_AUTH_CEXP_INCORRECT_PROTO_MSG 	= 0x07,
 	FC_AUTH_CEXP_RESTART_AUTH_PROTO 	= 0x08,

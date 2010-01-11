@@ -63,7 +63,7 @@ bfa_fcs_port_n2n_online(struct bfa_fcs_port_s *port)
 		 * First, check if we know the device by pwwn.
 		 */
 		rport = bfa_fcs_port_get_rport_by_pwwn(port,
-						       n2n_port->rem_port_wwn);
+							n2n_port->rem_port_wwn);
 		if (rport) {
 			bfa_trc(port->fcs, rport->pid);
 			bfa_trc(port->fcs, rport->pwwn);
@@ -73,8 +73,8 @@ bfa_fcs_port_n2n_online(struct bfa_fcs_port_s *port)
 		}
 
 		/*
-		 * In n2n there can be only one rport. Delete the old one whose
-		 * pid should be zero, because it is offline.
+		 * In n2n there can be only one rport. Delete the old one
+		 * whose pid should be zero, because it is offline.
 		 */
 		if (port->num_rports > 0) {
 			rport = bfa_fcs_port_get_rport_by_pid(port, 0);
