@@ -540,8 +540,6 @@ void xen_l4_entry_update(pgd_t *ptr, pgd_t val)
 	u[0].val = __pgd_val(val);
 	if (((unsigned long)ptr & ~PAGE_MASK)
 	    <= pgd_index(TASK_SIZE_MAX) * sizeof(*ptr)) {
-		if (!pgd_none(val))
-			u[0].val |= _PAGE_NX & __supported_pte_mask;
 		ptr = __user_pgd(ptr);
 		BUG_ON(!ptr);
 		u[1].ptr = virt_to_machine(ptr);
