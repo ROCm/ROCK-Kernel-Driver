@@ -9,6 +9,7 @@
 #include "ql4_glbl.h"
 #include "ql4_dbg.h"
 #include "ql4_inline.h"
+#include <scsi/iscsi_proto.h>
 
 /**
  * qla4xxx_copy_sense - copy sense data	into cmd sense buffer
@@ -97,7 +98,7 @@ qla4xxx_status_cont_entry(struct scsi_qla_host *ha,
 
 	/* Place command on done queue. */
 	if (srb->req_sense_len == 0) {
-		qla4xxx_srb_compl(ha, srb);
+		sp_put(ha, srb);
 		ha->status_srb = NULL;
 	}
 }
@@ -329,7 +330,7 @@ status_entry_exit:
 	/* complete the request, if not waiting for status_continuation pkt */
 	srb->cc_stat = sts_entry->completionStatus;
 	if (ha->status_srb == NULL)
-		qla4xxx_srb_compl(ha, srb);
+		sp_put(ha, srb);
 }
 
 /**
@@ -344,6 +345,9 @@ static void qla4xxx_process_response_queue(struct scsi_qla_host * ha)
 	uint32_t count = 0;
 	struct srb *srb = NULL;
 	struct status_entry *sts_entry;
+	struct async_pdu_iocb *apdu;
+	struct iscsi_hdr *pdu_hdr;
+	struct async_msg_pdu_iocb *apdu_iocb;
 
 	/* Process all responses from response queue */
 	while ((ha->response_in =
@@ -371,6 +375,34 @@ static void qla4xxx_process_response_queue(struct scsi_qla_host * ha)
 		case ET_PASSTHRU_STATUS:
 			break;
 
+		case ET_ASYNC_PDU:
+			apdu = (struct async_pdu_iocb *)sts_entry;
+			if (apdu->status != ASYNC_PDU_IOCB_STS_OK)
+				break;
+
+			pdu_hdr = (struct iscsi_hdr *)apdu->iscsi_pdu_hdr;
+			if (pdu_hdr->hlength || pdu_hdr->dlength[0] ||
+				pdu_hdr->dlength[1] || pdu_hdr->dlength[2]){
+				apdu_iocb = kmalloc(sizeof(struct async_msg_pdu_iocb),
+							GFP_ATOMIC);
+				if (apdu_iocb) {
+					memcpy(apdu_iocb->iocb, apdu,
+						sizeof(struct async_pdu_iocb));
+					list_add_tail(&apdu_iocb->list,
+							&ha->async_iocb_list);
+					DEBUG2(printk("scsi%ld:"
+						"%s: schedule async msg pdu\n",
+						ha->host_no, __func__));
+					set_bit(DPC_ASYNC_MSG_PDU,
+							&ha->dpc_flags);
+				} else {
+					DEBUG2(printk("scsi%ld:"
+							"%s: unable to alloc ASYNC PDU\n",
+							ha->host_no, __func__));
+				}
+			}
+			break;
+
 		case ET_STATUS_CONTINUATION:
 			qla4xxx_status_cont_entry(ha,
 				(struct status_cont_entry *) sts_entry);
@@ -393,7 +425,7 @@ static void qla4xxx_process_response_queue(struct scsi_qla_host * ha)
 			/* ETRY normally by sending it back with
 			 * DID_BUS_BUSY */
 			srb->cmd->result = DID_BUS_BUSY << 16;
-			qla4xxx_srb_compl(ha, srb);
+			sp_put(ha, srb);
 			break;
 
 		case ET_CONTINUE:
@@ -498,15 +530,20 @@ static void qla4xxx_isr_decode_mailbox(struct scsi_qla_host * ha,
 			break;
 
 		case MBOX_ASTS_LINK_UP:
-			DEBUG2(printk("scsi%ld: AEN %04x Adapter LINK UP\n",
-				      ha->host_no, mbox_status));
 			set_bit(AF_LINK_UP, &ha->flags);
+			if (test_bit(AF_INIT_DONE, &ha->flags))
+				set_bit(DPC_LINK_CHANGED, &ha->dpc_flags);
+
+			DEBUG2(printk("scsi%ld: AEN %04x Adapter LINK UP\n",
+					ha->host_no, mbox_status));
 			break;
 
 		case MBOX_ASTS_LINK_DOWN:
-			DEBUG2(printk("scsi%ld: AEN %04x Adapter LINK DOWN\n",
-				      ha->host_no, mbox_status));
 			clear_bit(AF_LINK_UP, &ha->flags);
+			set_bit(DPC_LINK_CHANGED, &ha->dpc_flags);
+
+			DEBUG2(printk("scsi%ld: AEN %04x Adapter LINK DOWN\n",
+                                      ha->host_no, mbox_status));
 			break;
 
 		case MBOX_ASTS_HEARTBEAT:
@@ -831,7 +868,7 @@ void qla4xxx_process_aen(struct scsi_qla_host * ha, uint8_t process_aen)
 				qla4xxx_reinitialize_ddb_list(ha);
 			} else if (mbox_sts[1] == 1) {	/* Specific device. */
 				qla4xxx_process_ddb_changed(ha, mbox_sts[2],
-							    mbox_sts[3]);
+							    mbox_sts[3], mbox_sts[4]);
 			}
 			break;
 		}
