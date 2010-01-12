@@ -20,7 +20,7 @@
 /*
  * Driver version
  */
-static char qla4xxx_version_str[40];
+char qla4xxx_version_str[40];
 EXPORT_SYMBOL_GPL(qla4xxx_version_str);
 
 /*
