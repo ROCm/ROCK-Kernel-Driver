@@ -1018,7 +1018,11 @@ extern int blk_verify_command(unsigned char *cmd, fmode_t has_write_perm);
 #define MAX_PHYS_SEGMENTS 128
 #define MAX_HW_SEGMENTS 128
 #define SAFE_MAX_SECTORS 255
+#ifndef CONFIG_KERNEL_DESKTOP
+#define BLK_DEF_MAX_SECTORS 2048
+#else
 #define BLK_DEF_MAX_SECTORS 1024
+#endif
 
 #define MAX_SEGMENT_SIZE	65536
 
