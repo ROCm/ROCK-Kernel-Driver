@@ -240,7 +240,7 @@ static int dec_checkmarker(void)
 	return 0;
 }
 
-int jpeg_check_size(unsigned char *buf, int width, int height)
+void jpeg_get_size(unsigned char *buf, int *width, int *height)
 {
 	datap = buf;
 	getbyte();
@@ -248,9 +248,8 @@ int jpeg_check_size(unsigned char *buf, int width, int height)
 	readtables(M_SOF0);
 	getword();
 	getbyte();
-        if (height != getword() || width != getword())
-		return 0;
-        return 1;
+        *height = getword();
+	*width = getword();
 }
 
 int jpeg_decode(buf, pic, width, height, depth, decdata)
@@ -889,9 +888,9 @@ PREC q[][64];
 #define PIC_32(yin, xin, p, xout)		\
 (						\
   y = outy[(yin) * 8 + xin],			\
-  STORECLAMP(p[(xout) * 4 + 0], y + cr),	\
+  STORECLAMP(p[(xout) * 4 + 0], y + cb),	\
   STORECLAMP(p[(xout) * 4 + 1], y - cg),	\
-  STORECLAMP(p[(xout) * 4 + 2], y + cb),	\
+  STORECLAMP(p[(xout) * 4 + 2], y + cr),	\
   p[(xout) * 4 + 3] = 0				\
 )
 

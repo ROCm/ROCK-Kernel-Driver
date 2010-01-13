@@ -34,8 +34,10 @@ struct splash_data {
     int splash_height;			/* height of image */
     int splash_text_xo;			/* text area origin */
     int splash_text_yo;
-    int splash_text_wi;			/* text area size */
+    int splash_text_wi;			/* text area size used*/
     int splash_text_he;
+    int splash_jpg_text_wi;		/* text area size of jpeg*/
+    int splash_jpg_text_he;
     int splash_showtext;		/* silent/verbose mode */
     int splash_boxcount;
     int splash_percent;
@@ -45,11 +47,19 @@ struct splash_data {
     unsigned char *splash_boxes;
     unsigned char *splash_jpeg;		/* jpeg */
     unsigned char *splash_palette;	/* palette for 8-bit */
+    int splash_boxes_xoff;
+    int splash_boxes_yoff;
 
     int splash_dosilent;		/* show silent jpeg */
     unsigned char *splash_silentjpeg;
     unsigned char *splash_sboxes;
     int splash_sboxcount;
+    struct splash_data *next;
+    int splash_sboxes_xoff;
+    int splash_sboxes_yoff;
+    int splash_pic_stride;
+    unsigned char *splash_pic;
+    int splash_pic_size;
 };
 #endif
 

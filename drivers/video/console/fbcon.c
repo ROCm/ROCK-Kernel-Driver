@@ -2185,7 +2185,16 @@ static int fbcon_switch(struct vc_data *vc)
 	ops = info->fbcon_par;
 
 #ifdef CONFIG_BOOTSPLASH
-	splash_prepare(vc, info);
+	{
+		struct splash_data *prev_sd = vc->vc_splash_data;
+		splash_prepare(vc, info);
+		if (vc->vc_splash_data && vc->vc_splash_data->splash_state &&
+		    vc->vc_splash_data != prev_sd) {
+			vc_resize(vc, vc->vc_splash_data->splash_text_wi / vc->vc_font.width,
+				  vc->vc_splash_data->splash_text_he / vc->vc_font.height);
+			con_remap_def_color(vc, vc->vc_splash_data->splash_color << 4 | vc->vc_splash_data->splash_fg_color);
+		}
+	}
 #endif
 
 	if (softback_top) {

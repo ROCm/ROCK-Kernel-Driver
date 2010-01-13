@@ -6,6 +6,7 @@
  * 		    Stefan Reinauer, <stepan@suse.de>,
  * 		    Steffen Winterfeldt, <snwint@suse.de>,
  *                  Michael Schroeder <mls@suse.de>
+            2009    Egbert Eich <eich@suse.de>
  *
  *        Ideas & SuSE screen work by Ken Wimer, <wimer@suse.de>
  *
@@ -55,7 +56,8 @@ static unsigned char *jpg_errors[] = {
 	"wrong marker",
 	"no EOI",
 	"bad tables",
-	"depth mismatch"
+	"depth mismatch",
+	"scale error"
 };
 
 static struct jpeg_decdata *decdata = 0; /* private decoder data */
@@ -64,7 +66,9 @@ static int splash_registered = 0;
 static int splash_usesilent = 0;	/* shall we display the silentjpeg? */
 int splash_default = 0xf01;
 
-static int splash_check_jpeg(unsigned char *jpeg, int width, int height, int depth);
+static int jpeg_get(unsigned char *buf, unsigned char *pic, int width, int height, int depth,
+		    struct jpeg_decdata *decdata);
+static int splash_look_for_jpeg(struct vc_data *vc, int width, int height);
 
 static int __init splash_setup(char *options)
 {
@@ -120,7 +124,8 @@ static int boxextract(unsigned char *buf, unsigned short *dp, unsigned char *col
     return 12;
 }
 
-static void boxit(unsigned char *pic, int bytes, unsigned char *buf, int num, int percent, int overpaint, int octpp)
+static void boxit(unsigned char *pic, int bytes, unsigned char *buf, int num,
+		  int percent, int xoff, int yoff, int overpaint, int octpp)
 {
     int x, y, p, doblend, r, g, b, a, add;
     unsigned int i = 0;
@@ -245,7 +250,7 @@ static void boxit(unsigned char *pic, int bytes, unsigned char *buf, int num, in
 	    }
 	    add = (xs & 1);
 	    add ^= (add ^ y) & 1 ? 1 : 3;		/* 2x2 ordered dithering */
-	    picp.ub = (pic + xs * octpp + y * bytes);
+	    picp.ub = (pic + (xs + xoff) * octpp + (y + yoff) * bytes);
 	    for (x = xs; x <= xe; x++) {
 		if (!(sti & 0x80000000)) {
 		    sti <<= 1;
@@ -310,12 +315,159 @@ static void boxit(unsigned char *pic, int bytes, unsigned char *buf, int num, in
     }
 }
 
+static void box_offsets(unsigned char *buf, int num,
+			int screen_w, int screen_h, int pic_w, int pic_h,
+			int *x_off, int *y_off)
+{
+    int a, doblend;
+    int x_min = pic_w, x_max = 0;
+    int y_min = pic_h, y_max = 0;
+    unsigned int i = 0;
+    unsigned short data1[4];
+    unsigned char cols1[16];
+    unsigned short data2[4];
+    unsigned char cols2[16];
+    unsigned char *bufend;
+    unsigned int stin, stinn, stixs, stixe, stiys, stiye;
+    int xs, xe, ys, ye;
+
+    SPLASH_DEBUG();
+
+    if ((screen_w == pic_w && screen_h == pic_h) || num == 0)
+	*x_off = *y_off = 0;
+
+    bufend = buf + num * 12;
+    stin = 1;
+    stinn = 0;
+    stixs = stixe = 0;
+    stiys = stiye = 0;
+
+    while(buf < bufend) {
+	doblend = 0;
+	buf += boxextract(buf, data1, cols1, &doblend);
+	if (data1[0] == 32767 && data1[1] == 32767) {
+	    /* box stipple */
+	    if (stinn == 32)
+		continue;
+	    if (stinn == 0) {
+		stixs = data1[2];
+		stixe = data1[3];
+		stiys = stiye = 0;
+	    } else if (stinn == 4) {
+		stiys = data1[2];
+		stiye = data1[3];
+	    }
+	    stin = stinn;
+	    continue;
+	}
+	stinn = 0;
+	if (data1[0] > 32767)
+	    buf += boxextract(buf, data2, cols2, &doblend);
+	if (data1[0] == 32767 && data1[1] == 32766) {
+	    /* box copy */
+	    i = 12 * (short)data1[3];
+	    doblend = 0;
+	    i += boxextract(buf + i, data1, cols1, &doblend);
+	    if (data1[0] > 32767)
+		boxextract(buf + i, data2, cols2, &doblend);
+	}
+	if (data1[0] == 32767)
+	    continue;
+	if (data1[2] > 32767) {
+	    data1[2] = ~data1[2];
+	}
+	if (data1[3] > 32767) {
+	    data1[3] = ~data1[3];
+	}
+	if (data1[0] > 32767) {
+	    data1[0] = ~data1[0];
+	    for (i = 0; i < 4; i++)
+		data1[i] = (data1[i] * (65536 - 1) + data2[i] * 1) >> 16;
+	}
+	*(unsigned int *)cols2 = *(unsigned int *)cols1;
+	a = cols2[3];
+	if (a == 0 && !doblend)
+	    continue;
+
+	if (stixs >= 32768) {
+	    xs = (stixs ^ 65535) + data1[0];
+	    xe = stixe ? stixe + data1[0] : data1[2];
+	} else if (stixe >= 32768) {
+	    xs = stixs ? data1[2] - stixs : data1[0];
+	    xe = data1[2] - (stixe ^ 65535);
+	} else {
+	    xs = stixs;
+	    xe = stixe ? stixe : data1[2];
+	}
+	if (stiys >= 32768) {
+	    ys = (stiys ^ 65535) + data1[1];
+	    ye = stiye ? stiye + data1[1] : data1[3];
+	} else if (stiye >= 32768) {
+	    ys = stiys ? data1[3] - stiys : data1[1];
+	    ye = data1[3] - (stiye ^ 65535);
+	} else {
+	    ys = stiys;
+	    ye = stiye ? stiye : data1[3];
+	}
+	if (xs < data1[0])
+	    xs = data1[0];
+	if (xe > data1[2])
+	    xe = data1[2];
+	if (ys < data1[1])
+	    ys = data1[1];
+	if (ye > data1[3])
+	    ye = data1[3];
+
+	if (xs < x_min)
+	    x_min = xs;
+	if (xe > x_max)
+	    x_max = xe;
+	if (ys < y_min)
+	    y_min = ys;
+	if (ye > y_max)
+	    y_max = ye;
+    }
+    {
+	int x_center = (x_min + x_max) / 2;
+	int y_center = (y_min + y_max) / 2;
+
+	if (screen_w == pic_w)
+	    *x_off = 0;
+	else {
+	    if (x_center < (pic_w + pic_w / 10) >> 1 && x_center > (pic_w - pic_w / 10) >> 1)
+		*x_off = (screen_w - pic_w) >> 1;
+	    else {
+		int x = x_center * screen_w / pic_w;
+		*x_off = x - x_center;
+		if (x_min + x_off > 0)
+		*x_off = 0;
+	    if (x_max + *x_off > screen_w)
+		*x_off = screen_w - pic_w;
+	    }
+	}
+	if (screen_h == pic_h)
+	    *y_off = 0;
+	else {
+	    if (y_center < (pic_h + pic_h / 10) >> 1 && y_center > (pic_h - pic_h / 10) >> 1)
+		*y_off = (screen_h - pic_h) >> 1;
+	    else {
+		int x = y_center * screen_h / pic_h;
+		*y_off = x - y_center;
+		if (y_min + y_off > 0)
+		    *y_off = 0;
+		if (y_max + *x_off > screen_h)
+		    *y_off = screen_h - pic_h;
+	    }
+	}
+    }
+}
+
 static int splash_check_jpeg(unsigned char *jpeg, int width, int height, int depth)
 {
     int size, err;
     unsigned char *mem;
 
-    size = ((width + 15) & ~15) * ((height + 15) & ~15) * (depth >> 3);
+    size = ((width + 15) & ~15) * ((height + 15) & ~15) * ((depth + 1) >> 3);
     mem = vmalloc(size);
     if (!mem) {
 	printk(KERN_INFO "bootsplash: no memory for decoded picture.\n");
@@ -331,12 +483,15 @@ static int splash_check_jpeg(unsigned char *jpeg, int width, int height, int dep
 
 static void splash_free(struct vc_data *vc, struct fb_info *info)
 {
+	struct splash_data *sd;
+	struct splash_data *next;
 	SPLASH_DEBUG();
-	if (!vc->vc_splash_data)
-		return;
-	if (vc->vc_splash_data->splash_silentjpeg)
-		vfree(vc->vc_splash_data->splash_sboxes);
-	vfree(vc->vc_splash_data);
+	for (sd = vc->vc_splash_data; sd; sd = next) {
+		next = sd->next;
+		vfree(sd->splash_sboxes);
+		vfree(sd->splash_pic);
+		vfree(sd);
+	}
 	vc->vc_splash_data = 0;
 	info->splash_data = 0;
 }
@@ -418,6 +573,48 @@ static inline int splash_geti(unsigned char *pos, int off)
            pos[off] | pos[off + 1] << 8 | pos[off + 2] << 16 | pos[off + 3] << 24;
 }
 
+/* move the given splash_data to the current one */
+static void splash_pivot_current(struct vc_data *vc, struct splash_data *new)
+{
+	struct splash_data *sd;
+	int state, percent, silent;
+
+	sd = vc->vc_splash_data;
+	if (!sd || sd == new)
+		return;
+	state = sd->splash_state;
+	percent = sd->splash_percent;
+	silent = sd->splash_dosilent;
+	vfree(sd->splash_pic);
+	sd->splash_pic_size = 0;
+	sd->splash_pic = NULL;
+	sd->splash_text_wi = sd->splash_jpg_text_wi;
+	sd->splash_text_he = sd->splash_jpg_text_he;
+	for (; sd->next; sd = sd->next) {
+		if (sd->next == new) {
+			sd->next = new->next;
+			new->next = vc->vc_splash_data;
+			vc->vc_splash_data = new;
+			/* copy the current states */
+			new->splash_state = state;
+			new->splash_percent = percent;
+			new->splash_dosilent = silent;
+			new->splash_text_wi = new->splash_jpg_text_wi;
+			new->splash_text_he = new->splash_jpg_text_he;
+
+			vfree(new->splash_pic);
+			new->splash_pic = NULL;
+			new->splash_pic_size = 0;
+
+			new->splash_boxes_xoff = 0;
+			new->splash_boxes_yoff = 0;
+			new->splash_sboxes_xoff = 0;
+			new->splash_sboxes_yoff = 0;
+			return;
+		}
+	}
+}
+
 static int splash_getraw(unsigned char *start, unsigned char *end, int *update)
 {
     unsigned char *ndata;
@@ -431,9 +628,11 @@ static int splash_getraw(unsigned char *start, unsigned char *end, int *update)
     int palcnt;
     int i, len;
     const int *offsets;
-    struct vc_data *vc;
+    struct vc_data *vc = NULL;
     struct fb_info *info;
     struct splash_data *sd;
+    struct splash_data *splash_found = NULL;
+    int unit_found = -1;
     int oldpercent, oldsilent;
 
     if (update)
@@ -442,6 +641,8 @@ static int splash_getraw(unsigned char *start, unsigned char *end, int *update)
     if (!update || start[7] < '2' || start[7] > '3' || splash_geti(start, 12) != (int)0xffffffff)
 	printk(KERN_INFO "bootsplash %s: looking for picture...\n", SPLASH_VERSION);
 
+    oldpercent = -1;
+    oldsilent = -1;
     for (ndata = start; ndata < end; ndata++) {
 	if (ndata[0] != 'B' || ndata[1] != 'O' || ndata[2] != 'O' || ndata[3] != 'T')
 	    continue;
@@ -457,7 +658,16 @@ static int splash_getraw(unsigned char *start, unsigned char *end, int *update)
 		vc_allocate(unit);
 	}
 	vc = vc_cons[unit].d;
+	if (!vc)
+		continue;
+
 	info = registered_fb[(int)con2fb_map[unit]];
+
+	if (info->fbops->fb_imageblit != cfb_imageblit) {
+	    splash_free(vc, info);
+	    printk(KERN_ERR "bootsplash: found, but framebuffer can't handle it!\n");
+	    return -1;
+	}
 	width = info->var.xres;
 	height = info->var.yres;
 	splash_size = splash_geti(ndata, SPLASH_OFF_SIZE);
@@ -507,6 +717,9 @@ static int splash_getraw(unsigned char *start, unsigned char *end, int *update)
 		}
 		if (update)
 		    *update = up;
+		vfree(sd->splash_pic);
+		sd->splash_pic = NULL;
+		sd->splash_pic_size = 0;
 	    }
 	    return unit;
 	}
@@ -522,12 +735,6 @@ static int splash_getraw(unsigned char *start, unsigned char *end, int *update)
 	    printk(KERN_ERR "bootsplash: ...found, but truncated!\n");
 	    return -1;
 	}
-	if (!jpeg_check_size(ndata + len + boxcnt * 12 + palcnt, width, height)) {
-	    ndata += len + splash_size - 1;
-	    continue;
-	}
-	if (splash_check_jpeg(ndata + len + boxcnt * 12 + palcnt, width, height, info->var.bits_per_pixel))
-	    return -1;
 	silentsize = splash_geti(ndata, SPLASH_OFF_SSIZE);
 	if (silentsize)
 	    printk(KERN_INFO "bootsplash: silentjpeg size %d bytes\n", silentsize);
@@ -543,32 +750,27 @@ static int splash_getraw(unsigned char *start, unsigned char *end, int *update)
 	    silentsize = 0;
 	}
 	sboxcnt = splash_gets(ndata, SPLASH_OFF_SBOXCNT);
-	if (silentsize) {
-	    unsigned char *simage = ndata + len + splash_size + 12 * sboxcnt;
-	    if (!jpeg_check_size(simage, width, height) ||
-		splash_check_jpeg(simage, width, height, info->var.bits_per_pixel)) {
-		    printk(KERN_WARNING "bootsplash: error in silent jpeg.\n");
-		    silentsize = 0;
-		}
-	}
-	oldpercent = -1;
-	oldsilent = -1;
 	if (vc->vc_splash_data) {
 	    oldpercent = vc->vc_splash_data->splash_percent;
 	    oldsilent = vc->vc_splash_data->splash_dosilent;
-	    splash_free(vc, info);
 	}
-	vc->vc_splash_data = sd = vmalloc(sizeof(*sd) + splash_size + (version < 3 ? 2 * 12 : 0));
+	sd = vmalloc(sizeof(*sd) + splash_size + (version < 3 ? 2 * 12 : 0));
 	if (!sd)
 	    break;
-	sd->splash_silentjpeg = 0;
-	sd->splash_sboxes = 0;
-	sd->splash_sboxcount = 0;
+	memset(sd, 0, sizeof(*sd));
+	jpeg_get_size(ndata + len + boxcnt * 12 + palcnt,
+		      &sd->splash_width, &sd->splash_height);
+	if (splash_check_jpeg(ndata + len + boxcnt * 12 + palcnt,
+			       sd->splash_width, sd->splash_height, info->var.bits_per_pixel)) {
+	    ndata += len + splash_size - 1;
+	    vfree(sd);
+	    continue;
+	}
 	if (silentsize) {
 	    sd->splash_silentjpeg = vmalloc(silentsize);
 	    if (sd->splash_silentjpeg) {
 		memcpy(sd->splash_silentjpeg, ndata + len + splash_size, silentsize);
-		sd->splash_sboxes = vc->vc_splash_data->splash_silentjpeg;
+		sd->splash_sboxes = sd->splash_silentjpeg;
 		sd->splash_silentjpeg += 12 * sboxcnt;
 		sd->splash_sboxcount = sboxcnt;
 	    }
@@ -579,8 +781,10 @@ static int splash_getraw(unsigned char *start, unsigned char *end, int *update)
 	sd->splash_overpaintok = splash_getb(ndata, SPLASH_OFF_OVEROK);
 	sd->splash_text_xo = splash_gets(ndata, SPLASH_OFF_XO);
 	sd->splash_text_yo = splash_gets(ndata, SPLASH_OFF_YO);
-	sd->splash_text_wi = splash_gets(ndata, SPLASH_OFF_WI);
-	sd->splash_text_he = splash_gets(ndata, SPLASH_OFF_HE);
+	sd->splash_text_wi = sd->splash_jpg_text_wi = splash_gets(ndata, SPLASH_OFF_WI);
+	sd->splash_text_he = sd->splash_jpg_text_he = splash_gets(ndata, SPLASH_OFF_HE);
+	sd->splash_pic = NULL;
+	sd->splash_pic_size = 0;
 	sd->splash_percent = oldpercent == -1 ? splash_gets(ndata, SPLASH_OFF_PERCENT) : oldpercent;
 	if (version == 1) {
 	    sd->splash_text_xo *= 8;
@@ -591,22 +795,6 @@ static int splash_getraw(unsigned char *start, unsigned char *end, int *update)
 	    sd->splash_fg_color = (splash_default >> 4) & 0x0f;
 	    sd->splash_state    = splash_default & 1;
 	}
-	if (sd->splash_text_xo + sd->splash_text_wi > width || sd->splash_text_yo + sd->splash_text_he > height) {
-	    splash_free(vc, info);
-	    printk(KERN_ERR "bootsplash: found, but has oversized text area!\n");
-	    return -1;
-	}
-	if (!vc_cons[unit].d || info->fbops->fb_imageblit != cfb_imageblit) {
-	    splash_free(vc, info);
-	    printk(KERN_ERR "bootsplash: found, but framebuffer can't handle it!\n");
-	    return -1;
-	}
-	printk(KERN_INFO "bootsplash: ...found (%dx%d, %d bytes, v%d).\n", width, height, splash_size, version);
-	if (version == 1) {
-	    printk(KERN_WARNING "bootsplash: Using deprecated v1 header. Updating your splash utility recommended.\n");
-	    printk(KERN_INFO    "bootsplash: Find the latest version at http://www.bootsplash.org/\n");
-	}
-
 	/* fake penguin box for older formats */
 	if (version == 1)
 	    boxcnt = splash_mkpenguin(sd, sd->splash_text_xo + 10, sd->splash_text_yo + 10, sd->splash_text_wi - 20, sd->splash_text_he - 20, 0xf0, 0xf0, 0xf0);
@@ -620,8 +808,39 @@ static int splash_getraw(unsigned char *start, unsigned char *end, int *update)
 	sd->splash_jpeg = sd->splash_palette + palcnt;
 	sd->splash_palcnt = palcnt / 3;
 	sd->splash_dosilent = sd->splash_silentjpeg != 0 ? (oldsilent == -1 ? 1 : oldsilent) : 0;
-	return unit;
+
+	sd->next = vc->vc_splash_data;
+	vc->vc_splash_data = sd;
+
+	if (sd->splash_width != width || sd->splash_height != height) {
+	    ndata += len + splash_size - 1;
+	    continue;
+	}
+	printk(KERN_INFO "bootsplash: ...found (%dx%d, %d bytes, v%d).\n", width, height, splash_size, version);
+	if (version == 1) {
+	    printk(KERN_WARNING "bootsplash: Using deprecated v1 header. Updating your splash utility recommended.\n");
+	    printk(KERN_INFO    "bootsplash: Find the latest version at http://www.bootsplash.org/\n");
+	}
+
+	splash_found = sd;
+	unit_found = unit;
     }
+
+    if (splash_found) {
+	splash_pivot_current(vc, splash_found);
+	return unit_found;
+    } else {
+	    vc = vc_cons[0].d;
+	    if (vc) {
+		    info = registered_fb[(int)con2fb_map[0]];
+		    width = info->var.xres;
+		    height = info->var.yres;
+		    if (!splash_look_for_jpeg(vc, width, height))
+			    return -1;
+		    return 0;
+	    }
+    }
+
     printk(KERN_ERR "bootsplash: ...no good signature found.\n");
     return -1;
 }
@@ -690,16 +909,65 @@ static void splash_off(struct fb_info *info)
 {
 	SPLASH_DEBUG();
 	info->splash_data = 0;
-	if (info->splash_pic)
-		vfree(info->splash_pic);
-	info->splash_pic = 0;
-	info->splash_pic_size = 0;
+}
+
+/* look for the splash with the matching size and set it as the current */
+static int splash_look_for_jpeg(struct vc_data *vc, int width, int height)
+{
+	struct splash_data *sd, *found = NULL;
+
+	for (sd = vc->vc_splash_data; sd; sd = sd->next) {
+		if (sd->splash_width >= width && sd->splash_height >= height) {
+			if (!found || (found->splash_width > sd->splash_width
+				       || found->splash_height > sd->splash_height)) {
+				found = sd;
+			}
+		}
+	}
+
+	if (found) {
+		printk(KERN_INFO "bootsplash: scalable image found (%dx%d scaled to %dx%d).\n",
+		       found->splash_width, found->splash_height, width, height);
+
+ 		splash_pivot_current(vc, found);
+
+		if (found->splash_height != height)
+			found->splash_text_he = height - (found->splash_height - found->splash_jpg_text_he);
+		else
+			found->splash_text_he = found->splash_jpg_text_he;
+		if (found->splash_width != width)
+			found->splash_text_wi = width - (found->splash_width - found->splash_jpg_text_wi);
+		else
+			found->splash_text_wi = found->splash_jpg_text_wi;
+
+		if (found->splash_width != width || found->splash_height != height) {
+			box_offsets(found->splash_boxes, found->splash_boxcount,
+				    width, height, found->splash_width, found->splash_height,
+				    &found->splash_boxes_xoff, &found->splash_boxes_yoff);
+			printk(KERN_INFO "bootsplash: offsets for boxes: x=%d y=%d\n",
+			       found->splash_boxes_xoff,found->splash_boxes_yoff);
+
+			if (found->splash_sboxes) {
+				box_offsets(found->splash_sboxes, found->splash_sboxcount,
+					    width, height, found->splash_width, found->splash_height,
+					    &found->splash_sboxes_xoff, &found->splash_sboxes_yoff);
+				printk(KERN_INFO "bootsplash: offsets sboxes: x=%d y=%d\n",
+				       found->splash_sboxes_xoff,found->splash_sboxes_yoff);
+			}
+		} else {
+			found->splash_sboxes_xoff = 0;
+			found->splash_sboxes_yoff = 0;
+		}
+		return 0;
+	}
+	return -1;
 }
 
 int splash_prepare(struct vc_data *vc, struct fb_info *info)
 {
 	int err;
         int width, height, depth, octpp, size, sbytes;
+	int pic_update = 0;
 
 	SPLASH_DEBUG("vc_num: %i", vc->vc_num);
 	if (!vc->vc_splash_data || !vc->vc_splash_data->splash_state) {
@@ -719,18 +987,26 @@ int splash_prepare(struct vc_data *vc, struct fb_info *info)
 		splash_off(info);
 		return -2;
 	}
+	if (splash_look_for_jpeg(vc, width, height) < 0) {
+		printk(KERN_INFO "bootsplash: no matching splash %dx%d\n",
+		       width, height);
+		splash_off(info);
+		return -2;
+	}
 
 	sbytes = ((width + 15) & ~15) * octpp;
 	size = sbytes * ((height + 15) & ~15);
-	if (size != info->splash_pic_size) {
-		vfree(info->splash_pic);
-		info->splash_pic = NULL;
-	}
-	if (!info->splash_pic)
-		info->splash_pic = vmalloc(size);
 
-	if (!info->splash_pic) {
-		printk(KERN_INFO "bootsplash: not enough memory.\n");
+	if (size != vc->vc_splash_data->splash_pic_size) {
+	    vfree(vc->vc_splash_data->splash_pic);
+	    vc->vc_splash_data->splash_pic = NULL;
+	}
+	if (!vc->vc_splash_data->splash_pic) {
+	    vc->vc_splash_data->splash_pic = vmalloc(size);
+	    pic_update = 1;
+	}
+	if (!vc->vc_splash_data->splash_pic) {
+	    printk(KERN_INFO "bootsplash: not enough memory.\n");
 		splash_off(info);
 		return -3;
 	}
@@ -740,22 +1016,25 @@ int splash_prepare(struct vc_data *vc, struct fb_info *info)
 
 	if (vc->vc_splash_data->splash_silentjpeg && vc->vc_splash_data->splash_dosilent) {
 		/* fill area after framebuffer with other jpeg */
-		if ((err = jpeg_decode(vc->vc_splash_data->splash_silentjpeg, info->splash_pic,
+		pic_update = 1;
+		if ((err = jpeg_get(vc->vc_splash_data->splash_silentjpeg, vc->vc_splash_data->splash_pic,
 				       ((width + 15) & ~15), ((height + 15) & ~15), depth, decdata))) {
 			printk(KERN_INFO "bootsplash: error while decompressing silent picture: %s (%d)\n",
 			       jpg_errors[err - 1], err);
 			vc->vc_splash_data->splash_dosilent = 0;
 		} else {
 			if (vc->vc_splash_data->splash_sboxcount)
-				boxit(info->splash_pic,
+				boxit(vc->vc_splash_data->splash_pic,
 				      sbytes,
 				      vc->vc_splash_data->splash_sboxes,
 				      vc->vc_splash_data->splash_sboxcount,
 				      vc->vc_splash_data->splash_percent,
+				      vc->vc_splash_data->splash_sboxes_xoff,
+				      vc->vc_splash_data->splash_sboxes_yoff,
 				      0,
 				      octpp);
 			splashcopy(info->screen_base,
-				   info->splash_pic,
+				   vc->vc_splash_data->splash_pic,
 				   info->var.yres,
 				   info->var.xres,
 				   info->fix.line_length, sbytes,
@@ -764,21 +1043,27 @@ int splash_prepare(struct vc_data *vc, struct fb_info *info)
 	} else
 		vc->vc_splash_data->splash_dosilent = 0;
 
-	if ((err = jpeg_decode(vc->vc_splash_data->splash_jpeg, info->splash_pic,
-		 ((width + 15) & ~15), ((height + 15) & ~15), depth, decdata))) {
-		printk(KERN_INFO "bootsplash: error while decompressing picture: %s (%d) .\n",
-		       jpg_errors[err - 1], err);
-		splash_off(info);
-		return -4;
+	if (pic_update) {
+		if ((err = jpeg_get(vc->vc_splash_data->splash_jpeg, vc->vc_splash_data->splash_pic,
+				    ((width + 15) & ~15), ((height + 15) & ~15), depth, decdata))) {
+			printk(KERN_INFO "bootsplash: error while decompressing picture: %s (%d) .\n",
+			       jpg_errors[err - 1], err);
+			splash_off(info);
+			return -4;
+		}
 	}
-	info->splash_pic_size = size;
-	info->splash_pic_stride = sbytes;
+
+	vc->vc_splash_data->splash_pic_size = size;
+	vc->vc_splash_data->splash_pic_stride = sbytes;
+
 	if (vc->vc_splash_data->splash_boxcount)
-		boxit(info->splash_pic,
+		boxit(vc->vc_splash_data->splash_pic,
 		      sbytes,
 		      vc->vc_splash_data->splash_boxes,
 		      vc->vc_splash_data->splash_boxcount,
 		      vc->vc_splash_data->splash_percent,
+		      vc->vc_splash_data->splash_boxes_xoff,
+		      vc->vc_splash_data->splash_boxes_yoff,
 		      0,
 		      octpp);
 	if (vc->vc_splash_data->splash_state)
@@ -921,6 +1206,8 @@ void splash_set_percent(struct vc_data *vc, int pe)
 			    info->splash_data->splash_sboxes,
 			    info->splash_data->splash_sboxcount,
 			    info->splash_data->splash_percent,
+			    info->splash_data->splash_sboxes_xoff,
+			    info->splash_data->splash_sboxes_yoff,
 			    1,
 			    octpp);
 #if 0
@@ -930,6 +1217,8 @@ void splash_set_percent(struct vc_data *vc, int pe)
 			    info->splash_data->splash_boxes,
 			    info->splash_data->splash_boxcount,
 			    info->splash_data->splash_percent,
+			    info->splash_data->splash_boxes_xoff,
+			    info->splash_data->splash_boxes_yoff,
 			    1,
 			    octpp);
 #endif
@@ -1007,11 +1296,14 @@ static int splash_write_proc(struct file *file, const char *buffer,
 	if (!strncmp(buffer,"freesilent\n",11)) {
 	        SPLASH_DEBUG( " freesilent");
 		if (vc->vc_splash_data && vc->vc_splash_data->splash_silentjpeg) {
+			struct splash_data *sd;
 			printk(KERN_INFO "bootsplash: freeing silent jpeg\n");
-			vc->vc_splash_data->splash_silentjpeg = 0;
-			vfree(vc->vc_splash_data->splash_sboxes);
-			vc->vc_splash_data->splash_sboxes = 0;
-			vc->vc_splash_data->splash_sboxcount = 0;
+			for (sd = vc->vc_splash_data; sd; sd = sd->next) {
+				sd->splash_silentjpeg = 0;
+				vfree(sd->splash_sboxes);
+				sd->splash_sboxes = 0;
+				sd->splash_sboxcount = 0;
+			}
 			if (vc->vc_splash_data->splash_dosilent) {
 				splash_status(vc);
 			}
@@ -1048,6 +1340,8 @@ static int splash_write_proc(struct file *file, const char *buffer,
 					      info->splash_data->splash_sboxes,
 					      info->splash_data->splash_sboxcount,
 					      info->splash_data->splash_percent,
+					      info->splash_data->splash_sboxes_xoff,
+					      info->splash_data->splash_sboxes_yoff,
 					      1,
 					      octpp);
 				} else 	if ((up & 1) != 0) {
@@ -1056,6 +1350,8 @@ static int splash_write_proc(struct file *file, const char *buffer,
 					      info->splash_data->splash_boxes,
 					      info->splash_data->splash_boxcount,
 					      info->splash_data->splash_percent,
+					      info->splash_data->splash_boxes_xoff,
+					      info->splash_data->splash_boxes_yoff,
 					      1,
 					      octpp);
 				}
@@ -1174,3 +1470,231 @@ void splash_init(void)
 	return;
 }
 
+#define SPLASH_ALIGN 15
+
+static u32 *do_coefficients(u32 from, u32 to, u32 *shift)
+{
+    u32 *coefficients;
+    u32 left = to;
+    int n = 1;
+    int cnt = from / to + 2;
+    u32 upper = 31;
+    int col_cnt = 0;
+    int row_cnt = 0;
+    int m;
+    u32 rnd = from >> 1;
+
+    while (upper > 0) {
+	if ((1 << upper) & from)
+	    break;
+	upper--;
+    }
+    upper++;
+
+    *shift = 32 - 8 - 1 - upper;
+
+    coefficients = vmalloc(sizeof (u32) * cnt * from + 1);
+    n = 1;
+    while (1) {
+	u32 sum = left;
+	col_cnt = 0;
+	m = n++;
+	while (sum < from) {
+	    coefficients[n++] = ((left << *shift) + rnd) / from;
+	    col_cnt++;
+	    left = to;
+	    sum += left;
+	}
+	left = sum - from;
+	coefficients[n++] = (((to - left) << *shift) + rnd) / from;
+	col_cnt++;
+	coefficients[m] = col_cnt;
+	row_cnt++;
+	if (!left)
+	    break;
+    }
+    coefficients[0] = row_cnt;
+    return coefficients;
+}
+
+
+struct pixel
+{
+    u32 red;
+    u32 green;
+    u32 blue;
+};
+
+#define put_pixel(pix, buf, depth)					\
+    switch (depth) {							\
+    case 15:								\
+	*(u16 *)(buf) = (u16)((pix).red << 10 | (pix).green << 5 | (pix).blue); \
+	(buf) += 2;							\
+	break;								\
+    case 16:								\
+	*(u16 *)(buf) = (u16)((pix).red << 11 | (pix).green << 5 | (pix).blue); \
+	(buf) += 2;							\
+	break;								\
+    case 24:								\
+        *(u16 *)(buf) = (u16)((pix).red << 8 | (pix).green);		\
+	buf += 2;							\
+	*((buf)++) = (pix).blue;					\
+	break;								\
+    case 32:								\
+	*(u32 *)(buf) = (u32)((pix).red << 16 | (pix).green << 8 | (pix).blue); \
+	(buf) += 4;							\
+	break;								\
+}
+
+#define get_pixel(pix, buf, depth)				       \
+    switch (depth) {						       \
+case 15:							       \
+    (pix).red = ((*(u16 *)(buf)) >> 10) & 0x1f;			       \
+    (pix).green = ((*(u16 *)(buf)) >> 5) & 0x1f;		       \
+    (pix).blue = (*(u16 *)(buf)) & 0x1f;			       \
+    (buf) += 2;							       \
+    break;							       \
+case 16:							       \
+    (pix).red = ((*(u16 *)(buf)) >> 11) & 0x1f;			       \
+    (pix).green = ((*(u16 *)(buf)) >> 5) & 0x3f;		       \
+    (pix).blue = (*(u16 *)(buf)) & 0x1f;			       \
+    (buf) += 2;							       \
+    break;							       \
+case 24:							       \
+    (pix).blue = *(((buf))++);					       \
+    (pix).green = *(((buf))++);					       \
+    (pix).red = *(((buf))++);					       \
+    break;							       \
+case 32:							       \
+    (pix).blue = *(((buf))++);					       \
+    (pix).green = *(((buf))++);					       \
+    (pix).red = *(((buf))++);					       \
+    (buf)++;							       \
+    break;							       \
+}
+
+static inline void
+scale_x(int depth, int src_w, unsigned char **src_p, u32 *x_coeff, u32 x_shift,  u32 y_coeff, struct pixel *row_buffer)
+{
+    u32 curr_x_coeff = 1;
+    struct pixel curr_pixel, tmp_pixel;
+    u32 x_array_size = x_coeff[0];
+    int x_column_num;
+    int i;
+    int l,m;
+    int k = 0;
+    u32 rnd = (1 << (x_shift - 1));
+
+    for (i = 0; i < src_w; ) {
+	curr_x_coeff = 1;
+	get_pixel(tmp_pixel, *src_p, depth);
+	i++;
+	for (l = 0; l < x_array_size; l++) {
+	    x_column_num = x_coeff[curr_x_coeff++];
+	    curr_pixel.red = curr_pixel.green = curr_pixel.blue = 0;
+	    for (m = 0; m < x_column_num - 1; m++) {
+		curr_pixel.red += tmp_pixel.red * x_coeff[curr_x_coeff];
+		curr_pixel.green += tmp_pixel.green * x_coeff[curr_x_coeff];
+		curr_pixel.blue += tmp_pixel.blue * x_coeff[curr_x_coeff];
+		curr_x_coeff++;
+		get_pixel(tmp_pixel, *src_p, depth);
+		i++;
+	    }
+	    curr_pixel.red += tmp_pixel.red * x_coeff[curr_x_coeff];
+	    curr_pixel.green += tmp_pixel.green * x_coeff[curr_x_coeff];
+	    curr_pixel.blue += tmp_pixel.blue * x_coeff[curr_x_coeff];
+	    curr_x_coeff++;
+	    curr_pixel.red = (curr_pixel.red + rnd) >> x_shift;
+	    curr_pixel.green = (curr_pixel.green + rnd) >> x_shift;
+	    curr_pixel.blue = (curr_pixel.blue + rnd) >> x_shift;
+	    row_buffer[k].red += curr_pixel.red * y_coeff;
+	    row_buffer[k].green += curr_pixel.green * y_coeff;
+	    row_buffer[k].blue += curr_pixel.blue * y_coeff;
+	    k++;
+	}
+    }
+}
+
+static void scale(unsigned char *src, unsigned char *dst, int depth, int src_w, int src_h, int dst_w, int dst_h)
+{
+    char *ret_dst;
+    int octpp = (depth + 1) >> 3;
+    int src_x_bytes = octpp * ((src_w + SPLASH_ALIGN) & ~SPLASH_ALIGN);
+    int dst_x_bytes = octpp * ((dst_w + SPLASH_ALIGN) & ~SPLASH_ALIGN);
+    int j;
+    struct pixel *row_buffer = (struct pixel *)vmalloc(sizeof(struct pixel) * (dst_w + 1));
+    u32 x_shift, y_shift;
+    u32 *x_coeff = do_coefficients(src_w, dst_w, &x_shift);
+    u32 *y_coeff = do_coefficients(src_h, dst_h, &y_shift);
+    u32 curr_y_coeff = 1;
+    unsigned char *src_p;
+    unsigned char *src_p_line = src;
+    char *dst_p_line;
+    int r,s;
+    int y_array_rows = y_coeff[0];
+    int y_column_num;
+    int k;
+    u32 rnd = (1 << (y_shift - 1));
+
+    ret_dst = dst_p_line = dst;
+
+    for (j = 0; j < src_h;) {
+	curr_y_coeff = 1;
+	for (r = 0; r < y_array_rows; r++) {
+	    y_column_num = y_coeff[curr_y_coeff++];
+	    for (k = 0; k < dst_w + 1; k++)
+		row_buffer[k].red = row_buffer[k].green = row_buffer[k].blue = 0;
+	    src_p = src_p_line;
+	    scale_x(depth,  src_w, &src_p, x_coeff, x_shift, y_coeff[curr_y_coeff], row_buffer );
+	    curr_y_coeff++;
+	    for (s = 1; s < y_column_num; s++) {
+		src_p = src_p_line = src_p_line + src_x_bytes;
+		j++;
+		scale_x(depth,  src_w, &src_p, x_coeff, x_shift, y_coeff[curr_y_coeff], row_buffer );
+		curr_y_coeff++;
+	    }
+	    for (k = 0; k < dst_w; k++) {
+		row_buffer[k].red = ( row_buffer[k].red + rnd) >> y_shift;
+		row_buffer[k].green = (row_buffer[k].green + rnd) >> y_shift;
+		row_buffer[k].blue = (row_buffer[k].blue + rnd) >> y_shift;
+		put_pixel (row_buffer[k], dst, depth);
+	    }
+	    dst = dst_p_line = dst_p_line + dst_x_bytes;
+	}
+	src_p_line = src_p_line + src_x_bytes;
+	j++;
+    }
+    vfree(row_buffer);
+    vfree(x_coeff);
+    vfree(y_coeff);
+}
+
+static int jpeg_get(unsigned char *buf, unsigned char *pic,
+		    int width, int height, int depth,
+		    struct jpeg_decdata *decdata)
+{
+	int my_width, my_height;
+	int err;
+
+	jpeg_get_size(buf, &my_width, &my_height);
+
+	if (my_height != height || my_width != width) {
+		int my_size = ((my_width + 15) & ~15)
+		    * ((my_height + 15) & ~15) * ((depth + 1) >> 3);
+		unsigned char *mem = vmalloc(my_size);
+
+		if ((err = jpeg_decode(buf, mem, ((my_width + 15) & ~15),
+				       ((my_height + 15) & ~15), depth, decdata))) {
+			vfree(mem);
+			return err;
+		}
+		printk(KERN_INFO "bootsplash: scaling image from %dx%d to %dx%d\n", my_width, my_height, width, height);
+
+		scale(mem, pic, depth, my_width, my_height, width, height);
+		vfree(mem);
+	} else {
+		if ((err = jpeg_decode(buf, pic, ((width + 15) & ~15), ((height + 15) & ~15), depth, decdata)))
+			return err;
+	}
+	return 0;
+}

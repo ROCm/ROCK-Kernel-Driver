@@ -30,6 +30,6 @@ struct jpeg_decdata {
 };
 
 extern int jpeg_decode(unsigned char *, unsigned char *, int, int, int, struct jpeg_decdata *);
-extern int jpeg_check_size(unsigned char *, int, int);
+extern void jpeg_get_size(unsigned char *, int *, int *);
 
 #endif

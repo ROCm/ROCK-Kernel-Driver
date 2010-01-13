@@ -858,9 +858,6 @@ struct fb_info {
 	void *par;
 #ifdef CONFIG_BOOTSPLASH
 	struct splash_data *splash_data;
-	unsigned char *splash_pic;
-	int splash_pic_size;
-	int splash_pic_stride;
 	char fb_cursordata[64];
 #endif
 	/* we need the PCI or similiar aperture base/size not
