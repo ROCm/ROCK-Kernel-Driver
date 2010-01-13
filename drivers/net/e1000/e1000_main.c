@@ -3840,16 +3840,16 @@ static bool e1000_clean_rx_irq(struct e1000_adapter *adapter,
 		 * definition only a frame fragment
 		 */
 		if (unlikely(!(status & E1000_RXD_STAT_EOP)))
-			set_bit(__E1000_DISCARDING, &adapter->flags);
+			adapter->discarding = true;
 
-		if (test_bit(__E1000_DISCARDING, &adapter->flags)) {
+		if (adapter->discarding) {
 			/* All receives must fit into a single buffer */
 			E1000_DBG("%s: Receive packet consumed multiple"
 				  " buffers\n", netdev->name);
 			/* recycle */
 			buffer_info->skb = skb;
 			if (status & E1000_RXD_STAT_EOP)
-				clear_bit(__E1000_DISCARDING, &adapter->flags);
+				adapter->discarding = false;
 			goto next_desc;
 		}
 

@@ -366,6 +366,8 @@ struct e1000_adapter {
 	struct work_struct downshift_task;
 	struct work_struct update_phy_task;
 	struct work_struct led_blink_task;
+
+	bool discarding;
 };
 
 struct e1000_info {
@@ -428,8 +430,7 @@ struct e1000_info {
 enum e1000_state_t {
 	__E1000_TESTING,
 	__E1000_RESETTING,
-	__E1000_DOWN,
-	__E1000_DISCARDING
+	__E1000_DOWN
 };
 
 enum latency_range {
