@@ -10,6 +10,7 @@
 #include <linux/syscalls.h>
 #include <linux/utime.h>
 #include <linux/pagemap.h>
+#include <linux/uio.h>
 
 static __initdata char *message;
 static void __init error(char *x)
