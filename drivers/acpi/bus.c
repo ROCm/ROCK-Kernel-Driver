@@ -665,6 +665,13 @@ void __init acpi_early_init(void)
 		goto error0;
 	}
 
+	status = acpi_load_override_tables();
+	if (ACPI_FAILURE(status)) {
+		printk(KERN_ERR PREFIX
+			"Unable to load Override Tables\n");
+		goto error0;
+	}
+
 	status = acpi_load_tables();
 	if (ACPI_FAILURE(status)) {
 		printk(KERN_ERR PREFIX

@@ -713,6 +713,15 @@ asmlinkage void __init start_kernel(void)
 
 	check_bugs();
 
+	/*
+	 * Do this before starting ACPI so we can read-in
+	 * override tables before the tables are actually
+	 * loaded. The usermode helper won't be initialized
+	 * until much later so we don't race against things
+	 * calling out to userspace.
+	 */
+	populate_rootfs();
+
 	acpi_early_init(); /* before LAPIC and SMP init */
 	sfi_init_late();
 
@@ -810,7 +819,6 @@ static void __init do_basic_setup(void)
 {
 	init_workqueues();
 	cpuset_init_smp();
-	usermodehelper_init();
 	init_tmpfs();
 	driver_init();
 	init_irq_proc();
