@@ -139,8 +139,13 @@ EXPORT_SYMBOL_GPL(kernel_kobj);
 #ifdef CONFIG_ENTERPRISE_SUPPORT
 const char *supported_printable(int taint)
 {
-	if (taint & TAINT_NO_SUPPORT)
-		return "No";
+	int mask = TAINT_PROPRIETARY_MODULE|TAINT_NO_SUPPORT;
+	if ((taint & mask) == mask)
+		return "No, Proprietary and Unsupported modules are loaded";
+	else if (taint & TAINT_PROPRIETARY_MODULE)
+		return "No, Proprietary modules are loaded";
+	else if (taint & TAINT_NO_SUPPORT)
+		return "No, Unsupported modules are loaded";
 	else if (taint & TAINT_EXTERNAL_SUPPORT)
 		return "Yes, External";
 	else
