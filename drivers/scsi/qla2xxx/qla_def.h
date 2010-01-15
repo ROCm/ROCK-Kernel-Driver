@@ -31,6 +31,7 @@
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_cmnd.h>
 #include <scsi/scsi_transport_fc.h>
+#include <scsi/scsi_bsg_fc.h>
 
 #define QLA2XXX_DRIVER_NAME  "qla2xxx"
 
@@ -226,6 +227,27 @@ struct srb_logio {
 #define SRB_LOGIN_COND_PLOGI	BIT_1
 #define SRB_LOGIN_SKIP_PRLI	BIT_2
 	uint16_t flags;
+};
+
+struct srb_bsg_ctx {
+#define SRB_ELS_CMD_RPT 3
+#define SRB_ELS_CMD_HST 4
+#define SRB_CT_CMD 5
+	uint16_t type;
+};
+
+struct srb_bsg {
+	struct srb_bsg_ctx ctx;
+	struct fc_bsg_job *bsg_job;
+};
+
+struct msg_echo_lb {
+	dma_addr_t send_dma;
+	dma_addr_t rcv_dma;
+	uint16_t req_sg_cnt;
+	uint16_t rsp_sg_cnt;
+	uint16_t options;
+	uint32_t transfer_size;
 };
 
 /*
@@ -522,6 +544,8 @@ typedef struct {
 #define MBA_DISCARD_RND_FRAME	0x8048	/* discard RND frame due to error. */
 #define MBA_REJECTED_FCP_CMD	0x8049	/* rejected FCP_CMD. */
 
+/* ISP mailbox loopback echo diagnostic error code */
+#define MBS_LB_RESET	0x17
 /*
  * Firmware options 1, 2, 3.
  */
@@ -1589,8 +1613,7 @@ typedef struct fc_port {
  */
 #define FCF_FABRIC_DEVICE	BIT_0
 #define FCF_LOGIN_NEEDED	BIT_1
-#define FCF_TAPE_PRESENT	BIT_2
-#define FCF_FCP2_DEVICE		BIT_3
+#define FCF_FCP2_DEVICE		BIT_2
 
 /* No loop ID flag. */
 #define FC_NO_LOOP_ID		0x1000
@@ -2259,12 +2282,15 @@ struct qla_hw_data {
 		uint32_t	disable_serdes		:1;
 		uint32_t	gpsc_supported		:1;
 		uint32_t	npiv_supported		:1;
+		uint32_t	pci_channel_io_perm_failure:1;
 		uint32_t	fce_enabled		:1;
 		uint32_t	fac_supported		:1;
 		uint32_t	chip_reset_done		:1;
 		uint32_t	port0			:1;
 		uint32_t	running_gold_fw		:1;
+		uint32_t	eeh_busy		:1;
 		uint32_t	cpu_affinity_enabled	:1;
+		uint32_t	disable_msix_handshake	:1;
 	} flags;
 
 	/* This spinlock is used to protect "io transactions", you must
@@ -2387,6 +2413,7 @@ struct qla_hw_data {
 #define IS_QLA81XX(ha)		(IS_QLA8001(ha))
 #define IS_QLA2XXX_MIDTYPE(ha)	(IS_QLA24XX(ha) || IS_QLA84XX(ha) || \
 				IS_QLA25XX(ha) || IS_QLA81XX(ha))
+#define IS_MSIX_NACK_CAPABLE(ha) (IS_QLA81XX(ha))
 #define IS_NOPOLLING_TYPE(ha)	((IS_QLA25XX(ha) || IS_QLA81XX(ha)) && \
 				(ha)->flags.msix_enabled)
 #define IS_FAC_REQUIRED(ha)	(IS_QLA81XX(ha))
@@ -2765,5 +2792,16 @@ typedef struct scsi_qla_host {
 #include "qla_inline.h"
 
 #define CMD_SP(Cmnd)		((Cmnd)->SCp.ptr)
+
+/*
+ * BSG Vendor specific commands
+ */
+
+#define QL_VND_LOOPBACK		0x01
+
+/* BSG definations for interpreting CommandSent field */
+#define INT_DEF_LB_LOOPBACK_CMD         0
+#define INT_DEF_LB_ECHO_CMD             1
+
 
 #endif
