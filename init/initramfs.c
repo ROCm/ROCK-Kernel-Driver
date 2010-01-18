@@ -1,6 +1,5 @@
 #include <linux/init.h>
 #include <linux/fs.h>
-#include <linux/file.h>
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/fcntl.h>
@@ -9,8 +8,6 @@
 #include <linux/dirent.h>
 #include <linux/syscalls.h>
 #include <linux/utime.h>
-#include <linux/pagemap.h>
-#include <linux/uio.h>
 
 static __initdata char *message;
 static void __init error(char *x)
@@ -336,152 +333,10 @@ static int __init do_name(void)
 	return 0;
 }
 
-ssize_t initramfs_file_read(struct file *file, const char *buf,
-			    size_t count, loff_t *ppos)
-{
-	struct address_space *mapping = file->f_mapping;
-	struct iovec iov = { .iov_base = (void __user *) buf,
-			     .iov_len = count };
-	struct iov_iter i;
-	long status = 0;
-	loff_t pos = *ppos;
-	ssize_t read = 0;
-
-	iov_iter_init(&i, &iov, 1, count, 0);
-
-	do {
-		struct page *page;
-		pgoff_t index;
-		unsigned long offset;
-		unsigned long bytes;
-		char *data;
-
-		offset = (pos & (PAGE_CACHE_SIZE - 1));
-		index = pos >> PAGE_CACHE_SHIFT;
-		bytes = min_t(unsigned long, PAGE_CACHE_SIZE - offset,
-			      iov_iter_count(&i));
-
-		page = read_mapping_page(mapping, index, NULL);
-		if (IS_ERR(page)) {
-			status = PTR_ERR(page);
-			break;
-		}
-
-		data = page_address(page);
-		memcpy(i.iov->iov_base + i.iov_offset, data + offset, bytes);
-
-		iov_iter_advance(&i, bytes);
-		pos += bytes;
-		read += bytes;
-	} while (iov_iter_count(&i));
-
-	*ppos = pos;
-
-	return read ? read : status;
-}
-
-ssize_t initramfs_file_write(struct file *file, const char * __user buf,
-			     size_t count, loff_t *ppos)
-{
-	struct address_space *mapping = file->f_mapping;
-	struct iovec iov = { .iov_base = (void __user *) buf,
-			     .iov_len = count };
-	long status = 0;
-	ssize_t written = 0;
-	unsigned int flags = 0;
-	loff_t pos = *ppos;
-	struct iov_iter i;
-
-	iov_iter_init(&i, &iov, 1, count, 0);
-
-	/*
-	 * Copies from kernel address space cannot fail (NFSD is a big user).
-	 */
-	if (segment_eq(get_fs(), KERNEL_DS))
-		flags |= AOP_FLAG_UNINTERRUPTIBLE;
-
-	mutex_lock(&mapping->host->i_mutex);
-
-	do {
-		struct page *page;
-		pgoff_t index;		/* Pagecache index for current page */
-		unsigned long offset;	/* Offset into pagecache page */
-		unsigned long bytes;	/* Bytes to write to page */
-		size_t copied;		/* Bytes copied from user */
-		void *fsdata;
-		char *data;
-
-		offset = (pos & (PAGE_CACHE_SIZE - 1));
-		index = pos >> PAGE_CACHE_SHIFT;
-		bytes = min_t(unsigned long, PAGE_CACHE_SIZE - offset,
-						iov_iter_count(&i));
-
-		status = simple_write_begin(file, mapping, pos, bytes, flags,
-						&page, &fsdata);
-		if (unlikely(status))
-			break;
-		data = page_address(page);
-
-		memcpy(data + offset, i.iov->iov_base + i.iov_offset, bytes);
-		copied = bytes;
-
-		status = simple_write_end(file, mapping, pos, bytes, copied,
-						page, fsdata);
-		if (unlikely(status < 0))
-			break;
-		copied = status;
-
-		iov_iter_advance(&i, copied);
-		pos += copied;
-		written += copied;
-
-	} while (iov_iter_count(&i));
-
-	mutex_unlock(&mapping->host->i_mutex);
-
-	*ppos = pos;
-
-	return written ? written : status;
-}
-
-ssize_t
-initramfs_read(unsigned int fd, const char * buf, size_t count)
-{
-	struct file *file;
-	ssize_t ret = 0;
-
-	file = fget(fd);
-	if (file) {
-		loff_t pos = file->f_pos;
-		ret = initramfs_file_read(file, buf, count, &pos);
-		file->f_pos = pos;
-		fput(file);
-	}
-
-	return ret;
-}
-
-ssize_t
-initramfs_write(unsigned int fd, const char * buf, size_t count)
-{
-	struct file *file;
-	ssize_t ret = 0;
-
-	file = fget(fd);
-	if (file) {
-		loff_t pos = file->f_pos;
-		ret = initramfs_file_write(file, buf, count, &pos);
-		file->f_pos = pos;
-		fput(file);
-	}
-
-	return ret;
-}
-
 static int __init do_copy(void)
 {
 	if (count >= body_len) {
-		initramfs_write(wfd, victim, body_len);
+		sys_write(wfd, victim, body_len);
 		sys_close(wfd);
 		do_utime(vcollected, mtime);
 		kfree(vcollected);
@@ -489,7 +344,7 @@ static int __init do_copy(void)
 		state = SkipIt;
 		return 0;
 	} else {
-		initramfs_write(wfd, victim, count);
+		sys_write(wfd, victim, count);
 		body_len -= count;
 		eat(count);
 		return 1;
@@ -710,7 +565,7 @@ static void __init clean_rootfs(void)
 }
 #endif
 
-int __init populate_rootfs(void)
+static int __init populate_rootfs(void)
 {
 	char *err = unpack_to_rootfs(__initramfs_start,
 			 __initramfs_end - __initramfs_start);
@@ -734,7 +589,7 @@ int __init populate_rootfs(void)
 				"; looks like an initrd\n", err);
 		fd = sys_open("/initrd.image", O_WRONLY|O_CREAT, 0700);
 		if (fd >= 0) {
-			initramfs_write(fd, (char *)initrd_start,
+			sys_write(fd, (char *)initrd_start,
 					initrd_end - initrd_start);
 			sys_close(fd);
 			free_initrd();
@@ -750,3 +605,4 @@ int __init populate_rootfs(void)
 	}
 	return 0;
 }
+rootfs_initcall(populate_rootfs);

@@ -98,6 +98,8 @@ call_usermodehelper_keys(char *path, char **argv, char **envp,
 	return call_usermodehelper_exec(info, wait);
 }
 
+extern void usermodehelper_init(void);
+
 struct file;
 extern int call_usermodehelper_pipe(char *path, char *argv[], char *envp[],
 				    struct file **filp);
