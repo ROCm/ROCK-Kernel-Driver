@@ -582,7 +582,7 @@ static int cache_defer_req(struct cache_req *req, struct cache_head *item)
 			dreq = req->defer(req);
 			goto retry;
 		}
-		return 0;
+		return -EAGAIN;
 	}
 	return 0;
 }
