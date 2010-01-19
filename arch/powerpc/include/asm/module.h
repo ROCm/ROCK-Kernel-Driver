@@ -92,6 +92,5 @@ void sort_ex_table(struct exception_table_entry *start,
 
 extern const unsigned long reloc_start[];
 #endif
-
 #endif /* __KERNEL__ */
 #endif	/* _ASM_POWERPC_MODULE_H */
