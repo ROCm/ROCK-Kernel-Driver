@@ -781,8 +781,8 @@ static int splash_getraw(unsigned char *start, unsigned char *end, int *update)
 	sd->splash_overpaintok = splash_getb(ndata, SPLASH_OFF_OVEROK);
 	sd->splash_text_xo = splash_gets(ndata, SPLASH_OFF_XO);
 	sd->splash_text_yo = splash_gets(ndata, SPLASH_OFF_YO);
-	sd->splash_text_wi = sd->splash_jpg_text_wi = splash_gets(ndata, SPLASH_OFF_WI);
-	sd->splash_text_he = sd->splash_jpg_text_he = splash_gets(ndata, SPLASH_OFF_HE);
+	sd->splash_text_wi = splash_gets(ndata, SPLASH_OFF_WI);
+	sd->splash_text_he = splash_gets(ndata, SPLASH_OFF_HE);
 	sd->splash_pic = NULL;
 	sd->splash_pic_size = 0;
 	sd->splash_percent = oldpercent == -1 ? splash_gets(ndata, SPLASH_OFF_PERCENT) : oldpercent;
@@ -795,6 +795,10 @@ static int splash_getraw(unsigned char *start, unsigned char *end, int *update)
 	    sd->splash_fg_color = (splash_default >> 4) & 0x0f;
 	    sd->splash_state    = splash_default & 1;
 	}
+	sd->splash_jpg_text_xo = sd->splash_text_xo;
+	sd->splash_jpg_text_yo = sd->splash_text_yo;
+	sd->splash_jpg_text_wi = sd->splash_text_wi;
+	sd->splash_jpg_text_he = sd->splash_text_he;
 	/* fake penguin box for older formats */
 	if (version == 1)
 	    boxcnt = splash_mkpenguin(sd, sd->splash_text_xo + 10, sd->splash_text_yo + 10, sd->splash_text_wi - 20, sd->splash_text_he - 20, 0xf0, 0xf0, 0xf0);
@@ -931,15 +935,24 @@ static int splash_look_for_jpeg(struct vc_data *vc, int width, int height)
 
  		splash_pivot_current(vc, found);
 
-		if (found->splash_height != height)
-			found->splash_text_he = height - (found->splash_height - found->splash_jpg_text_he);
-		else
+		if (found->splash_height != height) {
+			found->splash_text_yo = found->splash_jpg_text_yo * height / found->splash_height;
+			found->splash_text_he = found->splash_jpg_text_he * height / found->splash_height;
+			if (found->splash_text_yo + found->splash_text_he > height)
+				found->splash_text_yo = height - found->splash_text_he;
+		} else {
+			found->splash_text_yo = found->splash_jpg_text_yo;
 			found->splash_text_he = found->splash_jpg_text_he;
-		if (found->splash_width != width)
-			found->splash_text_wi = width - (found->splash_width - found->splash_jpg_text_wi);
-		else
+		}
+		if (found->splash_width != width) {
+			found->splash_text_xo = found->splash_jpg_text_xo * width / found->splash_width;
+			found->splash_text_wi = found->splash_jpg_text_wi * width / found->splash_width;
+			if (found->splash_text_xo + found->splash_text_wi > width)
+				found->splash_text_xo = width - found->splash_text_wi;
+		} else {
+			found->splash_text_xo = found->splash_jpg_text_xo;
 			found->splash_text_wi = found->splash_jpg_text_wi;
-
+		}
 		if (found->splash_width != width || found->splash_height != height) {
 			box_offsets(found->splash_boxes, found->splash_boxcount,
 				    width, height, found->splash_width, found->splash_height,
@@ -1494,6 +1507,8 @@ static u32 *do_coefficients(u32 from, u32 to, u32 *shift)
     *shift = 32 - 8 - 1 - upper;
 
     coefficients = vmalloc(sizeof (u32) * cnt * from + 1);
+    if (!coefficients)
+	return NULL;
     n = 1;
     while (1) {
 	u32 sum = left;
@@ -1615,7 +1630,7 @@ scale_x(int depth, int src_w, unsigned char **src_p, u32 *x_coeff, u32 x_shift, 
     }
 }
 
-static void scale(unsigned char *src, unsigned char *dst, int depth, int src_w, int src_h, int dst_w, int dst_h)
+static int scale(unsigned char *src, unsigned char *dst, int depth, int src_w, int src_h, int dst_w, int dst_h)
 {
     char *ret_dst;
     int octpp = (depth + 1) >> 3;
@@ -1635,6 +1650,13 @@ static void scale(unsigned char *src, unsigned char *dst, int depth, int src_w, 
     int y_column_num;
     int k;
     u32 rnd = (1 << (y_shift - 1));
+
+    if (!row_buffer || !x_coeff || !y_coeff) {
+	vfree(row_buffer);
+	vfree(x_coeff);
+	vfree(y_coeff);
+	return -ENOMEM;
+    }
 
     ret_dst = dst_p_line = dst;
 
@@ -1667,6 +1689,7 @@ static void scale(unsigned char *src, unsigned char *dst, int depth, int src_w, 
     vfree(row_buffer);
     vfree(x_coeff);
     vfree(y_coeff);
+    return 0;
 }
 
 static int jpeg_get(unsigned char *buf, unsigned char *pic,
@@ -1690,8 +1713,10 @@ static int jpeg_get(unsigned char *buf, unsigned char *pic,
 		}
 		printk(KERN_INFO "bootsplash: scaling image from %dx%d to %dx%d\n", my_width, my_height, width, height);
 
-		scale(mem, pic, depth, my_width, my_height, width, height);
+		err = scale(mem, pic, depth, my_width, my_height, width, height);
 		vfree(mem);
+		if (err < 0)
+		    return err;
 	} else {
 		if ((err = jpeg_decode(buf, pic, ((width + 15) & ~15), ((height + 15) & ~15), depth, decdata)))
 			return err;
