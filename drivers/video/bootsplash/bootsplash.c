@@ -6,7 +6,7 @@
  * 		    Stefan Reinauer, <stepan@suse.de>,
  * 		    Steffen Winterfeldt, <snwint@suse.de>,
  *                  Michael Schroeder <mls@suse.de>
-            2009    Egbert Eich <eich@suse.de>
+ *          2009, 2010 Egbert Eich <eich@suse.de>
  *
  *        Ideas & SuSE screen work by Ken Wimer, <wimer@suse.de>
  *
@@ -473,8 +473,14 @@ static int splash_check_jpeg(unsigned char *jpeg, int width, int height, int dep
 	printk(KERN_INFO "bootsplash: no memory for decoded picture.\n");
 	return -1;
     }
-    if (!decdata)
+    if (!decdata) {
 	decdata = vmalloc(sizeof(*decdata));
+	if (!decdata) {
+	    printk(KERN_INFO "bootsplash: not enough memory.\n");
+	    vfree(mem);
+	    return -1;
+	}
+    }
     if ((err = jpeg_decode(jpeg, mem, ((width + 15) & ~15), ((height + 15) & ~15), depth, decdata)))
 	  printk(KERN_INFO "bootsplash: error while decompressing picture: %s (%d)\n",jpg_errors[err - 1], err);
     vfree(mem);
@@ -795,8 +801,6 @@ static int splash_getraw(unsigned char *start, unsigned char *end, int *update)
 	    sd->splash_fg_color = (splash_default >> 4) & 0x0f;
 	    sd->splash_state    = splash_default & 1;
 	}
-	sd->splash_jpg_text_xo = sd->splash_text_xo;
-	sd->splash_jpg_text_yo = sd->splash_text_yo;
 	sd->splash_jpg_text_wi = sd->splash_text_wi;
 	sd->splash_jpg_text_he = sd->splash_text_he;
 	/* fake penguin box for older formats */
@@ -919,13 +923,15 @@ static void splash_off(struct fb_info *info)
 static int splash_look_for_jpeg(struct vc_data *vc, int width, int height)
 {
 	struct splash_data *sd, *found = NULL;
+	int found_delta_x = INT_MAX, found_delta_y = INT_MAX;
 
 	for (sd = vc->vc_splash_data; sd; sd = sd->next) {
-		if (sd->splash_width >= width && sd->splash_height >= height) {
-			if (!found || (found->splash_width > sd->splash_width
-				       || found->splash_height > sd->splash_height)) {
-				found = sd;
-			}
+		int delta_x = abs(sd->splash_width - width) * height;
+		int delta_y = abs(sd->splash_height - height) * width;
+		if (!found || (found_delta_x + found_delta_y > delta_x + delta_y)) {
+			found = sd;
+			found_delta_x = delta_x;
+			found_delta_y = delta_y;
 		}
 	}
 
@@ -935,24 +941,16 @@ static int splash_look_for_jpeg(struct vc_data *vc, int width, int height)
 
  		splash_pivot_current(vc, found);
 
-		if (found->splash_height != height) {
-			found->splash_text_yo = found->splash_jpg_text_yo * height / found->splash_height;
-			found->splash_text_he = found->splash_jpg_text_he * height / found->splash_height;
-			if (found->splash_text_yo + found->splash_text_he > height)
-				found->splash_text_yo = height - found->splash_text_he;
-		} else {
-			found->splash_text_yo = found->splash_jpg_text_yo;
+		/* textarea margins are constant independent from image size */
+		if (found->splash_height != height)
+			found->splash_text_he = height - (found->splash_height - found->splash_jpg_text_he);
+		else
 			found->splash_text_he = found->splash_jpg_text_he;
-		}
-		if (found->splash_width != width) {
-			found->splash_text_xo = found->splash_jpg_text_xo * width / found->splash_width;
-			found->splash_text_wi = found->splash_jpg_text_wi * width / found->splash_width;
-			if (found->splash_text_xo + found->splash_text_wi > width)
-				found->splash_text_xo = width - found->splash_text_wi;
-		} else {
-			found->splash_text_xo = found->splash_jpg_text_xo;
+		if (found->splash_width != width)
+			found->splash_text_wi = width - (found->splash_width - found->splash_jpg_text_wi);
+		else
 			found->splash_text_wi = found->splash_jpg_text_wi;
-		}
+
 		if (found->splash_width != width || found->splash_height != height) {
 			box_offsets(found->splash_boxes, found->splash_boxcount,
 				    width, height, found->splash_width, found->splash_height,
@@ -981,6 +979,7 @@ int splash_prepare(struct vc_data *vc, struct fb_info *info)
 	int err;
         int width, height, depth, octpp, size, sbytes;
 	int pic_update = 0;
+	int prev_wi, prev_he;
 
 	SPLASH_DEBUG("vc_num: %i", vc->vc_num);
 	if (!vc->vc_splash_data || !vc->vc_splash_data->splash_state) {
@@ -990,6 +989,10 @@ int splash_prepare(struct vc_data *vc, struct fb_info *info)
 		splash_off(info);
 		return -1;
 	}
+
+	/* remember the previous text area size */
+	prev_wi = vc->vc_splash_data->splash_text_wi;
+	prev_he = vc->vc_splash_data->splash_text_he;
 
         width = info->var.xres;
         height = info->var.yres;
@@ -1024,8 +1027,14 @@ int splash_prepare(struct vc_data *vc, struct fb_info *info)
 		return -3;
 	}
 
-	if (!decdata)
+	if (!decdata) {
 		decdata = vmalloc(sizeof(*decdata));
+		if (!decdata) {
+			printk(KERN_INFO "bootsplash: not enough memory.\n");
+			splash_off(info);
+			return -3;
+		}
+	}
 
 	if (vc->vc_splash_data->splash_silentjpeg && vc->vc_splash_data->splash_dosilent) {
 		/* fill area after framebuffer with other jpeg */
@@ -1085,6 +1094,16 @@ int splash_prepare(struct vc_data *vc, struct fb_info *info)
 		splash_off(info);
 		return -5;
 	}
+
+	/* text area resized? */
+	if (vc->vc_splash_data->splash_text_wi != prev_wi ||
+	    vc->vc_splash_data->splash_text_he != prev_he) {
+		vc_resize(vc, vc->vc_splash_data->splash_text_wi / vc->vc_font.width,
+			  vc->vc_splash_data->splash_text_he / vc->vc_font.height);
+		con_remap_def_color(vc, vc->vc_splash_data->splash_color << 4 |
+				    vc->vc_splash_data->splash_fg_color);
+	}
+
 	return 0;
 }
 
@@ -1487,49 +1506,90 @@ void splash_init(void)
 
 static u32 *do_coefficients(u32 from, u32 to, u32 *shift)
 {
-    u32 *coefficients;
-    u32 left = to;
-    int n = 1;
-    int cnt = from / to + 2;
-    u32 upper = 31;
-    int col_cnt = 0;
-    int row_cnt = 0;
-    int m;
-    u32 rnd = from >> 1;
+	u32 *coefficients;
+	u32 left = to;
+	int n = 1;
+	u32 upper = 31;
+	int col_cnt = 0;
+	int row_cnt = 0;
+	int m;
+	u32 rnd = from >> 1;
 
-    while (upper > 0) {
-	if ((1 << upper) & from)
-	    break;
-	upper--;
-    }
-    upper++;
+	if (from > to) {
+		left = to;
+		rnd = from >> 1;
 
-    *shift = 32 - 8 - 1 - upper;
+		while (upper > 0) {
+			if ((1 << upper) & from)
+				break;
+			upper--;
+		}
+		upper++;
 
-    coefficients = vmalloc(sizeof (u32) * cnt * from + 1);
-    if (!coefficients)
-	return NULL;
-    n = 1;
-    while (1) {
-	u32 sum = left;
-	col_cnt = 0;
-	m = n++;
-	while (sum < from) {
-	    coefficients[n++] = ((left << *shift) + rnd) / from;
-	    col_cnt++;
-	    left = to;
-	    sum += left;
+		*shift = 32 - 8 - 1 - upper;
+
+		coefficients = vmalloc(sizeof (u32) * (from / to + 2) * from + 1);
+		if (!coefficients)
+			return NULL;
+		n = 1;
+		while (1) {
+			u32 sum = left;
+			col_cnt = 0;
+			m = n++;
+			while (sum < from) {
+				coefficients[n++] = ((left << *shift) + rnd) / from;
+				col_cnt++;
+				left = to;
+				sum += left;
+			}
+			left = sum - from;
+			coefficients[n++] = (((to - left) << *shift) + rnd) / from;
+			col_cnt++;
+			coefficients[m] = col_cnt;
+			row_cnt++;
+			if (!left) {
+				coefficients[0] = row_cnt;
+				return coefficients;
+			}
+		}
+	} else {
+		left = 0;
+		rnd = to >> 1;
+
+		while (upper > 0) {
+			if ((1 << upper) & to)
+				break;
+			upper--;
+		}
+		upper++;
+
+		*shift = 32 - 8 - 1 - upper;
+
+		coefficients = vmalloc(sizeof (u32) * 3 * from + 1);
+		if (!coefficients)
+			return NULL;
+
+		while (1) {
+			u32 diff;
+			u32 sum = left;
+			col_cnt = 0;
+			row_cnt++;
+			while (sum < to) {
+				col_cnt++;
+				sum += from;
+			}
+			left = sum - to;
+			diff = from - left;
+			if (!left) {
+				coefficients[n] = col_cnt;
+				coefficients[0] = row_cnt;
+				return coefficients;
+			}
+			coefficients[n++] = col_cnt - 1;
+			coefficients[n++] = ((diff << *shift) + rnd) / from;
+			coefficients[n++] = ((left << *shift) + rnd) / from;
+		}
 	}
-	left = sum - from;
-	coefficients[n++] = (((to - left) << *shift) + rnd) / from;
-	col_cnt++;
-	coefficients[m] = col_cnt;
-	row_cnt++;
-	if (!left)
-	    break;
-    }
-    coefficients[0] = row_cnt;
-    return coefficients;
 }
 
 
@@ -1589,107 +1649,268 @@ case 32:							       \
 }
 
 static inline void
-scale_x(int depth, int src_w, unsigned char **src_p, u32 *x_coeff, u32 x_shift,  u32 y_coeff, struct pixel *row_buffer)
+scale_x_down(int depth, int src_w, unsigned char **src_p, u32 *x_coeff, u32 x_shift,  u32 y_coeff, struct pixel *row_buffer)
 {
-    u32 curr_x_coeff = 1;
-    struct pixel curr_pixel, tmp_pixel;
-    u32 x_array_size = x_coeff[0];
-    int x_column_num;
-    int i;
-    int l,m;
-    int k = 0;
-    u32 rnd = (1 << (x_shift - 1));
+	u32 curr_x_coeff = 1;
+	struct pixel curr_pixel, tmp_pixel;
+	u32 x_array_size = x_coeff[0];
+	int x_column_num;
+	int i;
+	int l,m;
+	int k = 0;
+	u32 rnd = (1 << (x_shift - 1));
 
-    for (i = 0; i < src_w; ) {
-	curr_x_coeff = 1;
-	get_pixel(tmp_pixel, *src_p, depth);
-	i++;
-	for (l = 0; l < x_array_size; l++) {
-	    x_column_num = x_coeff[curr_x_coeff++];
-	    curr_pixel.red = curr_pixel.green = curr_pixel.blue = 0;
-	    for (m = 0; m < x_column_num - 1; m++) {
-		curr_pixel.red += tmp_pixel.red * x_coeff[curr_x_coeff];
-		curr_pixel.green += tmp_pixel.green * x_coeff[curr_x_coeff];
-		curr_pixel.blue += tmp_pixel.blue * x_coeff[curr_x_coeff];
-		curr_x_coeff++;
+	for (i = 0; i < src_w; ) {
+		curr_x_coeff = 1;
 		get_pixel(tmp_pixel, *src_p, depth);
 		i++;
-	    }
-	    curr_pixel.red += tmp_pixel.red * x_coeff[curr_x_coeff];
-	    curr_pixel.green += tmp_pixel.green * x_coeff[curr_x_coeff];
-	    curr_pixel.blue += tmp_pixel.blue * x_coeff[curr_x_coeff];
-	    curr_x_coeff++;
-	    curr_pixel.red = (curr_pixel.red + rnd) >> x_shift;
-	    curr_pixel.green = (curr_pixel.green + rnd) >> x_shift;
-	    curr_pixel.blue = (curr_pixel.blue + rnd) >> x_shift;
-	    row_buffer[k].red += curr_pixel.red * y_coeff;
-	    row_buffer[k].green += curr_pixel.green * y_coeff;
-	    row_buffer[k].blue += curr_pixel.blue * y_coeff;
-	    k++;
+		for (l = 0; l < x_array_size; l++) {
+			x_column_num = x_coeff[curr_x_coeff++];
+			curr_pixel.red = curr_pixel.green = curr_pixel.blue = 0;
+			for (m = 0; m < x_column_num - 1; m++) {
+				curr_pixel.red += tmp_pixel.red * x_coeff[curr_x_coeff];
+				curr_pixel.green += tmp_pixel.green * x_coeff[curr_x_coeff];
+				curr_pixel.blue += tmp_pixel.blue * x_coeff[curr_x_coeff];
+				curr_x_coeff++;
+				get_pixel(tmp_pixel, *src_p, depth);
+				i++;
+			}
+			curr_pixel.red += tmp_pixel.red * x_coeff[curr_x_coeff];
+			curr_pixel.green += tmp_pixel.green * x_coeff[curr_x_coeff];
+			curr_pixel.blue += tmp_pixel.blue * x_coeff[curr_x_coeff];
+			curr_x_coeff++;
+			curr_pixel.red = (curr_pixel.red + rnd) >> x_shift;
+			curr_pixel.green = (curr_pixel.green + rnd) >> x_shift;
+			curr_pixel.blue = (curr_pixel.blue + rnd) >> x_shift;
+			row_buffer[k].red += curr_pixel.red * y_coeff;
+			row_buffer[k].green += curr_pixel.green * y_coeff;
+			row_buffer[k].blue += curr_pixel.blue * y_coeff;
+			k++;
+		}
 	}
-    }
 }
 
-static int scale(unsigned char *src, unsigned char *dst, int depth, int src_w, int src_h, int dst_w, int dst_h)
+static inline void
+scale_x_up(int depth, int src_w, unsigned char **src_p, u32 *x_coeff, u32 x_shift,  u32 y_coeff, struct pixel *row_buffer)
 {
-    char *ret_dst;
-    int octpp = (depth + 1) >> 3;
-    int src_x_bytes = octpp * ((src_w + SPLASH_ALIGN) & ~SPLASH_ALIGN);
-    int dst_x_bytes = octpp * ((dst_w + SPLASH_ALIGN) & ~SPLASH_ALIGN);
-    int j;
-    struct pixel *row_buffer = (struct pixel *)vmalloc(sizeof(struct pixel) * (dst_w + 1));
-    u32 x_shift, y_shift;
-    u32 *x_coeff = do_coefficients(src_w, dst_w, &x_shift);
-    u32 *y_coeff = do_coefficients(src_h, dst_h, &y_shift);
-    u32 curr_y_coeff = 1;
-    unsigned char *src_p;
-    unsigned char *src_p_line = src;
-    char *dst_p_line;
-    int r,s;
-    int y_array_rows = y_coeff[0];
-    int y_column_num;
-    int k;
-    u32 rnd = (1 << (y_shift - 1));
+	u32 curr_x_coeff = 1;
+	struct pixel curr_pixel, tmp_pixel;
+	u32 x_array_size = x_coeff[0];
+	int x_column_num;
+	int i;
+	int l,m;
+	int k = 0;
+	u32 rnd = (1 << (x_shift - 1));
 
-    if (!row_buffer || !x_coeff || !y_coeff) {
+	for (i = 0; i < src_w;) {
+		curr_x_coeff = 1;
+		get_pixel(tmp_pixel, *src_p, depth);
+		i++;
+		for (l = 0; l < x_array_size - 1; l++) {
+			x_column_num = x_coeff[curr_x_coeff++];
+			for (m = 0; m < x_column_num; m++) {
+				row_buffer[k].red += tmp_pixel.red * y_coeff;
+				row_buffer[k].green += tmp_pixel.green * y_coeff;
+				row_buffer[k].blue += tmp_pixel.blue * y_coeff;
+				k++;
+			}
+			curr_pixel.red = tmp_pixel.red * x_coeff[curr_x_coeff];
+			curr_pixel.green = tmp_pixel.green * x_coeff[curr_x_coeff];
+			curr_pixel.blue = tmp_pixel.blue * x_coeff[curr_x_coeff];
+			curr_x_coeff++;
+			get_pixel(tmp_pixel, *src_p, depth);
+			i++;
+			row_buffer[k].red += ((curr_pixel.red + tmp_pixel.red * x_coeff[curr_x_coeff] + rnd) >> x_shift) * y_coeff;
+			row_buffer[k].green += ((curr_pixel.green + tmp_pixel.green  * x_coeff[curr_x_coeff] + rnd) >> x_shift) * y_coeff;
+			row_buffer[k].blue += ((curr_pixel.blue + tmp_pixel.blue  * x_coeff[curr_x_coeff] + rnd) >> x_shift) * y_coeff;
+			k++;
+			curr_x_coeff++;
+		}
+		for (m = 0; m < x_coeff[curr_x_coeff]; m++) {
+			row_buffer[k].red += tmp_pixel.red * y_coeff;
+			row_buffer[k].green += tmp_pixel.green * y_coeff;
+			row_buffer[k].blue += tmp_pixel.blue * y_coeff;
+			k++;
+		}
+	}
+}
+
+static int scale_y_down(unsigned char *src, unsigned char *dst, int depth, int src_w, int src_h, int dst_w, int dst_h)
+{
+	int octpp = (depth + 1) >> 3;
+	int src_x_bytes = octpp * ((src_w + SPLASH_ALIGN) & ~SPLASH_ALIGN);
+	int dst_x_bytes = octpp * ((dst_w + SPLASH_ALIGN) & ~SPLASH_ALIGN);
+	int j;
+	struct pixel *row_buffer;
+	u32 x_shift, y_shift;
+	u32 *x_coeff;
+	u32 *y_coeff;
+	u32 curr_y_coeff = 1;
+	unsigned char *src_p;
+	unsigned char *src_p_line = src;
+	char *dst_p_line;
+	int r,s;
+	int y_array_rows;
+	int y_column_num;
+	int k;
+	u32 rnd;
+	int xup;
+
+	row_buffer = vmalloc(sizeof(struct pixel) * (dst_w + 1));
+	x_coeff = do_coefficients(src_w, dst_w, &x_shift);
+	y_coeff = do_coefficients(src_h, dst_h, &y_shift);
+	if (!row_buffer || !x_coeff || !y_coeff) {
+		vfree(row_buffer);
+		vfree(x_coeff);
+		vfree(y_coeff);
+		return -ENOMEM;
+	}
+
+	y_array_rows = y_coeff[0];
+	rnd = (1 << (y_shift - 1));
+	xup = (src_w <= dst_w) ? 1 : 0;
+
+	dst_p_line = dst;
+
+	printk(KERN_INFO "TST: scale height down.\n");
+	for (j = 0; j < src_h;) {
+		curr_y_coeff = 1;
+		for (r = 0; r < y_array_rows; r++) {
+			y_column_num = y_coeff[curr_y_coeff++];
+			for (k = 0; k < dst_w + 1; k++)
+				row_buffer[k].red = row_buffer[k].green = row_buffer[k].blue = 0;
+			src_p = src_p_line;
+			if (xup)
+				scale_x_up(depth,  src_w, &src_p, x_coeff, x_shift, y_coeff[curr_y_coeff], row_buffer );
+			else
+				scale_x_down(depth,  src_w, &src_p, x_coeff, x_shift, y_coeff[curr_y_coeff], row_buffer );
+			curr_y_coeff++;
+			for (s = 1; s < y_column_num; s++) {
+				src_p = src_p_line = src_p_line + src_x_bytes;
+				j++;
+				if (xup)
+					scale_x_up(depth,  src_w, &src_p, x_coeff, x_shift, y_coeff[curr_y_coeff], row_buffer );
+				else
+					scale_x_down(depth,  src_w, &src_p, x_coeff, x_shift, y_coeff[curr_y_coeff], row_buffer );
+				curr_y_coeff++;
+			}
+			for (k = 0; k < dst_w; k++) {
+				row_buffer[k].red = ( row_buffer[k].red + rnd) >> y_shift;
+				row_buffer[k].green = (row_buffer[k].green + rnd) >> y_shift;
+				row_buffer[k].blue = (row_buffer[k].blue + rnd) >> y_shift;
+				put_pixel (row_buffer[k], dst, depth);
+			}
+			dst = dst_p_line = dst_p_line + dst_x_bytes;
+		}
+		src_p_line = src_p_line + src_x_bytes;
+		j++;
+	}
 	vfree(row_buffer);
 	vfree(x_coeff);
 	vfree(y_coeff);
-	return -ENOMEM;
-    }
+	return 0;
+}
 
-    ret_dst = dst_p_line = dst;
+static int scale_y_up(unsigned char *src, unsigned char *dst, int depth, int src_w, int src_h, int dst_w, int dst_h)
+{
+	int octpp = (depth + 1) >> 3;
+	int src_x_bytes = octpp * ((src_w + SPLASH_ALIGN) & ~SPLASH_ALIGN);
+	int dst_x_bytes = octpp * ((dst_w + SPLASH_ALIGN) & ~SPLASH_ALIGN);
+	int j;
+	u32 x_shift, y_shift;
+	u32 *x_coeff;
+	u32 *y_coeff;
+	struct pixel *row_buf_list[2];
+	struct pixel *row_buffer;
+	u32 curr_y_coeff = 1;
+	unsigned char *src_p;
+	unsigned char *src_p_line = src;
+	char *dst_p_line;
+	int r,s;
+	int y_array_rows;
+	int y_column_num;
+	int k;
+	u32 rnd;
+	int bi;
+	int xup;
+	int writes;
 
-    for (j = 0; j < src_h;) {
-	curr_y_coeff = 1;
-	for (r = 0; r < y_array_rows; r++) {
-	    y_column_num = y_coeff[curr_y_coeff++];
-	    for (k = 0; k < dst_w + 1; k++)
-		row_buffer[k].red = row_buffer[k].green = row_buffer[k].blue = 0;
-	    src_p = src_p_line;
-	    scale_x(depth,  src_w, &src_p, x_coeff, x_shift, y_coeff[curr_y_coeff], row_buffer );
-	    curr_y_coeff++;
-	    for (s = 1; s < y_column_num; s++) {
+	x_coeff = do_coefficients(src_w, dst_w, &x_shift);
+	y_coeff = do_coefficients(src_h, dst_h, &y_shift);
+	if (!x_coeff || !y_coeff) {
+		vfree(x_coeff);
+		vfree(y_coeff);
+		return -ENOMEM;
+	}
+
+	y_array_rows = y_coeff[0];
+	rnd = (1 << (y_shift - 1));
+	bi = 1;
+	xup = (src_w <= dst_w) ? 1 : 0;
+	writes = 0;
+
+	row_buf_list[0] = (struct pixel *)vmalloc(2 * sizeof(struct pixel) * (dst_w + 1));
+	row_buf_list[1] = row_buf_list[0] + (dst_w + 1);
+
+	dst_p_line = dst;
+	src_p = src_p_line;
+
+	row_buffer = row_buf_list[0];
+
+	for (j = 0; j < src_h;) {
+	        memset(row_buf_list[0], 0, 2 * sizeof(struct pixel) * (dst_w + 1));
+		curr_y_coeff = 1;
+		if (xup)
+			scale_x_up(depth,  src_w, &src_p, x_coeff, x_shift, 1, row_buffer );
+		else
+			scale_x_down(depth,  src_w, &src_p, x_coeff, x_shift, 1, row_buffer );
 		src_p = src_p_line = src_p_line + src_x_bytes;
 		j++;
-		scale_x(depth,  src_w, &src_p, x_coeff, x_shift, y_coeff[curr_y_coeff], row_buffer );
-		curr_y_coeff++;
-	    }
-	    for (k = 0; k < dst_w; k++) {
-		row_buffer[k].red = ( row_buffer[k].red + rnd) >> y_shift;
-		row_buffer[k].green = (row_buffer[k].green + rnd) >> y_shift;
-		row_buffer[k].blue = (row_buffer[k].blue + rnd) >> y_shift;
-		put_pixel (row_buffer[k], dst, depth);
-	    }
-	    dst = dst_p_line = dst_p_line + dst_x_bytes;
+		for (r = 0; r < y_array_rows - 1; r++) {
+			struct pixel *old_row_buffer = row_buffer;
+			u32 prev_y_coeff_val;
+
+			y_column_num = y_coeff[curr_y_coeff];
+			for (s = 0; s < y_column_num; s++) {
+				for (k = 0; k < dst_w; k++)
+					put_pixel(row_buffer[k], dst, depth);
+				dst = dst_p_line = dst_p_line + dst_x_bytes;
+				writes++;
+			}
+			curr_y_coeff++;
+			row_buffer = row_buf_list[(bi++) % 2];
+			prev_y_coeff_val = y_coeff[curr_y_coeff++];
+			if (xup)
+				scale_x_up(depth,  src_w, &src_p, x_coeff, x_shift, 1, row_buffer );
+			else
+				scale_x_down(depth,  src_w, &src_p, x_coeff, x_shift, 1, row_buffer );
+			src_p = src_p_line = src_p_line + src_x_bytes;
+			j++;
+			for (k = 0; k <dst_w; k++) {
+				struct pixel pix;
+				pix.red = (old_row_buffer[k].red * prev_y_coeff_val + row_buffer[k].red * y_coeff[curr_y_coeff] + rnd) >> y_shift;
+				pix.green = (old_row_buffer[k].green * prev_y_coeff_val + row_buffer[k].green  * y_coeff[curr_y_coeff] + rnd) >> y_shift;
+				pix.blue = (old_row_buffer[k].blue * prev_y_coeff_val + row_buffer[k].blue  * y_coeff[curr_y_coeff] + rnd) >> y_shift;
+				old_row_buffer[k].red = old_row_buffer[k].green = old_row_buffer[k].blue = 0;
+				put_pixel(pix, dst, depth);
+			}
+			dst = dst_p_line = dst_p_line + dst_x_bytes;
+			writes++;
+			curr_y_coeff++;
+		}
+		for (r = 0; r < y_coeff[curr_y_coeff]; r++) {
+			for (k = 0; k < dst_w; k++) {
+				put_pixel(row_buffer[k], dst, depth);
+			}
+			dst = dst_p_line = dst_p_line + dst_x_bytes;
+			writes++;
+		}
 	}
-	src_p_line = src_p_line + src_x_bytes;
-	j++;
-    }
-    vfree(row_buffer);
-    vfree(x_coeff);
-    vfree(y_coeff);
-    return 0;
+	vfree(row_buf_list[0]);
+	vfree(x_coeff);
+	vfree(y_coeff);
+
+	return 0;
 }
 
 static int jpeg_get(unsigned char *buf, unsigned char *pic,
@@ -1712,11 +1933,13 @@ static int jpeg_get(unsigned char *buf, unsigned char *pic,
 			return err;
 		}
 		printk(KERN_INFO "bootsplash: scaling image from %dx%d to %dx%d\n", my_width, my_height, width, height);
-
-		err = scale(mem, pic, depth, my_width, my_height, width, height);
+		if (my_height <= height)
+			err = scale_y_up(mem, pic, depth, my_width, my_height, width, height);
+		else
+			err = scale_y_down(mem, pic, depth, my_width, my_height, width, height);
 		vfree(mem);
 		if (err < 0)
-		    return err;
+			return err;
 	} else {
 		if ((err = jpeg_decode(buf, pic, ((width + 15) & ~15), ((height + 15) & ~15), depth, decdata)))
 			return err;
