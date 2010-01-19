@@ -740,7 +740,7 @@ void halt_current_cpu(struct pt_regs *regs)
 {
 #ifdef CONFIG_X86_32
 	struct pt_regs fixed_regs;
-#endif 
+#endif
 	local_irq_disable();
 #ifdef CONFIG_X86_32
 	if (!user_mode_vm(regs)) {
