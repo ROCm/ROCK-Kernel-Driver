@@ -485,7 +485,6 @@ static int bnx2i_setup_cmd_pool(struct bnx2i_hba *hba,
 		struct iscsi_task *task = session->cmds[i];
 		struct bnx2i_cmd *cmd = task->dd_data;
 
-		/* Anil */
 		task->hdr = &cmd->hdr;
 		task->hdr_max = sizeof(struct iscsi_hdr);
 
@@ -765,7 +764,6 @@ struct bnx2i_hba *bnx2i_alloc_hba(struct cnic_dev *cnic)
 	hba->pci_svid = hba->pcidev->subsystem_vendor;
 	hba->pci_func = PCI_FUNC(hba->pcidev->devfn);
 	hba->pci_devno = PCI_SLOT(hba->pcidev->devfn);
-	bnx2i_identify_device(hba);
 
 	bnx2i_identify_device(hba);
 	bnx2i_setup_host_queue_size(hba, shost);
@@ -1879,7 +1877,7 @@ static void bnx2i_ep_disconnect(struct iscsi_endpoint *ep)
 
 	bnx2i_ep = ep->dd_data;
 
-	/* driver should not attempt connection cleanup untill TCP_CONNECT
+	/* driver should not attempt connection cleanup until TCP_CONNECT
 	 * completes either successfully or fails. Timeout is 9-secs, so
 	 * wait for it to complete
 	 */
