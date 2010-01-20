@@ -57,7 +57,8 @@ static unsigned char *jpg_errors[] = {
 	"no EOI",
 	"bad tables",
 	"depth mismatch",
-	"scale error"
+	"scale error",
+	"out of memory"
 };
 
 static struct jpeg_decdata *decdata = 0; /* private decoder data */
@@ -474,12 +475,12 @@ static int splash_check_jpeg(unsigned char *jpeg, int width, int height, int dep
 	return -1;
     }
     if (!decdata) {
-	decdata = vmalloc(sizeof(*decdata));
-	if (!decdata) {
-	    printk(KERN_INFO "bootsplash: not enough memory.\n");
-	    vfree(mem);
-	    return -1;
-	}
+	    decdata = vmalloc(sizeof(*decdata));
+	    if (!decdata) {
+		    printk(KERN_INFO "bootsplash: not enough memory.\n");
+		    vfree(mem);
+		    return -1;
+	    }
     }
     if ((err = jpeg_decode(jpeg, mem, ((width + 15) & ~15), ((height + 15) & ~15), depth, decdata)))
 	  printk(KERN_INFO "bootsplash: error while decompressing picture: %s (%d)\n",jpg_errors[err - 1], err);
@@ -803,6 +804,7 @@ static int splash_getraw(unsigned char *start, unsigned char *end, int *update)
 	}
 	sd->splash_jpg_text_wi = sd->splash_text_wi;
 	sd->splash_jpg_text_he = sd->splash_text_he;
+
 	/* fake penguin box for older formats */
 	if (version == 1)
 	    boxcnt = splash_mkpenguin(sd, sd->splash_text_xo + 10, sd->splash_text_yo + 10, sd->splash_text_wi - 20, sd->splash_text_he - 20, 0xf0, 0xf0, 0xf0);
@@ -913,10 +915,17 @@ int splash_verbose(void)
 	return 0;
 }
 
-static void splash_off(struct fb_info *info)
+static void splash_off(struct vc_data *vc,struct fb_info *info)
 {
+	int rows = info->var.xres / vc->vc_font.width;
+	int cols = info->var.yres / vc->vc_font.height;
 	SPLASH_DEBUG();
+
 	info->splash_data = 0;
+	if (rows != vc->vc_rows || cols != vc->vc_cols)
+		vc_resize(vc, rows, cols);
+	if (vc->vc_def_color != 0x07)
+		con_remap_def_color(vc, 0x07);
 }
 
 /* look for the splash with the matching size and set it as the current */
@@ -936,8 +945,8 @@ static int splash_look_for_jpeg(struct vc_data *vc, int width, int height)
 	}
 
 	if (found) {
-		printk(KERN_INFO "bootsplash: scalable image found (%dx%d scaled to %dx%d).\n",
-		       found->splash_width, found->splash_height, width, height);
+		SPLASH_DEBUG("bootsplash: scalable image found (%dx%d scaled to %dx%d).",
+			     found->splash_width, found->splash_height, width, height);
 
  		splash_pivot_current(vc, found);
 
@@ -955,15 +964,15 @@ static int splash_look_for_jpeg(struct vc_data *vc, int width, int height)
 			box_offsets(found->splash_boxes, found->splash_boxcount,
 				    width, height, found->splash_width, found->splash_height,
 				    &found->splash_boxes_xoff, &found->splash_boxes_yoff);
-			printk(KERN_INFO "bootsplash: offsets for boxes: x=%d y=%d\n",
-			       found->splash_boxes_xoff,found->splash_boxes_yoff);
+			SPLASH_DEBUG("bootsplash: offsets for boxes: x=%d y=%d",
+				     found->splash_boxes_xoff,found->splash_boxes_yoff);
 
 			if (found->splash_sboxes) {
 				box_offsets(found->splash_sboxes, found->splash_sboxcount,
 					    width, height, found->splash_width, found->splash_height,
 					    &found->splash_sboxes_xoff, &found->splash_sboxes_yoff);
-				printk(KERN_INFO "bootsplash: offsets sboxes: x=%d y=%d\n",
-				       found->splash_sboxes_xoff,found->splash_sboxes_yoff);
+				SPLASH_DEBUG("bootsplash: offsets sboxes: x=%d y=%d",
+					     found->splash_sboxes_xoff,found->splash_sboxes_yoff);
 			}
 		} else {
 			found->splash_sboxes_xoff = 0;
@@ -979,20 +988,15 @@ int splash_prepare(struct vc_data *vc, struct fb_info *info)
 	int err;
         int width, height, depth, octpp, size, sbytes;
 	int pic_update = 0;
-	int prev_wi, prev_he;
 
 	SPLASH_DEBUG("vc_num: %i", vc->vc_num);
 	if (!vc->vc_splash_data || !vc->vc_splash_data->splash_state) {
 		if (decdata)
 			vfree(decdata);
 		decdata = 0;
-		splash_off(info);
+		splash_off(vc,info);
 		return -1;
 	}
-
-	/* remember the previous text area size */
-	prev_wi = vc->vc_splash_data->splash_text_wi;
-	prev_he = vc->vc_splash_data->splash_text_he;
 
         width = info->var.xres;
         height = info->var.yres;
@@ -1000,13 +1004,13 @@ int splash_prepare(struct vc_data *vc, struct fb_info *info)
 	octpp = (depth + 1) >> 3;
 
 	if (depth == 24 || depth < 15) {	/* Other targets might need fixing */
-		splash_off(info);
+		splash_off(vc,info);
 		return -2;
 	}
 	if (splash_look_for_jpeg(vc, width, height) < 0) {
 		printk(KERN_INFO "bootsplash: no matching splash %dx%d\n",
 		       width, height);
-		splash_off(info);
+		splash_off(vc,info);
 		return -2;
 	}
 
@@ -1022,8 +1026,8 @@ int splash_prepare(struct vc_data *vc, struct fb_info *info)
 	    pic_update = 1;
 	}
 	if (!vc->vc_splash_data->splash_pic) {
-	    printk(KERN_INFO "bootsplash: not enough memory.\n");
-		splash_off(info);
+		printk(KERN_INFO "bootsplash: not enough memory.\n");
+		splash_off(vc,info);
 		return -3;
 	}
 
@@ -1031,16 +1035,15 @@ int splash_prepare(struct vc_data *vc, struct fb_info *info)
 		decdata = vmalloc(sizeof(*decdata));
 		if (!decdata) {
 			printk(KERN_INFO "bootsplash: not enough memory.\n");
-			splash_off(info);
+			splash_off(vc,info);
 			return -3;
 		}
 	}
 
 	if (vc->vc_splash_data->splash_silentjpeg && vc->vc_splash_data->splash_dosilent) {
-		/* fill area after framebuffer with other jpeg */
 		pic_update = 1;
 		if ((err = jpeg_get(vc->vc_splash_data->splash_silentjpeg, vc->vc_splash_data->splash_pic,
-				       ((width + 15) & ~15), ((height + 15) & ~15), depth, decdata))) {
+				    width, height, depth, decdata))) {
 			printk(KERN_INFO "bootsplash: error while decompressing silent picture: %s (%d)\n",
 			       jpg_errors[err - 1], err);
 			vc->vc_splash_data->splash_dosilent = 0;
@@ -1067,10 +1070,10 @@ int splash_prepare(struct vc_data *vc, struct fb_info *info)
 
 	if (pic_update) {
 		if ((err = jpeg_get(vc->vc_splash_data->splash_jpeg, vc->vc_splash_data->splash_pic,
-				    ((width + 15) & ~15), ((height + 15) & ~15), depth, decdata))) {
+				    width, height, depth, decdata))) {
 			printk(KERN_INFO "bootsplash: error while decompressing picture: %s (%d) .\n",
 			       jpg_errors[err - 1], err);
-			splash_off(info);
+			splash_off(vc,info);
 			return -4;
 		}
 	}
@@ -1088,22 +1091,22 @@ int splash_prepare(struct vc_data *vc, struct fb_info *info)
 		      vc->vc_splash_data->splash_boxes_yoff,
 		      0,
 		      octpp);
-	if (vc->vc_splash_data->splash_state)
+	if (vc->vc_splash_data->splash_state) {
+		int cols = vc->vc_splash_data->splash_text_wi / vc->vc_font.width;
+		int rows = vc->vc_splash_data->splash_text_he / vc->vc_font.height;
+		int color = vc->vc_splash_data->splash_color << 4 | vc->vc_splash_data->splash_fg_color;
 		info->splash_data = vc->vc_splash_data;
-	else {
-		splash_off(info);
+
+		/* vc_resize also calls con_switch which resets yscroll */
+		if (rows != vc->vc_rows || cols != vc->vc_cols)
+			vc_resize(vc, cols, rows);
+		if (vc->vc_def_color != color)
+			con_remap_def_color(vc, color);
+
+	} else {
+		splash_off(vc,info);
 		return -5;
 	}
-
-	/* text area resized? */
-	if (vc->vc_splash_data->splash_text_wi != prev_wi ||
-	    vc->vc_splash_data->splash_text_he != prev_he) {
-		vc_resize(vc, vc->vc_splash_data->splash_text_wi / vc->vc_font.width,
-			  vc->vc_splash_data->splash_text_he / vc->vc_font.height);
-		con_remap_def_color(vc, vc->vc_splash_data->splash_color << 4 |
-				    vc->vc_splash_data->splash_fg_color);
-	}
-
 	return 0;
 }
 
@@ -1124,12 +1127,16 @@ static struct proc_dir_entry *proc_splash;
 
 static int splash_recolor(struct vc_data *vc)
 {
+	int color;
+
 	SPLASH_DEBUG();
 	if (!vc->vc_splash_data)
 	    return -1;
 	if (!vc->vc_splash_data->splash_state)
 	    return 0;
-	con_remap_def_color(vc, vc->vc_splash_data->splash_color << 4 | vc->vc_splash_data->splash_fg_color);
+	color = vc->vc_splash_data->splash_color << 4 | vc->vc_splash_data->splash_fg_color;
+	if (vc->vc_def_color != color)
+		con_remap_def_color(vc, color);
 	if (fg_console == vc->vc_num) {
 		update_region(vc,
 			      vc->vc_origin + vc->vc_size_row * vc->vc_top,
@@ -1152,10 +1159,6 @@ static int splash_status(struct vc_data *vc)
 		splash_prepare(vc, info);
 	if (vc->vc_splash_data && vc->vc_splash_data->splash_state) {
 	        if (info->splash_data) {
-			con_remap_def_color(vc, info->splash_data->splash_color << 4 | info->splash_data->splash_fg_color);
-			/* vc_resize also calls con_switch which resets yscroll */
-			vc_resize(vc, info->splash_data->splash_text_wi / vc->vc_font.width,
-				  info->splash_data->splash_text_he / vc->vc_font.height);
 			if (fg_console == vc->vc_num) {
 				update_region(vc,
 					      vc->vc_origin + vc->vc_size_row * vc->vc_top,
@@ -1163,11 +1166,9 @@ static int splash_status(struct vc_data *vc)
 				splash_clear_margins(vc, info, 0);
 			}
 		}
-	} else {
-		/* Switch bootsplash off */
-		con_remap_def_color(vc, 0x07);
-		vc_resize(vc, info->var.xres / vc->vc_font.width, info->var.yres / vc->vc_font.height);
-	}
+	} else
+		splash_off(vc,info);
+
 	return 0;
 }
 
@@ -1224,10 +1225,9 @@ void splash_set_percent(struct vc_data *vc, int pe)
 	    || pe < oldpe) {
 	    if (splash_hasinter(vc->vc_splash_data->splash_boxes,
 				vc->vc_splash_data->splash_boxcount)) {
-		splash_status(vc);
-	    }
-	    else
-		splash_prepare(vc, info);
+		    splash_status(vc);
+	    } else
+		    splash_prepare(vc, info);
 	} else {
 	        int octpp = (info->var.bits_per_pixel + 1) >> 3;
 	        if (info->splash_data) {
@@ -1531,6 +1531,7 @@ static u32 *do_coefficients(u32 from, u32 to, u32 *shift)
 		coefficients = vmalloc(sizeof (u32) * (from / to + 2) * from + 1);
 		if (!coefficients)
 			return NULL;
+
 		n = 1;
 		while (1) {
 			u32 sum = left;
@@ -1756,7 +1757,7 @@ static int scale_y_down(unsigned char *src, unsigned char *dst, int depth, int s
 	u32 rnd;
 	int xup;
 
-	row_buffer = vmalloc(sizeof(struct pixel) * (dst_w + 1));
+	row_buffer = (struct pixel *)vmalloc(sizeof(struct pixel) * (dst_w + 1));
 	x_coeff = do_coefficients(src_w, dst_w, &x_shift);
 	y_coeff = do_coefficients(src_h, dst_h, &y_shift);
 	if (!row_buffer || !x_coeff || !y_coeff) {
@@ -1765,14 +1766,12 @@ static int scale_y_down(unsigned char *src, unsigned char *dst, int depth, int s
 		vfree(y_coeff);
 		return -ENOMEM;
 	}
-
 	y_array_rows = y_coeff[0];
 	rnd = (1 << (y_shift - 1));
 	xup = (src_w <= dst_w) ? 1 : 0;
 
 	dst_p_line = dst;
 
-	printk(KERN_INFO "TST: scale height down.\n");
 	for (j = 0; j < src_h;) {
 		curr_y_coeff = 1;
 		for (r = 0; r < y_array_rows; r++) {
@@ -1837,20 +1836,20 @@ static int scale_y_up(unsigned char *src, unsigned char *dst, int depth, int src
 
 	x_coeff = do_coefficients(src_w, dst_w, &x_shift);
 	y_coeff = do_coefficients(src_h, dst_h, &y_shift);
-	if (!x_coeff || !y_coeff) {
+	row_buf_list[0] = (struct pixel *)vmalloc(2 * sizeof(struct pixel) * (dst_w + 1));
+	if (!row_buf_list[0] || !x_coeff || !y_coeff) {
+	        vfree(row_buf_list[0]);
 		vfree(x_coeff);
 		vfree(y_coeff);
 		return -ENOMEM;
 	}
+	row_buf_list[1] = row_buf_list[0] + (dst_w + 1);
 
 	y_array_rows = y_coeff[0];
 	rnd = (1 << (y_shift - 1));
 	bi = 1;
 	xup = (src_w <= dst_w) ? 1 : 0;
 	writes = 0;
-
-	row_buf_list[0] = (struct pixel *)vmalloc(2 * sizeof(struct pixel) * (dst_w + 1));
-	row_buf_list[1] = row_buf_list[0] + (dst_w + 1);
 
 	dst_p_line = dst;
 	src_p = src_p_line;
@@ -1926,7 +1925,8 @@ static int jpeg_get(unsigned char *buf, unsigned char *pic,
 		int my_size = ((my_width + 15) & ~15)
 		    * ((my_height + 15) & ~15) * ((depth + 1) >> 3);
 		unsigned char *mem = vmalloc(my_size);
-
+		if (!mem)
+			return 17;
 		if ((err = jpeg_decode(buf, mem, ((my_width + 15) & ~15),
 				       ((my_height + 15) & ~15), depth, decdata))) {
 			vfree(mem);
@@ -1934,12 +1934,12 @@ static int jpeg_get(unsigned char *buf, unsigned char *pic,
 		}
 		printk(KERN_INFO "bootsplash: scaling image from %dx%d to %dx%d\n", my_width, my_height, width, height);
 		if (my_height <= height)
-			err = scale_y_up(mem, pic, depth, my_width, my_height, width, height);
+			err = scale_y_up(mem, pic, depth, my_width, my_height, ((width + 15) & ~15), ((height + 15) & ~15));
 		else
-			err = scale_y_down(mem, pic, depth, my_width, my_height, width, height);
+			err = scale_y_down(mem, pic, depth, my_width, my_height, ((width + 15) & ~15), ((height + 15) & ~15));
 		vfree(mem);
 		if (err < 0)
-			return err;
+			return 17;
 	} else {
 		if ((err = jpeg_decode(buf, pic, ((width + 15) & ~15), ((height + 15) & ~15), depth, decdata)))
 			return err;
