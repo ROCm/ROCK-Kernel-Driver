@@ -55,6 +55,7 @@
  *	82801JIR (ICH10R)    : document number 319973-002, 319974-002,
  *	82801JD  (ICH10D)    : document number 319973-002, 319974-002,
  *	82801JDO (ICH10DO)   : document number 319973-002, 319974-002,
+ *	(CPT)                : document number TBD
  *	5 Series (PCH)       : document number 322169-001, 322170-001,
  *	3400 Series (PCH)    : document number 322169-001, 322170-001
  */
@@ -124,6 +125,8 @@ enum iTCO_chipsets {
 	TCO_ICH10R,	/* ICH10R */
 	TCO_ICH10D,	/* ICH10D */
 	TCO_ICH10DO,	/* ICH10DO */
+	TCO_CPTD,       /* CPT Mobile */
+	TCO_CPTM,       /* CPT Desktop */
 	TCO_PCH,	/* PCH Desktop Full Featured */
 	TCO_PCHM,	/* PCH Mobile Full Featured */
 	TCO_PCHMSFF,	/* PCH Mobile SFF Full Featured */
@@ -167,6 +170,8 @@ static struct {
 	{"ICH10R", 2},
 	{"ICH10D", 2},
 	{"ICH10DO", 2},
+	{"CPTD", 2},
+	{"CPTM", 2},
 	{"PCH Desktop Full Featured", 2},
 	{"PCH Mobile Full Featured", 2},
 	{"PCH Mobile SFF Full Featured", 2},
@@ -238,6 +243,8 @@ static struct pci_device_id iTCO_wdt_pci_tbl[] = {
 	{ ITCO_PCI_DEVICE(0x3a16,				TCO_ICH10R)},
 	{ ITCO_PCI_DEVICE(0x3a1a,				TCO_ICH10D)},
 	{ ITCO_PCI_DEVICE(0x3a14,				TCO_ICH10DO)},
+	{ ITCO_PCI_DEVICE(PCI_DEVICE_ID_INTEL_CPT_LPC1,         TCO_CPTD)},
+	{ ITCO_PCI_DEVICE(PCI_DEVICE_ID_INTEL_CPT_LPC2,         TCO_CPTM)},
 	{ ITCO_PCI_DEVICE(0x3b00,				TCO_PCH)},
 	{ ITCO_PCI_DEVICE(0x3b01,				TCO_PCHM)},
 	{ ITCO_PCI_DEVICE(0x3b0d,				TCO_PCHMSFF)},
