@@ -65,7 +65,7 @@ static DEFINE_PER_CPU(u64, processed_stolen_time);
 static DEFINE_PER_CPU(u64, processed_blocked_time);
 
 /* Current runstate of each CPU (updated automatically by the hypervisor). */
-static DEFINE_PER_CPU(struct vcpu_runstate_info, runstate);
+DEFINE_PER_CPU(struct vcpu_runstate_info, runstate);
 
 /* Must be signed, as it's compared with s64 quantities which can be -ve. */
 #define NS_PER_TICK (1000000000LL/HZ)

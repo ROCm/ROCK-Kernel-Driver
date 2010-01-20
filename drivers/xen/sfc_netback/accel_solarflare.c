@@ -179,6 +179,8 @@ static int bend_dl_probe(struct efx_dl_device *efx_dl_dev,
 		type = NET_ACCEL_MSG_HWTYPE_FALCON_A;
 	else if (strcmp(silicon_rev, "falcon/b0") == 0)
 		type = NET_ACCEL_MSG_HWTYPE_FALCON_B;
+	else if (strcmp(silicon_rev, "siena/a0") == 0)
+		type = NET_ACCEL_MSG_HWTYPE_SIENA_A;
 	else {
 		EPRINTK("%s: unsupported silicon %s\n", __FUNCTION__,
 			silicon_rev);
@@ -280,11 +282,65 @@ static void bend_dl_remove(struct efx_dl_device *efx_dl_dev)
 }
 
 
+static void bend_dl_reset_suspend(struct efx_dl_device *efx_dl_dev)
+{
+	struct driverlink_port *port;
+
+	DPRINTK("Driverlink reset suspend.\n");
+
+	mutex_lock(&accel_mutex);
+
+	port = (struct driverlink_port *)efx_dl_dev->priv;
+	BUG_ON(list_empty(&dl_ports));
+	BUG_ON(port == NULL);
+	BUG_ON(port->efx_dl_dev != efx_dl_dev);
+
+	netback_disconnect_accelerator(0, port->net_dev->name);
+	mutex_unlock(&accel_mutex);
+}
+
+
+static void bend_dl_reset_resume(struct efx_dl_device *efx_dl_dev, int ok)
+{
+	int rc;
+	struct driverlink_port *port;
+
+	DPRINTK("Driverlink reset resume.\n");
+	
+	if (!ok)
+		return;
+
+	port = (struct driverlink_port *)efx_dl_dev->priv;
+	BUG_ON(list_empty(&dl_ports));
+	BUG_ON(port == NULL);
+	BUG_ON(port->efx_dl_dev != efx_dl_dev);
+
+	rc = netback_connect_accelerator(NETBACK_ACCEL_VERSION, 0,
+					 port->net_dev->name, &accel_hooks);
+	if (rc != 0) {
+		EPRINTK("Xen netback accelerator version mismatch\n");
+
+		mutex_lock(&accel_mutex);
+		list_del(&port->link);
+		mutex_unlock(&accel_mutex);
+
+		efx_dl_unregister_callbacks(efx_dl_dev, &bend_dl_callbacks);
+
+		netback_accel_shutdown_fwd_port(port->fwd_priv);
+
+		efx_dl_dev->priv = NULL;
+		kfree(port);
+	}
+}
+
+
 static struct efx_dl_driver bend_dl_driver = 
 	{
 		.name = "SFC Xen backend",
 		.probe = bend_dl_probe,
 		.remove = bend_dl_remove,
+		.reset_suspend = bend_dl_reset_suspend,
+		.reset_resume = bend_dl_reset_resume
 	};
 
 
@@ -712,6 +768,7 @@ static int netback_accel_hwinfo(struct netback_accel *bend,
 		rc = ef_bend_hwinfo_falcon_a(bend, &msgvi->resources.falcon_a);
 		break;
 	case NET_ACCEL_MSG_HWTYPE_FALCON_B:
+	case NET_ACCEL_MSG_HWTYPE_SIENA_A:
 		rc = ef_bend_hwinfo_falcon_b(bend, &msgvi->resources.falcon_b);
 		break;
 	case NET_ACCEL_MSG_HWTYPE_NONE:

@@ -5,14 +5,19 @@
 # error "please don't include this file directly"
 #endif
 
-typedef union raw_spinlock {
+typedef union {
 	unsigned int slock;
 	struct {
 /*
  * Xen versions prior to 3.2.x have a race condition with HYPERVISOR_poll().
  */
 #if CONFIG_XEN_COMPAT >= 0x030200
-#if CONFIG_NR_CPUS < 256
+/*
+ * On Xen we support a single level of interrupt re-enabling per lock. Hence
+ * we can have twice as many outstanding tickets. Thus the cut-off for using
+ * byte register pairs must be at half the number of CPUs.
+ */
+#if 2 * CONFIG_NR_CPUS < 256
 # define TICKET_SHIFT 8
 		u8 cur, seq;
 #else
@@ -33,6 +38,11 @@ typedef union raw_spinlock {
 #else
 # error NR_CPUS >= 256 not implemented
 #endif
+#endif
+#if CONFIG_NR_CPUS <= 256
+		u8 owner;
+#else
+		u16 owner;
 #endif
 	};
 } raw_spinlock_t;

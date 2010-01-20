@@ -426,7 +426,10 @@ static int blkfront_remove(struct xenbus_device *dev)
 
 	blkif_free(info, 0);
 
-	kfree(info);
+	if(info->users == 0)
+		kfree(info);
+	else
+		info->is_ready = -1;
 
 	return 0;
 }
@@ -495,6 +498,8 @@ int blkif_open(struct block_device *bd, fmode_t mode)
 #endif
 	struct blkfront_info *info = bd->bd_disk->private_data;
 
+	if(info->is_ready < 0)
+		return -ENODEV;
 	info->users++;
 	return 0;
 }
@@ -518,7 +523,10 @@ int blkif_release(struct gendisk *disk, fmode_t mode)
 		struct xenbus_device * dev = info->xbdev;
 		enum xenbus_state state = xenbus_read_driver_state(dev->otherend);
 
-		if (state == XenbusStateClosing && info->is_ready)
+		if(info->is_ready < 0) {
+			blkfront_closing(dev);
+			kfree(info);
+		} else if (state == XenbusStateClosing && info->is_ready)
 			blkfront_closing(dev);
 	}
 	return 0;
@@ -912,7 +920,7 @@ int blkfront_is_ready(struct xenbus_device *dev)
 {
 	struct blkfront_info *info = dev_get_drvdata(&dev->dev);
 
-	return info->is_ready;
+	return info->is_ready > 0;
 }
 
 

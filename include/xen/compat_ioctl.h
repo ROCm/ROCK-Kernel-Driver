@@ -41,7 +41,7 @@ struct privcmd_mmapbatch_32 {
 	domid_t dom; /* target domain */
 #if defined(CONFIG_X86) || defined(CONFIG_IA64)
 	union {      /* virtual address */
-		__u64 addr __packed;
+		__u64 addr __attribute__((packed));
 		__u32 va; /* ensures union is 4-byte aligned */
 	};
 #else
@@ -49,9 +49,27 @@ struct privcmd_mmapbatch_32 {
 #endif
 	compat_uptr_t arr; /* array of mfns - top nibble set on err */
 };
+
+struct privcmd_mmapbatch_v2_32 {
+	unsigned int num; /* number of pages to populate */
+	domid_t dom;      /* target domain */
+#if defined(CONFIG_X86) || defined(CONFIG_IA64)
+	union {      /* virtual address */
+		__u64 addr __attribute__((packed));
+		__u32 va; /* ensures union is 4-byte aligned */
+	};
+#else
+	__u64 addr;  /* virtual address */
+#endif
+	compat_uptr_t arr; /* array of mfns */
+	compat_uptr_t err; /* array of error codes */
+};
+
 #define IOCTL_PRIVCMD_MMAP_32                   \
 	_IOC(_IOC_NONE, 'P', 2, sizeof(struct privcmd_mmap_32))
-#define IOCTL_PRIVCMD_MMAPBATCH_32                  \
+#define IOCTL_PRIVCMD_MMAPBATCH_32              \
 	_IOC(_IOC_NONE, 'P', 3, sizeof(struct privcmd_mmapbatch_32))
+#define IOCTL_PRIVCMD_MMAPBATCH_V2_32           \
+	_IOC(_IOC_NONE, 'P', 4, sizeof(struct privcmd_mmapbatch_v2_32))
 
 #endif /* __LINUX_XEN_COMPAT_H__ */

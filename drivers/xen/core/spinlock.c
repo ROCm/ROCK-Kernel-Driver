@@ -38,6 +38,8 @@ int __cpuinit xen_spinlock_init(unsigned int cpu)
 	};
 	int rc;
 
+	setup_runstate_area(cpu);
+
 	rc = bind_ipi_to_irqaction(SPIN_UNLOCK_VECTOR,
 				   cpu,
 				   &spinlock_action);
@@ -116,13 +118,83 @@ int xen_spin_wait(raw_spinlock_t *lock, unsigned int token)
 
 unsigned int xen_spin_adjust(raw_spinlock_t *lock, unsigned int token)
 {
-	return token;//todo
+	struct spinning *spinning;
+
+	for (spinning = percpu_read(spinning); spinning; spinning = spinning->prev)
+		if (spinning->lock == lock) {
+			unsigned int ticket = spinning->ticket;
+
+			spinning->ticket = token >> TICKET_SHIFT;
+			token = (token & ((1 << TICKET_SHIFT) - 1))
+				| (ticket << TICKET_SHIFT);
+			break;
+		}
+
+	return token;
 }
 
-int xen_spin_wait_flags(raw_spinlock_t *lock, unsigned int *token,
-			  unsigned int flags)
+int xen_spin_wait_flags(raw_spinlock_t *lock, unsigned int *ptok,
+			unsigned int flags)
 {
-	return xen_spin_wait(lock, *token);//todo
+	int rc = 0, irq = spinlock_irq;
+	raw_rwlock_t *rm_lock;
+	struct spinning spinning, *nested;
+
+	/* If kicker interrupt not initialized yet, just spin. */
+	if (unlikely(irq < 0) || unlikely(!cpu_online(raw_smp_processor_id())))
+		return 0;
+
+	/* announce we're spinning */
+	spinning.ticket = *ptok >> TICKET_SHIFT;
+	spinning.lock = lock;
+	spinning.prev = percpu_read(spinning);
+	smp_wmb();
+	percpu_write(spinning, &spinning);
+
+	for (nested = spinning.prev; nested; nested = nested->prev)
+		if (nested->lock == lock)
+			break;
+
+	/* clear pending */
+	xen_clear_irq_pending(irq);
+
+	do {
+		/* Check again to make sure it didn't become free while
+		 * we weren't looking. */
+		if (lock->cur == spinning.ticket) {
+			/* If we interrupted another spinlock while it was
+			 * blocking, make sure it doesn't block (again)
+			 * without rechecking the lock. */
+			if (spinning.prev)
+				xen_set_irq_pending(irq);
+			rc = 1;
+			break;
+		}
+
+		if (!nested)
+			/* No need to use raw_local_irq_restore() here, as the
+			 * intended wakeup will happen with the poll call. */
+			vcpu_info_write(evtchn_upcall_mask, flags);
+
+		/* block until irq becomes pending */
+		xen_poll_irq(irq);
+
+		raw_local_irq_disable();
+	} while (!xen_test_irq_pending(irq));
+
+	/* Leave the irq pending so that any interrupted blocker will
+	 * re-check. */
+	if (!rc)
+		kstat_incr_irqs_this_cpu(irq, irq_to_desc(irq));
+
+	/* announce we're done */
+	percpu_write(spinning, spinning.prev);
+	rm_lock = &__get_cpu_var(spinning_rm_lock);
+	__raw_write_lock(rm_lock);
+	__raw_write_unlock(rm_lock);
+	*ptok = lock->cur | (spinning.ticket << TICKET_SHIFT);
+
+	return rc;
 }
 
 void xen_spin_kick(raw_spinlock_t *lock, unsigned int token)

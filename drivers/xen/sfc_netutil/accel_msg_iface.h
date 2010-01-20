@@ -120,6 +120,7 @@ enum net_accel_hw_type {
 	/*! NIC is Falcon-based */
 	NET_ACCEL_MSG_HWTYPE_FALCON_A = 1,
 	NET_ACCEL_MSG_HWTYPE_FALCON_B = 2,
+	NET_ACCEL_MSG_HWTYPE_SIENA_A = 3,
 };
 
 /*! The maximum number of pages used by an event queue. */

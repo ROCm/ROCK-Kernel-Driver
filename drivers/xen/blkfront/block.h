@@ -78,6 +78,7 @@ struct xlbd_major_info
 	int index;
 	int usage;
 	struct xlbd_type_info *type;
+	struct xlbd_minor_state *minors;
 };
 
 struct blk_shadow {

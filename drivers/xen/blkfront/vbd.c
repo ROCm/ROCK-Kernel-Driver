@@ -48,6 +48,12 @@
 #define VDEV_IS_EXTENDED(dev) ((dev)&(EXTENDED))
 #define BLKIF_MINOR_EXT(dev) ((dev)&(~EXTENDED))
 
+struct xlbd_minor_state {
+	unsigned int nr;
+	unsigned long *bitmap;
+	spinlock_t lock;
+};
+
 /*
  * For convenience we distinguish between ide, scsi and 'other' (i.e.,
  * potentially combinations of the two) in the naming scheme and in a few other
@@ -97,6 +103,8 @@ static struct xlbd_major_info *major_info[NUM_IDE_MAJORS + NUM_SCSI_MAJORS +
 #define XLBD_MAJOR_SCSI_RANGE	XLBD_MAJOR_SCSI_START ... XLBD_MAJOR_VBD_START - 1
 #define XLBD_MAJOR_VBD_RANGE	XLBD_MAJOR_VBD_START ... XLBD_MAJOR_VBD_START + NUM_VBD_MAJORS - 1
 
+#define XLBD_MAJOR_VBD_ALT(idx) ((idx) ^ XLBD_MAJOR_VBD_START ^ (XLBD_MAJOR_VBD_START + 1))
+
 static const struct block_device_operations xlvbd_block_fops =
 {
 	.owner = THIS_MODULE,
@@ -118,6 +126,7 @@ static struct xlbd_major_info *
 xlbd_alloc_major_info(int major, int minor, int index)
 {
 	struct xlbd_major_info *ptr;
+	struct xlbd_minor_state *minors;
 	int do_register;
 
 	ptr = kzalloc(sizeof(struct xlbd_major_info), GFP_KERNEL);
@@ -125,6 +134,22 @@ xlbd_alloc_major_info(int major, int minor, int index)
 		return NULL;
 
 	ptr->major = major;
+	minors = kmalloc(sizeof(*minors), GFP_KERNEL);
+	if (minors == NULL) {
+		kfree(ptr);
+		return NULL;
+	}
+
+	minors->bitmap = kzalloc(BITS_TO_LONGS(256) * sizeof(*minors->bitmap),
+				 GFP_KERNEL);
+	if (minors->bitmap == NULL) {
+		kfree(minors);
+		kfree(ptr);
+		return NULL;
+	}
+
+	spin_lock_init(&minors->lock);
+	minors->nr = 256;
 	do_register = 1;
 
 	switch (index) {
@@ -147,13 +172,19 @@ xlbd_alloc_major_info(int major, int minor, int index)
 		 * if someone already registered block major 202,
 		 * don't try to register it again
 		 */
-		if (major_info[XLBD_MAJOR_VBD_START] != NULL)
+		if (major_info[XLBD_MAJOR_VBD_ALT(index)] != NULL) {
+			kfree(minors->bitmap);
+			kfree(minors);
+			minors = major_info[XLBD_MAJOR_VBD_ALT(index)]->minors;
 			do_register = 0;
+		}
 		break;
 	}
 
 	if (do_register) {
 		if (register_blkdev(ptr->major, ptr->type->devname)) {
+			kfree(minors->bitmap);
+			kfree(minors);
 			kfree(ptr);
 			return NULL;
 		}
@@ -161,6 +192,7 @@ xlbd_alloc_major_info(int major, int minor, int index)
 		printk("xen-vbd: registered block device major %i\n", ptr->major);
 	}
 
+	ptr->minors = minors;
 	major_info[index] = ptr;
 	return ptr;
 }
@@ -210,6 +242,61 @@ xlbd_put_major_info(struct xlbd_major_info *mi)
 {
 	mi->usage--;
 	/* XXX: release major if 0 */
+}
+
+static int
+xlbd_reserve_minors(struct xlbd_major_info *mi, unsigned int minor,
+		    unsigned int nr_minors)
+{
+	struct xlbd_minor_state *ms = mi->minors;
+	unsigned int end = minor + nr_minors;
+	int rc;
+
+	if (end > ms->nr) {
+		unsigned long *bitmap, *old;
+
+		bitmap = kzalloc(BITS_TO_LONGS(end) * sizeof(*bitmap),
+				 GFP_KERNEL);
+		if (bitmap == NULL)
+			return -ENOMEM;
+
+		spin_lock(&ms->lock);
+		if (end > ms->nr) {
+			old = ms->bitmap;
+			memcpy(bitmap, ms->bitmap,
+			       BITS_TO_LONGS(ms->nr) * sizeof(*bitmap));
+			ms->bitmap = bitmap;
+			ms->nr = BITS_TO_LONGS(end) * BITS_PER_LONG;
+		} else
+			old = bitmap;
+		spin_unlock(&ms->lock);
+		kfree(old);
+	}
+
+	spin_lock(&ms->lock);
+	if (find_next_bit(ms->bitmap, end, minor) >= end) {
+		for (; minor < end; ++minor)
+			__set_bit(minor, ms->bitmap);
+		rc = 0;
+	} else
+		rc = -EBUSY;
+	spin_unlock(&ms->lock);
+
+	return rc;
+}
+
+static void
+xlbd_release_minors(struct xlbd_major_info *mi, unsigned int minor,
+		    unsigned int nr_minors)
+{
+	struct xlbd_minor_state *ms = mi->minors;
+	unsigned int end = minor + nr_minors;
+
+	BUG_ON(end > ms->nr);
+	spin_lock(&ms->lock);
+	for (; minor < end; ++minor)
+		__clear_bit(minor, ms->bitmap);
+	spin_unlock(&ms->lock);
 }
 
 static int
@@ -287,9 +374,14 @@ xlvbd_add(blkif_sector_t capacity, int vdevice, u16 vdisk_info,
 	    (minor & ((1 << mi->type->partn_shift) - 1)) == 0)
 		nr_minors = 1 << mi->type->partn_shift;
 
+	err = xlbd_reserve_minors(mi, minor, nr_minors);
+	if (err)
+		goto out;
+	err = -ENODEV;
+
 	gd = alloc_disk(nr_minors);
 	if (gd == NULL)
-		goto out;
+		goto release;
 
 	offset =  mi->index * mi->type->disks_per_major +
 			(minor >> mi->type->partn_shift);
@@ -328,7 +420,7 @@ xlvbd_add(blkif_sector_t capacity, int vdevice, u16 vdisk_info,
 
 	if (xlvbd_init_blk_queue(gd, sector_size)) {
 		del_gendisk(gd);
-		goto out;
+		goto release;
 	}
 
 	info->rq = gd->queue;
@@ -348,6 +440,8 @@ xlvbd_add(blkif_sector_t capacity, int vdevice, u16 vdisk_info,
 
 	return 0;
 
+ release:
+	xlbd_release_minors(mi, minor, nr_minors);
  out:
 	if (mi)
 		xlbd_put_major_info(mi);
@@ -358,14 +452,19 @@ xlvbd_add(blkif_sector_t capacity, int vdevice, u16 vdisk_info,
 void
 xlvbd_del(struct blkfront_info *info)
 {
+	unsigned int minor, nr_minors;
+
 	if (info->mi == NULL)
 		return;
 
 	BUG_ON(info->gd == NULL);
+	minor = info->gd->first_minor;
+	nr_minors = info->gd->minors;
 	del_gendisk(info->gd);
 	put_disk(info->gd);
 	info->gd = NULL;
 
+	xlbd_release_minors(info->mi, minor, nr_minors);
 	xlbd_put_major_info(info->mi);
 	info->mi = NULL;
 

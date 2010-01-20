@@ -89,6 +89,7 @@ int netfront_accel_vi_init_fini(netfront_accel_vnic *vnic,
 			(hw_info->evq_rptr & (PAGE_SIZE - 1));
 		break;
 	case NET_ACCEL_MSG_HWTYPE_FALCON_B:
+	case NET_ACCEL_MSG_HWTYPE_SIENA_A:
 		hw_info = &hw_msg->resources.falcon_b;
 		break;
 	default:
@@ -124,8 +125,9 @@ int netfront_accel_vi_init_fini(netfront_accel_vnic *vnic,
 	}
 	vnic->hw.falcon.doorbell = doorbell_kva;
 
-	/* On Falcon_B we get the rptr from the doorbell page */
-	if (hw_msg->type == NET_ACCEL_MSG_HWTYPE_FALCON_B) {
+	/* On Falcon_B and Siena we get the rptr from the doorbell page */
+	if (hw_msg->type == NET_ACCEL_MSG_HWTYPE_FALCON_B ||
+	    hw_msg->type == NET_ACCEL_MSG_HWTYPE_SIENA_A) {
 		vnic->hw.falcon.evq_rptr = 
 			(u32 *)((char *)vnic->hw.falcon.doorbell 
 				+ hw_info->evq_rptr);

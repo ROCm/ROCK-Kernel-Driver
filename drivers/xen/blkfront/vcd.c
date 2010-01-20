@@ -155,6 +155,9 @@ static int xencdrom_open(struct cdrom_device_info *cdi, int purpose)
 
 	info = cdi->disk->private_data;
 
+	if(info->is_ready < 0)
+		return -ENODEV;
+
 	if (strlen(info->xbdev->otherend) > MAX_PACKET_DATA) {
 		return -EIO;
 	}
@@ -315,6 +318,9 @@ static int xencdrom_block_open(struct block_device *bd, fmode_t mode)
 	struct vcd_disk *vcd;
 	int ret = 0;
 
+	if(info->is_ready < 0)
+		return -ENODEV;
+
 	if ((vcd = xencdrom_get_list_entry(info->gd))) {
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,28)
 		ret = cdrom_open(&vcd->vcd_cdrom_info, inode, file);
@@ -426,7 +432,7 @@ static int xencdrom_block_media_changed(struct gendisk *disk)
 	return ret;
 }
 
-static struct block_device_operations xencdrom_bdops =
+static const struct block_device_operations xencdrom_bdops =
 {
 	.owner		= THIS_MODULE,
 	.open		= xencdrom_block_open,
@@ -471,7 +477,6 @@ void register_vcd(struct blkfront_info *info)
 				gd->major);
 		goto err_out;
 	}
-	xencdrom_bdops.owner = gd->fops->owner;
 	gd->fops = &xencdrom_bdops;
 	vcd->vcd_cdrom_info.disk = gd;
 

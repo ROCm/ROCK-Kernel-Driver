@@ -1,4 +1,4 @@
-EXTRA_CFLAGS += -Idrivers/xen/sfc_netback -Idrivers/xen/sfc_netutil -Idrivers/xen/netback -Idrivers/net/sfc
+EXTRA_CFLAGS += -Idrivers/xen/sfc_netback -Idrivers/xen/sfc_netutil -Idrivers/xen/netback -Idrivers/net/sfc -Idrivers/net/sfc/sfc_resource
 EXTRA_CFLAGS += -D__ci_driver__ 
 EXTRA_CFLAGS += -DEFX_USE_KCOMPAT
 EXTRA_CFLAGS += -Werror
