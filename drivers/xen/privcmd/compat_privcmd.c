@@ -102,7 +102,7 @@ int privcmd_ioctl_32(int fd, unsigned int cmd, unsigned long arg)
 		struct privcmd_mmapbatch_v2_32 n32;
 #ifdef xen_pfn32_t
 		xen_pfn_t *__user arr;
-		xen_pfn32_t *__user arr32;
+		const xen_pfn32_t *__user arr32;
 		unsigned int i;
 #endif
 
@@ -133,17 +133,6 @@ int privcmd_ioctl_32(int fd, unsigned int cmd, unsigned long arg)
 #endif
 
 		ret = sys_ioctl(fd, IOCTL_PRIVCMD_MMAPBATCH_V2, (unsigned long)p);
-
-#ifdef xen_pfn32_t
-		for (i = 0; !ret && i < n32.num; ++i) {
-			xen_pfn_t mfn;
-
-			if (get_user(mfn, arr + i) || put_user(mfn, arr32 + i))
-				ret = -EFAULT;
-			else if (mfn != (xen_pfn32_t)mfn)
-				ret = -ERANGE;
-		}
-#endif
 	}
 		break;
 	default:

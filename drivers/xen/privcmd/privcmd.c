@@ -389,7 +389,8 @@ static long privcmd_ioctl(struct file *file,
 					ret = -EFAULT;
 				i += nr; p += nr;
 			}
-		}
+		} else if (clear_user(m.err, nr_pages * sizeof(*m.err)))
+			ret = -EFAULT;
 
 	mmapbatch_v2_out:
 		list_for_each_safe(l, l2, &pagelist)
