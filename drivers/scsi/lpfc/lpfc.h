@@ -109,7 +109,8 @@ struct hbq_dmabuf {
 	struct lpfc_dmabuf dbuf;
 	uint32_t size;
 	uint32_t tag;
-	struct lpfc_rcqe rcqe;
+	struct lpfc_cq_event cq_event;
+	unsigned long time_stamp;
 };
 
 /* Priority bit.  Set value to exceed low water mark in lpfc_mem. */
@@ -201,6 +202,7 @@ struct lpfc_stats {
 	uint32_t elsRcvLIRR;
 	uint32_t elsRcvRPS;
 	uint32_t elsRcvRPL;
+	uint32_t elsRcvRRQ;
 	uint32_t elsXmitFLOGI;
 	uint32_t elsXmitFDISC;
 	uint32_t elsXmitPLOGI;
@@ -278,6 +280,57 @@ enum hba_state {
 	LPFC_HBA_ERROR       =  -1
 };
 
+enum auth_state {
+	LPFC_AUTH_UNKNOWN		=  0,
+	LPFC_AUTH_SUCCESS		=  1,
+	LPFC_AUTH_FAIL			=  2,
+	LPFC_AUTH_FAIL_ELS_TMO		=  3,
+	LPFC_AUTH_FAIL_TRANS_TMO	=  4,
+	LPFC_AUTH_FAIL_LS_RJT_GEN	=  5,
+	LPFC_AUTH_FAIL_LS_RJT_BUSY	=  6,
+	LPFC_AUTH_FAIL_AUTH_RJT		=  7,
+};
+enum auth_msg_state {
+	LPFC_AUTH_NONE			=  0,
+	LPFC_AUTH_REJECT		=  1,	/* Sent a Reject */
+	LPFC_AUTH_NEGOTIATE		=  2,	/* Auth Negotiate */
+	LPFC_DHCHAP_CHALLENGE		=  3,	/* Challenge */
+	LPFC_DHCHAP_REPLY		=  4,	/* Reply */
+	LPFC_DHCHAP_SUCCESS_REPLY	=  5,	/* Success with Reply */
+	LPFC_DHCHAP_SUCCESS		=  6,	/* Success */
+	LPFC_AUTH_DONE			=  7,
+};
+
+struct lpfc_auth {
+	uint8_t auth_mode;
+	uint8_t bidirectional;
+	uint8_t hash_priority[4];
+	uint32_t hash_len;
+	uint8_t dh_group_priority[8];
+	uint32_t dh_group_len;
+	uint32_t reauth_interval;
+
+	uint8_t security_active;
+	enum auth_state auth_state;
+	enum auth_msg_state auth_msg_state;
+	uint32_t trans_id;              /* current transaction id. Can be set
+					   by incomming transactions as well */
+	uint32_t group_id;
+	uint32_t hash_id;
+	uint32_t direction;
+#define AUTH_DIRECTION_NONE	0
+#define AUTH_DIRECTION_REMOTE	0x1
+#define AUTH_DIRECTION_LOCAL	0x2
+#define AUTH_DIRECTION_BIDI	(AUTH_DIRECTION_LOCAL|AUTH_DIRECTION_REMOTE)
+
+	uint8_t *challenge;
+	uint32_t challenge_len;
+	uint8_t *dh_pub_key;
+	uint32_t dh_pub_key_len;
+
+	unsigned long last_auth;
+};
+
 struct lpfc_vport {
 	struct lpfc_hba *phba;
 	struct list_head listentry;
@@ -289,8 +342,8 @@ struct lpfc_vport {
 
 	uint16_t vpi;
 	uint16_t vfi;
-	uint8_t vfi_state;
-#define LPFC_VFI_REGISTERED	0x1
+	uint8_t vpi_state;
+#define LPFC_VPI_REGISTERED	0x1
 
 	uint32_t fc_flag;	/* FC flags */
 /* Several of these flags are HBA centric and should be moved to
@@ -313,6 +366,9 @@ struct lpfc_vport {
 #define FC_VPORT_NEEDS_REG_VPI	0x80000  /* Needs to have its vpi registered */
 #define FC_RSCN_DEFERRED	0x100000 /* A deferred RSCN being processed */
 #define FC_VPORT_NEEDS_INIT_VPI 0x200000 /* Need to INIT_VPI before FDISC */
+#define FC_VPORT_CVL_RCVD	0x400000 /* VLink failed due to CVL	 */
+#define FC_VFI_REGISTERED	0x800000 /* VFI is registered */
+#define FC_FDISC_COMPLETED	0x1000000/* FDISC completed */
 
 	uint32_t ct_flags;
 #define FC_CT_RFF_ID		0x1	 /* RFF_ID accepted by switch */
@@ -375,6 +431,15 @@ struct lpfc_vport {
 	uint8_t load_flag;
 #define FC_LOADING		0x1	/* HBA in process of loading drvr */
 #define FC_UNLOADING		0x2	/* HBA in process of unloading drvr */
+	/* Fields used for accessing auth service */
+	struct lpfc_auth auth;
+	uint32_t sc_tran_id;
+	struct list_head sc_response_wait_queue;
+	struct list_head sc_users;
+	struct work_struct sc_online_work;
+	struct work_struct sc_offline_work;
+	uint8_t security_service_state;
+
 	/* Vport Config Parameters */
 	uint32_t cfg_scan_down;
 	uint32_t cfg_lun_queue_depth;
@@ -390,6 +455,7 @@ struct lpfc_vport {
 	uint32_t cfg_max_luns;
 	uint32_t cfg_enable_da_id;
 	uint32_t cfg_max_scsicmpl_time;
+	uint32_t cfg_enable_auth;
 
 	uint32_t dev_loss_tmo_changed;
 
@@ -405,6 +471,7 @@ struct lpfc_vport {
 	uint8_t stat_data_enabled;
 	uint8_t stat_data_blocked;
 	struct list_head rcv_buffer_list;
+	unsigned long rcv_buffer_time_stamp;
 	uint32_t vport_flag;
 #define STATIC_VPORT	1
 };
@@ -527,13 +594,16 @@ struct lpfc_hba {
 #define HBA_ERATT_HANDLED	0x1 /* This flag is set when eratt handled */
 #define DEFER_ERATT		0x2 /* Deferred error attention in progress */
 #define HBA_FCOE_SUPPORT	0x4 /* HBA function supports FCOE */
-#define HBA_RECEIVE_BUFFER	0x8 /* Rcv buffer posted to worker thread */
+#define HBA_SP_QUEUE_EVT	0x8 /* Slow-path qevt posted to worker thread*/
 #define HBA_POST_RECEIVE_BUFFER 0x10 /* Rcv buffers need to be posted */
 #define FCP_XRI_ABORT_EVENT	0x20
 #define ELS_XRI_ABORT_EVENT	0x40
 #define ASYNC_EVENT		0x80
 #define LINK_DISABLED		0x100 /* Link disabled by user */
 #define FCF_DISC_INPROGRESS	0x200 /* FCF discovery in progress */
+#define HBA_FIP_SUPPORT		0x400 /* FIP support in HBA */
+#define HBA_AER_ENABLED		0x800 /* AER enabled with HBA */
+	uint32_t fcp_ring_in_use; /* When polling test if intr-hndlr active*/
 	struct lpfc_dmabuf slim2p;
 
 	MAILBOX_t *mbox;
@@ -551,6 +621,7 @@ struct lpfc_hba {
 	uint8_t fc_linkspeed;	/* Link speed after last READ_LA */
 
 	uint32_t fc_eventTag;	/* event tag for link attention */
+	uint32_t link_events;
 
 	/* These fields used to be binfo */
 	uint32_t fc_pref_DID;	/* preferred D_ID */
@@ -604,8 +675,8 @@ struct lpfc_hba {
 	uint32_t cfg_enable_hba_reset;
 	uint32_t cfg_enable_hba_heartbeat;
 	uint32_t cfg_enable_bg;
-	uint32_t cfg_enable_fip;
 	uint32_t cfg_log_verbose;
+	uint32_t cfg_aer_support;
 
 	lpfc_vpd_t vpd;		/* vital product data */
 

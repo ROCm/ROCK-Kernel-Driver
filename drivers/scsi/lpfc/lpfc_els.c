@@ -40,6 +40,9 @@
 #include "lpfc_crtn.h"
 #include "lpfc_vport.h"
 #include "lpfc_debugfs.h"
+#include "lpfc_auth_access.h"
+#include "lpfc_auth.h"
+#include "lpfc_security.h"
 
 static int lpfc_els_retry(struct lpfc_hba *, struct lpfc_iocbq *,
 			  struct lpfc_iocbq *);
@@ -50,9 +53,6 @@ static int lpfc_issue_els_fdisc(struct lpfc_vport *vport,
 				struct lpfc_nodelist *ndlp, uint8_t retry);
 static int lpfc_issue_fabric_iocb(struct lpfc_hba *phba,
 				  struct lpfc_iocbq *iocb);
-static void lpfc_register_new_vport(struct lpfc_hba *phba,
-				    struct lpfc_vport *vport,
-				    struct lpfc_nodelist *ndlp);
 
 static int lpfc_max_els_tries = 3;
 
@@ -173,13 +173,26 @@ lpfc_prep_els_iocb(struct lpfc_vport *vport, uint8_t expectRsp,
 	 * in FIP mode send FLOGI, FDISC and LOGO as FIP frames.
 	 */
 	if ((did == Fabric_DID) &&
-		bf_get(lpfc_fip_flag, &phba->sli4_hba.sli4_flags) &&
+		(phba->hba_flag & HBA_FIP_SUPPORT) &&
 		((elscmd == ELS_CMD_FLOGI) ||
 		 (elscmd == ELS_CMD_FDISC) ||
 		 (elscmd == ELS_CMD_LOGO)))
-		elsiocb->iocb_flag |= LPFC_FIP_ELS;
+		switch (elscmd) {
+		case ELS_CMD_FLOGI:
+		elsiocb->iocb_flag |= ((ELS_ID_FLOGI << LPFC_FIP_ELS_ID_SHIFT)
+					& LPFC_FIP_ELS_ID_MASK);
+		break;
+		case ELS_CMD_FDISC:
+		elsiocb->iocb_flag |= ((ELS_ID_FDISC << LPFC_FIP_ELS_ID_SHIFT)
+					& LPFC_FIP_ELS_ID_MASK);
+		break;
+		case ELS_CMD_LOGO:
+		elsiocb->iocb_flag |= ((ELS_ID_LOGO << LPFC_FIP_ELS_ID_SHIFT)
+					& LPFC_FIP_ELS_ID_MASK);
+		break;
+		}
 	else
-		elsiocb->iocb_flag &= ~LPFC_FIP_ELS;
+		elsiocb->iocb_flag &= ~LPFC_FIP_ELS_ID_MASK;
 
 	icmd = &elsiocb->iocb;
 
@@ -591,10 +604,16 @@ lpfc_cmpl_els_flogi_fabric(struct lpfc_vport *vport, struct lpfc_nodelist *ndlp,
 	} else {
 		ndlp->nlp_type |= NLP_FABRIC;
 		lpfc_nlp_set_state(vport, ndlp, NLP_STE_UNMAPPED_NODE);
-		if (vport->vfi_state & LPFC_VFI_REGISTERED) {
-			lpfc_start_fdiscs(phba);
-			lpfc_do_scr_ns_plogi(phba, vport);
-		} else
+		if ((!(vport->fc_flag & FC_VPORT_NEEDS_REG_VPI)) &&
+			(vport->vpi_state & LPFC_VPI_REGISTERED)) {
+			if (vport->cfg_enable_auth) {
+				if (lpfc_get_auth_config(vport, NULL))
+					return 1;
+			} else
+				lpfc_start_discovery(vport);
+		} else if (vport->fc_flag & FC_VFI_REGISTERED)
+			lpfc_register_new_vport(phba, vport, ndlp);
+		else
 			lpfc_issue_reg_vfi(vport);
 	}
 	return 0;
@@ -791,6 +810,9 @@ lpfc_cmpl_els_flogi(struct lpfc_hba *phba, struct lpfc_iocbq *cmdiocb,
 				 irsp->ulpTimeout);
 		goto flogifail;
 	}
+	spin_lock_irq(shost->host_lock);
+	vport->fc_flag &= ~FC_VPORT_CVL_RCVD;
+	spin_unlock_irq(shost->host_lock);
 
 	/*
 	 * The FLogI succeeded.  Sync the data for the CPU before
@@ -799,7 +821,10 @@ lpfc_cmpl_els_flogi(struct lpfc_hba *phba, struct lpfc_iocbq *cmdiocb,
 	prsp = list_get_first(&pcmd->list, struct lpfc_dmabuf, list);
 
 	sp = prsp->virt + sizeof(uint32_t);
-
+	if (sp->cmn.security)
+		ndlp->nlp_flag |= NLP_SC_REQ;
+	else
+		ndlp->nlp_flag &= ~NLP_SC_REQ;
 	/* FLOGI completes successfully */
 	lpfc_printf_vlog(vport, KERN_INFO, LOG_ELS,
 			 "0101 FLOGI completes sucessfully "
@@ -807,6 +832,16 @@ lpfc_cmpl_els_flogi(struct lpfc_hba *phba, struct lpfc_iocbq *cmdiocb,
 			 irsp->un.ulpWord[4], sp->cmn.e_d_tov,
 			 sp->cmn.w2.r_a_tov, sp->cmn.edtovResolution);
 
+	if (!vport->cfg_enable_auth) {
+		vport->auth.security_active = 0;
+		if (sp->cmn.security) {
+			lpfc_printf_vlog(vport, KERN_ERR, LOG_SECURITY,
+					 "1055 Authentication parameter is "
+					 "disabled, but is required by "
+					 "the fabric.\n");
+			goto flogifail;
+		}
+	}
 	if (vport->port_state == LPFC_FLOGI) {
 		/*
 		 * If Common Service Parameters indicate Nport
@@ -896,6 +931,10 @@ lpfc_issue_els_flogi(struct lpfc_vport *vport, struct lpfc_nodelist *ndlp,
 	sp = (struct serv_parm *) pcmd;
 
 	/* Setup CSPs accordingly for Fabric */
+
+	if (vport->cfg_enable_auth)
+		sp->cmn.security = 1;
+
 	sp->cmn.e_d_tov = 0;
 	sp->cmn.w2.r_a_tov = 0;
 	sp->cls1.classValid = 0;
@@ -1015,6 +1054,15 @@ lpfc_initial_flogi(struct lpfc_vport *vport)
 	struct lpfc_hba *phba = vport->phba;
 	struct lpfc_nodelist *ndlp;
 
+	if (vport->cfg_enable_auth && lpfc_security_wait(vport)) {
+		lpfc_printf_vlog(vport, KERN_ERR, LOG_SECURITY,
+				 "2725 Authentication is enabled but "
+				 "authentication service is not "
+				 "running\n");
+		vport->auth.auth_mode = FC_AUTHMODE_UNKNOWN;
+		return 0;
+	}
+
 	vport->port_state = LPFC_FLOGI;
 	lpfc_set_disctmo(vport);
 
@@ -1068,6 +1116,14 @@ lpfc_initial_fdisc(struct lpfc_vport *vport)
 	struct lpfc_hba *phba = vport->phba;
 	struct lpfc_nodelist *ndlp;
 
+	if (vport->cfg_enable_auth && lpfc_security_wait(vport)) {
+		lpfc_printf_vlog(vport, KERN_ERR, LOG_SECURITY,
+				 "1049 Authentication is enabled but "
+				 "authentication service is not "
+				 "running\n");
+		vport->auth.auth_mode = FC_AUTHMODE_UNKNOWN;
+		return 0;
+	}
 	/* First look for the Fabric ndlp */
 	ndlp = lpfc_findnode_did(vport, Fabric_DID);
 	if (!ndlp) {
@@ -2452,6 +2508,7 @@ lpfc_els_retry_delay_handler(struct lpfc_nodelist *ndlp)
 	 */
 	del_timer_sync(&ndlp->nlp_delayfunc);
 	retry = ndlp->nlp_retry;
+	ndlp->nlp_retry = 0;
 
 	switch (cmd) {
 	case ELS_CMD_FLOGI:
@@ -2706,17 +2763,21 @@ lpfc_els_retry(struct lpfc_hba *phba, struct lpfc_iocbq *cmdiocb,
 	if (did == FDMI_DID)
 		retry = 1;
 
-	if ((cmd == ELS_CMD_FLOGI) &&
+	if (((cmd == ELS_CMD_FLOGI) || (cmd == ELS_CMD_FDISC)) &&
 	    (phba->fc_topology != TOPOLOGY_LOOP) &&
 	    !lpfc_error_lost_link(irsp)) {
 		/* FLOGI retry policy */
 		retry = 1;
-		maxretry = 48;
-		if (cmdiocb->retry >= 32)
+		/* retry forever */
+		maxretry = 0;
+		if (cmdiocb->retry >= 100)
+			delay = 5000;
+		else if (cmdiocb->retry >= 32)
 			delay = 1000;
 	}
 
-	if ((++cmdiocb->retry) >= maxretry) {
+	cmdiocb->retry++;
+	if (maxretry && (cmdiocb->retry >= maxretry)) {
 		phba->fc_stat.elsRetryExceeded++;
 		retry = 0;
 	}
@@ -2795,6 +2856,17 @@ lpfc_els_retry(struct lpfc_hba *phba, struct lpfc_iocbq *cmdiocb,
 			ndlp->nlp_prev_state = ndlp->nlp_state;
 			lpfc_nlp_set_state(vport, ndlp, NLP_STE_NPR_NODE);
 			lpfc_issue_els_logo(vport, ndlp, cmdiocb->retry);
+			return 1;
+		case ELS_CMD_AUTH_NEG:
+		case ELS_CMD_DH_CHA:
+		case ELS_CMD_DH_REP:
+		case ELS_CMD_DH_SUC:
+			ndlp->nlp_prev_state = ndlp->nlp_state;
+			ndlp->nlp_state = NLP_STE_NPR_NODE;
+			lpfc_printf_log(phba, KERN_INFO, LOG_ELS,
+					"0153 Authentication LS_RJT Logical "
+					"busy\n");
+			lpfc_start_authentication(vport, ndlp);
 			return 1;
 		}
 	}
@@ -4124,8 +4196,8 @@ lpfc_els_rcv_rscn(struct lpfc_vport *vport, struct lpfc_iocbq *cmdiocb,
 	spin_lock_irq(shost->host_lock);
 	if (vport->fc_rscn_flush) {
 		/* Another thread is walking fc_rscn_id_list on this vport */
-		spin_unlock_irq(shost->host_lock);
 		vport->fc_flag |= FC_RSCN_DISCOVERY;
+		spin_unlock_irq(shost->host_lock);
 		/* Send back ACC */
 		lpfc_els_rsp_acc(vport, ELS_CMD_ACC, cmdiocb, ndlp, NULL);
 		return 0;
@@ -4500,6 +4572,29 @@ lpfc_els_rcv_lirr(struct lpfc_vport *vport, struct lpfc_iocbq *cmdiocb,
 	stat.un.b.vendorUnique = 0;
 	lpfc_els_rsp_reject(vport, stat.un.lsRjtError, cmdiocb, ndlp, NULL);
 	return 0;
+}
+
+/**
+ * lpfc_els_rcv_rrq - Process an unsolicited rrq iocb
+ * @vport: pointer to a host virtual N_Port data structure.
+ * @cmdiocb: pointer to lpfc command iocb data structure.
+ * @ndlp: pointer to a node-list data structure.
+ *
+ * This routine processes a Reinstate Recovery Qualifier (RRQ) IOCB
+ * received as an ELS unsolicited event. A request to RRQ shall only
+ * be accepted if the Originator Nx_Port N_Port_ID or the Responder
+ * Nx_Port N_Port_ID of the target Exchange is the same as the
+ * N_Port_ID of the Nx_Port that makes the request. If the RRQ is
+ * not accepted, an LS_RJT with reason code "Unable to perform
+ * command request" and reason code explanation "Invalid Originator
+ * S_ID" shall be returned. For now, we just unconditionally accept
+ * RRQ from the target.
+ **/
+static void
+lpfc_els_rcv_rrq(struct lpfc_vport *vport, struct lpfc_iocbq *cmdiocb,
+		 struct lpfc_nodelist *ndlp)
+{
+	lpfc_els_rsp_acc(vport, ELS_CMD_ACC, cmdiocb, ndlp, NULL);
 }
 
 /**
@@ -5203,6 +5298,362 @@ lpfc_els_flush_all_cmd(struct lpfc_hba  *phba)
 	return;
 }
 
+static void
+lpfc_els_rcv_auth_neg(struct lpfc_vport *vport, struct lpfc_iocbq *cmdiocb,
+		  struct lpfc_nodelist *ndlp)
+{
+	struct Scsi_Host  *shost = lpfc_shost_from_vport(vport);
+	struct lpfc_dmabuf *pcmd = cmdiocb->context2;
+	struct lpfc_auth_message *authcmd;
+	uint8_t reason, explanation;
+	uint32_t message_len;
+	uint32_t trans_id;
+	struct fc_auth_req *fc_req;
+	struct fc_auth_rsp *fc_rsp;
+
+	authcmd = pcmd->virt;
+	message_len = be32_to_cpu(authcmd->message_len);
+	trans_id = be32_to_cpu(authcmd->trans_id);
+
+	lpfc_els_rsp_acc(vport, ELS_CMD_ACC, cmdiocb, ndlp, NULL);
+
+	vport->auth.trans_id = trans_id;
+
+	if (lpfc_unpack_auth_negotiate(vport, authcmd->data,
+				       &reason, &explanation)) {
+		lpfc_issue_els_auth_reject(vport, ndlp, reason, explanation);
+		return;
+	}
+	vport->auth.direction = AUTH_DIRECTION_NONE;
+	lpfc_printf_vlog(vport, KERN_WARNING, LOG_SECURITY,
+			 "1033 Received auth_negotiate from Nport:x%x\n",
+			 ndlp->nlp_DID);
+
+	fc_req = kzalloc(sizeof(struct fc_auth_req), GFP_KERNEL);
+
+	fc_req->local_wwpn = wwn_to_u64(vport->fc_portname.u.wwn);
+	if (ndlp->nlp_type & NLP_FABRIC)
+		fc_req->remote_wwpn = AUTH_FABRIC_WWN;
+	else
+		fc_req->remote_wwpn = wwn_to_u64(ndlp->nlp_portname.u.wwn);
+	fc_req->u.dhchap_challenge.transaction_id = vport->auth.trans_id;
+	fc_req->u.dhchap_challenge.dh_group_id = vport->auth.group_id;
+	fc_req->u.dhchap_challenge.hash_id = vport->auth.hash_id;
+
+	fc_rsp = kzalloc(MAX_AUTH_RSP_SIZE, GFP_KERNEL);
+
+	if (lpfc_fc_security_dhchap_make_challenge(shost,
+			      fc_req, sizeof(struct fc_auth_req),
+	fc_rsp, MAX_AUTH_RSP_SIZE)) {
+		kfree(fc_rsp);
+		lpfc_issue_els_auth_reject(vport, ndlp, LOGIC_ERR, 0);
+	}
+
+	kfree(fc_req);
+
+}
+
+static void
+lpfc_els_rcv_chap_chal(struct lpfc_vport *vport, struct lpfc_iocbq *cmdiocb,
+		       struct lpfc_nodelist *ndlp)
+{
+
+	struct Scsi_Host  *shost = lpfc_shost_from_vport(vport);
+	struct lpfc_dmabuf *pcmd = cmdiocb->context2;
+	struct lpfc_auth_message *authcmd;
+	uint8_t reason, explanation;
+	uint32_t message_len;
+	uint32_t trans_id;
+	struct fc_auth_req *fc_req;
+	struct fc_auth_rsp *fc_rsp;
+	uint32_t fc_req_len;
+
+	authcmd = pcmd->virt;
+	message_len = be32_to_cpu(authcmd->message_len);
+	trans_id = be32_to_cpu(authcmd->trans_id);
+
+	lpfc_els_rsp_acc(vport, ELS_CMD_ACC, cmdiocb, ndlp, NULL);
+
+	if (vport->auth.auth_msg_state != LPFC_AUTH_NEGOTIATE) {
+		lpfc_printf_vlog(vport, KERN_ERR, LOG_SECURITY,
+				 "1034 Not Expecting Challenge - Rejecting "
+				 "Challenge.\n");
+		lpfc_issue_els_auth_reject(vport, ndlp, AUTH_ERR, BAD_PROTOCOL);
+		return;
+	}
+
+	if (trans_id  != vport->auth.trans_id) {
+		lpfc_printf_vlog(vport, KERN_ERR, LOG_SECURITY,
+				 "1035 Transport ID does not match - Rejecting "
+				 "Challenge.\n");
+		lpfc_issue_els_auth_reject(vport, ndlp, AUTH_ERR, BAD_PAYLOAD);
+		return;
+	}
+
+	if (lpfc_unpack_dhchap_challenge(vport, authcmd->data,
+					 &reason, &explanation)) {
+		lpfc_issue_els_auth_reject(vport, ndlp, reason, explanation);
+		return;
+	}
+	vport->auth.direction = AUTH_DIRECTION_NONE;
+
+	fc_req_len = (sizeof(struct fc_auth_req) +
+		      vport->auth.challenge_len +
+		      vport->auth.dh_pub_key_len);
+	fc_req = kzalloc(fc_req_len, GFP_KERNEL);
+	fc_req->local_wwpn = wwn_to_u64(vport->fc_portname.u.wwn);
+	if (ndlp->nlp_type & NLP_FABRIC)
+		fc_req->remote_wwpn = AUTH_FABRIC_WWN;
+	else
+		fc_req->remote_wwpn = wwn_to_u64(ndlp->nlp_portname.u.wwn);
+	fc_req->u.dhchap_reply.transaction_id = vport->auth.trans_id;
+	fc_req->u.dhchap_reply.dh_group_id = vport->auth.group_id;
+	fc_req->u.dhchap_reply.hash_id = vport->auth.hash_id;
+	fc_req->u.dhchap_reply.bidirectional = vport->auth.bidirectional;
+	fc_req->u.dhchap_reply.received_challenge_len =
+		vport->auth.challenge_len;
+	fc_req->u.dhchap_reply.received_public_key_len =
+			vport->auth.dh_pub_key_len;
+	memcpy(fc_req->u.dhchap_reply.data, vport->auth.challenge,
+	       vport->auth.challenge_len);
+	if (vport->auth.group_id != DH_GROUP_NULL) {
+		memcpy(fc_req->u.dhchap_reply.data + vport->auth.challenge_len,
+			vport->auth.dh_pub_key, vport->auth.dh_pub_key_len);
+	}
+
+	fc_rsp = kzalloc(MAX_AUTH_RSP_SIZE, GFP_KERNEL);
+
+	if (lpfc_fc_security_dhchap_make_response(shost,
+			fc_req, fc_req_len,
+			fc_rsp, MAX_AUTH_RSP_SIZE)) {
+		kfree(fc_rsp);
+		lpfc_issue_els_auth_reject(vport, ndlp, LOGIC_ERR, 0);
+	}
+
+	kfree(fc_req);
+
+}
+
+static void
+lpfc_els_rcv_auth_rjt(struct lpfc_vport *vport, struct lpfc_iocbq *cmdiocb,
+		      struct lpfc_nodelist *ndlp)
+{
+
+	struct lpfc_dmabuf *pcmd = cmdiocb->context2;
+	struct lpfc_auth_message *authcmd;
+	uint32_t message_len;
+	uint32_t trans_id;
+	struct lpfc_auth_reject *rjt;
+	struct lpfc_hba *phba = vport->phba;
+
+	authcmd = pcmd->virt;
+	rjt = (struct lpfc_auth_reject *)authcmd->data;
+
+	message_len = be32_to_cpu(authcmd->message_len);
+	trans_id = be32_to_cpu(authcmd->trans_id);
+
+	lpfc_els_rsp_acc(vport, ELS_CMD_ACC, cmdiocb, ndlp, NULL);
+
+	if (vport->auth.auth_state == LPFC_AUTH_SUCCESS) {
+		lpfc_printf_vlog(vport, KERN_ERR, LOG_SECURITY,
+				 "1036 Authentication transaction reject - "
+				 "re-auth request reason 0x%x exp 0x%x\n",
+				 rjt->reason, rjt->explanation);
+		lpfc_port_auth_failed(ndlp, LPFC_AUTH_FAIL_AUTH_RJT);
+		if (vport->auth.auth_msg_state == LPFC_DHCHAP_SUCCESS) {
+			/* start authentication */
+			lpfc_start_authentication(vport, ndlp);
+		}
+	} else {
+		if (rjt->reason == LOGIC_ERR && rjt->explanation == RESTART) {
+			lpfc_printf_vlog(vport, KERN_ERR, LOG_SECURITY,
+					 "1037 Authentication transaction "
+					 "reject - restarting authentication. "
+					 "reason 0x%x exp 0x%x\n",
+					 rjt->reason, rjt->explanation);
+			/* restart auth */
+			lpfc_start_authentication(vport, ndlp);
+		} else {
+			lpfc_printf_vlog(vport, KERN_ERR, LOG_SECURITY,
+				"1057 Authentication transaction "
+				"reject. reason 0x%x exp 0x%x\n",
+				rjt->reason, rjt->explanation);
+			lpfc_port_auth_failed(ndlp, LPFC_AUTH_FAIL_AUTH_RJT);
+			vport->auth.auth_msg_state = LPFC_AUTH_REJECT;
+			if (!(phba->sli3_options & LPFC_SLI3_NPIV_ENABLED) &&
+			    (phba->link_state != LPFC_CLEAR_LA)) {
+				/* If Auth failed enable link interrupt. */
+				lpfc_issue_clear_la(phba, vport);
+			}
+		}
+	}
+}
+
+static void
+lpfc_els_rcv_chap_reply(struct lpfc_vport *vport, struct lpfc_iocbq *cmdiocb,
+		  struct lpfc_nodelist *ndlp)
+{
+
+	struct Scsi_Host  *shost = lpfc_shost_from_vport(vport);
+	struct lpfc_dmabuf *pcmd = cmdiocb->context2;
+	struct lpfc_auth_message *authcmd;
+	uint32_t message_len;
+	uint32_t trans_id;
+	struct fc_auth_req *fc_req;
+	struct fc_auth_rsp *fc_rsp;
+	uint32_t data_len;
+
+	authcmd = pcmd->virt;
+	message_len = be32_to_cpu(authcmd->message_len);
+	trans_id = be32_to_cpu(authcmd->trans_id);
+
+	lpfc_els_rsp_acc(vport, ELS_CMD_ACC, cmdiocb, ndlp, NULL);
+
+	fc_req = kzalloc(MAX_AUTH_REQ_SIZE, GFP_KERNEL);
+
+	fc_req->local_wwpn = wwn_to_u64(vport->fc_portname.u.wwn);
+	if (ndlp->nlp_type & NLP_FABRIC)
+		fc_req->remote_wwpn = AUTH_FABRIC_WWN;
+	else
+		fc_req->remote_wwpn = wwn_to_u64(ndlp->nlp_portname.u.wwn);
+
+	if (vport->auth.auth_msg_state != LPFC_DHCHAP_CHALLENGE) {
+		lpfc_printf_vlog(vport, KERN_ERR, LOG_SECURITY,
+				 "1039 Not Expecting Reply - rejecting. State "
+				 "0x%x\n", vport->auth.auth_state);
+
+		lpfc_issue_els_auth_reject(vport, ndlp, AUTH_ERR, BAD_PROTOCOL);
+		return;
+	}
+
+	if (trans_id  != vport->auth.trans_id) {
+		lpfc_printf_vlog(vport, KERN_ERR, LOG_SECURITY,
+				 "1040 Bad Reply trans_id- rejecting. "
+				 "Trans_id: 0x%x Expecting: 0x%x \n",
+				 trans_id, vport->auth.trans_id);
+		lpfc_issue_els_auth_reject(vport, ndlp, AUTH_ERR, BAD_PAYLOAD);
+		return;
+	}
+
+	/* Zero is a valid length to be returned */
+	data_len = lpfc_unpack_dhchap_reply(vport, authcmd->data, fc_req);
+	fc_req->u.dhchap_success.hash_id = vport->auth.hash_id;
+	fc_req->u.dhchap_success.dh_group_id = vport->auth.group_id;
+	fc_req->u.dhchap_success.transaction_id = vport->auth.trans_id;
+	fc_req->u.dhchap_success.our_challenge_len = vport->auth.challenge_len;
+	memcpy(fc_req->u.dhchap_success.data, vport->auth.challenge,
+		vport->auth.challenge_len);
+
+	fc_rsp = kzalloc(MAX_AUTH_RSP_SIZE, GFP_KERNEL);
+
+	if (lpfc_fc_security_dhchap_authenticate(shost, fc_req,
+			(sizeof(struct fc_auth_req) +
+			data_len + vport->auth.challenge_len),
+			fc_rsp, MAX_AUTH_RSP_SIZE)) {
+		kfree(fc_rsp);
+		lpfc_issue_els_auth_reject(vport, ndlp, LOGIC_ERR, 0);
+	}
+
+	kfree(fc_req);
+
+}
+
+static void
+lpfc_els_rcv_chap_suc(struct lpfc_vport *vport, struct lpfc_iocbq *cmdiocb,
+		  struct lpfc_nodelist *ndlp)
+{
+
+	struct Scsi_Host  *shost = lpfc_shost_from_vport(vport);
+	struct lpfc_dmabuf *pcmd = cmdiocb->context2;
+	struct lpfc_auth_message *authcmd;
+	uint32_t message_len;
+	uint32_t trans_id;
+	struct fc_auth_req *fc_req;
+	struct fc_auth_rsp *fc_rsp;
+	uint32_t data_len;
+
+	authcmd = pcmd->virt;
+	message_len = be32_to_cpu(authcmd->message_len);
+	trans_id = be32_to_cpu(authcmd->trans_id);
+
+	lpfc_els_rsp_acc(vport, ELS_CMD_ACC, cmdiocb, ndlp, NULL);
+
+	if (vport->auth.auth_msg_state != LPFC_DHCHAP_REPLY &&
+	    vport->auth.auth_msg_state != LPFC_DHCHAP_SUCCESS_REPLY) {
+		lpfc_issue_els_auth_reject(vport, ndlp, AUTH_ERR, BAD_PROTOCOL);
+		return;
+	}
+
+	if (trans_id  != vport->auth.trans_id) {
+		lpfc_issue_els_auth_reject(vport, ndlp, AUTH_ERR, BAD_PAYLOAD);
+		return;
+	}
+
+	if (vport->auth.auth_msg_state == LPFC_DHCHAP_REPLY &&
+	    vport->auth.bidirectional) {
+
+		fc_req = kzalloc(MAX_AUTH_REQ_SIZE, GFP_KERNEL);
+		if (!fc_req)
+			return;
+
+		fc_req->local_wwpn = wwn_to_u64(vport->fc_portname.u.wwn);
+		if (ndlp->nlp_type & NLP_FABRIC)
+			fc_req->remote_wwpn = AUTH_FABRIC_WWN;
+		else
+			fc_req->remote_wwpn =
+				wwn_to_u64(ndlp->nlp_portname.u.wwn);
+		fc_req->u.dhchap_success.hash_id = vport->auth.hash_id;
+		fc_req->u.dhchap_success.dh_group_id = vport->auth.group_id;
+		fc_req->u.dhchap_success.transaction_id = vport->auth.trans_id;
+		fc_req->u.dhchap_success.our_challenge_len =
+				vport->auth.challenge_len;
+
+		memcpy(fc_req->u.dhchap_success.data, vport->auth.challenge,
+		       vport->auth.challenge_len);
+
+		/* Zero is a valid return length */
+		data_len = lpfc_unpack_dhchap_success(vport,
+						      authcmd->data,
+						      fc_req);
+
+		fc_rsp = kzalloc(MAX_AUTH_RSP_SIZE, GFP_KERNEL);
+		if (!fc_rsp)
+			return;
+
+		if (lpfc_fc_security_dhchap_authenticate(shost,
+			fc_req, sizeof(struct fc_auth_req) + data_len,
+			fc_rsp, MAX_AUTH_RSP_SIZE)) {
+			kfree(fc_rsp);
+			lpfc_issue_els_auth_reject(vport, ndlp, LOGIC_ERR, 0);
+		}
+
+		kfree(fc_req);
+
+	} else {
+		vport->auth.auth_msg_state = LPFC_DHCHAP_SUCCESS;
+
+		kfree(vport->auth.challenge);
+		vport->auth.challenge = NULL;
+		vport->auth.challenge_len = 0;
+
+		if (vport->auth.auth_state != LPFC_AUTH_SUCCESS) {
+			vport->auth.auth_state = LPFC_AUTH_SUCCESS;
+			lpfc_printf_vlog(vport, KERN_INFO, LOG_SECURITY,
+					 "1041 Authentication Successful\n");
+			lpfc_start_discovery(vport);
+		} else {
+			lpfc_printf_vlog(vport, KERN_INFO, LOG_SECURITY,
+				"1042 Re-Authentication Successful\n");
+		}
+		/* If config requires re-authentication start the timer */
+		vport->auth.last_auth = jiffies;
+		if (vport->auth.reauth_interval)
+			mod_timer(&ndlp->nlp_reauth_tmr, jiffies +
+				vport->auth.reauth_interval * 60 * HZ);
+	}
+	vport->auth.direction |= AUTH_DIRECTION_REMOTE;
+}
+
 /**
  * lpfc_send_els_failure_event - Posts an ELS command failure event
  * @phba: Pointer to hba context object.
@@ -5396,7 +5847,7 @@ lpfc_els_unsol_buffer(struct lpfc_hba *phba, struct lpfc_sli_ring *pring,
 	if (lpfc_els_chk_latt(vport))
 		goto dropit;
 
-	/* Ignore traffic recevied during vport shutdown. */
+	/* Ignore traffic received during vport shutdown. */
 	if (vport->load_flag & FC_UNLOADING)
 		goto dropit;
 
@@ -5618,6 +6069,50 @@ lpfc_els_unsol_buffer(struct lpfc_hba *phba, struct lpfc_sli_ring *pring,
 		if (newnode)
 			lpfc_nlp_put(ndlp);
 		break;
+	case ELS_CMD_RRQ:
+		lpfc_debugfs_disc_trc(vport, LPFC_DISC_TRC_ELS_UNSOL,
+			"RCV RRQ:         did:x%x/ste:x%x flg:x%x",
+			did, vport->port_state, ndlp->nlp_flag);
+
+		phba->fc_stat.elsRcvRRQ++;
+		lpfc_els_rcv_rrq(vport, elsiocb, ndlp);
+		if (newnode)
+			lpfc_nlp_put(ndlp);
+		break;
+	case ELS_CMD_AUTH_RJT:
+		lpfc_debugfs_disc_trc(vport, LPFC_DISC_TRC_ELS_UNSOL,
+			"RCV AUTH_RJT:        did:x%x/ste:x%x flg:x%x",
+			did, vport->port_state, ndlp->nlp_flag);
+		lpfc_els_rcv_auth_rjt(vport, elsiocb, ndlp);
+		break;
+	case ELS_CMD_AUTH_NEG:
+		lpfc_debugfs_disc_trc(vport, LPFC_DISC_TRC_ELS_UNSOL,
+			"RCV AUTH_NEG:        did:x%x/ste:x%x flg:x%x",
+			did, vport->port_state, ndlp->nlp_flag);
+		lpfc_els_rcv_auth_neg(vport, elsiocb, ndlp);
+		break;
+	case ELS_CMD_DH_CHA:
+		lpfc_debugfs_disc_trc(vport, LPFC_DISC_TRC_ELS_UNSOL,
+			"RCV DH_CHA:        did:x%x/ste:x%x flg:x%x",
+			did, vport->port_state, ndlp->nlp_flag);
+		lpfc_els_rcv_chap_chal(vport, elsiocb, ndlp);
+		break;
+	case ELS_CMD_DH_REP:
+		lpfc_debugfs_disc_trc(vport, LPFC_DISC_TRC_ELS_UNSOL,
+			"RCV DH_REP:        did:x%x/ste:x%x flg:x%x",
+			did, vport->port_state, ndlp->nlp_flag);
+		lpfc_els_rcv_chap_reply(vport, elsiocb, ndlp);
+		break;
+	case ELS_CMD_DH_SUC:
+		lpfc_debugfs_disc_trc(vport, LPFC_DISC_TRC_ELS_UNSOL,
+			"RCV DH_SUC:        did:x%x/ste:x%x flg:x%x",
+			did, vport->port_state, ndlp->nlp_flag);
+		lpfc_els_rcv_chap_suc(vport, elsiocb, ndlp);
+		break;
+	case ELS_CMD_AUTH_DONE:
+		lpfc_debugfs_disc_trc(vport, LPFC_DISC_TRC_ELS_UNSOL,
+			"RCV AUTH_DONE:        did:x%x/ste:x%x flg:x%x",
+			did, vport->port_state, ndlp->nlp_flag);
 	default:
 		lpfc_debugfs_disc_trc(vport, LPFC_DISC_TRC_ELS_UNSOL,
 			"RCV ELS cmd:     cmd:x%x did:x%x/ste:x%x",
@@ -5670,7 +6165,7 @@ dropit:
  *    NULL - No vport with the matching @vpi found
  *    Otherwise - Address to the vport with the matching @vpi.
  **/
-static struct lpfc_vport *
+struct lpfc_vport *
 lpfc_find_vport_by_vpid(struct lpfc_hba *phba, uint16_t vpi)
 {
 	struct lpfc_vport *vport;
@@ -5864,6 +6359,7 @@ lpfc_cmpl_reg_new_vport(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
 	struct Scsi_Host  *shost = lpfc_shost_from_vport(vport);
 	struct lpfc_nodelist *ndlp = (struct lpfc_nodelist *) pmb->context2;
 	MAILBOX_t *mb = &pmb->u.mb;
+	int rc;
 
 	spin_lock_irq(shost->host_lock);
 	vport->fc_flag &= ~FC_VPORT_NEEDS_REG_VPI;
@@ -5885,6 +6381,26 @@ lpfc_cmpl_reg_new_vport(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
 			spin_unlock_irq(shost->host_lock);
 			lpfc_can_disctmo(vport);
 			break;
+		/* If reg_vpi fail with invalid VPI status, re-init VPI */
+		case 0x20:
+			spin_lock_irq(shost->host_lock);
+			vport->fc_flag |= FC_VPORT_NEEDS_REG_VPI;
+			spin_unlock_irq(shost->host_lock);
+			lpfc_init_vpi(phba, pmb, vport->vpi);
+			pmb->vport = vport;
+			pmb->mbox_cmpl = lpfc_init_vpi_cmpl;
+			rc = lpfc_sli_issue_mbox(phba, pmb,
+				MBX_NOWAIT);
+			if (rc == MBX_NOT_FINISHED) {
+				lpfc_printf_vlog(vport,
+					KERN_ERR, LOG_MBOX,
+					"2732 Failed to issue INIT_VPI"
+					" mailbox command\n");
+			} else {
+				lpfc_nlp_put(ndlp);
+				return;
+			}
+
 		default:
 			/* Try to recover from this error */
 			lpfc_mbx_unreg_vpi(vport);
@@ -5897,15 +6413,21 @@ lpfc_cmpl_reg_new_vport(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
 				lpfc_initial_fdisc(vport);
 			break;
 		}
-
 	} else {
-		if (vport == phba->pport)
+		spin_lock_irq(shost->host_lock);
+		vport->vpi_state |= LPFC_VPI_REGISTERED;
+		spin_unlock_irq(shost->host_lock);
+		if (vport == phba->pport) {
 			if (phba->sli_rev < LPFC_SLI_REV4)
 				lpfc_issue_fabric_reglogin(vport);
-			else
-				lpfc_issue_reg_vfi(vport);
+			else {
+				lpfc_start_fdiscs(phba);
+				lpfc_do_scr_ns_plogi(phba, vport);
+			}
+		} else if (vport->cfg_enable_auth)
+			lpfc_get_auth_config(vport, NULL);
 		else
-			lpfc_do_scr_ns_plogi(phba, vport);
+			lpfc_start_discovery(vport);
 	}
 
 	/* Now, we decrement the ndlp reference count held for this
@@ -5926,7 +6448,7 @@ lpfc_cmpl_reg_new_vport(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
  * This routine registers the @vport as a new virtual port with a HBA.
  * It is done through a registering vpi mailbox command.
  **/
-static void
+void
 lpfc_register_new_vport(struct lpfc_hba *phba, struct lpfc_vport *vport,
 			struct lpfc_nodelist *ndlp)
 {
@@ -5967,6 +6489,78 @@ mbox_err_exit:
 }
 
 /**
+ * lpfc_retry_pport_discovery - Start timer to retry FLOGI.
+ * @phba: pointer to lpfc hba data structure.
+ *
+ * This routine abort all pending discovery commands and
+ * start a timer to retry FLOGI for the physical port
+ * discovery.
+ **/
+void
+lpfc_retry_pport_discovery(struct lpfc_hba *phba)
+{
+	struct lpfc_vport **vports;
+	struct lpfc_nodelist *ndlp;
+	struct Scsi_Host  *shost;
+	int i;
+	uint32_t link_state;
+
+	/* Treat this failure as linkdown for all vports */
+	link_state = phba->link_state;
+	lpfc_linkdown(phba);
+	phba->link_state = link_state;
+
+	vports = lpfc_create_vport_work_array(phba);
+
+	if (vports) {
+		for (i = 0; i <= phba->max_vports && vports[i] != NULL; i++) {
+			ndlp = lpfc_findnode_did(vports[i], Fabric_DID);
+			if (ndlp)
+				lpfc_cancel_retry_delay_tmo(vports[i], ndlp);
+			lpfc_els_flush_cmd(vports[i]);
+		}
+		lpfc_destroy_vport_work_array(phba, vports);
+	}
+
+	/* If fabric require FLOGI, then re-instantiate physical login */
+	ndlp = lpfc_findnode_did(phba->pport, Fabric_DID);
+	if (!ndlp)
+		return;
+
+
+	shost = lpfc_shost_from_vport(phba->pport);
+	mod_timer(&ndlp->nlp_delayfunc, jiffies + HZ);
+	spin_lock_irq(shost->host_lock);
+	ndlp->nlp_flag |= NLP_DELAY_TMO;
+	spin_unlock_irq(shost->host_lock);
+	ndlp->nlp_last_elscmd = ELS_CMD_FLOGI;
+	phba->pport->port_state = LPFC_FLOGI;
+	return;
+}
+
+/**
+ * lpfc_fabric_login_reqd - Check if FLOGI required.
+ * @phba: pointer to lpfc hba data structure.
+ * @cmdiocb: pointer to FDISC command iocb.
+ * @rspiocb: pointer to FDISC response iocb.
+ *
+ * This routine checks if a FLOGI is reguired for FDISC
+ * to succeed.
+ **/
+static int
+lpfc_fabric_login_reqd(struct lpfc_hba *phba,
+		struct lpfc_iocbq *cmdiocb,
+		struct lpfc_iocbq *rspiocb)
+{
+
+	if ((rspiocb->iocb.ulpStatus != IOSTAT_FABRIC_RJT) ||
+		(rspiocb->iocb.un.ulpWord[4] != RJT_LOGIN_REQUIRED))
+		return 0;
+	else
+		return 1;
+}
+
+/**
  * lpfc_cmpl_els_fdisc - Completion function for fdisc iocb command
  * @phba: pointer to lpfc hba data structure.
  * @cmdiocb: pointer to lpfc command iocb data structure.
@@ -5997,6 +6591,8 @@ lpfc_cmpl_els_fdisc(struct lpfc_hba *phba, struct lpfc_iocbq *cmdiocb,
 	struct lpfc_nodelist *next_np;
 	IOCB_t *irsp = &rspiocb->iocb;
 	struct lpfc_iocbq *piocb;
+	struct lpfc_dmabuf *pcmd = cmdiocb->context2, *prsp;
+	struct serv_parm *sp;
 
 	lpfc_printf_vlog(vport, KERN_INFO, LOG_ELS,
 			 "0123 FDISC completes. x%x/x%x prevDID: x%x\n",
@@ -6015,6 +6611,12 @@ lpfc_cmpl_els_fdisc(struct lpfc_hba *phba, struct lpfc_iocbq *cmdiocb,
 		irsp->ulpStatus, irsp->un.ulpWord[4], vport->fc_prevDID);
 
 	if (irsp->ulpStatus) {
+
+		if (lpfc_fabric_login_reqd(phba, cmdiocb, rspiocb)) {
+			lpfc_retry_pport_discovery(phba);
+			goto out;
+		}
+
 		/* Check for retry */
 		if (lpfc_els_retry(phba, cmdiocb, rspiocb))
 			goto out;
@@ -6024,12 +6626,27 @@ lpfc_cmpl_els_fdisc(struct lpfc_hba *phba, struct lpfc_iocbq *cmdiocb,
 				 irsp->ulpStatus, irsp->un.ulpWord[4]);
 		goto fdisc_failed;
 	}
-		if (vport->fc_vport->vport_state == FC_VPORT_INITIALIZING)
-			lpfc_vport_set_state(vport, FC_VPORT_FAILED);
-		lpfc_nlp_put(ndlp);
-		/* giving up on FDISC. Cancel discovery timer */
-		lpfc_can_disctmo(vport);
+	prsp = list_get_first(&pcmd->list, struct lpfc_dmabuf, list);
+	sp = prsp->virt + sizeof(uint32_t);
+	if (sp->cmn.security)
+		ndlp->nlp_flag |= NLP_SC_REQ;
+	else
+		ndlp->nlp_flag &= ~NLP_SC_REQ;
+	if (vport->cfg_enable_auth) {
+		if (lpfc_get_auth_config(vport, NULL))
+			goto fdisc_failed;
+	} else {
+		vport->auth.security_active = 0;
+		if (sp->cmn.security) {
+			lpfc_printf_vlog(vport, KERN_ERR, LOG_SECURITY,
+					 "1056 Authentication mode is "
+					 "disabled, but is required "
+					 "by the fabric.\n");
+			goto fdisc_failed;
+		}
+	}
 	spin_lock_irq(shost->host_lock);
+	vport->fc_flag &= ~FC_VPORT_CVL_RCVD;
 	vport->fc_flag |= FC_FABRIC;
 	if (vport->phba->fc_topology == TOPOLOGY_LOOP)
 		vport->fc_flag |=  FC_PUBLIC_LOOP;
@@ -6062,8 +6679,11 @@ lpfc_cmpl_els_fdisc(struct lpfc_hba *phba, struct lpfc_iocbq *cmdiocb,
 
 	if (vport->fc_flag & FC_VPORT_NEEDS_REG_VPI)
 		lpfc_register_new_vport(phba, vport, ndlp);
-	else
-		lpfc_do_scr_ns_plogi(phba, vport);
+	else if (vport->cfg_enable_auth) {
+		if (lpfc_get_auth_config(vport, NULL))
+			goto fdisc_failed;
+	} else
+		lpfc_start_discovery(vport);
 	goto out;
 fdisc_failed:
 	lpfc_vport_set_state(vport, FC_VPORT_FAILED);
@@ -6107,6 +6727,7 @@ lpfc_issue_els_fdisc(struct lpfc_vport *vport, struct lpfc_nodelist *ndlp,
 	int did = ndlp->nlp_DID;
 	int rc;
 
+	vport->port_state = LPFC_FDISC;
 	cmdsize = (sizeof(uint32_t) + sizeof(struct serv_parm));
 	elsiocb = lpfc_prep_els_iocb(vport, 1, cmdsize, retry, ndlp, did,
 				     ELS_CMD_FDISC);
@@ -6144,6 +6765,8 @@ lpfc_issue_els_fdisc(struct lpfc_vport *vport, struct lpfc_nodelist *ndlp,
 	sp->cls1.classValid = 0;
 	sp->cls2.seqDelivery = 1;
 	sp->cls3.seqDelivery = 1;
+	if (vport->cfg_enable_auth)
+		sp->cmn.security = 1;
 
 	pcmd += sizeof(uint32_t); /* CSP Word 2 */
 	pcmd += sizeof(uint32_t); /* CSP Word 3 */
@@ -6172,7 +6795,6 @@ lpfc_issue_els_fdisc(struct lpfc_vport *vport, struct lpfc_nodelist *ndlp,
 		return 1;
 	}
 	lpfc_vport_set_state(vport, FC_VPORT_INITIALIZING);
-	vport->port_state = LPFC_FDISC;
 	return 0;
 }
 
@@ -6614,6 +7236,191 @@ void lpfc_fabric_abort_hba(struct lpfc_hba *phba)
 	/* Cancel all the IOCBs from the completions list */
 	lpfc_sli_cancel_iocbs(phba, &completions, IOSTAT_LOCAL_REJECT,
 			      IOERR_SLI_ABORTED);
+}
+static void
+lpfc_cmpl_els_auth(struct lpfc_hba *phba, struct lpfc_iocbq *cmdiocb,
+		   struct lpfc_iocbq *rspiocb)
+{
+	IOCB_t *irsp = &rspiocb->iocb;
+	struct lpfc_vport *vport = cmdiocb->vport;
+	struct lpfc_nodelist *ndlp = (struct lpfc_nodelist *) cmdiocb->context1;
+	enum auth_state auth_state;
+	struct ls_rjt stat;
+
+	/* Check to see if link went down during discovery */
+	if (lpfc_els_chk_latt(vport)) {
+		vport->auth.auth_msg_state = LPFC_AUTH_NONE;
+		lpfc_els_free_iocb(phba, cmdiocb);
+		return;
+	}
+
+	if (irsp->ulpStatus) {
+		auth_state = LPFC_AUTH_FAIL;
+		if (irsp->ulpStatus == IOSTAT_LS_RJT) {
+			stat.un.lsRjtError = be32_to_cpu(irsp->un.ulpWord[4]);
+			lpfc_printf_vlog(vport, KERN_ERR, LOG_ELS,
+					 "1043 Authentication LS_RJT\n");
+			if (stat.un.b.lsRjtRsnCode == LSRJT_LOGICAL_BSY)
+				auth_state = LPFC_AUTH_FAIL_LS_RJT_BUSY;
+			else
+				auth_state = LPFC_AUTH_FAIL_LS_RJT_GEN;
+		} else if (irsp->ulpStatus == IOSTAT_LOCAL_REJECT &&
+			   (irsp->un.ulpWord[4] & 0xff) ==
+				IOERR_SEQUENCE_TIMEOUT) {
+			auth_state = LPFC_AUTH_FAIL_ELS_TMO;
+		}
+		/* Check for retry */
+		if (!lpfc_els_retry(phba, cmdiocb, rspiocb)) {
+			if (irsp->ulpStatus != IOSTAT_LS_RJT) {
+				lpfc_printf_vlog(vport, KERN_ERR, LOG_ELS,
+						 "1045 Issue AUTH_NEG failed."
+						 "Status:%x\n",
+						 irsp->ulpStatus);
+			}
+			if (vport->auth.auth_mode == FC_AUTHMODE_ACTIVE) {
+				lpfc_can_disctmo(vport);
+				lpfc_port_auth_failed(ndlp, auth_state);
+			}
+		}
+		if (!(phba->sli3_options & LPFC_SLI3_NPIV_ENABLED) &&
+		    (phba->link_state != LPFC_CLEAR_LA))
+			lpfc_issue_clear_la(phba, vport);
+		lpfc_els_free_iocb(phba, cmdiocb);
+		return;
+	}
+
+	if (vport->auth.auth_msg_state == LPFC_DHCHAP_SUCCESS ||
+	    vport->auth.auth_msg_state == LPFC_DHCHAP_SUCCESS_REPLY) {
+
+		kfree(vport->auth.challenge);
+		vport->auth.challenge = NULL;
+		vport->auth.challenge_len = 0;
+		kfree(vport->auth.dh_pub_key);
+		vport->auth.dh_pub_key = NULL;
+		vport->auth.dh_pub_key_len = 0;
+
+		if (vport->auth.auth_msg_state == LPFC_DHCHAP_SUCCESS) {
+			if (vport->auth.auth_state != LPFC_AUTH_SUCCESS) {
+				lpfc_printf_vlog(vport, KERN_WARNING,
+						 LOG_SECURITY, "1046 "
+						 "Authentication Successful\n");
+				vport->auth.auth_state = LPFC_AUTH_SUCCESS;
+				lpfc_start_discovery(vport);
+			} else {
+				lpfc_printf_vlog(vport, KERN_WARNING,
+						 LOG_SECURITY,
+						 "1047 Re-Authentication"
+						 " Successful\n");
+			}
+		}
+		/* restart authentication timer */
+		vport->auth.last_auth = jiffies;
+		if (vport->auth.reauth_interval)
+			mod_timer(&ndlp->nlp_reauth_tmr,
+				jiffies +
+				vport->auth.reauth_interval * 60 * HZ);
+	}
+	lpfc_els_free_iocb(phba, cmdiocb);
+}
+
+int
+lpfc_issue_els_auth(struct lpfc_vport *vport,
+		    struct lpfc_nodelist *ndlp,
+		    uint8_t message_code,
+		    uint8_t *payload,
+		    uint32_t payload_len)
+{
+	struct lpfc_hba *phba = vport->phba;
+	struct lpfc_iocbq *elsiocb;
+	struct lpfc_auth_message *authreq;
+
+	elsiocb = lpfc_prep_els_iocb(vport, 1,
+			sizeof(struct lpfc_auth_message) + payload_len,
+			0, ndlp, ndlp->nlp_DID, ELS_CMD_AUTH);
+
+	if (!elsiocb)
+		return 1;
+	authreq = (struct lpfc_auth_message *)
+		(((struct lpfc_dmabuf *) elsiocb->context2)->virt);
+	authreq->command_code = ELS_CMD_AUTH_BYTE;
+	authreq->flags = 0;
+	authreq->message_code = message_code;
+	authreq->protocol_ver = AUTH_VERSION;
+	authreq->message_len = cpu_to_be32(payload_len);
+	authreq->trans_id = cpu_to_be32(vport->auth.trans_id);
+	memcpy(authreq->data, payload, payload_len);
+
+	elsiocb->iocb_cmpl = lpfc_cmpl_els_auth;
+
+	if (lpfc_sli_issue_iocb(phba, LPFC_ELS_RING,
+				elsiocb, 0) == IOCB_ERROR) {
+		lpfc_els_free_iocb(phba, elsiocb);
+		return 1;
+	}
+
+	return 0;
+}
+
+static void
+lpfc_cmpl_els_auth_reject(struct lpfc_hba *phba, struct lpfc_iocbq *cmdiocb,
+		    struct lpfc_iocbq *rspiocb)
+{
+	struct lpfc_vport *vport = cmdiocb->vport;
+	IOCB_t *irsp = &rspiocb->iocb;
+
+	if (irsp->ulpStatus) {
+		/* Check for retry */
+		if (!lpfc_els_retry(phba, cmdiocb, rspiocb)) {
+			lpfc_printf_log(phba, KERN_ERR, LOG_ELS,
+					"1048 Issue AUTH_REJECT failed.\n");
+		}
+	} else
+	       vport->port_state = LPFC_VPORT_UNKNOWN;
+
+	lpfc_els_free_iocb(phba, cmdiocb);
+}
+
+int
+lpfc_issue_els_auth_reject(struct lpfc_vport *vport,
+					struct lpfc_nodelist *ndlp,
+					uint8_t reason, uint8_t explanation)
+{
+	struct lpfc_hba *phba = vport->phba;
+	struct lpfc_iocbq *elsiocb;
+	struct lpfc_auth_message *authreq;
+	struct lpfc_auth_reject *reject;
+
+	vport->auth.auth_msg_state = LPFC_AUTH_REJECT;
+
+	elsiocb = lpfc_prep_els_iocb(vport, 1, sizeof(struct lpfc_auth_message)
+				     + sizeof(struct lpfc_auth_reject), 0, ndlp,
+				     ndlp->nlp_DID, ELS_CMD_AUTH);
+
+	if (!elsiocb)
+		return 1;
+
+	authreq = (struct lpfc_auth_message *)
+		(((struct lpfc_dmabuf *) elsiocb->context2)->virt);
+	authreq->command_code = ELS_CMD_AUTH_BYTE;
+	authreq->flags = 0;
+	authreq->message_code = AUTH_REJECT;
+	authreq->protocol_ver = AUTH_VERSION;
+	reject = (struct lpfc_auth_reject *)authreq->data;
+	memset(reject, 0, sizeof(struct lpfc_auth_reject));
+	reject->reason = reason;
+	reject->explanation = explanation;
+
+	authreq->message_len = cpu_to_be32(sizeof(struct lpfc_auth_reject));
+	authreq->trans_id = cpu_to_be32(vport->auth.trans_id);
+	elsiocb->iocb_cmpl = lpfc_cmpl_els_auth_reject;
+
+	if (lpfc_sli_issue_iocb(phba, LPFC_ELS_RING, elsiocb, 0)
+			== IOCB_ERROR) {
+		lpfc_els_free_iocb(phba, elsiocb);
+		return 1;
+	}
+
+	return 0;
 }
 
 /**

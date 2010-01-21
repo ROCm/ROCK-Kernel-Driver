@@ -19,7 +19,7 @@
  *******************************************************************/
 
 #define FC_MAX_HOLD_RSCN     32	      /* max number of deferred RSCNs */
-#define FC_MAX_NS_RSP        65536    /* max size NameServer rsp */
+#define FC_MAX_NS_RSP        64512    /* max size NameServer rsp */
 #define FC_MAXLOOP           126      /* max devices supported on a fc loop */
 #define LPFC_DISC_FLOGI_TMO  10	      /* Discovery FLOGI ratov */
 
@@ -37,6 +37,7 @@ enum lpfc_work_type {
 	LPFC_EVT_KILL,
 	LPFC_EVT_ELS_RETRY,
 	LPFC_EVT_DEV_LOSS,
+	LPFC_EVT_REAUTH,
 	LPFC_EVT_FASTPATH_MGMT_EVT,
 };
 
@@ -99,14 +100,14 @@ struct lpfc_nodelist {
 #define NLP_USG_FREE_ACK_BIT	0x8	/* Indicate ndlp memory free invoked */
 
 	struct timer_list   nlp_delayfunc;	/* Used for delayed ELS cmds */
+	struct timer_list   nlp_reauth_tmr;	/* Used for re-authentication */
 	struct lpfc_hba *phba;
 	struct fc_rport *rport;			/* Corresponding FC transport
 						   port structure */
 	struct lpfc_vport *vport;
 	struct lpfc_work_evt els_retry_evt;
+	struct lpfc_work_evt els_reauth_evt;
 	struct lpfc_work_evt dev_loss_evt;
-	unsigned long last_ramp_up_time;        /* jiffy of last ramp up */
-	unsigned long last_q_full_time;		/* jiffy of last queue full */
 	struct kref     kref;
 	atomic_t cmd_pending;
 	uint32_t cmd_qdepth;
