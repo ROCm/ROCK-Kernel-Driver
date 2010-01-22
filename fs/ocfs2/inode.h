@@ -72,10 +72,6 @@ struct ocfs2_inode_info
 	u64				ip_last_used_group;
 
 	struct ocfs2_alloc_reservation	ip_la_data_resv;
-	/*
-	 * TODO: Directories should get inode reservations from their
-	 * current inode allocator. --Mark
-	 */
 };
 
 /*

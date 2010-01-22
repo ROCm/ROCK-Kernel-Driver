@@ -5,9 +5,14 @@
  *
  * Allocation reservations implementation
  *
- * Some code borrowed from fs/ext3/balloc.c
+ * Some code borrowed from fs/ext3/balloc.c and is:
  *
- * Copyright (C) 2009 Novell.  All rights reserved.
+ * Copyright (C) 1992, 1993, 1994, 1995
+ * Remy Card (card@masi.ibp.fr)
+ * Laboratoire MASI - Institut Blaise Pascal
+ * Universite Pierre et Marie Curie (Paris VI)
+ *
+ * The rest is copyright (C) 2009 Novell.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public
@@ -18,11 +23,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
  * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public
- * License along with this program; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 021110-1307, USA.
  */
 
 #include <linux/fs.h>
@@ -44,6 +44,31 @@
 
 
 DEFINE_SPINLOCK(resv_lock);
+
+#define	OCFS2_MIN_RESV_WINDOW_BITS	8
+#define	OCFS2_MAX_RESV_WINDOW_BITS	1024
+
+static unsigned int ocfs2_resv_window_bits(struct ocfs2_reservation_map *resmap)
+{
+	struct ocfs2_super *osb = resmap->m_osb;
+
+	mlog(0, "resv_level: %u\n", osb->osb_resv_level);
+
+	switch (osb->osb_resv_level) {
+	case 6:
+		return OCFS2_MAX_RESV_WINDOW_BITS;
+	case 5:
+		return 512;
+	case 4:
+		return 256;
+	case 3:
+		return 128;
+	case 2:
+		return 64;
+	}
+
+	return OCFS2_MIN_RESV_WINDOW_BITS;
+}
 
 static inline unsigned int ocfs2_resv_end(struct ocfs2_alloc_reservation *resv)
 {
@@ -167,11 +192,22 @@ static void __ocfs2_resv_trunc(struct ocfs2_alloc_reservation *resv)
 	resv->r_allocated = 0;
 }
 
+static void ocfs2_resv_remove(struct ocfs2_reservation_map *resmap,
+			      struct ocfs2_alloc_reservation *resv)
+{
+	if (resv->r_inuse) {
+		rb_erase(&resv->r_node, &resmap->m_reservations);
+		resv->r_inuse = 0;
+	}
+}
+
 static void __ocfs2_resv_discard(struct ocfs2_reservation_map *resmap,
 				 struct ocfs2_alloc_reservation *resv)
 {
-		__ocfs2_resv_trunc(resv);
-		rb_erase(&resv->r_node, &resmap->m_reservations);
+	assert_spin_locked(&resv_lock);
+
+	__ocfs2_resv_trunc(resv);
+	ocfs2_resv_remove(resmap, resv);
 }
 
 /* does nothing if 'resv' is null */
@@ -195,8 +231,12 @@ static void ocfs2_resmap_clear_all_resv(struct ocfs2_reservation_map *resmap)
 	while ((node = rb_last(&resmap->m_reservations)) != NULL) {
 		resv = rb_entry(node, struct ocfs2_alloc_reservation, r_node);
 
-		__ocfs2_resv_trunc(resv);
-		rb_erase(&resv->r_node, &resmap->m_reservations);
+		__ocfs2_resv_discard(resmap, resv);
+		/*
+		 * last_len and last_start no longer make sense if
+		 * we're changing the range of our allocations.
+		 */
+		resv->r_last_len = resv->r_last_start = 0;
 	}
 }
 
@@ -221,25 +261,17 @@ void ocfs2_resmap_uninit(struct ocfs2_reservation_map *resmap)
 	/* Does nothing for now. Keep this around for API symmetry */
 }
 
-unsigned int ocfs2_resv_target_len(unsigned int last_len)
-{
-	if (last_len < 8)
-		return 8;
-
-	last_len += 4;
-
-	if (last_len > 32)
-		return 32;
-
-	return last_len;
-}
-
+/*
+ * Determine the number of available bits between my_resv and the next
+ * window and extends my_resv accordingly.
+ */
 static int ocfs2_try_to_extend_resv(struct ocfs2_reservation_map *resmap,
 				    struct ocfs2_alloc_reservation *my_resv)
 {
 	unsigned int available, avail_end;
 	struct rb_node *next, *node = &my_resv->r_node;
 	struct ocfs2_alloc_reservation *next_resv;
+	unsigned int bits = ocfs2_resv_window_bits(resmap);
 
 	next = rb_next(node);
 
@@ -256,10 +288,9 @@ static int ocfs2_try_to_extend_resv(struct ocfs2_reservation_map *resmap,
 
 	available = avail_end - ocfs2_resv_end(my_resv) - 1;
 
-	if (available > 4)
-		available = 4;
-
 	my_resv->r_len += available;
+	if (my_resv->r_len > bits)
+		my_resv->r_len = bits;
 
 	ocfs2_check_resmap(resmap);
 
@@ -273,6 +304,8 @@ static void ocfs2_resv_insert(struct ocfs2_reservation_map *resmap,
 	struct rb_node *parent = NULL;
 	struct rb_node **p = &root->rb_node;
 	struct ocfs2_alloc_reservation *tmp;
+
+	assert_spin_locked(&resv_lock);
 
 	mlog(0, "Insert reservation start: %u len: %u\n", new->r_start,
 	     new->r_len);
@@ -295,6 +328,7 @@ static void ocfs2_resv_insert(struct ocfs2_reservation_map *resmap,
 
 	rb_link_node(&new->r_node, parent, p);
 	rb_insert_color(&new->r_node, root);
+	new->r_inuse = 1;
 
 	ocfs2_check_resmap(resmap);
 }
@@ -305,7 +339,8 @@ static void ocfs2_resv_insert(struct ocfs2_reservation_map *resmap,
  * @goal: which bit to search for
  *
  * If a window containing that goal is not found, we return the window
- * which comes before goal. Returns NULL on empty rbtree.
+ * which comes before goal. Returns NULL on empty rbtree or no window
+ * before goal.
  */
 static struct ocfs2_alloc_reservation *
 ocfs2_find_resv(struct ocfs2_reservation_map *resmap, unsigned int goal)
@@ -344,19 +379,20 @@ static void ocfs2_resv_find_window(struct ocfs2_reservation_map *resmap,
 {
 	struct rb_root *root = &resmap->m_reservations;
 	unsigned int last_start = resv->r_last_start;
-	unsigned int last_end = last_start + resv->r_last_len - 1;
-	unsigned int goal;
-	unsigned int len = ocfs2_resv_target_len(resv->r_last_len);
+	unsigned int goal = 0;
+	unsigned int len = ocfs2_resv_window_bits(resmap);
 	unsigned int gap_start, gap_end, gap_len;
 	struct ocfs2_alloc_reservation *prev_resv, *next_resv;
 	struct rb_node *prev, *next;
 
-	/* Math above doesn't work otherwise... */
-	BUG_ON(resv->r_last_len == 0);
+	if (resv->r_last_len) {
+		unsigned int last_end = last_start + resv->r_last_len - 1;
 
-	goal = last_end + 1;
-	if (goal >= resmap->m_bitmap_len)
-		goal = 0;
+		goal = last_end + 1;
+
+		if (goal >= resmap->m_bitmap_len)
+			goal = 0;
+	}
 
 	/*
 	 * Nasty cases to consider:
@@ -578,13 +614,21 @@ int ocfs2_resmap_resv_bits(struct ocfs2_reservation_map *resmap,
 	spin_lock(&resv_lock);
 
 	if (ocfs2_resv_empty(resv)) {
-		/*
-		 * If resv is empty, we return zero bytes and allow
-		 * ocfs2_resmap_claimed_bits() to start our new reservation.
-		 */
-		*cstart = *clen = 0;
-		ret = 0;
-		goto out;
+		mlog(0, "empty reservation, find new window\n");
+
+		ocfs2_resv_find_window(resmap, resv);
+
+		if (ocfs2_resv_empty(resv)) {
+			/*
+			 * If resv is still empty, we return zero
+			 * bytes and allow ocfs2_resmap_claimed_bits()
+			 * to start our new reservation after the
+			 * allocator has done it's work.
+			 */
+			*cstart = *clen = 0;
+			ret = 0;
+			goto out;
+		}
 	}
 
 	start = resv->r_start;

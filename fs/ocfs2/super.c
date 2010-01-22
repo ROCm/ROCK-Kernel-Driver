@@ -1446,7 +1446,6 @@ static int ocfs2_parse_options(struct super_block *sb,
 			    option < OCFS2_MAX_RESV_LEVEL)
 				mopt->resv_level = option;
 			break;
-
 		default:
 			mlog(ML_ERROR,
 			     "Unrecognized mount option \"%s\" "
