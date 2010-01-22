@@ -152,7 +152,6 @@ static void pseries_mach_cpu_die(void)
 		 * stack pointer.
 		 */
 		start_secondary();
-		goto out_bug;
 
 	} else if (get_preferred_offline_state(cpu) == CPU_STATE_OFFLINE) {
 
@@ -160,10 +159,8 @@ static void pseries_mach_cpu_die(void)
 		unregister_slb_shadow(hard_smp_processor_id(),
 					__pa(get_slb_shadow()));
 		rtas_stop_self();
-		goto out_bug;
 	}
 
-out_bug:
 	/* Should never get here... */
 	BUG();
 	for(;;);
@@ -209,6 +206,18 @@ static int pseries_cpu_disable(void)
 	return 0;
 }
 
+/*
+ * pseries_cpu_die: Wait for the cpu to die.
+ * @cpu: logical processor id of the CPU whose death we're awaiting.
+ *
+ * This function is called from the context of the thread which is performing
+ * the cpu-offline. Here we wait for long enough to allow the cpu in question
+ * to self-destroy so that the cpu-offline thread can send the CPU_DEAD
+ * notifications.
+ *
+ * OTOH, pseries_mach_cpu_die() is called by the @cpu when it wants to
+ * self-destruct.
+ */
 static void pseries_cpu_die(unsigned int cpu)
 {
 	int tries;

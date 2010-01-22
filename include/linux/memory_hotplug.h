@@ -12,8 +12,6 @@ struct mem_section;
 
 #ifdef CONFIG_MEMORY_HOTPLUG
 
-extern struct sysdev_class memory_sysdev_class;
-
 /*
  * Types for free bootmem.
  * The normal smallest mapcount is -1. Here is smaller value than it.

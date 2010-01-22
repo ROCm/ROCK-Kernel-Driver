@@ -28,10 +28,9 @@
 
 #define MEMORY_CLASS_NAME	"memory"
 
-struct sysdev_class memory_sysdev_class = {
+static struct sysdev_class memory_sysdev_class = {
 	.name = MEMORY_CLASS_NAME,
 };
-EXPORT_SYMBOL_GPL(memory_sysdev_class);
 
 static const char *memory_uevent_name(struct kset *kset, struct kobject *kobj)
 {
