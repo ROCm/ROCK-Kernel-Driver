@@ -37,13 +37,15 @@ struct ocfs2_bitmap_resv_ops;
 struct ocfs2_alloc_reservation {
 	struct rb_node	r_node;
 
-	u32	r_start;
-	u32	r_len;
+	unsigned int	r_start;
+	unsigned int	r_len;
 
-	u32	r_last_len;
-	u32	r_last_start;
+	unsigned int	r_last_len;
+	unsigned int	r_last_start;
 
-	u32	r_allocated;
+	unsigned int	r_allocated;
+
+	int		r_inuse;
 };
 
 struct ocfs2_reservation_map {
@@ -91,7 +93,7 @@ int ocfs2_resmap_init(struct ocfs2_super *osb,
  *
  * Re-initialize the parameters of a reservation bitmap. This is
  * useful for local alloc window slides.
- *
+ * 
  * If any bitmap parameters have changed, this function will call
  * ocfs2_trunc_resv against all existing reservations. A future
  * version will recalculate existing reservations based on the new
