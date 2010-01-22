@@ -104,6 +104,7 @@ extern int zfcp_fc_gs_setup(struct zfcp_adapter *);
 extern void zfcp_fc_gs_destroy(struct zfcp_adapter *);
 extern int zfcp_fc_execute_els_fc_job(struct fc_bsg_job *);
 extern int zfcp_fc_execute_ct_fc_job(struct fc_bsg_job *);
+extern int zfcp_fc_timeout_bsg_job(struct fc_bsg_job *);
 
 /* zfcp_fsf.c */
 extern int zfcp_fsf_open_port(struct zfcp_erp_action *);
@@ -124,8 +125,8 @@ extern struct zfcp_fsf_req *zfcp_fsf_control_file(struct zfcp_adapter *,
 extern void zfcp_fsf_req_dismiss_all(struct zfcp_adapter *);
 extern int zfcp_fsf_status_read(struct zfcp_qdio *);
 extern int zfcp_status_read_refill(struct zfcp_adapter *adapter);
-extern int zfcp_fsf_send_ct(struct zfcp_send_ct *, mempool_t *);
-extern int zfcp_fsf_send_els(struct zfcp_send_els *);
+extern int zfcp_fsf_send_ct(struct zfcp_send_ct *, mempool_t *, unsigned int);
+extern int zfcp_fsf_send_els(struct zfcp_send_els *, unsigned int);
 extern int zfcp_fsf_send_fcp_command_task(struct zfcp_unit *,
 					  struct scsi_cmnd *);
 extern void zfcp_fsf_req_free(struct zfcp_fsf_req *);

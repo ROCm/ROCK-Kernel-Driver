@@ -39,6 +39,7 @@ struct gpn_ft_resp_acc {
 #define ZFCP_GPN_FT_MAX_SIZE (ZFCP_GPN_FT_BUFFERS * PAGE_SIZE \
 				- sizeof(struct ct_hdr))
 #define ZFCP_GPN_FT_MAX_ENTRIES ZFCP_GPN_FT_BUFFERS * (ZFCP_GPN_FT_ENTRIES + 1)
+#define ZFCP_FC_CTELS_TMO      (2 * R_A_TOV)
 
 struct ct_iu_gpn_ft_resp {
 	struct ct_hdr header;
@@ -302,7 +303,8 @@ static int zfcp_fc_ns_gid_pn_request(struct zfcp_port *port,
 	init_completion(&compl_rec.done);
 	compl_rec.handler = zfcp_fc_ns_gid_pn_eval;
 	compl_rec.handler_data = (unsigned long) gid_pn;
-	ret = zfcp_fsf_send_ct(&gid_pn->ct, adapter->pool.gid_pn_req);
+	ret = zfcp_fsf_send_ct(&gid_pn->ct, adapter->pool.gid_pn_req,
+			       ZFCP_FC_CTELS_TMO);
 	if (!ret)
 		wait_for_completion(&compl_rec.done);
 	return ret;
@@ -453,7 +455,7 @@ static int zfcp_fc_adisc(struct zfcp_port *port)
 	adisc->ls_adisc.wwnn = fc_host_node_name(adapter->scsi_host);
 	adisc->ls_adisc.nport_id = fc_host_port_id(adapter->scsi_host);
 
-	ret = zfcp_fsf_send_els(&adisc->els);
+	ret = zfcp_fsf_send_els(&adisc->els, ZFCP_FC_CTELS_TMO);
 	if (ret)
 		kmem_cache_free(zfcp_data.adisc_cache, adisc);
 
@@ -568,7 +570,7 @@ static int zfcp_fc_send_gpn_ft(struct zfcp_gpn_ft *gpn_ft,
 
 	init_completion(&compl_rec.done);
 	compl_rec.handler = NULL;
-	ret = zfcp_fsf_send_ct(ct, NULL);
+	ret = zfcp_fsf_send_ct(ct, NULL, ZFCP_FC_CTELS_TMO);
 	if (!ret)
 		wait_for_completion(&compl_rec.done);
 	return ret;
@@ -771,7 +773,7 @@ int zfcp_fc_execute_els_fc_job(struct fc_bsg_job *job)
 	els_fc_job->els.handler_data = (unsigned long) els_fc_job;
 	els_fc_job->job = job;
 
-	return zfcp_fsf_send_els(&els_fc_job->els);
+	return zfcp_fsf_send_els(&els_fc_job->els, job->req->timeout / HZ);
 }
 
 struct zfcp_ct_fc_job {
@@ -849,12 +851,18 @@ int zfcp_fc_execute_ct_fc_job(struct fc_bsg_job *job)
 	ct_fc_job->ct.completion = NULL;
 	ct_fc_job->job = job;
 
-	ret = zfcp_fsf_send_ct(&ct_fc_job->ct, NULL);
+	ret = zfcp_fsf_send_ct(&ct_fc_job->ct, NULL, job->req->timeout / HZ);
 	if (ret) {
 		kfree(ct_fc_job);
 		zfcp_fc_wka_port_put(ct_fc_job->ct.wka_port);
 	}
 	return ret;
+}
+
+int zfcp_fc_timeout_bsg_job(struct fc_bsg_job *job)
+{
+	/* hardware tracks timeout, reset bsg timeout to not interfere */
+	return -EAGAIN;
 }
 
 int zfcp_fc_gs_setup(struct zfcp_adapter *adapter)
