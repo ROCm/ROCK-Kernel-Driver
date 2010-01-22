@@ -391,6 +391,7 @@ static const char *const enclosure_status [] = {
 	[ENCLOSURE_STATUS_NOT_INSTALLED] = "not installed",
 	[ENCLOSURE_STATUS_UNKNOWN] = "unknown",
 	[ENCLOSURE_STATUS_UNAVAILABLE] = "unavailable",
+	[ENCLOSURE_STATUS_MAX] = NULL,
 };
 
 static const char *const enclosure_type [] = {
@@ -441,9 +442,8 @@ static ssize_t set_component_status(struct device *cdev,
 	struct enclosure_component *ecomp = to_enclosure_component(cdev);
 	int i;
 
-	for (i = 0; i < ARRAY_SIZE(enclosure_status); i++) {
-		if (enclosure_status[i] &&
-		    strncmp(buf, enclosure_status[i],
+	for (i = 0; enclosure_status[i]; i++) {
+		if (strncmp(buf, enclosure_status[i],
 			    strlen(enclosure_status[i])) == 0 &&
 		    (buf[strlen(enclosure_status[i])] == '\n' ||
 		     buf[strlen(enclosure_status[i])] == '\0'))
