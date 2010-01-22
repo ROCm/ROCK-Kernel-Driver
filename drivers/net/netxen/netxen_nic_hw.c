@@ -345,8 +345,7 @@ netxen_pcie_sem_lock(struct netxen_adapter *adapter, int sem, u32 id_reg)
 void
 netxen_pcie_sem_unlock(struct netxen_adapter *adapter, int sem)
 {
-	int val;
-	val = NXRD32(adapter, NETXEN_PCIE_REG(PCIE_SEM_UNLOCK(sem)));
+	NXRD32(adapter, NETXEN_PCIE_REG(PCIE_SEM_UNLOCK(sem)));
 }
 
 int netxen_niu_xg_init_port(struct netxen_adapter *adapter, int port)
@@ -690,6 +689,9 @@ void netxen_p3_nic_set_multi(struct net_device *netdev)
 	LIST_HEAD(del_list);
 	struct list_head *head;
 	nx_mac_list_t *cur;
+
+	if (adapter->is_up != NETXEN_ADAPTER_UP_MAGIC)
+		return;
 
 	list_splice_tail_init(&adapter->mac_list, &del_list);
 
@@ -1936,10 +1938,10 @@ void netxen_nic_set_link_parameters(struct netxen_adapter *adapter)
 			return;
 		}
 
-		if (adapter->phy_read
-		    && adapter->phy_read(adapter,
-			     NETXEN_NIU_GB_MII_MGMT_ADDR_PHY_STATUS,
-			     &status) == 0) {
+		if (adapter->phy_read &&
+		    adapter->phy_read(adapter,
+				      NETXEN_NIU_GB_MII_MGMT_ADDR_PHY_STATUS,
+				      &status) == 0) {
 			if (netxen_get_phy_link(status)) {
 				switch (netxen_get_phy_speed(status)) {
 				case 0:
@@ -1966,10 +1968,10 @@ void netxen_nic_set_link_parameters(struct netxen_adapter *adapter)
 					adapter->link_duplex = -1;
 					break;
 				}
-				if (adapter->phy_read
-				    && adapter->phy_read(adapter,
-					     NETXEN_NIU_GB_MII_MGMT_ADDR_AUTONEG,
-					     &autoneg) != 0)
+				if (adapter->phy_read &&
+				    adapter->phy_read(adapter,
+				      NETXEN_NIU_GB_MII_MGMT_ADDR_AUTONEG,
+						      &autoneg) != 0)
 					adapter->link_autoneg = autoneg;
 			} else
 				goto link_down;
