@@ -4,6 +4,7 @@
  * Copyright (C) 2001, 2002, 2003, 2004 David S. Miller (davem@redhat.com)
  * Copyright (C) 2001 Jeff Garzik (jgarzik@pobox.com)
  * Copyright (C) 2004 Sun Microsystems Inc.
+ * Copyright (C) 2007-2010 Broadcom Corporation.
  */
 
 #ifndef _T3_H
@@ -49,6 +50,12 @@
 #define  TG3PCI_DEVICE_TIGON3_5717	 0x1655
 #define  TG3PCI_DEVICE_TIGON3_5718	 0x1656
 #define  TG3PCI_DEVICE_TIGON3_5724	 0x165c
+#define  TG3PCI_DEVICE_TIGON3_57781	 0x16b1
+#define  TG3PCI_DEVICE_TIGON3_57785	 0x16b5
+#define  TG3PCI_DEVICE_TIGON3_57761	 0x16b0
+#define  TG3PCI_DEVICE_TIGON3_57765	 0x16b4
+#define  TG3PCI_DEVICE_TIGON3_57791	 0x16b2
+#define  TG3PCI_DEVICE_TIGON3_57795	 0x16b6
 /* 0x04 --> 0x64 unused */
 #define TG3PCI_MSI_DATA			0x00000064
 /* 0x66 --> 0x68 unused */
@@ -122,6 +129,7 @@
 #define   ASIC_REV_5785			 0x5785
 #define   ASIC_REV_57780		 0x57780
 #define   ASIC_REV_5717			 0x5717
+#define   ASIC_REV_57765		 0x57785
 #define  GET_CHIP_REV(CHIP_REV_ID)	((CHIP_REV_ID) >> 8)
 #define   CHIPREV_5700_AX		 0x70
 #define   CHIPREV_5700_BX		 0x71
@@ -220,6 +228,7 @@
 /* 0xc0 --> 0xf4 unused */
 
 #define TG3PCI_GEN2_PRODID_ASICREV	0x000000f4
+#define TG3PCI_GEN15_PRODID_ASICREV	0x000000fc
 /* 0xf8 --> 0x200 unused */
 
 #define TG3_CORR_ERR_STAT		0x00000110
@@ -1046,6 +1055,8 @@
 #define  CPMU_MUTEX_REQ_DRIVER		 0x00001000
 #define TG3_CPMU_MUTEX_GNT		0x00003660
 #define  CPMU_MUTEX_GNT_DRIVER		 0x00001000
+#define TG3_CPMU_PHY_STRAP		0x00003664
+#define TG3_CPMU_PHY_STRAP_IS_SERDES	 0x00000020
 /* 0x3664 --> 0x3800 unused */
 
 /* Mbuf cluster free registers */
@@ -1195,14 +1206,18 @@
 #define  DEFAULT_MB_MACRX_LOW_WATER	  0x00000020
 #define  DEFAULT_MB_MACRX_LOW_WATER_5705  0x00000010
 #define  DEFAULT_MB_MACRX_LOW_WATER_5906  0x00000004
+#define  DEFAULT_MB_MACRX_LOW_WATER_57765 0x0000002a
 #define  DEFAULT_MB_MACRX_LOW_WATER_JUMBO 0x00000098
 #define  DEFAULT_MB_MACRX_LOW_WATER_JUMBO_5780 0x0000004b
+#define  DEFAULT_MB_MACRX_LOW_WATER_JUMBO_57765 0x0000007e
 #define BUFMGR_MB_HIGH_WATER		0x00004418
 #define  DEFAULT_MB_HIGH_WATER		 0x00000060
 #define  DEFAULT_MB_HIGH_WATER_5705	 0x00000060
 #define  DEFAULT_MB_HIGH_WATER_5906	 0x00000010
+#define  DEFAULT_MB_HIGH_WATER_57765	 0x000000a0
 #define  DEFAULT_MB_HIGH_WATER_JUMBO	 0x0000017c
 #define  DEFAULT_MB_HIGH_WATER_JUMBO_5780 0x00000096
+#define  DEFAULT_MB_HIGH_WATER_JUMBO_57765 0x000000ea
 #define BUFMGR_RX_MB_ALLOC_REQ		0x0000441c
 #define  BUFMGR_MB_ALLOC_BIT		 0x10000000
 #define BUFMGR_RX_MB_ALLOC_RESP		0x00004420
@@ -1532,6 +1547,8 @@
 #define  GRC_MODE_HOST_SENDBDS		0x00020000
 #define  GRC_MODE_NO_TX_PHDR_CSUM	0x00100000
 #define  GRC_MODE_NVRAM_WR_ENABLE	0x00200000
+#define  GRC_MODE_PCIE_TL_SEL		0x00000000
+#define  GRC_MODE_PCIE_PL_SEL		0x00400000
 #define  GRC_MODE_NO_RX_PHDR_CSUM	0x00800000
 #define  GRC_MODE_IRQ_ON_TX_CPU_ATTN	0x01000000
 #define  GRC_MODE_IRQ_ON_RX_CPU_ATTN	0x02000000
@@ -1539,7 +1556,13 @@
 #define  GRC_MODE_IRQ_ON_DMA_ATTN	0x08000000
 #define  GRC_MODE_IRQ_ON_FLOW_ATTN	0x10000000
 #define  GRC_MODE_4X_NIC_SEND_RINGS	0x20000000
+#define  GRC_MODE_PCIE_DL_SEL		0x20000000
 #define  GRC_MODE_MCAST_FRM_ENABLE	0x40000000
+#define  GRC_MODE_PCIE_HI_1K_EN		0x80000000
+#define  GRC_MODE_PCIE_PORT_MASK	(GRC_MODE_PCIE_TL_SEL | \
+					 GRC_MODE_PCIE_PL_SEL | \
+					 GRC_MODE_PCIE_DL_SEL | \
+					 GRC_MODE_PCIE_HI_1K_EN)
 #define GRC_MISC_CFG			0x00006804
 #define  GRC_MISC_CFG_CORECLK_RESET	0x00000001
 #define  GRC_MISC_CFG_PRESCALAR_MASK	0x000000fe
@@ -1793,6 +1816,11 @@
 /* 0x7e74 --> 0x8000 unused */
 
 
+/* Alternate PCIE definitions */
+#define TG3_PCIE_TLDLPL_PORT		0x00007c00
+#define TG3_PCIE_PL_LO_PHYCTL1		 0x00000004
+#define TG3_PCIE_PL_LO_PHYCTL1_L1PLLPD_EN	  0x00001000
+
 /* OTP bit definitions */
 #define TG3_OTP_AGCTGT_MASK		0x000000e0
 #define TG3_OTP_AGCTGT_SHIFT		1
@@ -1812,6 +1840,11 @@
 #define TG3_OTP_RCOFF_SHIFT		16
 
 #define TG3_OTP_DEFAULT			0x286c1640
+
+
+/* Hardware Legacy NVRAM layout */
+#define TG3_NVM_VPD_OFF			0x100
+#define TG3_NVM_VPD_LEN			256
 
 /* Hardware Selfboot NVRAM layout */
 #define TG3_NVM_HWSB_CFG1		0x00000004
@@ -2441,10 +2474,6 @@ struct ring_info {
 	DECLARE_PCI_UNMAP_ADDR(mapping)
 };
 
-struct tx_ring_info {
-	struct sk_buff			*skb;
-};
-
 struct tg3_config_info {
 	u32				flags;
 };
@@ -2608,7 +2637,7 @@ struct tg3_napi {
 
 	struct tg3_rx_buffer_desc	*rx_rcb;
 	struct tg3_tx_buffer_desc	*tx_ring;
-	struct tx_ring_info		*tx_buffers;
+	struct ring_info		*tx_buffers;
 
 	dma_addr_t			status_mapping;
 	dma_addr_t			rx_rcb_mapping;
@@ -2795,9 +2824,12 @@ struct tg3 {
 #define TG3_FLG3_NO_NVRAM		0x00004000
 #define TG3_FLG3_PHY_IS_FET		0x00010000
 #define TG3_FLG3_ENABLE_RSS		0x00020000
+#define TG3_FLG3_ENABLE_TSS		0x00040000
 #define TG3_FLG3_4G_DMA_BNDRY_BUG	0x00080000
 #define TG3_FLG3_40BIT_DMA_LIMIT_BUG	0x00100000
 #define TG3_FLG3_SHORT_DMA_BUG		0x00200000
+#define TG3_FLG3_USE_JUMBO_BDFLAG	0x00400000
+#define TG3_FLG3_L1PLLPD_EN		0x00800000
 
 	struct timer_list		timer;
 	u16				timer_counter;
@@ -2864,7 +2896,9 @@ struct tg3 {
 #define PHY_ID_BCM5756			0xbc050ed0
 #define PHY_ID_BCM5784			0xbc050fa0
 #define PHY_ID_BCM5761			0xbc050fd0
-#define PHY_ID_BCM5717			0x5c0d8a00
+#define PHY_ID_BCM5718C			0x5c0d8a00
+#define PHY_ID_BCM5718S			0xbc050ff0
+#define PHY_ID_BCM57765			0x5c0d8a40
 #define PHY_ID_BCM5906			0xdc00ac40
 #define PHY_ID_BCM8002			0x60010140
 #define PHY_ID_INVALID			0xffffffff
@@ -2887,8 +2921,9 @@ struct tg3 {
 	u32				led_ctrl;
 	u32				phy_otp;
 
-	char				board_part_number[24];
-#define TG3_VER_SIZE 32
+#define TG3_BPN_SIZE			24
+	char				board_part_number[TG3_BPN_SIZE];
+#define TG3_VER_SIZE			ETHTOOL_FWVERS_LEN
 	char				fw_ver[TG3_VER_SIZE];
 	u32				nic_sram_data_cfg;
 	u32				pci_clock_ctrl;
@@ -2906,7 +2941,8 @@ struct tg3 {
 	 (X) == PHY_ID_BCM5780 || (X) == PHY_ID_BCM5787 || \
 	 (X) == PHY_ID_BCM5755 || (X) == PHY_ID_BCM5756 || \
 	 (X) == PHY_ID_BCM5906 || (X) == PHY_ID_BCM5761 || \
-	 (X) == PHY_ID_BCM5717 || (X) == PHY_ID_BCM8002)
+	 (X) == PHY_ID_BCM5718C || (X) == PHY_ID_BCM5718S || \
+	 (X) == PHY_ID_BCM57765 || (X) == PHY_ID_BCM8002)
 
 	struct tg3_hw_stats		*hw_stats;
 	dma_addr_t			stats_mapping;
