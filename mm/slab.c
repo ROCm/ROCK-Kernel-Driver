@@ -305,7 +305,7 @@ struct kmem_list3 {
 	struct array_cache **alien;	/* on other nodes */
 	unsigned long next_reap;	/* updated without locking */
 	int free_touched;		/* updated without locking */
-};
+} __attribute__((aligned(sizeof(long))));
 
 /*
  * Need this for bootstrapping a per node allocator.
@@ -957,6 +957,11 @@ static int transfer_objects(struct array_cache *to,
 #define drain_alien_cache(cachep, alien) do { } while (0)
 #define reap_alien(cachep, l3) do { } while (0)
 
+static inline int numa_slab_nid(struct kmem_cache *cachep, gfp_t flags)
+{
+	return 0;
+}
+
 static inline struct array_cache **alloc_alien_cache(int node, int limit, gfp_t gfp)
 {
 	return (struct array_cache **)BAD_ALIEN_MAGIC;
@@ -987,6 +992,64 @@ static inline void *____cache_alloc_node(struct kmem_cache *cachep,
 
 static void *____cache_alloc_node(struct kmem_cache *, gfp_t, int);
 static void *alternate_node_alloc(struct kmem_cache *, gfp_t);
+
+/*
+ * slow path for numa_slab_nid(), below
+ */
+static noinline int __numa_slab_nid(struct kmem_cache *cachep,
+					int node, gfp_t flags)
+{
+	struct zonelist *zonelist;
+	struct zone *zone;
+	enum zone_type highest_zoneidx = gfp_zone(flags);
+
+	if (likely(node_state(node, N_NORMAL_MEMORY)))
+		return node;
+
+	/*
+	 * memoryless node:  consult its zonelist.
+	 * Cache the fallback node, if cache pointer provided.
+	 */
+	zonelist = &NODE_DATA(node)->node_zonelists[0];
+	(void)first_zones_zonelist(zonelist, highest_zoneidx,
+						NULL,
+						&zone);
+	if (cachep)
+		cachep->nodelists[node] =
+			(struct kmem_list3 *)((unsigned long)zone->node << 1 | 1);
+	return zone->node;
+}
+
+/*
+ * "Local" node for slab is first node in zonelist with memory.
+ * For nodes with memory this will be the actual local node.
+ *
+ * Use nodelist[numa_node_id()] to cache the fallback node for
+ * memoryless nodes.  We'll be loading that member soon anyway,
+ * or already have, when called for cache refill, ...  Use low
+ * bit of "pointer" as flag for "memoryless_node", indicating
+ * that the fallback nodes is stored here [<<1].
+ */
+#define memoryless_node(L3L) ((L3L) & 1)
+static inline int numa_slab_nid(struct kmem_cache *cachep, gfp_t flags)
+{
+	int node = numa_node_id();
+
+	if (likely(cachep)){
+		unsigned long l3l = (unsigned long)cachep->nodelists[node];
+
+		if (likely(l3l)) {
+			if (unlikely(memoryless_node(l3l)))
+				node = (int)(l3l >> 1);
+			return node;
+		}
+	}
+
+	/*
+	 * !cachep || !l3l - the slow path
+	 */
+	return __numa_slab_nid(cachep, node, flags);
+}
 
 static struct array_cache **alloc_alien_cache(int node, int limit, gfp_t gfp)
 {
@@ -1089,7 +1152,7 @@ static inline int cache_free_alien(struct kmem_cache *cachep, void *objp)
 	struct array_cache *alien = NULL;
 	int node;
 
-	node = numa_node_id();
+	node = numa_slab_nid(cachep, GFP_KERNEL);
 
 	/*
 	 * Make sure we are not freeing a object from another node to the array
@@ -1432,7 +1495,7 @@ void __init kmem_cache_init(void)
 	 * 6) Resize the head arrays of the kmalloc caches to their final sizes.
 	 */
 
-	node = numa_node_id();
+	node = numa_slab_nid(NULL, GFP_KERNEL);
 
 	/* 1) create the cache_cache */
 	INIT_LIST_HEAD(&cache_chain);
@@ -2068,7 +2131,7 @@ static int __init_refok setup_cpu_cache(struct kmem_cache *cachep, gfp_t gfp)
 			}
 		}
 	}
-	cachep->nodelists[numa_node_id()]->next_reap =
+	cachep->nodelists[numa_slab_nid(cachep, GFP_KERNEL)]->next_reap =
 			jiffies + REAPTIMEOUT_LIST3 +
 			((unsigned long)cachep) % REAPTIMEOUT_LIST3;
 
@@ -2398,7 +2461,7 @@ static void check_spinlock_acquired(struct kmem_cache *cachep)
 {
 #ifdef CONFIG_SMP
 	check_irq_off();
-	assert_spin_locked(&cachep->nodelists[numa_node_id()]->list_lock);
+	assert_spin_locked(&cachep->nodelists[numa_slab_nid(cachep, GFP_KERNEL)]->list_lock);
 #endif
 }
 
@@ -2425,7 +2488,7 @@ static void do_drain(void *arg)
 {
 	struct kmem_cache *cachep = arg;
 	struct array_cache *ac;
-	int node = numa_node_id();
+	int node = numa_slab_nid(cachep, GFP_KERNEL);
 
 	check_irq_off();
 	ac = cpu_cache_get(cachep);
@@ -2962,7 +3025,7 @@ static void *cache_alloc_refill(struct kmem_cache *cachep,
 
 retry:
 	check_irq_off();
-	node = numa_node_id();
+	node = numa_slab_nid(cachep, flags);
 	if (unlikely(must_refill))
 		goto force_grow;
 	ac = cpu_cache_get(cachep);
@@ -3164,7 +3227,7 @@ static void *alternate_node_alloc(struct kmem_cache *cachep, gfp_t flags)
 
 	if (in_interrupt() || (flags & __GFP_THISNODE))
 		return NULL;
-	nid_alloc = nid_here = numa_node_id();
+	nid_alloc = nid_here = numa_slab_nid(cachep, flags);
 	if (cpuset_do_slab_mem_spread() && (cachep->flags & SLAB_MEM_SPREAD))
 		nid_alloc = cpuset_mem_spread_node();
 	else if (current->mempolicy)
@@ -3339,6 +3402,7 @@ __cache_alloc_node(struct kmem_cache *cachep, gfp_t flags, int nodeid,
 {
 	unsigned long save_flags;
 	void *ptr;
+	int slab_node = numa_slab_nid(cachep, flags);
 
 	flags &= gfp_allowed_mask;
 
@@ -3351,7 +3415,7 @@ __cache_alloc_node(struct kmem_cache *cachep, gfp_t flags, int nodeid,
 	local_irq_save(save_flags);
 
 	if (unlikely(nodeid == -1))
-		nodeid = numa_node_id();
+		nodeid = slab_node;
 
 	if (unlikely(!cachep->nodelists[nodeid])) {
 		/* Node not bootstrapped yet */
@@ -3359,7 +3423,7 @@ __cache_alloc_node(struct kmem_cache *cachep, gfp_t flags, int nodeid,
 		goto out;
 	}
 
-	if (nodeid == numa_node_id()) {
+	if (nodeid == slab_node) {
 		/*
 		 * Use the locally cached objects if possible.
 		 * However ____cache_alloc does not allow fallback
@@ -3404,7 +3468,8 @@ __do_cache_alloc(struct kmem_cache *cache, gfp_t flags)
 	 * ____cache_alloc_node() knows how to locate memory on other nodes
 	 */
  	if (!objp)
- 		objp = ____cache_alloc_node(cache, flags, numa_node_id());
+ 		objp = ____cache_alloc_node(cache, flags,
+					 numa_slab_nid(cache, flags));
 
   out:
 	return objp;
@@ -3501,7 +3566,7 @@ static void cache_flusharray(struct kmem_cache *cachep, struct array_cache *ac)
 {
 	int batchcount;
 	struct kmem_list3 *l3;
-	int node = numa_node_id();
+	int node = numa_slab_nid(cachep, GFP_KERNEL);
 
 	batchcount = ac->batchcount;
 #if DEBUG
@@ -4151,7 +4216,7 @@ static void cache_reap(struct work_struct *w)
 {
 	struct kmem_cache *searchp;
 	struct kmem_list3 *l3;
-	int node = numa_node_id();
+	int node = numa_slab_nid(NULL, GFP_KERNEL);
 	struct delayed_work *work = to_delayed_work(w);
 
 	if (!mutex_trylock(&cache_chain_mutex))
