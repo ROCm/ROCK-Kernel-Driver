@@ -79,7 +79,7 @@ EXPORT_SYMBOL_GPL(e820_any_mapped);
  * Note: this function only works correct if the e820 table is sorted and
  * not-overlapping, which is the case
  */
-int __init e820_all_mapped(u64 start, u64 end, unsigned type)
+int e820_all_mapped(u64 start, u64 end, unsigned type)
 {
 	int i;
 
@@ -106,6 +106,7 @@ int __init e820_all_mapped(u64 start, u64 end, unsigned type)
 	}
 	return 0;
 }
+EXPORT_SYMBOL_GPL(e820_all_mapped);
 
 /*
  * Add a memory region to the kernel e820 map.

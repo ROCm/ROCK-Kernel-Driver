@@ -920,6 +920,14 @@ config X86_MCE_INTEL
 	   Additional support for intel specific MCE features such as
 	   the thermal monitor.
 
+config X86_MCE_XEON75XX
+	tristate "Intel Xeon 7500 series corrected memory error driver"
+	depends on X86_MCE_INTEL && PCI
+	---help---
+	   Add support for a Intel Xeon 7500 series specific memory error driver.
+	   This allows to report the DIMM and physical address on a corrected
+	   memory error machine check event.
+
 config X86_MCE_AMD
 	def_bool y
 	prompt "AMD MCE features"
