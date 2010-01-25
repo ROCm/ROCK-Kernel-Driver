@@ -231,16 +231,18 @@ update_nodes_add(int node, unsigned long start, unsigned long end)
 			printk(KERN_ERR "SRAT: Hotplug zone not continuous. Partly ignored\n");
 	}
 
-	if (changed)
+	if (changed) {
+		node_set(node, cpu_nodes_parsed);
 		printk(KERN_INFO "SRAT: hot plug zone found %Lx - %Lx\n",
 				 nd->start, nd->end);
+	}
 }
 
 /* Callback for parsing of the Proximity Domain <-> Memory Area mappings */
 void __init
 acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
 {
-	struct bootnode *nd;
+	struct bootnode *nd, oldnode;
 	unsigned long start, end;
 	int node, pxm;
 	int i;
@@ -281,6 +283,7 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
 		return;
 	}
 	nd = &nodes[node];
+	oldnode = *nd;
 	if (!node_test_and_set(node, nodes_parsed)) {
 		nd->start = start;
 		nd->end = end;
@@ -296,8 +299,13 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
 	e820_register_active_regions(node, start >> PAGE_SHIFT,
 				     end >> PAGE_SHIFT);
 
-	if (ma->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE)
+	if (ma->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE) {
 		update_nodes_add(node, start, end);
+		/* restore nodes[node] */
+		*nd = oldnode;
+		if ((nd->start | nd->end) == 0)
+			node_clear(node, nodes_parsed);
+	}
 
 	node_memblk_range[num_node_memblks].start = start;
 	node_memblk_range[num_node_memblks].end = end;
