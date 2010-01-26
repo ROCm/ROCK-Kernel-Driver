@@ -45,8 +45,6 @@
 #include "lpfc_compat.h"
 #include "lpfc_crtn.h"
 #include "lpfc_vport.h"
-#include "lpfc_auth_access.h"
-#include "lpfc_security.h"
 
 #define LPFC_DEF_DEVLOSS_TMO 30
 #define LPFC_MIN_DEVLOSS_TMO 1
@@ -641,7 +639,7 @@ lpfc_do_offline(struct lpfc_hba *phba, uint32_t type)
  * -EIO reset not configured or error posting the event
  * zero for success
  **/
-int
+static int
 lpfc_selective_reset(struct lpfc_hba *phba)
 {
 	struct completion online_compl;
@@ -680,7 +678,7 @@ lpfc_selective_reset(struct lpfc_hba *phba)
  * Notes:
  * Assumes any error from lpfc_selective_reset() will be negative.
  * If lpfc_selective_reset() returns zero then the length of the buffer
- * is returned which indicates succcess
+ * is returned which indicates success
  *
  * Returns:
  * -EINVAL if the buffer does not contain the string "selective"
@@ -1199,152 +1197,6 @@ lpfc_poll_store(struct device *dev, struct device_attribute *attr,
 	return strlen(buf);
 }
 
-static ssize_t
-lpfc_auth_state_show(struct device *dev, struct device_attribute *attr,
-		    char *buf)
-{
-	struct Scsi_Host  *shost = class_to_shost(dev);
-	struct lpfc_vport *vport = (struct lpfc_vport *) shost->hostdata;
-	switch (vport->auth.auth_state) {
-	case LPFC_AUTH_UNKNOWN:
-		if (vport->auth.auth_msg_state == LPFC_AUTH_NEGOTIATE ||
-		    vport->auth.auth_msg_state == LPFC_DHCHAP_CHALLENGE ||
-		    vport->auth.auth_msg_state == LPFC_DHCHAP_REPLY ||
-		    vport->auth.auth_msg_state == LPFC_DHCHAP_SUCCESS_REPLY)
-			return snprintf(buf, PAGE_SIZE, "Authenticating\n");
-		else
-			return snprintf(buf, PAGE_SIZE, "Not Authenticated\n");
-	case LPFC_AUTH_FAIL:
-		return snprintf(buf, PAGE_SIZE, "Failed\n");
-	case LPFC_AUTH_FAIL_ELS_TMO:
-		return snprintf(buf, PAGE_SIZE, "Failed - ELS Timeout\n");
-	case LPFC_AUTH_FAIL_TRANS_TMO:
-		return snprintf(buf, PAGE_SIZE, "Failed - "
-				"Transaction Timeout\n");
-	case LPFC_AUTH_FAIL_LS_RJT_GEN:
-		return snprintf(buf, PAGE_SIZE, "Failed - LS_RJT\n");
-	case LPFC_AUTH_FAIL_LS_RJT_BUSY:
-		return snprintf(buf, PAGE_SIZE, "Failed - LS_RJT Busy\n");
-	case LPFC_AUTH_FAIL_AUTH_RJT:
-		return snprintf(buf, PAGE_SIZE, "Failed - AUTH RJT\n");
-	case LPFC_AUTH_SUCCESS:
-		if (vport->auth.auth_msg_state == LPFC_AUTH_NEGOTIATE ||
-		    vport->auth.auth_msg_state == LPFC_DHCHAP_CHALLENGE ||
-		    vport->auth.auth_msg_state == LPFC_DHCHAP_REPLY ||
-		    vport->auth.auth_msg_state == LPFC_DHCHAP_SUCCESS_REPLY)
-			return snprintf(buf, PAGE_SIZE, "Authenticating\n");
-		else if (vport->auth.auth_msg_state == LPFC_DHCHAP_SUCCESS)
-			return snprintf(buf, PAGE_SIZE, "Authenticated\n");
-	}
-	return snprintf(buf, PAGE_SIZE, "Unknown\n");
-}
-
-static ssize_t
-lpfc_auth_dir_show(struct device *dev, struct device_attribute *attr,
-		   char *buf)
-{
-	struct Scsi_Host  *shost = class_to_shost(dev);
-	struct lpfc_vport *vport = (struct lpfc_vport *) shost->hostdata;
-	if (!vport->cfg_enable_auth ||
-	    vport->auth.auth_state != LPFC_AUTH_SUCCESS)
-		return snprintf(buf, PAGE_SIZE, "Unknown\n");
-	if (vport->auth.direction == AUTH_DIRECTION_LOCAL)
-		return snprintf(buf, PAGE_SIZE, "Local Authenticated\n");
-	else if (vport->auth.direction == AUTH_DIRECTION_REMOTE)
-		return snprintf(buf, PAGE_SIZE, "Remote Authenticated\n");
-	else if (vport->auth.direction == AUTH_DIRECTION_BIDI)
-		return snprintf(buf, PAGE_SIZE, "Bidi Authentication\n");
-	return snprintf(buf, PAGE_SIZE, "Unknown\n");
-}
-
-static ssize_t
-lpfc_auth_protocol_show(struct device *dev, struct device_attribute *attr,
-			char *buf)
-{
-	struct Scsi_Host  *shost = class_to_shost(dev);
-	struct lpfc_vport *vport = (struct lpfc_vport *) shost->hostdata;
-	if (vport->cfg_enable_auth &&
-	    vport->auth.auth_state == LPFC_AUTH_SUCCESS)
-		return snprintf(buf, PAGE_SIZE, "1 (DH-CHAP)\n");
-	else
-		return snprintf(buf, PAGE_SIZE, "Unknown\n");
-}
-
-static ssize_t
-lpfc_auth_dhgroup_show(struct device *dev, struct device_attribute *attr,
-		       char *buf)
-{
-	struct Scsi_Host  *shost = class_to_shost(dev);
-	struct lpfc_vport *vport = (struct lpfc_vport *) shost->hostdata;
-	if (!vport->cfg_enable_auth ||
-	    vport->auth.auth_state != LPFC_AUTH_SUCCESS)
-		return snprintf(buf, PAGE_SIZE, "Unknown\n");
-	switch (vport->auth.group_id) {
-	case DH_GROUP_NULL:
-		return snprintf(buf, PAGE_SIZE, "0 (NULL)\n");
-	case DH_GROUP_1024:
-		return snprintf(buf, PAGE_SIZE, "1 (1024)\n");
-	case DH_GROUP_1280:
-		return snprintf(buf, PAGE_SIZE, "2 (1280)\n");
-	case DH_GROUP_1536:
-		return snprintf(buf, PAGE_SIZE, "3 (1536)\n");
-	case DH_GROUP_2048:
-		return snprintf(buf, PAGE_SIZE, "4 (2048)\n");
-	}
-	return snprintf(buf, PAGE_SIZE, "%d (Unrecognized)\n",
-			vport->auth.group_id);
-}
-
-static ssize_t
-lpfc_auth_hash_show(struct device *dev, struct device_attribute *attr,
-		    char *buf)
-{
-	struct Scsi_Host  *shost = class_to_shost(dev);
-	struct lpfc_vport *vport = (struct lpfc_vport *) shost->hostdata;
-	if (!vport->cfg_enable_auth ||
-	    vport->auth.auth_state != LPFC_AUTH_SUCCESS)
-		return snprintf(buf, PAGE_SIZE, "Unknown\n");
-	switch (vport->auth.hash_id) {
-	case FC_SP_HASH_MD5:
-		return snprintf(buf, PAGE_SIZE, "5 (MD5)\n");
-	case FC_SP_HASH_SHA1:
-		return snprintf(buf, PAGE_SIZE, "6 (SHA1)\n");
-	}
-	return snprintf(buf, PAGE_SIZE, "%d (Unrecognized)\n",
-			vport->auth.hash_id);
-}
-static ssize_t
-lpfc_auth_last_show(struct device *dev, struct device_attribute *attr,
-		    char *buf)
-{
-	struct Scsi_Host  *shost = class_to_shost(dev);
-	struct lpfc_vport *vport = (struct lpfc_vport *) shost->hostdata;
-	struct timeval last_time;
-	if (!vport->cfg_enable_auth || vport->auth.last_auth == 0)
-		return snprintf(buf, PAGE_SIZE, "%d\n", -1);
-	jiffies_to_timeval((jiffies - vport->auth.last_auth), &last_time);
-	return snprintf(buf, PAGE_SIZE, "%ld\n", last_time.tv_sec);
-}
-
-static ssize_t
-lpfc_auth_next_show(struct device *dev, struct device_attribute *attr,
-		    char *buf)
-{
-	struct Scsi_Host  *shost = class_to_shost(dev);
-	struct lpfc_vport *vport = (struct lpfc_vport *) shost->hostdata;
-	unsigned long next_jiff;
-	struct timeval next_time;
-	if (!vport->cfg_enable_auth ||
-	    vport->auth.last_auth == 0 ||
-	    vport->auth.reauth_interval == 0)
-		return snprintf(buf, PAGE_SIZE, "%d\n", -1);
-	/* calculate the amount of time left until next auth */
-	next_jiff = (msecs_to_jiffies(vport->auth.reauth_interval * 60000) +
-		     vport->auth.last_auth) - jiffies;
-	jiffies_to_timeval(next_jiff, &next_time);
-	return snprintf(buf, PAGE_SIZE, "%ld\n", next_time.tv_sec);
-}
-
 /**
  * lpfc_param_show - Return a cfg attribute value in decimal
  *
@@ -1782,38 +1634,7 @@ static DEVICE_ATTR(max_xri, S_IRUGO, lpfc_max_xri_show, NULL);
 static DEVICE_ATTR(used_xri, S_IRUGO, lpfc_used_xri_show, NULL);
 static DEVICE_ATTR(npiv_info, S_IRUGO, lpfc_npiv_info_show, NULL);
 static DEVICE_ATTR(lpfc_temp_sensor, S_IRUGO, lpfc_temp_sensor_show, NULL);
-static DEVICE_ATTR(auth_state, S_IRUGO, lpfc_auth_state_show, NULL);
-static DEVICE_ATTR(auth_dir, S_IRUGO, lpfc_auth_dir_show, NULL);
-static DEVICE_ATTR(auth_protocol, S_IRUGO, lpfc_auth_protocol_show, NULL);
-static DEVICE_ATTR(auth_dhgroup, S_IRUGO, lpfc_auth_dhgroup_show, NULL);
-static DEVICE_ATTR(auth_hash, S_IRUGO, lpfc_auth_hash_show, NULL);
-static DEVICE_ATTR(auth_last, S_IRUGO, lpfc_auth_last_show, NULL);
-static DEVICE_ATTR(auth_next, S_IRUGO, lpfc_auth_next_show, NULL);
 
-static int
-lpfc_parse_wwn(const char *ns, uint8_t *nm)
-{
-	unsigned int i, j;
-	memset(nm, 0, 8);
-
-	/* Validate and store the new name */
-	for (i = 0, j = 0; i < 16; i++) {
-		if ((*ns >= 'a') && (*ns <= 'f'))
-			j = ((j << 4) | ((*ns++ - 'a') + 10));
-		else if ((*ns >= 'A') && (*ns <= 'F'))
-			j = ((j << 4) | ((*ns++ - 'A') + 10));
-		else if ((*ns >= '0') && (*ns <= '9'))
-			j = ((j << 4) | (*ns++ - '0'));
-		else
-			return -EINVAL;
-		if (i % 2) {
-			nm[i/2] = j & 0xff;
-			j = 0;
-		}
-	}
-
-	return 0;
-}
 
 static char *lpfc_soft_wwn_key = "C99G71SL8032A";
 
@@ -2209,88 +2030,6 @@ lpfc_vport_param_store(nodev_tmo)
 
 static DEVICE_ATTR(lpfc_nodev_tmo, S_IRUGO | S_IWUSR,
 		   lpfc_nodev_tmo_show, lpfc_nodev_tmo_store);
-static ssize_t
-lpfc_authenticate(struct device *dev, struct device_attribute *attr,
-		  const char *buf, size_t count)
-{
-	struct Scsi_Host *shost = class_to_shost(dev);
-	struct lpfc_vport *vport = (struct lpfc_vport *)shost->hostdata;
-	struct lpfc_hba   *phba = vport->phba;
-	struct lpfc_nodelist *ndlp;
-	int status;
-	struct lpfc_name wwpn;
-
-	if (lpfc_parse_wwn(buf, wwpn.u.wwn))
-		return -EINVAL;
-
-	if (vport->port_state == LPFC_VPORT_FAILED) {
-		lpfc_issue_lip(shost);
-		return strlen(buf);
-	}
-	if ((vport->fc_flag & FC_OFFLINE_MODE) ||
-	    (phba->sli.sli_flag & LPFC_BLOCK_MGMT_IO) ||
-	    (!vport->cfg_enable_auth))
-		return -EPERM;
-
-	/* If vport already in the middle of authentication do not restart */
-	if ((vport->auth.auth_msg_state == LPFC_AUTH_NEGOTIATE) ||
-	    (vport->auth.auth_msg_state == LPFC_DHCHAP_CHALLENGE) ||
-	    (vport->auth.auth_msg_state == LPFC_DHCHAP_REPLY))
-		return -EAGAIN;
-
-	if (wwn_to_u64(wwpn.u.wwn) == AUTH_FABRIC_WWN)
-		ndlp = lpfc_findnode_did(vport, Fabric_DID);
-	else
-		ndlp = lpfc_findnode_wwnn(vport, &wwpn);
-	if (!ndlp || !NLP_CHK_NODE_ACT(ndlp))
-		return -EPERM;
-	status = lpfc_start_node_authentication(ndlp);
-	if (status)
-		return status;
-	return strlen(buf);
-}
-static DEVICE_ATTR(lpfc_authenticate, S_IRUGO | S_IWUSR, NULL,
-		   lpfc_authenticate);
-
-static ssize_t
-lpfc_update_auth_config(struct device *dev, struct device_attribute *attr,
-			const char *buf, size_t count)
-{
-	struct Scsi_Host *shost = class_to_shost(dev);
-	struct lpfc_vport *vport = (struct lpfc_vport *)shost->hostdata;
-	struct lpfc_hba   *phba = vport->phba;
-	struct lpfc_nodelist *ndlp;
-	struct lpfc_name wwpn;
-	int status;
-
-	if (lpfc_parse_wwn(buf, wwpn.u.wwn))
-		return -EINVAL;
-
-	if ((vport->fc_flag & FC_OFFLINE_MODE) ||
-	    (phba->sli.sli_flag & LPFC_BLOCK_MGMT_IO) ||
-	    (!vport->cfg_enable_auth))
-		return -EPERM;
-
-	/* If vport already in the middle of authentication do not restart */
-	if ((vport->auth.auth_msg_state == LPFC_AUTH_NEGOTIATE) ||
-	    (vport->auth.auth_msg_state == LPFC_DHCHAP_CHALLENGE) ||
-	    (vport->auth.auth_msg_state == LPFC_DHCHAP_REPLY))
-		return -EAGAIN;
-
-	if (wwn_to_u64(wwpn.u.wwn) == AUTH_FABRIC_WWN)
-		status = lpfc_get_auth_config(vport, NULL);
-	else {
-		ndlp = lpfc_findnode_wwnn(vport, &wwpn);
-		if (!ndlp || !NLP_CHK_NODE_ACT(ndlp))
-			return -EPERM;
-		status = lpfc_get_auth_config(vport, ndlp);
-	}
-	if (status)
-		return -EPERM;
-	return strlen(buf);
-}
-static DEVICE_ATTR(lpfc_update_auth_config, S_IRUGO | S_IWUSR,
-		   NULL, lpfc_update_auth_config);
 
 /*
 # lpfc_devloss_tmo: If set, it will hold all I/O errors on devices that
@@ -3384,48 +3123,6 @@ LPFC_ATTR_R(use_msi, 0, 0, 2, "Use Message Signaled Interrupts (1) or "
 	    "MSI-X (2), if possible");
 
 /*
-# lpfc_enable_auth: controls FC Authentication.
-#       0 = Authentication OFF
-#       1 = Authentication ON
-# Value range [0,1]. Default value is 0.
-*/
-static int lpfc_enable_auth;
-module_param(lpfc_enable_auth, int, 0);
-MODULE_PARM_DESC(lpfc_enable_auth, "Enable FC Authentication");
-lpfc_vport_param_show(enable_auth);
-lpfc_vport_param_init(enable_auth, 0, 0, 1);
-static int
-lpfc_enable_auth_set(struct lpfc_vport *vport, int val)
-{
-	if (val == vport->cfg_enable_auth)
-		return 0;
-	if (val == 0) {
-		spin_lock_irq(&fc_security_user_lock);
-		list_del(&vport->sc_users);
-		spin_unlock_irq(&fc_security_user_lock);
-		vport->cfg_enable_auth = val;
-		lpfc_fc_queue_security_work(vport,
-					    &vport->sc_offline_work);
-		return 0;
-	} else if (val == 1) {
-		spin_lock_irq(&fc_security_user_lock);
-		list_add_tail(&vport->sc_users, &fc_security_user_list);
-		spin_unlock_irq(&fc_security_user_lock);
-		vport->cfg_enable_auth = val;
-		lpfc_fc_queue_security_work(vport,
-					    &vport->sc_online_work);
-		return 0;
-	}
-	lpfc_printf_vlog(vport, KERN_ERR, LOG_INIT,
-			 "0560 lpfc_enable_auth attribute cannot be set to %d, "
-			 "allowed range is [0, 1]\n", val);
-	return -EINVAL;
-}
-lpfc_vport_param_store(enable_auth);
-static DEVICE_ATTR(lpfc_enable_auth, S_IRUGO | S_IWUSR,
-		   lpfc_enable_auth_show, lpfc_enable_auth_store);
-
-/*
 # lpfc_fcp_imax: Set the maximum number of fast-path FCP interrupts per second
 #
 # Value range is [636,651042]. Default value is 10000.
@@ -3566,16 +3263,6 @@ struct device_attribute *lpfc_hba_attrs[] = {
 	&dev_attr_lpfc_poll,
 	&dev_attr_lpfc_poll_tmo,
 	&dev_attr_lpfc_use_msi,
-	&dev_attr_lpfc_enable_auth,
-	&dev_attr_lpfc_authenticate,
-	&dev_attr_lpfc_update_auth_config,
-	&dev_attr_auth_state,
-	&dev_attr_auth_dir,
-	&dev_attr_auth_protocol,
-	&dev_attr_auth_dhgroup,
-	&dev_attr_auth_hash,
-	&dev_attr_auth_last,
-	&dev_attr_auth_next,
 	&dev_attr_lpfc_fcp_imax,
 	&dev_attr_lpfc_fcp_wq_count,
 	&dev_attr_lpfc_fcp_eq_count,
@@ -3613,13 +3300,6 @@ struct device_attribute *lpfc_vport_attrs[] = {
 	&dev_attr_nport_evt_cnt,
 	&dev_attr_npiv_info,
 	&dev_attr_lpfc_enable_da_id,
-	&dev_attr_auth_state,
-	&dev_attr_auth_dir,
-	&dev_attr_auth_protocol,
-	&dev_attr_auth_dhgroup,
-	&dev_attr_auth_hash,
-	&dev_attr_auth_last,
-	&dev_attr_auth_next,
 	&dev_attr_lpfc_max_scsicmpl_time,
 	&dev_attr_lpfc_stat_data_ctrl,
 	&dev_attr_lpfc_static_vport,
@@ -3683,7 +3363,7 @@ sysfs_ctlreg_write(struct kobject *kobj, struct bin_attribute *bin_attr,
  * sysfs_ctlreg_read - Read method for reading from ctlreg
  * @kobj: kernel kobject that contains the kernel class device.
  * @bin_attr: kernel attributes passed to us.
- * @buf: if succesful contains the data from the adapter IOREG space.
+ * @buf: if successful contains the data from the adapter IOREG space.
  * @off: offset into buffer to beginning of data.
  * @count: bytes to transfer.
  *
@@ -4801,9 +4481,5 @@ lpfc_get_vport_cfgparam(struct lpfc_vport *vport)
 	lpfc_max_luns_init(vport, lpfc_max_luns);
 	lpfc_scan_down_init(vport, lpfc_scan_down);
 	lpfc_enable_da_id_init(vport, lpfc_enable_da_id);
-	if (vport->phba->sli_rev != LPFC_SLI_REV4)
-		lpfc_enable_auth_init(vport, lpfc_enable_auth);
-	else
-		lpfc_enable_auth_init(vport, 0);
 	return;
 }

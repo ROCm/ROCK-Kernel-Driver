@@ -162,7 +162,7 @@ obj-$(CONFIG_PPPOL2TP) += pppox.o pppol2tp.o
 obj-$(CONFIG_SLIP) += slip.o
 obj-$(CONFIG_SLHC) += slhc.o
 
-obj-$(CONFIG_XEN_NETFRONT) += xen-netfront.o
+obj-$(CONFIG_XEN_NETDEV_FRONTEND) += xen-netfront.o
 
 obj-$(CONFIG_DUMMY) += dummy.o
 obj-$(CONFIG_IFB) += ifb.o
@@ -285,3 +285,5 @@ obj-$(CONFIG_VIRTIO_NET) += virtio_net.o
 obj-$(CONFIG_SFC) += sfc/
 
 obj-$(CONFIG_WIMAX) += wimax/
+
+obj-$(CONFIG_OCTEON_MGMT_ETHERNET) += octeon/

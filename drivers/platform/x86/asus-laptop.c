@@ -233,6 +233,7 @@ static void asus_hotk_notify(struct acpi_device *device, u32 event);
 static struct acpi_driver asus_hotk_driver = {
 	.name = ASUS_HOTK_NAME,
 	.class = ASUS_HOTK_CLASS,
+	.owner = THIS_MODULE,
 	.ids = asus_device_ids,
 	.flags = ACPI_DRIVER_ALL_NOTIFY_EVENTS,
 	.ops = {
@@ -296,7 +297,7 @@ enum { KE_KEY, KE_END };
 static struct key_entry asus_keymap[] = {
 	{KE_KEY, 0x02, KEY_SCREENLOCK},
 	{KE_KEY, 0x05, KEY_WLAN},
-	{KE_KEY, 0x08, BTN_TOUCH},
+	{KE_KEY, 0x08, KEY_F13},
 	{KE_KEY, 0x17, KEY_ZOOM},
 	{KE_KEY, 0x1f, KEY_BATTERY},
 	{KE_KEY, 0x30, KEY_VOLUMEUP},
@@ -320,8 +321,9 @@ static struct key_entry asus_keymap[] = {
 	{KE_KEY, 0x61, KEY_SWITCHVIDEOMODE},
 	{KE_KEY, 0x62, KEY_SWITCHVIDEOMODE},
 	{KE_KEY, 0x63, KEY_SWITCHVIDEOMODE},
-	{KE_KEY, 0x6B, BTN_TOUCH}, /* Lock Mouse */
+	{KE_KEY, 0x6B, KEY_F13}, /* Lock Touchpad */
 	{KE_KEY, 0x82, KEY_CAMERA},
+	{KE_KEY, 0x88, KEY_WLAN },
 	{KE_KEY, 0x8A, KEY_PROG1},
 	{KE_KEY, 0x95, KEY_MEDIA},
 	{KE_KEY, 0x99, KEY_PHONE},
@@ -1248,9 +1250,6 @@ static int asus_hotk_add(struct acpi_device *device)
 {
 	int result;
 
-	if (!device)
-		return -EINVAL;
-
 	pr_notice("Asus Laptop Support version %s\n",
 	       ASUS_LAPTOP_VERSION);
 
@@ -1314,9 +1313,6 @@ end:
 
 static int asus_hotk_remove(struct acpi_device *device, int type)
 {
-	if (!device || !acpi_driver_data(device))
-		return -EINVAL;
-
 	kfree(hotk->name);
 	kfree(hotk);
 
@@ -1451,9 +1447,6 @@ out:
 static int __init asus_laptop_init(void)
 {
 	int result;
-
-	if (acpi_disabled)
-		return -ENODEV;
 
 	result = acpi_bus_register_driver(&asus_hotk_driver);
 	if (result < 0)

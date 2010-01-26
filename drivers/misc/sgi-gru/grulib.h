@@ -59,7 +59,6 @@
 /* Various kernel self-tests */
 #define GRU_KTEST			_IOWR(GRU_IOCTL_NUM, 52, void *)
 
-
 #define CONTEXT_WINDOW_BYTES(th)        (GRU_GSEG_PAGESIZE * (th))
 #define THREAD_POINTER(p, th)		(p + GRU_GSEG_PAGESIZE * (th))
 #define GSEG_START(cb)			((void *)((unsigned long)(cb) & ~(GRU_GSEG_PAGESIZE - 1)))

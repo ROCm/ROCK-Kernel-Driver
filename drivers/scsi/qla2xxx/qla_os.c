@@ -78,21 +78,6 @@ module_param(ql2xmaxqdepth, int, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(ql2xmaxqdepth,
 		"Maximum queue depth to report for target devices.");
 
-int ql2xqfulltracking = 1;
-module_param(ql2xqfulltracking, int, S_IRUGO|S_IWUSR);
-MODULE_PARM_DESC(ql2xqfulltracking,
-		"Controls whether the driver tracks queue full status "
-		"returns and dynamically adjusts a scsi device's queue "
-		"depth.  Default is 1, perform tracking.  Set to 0 to "
-		"disable dynamic tracking and adjustment of queue depth.");
-
-int ql2xqfullrampup = 120;
-module_param(ql2xqfullrampup, int, S_IRUGO|S_IWUSR);
-MODULE_PARM_DESC(ql2xqfullrampup,
-		"Number of seconds to wait to begin to ramp-up the queue "
-		"depth for a device after a queue-full condition has been "
-		"detected.  Default is 120 seconds.");
-
 int ql2xiidmaenable=1;
 module_param(ql2xiidmaenable, int, S_IRUGO|S_IRUSR);
 MODULE_PARM_DESC(ql2xiidmaenable,
@@ -1203,6 +1188,7 @@ qla2xxx_slave_configure(struct scsi_device *sdev)
 	scsi_qla_host_t *vha = shost_priv(sdev->host);
 	struct qla_hw_data *ha = vha->hw;
 	struct fc_rport *rport = starget_to_rport(sdev->sdev_target);
+	fc_port_t *fcport = *(fc_port_t **)rport->dd_data;
 	struct req_que *req = vha->req;
 
 	if (sdev->tagged_supported)
@@ -1211,6 +1197,8 @@ qla2xxx_slave_configure(struct scsi_device *sdev)
 		scsi_deactivate_tcq(sdev, req->max_q_depth);
 
 	rport->dev_loss_tmo = ha->port_down_retry_count;
+	if (sdev->type == TYPE_TAPE)
+		fcport->flags |= FCF_TAPE_PRESENT;
 
 	return 0;
 }
@@ -1221,13 +1209,61 @@ qla2xxx_slave_destroy(struct scsi_device *sdev)
 	sdev->hostdata = NULL;
 }
 
+static void qla2x00_handle_queue_full(struct scsi_device *sdev, int qdepth)
+{
+	fc_port_t *fcport = (struct fc_port *) sdev->hostdata;
+
+	if (!scsi_track_queue_full(sdev, qdepth))
+		return;
+
+	DEBUG2(qla_printk(KERN_INFO, fcport->vha->hw,
+		"scsi(%ld:%d:%d:%d): Queue depth adjusted-down to %d.\n",
+		fcport->vha->host_no, sdev->channel, sdev->id, sdev->lun,
+		sdev->queue_depth));
+}
+
+static void qla2x00_adjust_sdev_qdepth_up(struct scsi_device *sdev, int qdepth)
+{
+	fc_port_t *fcport = sdev->hostdata;
+	struct scsi_qla_host *vha = fcport->vha;
+	struct qla_hw_data *ha = vha->hw;
+	struct req_que *req = NULL;
+
+	req = vha->req;
+	if (!req)
+		return;
+
+	if (req->max_q_depth <= sdev->queue_depth || req->max_q_depth < qdepth)
+		return;
+
+	if (sdev->ordered_tags)
+		scsi_adjust_queue_depth(sdev, MSG_ORDERED_TAG, qdepth);
+	else
+		scsi_adjust_queue_depth(sdev, MSG_SIMPLE_TAG, qdepth);
+
+	DEBUG2(qla_printk(KERN_INFO, ha,
+	       "scsi(%ld:%d:%d:%d): Queue depth adjusted-up to %d.\n",
+	       fcport->vha->host_no, sdev->channel, sdev->id, sdev->lun,
+	       sdev->queue_depth));
+}
+
 static int
 qla2x00_change_queue_depth(struct scsi_device *sdev, int qdepth, int reason)
 {
-	if (reason != SCSI_QDEPTH_DEFAULT)
-		return -EOPNOTSUPP;
+	switch (reason) {
+	case SCSI_QDEPTH_DEFAULT:
+		scsi_adjust_queue_depth(sdev, scsi_get_tag_type(sdev), qdepth);
+		break;
+	case SCSI_QDEPTH_QFULL:
+		qla2x00_handle_queue_full(sdev, qdepth);
+		break;
+	case SCSI_QDEPTH_RAMP_UP:
+		qla2x00_adjust_sdev_qdepth_up(sdev, qdepth);
+		break;
+	default:
+		return EOPNOTSUPP;
+	}
 
-	scsi_adjust_queue_depth(sdev, scsi_get_tag_type(sdev), qdepth);
 	return sdev->queue_depth;
 }
 
@@ -1783,8 +1819,10 @@ qla2x00_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 	qla2x00_set_isp_flags(ha);
 
 	/* Set EEH reset type to fundamental if required by hba */
-	if (IS_QLA24XX(ha) || IS_QLA25XX(ha) || IS_QLA81XX(ha))
+	if ( IS_QLA24XX(ha) || IS_QLA25XX(ha) || IS_QLA81XX(ha)) {
 		pdev->needs_freset = 1;
+		pci_save_state(pdev);
+	}
 
 	/* Configure PCI I/O space */
 	ret = qla2x00_iospace_config(ha);
@@ -1935,15 +1973,11 @@ qla2x00_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 	host->max_channel = MAX_BUSES - 1;
 	host->max_lun = MAX_LUNS;
 	host->transportt = qla2xxx_transport_template;
-	sht->vendor_id = (SCSI_NL_VID_TYPE_PCI | PCI_VENDOR_ID_QLOGIC);
 
 	/* Set up the irqs */
 	ret = qla2x00_request_irqs(ha, rsp);
 	if (ret)
 		goto probe_init_failed;
-
-	pci_save_state(pdev);
-
 	/* Alloc arrays of request and response ring ptrs */
 que_init:
 	if (!qla2x00_alloc_queues(ha)) {
@@ -2145,7 +2179,6 @@ qla2x00_remove_one(struct pci_dev *pdev)
 	kfree(ha);
 	ha = NULL;
 
-	pci_disable_pcie_error_reporting(pdev);
 	pci_disable_device(pdev);
 	pci_set_drvdata(pdev, NULL);
 }
@@ -2772,7 +2805,7 @@ void qla2x00_relogin(struct scsi_qla_host *vha)
 
 			fcport->login_retry--;
 			if (fcport->flags & FCF_FABRIC_DEVICE) {
-				if (fcport->flags & FCF_FCP2_DEVICE)
+				if (fcport->flags & FCF_TAPE_PRESENT)
 					ha->isp_ops->fabric_logout(vha,
 							fcport->loop_id,
 							fcport->d_id.b.domain,
@@ -3108,10 +3141,7 @@ qla2x00_timer(scsi_qla_host_t *vha)
 			if (!IS_QLA2100(ha) && vha->link_down_timeout)
 				atomic_set(&vha->loop_state, LOOP_DEAD);
 
-			/*
-			 * Schedule an ISP abort to return any FCP2-device
-			 * commands.
-			 */
+			/* Schedule an ISP abort to return any tape commands. */
 			/* NPIV - scan physical port only */
 			if (!vha->vp_idx) {
 				spin_lock_irqsave(&ha->hardware_lock,
@@ -3128,7 +3158,7 @@ qla2x00_timer(scsi_qla_host_t *vha)
 					if (sp->ctx)
 						continue;
 					sfcp = sp->fcport;
-					if (!(sfcp->flags & FCF_FCP2_DEVICE))
+					if (!(sfcp->flags & FCF_TAPE_PRESENT))
 						continue;
 
 					set_bit(ISP_ABORT_NEEDED,
@@ -3280,7 +3310,6 @@ qla2xxx_pci_error_detected(struct pci_dev *pdev, pci_channel_state_t state)
 		return PCI_ERS_RESULT_CAN_RECOVER;
 	case pci_channel_io_frozen:
 		ha->flags.eeh_busy = 1;
-		qla2x00_free_irqs(vha);
 		pci_disable_device(pdev);
 		return PCI_ERS_RESULT_NEED_RESET;
 	case pci_channel_io_perm_failure:
@@ -3334,22 +3363,9 @@ qla2xxx_pci_slot_reset(struct pci_dev *pdev)
 	pci_ers_result_t ret = PCI_ERS_RESULT_DISCONNECT;
 	scsi_qla_host_t *base_vha = pci_get_drvdata(pdev);
 	struct qla_hw_data *ha = base_vha->hw;
-	struct rsp_que *rsp;
-	int rc, retries = 10;
+	int rc;
 
 	DEBUG17(qla_printk(KERN_WARNING, ha, "slot_reset\n"));
-
-	/* Workaround: qla2xxx driver which access hardware earlier
-	 * needs error state to be pci_channel_io_online.
-	 * Otherwise mailbox command timesout.
-	 */
-	pdev->error_state = pci_channel_io_normal;
-
-	pci_restore_state(pdev);
-	/* pci_restore_state() clears the saved_state flag of the device
-	 * save restored state which resets saved_state flag
-	 */
-	pci_save_state(pdev);
 
 	if (ha->mem_only)
 		rc = pci_enable_device_mem(pdev);
@@ -3362,22 +3378,26 @@ qla2xxx_pci_slot_reset(struct pci_dev *pdev)
 		return ret;
 	}
 
-	rsp = ha->rsp_q_map[0];
-	if (qla2x00_request_irqs(ha, rsp))
-		return ret;
-
 	if (ha->isp_ops->pci_config(base_vha))
 		return ret;
 
-	while (ha->flags.mbox_busy && retries--)
-		msleep(1000);
+#ifdef QL_DEBUG_LEVEL_17
+	{
+		uint8_t b;
+		uint32_t i;
 
+		printk("slot_reset_1: ");
+		for (i = 0; i < 256; i++) {
+			pci_read_config_byte(ha->pdev, i, &b);
+			printk("%s%02x", (i%16) ? " " : "\n", b);
+		}
+		printk("\n");
+	}
+#endif
 	set_bit(ABORT_ISP_ACTIVE, &base_vha->dpc_flags);
 	if (qla2x00_abort_isp(base_vha) == QLA_SUCCESS)
 		ret =  PCI_ERS_RESULT_RECOVERED;
 	clear_bit(ABORT_ISP_ACTIVE, &base_vha->dpc_flags);
-
-	pci_cleanup_aer_uncorrect_error_status(pdev);
 
 	DEBUG17(qla_printk(KERN_WARNING, ha,
 	    "slot_reset-return:ret=%x\n", ret));
@@ -3402,6 +3422,8 @@ qla2xxx_pci_resume(struct pci_dev *pdev)
 	}
 
 	ha->flags.eeh_busy = 0;
+
+	pci_cleanup_aer_uncorrect_error_status(pdev);
 }
 
 static struct pci_error_handlers qla2xxx_err_handler = {
@@ -3514,3 +3536,4 @@ MODULE_FIRMWARE(FW_FILE_ISP2300);
 MODULE_FIRMWARE(FW_FILE_ISP2322);
 MODULE_FIRMWARE(FW_FILE_ISP24XX);
 MODULE_FIRMWARE(FW_FILE_ISP25XX);
+MODULE_FIRMWARE(FW_FILE_ISP81XX);

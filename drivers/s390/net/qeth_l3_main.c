@@ -1471,6 +1471,35 @@ static int qeth_l3_send_checksum_command(struct qeth_card *card)
 	return 0;
 }
 
+int qeth_l3_set_rx_csum(struct qeth_card *card,
+	enum qeth_checksum_types csum_type)
+{
+	int rc = 0;
+
+	if (card->options.checksum_type == HW_CHECKSUMMING) {
+		if ((csum_type != HW_CHECKSUMMING) &&
+			(card->state != CARD_STATE_DOWN)) {
+			rc = qeth_l3_send_simple_setassparms(card,
+				IPA_INBOUND_CHECKSUM, IPA_CMD_ASS_STOP, 0);
+			if (rc)
+				return -EIO;
+		}
+	} else {
+		if (csum_type == HW_CHECKSUMMING) {
+			if (card->state != CARD_STATE_DOWN) {
+				if (!qeth_is_supported(card,
+				    IPA_INBOUND_CHECKSUM))
+					return -EPERM;
+				rc = qeth_l3_send_checksum_command(card);
+				if (rc)
+					return -EIO;
+			}
+		}
+	}
+	card->options.checksum_type = csum_type;
+	return rc;
+}
+
 static int qeth_l3_start_ipa_checksum(struct qeth_card *card)
 {
 	int rc = 0;
@@ -3078,27 +3107,14 @@ static u32 qeth_l3_ethtool_get_rx_csum(struct net_device *dev)
 static int qeth_l3_ethtool_set_rx_csum(struct net_device *dev, u32 data)
 {
 	struct qeth_card *card = dev->ml_priv;
-	enum qeth_card_states old_state;
 	enum qeth_checksum_types csum_type;
-
-	if ((card->state != CARD_STATE_UP) &&
-	    (card->state != CARD_STATE_DOWN))
-		return -EPERM;
 
 	if (data)
 		csum_type = HW_CHECKSUMMING;
 	else
 		csum_type = SW_CHECKSUMMING;
 
-	if (card->options.checksum_type != csum_type) {
-		old_state = card->state;
-		if (card->state == CARD_STATE_UP)
-			__qeth_l3_set_offline(card->gdev, 1);
-		card->options.checksum_type = csum_type;
-		if (old_state == CARD_STATE_UP)
-			__qeth_l3_set_online(card->gdev, 1);
-	}
-	return 0;
+	return qeth_l3_set_rx_csum(card, csum_type);
 }
 
 static int qeth_l3_ethtool_set_tso(struct net_device *dev, u32 data)
@@ -3127,7 +3143,7 @@ static const struct ethtool_ops qeth_l3_ethtool_ops = {
 	.set_tso     = qeth_l3_ethtool_set_tso,
 	.get_strings = qeth_core_get_strings,
 	.get_ethtool_stats = qeth_core_get_ethtool_stats,
-	.get_stats_count = qeth_core_get_stats_count,
+	.get_sset_count = qeth_core_get_sset_count,
 	.get_drvinfo = qeth_core_get_drvinfo,
 	.get_settings = qeth_core_ethtool_get_settings,
 };
@@ -3325,32 +3341,19 @@ static int __qeth_l3_set_online(struct ccwgroup_device *gdev, int recovery_mode)
 	qeth_set_allowed_threads(card, QETH_RECOVER_THREAD, 1);
 
 	recover_flag = card->state;
-	rc = ccw_device_set_online(CARD_RDEV(card));
-	if (rc) {
-		QETH_DBF_TEXT_(SETUP, 2, "1err%d", rc);
-		return -EIO;
-	}
-	rc = ccw_device_set_online(CARD_WDEV(card));
-	if (rc) {
-		QETH_DBF_TEXT_(SETUP, 2, "1err%d", rc);
-		return -EIO;
-	}
-	rc = ccw_device_set_online(CARD_DDEV(card));
-	if (rc) {
-		QETH_DBF_TEXT_(SETUP, 2, "1err%d", rc);
-		return -EIO;
-	}
-
 	rc = qeth_core_hardsetup_card(card);
 	if (rc) {
 		QETH_DBF_TEXT_(SETUP, 2, "2err%d", rc);
+		rc = -ENODEV;
 		goto out_remove;
 	}
 
 	qeth_l3_query_ipassists(card, QETH_PROT_IPV4);
 
-	if (!card->dev && qeth_l3_setup_netdev(card))
+	if (!card->dev && qeth_l3_setup_netdev(card)) {
+		rc = -ENODEV;
 		goto out_remove;
+	}
 
 	card->state = CARD_STATE_HARDSETUP;
 	qeth_print_status_message(card);
@@ -3367,6 +3370,7 @@ static int __qeth_l3_set_online(struct ccwgroup_device *gdev, int recovery_mode)
 			card->lan_online = 0;
 			return 0;
 		}
+		rc = -ENODEV;
 		goto out_remove;
 	} else
 		card->lan_online = 1;
@@ -3391,6 +3395,7 @@ static int __qeth_l3_set_online(struct ccwgroup_device *gdev, int recovery_mode)
 	rc = qeth_init_qdio_queues(card);
 	if (rc) {
 		QETH_DBF_TEXT_(SETUP, 2, "6err%d", rc);
+		rc = -ENODEV;
 		goto out_remove;
 	}
 	card->state = CARD_STATE_SOFTSETUP;
@@ -3421,7 +3426,7 @@ out_remove:
 		card->state = CARD_STATE_RECOVER;
 	else
 		card->state = CARD_STATE_DOWN;
-	return -ENODEV;
+	return rc;
 }
 
 static int qeth_l3_set_online(struct ccwgroup_device *gdev)

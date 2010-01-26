@@ -59,7 +59,13 @@ typedef u16 ia64_vector;
 extern int ia64_first_device_vector;
 extern int ia64_last_device_vector;
 
+#if defined(CONFIG_SMP) && (defined(CONFIG_IA64_GENERIC) || defined (CONFIG_IA64_DIG))
+/* Reserve the lower priority vector than device vectors for "move IRQ" IPI */
+#define IA64_IRQ_MOVE_VECTOR		0x30	/* "move IRQ" IPI */
+#define IA64_DEF_FIRST_DEVICE_VECTOR	0x31
+#else
 #define IA64_DEF_FIRST_DEVICE_VECTOR	0x30
+#endif
 #define IA64_DEF_LAST_DEVICE_VECTOR	0xe7
 #define IA64_FIRST_DEVICE_VECTOR	ia64_first_device_vector
 #define IA64_LAST_DEVICE_VECTOR		ia64_last_device_vector
@@ -67,9 +73,9 @@ extern int ia64_last_device_vector;
 #define IA64_NUM_DEVICE_VECTORS		(IA64_LAST_DEVICE_VECTOR - IA64_FIRST_DEVICE_VECTOR + 1)
 
 #define IA64_MCA_RENDEZ_VECTOR		0xe8	/* MCA rendez interrupt */
+#define IA64_PERFMON_VECTOR		0xee	/* performance monitor interrupt vector */
 #define IA64_TIMER_VECTOR		0xef	/* use highest-prio group 15 interrupt for timer */
 #define	IA64_MCA_WAKEUP_VECTOR		0xf0	/* MCA wakeup (must be >MCA_RENDEZ_VECTOR) */
-#define IA64_PERFMON_VECTOR		0xf1	/* performance monitor interrupt vector */
 #define IA64_IPI_LOCAL_TLB_FLUSH	0xfc	/* SMP flush local TLB */
 #define IA64_IPI_RESCHEDULE		0xfd	/* SMP reschedule */
 #define IA64_IPI_VECTOR			0xfe	/* inter-processor interrupt vector */

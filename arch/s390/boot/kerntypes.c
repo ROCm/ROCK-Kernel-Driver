@@ -15,8 +15,8 @@ typedef char *COMPILE_VERSION;
 
 /* General linux types */
 
-#include <linux/autoconf.h>
-#include <linux/compile.h>
+#include <generated/autoconf.h>
+#include <generated/compile.h>
 #include <linux/utsname.h>
 #include <linux/module.h>
 #include <linux/sched.h>
@@ -197,7 +197,7 @@ typedef char *COMPILE_VERSION;
 #include <linux/utime.h>
 #include <linux/uts.h>
 #include <linux/utsname.h>
-#include <linux/utsrelease.h>
+#include <generated/utsrelease.h>
 #include <linux/version.h>
 #include <linux/vfs.h>
 #include <linux/vmalloc.h>
@@ -271,7 +271,6 @@ typedef char *COMPILE_VERSION;
 /* qdio device driver */
 #include "drivers/s390/cio/qdio.h"
 #include "drivers/s390/cio/qdio_thinint.c"
-#include "drivers/s390/cio/qdio_perf.h"
 
 
 /* KVM */

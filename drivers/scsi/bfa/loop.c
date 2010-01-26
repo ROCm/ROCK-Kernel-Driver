@@ -58,17 +58,16 @@ static const u8   port_loop_alpa_map[] = {
 /*
  * Local Functions
  */
-static bfa_status_t    bfa_fcs_port_loop_send_plogi(struct bfa_fcs_port_s *port,
-					     u8 alpa);
+static bfa_status_t bfa_fcs_port_loop_send_plogi(struct bfa_fcs_port_s *port,
+					u8 alpa);
 
-static void            bfa_fcs_port_loop_plogi_response(void *fcsarg,
-						 struct bfa_fcxp_s *fcxp,
-						 void *cbarg,
-						 bfa_status_t req_status,
-						 u32 rsp_len,
-						 u32 resid_len,
-						 struct fchs_s *rsp_fchs);
-
+static void bfa_fcs_port_loop_plogi_response(void *fcsarg,
+					struct bfa_fcxp_s *fcxp,
+					void *cbarg,
+					bfa_status_t req_status,
+					u32 rsp_len,
+					u32 resid_len,
+					struct fchs_s *rsp_fchs);
 /**
  *   Called by port to initializar in provate LOOP topology.
  */
@@ -163,7 +162,7 @@ bfa_fcs_port_loop_send_plogi(struct bfa_fcs_port_s *port, u8 alpa)
 	len = fc_plogi_build(&fchs, bfa_fcxp_get_reqbuf(fcxp), alpa,
 			     bfa_fcs_port_get_fcid(port), 0,
 			     port->port_cfg.pwwn, port->port_cfg.nwwn,
-				 bfa_fcport_get_maxfrsize(port->fcs->bfa));
+				 bfa_pport_get_maxfrsize(port->fcs->bfa));
 
 	bfa_fcxp_send(fcxp, NULL, port->fabric->vf_id, port->lp_tag, BFA_FALSE,
 			  FC_CLASS_3, len, &fchs,

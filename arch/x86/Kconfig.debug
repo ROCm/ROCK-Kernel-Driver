@@ -25,7 +25,6 @@ config STRICT_DEVMEM
 config X86_VERBOSE_BOOTUP
 	bool "Enable verbose x86 bootup info messages"
 	default y
-	depends on !XEN
 	---help---
 	  Enables the informational output from the decompression stage
 	  (e.g. bzImage) of the boot. If you disable this you will still
@@ -137,7 +136,7 @@ config 4KSTACKS
 config DOUBLEFAULT
 	default y
 	bool "Enable doublefault exception handler" if EMBEDDED
-	depends on X86_32 && !X86_NO_TSS
+	depends on X86_32
 	---help---
 	  This option allows trapping of rare doublefault exceptions that
 	  would otherwise cause a system to silently reboot. Disabling this
@@ -186,7 +185,15 @@ config X86_DS_SELFTEST
 
 config HAVE_MMIOTRACE_SUPPORT
 	def_bool y
-	depends on !XEN
+
+config X86_DECODER_SELFTEST
+	bool "x86 instruction decoder selftest"
+	depends on DEBUG_KERNEL && KPROBES
+	---help---
+	 Perform x86 instruction decoder selftests at build time.
+	 This option is useful for checking the sanity of x86 instruction
+	 decoder code.
+	 If unsure, say "N".
 
 #
 # IO delay types:
@@ -266,7 +273,6 @@ config DEBUG_BOOT_PARAMS
 	bool "Debug boot parameters"
 	depends on DEBUG_KERNEL
 	depends on DEBUG_FS
-	depends on !XEN
 	---help---
 	  This option will cause struct boot_params to be exported via debugfs.
 
@@ -290,9 +296,23 @@ config OPTIMIZE_INLINING
 
 	  If unsure, say N.
 
+config DEBUG_STRICT_USER_COPY_CHECKS
+	bool "Strict copy size checks"
+	depends on DEBUG_KERNEL && !TRACE_BRANCH_PROFILING
+	---help---
+	  Enabling this option turns a certain set of sanity checks for user
+	  copy operations into compile time failures.
+
+	  The copy_from_user() etc checks are there to help test if there
+	  are sufficient security checks on the length argument of
+	  the copy operation, by having gcc prove that the argument is
+	  within bounds.
+
+	  If unsure, or if you run an older (pre 4.4) gcc, say N.
+
 config KDB
 	bool "Built-in Kernel Debugger support"
-	depends on DEBUG_KERNEL && !XEN
+	depends on DEBUG_KERNEL
 	select KALLSYMS
 	select KALLSYMS_ALL
 	help

@@ -446,7 +446,8 @@ struct kset *devices_kset;
  * @dev: device.
  * @attr: device attribute descriptor.
  */
-int device_create_file(struct device *dev, struct device_attribute *attr)
+int device_create_file(struct device *dev,
+		       const struct device_attribute *attr)
 {
 	int error = 0;
 	if (dev)
@@ -459,7 +460,8 @@ int device_create_file(struct device *dev, struct device_attribute *attr)
  * @dev: device.
  * @attr: device attribute descriptor.
  */
-void device_remove_file(struct device *dev, struct device_attribute *attr)
+void device_remove_file(struct device *dev,
+			const struct device_attribute *attr)
 {
 	if (dev)
 		sysfs_remove_file(&dev->kobj, &attr->attr);
@@ -470,7 +472,8 @@ void device_remove_file(struct device *dev, struct device_attribute *attr)
  * @dev: device.
  * @attr: device binary attribute descriptor.
  */
-int device_create_bin_file(struct device *dev, struct bin_attribute *attr)
+int device_create_bin_file(struct device *dev,
+			   const struct bin_attribute *attr)
 {
 	int error = -EINVAL;
 	if (dev)
@@ -484,7 +487,8 @@ EXPORT_SYMBOL_GPL(device_create_bin_file);
  * @dev: device.
  * @attr: device binary attribute descriptor.
  */
-void device_remove_bin_file(struct device *dev, struct bin_attribute *attr)
+void device_remove_bin_file(struct device *dev,
+			    const struct bin_attribute *attr)
 {
 	if (dev)
 		sysfs_remove_bin_file(&dev->kobj, attr);
@@ -905,8 +909,10 @@ int device_add(struct device *dev)
 		dev->init_name = NULL;
 	}
 
-	if (!dev_name(dev))
+	if (!dev_name(dev)) {
+		error = -EINVAL;
 		goto name_error;
+	}
 
 	pr_debug("device: '%s': %s\n", dev_name(dev), __func__);
 
@@ -993,6 +999,8 @@ done:
  AttrsError:
 	device_remove_class_symlinks(dev);
  SymlinkError:
+	if (MAJOR(dev->devt))
+		devtmpfs_delete_node(dev);
 	if (MAJOR(dev->devt))
 		device_remove_sys_dev_entry(dev);
  devtattrError:
@@ -1735,8 +1743,5 @@ void device_shutdown(void)
 			dev->driver->shutdown(dev);
 		}
 	}
-	kobject_put(sysfs_dev_char_kobj);
-	kobject_put(sysfs_dev_block_kobj);
-	kobject_put(dev_kobj);
 	async_synchronize_full();
 }

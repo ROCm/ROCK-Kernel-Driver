@@ -328,7 +328,7 @@ static int irq[MAXHA] __initdata =
 {0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
  0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff};
 /* disable driver flag */
-static int disable = 0;
+static int disable __initdata = 0;
 /* reserve flag */
 static int reserve_mode = 1;                  
 /* reserve list */
@@ -658,7 +658,7 @@ static int __devinit gdth_pci_init_one(struct pci_dev *pdev,
 #endif /* CONFIG_PCI */
 
 #ifdef CONFIG_EISA
-static int __devinit gdth_init_eisa(ushort eisa_adr,gdth_ha_str *ha)
+static int __init gdth_init_eisa(ushort eisa_adr,gdth_ha_str *ha)
 {
     ulong32 retries,id;
     unchar prot_ver,eisacf,i,irq_found;
@@ -752,7 +752,7 @@ static int __devinit gdth_init_eisa(ushort eisa_adr,gdth_ha_str *ha)
 #endif /* CONFIG_EISA */
 
 #ifdef CONFIG_ISA
-static int __devinit gdth_init_isa(ulong32 bios_adr,gdth_ha_str *ha)
+static int __init gdth_init_isa(ulong32 bios_adr,gdth_ha_str *ha)
 {
     register gdt2_dpram_str __iomem *dp2_ptr;
     int i;
@@ -4670,7 +4670,7 @@ static struct scsi_host_template gdth_template = {
 };
 
 #ifdef CONFIG_ISA
-static int __devinit gdth_isa_probe_one(ulong32 isa_bios)
+static int __init gdth_isa_probe_one(ulong32 isa_bios)
 {
 	struct Scsi_Host *shp;
 	gdth_ha_str *ha;
@@ -4802,7 +4802,7 @@ static int __devinit gdth_isa_probe_one(ulong32 isa_bios)
 #endif /* CONFIG_ISA */
 
 #ifdef CONFIG_EISA
-static int __devinit gdth_eisa_probe_one(ushort eisa_slot)
+static int __init gdth_eisa_probe_one(ushort eisa_slot)
 {
 	struct Scsi_Host *shp;
 	gdth_ha_str *ha;
@@ -5138,7 +5138,7 @@ static struct notifier_block gdth_notifier = {
     gdth_halt, NULL, 0
 };
 
-static int __devinit gdth_init(void)
+static int __init gdth_init(void)
 {
 	if (disable) {
 		printk("GDT-HA: Controller driver disabled from"
@@ -5192,7 +5192,7 @@ static int __devinit gdth_init(void)
 	return 0;
 }
 
-static void __devexit gdth_exit(void)
+static void __exit gdth_exit(void)
 {
 	gdth_ha_str *ha;
 

@@ -2481,7 +2481,7 @@ xfs_dm_punch_hole(
 	 * leaving them around if we are migrating the file....
 	 */
 	if (!error && (len == 0)) {
-		error = xfs_free_eofblocks(mp, ip, XFS_FREE_EOF_NOLOCK);
+		error = xfs_free_eofblocks(mp, ip, XFS_FREE_EOF_HASLOCK);
 	}
 
 	/*

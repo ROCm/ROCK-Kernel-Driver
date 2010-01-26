@@ -41,6 +41,11 @@ struct dm_region_hash {
 	struct list_head recovered_regions;
 	struct list_head failed_recovered_regions;
 
+	/*
+	 * If there was a barrier failure no regions can be marked clean.
+	 */
+	int barrier_failure;
+
 	void *context;
 	sector_t target_begin;
 
@@ -115,8 +120,7 @@ void dm_rh_dec(struct dm_region_hash *rh, region_t region);
 /* Delay bios on regions. */
 void dm_rh_delay(struct dm_region_hash *rh, struct bio *bio);
 
-void dm_rh_mark_nosync(struct dm_region_hash *rh,
-		       struct bio *bio, unsigned done, int error);
+void dm_rh_mark_nosync(struct dm_region_hash *rh, struct bio *bio);
 
 /*
  * Region recovery control.

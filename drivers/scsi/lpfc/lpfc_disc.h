@@ -37,7 +37,6 @@ enum lpfc_work_type {
 	LPFC_EVT_KILL,
 	LPFC_EVT_ELS_RETRY,
 	LPFC_EVT_DEV_LOSS,
-	LPFC_EVT_REAUTH,
 	LPFC_EVT_FASTPATH_MGMT_EVT,
 };
 
@@ -100,13 +99,11 @@ struct lpfc_nodelist {
 #define NLP_USG_FREE_ACK_BIT	0x8	/* Indicate ndlp memory free invoked */
 
 	struct timer_list   nlp_delayfunc;	/* Used for delayed ELS cmds */
-	struct timer_list   nlp_reauth_tmr;	/* Used for re-authentication */
 	struct lpfc_hba *phba;
 	struct fc_rport *rport;			/* Corresponding FC transport
 						   port structure */
 	struct lpfc_vport *vport;
 	struct lpfc_work_evt els_retry_evt;
-	struct lpfc_work_evt els_reauth_evt;
 	struct lpfc_work_evt dev_loss_evt;
 	struct kref     kref;
 	atomic_t cmd_pending;

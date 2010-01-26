@@ -278,8 +278,6 @@ typedef unsigned char *sk_buff_data_t;
  *	@local_df: allow local fragmentation
  *	@cloned: Head may be cloned (check refcnt to be sure)
  *	@nohdr: Payload reference only, must not modify header
- *	@proto_data_valid: Protocol data validated since arriving at localhost
- *	@proto_csum_blank: Protocol csum must be added before leaving localhost
  *	@pkt_type: Packet class
  *	@fclone: skbuff clone status
  *	@ip_summed: Driver fed us an IP checksum
@@ -301,7 +299,7 @@ typedef unsigned char *sk_buff_data_t;
  *	@nfctinfo: Relationship of this skb to the connection
  *	@nfct_reasm: netfilter conntrack re-assembly pointer
  *	@nf_bridge: Saved data about a bridged frame - see br_netfilter.c
- *	@iif: ifindex of device we arrived on
+ *	@skb_iif: ifindex of device we arrived on
  *	@queue_mapping: Queue mapping for multiqueue devices
  *	@tc_index: Traffic control index
  *	@tc_verd: traffic control verdict
@@ -368,7 +366,7 @@ struct sk_buff {
 	struct nf_bridge_info	*nf_bridge;
 #endif
 
-	int			iif;
+	int			skb_iif;
 #ifdef CONFIG_NET_SCHED
 	__u16			tc_index;	/* traffic control index */
 #ifdef CONFIG_NET_CLS_ACT
@@ -384,13 +382,9 @@ struct sk_buff {
 #ifdef	CONFIG_NETVM
 	__u8			emergency:1;
 #endif
-#ifdef CONFIG_XEN
-	__u8			proto_data_valid:1,
-				proto_csum_blank:1;
-#endif
 	kmemcheck_bitfield_end(flags2);
 
-	/* 0/9...15 bit hole */
+	/* 0/14 bit hole */
 
 #ifdef CONFIG_NET_DMA
 	dma_cookie_t		dma_cookie;
@@ -398,8 +392,10 @@ struct sk_buff {
 #ifdef CONFIG_NETWORK_SECMARK
 	__u32			secmark;
 #endif
-
-	__u32			mark;
+	union {
+		__u32		mark;
+		__u32		dropcount;
+	};
 
 	__u16			vlan_tci;
 
@@ -422,14 +418,6 @@ struct sk_buff {
 #include <linux/slab.h>
 
 #include <asm/system.h>
-
-#ifdef CONFIG_HAS_DMA
-#include <linux/dma-mapping.h>
-extern int skb_dma_map(struct device *dev, struct sk_buff *skb,
-		       enum dma_data_direction dir);
-extern void skb_dma_unmap(struct device *dev, struct sk_buff *skb,
-			  enum dma_data_direction dir);
-#endif
 
 #define SKB_ALLOC_FCLONE	0x01
 #define SKB_ALLOC_RX		0x02
@@ -510,8 +498,7 @@ extern int skb_append_datato_frags(struct sock *sk, struct sk_buff *skb,
 			int len,int odd, struct sk_buff *skb),
 			void *from, int length);
 
-struct skb_seq_state
-{
+struct skb_seq_state {
 	__u32		lower_offset;
 	__u32		upper_offset;
 	__u32		frag_idx;
@@ -2121,12 +2108,5 @@ static inline void skb_forward_csum(struct sk_buff *skb)
 }
 
 bool skb_partial_csum_set(struct sk_buff *skb, u16 start, u16 off);
-
-#if defined(CONFIG_XEN) || defined(CONFIG_PARAVIRT_XEN)
-int skb_checksum_setup(struct sk_buff *skb);
-#else
-static inline int skb_checksum_setup(struct sk_buff *skb) { return 0; }
-#endif
-
 #endif	/* __KERNEL__ */
 #endif	/* _LINUX_SKBUFF_H */

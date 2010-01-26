@@ -14,7 +14,7 @@
  */
 
 #include <linux/module.h>
-#include <linux/autoconf.h>
+#include <generated/autoconf.h>
 #include <linux/init.h>
 #include <linux/fs.h>
 #include <linux/dcache.h>

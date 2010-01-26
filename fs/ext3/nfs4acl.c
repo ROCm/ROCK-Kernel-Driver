@@ -225,9 +225,10 @@ ext3_nfs4acl_chmod(struct inode *inode)
 }
 
 static size_t
-ext3_xattr_list_nfs4acl(struct inode *inode, char *list, size_t list_len,
-			const char *name, size_t name_len)
+ext3_xattr_list_nfs4acl(struct dentry *dentry, char *list, size_t list_len,
+			const char *name, size_t name_len, int handler_flags)
 {
+	struct inode *inode = dentry->d_inode;
 	const size_t size = sizeof(NFS4ACL_XATTR);
 
 	if (!test_opt(inode->i_sb, NFS4ACL))
@@ -238,9 +239,10 @@ ext3_xattr_list_nfs4acl(struct inode *inode, char *list, size_t list_len,
 }
 
 static int
-ext3_xattr_get_nfs4acl(struct inode *inode, const char *name, void *buffer,
-		       size_t buffer_size)
+ext3_xattr_get_nfs4acl(struct dentry *dentry, const char *name, void *buffer,
+		       size_t buffer_size, int handler_flags)
 {
+	struct inode *inode = dentry->d_inode;
 	struct nfs4acl *acl;
 	size_t size;
 
@@ -267,16 +269,19 @@ ext3_xattr_get_nfs4acl(struct inode *inode, const char *name, void *buffer,
 
 #ifdef NFS4ACL_DEBUG
 static size_t
-ext3_xattr_list_masked_nfs4acl(struct inode *inode, char *list, size_t list_len,
-			       const char *name, size_t name_len)
+ext3_xattr_list_masked_nfs4acl(struct dentry *dentry, char *list,
+			       size_t list_len, const char *name,
+			       size_t name_len, int handler_flags)
 {
 	return 0;
 }
 
 static int
-ext3_xattr_get_masked_nfs4acl(struct inode *inode, const char *name,
-			      void *buffer, size_t buffer_size)
+ext3_xattr_get_masked_nfs4acl(struct dentry *dentry, const char *name,
+			      void *buffer, size_t buffer_size,
+			      int handler_flags)
 {
+	struct inode *inode = dentry->d_inode;
 	const int name_index = EXT3_XATTR_INDEX_NFS4ACL;
 	struct nfs4acl *acl;
 	void *xattr;
@@ -317,9 +322,11 @@ ext3_xattr_get_masked_nfs4acl(struct inode *inode, const char *name,
 #endif
 
 static int
-ext3_xattr_set_nfs4acl(struct inode *inode, const char *name,
-		       const void *value, size_t size, int flags)
+ext3_xattr_set_nfs4acl(struct dentry *dentry, const char *name,
+		       const void *value, size_t size, int flags,
+		       int handler_flags)
 {
+	struct inode *inode = dentry->d_inode;
 	handle_t *handle;
 	struct nfs4acl *acl = NULL;
 	int retval, retries = 0;

@@ -496,13 +496,10 @@ struct ethtool_ops {
 	u32     (*get_priv_flags)(struct net_device *);
 	int     (*set_priv_flags)(struct net_device *, u32);
 	int	(*get_sset_count)(struct net_device *, int);
-
-	/* the following hooks are obsolete */
-	int	(*self_test_count)(struct net_device *);/* use get_sset_count */
-	int	(*get_stats_count)(struct net_device *);/* use get_sset_count */
 	int	(*get_rxnfc)(struct net_device *, struct ethtool_rxnfc *, void *);
 	int	(*set_rxnfc)(struct net_device *, struct ethtool_rxnfc *);
 	int     (*flash_device)(struct net_device *, struct ethtool_flash *);
+	int	(*reset)(struct net_device *, u32 *);
 };
 #endif /* __KERNEL__ */
 
@@ -560,6 +557,7 @@ struct ethtool_ops {
 #define	ETHTOOL_SRXCLSRLDEL	0x00000031 /* Delete RX classification rule */
 #define	ETHTOOL_SRXCLSRLINS	0x00000032 /* Insert RX classification rule */
 #define	ETHTOOL_FLASHDEV	0x00000033 /* Flash firmware to device */
+#define	ETHTOOL_RESET		0x00000034 /* Reset hardware */
 
 /* compatibility with older code */
 #define SPARC_ETH_GSET		ETHTOOL_GSET
@@ -679,6 +677,8 @@ struct ethtool_ops {
 #define	AH_V6_FLOW	0x0b
 #define	ESP_V6_FLOW	0x0c
 #define	IP_USER_FLOW	0x0d
+#define IPV4_FLOW       0x10
+#define IPV6_FLOW       0x11
 
 /* L3-L4 network traffic flow hash options */
 #define	RXH_L2DA	(1 << 1)
@@ -691,5 +691,35 @@ struct ethtool_ops {
 #define	RXH_DISCARD	(1 << 31)
 
 #define	RX_CLS_FLOW_DISC	0xffffffffffffffffULL
+
+/* Reset flags */
+/* The reset() operation must clear the flags for the components which
+ * were actually reset.  On successful return, the flags indicate the
+ * components which were not reset, either because they do not exist
+ * in the hardware or because they cannot be reset independently.  The
+ * driver must never reset any components that were not requested.
+ */
+enum ethtool_reset_flags {
+	/* These flags represent components dedicated to the interface
+	 * the command is addressed to.  Shift any flag left by
+	 * ETH_RESET_SHARED_SHIFT to reset a shared component of the
+	 * same type.
+	 */
+	ETH_RESET_MGMT		= 1 << 0,	/* Management processor */
+	ETH_RESET_IRQ		= 1 << 1,	/* Interrupt requester */
+	ETH_RESET_DMA		= 1 << 2,	/* DMA engine */
+	ETH_RESET_FILTER	= 1 << 3,	/* Filtering/flow direction */
+	ETH_RESET_OFFLOAD	= 1 << 4,	/* Protocol offload */
+	ETH_RESET_MAC		= 1 << 5,	/* Media access controller */
+	ETH_RESET_PHY		= 1 << 6,	/* Transceiver/PHY */
+	ETH_RESET_RAM		= 1 << 7,	/* RAM shared between
+						 * multiple components */
+
+	ETH_RESET_DEDICATED	= 0x0000ffff,	/* All components dedicated to
+						 * this interface */
+	ETH_RESET_ALL		= 0xffffffff,	/* All components used by this
+						 * interface, even if shared */
+};
+#define ETH_RESET_SHARED_SHIFT	16
 
 #endif /* _LINUX_ETHTOOL_H */

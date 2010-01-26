@@ -580,7 +580,10 @@ __lpfc_sli_release_iocbq_s4(struct lpfc_hba *phba, struct lpfc_iocbq *iocbq)
 	else
 		sglq = __lpfc_clear_active_sglq(phba, iocbq->sli4_xritag);
 	if (sglq)  {
-		if (iocbq->iocb_flag & LPFC_EXCHANGE_BUSY) {
+		if (iocbq->iocb_flag & LPFC_DRIVER_ABORTED
+			&& ((iocbq->iocb.ulpStatus == IOSTAT_LOCAL_REJECT)
+			&& (iocbq->iocb.un.ulpWord[4]
+				== IOERR_ABORT_REQUESTED))) {
 			spin_lock_irqsave(&phba->sli4_hba.abts_sgl_list_lock,
 					iflag);
 			list_add(&sglq->list,
@@ -1714,7 +1717,6 @@ lpfc_sli_def_mbox_cmpl(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
 	struct lpfc_dmabuf *mp;
 	uint16_t rpi, vpi;
 	int rc;
-	struct lpfc_vport  *vport = pmb->vport;
 
 	mp = (struct lpfc_dmabuf *) (pmb->context1);
 
@@ -1737,18 +1739,6 @@ lpfc_sli_def_mbox_cmpl(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
 		rpi = pmb->u.mb.un.varWords[0];
 		vpi = pmb->u.mb.un.varRegLogin.vpi - phba->vpi_base;
 		lpfc_unreg_login(phba, vpi, rpi, pmb);
-		pmb->mbox_cmpl = lpfc_sli_def_mbox_cmpl;
-		rc = lpfc_sli_issue_mbox(phba, pmb, MBX_NOWAIT);
-		if (rc != MBX_NOT_FINISHED)
-			return;
-	}
-
-	/* Unreg VPI, if the REG_VPI succeed after VLink failure */
-	if ((pmb->u.mb.mbxCommand == MBX_REG_VPI) &&
-		!(phba->pport->load_flag & FC_UNLOADING) &&
-		!pmb->u.mb.mbxStatus) {
-		lpfc_unreg_vpi(phba, pmb->u.mb.un.varRegVpi.vpi, pmb);
-		pmb->vport = vport;
 		pmb->mbox_cmpl = lpfc_sli_def_mbox_cmpl;
 		rc = lpfc_sli_issue_mbox(phba, pmb, MBX_NOWAIT);
 		if (rc != MBX_NOT_FINISHED)
@@ -1821,7 +1811,7 @@ lpfc_sli_handle_mb_event(struct lpfc_hba *phba)
 		 */
 		if (lpfc_sli_chk_mbx_command(pmbox->mbxCommand) ==
 		    MBX_SHUTDOWN) {
-			/* Unknow mailbox command compl */
+			/* Unknown mailbox command compl */
 			lpfc_printf_log(phba, KERN_ERR, LOG_MBOX | LOG_SLI,
 					"(%d):0323 Unknown Mailbox command "
 					"x%x (x%x) Cmpl\n",
@@ -2238,15 +2228,9 @@ lpfc_sli_process_sol_iocb(struct lpfc_hba *phba, struct lpfc_sli_ring *pring,
 			 * All other are passed to the completion callback.
 			 */
 			if (pring->ringno == LPFC_ELS_RING) {
-				if ((phba->sli_rev < LPFC_SLI_REV4) &&
-				    (cmdiocbp->iocb_flag &
-							LPFC_DRIVER_ABORTED)) {
-					spin_lock_irqsave(&phba->hbalock,
-							  iflag);
+				if (cmdiocbp->iocb_flag & LPFC_DRIVER_ABORTED) {
 					cmdiocbp->iocb_flag &=
 						~LPFC_DRIVER_ABORTED;
-					spin_unlock_irqrestore(&phba->hbalock,
-							       iflag);
 					saveq->iocb.ulpStatus =
 						IOSTAT_LOCAL_REJECT;
 					saveq->iocb.un.ulpWord[4] =
@@ -2256,47 +2240,7 @@ lpfc_sli_process_sol_iocb(struct lpfc_hba *phba, struct lpfc_sli_ring *pring,
 					 * of DMAing payload, so don't free data
 					 * buffer till after a hbeat.
 					 */
-					spin_lock_irqsave(&phba->hbalock,
-							  iflag);
 					saveq->iocb_flag |= LPFC_DELAY_MEM_FREE;
-					spin_unlock_irqrestore(&phba->hbalock,
-							       iflag);
-				}
-				if ((phba->sli_rev == LPFC_SLI_REV4) &&
-				    (saveq->iocb_flag & LPFC_EXCHANGE_BUSY)) {
-					/* Set cmdiocb flag for the exchange
-					 * busy so sgl (xri) will not be
-					 * released until the abort xri is
-					 * received from hba, clear the
-					 * LPFC_DRIVER_ABORTED bit in case
-					 * it was driver initiated abort.
-					 */
-					spin_lock_irqsave(&phba->hbalock,
-							  iflag);
-					cmdiocbp->iocb_flag &=
-						~LPFC_DRIVER_ABORTED;
-					cmdiocbp->iocb_flag |=
-						LPFC_EXCHANGE_BUSY;
-					spin_unlock_irqrestore(&phba->hbalock,
-							       iflag);
-					cmdiocbp->iocb.ulpStatus =
-						IOSTAT_LOCAL_REJECT;
-					cmdiocbp->iocb.un.ulpWord[4] =
-						IOERR_ABORT_REQUESTED;
-					/*
-					 * For SLI4, irsiocb contains NO_XRI
-					 * in sli_xritag, it shall not affect
-					 * releasing sgl (xri) process.
-					 */
-					saveq->iocb.ulpStatus =
-						IOSTAT_LOCAL_REJECT;
-					saveq->iocb.un.ulpWord[4] =
-						IOERR_SLI_ABORTED;
-					spin_lock_irqsave(&phba->hbalock,
-							  iflag);
-					saveq->iocb_flag |= LPFC_DELAY_MEM_FREE;
-					spin_unlock_irqrestore(&phba->hbalock,
-							       iflag);
 				}
 			}
 			(cmdiocbp->iocb_cmpl) (phba, cmdiocbp, saveq);
@@ -4125,7 +4069,7 @@ lpfc_sli4_read_fcoe_params(struct lpfc_hba *phba,
  * addition, this routine gets the port vpd data.
  *
  * Return codes
- * 	0 - sucessful
+ * 	0 - successful
  * 	ENOMEM - could not allocated memory.
  **/
 static int
@@ -6043,10 +5987,12 @@ lpfc_sli4_iocb2wqe(struct lpfc_hba *phba, struct lpfc_iocbq *iocbq,
 		else
 			bf_set(abort_cmd_ia, &wqe->abort_cmd, 0);
 		bf_set(abort_cmd_criteria, &wqe->abort_cmd, T_XRI_TAG);
+		abort_tag = iocbq->iocb.un.acxri.abortIoTag;
 		wqe->words[5] = 0;
 		bf_set(lpfc_wqe_gen_ct, &wqe->generic,
 			((iocbq->iocb.ulpCt_h << 1) | iocbq->iocb.ulpCt_l));
 		abort_tag = iocbq->iocb.un.acxri.abortIoTag;
+		wqe->generic.abort_tag = abort_tag;
 		/*
 		 * The abort handler will send us CMD_ABORT_XRI_CN or
 		 * CMD_CLOSE_XRI_CN and the fw only accepts CMD_ABORT_XRI_CX
@@ -7058,14 +7004,7 @@ lpfc_sli_abort_els_cmpl(struct lpfc_hba *phba, struct lpfc_iocbq *cmdiocb,
 		    abort_iocb->iocb.ulpContext != abort_context ||
 		    (abort_iocb->iocb_flag & LPFC_DRIVER_ABORTED) == 0)
 			spin_unlock_irq(&phba->hbalock);
-		else if (phba->sli_rev < LPFC_SLI_REV4) {
-			/*
-			 * leave the SLI4 aborted command on the txcmplq
-			 * list and the command complete WCQE's XB bit
-			 * will tell whether the SGL (XRI) can be released
-			 * immediately or to the aborted SGL list for the
-			 * following abort XRI from the HBA.
-			 */
+		else {
 			list_del_init(&abort_iocb->list);
 			pring->txcmplq_cnt--;
 			spin_unlock_irq(&phba->hbalock);
@@ -7074,13 +7013,11 @@ lpfc_sli_abort_els_cmpl(struct lpfc_hba *phba, struct lpfc_iocbq *cmdiocb,
 			 * payload, so don't free data buffer till after
 			 * a hbeat.
 			 */
-			spin_lock_irq(&phba->hbalock);
 			abort_iocb->iocb_flag |= LPFC_DELAY_MEM_FREE;
-			abort_iocb->iocb_flag &= ~LPFC_DRIVER_ABORTED;
-			spin_unlock_irq(&phba->hbalock);
 
+			abort_iocb->iocb_flag &= ~LPFC_DRIVER_ABORTED;
 			abort_iocb->iocb.ulpStatus = IOSTAT_LOCAL_REJECT;
-			abort_iocb->iocb.un.ulpWord[4] = IOERR_ABORT_REQUESTED;
+			abort_iocb->iocb.un.ulpWord[4] = IOERR_SLI_ABORTED;
 			(abort_iocb->iocb_cmpl)(phba, abort_iocb, abort_iocb);
 		}
 	}
@@ -7169,7 +7106,7 @@ lpfc_sli_issue_abort_iotag(struct lpfc_hba *phba, struct lpfc_sli_ring *pring,
 		return 0;
 
 	/* This signals the response to set the correct status
-	 * before calling the completion handler
+	 * before calling the completion handler.
 	 */
 	cmdiocb->iocb_flag |= LPFC_DRIVER_ABORTED;
 
@@ -8422,24 +8359,11 @@ void lpfc_sli4_els_xri_abort_event_proc(struct lpfc_hba *phba)
 	}
 }
 
-/**
- * lpfc_sli4_iocb_param_transfer - Transfer pIocbOut and cmpl status to pIocbIn
- * @phba: pointer to lpfc hba data structure
- * @pIocbIn: pointer to the rspiocbq
- * @pIocbOut: pointer to the cmdiocbq
- * @wcqe: pointer to the complete wcqe
- *
- * This routine transfers the fields of a command iocbq to a response iocbq
- * by copying all the IOCB fields from command iocbq and transferring the
- * completion status information from the complete wcqe.
- **/
 static void
-lpfc_sli4_iocb_param_transfer(struct lpfc_hba *phba,
-			      struct lpfc_iocbq *pIocbIn,
+lpfc_sli4_iocb_param_transfer(struct lpfc_iocbq *pIocbIn,
 			      struct lpfc_iocbq *pIocbOut,
 			      struct lpfc_wcqe_complete *wcqe)
 {
-	unsigned long iflags;
 	size_t offset = offsetof(struct lpfc_iocbq, iocb);
 
 	memcpy((char *)pIocbIn + offset, (char *)pIocbOut + offset,
@@ -8453,17 +8377,8 @@ lpfc_sli4_iocb_param_transfer(struct lpfc_hba *phba,
 					wcqe->total_data_placed;
 		else
 			pIocbIn->iocb.un.ulpWord[4] = wcqe->parameter;
-	else {
+	else
 		pIocbIn->iocb.un.ulpWord[4] = wcqe->parameter;
-		pIocbIn->iocb.un.genreq64.bdl.bdeSize = wcqe->total_data_placed;
-	}
-
-	/* Pick up HBA exchange busy condition */
-	if (bf_get(lpfc_wcqe_c_xb, wcqe)) {
-		spin_lock_irqsave(&phba->hbalock, iflags);
-		pIocbIn->iocb_flag |= LPFC_EXCHANGE_BUSY;
-		spin_unlock_irqrestore(&phba->hbalock, iflags);
-	}
 }
 
 /**
@@ -8504,7 +8419,7 @@ lpfc_sli4_els_wcqe_to_rspiocbq(struct lpfc_hba *phba,
 	}
 
 	/* Fake the irspiocbq and copy necessary response information */
-	lpfc_sli4_iocb_param_transfer(phba, irspiocbq, cmdiocbq, wcqe);
+	lpfc_sli4_iocb_param_transfer(irspiocbq, cmdiocbq, wcqe);
 
 	return irspiocbq;
 }
@@ -9061,7 +8976,7 @@ lpfc_sli4_fp_handle_fcp_wcqe(struct lpfc_hba *phba,
 	}
 
 	/* Fake the irspiocb and copy necessary response information */
-	lpfc_sli4_iocb_param_transfer(phba, &irspiocbq, cmdiocbq, wcqe);
+	lpfc_sli4_iocb_param_transfer(&irspiocbq, cmdiocbq, wcqe);
 
 	/* Pass the cmd_iocb and the rsp state to the upper layer */
 	(cmdiocbq->iocb_cmpl)(phba, cmdiocbq, &irspiocbq);
@@ -11523,7 +11438,7 @@ lpfc_sli4_handle_received_buffer(struct lpfc_hba *phba,
  * sequential.
  *
  * Return codes
- * 	0 - sucessful
+ * 	0 - successful
  *      EIO - The mailbox failed to complete successfully.
  * 	When this error occurs, the driver is not guaranteed
  *	to have any rpi regions posted to the device and
@@ -11561,7 +11476,7 @@ lpfc_sli4_post_all_rpi_hdrs(struct lpfc_hba *phba)
  * maps up to 64 rpi context regions.
  *
  * Return codes
- * 	0 - sucessful
+ * 	0 - successful
  * 	ENOMEM - No available memory
  *      EIO - The mailbox failed to complete successfully.
  **/
@@ -11623,7 +11538,7 @@ lpfc_sli4_post_rpi_hdr(struct lpfc_hba *phba, struct lpfc_rpi_hdr *rpi_page)
  * PAGE_SIZE modulo 64 rpi context headers.
  *
  * Returns
- * 	A nonzero rpi defined as rpi_base <= rpi < max_rpi if sucessful
+ * 	A nonzero rpi defined as rpi_base <= rpi < max_rpi if successful
  * 	LPFC_RPI_ALLOC_ERROR if no rpis are available.
  **/
 int
@@ -12154,48 +12069,3 @@ out:
 	kfree(rgn23_data);
 	return;
 }
-
-/**
- * lpfc_cleanup_pending_mbox - Free up vport discovery mailbox commands.
- * @vport: pointer to vport data structure.
- *
- * This function iterate through the mailboxq and clean up all REG_LOGIN
- * and REG_VPI mailbox commands associated with the vport. This function
- * is called when driver want to restart discovery of the vport due to
- * a Clear Virtual Link event.
- **/
-void
-lpfc_cleanup_pending_mbox(struct lpfc_vport *vport)
-{
-	struct lpfc_hba *phba = vport->phba;
-	LPFC_MBOXQ_t *mb, *nextmb;
-	struct lpfc_dmabuf *mp;
-
-	spin_lock_irq(&phba->hbalock);
-	list_for_each_entry_safe(mb, nextmb, &phba->sli.mboxq, list) {
-		if (mb->vport != vport)
-			continue;
-
-		if ((mb->u.mb.mbxCommand != MBX_REG_LOGIN64) &&
-			(mb->u.mb.mbxCommand != MBX_REG_VPI))
-			continue;
-
-		if (mb->u.mb.mbxCommand == MBX_REG_LOGIN64) {
-			mp = (struct lpfc_dmabuf *) (mb->context1);
-			if (mp) {
-				__lpfc_mbuf_free(phba, mp->virt, mp->phys);
-				kfree(mp);
-			}
-		}
-		list_del(&mb->list);
-		mempool_free(mb, phba->mbox_mem_pool);
-	}
-	mb = phba->sli.mbox_active;
-	if (mb && (mb->vport == vport)) {
-		if ((mb->u.mb.mbxCommand == MBX_REG_LOGIN64) ||
-			(mb->u.mb.mbxCommand == MBX_REG_VPI))
-			mb->mbox_cmpl = lpfc_sli_def_mbox_cmpl;
-	}
-	spin_unlock_irq(&phba->hbalock);
-}
-

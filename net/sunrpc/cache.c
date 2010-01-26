@@ -401,9 +401,8 @@ static int cache_clean(void)
 		for (; ch; cp= & ch->next, ch= *cp) {
 			if (current_detail->nextcheck > ch->expiry_time)
 				current_detail->nextcheck = ch->expiry_time+1;
-			if (ch->expiry_time >= get_seconds()
-			    && ch->last_refresh >= current_detail->flush_time
-				)
+			if (ch->expiry_time >= get_seconds() &&
+			    ch->last_refresh >= current_detail->flush_time)
 				continue;
 			if (test_and_clear_bit(CACHE_PENDING, &ch->flags))
 				cache_dequeue(current_detail, ch);
@@ -522,10 +521,12 @@ static int cache_defer_req(struct cache_req *req, struct cache_head *item)
 		if (net_random()&1)
 			return -ENOMEM;
 	}
-
-	dreq = &sleeper.handle;
-	init_waitqueue_head(&sleeper.wait);
-	dreq->revisit = cache_restart_thread;
+	if (req->thread_wait) {
+		dreq = &sleeper.handle;
+		init_waitqueue_head(&sleeper.wait);
+		dreq->revisit = cache_restart_thread;
+	} else
+		dreq = req->defer(req);
 
  retry:
 	if (dreq == NULL)
@@ -567,7 +568,7 @@ static int cache_defer_req(struct cache_req *req, struct cache_head *item)
 			sleeper.wait,
 			!test_bit(CACHE_PENDING, &item->flags)
 			|| list_empty(&sleeper.handle.hash),
-			3*HZ);
+			req->thread_wait);
 		spin_lock(&cache_defer_lock);
 		if (!list_empty(&sleeper.handle.hash)) {
 			list_del_init(&sleeper.handle.recent);

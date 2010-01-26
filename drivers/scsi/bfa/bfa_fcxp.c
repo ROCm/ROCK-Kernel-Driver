@@ -324,15 +324,12 @@ hal_fcxp_tx_plog(struct bfa_s *bfa, u32 reqlen, struct bfa_fcxp_s *fcxp,
 				*((u32 *) BFA_FCXP_REQ_PLD(fcxp));
 
 			bfa_plog_fchdr_and_pl(bfa->plog, BFA_PL_MID_HAL_FCXP,
-					      BFA_PL_EID_TX,
-					      reqlen + sizeof(struct fchs_s),
-						fchs,
-					      pld_w0);
+				BFA_PL_EID_TX,
+				reqlen + sizeof(struct fchs_s), fchs, pld_w0);
 		} else {
 			bfa_plog_fchdr(bfa->plog, BFA_PL_MID_HAL_FCXP,
-				       BFA_PL_EID_TX,
-					reqlen + sizeof(struct fchs_s),
-				       fchs);
+				BFA_PL_EID_TX, reqlen + sizeof(struct fchs_s),
+				fchs);
 		}
 	} else {
 		bfa_plog_fchdr(bfa->plog, BFA_PL_MID_HAL_FCXP, BFA_PL_EID_TX,
@@ -389,7 +386,7 @@ bfa_fcxp_queue(struct bfa_fcxp_s *fcxp, struct bfi_fcxp_send_req_s *send_req)
 	struct bfa_s      		*bfa = fcxp->fcxp_mod->bfa;
 	struct bfa_fcxp_req_info_s	*reqi = &fcxp->req_info;
 	struct bfa_fcxp_rsp_info_s	*rspi = &fcxp->rsp_info;
-	struct bfa_rport_s			*rport = reqi->bfa_rport;
+	struct bfa_rport_s		*rport = reqi->bfa_rport;
 
 	bfi_h2i_set(send_req->mh, BFI_MC_FCXP, BFI_FCXP_H2I_SEND_REQ,
 			bfa_lpuid(bfa));

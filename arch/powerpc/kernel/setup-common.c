@@ -157,7 +157,7 @@ extern u32 cpu_temp_both(unsigned long cpu);
 #endif /* CONFIG_TAU */
 
 #ifdef CONFIG_SMP
-DEFINE_PER_CPU(unsigned int, pvr);
+DEFINE_PER_CPU(unsigned int, cpu_pvr);
 #endif
 
 static int show_cpuinfo(struct seq_file *m, void *v)
@@ -209,7 +209,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	}
 
 #ifdef CONFIG_SMP
-	pvr = per_cpu(pvr, cpu_id);
+	pvr = per_cpu(cpu_pvr, cpu_id);
 #else
 	pvr = mfspr(SPRN_PVR);
 #endif
@@ -219,7 +219,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	seq_printf(m, "processor\t: %lu\n", cpu_id);
 	seq_printf(m, "cpu\t\t: ");
 
-	if (cur_cpu_spec->cpu_name)
+	if (cur_cpu_spec->pvr_mask)
 		seq_printf(m, "%s", cur_cpu_spec->cpu_name);
 	else
 		seq_printf(m, "unknown (%08x)", pvr);
@@ -660,6 +660,7 @@ late_initcall(check_cache_coherency);
 
 #ifdef CONFIG_DEBUG_FS
 struct dentry *powerpc_debugfs_root;
+EXPORT_SYMBOL(powerpc_debugfs_root);
 
 static int powerpc_debugfs_init(void)
 {

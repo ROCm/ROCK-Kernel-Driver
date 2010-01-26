@@ -271,6 +271,8 @@ config BLK_DEV_CRYPTOLOOP
 	  instead, which can be configured to be on-disk compatible with the
 	  cryptoloop device.
 
+source "drivers/block/drbd/Kconfig"
+
 config BLK_DEV_NBD
 	tristate "Network block device support"
 	depends on NET
@@ -464,9 +466,9 @@ config XILINX_SYSACE
 	help
 	  Include support for the Xilinx SystemACE CompactFlash interface
 
-config XEN_BLKFRONT
+config XEN_BLKDEV_FRONTEND
 	tristate "Xen virtual block device support"
-	depends on PARAVIRT_XEN
+	depends on XEN
 	default y
 	help
 	  This driver implements the front-end of the Xen virtual

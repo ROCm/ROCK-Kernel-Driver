@@ -1528,7 +1528,7 @@ extern void halt_current_cpu(struct pt_regs *);
 
 void kdba_kdump_shutdown_slave(struct pt_regs *regs)
 {
-#ifndef CONFIG_PARAVIRT_XEN
+#ifndef CONFIG_XEN
 	halt_current_cpu(regs);
 #endif /* CONFIG_XEN */
 }

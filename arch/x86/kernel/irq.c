@@ -92,17 +92,17 @@ static int show_other_interrupts(struct seq_file *p, int prec)
 		seq_printf(p, "%10u ", irq_stats(j)->irq_tlb_count);
 	seq_printf(p, "  TLB shootdowns\n");
 #endif
-#ifdef CONFIG_X86_MCE
+#ifdef CONFIG_X86_THERMAL_VECTOR
 	seq_printf(p, "%*s: ", prec, "TRM");
 	for_each_online_cpu(j)
 		seq_printf(p, "%10u ", irq_stats(j)->irq_thermal_count);
 	seq_printf(p, "  Thermal event interrupts\n");
-# ifdef CONFIG_X86_MCE_THRESHOLD
+#endif
+#ifdef CONFIG_X86_MCE_THRESHOLD
 	seq_printf(p, "%*s: ", prec, "THR");
 	for_each_online_cpu(j)
 		seq_printf(p, "%10u ", irq_stats(j)->irq_threshold_count);
 	seq_printf(p, "  Threshold APIC interrupts\n");
-# endif
 #endif
 #ifdef CONFIG_X86_MCE
 	seq_printf(p, "%*s: ", prec, "MCE");
@@ -149,7 +149,7 @@ int show_interrupts(struct seq_file *p, void *v)
 	if (!desc)
 		return 0;
 
-	spin_lock_irqsave(&desc->lock, flags);
+	raw_spin_lock_irqsave(&desc->lock, flags);
 	for_each_online_cpu(j)
 		any_count |= kstat_irqs_cpu(i, j);
 	action = desc->action;
@@ -170,7 +170,7 @@ int show_interrupts(struct seq_file *p, void *v)
 
 	seq_putc(p, '\n');
 out:
-	spin_unlock_irqrestore(&desc->lock, flags);
+	raw_spin_unlock_irqrestore(&desc->lock, flags);
 	return 0;
 }
 
@@ -194,11 +194,11 @@ u64 arch_irq_stat_cpu(unsigned int cpu)
 	sum += irq_stats(cpu)->irq_call_count;
 	sum += irq_stats(cpu)->irq_tlb_count;
 #endif
-#ifdef CONFIG_X86_MCE
+#ifdef CONFIG_X86_THERMAL_VECTOR
 	sum += irq_stats(cpu)->irq_thermal_count;
-# ifdef CONFIG_X86_MCE_THRESHOLD
+#endif
+#ifdef CONFIG_X86_MCE_THRESHOLD
 	sum += irq_stats(cpu)->irq_threshold_count;
-# endif
 #endif
 #ifdef CONFIG_X86_MCE
 	sum += per_cpu(mce_exception_count, cpu);
@@ -294,12 +294,12 @@ void fixup_irqs(void)
 			continue;
 
 		/* interrupt's are disabled at this point */
-		spin_lock(&desc->lock);
+		raw_spin_lock(&desc->lock);
 
 		affinity = desc->affinity;
 		if (!irq_has_action(irq) ||
 		    cpumask_equal(affinity, cpu_online_mask)) {
-			spin_unlock(&desc->lock);
+			raw_spin_unlock(&desc->lock);
 			continue;
 		}
 
@@ -326,7 +326,7 @@ void fixup_irqs(void)
 		if (!(desc->status & IRQ_MOVE_PCNTXT) && desc->chip->unmask)
 			desc->chip->unmask(irq);
 
-		spin_unlock(&desc->lock);
+		raw_spin_unlock(&desc->lock);
 
 		if (break_affinity && set_affinity)
 			printk("Broke affinity for irq %i\n", irq);
@@ -356,10 +356,10 @@ void fixup_irqs(void)
 			irq = __get_cpu_var(vector_irq)[vector];
 
 			desc = irq_to_desc(irq);
-			spin_lock(&desc->lock);
+			raw_spin_lock(&desc->lock);
 			if (desc->chip->retrigger)
 				desc->chip->retrigger(irq);
-			spin_unlock(&desc->lock);
+			raw_spin_unlock(&desc->lock);
 		}
 	}
 }

@@ -155,7 +155,6 @@ static void get_unlock_tgh_handle(struct gru_tlb_global_handle *tgh)
  *
  */
 
-
 void gru_flush_tlb_range(struct gru_mm_struct *gms, unsigned long start,
 			 unsigned long len)
 {
@@ -376,6 +375,4 @@ void gru_tgh_flush_init(struct gru_state *gru)
 	/* first starting TGH index to use for remote purges */
 	gru->gs_tgh_first_remote = (cpus + (1 << shift) - 1) >> shift;
 
-	/* flush the GRU TLB in case there are stale entries present */
-	gru_flush_all_tlb(gru);
 }

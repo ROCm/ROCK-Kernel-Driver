@@ -60,9 +60,13 @@ static int bdl_pos_adj[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = -1};
 static int probe_mask[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = -1};
 static int probe_only[SNDRV_CARDS];
 static int single_cmd;
-static int enable_msi;
+static int enable_msi = -1;
 #ifdef CONFIG_SND_HDA_PATCH_LOADER
 static char *patch[SNDRV_CARDS];
+#endif
+#ifdef CONFIG_SND_HDA_INPUT_BEEP
+static int beep_mode[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] =
+					CONFIG_SND_HDA_INPUT_BEEP_MODE};
 #endif
 
 module_param_array(index, int, NULL, 0444);
@@ -91,6 +95,11 @@ MODULE_PARM_DESC(enable_msi, "Enable Message Signaled Interrupt (MSI)");
 module_param_array(patch, charp, NULL, 0444);
 MODULE_PARM_DESC(patch, "Patch file for Intel HD audio interface.");
 #endif
+#ifdef CONFIG_SND_HDA_INPUT_BEEP
+module_param_array(beep_mode, int, NULL, 0444);
+MODULE_PARM_DESC(beep_mode, "Select HDA Beep registration mode "
+			    "(0=off, 1=on, 2=mute switch on/off) (default=1).");
+#endif
 
 #ifdef CONFIG_SND_HDA_POWER_SAVE
 static int power_save = CONFIG_SND_HDA_POWER_SAVE_DEFAULT;
@@ -116,7 +125,6 @@ MODULE_SUPPORTED_DEVICE("{{Intel, ICH6},"
 			 "{Intel, ICH9},"
 			 "{Intel, ICH10},"
 			 "{Intel, PCH},"
-			 "{Intel, CPT},"
 			 "{Intel, SCH},"
 			 "{ATI, SB450},"
 			 "{ATI, SB600},"
@@ -406,6 +414,7 @@ struct azx {
 	unsigned short codec_mask;
 	int  codec_probe_mask; /* copied from probe_mask option */
 	struct hda_bus *bus;
+	unsigned int beep_mode;
 
 	/* CORB/RIRB */
 	struct azx_rb corb;
@@ -1406,6 +1415,7 @@ static int __devinit azx_codec_create(struct azx *chip, const char *model)
 			err = snd_hda_codec_new(chip->bus, c, &codec);
 			if (err < 0)
 				continue;
+			codec->beep_mode = chip->beep_mode;
 			codecs++;
 		}
 	}
@@ -2318,12 +2328,10 @@ static void __devinit check_probe_mask(struct azx *chip, int dev)
 }
 
 /*
- * white-list for enable_msi
+ * white/black-list for enable_msi
  */
-static struct snd_pci_quirk msi_white_list[] __devinitdata = {
-	SND_PCI_QUIRK(0x103c, 0x306d, "HP dv3", 1),
-	SND_PCI_QUIRK(0x103c, 0x30f7, "HP Pavilion dv4t-1300", 1),
-	SND_PCI_QUIRK(0x103c, 0x3607, "HP Compa CQ40", 1),
+static struct snd_pci_quirk msi_black_list[] __devinitdata = {
+	SND_PCI_QUIRK(0x1043, 0x81f2, "ASUS", 0), /* Athlon64 X2 + nvidia */
 	{}
 };
 
@@ -2331,10 +2339,12 @@ static void __devinit check_msi(struct azx *chip)
 {
 	const struct snd_pci_quirk *q;
 
-	chip->msi = enable_msi;
-	if (chip->msi)
+	if (enable_msi >= 0) {
+		chip->msi = !!enable_msi;
 		return;
-	q = snd_pci_quirk_lookup(chip->pci, msi_white_list);
+	}
+	chip->msi = 1;	/* enable MSI as default */
+	q = snd_pci_quirk_lookup(chip->pci, msi_black_list);
 	if (q) {
 		printk(KERN_INFO
 		       "hda_intel: msi for device %04x:%04x set to %d\n",
@@ -2598,6 +2608,10 @@ static int __devinit azx_probe(struct pci_dev *pci,
 		goto out_free;
 	card->private_data = chip;
 
+#ifdef CONFIG_SND_HDA_INPUT_BEEP
+	chip->beep_mode = beep_mode[dev];
+#endif
+
 	/* create codec instances */
 	err = azx_codec_create(chip, model[dev]);
 	if (err < 0)
@@ -2663,8 +2677,6 @@ static struct pci_device_id azx_ids[] = {
 	{ PCI_DEVICE(0x8086, 0x3a6e), .driver_data = AZX_DRIVER_ICH },
 	/* PCH */
 	{ PCI_DEVICE(0x8086, 0x3b56), .driver_data = AZX_DRIVER_ICH },
-	/* CPT */
-	{ PCI_DEVICE(0x8086, 0x1c20), .driver_data = AZX_DRIVER_ICH },
 	/* SCH */
 	{ PCI_DEVICE(0x8086, 0x811b), .driver_data = AZX_DRIVER_SCH },
 	/* ATI SB 450/600 */
@@ -2711,6 +2723,9 @@ static struct pci_device_id azx_ids[] = {
 	{ PCI_DEVICE(0x10de, 0x0ac1), .driver_data = AZX_DRIVER_NVIDIA },
 	{ PCI_DEVICE(0x10de, 0x0ac2), .driver_data = AZX_DRIVER_NVIDIA },
 	{ PCI_DEVICE(0x10de, 0x0ac3), .driver_data = AZX_DRIVER_NVIDIA },
+	{ PCI_DEVICE(0x10de, 0x0be2), .driver_data = AZX_DRIVER_NVIDIA },
+	{ PCI_DEVICE(0x10de, 0x0be3), .driver_data = AZX_DRIVER_NVIDIA },
+	{ PCI_DEVICE(0x10de, 0x0be4), .driver_data = AZX_DRIVER_NVIDIA },
 	{ PCI_DEVICE(0x10de, 0x0d94), .driver_data = AZX_DRIVER_NVIDIA },
 	{ PCI_DEVICE(0x10de, 0x0d95), .driver_data = AZX_DRIVER_NVIDIA },
 	{ PCI_DEVICE(0x10de, 0x0d96), .driver_data = AZX_DRIVER_NVIDIA },

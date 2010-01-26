@@ -791,7 +791,6 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 			 *  precedence!
 			 */
 			sc->result = (DID_OK << 16) | scsi_status;
-
 			if (!(scsi_state & MPI_SCSI_STATE_AUTOSENSE_VALID)) {
 
 				/*
@@ -801,21 +800,23 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 				 * with result of command (READ or VERIFY),
 				 * DID_SOFT_ERROR is set.
 				 */
-				if (ioc->bus_type == SPI && vdevice &&
-				    vdevice->vtarget->type == TYPE_DISK) {
+				if (ioc->bus_type == SPI) {
 					if (pScsiReq->CDB[0] == READ_6  ||
 					    pScsiReq->CDB[0] == READ_10 ||
 					    pScsiReq->CDB[0] == READ_12 ||
 					    pScsiReq->CDB[0] == READ_16 ||
 					    pScsiReq->CDB[0] == VERIFY  ||
 					    pScsiReq->CDB[0] == VERIFY_16) {
-						unsigned int bufflen;
-						bufflen = scsi_bufflen(sc);
-						if (bufflen != xfer_cnt) {
-						    sc->result = DID_SOFT_ERROR << 16;
-						    printk(MYIOC_s_WARN_FMT "Errata"
-						    "on LSI53C1030 occurred. sc->request_bufflen=0x%02x, "
-						    "xfer_cnt=0x%02x\n", ioc->name, bufflen, xfer_cnt);
+						if (scsi_bufflen(sc) !=
+							xfer_cnt) {
+							sc->result =
+							DID_SOFT_ERROR << 16;
+						    printk(KERN_WARNING "Errata"
+						    "on LSI53C1030 occurred."
+						    "sc->req_bufflen=0x%02x,"
+						    "xfer_cnt=0x%02x\n",
+						    scsi_bufflen(sc),
+						    xfer_cnt);
 						}
 					}
 				}
@@ -858,44 +859,55 @@ mptscsih_io_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 			sc->result = (DID_OK << 16) | scsi_status;
 			if (scsi_state == 0) {
 				;
-			} else if (scsi_state & MPI_SCSI_STATE_AUTOSENSE_VALID) {
-				unsigned int bufflen;
+			} else if (scsi_state &
+			    MPI_SCSI_STATE_AUTOSENSE_VALID) {
 
-				bufflen = scsi_bufflen(sc);
 				/*
-				 * For potential trouble on LSI53C1030. (date:2007.xx.)
-				 * It is checked whether the length of request data is equal to
+				 * For potential trouble on LSI53C1030.
+				 * (date:2007.xx.)
+				 * It is checked whether the length of
+				 * request data is equal to
 				 * the length of transfer and residual.
 				 * MEDIUM_ERROR is set by incorrect data.
 				 */
-				if (ioc->bus_type == SPI && vdevice &&
-				    vdevice->vtarget->type == TYPE_DISK) {
-					if (sc->sense_buffer[2] & 0x20) {
-					    difftransfer =
-					    sc->sense_buffer[3] << 24 |
-					    sc->sense_buffer[4] << 16 |
-					    sc->sense_buffer[5] << 8 |
-					    sc->sense_buffer[6];
-					    if ((sc->sense_buffer[3] & 0x80) == 0x80) {
-						if (bufflen != xfer_cnt) {
-						    sc->sense_buffer[2] = MEDIUM_ERROR;
-						    sc->sense_buffer[12] = 0xff;
-						    sc->sense_buffer[13] = 0xff;
-						    printk(MYIOC_s_WARN_FMT "Errata on "
-						    "LSI53C1030 occurred. sc->request_bufflen=0x%02x,"
-						    "xfer_cnt=0x%02x\n", ioc->name, bufflen, xfer_cnt);
-						}
-					} else {
-						if (bufflen != xfer_cnt + difftransfer) {
-						    sc->sense_buffer[2] = MEDIUM_ERROR;
-						    sc->sense_buffer[12] = 0xff;
-						    sc->sense_buffer[13] = 0xff;
-						    printk(MYIOC_s_WARN_FMT "Errata on "
-						    "LSI53C1030 occurred. sc->request_bufflen=0x%02x,"
-						    " xfer_cnt=0x%02x, difftransfer=0x%02x\n",
-						    ioc->name, bufflen , xfer_cnt, difftransfer);
-						}
-						}
+				if ((ioc->bus_type == SPI) &&
+					(sc->sense_buffer[2] & 0x20)) {
+					u32	 difftransfer;
+					difftransfer =
+					sc->sense_buffer[3] << 24 |
+					sc->sense_buffer[4] << 16 |
+					sc->sense_buffer[5] << 8 |
+					sc->sense_buffer[6];
+					if (((sc->sense_buffer[3] & 0x80) ==
+						0x80) && (scsi_bufflen(sc)
+						!= xfer_cnt)) {
+						sc->sense_buffer[2] =
+						    MEDIUM_ERROR;
+						sc->sense_buffer[12] = 0xff;
+						sc->sense_buffer[13] = 0xff;
+						printk(KERN_WARNING"Errata"
+						"on LSI53C1030 occurred."
+						"sc->req_bufflen=0x%02x,"
+						"xfer_cnt=0x%02x\n" ,
+						scsi_bufflen(sc),
+						xfer_cnt);
+					}
+					if (((sc->sense_buffer[3] & 0x80)
+						!= 0x80) &&
+						(scsi_bufflen(sc) !=
+						xfer_cnt + difftransfer)) {
+						sc->sense_buffer[2] =
+							MEDIUM_ERROR;
+						sc->sense_buffer[12] = 0xff;
+						sc->sense_buffer[13] = 0xff;
+						printk(KERN_WARNING
+						"Errata on LSI53C1030 occurred"
+						"sc->req_bufflen=0x%02x,"
+						" xfer_cnt=0x%02x,"
+						"difftransfer=0x%02x\n",
+						scsi_bufflen(sc),
+						xfer_cnt,
+						difftransfer);
 					}
 				}
 

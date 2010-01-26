@@ -320,7 +320,7 @@ found:
 	for (bus = dev->bus; bus; bus = bus->parent) {
 		struct pci_dev *bridge = bus->self;
 
-		if (!bridge || !bridge->is_pcie ||
+		if (!bridge || !pci_is_pcie(bridge) ||
 		    bridge->pcie_type == PCI_EXP_TYPE_PCI_BRIDGE)
 			return 0;
 
@@ -334,6 +334,35 @@ found:
 
 	if (atsru->include_all)
 		return 1;
+
+	return 0;
+}
+#endif
+
+#ifdef CONFIG_ACPI_NUMA
+static int __init
+dmar_parse_one_rhsa(struct acpi_dmar_header *header)
+{
+	struct acpi_dmar_rhsa *rhsa;
+	struct dmar_drhd_unit *drhd;
+
+	rhsa = (struct acpi_dmar_rhsa *)header;
+	for_each_drhd_unit(drhd) {
+		if (drhd->reg_base_addr == rhsa->base_address) {
+			int node = acpi_map_pxm_to_node(rhsa->proximity_domain);
+
+			if (!node_online(node))
+				node = -1;
+			drhd->iommu->node = node;
+			return 0;
+		}
+	}
+	WARN(1, "Your BIOS is broken; RHSA refers to non-existent DMAR unit at %llx\n"
+	     "BIOS vendor: %s; Ver: %s; Product Version: %s\n",
+	     drhd->reg_base_addr,
+	     dmi_get_system_info(DMI_BIOS_VENDOR),
+	     dmi_get_system_info(DMI_BIOS_VERSION),
+	     dmi_get_system_info(DMI_PRODUCT_VERSION));
 
 	return 0;
 }
@@ -458,7 +487,9 @@ parse_dmar_table(void)
 #endif
 			break;
 		case ACPI_DMAR_HARDWARE_AFFINITY:
-			/* We don't do anything with RHSA (yet?) */
+#ifdef CONFIG_ACPI_NUMA
+			ret = dmar_parse_one_rhsa(entry_header);
+#endif
 			break;
 		default:
 			printk(KERN_WARNING PREFIX
@@ -673,9 +704,15 @@ void __init detect_intel_iommu(void)
 			       "x2apic and Intr-remapping.\n");
 #endif
 #ifdef CONFIG_DMAR
-		if (ret && !no_iommu && !iommu_detected && !swiotlb &&
-		    !dmar_disabled)
+		if (ret && !no_iommu && !iommu_detected && !dmar_disabled) {
 			iommu_detected = 1;
+			/* Make sure ACS will be enabled */
+			pci_request_acs();
+		}
+#endif
+#ifdef CONFIG_X86
+		if (ret)
+			x86_init.iommu.iommu_init = intel_iommu_init;
 #endif
 	}
 	early_acpi_os_unmap_memory(dmar_tbl, dmar_tbl_size);
@@ -751,6 +788,8 @@ int alloc_iommu(struct dmar_drhd_unit *drhd)
 #endif
 	iommu->agaw = agaw;
 	iommu->msagaw = msagaw;
+
+	iommu->node = -1;
 
 	/* the registers might be more than one page */
 	map_size = max_t(int, ecap_max_iotlb_offset(iommu->ecap),
@@ -1093,6 +1132,7 @@ static void __dmar_enable_qi(struct intel_iommu *iommu)
 int dmar_enable_qi(struct intel_iommu *iommu)
 {
 	struct q_inval *qi;
+	struct page *desc_page;
 
 	if (!ecap_qis(iommu->ecap))
 		return -ENOENT;
@@ -1109,12 +1149,15 @@ int dmar_enable_qi(struct intel_iommu *iommu)
 
 	qi = iommu->qi;
 
-	qi->desc = (void *)(get_zeroed_page(GFP_ATOMIC));
-	if (!qi->desc) {
+
+	desc_page = alloc_pages_node(iommu->node, GFP_ATOMIC | __GFP_ZERO, 0);
+	if (!desc_page) {
 		kfree(qi);
 		iommu->qi = 0;
 		return -ENOMEM;
 	}
+
+	qi->desc = page_address(desc_page);
 
 	qi->desc_status = kmalloc(QI_LENGTH * sizeof(int), GFP_ATOMIC);
 	if (!qi->desc_status) {
@@ -1413,7 +1456,7 @@ int dmar_reenable_qi(struct intel_iommu *iommu)
 /*
  * Check interrupt remapping support in DMAR table description.
  */
-int dmar_ir_support(void)
+int __init dmar_ir_support(void)
 {
 	struct acpi_table_dmar *dmar;
 	dmar = (struct acpi_table_dmar *)dmar_tbl;

@@ -60,15 +60,6 @@ config SECURITYFS
 
 	  If you are unsure how to answer this question, answer N.
 
-config SECURITY_DEFAULT
-	string "Default security module"
-	depends on SECURITY
-	default ""
-	help
-          This determines the security module used if the security=
-          boot parmater is not provided.  If a security module is not
-          specified the first module to register will be used.
-
 config SECURITY_NETWORK
 	bool "Socket and Networking Security Hooks"
 	depends on SECURITY
@@ -98,28 +89,6 @@ config SECURITY_PATH
 	  This enables the security hooks for pathname based access control.
 	  If enabled, a security module can use these hooks to
 	  implement pathname based access controls.
-	  If you are unsure how to answer this question, answer N.
-
-config SECURITY_FILE_CAPABILITIES
-	bool "File POSIX Capabilities"
-	default n
-	help
-	  This enables filesystem capabilities, allowing you to give
-	  binaries a subset of root's powers without using setuid 0.
-
-	  If in doubt, answer N.
-
-config SECURITY_ROOTPLUG
-	bool "Root Plug Support"
-	depends on USB=y && SECURITY
-	help
-	  This is a sample LSM module that should only be used as such.
-	  It prevents any programs running with egid == 0 if a specific
-	  USB device is not present in the system.
-
-	  See <http://www.linuxjournal.com/article.php?sid=6279> for
-	  more information about this module.
-
 	  If you are unsure how to answer this question, answer N.
 
 config INTEL_TXT
@@ -174,6 +143,43 @@ source security/tomoyo/Kconfig
 source security/apparmor/Kconfig
 
 source security/integrity/ima/Kconfig
+
+choice
+	prompt "Default security module"
+	default DEFAULT_SECURITY_APPARMOR if SECURITY_APPARMOR
+	default DEFAULT_SECURITY_SELINUX if SECURITY_SELINUX
+	default DEFAULT_SECURITY_SMACK if SECURITY_SMACK
+	default DEFAULT_SECURITY_TOMOYO if SECURITY_TOMOYO
+	default DEFAULT_SECURITY_DAC
+
+	help
+	  Select the security module that will be used by default if the
+	  kernel parameter security= is not specified.
+
+	config DEFAULT_SECURITY_APPARMOR
+		bool "AppArmor" if SECURITY_APPARMOR=y
+
+	config DEFAULT_SECURITY_SELINUX
+		bool "SELinux" if SECURITY_SELINUX=y
+
+	config DEFAULT_SECURITY_SMACK
+		bool "Simplified Mandatory Access Control" if SECURITY_SMACK=y
+
+	config DEFAULT_SECURITY_TOMOYO
+		bool "TOMOYO" if SECURITY_TOMOYO=y
+
+	config DEFAULT_SECURITY_DAC
+		bool "Unix Discretionary Access Controls"
+
+endchoice
+
+config DEFAULT_SECURITY
+	string
+	default "apparmor" if DEFAULT_SECURITY_APPARMOR
+	default "selinux" if DEFAULT_SECURITY_SELINUX
+	default "smack" if DEFAULT_SECURITY_SMACK
+	default "tomoyo" if DEFAULT_SECURITY_TOMOYO
+	default "" if DEFAULT_SECURITY_DAC
 
 endmenu
 

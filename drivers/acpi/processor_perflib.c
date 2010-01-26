@@ -78,7 +78,6 @@ MODULE_PARM_DESC(ignore_ppc, "If the frequency of your machine gets wrongly" \
 
 static int acpi_processor_ppc_status;
 
-#ifdef CONFIG_CPU_FREQ
 static int acpi_processor_ppc_notifier(struct notifier_block *nb,
 				       unsigned long event, void *data)
 {
@@ -121,7 +120,6 @@ static int acpi_processor_ppc_notifier(struct notifier_block *nb,
 static struct notifier_block acpi_ppc_notifier_block = {
 	.notifier_call = acpi_processor_ppc_notifier,
 };
-#endif	/* CONFIG_CPU_FREQ */
 
 static int acpi_processor_get_platform_limit(struct acpi_processor *pr)
 {
@@ -154,27 +152,78 @@ static int acpi_processor_get_platform_limit(struct acpi_processor *pr)
 	return 0;
 }
 
-int acpi_processor_ppc_has_changed(struct acpi_processor *pr)
+#define ACPI_PROCESSOR_NOTIFY_PERFORMANCE	0x80
+/*
+ * acpi_processor_ppc_ost: Notify firmware the _PPC evaluation status
+ * @handle: ACPI processor handle
+ * @status: the status code of _PPC evaluation
+ *	0: success. OSPM is now using the performance state specificed.
+ *	1: failure. OSPM has not changed the number of P-states in use
+ */
+static void acpi_processor_ppc_ost(acpi_handle handle, int status)
+{
+	union acpi_object params[2] = {
+		{.type = ACPI_TYPE_INTEGER,},
+		{.type = ACPI_TYPE_INTEGER,},
+	};
+	struct acpi_object_list arg_list = {2, params};
+	acpi_handle temp;
+
+	params[0].integer.value = ACPI_PROCESSOR_NOTIFY_PERFORMANCE;
+	params[1].integer.value =  status;
+
+	/* when there is no _OST , skip it */
+	if (ACPI_FAILURE(acpi_get_handle(handle, "_OST", &temp)))
+		return;
+
+	acpi_evaluate_object(handle, "_OST", &arg_list, NULL);
+	return;
+}
+
+int acpi_processor_ppc_has_changed(struct acpi_processor *pr, int event_flag)
 {
 	int ret;
 
-	if (ignore_ppc)
+	if (ignore_ppc) {
+		/*
+		 * Only when it is notification event, the _OST object
+		 * will be evaluated. Otherwise it is skipped.
+		 */
+		if (event_flag)
+			acpi_processor_ppc_ost(pr->handle, 1);
 		return 0;
+	}
 
 	ret = acpi_processor_get_platform_limit(pr);
-
+	/*
+	 * Only when it is notification event, the _OST object
+	 * will be evaluated. Otherwise it is skipped.
+	 */
+	if (event_flag) {
+		if (ret < 0)
+			acpi_processor_ppc_ost(pr->handle, 1);
+		else
+			acpi_processor_ppc_ost(pr->handle, 0);
+	}
 	if (ret < 0)
 		return (ret);
 	else
-#ifdef CONFIG_CPU_FREQ
 		return cpufreq_update_policy(pr->id);
-#elif defined(CONFIG_PROCESSOR_EXTERNAL_CONTROL)
-		return processor_notify_external(pr,
-				PROCESSOR_PM_CHANGE, PM_TYPE_PERF);
-#endif
 }
 
-#ifdef CONFIG_CPU_FREQ
+int acpi_processor_get_bios_limit(int cpu, unsigned int *limit)
+{
+	struct acpi_processor *pr;
+
+	pr = per_cpu(processors, cpu);
+	if (!pr || !pr->performance || !pr->performance->state_count)
+		return -ENODEV;
+	*limit = pr->performance->states[pr->performance_platform_limit].
+		core_frequency * 1000;
+	return 0;
+}
+EXPORT_SYMBOL(acpi_processor_get_bios_limit);
+
 void acpi_processor_ppc_init(void)
 {
 	if (!cpufreq_register_notifier
@@ -193,7 +242,6 @@ void acpi_processor_ppc_exit(void)
 
 	acpi_processor_ppc_status &= ~PPC_REGISTERED;
 }
-#endif	/* CONFIG_CPU_FREQ */
 
 static int acpi_processor_get_performance_control(struct acpi_processor *pr)
 {
@@ -341,10 +389,7 @@ static int acpi_processor_get_performance_states(struct acpi_processor *pr)
 	return result;
 }
 
-#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
-static
-#endif
-int acpi_processor_get_performance_info(struct acpi_processor *pr)
+static int acpi_processor_get_performance_info(struct acpi_processor *pr)
 {
 	int result = 0;
 	acpi_status status = AE_OK;
@@ -385,7 +430,6 @@ int acpi_processor_get_performance_info(struct acpi_processor *pr)
 	return result;
 }
 
-#ifdef CONFIG_CPU_FREQ
 int acpi_processor_notify_smm(struct module *calling_module)
 {
 	acpi_status status;
@@ -446,12 +490,8 @@ int acpi_processor_notify_smm(struct module *calling_module)
 }
 
 EXPORT_SYMBOL(acpi_processor_notify_smm);
-#endif	/* CONFIG_CPU_FREQ */
 
-#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
-static
-#endif
-int acpi_processor_get_psd(struct acpi_processor *pr)
+static int acpi_processor_get_psd(struct acpi_processor	*pr)
 {
 	int result = 0;
 	acpi_status status = AE_OK;

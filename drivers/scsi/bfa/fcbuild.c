@@ -24,10 +24,10 @@
 /*
  * static build functions
  */
-static void     fc_els_rsp_build(struct fchs_s *fchs, u32 d_id, u32 s_id,
-				 u16 ox_id);
-static void     fc_bls_rsp_build(struct fchs_s *fchs, u32 d_id, u32 s_id,
-				 u16 ox_id);
+static void fc_els_rsp_build(struct fchs_s *fchs, u32 d_id, u32 s_id,
+			u16 ox_id);
+static void fc_bls_rsp_build(struct fchs_s *fchs, u32 d_id, u32 s_id,
+			u16 ox_id);
 static struct fchs_s   fc_els_req_tmpl;
 static struct fchs_s   fc_els_rsp_tmpl;
 static struct fchs_s   fc_bls_req_tmpl;
@@ -123,7 +123,7 @@ fcbuild_init(void)
 	rrq_tmpl.els_cmd.els_code = FC_ELS_RRQ;
 
 	/*
-	 * fcp_struct fchs_smpl
+	 * fcp_fchs_tmpl
 	 */
 	fcp_fchs_tmpl.routing = FC_RTG_FC4_DEV_DATA;
 	fcp_fchs_tmpl.cat_info = FC_CAT_UNSOLICIT_CMD;
@@ -135,7 +135,8 @@ fcbuild_init(void)
 }
 
 static void
-fc_gs_fchdr_build(struct fchs_s *fchs, u32 d_id, u32 s_id, u32 ox_id)
+fc_gs_fchdr_build(struct fchs_s *fchs, u32 d_id, u32 s_id,
+			u32 ox_id)
 {
 	bfa_os_memset(fchs, 0, sizeof(struct fchs_s));
 
@@ -157,7 +158,8 @@ fc_gs_fchdr_build(struct fchs_s *fchs, u32 d_id, u32 s_id, u32 ox_id)
 }
 
 void
-fc_els_req_build(struct fchs_s *fchs, u32 d_id, u32 s_id, u16 ox_id)
+fc_els_req_build(struct fchs_s *fchs, u32 d_id, u32 s_id,
+			u16 ox_id)
 {
 	bfa_os_memcpy(fchs, &fc_els_req_tmpl, sizeof(struct fchs_s));
 	fchs->d_id = (d_id);
@@ -166,7 +168,8 @@ fc_els_req_build(struct fchs_s *fchs, u32 d_id, u32 s_id, u16 ox_id)
 }
 
 static void
-fc_els_rsp_build(struct fchs_s *fchs, u32 d_id, u32 s_id, u16 ox_id)
+fc_els_rsp_build(struct fchs_s *fchs, u32 d_id, u32 s_id,
+			u16 ox_id)
 {
 	bfa_os_memcpy(fchs, &fc_els_rsp_tmpl, sizeof(struct fchs_s));
 	fchs->d_id = d_id;
@@ -196,7 +199,8 @@ fc_els_rsp_parse(struct fchs_s *fchs, int len)
 }
 
 static void
-fc_bls_rsp_build(struct fchs_s *fchs, u32 d_id, u32 s_id, u16 ox_id)
+fc_bls_rsp_build(struct fchs_s *fchs, u32 d_id, u32 s_id,
+			u16 ox_id)
 {
 	bfa_os_memcpy(fchs, &fc_bls_rsp_tmpl, sizeof(struct fchs_s));
 	fchs->d_id = d_id;
@@ -448,8 +452,8 @@ fc_prli_parse(struct fc_prli_s *prli)
 }
 
 u16
-fc_logo_build(struct fchs_s *fchs, struct fc_logo_s *logo, u32 d_id, u32 s_id,
-	      u16 ox_id, wwn_t port_name)
+fc_logo_build(struct fchs_s *fchs, struct fc_logo_s *logo, u32 d_id,
+			u32 s_id, u16 ox_id, wwn_t port_name)
 {
 	fc_els_req_build(fchs, d_id, s_id, ox_id);
 
@@ -520,7 +524,7 @@ fc_adisc_rsp_parse(struct fc_adisc_s *adisc, int len, wwn_t port_name,
 
 enum fc_parse_status
 fc_adisc_parse(struct fchs_s *fchs, void *pld, u32 host_dap,
-		wwn_t node_name, wwn_t port_name)
+		 wwn_t node_name, wwn_t port_name)
 {
 	struct fc_adisc_s     *adisc = (struct fc_adisc_s *) pld;
 
@@ -544,7 +548,7 @@ fc_pdisc_parse(struct fchs_s *fchs, wwn_t node_name, wwn_t port_name)
 		return FC_PARSE_FAILURE;
 
 	if ((bfa_os_ntohs(pdisc->class3.rxsz) <
-			(FC_MIN_PDUSZ - sizeof(struct fchs_s)))
+		 (FC_MIN_PDUSZ - sizeof(struct fchs_s)))
 	    || (pdisc->class3.rxsz == 0))
 		return FC_PARSE_FAILURE;
 
@@ -581,7 +585,7 @@ fc_abts_rsp_parse(struct fchs_s *fchs, int len)
 
 u16
 fc_rrq_build(struct fchs_s *fchs, struct fc_rrq_s *rrq, u32 d_id,
-		u32 s_id, u16 ox_id, u16 rrq_oxid)
+			 u32 s_id, u16 ox_id, u16 rrq_oxid)
 {
 	fc_els_req_build(fchs, d_id, s_id, ox_id);
 
@@ -643,8 +647,8 @@ fc_ba_acc_build(struct fchs_s *fchs, struct fc_ba_acc_s *ba_acc, u32 d_id,
 }
 
 u16
-fc_ls_acc_build(struct fchs_s *fchs, struct fc_els_cmd_s *els_cmd, u32 d_id,
-		u32 s_id, u16 ox_id)
+fc_ls_acc_build(struct fchs_s *fchs, struct fc_els_cmd_s *els_cmd,
+			u32 d_id, u32 s_id, u16 ox_id)
 {
 	fc_els_rsp_build(fchs, d_id, s_id, ox_id);
 	memset(els_cmd, 0, sizeof(struct fc_els_cmd_s));
@@ -672,7 +676,8 @@ fc_logout_params_pages(struct fchs_s *fc_frame, u8 els_code)
 
 u16
 fc_tprlo_acc_build(struct fchs_s *fchs, struct fc_tprlo_acc_s *tprlo_acc,
-		u32 d_id, u32 s_id, u16 ox_id, int num_pages)
+			u32 d_id, u32 s_id, u16 ox_id,
+			int num_pages)
 {
 	int             page;
 
@@ -696,7 +701,8 @@ fc_tprlo_acc_build(struct fchs_s *fchs, struct fc_tprlo_acc_s *tprlo_acc,
 
 u16
 fc_prlo_acc_build(struct fchs_s *fchs, struct fc_prlo_acc_s *prlo_acc,
-		u32 d_id, u32 s_id, u16 ox_id, int num_pages)
+			u32 d_id, u32 s_id, u16 ox_id,
+			int num_pages)
 {
 	int             page;
 
@@ -720,7 +726,7 @@ fc_prlo_acc_build(struct fchs_s *fchs, struct fc_prlo_acc_s *prlo_acc,
 
 u16
 fc_rnid_build(struct fchs_s *fchs, struct fc_rnid_cmd_s *rnid, u32 d_id,
-	u32 s_id, u16 ox_id, u32 data_format)
+			u32 s_id, u16 ox_id, u32 data_format)
 {
 	fc_els_req_build(fchs, d_id, s_id, ox_id);
 
@@ -734,10 +740,10 @@ fc_rnid_build(struct fchs_s *fchs, struct fc_rnid_cmd_s *rnid, u32 d_id,
 
 u16
 fc_rnid_acc_build(struct fchs_s *fchs, struct fc_rnid_acc_s *rnid_acc,
-		  u32 d_id, u32 s_id, u16 ox_id,
-		  u32 data_format,
-		  struct fc_rnid_common_id_data_s *common_id_data,
-		  struct fc_rnid_general_topology_data_s *gen_topo_data)
+			u32 d_id, u32 s_id, u16 ox_id,
+			u32 data_format,
+			struct fc_rnid_common_id_data_s *common_id_data,
+			struct fc_rnid_general_topology_data_s *gen_topo_data)
 {
 	memset(rnid_acc, 0, sizeof(struct fc_rnid_acc_s));
 
@@ -763,7 +769,7 @@ fc_rnid_acc_build(struct fchs_s *fchs, struct fc_rnid_acc_s *rnid_acc,
 
 u16
 fc_rpsc_build(struct fchs_s *fchs, struct fc_rpsc_cmd_s *rpsc, u32 d_id,
-		u32 s_id, u16 ox_id)
+			u32 s_id, u16 ox_id)
 {
 	fc_els_req_build(fchs, d_id, s_id, ox_id);
 
@@ -774,8 +780,9 @@ fc_rpsc_build(struct fchs_s *fchs, struct fc_rpsc_cmd_s *rpsc, u32 d_id,
 }
 
 u16
-fc_rpsc2_build(struct fchs_s *fchs, struct fc_rpsc2_cmd_s *rpsc2, u32 d_id,
-		u32 s_id, u32 *pid_list, u16 npids)
+fc_rpsc2_build(struct fchs_s *fchs, struct fc_rpsc2_cmd_s *rpsc2,
+			u32 d_id, u32 s_id, u32 *pid_list,
+			u16 npids)
 {
 	u32 dctlr_id = FC_DOMAIN_CTRLR(bfa_os_hton3b(d_id));
 	int i = 0;
@@ -790,13 +797,14 @@ fc_rpsc2_build(struct fchs_s *fchs, struct fc_rpsc2_cmd_s *rpsc2, u32 d_id,
 	for (i = 0; i < npids; i++)
 		rpsc2->pid_list[i].pid = pid_list[i];
 
-	return sizeof(struct fc_rpsc2_cmd_s) + ((npids - 1) * (sizeof(u32)));
+	return sizeof(struct fc_rpsc2_cmd_s) + ((npids - 1) *
+			(sizeof(u32)));
 }
 
 u16
 fc_rpsc_acc_build(struct fchs_s *fchs, struct fc_rpsc_acc_s *rpsc_acc,
-		u32 d_id, u32 s_id, u16 ox_id,
-		  struct fc_rpsc_speed_info_s *oper_speed)
+			u32 d_id, u32 s_id, u16 ox_id,
+			struct fc_rpsc_speed_info_s *oper_speed)
 {
 	memset(rpsc_acc, 0, sizeof(struct fc_rpsc_acc_s));
 
@@ -834,7 +842,8 @@ fc_logo_rsp_parse(struct fchs_s *fchs, int len)
 
 u16
 fc_pdisc_build(struct fchs_s *fchs, u32 d_id, u32 s_id,
-	u16 ox_id, wwn_t port_name, wwn_t node_name, u16 pdu_size)
+			u16 ox_id, wwn_t port_name, wwn_t node_name,
+			u16 pdu_size)
 {
 	struct fc_logi_s     *pdisc = (struct fc_logi_s *) (fchs + 1);
 
@@ -933,8 +942,8 @@ fc_prlo_rsp_parse(struct fchs_s *fchs, int len)
 
 u16
 fc_tprlo_build(struct fchs_s *fchs, u32 d_id, u32 s_id,
-	u16 ox_id, int num_pages, enum fc_tprlo_type tprlo_type,
-	u32 tpr_id)
+			u16 ox_id, int num_pages,
+			enum fc_tprlo_type tprlo_type, u32 tpr_id)
 {
 	struct fc_tprlo_s     *tprlo = (struct fc_tprlo_s *) (fchs + 1);
 	int             page;
@@ -1005,7 +1014,8 @@ fc_rrq_rsp_parse(struct fchs_s *fchs, int len)
 
 u16
 fc_ba_rjt_build(struct fchs_s *fchs, u32 d_id, u32 s_id,
-	u16 ox_id, u32 reason_code, u32 reason_expl)
+			u16 ox_id, u32 reason_code,
+			u32 reason_expl)
 {
 	struct fc_ba_rjt_s    *ba_rjt = (struct fc_ba_rjt_s *) (fchs + 1);
 
@@ -1054,7 +1064,8 @@ fc_gidpn_build(struct fchs_s *fchs, void *pyld, u32 s_id, u16 ox_id,
 {
 
 	struct ct_hdr_s       *cthdr = (struct ct_hdr_s *) pyld;
-	struct fcgs_gidpn_req_s *gidpn = (struct fcgs_gidpn_req_s *)(cthdr + 1);
+	struct fcgs_gidpn_req_s *gidpn =
+			(struct fcgs_gidpn_req_s *) (cthdr + 1);
 	u32        d_id = bfa_os_hton3b(FC_NAME_SERVER);
 
 	fc_gs_fchdr_build(fchs, d_id, s_id, ox_id);
@@ -1114,7 +1125,7 @@ fc_ct_rsp_parse(struct ct_hdr_s *cthdr)
 
 u16
 fc_scr_build(struct fchs_s *fchs, struct fc_scr_s *scr, u8 set_br_reg,
-		u32 s_id, u16 ox_id)
+			u32 s_id, u16 ox_id)
 {
 	u32        d_id = bfa_os_hton3b(FC_FABRIC_CONTROLLER);
 
@@ -1131,7 +1142,7 @@ fc_scr_build(struct fchs_s *fchs, struct fc_scr_s *scr, u8 set_br_reg,
 
 u16
 fc_rscn_build(struct fchs_s *fchs, struct fc_rscn_pl_s *rscn, u32 s_id,
-		u16 ox_id)
+			u16 ox_id)
 {
 	u32        d_id = bfa_os_hton3b(FC_FABRIC_CONTROLLER);
 	u16        payldlen;
@@ -1154,7 +1165,8 @@ fc_rftid_build(struct fchs_s *fchs, void *pyld, u32 s_id, u16 ox_id,
 	       enum bfa_port_role roles)
 {
 	struct ct_hdr_s       *cthdr = (struct ct_hdr_s *) pyld;
-	struct fcgs_rftid_req_s *rftid = (struct fcgs_rftid_req_s *)(cthdr + 1);
+	struct fcgs_rftid_req_s *rftid =
+			(struct fcgs_rftid_req_s *) (cthdr + 1);
 	u32        type_value, d_id = bfa_os_hton3b(FC_NAME_SERVER);
 	u8         index;
 
@@ -1181,10 +1193,12 @@ fc_rftid_build(struct fchs_s *fchs, void *pyld, u32 s_id, u16 ox_id,
 
 u16
 fc_rftid_build_sol(struct fchs_s *fchs, void *pyld, u32 s_id,
-	u16 ox_id, u8 *fc4_bitmap, u32 bitmap_size)
+			u16 ox_id, u8 *fc4_bitmap,
+			u32 bitmap_size)
 {
 	struct ct_hdr_s       *cthdr = (struct ct_hdr_s *) pyld;
-	struct fcgs_rftid_req_s *rftid = (struct fcgs_rftid_req_s *)(cthdr + 1);
+	struct fcgs_rftid_req_s *rftid =
+			(struct fcgs_rftid_req_s *) (cthdr + 1);
 	u32        d_id = bfa_os_hton3b(FC_NAME_SERVER);
 
 	fc_gs_fchdr_build(fchs, d_id, s_id, ox_id);
@@ -1194,7 +1208,7 @@ fc_rftid_build_sol(struct fchs_s *fchs, void *pyld, u32 s_id,
 
 	rftid->dap = s_id;
 	bfa_os_memcpy((void *)rftid->fc4_type, (void *)fc4_bitmap,
-(bitmap_size < 32 ? bitmap_size : 32));
+			(bitmap_size < 32 ? bitmap_size : 32));
 
 	return sizeof(struct fcgs_rftid_req_s) + sizeof(struct ct_hdr_s);
 }
@@ -1204,7 +1218,8 @@ fc_rffid_build(struct fchs_s *fchs, void *pyld, u32 s_id, u16 ox_id,
 	       u8 fc4_type, u8 fc4_ftrs)
 {
 	struct ct_hdr_s         *cthdr = (struct ct_hdr_s *) pyld;
-	struct fcgs_rffid_req_s *rffid = (struct fcgs_rffid_req_s *)(cthdr + 1);
+	struct fcgs_rffid_req_s *rffid =
+			(struct fcgs_rffid_req_s *) (cthdr + 1);
 	u32         d_id = bfa_os_hton3b(FC_NAME_SERVER);
 
 	fc_gs_fchdr_build(fchs, d_id, s_id, ox_id);
@@ -1226,7 +1241,7 @@ fc_rspnid_build(struct fchs_s *fchs, void *pyld, u32 s_id, u16 ox_id,
 
 	struct ct_hdr_s       *cthdr = (struct ct_hdr_s *) pyld;
 	struct fcgs_rspnid_req_s *rspnid =
-			(struct fcgs_rspnid_req_s *)(cthdr + 1);
+			(struct fcgs_rspnid_req_s *) (cthdr + 1);
 	u32        d_id = bfa_os_hton3b(FC_NAME_SERVER);
 
 	fc_gs_fchdr_build(fchs, d_id, s_id, ox_id);
@@ -1242,11 +1257,13 @@ fc_rspnid_build(struct fchs_s *fchs, void *pyld, u32 s_id, u16 ox_id,
 }
 
 u16
-fc_gid_ft_build(struct fchs_s *fchs, void *pyld, u32 s_id, u8 fc4_type)
+fc_gid_ft_build(struct fchs_s *fchs, void *pyld, u32 s_id,
+			u8 fc4_type)
 {
 
 	struct ct_hdr_s       *cthdr = (struct ct_hdr_s *) pyld;
-	struct fcgs_gidft_req_s *gidft = (struct fcgs_gidft_req_s *)(cthdr + 1);
+	struct fcgs_gidft_req_s *gidft =
+			(struct fcgs_gidft_req_s *) (cthdr + 1);
 	u32        d_id = bfa_os_hton3b(FC_NAME_SERVER);
 
 	fc_gs_fchdr_build(fchs, d_id, s_id, 0);
@@ -1266,7 +1283,8 @@ fc_rpnid_build(struct fchs_s *fchs, void *pyld, u32 s_id, u32 port_id,
 	       wwn_t port_name)
 {
 	struct ct_hdr_s       *cthdr = (struct ct_hdr_s *) pyld;
-	struct fcgs_rpnid_req_s *rpnid = (struct fcgs_rpnid_req_s *)(cthdr + 1);
+	struct fcgs_rpnid_req_s *rpnid =
+			(struct fcgs_rpnid_req_s *) (cthdr + 1);
 	u32        d_id = bfa_os_hton3b(FC_NAME_SERVER);
 
 	fc_gs_fchdr_build(fchs, d_id, s_id, 0);
@@ -1284,7 +1302,8 @@ fc_rnnid_build(struct fchs_s *fchs, void *pyld, u32 s_id, u32 port_id,
 	       wwn_t node_name)
 {
 	struct ct_hdr_s       *cthdr = (struct ct_hdr_s *) pyld;
-	struct fcgs_rnnid_req_s *rnnid = (struct fcgs_rnnid_req_s *)(cthdr + 1);
+	struct fcgs_rnnid_req_s *rnnid =
+			(struct fcgs_rnnid_req_s *) (cthdr + 1);
 	u32        d_id = bfa_os_hton3b(FC_NAME_SERVER);
 
 	fc_gs_fchdr_build(fchs, d_id, s_id, 0);
@@ -1302,7 +1321,8 @@ fc_rcsid_build(struct fchs_s *fchs, void *pyld, u32 s_id, u32 port_id,
 	       u32 cos)
 {
 	struct ct_hdr_s       *cthdr = (struct ct_hdr_s *) pyld;
-	struct fcgs_rcsid_req_s *rcsid = (struct fcgs_rcsid_req_s *)(cthdr + 1);
+	struct fcgs_rcsid_req_s *rcsid =
+			(struct fcgs_rcsid_req_s *) (cthdr + 1);
 	u32        d_id = bfa_os_hton3b(FC_NAME_SERVER);
 
 	fc_gs_fchdr_build(fchs, d_id, s_id, 0);
@@ -1320,7 +1340,8 @@ fc_rptid_build(struct fchs_s *fchs, void *pyld, u32 s_id, u32 port_id,
 	       u8 port_type)
 {
 	struct ct_hdr_s       *cthdr = (struct ct_hdr_s *) pyld;
-	struct fcgs_rptid_req_s *rptid = (struct fcgs_rptid_req_s *)(cthdr + 1);
+	struct fcgs_rptid_req_s *rptid =
+			(struct fcgs_rptid_req_s *) (cthdr + 1);
 	u32        d_id = bfa_os_hton3b(FC_NAME_SERVER);
 
 	fc_gs_fchdr_build(fchs, d_id, s_id, 0);
@@ -1337,7 +1358,8 @@ u16
 fc_ganxt_build(struct fchs_s *fchs, void *pyld, u32 s_id, u32 port_id)
 {
 	struct ct_hdr_s       *cthdr = (struct ct_hdr_s *) pyld;
-	struct fcgs_ganxt_req_s *ganxt = (struct fcgs_ganxt_req_s *)(cthdr + 1);
+	struct fcgs_ganxt_req_s *ganxt =
+			(struct fcgs_ganxt_req_s *) (cthdr + 1);
 	u32        d_id = bfa_os_hton3b(FC_NAME_SERVER);
 
 	fc_gs_fchdr_build(fchs, d_id, s_id, 0);
@@ -1398,7 +1420,7 @@ fc_gmal_req_build(struct fchs_s *fchs, void *pyld, u32 s_id, wwn_t wwn)
 
 	fc_gs_fchdr_build(fchs, d_id, s_id, 0);
 	fc_gs_ms_cthdr_build(cthdr, s_id, GS_FC_GMAL_CMD,
-					CT_GSSUBTYPE_CFGSERVER);
+			CT_GSSUBTYPE_CFGSERVER);
 
 	bfa_os_memset(gmal, 0, sizeof(fcgs_gmal_req_t));
 	gmal->wwn = wwn;
@@ -1418,7 +1440,7 @@ fc_gfn_req_build(struct fchs_s *fchs, void *pyld, u32 s_id, wwn_t wwn)
 
 	fc_gs_fchdr_build(fchs, d_id, s_id, 0);
 	fc_gs_ms_cthdr_build(cthdr, s_id, GS_FC_GFN_CMD,
-					CT_GSSUBTYPE_CFGSERVER);
+			CT_GSSUBTYPE_CFGSERVER);
 
 	bfa_os_memset(gfn, 0, sizeof(fcgs_gfn_req_t));
 	gfn->wwn = wwn;

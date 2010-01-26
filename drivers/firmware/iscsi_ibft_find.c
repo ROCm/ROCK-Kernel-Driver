@@ -78,8 +78,6 @@ void __init reserve_ibft_region(void)
 			}
 		}
 	}
-#ifndef CONFIG_XEN
 	if (ibft_addr)
 		reserve_bootmem(pos, PAGE_ALIGN(len), BOOTMEM_DEFAULT);
-#endif
 }

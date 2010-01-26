@@ -2,7 +2,7 @@
 # Makefile for local APIC drivers and for the IO-APIC code
 #
 
-obj-$(CONFIG_X86_LOCAL_APIC)	+= apic.o probe_$(BITS).o ipi.o nmi.o
+obj-$(CONFIG_X86_LOCAL_APIC)	+= apic.o apic_noop.o probe_$(BITS).o ipi.o nmi.o
 obj-$(CONFIG_X86_IO_APIC)	+= io_apic.o
 obj-$(CONFIG_SMP)		+= ipi.o
 
@@ -17,8 +17,3 @@ obj-$(CONFIG_X86_BIGSMP)	+= bigsmp_32.o
 obj-$(CONFIG_X86_NUMAQ)		+= numaq_32.o
 obj-$(CONFIG_X86_ES7000)	+= es7000_32.o
 obj-$(CONFIG_X86_SUMMIT)	+= summit_32.o
-
-probe_64-$(CONFIG_XEN)		:= probe_32.o
-
-disabled-obj-$(CONFIG_XEN)	:= apic_flat_$(BITS).o
-disabled-obj-$(filter-out $(CONFIG_SMP),$(CONFIG_XEN)) += ipi.o

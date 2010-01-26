@@ -42,7 +42,6 @@
 #include <linux/mpage.h>
 #include <linux/bit_spinlock.h>
 #include <trace/fs.h>
-#include <linux/precache.h>
 
 static int fsync_buffers_list(spinlock_t *lock, struct list_head *list);
 
@@ -283,11 +282,6 @@ void invalidate_bdev(struct block_device *bdev)
 
 	invalidate_bh_lrus();
 	invalidate_mapping_pages(mapping, 0, -1);
-
-	/* 99% of the time, we don't need to flush the precache on the bdev.
-	 * But, for the strange corners, lets be cautious
-	 */
-	precache_flush_inode(mapping);
 }
 EXPORT_SYMBOL(invalidate_bdev);
 

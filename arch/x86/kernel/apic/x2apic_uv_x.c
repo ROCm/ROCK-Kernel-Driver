@@ -36,13 +36,15 @@ DEFINE_PER_CPU(int, x2apic_extra_bits);
 
 static enum uv_system_type uv_system_type;
 static u64 gru_start_paddr, gru_end_paddr;
+int uv_min_hub_revision_id;
+EXPORT_SYMBOL_GPL(uv_min_hub_revision_id);
 
-static int is_GRU_range(u64 start, u64 end)
+static inline bool is_GRU_range(u64 start, u64 end)
 {
-	return start >= gru_start_paddr && end < gru_end_paddr;
+	return start >= gru_start_paddr && end <= gru_end_paddr;
 }
 
-static int uv_is_untracked_pat_range(u64 start, u64 end)
+static bool uv_is_untracked_pat_range(u64 start, u64 end)
 {
 	return is_ISA_range(start, end) || is_GRU_range(start, end);
 }
@@ -55,12 +57,19 @@ static int early_get_nodeid(void)
 	mmr = early_ioremap(UV_LOCAL_MMR_BASE | UVH_NODE_ID, sizeof(*mmr));
 	node_id.v = *mmr;
 	early_iounmap(mmr, sizeof(*mmr));
+
+	/* Currently, all blades have same revision number */
+	uv_min_hub_revision_id = node_id.s.revision;
+
 	return node_id.s.node_id;
 }
 
 static int __init uv_acpi_madt_oem_check(char *oem_id, char *oem_table_id)
 {
+	int nodeid;
+
 	if (!strcmp(oem_id, "SGI")) {
+		nodeid = early_get_nodeid();
 		x86_platform.is_untracked_pat_range =  uv_is_untracked_pat_range;
 		if (!strcmp(oem_table_id, "UVL"))
 			uv_system_type = UV_LEGACY_APIC;
@@ -68,7 +77,7 @@ static int __init uv_acpi_madt_oem_check(char *oem_id, char *oem_table_id)
 			uv_system_type = UV_X2APIC;
 		else if (!strcmp(oem_table_id, "UVH")) {
 			__get_cpu_var(x2apic_extra_bits) =
-				early_get_nodeid() << (UV_APIC_PNODE_SHIFT - 1);
+				nodeid << (UV_APIC_PNODE_SHIFT - 1);
 			uv_system_type = UV_NON_UNIQUE_APIC;
 			return 1;
 		}
@@ -225,10 +234,7 @@ uv_cpu_mask_to_apicid_and(const struct cpumask *cpumask,
 		if (cpumask_test_cpu(cpu, cpu_online_mask))
 			break;
 	}
-	if (cpu < nr_cpu_ids)
-		return per_cpu(x86_cpu_to_apicid, cpu);
-
-	return BAD_APICID;
+	return per_cpu(x86_cpu_to_apicid, cpu);
 }
 
 static unsigned int x2apic_get_apic_id(unsigned long x)

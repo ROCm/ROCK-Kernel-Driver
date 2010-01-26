@@ -232,6 +232,7 @@ struct cpufreq_driver {
 	/* optional */
 	unsigned int (*getavg)	(struct cpufreq_policy *policy,
 				 unsigned int cpu);
+	int	(*bios_limit)	(int cpu, unsigned int *limit);
 
 	int	(*exit)		(struct cpufreq_policy *policy);
 	int	(*suspend)	(struct cpufreq_policy *policy, pm_message_t pmsg);
@@ -302,7 +303,7 @@ static inline unsigned int cpufreq_get(unsigned int cpu)
 #endif
 
 /* query the last known CPU freq (in kHz). If zero, cpufreq couldn't detect it */
-#if defined(CONFIG_CPU_FREQ) || defined(CONFIG_PROCESSOR_EXTERNAL_CONTROL)
+#ifdef CONFIG_CPU_FREQ
 unsigned int cpufreq_quick_get(unsigned int cpu);
 #else
 static inline unsigned int cpufreq_quick_get(unsigned int cpu)

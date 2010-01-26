@@ -252,9 +252,9 @@ do {                                                            \
 #define checking_wrmsrl(msr, val) wrmsr_safe((msr), (u32)(val),		\
 					     (u32)((val) >> 32))
 
-#define write_tsc(val1, val2) wrmsr(0x10, (val1), (val2))
+#define write_tsc(val1, val2) wrmsr(MSR_IA32_TSC, (val1), (val2))
 
-#define write_rdtscp_aux(val) wrmsr(0xc0000103, (val), 0)
+#define write_rdtscp_aux(val) wrmsr(MSR_TSC_AUX, (val), 0)
 
 struct msr *msrs_alloc(void);
 void msrs_free(struct msr *msrs);
@@ -279,12 +279,12 @@ static inline int wrmsr_on_cpu(unsigned int cpu, u32 msr_no, u32 l, u32 h)
 	wrmsr(msr_no, l, h);
 	return 0;
 }
-static inline void rdmsr_on_cpus(const cpumask_t *m, u32 msr_no,
+static inline void rdmsr_on_cpus(const struct cpumask *m, u32 msr_no,
 				struct msr *msrs)
 {
        rdmsr_on_cpu(0, msr_no, &(msrs[0].l), &(msrs[0].h));
 }
-static inline void wrmsr_on_cpus(const cpumask_t *m, u32 msr_no,
+static inline void wrmsr_on_cpus(const struct cpumask *m, u32 msr_no,
 				struct msr *msrs)
 {
        wrmsr_on_cpu(0, msr_no, msrs[0].l, msrs[0].h);

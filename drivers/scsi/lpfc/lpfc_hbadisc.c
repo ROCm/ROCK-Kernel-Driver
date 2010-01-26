@@ -41,8 +41,6 @@
 #include "lpfc_crtn.h"
 #include "lpfc_vport.h"
 #include "lpfc_debugfs.h"
-#include "lpfc_security.h"
-#include "lpfc_auth_access.h"
 
 /* AlpaArray for assignment of scsid for scan-down and bind_method */
 static uint8_t lpfcAlpaArray[] = {
@@ -64,26 +62,6 @@ static uint8_t lpfcAlpaArray[] = {
 static void lpfc_disc_timeout_handler(struct lpfc_vport *);
 static void lpfc_disc_flush_list(struct lpfc_vport *vport);
 static void lpfc_unregister_fcfi_cmpl(struct lpfc_hba *, LPFC_MBOXQ_t *);
-
-void
-lpfc_start_discovery(struct lpfc_vport *vport)
-{
-	struct lpfc_hba *phba = vport->phba;
-
-	if (vport->auth.security_active &&
-	    vport->auth.auth_state != LPFC_AUTH_SUCCESS) {
-		lpfc_printf_vlog(vport, KERN_ERR, LOG_DISCOVERY,
-				 "0154 Authentication not complete.\n");
-		return;
-	}
-	if (vport->port_type == LPFC_NPIV_PORT) {
-		lpfc_do_scr_ns_plogi(phba, vport);
-		return;
-	}
-
-	lpfc_start_fdiscs(phba);
-	lpfc_do_scr_ns_plogi(phba, vport);
-}
 
 void
 lpfc_terminate_rport_io(struct fc_rport *rport)
@@ -444,15 +422,6 @@ lpfc_work_list_done(struct lpfc_hba *phba)
 			 */
 			lpfc_nlp_put(ndlp);
 			break;
-		case LPFC_EVT_REAUTH:
-			ndlp = (struct lpfc_nodelist *) (evtp->evt_arg1);
-			lpfc_reauthentication_handler(ndlp);
-			free_evt = 0; /* evt is part of ndlp */
-			/* decrement the node reference count held
-			 * for this queued work
-			 */
-			lpfc_nlp_put(ndlp);
-			break;
 		case LPFC_EVT_DEV_LOSS:
 			ndlp = (struct lpfc_nodelist *)(evtp->evt_arg1);
 			lpfc_dev_loss_tmo_handler(ndlp);
@@ -712,9 +681,6 @@ lpfc_cleanup_rpis(struct lpfc_vport *vport, int remove)
 			continue;
 		if (ndlp->nlp_state == NLP_STE_UNUSED_NODE)
 			continue;
-		/* Stop re-authentication timer of all nodes. */
-		del_timer_sync(&ndlp->nlp_reauth_tmr);
-
 		if ((phba->sli3_options & LPFC_SLI3_VPORT_TEARDOWN) ||
 			((vport->port_type == LPFC_NPIV_PORT) &&
 			(ndlp->nlp_DID == NameServer_DID)))
@@ -740,8 +706,6 @@ lpfc_cleanup_rpis(struct lpfc_vport *vport, int remove)
 void
 lpfc_port_link_failure(struct lpfc_vport *vport)
 {
-	lpfc_vport_set_state(vport, FC_VPORT_LINKDOWN);
-
 	/* Cleanup any outstanding received buffers */
 	lpfc_cleanup_rcv_buffers(vport);
 
@@ -769,25 +733,7 @@ lpfc_linkdown_port(struct lpfc_vport *vport)
 		vport->port_state, vport->fc_ns_retry, vport->fc_flag);
 
 	lpfc_port_link_failure(vport);
-	if (vport->auth.auth_state < LPFC_AUTH_FAIL) {
-		vport->auth.auth_state = LPFC_AUTH_UNKNOWN;
-		vport->auth.auth_msg_state = LPFC_AUTH_NONE;
-	}
-}
 
-void
-lpfc_port_auth_failed(struct lpfc_nodelist *ndlp, enum auth_state fail_state)
-{
-	struct lpfc_vport *vport = ndlp->vport;
-
-	vport->auth.auth_state = fail_state;
-	vport->auth.auth_msg_state = LPFC_AUTH_NONE;
-	lpfc_nlp_set_state(vport, ndlp, NLP_STE_NPR_NODE);
-	if (ndlp->nlp_type & NLP_FABRIC) {
-		lpfc_port_link_failure(vport);
-		lpfc_vport_set_state(vport, FC_VPORT_FAILED);
-		lpfc_issue_els_logo(vport, ndlp, 0);
-	}
 }
 
 int
@@ -908,8 +854,6 @@ lpfc_linkup_port(struct lpfc_vport *vport)
 	if (vport->fc_flag & FC_LBIT)
 		lpfc_linkup_cleanup_nodes(vport);
 
-	vport->auth.auth_state = LPFC_AUTH_UNKNOWN;
-	vport->auth.auth_msg_state = LPFC_AUTH_NONE;
 }
 
 static int
@@ -1030,12 +974,9 @@ lpfc_mbx_cmpl_local_config_link(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
 	/* Start discovery by sending a FLOGI. port_state is identically
 	 * LPFC_FLOGI while waiting for FLOGI cmpl
 	 */
-	if ((vport->cfg_enable_auth) &&
-	    (vport->security_service_state == SECURITY_OFFLINE))
-		lpfc_issue_clear_la(phba, vport);
-	else if (vport->port_state != LPFC_FLOGI)
+	if (vport->port_state != LPFC_FLOGI) {
 		lpfc_initial_flogi(vport);
-
+	}
 	return;
 
 out:
@@ -1754,11 +1695,10 @@ out:
  *
  * This function handles completion of init vpi mailbox command.
  */
-void
+static void
 lpfc_init_vpi_cmpl(struct lpfc_hba *phba, LPFC_MBOXQ_t *mboxq)
 {
 	struct lpfc_vport *vport = mboxq->vport;
-	struct lpfc_nodelist *ndlp;
 	if (mboxq->u.mb.mbxStatus) {
 		lpfc_printf_vlog(vport, KERN_ERR,
 				LOG_MBOX,
@@ -1772,20 +1712,6 @@ lpfc_init_vpi_cmpl(struct lpfc_hba *phba, LPFC_MBOXQ_t *mboxq)
 	vport->fc_flag &= ~FC_VPORT_NEEDS_INIT_VPI;
 	spin_unlock_irq(&phba->hbalock);
 
-	/* If this port is physical port or FDISC is done, do reg_vpi */
-	if ((phba->pport == vport) || (vport->port_state == LPFC_FDISC)) {
-			ndlp = lpfc_findnode_did(vport, Fabric_DID);
-			if (!ndlp)
-				lpfc_printf_vlog(vport, KERN_ERR,
-					LOG_DISCOVERY,
-					"2731 Cannot find fabric "
-					"controller node\n");
-			else
-				lpfc_register_new_vport(phba, vport, ndlp);
-			mempool_free(mboxq, phba->mbox_mem_pool);
-			return;
-	}
-
 	if (phba->link_flag & LS_NPIV_FAB_SUPPORTED)
 		lpfc_initial_fdisc(vport);
 	else {
@@ -1793,7 +1719,6 @@ lpfc_init_vpi_cmpl(struct lpfc_hba *phba, LPFC_MBOXQ_t *mboxq)
 		lpfc_printf_vlog(vport, KERN_ERR, LOG_ELS,
 				 "2606 No NPIV Fabric support\n");
 	}
-	mempool_free(mboxq, phba->mbox_mem_pool);
 	return;
 }
 
@@ -1889,16 +1814,12 @@ lpfc_mbx_cmpl_reg_vfi(struct lpfc_hba *phba, LPFC_MBOXQ_t *mboxq)
 	}
 	/* The VPI is implicitly registered when the VFI is registered */
 	vport->vpi_state |= LPFC_VPI_REGISTERED;
-	vport->fc_flag |= FC_VFI_REGISTERED;
-
-	vport->fc_flag &= ~FC_VPORT_NEEDS_REG_VPI;
 
 	if (vport->port_state == LPFC_FABRIC_CFG_LINK) {
-		if (vport->cfg_enable_auth)
-			lpfc_get_auth_config(vport, NULL);
-		else
-			lpfc_start_discovery(vport);
+		lpfc_start_fdiscs(phba);
+		lpfc_do_scr_ns_plogi(phba, vport);
 	}
+
 fail_free_mem:
 	mempool_free(mboxq, phba->mbox_mem_pool);
 	lpfc_mbuf_free(phba, dmabuf->virt, dmabuf->phys);
@@ -2412,7 +2333,6 @@ lpfc_mbx_cmpl_reg_vpi(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
 	}
 
 	vport->vpi_state |= LPFC_VPI_REGISTERED;
-	vport->fc_flag &= ~FC_VPORT_NEEDS_REG_VPI;
 	vport->num_disc_nodes = 0;
 	/* go thru NPR list and issue ELS PLOGIs */
 	if (vport->fc_npr_cnt)
@@ -2621,10 +2541,8 @@ lpfc_mbx_cmpl_fabric_reg_login(struct lpfc_hba *phba, LPFC_MBOXQ_t *pmb)
 	lpfc_nlp_set_state(vport, ndlp, NLP_STE_UNMAPPED_NODE);
 
 	if (vport->port_state == LPFC_FABRIC_CFG_LINK) {
-		if (vport->cfg_enable_auth)
-			lpfc_get_auth_config(vport, NULL);
-		else
-			lpfc_start_discovery(vport);
+		lpfc_start_fdiscs(phba);
+		lpfc_do_scr_ns_plogi(phba, vport);
 	}
 
 	lpfc_mbuf_free(phba, mp->virt, mp->phys);
@@ -3009,13 +2927,9 @@ lpfc_initialize_node(struct lpfc_vport *vport, struct lpfc_nodelist *ndlp,
 {
 	INIT_LIST_HEAD(&ndlp->els_retry_evt.evt_listp);
 	INIT_LIST_HEAD(&ndlp->dev_loss_evt.evt_listp);
-	INIT_LIST_HEAD(&ndlp->els_reauth_evt.evt_listp);
 	init_timer(&ndlp->nlp_delayfunc);
 	ndlp->nlp_delayfunc.function = lpfc_els_retry_delay;
 	ndlp->nlp_delayfunc.data = (unsigned long)ndlp;
-	init_timer(&ndlp->nlp_reauth_tmr);
-	ndlp->nlp_reauth_tmr.function = lpfc_reauth_node;
-	ndlp->nlp_reauth_tmr.data = (unsigned long)ndlp;
 	ndlp->nlp_DID = did;
 	ndlp->vport = vport;
 	ndlp->phba = vport->phba;
@@ -3423,12 +3337,9 @@ lpfc_cleanup_node(struct lpfc_vport *vport, struct lpfc_nodelist *ndlp)
 
 	ndlp->nlp_last_elscmd = 0;
 	del_timer_sync(&ndlp->nlp_delayfunc);
-	del_timer_sync(&ndlp->nlp_reauth_tmr);
 
 	list_del_init(&ndlp->els_retry_evt.evt_listp);
 	list_del_init(&ndlp->dev_loss_evt.evt_listp);
-	if (!list_empty(&ndlp->els_reauth_evt.evt_listp))
-		list_del_init(&ndlp->els_reauth_evt.evt_listp);
 
 	lpfc_unreg_rpi(vport, ndlp);
 
@@ -4232,14 +4143,7 @@ lpfc_filter_by_wwpn(struct lpfc_nodelist *ndlp, void *param)
 		      sizeof(ndlp->nlp_portname)) == 0;
 }
 
-static int
-lpfc_filter_by_wwnn(struct lpfc_nodelist *ndlp, void *param)
-{
-	return memcmp(&ndlp->nlp_nodename, param,
-		      sizeof(ndlp->nlp_nodename)) == 0;
-}
-
-struct lpfc_nodelist *
+static struct lpfc_nodelist *
 __lpfc_find_node(struct lpfc_vport *vport, node_filter filter, void *param)
 {
 	struct lpfc_nodelist *ndlp;
@@ -4249,22 +4153,6 @@ __lpfc_find_node(struct lpfc_vport *vport, node_filter filter, void *param)
 			return ndlp;
 	}
 	return NULL;
-}
-
-/*
- * Search node lists for a remote port matching filter criteria
- * Caller needs to hold host_lock before calling this routine.
- */
-struct lpfc_nodelist *
-lpfc_find_node(struct lpfc_vport *vport, node_filter filter, void *param)
-{
-	struct Scsi_Host     *shost = lpfc_shost_from_vport(vport);
-	struct lpfc_nodelist *ndlp;
-
-	spin_lock_irq(shost->host_lock);
-	ndlp = __lpfc_find_node(vport, filter, param);
-	spin_unlock_irq(shost->host_lock);
-	return ndlp;
 }
 
 /*
@@ -4293,21 +4181,6 @@ lpfc_findnode_wwpn(struct lpfc_vport *vport, struct lpfc_name *wwpn)
 	return ndlp;
 }
 
-/*
- * This routine looks up the ndlp lists for the given WWNN. If WWNN found it
- * returns the node element list pointer else return NULL.
- */
-struct lpfc_nodelist *
-lpfc_findnode_wwnn(struct lpfc_vport *vport, struct lpfc_name *wwnn)
-{
-	struct Scsi_Host *shost = lpfc_shost_from_vport(vport);
-	struct lpfc_nodelist *ndlp;
-
-	spin_lock_irq(shost->host_lock);
-	ndlp = __lpfc_find_node(vport, lpfc_filter_by_wwnn, wwnn);
-	spin_unlock_irq(shost->host_lock);
-	return ndlp;
-}
 void
 lpfc_nlp_init(struct lpfc_vport *vport, struct lpfc_nodelist *ndlp,
 	      uint32_t did)
@@ -4589,7 +4462,6 @@ lpfc_unregister_unused_fcf(struct lpfc_hba *phba)
 	int rc;
 	struct lpfc_vport **vports;
 	int i;
-	struct lpfc_nodelist *ndlp;
 
 	spin_lock_irq(&phba->hbalock);
 	/*
@@ -4617,10 +4489,6 @@ lpfc_unregister_unused_fcf(struct lpfc_hba *phba)
 	if (vports &&
 		(phba->sli3_options & LPFC_SLI3_NPIV_ENABLED))
 		for (i = 0; i <= phba->max_vports && vports[i] != NULL; i++) {
-			/* Stop FLOGI/FDISC retries */
-			ndlp = lpfc_findnode_did(vports[i], Fabric_DID);
-			if (ndlp)
-				lpfc_cancel_retry_delay_tmo(vports[i], ndlp);
 			lpfc_mbx_unreg_vpi(vports[i]);
 			spin_lock_irq(&phba->hbalock);
 			vports[i]->fc_flag |= FC_VPORT_NEEDS_INIT_VPI;
@@ -4628,9 +4496,6 @@ lpfc_unregister_unused_fcf(struct lpfc_hba *phba)
 			spin_unlock_irq(&phba->hbalock);
 		}
 	lpfc_destroy_vport_work_array(phba, vports);
-
-	/* Cleanup any outstanding ELS commands */
-	lpfc_els_flush_all_cmd(phba);
 
 	/* Unregister VFI */
 	mbox = mempool_alloc(phba->mbox_mem_pool, GFP_KERNEL);
@@ -4655,10 +4520,6 @@ lpfc_unregister_unused_fcf(struct lpfc_hba *phba)
 		mempool_free(mbox, phba->mbox_mem_pool);
 		return;
 	}
-
-	spin_lock_irq(&phba->hbalock);
-	phba->pport->fc_flag &= ~FC_VFI_REGISTERED;
-	spin_unlock_irq(&phba->hbalock);
 
 	/* Unregister FCF */
 	mbox = mempool_alloc(phba->mbox_mem_pool, GFP_KERNEL);

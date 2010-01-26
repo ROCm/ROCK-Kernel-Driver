@@ -311,26 +311,14 @@ static inline int pci_resource_alignment(struct pci_dev *dev,
 	return resource_alignment(res);
 }
 
-#ifdef CONFIG_PCI_GUESTDEV
-extern int pci_is_guestdev_to_reassign(struct pci_dev *dev);
-extern int pci_is_iomuldev(struct pci_dev *dev);
-#else
-#define pci_is_iomuldev(dev)	0
-#endif
+extern void pci_enable_acs(struct pci_dev *dev);
 
-#ifdef CONFIG_PCI_RESERVE
-unsigned long pci_reserve_size_io(struct pci_bus *bus);
-unsigned long pci_reserve_size_mem(struct pci_bus *bus);
-#else
-static inline unsigned long pci_reserve_size_io(struct pci_bus *bus)
-{
-	return 0;
-}
+struct pci_dev_reset_methods {
+	u16 vendor;
+	u16 device;
+	int (*reset)(struct pci_dev *dev, int probe);
+};
 
-static inline unsigned long pci_reserve_size_mem(struct pci_bus *bus)
-{
-	return 0;
-}
-#endif /* CONFIG_PCI_RESERVE */
+extern int pci_dev_specific_reset(struct pci_dev *dev, int probe);
 
 #endif /* DRIVERS_PCI_H */

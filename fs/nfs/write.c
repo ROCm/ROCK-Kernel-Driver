@@ -218,7 +218,7 @@ static int wb_priority(struct writeback_control *wbc)
 {
 	if (wbc->for_reclaim)
 		return FLUSH_HIGHPRI | FLUSH_STABLE;
-	if (wbc->for_kupdate)
+	if (wbc->for_kupdate || wbc->for_background)
 		return FLUSH_LOWPRI;
 	return 0;
 }
@@ -847,7 +847,7 @@ int nfs_updatepage(struct file *file, struct page *page,
 	 */
 	if (nfs_write_pageuptodate(page, inode) &&
 			inode->i_flock == NULL &&
-			!(file->f_flags & O_SYNC)) {
+			!(file->f_flags & O_DSYNC)) {
 		count = max(count + offset, nfs_page_length(page));
 		offset = 0;
 	}
@@ -1289,7 +1289,7 @@ int nfs_writeback_done(struct rpc_task *task, struct nfs_write_data *data)
 				 */
 				argp->stable = NFS_FILE_SYNC;
 			}
-			nfs4_restart_rpc(task, server->nfs_client);
+			nfs_restart_rpc(task, server->nfs_client);
 			return -EAGAIN;
 		}
 		if (time_before(complain, jiffies)) {
@@ -1301,7 +1301,6 @@ int nfs_writeback_done(struct rpc_task *task, struct nfs_write_data *data)
 		/* Can't do anything about it except throw an error. */
 		task->tk_status = -EIO;
 	}
-	nfs4_sequence_free_slot(server->nfs_client, &data->res.seq_res);
 	return 0;
 }
 

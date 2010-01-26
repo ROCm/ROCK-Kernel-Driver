@@ -178,7 +178,7 @@ static const struct aper_size_info_32 amd_8151_sizes[7] =
 
 static int amd_8151_configure(void)
 {
-	unsigned long gatt_bus = virt_to_gart(agp_bridge->gatt_table_real);
+	unsigned long gatt_bus = virt_to_phys(agp_bridge->gatt_table_real);
 	int i;
 
 	/* Configure AGP regs in each x86-64 host bridge. */
@@ -558,7 +558,7 @@ static void __devexit agp_amd64_remove(struct pci_dev *pdev)
 {
 	struct agp_bridge_data *bridge = pci_get_drvdata(pdev);
 
-	release_mem_region(virt_to_gart(bridge->gatt_table_real),
+	release_mem_region(virt_to_phys(bridge->gatt_table_real),
 			   amd64_aperture_sizes[bridge->aperture_size_idx].size);
 	agp_remove_bridge(bridge);
 	agp_put_bridge(bridge);
@@ -728,6 +728,10 @@ int __init agp_amd64_init(void)
 
 	if (agp_off)
 		return -EINVAL;
+
+	if (gart_iommu_aperture)
+		return agp_bridges_found ? 0 : -ENODEV;
+
 	err = pci_register_driver(&agp_amd64_pci_driver);
 	if (err < 0)
 		return err;
@@ -766,17 +770,15 @@ int __init agp_amd64_init(void)
 
 static void __exit agp_amd64_cleanup(void)
 {
+	if (gart_iommu_aperture)
+		return;
 	if (aperture_resource)
 		release_resource(aperture_resource);
 	pci_unregister_driver(&agp_amd64_pci_driver);
 }
 
-/* On AMD64 the PCI driver needs to initialize this driver early
-   for the IOMMU, so it has to be called via a backdoor. */
-#ifndef CONFIG_GART_IOMMU
 module_init(agp_amd64_init);
 module_exit(agp_amd64_cleanup);
-#endif
 
 MODULE_AUTHOR("Dave Jones <davej@redhat.com>, Andi Kleen");
 module_param(agp_try_unsupported, bool, 0);

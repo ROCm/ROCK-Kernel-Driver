@@ -35,7 +35,6 @@
 #include <linux/interrupt.h>
 #include <linux/proc_fs.h>
 #include <linux/uaccess.h>
-#include <linux/version.h>
 #ifdef CONFIG_X86_64
 #include <asm/uv/uv_irq.h>
 #endif
@@ -183,7 +182,6 @@ static long gru_get_config_info(unsigned long arg)
 		return -EFAULT;
 	return 0;
 }
-
 
 /*
  * gru_file_unlocked_ioctl

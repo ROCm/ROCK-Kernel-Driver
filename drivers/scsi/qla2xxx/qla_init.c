@@ -62,7 +62,7 @@ qla2x00_ctx_sp_timeout(unsigned long __data)
 	ctx->free(sp);
 }
 
-void
+static void
 qla2x00_ctx_sp_free(srb_t *sp)
 {
 	struct srb_ctx *ctx = sp->ctx;
@@ -205,7 +205,7 @@ qla2x00_async_login_done(struct scsi_qla_host *vha, fc_port_t *fcport,
 
 	switch (data[0]) {
 	case MBS_COMMAND_COMPLETE:
-		if (fcport->flags & FCF_FCP2_DEVICE)
+		if (fcport->flags & FCF_TAPE_PRESENT)
 			opts |= BIT_1;
 		rval = qla2x00_get_port_database(vha, fcport, opts);
 		if (rval != QLA_SUCCESS)
@@ -2216,7 +2216,7 @@ qla2x00_rport_del(void *data)
  *
  * Returns a pointer to the allocated fcport, or NULL, if none available.
  */
-fc_port_t *
+static fc_port_t *
 qla2x00_alloc_fcport(scsi_qla_host_t *vha, gfp_t flags)
 {
 	fc_port_t *fcport;
@@ -2726,7 +2726,7 @@ qla2x00_configure_fabric(scsi_qla_host_t *vha)
 
 		/*
 		 * Logout all previous fabric devices marked lost, except
-		 * FCP2 devices.
+		 * tape devices.
 		 */
 		list_for_each_entry(fcport, &vha->vp_fcports, list) {
 			if (test_bit(LOOP_RESYNC_NEEDED, &vha->dpc_flags))
@@ -2739,7 +2739,7 @@ qla2x00_configure_fabric(scsi_qla_host_t *vha)
 				qla2x00_mark_device_lost(vha, fcport,
 				    ql2xplogiabsentdevice, 0);
 				if (fcport->loop_id != FC_NO_LOOP_ID &&
-				    (fcport->flags & FCF_FCP2_DEVICE) == 0 &&
+				    (fcport->flags & FCF_TAPE_PRESENT) == 0 &&
 				    fcport->port_type != FCT_INITIATOR &&
 				    fcport->port_type != FCT_BROADCAST) {
 					ha->isp_ops->fabric_logout(vha,
@@ -2859,7 +2859,6 @@ qla2x00_find_all_fabric_devs(scsi_qla_host_t *vha,
 	struct scsi_qla_host *tvp;
 
 	rval = QLA_SUCCESS;
-	wrap.b24 = 0;
 
 	/* Try GID_PT to get device list, else GAN. */
 	swl = kcalloc(MAX_FIBRE_DEVICES, sizeof(sw_info_t), GFP_KERNEL);
@@ -3019,7 +3018,7 @@ qla2x00_find_all_fabric_devs(scsi_qla_host_t *vha,
 			fcport->d_id.b24 = new_fcport->d_id.b24;
 			fcport->flags |= FCF_LOGIN_NEEDED;
 			if (fcport->loop_id != FC_NO_LOOP_ID &&
-			    (fcport->flags & FCF_FCP2_DEVICE) == 0 &&
+			    (fcport->flags & FCF_TAPE_PRESENT) == 0 &&
 			    fcport->port_type != FCT_INITIATOR &&
 			    fcport->port_type != FCT_BROADCAST) {
 				ha->isp_ops->fabric_logout(vha, fcport->loop_id,
@@ -3273,9 +3272,9 @@ qla2x00_fabric_dev_login(scsi_qla_host_t *vha, fc_port_t *fcport,
 
 	rval = qla2x00_fabric_login(vha, fcport, next_loopid);
 	if (rval == QLA_SUCCESS) {
-		/* Send an ADISC to FCP2 devices.*/
+		/* Send an ADISC to tape devices.*/
 		opts = 0;
-		if (fcport->flags & FCF_FCP2_DEVICE)
+		if (fcport->flags & FCF_TAPE_PRESENT)
 			opts |= BIT_1;
 		rval = qla2x00_get_port_database(vha, fcport, opts);
 		if (rval != QLA_SUCCESS) {

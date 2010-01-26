@@ -94,8 +94,6 @@ static int wait_instruction_complete(void *h, enum mcs_op opc)
 	return status;
 }
 
-
-
 int cch_allocate(struct gru_context_configuration_handle *cch)
 {
 	int ret;
@@ -138,6 +136,7 @@ int cch_deallocate(struct gru_context_configuration_handle *cch)
 	 * Stop speculation into the GSEG being unmapped by the previous
 	 * DEALLOCATE.
 	 */
+	sync_core();
 	return ret;
 }
 
@@ -214,3 +213,4 @@ void tfh_exception(struct gru_tlb_fault_handle *tfh)
 	tfh->opc = TFHOP_EXCEPTION;
 	start_instruction(tfh);
 }
+

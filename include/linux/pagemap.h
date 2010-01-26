@@ -181,7 +181,7 @@ static inline int page_cache_add_speculative(struct page *page, int count)
 	if (unlikely(!atomic_add_unless(&page->_count, count, 0)))
 		return 0;
 #endif
-	VM_BUG_ON(PageTail(page));
+	VM_BUG_ON(PageCompound(page) && page != compound_head(page));
 
 	return 1;
 }
@@ -351,7 +351,6 @@ static inline void lock_page_nosync(struct page *page)
  * Never use this directly!
  */
 extern void wait_on_page_bit(struct page *page, int bit_nr);
-extern void __wait_on_page_locked(struct page *page);
 
 /* 
  * Wait for a page to be unlocked.
@@ -362,9 +361,8 @@ extern void __wait_on_page_locked(struct page *page);
  */
 static inline void wait_on_page_locked(struct page *page)
 {
-	might_sleep();
 	if (PageLocked(page))
-		__wait_on_page_locked(page);
+		wait_on_page_bit(page, PG_locked);
 }
 
 /* 
@@ -372,7 +370,6 @@ static inline void wait_on_page_locked(struct page *page)
  */
 static inline void wait_on_page_writeback(struct page *page)
 {
-	might_sleep();
 	if (PageWriteback(page))
 		wait_on_page_bit(page, PG_writeback);
 }

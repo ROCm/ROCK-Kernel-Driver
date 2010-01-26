@@ -1472,8 +1472,9 @@ static struct rt6_info *ip6_route_redirect(struct in6_addr *dest,
 				},
 			},
 		},
-		.gateway = *gateway,
 	};
+
+	ipv6_addr_copy(&rdfl.gateway, gateway);
 
 	if (rt6_need_strict(dest))
 		flags |= RT6_LOOKUP_F_IFACE;
@@ -2566,35 +2567,6 @@ proc_dointvec_route(struct ctl_table *table, int write,
 	return ret;
 }
 
-static int sysctl_intvec_route(struct ctl_table *table,
-		void __user *oldval, size_t __user *oldlenp,
-		void __user *newval, size_t newlen)
-{
-	struct net *net = container_of(table->data, struct net,
-				       ipv6.sysctl.ip6_rt_max_size);
-	int write = (newval && newlen);
-	ctl_table tmp = *table;
-	int new_size, ret;
-
-	mutex_lock(&net->ipv6.sysctl.ip6_rt_lock);
-	if (write) {
-		tmp.data = &new_size;
-		table = &tmp;
-	}
-
-	ret = sysctl_intvec(table, oldval, oldlenp, newval, newlen);
-
-	if (!ret && write) {
-		ret = mem_reserve_kmem_cache_set(&net->ipv6.ip6_rt_reserve,
-				net->ipv6.ip6_dst_ops.kmem_cachep, new_size);
-		if (!ret)
-			net->ipv6.sysctl.ip6_rt_max_size = new_size;
-	}
-	mutex_unlock(&net->ipv6.sysctl.ip6_rt_lock);
-
-	return ret;
-}
-
 ctl_table ipv6_route_table_template[] = {
 	{
 		.procname	=	"flush",
@@ -2604,7 +2576,6 @@ ctl_table ipv6_route_table_template[] = {
 		.proc_handler	=	ipv6_sysctl_rtcache_flush
 	},
 	{
-		.ctl_name	=	NET_IPV6_ROUTE_GC_THRESH,
 		.procname	=	"gc_thresh",
 		.data		=	&ip6_dst_ops_template.gc_thresh,
 		.maxlen		=	sizeof(int),
@@ -2612,78 +2583,62 @@ ctl_table ipv6_route_table_template[] = {
 		.proc_handler	=	proc_dointvec,
 	},
 	{
-		.ctl_name	=	NET_IPV6_ROUTE_MAX_SIZE,
 		.procname	=	"max_size",
 		.data		=	&init_net.ipv6.sysctl.ip6_rt_max_size,
 		.maxlen		=	sizeof(int),
 		.mode		=	0644,
 		.proc_handler	=	proc_dointvec_route,
-		.strategy	= 	&sysctl_intvec_route,
 	},
 	{
-		.ctl_name	=	NET_IPV6_ROUTE_GC_MIN_INTERVAL,
 		.procname	=	"gc_min_interval",
 		.data		=	&init_net.ipv6.sysctl.ip6_rt_gc_min_interval,
 		.maxlen		=	sizeof(int),
 		.mode		=	0644,
 		.proc_handler	=	proc_dointvec_jiffies,
-		.strategy	=	sysctl_jiffies,
 	},
 	{
-		.ctl_name	=	NET_IPV6_ROUTE_GC_TIMEOUT,
 		.procname	=	"gc_timeout",
 		.data		=	&init_net.ipv6.sysctl.ip6_rt_gc_timeout,
 		.maxlen		=	sizeof(int),
 		.mode		=	0644,
 		.proc_handler	=	proc_dointvec_jiffies,
-		.strategy	=	sysctl_jiffies,
 	},
 	{
-		.ctl_name	=	NET_IPV6_ROUTE_GC_INTERVAL,
 		.procname	=	"gc_interval",
 		.data		=	&init_net.ipv6.sysctl.ip6_rt_gc_interval,
 		.maxlen		=	sizeof(int),
 		.mode		=	0644,
 		.proc_handler	=	proc_dointvec_jiffies,
-		.strategy	=	sysctl_jiffies,
 	},
 	{
-		.ctl_name	=	NET_IPV6_ROUTE_GC_ELASTICITY,
 		.procname	=	"gc_elasticity",
 		.data		=	&init_net.ipv6.sysctl.ip6_rt_gc_elasticity,
 		.maxlen		=	sizeof(int),
 		.mode		=	0644,
 		.proc_handler	=	proc_dointvec_jiffies,
-		.strategy	=	sysctl_jiffies,
 	},
 	{
-		.ctl_name	=	NET_IPV6_ROUTE_MTU_EXPIRES,
 		.procname	=	"mtu_expires",
 		.data		=	&init_net.ipv6.sysctl.ip6_rt_mtu_expires,
 		.maxlen		=	sizeof(int),
 		.mode		=	0644,
 		.proc_handler	=	proc_dointvec_jiffies,
-		.strategy	=	sysctl_jiffies,
 	},
 	{
-		.ctl_name	=	NET_IPV6_ROUTE_MIN_ADVMSS,
 		.procname	=	"min_adv_mss",
 		.data		=	&init_net.ipv6.sysctl.ip6_rt_min_advmss,
 		.maxlen		=	sizeof(int),
 		.mode		=	0644,
 		.proc_handler	=	proc_dointvec_jiffies,
-		.strategy	=	sysctl_jiffies,
 	},
 	{
-		.ctl_name	=	NET_IPV6_ROUTE_GC_MIN_INTERVAL_MS,
 		.procname	=	"gc_min_interval_ms",
 		.data		=	&init_net.ipv6.sysctl.ip6_rt_gc_min_interval,
 		.maxlen		=	sizeof(int),
 		.mode		=	0644,
 		.proc_handler	=	proc_dointvec_ms_jiffies,
-		.strategy	=	sysctl_ms_jiffies,
 	},
-	{ .ctl_name = 0 }
+	{ }
 };
 
 struct ctl_table *ipv6_route_sysctl_init(struct net *net)
@@ -2704,6 +2659,7 @@ struct ctl_table *ipv6_route_sysctl_init(struct net *net)
 		table[6].data = &net->ipv6.sysctl.ip6_rt_gc_elasticity;
 		table[7].data = &net->ipv6.sysctl.ip6_rt_mtu_expires;
 		table[8].data = &net->ipv6.sysctl.ip6_rt_min_advmss;
+		table[9].data = &net->ipv6.sysctl.ip6_rt_gc_min_interval;
 	}
 
 	mutex_init(&net->ipv6.sysctl.ip6_rt_lock);

@@ -5,6 +5,7 @@
 # Don't trace early stages of a secondary CPU boot
 ifdef CONFIG_FUNCTION_TRACER
 CFLAGS_REMOVE_common.o = -pg
+CFLAGS_REMOVE_perf_event.o = -pg
 endif
 
 # Make sure load_percpu_segment has no stackprotector
@@ -34,8 +35,6 @@ obj-$(CONFIG_MTRR)			+= mtrr/
 obj-$(CONFIG_CPU_FREQ)			+= cpufreq/
 
 obj-$(CONFIG_X86_LOCAL_APIC)		+= perfctr-watchdog.o
-
-disabled-obj-$(CONFIG_XEN) := hypervisor.o vmware.o sched.o perfctr-watchdog.o
 
 quiet_cmd_mkcapflags = MKCAP   $@
       cmd_mkcapflags = $(PERL) $(srctree)/$(src)/mkcapflags.pl $< $@

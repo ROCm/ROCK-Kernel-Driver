@@ -23,6 +23,7 @@ struct task_struct *__switch_to(struct task_struct *prev,
 struct tss_struct;
 void __switch_to_xtra(struct task_struct *prev_p, struct task_struct *next_p,
 		      struct tss_struct *tss);
+extern void show_regs_common(void);
 
 #ifdef CONFIG_X86_32
 
@@ -122,14 +123,22 @@ do {									\
 #define __switch_canary_iparam
 #endif	/* CC_STACKPROTECTOR */
 
+/* The stack unwind code needs this but it pollutes traces otherwise */
+#ifdef CONFIG_UNWIND_INFO
+#define THREAD_RETURN_SYM \
+	".globl thread_return\n" \
+	"thread_return:\n\t"
+#else
+#define THREAD_RETURN_SYM
+#endif
+
 /* Save restore flags to clear handle leaking NT */
 #define switch_to(prev, next, last) \
 	asm volatile(SAVE_CONTEXT					  \
 	     "movq %%rsp,%P[threadrsp](%[prev])\n\t" /* save RSP */	  \
 	     "movq %P[threadrsp](%[next]),%%rsp\n\t" /* restore RSP */	  \
 	     "call __switch_to\n\t"					  \
-	     ".globl thread_return\n"					  \
-	     "thread_return:\n\t"					  \
+	     THREAD_RETURN_SYM						  \
 	     "movq "__percpu_arg([current_task])",%%rsi\n\t"		  \
 	     __switch_canary						  \
 	     "movq %P[thread_info](%%rsi),%%r8\n\t"			  \
@@ -157,19 +166,22 @@ extern void native_load_gs_index(unsigned);
  * Load a segment. Fall back on loading the zero
  * segment if something goes wrong..
  */
-#define loadsegment(seg, value)			\
-	asm volatile("\n"			\
-		     "1:\t"			\
-		     "movl %k0,%%" #seg "\n"	\
-		     "2:\n"			\
-		     ".section .fixup,\"ax\"\n"	\
-		     "3:\t"			\
-		     "movl %k1, %%" #seg "\n\t"	\
-		     "jmp 2b\n"			\
-		     ".previous\n"		\
-		     _ASM_EXTABLE(1b,3b)	\
-		     : :"r" (value), "r" (0) : "memory")
-
+#define loadsegment(seg, value)						\
+do {									\
+	unsigned short __val = (value);					\
+									\
+	asm volatile("						\n"	\
+		     "1:	movl %k0,%%" #seg "		\n"	\
+									\
+		     ".section .fixup,\"ax\"			\n"	\
+		     "2:	xorl %k0,%k0			\n"	\
+		     "		jmp 1b				\n"	\
+		     ".previous					\n"	\
+									\
+		     _ASM_EXTABLE(1b, 2b)				\
+									\
+		     : "+r" (__val) : : "memory");			\
+} while (0)
 
 /*
  * Save a segment register away

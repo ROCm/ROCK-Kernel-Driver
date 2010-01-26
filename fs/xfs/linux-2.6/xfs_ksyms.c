@@ -49,7 +49,6 @@
 #include "xfs_dir2_leaf.h"
 #include "xfs_dir2_block.h"
 #include "xfs_dir2_node.h"
-#include "xfs_dir2_trace.h"
 #include "xfs_acl.h"
 #include "xfs_attr.h"
 #include "xfs_attr_leaf.h"
@@ -63,7 +62,6 @@
 #include "xfs_iomap.h"
 #include "xfs_filestream.h"
 #include "xfs_vnodeops.h"
-#include "support/ktrace.h"
 
 EXPORT_SYMBOL(xfs_iunlock);
 EXPORT_SYMBOL(xfs_attr_remove);

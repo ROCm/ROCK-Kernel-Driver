@@ -216,11 +216,3 @@ sys_pciconfig_write (unsigned long bus, unsigned long dfn, unsigned long off, un
 }
 
 #endif /* CONFIG_PCI */
-
-#ifndef CONFIG_IA64_PERFMON_COMPAT
-asmlinkage long
-sys_perfmonctl (int fd, int cmd, void __user *arg, int count)
-{
-	return -ENOSYS;
-}
-#endif

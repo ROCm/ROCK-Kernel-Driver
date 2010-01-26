@@ -129,7 +129,7 @@ bfa_cb_ioim_get_sgaddr(struct bfad_ioim_s *dio, int sgeid)
 	sge = (struct scatterlist *)scsi_sglist(cmnd) + sgeid;
 	addr = (u64) sg_dma_address(sge);
 
-	return *(union bfi_addr_u *) &addr;
+	return *((union bfi_addr_u *) &addr);
 }
 
 static inline u32

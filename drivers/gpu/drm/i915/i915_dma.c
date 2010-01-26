@@ -134,6 +134,10 @@ static int i915_init_phys_hws(struct drm_device *dev)
 
 	memset(dev_priv->hw_status_page, 0, PAGE_SIZE);
 
+	if (IS_I965G(dev))
+		dev_priv->dma_status_page |= (dev_priv->dma_status_page >> 28) &
+					     0xf0;
+
 	I915_WRITE(HWS_PGA, dev_priv->dma_status_page);
 	DRM_DEBUG_DRIVER("Enabled hardware status page\n");
 	return 0;
@@ -810,9 +814,16 @@ static int i915_getparam(struct drm_device *dev, void *data,
 	case I915_PARAM_HAS_OVERLAY:
 		value = dev_priv->overlay ? 1 : 0;
 		break;
+	case I915_PARAM_HAS_PAGEFLIPPING:
+		value = 1;
+		break;
+	case I915_PARAM_HAS_EXECBUF2:
+		/* depends on GEM */
+		value = dev_priv->has_gem;
+		break;
 	default:
 		DRM_DEBUG_DRIVER("Unknown parameter %d\n",
-					param->param);
+				 param->param);
 		return -EINVAL;
 	}
 
@@ -965,7 +976,7 @@ static int i915_probe_agp(struct drm_device *dev, uint32_t *aperture_size,
 	 * Some of the preallocated space is taken by the GTT
 	 * and popup.  GTT is 1K per MB of aperture size, and popup is 4K.
 	 */
-	if (IS_G4X(dev) || IS_IGD(dev) || IS_IGDNG(dev))
+	if (IS_G4X(dev) || IS_PINEVIEW(dev) || IS_IRONLAKE(dev))
 		overhead = 4096;
 	else
 		overhead = (*aperture_size / 1024) + 4096;
@@ -1051,7 +1062,7 @@ static unsigned long i915_gtt_to_phys(struct drm_device *dev,
 	int gtt_offset, gtt_size;
 
 	if (IS_I965G(dev)) {
-		if (IS_G4X(dev) || IS_IGDNG(dev)) {
+		if (IS_G4X(dev) || IS_IRONLAKE(dev)) {
 			gtt_offset = 2*1024*1024;
 			gtt_size = 2*1024*1024;
 		} else {
@@ -1073,7 +1084,7 @@ static unsigned long i915_gtt_to_phys(struct drm_device *dev,
 
 	entry = *(volatile u32 *)(gtt + (gtt_addr / 1024));
 
-	DRM_DEBUG("GTT addr: 0x%08lx, PTE: 0x%08lx\n", gtt_addr, entry);
+	DRM_DEBUG_DRIVER("GTT addr: 0x%08lx, PTE: 0x%08lx\n", gtt_addr, entry);
 
 	/* Mask out these reserved bits on this hardware. */
 	if (!IS_I9XX(dev) || IS_I915G(dev) || IS_I915GM(dev) ||
@@ -1099,7 +1110,7 @@ static unsigned long i915_gtt_to_phys(struct drm_device *dev,
 	phys =(entry & PTE_ADDRESS_MASK) |
 		((uint64_t)(entry & PTE_ADDRESS_MASK_HIGH) << (32 - 4));
 
-	DRM_DEBUG("GTT addr: 0x%08lx, phys addr: 0x%08lx\n", gtt_addr, phys);
+	DRM_DEBUG_DRIVER("GTT addr: 0x%08lx, phys addr: 0x%08lx\n", gtt_addr, phys);
 
 	return phys;
 }
@@ -1198,14 +1209,6 @@ static int i915_load_modeset_init(struct drm_device *dev,
 	dev->mode_config.fb_base = drm_get_resource_start(dev, fb_bar) &
 		0xff000000;
 
-	if (IS_MOBILE(dev) || IS_I9XX(dev))
-		dev_priv->cursor_needs_physical = true;
-	else
-		dev_priv->cursor_needs_physical = false;
-
-	if (IS_I965G(dev) || IS_G33(dev))
-		dev_priv->cursor_needs_physical = false;
-
 	/* Basic memrange allocator for stolen space (aka vram) */
 	drm_mm_init(&dev_priv->vram, 0, prealloc_size);
 	DRM_INFO("set up %ldM of stolen space\n", prealloc_size / (1024*1024));
@@ -1255,6 +1258,8 @@ static int i915_load_modeset_init(struct drm_device *dev,
 	if (ret)
 		goto destroy_ringbuffer;
 
+	intel_modeset_init(dev);
+
 	ret = drm_irq_install(dev);
 	if (ret)
 		goto destroy_ringbuffer;
@@ -1268,8 +1273,6 @@ static int i915_load_modeset_init(struct drm_device *dev,
 	 */
 
 	I915_WRITE(INSTPM, (1 << 5) | (1 << 21));
-
-	intel_modeset_init(dev);
 
 	drm_helper_initial_config(dev);
 
@@ -1310,7 +1313,7 @@ static void i915_get_mem_freq(struct drm_device *dev)
 	drm_i915_private_t *dev_priv = dev->dev_private;
 	u32 tmp;
 
-	if (!IS_IGD(dev))
+	if (!IS_PINEVIEW(dev))
 		return;
 
 	tmp = I915_READ(CLKCFG);
@@ -1358,7 +1361,7 @@ int i915_driver_load(struct drm_device *dev, unsigned long flags)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 	resource_size_t base, size;
-	int ret = 0, mmio_bar = IS_I9XX(dev) ? 0 : 1;
+	int ret = 0, mmio_bar;
 	uint32_t agp_size, prealloc_size, prealloc_start;
 
 	/* i915 has 4 more counters */
@@ -1374,8 +1377,10 @@ int i915_driver_load(struct drm_device *dev, unsigned long flags)
 
 	dev->dev_private = (void *)dev_priv;
 	dev_priv->dev = dev;
+	dev_priv->info = (struct intel_device_info *) flags;
 
 	/* Add register map (needed for suspend/resume) */
+	mmio_bar = IS_I9XX(dev) ? 0 : 1;
 	base = drm_get_resource_start(dev, mmio_bar);
 	size = drm_get_resource_len(dev, mmio_bar);
 
@@ -1417,7 +1422,7 @@ int i915_driver_load(struct drm_device *dev, unsigned long flags)
 	if (ret)
 		goto out_iomapfree;
 
-	dev_priv->wq = create_workqueue("i915");
+	dev_priv->wq = create_singlethread_workqueue("i915");
 	if (dev_priv->wq == NULL) {
 		DRM_ERROR("Failed to create our workqueue.\n");
 		ret = -ENOMEM;
@@ -1438,7 +1443,7 @@ int i915_driver_load(struct drm_device *dev, unsigned long flags)
 
 	dev->driver->get_vblank_counter = i915_get_vblank_counter;
 	dev->max_vblank_count = 0xffffff; /* only 24 bits of frame count */
-	if (IS_G4X(dev) || IS_IGDNG(dev)) {
+	if (IS_G4X(dev) || IS_IRONLAKE(dev)) {
 		dev->max_vblank_count = 0xffffffff; /* full 32 bit counter */
 		dev->driver->get_vblank_counter = gm45_get_vblank_counter;
 	}
@@ -1527,6 +1532,15 @@ int i915_driver_unload(struct drm_device *dev)
 	}
 
 	if (drm_core_check_feature(dev, DRIVER_MODESET)) {
+		/*
+		 * free the memory space allocated for the child device
+		 * config parsed from VBT
+		 */
+		if (dev_priv->child_dev && dev_priv->child_dev_num) {
+			kfree(dev_priv->child_dev);
+			dev_priv->child_dev = NULL;
+			dev_priv->child_dev_num = 0;
+		}
 		drm_irq_uninstall(dev);
 		vga_client_register(dev->pdev, NULL, NULL, NULL);
 	}
@@ -1641,6 +1655,7 @@ struct drm_ioctl_desc i915_ioctls[] = {
 	DRM_IOCTL_DEF(DRM_I915_HWS_ADDR, i915_set_status_page, DRM_AUTH|DRM_MASTER|DRM_ROOT_ONLY),
 	DRM_IOCTL_DEF(DRM_I915_GEM_INIT, i915_gem_init_ioctl, DRM_AUTH|DRM_MASTER|DRM_ROOT_ONLY),
 	DRM_IOCTL_DEF(DRM_I915_GEM_EXECBUFFER, i915_gem_execbuffer, DRM_AUTH),
+	DRM_IOCTL_DEF(DRM_I915_GEM_EXECBUFFER2, i915_gem_execbuffer2, DRM_AUTH),
 	DRM_IOCTL_DEF(DRM_I915_GEM_PIN, i915_gem_pin_ioctl, DRM_AUTH|DRM_ROOT_ONLY),
 	DRM_IOCTL_DEF(DRM_I915_GEM_UNPIN, i915_gem_unpin_ioctl, DRM_AUTH|DRM_ROOT_ONLY),
 	DRM_IOCTL_DEF(DRM_I915_GEM_BUSY, i915_gem_busy_ioctl, DRM_AUTH),

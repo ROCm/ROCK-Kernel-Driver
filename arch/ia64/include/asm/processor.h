@@ -42,6 +42,7 @@
 
 #define IA64_THREAD_FPH_VALID	(__IA64_UL(1) << 0)	/* floating-point high state valid? */
 #define IA64_THREAD_DBG_VALID	(__IA64_UL(1) << 1)	/* debug registers valid? */
+#define IA64_THREAD_PM_VALID	(__IA64_UL(1) << 2)	/* performance registers valid? */
 #define IA64_THREAD_UAC_NOPRINT	(__IA64_UL(1) << 3)	/* don't log unaligned accesses */
 #define IA64_THREAD_UAC_SIGBUS	(__IA64_UL(1) << 4)	/* generate SIGBUS on unaligned acc. */
 #define IA64_THREAD_MIGRATION	(__IA64_UL(1) << 5)	/* require migration
@@ -228,7 +229,7 @@ struct cpuinfo_ia64 {
 #endif
 };
 
-DECLARE_PER_CPU(struct cpuinfo_ia64, cpu_info);
+DECLARE_PER_CPU(struct cpuinfo_ia64, ia64_cpu_info);
 
 /*
  * The "local" data variable.  It refers to the per-CPU data of the currently executing
@@ -236,8 +237,8 @@ DECLARE_PER_CPU(struct cpuinfo_ia64, cpu_info);
  * Do not use the address of local_cpu_data, since it will be different from
  * cpu_data(smp_processor_id())!
  */
-#define local_cpu_data		(&__ia64_per_cpu_var(cpu_info))
-#define cpu_data(cpu)		(&per_cpu(cpu_info, cpu))
+#define local_cpu_data		(&__ia64_per_cpu_var(ia64_cpu_info))
+#define cpu_data(cpu)		(&per_cpu(ia64_cpu_info, cpu))
 
 extern void print_cpu_info (struct cpuinfo_ia64 *);
 
@@ -320,6 +321,14 @@ struct thread_struct {
 #else
 # define INIT_THREAD_IA32
 #endif /* CONFIG_IA32_SUPPORT */
+#ifdef CONFIG_PERFMON
+	void *pfm_context;		     /* pointer to detailed PMU context */
+	unsigned long pfm_needs_checking;    /* when >0, pending perfmon work on kernel exit */
+# define INIT_THREAD_PM		.pfm_context =		NULL,     \
+				.pfm_needs_checking =	0UL,
+#else
+# define INIT_THREAD_PM
+#endif
 	unsigned long dbr[IA64_NUM_DBG_REGS];
 	unsigned long ibr[IA64_NUM_DBG_REGS];
 	struct ia64_fpreg fph[96];	/* saved/loaded on demand */
@@ -334,6 +343,7 @@ struct thread_struct {
 	.task_size =	DEFAULT_TASK_SIZE,			\
 	.last_fph_cpu =  -1,					\
 	INIT_THREAD_IA32					\
+	INIT_THREAD_PM						\
 	.dbr =		{0, },					\
 	.ibr =		{0, },					\
 	.fph =		{{{{0}}}, }				\

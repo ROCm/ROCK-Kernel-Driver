@@ -299,9 +299,7 @@ static ssize_t zcrypt_write(struct file *filp, const char __user *buf,
  */
 static int zcrypt_open(struct inode *inode, struct file *filp)
 {
-	lock_kernel();
 	atomic_inc(&zcrypt_open_count);
-	unlock_kernel();
 	return 0;
 }
 
@@ -395,10 +393,12 @@ static long zcrypt_rsa_crt(struct ica_rsa_modexpo_crt *crt)
 			 * u_mult_inv > 128 bytes.
 			 */
 			if (copied == 0) {
-				int len;
+				unsigned int len;
 				spin_unlock_bh(&zcrypt_device_lock);
 				/* len is max 256 / 2 - 120 = 8 */
 				len = crt->inputdatalength / 2 - 120;
+				if (len > sizeof(z1))
+					return -EFAULT;
 				z1 = z2 = z3 = 0;
 				if (copy_from_user(&z1, crt->np_prime, len) ||
 				    copy_from_user(&z2, crt->bp_key, len) ||

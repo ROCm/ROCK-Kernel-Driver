@@ -656,8 +656,6 @@ __mod_timer(struct timer_list *timer, unsigned long expires,
 
 	debug_activate(timer, expires);
 
-	new_base = __get_cpu_var(tvec_bases);
-
 	cpu = smp_processor_id();
 
 #if defined(CONFIG_NO_HZ) && defined(CONFIG_SMP)
@@ -1044,7 +1042,7 @@ static inline void __run_timers(struct tvec_base *base)
 	spin_unlock_irq(&base->lock);
 }
 
-#if defined(CONFIG_NO_HZ) || defined(CONFIG_NO_IDLE_HZ)
+#ifdef CONFIG_NO_HZ
 /*
  * Find out when the next timer event is due to happen. This
  * is used on S/390 to stop all activity when a CPU is idle.
@@ -1200,6 +1198,7 @@ void update_process_times(int user_tick)
 	run_local_timers();
 	rcu_check_callbacks(cpu, user_tick);
 	printk_tick();
+	perf_event_do_pending();
 	scheduler_tick();
 	run_posix_cpu_timers(p);
 }
@@ -1210,8 +1209,6 @@ void update_process_times(int user_tick)
 static void run_timer_softirq(struct softirq_action *h)
 {
 	struct tvec_base *base = __get_cpu_var(tvec_bases);
-
-	perf_event_do_pending();
 
 	hrtimer_run_pending();
 

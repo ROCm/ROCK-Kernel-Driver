@@ -163,8 +163,8 @@ rio_probe1 (struct pci_dev *pdev, const struct pci_device_id *ent)
 			    strcmp (media[card_idx], "4") == 0) {
 				np->speed = 100;
 				np->full_duplex = 1;
-			} else if (strcmp (media[card_idx], "100mbps_hd") == 0
-				   || strcmp (media[card_idx], "3") == 0) {
+			} else if (strcmp (media[card_idx], "100mbps_hd") == 0 ||
+				   strcmp (media[card_idx], "3") == 0) {
 				np->speed = 100;
 				np->full_duplex = 0;
 			} else if (strcmp (media[card_idx], "10mbps_fd") == 0 ||
@@ -411,7 +411,7 @@ rio_open (struct net_device *dev)
 	int i;
 	u16 macctrl;
 
-	i = request_irq (dev->irq, &rio_interrupt, IRQF_SHARED, dev->name, dev);
+	i = request_irq (dev->irq, rio_interrupt, IRQF_SHARED, dev->name, dev);
 	if (i)
 		return i;
 

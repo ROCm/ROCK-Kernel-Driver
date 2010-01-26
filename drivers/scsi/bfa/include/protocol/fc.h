@@ -50,11 +50,6 @@ struct fchs_s {
 
 	u32        ro;		/* relative offset */
 };
-
-#define FC_SOF_LEN		4
-#define FC_EOF_LEN		4
-#define FC_CRC_LEN		4
-
 /*
  * Fibre Channel BB_E Header Structure
  */
@@ -143,7 +138,7 @@ enum {
 	FC_TYPE_MAX		= 256,	/* 256 FC-4 types */
 };
 
-struct fc_fc4types_s {
+struct fc_fc4types_s{
 	u8         bits[FC_TYPE_MAX / 8];
 };
 
@@ -201,9 +196,9 @@ enum {
 /*
  * generic ELS command
  */
-struct fc_els_cmd_s {
-u32        els_code:8;	/* ELS Command Code */
-u32        reserved:24;
+struct fc_els_cmd_s{
+	u32        els_code:8;	/* ELS Command Code */
+	u32        reserved:24;
 };
 
 /*
@@ -272,7 +267,7 @@ enum {
  * N_Port PLOGI Common Service Parameters.
  * FC-PH-x. Figure-76. pg. 308.
  */
-struct fc_plogi_csp_s {
+struct fc_plogi_csp_s{
 	u8         verhi;	/* FC-PH high version */
 	u8         verlo;	/* FC-PH low version */
 	u16        bbcred;	/* BB_Credit */
@@ -326,7 +321,7 @@ struct fc_plogi_csp_s {
  * N_Port PLOGI Class Specific Parameters.
  * FC-PH-x. Figure 78. pg. 318.
  */
-struct fc_plogi_clp_s {
+struct fc_plogi_clp_s{
 #ifdef __BIGENDIAN
 	u32        class_valid:1;
 	u32        intermix:1;	/* class intermix supported if set =1.
@@ -361,15 +356,14 @@ struct fc_plogi_clp_s {
 	u32        reserved8:16;
 };
 
-#define FLOGI_VVL_BRCD    0x42524344 /* ASCII value for each character
-				      * in string "BRCD"
-				      */
+#define FLOGI_VVL_BRCD    0x42524344 /* ASCII value for each character in
+				      * string "BRCD" */
 
 /*
  * PLOGI els command and reply payload
  */
-struct fc_logi_s {
-	struct fc_els_cmd_s    els_cmd;	/* ELS command code */
+struct fc_logi_s{
+	struct fc_els_cmd_s els_cmd;	/* ELS command code */
 	struct fc_plogi_csp_s  csp;		/* common service params */
 	wwn_t           port_name;
 	wwn_t           node_name;
@@ -383,7 +377,7 @@ struct fc_logi_s {
 /*
  * LOGO els command payload
  */
-struct fc_logo_s {
+struct fc_logo_s{
 	struct fc_els_cmd_s    els_cmd;	/* ELS command code */
 	u32        res1:8;
 	u32        nport_id:24;	/* N_Port identifier of source */
@@ -406,7 +400,7 @@ struct fc_adisc_s {
 /*
  * Exchange status block
  */
-struct fc_exch_status_blk_s {
+struct fc_exch_status_blk_s{
 	u32        oxid:16;
 	u32        rxid:16;
 	u32        res1:8;
@@ -435,9 +429,9 @@ struct fc_res_s {
 /*
  * RES els accept payload
  */
-struct fc_res_acc_s {
-	struct fc_els_cmd_s	els_cmd;	/* ELS command code */
-	struct fc_exch_status_blk_s fc_exch_blk;/* Exchange status block */
+struct fc_res_acc_s{
+	struct fc_els_cmd_s els_cmd;	/* ELS command code */
+	struct fc_exch_status_blk_s fc_exch_blk; /* Exchange status block */
 };
 
 /*
@@ -491,7 +485,7 @@ struct fc_rsi_s {
  * structure for PRLI paramater pages, both request & response
  * see FC-PH-X table 113 & 115 for explanation also FCP table 8
  */
-struct fc_prli_params_s {
+struct fc_prli_params_s{
 	u32        reserved:16;
 #ifdef __BIGENDIAN
 	u32        reserved1:5;
@@ -532,7 +526,7 @@ enum {
 	FC_PRLI_ACC_PREDEF_IMG = 0x5,	/* predefined image - no prli needed */
 };
 
-struct fc_prli_params_page_s {
+struct fc_prli_params_page_s{
 	u32        type:8;
 	u32        codext:8;
 #ifdef __BIGENDIAN
@@ -552,13 +546,13 @@ struct fc_prli_params_page_s {
 
 	u32        origprocas;
 	u32        rspprocas;
-	struct fc_prli_params_s servparams;
+	struct fc_prli_params_s  servparams;
 };
 
 /*
  * PRLI request and accept payload, FC-PH-X tables 112 & 114
  */
-struct fc_prli_s {
+struct fc_prli_s{
 	u32        command:8;
 	u32        pglen:8;
 	u32        pagebytes:16;
@@ -568,7 +562,7 @@ struct fc_prli_s {
 /*
  * PRLO logout params page
  */
-struct fc_prlo_params_page_s {
+struct fc_prlo_params_page_s{
 	u32        type:8;
 	u32        type_ext:8;
 #ifdef __BIGENDIAN
@@ -593,7 +587,7 @@ struct fc_prlo_params_page_s {
 /*
  * PRLO els command payload
  */
-struct fc_prlo_s {
+struct fc_prlo_s{
 	u32        	command:8;
 	u32        	page_len:8;
 	u32        	payload_len:16;
@@ -603,7 +597,7 @@ struct fc_prlo_s {
 /*
  * PRLO Logout response parameter page
  */
-struct fc_prlo_acc_params_page_s {
+struct fc_prlo_acc_params_page_s{
 	u32        type:8;
 	u32        type_ext:8;
 
@@ -629,7 +623,7 @@ struct fc_prlo_acc_params_page_s {
 /*
  * PRLO els command ACC payload
  */
-struct fc_prlo_acc_s {
+struct fc_prlo_acc_s{
 	u32        command:8;
 	u32        page_len:8;
 	u32        payload_len:16;
@@ -651,7 +645,7 @@ enum {
 	FC_VU_SCR_REG_FUNC_FABRIC_NAME_CHANGE = 0x01
 };
 
-struct fc_scr_s {
+struct fc_scr_s{
 	u32 command:8;
 	u32 res:24;
 	u32 vu_reg_func:8; /* Vendor Unique Registrations */
@@ -723,7 +717,7 @@ enum {
 /*
  * RRQ els command payload
  */
-struct fc_rrq_s {
+struct fc_rrq_s{
 	struct fc_els_cmd_s    els_cmd;	/* ELS command code */
 	u32        res1:8;
 	u32        s_id:24;	/* exchange originator S_ID */
@@ -737,7 +731,7 @@ struct fc_rrq_s {
 /*
  * ABTS BA_ACC reply payload
  */
-struct fc_ba_acc_s {
+struct fc_ba_acc_s{
 	u32        seq_id_valid:8;	/* set to 0x00 for Abort Exchange */
 	u32        seq_id:8;	/* invalid for Abort Exchange */
 	u32        res2:16;
@@ -750,7 +744,7 @@ struct fc_ba_acc_s {
 /*
  * ABTS BA_RJT reject payload
  */
-struct fc_ba_rjt_s {
+struct fc_ba_rjt_s{
 	u32        res1:8;		/* Reserved */
 	u32        reason_code:8;	/* reason code for reject */
 	u32        reason_expl:8;	/* reason code explanation */
@@ -760,9 +754,9 @@ struct fc_ba_rjt_s {
 /*
  * TPRLO logout parameter page
  */
-struct fc_tprlo_params_page_s {
-u32        type:8;
-u32        type_ext:8;
+struct fc_tprlo_params_page_s{
+	u32        type:8;
+	u32        type_ext:8;
 
 #ifdef __BIGENDIAN
 	u32        opa_valid:1;
@@ -788,7 +782,7 @@ u32        type_ext:8;
 /*
  * TPRLO ELS command payload
  */
-struct fc_tprlo_s {
+struct fc_tprlo_s{
 	u32        command:8;
 	u32        page_len:8;
 	u32        payload_len:16;
@@ -796,7 +790,7 @@ struct fc_tprlo_s {
 	struct fc_tprlo_params_page_s tprlo_params[1];
 };
 
-enum fc_tprlo_type {
+enum fc_tprlo_type{
 	FC_GLOBAL_LOGO = 1,
 	FC_TPR_LOGO
 };
@@ -804,7 +798,7 @@ enum fc_tprlo_type {
 /*
  * TPRLO els command ACC payload
  */
-struct fc_tprlo_acc_s {
+struct fc_tprlo_acc_s{
 	u32	command:8;
 	u32	page_len:8;
 	u32	payload_len:16;
@@ -816,21 +810,21 @@ struct fc_tprlo_acc_s {
  */
 #define FC_RSCN_PGLEN	0x4
 
-enum fc_rscn_format {
+enum fc_rscn_format{
 	FC_RSCN_FORMAT_PORTID	= 0x0,
 	FC_RSCN_FORMAT_AREA	= 0x1,
 	FC_RSCN_FORMAT_DOMAIN	= 0x2,
 	FC_RSCN_FORMAT_FABRIC	= 0x3,
 };
 
-struct fc_rscn_event_s {
+struct fc_rscn_event_s{
 	u32        format:2;
 	u32        qualifier:4;
 	u32        resvd:2;
 	u32        portid:24;
 };
 
-struct fc_rscn_pl_s {
+struct fc_rscn_pl_s{
 	u8         command;
 	u8         pagelen;
 	u16        payldlen;
@@ -869,7 +863,7 @@ struct fc_echo_s {
 /*
  * RNID els command payload
  */
-struct fc_rnid_cmd_s {
+struct fc_rnid_cmd_s{
 	struct fc_els_cmd_s    els_cmd;
 	u32        node_id_data_format:8;
 	u32        reserved:24;
@@ -879,12 +873,12 @@ struct fc_rnid_cmd_s {
  * RNID els response payload
  */
 
-struct fc_rnid_common_id_data_s {
+struct fc_rnid_common_id_data_s{
 	wwn_t           port_name;
 	wwn_t           node_name;
 };
 
-struct fc_rnid_general_topology_data_s {
+struct fc_rnid_general_topology_data_s{
 	u32        vendor_unique[4];
 	u32        asso_type;
 	u32        phy_port_num;
@@ -897,7 +891,7 @@ struct fc_rnid_general_topology_data_s {
 	u32        vendor_specific:16;
 };
 
-struct fc_rnid_acc_s {
+struct fc_rnid_acc_s{
 	struct fc_els_cmd_s    els_cmd;
 	u32        node_id_data_format:8;
 	u32        common_id_data_length:8;
@@ -921,7 +915,7 @@ struct fc_rnid_acc_s {
 #define RNID_ASSOCIATED_TYPE_VIRTUALIZATION_DEVICE      0x00000003
 #define RNID_ASSOCIATED_TYPE_MULTI_FUNCTION_DEVICE      0x000000FF
 
-enum fc_rpsc_speed_cap {
+enum fc_rpsc_speed_cap{
 	RPSC_SPEED_CAP_1G = 0x8000,
 	RPSC_SPEED_CAP_2G = 0x4000,
 	RPSC_SPEED_CAP_4G = 0x2000,
@@ -932,7 +926,7 @@ enum fc_rpsc_speed_cap {
 	RPSC_SPEED_CAP_UNKNOWN = 0x0001,
 };
 
-enum fc_rpsc_op_speed_s {
+enum fc_rpsc_op_speed_s{
 	RPSC_OP_SPEED_1G = 0x8000,
 	RPSC_OP_SPEED_2G = 0x4000,
 	RPSC_OP_SPEED_4G = 0x2000,
@@ -943,24 +937,24 @@ enum fc_rpsc_op_speed_s {
 	RPSC_OP_SPEED_NOT_EST = 0x0001,	/*! speed not established */
 };
 
-struct fc_rpsc_speed_info_s {
-	u16        port_speed_cap;	/*! see struct fc_rpsc_speed_cap */
-	u16        port_op_speed;	/*! see enum fc_rpsc_op_speed_s */
+struct fc_rpsc_speed_info_s{
+	u16        port_speed_cap;	/*! see fc_rpsc_speed_cap_t */
+	u16        port_op_speed;	/*! see fc_rpsc_op_speed_t */
 };
 
-enum link_e2e_beacon_subcmd {
+enum link_e2e_beacon_subcmd{
 	LINK_E2E_BEACON_ON = 1,
 	LINK_E2E_BEACON_OFF = 2
 };
 
-enum beacon_type {
+enum beacon_type{
 	BEACON_TYPE_NORMAL	= 1,	/*! Normal Beaconing. Green */
 	BEACON_TYPE_WARN	= 2,	/*! Warning Beaconing. Yellow/Amber */
 	BEACON_TYPE_CRITICAL	= 3	/*! Critical Beaconing. Red */
 };
 
 struct link_e2e_beacon_param_s {
-	u8         beacon_type;	/* Beacon Type. See enum beacon_type */
+	u8         beacon_type;	/* Beacon Type. See beacon_type_t */
 	u8         beacon_frequency;
 					/* Beacon frequency. Number of blinks
 					 * per 10 seconds
@@ -981,10 +975,10 @@ struct link_e2e_beacon_param_s {
 /*
  * Link E2E beacon request/good response format. For LS_RJTs use fc_ls_rjt_t
  */
-struct link_e2e_beacon_req_s {
+struct link_e2e_beacon_req_s{
 	u32        ls_code;	/*! FC_ELS_E2E_LBEACON in requests *
 					 *or FC_ELS_ACC in good replies */
-	u32        ls_sub_cmd;	/*! See enum link_e2e_beacon_subcmd */
+	u32        ls_sub_cmd;	/*! See link_e2e_beacon_subcmd_t */
 	struct link_e2e_beacon_param_s beacon_parm;
 };
 
@@ -993,14 +987,14 @@ struct link_e2e_beacon_req_s {
  * all the ports within that domain (TODO - I don't think FOS implements
  * this...).
  */
-struct fc_rpsc_cmd_s {
+struct fc_rpsc_cmd_s{
 	struct fc_els_cmd_s    els_cmd;
 };
 
 /*
  * RPSC Acc
  */
-struct fc_rpsc_acc_s {
+struct fc_rpsc_acc_s{
 	u32        command:8;
 	u32        rsvd:8;
 	u32        num_entries:16;
@@ -1013,7 +1007,7 @@ struct fc_rpsc_acc_s {
  */
 #define FC_BRCD_TOKEN    0x42524344
 
-struct fc_rpsc2_cmd_s {
+struct fc_rpsc2_cmd_s{
 	struct fc_els_cmd_s    els_cmd;
 	u32       	token;
 	u16     	resvd;
@@ -1024,17 +1018,18 @@ struct fc_rpsc2_cmd_s {
 	} pid_list[1];
 };
 
-enum fc_rpsc2_port_type {
+enum fc_rpsc2_port_type{
 	RPSC2_PORT_TYPE_UNKNOWN = 0,
 	RPSC2_PORT_TYPE_NPORT   = 1,
 	RPSC2_PORT_TYPE_NLPORT  = 2,
 	RPSC2_PORT_TYPE_NPIV_PORT  = 0x5f,
 	RPSC2_PORT_TYPE_NPORT_TRUNK  = 0x6f,
 };
+
 /*
  * RPSC2 portInfo entry structure
  */
-struct fc_rpsc2_port_info_s {
+struct fc_rpsc2_port_info_s{
     u32    pid;        /* PID */
     u16    resvd1;
     u16    index;      /* port number / index */
@@ -1046,17 +1041,17 @@ struct fc_rpsc2_port_info_s {
 /*
  * RPSC2 Accept payload
  */
-struct fc_rpsc2_acc_s {
+struct fc_rpsc2_acc_s{
 	u8        els_cmd;
 	u8        resvd;
-    u16       num_pids;  /* Number of pids in the request */
-    struct fc_rpsc2_port_info_s  port_info[1];    /* port information */
+	u16       num_pids;  /* Number of pids in the request */
+	struct fc_rpsc2_port_info_s  port_info[1];    /* port information */
 };
 
 /**
  * bit fields so that multiple classes can be specified
  */
-enum fc_cos {
+enum fc_cos{
 	FC_CLASS_2	= 0x04,
 	FC_CLASS_3	= 0x08,
 	FC_CLASS_2_3	= 0x0C,
@@ -1065,11 +1060,11 @@ enum fc_cos {
 /*
  * symbolic name
  */
-struct fc_symname_s {
+struct fc_symname_s{
 	u8         symname[FC_SYMNAME_MAX];
 };
 
-struct fc_alpabm_s {
+struct fc_alpabm_s{
 	u8         alpa_bm[FC_ALPA_MAX / 8];
 };
 
@@ -1093,7 +1088,7 @@ struct fc_alpabm_s {
  * Virtual Fabric Tagging header format
  * @caution This is defined only in BIG ENDIAN format.
  */
-struct fc_vft_s {
+struct fc_vft_s{
 	u32        r_ctl:8;
 	u32        ver:2;
 	u32        type:4;

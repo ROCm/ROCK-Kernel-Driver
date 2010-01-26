@@ -174,7 +174,7 @@ struct ap_message {
  * Initialize a message before using. Otherwise this might result in
  * unexpected behaviour.
  */
-extern inline void ap_init_message(struct ap_message *ap_msg)
+static inline void ap_init_message(struct ap_message *ap_msg)
 {
 	ap_msg->psmid = 0;
 	ap_msg->length = 0;

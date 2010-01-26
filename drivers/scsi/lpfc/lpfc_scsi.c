@@ -626,7 +626,6 @@ lpfc_sli4_fcp_xri_aborted(struct lpfc_hba *phba,
 		&phba->sli4_hba.lpfc_abts_scsi_buf_list, list) {
 		if (psb->cur_iocbq.sli4_xritag == xri) {
 			list_del(&psb->list);
-			psb->exch_busy = 0;
 			psb->status = IOSTAT_SUCCESS;
 			spin_unlock_irqrestore(
 				&phba->sli4_hba.abts_scsi_buf_list_lock,
@@ -689,12 +688,11 @@ lpfc_sli4_repost_scsi_sgl_list(struct lpfc_hba *phba)
 					 list);
 			if (status) {
 				/* Put this back on the abort scsi list */
-				psb->exch_busy = 1;
+				psb->status = IOSTAT_LOCAL_REJECT;
+				psb->result = IOERR_ABORT_REQUESTED;
 				rc++;
-			} else {
-				psb->exch_busy = 0;
+			} else
 				psb->status = IOSTAT_SUCCESS;
-			}
 			/* Put it back into the SCSI buffer list */
 			lpfc_release_scsi_buf_s4(phba, psb);
 		}
@@ -841,12 +839,11 @@ lpfc_new_scsi_buf_s4(struct lpfc_vport *vport, int num_to_alloc)
 						psb->cur_iocbq.sli4_xritag);
 			if (status) {
 				/* Put this back on the abort scsi list */
-				psb->exch_busy = 1;
+				psb->status = IOSTAT_LOCAL_REJECT;
+				psb->result = IOERR_ABORT_REQUESTED;
 				rc++;
-			} else {
-				psb->exch_busy = 0;
+			} else
 				psb->status = IOSTAT_SUCCESS;
-			}
 			/* Put it back into the SCSI buffer list */
 			lpfc_release_scsi_buf_s4(phba, psb);
 			break;
@@ -860,12 +857,11 @@ lpfc_new_scsi_buf_s4(struct lpfc_vport *vport, int num_to_alloc)
 				 list);
 			if (status) {
 				/* Put this back on the abort scsi list */
-				psb->exch_busy = 1;
+				psb->status = IOSTAT_LOCAL_REJECT;
+				psb->result = IOERR_ABORT_REQUESTED;
 				rc++;
-			} else {
-				psb->exch_busy = 0;
+			} else
 				psb->status = IOSTAT_SUCCESS;
-			}
 			/* Put it back into the SCSI buffer list */
 			lpfc_release_scsi_buf_s4(phba, psb);
 		}
@@ -955,7 +951,8 @@ lpfc_release_scsi_buf_s4(struct lpfc_hba *phba, struct lpfc_scsi_buf *psb)
 {
 	unsigned long iflag = 0;
 
-	if (psb->exch_busy) {
+	if (psb->status == IOSTAT_LOCAL_REJECT
+		&& psb->result == IOERR_ABORT_REQUESTED) {
 		spin_lock_irqsave(&phba->sli4_hba.abts_scsi_buf_list_lock,
 					iflag);
 		psb->pCmd = NULL;
@@ -2224,9 +2221,6 @@ lpfc_scsi_cmd_iocb_cmpl(struct lpfc_hba *phba, struct lpfc_iocbq *pIocbIn,
 
 	lpfc_cmd->result = pIocbOut->iocb.un.ulpWord[4];
 	lpfc_cmd->status = pIocbOut->iocb.ulpStatus;
-	/* pick up SLI4 exhange busy status from HBA */
-	lpfc_cmd->exch_busy = pIocbOut->iocb_flag & LPFC_EXCHANGE_BUSY;
-
 	if (pnode && NLP_CHK_NODE_ACT(pnode))
 		atomic_dec(&pnode->cmd_pending);
 
@@ -2700,13 +2694,6 @@ lpfc_info(struct Scsi_Host *host)
 				 384-len,
 				 " port %s",
 				 phba->Port);
-		}
-		len = strlen(lpfcinfobuf);
-		if (phba->sli4_hba.link_state.logical_speed) {
-			snprintf(lpfcinfobuf + len,
-				 384-len,
-				 " Logical Link Speed: %d Mbps",
-				 phba->sli4_hba.link_state.logical_speed * 10);
 		}
 	}
 	return lpfcinfobuf;

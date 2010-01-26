@@ -605,7 +605,8 @@ static int alua_activate(struct scsi_device *sdev,
 	if (err != SCSI_DH_OK)
 		goto out;
 
-	if (h->tpgs & TPGS_MODE_EXPLICIT && h->state != TPGS_STATE_OPTIMIZED) {
+	if ((h->tpgs & TPGS_MODE_EXPLICIT) &&
+	    h->state != TPGS_STATE_OPTIMIZED) {
 		h->callback_fn = fn;
 		h->callback_data = data;
 		err = submit_stpg(h);

@@ -186,10 +186,12 @@ static int ieee80211_open(struct net_device *dev)
 		 * No need to check netif_running since we do not allow
 		 * it to start up with this invalid address.
 		 */
-		if (compare_ether_addr(null_addr, ndev->dev_addr) == 0)
+		if (compare_ether_addr(null_addr, ndev->dev_addr) == 0) {
 			memcpy(ndev->dev_addr,
 			       local->hw.wiphy->perm_addr,
 			       ETH_ALEN);
+			memcpy(ndev->perm_addr, ndev->dev_addr, ETH_ALEN);
+		}
 	}
 
 	/*
@@ -214,8 +216,8 @@ static int ieee80211_open(struct net_device *dev)
 		/* must be before the call to ieee80211_configure_filter */
 		local->monitors++;
 		if (local->monitors == 1) {
-			local->hw.conf.flags |= IEEE80211_CONF_RADIOTAP;
-			hw_reconf_flags |= IEEE80211_CONF_CHANGE_RADIOTAP;
+			local->hw.conf.flags |= IEEE80211_CONF_MONITOR;
+			hw_reconf_flags |= IEEE80211_CONF_CHANGE_MONITOR;
 		}
 
 		if (sdata->u.mntr_flags & MONITOR_FLAG_FCSFAIL)
@@ -435,8 +437,8 @@ static int ieee80211_stop(struct net_device *dev)
 
 		local->monitors--;
 		if (local->monitors == 0) {
-			local->hw.conf.flags &= ~IEEE80211_CONF_RADIOTAP;
-			hw_reconf_flags |= IEEE80211_CONF_CHANGE_RADIOTAP;
+			local->hw.conf.flags &= ~IEEE80211_CONF_MONITOR;
+			hw_reconf_flags |= IEEE80211_CONF_CHANGE_MONITOR;
 		}
 
 		if (sdata->u.mntr_flags & MONITOR_FLAG_FCSFAIL)
@@ -668,6 +670,7 @@ static u16 ieee80211_monitor_select_queue(struct net_device *dev,
 	struct ieee80211_local *local = sdata->local;
 	struct ieee80211_hdr *hdr;
 	struct ieee80211_radiotap_header *rtap = (void *)skb->data;
+	u8 *p;
 
 	if (local->hw.queues < 4)
 		return 0;
@@ -678,12 +681,14 @@ static u16 ieee80211_monitor_select_queue(struct net_device *dev,
 
 	hdr = (void *)((u8 *)skb->data + le16_to_cpu(rtap->it_len));
 
-	if (!ieee80211_is_data(hdr->frame_control)) {
+	if (!ieee80211_is_data_qos(hdr->frame_control)) {
 		skb->priority = 7;
 		return ieee802_1d_to_ac[skb->priority];
 	}
 
-	skb->priority = 0;
+	p = ieee80211_get_qos_ctl(hdr);
+	skb->priority = *p & IEEE80211_QOS_CTL_TAG1D_MASK;
+
 	return ieee80211_downgrade_queue(local, skb);
 }
 
@@ -786,13 +791,11 @@ int ieee80211_if_change_type(struct ieee80211_sub_if_data *sdata,
 		ieee80211_mandatory_rates(sdata->local,
 			sdata->local->hw.conf.channel->band);
 	sdata->drop_unencrypted = 0;
+	if (type == NL80211_IFTYPE_STATION)
+		sdata->u.mgd.use_4addr = false;
 
 	return 0;
 }
-
-static struct device_type wiphy_type = {
-	.name	= "wlan",
-};
 
 int ieee80211_if_add(struct ieee80211_local *local, const char *name,
 		     struct net_device **new_dev, enum nl80211_iftype type,
@@ -824,8 +827,8 @@ int ieee80211_if_add(struct ieee80211_local *local, const char *name,
 		goto fail;
 
 	memcpy(ndev->dev_addr, local->hw.wiphy->perm_addr, ETH_ALEN);
+	memcpy(ndev->perm_addr, ndev->dev_addr, ETH_ALEN);
 	SET_NETDEV_DEV(ndev, wiphy_dev(local->hw.wiphy));
-	SET_NETDEV_DEVTYPE(ndev, &wiphy_type);
 
 	/* don't use IEEE80211_DEV_TO_SUB_IF because it checks too much */
 	sdata = netdev_priv(ndev);
@@ -846,6 +849,12 @@ int ieee80211_if_add(struct ieee80211_local *local, const char *name,
 
 	/* setup type-dependent data */
 	ieee80211_setup_sdata(sdata, type);
+
+	if (params) {
+		ndev->ieee80211_ptr->use_4addr = params->use_4addr;
+		if (type == NL80211_IFTYPE_STATION)
+			sdata->u.mgd.use_4addr = params->use_4addr;
+	}
 
 	ret = register_netdevice(ndev);
 	if (ret)
@@ -890,22 +899,18 @@ void ieee80211_if_remove(struct ieee80211_sub_if_data *sdata)
 void ieee80211_remove_interfaces(struct ieee80211_local *local)
 {
 	struct ieee80211_sub_if_data *sdata, *tmp;
+	LIST_HEAD(unreg_list);
 
 	ASSERT_RTNL();
 
+	mutex_lock(&local->iflist_mtx);
 	list_for_each_entry_safe(sdata, tmp, &local->interfaces, list) {
-		/*
-		 * we cannot hold the iflist_mtx across unregister_netdevice,
-		 * but we only need to hold it for list modifications to lock
-		 * out readers since we're under the RTNL here as all other
-		 * writers.
-		 */
-		mutex_lock(&local->iflist_mtx);
 		list_del(&sdata->list);
-		mutex_unlock(&local->iflist_mtx);
 
-		unregister_netdevice(sdata->dev);
+		unregister_netdevice_queue(sdata->dev, &unreg_list);
 	}
+	mutex_unlock(&local->iflist_mtx);
+	unregister_netdevice_many(&unreg_list);
 }
 
 static u32 ieee80211_idle_off(struct ieee80211_local *local,

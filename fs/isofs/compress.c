@@ -103,7 +103,7 @@ static loff_t zisofs_uncompress_block(struct inode *inode, loff_t block_start,
 
 	stream.workspace = zisofs_zlib_workspace;
 	mutex_lock(&zisofs_zlib_lock);
-
+		
 	zerr = zlib_inflateInit(&stream);
 	if (zerr != Z_OK) {
 		if (zerr == Z_MEM_ERROR)

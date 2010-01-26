@@ -158,7 +158,7 @@ static int ecryptfs_open(struct inode *inode, struct file *file)
 	struct dentry *ecryptfs_dentry = file->f_path.dentry;
 	/* Private value of ecryptfs_dentry allocated in
 	 * ecryptfs_lookup() */
-	struct dentry *lower_dentry = ecryptfs_dentry_to_lower(ecryptfs_dentry);
+	struct dentry *lower_dentry;
 	struct ecryptfs_file_info *file_info;
 
 	mount_crypt_stat = &ecryptfs_superblock_to_private(
@@ -299,7 +299,6 @@ static int ecryptfs_ioctl(struct inode *inode, struct file *file,
 const struct file_operations ecryptfs_dir_fops = {
 	.readdir = ecryptfs_readdir,
 	.ioctl = ecryptfs_ioctl,
-	.mmap = generic_file_mmap,
 	.open = ecryptfs_open,
 	.flush = ecryptfs_flush,
 	.release = ecryptfs_release,

@@ -307,7 +307,7 @@ sub process_cpp_file($$$$)
 
     while (<FD>) {
 	chomp;
-	if (/.*__KMSG_PRINT\(\s*(\S*)\s*_FMT_(.*)_ARGS_\s*(.*)?_END_\s*\)/o) {
+	if (/.*__KMSG_PRINT\(\s*(\S*)\s*_FMT_(.*)_ARGS_\s*"(.*)"\s*_END_\s*\)/o) {
 	    if ($component ne "") {
 		add_kmsg_print($component, $1, $2, $3);
 	    } else {

@@ -10,6 +10,7 @@
  */
 #include <linux/debug_locks.h>
 #include <linux/interrupt.h>
+#include <linux/kmsg_dump.h>
 #include <linux/kallsyms.h>
 #include <linux/notifier.h>
 #include <linux/module.h>
@@ -77,6 +78,8 @@ NORET_TYPE void panic(const char * fmt, ...)
 	dump_stack();
 #endif
 
+	kmsg_dump(KMSG_DUMP_PANIC);
+
 #ifdef CONFIG_KDB_KDUMP
 	if (kdb_kdump_state == KDB_KDUMP_RESET) {
 		(void)kdb(KDB_REASON_OOPS, 999, get_irq_regs());
@@ -87,8 +90,7 @@ NORET_TYPE void panic(const char * fmt, ...)
 	 * everything else.
 	 * Do we want to call this before we try to display a message?
 	 */
-	if (!dump_after_notifier)
-		crash_kexec(NULL);
+	crash_kexec(NULL);
 
 	/*
 	 * Note smp_send_stop is the usual smp shutdown function, which
@@ -98,8 +100,6 @@ NORET_TYPE void panic(const char * fmt, ...)
 	smp_send_stop();
 
 	atomic_notifier_call_chain(&panic_notifier_list, 0, buf);
-
-	crash_kexec(NULL);
 
 	bust_spinlocks(0);
 
@@ -372,6 +372,7 @@ void oops_exit(void)
 {
 	do_oops_enter_exit();
 	print_oops_end_marker();
+	kmsg_dump(KMSG_DUMP_OOPS);
 }
 
 #ifdef WANT_WARN_ON_SLOWPATH

@@ -39,7 +39,6 @@
 #include <linux/ctype.h>
 #include <linux/log2.h>
 #include <linux/crc16.h>
-#include <linux/precache.h>
 #include <asm/uaccess.h>
 
 #include "ext4.h"
@@ -703,6 +702,7 @@ static struct inode *ext4_alloc_inode(struct super_block *sb)
 	ei->i_reserved_data_blocks = 0;
 	ei->i_reserved_meta_blocks = 0;
 	ei->i_allocated_meta_blocks = 0;
+	ei->i_da_metadata_calc_len = 0;
 	ei->i_delalloc_reserved_flag = 0;
 	spin_lock_init(&(ei->i_block_reservation_lock));
 #ifdef CONFIG_QUOTA
@@ -773,9 +773,22 @@ static inline void ext4_show_quota_options(struct seq_file *seq,
 #if defined(CONFIG_QUOTA)
 	struct ext4_sb_info *sbi = EXT4_SB(sb);
 
-	if (sbi->s_jquota_fmt)
-		seq_printf(seq, ",jqfmt=%s",
-		(sbi->s_jquota_fmt == QFMT_VFS_OLD) ? "vfsold" : "vfsv0");
+	if (sbi->s_jquota_fmt) {
+		char *fmtname = "";
+
+		switch (sbi->s_jquota_fmt) {
+		case QFMT_VFS_OLD:
+			fmtname = "vfsold";
+			break;
+		case QFMT_VFS_V0:
+			fmtname = "vfsv0";
+			break;
+		case QFMT_VFS_V1:
+			fmtname = "vfsv1";
+			break;
+		}
+		seq_printf(seq, ",jqfmt=%s", fmtname);
+	}
 
 	if (sbi->s_qf_names[USRQUOTA])
 		seq_printf(seq, ",usrjquota=%s", sbi->s_qf_names[USRQUOTA]);
@@ -1090,9 +1103,9 @@ enum {
 	Opt_abort, Opt_data_journal, Opt_data_ordered, Opt_data_writeback,
 	Opt_data_err_abort, Opt_data_err_ignore,
 	Opt_usrjquota, Opt_grpjquota, Opt_offusrjquota, Opt_offgrpjquota,
-	Opt_jqfmt_vfsold, Opt_jqfmt_vfsv0, Opt_quota, Opt_noquota,
-	Opt_ignore, Opt_barrier, Opt_nobarrier, Opt_err, Opt_resize,
-	Opt_usrquota, Opt_grpquota, Opt_i_version,
+	Opt_jqfmt_vfsold, Opt_jqfmt_vfsv0, Opt_jqfmt_vfsv1, Opt_quota,
+	Opt_noquota, Opt_ignore, Opt_barrier, Opt_nobarrier, Opt_err,
+	Opt_resize, Opt_usrquota, Opt_grpquota, Opt_i_version,
 	Opt_stripe, Opt_delalloc, Opt_nodelalloc,
 	Opt_block_validity, Opt_noblock_validity,
 	Opt_inode_readahead_blks, Opt_journal_ioprio,
@@ -1143,6 +1156,7 @@ static const match_table_t tokens = {
 	{Opt_grpjquota, "grpjquota=%s"},
 	{Opt_jqfmt_vfsold, "jqfmt=vfsold"},
 	{Opt_jqfmt_vfsv0, "jqfmt=vfsv0"},
+	{Opt_jqfmt_vfsv1, "jqfmt=vfsv1"},
 	{Opt_grpquota, "grpquota"},
 	{Opt_noquota, "noquota"},
 	{Opt_quota, "quota"},
@@ -1445,6 +1459,9 @@ clear_qf_name:
 			goto set_qf_format;
 		case Opt_jqfmt_vfsv0:
 			qfmt = QFMT_VFS_V0;
+			goto set_qf_format;
+		case Opt_jqfmt_vfsv1:
+			qfmt = QFMT_VFS_V1;
 set_qf_format:
 			if (sb_any_quota_loaded(sb) &&
 			    sbi->s_jquota_fmt != qfmt) {
@@ -1487,6 +1504,7 @@ set_qf_format:
 		case Opt_offgrpjquota:
 		case Opt_jqfmt_vfsold:
 		case Opt_jqfmt_vfsv0:
+		case Opt_jqfmt_vfsv1:
 			ext4_msg(sb, KERN_ERR,
 				"journaled quota options not supported");
 			break;
@@ -1685,8 +1703,6 @@ static int ext4_setup_super(struct super_block *sb, struct ext4_super_block *es,
 			EXT4_BLOCKS_PER_GROUP(sb),
 			EXT4_INODES_PER_GROUP(sb),
 			sbi->s_mount_opt);
-
-	precache_init(sb);
 
 	return res;
 }
@@ -2127,11 +2143,8 @@ static int parse_strtoul(const char *buf,
 {
 	char *endp;
 
-	while (*buf && isspace(*buf))
-		buf++;
-	*value = simple_strtoul(buf, &endp, 0);
-	while (*endp && isspace(*endp))
-		endp++;
+	*value = simple_strtoul(skip_spaces(buf), &endp, 0);
+	endp = skip_spaces(endp);
 	if (*endp || *value > max)
 		return -EINVAL;
 
@@ -2162,9 +2175,9 @@ static ssize_t lifetime_write_kbytes_show(struct ext4_attr *a,
 	struct super_block *sb = sbi->s_buddy_cache->i_sb;
 
 	return snprintf(buf, PAGE_SIZE, "%llu\n",
-			sbi->s_kbytes_written + 
+			(unsigned long long)(sbi->s_kbytes_written +
 			((part_stat_read(sb->s_bdev->bd_part, sectors[1]) -
-			  EXT4_SB(sb)->s_sectors_written_start) >> 1));
+			  EXT4_SB(sb)->s_sectors_written_start) >> 1)));
 }
 
 static ssize_t inode_readahead_blks_store(struct ext4_attr *a,
@@ -2749,26 +2762,6 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 	    EXT4_HAS_COMPAT_FEATURE(sb, EXT4_FEATURE_COMPAT_HAS_JOURNAL)) {
 		if (ext4_load_journal(sb, es, journal_devnum))
 			goto failed_mount3;
-		if (!(sb->s_flags & MS_RDONLY) &&
-		    EXT4_SB(sb)->s_journal->j_failed_commit) {
-			ext4_msg(sb, KERN_CRIT, "error: "
-			       "ext4_fill_super: Journal transaction "
-			       "%u is corrupt",
-			       EXT4_SB(sb)->s_journal->j_failed_commit);
-			if (test_opt(sb, ERRORS_RO)) {
-				ext4_msg(sb, KERN_CRIT,
-				       "Mounting filesystem read-only");
-				sb->s_flags |= MS_RDONLY;
-				EXT4_SB(sb)->s_mount_state |= EXT4_ERROR_FS;
-				es->s_state |= cpu_to_le16(EXT4_ERROR_FS);
-			}
-			if (test_opt(sb, ERRORS_PANIC)) {
-				EXT4_SB(sb)->s_mount_state |= EXT4_ERROR_FS;
-				es->s_state |= cpu_to_le16(EXT4_ERROR_FS);
-				ext4_commit_super(sb, 1);
-				goto failed_mount4;
-			}
-		}
 	} else if (test_opt(sb, NOLOAD) && !(sb->s_flags & MS_RDONLY) &&
 	      EXT4_HAS_INCOMPAT_FEATURE(sb, EXT4_FEATURE_INCOMPAT_RECOVER)) {
 		ext4_msg(sb, KERN_ERR, "required journal recovery "
@@ -3992,6 +3985,60 @@ static int ext4_get_sb(struct file_system_type *fs_type, int flags,
 	return get_sb_bdev(fs_type, flags, dev_name, data, ext4_fill_super,mnt);
 }
 
+#if !defined(CONTIG_EXT2_FS) && !defined(CONFIG_EXT2_FS_MODULE) && defined(CONFIG_EXT4_USE_FOR_EXT23)
+static struct file_system_type ext2_fs_type = {
+	.owner		= THIS_MODULE,
+	.name		= "ext2",
+	.get_sb		= ext4_get_sb,
+	.kill_sb	= kill_block_super,
+	.fs_flags	= FS_REQUIRES_DEV,
+};
+
+static inline void register_as_ext2(void)
+{
+	int err = register_filesystem(&ext2_fs_type);
+	if (err)
+		printk(KERN_WARNING
+		       "EXT4-fs: Unable to register as ext2 (%d)\n", err);
+}
+
+static inline void unregister_as_ext2(void)
+{
+	unregister_filesystem(&ext2_fs_type);
+}
+MODULE_ALIAS("ext2");
+#else
+static inline void register_as_ext2(void) { }
+static inline void unregister_as_ext2(void) { }
+#endif
+
+#if !defined(CONTIG_EXT3_FS) && !defined(CONFIG_EXT3_FS_MODULE) && defined(CONFIG_EXT4_USE_FOR_EXT23)
+static struct file_system_type ext3_fs_type = {
+	.owner		= THIS_MODULE,
+	.name		= "ext3",
+	.get_sb		= ext4_get_sb,
+	.kill_sb	= kill_block_super,
+	.fs_flags	= FS_REQUIRES_DEV,
+};
+
+static inline void register_as_ext3(void)
+{
+	int err = register_filesystem(&ext3_fs_type);
+	if (err)
+		printk(KERN_WARNING
+		       "EXT4-fs: Unable to register as ext3 (%d)\n", err);
+}
+
+static inline void unregister_as_ext3(void)
+{
+	unregister_filesystem(&ext3_fs_type);
+}
+MODULE_ALIAS("ext3");
+#else
+static inline void register_as_ext3(void) { }
+static inline void unregister_as_ext3(void) { }
+#endif
+
 static struct file_system_type ext4_fs_type = {
 	.owner		= THIS_MODULE,
 	.name		= "ext4",
@@ -4021,11 +4068,15 @@ static int __init init_ext4_fs(void)
 	err = init_inodecache();
 	if (err)
 		goto out1;
+	register_as_ext2();
+	register_as_ext3();
 	err = register_filesystem(&ext4_fs_type);
 	if (err)
 		goto out;
 	return 0;
 out:
+	unregister_as_ext2();
+	unregister_as_ext3();
 	destroy_inodecache();
 out1:
 	exit_ext4_xattr();
@@ -4041,6 +4092,8 @@ out4:
 
 static void __exit exit_ext4_fs(void)
 {
+	unregister_as_ext2();
+	unregister_as_ext3();
 	unregister_filesystem(&ext4_fs_type);
 	destroy_inodecache();
 	exit_ext4_xattr();

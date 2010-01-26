@@ -4208,20 +4208,17 @@ static int proc_do_kdb(ctl_table *table, int write, void __user *buffer,
 
 static ctl_table kdb_kern_table[] = {
 	{
-		.ctl_name	= CTL_UNNUMBERED,
 		.procname	= "kdb",
 		.data		= &kdb_on,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
-		.proc_handler	= &proc_do_kdb,
-		.strategy	= &sysctl_intvec,
+		.proc_handler	= proc_do_kdb,
 	},
 	{}
 };
 
 static ctl_table kdb_root_table[] = {
 	{
-		.ctl_name	= CTL_KERN,
 		.procname	= "kernel",
 		.mode		= 0555,
 		.child		= kdb_kern_table,

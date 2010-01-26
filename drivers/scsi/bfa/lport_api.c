@@ -47,16 +47,13 @@ bfa_fcs_get_base_port(struct bfa_fcs_s *fcs)
 }
 
 wwn_t
-bfa_fcs_port_get_rport(struct bfa_fcs_port_s *port,
-			wwn_t wwn,
-			int index,
-			int nrports,
-			bfa_boolean_t bwwn)
+bfa_fcs_port_get_rport(struct bfa_fcs_port_s *port, wwn_t wwn, int index,
+		       int nrports, bfa_boolean_t bwwn)
 {
-	struct list_head        *qh, *qe;
+	struct list_head *qh, *qe;
 	struct bfa_fcs_rport_s *rport = NULL;
 	int             i;
-	struct bfa_fcs_s      *fcs;
+	struct bfa_fcs_s *fcs;
 
 	if (port == NULL || nrports == 0)
 		return (wwn_t) 0;
@@ -69,7 +66,7 @@ bfa_fcs_port_get_rport(struct bfa_fcs_port_s *port,
 	qe = bfa_q_first(qh);
 
 	while ((qe != qh) && (i < nrports)) {
-		rport = (struct bfa_fcs_rport_s *) qe;
+		rport = (struct bfa_fcs_rport_s *)qe;
 		if (bfa_os_ntoh3b(rport->pid) > 0xFFF000) {
 			qe = bfa_q_next(qe);
 			bfa_trc(fcs, (u32) rport->pwwn);
@@ -91,7 +88,6 @@ bfa_fcs_port_get_rport(struct bfa_fcs_port_s *port,
 	}
 
 	bfa_trc(fcs, i);
-
 	if (rport)
 		return rport->pwwn;
 	else
@@ -100,12 +96,12 @@ bfa_fcs_port_get_rport(struct bfa_fcs_port_s *port,
 
 void
 bfa_fcs_port_get_rports(struct bfa_fcs_port_s *port, wwn_t rport_wwns[],
-				int *nrports)
+			int *nrports)
 {
-	struct list_head        *qh, *qe;
+	struct list_head *qh, *qe;
 	struct bfa_fcs_rport_s *rport = NULL;
 	int             i;
-	struct bfa_fcs_s      *fcs;
+	struct bfa_fcs_s *fcs;
 
 	if (port == NULL || rport_wwns == NULL || *nrports == 0)
 		return;
@@ -118,7 +114,7 @@ bfa_fcs_port_get_rports(struct bfa_fcs_port_s *port, wwn_t rport_wwns[],
 	qe = bfa_q_first(qh);
 
 	while ((qe != qh) && (i < *nrports)) {
-		rport = (struct bfa_fcs_rport_s *) qe;
+		rport = (struct bfa_fcs_rport_s *)qe;
 		if (bfa_os_ntoh3b(rport->pid) > 0xFFF000) {
 			qe = bfa_q_next(qe);
 			bfa_trc(fcs, (u32) rport->pwwn);
@@ -145,11 +141,11 @@ bfa_fcs_port_get_rports(struct bfa_fcs_port_s *port, wwn_t rport_wwns[],
 enum bfa_pport_speed
 bfa_fcs_port_get_rport_max_speed(struct bfa_fcs_port_s *port)
 {
-	struct list_head  *qh, *qe;
+	struct list_head *qh, *qe;
 	struct bfa_fcs_rport_s *rport = NULL;
-	struct bfa_fcs_s      *fcs;
+	struct bfa_fcs_s *fcs;
 	enum bfa_pport_speed max_speed = 0;
-	struct bfa_pport_attr_s  pport_attr;
+	struct bfa_pport_attr_s pport_attr;
 	enum bfa_pport_speed pport_speed;
 
 	if (port == NULL)
@@ -157,8 +153,10 @@ bfa_fcs_port_get_rport_max_speed(struct bfa_fcs_port_s *port)
 
 	fcs = port->fcs;
 
-	/* Get Physical port's current speed */
-	bfa_fcport_get_attr(port->fcs->bfa, &pport_attr);
+	/*
+	 * Get Physical port's current speed
+	 */
+	bfa_pport_get_attr(port->fcs->bfa, &pport_attr);
 	pport_speed = pport_attr.speed;
 	bfa_trc(fcs, pport_speed);
 
@@ -166,16 +164,15 @@ bfa_fcs_port_get_rport_max_speed(struct bfa_fcs_port_s *port)
 	qe = bfa_q_first(qh);
 
 	while (qe != qh) {
-		rport = (struct bfa_fcs_rport_s *) qe;
-		if ((bfa_os_ntoh3b(rport->pid) > 0xFFF000) ||
-			(bfa_fcs_rport_get_state(rport) ==
-				BFA_RPORT_OFFLINE)) {
+		rport = (struct bfa_fcs_rport_s *)qe;
+		if ((bfa_os_ntoh3b(rport->pid) > 0xFFF000)
+		    || (bfa_fcs_rport_get_state(rport) == BFA_RPORT_OFFLINE)) {
 			qe = bfa_q_next(qe);
 			continue;
 		}
 
-		if ((rport->rpf.rpsc_speed  == BFA_PPORT_SPEED_8GBPS) ||
-			(rport->rpf.rpsc_speed > pport_speed)) {
+		if ((rport->rpf.rpsc_speed == BFA_PPORT_SPEED_8GBPS)
+		    || (rport->rpf.rpsc_speed > pport_speed)) {
 			max_speed = rport->rpf.rpsc_speed;
 			break;
 		} else if (rport->rpf.rpsc_speed > max_speed) {
@@ -218,7 +215,7 @@ bfa_fcs_lookup_port(struct bfa_fcs_s *fcs, u16 vf_id, wwn_t lpwwn)
  */
 void
 bfa_fcs_port_get_info(struct bfa_fcs_port_s *port,
-				struct bfa_port_info_s *port_info)
+		      struct bfa_port_info_s *port_info)
 {
 
 	bfa_trc(port->fcs, port->fabric->fabric_name);
@@ -238,8 +235,7 @@ bfa_fcs_port_get_info(struct bfa_fcs_port_s *port,
 		port_info->port_wwn = bfa_fcs_port_get_pwwn(port);
 		port_info->node_wwn = bfa_fcs_port_get_nwwn(port);
 
-		port_info->max_vports_supp =
-			bfa_lps_get_max_vport(port->fcs->bfa);
+		port_info->max_vports_supp = bfa_fcs_vport_get_max(port->fcs);
 		port_info->num_vports_inuse =
 			bfa_fcs_fabric_vport_count(port->fabric);
 		port_info->max_rports_supp = BFA_FCS_MAX_RPORTS_SUPP;
@@ -263,10 +259,10 @@ bfa_fcs_port_get_info(struct bfa_fcs_port_s *port,
 
 void
 bfa_fcs_port_get_stats(struct bfa_fcs_port_s *fcs_port,
-				struct bfa_port_stats_s *port_stats)
+		       struct bfa_port_stats_s *port_stats)
 {
 	bfa_os_memcpy(port_stats, &fcs_port->stats,
-				sizeof(struct bfa_port_stats_s));
+		      sizeof(struct bfa_port_stats_s));
 	return;
 }
 

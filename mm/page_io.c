@@ -23,20 +23,15 @@
 
 DEFINE_TRACE(swap_out);
 
-static struct bio *get_swap_bio(gfp_t gfp_flags, pgoff_t index,
+static struct bio *get_swap_bio(gfp_t gfp_flags,
 				struct page *page, bio_end_io_t end_io)
 {
 	struct bio *bio;
 
 	bio = bio_alloc(gfp_flags, 1);
 	if (bio) {
-		struct swap_info_struct *sis;
-		swp_entry_t entry = { .val = index, };
-
-		sis = get_swap_info_struct(swp_type(entry));
-		bio->bi_sector = map_swap_page(sis, swp_offset(entry)) *
-					(PAGE_SIZE >> 9);
-		bio->bi_bdev = sis->bdev;
+		bio->bi_sector = map_swap_page(page, &bio->bi_bdev);
+		bio->bi_sector <<= PAGE_SHIFT - 9;
 		bio->bi_io_vec[0].bv_page = page;
 		bio->bi_io_vec[0].bv_len = PAGE_SIZE;
 		bio->bi_io_vec[0].bv_offset = 0;
@@ -118,31 +113,17 @@ int swap_writepage(struct page *page, struct writeback_control *wbc)
 		return ret;
 	}
 
-	bio = get_swap_bio(GFP_NOIO, page_private(page), page,
-				end_swap_bio_write);
+	bio = get_swap_bio(GFP_NOIO, page, end_swap_bio_write);
 	if (bio == NULL) {
 		set_page_dirty(page);
 		unlock_page(page);
 		ret = -ENOMEM;
 		goto out;
 	}
-
-#ifdef CONFIG_PRECACHE
-	set_page_writeback(page);
-	if (preswap_put(page) == 1) {
-		unlock_page(page);
-		end_page_writeback(page);
-		bio_put(bio);
-		goto out;
-	}
-#endif
-
 	if (wbc->sync_mode == WB_SYNC_ALL)
 		rw |= (1 << BIO_RW_SYNCIO) | (1 << BIO_RW_UNPLUG);
 	count_vm_event(PSWPOUT);
-#ifndef CONFIG_PRECACHE
 	set_page_writeback(page);
-#endif
 	trace_swap_out(page);
 	unlock_page(page);
 	submit_bio(rw, bio);
@@ -201,14 +182,7 @@ int swap_readpage(struct page *page)
 		return ret;
 	}
 
-	if (preswap_get(page) == 1) {
-		SetPageUptodate(page);
-		unlock_page(page);
-		goto out;
-	}
-
-	bio = get_swap_bio(GFP_KERNEL, page_private(page), page,
-				end_swap_bio_read);
+	bio = get_swap_bio(GFP_KERNEL, page, end_swap_bio_read);
 	if (bio == NULL) {
 		unlock_page(page);
 		ret = -ENOMEM;

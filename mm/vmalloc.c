@@ -398,13 +398,10 @@ overflow:
 			purged = 1;
 			goto retry;
 		}
-		if (printk_ratelimit()) {
+		if (printk_ratelimit())
 			printk(KERN_WARNING
-				"vmap allocation failed - "
-				"use vmalloc=<size> to increase size.\n");
-			printk(KERN_WARNING "vmalloc size=%lx start=%lx end=%lx node=%d gfp=%lx\n", size, vstart, vend, node, (unsigned long)gfp_mask);
-			dump_stack();
-		}
+				"vmap allocation for size %lu failed: "
+				"use vmalloc=<size> to increase size.\n", size);
 		kfree(va);
 		return ERR_PTR(-EBUSY);
 	}
@@ -482,8 +479,6 @@ static void vmap_debug_free_range(unsigned long start, unsigned long end)
 #ifdef CONFIG_DEBUG_PAGEALLOC
 	vunmap_page_range(start, end);
 	flush_tlb_kernel_range(start, end);
-#elif defined(CONFIG_XEN) && defined(CONFIG_X86)
-	vunmap_page_range(start, end);
 #endif
 }
 
@@ -764,7 +759,7 @@ static struct vmap_block *new_vmap_block(gfp_t gfp_mask)
 	spin_lock(&vbq->lock);
 	list_add(&vb->free_list, &vbq->free);
 	spin_unlock(&vbq->lock);
-	put_cpu_var(vmap_cpu_blocks);
+	put_cpu_var(vmap_block_queue);
 
 	return vb;
 }
@@ -829,7 +824,7 @@ again:
 		}
 		spin_unlock(&vb->lock);
 	}
-	put_cpu_var(vmap_cpu_blocks);
+	put_cpu_var(vmap_block_queue);
 	rcu_read_unlock();
 
 	if (!addr) {
@@ -1415,13 +1410,6 @@ static void *__vmalloc_area_node(struct vm_struct *area, gfp_t gfp_mask,
 	struct page **pages;
 	unsigned int nr_pages, array_size, i;
 	gfp_t nested_gfp = (gfp_mask & GFP_RECLAIM_MASK) | __GFP_ZERO;
-#ifdef CONFIG_XEN
-	gfp_t dma_mask = gfp_mask & (__GFP_DMA | __GFP_DMA32);
-
-	BUILD_BUG_ON((__GFP_DMA | __GFP_DMA32) != (__GFP_DMA + __GFP_DMA32));
-	if (dma_mask == (__GFP_DMA | __GFP_DMA32))
-		gfp_mask &= ~(__GFP_DMA | __GFP_DMA32);
-#endif
 
 	nr_pages = (area->size - PAGE_SIZE) >> PAGE_SHIFT;
 	array_size = (nr_pages * sizeof(struct page *));
@@ -1429,9 +1417,8 @@ static void *__vmalloc_area_node(struct vm_struct *area, gfp_t gfp_mask,
 	area->nr_pages = nr_pages;
 	/* Please note that the recursion is strictly bounded. */
 	if (array_size > PAGE_SIZE) {
-		pages = __vmalloc_node(array_size, 1,
-				       nested_gfp | __GFP_HIGHMEM,
-				       PAGE_KERNEL, node, caller);
+		pages = __vmalloc_node(array_size, 1, nested_gfp|__GFP_HIGHMEM,
+				PAGE_KERNEL, node, caller);
 		area->flags |= VM_VPAGES;
 	} else {
 		pages = kmalloc_node(array_size, nested_gfp, node);
@@ -1458,16 +1445,6 @@ static void *__vmalloc_area_node(struct vm_struct *area, gfp_t gfp_mask,
 			goto fail;
 		}
 		area->pages[i] = page;
-#ifdef CONFIG_XEN
-		if (dma_mask) {
-			if (xen_limit_pages_to_max_mfn(page, 0, 32)) {
-				area->nr_pages = i + 1;
-				goto fail;
-			}
-			if (gfp_mask & __GFP_ZERO)
-				clear_highpage(page);
-		}
-#endif
 	}
 
 	if (map_vm_area(area, prot, &pages))
@@ -1627,8 +1604,6 @@ void *vmalloc_exec(unsigned long size)
 #define GFP_VMALLOC32 GFP_DMA32 | GFP_KERNEL
 #elif defined(CONFIG_64BIT) && defined(CONFIG_ZONE_DMA)
 #define GFP_VMALLOC32 GFP_DMA | GFP_KERNEL
-#elif defined(CONFIG_XEN)
-#define GFP_VMALLOC32 __GFP_DMA | __GFP_DMA32 | GFP_KERNEL
 #else
 #define GFP_VMALLOC32 GFP_KERNEL
 #endif
@@ -2015,7 +1990,6 @@ void free_vm_area(struct vm_struct *area)
 }
 EXPORT_SYMBOL_GPL(free_vm_area);
 
-#ifndef CONFIG_HAVE_LEGACY_PER_CPU_AREA
 static struct vmap_area *node_to_va(struct rb_node *n)
 {
 	return n ? rb_entry(n, struct vmap_area, rb_node) : NULL;
@@ -2280,7 +2254,6 @@ err_free:
 	kfree(vms);
 	return NULL;
 }
-#endif
 
 /**
  * pcpu_free_vm_areas - free vmalloc areas for percpu allocator

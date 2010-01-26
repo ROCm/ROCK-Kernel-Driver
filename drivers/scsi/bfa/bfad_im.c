@@ -43,11 +43,11 @@ bfa_cb_ioim_done(void *drv, struct bfad_ioim_s *dio,
 	struct bfad_s         *bfad = drv;
 	struct bfad_itnim_data_s *itnim_data;
 	struct bfad_itnim_s *itnim;
-	u8         host_status = DID_OK;
 
 	switch (io_status) {
 	case BFI_IOIM_STS_OK:
 		bfa_trc(bfad, scsi_status);
+		cmnd->result = ScsiResult(DID_OK, scsi_status);
 		scsi_set_resid(cmnd, 0);
 
 		if (sns_len > 0) {
@@ -56,18 +56,8 @@ bfa_cb_ioim_done(void *drv, struct bfad_ioim_s *dio,
 				sns_len = SCSI_SENSE_BUFFERSIZE;
 			memcpy(cmnd->sense_buffer, sns_info, sns_len);
 		}
-		if (residue > 0) {
-			bfa_trc(bfad, residue);
+		if (residue > 0)
 			scsi_set_resid(cmnd, residue);
-			if (!sns_len && (scsi_status == SAM_STAT_GOOD) &&
-				(scsi_bufflen(cmnd) - residue) <
-					cmnd->underflow) {
-				bfa_trc(bfad, 0);
-				host_status = DID_ERROR;
-			}
-		}
-		cmnd->result = ScsiResult(host_status, scsi_status);
-
 		break;
 
 	case BFI_IOIM_STS_ABORTED:
@@ -177,15 +167,17 @@ bfad_im_info(struct Scsi_Host *shost)
 	static char     bfa_buf[256];
 	struct bfad_im_port_s *im_port =
 			(struct bfad_im_port_s *) shost->hostdata[0];
-	struct bfad_s *bfad = im_port->bfad;
-	char model[BFA_ADAPTER_MODEL_NAME_LEN];
+	struct bfa_ioc_attr_s  ioc_attr;
+	struct bfad_s         *bfad = im_port->bfad;
 
-	bfa_get_adapter_model(&bfad->bfa, model);
+	memset(&ioc_attr, 0, sizeof(ioc_attr));
+	bfa_get_attr(&bfad->bfa, &ioc_attr);
 
 	memset(bfa_buf, 0, sizeof(bfa_buf));
 	snprintf(bfa_buf, sizeof(bfa_buf),
 		 "Brocade FC/FCOE Adapter, " "model: %s hwpath: %s driver: %s",
-		 model, bfad->pci_name, BFAD_DRIVER_VERSION);
+		 ioc_attr.adapter_attr.model, bfad->pci_name,
+		 BFAD_DRIVER_VERSION);
 	return bfa_buf;
 }
 
@@ -509,6 +501,16 @@ void bfa_fcb_itnim_tov(struct bfad_itnim_s *itnim)
 }
 
 /**
+ * Path TOV processing begin notification -- dummy for linux
+ */
+void
+bfa_fcb_itnim_tov_begin(struct bfad_itnim_s *itnim)
+{
+}
+
+
+
+/**
  * Allocate a Scsi_Host for a port.
  */
 int
@@ -689,6 +691,9 @@ bfad_im_probe_undo(struct bfad_s *bfad)
 	}
 }
 
+
+
+
 int
 bfad_os_scsi_add_host(struct Scsi_Host *shost, struct bfad_im_port_s *im_port,
 			struct bfad_s *bfad)
@@ -825,6 +830,7 @@ bfad_im_module_init(void)
 		fc_attach_transport(&bfad_im_fc_function_template);
 	if (!bfad_im_scsi_transport_template)
 		return BFA_STATUS_ENOMEM;
+
 	return BFA_STATUS_OK;
 }
 
@@ -887,6 +893,8 @@ bfad_os_handle_qfull(struct bfad_itnim_s *itnim, struct scsi_device *sdev)
 }
 
 
+
+
 struct bfad_itnim_s *
 bfad_os_get_itnim(struct bfad_im_port_s *im_port, int id)
 {
@@ -923,9 +931,10 @@ bfad_os_fc_host_init(struct bfad_im_port_s *im_port)
 	struct Scsi_Host *host = im_port->shost;
 	struct bfad_s         *bfad = im_port->bfad;
 	struct bfad_port_s    *port = im_port->port;
-	struct bfa_pport_attr_s pattr;
-	char model[BFA_ADAPTER_MODEL_NAME_LEN];
-	char fw_ver[BFA_VERSION_LEN];
+	union attr {
+		struct bfa_pport_attr_s pattr;
+		struct bfa_ioc_attr_s  ioc_attr;
+	} attr;
 
 	fc_host_node_name(host) =
 		bfa_os_htonll((bfa_fcs_port_get_nwwn(port->fcs_port)));
@@ -945,18 +954,20 @@ bfad_os_fc_host_init(struct bfad_im_port_s *im_port)
 	/* For fibre channel services type 0x20 */
 	fc_host_supported_fc4s(host)[7] = 1;
 
-	bfa_get_adapter_model(&bfad->bfa, model);
-	bfa_get_adapter_fw_ver(&bfad->bfa, fw_ver);
+	memset(&attr.ioc_attr, 0, sizeof(attr.ioc_attr));
+	bfa_get_attr(&bfad->bfa, &attr.ioc_attr);
 	sprintf(fc_host_symbolic_name(host), "Brocade %s FV%s DV%s",
-		model, fw_ver, BFAD_DRIVER_VERSION);
+		attr.ioc_attr.adapter_attr.model,
+		attr.ioc_attr.adapter_attr.fw_ver, BFAD_DRIVER_VERSION);
 
 	fc_host_supported_speeds(host) = 0;
 	fc_host_supported_speeds(host) |=
 		FC_PORTSPEED_8GBIT | FC_PORTSPEED_4GBIT | FC_PORTSPEED_2GBIT |
 		FC_PORTSPEED_1GBIT;
 
-	bfa_fcport_get_attr(&bfad->bfa, &pattr);
-	fc_host_maxframe_size(host) = pattr.pport_cfg.maxfrsize;
+	memset(&attr.pattr, 0, sizeof(attr.pattr));
+	bfa_pport_get_attr(&bfad->bfa, &attr.pattr);
+	fc_host_maxframe_size(host) = attr.pattr.pport_cfg.maxfrsize;
 }
 
 static void
@@ -1144,7 +1155,7 @@ bfad_im_queuecommand(struct scsi_cmnd *cmnd, void (*done) (struct scsi_cmnd *))
 	hal_io = bfa_ioim_alloc(&bfad->bfa, (struct bfad_ioim_s *) cmnd,
 				    itnim->bfa_itnim, sg_cnt);
 	if (!hal_io) {
-		bfa_trc(bfad, 0);
+		printk(KERN_WARNING "hal_io failure\n");
 		spin_unlock_irqrestore(&bfad->bfad_lock, flags);
 		scsi_dma_unmap(cmnd);
 		return SCSI_MLQUEUE_HOST_BUSY;
@@ -1192,26 +1203,28 @@ int
 bfad_os_get_linkup_delay(struct bfad_s *bfad)
 {
 
-	uint8_t         nwwns = 0;
+	u8         nwwns = 0;
 	wwn_t           *wwns;
-	int 		linkup_delay;
+	int             ldelay;
 
 	/*
 	 * Querying for the boot target port wwns
 	 * -- read from boot information in flash.
 	 * If nwwns > 0 => boot over SAN and set bfa_linkup_delay = 30
-	 * else => local boot machine set bfa_linkup_delay = 0
+	 * else => local boot machine set bfa_linkup_delay = 10
 	 */
 
 	bfa_iocfc_get_bootwwns(&bfad->bfa, &nwwns, &wwns);
 
 	if (nwwns > 0) {
-		/* If Boot over SAN set linkup_delay = 30sec */
-		linkup_delay = 30;
+		/* If boot over SAN; linkup_delay = 30sec */
+		ldelay = 30;
 	} else {
-		/* If local boot; no linkup_delay */
-		linkup_delay = 0;
+		/* If local boot; linkup_delay = 10sec */
+		ldelay = 0;
 	}
 
-	return linkup_delay;
+	return ldelay;
 }
+
+

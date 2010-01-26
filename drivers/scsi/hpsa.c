@@ -196,9 +196,9 @@ static inline struct ctlr_info *sdev_to_hba(struct scsi_device *sdev)
 }
 
 static struct task_struct *hpsa_scan_thread;
-static DEFINE_MUTEX(scan_mutex);
-static LIST_HEAD(scan_q);
-static int scan_thread(void *data);
+static DEFINE_MUTEX(hpsa_scan_mutex);
+static LIST_HEAD(hpsa_scan_q);
+static int hpsa_scan_func(void *data);
 
 /**
  * add_to_scan_list() - add controller to rescan queue
@@ -219,11 +219,15 @@ static int add_to_scan_list(struct ctlr_info *h)
 	if (h->busy_initializing)
 		return 0;
 
+	/*
+	 * If we don't get the lock, it means the driver is unloading
+	 * and there's no point in scheduling a new scan.
+	 */
 	if (!mutex_trylock(&h->busy_shutting_down))
 		return 0;
 
-	mutex_lock(&scan_mutex);
-	list_for_each_entry(test_h, &scan_q, scan_list) {
+	mutex_lock(&hpsa_scan_mutex);
+	list_for_each_entry(test_h, &hpsa_scan_q, scan_list) {
 		if (test_h == h) {
 			found = 1;
 			break;
@@ -231,10 +235,10 @@ static int add_to_scan_list(struct ctlr_info *h)
 	}
 	if (!found && !h->busy_scanning) {
 		INIT_COMPLETION(h->scan_wait);
-		list_add_tail(&h->scan_list, &scan_q);
+		list_add_tail(&h->scan_list, &hpsa_scan_q);
 		ret = 1;
 	}
-	mutex_unlock(&scan_mutex);
+	mutex_unlock(&hpsa_scan_mutex);
 	mutex_unlock(&h->busy_shutting_down);
 
 	return ret;
@@ -257,24 +261,24 @@ static void remove_from_scan_list(struct ctlr_info *h)
 {
 	struct ctlr_info *test_h, *tmp_h;
 
-	mutex_lock(&scan_mutex);
-	list_for_each_entry_safe(test_h, tmp_h, &scan_q, scan_list) {
+	mutex_lock(&hpsa_scan_mutex);
+	list_for_each_entry_safe(test_h, tmp_h, &hpsa_scan_q, scan_list) {
 		if (test_h == h) { /* state 2. */
 			list_del(&h->scan_list);
 			complete_all(&h->scan_wait);
-			mutex_unlock(&scan_mutex);
+			mutex_unlock(&hpsa_scan_mutex);
 			return;
 		}
 	}
 	if (h->busy_scanning) { /* state 3. */
-		mutex_unlock(&scan_mutex);
+		mutex_unlock(&hpsa_scan_mutex);
 		wait_for_completion(&h->scan_wait);
 	} else { /* state 1, nothing to do. */
-		mutex_unlock(&scan_mutex);
+		mutex_unlock(&hpsa_scan_mutex);
 	}
 }
 
-/* scan_thread() - kernel thread used to rescan controllers
+/* hpsa_scan_func() - kernel thread used to rescan controllers
  * @data:	 Ignored.
  *
  * A kernel thread used scan for drive topology changes on
@@ -285,7 +289,7 @@ static void remove_from_scan_list(struct ctlr_info *h)
  *
  * returns 0.
  **/
-static int scan_thread(__attribute__((unused)) void *data)
+static int hpsa_scan_func(__attribute__((unused)) void *data)
 {
 	struct ctlr_info *h;
 	int host_no;
@@ -297,22 +301,22 @@ static int scan_thread(__attribute__((unused)) void *data)
 			break;
 
 		while (1) {
-			mutex_lock(&scan_mutex);
-			if (list_empty(&scan_q)) {
-				mutex_unlock(&scan_mutex);
+			mutex_lock(&hpsa_scan_mutex);
+			if (list_empty(&hpsa_scan_q)) {
+				mutex_unlock(&hpsa_scan_mutex);
 				break;
 			}
-			h = list_entry(scan_q.next, struct ctlr_info,
+			h = list_entry(hpsa_scan_q.next, struct ctlr_info,
 					scan_list);
 			list_del(&h->scan_list);
 			h->busy_scanning = 1;
-			mutex_unlock(&scan_mutex);
+			mutex_unlock(&hpsa_scan_mutex);
 			host_no = h->scsi_host ?  h->scsi_host->host_no : -1;
 			hpsa_update_scsi_devices(h, host_no);
 			complete_all(&h->scan_wait);
-			mutex_lock(&scan_mutex);
+			mutex_lock(&hpsa_scan_mutex);
 			h->busy_scanning = 0;
-			mutex_unlock(&scan_mutex);
+			mutex_unlock(&hpsa_scan_mutex);
 		}
 	}
 	return 0;
@@ -341,7 +345,7 @@ static int check_for_unit_attention(struct ctlr_info *h,
 	 * except that it's quite likely that we will get more than one
 	 * REPORT_LUNS_CHANGED condition in quick succession, which means
 	 * that those which occur after the first one will likely happen
-	 * *during* the scan_thread's rescan.  And the rescan code is not
+	 * *during* the hpsa_scan_thread's rescan.  And the rescan code is not
 	 * robust enough to restart in the middle, undoing what it has already
 	 * done, and it's not clear that it's even possible to do this, since
 	 * part of what it does is notify the SCSI mid layer, which starts
@@ -926,7 +930,7 @@ static void complete_scsi_command(struct CommandList *cp,
 
 	cmd->result = (DID_OK << 16); 		/* host byte */
 	cmd->result |= (COMMAND_COMPLETE << 8);	/* msg byte */
-	cmd->result |= (ei->ScsiStatus);
+	cmd->result |= (ei->ScsiStatus << 1);
 
 	/* copy the sense data whether we need to or not. */
 	memcpy(cmd->sense_buffer, ei->SenseInfo,
@@ -960,6 +964,13 @@ static void complete_scsi_command(struct CommandList *cp,
 				break;
 			}
 			if (sense_key == ILLEGAL_REQUEST) {
+				/*
+				 * SCSI REPORT_LUNS is commonly unsupported on
+				 * Smart Array.  Suppress noisy complaint.
+				 */
+				if (cp->Request.CDB[0] == REPORT_LUNS)
+					break;
+
 				/* If ASC/ASCQ indicate Logical Unit
 				 * Not Supported condition,
 				 */
@@ -987,7 +998,6 @@ static void complete_scsi_command(struct CommandList *cp,
 
 
 			/* Must be some other type of check condition */
-			cmd->result |= (ei->ScsiStatus << 1);
 			dev_warn(&h->pdev->dev, "cp %p has check condition: "
 					"unknown type: "
 					"Sense: 0x%x, ASC: 0x%x, ASCQ: 0x%x, "
@@ -1009,8 +1019,6 @@ static void complete_scsi_command(struct CommandList *cp,
 		 * Pass it up to the upper layers...
 		 */
 		if (ei->ScsiStatus) {
-
-			cmd->result |= (ei->ScsiStatus << 1);
 			dev_warn(&h->pdev->dev, "cp %p has status 0x%x "
 				"Sense: 0x%x, ASC: 0x%x, ASCQ: 0x%x, "
 				"Returning result: 0x%x\n",
@@ -1838,9 +1846,7 @@ static int hpsa_scsi_queue_command(struct scsi_cmnd *cmd,
 	spin_unlock_irqrestore(&h->lock, flags);
 	if (c == NULL) {			/* trouble... */
 		dev_err(&h->pdev->dev, "cmd_alloc returned NULL!\n");
-		cmd->result = DID_NO_CONNECT << 16;
-		done(cmd);
-		return 0;
+		return SCSI_MLQUEUE_HOST_BUSY;
 	}
 
 	/* Fill in the command list header */
@@ -1933,7 +1939,7 @@ static int wait_for_device_to_become_ready(struct ctlr_info *h,
 {
 	int rc = 0;
 	int count = 0;
-	int waittime = HZ;
+	int waittime = 1; /* seconds */
 	struct CommandList *c;
 
 	c = cmd_special_alloc(h);
@@ -1949,12 +1955,11 @@ static int wait_for_device_to_become_ready(struct ctlr_info *h,
 		/* Wait for a bit.  do this first, because if we send
 		 * the TUR right away, the reset will just abort it.
 		 */
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(waittime);
+		msleep(1000 * waittime);
 		count++;
 
 		/* Increase wait time with each try, up to a point. */
-		if (waittime < (HZ * HPSA_MAX_WAIT_INTERVAL_SECS))
+		if (waittime < HPSA_MAX_WAIT_INTERVAL_SECS)
 			waittime = waittime * 2;
 
 		/* Send the Test Unit Ready */
@@ -1972,7 +1977,7 @@ static int wait_for_device_to_become_ready(struct ctlr_info *h,
 			break;
 
 		dev_warn(&h->pdev->dev, "waiting %d secs "
-			"for device to become ready.\n", waittime / HZ);
+			"for device to become ready.\n", waittime);
 		rc = 1; /* device not ready. */
 	}
 
@@ -2838,8 +2843,7 @@ static __devinit int hpsa_message(struct pci_dev *pdev, unsigned char opcode,
 		tag = readl(vaddr + SA5_REPLY_PORT_OFFSET);
 		if (HPSA_TAG_DISCARD_ERROR_BITS(tag) == paddr32)
 			break;
-		schedule_timeout_uninterruptible(
-			HPSA_MSG_SEND_RETRY_INTERVAL_SECS * HZ);
+		msleep(HPSA_MSG_SEND_RETRY_INTERVAL_MSECS);
 	}
 
 	iounmap(vaddr);
@@ -2952,16 +2956,14 @@ static __devinit int hpsa_hard_reset_controller(struct pci_dev *pdev)
 	pmcsr |= PCI_D3hot;
 	pci_write_config_word(pdev, pos + PCI_PM_CTRL, pmcsr);
 
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(HZ >> 1);
+	msleep(500);
 
 	/* enter the D0 power management state */
 	pmcsr &= ~PCI_PM_CTRL_STATE_MASK;
 	pmcsr |= PCI_D0;
 	pci_write_config_word(pdev, pos + PCI_PM_CTRL, pmcsr);
 
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(HZ >> 1);
+	msleep(500);
 
 	/* Restore the PCI configuration space.  The Open CISS
 	 * Specification says, "Restore the PCI Configuration
@@ -3109,7 +3111,7 @@ default_int_mode:
 	return;
 }
 
-static int hpsa_pci_init(struct ctlr_info *h, struct pci_dev *pdev)
+static int __devinit hpsa_pci_init(struct ctlr_info *h, struct pci_dev *pdev)
 {
 	ushort subsystem_vendor_id, subsystem_device_id, command;
 	__u32 board_id, scratchpad = 0;
@@ -3187,8 +3189,7 @@ static int hpsa_pci_init(struct ctlr_info *h, struct pci_dev *pdev)
 		scratchpad = readl(h->vaddr + SA5_SCRATCHPAD_OFFSET);
 		if (scratchpad == HPSA_FIRMWARE_READY)
 			break;
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(HPSA_BOARD_READY_POLL_INTERVAL);
+		msleep(HPSA_BOARD_READY_POLL_INTERVAL_MSECS);
 	}
 	if (scratchpad != HPSA_FIRMWARE_READY) {
 		dev_warn(&pdev->dev, "board not ready, timed out.\n");
@@ -3262,8 +3263,7 @@ static int hpsa_pci_init(struct ctlr_info *h, struct pci_dev *pdev)
 		if (!(readl(h->vaddr + SA5_DOORBELL) & CFGTBL_ChangeReq))
 			break;
 		/* delay and try again */
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(10);
+		msleep(10);
 	}
 
 #ifdef HPSA_DEBUG
@@ -3302,7 +3302,7 @@ static int __devinit hpsa_init_one(struct pci_dev *pdev,
 
 		/* Some devices (notably the HP Smart Array 5i Controller)
 		   need a little pause here */
-		schedule_timeout_uninterruptible(HPSA_POST_RESET_PAUSE);
+		msleep(HPSA_POST_RESET_PAUSE_MSECS);
 
 		/* Now try to get the controller to respond to a no-op */
 		for (i = 0; i < HPSA_POST_RESET_NOOP_RETRIES; i++) {
@@ -3510,7 +3510,7 @@ static int __init hpsa_init(void)
 {
 	int err;
 	/* Start the scan thread */
-	hpsa_scan_thread = kthread_run(scan_thread, NULL, "hpsa_scan");
+	hpsa_scan_thread = kthread_run(hpsa_scan_func, NULL, "hpsa_scan");
 	if (IS_ERR(hpsa_scan_thread)) {
 		err = PTR_ERR(hpsa_scan_thread);
 		return -ENODEV;

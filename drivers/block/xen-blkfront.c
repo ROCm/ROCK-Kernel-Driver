@@ -42,6 +42,7 @@
 #include <linux/module.h>
 #include <linux/scatterlist.h>
 
+#include <xen/xen.h>
 #include <xen/xenbus.h>
 #include <xen/grant_table.h>
 #include <xen/events.h>
@@ -1056,6 +1057,7 @@ static struct xenbus_device_id blkfront_ids[] = {
 
 static struct xenbus_driver blkfront = {
 	.name = "vbd",
+	.owner = THIS_MODULE,
 	.ids = blkfront_ids,
 	.probe = blkfront_probe,
 	.remove = blkfront_remove,

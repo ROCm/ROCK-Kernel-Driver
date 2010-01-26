@@ -134,9 +134,9 @@
 #endif
 
 #if defined(QL_DEBUG_LEVEL_17)
-#define DEBUG17(x)    do {x; } while (0)
+#define DEBUG17(x)	do {x;} while (0)
 #else
-#define DEBUG17(x)    do {} while (0)
+#define DEBUG17(x)	do {} while (0)
 #endif
 
 /*

@@ -25,12 +25,12 @@ BFA_TRC_FILE(HAL, TSKIM);
  */
 #define bfa_tskim_qcomp(__tskim, __cbfn) do {			\
 	bfa_cb_queue((__tskim)->bfa, &(__tskim)->hcb_qe,	\
-				__cbfn, (__tskim));      \
+			 __cbfn, (__tskim));      \
 	bfa_tskim_notify_comp(__tskim);      \
 } while (0)
 
-#define bfa_tskim_notify_comp(__tskim) do {			\
-	if ((__tskim)->notify)					\
+#define bfa_tskim_notify_comp(__tskim) do {			 \
+	if ((__tskim)->notify)					 \
 		bfa_itnim_tskdone((__tskim)->itnim);      \
 } while (0)
 
@@ -110,7 +110,7 @@ bfa_tskim_sm_uninit(struct bfa_tskim_s *tskim, enum bfa_tskim_event event)
 		break;
 
 	default:
-		bfa_sm_fault(tskim->bfa, event);
+		bfa_assert(0);
 	}
 }
 
@@ -146,7 +146,7 @@ bfa_tskim_sm_active(struct bfa_tskim_s *tskim, enum bfa_tskim_event event)
 		break;
 
 	default:
-		bfa_sm_fault(tskim->bfa, event);
+		bfa_assert(0);
 	}
 }
 
@@ -178,7 +178,7 @@ bfa_tskim_sm_cleanup(struct bfa_tskim_s *tskim, enum bfa_tskim_event event)
 		break;
 
 	default:
-		bfa_sm_fault(tskim->bfa, event);
+		bfa_assert(0);
 	}
 }
 
@@ -207,7 +207,7 @@ bfa_tskim_sm_iocleanup(struct bfa_tskim_s *tskim, enum bfa_tskim_event event)
 		break;
 
 	default:
-		bfa_sm_fault(tskim->bfa, event);
+		bfa_assert(0);
 	}
 }
 
@@ -242,7 +242,7 @@ bfa_tskim_sm_qfull(struct bfa_tskim_s *tskim, enum bfa_tskim_event event)
 		break;
 
 	default:
-		bfa_sm_fault(tskim->bfa, event);
+		bfa_assert(0);
 	}
 }
 
@@ -277,7 +277,7 @@ bfa_tskim_sm_cleanup_qfull(struct bfa_tskim_s *tskim,
 		break;
 
 	default:
-		bfa_sm_fault(tskim->bfa, event);
+		bfa_assert(0);
 	}
 }
 
@@ -303,7 +303,7 @@ bfa_tskim_sm_hcb(struct bfa_tskim_s *tskim, enum bfa_tskim_event event)
 		break;
 
 	default:
-		bfa_sm_fault(tskim->bfa, event);
+		bfa_assert(0);
 	}
 }
 

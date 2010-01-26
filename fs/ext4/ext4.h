@@ -376,6 +376,12 @@ struct ext4_new_group_data {
 					 EXT4_GET_BLOCKS_DIO_CREATE_EXT)
 
 /*
+ * Flags used by ext4_free_blocks
+ */
+#define EXT4_FREE_BLOCKS_METADATA	0x0001
+#define EXT4_FREE_BLOCKS_FORGET		0x0002
+
+/*
  * ioctl commands
  */
 #define	EXT4_IOC_GETFLAGS		FS_IOC_GETFLAGS
@@ -693,6 +699,8 @@ struct ext4_inode_info {
 	unsigned int i_reserved_meta_blocks;
 	unsigned int i_allocated_meta_blocks;
 	unsigned short i_delalloc_reserved_flag;
+	sector_t i_da_metadata_calc_last_lblock;
+	int i_da_metadata_calc_len;
 
 	/* on-disk additional length */
 	__u16 i_extra_isize;
@@ -1336,8 +1344,6 @@ extern ext4_fsblk_t ext4_new_meta_blocks(handle_t *handle, struct inode *inode,
 			ext4_fsblk_t goal, unsigned long *count, int *errp);
 extern int ext4_claim_free_blocks(struct ext4_sb_info *sbi, s64 nblocks);
 extern int ext4_has_free_blocks(struct ext4_sb_info *sbi, s64 nblocks);
-extern void ext4_free_blocks(handle_t *handle, struct inode *inode,
-			ext4_fsblk_t block, unsigned long count, int metadata);
 extern void ext4_add_groupblocks(handle_t *handle, struct super_block *sb,
 				ext4_fsblk_t block, unsigned long count);
 extern ext4_fsblk_t ext4_count_free_blocks(struct super_block *);
@@ -1396,16 +1402,15 @@ extern int ext4_mb_reserve_blocks(struct super_block *, int);
 extern void ext4_discard_preallocations(struct inode *);
 extern int __init init_ext4_mballoc(void);
 extern void exit_ext4_mballoc(void);
-extern void ext4_mb_free_blocks(handle_t *, struct inode *,
-		ext4_fsblk_t, unsigned long, int, unsigned long *);
+extern void ext4_free_blocks(handle_t *handle, struct inode *inode,
+			     struct buffer_head *bh, ext4_fsblk_t block,
+			     unsigned long count, int flags);
 extern int ext4_mb_add_groupinfo(struct super_block *sb,
 		ext4_group_t i, struct ext4_group_desc *desc);
 extern int ext4_mb_get_buddy_cache_lock(struct super_block *, ext4_group_t);
 extern void ext4_mb_put_buddy_cache_lock(struct super_block *,
 						ext4_group_t, int);
 /* inode.c */
-int ext4_forget(handle_t *handle, int is_metadata, struct inode *inode,
-		struct buffer_head *bh, ext4_fsblk_t blocknr);
 struct buffer_head *ext4_getblk(handle_t *, struct inode *,
 						ext4_lblk_t, int, int *);
 struct buffer_head *ext4_bread(handle_t *, struct inode *,

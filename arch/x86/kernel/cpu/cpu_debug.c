@@ -30,9 +30,9 @@
 #include <asm/apic.h>
 #include <asm/desc.h>
 
-static DEFINE_PER_CPU(struct cpu_cpuX_base [CPU_REG_ALL_BIT], cpu_arr);
-static DEFINE_PER_CPU(struct cpu_private * [MAX_CPU_FILES], priv_arr);
-static DEFINE_PER_CPU(int, cpu_priv_count);
+static DEFINE_PER_CPU(struct cpu_cpuX_base [CPU_REG_ALL_BIT], cpud_arr);
+static DEFINE_PER_CPU(struct cpu_private * [MAX_CPU_FILES], cpud_priv_arr);
+static DEFINE_PER_CPU(int, cpud_priv_count);
 
 static DEFINE_MUTEX(cpu_debug_lock);
 
@@ -59,23 +59,17 @@ static struct cpu_debug_base cpu_base[] = {
 	{ "misc",	CPU_MISC,	0	},
 	{ "debug",	CPU_DEBUG,	0	},
 	{ "pat",	CPU_PAT,	0	},
-#ifndef CONFIG_XEN
 	{ "vmx",	CPU_VMX,	0	},
-#endif
 	{ "call",	CPU_CALL,	0	},
 	{ "base",	CPU_BASE,	0	},
 	{ "ver",	CPU_VER,	0	},
 	{ "conf",	CPU_CONF,	0	},
 	{ "smm",	CPU_SMM,	0	},
-#ifndef CONFIG_XEN
 	{ "svm",	CPU_SVM,	0	},
 	{ "osvm",	CPU_OSVM,	0	},
-#endif
 	{ "tss",	CPU_TSS,	0	},
 	{ "cr",		CPU_CR,		0	},
-#ifndef CONFIG_XEN
 	{ "dt",		CPU_DT,		0	},
-#endif
 	{ "registers",	CPU_REG_ALL,	0	},
 };
 
@@ -304,7 +298,6 @@ static void print_cr(void *arg)
 #endif
 }
 
-#ifndef CONFIG_XEN
 static void print_desc_ptr(char *str, struct seq_file *seq, struct desc_ptr dt)
 {
 	seq_printf(seq, " %s\t: %016llx\n", str, (u64)(dt.address | dt.size));
@@ -331,7 +324,6 @@ static void print_dt(void *seq)
 	store_tr(ldt);
 	seq_printf(seq, " TR\t: %016lx\n", ldt);
 }
-#endif /* CONFIG_XEN */
 
 static void print_dr(void *arg)
 {
@@ -354,7 +346,7 @@ static void print_apic(void *arg)
 {
 	struct seq_file *seq = arg;
 
-#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
+#ifdef CONFIG_X86_LOCAL_APIC
 	seq_printf(seq, " LAPIC\t:\n");
 	seq_printf(seq, " ID\t\t: %08x\n",  apic_read(APIC_ID) >> 24);
 	seq_printf(seq, " LVR\t\t: %08x\n",  apic_read(APIC_LVR));
@@ -408,11 +400,9 @@ static int cpu_seq_show(struct seq_file *seq, void *v)
 	case CPU_CR:
 		smp_call_function_single(priv->cpu, print_cr, seq, 1);
 		break;
-#ifndef CONFIG_XEN
 	case CPU_DT:
 		smp_call_function_single(priv->cpu, print_dt, seq, 1);
 		break;
-#endif
 	case CPU_DEBUG:
 		if (priv->file == CPU_INDEX_BIT)
 			smp_call_function_single(priv->cpu, print_dr, seq, 1);
@@ -497,11 +487,7 @@ static int write_cpu_register(struct cpu_private *priv, const char *buf)
 		return ret;
 
 	/* Supporting only MSRs */
-#ifndef CONFIG_XEN
 	if (priv->type < CPU_TSS_BIT)
-#else
-	if (cpu_base[priv->type].flag < CPU_TSS)
-#endif
 		return write_msr(priv, val);
 
 	return ret;
@@ -545,7 +531,7 @@ static int cpu_create_file(unsigned cpu, unsigned type, unsigned reg,
 
 	/* Already intialized */
 	if (file == CPU_INDEX_BIT)
-		if (per_cpu(cpu_arr[type].init, cpu))
+		if (per_cpu(cpud_arr[type].init, cpu))
 			return 0;
 
 	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
@@ -557,8 +543,8 @@ static int cpu_create_file(unsigned cpu, unsigned type, unsigned reg,
 	priv->reg = reg;
 	priv->file = file;
 	mutex_lock(&cpu_debug_lock);
-	per_cpu(priv_arr[type], cpu) = priv;
-	per_cpu(cpu_priv_count, cpu)++;
+	per_cpu(cpud_priv_arr[type], cpu) = priv;
+	per_cpu(cpud_priv_count, cpu)++;
 	mutex_unlock(&cpu_debug_lock);
 
 	if (file)
@@ -566,10 +552,10 @@ static int cpu_create_file(unsigned cpu, unsigned type, unsigned reg,
 				    dentry, (void *)priv, &cpu_fops);
 	else {
 		debugfs_create_file(cpu_base[type].name, S_IRUGO,
-				    per_cpu(cpu_arr[type].dentry, cpu),
+				    per_cpu(cpud_arr[type].dentry, cpu),
 				    (void *)priv, &cpu_fops);
 		mutex_lock(&cpu_debug_lock);
-		per_cpu(cpu_arr[type].init, cpu) = 1;
+		per_cpu(cpud_arr[type].init, cpu) = 1;
 		mutex_unlock(&cpu_debug_lock);
 	}
 
@@ -629,13 +615,9 @@ static int cpu_init_allreg(unsigned cpu, struct dentry *dentry)
 		if (!is_typeflag_valid(cpu, cpu_base[type].flag))
 			continue;
 		cpu_dentry = debugfs_create_dir(cpu_base[type].name, dentry);
-		per_cpu(cpu_arr[type].dentry, cpu) = cpu_dentry;
+		per_cpu(cpud_arr[type].dentry, cpu) = cpu_dentry;
 
-#ifndef CONFIG_XEN
 		if (type < CPU_TSS_BIT)
-#else
-		if (cpu_base[type].flag < CPU_TSS)
-#endif
 			err = cpu_init_msr(cpu, type, cpu_dentry);
 		else
 			err = cpu_create_file(cpu, type, 0, CPU_INDEX_BIT,
@@ -665,11 +647,11 @@ static int cpu_init_cpu(void)
 		err = cpu_init_allreg(cpu, cpu_dentry);
 
 		pr_info("cpu%d(%d) debug files %d\n",
-			cpu, nr_cpu_ids, per_cpu(cpu_priv_count, cpu));
-		if (per_cpu(cpu_priv_count, cpu) > MAX_CPU_FILES) {
+			cpu, nr_cpu_ids, per_cpu(cpud_priv_count, cpu));
+		if (per_cpu(cpud_priv_count, cpu) > MAX_CPU_FILES) {
 			pr_err("Register files count %d exceeds limit %d\n",
-				per_cpu(cpu_priv_count, cpu), MAX_CPU_FILES);
-			per_cpu(cpu_priv_count, cpu) = MAX_CPU_FILES;
+				per_cpu(cpud_priv_count, cpu), MAX_CPU_FILES);
+			per_cpu(cpud_priv_count, cpu) = MAX_CPU_FILES;
 			err = -ENFILE;
 		}
 		if (err)
@@ -694,8 +676,8 @@ static void __exit cpu_debug_exit(void)
 		debugfs_remove_recursive(cpu_debugfs_dir);
 
 	for (cpu = 0; cpu <  nr_cpu_ids; cpu++)
-		for (i = 0; i < per_cpu(cpu_priv_count, cpu); i++)
-			kfree(per_cpu(priv_arr[i], cpu));
+		for (i = 0; i < per_cpu(cpud_priv_count, cpu); i++)
+			kfree(per_cpu(cpud_priv_arr[i], cpu));
 }
 
 module_init(cpu_debug_init);

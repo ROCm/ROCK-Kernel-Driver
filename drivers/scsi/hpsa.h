@@ -108,7 +108,7 @@ struct ctlr_info {
 #define HPSA_BUS_RESET_MSG 2
 #define HPSA_HOST_RESET_MSG 3
 #define HPSA_MSG_SEND_RETRY_LIMIT 10
-#define HPSA_MSG_SEND_RETRY_INTERVAL_SECS 1
+#define HPSA_MSG_SEND_RETRY_INTERVAL_MSECS 1000
 
 /* Maximum time in seconds driver will wait for command completions
  * when polling before giving up.
@@ -139,7 +139,7 @@ struct ctlr_info {
 #define HPSA_BOARD_READY_ITERATIONS \
 	((HPSA_BOARD_READY_WAIT_SECS * 1000) / \
 		HPSA_BOARD_READY_POLL_INTERVAL_MSECS)
-#define HPSA_POST_RESET_PAUSE (30 * HZ)
+#define HPSA_POST_RESET_PAUSE_MSECS (3000)
 #define HPSA_POST_RESET_NOOP_RETRIES (12)
 
 /*  Defining the diffent access_menthods */

@@ -656,24 +656,31 @@ void __init early_cpu_init(void)
 	const struct cpu_dev *const *cdev;
 	int count = 0;
 
+#ifdef PROCESSOR_SELECT
 	printk(KERN_INFO "KERNEL supported cpus:\n");
+#endif
+
 	for (cdev = __x86_cpu_dev_start; cdev < __x86_cpu_dev_end; cdev++) {
 		const struct cpu_dev *cpudev = *cdev;
-		unsigned int j;
 
 		if (count >= X86_VENDOR_NUM)
 			break;
 		cpu_devs[count] = cpudev;
 		count++;
 
-		for (j = 0; j < 2; j++) {
-			if (!cpudev->c_ident[j])
-				continue;
-			printk(KERN_INFO "  %s %s\n", cpudev->c_vendor,
-				cpudev->c_ident[j]);
-		}
-	}
+#ifdef PROCESSOR_SELECT
+		{
+			unsigned int j;
 
+			for (j = 0; j < 2; j++) {
+				if (!cpudev->c_ident[j])
+					continue;
+				printk(KERN_INFO "  %s %s\n", cpudev->c_vendor,
+					cpudev->c_ident[j]);
+			}
+		}
+#endif
+	}
 	early_identify_cpu(&boot_cpu_data);
 }
 
@@ -834,10 +841,8 @@ static void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 			boot_cpu_data.x86_capability[i] &= c->x86_capability[i];
 	}
 
-#ifdef CONFIG_X86_MCE
 	/* Init Machine Check Exception if available. */
-	mcheck_init(c);
-#endif
+	mcheck_cpu_init(c);
 
 	select_idle_routine(c);
 
@@ -1090,7 +1095,7 @@ static void clear_all_debug_regs(void)
 
 void __cpuinit cpu_init(void)
 {
-	struct orig_ist *orig_ist;
+	struct orig_ist *oist;
 	struct task_struct *me;
 	struct tss_struct *t;
 	unsigned long v;
@@ -1099,7 +1104,7 @@ void __cpuinit cpu_init(void)
 
 	cpu = stack_smp_processor_id();
 	t = &per_cpu(init_tss, cpu);
-	orig_ist = &per_cpu(orig_ist, cpu);
+	oist = &per_cpu(orig_ist, cpu);
 
 #ifdef CONFIG_NUMA
 	if (cpu != 0 && percpu_read(node_number) == 0 &&
@@ -1133,19 +1138,19 @@ void __cpuinit cpu_init(void)
 	wrmsrl(MSR_KERNEL_GS_BASE, 0);
 	barrier();
 
-	check_efer();
+	x86_configure_nx();
 	if (cpu != 0)
 		enable_x2apic();
 
 	/*
 	 * set up and load the per-CPU TSS
 	 */
-	if (!orig_ist->ist[0]) {
+	if (!oist->ist[0]) {
 		char *estacks = per_cpu(exception_stacks, cpu);
 
 		for (v = 0; v < N_EXCEPTION_STACKS; v++) {
 			estacks += exception_stack_sizes[v];
-			orig_ist->ist[v] = t->x86_tss.ist[v] =
+			oist->ist[v] = t->x86_tss.ist[v] =
 					(unsigned long)estacks;
 		}
 	}

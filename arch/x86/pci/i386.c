@@ -129,7 +129,9 @@ static void __init pcibios_allocate_bus_resources(struct list_head *bus_list)
 					continue;
 				if (!r->start ||
 				    pci_claim_resource(dev, idx) < 0) {
-					dev_info(&dev->dev, "BAR %d: can't allocate resource\n", idx);
+					dev_info(&dev->dev,
+						 "can't reserve window %pR\n",
+						 r);
 					/*
 					 * Something is wrong with the region.
 					 * Invalidate the resource to prevent
@@ -144,16 +146,29 @@ static void __init pcibios_allocate_bus_resources(struct list_head *bus_list)
 	}
 }
 
+struct pci_check_idx_range {
+	int start;
+	int end;
+};
+
 static void __init pcibios_allocate_resources(int pass)
 {
 	struct pci_dev *dev = NULL;
-	int idx, disabled;
+	int idx, disabled, i;
 	u16 command;
 	struct resource *r;
 
+	struct pci_check_idx_range idx_range[] = {
+		{ PCI_STD_RESOURCES, PCI_STD_RESOURCE_END },
+#ifdef CONFIG_PCI_IOV
+		{ PCI_IOV_RESOURCES, PCI_IOV_RESOURCE_END },
+#endif
+	};
+
 	for_each_pci_dev(dev) {
 		pci_read_config_word(dev, PCI_COMMAND, &command);
-		for (idx = 0; idx < PCI_ROM_RESOURCE; idx++) {
+		for (i = 0; i < ARRAY_SIZE(idx_range); i++)
+		for (idx = idx_range[i].start; idx <= idx_range[i].end; idx++) {
 			r = &dev->resource[idx];
 			if (r->parent)		/* Already allocated */
 				continue;
@@ -164,12 +179,12 @@ static void __init pcibios_allocate_resources(int pass)
 			else
 				disabled = !(command & PCI_COMMAND_MEMORY);
 			if (pass == disabled) {
-				dev_dbg(&dev->dev, "resource %#08llx-%#08llx (f=%lx, d=%d, p=%d)\n",
-					(unsigned long long) r->start,
-					(unsigned long long) r->end,
-					r->flags, disabled, pass);
+				dev_dbg(&dev->dev,
+					"BAR %d: reserving %pr (d=%d, p=%d)\n",
+					idx, r, disabled, pass);
 				if (pci_claim_resource(dev, idx) < 0) {
-					dev_info(&dev->dev, "BAR %d: can't allocate resource\n", idx);
+					dev_info(&dev->dev,
+						 "can't reserve %pR\n", r);
 					/* We'll assign a new address later */
 					r->end -= r->start;
 					r->start = 0;
@@ -182,7 +197,7 @@ static void __init pcibios_allocate_resources(int pass)
 				/* Turn the ROM off, leave the resource region,
 				 * but keep it unregistered. */
 				u32 reg;
-				dev_dbg(&dev->dev, "disabling ROM\n");
+				dev_dbg(&dev->dev, "disabling ROM %pR\n", r);
 				r->flags &= ~IORESOURCE_ROM_ENABLE;
 				pci_read_config_dword(dev,
 						dev->rom_base_reg, &reg);
@@ -228,14 +243,12 @@ void __init pcibios_resource_survey(void)
 	pcibios_allocate_resources(1);
 
 	e820_reserve_resources_late();
-#ifndef CONFIG_XEN
 	/*
 	 * Insert the IO APIC resources after PCI initialization has
 	 * occured to handle IO APICS that are mapped in on a BAR in
 	 * PCI space, but before trying to assign unassigned pci res.
 	 */
 	ioapic_insert_resources();
-#endif
 }
 
 /**

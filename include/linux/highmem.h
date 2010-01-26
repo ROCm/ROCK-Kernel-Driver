@@ -46,7 +46,7 @@ void kmap_flush_unused(void);
 
 static inline unsigned int nr_free_highpages(void) { return 0; }
 
-#define totalhigh_pages 0
+#define totalhigh_pages 0UL
 
 #ifndef ARCH_HAS_KMAP
 static inline void *kmap(struct page *page)
@@ -130,14 +130,12 @@ alloc_zeroed_user_highpage_movable(struct vm_area_struct *vma,
 	return __alloc_zeroed_user_highpage(__GFP_MOVABLE, vma, vaddr);
 }
 
-#ifndef __HAVE_ARCH_CLEAR_HIGHPAGE
 static inline void clear_highpage(struct page *page)
 {
 	void *kaddr = kmap_atomic(page, KM_USER0);
 	clear_page(kaddr);
 	kunmap_atomic(kaddr, KM_USER0);
 }
-#endif
 
 static inline void zero_user_segments(struct page *page,
 	unsigned start1, unsigned end1,
@@ -191,8 +189,6 @@ static inline void copy_user_highpage(struct page *to, struct page *from,
 
 #endif
 
-#ifndef __HAVE_ARCH_COPY_HIGHPAGE
-
 static inline void copy_highpage(struct page *to, struct page *from)
 {
 	char *vfrom, *vto;
@@ -203,7 +199,5 @@ static inline void copy_highpage(struct page *to, struct page *from)
 	kunmap_atomic(vfrom, KM_USER0);
 	kunmap_atomic(vto, KM_USER1);
 }
-
-#endif
 
 #endif /* _LINUX_HIGHMEM_H */

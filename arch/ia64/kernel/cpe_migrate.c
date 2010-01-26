@@ -146,7 +146,7 @@ ia64_mca_cpe_move_page(u64 paddr, u32 node)
 	}
 
 	list_add(&page->lru, &pagelist);
-	ret = migrate_pages(&pagelist, alloc_migrate_page, node);
+	ret = migrate_pages(&pagelist, alloc_migrate_page, node, 0);
 	if (ret == 0) {
 		total_badpages++;
 		list_add_tail(&page->lru, &badpagelist);

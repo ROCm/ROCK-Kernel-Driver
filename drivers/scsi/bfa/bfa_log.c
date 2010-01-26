@@ -321,9 +321,8 @@ bfa_log(struct bfa_log_mod_s *log_mod, u32 msg_id, ...)
 
 	log_level = log_mod ? log_mod->log_level[mod] : bfa_log_info[mod].level;
 	if ((BFA_LOG_GET_SEVERITY(msg) > log_level) &&
-			(msg->attributes != BFA_LOG_ATTR_NONE)) {
+			(msg->attributes != BFA_LOG_ATTR_NONE))
 		return 0;
-	}
 
 	va_start(ap, msg_id);
 	bfa_os_vsprintf(buf, BFA_LOG_GET_MSG_FMT_STRING(msg), ap);

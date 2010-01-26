@@ -44,7 +44,6 @@
 #include "lpfc_crtn.h"
 #include "lpfc_version.h"
 #include "lpfc_vport.h"
-#include "lpfc_auth_access.h"
 
 inline void lpfc_vport_set_state(struct lpfc_vport *vport,
 				 enum fc_vport_state new_state)
@@ -379,21 +378,6 @@ lpfc_vport_create(struct fc_vport *fc_vport, bool disable)
 		goto error_out;
 	}
 
-	shost = lpfc_shost_from_vport(vport);
-
-	if ((lpfc_get_security_enabled)(shost)) {
-		/* Triggers fcauthd to register if it is running */
-		fc_host_post_event(shost, fc_get_event_number(),
-				   FCH_EVT_PORT_ONLINE, shost->host_no);
-		spin_lock_irq(&fc_security_user_lock);
-		list_add_tail(&vport->sc_users, &fc_security_user_list);
-		spin_unlock_irq(&fc_security_user_lock);
-		if (fc_service_state == FC_SC_SERVICESTATE_ONLINE) {
-			lpfc_fc_queue_security_work(vport,
-				&vport->sc_online_work);
-		}
-	}
-
 	/* Create binary sysfs attribute for vport */
 	lpfc_alloc_sysfs_attr(vport);
 
@@ -405,7 +389,7 @@ lpfc_vport_create(struct fc_vport *fc_vport, bool disable)
 	 * by the port.
 	 */
 	if ((phba->sli_rev == LPFC_SLI_REV4) &&
-		(pport->fc_flag & FC_VFI_REGISTERED)) {
+	    (pport->vpi_state & LPFC_VPI_REGISTERED)) {
 		rc = lpfc_sli4_init_vpi(phba, vpi);
 		if (rc) {
 			lpfc_printf_log(phba, KERN_ERR, LOG_VPORT,

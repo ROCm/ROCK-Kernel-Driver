@@ -10,30 +10,25 @@
 #include <linux/kernel.h>
 #include <linux/oprofile.h>
 #include <linux/sched.h>
-#include <linux/module.h>
-#include <linux/perfmon_kern.h>
+#include <asm/perfmon.h>
 #include <asm/ptrace.h>
 #include <asm/errno.h>
 
 static int allow_ints;
 
 static int
-perfmon_handler(struct pfm_context *ctx,
-		unsigned long ip, u64 stamp, void *data)
+perfmon_handler(struct task_struct *task, void *buf, pfm_ovfl_arg_t *arg,
+                struct pt_regs *regs, unsigned long stamp)
 {
-	struct pt_regs *regs;
-	struct pfm_ovfl_arg *arg;
-
-	regs = data;
-	arg = &ctx->ovfl_arg;
+	int event = arg->pmd_eventid;
  
-	arg->ovfl_ctrl = PFM_OVFL_CTRL_RESET;
+	arg->ovfl_ctrl.bits.reset_ovfl_pmds = 1;
 
 	/* the owner of the oprofile event buffer may have exited
 	 * without perfmon being shutdown (e.g. SIGSEGV)
 	 */
 	if (allow_ints)
-		oprofile_add_sample(regs, arg->pmd_eventid);
+		oprofile_add_sample(regs, event);
 	return 0;
 }
 
@@ -50,11 +45,14 @@ static void perfmon_stop(void)
 	allow_ints = 0;
 }
 
-static struct pfm_smpl_fmt oprofile_fmt = {
-	.fmt_name = "OProfile",
-	.fmt_handler = perfmon_handler,
-	.fmt_flags = PFM_FMT_BUILTIN_FLAG,
-	.owner = THIS_MODULE
+
+#define OPROFILE_FMT_UUID { \
+	0x77, 0x7a, 0x6e, 0x61, 0x20, 0x65, 0x73, 0x69, 0x74, 0x6e, 0x72, 0x20, 0x61, 0x65, 0x0a, 0x6c }
+
+static pfm_buffer_fmt_t oprofile_fmt = {
+ 	.fmt_name 	    = "oprofile_format",
+ 	.fmt_uuid	    = OPROFILE_FMT_UUID,
+ 	.fmt_handler	    = perfmon_handler,
 };
 
 
@@ -79,7 +77,7 @@ static int using_perfmon;
 
 int perfmon_init(struct oprofile_operations *ops)
 {
-	int ret = pfm_fmt_register(&oprofile_fmt);
+	int ret = pfm_register_buffer_fmt(&oprofile_fmt);
 	if (ret)
 		return -ENODEV;
 
@@ -92,10 +90,10 @@ int perfmon_init(struct oprofile_operations *ops)
 }
 
 
-void __exit perfmon_exit(void)
+void perfmon_exit(void)
 {
 	if (!using_perfmon)
 		return;
 
-	pfm_fmt_unregister(&oprofile_fmt);
+	pfm_unregister_buffer_fmt(oprofile_fmt.fmt_uuid);
 }

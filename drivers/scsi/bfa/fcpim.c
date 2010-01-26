@@ -36,18 +36,18 @@ BFA_TRC_FILE(FCS, FCPIM);
 /*
  * forward declarations
  */
-static void	bfa_fcs_itnim_timeout(void *arg);
-static void	bfa_fcs_itnim_free(struct bfa_fcs_itnim_s *itnim);
-static void	bfa_fcs_itnim_send_prli(void *itnim_cbarg,
+static void     bfa_fcs_itnim_timeout(void *arg);
+static void     bfa_fcs_itnim_free(struct bfa_fcs_itnim_s *itnim);
+static void     bfa_fcs_itnim_send_prli(void *itnim_cbarg,
 					struct bfa_fcxp_s *fcxp_alloced);
-static void	bfa_fcs_itnim_prli_response(void *fcsarg,
+static void     bfa_fcs_itnim_prli_response(void *fcsarg,
 					    struct bfa_fcxp_s *fcxp,
 					    void *cbarg,
 					    bfa_status_t req_status,
 					    u32 rsp_len,
 					    u32 resid_len,
 					    struct fchs_s *rsp_fchs);
-static void	bfa_fcs_itnim_aen_post(struct bfa_fcs_itnim_s *itnim,
+static void     bfa_fcs_itnim_aen_post(struct bfa_fcs_itnim_s *itnim,
 				       enum bfa_itnim_aen_event event);
 
 /**
@@ -61,28 +61,28 @@ enum bfa_fcs_itnim_event {
 	BFA_FCS_ITNIM_SM_RSP_OK = 4,	/*  good response */
 	BFA_FCS_ITNIM_SM_RSP_ERROR = 5,	/*  error response */
 	BFA_FCS_ITNIM_SM_TIMEOUT = 6,	/*  delay timeout */
-	BFA_FCS_ITNIM_SM_HCB_OFFLINE = 7, /*  BFA online callback */
-	BFA_FCS_ITNIM_SM_HCB_ONLINE = 8, /*  BFA offline callback */
+	BFA_FCS_ITNIM_SM_HCB_OFFLINE = 7,	/*  BFA online callback */
+	BFA_FCS_ITNIM_SM_HCB_ONLINE = 8,	/*  BFA offline callback */
 	BFA_FCS_ITNIM_SM_INITIATOR = 9,	/*  rport is initiator */
 	BFA_FCS_ITNIM_SM_DELETE = 10,	/*  delete event from rport */
 	BFA_FCS_ITNIM_SM_PRLO = 11,	/*  delete event from rport */
 };
 
-static void	bfa_fcs_itnim_sm_offline(struct bfa_fcs_itnim_s *itnim,
+static void     bfa_fcs_itnim_sm_offline(struct bfa_fcs_itnim_s *itnim,
 					 enum bfa_fcs_itnim_event event);
-static void	bfa_fcs_itnim_sm_prli_send(struct bfa_fcs_itnim_s *itnim,
+static void     bfa_fcs_itnim_sm_prli_send(struct bfa_fcs_itnim_s *itnim,
 					   enum bfa_fcs_itnim_event event);
-static void	bfa_fcs_itnim_sm_prli(struct bfa_fcs_itnim_s *itnim,
+static void     bfa_fcs_itnim_sm_prli(struct bfa_fcs_itnim_s *itnim,
 				      enum bfa_fcs_itnim_event event);
-static void	bfa_fcs_itnim_sm_prli_retry(struct bfa_fcs_itnim_s *itnim,
+static void     bfa_fcs_itnim_sm_prli_retry(struct bfa_fcs_itnim_s *itnim,
 					    enum bfa_fcs_itnim_event event);
-static void	bfa_fcs_itnim_sm_hcb_online(struct bfa_fcs_itnim_s *itnim,
+static void     bfa_fcs_itnim_sm_hcb_online(struct bfa_fcs_itnim_s *itnim,
 					    enum bfa_fcs_itnim_event event);
-static void	bfa_fcs_itnim_sm_online(struct bfa_fcs_itnim_s *itnim,
+static void     bfa_fcs_itnim_sm_online(struct bfa_fcs_itnim_s *itnim,
 					enum bfa_fcs_itnim_event event);
-static void	bfa_fcs_itnim_sm_hcb_offline(struct bfa_fcs_itnim_s *itnim,
+static void     bfa_fcs_itnim_sm_hcb_offline(struct bfa_fcs_itnim_s *itnim,
 					     enum bfa_fcs_itnim_event event);
-static void	bfa_fcs_itnim_sm_initiator(struct bfa_fcs_itnim_s *itnim,
+static void     bfa_fcs_itnim_sm_initiator(struct bfa_fcs_itnim_s *itnim,
 					   enum bfa_fcs_itnim_event event);
 
 static struct bfa_sm_table_s itnim_sm_table[] = {
@@ -102,7 +102,7 @@ static struct bfa_sm_table_s itnim_sm_table[] = {
 
 static void
 bfa_fcs_itnim_sm_offline(struct bfa_fcs_itnim_s *itnim,
-				enum bfa_fcs_itnim_event event)
+			 enum bfa_fcs_itnim_event event)
 {
 	bfa_trc(itnim->fcs, itnim->rport->pwwn);
 	bfa_trc(itnim->fcs, event);
@@ -126,14 +126,14 @@ bfa_fcs_itnim_sm_offline(struct bfa_fcs_itnim_s *itnim,
 		break;
 
 	default:
-		bfa_sm_fault(itnim->fcs, event);
+		bfa_assert(0);
 	}
 
 }
 
 static void
 bfa_fcs_itnim_sm_prli_send(struct bfa_fcs_itnim_s *itnim,
-				enum bfa_fcs_itnim_event event)
+			   enum bfa_fcs_itnim_event event)
 {
 	bfa_trc(itnim->fcs, itnim->rport->pwwn);
 	bfa_trc(itnim->fcs, event);
@@ -161,13 +161,13 @@ bfa_fcs_itnim_sm_prli_send(struct bfa_fcs_itnim_s *itnim,
 		break;
 
 	default:
-		bfa_sm_fault(itnim->fcs, event);
+		bfa_assert(0);
 	}
 }
 
 static void
 bfa_fcs_itnim_sm_prli(struct bfa_fcs_itnim_s *itnim,
-				enum bfa_fcs_itnim_event event)
+		      enum bfa_fcs_itnim_event event)
 {
 	bfa_trc(itnim->fcs, itnim->rport->pwwn);
 	bfa_trc(itnim->fcs, event);
@@ -193,7 +193,9 @@ bfa_fcs_itnim_sm_prli(struct bfa_fcs_itnim_s *itnim,
 
 	case BFA_FCS_ITNIM_SM_INITIATOR:
 		bfa_sm_set_state(itnim, bfa_fcs_itnim_sm_initiator);
-		/* dont discard fcxp. accept will reach same state*/
+		/*
+		 * dont discard fcxp. accept will reach same state
+		 */
 		break;
 
 	case BFA_FCS_ITNIM_SM_DELETE:
@@ -203,7 +205,7 @@ bfa_fcs_itnim_sm_prli(struct bfa_fcs_itnim_s *itnim,
 		break;
 
 	default:
-		bfa_sm_fault(itnim->fcs, event);
+		bfa_assert(0);
 	}
 }
 
@@ -238,7 +240,7 @@ bfa_fcs_itnim_sm_prli_retry(struct bfa_fcs_itnim_s *itnim,
 		break;
 
 	default:
-		bfa_sm_fault(itnim->fcs, event);
+		bfa_assert(0);
 	}
 }
 
@@ -268,13 +270,13 @@ bfa_fcs_itnim_sm_hcb_online(struct bfa_fcs_itnim_s *itnim,
 		break;
 
 	default:
-		bfa_sm_fault(itnim->fcs, event);
+		bfa_assert(0);
 	}
 }
 
 static void
 bfa_fcs_itnim_sm_online(struct bfa_fcs_itnim_s *itnim,
-						enum bfa_fcs_itnim_event event)
+			enum bfa_fcs_itnim_event event)
 {
 	bfa_trc(itnim->fcs, itnim->rport->pwwn);
 	bfa_trc(itnim->fcs, event);
@@ -296,7 +298,7 @@ bfa_fcs_itnim_sm_online(struct bfa_fcs_itnim_s *itnim,
 		break;
 
 	default:
-		bfa_sm_fault(itnim->fcs, event);
+		bfa_assert(0);
 	}
 }
 
@@ -319,7 +321,7 @@ bfa_fcs_itnim_sm_hcb_offline(struct bfa_fcs_itnim_s *itnim,
 		break;
 
 	default:
-		bfa_sm_fault(itnim->fcs, event);
+		bfa_assert(0);
 	}
 }
 
@@ -330,7 +332,7 @@ bfa_fcs_itnim_sm_hcb_offline(struct bfa_fcs_itnim_s *itnim,
  */
 static void
 bfa_fcs_itnim_sm_initiator(struct bfa_fcs_itnim_s *itnim,
-				enum bfa_fcs_itnim_event event)
+			   enum bfa_fcs_itnim_event event)
 {
 	bfa_trc(itnim->fcs, itnim->rport->pwwn);
 	bfa_trc(itnim->fcs, event);
@@ -352,7 +354,7 @@ bfa_fcs_itnim_sm_initiator(struct bfa_fcs_itnim_s *itnim,
 		break;
 
 	default:
-		bfa_sm_fault(itnim->fcs, event);
+		bfa_assert(0);
 	}
 }
 
@@ -364,24 +366,38 @@ bfa_fcs_itnim_sm_initiator(struct bfa_fcs_itnim_s *itnim,
 
 static void
 bfa_fcs_itnim_aen_post(struct bfa_fcs_itnim_s *itnim,
-			enum bfa_itnim_aen_event event)
+		       enum bfa_itnim_aen_event event)
 {
 	struct bfa_fcs_rport_s *rport = itnim->rport;
-	union bfa_aen_data_u  aen_data;
+	union bfa_aen_data_u aen_data;
 	struct bfa_log_mod_s *logmod = rport->fcs->logm;
-	wwn_t		lpwwn = bfa_fcs_port_get_pwwn(rport->port);
-	wwn_t		rpwwn = rport->pwwn;
-	char		lpwwn_ptr[BFA_STRING_32];
-	char		rpwwn_ptr[BFA_STRING_32];
+	wwn_t           lpwwn = bfa_fcs_port_get_pwwn(rport->port);
+	wwn_t           rpwwn = rport->pwwn;
+	char            lpwwn_ptr[BFA_STRING_32];
+	char            rpwwn_ptr[BFA_STRING_32];
 
-	/* Don't post events for well known addresses */
+	/*
+	 * Don't post events for well known addresses
+	 */
 	if (BFA_FCS_PID_IS_WKA(rport->pid))
 		return;
 
 	wwn2str(lpwwn_ptr, lpwwn);
 	wwn2str(rpwwn_ptr, rpwwn);
-	bfa_log(logmod, BFA_LOG_CREATE_ID(BFA_AEN_CAT_ITNIM, event),
-			rpwwn_ptr, lpwwn_ptr);
+
+	switch (event) {
+	case BFA_ITNIM_AEN_ONLINE:
+		bfa_log(logmod, BFA_AEN_ITNIM_ONLINE, rpwwn_ptr, lpwwn_ptr);
+		break;
+	case BFA_ITNIM_AEN_OFFLINE:
+		bfa_log(logmod, BFA_AEN_ITNIM_OFFLINE, rpwwn_ptr, lpwwn_ptr);
+		break;
+	case BFA_ITNIM_AEN_DISCONNECT:
+		bfa_log(logmod, BFA_AEN_ITNIM_DISCONNECT, rpwwn_ptr, lpwwn_ptr);
+		break;
+	default:
+		break;
+	}
 
 	aen_data.itnim.vf_id = rport->port->fabric->vf_id;
 	aen_data.itnim.ppwwn =
@@ -396,9 +412,9 @@ bfa_fcs_itnim_send_prli(void *itnim_cbarg, struct bfa_fcxp_s *fcxp_alloced)
 	struct bfa_fcs_itnim_s *itnim = itnim_cbarg;
 	struct bfa_fcs_rport_s *rport = itnim->rport;
 	struct bfa_fcs_port_s *port = rport->port;
-	struct fchs_s		fchs;
+	struct fchs_s          fchs;
 	struct bfa_fcxp_s *fcxp;
-	int		len;
+	int             len;
 
 	bfa_trc(itnim->fcs, itnim->rport->pwwn);
 
@@ -411,13 +427,13 @@ bfa_fcs_itnim_send_prli(void *itnim_cbarg, struct bfa_fcxp_s *fcxp_alloced)
 	}
 	itnim->fcxp = fcxp;
 
-	len = fc_prli_build(&fchs, bfa_fcxp_get_reqbuf(fcxp),
-			    itnim->rport->pid, bfa_fcs_port_get_fcid(port), 0);
+	len = fc_prli_build(&fchs, bfa_fcxp_get_reqbuf(fcxp), itnim->rport->pid,
+			    bfa_fcs_port_get_fcid(port), 0);
 
 	bfa_fcxp_send(fcxp, rport->bfa_rport, port->fabric->vf_id, port->lp_tag,
 		      BFA_FALSE, FC_CLASS_3, len, &fchs,
-		      bfa_fcs_itnim_prli_response, (void *)itnim,
-		      FC_MAX_PDUSZ, FC_RA_TOV);
+		      bfa_fcs_itnim_prli_response, (void *)itnim, FC_MAX_PDUSZ,
+		      FC_RA_TOV);
 
 	itnim->stats.prli_sent++;
 	bfa_sm_send_event(itnim, BFA_FCS_ITNIM_SM_FRMSENT);
@@ -428,7 +444,7 @@ bfa_fcs_itnim_prli_response(void *fcsarg, struct bfa_fcxp_s *fcxp, void *cbarg,
 			    bfa_status_t req_status, u32 rsp_len,
 			    u32 resid_len, struct fchs_s *rsp_fchs)
 {
-	struct bfa_fcs_itnim_s *itnim = (struct bfa_fcs_itnim_s *) cbarg;
+	struct bfa_fcs_itnim_s *itnim = (struct bfa_fcs_itnim_s *)cbarg;
 	struct fc_els_cmd_s   *els_cmd;
 	struct fc_prli_s      *prli_resp;
 	struct fc_ls_rjt_s    *ls_rjt;
@@ -459,7 +475,7 @@ bfa_fcs_itnim_prli_response(void *fcsarg, struct bfa_fcxp_s *fcxp, void *cbarg,
 			if (prli_resp->parampage.servparams.initiator) {
 				bfa_trc(itnim->fcs, prli_resp->parampage.type);
 				itnim->rport->scsi_function =
-							BFA_RPORT_INITIATOR;
+					BFA_RPORT_INITIATOR;
 				itnim->stats.prli_rsp_acc++;
 				bfa_sm_send_event(itnim,
 						  BFA_FCS_ITNIM_SM_INITIATOR);
@@ -472,10 +488,10 @@ bfa_fcs_itnim_prli_response(void *fcsarg, struct bfa_fcxp_s *fcxp, void *cbarg,
 		itnim->rport->scsi_function = BFA_RPORT_TARGET;
 
 		sparams = &prli_resp->parampage.servparams;
-		itnim->seq_rec	     = sparams->retry;
-		itnim->rec_support   = sparams->rec_support;
+		itnim->seq_rec = sparams->retry;
+		itnim->rec_support = sparams->rec_support;
 		itnim->task_retry_id = sparams->task_retry_id;
-		itnim->conf_comp     = sparams->confirm;
+		itnim->conf_comp = sparams->confirm;
 
 		itnim->stats.prli_rsp_acc++;
 		bfa_sm_send_event(itnim, BFA_FCS_ITNIM_SM_RSP_OK);
@@ -493,7 +509,7 @@ bfa_fcs_itnim_prli_response(void *fcsarg, struct bfa_fcxp_s *fcxp, void *cbarg,
 static void
 bfa_fcs_itnim_timeout(void *arg)
 {
-	struct bfa_fcs_itnim_s *itnim = (struct bfa_fcs_itnim_s *) arg;
+	struct bfa_fcs_itnim_s *itnim = (struct bfa_fcs_itnim_s *)arg;
 
 	itnim->stats.timeout++;
 	bfa_sm_send_event(itnim, BFA_FCS_ITNIM_SM_TIMEOUT);
@@ -513,7 +529,7 @@ bfa_fcs_itnim_free(struct bfa_fcs_itnim_s *itnim)
  */
 
 /**
- *	Called by rport when a new rport is created.
+ * 	Called by rport when a new rport is created.
  *
  * @param[in] rport	-  remote port.
  */
@@ -522,7 +538,7 @@ bfa_fcs_itnim_create(struct bfa_fcs_rport_s *rport)
 {
 	struct bfa_fcs_port_s *port = rport->port;
 	struct bfa_fcs_itnim_s *itnim;
-	struct bfad_itnim_s   *itnim_drv;
+	struct bfad_itnim_s *itnim_drv;
 	struct bfa_itnim_s *bfa_itnim;
 
 	/*
@@ -544,8 +560,7 @@ bfa_fcs_itnim_create(struct bfa_fcs_rport_s *rport)
 	/*
 	 * call BFA to create the itnim
 	 */
-	bfa_itnim =
-		bfa_itnim_create(port->fcs->bfa, rport->bfa_rport, itnim);
+	bfa_itnim = bfa_itnim_create(port->fcs->bfa, rport->bfa_rport, itnim);
 
 	if (bfa_itnim == NULL) {
 		bfa_trc(port->fcs, rport->pwwn);
@@ -554,10 +569,10 @@ bfa_fcs_itnim_create(struct bfa_fcs_rport_s *rport)
 		return NULL;
 	}
 
-	itnim->bfa_itnim     = bfa_itnim;
-	itnim->seq_rec	     = BFA_FALSE;
-	itnim->rec_support   = BFA_FALSE;
-	itnim->conf_comp     = BFA_FALSE;
+	itnim->bfa_itnim = bfa_itnim;
+	itnim->seq_rec = BFA_FALSE;
+	itnim->rec_support = BFA_FALSE;
+	itnim->conf_comp = BFA_FALSE;
 	itnim->task_retry_id = BFA_FALSE;
 
 	/*
@@ -569,7 +584,7 @@ bfa_fcs_itnim_create(struct bfa_fcs_rport_s *rport)
 }
 
 /**
- *	Called by rport to delete  the instance of FCPIM.
+ * 	Called by rport to delete  the instance of FCPIM.
  *
  * @param[in] rport	-  remote port.
  */
@@ -592,8 +607,8 @@ bfa_fcs_itnim_rport_online(struct bfa_fcs_itnim_s *itnim)
 		bfa_sm_send_event(itnim, BFA_FCS_ITNIM_SM_ONLINE);
 	} else {
 		/*
-		 * For well known addresses, we set the
-		 * itnim to initiator state
+		 * For well known addresses, we set the itnim to initiator
+		 * state
 		 */
 		itnim->stats.initiator++;
 		bfa_sm_send_event(itnim, BFA_FCS_ITNIM_SM_INITIATOR);
@@ -630,12 +645,13 @@ bfa_fcs_itnim_get_online_state(struct bfa_fcs_itnim_s *itnim)
 {
 	bfa_trc(itnim->fcs, itnim->rport->pid);
 	switch (bfa_sm_to_state(itnim_sm_table, itnim->sm)) {
-	case  BFA_ITNIM_ONLINE:
-	case  BFA_ITNIM_INITIATIOR:
+	case BFA_ITNIM_ONLINE:
+	case BFA_ITNIM_INITIATIOR:
 		return BFA_STATUS_OK;
 
 	default:
 		return BFA_STATUS_NO_FCPIM_NEXUS;
+
 	}
 }
 
@@ -645,7 +661,7 @@ bfa_fcs_itnim_get_online_state(struct bfa_fcs_itnim_s *itnim)
 void
 bfa_cb_itnim_online(void *cbarg)
 {
-	struct bfa_fcs_itnim_s *itnim = (struct bfa_fcs_itnim_s *) cbarg;
+	struct bfa_fcs_itnim_s *itnim = (struct bfa_fcs_itnim_s *)cbarg;
 
 	bfa_trc(itnim->fcs, itnim->rport->pwwn);
 	bfa_sm_send_event(itnim, BFA_FCS_ITNIM_SM_HCB_ONLINE);
@@ -657,7 +673,7 @@ bfa_cb_itnim_online(void *cbarg)
 void
 bfa_cb_itnim_offline(void *cb_arg)
 {
-	struct bfa_fcs_itnim_s *itnim = (struct bfa_fcs_itnim_s *) cb_arg;
+	struct bfa_fcs_itnim_s *itnim = (struct bfa_fcs_itnim_s *)cb_arg;
 
 	bfa_trc(itnim->fcs, itnim->rport->pwwn);
 	bfa_sm_send_event(itnim, BFA_FCS_ITNIM_SM_HCB_OFFLINE);
@@ -670,9 +686,10 @@ bfa_cb_itnim_offline(void *cb_arg)
 void
 bfa_cb_itnim_tov_begin(void *cb_arg)
 {
-	struct bfa_fcs_itnim_s *itnim = (struct bfa_fcs_itnim_s *) cb_arg;
+	struct bfa_fcs_itnim_s *itnim = (struct bfa_fcs_itnim_s *)cb_arg;
 
 	bfa_trc(itnim->fcs, itnim->rport->pwwn);
+	bfa_fcb_itnim_tov_begin(itnim->itnim_drv);
 }
 
 /**
@@ -681,14 +698,14 @@ bfa_cb_itnim_tov_begin(void *cb_arg)
 void
 bfa_cb_itnim_tov(void *cb_arg)
 {
-	struct bfa_fcs_itnim_s *itnim = (struct bfa_fcs_itnim_s *) cb_arg;
+	struct bfa_fcs_itnim_s *itnim = (struct bfa_fcs_itnim_s *)cb_arg;
 
 	bfa_trc(itnim->fcs, itnim->rport->pwwn);
 	bfa_fcb_itnim_tov(itnim->itnim_drv);
 }
 
 /**
- *		BFA notification to FCS/driver for second level error recovery.
+ * 		BFA notification to FCS/driver for second level error recovery.
  *
  * Atleast one I/O request has timedout and target is unresponsive to
  * repeated abort requests. Second level error recovery should be initiated
@@ -697,7 +714,7 @@ bfa_cb_itnim_tov(void *cb_arg)
 void
 bfa_cb_itnim_sler(void *cb_arg)
 {
-	struct bfa_fcs_itnim_s *itnim = (struct bfa_fcs_itnim_s *) cb_arg;
+	struct bfa_fcs_itnim_s *itnim = (struct bfa_fcs_itnim_s *)cb_arg;
 
 	itnim->stats.sler++;
 	bfa_trc(itnim->fcs, itnim->rport->pwwn);
@@ -728,10 +745,10 @@ bfa_fcs_itnim_attr_get(struct bfa_fcs_port_s *port, wwn_t rpwwn,
 	if (itnim == NULL)
 		return BFA_STATUS_NO_FCPIM_NEXUS;
 
-	attr->state	    = bfa_sm_to_state(itnim_sm_table, itnim->sm);
-	attr->retry	    = itnim->seq_rec;
-	attr->rec_support   = itnim->rec_support;
-	attr->conf_comp	    = itnim->conf_comp;
+	attr->state = bfa_sm_to_state(itnim_sm_table, itnim->sm);
+	attr->retry = itnim->seq_rec;
+	attr->rec_support = itnim->rec_support;
+	attr->conf_comp = itnim->conf_comp;
 	attr->task_retry_id = itnim->task_retry_id;
 
 	return BFA_STATUS_OK;
@@ -773,7 +790,7 @@ bfa_fcs_itnim_stats_clear(struct bfa_fcs_port_s *port, wwn_t rpwwn)
 
 void
 bfa_fcs_fcpim_uf_recv(struct bfa_fcs_itnim_s *itnim, struct fchs_s *fchs,
-						u16 len)
+		      u16 len)
 {
 	struct fc_els_cmd_s   *els_cmd;
 
@@ -804,6 +821,23 @@ bfa_fcs_itnim_pause(struct bfa_fcs_itnim_s *itnim)
 void
 bfa_fcs_itnim_resume(struct bfa_fcs_itnim_s *itnim)
 {
+}
+
+/**
+ *   Module initialization
+ */
+void
+bfa_fcs_fcpim_modinit(struct bfa_fcs_s *fcs)
+{
+}
+
+/**
+ *   Module cleanup
+ */
+void
+bfa_fcs_fcpim_modexit(struct bfa_fcs_s *fcs)
+{
+	bfa_fcs_modexit_comp(fcs);
 }
 
 

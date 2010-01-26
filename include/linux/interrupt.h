@@ -52,7 +52,6 @@
  * IRQF_ONESHOT - Interrupt is not reenabled after the hardirq handler finished.
  *                Used by threaded interrupts which need to keep the
  *                irq line disabled until the threaded handler has been run.
- * IRQF_NO_SUSPEND - Prevent this interrupt from being disabled during suspend.
  */
 #define IRQF_DISABLED		0x00000020
 #define IRQF_SAMPLE_RANDOM	0x00000040
@@ -63,7 +62,6 @@
 #define IRQF_NOBALANCING	0x00000800
 #define IRQF_IRQPOLL		0x00001000
 #define IRQF_ONESHOT		0x00002000
-#define IRQF_NO_SUSPEND		0x00008000
 
 /*
  * Bits used by threaded handlers:
@@ -318,12 +316,6 @@ static inline int disable_irq_wake(unsigned int irq)
 	return 0;
 }
 #endif /* CONFIG_GENERIC_HARDIRQS */
-
-#ifdef CONFIG_HAVE_IRQ_IGNORE_UNHANDLED
-int irq_ignore_unhandled(unsigned int irq);
-#else
-#define irq_ignore_unhandled(irq) 0
-#endif
 
 #ifndef __ARCH_SET_SOFTIRQ_PENDING
 #define set_softirq_pending(x) (local_softirq_pending() = (x))
@@ -609,12 +601,6 @@ extern void init_irq_proc(void);
 static inline void init_irq_proc(void)
 {
 }
-#endif
-
-#if defined(CONFIG_GENERIC_HARDIRQS) && defined(CONFIG_DEBUG_SHIRQ)
-extern void debug_poll_all_shared_irqs(void);
-#else
-static inline void debug_poll_all_shared_irqs(void) { }
 #endif
 
 struct seq_file;

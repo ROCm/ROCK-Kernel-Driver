@@ -15,6 +15,7 @@
 #include <linux/aio_abi.h>
 #include <linux/module.h>
 #include <linux/syscalls.h>
+#include <linux/backing-dev.h>
 #include <linux/uio.h>
 
 #define DEBUG 0
@@ -32,14 +33,12 @@
 #include <linux/workqueue.h>
 #include <linux/security.h>
 #include <linux/eventfd.h>
+#include <linux/blkdev.h>
+#include <linux/mempool.h>
+#include <linux/hash.h>
 
 #include <asm/kmap_types.h>
 #include <asm/uaccess.h>
-
-#ifdef CONFIG_EPOLL
-#include <linux/poll.h>
-#include <linux/anon_inodes.h>
-#endif
 
 #if DEBUG > 1
 #define dprintk		printk
@@ -65,6 +64,14 @@ static DECLARE_WORK(fput_work, aio_fput_routine);
 static DEFINE_SPINLOCK(fput_lock);
 static LIST_HEAD(fput_head);
 
+#define AIO_BATCH_HASH_BITS	3 /* allocated on-stack, so don't go crazy */
+#define AIO_BATCH_HASH_SIZE	(1 << AIO_BATCH_HASH_BITS)
+struct aio_batch_entry {
+	struct hlist_node list;
+	struct address_space *mapping;
+};
+mempool_t *abe_pool;
+
 static void aio_kick_handler(struct work_struct *);
 static void aio_queue_work(struct kioctx *);
 
@@ -78,6 +85,8 @@ static int __init aio_setup(void)
 	kioctx_cachep = KMEM_CACHE(kioctx,SLAB_HWCACHE_ALIGN|SLAB_PANIC);
 
 	aio_wq = create_workqueue("aio");
+	abe_pool = mempool_create_kmalloc_pool(1, sizeof(struct aio_batch_entry));
+	BUG_ON(!abe_pool);
 
 	pr_debug("aio_setup: sizeof(struct page) = %d\n", (int)sizeof(struct page));
 
@@ -702,10 +711,8 @@ static ssize_t aio_run_iocb(struct kiocb *iocb)
 	 */
 	ret = retry(iocb);
 
-	if (ret != -EIOCBRETRY && ret != -EIOCBQUEUED) {
-		BUG_ON(!list_empty(&iocb->ki_wait.task_list));
+	if (ret != -EIOCBRETRY && ret != -EIOCBQUEUED)
 		aio_complete(iocb, ret, 0);
-	}
 out:
 	spin_lock_irq(&ctx->ctx_lock);
 
@@ -857,13 +864,6 @@ static void try_queue_kicked_iocb(struct kiocb *iocb)
 	unsigned long flags;
 	int run = 0;
 
-	/* We're supposed to be the only path putting the iocb back on the run
-	 * list.  If we find that the iocb is *back* on a wait queue already
-	 * than retry has happened before we could queue the iocb.  This also
-	 * means that the retry could have completed and freed our iocb, no
-	 * good. */
-	BUG_ON((!list_empty(&iocb->ki_wait.task_list)));
-
 	spin_lock_irqsave(&ctx->ctx_lock, flags);
 	/* set this inside the lock so that we can't race with aio_run_iocb()
 	 * testing it and putting the iocb on the run list under the lock */
@@ -877,7 +877,7 @@ static void try_queue_kicked_iocb(struct kiocb *iocb)
 /*
  * kick_iocb:
  *      Called typically from a wait queue callback context
- *      (aio_wake_function) to trigger a retry of the iocb.
+ *      to trigger a retry of the iocb.
  *      The retry is usually executed by aio workqueue
  *      threads (See aio_kick_handler).
  */
@@ -997,11 +997,6 @@ put_rq:
 	if (waitqueue_active(&ctx->wait))
 		wake_up(&ctx->wait);
 
-#ifdef CONFIG_EPOLL
-	if (ctx->file && waitqueue_active(&ctx->poll_wait))
-		wake_up(&ctx->poll_wait);
-#endif
-
 	spin_unlock_irqrestore(&ctx->ctx_lock, flags);
 	return ret;
 }
@@ -1010,8 +1005,6 @@ EXPORT_SYMBOL(aio_complete);
 /* aio_read_evt
  *	Pull an event off of the ioctx's event ring.  Returns the number of 
  *	events fetched (0 or 1 ;-)
- *	If ent parameter is 0, just returns the number of events that would
- *	be fetched.
  *	FIXME: make this use cmpxchg.
  *	TODO: make the ringbuffer user mmap()able (requires FIXME).
  */
@@ -1034,18 +1027,13 @@ static int aio_read_evt(struct kioctx *ioctx, struct io_event *ent)
 
 	head = ring->head % info->nr;
 	if (head != ring->tail) {
-		if (ent) { /* event requested */
-			struct io_event *evp =
-				aio_ring_event(info, head, KM_USER1);
-			*ent = *evp;
-			head = (head + 1) % info->nr;
-			/* finish reading the event before updatng the head */
-			smp_mb();
-			ring->head = head;
-			ret = 1;
-			put_aio_ring_event(evp, KM_USER1);
-		} else /* only need to know availability */
-			ret = 1;
+		struct io_event *evp = aio_ring_event(info, head, KM_USER1);
+		*ent = *evp;
+		head = (head + 1) % info->nr;
+		smp_mb(); /* finish reading the event before updatng the head */
+		ring->head = head;
+		ret = 1;
+		put_aio_ring_event(evp, KM_USER1);
 	}
 	spin_unlock(&info->ring_lock);
 
@@ -1230,14 +1218,6 @@ static void io_destroy(struct kioctx *ioctx)
 
 	aio_cancel_all(ioctx);
 	wait_for_all_aios(ioctx);
-#ifdef CONFIG_EPOLL
-	/* forget the poll file, but it's up to the user to close it */
-	if (ioctx->file) {
-		fput(ioctx->file);
-		ioctx->file->private_data = 0;
-		ioctx->file = 0;
-	}
-#endif
 
 	/*
 	 * Wake up any waiters.  The setting of ctx->dead must be seen
@@ -1247,70 +1227,6 @@ static void io_destroy(struct kioctx *ioctx)
 	wake_up(&ioctx->wait);
 	put_ioctx(ioctx);	/* once for the lookup */
 }
-
-#ifdef CONFIG_EPOLL
-
-static int aio_queue_fd_close(struct inode *inode, struct file *file)
-{
-	struct kioctx *ioctx = file->private_data;
-	if (ioctx) {
-		file->private_data = 0;
-		spin_lock_irq(&ioctx->ctx_lock);
-		ioctx->file = 0;
-		spin_unlock_irq(&ioctx->ctx_lock);
-		fput(file);
-	}
-	return 0;
-}
-
-static unsigned int aio_queue_fd_poll(struct file *file, poll_table *wait)
-{	unsigned int pollflags = 0;
-	struct kioctx *ioctx = file->private_data;
-
-	if (ioctx) {
-
-		spin_lock_irq(&ioctx->ctx_lock);
-		/* Insert inside our poll wait queue */
-		poll_wait(file, &ioctx->poll_wait, wait);
-
-		/* Check our condition */
-		if (aio_read_evt(ioctx, 0))
-			pollflags = POLLIN | POLLRDNORM;
-		spin_unlock_irq(&ioctx->ctx_lock);
-	}
-
-	return pollflags;
-}
-
-static const struct file_operations aioq_fops = {
-	.release	= aio_queue_fd_close,
-	.poll		= aio_queue_fd_poll
-};
-
-/* make_aio_fd:
- *  Create a file descriptor that can be used to poll the event queue.
- *  Based on the excellent epoll code.
- */
-
-static int make_aio_fd(struct kioctx *ioctx)
-{
-	int fd;
-	struct file *file;
-
-	fd = anon_inode_getfd("[aioq]", &aioq_fops, ioctx, 0);
-	if (fd < 0)
-		return fd;
-
-	/* associate the file with the IO context */
-	file = fget(fd);
-	if (!file)
-		return -EBADF;
-	file->private_data = ioctx;
-	ioctx->file = file;
-	init_waitqueue_head(&ioctx->poll_wait);
-	return fd;
-}
-#endif
 
 /* sys_io_setup:
  *	Create an aio_context capable of receiving at least nr_events.
@@ -1324,30 +1240,18 @@ static int make_aio_fd(struct kioctx *ioctx)
  *	resources are available.  May fail with -EFAULT if an invalid
  *	pointer is passed for ctxp.  Will fail with -ENOSYS if not
  *	implemented.
- *
- *	To request a selectable fd, the user context has to be initialized
- *	to 1, instead of 0, and the return value is the fd.
- *	This keeps the system call compatible, since a non-zero value
- *	was not allowed so far.
  */
 SYSCALL_DEFINE2(io_setup, unsigned, nr_events, aio_context_t __user *, ctxp)
 {
 	struct kioctx *ioctx = NULL;
 	unsigned long ctx;
 	long ret;
-	int make_fd = 0;
 
 	ret = get_user(ctx, ctxp);
 	if (unlikely(ret))
 		goto out;
 
 	ret = -EINVAL;
-#ifdef CONFIG_EPOLL
-	if (ctx == 1) {
-		make_fd = 1;
-		ctx = 0;
-	}
-#endif
 	if (unlikely(ctx || nr_events == 0)) {
 		pr_debug("EINVAL: io_setup: ctx %lu nr_events %u\n",
 		         ctx, nr_events);
@@ -1358,12 +1262,8 @@ SYSCALL_DEFINE2(io_setup, unsigned, nr_events, aio_context_t __user *, ctxp)
 	ret = PTR_ERR(ioctx);
 	if (!IS_ERR(ioctx)) {
 		ret = put_user(ioctx->user_id, ctxp);
-#ifdef CONFIG_EPOLL
-		if (make_fd && ret >= 0)
-			ret = make_aio_fd(ioctx);
-#endif
-		if (ret >= 0)
-			return ret;
+		if (!ret)
+			return 0;
 
 		get_ioctx(ioctx); /* io_destroy() expects us to hold a ref */
 		io_destroy(ioctx);
@@ -1611,33 +1511,44 @@ static ssize_t aio_setup_iocb(struct kiocb *kiocb)
 	return 0;
 }
 
-/*
- * aio_wake_function:
- * 	wait queue callback function for aio notification,
- * 	Simply triggers a retry of the operation via kick_iocb.
- *
- * 	This callback is specified in the wait queue entry in
- *	a kiocb.
- *
- * Note:
- * This routine is executed with the wait queue lock held.
- * Since kick_iocb acquires iocb->ctx->ctx_lock, it nests
- * the ioctx lock inside the wait queue lock. This is safe
- * because this callback isn't used for wait queues which
- * are nested inside ioctx lock (i.e. ctx->wait)
- */
-static int aio_wake_function(wait_queue_t *wait, unsigned mode,
-			     int sync, void *key)
+static void aio_batch_add(struct address_space *mapping,
+			  struct hlist_head *batch_hash)
 {
-	struct kiocb *iocb = container_of(wait, struct kiocb, ki_wait);
+	struct aio_batch_entry *abe;
+	struct hlist_node *pos;
+	unsigned bucket;
 
-	list_del_init(&wait->task_list);
-	kick_iocb(iocb);
-	return 1;
+	bucket = hash_ptr(mapping, AIO_BATCH_HASH_BITS);
+	hlist_for_each_entry(abe, pos, &batch_hash[bucket], list) {
+		if (abe->mapping == mapping)
+			return;
+	}
+
+	abe = mempool_alloc(abe_pool, GFP_KERNEL);
+	BUG_ON(!igrab(mapping->host));
+	abe->mapping = mapping;
+	hlist_add_head(&abe->list, &batch_hash[bucket]);
+	return;
+}
+
+static void aio_batch_free(struct hlist_head *batch_hash)
+{
+	struct aio_batch_entry *abe;
+	struct hlist_node *pos, *n;
+	int i;
+
+	for (i = 0; i < AIO_BATCH_HASH_SIZE; i++) {
+		hlist_for_each_entry_safe(abe, pos, n, &batch_hash[i], list) {
+			blk_run_address_space(abe->mapping);
+			iput(abe->mapping->host);
+			hlist_del(&abe->list);
+			mempool_free(abe, abe_pool);
+		}
+	}
 }
 
 static int io_submit_one(struct kioctx *ctx, struct iocb __user *user_iocb,
-			 struct iocb *iocb)
+			 struct iocb *iocb, struct hlist_head *batch_hash)
 {
 	struct kiocb *req;
 	struct file *file;
@@ -1697,8 +1608,6 @@ static int io_submit_one(struct kioctx *ctx, struct iocb __user *user_iocb,
 	req->ki_buf = (char __user *)(unsigned long)iocb->aio_buf;
 	req->ki_left = req->ki_nbytes = iocb->aio_nbytes;
 	req->ki_opcode = iocb->aio_lio_opcode;
-	init_waitqueue_func_entry(&req->ki_wait, aio_wake_function);
-	INIT_LIST_HEAD(&req->ki_wait.task_list);
 
 	ret = aio_setup_iocb(req);
 
@@ -1713,6 +1622,12 @@ static int io_submit_one(struct kioctx *ctx, struct iocb __user *user_iocb,
 			;
 	}
 	spin_unlock_irq(&ctx->ctx_lock);
+	if (req->ki_opcode == IOCB_CMD_PREAD ||
+	    req->ki_opcode == IOCB_CMD_PREADV ||
+	    req->ki_opcode == IOCB_CMD_PWRITE ||
+	    req->ki_opcode == IOCB_CMD_PWRITEV)
+		aio_batch_add(file->f_mapping, batch_hash);
+
 	aio_put_req(req);	/* drop extra ref to req */
 	return 0;
 
@@ -1740,6 +1655,7 @@ SYSCALL_DEFINE3(io_submit, aio_context_t, ctx_id, long, nr,
 	struct kioctx *ctx;
 	long ret = 0;
 	int i;
+	struct hlist_head batch_hash[AIO_BATCH_HASH_SIZE] = { { 0, }, };
 
 	if (unlikely(nr < 0))
 		return -EINVAL;
@@ -1771,10 +1687,11 @@ SYSCALL_DEFINE3(io_submit, aio_context_t, ctx_id, long, nr,
 			break;
 		}
 
-		ret = io_submit_one(ctx, user_iocb, &tmp);
+		ret = io_submit_one(ctx, user_iocb, &tmp, batch_hash);
 		if (ret)
 			break;
 	}
+	aio_batch_free(batch_hash);
 
 	put_ioctx(ctx);
 	return i ? i : ret;

@@ -118,6 +118,7 @@ header-y += mtio.h
 header-y += ncp_no.h
 header-y += neighbour.h
 header-y += net_dropmon.h
+header-y += net_tstamp.h
 header-y += netfilter_arp.h
 header-y += netrom.h
 header-y += nfs2.h
@@ -165,10 +166,6 @@ header-y += utime.h
 header-y += veth.h
 header-y += videotext.h
 header-y += x25.h
-ifeq ($(ARCH), "ia64")
-header-y += perfmon.h
-header-y += perfmon_dfl_smpl.h
-endif
 
 unifdef-y += acct.h
 unifdef-y += adb.h
@@ -218,7 +215,6 @@ unifdef-y += futex.h
 unifdef-y += fs.h
 unifdef-y += gameport.h
 unifdef-y += generic_serial.h
-unifdef-y += hayesesp.h
 unifdef-y += hdlcdrv.h
 unifdef-y += hdlc.h
 unifdef-y += hdreg.h
@@ -334,6 +330,7 @@ unifdef-y += scc.h
 unifdef-y += sched.h
 unifdef-y += screen_info.h
 unifdef-y += sdla.h
+unifdef-y += securebits.h
 unifdef-y += selinux_netlink.h
 unifdef-y += sem.h
 unifdef-y += serial_core.h

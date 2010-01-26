@@ -63,7 +63,6 @@
 #include <asm/irq_remapping.h>
 #include <asm/hpet.h>
 #include <asm/hw_irq.h>
-#include <asm/irq_cfg.h>
 
 #include <asm/apic.h>
 
@@ -1597,9 +1596,6 @@ __apicdebuginit(void) print_IO_APIC(void)
 	struct irq_desc *desc;
 	unsigned int irq;
 
-	if (apic_verbosity == APIC_QUIET)
-		return;
-
 	printk(KERN_DEBUG "number of MP IRQ sources: %d.\n", mp_irq_entries);
 	for (i = 0; i < nr_ioapics; i++)
 		printk(KERN_DEBUG "number of IO-APIC #%d registers: %d.\n",
@@ -1706,9 +1702,6 @@ __apicdebuginit(void) print_APIC_field(int base)
 {
 	int i;
 
-	if (apic_verbosity == APIC_QUIET)
-		return;
-
 	printk(KERN_DEBUG);
 
 	for (i = 0; i < 8; i++)
@@ -1721,9 +1714,6 @@ __apicdebuginit(void) print_local_APIC(void *dummy)
 {
 	unsigned int i, v, ver, maxlvt;
 	u64 icr;
-
-	if (apic_verbosity == APIC_QUIET)
-		return;
 
 	printk(KERN_DEBUG "printing local APIC contents on CPU#%d/%d:\n",
 		smp_processor_id(), hard_smp_processor_id());
@@ -1822,13 +1812,19 @@ __apicdebuginit(void) print_local_APIC(void *dummy)
 	printk("\n");
 }
 
-__apicdebuginit(void) print_all_local_APICs(void)
+__apicdebuginit(void) print_local_APICs(int maxcpu)
 {
 	int cpu;
 
+	if (!maxcpu)
+		return;
+
 	preempt_disable();
-	for_each_online_cpu(cpu)
+	for_each_online_cpu(cpu) {
+		if (cpu >= maxcpu)
+			break;
 		smp_call_function_single(cpu, print_local_APIC, NULL, 1);
+	}
 	preempt_enable();
 }
 
@@ -1837,7 +1833,7 @@ __apicdebuginit(void) print_PIC(void)
 	unsigned int v;
 	unsigned long flags;
 
-	if (apic_verbosity == APIC_QUIET || !nr_legacy_irqs)
+	if (!nr_legacy_irqs)
 		return;
 
 	printk(KERN_DEBUG "\nprinting PIC contents\n");
@@ -1864,21 +1860,41 @@ __apicdebuginit(void) print_PIC(void)
 	printk(KERN_DEBUG "... PIC ELCR: %04x\n", v);
 }
 
-__apicdebuginit(int) print_all_ICs(void)
+static int __initdata show_lapic = 1;
+static __init int setup_show_lapic(char *arg)
 {
+	int num = -1;
+
+	if (strcmp(arg, "all") == 0) {
+		show_lapic = CONFIG_NR_CPUS;
+	} else {
+		get_option(&arg, &num);
+		if (num >= 0)
+			show_lapic = num;
+	}
+
+	return 1;
+}
+__setup("show_lapic=", setup_show_lapic);
+
+__apicdebuginit(int) print_ICs(void)
+{
+	if (apic_verbosity == APIC_QUIET)
+		return 0;
+
 	print_PIC();
 
 	/* don't print out if apic is not there */
 	if (!cpu_has_apic && !apic_from_smp_config())
 		return 0;
 
-	print_all_local_APICs();
+	print_local_APICs(show_lapic);
 	print_IO_APIC();
 
 	return 0;
 }
 
-fs_initcall(print_all_ICs);
+fs_initcall(print_ICs);
 
 
 /* Where if anywhere is the i8259 connect in external int mode */
@@ -2029,7 +2045,7 @@ void __init setup_ioapic_ids_from_mpc(void)
 	 * This is broken; anything with a real cpu count has to
 	 * circumvent this idiocy regardless.
 	 */
-	phys_id_present_map = apic->ioapic_phys_id_map(phys_cpu_present_map);
+	apic->ioapic_phys_id_map(&phys_cpu_present_map, &phys_id_present_map);
 
 	/*
 	 * Set the IOAPIC ID to the value stored in the MPC table.
@@ -2056,7 +2072,7 @@ void __init setup_ioapic_ids_from_mpc(void)
 		 * system must have a unique ID or we get lots of nice
 		 * 'stuck on smp_invalidate_needed IPI wait' messages.
 		 */
-		if (apic->check_apicid_used(phys_id_present_map,
+		if (apic->check_apicid_used(&phys_id_present_map,
 					mp_ioapics[apic_id].apicid)) {
 			printk(KERN_ERR "BIOS bug, IO-APIC#%d ID %d is already used!...\n",
 				apic_id, mp_ioapics[apic_id].apicid);
@@ -2071,7 +2087,7 @@ void __init setup_ioapic_ids_from_mpc(void)
 			mp_ioapics[apic_id].apicid = i;
 		} else {
 			physid_mask_t tmp;
-			tmp = apic->apicid_to_cpu_present(mp_ioapics[apic_id].apicid);
+			apic->apicid_to_cpu_present(mp_ioapics[apic_id].apicid, &tmp);
 			apic_printk(APIC_VERBOSE, "Setting %d in the "
 					"phys_id_present_map\n",
 					mp_ioapics[apic_id].apicid);
@@ -2268,26 +2284,28 @@ static void __target_IO_APIC_irq(unsigned int irq, unsigned int dest, struct irq
 
 /*
  * Either sets desc->affinity to a valid value, and returns
- * ->cpu_mask_to_apicid of that, or returns BAD_APICID and
+ * ->cpu_mask_to_apicid of that in dest_id, or returns -1 and
  * leaves desc->affinity untouched.
  */
 unsigned int
-set_desc_affinity(struct irq_desc *desc, const struct cpumask *mask)
+set_desc_affinity(struct irq_desc *desc, const struct cpumask *mask,
+		  unsigned int *dest_id)
 {
 	struct irq_cfg *cfg;
 	unsigned int irq;
 
 	if (!cpumask_intersects(mask, cpu_online_mask))
-		return BAD_APICID;
+		return -1;
 
 	irq = desc->irq;
 	cfg = desc->chip_data;
 	if (assign_irq_vector(irq, cfg, mask))
-		return BAD_APICID;
+		return -1;
 
 	cpumask_copy(desc->affinity, mask);
 
-	return apic->cpu_mask_to_apicid_and(desc->affinity, cfg->domain);
+	*dest_id = apic->cpu_mask_to_apicid_and(desc->affinity, cfg->domain);
+	return 0;
 }
 
 static int
@@ -2303,12 +2321,11 @@ set_ioapic_affinity_irq_desc(struct irq_desc *desc, const struct cpumask *mask)
 	cfg = desc->chip_data;
 
 	spin_lock_irqsave(&ioapic_lock, flags);
-	dest = set_desc_affinity(desc, mask);
-	if (dest != BAD_APICID) {
+	ret = set_desc_affinity(desc, mask, &dest);
+	if (!ret) {
 		/* Only the high 8 bits are valid. */
 		dest = SET_APIC_LOGICAL_ID(dest);
 		__target_IO_APIC_irq(irq, dest, cfg);
-		ret = 0;
 	}
 	spin_unlock_irqrestore(&ioapic_lock, flags);
 
@@ -2423,7 +2440,7 @@ asmlinkage void smp_irq_move_cleanup_interrupt(void)
 			continue;
 
 		cfg = irq_cfg(irq);
-		spin_lock(&desc->lock);
+		raw_spin_lock(&desc->lock);
 
 		/*
 		 * Check if the irq migration is in progress. If so, we
@@ -2449,7 +2466,7 @@ asmlinkage void smp_irq_move_cleanup_interrupt(void)
 		}
 		__get_cpu_var(vector_irq)[vector] = -1;
 unlock:
-		spin_unlock(&desc->lock);
+		raw_spin_unlock(&desc->lock);
 	}
 
 	irq_exit();
@@ -3211,6 +3228,7 @@ unsigned int create_irq_nr(unsigned int irq_want, int node)
 			continue;
 
 		desc_new = move_irq_desc(desc_new, node);
+		cfg_new = desc_new->chip_data;
 
 		if (__assign_irq_vector(new, cfg_new, apic->target_cpus()) == 0)
 			irq = new;
@@ -3349,8 +3367,7 @@ static int set_msi_irq_affinity(unsigned int irq, const struct cpumask *mask)
 	struct msi_msg msg;
 	unsigned int dest;
 
-	dest = set_desc_affinity(desc, mask);
-	if (dest == BAD_APICID)
+	if (set_desc_affinity(desc, mask, &dest))
 		return -1;
 
 	cfg = desc->chip_data;
@@ -3382,8 +3399,7 @@ ir_set_msi_irq_affinity(unsigned int irq, const struct cpumask *mask)
 	if (get_irte(irq, &irte))
 		return -1;
 
-	dest = set_desc_affinity(desc, mask);
-	if (dest == BAD_APICID)
+	if (set_desc_affinity(desc, mask, &dest))
 		return -1;
 
 	irte.vector = cfg->vector;
@@ -3565,8 +3581,7 @@ static int dmar_msi_set_affinity(unsigned int irq, const struct cpumask *mask)
 	struct msi_msg msg;
 	unsigned int dest;
 
-	dest = set_desc_affinity(desc, mask);
-	if (dest == BAD_APICID)
+	if (set_desc_affinity(desc, mask, &dest))
 		return -1;
 
 	cfg = desc->chip_data;
@@ -3621,8 +3636,7 @@ static int hpet_msi_set_affinity(unsigned int irq, const struct cpumask *mask)
 	struct msi_msg msg;
 	unsigned int dest;
 
-	dest = set_desc_affinity(desc, mask);
-	if (dest == BAD_APICID)
+	if (set_desc_affinity(desc, mask, &dest))
 		return -1;
 
 	cfg = desc->chip_data;
@@ -3728,8 +3742,7 @@ static int set_ht_irq_affinity(unsigned int irq, const struct cpumask *mask)
 	struct irq_cfg *cfg;
 	unsigned int dest;
 
-	dest = set_desc_affinity(desc, mask);
-	if (dest == BAD_APICID)
+	if (set_desc_affinity(desc, mask, &dest))
 		return -1;
 
 	cfg = desc->chip_data;
@@ -3962,7 +3975,7 @@ int __init io_apic_get_unique_id(int ioapic, int apic_id)
 	 */
 
 	if (physids_empty(apic_id_map))
-		apic_id_map = apic->ioapic_phys_id_map(phys_cpu_present_map);
+		apic->ioapic_phys_id_map(&phys_cpu_present_map, &apic_id_map);
 
 	spin_lock_irqsave(&ioapic_lock, flags);
 	reg_00.raw = io_apic_read(ioapic, 0);
@@ -3978,10 +3991,10 @@ int __init io_apic_get_unique_id(int ioapic, int apic_id)
 	 * Every APIC in a system must have a unique ID or we get lots of nice
 	 * 'stuck on smp_invalidate_needed IPI wait' messages.
 	 */
-	if (apic->check_apicid_used(apic_id_map, apic_id)) {
+	if (apic->check_apicid_used(&apic_id_map, apic_id)) {
 
 		for (i = 0; i < get_physical_broadcast(); i++) {
-			if (!apic->check_apicid_used(apic_id_map, i))
+			if (!apic->check_apicid_used(&apic_id_map, i))
 				break;
 		}
 
@@ -3994,7 +4007,7 @@ int __init io_apic_get_unique_id(int ioapic, int apic_id)
 		apic_id = i;
 	}
 
-	tmp = apic->apicid_to_cpu_present(apic_id);
+	apic->apicid_to_cpu_present(apic_id, &tmp);
 	physids_or(apic_id_map, apic_id_map, tmp);
 
 	if (reg_00.bits.ID != apic_id) {
@@ -4124,7 +4137,7 @@ static struct resource * __init ioapic_setup_resources(int nr_ioapics)
 	for (i = 0; i < nr_ioapics; i++) {
 		res[i].name = mem;
 		res[i].flags = IORESOURCE_MEM | IORESOURCE_BUSY;
-		sprintf(mem,  "IOAPIC %u", i);
+		snprintf(mem, IOAPIC_RESOURCE_NAME_SIZE, "IOAPIC %u", i);
 		mem += IOAPIC_RESOURCE_NAME_SIZE;
 	}
 
@@ -4158,18 +4171,17 @@ void __init ioapic_init_mappings(void)
 #ifdef CONFIG_X86_32
 fake_ioapic_page:
 #endif
-			ioapic_phys = (unsigned long)
-				alloc_bootmem_pages(PAGE_SIZE);
+			ioapic_phys = (unsigned long)alloc_bootmem_pages(PAGE_SIZE);
 			ioapic_phys = __pa(ioapic_phys);
 		}
 		set_fixmap_nocache(idx, ioapic_phys);
-		apic_printk(APIC_VERBOSE,
-			    "mapped IOAPIC to %08lx (%08lx)\n",
-			    __fix_to_virt(idx), ioapic_phys);
+		apic_printk(APIC_VERBOSE, "mapped IOAPIC to %08lx (%08lx)\n",
+			__fix_to_virt(idx) + (ioapic_phys & ~PAGE_MASK),
+			ioapic_phys);
 		idx++;
 
 		ioapic_res->start = ioapic_phys;
-		ioapic_res->end = ioapic_phys + (4 * 1024) - 1;
+		ioapic_res->end = ioapic_phys + IO_APIC_SLOT_SIZE - 1;
 		ioapic_res++;
 	}
 }

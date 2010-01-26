@@ -1076,17 +1076,16 @@ static int
 io_subchannel_remove (struct subchannel *sch)
 {
 	struct ccw_device *cdev;
-	unsigned long flags;
 
 	cdev = sch_get_cdev(sch);
 	if (!cdev)
 		goto out_free;
 	io_subchannel_quiesce(sch);
 	/* Set ccw device to not operational and drop reference. */
-	spin_lock_irqsave(cdev->ccwlock, flags);
+	spin_lock_irq(cdev->ccwlock);
 	sch_set_cdev(sch, NULL);
 	cdev->private->state = DEV_STATE_NOT_OPER;
-	spin_unlock_irqrestore(cdev->ccwlock, flags);
+	spin_unlock_irq(cdev->ccwlock);
 	ccw_device_unregister(cdev);
 out_free:
 	kfree(sch->private);
@@ -1520,6 +1519,7 @@ static int ccw_device_console_enable(struct ccw_device *cdev,
 	sch->driver = &io_subchannel_driver;
 	/* Initialize the ccw_device structure. */
 	cdev->dev.parent= &sch->dev;
+	sch_set_cdev(sch, cdev);
 	io_subchannel_recog(cdev, sch);
 	/* Now wait for the async. recognition to come to an end. */
 	spin_lock_irq(cdev->ccwlock);
@@ -1905,7 +1905,7 @@ out_unlock:
 	return ret;
 }
 
-static struct dev_pm_ops ccw_pm_ops = {
+static const struct dev_pm_ops ccw_pm_ops = {
 	.prepare = ccw_device_pm_prepare,
 	.complete = ccw_device_pm_complete,
 	.freeze = ccw_device_pm_freeze,

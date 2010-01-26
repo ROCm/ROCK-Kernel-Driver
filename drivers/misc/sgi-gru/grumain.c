@@ -860,7 +860,6 @@ static int gru_assign_context_number(struct gru_state *gru)
 	ctxnum = find_first_zero_bit(&gru->gs_context_map, GRU_NUM_CCH);
 	__set_bit(ctxnum, &gru->gs_context_map);
 	return ctxnum;
-
 }
 
 /*

@@ -226,6 +226,7 @@ struct rt_hash_bucket {
 #  define RT_HASH_LOCK_SZ	256
 # endif
 #endif
+#include <linux/reserve.h>
 
 static spinlock_t	*rt_hash_locks;
 # define rt_hash_lock_addr(slot) &rt_hash_locks[(slot) & (RT_HASH_LOCK_SZ - 1)]
@@ -271,6 +272,8 @@ static inline int rt_genid(struct net *net)
 {
 	return atomic_read(&net->ipv4.rt_genid);
 }
+
+static struct mem_reserve ipv4_route_reserve;
 
 static struct mem_reserve ipv4_route_reserve;
 
@@ -431,32 +434,7 @@ proc_dointvec_route(struct ctl_table *table, int write, void __user *buffer,
 	return ret;
 }
 
-static int sysctl_intvec_route(struct ctl_table *table,
-		void __user *oldval, size_t __user *oldlenp,
-		void __user *newval, size_t newlen)
-{
-	int write = (newval && newlen);
-	ctl_table tmp = *table;
-	int new_size, ret;
-
-	mutex_lock(&ipv4_route_lock);
-	if (write) {
-		tmp.data = &new_size;
-		table = &tmp;
-	}
-
-	ret = sysctl_intvec(table, oldval, oldlenp, newval, newlen);
-
-	if (!ret && write) {
-		ret = mem_reserve_kmem_cache_set(&ipv4_route_reserve,
-				ipv4_dst_ops.kmem_cachep, new_size);
-		if (!ret)
-			ip_rt_max_size = new_size;
-	}
-	mutex_unlock(&ipv4_route_lock);
-
-	return ret;
-}
+static struct mutex ipv4_route_lock;
 
 static const struct seq_operations rt_cache_seq_ops = {
 	.start  = rt_cache_seq_start,
@@ -571,43 +549,42 @@ static const struct file_operations rt_cpu_seq_fops = {
 };
 
 #ifdef CONFIG_NET_CLS_ROUTE
-static int ip_rt_acct_read(char *buffer, char **start, off_t offset,
-			   int length, int *eof, void *data)
+static int rt_acct_proc_show(struct seq_file *m, void *v)
 {
-	unsigned int i;
+	struct ip_rt_acct *dst, *src;
+	unsigned int i, j;
 
-	if ((offset & 3) || (length & 3))
-		return -EIO;
+	dst = kcalloc(256, sizeof(struct ip_rt_acct), GFP_KERNEL);
+	if (!dst)
+		return -ENOMEM;
 
-	if (offset >= sizeof(struct ip_rt_acct) * 256) {
-		*eof = 1;
-		return 0;
-	}
-
-	if (offset + length >= sizeof(struct ip_rt_acct) * 256) {
-		length = sizeof(struct ip_rt_acct) * 256 - offset;
-		*eof = 1;
-	}
-
-	offset /= sizeof(u32);
-
-	if (length > 0) {
-		u32 *dst = (u32 *) buffer;
-
-		*start = buffer;
-		memset(dst, 0, length);
-
-		for_each_possible_cpu(i) {
-			unsigned int j;
-			u32 *src;
-
-			src = ((u32 *) per_cpu_ptr(ip_rt_acct, i)) + offset;
-			for (j = 0; j < length/4; j++)
-				dst[j] += src[j];
+	for_each_possible_cpu(i) {
+		src = (struct ip_rt_acct *)per_cpu_ptr(ip_rt_acct, i);
+		for (j = 0; j < 256; j++) {
+			dst[j].o_bytes   += src[j].o_bytes;
+			dst[j].o_packets += src[j].o_packets;
+			dst[j].i_bytes   += src[j].i_bytes;
+			dst[j].i_packets += src[j].i_packets;
 		}
 	}
-	return length;
+
+	seq_write(m, dst, 256 * sizeof(struct ip_rt_acct));
+	kfree(dst);
+	return 0;
 }
+
+static int rt_acct_proc_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, rt_acct_proc_show, NULL);
+}
+
+static const struct file_operations rt_acct_proc_fops = {
+	.owner		= THIS_MODULE,
+	.open		= rt_acct_proc_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
 #endif
 
 static int __net_init ip_rt_do_proc_init(struct net *net)
@@ -625,8 +602,7 @@ static int __net_init ip_rt_do_proc_init(struct net *net)
 		goto err2;
 
 #ifdef CONFIG_NET_CLS_ROUTE
-	pde = create_proc_read_entry("rt_acct", 0, net->proc_net,
-			ip_rt_acct_read, NULL);
+	pde = proc_create("rt_acct", 0, net->proc_net, &rt_acct_proc_fops);
 	if (!pde)
 		goto err3;
 #endif
@@ -761,7 +737,7 @@ static inline int compare_keys(struct flowi *fl1, struct flowi *fl2)
 
 static inline int compare_netns(struct rtable *rt1, struct rtable *rt2)
 {
-	return dev_net(rt1->u.dst.dev) == dev_net(rt2->u.dst.dev);
+	return net_eq(dev_net(rt1->u.dst.dev), dev_net(rt2->u.dst.dev));
 }
 
 static inline int rt_is_expired(struct rtable *rth)
@@ -958,6 +934,12 @@ void rt_cache_flush(struct net *net, int delay)
 	rt_cache_invalidate(net);
 	if (delay >= 0)
 		rt_do_flush(!in_softirq());
+}
+
+/* Flush previous cache invalidated entries from the cache */
+void rt_cache_flush_batch(void)
+{
+	rt_do_flush(!in_softirq());
 }
 
 /*
@@ -1404,9 +1386,9 @@ void ip_rt_redirect(__be32 old_gw, __be32 daddr, __be32 new_gw,
 		return;
 
 	net = dev_net(dev);
-	if (new_gw == old_gw || !IN_DEV_RX_REDIRECTS(in_dev)
-	    || ipv4_is_multicast(new_gw) || ipv4_is_lbcast(new_gw)
-	    || ipv4_is_zeronet(new_gw))
+	if (new_gw == old_gw || !IN_DEV_RX_REDIRECTS(in_dev) ||
+	    ipv4_is_multicast(new_gw) || ipv4_is_lbcast(new_gw) ||
+	    ipv4_is_zeronet(new_gw))
 		goto reject_redirect;
 
 	if (!rt_caching(net))
@@ -1685,9 +1667,6 @@ unsigned short ip_rt_frag_needed(struct net *net, struct iphdr *iph,
 	__be32  skeys[2] = { iph->saddr, 0, };
 	__be32  daddr = iph->daddr;
 	unsigned short est_mtu = 0;
-
-	if (ipv4_config.no_pmtu_disc)
-		return 0;
 
 	for (k = 0; k < 2; k++) {
 		for (i = 0; i < 2; i++) {
@@ -2372,10 +2351,11 @@ skip_cache:
 				ip_hdr(skb)->protocol);
 			if (our
 #ifdef CONFIG_IP_MROUTE
-			    || (!ipv4_is_local_multicast(daddr) &&
-				IN_DEV_MFORWARD(in_dev))
+				||
+			    (!ipv4_is_local_multicast(daddr) &&
+			     IN_DEV_MFORWARD(in_dev))
 #endif
-			    ) {
+			   ) {
 				rcu_read_unlock();
 				return ip_route_input_mc(skb, daddr, saddr,
 							 tos, dev, our);
@@ -2572,9 +2552,9 @@ static int ip_route_output_slow(struct net *net, struct rtable **rp,
 		      of another iface. --ANK
 		 */
 
-		if (oldflp->oif == 0
-		    && (ipv4_is_multicast(oldflp->fl4_dst) ||
-			oldflp->fl4_dst == htonl(0xFFFFFFFF))) {
+		if (oldflp->oif == 0 &&
+		    (ipv4_is_multicast(oldflp->fl4_dst) ||
+		     oldflp->fl4_dst == htonl(0xFFFFFFFF))) {
 			/* It is equivalent to inet_addr_type(saddr) == RTN_LOCAL */
 			dev_out = ip_dev_find(net, oldflp->fl4_src);
 			if (dev_out == NULL)
@@ -2913,7 +2893,7 @@ static int rt_fill_info(struct net *net,
 	error = rt->u.dst.error;
 	expires = rt->u.dst.expires ? rt->u.dst.expires - jiffies : 0;
 	if (rt->peer) {
-		id = rt->peer->ip_id_count;
+		id = atomic_read(&rt->peer->ip_id_count) & 0xffff;
 		if (rt->peer->tcp_ts_stamp) {
 			ts = rt->peer->tcp_ts;
 			tsage = get_seconds() - rt->peer->tcp_ts_stamp;
@@ -3114,23 +3094,6 @@ static int ipv4_sysctl_rtcache_flush(ctl_table *__ctl, int write,
 	return -EINVAL;
 }
 
-static int ipv4_sysctl_rtcache_flush_strategy(ctl_table *table,
-						void __user *oldval,
-						size_t __user *oldlenp,
-						void __user *newval,
-						size_t newlen)
-{
-	int delay;
-	struct net *net;
-	if (newlen != sizeof(int))
-		return -EINVAL;
-	if (get_user(delay, (int __user *)newval))
-		return -EFAULT;
-	net = (struct net *)table->extra1;
-	rt_cache_flush(net, delay);
-	return 0;
-}
-
 static void rt_secret_reschedule(int old)
 {
 	struct net *net;
@@ -3175,23 +3138,8 @@ static int ipv4_sysctl_rt_secret_interval(ctl_table *ctl, int write,
 	return ret;
 }
 
-static int ipv4_sysctl_rt_secret_interval_strategy(ctl_table *table,
-						   void __user *oldval,
-						   size_t __user *oldlenp,
-						   void __user *newval,
-						   size_t newlen)
-{
-	int old = ip_rt_secret_interval;
-	int ret = sysctl_jiffies(table, oldval, oldlenp, newval, newlen);
-
-	rt_secret_reschedule(old);
-
-	return ret;
-}
-
 static ctl_table ipv4_route_table[] = {
 	{
-		.ctl_name	= NET_IPV4_ROUTE_GC_THRESH,
 		.procname	= "gc_thresh",
 		.data		= &ipv4_dst_ops.gc_thresh,
 		.maxlen		= sizeof(int),
@@ -3199,62 +3147,50 @@ static ctl_table ipv4_route_table[] = {
 		.proc_handler	= proc_dointvec,
 	},
 	{
-		.ctl_name	= NET_IPV4_ROUTE_MAX_SIZE,
 		.procname	= "max_size",
 		.data		= &ip_rt_max_size,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
-		.proc_handler	= &proc_dointvec_route,
-		.strategy	= &sysctl_intvec_route,
+		.proc_handler	= proc_dointvec_route,
 	},
 	{
 		/*  Deprecated. Use gc_min_interval_ms */
 
-		.ctl_name	= NET_IPV4_ROUTE_GC_MIN_INTERVAL,
 		.procname	= "gc_min_interval",
 		.data		= &ip_rt_gc_min_interval,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_jiffies,
-		.strategy	= sysctl_jiffies,
 	},
 	{
-		.ctl_name	= NET_IPV4_ROUTE_GC_MIN_INTERVAL_MS,
 		.procname	= "gc_min_interval_ms",
 		.data		= &ip_rt_gc_min_interval,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_ms_jiffies,
-		.strategy	= sysctl_ms_jiffies,
 	},
 	{
-		.ctl_name	= NET_IPV4_ROUTE_GC_TIMEOUT,
 		.procname	= "gc_timeout",
 		.data		= &ip_rt_gc_timeout,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_jiffies,
-		.strategy	= sysctl_jiffies,
 	},
 	{
-		.ctl_name	= NET_IPV4_ROUTE_GC_INTERVAL,
 		.procname	= "gc_interval",
 		.data		= &ip_rt_gc_interval,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_jiffies,
-		.strategy	= sysctl_jiffies,
 	},
 	{
-		.ctl_name	= NET_IPV4_ROUTE_REDIRECT_LOAD,
 		.procname	= "redirect_load",
 		.data		= &ip_rt_redirect_load,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
-		.proc_handler	= proc_dointvec,
+		.proc_handler	= proc_dointvec_route,
 	},
 	{
-		.ctl_name	= NET_IPV4_ROUTE_REDIRECT_NUMBER,
 		.procname	= "redirect_number",
 		.data		= &ip_rt_redirect_number,
 		.maxlen		= sizeof(int),
@@ -3262,7 +3198,6 @@ static ctl_table ipv4_route_table[] = {
 		.proc_handler	= proc_dointvec,
 	},
 	{
-		.ctl_name	= NET_IPV4_ROUTE_REDIRECT_SILENCE,
 		.procname	= "redirect_silence",
 		.data		= &ip_rt_redirect_silence,
 		.maxlen		= sizeof(int),
@@ -3270,7 +3205,6 @@ static ctl_table ipv4_route_table[] = {
 		.proc_handler	= proc_dointvec,
 	},
 	{
-		.ctl_name	= NET_IPV4_ROUTE_ERROR_COST,
 		.procname	= "error_cost",
 		.data		= &ip_rt_error_cost,
 		.maxlen		= sizeof(int),
@@ -3278,7 +3212,6 @@ static ctl_table ipv4_route_table[] = {
 		.proc_handler	= proc_dointvec,
 	},
 	{
-		.ctl_name	= NET_IPV4_ROUTE_ERROR_BURST,
 		.procname	= "error_burst",
 		.data		= &ip_rt_error_burst,
 		.maxlen		= sizeof(int),
@@ -3286,7 +3219,6 @@ static ctl_table ipv4_route_table[] = {
 		.proc_handler	= proc_dointvec,
 	},
 	{
-		.ctl_name	= NET_IPV4_ROUTE_GC_ELASTICITY,
 		.procname	= "gc_elasticity",
 		.data		= &ip_rt_gc_elasticity,
 		.maxlen		= sizeof(int),
@@ -3294,16 +3226,13 @@ static ctl_table ipv4_route_table[] = {
 		.proc_handler	= proc_dointvec,
 	},
 	{
-		.ctl_name	= NET_IPV4_ROUTE_MTU_EXPIRES,
 		.procname	= "mtu_expires",
 		.data		= &ip_rt_mtu_expires,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_jiffies,
-		.strategy	= sysctl_jiffies,
 	},
 	{
-		.ctl_name	= NET_IPV4_ROUTE_MIN_PMTU,
 		.procname	= "min_pmtu",
 		.data		= &ip_rt_min_pmtu,
 		.maxlen		= sizeof(int),
@@ -3311,7 +3240,6 @@ static ctl_table ipv4_route_table[] = {
 		.proc_handler	= proc_dointvec,
 	},
 	{
-		.ctl_name	= NET_IPV4_ROUTE_MIN_ADVMSS,
 		.procname	= "min_adv_mss",
 		.data		= &ip_rt_min_advmss,
 		.maxlen		= sizeof(int),
@@ -3319,50 +3247,46 @@ static ctl_table ipv4_route_table[] = {
 		.proc_handler	= proc_dointvec,
 	},
 	{
-		.ctl_name	= NET_IPV4_ROUTE_SECRET_INTERVAL,
 		.procname	= "secret_interval",
 		.data		= &ip_rt_secret_interval,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= ipv4_sysctl_rt_secret_interval,
-		.strategy	= ipv4_sysctl_rt_secret_interval_strategy,
 	},
-	{ .ctl_name = 0 }
+	{ }
 };
 
 static struct ctl_table empty[1];
 
 static struct ctl_table ipv4_skeleton[] =
 {
-	{ .procname = "route", .ctl_name = NET_IPV4_ROUTE,
+	{ .procname = "route", 
 	  .mode = 0555, .child = ipv4_route_table},
-	{ .procname = "neigh", .ctl_name = NET_IPV4_NEIGH,
+	{ .procname = "neigh", 
 	  .mode = 0555, .child = empty},
 	{ }
 };
 
 static __net_initdata struct ctl_path ipv4_path[] = {
-	{ .procname = "net", .ctl_name = CTL_NET, },
-	{ .procname = "ipv4", .ctl_name = NET_IPV4, },
+	{ .procname = "net", },
+	{ .procname = "ipv4", },
 	{ },
 };
 
 static struct ctl_table ipv4_route_flush_table[] = {
 	{
-		.ctl_name 	= NET_IPV4_ROUTE_FLUSH,
 		.procname	= "flush",
 		.maxlen		= sizeof(int),
 		.mode		= 0200,
 		.proc_handler	= ipv4_sysctl_rtcache_flush,
-		.strategy	= ipv4_sysctl_rtcache_flush_strategy,
 	},
-	{ .ctl_name = 0 },
+	{ },
 };
 
 static __net_initdata struct ctl_path ipv4_route_path[] = {
-	{ .procname = "net", .ctl_name = CTL_NET, },
-	{ .procname = "ipv4", .ctl_name = NET_IPV4, },
-	{ .procname = "route", .ctl_name = NET_IPV4_ROUTE, },
+	{ .procname = "net", },
+	{ .procname = "ipv4", },
+	{ .procname = "route", },
 	{ },
 };
 
@@ -3371,7 +3295,7 @@ static __net_init int sysctl_route_net_init(struct net *net)
 	struct ctl_table *tbl;
 
 	tbl = ipv4_route_flush_table;
-	if (net != &init_net) {
+	if (!net_eq(net, &init_net)) {
 		tbl = kmemdup(tbl, sizeof(ipv4_route_flush_table), GFP_KERNEL);
 		if (tbl == NULL)
 			goto err_dup;
@@ -3485,6 +3409,15 @@ int __init ip_rt_init(void)
 	ip_rt_max_size = (rt_hash_mask + 1) * 16;
 
 #ifdef CONFIG_PROC_FS
+	mutex_init(&ipv4_route_lock);
+#endif
+
+	mem_reserve_init(&ipv4_route_reserve, "IPv4 route cache",
+			&net_rx_reserve);
+	mem_reserve_kmem_cache_set(&ipv4_route_reserve,
+			ipv4_dst_ops.kmem_cachep, ip_rt_max_size);
+
+#ifdef CONFIG_PROCFS
 	mutex_init(&ipv4_route_lock);
 #endif
 

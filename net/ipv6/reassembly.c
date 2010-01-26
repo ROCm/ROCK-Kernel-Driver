@@ -211,18 +211,17 @@ static void ip6_frag_expire(unsigned long data)
 	fq_kill(fq);
 
 	net = container_of(fq->q.net, struct net, ipv6.frags);
-	dev = dev_get_by_index(net, fq->iif);
-	if (!dev)
-		goto out;
-
 	rcu_read_lock();
+	dev = dev_get_by_index_rcu(net, fq->iif);
+	if (!dev)
+		goto out_rcu_unlock;
+
 	IP6_INC_STATS_BH(net, __in6_dev_get(dev), IPSTATS_MIB_REASMTIMEOUT);
 	IP6_INC_STATS_BH(net, __in6_dev_get(dev), IPSTATS_MIB_REASMFAILS);
-	rcu_read_unlock();
 
 	/* Don't send error if the first segment did not arrive. */
 	if (!(fq->q.last_in & INET_FRAG_FIRST_IN) || !fq->q.fragments)
-		goto out;
+		goto out_rcu_unlock;
 
 	/*
 	   But use as source device on which LAST ARRIVED
@@ -231,9 +230,9 @@ static void ip6_frag_expire(unsigned long data)
 	 */
 	fq->q.fragments->dev = dev;
 	icmpv6_send(fq->q.fragments, ICMPV6_TIME_EXCEED, ICMPV6_EXC_FRAGTIME, 0, dev);
+out_rcu_unlock:
+	rcu_read_unlock();
 out:
-	if (dev)
-		dev_put(dev);
 	spin_unlock(&fq->q.lock);
 	fq_put(fq);
 }
@@ -666,47 +665,15 @@ proc_dointvec_fragment(struct ctl_table *table, int write,
 	return ret;
 }
 
-static int sysctl_intvec_fragment(struct ctl_table *table,
-		void __user *oldval, size_t __user *oldlenp,
-		void __user *newval, size_t newlen)
-{
-	struct net *net = container_of(table->data, struct net,
-				       ipv6.frags.high_thresh);
-	int write = (newval && newlen);
-	ctl_table tmp = *table;
-	int new_bytes, ret;
-
-	mutex_lock(&net->ipv6.frags.lock);
-	if (write) {
-		tmp.data = &new_bytes;
-		table = &tmp;
-	}
-
-	ret = sysctl_intvec(table, oldval, oldlenp, newval, newlen);
-
-	if (!ret && write) {
-		ret = mem_reserve_kmalloc_set(&net->ipv6.frags.reserve,
-					      new_bytes);
-		if (!ret)
-			net->ipv6.frags.high_thresh = new_bytes;
-	}
-	mutex_unlock(&net->ipv6.frags.lock);
-
-	return ret;
-}
-
 static struct ctl_table ip6_frags_ns_ctl_table[] = {
 	{
-		.ctl_name	= NET_IPV6_IP6FRAG_HIGH_THRESH,
 		.procname	= "ip6frag_high_thresh",
 		.data		= &init_net.ipv6.frags.high_thresh,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
-		.proc_handler	= &proc_dointvec_fragment,
-		.strategy	= &sysctl_intvec_fragment,
+		.proc_handler	= proc_dointvec_fragment,
 	},
 	{
-		.ctl_name	= NET_IPV6_IP6FRAG_LOW_THRESH,
 		.procname	= "ip6frag_low_thresh",
 		.data		= &init_net.ipv6.frags.low_thresh,
 		.maxlen		= sizeof(int),
@@ -714,26 +681,22 @@ static struct ctl_table ip6_frags_ns_ctl_table[] = {
 		.proc_handler	= proc_dointvec
 	},
 	{
-		.ctl_name	= NET_IPV6_IP6FRAG_TIME,
 		.procname	= "ip6frag_time",
 		.data		= &init_net.ipv6.frags.timeout,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_jiffies,
-		.strategy	= sysctl_jiffies,
 	},
 	{ }
 };
 
 static struct ctl_table ip6_frags_ctl_table[] = {
 	{
-		.ctl_name	= NET_IPV6_IP6FRAG_SECRET_INTERVAL,
 		.procname	= "ip6frag_secret_interval",
 		.data		= &ip6_frags.secret_interval,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_jiffies,
-		.strategy	= sysctl_jiffies
 	},
 	{ }
 };
@@ -744,7 +707,7 @@ static int ip6_frags_ns_sysctl_register(struct net *net)
 	struct ctl_table_header *hdr;
 
 	table = ip6_frags_ns_ctl_table;
-	if (net != &init_net) {
+	if (!net_eq(net, &init_net)) {
 		table = kmemdup(table, sizeof(ip6_frags_ns_ctl_table), GFP_KERNEL);
 		if (table == NULL)
 			goto err_alloc;
@@ -762,7 +725,7 @@ static int ip6_frags_ns_sysctl_register(struct net *net)
 	return 0;
 
 err_reg:
-	if (net != &init_net)
+	if (!net_eq(net, &init_net))
 		kfree(table);
 err_alloc:
 	return -ENOMEM;
@@ -774,7 +737,8 @@ static void ip6_frags_ns_sysctl_unregister(struct net *net)
 
 	table = net->ipv6.sysctl.frags_hdr->ctl_table_arg;
 	unregister_net_sysctl_table(net->ipv6.sysctl.frags_hdr);
-	kfree(table);
+	if (!net_eq(net, &init_net))
+		kfree(table);
 }
 
 static struct ctl_table_header *ip6_ctl_header;

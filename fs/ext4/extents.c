@@ -296,29 +296,44 @@ static inline int ext4_ext_space_root_idx(struct inode *inode, int check)
  * to allocate @blocks
  * Worse case is one block per extent
  */
-int ext4_ext_calc_metadata_amount(struct inode *inode, int blocks)
+int ext4_ext_calc_metadata_amount(struct inode *inode, sector_t lblock)
 {
-	int lcap, icap, rcap, leafs, idxs, num;
-	int newextents = blocks;
+	struct ext4_inode_info *ei = EXT4_I(inode);
+	int idxs, num = 0;
 
-	rcap = ext4_ext_space_root_idx(inode, 0);
-	lcap = ext4_ext_space_block(inode, 0);
-	icap = ext4_ext_space_block_idx(inode, 0);
-
-	/* number of new leaf blocks needed */
-	num = leafs = (newextents + lcap - 1) / lcap;
+	idxs = ((inode->i_sb->s_blocksize - sizeof(struct ext4_extent_header))
+		/ sizeof(struct ext4_extent_idx));
 
 	/*
-	 * Worse case, we need separate index block(s)
-	 * to link all new leaf blocks
+	 * If the new delayed allocation block is contiguous with the
+	 * previous da block, it can share index blocks with the
+	 * previous block, so we only need to allocate a new index
+	 * block every idxs leaf blocks.  At ldxs**2 blocks, we need
+	 * an additional index block, and at ldxs**3 blocks, yet
+	 * another index blocks.
 	 */
-	idxs = (leafs + icap - 1) / icap;
-	do {
-		num += idxs;
-		idxs = (idxs + icap - 1) / icap;
-	} while (idxs > rcap);
+	if (ei->i_da_metadata_calc_len &&
+	    ei->i_da_metadata_calc_last_lblock+1 == lblock) {
+		if ((ei->i_da_metadata_calc_len % idxs) == 0)
+			num++;
+		if ((ei->i_da_metadata_calc_len % (idxs*idxs)) == 0)
+			num++;
+		if ((ei->i_da_metadata_calc_len % (idxs*idxs*idxs)) == 0) {
+			num++;
+			ei->i_da_metadata_calc_len = 0;
+		} else
+			ei->i_da_metadata_calc_len++;
+		ei->i_da_metadata_calc_last_lblock++;
+		return num;
+	}
 
-	return num;
+	/*
+	 * In the worst case we need a new set of index blocks at
+	 * every level of the inode's extent tree.
+	 */
+	ei->i_da_metadata_calc_len = 1;
+	ei->i_da_metadata_calc_last_lblock = lblock;
+	return ext_depth(inode) + 1;
 }
 
 static int
@@ -1007,7 +1022,8 @@ cleanup:
 		for (i = 0; i < depth; i++) {
 			if (!ablocks[i])
 				continue;
-			ext4_free_blocks(handle, inode, ablocks[i], 1, 1);
+			ext4_free_blocks(handle, inode, 0, ablocks[i], 1,
+					 EXT4_FREE_BLOCKS_METADATA);
 		}
 	}
 	kfree(ablocks);
@@ -1959,7 +1975,6 @@ errout:
 static int ext4_ext_rm_idx(handle_t *handle, struct inode *inode,
 			struct ext4_ext_path *path)
 {
-	struct buffer_head *bh;
 	int err;
 	ext4_fsblk_t leaf;
 
@@ -1975,9 +1990,8 @@ static int ext4_ext_rm_idx(handle_t *handle, struct inode *inode,
 	if (err)
 		return err;
 	ext_debug("index is empty, remove it, free block %llu\n", leaf);
-	bh = sb_find_get_block(inode->i_sb, leaf);
-	ext4_forget(handle, 1, inode, bh, leaf);
-	ext4_free_blocks(handle, inode, leaf, 1, 1);
+	ext4_free_blocks(handle, inode, 0, leaf, 1,
+			 EXT4_FREE_BLOCKS_METADATA | EXT4_FREE_BLOCKS_FORGET);
 	return err;
 }
 
@@ -2044,12 +2058,11 @@ static int ext4_remove_blocks(handle_t *handle, struct inode *inode,
 				struct ext4_extent *ex,
 				ext4_lblk_t from, ext4_lblk_t to)
 {
-	struct buffer_head *bh;
 	unsigned short ee_len =  ext4_ext_get_actual_len(ex);
-	int i, metadata = 0;
+	int flags = EXT4_FREE_BLOCKS_FORGET;
 
 	if (S_ISDIR(inode->i_mode) || S_ISLNK(inode->i_mode))
-		metadata = 1;
+		flags |= EXT4_FREE_BLOCKS_METADATA;
 #ifdef EXTENTS_STATS
 	{
 		struct ext4_sb_info *sbi = EXT4_SB(inode->i_sb);
@@ -2074,11 +2087,7 @@ static int ext4_remove_blocks(handle_t *handle, struct inode *inode,
 		num = le32_to_cpu(ex->ee_block) + ee_len - from;
 		start = ext_pblock(ex) + ee_len - num;
 		ext_debug("free last %u blocks starting %llu\n", num, start);
-		for (i = 0; i < num; i++) {
-			bh = sb_find_get_block(inode->i_sb, start + i);
-			ext4_forget(handle, metadata, inode, bh, start + i);
-		}
-		ext4_free_blocks(handle, inode, start, num, metadata);
+		ext4_free_blocks(handle, inode, 0, start, num, flags);
 	} else if (from == le32_to_cpu(ex->ee_block)
 		   && to <= le32_to_cpu(ex->ee_block) + ee_len - 1) {
 		printk(KERN_INFO "strange request: removal %u-%u from %u:%u\n",
@@ -3029,6 +3038,14 @@ out:
 	return err;
 }
 
+static void unmap_underlying_metadata_blocks(struct block_device *bdev,
+			sector_t block, int count)
+{
+	int i;
+	for (i = 0; i < count; i++)
+                unmap_underlying_metadata(bdev, block + i);
+}
+
 static int
 ext4_ext_handle_uninitialized_extents(handle_t *handle, struct inode *inode,
 			ext4_lblk_t iblock, unsigned int max_blocks,
@@ -3104,6 +3121,18 @@ out:
 	} else
 		allocated = ret;
 	set_buffer_new(bh_result);
+	/*
+	 * if we allocated more blocks than requested
+	 * we need to make sure we unmap the extra block
+	 * allocated. The actual needed block will get
+	 * unmapped later when we find the buffer_head marked
+	 * new.
+	 */
+	if (allocated > max_blocks) {
+		unmap_underlying_metadata_blocks(inode->i_sb->s_bdev,
+					newblock + max_blocks,
+					allocated - max_blocks);
+	}
 map_out:
 	set_buffer_mapped(bh_result);
 out1:
@@ -3196,7 +3225,13 @@ int ext4_ext_get_blocks(handle_t *handle, struct inode *inode,
 	 * this situation is possible, though, _during_ tree modification;
 	 * this is why assert can't be put in ext4_ext_find_extent()
 	 */
-	BUG_ON(path[depth].p_ext == NULL && depth != 0);
+	if (path[depth].p_ext == NULL && depth != 0) {
+		ext4_error(inode->i_sb, __func__, "bad extent address "
+			   "inode: %lu, iblock: %d, depth: %d",
+			   inode->i_ino, iblock, depth);
+		err = -EIO;
+		goto out2;
+	}
 	eh = path[depth].p_hdr;
 
 	ex = path[depth].p_ext;
@@ -3325,8 +3360,8 @@ int ext4_ext_get_blocks(handle_t *handle, struct inode *inode,
 		/* not a good idea to call discard here directly,
 		 * but otherwise we'd need to call it every free() */
 		ext4_discard_preallocations(inode);
-		ext4_free_blocks(handle, inode, ext_pblock(&newex),
-					ext4_ext_get_actual_len(&newex), 0);
+		ext4_free_blocks(handle, inode, 0, ext_pblock(&newex),
+				 ext4_ext_get_actual_len(&newex), 0);
 		goto out2;
 	}
 

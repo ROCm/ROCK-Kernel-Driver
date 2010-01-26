@@ -112,7 +112,7 @@ bt_print_one(kdb_machreg_t ip,
 	}
 	if (btsp)
 		kdb_printf("        sp 0x%016lx bsp 0x%016lx cfm 0x%016lx info->pfs_loc 0x%016lx 0x%016lx\n",
-				sp, bsp, cfm, (u64) info->pfs_loc, info->pfs_loc ? *(info->pfs_loc) : 0);
+				sp, bsp, cfm, info->pfs_loc, info->pfs_loc ? *(info->pfs_loc) : 0);
 }
 
 /*
@@ -142,7 +142,7 @@ kdba_bt_stack(int argcount, const struct task_struct *p)
 	struct pt_regs *regs = NULL;
 	int count = 0;
 	int btsp = 0;			/* Backtrace the kdb code as well */
-	u64 *prev_pfs_loc = NULL;
+	unsigned long *prev_pfs_loc = NULL;
 	extern char __attribute__ ((weak)) ia64_spinlock_contention_pre3_4[];
 	extern char __attribute__ ((weak)) ia64_spinlock_contention_pre3_4_end[];
 

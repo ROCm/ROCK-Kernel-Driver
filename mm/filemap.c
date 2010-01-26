@@ -33,7 +33,6 @@
 #include <linux/cpuset.h>
 #include <linux/hardirq.h> /* for BUG_ON(!in_atomic()) only */
 #include <linux/memcontrol.h>
-#include <linux/precache.h>
 #include <linux/mm_inline.h> /* for page_is_file_cache() */
 #include <trace/filemap.h>
 #include "internal.h"
@@ -124,16 +123,6 @@ void __remove_from_page_cache(struct page *page)
 {
 	struct address_space *mapping = page->mapping;
 
-	/*
-	 * if we're uptodate, flush out into the precache, otherwise
-	 * invalidate any existing precache entries.  We can't leave
-	 * stale data around in the precache once our page is gone
-	 */
-	if (PageUptodate(page))
-		precache_put(page->mapping, page->index, page);
-	else
-		precache_flush(page->mapping, page->index);
-
 	radix_tree_delete(&mapping->page_tree, page->index);
 	page->mapping = NULL;
 	mapping->nrpages--;
@@ -202,7 +191,6 @@ static int sync_page(void *word)
 	if (mapping && mapping->a_ops && mapping->a_ops->sync_page)
 		mapping->a_ops->sync_page(page);
 	io_schedule();
-
 	return 0;
 }
 
@@ -278,27 +266,27 @@ int filemap_flush(struct address_space *mapping)
 EXPORT_SYMBOL(filemap_flush);
 
 /**
- * wait_on_page_writeback_range - wait for writeback to complete
- * @mapping:	target address_space
- * @start:	beginning page index
- * @end:	ending page index
+ * filemap_fdatawait_range - wait for writeback to complete
+ * @mapping:		address space structure to wait for
+ * @start_byte:		offset in bytes where the range starts
+ * @end_byte:		offset in bytes where the range ends (inclusive)
  *
- * Wait for writeback to complete against pages indexed by start->end
- * inclusive
+ * Walk the list of under-writeback pages of the given address space
+ * in the given range and wait for all of them.
  */
-int wait_on_page_writeback_range(struct address_space *mapping,
-				pgoff_t start, pgoff_t end)
+int filemap_fdatawait_range(struct address_space *mapping, loff_t start_byte,
+			    loff_t end_byte)
 {
+	pgoff_t index = start_byte >> PAGE_CACHE_SHIFT;
+	pgoff_t end = end_byte >> PAGE_CACHE_SHIFT;
 	struct pagevec pvec;
 	int nr_pages;
 	int ret = 0;
-	pgoff_t index;
 
-	if (end < start)
+	if (end_byte < start_byte)
 		return 0;
 
 	pagevec_init(&pvec, 0);
-	index = start;
 	while ((index <= end) &&
 			(nr_pages = pagevec_lookup_tag(&pvec, mapping, &index,
 			PAGECACHE_TAG_WRITEBACK,
@@ -328,90 +316,7 @@ int wait_on_page_writeback_range(struct address_space *mapping,
 
 	return ret;
 }
-
-/**
- * filemap_fdatawait_range - wait for all under-writeback pages to complete in a given range
- * @mapping: address space structure to wait for
- * @start:	offset in bytes where the range starts
- * @end:	offset in bytes where the range ends (inclusive)
- *
- * Walk the list of under-writeback pages of the given address space
- * in the given range and wait for all of them.
- *
- * This is just a simple wrapper so that callers don't have to convert offsets
- * to page indexes themselves
- */
-int filemap_fdatawait_range(struct address_space *mapping, loff_t start,
-			    loff_t end)
-{
-	return wait_on_page_writeback_range(mapping, start >> PAGE_CACHE_SHIFT,
-					    end >> PAGE_CACHE_SHIFT);
-}
 EXPORT_SYMBOL(filemap_fdatawait_range);
-
-/**
- * sync_page_range - write and wait on all pages in the passed range
- * @inode:	target inode
- * @mapping:	target address_space
- * @pos:	beginning offset in pages to write
- * @count:	number of bytes to write
- *
- * Write and wait upon all the pages in the passed range.  This is a "data
- * integrity" operation.  It waits upon in-flight writeout before starting and
- * waiting upon new writeout.  If there was an IO error, return it.
- *
- * We need to re-take i_mutex during the generic_osync_inode list walk because
- * it is otherwise livelockable.
- */
-int sync_page_range(struct inode *inode, struct address_space *mapping,
-			loff_t pos, loff_t count)
-{
-	pgoff_t start = pos >> PAGE_CACHE_SHIFT;
-	pgoff_t end = (pos + count - 1) >> PAGE_CACHE_SHIFT;
-	int ret;
-
-	if (!mapping_cap_writeback_dirty(mapping) || !count)
-		return 0;
-	ret = filemap_fdatawrite_range(mapping, pos, pos + count - 1);
-	if (ret == 0) {
-		mutex_lock(&inode->i_mutex);
-		ret = generic_osync_inode(inode, mapping, OSYNC_METADATA);
-		mutex_unlock(&inode->i_mutex);
-	}
-	if (ret == 0)
-		ret = wait_on_page_writeback_range(mapping, start, end);
-	return ret;
-}
-EXPORT_SYMBOL_GPL(sync_page_range);
-
-/**
- * sync_page_range_nolock - write & wait on all pages in the passed range without locking
- * @inode:	target inode
- * @mapping:	target address_space
- * @pos:	beginning offset in pages to write
- * @count:	number of bytes to write
- *
- * Note: Holding i_mutex across sync_page_range_nolock() is not a good idea
- * as it forces O_SYNC writers to different parts of the same file
- * to be serialised right until io completion.
- */
-int sync_page_range_nolock(struct inode *inode, struct address_space *mapping,
-			   loff_t pos, loff_t count)
-{
-	pgoff_t start = pos >> PAGE_CACHE_SHIFT;
-	pgoff_t end = (pos + count - 1) >> PAGE_CACHE_SHIFT;
-	int ret;
-
-	if (!mapping_cap_writeback_dirty(mapping) || !count)
-		return 0;
-	ret = filemap_fdatawrite_range(mapping, pos, pos + count - 1);
-	if (ret == 0)
-		ret = generic_osync_inode(inode, mapping, OSYNC_METADATA);
-	if (ret == 0)
-		ret = wait_on_page_writeback_range(mapping, start, end);
-	return ret;
-}
-EXPORT_SYMBOL_GPL(sync_page_range_nolock);
 
 /**
  * filemap_fdatawait - wait for all under-writeback pages to complete
@@ -427,8 +332,7 @@ int filemap_fdatawait(struct address_space *mapping)
 	if (i_size == 0)
 		return 0;
 
-	return wait_on_page_writeback_range(mapping, 0,
-				(i_size - 1) >> PAGE_CACHE_SHIFT);
+	return filemap_fdatawait_range(mapping, 0, i_size - 1);
 }
 EXPORT_SYMBOL(filemap_fdatawait);
 
@@ -475,9 +379,8 @@ int filemap_write_and_wait_range(struct address_space *mapping,
 						 WB_SYNC_ALL);
 		/* See comment of filemap_write_and_wait() */
 		if (err != -EIO) {
-			int err2 = wait_on_page_writeback_range(mapping,
-						lstart >> PAGE_CACHE_SHIFT,
-						lend >> PAGE_CACHE_SHIFT);
+			int err2 = filemap_fdatawait_range(mapping,
+						lstart, lend);
 			if (!err)
 				err = err2;
 		}
@@ -573,6 +476,12 @@ struct page *__page_cache_alloc(gfp_t gfp)
 EXPORT_SYMBOL(__page_cache_alloc);
 #endif
 
+static int __sleep_on_page_lock(void *word)
+{
+	io_schedule();
+	return 0;
+}
+
 /*
  * In order to wait for pages to become available there must be
  * waitqueues associated with pages. By using a hash table of
@@ -625,22 +534,6 @@ void add_page_wait_queue(struct page *page, wait_queue_t *waiter)
 }
 EXPORT_SYMBOL_GPL(add_page_wait_queue);
 
-/*
- * If PageWaiters was found to be set at unlock time, __wake_page_waiters
- * should be called to actually perform the wakeup of waiters.
- */
-static void __wake_page_waiters(struct page *page)
-{
-	ClearPageWaiters(page);
-	/*
-	 * The smp_mb() is necessary to enforce ordering between the clear_bit
-	 * and the read of the waitqueue (to avoid SMP races with a parallel
-	 * __wait_on_page_locked()).
-	 */
-	smp_mb__after_clear_bit();
-	wake_up_page(page, PG_locked);
-}
-
 /**
  * unlock_page - unlock a locked page
  * @page: the page
@@ -657,8 +550,8 @@ void unlock_page(struct page *page)
 {
 	VM_BUG_ON(!PageLocked(page));
 	clear_bit_unlock(PG_locked, &page->flags);
-	if (unlikely(PageWaiters(page)))
-		__wake_page_waiters(page);
+	smp_mb__after_clear_bit();
+	wake_up_page(page, PG_locked);
 }
 EXPORT_SYMBOL(unlock_page);
 
@@ -690,58 +583,21 @@ EXPORT_SYMBOL(end_page_writeback);
  */
 void __lock_page(struct page *page)
 {
-	wait_queue_head_t *wq = page_waitqueue(page);
 	DEFINE_WAIT_BIT(wait, &page->flags, PG_locked);
 
-	do {
-		prepare_to_wait(wq, &wait.wait, TASK_UNINTERRUPTIBLE);
-		SetPageWaiters(page);
-		if (likely(PageLocked(page)))
-			sync_page(page);
-	} while (!trylock_page(page));
-	finish_wait(wq, &wait.wait);
+	__wait_on_bit_lock(page_waitqueue(page), &wait, sync_page,
+							TASK_UNINTERRUPTIBLE);
 }
 EXPORT_SYMBOL(__lock_page);
 
 int __lock_page_killable(struct page *page)
 {
-	wait_queue_head_t *wq = page_waitqueue(page);
 	DEFINE_WAIT_BIT(wait, &page->flags, PG_locked);
-	int err = 0;
 
-	do {
-		prepare_to_wait(wq, &wait.wait, TASK_KILLABLE);
-		SetPageWaiters(page);
-		if (likely(PageLocked(page))) {
-			err = sync_page_killable(page);
-			if (err)
-				break;
-		}
-	} while (!trylock_page(page));
-	finish_wait(wq, &wait.wait);
-
-	return err;
+	return __wait_on_bit_lock(page_waitqueue(page), &wait,
+					sync_page_killable, TASK_KILLABLE);
 }
 EXPORT_SYMBOL_GPL(__lock_page_killable);
-
-void  __wait_on_page_locked(struct page *page)
-{
-	wait_queue_head_t *wq = page_waitqueue(page);
-	DEFINE_WAIT_BIT(wait, &page->flags, PG_locked);
-
-	do {
-		prepare_to_wait(wq, &wait.wait, TASK_UNINTERRUPTIBLE);
-		SetPageWaiters(page);
-		if (likely(PageLocked(page)))
-			sync_page(page);
-	} while (PageLocked(page));
-	finish_wait(wq, &wait.wait);
-
-	/* Clean up a potentially dangling PG_waiters */
-	if (unlikely(PageWaiters(page)))
-		__wake_page_waiters(page);
-}
-EXPORT_SYMBOL(__wait_on_page_locked);
 
 /**
  * __lock_page_nosync - get a lock on the page, without calling sync_page()
@@ -750,18 +606,11 @@ EXPORT_SYMBOL(__wait_on_page_locked);
  * Variant of lock_page that does not require the caller to hold a reference
  * on the page's mapping.
  */
-void  __lock_page_nosync(struct page *page)
+void __lock_page_nosync(struct page *page)
 {
-	wait_queue_head_t *wq = page_waitqueue(page);
 	DEFINE_WAIT_BIT(wait, &page->flags, PG_locked);
-
-	do {
-		prepare_to_wait(wq, &wait.wait, TASK_UNINTERRUPTIBLE);
-		SetPageWaiters(page);
-		if (likely(PageLocked(page)))
-			io_schedule();
-	} while (!trylock_page(page));
-	finish_wait(wq, &wait.wait);
+	__wait_on_bit_lock(page_waitqueue(page), &wait, __sleep_on_page_lock,
+							TASK_UNINTERRUPTIBLE);
 }
 
 /**
@@ -1983,7 +1832,7 @@ static size_t __iovec_copy_from_user_inatomic(char *vaddr,
 
 /*
  * Copy as much as we can into the page and return the number of bytes which
- * were sucessfully copied.  If a fault is encountered then return the number of
+ * were successfully copied.  If a fault is encountered then return the number of
  * bytes which were copied.
  */
 size_t iov_iter_copy_from_user_atomic(struct page *page,
@@ -2400,7 +2249,6 @@ generic_file_buffered_write(struct kiocb *iocb, const struct iovec *iov,
 		size_t count, ssize_t written)
 {
 	struct file *file = iocb->ki_filp;
-	struct address_space *mapping = file->f_mapping;
 	ssize_t status;
 	struct iov_iter i;
 
@@ -2412,15 +2260,6 @@ generic_file_buffered_write(struct kiocb *iocb, const struct iovec *iov,
 		*ppos = pos + status;
   	}
 	
-	/*
-	 * If we get here for O_DIRECT writes then we must have fallen through
-	 * to buffered writes (block instantiation inside i_size).  So we sync
-	 * the file data here, to try to honour O_DIRECT expectations.
-	 */
-	if (unlikely(file->f_flags & O_DIRECT) && written)
-		status = filemap_write_and_wait_range(mapping,
-					pos, pos + written - 1);
-
 	return written ? written : status;
 }
 EXPORT_SYMBOL(generic_file_buffered_write);
@@ -2519,10 +2358,7 @@ ssize_t __generic_file_aio_write(struct kiocb *iocb, const struct iovec *iov,
 		 * semantics.
 		 */
 		endbyte = pos + written_buffered - written - 1;
-		err = do_sync_mapping_range(file->f_mapping, pos, endbyte,
-					    SYNC_FILE_RANGE_WAIT_BEFORE|
-					    SYNC_FILE_RANGE_WRITE|
-					    SYNC_FILE_RANGE_WAIT_AFTER);
+		err = filemap_write_and_wait_range(file->f_mapping, pos, endbyte);
 		if (err == 0) {
 			written = written_buffered;
 			invalidate_mapping_pages(mapping,

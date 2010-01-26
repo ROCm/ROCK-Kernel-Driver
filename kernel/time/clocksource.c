@@ -39,7 +39,7 @@ void timecounter_init(struct timecounter *tc,
 	tc->cycle_last = cc->read(cc);
 	tc->nsec = start_tstamp;
 }
-EXPORT_SYMBOL(timecounter_init);
+EXPORT_SYMBOL_GPL(timecounter_init);
 
 /**
  * timecounter_read_delta - get nanoseconds since last call of this function
@@ -83,7 +83,7 @@ u64 timecounter_read(struct timecounter *tc)
 
 	return nsec;
 }
-EXPORT_SYMBOL(timecounter_read);
+EXPORT_SYMBOL_GPL(timecounter_read);
 
 u64 timecounter_cyc2time(struct timecounter *tc,
 			 cycle_t cycle_tstamp)
@@ -105,7 +105,60 @@ u64 timecounter_cyc2time(struct timecounter *tc,
 
 	return nsec;
 }
-EXPORT_SYMBOL(timecounter_cyc2time);
+EXPORT_SYMBOL_GPL(timecounter_cyc2time);
+
+/**
+ * clocks_calc_mult_shift - calculate mult/shift factors for scaled math of clocks
+ * @mult:	pointer to mult variable
+ * @shift:	pointer to shift variable
+ * @from:	frequency to convert from
+ * @to:		frequency to convert to
+ * @minsec:	guaranteed runtime conversion range in seconds
+ *
+ * The function evaluates the shift/mult pair for the scaled math
+ * operations of clocksources and clockevents.
+ *
+ * @to and @from are frequency values in HZ. For clock sources @to is
+ * NSEC_PER_SEC == 1GHz and @from is the counter frequency. For clock
+ * event @to is the counter frequency and @from is NSEC_PER_SEC.
+ *
+ * The @minsec conversion range argument controls the time frame in
+ * seconds which must be covered by the runtime conversion with the
+ * calculated mult and shift factors. This guarantees that no 64bit
+ * overflow happens when the input value of the conversion is
+ * multiplied with the calculated mult factor. Larger ranges may
+ * reduce the conversion accuracy by chosing smaller mult and shift
+ * factors.
+ */
+void
+clocks_calc_mult_shift(u32 *mult, u32 *shift, u32 from, u32 to, u32 minsec)
+{
+	u64 tmp;
+	u32 sft, sftacc= 32;
+
+	/*
+	 * Calculate the shift factor which is limiting the conversion
+	 * range:
+	 */
+	tmp = ((u64)minsec * from) >> 32;
+	while (tmp) {
+		tmp >>=1;
+		sftacc--;
+	}
+
+	/*
+	 * Find the conversion shift/mult pair which has the best
+	 * accuracy and fits the maxsec conversion range:
+	 */
+	for (sft = 32; sft > 0; sft--) {
+		tmp = (u64) to << sft;
+		do_div(tmp, from);
+		if ((tmp >> sftacc) == 0)
+			break;
+	}
+	*mult = tmp;
+	*shift = sft;
+}
 
 /*[Clocksource internal variables]---------
  * curr_clocksource:
@@ -413,8 +466,6 @@ void clocksource_touch_watchdog(void)
 	clocksource_resume_watchdog();
 }
 
-#ifdef CONFIG_GENERIC_TIME
-
 /**
  * clocksource_max_deferment - Returns max time the clocksource can be deferred
  * @cs:         Pointer to clocksource
@@ -455,6 +506,8 @@ static u64 clocksource_max_deferment(struct clocksource *cs)
 	 */
 	return max_nsecs - (max_nsecs >> 5);
 }
+
+#ifdef CONFIG_GENERIC_TIME
 
 /**
  * clocksource_select - Select the best clocksource available
@@ -624,7 +677,7 @@ sysfs_show_current_clocksources(struct sys_device *dev,
  * @count:	length of buffer
  *
  * Takes input from sysfs interface for manually overriding the default
- * clocksource selction.
+ * clocksource selection.
  */
 static ssize_t sysfs_override_clocksource(struct sys_device *dev,
 					  struct sysdev_attribute *attr,

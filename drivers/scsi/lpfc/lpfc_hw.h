@@ -353,8 +353,7 @@ struct csp {
 
 	uint16_t huntgroup:1;	/* FC Word 1, bit 23 */
 	uint16_t simplex:1;	/* FC Word 1, bit 22 */
-	uint16_t security:1;    /* FC Word 1, bit 21 */
-	uint16_t word1Reserved1:2;	/* FC Word 1, bit 20:19 */
+	uint16_t word1Reserved1:3;	/* FC Word 1, bit 21:19 */
 	uint16_t dhd:1;		/* FC Word 1, bit 18 */
 	uint16_t contIncSeqCnt:1;	/* FC Word 1, bit 17 */
 	uint16_t payloadlength:1;	/* FC Word 1, bit 16 */
@@ -371,8 +370,7 @@ struct csp {
 	uint16_t payloadlength:1;	/* FC Word 1, bit 16 */
 	uint16_t contIncSeqCnt:1;	/* FC Word 1, bit 17 */
 	uint16_t dhd:1;		/* FC Word 1, bit 18 */
-	uint16_t word1Reserved1:2;	/* FC Word 1, bit 20:19 */
-	 uint16_t security:1;    /* FC Word 1, bit 21 */
+	uint16_t word1Reserved1:3;	/* FC Word 1, bit 21:19 */
 	uint16_t simplex:1;	/* FC Word 1, bit 22 */
 	uint16_t huntgroup:1;	/* FC Word 1, bit 23 */
 #endif
@@ -540,17 +538,6 @@ struct fc_vft_header {
 #define ELS_CMD_SCR       0x62000000
 #define ELS_CMD_RNID      0x78000000
 #define ELS_CMD_LIRR      0x7A000000
-/*
- * ELS commands for authentication
- * ELS_CMD_AUTH<<24 | AUTH_NEGOTIATE<<8 | AUTH_VERSION
- */
-#define ELS_CMD_AUTH      0x90000000
-#define ELS_CMD_AUTH_RJT  0x90000A01
-#define ELS_CMD_AUTH_NEG  0x90000B01
-#define ELS_CMD_AUTH_DONE 0x90000C01
-#define ELS_CMD_DH_CHA    0x90001001
-#define ELS_CMD_DH_REP    0x90001101
-#define ELS_CMD_DH_SUC    0x90001201
 #else	/*  __LITTLE_ENDIAN_BITFIELD */
 #define ELS_CMD_MASK      0xffff
 #define ELS_RSP_MASK      0xff
@@ -587,17 +574,6 @@ struct fc_vft_header {
 #define ELS_CMD_SCR       0x62
 #define ELS_CMD_RNID      0x78
 #define ELS_CMD_LIRR      0x7A
-/*
- * ELS commands for authentication
- * ELS_CMD_AUTH | AUTH_NEGOTIATE<<16 | AUTH_VERSION<<24
- */
-#define ELS_CMD_AUTH      0x00000090
-#define ELS_CMD_AUTH_RJT  0x010A0090
-#define ELS_CMD_AUTH_NEG  0x010B0090
-#define ELS_CMD_AUTH_DONE 0x010C0090
-#define ELS_CMD_DH_CHA    0x01100090
-#define ELS_CMD_DH_REP    0x01110090
-#define ELS_CMD_DH_SUC    0x01120090
 #endif
 
 /*
@@ -1194,6 +1170,7 @@ typedef struct {
 #define PCI_DEVICE_ID_TIGERSHARK    0x0704
 #define PCI_DEVICE_ID_TOMCAT        0x0714
 #define PCI_DEVICE_ID_FALCON        0xf180
+#define PCI_DEVICE_ID_RAYWIRE       0x0214
 
 #define JEDEC_ID_ADDRESS            0x0080001c
 #define FIREFLY_JEDEC_ID            0x1ACC

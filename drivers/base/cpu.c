@@ -112,7 +112,7 @@ static inline void register_cpu_control(struct cpu *cpu)
 }
 #endif /* CONFIG_HOTPLUG_CPU */
 
-#if defined(CONFIG_KEXEC) && !defined(CONFIG_XEN)
+#ifdef CONFIG_KEXEC
 #include <linux/kexec.h>
 
 static ssize_t show_crash_notes(struct sys_device *dev, struct sysdev_attribute *attr,
@@ -131,7 +131,7 @@ static ssize_t show_crash_notes(struct sys_device *dev, struct sysdev_attribute 
 	 * boot up and this data does not change there after. Hence this
 	 * operation should be safe. No locking required.
 	 */
-	addr = __pa(per_cpu_ptr(crash_notes, cpunum));
+	addr = per_cpu_ptr_to_phys(per_cpu_ptr(crash_notes, cpunum));
 	rc = sprintf(buf, "%Lx\n", addr);
 	return rc;
 }
@@ -251,7 +251,7 @@ int __cpuinit register_cpu(struct cpu *cpu, int num)
 	if (!error)
 		register_cpu_under_node(num, cpu_to_node(num));
 
-#if defined(CONFIG_KEXEC) && !defined(CONFIG_XEN)
+#ifdef CONFIG_KEXEC
 	if (!error)
 		error = sysdev_create_file(&cpu->sysdev, &attr_crash_notes);
 #endif

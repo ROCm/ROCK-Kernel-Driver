@@ -30,7 +30,6 @@ enum bfi_lps_h2i_msgs {
 enum bfi_lps_i2h_msgs {
 	BFI_LPS_H2I_LOGIN_RSP	= BFA_I2HM(1),
 	BFI_LPS_H2I_LOGOUT_RSP	= BFA_I2HM(2),
-	BFI_LPS_H2I_CVL_EVENT	= BFA_I2HM(3),
 };
 
 struct bfi_lps_login_req_s {
@@ -58,8 +57,8 @@ struct bfi_lps_login_rsp_s {
 	u8		npiv_en;
 	u32	lp_pid:24;
 	u32	auth_req:8;
-	struct mac_s	lp_mac;
-	struct mac_s	fcf_mac;
+	mac_t		lp_mac;
+	mac_t		fcf_mac;
 	u8		ext_status;
 	u8  	brcd_switch;/*  attached peer is brcd switch	*/
 };
@@ -78,12 +77,6 @@ struct bfi_lps_logout_rsp_s {
 	u8		rsvd[2];
 };
 
-struct bfi_lps_cvl_event_s {
-	struct bfi_mhdr_s  mh;		/*  common msg header		*/
-	u8		lp_tag;
-	u8		rsvd[3];
-};
-
 union bfi_lps_h2i_msg_u {
 	struct bfi_mhdr_s		*msg;
 	struct bfi_lps_login_req_s	*login_req;
@@ -94,7 +87,6 @@ union bfi_lps_i2h_msg_u {
 	struct bfi_msg_s		*msg;
 	struct bfi_lps_login_rsp_s	*login_rsp;
 	struct bfi_lps_logout_rsp_s	*logout_rsp;
-	struct bfi_lps_cvl_event_s	*cvl_event;
 };
 
 #pragma pack()

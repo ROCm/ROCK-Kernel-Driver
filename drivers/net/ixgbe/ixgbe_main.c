@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   Intel 10 Gigabit PCI Express Linux driver
-  Copyright(c) 1999 - 2009 Intel Corporation.
+  Copyright(c) 1999 - 2010 Intel Corporation.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms and conditions of the GNU General Public License,
@@ -52,7 +52,7 @@ static const char ixgbe_driver_string[] =
 
 #define DRV_VERSION "2.0.44-k2"
 const char ixgbe_driver_version[] = DRV_VERSION;
-static char ixgbe_copyright[] = "Copyright (c) 1999-2009 Intel Corporation.";
+static char ixgbe_copyright[] = "Copyright (c) 1999-2010 Intel Corporation.";
 
 static int entropy = 0;
 module_param(entropy, int, 0);
@@ -100,6 +100,8 @@ static struct pci_device_id ixgbe_pci_tbl[] = {
 	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82599_KX4),
 	 board_82599 },
 	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82599_XAUI_LOM),
+	 board_82599 },
+	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82599_KR),
 	 board_82599 },
 	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82599_SFP),
 	 board_82599 },
@@ -223,10 +225,20 @@ static void ixgbe_unmap_and_free_tx_resource(struct ixgbe_adapter *adapter,
                                              struct ixgbe_tx_buffer
                                              *tx_buffer_info)
 {
-	tx_buffer_info->dma = 0;
+	if (tx_buffer_info->dma) {
+		if (tx_buffer_info->mapped_as_page)
+			pci_unmap_page(adapter->pdev,
+				       tx_buffer_info->dma,
+				       tx_buffer_info->length,
+				       PCI_DMA_TODEVICE);
+		else
+			pci_unmap_single(adapter->pdev,
+					 tx_buffer_info->dma,
+					 tx_buffer_info->length,
+					 PCI_DMA_TODEVICE);
+		tx_buffer_info->dma = 0;
+	}
 	if (tx_buffer_info->skb) {
-		skb_dma_unmap(&adapter->pdev->dev, tx_buffer_info->skb,
-		              DMA_TO_DEVICE);
 		dev_kfree_skb_any(tx_buffer_info->skb);
 		tx_buffer_info->skb = NULL;
 	}
@@ -255,10 +267,12 @@ static inline bool ixgbe_tx_is_paused(struct ixgbe_adapter *adapter,
 		int reg_idx = tx_ring->reg_idx;
 		int dcb_i = adapter->ring_feature[RING_F_DCB].indices;
 
-		if (adapter->hw.mac.type == ixgbe_mac_82598EB) {
+		switch (adapter->hw.mac.type) {
+		case ixgbe_mac_82598EB:
 			tc = reg_idx >> 2;
 			txoff = IXGBE_TFCS_TXOFF0;
-		} else if (adapter->hw.mac.type == ixgbe_mac_82599EB) {
+			break;
+		case ixgbe_mac_82599EB:
 			tc = 0;
 			txoff = IXGBE_TFCS_TXOFF;
 			if (dcb_i == 8) {
@@ -277,6 +291,9 @@ static inline bool ixgbe_tx_is_paused(struct ixgbe_adapter *adapter,
 						tc += (reg_idx - 96) >> 4;
 				}
 			}
+			break;
+		default:
+			tc = 0;
 		}
 		txoff <<= tc;
 	}
@@ -430,8 +447,6 @@ static bool ixgbe_clean_tx_irq(struct ixgbe_q_vector *q_vector,
 	tx_ring->total_packets += total_packets;
 	tx_ring->stats.packets += total_packets;
 	tx_ring->stats.bytes += total_bytes;
-	netdev->stats.tx_bytes += total_bytes;
-	netdev->stats.tx_packets += total_packets;
 	return (count < tx_ring->work_limit);
 }
 
@@ -4378,6 +4393,11 @@ static int ixgbe_resume(struct pci_dev *pdev)
 
 	pci_set_power_state(pdev, PCI_D0);
 	pci_restore_state(pdev);
+	/*
+	 * pci_restore_state clears dev->state_saved so call
+	 * pci_save_state to restore it.
+	 */
+	pci_save_state(pdev);
 
 	err = pci_enable_device_mem(pdev);
 	if (err) {
@@ -4516,6 +4536,7 @@ void ixgbe_update_stats(struct ixgbe_adapter *adapter)
 	struct ixgbe_hw *hw = &adapter->hw;
 	u64 total_mpc = 0;
 	u32 i, missed_rx = 0, mpc, bprc, lxon, lxoff, xon_off_tot;
+	u64 non_eop_descs = 0, restart_queue = 0;
 
 	if (adapter->flags2 & IXGBE_FLAG2_RSC_ENABLED) {
 		u64 rsc_count = 0;
@@ -4533,10 +4554,12 @@ void ixgbe_update_stats(struct ixgbe_adapter *adapter)
 
 	/* gather some stats to the adapter struct that are per queue */
 	for (i = 0; i < adapter->num_tx_queues; i++)
-		adapter->restart_queue += adapter->tx_ring[i].restart_queue;
+		restart_queue += adapter->tx_ring[i].restart_queue;
+	adapter->restart_queue = restart_queue;
 
 	for (i = 0; i < adapter->num_rx_queues; i++)
-		adapter->non_eop_descs += adapter->tx_ring[i].non_eop_descs;
+		non_eop_descs += adapter->rx_ring[i].non_eop_descs;
+	adapter->non_eop_descs = non_eop_descs;
 
 	adapter->stats.crcerrs += IXGBE_READ_REG(hw, IXGBE_CRCERRS);
 	for (i = 0; i < 8; i++) {
@@ -5008,7 +5031,18 @@ static bool ixgbe_tx_csum(struct ixgbe_adapter *adapter,
 		                    IXGBE_ADVTXD_DTYP_CTXT);
 
 		if (skb->ip_summed == CHECKSUM_PARTIAL) {
-			switch (skb->protocol) {
+			__be16 protocol;
+
+			if (skb->protocol == cpu_to_be16(ETH_P_8021Q)) {
+				const struct vlan_ethhdr *vhdr =
+					(const struct vlan_ethhdr *)skb->data;
+
+				protocol = vhdr->h_vlan_encapsulated_proto;
+			} else {
+				protocol = skb->protocol;
+			}
+
+			switch (protocol) {
 			case cpu_to_be16(ETH_P_IP):
 				type_tucmd_mlhl |= IXGBE_ADVTXD_TUCMD_IPV4;
 				if (ip_hdr(skb)->protocol == IPPROTO_TCP)
@@ -5060,22 +5094,15 @@ static int ixgbe_tx_map(struct ixgbe_adapter *adapter,
                         struct sk_buff *skb, u32 tx_flags,
                         unsigned int first)
 {
+	struct pci_dev *pdev = adapter->pdev;
 	struct ixgbe_tx_buffer *tx_buffer_info;
 	unsigned int len;
 	unsigned int total = skb->len;
 	unsigned int offset = 0, size, count = 0, i;
 	unsigned int nr_frags = skb_shinfo(skb)->nr_frags;
 	unsigned int f;
-	dma_addr_t *map;
 
 	i = tx_ring->next_to_use;
-
-	if (skb_dma_map(&adapter->pdev->dev, skb, DMA_TO_DEVICE)) {
-		dev_err(&adapter->pdev->dev, "TX DMA map failed\n");
-		return 0;
-	}
-
-	map = skb_shinfo(skb)->dma_maps;
 
 	if (tx_flags & IXGBE_TX_FLAGS_FCOE)
 		/* excluding fcoe_crc_eof for FCoE */
@@ -5087,7 +5114,12 @@ static int ixgbe_tx_map(struct ixgbe_adapter *adapter,
 		size = min(len, (uint)IXGBE_MAX_DATA_PER_TXD);
 
 		tx_buffer_info->length = size;
-		tx_buffer_info->dma = skb_shinfo(skb)->dma_head + offset;
+		tx_buffer_info->mapped_as_page = false;
+		tx_buffer_info->dma = pci_map_single(pdev,
+						     skb->data + offset,
+						     size, PCI_DMA_TODEVICE);
+		if (pci_dma_mapping_error(pdev, tx_buffer_info->dma))
+			goto dma_error;
 		tx_buffer_info->time_stamp = jiffies;
 		tx_buffer_info->next_to_watch = i;
 
@@ -5108,7 +5140,7 @@ static int ixgbe_tx_map(struct ixgbe_adapter *adapter,
 
 		frag = &skb_shinfo(skb)->frags[f];
 		len = min((unsigned int)frag->size, total);
-		offset = 0;
+		offset = frag->page_offset;
 
 		while (len) {
 			i++;
@@ -5119,7 +5151,13 @@ static int ixgbe_tx_map(struct ixgbe_adapter *adapter,
 			size = min(len, (uint)IXGBE_MAX_DATA_PER_TXD);
 
 			tx_buffer_info->length = size;
-			tx_buffer_info->dma = map[f] + offset;
+			tx_buffer_info->dma = pci_map_page(adapter->pdev,
+							   frag->page,
+							   offset, size,
+							   PCI_DMA_TODEVICE);
+			tx_buffer_info->mapped_as_page = true;
+			if (pci_dma_mapping_error(pdev, tx_buffer_info->dma))
+				goto dma_error;
 			tx_buffer_info->time_stamp = jiffies;
 			tx_buffer_info->next_to_watch = i;
 
@@ -5134,6 +5172,27 @@ static int ixgbe_tx_map(struct ixgbe_adapter *adapter,
 
 	tx_ring->tx_buffer_info[i].skb = skb;
 	tx_ring->tx_buffer_info[first].next_to_watch = i;
+
+	return count;
+
+dma_error:
+	dev_err(&pdev->dev, "TX DMA map failed\n");
+
+	/* clear timestamp and dma mappings for failed tx_buffer_info map */
+	tx_buffer_info->dma = 0;
+	tx_buffer_info->time_stamp = 0;
+	tx_buffer_info->next_to_watch = 0;
+	count--;
+
+	/* clear timestamp and dma mappings for remaining portion of packet */
+	while (count >= 0) {
+		count--;
+		i--;
+		if (i < 0)
+			i += tx_ring->count;
+		tx_buffer_info = &tx_ring->tx_buffer_info[i];
+		ixgbe_unmap_and_free_tx_resource(adapter, tx_buffer_info);
+	}
 
 	return count;
 }
@@ -5307,6 +5366,7 @@ static netdev_tx_t ixgbe_xmit_frame(struct sk_buff *skb,
 {
 	struct ixgbe_adapter *adapter = netdev_priv(netdev);
 	struct ixgbe_ring *tx_ring;
+	struct netdev_queue *txq;
 	unsigned int first;
 	unsigned int tx_flags = 0;
 	u8 hdr_len = 0;
@@ -5404,6 +5464,9 @@ static netdev_tx_t ixgbe_xmit_frame(struct sk_buff *skb,
 				tx_ring->atr_count = 0;
 			}
 		}
+		txq = netdev_get_tx_queue(netdev, tx_ring->queue_index);
+		txq->tx_bytes += skb->len;
+		txq->tx_packets++;
 		ixgbe_tx_queue(adapter, tx_ring, tx_flags, count, skb->len,
 		               hdr_len);
 		ixgbe_maybe_stop_tx(netdev, tx_ring, DESC_NEEDED);
@@ -5415,19 +5478,6 @@ static netdev_tx_t ixgbe_xmit_frame(struct sk_buff *skb,
 	}
 
 	return NETDEV_TX_OK;
-}
-
-/**
- * ixgbe_get_stats - Get System Network Statistics
- * @netdev: network interface device structure
- *
- * Returns the address of the device statistics structure.
- * The statistics are actually updated from the timer callback.
- **/
-static struct net_device_stats *ixgbe_get_stats(struct net_device *netdev)
-{
-	/* only return the current stats */
-	return &netdev->stats;
 }
 
 /**
@@ -5541,6 +5591,10 @@ static void ixgbe_netpoll(struct net_device *netdev)
 	struct ixgbe_adapter *adapter = netdev_priv(netdev);
 	int i;
 
+	/* if interface is down do nothing */
+	if (test_bit(__IXGBE_DOWN, &adapter->state))
+		return;
+
 	adapter->flags |= IXGBE_FLAG_IN_NETPOLL;
 	if (adapter->flags & IXGBE_FLAG_MSIX_ENABLED) {
 		int num_q_vectors = adapter->num_msix_vectors - NON_Q_VECTORS;
@@ -5560,7 +5614,6 @@ static const struct net_device_ops ixgbe_netdev_ops = {
 	.ndo_stop		= ixgbe_close,
 	.ndo_start_xmit		= ixgbe_xmit_frame,
 	.ndo_select_queue	= ixgbe_select_queue,
-	.ndo_get_stats		= ixgbe_get_stats,
 	.ndo_set_rx_mode        = ixgbe_set_rx_mode,
 	.ndo_set_multicast_list	= ixgbe_set_rx_mode,
 	.ndo_validate_addr	= eth_validate_addr,

@@ -169,10 +169,7 @@ static void __init dmi_save_uuid(const struct dmi_header *dm, int slot, int inde
 	if (!s)
 		return;
 
-	sprintf(s,
-		"%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X",
-		d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7],
-		d[8], d[9], d[10], d[11], d[12], d[13], d[14], d[15]);
+	sprintf(s, "%pUB", d);
 
         dmi_ident[slot] = s;
 }
@@ -424,17 +421,12 @@ static bool dmi_matches(const struct dmi_system_id *dmi)
 {
 	int i;
 
-#ifdef CONFIG_XEN
-	if (!is_initial_xendomain())
-		return false;
-#endif
-
 	WARN(!dmi_initialized, KERN_ERR "dmi check: not initialized yet.\n");
 
 	for (i = 0; i < ARRAY_SIZE(dmi->matches); i++) {
 		int s = dmi->matches[i].slot;
 		if (s == DMI_NONE)
-			continue;
+			break;
 		if (dmi_ident[s]
 		    && strstr(dmi_ident[s], dmi->matches[i].substr))
 			continue;
@@ -442,6 +434,15 @@ static bool dmi_matches(const struct dmi_system_id *dmi)
 		return false;
 	}
 	return true;
+}
+
+/**
+ *	dmi_is_end_of_table - check for end-of-table marker
+ *	@dmi: pointer to the dmi_system_id structure to check
+ */
+static bool dmi_is_end_of_table(const struct dmi_system_id *dmi)
+{
+	return dmi->matches[0].slot == DMI_NONE;
 }
 
 /**
@@ -462,7 +463,7 @@ int dmi_check_system(const struct dmi_system_id *list)
 	int count = 0;
 	const struct dmi_system_id *d;
 
-	for (d = list; d->ident; d++)
+	for (d = list; !dmi_is_end_of_table(d); d++)
 		if (dmi_matches(d)) {
 			count++;
 			if (d->callback && d->callback(d))
@@ -489,7 +490,7 @@ const struct dmi_system_id *dmi_first_match(const struct dmi_system_id *list)
 {
 	const struct dmi_system_id *d;
 
-	for (d = list; d->ident; d++)
+	for (d = list; !dmi_is_end_of_table(d); d++)
 		if (dmi_matches(d))
 			return d;
 
