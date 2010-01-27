@@ -1014,6 +1014,34 @@ static int usbhid_start(struct hid_device *hid)
 				USB_INTERFACE_PROTOCOL_KEYBOARD)
 		usbhid_set_leds(hid);
 
+#ifdef CONFIG_KDB_USB
+	/* Attach USB keyboards to kdb */
+	if (intf->cur_altsetting->desc.bInterfaceProtocol ==
+	    USB_INTERFACE_PROTOCOL_KEYBOARD) {
+		int ret;
+		struct usbhid_device *usbhid = hid->driver_data;
+		extern void *usb_hcd_get_kdb_poll_func(struct usb_device *udev);
+		extern void * usb_hcd_get_kdb_completion_func(struct usb_device *udev);
+		extern int usb_hcd_check_uhci(struct usb_device *udev);
+		extern kdb_hc_keyboard_attach_t
+			usb_hcd_get_hc_keyboard_attach(struct usb_device *udev);
+		extern kdb_hc_keyboard_detach_t
+			usb_hcd_get_hc_keyboard_detach(struct usb_device *udev);
+
+		ret = kdb_usb_keyboard_attach(usbhid->urbin, usbhid->inbuf,
+					      usb_hcd_get_kdb_poll_func(interface_to_usbdev(intf)),
+					      usb_hcd_get_kdb_completion_func(interface_to_usbdev(intf)),
+					      usb_hcd_get_hc_keyboard_attach(interface_to_usbdev(intf)),
+					      usb_hcd_get_hc_keyboard_detach(interface_to_usbdev(intf)),
+					      usbhid->bufsize,
+					      NULL);
+
+		if (ret == -1)
+			printk(": FAILED to register keyboard (%s) "
+				"with KDB\n", hid->phys);
+	}
+#endif /* CONFIG_KDB_USB */
+
 	return 0;
 
 fail:
@@ -1173,34 +1201,6 @@ static int usbhid_probe(struct usb_interface *intf, const struct usb_device_id *
 			dev_err(&intf->dev, "can't add hid device: %d\n", ret);
 		goto err_free;
 	}
-
-#ifdef CONFIG_KDB_USB
-	/* Attach USB keyboards to kdb */
-	if (intf->cur_altsetting->desc.bInterfaceProtocol ==
-	    USB_INTERFACE_PROTOCOL_KEYBOARD) {
-		int ret;
-		struct usbhid_device *usbhid = hid->driver_data;
-		extern void *usb_hcd_get_kdb_poll_func(struct usb_device *udev);
-		extern void * usb_hcd_get_kdb_completion_func(struct usb_device *udev);
-		extern int usb_hcd_check_uhci(struct usb_device *udev);
-		extern kdb_hc_keyboard_attach_t
-			usb_hcd_get_hc_keyboard_attach(struct usb_device *udev);
-		extern kdb_hc_keyboard_detach_t
-			usb_hcd_get_hc_keyboard_detach(struct usb_device *udev);
-
-		ret = kdb_usb_keyboard_attach(usbhid->urbin, usbhid->inbuf,
-					      usb_hcd_get_kdb_poll_func(interface_to_usbdev(intf)),
-					      usb_hcd_get_kdb_completion_func(interface_to_usbdev(intf)),
-					      usb_hcd_get_hc_keyboard_attach(interface_to_usbdev(intf)),
-					      usb_hcd_get_hc_keyboard_detach(interface_to_usbdev(intf)),
-					      usbhid->bufsize,
-					      NULL);
-
-		if (ret == -1)
-			printk(": FAILED to register keyboard (%s) "
-				"with KDB\n", hid->phys);
-	}
-#endif /* CONFIG_KDB_USB */
 
 	return 0;
 err_free:
