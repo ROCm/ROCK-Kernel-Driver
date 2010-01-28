@@ -42,6 +42,27 @@ config PCI_DEBUG
 
 	  When in doubt, say N.
 
+config PCI_GUESTDEV
+	bool "PCI Device Reservation for Passthrough"
+	depends on PCI && ACPI && XEN
+	default y
+	help
+	  Say Y here if you want to reserve PCI device for passthrough.
+
+config PCI_IOMULTI
+	bool "PCI Device IO Multiplex for Passthrough"
+	depends on PCI && ACPI && XEN
+	default y
+	help
+	  Say Y here if you need io multiplexing.
+
+config PCI_RESERVE
+	bool "PCI IO/MEMORY space reserve"
+	depends on PCI && XEN_PRIVILEGED_GUEST
+	default y
+	help
+	  Say Y here if you need PCI IO/MEMORY space reserve
+
 config PCI_STUB
 	tristate "PCI Stub driver"
 	depends on PCI
@@ -54,7 +75,7 @@ config PCI_STUB
 config HT_IRQ
 	bool "Interrupts on hypertransport devices"
 	default y
-	depends on PCI && X86_LOCAL_APIC && X86_IO_APIC
+	depends on PCI && X86_LOCAL_APIC && X86_IO_APIC && !XEN
 	help
 	   This allows native hypertransport devices to use interrupts.
 
@@ -72,7 +93,7 @@ config PCI_IOV
 
 config PCI_IOAPIC
 	bool
-	depends on PCI
+	depends on PCI && !XEN
 	depends on ACPI
 	depends on HOTPLUG
 	default y

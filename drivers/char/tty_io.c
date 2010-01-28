@@ -136,6 +136,8 @@ LIST_HEAD(tty_drivers);			/* linked list of tty drivers */
 DEFINE_MUTEX(tty_mutex);
 EXPORT_SYMBOL(tty_mutex);
 
+int console_use_vt = 1;
+
 static ssize_t tty_read(struct file *, char __user *, size_t, loff_t *);
 static ssize_t tty_write(struct file *, const char __user *, size_t, loff_t *);
 ssize_t redirected_tty_write(struct file *, const char __user *,
@@ -1776,7 +1778,7 @@ retry_open:
 		goto got_driver;
 	}
 #ifdef CONFIG_VT
-	if (device == MKDEV(TTY_MAJOR, 0)) {
+	if (console_use_vt && device == MKDEV(TTY_MAJOR, 0)) {
 		extern struct tty_driver *console_driver;
 		driver = tty_driver_kref_get(console_driver);
 		index = fg_console;
@@ -3155,7 +3157,8 @@ static int __init tty_init(void)
 			      "console");
 
 #ifdef CONFIG_VT
-	vty_init(&console_fops);
+	if (console_use_vt)
+		vty_init(&console_fops);
 #endif
 	return 0;
 }

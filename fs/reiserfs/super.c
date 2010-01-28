@@ -26,6 +26,7 @@
 #include <linux/vfs.h>
 #include <linux/mount.h>
 #include <linux/namei.h>
+#include <linux/precache.h>
 #include <linux/crc32.h>
 #include <linux/smp_lock.h>
 
@@ -1876,6 +1877,7 @@ static int reiserfs_fill_super(struct super_block *s, void *data, int silent)
 
 	init_waitqueue_head(&(sbi->s_wait));
 	spin_lock_init(&sbi->bitmap_lock);
+	precache_init(s);
 
 	reiserfs_write_unlock(s);
 

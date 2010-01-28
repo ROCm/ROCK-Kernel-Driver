@@ -38,6 +38,7 @@
 #include <linux/seq_file.h>
 #include <linux/nfs4acl.h>
 #include <linux/log2.h>
+#include <linux/precache.h>
 
 #include <asm/uaccess.h>
 
@@ -1369,6 +1370,7 @@ static int ext3_setup_super(struct super_block *sb, struct ext3_super_block *es,
 	} else {
 		ext3_msg(sb, KERN_INFO, "using internal journal");
 	}
+	precache_init(sb);
 	return res;
 }
 

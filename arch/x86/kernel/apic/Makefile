@@ -17,3 +17,8 @@ obj-$(CONFIG_X86_BIGSMP)	+= bigsmp_32.o
 obj-$(CONFIG_X86_NUMAQ)		+= numaq_32.o
 obj-$(CONFIG_X86_ES7000)	+= es7000_32.o
 obj-$(CONFIG_X86_SUMMIT)	+= summit_32.o
+
+probe_64-$(CONFIG_XEN)		:= probe_32.o
+
+disabled-obj-$(CONFIG_XEN)	:= apic_flat_$(BITS).o apic_noop.o
+disabled-obj-$(filter-out $(CONFIG_SMP),$(CONFIG_XEN)) += ipi.o
