@@ -1533,10 +1533,9 @@ static struct attribute_group hstate_attr_group = {
 	.attrs = hstate_attrs,
 };
 
-static int __init hugetlb_sysfs_add_hstate(struct hstate *h,
-				struct kobject *parent,
-				struct kobject **hstate_kobjs,
-				struct attribute_group *hstate_attr_group)
+static int hugetlb_sysfs_add_hstate(struct hstate *h, struct kobject *parent,
+				    struct kobject **hstate_kobjs,
+				    struct attribute_group *hstate_attr_group)
 {
 	int retval;
 	int hi = h - hstates;
@@ -1648,7 +1647,7 @@ void hugetlb_unregister_node(struct node *node)
  * hugetlb module exit:  unregister hstate attributes from node sysdevs
  * that have them.
  */
-static void __init hugetlb_unregister_all_nodes(void)
+static void hugetlb_unregister_all_nodes(void)
 {
 	int nid;
 
@@ -1668,7 +1667,7 @@ static void __init hugetlb_unregister_all_nodes(void)
  * Register hstate attributes for a single node sysdev.
  * No-op if attributes already registered.
  */
-void __init hugetlb_register_node(struct node *node)
+void hugetlb_register_node(struct node *node)
 {
 	struct hstate *h;
 	struct node_hstate *nhs = &node_hstates[node->sysdev.id];
@@ -1701,7 +1700,7 @@ void __init hugetlb_register_node(struct node *node)
  * sysdevs of nodes that have memory.  All on-line nodes should have
  * registered their associated sysdev by this time.
  */
-static void __init hugetlb_register_all_nodes(void)
+static void hugetlb_register_all_nodes(void)
 {
 	int nid;
 
