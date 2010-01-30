@@ -59,7 +59,7 @@ unsigned int aac_response_normal(struct aac_queue * q)
 	int consumed = 0;
 	unsigned long flags, mflags;
 
-	spin_lock_irqsave(q->lock, flags);	
+	spin_lock_irqsave(q->lock, flags);
 	/*
 	 *	Keep pulling response QEs off the response queue and waking
 	 *	up the waiters until there are no more QEs. We then return

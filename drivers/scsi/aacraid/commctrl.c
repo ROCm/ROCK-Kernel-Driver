@@ -842,20 +842,11 @@ static int aac_get_pci_info(struct aac_dev* dev, void __user *arg)
 int aac_do_ioctl(struct aac_dev * dev, int cmd, void __user *arg)
 {
 	int status;
-	unsigned long mflags;
 
 	/*
 	 *	HBA gets first crack
 	 */
 
-	spin_lock_irqsave(&dev->manage_lock, mflags);
-	if (dev->management_fib_count > AAC_NUM_MGT_FIB) {
-		printk(KERN_INFO "No management Fibs Available:%d\n",
-						dev->management_fib_count);
-		spin_unlock_irqrestore(&dev->manage_lock, mflags);
-		return -EBUSY;
-	}
-	spin_unlock_irqrestore(&dev->manage_lock, mflags);
 	status = aac_dev_ioctl(dev, cmd, arg);
 	if (status != -ENOTTY)
 		return status;

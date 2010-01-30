@@ -397,6 +397,8 @@ int aac_fib_send(u16 command, struct fib *fibptr, unsigned long size,
 	struct hw_fib * hw_fib = fibptr->hw_fib_va;
 	unsigned long flags = 0;
 	unsigned long qflags;
+	unsigned long mflags = 0;
+
 
 	if (!(hw_fib->header.XferState & cpu_to_le32(HostOwned)))
 		return -EBUSY;
@@ -478,13 +480,28 @@ int aac_fib_send(u16 command, struct fib *fibptr, unsigned long size,
 	if (!dev->queues)
 		return -EBUSY;
 
-	if(wait)
+	if (wait) {
+
+		spin_lock_irqsave(&dev->manage_lock, mflags);
+		if (dev->management_fib_count >= AAC_NUM_MGT_FIB) {
+			printk(KERN_INFO "No management Fibs Available:%d\n",
+						dev->management_fib_count);
+			spin_unlock_irqrestore(&dev->manage_lock, mflags);
+			return -EBUSY;
+		}
+		dev->management_fib_count++;
+		spin_unlock_irqrestore(&dev->manage_lock, mflags);
 		spin_lock_irqsave(&fibptr->event_lock, flags);
+	}
 
 	if (aac_adapter_deliver(fibptr) != 0) {
 		printk(KERN_ERR "aac_fib_send: returned -EBUSY\n");
-		if (wait)
+		if (wait) {
 			spin_unlock_irqrestore(&fibptr->event_lock, flags);
+			spin_lock_irqsave(&dev->manage_lock, mflags);
+			dev->management_fib_count--;
+			spin_unlock_irqrestore(&dev->manage_lock, mflags);
+		}
 		return -EBUSY;
 	}
 
@@ -494,13 +511,7 @@ int aac_fib_send(u16 command, struct fib *fibptr, unsigned long size,
 	 */
 
 	if (wait) {
-		unsigned long mflags;
 		spin_unlock_irqrestore(&fibptr->event_lock, flags);
-
-		spin_lock_irqsave(&dev->manage_lock, mflags);
-		dev->management_fib_count++;
-		spin_unlock_irqrestore(&dev->manage_lock, mflags);
-
 		/* Only set for first known interruptable command */
 		if (wait < 0) {
 			/*
@@ -535,8 +546,10 @@ int aac_fib_send(u16 command, struct fib *fibptr, unsigned long size,
 				}
 				udelay(5);
 			}
-		} else
-			down_interruptible(&fibptr->event_wait);
+		} else if (down_interruptible(&fibptr->event_wait)) {
+			/* Do nothing ... satisfy
+			 * down_interruptible must_check */
+		}
 
 		spin_lock_irqsave(&fibptr->event_lock, flags);
 		if (fibptr->done == 0) {
