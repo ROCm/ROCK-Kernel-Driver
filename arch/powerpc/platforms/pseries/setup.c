@@ -319,11 +319,7 @@ static void __init pSeries_setup_arch(void)
 static int __init pSeries_init_panel(void)
 {
 	/* Manually leave the kernel version on the panel. */
-#ifdef CONFIG_CRASH_DUMP
-	ppc_md.progress("SuSE Linux crashed :-(\n", 0);
-#else
 	ppc_md.progress("SuSE Linux\n", 0);
-#endif
 	ppc_md.progress(init_utsname()->version, 0);
 
 	return 0;
