@@ -95,6 +95,18 @@ static unsigned long frame_list[PAGE_SIZE / sizeof(unsigned long)];
 #define dec_totalhigh_pages() ((void)0)
 #endif
 
+#ifndef CONFIG_XEN
+/*
+ * In HVM guests accounting here uses the Xen visible values, but the kernel
+ * determined totalram_pages value shouldn't get altered. Since totalram_pages
+ * includes neither the kernel static image nor any memory allocated prior to
+ * or from the bootmem allocator, we have to synchronize the two values.
+ */
+static unsigned long __read_mostly totalram_bias;
+#else
+#define totalram_bias 0
+#endif
+
 /* List of ballooned pages, threaded through the mem_map array. */
 static LIST_HEAD(ballooned_pages);
 
@@ -323,7 +335,7 @@ static int increase_reservation(unsigned long nr_pages)
 	}
 
 	bs.current_pages += rc;
-	totalram_pages = bs.current_pages;
+	totalram_pages = bs.current_pages - totalram_bias;
 
  out:
 	balloon_free_and_unlock(flags);
@@ -405,7 +417,7 @@ static int decrease_reservation(unsigned long nr_pages)
 	BUG_ON(ret != nr_pages);
 
 	bs.current_pages -= nr_pages;
-	totalram_pages = bs.current_pages;
+	totalram_pages = bs.current_pages - totalram_bias;
 
 	balloon_unlock(flags);
 
@@ -544,7 +556,19 @@ static struct notifier_block xenstore_notifier;
 
 static int __init balloon_init(void)
 {
-#if defined(CONFIG_X86) && defined(CONFIG_XEN) 
+#if !defined(CONFIG_XEN)
+# ifndef XENMEM_get_pod_target
+#  define XENMEM_get_pod_target 17
+	typedef struct xen_pod_target {
+		uint64_t target_pages;
+		uint64_t tot_pages;
+		uint64_t pod_cache_pages;
+		uint64_t pod_entries;
+		domid_t domid;
+	} xen_pod_target_t;
+# endif
+	xen_pod_target_t pod_target = { .domid = DOMID_SELF };
+#elif defined(CONFIG_X86)
 	unsigned long pfn;
 	struct page *page;
 #endif
@@ -559,7 +583,20 @@ static int __init balloon_init(void)
 	bs.current_pages = min(xen_start_info->nr_pages, max_pfn);
 	totalram_pages   = bs.current_pages;
 #else 
-	bs.current_pages = totalram_pages; 
+	totalram_bias = HYPERVISOR_memory_op(
+		HYPERVISOR_memory_op(XENMEM_get_pod_target,
+			&pod_target) != -ENOSYS
+		? XENMEM_maximum_reservation
+		: XENMEM_current_reservation,
+		&pod_target.domid);
+	if ((long)totalram_bias != -ENOSYS) {
+		BUG_ON(totalram_bias < totalram_pages);
+		bs.current_pages = totalram_bias;
+		totalram_bias -= totalram_pages;
+	} else {
+		totalram_bias = 0;
+		bs.current_pages = totalram_pages;
+	}
 #endif
 	bs.target_pages  = bs.current_pages;
 	bs.balloon_low   = 0;
@@ -706,7 +743,7 @@ struct page **alloc_empty_pages_and_pagevec(int nr_pages)
 			goto err;
 		}
 
-		totalram_pages = --bs.current_pages;
+		totalram_pages = --bs.current_pages - totalram_bias;
 		if (PageHighMem(page))
 			dec_totalhigh_pages();
 		page_zone(page)->present_pages--;
@@ -734,8 +771,9 @@ EXPORT_SYMBOL_GPL(alloc_empty_pages_and_pagevec);
 
 #endif /* CONFIG_XEN_BACKEND */
 
+#ifdef CONFIG_XEN
 static void _free_empty_pages_and_pagevec(struct page **pagevec, int nr_pages,
-					  int free_vec)
+					  bool free_vec)
 {
 	unsigned long flags;
 	int i;
@@ -748,8 +786,10 @@ static void _free_empty_pages_and_pagevec(struct page **pagevec, int nr_pages,
 		BUG_ON(page_count(pagevec[i]) != 1);
 		balloon_append(pagevec[i], !free_vec);
 	}
-	if (!free_vec)
-		totalram_pages = bs.current_pages -= nr_pages;
+	if (!free_vec) {
+		bs.current_pages -= nr_pages;
+		totalram_pages = bs.current_pages - totalram_bias;
+	}
 	balloon_unlock(flags);
 
 	if (free_vec)
@@ -758,18 +798,19 @@ static void _free_empty_pages_and_pagevec(struct page **pagevec, int nr_pages,
 	schedule_work(&balloon_worker);
 }
 
+void free_empty_pages(struct page **pagevec, int nr_pages)
+{
+	_free_empty_pages_and_pagevec(pagevec, nr_pages, false);
+}
+#endif
+
 #if defined(CONFIG_XEN_BACKEND) || defined(CONFIG_XEN_BACKEND_MODULE)
 void free_empty_pages_and_pagevec(struct page **pagevec, int nr_pages)
 {
-	_free_empty_pages_and_pagevec(pagevec, nr_pages, 1);
+	_free_empty_pages_and_pagevec(pagevec, nr_pages, true);
 }
 EXPORT_SYMBOL_GPL(free_empty_pages_and_pagevec);
-#endif /* CONFIG_XEN_BACKEND */
-
-void free_empty_pages(struct page **pagevec, int nr_pages)
-{
-	_free_empty_pages_and_pagevec(pagevec, nr_pages, 0);
-}
+#endif
 
 void balloon_release_driver_page(struct page *page)
 {
@@ -777,7 +818,7 @@ void balloon_release_driver_page(struct page *page)
 
 	balloon_lock(flags);
 	balloon_append(page, 1);
-	totalram_pages = --bs.current_pages;
+	totalram_pages = --bs.current_pages - totalram_bias;
 	bs.driver_pages--;
 	balloon_unlock(flags);
 

@@ -411,7 +411,7 @@ EXPORT_SYMBOL(profile_pc);
 /*
  * Default timer interrupt handler
  */
-irqreturn_t timer_interrupt(int irq, void *dev_id)
+static irqreturn_t timer_interrupt(int irq, void *dev_id)
 {
 	s64 delta, delta_cpu, stolen, blocked;
 	unsigned int i, cpu = smp_processor_id();

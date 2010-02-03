@@ -747,7 +747,10 @@ static int reassign_resources;
 
 static int __init pci_set_reassign_resources(char *str)
 {
-	reassign_resources = 1;
+	if (str && !strcmp(str, "all"))
+		reassign_resources = -1;
+	else
+		reassign_resources = 1;
 
 	return 1;
 }
@@ -755,6 +758,8 @@ __setup("reassign_resources", pci_set_reassign_resources);
 
 int pci_is_guestdev_to_reassign(struct pci_dev *dev)
 {
+	if (reassign_resources < 0)
+		return TRUE;
 	if (reassign_resources)
 		return pci_is_guestdev(dev);
 	return FALSE;

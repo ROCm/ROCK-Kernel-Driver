@@ -312,9 +312,9 @@ void force_evtchn_callback(void)
 /* Not a GPL symbol: used in ubiquitous macros, so too restrictive. */
 EXPORT_SYMBOL(force_evtchn_callback);
 
-static DEFINE_PER_CPU(unsigned int, upcall_count) = { 0 };
-static DEFINE_PER_CPU(unsigned int, last_processed_l1i) = { BITS_PER_LONG - 1 };
-static DEFINE_PER_CPU(unsigned int, last_processed_l2i) = { BITS_PER_LONG - 1 };
+static DEFINE_PER_CPU(unsigned int, upcall_count);
+static DEFINE_PER_CPU(unsigned int, current_l1i);
+static DEFINE_PER_CPU(unsigned int, current_l2i);
 
 #ifndef vcpu_info_xchg
 #define vcpu_info_xchg(fld, val) xchg(&current_vcpu_info()->fld, val)
@@ -362,32 +362,23 @@ asmlinkage void __irq_entry evtchn_do_upcall(struct pt_regs *regs)
 #endif
 		l1 = vcpu_info_xchg(evtchn_pending_sel, 0);
 
-		l1i = percpu_read(last_processed_l1i);
-		l2i = percpu_read(last_processed_l2i);
+		l1i = percpu_read(current_l1i);
+		l2i = percpu_read(current_l2i);
 
 		while (l1 != 0) {
-
-			l1i = (l1i + 1) % BITS_PER_LONG;
 			masked_l1 = l1 & ((~0UL) << l1i);
-
-			if (masked_l1 == 0) { /* if we masked out all events, wrap around to the beginning */
-				l1i = BITS_PER_LONG - 1;
-				l2i = BITS_PER_LONG - 1;
+			/* If we masked out all events, wrap to beginning. */
+			if (masked_l1 == 0) {
+				l1i = l2i = 0;
 				continue;
 			}
 			l1i = __ffs(masked_l1);
 
 			do {
 				l2 = active_evtchns(l1i);
-
-				l2i = (l2i + 1) % BITS_PER_LONG;
 				masked_l2 = l2 & ((~0UL) << l2i);
-
-				if (masked_l2 == 0) { /* if we masked out all events, move on */
-					l2i = BITS_PER_LONG - 1;
+				if (masked_l2 == 0)
 					break;
-				}
-
 				l2i = __ffs(masked_l2);
 
 				/* process port */
@@ -398,16 +389,22 @@ asmlinkage void __irq_entry evtchn_do_upcall(struct pt_regs *regs)
 					printk(KERN_EMERG "%s(%d): No handler for irq %d\n",
 					       __func__, smp_processor_id(), irq);
 
-				/* if this is the final port processed, we'll pick up here+1 next time */
-				percpu_write(last_processed_l1i, l1i);
-				percpu_write(last_processed_l2i, l2i);
+				l2i = (l2i + 1) % BITS_PER_LONG;
 
-			} while (l2i != BITS_PER_LONG - 1);
+				/* Next caller starts at last processed + 1 */
+				percpu_write(current_l1i,
+					l2i ? l1i : (l1i + 1) % BITS_PER_LONG);
+				percpu_write(current_l2i, l2i);
+
+			} while (l2i != 0);
 
 			l2 = active_evtchns(l1i);
-			if (l2 == 0) /* we handled all ports, so we can clear the selector bit */
+			/* If we handled all ports, clear the selector bit. */
+			if (l2 == 0)
 				l1 &= ~(1UL << l1i);
 
+			l1i = (l1i + 1) % BITS_PER_LONG;
+			l2i = 0;
 		}
 
 		/* If there were nested callbacks then we have more to do. */

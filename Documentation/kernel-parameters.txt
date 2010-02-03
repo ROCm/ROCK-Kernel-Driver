@@ -2179,7 +2179,7 @@ and is between 256 and 4096 characters. It is defined in the file
 
 	reassign_resources	[PCI,ACPI,XEN]
 			Use guestdev= parameter to reassign device's
-			resources.
+			resources, or specify =all here.
 
 	reboot=		[BUGS=X86-32,BUGS=ARM,BUGS=IA-64] Rebooting mode
 			Format: <reboot_mode>[,<reboot_mode2>[,...]]
