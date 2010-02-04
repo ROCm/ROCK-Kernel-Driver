@@ -40,12 +40,19 @@ static struct kmem_cache *filp_cachep __read_mostly;
 
 static struct percpu_counter nr_files __cacheline_aligned_in_smp;
 
+static inline void file_free_rcu(struct rcu_head *head)
+{
+	struct file *f = container_of(head, struct file, f_u.fu_rcuhead);
+
+	put_cred(f->f_cred);
+	kmem_cache_free(filp_cachep, f);
+}
+
 static inline void file_free(struct file *f)
 {
 	percpu_counter_dec(&nr_files);
 	file_check_state(f);
-	put_cred(f->f_cred);
-	kmem_cache_free(filp_cachep, f);
+	call_rcu(&f->f_u.fu_rcuhead, file_free_rcu);
 }
 
 /*
@@ -120,7 +127,7 @@ struct file *get_empty_filp(void)
 		goto fail_sec;
 
 	INIT_LIST_HEAD(&f->f_u.fu_list);
-	f->f_count = 1;
+	atomic_long_set(&f->f_count, 1);
 	rwlock_init(&f->f_owner.lock);
 	f->f_cred = get_cred(cred);
 	spin_lock_init(&f->f_lock);
@@ -189,7 +196,7 @@ EXPORT_SYMBOL(alloc_file);
 
 void fput(struct file *file)
 {
-	if (unlikely(file_dec_and_test(file)))
+	if (atomic_long_dec_and_test(&file->f_count))
 		__fput(file);
 }
 
@@ -260,38 +267,21 @@ void __fput(struct file *file)
 	mntput(mnt);
 }
 
-static inline struct file *get_stable_file(struct files_struct *files, unsigned int fd)
-{
-	struct fdtable *fdt;
-	struct file *file;
-
-	rcu_read_lock();
-	fdt = files_fdtable(files);
-	if (likely(fd < fdt->max_fds)) {
-		file = rcu_dereference(fdt->fd[fd]);
-		if (file) {
-			spin_lock(&file->f_lock);
-			if (unlikely(file != fdt->fd[fd] || !file->f_count)) {
-				spin_unlock(&file->f_lock);
-				file = NULL;
-				goto out;
-			}
-			file->f_count++;
-			spin_unlock(&file->f_lock);
-		}
-	} else
-		file = NULL;
-out:
-	rcu_read_unlock();
-	return file;
-}
-
 struct file *fget(unsigned int fd)
 {
 	struct file *file;
 	struct files_struct *files = current->files;
 
-	file = get_stable_file(files, fd);
+	rcu_read_lock();
+	file = fcheck_files(files, fd);
+	if (file) {
+		if (!atomic_long_inc_not_zero(&file->f_count)) {
+			/* File object ref couldn't be taken */
+			rcu_read_unlock();
+			return NULL;
+		}
+	}
+	rcu_read_unlock();
 
 	return file;
 }
@@ -310,12 +300,20 @@ struct file *fget_light(unsigned int fd, int *fput_needed)
 	struct file *file;
 	struct files_struct *files = current->files;
 
+	*fput_needed = 0;
 	if (likely((atomic_read(&files->count) == 1))) {
-		*fput_needed = 0;
 		file = fcheck_files(files, fd);
 	} else {
-		*fput_needed = 1;
-		file = get_stable_file(files, fd);
+		rcu_read_lock();
+		file = fcheck_files(files, fd);
+		if (file) {
+			if (atomic_long_inc_not_zero(&file->f_count))
+				*fput_needed = 1;
+			else
+				/* Didn't get the reference, someone's freed */
+				file = NULL;
+		}
+		rcu_read_unlock();
 	}
 
 	return file;
@@ -324,7 +322,7 @@ struct file *fget_light(unsigned int fd, int *fput_needed)
 
 void put_filp(struct file *file)
 {
-	if (unlikely(file_dec_and_test(file))) {
+	if (atomic_long_dec_and_test(&file->f_count)) {
 		security_file_free(file);
 		file_kill(file);
 		file_free(file);
@@ -390,7 +388,7 @@ retry:
 		struct vfsmount *mnt;
 		if (!S_ISREG(f->f_path.dentry->d_inode->i_mode))
 		       continue;
-		if (!f->f_count)
+		if (!file_count(f))
 			continue;
 		if (!(f->f_mode & FMODE_WRITE))
 			continue;
@@ -416,7 +414,7 @@ void __init files_init(unsigned long mempages)
 	int n; 
 
 	filp_cachep = kmem_cache_create("filp", sizeof(struct file), 0,
-			SLAB_HWCACHE_ALIGN | SLAB_DESTROY_BY_RCU | SLAB_PANIC, NULL);
+			SLAB_HWCACHE_ALIGN | SLAB_PANIC, NULL);
 
 	/*
 	 * One file with associated inode and dcache is very roughly 1K.

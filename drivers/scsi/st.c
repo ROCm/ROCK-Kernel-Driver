@@ -1272,7 +1272,7 @@ static int st_flush(struct file *filp, fl_owner_t id)
 	struct st_partstat *STps = &(STp->ps[STp->partition]);
 	char *name = tape_name(STp);
 
-	if (filp->f_count > 1)
+	if (file_count(filp) > 1)
 		return 0;
 
 	if (STps->rw == ST_WRITING && !STp->pos_unknown) {

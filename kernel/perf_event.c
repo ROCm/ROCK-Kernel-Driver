@@ -4626,7 +4626,7 @@ static int perf_event_set_output(struct perf_event *event, int output_fd)
 	if (event->data)
 		goto out;
 
-	get_file(output_file);
+	atomic_long_inc(&output_file->f_count);
 
 set:
 	mutex_lock(&event->mmap_mutex);
@@ -4887,7 +4887,7 @@ inherit_event(struct perf_event *parent_event,
 	 * we are in the parent and we know that the filp still
 	 * exists and has a nonzero count:
 	 */
-	get_file(parent_event->filp);
+	atomic_long_inc(&parent_event->filp->f_count);
 
 	/*
 	 * Link this into the parent event's child list

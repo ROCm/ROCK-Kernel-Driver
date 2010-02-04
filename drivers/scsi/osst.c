@@ -4824,7 +4824,7 @@ static int os_scsi_tape_flush(struct file * filp, fl_owner_t id)
 	struct osst_request * SRpnt  = NULL;
 	char		    * name   = tape_name(STp);
 
-	if (filp->f_count > 1)
+	if (file_count(filp) > 1)
 		return 0;
 
 	if ((STps->rw == ST_WRITING || STp->dirty) && !STp->pos_unknown) {

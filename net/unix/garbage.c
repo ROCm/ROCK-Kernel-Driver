@@ -311,7 +311,7 @@ void unix_gc(void)
 		long total_refs;
 		long inflight_refs;
 
-		total_refs = u->sk.sk_socket->file->f_count;
+		total_refs = file_count(u->sk.sk_socket->file);
 		inflight_refs = atomic_long_read(&u->inflight);
 
 		BUG_ON(inflight_refs < 1);
