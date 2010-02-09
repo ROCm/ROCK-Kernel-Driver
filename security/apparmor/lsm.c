@@ -571,8 +571,8 @@ static int apparmor_socket_create(int family, int type, int protocol, int kern){
 
 	profile = aa_current_profile();
 	if (profile)
-		error = aa_net_perm(profile, "socket_create", family,
-							type, protocol);
+		error = aa_net_perm(profile, "socket_create", 0,
+				    family, type, protocol);
 	return error;
 }
 

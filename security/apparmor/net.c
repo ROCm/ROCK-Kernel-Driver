@@ -92,7 +92,7 @@ static int aa_audit_net(struct aa_profile *profile, struct aa_audit_net *sa)
 	return aa_audit(type, profile, (struct aa_audit *)sa, audit_cb);
 }
 
-int aa_net_perm(struct aa_profile *profile, char *operation,
+int aa_net_perm(struct aa_profile *profile, char *operation, int int_state,
 		int family, int type, int protocol)
 {
 	struct aa_audit_net sa;
@@ -114,7 +114,7 @@ int aa_net_perm(struct aa_profile *profile, char *operation,
 
 	memset(&sa, 0, sizeof(sa));
 	sa.base.operation = operation;
-	sa.base.gfp_mask = GFP_KERNEL;
+	sa.base.gfp_mask = int_state ? GFP_ATOMIC : GFP_KERNEL;
 	sa.family = family;
 	sa.type = type;
 	sa.protocol = protocol;
@@ -128,17 +128,9 @@ int aa_revalidate_sk(struct sock *sk, char *operation)
 	struct cred *cred;
 	int error = 0;
 
-	/* this is some debugging code to flush out the network hooks that
-	   that are called in interrupt context */
-	if (in_interrupt()) {
-		printk(KERN_WARNING "AppArmor Debug: Hook being called from interrupt context\n");
-		dump_stack();
-		return 0;
-	}
-
 	cred = aa_get_task_policy(current, &profile);
 	if (profile)
-		error = aa_net_perm(profile, operation,
+		error = aa_net_perm(profile, operation, in_interrupt(),
 				    sk->sk_family, sk->sk_type,
 				    sk->sk_protocol);
 	put_cred(cred);
