@@ -52,6 +52,39 @@
 static unsigned long netbk_queue_length = 32;
 module_param_named(queue_length, netbk_queue_length, ulong, 0644);
 
+static int add_domain_to_list(netif_t *netif)
+{
+	unsigned int group = 0;
+	unsigned int min_domains = xen_netbk[0].group_domain_nr;
+	unsigned int i;
+
+	/* Find out the list which contains least number of domain */
+	for (i = 1; i < netbk_nr_groups; i++) {
+		if (xen_netbk[i].group_domain_nr < min_domains) {
+			group = i;
+			min_domains = xen_netbk[i].group_domain_nr;
+		}
+	}
+
+	netif->group = group;
+	spin_lock(&xen_netbk[group].group_domain_list_lock);
+	list_add_tail(&netif->group_list,
+		      &xen_netbk[group].group_domain_list);
+	xen_netbk[group].group_domain_nr++;
+	spin_unlock(&xen_netbk[group].group_domain_list_lock);
+	return group;
+}
+
+static void remove_domain_from_list(netif_t *netif)
+{
+	struct xen_netbk *netbk = xen_netbk + netif->group;
+
+	spin_lock(&netbk->group_domain_list_lock);
+	netbk->group_domain_nr--;
+	list_del(&netif->group_list);
+	spin_unlock(&netbk->group_domain_list_lock);
+}
+
 static void __netif_up(netif_t *netif)
 {
 	enable_irq(netif->irq);
@@ -68,6 +101,7 @@ static int net_open(struct net_device *dev)
 {
 	netif_t *netif = netdev_priv(dev);
 	if (netback_carrier_ok(netif)) {
+		add_domain_to_list(netif);
 		__netif_up(netif);
 		netif_start_queue(dev);
 	}
@@ -77,8 +111,10 @@ static int net_open(struct net_device *dev)
 static int net_close(struct net_device *dev)
 {
 	netif_t *netif = netdev_priv(dev);
-	if (netback_carrier_ok(netif))
+	if (netback_carrier_ok(netif)) {
 		__netif_down(netif);
+		remove_domain_from_list(netif);
+	}
 	netif_stop_queue(dev);
 	return 0;
 }
@@ -334,6 +370,9 @@ int netif_map(netif_t *netif, unsigned long tx_ring_ref,
 	if (netif->rx_comms_area == NULL)
 		goto err_rx;
 
+	if (add_domain_to_list(netif) < 0)
+		goto err_map;
+
 	err = map_frontend_pages(netif, tx_ring_ref, rx_ring_ref);
 	if (err)
 		goto err_map;
@@ -367,6 +406,7 @@ int netif_map(netif_t *netif, unsigned long tx_ring_ref,
 	return 0;
 err_hypervisor:
 	unmap_frontend_pages(netif);
+	remove_domain_from_list(netif);
 err_map:
 	free_vm_area(netif->rx_comms_area);
 err_rx:
@@ -380,8 +420,10 @@ void netif_disconnect(netif_t *netif)
 		rtnl_lock();
 		netback_carrier_off(netif);
 		netif_carrier_off(netif->dev); /* discard queued packets */
-		if (netif_running(netif->dev))
+		if (netif_running(netif->dev)) {
 			__netif_down(netif);
+			remove_domain_from_list(netif);
+		}
 		rtnl_unlock();
 		netif_put(netif);
 	}

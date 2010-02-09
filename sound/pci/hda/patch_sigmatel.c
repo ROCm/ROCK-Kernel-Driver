@@ -4346,6 +4346,12 @@ static int stac92xx_init(struct hda_codec *codec)
 		if (enable_pin_detect(codec, nid, STAC_PWR_EVENT))
 			stac_issue_unsol_event(codec, nid);
 	}
+
+#ifdef CONFIG_SND_HDA_POWER_SAVE
+	/* sync mute LED */
+	if (spec->gpio_led && codec->patch_ops.check_power_status)
+		codec->patch_ops.check_power_status(codec, 0x01);
+#endif	
 	if (spec->dac_list)
 		stac92xx_power_down(codec);
 	return 0;
@@ -4747,19 +4753,14 @@ static int hp_blike_system(u32 subsystem_id);
 static void set_hp_led_gpio(struct hda_codec *codec)
 {
 	struct sigmatel_spec *spec = codec->spec;
-	switch (codec->vendor_id) {
-	case 0x111d7608:
-		/* GPIO 0 */
-		spec->gpio_led = 0x01;
-		break;
-	case 0x111d7600:
-	case 0x111d7601:
-	case 0x111d7602:
-	case 0x111d7603:
-		/* GPIO 3 */
-		spec->gpio_led = 0x08;
-		break;
-	}
+	unsigned int gpio;
+
+	gpio = snd_hda_param_read(codec, codec->afg, AC_PAR_GPIO_CAP);
+	gpio &= AC_GPIO_IO_COUNT;
+	if (gpio > 3)
+		spec->gpio_led = 0x08; /* GPIO 3 */
+	else
+		spec->gpio_led = 0x01; /* GPIO 0 */
 }
 
 /*
@@ -4782,7 +4783,7 @@ static void set_hp_led_gpio(struct hda_codec *codec)
  * Need more information on whether it is true across the entire series.
  * -- kunal
  */
-static int find_mute_led_gpio(struct hda_codec *codec)
+static int find_mute_led_gpio(struct hda_codec *codec, int default_polarity)
 {
 	struct sigmatel_spec *spec = codec->spec;
 	const struct dmi_device *dev = NULL;
@@ -4809,7 +4810,7 @@ static int find_mute_led_gpio(struct hda_codec *codec)
 		 */
 		if (!hp_blike_system(codec->subsystem_id)) {
 			set_hp_led_gpio(codec);
-			spec->gpio_led_polarity = 1;
+			spec->gpio_led_polarity = default_polarity;
 			return 1;
 		}
 	}
@@ -4907,6 +4908,11 @@ static int stac92xx_resume(struct hda_codec *codec)
 			stac_issue_unsol_event(codec,
 					       spec->autocfg.line_out_pins[0]);
 	}
+#ifdef CONFIG_SND_HDA_POWER_SAVE
+	/* sync mute LED */
+	if (spec->gpio_led && codec->patch_ops.check_power_status)
+		codec->patch_ops.check_power_status(codec, 0x01);
+#endif	
 	return 0;
 }
 
@@ -4926,43 +4932,29 @@ static int stac92xx_hp_check_power_status(struct hda_codec *codec,
 					      hda_nid_t nid)
 {
 	struct sigmatel_spec *spec = codec->spec;
+	int i, muted = 1;
 
-	if (nid == 0x10) {
-		if (snd_hda_codec_amp_read(codec, nid, 0, HDA_OUTPUT, 0) &
-		    HDA_AMP_MUTE)
-			spec->gpio_data &= ~spec->gpio_led; /* orange */
-		else
-			spec->gpio_data |= spec->gpio_led; /* white */
-
-		if (!spec->gpio_led_polarity) {
-			/* LED state is inverted on these systems */
-			spec->gpio_data ^= spec->gpio_led;
+	for (i = 0; i < spec->multiout.num_dacs; i++) {
+		nid = spec->multiout.dac_nids[i];
+		if (!(snd_hda_codec_amp_read(codec, nid, 0, HDA_OUTPUT, 0) &
+		      HDA_AMP_MUTE)) {
+			muted = 0; /* something heard */
+			break;
 		}
+	}
+	if (muted)
+		spec->gpio_data &= ~spec->gpio_led; /* orange */
+	else
+		spec->gpio_data |= spec->gpio_led; /* white */
 
-		stac_gpio_set(codec, spec->gpio_mask,
-			      spec->gpio_dir,
-			      spec->gpio_data);
+	if (!spec->gpio_led_polarity) {
+		/* LED state is inverted on these systems */
+		spec->gpio_data ^= spec->gpio_led;
 	}
 
-	return 0;
-}
-
-static int idt92hd83xxx_hp_check_power_status(struct hda_codec *codec,
-					      hda_nid_t nid)
-{
-	struct sigmatel_spec *spec = codec->spec;
-
-	if (nid != 0x13)
-		return 0;
-	if (snd_hda_codec_amp_read(codec, nid, 0, HDA_OUTPUT, 0) & HDA_AMP_MUTE)
-		spec->gpio_data |= spec->gpio_led; /* mute LED on */
-	else
-		spec->gpio_data &= ~spec->gpio_led; /* mute LED off */
 	stac_gpio_set(codec, spec->gpio_mask, spec->gpio_dir, spec->gpio_data);
-
 	return 0;
 }
-
 #endif
 
 static int stac92xx_suspend(struct hda_codec *codec, pm_message_t state)
@@ -5334,6 +5326,7 @@ again:
 		spec->num_pwrs = 0;
 		break;
 	case 0x111d7604:
+	case 0x111d76d4:
 	case 0x111d7605:
 	case 0x111d76d5:
 		if (spec->board_config == STAC_92HD83XXX_PWR_REF)
@@ -5344,10 +5337,7 @@ again:
 
 	codec->patch_ops = stac92xx_patch_ops;
 
-	if (spec->board_config == STAC_92HD83XXX_HP)
-		spec->gpio_led = 0x01;
-
-	if (find_mute_led_gpio(codec))
+	if (find_mute_led_gpio(codec, 0))
 		snd_printd("mute LED gpio %d polarity %d\n",
 				spec->gpio_led,
 				spec->gpio_led_polarity);
@@ -5359,7 +5349,7 @@ again:
 		spec->gpio_data |= spec->gpio_led;
 		/* register check_power_status callback. */
 		codec->patch_ops.check_power_status =
-			idt92hd83xxx_hp_check_power_status;
+			stac92xx_hp_check_power_status;
 	}
 #endif	
 
@@ -5629,7 +5619,6 @@ again:
 		 */
 		spec->num_smuxes = 1;
 		spec->num_dmuxes = 1;
-		spec->gpio_led = 0x01;
 		/* fallthrough */
 	case STAC_HP_DV5:
 		snd_hda_codec_set_pincfg(codec, 0x0d, 0x90170010);
@@ -5644,8 +5633,6 @@ again:
 		spec->num_dmics = 1;
 		spec->num_dmuxes = 1;
 		spec->num_smuxes = 1;
-		/* orange/white mute led on GPIO3, orange=0, white=1 */
-		spec->gpio_led = 0x08;
 		break;
 	}
 
@@ -5667,7 +5654,7 @@ again:
 		}
 	}
 
-	if (find_mute_led_gpio(codec))
+	if (find_mute_led_gpio(codec, 1))
 		snd_printd("mute LED gpio %d polarity %d\n",
 				spec->gpio_led,
 				spec->gpio_led_polarity);
@@ -6199,6 +6186,7 @@ static struct hda_codec_preset snd_hda_preset_sigmatel[] = {
  	{ .id = 0x838476a7, .name = "STAC9254D", .patch = patch_stac9205 },
 	{ .id = 0x111d7603, .name = "92HD75B3X5", .patch = patch_stac92hd71bxx},
 	{ .id = 0x111d7604, .name = "92HD83C1X5", .patch = patch_stac92hd83xxx},
+	{ .id = 0x111d76d4, .name = "92HD83C1C5", .patch = patch_stac92hd83xxx},
 	{ .id = 0x111d7605, .name = "92HD81B1X5", .patch = patch_stac92hd83xxx},
 	{ .id = 0x111d76d5, .name = "92HD81B1C5", .patch = patch_stac92hd83xxx},
 	{ .id = 0x111d7666, .name = "92HD88B3", .patch = patch_stac92hd83xxx},

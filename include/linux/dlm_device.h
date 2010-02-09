@@ -21,7 +21,7 @@
 #include <linux/dlm.h>
 #include <linux/types.h>
 
-#define DLM_USER_LVB_LEN	64
+#define DLM_USER_LVB_LEN	32
 
 /* Version of the device interface */
 #define DLM_DEVICE_VERSION_MAJOR 6

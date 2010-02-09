@@ -35,23 +35,21 @@
  */
 
 #include "common.h"
+#include <linux/kthread.h>
+#include <linux/vmalloc.h>
 #include <xen/balloon.h>
 #include <xen/interface/memory.h>
 
 /*define NETBE_DEBUG_INTERRUPT*/
 
-struct netbk_rx_meta {
-	skb_frag_t frag;
-	int id;
-	u8 copy:1;
-};
+struct xen_netbk *xen_netbk;
+unsigned int netbk_nr_groups;
+static bool use_kthreads = true;
+static bool __initdata bind_threads;
 
-struct netbk_tx_pending_inuse {
-	struct list_head list;
-	unsigned long alloc_time;
-};
+#define GET_GROUP_INDEX(netif) ((netif)->group)
 
-static void netif_idx_release(u16 pending_idx);
+static void netif_idx_release(struct xen_netbk *, u16 pending_idx);
 static void make_tx_response(netif_t *netif, 
 			     netif_tx_request_t *txp,
 			     s8       st);
@@ -62,81 +60,34 @@ static netif_rx_response_t *make_rx_response(netif_t *netif,
 					     u16      size,
 					     u16      flags);
 
-static void net_tx_action(unsigned long unused);
-static DECLARE_TASKLET(net_tx_tasklet, net_tx_action, 0);
+static void net_tx_action(unsigned long group);
+static void net_rx_action(unsigned long group);
 
-static void net_rx_action(unsigned long unused);
-static DECLARE_TASKLET(net_rx_tasklet, net_rx_action, 0);
-
-static struct timer_list net_timer;
-static struct timer_list netbk_tx_pending_timer;
-
-#define MAX_PENDING_REQS (1U << CONFIG_XEN_NETDEV_TX_SHIFT)
-
-static struct sk_buff_head rx_queue;
-
-static struct page **mmap_pages;
-static inline unsigned long idx_to_pfn(unsigned int idx)
+static inline unsigned long idx_to_pfn(struct xen_netbk *netbk, unsigned int idx)
 {
-	return page_to_pfn(mmap_pages[idx]);
+	return page_to_pfn(netbk->mmap_pages[idx]);
 }
 
-static inline unsigned long idx_to_kaddr(unsigned int idx)
+static inline unsigned long idx_to_kaddr(struct xen_netbk *netbk, unsigned int idx)
 {
-	return (unsigned long)pfn_to_kaddr(idx_to_pfn(idx));
+	return (unsigned long)pfn_to_kaddr(idx_to_pfn(netbk, idx));
 }
 
 /* extra field used in struct page */
-static inline void netif_set_page_index(struct page *pg, unsigned int index)
+static inline void netif_set_page_ext(struct page *pg, struct page_ext *ext)
 {
-	*(unsigned long *)&pg->mapping = index;
-}
-
-static inline int netif_page_index(struct page *pg)
-{
-	unsigned long idx = (unsigned long)pg->mapping;
-
-	if (!PageForeign(pg))
-		return -1;
-
-	if ((idx >= MAX_PENDING_REQS) || (mmap_pages[idx] != pg))
-		return -1;
-
-	return idx;
+	pg->mapping = (void *)ext;
 }
 
 #define PKT_PROT_LEN 64
 
-static struct pending_tx_info {
-	netif_tx_request_t req;
-	netif_t *netif;
-} pending_tx_info[MAX_PENDING_REQS];
-static u16 pending_ring[MAX_PENDING_REQS];
-typedef unsigned int PEND_RING_IDX;
 #define MASK_PEND_IDX(_i) ((_i)&(MAX_PENDING_REQS-1))
-static PEND_RING_IDX pending_prod, pending_cons;
-#define NR_PENDING_REQS (MAX_PENDING_REQS - pending_prod + pending_cons)
 
-/* Freed TX SKBs get batched on this ring before return to pending_ring. */
-static u16 dealloc_ring[MAX_PENDING_REQS];
-static PEND_RING_IDX dealloc_prod, dealloc_cons;
-
-/* Doubly-linked list of in-use pending entries. */
-static struct netbk_tx_pending_inuse pending_inuse[MAX_PENDING_REQS];
-static LIST_HEAD(pending_inuse_head);
-
-static struct sk_buff_head tx_queue;
-
-static grant_handle_t grant_tx_handle[MAX_PENDING_REQS];
-static gnttab_unmap_grant_ref_t tx_unmap_ops[MAX_PENDING_REQS];
-static gnttab_map_grant_ref_t tx_map_ops[MAX_PENDING_REQS];
-
-static struct list_head net_schedule_list;
-static spinlock_t net_schedule_list_lock;
-
-#define MAX_MFN_ALLOC 64
-static unsigned long mfn_list[MAX_MFN_ALLOC];
-static unsigned int alloc_index = 0;
+static inline pending_ring_idx_t nr_pending_reqs(const struct xen_netbk *netbk)
+{
+	return MAX_PENDING_REQS -
+		netbk->pending_prod + netbk->pending_cons;
+}
 
 /* Setting this allows the safe use of this driver without netloop. */
 static int MODPARM_copy_skb = 1;
@@ -145,16 +96,22 @@ MODULE_PARM_DESC(copy_skb, "Copy data received from netfront without netloop");
 static int MODPARM_permute_returns = 0;
 module_param_named(permute_returns, MODPARM_permute_returns, bool, S_IRUSR|S_IWUSR);
 MODULE_PARM_DESC(permute_returns, "Randomly permute the order in which TX responses are sent to the frontend");
+module_param_named(groups, netbk_nr_groups, uint, 0);
+MODULE_PARM_DESC(groups, "Specify the number of tasklet pairs/threads to use");
+module_param_named(tasklets, use_kthreads, invbool, 0);
+MODULE_PARM_DESC(tasklets, "Use tasklets instead of kernel threads");
+module_param_named(bind, bind_threads, bool, 0);
+MODULE_PARM_DESC(bind, "Bind kernel threads to (v)CPUs");
 
 int netbk_copy_skb_mode;
 
-static inline unsigned long alloc_mfn(void)
+static inline unsigned long alloc_mfn(struct xen_netbk *netbk)
 {
-	BUG_ON(alloc_index == 0);
-	return mfn_list[--alloc_index];
+	BUG_ON(netbk->alloc_index == 0);
+	return netbk->mfn_list[--netbk->alloc_index];
 }
 
-static int check_mfn(int nr)
+static int check_mfn(struct xen_netbk *netbk, unsigned int nr)
 {
 	struct xen_memory_reservation reservation = {
 		.extent_order = 0,
@@ -162,24 +119,31 @@ static int check_mfn(int nr)
 	};
 	int rc;
 
-	if (likely(alloc_index >= nr))
+	if (likely(netbk->alloc_index >= nr))
 		return 0;
 
-	set_xen_guest_handle(reservation.extent_start, mfn_list + alloc_index);
-	reservation.nr_extents = MAX_MFN_ALLOC - alloc_index;
+	set_xen_guest_handle(reservation.extent_start,
+			     netbk->mfn_list + netbk->alloc_index);
+	reservation.nr_extents = MAX_MFN_ALLOC - netbk->alloc_index;
 	rc = HYPERVISOR_memory_op(XENMEM_increase_reservation, &reservation);
 	if (likely(rc > 0))
-		alloc_index += rc;
+		netbk->alloc_index += rc;
 
-	return alloc_index >= nr ? 0 : -ENOMEM;
+	return netbk->alloc_index >= nr ? 0 : -ENOMEM;
 }
 
-static inline void maybe_schedule_tx_action(void)
+static inline void maybe_schedule_tx_action(unsigned int group)
 {
+	struct xen_netbk *netbk = &xen_netbk[group];
+
 	smp_mb();
-	if ((NR_PENDING_REQS < (MAX_PENDING_REQS/2)) &&
-	    !list_empty(&net_schedule_list))
-		tasklet_schedule(&net_tx_tasklet);
+	if ((nr_pending_reqs(netbk) < (MAX_PENDING_REQS/2)) &&
+	    !list_empty(&netbk->net_schedule_list)) {
+		if (use_kthreads)
+			wake_up(&netbk->netbk_action_wq);
+		else
+			tasklet_schedule(&netbk->net_tx_tasklet);
+	}
 }
 
 static struct sk_buff *netbk_copy_skb(struct sk_buff *skb)
@@ -288,6 +252,7 @@ static void tx_queue_callback(unsigned long data)
 int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	netif_t *netif = netdev_priv(dev);
+	struct xen_netbk *netbk;
 
 	BUG_ON(skb->dev != dev);
 
@@ -337,8 +302,12 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		}
 	}
 
-	skb_queue_tail(&rx_queue, skb);
-	tasklet_schedule(&net_rx_tasklet);
+	netbk = &xen_netbk[GET_GROUP_INDEX(netif)];
+	skb_queue_tail(&netbk->rx_queue, skb);
+	if (use_kthreads)
+		wake_up(&netbk->netbk_action_wq);
+	else
+		tasklet_schedule(&netbk->net_rx_tasklet);
 
 	return NETDEV_TX_OK;
 
@@ -393,19 +362,32 @@ static u16 netbk_gop_frag(netif_t *netif, struct netbk_rx_meta *meta,
 	multicall_entry_t *mcl;
 	netif_rx_request_t *req;
 	unsigned long old_mfn, new_mfn;
-	int idx = netif_page_index(page);
+	struct xen_netbk *netbk = &xen_netbk[GET_GROUP_INDEX(netif)];
 
 	old_mfn = virt_to_mfn(page_address(page));
 
 	req = RING_GET_REQUEST(&netif->rx, netif->rx.req_cons + i);
 	if (netif->copying_receiver) {
+		struct page_ext *ext;
+
 		/* The fragment needs to be copied rather than
 		   flipped. */
 		meta->copy = 1;
 		copy_gop = npo->copy + npo->copy_prod++;
 		copy_gop->flags = GNTCOPY_dest_gref;
-		if (idx > -1) {
-			struct pending_tx_info *src_pend = &pending_tx_info[idx];
+		if (PageForeign(page) &&
+		    (ext = (void *)page->mapping) != NULL &&
+		    ext->idx < MAX_PENDING_REQS &&
+		    ext->group < netbk_nr_groups) {
+			struct pending_tx_info *src_pend;
+
+			netbk = &xen_netbk[ext->group];
+			BUG_ON(ext < netbk->page_extinfo ||
+			       ext >= netbk->page_extinfo +
+				      ARRAY_SIZE(netbk->page_extinfo));
+			BUG_ON(netbk->mmap_pages[ext->idx] != page);
+			src_pend = &netbk->pending_tx_info[ext->idx];
+			BUG_ON(ext->group != GET_GROUP_INDEX(src_pend->netif));
 			copy_gop->source.domid = src_pend->netif->domid;
 			copy_gop->source.u.ref = src_pend->req.gref;
 			copy_gop->flags |= GNTCOPY_source_gref;
@@ -421,7 +403,7 @@ static u16 netbk_gop_frag(netif_t *netif, struct netbk_rx_meta *meta,
 	} else {
 		meta->copy = 0;
 		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
-			new_mfn = alloc_mfn();
+			new_mfn = alloc_mfn(netbk);
 
 			/*
 			 * Set the new P2M table entry before
@@ -566,7 +548,7 @@ static void netbk_add_frag_responses(netif_t *netif, int status,
 	}
 }
 
-static void net_rx_action(unsigned long unused)
+static void net_rx_action(unsigned long group)
 {
 	netif_t *netif = NULL;
 	s8 status;
@@ -576,52 +558,37 @@ static void net_rx_action(unsigned long unused)
 	struct sk_buff_head rxq;
 	struct sk_buff *skb;
 	int notify_nr = 0;
-	int ret;
+	int ret, eagain;
 	int nr_frags;
 	int count;
 	unsigned long offset;
-    int eagain;
-
-	/*
-	 * Putting hundreds of bytes on the stack is considered rude.
-	 * Static works because a tasklet can only be on one CPU at any time.
-	 */
-	static multicall_entry_t rx_mcl[NET_RX_RING_SIZE+3];
-	static mmu_update_t rx_mmu[NET_RX_RING_SIZE];
-	static gnttab_transfer_t grant_trans_op[NET_RX_RING_SIZE];
-	static gnttab_copy_t grant_copy_op[NET_RX_RING_SIZE];
-	static DECLARE_BITMAP(rx_notify, NR_DYNIRQS);
-#if NR_DYNIRQS <= 0x10000
-	static u16 notify_list[NET_RX_RING_SIZE];
-#else
-	static int notify_list[NET_RX_RING_SIZE];
-#endif
-	static struct netbk_rx_meta meta[NET_RX_RING_SIZE];
+	struct xen_netbk *netbk = &xen_netbk[group];
 
 	struct netrx_pending_operations npo = {
-		mmu: rx_mmu,
-		trans: grant_trans_op,
-		copy: grant_copy_op,
-		mcl: rx_mcl,
-		meta: meta};
+		.mmu   = netbk->rx_mmu,
+		.trans = netbk->grant_trans_op,
+		.copy  = netbk->grant_copy_op,
+		.mcl   = netbk->rx_mcl,
+		.meta  = netbk->meta,
+	};
 
 	skb_queue_head_init(&rxq);
 
 	count = 0;
 
-	while ((skb = skb_dequeue(&rx_queue)) != NULL) {
+	while ((skb = skb_dequeue(&netbk->rx_queue)) != NULL) {
 		nr_frags = skb_shinfo(skb)->nr_frags;
 		*(int *)skb->cb = nr_frags;
 
 		if (!xen_feature(XENFEAT_auto_translated_physmap) &&
 		    !((netif_t *)netdev_priv(skb->dev))->copying_receiver &&
-		    check_mfn(nr_frags + 1)) {
+		    check_mfn(netbk, nr_frags + 1)) {
 			/* Memory squeeze? Back off for an arbitrary while. */
 			if ( net_ratelimit() )
 				WPRINTK("Memory squeeze in netback "
 					"driver.\n");
-			mod_timer(&net_timer, jiffies + HZ);
-			skb_queue_head(&rx_queue, skb);
+			mod_timer(&netbk->net_timer, jiffies + HZ);
+			skb_queue_head(&netbk->rx_queue, skb);
 			break;
 		}
 
@@ -636,39 +603,39 @@ static void net_rx_action(unsigned long unused)
 			break;
 	}
 
-	BUG_ON(npo.meta_prod > ARRAY_SIZE(meta));
+	BUG_ON(npo.meta_prod > ARRAY_SIZE(netbk->meta));
 
 	npo.mmu_mcl = npo.mcl_prod;
 	if (npo.mcl_prod) {
 		BUG_ON(xen_feature(XENFEAT_auto_translated_physmap));
-		BUG_ON(npo.mmu_prod > ARRAY_SIZE(rx_mmu));
+		BUG_ON(npo.mmu_prod > ARRAY_SIZE(netbk->rx_mmu));
 		mcl = npo.mcl + npo.mcl_prod++;
 
 		BUG_ON(mcl[-1].op != __HYPERVISOR_update_va_mapping);
 		mcl[-1].args[MULTI_UVMFLAGS_INDEX] = UVMF_TLB_FLUSH|UVMF_ALL;
 
 		mcl->op = __HYPERVISOR_mmu_update;
-		mcl->args[0] = (unsigned long)rx_mmu;
+		mcl->args[0] = (unsigned long)netbk->rx_mmu;
 		mcl->args[1] = npo.mmu_prod;
 		mcl->args[2] = 0;
 		mcl->args[3] = DOMID_SELF;
 	}
 
 	if (npo.trans_prod) {
-		BUG_ON(npo.trans_prod > ARRAY_SIZE(grant_trans_op));
+		BUG_ON(npo.trans_prod > ARRAY_SIZE(netbk->grant_trans_op));
 		mcl = npo.mcl + npo.mcl_prod++;
 		mcl->op = __HYPERVISOR_grant_table_op;
 		mcl->args[0] = GNTTABOP_transfer;
-		mcl->args[1] = (unsigned long)grant_trans_op;
+		mcl->args[1] = (unsigned long)netbk->grant_trans_op;
 		mcl->args[2] = npo.trans_prod;
 	}
 
 	if (npo.copy_prod) {
-		BUG_ON(npo.copy_prod > ARRAY_SIZE(grant_copy_op));
+		BUG_ON(npo.copy_prod > ARRAY_SIZE(netbk->grant_copy_op));
 		mcl = npo.mcl + npo.mcl_prod++;
 		mcl->op = __HYPERVISOR_grant_table_op;
 		mcl->args[0] = GNTTABOP_copy;
-		mcl->args[1] = (unsigned long)grant_copy_op;
+		mcl->args[1] = (unsigned long)netbk->grant_copy_op;
 		mcl->args[2] = npo.copy_prod;
 	}
 
@@ -676,7 +643,7 @@ static void net_rx_action(unsigned long unused)
 	if (!npo.mcl_prod)
 		return;
 
-	BUG_ON(npo.mcl_prod > ARRAY_SIZE(rx_mcl));
+	BUG_ON(npo.mcl_prod > ARRAY_SIZE(netbk->rx_mcl));
 
 	ret = HYPERVISOR_multicall(npo.mcl, npo.mcl_prod);
 	BUG_ON(ret != 0);
@@ -707,7 +674,7 @@ static void net_rx_action(unsigned long unused)
 			atomic_set(&(skb_shinfo(skb)->dataref), 1);
 			skb_shinfo(skb)->frag_list = NULL;
 			skb_shinfo(skb)->nr_frags = 0;
-			netbk_free_pages(nr_frags, meta + npo.meta_cons + 1);
+			netbk_free_pages(nr_frags, netbk->meta + npo.meta_cons + 1);
 		}
 
         if(!eagain)
@@ -716,7 +683,7 @@ static void net_rx_action(unsigned long unused)
 		    netif->stats.tx_packets++;
         }
 
-		id = meta[npo.meta_cons].id;
+		id = netbk->meta[npo.meta_cons].id;
 		flags = nr_frags ? NETRXF_more_data : 0;
 
 		if (skb->ip_summed == CHECKSUM_PARTIAL) /* local packet? */
@@ -724,14 +691,14 @@ static void net_rx_action(unsigned long unused)
 		else if (skb->proto_data_valid) /* remote but checksummed? */
 			flags |= NETRXF_data_validated;
 
-		if (meta[npo.meta_cons].copy)
+		if (netbk->meta[npo.meta_cons].copy)
 			offset = 0;
 		else
 			offset = offset_in_page(skb->data);
 		resp = make_rx_response(netif, id, status, offset,
 					skb_headlen(skb), flags);
 
-		if (meta[npo.meta_cons].frag.size) {
+		if (netbk->meta[npo.meta_cons].frag.size) {
 			struct netif_extra_info *gso =
 				(struct netif_extra_info *)
 				RING_GET_RESPONSE(&netif->rx,
@@ -739,7 +706,7 @@ static void net_rx_action(unsigned long unused)
 
 			resp->flags |= NETRXF_extra_info;
 
-			gso->u.gso.size = meta[npo.meta_cons].frag.size;
+			gso->u.gso.size = netbk->meta[npo.meta_cons].frag.size;
 			gso->u.gso.type = XEN_NETIF_GSO_TYPE_TCPV4;
 			gso->u.gso.pad = 0;
 			gso->u.gso.features = 0;
@@ -749,13 +716,13 @@ static void net_rx_action(unsigned long unused)
 		}
 
 		netbk_add_frag_responses(netif, status,
-					 meta + npo.meta_cons + 1,
+					 netbk->meta + npo.meta_cons + 1,
 					 nr_frags);
 
 		RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(&netif->rx, ret);
 		irq = netif->irq - DYNIRQ_BASE;
-		if (ret && !__test_and_set_bit(irq, rx_notify))
-			notify_list[notify_nr++] = irq;
+		if (ret && !__test_and_set_bit(irq, netbk->rx_notify))
+			netbk->notify_list[notify_nr++] = irq;
 
 		if (netif_queue_stopped(netif->dev) &&
 		    netif_schedulable(netif) &&
@@ -772,45 +739,56 @@ static void net_rx_action(unsigned long unused)
         {
 	        netif->rx_req_cons_peek += skb_shinfo(skb)->nr_frags + 1 +
 				   !!skb_shinfo(skb)->gso_size;
-            skb_queue_head(&rx_queue, skb);
+            skb_queue_head(&netbk->rx_queue, skb);
         }
 
 		npo.meta_cons += nr_frags + 1;
 	}
 
 	if (notify_nr == 1) {
-		irq = *notify_list;
-		__clear_bit(irq, rx_notify);
+		irq = *netbk->notify_list;
+		__clear_bit(irq, netbk->rx_notify);
 		notify_remote_via_irq(irq + DYNIRQ_BASE);
 	} else {
 		for (count = ret = 0; ret < notify_nr; ++ret) {
-			irq = notify_list[ret];
-			__clear_bit(irq, rx_notify);
-			if (!multi_notify_remote_via_irq(rx_mcl + count,
+			irq = netbk->notify_list[ret];
+			__clear_bit(irq, netbk->rx_notify);
+			if (!multi_notify_remote_via_irq(netbk->rx_mcl + count,
 							 irq + DYNIRQ_BASE))
 				++count;
 		}
-		if (HYPERVISOR_multicall(rx_mcl, count))
+		if (HYPERVISOR_multicall(netbk->rx_mcl, count))
 			BUG();
 	}
 
 	/* More work to do? */
-	if (!skb_queue_empty(&rx_queue) && !timer_pending(&net_timer))
-		tasklet_schedule(&net_rx_tasklet);
+	if (!skb_queue_empty(&netbk->rx_queue) &&
+	    !timer_pending(&netbk->net_timer)) {
+		if (use_kthreads)
+			wake_up(&netbk->netbk_action_wq);
+		else
+			tasklet_schedule(&netbk->net_rx_tasklet);
+	}
 #if 0
 	else
 		xen_network_done_notify();
 #endif
 }
 
-static void net_alarm(unsigned long unused)
+static void net_alarm(unsigned long group)
 {
-	tasklet_schedule(&net_rx_tasklet);
+	if (use_kthreads)
+		wake_up(&xen_netbk[group].netbk_action_wq);
+	else
+		tasklet_schedule(&xen_netbk[group].net_rx_tasklet);
 }
 
-static void netbk_tx_pending_timeout(unsigned long unused)
+static void netbk_tx_pending_timeout(unsigned long group)
 {
-	tasklet_schedule(&net_tx_tasklet);
+	if (use_kthreads)
+		wake_up(&xen_netbk[group].netbk_action_wq);
+	else
+		tasklet_schedule(&xen_netbk[group].net_tx_tasklet);
 }
 
 struct net_device_stats *netif_be_get_stats(struct net_device *dev)
@@ -826,27 +804,31 @@ static int __on_net_schedule_list(netif_t *netif)
 
 static void remove_from_net_schedule_list(netif_t *netif)
 {
-	spin_lock_irq(&net_schedule_list_lock);
+	struct xen_netbk *netbk = &xen_netbk[GET_GROUP_INDEX(netif)];
+
+	spin_lock_irq(&netbk->net_schedule_list_lock);
 	if (likely(__on_net_schedule_list(netif))) {
 		list_del(&netif->list);
 		netif->list.next = NULL;
 		netif_put(netif);
 	}
-	spin_unlock_irq(&net_schedule_list_lock);
+	spin_unlock_irq(&netbk->net_schedule_list_lock);
 }
 
 static void add_to_net_schedule_list_tail(netif_t *netif)
 {
+	struct xen_netbk *netbk = &xen_netbk[GET_GROUP_INDEX(netif)];
+
 	if (__on_net_schedule_list(netif))
 		return;
 
-	spin_lock_irq(&net_schedule_list_lock);
+	spin_lock_irq(&netbk->net_schedule_list_lock);
 	if (!__on_net_schedule_list(netif) &&
 	    likely(netif_schedulable(netif))) {
-		list_add_tail(&netif->list, &net_schedule_list);
+		list_add_tail(&netif->list, &netbk->net_schedule_list);
 		netif_get(netif);
 	}
-	spin_unlock_irq(&net_schedule_list_lock);
+	spin_unlock_irq(&netbk->net_schedule_list_lock);
 }
 
 /*
@@ -869,7 +851,7 @@ void netif_schedule_work(netif_t *netif)
 
 	if (more_to_do) {
 		add_to_net_schedule_list_tail(netif);
-		maybe_schedule_tx_action();
+		maybe_schedule_tx_action(GET_GROUP_INDEX(netif));
 	}
 }
 
@@ -906,17 +888,19 @@ static void tx_credit_callback(unsigned long data)
 	netif_schedule_work(netif);
 }
 
-static inline int copy_pending_req(PEND_RING_IDX pending_idx)
+static inline int copy_pending_req(struct xen_netbk *netbk,
+				   pending_ring_idx_t pending_idx)
 {
-	return gnttab_copy_grant_page(grant_tx_handle[pending_idx],
-				      &mmap_pages[pending_idx]);
+	return gnttab_copy_grant_page(netbk->grant_tx_handle[pending_idx],
+				      &netbk->mmap_pages[pending_idx]);
 }
 
-static void permute_dealloc_ring(PEND_RING_IDX dc, PEND_RING_IDX dp)
+static void permute_dealloc_ring(u16 *dealloc_ring, pending_ring_idx_t dc,
+				 pending_ring_idx_t dp)
 {
 	static unsigned random_src = 0x12345678;
 	unsigned dst_offset;
-	PEND_RING_IDX dest;
+	pending_ring_idx_t dest;
 	u16 tmp;
 
 	while (dc != dp) {
@@ -931,62 +915,67 @@ static void permute_dealloc_ring(PEND_RING_IDX dc, PEND_RING_IDX dp)
 	}
 }
 
-inline static void net_tx_action_dealloc(void)
+inline static void net_tx_action_dealloc(struct xen_netbk *netbk)
 {
 	struct netbk_tx_pending_inuse *inuse, *n;
 	gnttab_unmap_grant_ref_t *gop;
 	u16 pending_idx;
-	PEND_RING_IDX dc, dp;
+	pending_ring_idx_t dc, dp;
 	netif_t *netif;
 	int ret;
 	LIST_HEAD(list);
 
-	dc = dealloc_cons;
-	gop = tx_unmap_ops;
+	dc = netbk->dealloc_cons;
+	gop = netbk->tx_unmap_ops;
 
 	/*
 	 * Free up any grants we have finished using
 	 */
 	do {
-		dp = dealloc_prod;
+		dp = netbk->dealloc_prod;
 
 		/* Ensure we see all indices enqueued by netif_idx_release(). */
 		smp_rmb();
 
 		if (MODPARM_permute_returns)
-			permute_dealloc_ring(dc, dp);
+			permute_dealloc_ring(netbk->dealloc_ring, dc, dp);
 
 		while (dc != dp) {
 			unsigned long pfn;
+			struct netbk_tx_pending_inuse *pending_inuse =
+					netbk->pending_inuse;
 
-			pending_idx = dealloc_ring[MASK_PEND_IDX(dc++)];
+			pending_idx = netbk->dealloc_ring[MASK_PEND_IDX(dc++)];
 			list_move_tail(&pending_inuse[pending_idx].list, &list);
 
-			pfn = idx_to_pfn(pending_idx);
+			pfn = idx_to_pfn(netbk, pending_idx);
 			/* Already unmapped? */
 			if (!phys_to_machine_mapping_valid(pfn))
 				continue;
 
-			gnttab_set_unmap_op(gop, idx_to_kaddr(pending_idx),
+			gnttab_set_unmap_op(gop, idx_to_kaddr(netbk, pending_idx),
 					    GNTMAP_host_map,
-					    grant_tx_handle[pending_idx]);
+					    netbk->grant_tx_handle[pending_idx]);
 			gop++;
 		}
 
 		if (netbk_copy_skb_mode != NETBK_DELAYED_COPY_SKB ||
-		    list_empty(&pending_inuse_head))
+		    list_empty(&netbk->pending_inuse_head))
 			break;
 
 		/* Copy any entries that have been pending for too long. */
-		list_for_each_entry_safe(inuse, n, &pending_inuse_head, list) {
+		list_for_each_entry_safe(inuse, n, &netbk->pending_inuse_head, list) {
+			struct pending_tx_info *pending_tx_info
+				= netbk->pending_tx_info;
+
 			if (time_after(inuse->alloc_time + HZ / 2, jiffies))
 				break;
 
-			pending_idx = inuse - pending_inuse;
+			pending_idx = inuse - netbk->pending_inuse;
 
 			pending_tx_info[pending_idx].netif->nr_copied_skbs++;
 
-			switch (copy_pending_req(pending_idx)) {
+			switch (copy_pending_req(netbk, pending_idx)) {
 			case 0:
 				list_move_tail(&inuse->list, &list);
 				continue;
@@ -999,26 +988,30 @@ inline static void net_tx_action_dealloc(void)
 
 			break;
 		}
-	} while (dp != dealloc_prod);
+	} while (dp != netbk->dealloc_prod);
 
-	dealloc_cons = dc;
+	netbk->dealloc_cons = dc;
 
 	ret = HYPERVISOR_grant_table_op(
-		GNTTABOP_unmap_grant_ref, tx_unmap_ops, gop - tx_unmap_ops);
+		GNTTABOP_unmap_grant_ref, netbk->tx_unmap_ops,
+		gop - netbk->tx_unmap_ops);
 	BUG_ON(ret);
 
 	list_for_each_entry_safe(inuse, n, &list, list) {
-		pending_idx = inuse - pending_inuse;
+		struct pending_tx_info *pending_tx_info =
+			netbk->pending_tx_info;
 
+		pending_idx = inuse - netbk->pending_inuse;
 		netif = pending_tx_info[pending_idx].netif;
 
 		make_tx_response(netif, &pending_tx_info[pending_idx].req, 
 				 NETIF_RSP_OKAY);
 
 		/* Ready for next use. */
-		gnttab_reset_grant_page(mmap_pages[pending_idx]);
+		gnttab_reset_grant_page(netbk->mmap_pages[pending_idx]);
 
-		pending_ring[MASK_PEND_IDX(pending_prod++)] = pending_idx;
+		netbk->pending_ring[MASK_PEND_IDX(netbk->pending_prod++)] =
+			pending_idx;
 
 		netif_put(netif);
 
@@ -1095,9 +1088,14 @@ static gnttab_map_grant_ref_t *netbk_get_requests(netif_t *netif,
 	start = ((unsigned long)shinfo->frags[0].page == pending_idx);
 
 	for (i = start; i < shinfo->nr_frags; i++, txp++) {
-		pending_idx = pending_ring[MASK_PEND_IDX(pending_cons++)];
+		struct xen_netbk *netbk = &xen_netbk[GET_GROUP_INDEX(netif)];
+		pending_ring_idx_t index = MASK_PEND_IDX(netbk->pending_cons++);
+		struct pending_tx_info *pending_tx_info =
+			netbk->pending_tx_info;
 
-		gnttab_set_map_op(mop++, idx_to_kaddr(pending_idx),
+		pending_idx = netbk->pending_ring[index];
+
+		gnttab_set_map_op(mop++, idx_to_kaddr(netbk, pending_idx),
 				  GNTMAP_host_map | GNTMAP_readonly,
 				  txp->gref, netif->domid);
 
@@ -1110,11 +1108,12 @@ static gnttab_map_grant_ref_t *netbk_get_requests(netif_t *netif,
 	return mop;
 }
 
-static int netbk_tx_check_mop(struct sk_buff *skb,
-			       gnttab_map_grant_ref_t **mopp)
+static int netbk_tx_check_mop(struct xen_netbk *netbk, struct sk_buff *skb,
+			      gnttab_map_grant_ref_t **mopp)
 {
 	gnttab_map_grant_ref_t *mop = *mopp;
 	int pending_idx = *((u16 *)skb->data);
+	struct pending_tx_info *pending_tx_info = netbk->pending_tx_info;
 	netif_t *netif = pending_tx_info[pending_idx].netif;
 	netif_tx_request_t *txp;
 	struct skb_shared_info *shinfo = skb_shinfo(skb);
@@ -1124,14 +1123,16 @@ static int netbk_tx_check_mop(struct sk_buff *skb,
 	/* Check status of header. */
 	err = mop->status;
 	if (unlikely(err)) {
+		pending_ring_idx_t index = MASK_PEND_IDX(netbk->pending_prod++);
+
 		txp = &pending_tx_info[pending_idx].req;
 		make_tx_response(netif, txp, NETIF_RSP_ERROR);
-		pending_ring[MASK_PEND_IDX(pending_prod++)] = pending_idx;
+		netbk->pending_ring[index] = pending_idx;
 		netif_put(netif);
 	} else {
-		set_phys_to_machine(idx_to_pfn(pending_idx),
+		set_phys_to_machine(idx_to_pfn(netbk, pending_idx),
 			FOREIGN_FRAME(mop->dev_bus_addr >> PAGE_SHIFT));
-		grant_tx_handle[pending_idx] = mop->handle;
+		netbk->grant_tx_handle[pending_idx] = mop->handle;
 	}
 
 	/* Skip first skb fragment if it is on same page as header fragment. */
@@ -1139,25 +1140,27 @@ static int netbk_tx_check_mop(struct sk_buff *skb,
 
 	for (i = start; i < nr_frags; i++) {
 		int j, newerr;
+		pending_ring_idx_t index;
 
 		pending_idx = (unsigned long)shinfo->frags[i].page;
 
 		/* Check error status: if okay then remember grant handle. */
 		newerr = (++mop)->status;
 		if (likely(!newerr)) {
-			set_phys_to_machine(idx_to_pfn(pending_idx),
+			set_phys_to_machine(idx_to_pfn(netbk, pending_idx),
 				FOREIGN_FRAME(mop->dev_bus_addr>>PAGE_SHIFT));
-			grant_tx_handle[pending_idx] = mop->handle;
+			netbk->grant_tx_handle[pending_idx] = mop->handle;
 			/* Had a previous error? Invalidate this fragment. */
 			if (unlikely(err))
-				netif_idx_release(pending_idx);
+				netif_idx_release(netbk, pending_idx);
 			continue;
 		}
 
 		/* Error on this fragment: respond to client with an error. */
 		txp = &pending_tx_info[pending_idx].req;
 		make_tx_response(netif, txp, NETIF_RSP_ERROR);
-		pending_ring[MASK_PEND_IDX(pending_prod++)] = pending_idx;
+		index = MASK_PEND_IDX(netbk->pending_prod++);
+		netbk->pending_ring[index] = pending_idx;
 		netif_put(netif);
 
 		/* Not the first error? Preceding frags already invalidated. */
@@ -1166,10 +1169,10 @@ static int netbk_tx_check_mop(struct sk_buff *skb,
 
 		/* First error: invalidate header and preceding fragments. */
 		pending_idx = *((u16 *)skb->data);
-		netif_idx_release(pending_idx);
+		netif_idx_release(netbk, pending_idx);
 		for (j = start; j < i; j++) {
 			pending_idx = (unsigned long)shinfo->frags[i].page;
-			netif_idx_release(pending_idx);
+			netif_idx_release(netbk, pending_idx);
 		}
 
 		/* Remember the error: invalidate all subsequent fragments. */
@@ -1180,7 +1183,7 @@ static int netbk_tx_check_mop(struct sk_buff *skb,
 	return err;
 }
 
-static void netbk_fill_frags(struct sk_buff *skb)
+static void netbk_fill_frags(struct xen_netbk *netbk, struct sk_buff *skb)
 {
 	struct skb_shared_info *shinfo = skb_shinfo(skb);
 	int nr_frags = shinfo->nr_frags;
@@ -1193,12 +1196,12 @@ static void netbk_fill_frags(struct sk_buff *skb)
 
 		pending_idx = (unsigned long)frag->page;
 
-		pending_inuse[pending_idx].alloc_time = jiffies;
-		list_add_tail(&pending_inuse[pending_idx].list,
-			      &pending_inuse_head);
+		netbk->pending_inuse[pending_idx].alloc_time = jiffies;
+		list_add_tail(&netbk->pending_inuse[pending_idx].list,
+			      &netbk->pending_inuse_head);
 
-		txp = &pending_tx_info[pending_idx].req;
-		frag->page = mmap_pages[pending_idx];
+		txp = &netbk->pending_tx_info[pending_idx].req;
+		frag->page = netbk->mmap_pages[pending_idx];
 		frag->size = txp->size;
 		frag->page_offset = txp->offset;
 
@@ -1260,9 +1263,9 @@ static int netbk_set_skb_gso(struct sk_buff *skb, struct netif_extra_info *gso)
 }
 
 /* Called after netfront has transmitted */
-static void net_tx_action(unsigned long unused)
+static void net_tx_action(unsigned long group)
 {
-	struct list_head *ent;
+	struct xen_netbk *netbk = &xen_netbk[group];
 	struct sk_buff *skb;
 	netif_t *netif;
 	netif_tx_request_t txreq;
@@ -1274,15 +1277,15 @@ static void net_tx_action(unsigned long unused)
 	unsigned int data_len;
 	int ret, work_to_do;
 
-	net_tx_action_dealloc();
+	net_tx_action_dealloc(netbk);
 
-	mop = tx_map_ops;
+	mop = netbk->tx_map_ops;
 	BUILD_BUG_ON(MAX_SKB_FRAGS >= MAX_PENDING_REQS);
-	while (((NR_PENDING_REQS + MAX_SKB_FRAGS) < MAX_PENDING_REQS) &&
-		!list_empty(&net_schedule_list)) {
+	while (((nr_pending_reqs(netbk) + MAX_SKB_FRAGS) < MAX_PENDING_REQS) &&
+		!list_empty(&netbk->net_schedule_list)) {
 		/* Get a netif from the list with work to do. */
-		ent = net_schedule_list.next;
-		netif = list_entry(ent, netif_t, list);
+		netif = list_first_entry(&netbk->net_schedule_list,
+					 netif_t, list);
 		netif_get(netif);
 		remove_from_net_schedule_list(netif);
 
@@ -1364,7 +1367,7 @@ static void net_tx_action(unsigned long unused)
 			continue;
 		}
 
-		pending_idx = pending_ring[MASK_PEND_IDX(pending_cons)];
+		pending_idx = netbk->pending_ring[MASK_PEND_IDX(netbk->pending_cons)];
 
 		data_len = (txreq.size > PKT_PROT_LEN &&
 			    ret < MAX_SKB_FRAGS) ?
@@ -1392,14 +1395,14 @@ static void net_tx_action(unsigned long unused)
 			}
 		}
 
-		gnttab_set_map_op(mop, idx_to_kaddr(pending_idx),
+		gnttab_set_map_op(mop, idx_to_kaddr(netbk, pending_idx),
 				  GNTMAP_host_map | GNTMAP_readonly,
 				  txreq.gref, netif->domid);
 		mop++;
 
-		memcpy(&pending_tx_info[pending_idx].req,
+		memcpy(&netbk->pending_tx_info[pending_idx].req,
 		       &txreq, sizeof(txreq));
-		pending_tx_info[pending_idx].netif = netif;
+		netbk->pending_tx_info[pending_idx].netif = netif;
 		*((u16 *)skb->data) = pending_idx;
 
 		__skb_put(skb, data_len);
@@ -1414,20 +1417,20 @@ static void net_tx_action(unsigned long unused)
 			skb_shinfo(skb)->frags[0].page = (void *)~0UL;
 		}
 
-		__skb_queue_tail(&tx_queue, skb);
+		__skb_queue_tail(&netbk->tx_queue, skb);
 
-		pending_cons++;
+		netbk->pending_cons++;
 
 		mop = netbk_get_requests(netif, skb, txfrags, mop);
 
 		netif->tx.req_cons = i;
 		netif_schedule_work(netif);
 
-		if ((mop - tx_map_ops) >= ARRAY_SIZE(tx_map_ops))
+		if ((mop - netbk->tx_map_ops) >= ARRAY_SIZE(netbk->tx_map_ops))
 			break;
 	}
 
-	if (mop == tx_map_ops)
+	if (mop == netbk->tx_map_ops)
 		goto out;
 
     /* NOTE: some maps may fail with GNTST_eagain, which could be successfully
@@ -1435,20 +1438,21 @@ static void net_tx_action(unsigned long unused)
      * req and let the frontend resend the relevant packet again. This is fine
      * because it is unlikely that a network buffer will be paged out or shared,
      * and therefore it is unlikely to fail with GNTST_eagain. */
-	ret = HYPERVISOR_grant_table_op(
-		GNTTABOP_map_grant_ref, tx_map_ops, mop - tx_map_ops);
+	ret = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref,
+					netbk->tx_map_ops,
+					mop - netbk->tx_map_ops);
 	BUG_ON(ret);
 
-	mop = tx_map_ops;
-	while ((skb = __skb_dequeue(&tx_queue)) != NULL) {
+	mop = netbk->tx_map_ops;
+	while ((skb = __skb_dequeue(&netbk->tx_queue)) != NULL) {
 		netif_tx_request_t *txp;
 
 		pending_idx = *((u16 *)skb->data);
-		netif       = pending_tx_info[pending_idx].netif;
-		txp         = &pending_tx_info[pending_idx].req;
+		netif = netbk->pending_tx_info[pending_idx].netif;
+		txp = &netbk->pending_tx_info[pending_idx].req;
 
 		/* Check the remap error code. */
-		if (unlikely(netbk_tx_check_mop(skb, &mop))) {
+		if (unlikely(netbk_tx_check_mop(netbk, skb, &mop))) {
 			DPRINTK("netback grant failed.\n");
 			skb_shinfo(skb)->nr_frags = 0;
 			kfree_skb(skb);
@@ -1457,7 +1461,7 @@ static void net_tx_action(unsigned long unused)
 
 		data_len = skb->len;
 		memcpy(skb->data,
-		       (void *)(idx_to_kaddr(pending_idx)|txp->offset),
+		       (void *)(idx_to_kaddr(netbk, pending_idx)|txp->offset),
 		       data_len);
 		if (data_len < txp->size) {
 			/* Append the packet payload as a fragment. */
@@ -1465,7 +1469,7 @@ static void net_tx_action(unsigned long unused)
 			txp->size -= data_len;
 		} else {
 			/* Schedule a response immediately. */
-			netif_idx_release(pending_idx);
+			netif_idx_release(netbk, pending_idx);
 		}
 
 		/*
@@ -1481,7 +1485,7 @@ static void net_tx_action(unsigned long unused)
 		}
 		skb->proto_csum_blank = !!(txp->flags & NETTXF_csum_blank);
 
-		netbk_fill_frags(skb);
+		netbk_fill_frags(netbk, skb);
 
 		skb->dev      = netif->dev;
 		skb->protocol = eth_type_trans(skb, skb->dev);
@@ -1496,42 +1500,52 @@ static void net_tx_action(unsigned long unused)
 			continue;
 		}
 
-		netif_rx(skb);
+		if (use_kthreads)
+			netif_rx_ni(skb);
+		else
+			netif_rx(skb);
 		netif->dev->last_rx = jiffies;
 	}
 
  out:
 	if (netbk_copy_skb_mode == NETBK_DELAYED_COPY_SKB &&
-	    !list_empty(&pending_inuse_head)) {
+	    !list_empty(&netbk->pending_inuse_head)) {
 		struct netbk_tx_pending_inuse *oldest;
 
-		oldest = list_entry(pending_inuse_head.next,
+		oldest = list_entry(netbk->pending_inuse_head.next,
 				    struct netbk_tx_pending_inuse, list);
-		mod_timer(&netbk_tx_pending_timer, oldest->alloc_time + HZ);
+		mod_timer(&netbk->tx_pending_timer, oldest->alloc_time + HZ);
 	}
 }
 
-static void netif_idx_release(u16 pending_idx)
+static void netif_idx_release(struct xen_netbk *netbk, u16 pending_idx)
 {
-	static DEFINE_SPINLOCK(_lock);
 	unsigned long flags;
 
-	spin_lock_irqsave(&_lock, flags);
-	dealloc_ring[MASK_PEND_IDX(dealloc_prod)] = pending_idx;
+	spin_lock_irqsave(&netbk->release_lock, flags);
+	netbk->dealloc_ring[MASK_PEND_IDX(netbk->dealloc_prod)] = pending_idx;
 	/* Sync with net_tx_action_dealloc: insert idx /then/ incr producer. */
 	smp_wmb();
-	dealloc_prod++;
-	spin_unlock_irqrestore(&_lock, flags);
+	netbk->dealloc_prod++;
+	spin_unlock_irqrestore(&netbk->release_lock, flags);
 
-	tasklet_schedule(&net_tx_tasklet);
+	if (use_kthreads)
+		wake_up(&netbk->netbk_action_wq);
+	else
+		tasklet_schedule(&netbk->net_tx_tasklet);
 }
 
 static void netif_page_release(struct page *page, unsigned int order)
 {
-	int idx = netif_page_index(page);
+	struct page_ext *ext = (void *)page->mapping;
+	unsigned int idx = ext->idx;
+	unsigned int group = ext->group;
+	struct xen_netbk *netbk = &xen_netbk[group];
+
 	BUG_ON(order);
-	BUG_ON(idx < 0);
-	netif_idx_release(idx);
+	BUG_ON(group >= netbk_nr_groups || idx >= MAX_PENDING_REQS);
+	BUG_ON(netbk->mmap_pages[idx] != page);
+	netif_idx_release(netbk, idx);
 }
 
 irqreturn_t netif_be_int(int irq, void *dev_id)
@@ -1539,7 +1553,7 @@ irqreturn_t netif_be_int(int irq, void *dev_id)
 	netif_t *netif = dev_id;
 
 	add_to_net_schedule_list_tail(netif);
-	maybe_schedule_tx_action();
+	maybe_schedule_tx_action(GET_GROUP_INDEX(netif));
 
 	if (netif_schedulable(netif) && !netbk_queue_full(netif))
 		netif_wake_queue(netif->dev);
@@ -1605,29 +1619,35 @@ static irqreturn_t netif_be_dbg(int irq, void *dev_id)
 {
 	struct list_head *ent;
 	netif_t *netif;
-	int i = 0;
+	unsigned int i = 0, group;
 
 	printk(KERN_ALERT "netif_schedule_list:\n");
-	spin_lock_irq(&net_schedule_list_lock);
 
-	list_for_each (ent, &net_schedule_list) {
-		netif = list_entry(ent, netif_t, list);
-		printk(KERN_ALERT " %d: private(rx_req_cons=%08x "
-		       "rx_resp_prod=%08x\n",
-		       i, netif->rx.req_cons, netif->rx.rsp_prod_pvt);
-		printk(KERN_ALERT "   tx_req_cons=%08x tx_resp_prod=%08x)\n",
-		       netif->tx.req_cons, netif->tx.rsp_prod_pvt);
-		printk(KERN_ALERT "   shared(rx_req_prod=%08x "
-		       "rx_resp_prod=%08x\n",
-		       netif->rx.sring->req_prod, netif->rx.sring->rsp_prod);
-		printk(KERN_ALERT "   rx_event=%08x tx_req_prod=%08x\n",
-		       netif->rx.sring->rsp_event, netif->tx.sring->req_prod);
-		printk(KERN_ALERT "   tx_resp_prod=%08x, tx_event=%08x)\n",
-		       netif->tx.sring->rsp_prod, netif->tx.sring->rsp_event);
-		i++;
+	for (group = 0; group < netbk_nr_groups; ++group) {
+		struct xen_netbk *netbk = &xen_netbk[group];
+
+		spin_lock_irq(&netbk->net_schedule_list_lock);
+
+		list_for_each(ent, &netbk->net_schedule_list) {
+			netif = list_entry(ent, netif_t, list);
+			printk(KERN_ALERT " %d: private(rx_req_cons=%08x "
+			       "rx_resp_prod=%08x\n",
+			       i, netif->rx.req_cons, netif->rx.rsp_prod_pvt);
+			printk(KERN_ALERT "   tx_req_cons=%08x tx_resp_prod=%08x)\n",
+			       netif->tx.req_cons, netif->tx.rsp_prod_pvt);
+			printk(KERN_ALERT "   shared(rx_req_prod=%08x "
+			       "rx_resp_prod=%08x\n",
+			       netif->rx.sring->req_prod, netif->rx.sring->rsp_prod);
+			printk(KERN_ALERT "   rx_event=%08x tx_req_prod=%08x\n",
+			       netif->rx.sring->rsp_event, netif->tx.sring->req_prod);
+			printk(KERN_ALERT "   tx_resp_prod=%08x, tx_event=%08x)\n",
+			       netif->tx.sring->rsp_prod, netif->tx.sring->rsp_event);
+			i++;
+		}
+
+		spin_unlock_irq(&netbk->netbk->net_schedule_list_lock);
 	}
 
-	spin_unlock_irq(&net_schedule_list_lock);
 	printk(KERN_ALERT " ** End of netif_schedule_list **\n");
 
 	return IRQ_HANDLED;
@@ -1640,48 +1660,132 @@ static struct irqaction netif_be_dbg_action = {
 };
 #endif
 
+static inline int rx_work_todo(struct xen_netbk *netbk)
+{
+	return !skb_queue_empty(&netbk->rx_queue);
+}
+
+static inline int tx_work_todo(struct xen_netbk *netbk)
+{
+	if (netbk->dealloc_cons != netbk->dealloc_prod)
+		return 1;
+
+	if (nr_pending_reqs(netbk) + MAX_SKB_FRAGS < MAX_PENDING_REQS &&
+	    !list_empty(&netbk->net_schedule_list))
+		return 1;
+
+	return 0;
+}
+
+static int netbk_action_thread(void *index)
+{
+	unsigned long group = (unsigned long)index;
+	struct xen_netbk *netbk = &xen_netbk[group];
+
+	while (1) {
+		wait_event_interruptible(netbk->netbk_action_wq,
+					 rx_work_todo(netbk) ||
+					 tx_work_todo(netbk));
+		cond_resched();
+
+		if (rx_work_todo(netbk))
+			net_rx_action(group);
+
+		if (tx_work_todo(netbk))
+			net_tx_action(group);
+	}
+
+	return 0;
+}
+
+
 static int __init netback_init(void)
 {
-	int i;
+	unsigned int i, group;
+	int rc;
 	struct page *page;
 
 	if (!is_running_on_xen())
 		return -ENODEV;
 
+	if (!netbk_nr_groups)
+		netbk_nr_groups = (num_online_cpus() + 1) / 2;
+
 	/* We can increase reservation by this much in net_rx_action(). */
-	balloon_update_driver_allowance(NET_RX_RING_SIZE);
+	balloon_update_driver_allowance(netbk_nr_groups * NET_RX_RING_SIZE);
 
-	skb_queue_head_init(&rx_queue);
-	skb_queue_head_init(&tx_queue);
-
-	init_timer(&net_timer);
-	net_timer.data = 0;
-	net_timer.function = net_alarm;
-
-	init_timer(&netbk_tx_pending_timer);
-	netbk_tx_pending_timer.data = 0;
-	netbk_tx_pending_timer.function = netbk_tx_pending_timeout;
-
-	mmap_pages = alloc_empty_pages_and_pagevec(MAX_PENDING_REQS);
-	if (mmap_pages == NULL) {
-		printk("%s: out of memory\n", __FUNCTION__);
+	xen_netbk = __vmalloc(netbk_nr_groups * sizeof(*xen_netbk),
+			    GFP_KERNEL|__GFP_HIGHMEM|__GFP_ZERO, PAGE_KERNEL);
+	if (!xen_netbk) {
+		printk(KERN_ALERT "%s: out of memory\n", __func__);
 		return -ENOMEM;
 	}
 
-	for (i = 0; i < MAX_PENDING_REQS; i++) {
-		page = mmap_pages[i];
-		SetPageForeign(page, netif_page_release);
-		netif_set_page_index(page, i);
-		INIT_LIST_HEAD(&pending_inuse[i].list);
+	for (group = 0; group < netbk_nr_groups; group++) {
+		struct xen_netbk *netbk = &xen_netbk[group];
+
+		if (use_kthreads) {
+			init_waitqueue_head(&netbk->netbk_action_wq);
+			netbk->task = kthread_create(netbk_action_thread,
+						     (void *)(long)group,
+						     "netback/%u", group);
+
+			if (!IS_ERR(netbk->task)) {
+				if (bind_threads)
+					kthread_bind(netbk->task, group);
+				wake_up_process(netbk->task);
+			} else {
+				printk(KERN_ALERT
+				       "kthread_create() fails at netback\n");
+				rc = PTR_ERR(netbk->task);
+				goto failed_init;
+			}
+		} else {
+			tasklet_init(&netbk->net_tx_tasklet, net_tx_action, group);
+			tasklet_init(&netbk->net_rx_tasklet, net_rx_action, group);
+		}
+
+		skb_queue_head_init(&netbk->rx_queue);
+		skb_queue_head_init(&netbk->tx_queue);
+
+		netbk->mmap_pages =
+			alloc_empty_pages_and_pagevec(MAX_PENDING_REQS);
+		if (netbk->mmap_pages == NULL) {
+			printk(KERN_ALERT "%s: out of memory\n", __func__);
+			rc = -ENOMEM;
+			goto failed_init;
+		}
+
+		init_timer(&netbk->net_timer);
+		netbk->net_timer.data = group;
+		netbk->net_timer.function = net_alarm;
+
+		init_timer(&netbk->tx_pending_timer);
+		netbk->tx_pending_timer.data = group;
+		netbk->tx_pending_timer.function =
+			netbk_tx_pending_timeout;
+
+		netbk->pending_prod = MAX_PENDING_REQS;
+
+		INIT_LIST_HEAD(&netbk->pending_inuse_head);
+		INIT_LIST_HEAD(&netbk->net_schedule_list);
+		INIT_LIST_HEAD(&netbk->group_domain_list);
+
+		spin_lock_init(&netbk->net_schedule_list_lock);
+		spin_lock_init(&netbk->release_lock);
+		spin_lock_init(&netbk->group_domain_list_lock);
+
+		for (i = 0; i < MAX_PENDING_REQS; i++) {
+			page = netbk->mmap_pages[i];
+			SetPageForeign(page, netif_page_release);
+			netbk->page_extinfo[i].group = group;
+			netbk->page_extinfo[i].idx = i;
+			netif_set_page_ext(page,
+					   &netbk->page_extinfo[i]);
+			netbk->pending_ring[i] = i;
+			INIT_LIST_HEAD(&netbk->pending_inuse[i].list);
+		}
 	}
-
-	pending_cons = 0;
-	pending_prod = MAX_PENDING_REQS;
-	for (i = 0; i < MAX_PENDING_REQS; i++)
-		pending_ring[i] = i;
-
-	spin_lock_init(&net_schedule_list_lock);
-	INIT_LIST_HEAD(&net_schedule_list);
 
 	netbk_copy_skb_mode = NETBK_DONT_COPY_SKB;
 	if (MODPARM_copy_skb) {
@@ -1703,6 +1807,22 @@ static int __init netback_init(void)
 #endif
 
 	return 0;
+
+failed_init:
+	while (group-- > 0) {
+		struct xen_netbk *netbk = &xen_netbk[group];
+
+		if (use_kthreads && netbk->task && !IS_ERR(netbk->task))
+			kthread_stop(netbk->task);
+		if (netbk->mmap_pages)
+			free_empty_pages_and_pagevec(netbk->mmap_pages,
+						     MAX_PENDING_REQS);
+		del_timer(&netbk->tx_pending_timer);
+		del_timer(&netbk->net_timer);
+	}
+	vfree(xen_netbk);
+
+	return rc;
 }
 
 module_init(netback_init);

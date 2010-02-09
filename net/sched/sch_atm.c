@@ -164,7 +164,7 @@ static void atm_tc_put(struct Qdisc *sch, unsigned long cl)
 	tcf_destroy_chain(&flow->filter_list);
 	if (flow->sock) {
 		pr_debug("atm_tc_put: f_count %ld\n",
-			flow->sock->file->f_count);
+			file_count(flow->sock->file));
 		flow->vcc->pop = flow->old_pop;
 		sockfd_put(flow->sock);
 	}
@@ -260,7 +260,7 @@ static int atm_tc_change(struct Qdisc *sch, u32 classid, u32 parent,
 	sock = sockfd_lookup(fd, &error);
 	if (!sock)
 		return error;	/* f_count++ */
-	pr_debug("atm_tc_change: f_count %ld\n", sock->file->f_count);
+	pr_debug("atm_tc_change: f_count %ld\n", file_count(sock->file));
 	if (sock->ops->family != PF_ATMSVC && sock->ops->family != PF_ATMPVC) {
 		error = -EPROTOTYPE;
 		goto err_out;
