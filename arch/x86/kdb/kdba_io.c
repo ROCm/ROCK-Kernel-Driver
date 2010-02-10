@@ -366,7 +366,23 @@ static int get_serial_char(void)
 
 #ifdef	CONFIG_VT_CONSOLE
 
-static int kbd_exists;
+static int kdb_check_kbd_exists(void)
+{
+       static int kbd_exists = -1;
+
+       /* One time init */
+       if (kbd_exists == -1) {
+               if (KDB_FLAG(NO_I8042) || KDB_FLAG(NO_VT_CONSOLE) ||
+                       (kbd_read_status() == 0xff &&
+                        kbd_read_input() == 0xff))
+                       kbd_exists = 0;
+               else
+                       kbd_exists = 1;
+       }
+
+       return kbd_exists;
+}
+
 
 /*
  * Check if the keyboard controller has a keypress for us.
@@ -382,12 +398,8 @@ static int get_kbd_char(void)
 	u_short keychar;
 	extern u_short plain_map[], shift_map[], ctrl_map[];
 
-	if (KDB_FLAG(NO_I8042) || KDB_FLAG(NO_VT_CONSOLE) ||
-	    (inb(KBD_STATUS_REG) == 0xff && inb(KBD_DATA_REG) == 0xff)) {
-		kbd_exists = 0;
+       if (!kdb_check_kbd_exists())
 		return -1;
-	}
-	kbd_exists = 1;
 
 	if ((inb(KBD_STATUS_REG) & KBD_STAT_OBF) == 0)
 		return -1;
@@ -571,7 +583,7 @@ static int blink_led(void)
 {
 	static long delay;
 
-	if (kbd_exists == 0)
+       if (!kdb_check_kbd_exists())
 		return -1;
 
 	if (--delay < 0) {
@@ -621,6 +633,9 @@ void kdba_local_arch_setup(void)
 	int timeout;
 	unsigned char c;
 
+       if (!kdb_check_kbd_exists())
+               return;
+
 	while (kbd_read_status() & KBD_STAT_IBF);
 	kbd_write_command(KBD_CCMD_READ_MODE);
 	mdelay(1);
@@ -645,6 +660,9 @@ void kdba_local_arch_cleanup(void)
 #ifdef	CONFIG_VT_CONSOLE
 	int timeout;
 	unsigned char c;
+
+       if (!kdb_check_kbd_exists())
+               return;
 
 	while (kbd_read_status() & KBD_STAT_IBF);
 	kbd_write_command(KBD_CCMD_READ_MODE);
