@@ -361,6 +361,12 @@ static struct taskstats *mk_reply(struct sk_buff *skb, int type, u32 pid)
 	struct nlattr *na, *ret;
 	int aggr;
 
+	/* If we don't pad, we end up with alignment on a 4 byte boundary.
+	 * This causes lots of runtime warnings on systems requiring 8 byte
+	 * alignment */
+	u32 pids[2] = { pid, 0 };
+	int pid_size = ALIGN(sizeof(pid), sizeof(long));
+
 	aggr = (type == TASKSTATS_TYPE_PID)
 			? TASKSTATS_TYPE_AGGR_PID
 			: TASKSTATS_TYPE_AGGR_TGID;
@@ -368,7 +374,7 @@ static struct taskstats *mk_reply(struct sk_buff *skb, int type, u32 pid)
 	na = nla_nest_start(skb, aggr);
 	if (!na)
 		goto err;
-	if (nla_put(skb, type, sizeof(pid), &pid) < 0)
+	if (nla_put(skb, type, pid_size, pids) < 0)
 		goto err;
 	ret = nla_reserve(skb, TASKSTATS_TYPE_STATS, sizeof(struct taskstats));
 	if (!ret)
@@ -432,12 +438,6 @@ static int taskstats_user_cmd(struct sk_buff *skb, struct genl_info *info)
 	struct taskstats *stats;
 	size_t size;
 	cpumask_var_t mask;
-#ifdef CONFIG_IA64
-	struct taskstats statn;
-#define statf	&statn
-#else
-#define statf	stats
-#endif
 
 	if (!alloc_cpumask_var(&mask, GFP_KERNEL))
 		return -ENOMEM;
@@ -478,7 +478,7 @@ free_return_rc:
 		if (!stats)
 			goto err;
 
-		rc = fill_pid(pid, NULL, statf);
+		rc = fill_pid(pid, NULL, stats);
 		if (rc < 0)
 			goto err;
 	} else if (info->attrs[TASKSTATS_CMD_ATTR_TGID]) {
@@ -487,15 +487,12 @@ free_return_rc:
 		if (!stats)
 			goto err;
 
-		rc = fill_tgid(tgid, NULL, statf);
+		rc = fill_tgid(tgid, NULL, stats);
 		if (rc < 0)
 			goto err;
 	} else
 		goto err;
 
-#ifdef CONFIG_IA64
-	memcpy(stats, &statn, sizeof(statn));
-#endif
 	return send_reply(rep_skb, info);
 err:
 	nlmsg_free(rep_skb);
