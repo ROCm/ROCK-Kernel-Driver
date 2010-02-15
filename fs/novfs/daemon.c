@@ -2046,14 +2046,14 @@ static long local_unlink(const char *pathname)
 	}
 	dentry = lookup_one_len(name, nd.path.dentry, strlen(name));
 	error = PTR_ERR(dentry);
-	DbgPrint("dentry %p", dentry);
-	if (!(dentry->d_inode->i_mode & S_IFLNK)) {
-		DbgPrint("%s not a link", name);
-		error=-ENOENT;
-		goto exit1;
-	}
 
 	if (!IS_ERR(dentry)) {
+		DbgPrint("dentry %p", dentry);
+		if (!(dentry->d_inode->i_mode & S_IFLNK)) {
+			DbgPrint("%s not a link", name);
+			error=-ENOENT;
+			goto exit1;
+		}
 		/* Why not before? Because we want correct error value */
 		if (nd.last.name[nd.last.len])
 			goto slashes;
