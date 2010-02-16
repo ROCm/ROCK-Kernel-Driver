@@ -425,6 +425,8 @@ static void igb_assign_vector(struct igb_q_vector *q_vector, int msix_vector)
 			msixbm = E1000_EICR_RX_QUEUE0 << rx_queue;
 		if (tx_queue > IGB_N0_QUEUE)
 			msixbm |= E1000_EICR_TX_QUEUE0 << tx_queue;
+		if (!adapter->msix_entries && msix_vector == 0)
+			msixbm |= E1000_EIMS_OTHER;
 		array_wr32(E1000_MSIXBM(0), msix_vector, msixbm);
 		q_vector->eims_value = msixbm;
 		break;
@@ -882,7 +884,6 @@ static int igb_request_irq(struct igb_adapter *adapter)
 {
 	struct net_device *netdev = adapter->netdev;
 	struct pci_dev *pdev = adapter->pdev;
-	struct e1000_hw *hw = &adapter->hw;
 	int err = 0;
 	int irq_flags = 0;
 
@@ -918,20 +919,7 @@ static int igb_request_irq(struct igb_adapter *adapter)
 		igb_setup_all_tx_resources(adapter);
 		igb_setup_all_rx_resources(adapter);
 	} else {
-		switch (hw->mac.type) {
-		case e1000_82575:
-			wr32(E1000_MSIXBM(0),
-			     (E1000_EICR_RX_QUEUE0 |
-			      E1000_EICR_TX_QUEUE0 |
-			      E1000_EIMS_OTHER));
-			break;
-		case e1000_82580:
-		case e1000_82576:
-			wr32(E1000_IVAR0, E1000_IVAR_VALID);
-			break;
-		default:
-			break;
-		}
+		igb_assign_vector(adapter->q_vector[0], 0);
 	}
 
 	if (adapter->flags & IGB_FLAG_HAS_MSI) {
@@ -1150,6 +1138,8 @@ int igb_up(struct igb_adapter *adapter)
 	}
 	if (adapter->msix_entries)
 		igb_configure_msix(adapter);
+	else
+		igb_assign_vector(adapter->q_vector[0], 0);
 
 	/* Clear any pending interrupts. */
 	rd32(E1000_ICR);
