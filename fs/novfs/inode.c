@@ -2672,8 +2672,17 @@ void update_inode(struct inode *Inode, struct novfs_entry_info *Info)
 	Inode->i_mtime = Info->mtime;
 
 	if (Inode->i_size && Inode->i_sb->s_blocksize) {
-		Inode->i_blocks =
-		    (unsigned long) (Info->size >> (loff_t) Inode->i_blkbits);
+
+		/*
+		 * Filling number of blocks as in NSS filesystem.
+		 * The s_blocksize is initialized to PAGE_CACHE_SIZE in
+		 * the super block initialization.
+		 *
+		 * Update i_blocks to have the number of 512 blocks
+		 */
+		Inode->i_blocks = (((loff_t)Info->size) + Inode->i_sb->s_blocksize - 1)
+							>> (loff_t)Inode->i_blkbits;
+		Inode->i_blocks = Inode->i_blocks << (PAGE_CACHE_SHIFT - 9);
 		Inode->i_bytes = Info->size & (Inode->i_sb->s_blocksize - 1);
 
 		DbgPrint("i_sb->s_blocksize=%d", Inode->i_sb->s_blocksize);
@@ -2761,7 +2770,11 @@ struct dentry *novfs_i_lookup(struct inode *dir, struct dentry *dentry,
 					}
 
 					if (!inode && ino) {
-						uid = novfs_scope_get_uid(id->Scope);
+						if (id && id->Scope) {
+							uid = novfs_scope_get_uid(id->Scope);
+						} else {
+							uid = novfs_scope_get_uid(novfs_get_scope(dentry));
+						}
 						if (novfs_lock_inode_cache(dir)) {
 							inode = novfs_get_inode (dentry->d_sb, info->mode, 0, uid, ino, &name);
 							if (inode) {
@@ -3171,7 +3184,6 @@ int novfs_i_setattr(struct dentry *dentry, struct iattr *attr)
 	unsigned int ia_valid = attr->ia_valid;
 	struct novfs_schandle session;
 	int retVal = 0;
-	struct iattr mattr;
 
 	if (IS_ROOT(dentry) ||	/* Root */
 	    IS_ROOT(dentry->d_parent) ||	/* User */
@@ -3228,30 +3240,6 @@ int novfs_i_setattr(struct dentry *dentry, struct iattr *attr)
 					 attr->ia_gid,
 					 attr->ia_size,
 					 atime_buf, mtime_buf, ctime_buf);
-
-				if ((attr->ia_valid & ATTR_FILE)
-				    && (attr->ia_valid & ATTR_SIZE)) {
-					memcpy(&mattr, attr, sizeof(mattr));
-					mattr.ia_valid &=
-					    ~(ATTR_FILE | ATTR_SIZE);
-					attr = &mattr;
-					ia_valid = attr->ia_valid;
-#if 0   // thanks to vfs changes in our tree...
-					retVal =
-					    novfs_trunc_ex(attr->
-								   ia_file->
-								   private_data,
-								   attr->
-								   ia_size,
-								   session);
-					if (!retVal) {
-						inode->i_size = attr->ia_size;
-						((struct inode_data *) inode->
-						 i_private)->Flags |=
-			       UPDATE_INODE;
-					}
-#endif
-				}
 
 				if (ia_valid
 				    && !(retVal =
