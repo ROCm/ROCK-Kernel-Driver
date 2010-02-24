@@ -1586,7 +1586,7 @@ static void __init setup_IO_APIC_irqs(void)
 
 		irq = pin_2_irq(idx, apic_id, pin);
 
-#if defined(CONFIG_XEN)
+#ifdef CONFIG_XEN
 		if (irq < PIRQ_BASE || irq >= PIRQ_BASE + nr_pirqs)
 			continue;
 #else

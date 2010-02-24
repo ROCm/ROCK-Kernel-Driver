@@ -179,6 +179,4 @@ void preswap_init(unsigned type)
 	if ((s32)preswap_poolid >= 0)
 		return;
 	preswap_poolid = tmem_new_pool(0, 0, TMEM_POOL_PERSIST);
-	if (preswap_poolid < 0)
-		return;
 }

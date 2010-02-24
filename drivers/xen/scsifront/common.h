@@ -70,8 +70,7 @@
 #define VSCSIIF_MAX_TARGET          64
 #define VSCSIIF_MAX_LUN             255
 
-#define VSCSIIF_RING_SIZE	\
-    __RING_SIZE((struct vscsiif_sring *)0, PAGE_SIZE)
+#define VSCSIIF_RING_SIZE	__CONST_RING_SIZE(vscsiif, PAGE_SIZE)
 #define VSCSIIF_MAX_REQS	VSCSIIF_RING_SIZE
 
 struct vscsifrnt_shadow {

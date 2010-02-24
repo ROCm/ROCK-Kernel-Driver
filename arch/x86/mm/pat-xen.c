@@ -325,7 +325,7 @@ static int reserve_ram_pages_type(u64 start, u64 end, unsigned long req_type,
 				  unsigned long *new_type)
 {
 	struct page *page;
-	u64 pfn;
+	unsigned long mfn;
 
 	if (req_type == _PAGE_CACHE_UC) {
 		/* We do not support strong UC */
@@ -333,9 +333,10 @@ static int reserve_ram_pages_type(u64 start, u64 end, unsigned long req_type,
 		req_type = _PAGE_CACHE_UC_MINUS;
 	}
 
-	for (pfn = (start >> PAGE_SHIFT); pfn < (end >> PAGE_SHIFT); ++pfn) {
-		unsigned long type;
+	for (mfn = (start >> PAGE_SHIFT); mfn < (end >> PAGE_SHIFT); ++mfn) {
+		unsigned long type, pfn = mfn_to_local_pfn(mfn);
 
+		BUG_ON(!pfn_valid(pfn));
 		page = pfn_to_page(pfn);
 		type = get_page_memtype(page);
 		if (type != -1) {
@@ -352,8 +353,8 @@ static int reserve_ram_pages_type(u64 start, u64 end, unsigned long req_type,
 	if (new_type)
 		*new_type = req_type;
 
-	for (pfn = (start >> PAGE_SHIFT); pfn < (end >> PAGE_SHIFT); ++pfn) {
-		page = pfn_to_page(pfn);
+	for (mfn = (start >> PAGE_SHIFT); mfn < (end >> PAGE_SHIFT); ++mfn) {
+		page = pfn_to_page(mfn_to_local_pfn(mfn));
 		set_page_memtype(page, req_type);
 	}
 	return 0;
@@ -362,9 +363,12 @@ static int reserve_ram_pages_type(u64 start, u64 end, unsigned long req_type,
 static int free_ram_pages_type(u64 start, u64 end)
 {
 	struct page *page;
-	u64 pfn;
+	unsigned long mfn;
 
-	for (pfn = (start >> PAGE_SHIFT); pfn < (end >> PAGE_SHIFT); ++pfn) {
+	for (mfn = (start >> PAGE_SHIFT); mfn < (end >> PAGE_SHIFT); ++mfn) {
+		unsigned long pfn = mfn_to_local_pfn(mfn);
+
+		BUG_ON(!pfn_valid(pfn));
 		page = pfn_to_page(pfn);
 		set_page_memtype(page, -1);
 	}
