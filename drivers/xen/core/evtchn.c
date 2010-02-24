@@ -340,7 +340,7 @@ asmlinkage void __irq_entry evtchn_do_upcall(struct pt_regs *regs)
 	struct pt_regs     *old_regs = set_irq_regs(regs);
 	unsigned long       l1, l2;
 	unsigned long       masked_l1, masked_l2;
-	unsigned int        l1i, l2i, port, count;
+	unsigned int        l1i, l2i, start_l1i, start_l2i, port, count, i;
 	int                 irq;
 
 	exit_idle();
@@ -362,10 +362,10 @@ asmlinkage void __irq_entry evtchn_do_upcall(struct pt_regs *regs)
 #endif
 		l1 = vcpu_info_xchg(evtchn_pending_sel, 0);
 
-		l1i = percpu_read(current_l1i);
-		l2i = percpu_read(current_l2i);
+		start_l1i = l1i = percpu_read(current_l1i);
+		start_l2i = percpu_read(current_l2i);
 
-		while (l1 != 0) {
+		for (i = 0; l1 != 0; i++) {
 			masked_l1 = l1 & ((~0UL) << l1i);
 			/* If we masked out all events, wrap to beginning. */
 			if (masked_l1 == 0) {
@@ -374,8 +374,19 @@ asmlinkage void __irq_entry evtchn_do_upcall(struct pt_regs *regs)
 			}
 			l1i = __ffs(masked_l1);
 
+			l2 = active_evtchns(l1i);
+			l2i = 0; /* usually scan entire word from start */
+			if (l1i == start_l1i) {
+				/* We scan the starting word in two parts. */
+				if (i == 0)
+					/* 1st time: start in the middle */
+					l2i = start_l2i;
+				else
+					/* 2nd time: mask bits done already */
+					l2 &= (1ul << start_l2i) - 1;
+			}
+
 			do {
-				l2 = active_evtchns(l1i);
 				masked_l2 = l2 & ((~0UL) << l2i);
 				if (masked_l2 == 0)
 					break;
@@ -398,13 +409,11 @@ asmlinkage void __irq_entry evtchn_do_upcall(struct pt_regs *regs)
 
 			} while (l2i != 0);
 
-			l2 = active_evtchns(l1i);
-			/* If we handled all ports, clear the selector bit. */
-			if (l2 == 0)
+			/* Scan start_l1i twice; all others once. */
+			if ((l1i != start_l1i) || (i != 0))
 				l1 &= ~(1UL << l1i);
 
 			l1i = (l1i + 1) % BITS_PER_LONG;
-			l2i = 0;
 		}
 
 		/* If there were nested callbacks then we have more to do. */

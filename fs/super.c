@@ -225,6 +225,7 @@ void deactivate_locked_super(struct super_block *s)
 		spin_unlock(&sb_lock);
 		vfs_dq_off(s, 0);
 		fs->kill_sb(s);
+		precache_flush_filesystem(s);
 		put_filesystem(fs);
 		put_super(s);
 	} else {
@@ -886,9 +887,6 @@ int get_sb_nodev(struct file_system_type *fs_type,
 		return error;
 	}
 	s->s_flags |= MS_ACTIVE;
-#ifdef CONFIG_PRECACHE
-	s->precache_poolid = -2;
-#endif
 	simple_set_mnt(mnt, s);
 	return 0;
 }

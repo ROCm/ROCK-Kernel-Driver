@@ -2611,7 +2611,7 @@ void preswap_shrink(unsigned long target_pages)
 				pages = si->preswap_pages;
 				unuse_pages = 0; /* unuse all */
 			}
-			if (security_vm_enough_memory(pages))
+			if (security_vm_enough_memory_kern(pages))
 				continue;
 			vm_unacct_memory(pages);
 			break;

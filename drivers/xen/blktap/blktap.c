@@ -72,7 +72,7 @@
  * mmap_alloc is initialised to 2 and should be adjustable on the fly via
  * sysfs.
  */
-#define BLK_RING_SIZE		__RING_SIZE((blkif_sring_t *)0, PAGE_SIZE)
+#define BLK_RING_SIZE		__CONST_RING_SIZE(blkif, PAGE_SIZE)
 #define MAX_DYNAMIC_MEM		BLK_RING_SIZE
 #define MAX_PENDING_REQS	BLK_RING_SIZE
 #define MMAP_PAGES (MAX_PENDING_REQS * BLKIF_MAX_SEGMENTS_PER_REQUEST)

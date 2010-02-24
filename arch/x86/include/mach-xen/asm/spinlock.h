@@ -40,6 +40,7 @@
 
 #ifdef TICKET_SHIFT
 
+#include <asm/irqflags.h>
 #include <asm/smp-processor-id.h>
 #include <xen/interface/vcpu.h>
 
@@ -47,10 +48,9 @@ DECLARE_PER_CPU(struct vcpu_runstate_info, runstate);
 
 int xen_spinlock_init(unsigned int cpu);
 void xen_spinlock_cleanup(unsigned int cpu);
-int xen_spin_wait(arch_spinlock_t *, unsigned int token);
-int xen_spin_wait_flags(arch_spinlock_t *, unsigned int *token,
-			unsigned int flags);
-unsigned int xen_spin_adjust(arch_spinlock_t *, unsigned int token);
+bool xen_spin_wait(arch_spinlock_t *, unsigned int *token,
+		   unsigned int flags);
+unsigned int xen_spin_adjust(const arch_spinlock_t *, unsigned int token);
 void xen_spin_kick(arch_spinlock_t *, unsigned int token);
 
 /*
@@ -92,7 +92,14 @@ void xen_spin_kick(arch_spinlock_t *, unsigned int token);
 	    : "+Q" (token), "+g" (count) \
 	    : "m" (lock->slock) \
 	    : "memory", "cc")
-
+#define __ticket_spin_unlock_body \
+	asm(UNLOCK_LOCK_PREFIX "incb %2\n\t" \
+	    "movzwl %2, %0\n\t" \
+	    "cmpb %h0, %b0\n\t" \
+	    "setne %1" \
+	    : "=&Q" (token), "=qm" (kick), "+m" (lock->slock) \
+	    : \
+	    : "memory", "cc")
 
 static __always_inline int __ticket_spin_trylock(arch_spinlock_t *lock)
 {
@@ -114,22 +121,6 @@ static __always_inline int __ticket_spin_trylock(arch_spinlock_t *lock)
 		lock->owner = raw_smp_processor_id();
 
 	return tmp;
-}
-
-static __always_inline void __ticket_spin_unlock(arch_spinlock_t *lock)
-{
-	unsigned int token;
-	unsigned char kick;
-
-	asm(UNLOCK_LOCK_PREFIX "incb %2\n\t"
-	    "movzwl %2, %0\n\t"
-	    "cmpb %h0, %b0\n\t"
-	    "setne %1"
-	    : "=&Q" (token), "=qm" (kick), "+m" (lock->slock)
-	    :
-	    : "memory", "cc");
-	if (kick)
-		xen_spin_kick(lock, token);
 }
 #elif TICKET_SHIFT == 16
 #define __ticket_spin_lock_preamble \
@@ -162,6 +153,19 @@ static __always_inline void __ticket_spin_unlock(arch_spinlock_t *lock)
 		    : "m" (lock->slock) \
 		    : "memory", "cc"); \
 	} while (0)
+#define __ticket_spin_unlock_body \
+	do { \
+		unsigned int tmp; \
+		asm(UNLOCK_LOCK_PREFIX "incw %2\n\t" \
+		    "movl %2, %0\n\t" \
+		    "shldl $16, %0, %3\n\t" \
+		    "cmpw %w3, %w0\n\t" \
+		    "setne %1" \
+		    : "=&r" (token), "=qm" (kick), "+m" (lock->slock), \
+		      "=&r" (tmp) \
+		    : \
+		    : "memory", "cc"); \
+	} while (0)
 
 static __always_inline int __ticket_spin_trylock(arch_spinlock_t *lock)
 {
@@ -187,23 +191,6 @@ static __always_inline int __ticket_spin_trylock(arch_spinlock_t *lock)
 
 	return tmp;
 }
-
-static __always_inline void __ticket_spin_unlock(arch_spinlock_t *lock)
-{
-	unsigned int token, tmp;
-	bool kick;
-
-	asm(UNLOCK_LOCK_PREFIX "incw %2\n\t"
-	    "movl %2, %0\n\t"
-	    "shldl $16, %0, %3\n\t"
-	    "cmpw %w3, %w0\n\t"
-	    "setne %1"
-	    : "=&r" (token), "=qm" (kick), "+m" (lock->slock), "=&r" (tmp)
-	    :
-	    : "memory", "cc");
-	if (kick)
-		xen_spin_kick(lock, token);
-}
 #endif
 
 #define __ticket_spin_count(lock) \
@@ -227,16 +214,21 @@ static inline int __ticket_spin_is_contended(arch_spinlock_t *lock)
 static __always_inline void __ticket_spin_lock(arch_spinlock_t *lock)
 {
 	unsigned int token, count;
+	unsigned int flags = __raw_local_irq_save();
 	bool free;
 
 	__ticket_spin_lock_preamble;
 	if (likely(free))
-		return;
-	token = xen_spin_adjust(lock, token);
-	do {
-		count = __ticket_spin_count(lock);
-		__ticket_spin_lock_body;
-	} while (unlikely(!count) && !xen_spin_wait(lock, token));
+		raw_local_irq_restore(flags);
+	else {
+		token = xen_spin_adjust(lock, token);
+		raw_local_irq_restore(flags);
+		do {
+			count = __ticket_spin_count(lock);
+			__ticket_spin_lock_body;
+		} while (unlikely(!count)
+			 && !xen_spin_wait(lock, &token, flags));
+	}
 	lock->owner = raw_smp_processor_id();
 }
 
@@ -247,19 +239,33 @@ static __always_inline void __ticket_spin_lock_flags(arch_spinlock_t *lock,
 	bool free;
 
 	__ticket_spin_lock_preamble;
-	if (likely(free))
-		return;
-	token = xen_spin_adjust(lock, token);
-	do {
-		count = __ticket_spin_count(lock);
-		__ticket_spin_lock_body;
-	} while (unlikely(!count) && !xen_spin_wait_flags(lock, &token, flags));
+	if (unlikely(!free)) {
+		token = xen_spin_adjust(lock, token);
+		do {
+			count = __ticket_spin_count(lock);
+			__ticket_spin_lock_body;
+		} while (unlikely(!count)
+			 && !xen_spin_wait(lock, &token, flags));
+	}
 	lock->owner = raw_smp_processor_id();
 }
 
+static __always_inline void __ticket_spin_unlock(arch_spinlock_t *lock)
+{
+	unsigned int token;
+	bool kick;
+
+	__ticket_spin_unlock_body;
+	if (kick)
+		xen_spin_kick(lock, token);
+}
+
+#ifndef XEN_SPINLOCK_SOURCE
 #undef __ticket_spin_lock_preamble
 #undef __ticket_spin_lock_body
+#undef __ticket_spin_unlock_body
 #undef __ticket_spin_count
+#endif
 
 #define __arch_spin(n) __ticket_spin_##n
 

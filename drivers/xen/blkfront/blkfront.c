@@ -63,7 +63,7 @@
 #define GRANT_INVALID_REF	0
 
 static void connect(struct blkfront_info *);
-static void blkfront_closing(struct xenbus_device *);
+static void blkfront_closing(struct blkfront_info *);
 static int blkfront_remove(struct xenbus_device *);
 static int talk_to_backend(struct xenbus_device *, struct blkfront_info *);
 static int setup_blkring(struct xenbus_device *, struct blkfront_info *);
@@ -302,7 +302,7 @@ static void backend_changed(struct xenbus_device *dev,
 			xenbus_dev_error(dev, -EBUSY,
 					 "Device in use; refusing to close");
 		else
-			blkfront_closing(dev);
+			blkfront_closing(info);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,17)
 		up(&bd->bd_sem);
 #else
@@ -387,12 +387,11 @@ static void connect(struct blkfront_info *info)
  * the backend.  Once is this done, we can switch to Closed in
  * acknowledgement.
  */
-static void blkfront_closing(struct xenbus_device *dev)
+static void blkfront_closing(struct blkfront_info *info)
 {
-	struct blkfront_info *info = dev_get_drvdata(&dev->dev);
 	unsigned long flags;
 
-	DPRINTK("blkfront_closing: %s removed\n", dev->nodename);
+	DPRINTK("blkfront_closing: %d removed\n", info->vdevice);
 
 	if (info->rq == NULL)
 		goto out;
@@ -414,7 +413,8 @@ static void blkfront_closing(struct xenbus_device *dev)
 	xlvbd_del(info);
 
  out:
-	xenbus_frontend_closed(dev);
+	if (info->xbdev)
+		xenbus_frontend_closed(info->xbdev);
 }
 
 
@@ -429,7 +429,7 @@ static int blkfront_remove(struct xenbus_device *dev)
 	if(info->users == 0)
 		kfree(info);
 	else
-		info->is_ready = -1;
+		info->xbdev = NULL;
 
 	return 0;
 }
@@ -498,7 +498,7 @@ int blkif_open(struct block_device *bd, fmode_t mode)
 #endif
 	struct blkfront_info *info = bd->bd_disk->private_data;
 
-	if(info->is_ready < 0)
+	if (!info->xbdev)
 		return -ENODEV;
 	info->users++;
 	return 0;
@@ -521,13 +521,13 @@ int blkif_release(struct gendisk *disk, fmode_t mode)
 		   have ignored this request initially, as the device was
 		   still mounted. */
 		struct xenbus_device * dev = info->xbdev;
-		enum xenbus_state state = xenbus_read_driver_state(dev->otherend);
 
-		if(info->is_ready < 0) {
-			blkfront_closing(dev);
+		if (!dev) {
+			blkfront_closing(info);
 			kfree(info);
-		} else if (state == XenbusStateClosing && info->is_ready)
-			blkfront_closing(dev);
+		} else if (xenbus_read_driver_state(dev->otherend)
+			   == XenbusStateClosing && info->is_ready)
+			blkfront_closing(info);
 	}
 	return 0;
 }
@@ -920,7 +920,7 @@ int blkfront_is_ready(struct xenbus_device *dev)
 {
 	struct blkfront_info *info = dev_get_drvdata(&dev->dev);
 
-	return info->is_ready > 0;
+	return info->is_ready && info->xbdev;
 }
 
 
