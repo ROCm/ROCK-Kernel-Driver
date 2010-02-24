@@ -827,7 +827,7 @@ fail:
 	return PTR_ERR(dentry);
 }
 
- /*
+/*
  * This is a temporary kludge to deal with "automount" symlinks; proper
  * solution is to trigger them on follow_mount(), so that do_lookup()
  * would DTRT.  To be killed before 2.6.34-final.
