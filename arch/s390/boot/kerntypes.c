@@ -15,7 +15,6 @@ typedef char *COMPILE_VERSION;
 
 /* General linux types */
 
-#include <generated/autoconf.h>
 #include <generated/compile.h>
 #include <linux/utsname.h>
 #include <linux/module.h>
