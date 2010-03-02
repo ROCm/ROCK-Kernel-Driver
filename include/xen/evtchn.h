@@ -47,6 +47,8 @@
 /*
  * LOW-LEVEL DEFINITIONS
  */
+
+#ifdef CONFIG_XEN
 struct irq_cfg {
 	u32 info;
 	union {
@@ -56,6 +58,7 @@ struct irq_cfg {
 #endif
 	};
 };
+#endif
 
 /*
  * Dynamically bind an event source to an IRQ-like callback handler.

@@ -13,6 +13,7 @@
 #include <asm/hypervisor.h>
 #include <xen/xenbus.h>
 #include <linux/cpu.h>
+#include <xen/clock.h>
 #include <xen/gnttab.h>
 #include <xen/xencons.h>
 #include <xen/cpu_hotplug.h>
@@ -176,10 +177,12 @@ static int take_machine_down(void *_suspend)
 	} else
 		BUG_ON(suspend_cancelled > 0);
 	suspend->resume_notifier(suspend_cancelled);
-	if (suspend_cancelled >= 0) {
+	if (suspend_cancelled >= 0)
 		post_suspend(suspend_cancelled, suspend->fast_suspend);
+	if (!suspend_cancelled)
+		xen_clockevents_resume();
+	if (suspend_cancelled >= 0)
 		sysdev_resume();
-	}
 	if (!suspend_cancelled) {
 #ifdef __x86_64__
 		/*

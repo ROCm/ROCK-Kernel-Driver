@@ -78,7 +78,6 @@ config CLOCKSOURCE_WATCHDOG
 
 config GENERIC_CLOCKEVENTS
 	def_bool y
-	depends on !XEN
 
 config GENERIC_CLOCKEVENTS_BROADCAST
 	def_bool y

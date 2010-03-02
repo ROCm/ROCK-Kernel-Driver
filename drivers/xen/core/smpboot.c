@@ -19,6 +19,7 @@
 #include <linux/percpu.h>
 #include <asm/desc.h>
 #include <asm/pgalloc.h>
+#include <xen/clock.h>
 #include <xen/evtchn.h>
 #include <xen/interface/vcpu.h>
 #include <xen/cpu_hotplug.h>
@@ -198,6 +199,7 @@ static void __cpuinit cpu_bringup(void)
 	identify_secondary_cpu(&current_cpu_data);
 	touch_softlockup_watchdog();
 	preempt_disable();
+	xen_setup_cpu_clockevents();
 	local_irq_enable();
 }
 

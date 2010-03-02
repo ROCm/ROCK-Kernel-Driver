@@ -352,7 +352,6 @@ _blktap_sysfs_destroy(struct device *dev)
 	device_remove_file(dev, &dev_attr_resume);
 	device_remove_file(dev, &dev_attr_debug);
 
-	put_device(dev);
 	device_unregister(dev);
 
 	clear_bit(BLKTAP_SYSFS, &tap->dev_inuse);

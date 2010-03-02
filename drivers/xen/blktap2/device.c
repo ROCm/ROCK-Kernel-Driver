@@ -950,8 +950,6 @@ blktap_device_restart(struct blktap *tap)
 	struct blktap_device *dev;
 
 	dev = &tap->device;
-	if (!dev->gd || !dev->gd->queue)
-		return;
 
 	if (blktap_active(tap) && RING_FULL(&tap->ring.ring)) {
 		blktap_defer(tap);
@@ -967,11 +965,15 @@ blktap_device_restart(struct blktap *tap)
 	spin_lock_irq(&dev->lock);
 
 	/* Re-enable calldowns. */
-	if (blk_queue_stopped(dev->gd->queue))
-		blk_start_queue(dev->gd->queue);
+	if (dev->gd) {
+		struct request_queue *rq = dev->gd->queue;
 
-	/* Kick things off immediately. */
-	blktap_device_do_request(dev->gd->queue);
+		if (blk_queue_stopped(rq))
+			blk_start_queue(rq);
+
+		/* Kick things off immediately. */
+		blktap_device_do_request(rq);
+	}
 
 	spin_unlock_irq(&dev->lock);
 }
@@ -1060,6 +1062,7 @@ int
 blktap_device_destroy(struct blktap *tap)
 {
 	struct blktap_device *dev = &tap->device;
+	struct gendisk *gd = dev->gd;
 
 	if (!test_bit(BLKTAP_DEVICE, &tap->dev_inuse))
 		return 0;
@@ -1071,8 +1074,9 @@ blktap_device_destroy(struct blktap *tap)
 
 	spin_lock_irq(&dev->lock);
 	/* No more blktap_device_do_request(). */
-	blk_stop_queue(dev->gd->queue);
+	blk_stop_queue(gd->queue);
 	clear_bit(BLKTAP_DEVICE, &tap->dev_inuse);
+	dev->gd = NULL;
 	spin_unlock_irq(&dev->lock);
 
 #ifdef ENABLE_PASSTHROUGH
@@ -1080,11 +1084,9 @@ blktap_device_destroy(struct blktap *tap)
 		blktap_device_close_bdev(tap);
 #endif
 
-	del_gendisk(dev->gd);
-	put_disk(dev->gd);
-	blk_cleanup_queue(dev->gd->queue);
-
-	dev->gd = NULL;
+	del_gendisk(gd);
+	blk_cleanup_queue(gd->queue);
+	put_disk(gd);
 
 	wake_up(&tap->wq);
 

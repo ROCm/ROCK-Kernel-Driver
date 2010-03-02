@@ -290,8 +290,10 @@ static void backend_changed(struct xenbus_device *dev,
 			break;
 		}
 		bd = bdget_disk(info->gd, 0);
-		if (bd == NULL)
+		if (bd == NULL) {
 			xenbus_dev_fatal(dev, -ENODEV, "bdget failed");
+			break;
+		}
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,17)
 		down(&bd->bd_sem);

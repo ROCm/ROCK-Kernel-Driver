@@ -385,9 +385,6 @@ config HAVE_IRQ_IGNORE_UNHANDLED
 config IRQ_PER_CPU
 	bool
 
-config NO_IDLE_HZ
-	def_bool y
-
 config XEN_SMPBOOT
 	def_bool y
 	depends on SMP && !PPC_XEN

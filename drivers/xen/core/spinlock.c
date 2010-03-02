@@ -10,6 +10,7 @@
 #include <linux/kernel.h>
 #include <linux/kernel_stat.h>
 #include <linux/module.h>
+#include <xen/clock.h>
 #include <xen/evtchn.h>
 
 #ifdef TICKET_SHIFT
@@ -189,6 +190,7 @@ bool xen_spin_wait(arch_spinlock_t *lock, unsigned int *ptok,
 	other = spinning.prev;
 	percpu_write(spinning, other);
 	rm_lock = &__get_cpu_var(spinning_rm_lock);
+	raw_local_irq_disable();
 	arch_write_lock(rm_lock);
 	arch_write_unlock(rm_lock);
 	*ptok = lock->cur | (spinning.ticket << TICKET_SHIFT);
@@ -203,7 +205,6 @@ bool xen_spin_wait(arch_spinlock_t *lock, unsigned int *ptok,
 			bool free;
 
 			lock = other->lock;
-			raw_local_irq_disable();
 			__ticket_spin_lock_preamble;
 			if (!free)
 				token = spin_adjust(other->prev, lock, token);
