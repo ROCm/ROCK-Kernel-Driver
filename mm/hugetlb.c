@@ -18,7 +18,6 @@
 #include <linux/mutex.h>
 #include <linux/bootmem.h>
 #include <linux/sysfs.h>
-#include <trace/hugetlb.h>
 
 #include <asm/page.h>
 #include <asm/pgtable.h>
@@ -50,14 +49,6 @@ static unsigned long __initdata default_hstate_size;
  * Protects updates to hugepage_freelists, nr_huge_pages, and free_huge_pages
  */
 static DEFINE_SPINLOCK(hugetlb_lock);
-
-DEFINE_TRACE(hugetlb_page_release);
-DEFINE_TRACE(hugetlb_page_grab);
-DEFINE_TRACE(hugetlb_buddy_pgalloc);
-DEFINE_TRACE(hugetlb_page_alloc);
-DEFINE_TRACE(hugetlb_page_free);
-DEFINE_TRACE(hugetlb_pages_reserve);
-DEFINE_TRACE(hugetlb_pages_unreserve);
 
 /*
  * Region tracking -- allows tracking of reservations and instantiated pages
@@ -519,7 +510,6 @@ static void update_and_free_page(struct hstate *h, struct page *page)
 
 	VM_BUG_ON(h->order >= MAX_ORDER);
 
-	trace_hugetlb_page_release(page);
 	h->nr_huge_pages--;
 	h->nr_huge_pages_node[page_to_nid(page)]--;
 	for (i = 0; i < pages_per_huge_page(h); i++) {
@@ -554,7 +544,6 @@ static void free_huge_page(struct page *page)
 	int nid = page_to_nid(page);
 	struct address_space *mapping;
 
-	trace_hugetlb_page_free(page);
 	mapping = (struct address_space *) page_private(page);
 	set_page_private(page, 0);
 	BUG_ON(page_count(page));
@@ -615,10 +604,8 @@ static struct page *alloc_fresh_huge_page_node(struct hstate *h, int nid)
 {
 	struct page *page;
 
-	if (h->order >= MAX_ORDER) {
-		page = NULL;
-		goto end;
-	}
+	if (h->order >= MAX_ORDER)
+		return NULL;
 
 	page = alloc_pages_exact_node(nid,
 		htlb_alloc_mask|__GFP_COMP|__GFP_THISNODE|
@@ -627,13 +614,11 @@ static struct page *alloc_fresh_huge_page_node(struct hstate *h, int nid)
 	if (page) {
 		if (arch_prepare_hugepage(page)) {
 			__free_pages(page, huge_page_order(h));
-			page = NULL;
-			goto end;
+			return NULL;
 		}
 		prep_new_huge_page(h, page, nid);
 	}
-end:
-	trace_hugetlb_page_grab(page);
+
 	return page;
 }
 
@@ -803,8 +788,7 @@ static struct page *alloc_buddy_huge_page(struct hstate *h,
 	spin_lock(&hugetlb_lock);
 	if (h->surplus_huge_pages >= h->nr_overcommit_huge_pages) {
 		spin_unlock(&hugetlb_lock);
-		page = NULL;
-		goto end;
+		return NULL;
 	} else {
 		h->nr_huge_pages++;
 		h->surplus_huge_pages++;
@@ -842,8 +826,7 @@ static struct page *alloc_buddy_huge_page(struct hstate *h,
 		__count_vm_event(HTLB_BUDDY_PGALLOC_FAIL);
 	}
 	spin_unlock(&hugetlb_lock);
-end:
-	trace_hugetlb_buddy_pgalloc(page);
+
 	return page;
 }
 
@@ -1064,7 +1047,6 @@ static struct page *alloc_huge_page(struct vm_area_struct *vma,
 
 	vma_commit_reservation(h, vma, addr);
 
-	trace_hugetlb_page_alloc(page);
 	return page;
 }
 
@@ -2743,8 +2725,7 @@ int hugetlb_reserve_pages(struct inode *inode,
 					struct vm_area_struct *vma,
 					int acctflag)
 {
-	int ret = 0;
-	long chg;
+	long ret, chg;
 	struct hstate *h = hstate_inode(inode);
 
 	/*
@@ -2753,7 +2734,7 @@ int hugetlb_reserve_pages(struct inode *inode,
 	 * and filesystem quota without using reserves
 	 */
 	if (acctflag & VM_NORESERVE)
-		goto end;
+		return 0;
 
 	/*
 	 * Shared mappings base their reservation on the number of pages that
@@ -2765,10 +2746,8 @@ int hugetlb_reserve_pages(struct inode *inode,
 		chg = region_chg(&inode->i_mapping->private_list, from, to);
 	else {
 		struct resv_map *resv_map = resv_map_alloc();
-		if (!resv_map) {
-			ret = -ENOMEM;
-			goto end;
-		}
+		if (!resv_map)
+			return -ENOMEM;
 
 		chg = to - from;
 
@@ -2776,16 +2755,12 @@ int hugetlb_reserve_pages(struct inode *inode,
 		set_vma_resv_flags(vma, HPAGE_RESV_OWNER);
 	}
 
-	if (chg < 0) {
-		ret = chg;
-		goto end;
-	}
+	if (chg < 0)
+		return chg;
 
 	/* There must be enough filesystem quota for the mapping */
-	if (hugetlb_get_quota(inode->i_mapping, chg)) {
-		ret = -ENOSPC;
-		goto end;
-	}
+	if (hugetlb_get_quota(inode->i_mapping, chg))
+		return -ENOSPC;
 
 	/*
 	 * Check enough hugepages are available for the reservation.
@@ -2794,7 +2769,7 @@ int hugetlb_reserve_pages(struct inode *inode,
 	ret = hugetlb_acct_memory(h, chg);
 	if (ret < 0) {
 		hugetlb_put_quota(inode->i_mapping, chg);
-		goto end;
+		return ret;
 	}
 
 	/*
@@ -2810,18 +2785,14 @@ int hugetlb_reserve_pages(struct inode *inode,
 	 */
 	if (!vma || vma->vm_flags & VM_MAYSHARE)
 		region_add(&inode->i_mapping->private_list, from, to);
-end:
-	trace_hugetlb_pages_reserve(inode, from, to, ret);
-	return ret;
+	return 0;
 }
 
 void hugetlb_unreserve_pages(struct inode *inode, long offset, long freed)
 {
 	struct hstate *h = hstate_inode(inode);
-	long chg;
+	long chg = region_truncate(&inode->i_mapping->private_list, offset);
 
-	trace_hugetlb_pages_unreserve(inode, offset, freed);
-	chg = region_truncate(&inode->i_mapping->private_list, offset);
 	spin_lock(&inode->i_lock);
 	inode->i_blocks -= (blocks_per_huge_page(h) * freed);
 	spin_unlock(&inode->i_lock);

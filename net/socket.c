@@ -96,7 +96,6 @@
 
 #include <net/sock.h>
 #include <linux/netfilter.h>
-#include <trace/socket.h>
 
 #include <linux/if_tun.h>
 #include <linux/ipv6_route.h>
@@ -162,11 +161,6 @@ static const struct net_proto_family *net_families[NPROTO] __read_mostly;
  */
 
 static DEFINE_PER_CPU(int, sockets_in_use) = 0;
-
-DEFINE_TRACE(socket_sendmsg);
-DEFINE_TRACE(socket_recvmsg);
-DEFINE_TRACE(socket_create);
-DEFINE_TRACE(socket_call);
 
 /*
  * Support routines.
@@ -570,7 +564,6 @@ int sock_sendmsg(struct socket *sock, struct msghdr *msg, size_t size)
 	ret = __sock_sendmsg(&iocb, sock, msg, size);
 	if (-EIOCBQUEUED == ret)
 		ret = wait_on_sync_kiocb(&iocb);
-	trace_socket_sendmsg(sock, msg, size, ret);
 	return ret;
 }
 
@@ -700,12 +693,10 @@ int sock_recvmsg(struct socket *sock, struct msghdr *msg,
 	int ret;
 
 	init_sync_kiocb(&iocb, NULL);
-
 	iocb.private = &siocb;
 	ret = __sock_recvmsg(&iocb, sock, msg, size, flags);
 	if (-EIOCBQUEUED == ret)
 		ret = wait_on_sync_kiocb(&iocb);
-	trace_socket_recvmsg(sock, msg, size, flags, ret);
 	return ret;
 }
 
@@ -1327,7 +1318,6 @@ SYSCALL_DEFINE3(socket, int, family, int, type, int, protocol)
 	if (retval < 0)
 		goto out_release;
 
-	trace_socket_create(sock, retval);
 out:
 	/* It may be already another descriptor 8) Not kernel problem. */
 	return retval;
@@ -2254,8 +2244,6 @@ SYSCALL_DEFINE2(socketcall, int, call, unsigned long __user *, args)
 
 	a0 = a[0];
 	a1 = a[1];
-
-	trace_socket_call(call, a0);
 
 	switch (call) {
 	case SYS_SOCKET:

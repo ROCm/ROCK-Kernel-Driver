@@ -24,7 +24,6 @@
 #include <linux/ftrace.h>
 #include <linux/smp.h>
 #include <linux/tick.h>
-#include <trace/irq.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/irq.h>

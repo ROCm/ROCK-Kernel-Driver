@@ -56,7 +56,6 @@
 #include <linux/kallsyms.h>
 #include <linux/swapops.h>
 #include <linux/elf.h>
-#include <trace/swap.h>
 
 #include <asm/io.h>
 #include <asm/pgalloc.h>
@@ -66,8 +65,6 @@
 #include <asm/pgtable.h>
 
 #include "internal.h"
-
-DEFINE_TRACE(swap_in);
 
 #ifndef CONFIG_NEED_MULTIPLE_NODES
 /* use the per-pgdat data instead for discontigmem - mbligh */
@@ -2686,7 +2683,6 @@ static int do_swap_page(struct mm_struct *mm, struct vm_area_struct *vma,
 		/* Had to read the page from swap area: Major fault */
 		ret = VM_FAULT_MAJOR;
 		count_vm_event(PGMAJFAULT);
-		trace_swap_in(page, entry);
 	} else if (PageHWPoison(page)) {
 		/*
 		 * hwpoisoned dirty swapcache pages are kept for killing
