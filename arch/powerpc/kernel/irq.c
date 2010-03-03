@@ -54,7 +54,6 @@
 #include <linux/pci.h>
 #include <linux/debugfs.h>
 #include <linux/perf_event.h>
-#include <linux/ftrace.h>
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
@@ -338,12 +337,12 @@ static inline void check_stack_overflow(void)
 #endif
 }
 
-void __irq_entry do_IRQ(struct pt_regs *regs)
+void do_IRQ(struct pt_regs *regs)
 {
 	struct pt_regs *old_regs = set_irq_regs(regs);
 	unsigned int irq;
 
-	trace_powerpc_irq_entry(regs);
+	trace_irq_entry(regs);
 
 	irq_enter();
 
@@ -369,7 +368,7 @@ void __irq_entry do_IRQ(struct pt_regs *regs)
 	}
 #endif
 
-	trace_powerpc_irq_exit(regs);
+	trace_irq_exit(regs);
 }
 
 void __init init_IRQ(void)

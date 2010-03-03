@@ -5,11 +5,10 @@
 #define _TRACE_POWERPC_H
 
 #include <linux/tracepoint.h>
-#include <trace/irq.h>
 
 struct pt_regs;
 
-TRACE_EVENT(powerpc_irq_entry,
+TRACE_EVENT(irq_entry,
 
 	TP_PROTO(struct pt_regs *regs),
 
@@ -26,7 +25,7 @@ TRACE_EVENT(powerpc_irq_entry,
 	TP_printk("pt_regs=%p", __entry->regs)
 );
 
-TRACE_EVENT(powerpc_irq_exit,
+TRACE_EVENT(irq_exit,
 
 	TP_PROTO(struct pt_regs *regs),
 
