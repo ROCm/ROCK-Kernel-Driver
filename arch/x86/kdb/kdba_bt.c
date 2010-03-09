@@ -721,7 +721,7 @@ static const char *bb_spurious[] = {
 				/* relocate_kernel */
 	"relocate_new_kernel",
 #endif	/* CONFIG_KEXEC */
-#ifdef	CONFIG_PARAVIRT_XEN
+#ifdef	CONFIG_XEN
 				/* arch/i386/xen/xen-asm.S */
 	"xen_irq_enable_direct_end",
 	"xen_irq_disable_direct_end",
@@ -3243,9 +3243,6 @@ bb_usage_mov(const struct bb_operand *src, const struct bb_operand *dst, int l)
 	    bb_is_int_reg(dst->base_rc) &&
 	    full_register_dst) {
 #ifdef	CONFIG_X86_32
-#ifndef TSS_sysenter_sp0
-#define TSS_sysenter_sp0 SYSENTER_stack_sp0
-#endif
 		/* mov from TSS_sysenter_sp0+offset to esp to fix up the
 		 * sysenter stack, it leaves esp well defined.  mov
 		 * TSS_ysenter_sp0+offset(%esp),%esp is followed by up to 5
@@ -4873,7 +4870,7 @@ kdb_bb_all(int argc, const char **argv)
 #ifdef	CONFIG_MATH_EMULATION
 		   " CONFIG_MATH_EMULATION"
 #endif
-#ifdef	CONFIG_PARAVIRT_XEN
+#ifdef	CONFIG_XEN
 		   " CONFIG_XEN"
 #endif
 #ifdef	CONFIG_DEBUG_INFO

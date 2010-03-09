@@ -7,6 +7,8 @@
 #include <linux/string.h>
 #include <linux/pci.h>
 #include <linux/dmi.h>
+#include <linux/range.h>
+
 #include <asm/pci-direct.h>
 #include <linux/sort.h>
 #include <asm/io.h>
@@ -28,11 +30,6 @@ static int __cpuinitdata fam10h_pci_mmconf_base_status;
 static struct pci_hostbridge_probe pci_probes[] __cpuinitdata = {
 	{ 0, 0x18, PCI_VENDOR_ID_AMD, 0x1200 },
 	{ 0xff, 0, PCI_VENDOR_ID_AMD, 0x1200 },
-};
-
-struct range {
-	u64 start;
-	u64 end;
 };
 
 static int __cpuinit cmp_range(const void *x1, const void *x2)
@@ -218,16 +215,6 @@ void __cpuinit fam10h_check_enable_mmcfg(void)
 	val |= fam10h_pci_mmconf_base | (8 << FAM10H_MMIO_CONF_BUSRANGE_SHIFT) |
 	       FAM10H_MMIO_CONF_ENABLE;
 	wrmsrl(address, val);
-
-#ifdef CONFIG_XEN
-	{
-		u64 val2;
-
-		rdmsrl(address, val2);
-		if (val2 != val)
-			pci_probe &= ~PCI_CHECK_ENABLE_AMD_MMCONF;
-	}
-#endif
 }
 
 static int __devinit set_check_enable_amd_mmconf(const struct dmi_system_id *d)

@@ -873,15 +873,6 @@ static const struct bin_table bin_bus_table[] = {
 };
 
 
-#ifdef CONFIG_XEN
-#include <xen/sysctl.h>
-static const struct bin_table bin_xen_table[] = {
-	{ CTL_INT,	CTL_XEN_INDEPENDENT_WALLCLOCK,	"independent_wallclock" },
-	{ CTL_ULONG,	CTL_XEN_PERMITTED_CLOCK_JITTER,	"permitted_clock_jitter" },
-	{}
-};
-#endif
-
 static const struct bin_table bin_s390dbf_table[] = {
 	{ CTL_INT,	5678 /* CTL_S390DBF_STOPPABLE */, "debug_stoppable" },
 	{ CTL_INT,	5679 /* CTL_S390DBF_ACTIVE */,	  "debug_active" },
@@ -921,9 +912,6 @@ static const struct bin_table bin_root_table[] = {
 	{ CTL_DIR,	CTL_BUS,	"bus",		bin_bus_table },
 	{ CTL_DIR,	CTL_ABI,	"abi" },
 	/* CTL_CPU not used */
-#ifdef CONFIG_XEN
-	{ CTL_DIR,	CTL_XEN,	"xen",		bin_xen_table },
-#endif
 	/* CTL_ARLAN "arlan" no longer used */
 	{ CTL_DIR,	CTL_S390DBF,	"s390dbf",	bin_s390dbf_table },
 	{ CTL_DIR,	CTL_SUNRPC,	"sunrpc",	bin_sunrpc_table },
@@ -1344,7 +1332,7 @@ static ssize_t binary_sysctl(const int *name, int nlen,
 	ssize_t result;
 	char *pathname;
 	int flags;
-	int acc_mode, fmode;
+	int acc_mode;
 
 	pathname = sysctl_getname(name, nlen, &table);
 	result = PTR_ERR(pathname);
@@ -1355,15 +1343,12 @@ static ssize_t binary_sysctl(const int *name, int nlen,
 	if (oldval && oldlen && newval && newlen) {
 		flags = O_RDWR;
 		acc_mode = MAY_READ | MAY_WRITE;
-		fmode = FMODE_READ | FMODE_WRITE;
 	} else if (newval && newlen) {
 		flags = O_WRONLY;
 		acc_mode = MAY_WRITE;
-		fmode = FMODE_WRITE;
 	} else if (oldval && oldlen) {
 		flags = O_RDONLY;
 		acc_mode = MAY_READ;
-		fmode = FMODE_READ;
 	} else {
 		result = 0;
 		goto out_putname;
@@ -1374,7 +1359,7 @@ static ssize_t binary_sysctl(const int *name, int nlen,
 	if (result)
 		goto out_putname;
 
-	result = may_open(&nd.path, acc_mode, fmode);
+	result = may_open(&nd.path, acc_mode, flags);
 	if (result)
 		goto out_putpath;
 

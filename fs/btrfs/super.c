@@ -38,7 +38,6 @@
 #include <linux/namei.h>
 #include <linux/miscdevice.h>
 #include <linux/magic.h>
-#include <linux/precache.h>
 #include "compat.h"
 #include "ctree.h"
 #include "disk-io.h"
@@ -402,7 +401,6 @@ static int btrfs_fill_super(struct super_block *sb,
 	sb->s_root = root_dentry;
 
 	save_mount_options(sb, data);
-	precache_init(sb);
 	return 0;
 
 fail_close:

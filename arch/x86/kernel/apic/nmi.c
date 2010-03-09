@@ -27,11 +27,7 @@
 #include <linux/kdebug.h>
 #include <linux/smp.h>
 
-#ifdef ARCH_HAS_NMI_WATCHDOG
 #include <asm/i8259.h>
-#else
-#include <asm/nmi.h>
-#endif
 #include <asm/io_apic.h>
 #include <asm/proto.h>
 #include <asm/timer.h>
@@ -41,9 +37,6 @@
 #include <asm/mach_traps.h>
 
 int unknown_nmi_panic;
-
-#ifdef ARCH_HAS_NMI_WATCHDOG
-
 int nmi_watchdog_enabled;
 
 /* For reliability, we're prepared to waste bits here. */
@@ -184,7 +177,7 @@ int __init check_nmi_watchdog(void)
 error:
 	if (nmi_watchdog == NMI_IO_APIC) {
 		if (!timer_through_8259)
-			disable_8259A_irq(0);
+			legacy_pic->chip->mask(0);
 		on_each_cpu(__acpi_nmi_disable, NULL, 1);
 	}
 
@@ -423,13 +416,13 @@ nmi_watchdog_tick(struct pt_regs *regs, unsigned reason)
 
 	/* We can be called before check_nmi_watchdog, hence NULL check. */
 	if (cpumask_test_cpu(cpu, to_cpumask(backtrace_mask))) {
-		static DEFINE_SPINLOCK(lock);	/* Serialise the printks */
+		static DEFINE_RAW_SPINLOCK(lock); /* Serialise the printks */
 
-		spin_lock(&lock);
+		raw_spin_lock(&lock);
 		printk(KERN_WARNING "NMI backtrace for cpu %d\n", cpu);
 		show_regs(regs);
 		dump_stack();
-		spin_unlock(&lock);
+		raw_spin_unlock(&lock);
 		cpumask_clear_cpu(cpu, to_cpumask(backtrace_mask));
 
 		rc = 1;
@@ -445,8 +438,8 @@ nmi_watchdog_tick(struct pt_regs *regs, unsigned reason)
 		 * Ayiee, looks like this CPU is stuck ...
 		 * wait a few IRQs (5 seconds) before doing the oops ...
 		 */
-		__this_cpu_inc(per_cpu_var(alert_counter));
-		if (__this_cpu_read(per_cpu_var(alert_counter)) == 5 * nmi_hz)
+		__this_cpu_inc(alert_counter);
+		if (__this_cpu_read(alert_counter) == 5 * nmi_hz)
 			/*
 			 * die_nmi will return ONLY if NOTIFY_STOP happens..
 			 */
@@ -454,7 +447,7 @@ nmi_watchdog_tick(struct pt_regs *regs, unsigned reason)
 				regs, panic_on_timeout);
 	} else {
 		__get_cpu_var(last_irq_sum) = sum;
-		__this_cpu_write(per_cpu_var(alert_counter), 0);
+		__this_cpu_write(alert_counter, 0);
 	}
 
 	/* see if the nmi watchdog went off */
@@ -476,11 +469,8 @@ nmi_watchdog_tick(struct pt_regs *regs, unsigned reason)
 	return rc;
 }
 
-#endif /* ARCH_HAS_NMI_WATCHDOG */
-
 #ifdef CONFIG_SYSCTL
 
-#ifdef ARCH_HAS_NMI_WATCHDOG
 static void enable_ioapic_nmi_watchdog_single(void *unused)
 {
 	__get_cpu_var(wd_enabled) = 1;
@@ -498,7 +488,6 @@ static void disable_ioapic_nmi_watchdog(void)
 {
 	on_each_cpu(stop_apic_nmi_watchdog, NULL, 1);
 }
-#endif
 
 static int __init setup_unknown_nmi_panic(char *str)
 {
@@ -517,7 +506,6 @@ static int unknown_nmi_panic_callback(struct pt_regs *regs, int cpu)
 	return 0;
 }
 
-#ifdef ARCH_HAS_NMI_WATCHDOG
 /*
  * proc handler for /proc/sys/kernel/nmi
  */
@@ -555,7 +543,6 @@ int proc_nmi_enabled(struct ctl_table *table, int write,
 	}
 	return 0;
 }
-#endif
 
 #endif /* CONFIG_SYSCTL */
 
@@ -568,7 +555,6 @@ int do_nmi_callback(struct pt_regs *regs, int cpu)
 	return 0;
 }
 
-#ifdef ARCH_HAS_NMI_WATCHDOG
 void arch_trigger_all_cpu_backtrace(void)
 {
 	int i;
@@ -585,4 +571,3 @@ void arch_trigger_all_cpu_backtrace(void)
 		mdelay(1);
 	}
 }
-#endif

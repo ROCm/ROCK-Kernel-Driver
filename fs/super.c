@@ -37,7 +37,6 @@
 #include <linux/kobject.h>
 #include <linux/mutex.h>
 #include <linux/file.h>
-#include <linux/precache.h>
 #include <asm/uaccess.h>
 #include "internal.h"
 
@@ -105,9 +104,6 @@ static struct super_block *alloc_super(struct file_system_type *type)
 		s->s_qcop = sb_quotactl_ops;
 		s->s_op = &default_op;
 		s->s_time_gran = 1000000000;
-#ifdef CONFIG_PRECACHE
-		s->precache_poolid = -1;
-#endif
 	}
 out:
 	return s;
@@ -198,7 +194,6 @@ void deactivate_super(struct super_block *s)
 		vfs_dq_off(s, 0);
 		down_write(&s->s_umount);
 		fs->kill_sb(s);
-		precache_flush_filesystem(s);
 		put_filesystem(fs);
 		put_super(s);
 	}
@@ -225,7 +220,6 @@ void deactivate_locked_super(struct super_block *s)
 		spin_unlock(&sb_lock);
 		vfs_dq_off(s, 0);
 		fs->kill_sb(s);
-		precache_flush_filesystem(s);
 		put_filesystem(fs);
 		put_super(s);
 	} else {
@@ -568,7 +562,7 @@ out:
 static int __do_remount_sb(struct super_block *sb, int flags, void *data, int rflags)
 {
 	int retval;
-	int remount_rw;
+	int remount_rw, remount_ro;
 
 	if (sb->s_frozen != SB_UNFROZEN)
 		return -EBUSY;
@@ -584,9 +578,12 @@ static int __do_remount_sb(struct super_block *sb, int flags, void *data, int rf
 		shrink_dcache_sb(sb);
 	sync_filesystem(sb);
 
+	remount_ro = (flags & MS_RDONLY) && !(sb->s_flags & MS_RDONLY);
+	remount_rw = !(flags & MS_RDONLY) && (sb->s_flags & MS_RDONLY);
+
 	/* If we are remounting RDONLY and current sb is read/write,
 	   make sure there are no rw files opened */
-	if ((flags & MS_RDONLY) && !(sb->s_flags & MS_RDONLY)) {
+	if (remount_ro) {
 		if (rflags & REMOUNT_FORCE)
 			mark_files_ro(sb);
 		else if (!fs_may_remount_ro(sb))
@@ -595,7 +592,6 @@ static int __do_remount_sb(struct super_block *sb, int flags, void *data, int rf
 		if (retval < 0 && retval != -ENOSYS)
 			return -EBUSY;
 	}
-	remount_rw = !(flags & MS_RDONLY) && (sb->s_flags & MS_RDONLY);
 
 	if (sb->s_op->remount_fs) {
 		retval = sb->s_op->remount_fs(sb, &flags, data);
@@ -605,6 +601,16 @@ static int __do_remount_sb(struct super_block *sb, int flags, void *data, int rf
 	sb->s_flags = (sb->s_flags & ~MS_RMT_MASK) | (flags & MS_RMT_MASK);
 	if (remount_rw)
 		vfs_dq_quota_on_remount(sb);
+	/*
+	 * Some filesystems modify their metadata via some other path than the
+	 * bdev buffer cache (eg. use a private mapping, or directories in
+	 * pagecache, etc). Also file data modifications go via their own
+	 * mappings. So If we try to mount readonly then copy the filesystem
+	 * from bdev, we could get stale data, so invalidate it to give a best
+	 * effort at coherency.
+	 */
+	if (remount_ro && sb->s_bdev)
+		invalidate_bdev(sb->s_bdev);
 	return 0;
 }
 
@@ -940,6 +946,9 @@ vfs_kern_mount(struct file_system_type *type, int flags, const char *name, void 
 	mnt = alloc_vfsmnt(name);
 	if (!mnt)
 		goto out;
+
+	if (flags & MS_KERNMOUNT)
+		mnt->mnt_flags = MNT_INTERNAL;
 
 	if (data && !(type->fs_flags & FS_BINARY_MOUNTDATA)) {
 		secdata = alloc_secdata();

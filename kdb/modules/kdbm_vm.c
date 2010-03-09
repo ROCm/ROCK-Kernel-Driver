@@ -90,8 +90,8 @@ kdbm_print_vm(struct vm_area_struct *vp, unsigned long addr, int verbose_flg)
 	kdb_printf("shared.vm_set.list.prev = 0x%p\n", (void *) vp->shared.vm_set.list.prev);
 	kdb_printf("shared.vm_set.parent = 0x%p\n", (void *) vp->shared.vm_set.parent);
 	kdb_printf("shared.vm_set.head = 0x%p\n", (void *) vp->shared.vm_set.head);
-	kdb_printf("anon_vma_node.next = 0x%p\n", (void *) vp->anon_vma_node.next);
-	kdb_printf("anon_vma_node.prev = 0x%p\n", (void *) vp->anon_vma_node.prev);
+	kdb_printf("anon_vma_chain.next = 0x%p\n", (void *) vp->anon_vma_chain.next);
+	kdb_printf("anon_vma_chain.prev = 0x%p\n", (void *) vp->anon_vma_chain.prev);
 	kdb_printf("vm_ops = 0x%p\n", (void *) vp->vm_ops);
 	if (vp->vm_ops != NULL) {
 		kdb_printf("vm_ops->open = 0x%p\n", vp->vm_ops->open);
@@ -303,7 +303,9 @@ kdbm_pgdat(int argc, const char **argv)
 #ifdef CONFIG_FLAT_NODE_MEM_MAP
 	kdb_printf("  node_mem_map = 0x%p\n", pgdatp->node_mem_map);
 #endif
+#ifndef CONFIG_NO_BOOTMEM
 	kdb_printf("  bdata = 0x%p", pgdatp->bdata);
+#endif
 	kdb_printf("  node_start_pfn = 0x%lx\n", pgdatp->node_start_pfn);
 	kdb_printf("  node_present_pages = %ld (0x%lx)\n",
 		   pgdatp->node_present_pages, pgdatp->node_present_pages);
@@ -752,7 +754,7 @@ kdbm_filp(int argc, const char **argv)
 			f.f_dentry, f.f_vfsmnt, f.f_op);
 
 	kdb_printf(" f_count = %ld f_flags = 0x%x f_mode = 0x%x\n",
-			f.f_count, f.f_flags, f.f_mode);
+			atomic_long_read(&f.f_count), f.f_flags, f.f_mode);
 
 	kdb_printf(" f_pos = %Ld\n", f.f_pos);
 #ifdef	CONFIG_SECURITY

@@ -58,6 +58,7 @@ struct ocfs2_alloc_context {
 	struct ocfs2_alloc_reservation	*ac_resv;
 };
 
+void ocfs2_init_steal_slots(struct ocfs2_super *osb);
 void ocfs2_free_alloc_context(struct ocfs2_alloc_context *ac);
 static inline int ocfs2_alloc_context_bits_left(struct ocfs2_alloc_context *ac)
 {
