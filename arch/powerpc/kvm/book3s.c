@@ -1104,6 +1104,12 @@ int __kvmppc_vcpu_run(struct kvm_run *kvm_run, struct kvm_vcpu *vcpu)
 	bool save_vsx = current->thread.used_vsr;
 	ulong ext_msr;
 
+#ifdef CONFIG_ALTIVEC
+	/* JDM This is functionally unnecessary but works around an
+	 * over-eager unintialized usage checker in gcc 4.5 */
+	ext_bkp.vrsave = current->thread.vrsave;
+#endif
+
 	/* No need to go into the guest when all we do is going out */
 	if (signal_pending(current)) {
 		kvm_run->exit_reason = KVM_EXIT_INTR;
