@@ -711,7 +711,7 @@ static int __devinit mpc52xx_gpt_wdt_init(void)
 	return 0;
 }
 
-#define mpc52xx_gpt_wdt_setup(x, y)		(0)
+#define mpc52xx_gpt_wdt_setup(x, y)		do { } while(0)
 
 #endif	/*  CONFIG_MPC5200_WDT	*/
 
