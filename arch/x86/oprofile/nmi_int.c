@@ -381,7 +381,7 @@ static void nmi_is_counter_enabled(struct op_msrs * const msrs)
 		if ((vendor == X86_VENDOR_INTEL) && (family == 0xf)) {
 			if (val & P4_CCCR_ENABLE)
 				goto err_rsvd;
-		} else if (val & ARCH_PERFMON_EVENTSEL0_ENABLE) {
+		} else if (val & ARCH_PERFMON_EVENTSEL_ENABLE) {
 			goto err_rsvd;
 		}
 	}

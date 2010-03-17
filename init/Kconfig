@@ -504,6 +504,7 @@ config HAVE_UNSTABLE_SCHED_CLOCK
 
 menuconfig CGROUPS
 	boolean "Control Group support"
+	depends on EVENTFD
 	default n if KERNEL_DESKTOP
 	default y
 	help
