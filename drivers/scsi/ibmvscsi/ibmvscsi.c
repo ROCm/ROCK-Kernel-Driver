@@ -71,6 +71,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/delay.h>
 #include <linux/of.h>
+#include <linux/pm.h>
 #include <asm/firmware.h>
 #include <asm/vio.h>
 #include <scsi/scsi.h>
@@ -1996,6 +1997,19 @@ static int ibmvscsi_remove(struct vio_dev *vdev)
 }
 
 /**
+ * ibmvscsi_resume: Resume from suspend
+ * @dev:	device struct
+ *
+ * We may have lost an interrupt across suspend/resume, so kick the
+ * interrupt handler
+ */
+static int ibmvscsi_resume(struct device *dev)
+{
+	struct ibmvscsi_host_data *hostdata = dev_get_drvdata(dev);
+	return ibmvscsi_ops->resume(hostdata);
+}
+
+/**
  * ibmvscsi_device_table: Used by vio.c to match devices in the device tree we 
  * support.
  */
@@ -2005,6 +2019,10 @@ static struct vio_device_id ibmvscsi_device_table[] __devinitdata = {
 };
 MODULE_DEVICE_TABLE(vio, ibmvscsi_device_table);
 
+static struct dev_pm_ops ibmvscsi_pm_ops = {
+	.resume = ibmvscsi_resume
+};
+
 static struct vio_driver ibmvscsi_driver = {
 	.id_table = ibmvscsi_device_table,
 	.probe = ibmvscsi_probe,
@@ -2013,6 +2031,7 @@ static struct vio_driver ibmvscsi_driver = {
 	.driver = {
 		.name = IBMVSCSI_PROC_NAME,
 		.owner = THIS_MODULE,
+		.pm = &ibmvscsi_pm_ops,
 	}
 };
 
