@@ -56,7 +56,7 @@
 /*
  * Generic counter attributes
  */
-ssize_t ds1682_show(struct device *dev, struct device_attribute *attr,
+static ssize_t ds1682_show(struct device *dev, struct device_attribute *attr,
 			   char *buf)
 {
 	struct sensor_device_attribute_2 *sattr = to_sensor_dev_attr_2(attr);
@@ -82,7 +82,7 @@ ssize_t ds1682_show(struct device *dev, struct device_attribute *attr,
 	return sprintf(buf, "%li\n", (long)le32_to_cpu(val));
 }
 
-ssize_t ds1682_store(struct device *dev, struct device_attribute *attr,
+static ssize_t ds1682_store(struct device *dev, struct device_attribute *attr,
 			    const char *buf, size_t count)
 {
 	struct sensor_device_attribute_2 *sattr = to_sensor_dev_attr_2(attr);
