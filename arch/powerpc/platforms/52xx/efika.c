@@ -13,7 +13,6 @@
 #include <generated/utsrelease.h>
 #include <linux/pci.h>
 #include <linux/of.h>
-#include <linux/console.h>
 #include <asm/prom.h>
 #include <asm/time.h>
 #include <asm/machdep.h>
@@ -212,61 +211,12 @@ static int __init efika_probe(void)
 	return 1;
 }
 
-/*
- * Per default, input/output-device points to the keyboard/screen
- * If no card is installed, the built-in serial port is used as a fallback.
- * But unfortunately, the firmware does not connect /chosen/{stdin,stdout}
- * the the built-in serial node. Instead, a /failsafe node is created.
- * More advanced hardware configurations cant be detected,
- * boot with console=xyz123 to point the kernel to the correct device
- */
-static void __init efika_init_early(void)
-{
-#ifdef CONFIG_SERIAL_MPC52xx
-	struct device_node *stdout_node;
-	const char *property;
-
-	if (strstr(cmd_line, "console="))
-		return;
-	/* find the boot console from /chosen/stdout */
-	if (!of_chosen)
-		return;
-	property = of_get_property(of_chosen, "linux,stdout-path", NULL);
-	if (!property)
-		return;
-	stdout_node = of_find_node_by_path(property);
-	if (!stdout_node)
-		return;
-	property = of_get_property(stdout_node, "device_type", NULL);
-	if (property && strcmp(property, "serial") == 0) {
-		/*
-		 * The 9pin connector is either /failsafe or /builtin/serial.
-		 * The optional graphics card has also type 'serial' in VGA mode.
-		 */
-		property = of_get_property(stdout_node, "name", NULL);
-		if (property) {
-			if (strcmp(property, "failsafe") == 0)
-				add_preferred_console("ttyPSC", 0, NULL);
-			else {
-				if (strcmp(property, "serial") == 0) {
-					property = of_get_property(stdout_node, "model", NULL);
-					if (property && strcmp(property, "mpc5200-serial") == 0)
-						add_preferred_console("ttyPSC", 0, NULL);
-				}
-			}
-		}
-	}
-	of_node_put(stdout_node);
-#endif
-}
-
 define_machine(efika)
 {
 	.name			= EFIKA_PLATFORM_NAME,
 	.probe			= efika_probe,
 	.setup_arch		= efika_setup_arch,
 	.init			= mpc52xx_declare_of_platform_devices,
-	.init_early		= efika_init_early,
 	.show_cpuinfo		= efika_show_cpuinfo,
 	.init_IRQ		= mpc52xx_init_irq,
 	.get_irq		= mpc52xx_get_irq,

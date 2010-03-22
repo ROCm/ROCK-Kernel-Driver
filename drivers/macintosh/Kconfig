@@ -256,10 +256,4 @@ config PMAC_RACKMETER
 	  This driver provides some support to control the front panel
           blue LEDs "vu-meter" of the XServer macs.
 
-config MACONLINUX
-	tristate "Mac on Linux kernel module"
-	depends on PPC32 && PPC_PMAC && MODULES && NET
-	help
-	  call helpdesk
-
 endif # MACINTOSH_DRIVERS
