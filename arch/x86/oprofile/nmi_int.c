@@ -172,7 +172,7 @@ static int nmi_setup_mux(void)
 
 	for_each_possible_cpu(i) {
 		per_cpu(cpu_msrs, i).multiplex =
-			kmalloc(multiplex_size, GFP_KERNEL);
+			kzalloc(multiplex_size, GFP_KERNEL);
 		if (!per_cpu(cpu_msrs, i).multiplex)
 			return 0;
 	}
@@ -192,7 +192,6 @@ static void nmi_cpu_setup_mux(int cpu, struct op_msrs const * const msrs)
 		if (counter_config[i].enabled) {
 			multiplex[i].saved = -(u64)counter_config[i].count;
 		} else {
-			multiplex[i].addr  = 0;
 			multiplex[i].saved = 0;
 		}
 	}
@@ -202,25 +201,27 @@ static void nmi_cpu_setup_mux(int cpu, struct op_msrs const * const msrs)
 
 static void nmi_cpu_save_mpx_registers(struct op_msrs *msrs)
 {
+	struct op_msr *counters = msrs->counters;
 	struct op_msr *multiplex = msrs->multiplex;
 	int i;
 
 	for (i = 0; i < model->num_counters; ++i) {
 		int virt = op_x86_phys_to_virt(i);
-		if (multiplex[virt].addr)
-			rdmsrl(multiplex[virt].addr, multiplex[virt].saved);
+		if (counters[i].addr)
+			rdmsrl(counters[i].addr, multiplex[virt].saved);
 	}
 }
 
 static void nmi_cpu_restore_mpx_registers(struct op_msrs *msrs)
 {
+	struct op_msr *counters = msrs->counters;
 	struct op_msr *multiplex = msrs->multiplex;
 	int i;
 
 	for (i = 0; i < model->num_counters; ++i) {
 		int virt = op_x86_phys_to_virt(i);
-		if (multiplex[virt].addr)
-			wrmsrl(multiplex[virt].addr, multiplex[virt].saved);
+		if (counters[i].addr)
+			wrmsrl(counters[i].addr, multiplex[virt].saved);
 	}
 }
 
@@ -316,11 +317,11 @@ static int allocate_msrs(void)
 
 	int i;
 	for_each_possible_cpu(i) {
-		per_cpu(cpu_msrs, i).counters = kmalloc(counters_size,
+		per_cpu(cpu_msrs, i).counters = kzalloc(counters_size,
 							GFP_KERNEL);
 		if (!per_cpu(cpu_msrs, i).counters)
 			return 0;
-		per_cpu(cpu_msrs, i).controls = kmalloc(controls_size,
+		per_cpu(cpu_msrs, i).controls = kzalloc(controls_size,
 							GFP_KERNEL);
 		if (!per_cpu(cpu_msrs, i).controls)
 			return 0;
@@ -380,7 +381,7 @@ static void nmi_is_counter_enabled(struct op_msrs * const msrs)
 		if ((vendor == X86_VENDOR_INTEL) && (family == 0xf)) {
 			if (val & P4_CCCR_ENABLE)
 				goto err_rsvd;
-		} else if (val & ARCH_PERFMON_EVENTSEL0_ENABLE) {
+		} else if (val & ARCH_PERFMON_EVENTSEL_ENABLE) {
 			goto err_rsvd;
 		}
 	}

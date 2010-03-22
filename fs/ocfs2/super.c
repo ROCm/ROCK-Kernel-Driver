@@ -41,7 +41,6 @@
 #include <linux/mount.h>
 #include <linux/seq_file.h>
 #include <linux/quotaops.h>
-#include <linux/precache.h>
 #include <linux/smp_lock.h>
 
 #define MLOG_MASK_PREFIX ML_SUPER
@@ -70,6 +69,7 @@
 #include "xattr.h"
 #include "quota.h"
 #include "refcounttree.h"
+#include "suballoc.h"
 
 #include "buffer_head_io.h"
 
@@ -305,9 +305,12 @@ static int ocfs2_osb_dump(struct ocfs2_super *osb, char *buf, int len)
 
 	spin_lock(&osb->osb_lock);
 	out += snprintf(buf + out, len - out,
-			"%10s => Slot: %d  NumStolen: %d\n", "Steal",
+			"%10s => InodeSlot: %d  StolenInodes: %d, "
+			"MetaSlot: %d  StolenMeta: %d\n", "Steal",
 			osb->s_inode_steal_slot,
-			atomic_read(&osb->s_num_inodes_stolen));
+			atomic_read(&osb->s_num_inodes_stolen),
+			osb->s_meta_steal_slot,
+			atomic_read(&osb->s_num_meta_stolen));
 	spin_unlock(&osb->osb_lock);
 
 	out += snprintf(buf + out, len - out, "OrphanScan => ");
@@ -2019,7 +2022,7 @@ static int ocfs2_initialize_super(struct super_block *sb,
 	osb->blocked_lock_count = 0;
 	spin_lock_init(&osb->osb_lock);
 	spin_lock_init(&osb->osb_xattr_lock);
-	ocfs2_init_inode_steal_slot(osb);
+	ocfs2_init_steal_slots(osb);
 
 	atomic_set(&osb->alloc_stats.moves, 0);
 	atomic_set(&osb->alloc_stats.local_data, 0);
@@ -2257,7 +2260,6 @@ static int ocfs2_initialize_super(struct super_block *sb,
 		mlog_errno(status);
 		goto bail;
 	}
-	shared_precache_init(sb, &di->id2.i_super.s_uuid[0]);
 
 bail:
 	mlog_exit(status);

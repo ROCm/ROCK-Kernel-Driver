@@ -46,6 +46,13 @@
 
 #include "mce-internal.h"
 
+static DEFINE_MUTEX(mce_read_mutex);
+
+#define rcu_dereference_check_mce(p) \
+	rcu_dereference_check((p), \
+			      rcu_read_lock_sched_held() || \
+			      lockdep_is_held(&mce_read_mutex))
+
 #define CREATE_TRACE_POINTS
 #include <trace/events/mce.h>
 
@@ -160,7 +167,7 @@ void mce_log(struct mce *mce)
 	mce->finished = 0;
 	wmb();
 	for (;;) {
-		entry = rcu_dereference(mcelog.next);
+		entry = rcu_dereference_check_mce(mcelog.next);
 		for (;;) {
 			/*
 			 * When the buffer fills up discard new entries.
@@ -468,9 +475,7 @@ static inline void mce_get_rip(struct mce *m, struct pt_regs *regs)
  */
 asmlinkage void smp_mce_self_interrupt(struct pt_regs *regs)
 {
-#ifndef CONFIG_XEN
 	ack_APIC_irq();
-#endif
 	exit_idle();
 	irq_enter();
 	mce_notify_irq();
@@ -493,7 +498,7 @@ static void mce_report_event(struct pt_regs *regs)
 		return;
 	}
 
-#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
+#ifdef CONFIG_X86_LOCAL_APIC
 	/*
 	 * Without APIC do not notify. The event will be picked
 	 * up eventually.
@@ -1143,15 +1148,8 @@ void mce_log_therm_throt_event(__u64 status)
  * Periodic polling timer for "silent" machine check errors.  If the
  * poller finds an MCE, poll 2x faster.  When the poller finds no more
  * errors, poll 2x slower (up to check_interval seconds).
- *
- * We will disable polling in DOM0 since all CMCI/Polling
- * mechanism will be done in XEN for Intel CPUs
  */
-#if defined (CONFIG_X86_XEN_MCE)
-static int check_interval = 0; /* disable polling */
-#else
 static int check_interval = 5 * 60; /* 5 minutes */
-#endif
 
 static DEFINE_PER_CPU(int, mce_next_interval); /* in jiffies */
 static DEFINE_PER_CPU(struct timer_list, mce_timer);
@@ -1316,7 +1314,6 @@ static int __cpuinit __mcheck_cpu_apply_quirks(struct cpuinfo_x86 *c)
 
 	/* This should be disabled by the BIOS, but isn't always */
 	if (c->x86_vendor == X86_VENDOR_AMD) {
-#ifndef CONFIG_XEN
 		if (c->x86 == 15 && banks > 4) {
 			/*
 			 * disable GART TBL walk error reporting, which
@@ -1325,7 +1322,6 @@ static int __cpuinit __mcheck_cpu_apply_quirks(struct cpuinfo_x86 *c)
 			 */
 			clear_bit(10, (unsigned long *)&mce_banks[4].ctl);
 		}
-#endif
 		if (c->x86 <= 17 && mce_bootlog < 0) {
 			/*
 			 * Lots of broken BIOS around that don't clear them
@@ -1393,7 +1389,6 @@ static void __cpuinit __mcheck_cpu_ancient_init(struct cpuinfo_x86 *c)
 
 static void __mcheck_cpu_init_vendor(struct cpuinfo_x86 *c)
 {
-#ifndef CONFIG_X86_64_XEN
 	switch (c->x86_vendor) {
 	case X86_VENDOR_INTEL:
 		mce_intel_feature_init(c);
@@ -1404,7 +1399,6 @@ static void __mcheck_cpu_init_vendor(struct cpuinfo_x86 *c)
 	default:
 		break;
 	}
-#endif
 }
 
 static void __mcheck_cpu_init_timer(void)
@@ -1509,8 +1503,6 @@ static void collect_tscs(void *data)
 	rdtscll(cpu_tsc[smp_processor_id()]);
 }
 
-static DEFINE_MUTEX(mce_read_mutex);
-
 static ssize_t mce_read(struct file *filp, char __user *ubuf, size_t usize,
 			loff_t *off)
 {
@@ -1524,7 +1516,7 @@ static ssize_t mce_read(struct file *filp, char __user *ubuf, size_t usize,
 		return -ENOMEM;
 
 	mutex_lock(&mce_read_mutex);
-	next = rcu_dereference(mcelog.next);
+	next = rcu_dereference_check_mce(mcelog.next);
 
 	/* Only supports full reads right now */
 	if (*off != 0 || usize < MCE_LOG_LEN*sizeof(struct mce)) {
@@ -1589,7 +1581,7 @@ timeout:
 static unsigned int mce_poll(struct file *file, poll_table *wait)
 {
 	poll_wait(file, &mce_wait, wait);
-	if (rcu_dereference(mcelog.next))
+	if (rcu_dereference_check_mce(mcelog.next))
 		return POLLIN | POLLRDNORM;
 	return 0;
 }
@@ -2068,6 +2060,7 @@ static __init void mce_init_banks(void)
 		struct mce_bank *b = &mce_banks[i];
 		struct sysdev_attribute *a = &b->attr;
 
+		sysfs_attr_init(&a->attr);
 		a->attr.name	= b->attrname;
 		snprintf(b->attrname, ATTR_LEN, "bank%d", i);
 
@@ -2101,16 +2094,6 @@ static __init int mcheck_init_device(void)
 
 	register_hotcpu_notifier(&mce_cpu_notifier);
 	misc_register(&mce_log_device);
-
-#ifdef CONFIG_X86_XEN_MCE
-	if (is_initial_xendomain()) {
-		/* Register vIRQ handler for MCE LOG processing */
-		extern int bind_virq_for_mce(void);
-
-		printk(KERN_DEBUG "MCE: bind virq for DOM0 logging\n");
-		bind_virq_for_mce();
-	}
-#endif
 
 	return err;
 }

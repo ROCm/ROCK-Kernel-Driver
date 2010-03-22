@@ -1956,7 +1956,7 @@ xfs_dm_get_dmattr(
 		alloc_size = XFS_BUG_KLUDGE;
 	if (alloc_size > ATTR_MAX_VALUELEN)
 		alloc_size = ATTR_MAX_VALUELEN;
-	value = kmem_alloc(alloc_size, KM_SLEEP | KM_LARGE);
+	value = kmem_zalloc_large(alloc_size);
 
 	/* Get the attribute's value. */
 
@@ -2877,7 +2877,7 @@ xfs_dm_sync_by_handle(
 	/* We need to protect against concurrent writers.. */
 	ret = filemap_fdatawrite(inode->i_mapping);
 	down_rw_sems(inode, DM_FLAGS_IMUX);
-	err = -xfs_fsync(ip);
+	err = xfs_fsync(inode, 1);
 	if (!ret)
 		ret = err;
 	up_rw_sems(inode, DM_FLAGS_IMUX);

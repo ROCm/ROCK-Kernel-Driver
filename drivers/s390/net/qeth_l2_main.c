@@ -486,22 +486,14 @@ static int qeth_l2_send_setmac_cb(struct qeth_card *card,
 		case IPA_RC_L2_DUP_MAC:
 		case IPA_RC_L2_DUP_LAYER3_MAC:
 			dev_warn(&card->gdev->dev,
-				"MAC address "
-				"%2.2x:%2.2x:%2.2x:%2.2x:%2.2x:%2.2x "
-				"already exists\n",
-				card->dev->dev_addr[0], card->dev->dev_addr[1],
-				card->dev->dev_addr[2], card->dev->dev_addr[3],
-				card->dev->dev_addr[4], card->dev->dev_addr[5]);
+				"MAC address %pM already exists\n",
+				card->dev->dev_addr);
 			break;
 		case IPA_RC_L2_MAC_NOT_AUTH_BY_HYP:
 		case IPA_RC_L2_MAC_NOT_AUTH_BY_ADP:
 			dev_warn(&card->gdev->dev,
-				"MAC address "
-				"%2.2x:%2.2x:%2.2x:%2.2x:%2.2x:%2.2x "
-				"is not authorized\n",
-				card->dev->dev_addr[0], card->dev->dev_addr[1],
-				card->dev->dev_addr[2], card->dev->dev_addr[3],
-				card->dev->dev_addr[4], card->dev->dev_addr[5]);
+				"MAC address %pM is not authorized\n",
+				card->dev->dev_addr);
 			break;
 		default:
 			break;
@@ -512,12 +504,8 @@ static int qeth_l2_send_setmac_cb(struct qeth_card *card,
 		memcpy(card->dev->dev_addr, cmd->data.setdelmac.mac,
 		       OSA_ADDR_LEN);
 		dev_info(&card->gdev->dev,
-			"MAC address %2.2x:%2.2x:%2.2x:%2.2x:%2.2x:%2.2x "
-			"successfully registered on device %s\n",
-			card->dev->dev_addr[0], card->dev->dev_addr[1],
-			card->dev->dev_addr[2], card->dev->dev_addr[3],
-			card->dev->dev_addr[4], card->dev->dev_addr[5],
-			card->dev->name);
+			"MAC address %pM successfully registered on device %s\n",
+			card->dev->dev_addr, card->dev->name);
 	}
 	return 0;
 }
@@ -634,7 +622,7 @@ static void qeth_l2_set_multicast_list(struct net_device *dev)
 	for (dm = dev->mc_list; dm; dm = dm->next)
 		qeth_l2_add_mc(card, dm->da_addr, 0);
 
-	list_for_each_entry(ha, &dev->uc.list, list)
+	netdev_for_each_uc_addr(ha, dev)
 		qeth_l2_add_mc(card, ha->addr, 1);
 
 	spin_unlock_bh(&card->mclock);
@@ -939,7 +927,6 @@ static int __qeth_l2_set_online(struct ccwgroup_device *gdev, int recovery_mode)
 	QETH_DBF_TEXT(SETUP, 2, "setonlin");
 	QETH_DBF_HEX(SETUP, 2, &card, sizeof(void *));
 
-	qeth_set_allowed_threads(card, QETH_RECOVER_THREAD, 1);
 	recover_flag = card->state;
 	rc = qeth_core_hardsetup_card(card);
 	if (rc) {
@@ -1084,11 +1071,9 @@ static int qeth_l2_recover(void *ptr)
 		dev_info(&card->gdev->dev,
 			"Device successfully recovered!\n");
 	else {
-		if (card->dev) {
-			rtnl_lock();
-			dev_close(card->dev);
-			rtnl_unlock();
-		}
+		rtnl_lock();
+		dev_close(card->dev);
+		rtnl_unlock();
 		dev_warn(&card->gdev->dev, "The qeth device driver "
 			"failed to recover an error on the device\n");
 	}
@@ -1142,11 +1127,9 @@ static int qeth_l2_pm_resume(struct ccwgroup_device *gdev)
 	if (card->state == CARD_STATE_RECOVER) {
 		rc = __qeth_l2_set_online(card->gdev, 1);
 		if (rc) {
-			if (card->dev) {
-				rtnl_lock();
-				dev_close(card->dev);
-				rtnl_unlock();
-			}
+			rtnl_lock();
+			dev_close(card->dev);
+			rtnl_unlock();
 		}
 	} else
 		rc = __qeth_l2_set_online(card->gdev, 0);

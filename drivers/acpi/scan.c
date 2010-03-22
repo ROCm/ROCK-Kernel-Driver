@@ -168,16 +168,6 @@ acpi_device_hid_show(struct device *dev, struct device_attribute *attr, char *bu
 }
 static DEVICE_ATTR(hid, 0444, acpi_device_hid_show, NULL);
 
-#ifdef CONFIG_PCI_GUESTDEV
-static ssize_t
-acpi_device_uid_show(struct device *dev, struct device_attribute *attr, char *buf) {
-	struct acpi_device *acpi_dev = to_acpi_device(dev);
-
-	return sprintf(buf, "%s\n", acpi_dev->pnp.unique_id);
-}
-static DEVICE_ATTR(uid, 0444, acpi_device_uid_show, NULL);
-#endif
-
 static ssize_t
 acpi_device_path_show(struct device *dev, struct device_attribute *attr, char *buf) {
 	struct acpi_device *acpi_dev = to_acpi_device(dev);
@@ -218,13 +208,6 @@ static int acpi_device_setup_files(struct acpi_device *dev)
 	if (result)
 		goto end;
 
-#ifdef CONFIG_PCI_GUESTDEV
-	if(dev->pnp.unique_id) {
-		result = device_create_file(&dev->dev, &dev_attr_uid);
-		if(result)
-			goto end;
-	}
-#endif
         /*
          * If device has _EJ0, 'eject' file is created that is used to trigger
          * hot-removal function from userland.
@@ -288,9 +271,6 @@ static void acpi_free_ids(struct acpi_device *device)
 		kfree(id->id);
 		kfree(id);
 	}
-#ifdef CONFIG_PCI_GUESTDEV
-	kfree(device->pnp.unique_id);
-#endif
 }
 
 static void acpi_device_release(struct device *dev)
@@ -761,19 +741,40 @@ acpi_bus_extract_wakeup_device_power_package(struct acpi_device *device,
 	return AE_OK;
 }
 
-static int acpi_bus_get_wakeup_device_flags(struct acpi_device *device)
+static void acpi_bus_set_run_wake_flags(struct acpi_device *device)
 {
-	acpi_status status = 0;
-	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
-	union acpi_object *package = NULL;
-	int psw_error;
-
 	struct acpi_device_id button_device_ids[] = {
 		{"PNP0C0D", 0},
 		{"PNP0C0C", 0},
 		{"PNP0C0E", 0},
 		{"", 0},
 	};
+	acpi_status status;
+	acpi_event_status event_status;
+
+	device->wakeup.run_wake_count = 0;
+	device->wakeup.flags.notifier_present = 0;
+
+	/* Power button, Lid switch always enable wakeup */
+	if (!acpi_match_device_ids(device, button_device_ids)) {
+		device->wakeup.flags.run_wake = 1;
+		device->wakeup.flags.always_enabled = 1;
+		return;
+	}
+
+	status = acpi_get_gpe_status(NULL, device->wakeup.gpe_number,
+					ACPI_NOT_ISR, &event_status);
+	if (status == AE_OK)
+		device->wakeup.flags.run_wake =
+				!!(event_status & ACPI_EVENT_FLAG_HANDLE);
+}
+
+static int acpi_bus_get_wakeup_device_flags(struct acpi_device *device)
+{
+	acpi_status status = 0;
+	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
+	union acpi_object *package = NULL;
+	int psw_error;
 
 	/* _PRW */
 	status = acpi_evaluate_object(device->handle, "_PRW", NULL, &buffer);
@@ -793,6 +794,7 @@ static int acpi_bus_get_wakeup_device_flags(struct acpi_device *device)
 
 	device->wakeup.flags.valid = 1;
 	device->wakeup.prepare_count = 0;
+	acpi_bus_set_run_wake_flags(device);
 	/* Call _PSW/_DSW object to disable its ability to wake the sleeping
 	 * system for the ACPI device with the _PRW object.
 	 * The _PSW object is depreciated in ACPI 3.0 and is replaced by _DSW.
@@ -803,10 +805,6 @@ static int acpi_bus_get_wakeup_device_flags(struct acpi_device *device)
 	if (psw_error)
 		ACPI_DEBUG_PRINT((ACPI_DB_INFO,
 				"error in _DSW or _PSW evaluation\n"));
-
-	/* Power button, Lid switch always enable wakeup */
-	if (!acpi_match_device_ids(device, button_device_ids))
-		device->wakeup.flags.run_wake = 1;
 
 end:
 	if (ACPI_FAILURE(status))
@@ -1067,11 +1065,6 @@ static void acpi_device_set_id(struct acpi_device *device)
 			for (i = 0; i < cid_list->count; i++)
 				acpi_add_id(device, cid_list->ids[i].string);
 		}
-#ifdef CONFIG_PCI_GUESTDEV
-		if (info->valid & ACPI_VALID_UID)
-			device->pnp.unique_id = kstrdup(info->unique_id.string,
-							GFP_KERNEL);
-#endif
 		if (info->valid & ACPI_VALID_ADR) {
 			device->pnp.bus_address = info->address;
 			device->flags.bus_address = 1;

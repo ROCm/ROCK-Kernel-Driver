@@ -1,71 +1,17 @@
 #include "qlge.h"
 
-
-unsigned int get_other_func_num(struct ql_adapter *qdev)
+/* Read a NIC register from the alternate function. */
+static u32 ql_read_other_func_reg(struct ql_adapter *qdev,
+						u32 reg)
 {
-	unsigned int other_function;
-	unsigned int status;
-	unsigned int test_logic;
-	unsigned int nic1_function_num = 0xffffffff;
-	unsigned int nic2_function_num = 0xffffffff;
-	unsigned int fc1_function_num = 0xffffffff;
-	unsigned int fc2_function_num = 0xffffffff;
-
-	QPRINTK(qdev, DRV, ERR, "Trying to figure out function mapping, "
-				"my function = %d\n", qdev->func);
-	status = ql_read_mpi_reg(qdev, TEST_LOGIC_FUNC_PORT_CONFIG,
-					&test_logic);
-	if (status)
-		return 0xffffffff;
-
-	QPRINTK(qdev, DRV, ERR, "Test logic 0x%08x = 0x%08x\n",
-				TEST_LOGIC_FUNC_PORT_CONFIG, test_logic);
-
-	/* First, establish the function number of the other PCI function */
-	if (test_logic & FC1_FUNCTION_ENABLE)
-		fc1_function_num = (test_logic & FC1_FUNCTION_MASK) >>
-					FC1_FUNCTION_SHIFT;
-	if (test_logic & FC2_FUNCTION_ENABLE)
-		fc2_function_num = (test_logic & FC2_FUNCTION_MASK) >>
-					FC2_FUNCTION_SHIFT;
-	if (test_logic & NIC1_FUNCTION_ENABLE)
-		nic1_function_num = (test_logic & NIC1_FUNCTION_MASK) >>
-					NIC1_FUNCTION_SHIFT;
-	if (test_logic & NIC2_FUNCTION_ENABLE)
-		nic2_function_num = (test_logic & NIC2_FUNCTION_MASK) >>
-					NIC2_FUNCTION_SHIFT;
-	if (qdev->func == nic1_function_num)
-		other_function = nic2_function_num;
-	else
-		other_function = nic1_function_num;
-
-	QPRINTK(qdev, DRV, ERR, "My function = %d, other NIC function = %d,"
-			"FC1 Func = %d, FC2 Func = %d\n", qdev->func,
-			other_function,	fc1_function_num, fc2_function_num);
-	return other_function;
-}
-
-static unsigned int read_other_function_reg(struct ql_adapter *qdev,
-						unsigned int reg)
-{
-	unsigned int other_function;
-	unsigned int register_to_read;
-	unsigned int reg_val;
+	u32 register_to_read;
+	u32 reg_val;
 	unsigned int status = 0;
 
-	other_function = get_other_func_num(qdev);
-
-	/* The other function is not enabled so we don't need
-	 * to read anything out of it.
-	 */
-	if (other_function == 0xffffffff)
-		return other_function;
-
-	/* The other function is there so now we need to
-	 * read the requested register.
-	 */
-	register_to_read = REG_BLOCK | MPI_READ |
-				(other_function << FUNCTION_SHIFT) | reg;
+	register_to_read = MPI_NIC_REG_BLOCK
+				| MPI_NIC_READ
+				| (qdev->alt_func << MPI_NIC_FUNCTION_SHIFT)
+				| reg;
 	status = ql_read_mpi_reg(qdev, register_to_read, &reg_val);
 	if (status != 0)
 		return 0xffffffff;
@@ -73,41 +19,30 @@ static unsigned int read_other_function_reg(struct ql_adapter *qdev,
 	return reg_val;
 }
 
-static unsigned int write_other_function_reg(struct ql_adapter *qdev,
-					unsigned int reg, unsigned int reg_val)
+/* Write a NIC register from the alternate function. */
+static int ql_write_other_func_reg(struct ql_adapter *qdev,
+					u32 reg, u32 reg_val)
 {
-	unsigned int other_function;
-	unsigned int register_to_read;
-	unsigned int status = 0;
+	u32 register_to_read;
+	int status = 0;
 
-	other_function = get_other_func_num(qdev);
-
-	/*
-	 * The other function is not enabled so we don't
-	 * need to read anything out of it.
-	 */
-	if (other_function == 0xffffffff)
-		return -1;
-
-	/*
-	 * The other function is there so now we need
-	 * to read the requested register.
-	 */
-	register_to_read = REG_BLOCK | MPI_READ |
-				(other_function << FUNCTION_SHIFT) | reg;
+	register_to_read = MPI_NIC_REG_BLOCK
+				| MPI_NIC_READ
+				| (qdev->alt_func << MPI_NIC_FUNCTION_SHIFT)
+				| reg;
 	status = ql_write_mpi_reg(qdev, register_to_read, reg_val);
 
 	return status;
 }
 
-int wait_other_function_reg_rdy(struct ql_adapter *qdev, unsigned int reg,
-					unsigned int bit, unsigned int err_bit)
+static int ql_wait_other_func_reg_rdy(struct ql_adapter *qdev, u32 reg,
+					u32 bit, u32 err_bit)
 {
-	unsigned int temp;
+	u32 temp;
 	int count = 10;
 
 	while (count) {
-		temp = read_other_function_reg(qdev, reg);
+		temp = ql_read_other_func_reg(qdev, reg);
 
 		/* check for errors */
 		if (temp & err_bit)
@@ -120,60 +55,34 @@ int wait_other_function_reg_rdy(struct ql_adapter *qdev, unsigned int reg,
 	return -1;
 }
 
-int read_other_function_serdes_reg(struct ql_adapter *qdev, unsigned int reg,
-							unsigned int *data)
+static int ql_read_other_func_serdes_reg(struct ql_adapter *qdev, u32 reg,
+							u32 *data)
 {
 	int status;
 
 	/* wait for reg to come ready */
-	status = wait_other_function_reg_rdy(qdev, XG_SERDES_ADDR / 4,
+	status = ql_wait_other_func_reg_rdy(qdev, XG_SERDES_ADDR / 4,
 						XG_SERDES_ADDR_RDY, 0);
 	if (status)
 		goto exit;
 
 	/* set up for reg read */
-	write_other_function_reg(qdev, XG_SERDES_ADDR / 4, reg | PROC_ADDR_R);
+	ql_write_other_func_reg(qdev, XG_SERDES_ADDR/4, reg | PROC_ADDR_R);
 
 	/* wait for reg to come ready */
-	status = wait_other_function_reg_rdy(qdev, XG_SERDES_ADDR / 4,
+	status = ql_wait_other_func_reg_rdy(qdev, XG_SERDES_ADDR / 4,
 						XG_SERDES_ADDR_RDY, 0);
 	if (status)
 		goto exit;
 
 	/* get the data */
-	*data = read_other_function_reg(qdev, (XG_SERDES_DATA / 4));
-exit:
-	return status;
-}
-
-int ql_read_other_function_xgmac_reg(struct ql_adapter *qdev, unsigned int reg,
-							unsigned int *data)
-{
-	int status = 0;
-
-	/* wait for reg to come ready */
-	status = wait_other_function_reg_rdy(qdev, XGMAC_ADDR / 4,
-						XGMAC_ADDR_RDY, XGMAC_ADDR_XME);
-	if (status)
-		goto exit;
-
-	/* set up for reg read */
-	write_other_function_reg(qdev, XGMAC_ADDR / 4, reg | XGMAC_ADDR_R);
-
-	/* wait for reg to come ready */
-	status = wait_other_function_reg_rdy(qdev, XGMAC_ADDR / 4,
-						XGMAC_ADDR_RDY, XGMAC_ADDR_XME);
-	if (status)
-		goto exit;
-
-	/* get the data */
-	*data = read_other_function_reg(qdev, XGMAC_DATA / 4);
+	*data = ql_read_other_func_reg(qdev, (XG_SERDES_DATA / 4));
 exit:
 	return status;
 }
 
 /* Read out the SERDES registers */
-int ql_read_serdes_reg(struct ql_adapter *qdev, u32 reg, u32 * data)
+static int ql_read_serdes_reg(struct ql_adapter *qdev, u32 reg, u32 * data)
 {
 	int status;
 
@@ -196,24 +105,24 @@ exit:
 	return status;
 }
 
-void get_both_serdes(struct ql_adapter *qdev, unsigned int addr,
-			unsigned int *direct_ptr, unsigned int *indirect_ptr,
+static void ql_get_both_serdes(struct ql_adapter *qdev, u32 addr,
+			u32 *direct_ptr, u32 *indirect_ptr,
 			unsigned int direct_valid, unsigned int indirect_valid)
 {
 	unsigned int status;
 
-	status = 0xffffffff;
+	status = 1;
 	if (direct_valid)
 		status = ql_read_serdes_reg(qdev, addr, direct_ptr);
-
+	/* Dead fill any failures or invalids. */
 	if (status)
 		*direct_ptr = 0xDEADBEEF;
 
-	status = 0xffffffff;
+	status = 1;
 	if (indirect_valid)
-		status = read_other_function_serdes_reg(
+		status = ql_read_other_func_serdes_reg(
 						qdev, addr, indirect_ptr);
-
+	/* Dead fill any failures or invalids. */
 	if (status)
 		*indirect_ptr = 0xDEADBEEF;
 }
@@ -223,41 +132,48 @@ static int ql_get_serdes_regs(struct ql_adapter *qdev,
 {
 	int status;
 	unsigned int xfi_direct_valid, xfi_indirect_valid, xaui_direct_valid;
-	unsigned int xaui_indirect_valid, temp, xaui_reg, i;
-	unsigned int *direct_ptr;
-	unsigned int *indirect_ptr;
+	unsigned int xaui_indirect_valid, i;
+	u32 *direct_ptr, temp;
+	u32 *indirect_ptr;
 
 	xfi_direct_valid = xfi_indirect_valid = 0;
 	xaui_direct_valid = xaui_indirect_valid = 1;
 
 	/* The XAUI needs to be read out per port */
-	xaui_reg = 0x800;
 	if (qdev->func & 1) {
 		/* We are NIC 2	*/
-		status = read_other_function_serdes_reg(qdev, xaui_reg, &temp);
+		status = ql_read_other_func_serdes_reg(qdev,
+				XG_SERDES_XAUI_HSS_PCS_START, &temp);
 		if (status)
-			temp = XAUI_POWERED_DOWN;
-		if ((temp & XAUI_POWERED_DOWN) == XAUI_POWERED_DOWN)
+			temp = XG_SERDES_ADDR_XAUI_PWR_DOWN;
+		if ((temp & XG_SERDES_ADDR_XAUI_PWR_DOWN) ==
+					XG_SERDES_ADDR_XAUI_PWR_DOWN)
 			xaui_indirect_valid = 0;
 
-		status = ql_read_serdes_reg(qdev, xaui_reg, &temp);
+		status = ql_read_serdes_reg(qdev,
+				XG_SERDES_XAUI_HSS_PCS_START, &temp);
 		if (status)
-			temp = XAUI_POWERED_DOWN;
+			temp = XG_SERDES_ADDR_XAUI_PWR_DOWN;
 
-		if ((temp & XAUI_POWERED_DOWN) == XAUI_POWERED_DOWN)
+		if ((temp & XG_SERDES_ADDR_XAUI_PWR_DOWN) ==
+					XG_SERDES_ADDR_XAUI_PWR_DOWN)
 			xaui_direct_valid = 0;
 	} else {
 		/* We are NIC 1	*/
-		status = read_other_function_serdes_reg(qdev, xaui_reg, &temp);
+		status = ql_read_other_func_serdes_reg(qdev,
+				XG_SERDES_XAUI_HSS_PCS_START, &temp);
 		if (status)
-			temp = XAUI_POWERED_DOWN;
-		if ((temp & XAUI_POWERED_DOWN) == XAUI_POWERED_DOWN)
+			temp = XG_SERDES_ADDR_XAUI_PWR_DOWN;
+		if ((temp & XG_SERDES_ADDR_XAUI_PWR_DOWN) ==
+					XG_SERDES_ADDR_XAUI_PWR_DOWN)
 			xaui_indirect_valid = 0;
 
-		status = ql_read_serdes_reg(qdev, xaui_reg, &temp);
+		status = ql_read_serdes_reg(qdev,
+				XG_SERDES_XAUI_HSS_PCS_START, &temp);
 		if (status)
-			temp = XAUI_POWERED_DOWN;
-		if ((temp & XAUI_POWERED_DOWN) == XAUI_POWERED_DOWN)
+			temp = XG_SERDES_ADDR_XAUI_PWR_DOWN;
+		if ((temp & XG_SERDES_ADDR_XAUI_PWR_DOWN) ==
+					XG_SERDES_ADDR_XAUI_PWR_DOWN)
 			xaui_direct_valid = 0;
 	}
 
@@ -265,11 +181,12 @@ static int ql_get_serdes_regs(struct ql_adapter *qdev,
 	 * XFI register is shared so only need to read one
 	 * functions and then check the bits.
 	 */
-	status = ql_read_serdes_reg(qdev, 0x1E06, &temp);
+	status = ql_read_serdes_reg(qdev, XG_SERDES_ADDR_STS, &temp);
 	if (status)
 		temp = 0;
 
-	if ((temp & XFI1_POWERED_UP) == XFI1_POWERED_UP) {
+	if ((temp & XG_SERDES_ADDR_XFI1_PWR_UP) ==
+					XG_SERDES_ADDR_XFI1_PWR_UP) {
 		/* now see if i'm NIC 1 or NIC 2 */
 		if (qdev->func & 1)
 			/* I'm NIC 2, so the indirect (NIC1) xfi is up. */
@@ -277,7 +194,8 @@ static int ql_get_serdes_regs(struct ql_adapter *qdev,
 		else
 			xfi_direct_valid = 1;
 	}
-	if ((temp & XFI2_POWERED_UP) == XFI2_POWERED_UP) {
+	if ((temp & XG_SERDES_ADDR_XFI2_PWR_UP) ==
+					XG_SERDES_ADDR_XFI2_PWR_UP) {
 		/* now see if i'm NIC 1 or NIC 2 */
 		if (qdev->func & 1)
 			/* I'm NIC 2, so the indirect (NIC1) xfi is up. */
@@ -286,116 +204,157 @@ static int ql_get_serdes_regs(struct ql_adapter *qdev,
 			xfi_indirect_valid = 1;
 	}
 
+	/* Get XAUI_AN register block. */
 	if (qdev->func & 1) {
 		/* Function 2 is direct	*/
-		direct_ptr = (unsigned int *)(&mpi_coredump->serdes2_xaui_an);
-		indirect_ptr = (unsigned int *)(&mpi_coredump->serdes_xaui_an);
+		direct_ptr = mpi_coredump->serdes2_xaui_an;
+		indirect_ptr = mpi_coredump->serdes_xaui_an;
 	} else {
 		/* Function 1 is direct	*/
-		direct_ptr = (unsigned int *)(&mpi_coredump->serdes_xaui_an);
-		indirect_ptr = (unsigned int *)(&mpi_coredump->serdes2_xaui_an);
+		direct_ptr = mpi_coredump->serdes_xaui_an;
+		indirect_ptr = mpi_coredump->serdes2_xaui_an;
 	}
 
 	for (i = 0; i <= 0x000000034; i += 4, direct_ptr++, indirect_ptr++)
-		get_both_serdes(qdev, i, direct_ptr, indirect_ptr,
+		ql_get_both_serdes(qdev, i, direct_ptr, indirect_ptr,
 					xaui_direct_valid, xaui_indirect_valid);
+
+	/* Get XAUI_HSS_PCS register block. */
 	if (qdev->func & 1) {
 		direct_ptr =
-			(unsigned int *)(&mpi_coredump->serdes2_xaui_hss_pcs);
+			mpi_coredump->serdes2_xaui_hss_pcs;
 		indirect_ptr =
-			(unsigned int *)(&mpi_coredump->serdes_xaui_hss_pcs);
+			mpi_coredump->serdes_xaui_hss_pcs;
 	} else {
 		direct_ptr =
-			(unsigned int *)(&mpi_coredump->serdes_xaui_hss_pcs);
+			mpi_coredump->serdes_xaui_hss_pcs;
 		indirect_ptr =
-			(unsigned int *)(&mpi_coredump->serdes2_xaui_hss_pcs);
+			mpi_coredump->serdes2_xaui_hss_pcs;
 	}
 
 	for (i = 0x800; i <= 0x880; i += 4, direct_ptr++, indirect_ptr++)
-		get_both_serdes(qdev, i, direct_ptr, indirect_ptr,
+		ql_get_both_serdes(qdev, i, direct_ptr, indirect_ptr,
 					xaui_direct_valid, xaui_indirect_valid);
+
+	/* Get XAUI_XFI_AN register block. */
 	if (qdev->func & 1) {
-		direct_ptr = (unsigned int *)(&mpi_coredump->serdes2_xfi_an);
-		indirect_ptr = (unsigned int *)(&mpi_coredump->serdes_xfi_an);
+		direct_ptr = mpi_coredump->serdes2_xfi_an;
+		indirect_ptr = mpi_coredump->serdes_xfi_an;
 	} else {
-		direct_ptr = (unsigned int *)(&mpi_coredump->serdes_xfi_an);
-		indirect_ptr = (unsigned int *)(&mpi_coredump->serdes2_xfi_an);
+		direct_ptr = mpi_coredump->serdes_xfi_an;
+		indirect_ptr = mpi_coredump->serdes2_xfi_an;
 	}
 
 	for (i = 0x1000; i <= 0x1034; i += 4, direct_ptr++, indirect_ptr++)
-		get_both_serdes(qdev, i, direct_ptr, indirect_ptr,
+		ql_get_both_serdes(qdev, i, direct_ptr, indirect_ptr,
 					xfi_direct_valid, xfi_indirect_valid);
+
+	/* Get XAUI_XFI_TRAIN register block. */
 	if (qdev->func & 1) {
-		direct_ptr = (unsigned int *)(&mpi_coredump->serdes2_xfi_train);
+		direct_ptr = mpi_coredump->serdes2_xfi_train;
 		indirect_ptr =
-			(unsigned int *)(&mpi_coredump->serdes_xfi_train);
+			mpi_coredump->serdes_xfi_train;
 	} else {
-		direct_ptr = (unsigned int *)(&mpi_coredump->serdes_xfi_train);
+		direct_ptr = mpi_coredump->serdes_xfi_train;
 		indirect_ptr =
-			(unsigned int *)(&mpi_coredump->serdes2_xfi_train);
+			mpi_coredump->serdes2_xfi_train;
 	}
 
 	for (i = 0x1050; i <= 0x107c; i += 4, direct_ptr++, indirect_ptr++)
-		get_both_serdes(qdev, i, direct_ptr, indirect_ptr,
+		ql_get_both_serdes(qdev, i, direct_ptr, indirect_ptr,
 					xfi_direct_valid, xfi_indirect_valid);
+
+	/* Get XAUI_XFI_HSS_PCS register block. */
 	if (qdev->func & 1) {
 		direct_ptr =
-			(unsigned int *)(&mpi_coredump->serdes2_xfi_hss_pcs);
+			mpi_coredump->serdes2_xfi_hss_pcs;
 		indirect_ptr =
-			(unsigned int *)(&mpi_coredump->serdes_xfi_hss_pcs);
+			mpi_coredump->serdes_xfi_hss_pcs;
 	} else {
 		direct_ptr =
-			(unsigned int *)(&mpi_coredump->serdes_xfi_hss_pcs);
+			mpi_coredump->serdes_xfi_hss_pcs;
 		indirect_ptr =
-			(unsigned int *)(&mpi_coredump->serdes2_xfi_hss_pcs);
+			mpi_coredump->serdes2_xfi_hss_pcs;
 	}
 
 	for (i = 0x1800; i <= 0x1838; i += 4, direct_ptr++, indirect_ptr++)
-		get_both_serdes(qdev, i, direct_ptr, indirect_ptr,
+		ql_get_both_serdes(qdev, i, direct_ptr, indirect_ptr,
 					xfi_direct_valid, xfi_indirect_valid);
+
+	/* Get XAUI_XFI_HSS_TX register block. */
 	if (qdev->func & 1) {
 		direct_ptr =
-			(unsigned int *)(&mpi_coredump->serdes2_xfi_hss_tx);
+			mpi_coredump->serdes2_xfi_hss_tx;
 		indirect_ptr =
-			(unsigned int *)(&mpi_coredump->serdes_xfi_hss_tx);
+			mpi_coredump->serdes_xfi_hss_tx;
 	} else {
-		direct_ptr = (unsigned int *)(&mpi_coredump->serdes_xfi_hss_tx);
+		direct_ptr = mpi_coredump->serdes_xfi_hss_tx;
 		indirect_ptr =
-			(unsigned int *)(&mpi_coredump->serdes2_xfi_hss_tx);
+			mpi_coredump->serdes2_xfi_hss_tx;
 	}
 	for (i = 0x1c00; i <= 0x1c1f; i++, direct_ptr++, indirect_ptr++)
-		get_both_serdes(qdev, i, direct_ptr, indirect_ptr,
+		ql_get_both_serdes(qdev, i, direct_ptr, indirect_ptr,
 					xfi_direct_valid, xfi_indirect_valid);
+
+	/* Get XAUI_XFI_HSS_RX register block. */
 	if (qdev->func & 1) {
 		direct_ptr =
-			(unsigned int *)(&mpi_coredump->serdes2_xfi_hss_rx);
+			mpi_coredump->serdes2_xfi_hss_rx;
 		indirect_ptr =
-			(unsigned int *)(&mpi_coredump->serdes_xfi_hss_rx);
+			mpi_coredump->serdes_xfi_hss_rx;
 	} else {
-		direct_ptr = (unsigned int *)(&mpi_coredump->serdes_xfi_hss_rx);
+		direct_ptr = mpi_coredump->serdes_xfi_hss_rx;
 		indirect_ptr =
-			(unsigned int *)(&mpi_coredump->serdes2_xfi_hss_rx);
+			mpi_coredump->serdes2_xfi_hss_rx;
 	}
 
 	for (i = 0x1c40; i <= 0x1c5f; i++, direct_ptr++, indirect_ptr++)
-		get_both_serdes(qdev, i, direct_ptr, indirect_ptr,
+		ql_get_both_serdes(qdev, i, direct_ptr, indirect_ptr,
 					xfi_direct_valid, xfi_indirect_valid);
 
+
+	/* Get XAUI_XFI_HSS_PLL register block. */
 	if (qdev->func & 1) {
 		direct_ptr =
-			(unsigned int *)(&mpi_coredump->serdes2_xfi_hss_pll);
+			mpi_coredump->serdes2_xfi_hss_pll;
 		indirect_ptr =
-			(unsigned int *)(&mpi_coredump->serdes_xfi_hss_pll);
+			mpi_coredump->serdes_xfi_hss_pll;
 	} else {
 		direct_ptr =
-			(unsigned int *)(&mpi_coredump->serdes_xfi_hss_pll);
+			mpi_coredump->serdes_xfi_hss_pll;
 		indirect_ptr =
-			(unsigned int *)(&mpi_coredump->serdes2_xfi_hss_pll);
+			mpi_coredump->serdes2_xfi_hss_pll;
 	}
 	for (i = 0x1e00; i <= 0x1e1f; i++, direct_ptr++, indirect_ptr++)
-		get_both_serdes(qdev, i, direct_ptr, indirect_ptr,
+		ql_get_both_serdes(qdev, i, direct_ptr, indirect_ptr,
 					xfi_direct_valid, xfi_indirect_valid);
 	return 0;
+}
+
+static int ql_read_other_func_xgmac_reg(struct ql_adapter *qdev, u32 reg,
+							u32 *data)
+{
+	int status = 0;
+
+	/* wait for reg to come ready */
+	status = ql_wait_other_func_reg_rdy(qdev, XGMAC_ADDR / 4,
+						XGMAC_ADDR_RDY, XGMAC_ADDR_XME);
+	if (status)
+		goto exit;
+
+	/* set up for reg read */
+	ql_write_other_func_reg(qdev, XGMAC_ADDR / 4, reg | XGMAC_ADDR_R);
+
+	/* wait for reg to come ready */
+	status = ql_wait_other_func_reg_rdy(qdev, XGMAC_ADDR / 4,
+						XGMAC_ADDR_RDY, XGMAC_ADDR_XME);
+	if (status)
+		goto exit;
+
+	/* get the data */
+	*data = ql_read_other_func_reg(qdev, XGMAC_DATA / 4);
+exit:
+	return status;
 }
 
 /* Read the 400 xgmac control/statistics registers
@@ -430,7 +389,7 @@ static int ql_get_xgmac_regs(struct ql_adapter *qdev, u32 * buf,
 			(i > 0x000005c8 && i < 0x00000600)) {
 			if (other_function)
 				status =
-				ql_read_other_function_xgmac_reg(qdev, i, buf);
+				ql_read_other_func_xgmac_reg(qdev, i, buf);
 			else
 				status = ql_read_xgmac_reg(qdev, i, buf);
 
@@ -442,7 +401,6 @@ static int ql_get_xgmac_regs(struct ql_adapter *qdev, u32 * buf,
 	return status;
 }
 
-/* Read out the ETS registers */
 static int ql_get_ets_regs(struct ql_adapter *qdev, u32 * buf)
 {
 	int status = 0;
@@ -461,7 +419,6 @@ static int ql_get_ets_regs(struct ql_adapter *qdev, u32 * buf)
 	return status;
 }
 
-/* For each RX Ring, read the interrupt enable register */
 static void ql_get_intr_states(struct ql_adapter *qdev, u32 * buf)
 {
 	int i;
@@ -486,8 +443,8 @@ static int ql_get_cam_entries(struct ql_adapter *qdev, u32 * buf)
 		status = ql_get_mac_addr_reg(qdev,
 					MAC_ADDR_TYPE_CAM_MAC, i, value);
 		if (status) {
-			QPRINTK(qdev, DRV, ERR,
-				"Failed read of mac index register.\n");
+			netif_err(qdev, drv, qdev->ndev,
+				  "Failed read of mac index register.\n");
 			goto err;
 		}
 		*buf++ = value[0];	/* lower MAC address */
@@ -498,8 +455,8 @@ static int ql_get_cam_entries(struct ql_adapter *qdev, u32 * buf)
 		status = ql_get_mac_addr_reg(qdev,
 					MAC_ADDR_TYPE_MULTI_MAC, i, value);
 		if (status) {
-			QPRINTK(qdev, DRV, ERR,
-				"Failed read of mac index register.\n");
+			netif_err(qdev, drv, qdev->ndev,
+				  "Failed read of mac index register.\n");
 			goto err;
 		}
 		*buf++ = value[0];	/* lower Mcast address */
@@ -522,8 +479,8 @@ static int ql_get_routing_entries(struct ql_adapter *qdev, u32 * buf)
 	for (i = 0; i < 16; i++) {
 		status = ql_get_routing_reg(qdev, i, &value);
 		if (status) {
-			QPRINTK(qdev, DRV, ERR,
-				"Failed read of routing index register.\n");
+			netif_err(qdev, drv, qdev->ndev,
+				  "Failed read of routing index register.\n");
 			goto err;
 		} else {
 			*buf++ = value;
@@ -542,7 +499,7 @@ static int ql_get_mpi_shadow_regs(struct ql_adapter *qdev, u32 * buf)
 
 	for (i = 0; i < MPI_CORE_SH_REGS_CNT; i++, buf++) {
 		status = ql_write_mpi_reg(qdev, RISC_124,
-					  (SHADOW_OFFSET | i << 20));
+				(SHADOW_OFFSET | i << SHADOW_REG_SHIFT));
 		if (status)
 			goto end;
 		status = ql_read_mpi_reg(qdev, RISC_127, buf);
@@ -568,29 +525,31 @@ static int ql_get_mpi_regs(struct ql_adapter *qdev, u32 * buf,
 
 /* Read the ASIC probe dump */
 static unsigned int *ql_get_probe(struct ql_adapter *qdev, u32 clock,
-					u8 *valid, u32 *buf)
+					u32 valid, u32 *buf)
 {
 	u32 module, mux_sel, probe, lo_val, hi_val;
 
-	for (module = 0; module < MAX_MODULES; module++) {
-		if (valid[module]) {
-			for (mux_sel = 0; mux_sel < MAX_MUX; mux_sel++) {
-				probe = clock | ADDRESS_REGISTER_ENABLE |
-						mux_sel | (module << 9);
-				ql_write32(qdev, PRB_MX_ADDR, probe);
-				lo_val = ql_read32(qdev, PRB_MX_DATA);
-				if (mux_sel == 0) {
-					*buf = probe;
-					buf++;
-				}
-				probe |= UP;
-				ql_write32(qdev, PRB_MX_ADDR, probe);
-				hi_val = ql_read32(qdev, PRB_MX_DATA);
-				*buf = lo_val;
-				buf++;
-				*buf = hi_val;
+	for (module = 0; module < PRB_MX_ADDR_MAX_MODS; module++) {
+		if (!((valid >> module) & 1))
+			continue;
+		for (mux_sel = 0; mux_sel < PRB_MX_ADDR_MAX_MUX; mux_sel++) {
+			probe = clock
+				| PRB_MX_ADDR_ARE
+				| mux_sel
+				| (module << PRB_MX_ADDR_MOD_SEL_SHIFT);
+			ql_write32(qdev, PRB_MX_ADDR, probe);
+			lo_val = ql_read32(qdev, PRB_MX_DATA);
+			if (mux_sel == 0) {
+				*buf = probe;
 				buf++;
 			}
+			probe |= PRB_MX_ADDR_UP;
+			ql_write32(qdev, PRB_MX_ADDR, probe);
+			hi_val = ql_read32(qdev, PRB_MX_DATA);
+			*buf = lo_val;
+			buf++;
+			*buf = hi_val;
+			buf++;
 		}
 	}
 	return buf;
@@ -598,155 +557,16 @@ static unsigned int *ql_get_probe(struct ql_adapter *qdev, u32 clock,
 
 static int ql_get_probe_dump(struct ql_adapter *qdev, unsigned int *buf)
 {
-
-	unsigned char sys_clock_valid_modules[0x20] = {
-				1,	/* 0x00 */
-				1,	/* 0x01 */
-				1,	/* 0x02 */
-				0,	/* 0x03 */
-				1,	/* 0x04 */
-				1,	/* 0x05 */
-				1,	/* 0x06 */
-				1,	/* 0x07 */
-				1,	/* 0x08 */
-				1,	/* 0x09 */
-				1,	/* 0x0A */
-				1,	/* 0x0B */
-				1,	/* 0x0C */
-				1,	/* 0x0D */
-				1,	/* 0x0E */
-				0,	/* 0x0F */
-				1,	/* 0x10 */
-				1,	/* 0x11 */
-				1,	/* 0x12 */
-				1,	/* 0x13 */
-				0,	/* 0x14 */
-				0,	/* 0x15 */
-				0,	/* 0x16 */
-				0,	/* 0x17 */
-				0,	/* 0x18 */
-				0,	/* 0x19 */
-				0,	/* 0x1A */
-				0,	/* 0x1B */
-				0,	/* 0x1C */
-				0,	/* 0x1D */
-				0,	/* 0x1E */
-				0	/* 0x1F */
-			};
-
-
-	unsigned char pci_clock_valid_modules[0x20] = {
-				1,	/* 0x00 */
-				0,	/* 0x01 */
-				0,	/* 0x02 */
-				0,	/* 0x03 */
-				0,	/* 0x04 */
-				0,	/* 0x05 */
-				1,	/* 0x06 */
-				1,	/* 0x07 */
-				0,	/* 0x08 */
-				0,	/* 0x09 */
-				0,	/* 0x0A */
-				0,	/* 0x0B */
-				0,	/* 0x0C */
-				0,	/* 0x0D */
-				1,	/* 0x0E */
-				0,	/* 0x0F */
-				0,	/* 0x10 */
-				0,	/* 0x11 */
-				0,	/* 0x12 */
-				0,	/* 0x13 */
-				0,	/* 0x14 */
-				0,	/* 0x15 */
-				0,	/* 0x16 */
-				0,	/* 0x17 */
-				0,	/* 0x18 */
-				0,	/* 0x19 */
-				0,	/* 0x1A */
-				0,	/* 0x1B */
-				0,	/* 0x1C */
-				0,	/* 0x1D */
-				0,	/* 0x1E */
-				0	/* 0x1F */
-			};
-
-	unsigned char xgm_clock_valid_modules[0x20] = {
-				1,	/* 0x00 */
-				0,	/* 0x01 */
-				0,	/* 0x02 */
-				1,	/* 0x03 */
-				0,	/* 0x04 */
-				0,	/* 0x05 */
-				0,	/* 0x06 */
-				0,	/* 0x07 */
-				1,	/* 0x08 */
-				1,	/* 0x09 */
-				0,	/* 0x0A */
-				0,	/* 0x0B */
-				1,	/* 0x0C */
-				1,	/* 0x0D */
-				1,	/* 0x0E */
-				0,	/* 0x0F */
-				1,	/* 0x10 */
-				1,	/* 0x11 */
-				0,	/* 0x12 */
-				0,	/* 0x13 */
-				0,	/* 0x14 */
-				0,	/* 0x15 */
-				0,	/* 0x16 */
-				0,	/* 0x17 */
-				0,	/* 0x18 */
-				0,	/* 0x19 */
-				0,	/* 0x1A */
-				0,	/* 0x1B */
-				0,	/* 0x1C */
-				0,	/* 0x1D */
-				0,	/* 0x1E */
-				0	/* 0x1F */
-			};
-
-	unsigned char fc_clock_valid_modules[0x20] = {
-				1,	/* 0x00 */
-				0,	/* 0x01 */
-				0,	/* 0x02 */
-				0,	/* 0x03 */
-				0,	/* 0x04 */
-				0,	/* 0x05 */
-				0,	/* 0x06 */
-				0,	/* 0x07 */
-				0,	/* 0x08 */
-				0,	/* 0x09 */
-				0,	/* 0x0A */
-				0,	/* 0x0B */
-				1,	/* 0x0C */
-				1,	/* 0x0D */
-				0,	/* 0x0E */
-				0,	/* 0x0F */
-				0,	/* 0x10 */
-				0,	/* 0x11 */
-				0,	/* 0x12 */
-				0,	/* 0x13 */
-				0,	/* 0x14 */
-				0,	/* 0x15 */
-				0,	/* 0x16 */
-				0,	/* 0x17 */
-				0,	/* 0x18 */
-				0,	/* 0x19 */
-				0,	/* 0x1A */
-				0,	/* 0x1B */
-				0,	/* 0x1C */
-				0,	/* 0x1D */
-				0,	/* 0x1E */
-				0	/* 0x1F */
-			};
-
 	/* First we have to enable the probe mux */
-	ql_write_mpi_reg(qdev, 0x100e, 0x18a20000);
-	buf = ql_get_probe(qdev, SYS_CLOCK, sys_clock_valid_modules, buf);
-	buf = ql_get_probe(qdev, PCI_CLOCK, pci_clock_valid_modules, buf);
-	buf = ql_get_probe(qdev, XGM_CLOCK, xgm_clock_valid_modules, buf);
-	buf = ql_get_probe(qdev, FC_CLOCK, fc_clock_valid_modules, buf);
-
+	ql_write_mpi_reg(qdev, MPI_TEST_FUNC_PRB_CTL, MPI_TEST_FUNC_PRB_EN);
+	buf = ql_get_probe(qdev, PRB_MX_ADDR_SYS_CLOCK,
+			PRB_MX_ADDR_VALID_SYS_MOD, buf);
+	buf = ql_get_probe(qdev, PRB_MX_ADDR_PCI_CLOCK,
+			PRB_MX_ADDR_VALID_PCI_MOD, buf);
+	buf = ql_get_probe(qdev, PRB_MX_ADDR_XGM_CLOCK,
+			PRB_MX_ADDR_VALID_XGM_MOD, buf);
+	buf = ql_get_probe(qdev, PRB_MX_ADDR_FC_CLOCK,
+			PRB_MX_ADDR_VALID_FC_MOD, buf);
 	return 0;
 
 }
@@ -770,10 +590,12 @@ static int ql_get_routing_index_registers(struct ql_adapter *qdev, u32 *buf)
 		else
 			index_max = 16;
 		for (index = 0; index < index_max; index++) {
-			val = 0x04000000 | (type << 16) | (index << 8);
+			val = RT_IDX_RS
+				| (type << RT_IDX_TYPE_SHIFT)
+				| (index << RT_IDX_IDX_SHIFT);
 			ql_write32(qdev, RT_IDX, val);
 			result_index = 0;
-			while ((result_index & 0x40000000) == 0)
+			while ((result_index & RT_IDX_MR) == 0)
 				result_index = ql_read32(qdev, RT_IDX);
 			result_data = ql_read32(qdev, RT_DATA);
 			*buf = type;
@@ -791,79 +613,73 @@ static int ql_get_routing_index_registers(struct ql_adapter *qdev, u32 *buf)
 }
 
 /* Read out the MAC protocol registers */
-void ql_get_mac_protocol_registers(struct ql_adapter *qdev, u32 *buf)
+static void ql_get_mac_protocol_registers(struct ql_adapter *qdev, u32 *buf)
 {
 	u32 result_index, result_data;
 	u32 type;
 	u32 index;
 	u32 offset;
 	u32 val;
-	u32 initial_val = 0;
+	u32 initial_val = MAC_ADDR_RS;
 	u32 max_index;
 	u32 max_offset;
 
-	for (type = 0; type < NUM_TYPES; type++) {
+	for (type = 0; type < MAC_ADDR_TYPE_COUNT; type++) {
 		switch (type) {
 
 		case 0: /* CAM */
-				initial_val = RS_AND_ADR;
-				max_index = 512;
-				max_offset = 3;
-				break;
+			initial_val |= MAC_ADDR_ADR;
+			max_index = MAC_ADDR_MAX_CAM_ENTRIES;
+			max_offset = MAC_ADDR_MAX_CAM_WCOUNT;
+			break;
 		case 1: /* Multicast MAC Address */
-				initial_val = RS_ONLY;
-				max_index = 32;
-				max_offset = 2;
-				break;
+			max_index = MAC_ADDR_MAX_CAM_WCOUNT;
+			max_offset = MAC_ADDR_MAX_CAM_WCOUNT;
+			break;
 		case 2: /* VLAN filter mask */
 		case 3: /* MC filter mask */
-				initial_val = RS_ONLY;
-				max_index = 4096;
-				max_offset = 1;
-				break;
+			max_index = MAC_ADDR_MAX_CAM_WCOUNT;
+			max_offset = MAC_ADDR_MAX_CAM_WCOUNT;
+			break;
 		case 4: /* FC MAC addresses */
-				initial_val = RS_ONLY;
-				max_index = 4;
-				max_offset = 2;
-				break;
+			max_index = MAC_ADDR_MAX_FC_MAC_ENTRIES;
+			max_offset = MAC_ADDR_MAX_FC_MAC_WCOUNT;
+			break;
 		case 5: /* Mgmt MAC addresses */
-				initial_val = RS_ONLY;
-				max_index = 8;
-				max_offset = 2;
-				break;
+			max_index = MAC_ADDR_MAX_MGMT_MAC_ENTRIES;
+			max_offset = MAC_ADDR_MAX_MGMT_MAC_WCOUNT;
+			break;
 		case 6: /* Mgmt VLAN addresses */
-				initial_val = RS_ONLY;
-				max_index = 16;
-				max_offset = 1;
-				break;
+			max_index = MAC_ADDR_MAX_MGMT_VLAN_ENTRIES;
+			max_offset = MAC_ADDR_MAX_MGMT_VLAN_WCOUNT;
+			break;
 		case 7: /* Mgmt IPv4 address */
-				initial_val = RS_ONLY;
-				max_index = 4;
-				max_offset = 1;
-				break;
+			max_index = MAC_ADDR_MAX_MGMT_V4_ENTRIES;
+			max_offset = MAC_ADDR_MAX_MGMT_V4_WCOUNT;
+			break;
 		case 8: /* Mgmt IPv6 address */
-				initial_val = RS_ONLY;
-				max_index = 4;
-				max_offset = 4;
-				break;
+			max_index = MAC_ADDR_MAX_MGMT_V6_ENTRIES;
+			max_offset = MAC_ADDR_MAX_MGMT_V6_WCOUNT;
+			break;
 		case 9: /* Mgmt TCP/UDP Dest port */
-				initial_val = RS_ONLY;
-				max_index = 4;
-				max_offset = 1;
-				break;
+			max_index = MAC_ADDR_MAX_MGMT_TU_DP_ENTRIES;
+			max_offset = MAC_ADDR_MAX_MGMT_TU_DP_WCOUNT;
+			break;
 		default:
-				printk(KERN_ERR	"Bad type!!! 0x%08x\n", type);
-				max_index = 0;
-				max_offset = 0;
-				break;
+			printk(KERN_ERR"Bad type!!! 0x%08x\n", type);
+			max_index = 0;
+			max_offset = 0;
+			break;
 		}
 		for (index = 0; index < max_index; index++) {
 			for (offset = 0; offset < max_offset; offset++) {
-				val = initial_val | (type << 16) |
-					(index << 4) | (offset);
+				val = initial_val
+					| (type << MAC_ADDR_TYPE_SHIFT)
+					| (index << MAC_ADDR_IDX_SHIFT)
+					| (offset);
 				ql_write32(qdev, MAC_ADDR_IDX, val);
 				result_index = 0;
-				while ((result_index & 0x40000000) == 0) {
+				while ((result_index & MAC_ADDR_MR) == 0) {
 					result_index = ql_read32(qdev,
 								MAC_ADDR_IDX);
 				}
@@ -874,6 +690,24 @@ void ql_get_mac_protocol_registers(struct ql_adapter *qdev, u32 *buf)
 				buf++;
 			}
 		}
+	}
+}
+
+static void ql_get_sem_registers(struct ql_adapter *qdev, u32 *buf)
+{
+	u32 func_num, reg, reg_val;
+	int status;
+
+	for (func_num = 0; func_num < MAX_SEMAPHORE_FUNCTIONS ; func_num++) {
+		reg = MPI_NIC_REG_BLOCK
+			| (func_num << MPI_NIC_FUNCTION_SHIFT)
+			| (SEM / 4);
+		status = ql_read_mpi_reg(qdev, reg, &reg_val);
+		*buf = reg_val;
+		/* if the read failed then dead fill the element. */
+		if (!status)
+			*buf = 0xdeadbeef;
+		buf++;
 	}
 }
 
@@ -889,83 +723,6 @@ static void ql_build_coredump_seg_header(
 	memcpy(seg_hdr->description, desc, (sizeof(seg_hdr->description)) - 1);
 }
 
-void ql_gen_reg_dump(struct ql_adapter *qdev,
-			struct ql_reg_dump *mpi_coredump)
-{
-	int i, status;
-
-
-	memset(&(mpi_coredump->mpi_global_header), 0,
-		sizeof(struct mpi_coredump_global_header));
-	mpi_coredump->mpi_global_header.cookie = MPI_COREDUMP_COOKIE;
-	mpi_coredump->mpi_global_header.headerSize =
-		sizeof(struct mpi_coredump_global_header);
-	mpi_coredump->mpi_global_header.imageSize =
-		sizeof(struct ql_reg_dump);
-	memcpy(mpi_coredump->mpi_global_header.idString, "MPI Coredump",
-		sizeof(mpi_coredump->mpi_global_header.idString));
-
-
-	/* segment 16 */
-	ql_build_coredump_seg_header(&mpi_coredump->misc_nic_seg_hdr,
-				MISC_NIC_INFO_SEG_NUM,
-				sizeof(struct mpi_coredump_segment_header)
-				+ sizeof(mpi_coredump->misc_nic_info),
-				"MISC NIC INFO");
-	mpi_coredump->misc_nic_info.rx_ring_count = qdev->rx_ring_count;
-	mpi_coredump->misc_nic_info.tx_ring_count = qdev->tx_ring_count;
-	mpi_coredump->misc_nic_info.intr_count = qdev->intr_count;
-	mpi_coredump->misc_nic_info.function = qdev->func;
-
-	/* Segment 16, Rev C. Step 18 */
-	ql_build_coredump_seg_header(&mpi_coredump->nic_regs_seg_hdr,
-				NIC1_CONTROL_SEG_NUM,
-				sizeof(struct mpi_coredump_segment_header)
-				+ sizeof(mpi_coredump->nic_regs),
-				"NIC Registers");
-	/* Get generic reg dump */
-	for (i = 0; i < 64; i++)
-		mpi_coredump->nic_regs[i] = ql_read32(qdev, i * sizeof(u32));
-
-	/* Segment 31 */
-	/* Get indexed register values. */
-	ql_build_coredump_seg_header(&mpi_coredump->intr_states_seg_hdr,
-				INTR_STATES_SEG_NUM,
-				sizeof(struct mpi_coredump_segment_header)
-				+ sizeof(mpi_coredump->intr_states),
-				"INTR States");
-	ql_get_intr_states(qdev, &mpi_coredump->intr_states[0]);
-
-	ql_build_coredump_seg_header(&mpi_coredump->cam_entries_seg_hdr,
-				CAM_ENTRIES_SEG_NUM,
-				sizeof(struct mpi_coredump_segment_header)
-				+ sizeof(mpi_coredump->cam_entries),
-				"CAM Entries");
-	status = ql_get_cam_entries(qdev, &mpi_coredump->cam_entries[0]);
-	if (status)
-		return;
-
-	ql_build_coredump_seg_header(&mpi_coredump->nic_routing_words_seg_hdr,
-				ROUTING_WORDS_SEG_NUM,
-				sizeof(struct mpi_coredump_segment_header)
-				+ sizeof(mpi_coredump->nic_routing_words),
-				"Routing Words");
-	status = ql_get_routing_entries(qdev,
-			 &mpi_coredump->nic_routing_words[0]);
-	if (status)
-		return;
-
-	/* Segment 34 (Rev C. step 23) */
-	ql_build_coredump_seg_header(&mpi_coredump->ets_seg_hdr,
-				ETS_SEG_NUM,
-				sizeof(struct mpi_coredump_segment_header)
-				+ sizeof(mpi_coredump->ets),
-				"ETS Registers");
-	status = ql_get_ets_regs(qdev, &mpi_coredump->ets[0]);
-	if (status)
-		return;
-}
-
 /*
  * This function should be called when a coredump / probedump
  * is to be extracted from the HBA. It is assumed there is a
@@ -977,11 +734,9 @@ int ql_core_dump(struct ql_adapter *qdev, struct ql_mpi_coredump *mpi_coredump)
 {
 	int status;
 	int i;
-	unsigned int func_num, reg, reg_val;
 
 	if (!mpi_coredump) {
-		QPRINTK(qdev, DRV, ERR,
-			"No memory available.\n");
+		netif_err(qdev, drv, qdev->ndev, "No memory available.\n");
 		return -ENOMEM;
 	}
 
@@ -993,8 +748,8 @@ int ql_core_dump(struct ql_adapter *qdev, struct ql_mpi_coredump *mpi_coredump)
 
 	status = ql_pause_mpi_risc(qdev);
 	if (status) {
-		QPRINTK(qdev, DRV, ERR,
-			"Failed RISC pause. Status = 0x%.08x\n", status);
+		netif_err(qdev, drv, qdev->ndev,
+			  "Failed RISC pause. Status = 0x%.08x\n", status);
 		goto err;
 	}
 
@@ -1033,25 +788,24 @@ int ql_core_dump(struct ql_adapter *qdev, struct ql_mpi_coredump *mpi_coredump)
 
 	if (qdev->func & 1) {
 		/* Odd means our function is NIC 2 */
-		for (i = 0; i < 64; i++)
+		for (i = 0; i < NIC_REGS_DUMP_WORD_COUNT; i++)
 			mpi_coredump->nic2_regs[i] =
 					 ql_read32(qdev, i * sizeof(u32));
 
-		for (i = 0; i < 64; i++)
+		for (i = 0; i < NIC_REGS_DUMP_WORD_COUNT; i++)
 			mpi_coredump->nic_regs[i] =
-			read_other_function_reg(qdev, (i * sizeof(u32)) / 4);
+			ql_read_other_func_reg(qdev, (i * sizeof(u32)) / 4);
 
 		ql_get_xgmac_regs(qdev, &mpi_coredump->xgmac2[0], 0);
 		ql_get_xgmac_regs(qdev, &mpi_coredump->xgmac1[0], 1);
 	} else {
 		/* Even means our function is NIC 1 */
-		for (i = 0; i < 64; i++)
+		for (i = 0; i < NIC_REGS_DUMP_WORD_COUNT; i++)
 			mpi_coredump->nic_regs[i] =
 					ql_read32(qdev, i * sizeof(u32));
-
-		for (i = 0; i < 64; i++)
+		for (i = 0; i < NIC_REGS_DUMP_WORD_COUNT; i++)
 			mpi_coredump->nic2_regs[i] =
-			read_other_function_reg(qdev, (i * sizeof(u32)) / 4);
+			ql_read_other_func_reg(qdev, (i * sizeof(u32)) / 4);
 
 		ql_get_xgmac_regs(qdev, &mpi_coredump->xgmac1[0], 0);
 		ql_get_xgmac_regs(qdev, &mpi_coredump->xgmac2[0], 1);
@@ -1156,9 +910,9 @@ int ql_core_dump(struct ql_adapter *qdev, struct ql_mpi_coredump *mpi_coredump)
 
 	status = ql_get_serdes_regs(qdev, mpi_coredump);
 	if (status) {
-		QPRINTK(qdev, DRV, ERR,
-			"Failed Dump of Serdes Registers. Status = 0x%.08x\n",
-			status);
+		netif_err(qdev, drv, qdev->ndev,
+			  "Failed Dump of Serdes Registers. Status = 0x%.08x\n",
+			  status);
 		goto err;
 	}
 
@@ -1414,32 +1168,24 @@ int ql_core_dump(struct ql_adapter *qdev, struct ql_mpi_coredump *mpi_coredump)
 			sizeof(struct mpi_coredump_segment_header) +
 			sizeof(mpi_coredump->sem_regs),	"Sem Registers");
 
-	for (func_num = 0; func_num < MAX_SEMAPHORE_FUNCTIONS ; func_num++) {
-		reg = REG_BLOCK | (func_num << FUNCTION_SHIFT) | (SEM / 4);
-		status = ql_read_mpi_reg(qdev, reg, &reg_val);
-		mpi_coredump->sem_regs[func_num] = reg_val;
-		if (status != 0)
-			mpi_coredump->sem_regs[func_num] = 0xdeadbeef;
-	}
+	ql_get_sem_registers(qdev, &mpi_coredump->sem_regs[0]);
 
-	/* not in the spec... but we need to prevent the mpi restarting
-	 * while we dump the memory
-	 */
-	ql_write_mpi_reg(qdev, 0x100a, 0x3);
+	/* Prevent the mpi restarting while we dump the memory.*/
+	ql_write_mpi_reg(qdev, MPI_TEST_FUNC_RST_STS, MPI_TEST_FUNC_RST_FRC);
 
 	/* clear the pause */
 	status = ql_unpause_mpi_risc(qdev);
 	if (status) {
-		QPRINTK(qdev, DRV, ERR,
-			"Failed RISC unpause. Status = 0x%.08x\n", status);
+		netif_err(qdev, drv, qdev->ndev,
+			  "Failed RISC unpause. Status = 0x%.08x\n", status);
 		goto err;
 	}
 
 	/* Reset the RISC so we can dump RAM */
 	status = ql_hard_reset_mpi_risc(qdev);
 	if (status) {
-		QPRINTK(qdev, DRV, ERR,
-			"Failed RISC reset. Status = 0x%.08x\n", status);
+		netif_err(qdev, drv, qdev->ndev,
+			  "Failed RISC reset. Status = 0x%.08x\n", status);
 		goto err;
 	}
 
@@ -1451,8 +1197,9 @@ int ql_core_dump(struct ql_adapter *qdev, struct ql_mpi_coredump *mpi_coredump)
 	status = ql_dump_risc_ram_area(qdev, &mpi_coredump->code_ram[0],
 					CODE_RAM_ADDR, CODE_RAM_CNT);
 	if (status) {
-		QPRINTK(qdev, DRV, ERR,
-			"Failed Dump of CODE RAM. Status = 0x%.08x\n", status);
+		netif_err(qdev, drv, qdev->ndev,
+			  "Failed Dump of CODE RAM. Status = 0x%.08x\n",
+			  status);
 		goto err;
 	}
 
@@ -1465,8 +1212,9 @@ int ql_core_dump(struct ql_adapter *qdev, struct ql_mpi_coredump *mpi_coredump)
 	status = ql_dump_risc_ram_area(qdev, &mpi_coredump->memc_ram[0],
 					MEMC_RAM_ADDR, MEMC_RAM_CNT);
 	if (status) {
-		QPRINTK(qdev, DRV, ERR,
-			"Failed Dump of MEMC RAM. Status = 0x%.08x\n", status);
+		netif_err(qdev, drv, qdev->ndev,
+			  "Failed Dump of MEMC RAM. Status = 0x%.08x\n",
+			  status);
 		goto err;
 	}
 err:
@@ -1474,6 +1222,107 @@ err:
 	return status;
 
 }
+
+static void ql_get_core_dump(struct ql_adapter *qdev)
+{
+	if (!ql_own_firmware(qdev)) {
+		netif_err(qdev, drv, qdev->ndev, "Don't own firmware!\n");
+		return;
+	}
+
+	if (!netif_running(qdev->ndev)) {
+		netif_err(qdev, ifup, qdev->ndev,
+			  "Force Coredump can only be done from interface that is up.\n");
+		return;
+	}
+
+	if (ql_mb_sys_err(qdev)) {
+		netif_err(qdev, ifup, qdev->ndev,
+			  "Fail force coredump with ql_mb_sys_err().\n");
+		return;
+	}
+}
+
+void ql_gen_reg_dump(struct ql_adapter *qdev,
+			struct ql_reg_dump *mpi_coredump)
+{
+	int i, status;
+
+
+	memset(&(mpi_coredump->mpi_global_header), 0,
+		sizeof(struct mpi_coredump_global_header));
+	mpi_coredump->mpi_global_header.cookie = MPI_COREDUMP_COOKIE;
+	mpi_coredump->mpi_global_header.headerSize =
+		sizeof(struct mpi_coredump_global_header);
+	mpi_coredump->mpi_global_header.imageSize =
+		sizeof(struct ql_reg_dump);
+	memcpy(mpi_coredump->mpi_global_header.idString, "MPI Coredump",
+		sizeof(mpi_coredump->mpi_global_header.idString));
+
+
+	/* segment 16 */
+	ql_build_coredump_seg_header(&mpi_coredump->misc_nic_seg_hdr,
+				MISC_NIC_INFO_SEG_NUM,
+				sizeof(struct mpi_coredump_segment_header)
+				+ sizeof(mpi_coredump->misc_nic_info),
+				"MISC NIC INFO");
+	mpi_coredump->misc_nic_info.rx_ring_count = qdev->rx_ring_count;
+	mpi_coredump->misc_nic_info.tx_ring_count = qdev->tx_ring_count;
+	mpi_coredump->misc_nic_info.intr_count = qdev->intr_count;
+	mpi_coredump->misc_nic_info.function = qdev->func;
+
+	/* Segment 16, Rev C. Step 18 */
+	ql_build_coredump_seg_header(&mpi_coredump->nic_regs_seg_hdr,
+				NIC1_CONTROL_SEG_NUM,
+				sizeof(struct mpi_coredump_segment_header)
+				+ sizeof(mpi_coredump->nic_regs),
+				"NIC Registers");
+	/* Get generic reg dump */
+	for (i = 0; i < 64; i++)
+		mpi_coredump->nic_regs[i] = ql_read32(qdev, i * sizeof(u32));
+
+	/* Segment 31 */
+	/* Get indexed register values. */
+	ql_build_coredump_seg_header(&mpi_coredump->intr_states_seg_hdr,
+				INTR_STATES_SEG_NUM,
+				sizeof(struct mpi_coredump_segment_header)
+				+ sizeof(mpi_coredump->intr_states),
+				"INTR States");
+	ql_get_intr_states(qdev, &mpi_coredump->intr_states[0]);
+
+	ql_build_coredump_seg_header(&mpi_coredump->cam_entries_seg_hdr,
+				CAM_ENTRIES_SEG_NUM,
+				sizeof(struct mpi_coredump_segment_header)
+				+ sizeof(mpi_coredump->cam_entries),
+				"CAM Entries");
+	status = ql_get_cam_entries(qdev, &mpi_coredump->cam_entries[0]);
+	if (status)
+		return;
+
+	ql_build_coredump_seg_header(&mpi_coredump->nic_routing_words_seg_hdr,
+				ROUTING_WORDS_SEG_NUM,
+				sizeof(struct mpi_coredump_segment_header)
+				+ sizeof(mpi_coredump->nic_routing_words),
+				"Routing Words");
+	status = ql_get_routing_entries(qdev,
+			 &mpi_coredump->nic_routing_words[0]);
+	if (status)
+		return;
+
+	/* Segment 34 (Rev C. step 23) */
+	ql_build_coredump_seg_header(&mpi_coredump->ets_seg_hdr,
+				ETS_SEG_NUM,
+				sizeof(struct mpi_coredump_segment_header)
+				+ sizeof(mpi_coredump->ets),
+				"ETS Registers");
+	status = ql_get_ets_regs(qdev, &mpi_coredump->ets[0]);
+	if (status)
+		return;
+
+	if (test_bit(QL_FRC_COREDUMP, &qdev->flags))
+		ql_get_core_dump(qdev);
+}
+
 /* Coredump to messages log file using separate worker thread */
 void ql_mpi_core_to_log(struct work_struct *work)
 {
@@ -1484,7 +1333,8 @@ void ql_mpi_core_to_log(struct work_struct *work)
 
 	count = sizeof(struct ql_mpi_coredump) / sizeof(u32);
 	tmp = (u32 *)qdev->mpi_coredump;
-	QPRINTK(qdev, DRV, DEBUG, "Core is dumping to log file!\n");
+	netif_printk(qdev, drv, KERN_DEBUG, qdev->ndev,
+		     "Core is dumping to log file!\n");
 
 	for (i = 0; i < count; i += 8) {
 		printk(KERN_ERR "%.08x: %.08x %.08x %.08x %.08x %.08x "

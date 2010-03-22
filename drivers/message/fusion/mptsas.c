@@ -47,11 +47,9 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/errno.h>
-#include <linux/sched.h>
+#include <linux/jiffies.h>
 #include <linux/workqueue.h>
-#include <linux/interrupt.h>
 #include <linux/delay.h>	/* for mdelay */
-#include <linux/pci.h>
 
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
@@ -64,6 +62,7 @@
 #include "mptscsih.h"
 #include "mptsas.h"
 
+
 #define my_NAME		"Fusion MPT SAS Host driver"
 #define my_VERSION	MPT_LINUX_VERSION_COMMON
 #define MYNAM		"mptsas"
@@ -74,7 +73,6 @@
 #define MPTSAS_RAID_CHANNEL	1
 
 #define SAS_CONFIG_PAGE_TIMEOUT		30
-
 MODULE_AUTHOR(MODULEAUTHOR);
 MODULE_DESCRIPTION(my_NAME);
 MODULE_LICENSE("GPL");
@@ -85,25 +83,6 @@ module_param(mpt_pt_clear, int, 0);
 MODULE_PARM_DESC(mpt_pt_clear,
 		" Clear persistency table: enable=1  "
 		"(default=MPTSCSIH_PT_CLEAR=0)");
-
-static int mpt_cmd_retry_count = 300;
-module_param(mpt_cmd_retry_count, int, 0);
-MODULE_PARM_DESC(mpt_cmd_retry_count,
-		" Device discovery TUR command retry count: default=300");
-
-static int mpt_disable_hotplug_remove = 0;
-module_param(mpt_disable_hotplug_remove, int, 0);
-MODULE_PARM_DESC(mpt_disable_hotplug_remove,
-		" Disable hotpug remove events: default=0");
-
-static int mpt_sdev_queue_depth = MPT_SCSI_CMD_PER_DEV_HIGH;
-static int mptsas_set_sdev_queue_depth(const char *val,
-    struct kernel_param *kp);
-module_param_call(mpt_sdev_queue_depth, mptsas_set_sdev_queue_depth,
-    param_get_int, &mpt_sdev_queue_depth, 0600);
-MODULE_PARM_DESC(mpt_sdev_queue_depth,
-    " Max Device Queue Depth (default="
-    __MODULE_STRING(MPT_SCSI_CMD_PER_DEV_HIGH) ")");
 
 /* scsi-mid layer global parmeter is max_report_luns, which is 511 */
 #define MPTSAS_MAX_LUN (16895)
@@ -117,6 +96,7 @@ static u8	mptsasInternalCtx = MPT_MAX_PROTOCOL_DRIVERS; /* Used only for interna
 static u8	mptsasMgmtCtx = MPT_MAX_PROTOCOL_DRIVERS;
 static u8	mptsasDeviceResetCtx = MPT_MAX_PROTOCOL_DRIVERS;
 
+static void mptsas_firmware_event_work(struct work_struct *work);
 static void mptsas_send_sas_event(struct fw_event_work *fw_event);
 static void mptsas_send_raid_event(struct fw_event_work *fw_event);
 static void mptsas_send_ir2_event(struct fw_event_work *fw_event);
@@ -145,39 +125,6 @@ static void mptsas_scan_sas_topology(MPT_ADAPTER *ioc);
 static void mptsas_broadcast_primative_work(struct fw_event_work *fw_event);
 static void mptsas_handle_queue_full_event(struct fw_event_work *fw_event);
 static void mptsas_volume_delete(MPT_ADAPTER *ioc, u8 id);
-
-
-void	mptsas_schedule_target_reset(void *ioc);
-static void mptsas_firmware_event_work(struct work_struct *work);
-
-/**
- *	mptsas_set_sdev_queue_depth - global setting of the mpt_sdev_queue_depth
- *	found via /sys/module/mptsas/parameters/mpt_sdev_queue_depth
- *	@val:
- *	@kp:
- *
- *	Returns
- **/
-static int
-mptsas_set_sdev_queue_depth(const char *val, struct kernel_param *kp)
-{
-	int ret = param_set_int(val, kp);
-	MPT_ADAPTER *ioc;
-	struct scsi_device	*sdev;
-
-	if (ret)
-		return ret;
-
-	list_for_each_entry(ioc, &ioc_list, list) {
-		if (ioc->bus_type != SAS)
-			continue;
-		shost_for_each_device(sdev, ioc->sh)
-			mptscsih_change_queue_depth(sdev, mpt_sdev_queue_depth,
-						    SCSI_QDEPTH_DEFAULT);
-		ioc->sdev_queue_depth = mpt_sdev_queue_depth;
-	}
-	return 0;
-}
 
 static void mptsas_print_phy_data(MPT_ADAPTER *ioc,
 					MPI_SAS_IO_UNIT0_PHY_DATA *phy_data)
@@ -332,10 +279,6 @@ mptsas_add_fw_event(MPT_ADAPTER *ioc, struct fw_event_work *fw_event,
 {
 	unsigned long flags;
 
-#if defined(CPQ_CIM)
-	ioc->csmi_change_count++;
-#endif
-
 	spin_lock_irqsave(&ioc->fw_event_lock, flags);
 	list_add_tail(&fw_event->list, &ioc->fw_event_list);
 	INIT_DELAYED_WORK(&fw_event->work, mptsas_firmware_event_work);
@@ -354,7 +297,7 @@ mptsas_requeue_fw_event(MPT_ADAPTER *ioc, struct fw_event_work *fw_event,
 	unsigned long flags;
 	spin_lock_irqsave(&ioc->fw_event_lock, flags);
 	devtprintk(ioc, printk(MYIOC_s_DEBUG_FMT "%s: reschedule task "
-	    "(fw_event=0x%p)\n", ioc->name,__FUNCTION__, fw_event));
+	    "(fw_event=0x%p)\n", ioc->name, __func__, fw_event));
 	fw_event->retries++;
 	queue_delayed_work(ioc->fw_event_q, &fw_event->work,
 	    msecs_to_jiffies(delay));
@@ -382,7 +325,7 @@ mptsas_cleanup_fw_event_q(MPT_ADAPTER *ioc)
 {
 	struct fw_event_work *fw_event, *next;
 	struct mptsas_target_reset_event *target_reset_list, *n;
-	MPT_SCSI_HOST   *hd = shost_priv(ioc->sh);
+	MPT_SCSI_HOST	*hd = shost_priv(ioc->sh);
 
 	/* flush the target_reset_list */
 	if (!list_empty(&hd->target_reset_list)) {
@@ -493,14 +436,7 @@ mptsas_is_end_device(struct mptsas_devinfo * attached)
 		return 0;
 }
 
-/**
- *	mptsas_port_delete -
- *	@ioc: Pointer to MPT_ADAPTER structure
- *	@port_details:
- *
- *	(no mutex)
- *
- **/
+/* no mutex */
 static void
 mptsas_port_delete(MPT_ADAPTER *ioc, struct mptsas_portinfo_details * port_details)
 {
@@ -529,11 +465,6 @@ mptsas_port_delete(MPT_ADAPTER *ioc, struct mptsas_portinfo_details * port_detai
 	kfree(port_details);
 }
 
-/**
- *	mptsas_get_rphy -
- *	@phy_info:
- *
- **/
 static inline struct sas_rphy *
 mptsas_get_rphy(struct mptsas_phyinfo *phy_info)
 {
@@ -543,13 +474,6 @@ mptsas_get_rphy(struct mptsas_phyinfo *phy_info)
 		return NULL;
 }
 
-/**
- *	mptsas_set_rphy -
- *	@ioc: Pointer to MPT_ADAPTER structure
- *	@phy_info:
- *	@rphy:
- *
- **/
 static inline void
 mptsas_set_rphy(MPT_ADAPTER *ioc, struct mptsas_phyinfo *phy_info, struct sas_rphy *rphy)
 {
@@ -567,11 +491,6 @@ mptsas_set_rphy(MPT_ADAPTER *ioc, struct mptsas_phyinfo *phy_info, struct sas_rp
 	}
 }
 
-/**
- *	mptsas_get_port -
- *	@phy_info:
- *
- **/
 static inline struct sas_port *
 mptsas_get_port(struct mptsas_phyinfo *phy_info)
 {
@@ -581,13 +500,6 @@ mptsas_get_port(struct mptsas_phyinfo *phy_info)
 		return NULL;
 }
 
-/**
- *	mptsas_set_port -
- *	@ioc: Pointer to MPT_ADAPTER structure
- *	@phy_info:
- *	@port:
- *
- **/
 static inline void
 mptsas_set_port(MPT_ADAPTER *ioc, struct mptsas_phyinfo *phy_info, struct sas_port *port)
 {
@@ -602,11 +514,6 @@ mptsas_set_port(MPT_ADAPTER *ioc, struct mptsas_phyinfo *phy_info, struct sas_po
 	}
 }
 
-/**
- *	mptsas_get_starget -
- *	@phy_info:
- *
- **/
 static inline struct scsi_target *
 mptsas_get_starget(struct mptsas_phyinfo *phy_info)
 {
@@ -616,12 +523,6 @@ mptsas_get_starget(struct mptsas_phyinfo *phy_info)
 		return NULL;
 }
 
-/**
- *	mptsas_set_starget -
- *	@phy_info:
- *	@starget:
- *
- **/
 static inline void
 mptsas_set_starget(struct mptsas_phyinfo *phy_info, struct scsi_target *
 starget)
@@ -643,15 +544,15 @@ static void
 mptsas_add_device_component(MPT_ADAPTER *ioc, u8 channel, u8 id,
 	u64 sas_address, u32 device_info, u16 slot, u64 enclosure_logical_id)
 {
-	struct sas_device_info	*sas_info, *next;
+	struct mptsas_device_info	*sas_info, *next;
 	struct scsi_device	*sdev;
 	struct scsi_target	*starget;
-	struct sas_rphy		*rphy;
+	struct sas_rphy	*rphy;
 
 	/*
 	 * Delete all matching devices out of the list
 	 */
-	down(&ioc->sas_device_info_mutex);
+	mutex_lock(&ioc->sas_device_info_mutex);
 	list_for_each_entry_safe(sas_info, next, &ioc->sas_device_info_list,
 	    list) {
 		if (!sas_info->is_logical_volume &&
@@ -663,7 +564,7 @@ mptsas_add_device_component(MPT_ADAPTER *ioc, u8 channel, u8 id,
 		}
 	}
 
-	sas_info = kzalloc(sizeof(struct sas_device_info), GFP_KERNEL);
+	sas_info = kzalloc(sizeof(struct mptsas_device_info), GFP_KERNEL);
 	if (!sas_info)
 		goto out;
 
@@ -693,7 +594,7 @@ mptsas_add_device_component(MPT_ADAPTER *ioc, u8 channel, u8 id,
 	}
 
  out:
-	up(&ioc->sas_device_info_mutex);
+	mutex_unlock(&ioc->sas_device_info_mutex);
 	return;
 }
 
@@ -730,23 +631,23 @@ mptsas_add_device_component_by_fw(MPT_ADAPTER *ioc, u8 channel, u8 id)
 }
 
 /**
- *	mptsas_add_device_component_starget_ir - Handle Integrated RAID, adding
- *	each individual device to list
+ *	mptsas_add_device_component_starget_ir - Handle Integrated RAID, adding each individual device to list
  *	@ioc: Pointer to MPT_ADAPTER structure
  *	@channel: fw mapped id's
  *	@id:
  *
  **/
 static void
-mptsas_add_device_component_starget_ir(MPT_ADAPTER *ioc, struct scsi_target *starget)
+mptsas_add_device_component_starget_ir(MPT_ADAPTER *ioc,
+		struct scsi_target *starget)
 {
 	CONFIGPARMS			cfg;
 	ConfigPageHeader_t		hdr;
 	dma_addr_t			dma_handle;
 	pRaidVolumePage0_t		buffer = NULL;
 	int				i;
-	RaidPhysDiskPage0_t		phys_disk;
-	struct sas_device_info		*sas_info, *next;
+	RaidPhysDiskPage0_t 		phys_disk;
+	struct mptsas_device_info	*sas_info, *next;
 
 	memset(&cfg, 0 , sizeof(CONFIGPARMS));
 	memset(&hdr, 0 , sizeof(ConfigPageHeader_t));
@@ -783,14 +684,14 @@ mptsas_add_device_component_starget_ir(MPT_ADAPTER *ioc, struct scsi_target *sta
 	 */
 	for (i = 0; i < buffer->NumPhysDisks; i++) {
 
-		if(mpt_raid_phys_disk_pg0(ioc,
+		if (mpt_raid_phys_disk_pg0(ioc,
 		    buffer->PhysDisk[i].PhysDiskNum, &phys_disk) != 0)
 			continue;
 
 		mptsas_add_device_component_by_fw(ioc, phys_disk.PhysDiskBus,
 		    phys_disk.PhysDiskID);
 
-		down(&ioc->sas_device_info_mutex);
+		mutex_lock(&ioc->sas_device_info_mutex);
 		list_for_each_entry(sas_info, &ioc->sas_device_info_list,
 		    list) {
 			if (!sas_info->is_logical_volume &&
@@ -800,13 +701,14 @@ mptsas_add_device_component_starget_ir(MPT_ADAPTER *ioc, struct scsi_target *sta
 				sas_info->volume_id = starget->id;
 			}
 		}
-		up(&ioc->sas_device_info_mutex);
+		mutex_unlock(&ioc->sas_device_info_mutex);
+
 	}
 
 	/*
 	 * Delete all matching devices out of the list
 	 */
-	down(&ioc->sas_device_info_mutex);
+	mutex_lock(&ioc->sas_device_info_mutex);
 	list_for_each_entry_safe(sas_info, next, &ioc->sas_device_info_list,
 	    list) {
 		if (sas_info->is_logical_volume && sas_info->fw.id ==
@@ -816,7 +718,7 @@ mptsas_add_device_component_starget_ir(MPT_ADAPTER *ioc, struct scsi_target *sta
 		}
 	}
 
-	sas_info = kzalloc(sizeof(struct sas_device_info), GFP_KERNEL);
+	sas_info = kzalloc(sizeof(struct mptsas_device_info), GFP_KERNEL);
 	if (sas_info) {
 		sas_info->fw.id = starget->id;
 		sas_info->os.id = starget->id;
@@ -825,7 +727,7 @@ mptsas_add_device_component_starget_ir(MPT_ADAPTER *ioc, struct scsi_target *sta
 		INIT_LIST_HEAD(&sas_info->list);
 		list_add_tail(&sas_info->list, &ioc->sas_device_info_list);
 	}
-	up(&ioc->sas_device_info_mutex);
+	mutex_unlock(&ioc->sas_device_info_mutex);
 
  out:
 	if (buffer)
@@ -868,8 +770,7 @@ mptsas_add_device_component_starget(MPT_ADAPTER *ioc,
 }
 
 /**
- *	mptsas_del_device_component_by_os - Once a device has been removed, we
- *	mark the entry in the list as being cached
+ *	mptsas_del_device_component_by_os - Once a device has been removed, we mark the entry in the list as being cached
  *	@ioc: Pointer to MPT_ADAPTER structure
  *	@channel: os mapped id's
  *	@id:
@@ -878,7 +779,7 @@ mptsas_add_device_component_starget(MPT_ADAPTER *ioc,
 static void
 mptsas_del_device_component_by_os(MPT_ADAPTER *ioc, u8 channel, u8 id)
 {
-	struct sas_device_info	*sas_info, *next;
+	struct mptsas_device_info	*sas_info, *next;
 
 	/*
 	 * Set is_cached flag
@@ -898,24 +799,20 @@ mptsas_del_device_component_by_os(MPT_ADAPTER *ioc, u8 channel, u8 id)
 static void
 mptsas_del_device_components(MPT_ADAPTER *ioc)
 {
-	struct sas_device_info	*sas_info, *next;
+	struct mptsas_device_info	*sas_info, *next;
 
-	down(&ioc->sas_device_info_mutex);
+	mutex_lock(&ioc->sas_device_info_mutex);
 	list_for_each_entry_safe(sas_info, next, &ioc->sas_device_info_list,
 		list) {
 		list_del(&sas_info->list);
 		kfree(sas_info);
 	}
-	up(&ioc->sas_device_info_mutex);
+	mutex_unlock(&ioc->sas_device_info_mutex);
 }
 
 
 /*
  * mptsas_setup_wide_ports
- *	configuration
- *	in the sas_topology
- *	@ioc: Pointer to MPT_ADAPTER structure
- *	@port_info:
  *
  * Updates for new and existing narrow/wide port configuration
  * in the sas_topology
@@ -939,14 +836,13 @@ mptsas_setup_wide_ports(MPT_ADAPTER *ioc, struct mptsas_portinfo *port_info)
 			continue;
 		if (port_details->num_phys < 2)
 			continue;
-
 		/*
 		 * Removing a phy from a port, letting the last
 		 * phy be removed by firmware events.
 		 */
 		dsaswideprintk(ioc, printk(MYIOC_s_DEBUG_FMT
-			"%s: [%p]: deleting phy = %d\n",
-			ioc->name, __FUNCTION__, port_details, i));
+		    "%s: [%p]: deleting phy = %d\n",
+		    ioc->name, __func__, port_details, i));
 		port_details->num_phys--;
 		port_details->phy_bitmask &= ~ (1 << phy_info->phy_id);
 		memset(&phy_info->attached, 0, sizeof(struct mptsas_devinfo));
@@ -1049,18 +945,19 @@ mptsas_setup_wide_ports(MPT_ADAPTER *ioc, struct mptsas_portinfo *port_info)
 }
 
 /**
- *	mptsas_find_vtarget - obtain vtarget object for non-raid devices
- *	@ioc: Pointer to MPT_ADAPTER structure
- *	@channel:
- *	@id:
+ * csmisas_find_vtarget
+ *
+ * @ioc
+ * @volume_id
+ * @volume_bus
  *
  **/
 static VirtTarget *
 mptsas_find_vtarget(MPT_ADAPTER *ioc, u8 channel, u8 id)
 {
-	struct scsi_device		*sdev;
+	struct scsi_device 		*sdev;
 	VirtDevice			*vdevice;
-	VirtTarget			*vtarget = NULL;
+	VirtTarget 			*vtarget = NULL;
 
 	shost_for_each_device(sdev, ioc->sh) {
 		vdevice = sdev->hostdata;
@@ -1120,14 +1017,16 @@ mptsas_queue_rescan(MPT_ADAPTER *ioc)
 
 
 /**
- *	mptsas_target_reset - Issues TARGET_RESET to end device using
- *	handshaking method
- *	@ioc: Pointer to MPT_ADAPTER structure
- *	@channel:
- *	@id:
+ * mptsas_target_reset
  *
- *	Returns (1) success
- *		(0) failure
+ * Issues TARGET_RESET to end device using handshaking method
+ *
+ * @ioc
+ * @channel
+ * @id
+ *
+ * Returns (1) success
+ *         (0) failure
  *
  **/
 static int
@@ -1135,7 +1034,6 @@ mptsas_target_reset(MPT_ADAPTER *ioc, u8 channel, u8 id)
 {
 	MPT_FRAME_HDR	*mf;
 	SCSITaskMgmt_t	*pScsiTm;
-
 	if (mpt_set_taskmgmt_in_progress_flag(ioc) != 0)
 		return 0;
 
@@ -1191,13 +1089,15 @@ mptsas_block_io_starget(struct scsi_target *starget)
 }
 
 /**
- * mptsas_target_reset_queue -
- * @ioc: Pointer to MPT_ADAPTER structure
- * @sas_event_data:
+ * mptsas_target_reset_queue
  *
- * Receive request for TARGET_RESET after
- * recieving an firmware event NOT_RESPONDING_EVENT, then put command in
- * link list and queue if task_queue already in use.
+ * Receive request for TARGET_RESET after recieving an firmware
+ * event NOT_RESPONDING_EVENT, then put command in link list
+ * and queue if task_queue already in use.
+ *
+ * @ioc
+ * @sas_event_data
+ *
  **/
 static void
 mptsas_target_reset_queue(MPT_ADAPTER *ioc,
@@ -1211,11 +1111,10 @@ mptsas_target_reset_queue(MPT_ADAPTER *ioc,
 	id = sas_event_data->TargetID;
 	channel = sas_event_data->Bus;
 
-	if ((vtarget = mptsas_find_vtarget(ioc, channel, id))) {
-		if (!ioc->disable_hotplug_remove) {
-			mptsas_block_io_starget(vtarget->starget);
-			vtarget->deleted = 1; /* block IO */
-		}
+	vtarget = mptsas_find_vtarget(ioc, channel, id);
+	if (vtarget) {
+		mptsas_block_io_starget(vtarget->starget);
+		vtarget->deleted = 1; /* block IO */
 	}
 
 	target_reset_list = kzalloc(sizeof(struct mptsas_target_reset_event),
@@ -1239,57 +1138,20 @@ mptsas_target_reset_queue(MPT_ADAPTER *ioc,
 }
 
 /**
- * mptsas_schedule_target_reset- send pending target reset
- * @iocp: per adapter object
- *
- * This function will delete scheduled target reset from the list and
- * try to send next target reset. This will be called from completion
- * context of any Task managment command.
- */
-
-void
-mptsas_schedule_target_reset(void *iocp)
-{
-	MPT_ADAPTER *ioc = (MPT_ADAPTER*)(iocp);
-	MPT_SCSI_HOST	*hd = shost_priv(ioc->sh);
-	struct list_head *head = &hd->target_reset_list;
-	struct mptsas_target_reset_event	*target_reset_list;
-	u8		id, channel;
-	/*
-	 * issue target reset to next device in the queue
-	 */
-
-	head = &hd->target_reset_list;
-	if (list_empty(head))
-		return;
-
-	target_reset_list = list_entry(head->next,
-		struct mptsas_target_reset_event, list);
-
-	id = target_reset_list->sas_event_data.TargetID;
-	channel = target_reset_list->sas_event_data.Bus;
-	target_reset_list->time_count = jiffies;
-
-	if (mptsas_target_reset(ioc, channel, id))
-		target_reset_list->target_reset_issued = 1;
-	return;
-}
-
-
-/**
- *	mptsas_taskmgmt_complete - Completion for TARGET_RESET after
- *	NOT_RESPONDING_EVENT, enable work queue to finish off removing device
- *	from upper layers. then send next TARGET_RESET in the queue.
+ *	mptsas_taskmgmt_complete - complete SAS task management function
  *	@ioc: Pointer to MPT_ADAPTER structure
  *
+ *	Completion for TARGET_RESET after NOT_RESPONDING_EVENT, enable work
+ *	queue to finish off removing device from upper layers. then send next
+ *	TARGET_RESET in the queue.
  **/
 static int
 mptsas_taskmgmt_complete(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 {
 	MPT_SCSI_HOST	*hd = shost_priv(ioc->sh);
-	struct list_head *head = &hd->target_reset_list;
-	struct mptsas_target_reset_event	*target_reset_list;
+        struct list_head *head = &hd->target_reset_list;
 	u8		id, channel;
+	struct mptsas_target_reset_event	*target_reset_list;
 	SCSITaskMgmtReply_t *pScsiTmReply;
 
 	dtmprintk(ioc, printk(MYIOC_s_DEBUG_FMT "TaskMgmt completed: "
@@ -1364,15 +1226,32 @@ mptsas_taskmgmt_complete(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *mr)
 			&target_reset_list->sas_event_data);
 
 
-	ioc->schedule_target_reset(ioc);
+	/*
+	 * issue target reset to next device in the queue
+	 */
+
+	head = &hd->target_reset_list;
+	if (list_empty(head))
+		return 1;
+
+	target_reset_list = list_entry(head->next, struct mptsas_target_reset_event,
+	    list);
+
+	id = target_reset_list->sas_event_data.TargetID;
+	channel = target_reset_list->sas_event_data.Bus;
+	target_reset_list->time_count = jiffies;
+
+	if (mptsas_target_reset(ioc, channel, id))
+		target_reset_list->target_reset_issued = 1;
 
 	return 1;
 }
 
 /**
- *	mptsas_ioc_reset -
- *	@ioc: Pointer to MPT_ADAPTER structure
- *	@reset_phase:
+ * mptscsih_ioc_reset
+ *
+ * @ioc
+ * @reset_phase
  *
  **/
 static int
@@ -1417,6 +1296,7 @@ mptsas_ioc_reset(MPT_ADAPTER *ioc, int reset_phase)
 	return rc;
 }
 
+
 /**
  * enum device_state -
  * @DEVICE_RETRY: need to retry the TUR
@@ -1430,15 +1310,6 @@ enum device_state{
 	DEVICE_READY,
 };
 
-
-/**
- *	mptsas_sas_enclosure_pg0 -
- *	@ioc: Pointer to MPT_ADAPTER structure
- *	@enclosure:
- *	@form:
- *	@form_specific:
- *
- **/
 static int
 mptsas_sas_enclosure_pg0(MPT_ADAPTER *ioc, struct mptsas_enclosure *enclosure,
 		u32 form, u32 form_specific)
@@ -1583,8 +1454,7 @@ mptsas_add_end_device(MPT_ADAPTER *ioc, struct mptsas_phyinfo *phy_info)
 }
 
 /**
- *	mptsas_del_end_device - report a deleted end device to sas transport
- *	layer
+ *	mptsas_del_end_device - report a deleted end device to sas transport layer
  *	@ioc: Pointer to MPT_ADAPTER structure
  *	@phy_info: decribes attached device
  *
@@ -1782,297 +1652,13 @@ mptsas_firmware_event_work(struct work_struct *work)
 
 
 
-/**
- *	mptsas_get_lun_number - returns the first entry in report_luns table
- *	@ioc: Pointer to MPT_ADAPTER structure
- *	@channel:
- *	@id:
- *	@lun:
- *
- */
-static int
-mptsas_get_lun_number(MPT_ADAPTER *ioc, u8 channel, u8 id, int *lun)
-{
-	INTERNAL_CMD	*iocmd;
-	struct scsi_lun *lun_data;
-	dma_addr_t	lun_data_dma;
-	u32		lun_data_len;
-	u8		*data;
-	MPT_SCSI_HOST	*hd;
-	int		rc;
-	u32		length, num_luns;
-
-	iocmd = NULL;
-	hd = shost_priv(ioc->sh);
-	lun_data_len = (255 * sizeof(struct scsi_lun));
-	lun_data = pci_alloc_consistent(ioc->pcidev, lun_data_len,
-	    &lun_data_dma);
-	if (!lun_data) {
-		printk(MYIOC_s_ERR_FMT "%s: pci_alloc_consistent(%d) FAILED!\n",
-		    ioc->name, __FUNCTION__, lun_data_len);
-		rc = -ENOMEM;
-		goto out;
-	}
-
-	iocmd = kzalloc(sizeof(INTERNAL_CMD), GFP_KERNEL);
-	if (!iocmd) {
-		printk(MYIOC_s_ERR_FMT "%s: kzalloc(%zd) FAILED!\n",
-		    ioc->name, __FUNCTION__, sizeof(INTERNAL_CMD));
-		rc = -ENOMEM;
-		goto out;
-	}
-
-	/*
-	 * Report Luns
-	 */
-	iocmd->cmd = REPORT_LUNS;
-	iocmd->data_dma = lun_data_dma;
-	iocmd->data = (u8 *)lun_data;
-	iocmd->size = lun_data_len;
-	iocmd->channel = channel;
-	iocmd->id = id;
-
-	if ((rc = mptscsih_do_cmd(hd, iocmd)) < 0) {
-		printk(MYIOC_s_ERR_FMT "%s: fw_channel=%d fw_id=%d: "
-		    "report_luns failed due to rc=0x%x\n", ioc->name,
-		    __FUNCTION__, channel, id, rc);
-		goto out;
-	}
-
-	if (rc != MPT_SCANDV_GOOD) {
-		printk(MYIOC_s_ERR_FMT "%s: fw_channel=%d fw_id=%d: "
-		    "report_luns failed due to rc=0x%x\n", ioc->name,
-		    __FUNCTION__, channel, id, rc);
-		rc = -rc;
-		goto out;
-	}
-
-	data = (u8 *)lun_data;
-	length = ((data[0] << 24) | (data[1] << 16) |
-	    (data[2] << 8) | (data[3] << 0));
-
-	num_luns = (length / sizeof(struct scsi_lun));
-	if (!num_luns)
-		goto out;
-	/* return 1st lun in the list */
-	*lun = scsilun_to_int(&lun_data[1]);
-
-#if 0
-	/* some debugging, left commented out */
-	{
-		struct scsi_lun *lunp;
-		for (lunp = &lun_data[1]; lunp <= &lun_data[num_luns]; lunp++)
-			printk("%x\n", scsilun_to_int(lunp));
-	}
-#endif
-
- out:
-	if (lun_data)
-		pci_free_consistent(ioc->pcidev, lun_data_len, lun_data,
-		    lun_data_dma);
-	kfree(iocmd);
-	return rc;
-}
-
-/**
- * mptsas_test_unit_ready -
- * @ioc: Pointer to MPT_ADAPTER structure
- * @channel:
- * @id:
- * @count: retry count
- *
- */
-enum device_state
-mptsas_test_unit_ready(MPT_ADAPTER *ioc, u8 channel, u8 id, u16 count)
-{
-	INTERNAL_CMD	*iocmd;
-	MPT_SCSI_HOST	*hd = shost_priv(ioc->sh);
-	enum device_state	state;
-	int			rc;
-	u8		skey, asc, ascq;
-	u8		retry_ua;
-
-	if (count >= mpt_cmd_retry_count)
-		return DEVICE_ERROR;
-
-	retry_ua = 0;
-	iocmd = kzalloc(sizeof(INTERNAL_CMD), GFP_KERNEL);
-	if (!iocmd) {
-		printk(MYIOC_s_ERR_FMT "%s: kzalloc(%zd) FAILED!\n",
-		__FUNCTION__, ioc->name, sizeof(INTERNAL_CMD));
-		return DEVICE_ERROR;
-	}
-
-	state = DEVICE_ERROR;
-	iocmd->cmd = TEST_UNIT_READY;
-	iocmd->data_dma = -1;
-	iocmd->data = NULL;
-
-	if (mptscsih_is_phys_disk(ioc, channel, id)) {
-		iocmd->flags |= MPT_ICFLAG_PHYS_DISK;
-		iocmd->physDiskNum = mptscsih_raid_id_to_num(ioc, channel, id);
-		iocmd->id = id;
-	}
-	iocmd->channel = channel;
-	iocmd->id = id;
-
- retry:
-	devtprintk(ioc, printk(MYIOC_s_DEBUG_FMT "%s: fw_channel=%d "
-	    "fw_id=%d retry=%d\n", ioc->name, __FUNCTION__, channel, id, count));
-	rc = mptscsih_do_cmd(hd, iocmd);
-	devtprintk(ioc, printk(MYIOC_s_DEBUG_FMT "%s: rc=0x%02x\n",
-	    ioc->name, __FUNCTION__, rc));
-	if (rc < 0) {
-		printk(MYIOC_s_ERR_FMT "%s: fw_channel=%d fw_id=%d: "
-		    "tur failed due to timeout\n", ioc->name,
-		    __FUNCTION__, channel, id);
-		goto tur_done;
-	}
-
-	switch(rc) {
-	case MPT_SCANDV_GOOD:
-		state = DEVICE_READY;
-		goto tur_done;
-	case MPT_SCANDV_BUSY:
-		devtprintk(ioc, printk(MYIOC_s_DEBUG_FMT "%s: "
-		    "fw_channel=%d fw_id=%d : device busy\n",
-		    ioc->name, __FUNCTION__, channel, id));
-		state = DEVICE_RETRY;
-		break;
-	case MPT_SCANDV_DID_RESET:
-		devtprintk(ioc, printk(MYIOC_s_DEBUG_FMT "%s: "
-		    "fw_channel=%d fw_id=%d : did reset\n",
-		    ioc->name, __FUNCTION__, channel, id));
-		state = DEVICE_RETRY;
-		break;
-	case MPT_SCANDV_SENSE:
-		skey = ioc->internal_cmds.sense[2] & 0x0F;
-		asc = ioc->internal_cmds.sense[12];
-		ascq = ioc->internal_cmds.sense[13];
-
-		devtprintk(ioc, printk(MYIOC_s_DEBUG_FMT "%s: "
-		    "fw_channel=%d fw_id=%d : [sense_key,asc,"
-		    "ascq]: [0x%02x,0x%02x,0x%02x]\n", ioc->name,
-		     __FUNCTION__, channel, id, skey, asc, ascq));
-
-		if (skey == UNIT_ATTENTION) {
-			state = DEVICE_RETRY;
-			break;
-		} else if (skey == NOT_READY) {
-			/*
-			 * medium isn't present
-			 */
-			if (asc == 0x3a) {
-				state = DEVICE_READY;
-				goto tur_done;
-			}
-			/*
-			 * LU becoming ready, or
-			 * LU hasn't self-configured yet
-			 */
-			if ((asc == 0x04 && ascq == 0x01) ||
-			    (asc == 0x04 && ascq == 0x11) ||
-			    asc == 0x3e) {
-				state = DEVICE_RETRY;
-				break;
-			}
-		} else if (skey == ILLEGAL_REQUEST) {
-		/* try sending a tur to a non-zero lun number */
-			if (!iocmd->lun && !mptsas_get_lun_number(ioc,
-			    channel, id, &iocmd->lun) && iocmd->lun)
-				goto retry;
-		}
-		printk(MYIOC_s_ERR_FMT "%s: fw_channel=%d fw_id=%d : "
-		    "tur failed due to [sense_key,asc,ascq]: "
-		    "[0x%02x,0x%02x,0x%02x]\n", ioc->name,
-		    __FUNCTION__, channel, id, skey, asc, ascq);
-		goto tur_done;
-	case MPT_SCANDV_SELECTION_TIMEOUT:
-		printk(MYIOC_s_ERR_FMT "%s: fw_channel=%d fw_id=%d: "
-		    "tur failed due to no device\n", ioc->name,
-		    __FUNCTION__, channel,
-		    id);
-		goto tur_done;
-	case MPT_SCANDV_SOME_ERROR:
-		printk(MYIOC_s_ERR_FMT "%s: fw_channel=%d fw_id=%d: "
-		    "tur failed due to some error\n", ioc->name,
-		    __FUNCTION__,
-		    channel, id);
-		goto tur_done;
-	default:
-		printk(MYIOC_s_ERR_FMT
-		    "%s: fw_channel=%d fw_id=%d: tur failed due to "
-		    "unknown rc=0x%02x\n", ioc->name, __FUNCTION__,
-		    channel, id, rc );
-		goto tur_done;
-	}
- tur_done:
-	kfree(iocmd);
-	return state;
-}
-
-/**
- *	mptsas_issue_tlr - Enabling Transport Layer Retries
- *	@hd:
- *	@sdev:
- *
- **/
-static void
-mptsas_issue_tlr(MPT_SCSI_HOST *hd, struct scsi_device *sdev)
-{
-	INTERNAL_CMD	*iocmd;
-	VirtDevice	*vdevice = sdev->hostdata;
-	u8		retries;
-	u8		rc;
-	MPT_ADAPTER *ioc = hd->ioc;
-
-	if ( sdev->inquiry[8]  == 'H' &&
-	     sdev->inquiry[9]  == 'P' &&
-	     sdev->inquiry[10] == ' ' &&
-	     sdev->inquiry[11] == ' ' &&
-	     sdev->inquiry[12] == ' ' &&
-	     sdev->inquiry[13] == ' ' &&
-	     sdev->inquiry[14] == ' ' &&
-	     sdev->inquiry[15] == ' ' ) {
-
-		iocmd = kzalloc(sizeof(INTERNAL_CMD), GFP_KERNEL);
-		if (!iocmd) {
-			printk(MYIOC_s_ERR_FMT "%s: kzalloc(%zd) FAILED!\n",
-			__FUNCTION__, ioc->name, sizeof(INTERNAL_CMD));
-			return;
-		}
-		iocmd->id = vdevice->vtarget->id;
-		iocmd->channel = vdevice->vtarget->channel;
-		iocmd->lun = vdevice->lun;
-		iocmd->physDiskNum = -1;
-		iocmd->cmd = TRANSPORT_LAYER_RETRIES;
-		iocmd->data_dma = -1;
-		for (retries = 0, rc = -1; retries < 3; retries++) {
-			rc = mptscsih_do_cmd(hd, iocmd);
-			if (!rc)
-				break;
-		}
-		if (rc != 0)
-			printk(MYIOC_s_DEBUG_FMT "unable to enable TLR on"
-			   " fw_channel %d, fw_id %d, lun=%d\n",
-			   ioc->name, vdevice->vtarget->channel,
-			   vdevice->vtarget->id, sdev->lun);
-		kfree(iocmd);
-	}
-}
-
-/**
- *	mptsas_slave_configure -
- *	@sdev:
- *
- **/
 static int
 mptsas_slave_configure(struct scsi_device *sdev)
 {
 	struct Scsi_Host	*host = sdev->host;
-	MPT_SCSI_HOST		*hd = shost_priv(host);
-	MPT_ADAPTER		*ioc = hd->ioc;
-	VirtDevice		*vdevice = sdev->hostdata;
+	MPT_SCSI_HOST	*hd = shost_priv(host);
+	MPT_ADAPTER	*ioc = hd->ioc;
+	VirtDevice	*vdevice = sdev->hostdata;
 
 	if (vdevice->vtarget->deleted) {
 		sdev_printk(KERN_INFO, sdev, "clearing deleted flag\n");
@@ -2092,19 +1678,10 @@ mptsas_slave_configure(struct scsi_device *sdev)
 
 	mptsas_add_device_component_starget(ioc, scsi_target(sdev));
 
-	if (sdev->type == TYPE_TAPE &&
-	    (ioc->facts.IOCCapabilities & MPI_IOCFACTS_CAPABILITY_TLR ))
-		mptsas_issue_tlr(hd, sdev);
  out:
-
 	return mptscsih_slave_configure(sdev);
 }
 
-/**
- *	mptsas_target_alloc -
- *	@starget:
- *
- **/
 static int
 mptsas_target_alloc(struct scsi_target *starget)
 {
@@ -2114,7 +1691,7 @@ mptsas_target_alloc(struct scsi_target *starget)
 	u8			id, channel;
 	struct sas_rphy		*rphy;
 	struct mptsas_portinfo	*p;
-	int			 i;
+	int 			 i;
 	MPT_ADAPTER		*ioc = hd->ioc;
 
 	vtarget = kzalloc(sizeof(VirtTarget), GFP_KERNEL);
@@ -2135,9 +1712,13 @@ mptsas_target_alloc(struct scsi_target *starget)
 			kfree(vtarget);
 			return -ENXIO;
 		}
-		for (i=0; i < ioc->raid_data.pIocPg2->NumActiveVolumes; i++)
-			if (id == ioc->raid_data.pIocPg2->RaidVolume[i].VolumeID)
-				channel = ioc->raid_data.pIocPg2->RaidVolume[i].VolumeBus;
+		for (i = 0; i < ioc->raid_data.pIocPg2->NumActiveVolumes; i++) {
+			if (id == ioc->raid_data.pIocPg2->
+					RaidVolume[i].VolumeID) {
+				channel = ioc->raid_data.pIocPg2->
+					RaidVolume[i].VolumeBus;
+			}
+		}
 		vtarget->raidVolume = 1;
 		goto out;
 	}
@@ -2152,12 +1733,6 @@ mptsas_target_alloc(struct scsi_target *starget)
 			id = p->phy_info[i].attached.id;
 			channel = p->phy_info[i].attached.channel;
 			mptsas_set_starget(&p->phy_info[i], starget);
-
-			starget_printk(KERN_INFO, starget, MYIOC_s_FMT
-			"add device: fw_channel %d, fw_id %d, phy %d, sas_addr 0x%llx\n",
-			ioc->name, p->phy_info[i].attached.channel,
-			p->phy_info[i].attached.id, p->phy_info[i].attached.phy_id,
-			(unsigned long long)p->phy_info[i].attached.sas_address);
 
 			/*
 			 * Exposing hidden raid components
@@ -2185,11 +1760,6 @@ mptsas_target_alloc(struct scsi_target *starget)
 	return 0;
 }
 
-/**
- *	mptsas_target_destroy -
- *	@starget:
- *
- **/
 static void
 mptsas_target_destroy(struct scsi_target *starget)
 {
@@ -2197,7 +1767,7 @@ mptsas_target_destroy(struct scsi_target *starget)
 	MPT_SCSI_HOST		*hd = shost_priv(host);
 	struct sas_rphy		*rphy;
 	struct mptsas_portinfo	*p;
-	int			 i;
+	int 			 i;
 	MPT_ADAPTER	*ioc = hd->ioc;
 	VirtTarget	*vtarget;
 
@@ -2208,6 +1778,7 @@ mptsas_target_destroy(struct scsi_target *starget)
 
 	mptsas_del_device_component_by_os(ioc, starget->channel,
 	    starget->id);
+
 
 	if (starget->channel == MPTSAS_RAID_CHANNEL)
 		goto out;
@@ -2237,11 +1808,7 @@ mptsas_target_destroy(struct scsi_target *starget)
 	starget->hostdata = NULL;
 }
 
-/**
- *	mptsas_slave_alloc -
- *	@sdev:
- *
- **/
+
 static int
 mptsas_slave_alloc(struct scsi_device *sdev)
 {
@@ -2250,8 +1817,8 @@ mptsas_slave_alloc(struct scsi_device *sdev)
 	struct sas_rphy		*rphy;
 	struct mptsas_portinfo	*p;
 	VirtDevice		*vdevice;
-	struct scsi_target	*starget;
-	int			i;
+	struct scsi_target 	*starget;
+	int 			i;
 	MPT_ADAPTER *ioc = hd->ioc;
 
 	vdevice = kzalloc(sizeof(VirtDevice), GFP_KERNEL);
@@ -2263,9 +1830,6 @@ mptsas_slave_alloc(struct scsi_device *sdev)
 	starget = scsi_target(sdev);
 	vdevice->vtarget = starget->hostdata;
 
-	/*
-	 * RAID volumes placed beyond the last expected port.
-	 */
 	if (sdev->channel == MPTSAS_RAID_CHANNEL)
 		goto out;
 
@@ -2299,12 +1863,6 @@ mptsas_slave_alloc(struct scsi_device *sdev)
 	return 0;
 }
 
-/**
- *	mptsas_qcmd -
- *	@SCpnt:
- *	@done:
- *
- **/
 static int
 mptsas_qcmd(struct scsi_cmnd *SCpnt, void (*done)(struct scsi_cmnd *))
 {
@@ -2335,7 +1893,7 @@ static struct scsi_host_template mptsas_driver_template = {
 	.module				= THIS_MODULE,
 	.proc_name			= "mptsas",
 	.proc_info			= mptscsih_proc_info,
-	.name				= "MPT SAS Host",
+	.name				= "MPT SPI Host",
 	.info				= mptscsih_info,
 	.queuecommand			= mptsas_qcmd,
 	.target_alloc			= mptsas_target_alloc,
@@ -2343,7 +1901,7 @@ static struct scsi_host_template mptsas_driver_template = {
 	.slave_configure		= mptsas_slave_configure,
 	.target_destroy			= mptsas_target_destroy,
 	.slave_destroy			= mptscsih_slave_destroy,
-	.change_queue_depth		= mptscsih_change_queue_depth,
+	.change_queue_depth 		= mptscsih_change_queue_depth,
 	.eh_abort_handler		= mptscsih_abort,
 	.eh_device_reset_handler	= mptscsih_dev_reset,
 	.eh_bus_reset_handler		= mptscsih_bus_reset,
@@ -2358,11 +1916,6 @@ static struct scsi_host_template mptsas_driver_template = {
 	.shost_attrs			= mptscsih_host_attrs,
 };
 
-/**
- *	mptsas_get_linkerrors -
- *	@phy:
- *
- **/
 static int mptsas_get_linkerrors(struct sas_phy *phy)
 {
 	MPT_ADAPTER *ioc = phy_to_ioc(phy);
@@ -2425,13 +1978,6 @@ static int mptsas_get_linkerrors(struct sas_phy *phy)
 	return error;
 }
 
-/**
- *	mptsas_mgmt_done -
- *	@ioc: Pointer to MPT_ADAPTER structure
- *	@req:
- *	@reply:
- *
- **/
 static int mptsas_mgmt_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *req,
 		MPT_FRAME_HDR *reply)
 {
@@ -2450,12 +1996,6 @@ static int mptsas_mgmt_done(MPT_ADAPTER *ioc, MPT_FRAME_HDR *req,
 	return 0;
 }
 
-/**
- *	mptsas_phy_reset -
- *	@phy:
- *	@hard_reset:
- *
- **/
 static int mptsas_phy_reset(struct sas_phy *phy, int hard_reset)
 {
 	MPT_ADAPTER *ioc = phy_to_ioc(phy);
@@ -2494,16 +2034,14 @@ static int mptsas_phy_reset(struct sas_phy *phy, int hard_reset)
 
 	INITIALIZE_MGMT_STATUS(ioc->sas_mgmt.status)
 	mpt_put_msg_frame(mptsasMgmtCtx, ioc, mf);
-	timeleft = wait_for_completion_timeout(&ioc->sas_mgmt.done, 10*HZ);
-	if (!(ioc->sas_mgmt.status & MPT_MGMT_STATUS_COMMAND_GOOD)) {
-		error = -ETIME;
+
+	timeleft = wait_for_completion_timeout(&ioc->sas_mgmt.done,
+			10 * HZ);
+	if (!timeleft) {
+		/* On timeout reset the board */
 		mpt_free_msg_frame(ioc, mf);
-		if (ioc->sas_mgmt.status & MPT_MGMT_STATUS_DID_IOCRESET)
-			goto out_unlock;
-		if (!timeleft) {
-			if (mpt_SoftResetHandler(ioc, CAN_SLEEP) != 0)
-				mpt_HardResetHandler(ioc, CAN_SLEEP);
-		}
+		mpt_HardResetHandler(ioc, CAN_SLEEP);
+		error = -ETIMEDOUT;
 		goto out_unlock;
 	}
 
@@ -2532,12 +2070,6 @@ static int mptsas_phy_reset(struct sas_phy *phy, int hard_reset)
 	return error;
 }
 
-/**
- *	mptsas_get_enclosure_identifier -
- *	@rphy:
- *	@identifier:
- *
- **/
 static int
 mptsas_get_enclosure_identifier(struct sas_rphy *rphy, u64 *identifier)
 {
@@ -2572,11 +2104,6 @@ mptsas_get_enclosure_identifier(struct sas_rphy *rphy, u64 *identifier)
 	return error;
 }
 
-/**
- *	mptsas_get_bay_identifier -
- *	@rphy:
- *
- **/
 static int
 mptsas_get_bay_identifier(struct sas_rphy *rphy)
 {
@@ -2664,14 +2191,10 @@ static int mptsas_smp_handler(struct Scsi_Host *shost, struct sas_rphy *rphy,
 		(((int *) mf) + (offsetof(SmpPassthroughRequest_t, SGL) / 4));
 
 	/* request */
-
-	flagsLength = MPI_SGE_FLAGS_SIMPLE_ELEMENT |
-		MPI_SGE_FLAGS_SYSTEM_ADDRESS |
-		MPI_SGE_FLAGS_HOST_TO_IOC |
-		MPI_SGE_FLAGS_END_OF_BUFFER;
-
-	flagsLength = flagsLength << MPI_SGE_FLAGS_SHIFT;
-
+	flagsLength = (MPI_SGE_FLAGS_SIMPLE_ELEMENT |
+		       MPI_SGE_FLAGS_END_OF_BUFFER |
+		       MPI_SGE_FLAGS_DIRECTION)
+		       << MPI_SGE_FLAGS_SHIFT;
 	flagsLength |= (blk_rq_bytes(req) - 4);
 
 	dma_addr_out = pci_map_single(ioc->pcidev, bio_data(req->bio),
@@ -2692,27 +2215,20 @@ static int mptsas_smp_handler(struct Scsi_Host *shost, struct sas_rphy *rphy,
 	dma_addr_in =  pci_map_single(ioc->pcidev, bio_data(rsp->bio),
 				      blk_rq_bytes(rsp), PCI_DMA_BIDIRECTIONAL);
 	if (!dma_addr_in)
-		goto out_unmap;
-
+		goto unmap;
 	ioc->add_sge(psge, flagsLength, dma_addr_in);
 
 	INITIALIZE_MGMT_STATUS(ioc->sas_mgmt.status)
 	mpt_put_msg_frame(mptsasMgmtCtx, ioc, mf);
 
 	timeleft = wait_for_completion_timeout(&ioc->sas_mgmt.done, 10 * HZ);
-	if (!(ioc->sas_mgmt.status & MPT_MGMT_STATUS_COMMAND_GOOD)) {
-		ret = -ETIME;
-		mpt_free_msg_frame(ioc, mf);
-		mf = NULL;
-		if (ioc->sas_mgmt.status & MPT_MGMT_STATUS_DID_IOCRESET)
-			goto out_unmap;
-		if (!timeleft) {
-			if (mpt_SoftResetHandler(ioc, CAN_SLEEP) != 0)
-				mpt_HardResetHandler(ioc, CAN_SLEEP);
-		}
-		goto out_unmap;
+	if (!timeleft) {
+		printk(MYIOC_s_ERR_FMT "%s: smp timeout!\n", ioc->name, __func__);
+		/* On timeout reset the board */
+		mpt_HardResetHandler(ioc, CAN_SLEEP);
+		ret = -ETIMEDOUT;
+		goto unmap;
 	}
-
 	mf = NULL;
 
 	if (ioc->sas_mgmt.status & MPT_MGMT_STATUS_RF_VALID) {
@@ -2729,7 +2245,7 @@ static int mptsas_smp_handler(struct Scsi_Host *shost, struct sas_rphy *rphy,
 		    ioc->name, __func__);
 		ret = -ENXIO;
 	}
-out_unmap:
+unmap:
 	if (dma_addr_out)
 		pci_unmap_single(ioc->pcidev, dma_addr_out, blk_rq_bytes(req),
 				 PCI_DMA_BIDIRECTIONAL);
@@ -2746,7 +2262,6 @@ out:
 	return ret;
 }
 
-
 static struct sas_function_template mptsas_transport_functions = {
 	.get_linkerrors		= mptsas_get_linkerrors,
 	.get_enclosure_identifier = mptsas_get_enclosure_identifier,
@@ -2757,12 +2272,6 @@ static struct sas_function_template mptsas_transport_functions = {
 
 static struct scsi_transport_template *mptsas_transport_template;
 
-/**
- *	mptsas_sas_io_unit_pg0 -
- *	@ioc: Pointer to MPT_ADAPTER structure
- *	@port_info:
- *
- **/
 static int
 mptsas_sas_io_unit_pg0(MPT_ADAPTER *ioc, struct mptsas_portinfo *port_info)
 {
@@ -2811,7 +2320,7 @@ mptsas_sas_io_unit_pg0(MPT_ADAPTER *ioc, struct mptsas_portinfo *port_info)
 
 	port_info->num_phys = buffer->NumPhys;
 	port_info->phy_info = kcalloc(port_info->num_phys,
-		sizeof(struct mptsas_phyinfo),GFP_KERNEL);
+		sizeof(struct mptsas_phyinfo), GFP_KERNEL);
 	if (!port_info->phy_info) {
 		error = -ENOMEM;
 		goto out_free_consistent;
@@ -2841,11 +2350,6 @@ mptsas_sas_io_unit_pg0(MPT_ADAPTER *ioc, struct mptsas_portinfo *port_info)
 	return error;
 }
 
-/**
- *	mptsas_sas_io_unit_pg1 -
- *	@ioc: Pointer to MPT_ADAPTER structure
- *
- **/
 static int
 mptsas_sas_io_unit_pg1(MPT_ADAPTER *ioc)
 {
@@ -2861,11 +2365,11 @@ mptsas_sas_io_unit_pg1(MPT_ADAPTER *ioc)
 
 	cfg.cfghdr.ehdr = &hdr;
 	cfg.action = MPI_CONFIG_ACTION_PAGE_HEADER;
+	cfg.timeout = SAS_CONFIG_PAGE_TIMEOUT;
 	cfg.cfghdr.ehdr->PageType = MPI_CONFIG_PAGETYPE_EXTENDED;
 	cfg.cfghdr.ehdr->ExtPageType = MPI_CONFIG_EXTPAGETYPE_SAS_IO_UNIT;
 	cfg.cfghdr.ehdr->PageVersion = MPI_SASIOUNITPAGE1_PAGEVERSION;
 	cfg.cfghdr.ehdr->PageNumber = 1;
-	cfg.timeout = SAS_CONFIG_PAGE_TIMEOUT;
 
 	error = mpt_config(ioc, &cfg);
 	if (error)
@@ -2903,14 +2407,6 @@ mptsas_sas_io_unit_pg1(MPT_ADAPTER *ioc)
 	return error;
 }
 
-/**
- *	mptsas_sas_phy_pg0 -
- *	@ioc: Pointer to MPT_ADAPTER structure
- *	@phy_info:
- *	@form:
- *	@form_specific:
- *
- **/
 static int
 mptsas_sas_phy_pg0(MPT_ADAPTER *ioc, struct mptsas_phyinfo *phy_info,
 		u32 form, u32 form_specific)
@@ -2931,12 +2427,12 @@ mptsas_sas_phy_pg0(MPT_ADAPTER *ioc, struct mptsas_phyinfo *phy_info,
 
 	cfg.cfghdr.ehdr = &hdr;
 	cfg.dir = 0;	/* read */
+	cfg.timeout = SAS_CONFIG_PAGE_TIMEOUT;
 
 	/* Get Phy Pg 0 for each Phy. */
 	cfg.physAddr = -1;
 	cfg.pageAddr = form + form_specific;
 	cfg.action = MPI_CONFIG_ACTION_PAGE_HEADER;
-	cfg.timeout = SAS_CONFIG_PAGE_TIMEOUT;
 
 	error = mpt_config(ioc, &cfg);
 	if (error)
@@ -2975,14 +2471,6 @@ mptsas_sas_phy_pg0(MPT_ADAPTER *ioc, struct mptsas_phyinfo *phy_info,
 	return error;
 }
 
-/**
- *	mptsas_sas_device_pg0 -
- *	@ioc: Pointer to MPT_ADAPTER structure
- *	@device_info:
- *	@form:
- *	@form_specific:
- *
- **/
 static int
 mptsas_sas_device_pg0(MPT_ADAPTER *ioc, struct mptsas_devinfo *device_info,
 		u32 form, u32 form_specific)
@@ -3009,6 +2497,7 @@ mptsas_sas_device_pg0(MPT_ADAPTER *ioc, struct mptsas_devinfo *device_info,
 	cfg.dir = 0;	/* read */
 	cfg.timeout = SAS_CONFIG_PAGE_TIMEOUT;
 
+	memset(device_info, 0, sizeof(struct mptsas_devinfo));
 	error = mpt_config(ioc, &cfg);
 	if (error)
 		goto out;
@@ -3028,12 +2517,6 @@ mptsas_sas_device_pg0(MPT_ADAPTER *ioc, struct mptsas_devinfo *device_info,
 	cfg.action = MPI_CONFIG_ACTION_PAGE_READ_CURRENT;
 
 	error = mpt_config(ioc, &cfg);
-
-	if (error == MPI_IOCSTATUS_CONFIG_INVALID_PAGE) {
-		error = -ENODEV;
-		goto out_free_consistent;
-	}
-
 	if (error)
 		goto out_free_consistent;
 
@@ -3062,14 +2545,6 @@ mptsas_sas_device_pg0(MPT_ADAPTER *ioc, struct mptsas_devinfo *device_info,
 	return error;
 }
 
-/**
- *	mptsas_sas_expander_pg0 -
- *	@ioc: Pointer to MPT_ADAPTER structure
- *	@port_info:
- *	@form:
- *	@form_specific:
- *
- **/
 static int
 mptsas_sas_expander_pg0(MPT_ADAPTER *ioc, struct mptsas_portinfo *port_info,
 		u32 form, u32 form_specific)
@@ -3097,6 +2572,7 @@ mptsas_sas_expander_pg0(MPT_ADAPTER *ioc, struct mptsas_portinfo *port_info,
 	cfg.dir = 0;	/* read */
 	cfg.timeout = SAS_CONFIG_PAGE_TIMEOUT;
 
+	memset(port_info, 0, sizeof(struct mptsas_portinfo));
 	error = mpt_config(ioc, &cfg);
 	if (error)
 		goto out;
@@ -3117,18 +2593,18 @@ mptsas_sas_expander_pg0(MPT_ADAPTER *ioc, struct mptsas_portinfo *port_info,
 	cfg.action = MPI_CONFIG_ACTION_PAGE_READ_CURRENT;
 
 	error = mpt_config(ioc, &cfg);
-	if (error == MPI_IOCSTATUS_CONFIG_INVALID_PAGE) {
+	if (error)
+		goto out_free_consistent;
+
+	if (!buffer->NumPhys) {
 		error = -ENODEV;
 		goto out_free_consistent;
 	}
 
-	if (error)
-		goto out_free_consistent;
-
 	/* save config data */
 	port_info->num_phys = (buffer->NumPhys) ? buffer->NumPhys : 1;
 	port_info->phy_info = kcalloc(port_info->num_phys,
-		sizeof(struct mptsas_phyinfo),GFP_KERNEL);
+		sizeof(struct mptsas_phyinfo), GFP_KERNEL);
 	if (!port_info->phy_info) {
 		error = -ENOMEM;
 		goto out_free_consistent;
@@ -3152,14 +2628,6 @@ mptsas_sas_expander_pg0(MPT_ADAPTER *ioc, struct mptsas_portinfo *port_info,
 	return error;
 }
 
-/**
- *	mptsas_sas_expander_pg1 -
- *	@ioc: Pointer to MPT_ADAPTER structure
- *	@phy_info:
- *	@form:
- *	@form_specific:
- *
- **/
 static int
 mptsas_sas_expander_pg1(MPT_ADAPTER *ioc, struct mptsas_phyinfo *phy_info,
 		u32 form, u32 form_specific)
@@ -3205,6 +2673,7 @@ mptsas_sas_expander_pg1(MPT_ADAPTER *ioc, struct mptsas_phyinfo *phy_info,
 	cfg.action = MPI_CONFIG_ACTION_PAGE_READ_CURRENT;
 
 	error = mpt_config(ioc, &cfg);
+
 	if (error == MPI_IOCSTATUS_CONFIG_INVALID_PAGE) {
 		error = -ENODEV;
 		goto out;
@@ -3260,18 +2729,18 @@ struct rep_manu_reply{
 };
 
 /**
- * mptsas_exp_repmanufacture_info -
- * @ioc: per adapter object
- * @sas_address: expander sas address
- * @edev: the sas_expander_device object
- *
- * Fills in the sas_expander_device object when SMP port is created.
- *
- * Returns 0 for success, non-zero for failure.
- */
+  * mptsas_exp_repmanufacture_info -
+  * @ioc: per adapter object
+  * @sas_address: expander sas address
+  * @edev: the sas_expander_device object
+  *
+  * Fills in the sas_expander_device object when SMP port is created.
+  *
+  * Returns 0 for success, non-zero for failure.
+  */
 static int
 mptsas_exp_repmanufacture_info(MPT_ADAPTER *ioc,
-    u64 sas_address, struct sas_expander_device *edev)
+	u64 sas_address, struct sas_expander_device *edev)
 {
 	MPT_FRAME_HDR *mf;
 	SmpPassthroughRequest_t *smpreq;
@@ -3291,7 +2760,7 @@ mptsas_exp_repmanufacture_info(MPT_ADAPTER *ioc,
 	if (ioc->ioc_reset_in_progress) {
 		spin_unlock_irqrestore(&ioc->taskmgmt_lock, flags);
 		printk(MYIOC_s_INFO_FMT "%s: host reset in progress!\n",
-		    __func__, ioc->name);
+			__func__, ioc->name);
 		return -EFAULT;
 	}
 	spin_unlock_irqrestore(&ioc->taskmgmt_lock, flags);
@@ -3314,7 +2783,7 @@ mptsas_exp_repmanufacture_info(MPT_ADAPTER *ioc,
 	data_out = pci_alloc_consistent(ioc->pcidev, sz, &data_out_dma);
 	if (!data_out) {
 		printk(KERN_ERR "Memory allocation failure at %s:%d/%s()!\n",
-		    __FILE__, __LINE__, __func__);
+			__FILE__, __LINE__, __func__);
 		ret = -ENOMEM;
 		goto put_mf;
 	}
@@ -3350,7 +2819,7 @@ mptsas_exp_repmanufacture_info(MPT_ADAPTER *ioc,
 	flagsLength = flagsLength << MPI_SGE_FLAGS_SHIFT;
 	flagsLength |= sizeof(struct rep_manu_reply);
 	ioc->add_sge(psge, flagsLength, data_out_dma +
-	   sizeof(struct rep_manu_request));
+	sizeof(struct rep_manu_request));
 
 	INITIALIZE_MGMT_STATUS(ioc->sas_mgmt.status)
 	mpt_put_msg_frame(mptsasMgmtCtx, ioc, mf);
@@ -3362,10 +2831,8 @@ mptsas_exp_repmanufacture_info(MPT_ADAPTER *ioc,
 		mf = NULL;
 		if (ioc->sas_mgmt.status & MPT_MGMT_STATUS_DID_IOCRESET)
 			goto out_free;
-		if (!timeleft) {
-			if (mpt_SoftResetHandler(ioc, CAN_SLEEP) != 0)
-				mpt_HardResetHandler(ioc, CAN_SLEEP);
-		}
+		if (!timeleft)
+			mpt_HardResetHandler(ioc, CAN_SLEEP);
 		goto out_free;
 	}
 
@@ -3374,36 +2841,34 @@ mptsas_exp_repmanufacture_info(MPT_ADAPTER *ioc,
 	if (ioc->sas_mgmt.status & MPT_MGMT_STATUS_RF_VALID) {
 		u8 *tmp;
 
-		smprep = (SmpPassthroughReply_t *)ioc->sas_mgmt.reply;
-		if (le16_to_cpu(smprep->ResponseDataLength) !=
-		    sizeof(struct rep_manu_reply))
+	smprep = (SmpPassthroughReply_t *)ioc->sas_mgmt.reply;
+	if (le16_to_cpu(smprep->ResponseDataLength) !=
+		sizeof(struct rep_manu_reply))
 			goto out_free;
 
-		manufacture_reply = data_out + sizeof(struct rep_manu_request);
-		strncpy(edev->vendor_id, manufacture_reply->vendor_id,
-		     SAS_EXPANDER_VENDOR_ID_LEN);
-		strncpy(edev->product_id, manufacture_reply->product_id,
-		     SAS_EXPANDER_PRODUCT_ID_LEN);
-		strncpy(edev->product_rev, manufacture_reply->product_rev,
-		     SAS_EXPANDER_PRODUCT_REV_LEN);
-		edev->level = manufacture_reply->sas_format;
-		if (manufacture_reply->sas_format) {
-			strncpy(edev->component_vendor_id,
-			    manufacture_reply->component_vendor_id,
-			     SAS_EXPANDER_COMPONENT_VENDOR_ID_LEN);
-			tmp = (u8 *)&manufacture_reply->component_id;
-			edev->component_id = tmp[0] << 8 | tmp[1];
-			edev->component_revision_id =
-			    manufacture_reply->component_revision_id;
+	manufacture_reply = data_out + sizeof(struct rep_manu_request);
+	strncpy(edev->vendor_id, manufacture_reply->vendor_id,
+		SAS_EXPANDER_VENDOR_ID_LEN);
+	strncpy(edev->product_id, manufacture_reply->product_id,
+		SAS_EXPANDER_PRODUCT_ID_LEN);
+	strncpy(edev->product_rev, manufacture_reply->product_rev,
+		SAS_EXPANDER_PRODUCT_REV_LEN);
+	edev->level = manufacture_reply->sas_format;
+	if (manufacture_reply->sas_format) {
+		strncpy(edev->component_vendor_id,
+			manufacture_reply->component_vendor_id,
+				SAS_EXPANDER_COMPONENT_VENDOR_ID_LEN);
+		tmp = (u8 *)&manufacture_reply->component_id;
+		edev->component_id = tmp[0] << 8 | tmp[1];
+		edev->component_revision_id =
+			manufacture_reply->component_revision_id;
 		}
-
 	} else {
 		printk(MYIOC_s_ERR_FMT
-		    "%s: smp passthru reply failed to be returned\n",
-		    ioc->name, __func__);
+			"%s: smp passthru reply failed to be returned\n",
+			ioc->name, __func__);
 		ret = -ENXIO;
 	}
-
 out_free:
 	if (data_out_dma)
 		pci_free_consistent(ioc->pcidev, sz, data_out, data_out_dma);
@@ -3415,16 +2880,8 @@ out_unlock:
 	mutex_unlock(&ioc->sas_mgmt.mutex);
 out:
 	return ret;
+ }
 
-}
-
-
-/**
- *	mptsas_parse_device_info -
- *	@identify:
- *	@device_info:
- *
- **/
 static void
 mptsas_parse_device_info(struct sas_identify *identify,
 		struct mptsas_devinfo *device_info)
@@ -3484,13 +2941,6 @@ mptsas_parse_device_info(struct sas_identify *identify,
 	}
 }
 
-/**
- *	mptsas_probe_one_phy -
- *	@dev:
- *	@phy_info:
- *	@local:
- *
- **/
 static int mptsas_probe_one_phy(struct device *dev,
 		struct mptsas_phyinfo *phy_info, int index, int local)
 {
@@ -3614,6 +3064,7 @@ static int mptsas_probe_one_phy(struct device *dev,
 	ioc = phy_to_ioc(phy_info->phy);
 
 	if (phy_info->sas_port_add_phy) {
+
 		if (!port) {
 			port = sas_port_alloc_num(dev);
 			if (!port) {
@@ -3631,18 +3082,20 @@ static int mptsas_probe_one_phy(struct device *dev,
 			devtprintk(ioc, dev_printk(KERN_DEBUG, &port->dev,
 			    MYIOC_s_FMT "add port %d, sas_addr (0x%llx)\n",
 			    ioc->name, port->port_identifier,
-			    (unsigned long long)phy_info->attached.sas_address));
+			    (unsigned long long)phy_info->
+			    attached.sas_address));
 		}
-		dsaswideprintk(ioc, printk(MYIOC_s_DEBUG_FMT "sas_port_add_phy: phy_id=%d\n",
-					   ioc->name, phy_info->phy_id));
+		dsaswideprintk(ioc, printk(MYIOC_s_DEBUG_FMT
+			"sas_port_add_phy: phy_id=%d\n",
+			ioc->name, phy_info->phy_id));
 		sas_port_add_phy(port, phy_info->phy);
 		phy_info->sas_port_add_phy = 0;
 		devtprintk(ioc, dev_printk(KERN_DEBUG, &phy_info->phy->dev,
 		    MYIOC_s_FMT "add phy %d, phy-obj (0x%p)\n", ioc->name,
 		     phy_info->phy_id, phy_info->phy));
 	}
-
 	if (!mptsas_get_rphy(phy_info) && port && !port->rphy) {
+
 		struct sas_rphy *rphy;
 		struct device *parent;
 		struct sas_identify identify;
@@ -3711,22 +3164,16 @@ static int mptsas_probe_one_phy(struct device *dev,
 		}
 		mptsas_set_rphy(ioc, phy_info, rphy);
 		if (identify.device_type == SAS_EDGE_EXPANDER_DEVICE ||
-		    identify.device_type == SAS_FANOUT_EXPANDER_DEVICE)
-			mptsas_exp_repmanufacture_info(ioc,
-			    identify.sas_address,
-			    rphy_to_expander_device(rphy));
+			identify.device_type == SAS_FANOUT_EXPANDER_DEVICE)
+				mptsas_exp_repmanufacture_info(ioc,
+					identify.sas_address,
+					rphy_to_expander_device(rphy));
 	}
 
  out:
 	return error;
 }
 
-/**
- *	mptsas_probe_hba_phys -
- *	@ioc: Pointer to MPT_ADAPTER structure
- *	@handle:
- *
- **/
 static int
 mptsas_probe_hba_phys(MPT_ADAPTER *ioc)
 {
@@ -4157,12 +3604,13 @@ mptsas_send_link_status_event(struct fw_event_work *fw_event)
 		if (!port_info) {
 			if (ioc->old_sas_discovery_protocal) {
 				port_info = mptsas_expander_add(ioc,
-				    le16_to_cpu(link_data->DevHandle));
+					le16_to_cpu(link_data->DevHandle));
 				if (port_info)
 					goto out;
 			}
 			goto out;
 		}
+
 		if (port_info == ioc->hba_port_info)
 			mptsas_probe_hba_phys(ioc);
 		else
@@ -4187,7 +3635,7 @@ static void
 mptsas_not_responding_devices(MPT_ADAPTER *ioc)
 {
 	struct mptsas_portinfo buffer, *port_info;
-	struct sas_device_info	*sas_info;
+	struct mptsas_device_info	*sas_info;
 	struct mptsas_devinfo sas_device;
 	u32	handle;
 	VirtTarget *vtarget = NULL;
@@ -4195,9 +3643,6 @@ mptsas_not_responding_devices(MPT_ADAPTER *ioc)
 	u8 found_expander;
 	int retval, retry_count;
 	unsigned long flags;
-
-	if (ioc->disable_hotplug_remove)
-		return;
 
 	mpt_findImVolumes(ioc);
 
@@ -4212,66 +3657,74 @@ mptsas_not_responding_devices(MPT_ADAPTER *ioc)
 	spin_unlock_irqrestore(&ioc->taskmgmt_lock, flags);
 
 	/* devices, logical volumes */
+	mutex_lock(&ioc->sas_device_info_mutex);
  redo_device_scan:
 	list_for_each_entry(sas_info, &ioc->sas_device_info_list, list) {
 		if (sas_info->is_cached)
 			continue;
 		if (!sas_info->is_logical_volume) {
-		sas_device.handle = 0;
-		retry_count = 0;
+			sas_device.handle = 0;
+			retry_count = 0;
 retry_page:
-		retval = mptsas_sas_device_pg0(ioc, &sas_device,
+			retval = mptsas_sas_device_pg0(ioc, &sas_device,
 				(MPI_SAS_DEVICE_PGAD_FORM_BUS_TARGET_ID
 				<< MPI_SAS_DEVICE_PGAD_FORM_SHIFT),
 				(sas_info->fw.channel << 8) +
 				sas_info->fw.id);
 
-		if (sas_device.handle)
-			continue;
-		if (retval == -EBUSY) {
-			spin_lock_irqsave(&ioc->taskmgmt_lock, flags);
-			if (ioc->ioc_reset_in_progress) {
-				dfailprintk(ioc,
-				    printk(MYIOC_s_DEBUG_FMT
-				    "%s: exiting due to reset\n",
-				    ioc->name, __func__));
-				spin_unlock_irqrestore
-				    (&ioc->taskmgmt_lock, flags);
-				return;
+			if (sas_device.handle)
+				continue;
+			if (retval == -EBUSY) {
+				spin_lock_irqsave(&ioc->taskmgmt_lock, flags);
+				if (ioc->ioc_reset_in_progress) {
+					dfailprintk(ioc,
+					printk(MYIOC_s_DEBUG_FMT
+					"%s: exiting due to reset\n",
+					ioc->name, __func__));
+					spin_unlock_irqrestore
+					(&ioc->taskmgmt_lock, flags);
+					mutex_unlock(&ioc->
+					sas_device_info_mutex);
+					return;
+				}
+				spin_unlock_irqrestore(&ioc->taskmgmt_lock,
+				flags);
 			}
-			spin_unlock_irqrestore(&ioc->taskmgmt_lock,
-			flags);
-		}
 
-		if (retval && (retval != -ENODEV)) {
-			if (retry_count < 10) {
-				retry_count++;
-				goto retry_page;
-			} else {
-				devtprintk(ioc, printk(MYIOC_s_DEBUG_FMT
-				"%s: Config page retry exceeded retry "
-				"count deleting device 0x%llx\n",
-				ioc->name, __func__,
-				sas_info->sas_address));
+			if (retval && (retval != -ENODEV)) {
+				if (retry_count < 10) {
+					retry_count++;
+					goto retry_page;
+				} else {
+					devtprintk(ioc, printk(MYIOC_s_DEBUG_FMT
+					"%s: Config page retry exceeded retry "
+					"count deleting device 0x%llx\n",
+					ioc->name, __func__,
+					sas_info->sas_address));
+				}
 			}
-		}
 
-		/* delete device */
-		vtarget = mptsas_find_vtarget(ioc,
+			/* delete device */
+			vtarget = mptsas_find_vtarget(ioc,
 				sas_info->fw.channel, sas_info->fw.id);
-		if (vtarget)
-			vtarget->deleted = 1;
-		phy_info = mptsas_find_phyinfo_by_sas_address(ioc,
-		    sas_info->sas_address);
-		if (phy_info) {
-			mptsas_del_end_device(ioc, phy_info);
-			goto redo_device_scan;
-		}
+
+			if (vtarget)
+				vtarget->deleted = 1;
+
+			phy_info = mptsas_find_phyinfo_by_sas_address(ioc,
+					sas_info->sas_address);
+
+			if (phy_info) {
+				mptsas_del_end_device(ioc, phy_info);
+				goto redo_device_scan;
+			}
 		} else
 			mptsas_volume_delete(ioc, sas_info->fw.id);
 	}
+	mutex_unlock(&ioc->sas_device_info_mutex);
 
 	/* expanders */
+	mutex_lock(&ioc->sas_topology_mutex);
  redo_expander_scan:
 	list_for_each_entry(port_info, &ioc->sas_topology, list) {
 
@@ -4299,6 +3752,7 @@ retry_page:
 			goto redo_expander_scan;
 		}
 	}
+	mutex_unlock(&ioc->sas_topology_mutex);
 }
 
 /**
@@ -4310,7 +3764,7 @@ static void
 mptsas_probe_expanders(MPT_ADAPTER *ioc)
 {
 	struct mptsas_portinfo buffer, *port_info;
-	u32			handle;
+	u32 			handle;
 	int i;
 
 	handle = 0xFFFF;
@@ -4358,11 +3812,9 @@ mptsas_probe_expanders(MPT_ADAPTER *ioc)
 static void
 mptsas_probe_devices(MPT_ADAPTER *ioc)
 {
-	u16 retry_count;
 	u16 handle;
 	struct mptsas_devinfo sas_device;
 	struct mptsas_phyinfo *phy_info;
-	enum device_state state;
 
 	handle = 0xFFFF;
 	while (!(mptsas_sas_device_pg0(ioc, &sas_device,
@@ -4383,17 +3835,7 @@ mptsas_probe_devices(MPT_ADAPTER *ioc)
 		if (mptsas_get_rphy(phy_info))
 			continue;
 
-		state = DEVICE_RETRY;
-		retry_count = 0;
-		while(state == DEVICE_RETRY) {
-			state = mptsas_test_unit_ready(ioc, sas_device.channel,
-			    sas_device.id, retry_count++);
-			ssleep(1);
-		}
-		if (state == DEVICE_READY)
-			mptsas_add_end_device(ioc, phy_info);
-		else
-			memset(&phy_info->attached, 0, sizeof(struct mptsas_devinfo));
+		mptsas_add_end_device(ioc, phy_info);
 	}
 }
 
@@ -4435,14 +3877,13 @@ mptsas_scan_sas_topology(MPT_ADAPTER *ioc)
 }
 
 
-
 static void
 mptsas_handle_queue_full_event(struct fw_event_work *fw_event)
 {
 	MPT_ADAPTER *ioc;
 	EventDataQueueFull_t *qfull_data;
-	struct sas_device_info *sas_info;
-	struct scsi_device      *sdev;
+	struct mptsas_device_info *sas_info;
+	struct scsi_device	*sdev;
 	int depth;
 	int id = -1;
 	int channel = -1;
@@ -4457,7 +3898,7 @@ mptsas_handle_queue_full_event(struct fw_event_work *fw_event)
 	current_depth = le16_to_cpu(qfull_data->CurrentDepth);
 
 	/* if hidden raid component, look for the volume id */
-	down(&ioc->sas_device_info_mutex);
+	mutex_lock(&ioc->sas_device_info_mutex);
 	if (mptscsih_is_phys_disk(ioc, fw_channel, fw_id)) {
 		list_for_each_entry(sas_info, &ioc->sas_device_info_list,
 		    list) {
@@ -4490,7 +3931,7 @@ mptsas_handle_queue_full_event(struct fw_event_work *fw_event)
 	}
 
  out:
-	up(&ioc->sas_device_info_mutex);
+	mutex_unlock(&ioc->sas_device_info_mutex);
 
 	if (id != -1) {
 		shost_for_each_device(sdev, ioc->sh) {
@@ -4524,12 +3965,6 @@ mptsas_handle_queue_full_event(struct fw_event_work *fw_event)
 }
 
 
-/**
- *	mptsas_find_phyinfo_by_sas_address -
- *	@ioc: Pointer to MPT_ADAPTER structure
- *	@sas_address:
- *
- **/
 static struct mptsas_phyinfo *
 mptsas_find_phyinfo_by_sas_address(MPT_ADAPTER *ioc, u64 sas_address)
 {
@@ -4553,7 +3988,6 @@ mptsas_find_phyinfo_by_sas_address(MPT_ADAPTER *ioc, u64 sas_address)
 	mutex_unlock(&ioc->sas_topology_mutex);
 	return phy_info;
 }
-
 
 /**
  *	mptsas_find_phyinfo_by_phys_disk_num -
@@ -4581,7 +4015,7 @@ mptsas_find_phyinfo_by_phys_disk_num(MPT_ADAPTER *ioc, u8 phys_disk_num,
 	num_paths = mpt_raid_phys_disk_get_num_paths(ioc, phys_disk_num);
 	if (!num_paths)
 		goto out;
-	phys_disk = kzalloc(offsetof(RaidPhysDiskPage1_t,Path) +
+	phys_disk = kzalloc(offsetof(RaidPhysDiskPage1_t, Path) +
 	   (num_paths * sizeof(RAID_PHYS_DISK1_PATH)), GFP_KERNEL);
 	if (!phys_disk)
 		goto out;
@@ -4594,7 +4028,8 @@ mptsas_find_phyinfo_by_phys_disk_num(MPT_ADAPTER *ioc, u8 phys_disk_num,
 		    (channel == phys_disk->Path[i].PhysDiskBus)) {
 			memcpy(&sas_address, &phys_disk->Path[i].WWID,
 				sizeof(u64));
-			phy_info = mptsas_find_phyinfo_by_sas_address(ioc, sas_address);
+			phy_info = mptsas_find_phyinfo_by_sas_address(ioc,
+					sas_address);
 			goto out;
 		}
 	}
@@ -4616,9 +4051,11 @@ mptsas_find_phyinfo_by_phys_disk_num(MPT_ADAPTER *ioc, u8 phys_disk_num,
 				continue;
 			if (port_info->phy_info[i].attached.phys_disk_num == ~0)
 				continue;
-			if (port_info->phy_info[i].attached.phys_disk_num == phys_disk_num &&
-			    port_info->phy_info[i].attached.id == id &&
-			    port_info->phy_info[i].attached.channel == channel)
+			if ((port_info->phy_info[i].attached.phys_disk_num ==
+			    phys_disk_num) &&
+			    (port_info->phy_info[i].attached.id == id) &&
+			    (port_info->phy_info[i].attached.channel ==
+			     channel))
 				phy_info = &port_info->phy_info[i];
 		}
 	}
@@ -4626,12 +4063,6 @@ mptsas_find_phyinfo_by_phys_disk_num(MPT_ADAPTER *ioc, u8 phys_disk_num,
 	return phy_info;
 }
 
-/**
- *	mptsas_reprobe_lun -
- *	@sdev:
- *	@data:
- *
- **/
 static void
 mptsas_reprobe_lun(struct scsi_device *sdev, void *data)
 {
@@ -4641,12 +4072,6 @@ mptsas_reprobe_lun(struct scsi_device *sdev, void *data)
 	rc = scsi_device_reprobe(sdev);
 }
 
-/**
- *	mptsas_reprobe_target -
- *	@starget:
- *	@uld_attach:
- *
- **/
 static void
 mptsas_reprobe_target(struct scsi_target *starget, int uld_attach)
 {
@@ -4654,15 +4079,6 @@ mptsas_reprobe_target(struct scsi_target *starget, int uld_attach)
 			mptsas_reprobe_lun);
 }
 
-/**
- *	mptsas_adding_inactive_raid_components -
- *	@ioc: Pointer to MPT_ADAPTER structure
- *	@channel:
- *	@id:
- *
- *
- *	 TODO: check for hotspares
- **/
 static void
 mptsas_adding_inactive_raid_components(MPT_ADAPTER *ioc, u8 channel, u8 id)
 {
@@ -4670,7 +4086,7 @@ mptsas_adding_inactive_raid_components(MPT_ADAPTER *ioc, u8 channel, u8 id)
 	ConfigPageHeader_t		hdr;
 	dma_addr_t			dma_handle;
 	pRaidVolumePage0_t		buffer = NULL;
-	RaidPhysDiskPage0_t		phys_disk;
+	RaidPhysDiskPage0_t 		phys_disk;
 	int				i;
 	struct mptsas_phyinfo	*phy_info;
 	struct mptsas_devinfo		sas_device;
@@ -4681,7 +4097,6 @@ mptsas_adding_inactive_raid_components(MPT_ADAPTER *ioc, u8 channel, u8 id)
 	cfg.pageAddr = (channel << 8) + id;
 	cfg.cfghdr.hdr = &hdr;
 	cfg.action = MPI_CONFIG_ACTION_PAGE_HEADER;
-	cfg.timeout = SAS_CONFIG_PAGE_TIMEOUT;
 
 	if (mpt_config(ioc, &cfg) != 0)
 		goto out;
@@ -4742,7 +4157,6 @@ mptsas_hotplug_work(MPT_ADAPTER *ioc, struct fw_event_work *fw_event,
 	struct scsi_target * starget;
 	struct mptsas_devinfo sas_device;
 	VirtTarget *vtarget;
-	enum device_state state;
 	int i;
 
 	switch (hot_plug_info->event_type) {
@@ -4782,27 +4196,13 @@ mptsas_hotplug_work(MPT_ADAPTER *ioc, struct fw_event_work *fw_event,
 		if (mptsas_get_rphy(phy_info))
 			break;
 
-		state = mptsas_test_unit_ready(ioc, phy_info->attached.channel,
-		    phy_info->attached.id, fw_event->retries);
-
-		if (state == DEVICE_RETRY && !ioc->fw_events_off) {
-			mptsas_requeue_fw_event(ioc, fw_event, 1000);
-			return;
-		}
-
-		if (state == DEVICE_READY)
-			mptsas_add_end_device(ioc, phy_info);
-		else
-			memset(&phy_info->attached, 0, sizeof(struct mptsas_devinfo));
+		mptsas_add_end_device(ioc, phy_info);
 		break;
 
 	case MPTSAS_DEL_DEVICE:
-
-		if (!ioc->disable_hotplug_remove) {
-			phy_info = mptsas_find_phyinfo_by_sas_address(ioc,
-			    hot_plug_info->sas_address);
-			mptsas_del_end_device(ioc, phy_info);
-		}
+		phy_info = mptsas_find_phyinfo_by_sas_address(ioc,
+		    hot_plug_info->sas_address);
+		mptsas_del_end_device(ioc, phy_info);
 		break;
 
 	case MPTSAS_DEL_PHYSDISK:
@@ -4810,8 +4210,9 @@ mptsas_hotplug_work(MPT_ADAPTER *ioc, struct fw_event_work *fw_event,
 		mpt_findImVolumes(ioc);
 
 		phy_info = mptsas_find_phyinfo_by_phys_disk_num(
-		    ioc, hot_plug_info->phys_disk_num, hot_plug_info->channel,
-		    hot_plug_info->id);
+				ioc, hot_plug_info->phys_disk_num,
+				hot_plug_info->channel,
+				hot_plug_info->id);
 		mptsas_del_end_device(ioc, phy_info);
 		break;
 
@@ -4962,14 +4363,6 @@ mptsas_hotplug_work(MPT_ADAPTER *ioc, struct fw_event_work *fw_event,
 	mptsas_free_fw_event(ioc, fw_event);
 }
 
-/**
- * mptsas_send_sas_event
- *
- *
- * @ioc
- * @sas_event_data
- *
- **/
 static void
 mptsas_send_sas_event(struct fw_event_work *fw_event)
 {
@@ -5036,15 +4429,6 @@ mptsas_send_sas_event(struct fw_event_work *fw_event)
 	}
 }
 
-
-/**
- * mptsas_send_raid_event
- *
- *
- * @ioc
- * @raid_event_data
- *
- **/
 static void
 mptsas_send_raid_event(struct fw_event_work *fw_event)
 {
@@ -5164,19 +4548,19 @@ mptsas_send_raid_event(struct fw_event_work *fw_event)
 /**
  *	mptsas_issue_tm - send mptsas internal tm request
  *	@ioc: Pointer to MPT_ADAPTER structure
- *	@type
- *	@channel
- *	@id
- *	@lun
- *	@task_context
- *	@timeout
+ *	@type: Task Management type
+ *	@channel: channel number for task management
+ *	@id: Logical Target ID for reset (if appropriate)
+ *	@lun: Logical unit for reset (if appropriate)
+ *	@task_context: Context for the task to be aborted
+ *	@timeout: timeout for task management control
  *
- *	return:
+ *	return 0 on success and -1 on failure:
  *
- **/
+ */
 static int
-mptsas_issue_tm(MPT_ADAPTER *ioc, u8 type, u8 channel, u8 id, u64 lun, int task_context, ulong timeout,
-	u8 *issue_reset)
+mptsas_issue_tm(MPT_ADAPTER *ioc, u8 type, u8 channel, u8 id, u64 lun,
+	int task_context, ulong timeout, u8 *issue_reset)
 {
 	MPT_FRAME_HDR	*mf;
 	SCSITaskMgmt_t	*pScsiTm;
@@ -5184,7 +4568,8 @@ mptsas_issue_tm(MPT_ADAPTER *ioc, u8 type, u8 channel, u8 id, u64 lun, int task_
 	unsigned long	 timeleft;
 
 	*issue_reset = 0;
-	if ((mf = mpt_get_msg_frame(mptsasDeviceResetCtx, ioc)) == NULL) {
+	mf = mpt_get_msg_frame(mptsasDeviceResetCtx, ioc);
+	if (mf == NULL) {
 		retval = -1; /* return failure */
 		dtmprintk(ioc, printk(MYIOC_s_WARN_FMT "TaskMgmt request: no "
 		    "msg frames!!\n", ioc->name));
@@ -5242,20 +4627,20 @@ mptsas_issue_tm(MPT_ADAPTER *ioc, u8 type, u8 channel, u8 id, u64 lun, int task_
 }
 
 /**
- *	mptsas_broadcast_primative_work - Work queue thread to handle
- *	broadcast primitive events
+ *	mptsas_broadcast_primative_work - Handle broadcast primitives
  *	@work: work queue payload containing info describing the event
  *
- **/
+ *	this will be handled in workqueue context.
+ */
 static void
 mptsas_broadcast_primative_work(struct fw_event_work *fw_event)
 {
 	MPT_ADAPTER *ioc = fw_event->ioc;
-	MPT_FRAME_HDR		*mf;
-	VirtDevice		*vdevice;
+	MPT_FRAME_HDR	*mf;
+	VirtDevice	*vdevice;
 	int			ii;
 	struct scsi_cmnd	*sc;
-	SCSITaskMgmtReply_t *	pScsiTmReply;
+	SCSITaskMgmtReply_t	*pScsiTmReply;
 	u8			issue_reset;
 	int			task_context;
 	u8			channel, id;
@@ -5264,7 +4649,7 @@ mptsas_broadcast_primative_work(struct fw_event_work *fw_event)
 	u32			 query_count;
 
 	dtmprintk(ioc, printk(MYIOC_s_DEBUG_FMT
-	    "%s - enter\n", ioc->name, __FUNCTION__));
+	    "%s - enter\n", ioc->name, __func__));
 
 	mutex_lock(&ioc->taskmgmt_cmds.mutex);
 	if (mpt_set_taskmgmt_in_progress_flag(ioc) != 0) {
@@ -5322,7 +4707,7 @@ mptsas_broadcast_primative_work(struct fw_event_work *fw_event)
  out:
 	dtmprintk(ioc, printk(MYIOC_s_DEBUG_FMT
 	    "%s - exit, query_count = %d termination_count = %d\n",
-	    ioc->name, __FUNCTION__, query_count, termination_count));
+	    ioc->name, __func__, query_count, termination_count));
 
 	ioc->broadcast_aen_busy = 0;
 	mpt_clear_taskmgmt_in_progress_flag(ioc);
@@ -5330,19 +4715,20 @@ mptsas_broadcast_primative_work(struct fw_event_work *fw_event)
 
 	if (issue_reset) {
 		printk(MYIOC_s_WARN_FMT "Issuing Reset from %s!!\n",
-		    ioc->name, __FUNCTION__);
-		if (mpt_SoftResetHandler(ioc, CAN_SLEEP))
-			mpt_HardResetHandler(ioc, CAN_SLEEP);
+		    ioc->name, __func__);
+		mpt_HardResetHandler(ioc, CAN_SLEEP);
 	}
 	mptsas_free_fw_event(ioc, fw_event);
 }
 
-/**
- *	mptsas_send_ir2_event - handle exposing hidden disk when an inactive raid volume is added
- *	@ioc: Pointer to MPT_ADAPTER structure
- *	@ir2_data:
+/*
+ * mptsas_send_ir2_event - handle exposing hidden disk when
+ * an inactive raid volume is added
  *
- **/
+ * @ioc: Pointer to MPT_ADAPTER structure
+ * @ir2_data
+ *
+ */
 static void
 mptsas_send_ir2_event(struct fw_event_work *fw_event)
 {
@@ -5384,13 +4770,6 @@ mptsas_send_ir2_event(struct fw_event_work *fw_event)
 	mptsas_hotplug_work(ioc, fw_event, &hot_plug_info);
 }
 
-
-/**
- *	mptsas_event_process -
- *	@ioc: Pointer to MPT_ADAPTER structure
- *	@reply:
- *
- **/
 static int
 mptsas_event_process(MPT_ADAPTER *ioc, EventNotificationReply_t *reply)
 {
@@ -5398,9 +4777,6 @@ mptsas_event_process(MPT_ADAPTER *ioc, EventNotificationReply_t *reply)
 	int sz, event_data_sz;
 	struct fw_event_work *fw_event;
 	unsigned long delay;
-
-	if (ioc->bus_type != SAS)
-		return 0;
 
 	/* events turned off due to host reset or driver unloading */
 	if (ioc->fw_events_off)
@@ -5484,7 +4860,6 @@ mptsas_event_process(MPT_ADAPTER *ioc, EventNotificationReply_t *reply)
 	return 0;
 }
 
-
 /* Delete a volume when no longer listed in ioc pg2
  */
 static void mptsas_volume_delete(MPT_ADAPTER *ioc, u8 id)
@@ -5504,24 +4879,18 @@ static void mptsas_volume_delete(MPT_ADAPTER *ioc, u8 id)
 			goto release_sdev;
  out:
 	printk(MYIOC_s_INFO_FMT "removing raid volume, channel %d, "
-	    "id %d\n", ioc->name, MPTSAS_RAID_CHANNEL,id);
+	    "id %d\n", ioc->name, MPTSAS_RAID_CHANNEL, id);
 	scsi_remove_device(sdev);
  release_sdev:
 	scsi_device_put(sdev);
 }
 
-/**
- *	mptsas_probe -
- *	@pdev:
- *	@id:
- *
- **/
 static int
 mptsas_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	struct Scsi_Host	*sh;
 	MPT_SCSI_HOST		*hd;
-	MPT_ADAPTER		*ioc;
+	MPT_ADAPTER 		*ioc;
 	unsigned long		 flags;
 	int			 ii;
 	int			 numSGE = 0;
@@ -5539,7 +4908,7 @@ mptsas_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	ioc->DoneCtx = mptsasDoneCtx;
 	ioc->TaskCtx = mptsasTaskCtx;
 	ioc->InternalCtx = mptsasInternalCtx;
-	ioc->schedule_target_reset = &mptsas_schedule_target_reset;
+
 	/*  Added sanity check on readiness of the MPT adapter.
 	 */
 	if (ioc->last_state != MPI_IOC_STATE_OPERATIONAL) {
@@ -5580,7 +4949,7 @@ mptsas_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 			ioc->name);
 		error = -1;
 		goto out_mptsas_probe;
-	}
+        }
 
 	spin_lock_irqsave(&ioc->FreeQlock, flags);
 
@@ -5605,9 +4974,9 @@ mptsas_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	INIT_LIST_HEAD(&ioc->sas_topology);
 	mutex_init(&ioc->sas_topology_mutex);
+	mutex_init(&ioc->sas_discovery_mutex);
 	mutex_init(&ioc->sas_mgmt.mutex);
 	init_completion(&ioc->sas_mgmt.done);
-
 
 	/* Verify that we won't exceed the maximum
 	 * number of chain buffers
@@ -5618,7 +4987,6 @@ mptsas_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	 * A slightly different algorithm is required for
 	 * 64bit SGEs.
 	 */
-
 	scale = ioc->req_sz/ioc->SGE_size;
 	if (ioc->sg_addr_size == sizeof(u64)) {
 		numSGE = (scale - 1) *
@@ -5655,16 +5023,12 @@ mptsas_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	dprintk(ioc, printk(MYIOC_s_DEBUG_FMT "ScsiLookup @ %p\n",
 		 ioc->name, ioc->ScsiLookup));
 
-	ioc->sdev_queue_depth = mpt_sdev_queue_depth;
 	ioc->sas_data.ptClear = mpt_pt_clear;
-	hd->last_queue_full = 0;
-	ioc->disable_hotplug_remove = mpt_disable_hotplug_remove;
-	if (ioc->disable_hotplug_remove)
-		printk(MYIOC_s_INFO_FMT "disabling hotplug remove\n", ioc->name);
 
+	hd->last_queue_full = 0;
 	INIT_LIST_HEAD(&hd->target_reset_list);
 	INIT_LIST_HEAD(&ioc->sas_device_info_list);
-	init_MUTEX(&ioc->sas_device_info_mutex);
+	mutex_init(&ioc->sas_device_info_mutex);
 
 	spin_unlock_irqrestore(&ioc->FreeQlock, flags);
 
@@ -5702,14 +5066,7 @@ mptsas_shutdown(struct pci_dev *pdev)
 	mptsas_cleanup_fw_event_q(ioc);
 }
 
-
-/**
- *	mptsas_remove -
- *	@pdev:
- *
- **/
-static void __devexit
-mptsas_remove(struct pci_dev *pdev)
+static void __devexit mptsas_remove(struct pci_dev *pdev)
 {
 	MPT_ADAPTER *ioc = pci_get_drvdata(pdev);
 	struct mptsas_portinfo *p, *n;
@@ -5719,6 +5076,7 @@ mptsas_remove(struct pci_dev *pdev)
 
 	mptsas_del_device_components(ioc);
 
+	ioc->sas_discovery_ignore_events = 1;
 	sas_remove_host(ioc->sh);
 
 	mutex_lock(&ioc->sas_topology_mutex);
@@ -5763,10 +5121,6 @@ static struct pci_driver mptsas_driver = {
 #endif
 };
 
-/**
- *	mptsas_init -
- *
- **/
 static int __init
 mptsas_init(void)
 {
@@ -5797,10 +5151,6 @@ mptsas_init(void)
 	return error;
 }
 
-/**
- *	mptsas_exit -
- *
- **/
 static void __exit
 mptsas_exit(void)
 {

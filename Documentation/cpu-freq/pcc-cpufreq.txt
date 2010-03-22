@@ -205,4 +205,3 @@ to ensure that the same frequency is requested of all dependent CPUs.
 The "cpufreq_stats" module in its present form cannot be loaded and
 expected to work with the PCC driver. Since the "cpufreq_stats" module
 provides information wrt each P-state, it is not applicable to the PCC driver.
-

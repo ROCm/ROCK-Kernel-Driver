@@ -84,6 +84,10 @@ int aa_get_name(struct path *path, int is_dir, char **buffer, char **name)
 	return error;
 }
 
+/* Only needed until d_namespace_path is cleaned up and doesn't use
+ * vfsmount_lock anymore. -jeffm */
+extern spinlock_t vfsmount_lock;
+
 int d_namespace_path(struct path *path, char *buf, int buflen, char **name)
 {
 	struct path root, tmp, ns_root = { };

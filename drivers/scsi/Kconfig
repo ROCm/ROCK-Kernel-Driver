@@ -1,9 +1,15 @@
 menu "SCSI device support"
 
+config SCSI_MOD
+       tristate
+       default y if SCSI=n || SCSI=y
+       default m if SCSI=m
+
 config RAID_ATTRS
 	tristate "RAID Transport Class"
 	default n
 	depends on BLOCK
+	depends on SCSI_MOD
 	---help---
 	  Provides RAID
 
@@ -644,7 +650,7 @@ config SCSI_FLASHPOINT
 
 config VMWARE_PVSCSI
 	tristate "VMware PVSCSI driver support"
-	depends on PCI && SCSI && !XEN && X86
+	depends on PCI && SCSI && X86
 	help
 	  This driver supports VMware's para virtualized SCSI HBA.
 	  To compile this driver as a module, choose M here: the

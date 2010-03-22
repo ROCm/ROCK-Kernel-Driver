@@ -386,7 +386,7 @@ static int acpi_thermal_trips_update(struct acpi_thermal *tz, int flag)
 					  "No critical threshold\n"));
 		} else if (tmp <= 2732) {
 			printk(KERN_WARNING FW_BUG "Invalid critical threshold "
-			       "(_CRT:%)\n", tmp);
+			       "(%llu)\n", tmp);
 			tz->trips.critical.flags.valid = 0;
 		} else {
 			tz->trips.critical.flags.valid = 1;

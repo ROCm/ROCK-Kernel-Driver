@@ -646,7 +646,7 @@ config HVC_IUCV
 
 config HVC_XEN
 	bool "Xen Hypervisor Console support"
-	depends on PARAVIRT_XEN
+	depends on XEN
 	select HVC_DRIVER
 	select HVC_IRQ
 	default y
@@ -666,6 +666,14 @@ config VIRTIO_CONSOLE
 	help
 	  Virtio console for use with lguest and other hypervisors.
 
+	  Also serves as a general-purpose serial device for data
+	  transfer between the guest and host.  Character devices at
+	  /dev/vportNpn will be created when corresponding ports are
+	  found, where N is the device number and n is the port number
+	  within that device.  If specified by the host, a sysfs
+	  attribute called 'name' will be populated with a name for
+	  the port which can be used by udev scripts to create a
+	  symlink to the device.
 
 config HVCS
 	tristate "IBM Hypervisor Virtual Console Server support"
@@ -1039,7 +1047,7 @@ config MAX_RAW_DEVS
 config HPET
 	bool "HPET - High Precision Event Timer" if (X86 || IA64)
 	default n
-	depends on ACPI && !XEN
+	depends on ACPI
 	help
 	  If you say Y here, you will have a miscdevice named "/dev/hpet/".  Each
 	  open selects one of the timers supported by the HPET.  The timers are

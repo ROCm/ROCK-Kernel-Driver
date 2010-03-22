@@ -26,7 +26,6 @@
 #include <linux/writeback.h>
 #include <linux/backing-dev.h>
 #include <linux/pagevec.h>
-#include <linux/precache.h>
 
 /*
  * I/O completion handler for multipage BIOs.
@@ -284,13 +283,6 @@ do_mpage_readpage(struct bio *bio, struct page *page, unsigned nr_pages,
 		}
 	} else if (fully_mapped) {
 		SetPageMappedToDisk(page);
-	}
-
-	if (fully_mapped &&
-	    blocks_per_page == 1 && !PageUptodate(page) &&
-	    precache_get(page->mapping, page->index, page) == 1) {
-		SetPageUptodate(page);
-		goto confused;
 	}
 
 	/*
@@ -569,7 +561,7 @@ page_is_mapped:
 	if (page->index >= end_index) {
 		/*
 		 * The page straddles i_size.  It must be zeroed out on each
-		 * and every writepage invokation because it may be mmapped.
+		 * and every writepage invocation because it may be mmapped.
 		 * "A file is mapped in multiples of the page size.  For a file
 		 * that is not a multiple of the page size, the remaining memory
 		 * is zeroed when mapped, and writes to that region are not

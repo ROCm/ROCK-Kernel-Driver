@@ -313,7 +313,7 @@ static void __cpuinit amd_detect_cmp(struct cpuinfo_x86 *c)
 int amd_get_nb_id(int cpu)
 {
 	int id = 0;
-#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
+#ifdef CONFIG_SMP
 	id = per_cpu(cpu_llc_id, cpu);
 #endif
 	return id;
@@ -403,7 +403,7 @@ static void __cpuinit early_init_amd(struct cpuinfo_x86 *c)
 		    (c->x86_model == 8 && c->x86_mask >= 8))
 			set_cpu_cap(c, X86_FEATURE_K6_MTRR);
 #endif
-#if defined(CONFIG_X86_LOCAL_APIC) && defined(CONFIG_PCI) && !defined(CONFIG_XEN)
+#if defined(CONFIG_X86_LOCAL_APIC) && defined(CONFIG_PCI)
 	/* check CPU config space for extended APIC ID */
 	if (cpu_has_apic && c->x86 >= 0xf) {
 		unsigned int val;
@@ -469,10 +469,8 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 	if (c->x86 == 0x10 || c->x86 == 0x11)
 		set_cpu_cap(c, X86_FEATURE_REP_GOOD);
 
-#ifndef CONFIG_XEN
 	/* get apicid instead of initial apic id from cpuid */
 	c->apicid = hard_smp_processor_id();
-#endif
 #else
 
 	/*
@@ -548,7 +546,6 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 		fam10h_check_enable_mmcfg();
 	}
 
-#ifndef CONFIG_XEN
 	if (c == &boot_cpu_data && c->x86 >= 0xf && c->x86 <= 0x11) {
 		unsigned long long tseg;
 
@@ -567,7 +564,6 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 				set_memory_4k((unsigned long)__va(tseg), 1);
 		}
 	}
-#endif
 #endif
 }
 
