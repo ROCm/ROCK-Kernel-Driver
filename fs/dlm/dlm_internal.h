@@ -592,7 +592,6 @@ void dlm_timeout_warn(struct dlm_lkb *lkb);
 int dlm_plock_init(void);
 void dlm_plock_exit(void);
 
-#define CONFIG_DLM_DEBUG 1
 #ifdef CONFIG_DLM_DEBUG
 int dlm_register_debugfs(void);
 void dlm_unregister_debugfs(void);
