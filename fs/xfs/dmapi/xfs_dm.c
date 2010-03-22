@@ -3152,12 +3152,12 @@ STATIC int
 xfs_dm_send_namesp_event(
 	dm_eventtype_t	event,
 	struct xfs_mount *mp,
-	xfs_inode_t	*ip1,
+	struct xfs_inode *ip1,
 	dm_right_t	vp1_right,
-	xfs_inode_t	*ip2,
+	struct xfs_inode *ip2,
 	dm_right_t	vp2_right,
-	const char	*name1,
-	const char	*name2,
+	const unsigned char *name1,
+	const unsigned char *name2,
 	mode_t		mode,
 	int		retcode,
 	int		flags)
