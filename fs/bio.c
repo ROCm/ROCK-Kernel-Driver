@@ -1427,16 +1427,6 @@ void bio_endio(struct bio *bio, int error)
 	else if (!test_bit(BIO_UPTODATE, &bio->bi_flags))
 		error = -EIO;
 
-	if (bio_data_dir(bio) == READ)
-		/*
-		 * If the current cpu has written to the page by hand
-		 * without dma, we must enforce ordering to be sure
-		 * this written data will be visible before we expose
-		 * the page contents to other cpus (for example with
-		 * a set_pte).
-		 */
-		smp_wmb();
-
 	if (bio->bi_end_io)
 		bio->bi_end_io(bio, error);
 }
