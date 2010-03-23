@@ -387,7 +387,6 @@ static int smp __read_mostly;
 static int apm_disabled = -1;
 #ifdef CONFIG_SMP
 static int power_off;
-static int power_off_set;
 #else
 static int power_off = 1;
 #endif
@@ -1852,14 +1851,6 @@ static int apm(void *unused)
 		}
 	}
 
-#ifdef CONFIG_SMP
-	if (!power_off_set) {
-		power_off = (num_online_cpus() == 1);
-		/* remember not to initialize (with default value) again */
-		power_off_set = 1;
-	}
-#endif
-
 	/* Install our power off handler.. */
 	if (power_off)
 		pm_power_off = apm_power_off;
@@ -1903,12 +1894,8 @@ static int __init apm_setup(char *str)
 		if (strncmp(str, "debug", 5) == 0)
 			debug = !invert;
 		if ((strncmp(str, "power-off", 9) == 0) ||
-		    (strncmp(str, "power_off", 9) == 0)) {
+		    (strncmp(str, "power_off", 9) == 0))
 			power_off = !invert;
-#ifdef CONFIG_SMP
-			power_off_set = 1;
-#endif
-		}
 		if (strncmp(str, "smp", 3) == 0) {
 			smp = !invert;
 			idle_threshold = 100;
