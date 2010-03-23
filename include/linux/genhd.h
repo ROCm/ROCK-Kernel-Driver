@@ -25,12 +25,6 @@ extern struct device_type part_type;
 extern struct kobject *block_depr;
 extern struct class block_class;
 
-#ifdef CONFIG_DEBUG_BLOCK_EXT_DEVT
-extern int blk_mangle_devt;
-#else
-#define blk_mangle_devt		0
-#endif
-
 enum {
 /* These three have identical behaviour; use the second one if DOS FDISK gets
    confused about extended/logical partitions starting past cylinder 1023. */

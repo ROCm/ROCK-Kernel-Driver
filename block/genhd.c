@@ -37,12 +37,6 @@ static DEFINE_IDR(ext_devt_idr);
 
 static struct device_type disk_type;
 
-#ifdef CONFIG_DEBUG_BLOCK_EXT_DEVT
-int blk_mangle_devt;
-module_param_named(mangle_devt, blk_mangle_devt, bool, 0444);
-EXPORT_SYMBOL_GPL(blk_mangle_devt);
-#endif
-
 /**
  * disk_get_part - get partition
  * @disk: disk to look partition from
@@ -379,9 +373,6 @@ static int blk_mangle_minor(int minor)
 {
 #ifdef CONFIG_DEBUG_BLOCK_EXT_DEVT
 	int i;
-
-	if (!blk_mangle_devt)
-		return minor;
 
 	for (i = 0; i < MINORBITS / 2; i++) {
 		int low = minor & (1 << i);
