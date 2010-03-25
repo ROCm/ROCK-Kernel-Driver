@@ -170,10 +170,9 @@ static struct novfs_scope_list *Scope_Find_Scope(int Create)
 				kfree(scope);
 				scope = NULL;
 			}
-		}
-
-		if (addscope) {
-			novfs_add_to_root(scope->ScopeUserName);
+			
+			if (scope && addscope)
+				novfs_add_to_root(scope->ScopeUserName);
 		}
 	}
 
