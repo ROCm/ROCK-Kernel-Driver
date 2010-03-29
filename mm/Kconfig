@@ -287,3 +287,31 @@ config NOMMU_INITIAL_TRIM_EXCESS
 	  of 1 says that all excess pages should be trimmed.
 
 	  See Documentation/nommu-mmap.txt for more information.
+
+#
+# support for transcendent memory
+#
+config TMEM
+	bool
+	help
+	  In a virtualized environment, allows unused and underutilized
+	  system physical memory to be made accessible through a narrow
+	  well-defined page-copy-based API.  If unsure, say Y.
+
+config PRECACHE
+	bool "Cache clean pages in transcendent memory"
+	depends on XEN
+	select TMEM
+	help
+	  Allows the transcendent memory pool to be used to store clean
+	  page-cache pages which, under some circumstances, will greatly
+	  reduce paging and thus improve performance.  If unsure, say Y.
+
+config PRESWAP
+	bool "Swap pages to transcendent memory"
+	depends on XEN
+	select TMEM
+	help
+	  Allows the transcendent memory pool to be used as a pseudo-swap
+	  device which, under some circumstances, will greatly reduce
+	  swapping and thus improve performance.  If unsure, say Y.

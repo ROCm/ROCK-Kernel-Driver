@@ -401,7 +401,7 @@ ENTRY(ia32_sysenter_target)
 	CFI_SIGNAL_FRAME
 	CFI_DEF_CFA esp, 0
 	CFI_REGISTER esp, ebp
-	movl TSS_sysenter_sp0(%esp),%esp
+	movl SYSENTER_stack_sp0(%esp),%esp
 sysenter_past_esp:
 	/*
 	 * Interrupts are disabled here, but we can't trace it until
@@ -1109,7 +1109,7 @@ ENTRY(kernel_thread_helper)
 	CFI_ENDPROC
 ENDPROC(kernel_thread_helper)
 
-#ifdef CONFIG_XEN
+#ifdef CONFIG_PARAVIRT_XEN
 /* Xen doesn't set %esp to be precisely what the normal sysenter
    entrypoint expects, so fix it up before using the normal path. */
 ENTRY(xen_sysenter_target)
@@ -1202,7 +1202,7 @@ ENTRY(xen_failsafe_callback)
 .previous
 ENDPROC(xen_failsafe_callback)
 
-#endif	/* CONFIG_XEN */
+#endif	/* CONFIG_PARAVIRT_XEN */
 
 #ifdef CONFIG_FUNCTION_TRACER
 #ifdef CONFIG_DYNAMIC_FTRACE
@@ -1381,7 +1381,7 @@ END(page_fault)
  * that sets up the real kernel stack. Check here, since we can't
  * allow the wrong stack to be used.
  *
- * "TSS_sysenter_sp0+12" is because the NMI/debug handler will have
+ * "SYSENTER_stack_sp0+12" is because the NMI/debug handler will have
  * already pushed 3 words if it hits on the sysenter instruction:
  * eflags, cs and eip.
  *
@@ -1393,7 +1393,7 @@ END(page_fault)
 	cmpw $__KERNEL_CS, 4(%esp)
 	jne \ok
 \label:
-	movl TSS_sysenter_sp0 + \offset(%esp), %esp
+	movl SYSENTER_stack_sp0 + \offset(%esp), %esp
 	CFI_DEF_CFA esp, 0
 	CFI_UNDEFINED eip
 	pushfl

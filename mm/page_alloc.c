@@ -609,6 +609,14 @@ static void __free_pages_ok(struct page *page, unsigned int order)
 	int bad = 0;
 	int wasMlocked = __TestClearPageMlocked(page);
 
+#ifdef CONFIG_XEN
+	if (PageForeign(page)) {
+		WARN_ON(wasMlocked);
+		PageForeignDestructor(page, order);
+		return;
+	}
+#endif
+
 	trace_mm_page_free_direct(page, order);
 	kmemcheck_free_shadow(page, order);
 
@@ -1109,6 +1117,14 @@ void free_hot_cold_page(struct page *page, int cold)
 	unsigned long flags;
 	int migratetype;
 	int wasMlocked = __TestClearPageMlocked(page);
+
+#ifdef CONFIG_XEN
+	if (PageForeign(page)) {
+		WARN_ON(wasMlocked);
+		PageForeignDestructor(page, 0);
+		return;
+	}
+#endif
 
 	trace_mm_page_free_direct(page, 0);
 	kmemcheck_free_shadow(page, 0);
@@ -4669,6 +4685,22 @@ static void __setup_per_zone_wmarks(void)
 		setup_zone_migrate_reserve(zone);
 		spin_unlock_irqrestore(&zone->lock, flags);
 	}
+
+#ifdef CONFIG_XEN
+	for_each_populated_zone(zone) {
+		unsigned int cpu;
+
+		for_each_online_cpu(cpu) {
+			unsigned long high;
+
+			high = percpu_pagelist_fraction
+			       ? zone->present_pages / percpu_pagelist_fraction
+			       : 5 * zone_batchsize(zone);
+			setup_pagelist_highmark(
+				per_cpu_ptr(zone->pageset, cpu), high);
+		}
+	}
+#endif
 
 	/* update totalreserve_pages */
 	calculate_totalreserve_pages();
