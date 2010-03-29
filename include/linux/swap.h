@@ -183,7 +183,60 @@ struct swap_info_struct {
 	struct block_device *bdev;	/* swap device or bdev of swap file */
 	struct file *swap_file;		/* seldom referenced */
 	unsigned int old_block_size;	/* seldom referenced */
+#ifdef CONFIG_PRESWAP
+	unsigned long *preswap_map;
+	unsigned int preswap_pages;
+#endif
 };
+
+#ifdef CONFIG_PRESWAP
+
+#include <linux/sysctl.h>
+extern int preswap_sysctl_handler(struct ctl_table *, int, void __user *,
+	size_t *, loff_t *);
+extern const unsigned long preswap_zero, preswap_infinity;
+
+extern struct swap_info_struct *get_swap_info_struct(unsigned int type);
+
+extern void preswap_shrink(unsigned long);
+extern int preswap_test(struct swap_info_struct *, unsigned long);
+extern void preswap_init(unsigned);
+extern int preswap_put(struct page *);
+extern int preswap_get(struct page *);
+extern void preswap_flush(unsigned, unsigned long);
+extern void preswap_flush_area(unsigned);
+#else
+static inline void preswap_shrink(unsigned long target_pages)
+{
+}
+
+static inline int preswap_test(struct swap_info_struct *sis, unsigned long offset)
+{
+	return 0;
+}
+
+static inline void preswap_init(unsigned type)
+{
+}
+
+static inline int preswap_put(struct page *page)
+{
+	return 0;
+}
+
+static inline int preswap_get(struct page *get)
+{
+	return 0;
+}
+
+static inline void preswap_flush(unsigned type, unsigned long offset)
+{
+}
+
+static inline void preswap_flush_area(unsigned type)
+{
+}
+#endif /* CONFIG_PRESWAP */
 
 struct swap_list_t {
 	int head;	/* head of priority-ordered swapfile list */

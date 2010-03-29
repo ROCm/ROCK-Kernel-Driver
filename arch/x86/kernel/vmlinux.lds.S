@@ -16,8 +16,10 @@
 
 #ifdef CONFIG_X86_32
 #define LOAD_OFFSET __PAGE_OFFSET
-#else
+#elif !defined(CONFIG_XEN) || CONFIG_XEN_COMPAT > 0x030002
 #define LOAD_OFFSET __START_KERNEL_map
+#else
+#define LOAD_OFFSET 0
 #endif
 
 #include <asm-generic/vmlinux.lds.h>
@@ -41,7 +43,7 @@ ENTRY(phys_startup_64)
 jiffies_64 = jiffies;
 #endif
 
-#if defined(CONFIG_X86_64) && defined(CONFIG_DEBUG_RODATA)
+#if defined(CONFIG_X86_64) && defined(CONFIG_DEBUG_RODATA) && !defined(CONFIG_XEN)
 /*
  * On 64-bit, align RODATA to 2MB so that even with CONFIG_DEBUG_RODATA
  * we retain large page mappings for boundaries spanning kernel text, rodata
@@ -84,6 +86,10 @@ SECTIONS
 {
 #ifdef CONFIG_X86_32
         . = LOAD_OFFSET + LOAD_PHYSICAL_ADDR;
+#if defined(CONFIG_XEN) && CONFIG_XEN_COMPAT <= 0x030002
+#undef LOAD_OFFSET
+#define LOAD_OFFSET 0
+#endif
         phys_startup_32 = startup_32 - LOAD_OFFSET;
 #else
         . = __START_KERNEL;
