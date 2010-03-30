@@ -1309,6 +1309,18 @@ out_err:
 	return err;
 }
 
+static inline loff_t
+reiserfs_max_file_offset(struct super_block *sb)
+{
+	/* Limited by stat_data->sd_blocks, 2^32-1 blocks */
+	loff_t fs_max = (sb->s_blocksize << 32) - sb->s_blocksize;
+
+	/* Limited by 32-bit MAX_LFS_FILESIZE */
+	loff_t page_cache_max = (((u64)PAGE_CACHE_SIZE << 31)-1);
+
+	return min(fs_max, page_cache_max);
+}
+
 static int read_super_block(struct super_block *s, int offset)
 {
 	struct buffer_head *bh;
@@ -1398,10 +1410,7 @@ static int read_super_block(struct super_block *s, int offset)
 	s->dq_op = &reiserfs_quota_operations;
 #endif
 
-	/* new format is limited by the 32 bit wide i_blocks field, want to
-	 ** be one full block below that.
-	 */
-	s->s_maxbytes = (512LL << 32) - s->s_blocksize;
+	s->s_maxbytes = reiserfs_max_file_offset(s);
 	return 0;
 }
 
