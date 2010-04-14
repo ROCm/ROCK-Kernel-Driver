@@ -21,6 +21,7 @@
 #include <linux/highmem.h>
 #include <linux/hardirq.h>
 #include <linux/delay.h>
+#include <linux/slab.h>
 
 #include <asm/uaccess.h>
 

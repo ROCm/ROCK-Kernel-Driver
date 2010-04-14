@@ -9,6 +9,7 @@
  * printing the values of arguments.
  */
 
+#include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/kallsyms.h>
 #include <linux/kdb.h>

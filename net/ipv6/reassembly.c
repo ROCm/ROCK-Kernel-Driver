@@ -41,6 +41,7 @@
 #include <linux/random.h>
 #include <linux/jhash.h>
 #include <linux/skbuff.h>
+#include <linux/slab.h>
 #include <linux/reserve.h>
 
 #include <net/sock.h>

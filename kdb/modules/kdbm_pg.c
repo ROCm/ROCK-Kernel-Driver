@@ -17,6 +17,7 @@
 #include <linux/kdbprivate.h>
 #include <linux/blkdev.h>
 #include <linux/ctype.h>
+#include <linux/slab.h>
 
 MODULE_AUTHOR("SGI");
 MODULE_DESCRIPTION("Debug page information");

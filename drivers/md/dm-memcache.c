@@ -18,6 +18,7 @@
 #include "dm.h"
 #include "dm-memcache.h"
 #include <linux/dm-io.h>
+#include <linux/slab.h>
 
 struct dm_mem_cache_client {
 	spinlock_t lock;

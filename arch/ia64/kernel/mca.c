@@ -88,6 +88,7 @@
 #include <linux/cpumask.h>
 #include <linux/kdebug.h>
 #include <linux/cpu.h>
+#include <linux/gfp.h>
 #ifdef CONFIG_KDB
 #include <linux/kdb.h>
 #include <linux/kdbprivate.h>  /* for switch state wrappers */

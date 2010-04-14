@@ -48,6 +48,7 @@ static const char *version = "v0.2431";
 
 #include <linux/kernel.h>
 #include <linux/vmalloc.h>
+#include <linux/slab.h>
 
 #include <linux/dm-io.h>
 #include <linux/dm-dirty-log.h>

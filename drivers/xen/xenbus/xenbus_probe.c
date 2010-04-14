@@ -46,6 +46,7 @@
 #include <linux/proc_fs.h>
 #include <linux/notifier.h>
 #include <linux/mutex.h>
+#include <linux/slab.h>
 #include <linux/io.h>
 
 #include <asm/page.h>

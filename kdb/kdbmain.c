@@ -51,6 +51,7 @@
 #include <asm/kdebug.h>
 #include <linux/proc_fs.h>
 #include <asm/uaccess.h>
+#include <linux/slab.h>
 char kdb_debug_info_filename[256] = {""};
 EXPORT_SYMBOL(kdb_debug_info_filename);
 #define GREP_LEN 256

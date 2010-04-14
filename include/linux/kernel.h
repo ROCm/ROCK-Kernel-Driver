@@ -456,7 +456,7 @@ int printk_hash(const char *, const char *, ...);
 		.burst = DEFAULT_RATELIMIT_BURST,       \
 	};                                              \
 							\
-	if (!__ratelimit(&_rs))                         \
+	if (__ratelimit(&_rs))                          \
 		printk(fmt, ##__VA_ARGS__);		\
 })
 #else

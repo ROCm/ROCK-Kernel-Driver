@@ -29,6 +29,7 @@
 #include <linux/ctype.h>
 #include <linux/file.h>
 #include <linux/err.h>
+#include <linux/slab.h>
 #include "modules/lcrash/klib.h"
 #include "modules/lcrash/kl_stringtab.h"
 #include "modules/lcrash/kl_btnode.h"

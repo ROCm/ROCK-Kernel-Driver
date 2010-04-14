@@ -17,6 +17,7 @@
 #include <linux/uaccess.h>
 #include <asm/sections.h>
 #include <asm/unaligned.h>
+#include <linux/slab.h>
 
 extern const char __start_unwind[], __end_unwind[];
 extern const u8 __start_unwind_hdr[], __end_unwind_hdr[];
