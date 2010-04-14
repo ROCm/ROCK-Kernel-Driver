@@ -4345,8 +4345,6 @@ int novfs_add_inode_entry(struct inode *i,
 	struct inode_data *id;
 	struct novfs_dir_cache *new;
 	int retVal = -ENOMEM;
-	struct novfs_dir_cache *todel;
-	struct list_head *todeltmp;
 
 	//SClark
 	DbgPrint("i: %p", i);
@@ -4382,19 +4380,6 @@ int novfs_add_inode_entry(struct inode *i,
 			memcpy(new->name, name->name, name->len);
 			new->name[new->nameLen] = '\0';
 			list_add(&new->list, &id->DirCache);
-
-			if (id->cntDC > 20) {
-				todeltmp = id->DirCache.prev;
-				todel = list_entry(todeltmp, struct novfs_dir_cache, list);
-
-				list_del(&todel->list);
-
-				kfree(todel);
-
-				DCCount--;
-				id->cntDC--;
-			}
-
 		}
 	}
 	return (retVal);

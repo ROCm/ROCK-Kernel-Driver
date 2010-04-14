@@ -210,11 +210,7 @@ void splashcopy(u8 *dst, u8 *src, int height, int width, int dstbytes, int srcby
 		union pt p, q;
 		p.ul = (u32 *)dst;
 		q.ul = (u32 *)src;
-		for (i=0; i < width/8; i++) {
-			fb_writel(*q.ul++,p.ul++);
-			fb_writel(*q.ul++,p.ul++);
-		}
-		if (width & 4)
+		for (i = 0; i < width / 4; i++)
 			fb_writel(*q.ul++,p.ul++);
 		if (width & 2)
 			fb_writew(*q.us++,p.us++);
@@ -234,12 +230,8 @@ static void splashset(u8 *dst, int height, int width, int dstbytes, u32 bgx, int
 	while (height-- > 0) {
 		union pt p;
 		p.ul = (u32 *)dst;
-		if (octpp != 3) {
-			for (i=0; i < width/8; i++) {
-				fb_writel(bgx,p.ul++);
-				fb_writel(bgx,p.ul++);
-			}
-			if (width & 4)
+		if (!(octpp & 1)) {
+			for (i = 0; i < width / 4; i++)
 				fb_writel(bgx,p.ul++);
 			if (width & 2)
 				fb_writew(bgx,p.us++);
@@ -248,7 +240,7 @@ static void splashset(u8 *dst, int height, int width, int dstbytes, u32 bgx, int
 			dst += dstbytes;
 		} else { /* slow! */
 			for (i=0; i < width; i++)
-				fb_writeb((bgx >> ((i & 0x3) * 8)) && 0xff,p.ub++);
+				fb_writeb((bgx >> ((i % 3) * 8)) && 0xff,p.ub++);
 		}
 	}
 }
@@ -398,8 +390,7 @@ int splash_cursor(struct fb_info *info, struct fb_cursor *cursor)
 void splash_bmove_redraw(struct vc_data *vc, struct fb_info *info, int y, int sx, int dx, int width)
 {
 	struct splash_data *sd;
-        int octpp = (info->var.bits_per_pixel + 1) >> 3;
-	unsigned short *d = (unsigned short *) (vc->vc_origin + vc->vc_size_row * y + dx * octpp);
+	unsigned short *d = (unsigned short *) (vc->vc_origin + vc->vc_size_row * y + dx * 2);
 	unsigned short *s = d + (dx - sx);
 	unsigned short *start = d;
 	unsigned short *ls = d;
