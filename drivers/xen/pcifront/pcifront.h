@@ -6,6 +6,7 @@
 #ifndef __XEN_PCIFRONT_H__
 #define __XEN_PCIFRONT_H__
 
+#include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/pci.h>
 #include <xen/xenbus.h>

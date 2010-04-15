@@ -25,6 +25,8 @@
 #include <linux/bootmem.h>
 #include <linux/iommu-helper.h>
 #include <linux/highmem.h>
+#include <linux/gfp.h>
+
 #include <asm/io.h>
 #include <asm/pci.h>
 #include <asm/dma.h>

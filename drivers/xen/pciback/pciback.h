@@ -6,6 +6,7 @@
 #ifndef __XEN_PCIBACK_H__
 #define __XEN_PCIBACK_H__
 
+#include <linux/slab.h>
 #include <linux/pci.h>
 #include <linux/interrupt.h>
 #include <xen/xenbus.h>

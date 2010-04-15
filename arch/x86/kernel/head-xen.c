@@ -74,9 +74,10 @@ extern void nmi(void);
 #define CALLBACK_ADDR(fn) { __KERNEL_CS, (unsigned long)(fn) }
 #endif
 
-unsigned long *machine_to_phys_mapping = (void *)MACH2PHYS_VIRT_START;
+unsigned long *__read_mostly machine_to_phys_mapping =
+	(void *)MACH2PHYS_VIRT_START;
 EXPORT_SYMBOL(machine_to_phys_mapping);
-unsigned int machine_to_phys_order;
+unsigned int __read_mostly machine_to_phys_order;
 EXPORT_SYMBOL(machine_to_phys_order);
 
 void __init xen_start_kernel(void)

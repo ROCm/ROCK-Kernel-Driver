@@ -34,6 +34,7 @@
 #define NETFRONT_H
 
 #include <xen/interface/io/netif.h>
+#include <linux/slab.h>
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>
 #include <linux/list.h>

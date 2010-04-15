@@ -22,6 +22,7 @@
  ****************************************************************************
  */
 
+#include <linux/slab.h>
 #include <linux/if_ether.h>
 #include <linux/delay.h>
 #include <asm/io.h>

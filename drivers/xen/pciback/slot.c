@@ -6,10 +6,6 @@
  *   Author: Tristan Gingold <tristan.gingold@bull.net>, from vpci.c
  */
 
-#include <linux/list.h>
-#include <linux/slab.h>
-#include <linux/pci.h>
-#include <linux/spinlock.h>
 #include "pciback.h"
 
 /* There are at most 32 slots in a pci bus.  */

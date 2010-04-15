@@ -1,4 +1,5 @@
 #include <linux/module.h>
+#include <linux/slab.h>
 #include "blkback-pagemap.h"
 
 static int blkback_pagemap_size;

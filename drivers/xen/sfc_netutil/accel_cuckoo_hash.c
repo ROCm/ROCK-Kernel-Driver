@@ -24,6 +24,7 @@
 
 #include <linux/types.h> /* needed for linux/random.h */
 #include <linux/random.h>
+#include <linux/slab.h>
 
 #include "accel_cuckoo_hash.h"
 #include "accel_util.h"

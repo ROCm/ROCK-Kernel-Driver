@@ -1,4 +1,5 @@
 #include <linux/mm.h>
+#include <linux/gfp.h>
 #include <linux/module.h>
 #include <linux/smp.h>
 #include <xen/features.h>

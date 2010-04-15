@@ -33,6 +33,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/slab.h>
 #include <linux/errno.h>
 #include <linux/uio.h>
 #include <linux/notifier.h>

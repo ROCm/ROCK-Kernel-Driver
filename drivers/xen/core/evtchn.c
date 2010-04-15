@@ -31,6 +31,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/slab.h>
 #include <linux/irq.h>
 #include <linux/interrupt.h>
 #include <linux/sched.h>
@@ -197,6 +198,12 @@ static inline unsigned int evtchn_from_irq(unsigned int irq)
 	cfg = irq_cfg(irq);
 	return cfg ? cfg->info & ((1U << _EVTCHN_BITS) - 1) : 0;
 }
+
+unsigned int irq_from_evtchn(unsigned int port)
+{
+	return evtchn_to_irq[port];
+}
+EXPORT_SYMBOL_GPL(irq_from_evtchn);
 
 /* IRQ <-> VIRQ mapping. */
 DEFINE_PER_CPU(int[NR_VIRQS], virq_to_irq) = {[0 ... NR_VIRQS-1] = -1};
@@ -394,9 +401,8 @@ asmlinkage void __irq_entry evtchn_do_upcall(struct pt_regs *regs)
 
 				/* process port */
 				port = (l1i * BITS_PER_LONG) + l2i;
-				if (unlikely((irq = evtchn_to_irq[port]) == -1))
-					evtchn_device_upcall(port);
-				else if (!handle_irq(irq, regs) && printk_ratelimit())
+				if ((unlikely((irq = evtchn_to_irq[port]) == -1)
+				     || !handle_irq(irq, regs)) && printk_ratelimit())
 					printk(KERN_EMERG "%s(%d): No handler for irq %d\n",
 					       __func__, smp_processor_id(), irq);
 

@@ -44,7 +44,6 @@ EXPORT_PER_CPU_SYMBOL(cpu_info);
 static int __read_mostly resched_irq = -1;
 static int __read_mostly callfunc_irq = -1;
 static int __read_mostly call1func_irq = -1;
-static int __read_mostly reboot_irq = -1;
 
 #ifdef CONFIG_X86_LOCAL_APIC
 #define set_cpu_to_apicid(cpu, apicid) (per_cpu(x86_cpu_to_apicid, cpu) = (apicid))
@@ -118,10 +117,6 @@ static int __cpuinit xen_smp_intr_init(unsigned int cpu)
 		.handler = smp_call_function_single_interrupt,
 		.flags   = IRQF_DISABLED,
 		.name    = "call1func"
-	}, reboot_action = {
-		.handler = smp_reboot_interrupt,
-		.flags   = IRQF_DISABLED,
-		.name    = "reboot"
 	};
 	int rc;
 
@@ -155,19 +150,9 @@ static int __cpuinit xen_smp_intr_init(unsigned int cpu)
 	else
 		BUG_ON(call1func_irq != rc);
 
-	rc = bind_ipi_to_irqaction(REBOOT_VECTOR,
-				   cpu,
-				   &reboot_action);
-	if (rc < 0)
-		goto unbind_call1;
-	if (reboot_irq < 0)
-		reboot_irq = rc;
-	else
-		BUG_ON(reboot_irq != rc);
-
 	rc = xen_spinlock_init(cpu);
 	if (rc < 0)
-		goto unbind_reboot;
+		goto unbind_call1;
 
 	if ((cpu != 0) && ((rc = local_setup_timer(cpu)) != 0))
 		goto fail;
@@ -176,8 +161,6 @@ static int __cpuinit xen_smp_intr_init(unsigned int cpu)
 
  fail:
 	xen_spinlock_cleanup(cpu);
- unbind_reboot:
-	unbind_from_per_cpu_irq(reboot_irq, cpu, NULL);
  unbind_call1:
 	unbind_from_per_cpu_irq(call1func_irq, cpu, NULL);
  unbind_call:
@@ -196,7 +179,6 @@ static void __cpuinit xen_smp_intr_exit(unsigned int cpu)
 	unbind_from_per_cpu_irq(resched_irq, cpu, NULL);
 	unbind_from_per_cpu_irq(callfunc_irq, cpu, NULL);
 	unbind_from_per_cpu_irq(call1func_irq, cpu, NULL);
-	unbind_from_per_cpu_irq(reboot_irq, cpu, NULL);
 	xen_spinlock_cleanup(cpu);
 }
 #endif

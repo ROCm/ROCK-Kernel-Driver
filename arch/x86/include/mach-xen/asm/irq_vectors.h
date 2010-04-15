@@ -12,8 +12,7 @@
 #define CALL_FUNCTION_VECTOR		1
 #define CALL_FUNC_SINGLE_VECTOR		2
 #define SPIN_UNLOCK_VECTOR		3
-#define REBOOT_VECTOR			4
-#define NR_IPIS				5
+#define NR_IPIS				4
 
 /*
  * The maximum number of vectors supported by i386 processors

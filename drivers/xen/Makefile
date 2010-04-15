@@ -6,7 +6,6 @@ xen-balloon-$(CONFIG_PARAVIRT_XEN) := balloon.o
 xen-balloon-$(CONFIG_XEN)	:= balloon/
 obj-$(CONFIG_XEN)		+= core/
 obj-$(CONFIG_XEN)		+= console/
-obj-$(CONFIG_XEN)		+= evtchn/
 obj-y				+= xenbus/
 obj-$(CONFIG_XEN)		+= char/
 

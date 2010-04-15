@@ -30,8 +30,8 @@
  * IN THE SOFTWARE.
  */
 
-#if defined(CONFIG_XEN) || defined(MODULE)
 #include <linux/slab.h>
+#if defined(CONFIG_XEN) || defined(MODULE)
 #include <xen/evtchn.h>
 #include <xen/gnttab.h>
 #include <xen/driver_util.h>

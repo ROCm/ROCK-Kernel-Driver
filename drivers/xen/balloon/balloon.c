@@ -43,7 +43,7 @@
 #include <linux/pagemap.h>
 #include <linux/bootmem.h>
 #include <linux/highmem.h>
-#include <linux/vmalloc.h>
+#include <linux/slab.h>
 #include <linux/mutex.h>
 #include <xen/xen_proc.h>
 #include <asm/hypervisor.h>
@@ -568,6 +568,7 @@ static int __init balloon_init(void)
 	} xen_pod_target_t;
 # endif
 	xen_pod_target_t pod_target = { .domid = DOMID_SELF };
+	int rc;
 #elif defined(CONFIG_X86)
 	unsigned long pfn;
 	struct page *page;
@@ -583,11 +584,17 @@ static int __init balloon_init(void)
 	bs.current_pages = min(xen_start_info->nr_pages, max_pfn);
 	totalram_pages   = bs.current_pages;
 #else 
-	totalram_bias = HYPERVISOR_memory_op(
-		HYPERVISOR_memory_op(XENMEM_get_pod_target,
-			&pod_target) != -ENOSYS
-		? XENMEM_maximum_reservation
-		: XENMEM_current_reservation,
+	rc = HYPERVISOR_memory_op(XENMEM_get_pod_target, &pod_target);
+	/*
+	 * Xen prior to 3.4.0 masks the memory_op command to 4 bits, thus
+	 * converting XENMEM_get_pod_target to XENMEM_decrease_reservation.
+	 * Fortunately this results in a request with all input fields zero,
+	 * but (due to the way bit 4 and upwards get interpreted) a starting
+	 * extent of 1. When start_extent > nr_extents (>= in newer Xen), we
+	 * simply get start_extent returned.
+	 */
+	totalram_bias = HYPERVISOR_memory_op(rc != -ENOSYS && rc != 1
+		? XENMEM_maximum_reservation : XENMEM_current_reservation,
 		&pod_target.domid);
 	if ((long)totalram_bias != -ENOSYS) {
 		BUG_ON(totalram_bias < totalram_pages);

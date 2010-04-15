@@ -18,7 +18,6 @@
 #include <linux/threads.h>
 
 #include <linux/bitops.h>
-#include <linux/slab.h>
 #include <linux/list.h>
 #include <linux/spinlock.h>
 #include <linux/sched.h>

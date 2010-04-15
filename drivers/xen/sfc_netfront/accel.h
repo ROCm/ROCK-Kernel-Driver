@@ -35,6 +35,7 @@
 #include <xen/evtchn.h>
 
 #include <linux/kernel.h>
+#include <linux/slab.h>
 #include <linux/version.h>
 #include <linux/list.h>
 

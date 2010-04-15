@@ -1,6 +1,7 @@
 #ifndef _BLKTAP_H_
 #define _BLKTAP_H_
 
+#include <linux/slab.h>
 #include <linux/fs.h>
 #include <linux/poll.h>
 #include <linux/cdev.h>

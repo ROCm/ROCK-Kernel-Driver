@@ -37,6 +37,7 @@
 #include <linux/err.h>
 #include <linux/interrupt.h>
 #include <linux/mutex.h>
+#include <linux/slab.h>
 #include <asm/uaccess.h>
 #include <xen/evtchn.h>
 #include <xen/interface/grant_table.h>

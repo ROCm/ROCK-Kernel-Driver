@@ -20,7 +20,7 @@
 #undef __XEN_TOOLS__
 #include <linux/kernel.h>
 #include <linux/module.h>
-#include <linux/gfp.h>
+#include <linux/slab.h>
 #include <linux/percpu.h>
 #include <asm/hypervisor.h>
 #include <xen/blkif.h>

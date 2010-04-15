@@ -349,10 +349,10 @@ void __init free_early_partial(u64 start, u64 end)
 
 try_next:
 	i = find_overlapped_early(start, end);
-	r = &early_res[i];
-	if (i >= max_early_res || !r->end)
+	if (i >= max_early_res)
 		return;
 
+	r = &early_res[i];
 	/* hole ? */
 	if (r->end >= end && r->start <= start) {
 		drop_range_partial(i, start, end);

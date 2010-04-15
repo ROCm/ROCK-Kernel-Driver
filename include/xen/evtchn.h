@@ -144,9 +144,6 @@ void irq_resume(void);
 /* Entry point for notifications into Linux subsystems. */
 asmlinkage void evtchn_do_upcall(struct pt_regs *regs);
 
-/* Entry point for notifications into the userland character device. */
-void evtchn_device_upcall(int port);
-
 /* Mark a PIRQ as unavailable for dynamic allocation. */
 void evtchn_register_pirq(int irq);
 /* Map a Xen-supplied PIRQ to a dynamically allocated one. */
@@ -157,6 +154,7 @@ int evtchn_get_xen_pirq(int irq);
 void mask_evtchn(int port);
 void disable_all_local_evtchn(void);
 void unmask_evtchn(int port);
+unsigned int irq_from_evtchn(unsigned int port);
 
 #ifdef CONFIG_SMP
 void rebind_evtchn_to_cpu(int port, unsigned int cpu);

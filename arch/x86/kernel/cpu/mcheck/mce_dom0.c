@@ -1,6 +1,7 @@
 #include <linux/init.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
+#include <linux/slab.h>
 #include <xen/interface/xen.h>
 #include <xen/evtchn.h>
 #include <xen/interface/vcpu.h>

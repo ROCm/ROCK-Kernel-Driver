@@ -613,10 +613,8 @@ static __init void reserve_ibft_region(void)
 
 	addr = find_ibft_region(&size);
 
-#ifndef CONFIG_XEN
 	if (size)
 		reserve_early_overlap_ok(addr, addr + size, "ibft");
-#endif
 }
 
 #ifdef CONFIG_X86_RESERVE_LOW_64K

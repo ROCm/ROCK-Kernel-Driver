@@ -137,7 +137,6 @@ extern asmlinkage void smp_invalidate_interrupt(struct pt_regs *);
 extern irqreturn_t smp_reschedule_interrupt(int, void *);
 extern irqreturn_t smp_call_function_interrupt(int, void *);
 extern irqreturn_t smp_call_function_single_interrupt(int, void *);
-extern irqreturn_t smp_reboot_interrupt(int, void *);
 #endif
 #endif
 

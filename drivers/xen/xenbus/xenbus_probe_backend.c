@@ -42,6 +42,7 @@
 #include <linux/ctype.h>
 #include <linux/fcntl.h>
 #include <linux/mm.h>
+#include <linux/slab.h>
 #include <linux/notifier.h>
 
 #include <asm/io.h>

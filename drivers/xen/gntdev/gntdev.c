@@ -23,6 +23,7 @@
 #include <linux/fs.h>
 #include <linux/device.h>
 #include <linux/mm.h>
+#include <linux/slab.h>
 #include <linux/mman.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>

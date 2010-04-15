@@ -1,12 +1,10 @@
 /*
  * PCI Backend -- Configuration overlay for MSI capability
  */
-#include <linux/pci.h>
-#include <linux/slab.h>
+#include "pciback.h"
 #include "conf_space.h"
 #include "conf_space_capability.h"
 #include <xen/interface/io/pciif.h>
-#include "pciback.h"
 
 int pciback_enable_msi(struct pciback_device *pdev,
 		struct pci_dev *dev, struct xen_pci_op *op)

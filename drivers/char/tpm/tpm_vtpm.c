@@ -16,6 +16,7 @@
 
 #include <asm/uaccess.h>
 #include <linux/list.h>
+#include <linux/slab.h>
 #include <linux/device.h>
 #include <linux/interrupt.h>
 #include <linux/platform_device.h>

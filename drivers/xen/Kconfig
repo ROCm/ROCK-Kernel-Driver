@@ -430,8 +430,7 @@ config XEN_SCRUB_PAGES
 
 config XEN_DEV_EVTCHN
 	tristate "Xen /dev/xen/evtchn device"
-	depends on PARAVIRT_XEN
-	default y
+	default PARAVIRT_XEN || XEN_PRIVILEGED_GUEST || m
 	help
 	  The evtchn driver allows a userspace process to triger event
 	  channels and to receive notification of an event channel

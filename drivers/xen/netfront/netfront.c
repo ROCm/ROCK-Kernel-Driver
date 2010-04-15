@@ -1766,6 +1766,13 @@ static void xennet_set_features(struct net_device *dev)
 		xennet_set_tso(dev, 1);
 }
 
+static void netfront_get_drvinfo(struct net_device *dev,
+				 struct ethtool_drvinfo *info)
+{
+	strcpy(info->driver, "netfront");
+	strcpy(info->bus_info, dev_name(dev->dev.parent));
+}
+
 static int network_connect(struct net_device *dev)
 {
 	struct netfront_info *np = netdev_priv(dev);
@@ -1874,6 +1881,7 @@ static void netif_uninit(struct net_device *dev)
 
 static const struct ethtool_ops network_ethtool_ops =
 {
+	.get_drvinfo = netfront_get_drvinfo,
 	.get_tx_csum = ethtool_op_get_tx_csum,
 	.set_tx_csum = ethtool_op_set_tx_csum,
 	.get_sg = ethtool_op_get_sg,
