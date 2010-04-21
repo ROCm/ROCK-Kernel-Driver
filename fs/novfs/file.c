@@ -1569,11 +1569,16 @@ int novfs_delete(unsigned char * Path, int DirectoryFlag, struct novfs_schandle 
 		if (reply) {
 			retCode = 0;
 			if (reply->Reply.ErrorCode) {
-				if ((reply->Reply.ErrorCode & 0xFFFF) == 0x0006) {	/* Access Denied Error */
+
+				/* Refer to the file ncp.c, in xtier's 
+				 * NCP89_08 Function for various error codes */
+
+				if ((reply->Reply.ErrorCode & 0xFFFF) == 0x0006)
 					retCode = -EACCES;
-				} else {
+				else if ((reply->Reply.ErrorCode & 0xFFFF) == 0x0513)
+					retCode = -ENOTEMPTY;
+				else 
 					retCode = -EIO;
-				}
 			}
 			kfree(reply);
 		}

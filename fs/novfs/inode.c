@@ -3825,7 +3825,7 @@ int novfs_fill_super(struct super_block *SB, void *Data, int Silent)
 
 	SB->s_blocksize = PAGE_CACHE_SIZE;
 	SB->s_blocksize_bits = PAGE_CACHE_SHIFT;
-	SB->s_maxbytes = 0xFFFFFFFFFFFFFFFFULL;	/* Max file size */
+	SB->s_maxbytes = MAX_LFS_FILESIZE;	/* Max file size */
 	SB->s_op = &novfs_ops;
 	SB->s_flags |= (MS_NODIRATIME | MS_NODEV | MS_POSIXACL);
 	SB->s_magic = NOVFS_MAGIC;
