@@ -336,13 +336,13 @@ static void synaptics_pt_create(struct psmouse *psmouse)
 	serio_register_port(serio);
 }
 
+#ifdef CONFIG_MOUSE_PS2_SYNAPTICS_LED
 /*
  * LED handling:
  * Some Synaptics devices have an embeded LED at the top-left corner.
  */
 
 struct synaptics_led {
-	enum led_brightness status;
 	struct psmouse *psmouse;
 	struct work_struct work;
 	struct led_classdev cdev;
@@ -350,12 +350,21 @@ struct synaptics_led {
 
 static void synaptics_set_led(struct psmouse *psmouse, int on)
 {
-	unsigned char param[1];
+	int i;
+	unsigned char cmd = on ? 0x88 : 0x10;
 
-	if (psmouse_sliced_command(psmouse, on ? 0x88 : 0x10))
-		return;
-	param[0] = 0x0a;
-	ps2_command(&psmouse->ps2dev, param, PSMOUSE_CMD_SETRATE);
+	ps2_begin_command(&psmouse->ps2dev);
+	if (__ps2_command(&psmouse->ps2dev, NULL, PSMOUSE_CMD_SETSCALE11))
+		goto out;
+	for (i = 6; i >= 0; i -= 2) {
+		unsigned char d = (cmd >> i) & 3;
+		if (__ps2_command(&psmouse->ps2dev, &d, PSMOUSE_CMD_SETRES))
+			goto out;
+	}
+	cmd = 0x0a;
+	__ps2_command(&psmouse->ps2dev, &cmd, PSMOUSE_CMD_SETRATE);
+ out:
+	ps2_end_command(&psmouse->ps2dev);
 }
 
 static void synaptics_led_work(struct work_struct *work)
@@ -363,7 +372,7 @@ static void synaptics_led_work(struct work_struct *work)
 	struct synaptics_led *led;
 
 	led = container_of(work, struct synaptics_led, work);
-	synaptics_set_led(led->psmouse, led->status);
+	synaptics_set_led(led->psmouse, led->cdev.brightness);
 }
 
 static void synaptics_led_cdev_brightness_set(struct led_classdev *cdev,
@@ -372,10 +381,15 @@ static void synaptics_led_cdev_brightness_set(struct led_classdev *cdev,
 	struct synaptics_led *led;
 
 	led = container_of(cdev, struct synaptics_led, cdev);
-	if (value != led->status) {
-		led->status = value;
-		schedule_work(&led->work);
-	}
+	schedule_work(&led->work);
+}
+
+static void synaptics_sync_led(struct psmouse *psmouse)
+{
+	struct synaptics_data *priv = psmouse->private;
+
+	if (priv->led)
+		synaptics_set_led(psmouse, priv->led->cdev.brightness);
 }
 
 static int synaptics_init_led(struct psmouse *psmouse)
@@ -408,6 +422,23 @@ static int synaptics_init_led(struct psmouse *psmouse)
 	priv->led = led;
 	return 0;
 }
+
+static void synaptics_free_led(struct psmouse *psmouse)
+{
+	struct synaptics_data *priv = psmouse->private;
+
+	if (!priv->led)
+		return;
+	cancel_work_sync(&priv->led->work);
+	synaptics_set_led(psmouse, 0);
+	led_classdev_unregister(&priv->led->cdev);
+	kfree(priv->led);
+}
+#else
+#define synaptics_init_led(ps)	0
+#define synaptics_free_led(ps)	do {} while (0)
+#define synaptics_sync_led(ps)	do {} while (0)
+#endif
 
 /*****************************************************************************
  *	Functions to interpret the absolute mode packets
@@ -696,14 +727,7 @@ static void set_input_params(struct input_dev *dev, struct synaptics_data *priv)
 
 static void synaptics_disconnect(struct psmouse *psmouse)
 {
-	struct synaptics_data *priv = psmouse->private;
-
-	if (priv->led) {
-		cancel_work_sync(&priv->led->work);
-		synaptics_set_led(psmouse, 0);
-		led_classdev_unregister(&priv->led->cdev);
-		kfree(priv->led);
-	}
+	synaptics_free_led(psmouse);
 	synaptics_reset(psmouse);
 	kfree(psmouse->private);
 	psmouse->private = NULL;
@@ -735,8 +759,7 @@ static int synaptics_reconnect(struct psmouse *psmouse)
 		return -1;
 	}
 
-	if (priv->led)
-		synaptics_set_led(psmouse, priv->led->status);
+	synaptics_sync_led(psmouse);
 
 	return 0;
 }

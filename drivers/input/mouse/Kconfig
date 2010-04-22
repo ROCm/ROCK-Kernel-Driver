@@ -19,6 +19,7 @@ config MOUSE_PS2
 	select SERIO_LIBPS2
 	select SERIO_I8042 if X86
 	select SERIO_GSCPS2 if GSC
+	select LEDS_CLASS if MOUSE_PS2_SYNAPICS_LED
 	help
 	  Say Y here if you have a PS/2 mouse connected to your system. This
 	  includes the standard 2 or 3-button PS/2 mouse, as well as PS/2
@@ -66,6 +67,14 @@ config MOUSE_PS2_SYNAPTICS
 	  your system.
 
 	  If unsure, say Y.
+
+config MOUSE_PS2_SYNAPTICS_LED
+	bool "Support embedded LED on Synaptics devices"
+	depends on MOUSE_PS2_SYNAPTICS
+	select NEW_LEDS
+	help
+	  Say Y here if you have a Synaptics device with an embedded LED.
+	  This will enable LED class driver to control the LED device.
 
 config MOUSE_PS2_LIFEBOOK
 	bool "Fujitsu Lifebook PS/2 mouse protocol extension" if EMBEDDED
