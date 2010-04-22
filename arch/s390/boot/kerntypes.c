@@ -20,6 +20,7 @@ typedef char *COMPILE_VERSION;
 #include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
+#include <linux/slab.h>
 #ifdef CONFIG_SLUB
  #include <linux/slub_def.h>
 #endif
@@ -29,7 +30,6 @@ typedef char *COMPILE_VERSION;
 #ifdef CONFIG_SLQB
  #include <linux/slqb_def.h>
 #endif
-#include <linux/slab.h>
 #include <linux/bio.h>
 #include <linux/bitmap.h>
 #include <linux/bitops.h>
