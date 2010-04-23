@@ -52,10 +52,18 @@ MODULE_ALIAS("wmi:5FB7F034-2C63-45e9-BE91-3D44E2C707E4");
 #define HPWMI_WIRELESS_QUERY 0x5
 #define HPWMI_HOTKEY_QUERY 0xc
 
+#define PREFIX "HP WMI: "
+
 enum hp_wmi_radio {
 	HPWMI_WIFI = 0,
 	HPWMI_BLUETOOTH = 1,
 	HPWMI_WWAN = 2,
+};
+
+enum hp_wmi_event_ids {
+	HPWMI_DOCK_EVENT = 1,
+	HPWMI_BEZEL_BUTTON = 4,
+	HPWMI_WIRELESS = 5,
 };
 
 static int __devinit hp_wmi_bios_setup(struct platform_device *device);
@@ -338,47 +346,53 @@ static void hp_wmi_notify(u32 value, void *context)
 	struct acpi_buffer response = { ACPI_ALLOCATE_BUFFER, NULL };
 	static struct key_entry *key;
 	union acpi_object *obj;
-	int eventcode;
+	int eventcode, key_code;
 	acpi_status status;
 
 	status = wmi_get_event_data(value, &response);
 	if (status != AE_OK) {
-		printk(KERN_INFO "hp-wmi: bad event status 0x%x\n", status);
+		printk(KERN_INFO PREFIX "bad event status 0x%x\n", status);
 		return;
 	}
 
 	obj = (union acpi_object *)response.pointer;
 
 	if (!obj || obj->type != ACPI_TYPE_BUFFER || obj->buffer.length != 8) {
-		printk(KERN_INFO "HP WMI: Unknown response received\n");
+		printk(KERN_INFO PREFIX "Unknown response received\n");
 		kfree(obj);
 		return;
 	}
 
 	eventcode = *((u8 *) obj->buffer.pointer);
 	kfree(obj);
-	if (eventcode == 0x4)
-		eventcode = hp_wmi_perform_query(HPWMI_HOTKEY_QUERY, 0,
-						0);
-	key = hp_wmi_get_entry_by_scancode(eventcode);
-	if (key) {
-		switch (key->type) {
-		case KE_KEY:
-			input_report_key(hp_wmi_input_dev,
-					 key->keycode, 1);
-			input_sync(hp_wmi_input_dev);
-			input_report_key(hp_wmi_input_dev,
-					 key->keycode, 0);
-			input_sync(hp_wmi_input_dev);
-			break;
-		}
-	} else if (eventcode == 0x1) {
+	switch (eventcode) {
+	case HPWMI_DOCK_EVENT:
 		input_report_switch(hp_wmi_input_dev, SW_DOCK,
 				    hp_wmi_dock_state());
 		input_report_switch(hp_wmi_input_dev, SW_TABLET_MODE,
 				    hp_wmi_tablet_state());
 		input_sync(hp_wmi_input_dev);
-	} else if (eventcode == 0x5) {
+		break;
+	case HPWMI_BEZEL_BUTTON:
+		key_code = hp_wmi_perform_query(HPWMI_HOTKEY_QUERY, 0,
+						 0);
+		key = hp_wmi_get_entry_by_scancode(key_code);
+		if (key) {
+			switch (key->type) {
+			case KE_KEY:
+				input_report_key(hp_wmi_input_dev,
+						 key->keycode, 1);
+				input_sync(hp_wmi_input_dev);
+				input_report_key(hp_wmi_input_dev,
+						 key->keycode, 0);
+				input_sync(hp_wmi_input_dev);
+				break;
+			}
+		} else
+			printk(KERN_INFO PREFIX "Unknown key code - 0x%x\n",
+			       key_code);
+		break;
+	case HPWMI_WIRELESS:
 		if (wifi_rfkill)
 			rfkill_set_states(wifi_rfkill,
 					  hp_wmi_get_sw_state(HPWMI_WIFI),
@@ -391,9 +405,12 @@ static void hp_wmi_notify(u32 value, void *context)
 			rfkill_set_states(wwan_rfkill,
 					  hp_wmi_get_sw_state(HPWMI_WWAN),
 					  hp_wmi_get_hw_state(HPWMI_WWAN));
-	} else
-		printk(KERN_INFO "HP WMI: Unknown key pressed - %x\n",
-			eventcode);
+		break;
+	default:
+		printk(KERN_INFO PREFIX "Unknown eventcode - %d\n",
+		       eventcode);
+		break;
+	}
 }
 
 static int __init hp_wmi_input_setup(void)
