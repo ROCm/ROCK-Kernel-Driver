@@ -270,11 +270,10 @@ struct guestdev __init *pci_copy_guestdev(struct guestdev *gdev_src)
 
 	BUG_ON(!(gdev_src->flags & GUESTDEV_FLAG_DEVICEPATH));
 
-	gdev = kmalloc(sizeof(*gdev), GFP_KERNEL);
+	gdev = kzalloc(sizeof(*gdev), GFP_KERNEL);
 	if (!gdev)
 		goto allocate_err_end;
 
-	memset(gdev, 0, sizeof(*gdev));
 	INIT_LIST_HEAD(&gdev->root_list);
 	gdev->flags = gdev_src->flags;
 	gdev->options = gdev_src->options;
@@ -287,10 +286,9 @@ struct guestdev __init *pci_copy_guestdev(struct guestdev *gdev_src)
 
 	node_src = gdev_src->u.devicepath.child;
 	while (node_src) {
-		node = kmalloc(sizeof(*node), GFP_KERNEL);
+		node = kzalloc(sizeof(*node), GFP_KERNEL);
 		if (!node)
 			goto allocate_err_end;
-		memset(node, 0, sizeof(*node));
 		node->dev = node_src->dev;
 		node->func = node_src->func;
 		if (!node_upper)
@@ -333,10 +331,9 @@ static int __init pci_make_devicepath_guestdev(char *path_str, int options)
 	if (!pci_get_hid_uid(sp, hid, uid))
 		goto format_err_end;
 
-	gdev_org = kmalloc(sizeof(*gdev_org), GFP_KERNEL);
+	gdev_org = kzalloc(sizeof(*gdev_org), GFP_KERNEL);
 	if (!gdev_org)
 		goto allocate_err_end;
-	memset(gdev_org, 0, sizeof(*gdev_org));
 	INIT_LIST_HEAD(&gdev_org->root_list);
 	gdev_org->flags = GUESTDEV_FLAG_DEVICEPATH;
 	gdev_org->options = options;
@@ -362,10 +359,9 @@ static int __init pci_make_devicepath_guestdev(char *path_str, int options)
 			continue;
 		}
 		if (gdev && pci_get_dev_func(sp, &dev, &func)) {
-			node = kmalloc(sizeof(*node), GFP_KERNEL);
+			node = kzalloc(sizeof(*node), GFP_KERNEL);
 			if (!node)
 				goto allocate_err_end;
-			memset(node, 0, sizeof(*node));
 			node->dev = dev;
 			node->func = func;
 			/* add node to end of guestdev */
@@ -631,12 +627,11 @@ static int pci_get_sbdf_from_pcidev(
 		return FALSE;
 
 	for(;;) {
-		node = kmalloc(sizeof(*node), GFP_KERNEL);
+		node = kzalloc(sizeof(*node), GFP_KERNEL);
 		if (!node) {
 			printk(KERN_ERR "PCI: Failed to allocate memory.\n");
 			goto err_end;
 		}
-		memset(node, 0, sizeof(*node));
 		node->dev = PCI_SLOT(dev->devfn);
 		node->func = PCI_FUNC(dev->devfn);
 

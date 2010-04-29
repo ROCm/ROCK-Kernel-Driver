@@ -115,7 +115,7 @@ static void post_suspend(int suspend_cancelled, int fast_suspend)
 		BUG();
 	HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
 
-	memset(empty_zero_page, 0, PAGE_SIZE);
+	clear_page(empty_zero_page);
 
 	fpp = PAGE_SIZE/sizeof(unsigned long);
 	for (i = 0, j = 0, k = -1; i < max_pfn; i += fpp, j++) {

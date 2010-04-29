@@ -1693,10 +1693,11 @@ static int netbk_action_thread(void *index)
 	unsigned long group = (unsigned long)index;
 	struct xen_netbk *netbk = &xen_netbk[group];
 
-	while (1) {
+	while (!kthread_should_stop()) {
 		wait_event_interruptible(netbk->netbk_action_wq,
 					 rx_work_todo(netbk) ||
-					 tx_work_todo(netbk));
+					 tx_work_todo(netbk) ||
+					 kthread_should_stop());
 		cond_resched();
 
 		if (rx_work_todo(netbk))

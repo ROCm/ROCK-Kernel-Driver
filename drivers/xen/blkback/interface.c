@@ -41,11 +41,10 @@ blkif_t *blkif_alloc(domid_t domid)
 {
 	blkif_t *blkif;
 
-	blkif = kmem_cache_alloc(blkif_cachep, GFP_KERNEL);
+	blkif = kmem_cache_alloc(blkif_cachep, GFP_KERNEL|__GFP_ZERO);
 	if (!blkif)
 		return ERR_PTR(-ENOMEM);
 
-	memset(blkif, 0, sizeof(*blkif));
 	blkif->domid = domid;
 	spin_lock_init(&blkif->blk_ring_lock);
 	atomic_set(&blkif->refcnt, 1);

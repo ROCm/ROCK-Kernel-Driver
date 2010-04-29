@@ -218,17 +218,12 @@ static void __cpuinit cpu_initialize_context(unsigned int cpu)
 	ctxt.flags = VGCF_IN_KERNEL;
 	ctxt.user_regs.ds = __USER_DS;
 	ctxt.user_regs.es = __USER_DS;
-	ctxt.user_regs.fs = 0;
-	ctxt.user_regs.gs = 0;
 	ctxt.user_regs.ss = __KERNEL_DS;
 	ctxt.user_regs.eip = (unsigned long)cpu_bringup_and_idle;
 	ctxt.user_regs.eflags = X86_EFLAGS_IF | 0x1000; /* IOPL_RING1 */
 
-	memset(&ctxt.fpu_ctxt, 0, sizeof(ctxt.fpu_ctxt));
-
 	smp_trap_init(ctxt.trap_ctxt);
 
-	ctxt.ldt_ents = 0;
 	ctxt.gdt_frames[0] = arbitrary_virt_to_mfn(get_cpu_gdt_table(cpu));
 	ctxt.gdt_ents = GDT_SIZE / 8;
 

@@ -46,11 +46,10 @@ struct vscsibk_info *vscsibk_info_alloc(domid_t domid)
 {
 	struct vscsibk_info *info;
 
-	info = kmem_cache_alloc(scsiback_cachep, GFP_KERNEL);
+	info = kmem_cache_alloc(scsiback_cachep, GFP_KERNEL|__GFP_ZERO);
 	if (!info)
 		return ERR_PTR(-ENOMEM);
 
-	memset(info, 0, sizeof(*info));
 	info->domid = domid;
 	spin_lock_init(&info->ring_lock);
 	atomic_set(&info->nr_unreplied_reqs, 0);

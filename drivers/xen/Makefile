@@ -1,6 +1,5 @@
 obj-$(CONFIG_PARAVIRT_XEN)	+= grant-table.o features.o events.o manage.o
 xen-hotplug-$(CONFIG_PARAVIRT_XEN) := cpu_hotplug.o
-xen-xencomm-$(CONFIG_PARAVIRT_XEN) := xencomm.o
 xen-balloon-$(CONFIG_PARAVIRT_XEN) := balloon.o
 
 xen-balloon-$(CONFIG_XEN)	:= balloon/
@@ -16,7 +15,7 @@ endif
 
 obj-$(CONFIG_XEN)		+= features.o util.o
 obj-$(CONFIG_HOTPLUG_CPU)	+= $(xen-hotplug-y)
-obj-$(CONFIG_XEN_XENCOMM)	+= $(xen-xencomm-y)
+obj-$(CONFIG_XEN_XENCOMM)	+= xencomm.o
 obj-$(CONFIG_XEN_BALLOON)	+= $(xen-balloon-y)
 obj-$(CONFIG_XEN_DEV_EVTCHN)	+= evtchn.o
 obj-$(CONFIG_XENFS)		+= xenfs/

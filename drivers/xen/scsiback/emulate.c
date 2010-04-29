@@ -240,12 +240,10 @@ static void __report_luns(pending_req_t *pending_req, void *data)
 	alloc_len  = sizeof(struct scsi_lun) * alloc_luns
 				+ VSCSI_REPORT_LUNS_HEADER;
 retry:
-	if ((buff = kmalloc(alloc_len, GFP_KERNEL)) == NULL) {
+	if ((buff = kzalloc(alloc_len, GFP_KERNEL)) == NULL) {
 		printk(KERN_ERR "scsiback:%s kmalloc err\n", __FUNCTION__);
 		goto fail;
 	}
-
-	memset(buff, 0, alloc_len);
 
 	one_lun = (struct scsi_lun *) &buff[8];
 	spin_lock_irqsave(&info->v2p_lock, flags);

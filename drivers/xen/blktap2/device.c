@@ -566,7 +566,8 @@ blktap_map(struct blktap *tap,
 
 	if (!xen_feature(XENFEAT_auto_translated_physmap)) {
 		pte = mk_pte(page, ring->vma->vm_page_prot);
-		blktap_map_uaddr(ring->vma, uvaddr, pte_mkwrite(pte));
+		blktap_map_uaddr(ring->vma, uvaddr,
+				 pte_mkspecial(pte_mkwrite(pte)));
 		flush_tlb_page(ring->vma, uvaddr);
 		blktap_map_uaddr(NULL, kvaddr, mk_pte(page, PAGE_KERNEL));
 		flush_tlb_kernel_page(kvaddr);

@@ -232,7 +232,6 @@ netif_t *netif_alloc(struct device *parent, domid_t domid, unsigned int handle)
 	SET_NETDEV_DEV(dev, parent);
 
 	netif = netdev_priv(dev);
-	memset(netif, 0, sizeof(*netif));
 	netif->domid  = domid;
 	netif->group = UINT_MAX;
 	netif->handle = handle;

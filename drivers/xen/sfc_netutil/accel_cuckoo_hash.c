@@ -77,7 +77,7 @@ int cuckoo_hash_init(cuckoo_hash_table *hashtab, unsigned length_bits,
 	BUG_ON(length_bits >= sizeof(unsigned) * 8);
 	BUG_ON(key_length > sizeof(cuckoo_hash_key));
 
-	table_mem = kmalloc(sizeof(cuckoo_hash_entry) * 2 * length, GFP_KERNEL);
+	table_mem = kzalloc(sizeof(cuckoo_hash_entry) * 2 * length, GFP_KERNEL);
 
 	if (table_mem == NULL)
 		return -ENOMEM;
@@ -92,9 +92,6 @@ int cuckoo_hash_init(cuckoo_hash_table *hashtab, unsigned length_bits,
 		(table_mem + length * sizeof(cuckoo_hash_entry));
 
 	set_hash_parameters(hashtab);
-
-	/* Zero the table */
-	memset(hashtab->table0, 0, length * 2 * sizeof(cuckoo_hash_entry));
 
 	return 0;
 }

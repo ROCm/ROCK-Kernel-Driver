@@ -17,4 +17,3 @@ obj-$(CONFIG_GENERIC_CLOCKEVENTS) += clockevents.o
 obj-$(CONFIG_XEN_DOMCTL)	+= domctl.o
 CFLAGS_domctl.o			:= -D__XEN_PUBLIC_XEN_H__ -D__XEN_PUBLIC_GRANT_TABLE_H__
 CFLAGS_domctl.o			+= -D__XEN_TOOLS__ -imacros xen/interface/domctl.h
-obj-$(CONFIG_XEN_XENCOMM)	+= xencomm.o

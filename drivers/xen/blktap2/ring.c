@@ -215,7 +215,7 @@ blktap_ring_open(struct inode *inode, struct file *filp)
 	struct blktap *tap;
 
 	idx = iminor(inode);
-	if (idx < 0 || idx > MAX_BLKTAP_DEVICE || blktaps[idx] == NULL) {
+	if (idx < 0 || idx >= MAX_BLKTAP_DEVICE || blktaps[idx] == NULL) {
 		BTERR("unable to open device blktap%d\n", idx);
 		return -ENODEV;
 	}

@@ -26,11 +26,10 @@ static tpmif_t *alloc_tpmif(domid_t domid, struct backend_info *bi)
 {
 	tpmif_t *tpmif;
 
-	tpmif = kmem_cache_alloc(tpmif_cachep, GFP_KERNEL);
+	tpmif = kmem_cache_alloc(tpmif_cachep, GFP_KERNEL|__GFP_ZERO);
 	if (tpmif == NULL)
 		goto out_of_memory;
 
-	memset(tpmif, 0, sizeof (*tpmif));
 	tpmif->domid = domid;
 	tpmif->status = DISCONNECTED;
 	tpmif->bi = bi;
@@ -131,7 +130,7 @@ int tpmif_map(tpmif_t *tpmif, unsigned long shared_page, unsigned int evtchn)
 	}
 
 	tpmif->tx = (tpmif_tx_interface_t *)tpmif->tx_area->addr;
-	memset(tpmif->tx, 0, PAGE_SIZE);
+	clear_page(tpmif->tx);
 
 	err = bind_interdomain_evtchn_to_irqhandler(
 		tpmif->domid, evtchn, tpmif_be_int, 0, tpmif->devname, tpmif);

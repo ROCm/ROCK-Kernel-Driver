@@ -671,7 +671,7 @@ static int __init blkif_init(void)
 
 	mmap_pages = blkif_reqs * BLKIF_MAX_SEGMENTS_PER_REQUEST;
 
-	pending_reqs          = kmalloc(sizeof(pending_reqs[0]) *
+	pending_reqs          = kzalloc(sizeof(pending_reqs[0]) *
 					blkif_reqs, GFP_KERNEL);
 	pending_grant_handles = kmalloc(sizeof(pending_grant_handles[0]) *
 					mmap_pages, GFP_KERNEL);
@@ -688,7 +688,6 @@ static int __init blkif_init(void)
 
 	blkif_interface_init();
 
-	memset(pending_reqs, 0, sizeof(pending_reqs));
 	INIT_LIST_HEAD(&pending_free);
 
 	for (i = 0; i < blkif_reqs; i++)

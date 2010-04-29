@@ -236,8 +236,11 @@ static void tap_update_blkif_status(blkif_t *blkif)
 		err = PTR_ERR(blkif->xenblkd);
 		blkif->xenblkd = NULL;
 		xenbus_dev_fatal(blkif->be->dev, err, "start xenblkd");
-		WPRINTK("Error starting thread\n");
-	}
+		WPRINTK("Error starting thread %s\n", name);
+	} else
+		DPRINTK("Thread started for domid %d, connected disk %d\n",
+			blkif->domid, blkif->dev_num);
+
 }
 
 /**
@@ -327,8 +330,6 @@ static void tap_backend_changed(struct xenbus_watch *watch,
 	/* Associate tap dev with domid*/
 	be->blkif->dev_num = dom_to_devid(be->blkif->domid, be->xenbus_id, 
 					  be->blkif);
-	DPRINTK("Thread started for domid [%d], connecting disk\n", 
-		be->blkif->dev_num);
 
 	tap_update_blkif_status(be->blkif);
 }
@@ -342,7 +343,7 @@ static void tap_frontend_changed(struct xenbus_device *dev,
 	struct backend_info *be = dev_get_drvdata(&dev->dev);
 	int err;
 
-	DPRINTK("\n");
+	DPRINTK("fe_changed(%s,%d)\n", dev->nodename, frontend_state);
 
 	switch (frontend_state) {
 	case XenbusStateInitialising:

@@ -136,7 +136,7 @@ blktap_control_ioctl(struct inode *inode, struct file *filp,
 	case BLKTAP2_IOCTL_FREE_TAP:
 		dev = arg;
 
-		if (dev > MAX_BLKTAP_DEVICE || !blktaps[dev])
+		if (dev >= MAX_BLKTAP_DEVICE || !blktaps[dev])
 			return -EINVAL;
 
 		blktap_control_destroy_device(blktaps[dev]);

@@ -15,6 +15,7 @@ $(obj)/inat.o: $(obj)/inat-tables.c
 clean-files := inat-tables.c
 
 obj-$(CONFIG_SMP) += msr-smp.o cache-smp.o
+obj-$(CONFIG_XEN) += cache-smp.o
 
 lib-y := delay.o
 lib-y += thunk_$(BITS).o

@@ -1194,7 +1194,7 @@ int kern_addr_valid(unsigned long addr)
 #ifdef CONFIG_XEN
 	/*
 	 * Don't walk page tables for hypervisor addresses, but allow
-	 * the M2P table to be accessed through /proc/kcore.
+	 * the M2P table to be accessed through e.g. /proc/kcore.
 	 */
 	if (addr >= (unsigned long)machine_to_phys_mapping &&
 	    addr < (unsigned long)(machine_to_phys_mapping +

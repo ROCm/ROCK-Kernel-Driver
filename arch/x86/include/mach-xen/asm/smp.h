@@ -135,6 +135,8 @@ int native_cpu_disable(void);
 void native_cpu_die(unsigned int cpu);
 void native_play_dead(void);
 void play_dead_common(void);
+void wbinvd_on_cpu(int cpu);
+int wbinvd_on_all_cpus(void);
 
 #else /* CONFIG_XEN */
 
@@ -154,9 +156,6 @@ void play_dead(void);
 
 #endif /* CONFIG_XEN */
 
-void wbinvd_on_cpu(int cpu);
-int wbinvd_on_all_cpus(void);
-
 void smp_store_cpu_info(int id);
 #define cpu_physical_id(cpu)	per_cpu(x86_cpu_to_apicid, cpu)
 
@@ -165,7 +164,7 @@ static inline int num_booting_cpus(void)
 {
 	return cpumask_weight(cpu_callout_mask);
 }
-#else /* !CONFIG_SMP */
+#elif /* !CONFIG_SMP && */ !defined(CONFIG_XEN)
 #define wbinvd_on_cpu(cpu)     wbinvd()
 static inline int wbinvd_on_all_cpus(void)
 {
@@ -173,6 +172,10 @@ static inline int wbinvd_on_all_cpus(void)
 	return 0;
 }
 #endif /* CONFIG_SMP */
+
+#ifdef CONFIG_XEN
+int wbinvd_on_all_cpus(void);
+#endif
 
 extern unsigned disabled_cpus __cpuinitdata;
 

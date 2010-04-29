@@ -1103,15 +1103,6 @@ int resend_irq_on_evtchn(unsigned int irq)
  * Interface to generic handling in irq.c
  */
 
-static unsigned int startup_dynirq(unsigned int irq)
-{
-	int evtchn = evtchn_from_irq(irq);
-
-	if (VALID_EVTCHN(evtchn))
-		unmask_evtchn(evtchn);
-	return 0;
-}
-
 static void unmask_dynirq(unsigned int irq)
 {
 	int evtchn = evtchn_from_irq(irq);
@@ -1128,6 +1119,14 @@ static void mask_dynirq(unsigned int irq)
 		mask_evtchn(evtchn);
 }
 
+static unsigned int startup_dynirq(unsigned int irq)
+{
+	unmask_dynirq(irq);
+	return 0;
+}
+
+#define shutdown_dynirq mask_dynirq
+
 static void ack_dynirq(unsigned int irq)
 {
 	int evtchn = evtchn_from_irq(irq);
@@ -1142,23 +1141,22 @@ static void ack_dynirq(unsigned int irq)
 
 static void end_dynirq(unsigned int irq)
 {
-	int evtchn = evtchn_from_irq(irq);
-
-	if (VALID_EVTCHN(evtchn) && !(irq_to_desc(irq)->status & IRQ_DISABLED))
-		unmask_evtchn(evtchn);
+	if (!(irq_to_desc(irq)->status & IRQ_DISABLED))
+		unmask_dynirq(irq);
 }
 
 static struct irq_chip dynirq_chip = {
 	.name     = "Dynamic",
 	.startup  = startup_dynirq,
-	.shutdown = mask_dynirq,
+	.shutdown = shutdown_dynirq,
+	.enable   = unmask_dynirq,
 	.disable  = mask_dynirq,
 	.mask     = mask_dynirq,
 	.unmask   = unmask_dynirq,
 	.mask_ack = ack_dynirq,
 	.ack      = ack_dynirq,
-	.eoi      = end_dynirq,
 	.end      = end_dynirq,
+	.eoi      = end_dynirq,
 #ifdef CONFIG_SMP
 	.set_affinity = set_affinity_irq,
 #endif
@@ -1223,7 +1221,7 @@ static int set_type_pirq(unsigned int irq, unsigned int type)
 	return 0;
 }
 
-static unsigned int startup_pirq(unsigned int irq)
+static void enable_pirq(unsigned int irq)
 {
 	struct evtchn_bind_pirq bind_pirq;
 	int evtchn = evtchn_from_irq(irq);
@@ -1242,7 +1240,7 @@ static unsigned int startup_pirq(unsigned int irq)
 		if (bind_pirq.flags)
 			printk(KERN_INFO "Failed to obtain physical IRQ %d\n",
 			       irq);
-		return 0;
+		return;
 	}
 	evtchn = bind_pirq.port;
 
@@ -1254,11 +1252,9 @@ static unsigned int startup_pirq(unsigned int irq)
 
  out:
 	pirq_unmask_and_notify(evtchn, irq);
-
-	return 0;
 }
 
-static void shutdown_pirq(unsigned int irq)
+static void disable_pirq(unsigned int irq)
 {
 	struct evtchn_close close;
 	int evtchn = evtchn_from_irq(irq);
@@ -1277,47 +1273,46 @@ static void shutdown_pirq(unsigned int irq)
 	irq_cfg(irq)->info = mk_irq_info(IRQT_PIRQ, index_from_irq(irq), 0);
 }
 
+static unsigned int startup_pirq(unsigned int irq)
+{
+	enable_pirq(irq);
+	return 0;
+}
+
+#define shutdown_pirq disable_pirq
+
 static void unmask_pirq(unsigned int irq)
-{
-	startup_pirq(irq);
-}
-
-static void mask_pirq(unsigned int irq)
-{
-}
-
-static void ack_pirq(unsigned int irq)
 {
 	int evtchn = evtchn_from_irq(irq);
 
-	move_native_irq(irq);
-
-	if (VALID_EVTCHN(evtchn)) {
-		mask_evtchn(evtchn);
-		clear_evtchn(evtchn);
-	}
+	if (VALID_EVTCHN(evtchn))
+		pirq_unmask_and_notify(evtchn, irq);
 }
+
+#define mask_pirq mask_dynirq
+#define ack_pirq  ack_dynirq
 
 static void end_pirq(unsigned int irq)
 {
-	int evtchn = evtchn_from_irq(irq);
-
 	if ((irq_to_desc(irq)->status & (IRQ_DISABLED|IRQ_PENDING)) ==
-	    (IRQ_DISABLED|IRQ_PENDING)) {
+	    (IRQ_DISABLED|IRQ_PENDING))
 		shutdown_pirq(irq);
-	} else if (VALID_EVTCHN(evtchn))
-		pirq_unmask_and_notify(evtchn, irq);
+	else
+		unmask_pirq(irq);
 }
 
 static struct irq_chip pirq_chip = {
 	.name     = "Phys",
 	.startup  = startup_pirq,
 	.shutdown = shutdown_pirq,
+	.enable   = enable_pirq,
+	.disable  = disable_pirq,
 	.mask     = mask_pirq,
 	.unmask   = unmask_pirq,
 	.mask_ack = ack_pirq,
 	.ack      = ack_pirq,
 	.end      = end_pirq,
+	.eoi      = end_pirq,
 	.set_type = set_type_pirq,
 #ifdef CONFIG_SMP
 	.set_affinity = set_affinity_irq,

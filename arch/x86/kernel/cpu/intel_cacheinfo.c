@@ -301,7 +301,7 @@ struct _cache_attr {
 	ssize_t (*store)(struct _cpuid4_info *, const char *, size_t count);
 };
 
-#ifdef CONFIG_CPU_SUP_AMD
+#if defined(CONFIG_CPU_SUP_AMD) && !defined(CONFIG_XEN)
 static unsigned int __cpuinit amd_calc_l3_indices(void)
 {
 	/*
@@ -869,7 +869,7 @@ static struct attribute *default_attrs[] = {
 
 static struct attribute *default_l3_attrs[] = {
 	DEFAULT_SYSFS_CACHE_ATTRS,
-#ifdef CONFIG_CPU_SUP_AMD
+#if defined(CONFIG_CPU_SUP_AMD) && !defined(CONFIG_XEN)
 	&cache_disable_0.attr,
 	&cache_disable_1.attr,
 #endif

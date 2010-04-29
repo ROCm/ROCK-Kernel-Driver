@@ -553,16 +553,17 @@ void signal_tapdisk(int idx)
 {
 	tap_blkif_t *info;
 	struct task_struct *ptask;
+	struct mm_struct *mm;
 
 	/*
 	 * if the userland tools set things up wrong, this could be negative;
 	 * just don't try to signal in this case
 	 */
-	if (idx < 0)
+	if (idx < 0 || idx >= MAX_TAP_DEV)
 		return;
 
 	info = tapfds[idx];
-	if ((idx < 0) || (idx > MAX_TAP_DEV) || !info)
+	if (!info)
 		return;
 
 	if (info->pid > 0) {
@@ -573,7 +574,9 @@ void signal_tapdisk(int idx)
 	}
 	info->blkif = NULL;
 
-	return;
+	mm = xchg(&info->mm, NULL);
+	if (mm)
+		mmput(mm);
 }
 
 static int blktap_open(struct inode *inode, struct file *filp)
@@ -586,10 +589,13 @@ static int blktap_open(struct inode *inode, struct file *filp)
 	/* ctrl device, treat differently */
 	if (!idx)
 		return 0;
+	if (idx < 0 || idx >= MAX_TAP_DEV) {
+		WPRINTK("No device /dev/xen/blktap%d\n", idx);
+		return -ENODEV;
+	}
 
 	info = tapfds[idx];
-
-	if ((idx < 0) || (idx > MAX_TAP_DEV) || !info) {
+	if (!info) {
 		WPRINTK("Unable to open device /dev/xen/blktap%d\n",
 			idx);
 		return -ENODEV;
@@ -638,6 +644,7 @@ static int blktap_open(struct inode *inode, struct file *filp)
 static int blktap_release(struct inode *inode, struct file *filp)
 {
 	tap_blkif_t *info = filp->private_data;
+	struct mm_struct *mm;
 	
 	/* check for control device */
 	if (!info)
@@ -646,8 +653,9 @@ static int blktap_release(struct inode *inode, struct file *filp)
 	info->ring_ok = 0;
 	smp_wmb();
 
-	mmput(info->mm);
-	info->mm = NULL;
+	mm = xchg(&info->mm, NULL);
+	if (mm)
+		mmput(mm);
 	kfree(info->foreign_map.map);
 	info->foreign_map.map = NULL;
 
@@ -849,9 +857,11 @@ static int blktap_ioctl(struct inode *inode, struct file *filp,
 		unsigned long dev = arg;
 		unsigned long flags;
 
-		info = tapfds[dev];
+		if (info || dev >= MAX_TAP_DEV)
+			return -EINVAL;
 
-		if ((dev > MAX_TAP_DEV) || !info)
+		info = tapfds[dev];
+		if (!info)
 			return 0; /* should this be an error? */
 
 		spin_lock_irqsave(&pending_free_lock, flags);
@@ -862,16 +872,19 @@ static int blktap_ioctl(struct inode *inode, struct file *filp,
 		return 0;
 	}
 	case BLKTAP_IOCTL_MINOR:
-	{
-		unsigned long dev = arg;
+		if (!info) {
+			unsigned long dev = arg;
 
-		info = tapfds[dev];
+			if (dev >= MAX_TAP_DEV)
+				return -EINVAL;
 
-		if ((dev > MAX_TAP_DEV) || !info)
-			return -EINVAL;
+			info = tapfds[dev];
+			if (!info)
+				return -EINVAL;
+		}
 
 		return info->minor;
-	}
+
 	case BLKTAP_IOCTL_MAJOR:
 		return blktap_major;
 
@@ -905,9 +918,11 @@ static void blktap_kick_user(int idx)
 {
 	tap_blkif_t *info;
 
-	info = tapfds[idx];
+	if (idx < 0 || idx >= MAX_TAP_DEV)
+		return;
 
-	if ((idx < 0) || (idx > MAX_TAP_DEV) || !info)
+	info = tapfds[idx];
+	if (!info)
 		return;
 
 	wake_up_interruptible(&info->wait);
@@ -1053,9 +1068,8 @@ static void fast_flush_area(pending_req_t *req, int k_idx, int u_idx,
 	struct mm_struct *mm;
 	
 
-	info = tapfds[tapidx];
-
-	if ((tapidx < 0) || (tapidx > MAX_TAP_DEV) || !info) {
+	if ((tapidx < 0) || (tapidx >= MAX_TAP_DEV)
+	    || !(info = tapfds[tapidx])) {
 		WPRINTK("fast_flush: Couldn't get info!\n");
 		return;
 	}
@@ -1089,7 +1103,7 @@ static void fast_flush_area(pending_req_t *req, int k_idx, int u_idx,
 				INVALID_P2M_ENTRY);
 		}
 
-		if (khandle->user != INVALID_GRANT_HANDLE) {
+		if (mm != NULL && khandle->user != INVALID_GRANT_HANDLE) {
 			BUG_ON(xen_feature(XENFEAT_auto_translated_physmap));
 			if (!locked++)
 				down_write(&mm->mmap_sem);
@@ -1147,6 +1161,7 @@ static void print_stats(blkif_t *blkif)
 int tap_blkif_schedule(void *arg)
 {
 	blkif_t *blkif = arg;
+	tap_blkif_t *info;
 
 	blkif_get(blkif);
 
@@ -1180,7 +1195,15 @@ int tap_blkif_schedule(void *arg)
 		printk(KERN_DEBUG "%s: exiting\n", current->comm);
 
 	blkif->xenblkd = NULL;
+	info = tapfds[blkif->dev_num];
 	blkif_put(blkif);
+
+	if (info) {
+		struct mm_struct *mm = xchg(&info->mm, NULL);
+
+		if (mm)
+			mmput(mm);
+	}
 
 	return 0;
 }
@@ -1294,7 +1317,7 @@ static int do_block_io_op(blkif_t *blkif)
 	rmb(); /* Ensure we see queued requests up to 'rp'. */
 
 	/*Check blkif has corresponding UE ring*/
-	if (blkif->dev_num < 0) {
+	if (blkif->dev_num < 0 || blkif->dev_num >= MAX_TAP_DEV) {
 		/*oops*/
 		if (print_dbug) {
 			WPRINTK("Corresponding UE " 
@@ -1306,8 +1329,7 @@ static int do_block_io_op(blkif_t *blkif)
 
 	info = tapfds[blkif->dev_num];
 
-	if (blkif->dev_num > MAX_TAP_DEV || !info ||
-	    !test_bit(0, &info->dev_inuse)) {
+	if (!info || !test_bit(0, &info->dev_inuse)) {
 		if (print_dbug) {
 			WPRINTK("Can't get UE info!\n");
 			print_dbug = 0;
@@ -1435,7 +1457,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 		BUG();
 	}
 
-	if (blkif->dev_num < 0 || blkif->dev_num > MAX_TAP_DEV)
+	if (blkif->dev_num < 0 || blkif->dev_num >= MAX_TAP_DEV)
 		goto fail_response;
 
 	info = tapfds[blkif->dev_num];
@@ -1756,7 +1778,7 @@ static int __init blkif_init(void)
 	/* tapfds[0] is always NULL */
 	blktap_next_minor++;
 
-	DPRINTK("Created misc_dev [/dev/xen/blktap%d]\n",i);
+	DPRINTK("Created misc_dev %d:0 [/dev/xen/blktap0]\n", ret);
 
 	/* Make sure the xen class exists */
 	if ((class = get_xen_class()) != NULL) {

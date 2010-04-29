@@ -151,7 +151,7 @@ void __init xen_start_kernel(void)
 	/* Switch to the real shared_info page, and clear the dummy page. */
 	set_fixmap(FIX_SHARED_INFO, xen_start_info->shared_info);
 	HYPERVISOR_shared_info = (shared_info_t *)fix_to_virt(FIX_SHARED_INFO);
-	memset(empty_zero_page, 0, sizeof(empty_zero_page));
+	clear_page(empty_zero_page);
 
 	setup_vcpu_info(0);
 
