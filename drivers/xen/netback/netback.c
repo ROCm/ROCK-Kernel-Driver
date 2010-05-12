@@ -42,9 +42,9 @@
 
 /*define NETBE_DEBUG_INTERRUPT*/
 
-struct xen_netbk *xen_netbk;
-unsigned int netbk_nr_groups;
-static bool use_kthreads = true;
+struct xen_netbk *__read_mostly xen_netbk;
+unsigned int __read_mostly netbk_nr_groups;
+static bool __read_mostly use_kthreads = true;
 static bool __initdata bind_threads;
 
 #define GET_GROUP_INDEX(netif) ((netif)->group)
@@ -74,9 +74,42 @@ static inline unsigned long idx_to_kaddr(struct xen_netbk *netbk, unsigned int i
 }
 
 /* extra field used in struct page */
-static inline void netif_set_page_ext(struct page *pg, struct page_ext *ext)
+union page_ext {
+	struct {
+#if BITS_PER_LONG < 64
+#define GROUP_WIDTH (BITS_PER_LONG - CONFIG_XEN_NETDEV_TX_SHIFT)
+#define MAX_GROUPS ((1U << GROUP_WIDTH) - 1)
+		unsigned int grp:GROUP_WIDTH;
+		unsigned int idx:CONFIG_XEN_NETDEV_TX_SHIFT;
+#else
+#define MAX_GROUPS UINT_MAX
+		unsigned int grp, idx;
+#endif
+	} e;
+	void *mapping;
+};
+
+static inline void netif_set_page_ext(struct page *pg, unsigned int group,
+				      unsigned int idx)
 {
-	pg->mapping = (void *)ext;
+	union page_ext ext = { .e = { .grp = group + 1, .idx = idx } };
+
+	BUILD_BUG_ON(sizeof(ext) > sizeof(ext.mapping));
+	pg->mapping = ext.mapping;
+}
+
+static inline unsigned int netif_page_group(const struct page *pg)
+{
+	union page_ext ext = { .mapping = pg->mapping };
+
+	return ext.e.grp - 1;
+}
+
+static inline unsigned int netif_page_index(const struct page *pg)
+{
+	union page_ext ext = { .mapping = pg->mapping };
+
+	return ext.e.idx;
 }
 
 #define PKT_PROT_LEN 64
@@ -368,7 +401,7 @@ static u16 netbk_gop_frag(netif_t *netif, struct netbk_rx_meta *meta,
 
 	req = RING_GET_REQUEST(&netif->rx, netif->rx.req_cons + i);
 	if (netif->copying_receiver) {
-		struct page_ext *ext;
+		unsigned int group, idx;
 
 		/* The fragment needs to be copied rather than
 		   flipped. */
@@ -376,18 +409,15 @@ static u16 netbk_gop_frag(netif_t *netif, struct netbk_rx_meta *meta,
 		copy_gop = npo->copy + npo->copy_prod++;
 		copy_gop->flags = GNTCOPY_dest_gref;
 		if (PageForeign(page) &&
-		    (ext = (void *)page->mapping) != NULL &&
-		    ext->idx < MAX_PENDING_REQS &&
-		    ext->group < netbk_nr_groups) {
+		    page->mapping != NULL &&
+		    (idx = netif_page_index(page)) < MAX_PENDING_REQS &&
+		    (group = netif_page_group(page)) < netbk_nr_groups) {
 			struct pending_tx_info *src_pend;
 
-			netbk = &xen_netbk[ext->group];
-			BUG_ON(ext < netbk->page_extinfo ||
-			       ext >= netbk->page_extinfo +
-				      ARRAY_SIZE(netbk->page_extinfo));
-			BUG_ON(netbk->mmap_pages[ext->idx] != page);
-			src_pend = &netbk->pending_tx_info[ext->idx];
-			BUG_ON(ext->group != GET_GROUP_INDEX(src_pend->netif));
+			netbk = &xen_netbk[group];
+			BUG_ON(netbk->mmap_pages[idx] != page);
+			src_pend = &netbk->pending_tx_info[idx];
+			BUG_ON(group != GET_GROUP_INDEX(src_pend->netif));
 			copy_gop->source.domid = src_pend->netif->domid;
 			copy_gop->source.u.ref = src_pend->req.gref;
 			copy_gop->flags |= GNTCOPY_source_gref;
@@ -1537,9 +1567,8 @@ static void netif_idx_release(struct xen_netbk *netbk, u16 pending_idx)
 
 static void netif_page_release(struct page *page, unsigned int order)
 {
-	struct page_ext *ext = (void *)page->mapping;
-	unsigned int idx = ext->idx;
-	unsigned int group = ext->group;
+	unsigned int idx = netif_page_index(page);
+	unsigned int group = netif_page_group(page);
 	struct xen_netbk *netbk = &xen_netbk[group];
 
 	BUG_ON(order);
@@ -1722,6 +1751,8 @@ static int __init netback_init(void)
 
 	if (!netbk_nr_groups)
 		netbk_nr_groups = (num_online_cpus() + 1) / 2;
+	if (netbk_nr_groups > MAX_GROUPS)
+		netbk_nr_groups = MAX_GROUPS;
 
 	/* We can increase reservation by this much in net_rx_action(). */
 	balloon_update_driver_allowance(netbk_nr_groups * NET_RX_RING_SIZE);
@@ -1781,19 +1812,14 @@ static int __init netback_init(void)
 
 		INIT_LIST_HEAD(&netbk->pending_inuse_head);
 		INIT_LIST_HEAD(&netbk->net_schedule_list);
-		INIT_LIST_HEAD(&netbk->group_domain_list);
 
 		spin_lock_init(&netbk->net_schedule_list_lock);
 		spin_lock_init(&netbk->release_lock);
-		spin_lock_init(&netbk->group_domain_list_lock);
 
 		for (i = 0; i < MAX_PENDING_REQS; i++) {
 			page = netbk->mmap_pages[i];
 			SetPageForeign(page, netif_page_release);
-			netbk->page_extinfo[i].group = group;
-			netbk->page_extinfo[i].idx = i;
-			netif_set_page_ext(page,
-					   &netbk->page_extinfo[i]);
+			netif_set_page_ext(page, group, i);
 			netbk->pending_ring[i] = i;
 			INIT_LIST_HEAD(&netbk->pending_inuse[i].list);
 		}

@@ -17,12 +17,10 @@ EXPORT_SYMBOL(wbinvd_on_cpu);
 
 int wbinvd_on_all_cpus(void)
 {
-#ifdef MMUEXT_FLUSH_CACHE_GLOBAL /* XXX remove */
 	struct mmuext_op op = { .cmd = MMUEXT_FLUSH_CACHE_GLOBAL };
 
 	if (HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) == 0)
 		return 0;
-#endif
 	/* Best effort as fallback. */
 	return on_each_cpu(__wbinvd, NULL, 1);
 }

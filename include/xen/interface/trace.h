@@ -53,6 +53,7 @@
 #define TRC_HVM_HANDLER   0x00082000   /* various HVM handlers      */
 
 #define TRC_SCHED_MIN       0x00021000   /* Just runstate changes */
+#define TRC_SCHED_CLASS     0x00022000   /* Scheduler-specific    */
 #define TRC_SCHED_VERBOSE   0x00028000   /* More inclusive scheduling */
 
 /* Trace events per class */
@@ -82,6 +83,12 @@
 #define TRC_MEM_PAGE_GRANT_MAP      (TRC_MEM + 1)
 #define TRC_MEM_PAGE_GRANT_UNMAP    (TRC_MEM + 2)
 #define TRC_MEM_PAGE_GRANT_TRANSFER (TRC_MEM + 3)
+#define TRC_MEM_SET_P2M_ENTRY       (TRC_MEM + 4)
+#define TRC_MEM_DECREASE_RESERVATION (TRC_MEM + 5)
+#define TRC_MEM_POD_POPULATE        (TRC_MEM + 16)
+#define TRC_MEM_POD_ZERO_RECLAIM    (TRC_MEM + 17)
+#define TRC_MEM_POD_SUPERPAGE_SPLINTER (TRC_MEM + 18)
+
 
 #define TRC_PV_HYPERCALL             (TRC_PV +  1)
 #define TRC_PV_TRAP                  (TRC_PV +  3)
@@ -149,6 +156,8 @@
 #define TRC_HVM_LMSW            (TRC_HVM_HANDLER + 0x19)
 #define TRC_HVM_LMSW64          (TRC_HVM_HANDLER + TRC_64_FLAG + 0x19)
 #define TRC_HVM_INTR_WINDOW     (TRC_HVM_HANDLER + 0x20)
+#define TRC_HVM_NPF             (TRC_HVM_HANDLER + 0x21)
+
 #define TRC_HVM_IOPORT_WRITE    (TRC_HVM_HANDLER + 0x216)
 #define TRC_HVM_IOMEM_WRITE     (TRC_HVM_HANDLER + 0x217)
 
@@ -193,6 +202,16 @@ struct t_buf {
     uint32_t cons;   /* Offset of next item to be consumed by control tools. */
     uint32_t prod;   /* Offset of next item to be produced by Xen.           */
     /*  Records follow immediately after the meta-data header.    */
+};
+
+/* Structure used to pass MFNs to the trace buffers back to trace consumers.
+ * Offset is an offset into the mapped structure where the mfn list will be held.
+ * MFNs will be at ((unsigned long *)(t_info))+(t_info->cpu_offset[cpu]).
+ */
+struct t_info {
+    uint16_t tbuf_size; /* Size in pages of each trace buffer */
+    uint16_t mfn_offset[];  /* Offset within t_info structure of the page list per cpu */
+    /* MFN lists immediately after the header */
 };
 
 #endif /* __XEN_PUBLIC_TRACE_H__ */

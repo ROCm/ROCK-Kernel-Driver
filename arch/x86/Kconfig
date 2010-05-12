@@ -2218,7 +2218,7 @@ endif # X86_32
 
 config K8_NB
 	def_bool y
-	depends on CPU_SUP_AMD && PCI
+	depends on CPU_SUP_AMD && PCI && !XEN_UNPRIVILEGED_GUEST
 
 source "drivers/pcmcia/Kconfig"
 

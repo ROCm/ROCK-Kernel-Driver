@@ -60,7 +60,7 @@ struct xen_domctl_vcpuaffinity_v5 {
 };
 
 union xen_domctl {
-	/* v4: sles10 sp1: xen 3.0.4 + 32-on-64 patches */
+	/* v4: sle10 sp1: xen 3.0.4 + 32-on-64 patches */
 	struct {
 		uint32_t cmd;
 		uint32_t interface_version;
@@ -74,7 +74,11 @@ union xen_domctl {
 		};
 	} v4;
 
-	/* v5: upstream: xen 3.1, v6: upstream: xen 4.0 */
+	/*
+	 * v5: upstream: xen 3.1
+	 * v6: upstream: xen 4.0
+	 * v7: sle11 sp1: xen 4.0 + cpupools patches
+	 */
 	struct {
 		uint32_t cmd;
 		uint32_t interface_version;
@@ -85,7 +89,7 @@ union xen_domctl {
 			uint64_aligned_t                     dummy_align;
 			uint8_t                              dummy_pad[128];
 		};
-	} v5, v6;
+	} v5, v6, v7;
 };
 
 /* The actual code comes here */
@@ -113,8 +117,11 @@ int xen_guest_address_size(int domid)
 	}								\
 } while (0)
 
-	BUILD_BUG_ON(XEN_DOMCTL_INTERFACE_VERSION > 6);
+	BUILD_BUG_ON(XEN_DOMCTL_INTERFACE_VERSION > 7);
+	guest_address_size(7);
+#if CONFIG_XEN_COMPAT < 0x040100
 	guest_address_size(6);
+#endif
 #if CONFIG_XEN_COMPAT < 0x040000
 	guest_address_size(5);
 #endif
@@ -123,7 +130,7 @@ int xen_guest_address_size(int domid)
 #endif
 
 	ret = BITS_PER_LONG;
-	printk("v%d...6 domctls failed, assuming dom%d is native: %d\n",
+	printk("v%d...7 domctls failed, assuming dom%d is native: %d\n",
 	       low, domid, ret);
 
 	return ret;
@@ -163,8 +170,12 @@ static inline int get_vcpuaffinity(unsigned int nr, void *mask)
 	union xen_domctl domctl;
 	int rc;
 
-	BUILD_BUG_ON(XEN_DOMCTL_INTERFACE_VERSION > 6);
-	rc = vcpuaffinity(get, 6);
+	BUILD_BUG_ON(XEN_DOMCTL_INTERFACE_VERSION > 7);
+	rc = vcpuaffinity(get, 7);
+#if CONFIG_XEN_COMPAT < 0x040100
+	if (rc)
+		rc = vcpuaffinity(get, 6);
+#endif
 #if CONFIG_XEN_COMPAT < 0x040000
 	if (rc)
 		rc = vcpuaffinity(get, 5);
@@ -181,8 +192,12 @@ static inline int set_vcpuaffinity(unsigned int nr, void *mask)
 	union xen_domctl domctl;
 	int rc;
 
-	BUILD_BUG_ON(XEN_DOMCTL_INTERFACE_VERSION > 6);
-	rc = vcpuaffinity(set, 6);
+	BUILD_BUG_ON(XEN_DOMCTL_INTERFACE_VERSION > 7);
+	rc = vcpuaffinity(set, 7);
+#if CONFIG_XEN_COMPAT < 0x040100
+	if (rc)
+		rc = vcpuaffinity(set, 6);
+#endif
 #if CONFIG_XEN_COMPAT < 0x040000
 	if (rc)
 		rc = vcpuaffinity(set, 5);

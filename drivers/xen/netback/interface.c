@@ -55,22 +55,20 @@ module_param_named(queue_length, netbk_queue_length, ulong, 0644);
 static void __netif_up(netif_t *netif)
 {
 	unsigned int group = 0;
-	unsigned int min_domains = xen_netbk[0].group_domain_nr;
+	unsigned int min_groups = atomic_read(&xen_netbk[0].nr_groups);
 	unsigned int i;
 
 	/* Find the list which contains least number of domains. */
 	for (i = 1; i < netbk_nr_groups; i++) {
-		if (xen_netbk[i].group_domain_nr < min_domains) {
+		unsigned int nr_groups = atomic_read(&xen_netbk[i].nr_groups);
+
+		if (nr_groups < min_groups) {
 			group = i;
-			min_domains = xen_netbk[i].group_domain_nr;
+			min_groups = nr_groups;
 		}
 	}
 
-	spin_lock(&xen_netbk[group].group_domain_list_lock);
-	list_add_tail(&netif->group_list,
-		      &xen_netbk[group].group_domain_list);
-	xen_netbk[group].group_domain_nr++;
-	spin_unlock(&xen_netbk[group].group_domain_list_lock);
+	atomic_inc(&xen_netbk[group].nr_groups);
 	netif->group = group;
 
 	enable_irq(netif->irq);
@@ -85,10 +83,7 @@ static void __netif_down(netif_t *netif)
 	netif_deschedule_work(netif);
 
 	netif->group = UINT_MAX;
-	spin_lock(&netbk->group_domain_list_lock);
-	netbk->group_domain_nr--;
-	list_del(&netif->group_list);
-	spin_unlock(&netbk->group_domain_list_lock);
+	atomic_dec(&netbk->nr_groups);
 }
 
 static int net_open(struct net_device *dev)

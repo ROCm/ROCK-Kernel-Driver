@@ -35,7 +35,7 @@
 #include "xen.h"
 #include "grant_table.h"
 
-#define XEN_DOMCTL_INTERFACE_VERSION 0x00000006
+#define XEN_DOMCTL_INTERFACE_VERSION 0x00000007
 
 struct xenctl_cpumap {
     XEN_GUEST_HANDLE_64(uint8) bitmap;
@@ -60,10 +60,10 @@ struct xen_domctl_createdomain {
  /* Should domain memory integrity be verifed by tboot during Sx? */
 #define _XEN_DOMCTL_CDF_s3_integrity  2
 #define XEN_DOMCTL_CDF_s3_integrity   (1U<<_XEN_DOMCTL_CDF_s3_integrity)
-    uint32_t flags;
  /* Disable out-of-sync shadow page tables? */
 #define _XEN_DOMCTL_CDF_oos_off       3
 #define XEN_DOMCTL_CDF_oos_off        (1U<<_XEN_DOMCTL_CDF_oos_off)
+    uint32_t flags;
 };
 typedef struct xen_domctl_createdomain xen_domctl_createdomain_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_createdomain_t);
@@ -106,6 +106,7 @@ struct xen_domctl_getdomaininfo {
     uint32_t max_vcpu_id;        /* Maximum VCPUID in use by this domain. */
     uint32_t ssidref;
     xen_domain_handle_t handle;
+    uint32_t cpupool;
 };
 typedef struct xen_domctl_getdomaininfo xen_domctl_getdomaininfo_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_getdomaininfo_t);
@@ -160,6 +161,14 @@ struct xen_domctl_getpageframeinfo2 {
 };
 typedef struct xen_domctl_getpageframeinfo2 xen_domctl_getpageframeinfo2_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_getpageframeinfo2_t);
+
+/* XEN_DOMCTL_getpageframeinfo3 */
+struct xen_domctl_getpageframeinfo3 {
+    /* IN variables. */
+    uint64_aligned_t num;
+    /* IN/OUT variables. */
+    XEN_GUEST_HANDLE_64(xen_pfn_t) array;
+};
 
 
 /*
@@ -295,6 +304,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_max_vcpus_t);
 /* Scheduler types. */
 #define XEN_SCHEDULER_SEDF     4
 #define XEN_SCHEDULER_CREDIT   5
+#define XEN_SCHEDULER_CREDIT2  6
 /* Set or get info? */
 #define XEN_DOMCTL_SCHEDOP_putinfo 0
 #define XEN_DOMCTL_SCHEDOP_getinfo 1
@@ -313,6 +323,9 @@ struct xen_domctl_scheduler_op {
             uint16_t weight;
             uint16_t cap;
         } credit;
+        struct xen_domctl_sched_credit2 {
+            uint16_t weight;
+        } credit2;
     } u;
 };
 typedef struct xen_domctl_scheduler_op xen_domctl_scheduler_op_t;
@@ -431,6 +444,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_real_mode_area_t);
 #define XEN_DOMCTL_SENDTRIGGER_RESET  1
 #define XEN_DOMCTL_SENDTRIGGER_INIT   2
 #define XEN_DOMCTL_SENDTRIGGER_POWER  3
+#define XEN_DOMCTL_SENDTRIGGER_SLEEP  4
 struct xen_domctl_sendtrigger {
     uint32_t  trigger;  /* IN */
     uint32_t  vcpu;     /* IN */
@@ -772,7 +786,6 @@ struct xen_domctl_mem_sharing_op {
 typedef struct xen_domctl_mem_sharing_op xen_domctl_mem_sharing_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_mem_sharing_op_t);
 
-
 struct xen_domctl {
     uint32_t cmd;
 #define XEN_DOMCTL_createdomain                   1
@@ -832,6 +845,7 @@ struct xen_domctl {
 #define XEN_DOMCTL_disable_migrate               58
 #define XEN_DOMCTL_gettscinfo                    59
 #define XEN_DOMCTL_settscinfo                    60
+#define XEN_DOMCTL_getpageframeinfo3             61
 #define XEN_DOMCTL_gdbsx_guestmemio            1000
 #define XEN_DOMCTL_gdbsx_pausevcpu             1001
 #define XEN_DOMCTL_gdbsx_unpausevcpu           1002
@@ -844,6 +858,7 @@ struct xen_domctl {
         struct xen_domctl_getmemlist        getmemlist;
         struct xen_domctl_getpageframeinfo  getpageframeinfo;
         struct xen_domctl_getpageframeinfo2 getpageframeinfo2;
+        struct xen_domctl_getpageframeinfo3 getpageframeinfo3;
         struct xen_domctl_vcpuaffinity      vcpuaffinity;
         struct xen_domctl_shadow_op         shadow_op;
         struct xen_domctl_max_mem           max_mem;

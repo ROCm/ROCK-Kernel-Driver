@@ -68,7 +68,25 @@ static struct page *ttm_tt_alloc_page(unsigned page_flags)
 	else
 		gfp_flags |= __GFP_HIGHMEM;
 
+#ifndef CONFIG_XEN
 	return alloc_page(gfp_flags);
+#else
+	{
+		struct page *page = alloc_page(gfp_flags);
+
+		if (page && (page_flags & TTM_PAGE_FLAG_DMA32)) {
+			int ret = xen_limit_pages_to_max_mfn(page, 0, 32);
+
+			if (ret)
+				printk(KERN_WARNING TTM_PFX
+				       "Error restricting pfn %lx: %d\n",
+				       page_to_pfn(page), ret);
+			else if (page_flags & TTM_PAGE_FLAG_ZERO_ALLOC)
+				clear_page(page_address(page));
+		}
+		return page;
+	}
+#endif
 }
 
 static void ttm_tt_free_user_pages(struct ttm_tt *ttm)

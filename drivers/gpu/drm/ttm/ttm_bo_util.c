@@ -519,6 +519,10 @@ int ttm_bo_pfn_prot(struct ttm_buffer_object *bo,
 							   PAGE_SHIFT));
 	*prot = (mem->placement & TTM_PL_FLAG_CACHED) ?
 		PAGE_KERNEL : ttm_io_prot(mem->placement, PAGE_KERNEL);
+#if defined(CONFIG_XEN) && defined(_PAGE_IOMAP)
+	if (bus_size != 0)
+		pgprot_val(*prot) |= _PAGE_IOMAP;
+#endif
 
 	return 0;
 }

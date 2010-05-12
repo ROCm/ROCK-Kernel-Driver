@@ -584,6 +584,8 @@ end:
 	return result;
 }
 
+#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
+
 int acpi_processor_preregister_performance(
 		struct acpi_processor_performance __percpu *performance)
 {
@@ -799,3 +801,5 @@ acpi_processor_unregister_performance(struct acpi_processor_performance
 }
 
 EXPORT_SYMBOL(acpi_processor_unregister_performance);
+
+#endif /* !CONFIG_PROCESSOR_EXTERNAL_CONTROL */

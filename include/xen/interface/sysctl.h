@@ -34,12 +34,12 @@
 #include "xen.h"
 #include "domctl.h"
 
-#define XEN_SYSCTL_INTERFACE_VERSION 0x00000007
+#define XEN_SYSCTL_INTERFACE_VERSION 0x00000008
 
 /*
  * Read console content from Xen buffer ring.
  */
-#define XEN_SYSCTL_readconsole       1
+/* XEN_SYSCTL_readconsole */
 struct xen_sysctl_readconsole {
     /* IN: Non-zero -> clear after reading. */
     uint8_t clear;
@@ -60,7 +60,7 @@ typedef struct xen_sysctl_readconsole xen_sysctl_readconsole_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_readconsole_t);
 
 /* Get trace buffers machine base address */
-#define XEN_SYSCTL_tbuf_op           2
+/* XEN_SYSCTL_tbuf_op */
 struct xen_sysctl_tbuf_op {
     /* IN variables */
 #define XEN_SYSCTL_TBUFOP_get_info     0
@@ -75,7 +75,7 @@ struct xen_sysctl_tbuf_op {
     uint32_t             evt_mask;
     /* OUT variables */
     uint64_aligned_t buffer_mfn;
-    uint32_t size;
+    uint32_t size;  /* Also an IN variable! */
 };
 typedef struct xen_sysctl_tbuf_op xen_sysctl_tbuf_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_tbuf_op_t);
@@ -83,7 +83,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_sysctl_tbuf_op_t);
 /*
  * Get physical information about the host machine
  */
-#define XEN_SYSCTL_physinfo          3
+/* XEN_SYSCTL_physinfo */
  /* (x86) The platform supports HVM guests. */
 #define _XEN_SYSCTL_PHYSCAP_hvm          0
 #define XEN_SYSCTL_PHYSCAP_hvm           (1u<<_XEN_SYSCTL_PHYSCAP_hvm)
@@ -93,29 +93,13 @@ DEFINE_XEN_GUEST_HANDLE(xen_sysctl_tbuf_op_t);
 struct xen_sysctl_physinfo {
     uint32_t threads_per_core;
     uint32_t cores_per_socket;
-    uint32_t nr_cpus;
-    uint32_t max_node_id;
+    uint32_t nr_cpus, max_cpu_id;
+    uint32_t nr_nodes, max_node_id;
     uint32_t cpu_khz;
     uint64_aligned_t total_pages;
     uint64_aligned_t free_pages;
     uint64_aligned_t scrub_pages;
     uint32_t hw_cap[8];
-
-    /*
-     * IN: maximum addressable entry in the caller-provided cpu_to_node array.
-     * OUT: largest cpu identifier in the system.
-     * If OUT is greater than IN then the cpu_to_node array is truncated!
-     */
-    uint32_t max_cpu_id;
-    /*
-     * If not NULL, this array is filled with node identifier for each cpu.
-     * If a cpu has no node information (e.g., cpu not present) then the
-     * sentinel value ~0u is written.
-     * The size of this array is specified by the caller in @max_cpu_id.
-     * If the actual @max_cpu_id is smaller than the array then the trailing
-     * elements of the array will not be written by the sysctl.
-     */
-    XEN_GUEST_HANDLE_64(uint32) cpu_to_node;
 
     /* XEN_SYSCTL_PHYSCAP_??? */
     uint32_t capabilities;
@@ -126,7 +110,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_sysctl_physinfo_t);
 /*
  * Get the ID of the current scheduler.
  */
-#define XEN_SYSCTL_sched_id          4
+/* XEN_SYSCTL_sched_id */
 struct xen_sysctl_sched_id {
     /* OUT variable */
     uint32_t sched_id;
@@ -135,7 +119,7 @@ typedef struct xen_sysctl_sched_id xen_sysctl_sched_id_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_sched_id_t);
 
 /* Interface for controlling Xen software performance counters. */
-#define XEN_SYSCTL_perfc_op          5
+/* XEN_SYSCTL_perfc_op */
 /* Sub-operations: */
 #define XEN_SYSCTL_PERFCOP_reset 1   /* Reset all counters to zero. */
 #define XEN_SYSCTL_PERFCOP_query 2   /* Get perfctr information. */
@@ -162,7 +146,7 @@ struct xen_sysctl_perfc_op {
 typedef struct xen_sysctl_perfc_op xen_sysctl_perfc_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_perfc_op_t);
 
-#define XEN_SYSCTL_getdomaininfolist 6
+/* XEN_SYSCTL_getdomaininfolist */
 struct xen_sysctl_getdomaininfolist {
     /* IN variables. */
     domid_t               first_domain;
@@ -175,7 +159,7 @@ typedef struct xen_sysctl_getdomaininfolist xen_sysctl_getdomaininfolist_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_getdomaininfolist_t);
 
 /* Inject debug keys into Xen. */
-#define XEN_SYSCTL_debug_keys        7
+/* XEN_SYSCTL_debug_keys */
 struct xen_sysctl_debug_keys {
     /* IN variables. */
     XEN_GUEST_HANDLE_64(char) keys;
@@ -185,7 +169,7 @@ typedef struct xen_sysctl_debug_keys xen_sysctl_debug_keys_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_debug_keys_t);
 
 /* Get physical CPU information. */
-#define XEN_SYSCTL_getcpuinfo        8
+/* XEN_SYSCTL_getcpuinfo */
 struct xen_sysctl_cpuinfo {
     uint64_aligned_t idletime;
 };
@@ -201,7 +185,7 @@ struct xen_sysctl_getcpuinfo {
 typedef struct xen_sysctl_getcpuinfo xen_sysctl_getcpuinfo_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_getcpuinfo_t); 
 
-#define XEN_SYSCTL_availheap         9
+/* XEN_SYSCTL_availheap */
 struct xen_sysctl_availheap {
     /* IN variables. */
     uint32_t min_bitwidth;  /* Smallest address width (zero if don't care). */
@@ -213,7 +197,7 @@ struct xen_sysctl_availheap {
 typedef struct xen_sysctl_availheap xen_sysctl_availheap_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_availheap_t);
 
-#define XEN_SYSCTL_get_pmstat        10
+/* XEN_SYSCTL_get_pmstat */
 struct pm_px_val {
     uint64_aligned_t freq;        /* Px core frequency */
     uint64_aligned_t residency;   /* Px residency time */
@@ -270,7 +254,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_sysctl_get_pmstat_t);
 #define XEN_CPU_HOTPLUG_STATUS_ONLINE  2
 #define XEN_CPU_HOTPLUG_STATUS_NEW     3
 
-#define XEN_SYSCTL_cpu_hotplug       11
+/* XEN_SYSCTL_cpu_hotplug */
 struct xen_sysctl_cpu_hotplug {
     /* IN variables */
     uint32_t cpu;   /* Physical cpu. */
@@ -286,7 +270,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_sysctl_cpu_hotplug_t);
  * Get/set xen power management, include 
  * 1. cpufreq governors and related parameters
  */
-#define XEN_SYSCTL_pm_op        12
+/* XEN_SYSCTL_pm_op */
 struct xen_userspace {
     uint32_t scaling_setspeed;
 };
@@ -333,6 +317,8 @@ struct xen_get_cpufreq_para {
         struct  xen_userspace userspace;
         struct  xen_ondemand ondemand;
     } u;
+
+    int32_t turbo_enabled;
 };
 
 struct xen_set_cpufreq_gov {
@@ -350,22 +336,6 @@ struct xen_set_cpufreq_para {
     uint32_t ctrl_value;
 };
 
-/* Get physical CPU topology information. */
-#define INVALID_TOPOLOGY_ID  (~0U)
-struct xen_get_cputopo {
-     /* IN: maximum addressable entry in
-      * the caller-provided cpu_to_core/socket.
-      */
-    uint32_t max_cpus;
-    XEN_GUEST_HANDLE_64(uint32) cpu_to_core;
-    XEN_GUEST_HANDLE_64(uint32) cpu_to_socket;
-
-    /* OUT: number of cpus returned
-     * If OUT is greater than IN then the cpu_to_core/socket is truncated!
-     */
-    uint32_t nr_cpus;
-};
-
 struct xen_sysctl_pm_op {
     #define PM_PARA_CATEGORY_MASK      0xf0
     #define CPUFREQ_PARA               0x10
@@ -375,9 +345,6 @@ struct xen_sysctl_pm_op {
     #define SET_CPUFREQ_GOV            (CPUFREQ_PARA | 0x02)
     #define SET_CPUFREQ_PARA           (CPUFREQ_PARA | 0x03)
     #define GET_CPUFREQ_AVGFREQ        (CPUFREQ_PARA | 0x04)
-
-    /* get CPU topology */
-    #define XEN_SYSCTL_pm_op_get_cputopo  0x20
 
     /* set/reset scheduler power saving option */
     #define XEN_SYSCTL_pm_op_set_sched_opt_smt    0x21
@@ -390,6 +357,10 @@ struct xen_sysctl_pm_op {
     #define XEN_SYSCTL_pm_op_set_vcpu_migration_delay   0x24
     #define XEN_SYSCTL_pm_op_get_vcpu_migration_delay   0x25
 
+    /* enable/disable turbo mode when in dbs governor */
+    #define XEN_SYSCTL_pm_op_enable_turbo               0x26
+    #define XEN_SYSCTL_pm_op_disable_turbo              0x27
+
     uint32_t cmd;
     uint32_t cpuid;
     union {
@@ -397,7 +368,6 @@ struct xen_sysctl_pm_op {
         struct xen_set_cpufreq_gov  set_gov;
         struct xen_set_cpufreq_para set_para;
         uint64_aligned_t get_avgfreq;
-        struct xen_get_cputopo      get_topo;
         uint32_t                    set_sched_opt_smt;
         uint32_t                    get_max_cstate;
         uint32_t                    set_max_cstate;
@@ -406,7 +376,7 @@ struct xen_sysctl_pm_op {
     } u;
 };
 
-#define XEN_SYSCTL_page_offline_op        14
+/* XEN_SYSCTL_page_offline_op */
 struct xen_sysctl_page_offline_op {
     /* IN: range of page to be offlined */
 #define sysctl_page_offline     1
@@ -454,7 +424,7 @@ struct xen_sysctl_page_offline_op {
 
 #define PG_OFFLINE_OWNER_SHIFT 16
 
-#define XEN_SYSCTL_lockprof_op       15
+/* XEN_SYSCTL_lockprof_op */
 /* Sub-operations: */
 #define XEN_SYSCTL_LOCKPROF_reset 1   /* Reset all profile data to zero. */
 #define XEN_SYSCTL_LOCKPROF_query 2   /* Get lock profile information. */
@@ -486,13 +456,125 @@ struct xen_sysctl_lockprof_op {
 typedef struct xen_sysctl_lockprof_op xen_sysctl_lockprof_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_lockprof_op_t);
 
+/* XEN_SYSCTL_topologyinfo */
+#define INVALID_TOPOLOGY_ID  (~0U)
+struct xen_sysctl_topologyinfo {
+    /*
+     * IN: maximum addressable entry in the caller-provided arrays.
+     * OUT: largest cpu identifier in the system.
+     * If OUT is greater than IN then the arrays are truncated!
+     */
+    uint32_t max_cpu_index;
+
+    /*
+     * If not NULL, this array is filled with core/socket/node identifier for 
+     * each cpu.
+     * If a cpu has no core/socket/node information (e.g., cpu not present) 
+     * then the sentinel value ~0u is written.
+     * The size of this array is specified by the caller in @max_cpu_index.
+     * If the actual @max_cpu_index is smaller than the array then the trailing
+     * elements of the array will not be written by the sysctl.
+     */
+    XEN_GUEST_HANDLE_64(uint32) cpu_to_core;
+    XEN_GUEST_HANDLE_64(uint32) cpu_to_socket;
+    XEN_GUEST_HANDLE_64(uint32) cpu_to_node;
+};
+typedef struct xen_sysctl_topologyinfo xen_sysctl_topologyinfo_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_topologyinfo_t);
+
+/* XEN_SYSCTL_numainfo */
+struct xen_sysctl_numainfo {
+    /*
+     * IN: maximum addressable entry in the caller-provided arrays.
+     * OUT: largest node identifier in the system.
+     * If OUT is greater than IN then the arrays are truncated!
+     */
+    uint32_t max_node_index;
+
+    /* NB. Entries are 0 if node is not present. */
+    XEN_GUEST_HANDLE_64(uint64) node_to_memsize;
+    XEN_GUEST_HANDLE_64(uint64) node_to_memfree;
+
+    /*
+     * Array, of size (max_node_index+1)^2, listing memory access distances
+     * between nodes. If an entry has no node distance information (e.g., node 
+     * not present) then the value ~0u is written.
+     * 
+     * Note that the array rows must be indexed by multiplying by the minimum 
+     * of the caller-provided max_node_index and the returned value of
+     * max_node_index. That is, if the largest node index in the system is
+     * smaller than the caller can handle, a smaller 2-d array is constructed
+     * within the space provided by the caller. When this occurs, trailing
+     * space provided by the caller is not modified. If the largest node index
+     * in the system is larger than the caller can handle, then a 2-d array of
+     * the maximum size handleable by the caller is constructed.
+     */
+    XEN_GUEST_HANDLE_64(uint32) node_to_node_distance;
+};
+typedef struct xen_sysctl_numainfo xen_sysctl_numainfo_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_numainfo_t);
+
+/* XEN_SYSCTL_cpupool_op */
+#define XEN_SYSCTL_CPUPOOL_OP_CREATE                1  /* C */
+#define XEN_SYSCTL_CPUPOOL_OP_DESTROY               2  /* D */
+#define XEN_SYSCTL_CPUPOOL_OP_INFO                  3  /* I */
+#define XEN_SYSCTL_CPUPOOL_OP_ADDCPU                4  /* A */
+#define XEN_SYSCTL_CPUPOOL_OP_RMCPU                 5  /* R */
+#define XEN_SYSCTL_CPUPOOL_OP_MOVEDOMAIN            6  /* M */
+#define XEN_SYSCTL_CPUPOOL_OP_FREEINFO              7  /* F */
+#define XEN_SYSCTL_CPUPOOL_PAR_ANY     0xFFFFFFFF
+struct xen_sysctl_cpupool_op {
+    uint32_t op;          /* IN */
+    uint32_t cpupool_id;  /* IN: CDIARM OUT: CI */
+    uint32_t sched_id;    /* IN: C      OUT: I  */
+    uint32_t domid;       /* IN: M              */
+    uint32_t cpu;         /* IN: AR             */
+    uint32_t n_dom;       /*            OUT: I  */
+    struct xenctl_cpumap cpumap; /*     OUT: IF */
+};
+typedef struct xen_sysctl_cpupool_op xen_sysctl_cpupool_op_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_cpupool_op_t);
+
+/* XEN_SYSCTL_scheduler_op */
+/* Set or get info? */
+#define XEN_SYSCTL_SCHEDOP_putinfo 0
+#define XEN_SYSCTL_SCHEDOP_getinfo 1
+struct xen_sysctl_scheduler_op {
+    uint32_t sched_id;  /* XEN_SCHEDULER_* (domctl.h) */
+    uint32_t cmd;       /* XEN_SYSCTL_SCHEDOP_* */
+    union {
+    } u;
+};
+typedef struct xen_sysctl_scheduler_op xen_sysctl_scheduler_op_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_scheduler_op_t);
+
 struct xen_sysctl {
     uint32_t cmd;
+#define XEN_SYSCTL_readconsole                    1
+#define XEN_SYSCTL_tbuf_op                        2
+#define XEN_SYSCTL_physinfo                       3
+#define XEN_SYSCTL_sched_id                       4
+#define XEN_SYSCTL_perfc_op                       5
+#define XEN_SYSCTL_getdomaininfolist              6
+#define XEN_SYSCTL_debug_keys                     7
+#define XEN_SYSCTL_getcpuinfo                     8
+#define XEN_SYSCTL_availheap                      9
+#define XEN_SYSCTL_get_pmstat                    10
+#define XEN_SYSCTL_cpu_hotplug                   11
+#define XEN_SYSCTL_pm_op                         12
+#define XEN_SYSCTL_page_offline_op               14
+#define XEN_SYSCTL_lockprof_op                   15
+#define XEN_SYSCTL_topologyinfo                  16 
+#define XEN_SYSCTL_numainfo                      17
+#define XEN_SYSCTL_cpupool_op                    18
+#define XEN_SYSCTL_scheduler_op                  19
     uint32_t interface_version; /* XEN_SYSCTL_INTERFACE_VERSION */
     union {
         struct xen_sysctl_readconsole       readconsole;
         struct xen_sysctl_tbuf_op           tbuf_op;
         struct xen_sysctl_physinfo          physinfo;
+        struct xen_sysctl_topologyinfo      topologyinfo;
+        struct xen_sysctl_numainfo          numainfo;
         struct xen_sysctl_sched_id          sched_id;
         struct xen_sysctl_perfc_op          perfc_op;
         struct xen_sysctl_getdomaininfolist getdomaininfolist;
@@ -504,6 +586,8 @@ struct xen_sysctl {
         struct xen_sysctl_pm_op             pm_op;
         struct xen_sysctl_page_offline_op   page_offline;
         struct xen_sysctl_lockprof_op       lockprof_op;
+        struct xen_sysctl_cpupool_op        cpupool_op;
+        struct xen_sysctl_scheduler_op      scheduler_op;
         uint8_t                             pad[128];
     } u;
 };
