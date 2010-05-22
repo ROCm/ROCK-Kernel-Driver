@@ -596,6 +596,11 @@ static int __cpuinit acpi_processor_add(struct acpi_device *device)
 		return 0;
 	}
 
+#ifdef CONFIG_SMP
+	if (pr->id >= setup_max_cpus && pr->id != 0)
+		return 0;
+#endif
+
 	BUG_ON(!processor_cntl_external() &&
 	       ((pr->id >= nr_cpu_ids) || (pr->id < 0)));
 
@@ -604,14 +609,8 @@ static int __cpuinit acpi_processor_add(struct acpi_device *device)
 	 * ACPI id of processors can be reported wrongly by the BIOS.
 	 * Don't trust it blindly
 	 */
-#ifndef CONFIG_XEN
 	if (per_cpu(processor_device_array, pr->id) != NULL &&
 	    per_cpu(processor_device_array, pr->id) != device) {
-#else
-	BUG_ON(pr->acpi_id >= NR_ACPI_CPUS);
-	if (processor_device_array[pr->acpi_id] != NULL &&
-	    processor_device_array[pr->acpi_id] != device) {
-#endif
 		printk(KERN_WARNING "BIOS reported wrong ACPI id "
 			"for the processor\n");
 		result = -ENODEV;
