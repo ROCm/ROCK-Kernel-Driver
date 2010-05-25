@@ -448,6 +448,11 @@ static int acpi_processor_get_info(struct acpi_device *device)
 			return -ENODEV;
 		}
 	}
+#if defined(CONFIG_SMP) && defined(CONFIG_PROCESSOR_EXTERNAL_CONTROL)
+	if (pr->id >= setup_max_cpus && pr->id > 0)
+		pr->id = -1;
+#endif
+
 	/*
 	 * On some boxes several processors use the same processor bus id.
 	 * But they are located in different scope. For example:
@@ -597,8 +602,11 @@ static int __cpuinit acpi_processor_add(struct acpi_device *device)
 	}
 
 #ifdef CONFIG_SMP
-	if (pr->id >= setup_max_cpus && pr->id != 0)
-		return 0;
+	if (pr->id >= setup_max_cpus && pr->id != 0) {
+		if (!processor_cntl_external())
+			return 0;
+		WARN_ON(pr->id != -1);
+	}
 #endif
 
 	BUG_ON(!processor_cntl_external() &&
@@ -609,8 +617,14 @@ static int __cpuinit acpi_processor_add(struct acpi_device *device)
 	 * ACPI id of processors can be reported wrongly by the BIOS.
 	 * Don't trust it blindly
 	 */
+#ifndef CONFIG_XEN
 	if (per_cpu(processor_device_array, pr->id) != NULL &&
 	    per_cpu(processor_device_array, pr->id) != device) {
+#else
+	BUG_ON(pr->acpi_id >= NR_ACPI_CPUS);
+	if (processor_device_array[pr->acpi_id] != NULL &&
+	    processor_device_array[pr->acpi_id] != device) {
+#endif
 		printk(KERN_WARNING "BIOS reported wrong ACPI id "
 			"for the processor\n");
 		result = -ENODEV;

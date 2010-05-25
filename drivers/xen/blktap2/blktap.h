@@ -205,6 +205,7 @@ blktap_validate_params(struct blktap *tap, struct blktap_params *params)
 }
 
 int blktap_control_destroy_device(struct blktap *);
+int blktap_control_finish_destroy(struct blktap *);
 
 int blktap_ring_init(int *);
 int blktap_ring_free(void);

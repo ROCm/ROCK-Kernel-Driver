@@ -195,12 +195,18 @@ blktap_control_destroy_device(struct blktap *tap)
 
 	clear_bit(BLKTAP_SHUTDOWN_REQUESTED, &tap->dev_inuse);
 
-	if (tap->dev_inuse == (1UL << BLKTAP_CONTROL)) {
+	if (blktap_control_finish_destroy(tap))
 		err = 0;
-		clear_bit(BLKTAP_CONTROL, &tap->dev_inuse);
-	}
 
 	return err;
+}
+
+int
+blktap_control_finish_destroy(struct blktap *tap)
+{
+	if (tap->dev_inuse == (1UL << BLKTAP_CONTROL))
+		clear_bit(BLKTAP_CONTROL, &tap->dev_inuse);
+	return !tap->dev_inuse;
 }
 
 static int __init
