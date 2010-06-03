@@ -92,6 +92,9 @@ acpi_os_predefined_override(const struct acpi_predefined_names *init_val,
 			    acpi_string * new_val);
 
 acpi_status
+acpi_load_override_tables(void);
+
+acpi_status
 acpi_os_table_override(struct acpi_table_header *existing_table,
 		       struct acpi_table_header **new_table);
 
