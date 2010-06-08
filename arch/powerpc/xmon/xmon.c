@@ -2604,7 +2604,7 @@ static void xmon_print_symbol(unsigned long address, const char *mid,
 	printf("%s", after);
 }
 
-extern void debugger_syslog_data(char *syslog_data[4]);
+extern void kdb_syslog_data(char *syslog_data[]);
 #define SYSLOG_WRAP(p) if (p < syslog_data[0]) p = syslog_data[1]-1; \
 	else if (p >= syslog_data[1]) p = syslog_data[0];
 

@@ -250,7 +250,8 @@ struct utrace_engine *utrace_attach_task(
 	 * Initialize the new engine structure.  It starts out with two
 	 * refs: one ref to return, and one ref for being attached.
 	 */
-	kref_set(&engine->kref, 2);
+	kref_init(&engine->kref);
+	kref_get(&engine->kref);
 	engine->flags = 0;
 	engine->ops = ops;
 	engine->data = data;
