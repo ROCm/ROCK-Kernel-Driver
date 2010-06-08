@@ -30,10 +30,6 @@
 #include <asm/mmu.h>
 #include <asm/mpspec.h>
 
-#ifdef CONFIG_XEN
-#include <xen/interface/platform.h>
-#endif
-
 #define COMPILER_DEPENDENT_INT64   long long
 #define COMPILER_DEPENDENT_UINT64  unsigned long long
 
@@ -89,7 +85,6 @@ extern int acpi_ioapic;
 extern int acpi_noirq;
 extern int acpi_strict;
 extern int acpi_disabled;
-extern int acpi_ht;
 extern int acpi_pci_disabled;
 extern int acpi_skip_timer_override;
 extern int acpi_use_timer_override;
@@ -101,7 +96,6 @@ void acpi_pic_sci_set_trigger(unsigned int, u16);
 static inline void disable_acpi(void)
 {
 	acpi_disabled = 1;
-	acpi_ht = 0;
 	acpi_pci_disabled = 1;
 	acpi_noirq = 1;
 }
@@ -123,27 +117,6 @@ extern unsigned long acpi_wakeup_address;
 
 /* early initialization routine */
 extern void acpi_reserve_wakeup_memory(void);
-
-#ifdef CONFIG_XEN
-static inline int acpi_notify_hypervisor_state(u8 sleep_state,
-					       u32 pm1a_cnt_val,
-					       u32 pm1b_cnt_val)
-{
-	struct xen_platform_op op = {
-		.cmd = XENPF_enter_acpi_sleep,
-		.interface_version = XENPF_INTERFACE_VERSION,
-		.u = {
-			.enter_acpi_sleep = {
-				.pm1a_cnt_val = pm1a_cnt_val,
-				.pm1b_cnt_val = pm1b_cnt_val,
-				.sleep_state = sleep_state,
-			},
-		},
-	};
-
-	return HYPERVISOR_platform_op(&op);
-}
-#endif /* CONFIG_XEN */
 
 /*
  * Check if the CPU can handle C2 and deeper
@@ -203,9 +176,7 @@ static inline void disable_acpi(void) { }
 
 #endif /* !CONFIG_ACPI */
 
-#ifndef CONFIG_XEN
 #define ARCH_HAS_POWER_INIT	1
-#endif
 
 struct bootnode;
 

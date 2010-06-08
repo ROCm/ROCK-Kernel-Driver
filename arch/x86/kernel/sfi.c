@@ -31,7 +31,7 @@
 #include <asm/setup.h>
 #include <asm/apic.h>
 
-#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
+#ifdef CONFIG_X86_LOCAL_APIC
 static unsigned long sfi_lapic_addr __initdata = APIC_DEFAULT_PHYS_BASE;
 
 void __init mp_sfi_register_lapic_address(unsigned long address)
@@ -81,7 +81,6 @@ static int __init sfi_parse_cpus(struct sfi_table_header *table)
 #endif /* CONFIG_X86_LOCAL_APIC */
 
 #ifdef CONFIG_X86_IO_APIC
-static u32 gsi_base;
 
 static int __init sfi_parse_ioapic(struct sfi_table_header *table)
 {
@@ -94,17 +93,13 @@ static int __init sfi_parse_ioapic(struct sfi_table_header *table)
 	pentry = (struct sfi_apic_table_entry *)sb->pentry;
 
 	for (i = 0; i < num; i++) {
-		mp_register_ioapic(i, pentry->phys_addr, gsi_base);
-		gsi_base += io_apic_get_redir_entries(i);
+		mp_register_ioapic(i, pentry->phys_addr, gsi_end + 1);
 		pentry++;
 	}
 
-#ifndef CONFIG_XEN
 	WARN(pic_mode, KERN_WARNING
 		"SFI: pic_mod shouldn't be 1 when IOAPIC table is present\n");
 	pic_mode = 0;
-#endif
-
 	return 0;
 }
 #endif /* CONFIG_X86_IO_APIC */
@@ -114,7 +109,7 @@ static int __init sfi_parse_ioapic(struct sfi_table_header *table)
  */
 int __init sfi_platform_init(void)
 {
-#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
+#ifdef CONFIG_X86_LOCAL_APIC
 	mp_sfi_register_lapic_address(sfi_lapic_addr);
 	sfi_table_parse(SFI_SIG_CPUS, NULL, NULL, sfi_parse_cpus);
 #endif

@@ -146,12 +146,14 @@ enum {
 	SWP_DISCARDING	= (1 << 3),	/* now discarding a free cluster */
 	SWP_SOLIDSTATE	= (1 << 4),	/* blkdev seeks are cheap */
 	SWP_CONTINUED	= (1 << 5),	/* swap_map has count continuation */
-	SWP_FILE	= (1 << 6),	/* file swap area */
+	SWP_BLKDEV	= (1 << 6),	/* its a block device */
+	SWP_FILE	= (1 << 7),	/* file swap area */
 					/* add others here before... */
 	SWP_SCANNING	= (1 << 8),	/* refcount in scan_swap_map */
 };
 
 #define SWAP_CLUSTER_MAX 32
+#define COMPACT_CLUSTER_MAX SWAP_CLUSTER_MAX
 
 #define SWAP_MAP_MAX	0x3e	/* Max duplication count, in first swap_map */
 #define SWAP_MAP_BAD	0x3f	/* Note pageblock is bad, in first swap_map */
@@ -183,60 +185,7 @@ struct swap_info_struct {
 	struct block_device *bdev;	/* swap device or bdev of swap file */
 	struct file *swap_file;		/* seldom referenced */
 	unsigned int old_block_size;	/* seldom referenced */
-#ifdef CONFIG_PRESWAP
-	unsigned long *preswap_map;
-	unsigned int preswap_pages;
-#endif
 };
-
-#ifdef CONFIG_PRESWAP
-
-#include <linux/sysctl.h>
-extern int preswap_sysctl_handler(struct ctl_table *, int, void __user *,
-	size_t *, loff_t *);
-extern const unsigned long preswap_zero, preswap_infinity;
-
-extern struct swap_info_struct *get_swap_info_struct(unsigned int type);
-
-extern void preswap_shrink(unsigned long);
-extern int preswap_test(struct swap_info_struct *, unsigned long);
-extern void preswap_init(unsigned);
-extern int preswap_put(struct page *);
-extern int preswap_get(struct page *);
-extern void preswap_flush(unsigned, unsigned long);
-extern void preswap_flush_area(unsigned);
-#else
-static inline void preswap_shrink(unsigned long target_pages)
-{
-}
-
-static inline int preswap_test(struct swap_info_struct *sis, unsigned long offset)
-{
-	return 0;
-}
-
-static inline void preswap_init(unsigned type)
-{
-}
-
-static inline int preswap_put(struct page *page)
-{
-	return 0;
-}
-
-static inline int preswap_get(struct page *get)
-{
-	return 0;
-}
-
-static inline void preswap_flush(unsigned type, unsigned long offset)
-{
-}
-
-static inline void preswap_flush_area(unsigned type)
-{
-}
-#endif /* CONFIG_PRESWAP */
 
 struct swap_list_t {
 	int head;	/* head of priority-ordered swapfile list */
@@ -277,20 +226,15 @@ static inline void lru_cache_add_anon(struct page *page)
 	__lru_cache_add(page, LRU_INACTIVE_ANON);
 }
 
-static inline void lru_cache_add_active_anon(struct page *page)
-{
-	__lru_cache_add(page, LRU_ACTIVE_ANON);
-}
-
 static inline void lru_cache_add_file(struct page *page)
 {
 	__lru_cache_add(page, LRU_INACTIVE_FILE);
 }
 
-static inline void lru_cache_add_active_file(struct page *page)
-{
-	__lru_cache_add(page, LRU_ACTIVE_FILE);
-}
+/* LRU Isolation modes. */
+#define ISOLATE_INACTIVE 0	/* Isolate inactive pages. */
+#define ISOLATE_ACTIVE 1	/* Isolate active pages. */
+#define ISOLATE_BOTH 2		/* Isolate both active and inactive pages. */
 
 /* linux/mm/vmscan.c */
 extern unsigned long try_to_free_pages(struct zonelist *zonelist, int order,
@@ -338,6 +282,11 @@ extern void kswapd_stop(int nid);
 /* linux/mm/shmem.c */
 extern int shmem_unuse(swp_entry_t entry, struct page *page);
 #endif /* CONFIG_MMU */
+
+#ifdef CONFIG_CGROUP_MEM_RES_CTLR
+extern void mem_cgroup_get_shmem_target(struct inode *inode, pgoff_t pgoff,
+					struct page **pagep, swp_entry_t *ent);
+#endif
 
 extern void swap_unplug_io_fn(struct backing_dev_info *, struct page *);
 

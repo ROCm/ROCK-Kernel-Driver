@@ -168,7 +168,7 @@ static int elousb_probe(struct usb_interface *intf, const struct usb_device_id *
 	if (!elo || !input_dev)
 		goto fail1;
 
-	elo->data = usb_buffer_alloc(dev, 8, GFP_ATOMIC, &elo->data_dma);
+	elo->data = usb_alloc_coherent(dev, 8, GFP_ATOMIC, &elo->data_dma);
 	if (!elo->data)
 		goto fail1;
 
@@ -242,7 +242,9 @@ static int elousb_probe(struct usb_interface *intf, const struct usb_device_id *
 	elo->irq->transfer_dma = elo->data_dma;
 	elo->irq->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 
-	input_register_device(elo->dev);
+	error = input_register_device(elo->dev);
+	if (error)
+		goto fail4;
 
 	usb_set_intfdata(intf, elo);
 	return 0;
@@ -252,7 +254,7 @@ fail4:
 fail3:
 	usb_free_urb(elo->irq);
 fail2:
-	usb_buffer_free(dev, 8, elo->data, elo->data_dma);
+	usb_free_coherent(dev, 8, elo->data, elo->data_dma);
 fail1:
 	input_free_device(input_dev);
 	kfree(elo);
@@ -268,7 +270,7 @@ static void elousb_disconnect(struct usb_interface *intf)
 		usb_kill_urb(elo->irq);
 		input_unregister_device(elo->dev);
 		usb_free_urb(elo->irq);
-		usb_buffer_free(interface_to_usbdev(intf), 8, elo->data, elo->data_dma);
+		usb_free_coherent(interface_to_usbdev(intf), 8, elo->data, elo->data_dma);
 		kfree(elo);
 	}
 }

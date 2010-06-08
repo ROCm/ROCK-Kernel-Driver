@@ -23,7 +23,7 @@
  * If outCount is 0, this routine completes successfully WITHOUT waiting
  * for the mailbox command to complete.
  **/
-int qla4xxx_mailbox_command(struct scsi_qla_host *ha, uint8_t inCount,
+static int qla4xxx_mailbox_command(struct scsi_qla_host *ha, uint8_t inCount,
 				   uint8_t outCount, uint32_t *mbx_cmd,
 				   uint32_t *mbx_sts)
 {
@@ -164,8 +164,6 @@ int qla4xxx_mailbox_command(struct scsi_qla_host *ha, uint8_t inCount,
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 mbox_exit:
-	if (status == QLA_SUCCESS)
-		qla4xxx_check_for_clear_ddb(ha, mbx_cmd);
 	mutex_lock(&ha->mbox_sem);
 	clear_bit(AF_MBOX_COMMAND, &ha->flags);
 	mutex_unlock(&ha->mbox_sem);
@@ -174,69 +172,9 @@ mbox_exit:
 	return status;
 }
 
-/**
- * qla4xxx_issue_iocb - issue mailbox iocb command
- * @ha: adapter state pointer.
- * @buffer: buffer pointer.
- * @phys_addr: physical address of buffer.
- * @size: size of buffer.
- *
- * Issues iocbs via mailbox commands.
- * TARGET_QUEUE_LOCK must be released.
- * ADAPTER_STATE_LOCK must be released.
- **/
-int
-qla4xxx_issue_iocb(struct scsi_qla_host *ha, uint32_t comp_offset,
-			dma_addr_t phys_addr)
-{
-	uint32_t mbox_cmd[MBOX_REG_COUNT];
-	uint32_t mbox_sts[MBOX_REG_COUNT];
-	int status;
-
-	memset(&mbox_cmd, 0, sizeof(mbox_cmd));
-	memset(&mbox_sts, 0, sizeof(mbox_sts));
-
-	mbox_cmd[0] = MBOX_CMD_EXECUTE_IOCB_A64;
-	mbox_cmd[1] = comp_offset;
-	mbox_cmd[2] = LSDW(phys_addr);
-	mbox_cmd[3] = MSDW(phys_addr);
-
-	status = qla4xxx_mailbox_command(ha, MBOX_REG_COUNT, 1, &mbox_cmd[0], &mbox_sts[0]);
-	return status;
-}
-
-int qla4xxx_conn_close_sess_logout(struct scsi_qla_host *ha,
-				    uint16_t fw_ddb_index,
-				    uint16_t connection_id,
-				    uint16_t option)
-{
-	uint32_t mbox_cmd[MBOX_REG_COUNT];
-	uint32_t mbox_sts[MBOX_REG_COUNT];
-
-	memset(&mbox_cmd, 0, sizeof(mbox_cmd));
-	memset(&mbox_sts, 0, sizeof(mbox_sts));
-
-	mbox_cmd[0] = MBOX_CMD_CONN_CLOSE_SESS_LOGOUT;
-	mbox_cmd[1] = fw_ddb_index;
-	mbox_cmd[2] = connection_id;
-	mbox_cmd[3] = LOGOUT_OPTION_RESET;
-
-	if (qla4xxx_mailbox_command(ha, MBOX_REG_COUNT, 2, &mbox_cmd[0], &mbox_sts[0]) !=
-	    QLA_SUCCESS) {
-		DEBUG2(printk("scsi%ld: %s: MBOX_CMD_CONN_CLOSE_SESS_LOGOUT "
-			      "option %04x failed sts %04X %04X",
-			      ha->host_no, __func__,
-			      option, mbox_sts[0], mbox_sts[1]));
-		if (mbox_sts[0] == 0x4005)
-			DEBUG2(printk("%s reason %04X\n", __func__,
-				      mbox_sts[1]));
-	}
-	return QLA_SUCCESS;
-}
-
 uint8_t
-qla4xxx_set_ifcb(struct scsi_qla_host *ha, uint32_t *mbox_cmd, uint32_t *mbox_sts,
-			dma_addr_t init_fw_cb_dma)
+qla4xxx_set_ifcb(struct scsi_qla_host *ha, uint32_t *mbox_cmd,
+		 uint32_t *mbox_sts, dma_addr_t init_fw_cb_dma)
 {
 	memset(mbox_cmd, 0, sizeof(mbox_cmd[0]) * MBOX_REG_COUNT);
 	memset(mbox_sts, 0, sizeof(mbox_sts[0]) * MBOX_REG_COUNT);
@@ -244,54 +182,40 @@ qla4xxx_set_ifcb(struct scsi_qla_host *ha, uint32_t *mbox_cmd, uint32_t *mbox_st
 	mbox_cmd[1] = 0;
 	mbox_cmd[2] = LSDW(init_fw_cb_dma);
 	mbox_cmd[3] = MSDW(init_fw_cb_dma);
-	if (ha->ifcb_size > LEGACY_IFCB_SIZE) {
-		mbox_cmd[4] = ha->ifcb_size;
-		mbox_cmd[5] = (IFCB_VER_MAX << 8) | IFCB_VER_MIN;
-	}
+	mbox_cmd[4] = sizeof(struct addr_ctrl_blk);
+	mbox_cmd[5] = (IFCB_VER_MAX << 8) | IFCB_VER_MIN;
 
-	if (qla4xxx_mailbox_command(ha, 6, 6, mbox_cmd, mbox_sts)
-		!= QLA_SUCCESS) {
-		DEBUG2(printk("scsi%ld: %s: "
-			      "MBOX_CMD_INITIALIZE_FIRMWARE failed w/ status %04X\n",
+	if (qla4xxx_mailbox_command(ha, 6, 6, mbox_cmd, mbox_sts) !=
+	    QLA_SUCCESS) {
+		DEBUG2(printk(KERN_WARNING "scsi%ld: %s: "
+			      "MBOX_CMD_INITIALIZE_FIRMWARE"
+			      " failed w/ status %04X\n",
 			      ha->host_no, __func__, mbox_sts[0]));
-		return (QLA_ERROR);
+		return QLA_ERROR;
 	}
-	return (QLA_SUCCESS);
+	return QLA_SUCCESS;
 }
 
 uint8_t
-qla4xxx_get_ifcb(struct scsi_qla_host *ha, uint32_t *mbox_cmd, uint32_t *mbox_sts,
-                dma_addr_t init_fw_cb_dma)
+qla4xxx_get_ifcb(struct scsi_qla_host *ha, uint32_t *mbox_cmd,
+		 uint32_t *mbox_sts, dma_addr_t init_fw_cb_dma)
 {
-	int i;
-
 	memset(mbox_cmd, 0, sizeof(mbox_cmd[0]) * MBOX_REG_COUNT);
 	memset(mbox_sts, 0, sizeof(mbox_sts[0]) * MBOX_REG_COUNT);
 	mbox_cmd[0] = MBOX_CMD_GET_INIT_FW_CTRL_BLOCK;
 	mbox_cmd[2] = LSDW(init_fw_cb_dma);
 	mbox_cmd[3] = MSDW(init_fw_cb_dma);
-	if (init_fw_cb_dma != 0 && ha->ifcb_size > LEGACY_IFCB_SIZE)
-		mbox_cmd[4] = ha->ifcb_size;
+	mbox_cmd[4] = sizeof(struct addr_ctrl_blk);
 
-	if (qla4xxx_mailbox_command(ha, 5, 5, mbox_cmd, mbox_sts)
-		!= QLA_SUCCESS) {
-		if (init_fw_cb_dma == 0 &&
-			mbox_sts[0] == MBOX_STS_COMMAND_ERROR)
-			return (QLA_SUCCESS);
-
-		DEBUG2(printk("scsi%ld: %s: "
-			      "MBOX_CMD_GET_INIT_FW_CTRL_BLOCK failed w/ status %04X\n",
+	if (qla4xxx_mailbox_command(ha, 5, 5, mbox_cmd, mbox_sts) !=
+	    QLA_SUCCESS) {
+		DEBUG2(printk(KERN_WARNING "scsi%ld: %s: "
+			      "MBOX_CMD_GET_INIT_FW_CTRL_BLOCK"
+			      " failed w/ status %04X\n",
 			      ha->host_no, __func__, mbox_sts[0]));
-
-		for (i = 0; i < MBOX_REG_COUNT; i++) {
-			DEBUG2(printk("mbox_cmd[%d] = %08x,     "
-				"mbox_sts[%d] = %08x\n",
-				i, mbox_cmd[i], i, mbox_sts[i]));
-		}
-
-		return (QLA_ERROR);
+		return QLA_ERROR;
 	}
-	return (QLA_SUCCESS);
+	return QLA_SUCCESS;
 }
 
 void
@@ -307,7 +231,7 @@ qla4xxx_update_local_ip(struct scsi_qla_host *ha,
 		min(sizeof(ha->gateway), sizeof(init_fw_cb->ipv4_gw_addr)));
 
 	if (is_ipv6_enabled(ha)) {
-		 /* Save IPv6 Address */
+		/* Save IPv6 Address */
 		ha->ipv6_link_local_state = init_fw_cb->ipv6_lnk_lcl_addr_state;
 		ha->ipv6_addr0_state = init_fw_cb->ipv6_addr0_state;
 		ha->ipv6_addr1_state = init_fw_cb->ipv6_addr1_state;
@@ -315,14 +239,20 @@ qla4xxx_update_local_ip(struct scsi_qla_host *ha,
 		ha->ipv6_link_local_addr.in6_u.u6_addr8[0] = 0xFE;
 		ha->ipv6_link_local_addr.in6_u.u6_addr8[1] = 0x80;
 
-		memcpy(&ha->ipv6_link_local_addr.in6_u.u6_addr8[8], init_fw_cb->ipv6_if_id,
-			min(sizeof(ha->ipv6_link_local_addr)/2, sizeof(init_fw_cb->ipv6_if_id)));
+		memcpy(&ha->ipv6_link_local_addr.in6_u.u6_addr8[8],
+			init_fw_cb->ipv6_if_id,
+			min(sizeof(ha->ipv6_link_local_addr)/2,
+			sizeof(init_fw_cb->ipv6_if_id)));
 		memcpy(&ha->ipv6_addr0, init_fw_cb->ipv6_addr0,
-			min(sizeof(ha->ipv6_addr0), sizeof(init_fw_cb->ipv6_addr0)));
+			min(sizeof(ha->ipv6_addr0),
+			sizeof(init_fw_cb->ipv6_addr0)));
 		memcpy(&ha->ipv6_addr1, init_fw_cb->ipv6_addr1,
-			min(sizeof(ha->ipv6_addr1), sizeof(init_fw_cb->ipv6_addr1)));
-		memcpy(&ha->ipv6_default_router_addr, init_fw_cb->ipv6_dflt_rtr_addr,
-			min(sizeof(ha->ipv6_default_router_addr), sizeof(init_fw_cb->ipv6_dflt_rtr_addr)));
+			min(sizeof(ha->ipv6_addr1),
+			sizeof(init_fw_cb->ipv6_addr1)));
+		memcpy(&ha->ipv6_default_router_addr,
+			init_fw_cb->ipv6_dflt_rtr_addr,
+			min(sizeof(ha->ipv6_default_router_addr),
+			sizeof(init_fw_cb->ipv6_dflt_rtr_addr)));
 	}
 }
 
@@ -335,9 +265,10 @@ qla4xxx_update_local_ifcb(struct scsi_qla_host *ha,
 {
 	if (qla4xxx_get_ifcb(ha, mbox_cmd, mbox_sts, init_fw_cb_dma)
 	    != QLA_SUCCESS) {
-		DEBUG2(printk("scsi%ld: %s: Failed to get init_fw_ctrl_blk\n",
-				ha->host_no, __func__));
-		return (QLA_ERROR);
+		DEBUG2(printk(KERN_WARNING
+			      "scsi%ld: %s: Failed to get init_fw_ctrl_blk\n",
+			      ha->host_no, __func__));
+		return QLA_ERROR;
 	}
 
 	DEBUG2(qla4xxx_dump_buffer(init_fw_cb, sizeof(struct addr_ctrl_blk)));
@@ -365,7 +296,7 @@ qla4xxx_update_local_ifcb(struct scsi_qla_host *ha,
 	}
 	qla4xxx_update_local_ip(ha, init_fw_cb);
 
-	return (QLA_SUCCESS);
+	return QLA_SUCCESS;
 }
 
 /**
@@ -379,9 +310,6 @@ int qla4xxx_initialize_fw_cb(struct scsi_qla_host * ha)
 	uint32_t mbox_cmd[MBOX_REG_COUNT];
 	uint32_t mbox_sts[MBOX_REG_COUNT];
 	int status = QLA_ERROR;
-
-	/* Default to Legacy IFCB Size */
-	ha->ifcb_size = LEGACY_IFCB_SIZE;
 
 	init_fw_cb = dma_alloc_coherent(&ha->pdev->dev,
 					sizeof(struct addr_ctrl_blk),
@@ -397,21 +325,12 @@ int qla4xxx_initialize_fw_cb(struct scsi_qla_host * ha)
 	memset(&mbox_cmd, 0, sizeof(mbox_cmd));
 	memset(&mbox_sts, 0, sizeof(mbox_sts));
 
-	/*
-	 * Determine if larger IFCB is supported
-	 */
-	if (qla4xxx_get_ifcb(ha, &mbox_cmd[0], &mbox_sts[0], init_fw_cb_dma)
-		!= QLA_SUCCESS) {
+	if (qla4xxx_get_ifcb(ha, &mbox_cmd[0], &mbox_sts[0], init_fw_cb_dma) !=
+	    QLA_SUCCESS) {
 		dma_free_coherent(&ha->pdev->dev,
 				  sizeof(struct addr_ctrl_blk),
 				  init_fw_cb, init_fw_cb_dma);
 		goto exit_init_fw_cb;
-	}
-
-	if (mbox_sts[0] == MBOX_STS_COMMAND_ERROR &&
-		mbox_sts[4] > LEGACY_IFCB_SIZE) {
-		/* Supports larger ifcb size */
-		ha->ifcb_size = mbox_sts[4];
 	}
 
 	/* Initialize request and response queues. */
@@ -437,7 +356,8 @@ int qla4xxx_initialize_fw_cb(struct scsi_qla_host * ha)
 
 	if (qla4xxx_set_ifcb(ha, &mbox_cmd[0], &mbox_sts[0], init_fw_cb_dma)
 		!= QLA_SUCCESS) {
-		DEBUG2(printk("scsi%ld: %s: Failed to set init_fw_ctrl_blk\n",
+		DEBUG2(printk(KERN_WARNING
+			      "scsi%ld: %s: Failed to set init_fw_ctrl_blk\n",
 			      ha->host_no, __func__));
 		goto exit_init_fw_cb;
 	}
@@ -479,8 +399,8 @@ int qla4xxx_get_dhcp_ip_address(struct scsi_qla_host * ha)
 
 	/* Get Initialize Firmware Control Block. */
 	memset(init_fw_cb, 0, sizeof(struct addr_ctrl_blk));
-	if (qla4xxx_get_ifcb(ha, &mbox_cmd[0], &mbox_sts[0], init_fw_cb_dma)
-		!= QLA_SUCCESS) {
+	if (qla4xxx_get_ifcb(ha, &mbox_cmd[0], &mbox_sts[0], init_fw_cb_dma) !=
+	    QLA_SUCCESS) {
 		DEBUG2(printk("scsi%ld: %s: Failed to get init_fw_ctrl_blk\n",
 			      ha->host_no, __func__));
 		dma_free_coherent(&ha->pdev->dev,
@@ -574,6 +494,7 @@ int qla4xxx_get_fwddb_entry(struct scsi_qla_host *ha,
 			    uint16_t *connection_id)
 {
 	int status = QLA_ERROR;
+	uint16_t options;
 	uint32_t mbox_cmd[MBOX_REG_COUNT];
 	uint32_t mbox_sts[MBOX_REG_COUNT];
 
@@ -606,14 +527,26 @@ int qla4xxx_get_fwddb_entry(struct scsi_qla_host *ha,
 		goto exit_get_fwddb;
 	}
 	if (fw_ddb_entry) {
-		dev_info(&ha->pdev->dev, "%s: DDB[%d] MB0 %04x Tot %d "
-				"Next %d State %04x ConnErr %08x " NIPQUAD_FMT
+		options = le16_to_cpu(fw_ddb_entry->options);
+		if (options & DDB_OPT_IPV6_DEVICE) {
+			dev_info(&ha->pdev->dev, "%s: DDB[%d] MB0 %04x Tot %d "
+				"Next %d State %04x ConnErr %08x %pI6 "
 				":%04d \"%s\"\n", __func__, fw_ddb_index,
 				mbox_sts[0], mbox_sts[2], mbox_sts[3],
 				mbox_sts[4], mbox_sts[5],
-				NIPQUAD(fw_ddb_entry->ip_addr),
+				fw_ddb_entry->ip_addr,
 				le16_to_cpu(fw_ddb_entry->port),
 				fw_ddb_entry->iscsi_name);
+		} else {
+			dev_info(&ha->pdev->dev, "%s: DDB[%d] MB0 %04x Tot %d "
+				"Next %d State %04x ConnErr %08x %pI4 "
+				":%04d \"%s\"\n", __func__, fw_ddb_index,
+				mbox_sts[0], mbox_sts[2], mbox_sts[3],
+				mbox_sts[4], mbox_sts[5],
+				fw_ddb_entry->ip_addr,
+				le16_to_cpu(fw_ddb_entry->port),
+				fw_ddb_entry->iscsi_name);
+		}
 	}
 	if (num_valid_ddb_entries)
 		*num_valid_ddb_entries = mbox_sts[2];
@@ -843,9 +776,8 @@ int qla4xxx_abort_task(struct scsi_qla_host *ha, struct srb *srb)
 	uint32_t mbox_sts[MBOX_REG_COUNT];
 	struct scsi_cmnd *cmd = srb->cmd;
 	int status = QLA_SUCCESS;
-
-	DEBUG2(printk("scsi%ld:%d:%d:%d: abort task issued\n", ha->host_no,
-			cmd->device->channel, cmd->device->id, cmd->device->lun));
+	unsigned long flags = 0;
+	uint32_t index;
 
 	/*
 	 * Send abort task command to ISP, so that the ISP will return
@@ -854,26 +786,33 @@ int qla4xxx_abort_task(struct scsi_qla_host *ha, struct srb *srb)
 	memset(&mbox_cmd, 0, sizeof(mbox_cmd));
 	memset(&mbox_sts, 0, sizeof(mbox_sts));
 
+	spin_lock_irqsave(&ha->hardware_lock, flags);
+	index = (unsigned long)(unsigned char *)cmd->host_scribble;
+	spin_unlock_irqrestore(&ha->hardware_lock, flags);
+
+	/* Firmware already posted completion on response queue */
+	if (index == MAX_SRBS)
+		return status;
+
 	mbox_cmd[0] = MBOX_CMD_ABORT_TASK;
 	mbox_cmd[1] = srb->fw_ddb_index;
-	mbox_cmd[2] = (unsigned long)(unsigned char *)cmd->host_scribble;
-	mbox_cmd[5] = 0x01;     /* Immediate Command Enable */
+	mbox_cmd[2] = index;
+	/* Immediate Command Enable */
+	mbox_cmd[5] = 0x01;
 
-	qla4xxx_mailbox_command(ha, MBOX_REG_COUNT, 5, &mbox_cmd[0], &mbox_sts[0]);
+	qla4xxx_mailbox_command(ha, MBOX_REG_COUNT, 5, &mbox_cmd[0],
+	    &mbox_sts[0]);
 	if (mbox_sts[0] != MBOX_STS_COMMAND_COMPLETE) {
 		status = QLA_ERROR;
 
-		DEBUG2(printk("scsi%ld:%d:%d:%d: abort task FAILED: ", ha->host_no,
-			cmd->device->channel, cmd->device->id, cmd->device->lun));
-		DEBUG2(printk("mbx0=%04X, mb1=%04X, mb2=%04X, mb3=%04X, mb4=%04X\n",
-			mbox_sts[0], mbox_sts[1], mbox_sts[2], mbox_sts[3],
-			mbox_sts[4]));
+		DEBUG2(printk(KERN_WARNING "scsi%ld:%d:%d: abort task FAILED: "
+		    "mbx0=%04X, mb1=%04X, mb2=%04X, mb3=%04X, mb4=%04X\n",
+		    ha->host_no, cmd->device->id, cmd->device->lun, mbox_sts[0],
+		    mbox_sts[1], mbox_sts[2], mbox_sts[3], mbox_sts[4]));
 	}
 
 	return status;
 }
-
-
 
 /**
  * qla4xxx_reset_lun - issues LUN Reset
@@ -891,31 +830,9 @@ int qla4xxx_reset_lun(struct scsi_qla_host * ha, struct ddb_entry * ddb_entry,
 	uint32_t mbox_cmd[MBOX_REG_COUNT];
 	uint32_t mbox_sts[MBOX_REG_COUNT];
 	int status = QLA_SUCCESS;
-	unsigned long wait_online;
 
 	DEBUG2(printk("scsi%ld:%d:%d: lun reset issued\n", ha->host_no,
 		      ddb_entry->os_target_id, lun));
-
-	/*
-	 * If device is not online wait for 10 sec for device to come online.
-	 * else return error
-	 */
-	if (atomic_read(&ddb_entry->state) != DDB_STATE_ONLINE) {
-		wait_online = jiffies + (DEVICE_ONLINE_TOV * HZ);
-		while (time_before(jiffies, wait_online)) {
-			set_current_state(TASK_INTERRUPTIBLE);
-			schedule_timeout(HZ);
-			if (atomic_read(&ddb_entry->state) == DDB_STATE_ONLINE)
-				break;
-		}
-
-		if (atomic_read(&ddb_entry->state) != DDB_STATE_ONLINE) {
-			DEBUG2(printk("scsi%ld: %s: Unable to reset lun."
-					"Device is not online.\n", ha->host_no
-					, __func__));
-			return QLA_ERROR;
-		}
-	}
 
 	/*
 	 * Send lun reset command to ISP, so that the ISP will return all

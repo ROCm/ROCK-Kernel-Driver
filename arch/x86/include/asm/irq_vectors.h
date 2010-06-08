@@ -49,7 +49,6 @@
 #ifdef CONFIG_X86_32
 # define SYSCALL_VECTOR			0x80
 #endif
-#define KDBENTER_VECTOR	0x81
 
 /*
  * Vectors 0x30-0x3f are used for ISA interrupts.
@@ -101,12 +100,6 @@
 #define INVALIDATE_TLB_VECTOR_END	0xf7
 #define INVALIDATE_TLB_VECTOR_START	0xf0
 #define NUM_INVALIDATE_TLB_VECTORS	   8
-
-/*
- * KDB_VECTOR will take over vector 0xfe when it is needed, as in theory
- * it should not be used anyway.
- */
-#define KDB_VECTOR			0xfe
 
 /*
  * Local APIC timer IRQ vector is on a different priority level,

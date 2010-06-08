@@ -115,6 +115,8 @@ xfs_fsync(struct inode *inode, int datasync)
 
 	xfs_iflags_clear(ip, XFS_ITRUNCATED);
 
+	xfs_ioend_wait(ip);
+
 	/*
 	 * We always need to make sure that the required inode state is safe on
 	 * disk.  The inode might be clean but we still might need to force the
@@ -210,10 +212,9 @@ xfs_fsync(struct inode *inode, int datasync)
 STATIC int
 xfs_file_fsync(
 	struct file		*file,
-	struct dentry		*dentry,
 	int			datasync)
 {
-	return xfs_fsync(dentry->d_inode, datasync);
+	return xfs_fsync(file->f_dentry->d_inode, datasync);
 }
 
 
@@ -876,7 +877,7 @@ write_retry:
 			mutex_lock(&inode->i_mutex);
 		xfs_ilock(ip, iolock);
 
-		error2 = -xfs_file_fsync(file, file->f_path.dentry,
+		error2 = -xfs_file_fsync(file,
 					 (file->f_flags & __O_SYNC) ? 0 : 1);
 		if (!error)
 			error = error2;

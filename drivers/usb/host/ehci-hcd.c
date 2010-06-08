@@ -31,12 +31,11 @@
 #include <linux/list.h>
 #include <linux/interrupt.h>
 #include <linux/usb.h>
+#include <linux/usb/hcd.h>
 #include <linux/moduleparam.h>
 #include <linux/dma-mapping.h>
 #include <linux/debugfs.h>
 #include <linux/slab.h>
-
-#include "../core/hcd.h"
 
 #include <asm/byteorder.h>
 #include <asm/io.h>
@@ -1093,48 +1092,6 @@ static int ehci_get_frame (struct usb_hcd *hcd)
 		ehci->periodic_size;
 }
 
-#ifdef CONFIG_KDB_USB
-
-int
-ehci_kdb_poll_char(struct urb *urb)
-{
-        struct ehci_hcd *ehci;
-
-        /* just to make sure */
-        if (!urb || !urb->dev || !urb->dev->bus)
-                return -1;
-
-        ehci = (struct ehci_hcd *) hcd_to_ehci(bus_to_hcd(urb->dev->bus));
-
-        /* make sure */
-        if (!ehci)
-                return -1;
-
-        if (!HC_IS_RUNNING (ehci_to_hcd(ehci)->state))
-                return -1;
-
-	/*
-	 * If ehci->lock is held coming into this routine, it could
-	 * mean KDB was entered while the HC driver was in the midst
-	 * of processing URBs. Therefore it could be dangerous to
-	 * processes URBs from this poll routine. And, we can't wait on
-	 * the lock since we are in KDB and kernel threads (including the
-	 * one holding the lock) are suspended.
-	 * So, we punt and return an error. Keyboards attached to this
-	 * HC will not be useable from KDB at this time.
-	 */
-	if (spin_is_locked(&ehci->lock))
-		return -EBUSY;
-
-	/* processes the URB */
-        if (qh_completions_kdb(ehci, urb->hcpriv, urb))
-                return 0;
-
-        return -1;
-}
-
-#endif /* CONFIG_KDB_USB */
-
 /*-------------------------------------------------------------------------*/
 
 MODULE_DESCRIPTION(DRIVER_DESC);
@@ -1178,7 +1135,7 @@ MODULE_LICENSE ("GPL");
 
 #ifdef CONFIG_XPS_USB_HCD_XILINX
 #include "ehci-xilinx-of.c"
-#define OF_PLATFORM_DRIVER	ehci_hcd_xilinx_of_driver
+#define XILINX_OF_PLATFORM_DRIVER	ehci_hcd_xilinx_of_driver
 #endif
 
 #ifdef CONFIG_PLAT_ORION
@@ -1202,7 +1159,8 @@ MODULE_LICENSE ("GPL");
 #endif
 
 #if !defined(PCI_DRIVER) && !defined(PLATFORM_DRIVER) && \
-    !defined(PS3_SYSTEM_BUS_DRIVER) && !defined(OF_PLATFORM_DRIVER)
+    !defined(PS3_SYSTEM_BUS_DRIVER) && !defined(OF_PLATFORM_DRIVER) && \
+    !defined(XILINX_OF_PLATFORM_DRIVER)
 #error "missing bus glue for ehci-hcd"
 #endif
 
@@ -1256,10 +1214,20 @@ static int __init ehci_hcd_init(void)
 	if (retval < 0)
 		goto clean3;
 #endif
+
+#ifdef XILINX_OF_PLATFORM_DRIVER
+	retval = of_register_platform_driver(&XILINX_OF_PLATFORM_DRIVER);
+	if (retval < 0)
+		goto clean4;
+#endif
 	return retval;
 
+#ifdef XILINX_OF_PLATFORM_DRIVER
+	/* of_unregister_platform_driver(&XILINX_OF_PLATFORM_DRIVER); */
+clean4:
+#endif
 #ifdef OF_PLATFORM_DRIVER
-	/* of_unregister_platform_driver(&OF_PLATFORM_DRIVER); */
+	of_unregister_platform_driver(&OF_PLATFORM_DRIVER);
 clean3:
 #endif
 #ifdef PS3_SYSTEM_BUS_DRIVER
@@ -1286,6 +1254,9 @@ module_init(ehci_hcd_init);
 
 static void __exit ehci_hcd_cleanup(void)
 {
+#ifdef XILINX_OF_PLATFORM_DRIVER
+	of_unregister_platform_driver(&XILINX_OF_PLATFORM_DRIVER);
+#endif
 #ifdef OF_PLATFORM_DRIVER
 	of_unregister_platform_driver(&OF_PLATFORM_DRIVER);
 #endif

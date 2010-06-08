@@ -63,6 +63,7 @@
 #include <linux/sched.h>
 #include <linux/signal.h>
 #include <linux/idr.h>
+#include <linux/kgdb.h>
 #include <linux/ftrace.h>
 #include <linux/async.h>
 #include <linux/kmemcheck.h>
@@ -101,10 +102,6 @@ extern void tc_init(void);
 
 enum system_states system_state __read_mostly;
 EXPORT_SYMBOL(system_state);
-
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#endif	/* CONFIG_KDB */
 
 /*
  * Boot command-line arguments
@@ -208,26 +205,6 @@ char * envp_init[MAX_INIT_ENVS+2] = { "HOME=/", "TERM=linux", NULL, };
 static const char *panic_later, *panic_param;
 
 extern struct obs_kernel_param __setup_start[], __setup_end[];
-
-#ifdef	CONFIG_KDB
-static int __init kdb_setup(char *str)
-{
-	if (strcmp(str, "on") == 0) {
-		kdb_on = 1;
-	} else if (strcmp(str, "on-nokey") == 0) {
-		kdb_on = 2;
-	} else if (strcmp(str, "off") == 0) {
-		kdb_on = 0;
-	} else if (strcmp(str, "early") == 0) {
-		kdb_on = 1;
-		kdb_flags |= KDB_FLAG_EARLYKDB;
-	} else
-		printk("kdb flag %s not recognised\n", str);
-	return 0;
-}
-
-__setup("kdb=", kdb_setup);
-#endif	/* CONFIG_KDB */
 
 static int __init obsolete_checksetup(char *line)
 {
@@ -594,7 +571,7 @@ asmlinkage void __init start_kernel(void)
 	setup_per_cpu_areas();
 	smp_prepare_boot_cpu();	/* arch-specific boot-cpu hooks */
 
-	build_all_zonelists();
+	build_all_zonelists(NULL);
 	page_alloc_init();
 
 	printk(KERN_NOTICE "Kernel command line: %s\n", boot_command_line);
@@ -692,14 +669,6 @@ asmlinkage void __init start_kernel(void)
 	calibrate_delay();
 	pidmap_init();
 	anon_vma_init();
-
-#ifdef	CONFIG_KDB
-	kdb_init();
-	if (KDB_FLAG(EARLYKDB)) {
-		KDB_ENTER();
-	}
-#endif	/* CONFIG_KDB */
-
 #ifdef CONFIG_X86
 	if (efi_enabled)
 		efi_enter_virtual_mode();
@@ -711,6 +680,7 @@ asmlinkage void __init start_kernel(void)
 	buffer_init();
 	key_init();
 	security_init();
+	dbg_late_init();
 	vfs_caches_init(totalram_pages);
 	signals_init();
 	/* rootfs populating might need page-writeback */

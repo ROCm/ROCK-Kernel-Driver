@@ -16,29 +16,6 @@
 /* this struct defines the way the registers are stored on the
    stack during a system call. */
 
-enum EFLAGS {
-        EF_CF   = 0x00000001,
-        EF_PF   = 0x00000004,
-        EF_AF   = 0x00000010,
-        EF_ZF   = 0x00000040,
-        EF_SF   = 0x00000080,
-        EF_TF   = 0x00000100,
-        EF_IE   = 0x00000200,
-        EF_DF   = 0x00000400,
-        EF_OF   = 0x00000800,
-        EF_IOPL = 0x00003000,
-        EF_IOPL_RING0 = 0x00000000,
-        EF_IOPL_RING1 = 0x00001000,
-        EF_IOPL_RING2 = 0x00002000,
-        EF_NT   = 0x00004000,   /* nested task */
-        EF_RF   = 0x00010000,   /* resume */
-        EF_VM   = 0x00020000,   /* virtual mode */
-        EF_AC   = 0x00040000,   /* alignment */
-        EF_VIF  = 0x00080000,   /* virtual interrupt */
-        EF_VIP  = 0x00100000,   /* virtual interrupt pending */
-        EF_ID   = 0x00200000,   /* id */
-};
-
 #ifndef __KERNEL__
 
 struct pt_regs {
@@ -298,9 +275,7 @@ static inline unsigned long regs_get_kernel_stack_nth(struct pt_regs *regs,
 }
 
 #define arch_has_single_step()	(1)
-#if defined(CONFIG_XEN)
-#define arch_has_block_step()	(0)
-#elif defined(CONFIG_X86_DEBUGCTLMSR)
+#ifdef CONFIG_X86_DEBUGCTLMSR
 #define arch_has_block_step()	(1)
 #else
 #define arch_has_block_step()	(boot_cpu_data.x86 >= 6)
@@ -313,12 +288,6 @@ extern int do_get_thread_area(struct task_struct *p, int idx,
 			      struct user_desc __user *info);
 extern int do_set_thread_area(struct task_struct *p, int idx,
 			      struct user_desc __user *info, int can_allocate);
-
-#ifdef CONFIG_X86_PTRACE_BTS
-extern void ptrace_bts_untrace(struct task_struct *tsk);
-
-#define arch_ptrace_untrace(tsk)	ptrace_bts_untrace(tsk)
-#endif /* CONFIG_X86_PTRACE_BTS */
 
 #endif /* __KERNEL__ */
 

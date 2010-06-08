@@ -209,7 +209,6 @@ int qla4xxx_send_command_to_isp(struct scsi_qla_host *ha, struct srb * srb)
 	int nseg;
 	uint16_t tot_dsds;
 	uint16_t req_cnt;
-	uint16_t i;
 	unsigned long flags;
 	uint32_t index;
 	char tag[2];
@@ -222,24 +221,7 @@ int qla4xxx_send_command_to_isp(struct scsi_qla_host *ha, struct srb * srb)
 	/* Acquire hardware specific lock */
 	spin_lock_irqsave(&ha->hardware_lock, flags);
 
-	//index = (uint32_t)cmd->request->tag;
-	index = ha->current_active_index;
-	for (i = 0; i < MAX_SRBS; i++) {
-		index++;
-		if (index == MAX_SRBS)
-			index = 1;
-		if (ha->active_srb_array[index] == 0) {
-			ha->current_active_index = index;
-			break;
-		}
-	}
-
-	if (i >= MAX_SRBS) {
-                printk(KERN_INFO "scsi%ld: %s: NO more SRB entries used "
-                       "iocbs=%d, \n reqs remaining=%d\n", ha->host_no,
-                       __func__, ha->iocb_cnt, ha->req_q_count);
-                goto queuing_error;
-        }
+	index = (uint32_t)cmd->request->tag;
 
 	/*
 	 * Check to see if adapter is online before placing request on
@@ -317,8 +299,7 @@ int qla4xxx_send_command_to_isp(struct scsi_qla_host *ha, struct srb * srb)
 	qla4xxx_build_scsi_iocbs(srb, cmd_entry, tot_dsds);
 	wmb();
 
-	srb->cmd->host_scribble = (unsigned char *)srb;
-	ha->active_srb_array[index] = srb;
+	srb->cmd->host_scribble = (unsigned char *)(unsigned long)index;
 
 	/* update counters */
 	srb->state = SRB_ACTIVE_STATE;

@@ -38,11 +38,6 @@
 #include <asm/fixmap.h>
 #endif
 
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-static int  kdb_serial_line = -1;
-#endif	/* CONFIG_KDB */
-
 struct early_serial8250_device {
 	struct uart_port port;
 	char options[16];		/* e.g., 115200n8 */
@@ -235,30 +230,6 @@ int __init setup_early_serial8250_console(char *cmdline)
 		return err;
 
 	register_console(&early_serial8250_console);
-
-#ifdef	CONFIG_KDB
-	/*
-	 * Remember the line number of the first serial
-	 * console.  We'll make this the kdb serial console too.
-	 */
-	if (kdb_serial_line == -1) {
-		kdb_serial_line = early_serial8250_console.index;
-		kdb_serial.io_type = early_device.port.iotype;
-		switch (early_device.port.iotype) {
-		case SERIAL_IO_MEM:
-#ifdef  SERIAL_IO_MEM32
-		case SERIAL_IO_MEM32:
-#endif
-			kdb_serial.iobase = (unsigned long)(early_device.port.membase);
-			kdb_serial.ioreg_shift = early_device.port.regshift;
-			break;
-		default:
-			kdb_serial.iobase = early_device.port.iobase;
-			kdb_serial.ioreg_shift = 0;
-			break;
-		}
-	}
-#endif	/* CONFIG_KDB */
 
 	return 0;
 }

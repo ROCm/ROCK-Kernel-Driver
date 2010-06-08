@@ -51,7 +51,7 @@ static void ql4xxx_set_mac_number(struct scsi_qla_host *ha)
  * This routine deallocates and unlinks the specified ddb_entry from the
  * adapter's
  **/
-void qla4xxx_free_ddb(struct scsi_qla_host *ha,
+static void qla4xxx_free_ddb(struct scsi_qla_host *ha,
 			     struct ddb_entry *ddb_entry)
 {
 	/* Remove device entry from list */
@@ -95,7 +95,6 @@ void qla4xxx_free_ddb_list(struct scsi_qla_host *ha)
  **/
 int qla4xxx_init_rings(struct scsi_qla_host *ha)
 {
-	uint16_t i;
 	unsigned long flags = 0;
 
 	/* Initialize request queue. */
@@ -123,10 +122,6 @@ int qla4xxx_init_rings(struct scsi_qla_host *ha)
 	writel(0, &ha->reg->req_q_in);
 	writel(0, &ha->reg->rsp_q_out);
 	readl(&ha->reg->rsp_q_out);
-
-	/* Initialize active array */
-	for (i = 0; i < MAX_SRBS; i++)
-		ha->active_srb_array[i] = NULL;
 
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
@@ -206,44 +201,51 @@ qla4xxx_wait_for_ip_config(struct scsi_qla_host *ha)
 	 * need to wait for another */
 	if (is_ipv4_enabled(ha) && is_ipv6_enabled(ha)) {
 		if (((ha->addl_fw_state & FW_ADDSTATE_DHCPv4_ENABLED) != 0) &&
-			((ha->addl_fw_state & FW_ADDSTATE_DHCPv4_LEASE_ACQUIRED) == 0)) {
+		    ((ha->addl_fw_state &
+				    FW_ADDSTATE_DHCPv4_LEASE_ACQUIRED) == 0)) {
 			ipv4_wait = 1;
 		}
-		if (((ha->ipv6_addl_options & IPV6_ADDOPT_NEIGHBOR_DISCOVERY_ADDR_ENABLE) != 0) &&
+		if (((ha->ipv6_addl_options &
+			    IPV6_ADDOPT_NEIGHBOR_DISCOVERY_ADDR_ENABLE) != 0) &&
 		    ((ha->ipv6_link_local_state == IP_ADDRSTATE_ACQUIRING) ||
 		     (ha->ipv6_addr0_state == IP_ADDRSTATE_ACQUIRING) ||
 		     (ha->ipv6_addr1_state == IP_ADDRSTATE_ACQUIRING))) {
 
 			ipv6_wait = 1;
 
-			if ((ha->ipv6_link_local_state == IP_ADDRSTATE_PREFERRED) ||
+			if ((ha->ipv6_link_local_state ==
+						     IP_ADDRSTATE_PREFERRED) ||
 			    (ha->ipv6_addr0_state == IP_ADDRSTATE_PREFERRED) ||
 			    (ha->ipv6_addr1_state == IP_ADDRSTATE_PREFERRED)) {
-				DEBUG2(printk("scsi%ld: %s: "
-						"Preferred IP configured.  Don't wait! \n",
-						ha->host_no, __func__));
+				DEBUG2(printk(KERN_INFO "scsi%ld: %s: "
+					      "Preferred IP configured."
+					      " Don't wait!\n", ha->host_no,
+					      __func__));
 				ipv6_wait = 0;
 			}
 			if (memcmp(&ha->ipv6_default_router_addr, ip_address,
 				IPv6_ADDR_LEN) == 0) {
-				DEBUG2(printk("scsi%ld: %s: "
-					      "No Router configured.  Don't wait! \n",
-					      ha->host_no, __func__));
+				DEBUG2(printk(KERN_INFO "scsi%ld: %s: "
+					      "No Router configured. "
+					      "Don't wait!\n", ha->host_no,
+					      __func__));
 				ipv6_wait = 0;
 			}
-			if ((ha->ipv6_default_router_state == IPV6_RTRSTATE_MANUAL) &&
-			    (ha->ipv6_link_local_state == IP_ADDRSTATE_TENTATIVE) &&
+			if ((ha->ipv6_default_router_state ==
+						IPV6_RTRSTATE_MANUAL) &&
+			    (ha->ipv6_link_local_state ==
+						IP_ADDRSTATE_TENTATIVE) &&
 			    (memcmp(&ha->ipv6_link_local_addr,
-				   &ha->ipv6_default_router_addr, 4) == 0)) {
+				    &ha->ipv6_default_router_addr, 4) == 0)) {
 				DEBUG2(printk("scsi%ld: %s: LinkLocal Router & "
-					"IP configured.  Don't wait! \n",
+					"IP configured. Don't wait!\n",
 					ha->host_no, __func__));
 				ipv6_wait = 0;
 			}
 		}
 		if (ipv4_wait || ipv6_wait) {
-			DEBUG2(printk("scsi%ld: %s: Wait for additional IP(s) \"",
-					ha->host_no, __func__));
+			DEBUG2(printk("scsi%ld: %s: Wait for additional "
+				      "IP(s) \"", ha->host_no, __func__));
 			if (ipv4_wait)
 				DEBUG2(printk("IPv4 "));
 			if (ha->ipv6_link_local_state == IP_ADDRSTATE_ACQUIRING)
@@ -256,7 +258,7 @@ qla4xxx_wait_for_ip_config(struct scsi_qla_host *ha)
 		}
 	}
 
-	return (ipv4_wait|ipv6_wait);
+	return ipv4_wait|ipv6_wait;
 }
 
 static int qla4xxx_fw_ready(struct scsi_qla_host *ha)
@@ -297,31 +299,33 @@ static int qla4xxx_fw_ready(struct scsi_qla_host *ha)
 		}
 
 		if (ha->firmware_state & FW_STATE_WAIT_AUTOCONNECT) {
-			DEBUG2(printk("scsi%ld: %s: fwstate:"
+			DEBUG2(printk(KERN_INFO "scsi%ld: %s: fwstate:"
 				      "AUTOCONNECT in progress\n",
 				      ha->host_no, __func__));
 		}
 
 		if (ha->firmware_state & FW_STATE_CONFIGURING_IP) {
-			DEBUG2(printk("scsi%ld: %s: fwstate: CONFIGURING IP\n",
-				       ha->host_no, __func__));
+			DEBUG2(printk(KERN_INFO "scsi%ld: %s: fwstate:"
+				      " CONFIGURING IP\n",
+				      ha->host_no, __func__));
 			/*
-			 * Check for link state after 15 secs and if link is still DOWN then,
-			 * cable is unplugged. Ignore "DHCP in Progress/CONFIGURING IP" bit
-			 * to check if firmware is in ready state or not after 15 secs.
+			 * Check for link state after 15 secs and if link is
+			 * still DOWN then, cable is unplugged. Ignore "DHCP
+			 * in Progress/CONFIGURING IP" bit to check if firmware
+			 * is in ready state or not after 15 secs.
 			 * This is applicable for both 2.x & 3.x firmware
 			 */
 			if (timeout_count <= (ADAPTER_INIT_TOV - 15)) {
 				if (ha->addl_fw_state & FW_ADDSTATE_LINK_UP) {
-					DEBUG2(printk("scsi%ld: %s: LINK UP "
-						      "(Cable plugged)\n",
-						      ha->host_no, __func__));
-				}
-				else if (ha->firmware_state &
-					(FW_STATE_CONFIGURING_IP | FW_STATE_READY)) {
-					DEBUG2(printk("scsi%ld: %s: LINK DOWN "
-						      "(Cable unplugged)\n",
-						      ha->host_no, __func__));
+					DEBUG2(printk(KERN_INFO "scsi%ld: %s:"
+						  " LINK UP (Cable plugged)\n",
+						  ha->host_no, __func__));
+				} else if (ha->firmware_state &
+					  (FW_STATE_CONFIGURING_IP |
+							     FW_STATE_READY)) {
+					DEBUG2(printk(KERN_INFO "scsi%ld: %s: "
+						"LINK DOWN (Cable unplugged)\n",
+						ha->host_no, __func__));
 					ha->firmware_state = FW_STATE_READY;
 				}
 			}
@@ -329,38 +333,41 @@ static int qla4xxx_fw_ready(struct scsi_qla_host *ha)
 
 		if (ha->firmware_state == FW_STATE_READY) {
 			/* If DHCP IP Addr is available, retrieve it now. */
-			if (test_and_clear_bit(DPC_GET_DHCP_IP_ADDR, &ha->dpc_flags))
+			if (test_and_clear_bit(DPC_GET_DHCP_IP_ADDR,
+								&ha->dpc_flags))
 				qla4xxx_get_dhcp_ip_address(ha);
 
-			if (!qla4xxx_wait_for_ip_config(ha) || timeout_count == 1) {
-				DEBUG2(dev_info(&ha->pdev->dev, "Firmware Ready..\n"));
-				/* The firmware is ready to process SCSI commands. */
+			if (!qla4xxx_wait_for_ip_config(ha) ||
+							timeout_count == 1) {
 				DEBUG2(dev_info(&ha->pdev->dev,
-						  "scsi%ld: %s: MEDIA TYPE - %s\n",
-						  ha->host_no,
-						  __func__, (ha->addl_fw_state &
-							     FW_ADDSTATE_OPTICAL_MEDIA)
-						  != 0 ? "OPTICAL" : "COPPER"));
+						"Firmware Ready..\n"));
+				/* The firmware is ready to process SCSI
+				   commands. */
 				DEBUG2(dev_info(&ha->pdev->dev,
-						  "scsi%ld: %s: DHCPv4 STATE Enabled "
-						  "%s\n",
-						  ha->host_no, __func__,
-						  (ha->addl_fw_state &
-						   FW_ADDSTATE_DHCPv4_ENABLED) != 0 ?
-						  "YES" : "NO"));
+					"scsi%ld: %s: MEDIA TYPE"
+					" - %s\n", ha->host_no,
+					__func__, (ha->addl_fw_state &
+					FW_ADDSTATE_OPTICAL_MEDIA)
+					!= 0 ? "OPTICAL" : "COPPER"));
 				DEBUG2(dev_info(&ha->pdev->dev,
-						  "scsi%ld: %s: LINK %s\n",
-						  ha->host_no, __func__,
-						  (ha->addl_fw_state &
-						   FW_ADDSTATE_LINK_UP) != 0 ?
-						  "UP" : "DOWN"));
+					"scsi%ld: %s: DHCPv4 STATE"
+					" Enabled %s\n", ha->host_no,
+					 __func__, (ha->addl_fw_state &
+					 FW_ADDSTATE_DHCPv4_ENABLED) != 0 ?
+					"YES" : "NO"));
 				DEBUG2(dev_info(&ha->pdev->dev,
-						  "scsi%ld: %s: iSNS Service "
-						  "Started %s\n",
-						  ha->host_no, __func__,
-						  (ha->addl_fw_state &
-						   FW_ADDSTATE_ISNS_SVC_ENABLED) != 0 ?
-						  "YES" : "NO"));
+					"scsi%ld: %s: LINK %s\n",
+					ha->host_no, __func__,
+					(ha->addl_fw_state &
+					 FW_ADDSTATE_LINK_UP) != 0 ?
+					"UP" : "DOWN"));
+				DEBUG2(dev_info(&ha->pdev->dev,
+					"scsi%ld: %s: iSNS Service "
+					"Started %s\n",
+					ha->host_no, __func__,
+					(ha->addl_fw_state &
+					 FW_ADDSTATE_ISNS_SVC_ENABLED) != 0 ?
+					"YES" : "NO"));
 
 				ready = 1;
 				break;
@@ -454,11 +461,11 @@ static struct ddb_entry* qla4xxx_get_ddb_entry(struct scsi_qla_host *ha,
 		      __func__, fw_ddb_index));
 	list_for_each_entry(ddb_entry, &ha->ddb_list, list) {
 		if ((memcmp(ddb_entry->iscsi_name, fw_ddb_entry->iscsi_name,
-			    ISCSI_NAME_SIZE) == 0) &&
-		    (ddb_entry->tpgt ==
-			    le32_to_cpu(fw_ddb_entry->tgt_portal_grp)) &&
-		    (memcmp(ddb_entry->isid, fw_ddb_entry->isid,
-			    sizeof(ddb_entry->isid)) == 0)) {
+			   ISCSI_NAME_SIZE) == 0) &&
+			(ddb_entry->tpgt ==
+				le32_to_cpu(fw_ddb_entry->tgt_portal_grp)) &&
+			(memcmp(ddb_entry->isid, fw_ddb_entry->isid,
+				sizeof(ddb_entry->isid)) == 0)) {
 			found++;
 			break;
 		}
@@ -517,13 +524,12 @@ static int qla4xxx_update_ddb_entry(struct scsi_qla_host *ha,
 		goto exit_update_ddb;
 	}
 
-	if ((qla4xxx_get_fwddb_entry(ha, fw_ddb_index, fw_ddb_entry,
+	if (qla4xxx_get_fwddb_entry(ha, fw_ddb_index, fw_ddb_entry,
 				    fw_ddb_entry_dma, NULL, NULL,
 				    &ddb_entry->fw_ddb_device_state, &conn_err,
 				    &ddb_entry->tcp_source_port_num,
-				    &ddb_entry->connection_id) == QLA_SUCCESS))
-		status = QLA_SUCCESS;
-	else {
+				    &ddb_entry->connection_id) ==
+	    QLA_ERROR) {
 		DEBUG2(printk("scsi%ld: %s: failed get_ddb_entry for "
 			      "fw_ddb_index %d\n", ha->host_no, __func__,
 			      fw_ddb_index));
@@ -531,6 +537,8 @@ static int qla4xxx_update_ddb_entry(struct scsi_qla_host *ha,
 		goto exit_update_ddb;
 	}
 
+	status = QLA_SUCCESS;
+	ddb_entry->options = le16_to_cpu(fw_ddb_entry->options);
 	ddb_entry->target_session_id = le16_to_cpu(fw_ddb_entry->tsid);
 	ddb_entry->task_mgmt_timeout =
 		le16_to_cpu(fw_ddb_entry->def_timeout);
@@ -554,6 +562,14 @@ static int qla4xxx_update_ddb_entry(struct scsi_qla_host *ha,
 	memcpy(&ddb_entry->ip_addr[0], &fw_ddb_entry->ip_addr[0],
 	       min(sizeof(ddb_entry->ip_addr), sizeof(fw_ddb_entry->ip_addr)));
 
+	ddb_entry->iscsi_max_burst_len = fw_ddb_entry->iscsi_max_burst_len;
+	ddb_entry->iscsi_max_outsnd_r2t = fw_ddb_entry->iscsi_max_outsnd_r2t;
+	ddb_entry->iscsi_first_burst_len = fw_ddb_entry->iscsi_first_burst_len;
+	ddb_entry->iscsi_max_rcv_data_seg_len =
+				fw_ddb_entry->iscsi_max_rcv_data_seg_len;
+	ddb_entry->iscsi_max_snd_data_seg_len =
+				fw_ddb_entry->iscsi_max_snd_data_seg_len;
+
 	if (ddb_entry->options & DDB_OPT_IPV6_DEVICE) {
 		memcpy(&ddb_entry->remote_ipv6_addr,
 			fw_ddb_entry->ip_addr,
@@ -563,19 +579,27 @@ static int qla4xxx_update_ddb_entry(struct scsi_qla_host *ha,
 			fw_ddb_entry->link_local_ipv6_addr,
 			min(sizeof(ddb_entry->link_local_ipv6_addr),
 			sizeof(fw_ddb_entry->link_local_ipv6_addr)));
-	}
 
-	DEBUG2(dev_info(&ha->pdev->dev, "%s: DDB[%d] osIdx = %d "
-					"State %04x ConnErr %08x "
-					NIPQUAD_FMT ":%04d \"%s\"\n",
+		DEBUG2(dev_info(&ha->pdev->dev, "%s: DDB[%d] osIdx = %d "
+					"State %04x ConnErr %08x IP %pI6 "
+					":%04d \"%s\"\n",
 					__func__, fw_ddb_index,
 					ddb_entry->os_target_id,
-					ddb_entry->fw_ddb_device_state, conn_err,
-					NIPQUAD(fw_ddb_entry->ip_addr),
+					ddb_entry->fw_ddb_device_state,
+					conn_err, fw_ddb_entry->ip_addr,
 					le16_to_cpu(fw_ddb_entry->port),
 					fw_ddb_entry->iscsi_name));
-
- exit_update_ddb:
+	} else
+		DEBUG2(dev_info(&ha->pdev->dev, "%s: DDB[%d] osIdx = %d "
+					"State %04x ConnErr %08x IP %pI4 "
+					":%04d \"%s\"\n",
+					__func__, fw_ddb_index,
+					ddb_entry->os_target_id,
+					ddb_entry->fw_ddb_device_state,
+					conn_err, fw_ddb_entry->ip_addr,
+					le16_to_cpu(fw_ddb_entry->port),
+					fw_ddb_entry->iscsi_name));
+exit_update_ddb:
 	if (fw_ddb_entry)
 		dma_free_coherent(&ha->pdev->dev, sizeof(*fw_ddb_entry),
 				  fw_ddb_entry, fw_ddb_entry_dma);
@@ -637,8 +661,8 @@ int qla4_is_relogin_allowed(struct scsi_qla_host *ha, uint32_t conn_err)
 	login_rsp_sts_class = ((conn_err & 0x0000ff00) >> 8);
 	if (err_code == 0x1c || err_code == 0x06) {
 		DEBUG2(dev_info(&ha->pdev->dev,
-			": conn_err=0x%08x, send target completed or access"
-			" denied failure\n", conn_err));
+				": conn_err=0x%08x, send target completed"
+				" or access denied failure\n", conn_err));
 		relogin = 0;
 	}
 	if ((err_code == 0x08) && (login_rsp_sts_class == 0x02)) {
@@ -646,7 +670,8 @@ int qla4_is_relogin_allowed(struct scsi_qla_host *ha, uint32_t conn_err)
 		   Login Response Status in Error Code Detail
 		   indicates login should not be retried.*/
 		DEBUG2(dev_info(&ha->pdev->dev,
-			": conn_err=0x%08x, do not retry relogin\n", conn_err));
+				": conn_err=0x%08x, do not retry relogin\n",
+				conn_err));
 		relogin = 0;
 	}
 
@@ -671,13 +696,14 @@ static int qla4xxx_build_ddb_list(struct scsi_qla_host *ha)
 	struct ddb_entry *ddb_entry;
 	struct dev_db_entry *fw_ddb_entry = NULL;
 	dma_addr_t fw_ddb_entry_dma;
-	uint32_t new_tgt;
 	uint32_t ipv6_device;
+	uint32_t new_tgt;
 
 	fw_ddb_entry = dma_alloc_coherent(&ha->pdev->dev, sizeof(*fw_ddb_entry),
-						&fw_ddb_entry_dma, GFP_KERNEL);
+			&fw_ddb_entry_dma, GFP_KERNEL);
 	if (fw_ddb_entry == NULL) {
-		DEBUG2(dev_info(&ha->pdev->dev, "%s: DMA alloc failed\n", __func__));
+		DEBUG2(dev_info(&ha->pdev->dev, "%s: DMA alloc failed\n",
+				__func__));
 		return QLA_ERROR;
 	}
 
@@ -685,10 +711,11 @@ static int qla4xxx_build_ddb_list(struct scsi_qla_host *ha)
 	for (fw_ddb_index = 0; fw_ddb_index < MAX_DDB_ENTRIES;
 	     fw_ddb_index = next_fw_ddb_index) {
 		/* First, let's see if a device exists here */
-		if (qla4xxx_get_fwddb_entry(ha, fw_ddb_index, fw_ddb_entry, 0, NULL,
-					    &next_fw_ddb_index, &ddb_state,
-					    &conn_err, NULL, NULL) ==
-		    QLA_ERROR) {
+		if (qla4xxx_get_fwddb_entry(ha, fw_ddb_index, fw_ddb_entry,
+					    0, NULL, &next_fw_ddb_index,
+					    &ddb_state, &conn_err,
+					    NULL, NULL) ==
+					    QLA_ERROR) {
 			DEBUG2(printk("scsi%ld: %s: get_ddb_entry, "
 				      "fw_ddb_index %d failed", ha->host_no,
 				      __func__, fw_ddb_index));
@@ -708,13 +735,16 @@ static int qla4xxx_build_ddb_list(struct scsi_qla_host *ha)
 			ipv6_device = le16_to_cpu(fw_ddb_entry->options) &
 					DDB_OPT_IPV6_DEVICE;
 			if (qla4_is_relogin_allowed(ha, conn_err) &&
-			    ((!ipv6_device && *((uint32_t *)fw_ddb_entry->ip_addr))
-			    || ipv6_device)) {
+					((!ipv6_device &&
+					  *((uint32_t *)fw_ddb_entry->ip_addr))
+					 || ipv6_device)) {
 				qla4xxx_set_ddb_entry(ha, fw_ddb_index, 0);
 				if (qla4xxx_get_fwddb_entry(ha, fw_ddb_index,
-					NULL, 0, NULL, &next_fw_ddb_index,
-					&ddb_state, &conn_err, NULL, NULL)
-					== QLA_ERROR) {
+							NULL, 0, NULL,
+							&next_fw_ddb_index,
+							&ddb_state, &conn_err,
+							NULL, NULL)
+						== QLA_ERROR) {
 					DEBUG2(printk("scsi%ld: %s:"
 						"get_ddb_entry %d failed\n",
 						ha->host_no,
@@ -1085,13 +1115,6 @@ static int qla4xxx_start_firmware_from_flash(struct scsi_qla_host *ha)
 		     ha->host_no, __func__));
 
 	spin_lock_irqsave(&ha->hardware_lock, flags);
-	/*
-	 * Firmware must be informed that the driver supports
-	 * ACB firmware features while starting firmware.
-	 * If the firmware also supports these features it will
-	 * be indicated in the IFCB offset 0x3A (acb_version).
-	 */
-	writel(ACB_SUPPORTED, &ha->reg->mailbox[6]);
 	writel(jiffies, &ha->reg->mailbox[7]);
 	if (is_qla4022(ha) | is_qla4032(ha))
 		writel(set_rmask(NVR_WRITE_ENABLE),
@@ -1105,8 +1128,8 @@ static int qla4xxx_start_firmware_from_flash(struct scsi_qla_host *ha)
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 	/* Wait for firmware to come UP. */
-	DEBUG2(printk("scsi%ld: %s: Wait up to %d seconds for "
-		      "boot firmware to complete... \n",
+	DEBUG2(printk(KERN_INFO "scsi%ld: %s: Wait up to %d seconds for "
+		      "boot firmware to complete...\n",
 		      ha->host_no, __func__, FIRMWARE_UP_TOV));
 	max_wait_time = jiffies + (FIRMWARE_UP_TOV * HZ);
 	do {
@@ -1122,15 +1145,15 @@ static int qla4xxx_start_firmware_from_flash(struct scsi_qla_host *ha)
 		if (mbox_status == MBOX_STS_COMMAND_COMPLETE)
 			break;
 
-		DEBUG2(printk("scsi%ld: %s: Waiting for boot firmware to "
-			      "complete... ctrl_sts=0x%x\n",
+		DEBUG2(printk(KERN_INFO "scsi%ld: %s: Waiting for boot "
+			      "firmware to complete... ctrl_sts=0x%x\n",
 			      ha->host_no, __func__, ctrl_status));
 
 		msleep_interruptible(250);
 	} while (!time_after_eq(jiffies, max_wait_time));
 
 	if (mbox_status == MBOX_STS_COMMAND_COMPLETE) {
-		DEBUG(printk("scsi%ld: %s: Firmware has started\n",
+		DEBUG(printk(KERN_INFO "scsi%ld: %s: Firmware has started\n",
 			     ha->host_no, __func__));
 
 		spin_lock_irqsave(&ha->hardware_lock, flags);
@@ -1439,7 +1462,7 @@ static void qla4xxx_add_device_dynamically(struct scsi_qla_host *ha,
  * This routine processes a Decive Database Changed AEN Event.
  **/
 int qla4xxx_process_ddb_changed(struct scsi_qla_host *ha, uint32_t fw_ddb_index,
-				uint32_t state, uint32_t conn_err)
+		uint32_t state, uint32_t conn_err)
 {
 	struct ddb_entry * ddb_entry;
 	uint32_t old_fw_ddb_device_state;

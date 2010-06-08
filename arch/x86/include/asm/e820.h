@@ -45,7 +45,12 @@
 #define E820_NVS	4
 #define E820_UNUSABLE	5
 
-/* reserved RAM used by kernel itself */
+/*
+ * reserved RAM used by kernel itself
+ * if CONFIG_INTEL_TXT is enabled, memory of this type will be
+ * included in the S3 integrity calculation and so should not include
+ * any memory that BIOS might alter over the S3 transition
+ */
 #define E820_RESERVED_KERN        128
 
 #ifndef __ASSEMBLY__
@@ -61,11 +66,7 @@ struct e820map {
 	struct e820entry map[E820_X_MAX];
 };
 
-#ifndef CONFIG_XEN
 #define ISA_START_ADDRESS	0xa0000
-#else
-#define ISA_START_ADDRESS	0
-#endif
 #define ISA_END_ADDRESS		0x100000
 
 #define BIOS_BEGIN		0x000a0000

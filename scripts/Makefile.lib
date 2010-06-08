@@ -22,12 +22,6 @@ obj-m := $(filter-out $(obj-y),$(obj-m))
 
 lib-y := $(filter-out $(obj-y), $(sort $(lib-y) $(lib-m)))
 
-# Remove objects forcibly disabled
-
-obj-y := $(filter-out $(disabled-obj-y),$(obj-y))
-obj-m := $(filter-out $(disabled-obj-y),$(obj-m))
-lib-y := $(filter-out $(disabled-obj-y),$(lib-y))
-
 
 # Handle objects in subdirs
 # ---------------------------------------------------------------------------
@@ -247,7 +241,11 @@ cmd_lzma = (cat $(filter-out FORCE,$^) | \
 	lzma -9 && $(call size_append, $(filter-out FORCE,$^))) > $@ || \
 	(rm -f $@ ; false)
 
-quiet_cmd_lzo = LZO    $@
+quiet_cmd_lzo = LZO     $@
 cmd_lzo = (cat $(filter-out FORCE,$^) | \
 	lzop -9 && $(call size_append, $(filter-out FORCE,$^))) > $@ || \
 	(rm -f $@ ; false)
+
+# misc stuff
+# ---------------------------------------------------------------------------
+quote:="

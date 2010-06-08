@@ -3,10 +3,6 @@
 #include <linux/init.h>
 #include <linux/pm.h>
 #include <linux/efi.h>
-#ifdef CONFIG_KDB
-#include <linux/kdb.h>
-#endif /* CONFIG_KDB */
-#include <linux/kexec.h>
 #include <linux/dmi.h>
 #include <linux/sched.h>
 #include <linux/tboot.h>
@@ -634,14 +630,6 @@ void native_machine_shutdown(void)
 	/* Make certain I only run on the appropriate processor */
 	set_cpus_allowed_ptr(current, cpumask_of(reboot_cpu_id));
 
-#if defined(CONFIG_X86_32) && defined(CONFIG_KDB)
-	/*
-	 * If this restart is occuring while kdb is running (e.g. reboot
-	 * command), the other CPU's are already stopped.  Don't try to
-	 * stop them yet again.
-	 */
-	if (!KDB_IS_RUNNING())
-#endif	/* defined(CONFIG_X86_32) && defined(CONFIG_KDB) */
 	/* O.K Now that I'm on the appropriate processor,
 	 * stop all of the others.
 	 */
@@ -751,29 +739,6 @@ static int crashing_cpu;
 static nmi_shootdown_cb shootdown_callback;
 
 static atomic_t waiting_for_crash_ipi;
-
-#ifdef CONFIG_KDB_KDUMP
-void halt_current_cpu(struct pt_regs *regs)
-{
-#ifdef CONFIG_X86_32
-	struct pt_regs fixed_regs;
-#endif
-	local_irq_disable();
-#ifdef CONFIG_X86_32
-	if (!user_mode_vm(regs)) {
-		crash_fixup_ss_esp(&fixed_regs, regs);
-		regs = &fixed_regs;
-	}
-#endif
-        crash_save_cpu(regs, raw_smp_processor_id());
-	disable_local_APIC();
-	atomic_dec(&waiting_for_crash_ipi);
-	/* Assume hlt works */
-	halt();
-	for(;;)
-		cpu_relax();
-}
-#endif /* CONFIG_KDB_KDUMP */
 
 static int crash_nmi_callback(struct notifier_block *self,
 			unsigned long val, void *data)

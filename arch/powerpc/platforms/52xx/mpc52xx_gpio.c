@@ -168,7 +168,7 @@ static int __devinit mpc52xx_wkup_gpiochip_probe(struct of_device *ofdev,
 	ofchip->gc.get              = mpc52xx_wkup_gpio_get;
 	ofchip->gc.set              = mpc52xx_wkup_gpio_set;
 
-	ret = of_mm_gpiochip_add(ofdev->node, &chip->mmchip);
+	ret = of_mm_gpiochip_add(ofdev->dev.of_node, &chip->mmchip);
 	if (ret)
 		return ret;
 
@@ -193,9 +193,11 @@ static const struct of_device_id mpc52xx_wkup_gpiochip_match[] = {
 };
 
 static struct of_platform_driver mpc52xx_wkup_gpiochip_driver = {
-	.owner = THIS_MODULE,
-	.name = "gpio_wkup",
-	.match_table = mpc52xx_wkup_gpiochip_match,
+	.driver = {
+		.name = "gpio_wkup",
+		.owner = THIS_MODULE,
+		.of_match_table = mpc52xx_wkup_gpiochip_match,
+	},
 	.probe = mpc52xx_wkup_gpiochip_probe,
 	.remove = mpc52xx_gpiochip_remove,
 };
@@ -330,7 +332,7 @@ static int __devinit mpc52xx_simple_gpiochip_probe(struct of_device *ofdev,
 	ofchip->gc.get              = mpc52xx_simple_gpio_get;
 	ofchip->gc.set              = mpc52xx_simple_gpio_set;
 
-	ret = of_mm_gpiochip_add(ofdev->node, &chip->mmchip);
+	ret = of_mm_gpiochip_add(ofdev->dev.of_node, &chip->mmchip);
 	if (ret)
 		return ret;
 
@@ -350,9 +352,11 @@ static const struct of_device_id mpc52xx_simple_gpiochip_match[] = {
 };
 
 static struct of_platform_driver mpc52xx_simple_gpiochip_driver = {
-	.owner = THIS_MODULE,
-	.name = "gpio",
-	.match_table = mpc52xx_simple_gpiochip_match,
+	.driver = {
+		.name = "gpio",
+		.owner = THIS_MODULE,
+		.of_match_table = mpc52xx_simple_gpiochip_match,
+	},
 	.probe = mpc52xx_simple_gpiochip_probe,
 	.remove = mpc52xx_gpiochip_remove,
 };

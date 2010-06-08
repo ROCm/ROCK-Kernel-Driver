@@ -59,14 +59,14 @@ struct ext3_xattr_entry {
 
 # ifdef CONFIG_EXT3_FS_XATTR
 
-extern struct xattr_handler ext3_xattr_user_handler;
-extern struct xattr_handler ext3_xattr_trusted_handler;
-extern struct xattr_handler ext3_xattr_acl_access_handler;
-extern struct xattr_handler ext3_xattr_acl_default_handler;
-extern struct xattr_handler ext3_xattr_security_handler;
-extern struct xattr_handler ext3_nfs4acl_xattr_handler;
+extern const struct xattr_handler ext3_xattr_user_handler;
+extern const struct xattr_handler ext3_xattr_trusted_handler;
+extern const struct xattr_handler ext3_xattr_acl_access_handler;
+extern const struct xattr_handler ext3_xattr_acl_default_handler;
+extern const struct xattr_handler ext3_xattr_security_handler;
+extern const struct xattr_handler ext3_nfs4acl_xattr_handler;
 #ifdef NFS4ACL_DEBUG
-extern struct xattr_handler ext3_masked_nfs4acl_xattr_handler;
+extern const struct xattr_handler ext3_masked_nfs4acl_xattr_handler;
 #endif
 
 extern ssize_t ext3_listxattr(struct dentry *, char *, size_t);
@@ -81,7 +81,7 @@ extern void ext3_xattr_put_super(struct super_block *);
 extern int init_ext3_xattr(void);
 extern void exit_ext3_xattr(void);
 
-extern struct xattr_handler *ext3_xattr_handlers[];
+extern const struct xattr_handler *ext3_xattr_handlers[];
 
 # else  /* CONFIG_EXT3_FS_XATTR */
 

@@ -267,15 +267,6 @@ nouveau_sgdma_init(struct drm_device *dev)
 
 	dev_priv->gart_info.sg_dummy_page =
 		alloc_page(GFP_KERNEL|__GFP_DMA32);
-#ifdef CONFIG_XEN
-	if (!dev_priv->gart_info.sg_dummy_page)
-		ret = ENOMEM;
-	else
-		ret = xen_limit_pages_to_max_mfn(
-			dev_priv->gart_info.sg_dummy_page, 0, 32);
-	if (ret)
-		NV_WARN(dev, "Error restricting SG dummy page: %d\n", ret);
-#endif
 	set_bit(PG_locked, &dev_priv->gart_info.sg_dummy_page->flags);
 	dev_priv->gart_info.sg_dummy_bus =
 		pci_map_page(dev->pdev, dev_priv->gart_info.sg_dummy_page, 0,

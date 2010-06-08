@@ -84,7 +84,7 @@ void addtodentry(struct dentry *Parent, unsigned char *List, int Level);
 int novfs_filldir(void *data, const char *name, int namelen, loff_t off,
 		  ino_t ino, unsigned ftype);
 int novfs_dir_readdir(struct file *filp, void *dirent, filldir_t filldir);
-int novfs_dir_fsync(struct file *file, struct dentry *dentry, int datasync);
+int novfs_dir_fsync(struct file *file, int datasync);
 
 /*
  * Declared address space operations
@@ -115,7 +115,7 @@ int novfs_f_mmap(struct file *file, struct vm_area_struct *vma);
 int novfs_f_open(struct inode *, struct file *);
 int novfs_f_flush(struct file *, fl_owner_t);
 int novfs_f_release(struct inode *, struct file *);
-int novfs_f_fsync(struct file *, struct dentry *, int datasync);
+int novfs_f_fsync(struct file *, int datasync);
 int novfs_f_lock(struct file *, int, struct file_lock *);
 
 /*
@@ -1278,11 +1278,11 @@ int novfs_dir_readdir(struct file *file, void *dirent, filldir_t filldir)
 	return 1;
 }
 
-int novfs_dir_fsync(struct file *file, struct dentry *dentry, int datasync)
+int novfs_dir_fsync(struct file *file, int datasync)
 {
 	DbgPrint("Name %.*s", file->f_dentry->d_name.len,
 		 file->f_dentry->d_name.name);
-	return (simple_sync_file(file, dentry, datasync));
+	return generic_file_fsync(file, datasync);
 }
 
 ssize_t novfs_f_read(struct file * file, char *buf, size_t len, loff_t * off)
@@ -1709,7 +1709,7 @@ int novfs_f_release(struct inode *inode, struct file *file)
 	return (retCode);
 }
 
-int novfs_f_fsync(struct file *file, struct dentry *dentry, int datasync)
+int novfs_f_fsync(struct file *file, int datasync)
 {
 	return 0;
 }

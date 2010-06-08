@@ -106,7 +106,7 @@ static inline void register_cpu_control(struct cpu *cpu)
 }
 #endif /* CONFIG_HOTPLUG_CPU */
 
-#if defined(CONFIG_KEXEC) && !defined(CONFIG_XEN)
+#ifdef CONFIG_KEXEC
 #include <linux/kexec.h>
 
 static ssize_t show_crash_notes(struct sys_device *dev, struct sysdev_attribute *attr,
@@ -186,7 +186,7 @@ static ssize_t print_cpus_offline(struct sysdev_class *class,
 	/* display offline cpus < nr_cpu_ids */
 	if (!alloc_cpumask_var(&offline, GFP_KERNEL))
 		return -ENOMEM;
-	cpumask_complement(offline, cpu_online_mask);
+	cpumask_andnot(offline, cpu_possible_mask, cpu_online_mask);
 	n = cpulist_scnprintf(buf, len, offline);
 	free_cpumask_var(offline);
 
@@ -231,7 +231,7 @@ int __cpuinit register_cpu(struct cpu *cpu, int num)
 	if (!error)
 		register_cpu_under_node(num, cpu_to_node(num));
 
-#if defined(CONFIG_KEXEC) && !defined(CONFIG_XEN)
+#ifdef CONFIG_KEXEC
 	if (!error)
 		error = sysdev_create_file(&cpu->sysdev, &attr_crash_notes);
 #endif

@@ -34,12 +34,10 @@ struct super_block;
 struct dentry;
 
 void oprofile_create_files(struct super_block *sb, struct dentry *root);
-void oprofile_timer_init(struct oprofile_operations *ops);
+int oprofile_timer_init(struct oprofile_operations *ops);
+void oprofile_timer_exit(void);
 
 int oprofile_set_backtrace(unsigned long depth);
 int oprofile_set_timeout(unsigned long time);
-
-int oprofile_set_active(int active_domains[], unsigned int adomains);
-int oprofile_set_passive(int passive_domains[], unsigned int pdomains);
 
 #endif /* OPROF_H */

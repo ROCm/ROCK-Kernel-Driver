@@ -10,62 +10,23 @@
  *
  * Copyright (c) 2000-2007 Silicon Graphics, Inc.  All Rights Reserved.
  * Copyright (C) 2000 Stephane Eranian <eranian@hpl.hp.com>
+ * Copyright (C) 2009 Jason Wessel <jason.wessel@windriver.com>
  */
 
+#ifdef	CONFIG_KGDB_KDB
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <asm/atomic.h>
 
-#ifdef CONFIG_KDB
-/* These are really private, but they must be defined before including
- * asm-$(ARCH)/kdb.h, so make them public and put them here.
- */
-extern int kdb_getuserarea_size(void *, unsigned long, size_t);
-extern int kdb_putuserarea_size(unsigned long, void *, size_t);
-
-#include <asm/kdb.h>
-#endif
-
-#define KDB_MAJOR_VERSION	4
-#define KDB_MINOR_VERSION	4
-#define KDB_TEST_VERSION	""
+#define KDB_POLL_FUNC_MAX	5
+extern int kdb_poll_idx;
 
 /*
  * kdb_initial_cpu is initialized to -1, and is set to the cpu
  * number whenever the kernel debugger is entered.
  */
-extern volatile int kdb_initial_cpu;
+extern int kdb_initial_cpu;
 extern atomic_t kdb_event;
-extern atomic_t kdb_8250;
-#ifdef	CONFIG_KDB
-#define KDB_IS_RUNNING() (kdb_initial_cpu != -1)
-#define KDB_8250() (atomic_read(&kdb_8250) != 0)
-#else
-#define KDB_IS_RUNNING() (0)
-#define KDB_8250() (0)
-#endif	/* CONFIG_KDB */
-
-/*
- * kdb_on
- *
- * 	Defines whether kdb is on or not.  Default value
- *	is set by CONFIG_KDB_OFF.  Boot with kdb=on/off/on-nokey
- *	or echo "[012]" > /proc/sys/kernel/kdb to change it.
- */
-extern int kdb_on;
-
-#if defined(CONFIG_SERIAL_8250_CONSOLE) || defined(CONFIG_SERIAL_SGI_L1_CONSOLE)
-/*
- * kdb_serial.iobase is initialized to zero, and is set to the I/O
- * address of the serial port when the console is setup in
- * serial_console_setup.
- */
-extern struct kdb_serial {
-	int io_type;
-	unsigned long iobase;
-	unsigned long ioreg_shift;
-} kdb_serial;
-#endif
 
 /*
  * kdb_diemsg
@@ -75,17 +36,20 @@ extern struct kdb_serial {
  */
 extern const char *kdb_diemsg;
 
-#define KDB_FLAG_EARLYKDB	(1 << 0)	/* set from boot parameter kdb=early */
-#define KDB_FLAG_CATASTROPHIC	(1 << 1)	/* A catastrophic event has occurred */
-#define KDB_FLAG_CMD_INTERRUPT	(1 << 2)	/* Previous command was interrupted */
-#define KDB_FLAG_NOIPI		(1 << 3)	/* Do not send IPIs */
-#define KDB_FLAG_ONLY_DO_DUMP	(1 << 4)	/* Only do a dump, used when kdb is off */
-#define KDB_FLAG_NO_CONSOLE	(1 << 5)	/* No console is available, kdb is disabled */
-#define KDB_FLAG_NO_VT_CONSOLE	(1 << 6)	/* No VT console is available, do not use keyboard */
-#define KDB_FLAG_NO_I8042	(1 << 7)	/* No i8042 chip is available, do not use keyboard */
-#define KDB_FLAG_RECOVERY	(1 << 8)	/* kdb is being entered for an error which has been recovered */
+#define KDB_FLAG_EARLYKDB	(1 << 0) /* set from boot parameter kdb=early */
+#define KDB_FLAG_CATASTROPHIC	(1 << 1) /* A catastrophic event has occurred */
+#define KDB_FLAG_CMD_INTERRUPT	(1 << 2) /* Previous command was interrupted */
+#define KDB_FLAG_NOIPI		(1 << 3) /* Do not send IPIs */
+#define KDB_FLAG_ONLY_DO_DUMP	(1 << 4) /* Only do a dump, used when
+					  * kdb is off */
+#define KDB_FLAG_NO_CONSOLE	(1 << 5) /* No console is available,
+					  * kdb is disabled */
+#define KDB_FLAG_NO_VT_CONSOLE	(1 << 6) /* No VT console is available, do
+					  * not use keyboard */
+#define KDB_FLAG_NO_I8042	(1 << 7) /* No i8042 chip is available, do
+					  * not use keyboard */
 
-extern volatile int kdb_flags;			/* Global flags, see kdb_state for per cpu state */
+extern int kdb_flags;	/* Global flags, see kdb_state for per cpu state */
 
 extern void kdb_save_flags(void);
 extern void kdb_restore_flags(void);
@@ -101,84 +65,53 @@ extern void kdb_restore_flags(void);
  */
 
 typedef enum {
-	KDB_REASON_ENTER=1,		/* KDB_ENTER() trap/fault - regs valid */
-	KDB_REASON_ENTER_SLAVE,		/* KDB_ENTER_SLAVE() trap/fault - regs valid */
-	KDB_REASON_BREAK,		/* Breakpoint inst. - regs valid */
-	KDB_REASON_DEBUG,		/* Debug Fault - regs valid */
-	KDB_REASON_OOPS,		/* Kernel Oops - regs valid */
-	KDB_REASON_SWITCH,		/* CPU switch - regs valid*/
-	KDB_REASON_KEYBOARD,		/* Keyboard entry - regs valid */
-	KDB_REASON_NMI,			/* Non-maskable interrupt; regs valid */
-	KDB_REASON_RECURSE,		/* Recursive entry to kdb; regs probably valid */
-	KDB_REASON_CPU_UP,		/* Add one cpu to kdb; regs invalid */
-	KDB_REASON_SILENT,		/* Silent entry/exit to kdb; regs invalid - internal only */
+	KDB_REASON_ENTER = 1,	/* KDB_ENTER() trap/fault - regs valid */
+	KDB_REASON_ENTER_SLAVE,	/* KDB_ENTER_SLAVE() trap/fault - regs valid */
+	KDB_REASON_BREAK,	/* Breakpoint inst. - regs valid */
+	KDB_REASON_DEBUG,	/* Debug Fault - regs valid */
+	KDB_REASON_OOPS,	/* Kernel Oops - regs valid */
+	KDB_REASON_SWITCH,	/* CPU switch - regs valid*/
+	KDB_REASON_KEYBOARD,	/* Keyboard entry - regs valid */
+	KDB_REASON_NMI,		/* Non-maskable interrupt; regs valid */
+	KDB_REASON_RECURSE,	/* Recursive entry to kdb;
+				 * regs probably valid */
+	KDB_REASON_SSTEP,	/* Single Step trap. - regs valid */
 } kdb_reason_t;
 
-#ifdef	CONFIG_KDB
-extern int kdb(kdb_reason_t, int, struct pt_regs *);
-#else
-#define kdb(reason,error_code,frame) (0)
-#endif
-
-/* Mainly used by kdb code, but this function is sometimes used
- * by hacked debug code so make it generally available, not private.
- */
-extern void kdb_printf(const char *,...)
+extern int kdb_trap_printk;
+extern int vkdb_printf(const char *fmt, va_list args)
+	    __attribute__ ((format (printf, 1, 0)));
+extern int kdb_printf(const char *, ...)
 	    __attribute__ ((format (printf, 1, 2)));
-typedef void (*kdb_printf_t)(const char *, ...)
+typedef int (*kdb_printf_t)(const char *, ...)
 	     __attribute__ ((format (printf, 1, 2)));
-extern void kdb_init(void);
 
-#if defined(CONFIG_SMP)
-/*
- * Kernel debugger non-maskable IPI handler.
- */
-extern int kdb_ipi(struct pt_regs *, void (*ack_interrupt)(void));
-extern void smp_kdb_stop(void);
-#else	/* CONFIG_SMP */
-#define	smp_kdb_stop()
-#endif	/* CONFIG_SMP */
+extern void kdb_init(int level);
 
-#ifdef CONFIG_KDB_USB
-
-#include <linux/usb.h>
-
-typedef int (*kdb_hc_keyboard_attach_t)(int i, unsigned int bufsize);
-typedef int (*kdb_hc_keyboard_detach_t)(struct urb *urb, int i);
-
-extern int kdb_usb_keyboard_attach(struct urb *urb, unsigned char *buffer,
-				   void *poll_func, void *compl_func,
-				   kdb_hc_keyboard_attach_t kdb_hc_keyboard_attach,
-				   kdb_hc_keyboard_detach_t kdb_hc_keyboard_detach,
-				   unsigned int bufsize,
-				   struct urb *hid_urb);
-
-extern int kdb_usb_keyboard_detach(struct urb *urb);
-
-#endif /* CONFIG_KDB_USB */
+/* Access to kdb specific polling devices */
+typedef int (*get_char_func)(void);
+extern get_char_func kdb_poll_funcs[];
+extern int kdb_get_kbd_char(void);
 
 static inline
 int kdb_process_cpu(const struct task_struct *p)
 {
 	unsigned int cpu = task_thread_info(p)->cpu;
-	if (cpu > NR_CPUS)
+	if (cpu > num_possible_cpus())
 		cpu = 0;
 	return cpu;
 }
 
-extern const char kdb_serial_str[];
+/* kdb access to register set for stack dumping */
+extern struct pt_regs *kdb_current_regs;
 
-#ifdef CONFIG_KDB_KDUMP
-/* Define values for kdb_kdump_state */
-extern int kdb_kdump_state;	/* KDB kdump state */
-#define KDB_KDUMP_RESET		0
-#define KDB_KDUMP_KDUMP		1
-
-void kdba_kdump_prepare(struct pt_regs *);
-void machine_crash_shutdown(struct pt_regs *);
-void machine_crash_shutdown_begin(void);
-void machine_crash_shutdown_end(struct pt_regs *);
-
-#endif /* CONFIG_KDB_KDUMP */
-
+#else /* ! CONFIG_KGDB_KDB */
+#define kdb_printf(...)
+#define kdb_init(x)
+#endif	/* CONFIG_KGDB_KDB */
+enum {
+	KDB_NOT_INITIALIZED,
+	KDB_INIT_EARLY,
+	KDB_INIT_FULL,
+};
 #endif	/* !_KDB_H */

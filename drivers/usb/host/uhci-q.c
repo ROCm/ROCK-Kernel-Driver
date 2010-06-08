@@ -25,17 +25,6 @@
  * games with the FSBR code to make sure we get the correct order in all
  * the cases. I don't think it's worth the effort
  */
-#ifdef CONFIG_KDB_USB
-/* KDB HID QH, managed by KDB code */
-static int kdb_uhci_keyboard_check_uhci_qh(struct uhci_qh *qh);
-static int kdb_uhci_keyboard_set_qh(struct urb *urb, struct uhci_qh *qh);
-static struct uhci_qh *kdb_uhci_keyboard_get_qh(struct urb *urb);
-static int kdb_uhci_keyboard_set_hid_event(struct urb *urb, int hid_event);
-static int kdb_uhci_keyboard_get_hid_event(struct urb *urb);
-static int kdb_uhci_keyboard_set_hid_event_qh(struct uhci_qh *qh, int hid_event);
-static int kdb_uhci_keyboard_urb(struct urb *urb);
-#endif
-
 static void uhci_set_next_interrupt(struct uhci_hcd *uhci)
 {
 	if (uhci->is_stopped)
@@ -298,58 +287,6 @@ static struct uhci_qh *uhci_alloc_qh(struct uhci_hcd *uhci,
 	}
 	return qh;
 }
-
-#ifdef CONFIG_KDB_USB
-/*
- * Same as uhci_alloc_qh execpt it doesn't change to hep->hcpriv
- */
-static struct uhci_qh *kdb_uhci_alloc_qh(struct uhci_hcd *uhci,
-					 struct usb_device *udev, struct usb_host_endpoint *hep)
-{
-	dma_addr_t dma_handle;
-	struct uhci_qh *qh;
-
-	qh = dma_pool_alloc(uhci->qh_pool, GFP_ATOMIC, &dma_handle);
-	if (!qh)
-		return NULL;
-
-	memset(qh, 0, sizeof(*qh));
-	qh->dma_handle = dma_handle;
-
-	qh->element = UHCI_PTR_TERM;
-	qh->link = UHCI_PTR_TERM;
-
-	INIT_LIST_HEAD(&qh->queue);
-	INIT_LIST_HEAD(&qh->node);
-
-	if (udev) {             /* Normal QH */
-		qh->type = hep->desc.bmAttributes & USB_ENDPOINT_XFERTYPE_MASK;
-		if (qh->type != USB_ENDPOINT_XFER_ISOC) {
-			qh->dummy_td = uhci_alloc_td(uhci);
-			if (!qh->dummy_td) {
-				dma_pool_free(uhci->qh_pool, qh, dma_handle);
-				return NULL;
-			}
-		}
-		qh->state = QH_STATE_IDLE;
-		qh->hep = hep;
-		qh->udev = udev;
-
-		if (qh->type == USB_ENDPOINT_XFER_INT ||
-		    qh->type == USB_ENDPOINT_XFER_ISOC)
-			qh->load = usb_calc_bus_time(udev->speed,
-						     usb_endpoint_dir_in(&hep->desc),
-						     qh->type == USB_ENDPOINT_XFER_ISOC,
-						     le16_to_cpu(hep->desc.wMaxPacketSize))
-				/ 1000 + 1;
-
-	} else {                /* Skeleton QH */
-		qh->state = QH_STATE_ACTIVE;
-		qh->type = -1;
-	}
-	return qh;
-}
-#endif
 
 static void uhci_free_qh(struct uhci_hcd *uhci, struct uhci_qh *qh)
 {
@@ -1457,21 +1394,6 @@ static int uhci_urb_enqueue(struct usb_hcd *hcd,
 	if (!urbp)
 		goto done;
 
-#ifdef CONFIG_KDB_USB
-	/* Always allocate new QH for KDB URB.
-	 * KDB HQ will be managed by KDB poll code not by
-	 * UHCI HCD Driver.
-	 */
-	if (kdb_uhci_keyboard_urb(urb) != -1){
-		/* KDB urb will be enqued only once */
-		kdb_uhci_keyboard_set_qh(urb, NULL);
-		qh = kdb_uhci_alloc_qh(uhci, urb->dev, urb->ep);
-		if (!qh)
-			goto err_no_qh;
-		kdb_uhci_keyboard_set_qh(urb, qh);
-	} else
-#endif
-
 	if (urb->ep->hcpriv)
 		qh = urb->ep->hcpriv;
 	else {
@@ -1719,14 +1641,6 @@ static int uhci_advance_check(struct uhci_hcd *uhci, struct uhci_qh *qh)
 	int ret = 1;
 	unsigned status;
 
-#ifdef CONFIG_KDB_USB
-	/* Don't manage KDB QH */
-	if(kdb_uhci_keyboard_check_uhci_qh(qh) != -1){
-		ret = 0;
-		goto done;
-	}
-#endif
-
 	if (qh->type == USB_ENDPOINT_XFER_ISOC)
 		goto done;
 
@@ -1819,11 +1733,6 @@ rescan:
 			uhci->next_qh = list_entry(qh->node.next,
 					struct uhci_qh, node);
 
-#ifdef CONFIG_KDB_USB
-			/* Don't manage KDB QH */
-			if(kdb_uhci_keyboard_check_uhci_qh(qh) != -1)
-				continue;
-#endif
 			if (uhci_advance_check(uhci, qh)) {
 				uhci_scan_qh(uhci, qh);
 				if (qh->state == QH_STATE_ACTIVE) {
@@ -1850,76 +1759,3 @@ rescan:
 	else
 		uhci_set_next_interrupt(uhci);
 }
-
-#ifdef CONFIG_KDB_USB
-/*
- * Activate KDB UHCI QH, called by KDB poll code.
- */
-static void kdb_activate_uhci_qh(struct uhci_qh *qh)
-{
-	struct urb_priv *urbp;
-	struct uhci_td *td;
-	__le32 status, token;
-
-	urbp = list_entry(qh->queue.next, struct urb_priv, node);
-
-	list_for_each_entry(td, &urbp->td_list, list){
-		status = td->status;
-		token = td->token;
-		barrier();
-		/* Clear Status and ActLen */
-		status &= cpu_to_le32(0xff000000);
-		/* Make TD Active */
-		status |= cpu_to_le32(TD_CTRL_ACTIVE);
-		/* Clear TD Interrupt */
-		status &= cpu_to_le32(~TD_CTRL_IOC);
-		/* Toggle Data Sycronization Bit */
-		if (token & cpu_to_le32(TD_TOKEN_TOGGLE))
-			token &= cpu_to_le32(~TD_TOKEN_TOGGLE);
-		else
-			token |= cpu_to_le32(TD_TOKEN_TOGGLE);
-
-		td->token = token;
-		td->status = status;
-		barrier();
-	}
-	/* Activate KDB UHCI Keyboard HID QH */
-	td = list_entry(urbp->td_list.next, struct uhci_td, list);
-	qh->element = LINK_TO_TD(td);
-	barrier();
-}
-
-/*
- * Called when KDB finishes process key press/release event.
- */
-static void
-kdb_uhci_urb_complete (struct urb *urb)
-{
-	if (!kdb_uhci_keyboard_get_hid_event(urb))
-		return;
-
-	/* Activate KDB TD */
-	kdb_activate_uhci_qh(kdb_uhci_keyboard_get_qh(urb));
-	kdb_uhci_keyboard_set_hid_event(urb, 0);
-}
-
-/*
- * Check if state of KDB URB changed (key was pressed/released).
- */
-static int uhci_check_kdb_uhci_qh(struct uhci_qh *qh)
-{
-	struct urb_priv *urbp = NULL;
-	struct uhci_td *td;
-	unsigned status;
-
-	urbp = list_entry(qh->queue.next, struct urb_priv, node);
-	td = list_entry(urbp->td_list.next, struct uhci_td, list);
-	status = td_status(td);
-	if (!(status & TD_CTRL_ACTIVE)){
-		/* We're okay, the queue has advanced */
-		kdb_uhci_keyboard_set_hid_event_qh(qh, 1);
-		return 0;
-	}
-	return -1;
-}
-#endif

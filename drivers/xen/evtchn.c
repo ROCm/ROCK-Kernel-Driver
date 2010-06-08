@@ -49,15 +49,9 @@
 #include <linux/cpu.h>
 
 #include <xen/xen.h>
-#ifdef CONFIG_PARAVIRT_XEN
 #include <xen/events.h>
 #include <xen/evtchn.h>
 #include <asm/xen/hypervisor.h>
-#else
-#include <xen/evtchn.h>
-#include <xen/public/evtchn.h>
-#define bind_evtchn_to_irqhandler bind_caller_port_to_irqhandler
-#endif
 
 struct per_user_data {
 	struct mutex bind_mutex; /* serialize bind/unbind operations */
@@ -79,7 +73,7 @@ struct per_user_data {
 static struct per_user_data *port_user[NR_EVENT_CHANNELS];
 static DEFINE_SPINLOCK(port_user_lock); /* protects port_user[] and ring_prod */
 
-static irqreturn_t evtchn_interrupt(int irq, void *data)
+irqreturn_t evtchn_interrupt(int irq, void *data)
 {
 	unsigned int port = (unsigned long)data;
 	struct per_user_data *u;
@@ -417,8 +411,7 @@ static int evtchn_open(struct inode *inode, struct file *filp)
 	if (u == NULL)
 		return -ENOMEM;
 
-	u->name = kasprintf(GFP_KERNEL, "evtchn:%s[%d]",
-			    current->comm, current->pid);
+	u->name = kasprintf(GFP_KERNEL, "evtchn:%s", current->comm);
 	if (u->name == NULL) {
 		kfree(u);
 		return -ENOMEM;

@@ -16,7 +16,7 @@
 				& ~(CONFIG_PHYSICAL_ALIGN - 1))
 
 /* Minimum kernel alignment, as a power of two */
-#if defined(CONFIG_X86_64) && !defined(CONFIG_XEN)
+#ifdef CONFIG_X86_64
 #define MIN_KERNEL_ALIGN_LG2	PMD_SHIFT
 #else
 #define MIN_KERNEL_ALIGN_LG2	(PAGE_SHIFT + THREAD_ORDER)
@@ -24,7 +24,7 @@
 #define MIN_KERNEL_ALIGN	(_AC(1, UL) << MIN_KERNEL_ALIGN_LG2)
 
 #if (CONFIG_PHYSICAL_ALIGN & (CONFIG_PHYSICAL_ALIGN-1)) || \
-	(CONFIG_PHYSICAL_ALIGN < (_AC(1, UL) << MIN_KERNEL_ALIGN_LG2))
+	(CONFIG_PHYSICAL_ALIGN < MIN_KERNEL_ALIGN)
 #error "Invalid value for CONFIG_PHYSICAL_ALIGN"
 #endif
 

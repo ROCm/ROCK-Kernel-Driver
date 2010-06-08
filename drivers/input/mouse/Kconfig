@@ -17,7 +17,7 @@ config MOUSE_PS2
 	default y
 	select SERIO
 	select SERIO_LIBPS2
-	select SERIO_I8042 if X86
+	select SERIO_I8042 if X86 && !X86_MRST
 	select SERIO_GSCPS2 if GSC
 	select LEDS_CLASS if MOUSE_PS2_SYNAPICS_LED
 	help

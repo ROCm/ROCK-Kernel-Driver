@@ -228,8 +228,8 @@ union external_hw_config_reg {
 #define MBOX_CMD_READ_FLASH			0x0026
 #define MBOX_CMD_CLEAR_DATABASE_ENTRY		0x0031
 #define MBOX_CMD_CONN_CLOSE_SESS_LOGOUT		0x0056
-#define LOGOUT_OPTION_CLOSE_SESSION		0x02
-#define LOGOUT_OPTION_RESET			0x04
+#define LOGOUT_OPTION_CLOSE_SESSION		0x01
+#define LOGOUT_OPTION_RELOGIN			0x02
 #define MBOX_CMD_EXECUTE_IOCB_A64		0x005A
 #define MBOX_CMD_INITIALIZE_FIRMWARE		0x0060
 #define MBOX_CMD_GET_INIT_FW_CTRL_BLOCK		0x0061
@@ -363,7 +363,8 @@ struct addr_ctrl_blk {
 	uint8_t ipv4_ttl;	/* 39 */
 	uint8_t acb_version;	/* 3A */
 #define ACB_NOT_SUPPORTED		0x00
-#define ACB_SUPPORTED			0x02 /* Capable of ACB Version 2 Features */
+#define ACB_SUPPORTED			0x02 /* Capable of ACB Version 2
+						Features */
 
 	uint8_t res2;	/* 3B */
 	uint16_t def_timeout;	/* 3C-3D */
@@ -409,7 +410,8 @@ struct addr_ctrl_blk {
 #define IPV6_OPT_IPV6_PROTOCOL_ENABLE	0x8000
 
 	uint16_t ipv6_addtl_opts;	/* 208-209 */
-#define IPV6_ADDOPT_NEIGHBOR_DISCOVERY_ADDR_ENABLE	0x0002 /* Pri ACB Only */
+#define IPV6_ADDOPT_NEIGHBOR_DISCOVERY_ADDR_ENABLE	0x0002 /* Pri ACB
+								  Only */
 #define IPV6_ADDOPT_AUTOCONFIG_LINK_LOCAL_ADDR		0x0001
 
 	uint16_t ipv6_tcp_opts;	/* 20A-20B */
@@ -607,14 +609,13 @@ struct conn_event_log_entry {
 /* IOCB header structure */
 struct qla4_header {
 	uint8_t entryType;
-#define ET_STATUS		0x03
-#define ET_MARKER		0x04
-#define ET_CONT_T1		0x0A
-#define ET_STATUS_CONTINUATION	0x10
-#define ET_CMND_T3		0x19
-#define ET_ASYNC_PDU		0x37
-#define ET_PASSTHRU0		0x3A
-#define ET_PASSTHRU_STATUS	0x3C
+#define ET_STATUS		 0x03
+#define ET_MARKER		 0x04
+#define ET_CONT_T1		 0x0A
+#define ET_STATUS_CONTINUATION	 0x10
+#define ET_CMND_T3		 0x19
+#define ET_PASSTHRU0		 0x3A
+#define ET_PASSTHRU_STATUS	 0x3C
 
 	uint8_t entryStatus;
 	uint8_t systemDefined;
@@ -723,18 +724,6 @@ struct qla4_marker_entry {
 	uint64_t reserved6;	/* 38-3F */
 };
 
-/* Asynchronous PDU IOCB structure */
-struct async_pdu_iocb {
-	struct qla4_header hdr;         /* 00-02 */
-	uint32_t async_pdu_handle;      /* 03-06 */
-	uint16_t target_id;             /* 07-08 */
-	uint16_t status;                /* 09-0A */
-#define ASYNC_PDU_IOCB_STS_OK   0x01
-
-	uint32_t rsrvd;                 /* 0B-0F */
-	uint8_t iscsi_pdu_hdr[48];      /* 10-3F */
-};
-
 /* Status entry structure*/
 struct status_entry {
 	struct qla4_header hdr;	/* 00-03 */
@@ -777,15 +766,6 @@ struct status_entry {
 
 };
 
-struct pdu_entry {
-	uint8_t *Buff;
-	uint32_t BuffLen;
-	uint32_t SendBuffLen;
-	uint32_t RecvBuffLen;
-	struct pdu_entry *Next;
-	dma_addr_t DmaBuff;
-};
-
 /* Status Continuation entry */
 struct status_cont_entry {
        struct qla4_header hdr; /* 00-03 */
@@ -797,9 +777,11 @@ struct passthru0 {
 	uint32_t handle;	/* 04-07 */
 	uint16_t target;	/* 08-09 */
 	uint16_t connectionID;	/* 0A-0B */
+#define ISNS_DEFAULT_SERVER_CONN_ID	((uint16_t)0x8000)
 
 	uint16_t controlFlags;	/* 0C-0D */
-#define PT_FLAG_ISCSI_PDU		0x1000
+#define PT_FLAG_ETHERNET_FRAME		0x8000
+#define PT_FLAG_ISNS_PDU		0x8000
 #define PT_FLAG_SEND_BUFFER		0x0200
 #define PT_FLAG_WAIT_4_RESPONSE		0x0100
 
@@ -809,8 +791,7 @@ struct passthru0 {
 	struct data_seg_a64 outDataSeg64;	/* 10-1B */
 	uint32_t res1;		/* 1C-1F */
 	struct data_seg_a64 inDataSeg64;	/* 20-2B */
-	uint8_t res2[16];	/* 2C-3F */
-	uint32_t async_pdu_handle;
+	uint8_t res2[20];	/* 2C-3F */
 };
 
 struct passthru_status {

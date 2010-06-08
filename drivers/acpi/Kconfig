@@ -9,7 +9,7 @@ menuconfig ACPI
 	depends on PCI
 	depends on PM
 	select PNP
-	select CPU_IDLE if !PROCESSOR_EXTERNAL_CONTROL
+	select CPU_IDLE
 	default y
 	help
 	  Advanced Configuration and Power Interface (ACPI) support for 
@@ -307,7 +307,6 @@ config ACPI_PCI_SLOT
 config X86_PM_TIMER
 	bool "Power Management Timer Support" if EMBEDDED
 	depends on X86
-	depends on !XEN
 	default y
 	help
 	  The Power Management Timer is available on all ACPI-capable,
@@ -361,13 +360,13 @@ config ACPI_SBS
 	  To compile this driver as a module, choose M here:
 	  the modules will be called sbs and sbshc.
 
-config ACPI_PV_SLEEP
-	bool
-	depends on X86 && XEN && ACPI_SLEEP
-	default y
+config ACPI_HED
+	tristate "Hardware Error Device"
+	help
+	  This driver supports the Hardware Error Device (PNP0C33),
+	  which is used to report some hardware errors notified via
+	  SCI, mainly the corrected errors.
 
-config PROCESSOR_EXTERNAL_CONTROL
-	bool
-	depends on (X86 || IA64) && XEN
-	default y
+source "drivers/acpi/apei/Kconfig"
+
 endif	# ACPI

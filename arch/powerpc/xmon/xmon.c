@@ -2616,7 +2616,7 @@ static void xmon_show_dmesg(void)
 	/* syslog_data[0,1] physical start, end+1.
 	 * syslog_data[2,3] logical start, end+1.
 	 */
-	debugger_syslog_data(syslog_data);
+	kdb_syslog_data(syslog_data);
 	if (syslog_data[2] == syslog_data[3])
 		return;
 	logsize = syslog_data[1] - syslog_data[0];

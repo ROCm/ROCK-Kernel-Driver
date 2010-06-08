@@ -105,7 +105,7 @@ do {							\
 
 /*
  * Generate a percpu add to memory instruction and optimize code
- * if a one is added or subtracted.
+ * if one is added or subtracted.
  */
 #define percpu_add_op(var, val)						\
 do {									\
@@ -190,36 +190,27 @@ do {									\
 	pfo_ret__;					\
 })
 
-#define percpu_xchg_op(op, var, val)			\
+#define percpu_unary_op(op, var)			\
 ({							\
-	typedef typeof(var) pxo_T__;			\
-	pxo_T__ pxo_ret__;				\
-	if (0)						\
-		pxo_ret__ = (val);			\
 	switch (sizeof(var)) {				\
 	case 1:						\
-		asm(op "b %0,"__percpu_arg(1)		\
-		    : "=q" (pxo_ret__), "+m" (var)	\
-		    : "0" ((pxo_T__)(val)));		\
+		asm(op "b "__percpu_arg(0)		\
+		    : "+m" (var));			\
 		break;					\
 	case 2:						\
-		asm(op "w %0,"__percpu_arg(1)		\
-		    : "=r" (pxo_ret__), "+m" (var)	\
-		    : "0" ((pxo_T__)(val)));		\
+		asm(op "w "__percpu_arg(0)		\
+		    : "+m" (var));			\
 		break;					\
 	case 4:						\
-		asm(op "l %0,"__percpu_arg(1)		\
-		    : "=r" (pxo_ret__), "+m" (var)	\
-		    : "0" ((pxo_T__)(val)));		\
+		asm(op "l "__percpu_arg(0)		\
+		    : "+m" (var));			\
 		break;					\
 	case 8:						\
-		asm(op "q %0,"__percpu_arg(1)		\
-		    : "=r" (pxo_ret__), "+m" (var)	\
-		    : "0" ((pxo_T__)(val)));		\
+		asm(op "q "__percpu_arg(0)		\
+		    : "+m" (var));			\
 		break;					\
 	default: __bad_percpu_size();			\
 	}						\
-	pxo_ret__;					\
 })
 
 /*
@@ -239,10 +230,7 @@ do {									\
 #define percpu_and(var, val)		percpu_to_op("and", var, val)
 #define percpu_or(var, val)		percpu_to_op("or", var, val)
 #define percpu_xor(var, val)		percpu_to_op("xor", var, val)
-#define percpu_xchg(var, val)		percpu_xchg_op("xchg", var, val)
-#if defined(CONFIG_X86_XADD) || defined(CONFIG_X86_64)
-#define percpu_xadd(var, val)		percpu_xchg_op("xadd", var, val)
-#endif
+#define percpu_inc(var)		percpu_unary_op("inc", var)
 
 #define __this_cpu_read_1(pcp)		percpu_from_op("mov", (pcp), "m"(pcp))
 #define __this_cpu_read_2(pcp)		percpu_from_op("mov", (pcp), "m"(pcp))
