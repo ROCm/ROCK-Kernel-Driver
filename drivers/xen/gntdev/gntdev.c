@@ -44,6 +44,10 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 
+#define GNTDEV_NAME "gntdev"
+MODULE_ALIAS("devname:xen/" GNTDEV_NAME);
+MODULE_ALIAS("devname:" GNTDEV_NAME);
+
 #define MAX_GRANTS_LIMIT   1024
 #define DEFAULT_MAX_GRANTS 128
 
@@ -161,8 +165,6 @@ static struct vm_operations_struct gntdev_vmops = {
 
 /* The driver major number, for use when unregistering the driver. */
 static int gntdev_major;
-
-#define GNTDEV_NAME "gntdev"
 
 /* Memory mapping functions
  * ------------------------

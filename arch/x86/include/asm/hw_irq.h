@@ -123,7 +123,6 @@ extern void smp_error_interrupt(struct pt_regs *);
 extern asmlinkage void smp_irq_move_cleanup_interrupt(void);
 #endif
 #ifdef CONFIG_SMP
-#ifndef CONFIG_XEN
 extern void smp_reschedule_interrupt(struct pt_regs *);
 extern void smp_call_function_interrupt(struct pt_regs *);
 extern void smp_call_function_single_interrupt(struct pt_regs *);
@@ -132,11 +131,8 @@ extern void smp_invalidate_interrupt(struct pt_regs *);
 #else
 extern asmlinkage void smp_invalidate_interrupt(struct pt_regs *);
 #endif
-#else
-#include <linux/irqreturn.h>
-extern irqreturn_t smp_reschedule_interrupt(int, void *);
-extern irqreturn_t smp_call_function_interrupt(int, void *);
-extern irqreturn_t smp_call_function_single_interrupt(int, void *);
+#ifdef CONFIG_XEN
+extern void smp_reboot_interrupt(struct pt_regs *);
 #endif
 #endif
 

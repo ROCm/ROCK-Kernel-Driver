@@ -72,7 +72,7 @@ static void kick_pending_request_queues(struct blkfront_info *);
 
 static irqreturn_t blkif_int(int irq, void *dev_id);
 static void blkif_restart_queue(struct work_struct *arg);
-static void blkif_recover(struct blkfront_info *);
+static int blkif_recover(struct blkfront_info *);
 static void blkif_completion(struct blk_shadow *);
 static void blkif_free(struct blkfront_info *, int);
 
@@ -149,7 +149,7 @@ static int blkfront_resume(struct xenbus_device *dev)
 
 	err = talk_to_backend(dev, info);
 	if (info->connected == BLKIF_STATE_SUSPENDED && !err)
-		blkif_recover(info);
+		err = blkif_recover(info);
 
 	return err;
 }
@@ -869,7 +869,7 @@ static void blkif_completion(struct blk_shadow *s)
 		gnttab_end_foreign_access(s->req.seg[i].gref, 0UL);
 }
 
-static void blkif_recover(struct blkfront_info *info)
+static int blkif_recover(struct blkfront_info *info)
 {
 	int i;
 	blkif_request_t *req;
@@ -877,8 +877,10 @@ static void blkif_recover(struct blkfront_info *info)
 	int j;
 
 	/* Stage 1: Make a safe copy of the shadow state. */
-	copy = kmalloc(sizeof(info->shadow), GFP_NOIO | __GFP_NOFAIL | __GFP_HIGH);
-	memcpy(copy, info->shadow, sizeof(info->shadow));
+	copy = kmemdup(info->shadow, sizeof(info->shadow),
+		       GFP_NOIO | __GFP_NOFAIL | __GFP_HIGH);
+	if (!copy)
+		return -ENOMEM;
 
 	/* Stage 2: Set up free list. */
 	memset(&info->shadow, 0, sizeof(info->shadow));
@@ -932,6 +934,8 @@ static void blkif_recover(struct blkfront_info *info)
 	kick_pending_request_queues(info);
 
 	spin_unlock_irq(&blkif_io_lock);
+
+	return 0;
 }
 
 int blkfront_is_ready(struct xenbus_device *dev)

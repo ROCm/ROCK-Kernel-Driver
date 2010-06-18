@@ -19,6 +19,7 @@
 
 #include <stdarg.h>
 #include <linux/module.h>
+#include <linux/rwsem.h>
 #include <xen/xenbus.h>
 #include "common.h"
 
@@ -28,6 +29,7 @@
     printk("netback/xenbus (%s:%d) " fmt ".\n", __FUNCTION__, __LINE__, ##args)
 #endif
 
+static DECLARE_RWSEM(teardown_sem);
 
 static int connect_rings(struct backend_info *);
 static void connect(struct backend_info *);
@@ -39,13 +41,16 @@ static int netback_remove(struct xenbus_device *dev)
 
 	netback_remove_accelerators(be, dev);
 
+	down_write(&teardown_sem);
 	if (be->netif) {
 		kobject_uevent(&dev->dev.kobj, KOBJ_OFFLINE);
 		netif_disconnect(be->netif);
 		be->netif = NULL;
 	}
-	kfree(be);
 	dev_set_drvdata(&dev->dev, NULL);
+	up_write(&teardown_sem);
+	kfree(be);
+
 	return 0;
 }
 
@@ -151,8 +156,7 @@ fail:
  */
 static int netback_uevent(struct xenbus_device *xdev, struct kobj_uevent_env *env)
 {
-	struct backend_info *be = dev_get_drvdata(&xdev->dev);
-	netif_t *netif = be->netif;
+	struct backend_info *be;
 	char *val;
 
 	DPRINTK("netback_uevent");
@@ -163,12 +167,15 @@ static int netback_uevent(struct xenbus_device *xdev, struct kobj_uevent_env *en
 		xenbus_dev_fatal(xdev, err, "reading script");
 		return err;
 	}
-	else {
-		add_uevent_var(env, "script=%s", val);
-		kfree(val);
-	}
 
-	add_uevent_var(env, "vif=%s", netif->dev->name);
+	add_uevent_var(env, "script=%s", val);
+	kfree(val);
+
+	down_read(&teardown_sem);
+	be = dev_get_drvdata(&xdev->dev);
+	if (be && be->netif)
+		add_uevent_var(env, "vif=%s", be->netif->dev->name);
+	up_read(&teardown_sem);
 
 	return 0;
 }
@@ -179,6 +186,7 @@ static void backend_create_netif(struct backend_info *be)
 	int err;
 	long handle;
 	struct xenbus_device *dev = be->dev;
+	netif_t *netif;
 
 	if (be->netif != NULL)
 		return;
@@ -189,13 +197,13 @@ static void backend_create_netif(struct backend_info *be)
 		return;
 	}
 
-	be->netif = netif_alloc(&dev->dev, dev->otherend_id, handle);
-	if (IS_ERR(be->netif)) {
-		err = PTR_ERR(be->netif);
-		be->netif = NULL;
+	netif = netif_alloc(&dev->dev, dev->otherend_id, handle);
+	if (IS_ERR(netif)) {
+		err = PTR_ERR(netif);
 		xenbus_dev_fatal(dev, err, "creating interface");
 		return;
 	}
+	be->netif = netif;
 
 	kobject_uevent(&dev->dev.kobj, KOBJ_ONLINE);
 }

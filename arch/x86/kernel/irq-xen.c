@@ -98,6 +98,11 @@ static int show_other_interrupts(struct seq_file *p, int prec)
 	for_each_online_cpu(j)
 		seq_printf(p, "%10u ", irq_stats(j)->irq_tlb_count);
 	seq_printf(p, "  TLB shootdowns\n");
+#else
+	seq_printf(p, "%*s: ", prec, "LCK");
+	for_each_online_cpu(j)
+		seq_printf(p, "%10u ", irq_stats(j)->irq_lock_count);
+	seq_printf(p, "  Spinlock wakeups\n");
 #endif
 #endif
 #ifdef CONFIG_X86_THERMAL_VECTOR
@@ -206,6 +211,8 @@ u64 arch_irq_stat_cpu(unsigned int cpu)
 	sum += irq_stats(cpu)->irq_call_count;
 #ifndef CONFIG_XEN
 	sum += irq_stats(cpu)->irq_tlb_count;
+#else
+	sum += irq_stats(cpu)->irq_lock_count;
 #endif
 #endif
 #ifdef CONFIG_X86_THERMAL_VECTOR

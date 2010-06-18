@@ -5,7 +5,9 @@
  * Chris Bookholt <hap10@epoch.ncsc.mil>
  */
 #include <linux/module.h>
+#include <linux/gfp.h>
 #include <linux/init.h>
+#include <linux/kernel.h>
 #include <linux/rwsem.h>
 #include <linux/list.h>
 #include <linux/spinlock.h>
@@ -507,34 +509,46 @@ static void kill_domain_by_device(struct pcistub_device *psdev)
 {
 	struct xenbus_transaction xbt;
 	int err;
-	char nodename[1024];
+	char *nodename;
 
-	if (!psdev) 
+	if (!psdev) {
 		dev_err(&psdev->dev->dev,
 			"device is NULL when do AER recovery/kill_domain\n");
-	sprintf(nodename, "/local/domain/0/backend/pci/%d/0", 
-		psdev->pdev->xdev->otherend_id);
-	nodename[strlen(nodename)] = '\0';
+		return;
+	}
 
-again:
-	err = xenbus_transaction_start(&xbt);
-	if (err)
-	{
+	nodename = kasprintf(GFP_KERNEL,
+			     "/local/domain/0/backend/pci/%d/0",
+			     psdev->pdev->xdev->otherend_id);
+	if (!nodename) {
 		dev_err(&psdev->dev->dev,
-			"error %d when start xenbus transaction\n", err);
+			"not enough memory\n");
 		return;
 	}
-	/*PV AER handlers will set this flag*/
-	xenbus_printf(xbt, nodename, "aerState" , "aerfail" );
-	err = xenbus_transaction_end(xbt, 0);
-	if (err)
-	{
-		if (err == -EAGAIN)
-			goto again;
-		dev_err(&psdev->dev->dev,
-			"error %d when end xenbus transaction\n", err);
-		return;
-	}
+
+	do {
+		err = xenbus_transaction_start(&xbt);
+		if (err) {
+			dev_err(&psdev->dev->dev,
+				"error %d starting xenbus transaction\n", err);
+			break;
+		}
+
+		/* PV AER handlers will set this flag */
+		xenbus_printf(xbt, nodename, "aerState" , "aerfail" );
+
+		err = xenbus_transaction_end(xbt, 0);
+		switch (err) {
+		default:
+			dev_err(&psdev->dev->dev,
+				"error %d ending xenbus transaction\n", err);
+			break;
+		case 0:
+		case -EAGAIN:
+			break;
+		}
+	} while (err == -EAGAIN);
+	kfree(nodename);
 }
 
 /* For each aer recovery step error_detected, mmio_enabled, etc, front_end and

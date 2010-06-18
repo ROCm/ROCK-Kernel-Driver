@@ -36,7 +36,6 @@
 #include <linux/interrupt.h>
 #include <linux/sched.h>
 #include <linux/kernel_stat.h>
-#include <linux/sysdev.h>
 #include <linux/ftrace.h>
 #include <linux/version.h>
 #include <asm/atomic.h>
@@ -77,12 +76,10 @@ static DEFINE_PER_CPU(int[NR_VIRQS], virq_to_evtchn);
 #endif
 
 /* IRQ <-> IPI mapping. */
-#ifndef NR_IPIS
-#define NR_IPIS 1
-#endif
 #if defined(CONFIG_SMP) && defined(CONFIG_X86)
-static int ipi_to_irq[NR_IPIS] __read_mostly = {[0 ... NR_IPIS-1] = -1};
-static DEFINE_PER_CPU(int[NR_IPIS], ipi_to_evtchn);
+static int __read_mostly ipi_irq = -1;
+DEFINE_PER_CPU(DECLARE_BITMAP(, NR_IPIS), ipi_pending);
+static DEFINE_PER_CPU(evtchn_port_t, ipi_evtchn);
 #else
 #define PER_CPU_IPI_IRQ
 #endif
@@ -138,7 +135,9 @@ static inline u32 mk_irq_info(u32 type, u32 index, u32 evtchn)
 
 	BUILD_BUG_ON(NR_PIRQS > (1U << _INDEX_BITS));
 	BUILD_BUG_ON(NR_VIRQS > (1U << _INDEX_BITS));
+#if defined(PER_CPU_IPI_IRQ) && defined(NR_IPIS)
 	BUILD_BUG_ON(NR_IPIS > (1U << _INDEX_BITS));
+#endif
 	BUG_ON(index >> _INDEX_BITS);
 
 	BUILD_BUG_ON(NR_EVENT_CHANNELS > (1U << _EVTCHN_BITS));
@@ -175,7 +174,7 @@ static inline unsigned int evtchn_from_per_cpu_irq(unsigned int irq,
 #endif
 #ifndef PER_CPU_IPI_IRQ
 	case IRQT_IPI:
-		return per_cpu(ipi_to_evtchn, cpu)[index_from_irq(irq)];
+		return per_cpu(ipi_evtchn, cpu);
 #endif
 	}
 	BUG();
@@ -210,6 +209,9 @@ DEFINE_PER_CPU(int[NR_VIRQS], virq_to_irq) = {[0 ... NR_VIRQS-1] = -1};
 
 #if defined(CONFIG_SMP) && defined(PER_CPU_IPI_IRQ)
 /* IRQ <-> IPI mapping. */
+#ifndef NR_IPIS
+#define NR_IPIS 1
+#endif
 DEFINE_PER_CPU(int[NR_IPIS], ipi_to_irq) = {[0 ... NR_IPIS-1] = -1};
 #endif
 
@@ -731,7 +733,7 @@ void unbind_from_per_cpu_irq(unsigned int irq, unsigned int cpu,
 #endif
 #ifndef PER_CPU_IPI_IRQ
 		case IRQT_IPI:
-			per_cpu(ipi_to_evtchn, cpu)[index_from_irq(irq)] = 0;
+			per_cpu(ipi_evtchn, cpu) = 0;
 			break;
 #endif
 		default:
@@ -981,46 +983,43 @@ int bind_ipi_to_irqhandler(
 }
 #else
 int __cpuinit bind_ipi_to_irqaction(
-	unsigned int ipi,
 	unsigned int cpu,
 	struct irqaction *action)
 {
 	struct evtchn_bind_ipi bind_ipi;
-	int evtchn, irq, retval = 0;
+	int evtchn, retval = 0;
 
 	spin_lock(&irq_mapping_update_lock);
 
-	if (VALID_EVTCHN(per_cpu(ipi_to_evtchn, cpu)[ipi])) {
+	if (VALID_EVTCHN(per_cpu(ipi_evtchn, cpu))) {
 		spin_unlock(&irq_mapping_update_lock);
 		return -EBUSY;
 	}
 
-	if ((irq = ipi_to_irq[ipi]) == -1) {
-		if ((irq = find_unbound_irq(cpu, true)) < 0) {
+	if (ipi_irq < 0) {
+		if ((ipi_irq = find_unbound_irq(cpu, true)) < 0) {
 			spin_unlock(&irq_mapping_update_lock);
-			return irq;
+			return ipi_irq;
 		}
 
 		/* Extra reference so count will never drop to zero. */
-		irq_cfg(irq)->bindcount++;
+		irq_cfg(ipi_irq)->bindcount++;
 
-		ipi_to_irq[ipi] = irq;
-		irq_cfg(irq)->info = mk_irq_info(IRQT_IPI, ipi, 0);
+		irq_cfg(ipi_irq)->info = mk_irq_info(IRQT_IPI, 0, 0);
 		retval = 1;
 	}
 
 	bind_ipi.vcpu = cpu;
-	if (HYPERVISOR_event_channel_op(EVTCHNOP_bind_ipi,
-					&bind_ipi) != 0)
+	if (HYPERVISOR_event_channel_op(EVTCHNOP_bind_ipi, &bind_ipi))
 		BUG();
 
 	evtchn = bind_ipi.port;
-	evtchn_to_irq[evtchn] = irq;
-	per_cpu(ipi_to_evtchn, cpu)[ipi] = evtchn;
+	evtchn_to_irq[evtchn] = ipi_irq;
+	per_cpu(ipi_evtchn, cpu) = evtchn;
 
 	bind_evtchn_to_cpu(evtchn, cpu);
 
-	irq_cfg(irq)->bindcount++;
+	irq_cfg(ipi_irq)->bindcount++;
 
 	spin_unlock(&irq_mapping_update_lock);
 
@@ -1032,15 +1031,15 @@ int __cpuinit bind_ipi_to_irqaction(
 		local_irq_restore(flags);
 	} else {
 		action->flags |= IRQF_PERCPU | IRQF_NO_SUSPEND;
-		retval = setup_irq(irq, action);
+		retval = setup_irq(ipi_irq, action);
 		if (retval) {
-			unbind_from_per_cpu_irq(irq, cpu, NULL);
+			unbind_from_per_cpu_irq(ipi_irq, cpu, NULL);
 			BUG_ON(retval > 0);
-			irq = retval;
+			ipi_irq = retval;
 		}
 	}
 
-	return irq;
+	return ipi_irq;
 }
 #endif /* PER_CPU_IPI_IRQ */
 #endif /* CONFIG_SMP */
@@ -1335,9 +1334,10 @@ int irq_ignore_unhandled(unsigned int irq)
 #if defined(CONFIG_SMP) && !defined(PER_CPU_IPI_IRQ)
 void notify_remote_via_ipi(unsigned int ipi, unsigned int cpu)
 {
-	int evtchn = evtchn_from_per_cpu_irq(ipi_to_irq[ipi], cpu);
+	int evtchn = per_cpu(ipi_evtchn, cpu);
 
-	if (VALID_EVTCHN(evtchn))
+	if (VALID_EVTCHN(evtchn)
+	    && !test_and_set_bit(ipi, per_cpu(ipi_pending, cpu)))
 		notify_remote_via_evtchn(evtchn);
 }
 #endif
@@ -1421,24 +1421,6 @@ void disable_all_local_evtchn(void)
 			synch_set_bit(i, &s->evtchn_mask[0]);
 }
 
-/* Clear an irq's pending state, in preparation for polling on it. */
-void xen_clear_irq_pending(int irq)
-{
-	int evtchn = evtchn_from_irq(irq);
-
-	if (VALID_EVTCHN(evtchn))
-		clear_evtchn(evtchn);
-}
-
-/* Set an irq's pending state, to avoid blocking on it. */
-void xen_set_irq_pending(int irq)
-{
-	int evtchn = evtchn_from_irq(irq);
-
-	if (VALID_EVTCHN(evtchn))
-		set_evtchn(evtchn);
-}
-
 /* Test an irq's pending state. */
 int xen_test_irq_pending(int irq)
 {
@@ -1447,18 +1429,9 @@ int xen_test_irq_pending(int irq)
 	return VALID_EVTCHN(evtchn) && test_evtchn(evtchn);
 }
 
-/* Poll waiting for an irq to become pending.  In the usual case, the
-   irq will be disabled so it won't deliver an interrupt. */
-void xen_poll_irq(int irq)
-{
-	evtchn_port_t evtchn = evtchn_from_irq(irq);
-
-	if (VALID_EVTCHN(evtchn)
-	    && HYPERVISOR_poll_no_timeout(&evtchn, 1))
-		BUG();
-}
-
 #ifdef CONFIG_PM_SLEEP
+#include <linux/sysdev.h>
+
 static void restore_cpu_virqs(unsigned int cpu)
 {
 	struct evtchn_bind_virq bind_virq;
@@ -1511,16 +1484,20 @@ static void restore_cpu_ipis(unsigned int cpu)
 {
 #ifdef CONFIG_SMP
 	struct evtchn_bind_ipi bind_ipi;
-	int ipi, irq, evtchn;
+	int evtchn;
+#ifdef PER_CPU_IPI_IRQ
+	int ipi, irq;
 
 	for (ipi = 0; ipi < NR_IPIS; ipi++) {
-#ifdef PER_CPU_IPI_IRQ
 		if ((irq = per_cpu(ipi_to_irq, cpu)[ipi]) == -1)
-#else
-		if ((irq = ipi_to_irq[ipi]) == -1
-		    || !VALID_EVTCHN(per_cpu(ipi_to_evtchn, cpu)[ipi]))
-#endif
 			continue;
+#else
+#define ipi 0
+#define irq ipi_irq
+		if (irq == -1
+		    || !VALID_EVTCHN(per_cpu(ipi_evtchn, cpu)))
+			return;
+#endif
 
 		BUG_ON(irq_cfg(irq)->info != mk_irq_info(IRQT_IPI, ipi, 0));
 
@@ -1536,14 +1513,19 @@ static void restore_cpu_ipis(unsigned int cpu)
 #ifdef PER_CPU_IPI_IRQ
 		irq_cfg(irq)->info = mk_irq_info(IRQT_IPI, ipi, evtchn);
 #else
-		per_cpu(ipi_to_evtchn, cpu)[ipi] = evtchn;
+		per_cpu(ipi_evtchn, cpu) = evtchn;
 #endif
 		bind_evtchn_to_cpu(evtchn, cpu);
 
 		/* Ready for use. */
 		if (!(irq_to_desc(irq)->status & IRQ_DISABLED))
 			unmask_evtchn(evtchn);
+#ifdef PER_CPU_IPI_IRQ
 	}
+#else
+#undef irq
+#undef ipi
+#endif
 #endif
 }
 

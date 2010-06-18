@@ -29,9 +29,6 @@
 #include <asm/proto.h>
 #include <asm/ipi.h>
 #include <xen/evtchn.h>
-
-static unsigned int __read_mostly reboot = NR_CPUS;
-
 /*
  *	Some notes on x86 processor bugs affecting SMP operation:
  *
@@ -135,6 +132,15 @@ void xen_send_call_func_ipi(const struct cpumask *mask)
 	xen_send_IPI_mask_allbutself(mask, CALL_FUNCTION_VECTOR);
 }
 
+/*
+ * this function calls the 'stop' function on all other CPUs in the system.
+ */
+
+void smp_reboot_interrupt(struct pt_regs *regs)
+{
+	stop_this_cpu(NULL);
+}
+
 void xen_smp_send_stop(void)
 {
 	unsigned long flags;
@@ -149,10 +155,8 @@ void xen_smp_send_stop(void)
 	 * (this implies we cannot stop CPUs spinning with irq off
 	 * currently)
 	 */
-	reboot = raw_smp_processor_id();
-	wmb();
 	if (num_online_cpus() > 1) {
-		xen_send_IPI_allbutself(RESCHEDULE_VECTOR);
+		xen_send_IPI_allbutself(REBOOT_VECTOR);
 
 		/* Don't wait longer than a second */
 		wait = USEC_PER_SEC;
@@ -170,34 +174,19 @@ void xen_smp_send_stop(void)
  * all the work is done automatically when
  * we return from the interrupt.
  */
-irqreturn_t smp_reschedule_interrupt(int irq, void *dev_id)
+void smp_reschedule_interrupt(struct pt_regs *regs)
 {
-	if (likely(reboot >= NR_CPUS) || reboot == raw_smp_processor_id())
-		inc_irq_stat(irq_resched_count);
-	else {
-		irq_enter();
-		stop_this_cpu(NULL);
-		irq_exit();
-	}
-	return IRQ_HANDLED;
+	inc_irq_stat(irq_resched_count);
 }
 
-irqreturn_t smp_call_function_interrupt(int irq, void *dev_id)
+void smp_call_function_interrupt(struct pt_regs *regs)
 {
-	irq_enter();
 	generic_smp_call_function_interrupt();
 	inc_irq_stat(irq_call_count);
-	irq_exit();
-
-	return IRQ_HANDLED;
 }
 
-irqreturn_t smp_call_function_single_interrupt(int irq, void *dev_id)
+void smp_call_function_single_interrupt(struct pt_regs *regs)
 {
-	irq_enter();
 	generic_smp_call_function_single_interrupt();
 	inc_irq_stat(irq_call_count);
-	irq_exit();
-
-	return IRQ_HANDLED;
 }

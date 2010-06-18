@@ -1804,3 +1804,5 @@ static int __init blkif_init(void)
 module_init(blkif_init);
 
 MODULE_LICENSE("Dual BSD/GPL");
+MODULE_ALIAS("devname:xen/blktap0");
+MODULE_ALIAS("devname:blktap0");

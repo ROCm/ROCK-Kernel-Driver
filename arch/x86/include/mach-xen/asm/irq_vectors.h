@@ -11,7 +11,7 @@
 #define RESCHEDULE_VECTOR		0
 #define CALL_FUNCTION_VECTOR		1
 #define CALL_FUNC_SINGLE_VECTOR		2
-#define SPIN_UNLOCK_VECTOR		3
+#define REBOOT_VECTOR			3
 #define NR_IPIS				4
 
 /*

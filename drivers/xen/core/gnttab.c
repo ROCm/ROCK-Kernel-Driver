@@ -36,7 +36,6 @@
 #include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/seqlock.h>
-#include <linux/sysdev.h>
 #include <xen/interface/xen.h>
 #include <xen/gnttab.h>
 #include <asm/pgtable.h>
@@ -713,6 +712,7 @@ EXPORT_SYMBOL(gnttab_post_map_adjust);
 
 #endif /* __HAVE_ARCH_PTE_SPECIAL */
 
+struct sys_device;
 static int gnttab_resume(struct sys_device *dev)
 {
 	if (max_nr_grant_frames() < nr_grant_frames)
@@ -722,6 +722,8 @@ static int gnttab_resume(struct sys_device *dev)
 #define gnttab_resume() gnttab_resume(NULL)
 
 #ifdef CONFIG_PM_SLEEP
+#include <linux/sysdev.h>
+
 #ifdef CONFIG_X86
 static int gnttab_suspend(struct sys_device *dev, pm_message_t state)
 {

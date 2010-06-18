@@ -115,9 +115,9 @@ int bind_ipi_to_irqhandler(
 	void *dev_id);
 #else
 int bind_ipi_to_irqaction(
-	unsigned int ipi,
 	unsigned int cpu,
 	struct irqaction *action);
+DECLARE_PER_CPU(DECLARE_BITMAP(, NR_IPIS), ipi_pending);
 #endif
 #endif
 
@@ -204,18 +204,8 @@ multi_notify_remote_via_evtchn(multicall_entry_t *mcl, int port)
 	mcl->args[1] = (unsigned long)send;
 }
 
-/* Clear an irq's pending state, in preparation for polling on it. */
-void xen_clear_irq_pending(int irq);
-
-/* Set an irq's pending state, to avoid blocking on it. */
-void xen_set_irq_pending(int irq);
-
 /* Test an irq's pending state. */
 int xen_test_irq_pending(int irq);
-
-/* Poll waiting for an irq to become pending.  In the usual case, the
-   irq will be disabled so it won't deliver an interrupt. */
-void xen_poll_irq(int irq);
 
 /*
  * Use these to access the event channel underlying the IRQ handle returned

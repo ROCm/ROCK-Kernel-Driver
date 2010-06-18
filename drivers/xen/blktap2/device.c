@@ -849,6 +849,26 @@ blktap_device_run_queue(struct blktap *tap)
 	BTDBG("running queue for %d\n", tap->minor);
 
 	while ((req = blk_peek_request(rq)) != NULL) {
+		if (!blk_fs_request(req)) {
+			blk_start_request(req);
+			__blk_end_request_all(req, -EIO);
+			continue;
+		}
+
+		if (blk_barrier_rq(req)) {
+			blk_start_request(req);
+			__blk_end_request_all(req, -EOPNOTSUPP);
+			continue;
+		}
+
+#ifdef ENABLE_PASSTHROUGH
+		if (test_bit(BLKTAP_PASSTHROUGH, &tap->dev_inuse)) {
+			blk_start_request(req);
+			blktap_device_forward_request(tap, req);
+			continue;
+		}
+#endif
+
 		if (RING_FULL(&ring->ring)) {
 		wait:
 			/* Avoid pointless unplugs. */
@@ -856,25 +876,6 @@ blktap_device_run_queue(struct blktap *tap)
 			blktap_defer(tap);
 			break;
 		}
-
-		blk_start_request(req);
-
-		if (!blk_fs_request(req)) {
-			__blk_end_request_all(req, -EIO);
-			continue;
-		}
-
-		if (blk_barrier_rq(req)) {
-			__blk_end_request_all(req, -EOPNOTSUPP);
-			continue;
-		}
-
-#ifdef ENABLE_PASSTHROUGH
-		if (test_bit(BLKTAP_PASSTHROUGH, &tap->dev_inuse)) {
-			blktap_device_forward_request(tap, req);
-			continue;
-		}
-#endif
 
 		request = blktap_request_allocate(tap);
 		if (!request) {
@@ -887,6 +888,8 @@ blktap_device_run_queue(struct blktap *tap)
 		      req->cmd, (unsigned long long)blk_rq_pos(req),
 		      blk_rq_cur_sectors(req), blk_rq_sectors(req), req->buffer,
 		      rq_data_dir(req) ? "write" : "read", request);
+
+		blk_start_request(req);
 
 		spin_unlock_irq(&dev->lock);
 		down_read(&tap->tap_sem);
@@ -935,12 +938,11 @@ blktap_device_do_request(struct request_queue *rq)
 	return;
 
 fail:
-	while ((req = blk_peek_request(rq))) {
+	while ((req = blk_fetch_request(rq))) {
 		BTERR("device closed: failing secs %llu - %llu\n",
 		      (unsigned long long)blk_rq_pos(req),
 		      (unsigned long long)blk_rq_pos(req)
 		      + blk_rq_cur_sectors(req));
-		blk_start_request(req);
 		__blk_end_request_all(req, -EIO);
 	}
 }
