@@ -367,8 +367,9 @@ ssize_t initramfs_file_read(struct file *file, const char *buf,
 			break;
 		}
 
-		data = page_address(page);
+		data = kmap_atomic(page, KM_USER0);
 		memcpy(i.iov->iov_base + i.iov_offset, data + offset, bytes);
+		kunmap_atomic(data, KM_USER0);
 
 		iov_iter_advance(&i, bytes);
 		pos += bytes;
@@ -420,9 +421,9 @@ ssize_t initramfs_file_write(struct file *file, const char * __user buf,
 						&page, &fsdata);
 		if (unlikely(status))
 			break;
-		data = page_address(page);
-
+		data = kmap_atomic(page, KM_USER0);
 		memcpy(data + offset, i.iov->iov_base + i.iov_offset, bytes);
+		kunmap_atomic(page, KM_USER0);
 		copied = bytes;
 
 		status = simple_write_end(file, mapping, pos, bytes, copied,
