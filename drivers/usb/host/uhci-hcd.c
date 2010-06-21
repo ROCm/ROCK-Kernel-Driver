@@ -38,6 +38,7 @@
 #include <linux/dmapool.h>
 #include <linux/dma-mapping.h>
 #include <linux/usb.h>
+#include <linux/usb/hcd.h>
 #include <linux/bitops.h>
 #include <linux/dmi.h>
 
@@ -46,14 +47,8 @@
 #include <asm/irq.h>
 #include <asm/system.h>
 
-#include "../core/hcd.h"
 #include "uhci-hcd.h"
 #include "pci-quirks.h"
-
-#ifdef CONFIG_KDB_USB
-#include <linux/kdb.h>
-#include <linux/kdbprivate.h>
-#endif
 
 /*
  * Version Information
@@ -465,213 +460,6 @@ static irqreturn_t uhci_irq(struct usb_hcd *hcd)
 
 	return IRQ_HANDLED;
 }
-
-#ifdef CONFIG_KDB_USB
-/* Unlink KDB QH from hardware and software scheduler */
-static void kdb_unlink_uhci_qh(struct urb *urb, struct uhci_qh *qh)
-{
-	unsigned long flags;
-	struct uhci_hcd *uhci;
-
-	uhci = (struct uhci_hcd *) hcd_to_uhci(bus_to_hcd(urb->dev->bus));
-
-	spin_lock_irqsave(&uhci->lock, flags);
-	unlink_interrupt(NULL, qh);
-	list_del(&(qh->node));
-	spin_unlock_irqrestore(&uhci->lock, flags);
-
-}
-
-static int uhci_kdb_poll_char(struct urb *urb)
-{
-	if (!urb) /* can happen if no keyboard attached */
-		return -1;
-
-	return uhci_check_kdb_uhci_qh(kdb_uhci_keyboard_get_qh(urb));
-}
-
-/* Only 1 UHCI Keyboard supported */
-static inline void kdb_usb_fill_int_urb (struct urb *urb,
-					 struct usb_device *dev,
-					 unsigned int pipe,
-					 void *transfer_buffer,
-					 int buffer_length,
-					 usb_complete_t complete_fn,
-					 void *context,
-					 int interval)
-{
-	urb->dev = dev;
-	urb->pipe = pipe;
-	urb->transfer_buffer = transfer_buffer;
-	urb->transfer_buffer_length = buffer_length;
-	urb->complete = complete_fn;
-	urb->context = context;
-	urb->interval = interval;
-	urb->start_frame = -1;
-}
-
-static int kdb_uhci_keyboard_attach(int i, unsigned int usbhid_bufsize)
-{
-	struct urb *kdb_urb;
-	unsigned char *kdb_buffer;
-	dma_addr_t uhci_inbuf_dma;
-	struct urb *hid_inurb = kdb_usb_kbds[i].urb;
-	int ret = -1;
-
-	kdb_usb_kbds[i].hid_urb = hid_inurb;
-
-	kdb_urb = NULL;
-	kdb_buffer = NULL;
-	if (!(kdb_buffer = usb_buffer_alloc(hid_inurb->dev,
-					    usbhid_bufsize, GFP_ATOMIC,
-					    &uhci_inbuf_dma)))
-		goto out;
-
-	if (!(kdb_urb = usb_alloc_urb(0, GFP_KERNEL)))
-		goto out;
-
-	kdb_usb_fill_int_urb(kdb_urb,
-			     hid_inurb->dev,
-			     hid_inurb->pipe,
-			     kdb_buffer,
-			     hid_inurb->transfer_buffer_length,
-			     hid_inurb->complete,
-			     hid_inurb->context,
-			     hid_inurb->interval
-		);
-
-	(kdb_urb)->transfer_dma = uhci_inbuf_dma;
-	(kdb_urb)->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
-
-	kdb_usb_kbds[i].urb = kdb_urb;
-	kdb_usb_kbds[i].buffer = kdb_buffer;
-
-	if (usb_submit_urb(kdb_urb, GFP_ATOMIC)){
-		kdb_usb_keyboard_detach(hid_inurb);
-		goto out;
-	}
-	/* Remove KDB special URB from endpoin queue to
-	 * prevent hang during hid_disconnect().
-	 */
-	list_del(&(kdb_urb->urb_list));
-
-	ret = 0;
-	return ret;
-out:
-	/* Some Error Cleanup */
-	ret = -1;
-	printk("KDB: Error, UHCI Keyboard HID won't work!\n");
-
-	if (kdb_buffer)
-		usb_buffer_free(hid_inurb->dev,
-				usbhid_bufsize, kdb_buffer,
-				uhci_inbuf_dma);
-
-	if (kdb_urb)
-		usb_free_urb(kdb_urb);
-
-	return ret;
-}
-
-static int kdb_uhci_keyboard_detach(struct urb *urb, int i)
-{
-	int ret;
-
-	if (kdb_usb_kbds[i].qh && (kdb_usb_kbds[i].hid_urb == urb)) {
-		/* UHCI keyboard */
-		kdb_unlink_uhci_qh(kdb_usb_kbds[i].urb, kdb_usb_kbds[i].qh);
-		ret = 0;
-	}
-	ret = -1;
-
-	return ret;
-}
-
-/* Check if URB is managed by KDB code */
-static int kdb_uhci_keyboard_urb(struct urb *urb)
-{
-	int i;
-
-	for (i = 0; i < KDB_USB_NUM_KEYBOARDS; i++) {
-		if (kdb_usb_kbds[i].urb && kdb_usb_kbds[i].urb == urb)
-			return i;
-	}
-	return -1;
-}
-
-/* Check if UHCI QH is managed by KDB code */
-static int kdb_uhci_keyboard_check_uhci_qh(struct uhci_qh *qh)
-{
-	int i;
-
-	for (i = 0; i < KDB_USB_NUM_KEYBOARDS; i++) {
-		if (kdb_usb_kbds[i].urb && kdb_usb_kbds[i].qh == qh)
-			return i;
-	}
-	return -1;
-}
-
-/* Set UHCI QH using URB pointer */
-static int kdb_uhci_keyboard_set_qh(struct urb *urb, struct uhci_qh *qh)
-{
-	int i;
-
-	i = kdb_uhci_keyboard_urb(urb);
-	if (i != -1)
-		kdb_usb_kbds[i].qh = qh;
-
-	return 0;
-}
-
-/* Get UHCI QH using URB pointer */
-static struct uhci_qh *kdb_uhci_keyboard_get_qh(struct urb *urb)
-{
-	int i;
-
-	i = kdb_uhci_keyboard_urb(urb);
-	if (i != -1)
-		return kdb_usb_kbds[i].qh;
-
-	return NULL;
-}
-
-/* Set UHCI hid_event using URB pointer */
-static int kdb_uhci_keyboard_set_hid_event(struct urb *urb, int hid_event)
-{
-	int i;
-
-	i = kdb_uhci_keyboard_urb(urb);
-	if (i != -1)
-		kdb_usb_kbds[i].kdb_hid_event = hid_event;
-
-	return 0;
-}
-/* Get UHCI hid_event using URB pointer */
-static int kdb_uhci_keyboard_get_hid_event(struct urb *urb)
-{
-	int i;
-
-	i = kdb_uhci_keyboard_urb(urb);
-	if (i != -1)
-		return kdb_usb_kbds[i].kdb_hid_event;
-
-	return 0;
-}
-
-/* Set UHCI hid_event using UHCI QH pointer */
-static int kdb_uhci_keyboard_set_hid_event_qh(struct uhci_qh *qh, int hid_event)
-{
-	int i;
-
-	for (i = 0; i < KDB_USB_NUM_KEYBOARDS; i++) {
-		if (kdb_usb_kbds[i].urb && kdb_usb_kbds[i].qh == qh){
-			kdb_usb_kbds[i].kdb_hid_event = hid_event;
-			return i;
-		}
-	}
-	return -1;
-}
-#endif
 
 /*
  * Store the current frame number in uhci->frame_number if the controller
@@ -1147,12 +935,6 @@ static const struct hc_driver uhci_driver = {
 
 	.hub_status_data =	uhci_hub_status_data,
 	.hub_control =		uhci_hub_control,
-#ifdef CONFIG_KDB_USB
-	.kdb_poll_char =        uhci_kdb_poll_char,
-	.kdb_completion =       kdb_uhci_urb_complete,
-	.kdb_hc_keyboard_attach =       kdb_uhci_keyboard_attach,
-	.kdb_hc_keyboard_detach =       kdb_uhci_keyboard_detach,
-#endif
 };
 
 static const struct pci_device_id uhci_pci_ids[] = { {

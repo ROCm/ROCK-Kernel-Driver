@@ -15,9 +15,6 @@
 #include <linux/bug.h>
 #include <linux/nmi.h>
 #include <linux/sysfs.h>
-#ifdef CONFIG_KDB
-#include <linux/kdb.h>
-#endif
 
 #include <asm/stacktrace.h>
 #include <linux/unwind.h>
@@ -298,11 +295,6 @@ unsigned __kprobes long oops_begin(void)
 	int cpu;
 	unsigned long flags;
 
-	/* notify the hw-branch tracer so it may disable tracing and
-	   add the last trace to the trace buffer -
-	   the earlier this happens, the more useful the trace. */
-	trace_hw_branch_oops();
-
 	oops_enter();
 
 	/* racy, but better than risking deadlock. */
@@ -334,9 +326,6 @@ void __kprobes oops_end(unsigned long flags, struct pt_regs *regs, int signr)
 		/* Nest count reaches zero, release the lock. */
 		arch_spin_unlock(&die_lock);
 	raw_local_irq_restore(flags);
-#ifdef CONFIG_KB
-	kdb(KDB_REASON_OOPS, signr, regs);
-#endif
 	oops_exit();
 
 	if (!signr)
@@ -405,9 +394,6 @@ void die(const char *str, struct pt_regs *regs, long err)
 
 	if (__die(str, regs, err))
 		sig = 0;
-#ifdef CONFIG_KDB
-	kdb_diemsg = str;
-#endif
 	oops_end(flags, regs, sig);
 }
 
@@ -428,9 +414,6 @@ die_nmi(char *str, struct pt_regs *regs, int do_panic)
 	printk(" on CPU%d, ip %08lx, registers:\n",
 		smp_processor_id(), regs->ip);
 	show_registers(regs);
-#ifdef CONFIG_KDB
-	kdb(KDB_REASON_NMI, 0, regs);
-#endif
 	oops_end(flags, regs, 0);
 	if (do_panic || panic_on_oops)
 		panic("Non maskable interrupt");

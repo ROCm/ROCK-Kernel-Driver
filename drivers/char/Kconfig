@@ -276,10 +276,18 @@ config N_HDLC
 	  Allows synchronous HDLC communications with tty device drivers that
 	  support synchronous HDLC such as the Microgate SyncLink adapter.
 
-	  This driver can only be built as a module ( = code which can be
+	  This driver can be built as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
 	  The module will be called n_hdlc. If you want to do that, say M
 	  here.
+
+config N_GSM
+	tristate "GSM MUX line discipline support (EXPERIMENTAL)"
+	depends on EXPERIMENTAL
+	depends on NET
+	help
+	  This line discipline provides support for the GSM MUX protocol and
+	  presents the mux as a set of 61 individual tty devices.
 
 config RISCOM8
 	tristate "SDL RISCom/8 card support"
@@ -646,7 +654,7 @@ config HVC_IUCV
 
 config HVC_XEN
 	bool "Xen Hypervisor Console support"
-	depends on PARAVIRT_XEN
+	depends on XEN
 	select HVC_DRIVER
 	select HVC_IRQ
 	default y
@@ -1047,7 +1055,7 @@ config MAX_RAW_DEVS
 config HPET
 	bool "HPET - High Precision Event Timer" if (X86 || IA64)
 	default n
-	depends on ACPI && !XEN
+	depends on ACPI
 	help
 	  If you say Y here, you will have a miscdevice named "/dev/hpet/".  Each
 	  open selects one of the timers supported by the HPET.  The timers are
@@ -1112,6 +1120,14 @@ config DEVPORT
 	default y
 
 source "drivers/s390/char/Kconfig"
+
+config RAMOOPS
+	tristate "Log panic/oops to a RAM buffer"
+	depends on HAS_IOMEM
+	default n
+	help
+	  This enables panic and oops messages to be logged to a circular
+	  buffer in RAM where it can be read back at some later point.
 
 config CRASHER
 	tristate "Crasher Module"

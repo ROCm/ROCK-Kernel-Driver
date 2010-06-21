@@ -30,13 +30,14 @@ void __cpuinit init_scattered_cpuid_features(struct cpuinfo_x86 *c)
 	const struct cpuid_bit *cb;
 
 	static const struct cpuid_bit __cpuinitconst cpuid_bits[] = {
-		{ X86_FEATURE_IDA,   CR_EAX, 1, 0x00000006 },
-		{ X86_FEATURE_ARAT,  CR_EAX, 2, 0x00000006 },
-		{ X86_FEATURE_CPB,   CR_EDX, 9, 0x80000007 },
-		{ X86_FEATURE_NPT,   CR_EDX, 0, 0x8000000a },
-		{ X86_FEATURE_LBRV,  CR_EDX, 1, 0x8000000a },
-		{ X86_FEATURE_SVML,  CR_EDX, 2, 0x8000000a },
-		{ X86_FEATURE_NRIPS, CR_EDX, 3, 0x8000000a },
+		{ X86_FEATURE_IDA,   		CR_EAX, 1, 0x00000006 },
+		{ X86_FEATURE_ARAT,  		CR_EAX, 2, 0x00000006 },
+		{ X86_FEATURE_APERFMPERF,	CR_ECX, 0, 0x00000006 },
+		{ X86_FEATURE_CPB,   		CR_EDX, 9, 0x80000007 },
+		{ X86_FEATURE_NPT,   		CR_EDX, 0, 0x8000000a },
+		{ X86_FEATURE_LBRV,  		CR_EDX, 1, 0x8000000a },
+		{ X86_FEATURE_SVML,  		CR_EDX, 2, 0x8000000a },
+		{ X86_FEATURE_NRIPS, 		CR_EDX, 3, 0x8000000a },
 		{ 0, 0, 0, 0 }
 	};
 
@@ -75,7 +76,7 @@ void __cpuinit init_scattered_cpuid_features(struct cpuinfo_x86 *c)
  */
 void __cpuinit detect_extended_topology(struct cpuinfo_x86 *c)
 {
-#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
+#ifdef CONFIG_SMP
 	unsigned int eax, ebx, ecx, edx, sub_index;
 	unsigned int ht_mask_width, core_plus_mask_width;
 	unsigned int core_select_mask, core_level_siblings;

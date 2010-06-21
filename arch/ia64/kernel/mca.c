@@ -89,10 +89,6 @@
 #include <linux/kdebug.h>
 #include <linux/cpu.h>
 #include <linux/gfp.h>
-#ifdef CONFIG_KDB
-#include <linux/kdb.h>
-#include <linux/kdbprivate.h>  /* for switch state wrappers */
-#endif /* CONFIG_KDB */
 
 #include <asm/delay.h>
 #include <asm/machvec.h>
@@ -829,14 +825,6 @@ ia64_mca_rendez_int_handler(int rendez_irq, void *arg)
 	 */
 	ia64_sal_mc_rendez();
 
-#ifdef CONFIG_KDB
-	/* We get here when the MCA monarch has entered and has woken up the
-	 * slaves.  Do a KDB rendezvous to meet the monarch cpu.
-	 */
-	if (monarch_cpu != -1)
-		KDB_ENTER_SLAVE();
-#endif
-
 	NOTIFY_MCA(DIE_MCA_RENDZVOUS_PROCESS, get_irq_regs(), (long)&nd, 1);
 
 	/* Wait for the monarch cpu to exit. */
@@ -1392,19 +1380,6 @@ ia64_mca_handler(struct pt_regs *regs, struct switch_stack *sw,
 		mca_insert_tr(0x2); /*Reload dynamic itrs*/
 	}
 
-#ifdef	CONFIG_KDB
-	kdb_save_flags();
-	KDB_FLAG_CLEAR(CATASTROPHIC);
-	KDB_FLAG_CLEAR(RECOVERY);
-	if (recover)
-		KDB_FLAG_SET(RECOVERY);
-	else
-		KDB_FLAG_SET(CATASTROPHIC);
-	KDB_FLAG_SET(NOIPI);		/* do not send IPI for MCA/INIT events */
-	KDB_ENTER();
-	kdb_restore_flags();
-#endif	/* CONFIG_KDB */
-
 	NOTIFY_MCA(DIE_MCA_MONARCH_LEAVE, regs, (long)&nd, 1);
 
 	if (atomic_dec_return(&mca_count) > 0) {
@@ -1417,12 +1392,6 @@ ia64_mca_handler(struct pt_regs *regs, struct switch_stack *sw,
 			if (cpu_isset(i, mca_cpu)) {
 				monarch_cpu = i;
 				cpu_clear(i, mca_cpu);	/* wake next cpu */
-#ifdef CONFIG_KDB
-				/*
-				 * No longer a monarch, report in as a slave.
-				 */
-				KDB_ENTER_SLAVE();
-#endif
 				while (monarch_cpu != -1)
 					cpu_relax();	/* spin until last cpu leaves */
 				set_curr_task(cpu, previous_current);
@@ -1432,7 +1401,6 @@ ia64_mca_handler(struct pt_regs *regs, struct switch_stack *sw,
 			}
 		}
 	}
-
 	set_curr_task(cpu, previous_current);
 	ia64_mc_info.imi_rendez_checkin[cpu] = IA64_MCA_RENDEZ_CHECKIN_NOTDONE;
 	monarch_cpu = -1;	/* This frees the slaves and previous monarchs */
@@ -1693,11 +1661,6 @@ default_monarch_init_process(struct notifier_block *self, unsigned long val, voi
 		}
 	}
 	printk("\n\n");
-#ifdef	CONFIG_KDB
-	KDB_FLAG_SET(NOIPI);		/* do not send IPI for MCA/INIT events */
-	KDB_ENTER();
-	KDB_FLAG_CLEAR(NOIPI);
-#else	/* !CONFIG_KDB */
 	if (read_trylock(&tasklist_lock)) {
 		do_each_thread (g, t) {
 			printk("\nBacktrace of pid %d (%s)\n", t->pid, t->comm);
@@ -1705,7 +1668,6 @@ default_monarch_init_process(struct notifier_block *self, unsigned long val, voi
 		} while_each_thread (g, t);
 		read_unlock(&tasklist_lock);
 	}
-#endif	/* CONFIG_KDB */
 	/* FIXME: This will not restore zapped printk locks. */
 	RESTORE_LOGLEVEL(console_loglevel);
 	return NOTIFY_DONE;
@@ -1738,20 +1700,6 @@ ia64_init_handler(struct pt_regs *regs, struct switch_stack *sw,
 	int cpu = smp_processor_id();
 	struct ia64_mca_notify_die nd =
 		{ .sos = sos, .monarch_cpu = &monarch_cpu };
-#ifdef	CONFIG_KDB
-	int kdba_recalcitrant = 0;
-	/* kdba_wait_for_cpus() sends INIT to recalcitrant cpus which ends up
-	 * calling this routine.  If KDB is waiting for the IPI to be processed
-	 * then treat all INIT events as slaves, kdb_initial_cpu is the
-	 * monarch.
-	 */
-	if (KDB_STATE(WAIT_IPI)) {
-		monarch_cpu = kdb_initial_cpu;
-		sos->monarch = 0;
-		KDB_STATE_CLEAR(WAIT_IPI);
-		kdba_recalcitrant = 1;
-	}
-#endif	/* CONFIG_KDB */
 
 	NOTIFY_INIT(DIE_INIT_ENTER, regs, (long)&nd, 0);
 
@@ -1795,11 +1743,6 @@ ia64_init_handler(struct pt_regs *regs, struct switch_stack *sw,
 #else
 		while (monarch_cpu == -1)
 			cpu_relax();	/* spin until monarch enters */
-#ifdef CONFIG_KDB
-		KDB_ENTER_SLAVE();
-		if (kdba_recalcitrant)
-			monarch_cpu = -1;
-#endif /* CONFIG_KDB */
 #endif
 
 		NOTIFY_INIT(DIE_INIT_SLAVE_ENTER, regs, (long)&nd, 1);
@@ -1834,14 +1777,6 @@ ia64_init_handler(struct pt_regs *regs, struct switch_stack *sw,
 	mprintk("Delaying for 5 seconds...\n");
 	udelay(5*1000000);
 	ia64_wait_for_slaves(cpu, "INIT");
-
-#ifdef	CONFIG_KDB
-	kdb_save_flags();
-	KDB_FLAG_SET(NOIPI);		/* do not send IPI for MCA/INIT events */
-	KDB_ENTER();
-	kdb_restore_flags();
-#endif	/* CONFIG_KDB */
-
 	/* If nobody intercepts DIE_INIT_MONARCH_PROCESS then we drop through
 	 * to default_monarch_init_process() above and just print all the
 	 * tasks.
@@ -2080,13 +2015,6 @@ ia64_mca_init(void)
 			printk(KERN_INFO "Increasing MCA rendezvous timeout from "
 				"%ld to %ld milliseconds\n", timeout, isrv.v0);
 			timeout = isrv.v0;
-#ifdef CONFIG_KDB
-			/* kdb must wait long enough for the MCA timeout to trip
-			 * and process.  The MCA timeout is in milliseconds.
-			 */
-			kdb_wait_for_cpus_secs = max(kdb_wait_for_cpus_secs,
-						(int)(timeout/1000) + 10);
-#endif /* CONFIG_KDB */
 			NOTIFY_MCA(DIE_MCA_NEW_TIMEOUT, NULL, timeout, 0);
 			continue;
 		}

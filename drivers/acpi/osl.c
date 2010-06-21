@@ -466,7 +466,7 @@ acpi_override_tables(void)
 	int i;
 
 	/* This is early enough that we don't need the mutex yet */
-	for (i = 0; i < acpi_gbl_root_table_list.count; ++i) {
+	for (i = 0; i < acpi_gbl_root_table_list.current_table_count; ++i) {
 		if (acpi_tb_is_table_loaded(i))
 			continue;
 
@@ -1379,6 +1379,15 @@ int acpi_check_mem_region(resource_size_t start, resource_size_t n,
 EXPORT_SYMBOL(acpi_check_mem_region);
 
 /*
+ * Let drivers know whether the resource checks are effective
+ */
+int acpi_resources_are_enforced(void)
+{
+	return acpi_enforce_resources == ENFORCE_RESOURCES_STRICT;
+}
+EXPORT_SYMBOL(acpi_resources_are_enforced);
+
+/*
  * Acquire a spinlock.
  *
  * handle is a pointer to the spinlock_t.
@@ -1578,7 +1587,7 @@ acpi_os_invalidate_address(
 	switch (space_id) {
 	case ACPI_ADR_SPACE_SYSTEM_IO:
 	case ACPI_ADR_SPACE_SYSTEM_MEMORY:
-		/* Only interference checks against SystemIO and SytemMemory
+		/* Only interference checks against SystemIO and SystemMemory
 		   are needed */
 		res.start = address;
 		res.end = address + length - 1;
@@ -1630,7 +1639,7 @@ acpi_os_validate_address (
 	switch (space_id) {
 	case ACPI_ADR_SPACE_SYSTEM_IO:
 	case ACPI_ADR_SPACE_SYSTEM_MEMORY:
-		/* Only interference checks against SystemIO and SytemMemory
+		/* Only interference checks against SystemIO and SystemMemory
 		   are needed */
 		res = kzalloc(sizeof(struct acpi_res_list), GFP_KERNEL);
 		if (!res)

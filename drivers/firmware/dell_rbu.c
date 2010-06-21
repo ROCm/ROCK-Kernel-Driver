@@ -170,28 +170,9 @@ static int create_packet(void *data, size_t length)
 			spin_lock(&rbu_data.lock);
 			goto out_alloc_packet_array;
 		}
-#ifdef CONFIG_XEN
-		if (ordernum && xen_create_contiguous_region(
-			(unsigned long)packet_data_temp_buf, ordernum, 0)) {
-			free_pages((unsigned long)packet_data_temp_buf,
-				   ordernum);
-			printk(KERN_WARNING
-				"dell_rbu:%s: failed to adjust new "
-				"packet\n", __func__);
-			retval = -ENOMEM;
-			spin_lock(&rbu_data.lock);
-			goto out_alloc_packet_array;
-		}
-#endif
 
-		if ((unsigned long)virt_to_bus(packet_data_temp_buf)
+		if ((unsigned long)virt_to_phys(packet_data_temp_buf)
 				< allocation_floor) {
-#ifdef CONFIG_XEN
-			if (ordernum)
-				xen_destroy_contiguous_region(
-					(unsigned long)packet_data_temp_buf,
-					ordernum);
-#endif
 			pr_debug("packet 0x%lx below floor at 0x%lx.\n",
 					(unsigned long)virt_to_phys(
 						packet_data_temp_buf),
@@ -205,7 +186,7 @@ static int create_packet(void *data, size_t length)
 	newpacket->data = packet_data_temp_buf;
 
 	pr_debug("create_packet: newpacket at physical addr %lx\n",
-		(unsigned long)virt_to_bus(newpacket->data));
+		(unsigned long)virt_to_phys(newpacket->data));
 
 	/* packets may not have fixed size */
 	newpacket->length = length;
@@ -224,7 +205,7 @@ out_alloc_packet_array:
 	/* always free packet array */
 	for (;idx>0;idx--) {
 		pr_debug("freeing unused packet below floor 0x%lx.\n",
-			(unsigned long)virt_to_bus(
+			(unsigned long)virt_to_phys(
 				invalid_addr_packet_array[idx-1]));
 		free_pages((unsigned long)invalid_addr_packet_array[idx-1],
 			ordernum);
@@ -368,13 +349,6 @@ static void packet_empty_list(void)
 		 * to make sure there are no stale RBU packets left in memory
 		 */
 		memset(newpacket->data, 0, rbu_data.packetsize);
-#ifdef CONFIG_XEN
-		if (newpacket->ordernum)
-			xen_destroy_contiguous_region(
-				(unsigned long)newpacket->data,
-				newpacket->ordernum);
-#endif
-
 		free_pages((unsigned long) newpacket->data,
 			newpacket->ordernum);
 		kfree(newpacket);
@@ -429,9 +403,7 @@ static int img_update_realloc(unsigned long size)
 {
 	unsigned char *image_update_buffer = NULL;
 	unsigned long rc;
-#ifndef CONFIG_XEN
 	unsigned long img_buf_phys_addr;
-#endif
 	int ordernum;
 	int dma_alloc = 0;
 
@@ -462,19 +434,15 @@ static int img_update_realloc(unsigned long size)
 
 	spin_unlock(&rbu_data.lock);
 
-#ifndef CONFIG_XEN
 	ordernum = get_order(size);
 	image_update_buffer =
 		(unsigned char *) __get_free_pages(GFP_KERNEL, ordernum);
 
 	img_buf_phys_addr =
-		(unsigned long) virt_to_bus(image_update_buffer);
+		(unsigned long) virt_to_phys(image_update_buffer);
 
 	if (img_buf_phys_addr > BIOS_SCAN_LIMIT) {
 		free_pages((unsigned long) image_update_buffer, ordernum);
-#else
-	{
-#endif
 		ordernum = -1;
 		image_update_buffer = dma_alloc_coherent(NULL, size,
 			&dell_rbu_dmaaddr, GFP_KERNEL);
@@ -554,7 +522,7 @@ static ssize_t read_rbu_mono_data(char *buffer, loff_t pos, size_t count)
 			rbu_data.image_update_buffer, rbu_data.bios_image_size);
 }
 
-static ssize_t read_rbu_data(struct kobject *kobj,
+static ssize_t read_rbu_data(struct file *filp, struct kobject *kobj,
 			     struct bin_attribute *bin_attr,
 			     char *buffer, loff_t pos, size_t count)
 {
@@ -608,7 +576,7 @@ static void callbackfn_rbu(const struct firmware *fw, void *context)
 	release_firmware(fw);
 }
 
-static ssize_t read_rbu_image_type(struct kobject *kobj,
+static ssize_t read_rbu_image_type(struct file *filp, struct kobject *kobj,
 				   struct bin_attribute *bin_attr,
 				   char *buffer, loff_t pos, size_t count)
 {
@@ -618,7 +586,7 @@ static ssize_t read_rbu_image_type(struct kobject *kobj,
 	return size;
 }
 
-static ssize_t write_rbu_image_type(struct kobject *kobj,
+static ssize_t write_rbu_image_type(struct file *filp, struct kobject *kobj,
 				    struct bin_attribute *bin_attr,
 				    char *buffer, loff_t pos, size_t count)
 {
@@ -679,7 +647,7 @@ static ssize_t write_rbu_image_type(struct kobject *kobj,
 	return rc;
 }
 
-static ssize_t read_rbu_packet_size(struct kobject *kobj,
+static ssize_t read_rbu_packet_size(struct file *filp, struct kobject *kobj,
 				    struct bin_attribute *bin_attr,
 				    char *buffer, loff_t pos, size_t count)
 {
@@ -692,7 +660,7 @@ static ssize_t read_rbu_packet_size(struct kobject *kobj,
 	return size;
 }
 
-static ssize_t write_rbu_packet_size(struct kobject *kobj,
+static ssize_t write_rbu_packet_size(struct file *filp, struct kobject *kobj,
 				     struct bin_attribute *bin_attr,
 				     char *buffer, loff_t pos, size_t count)
 {
@@ -727,12 +695,6 @@ static struct bin_attribute rbu_packet_size_attr = {
 static int __init dcdrbu_init(void)
 {
 	int rc;
-
-#ifdef CONFIG_XEN
-	if (!is_initial_xendomain())
-		return -ENODEV;
-#endif
-
 	spin_lock_init(&rbu_data.lock);
 
 	init_packet_head();

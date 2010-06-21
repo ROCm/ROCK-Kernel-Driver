@@ -95,8 +95,9 @@ sp-$(CONFIG_X86_64) := rsp
 cfi := $(call as-instr,.cfi_startproc\n.cfi_rel_offset $(sp-y)$(comma)0\n.cfi_endproc,-DCONFIG_AS_CFI=1)
 # is .cfi_signal_frame supported too?
 cfi-sigframe := $(call as-instr,.cfi_startproc\n.cfi_signal_frame\n.cfi_endproc,-DCONFIG_AS_CFI_SIGNAL_FRAME=1)
-KBUILD_AFLAGS += $(cfi) $(cfi-sigframe)
-KBUILD_CFLAGS += $(cfi) $(cfi-sigframe)
+cfi-sections := $(call as-instr,.cfi_sections .debug_frame,-DCONFIG_AS_CFI_SECTIONS=1)
+KBUILD_AFLAGS += $(cfi) $(cfi-sigframe) $(cfi-sections)
+KBUILD_CFLAGS += $(cfi) $(cfi-sigframe) $(cfi-sections)
 
 LDFLAGS := -m elf_$(UTS_MACHINE)
 
@@ -139,9 +140,6 @@ drivers-$(CONFIG_PM) += arch/x86/power/
 
 drivers-$(CONFIG_FB) += arch/x86/video/
 
-# KDB support
-drivers-$(CONFIG_KDB) += arch/x86/kdb/
-
 ####
 # boot loader support. Several targets are kept for legacy purposes
 
@@ -149,27 +147,8 @@ boot := arch/x86/boot
 
 BOOT_TARGETS = bzlilo bzdisk fdimage fdimage144 fdimage288 isoimage
 
-PHONY += bzImage vmlinuz $(BOOT_TARGETS)
+PHONY += bzImage $(BOOT_TARGETS)
 
-ifdef CONFIG_XEN
-LINUXINCLUDE := -D__XEN_INTERFACE_VERSION__=$(CONFIG_XEN_INTERFACE_VERSION) \
-	-I$(srctree)/arch/x86/include/mach-xen $(LINUXINCLUDE)
-
-ifdef CONFIG_X86_64
-LDFLAGS_vmlinux := -e startup_64
-endif
-
-# Default kernel to build
-all: vmlinuz
-
-# KBUILD_IMAGE specifies the target image being built
-KBUILD_IMAGE := $(boot)/vmlinuz
-
-vmlinuz: vmlinux
-	$(Q)$(MAKE) $(build)=$(boot) $(KBUILD_IMAGE)
-	$(Q)mkdir -p $(objtree)/arch/$(UTS_MACHINE)/boot
-	$(Q)ln -fsn ../../x86/boot/$@ $(objtree)/arch/$(UTS_MACHINE)/boot/$@
-else
 # Default kernel to build
 all: bzImage
 
@@ -183,7 +162,6 @@ endif
 	$(Q)$(MAKE) $(build)=$(boot) $(KBUILD_IMAGE)
 	$(Q)mkdir -p $(objtree)/arch/$(UTS_MACHINE)/boot
 	$(Q)ln -fsn ../../x86/boot/bzImage $(objtree)/arch/$(UTS_MACHINE)/boot/$@
-endif
 
 $(BOOT_TARGETS): vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $@

@@ -11,7 +11,7 @@
 #ifndef _ASM_X86_UV_UV_HUB_H
 #define _ASM_X86_UV_UV_HUB_H
 
-#ifdef CONFIG_X86_UV
+#ifdef CONFIG_X86_64
 #include <linux/numa.h>
 #include <linux/percpu.h>
 #include <linux/timer.h>
@@ -307,7 +307,7 @@ static inline unsigned long uv_read_global_mmr32(int pnode, unsigned long offset
  * Access Global MMR space using the MMR space located at the top of physical
  * memory.
  */
-static inline unsigned long *uv_global_mmr64_address(int pnode, unsigned long offset)
+static inline volatile void __iomem *uv_global_mmr64_address(int pnode, unsigned long offset)
 {
 	return __va(UV_GLOBAL_MMR64_BASE |
 		    UV_GLOBAL_MMR64_PNODE_BITS(pnode) | offset);

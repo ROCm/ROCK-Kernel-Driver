@@ -1735,7 +1735,8 @@ int ocfs2_write_begin_nolock(struct address_space *mapping,
 			goto out;
 		}
 
-		data_ac->ac_resv = &OCFS2_I(inode)->ip_la_data_resv;
+		if (data_ac)
+			data_ac->ac_resv = &OCFS2_I(inode)->ip_la_data_resv;
 
 		credits = ocfs2_calc_extend_credits(inode->i_sb,
 						    &di->id2.i_list,

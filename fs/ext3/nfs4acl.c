@@ -361,7 +361,7 @@ retry:
 	return retval;
 }
 
-struct xattr_handler ext3_nfs4acl_xattr_handler = {
+const struct xattr_handler ext3_nfs4acl_xattr_handler = {
 	.prefix	= NFS4ACL_XATTR,
 	.list	= ext3_xattr_list_nfs4acl,
 	.get	= ext3_xattr_get_nfs4acl,
@@ -369,7 +369,7 @@ struct xattr_handler ext3_nfs4acl_xattr_handler = {
 };
 
 #ifdef NFS4ACL_DEBUG
-struct xattr_handler ext3_masked_nfs4acl_xattr_handler = {
+const struct xattr_handler ext3_masked_nfs4acl_xattr_handler = {
 	.prefix	= "system.masked-nfs4acl",
 	.list	= ext3_xattr_list_masked_nfs4acl,
 	.get	= ext3_xattr_get_masked_nfs4acl,

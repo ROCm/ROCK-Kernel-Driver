@@ -8,10 +8,6 @@
  * @author Barry Kasindorf <barry.kasindorf@amd.com>
  * @author Robert Richter <robert.richter@amd.com>
  *
- * Modified by Aravind Menon for Xen
- * These modifications are:
- * Copyright (C) 2005 Hewlett-Packard Co.
- *
  * Each CPU has a local buffer that stores PC value/event
  * pairs. We also log context switches when we notice them.
  * Eventually each CPU's buffer is processed into the global
@@ -34,35 +30,13 @@
 
 #define OP_BUFFER_FLAGS	0
 
-/*
- * Read and write access is using spin locking. Thus, writing to the
- * buffer by NMI handler (x86) could occur also during critical
- * sections when reading the buffer. To avoid this, there are 2
- * buffers for independent read and write access. Read access is in
- * process context only, write access only in the NMI handler. If the
- * read buffer runs empty, both buffers are swapped atomically. There
- * is potentially a small window during swapping where the buffers are
- * disabled and samples could be lost.
- *
- * Using 2 buffers is a little bit overhead, but the solution is clear
- * and does not require changes in the ring buffer implementation. It
- * can be changed to a single buffer solution when the ring buffer
- * access is implemented as non-locking atomic code.
- */
-static struct ring_buffer *op_ring_buffer_read;
-static struct ring_buffer *op_ring_buffer_write;
+static struct ring_buffer *op_ring_buffer;
 DEFINE_PER_CPU(struct oprofile_cpu_buffer, op_cpu_buffer);
 
 static void wq_sync_buffer(struct work_struct *work);
 
 #define DEFAULT_TIMER_EXPIRE (HZ / 10)
 static int work_enabled;
-
-#ifndef CONFIG_XEN
-#define current_domain COORDINATOR_DOMAIN
-#else
-static int32_t current_domain = COORDINATOR_DOMAIN;
-#endif
 
 unsigned long oprofile_get_cpu_buffer_size(void)
 {
@@ -78,12 +52,9 @@ void oprofile_cpu_buffer_inc_smpl_lost(void)
 
 void free_cpu_buffers(void)
 {
-	if (op_ring_buffer_read)
-		ring_buffer_free(op_ring_buffer_read);
-	op_ring_buffer_read = NULL;
-	if (op_ring_buffer_write)
-		ring_buffer_free(op_ring_buffer_write);
-	op_ring_buffer_write = NULL;
+	if (op_ring_buffer)
+		ring_buffer_free(op_ring_buffer);
+	op_ring_buffer = NULL;
 }
 
 #define RB_EVENT_HDR_SIZE 4
@@ -96,18 +67,15 @@ int alloc_cpu_buffers(void)
 	unsigned long byte_size = buffer_size * (sizeof(struct op_sample) +
 						 RB_EVENT_HDR_SIZE);
 
-	op_ring_buffer_read = ring_buffer_alloc(byte_size, OP_BUFFER_FLAGS);
-	if (!op_ring_buffer_read)
-		goto fail;
-	op_ring_buffer_write = ring_buffer_alloc(byte_size, OP_BUFFER_FLAGS);
-	if (!op_ring_buffer_write)
+	op_ring_buffer = ring_buffer_alloc(byte_size, OP_BUFFER_FLAGS);
+	if (!op_ring_buffer)
 		goto fail;
 
 	for_each_possible_cpu(i) {
 		struct oprofile_cpu_buffer *b = &per_cpu(op_cpu_buffer, i);
 
 		b->last_task = NULL;
-		b->last_cpu_mode = -1;
+		b->last_is_kernel = -1;
 		b->tracing = 0;
 		b->buffer_size = buffer_size;
 		b->sample_received = 0;
@@ -172,16 +140,11 @@ struct op_sample
 *op_cpu_buffer_write_reserve(struct op_entry *entry, unsigned long size)
 {
 	entry->event = ring_buffer_lock_reserve
-		(op_ring_buffer_write, sizeof(struct op_sample) +
+		(op_ring_buffer, sizeof(struct op_sample) +
 		 size * sizeof(entry->sample->data[0]));
-	if (entry->event)
-		entry->sample = ring_buffer_event_data(entry->event);
-	else
-		entry->sample = NULL;
-
-	if (!entry->sample)
+	if (!entry->event)
 		return NULL;
-
+	entry->sample = ring_buffer_event_data(entry->event);
 	entry->size = size;
 	entry->data = entry->sample->data;
 
@@ -190,25 +153,16 @@ struct op_sample
 
 int op_cpu_buffer_write_commit(struct op_entry *entry)
 {
-	return ring_buffer_unlock_commit(op_ring_buffer_write, entry->event);
+	return ring_buffer_unlock_commit(op_ring_buffer, entry->event);
 }
 
 struct op_sample *op_cpu_buffer_read_entry(struct op_entry *entry, int cpu)
 {
 	struct ring_buffer_event *e;
-	e = ring_buffer_consume(op_ring_buffer_read, cpu, NULL);
-	if (e)
-		goto event;
-	if (ring_buffer_swap_cpu(op_ring_buffer_read,
-				 op_ring_buffer_write,
-				 cpu))
+	e = ring_buffer_consume(op_ring_buffer, cpu, NULL, NULL);
+	if (!e)
 		return NULL;
-	e = ring_buffer_consume(op_ring_buffer_read, cpu, NULL);
-	if (e)
-		goto event;
-	return NULL;
 
-event:
 	entry->event = e;
 	entry->sample = ring_buffer_event_data(e);
 	entry->size = (ring_buffer_event_length(e) - sizeof(struct op_sample))
@@ -219,13 +173,12 @@ event:
 
 unsigned long op_cpu_buffer_entries(int cpu)
 {
-	return ring_buffer_entries_cpu(op_ring_buffer_read, cpu)
-		+ ring_buffer_entries_cpu(op_ring_buffer_write, cpu);
+	return ring_buffer_entries_cpu(op_ring_buffer, cpu);
 }
 
 static int
 op_add_code(struct oprofile_cpu_buffer *cpu_buf, unsigned long backtrace,
-	    int cpu_mode, struct task_struct *task)
+	    int is_kernel, struct task_struct *task)
 {
 	struct op_entry entry;
 	struct op_sample *sample;
@@ -238,15 +191,16 @@ op_add_code(struct oprofile_cpu_buffer *cpu_buf, unsigned long backtrace,
 		flags |= TRACE_BEGIN;
 
 	/* notice a switch from user->kernel or vice versa */
-	if (cpu_buf->last_cpu_mode != cpu_mode) {
-		cpu_buf->last_cpu_mode = cpu_mode;
-		flags |= KERNEL_CTX_SWITCH | cpu_mode;
+	is_kernel = !!is_kernel;
+	if (cpu_buf->last_is_kernel != is_kernel) {
+		cpu_buf->last_is_kernel = is_kernel;
+		flags |= KERNEL_CTX_SWITCH;
+		if (is_kernel)
+			flags |= IS_KERNEL;
 	}
 
 	/* notice a task switch */
-	/* if not processing other domain samples */
-	if (cpu_buf->last_task != task &&
-	    current_domain == COORDINATOR_DOMAIN) {
+	if (cpu_buf->last_task != task) {
 		cpu_buf->last_task = task;
 		flags |= USER_CTX_SWITCH;
 	}
@@ -295,14 +249,14 @@ op_add_sample(struct oprofile_cpu_buffer *cpu_buf,
 /*
  * This must be safe from any context.
  *
- * cpu_mode is needed because on some architectures you cannot
+ * is_kernel is needed because on some architectures you cannot
  * tell if you are in kernel or user space simply by looking at
- * pc. We tag this in the buffer by generating kernel/user (and
- * xen) enter events whenever cpu_mode changes
+ * pc. We tag this in the buffer by generating kernel enter/exit
+ * events whenever is_kernel changes
  */
 static int
 log_sample(struct oprofile_cpu_buffer *cpu_buf, unsigned long pc,
-	   unsigned long backtrace, int cpu_mode, unsigned long event)
+	   unsigned long backtrace, int is_kernel, unsigned long event)
 {
 	cpu_buf->sample_received++;
 
@@ -311,7 +265,7 @@ log_sample(struct oprofile_cpu_buffer *cpu_buf, unsigned long pc,
 		return 0;
 	}
 
-	if (op_add_code(cpu_buf, backtrace, cpu_mode, current))
+	if (op_add_code(cpu_buf, backtrace, is_kernel, current))
 		goto fail;
 
 	if (op_add_sample(cpu_buf, pc, event))
@@ -365,8 +319,16 @@ void oprofile_add_ext_sample(unsigned long pc, struct pt_regs * const regs,
 
 void oprofile_add_sample(struct pt_regs * const regs, unsigned long event)
 {
-	int is_kernel = !user_mode(regs);
-	unsigned long pc = profile_pc(regs);
+	int is_kernel;
+	unsigned long pc;
+
+	if (likely(regs)) {
+		is_kernel = !user_mode(regs);
+		pc = profile_pc(regs);
+	} else {
+		is_kernel = 0;    /* This value will not be used */
+		pc = ESCAPE_CODE; /* as this causes an early return. */
+	}
 
 	__oprofile_add_ext_sample(pc, regs, event, is_kernel);
 }
@@ -442,20 +404,6 @@ void oprofile_add_pc(unsigned long pc, int is_kernel, unsigned long event)
 	log_sample(cpu_buf, pc, 0, is_kernel, event);
 }
 
-#ifdef CONFIG_XEN
-/*
- * This is basically log_sample(b, ESCAPE_CODE, 1, cpu_mode, CPU_TRACE_BEGIN),
- * as was previously accessible through oprofile_add_pc().
- */
-void oprofile_add_mode(int cpu_mode)
-{
-	struct oprofile_cpu_buffer *cpu_buf = &__get_cpu_var(op_cpu_buffer);
-
-	if (op_add_code(cpu_buf, 1, cpu_mode, current))
-		cpu_buf->sample_lost_overflow++;
-}
-#endif
-
 void oprofile_add_trace(unsigned long pc)
 {
 	struct oprofile_cpu_buffer *cpu_buf = &__get_cpu_var(op_cpu_buffer);
@@ -479,28 +427,6 @@ fail:
 	cpu_buf->backtrace_aborted++;
 	return;
 }
-
-#ifdef CONFIG_XEN
-int oprofile_add_domain_switch(int32_t domain_id)
-{
-	struct op_entry entry;
-	struct op_sample *sample;
-
-	sample = op_cpu_buffer_write_reserve(&entry, 1);
-	if (!sample)
-		return 0;
-
-	sample->eip = ESCAPE_CODE;
-	sample->event = DOMAIN_SWITCH;
-
-	op_cpu_buffer_add_data(&entry, domain_id);
-	op_cpu_buffer_write_commit(&entry);
-
-	current_domain = domain_id;
-
-	return 1;
-}
-#endif
 
 /*
  * This serves to avoid cpu buffer overflow, and makes sure

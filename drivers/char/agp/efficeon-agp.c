@@ -28,6 +28,7 @@
 #include <linux/page-flags.h>
 #include <linux/mm.h>
 #include "agp.h"
+#include "intel-agp.h"
 
 /*
  * The real differences to the generic AGP code is
@@ -226,7 +227,7 @@ static int efficeon_create_gatt_table(struct agp_bridge_data *bridge)
 
 		efficeon_private.l1_table[index] = page;
 
-		value = virt_to_gart((unsigned long *)page) | pati | present | index;
+		value = virt_to_phys((unsigned long *)page) | pati | present | index;
 
 		pci_write_config_dword(agp_bridge->dev,
 			EFFICEON_ATTPAGE, value);

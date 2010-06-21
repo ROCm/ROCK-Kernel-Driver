@@ -321,19 +321,11 @@ void __init free_early(u64 start, u64 end)
 
 	i = find_overlapped_early(start, end);
 	r = &early_res[i];
-#ifdef CONFIG_XEN /* Shouldn't it always be this way? */
-	if (i >= max_early_res || r->end < end || r->start > start)
-		panic("free_early on not reserved area: %llx-%llx!",
-			 start, end - 1);
-
-	drop_range_partial(i, start, end);
-#else
 	if (i >= max_early_res || r->end != end || r->start != start)
 		panic("free_early on not reserved area: %llx-%llx!",
 			 start, end - 1);
 
 	drop_range(i);
-#endif
 }
 
 void __init free_early_partial(u64 start, u64 end)
@@ -401,7 +393,9 @@ static void __init subtract_early_res(struct range *range, int az)
 int __init get_free_all_memory_range(struct range **rangep, int nodeid)
 {
 	int i, count;
-	u64 end, size, mem = -1ULL;
+	u64 start = 0, end;
+	u64 size;
+	u64 mem;
 	struct range *range;
 	int nr_range;
 
@@ -415,11 +409,9 @@ int __init get_free_all_memory_range(struct range **rangep, int nodeid)
 	end = get_max_mapped();
 #ifdef MAX_DMA32_PFN
 	if (end > (MAX_DMA32_PFN << PAGE_SHIFT))
-		mem = find_fw_memmap_area(MAX_DMA32_PFN << PAGE_SHIFT, end,
-					  size, sizeof(struct range));
+		start = MAX_DMA32_PFN << PAGE_SHIFT;
 #endif
-	if (mem == -1ULL)
-		mem = find_fw_memmap_area(0, end, size, sizeof(struct range));
+	mem = find_fw_memmap_area(start, end, size, sizeof(struct range));
 	if (mem == -1ULL)
 		panic("can not find more space for range free");
 

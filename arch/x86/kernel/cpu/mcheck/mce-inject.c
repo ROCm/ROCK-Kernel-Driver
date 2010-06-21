@@ -144,7 +144,7 @@ static void raise_mce(struct mce *m)
 	if (context == MCJ_CTX_RANDOM)
 		return;
 
-#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
+#ifdef CONFIG_X86_LOCAL_APIC
 	if (m->inject_flags & MCJ_NMI_BROADCAST) {
 		unsigned long start;
 		int cpu;

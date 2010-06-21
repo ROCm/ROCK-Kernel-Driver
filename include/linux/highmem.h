@@ -27,7 +27,7 @@ static inline void invalidate_kernel_vmap_range(void *vaddr, int size)
 
 #include <asm/kmap_types.h>
 
-#if defined(CONFIG_DEBUG_HIGHMEM) && defined(CONFIG_TRACE_IRQFLAGS_SUPPORT)
+#ifdef CONFIG_DEBUG_HIGHMEM
 
 void debug_kmap_atomic(enum km_type type);
 
@@ -136,14 +136,12 @@ alloc_zeroed_user_highpage_movable(struct vm_area_struct *vma,
 	return __alloc_zeroed_user_highpage(__GFP_MOVABLE, vma, vaddr);
 }
 
-#ifndef __HAVE_ARCH_CLEAR_HIGHPAGE
 static inline void clear_highpage(struct page *page)
 {
 	void *kaddr = kmap_atomic(page, KM_USER0);
 	clear_page(kaddr);
 	kunmap_atomic(kaddr, KM_USER0);
 }
-#endif
 
 static inline void zero_user_segments(struct page *page,
 	unsigned start1, unsigned end1,
@@ -197,8 +195,6 @@ static inline void copy_user_highpage(struct page *to, struct page *from,
 
 #endif
 
-#ifndef __HAVE_ARCH_COPY_HIGHPAGE
-
 static inline void copy_highpage(struct page *to, struct page *from)
 {
 	char *vfrom, *vto;
@@ -209,7 +205,5 @@ static inline void copy_highpage(struct page *to, struct page *from)
 	kunmap_atomic(vfrom, KM_USER0);
 	kunmap_atomic(vto, KM_USER1);
 }
-
-#endif
 
 #endif /* _LINUX_HIGHMEM_H */

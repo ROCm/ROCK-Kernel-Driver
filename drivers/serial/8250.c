@@ -44,25 +44,10 @@
 #include <asm/irq.h>
 
 #include "8250.h"
+
 #ifdef CONFIG_SPARC
 #include "suncore.h"
 #endif
-
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-/*
- * kdb_serial_line records the serial line number of the first serial console.
- * NOTE: The kernel ignores characters on the serial line unless a user space
- * program has opened the line first.  To enter kdb before user space has opened
- * the serial line, you can use the 'kdb=early' flag to lilo and set the
- * appropriate breakpoints.
- */
-
-static int  kdb_serial_line = -1;
-static const char *kdb_serial_ptr = kdb_serial_str;
-#else
-#define KDB_8250() 0
-#endif	/* CONFIG_KDB */
 
 /*
  * Configuration:
@@ -1418,20 +1403,6 @@ receive_chars(struct uart_8250_port *up, unsigned int *status)
 			 * just force the read character to be 0
 			 */
 			ch = 0;
-#ifdef CONFIG_KDB
-		if ((up->port.line == kdb_serial_line) && kdb_on == 1) {
-		    if (ch == *kdb_serial_ptr) {
-			if (!(*++kdb_serial_ptr)) {
-				atomic_inc(&kdb_8250);
-				kdb(KDB_REASON_KEYBOARD, 0, get_irq_regs());
-				atomic_dec(&kdb_8250);
-				kdb_serial_ptr = kdb_serial_str;
-				break;
-			}
-		    } else
-			kdb_serial_ptr = kdb_serial_str;
-		}
-#endif /* CONFIG_KDB */
 
 		flag = TTY_NORMAL;
 		up->port.icount.rx++;
@@ -1926,8 +1897,8 @@ static int serial8250_get_poll_char(struct uart_port *port)
 	struct uart_8250_port *up = (struct uart_8250_port *)port;
 	unsigned char lsr = serial_inp(up, UART_LSR);
 
-	while (!(lsr & UART_LSR_DR))
-		lsr = serial_inp(up, UART_LSR);
+	if (!(lsr & UART_LSR_DR))
+		return NO_POLL_CHAR;
 
 	return serial_inp(up, UART_RX);
 }
@@ -2805,7 +2776,7 @@ serial8250_console_write(struct console *co, const char *s, unsigned int count)
 	if (up->port.sysrq) {
 		/* serial8250_handle_port() already took the lock */
 		locked = 0;
-	} else if (oops_in_progress || KDB_8250()) {
+	} else if (oops_in_progress) {
 		locked = spin_trylock(&up->port.lock);
 	} else
 		spin_lock(&up->port.lock);
@@ -2862,30 +2833,6 @@ static int __init serial8250_console_setup(struct console *co, char *options)
 	port = &serial8250_ports[co->index].port;
 	if (!port->iobase && !port->membase)
 		return -ENODEV;
-
-#ifdef	CONFIG_KDB
-	/*
-	 * Remember the line number of the first serial
-	 * console.  We'll make this the kdb serial console too.
-	 */
-	if (co && kdb_serial_line == -1) {
-		kdb_serial_line = co->index;
-		kdb_serial.io_type = port->iotype;
-		switch (port->iotype) {
-		case SERIAL_IO_MEM:
-#ifdef  SERIAL_IO_MEM32
-		case SERIAL_IO_MEM32:
-#endif
-			kdb_serial.iobase = (unsigned long)(port->membase);
-			kdb_serial.ioreg_shift = port->regshift;
-			break;
-		default:
-			kdb_serial.iobase = port->iobase;
-			kdb_serial.ioreg_shift = 0;
-			break;
-		}
-	}
-#endif	/* CONFIG_KDB */
 
 	if (options)
 		uart_parse_options(options, &baud, &parity, &bits, &flow);

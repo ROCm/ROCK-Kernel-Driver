@@ -36,6 +36,7 @@
 #include <linux/fs.h>
 #include <linux/mm.h>
 #include <linux/debugfs.h>
+#include <linux/edac_mce.h>
 
 #include <asm/processor.h>
 #include <asm/hw_irq.h>
@@ -171,6 +172,15 @@ void mce_log(struct mce *mce)
 		entry = rcu_dereference_check_mce(mcelog.next);
 		for (;;) {
 			/*
+			 * If edac_mce is enabled, it will check the error type
+			 * and will process it, if it is a known error.
+			 * Otherwise, the error will be sent through mcelog
+			 * interface
+			 */
+			if (edac_mce_parse(mce))
+				return;
+
+			/*
 			 * When the buffer fills up discard new entries.
 			 * Assume that the earlier errors are the more
 			 * interesting ones:
@@ -266,7 +276,7 @@ static void wait_for_panic(void)
 
 static void mce_panic(char *msg, struct mce *final, char *exp)
 {
-	int i;
+	int i, apei_err = 0;
 
 	if (!fake_panic) {
 		/*
@@ -289,8 +299,11 @@ static void mce_panic(char *msg, struct mce *final, char *exp)
 		struct mce *m = &mcelog.entry[i];
 		if (!(m->status & MCI_STATUS_VAL))
 			continue;
-		if (!(m->status & MCI_STATUS_UC))
+		if (!(m->status & MCI_STATUS_UC)) {
 			print_mce(m);
+			if (!apei_err)
+				apei_err = apei_write_mce(m);
+		}
 	}
 	/* Now print uncorrected but with the final one last */
 	for (i = 0; i < MCE_LOG_LEN; i++) {
@@ -299,11 +312,17 @@ static void mce_panic(char *msg, struct mce *final, char *exp)
 			continue;
 		if (!(m->status & MCI_STATUS_UC))
 			continue;
-		if (!final || memcmp(m, final, sizeof(struct mce)))
+		if (!final || memcmp(m, final, sizeof(struct mce))) {
 			print_mce(m);
+			if (!apei_err)
+				apei_err = apei_write_mce(m);
+		}
 	}
-	if (final)
+	if (final) {
 		print_mce(final);
+		if (!apei_err)
+			apei_err = apei_write_mce(final);
+	}
 	if (cpu_missing)
 		printk(KERN_EMERG "Some CPUs didn't answer in synchronization\n");
 	print_mce_tail();
@@ -476,9 +495,7 @@ static inline void mce_get_rip(struct mce *m, struct pt_regs *regs)
  */
 asmlinkage void smp_mce_self_interrupt(struct pt_regs *regs)
 {
-#ifndef CONFIG_XEN
 	ack_APIC_irq();
-#endif
 	exit_idle();
 	irq_enter();
 	mce_notify_irq();
@@ -501,7 +518,7 @@ static void mce_report_event(struct pt_regs *regs)
 		return;
 	}
 
-#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
+#ifdef CONFIG_X86_LOCAL_APIC
 	/*
 	 * Without APIC do not notify. The event will be picked
 	 * up eventually.
@@ -548,7 +565,7 @@ void machine_check_poll(enum mcp_flags flags, mce_banks_t *b)
 	struct mce m;
 	int i;
 
-	__get_cpu_var(mce_poll_count)++;
+	percpu_inc(mce_poll_count);
 
 	mce_setup(&m);
 
@@ -947,7 +964,7 @@ void do_machine_check(struct pt_regs *regs, long error_code)
 
 	atomic_inc(&mce_entry);
 
-	__get_cpu_var(mce_exception_count)++;
+	percpu_inc(mce_exception_count);
 
 	if (notify_die(DIE_NMI, "machine check", regs, error_code,
 			   18, SIGKILL) == NOTIFY_STOP)
@@ -1151,15 +1168,8 @@ void mce_log_therm_throt_event(__u64 status)
  * Periodic polling timer for "silent" machine check errors.  If the
  * poller finds an MCE, poll 2x faster.  When the poller finds no more
  * errors, poll 2x slower (up to check_interval seconds).
- *
- * We will disable polling in DOM0 since all CMCI/Polling
- * mechanism will be done in XEN for Intel CPUs
  */
-#if defined (CONFIG_X86_XEN_MCE)
-static int check_interval = 0; /* disable polling */
-#else
 static int check_interval = 5 * 60; /* 5 minutes */
-#endif
 
 static DEFINE_PER_CPU(int, mce_next_interval); /* in jiffies */
 static DEFINE_PER_CPU(struct timer_list, mce_timer);
@@ -1324,7 +1334,6 @@ static int __cpuinit __mcheck_cpu_apply_quirks(struct cpuinfo_x86 *c)
 
 	/* This should be disabled by the BIOS, but isn't always */
 	if (c->x86_vendor == X86_VENDOR_AMD) {
-#ifndef CONFIG_XEN
 		if (c->x86 == 15 && banks > 4) {
 			/*
 			 * disable GART TBL walk error reporting, which
@@ -1333,7 +1342,6 @@ static int __cpuinit __mcheck_cpu_apply_quirks(struct cpuinfo_x86 *c)
 			 */
 			clear_bit(10, (unsigned long *)&mce_banks[4].ctl);
 		}
-#endif
 		if (c->x86 <= 17 && mce_bootlog < 0) {
 			/*
 			 * Lots of broken BIOS around that don't clear them
@@ -1401,7 +1409,6 @@ static void __cpuinit __mcheck_cpu_ancient_init(struct cpuinfo_x86 *c)
 
 static void __mcheck_cpu_init_vendor(struct cpuinfo_x86 *c)
 {
-#ifndef CONFIG_X86_64_XEN
 	switch (c->x86_vendor) {
 	case X86_VENDOR_INTEL:
 		mce_intel_feature_init(c);
@@ -1412,7 +1419,6 @@ static void __mcheck_cpu_init_vendor(struct cpuinfo_x86 *c)
 	default:
 		break;
 	}
-#endif
 }
 
 static void __mcheck_cpu_init_timer(void)
@@ -1517,6 +1523,43 @@ static void collect_tscs(void *data)
 	rdtscll(cpu_tsc[smp_processor_id()]);
 }
 
+static int mce_apei_read_done;
+
+/* Collect MCE record of previous boot in persistent storage via APEI ERST. */
+static int __mce_read_apei(char __user **ubuf, size_t usize)
+{
+	int rc;
+	u64 record_id;
+	struct mce m;
+
+	if (usize < sizeof(struct mce))
+		return -EINVAL;
+
+	rc = apei_read_mce(&m, &record_id);
+	/* Error or no more MCE record */
+	if (rc <= 0) {
+		mce_apei_read_done = 1;
+		return rc;
+	}
+	rc = -EFAULT;
+	if (copy_to_user(*ubuf, &m, sizeof(struct mce)))
+		return rc;
+	/*
+	 * In fact, we should have cleared the record after that has
+	 * been flushed to the disk or sent to network in
+	 * /sbin/mcelog, but we have no interface to support that now,
+	 * so just clear it to avoid duplication.
+	 */
+	rc = apei_clear_mce(record_id);
+	if (rc) {
+		mce_apei_read_done = 1;
+		return rc;
+	}
+	*ubuf += sizeof(struct mce);
+
+	return 0;
+}
+
 static ssize_t mce_read(struct file *filp, char __user *ubuf, size_t usize,
 			loff_t *off)
 {
@@ -1530,15 +1573,19 @@ static ssize_t mce_read(struct file *filp, char __user *ubuf, size_t usize,
 		return -ENOMEM;
 
 	mutex_lock(&mce_read_mutex);
+
+	if (!mce_apei_read_done) {
+		err = __mce_read_apei(&buf, usize);
+		if (err || buf != ubuf)
+			goto out;
+	}
+
 	next = rcu_dereference_check_mce(mcelog.next);
 
 	/* Only supports full reads right now */
-	if (*off != 0 || usize < MCE_LOG_LEN*sizeof(struct mce)) {
-		mutex_unlock(&mce_read_mutex);
-		kfree(cpu_tsc);
-
-		return -EINVAL;
-	}
+	err = -EINVAL;
+	if (*off != 0 || usize < MCE_LOG_LEN*sizeof(struct mce))
+		goto out;
 
 	err = 0;
 	prev = 0;
@@ -1586,16 +1633,23 @@ timeout:
 			memset(&mcelog.entry[i], 0, sizeof(struct mce));
 		}
 	}
+
+	if (err)
+		err = -EFAULT;
+
+out:
 	mutex_unlock(&mce_read_mutex);
 	kfree(cpu_tsc);
 
-	return err ? -EFAULT : buf - ubuf;
+	return err ? err : buf - ubuf;
 }
 
 static unsigned int mce_poll(struct file *file, poll_table *wait)
 {
 	poll_wait(file, &mce_wait, wait);
 	if (rcu_dereference_check_mce(mcelog.next))
+		return POLLIN | POLLRDNORM;
+	if (!mce_apei_read_done && apei_check_mce())
 		return POLLIN | POLLRDNORM;
 	return 0;
 }
@@ -2108,16 +2162,6 @@ static __init int mcheck_init_device(void)
 
 	register_hotcpu_notifier(&mce_cpu_notifier);
 	misc_register(&mce_log_device);
-
-#ifdef CONFIG_X86_XEN_MCE
-	if (is_initial_xendomain()) {
-		/* Register vIRQ handler for MCE LOG processing */
-		extern int bind_virq_for_mce(void);
-
-		printk(KERN_DEBUG "MCE: bind virq for DOM0 logging\n");
-		bind_virq_for_mce();
-	}
-#endif
 
 	return err;
 }

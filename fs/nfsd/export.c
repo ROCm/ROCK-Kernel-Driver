@@ -259,10 +259,9 @@ static struct cache_detail svc_expkey_cache = {
 	.alloc		= expkey_alloc,
 };
 
-static struct svc_expkey *
-svc_expkey_lookup(struct svc_expkey *item)
+static int
+svc_expkey_hash(struct svc_expkey *item)
 {
-	struct cache_head *ch;
 	int hash = item->ek_fsidtype;
 	char * cp = (char*)item->ek_fsid;
 	int len = key_len(item->ek_fsidtype);
@@ -270,6 +269,14 @@ svc_expkey_lookup(struct svc_expkey *item)
 	hash ^= hash_mem(cp, len, EXPKEY_HASHBITS);
 	hash ^= hash_ptr(item->ek_client, EXPKEY_HASHBITS);
 	hash &= EXPKEY_HASHMASK;
+	return hash;
+}
+
+static struct svc_expkey *
+svc_expkey_lookup(struct svc_expkey *item)
+{
+	struct cache_head *ch;
+	int hash = svc_expkey_hash(item);
 
 	ch = sunrpc_cache_lookup(&svc_expkey_cache, &item->h,
 				 hash);
@@ -283,13 +290,7 @@ static struct svc_expkey *
 svc_expkey_update(struct svc_expkey *new, struct svc_expkey *old)
 {
 	struct cache_head *ch;
-	int hash = new->ek_fsidtype;
-	char * cp = (char*)new->ek_fsid;
-	int len = key_len(new->ek_fsidtype);
-
-	hash ^= hash_mem(cp, len, EXPKEY_HASHBITS);
-	hash ^= hash_ptr(new->ek_client, EXPKEY_HASHBITS);
-	hash &= EXPKEY_HASHMASK;
+	int hash = svc_expkey_hash(new);
 
 	ch = sunrpc_cache_update(&svc_expkey_cache, &new->h,
 				 &old->h, hash);
@@ -738,14 +739,22 @@ struct cache_detail svc_export_cache = {
 	.alloc		= svc_export_alloc,
 };
 
+static int
+svc_export_hash(struct svc_export *exp)
+{
+	int hash;
+
+	hash = hash_ptr(exp->ex_client, EXPORT_HASHBITS);
+	hash ^= hash_ptr(exp->ex_path.dentry, EXPORT_HASHBITS);
+	hash ^= hash_ptr(exp->ex_path.mnt, EXPORT_HASHBITS);
+	return hash;
+}
+
 static struct svc_export *
 svc_export_lookup(struct svc_export *exp)
 {
 	struct cache_head *ch;
-	int hash;
-	hash = hash_ptr(exp->ex_client, EXPORT_HASHBITS);
-	hash ^= hash_ptr(exp->ex_path.dentry, EXPORT_HASHBITS);
-	hash ^= hash_ptr(exp->ex_path.mnt, EXPORT_HASHBITS);
+	int hash = svc_export_hash(exp);
 
 	ch = sunrpc_cache_lookup(&svc_export_cache, &exp->h,
 				 hash);
@@ -759,10 +768,7 @@ static struct svc_export *
 svc_export_update(struct svc_export *new, struct svc_export *old)
 {
 	struct cache_head *ch;
-	int hash;
-	hash = hash_ptr(old->ex_client, EXPORT_HASHBITS);
-	hash ^= hash_ptr(old->ex_path.dentry, EXPORT_HASHBITS);
-	hash ^= hash_ptr(old->ex_path.mnt, EXPORT_HASHBITS);
+	int hash = svc_export_hash(old);
 
 	ch = sunrpc_cache_update(&svc_export_cache, &new->h,
 				 &old->h,
@@ -947,9 +953,10 @@ static void exp_fsid_unhash(struct svc_export *exp)
 
 	ek = exp_get_fsid_key(exp->ex_client, exp->ex_fsid);
 	if (!IS_ERR(ek)) {
-		sunrpc_invalidate(&ek->h, &svc_expkey_cache);
+		ek->h.expiry_time = get_seconds()-1;
 		cache_put(&ek->h, &svc_expkey_cache);
 	}
+	svc_expkey_cache.nextcheck = get_seconds();
 }
 
 static int exp_fsid_hash(svc_client *clp, struct svc_export *exp)
@@ -984,9 +991,10 @@ static void exp_unhash(struct svc_export *exp)
 
 	ek = exp_get_key(exp->ex_client, inode->i_sb->s_dev, inode->i_ino);
 	if (!IS_ERR(ek)) {
-		sunrpc_invalidate(&ek->h, &svc_expkey_cache);
+		ek->h.expiry_time = get_seconds()-1;
 		cache_put(&ek->h, &svc_expkey_cache);
 	}
+	svc_expkey_cache.nextcheck = get_seconds();
 }
 	
 /*
@@ -1087,9 +1095,9 @@ exp_export(struct nfsctl_export *nxp)
 		err = 0;
 finish:
 	kfree(new.ex_pathname);
-	if (exp)
+	if (!IS_ERR_OR_NULL(exp))
 		exp_put(exp);
-	if (fsid_key && !IS_ERR(fsid_key))
+	if (!IS_ERR_OR_NULL(fsid_key))
 		cache_put(&fsid_key->h, &svc_expkey_cache);
 	path_put(&path);
 out_put_clp:
@@ -1107,7 +1115,8 @@ out:
 static void
 exp_do_unexport(svc_export *unexp)
 {
-	sunrpc_invalidate(&unexp->h, &svc_export_cache);
+	unexp->h.expiry_time = get_seconds()-1;
+	svc_export_cache.nextcheck = get_seconds();
 	exp_unhash(unexp);
 	exp_fsid_unhash(unexp);
 }

@@ -13,10 +13,6 @@
 #include <linux/swap.h>
 #include <linux/vmalloc.h>
 #include <linux/pagemap.h>
-#ifdef	CONFIG_KDB
-#include <linux/kdb.h>
-#include <linux/kdbprivate.h>
-#endif	/* CONFIG_KDB */
 #include <linux/namei.h>
 #include <linux/shm.h>
 #include <linux/blkdev.h>
@@ -143,7 +139,8 @@ static int discard_swap(struct swap_info_struct *si)
 	nr_blocks = ((sector_t)se->nr_pages - 1) << (PAGE_SHIFT - 9);
 	if (nr_blocks) {
 		err = blkdev_issue_discard(si->bdev, start_block,
-				nr_blocks, GFP_KERNEL, DISCARD_FL_BARRIER);
+				nr_blocks, GFP_KERNEL,
+				BLKDEV_IFL_WAIT | BLKDEV_IFL_BARRIER);
 		if (err)
 			return err;
 		cond_resched();
@@ -154,7 +151,8 @@ static int discard_swap(struct swap_info_struct *si)
 		nr_blocks = (sector_t)se->nr_pages << (PAGE_SHIFT - 9);
 
 		err = blkdev_issue_discard(si->bdev, start_block,
-				nr_blocks, GFP_KERNEL, DISCARD_FL_BARRIER);
+				nr_blocks, GFP_KERNEL,
+				BLKDEV_IFL_WAIT | BLKDEV_IFL_BARRIER);
 		if (err)
 			break;
 
@@ -193,7 +191,8 @@ static void discard_swap_cluster(struct swap_info_struct *si,
 			start_block <<= PAGE_SHIFT - 9;
 			nr_blocks <<= PAGE_SHIFT - 9;
 			if (blkdev_issue_discard(si->bdev, start_block,
-				    nr_blocks, GFP_NOIO, DISCARD_FL_BARRIER))
+				    nr_blocks, GFP_NOIO, BLKDEV_IFL_WAIT |
+							BLKDEV_IFL_BARRIER))
 				break;
 		}
 
@@ -578,6 +577,7 @@ static unsigned char swap_entry_free(struct swap_info_struct *p,
 
 	/* free if no reference */
 	if (!usage) {
+		struct gendisk *disk = p->bdev->bd_disk;
 		if (offset < p->lowest_bit)
 			p->lowest_bit = offset;
 		if (offset > p->highest_bit)
@@ -587,7 +587,9 @@ static unsigned char swap_entry_free(struct swap_info_struct *p,
 			swap_list.next = p->type;
 		nr_swap_pages++;
 		p->inuse_pages--;
-		preswap_flush(p->type, offset);
+		if ((p->flags & SWP_BLKDEV) &&
+				disk->fops->swap_slot_free_notify)
+			disk->fops->swap_slot_free_notify(p->bdev, offset);
 	}
 
 	return usage;
@@ -1030,7 +1032,7 @@ static int unuse_mm(struct mm_struct *mm,
  * Recycle to start on reaching the end, returning 0 when empty.
  */
 static unsigned int find_next_to_unuse(struct swap_info_struct *si,
-				unsigned int prev, unsigned int preswap)
+					unsigned int prev)
 {
 	unsigned int max = si->max;
 	unsigned int i = prev;
@@ -1056,12 +1058,6 @@ static unsigned int find_next_to_unuse(struct swap_info_struct *si,
 			prev = 0;
 			i = 1;
 		}
-		if (preswap) {
-			if (preswap_test(si, i))
-				break;
-			else
-				continue;
-		}
 		count = si->swap_map[i];
 		if (count && swap_count(count) != SWAP_MAP_BAD)
 			break;
@@ -1073,12 +1069,8 @@ static unsigned int find_next_to_unuse(struct swap_info_struct *si,
  * We completely avoid races by reading each swap page in advance,
  * and then search for the process using it.  All the necessary
  * page table adjustments can then be made atomically.
- *
- * if the boolean preswap is true, only unuse pages_to_unuse pages;
- * pages_to_unuse==0 means all pages
  */
-static int try_to_unuse(unsigned int type, unsigned int preswap,
-		unsigned long pages_to_unuse)
+static int try_to_unuse(unsigned int type)
 {
 	struct swap_info_struct *si = swap_info[type];
 	struct mm_struct *start_mm;
@@ -1111,7 +1103,7 @@ static int try_to_unuse(unsigned int type, unsigned int preswap,
 	 * one pass through swap_map is enough, but not necessarily:
 	 * there are races when an instance of an entry might be missed.
 	 */
-	while ((i = find_next_to_unuse(si, i, preswap)) != 0) {
+	while ((i = find_next_to_unuse(si, i)) != 0) {
 		if (signal_pending(current)) {
 			retval = -EINTR;
 			break;
@@ -1278,8 +1270,6 @@ static int try_to_unuse(unsigned int type, unsigned int preswap,
 		 * interactive performance.
 		 */
 		cond_resched();
-		if (preswap && pages_to_unuse && !--pages_to_unuse)
-			break;
 	}
 
 	mmput(start_mm);
@@ -1624,7 +1614,7 @@ SYSCALL_DEFINE1(swapoff, const char __user *, specialfile)
 	spin_unlock(&swap_lock);
 
 	current->flags |= PF_OOM_ORIGIN;
-	err = try_to_unuse(type, 0, 0);
+	err = try_to_unuse(type);
 	current->flags &= ~PF_OOM_ORIGIN;
 
 	if (err) {
@@ -1676,14 +1666,9 @@ SYSCALL_DEFINE1(swapoff, const char __user *, specialfile)
 	swap_map = p->swap_map;
 	p->swap_map = NULL;
 	p->flags = 0;
-	preswap_flush_area(type);
 	spin_unlock(&swap_lock);
 	mutex_unlock(&swapon_mutex);
 	vfree(swap_map);
-#ifdef CONFIG_PRESWAP
-	if (p->preswap_map)
-		vfree(p->preswap_map);
-#endif
 	/* Destroy swap account informatin */
 	swap_cgroup_swapoff(type);
 
@@ -1839,7 +1824,6 @@ SYSCALL_DEFINE2(swapon, const char __user *, specialfile, int, swap_flags)
 	unsigned long maxpages;
 	unsigned long swapfilepages;
 	unsigned char *swap_map = NULL;
-	unsigned long *preswap_map = NULL;
 	struct page *page = NULL;
 	struct inode *inode = NULL;
 	int did_down = 0;
@@ -1926,6 +1910,7 @@ SYSCALL_DEFINE2(swapon, const char __user *, specialfile, int, swap_flags)
 		if (error < 0)
 			goto bad_swap;
 		p->bdev = bdev;
+		p->flags |= SWP_BLKDEV;
 	} else if (S_ISREG(inode->i_mode)) {
 		p->bdev = inode->i_sb->s_bdev;
 		mutex_lock(&inode->i_mutex);
@@ -2040,12 +2025,6 @@ SYSCALL_DEFINE2(swapon, const char __user *, specialfile, int, swap_flags)
 		}
 	}
 
-#ifdef CONFIG_PRESWAP
-	preswap_map = vmalloc(maxpages / sizeof(long));
-	if (preswap_map)
-		memset(preswap_map, 0, maxpages / sizeof(long));
-#endif
-
 	error = swap_cgroup_swapon(type, maxpages);
 	if (error)
 		goto bad_swap;
@@ -2084,9 +2063,6 @@ SYSCALL_DEFINE2(swapon, const char __user *, specialfile, int, swap_flags)
 	else
 		p->prio = --least_priority;
 	p->swap_map = swap_map;
-#ifdef CONFIG_PRESWAP
-	p->preswap_map = preswap_map;
-#endif
 	p->flags |= SWP_WRITEOK;
 	nr_swap_pages += nr_good_pages;
 	total_swap_pages += nr_good_pages;
@@ -2110,7 +2086,6 @@ SYSCALL_DEFINE2(swapon, const char __user *, specialfile, int, swap_flags)
 		swap_list.head = swap_list.next = type;
 	else
 		swap_info[prev]->next = type;
-	preswap_init(type);
 	spin_unlock(&swap_lock);
 	mutex_unlock(&swapon_mutex);
 	error = 0;
@@ -2127,7 +2102,6 @@ bad_swap_2:
 	p->swap_file = NULL;
 	p->flags = 0;
 	spin_unlock(&swap_lock);
-	vfree(preswap_map);
 	vfree(swap_map);
 	if (swap_file)
 		filp_close(swap_file, NULL);
@@ -2162,24 +2136,6 @@ void si_swapinfo(struct sysinfo *val)
 	val->totalswap = total_swap_pages + nr_to_be_unused;
 	spin_unlock(&swap_lock);
 }
-
-#ifdef	CONFIG_KDB
-/* Like si_swapinfo() but without the locks */
-void kdb_si_swapinfo(struct sysinfo *val)
-{
-	unsigned int i;
-	unsigned long nr_to_be_unused = 0;
-
-	for (i = 0; i < nr_swapfiles; i++) {
-		if (!(swap_info[i]->flags & SWP_USED) ||
-		     (swap_info[i]->flags & SWP_WRITEOK))
-			continue;
-		nr_to_be_unused += swap_info[i]->inuse_pages;
-	}
-	val->freeswap = nr_swap_pages + nr_to_be_unused;
-	val->totalswap = total_swap_pages + nr_to_be_unused;
-}
-#endif	/* CONFIG_KDB */
 
 /*
  * Verify that a swap entry is valid and increment its swap map count.
@@ -2346,10 +2302,6 @@ int valid_swaphandles(swp_entry_t entry, unsigned long *offset)
 		base++;
 
 	spin_lock(&swap_lock);
-	if (preswap_test(si, target)) {
-		spin_unlock(&swap_lock);
-		return 0;
-	}
 	if (end > si->max)	/* don't go beyond end of map */
 		end = si->max;
 
@@ -2360,9 +2312,6 @@ int valid_swaphandles(swp_entry_t entry, unsigned long *offset)
 			break;
 		if (swap_count(si->swap_map[toff]) == SWAP_MAP_BAD)
 			break;
-		/* Don't read in preswap pages */
-		if (preswap_test(si, toff))
-			break;
 	}
 	/* Count contiguous allocated slots below our target */
 	for (toff = target; --toff >= base; nr_pages++) {
@@ -2370,9 +2319,6 @@ int valid_swaphandles(swp_entry_t entry, unsigned long *offset)
 		if (!si->swap_map[toff])
 			break;
 		if (swap_count(si->swap_map[toff]) == SWAP_MAP_BAD)
-			break;
-		/* Don't read in preswap pages */
-		if (preswap_test(si, toff))
 			break;
 	}
 	spin_unlock(&swap_lock);
@@ -2600,98 +2546,3 @@ static void free_swap_count_continuations(struct swap_info_struct *si)
 		}
 	}
 }
-
-#ifdef CONFIG_PRESWAP
-/*
- * preswap infrastructure functions
- */
-
-struct swap_info_struct *get_swap_info_struct(unsigned int type)
-{
-	BUG_ON(type > MAX_SWAPFILES);
-	return swap_info[type];
-}
-
-/* code structure leveraged from sys_swapoff */
-void preswap_shrink(unsigned long target_pages)
-{
-	struct swap_info_struct *si = NULL;
-	unsigned long total_pages = 0, total_pages_to_unuse;
-	unsigned long pages = 0, unuse_pages = 0;
-	int type;
-	int wrapped = 0;
-
-	do {
-		/*
-		 * we don't want to hold swap_lock while doing a very
-		 * lengthy try_to_unuse, but swap_list may change
-		 * so restart scan from swap_list.head each time
-		 */
-		spin_lock(&swap_lock);
-		total_pages = 0;
-		for (type = swap_list.head; type >= 0; type = si->next) {
-			si = swap_info[type];
-			total_pages += si->preswap_pages;
-		}
-		if (total_pages <= target_pages) {
-			spin_unlock(&swap_lock);
-			return;
-		}
-		total_pages_to_unuse = total_pages - target_pages;
-		for (type = swap_list.head; type >= 0; type = si->next) {
-			si = swap_info[type];
-			if (total_pages_to_unuse < si->preswap_pages)
-				pages = unuse_pages = total_pages_to_unuse;
-			else {
-				pages = si->preswap_pages;
-				unuse_pages = 0; /* unuse all */
-			}
-			if (security_vm_enough_memory_kern(pages))
-				continue;
-			vm_unacct_memory(pages);
-			break;
-		}
-		spin_unlock(&swap_lock);
-		if (type < 0)
-			return;
-		current->flags |= PF_OOM_ORIGIN;
-		(void)try_to_unuse(type, 1, unuse_pages);
-		current->flags &= ~PF_OOM_ORIGIN;
-		wrapped++;
-	} while (wrapped <= 3);
-}
-
-
-#ifdef CONFIG_SYSCTL
-/* cat /sys/proc/vm/preswap provides total number of pages in preswap
- * across all swaptypes.  echo N > /sys/proc/vm/preswap attempts to shrink
- * preswap page usage to N (usually 0) */
-int preswap_sysctl_handler(ctl_table *table, int write,
-	void __user *buffer, size_t *length, loff_t *ppos)
-{
-	unsigned long npages;
-	int type;
-	unsigned long totalpages = 0;
-	struct swap_info_struct *si = NULL;
-
-	/* modeled after hugetlb_sysctl_handler in mm/hugetlb.c */
-	if (!write) {
-		spin_lock(&swap_lock);
-		for (type = swap_list.head; type >= 0; type = si->next) {
-			si = swap_info[type];
-			totalpages += si->preswap_pages;
-		}
-		spin_unlock(&swap_lock);
-		npages = totalpages;
-	}
-	table->data = &npages;
-	table->maxlen = sizeof(unsigned long);
-	proc_doulongvec_minmax(table, write, buffer, length, ppos);
-
-	if (write)
-		preswap_shrink(npages);
-
-	return 0;
-}
-#endif
-#endif /* CONFIG_PRESWAP */

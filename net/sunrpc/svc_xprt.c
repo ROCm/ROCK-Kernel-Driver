@@ -651,11 +651,6 @@ int svc_recv(struct svc_rqst *rqstp, long timeout)
 	if (signalled() || kthread_should_stop())
 		return -EINTR;
 
-	/* Normally we will wait up to 5 seconds for any required
-	 * cache information to be provided.
-	 */
-	rqstp->rq_chandle.thread_wait = 5*HZ;
-
 	spin_lock_bh(&pool->sp_lock);
 	xprt = svc_xprt_dequeue(pool);
 	if (xprt) {
@@ -663,12 +658,6 @@ int svc_recv(struct svc_rqst *rqstp, long timeout)
 		svc_xprt_get(xprt);
 		rqstp->rq_reserved = serv->sv_max_mesg;
 		atomic_add(rqstp->rq_reserved, &xprt->xpt_reserved);
-
-		/* As there is a shortage of threads and this request
-		 * had to be queue, don't allow the thread to wait so
-		 * long for cache updates.
-		 */
-		rqstp->rq_chandle.thread_wait = 1*HZ;
 	} else {
 		/* No data pending. Go to sleep */
 		svc_thread_enqueue(pool, rqstp);
@@ -755,8 +744,10 @@ int svc_recv(struct svc_rqst *rqstp, long timeout)
 		if (rqstp->rq_deferred) {
 			svc_xprt_received(xprt);
 			len = svc_deferred_recv(rqstp);
-		} else
+		} else {
 			len = xprt->xpt_ops->xpo_recvfrom(rqstp);
+			svc_xprt_received(xprt);
+		}
 		dprintk("svc: got len=%d\n", len);
 	}
 
@@ -904,12 +895,12 @@ void svc_delete_xprt(struct svc_xprt *xprt)
 	 */
 	if (test_bit(XPT_TEMP, &xprt->xpt_flags))
 		serv->sv_tmpcnt--;
+	spin_unlock_bh(&serv->sv_lock);
 
 	while ((dr = svc_deferred_dequeue(xprt)) != NULL)
 		kfree(dr);
 
 	svc_xprt_put(xprt);
-	spin_unlock_bh(&serv->sv_lock);
 }
 
 void svc_close_xprt(struct svc_xprt *xprt)

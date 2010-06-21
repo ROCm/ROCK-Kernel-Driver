@@ -166,18 +166,6 @@ static int get_fs_path(struct task_struct *task, struct path *path, bool root)
 	return result;
 }
 
-static int get_nr_threads(struct task_struct *tsk)
-{
-	unsigned long flags;
-	int count = 0;
-
-	if (lock_task_sighand(tsk, &flags)) {
-		count = atomic_read(&tsk->signal->count);
-		unlock_task_sighand(tsk, &flags);
-	}
-	return count;
-}
-
 static int proc_cwd_link(struct inode *inode, struct path *path)
 {
 	struct task_struct *task = get_proc_task(inode);
@@ -813,6 +801,7 @@ out_no_task:
 
 static const struct file_operations proc_info_file_operations = {
 	.read		= proc_info_read,
+	.llseek		= generic_file_llseek,
 };
 
 static int proc_single_show(struct seq_file *m, void *v)
@@ -1070,6 +1059,7 @@ out_no_task:
 
 static const struct file_operations proc_environ_operations = {
 	.read		= environ_read,
+	.llseek		= generic_file_llseek,
 };
 
 static ssize_t oom_adjust_read(struct file *file, char __user *buf,
@@ -1143,6 +1133,7 @@ static ssize_t oom_adjust_write(struct file *file, const char __user *buf,
 static const struct file_operations proc_oom_adjust_operations = {
 	.read		= oom_adjust_read,
 	.write		= oom_adjust_write,
+	.llseek		= generic_file_llseek,
 };
 
 #ifdef CONFIG_AUDITSYSCALL
@@ -1214,6 +1205,7 @@ out_free_page:
 static const struct file_operations proc_loginuid_operations = {
 	.read		= proc_loginuid_read,
 	.write		= proc_loginuid_write,
+	.llseek		= generic_file_llseek,
 };
 
 static ssize_t proc_sessionid_read(struct file * file, char __user * buf,
@@ -1234,6 +1226,7 @@ static ssize_t proc_sessionid_read(struct file * file, char __user * buf,
 
 static const struct file_operations proc_sessionid_operations = {
 	.read		= proc_sessionid_read,
+	.llseek		= generic_file_llseek,
 };
 #endif
 
@@ -1285,6 +1278,7 @@ static ssize_t proc_fault_inject_write(struct file * file,
 static const struct file_operations proc_fault_inject_operations = {
 	.read		= proc_fault_inject_read,
 	.write		= proc_fault_inject_write,
+	.llseek		= generic_file_llseek,
 };
 #endif
 
@@ -2026,7 +2020,7 @@ static ssize_t proc_fdinfo_read(struct file *file, char __user *buf,
 }
 
 static const struct file_operations proc_fdinfo_file_operations = {
-	.open		= nonseekable_open,
+	.open           = nonseekable_open,
 	.read		= proc_fdinfo_read,
 };
 
@@ -2310,6 +2304,7 @@ out_no_task:
 static const struct file_operations proc_pid_attr_operations = {
 	.read		= proc_pid_attr_read,
 	.write		= proc_pid_attr_write,
+	.llseek		= generic_file_llseek,
 };
 
 static const struct pid_entry attr_dir_stuff[] = {
@@ -2430,6 +2425,7 @@ static ssize_t proc_coredump_filter_write(struct file *file,
 static const struct file_operations proc_coredump_filter_operations = {
 	.read		= proc_coredump_filter_read,
 	.write		= proc_coredump_filter_write,
+	.llseek		= generic_file_llseek,
 };
 #endif
 
@@ -2519,7 +2515,7 @@ static struct dentry *proc_base_instantiate(struct inode *dir,
 	const struct pid_entry *p = ptr;
 	struct inode *inode;
 	struct proc_inode *ei;
-	struct dentry *error = ERR_PTR(-EINVAL);
+	struct dentry *error;
 
 	/* Allocate the inode */
 	error = ERR_PTR(-ENOMEM);
@@ -2869,7 +2865,7 @@ out:
 
 struct dentry *proc_pid_lookup(struct inode *dir, struct dentry * dentry, struct nameidata *nd)
 {
-	struct dentry *result = ERR_PTR(-ENOENT);
+	struct dentry *result;
 	struct task_struct *task;
 	unsigned tgid;
 	struct pid_namespace *ns;

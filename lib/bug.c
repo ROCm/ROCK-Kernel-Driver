@@ -43,10 +43,6 @@
 #include <linux/bug.h>
 #include <linux/sched.h>
 
-#ifdef CONFIG_KDB
-#include <linux/kdb.h>
-#endif
-
 extern const struct bug_entry __start___bug_table[], __stop___bug_table[];
 
 static inline unsigned long bug_addr(const struct bug_entry *bug)
@@ -169,7 +165,7 @@ enum bug_trap_type report_bug(unsigned long bugaddr, struct pt_regs *regs)
 			       (void *)bugaddr);
 
 		show_regs(regs);
-		add_taint(TAINT_WARN);
+		add_taint(BUG_GET_TAINT(bug));
 		return BUG_TRAP_TYPE_WARN;
 	}
 
@@ -180,10 +176,6 @@ enum bug_trap_type report_bug(unsigned long bugaddr, struct pt_regs *regs)
 		printk(KERN_CRIT "Kernel BUG at %p "
 		       "[verbose debug info unavailable]\n",
 		       (void *)bugaddr);
-
-#ifdef CONFIG_KDB
-	kdb(KDB_REASON_ENTER, 0, regs);
-#endif
 
 	return BUG_TRAP_TYPE_BUG;
 }

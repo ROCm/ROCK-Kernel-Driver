@@ -23,10 +23,6 @@ struct pglist_data *next_online_pgdat(struct pglist_data *pgdat)
 		return NULL;
 	return NODE_DATA(nid);
 }
-#ifdef CONFIG_KDB
-EXPORT_SYMBOL(first_online_pgdat);
-EXPORT_SYMBOL(next_online_pgdat);
-#endif
 
 /*
  * next_zone - helper magic for for_each_zone()

@@ -96,6 +96,7 @@ EXPORT_SYMBOL(pcibios_align_resource);
  *	  the fact the PCI specs explicitly allow address decoders to be
  *	  shared between expansion ROMs and other resource regions, it's
  *	  at least dangerous)
+ *	- bad resource sizes or overlaps with other regions
  *
  *  Our solution:
  *	(1) Allocate resources for all buses behind PCI-to-PCI bridges.
@@ -136,6 +137,7 @@ static void __init pcibios_allocate_bus_resources(struct list_head *bus_list)
 					 * child resource allocations in this
 					 * range.
 					 */
+					r->start = r->end = 0;
 					r->flags = 0;
 				}
 			}
@@ -239,14 +241,12 @@ void __init pcibios_resource_survey(void)
 	pcibios_allocate_resources(1);
 
 	e820_reserve_resources_late();
-#ifndef CONFIG_XEN
 	/*
 	 * Insert the IO APIC resources after PCI initialization has
 	 * occured to handle IO APICS that are mapped in on a BAR in
 	 * PCI space, but before trying to assign unassigned pci res.
 	 */
 	ioapic_insert_resources();
-#endif
 }
 
 /**

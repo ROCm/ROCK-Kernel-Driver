@@ -19,7 +19,7 @@ config PCI_MSI
 	   by using the 'pci=nomsi' option.  This disables MSI for the
 	   entire system.
 
-	   If you don't know what to do here, say N.
+	   If you don't know what to do here, say Y.
 
 config PCI_DEBUG
 	bool "PCI Debugging"
@@ -64,7 +64,7 @@ config PCI_STUB
 config HT_IRQ
 	bool "Interrupts on hypertransport devices"
 	default y
-	depends on PCI && X86_LOCAL_APIC && X86_IO_APIC && !XEN
+	depends on PCI && X86_LOCAL_APIC && X86_IO_APIC
 	help
 	   This allows native hypertransport devices to use interrupts.
 
@@ -82,7 +82,7 @@ config PCI_IOV
 
 config PCI_IOAPIC
 	bool
-	depends on PCI && !XEN
+	depends on PCI
 	depends on ACPI
 	depends on HOTPLUG
 	default y

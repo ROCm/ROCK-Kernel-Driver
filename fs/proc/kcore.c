@@ -130,7 +130,7 @@ static void __kcore_update_ram(struct list_head *list)
 }
 
 
-#if defined(CONFIG_HIGHMEM) || defined(CONFIG_XEN)
+#ifdef CONFIG_HIGHMEM
 /*
  * If no highmem, we can assume [0...max_low_pfn) continuous range of memory
  * because memory hole is not as big as !HIGHMEM case.
@@ -146,11 +146,7 @@ static int kcore_update_ram(void)
 	if (!ent)
 		return -ENOMEM;
 	ent->addr = (unsigned long)__va(0);
-#ifdef CONFIG_HIGHMEM
 	ent->size = max_low_pfn << PAGE_SHIFT;
-#else
-	ent->size = max_pfn << PAGE_SHIFT;
-#endif
 	ent->type = KCORE_RAM;
 	list_add(&ent->list, &head);
 	__kcore_update_ram(&head);
@@ -562,6 +558,7 @@ static int open_kcore(struct inode *inode, struct file *filp)
 static const struct file_operations proc_kcore_operations = {
 	.read		= read_kcore,
 	.open		= open_kcore,
+	.llseek		= generic_file_llseek,
 };
 
 #ifdef CONFIG_MEMORY_HOTPLUG
@@ -591,7 +588,7 @@ static struct kcore_list kcore_text;
  */
 static void __init proc_kcore_text_init(void)
 {
-	kclist_add(&kcore_text, _stext, _end - _stext, KCORE_TEXT);
+	kclist_add(&kcore_text, _text, _end - _text, KCORE_TEXT);
 }
 #else
 static void __init proc_kcore_text_init(void)

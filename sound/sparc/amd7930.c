@@ -1065,9 +1065,11 @@ static const struct of_device_id amd7930_match[] = {
 };
 
 static struct of_platform_driver amd7930_sbus_driver = {
-	.owner		= THIS_MODULE,
-	.name		= "audio",
-	.match_table	= amd7930_match,
+	.driver = {
+		.name = "audio",
+		.owner = THIS_MODULE,
+		.of_match_table = amd7930_match,
+	},
 	.probe		= amd7930_sbus_probe,
 };
 

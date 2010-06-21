@@ -125,9 +125,6 @@ struct cache_detail {
  */
 struct cache_req {
 	struct cache_deferred_req *(*defer)(struct cache_req *req);
-	int thread_wait;  /* How long (jiffies) we can block the
-			   * current thread to wait for updates.
-			   */
 };
 /* this must be embedded in a deferred_request that is being
  * delayed awaiting cache-fill
@@ -220,35 +217,14 @@ static inline int get_int(char **bpp, int *anint)
 	return 0;
 }
 
-/*
- * timestamps kept in the cache are expressed in seconds
- * since boot.  This is the best for measuring differences in
- * real time.
- */
-static inline unsigned long monotonic_seconds(void)
-{
-	struct timespec boot;
-	getboottime(&boot);
-	return get_seconds() - boot.tv_sec;
-}
-
 static inline time_t get_expiry(char **bpp)
 {
 	int rv;
-	struct timespec boot;
-
 	if (get_int(bpp, &rv))
 		return 0;
 	if (rv < 0)
 		return 0;
-	getboottime(&boot);
-	return rv - boot.tv_sec;
+	return rv;
 }
 
-static inline void sunrpc_invalidate(struct cache_head *h,
-				     struct cache_detail *detail)
-{
-	h->expiry_time = monotonic_seconds() - 1;
-	detail->nextcheck = monotonic_seconds();
-}
 #endif /*  _LINUX_SUNRPC_CACHE_H_ */
