@@ -1900,8 +1900,8 @@ static int e1000_request_irq(struct e1000_adapter *adapter)
 
 	if (entropy)
 		irq_flags |= IRQF_SAMPLE_RANDOM;
-	err = request_irq(adapter->pdev->irq, e1000_intr, irq_flags,
-			  netdev->name, netdev);
+	err = request_irq(adapter->pdev->irq, e1000_intr,
+			  irq_flags | IRQF_SHARED, netdev->name, netdev);
 	if (err)
 		e_err("Unable to allocate interrupt, Error: %d\n", err);
 

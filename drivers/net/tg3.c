@@ -1979,6 +1979,58 @@ static int tg3_phy_reset(struct tg3 *tp)
 		tg3_phy_toggle_apd(tp, false);
 
 out:
+	if ((tp->phy_id & TG3_PHY_ID_MASK) == TG3_PHY_ID_BCM50610 ||
+	    (tp->phy_id & TG3_PHY_ID_MASK) == TG3_PHY_ID_BCM50610M) {
+		u32 reg;
+
+		/* Enable SM_DSP clock and tx 6dB coding. */
+		reg = MII_TG3_AUXCTL_SHDWSEL_AUXCTL |
+		      MII_TG3_AUXCTL_ACTL_SMDSP_ENA |
+		      MII_TG3_AUXCTL_ACTL_TX_6DB;
+		tg3_writephy(tp, MII_TG3_AUX_CTRL, reg);
+
+		reg = MII_TG3_DSP_EXP8_REJ2MHz;
+		tg3_phydsp_write(tp, MII_TG3_DSP_EXP8, reg);
+
+		/* Apply workaround to A0 revision parts only. */
+		if (tp->phy_id == TG3_PHY_ID_BCM50610 ||
+		    tp->phy_id == TG3_PHY_ID_BCM50610M) {
+			tg3_phydsp_write(tp, 0x001F, 0x0300);
+			tg3_phydsp_write(tp, 0x601F, 0x0002);
+			tg3_phydsp_write(tp, 0x0F75, 0x003C);
+			tg3_phydsp_write(tp, 0x0F96, 0x0010);
+			tg3_phydsp_write(tp, 0x0F97, 0x0C0C);
+		}
+
+		/* Turn off SM_DSP clock. */
+		reg = MII_TG3_AUXCTL_SHDWSEL_AUXCTL |
+		      MII_TG3_AUXCTL_ACTL_TX_6DB;
+		tg3_writephy(tp, MII_TG3_AUX_CTRL, reg);
+
+		/* Clear all mode configuration bits. */
+		reg = MII_TG3_MISC_SHDW_WREN |
+		      MII_TG3_MISC_SHDW_RGMII_SEL;
+		tg3_writephy(tp, MII_TG3_MISC_SHDW, reg);
+	}
+	if ((tp->phy_id & TG3_PHY_ID_MASK) == TG3_PHY_ID_BCM57780) {
+		u32 reg;
+
+		/* Enable SM_DSP clock and tx 6dB coding. */
+		reg = MII_TG3_AUXCTL_SHDWSEL_AUXCTL |
+		      MII_TG3_AUXCTL_ACTL_SMDSP_ENA |
+		      MII_TG3_AUXCTL_ACTL_TX_6DB;
+		tg3_writephy(tp, MII_TG3_AUX_CTRL, reg);
+
+		tg3_writephy(tp, MII_TG3_DSP_ADDRESS, MII_TG3_DSP_EXP75);
+		tg3_readphy(tp, MII_TG3_DSP_RW_PORT, &reg);
+		reg |= MII_TG3_DSP_EXP75_SUP_CM_OSC;
+		tg3_phydsp_write(tp, MII_TG3_DSP_EXP75, reg);
+
+		/* Turn off SM_DSP clock. */
+		reg = MII_TG3_AUXCTL_SHDWSEL_AUXCTL |
+		      MII_TG3_AUXCTL_ACTL_TX_6DB;
+		tg3_writephy(tp, MII_TG3_AUX_CTRL, reg);
+	}
 	if (tp->tg3_flags2 & TG3_FLG2_PHY_ADC_BUG) {
 		tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x0c00);
 		tg3_writephy(tp, MII_TG3_DSP_ADDRESS, 0x201f);
@@ -2039,6 +2091,22 @@ out:
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5906) {
 		/* adjust output voltage */
 		tg3_writephy(tp, MII_TG3_FET_PTEST, 0x12);
+	}
+	else if (tp->tg3_flags3 & TG3_FLG3_PHY_IS_FET) {
+		u32 brcmtest;
+		if (!tg3_readphy(tp, MII_TG3_FET_TEST, &brcmtest) &&
+		    !tg3_writephy(tp, MII_TG3_FET_TEST,
+				  brcmtest | MII_TG3_FET_SHADOW_EN)) {
+			u32 val, reg = MII_TG3_FET_SHDW_AUXMODE4;
+
+			if (!tg3_readphy(tp, reg, &val)) {
+				val &= ~MII_TG3_FET_SHDW_AM4_LED_MASK;
+				val |= MII_TG3_FET_SHDW_AM4_LED_MODE1;
+				tg3_writephy(tp, reg, val);
+			}
+
+			tg3_writephy(tp, MII_TG3_FET_TEST, brcmtest);
+		}
 	}
 
 	tg3_phy_toggle_automdix(tp, 1);
@@ -3281,6 +3349,15 @@ relink:
 
 	tw32_f(MAC_MODE, tp->mac_mode);
 	udelay(40);
+
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5785) {
+		if (tp->link_config.active_speed == SPEED_10)
+			tw32(MAC_MI_STAT,
+			     MAC_MI_STAT_10MBPS_MODE |
+			     MAC_MI_STAT_LNKSTAT_ATTN_ENAB);
+		else
+			tw32(MAC_MI_STAT, MAC_MI_STAT_LNKSTAT_ATTN_ENAB);
+	}
 
 	if (tp->tg3_flags & TG3_FLAG_USE_LINKCHG_REG) {
 		/* Polled via timer. */
@@ -13372,9 +13449,11 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	    GET_CHIP_REV(tp->pci_chip_rev_id) != CHIPREV_5700_BX)
 		tp->coalesce_mode |= HOSTCC_MODE_32BYTE;
 
+#if 0
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5785 ||
 	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_57780)
 		tp->tg3_flags3 |= TG3_FLG3_USE_PHYLIB;
+#endif
 
 	err = tg3_mdio_init(tp);
 	if (err)
@@ -14165,6 +14244,10 @@ static char * __devinit tg3_phy_string(struct tg3 *tp)
 	case TG3_PHY_ID_BCM5718C:	return "5718C";
 	case TG3_PHY_ID_BCM5718S:	return "5718S";
 	case TG3_PHY_ID_BCM57765:	return "57765";
+	case TG3_PHY_ID_BCM50610:	return "50610";
+	case TG3_PHY_ID_BCM50610M:	return "50610M";
+	case TG3_PHY_ID_BCMAC131:	return "AC131";
+	case TG3_PHY_ID_BCM57780:	return "57780";
 	case TG3_PHY_ID_BCM8002:	return "8002/serdes";
 	case 0:			return "serdes";
 	default:		return "unknown";
