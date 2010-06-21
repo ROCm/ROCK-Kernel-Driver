@@ -416,8 +416,10 @@ unlock:
 }
 EXPORT_SYMBOL(call_usermodehelper_exec);
 
-void __init usermodehelper_init(void)
+static int __init usermodehelper_init(void)
 {
 	khelper_wq = create_singlethread_workqueue("khelper");
 	BUG_ON(!khelper_wq);
+	return 0;
 }
+rootfs_initcall(usermodehelper_init);

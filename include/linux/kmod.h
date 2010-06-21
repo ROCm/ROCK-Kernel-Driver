@@ -109,8 +109,6 @@ call_usermodehelper(char *path, char **argv, char **envp, enum umh_wait wait)
 				       NULL, NULL, NULL);
 }
 
-extern void usermodehelper_init(void);
-
 extern int usermodehelper_disable(void);
 extern void usermodehelper_enable(void);
 
