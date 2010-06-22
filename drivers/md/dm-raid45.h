@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006-2008 Red Hat, Inc. All rights reserved.
+ * Copyright (C) 2006-2009 Red Hat, Inc. All rights reserved.
  *
  * Module Author: Heinz Mauelshagen (Mauelshagen@RedHat.com)
  *
@@ -14,6 +14,8 @@
 
 /* Factor out to dm.h! */
 #define	STR_LEN(ptr, str)	(ptr), (str), strlen((ptr))
+/* Reference to array end. */
+#define ARRAY_END(a)    ((a) + ARRAY_SIZE(a))
 
 enum dm_lock_type { DM_RAID45_EX, DM_RAID45_SHARED };
 

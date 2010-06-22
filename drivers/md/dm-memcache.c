@@ -210,7 +210,7 @@ int dm_mem_cache_grow(struct dm_mem_cache_client *cl, unsigned objects)
 	cl->free_list = pl;
 	cl->free_pages += pages;
 	cl->total_pages += pages;
-	cl->objects++;
+	cl->objects += objects;
 	spin_unlock_irq(&cl->lock);
 
 	mempool_resize(cl->objs_pool, cl->objects, GFP_NOIO);
@@ -242,7 +242,7 @@ int dm_mem_cache_shrink(struct dm_mem_cache_client *cl, unsigned objects)
 		cl->free_list = pos;
 		cl->free_pages -= pages;
 		cl->total_pages -= pages;
-		cl->objects--;
+		cl->objects -= objects;
 		last->next = NULL;
 	}
 	spin_unlock_irqrestore(&cl->lock, flags);
@@ -298,5 +298,5 @@ void dm_mem_cache_free(struct dm_mem_cache_client *cl,
 EXPORT_SYMBOL(dm_mem_cache_free);
 
 MODULE_DESCRIPTION(DM_NAME " dm memory cache");
-MODULE_AUTHOR("Heinz Mauelshagen <hjm@redhat.com>");
+MODULE_AUTHOR("Heinz Mauelshagen <heinzm@redhat.com>");
 MODULE_LICENSE("GPL");
