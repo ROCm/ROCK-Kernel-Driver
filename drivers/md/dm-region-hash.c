@@ -54,6 +54,101 @@
  *   'delayed_bios' fields of the regions.  This is used from irq
  *   context, so all other uses will have to suspend local irqs.
  *---------------------------------------------------------------*/
+struct dm_region_hash {
+	uint32_t region_size;
+	unsigned region_shift;
+
+	/* holds persistent region state */
+	struct dm_dirty_log *log;
+
+	/* hash table */
+	rwlock_t hash_lock;
+	mempool_t *region_pool;
+	unsigned mask;
+	unsigned nr_buckets;
+	unsigned prime;
+	unsigned shift;
+	struct list_head *buckets;
+
+	unsigned max_recovery; /* Max # of regions to recover in parallel */
+
+	spinlock_t region_lock;
+	atomic_t recovery_in_flight;
+	struct semaphore recovery_count;
+	struct list_head clean_regions;
+	struct list_head quiesced_regions;
+	struct list_head recovered_regions;
+	struct list_head failed_recovered_regions;
+
+	/*
+	 * If there was a barrier failure no regions can be marked clean.
+	 */
+	int barrier_failure;
+
+	void *context;
+	sector_t target_begin;
+
+	/* Callback function to schedule bios writes */
+	void (*dispatch_bios)(void *context, struct bio_list *bios);
+
+	/* Callback function to wakeup callers worker thread. */
+	void (*wakeup_workers)(void *context);
+
+	/* Callback function to wakeup callers recovery waiters. */
+	void (*wakeup_all_recovery_waiters)(void *context);
+};
+
+struct dm_region {
+	struct dm_region_hash *rh;	/* FIXME: can we get rid of this ? */
+	region_t key;
+	int state;
+
+	struct list_head hash_list;
+	struct list_head list;
+
+	atomic_t pending;
+	struct bio_list delayed_bios;
+};
+
+/*
+ * Conversion fns
+ */
+region_t dm_rh_sector_to_region(struct dm_region_hash *rh, sector_t sector)
+{
+	return sector >> rh->region_shift;
+}
+EXPORT_SYMBOL_GPL(dm_rh_sector_to_region);
+
+sector_t dm_rh_region_to_sector(struct dm_region_hash *rh, region_t region)
+{
+	return region << rh->region_shift;
+}
+EXPORT_SYMBOL_GPL(dm_rh_region_to_sector);
+
+region_t dm_rh_bio_to_region(struct dm_region_hash *rh, struct bio *bio)
+{
+	return dm_rh_sector_to_region(rh, bio->bi_sector - rh->target_begin);
+}
+EXPORT_SYMBOL_GPL(dm_rh_bio_to_region);
+
+void *dm_rh_region_context(struct dm_region *reg)
+{
+	return reg->rh->context;
+}
+EXPORT_SYMBOL_GPL(dm_rh_region_context);
+
+region_t dm_rh_get_region_key(struct dm_region *reg)
+{
+	return reg->key;
+}
+EXPORT_SYMBOL_GPL(dm_rh_get_region_key);
+
+sector_t dm_rh_get_region_size(struct dm_region_hash *rh)
+{
+	return rh->region_size;
+}
+EXPORT_SYMBOL_GPL(dm_rh_get_region_size);
+
 /*
  * FIXME: shall we pass in a structure instead of all these args to
  * dm_region_hash_create()????
@@ -522,9 +617,8 @@ static int __rh_recovery_prepare(struct dm_region_hash *rh)
 	return 1;
 }
 
-int dm_rh_recovery_prepare(struct dm_region_hash *rh)
+void dm_rh_recovery_prepare(struct dm_region_hash *rh)
 {
-	int r = 0;
 	/* Extra reference to avoid race with dm_rh_stop_recovery */
 	atomic_inc(&rh->recovery_in_flight);
 
@@ -533,17 +627,13 @@ int dm_rh_recovery_prepare(struct dm_region_hash *rh)
 		if (__rh_recovery_prepare(rh) <= 0) {
 			atomic_dec(&rh->recovery_in_flight);
 			up(&rh->recovery_count);
-			r = -ENOENT;
 			break;
 		}
 	}
 
 	/* Drop the extra reference */
-	if (atomic_dec_and_test(&rh->recovery_in_flight)) {
+	if (atomic_dec_and_test(&rh->recovery_in_flight))
 		rh->wakeup_all_recovery_waiters(rh->context);
-		r = -ESRCH;
-	}
-	return r;
 }
 EXPORT_SYMBOL_GPL(dm_rh_recovery_prepare);
 
@@ -605,6 +695,19 @@ void dm_rh_delay(struct dm_region_hash *rh, struct bio *bio)
 	read_unlock(&rh->hash_lock);
 }
 EXPORT_SYMBOL_GPL(dm_rh_delay);
+
+void dm_rh_delay_by_region(struct dm_region_hash *rh,
+			   struct bio *bio, region_t region)
+{
+	struct dm_region *reg;
+
+	/* FIXME: locking. */
+	read_lock(&rh->hash_lock);
+	reg = __rh_find(rh, region);
+	bio_list_add(&reg->delayed_bios, bio);
+	read_unlock(&rh->hash_lock);
+}
+EXPORT_SYMBOL_GPL(dm_rh_delay_by_region);
 
 void dm_rh_stop_recovery(struct dm_region_hash *rh)
 {
