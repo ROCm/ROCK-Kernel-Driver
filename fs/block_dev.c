@@ -417,7 +417,8 @@ int blkdev_fsync(struct file *filp, struct dentry *dentry, int datasync)
 	 */
 	mutex_unlock(&bd_inode->i_mutex);
 
-	error = blkdev_issue_flush(bdev, NULL);
+	error = blkdev_issue_flush(bdev, GFP_KERNEL, NULL,
+				(BLKDEV_IFL_WAIT));
 	if (error == -EOPNOTSUPP)
 		error = 0;
 
