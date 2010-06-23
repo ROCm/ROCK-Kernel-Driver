@@ -423,7 +423,7 @@ ssize_t initramfs_file_write(struct file *file, const char * __user buf,
 			break;
 		data = kmap_atomic(page, KM_USER0);
 		memcpy(data + offset, i.iov->iov_base + i.iov_offset, bytes);
-		kunmap_atomic(page, KM_USER0);
+		kunmap_atomic(data, KM_USER0);
 		copied = bytes;
 
 		status = simple_write_end(file, mapping, pos, bytes, copied,
