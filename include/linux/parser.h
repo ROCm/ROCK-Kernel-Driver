@@ -26,7 +26,6 @@ typedef struct {
 } substring_t;
 
 int match_token(char *, const match_table_t table, substring_t args[]);
-int match_string(substring_t *s, const char *str);
 int match_int(substring_t *, int *result);
 int match_octal(substring_t *, int *result);
 int match_hex(substring_t *, int *result);
