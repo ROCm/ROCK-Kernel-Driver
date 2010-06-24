@@ -47,6 +47,7 @@
 #include "xattr.h"
 #include "acl.h"
 #include "mballoc.h"
+#include "richacl.h"
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/ext4.h>
@@ -738,7 +739,9 @@ static struct inode *ext4_alloc_inode(struct super_block *sb)
 	ei = kmem_cache_alloc(ext4_inode_cachep, GFP_NOFS);
 	if (!ei)
 		return NULL;
-
+#ifdef CONFIG_EXT4_FS_RICHACL
+	ei->i_richacl = EXT4_RICHACL_NOT_CACHED;
+#endif
 	ei->vfs_inode.i_version = 1;
 	ei->vfs_inode.i_data.writeback_index = 0;
 	memset(&ei->i_cached_extent, 0, sizeof(struct ext4_ext_cache));
@@ -814,6 +817,13 @@ static void destroy_inodecache(void)
 static void ext4_clear_inode(struct inode *inode)
 {
 	dquot_drop(inode);
+#ifdef CONFIG_EXT4_FS_RICHACL
+	if (EXT4_I(inode)->i_richacl &&
+		EXT4_I(inode)->i_richacl != EXT4_RICHACL_NOT_CACHED) {
+		richacl_put(EXT4_I(inode)->i_richacl);
+		EXT4_I(inode)->i_richacl = EXT4_RICHACL_NOT_CACHED;
+	}
+#endif
 	ext4_discard_preallocations(inode);
 	if (EXT4_JOURNAL(inode))
 		jbd2_journal_release_jbd_inode(EXT4_SB(inode->i_sb)->s_journal,
@@ -914,10 +924,13 @@ static int ext4_show_options(struct seq_file *seq, struct vfsmount *vfs)
 		seq_puts(seq, ",nouser_xattr");
 	}
 #endif
-#ifdef CONFIG_EXT4_FS_POSIX_ACL
-	if ((sb->s_flags & MS_POSIXACL) && !(def_mount_opts & EXT4_DEFM_ACL))
-		seq_puts(seq, ",acl");
-	if (!(sb->s_flags & MS_POSIXACL) && (def_mount_opts & EXT4_DEFM_ACL))
+#if defined(CONFIG_EXT4_FS_POSIX_ACL) || defined(CONFIG_EXT4_FS_RICHACL)
+	if (sb->s_flags & MS_POSIXACL) {
+		if (!(def_mount_opts & EXT4_DEFM_ACL))
+			seq_puts(seq, ",acl");
+	} else if (sb->s_flags & MS_RICHACL)
+		seq_puts(seq, ",richacl");
+	else if (def_mount_opts & EXT4_DEFM_ACL)
 		seq_puts(seq, ",noacl");
 #endif
 	if (sbi->s_commit_interval != JBD2_DEFAULT_MAX_COMMIT_AGE*HZ) {
@@ -1141,7 +1154,7 @@ enum {
 	Opt_bsd_df, Opt_minix_df, Opt_grpid, Opt_nogrpid,
 	Opt_resgid, Opt_resuid, Opt_sb, Opt_err_cont, Opt_err_panic, Opt_err_ro,
 	Opt_nouid32, Opt_debug, Opt_oldalloc, Opt_orlov,
-	Opt_user_xattr, Opt_nouser_xattr, Opt_acl, Opt_noacl,
+	Opt_user_xattr, Opt_nouser_xattr, Opt_acl, Opt_richacl, Opt_noacl,
 	Opt_auto_da_alloc, Opt_noauto_da_alloc, Opt_noload, Opt_nobh, Opt_bh,
 	Opt_commit, Opt_min_batch_time, Opt_max_batch_time,
 	Opt_journal_update, Opt_journal_dev,
@@ -1179,6 +1192,7 @@ static const match_table_t tokens = {
 	{Opt_user_xattr, "user_xattr"},
 	{Opt_nouser_xattr, "nouser_xattr"},
 	{Opt_acl, "acl"},
+	{Opt_richacl, "richacl"},
 	{Opt_noacl, "noacl"},
 	{Opt_noload, "noload"},
 	{Opt_noload, "norecovery"},
@@ -1417,17 +1431,26 @@ static int parse_options(char *options, struct super_block *sb,
 			ext4_msg(sb, KERN_ERR, "(no)user_xattr options not supported");
 			break;
 #endif
-#ifdef CONFIG_EXT4_FS_POSIX_ACL
+#if defined(CONFIG_EXT4_FS_POSIX_ACL) || defined(CONFIG_EXT4_FS_RICHACL)
+# ifdef CONFIG_EXT4_FS_POSIX_ACL
 		case Opt_acl:
-			sb->s_flags |= MS_POSIXACL;
+			if (!(sb->s_flags & MS_RICHACL))
+				sb->s_flags |= MS_POSIXACL;
 			break;
-		case Opt_noacl:
+# endif
+# ifdef CONFIG_EXT4_FS_RICHACL
+		case Opt_richacl:
 			sb->s_flags &= ~MS_POSIXACL;
+			sb->s_flags |= MS_RICHACL;
+			break;
+# endif
+		case Opt_noacl:
+			sb->s_flags &= ~(MS_POSIXACL | MS_RICHACL);
 			break;
 #else
 		case Opt_acl:
 		case Opt_noacl:
-			ext4_msg(sb, KERN_ERR, "(no)acl options not supported");
+			ext4_msg(sb, KERN_ERR, "(no)acl/richacl options not supported");
 			break;
 #endif
 		case Opt_journal_update:
@@ -2526,7 +2549,7 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 	if (def_mount_opts & EXT4_DEFM_XATTR_USER)
 		set_opt(sbi->s_mount_opt, XATTR_USER);
 #endif
-#ifdef CONFIG_EXT4_FS_POSIX_ACL
+#if defined(CONFIG_EXT4_FS_POSIX_ACL)
 	if (def_mount_opts & EXT4_DEFM_ACL)
 		sb->s_flags |= MS_POSIXACL;
 #endif
