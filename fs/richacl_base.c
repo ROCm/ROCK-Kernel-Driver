@@ -352,7 +352,8 @@ richacl_chmod(struct richacl *acl, mode_t mode)
 
 	if (acl->a_owner_mask == owner_mask &&
 	    acl->a_group_mask == group_mask &&
-	    acl->a_other_mask == other_mask)
+	    acl->a_other_mask == other_mask &&
+	    (!richacl_is_auto_inherit(acl) || richacl_is_protected(acl)))
 		return acl;
 
 	clone = richacl_clone(acl);
@@ -363,6 +364,8 @@ richacl_chmod(struct richacl *acl, mode_t mode)
 	clone->a_owner_mask = owner_mask;
 	clone->a_group_mask = group_mask;
 	clone->a_other_mask = other_mask;
+	if (richacl_is_auto_inherit(clone))
+		clone->a_flags |= ACL4_PROTECTED;
 
 	return clone;
 }
@@ -538,6 +541,16 @@ richacl_inherit(const struct richacl *dir_acl, struct inode *inode)
 	acl->a_group_mask &= richacl_mode_to_mask(inode->i_mode >> 3);
 	acl->a_other_mask &= richacl_mode_to_mask(inode->i_mode);
 	mask = ~S_IRWXUGO | richacl_masks_to_mode(acl);
+
+	if (richacl_is_auto_inherit(dir_acl)) {
+		/*
+		 * We need to set ACL4_PROTECTED because we are
+		 * doing an implicit chmod
+		 */
+		acl->a_flags = ACL4_AUTO_INHERIT | ACL4_PROTECTED;
+		richacl_for_each_entry(ace, acl)
+			ace->e_flags |= ACE4_INHERITED_ACE;
+	}
 
 mask:
 	inode->i_mode &= mask;
