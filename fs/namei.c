@@ -252,7 +252,6 @@ int generic_permission(struct inode *inode, int mask,
 int inode_permission(struct inode *inode, int mask)
 {
 	int retval;
-	int submask = mask;
 
 	if (mask & MAY_WRITE) {
 		umode_t mode = inode->i_mode;
@@ -271,11 +270,8 @@ int inode_permission(struct inode *inode, int mask)
 			return -EACCES;
 	}
 
-	if (!IS_WITHAPPEND(inode))
-		submask &= ~MAY_APPEND;
-
 	if (inode->i_op->permission)
-		retval = inode->i_op->permission(inode, submask);
+		retval = inode->i_op->permission(inode, mask);
 	else
 		retval = generic_permission(inode, mask, inode->i_op->check_acl);
 
