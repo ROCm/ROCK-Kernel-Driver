@@ -273,4 +273,25 @@ extern struct richacl *richacl_chmod(struct richacl *, mode_t);
 extern int richacl_permission(struct inode *, const struct richacl *,
 			      unsigned int);
 
+/* richacl_inode.c */
+
+#ifdef CONFIG_FS_RICHACL
+extern int richacl_may_create(struct inode *, int,
+			      int (*)(struct inode *, unsigned int));
+extern int richacl_may_delete(struct inode *, struct inode *, int,
+			      int (*)(struct inode *, unsigned int));
+extern int richacl_inode_permission(struct inode *, const struct richacl *,
+				    unsigned int);
+extern int richacl_inode_change_ok(struct inode *, struct iattr *,
+				   int (*)(struct inode *, unsigned int));
+#else
+static inline int
+richacl_inode_change_ok(struct inode *inode, struct iattr *attr,
+			int (*richacl_permission)(struct inode *inode,
+						  unsigned int mask))
+{
+	return -EPERM;
+}
+#endif
+
 #endif /* __RICHACL_H */
