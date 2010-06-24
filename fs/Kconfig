@@ -39,6 +39,10 @@ config FS_POSIX_ACL
 	bool
 	default n
 
+config FS_RICHACL
+	bool
+	default n
+
 source "fs/xfs/Kconfig"
 source "fs/gfs2/Kconfig"
 source "fs/ocfs2/Kconfig"
