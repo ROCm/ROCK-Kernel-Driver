@@ -1543,8 +1543,6 @@ struct inode_operations {
 	void (*truncate) (struct inode *);
 	int (*permission) (struct inode *, int);
 	int (*check_acl)(struct inode *, int);
-	int (*may_create) (struct inode *, int);
-	int (*may_delete) (struct inode *, struct inode *);
 	int (*setattr) (struct dentry *, struct iattr *);
 	int (*getattr) (struct vfsmount *mnt, struct dentry *, struct kstat *);
 	int (*setxattr) (struct dentry *, const char *,const void *,size_t,int);
@@ -1556,6 +1554,10 @@ struct inode_operations {
 			  loff_t len);
 	int (*fiemap)(struct inode *, struct fiemap_extent_info *, u64 start,
 		      u64 len);
+	int (*may_create) (struct inode *, int);
+	int (*may_delete) (struct inode *, struct inode *, int);
+
+
 };
 
 struct seq_file;
