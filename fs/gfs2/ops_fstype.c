@@ -1134,19 +1134,6 @@ static int fill_super(struct super_block *sb, struct gfs2_args *args, int silent
 	}
 	sdp->sd_args = *args;
 
-	if (!sdp->sd_args.ar_spectator  || !(sb->s_flags & MS_RDONLY) ||
-	    sdp->sd_args.ar_ignore_local_fs) {
-		printk(KERN_WARNING "Only read-only GFS2 mounts are "
-		       "supported.\nPlease mount with the \"spectator\" and "
-		       "\"ro\" mount options\n");
-		goto fail;
-	}
-
-	printk(KERN_WARNING
-	       "WARNING: GFS2 mounts are ONLY supported for single-node "
-	       "migration of data!\nNo performance or write bugs will be "
-	       "considered.\n");
-
 	if (sdp->sd_args.ar_spectator) {
                 sb->s_flags |= MS_RDONLY;
 		set_bit(SDF_NORECOVERY, &sdp->sd_flags);
