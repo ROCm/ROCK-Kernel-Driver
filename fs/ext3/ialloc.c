@@ -28,7 +28,6 @@
 
 #include "xattr.h"
 #include "acl.h"
-#include "nfs4acl.h"
 
 /*
  * ialloc.c contains the inodes allocation and deallocation routines
@@ -596,10 +595,7 @@ got:
 	if (err)
 		goto fail_drop;
 
-	if (test_opt(sb, NFS4ACL))
-		err = ext3_nfs4acl_init(handle, inode, dir);
-	else
-		err = ext3_init_acl(handle, inode, dir);
+	err = ext3_init_acl(handle, inode, dir);
 	if (err)
 		goto fail_free_drop;
 

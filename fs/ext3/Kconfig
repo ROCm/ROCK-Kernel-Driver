@@ -97,13 +97,6 @@ config EXT3_FS_POSIX_ACL
 
 	  If you don't know what Access Control Lists are, say N
 
-config EXT3_FS_NFS4ACL
-	bool "Native NFSv4 ACLs (EXPERIMENTAL)"
-	depends on EXT3_FS_XATTR && EXPERIMENTAL
-	select FS_NFS4ACL
-	help
-	  Allow to use NFSv4 ACLs instead of POSIX ACLs.
-
 config EXT3_FS_SECURITY
 	bool "Ext3 Security Labels"
 	depends on EXT3_FS_XATTR
