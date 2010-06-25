@@ -81,8 +81,7 @@ void *__kmalloc_reserve(size_t size, gfp_t flags, int node, unsigned long ip,
  * Returns NULL on failure
  */
 #define kmalloc_reserve(size, gfp, node, res, emerg) 			\
-	__kmalloc_reserve(size, gfp, node, 				\
-			  __builtin_return_address(0), res, emerg)
+	__kmalloc_reserve(size, gfp, node, _RET_IP_, res, emerg)
 
 void __kfree_reserve(void *obj, struct mem_reserve *res, int emerg);
 

@@ -620,27 +620,22 @@ config PARAVIRT_SPINLOCKS
 config PARAVIRT_CPU
 	bool
 	select PARAVIRT
-	default n
 
 config PARAVIRT_TIME
 	bool
 	select PARAVIRT
-	default n
 
 config PARAVIRT_IRQ
 	bool
 	select PARAVIRT
-	default n
 
 config PARAVIRT_APIC
 	bool
 	select PARAVIRT
-	default n
 
 config PARAVIRT_MMU
 	bool
 	select PARAVIRT
-	default n
 
 #
 # This is a placeholder to activate the old "include all pv-ops functionality"
@@ -654,7 +649,6 @@ config PARAVIRT_ALL
 	select PARAVIRT_IRQ
 	select PARAVIRT_APIC
 	select PARAVIRT_MMU
-	default n
 
 config PARAVIRT_CLOCK
 	bool
@@ -1596,7 +1590,6 @@ config SECCOMP
 config SECCOMP_DISABLE_TSC
 	bool "Disable the TSC for seccomp tasks"
 	depends on SECCOMP
-	default n
 	help
 	  This feature mathematically prevents covert channels
 	  for tasks running under SECCOMP. This can generate
