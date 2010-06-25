@@ -49,9 +49,15 @@
 #include <linux/cpu.h>
 
 #include <xen/xen.h>
+#ifdef CONFIG_PARAVIRT_XEN
 #include <xen/events.h>
 #include <xen/evtchn.h>
 #include <asm/xen/hypervisor.h>
+#else
+#include <xen/evtchn.h>
+#include <xen/public/evtchn.h>
+#define bind_evtchn_to_irqhandler bind_caller_port_to_irqhandler
+#endif
 
 struct per_user_data {
 	struct mutex bind_mutex; /* serialize bind/unbind operations */
@@ -73,7 +79,7 @@ struct per_user_data {
 static struct per_user_data *port_user[NR_EVENT_CHANNELS];
 static DEFINE_SPINLOCK(port_user_lock); /* protects port_user[] and ring_prod */
 
-irqreturn_t evtchn_interrupt(int irq, void *data)
+static irqreturn_t evtchn_interrupt(int irq, void *data)
 {
 	unsigned int port = (unsigned long)data;
 	struct per_user_data *u;
@@ -411,7 +417,8 @@ static int evtchn_open(struct inode *inode, struct file *filp)
 	if (u == NULL)
 		return -ENOMEM;
 
-	u->name = kasprintf(GFP_KERNEL, "evtchn:%s", current->comm);
+	u->name = kasprintf(GFP_KERNEL, "evtchn:%s[%d]",
+			    current->comm, current->pid);
 	if (u->name == NULL) {
 		kfree(u);
 		return -ENOMEM;
@@ -505,3 +512,5 @@ module_init(evtchn_init);
 module_exit(evtchn_cleanup);
 
 MODULE_LICENSE("GPL");
+MODULE_ALIAS("devname:xen/evtchn");
+MODULE_ALIAS("devname:evtchn");

@@ -16,7 +16,7 @@
 				& ~(CONFIG_PHYSICAL_ALIGN - 1))
 
 /* Minimum kernel alignment, as a power of two */
-#ifdef CONFIG_X86_64
+#if defined(CONFIG_X86_64) && !defined(CONFIG_XEN)
 #define MIN_KERNEL_ALIGN_LG2	PMD_SHIFT
 #else
 #define MIN_KERNEL_ALIGN_LG2	(PAGE_SHIFT + THREAD_ORDER)

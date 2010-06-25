@@ -64,7 +64,7 @@ config PCI_STUB
 config HT_IRQ
 	bool "Interrupts on hypertransport devices"
 	default y
-	depends on PCI && X86_LOCAL_APIC && X86_IO_APIC
+	depends on PCI && X86_LOCAL_APIC && X86_IO_APIC && !XEN
 	help
 	   This allows native hypertransport devices to use interrupts.
 
@@ -82,7 +82,7 @@ config PCI_IOV
 
 config PCI_IOAPIC
 	bool
-	depends on PCI
+	depends on PCI && !XEN
 	depends on ACPI
 	depends on HOTPLUG
 	default y

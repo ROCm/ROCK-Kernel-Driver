@@ -115,8 +115,10 @@ int main(void)
 	ENTRY(cr8);
 	BLANK();
 #undef ENTRY
+#ifndef CONFIG_X86_NO_TSS
 	DEFINE(TSS_ist, offsetof(struct tss_struct, x86_tss.ist));
 	BLANK();
+#endif
 	DEFINE(crypto_tfm_ctx_offset, offsetof(struct crypto_tfm, __crt_ctx));
 	BLANK();
 	DEFINE(__NR_syscall_max, sizeof(syscalls) - 1);
@@ -130,7 +132,7 @@ int main(void)
 
 	BLANK();
 	DEFINE(PAGE_SIZE_asm, PAGE_SIZE);
-#ifdef CONFIG_XEN
+#ifdef CONFIG_PARAVIRT_XEN
 	BLANK();
 	OFFSET(XEN_vcpu_info_mask, vcpu_info, evtchn_upcall_mask);
 	OFFSET(XEN_vcpu_info_pending, vcpu_info, evtchn_upcall_pending);

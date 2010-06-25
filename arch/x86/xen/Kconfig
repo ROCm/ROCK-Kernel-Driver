@@ -2,7 +2,7 @@
 # This Kconfig describes xen options
 #
 
-config XEN
+config PARAVIRT_XEN
 	bool "Xen guest support"
 	select PARAVIRT_ALL
 	select PARAVIRT_CLOCK
@@ -17,7 +17,7 @@ config XEN_MAX_DOMAIN_MEMORY
        int "Maximum allowed size of a domain in gigabytes"
        default 8 if X86_32
        default 32 if X86_64
-       depends on XEN
+       depends on PARAVIRT_XEN
        help
          The pseudo-physical to machine address array is sized
          according to the maximum possible memory size of a Xen
@@ -26,12 +26,12 @@ config XEN_MAX_DOMAIN_MEMORY
 
 config XEN_SAVE_RESTORE
        bool
-       depends on XEN && PM
+       depends on PARAVIRT_XEN && PM
        default y
 
 config XEN_DEBUG_FS
 	bool "Enable Xen debug and tuning parameters in debugfs"
-	depends on XEN && DEBUG_FS
+	depends on PARAVIRT_XEN && DEBUG_FS
 	default n
 	help
 	  Enable statistics output and various tuning options in debugfs.

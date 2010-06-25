@@ -446,7 +446,8 @@ static ssize_t bbn_show(struct device *dev,
 		struct acpi_pci_root *root;
 		root = list_entry(entry, struct acpi_pci_root, node);
 		if (&root->device->dev == dev)
-			return sprintf(buf, "%02x\n", root->bus_nr);
+			return sprintf(buf, "%02x\n",
+				       (unsigned int)root->secondary.start);
 	}
 	return 0;
 }
@@ -651,7 +652,7 @@ int acpi_pci_get_root_seg_bbn(char *hid, char *uid, int *seg, int *bbn)
 		}
 
 		*seg = (int)root->segment;
-		*bbn = (int)root->bus_nr;
+		*bbn = (int)root->secondary.start;
 		return TRUE;
 	}
 	return FALSE;

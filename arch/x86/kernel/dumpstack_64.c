@@ -22,6 +22,7 @@
 #define N_EXCEPTION_STACKS_END \
 		(N_EXCEPTION_STACKS + DEBUG_STKSZ/EXCEPTION_STKSZ - 2)
 
+#ifndef CONFIG_X86_NO_TSS
 static char x86_stack_ids[][8] = {
 		[ DEBUG_STACK-1			]	= "#DB",
 		[ NMI_STACK-1			]	= "NMI",
@@ -33,10 +34,12 @@ static char x86_stack_ids[][8] = {
 		  N_EXCEPTION_STACKS_END	]	= "#DB[?]"
 #endif
 };
+#endif
 
 static unsigned long *in_exception_stack(unsigned cpu, unsigned long stack,
 					 unsigned *usedp, char **idp)
 {
+#ifndef CONFIG_X86_NO_TSS
 	unsigned k;
 
 	/*
@@ -96,6 +99,7 @@ static unsigned long *in_exception_stack(unsigned cpu, unsigned long stack,
 		}
 #endif
 	}
+#endif /* CONFIG_X86_NO_TSS */
 	return NULL;
 }
 

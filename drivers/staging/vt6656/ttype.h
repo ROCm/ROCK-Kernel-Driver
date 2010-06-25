@@ -29,6 +29,10 @@
 #ifndef __TTYPE_H__
 #define __TTYPE_H__
 
+#ifdef CONFIG_XEN
+#include <asm/hypervisor.h>
+#endif
+
 /******* Common definitions and typedefs ***********************************/
 
 //2007-0115-05<Add>by MikeLiu
