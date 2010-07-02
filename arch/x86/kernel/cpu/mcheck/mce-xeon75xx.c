@@ -16,9 +16,6 @@
  * then interpret aux0/aux1
  */
 
-/* #define DEBUG 1 */	/* disable for production */
-#define pr_fmt(x) "MCE: " x
-
 #include <linux/moduleparam.h>
 #include <linux/pci_ids.h>
 #include <linux/hrtimer.h>
@@ -172,7 +169,7 @@ static u64 encode_dimm(struct pfa_dimm *d, u8 valid)
 	if (p.d.ddr_dimm_column_id != d->ddr_dimm_column_id)
 		valid &= ~DIMM_VALID_DIMM_COLUMN;
 	p.d.valid = valid;
-	pr_debug("PFA fbd_ch %u ddr_ch %u dimm %u rank %u bank %u valid %x\n",
+	pr_debug("MCE: PFA fbd_ch %u ddr_ch %u dimm %u rank %u bank %u valid %x\n",
 		 d->fbd_channel_id,
 		 d->ddr_channel_id,
 		 d->ddr_dimm_id,
@@ -207,7 +204,7 @@ pfa_command(unsigned bank, unsigned socketid, unsigned command, unsigned valid)
 	mb();	/* Reread fields after they got changed */
 
 	if (pfa_table->status != PFA_STATUS_SUCCESS) {
-		pr_debug("Memory PFA command %d failed: socket:%d bank:%d status:%x\n",
+		pr_debug("MCE: Memory PFA command %d failed: socket:%d bank:%d status:%x\n",
 			command, socketid, bank, pfa_table->status);
 		return -pfa_table->status;
 	}
@@ -243,7 +240,7 @@ static int translate_memory_error(struct mce *m)
 	 */
 	rdmsrl(MSR_IA32_MCx_STATUS(m->bank), status);
 	if (status & MCI_STATUS_OVER) {
-		pr_debug("%d: overflow race on bank %d\n", cpu, m->bank);
+		pr_debug("MCE: %d: overflow race on bank %d\n", cpu, m->bank);
 		return -1;
 	}
 
@@ -252,7 +249,7 @@ static int translate_memory_error(struct mce *m)
 	if (valid & PFA_VALID_PA) {
 		m->status |= MCI_STATUS_ADDRV;
 		m->addr = pfa_table->physical_addr;
-		pr_debug("%d: got physical address %llx valid %x\n",
+		pr_debug("MCE: %d: got physical address %llx valid %x\n",
 			cpu, m->addr, valid);
 		ret = 0;
 	}
@@ -307,7 +304,7 @@ static void xeon75xx_mce_poll(struct mce *m)
 		if (translate_memory_error(m) < 0) {
 			/* On error stop converting for the next second */
 			cperm = memerr_max_conv_rate;
-			pr_debug("PFA translation failed\n");
+			pr_debug("MCE: PFA translation failed\n");
 		}
 	} else
 		pfa_lost++;
