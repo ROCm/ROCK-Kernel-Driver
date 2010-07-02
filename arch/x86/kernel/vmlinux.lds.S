@@ -332,7 +332,9 @@ SECTIONS
 
 	/* Sections to be discarded */
 	DISCARDS
+#ifndef CONFIG_UNWIND_INFO
 	/DISCARD/ : { *(.eh_frame) }
+#endif
 }
 
 
