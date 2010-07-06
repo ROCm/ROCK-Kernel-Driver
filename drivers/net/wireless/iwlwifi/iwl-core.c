@@ -2240,13 +2240,6 @@ int iwl_mac_config(struct ieee80211_hw *hw, u32 changed)
 			IWL_DEBUG_MAC80211(priv, "Error setting sleep level\n");
 	}
 
-	if (changed & IEEE80211_CONF_CHANGE_POWER) {
-		IWL_DEBUG_MAC80211(priv, "TX Power old=%d new=%d\n",
-			priv->tx_power_user_lmt, conf->power_level);
-
-		iwl_set_tx_power(priv, conf->power_level, false);
-	}
-
 	if (changed & IEEE80211_CONF_CHANGE_QOS) {
 		bool qos_active = !!(conf->flags & IEEE80211_CONF_QOS);
 
@@ -2269,6 +2262,14 @@ int iwl_mac_config(struct ieee80211_hw *hw, u32 changed)
 		iwlcore_commit_rxon(priv);
 	else
 		IWL_DEBUG_INFO(priv, "Not re-sending same RXON configuration.\n");
+
+	if (changed & IEEE80211_CONF_CHANGE_POWER) {
+		IWL_DEBUG_MAC80211(priv, "TX Power old=%d new=%d\n",
+			priv->tx_power_user_lmt, conf->power_level);
+
+		iwl_set_tx_power(priv, conf->power_level, false);
+	}
+
 
 
 out:

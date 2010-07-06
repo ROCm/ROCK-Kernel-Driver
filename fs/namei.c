@@ -252,7 +252,6 @@ int generic_permission(struct inode *inode, int mask,
 int inode_permission(struct inode *inode, int mask)
 {
 	int retval;
-	int submask = mask;
 
 	if (mask & MAY_WRITE) {
 		umode_t mode = inode->i_mode;
@@ -271,11 +270,8 @@ int inode_permission(struct inode *inode, int mask)
 			return -EACCES;
 	}
 
-	if (!IS_WITHAPPEND(inode))
-		submask &= ~MAY_APPEND;
-
 	if (inode->i_op->permission)
-		retval = inode->i_op->permission(inode, submask);
+		retval = inode->i_op->permission(inode, mask);
 	else
 		retval = generic_permission(inode, mask, inode->i_op->check_acl);
 
@@ -1297,6 +1293,26 @@ static inline int check_sticky(struct inode *dir, struct inode *inode)
 }
 
 /*
+ * Do the directory specific tests of inode_permission() and call the
+ * may_delete inode operation.  The may_delete inode operation must do the
+ * sticky check when needed.
+ */
+static int may_delete_iop(struct inode *dir, struct inode *inode, int replace)
+{
+	int error;
+
+	if (IS_RDONLY(dir))
+		return -EROFS;
+	if (IS_IMMUTABLE(dir))
+		return -EACCES;
+	error = dir->i_op->may_delete(dir, inode, replace);
+	if (!error)
+		error = security_inode_permission(dir, MAY_WRITE | MAY_EXEC);
+
+	return error;
+}
+
+/*
  *	Check whether we can remove a link victim from directory dir, check
  *  whether the type of victim is right.
  *  1. We can't do it if dir is read-only (done in permission())
@@ -1315,7 +1331,8 @@ static inline int check_sticky(struct inode *dir, struct inode *inode)
  * 10. We don't allow removal of NFS sillyrenamed files; it's handled by
  *     nfs_async_unlink().
  */
-static int may_delete(struct inode *dir,struct dentry *victim,int isdir)
+static int may_delete(struct inode *dir, struct dentry *victim,
+		      int isdir, int replace)
 {
 	int error;
 
@@ -1324,16 +1341,9 @@ static int may_delete(struct inode *dir,struct dentry *victim,int isdir)
 
 	BUG_ON(victim->d_parent->d_inode != dir);
 	audit_inode_child(victim, dir);
-
-	if (dir->i_op->may_delete) {
-		if (IS_RDONLY(dir))
-			return -EROFS;
-		if (IS_IMMUTABLE(dir))
-			return -EACCES;
-		error = dir->i_op->may_delete(dir, victim->d_inode);
-		if (!error)
-			error = security_inode_permission(dir, MAY_WRITE | MAY_EXEC);
-	} else {
+	if (dir->i_op->may_delete)
+		error = may_delete_iop(dir, victim->d_inode, replace);
+	else {
 		error = inode_permission(dir, MAY_WRITE | MAY_EXEC);
 		if (!error && check_sticky(dir, victim->d_inode))
 			error = -EPERM;
@@ -1342,7 +1352,8 @@ static int may_delete(struct inode *dir,struct dentry *victim,int isdir)
 		return error;
 	if (IS_APPEND(dir))
 		return -EPERM;
-	if (IS_APPEND(victim->d_inode) || IS_IMMUTABLE(victim->d_inode))
+	if (IS_APPEND(victim->d_inode) || IS_IMMUTABLE(victim->d_inode) ||
+		IS_SWAPFILE(victim->d_inode))
 		return -EPERM;
 	if (isdir) {
 		if (!S_ISDIR(victim->d_inode->i_mode))
@@ -1358,6 +1369,25 @@ static int may_delete(struct inode *dir,struct dentry *victim,int isdir)
 	return 0;
 }
 
+/*
+ * Do the directory specific tests of inode_permission() and call the
+ * may_create inode operation.
+ */
+static int may_create_iop(struct inode *dir, int isdir)
+{
+	int error;
+
+	if (IS_RDONLY(dir))
+		return -EROFS;
+	if (IS_IMMUTABLE(dir))
+		return -EACCES;
+	error = dir->i_op->may_create(dir, isdir);
+	if (!error)
+		error = security_inode_permission(dir, MAY_WRITE | MAY_EXEC);
+
+	return error;
+}
+
 /*	Check whether we can create an object with dentry child in directory
  *  dir.
  *  1. We can't do it if child already exists (open has special treatment for
@@ -1366,28 +1396,16 @@ static int may_delete(struct inode *dir,struct dentry *victim,int isdir)
  *  3. We should have write and exec permissions on dir
  *  4. We can't do it if dir is immutable (done in permission())
  */
-static inline int may_create(struct inode *dir, struct dentry *child,
-			     int isdir)
+static inline int may_create(struct inode *dir, struct dentry *child, int isdir)
 {
-	int error;
-
 	if (child->d_inode)
 		return -EEXIST;
 	if (IS_DEADDIR(dir))
 		return -ENOENT;
-
-	if (dir->i_op->may_create) {
-		if (IS_RDONLY(dir))
-			return -EROFS;
-		if (IS_IMMUTABLE(dir))
-			return -EACCES;
-		error = dir->i_op->may_create(dir, isdir);
-		if (!error)
-			error = security_inode_permission(dir, MAY_WRITE | MAY_EXEC);
-	} else
-		error = inode_permission(dir, MAY_WRITE | MAY_EXEC);
-
-	return error;
+	if (dir->i_op->may_create)
+		return may_create_iop(dir, isdir);
+	else
+		return inode_permission(dir, MAY_WRITE | MAY_EXEC);
 }
 
 /*
@@ -1537,7 +1555,7 @@ static int __open_namei_create(struct nameidata *nd, struct path *path,
 	int error;
 	struct dentry *dir = nd->path.dentry;
 
-	if (!IS_POSIXACL(dir->d_inode))
+	if (!IS_ACL(dir->d_inode))
 		mode &= ~current_umask();
 	error = security_path_mknod(&nd->path, path->dentry, mode, 0);
 	if (error)
@@ -2060,7 +2078,7 @@ SYSCALL_DEFINE4(mknodat, int, dfd, const char __user *, filename, int, mode,
 		error = PTR_ERR(dentry);
 		goto out_unlock;
 	}
-	if (!IS_POSIXACL(nd.path.dentry->d_inode))
+	if (!IS_ACL(nd.path.dentry->d_inode))
 		mode &= ~current_umask();
 	error = may_mknod(mode);
 	if (error)
@@ -2137,7 +2155,7 @@ SYSCALL_DEFINE3(mkdirat, int, dfd, const char __user *, pathname, int, mode)
 	if (IS_ERR(dentry))
 		goto out_unlock;
 
-	if (!IS_POSIXACL(nd.path.dentry->d_inode))
+	if (!IS_ACL(nd.path.dentry->d_inode))
 		mode &= ~current_umask();
 	error = mnt_want_write(nd.path.mnt);
 	if (error)
@@ -2192,7 +2210,7 @@ void dentry_unhash(struct dentry *dentry)
 
 int vfs_rmdir(struct inode *dir, struct dentry *dentry)
 {
-	int error = may_delete(dir, dentry, 1);
+	int error = may_delete(dir, dentry, 1, 0);
 
 	if (error)
 		return error;
@@ -2279,7 +2297,7 @@ SYSCALL_DEFINE1(rmdir, const char __user *, pathname)
 
 int vfs_unlink(struct inode *dir, struct dentry *dentry)
 {
-	int error = may_delete(dir, dentry, 0);
+	int error = may_delete(dir, dentry, 0, 0);
 
 	if (error)
 		return error;
@@ -2671,14 +2689,14 @@ int vfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	if (old_dentry->d_inode == new_dentry->d_inode)
  		return 0;
  
-	error = may_delete(old_dir, old_dentry, is_dir);
+	error = may_delete(old_dir, old_dentry, is_dir, 0);
 	if (error)
 		return error;
 
 	if (!new_dentry->d_inode)
 		error = may_create(new_dir, new_dentry, is_dir);
 	else
-		error = may_delete(new_dir, new_dentry, is_dir);
+		error = may_delete(new_dir, new_dentry, is_dir, 1);
 	if (error)
 		return error;
 

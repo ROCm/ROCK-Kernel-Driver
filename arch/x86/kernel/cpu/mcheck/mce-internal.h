@@ -28,6 +28,8 @@ extern int mce_ser;
 
 extern struct mce_bank *mce_banks;
 
+extern void (*mce_cpu_specific_poll)(struct mce *);
+
 #ifdef CONFIG_ACPI_APEI
 int apei_write_mce(struct mce *m);
 ssize_t apei_read_mce(struct mce *m, u64 *record_id);

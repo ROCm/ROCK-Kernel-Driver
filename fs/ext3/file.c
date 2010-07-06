@@ -24,10 +24,8 @@
 #include <linux/quotaops.h>
 #include <linux/ext3_fs.h>
 #include <linux/ext3_jbd.h>
-#include "namei.h"
 #include "xattr.h"
 #include "acl.h"
-#include "nfs4acl.h"
 
 /*
  * Called when an inode is released. Note that this is different
@@ -83,7 +81,5 @@ const struct inode_operations ext3_file_inode_operations = {
 #endif
 	.check_acl	= ext3_check_acl,
 	.fiemap		= ext3_fiemap,
-	.may_create	= ext3_may_create,
-	.may_delete	= ext3_may_delete,
 };
 

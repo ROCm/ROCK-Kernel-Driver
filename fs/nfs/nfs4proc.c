@@ -2028,7 +2028,7 @@ nfs4_atomic_open(struct inode *dir, struct dentry *dentry, struct nameidata *nd)
 	if (nd->flags & LOOKUP_CREATE) {
 		attr.ia_mode = nd->intent.open.create_mode;
 		attr.ia_valid = ATTR_MODE;
-		if (!IS_POSIXACL(dir))
+		if (!IS_ACL(dir))
 			attr.ia_mode &= ~current_umask();
 	} else {
 		attr.ia_valid = 0;

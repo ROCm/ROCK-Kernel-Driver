@@ -10,4 +10,3 @@ ext3-y	:= balloc.o bitmap.o dir.o file.o fsync.o ialloc.o inode.o \
 ext3-$(CONFIG_EXT3_FS_XATTR)	 += xattr.o xattr_user.o xattr_trusted.o
 ext3-$(CONFIG_EXT3_FS_POSIX_ACL) += acl.o
 ext3-$(CONFIG_EXT3_FS_SECURITY)	 += xattr_security.o
-ext3-$(CONFIG_EXT3_FS_NFS4ACL)	 += nfs4acl.o

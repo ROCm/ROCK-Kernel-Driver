@@ -51,9 +51,8 @@ obj-$(CONFIG_FS_POSIX_ACL)	+= posix_acl.o xattr_acl.o
 obj-$(CONFIG_NFS_COMMON)	+= nfs_common/
 obj-$(CONFIG_GENERIC_ACL)	+= generic_acl.o
 
-obj-$(CONFIG_FS_NFS4ACL)	+= nfs4acl.o
-nfs4acl-y			:= nfs4acl_base.o nfs4acl_xattr.o \
-				   nfs4acl_compat.o
+obj-$(CONFIG_FS_RICHACL)	+= richacl.o
+richacl-y			:= richacl_base.o richacl_inode.o richacl_xattr.o
 
 obj-y				+= quota/
 

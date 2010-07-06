@@ -39,7 +39,7 @@ config FS_POSIX_ACL
 	bool
 	default n
 
-config FS_NFS4ACL
+config FS_RICHACL
 	bool
 	default n
 
