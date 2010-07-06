@@ -297,102 +297,6 @@ xfs_ip2dmflags(
 	return _xfs_dic2dmflags(ip->i_d.di_flags) |
 			(XFS_IFORK_Q(ip) ? DM_XFLAG_HASATTR : 0);
 }
-
-STATIC uint
-xfs_dic2dmflags(
-	xfs_dinode_t	*dip)
-{
-	return _xfs_dic2dmflags(be16_to_cpu(dip->di_flags)) |
-			(XFS_DFORK_Q(dip) ? DM_XFLAG_HASATTR : 0);
-}
-
-/*
- * This copies selected fields in an inode into a dm_stat structure.  Because
- * these fields must return the same values as they would in stat(), the
- * majority of this code was copied directly from xfs_getattr().  Any future
- * changes to xfs_gettattr() must also be reflected here.
- */
-STATIC void
-xfs_dip_to_stat(
-	xfs_mount_t		*mp,
-	xfs_ino_t		ino,
-	xfs_dinode_t		*dip,
-	dm_stat_t		*buf)
-{
-	xfs_dinode_t	*dic = dip;
-
-	/*
-	 * The inode format changed when we moved the link count and
-	 * made it 32 bits long.  If this is an old format inode,
-	 * convert it in memory to look like a new one.  If it gets
-	 * flushed to disk we will convert back before flushing or
-	 * logging it.  We zero out the new projid field and the old link
-	 * count field.  We'll handle clearing the pad field (the remains
-	 * of the old uuid field) when we actually convert the inode to
-	 * the new format. We don't change the version number so that we
-	 * can distinguish this from a real new format inode.
-	 */
-	if (dic->di_version == 1) {
-		buf->dt_nlink = be16_to_cpu(dic->di_onlink);
-		/*buf->dt_xfs_projid = 0;*/
-	} else {
-		buf->dt_nlink = be32_to_cpu(dic->di_nlink);
-		/*buf->dt_xfs_projid = be16_to_cpu(dic->di_projid);*/
-	}
-	buf->dt_ino = ino;
-	buf->dt_dev = new_encode_dev(mp->m_ddev_targp->bt_dev);
-	buf->dt_mode = be16_to_cpu(dic->di_mode);
-	buf->dt_uid = be32_to_cpu(dic->di_uid);
-	buf->dt_gid = be32_to_cpu(dic->di_gid);
-	buf->dt_size = be64_to_cpu(dic->di_size);
-	buf->dt_atime = be32_to_cpu(dic->di_atime.t_sec);
-	buf->dt_mtime = be32_to_cpu(dic->di_mtime.t_sec);
-	buf->dt_ctime = be32_to_cpu(dic->di_ctime.t_sec);
-	buf->dt_xfs_xflags = xfs_dic2dmflags(dip);
-	buf->dt_xfs_extsize =
-		be32_to_cpu(dic->di_extsize) << mp->m_sb.sb_blocklog;
-	buf->dt_xfs_extents = be32_to_cpu(dic->di_nextents);
-	buf->dt_xfs_aextents = be16_to_cpu(dic->di_anextents);
-	buf->dt_xfs_igen = be32_to_cpu(dic->di_gen);
-	buf->dt_xfs_dmstate = be16_to_cpu(dic->di_dmstate);
-
-	switch (dic->di_format) {
-	case XFS_DINODE_FMT_DEV:
-		buf->dt_rdev = xfs_dinode_get_rdev(dic);
-		buf->dt_blksize = BLKDEV_IOSIZE;
-		buf->dt_blocks = 0;
-		break;
-	case XFS_DINODE_FMT_LOCAL:
-	case XFS_DINODE_FMT_UUID:
-		buf->dt_rdev = 0;
-		buf->dt_blksize = mp->m_sb.sb_blocksize;
-		buf->dt_blocks = 0;
-		break;
-	case XFS_DINODE_FMT_EXTENTS:
-	case XFS_DINODE_FMT_BTREE:
-		buf->dt_rdev = 0;
-		buf->dt_blksize = mp->m_sb.sb_blocksize;
-		buf->dt_blocks =
-			XFS_FSB_TO_BB(mp, be64_to_cpu(dic->di_nblocks));
-		break;
-	}
-
-	memset(&buf->dt_pad1, 0, sizeof(buf->dt_pad1));
-	memset(&buf->dt_pad2, 0, sizeof(buf->dt_pad2));
-	memset(&buf->dt_pad3, 0, sizeof(buf->dt_pad3));
-
-	/* Finally fill in the DMAPI specific fields */
-	buf->dt_pers = 0;
-	buf->dt_change = 0;
-	buf->dt_nevents = DM_EVENT_MAX;
-	buf->dt_emask = be32_to_cpu(dic->di_dmevmask);
-	buf->dt_dtime = be32_to_cpu(dic->di_ctime.t_sec);
-	/* Set if one of READ, WRITE or TRUNCATE bits is set in emask */
-	buf->dt_pmanreg = (DMEV_ISSET(DM_EVENT_READ, buf->dt_emask) ||
-			DMEV_ISSET(DM_EVENT_WRITE, buf->dt_emask) ||
-			DMEV_ISSET(DM_EVENT_TRUNCATE, buf->dt_emask)) ? 1 : 0;
-}
-
 /*
  * Pull out both ondisk and incore fields, incore has preference.
  * The inode must be kept locked SHARED by the caller.
@@ -486,7 +390,6 @@ STATIC int
 xfs_dm_bulkall_iget_one(
 	xfs_mount_t	*mp,
 	xfs_ino_t	ino,
-	xfs_daddr_t	bno,
 	int		*value_lenp,
 	dm_xstat_t	*xbuf,
 	u_int		*xstat_szp,
@@ -500,7 +403,7 @@ xfs_dm_bulkall_iget_one(
 	int		error;
 
 	error = xfs_iget(mp, NULL, ino,
-			 XFS_IGET_BULKSTAT, XFS_ILOCK_SHARED, &ip, bno);
+			 XFS_IGET_UNTRUSTED, XFS_ILOCK_SHARED, &ip);
 	if (error)
 		return error;
 
@@ -533,109 +436,6 @@ xfs_dm_bulkall_iget_one(
 	return 0;
 }
 
-
-STATIC int
-xfs_dm_inline_attr(
-	xfs_mount_t	*mp,
-	xfs_dinode_t	*dip,
-	char		*attr_name,
-	caddr_t		attr_buf,
-	int		*value_lenp)
-{
-	if (dip->di_aformat == XFS_DINODE_FMT_LOCAL) {
-		xfs_attr_shortform_t	*sf;
-		xfs_attr_sf_entry_t	*sfe;
-		unsigned int		namelen = strlen(attr_name);
-		unsigned int		valuelen = *value_lenp;
-		int			i;
-
-		sf = (xfs_attr_shortform_t *)XFS_DFORK_APTR(dip);
-		sfe = &sf->list[0];
-		for (i = 0; i < sf->hdr.count;
-				sfe = XFS_ATTR_SF_NEXTENTRY(sfe), i++) {
-			if (sfe->namelen != namelen)
-				continue;
-			if (!(sfe->flags & XFS_ATTR_ROOT))
-				continue;
-			if (memcmp(attr_name, sfe->nameval, namelen) != 0)
-				continue;
-			if (valuelen < sfe->valuelen)
-				return ERANGE;
-			valuelen = sfe->valuelen;
-			memcpy(attr_buf, &sfe->nameval[namelen], valuelen);
-			*value_lenp = valuelen;
-			return 0;
-		}
-	}
-	*value_lenp = 0;
-	return ENOATTR;
-}
-
-STATIC void
-dm_dip_to_handle(
-	xfs_ino_t	ino,
-	xfs_dinode_t	*dip,
-	dm_fsid_t	*fsid,
-	dm_handle_t	*handlep)
-{
-	dm_fid_t	fid;
-	int		hsize;
-
-	fid.dm_fid_len = sizeof(struct dm_fid) - sizeof(fid.dm_fid_len);
-	fid.dm_fid_pad = 0;
-	fid.dm_fid_ino = ino;
-	fid.dm_fid_gen = be32_to_cpu(dip->di_gen);
-
-	memcpy(&handlep->ha_fsid, fsid, sizeof(*fsid));
-	memcpy(&handlep->ha_fid, &fid, fid.dm_fid_len + sizeof(fid.dm_fid_len));
-	hsize = DM_HSIZE(*handlep);
-	memset((char *)handlep + hsize, 0, sizeof(*handlep) - hsize);
-}
-
-STATIC int
-xfs_dm_bulkall_inline_one(
-	xfs_mount_t	*mp,
-	xfs_ino_t	ino,
-	xfs_dinode_t	*dip,
-	dm_fsid_t	*fsid,
-	int		*value_lenp,
-	dm_xstat_t	*xbuf,
-	u_int		*xstat_szp,
-	char		*attr_name,
-	caddr_t		attr_buf)
-{
-	dm_handle_t	handle;
-	u_int		xstat_sz = *xstat_szp;
-	int		value_len = *value_lenp;
-	int		error;
-
-	if (dip->di_mode == 0)
-		return ENOENT;
-
-	xfs_dip_to_stat(mp, ino, dip, &xbuf->dx_statinfo);
-	dm_dip_to_handle(ino, dip, fsid, &handle);
-	xfs_dm_handle_to_xstat(xbuf, xstat_sz, &handle, sizeof(handle));
-
-	memset(&xbuf->dx_attrdata, 0, sizeof(dm_vardata_t));
-	error = xfs_dm_inline_attr(mp, dip, attr_name, attr_buf, &value_len);
-	DM_EA_XLATE_ERR(error);
-	if (error && (error != ENOATTR)) {
-		if (error == E2BIG)
-			error = ENOMEM;
-		return error;
-	}
-
-	/* How much space was in the attr? */
-	if (error != ENOATTR) {
-		xbuf->dx_attrdata.vd_offset = xstat_sz;
-		xbuf->dx_attrdata.vd_length = value_len;
-		xstat_sz += (value_len+(DM_STAT_ALIGN-1)) & ~(DM_STAT_ALIGN-1);
-	}
-	*xstat_szp = xbuf->dx_statinfo._link = xstat_sz;
-	*value_lenp = value_len;
-	return 0;
-}
-
 /*
  * This is used by dm_get_bulkall().
  * Given a inumber, it igets the inode and fills the given buffer
@@ -647,11 +447,9 @@ xfs_dm_bulkall_one(
 	xfs_ino_t	ino,		/* inode number to get data for */
 	void		__user *buffer,	/* buffer to place output in */
 	int		ubsize,		/* size of buffer */
-	void		*private_data,	/* my private data */
-	xfs_daddr_t	bno,		/* starting block of inode cluster */
 	int		*ubused,	/* amount of buffer we used */
-	void		*dibuff,	/* on-disk inode buffer */
-	int		*res)		/* bulkstat result code */
+	int		*res,		/* bulkstat result code */
+	void		*private_data)	/* my private data */
 {
 	dm_xstat_t	*xbuf;
 	u_int		xstat_sz;
@@ -687,18 +485,10 @@ xfs_dm_bulkall_one(
 	attr_buf_sz = value_len;
 	attr_buf = kmem_alloc(attr_buf_sz, KM_SLEEP);
 
-	if (!dibuff)
-		error = xfs_dm_bulkall_iget_one(mp, ino, bno,
-						&value_len, xbuf, &xstat_sz,
-						dmb->attrname.dan_chars,
-						attr_buf);
-	else
-		error = xfs_dm_bulkall_inline_one(mp, ino,
-						  (xfs_dinode_t *)dibuff,
-						  &dmb->fsid,
-						  &value_len, xbuf, &xstat_sz,
-						  dmb->attrname.dan_chars,
-						  attr_buf);
+	error = xfs_dm_bulkall_iget_one(mp, ino,
+					&value_len, xbuf, &xstat_sz,
+					dmb->attrname.dan_chars,
+					attr_buf);
 	if (error)
 		goto out_free_buffers;
 
@@ -749,7 +539,6 @@ STATIC int
 xfs_dm_bulkattr_iget_one(
 	xfs_mount_t	*mp,
 	xfs_ino_t	ino,
-	xfs_daddr_t	bno,
 	dm_stat_t	*sbuf,
 	u_int		stat_sz)
 {
@@ -758,7 +547,7 @@ xfs_dm_bulkattr_iget_one(
 	int		error;
 
 	error = xfs_iget(mp, NULL, ino,
-			 XFS_IGET_BULKSTAT, XFS_ILOCK_SHARED, &ip, bno);
+			 XFS_IGET_UNTRUSTED, XFS_ILOCK_SHARED, &ip);
 	if (error)
 		return error;
 
@@ -770,24 +559,6 @@ xfs_dm_bulkattr_iget_one(
 	return 0;
 }
 
-STATIC int
-xfs_dm_bulkattr_inline_one(
-	xfs_mount_t	*mp,
-	xfs_ino_t	ino,
-	xfs_dinode_t	*dip,
-	dm_fsid_t	*fsid,
-	dm_stat_t	*sbuf,
-	u_int		stat_sz)
-{
-	dm_handle_t	handle;
-
-	if (dip->di_mode == 0)
-		return ENOENT;
-	xfs_dip_to_stat(mp, ino, dip, sbuf);
-	dm_dip_to_handle(ino, dip, fsid, &handle);
-	xfs_dm_handle_to_stat(sbuf, stat_sz, &handle, sizeof(handle));
-	return 0;
-}
 
 /*
  * This is used by dm_get_bulkattr().
@@ -800,11 +571,9 @@ xfs_dm_bulkattr_one(
 	xfs_ino_t	ino,		/* inode number to get data for */
 	void		__user *buffer,	/* buffer to place output in */
 	int		ubsize,		/* size of buffer */
-	void		*private_data,	/* my private data */
-	xfs_daddr_t	bno,		/* starting block of inode cluster */
 	int		*ubused,	/* amount of buffer we used */
-	void		*dibuff,	/* on-disk inode buffer */
-	int		*res)		/* bulkstat result code */
+	int		*res,		/* bulkstat result code */
+	void		*private_data)	/* my private data */
 {
 	dm_stat_t	*sbuf;
 	u_int		stat_sz;
@@ -825,12 +594,7 @@ xfs_dm_bulkattr_one(
 
 	sbuf = kmem_alloc(stat_sz, KM_SLEEP);
 
-	if (!dibuff)
-		error = xfs_dm_bulkattr_iget_one(mp, ino, bno, sbuf, stat_sz);
-	else
-		error = xfs_dm_bulkattr_inline_one(mp, ino,
-						   (xfs_dinode_t *)dibuff,
-						   &dmb->fsid, sbuf, stat_sz);
+	error = xfs_dm_bulkattr_iget_one(mp, ino, sbuf, stat_sz);
 	if (error)
 		goto out_free_buffer;
 
@@ -1424,8 +1188,8 @@ xfs_dm_get_bulkall_rvp(
 	dmb.laststruct = NULL;
 	memcpy(&dmb.fsid, mp->m_fixedfsid, sizeof(dm_fsid_t));
 	error = xfs_bulkstat(mp, (xfs_ino_t *)&loc, &nelems,
-			     xfs_dm_bulkall_one, (void*)&dmb, statstruct_sz,
-			     bufp, BULKSTAT_FG_INLINE, &done);
+			     xfs_dm_bulkall_one, statstruct_sz,
+			     bufp, &done, (void*)&dmb);
 	if (error)
 		return(-error); /* Return negative error to DMAPI */
 
@@ -1520,8 +1284,8 @@ xfs_dm_get_bulkattr_rvp(
 	dmb.laststruct = NULL;
 	memcpy(&dmb.fsid, mp->m_fixedfsid, sizeof(dm_fsid_t));
 	error = xfs_bulkstat(mp, (xfs_ino_t *)&loc, &nelems,
-				xfs_dm_bulkattr_one, (void*)&dmb,
-				statstruct_sz, bufp, BULKSTAT_FG_INLINE, &done);
+				xfs_dm_bulkattr_one,
+				statstruct_sz, bufp, &done, (void*)&dmb);
 	if (error)
 		return(-error); /* Return negative error to DMAPI */
 
@@ -1793,7 +1557,7 @@ dm_filldir(void *__buf, const char *name, int namelen, loff_t offset,
 		goto out_err;
 
 	memset(statp, 0, dm_stat_size(MAXNAMLEN));
-	error = -xfs_dm_bulkattr_iget_one(cb->mp, ino, 0,
+	error = -xfs_dm_bulkattr_iget_one(cb->mp, ino,
 			statp, needed);
 	if (error)
 		goto out_err;
@@ -3244,7 +3008,7 @@ xfs_dm_fh_to_inode(
 	if (ino == 0)
 		return -ESTALE;
 
-	error = xfs_iget(mp, NULL, ino, 0, XFS_ILOCK_SHARED, &ip, 0);
+	error = xfs_iget(mp, NULL, ino, 0, XFS_ILOCK_SHARED, &ip);
 	if (error)
 		return -error;
 	if (!ip)
