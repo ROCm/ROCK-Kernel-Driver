@@ -396,6 +396,8 @@ asmlinkage void __irq_entry evtchn_do_upcall(struct pt_regs *regs)
 			}
 
 			do {
+				bool handled = false;
+
 				masked_l2 = l2 & ((~0UL) << l2i);
 				if (masked_l2 == 0)
 					break;
@@ -403,10 +405,15 @@ asmlinkage void __irq_entry evtchn_do_upcall(struct pt_regs *regs)
 
 				/* process port */
 				port = (l1i * BITS_PER_LONG) + l2i;
-				if ((unlikely((irq = evtchn_to_irq[port]) == -1)
-				     || !handle_irq(irq, regs)) && printk_ratelimit())
-					printk(KERN_EMERG "%s(%d): No handler for irq %d\n",
-					       __func__, smp_processor_id(), irq);
+				mask_evtchn(port);
+				if ((irq = evtchn_to_irq[port]) != -1) {
+					clear_evtchn(port);
+					handled = handle_irq(irq, regs);
+				}
+				if (!handled && printk_ratelimit())
+					pr_emerg("No handler for irq %d"
+						 " (port %u)\n",
+						 irq, port);
 
 				l2i = (l2i + 1) % BITS_PER_LONG;
 
@@ -450,8 +457,8 @@ static int find_unbound_irq(unsigned int cpu, bool percpu)
 
 			desc->status |= IRQ_NOPROBE;
 			if (!percpu) {
-				handle = handle_level_irq;
-				name = "level";
+				handle = handle_fasteoi_irq;
+				name = "fasteoi";
 			} else {
 				handle = handle_percpu_irq;
 				name = "percpu";
@@ -502,8 +509,7 @@ static int bind_local_port_to_irq(unsigned int local_port)
 	BUG_ON(evtchn_to_irq[local_port] != -1);
 
 	if ((irq = find_unbound_irq(smp_processor_id(), false)) < 0) {
-		struct evtchn_close close = { .port = local_port };
-		if (HYPERVISOR_event_channel_op(EVTCHNOP_close, &close))
+		if (close_evtchn(local_port))
 			BUG();
 		goto out;
 	}
@@ -623,7 +629,6 @@ static int bind_ipi_to_irq(unsigned int ipi, unsigned int cpu)
 
 static void unbind_from_irq(unsigned int irq)
 {
-	struct evtchn_close close;
 	unsigned int cpu;
 	int evtchn = evtchn_from_irq(irq);
 
@@ -633,9 +638,8 @@ static void unbind_from_irq(unsigned int irq)
 	spin_lock(&irq_mapping_update_lock);
 
 	if (!--irq_cfg(irq)->bindcount && VALID_EVTCHN(evtchn)) {
-		close.port = evtchn;
 		if ((type_from_irq(irq) != IRQT_CALLER_PORT) &&
-		    HYPERVISOR_event_channel_op(EVTCHNOP_close, &close))
+		    close_evtchn(evtchn))
 			BUG();
 
 		switch (type_from_irq(irq)) {
@@ -1126,20 +1130,10 @@ static unsigned int startup_dynirq(unsigned int irq)
 
 #define shutdown_dynirq mask_dynirq
 
-static void ack_dynirq(unsigned int irq)
-{
-	int evtchn = evtchn_from_irq(irq);
-
-	move_native_irq(irq);
-
-	if (VALID_EVTCHN(evtchn)) {
-		mask_evtchn(evtchn);
-		clear_evtchn(evtchn);
-	}
-}
-
 static void end_dynirq(unsigned int irq)
 {
+	move_native_irq(irq);
+
 	if (!(irq_to_desc(irq)->status & IRQ_DISABLED))
 		unmask_dynirq(irq);
 }
@@ -1152,8 +1146,6 @@ static struct irq_chip dynirq_chip = {
 	.disable  = mask_dynirq,
 	.mask     = mask_dynirq,
 	.unmask   = unmask_dynirq,
-	.mask_ack = ack_dynirq,
-	.ack      = ack_dynirq,
 	.end      = end_dynirq,
 	.eoi      = end_dynirq,
 #ifdef CONFIG_SMP
@@ -1255,7 +1247,6 @@ static void enable_pirq(unsigned int irq)
 
 static void disable_pirq(unsigned int irq)
 {
-	struct evtchn_close close;
 	int evtchn = evtchn_from_irq(irq);
 
 	if (!VALID_EVTCHN(evtchn))
@@ -1263,8 +1254,7 @@ static void disable_pirq(unsigned int irq)
 
 	mask_evtchn(evtchn);
 
-	close.port = evtchn;
-	if (HYPERVISOR_event_channel_op(EVTCHNOP_close, &close) != 0)
+	if (close_evtchn(evtchn))
 		BUG();
 
 	bind_evtchn_to_cpu(evtchn, 0);
@@ -1289,10 +1279,11 @@ static void unmask_pirq(unsigned int irq)
 }
 
 #define mask_pirq mask_dynirq
-#define ack_pirq  ack_dynirq
 
 static void end_pirq(unsigned int irq)
 {
+	move_native_irq(irq);
+
 	if ((irq_to_desc(irq)->status & (IRQ_DISABLED|IRQ_PENDING)) ==
 	    (IRQ_DISABLED|IRQ_PENDING))
 		shutdown_pirq(irq);
@@ -1308,8 +1299,6 @@ static struct irq_chip pirq_chip = {
 	.disable  = disable_pirq,
 	.mask     = mask_pirq,
 	.unmask   = unmask_pirq,
-	.mask_ack = ack_pirq,
-	.ack      = ack_pirq,
 	.end      = end_pirq,
 	.eoi      = end_pirq,
 	.set_type = set_type_pirq,
@@ -1646,7 +1635,7 @@ EXPORT_SYMBOL_GPL(nr_pirqs);
 
 int __init arch_probe_nr_irqs(void)
 {
-	int nr_irqs_gsi = gsi_end + 1 + NR_IRQS_LEGACY, nr;
+	int nr_irqs_gsi = gsi_top + NR_IRQS_LEGACY, nr;
 
 	nr = nr_irqs_gsi + 8 * nr_cpu_ids;
 #ifdef CONFIG_PCI_MSI
@@ -1695,8 +1684,8 @@ void evtchn_register_pirq(int irq)
 	if (identity_mapped_irq(irq) || type_from_irq(irq) != IRQT_UNBOUND)
 		return;
 	irq_cfg(irq)->info = mk_irq_info(IRQT_PIRQ, irq, 0);
-	set_irq_chip_and_handler_name(irq, &pirq_chip, handle_level_irq,
-				      "level");
+	set_irq_chip_and_handler_name(irq, &pirq_chip, handle_fasteoi_irq,
+				      "fasteoi");
 }
 
 int evtchn_map_pirq(int irq, int xen_pirq)
@@ -1725,7 +1714,7 @@ int evtchn_map_pirq(int irq, int xen_pirq)
 		if (irq < PIRQ_BASE)
 			return -ENOSPC;
 		set_irq_chip_and_handler_name(irq, &pirq_chip,
-					      handle_level_irq, "level");
+					      handle_fasteoi_irq, "fasteoi");
 	} else if (!xen_pirq) {
 		if (unlikely(type_from_irq(irq) != IRQT_PIRQ))
 			return -EINVAL;
@@ -1787,7 +1776,7 @@ void __init xen_init_IRQ(void)
 	for (i = DYNIRQ_BASE; i < (DYNIRQ_BASE + NR_DYNIRQS); i++) {
 		irq_to_desc(i)->status |= IRQ_NOPROBE;
 		set_irq_chip_and_handler_name(i, &dynirq_chip,
-					      handle_level_irq, "level");
+					      handle_fasteoi_irq, "fasteoi");
 	}
 
 	for (i = PIRQ_BASE; i < (PIRQ_BASE + nr_pirqs); i++) {
@@ -1804,6 +1793,6 @@ void __init xen_init_IRQ(void)
 #endif
 
 		set_irq_chip_and_handler_name(i, &pirq_chip,
-					      handle_level_irq, "level");
+					      handle_fasteoi_irq, "fasteoi");
 	}
 }

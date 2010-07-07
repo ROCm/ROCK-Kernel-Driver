@@ -244,6 +244,9 @@ static void evtchn_unbind_from_user(struct per_user_data *u, int port)
 	int irq = irq_from_evtchn(port);
 
 	unbind_from_irqhandler(irq, (void *)(unsigned long)port);
+#ifdef CONFIG_XEN
+	WARN_ON(close_evtchn(port));
+#endif
 
 	/* make sure we unbind the irq handler before clearing the port */
 	barrier();

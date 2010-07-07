@@ -1027,13 +1027,6 @@ static int xsd_port_read(char *page, char **start, off_t off,
 #endif
 
 #if defined(CONFIG_XEN) || defined(MODULE)
-static int xb_free_port(evtchn_port_t port)
-{
-	struct evtchn_close close;
-	close.port = port;
-	return HYPERVISOR_event_channel_op(EVTCHNOP_close, &close);
-}
-
 int xenbus_conn(domid_t remote_dom, unsigned long *grant_ref, evtchn_port_t *local_port)
 {
 	struct evtchn_alloc_unbound alloc_unbound;
@@ -1047,7 +1040,7 @@ int xenbus_conn(domid_t remote_dom, unsigned long *grant_ref, evtchn_port_t *loc
 	remove_xen_proc_entry("xsd_port");
 #endif
 
-	rc = xb_free_port(xen_store_evtchn);
+	rc = close_evtchn(xen_store_evtchn);
 	if (rc != 0)
 		goto fail0;
 
@@ -1073,7 +1066,7 @@ int xenbus_conn(domid_t remote_dom, unsigned long *grant_ref, evtchn_port_t *loc
 	return 0;
 
 fail1:
-	rc2 = xb_free_port(xen_store_evtchn);
+	rc2 = close_evtchn(xen_store_evtchn);
 	if (rc2 != 0)
 		printk(KERN_WARNING
 		       "XENBUS: Error freeing xenstore event channel: %d\n",

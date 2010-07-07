@@ -219,8 +219,10 @@ do {									\
 ({							\
 	typedef typeof(var) pxo_T__;			\
 	pxo_T__ pxo_ret__;				\
-	if (0)						\
+	if (0) {					\
 		pxo_ret__ = (val);			\
+		(void)pxo_ret__;			\
+	}						\
 	switch (sizeof(var)) {				\
 	case 1:						\
 		asm(op "b %0,"__percpu_arg(1)		\

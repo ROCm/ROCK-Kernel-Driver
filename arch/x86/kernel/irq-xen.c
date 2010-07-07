@@ -326,7 +326,7 @@ void fixup_irqs(void)
 		affinity = desc->affinity;
 		if (!irq_has_action(irq) ||
 		    (desc->status & IRQ_PER_CPU) ||
-		    cpumask_equal(affinity, cpu_online_mask)) {
+		    cpumask_subset(affinity, cpu_online_mask)) {
 			raw_spin_unlock(&desc->lock);
 			continue;
 		}
@@ -344,7 +344,7 @@ void fixup_irqs(void)
 
 		if (desc->chip->set_affinity)
 			desc->chip->set_affinity(irq, affinity);
-		else if (!(warned++))
+		else if (desc->chip != &no_irq_chip && !(warned++))
 			set_affinity = 0;
 
 		if (!(desc->status & IRQ_MOVE_PCNTXT) && desc->chip->unmask)

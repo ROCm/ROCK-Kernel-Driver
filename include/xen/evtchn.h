@@ -204,6 +204,12 @@ multi_notify_remote_via_evtchn(multicall_entry_t *mcl, int port)
 	mcl->args[1] = (unsigned long)send;
 }
 
+static inline int close_evtchn(int port)
+{
+	struct evtchn_close close = { .port = port };
+	return HYPERVISOR_event_channel_op(EVTCHNOP_close, &close);
+}
+
 /* Test an irq's pending state. */
 int xen_test_irq_pending(int irq);
 

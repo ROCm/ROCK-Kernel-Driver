@@ -41,9 +41,11 @@ static int netback_remove(struct xenbus_device *dev)
 
 	netback_remove_accelerators(be, dev);
 
+	if (be->netif)
+		kobject_uevent(&dev->dev.kobj, KOBJ_OFFLINE);
+
 	down_write(&teardown_sem);
 	if (be->netif) {
-		kobject_uevent(&dev->dev.kobj, KOBJ_OFFLINE);
 		netif_disconnect(be->netif);
 		be->netif = NULL;
 	}
