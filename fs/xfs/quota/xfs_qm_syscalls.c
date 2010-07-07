@@ -1110,7 +1110,8 @@ xfs_qm_internalqcheck_adjust(
 	void		__user *buffer,	/* not used */
 	int		ubsize,		/* not used */
 	int		*ubused,	/* not used */
-	int		*res)		/* bulkstat result code */
+	int		*res,		/* bulkstat result code */
+	void		*private_data)
 {
 	xfs_inode_t		*ip;
 	xfs_dqtest_t		*ud, *gd;
@@ -1204,7 +1205,7 @@ xfs_qm_internalqcheck(
 		 */
 		error = xfs_bulkstat(mp, &lastino, &count,
 				 xfs_qm_internalqcheck_adjust,
-				 0, NULL, &done);
+				 0, NULL, &done, NULL);
 		if (error) {
 			cmn_err(CE_DEBUG, "Bulkstat returned error 0x%x", error);
 			break;
