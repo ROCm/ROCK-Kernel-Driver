@@ -37,16 +37,20 @@ static void GetConnData(struct nwc_get_conn_info * connInfo, struct novfs_xplat_
 /*++======================================================================*/
 int novfs_open_conn_by_name(struct novfs_xplat *pdata, void ** Handle, struct novfs_schandle Session)
 {
-	struct novfs_xplat_call_request *cmd;
-	struct novfs_xplat_call_reply *reply;
-	struct nwd_open_conn_by_name *openConn, *connReply;
+	struct novfs_xplat_call_request *cmd = NULL;
+	struct novfs_xplat_call_reply *reply = NULL;
+	struct nwd_open_conn_by_name *openConn = NULL, *connReply = NULL;
 	struct nwc_open_conn_by_name ocbn;
 	int retCode = 0;
-	unsigned long cmdlen, datalen, replylen, cpylen;
-	char *data;
+	unsigned long cmdlen, datalen, replylen, cpylen, pnamelen, stypelen;
+	char *data = NULL;
 
 	cpylen = copy_from_user(&ocbn, pdata->reqData, sizeof(ocbn));
-	datalen = sizeof(*openConn) + strlen_user(ocbn.pName->pString) + strlen_user(ocbn.pServiceType);
+	pnamelen = strlen_user(ocbn.pName->pString);
+	stypelen = strlen_user(ocbn.pServiceType);
+	if (pnamelen > MAX_NAME_LEN || stypelen > NW_MAX_SERVICE_TYPE_LEN)
+		return -EINVAL;
+	datalen = sizeof(*openConn) + pnamelen + stypelen;
 	cmdlen = datalen + sizeof(*cmd);
 	cmd = kmalloc(cmdlen, GFP_KERNEL);
 
@@ -61,8 +65,8 @@ int novfs_open_conn_by_name(struct novfs_xplat *pdata, void ** Handle, struct no
 	cmd->dataLen = datalen;
 	openConn = (struct nwd_open_conn_by_name *) cmd->data;
 
-	openConn->nameLen = strlen_user(ocbn.pName->pString);
-	openConn->serviceLen = strlen_user(ocbn.pServiceType);
+	openConn->nameLen = pnamelen;
+	openConn->serviceLen = stypelen;
 	openConn->uConnFlags = ocbn.uConnFlags;
 	openConn->ConnHandle = Uint32toHandle(ocbn.ConnHandle);
 	data = (char *)openConn;
@@ -70,13 +74,9 @@ int novfs_open_conn_by_name(struct novfs_xplat *pdata, void ** Handle, struct no
 	openConn->oName = sizeof(*openConn);
 
 	openConn->oServiceType = openConn->oName + openConn->nameLen;
-	cpylen =
-		copy_from_user(data, ocbn.pName->pString,
-				openConn->nameLen);
+	cpylen = copy_from_user(data, ocbn.pName->pString, openConn->nameLen);
 	data += openConn->nameLen;
-	cpylen =
-		copy_from_user(data, ocbn.pServiceType,
-				openConn->serviceLen);
+	cpylen = copy_from_user(data, ocbn.pServiceType, openConn->serviceLen);
 
 	retCode =
 		Queue_Daemon_Command((void *)cmd, cmdlen, NULL, 0,
@@ -109,9 +109,9 @@ int novfs_open_conn_by_name(struct novfs_xplat *pdata, void ** Handle, struct no
 
 int novfs_open_conn_by_addr(struct novfs_xplat *pdata, void ** Handle, struct novfs_schandle Session)
 {
-	struct novfs_xplat_call_request *cmd;
-	struct novfs_xplat_call_reply *reply;
-	struct nwd_open_conn_by_addr *openConn, *connReply;
+	struct novfs_xplat_call_request *cmd = NULL;
+	struct novfs_xplat_call_reply *reply = NULL;
+	struct nwd_open_conn_by_addr *openConn = NULL, *connReply = NULL;
 	struct nwc_open_conn_by_addr ocba;
 	struct nwc_tran_addr tranAddr;
 	int retCode = 0;
@@ -133,8 +133,11 @@ int novfs_open_conn_by_addr(struct novfs_xplat *pdata, void ** Handle, struct no
 	cmd->dataLen = datalen;
 	openConn = (struct nwd_open_conn_by_addr *) cmd->data;
 
-	cpylen =
-		copy_from_user(&tranAddr, ocba.pTranAddr, sizeof(tranAddr));
+	cpylen = copy_from_user(&tranAddr, ocba.pTranAddr, sizeof(tranAddr));
+	if (tranAddr.uAddressLength > sizeof(addr)) {
+		retCode = -EINVAL;
+		goto out;
+	}
 
 	DbgPrint("tranAddr");
 	novfs_dump(sizeof(tranAddr), &tranAddr);
@@ -143,17 +146,14 @@ int novfs_open_conn_by_addr(struct novfs_xplat *pdata, void ** Handle, struct no
 	openConn->TranAddr.uAddressLength = tranAddr.uAddressLength;
 	memset(addr, 0xcc, sizeof(addr) - 1);
 
-	cpylen =
-		copy_from_user(addr, tranAddr.puAddress,
-				tranAddr.uAddressLength);
+	cpylen = copy_from_user(addr, tranAddr.puAddress, tranAddr.uAddressLength);
 
 	DbgPrint("addr");
 	novfs_dump(sizeof(addr), addr);
 
 	openConn->TranAddr.oAddress = *(unsigned int *) (&addr[2]);
 
-	retCode =
-		Queue_Daemon_Command((void *)cmd, cmdlen, NULL, 0,
+	retCode = Queue_Daemon_Command((void *)cmd, cmdlen, NULL, 0,
 				(void **)&reply, &replylen,
 				INTERRUPTIBLE);
 	if (reply) {
@@ -178,17 +178,17 @@ int novfs_open_conn_by_addr(struct novfs_xplat *pdata, void ** Handle, struct no
 		kfree(reply);
 	}
 
+out:
 	kfree(cmd);
-
 	return (retCode);
 
 }
 
 int novfs_open_conn_by_ref(struct novfs_xplat *pdata, void ** Handle, struct novfs_schandle Session)
 {
-	struct novfs_xplat_call_request *cmd;
-	struct novfs_xplat_call_reply *reply;
-	struct nwd_open_conn_by_ref *openConn;
+	struct novfs_xplat_call_request *cmd = NULL;
+	struct novfs_xplat_call_reply *reply = NULL;
+	struct nwd_open_conn_by_ref *openConn = NULL;
 	struct nwc_open_conn_by_ref ocbr;
 	int retCode = -ENOMEM;
 	unsigned long cmdlen, datalen, replylen, cpylen;
@@ -207,8 +207,7 @@ int novfs_open_conn_by_ref(struct novfs_xplat *pdata, void ** Handle, struct nov
 	cmd->dataLen = datalen;
 	openConn = (struct nwd_open_conn_by_ref *) cmd->data;
 
-	openConn->uConnReference =
-		(void *) (unsigned long) ocbr.uConnReference;
+	openConn->uConnReference = (void *) (unsigned long) ocbr.uConnReference;
 	openConn->uConnFlags = ocbr.uConnFlags;
 
 	retCode =
@@ -225,13 +224,10 @@ int novfs_open_conn_by_ref(struct novfs_xplat *pdata, void ** Handle, struct nov
 			/*
 			 * we got valid data.
 			 */
-			ocbr.ConnHandle =
-				HandletoUint32(openConn->ConnHandle);
+			ocbr.ConnHandle = HandletoUint32(openConn->ConnHandle);
 			*Handle = openConn->ConnHandle;
 
-			cpylen =
-				copy_to_user(pdata->reqData, &ocbr,
-						sizeof(ocbr));
+			cpylen = copy_to_user(pdata->reqData, &ocbr, sizeof(ocbr));
 			DbgPrint("New Conn Handle = %X", openConn->ConnHandle);
 		}
 		kfree(reply);
@@ -245,59 +241,63 @@ int novfs_open_conn_by_ref(struct novfs_xplat *pdata, void ** Handle, struct nov
 int novfs_raw_send(struct novfs_xplat *pdata, struct novfs_schandle Session)
 {
 	struct nwc_request xRequest;
-	struct nwc_frag *frag, *cFrag, *reqFrag;
-	struct novfs_xplat_call_request *cmd;
-	struct novfs_xplat_call_reply *reply;
-	int retCode = -ENOMEM;
+	struct nwc_frag *frag = NULL, *cFrag = NULL, *reqFrag = NULL;
+	struct novfs_xplat_call_request *cmd = NULL;
+	struct novfs_xplat_call_reply *reply = NULL;
+	int retCode = 0;
 	unsigned long cmdlen, datalen, replylen, cpylen, totalLen;
 	unsigned int x;
-	struct nwd_ncp_req *ncpData;
-	struct nwd_ncp_rep *ncpReply;
-	unsigned char *reqData;
+	struct nwd_ncp_req *ncpData = NULL;
+	struct nwd_ncp_rep *ncpReply = NULL;
+	unsigned char *reqData = NULL;
 	unsigned long actualReplyLength = 0;
 
 	DbgPrint("[XPLAT] Process Raw NCP Send");
 	cpylen = copy_from_user(&xRequest, pdata->reqData, sizeof(xRequest));
 
+	if (xRequest.uNumReplyFrags > MAX_NUM_REPLIES || xRequest.uNumReplyFrags < MIN_NUM_REPLIES ||
+	    xRequest.uNumRequestFrags > MAX_NUM_REQUESTS || xRequest.uNumRequestFrags < MIN_NUM_REQUESTS)
+		return -EINVAL;
+
 	/*
 	 * Figure out the length of the request
 	 */
-	frag =
-	    kmalloc(xRequest.uNumReplyFrags * sizeof(struct nwc_frag), GFP_KERNEL);
+	frag = kmalloc(xRequest.uNumReplyFrags * sizeof(struct nwc_frag), GFP_KERNEL);
 
-	DbgPrint("[XPLAT RawNCP] - Reply Frag Count 0x%X",
-		 xRequest.uNumReplyFrags);
+	DbgPrint("[XPLAT RawNCP] - Reply Frag Count 0x%X", xRequest.uNumReplyFrags);
 
 	if (!frag)
-		return (retCode);
+		return -ENOMEM;
 
-	cpylen =
-	    copy_from_user(frag, xRequest.pReplyFrags,
-			   xRequest.uNumReplyFrags * sizeof(struct nwc_frag));
+	cpylen = copy_from_user(frag, xRequest.pReplyFrags, xRequest.uNumReplyFrags * sizeof(struct nwc_frag));
 	totalLen = 0;
 
 	cFrag = frag;
 	for (x = 0; x < xRequest.uNumReplyFrags; x++) {
 		DbgPrint("[XPLAT - RawNCP] - Frag Len = %d", cFrag->uLength);
+		if (cFrag->uLength > MAX_FRAG_SIZE || cFrag->uLength < MIN_FRAG_SIZE) {
+			retCode = -EINVAL;
+			goto out;
+		}
 		totalLen += cFrag->uLength;
 		cFrag++;
 	}
 
 	DbgPrint("[XPLAT - RawNCP] - totalLen = %d", totalLen);
 	datalen = 0;
-	reqFrag =
-	    kmalloc(xRequest.uNumRequestFrags * sizeof(struct nwc_frag),
-			 GFP_KERNEL);
+	reqFrag = kmalloc(xRequest.uNumRequestFrags * sizeof(struct nwc_frag), GFP_KERNEL);
 	if (!reqFrag) {
-		kfree(frag);
-		return (retCode);
+		retCode = -ENOMEM;
+		goto out;
 	}
 
-	cpylen =
-	    copy_from_user(reqFrag, xRequest.pRequestFrags,
-			   xRequest.uNumRequestFrags * sizeof(struct nwc_frag));
+	cpylen = copy_from_user(reqFrag, xRequest.pRequestFrags, xRequest.uNumRequestFrags * sizeof(struct nwc_frag));
 	cFrag = reqFrag;
 	for (x = 0; x < xRequest.uNumRequestFrags; x++) {
+		if (cFrag->uLength > MAX_FRAG_SIZE || cFrag->uLength < MIN_FRAG_SIZE) {
+			retCode = -EINVAL;
+			goto out;
+		}
 		datalen += cFrag->uLength;
 		cFrag++;
 	}
@@ -311,8 +311,10 @@ int novfs_raw_send(struct novfs_xplat *pdata, struct novfs_schandle Session)
 	DbgPrint("[XPLAT RawNCP] - Total Command Data Len = %x", cmdlen);
 
 	cmd = kmalloc(cmdlen, GFP_KERNEL);
-	if (!cmd)
-		return -ENOMEM;
+	if (!cmd) {
+		retCode = -ENOMEM;
+		goto out;
+	}
 
 	cmd->Command.CommandType = VFS_COMMAND_XPLAT_CALL;
 	cmd->Command.SequenceNumber = 0;
@@ -333,9 +335,7 @@ int novfs_raw_send(struct novfs_xplat *pdata, struct novfs_schandle Session)
 	cFrag = reqFrag;
 
 	for (x = 0; x < xRequest.uNumRequestFrags; x++) {
-		cpylen =
-			copy_from_user(reqData, cFrag->pData,
-					cFrag->uLength);
+		cpylen = copy_from_user(reqData, cFrag->pData, cFrag->uLength);
 		reqData += cFrag->uLength;
 		cFrag++;
 	}
@@ -369,12 +369,9 @@ int novfs_raw_send(struct novfs_xplat *pdata, struct novfs_schandle Session)
 			DbgPrint("RawNCP - Copy Frag %d: 0x%X", x,
 					cFrag->uLength);
 
-			datalen =
-				min((unsigned long) cFrag->uLength, totalLen);
+			datalen = min((unsigned long) cFrag->uLength, totalLen);
 
-			cpylen =
-				copy_to_user(cFrag->pData, reqData,
-						datalen);
+			cpylen = copy_to_user(cFrag->pData, reqData, datalen);
 			totalLen -= datalen;
 			reqData += datalen;
 			actualReplyLength += datalen;
@@ -387,10 +384,12 @@ int novfs_raw_send(struct novfs_xplat *pdata, struct novfs_schandle Session)
 		retCode = -EIO;
 	}
 
-	kfree(cmd);
+
 	xRequest.uActualReplyLength = actualReplyLength;
 	cpylen = copy_to_user(pdata->reqData, &xRequest, sizeof(xRequest));
 
+out:
+	kfree(cmd);
 	kfree(reqFrag);
 	kfree(frag);
 
@@ -399,10 +398,10 @@ int novfs_raw_send(struct novfs_xplat *pdata, struct novfs_schandle Session)
 
 int novfs_conn_close(struct novfs_xplat *pdata, void ** Handle, struct novfs_schandle Session)
 {
-	struct novfs_xplat_call_request *cmd;
-	struct novfs_xplat_call_reply *reply;
+	struct novfs_xplat_call_request *cmd = NULL;
+	struct novfs_xplat_call_reply *reply = NULL;
 	struct nwc_close_conn cc;
-	struct nwd_close_conn *nwdClose;
+	struct nwd_close_conn *nwdClose = NULL;
 	int retCode = 0;
 	unsigned long cmdlen, datalen, replylen, cpylen;
 
@@ -439,10 +438,10 @@ int novfs_conn_close(struct novfs_xplat *pdata, void ** Handle, struct novfs_sch
 
 int novfs_sys_conn_close(struct novfs_xplat *pdata, unsigned long *Handle, struct novfs_schandle Session)
 {
-	struct novfs_xplat_call_request *cmd;
-	struct novfs_xplat_call_reply *reply;
+	struct novfs_xplat_call_request *cmd = NULL;
+	struct novfs_xplat_call_reply *reply = NULL;
 	struct nwc_close_conn cc;
-	struct nwd_close_conn *nwdClose;
+	struct nwd_close_conn *nwdClose = NULL;
 	unsigned int retCode = 0;
 	unsigned long cmdlen, datalen, replylen, cpylen;
 
@@ -479,13 +478,18 @@ int novfs_sys_conn_close(struct novfs_xplat *pdata, unsigned long *Handle, struc
 
 int novfs_login_id(struct novfs_xplat *pdata, struct novfs_schandle Session)
 {
-	struct nwc_login_id lgn, *plgn;
+	struct nwc_login_id lgn, *plgn = NULL;
 	int retCode = -ENOMEM;
 	struct ncl_string server;
 	struct ncl_string username;
 	struct ncl_string password;
 	unsigned long cpylen;
 	struct nwc_string nwcStr;
+
+
+	memset(&server, 0, sizeof(server));
+	memset(&username, 0, sizeof(username));
+	memset(&password, 0, sizeof(password));
 
 	cpylen = copy_from_user(&lgn, pdata->reqData, sizeof(lgn));
 
@@ -496,6 +500,9 @@ int novfs_login_id(struct novfs_xplat *pdata, struct novfs_schandle Session)
 	DbgPrint("DomainName\n");
 	novfs_dump(sizeof(nwcStr), &nwcStr);
 
+	if (nwcStr.DataLen > MAX_NAME_LEN)
+		return -EINVAL;
+
 	if ((server.buffer = kmalloc(nwcStr.DataLen, GFP_KERNEL))) {
 		server.type = nwcStr.DataType;
 		server.len = nwcStr.DataLen;
@@ -505,8 +512,11 @@ int novfs_login_id(struct novfs_xplat *pdata, struct novfs_schandle Session)
 
 			cpylen = copy_from_user(&nwcStr, lgn.pObjectName, sizeof(nwcStr));
 			DbgPrint("ObjectName");
+			if (nwcStr.DataLen > MAX_OBJECT_NAME_LENGTH) {
+				retCode = -EINVAL;
+				goto out;
+			}
 			novfs_dump(sizeof(nwcStr), &nwcStr);
-
 			if ((username.buffer = kmalloc(nwcStr.DataLen, GFP_KERNEL))) {
 				username.type = nwcStr.DataType;
 				username.len = nwcStr.DataLen;
@@ -516,6 +526,10 @@ int novfs_login_id(struct novfs_xplat *pdata, struct novfs_schandle Session)
 
 					cpylen = copy_from_user(&nwcStr, lgn.pPassword, sizeof(nwcStr));
 					DbgPrint("Password");
+					if (nwcStr.DataLen > MAX_PASSWORD_LENGTH) {
+						retCode = -EINVAL;
+						goto out;
+					}
 					novfs_dump(sizeof(nwcStr), &nwcStr);
 
 					if ((password.buffer = kmalloc(nwcStr.DataLen, GFP_KERNEL))) {
@@ -531,24 +545,26 @@ int novfs_login_id(struct novfs_xplat *pdata, struct novfs_schandle Session)
 							cpylen = copy_to_user(&plgn->AuthenticationId, &lgn.AuthenticationId, sizeof(plgn->AuthenticationId));
 						}
 						memset(password.buffer, 0, password.len);
-						kfree(password.buffer);
+
 					}
 				}
 				memset(username.buffer, 0, username.len);
-				kfree(username.buffer);
 			}
 		}
-		kfree(server.buffer);
 	}
+out:
+	kfree(password.buffer);
+	kfree(username.buffer);
+	kfree(server.buffer);
 	return (retCode);
 }
 
 int novfs_auth_conn(struct novfs_xplat *pdata, struct novfs_schandle Session)
 {
 	struct nwc_auth_with_id pauth;
-	struct nwc_auth_wid *pDauth;
-	struct novfs_xplat_call_request *cmd;
-	struct novfs_xplat_call_reply *reply;
+	struct nwc_auth_wid *pDauth = NULL;
+	struct novfs_xplat_call_request *cmd = NULL;
+	struct novfs_xplat_call_reply *reply = NULL;
 	int retCode = -ENOMEM;
 	unsigned long cmdlen, datalen, replylen, cpylen;
 
@@ -583,10 +599,10 @@ int novfs_auth_conn(struct novfs_xplat *pdata, struct novfs_schandle Session)
 
 int novfs_license_conn(struct novfs_xplat *pdata, struct novfs_schandle Session)
 {
-	struct novfs_xplat_call_request *cmd;
-	struct novfs_xplat_call_reply *reply;
+	struct novfs_xplat_call_request *cmd = NULL;
+	struct novfs_xplat_call_reply *reply = NULL;
 	struct nwc_license_conn lisc;
-	struct nwc_lisc_id * pDLisc;
+	struct nwc_lisc_id * pDLisc = NULL;
 	int retCode = -ENOMEM;
 	unsigned long cmdlen, datalen, replylen, cpylen;
 
@@ -621,9 +637,9 @@ int novfs_license_conn(struct novfs_xplat *pdata, struct novfs_schandle Session)
 
 int novfs_logout_id(struct novfs_xplat *pdata, struct novfs_schandle Session)
 {
-	struct novfs_xplat_call_request *cmd;
-	struct novfs_xplat_call_reply *reply;
-	struct nwc_lo_id logout, *pDLogout;
+	struct novfs_xplat_call_request *cmd = NULL;
+	struct novfs_xplat_call_reply *reply = NULL;
+	struct nwc_lo_id logout, *pDLogout = NULL;
 	int retCode = -ENOMEM;
 	unsigned long cmdlen, datalen, replylen, cpylen;
 
@@ -659,9 +675,9 @@ int novfs_logout_id(struct novfs_xplat *pdata, struct novfs_schandle Session)
 
 int novfs_unlicense_conn(struct novfs_xplat *pdata, struct novfs_schandle Session)
 {
-	struct novfs_xplat_call_request *cmd;
-	struct novfs_xplat_call_reply *reply;
-	struct nwc_unlic_conn *pUconn, ulc;
+	struct novfs_xplat_call_request *cmd = NULL;
+	struct novfs_xplat_call_reply *reply = NULL;
+	struct nwc_unlic_conn *pUconn = NULL, ulc;
 	int retCode = -ENOMEM;
 	unsigned long cmdlen, datalen, replylen, cpylen;
 
@@ -697,9 +713,9 @@ int novfs_unlicense_conn(struct novfs_xplat *pdata, struct novfs_schandle Sessio
 
 int novfs_unauthenticate(struct novfs_xplat *pdata, struct novfs_schandle Session)
 {
-	struct novfs_xplat_call_request *cmd;
-	struct novfs_xplat_call_reply *reply;
-	struct nwc_unauthenticate auth, *pDAuth;
+	struct novfs_xplat_call_request *cmd = NULL;
+	struct novfs_xplat_call_reply *reply = NULL;
+	struct nwc_unauthenticate auth, *pDAuth = NULL;
 	int retCode = -ENOMEM;
 	unsigned long cmdlen, datalen, replylen, cpylen;
 
@@ -736,10 +752,10 @@ int novfs_unauthenticate(struct novfs_xplat *pdata, struct novfs_schandle Sessio
 
 int novfs_get_conn_info(struct novfs_xplat *pdata, struct novfs_schandle Session)
 {
-	struct novfs_xplat_call_request *cmd;
-	struct novfs_xplat_call_reply *reply;
+	struct novfs_xplat_call_request *cmd = NULL;
+	struct novfs_xplat_call_reply *reply = NULL;
 	struct nwc_get_conn_info connInfo;
-	struct nwd_conn_info *pDConnInfo;
+	struct nwd_conn_info *pDConnInfo = NULL;
 	int retCode = -ENOMEM;
 	unsigned long cmdlen, replylen, cpylen;
 
@@ -750,6 +766,11 @@ int novfs_get_conn_info(struct novfs_xplat *pdata, struct novfs_schandle Session
 
 	if (!cmd)
 		return -ENOMEM;
+
+	if (connInfo.uInfoLength > MAX_INFO_LEN) {
+		retCode = -EINVAL;
+		goto out;
+	}
 
 	cmd->Command.CommandType = VFS_COMMAND_XPLAT_CALL;
 	cmd->Command.SequenceNumber = 0;
@@ -775,6 +796,7 @@ int novfs_get_conn_info(struct novfs_xplat *pdata, struct novfs_schandle Session
 
 		kfree(reply);
 	}
+out:
 	kfree(cmd);
 	return (retCode);
 
@@ -782,20 +804,23 @@ int novfs_get_conn_info(struct novfs_xplat *pdata, struct novfs_schandle Session
 
 int novfs_set_conn_info(struct novfs_xplat *pdata, struct novfs_schandle Session)
 {
-	struct novfs_xplat_call_request *cmd;
-	struct novfs_xplat_call_reply *reply;
+	struct novfs_xplat_call_request *cmd = NULL;
+	struct novfs_xplat_call_reply *reply = NULL;
 	struct nwc_set_conn_info connInfo;
-	struct nwd_set_conn_info *pDConnInfo;
+	struct nwd_set_conn_info *pDConnInfo = NULL;
 	int retCode = -ENOMEM;
 	unsigned long cmdlen, replylen, cpylen;
 
 	cmdlen = sizeof(*cmd) + sizeof(*pDConnInfo);
 	cmd = kmalloc(cmdlen, GFP_KERNEL);
-	cpylen =
-	    copy_from_user(&connInfo, pdata->reqData, sizeof(struct nwc_set_conn_info));
+	cpylen = copy_from_user(&connInfo, pdata->reqData, sizeof(struct nwc_set_conn_info));
 
 	if (!cmd)
 		return -ENOMEM;
+	if (connInfo.uInfoLength > MAX_INFO_LEN) {
+		retCode = -EINVAL;
+		goto out;
+	}
 
 	cmd->Command.CommandType = VFS_COMMAND_XPLAT_CALL;
 	cmd->Command.SequenceNumber = 0;
@@ -817,6 +842,8 @@ int novfs_set_conn_info(struct novfs_xplat *pdata, struct novfs_schandle Session
 		retCode = reply->Reply.ErrorCode;
 		kfree(reply);
 	}
+
+out:
 	kfree(cmd);
 	return (retCode);
 
@@ -824,12 +851,12 @@ int novfs_set_conn_info(struct novfs_xplat *pdata, struct novfs_schandle Session
 
 int novfs_get_id_info(struct novfs_xplat *pdata, struct novfs_schandle Session)
 {
-	struct novfs_xplat_call_request *cmd;
-	struct novfs_xplat_call_reply *reply;
-	struct nwc_get_id_info qidInfo, *gId;
-	struct nwd_get_id_info *idInfo;
+	struct novfs_xplat_call_request *cmd = NULL;
+	struct novfs_xplat_call_reply *reply = NULL;
+	struct nwc_get_id_info qidInfo, *gId = NULL;
+	struct nwd_get_id_info *idInfo = NULL;
 	struct nwc_string xferStr;
-	char *str;
+	char *str = NULL;
 	int retCode = -ENOMEM;
 	unsigned long cmdlen, replylen, cpylen;
 
@@ -846,12 +873,10 @@ int novfs_get_id_info(struct novfs_xplat *pdata, struct novfs_schandle Session)
 	cmd->NwcCommand = NWC_GET_IDENTITY_INFO;
 
 	idInfo = (struct nwd_get_id_info *) cmd->data;
-
 	idInfo->AuthenticationId = qidInfo.AuthenticationId;
 	cmd->dataLen = sizeof(*idInfo);
 
-	retCode =
-		Queue_Daemon_Command((void *)cmd, cmdlen, NULL, 0,
+	retCode = Queue_Daemon_Command((void *)cmd, cmdlen, NULL, 0,
 				(void **)&reply, &replylen,
 				INTERRUPTIBLE);
 	if (reply) {
@@ -863,77 +888,77 @@ int novfs_get_id_info(struct novfs_xplat *pdata, struct novfs_schandle Session)
 			 */
 			gId = pdata->reqData;
 			idInfo = (struct nwd_get_id_info *) reply->data;
-			cpylen =
-				copy_to_user(&gId->AuthenticationId,
+			cpylen = copy_to_user(&gId->AuthenticationId,
 						&idInfo->AuthenticationId,
 						sizeof(idInfo->
 							AuthenticationId));
-			cpylen =
-				copy_to_user(&gId->AuthType,
+			cpylen = copy_to_user(&gId->AuthType,
 						&idInfo->AuthType,
 						sizeof(idInfo->AuthType));
-			cpylen =
-				copy_to_user(&gId->IdentityFlags,
+			cpylen = copy_to_user(&gId->IdentityFlags,
 						&idInfo->IdentityFlags,
 						sizeof(idInfo->IdentityFlags));
-			cpylen =
-				copy_to_user(&gId->NameType,
+			cpylen = copy_to_user(&gId->NameType,
 						&idInfo->NameType,
 						sizeof(idInfo->NameType));
-			cpylen =
-				copy_to_user(&gId->ObjectType,
+			cpylen = copy_to_user(&gId->ObjectType,
 						&idInfo->ObjectType,
 						sizeof(idInfo->ObjectType));
 
-			cpylen =
-				copy_from_user(&xferStr, gId->pDomainName,
+			cpylen = copy_from_user(&xferStr, gId->pDomainName,
 						sizeof(struct nwc_string));
-			str =
-				(char *)((char *)reply->data +
-						idInfo->pDomainNameOffset);
-			cpylen =
-				copy_to_user(xferStr.pBuffer, str,
-						idInfo->domainLen);
+			if (idInfo->pDomainNameOffset >= reply->dataLen) {
+				retCode = -EINVAL;
+				goto out;
+			}
+			str = (char *)((char *)reply->data + idInfo->pDomainNameOffset);
+			if (idInfo->domainLen > reply->dataLen - idInfo->pDomainNameOffset ) {
+				retCode = -EINVAL;
+				goto out;
+			}
+
+			cpylen = copy_to_user(xferStr.pBuffer, str, idInfo->domainLen);
 			xferStr.DataType = NWC_STRING_TYPE_ASCII;
 			xferStr.DataLen = idInfo->domainLen;
-			cpylen =
-				copy_to_user(gId->pDomainName, &xferStr,
-						sizeof(struct nwc_string));
+			cpylen = copy_to_user(gId->pDomainName, &xferStr, sizeof(struct nwc_string));
+			cpylen = copy_from_user(&xferStr, gId->pObjectName, sizeof(struct nwc_string));
 
-			cpylen =
-				copy_from_user(&xferStr, gId->pObjectName,
-						sizeof(struct nwc_string));
-			str =
-				(char *)((char *)reply->data +
-						idInfo->pObjectNameOffset);
-			cpylen =
-				copy_to_user(xferStr.pBuffer, str,
-						idInfo->objectLen);
+			if (idInfo->pObjectNameOffset >= reply->dataLen) {
+				retCode = -EINVAL;
+				goto out;
+			}
+			str = (char *)((char *)reply->data + idInfo->pObjectNameOffset);
+			if (idInfo->objectLen > reply->dataLen - idInfo->pObjectNameOffset) {
+				retCode = -EINVAL;
+				goto out;
+			}
+			cpylen = copy_to_user(xferStr.pBuffer, str, idInfo->objectLen);
 			xferStr.DataLen = idInfo->objectLen - 1;
 			xferStr.DataType = NWC_STRING_TYPE_ASCII;
-			cpylen =
-				copy_to_user(gId->pObjectName, &xferStr,
-						sizeof(struct nwc_string));
+			cpylen = copy_to_user(gId->pObjectName, &xferStr, sizeof(struct nwc_string));
+		}
 		}
 
+out:
 		kfree(reply);
-	}
 	kfree(cmd);
 	return (retCode);
 }
 
 int novfs_scan_conn_info(struct novfs_xplat *pdata, struct novfs_schandle Session)
 {
-	struct novfs_xplat_call_request *cmd;
-	struct novfs_xplat_call_reply *reply;
-	struct nwc_scan_conn_info connInfo, *rInfo;
-	struct nwd_scan_conn_info *pDConnInfo;
+	struct novfs_xplat_call_request *cmd = NULL;
+	struct novfs_xplat_call_reply *reply = NULL;
+	struct nwc_scan_conn_info connInfo, *rInfo = NULL;
+	struct nwd_scan_conn_info *pDConnInfo = NULL;
 	int retCode = -ENOMEM;
 	unsigned long cmdlen, replylen, cpylen;
-	unsigned char *localData;
+	unsigned char *localData = NULL;
 
-	cpylen =
-	    copy_from_user(&connInfo, pdata->reqData, sizeof(struct nwc_scan_conn_info));
+	cpylen = copy_from_user(&connInfo, pdata->reqData, sizeof(struct nwc_scan_conn_info));
+
+	if (connInfo.uReturnInfoLength > MAX_INFO_LEN || connInfo.uScanInfoLen > MAX_INFO_LEN)
+		return -EINVAL;
 
 	cmdlen = sizeof(*cmd) + sizeof(*pDConnInfo) + connInfo.uScanInfoLen;
 	cmd = kmalloc(cmdlen, GFP_KERNEL);
@@ -962,8 +987,7 @@ int novfs_scan_conn_info(struct novfs_xplat *pdata, struct novfs_schandle Sessio
 	__DbgPrint("    connInfo.uScanFlags = 0x%X\n", connInfo.uScanFlags);
 
 	pDConnInfo->uScanIndex = connInfo.uScanIndex;
-	pDConnInfo->uConnectionReference =
-		connInfo.uConnectionReference;
+	pDConnInfo->uConnectionReference = connInfo.uConnectionReference;
 	pDConnInfo->uScanInfoLevel = connInfo.uScanInfoLevel;
 	pDConnInfo->uScanInfoLen = connInfo.uScanInfoLen;
 	pDConnInfo->uReturnInfoLength = connInfo.uReturnInfoLength;
@@ -974,8 +998,7 @@ int novfs_scan_conn_info(struct novfs_xplat *pdata, struct novfs_schandle Sessio
 		localData = (unsigned char *) pDConnInfo;
 		pDConnInfo->uScanConnInfoOffset = sizeof(*pDConnInfo);
 		localData += pDConnInfo->uScanConnInfoOffset;
-		cpylen =
-			copy_from_user(localData, connInfo.pScanConnInfo,
+		cpylen = copy_from_user(localData, connInfo.pScanConnInfo,
 					connInfo.uScanInfoLen);
 	} else {
 		pDConnInfo->uScanConnInfoOffset = 0;
@@ -1035,8 +1058,7 @@ int novfs_scan_conn_info(struct novfs_xplat *pdata, struct novfs_schandle Sessio
 static void GetUserData(struct nwc_scan_conn_info * connInfo, struct novfs_xplat_call_request *cmd, struct novfs_xplat_call_reply *reply)
 {
 	unsigned long uLevel;
-	struct nwd_scan_conn_info *pDConnInfo;
-
+	struct nwd_scan_conn_info *pDConnInfo = NULL;
 	unsigned char *srcData = NULL;
 	unsigned long dataLen = 0, cpylen;
 
@@ -1082,26 +1104,17 @@ static void GetUserData(struct nwc_scan_conn_info * connInfo, struct novfs_xplat
 			DbgPrint("NWC_CONN_INFO_TRAN_ADDR 0x%p -> 0x%p :: 0x%X",
 			     srcData, connInfo->pReturnConnInfo, dataLen);
 
-			cpylen =
-			    copy_from_user(&tranAddr, dstData,
-					   sizeof(tranAddr));
-
-			srcData +=
-			    ((struct nwd_scan_conn_info *) srcData)->
-			    uReturnConnInfoOffset;
-
-			tranAddr.uTransportType =
-			    ((struct nwd_tran_addr *)  srcData)->uTransportType;
-			tranAddr.uAddressLength =
-			    ((struct tagNwdTranAddrEx *) srcData)->uAddressLength;
-
-			cpylen =
-			    copy_to_user(dstData, &tranAddr, sizeof(tranAddr));
-			cpylen =
-			    copy_to_user(tranAddr.puAddress,
-					 ((struct tagNwdTranAddrEx *) srcData)->Buffer,
-					 ((struct tagNwdTranAddrEx *) srcData)->
-					 uAddressLength);
+			cpylen = copy_from_user(&tranAddr, dstData, sizeof(tranAddr));
+			if (((struct nwd_scan_conn_info *) srcData)->uReturnConnInfoOffset >= reply->dataLen)
+				goto out;
+			srcData += ((struct nwd_scan_conn_info *)srcData)->uReturnConnInfoOffset;
+			tranAddr.uTransportType = ((struct nwd_tran_addr *)srcData)->uTransportType;
+			tranAddr.uAddressLength = ((struct tagNwdTranAddrEx *)srcData)->uAddressLength;
+			if (tranAddr.uAddressLength > MAX_ADDRESS_LENGTH)
+				goto out;
+			cpylen = copy_to_user(dstData, &tranAddr, sizeof(tranAddr));
+			cpylen = copy_to_user(tranAddr.puAddress,
+					 ((struct tagNwdTranAddrEx *) srcData)->Buffer, tranAddr.uAddressLength);
 			dataLen = 0;
 			break;
 		}
@@ -1115,13 +1128,13 @@ static void GetUserData(struct nwc_scan_conn_info * connInfo, struct novfs_xplat
 		break;
 	}
 
-	if (srcData && dataLen) {
+	if (srcData && dataLen && dataLen <= reply->dataLen) {
 		DbgPrint("Copy Data 0x%p -> 0x%p :: 0x%X",
 			 srcData, connInfo->pReturnConnInfo, dataLen);
-		cpylen =
-		    copy_to_user(connInfo->pReturnConnInfo, srcData, dataLen);
+		cpylen = copy_to_user(connInfo->pReturnConnInfo, srcData, dataLen);
 	}
 
+out:
 	return;
 }
 
@@ -1131,7 +1144,7 @@ static void GetUserData(struct nwc_scan_conn_info * connInfo, struct novfs_xplat
 static void GetConnData(struct nwc_get_conn_info * connInfo, struct novfs_xplat_call_request *cmd, struct novfs_xplat_call_reply *reply)
 {
 	unsigned long uLevel;
-	struct nwd_conn_info * pDConnInfo;
+	struct nwd_conn_info *pDConnInfo = NULL;
 
 	unsigned char *srcData = NULL;
 	unsigned long dataLen = 0, cpylen;
@@ -1156,21 +1169,17 @@ static void GetConnData(struct nwc_get_conn_info * connInfo, struct novfs_xplat_
 
 			srcData = (unsigned char *) reply->data;
 
-			cpylen =
-			    copy_from_user(&tranAddr, dstData,
-					   sizeof(tranAddr));
+			cpylen = copy_from_user(&tranAddr, dstData, sizeof(tranAddr));
 			tranAddr.uTransportType =
 			    ((struct tagNwdTranAddrEx *) srcData)->uTransportType;
 			tranAddr.uAddressLength =
 			    ((struct tagNwdTranAddrEx *) srcData)->uAddressLength;
-
-			cpylen =
-			    copy_to_user(dstData, &tranAddr, sizeof(tranAddr));
-			cpylen =
-			    copy_to_user(tranAddr.puAddress,
+			if (tranAddr.uAddressLength > MAX_ADDRESS_LENGTH)
+				goto out;
+			cpylen = copy_to_user(dstData, &tranAddr, sizeof(tranAddr));
+			cpylen = copy_to_user(tranAddr.puAddress,
 					 ((struct tagNwdTranAddrEx *) srcData)->Buffer,
-					 ((struct tagNwdTranAddrEx *) srcData)->
-					 uAddressLength);
+				         tranAddr.uAddressLength);
 			dataLen = 0;
 			break;
 		}
@@ -1214,20 +1223,19 @@ static void GetConnData(struct nwc_get_conn_info * connInfo, struct novfs_xplat_
 		break;
 	}
 
-	if (srcData && dataLen) {
-		cpylen =
-		    copy_to_user(connInfo->pConnInfo, srcData,
-				 connInfo->uInfoLength);
+	if (srcData && dataLen && dataLen <= reply->dataLen) {
+		cpylen = copy_to_user(connInfo->pConnInfo, srcData, connInfo->uInfoLength);
 	}
 
+out:
 	return;
 }
 
 int novfs_get_daemon_ver(struct novfs_xplat *pdata, struct novfs_schandle Session)
 {
-	struct novfs_xplat_call_request *cmd;
-	struct novfs_xplat_call_reply *reply;
-	struct nwd_get_reqversion *pDVersion;
+	struct novfs_xplat_call_request *cmd = NULL;
+	struct novfs_xplat_call_reply *reply = NULL;
+	struct nwd_get_reqversion *pDVersion = NULL;
 	int retCode = -ENOMEM;
 	unsigned long cmdlen, datalen, replylen, cpylen;
 
@@ -1261,17 +1269,18 @@ int novfs_get_daemon_ver(struct novfs_xplat *pdata, struct novfs_schandle Sessio
 
 int novfs_get_preferred_DS_tree(struct novfs_xplat *pdata, struct novfs_schandle Session)
 {
-	struct novfs_xplat_call_request *cmd;
-	struct novfs_xplat_call_reply *reply;
-	struct nwd_get_pref_ds_tree *pDGetTree;
-	struct nwc_get_pref_ds_tree xplatCall, *p;
+	struct novfs_xplat_call_request *cmd = NULL;
+	struct novfs_xplat_call_reply *reply = NULL;
+	struct nwd_get_pref_ds_tree *pDGetTree = NULL;
+	struct nwc_get_pref_ds_tree xplatCall, *p = NULL;
 	int retCode = -ENOMEM;
 	unsigned long cmdlen, datalen, replylen, cpylen;
-	unsigned char *dPtr;
+	unsigned char *dPtr = NULL;
 
-	cpylen =
-	    copy_from_user(&xplatCall, pdata->reqData,
+	cpylen = copy_from_user(&xplatCall, pdata->reqData,
 			   sizeof(struct nwc_get_pref_ds_tree));
+	if (xplatCall.uTreeLength > NW_MAX_TREE_NAME_LEN)
+		return -EINVAL;
 	datalen = sizeof(*pDGetTree) + xplatCall.uTreeLength;
 	cmdlen = datalen + sizeof(*cmd);
 	cmd = kmalloc(cmdlen, GFP_KERNEL);
@@ -1292,10 +1301,12 @@ int novfs_get_preferred_DS_tree(struct novfs_xplat *pdata, struct novfs_schandle
 	if (reply) {
 		retCode = reply->Reply.ErrorCode;
 		if (!retCode) {
-			pDGetTree =
-				(struct nwd_get_pref_ds_tree *) reply->data;
-			dPtr =
-				reply->data + pDGetTree->DsTreeNameOffset;
+			pDGetTree = (struct nwd_get_pref_ds_tree *) reply->data;
+			if (pDGetTree->DsTreeNameOffset >= reply->dataLen) {
+				retCode = -EINVAL;
+				goto out;
+			}
+			dPtr = reply->data + pDGetTree->DsTreeNameOffset;
 			p = (struct nwc_get_pref_ds_tree *) pdata->reqData;
 
 			DbgPrint("Reply recieved");
@@ -1303,14 +1314,17 @@ int novfs_get_preferred_DS_tree(struct novfs_xplat *pdata, struct novfs_schandle
 					pDGetTree->uTreeLength);
 			__DbgPrint("   TreeName = %s\n", dPtr);
 
-			cpylen =
-				copy_to_user(p, &pDGetTree->uTreeLength, 4);
-			cpylen =
-				copy_to_user(xplatCall.pDsTreeName, dPtr,
-						pDGetTree->uTreeLength);
+			if (pDGetTree->uTreeLength > reply->dataLen - pDGetTree->DsTreeNameOffset) {
+				retCode = -EINVAL;
+				goto out;
+			}
+			cpylen = copy_to_user(p, &pDGetTree->uTreeLength, 4);
+			cpylen = copy_to_user(xplatCall.pDsTreeName, dPtr, pDGetTree->uTreeLength);
 		}
-		kfree(reply);
 	}
+
+out:
+	kfree(reply);
 	kfree(cmd);
 	return (retCode);
 
@@ -1318,17 +1332,17 @@ int novfs_get_preferred_DS_tree(struct novfs_xplat *pdata, struct novfs_schandle
 
 int novfs_set_preferred_DS_tree(struct novfs_xplat *pdata, struct novfs_schandle Session)
 {
-	struct novfs_xplat_call_request *cmd;
-	struct novfs_xplat_call_reply *reply;
-	struct nwd_set_pref_ds_tree *pDSetTree;
+	struct novfs_xplat_call_request *cmd = NULL;
+	struct novfs_xplat_call_reply *reply = NULL;
+	struct nwd_set_pref_ds_tree *pDSetTree = NULL;
 	struct nwc_set_pref_ds_tree xplatCall;
 	int retCode = -ENOMEM;
 	unsigned long cmdlen, datalen, replylen, cpylen;
-	unsigned char *dPtr;
+	unsigned char *dPtr = NULL;
 
-	cpylen =
-	    copy_from_user(&xplatCall, pdata->reqData,
-			   sizeof(struct nwc_set_pref_ds_tree));
+	cpylen = copy_from_user(&xplatCall, pdata->reqData, sizeof(struct nwc_set_pref_ds_tree));
+	if (xplatCall.uTreeLength > NW_MAX_TREE_NAME_LEN)
+		return -EINVAL;
 	datalen = sizeof(*pDSetTree) + xplatCall.uTreeLength;
 	cmdlen = datalen + sizeof(*cmd);
 	cmd = kmalloc(cmdlen, GFP_KERNEL);
@@ -1346,8 +1360,7 @@ int novfs_set_preferred_DS_tree(struct novfs_xplat *pdata, struct novfs_schandle
 	pDSetTree->uTreeLength = xplatCall.uTreeLength;
 
 	dPtr = cmd->data + sizeof(*pDSetTree);
-	cpylen =
-		copy_from_user(dPtr, xplatCall.pDsTreeName,
+	cpylen = copy_from_user(dPtr, xplatCall.pDsTreeName,
 				xplatCall.uTreeLength);
 
 	retCode =
@@ -1366,19 +1379,19 @@ int novfs_set_preferred_DS_tree(struct novfs_xplat *pdata, struct novfs_schandle
 int novfs_set_default_ctx(struct novfs_xplat *pdata,
 		struct novfs_schandle Session)
 {
-	struct novfs_xplat_call_request *cmd;
-	struct novfs_xplat_call_reply *reply;
+	struct novfs_xplat_call_request *cmd = NULL;
+	struct novfs_xplat_call_reply *reply = NULL;
 	struct nwc_set_def_name_ctx xplatCall;
-	struct nwd_set_def_name_ctx * pDSet;
+	struct nwd_set_def_name_ctx * pDSet = NULL;
 	int retCode = -ENOMEM;
 	unsigned long cmdlen, datalen, replylen, cpylen;
-	unsigned char *dPtr;
+	unsigned char *dPtr = NULL;
 
-	cpylen =
-	    copy_from_user(&xplatCall, pdata->reqData,
+	cpylen = copy_from_user(&xplatCall, pdata->reqData,
 			   sizeof(struct nwc_set_def_name_ctx));
-	datalen =
-	    sizeof(*pDSet) + xplatCall.uTreeLength + xplatCall.uNameLength;
+	if (xplatCall.uNameLength > MAX_NAME_LEN || xplatCall.uTreeLength > NW_MAX_TREE_NAME_LEN)
+		return -EINVAL;
+	datalen = sizeof(*pDSet) + xplatCall.uTreeLength + xplatCall.uNameLength;
 	cmdlen = datalen + sizeof(*cmd);
 	cmd = kmalloc(cmdlen, GFP_KERNEL);
 
@@ -1388,23 +1401,19 @@ int novfs_set_default_ctx(struct novfs_xplat *pdata,
 	cmd->Command.SequenceNumber = 0;
 	cmd->Command.SessionId = Session;
 	cmd->NwcCommand = NWC_SET_DEFAULT_NAME_CONTEXT;
-	cmd->dataLen =
-		sizeof(struct nwd_set_def_name_ctx) +
-		xplatCall.uTreeLength + xplatCall.uNameLength;
+	cmd->dataLen = sizeof(struct nwd_set_def_name_ctx) + xplatCall.uTreeLength + xplatCall.uNameLength;
 
 	pDSet = (struct nwd_set_def_name_ctx *) cmd->data;
 	dPtr = cmd->data;
 
 	pDSet->TreeOffset = sizeof(struct nwd_set_def_name_ctx);
 	pDSet->uTreeLength = xplatCall.uTreeLength;
-	pDSet->NameContextOffset =
-		pDSet->TreeOffset + xplatCall.uTreeLength;
+	pDSet->NameContextOffset = pDSet->TreeOffset + xplatCall.uTreeLength;
 	pDSet->uNameLength = xplatCall.uNameLength;
 
 	//sgled      cpylen = copy_from_user(dPtr+pDSet->TreeOffset, xplatCall.pTreeName, xplatCall.uTreeLength);
 	cpylen = copy_from_user(dPtr + pDSet->TreeOffset, xplatCall.pDsTreeName, xplatCall.uTreeLength);	//sgled
-	cpylen =
-		copy_from_user(dPtr + pDSet->NameContextOffset,
+	cpylen = copy_from_user(dPtr + pDSet->NameContextOffset,
 				xplatCall.pNameContext,
 				xplatCall.uNameLength);
 
@@ -1424,20 +1433,20 @@ int novfs_set_default_ctx(struct novfs_xplat *pdata,
 int novfs_get_default_ctx(struct novfs_xplat *pdata,
 		struct novfs_schandle Session)
 {
-	struct novfs_xplat_call_request *cmd;
-	struct novfs_xplat_call_reply *reply;
+	struct novfs_xplat_call_request *cmd = NULL;
+	struct novfs_xplat_call_reply *reply = NULL;
 	struct nwc_get_def_name_ctx xplatCall;
-	struct nwd_get_def_name_ctx * pGet;
-	char *dPtr;
+	struct nwd_get_def_name_ctx * pGet = NULL;
+	char *dPtr = NULL;
 	int retCode = -ENOMEM;
 	unsigned long cmdlen, replylen, cpylen;
 
-	cpylen =
-	    copy_from_user(&xplatCall, pdata->reqData,
+	cpylen = copy_from_user(&xplatCall, pdata->reqData,
 			   sizeof(struct nwc_get_def_name_ctx));
-	cmdlen =
-	    sizeof(*cmd) + sizeof(struct nwd_get_def_name_ctx ) +
-	    xplatCall.uTreeLength;
+	if (xplatCall.uTreeLength > NW_MAX_TREE_NAME_LEN)
+		return -EINVAL;
+
+	cmdlen = sizeof(*cmd) + sizeof(struct nwd_get_def_name_ctx ) + xplatCall.uTreeLength;
 	cmd = kmalloc(cmdlen, GFP_KERNEL);
 
 	if (!cmd)
@@ -1512,16 +1521,20 @@ int novfs_query_feature(struct novfs_xplat *pdata, struct novfs_schandle Session
 int novfs_get_tree_monitored_conn(struct novfs_xplat *pdata,
 		struct novfs_schandle Session)
 {
-	struct novfs_xplat_call_request *cmd;
-	struct novfs_xplat_call_reply *reply;
-	struct nwc_get_tree_monitored_conn_ref xplatCall, *p;
-	struct nwd_get_tree_monitored_conn_ref *pDConnRef;
-	char *dPtr;
+	struct novfs_xplat_call_request *cmd = NULL;
+	struct novfs_xplat_call_reply *reply = NULL;
+	struct nwc_get_tree_monitored_conn_ref xplatCall, *p = NULL;
+	struct nwd_get_tree_monitored_conn_ref *pDConnRef = NULL;
+	char *dPtr = NULL;
 	unsigned long status = -ENOMEM, cmdlen, datalen, replylen, cpylen;
 
 	cpylen =
 	    copy_from_user(&xplatCall, pdata->reqData,
 			   sizeof(struct nwc_get_tree_monitored_conn_ref));
+	if (!access_ok(VERIFY_READ, xplatCall.pTreeName, sizeof(struct nwc_string)))
+		return -EINVAL;
+	if (xplatCall.pTreeName->DataLen > NW_MAX_TREE_NAME_LEN)
+		return -EINVAL;
 	datalen = sizeof(*pDConnRef) + xplatCall.pTreeName->DataLen;
 	cmdlen = datalen + sizeof(*cmd);
 	cmd = kmalloc(cmdlen, GFP_KERNEL);
@@ -1564,12 +1577,12 @@ int novfs_get_tree_monitored_conn(struct novfs_xplat *pdata,
 
 int novfs_enum_ids(struct novfs_xplat *pdata, struct novfs_schandle Session)
 {
-	struct novfs_xplat_call_request *cmd;
-	struct novfs_xplat_call_reply *reply;
-	struct nwc_enum_ids xplatCall, *eId;
-	struct nwd_enum_ids *pEnum;
+	struct novfs_xplat_call_request *cmd = NULL;
+	struct novfs_xplat_call_reply *reply = NULL;
+	struct nwc_enum_ids xplatCall, *eId = NULL;
+	struct nwd_enum_ids *pEnum = NULL;
 	struct nwc_string xferStr;
-	char *str;
+	char *str = NULL;
 	unsigned long status = -ENOMEM, cmdlen, datalen, replylen, cpylen;
 
 	cpylen =
@@ -1629,56 +1642,71 @@ int novfs_enum_ids(struct novfs_xplat *pdata, struct novfs_schandle Session)
 			cpylen =
 				copy_from_user(&xferStr, eId->pDomainName,
 						sizeof(struct nwc_string));
+			if (pEnum->domainNameOffset >= reply->dataLen) {
+				status = -EINVAL;
+				goto out;
+			}
 			str =
 				(char *)((char *)reply->data +
 						pEnum->domainNameOffset);
-			DbgPrint("[XPLAT NWCAPI] Found Domain %s",
-					str);
+			DbgPrint("[XPLAT NWCAPI] Found Domain %s", str);
+			if (pEnum->domainNameLen > reply->dataLen - pEnum->domainNameOffset) {
+				status = -EINVAL;
+				goto out;
+			}
 			cpylen =
 				copy_to_user(xferStr.pBuffer, str,
 						pEnum->domainNameLen);
 			xferStr.DataType = NWC_STRING_TYPE_ASCII;
 			xferStr.DataLen = pEnum->domainNameLen - 1;
-			cpylen =
-				copy_to_user(eId->pDomainName, &xferStr,
+			cpylen = copy_to_user(eId->pDomainName, &xferStr,
 						sizeof(struct nwc_string));
 
-			cpylen =
-				copy_from_user(&xferStr, eId->pObjectName,
+			cpylen = copy_from_user(&xferStr, eId->pObjectName,
 						sizeof(struct nwc_string));
-			str =
-				(char *)((char *)reply->data +
-						pEnum->objectNameOffset);
+			if (pEnum->objectNameOffset >= reply->dataLen) {
+				status = -EINVAL;
+				goto out;
+			}
+			str = (char *)((char *)reply->data + pEnum->objectNameOffset);
 			DbgPrint("[XPLAT NWCAPI] Found User %s", str);
-			cpylen =
-				copy_to_user(xferStr.pBuffer, str,
-						pEnum->objectNameLen);
+			if (pEnum->objectNameLen > reply->dataLen - pEnum->objectNameOffset) {
+				status = -EINVAL;
+				goto out;
+			}
+			cpylen = copy_to_user(xferStr.pBuffer, str, pEnum->objectNameLen);
 			xferStr.DataType = NWC_STRING_TYPE_ASCII;
 			xferStr.DataLen = pEnum->objectNameLen - 1;
-			cpylen =
-				copy_to_user(eId->pObjectName, &xferStr,
-						sizeof(struct nwc_string));
+			cpylen = copy_to_user(eId->pObjectName, &xferStr, sizeof(struct nwc_string));
 		}
-
-		kfree(reply);
-
 	}
+out:
+	kfree(reply);
 	kfree(cmd);
 	return (status);
 }
 
 int novfs_change_auth_key(struct novfs_xplat *pdata, struct novfs_schandle Session)
 {
-	struct novfs_xplat_call_request *cmd;
-	struct novfs_xplat_call_reply *reply;
+	struct novfs_xplat_call_request *cmd = NULL;
+	struct novfs_xplat_call_reply *reply = NULL;
 	struct nwc_change_key xplatCall;
-	struct nwd_change_key *pNewKey;
+	struct nwd_change_key *pNewKey = NULL;
 	struct nwc_string xferStr;
-	char *str;
-	unsigned long status = -ENOMEM, cmdlen, datalen, replylen, cpylen;
+	char *str = NULL;
+	unsigned long status = -ENOMEM, cmdlen = 0, datalen, replylen, cpylen;
 
-	cpylen =
-	    copy_from_user(&xplatCall, pdata->reqData, sizeof(struct nwc_change_key));
+	cpylen = copy_from_user(&xplatCall, pdata->reqData, sizeof(struct nwc_change_key));
+	if (!access_ok(VERIFY_READ, xplatCall.pDomainName, sizeof(struct nwc_string)) ||
+	    !access_ok(VERIFY_READ, xplatCall.pObjectName, sizeof(struct nwc_string)) ||
+	    !access_ok(VERIFY_READ, xplatCall.pNewPassword, sizeof(struct nwc_string)) ||
+	    !access_ok(VERIFY_READ, xplatCall.pVerifyPassword, sizeof(struct nwc_string)))
+		return -EINVAL;
+	if (xplatCall.pDomainName->DataLen > MAX_DOMAIN_LEN ||
+	    xplatCall.pObjectName->DataLen > MAX_OBJECT_NAME_LENGTH ||
+	    xplatCall.pNewPassword->DataLen > MAX_PASSWORD_LENGTH ||
+	    xplatCall.pVerifyPassword->DataLen > MAX_PASSWORD_LENGTH)
+		return -EINVAL;
 
 	datalen =
 	    sizeof(struct nwd_change_key) + xplatCall.pDomainName->DataLen +
@@ -1707,10 +1735,12 @@ int novfs_change_auth_key(struct novfs_xplat *pdata, struct novfs_schandle Sessi
 	 * Get the tree name
 	 */
 	str += sizeof(*pNewKey);
-	cpylen =
-		copy_from_user(&xferStr, xplatCall.pDomainName,
-				sizeof(struct nwc_string));
+	cpylen = copy_from_user(&xferStr, xplatCall.pDomainName, sizeof(struct nwc_string));
 	pNewKey->domainNameOffset = sizeof(*pNewKey);
+	if (xferStr.DataLen > MAX_DOMAIN_LEN) {
+		status = -EINVAL;
+		goto out;
+	}
 	cpylen = copy_from_user(str, xferStr.pBuffer, xferStr.DataLen);
 	pNewKey->domainNameLen = xferStr.DataLen;
 
@@ -1718,11 +1748,12 @@ int novfs_change_auth_key(struct novfs_xplat *pdata, struct novfs_schandle Sessi
 	 * Get the User Name
 	 */
 	str += pNewKey->domainNameLen;
-	cpylen =
-		copy_from_user(&xferStr, xplatCall.pObjectName,
-				sizeof(struct nwc_string));
-	pNewKey->objectNameOffset =
-		pNewKey->domainNameOffset + pNewKey->domainNameLen;
+	cpylen = copy_from_user(&xferStr, xplatCall.pObjectName, sizeof(struct nwc_string));
+	pNewKey->objectNameOffset = pNewKey->domainNameOffset + pNewKey->domainNameLen;
+	if (xferStr.DataLen > MAX_OBJECT_NAME_LENGTH) {
+		status = -EINVAL;
+		goto out;
+	}
 	cpylen = copy_from_user(str, xferStr.pBuffer, xferStr.DataLen);
 	pNewKey->objectNameLen = xferStr.DataLen;
 
@@ -1730,11 +1761,12 @@ int novfs_change_auth_key(struct novfs_xplat *pdata, struct novfs_schandle Sessi
 	 * Get the New Password
 	 */
 	str += pNewKey->objectNameLen;
-	cpylen =
-		copy_from_user(&xferStr, xplatCall.pNewPassword,
-				sizeof(struct nwc_string));
-	pNewKey->newPasswordOffset =
-		pNewKey->objectNameOffset + pNewKey->objectNameLen;
+	cpylen = copy_from_user(&xferStr, xplatCall.pNewPassword, sizeof(struct nwc_string));
+	pNewKey->newPasswordOffset = pNewKey->objectNameOffset + pNewKey->objectNameLen;
+	if (xferStr.DataLen > MAX_PASSWORD_LENGTH) {
+		status = -EINVAL;
+		goto out;
+	}
 	cpylen = copy_from_user(str, xferStr.pBuffer, xferStr.DataLen);
 	pNewKey->newPasswordLen = xferStr.DataLen;
 
@@ -1742,34 +1774,35 @@ int novfs_change_auth_key(struct novfs_xplat *pdata, struct novfs_schandle Sessi
 	 * Get the Verify Password
 	 */
 	str += pNewKey->newPasswordLen;
-	cpylen =
-		copy_from_user(&xferStr, xplatCall.pVerifyPassword,
-				sizeof(struct nwc_string));
-	pNewKey->verifyPasswordOffset =
-		pNewKey->newPasswordOffset + pNewKey->newPasswordLen;
+	cpylen = copy_from_user(&xferStr, xplatCall.pVerifyPassword, sizeof(struct nwc_string));
+	pNewKey->verifyPasswordOffset = pNewKey->newPasswordOffset + pNewKey->newPasswordLen;
+	if (xferStr.DataLen > MAX_PASSWORD_LENGTH) {
+		status = -EINVAL;
+		goto out;
+	}
 	cpylen = copy_from_user(str, xferStr.pBuffer, xferStr.DataLen);
 	pNewKey->verifyPasswordLen = xferStr.DataLen;
 
-	status =
-		Queue_Daemon_Command((void *)cmd, cmdlen, NULL, 0,
+	status = Queue_Daemon_Command((void *)cmd, cmdlen, NULL, 0,
 				(void **)&reply, &replylen,
 				INTERRUPTIBLE);
 	if (reply) {
 		status = reply->Reply.ErrorCode;
-		kfree(reply);
-	}
-	memset(cmd, 0, cmdlen);
 
+	}
+out:
+	memset(cmd, 0, cmdlen);
+	kfree(reply);
 	kfree(cmd);
 	return (status);
 }
 
 int novfs_set_pri_conn(struct novfs_xplat *pdata, struct novfs_schandle Session)
 {
-	struct novfs_xplat_call_request *cmd;
-	struct novfs_xplat_call_reply *reply;
+	struct novfs_xplat_call_request *cmd = NULL;
+	struct novfs_xplat_call_reply *reply = NULL;
 	struct nwc_set_primary_conn xplatCall;
-	struct nwd_set_primary_conn *pConn;
+	struct nwd_set_primary_conn *pConn = NULL;
 	unsigned long status = -ENOMEM, cmdlen, datalen, replylen, cpylen;
 
 	cpylen =
@@ -1805,7 +1838,7 @@ int novfs_set_pri_conn(struct novfs_xplat *pdata, struct novfs_schandle Session)
 int novfs_get_pri_conn(struct novfs_xplat *pdata, struct novfs_schandle Session)
 {
 	struct novfs_xplat_call_request cmd;
-	struct novfs_xplat_call_reply *reply;
+	struct novfs_xplat_call_reply *reply = NULL;
 	unsigned long status = -ENOMEM, cmdlen, replylen, cpylen;
 
 	cmdlen = (unsigned long) (&((struct novfs_xplat_call_request *) 0)->data);
@@ -1837,8 +1870,8 @@ int novfs_get_pri_conn(struct novfs_xplat *pdata, struct novfs_schandle Session)
 int novfs_set_map_drive(struct novfs_xplat *pdata, struct novfs_schandle Session)
 {
 
-	struct novfs_xplat_call_request *cmd;
-	struct novfs_xplat_call_reply *reply;
+	struct novfs_xplat_call_request *cmd = NULL;
+	struct novfs_xplat_call_reply *reply = NULL;
 	unsigned long status = 0, datalen, cmdlen, replylen;
 	struct nwc_map_drive_ex symInfo;
 
@@ -1846,6 +1879,8 @@ int novfs_set_map_drive(struct novfs_xplat *pdata, struct novfs_schandle Session
 	cmdlen = sizeof(*cmd);
 	if (copy_from_user(&symInfo, pdata->reqData, sizeof(symInfo)))
 		return -EFAULT;
+	if (symInfo.dirPathOffsetLength > MAX_OFFSET_LEN || symInfo.linkOffsetLength > MAX_OFFSET_LEN)
+		return -EINVAL;
 	datalen = sizeof(symInfo) + symInfo.dirPathOffsetLength +
 	    symInfo.linkOffsetLength;
 
@@ -1890,14 +1925,16 @@ int novfs_set_map_drive(struct novfs_xplat *pdata, struct novfs_schandle Session
 
 int novfs_unmap_drive(struct novfs_xplat *pdata, struct novfs_schandle Session)
 {
-	struct novfs_xplat_call_request *cmd;
-	struct novfs_xplat_call_reply *reply;
+	struct novfs_xplat_call_request *cmd = NULL;
+	struct novfs_xplat_call_reply *reply = NULL;
 	unsigned long status = 0, datalen, cmdlen, replylen, cpylen;
 	struct nwc_unmap_drive_ex symInfo;
 
 	DbgPrint("");
 
 	cpylen = copy_from_user(&symInfo, pdata->reqData, sizeof(symInfo));
+	if (symInfo.linkLen > MAX_NAME_LEN)
+		return -EINVAL;
 	cmdlen = sizeof(*cmd);
 	datalen = sizeof(symInfo) + symInfo.linkLen;
 
@@ -1913,8 +1950,7 @@ int novfs_unmap_drive(struct novfs_xplat *pdata, struct novfs_schandle Session)
 	cmd->NwcCommand = NWC_UNMAP_DRIVE;
 
 	cpylen = copy_from_user(cmd->data, pdata->reqData, datalen);
-	status =
-		Queue_Daemon_Command((void *)cmd, cmdlen, NULL, 0,
+	status = Queue_Daemon_Command((void *)cmd, cmdlen, NULL, 0,
 				(void **)&reply, &replylen,
 				INTERRUPTIBLE);
 
@@ -1928,11 +1964,11 @@ int novfs_unmap_drive(struct novfs_xplat *pdata, struct novfs_schandle Session)
 
 int novfs_enum_drives(struct novfs_xplat *pdata, struct novfs_schandle Session)
 {
-	struct novfs_xplat_call_request *cmd;
-	struct novfs_xplat_call_reply *reply;
+	struct novfs_xplat_call_request *cmd = NULL;
+	struct novfs_xplat_call_reply *reply = NULL;
 	unsigned long status = 0, cmdlen, replylen, cpylen;
 	unsigned long offset;
-	char *cp;
+	char *cp = NULL;
 
 	DbgPrint("");
 
@@ -1955,37 +1991,36 @@ int novfs_enum_drives(struct novfs_xplat *pdata, struct novfs_schandle Session)
 		status = reply->Reply.ErrorCode;
 		DbgPrint("Status Code = 0x%X", status);
 		if (!status) {
-			offset =
-				sizeof(((struct nwc_get_mapped_drives *) pdata->
+			offset = sizeof(((struct nwc_get_mapped_drives *) pdata->
 							repData)->MapBuffLen);
 			cp = reply->data;
-			replylen =
-				((struct nwc_get_mapped_drives *) pdata->repData)->
-				MapBuffLen;
-			cpylen =
-				copy_to_user(pdata->repData, cp, offset);
+			replylen = ((struct nwc_get_mapped_drives *) pdata->repData)->MapBuffLen;
+			if (offset > reply->dataLen) {
+				status = -EINVAL;
+				goto out;
+			}
+			cpylen = copy_to_user(pdata->repData, cp, offset);
 			cp += offset;
-			cpylen =
-				copy_to_user(((struct nwc_get_mapped_drives *) pdata->
+			cpylen = copy_to_user(((struct nwc_get_mapped_drives *) pdata->
 							repData)->MapBuffer, cp,
 						min(replylen - offset,
 							reply->dataLen - offset));
 		}
-
-		kfree(reply);
 	}
+out:
+	kfree(reply);
 	kfree(cmd);
 	return (status);
 }
 
 int novfs_get_bcast_msg(struct novfs_xplat *pdata, struct novfs_schandle Session)
 {
-	struct novfs_xplat_call_request *cmd;
-	struct novfs_xplat_call_reply *reply;
+	struct novfs_xplat_call_request *cmd = NULL;
+	struct novfs_xplat_call_reply *reply = NULL;
 	unsigned long cmdlen, replylen;
 	int status = 0x8866, cpylen;
 	struct nwc_get_bcast_notification msg;
-	struct nwd_get_bcast_notification *dmsg;
+	struct nwd_get_bcast_notification *dmsg = NULL;
 
 	cmdlen = sizeof(*cmd) + sizeof(*dmsg);
 	cmd = kmalloc(cmdlen, GFP_KERNEL);
@@ -2013,33 +2048,21 @@ int novfs_get_bcast_msg(struct novfs_xplat *pdata, struct novfs_schandle Session
 		if (!status) {
 			char *cp = pdata->repData;
 
-			dmsg =
-				(struct nwd_get_bcast_notification *) reply->data;
+			dmsg = (struct nwd_get_bcast_notification *) reply->data;
 			if (pdata->repLen < dmsg->messageLen) {
 				dmsg->messageLen = pdata->repLen;
 			}
 			msg.messageLen = dmsg->messageLen;
-			cpylen =
-				offsetof(struct
-						nwc_get_bcast_notification,
-						message);
+			cpylen = offsetof(struct nwc_get_bcast_notification, message);
 			cp += cpylen;
-			cpylen =
-				copy_to_user(pdata->repData, &msg, cpylen);
-			cpylen =
-				copy_to_user(cp, dmsg->message,
-						msg.messageLen);
+			cpylen = copy_to_user(pdata->repData, &msg, cpylen);
+			cpylen = copy_to_user(cp, dmsg->message, msg.messageLen);
 		} else {
 			msg.messageLen = 0;
 			msg.message[0] = 0;
-			cpylen = offsetof(struct
-					nwc_get_bcast_notification,
-					message);
-			cpylen =
-				copy_to_user(pdata->repData, &msg,
-						sizeof(msg));
+			cpylen = offsetof(struct nwc_get_bcast_notification, message);
+			cpylen = copy_to_user(pdata->repData, &msg, sizeof(msg));
 		}
-
 		kfree(reply);
 	}
 	kfree(cmd);
@@ -2048,24 +2071,21 @@ int novfs_get_bcast_msg(struct novfs_xplat *pdata, struct novfs_schandle Session
 
 int novfs_set_key_value(struct novfs_xplat *pdata, struct novfs_schandle Session)
 {
-	struct novfs_xplat_call_request *cmd;
-	struct novfs_xplat_call_reply *reply;
+	struct novfs_xplat_call_request *cmd = NULL;
+	struct novfs_xplat_call_reply *reply = NULL;
 	struct nwc_set_key xplatCall;
-	struct nwd_set_key *pNewKey;
+	struct nwd_set_key *pNewKey = NULL;
 	struct nwc_string cstrObjectName, cstrPassword;
-	char *str;
+	char *str = NULL;
 	unsigned long status = -ENOMEM, cmdlen, datalen, replylen, cpylen;
 
 	cpylen = copy_from_user(&xplatCall, pdata->reqData, sizeof(struct nwc_set_key));
-	cpylen =
-	    copy_from_user(&cstrObjectName, xplatCall.pObjectName,
-			   sizeof(struct nwc_string));
-	cpylen =
-	    copy_from_user(&cstrPassword, xplatCall.pNewPassword,
-			   sizeof(struct nwc_string));
+	cpylen = copy_from_user(&cstrObjectName, xplatCall.pObjectName, sizeof(struct nwc_string));
+	cpylen = copy_from_user(&cstrPassword, xplatCall.pNewPassword, sizeof(struct nwc_string));
 
-	datalen =
-	    sizeof(struct nwd_set_key ) + cstrObjectName.DataLen + cstrPassword.DataLen;
+	if (cstrObjectName.DataLen > MAX_OBJECT_NAME_LENGTH || cstrPassword.DataLen > MAX_PASSWORD_LENGTH)
+		return -EINVAL;
+	datalen = sizeof(struct nwd_set_key ) + cstrObjectName.DataLen + cstrPassword.DataLen;
 
 	cmdlen = sizeof(*cmd) + datalen;
 	cmd = kmalloc(cmdlen, GFP_KERNEL);
@@ -2099,16 +2119,12 @@ int novfs_set_key_value(struct novfs_xplat *pdata, struct novfs_schandle Session
 	/*
 	 * Get the Verify Password
 	 */
-	cpylen =
-		copy_from_user(str, cstrPassword.pBuffer,
-				cstrPassword.DataLen);
+	cpylen = copy_from_user(str, cstrPassword.pBuffer, cstrPassword.DataLen);
 
 	pNewKey->newPasswordLen = cstrPassword.DataLen;
-	pNewKey->newPasswordOffset =
-		pNewKey->objectNameOffset + pNewKey->objectNameLen;
+	pNewKey->newPasswordOffset = pNewKey->objectNameOffset + pNewKey->objectNameLen;
 
-	status =
-		Queue_Daemon_Command((void *)cmd, cmdlen, NULL, 0,
+	status = Queue_Daemon_Command((void *)cmd, cmdlen, NULL, 0,
 				(void **)&reply, &replylen,
 				INTERRUPTIBLE);
 	if (reply) {
@@ -2121,16 +2137,22 @@ int novfs_set_key_value(struct novfs_xplat *pdata, struct novfs_schandle Session
 
 int novfs_verify_key_value(struct novfs_xplat *pdata, struct novfs_schandle Session)
 {
-	struct novfs_xplat_call_request *cmd;
-	struct novfs_xplat_call_reply *reply;
+	struct novfs_xplat_call_request *cmd = NULL;
+	struct novfs_xplat_call_reply *reply = NULL;
 	struct nwc_verify_key xplatCall;
-	struct nwd_verify_key *pNewKey;
+	struct nwd_verify_key *pNewKey = NULL;
 	struct nwc_string xferStr;
-	char *str;
+	char *str = NULL;
 	unsigned long status = -ENOMEM, cmdlen, datalen, replylen, cpylen;
 
-	cpylen =
-	    copy_from_user(&xplatCall, pdata->reqData, sizeof(struct nwc_verify_key));
+	cpylen = copy_from_user(&xplatCall, pdata->reqData, sizeof(struct nwc_verify_key));
+
+	if (!access_ok(VERIFY_READ, xplatCall.pDomainName, sizeof(struct nwc_string)) ||
+	    !access_ok(VERIFY_READ, xplatCall.pVerifyPassword, sizeof(struct nwc_string)))
+		return -EINVAL;
+	if (xplatCall.pDomainName->DataLen > MAX_NAME_LEN || xplatCall.pObjectName->DataLen > MAX_OBJECT_NAME_LENGTH ||
+	    xplatCall.pVerifyPassword->DataLen > MAX_PASSWORD_LENGTH)
+		return -EINVAL;
 
 	datalen =
 	    sizeof(struct nwd_verify_key) + xplatCall.pDomainName->DataLen +
@@ -2169,11 +2191,9 @@ int novfs_verify_key_value(struct novfs_xplat *pdata, struct novfs_schandle Sess
 	 * Get the User Name
 	 */
 	str += pNewKey->domainNameLen;
-	cpylen =
-		copy_from_user(&xferStr, xplatCall.pObjectName,
+	cpylen = copy_from_user(&xferStr, xplatCall.pObjectName,
 				sizeof(struct nwc_string));
-	pNewKey->objectNameOffset =
-		pNewKey->domainNameOffset + pNewKey->domainNameLen;
+	pNewKey->objectNameOffset = pNewKey->domainNameOffset + pNewKey->domainNameLen;
 	cpylen = copy_from_user(str, xferStr.pBuffer, xferStr.DataLen);
 	pNewKey->objectNameLen = xferStr.DataLen;
 
@@ -2181,16 +2201,14 @@ int novfs_verify_key_value(struct novfs_xplat *pdata, struct novfs_schandle Sess
 	 * Get the Verify Password
 	 */
 	str += pNewKey->objectNameLen;
-	cpylen =
-		copy_from_user(&xferStr, xplatCall.pVerifyPassword,
+	cpylen = copy_from_user(&xferStr, xplatCall.pVerifyPassword,
 				sizeof(struct nwc_string));
 	pNewKey->verifyPasswordOffset =
 		pNewKey->objectNameOffset + pNewKey->objectNameLen;
 	cpylen = copy_from_user(str, xferStr.pBuffer, xferStr.DataLen);
 	pNewKey->verifyPasswordLen = xferStr.DataLen;
 
-	status =
-		Queue_Daemon_Command((void *)cmd, cmdlen, NULL, 0,
+	status = Queue_Daemon_Command((void *)cmd, cmdlen, NULL, 0,
 				(void **)&reply, &replylen,
 				INTERRUPTIBLE);
 	if (reply) {
@@ -2200,3 +2218,4 @@ int novfs_verify_key_value(struct novfs_xplat *pdata, struct novfs_schandle Sess
 	kfree(cmd);
 	return (status);
 }
+

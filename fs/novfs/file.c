@@ -1077,7 +1077,7 @@ int novfs_write_file(void *Handle, unsigned char * Buffer, size_t * Bytes,
 
 	DbgPrint("cmdlen=%ld len=%ld", cmdlen, len);
 
-	if ((cmdlen + len) > novfs_max_iosize) {
+	if (len > novfs_max_iosize - cmdlen) {
 		len = novfs_max_iosize - cmdlen;
 		len = (len / PAGE_SIZE) * PAGE_SIZE;
 	}
@@ -1449,6 +1449,8 @@ int novfs_write_stream(void *ConnHandle, unsigned char * Handle, u_char * Buffer
 	size_t len;
 
 	len = *Bytes;
+	if (len > novfs_max_iosize)
+		len = novfs_max_iosize;
 	cmdlen = len + offsetof(struct novfs_write_stream_request, data);
 	*Bytes = 0;
 
