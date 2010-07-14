@@ -811,6 +811,9 @@ static int daemon_login(struct novfs_login *Login, struct novfs_schandle *Sessio
 	struct ncl_string password;
 
 	if (!copy_from_user(&lLogin, Login, sizeof(lLogin))) {
+		if (lLogin.Server.length > MAX_SERVER_NAME_LENGTH || lLogin.UserName.length > MAX_NAME_LEN ||
+		    lLogin.Password.length > MAX_PASSWORD_LENGTH)
+			return -EINVAL;
 		server.buffer = kmalloc(lLogin.Server.length, GFP_KERNEL);
 		if (server.buffer) {
 			server.len = lLogin.Server.length;
@@ -857,6 +860,8 @@ static int daemon_logout(struct novfs_logout *Logout, struct novfs_schandle *Ses
 
 	if (copy_from_user(&lLogout, Logout, sizeof(lLogout)))
 		return -EFAULT;
+	if (lLogout.Server.length > MAX_SERVER_NAME_LENGTH)
+		return -EINVAL;
 	server.name = kmalloc(lLogout.Server.length, GFP_KERNEL);
 	if (!server.name)
 		return -ENOMEM;
@@ -1102,6 +1107,8 @@ int novfs_daemon_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			char *buf;
 			io.length = 0;
 			cpylen = copy_from_user(&io, (char *)arg, sizeof(io));
+			if (io.length <= 0 || io.length > 1024)
+				return -EINVAL;
 			if (io.length) {
 				buf = kmalloc(io.length + 1, GFP_KERNEL);
 				if (buf) {
@@ -1453,6 +1460,8 @@ int novfs_daemon_lib_ioctl(struct inode *inode, struct file *file, unsigned int 
 				cpylen =
 				    copy_from_user(&io, (void *)arg,
 						   sizeof(io));
+				if (io.length <= 0 || io.length > 1024)
+					return -EINVAL;
 				if (io.length) {
 					buf =
 					    kmalloc(io.length + 1,
@@ -1478,9 +1487,7 @@ int novfs_daemon_lib_ioctl(struct inode *inode, struct file *file, unsigned int 
 				cpylen =
 				    copy_from_user(&data, (void *)arg,
 						   sizeof(data));
-				retCode =
-				    ((data.
-				      xfunction & 0x0000FFFF) | 0xCC000000);
+				retCode = ((data.xfunction & 0x0000FFFF) | 0xCC000000);
 
 				switch (data.xfunction) {
 				case NWC_OPEN_CONN_BY_NAME:
@@ -1815,8 +1822,7 @@ static int NwdConvertLocalHandle(struct novfs_xplat *pdata, struct daemon_handle
 //sgled         memcpy(lh.NwWareHandle, resource->handle, sizeof(resource->handle));
 			memcpy(lh.NetWareHandle, resource->handle, sizeof(resource->handle));	//sgled
 			if (pdata->repLen >= sizeof(struct nwc_convert_local_handle)) {
-				cpylen =
-				    copy_to_user(pdata->repData, &lh,
+				cpylen = copy_to_user(pdata->repData, &lh,
 						 sizeof(struct nwc_convert_local_handle));
 				retVal = 0;
 			} else {
@@ -1838,6 +1844,8 @@ static int NwdGetMountPath(struct novfs_xplat *pdata)
 	unsigned long cpylen;
 	struct nwc_get_mount_path mp;
 
+	if (pdata->reqLen != sizeof(mp))
+		return -EINVAL;
 	cpylen = copy_from_user(&mp, pdata->reqData, pdata->reqLen);
 
 	if (novfs_current_mnt) {
@@ -1878,21 +1886,19 @@ static int set_map_drive(struct novfs_xplat *pdata, struct novfs_schandle Sessio
 		return retVal;
 	if (copy_from_user(&symInfo, pdata->reqData, sizeof(symInfo)))
 		return -EFAULT;
-	drivemap =
-		kmalloc(sizeof(struct drive_map) + symInfo.linkOffsetLength,
+	if (symInfo.linkOffsetLength > MAX_NAME_LEN)
+		return -EINVAL;
+	drivemap = kmalloc(sizeof(struct drive_map) + symInfo.linkOffsetLength,
 				GFP_KERNEL);
 	if (!drivemap)
 		return -ENOMEM;
 
 	path = (char *)pdata->reqData;
 	path += symInfo.linkOffset;
-	cpylen =
-		copy_from_user(drivemap->name, path,
-				symInfo.linkOffsetLength);
+	cpylen = copy_from_user(drivemap->name, path, symInfo.linkOffsetLength);
 
 	drivemap->session = Session;
-	drivemap->hash =
-		full_name_hash(drivemap->name,
+	drivemap->hash = full_name_hash(drivemap->name,
 				symInfo.linkOffsetLength - 1);
 	drivemap->namelen = symInfo.linkOffsetLength - 1;
 	DbgPrint("hash=0x%lx path=%s", drivemap->hash, drivemap->name);
@@ -1910,8 +1916,7 @@ static int set_map_drive(struct novfs_xplat *pdata, struct novfs_schandle Sessio
 				dm, dm->hash, dm->namelen, dm->name);
 
 		if (drivemap->hash == dm->hash) {
-			if (0 ==
-					strcmp(dm->name, drivemap->name)) {
+			if (0 == strcmp(dm->name, drivemap->name)) {
 				dm = NULL;
 				break;
 			}
@@ -1950,7 +1955,8 @@ static int unmap_drive(struct novfs_xplat *pdata, struct novfs_schandle Session)
 		return retVal;
 	if (copy_from_user(&symInfo, pdata->reqData, sizeof(symInfo)))
 		return -EFAULT;
-
+	if (symInfo.linkLen > MAX_NAME_LEN || symInfo.linkLen == 0)
+		return -EINVAL;
 	path = kmalloc(symInfo.linkLen, GFP_KERNEL);
 	if (!path)
 		return -ENOMEM;

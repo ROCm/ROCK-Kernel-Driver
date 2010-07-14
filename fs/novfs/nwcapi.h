@@ -297,6 +297,18 @@ N_EXTERN_LIBRARY(NWRCODE)
 #define  MAX_ADDRESS_LENGTH               32
 #define  MAX_NAME_SERVICE_PROVIDERS       10
 
+#define MAX_NAME_LEN			1024
+#define MAX_NUM_REPLIES		4096
+#define MIN_NUM_REPLIES		1
+#define MAX_NUM_REQUESTS		4096
+#define MIN_NUM_REQUESTS		1
+#define MAX_FRAG_SIZE			4096	
+#define MIN_FRAG_SIZE			1
+#define MAX_INFO_LEN			4096
+#define MAX_DOMAIN_LEN			MAX_NETWORK_NAME_LENGTH
+#define MAX_OFFSET_LEN			4096
+
+
 //
 // Flags for the GetBroadcastMessage API
 //
