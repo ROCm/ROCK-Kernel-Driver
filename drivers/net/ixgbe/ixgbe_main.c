@@ -3727,10 +3727,6 @@ void ixgbe_down(struct ixgbe_adapter *adapter)
 	cancel_work_sync(&adapter->watchdog_task);
 
 	netif_carrier_off(netdev);
-	/* power down the optics */
-	if (hw->phy.multispeed_fiber)
-		hw->mac.ops.disable_tx_laser(hw);
-
 	netif_tx_disable(netdev);
 
 	ixgbe_irq_disable(adapter);
@@ -3756,6 +3752,10 @@ void ixgbe_down(struct ixgbe_adapter *adapter)
 		IXGBE_WRITE_REG(hw, IXGBE_DMATXCTL,
 		                (IXGBE_READ_REG(hw, IXGBE_DMATXCTL) &
 		                 ~IXGBE_DMATXCTL_TE));
+
+	/* power down the optics */
+	if (hw->phy.multispeed_fiber)
+		hw->mac.ops.disable_tx_laser(hw);
 
 	/* clear n-tuple filters that are cached */
 	ethtool_ntuple_flush(netdev);
@@ -4016,7 +4016,7 @@ static void ixgbe_set_num_queues(struct ixgbe_adapter *adapter)
 
 done:
 	/* Notify the stack of the (possibly) reduced Tx Queue count. */
-	adapter->netdev->real_num_tx_queues = adapter->num_tx_queues;
+	netif_set_real_num_tx_queues(adapter->netdev, adapter->num_tx_queues);
 }
 
 static void ixgbe_acquire_msix_vectors(struct ixgbe_adapter *adapter,
