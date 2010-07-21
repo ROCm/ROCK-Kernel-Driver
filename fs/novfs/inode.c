@@ -3421,11 +3421,8 @@ ssize_t novfs_i_getxattr(struct dentry *dentry, const char *name, void *buffer,
 							retxcode = -ERANGE;
 						}
 					}
-
-					if (bufRead) {
-						kfree(bufRead);
-					}
 				}
+				kfree(bufRead);
 			}
 		}
 		kfree(buf);
