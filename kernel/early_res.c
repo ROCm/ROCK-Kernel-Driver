@@ -7,6 +7,8 @@
 #include <linux/bootmem.h>
 #include <linux/mm.h>
 #include <linux/early_res.h>
+#include <linux/slab.h>
+#include <linux/kmemleak.h>
 
 /*
  * Early reserved memory areas.
@@ -319,6 +321,8 @@ void __init free_early(u64 start, u64 end)
 	struct early_res *r;
 	int i;
 
+	kmemleak_free_part(__va(start), end - start);
+
 	i = find_overlapped_early(start, end);
 	r = &early_res[i];
 #ifdef CONFIG_XEN /* Shouldn't it always be this way? */
@@ -340,6 +344,8 @@ void __init free_early_partial(u64 start, u64 end)
 {
 	struct early_res *r;
 	int i;
+
+	kmemleak_free_part(__va(start), end - start);
 
 	if (start == end)
 		return;
