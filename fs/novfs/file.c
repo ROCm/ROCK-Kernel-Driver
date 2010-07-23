@@ -319,13 +319,7 @@ int novfs_getx_file_info(char *Path, const char *Name, char *buffer,
 					 reply->Reply.ErrorCode);
 				DbgPrint("xattr: replylen=%d", replylen);
 
-				//0xC9 = EA not found (C9), 0xD1 = EA access denied
-				if ((reply->Reply.ErrorCode == 0xC9)
-				    || (reply->Reply.ErrorCode == 0xD1)) {
-					retCode = -ENOATTR;
-				} else {
-					retCode = -ENOENT;
-				}
+				retCode = -ENOATTR;
 			} else {
 
 				*dataLen =
