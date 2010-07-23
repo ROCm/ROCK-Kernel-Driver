@@ -3421,11 +3421,8 @@ ssize_t novfs_i_getxattr(struct dentry *dentry, const char *name, void *buffer,
 							retxcode = -ERANGE;
 						}
 					}
-
-					if (bufRead) {
-						kfree(bufRead);
-					}
 				}
+				kfree(bufRead);
 			}
 		}
 		kfree(buf);
@@ -3977,6 +3974,17 @@ int __init init_novfs(void)
 	inHAX = 0;
 	inHAXTime = get_nanosecond_time();
 
+	retCode = bdi_init(&novfs_backing_dev_info);
+
+	if(!retCode)
+		retCode = bdi_register(&novfs_backing_dev_info, NULL, "novfs-map");
+	if (retCode) {
+		bdi_destroy(&novfs_backing_dev_info);
+		goto bdi_fail;
+	}
+
+	
+
 	retCode = novfs_proc_init();
 
 	novfs_profile_init();
@@ -3992,6 +4000,8 @@ int __init init_novfs(void)
 			novfs_scope_exit();
 		}
 	}
+
+bdi_fail:
 	return (retCode);
 }
 
@@ -4007,6 +4017,8 @@ void __exit exit_novfs(void)
 		kfree(novfs_current_mnt);
 		novfs_current_mnt = NULL;
 	}
+
+	bdi_destroy(&novfs_backing_dev_info);
 }
 
 int novfs_lock_inode_cache(struct inode *i)

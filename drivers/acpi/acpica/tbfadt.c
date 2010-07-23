@@ -550,11 +550,12 @@ static void acpi_tb_validate_fadt(void)
 			    (!address64->address && length)) {
 				ACPI_WARNING((AE_INFO,
 					      "Optional field %s has zero address or length: "
-					      "0x%8.8X%8.8X/0x%X",
+					      "0x%8.8X%8.8X/0x%X - not using it",
 					      name,
 					      ACPI_FORMAT_UINT64(address64->
 								 address),
 					      length));
+				address64->address = 0;
 			}
 		}
 	}
