@@ -280,9 +280,8 @@ int novfs_getx_file_info(char *Path, const char *Name, char *buffer,
 	DbgPrint("xattr: Path = %s, pathlen = %i, Name = %s, namelen = %i",
 		 Path, pathlen, Name, namelen);
 
-	if (namelen > MAX_XATTR_NAME_LEN) {
-		return ENOATTR;
-	}
+	if (namelen > MAX_XATTR_NAME_LEN)
+		return -ENOATTR;
 
 	cmdlen = offsetof(struct novfs_xa_get_request, data) + pathlen + 1 + namelen + 1;	// two '\0'
 	cmd = (struct novfs_xa_get_request *) kmalloc(cmdlen, GFP_KERNEL);
@@ -375,9 +374,8 @@ int novfs_setx_file_info(char *Path, const char *Name, const void *Value,
 	DbgPrint("xattr: Path = %s, pathlen = %i, Name = %s, namelen = %i, "
 		 "value len = %u", Path, pathlen, Name, namelen, valueLen);
 
-	if (namelen > MAX_XATTR_NAME_LEN) {
-		return ENOATTR;
-	}
+	if (namelen > MAX_XATTR_NAME_LEN)
+		return -ENOATTR;
 
 	cmdlen = offsetof(struct novfs_xa_set_request, data) + pathlen + 1 + namelen + 1 + valueLen;
 	cmd = (struct novfs_xa_set_request *) kmalloc(cmdlen, GFP_KERNEL);
