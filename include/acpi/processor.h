@@ -65,7 +65,7 @@ struct acpi_power_register {
 	u8 space_id;
 	u8 bit_width;
 	u8 bit_offset;
-	u8 reserved;
+	u8 access_size;
 	u64 address;
 } __attribute__ ((packed));
 
@@ -80,6 +80,7 @@ struct acpi_processor_cx {
 	u32 power;
 	u32 usage;
 	u64 time;
+	u8 bm_sts_skip;
 #ifdef CONFIG_PROCESSOR_EXTERNAL_CONTROL
 	/* Require raw information for external control logic */
 	struct acpi_power_register reg;

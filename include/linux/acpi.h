@@ -255,7 +255,7 @@ int acpi_pci_get_root_seg_bbn(char *hid, char *uid, int *seg, int *bbn);
 #ifdef CONFIG_PM_SLEEP
 void __init acpi_no_s4_hw_signature(void);
 void __init acpi_old_suspend_ordering(void);
-void __init acpi_s4_no_nvs(void);
+void __init acpi_nvs_nosave(void);
 #endif /* CONFIG_PM_SLEEP */
 
 struct acpi_osc_context {
