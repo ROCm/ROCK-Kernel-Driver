@@ -80,8 +80,9 @@ struct acpi_processor_cx {
 	u32 power;
 	u32 usage;
 	u64 time;
+#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
 	u8 bm_sts_skip;
-#ifdef CONFIG_PROCESSOR_EXTERNAL_CONTROL
+#else
 	/* Require raw information for external control logic */
 	struct acpi_power_register reg;
 	u32 csd_count;

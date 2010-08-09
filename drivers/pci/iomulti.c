@@ -15,27 +15,16 @@
  *
  * Copyright (c) 2009 Isaku Yamahata
  *                    VA Linux Systems Japan K.K.
- *
  */
 
-#include <linux/kernel.h>
-#include <linux/list.h>
-#include <linux/fs.h>
-#include <linux/miscdevice.h>
-#include <linux/pci.h>
-#include <linux/sort.h>
-
-#include <asm/setup.h>
-#include <asm/uaccess.h>
-
-#include "pci.h"
 #include "iomulti.h"
+#include "pci.h"
+#include <linux/module.h>
+#include <linux/sort.h>
+#include <asm/setup.h>
 
-#define PCI_NUM_BARS		6
 #define PCI_BUS_MAX		255
 #define PCI_DEV_MAX		31
-#define PCI_FUNC_MAX		7
-#define PCI_NUM_FUNC		8
 
 /* see pci_resource_len */
 static inline resource_size_t pci_iomul_len(const struct resource* r)
@@ -92,73 +81,15 @@ static inline unsigned char pci_dev_switch_busnr(struct pci_dev *pdev)
 	return pdev->bus->number;
 }
 
-struct pci_iomul_func {
-	int		segment;
-	uint8_t		bus;
-	uint8_t		devfn;
-
-	/* only start and end are used */
-	unsigned long	io_size;
-	uint8_t		io_bar;
-	struct resource	resource[PCI_NUM_BARS];
-	struct resource dummy_parent;
-};
-
-struct pci_iomul_switch {
-	struct list_head	list;	/* bus_list_lock protects */
-
-	/*
-	 * This lock the following entry and following
-	 * pci_iomul_slot/pci_iomul_func.
-	 */
-	struct mutex		lock;
-	struct kref		kref;
-
-	struct resource		io_resource;
-	struct resource		*io_region;
-	unsigned int		count;
-	struct pci_dev		*current_pdev;
-
-	int			segment;
-	uint8_t			bus;
-
-	uint32_t		io_base;
-	uint32_t		io_limit;
-
-	/* func which has the largeset io size*/
-	struct pci_iomul_func	*func;
-
-	struct list_head	slots;
-};
-
-struct pci_iomul_slot {
-	struct list_head	sibling;
-	struct kref		kref;
-	/*
-	 * busnr
-	 * when pcie, the primary busnr of the PCI-PCI bridge on which
-	 * this devices sits.
-	 */
-	uint8_t			switch_busnr;
-	struct resource		dummy_parent[PCI_NUM_RESOURCES - PCI_BRIDGE_RESOURCES];
-
-	/* device */
-	int			segment;
-	uint8_t			bus;
-	uint8_t			dev;
-
-	struct pci_iomul_func	*func[PCI_NUM_FUNC];
-};
-
 static LIST_HEAD(switch_list);
 static DEFINE_MUTEX(switch_list_lock);
 
 /*****************************************************************************/
-static int inline pci_iomul_switch_io_allocated(
-	const struct pci_iomul_switch *sw)
+int pci_iomul_switch_io_allocated(const struct pci_iomul_switch *sw)
 {
 	return !(sw->io_base == 0 || sw->io_base > sw->io_limit);
 }
+EXPORT_SYMBOL_GPL(pci_iomul_switch_io_allocated);
 
 static struct pci_iomul_switch *pci_iomul_find_switch_locked(int segment,
 							     uint8_t bus)
@@ -190,9 +121,9 @@ static void pci_iomul_switch_get(struct pci_iomul_switch *sw);
 /* on successfull exit, sw->lock is locked for use slot and
  * refrence count of sw is incremented.
  */
-static void pci_iomul_get_lock_switch(struct pci_dev *pdev,
-				      struct pci_iomul_switch **swp,
-				      struct pci_iomul_slot **slot)
+void pci_iomul_get_lock_switch(struct pci_dev *pdev,
+			       struct pci_iomul_switch **swp,
+			       struct pci_iomul_slot **slot)
 {
 	mutex_lock(&switch_list_lock);
 
@@ -215,6 +146,7 @@ static void pci_iomul_get_lock_switch(struct pci_dev *pdev,
 out:
 	mutex_unlock(&switch_list_lock);
 }
+EXPORT_SYMBOL_GPL(pci_iomul_get_lock_switch);
 
 static struct pci_iomul_switch *pci_iomul_switch_alloc(int segment,
 						       uint8_t bus)
@@ -246,31 +178,13 @@ static void pci_iomul_switch_add_locked(struct pci_iomul_switch *sw)
 	list_add(&sw->list, &switch_list);
 }
 
-#ifdef CONFIG_HOTPLUG_PCI
+#if defined(CONFIG_HOTPLUG_PCI) || defined(CONFIG_HOTPLUG_PCI_MODULE)
 static void pci_iomul_switch_del_locked(struct pci_iomul_switch *sw)
 {
 	BUG_ON(!mutex_is_locked(&switch_list_lock));
 	list_del(&sw->list);
 }
 #endif
-
-static void pci_iomul_switch_get(struct pci_iomul_switch *sw)
-{
-	kref_get(&sw->kref);
-}
-
-static void pci_iomul_switch_release(struct kref *kref)
-{
-	struct pci_iomul_switch *sw = container_of(kref,
-						   struct pci_iomul_switch,
-						   kref);
-	kfree(sw);
-}
-
-static void pci_iomul_switch_put(struct pci_iomul_switch *sw)
-{
-	kref_put(&sw->kref, &pci_iomul_switch_release);
-}
 
 static int __devinit pci_iomul_slot_init(struct pci_dev *pdev,
 					 struct pci_iomul_slot *slot)
@@ -288,7 +202,7 @@ static int __devinit pci_iomul_slot_init(struct pci_dev *pdev,
 		return -ENOSYS;
 	}
 
-        pci_read_config_word(pdev, rpcap + PCI_CAP_FLAGS, &cap);
+	pci_read_config_word(pdev, rpcap + PCI_CAP_FLAGS, &cap);
 	switch ((cap & PCI_EXP_FLAGS_TYPE) >> 4) {
 	case PCI_EXP_TYPE_RC_END:
 		printk(KERN_INFO
@@ -339,7 +253,7 @@ static void pci_iomul_slot_add_locked(struct pci_iomul_switch *sw,
 	list_add(&slot->sibling, &sw->slots);
 }
 
-#ifdef CONFIG_HOTPLUG_PCI
+#if defined(CONFIG_HOTPLUG_PCI) || defined(CONFIG_HOTPLUG_PCI_MODULE)
 static void pci_iomul_slot_del_locked(struct pci_iomul_switch *sw,
 				       struct pci_iomul_slot *slot)
 {
@@ -347,23 +261,6 @@ static void pci_iomul_slot_del_locked(struct pci_iomul_switch *sw,
 	list_del(&slot->sibling);
 }
 #endif
-
-static void pci_iomul_slot_get(struct pci_iomul_slot *slot)
-{
-	kref_get(&slot->kref);
-}
-
-static void pci_iomul_slot_release(struct kref *kref)
-{
-	struct pci_iomul_slot *slot = container_of(kref, struct pci_iomul_slot,
-						   kref);
-	kfree(slot);
-}
-
-static void pci_iomul_slot_put(struct pci_iomul_slot *slot)
-{
-	kref_put(&slot->kref, &pci_iomul_slot_release);
-}
 
 /*****************************************************************************/
 static int pci_get_sbd(const char *str,
@@ -397,10 +294,12 @@ static char iomul_param[COMMAND_LINE_SIZE];
 #define TOKEN_MAX	10	/* SSSS:BB:DD length is 10 */
 static int pci_is_iomul_dev_param(struct pci_dev *pdev)
 {
-        int len;
-        char *p;
+	int len;
+	char *p;
 	char *next_str;
 
+	if (!strcmp(iomul_param, "all"))
+		return 1;
 	for (p = &iomul_param[0]; *p != '\0'; p = next_str + 1) {
 		next_str = strchr(p, ',');
 		if (next_str != NULL)
@@ -425,7 +324,7 @@ static int pci_is_iomul_dev_param(struct pci_dev *pdev)
 			break;
 	}
 
-	/* check guestcev=<device>+iomul option */
+	/* check guestdev=<device>+iomul option */
 	return pci_is_iomuldev(pdev);
 }
 
@@ -459,12 +358,12 @@ static void __devinit pci_iomul_set_bridge_io_window(struct pci_dev *bridge,
 	upper16 = ((io_base & 0xffff00) >> 8) |
 		(((io_limit & 0xffff00) >> 8) << 16);
 
-        /* Temporarily disable the I/O range before updating PCI_IO_BASE. */
-        pci_write_config_dword(bridge, PCI_IO_BASE_UPPER16, 0x0000ffff);
-        /* Update lower 16 bits of I/O base/limit. */
-        pci_write_config_word(bridge, PCI_IO_BASE, l);
-        /* Update upper 16 bits of I/O base/limit. */
-        pci_write_config_dword(bridge, PCI_IO_BASE_UPPER16, upper16);
+	/* Temporarily disable the I/O range before updating PCI_IO_BASE. */
+	pci_write_config_dword(bridge, PCI_IO_BASE_UPPER16, 0x0000ffff);
+	/* Update lower 16 bits of I/O base/limit. */
+	pci_write_config_word(bridge, PCI_IO_BASE, l);
+	/* Update upper 16 bits of I/O base/limit. */
+	pci_write_config_dword(bridge, PCI_IO_BASE_UPPER16, upper16);
 }
 
 static void __devinit pci_disable_bridge_io_window(struct pci_dev *bridge)
@@ -733,9 +632,9 @@ static void __devinit pci_iomul_setup_brige(struct pci_dev *bridge,
 	pci_read_config_word(bridge, PCI_COMMAND, &cmd);
 	if (!(cmd & PCI_COMMAND_IO)) {
 		cmd |= PCI_COMMAND_IO;
-                printk(KERN_INFO "PCI: Forcibly Enabling IO %s\n",
+		printk(KERN_INFO "PCI: Forcibly Enabling IO %s\n",
 		       pci_name(bridge));
-                pci_write_config_word(bridge, PCI_COMMAND, cmd);
+		pci_write_config_word(bridge, PCI_COMMAND, cmd);
 	}
 }
 
@@ -879,8 +778,7 @@ static void __devinit quirk_iomul_reassign_ioresource(struct pci_dev *pdev)
 	}
 
 	BUG_ON(f->io_size > sw->io_limit - sw->io_base + 1);
-	if (/* f == sf */
-            sf != NULL &&
+	if (/* f == sf */ sf != NULL &&
 	    pci_domain_nr(pdev->bus) == sf->segment &&
 	    pdev->bus->number == sf->bus &&
 	    pdev->devfn == sf->devfn)
@@ -897,7 +795,7 @@ DECLARE_PCI_FIXUP_FINAL(PCI_ANY_ID, PCI_ANY_ID,
 			quirk_iomul_reassign_ioresource);
 
 /*****************************************************************************/
-#ifdef CONFIG_HOTPLUG_PCI
+#if defined(CONFIG_HOTPLUG_PCI) || defined(CONFIG_HOTPLUG_PCI_MODULE)
 static int __devinit __pci_iomul_notifier_del_device(struct pci_dev *pdev)
 {
 	struct pci_iomul_switch *sw;
@@ -963,7 +861,7 @@ static int __devinit pci_iomul_notifier_del_device(struct pci_dev *pdev)
 		ret = __pci_iomul_notifier_del_switch(pdev);
 		break;
 	default:
-                printk(KERN_WARNING "PCI IOMUL: "
+		printk(KERN_WARNING "PCI IOMUL: "
 		       "device %s has unknown header type %02x, ignoring.\n",
 		       pci_name(pdev), pdev->hdr_type);
 		ret = -EIO;
@@ -975,10 +873,10 @@ static int __devinit pci_iomul_notifier_del_device(struct pci_dev *pdev)
 static int __devinit pci_iomul_notifier(struct notifier_block *nb,
 					unsigned long action, void *data)
 {
-        struct device *dev = data;
-        struct pci_dev *pdev = to_pci_dev(dev);
+	struct device *dev = data;
+	struct pci_dev *pdev = to_pci_dev(dev);
 
-        switch (action) {
+	switch (action) {
 	case BUS_NOTIFY_ADD_DEVICE:
 		quirk_iomul_reassign_ioresource(pdev);
 		break;
@@ -992,424 +890,15 @@ static int __devinit pci_iomul_notifier(struct notifier_block *nb,
 	return 0;
 }
 
-static struct notifier_block pci_iomul_nb = {
-        .notifier_call = pci_iomul_notifier,
+static struct notifier_block __devinitdata pci_iomul_nb = {
+	.notifier_call = pci_iomul_notifier,
 };
 
 static int __init pci_iomul_hotplug_init(void)
 {
-        bus_register_notifier(&pci_bus_type, &pci_iomul_nb);
+	bus_register_notifier(&pci_bus_type, &pci_iomul_nb);
 	return 0;
 }
 
 late_initcall(pci_iomul_hotplug_init);
 #endif
-
-/*****************************************************************************/
-struct pci_iomul_data {
-	struct mutex lock;
-
-	struct pci_dev *pdev;
-	struct pci_iomul_switch *sw;
-	struct pci_iomul_slot *slot;	/* slot::kref */
-	struct pci_iomul_func **func;	/* when dereferencing,
-					   sw->lock is necessary */
-};
-
-static int pci_iomul_func_ioport(struct pci_iomul_func *func,
-				 uint8_t bar, uint64_t offset, int *port)
-{
-	if (!(func->io_bar & (1 << bar)))
-		return -EINVAL;
-
-	*port = func->resource[bar].start + offset;
-	if (*port < func->resource[bar].start ||
-	    *port > func->resource[bar].end)
-		return -EINVAL;
-
-	return 0;
-}
-
-static inline int pci_iomul_valid(struct pci_iomul_data *iomul)
-{
-	BUG_ON(!mutex_is_locked(&iomul->lock));
-	BUG_ON(!mutex_is_locked(&iomul->sw->lock));
-	return pci_iomul_switch_io_allocated(iomul->sw) &&
-		*iomul->func != NULL;
-}
-
-static void __pci_iomul_enable_io(struct pci_dev *pdev)
-{
-	uint16_t cmd;
-
-	pci_dev_get(pdev);
-	pci_read_config_word(pdev, PCI_COMMAND, &cmd);
-	cmd |= PCI_COMMAND_IO;
-	pci_write_config_word(pdev, PCI_COMMAND, cmd);
-}
-
-static void __pci_iomul_disable_io(struct pci_iomul_data *iomul,
-				   struct pci_dev *pdev)
-{
-	uint16_t cmd;
-
-	if (!pci_iomul_valid(iomul))
-		return;
-
-	pci_read_config_word(pdev, PCI_COMMAND, &cmd);
-	cmd &= ~PCI_COMMAND_IO;
-	pci_write_config_word(pdev, PCI_COMMAND, cmd);
-	pci_dev_put(pdev);
-}
-
-static int pci_iomul_open(struct inode *inode, struct file *filp)
-{
-	struct pci_iomul_data *iomul;
-	iomul = kmalloc(sizeof(*iomul), GFP_KERNEL);
-	if (iomul == NULL)
-		return -ENOMEM;
-
-	mutex_init(&iomul->lock);
-	iomul->pdev = NULL;
-	iomul->sw = NULL;
-	iomul->slot = NULL;
-	iomul->func = NULL;
-	filp->private_data = (void*)iomul;
-
-	return 0;
-}
-
-static int pci_iomul_release(struct inode *inode, struct file *filp)
-{
-	struct pci_iomul_data *iomul =
-		(struct pci_iomul_data*)filp->private_data;
-	struct pci_iomul_switch *sw;
-	struct pci_iomul_slot *slot = NULL;
-
-	mutex_lock(&iomul->lock);
-	sw = iomul->sw;
-	slot = iomul->slot;
-	if (iomul->pdev != NULL) {
-		if (sw != NULL) {
-			mutex_lock(&sw->lock);
-			if (sw->current_pdev == iomul->pdev) {
-				__pci_iomul_disable_io(iomul,
-						       sw->current_pdev);
-				sw->current_pdev = NULL;
-			}
-			sw->count--;
-			if (sw->count == 0) {
-				release_region(sw->io_region->start, sw->io_region->end - sw->io_region->start + 1);
-				sw->io_region = NULL;
-			}
-			mutex_unlock(&sw->lock);
-		}
-		pci_dev_put(iomul->pdev);
-	}
-	mutex_unlock(&iomul->lock);
-
-	if (slot != NULL)
-		pci_iomul_slot_put(slot);
-	if (sw != NULL)
-		pci_iomul_switch_put(sw);
-	kfree(iomul);
-	return 0;
-}
-
-static long pci_iomul_setup(struct pci_iomul_data *iomul,
-			    struct pci_iomul_setup __user *arg)
-{
-	long error = 0;
-	struct pci_iomul_setup setup;
-	struct pci_iomul_switch *sw = NULL;
-	struct pci_iomul_slot *slot;
-	struct pci_bus *pbus;
-	struct pci_dev *pdev;
-
-	if (copy_from_user(&setup, arg, sizeof(setup)))
-		return -EFAULT;
-
-	pbus = pci_find_bus(setup.segment, setup.bus);
-	if (pbus == NULL)
-		return -ENODEV;
-	pdev = pci_get_slot(pbus, setup.dev);
-	if (pdev == NULL)
-		return -ENODEV;
-
-	mutex_lock(&iomul->lock);
-	if (iomul->sw != NULL) {
-		error = -EBUSY;
-		goto out0;
-	}
-
-	pci_iomul_get_lock_switch(pdev, &sw, &slot);
-	if (sw == NULL || slot == NULL) {
-		error = -ENODEV;
-		goto out0;
-	}
-	if (!pci_iomul_switch_io_allocated(sw)) {
-		error = -ENODEV;
-		goto out;
-	}
-
-	if (slot->func[setup.func] == NULL) {
-		error = -ENODEV;
-		goto out;
-	}
-
-	if (sw->count == 0) {
-		BUG_ON(sw->io_region != NULL);
-		sw->io_region =
-			request_region(sw->io_base,
-				       sw->io_limit - sw->io_base + 1,
-				       "PCI IO Multiplexer driver");
-		if (sw->io_region == NULL) {
-			mutex_unlock(&sw->lock);
-			error = -EBUSY;
-			goto out;
-		}
-	}
-	sw->count++;
-	pci_iomul_slot_get(slot);
-
-	iomul->pdev = pdev;
-	iomul->sw = sw;
-	iomul->slot = slot;
-	iomul->func = &slot->func[setup.func];
-
-out:
-	mutex_unlock(&sw->lock);
-out0:
-	mutex_unlock(&iomul->lock);
-	if (error != 0) {
-		if (sw != NULL)
-			pci_iomul_switch_put(sw);
-		pci_dev_put(pdev);
-	}
-	return error;
-}
-
-static int pci_iomul_lock(struct pci_iomul_data *iomul,
-			  struct pci_iomul_switch **sw,
-			  struct pci_iomul_func **func)
-{
-	mutex_lock(&iomul->lock);
-	*sw = iomul->sw;
-	if (*sw == NULL) {
-		mutex_unlock(&iomul->lock);
-		return -ENODEV;
-	}
-	mutex_lock(&(*sw)->lock);
-	if (!pci_iomul_valid(iomul)) {
-		mutex_unlock(&(*sw)->lock);
-		mutex_unlock(&iomul->lock);
-		return -ENODEV;
-	}
-	*func = *iomul->func;
-
-	return 0;
-}
-
-static long pci_iomul_disable_io(struct pci_iomul_data *iomul)
-{
-	long error = 0;
-	struct pci_iomul_switch *sw;
-	struct pci_iomul_func *dummy_func;
-	struct pci_dev *pdev;
-
-	if (pci_iomul_lock(iomul, &sw, &dummy_func) < 0)
-		return -ENODEV;
-
-	pdev = iomul->pdev;
-	if (pdev == NULL)
-		error = -ENODEV;
-
-	if (pdev != NULL && sw->current_pdev == pdev) {
-		__pci_iomul_disable_io(iomul, pdev);
-		sw->current_pdev = NULL;
-	}
-
-	mutex_unlock(&sw->lock);
-	mutex_unlock(&iomul->lock);
-	return error;
-}
-
-static void pci_iomul_switch_to(
-	struct pci_iomul_data *iomul, struct pci_iomul_switch *sw,
-	struct pci_dev *next_pdev)
-{
-	if (sw->current_pdev == next_pdev)
-		/* nothing to do */
-		return;
-
-	if (sw->current_pdev != NULL)
-		__pci_iomul_disable_io(iomul, sw->current_pdev);
-
-	__pci_iomul_enable_io(next_pdev);
-	sw->current_pdev = next_pdev;
-}
-
-static long pci_iomul_in(struct pci_iomul_data *iomul,
-			 struct pci_iomul_in __user *arg)
-{
-	struct pci_iomul_in in;
-	struct pci_iomul_switch *sw;
-	struct pci_iomul_func *func;
-
-	long error = 0;
-	int port;
-	uint32_t value = 0;
-
-	if (copy_from_user(&in, arg, sizeof(in)))
-		return -EFAULT;
-
-	if (pci_iomul_lock(iomul, &sw, &func) < 0)
-		return -ENODEV;
-
-	error = pci_iomul_func_ioport(func, in.bar, in.offset, &port);
-	if (error)
-		goto out;
-
-	pci_iomul_switch_to(iomul, sw, iomul->pdev);
-	switch (in.size) {
-	case 4:
-		value = inl(port);
-		break;
-	case 2:
-		value = inw(port);
-		break;
-	case 1:
-		value = inb(port);
-		break;
-	default:
-		error = -EINVAL;
-		break;
-	}
-
-out:
-	mutex_unlock(&sw->lock);
-	mutex_unlock(&iomul->lock);
-
-	if (error == 0 && put_user(value, &arg->value))
-		return -EFAULT;
-	return error;
-}
-
-static long pci_iomul_out(struct pci_iomul_data *iomul,
-			  struct pci_iomul_out __user *arg)
-{
-	struct pci_iomul_in out;
-	struct pci_iomul_switch *sw;
-	struct pci_iomul_func *func;
-
-	long error = 0;
-	int port;
-
-	if (copy_from_user(&out, arg, sizeof(out)))
-		return -EFAULT;
-
-	if (pci_iomul_lock(iomul, &sw, &func) < 0)
-		return -ENODEV;
-
-	error = pci_iomul_func_ioport(func, out.bar, out.offset, &port);
-	if (error)
-		goto out;
-
-	pci_iomul_switch_to(iomul, sw, iomul->pdev);
-	switch (out.size) {
-	case 4:
-		outl(out.value, port);
-		break;
-	case 2:
-		outw(out.value, port);
-		break;
-	case 1:
-		outb(out.value, port);
-		break;
-	default:
-		error = -EINVAL;
-		break;
-	}
-
-out:
-	mutex_unlock(&sw->lock);
-	mutex_unlock(&iomul->lock);
-	return error;
-}
-
-static long pci_iomul_ioctl(struct file *filp,
-			    unsigned int cmd, unsigned long arg)
-{
-	long error;
-	struct pci_iomul_data *iomul =
-		(struct pci_iomul_data*)filp->private_data;
-
-	if (!capable(CAP_SYS_ADMIN) || !capable(CAP_SYS_RAWIO))
-		return -EPERM;
-
-	switch (cmd) {
-	case PCI_IOMUL_SETUP:
-		error = pci_iomul_setup(iomul,
-					(struct pci_iomul_setup __user *)arg);
-		break;
-	case PCI_IOMUL_DISABLE_IO:
-		error = pci_iomul_disable_io(iomul);
-		break;
-	case PCI_IOMUL_IN:
-		error = pci_iomul_in(iomul, (struct pci_iomul_in __user *)arg);
-		break;
-	case PCI_IOMUL_OUT:
-		error = pci_iomul_out(iomul,
-				      (struct pci_iomul_out __user *)arg);
-		break;
-	default:
-		error = -ENOSYS;
-		break;
-	}
-
-	return error;
-}
-
-static const struct file_operations pci_iomul_fops = {
-	.owner = THIS_MODULE,
-
-	.open = pci_iomul_open, /* nonseekable_open */
-	.release = pci_iomul_release,
-
-	.unlocked_ioctl = pci_iomul_ioctl,
-};
-
-static struct miscdevice pci_iomul_miscdev = {
-	.minor = MISC_DYNAMIC_MINOR,
-	.name = "pci_iomul",
-	.fops = &pci_iomul_fops,
-};
-
-static int pci_iomul_init(void)
-{
-	int error;
-	error = misc_register(&pci_iomul_miscdev);
-	if (error != 0) {
-		printk(KERN_ALERT "Couldn't register /dev/misc/pci_iomul");
-		return error;
-	}
-	printk("PCI IO multiplexer device installed.\n");
-	return 0;
-}
-
-#if 0
-static void pci_iomul_cleanup(void)
-{
-	misc_deregister(&pci_iomul_miscdev);
-}
-#endif
-
-/*
- * This must be called after pci fixup final which is called by
- * device_initcall(pci_init).
- */
-late_initcall(pci_iomul_init);
-
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Isaku Yamahata <yamahata@valinux.co.jp>");
-MODULE_DESCRIPTION("PCI IO space multiplexing driver");

@@ -399,9 +399,11 @@ static int connect_rings(struct backend_info *be)
 
 	if (xenbus_scanf(XBT_NIL, dev->otherend, "feature-sg", "%d", &val) < 0)
 		val = 0;
-	if (val) {
-		be->netif->features |= NETIF_F_SG;
-		be->netif->dev->features |= NETIF_F_SG;
+	if (!val) {
+		be->netif->features &= ~NETIF_F_SG;
+		be->netif->dev->features &= ~NETIF_F_SG;
+		if (be->netif->dev->mtu > ETH_DATA_LEN)
+			be->netif->dev->mtu = ETH_DATA_LEN;
 	}
 
 	if (xenbus_scanf(XBT_NIL, dev->otherend, "feature-gso-tcpv4", "%d",

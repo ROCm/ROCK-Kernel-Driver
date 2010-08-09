@@ -1,5 +1,3 @@
-#ifndef PCI_IOMULTI_H
-#define PCI_IOMULTI_H
 /*
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,35 +15,108 @@
  *
  * Copyright (c) 2009 Isaku Yamahata
  *                    VA Linux Systems Japan K.K.
- *
  */
 
-struct pci_iomul_setup {
-	uint16_t	segment;
+#include <linux/kernel.h>
+#include <linux/list.h>
+#include <linux/pci.h>
+
+#define PCI_NUM_BARS		6
+#define PCI_NUM_FUNC		8
+
+struct pci_iomul_func {
+	int		segment;
 	uint8_t		bus;
-	uint8_t		dev;
-	uint8_t		func;
+	uint8_t		devfn;
+
+	/* only start and end are used */
+	unsigned long	io_size;
+	uint8_t		io_bar;
+	struct resource	resource[PCI_NUM_BARS];
+	struct resource dummy_parent;
 };
 
-struct pci_iomul_in {
-	uint8_t		bar;
-	uint64_t	offset;
+struct pci_iomul_switch {
+	struct list_head	list;	/* bus_list_lock protects */
 
-	uint8_t		size;
-	uint32_t	value;
+	/*
+	 * This lock the following entry and following
+	 * pci_iomul_slot/pci_iomul_func.
+	 */
+	struct mutex		lock;
+	struct kref		kref;
+
+	struct resource		io_resource;
+	struct resource		*io_region;
+	unsigned int		count;
+	struct pci_dev		*current_pdev;
+
+	int			segment;
+	uint8_t			bus;
+
+	uint32_t		io_base;
+	uint32_t		io_limit;
+
+	/* func which has the largeset io size*/
+	struct pci_iomul_func	*func;
+
+	struct list_head	slots;
 };
 
-struct pci_iomul_out {
-	uint8_t		bar;
-	uint64_t	offset;
+static inline void pci_iomul_switch_get(struct pci_iomul_switch *sw)
+{
+	kref_get(&sw->kref);
+}
 
-	uint8_t		size;
-	uint32_t	value;
+static inline void pci_iomul_switch_release(struct kref *kref)
+{
+	struct pci_iomul_switch *sw = container_of(kref,
+						   struct pci_iomul_switch,
+						   kref);
+	kfree(sw);
+}
+
+static inline void pci_iomul_switch_put(struct pci_iomul_switch *sw)
+{
+	kref_put(&sw->kref, &pci_iomul_switch_release);
+}
+
+struct pci_iomul_slot {
+	struct list_head	sibling;
+	struct kref		kref;
+	/*
+	 * busnr
+	 * when pcie, the primary busnr of the PCI-PCI bridge on which
+	 * this devices sits.
+	 */
+	uint8_t			switch_busnr;
+	struct resource		dummy_parent[PCI_NUM_RESOURCES - PCI_BRIDGE_RESOURCES];
+
+	/* device */
+	int			segment;
+	uint8_t			bus;
+	uint8_t			dev;
+
+	struct pci_iomul_func	*func[PCI_NUM_FUNC];
 };
 
-#define PCI_IOMUL_SETUP		_IOW ('P', 0, struct pci_iomul_setup)
-#define PCI_IOMUL_DISABLE_IO	_IO  ('P', 1)
-#define PCI_IOMUL_IN		_IOWR('P', 2, struct pci_iomul_in)
-#define PCI_IOMUL_OUT		_IOW ('P', 3, struct pci_iomul_out)
+static inline void pci_iomul_slot_get(struct pci_iomul_slot *slot)
+{
+	kref_get(&slot->kref);
+}
 
-#endif /* PCI_IOMULTI_H */
+static inline void pci_iomul_slot_release(struct kref *kref)
+{
+	struct pci_iomul_slot *slot = container_of(kref, struct pci_iomul_slot,
+						   kref);
+	kfree(slot);
+}
+
+static inline void pci_iomul_slot_put(struct pci_iomul_slot *slot)
+{
+	kref_put(&slot->kref, &pci_iomul_slot_release);
+}
+
+int pci_iomul_switch_io_allocated(const struct pci_iomul_switch *);
+void pci_iomul_get_lock_switch(struct pci_dev *, struct pci_iomul_switch **,
+			       struct pci_iomul_slot **);

@@ -59,6 +59,7 @@
 
 #define MAX_TAP_DEV 256     /*the maximum number of tapdisk ring devices    */
 #define MAX_DEV_NAME 100    /*the max tapdisk ring device name e.g. blktap0 */
+#define TAP_DEV_NAME "xen/blktap"
 
 /*
  * The maximum number of requests that can be outstanding at any time
@@ -524,7 +525,7 @@ found:
 
 		if ((class = get_xen_class()) != NULL)
 			device_create(class, NULL, MKDEV(blktap_major, minor),
-				      NULL, "blktap%d", minor);
+				      NULL, TAP_DEV_NAME "%d", minor);
 	}
 
 out:
@@ -590,18 +591,18 @@ static int blktap_open(struct inode *inode, struct file *filp)
 	if (!idx)
 		return 0;
 	if (idx < 0 || idx >= MAX_TAP_DEV) {
-		WPRINTK("No device /dev/xen/blktap%d\n", idx);
+		WPRINTK("No device /dev/" TAP_DEV_NAME "%d\n", idx);
 		return -ENODEV;
 	}
 
 	info = tapfds[idx];
 	if (!info) {
-		WPRINTK("Unable to open device /dev/xen/blktap%d\n",
+		WPRINTK("Unable to open device /dev/" TAP_DEV_NAME "%d\n",
 			idx);
 		return -ENODEV;
 	}
 
-	DPRINTK("Opening device /dev/xen/blktap%d\n",idx);
+	DPRINTK("Opening device /dev/" TAP_DEV_NAME "%d\n",idx);
 	
 	/*Only one process can access device at a time*/
 	if (test_and_set_bit(0, &info->dev_inuse))
@@ -634,7 +635,7 @@ static int blktap_open(struct inode *inode, struct file *filp)
 			info->idx_map[i] = INVALID_REQ;
 	}
 
-	DPRINTK("Tap open: device /dev/xen/blktap%d\n",idx);
+	DPRINTK("Tap open: device /dev/" TAP_DEV_NAME "%d\n",idx);
 	return 0;
 
  fail_nomem:
@@ -677,7 +678,7 @@ static int blktap_release(struct inode *inode, struct file *filp)
 	}
 
 	clear_bit(0, &info->dev_inuse);
-	DPRINTK("Freeing device [/dev/xen/blktap%d]\n",info->minor);
+	DPRINTK("Freeing device [/dev/" TAP_DEV_NAME "%d]\n",info->minor);
 
 	return 0;
 }
@@ -1778,7 +1779,7 @@ static int __init blkif_init(void)
 	/* tapfds[0] is always NULL */
 	blktap_next_minor++;
 
-	DPRINTK("Created misc_dev %d:0 [/dev/xen/blktap0]\n", ret);
+	DPRINTK("Created misc_dev %d:0 [/dev/" TAP_DEV_NAME "0]\n", ret);
 
 	/* Make sure the xen class exists */
 	if ((class = get_xen_class()) != NULL) {
@@ -1790,7 +1791,7 @@ static int __init blkif_init(void)
 		 * made.
 		 */
 		device_create(class, NULL, MKDEV(blktap_major, 0), NULL,
-			      "blktap0");
+			      TAP_DEV_NAME "0");
 	} else {
 		/* this is bad, but not fatal */
 		WPRINTK("blktap: sysfs xen_class not created\n");
@@ -1804,5 +1805,4 @@ static int __init blkif_init(void)
 module_init(blkif_init);
 
 MODULE_LICENSE("Dual BSD/GPL");
-MODULE_ALIAS("devname:xen/blktap0");
-MODULE_ALIAS("devname:blktap0");
+MODULE_ALIAS("devname:" TAP_DEV_NAME "0");

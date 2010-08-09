@@ -39,7 +39,7 @@ config PCI_GUESTDEV
 	  Say Y here if you want to reserve PCI device for passthrough.
 
 config PCI_IOMULTI
-	bool "PCI Device IO Multiplex for Passthrough"
+	tristate "PCI Device IO Multiplex for Passthrough"
 	depends on PCI && ACPI && XEN
 	default y
 	help

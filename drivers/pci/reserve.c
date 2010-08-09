@@ -15,7 +15,6 @@
  *
  * Copyright (c) 2009 Isaku Yamahata
  *                    VA Linux Systems Japan K.K.
- *
  */
 
 #include <linux/kernel.h>

@@ -81,7 +81,7 @@ struct pcidev_sbdf_node {
 	struct pcidev_sbdf_node *child;
 };
 
-static char guestdev_param[COMMAND_LINE_SIZE];
+static char __initdata guestdev_param[COMMAND_LINE_SIZE];
 static LIST_HEAD(guestdev_list);
 
 /* Get hid and uid */
@@ -760,7 +760,7 @@ int pci_is_guestdev_to_reassign(struct pci_dev *dev)
 	return FALSE;
 }
 
-#ifdef CONFIG_PCI_IOMULTI
+#if defined(CONFIG_PCI_IOMULTI) || defined(CONFIG_PCI_IOMULTI_MODULE)
 static int pci_iomul_node_match(const struct devicepath_node *gdev_node,
 				const struct pcidev_sbdf_node *sbdf_node,
 				int options)

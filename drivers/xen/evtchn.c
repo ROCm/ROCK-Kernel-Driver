@@ -481,7 +481,7 @@ static const struct file_operations evtchn_fops = {
 
 static struct miscdevice evtchn_miscdev = {
 	.minor        = MISC_DYNAMIC_MINOR,
-	.name         = "evtchn",
+	.name         = "xen/evtchn",
 	.fops         = &evtchn_fops,
 };
 static int __init evtchn_init(void)
@@ -494,10 +494,10 @@ static int __init evtchn_init(void)
 	spin_lock_init(&port_user_lock);
 	memset(port_user, 0, sizeof(port_user));
 
-	/* Create '/dev/misc/evtchn'. */
+	/* Create '/dev/xen/evtchn'. */
 	err = misc_register(&evtchn_miscdev);
 	if (err != 0) {
-		printk(KERN_ALERT "Could not register /dev/misc/evtchn\n");
+		printk(KERN_ALERT "Could not register /dev/xen/evtchn\n");
 		return err;
 	}
 
@@ -516,4 +516,3 @@ module_exit(evtchn_cleanup);
 
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("devname:xen/evtchn");
-MODULE_ALIAS("devname:evtchn");

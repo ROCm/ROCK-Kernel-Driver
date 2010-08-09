@@ -1495,6 +1495,10 @@ int setup_ioapic_entry(int apic_id, int irq,
 	return 0;
 }
 
+static struct {
+	DECLARE_BITMAP(pin_programmed, MP_MAX_IOAPIC_PIN + 1);
+} mp_ioapic_routing[MAX_IO_APICS];
+
 static void setup_IO_APIC_irq(int apic_id, int pin, unsigned int irq, struct irq_desc *desc,
 			      int trigger, int polarity)
 {
@@ -1515,6 +1519,42 @@ static void setup_IO_APIC_irq(int apic_id, int pin, unsigned int irq, struct irq
 	 */
 	if (irq < legacy_pic->nr_legacy_irqs && cpumask_test_cpu(0, cfg->domain))
 		apic->vector_allocation_domain(0, cfg->domain);
+#else
+	/*
+	 * For legacy IRQs we may get here before trigger mode and polarity
+	 * get obtained, but Xen refuses to set those through
+	 * PHYSDEVOP_setup_gsi more than once (perhaps even at all).
+	 */
+	if (irq >= legacy_pic->nr_legacy_irqs
+	    || test_bit(pin, mp_ioapic_routing[apic_id].pin_programmed)) {
+		struct physdev_setup_gsi setup_gsi = {
+			.gsi = irq,
+			.triggering = trigger,
+			.polarity = polarity
+		};
+		struct physdev_map_pirq map_pirq = {
+			.domid = DOMID_SELF,
+			.type = MAP_PIRQ_TYPE_GSI,
+			.index = irq,
+			.pirq = irq
+		};
+
+		switch (HYPERVISOR_physdev_op(PHYSDEVOP_setup_gsi,
+					      &setup_gsi)) {
+		case -EEXIST:
+			if (irq < legacy_pic->nr_legacy_irqs)
+				break;
+			/* fall through */
+		case 0:
+			evtchn_register_pirq(irq);
+			if (HYPERVISOR_physdev_op(PHYSDEVOP_map_pirq,
+						  &map_pirq) == 0) {
+				/* fake (for init_IO_APIC_traps()): */
+				cfg->vector = irq;
+				return;
+			}
+		}
+	}
 #endif
 
 	if (assign_irq_vector(irq, cfg, apic->target_cpus()))
@@ -1549,10 +1589,6 @@ static void setup_IO_APIC_irq(int apic_id, int pin, unsigned int irq, struct irq
 
 	ioapic_write_entry(apic_id, pin, entry);
 }
-
-static struct {
-	DECLARE_BITMAP(pin_programmed, MP_MAX_IOAPIC_PIN + 1);
-} mp_ioapic_routing[MAX_IO_APICS];
 
 static void __init setup_IO_APIC_irqs(void)
 {

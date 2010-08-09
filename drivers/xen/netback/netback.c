@@ -112,7 +112,13 @@ static inline unsigned int netif_page_index(const struct page *pg)
 	return ext.e.idx;
 }
 
-#define PKT_PROT_LEN 64
+/*
+ * This is the amount of packet we copy rather than map, so that the
+ * guest can't fiddle with the contents of the headers while we do
+ * packet processing on them (netfilter, routing, etc). 72 is enough
+ * to cover TCP+IP headers including options.
+ */
+#define PKT_PROT_LEN 72
 
 #define MASK_PEND_IDX(_i) ((_i)&(MAX_PENDING_REQS-1))
 
@@ -1516,6 +1522,16 @@ static void net_tx_action(unsigned long group)
 		skb->proto_csum_blank = !!(txp->flags & NETTXF_csum_blank);
 
 		netbk_fill_frags(netbk, skb);
+
+		/*
+		 * If the initial fragment was < PKT_PROT_LEN then
+		 * pull through some bytes from the other fragments to
+		 * increase the linear region to PKT_PROT_LEN bytes.
+		 */
+		if (skb_headlen(skb) < PKT_PROT_LEN && skb_is_nonlinear(skb)) {
+			int target = min_t(int, skb->len, PKT_PROT_LEN);
+			__pskb_pull_tail(skb, target - skb_headlen(skb));
+		}
 
 		skb->dev      = netif->dev;
 		skb->protocol = eth_type_trans(skb, skb->dev);
