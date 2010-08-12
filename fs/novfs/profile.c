@@ -62,7 +62,7 @@ static struct proc_dir_entry *inode_file = NULL;
 
 static DECLARE_MUTEX(LocalPrint_lock);
 
-static ssize_t User_proc_write_DbgBuffer(struct file *file, const char __user *buf, size_t nbytes, loff_t *ppos)
+static ssize_t User_proc_write_DbgBuffer(struct file *file, const char __user * buf, size_t nbytes, loff_t * ppos)
 {
 	ssize_t retval = nbytes;
 	u_char *lbuf, *p;
@@ -101,8 +101,7 @@ static ssize_t User_proc_write_DbgBuffer(struct file *file, const char __user *b
 			} else if (!strcmp("novfsd", lbuf)) {
 				novfs_daemon_debug_cmd_send(p);
 			} else if (!strcmp("file_update_timeout", lbuf)) {
-				novfs_update_timeout =
-				    simple_strtoul(p, NULL, 0);
+				novfs_update_timeout = simple_strtoul(p, NULL, 0);
 			} else if (!strcmp("cache", lbuf)) {
 				if (!strcmp("on", p)) {
 					novfs_page_cache = 1;
@@ -134,9 +133,7 @@ static ssize_t User_proc_read_DbgBuffer(struct file *file, char *buf, size_t nby
 			count = nbytes;
 		}
 
-		count -=
-		    copy_to_user(buf, &DbgPrintBuffer[DbgPrintBufferReadOffset],
-				 count);
+		count -= copy_to_user(buf, &DbgPrintBuffer[DbgPrintBufferReadOffset], count);
 
 		if (count == 0) {
 			if (retval == 0)
@@ -144,8 +141,7 @@ static ssize_t User_proc_read_DbgBuffer(struct file *file, char *buf, size_t nby
 		} else {
 			DbgPrintBufferReadOffset += count;
 			if (DbgPrintBufferReadOffset >= DbgPrintBufferOffset) {
-				DbgPrintBufferOffset =
-				    DbgPrintBufferReadOffset = 0;
+				DbgPrintBufferOffset = DbgPrintBufferReadOffset = 0;
 			}
 			retval = count;
 		}
@@ -158,7 +154,8 @@ static int proc_read_DbgBuffer(char *page, char **start, off_t off, int count, i
 {
 	int len;
 
-	printk(KERN_ALERT "proc_read_DbgBuffer: off=%ld count=%d DbgPrintBufferOffset=%lu DbgPrintBufferReadOffset=%lu\n", off, count, DbgPrintBufferOffset, DbgPrintBufferReadOffset);
+	printk(KERN_ALERT "proc_read_DbgBuffer: off=%ld count=%d DbgPrintBufferOffset=%lu DbgPrintBufferReadOffset=%lu\n", off,
+	       count, DbgPrintBufferOffset, DbgPrintBufferReadOffset);
 
 	len = DbgPrintBufferOffset - DbgPrintBufferReadOffset;
 
@@ -187,9 +184,7 @@ static int LocalPrint(char *Fmt, ...)
 
 	if (DbgPrintBuffer) {
 		va_start(args, Fmt);
-		len += vsnprintf(DbgPrintBuffer + DbgPrintBufferOffset,
-				 DbgPrintBufferSize - DbgPrintBufferOffset,
-				 Fmt, args);
+		len += vsnprintf(DbgPrintBuffer + DbgPrintBufferOffset, DbgPrintBufferSize - DbgPrintBufferOffset, Fmt, args);
 		DbgPrintBufferOffset += len;
 	}
 
@@ -209,8 +204,7 @@ int ___DbgPrint(const char *site, const char *Fmt, ...)
 		if (buf) {
 			va_start(args, Fmt);
 			len = snprintf(buf, DBG_BUFFER_SIZE, "[%d] %s ", current->pid, site);
-			len += vsnprintf(buf + len, DBG_BUFFER_SIZE - len, Fmt,
-				      args);
+			len += vsnprintf(buf + len, DBG_BUFFER_SIZE - len, Fmt, args);
 			if (-1 == len) {
 				len = DBG_BUFFER_SIZE - 1;
 				buf[len] = '\0';
@@ -226,25 +220,18 @@ int ___DbgPrint(const char *site, const char *Fmt, ...)
 				}
 
 				if (DbgPrintBuffer && DbgPrintOn) {
-					if ((DbgPrintBufferOffset + len) >
-					    DbgPrintBufferSize) {
+					if ((DbgPrintBufferOffset + len) > DbgPrintBufferSize) {
 						offset = DbgPrintBufferOffset;
 						DbgPrintBufferOffset = 0;
-						memset(&DbgPrintBuffer[offset],
-						       0,
-						       DbgPrintBufferSize -
-						       offset);
+						memset(&DbgPrintBuffer[offset], 0, DbgPrintBufferSize - offset);
 					}
 
 					mb();
 
-					if ((DbgPrintBufferOffset + len) <
-					    DbgPrintBufferSize) {
+					if ((DbgPrintBufferOffset + len) < DbgPrintBufferSize) {
 						DbgPrintBufferOffset += len;
-						offset =
-						    DbgPrintBufferOffset - len;
-						memcpy(&DbgPrintBuffer[offset],
-						       buf, len + 1);
+						offset = DbgPrintBufferOffset - len;
+						memcpy(&DbgPrintBuffer[offset], buf, len + 1);
 					}
 				}
 			}
@@ -317,8 +304,7 @@ static void NovfsGregorianDay(struct local_rtc_time *tm)
 	int leapsToDate;
 	int lastYear;
 	int day;
-	int MonthOffset[] =
-	    { 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334 };
+	int MonthOffset[] = { 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334 };
 
 	lastYear = tm->tm_year - 1;
 
@@ -333,9 +319,7 @@ static void NovfsGregorianDay(struct local_rtc_time *tm)
 	 *
 	 * e.g. 1904 was a leap year, 1900 was not, 1996 is, and 2000 will be
 	 */
-	if ((tm->tm_year % 4 == 0) &&
-	    ((tm->tm_year % 100 != 0) || (tm->tm_year % 400 == 0)) &&
-	    (tm->tm_mon > 2)) {
+	if ((tm->tm_year % 4 == 0) && ((tm->tm_year % 100 != 0) || (tm->tm_year % 400 == 0)) && (tm->tm_mon > 2)) {
 		/*
 		 * We are past Feb. 29 in a leap year
 		 */
@@ -344,8 +328,7 @@ static void NovfsGregorianDay(struct local_rtc_time *tm)
 		day = 0;
 	}
 
-	day += lastYear * 365 + leapsToDate + MonthOffset[tm->tm_mon - 1] +
-	    tm->tm_mday;
+	day += lastYear * 365 + leapsToDate + MonthOffset[tm->tm_mon - 1] + tm->tm_mday;
 
 	tm->tm_wday = day % 7;
 }
@@ -388,17 +371,15 @@ static void private_to_tm(int tim, struct local_rtc_time *tm)
 char *ctime_r(time_t * clock, char *buf)
 {
 	struct local_rtc_time tm;
-	static char *DAYOFWEEK[] =
-	    { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
-	static char *MONTHOFYEAR[] =
-	    { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep",
-"Oct", "Nov", "Dec" };
+	static char *DAYOFWEEK[] = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
+	static char *MONTHOFYEAR[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep",
+		"Oct", "Nov", "Dec"
+	};
 
 	private_to_tm(*clock, &tm);
 
 	sprintf(buf, "%s %s %d %d:%02d:%02d %d", DAYOFWEEK[tm.tm_wday],
-		MONTHOFYEAR[tm.tm_mon - 1], tm.tm_mday, tm.tm_hour, tm.tm_min,
-		tm.tm_sec, tm.tm_year);
+		MONTHOFYEAR[tm.tm_mon - 1], tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec, tm.tm_year);
 	return (buf);
 }
 
@@ -421,8 +402,7 @@ static void dump(struct dentry *parent, void *pf)
 	}
 
 	if (parent) {
-		pfunc("starting 0x%p %.*s\n", parent, parent->d_name.len,
-		      parent->d_name.name);
+		pfunc("starting 0x%p %.*s\n", parent, parent->d_name.len, parent->d_name.name);
 		if (parent->d_subdirs.next == &parent->d_subdirs) {
 			pfunc("No children...\n");
 		} else {
@@ -434,18 +414,13 @@ static void dump(struct dentry *parent, void *pf)
 				while (l) {
 					p = l->dentry->d_subdirs.next;
 					while (p != &l->dentry->d_subdirs) {
-						d = list_entry(p, struct dentry,
-							       d_u.d_child);
+						d = list_entry(p, struct dentry, d_u.d_child);
 						p = p->next;
 
-						if (d->d_subdirs.next !=
-						    &d->d_subdirs) {
-							n = kmalloc(sizeof
-									 (*n),
-									 GFP_KERNEL);
+						if (d->d_subdirs.next != &d->d_subdirs) {
+							n = kmalloc(sizeof(*n), GFP_KERNEL);
 							if (n) {
-								n->next =
-								    l->next;
+								n->next = l->next;
 								l->next = n;
 								n->dentry = d;
 							}
@@ -461,21 +436,11 @@ static void dump(struct dentry *parent, void *pf)
 								     "   d_subdirs: 0x%p\n"
 								     "   d_inode:   0x%p\n",
 								     d, path,
-								     d->d_name.
-								     len,
-								     d->d_name.
-								     name,
-								     d->
-								     d_parent,
+								     d->d_name.len,
+								     d->d_name.name,
+								     d->d_parent,
 								     atomic_read
-								     (&d->
-								      d_count),
-								     d->d_flags,
-								     d->
-								     d_subdirs.
-								     next,
-								     d->
-								     d_inode);
+								     (&d->d_count), d->d_flags, d->d_subdirs.next, d->d_inode);
 							}
 						}
 					}
@@ -484,22 +449,15 @@ static void dump(struct dentry *parent, void *pf)
 				l = start;
 				while (l) {
 					d = l->dentry;
-					path =
-					    novfs_scope_dget_path(d, buf,
-							    PATH_LENGTH_BUFFER,
-							    1);
+					path = novfs_scope_dget_path(d, buf, PATH_LENGTH_BUFFER, 1);
 					if (path) {
 						sd = " (None)";
-						if (&d->d_subdirs !=
-						    d->d_subdirs.next) {
+						if (&d->d_subdirs != d->d_subdirs.next) {
 							sd = "";
 						}
 						inode_number[0] = '\0';
 						if (d->d_inode) {
-							sprintf(inode_number,
-								" (%lu)",
-								d->d_inode->
-								i_ino);
+							sprintf(inode_number, " (%lu)", d->d_inode->i_ino);
 						}
 						pfunc("0x%p %s\n"
 						      "   d_parent:  0x%p\n"
@@ -509,9 +467,7 @@ static void dump(struct dentry *parent, void *pf)
 						      "   d_inode:   0x%p%s\n",
 						      d, path, d->d_parent,
 						      atomic_read(&d->d_count),
-						      d->d_flags,
-						      d->d_subdirs.next, sd,
-						      d->d_inode, inode_number);
+						      d->d_flags, d->d_subdirs.next, sd, d->d_inode, inode_number);
 					}
 
 					n = l;
@@ -550,8 +506,7 @@ static ssize_t common_read(char *buf, size_t len, loff_t * off)
 
 }
 
-static ssize_t novfs_profile_read_inode(struct file * file, char *buf, size_t len,
-			   loff_t * off)
+static ssize_t novfs_profile_read_inode(struct file *file, char *buf, size_t len, loff_t * off)
 {
 	ssize_t retval = 0;
 	unsigned long offset = *off;
@@ -566,7 +521,6 @@ static ssize_t novfs_profile_read_inode(struct file * file, char *buf, size_t le
 		novfs_dump_inode(LocalPrint);
 	}
 
-
 	retval = common_read(buf, len, off);
 
 	if (0 == retval) {
@@ -580,8 +534,7 @@ static ssize_t novfs_profile_read_inode(struct file * file, char *buf, size_t le
 
 }
 
-static ssize_t novfs_profile_dentry_read(struct file * file, char *buf, size_t len,
-				     loff_t * off)
+static ssize_t novfs_profile_dentry_read(struct file *file, char *buf, size_t len, loff_t * off)
 {
 	ssize_t retval = 0;
 	unsigned long offset = *off;
@@ -630,18 +583,12 @@ void novfs_profile_init()
 		dbg_dir = proc_mkdir(MODULE_NAME, NULL);
 
 	if (dbg_dir) {
-		dbg_file = create_proc_read_entry("Debug",
-						  0600,
-						  dbg_dir,
-						  proc_read_DbgBuffer, NULL);
+		dbg_file = create_proc_read_entry("Debug", 0600, dbg_dir, proc_read_DbgBuffer, NULL);
 		if (dbg_file) {
 			dbg_file->size = DBGBUFFERSIZE;
-			memcpy(&Dbg_proc_file_operations, dbg_file->proc_fops,
-			       sizeof(struct file_operations));
-			Dbg_proc_file_operations.read =
-			    User_proc_read_DbgBuffer;
-			Dbg_proc_file_operations.write =
-			    User_proc_write_DbgBuffer;
+			memcpy(&Dbg_proc_file_operations, dbg_file->proc_fops, sizeof(struct file_operations));
+			Dbg_proc_file_operations.read = User_proc_read_DbgBuffer;
+			Dbg_proc_file_operations.write = User_proc_write_DbgBuffer;
 			dbg_file->proc_fops = &Dbg_proc_file_operations;
 		} else {
 			remove_proc_entry(MODULE_NAME, NULL);
@@ -655,22 +602,16 @@ void novfs_profile_init()
 			inode_file = create_proc_entry("inode", 0600, dbg_dir);
 			if (inode_file) {
 				inode_file->size = 0;
-				memcpy(&inode_proc_file_ops,
-				       inode_file->proc_fops,
-				       sizeof(struct file_operations));
+				memcpy(&inode_proc_file_ops, inode_file->proc_fops, sizeof(struct file_operations));
 				inode_proc_file_ops.owner = THIS_MODULE;
-				inode_proc_file_ops.read =
-					novfs_profile_read_inode;
+				inode_proc_file_ops.read = novfs_profile_read_inode;
 				inode_file->proc_fops = &inode_proc_file_ops;
 			}
 
-			dentry_file = create_proc_entry("dentry",
-							0600, dbg_dir);
+			dentry_file = create_proc_entry("dentry", 0600, dbg_dir);
 			if (dentry_file) {
 				dentry_file->size = 0;
-				memcpy(&dentry_proc_file_ops,
-				       dentry_file->proc_fops,
-				       sizeof(struct file_operations));
+				memcpy(&dentry_proc_file_ops, dentry_file->proc_fops, sizeof(struct file_operations));
 				dentry_proc_file_ops.owner = THIS_MODULE;
 				dentry_proc_file_ops.read = novfs_profile_dentry_read;
 				dentry_file->proc_fops = &dentry_proc_file_ops;
@@ -686,19 +627,14 @@ void novfs_profile_init()
 void novfs_profile_exit(void)
 {
 	if (dbg_file)
-		DbgPrint("Calling remove_proc_entry(Debug, NULL)\n"),
-		    remove_proc_entry("Debug", dbg_dir);
+		DbgPrint("Calling remove_proc_entry(Debug, NULL)\n"), remove_proc_entry("Debug", dbg_dir);
 	if (inode_file)
-		DbgPrint("Calling remove_proc_entry(inode, NULL)\n"),
-		    remove_proc_entry("inode", dbg_dir);
+		DbgPrint("Calling remove_proc_entry(inode, NULL)\n"), remove_proc_entry("inode", dbg_dir);
 	if (dentry_file)
-		DbgPrint("Calling remove_proc_entry(dentry, NULL)\n"),
-		    remove_proc_entry("dentry", dbg_dir);
+		DbgPrint("Calling remove_proc_entry(dentry, NULL)\n"), remove_proc_entry("dentry", dbg_dir);
 
 	if (dbg_dir && (dbg_dir != novfs_procfs_dir)) {
 		DbgPrint("Calling remove_proc_entry(%s, NULL)\n", MODULE_NAME);
 		remove_proc_entry(MODULE_NAME, NULL);
 	}
 }
-
-

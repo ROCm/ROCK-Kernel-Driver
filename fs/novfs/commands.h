@@ -159,7 +159,6 @@ struct novfs_command_reply_header {
 
 };
 
-
 struct novfs_delete_file_request {
 	struct novfs_command_request_header Command;
 	unsigned int isDirectory;
@@ -681,7 +680,6 @@ struct nwd_server_version {
 	unsigned short int uRevision;
 };
 
-
 #define	MAX_ADDRESS_LENGTH	32
 
 struct tagNwdTranAddrEx {
@@ -933,8 +931,7 @@ struct novfs_set_file_lock_reply {
 
 };
 
-
-struct novfs_scope_list{
+struct novfs_scope_list {
 	struct list_head ScopeList;
 	struct novfs_schandle ScopeId;
 	struct novfs_schandle SessionId;
@@ -952,4 +949,4 @@ struct novfs_scope_list{
 
 #pragma pack(pop)
 
-#endif	/* __NOVFS_COMMANDS_H */
+#endif /* __NOVFS_COMMANDS_H */

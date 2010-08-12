@@ -47,9 +47,7 @@ static int Novfs_Get_Version(char *page, char **start, off_t off, int count, int
 		if (novfs_current_mnt) {
 			i = strlen(novfs_current_mnt);
 			if ((i > 0) && i < (count - len)) {
-				len +=
-				    sprintf(buf + len, "Novfs mount=%s\n",
-					    novfs_current_mnt);
+				len += sprintf(buf + len, "Novfs mount=%s\n", novfs_current_mnt);
 			}
 		}
 		DbgPrint("%s", buf);
@@ -69,9 +67,7 @@ int novfs_proc_init(void)
 
 		if (Novfs_Control) {
 			Novfs_Control->size = 0;
-			memcpy(&novfs_daemon_proc_fops,
-					Novfs_Control->proc_fops,
-					sizeof(struct file_operations));
+			memcpy(&novfs_daemon_proc_fops, Novfs_Control->proc_fops, sizeof(struct file_operations));
 
 			/*
 			 * Setup our functions
@@ -96,8 +92,7 @@ int novfs_proc_init(void)
 			/*
 			 * Setup our file functions
 			 */
-			memcpy(&novfs_lib_proc_fops, Novfs_Library->proc_fops,
-			       sizeof(struct file_operations));
+			memcpy(&novfs_lib_proc_fops, Novfs_Library->proc_fops, sizeof(struct file_operations));
 			novfs_lib_proc_fops.owner = THIS_MODULE;
 			novfs_lib_proc_fops.open = novfs_daemon_lib_open;
 			novfs_lib_proc_fops.release = novfs_daemon_lib_close;
@@ -112,9 +107,7 @@ int novfs_proc_init(void)
 			return (-ENOENT);
 		}
 
-		Novfs_Version =
-		    create_proc_read_entry("Version", 0444, novfs_procfs_dir,
-					   Novfs_Get_Version, NULL);
+		Novfs_Version = create_proc_read_entry("Version", 0444, novfs_procfs_dir, Novfs_Get_Version, NULL);
 		if (Novfs_Version) {
 			Novfs_Version->size = 0;
 		} else {
@@ -141,8 +134,7 @@ void novfs_proc_exit(void)
 	DbgPrint("remove_proc_entry(Library, NULL)\n");
 	remove_proc_entry("Library", novfs_procfs_dir);
 
-	DbgPrint("remove_proc_entry(%s, NULL)\n",
-		 MODULE_NAME);
+	DbgPrint("remove_proc_entry(%s, NULL)\n", MODULE_NAME);
 	remove_proc_entry(MODULE_NAME, NULL);
 
 	DbgPrint("done\n");

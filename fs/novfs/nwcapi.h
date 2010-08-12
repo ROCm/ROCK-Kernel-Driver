@@ -14,7 +14,7 @@
 #ifndef __NWCLNX_H__
 #define __NWCLNX_H__
 
-#if 0                          //sgled hack
+#if 0				//sgled hack
 #else //sgled hack (up to endif)
 
 #define NW_MAX_TREE_NAME_LEN              33
@@ -120,8 +120,7 @@ struct novfs_xplat {
 
 #if 0
 N_EXTERN_LIBRARY(NWRCODE)
-    NWCLnxReq
-    (nuint32 request, nptr pInBuf, nuint32 inLen, nptr pOutBuf, nuint32 outLen);
+    NWCLnxReq(nuint32 request, nptr pInBuf, nuint32 inLen, nptr pOutBuf, nuint32 outLen);
 #endif
 //
 // Network Name Format Type
@@ -302,12 +301,11 @@ N_EXTERN_LIBRARY(NWRCODE)
 #define MIN_NUM_REPLIES		1
 #define MAX_NUM_REQUESTS		4096
 #define MIN_NUM_REQUESTS		1
-#define MAX_FRAG_SIZE			4096	
+#define MAX_FRAG_SIZE			4096
 #define MIN_FRAG_SIZE			1
 #define MAX_INFO_LEN			4096
 #define MAX_DOMAIN_LEN			MAX_NETWORK_NAME_LENGTH
 #define MAX_OFFSET_LEN			4096
-
 
 //
 // Flags for the GetBroadcastMessage API
@@ -338,7 +336,6 @@ N_EXTERN_LIBRARY(NWRCODE)
 
 //===[ Type definitions ]==================================================
 
-
 //
 // Structure for defining what a transport
 // address looks like
@@ -349,7 +346,6 @@ struct nwc_tran_addr {
 	u32 uAddressLength;
 	unsigned char *puAddress;
 };
-
 
 struct nwc_conn_string {
 	char *pString;
@@ -501,7 +497,6 @@ struct nwc_convert_netware_handle {
 	u32 uFileSize;
 };
 
-
 //++=======================================================================
 //  API Name:        NwcGetConnInfo
 //
@@ -617,7 +612,6 @@ struct nwc_get_tree_monitored_conn_ref {
 
 };
 
-
 //++=======================================================================
 //  API Name:        NwcGetPreferredDsTree
 //
@@ -677,7 +671,6 @@ struct nwc_get_pref_ds_tree {
 struct nwc_license_conn {
 	u32 ConnHandle;
 };
-
 
 //++=======================================================================
 //  API Name:        NWCGetMappedDrives
@@ -1171,7 +1164,6 @@ struct nwc_set_primary_conn {
 
 };
 
-
 //++=======================================================================
 //  API Name:        NwcQueryFeature
 //
@@ -1316,7 +1308,6 @@ struct nwc_login_id {
 
 };
 
-
 //++=======================================================================
 //  API Name:        NWCSetPassword
 //
@@ -1400,7 +1391,6 @@ struct nwc_auth_with_id {
 	u32 AuthenticationId;
 
 };
-
 
 struct nwc_unmap_drive_ex {
 //         unsigned long      connHdl;

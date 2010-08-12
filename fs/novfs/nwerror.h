@@ -14,7 +14,6 @@
 #ifndef __NOVFS_ERROR_H
 #define __NOVFS_ERROR_H
 
-
 /*
  * Network errors
  * Decimal values at end of line are 32768 lower than actual
@@ -655,4 +654,4 @@
 #define NWE_LOCK_ERROR			0x89FF	// 255
 #define NWE_FAILURE			0x89FF	// 255 Generic Failure
 
-#endif	/* __NOVFS_ERROR_H */
+#endif /* __NOVFS_ERROR_H */

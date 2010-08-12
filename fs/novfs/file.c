@@ -27,11 +27,11 @@
 #include "commands.h"
 #include "nwerror.h"
 
-static ssize_t novfs_tree_read(struct file * file, char *buf, size_t len, loff_t * off);
+static ssize_t novfs_tree_read(struct file *file, char *buf, size_t len, loff_t * off);
 extern struct dentry_operations novfs_dentry_operations;
 
 static struct file_operations novfs_tree_operations = {
-      read:novfs_tree_read,
+read:	novfs_tree_read,
 };
 
 /*
@@ -44,7 +44,7 @@ static int StripTrailingDots = 1;
 int novfs_get_alltrees(struct dentry *parent)
 {
 	unsigned char *p;
-	struct novfs_command_reply_header * reply = NULL;
+	struct novfs_command_reply_header *reply = NULL;
 	unsigned long replylen = 0;
 	struct novfs_command_request_header cmd;
 	int retCode;
@@ -63,8 +63,7 @@ int novfs_get_alltrees(struct dentry *parent)
 	DbgPrint("reply=0x%p replylen=%d", reply, replylen);
 	if (reply) {
 		novfs_dump(replylen, reply);
-		if (!reply->ErrorCode
-		    && (replylen > sizeof(struct novfs_command_reply_header))) {
+		if (!reply->ErrorCode && (replylen > sizeof(struct novfs_command_reply_header))) {
 			p = (char *)reply + 8;
 			while (*p) {
 				DbgPrint("%s", p);
@@ -92,7 +91,7 @@ int novfs_get_alltrees(struct dentry *parent)
 	return (retCode);
 }
 
-static ssize_t novfs_tree_read(struct file * file, char *buf, size_t len, loff_t * off)
+static ssize_t novfs_tree_read(struct file *file, char *buf, size_t len, loff_t * off)
 {
 	if (file->f_pos != 0) {
 		return (0);
@@ -103,7 +102,7 @@ static ssize_t novfs_tree_read(struct file * file, char *buf, size_t len, loff_t
 	return (5);
 }
 
-int novfs_get_servers(unsigned char ** ServerList, struct novfs_schandle SessionId)
+int novfs_get_servers(unsigned char **ServerList, struct novfs_schandle SessionId)
 {
 	struct novfs_get_connected_server_list req;
 	struct novfs_get_connected_server_list_reply *reply = NULL;
@@ -115,15 +114,13 @@ int novfs_get_servers(unsigned char ** ServerList, struct novfs_schandle Session
 	req.Command.CommandType = VFS_COMMAND_GET_CONNECTED_SERVER_LIST;
 	req.Command.SessionId = SessionId;
 
-	retCode =
-	    Queue_Daemon_Command(&req, sizeof(req), NULL, 0, (void *)&reply,
-				 &replylen, INTERRUPTIBLE);
+	retCode = Queue_Daemon_Command(&req, sizeof(req), NULL, 0, (void *)&reply, &replylen, INTERRUPTIBLE);
 	if (reply) {
 		DbgPrint("reply");
 		replylen -= sizeof(struct novfs_command_reply_header);
 		if (!reply->Reply.ErrorCode && replylen) {
 			memcpy(reply, reply->List, replylen);
-			*ServerList = (unsigned char *) reply;
+			*ServerList = (unsigned char *)reply;
 			retCode = 0;
 		} else {
 			kfree(reply);
@@ -133,8 +130,7 @@ int novfs_get_servers(unsigned char ** ServerList, struct novfs_schandle Session
 	return (retCode);
 }
 
-int novfs_get_vols(struct qstr *Server, unsigned char ** VolumeList,
-				 struct novfs_schandle SessionId)
+int novfs_get_vols(struct qstr *Server, unsigned char **VolumeList, struct novfs_schandle SessionId)
 {
 	struct novfs_get_server_volume_list *req;
 	struct novfs_get_server_volume_list_reply *reply = NULL;
@@ -151,9 +147,7 @@ int novfs_get_vols(struct qstr *Server, unsigned char ** VolumeList,
 	memcpy(req->Name, Server->name, Server->len);
 	req->Command.SessionId = SessionId;
 
-	retCode =
-		Queue_Daemon_Command(req, reqlen, NULL, 0, (void *)&reply,
-				&replylen, INTERRUPTIBLE);
+	retCode = Queue_Daemon_Command(req, reqlen, NULL, 0, (void *)&reply, &replylen, INTERRUPTIBLE);
 	if (reply) {
 		DbgPrint("reply");
 		novfs_dump(replylen, reply);
@@ -161,7 +155,7 @@ int novfs_get_vols(struct qstr *Server, unsigned char ** VolumeList,
 
 		if (!reply->Reply.ErrorCode && replylen) {
 			memcpy(reply, reply->List, replylen);
-			*VolumeList = (unsigned char *) reply;
+			*VolumeList = (unsigned char *)reply;
 			retCode = 0;
 		} else {
 			kfree(reply);
@@ -172,11 +166,11 @@ int novfs_get_vols(struct qstr *Server, unsigned char ** VolumeList,
 	return (retCode);
 }
 
-int novfs_get_file_info(unsigned char * Path, struct novfs_entry_info * Info, struct novfs_schandle SessionId)
+int novfs_get_file_info(unsigned char *Path, struct novfs_entry_info *Info, struct novfs_schandle SessionId)
 {
 	struct novfs_verify_file_reply *reply = NULL;
 	unsigned long replylen = 0;
-	struct novfs_verify_file_request * cmd;
+	struct novfs_verify_file_request *cmd;
 	int cmdlen;
 	int retCode = -ENOENT;
 	int pathlen;
@@ -195,7 +189,7 @@ int novfs_get_file_info(unsigned char * Path, struct novfs_entry_info * Info, st
 			if ('.' == Path[pathlen - 1])
 				pathlen--;
 		}
-		cmdlen = offsetof(struct novfs_verify_file_request,path) + pathlen;
+		cmdlen = offsetof(struct novfs_verify_file_request, path) + pathlen;
 		cmd = kmalloc(cmdlen, GFP_KERNEL);
 		if (cmd) {
 			cmd->Command.CommandType = VFS_COMMAND_VERIFY_FILE;
@@ -204,10 +198,7 @@ int novfs_get_file_info(unsigned char * Path, struct novfs_entry_info * Info, st
 			cmd->pathLen = pathlen;
 			memcpy(cmd->path, Path, cmd->pathLen);
 
-			retCode =
-			    Queue_Daemon_Command(cmd, cmdlen, NULL, 0,
-						 (void *)&reply, &replylen,
-						 INTERRUPTIBLE);
+			retCode = Queue_Daemon_Command(cmd, cmdlen, NULL, 0, (void *)&reply, &replylen, INTERRUPTIBLE);
 
 			if (reply) {
 
@@ -217,38 +208,31 @@ int novfs_get_file_info(unsigned char * Path, struct novfs_entry_info * Info, st
 					Info->type = 3;
 					Info->mode = S_IRWXU;
 
-					if (reply->
-					    fileMode & NW_ATTRIBUTE_DIRECTORY) {
+					if (reply->fileMode & NW_ATTRIBUTE_DIRECTORY) {
 						Info->mode |= S_IFDIR;
 					} else {
 						Info->mode |= S_IFREG;
 					}
 
-					if (reply->
-					    fileMode & NW_ATTRIBUTE_READ_ONLY) {
+					if (reply->fileMode & NW_ATTRIBUTE_READ_ONLY) {
 						Info->mode &= ~(S_IWUSR);
 					}
 
 					Info->uid = current_euid();
 					Info->gid = current_egid();
 					Info->size = reply->fileSize;
-					Info->atime.tv_sec =
-					    reply->lastAccessTime;
+					Info->atime.tv_sec = reply->lastAccessTime;
 					Info->atime.tv_nsec = 0;
 					Info->mtime.tv_sec = reply->modifyTime;
 					Info->mtime.tv_nsec = 0;
 					Info->ctime.tv_sec = reply->createTime;
 					Info->ctime.tv_nsec = 0;
 					DbgPrint("replylen=%d sizeof(VERIFY_FILE_REPLY)=%d",
-					     replylen,
-					     sizeof(struct novfs_verify_file_reply));
-					if (replylen >
-					    sizeof(struct novfs_verify_file_reply)) {
-						unsigned int *lp =
-						    &reply->fileMode;
+						 replylen, sizeof(struct novfs_verify_file_reply));
+					if (replylen > sizeof(struct novfs_verify_file_reply)) {
+						unsigned int *lp = &reply->fileMode;
 						lp++;
-						DbgPrint("extra data 0x%x",
-							 *lp);
+						DbgPrint("extra data 0x%x", *lp);
 						Info->mtime.tv_nsec = *lp;
 					}
 					retCode = 0;
@@ -265,8 +249,7 @@ int novfs_get_file_info(unsigned char * Path, struct novfs_entry_info * Info, st
 }
 
 int novfs_getx_file_info(char *Path, const char *Name, char *buffer,
-			 ssize_t buffer_size, ssize_t * dataLen,
-			 struct novfs_schandle SessionId)
+			 ssize_t buffer_size, ssize_t * dataLen, struct novfs_schandle SessionId)
 {
 	struct novfs_xa_get_reply *reply = NULL;
 	unsigned long replylen = 0;
@@ -277,14 +260,13 @@ int novfs_getx_file_info(char *Path, const char *Name, char *buffer,
 	int namelen = strlen(Name);
 	int pathlen = strlen(Path);
 
-	DbgPrint("xattr: Path = %s, pathlen = %i, Name = %s, namelen = %i",
-		 Path, pathlen, Name, namelen);
+	DbgPrint("xattr: Path = %s, pathlen = %i, Name = %s, namelen = %i", Path, pathlen, Name, namelen);
 
 	if (namelen > MAX_XATTR_NAME_LEN)
 		return -ENOATTR;
 
-	cmdlen = offsetof(struct novfs_xa_get_request, data) + pathlen + 1 + namelen + 1;	// two '\0'
-	cmd = (struct novfs_xa_get_request *) kmalloc(cmdlen, GFP_KERNEL);
+	cmdlen = offsetof(struct novfs_xa_get_request, data)+pathlen + 1 + namelen + 1;	// two '\0'
+	cmd = (struct novfs_xa_get_request *)kmalloc(cmdlen, GFP_KERNEL);
 	if (cmd) {
 		cmd->Command.CommandType = VFS_COMMAND_GET_EXTENDED_ATTRIBUTE;
 		cmd->Command.SequenceNumber = 0;
@@ -297,35 +279,27 @@ int novfs_getx_file_info(char *Path, const char *Name, char *buffer,
 		memcpy(cmd->data + cmd->pathLen + 1, Name, cmd->nameLen + 1);
 
 		DbgPrint("xattr: PXA_GET_REQUEST BEGIN");
-		DbgPrint("xattr: Queue_Daemon_Command %d",
-			 cmd->Command.CommandType);
-		DbgPrint("xattr: Command.SessionId = %d",
-			 cmd->Command.SessionId);
+		DbgPrint("xattr: Queue_Daemon_Command %d", cmd->Command.CommandType);
+		DbgPrint("xattr: Command.SessionId = %d", cmd->Command.SessionId);
 		DbgPrint("xattr: pathLen = %d", cmd->pathLen);
 		DbgPrint("xattr: Path = %s", cmd->data);
 		DbgPrint("xattr: nameLen = %d", cmd->nameLen);
 		DbgPrint("xattr: name = %s", (cmd->data + cmd->pathLen + 1));
 		DbgPrint("xattr: PXA_GET_REQUEST END");
 
-		retCode =
-		    Queue_Daemon_Command(cmd, cmdlen, NULL, 0, (void *)&reply,
-					 &replylen, INTERRUPTIBLE);
+		retCode = Queue_Daemon_Command(cmd, cmdlen, NULL, 0, (void *)&reply, &replylen, INTERRUPTIBLE);
 
 		if (reply) {
 
 			if (reply->Reply.ErrorCode) {
-				DbgPrint("xattr: reply->Reply.ErrorCode=%d, %X",
-					 reply->Reply.ErrorCode,
-					 reply->Reply.ErrorCode);
+				DbgPrint("xattr: reply->Reply.ErrorCode=%d, %X", reply->Reply.ErrorCode, reply->Reply.ErrorCode);
 				DbgPrint("xattr: replylen=%d", replylen);
 
 				retCode = -ENOATTR;
 			} else {
 
-				*dataLen =
-				    replylen - sizeof(struct novfs_command_reply_header);
-				DbgPrint("xattr: replylen=%u, dataLen=%u",
-					 replylen, *dataLen);
+				*dataLen = replylen - sizeof(struct novfs_command_reply_header);
+				DbgPrint("xattr: replylen=%u, dataLen=%u", replylen, *dataLen);
 
 				if (buffer_size >= *dataLen) {
 					DbgPrint("xattr: copying to buffer from &reply->pData");
@@ -353,8 +327,7 @@ int novfs_getx_file_info(char *Path, const char *Name, char *buffer,
 }
 
 int novfs_setx_file_info(char *Path, const char *Name, const void *Value,
-			 unsigned long valueLen, unsigned long *bytesWritten,
-			 int flags, struct novfs_schandle SessionId)
+			 unsigned long valueLen, unsigned long *bytesWritten, int flags, struct novfs_schandle SessionId)
 {
 	struct novfs_xa_set_reply *reply = NULL;
 	unsigned long replylen = 0;
@@ -371,8 +344,8 @@ int novfs_setx_file_info(char *Path, const char *Name, const void *Value,
 	if (namelen > MAX_XATTR_NAME_LEN)
 		return -ENOATTR;
 
-	cmdlen = offsetof(struct novfs_xa_set_request, data) + pathlen + 1 + namelen + 1 + valueLen;
-	cmd = (struct novfs_xa_set_request *) kmalloc(cmdlen, GFP_KERNEL);
+	cmdlen = offsetof(struct novfs_xa_set_request, data)+pathlen + 1 + namelen + 1 + valueLen;
+	cmd = (struct novfs_xa_set_request *)kmalloc(cmdlen, GFP_KERNEL);
 	if (cmd) {
 		cmd->Command.CommandType = VFS_COMMAND_SET_EXTENDED_ATTRIBUTE;
 		cmd->Command.SequenceNumber = 0;
@@ -386,14 +359,11 @@ int novfs_setx_file_info(char *Path, const char *Name, const void *Value,
 		memcpy(cmd->data + cmd->pathLen + 1, Name, cmd->nameLen + 1);
 
 		cmd->valueLen = valueLen;
-		memcpy(cmd->data + cmd->pathLen + 1 + cmd->nameLen + 1, Value,
-		       valueLen);
+		memcpy(cmd->data + cmd->pathLen + 1 + cmd->nameLen + 1, Value, valueLen);
 
 		DbgPrint("xattr: PXA_SET_REQUEST BEGIN");
-		DbgPrint("attr: Queue_Daemon_Command %d",
-			 cmd->Command.CommandType);
-		DbgPrint("xattr: Command.SessionId = %d",
-			 cmd->Command.SessionId);
+		DbgPrint("attr: Queue_Daemon_Command %d", cmd->Command.CommandType);
+		DbgPrint("xattr: Command.SessionId = %d", cmd->Command.SessionId);
 		DbgPrint("xattr: pathLen = %d", cmd->pathLen);
 		DbgPrint("xattr: Path = %s", cmd->data);
 		DbgPrint("xattr: nameLen = %d", cmd->nameLen);
@@ -402,26 +372,20 @@ int novfs_setx_file_info(char *Path, const char *Name, const void *Value,
 
 		DbgPrint("xattr: PXA_SET_REQUEST END");
 
-		retCode =
-		    Queue_Daemon_Command(cmd, cmdlen, NULL, 0, (void *)&reply,
-					 &replylen, INTERRUPTIBLE);
+		retCode = Queue_Daemon_Command(cmd, cmdlen, NULL, 0, (void *)&reply, &replylen, INTERRUPTIBLE);
 
 		if (reply) {
 
 			if (reply->Reply.ErrorCode) {
-				DbgPrint("xattr: reply->Reply.ErrorCode=%d, %X",
-					 reply->Reply.ErrorCode,
-					 reply->Reply.ErrorCode);
+				DbgPrint("xattr: reply->Reply.ErrorCode=%d, %X", reply->Reply.ErrorCode, reply->Reply.ErrorCode);
 				DbgPrint("xattr: replylen=%d", replylen);
 
 				retCode = -reply->Reply.ErrorCode;	//-ENOENT;
 			} else {
 
 				DbgPrint("xattr: replylen=%u, real len = %u",
-					 replylen,
-					 replylen - sizeof(struct novfs_command_reply_header));
-				memcpy(bytesWritten, &reply->pData,
-				       replylen - sizeof(struct novfs_command_reply_header));
+					 replylen, replylen - sizeof(struct novfs_command_reply_header));
+				memcpy(bytesWritten, &reply->pData, replylen - sizeof(struct novfs_command_reply_header));
 
 				retCode = 0;
 			}
@@ -437,8 +401,7 @@ int novfs_setx_file_info(char *Path, const char *Name, const void *Value,
 	return retCode;
 }
 
-int novfs_listx_file_info(char *Path, char *buffer, ssize_t buffer_size,
-			  ssize_t * dataLen, struct novfs_schandle SessionId)
+int novfs_listx_file_info(char *Path, char *buffer, ssize_t buffer_size, ssize_t * dataLen, struct novfs_schandle SessionId)
 {
 	struct novfs_xa_list_reply *reply = NULL;
 	unsigned long replylen = 0;
@@ -451,7 +414,7 @@ int novfs_listx_file_info(char *Path, char *buffer, ssize_t buffer_size,
 
 	*dataLen = 0;
 	cmdlen = offsetof(struct novfs_verify_file_request, path) + pathlen;
-	cmd = (struct novfs_verify_file_request *) kmalloc(cmdlen, GFP_KERNEL);
+	cmd = (struct novfs_verify_file_request *)kmalloc(cmdlen, GFP_KERNEL);
 	if (cmd) {
 		cmd->Command.CommandType = VFS_COMMAND_LIST_EXTENDED_ATTRIBUTES;
 		cmd->Command.SequenceNumber = 0;
@@ -459,40 +422,30 @@ int novfs_listx_file_info(char *Path, char *buffer, ssize_t buffer_size,
 		cmd->pathLen = pathlen;
 		memcpy(cmd->path, Path, cmd->pathLen + 1);	//+ '\0'
 		DbgPrint("xattr: PVERIFY_FILE_REQUEST BEGIN");
-		DbgPrint("xattr: Queue_Daemon_Command %d",
-		     cmd->Command.CommandType);
-		DbgPrint("xattr: Command.SessionId = %d",
-		     cmd->Command.SessionId);
+		DbgPrint("xattr: Queue_Daemon_Command %d", cmd->Command.CommandType);
+		DbgPrint("xattr: Command.SessionId = %d", cmd->Command.SessionId);
 		DbgPrint("xattr: pathLen = %d", cmd->pathLen);
 		DbgPrint("xattr: Path = %s", cmd->path);
 		DbgPrint("xattr: PVERIFY_FILE_REQUEST END");
 
-		retCode = Queue_Daemon_Command(cmd, cmdlen, NULL, 0,
-					       (void *)&reply, &replylen,
-					       INTERRUPTIBLE);
+		retCode = Queue_Daemon_Command(cmd, cmdlen, NULL, 0, (void *)&reply, &replylen, INTERRUPTIBLE);
 
 		if (reply) {
 
 			if (reply->Reply.ErrorCode) {
-				DbgPrint("xattr: reply->Reply.ErrorCode=%d, %X",
-					 reply->Reply.ErrorCode,
-					 reply->Reply.ErrorCode);
+				DbgPrint("xattr: reply->Reply.ErrorCode=%d, %X", reply->Reply.ErrorCode, reply->Reply.ErrorCode);
 				DbgPrint("xattr: replylen=%d", replylen);
 
 				retCode = -ENOENT;
 			} else {
-				*dataLen =
-				    replylen - sizeof(struct novfs_command_reply_header);
-				DbgPrint("xattr: replylen=%u, dataLen=%u",
-					 replylen, *dataLen);
+				*dataLen = replylen - sizeof(struct novfs_command_reply_header);
+				DbgPrint("xattr: replylen=%u, dataLen=%u", replylen, *dataLen);
 
 				if (buffer_size >= *dataLen) {
-					DbgPrint("xattr: copying to buffer "
-						 "from &reply->pData");
+					DbgPrint("xattr: copying to buffer " "from &reply->pData");
 					memcpy(buffer, &reply->pData, *dataLen);
 				} else {
-					DbgPrint("xattr: (!!!) buffer is "
-						 "smaller then reply\n");
+					DbgPrint("xattr: (!!!) buffer is " "smaller then reply\n");
 					retCode = -ERANGE;
 				}
 				DbgPrint("xattr: /dumping buffer");
@@ -513,8 +466,7 @@ int novfs_listx_file_info(char *Path, char *buffer, ssize_t buffer_size,
 	return retCode;
 }
 
-static int begin_directory_enumerate(unsigned char * Path, int PathLen, void ** EnumHandle,
-			      struct novfs_schandle SessionId)
+static int begin_directory_enumerate(unsigned char *Path, int PathLen, void **EnumHandle, struct novfs_schandle SessionId)
 {
 	struct novfs_begin_enumerate_directory_request *cmd;
 	struct novfs_begin_enumerate_directory_reply *reply = NULL;
@@ -524,7 +476,7 @@ static int begin_directory_enumerate(unsigned char * Path, int PathLen, void ** 
 	*EnumHandle = 0;
 
 	cmdlen = offsetof(struct
-			novfs_begin_enumerate_directory_request, path) + PathLen;
+			  novfs_begin_enumerate_directory_request, path) + PathLen;
 	cmd = kmalloc(cmdlen, GFP_KERNEL);
 	if (cmd) {
 		cmd->Command.CommandType = VFS_COMMAND_START_ENUMERATE;
@@ -534,9 +486,7 @@ static int begin_directory_enumerate(unsigned char * Path, int PathLen, void ** 
 		cmd->pathLen = PathLen;
 		memcpy(cmd->path, Path, PathLen);
 
-		retCode =
-		    Queue_Daemon_Command(cmd, cmdlen, NULL, 0, (void *)&reply,
-					 &replylen, INTERRUPTIBLE);
+		retCode = Queue_Daemon_Command(cmd, cmdlen, NULL, 0, (void *)&reply, &replylen, INTERRUPTIBLE);
 /*
  *      retCode = Queue_Daemon_Command(cmd, cmdlen, NULL, 0, (void *)&reply, &replylen, 0);
  */
@@ -569,9 +519,7 @@ int novfs_end_directory_enumerate(void *EnumHandle, struct novfs_schandle Sessio
 
 	cmd.enumerateHandle = EnumHandle;
 
-	retCode =
-	    Queue_Daemon_Command(&cmd, sizeof(cmd), NULL, 0, (void *)&reply,
-				 &replylen, 0);
+	retCode = Queue_Daemon_Command(&cmd, sizeof(cmd), NULL, 0, (void *)&reply, &replylen, 0);
 	if (reply) {
 		retCode = 0;
 		if (reply->Reply.ErrorCode) {
@@ -583,14 +531,14 @@ int novfs_end_directory_enumerate(void *EnumHandle, struct novfs_schandle Sessio
 	return (retCode);
 }
 
-static int directory_enumerate_ex(void ** EnumHandle, struct novfs_schandle SessionId, int *Count,
-			   struct novfs_entry_info **PInfo, int Interrupt)
+static int directory_enumerate_ex(void **EnumHandle, struct novfs_schandle SessionId, int *Count,
+				  struct novfs_entry_info **PInfo, int Interrupt)
 {
 	struct novfs_enumerate_directory_ex_request cmd;
 	struct novfs_enumerate_directory_ex_reply *reply = NULL;
 	unsigned long replylen = 0;
 	int retCode = 0;
-	struct novfs_entry_info * info;
+	struct novfs_entry_info *info;
 	struct novfs_enumerate_directory_ex_data *data;
 	int isize;
 
@@ -606,9 +554,7 @@ static int directory_enumerate_ex(void ** EnumHandle, struct novfs_schandle Sess
 	cmd.pathLen = 0;
 	cmd.path[0] = '\0';
 
-	retCode =
-	    Queue_Daemon_Command(&cmd, sizeof(cmd), NULL, 0, (void *)&reply,
-				 &replylen, Interrupt);
+	retCode = Queue_Daemon_Command(&cmd, sizeof(cmd), NULL, 0, (void *)&reply, &replylen, Interrupt);
 
 	if (reply) {
 		retCode = 0;
@@ -617,88 +563,60 @@ static int directory_enumerate_ex(void ** EnumHandle, struct novfs_schandle Sess
 		 * error but there could still be valid data.
 		 */
 
-		if (!reply->Reply.ErrorCode ||
-		    ((replylen > sizeof(struct novfs_command_reply_header)) &&
-		     (reply->enumCount > 0))) {
+		if (!reply->Reply.ErrorCode || ((replylen > sizeof(struct novfs_command_reply_header)) && (reply->enumCount > 0))) {
 			DbgPrint("isize=%d", replylen);
 			data =
-			    (struct novfs_enumerate_directory_ex_data *) ((char *)reply +
-							    sizeof
-							    (struct novfs_enumerate_directory_ex_reply));
-			isize =
-			    replylen - sizeof(struct novfs_enumerate_directory_ex_reply *) -
-			    reply->enumCount *
-			    offsetof(struct
-					    novfs_enumerate_directory_ex_data, name);
-			isize +=
-			    (reply->enumCount *
-			     offsetof(struct novfs_entry_info, name));
+			    (struct novfs_enumerate_directory_ex_data *)((char *)reply +
+									 sizeof(struct novfs_enumerate_directory_ex_reply));
+			isize = replylen - sizeof(struct novfs_enumerate_directory_ex_reply *) - reply->enumCount * offsetof(struct
+															     novfs_enumerate_directory_ex_data,
+															     name);
+			isize += (reply->enumCount * offsetof(struct novfs_entry_info, name));
 
 			if (PInfo) {
 				*PInfo = info = kmalloc(isize, GFP_KERNEL);
 				if (*PInfo) {
-					DbgPrint("data=0x%p info=0x%p",
-						 data, info);
+					DbgPrint("data=0x%p info=0x%p", data, info);
 					*Count = reply->enumCount;
 					do {
-						DbgPrint("data=0x%p length=%d",
-							 data);
+						DbgPrint("data=0x%p length=%d", data);
 
 						info->type = 3;
 						info->mode = S_IRWXU;
 
-						if (data->
-						    mode &
-						    NW_ATTRIBUTE_DIRECTORY) {
+						if (data->mode & NW_ATTRIBUTE_DIRECTORY) {
 							info->mode |= S_IFDIR;
 							info->mode |= S_IXUSR;
 						} else {
 							info->mode |= S_IFREG;
 						}
 
-						if (data->
-						    mode &
-						    NW_ATTRIBUTE_READ_ONLY) {
-							info->mode &=
-							    ~(S_IWUSR);
+						if (data->mode & NW_ATTRIBUTE_READ_ONLY) {
+							info->mode &= ~(S_IWUSR);
 						}
 
-						if (data->
-						    mode & NW_ATTRIBUTE_EXECUTE)
-						{
+						if (data->mode & NW_ATTRIBUTE_EXECUTE) {
 							info->mode |= S_IXUSR;
 						}
 
 						info->uid = current_euid();
 						info->gid = current_egid();
 						info->size = data->size;
-						info->atime.tv_sec =
-						    data->lastAccessTime;
+						info->atime.tv_sec = data->lastAccessTime;
 						info->atime.tv_nsec = 0;
-						info->mtime.tv_sec =
-						    data->modifyTime;
+						info->mtime.tv_sec = data->modifyTime;
 						info->mtime.tv_nsec = 0;
-						info->ctime.tv_sec =
-						    data->createTime;
+						info->ctime.tv_sec = data->createTime;
 						info->ctime.tv_nsec = 0;
-						info->namelength =
-						    data->nameLen;
-						memcpy(info->name, data->name,
-						       data->nameLen);
-						data =
-						    (struct novfs_enumerate_directory_ex_data *)
-						    & data->name[data->nameLen];
-						replylen =
-						    (int)((char *)&info->
-							  name[info->
-							       namelength] -
-							  (char *)info);
+						info->namelength = data->nameLen;
+						memcpy(info->name, data->name, data->nameLen);
+						data = (struct novfs_enumerate_directory_ex_data *)
+						    &data->name[data->nameLen];
+						replylen = (int)((char *)&info->name[info->namelength] - (char *)info);
 						DbgPrint("info=0x%p", info);
 						novfs_dump(replylen, info);
 
-						info =
-						    (struct novfs_entry_info *) & info->
-						    name[info->namelength];
+						info = (struct novfs_entry_info *)&info->name[info->namelength];
 
 					} while (--reply->enumCount);
 				}
@@ -717,9 +635,8 @@ static int directory_enumerate_ex(void ** EnumHandle, struct novfs_schandle Sess
 	return (retCode);
 }
 
-int novfs_get_dir_listex(unsigned char * Path, void ** EnumHandle, int *Count,
-			       struct novfs_entry_info **Info,
-			       struct novfs_schandle SessionId)
+int novfs_get_dir_listex(unsigned char *Path, void **EnumHandle, int *Count,
+			 struct novfs_entry_info **Info, struct novfs_schandle SessionId)
 {
 	int retCode = -ENOENT;
 
@@ -728,20 +645,16 @@ int novfs_get_dir_listex(unsigned char * Path, void ** EnumHandle, int *Count,
 	if (Info)
 		*Info = NULL;
 
-	if ((void *) - 1 == *EnumHandle) {
+	if ((void *)-1 == *EnumHandle) {
 		return (-ENODATA);
 	}
 
 	if (0 == *EnumHandle) {
-		retCode =
-		    begin_directory_enumerate(Path, strlen(Path), EnumHandle,
-					      SessionId);
+		retCode = begin_directory_enumerate(Path, strlen(Path), EnumHandle, SessionId);
 	}
 
 	if (*EnumHandle) {
-		retCode =
-		    directory_enumerate_ex(EnumHandle, SessionId, Count, Info,
-					   INTERRUPTIBLE);
+		retCode = directory_enumerate_ex(EnumHandle, SessionId, Count, Info, INTERRUPTIBLE);
 		if (retCode) {
 			novfs_end_directory_enumerate(*EnumHandle, SessionId);
 			retCode = 0;
@@ -751,9 +664,7 @@ int novfs_get_dir_listex(unsigned char * Path, void ** EnumHandle, int *Count,
 	return (retCode);
 }
 
-int novfs_open_file(unsigned char * Path, int Flags, struct novfs_entry_info * Info,
-		void ** Handle,
-		struct novfs_schandle SessionId)
+int novfs_open_file(unsigned char *Path, int Flags, struct novfs_entry_info *Info, void **Handle, struct novfs_schandle SessionId)
 {
 	struct novfs_open_file_request *cmd;
 	struct novfs_open_file_reply *reply;
@@ -817,19 +728,15 @@ int novfs_open_file(unsigned char * Path, int Flags, struct novfs_entry_info * I
 		cmd->pathLen = pathlen;
 		memcpy(cmd->path, Path, pathlen);
 
-		retCode =
-		    Queue_Daemon_Command(cmd, cmdlen, NULL, 0, (void *)&reply,
-					 &replylen, INTERRUPTIBLE);
+		retCode = Queue_Daemon_Command(cmd, cmdlen, NULL, 0, (void *)&reply, &replylen, INTERRUPTIBLE);
 
 		if (reply) {
 			if (reply->Reply.ErrorCode) {
 				if (NWE_OBJECT_EXISTS == reply->Reply.ErrorCode) {
 					retCode = -EEXIST;
-				} else if (NWE_ACCESS_DENIED ==
-					   reply->Reply.ErrorCode) {
+				} else if (NWE_ACCESS_DENIED == reply->Reply.ErrorCode) {
 					retCode = -EACCES;
-				} else if (NWE_FILE_IN_USE ==
-					   reply->Reply.ErrorCode) {
+				} else if (NWE_FILE_IN_USE == reply->Reply.ErrorCode) {
 					retCode = -EBUSY;
 				} else {
 					retCode = -ENOENT;
@@ -847,7 +754,7 @@ int novfs_open_file(unsigned char * Path, int Flags, struct novfs_entry_info * I
 	return (retCode);
 }
 
-int novfs_create(unsigned char * Path, int DirectoryFlag, struct novfs_schandle SessionId)
+int novfs_create(unsigned char *Path, int DirectoryFlag, struct novfs_schandle SessionId)
 {
 	struct novfs_create_file_request *cmd;
 	struct novfs_create_file_reply *reply;
@@ -875,9 +782,7 @@ int novfs_create(unsigned char * Path, int DirectoryFlag, struct novfs_schandle 
 	cmd->pathlength = pathlen;
 	memcpy(cmd->path, Path, pathlen);
 
-	retCode =
-		Queue_Daemon_Command(cmd, cmdlen, NULL, 0, (void *)&reply,
-				&replylen, INTERRUPTIBLE);
+	retCode = Queue_Daemon_Command(cmd, cmdlen, NULL, 0, (void *)&reply, &replylen, INTERRUPTIBLE);
 
 	if (reply) {
 		retCode = 0;
@@ -906,9 +811,7 @@ int novfs_close_file(void *Handle, struct novfs_schandle SessionId)
 
 	cmd.handle = Handle;
 
-	retCode =
-	    Queue_Daemon_Command(&cmd, sizeof(cmd), NULL, 0, (void *)&reply,
-				 &replylen, 0);
+	retCode = Queue_Daemon_Command(&cmd, sizeof(cmd), NULL, 0, (void *)&reply, &replylen, 0);
 	if (reply) {
 		retCode = 0;
 		if (reply->Reply.ErrorCode) {
@@ -919,11 +822,10 @@ int novfs_close_file(void *Handle, struct novfs_schandle SessionId)
 	return (retCode);
 }
 
-int novfs_read_file(void *Handle, unsigned char * Buffer, size_t * Bytes,
-		    loff_t * Offset, struct novfs_schandle SessionId)
+int novfs_read_file(void *Handle, unsigned char *Buffer, size_t * Bytes, loff_t * Offset, struct novfs_schandle SessionId)
 {
 	struct novfs_read_file_request cmd;
-	struct novfs_read_file_reply * reply = NULL;
+	struct novfs_read_file_reply *reply = NULL;
 	unsigned long replylen = 0;
 	int retCode = 0;
 	size_t len;
@@ -931,10 +833,9 @@ int novfs_read_file(void *Handle, unsigned char * Buffer, size_t * Bytes,
 	len = *Bytes;
 	*Bytes = 0;
 
-	if (offsetof(struct novfs_read_file_reply, data) + len
-			> novfs_max_iosize) {
+	if (offsetof(struct novfs_read_file_reply, data) + len > novfs_max_iosize) {
 		len = novfs_max_iosize - offsetof(struct
-				novfs_read_file_reply, data);
+						  novfs_read_file_reply, data);
 		len = (len / PAGE_SIZE) * PAGE_SIZE;
 	}
 
@@ -946,9 +847,7 @@ int novfs_read_file(void *Handle, unsigned char * Buffer, size_t * Bytes,
 	cmd.len = len;
 	cmd.offset = *Offset;
 
-	retCode =
-	    Queue_Daemon_Command(&cmd, sizeof(cmd), NULL, 0, (void *)&reply,
-				 &replylen, INTERRUPTIBLE);
+	retCode = Queue_Daemon_Command(&cmd, sizeof(cmd), NULL, 0, (void *)&reply, &replylen, INTERRUPTIBLE);
 
 	DbgPrint("Queue_Daemon_Command 0x%x replylen=%d", retCode, replylen);
 
@@ -961,11 +860,10 @@ int novfs_read_file(void *Handle, unsigned char * Buffer, size_t * Bytes,
 			}
 		} else {
 			replylen -= offsetof(struct
-					novfs_read_file_reply, data);
+					     novfs_read_file_reply, data);
 
 			if (replylen > 0) {
-				replylen -=
-				    copy_to_user(Buffer, reply->data, replylen);
+				replylen -= copy_to_user(Buffer, reply->data, replylen);
 				*Bytes = replylen;
 			}
 		}
@@ -981,11 +879,10 @@ int novfs_read_file(void *Handle, unsigned char * Buffer, size_t * Bytes,
 }
 
 int novfs_read_pages(void *Handle, struct novfs_data_list *DList,
-		int DList_Cnt, size_t * Bytes, loff_t * Offset,
-		struct novfs_schandle SessionId)
+		     int DList_Cnt, size_t * Bytes, loff_t * Offset, struct novfs_schandle SessionId)
 {
 	struct novfs_read_file_request cmd;
-	struct novfs_read_file_reply * reply = NULL;
+	struct novfs_read_file_reply *reply = NULL;
 	struct novfs_read_file_reply lreply;
 	unsigned long replylen = 0;
 	int retCode = 0;
@@ -995,8 +892,7 @@ int novfs_read_pages(void *Handle, struct novfs_data_list *DList,
 	*Bytes = 0;
 
 	DbgPrint("Handle=0x%p Dlst=0x%p Dlcnt=%d Bytes=%d Offset=%lld "
-		 "SessionId=0x%p:%p", Handle, DList, DList_Cnt, len, *Offset,
-		 SessionId.hTypeId, SessionId.hId);
+		 "SessionId=0x%p:%p", Handle, DList, DList_Cnt, len, *Offset, SessionId.hTypeId, SessionId.hId);
 
 	cmd.Command.CommandType = VFS_COMMAND_READ_FILE;
 	cmd.Command.SequenceNumber = 0;
@@ -1014,9 +910,7 @@ int novfs_read_pages(void *Handle, struct novfs_data_list *DList,
 	DList[0].len = offsetof(struct novfs_read_file_reply, data);
 	DList[0].rwflag = DLWRITE;
 
-	retCode =
-	    Queue_Daemon_Command(&cmd, sizeof(cmd), DList, DList_Cnt,
-				 (void *)&reply, &replylen, INTERRUPTIBLE);
+	retCode = Queue_Daemon_Command(&cmd, sizeof(cmd), DList, DList_Cnt, (void *)&reply, &replylen, INTERRUPTIBLE);
 
 	DbgPrint("Queue_Daemon_Command 0x%x", retCode);
 
@@ -1033,7 +927,7 @@ int novfs_read_pages(void *Handle, struct novfs_data_list *DList,
 			}
 		}
 		*Bytes = replylen - offsetof(struct
-				novfs_read_file_reply, data);
+					     novfs_read_file_reply, data);
 	}
 
 	if (reply) {
@@ -1045,8 +939,7 @@ int novfs_read_pages(void *Handle, struct novfs_data_list *DList,
 	return (retCode);
 }
 
-int novfs_write_file(void *Handle, unsigned char * Buffer, size_t * Bytes,
-		     loff_t * Offset, struct novfs_schandle SessionId)
+int novfs_write_file(void *Handle, unsigned char *Buffer, size_t * Bytes, loff_t * Offset, struct novfs_schandle SessionId)
 {
 	struct novfs_write_file_request cmd;
 	struct novfs_write_file_reply *reply = NULL;
@@ -1082,9 +975,7 @@ int novfs_write_file(void *Handle, unsigned char * Buffer, size_t * Bytes,
 
 	DbgPrint("cmdlen=%ld len=%ld", cmdlen, len);
 
-	npage =
-	    (((unsigned long)Buffer & ~PAGE_MASK) + len +
-	     (PAGE_SIZE - 1)) >> PAGE_SHIFT;
+	npage = (((unsigned long)Buffer & ~PAGE_MASK) + len + (PAGE_SIZE - 1)) >> PAGE_SHIFT;
 
 	dlist = kmalloc(sizeof(struct novfs_data_list) * (npage + 1), GFP_KERNEL);
 	if (NULL == dlist) {
@@ -1121,8 +1012,7 @@ int novfs_write_file(void *Handle, unsigned char * Buffer, size_t * Bytes,
 			dlist[0].len = len;
 		}
 
-		DbgPrint("page=0x%p offset=0x%p len=%d",
-			 dlist[0].page, dlist[0].offset, dlist[0].len);
+		DbgPrint("page=0x%p offset=0x%p len=%d", dlist[0].page, dlist[0].offset, dlist[0].len);
 
 		boff = dlist[0].len;
 
@@ -1140,8 +1030,7 @@ int novfs_write_file(void *Handle, unsigned char * Buffer, size_t * Bytes,
 			dlist[i].rwflag = DLREAD;
 
 			boff += dlist[i].len;
-			DbgPrint("%d: page=0x%p offset=0x%p len=%d", i,
-				 dlist[i].page, dlist[i].offset, dlist[i].len);
+			DbgPrint("%d: page=0x%p offset=0x%p len=%d", i, dlist[i].page, dlist[i].offset, dlist[i].len);
 		}
 
 		dlist[i].page = NULL;
@@ -1152,10 +1041,7 @@ int novfs_write_file(void *Handle, unsigned char * Buffer, size_t * Bytes,
 
 		DbgPrint("Buffer=0x%p boff=0x%x len=%d", Buffer, boff, len);
 
-		retCode =
-		    Queue_Daemon_Command(&cmd, cmdlen, dlist, res,
-					 (void *)&reply, &replylen,
-					 INTERRUPTIBLE);
+		retCode = Queue_Daemon_Command(&cmd, cmdlen, dlist, res, (void *)&reply, &replylen, INTERRUPTIBLE);
 
 	} else {
 		char *kdata;
@@ -1175,10 +1061,7 @@ int novfs_write_file(void *Handle, unsigned char * Buffer, size_t * Bytes,
 			dlist[1].len = sizeof(lreply);
 			dlist[1].rwflag = DLWRITE;
 
-			retCode =
-			    Queue_Daemon_Command(&cmd, cmdlen, dlist, 2,
-						 (void *)&reply, &replylen,
-						 INTERRUPTIBLE);
+			retCode = Queue_Daemon_Command(&cmd, cmdlen, dlist, 2, (void *)&reply, &replylen, INTERRUPTIBLE);
 
 			kfree(kdata);
 		}
@@ -1218,8 +1101,7 @@ int novfs_write_file(void *Handle, unsigned char * Buffer, size_t * Bytes,
 	kfree(pages);
 	kfree(dlist);
 
-	DbgPrint("*Bytes=0x%x retCode=0x%x", *Bytes,
-		 retCode);
+	DbgPrint("*Bytes=0x%x retCode=0x%x", *Bytes, retCode);
 
 	return (retCode);
 }
@@ -1245,8 +1127,7 @@ int novfs_write_page(void *Handle, struct page *Page, struct novfs_schandle Sess
 	int retCode = 0, cmdlen;
 	struct novfs_data_list dlst[2];
 
-	DbgPrint("Handle=0x%p Page=0x%p Index=%lu SessionId=0x%llx",
-		 Handle, Page, Page->index, SessionId);
+	DbgPrint("Handle=0x%p Page=0x%p Index=%lu SessionId=0x%llx", Handle, Page, Page->index, SessionId);
 
 	dlst[0].page = NULL;
 	dlst[0].offset = &lreply;
@@ -1268,9 +1149,7 @@ int novfs_write_page(void *Handle, struct page *Page, struct novfs_schandle Sess
 	cmd.len = PAGE_CACHE_SIZE;
 	cmd.offset = (loff_t) Page->index << PAGE_CACHE_SHIFT;;
 
-	retCode =
-	    Queue_Daemon_Command(&cmd, cmdlen, &dlst, 2, (void *)&reply,
-				 &replylen, INTERRUPTIBLE);
+	retCode = Queue_Daemon_Command(&cmd, cmdlen, &dlst, 2, (void *)&reply, &replylen, INTERRUPTIBLE);
 	if (!retCode) {
 		if (reply) {
 			memcpy(&lreply, reply, sizeof(lreply));
@@ -1314,8 +1193,7 @@ int novfs_write_pages(void *Handle, struct novfs_data_list *DList, int DList_Cnt
 	size_t len;
 
 	DbgPrint("Handle=0x%p Dlst=0x%p Dlcnt=%d Bytes=%d Offset=%lld "
-		 "SessionId=0x%llx\n", Handle, DList, DList_Cnt, Bytes,
-		 Offset, SessionId);
+		 "SessionId=0x%llx\n", Handle, DList, DList_Cnt, Bytes, Offset, SessionId);
 
 	DList[0].page = NULL;
 	DList[0].offset = &lreply;
@@ -1334,10 +1212,7 @@ int novfs_write_pages(void *Handle, struct novfs_data_list *DList, int DList_Cnt
 		cmd.len = len;
 		cmd.offset = Offset;
 
-		retCode =
-		    Queue_Daemon_Command(&cmd, cmdlen, DList, DList_Cnt,
-					 (void *)&reply, &replylen,
-					 INTERRUPTIBLE);
+		retCode = Queue_Daemon_Command(&cmd, cmdlen, DList, DList_Cnt, (void *)&reply, &replylen, INTERRUPTIBLE);
 		if (!retCode) {
 			if (reply) {
 				memcpy(&lreply, reply, sizeof(lreply));
@@ -1369,9 +1244,8 @@ int novfs_write_pages(void *Handle, struct novfs_data_list *DList, int DList_Cnt
 	return (retCode);
 }
 
-int novfs_read_stream(void *ConnHandle, unsigned char * Handle, u_char * Buffer,
-		      size_t * Bytes, loff_t * Offset, int User,
-		      struct novfs_schandle SessionId)
+int novfs_read_stream(void *ConnHandle, unsigned char *Handle, u_char * Buffer,
+		      size_t * Bytes, loff_t * Offset, int User, struct novfs_schandle SessionId)
 {
 	struct novfs_read_stream_request cmd;
 	struct novfs_read_stream_reply *reply = NULL;
@@ -1382,10 +1256,9 @@ int novfs_read_stream(void *ConnHandle, unsigned char * Handle, u_char * Buffer,
 	len = *Bytes;
 	*Bytes = 0;
 
-	if (offsetof(struct novfs_read_file_reply, data) + len
-			> novfs_max_iosize) {
+	if (offsetof(struct novfs_read_file_reply, data) + len > novfs_max_iosize) {
 		len = novfs_max_iosize - offsetof(struct
-				novfs_read_file_reply, data);
+						  novfs_read_file_reply, data);
 		len = (len / PAGE_SIZE) * PAGE_SIZE;
 	}
 
@@ -1398,9 +1271,7 @@ int novfs_read_stream(void *ConnHandle, unsigned char * Handle, u_char * Buffer,
 	cmd.len = len;
 	cmd.offset = *Offset;
 
-	retCode =
-	    Queue_Daemon_Command(&cmd, sizeof(cmd), NULL, 0, (void *)&reply,
-				 &replylen, INTERRUPTIBLE);
+	retCode = Queue_Daemon_Command(&cmd, sizeof(cmd), NULL, 0, (void *)&reply, &replylen, INTERRUPTIBLE);
 
 	DbgPrint("Queue_Daemon_Command 0x%x replylen=%d", retCode, replylen);
 
@@ -1410,12 +1281,10 @@ int novfs_read_stream(void *ConnHandle, unsigned char * Handle, u_char * Buffer,
 			retCode = -EIO;
 		} else {
 			replylen -= offsetof(struct
-					novfs_read_stream_reply, data);
+					     novfs_read_stream_reply, data);
 			if (replylen > 0) {
 				if (User) {
-					replylen -=
-					    copy_to_user(Buffer, reply->data,
-							 replylen);
+					replylen -= copy_to_user(Buffer, reply->data, replylen);
 				} else {
 					memcpy(Buffer, reply->data, replylen);
 				}
@@ -1431,11 +1300,11 @@ int novfs_read_stream(void *ConnHandle, unsigned char * Handle, u_char * Buffer,
 	return (retCode);
 }
 
-int novfs_write_stream(void *ConnHandle, unsigned char * Handle, u_char * Buffer,
+int novfs_write_stream(void *ConnHandle, unsigned char *Handle, u_char * Buffer,
 		       size_t * Bytes, loff_t * Offset, struct novfs_schandle SessionId)
 {
-	struct novfs_write_stream_request * cmd;
-	struct novfs_write_stream_reply * reply = NULL;
+	struct novfs_write_stream_request *cmd;
+	struct novfs_write_stream_reply *reply = NULL;
 	unsigned long replylen = 0;
 	int retCode = 0, cmdlen;
 	size_t len;
@@ -1449,7 +1318,7 @@ int novfs_write_stream(void *ConnHandle, unsigned char * Handle, u_char * Buffer
 	if (cmdlen > novfs_max_iosize) {
 		cmdlen = novfs_max_iosize;
 		len = cmdlen - offsetof(struct
-				novfs_write_stream_request, data);
+					novfs_write_stream_request, data);
 	}
 
 	DbgPrint("cmdlen=%d len=%d", cmdlen, len);
@@ -1472,9 +1341,7 @@ int novfs_write_stream(void *ConnHandle, unsigned char * Handle, u_char * Buffer
 		cmd->len = len;
 		cmd->offset = *Offset;
 
-		retCode =
-		    Queue_Daemon_Command(cmd, cmdlen, NULL, 0, (void *)&reply,
-					 &replylen, INTERRUPTIBLE);
+		retCode = Queue_Daemon_Command(cmd, cmdlen, NULL, 0, (void *)&reply, &replylen, INTERRUPTIBLE);
 		if (reply) {
 			switch (reply->Reply.ErrorCode) {
 			case 0:
@@ -1493,8 +1360,7 @@ int novfs_write_stream(void *ConnHandle, unsigned char * Handle, u_char * Buffer
 				retCode = -EIO;
 				break;
 			}
-			DbgPrint("reply->bytesWritten=0x%lx",
-			     reply->bytesWritten);
+			DbgPrint("reply->bytesWritten=0x%lx", reply->bytesWritten);
 			*Bytes = reply->bytesWritten;
 			kfree(reply);
 		}
@@ -1505,7 +1371,7 @@ int novfs_write_stream(void *ConnHandle, unsigned char * Handle, u_char * Buffer
 	return (retCode);
 }
 
-int novfs_close_stream(void *ConnHandle, unsigned char * Handle, struct novfs_schandle SessionId)
+int novfs_close_stream(void *ConnHandle, unsigned char *Handle, struct novfs_schandle SessionId)
 {
 	struct novfs_close_stream_request cmd;
 	struct novfs_close_stream_reply *reply;
@@ -1519,9 +1385,7 @@ int novfs_close_stream(void *ConnHandle, unsigned char * Handle, struct novfs_sc
 	cmd.connection = ConnHandle;
 	memcpy(cmd.handle, Handle, sizeof(cmd.handle));
 
-	retCode =
-	    Queue_Daemon_Command(&cmd, sizeof(cmd), NULL, 0, (void *)&reply,
-				 &replylen, 0);
+	retCode = Queue_Daemon_Command(&cmd, sizeof(cmd), NULL, 0, (void *)&reply, &replylen, 0);
 	if (reply) {
 		retCode = 0;
 		if (reply->Reply.ErrorCode) {
@@ -1532,7 +1396,7 @@ int novfs_close_stream(void *ConnHandle, unsigned char * Handle, struct novfs_sc
 	return (retCode);
 }
 
-int novfs_delete(unsigned char * Path, int DirectoryFlag, struct novfs_schandle SessionId)
+int novfs_delete(unsigned char *Path, int DirectoryFlag, struct novfs_schandle SessionId)
 {
 	struct novfs_delete_file_request *cmd;
 	struct novfs_delete_file_reply *reply;
@@ -1557,9 +1421,7 @@ int novfs_delete(unsigned char * Path, int DirectoryFlag, struct novfs_schandle 
 		cmd->pathlength = pathlen;
 		memcpy(cmd->path, Path, pathlen);
 
-		retCode =
-		    Queue_Daemon_Command(cmd, cmdlen, NULL, 0, (void *)&reply,
-					 &replylen, INTERRUPTIBLE);
+		retCode = Queue_Daemon_Command(cmd, cmdlen, NULL, 0, (void *)&reply, &replylen, INTERRUPTIBLE);
 		if (reply) {
 			retCode = 0;
 			if (reply->Reply.ErrorCode) {
@@ -1571,7 +1433,7 @@ int novfs_delete(unsigned char * Path, int DirectoryFlag, struct novfs_schandle 
 					retCode = -EACCES;
 				else if ((reply->Reply.ErrorCode & 0xFFFF) == 0x0513)
 					retCode = -ENOTEMPTY;
-				else 
+				else
 					retCode = -EIO;
 			}
 			kfree(reply);
@@ -1583,8 +1445,7 @@ int novfs_delete(unsigned char * Path, int DirectoryFlag, struct novfs_schandle 
 	return (retCode);
 }
 
-int novfs_trunc(unsigned char * Path, int PathLen,
-		struct novfs_schandle SessionId)
+int novfs_trunc(unsigned char *Path, int PathLen, struct novfs_schandle SessionId)
 {
 	struct novfs_truncate_file_request *cmd;
 	struct novfs_truncate_file_reply *reply = NULL;
@@ -1596,7 +1457,7 @@ int novfs_trunc(unsigned char * Path, int PathLen,
 			PathLen--;
 	}
 	cmdlen = offsetof(struct novfs_truncate_file_request, path)
-		+ PathLen;
+	+ PathLen;
 	cmd = kmalloc(cmdlen, GFP_KERNEL);
 	if (cmd) {
 		cmd->Command.CommandType = VFS_COMMAND_TRUNCATE_FILE;
@@ -1606,9 +1467,7 @@ int novfs_trunc(unsigned char * Path, int PathLen,
 		cmd->pathLen = PathLen;
 		memcpy(cmd->path, Path, PathLen);
 
-		retCode =
-		    Queue_Daemon_Command(cmd, cmdlen, NULL, 0, (void *)&reply,
-					 &replylen, INTERRUPTIBLE);
+		retCode = Queue_Daemon_Command(cmd, cmdlen, NULL, 0, (void *)&reply, &replylen, INTERRUPTIBLE);
 		if (reply) {
 			if (reply->Reply.ErrorCode) {
 				retCode = -EIO;
@@ -1622,8 +1481,7 @@ int novfs_trunc(unsigned char * Path, int PathLen,
 	return (retCode);
 }
 
-int novfs_trunc_ex(void *Handle, loff_t Offset,
-		struct novfs_schandle SessionId)
+int novfs_trunc_ex(void *Handle, loff_t Offset, struct novfs_schandle SessionId)
 {
 	struct novfs_write_file_request cmd;
 	struct novfs_write_file_reply *reply = NULL;
@@ -1641,9 +1499,7 @@ int novfs_trunc_ex(void *Handle, loff_t Offset,
 	cmd.len = 0;
 	cmd.offset = Offset;
 
-	retCode =
-	    Queue_Daemon_Command(&cmd, cmdlen, NULL, 0, (void *)&reply,
-				 &replylen, INTERRUPTIBLE);
+	retCode = Queue_Daemon_Command(&cmd, cmdlen, NULL, 0, (void *)&reply, &replylen, INTERRUPTIBLE);
 
 	DbgPrint("retCode=0x%x reply=0x%p", retCode, reply);
 
@@ -1680,9 +1536,8 @@ int novfs_trunc_ex(void *Handle, loff_t Offset,
 	return (retCode);
 }
 
-int novfs_rename_file(int DirectoryFlag, unsigned char * OldName, int OldLen,
-		      unsigned char * NewName, int NewLen,
-		      struct novfs_schandle SessionId)
+int novfs_rename_file(int DirectoryFlag, unsigned char *OldName, int OldLen,
+		      unsigned char *NewName, int NewLen, struct novfs_schandle SessionId)
 {
 	struct novfs_rename_file_request cmd;
 	struct novfs_rename_file_reply *reply;
@@ -1690,11 +1545,10 @@ int novfs_rename_file(int DirectoryFlag, unsigned char * OldName, int OldLen,
 	int retCode;
 
 	__DbgPrint("%s:\n"
-		 "   DirectoryFlag: %d\n"
-		 "   OldName:       %.*s\n"
-		 "   NewName:       %.*s\n"
-		 "   SessionId:     0x%llx\n", __func__,
-		 DirectoryFlag, OldLen, OldName, NewLen, NewName, SessionId);
+		   "   DirectoryFlag: %d\n"
+		   "   OldName:       %.*s\n"
+		   "   NewName:       %.*s\n"
+		   "   SessionId:     0x%llx\n", __func__, DirectoryFlag, OldLen, OldName, NewLen, NewName, SessionId);
 
 	cmd.Command.CommandType = VFS_COMMAND_RENAME_FILE;
 	cmd.Command.SequenceNumber = 0;
@@ -1715,9 +1569,7 @@ int novfs_rename_file(int DirectoryFlag, unsigned char * OldName, int OldLen,
 	cmd.oldnameLen = OldLen;
 	memcpy(cmd.oldname, OldName, OldLen);
 
-	retCode =
-	    Queue_Daemon_Command(&cmd, sizeof(cmd), NULL, 0, (void *)&reply,
-				 &replylen, INTERRUPTIBLE);
+	retCode = Queue_Daemon_Command(&cmd, sizeof(cmd), NULL, 0, (void *)&reply, &replylen, INTERRUPTIBLE);
 	if (reply) {
 		retCode = 0;
 		if (reply->Reply.ErrorCode) {
@@ -1728,8 +1580,7 @@ int novfs_rename_file(int DirectoryFlag, unsigned char * OldName, int OldLen,
 	return (retCode);
 }
 
-int novfs_set_attr(unsigned char * Path, struct iattr *Attr,
-		struct novfs_schandle SessionId)
+int novfs_set_attr(unsigned char *Path, struct iattr *Attr, struct novfs_schandle SessionId)
 {
 	struct novfs_set_file_info_request *cmd;
 	struct novfs_set_file_info_reply *reply;
@@ -1743,7 +1594,7 @@ int novfs_set_attr(unsigned char * Path, struct iattr *Attr,
 			pathlen--;
 	}
 
-	cmdlen = offsetof(struct novfs_set_file_info_request,path) + pathlen;
+	cmdlen = offsetof(struct novfs_set_file_info_request, path) + pathlen;
 	cmd = kmalloc(cmdlen, GFP_KERNEL);
 	if (cmd) {
 		cmd->Command.CommandType = VFS_COMMAND_SET_FILE_INFO;
@@ -1765,9 +1616,7 @@ int novfs_set_attr(unsigned char * Path, struct iattr *Attr,
 		cmd->pathlength = pathlen;
 		memcpy(cmd->path, Path, pathlen);
 
-		retCode =
-		    Queue_Daemon_Command(cmd, cmdlen, NULL, 0, (void *)&reply,
-					 &replylen, INTERRUPTIBLE);
+		retCode = Queue_Daemon_Command(cmd, cmdlen, NULL, 0, (void *)&reply, &replylen, INTERRUPTIBLE);
 		if (reply) {
 			switch (reply->Reply.ErrorCode) {
 			case 0:
@@ -1795,8 +1644,7 @@ int novfs_set_attr(unsigned char * Path, struct iattr *Attr,
 	return (retCode);
 }
 
-int novfs_get_file_cache_flag(unsigned char * Path,
-		struct novfs_schandle SessionId)
+int novfs_get_file_cache_flag(unsigned char *Path, struct novfs_schandle SessionId)
 {
 	struct novfs_get_cache_flag *cmd;
 	struct novfs_get_cache_flag_reply *reply = NULL;
@@ -1813,10 +1661,9 @@ int novfs_get_file_cache_flag(unsigned char * Path,
 			if ('.' == Path[pathlen - 1])
 				pathlen--;
 		}
-		cmdlen = offsetof(struct novfs_get_cache_flag, path) +
-			pathlen;
+		cmdlen = offsetof(struct novfs_get_cache_flag, path) + pathlen;
 		cmd = (struct novfs_get_cache_flag *)
-			kmalloc(cmdlen, GFP_KERNEL);
+		    kmalloc(cmdlen, GFP_KERNEL);
 		if (cmd) {
 			cmd->Command.CommandType = VFS_COMMAND_GET_CACHE_FLAG;
 			cmd->Command.SequenceNumber = 0;
@@ -1824,9 +1671,7 @@ int novfs_get_file_cache_flag(unsigned char * Path,
 			cmd->pathLen = pathlen;
 			memcpy(cmd->path, Path, cmd->pathLen);
 
-			Queue_Daemon_Command(cmd, cmdlen, NULL, 0,
-					     (void *)&reply, &replylen,
-					     INTERRUPTIBLE);
+			Queue_Daemon_Command(cmd, cmdlen, NULL, 0, (void *)&reply, &replylen, INTERRUPTIBLE);
 
 			if (reply) {
 
@@ -1851,8 +1696,7 @@ int novfs_get_file_cache_flag(unsigned char * Path,
  *
  *  Notes: lock type - fcntl
  */
-int novfs_set_file_lock(struct novfs_schandle SessionId, void *Handle,
-			unsigned char fl_type, loff_t fl_start, loff_t fl_len)
+int novfs_set_file_lock(struct novfs_schandle SessionId, void *Handle, unsigned char fl_type, loff_t fl_start, loff_t fl_len)
 {
 	struct novfs_set_file_lock_request *cmd;
 	struct novfs_set_file_lock_reply *reply = NULL;
@@ -1863,8 +1707,7 @@ int novfs_set_file_lock(struct novfs_schandle SessionId, void *Handle,
 
 	DbgPrint("SessionId:     0x%llx\n", SessionId);
 
-	cmd =
-	    (struct novfs_set_file_lock_request *) kmalloc(sizeof(struct novfs_set_file_lock_request), GFP_KERNEL);
+	cmd = (struct novfs_set_file_lock_request *)kmalloc(sizeof(struct novfs_set_file_lock_request), GFP_KERNEL);
 
 	if (cmd) {
 		DbgPrint("2");
@@ -1887,20 +1730,17 @@ int novfs_set_file_lock(struct novfs_schandle SessionId, void *Handle,
 		DbgPrint("3");
 
 		DbgPrint("BEGIN dump arguments");
-		DbgPrint("Queue_Daemon_Command %d",
-			 cmd->Command.CommandType);
+		DbgPrint("Queue_Daemon_Command %d", cmd->Command.CommandType);
 		DbgPrint("cmd->handle   = 0x%p", cmd->handle);
 		DbgPrint("cmd->fl_type  = %u", cmd->fl_type);
 		DbgPrint("cmd->fl_start = 0x%X", cmd->fl_start);
 		DbgPrint("cmd->fl_len   = 0x%X", cmd->fl_len);
-		DbgPrint("sizeof(SET_FILE_LOCK_REQUEST) = %u",
-		     sizeof(struct novfs_set_file_lock_request));
+		DbgPrint("sizeof(SET_FILE_LOCK_REQUEST) = %u", sizeof(struct novfs_set_file_lock_request));
 		DbgPrint("END dump arguments");
 
 		retCode =
 		    Queue_Daemon_Command(cmd, sizeof(struct novfs_set_file_lock_request),
-					 NULL, 0, (void *)&reply, &replylen,
-					 INTERRUPTIBLE);
+					 NULL, 0, (void *)&reply, &replylen, INTERRUPTIBLE);
 		DbgPrint("4");
 
 		if (reply) {
