@@ -402,7 +402,7 @@ ENTRY(ia32_sysenter_target)
 	CFI_SIGNAL_FRAME
 	CFI_DEF_CFA esp, 0
 	CFI_REGISTER esp, ebp
-	movl SYSENTER_stack_sp0(%esp),%esp
+	movl TSS_sysenter_sp0(%esp),%esp
 sysenter_past_esp:
 	/*
 	 * Interrupts are disabled here, but we can't trace it until
@@ -611,14 +611,14 @@ ldt_ss:
  * compensating for the offset by changing to the ESPFIX segment with
  * a base address that matches for the difference.
  */
+#define GDT_ESPFIX_SS PER_CPU_VAR(gdt_page) + (GDT_ENTRY_ESPFIX_SS * 8)
 	mov %esp, %edx			/* load kernel esp */
 	mov PT_OLDESP(%esp), %eax	/* load userspace esp */
 	mov %dx, %ax			/* eax: new kernel esp */
 	sub %eax, %edx			/* offset (low word is 0) */
-	PER_CPU(gdt_page, %ebx)
 	shr $16, %edx
-	mov %dl, GDT_ENTRY_ESPFIX_SS * 8 + 4(%ebx) /* bits 16..23 */
-	mov %dh, GDT_ENTRY_ESPFIX_SS * 8 + 7(%ebx) /* bits 24..31 */
+	mov %dl, GDT_ESPFIX_SS + 4 /* bits 16..23 */
+	mov %dh, GDT_ESPFIX_SS + 7 /* bits 24..31 */
 	pushl $__ESPFIX_SS
 	CFI_ADJUST_CFA_OFFSET 4
 	push %eax			/* new kernel esp */
@@ -791,9 +791,8 @@ ptregs_clone:
  * normal stack and adjusts ESP with the matching offset.
  */
 	/* fixup the stack */
-	PER_CPU(gdt_page, %ebx)
-	mov GDT_ENTRY_ESPFIX_SS * 8 + 4(%ebx), %al /* bits 16..23 */
-	mov GDT_ENTRY_ESPFIX_SS * 8 + 7(%ebx), %ah /* bits 24..31 */
+	mov GDT_ESPFIX_SS + 4, %al /* bits 16..23 */
+	mov GDT_ESPFIX_SS + 7, %ah /* bits 24..31 */
 	shl $16, %eax
 	addl %esp, %eax			/* the adjusted stack pointer */
 	pushl $__KERNEL_DS
@@ -914,7 +913,7 @@ ENTRY(simd_coprocessor_error)
 	.balign 4
 	.long 661b
 	.long 663f
-	.byte X86_FEATURE_XMM
+	.word X86_FEATURE_XMM
 	.byte 662b-661b
 	.byte 664f-663f
 .previous
@@ -1108,7 +1107,7 @@ ENTRY(kernel_thread_helper)
 	CFI_ENDPROC
 ENDPROC(kernel_thread_helper)
 
-#ifdef CONFIG_PARAVIRT_XEN
+#ifdef CONFIG_XEN
 /* Xen doesn't set %esp to be precisely what the normal sysenter
    entrypoint expects, so fix it up before using the normal path. */
 ENTRY(xen_sysenter_target)
@@ -1201,7 +1200,10 @@ ENTRY(xen_failsafe_callback)
 .previous
 ENDPROC(xen_failsafe_callback)
 
-#endif	/* CONFIG_PARAVIRT_XEN */
+BUILD_INTERRUPT3(xen_hvm_callback_vector, XEN_HVM_EVTCHN_CALLBACK,
+		xen_evtchn_do_upcall)
+
+#endif	/* CONFIG_XEN */
 
 #ifdef CONFIG_FUNCTION_TRACER
 #ifdef CONFIG_DYNAMIC_FTRACE
@@ -1380,7 +1382,7 @@ END(page_fault)
  * that sets up the real kernel stack. Check here, since we can't
  * allow the wrong stack to be used.
  *
- * "SYSENTER_stack_sp0+12" is because the NMI/debug handler will have
+ * "TSS_sysenter_sp0+12" is because the NMI/debug handler will have
  * already pushed 3 words if it hits on the sysenter instruction:
  * eflags, cs and eip.
  *
@@ -1392,7 +1394,7 @@ END(page_fault)
 	cmpw $__KERNEL_CS, 4(%esp)
 	jne \ok
 \label:
-	movl SYSENTER_stack_sp0 + \offset(%esp), %esp
+	movl TSS_sysenter_sp0 + \offset(%esp), %esp
 	CFI_DEF_CFA esp, 0
 	CFI_UNDEFINED eip
 	pushfl

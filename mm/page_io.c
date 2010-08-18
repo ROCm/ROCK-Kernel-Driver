@@ -111,13 +111,6 @@ int swap_writepage(struct page *page, struct writeback_control *wbc)
 		return ret;
 	}
 
-	if (preswap_put(page) == 1) {
-		set_page_writeback(page);
-		unlock_page(page);
-		end_page_writeback(page);
-		goto out;
-	}
-
 	bio = get_swap_bio(GFP_NOIO, page, end_swap_bio_write);
 	if (bio == NULL) {
 		set_page_dirty(page);
@@ -126,7 +119,7 @@ int swap_writepage(struct page *page, struct writeback_control *wbc)
 		goto out;
 	}
 	if (wbc->sync_mode == WB_SYNC_ALL)
-		rw |= (1 << BIO_RW_SYNCIO) | (1 << BIO_RW_UNPLUG);
+		rw |= REQ_SYNC | REQ_UNPLUG;
 	count_vm_event(PSWPOUT);
 	set_page_writeback(page);
 	unlock_page(page);
@@ -184,12 +177,6 @@ int swap_readpage(struct page *page)
 		if (!ret)
 			count_vm_event(PSWPIN);
 		return ret;
-	}
-
-	if (preswap_get(page) == 1) {
-		SetPageUptodate(page);
-		unlock_page(page);
-		goto out;
 	}
 
 	bio = get_swap_bio(GFP_KERNEL, page, end_swap_bio_read);

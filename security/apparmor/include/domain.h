@@ -4,7 +4,7 @@
  * This file contains AppArmor security domain transition function definitions.
  *
  * Copyright (C) 1998-2008 Novell/SUSE
- * Copyright 2009 Canonical Ltd.
+ * Copyright 2009-2010 Canonical Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -25,13 +25,12 @@ struct aa_domain {
 
 int apparmor_bprm_set_creds(struct linux_binprm *bprm);
 int apparmor_bprm_secureexec(struct linux_binprm *bprm);
-int apparmor_bprm_committing_creds(struct linux_binprm *bprm);
+void apparmor_bprm_committing_creds(struct linux_binprm *bprm);
 void apparmor_bprm_committed_creds(struct linux_binprm *bprm);
 
 void aa_free_domain_entries(struct aa_domain *domain);
-int aa_change_hat(const char *hat_name, u64 token, int permtest);
-int aa_change_profile(const char *ns_name, const char *name, int onexec,
-		      int permtest);
+int aa_change_hat(const char *hats[], int count, u64 token, bool permtest);
+int aa_change_profile(const char *ns_name, const char *name, bool onexec,
+		      bool permtest);
 
-
-#endif	/* __AA_DOMAIN_H */
+#endif /* __AA_DOMAIN_H */

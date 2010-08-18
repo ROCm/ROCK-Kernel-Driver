@@ -31,6 +31,7 @@
 #include <asm/tlbflush.h>
 #include <asm/shmparam.h>
 
+bool vmap_lazy_unmap __read_mostly = true;
 
 /*** Page table manipulation functions ***/
 
@@ -479,8 +480,6 @@ static void vmap_debug_free_range(unsigned long start, unsigned long end)
 #ifdef CONFIG_DEBUG_PAGEALLOC
 	vunmap_page_range(start, end);
 	flush_tlb_kernel_range(start, end);
-#elif defined(CONFIG_XEN) && defined(CONFIG_X86)
-	vunmap_page_range(start, end);
 #endif
 }
 
@@ -503,6 +502,9 @@ static void vmap_debug_free_range(unsigned long start, unsigned long end)
 static unsigned long lazy_max_pages(void)
 {
 	unsigned int log;
+
+	if (!vmap_lazy_unmap)
+		return 0;
 
 	log = fls(num_online_cpus());
 
@@ -734,7 +736,7 @@ static struct vmap_block *new_vmap_block(gfp_t gfp_mask)
 					node, gfp_mask);
 	if (unlikely(IS_ERR(va))) {
 		kfree(vb);
-		return ERR_PTR(PTR_ERR(va));
+		return ERR_CAST(va);
 	}
 
 	err = radix_tree_preload(gfp_mask);
@@ -1474,13 +1476,6 @@ static void *__vmalloc_area_node(struct vm_struct *area, gfp_t gfp_mask,
 	struct page **pages;
 	unsigned int nr_pages, array_size, i;
 	gfp_t nested_gfp = (gfp_mask & GFP_RECLAIM_MASK) | __GFP_ZERO;
-#ifdef CONFIG_XEN
-	gfp_t dma_mask = gfp_mask & (__GFP_DMA | __GFP_DMA32);
-
-	BUILD_BUG_ON((__GFP_DMA | __GFP_DMA32) != (__GFP_DMA + __GFP_DMA32));
-	if (dma_mask == (__GFP_DMA | __GFP_DMA32))
-		gfp_mask &= ~(__GFP_DMA | __GFP_DMA32);
-#endif
 
 	nr_pages = (area->size - PAGE_SIZE) >> PAGE_SHIFT;
 	array_size = (nr_pages * sizeof(struct page *));
@@ -1516,16 +1511,6 @@ static void *__vmalloc_area_node(struct vm_struct *area, gfp_t gfp_mask,
 			goto fail;
 		}
 		area->pages[i] = page;
-#ifdef CONFIG_XEN
-		if (dma_mask) {
-			if (xen_limit_pages_to_max_mfn(page, 0, 32)) {
-				area->nr_pages = i + 1;
-				goto fail;
-			}
-			if (gfp_mask & __GFP_ZERO)
-				clear_highpage(page);
-		}
-#endif
 	}
 
 	if (map_vm_area(area, prot, &pages))
@@ -1685,8 +1670,6 @@ void *vmalloc_exec(unsigned long size)
 #define GFP_VMALLOC32 GFP_DMA32 | GFP_KERNEL
 #elif defined(CONFIG_64BIT) && defined(CONFIG_ZONE_DMA)
 #define GFP_VMALLOC32 GFP_DMA | GFP_KERNEL
-#elif defined(CONFIG_XEN)
-#define GFP_VMALLOC32 __GFP_DMA | __GFP_DMA32 | GFP_KERNEL
 #else
 #define GFP_VMALLOC32 GFP_KERNEL
 #endif
@@ -2424,7 +2407,7 @@ static int s_show(struct seq_file *m, void *p)
 		seq_printf(m, " pages=%d", v->nr_pages);
 
 	if (v->phys_addr)
-		seq_printf(m, " phys=%lx", v->phys_addr);
+		seq_printf(m, " phys=%llx", (unsigned long long)v->phys_addr);
 
 	if (v->flags & VM_IOREMAP)
 		seq_printf(m, " ioremap");
@@ -2458,8 +2441,11 @@ static int vmalloc_open(struct inode *inode, struct file *file)
 	unsigned int *ptr = NULL;
 	int ret;
 
-	if (NUMA_BUILD)
+	if (NUMA_BUILD) {
 		ptr = kmalloc(nr_node_ids * sizeof(unsigned int), GFP_KERNEL);
+		if (ptr == NULL)
+			return -ENOMEM;
+	}
 	ret = seq_open(file, &vmalloc_op);
 	if (!ret) {
 		struct seq_file *m = file->private_data;

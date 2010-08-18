@@ -4,7 +4,7 @@
  * This file contains AppArmor ipc mediation
  *
  * Copyright (C) 1998-2008 Novell/SUSE
- * Copyright 2009 Canonical Ltd.
+ * Copyright 2009-2010 Canonical Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -20,27 +20,44 @@
 #include "include/context.h"
 #include "include/policy.h"
 
-
-struct aa_audit_ptrace {
-	struct aa_audit base;
-
-	pid_t tracer, tracee;
-};
-
 /* call back to audit ptrace fields */
 static void audit_cb(struct audit_buffer *ab, void *va)
 {
-	struct aa_audit_ptrace *sa = va;
-	audit_log_format(ab, " tracer=%d tracee=%d", sa->tracer, sa->tracee);
+	struct common_audit_data *sa = va;
+	audit_log_format(ab, " target=");
+	audit_log_untrustedstring(ab, sa->aad.target);
 }
 
+/**
+ * aa_audit_ptrace - do auditing for ptrace
+ * @profile: profile being enforced  (NOT NULL)
+ * @target: profile being traced (NOT NULL)
+ * @error: error condition
+ *
+ * Returns: %0 or error code
+ */
 static int aa_audit_ptrace(struct aa_profile *profile,
-			   struct aa_audit_ptrace *sa)
+			   struct aa_profile *target, int error)
 {
-	return aa_audit(AUDIT_APPARMOR_AUTO, profile, (struct aa_audit *)sa,
+	struct common_audit_data sa;
+	COMMON_AUDIT_DATA_INIT(&sa, NONE);
+	sa.aad.op = OP_PTRACE;
+	sa.aad.target = target;
+	sa.aad.error = error;
+
+	return aa_audit(AUDIT_APPARMOR_AUTO, profile, GFP_ATOMIC, &sa,
 			audit_cb);
 }
 
+/**
+ * aa_may_ptrace - test if tracer task can trace the tracee
+ * @tracer_task: task who will do the tracing  (NOT NULL)
+ * @tracer: profile of the task doing the tracing  (NOT NULL)
+ * @tracee: task to be traced
+ * @mode: whether PTRACE_MODE_READ || PTRACE_MODE_ATTACH
+ *
+ * Returns: %0 else error code if permission denied or error
+ */
 int aa_may_ptrace(struct task_struct *tracer_task, struct aa_profile *tracer,
 		  struct aa_profile *tracee, unsigned int mode)
 {
@@ -49,19 +66,26 @@ int aa_may_ptrace(struct task_struct *tracer_task, struct aa_profile *tracer,
 	 *       Test mode for PTRACE_MODE_READ || PTRACE_MODE_ATTACH
 	 */
 
-	if (!tracer || tracer == tracee)
+	if (unconfined(tracer) || tracer == tracee)
 		return 0;
 	/* log this capability request */
 	return aa_capable(tracer_task, tracer, CAP_SYS_PTRACE, 1);
 }
 
+/**
+ * aa_ptrace - do ptrace permission check and auditing
+ * @tracer: task doing the tracing (NOT NULL)
+ * @tracee: task being traced (NOT NULL)
+ * @mode: ptrace mode either PTRACE_MODE_READ || PTRACE_MODE_ATTACH
+ *
+ * Returns: %0 else error code if permission denied or error
+ */
 int aa_ptrace(struct task_struct *tracer, struct task_struct *tracee,
 	      unsigned int mode)
 {
 	/*
 	 * tracer can ptrace tracee when
 	 * - tracer is unconfined ||
-	 * - tracer & tracee are in the same namespace &&
 	 *   - tracer is in complain mode
 	 *   - tracer has rules allowing it to trace tracee currently this is:
 	 *       - confined by the same profile ||
@@ -69,36 +93,20 @@ int aa_ptrace(struct task_struct *tracer, struct task_struct *tracee,
 	 */
 
 	struct aa_profile *tracer_p;
-	const struct cred *cred = aa_get_task_policy(tracer, &tracer_p);
+	/* cred released below */
+	const struct cred *cred = get_task_cred(tracer);
 	int error = 0;
+	tracer_p = aa_cred_profile(cred);
 
-	if (tracer_p) {
-		struct aa_audit_ptrace sa;
-		memset(&sa, 0, sizeof(sa));
-		sa.base.operation = "ptrace";
-		sa.base.gfp_mask = GFP_ATOMIC;
-		sa.tracer = tracer->pid;
-		sa.tracee = tracee->pid;
-		/* FIXME: different namespace restriction can be lifted
-		 * if, namespace are matched to AppArmor namespaces
-		 */
-		if (tracer->nsproxy != tracee->nsproxy) {
-			sa.base.info = "different namespaces";
-			sa.base.error = -EPERM;
-			aa_audit(AUDIT_APPARMOR_DENIED, tracer_p, &sa.base,
-				 audit_cb);
-		} else {
-			struct aa_profile *tracee_p;
-			struct cred *lcred = aa_get_task_policy(tracee,
-								&tracee_p);
+	if (!unconfined(tracer_p)) {
+		/* lcred released below */
+		const struct cred *lcred = get_task_cred(tracee);
+		struct aa_profile *tracee_p = aa_cred_profile(lcred);
 
-			sa.base.error = aa_may_ptrace(tracer, tracer_p,
-						      tracee_p, mode);
-			sa.base.error = aa_audit_ptrace(tracer_p, &sa);
+		error = aa_may_ptrace(tracer, tracer_p, tracee_p, mode);
+		error = aa_audit_ptrace(tracer_p, tracee_p, error);
 
-			put_cred(lcred);
-		}
-		error = sa.base.error;
+		put_cred(lcred);
 	}
 	put_cred(cred);
 

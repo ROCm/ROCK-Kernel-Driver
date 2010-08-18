@@ -33,8 +33,6 @@
 #include <linux/init.h>
 #include <linux/cpufreq.h>
 #include <linux/slab.h>
-#include <linux/proc_fs.h>
-#include <linux/seq_file.h>
 #include <linux/acpi.h>
 #include <linux/dmi.h>
 #include <linux/moduleparam.h>
@@ -82,13 +80,6 @@ module_param(bm_check_disable, uint, 0000);
 static unsigned int latency_factor __read_mostly = 2;
 module_param(latency_factor, uint, 0644);
 
-#ifdef CONFIG_ACPI_PROCFS
-static u64 us_to_pm_timer_ticks(s64 t)
-{
-	return div64_u64(t * PM_TIMER_FREQUENCY, 1000000);
-}
-#endif
-
 /*
  * IBM ThinkPad R40e crashes mysteriously when going into C2 or C3.
  * For now disable this. Probably a bug somewhere else.
@@ -128,7 +119,6 @@ static struct dmi_system_id __cpuinitdata processor_power_dmi_table[] = {
 };
 
 
-#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
 /*
  * Callers should disable interrupts before the call and enable
  * interrupts after return.
@@ -147,7 +137,6 @@ static void acpi_safe_halt(void)
 	}
 	current_thread_info()->status |= TS_POLLING;
 }
-#endif
 
 #ifdef ARCH_APICTIMER_STOPS_ON_C3
 
@@ -166,7 +155,7 @@ static void lapic_timer_check_state(int state, struct acpi_processor *pr,
 	if (cpu_has(&cpu_data(pr->id), X86_FEATURE_ARAT))
 		return;
 
-	if (boot_cpu_has(X86_FEATURE_AMDC1E))
+	if (c1e_detected)
 		type = ACPI_STATE_C1;
 
 	/*
@@ -218,7 +207,7 @@ static void lapic_timer_state_broadcast(struct acpi_processor *pr,
 static void lapic_timer_check_state(int state, struct acpi_processor *pr,
 				   struct acpi_processor_cx *cstate) { }
 static void lapic_timer_propagate_broadcast(struct acpi_processor *pr) { }
-static inline void lapic_timer_state_broadcast(struct acpi_processor *pr,
+static void lapic_timer_state_broadcast(struct acpi_processor *pr,
 				       struct acpi_processor_cx *cx,
 				       int broadcast)
 {
@@ -266,8 +255,7 @@ int acpi_processor_resume(struct acpi_device * device)
 	return 0;
 }
 
-#if defined (CONFIG_GENERIC_TIME) && defined (CONFIG_X86) \
-    && !defined(CONFIG_PROCESSOR_EXTERNAL_CONTROL)
+#if defined(CONFIG_X86)
 static void tsc_check_state(int state)
 {
 	switch (boot_cpu_data.x86_vendor) {
@@ -464,8 +452,7 @@ static int acpi_processor_get_power_info_cst(struct acpi_processor *pr)
 				 */
 				cx.entry_method = ACPI_CSTATE_HALT;
 				snprintf(cx.desc, ACPI_CX_DESC_LEN, "ACPI HLT");
-			/* This doesn't apply to external control case */
-			} else if (!processor_pm_external()) {
+			} else {
 				continue;
 			}
 			if (cx.type == ACPI_STATE_C1 &&
@@ -503,12 +490,6 @@ static int acpi_processor_get_power_info_cst(struct acpi_processor *pr)
 			continue;
 
 		cx.power = obj->integer.value;
-
-#ifdef CONFIG_PROCESSOR_EXTERNAL_CONTROL
-		/* cache control methods to notify external logic */
-		if (processor_pm_external())
-			memcpy(&cx.reg, reg, sizeof(*reg));
-#endif
 
 		current_count++;
 		memcpy(&(pr->power.states[current_count]), &cx, sizeof(cx));
@@ -608,11 +589,7 @@ static void acpi_processor_power_verify_c3(struct acpi_processor *pr,
 	 */
 	cx->valid = 1;
 
-#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
 	cx->latency_ticks = cx->latency;
-#else
-	cx->latency_ticks = us_to_pm_timer_ticks(cx->latency);
-#endif
 	/*
 	 * On older chipsets, BM_RLD needs to be set
 	 * in order for Bus Master activity to wake the
@@ -645,11 +622,7 @@ static int acpi_processor_power_verify(struct acpi_processor *pr)
 			if (!cx->address)
 				break;
 			cx->valid = 1; 
-#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
 			cx->latency_ticks = cx->latency; /* Normalize latency */
-#else
-			cx->latency_ticks = us_to_pm_timer_ticks(cx->latency);
-#endif
 			break;
 
 		case ACPI_STATE_C3:
@@ -692,20 +665,6 @@ static int acpi_processor_get_power_info(struct acpi_processor *pr)
 
 	pr->power.count = acpi_processor_power_verify(pr);
 
-#ifdef CONFIG_PROCESSOR_EXTERNAL_CONTROL
-	/*
-	 * Set Default Policy
-	 * ------------------
-	 * Now that we know which states are supported, set the default
-	 * policy.  Note that this policy can be changed dynamically
-	 * (e.g. encourage deeper sleeps to conserve battery life when
-	 * not on AC).
-	 */
-	result = acpi_processor_set_power_policy(pr);
-	if (result)
-		return result;
-#endif
-
 	/*
 	 * if one state of type C2 or C3 is available, mark this
 	 * CPU as being "idle manageable"
@@ -721,79 +680,6 @@ static int acpi_processor_get_power_info(struct acpi_processor *pr)
 	return 0;
 }
 
-#ifdef CONFIG_ACPI_PROCFS
-static int acpi_processor_power_seq_show(struct seq_file *seq, void *offset)
-{
-	struct acpi_processor *pr = seq->private;
-	unsigned int i;
-
-
-	if (!pr)
-		goto end;
-
-	seq_printf(seq, "active state:            C%zd\n"
-		   "max_cstate:              C%d\n"
-		   "maximum allowed latency: %d usec\n",
-		   pr->power.state ? pr->power.state - pr->power.states : 0,
-		   max_cstate, pm_qos_request(PM_QOS_CPU_DMA_LATENCY));
-
-	seq_puts(seq, "states:\n");
-
-	for (i = 1; i <= pr->power.count; i++) {
-		seq_printf(seq, "   %cC%d:                  ",
-			   (&pr->power.states[i] ==
-			    pr->power.state ? '*' : ' '), i);
-
-		if (!pr->power.states[i].valid) {
-			seq_puts(seq, "<not supported>\n");
-			continue;
-		}
-
-		switch (pr->power.states[i].type) {
-		case ACPI_STATE_C1:
-			seq_printf(seq, "type[C1] ");
-			break;
-		case ACPI_STATE_C2:
-			seq_printf(seq, "type[C2] ");
-			break;
-		case ACPI_STATE_C3:
-			seq_printf(seq, "type[C3] ");
-			break;
-		default:
-			seq_printf(seq, "type[--] ");
-			break;
-		}
-
-		seq_puts(seq, "promotion[--] ");
-
-		seq_puts(seq, "demotion[--] ");
-
-		seq_printf(seq, "latency[%03d] usage[%08d] duration[%020Lu]\n",
-			   pr->power.states[i].latency,
-			   pr->power.states[i].usage,
-			   us_to_pm_timer_ticks(pr->power.states[i].time));
-	}
-
-      end:
-	return 0;
-}
-
-static int acpi_processor_power_open_fs(struct inode *inode, struct file *file)
-{
-	return single_open(file, acpi_processor_power_seq_show,
-			   PDE(inode)->data);
-}
-
-static const struct file_operations acpi_processor_power_fops = {
-	.owner = THIS_MODULE,
-	.open = acpi_processor_power_open_fs,
-	.read = seq_read,
-	.llseek = seq_lseek,
-	.release = single_release,
-};
-#endif
-
-#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
 /**
  * acpi_idle_bm_check - checks if bus master activity was detected
  */
@@ -836,13 +722,12 @@ static inline void acpi_idle_do_entry(struct acpi_processor_cx *cx)
 	} else if (cx->entry_method == ACPI_CSTATE_HALT) {
 		acpi_safe_halt();
 	} else {
-		int unused;
 		/* IO port based C-state */
 		inb(cx->address);
 		/* Dummy wait op - must do something useless after P_LVL2 read
 		   because chipsets cannot guarantee that STPCLK# signal
 		   gets asserted in time to freeze execution properly. */
-		unused = inl(acpi_gbl_FADT.xpm_timer_block.address);
+		inl(acpi_gbl_FADT.xpm_timer_block.address);
 	}
 	start_critical_timings();
 }
@@ -1170,7 +1055,6 @@ static int acpi_processor_setup_cpuidle(struct acpi_processor *pr)
 
 	return 0;
 }
-#endif /* CONFIG_PROCESSOR_EXTERNAL_CONTROL */
 
 int acpi_processor_cst_has_changed(struct acpi_processor *pr)
 {
@@ -1189,23 +1073,13 @@ int acpi_processor_cst_has_changed(struct acpi_processor *pr)
 	if (!pr->flags.power_setup_done)
 		return -ENODEV;
 
-	if (processor_pm_external()) {
-		pr->flags.power = 0;
-		ret = acpi_processor_get_power_info(pr);
-		processor_notify_external(pr,
-			PROCESSOR_PM_CHANGE, PM_TYPE_IDLE);
-		return ret;
-	}
-
 	cpuidle_pause_and_lock();
 	cpuidle_disable_device(&pr->power.dev);
 	acpi_processor_get_power_info(pr);
-#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
 	if (pr->flags.power) {
 		acpi_processor_setup_cpuidle(pr);
 		ret = cpuidle_enable_device(&pr->power.dev);
 	}
-#endif
 	cpuidle_resume_and_unlock();
 
 	return ret;
@@ -1216,9 +1090,6 @@ int __cpuinit acpi_processor_power_init(struct acpi_processor *pr,
 {
 	acpi_status status = 0;
 	static int first_run;
-#ifdef CONFIG_ACPI_PROCFS
-	struct proc_dir_entry *entry = NULL;
-#endif
 
 	if (boot_option_idle_override)
 		return 0;
@@ -1240,10 +1111,6 @@ int __cpuinit acpi_processor_power_init(struct acpi_processor *pr,
 			       "ACPI: processor limited to max C-state %d\n",
 			       max_cstate);
 		first_run++;
-#if defined(CONFIG_PROCESSOR_EXTERNAL_CONTROL) && defined(CONFIG_SMP)
-		pm_qos_add_notifier(PM_QOS_CPU_DMA_LATENCY,
-				    &acpi_processor_latency_notifier);
-#endif
 	}
 
 	if (!pr)
@@ -1261,7 +1128,6 @@ int __cpuinit acpi_processor_power_init(struct acpi_processor *pr,
 	acpi_processor_get_power_info(pr);
 	pr->flags.power_setup_done = 1;
 
-#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
 	/*
 	 * Install the idle handler if processor power management is supported.
 	 * Note that we use previously set idle handler will be used on
@@ -1272,21 +1138,6 @@ int __cpuinit acpi_processor_power_init(struct acpi_processor *pr,
 		if (cpuidle_register_device(&pr->power.dev))
 			return -EIO;
 	}
-#endif
-#ifdef CONFIG_ACPI_PROCFS
-	/* 'power' [R] */
-	entry = proc_create_data(ACPI_PROCESSOR_FILE_POWER,
-				 S_IRUGO, acpi_device_dir(device),
-				 &acpi_processor_power_fops,
-				 acpi_driver_data(device));
-	if (!entry)
-		return -EIO;
-#endif
-
-	if (processor_pm_external())
-		processor_notify_external(pr,
-			PROCESSOR_PM_INIT, PM_TYPE_IDLE);
-
 	return 0;
 }
 
@@ -1298,19 +1149,6 @@ int acpi_processor_power_exit(struct acpi_processor *pr,
 
 	cpuidle_unregister_device(&pr->power.dev);
 	pr->flags.power_setup_done = 0;
-
-#ifdef CONFIG_ACPI_PROCFS
-	if (acpi_device_dir(device))
-		remove_proc_entry(ACPI_PROCESSOR_FILE_POWER,
-				  acpi_device_dir(device));
-#endif
-
-#if defined(CONFIG_PROCESSOR_EXTERNAL_CONTROL) && defined(CONFIG_SMP)
-	/* Unregister the idle handler when processor #0 is removed. */
-	if (pr->id == 0)
-		pm_qos_remove_notifier(PM_QOS_CPU_DMA_LATENCY,
-				       &acpi_processor_latency_notifier);
-#endif
 
 	return 0;
 }

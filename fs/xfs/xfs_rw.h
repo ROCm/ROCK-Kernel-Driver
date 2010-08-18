@@ -45,16 +45,5 @@ extern int xfs_read_buf(struct xfs_mount *mp, xfs_buftarg_t *btp,
 extern void xfs_ioerror_alert(char *func, struct xfs_mount *mp,
 				xfs_buf_t *bp, xfs_daddr_t blkno);
 extern xfs_extlen_t xfs_get_extsz_hint(struct xfs_inode *ip);
-/*
- * Prototypes for functions in xfs_vnodeops.c.
- */
-
-/*
- * Flags for xfs_free_eofblocks
- */
-#define XFS_FREE_EOF_TRYLOCK   (1<<0)
-#define XFS_FREE_EOF_HASLOCK   (1<<1)
-extern int xfs_free_eofblocks(struct xfs_mount *mp, struct xfs_inode *ip,
-                       int flags);
 
 #endif /* __XFS_RW_H__ */

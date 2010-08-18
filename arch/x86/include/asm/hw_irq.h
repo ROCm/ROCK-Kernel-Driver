@@ -78,7 +78,6 @@ static inline void set_io_apic_irq_attr(struct io_apic_irq_attr *irq_attr,
 	irq_attr->polarity	= polarity;
 }
 
-#ifndef CONFIG_XEN
 /*
  * This is performance-critical, we want to do it O(1)
  *
@@ -93,9 +92,6 @@ struct irq_cfg {
 };
 
 extern struct irq_cfg *irq_cfg(unsigned int);
-#else
-struct irq_cfg;
-#endif
 extern int assign_irq_vector(int, struct irq_cfg *, const struct cpumask *);
 extern void send_cleanup_vector(struct irq_cfg *);
 
@@ -131,14 +127,9 @@ extern void smp_invalidate_interrupt(struct pt_regs *);
 #else
 extern asmlinkage void smp_invalidate_interrupt(struct pt_regs *);
 #endif
-#ifdef CONFIG_XEN
-extern void smp_reboot_interrupt(struct pt_regs *);
-#endif
 #endif
 
-#ifndef CONFIG_XEN
 extern void (*__initconst interrupt[NR_VECTORS-FIRST_EXTERNAL_VECTOR])(void);
-#endif
 
 typedef int vector_irq_t[NR_VECTORS];
 DECLARE_PER_CPU(vector_irq_t, vector_irq);

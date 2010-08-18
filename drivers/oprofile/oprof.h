@@ -40,7 +40,4 @@ void oprofile_timer_exit(void);
 int oprofile_set_backtrace(unsigned long depth);
 int oprofile_set_timeout(unsigned long time);
 
-int oprofile_set_active(int active_domains[], unsigned int adomains);
-int oprofile_set_passive(int passive_domains[], unsigned int pdomains);
-
 #endif /* OPROF_H */

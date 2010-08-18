@@ -7,11 +7,6 @@ obj-y		+= access.o bus.o probe.o remove.o pci.o \
 			irq.o vpd.o
 obj-$(CONFIG_PROC_FS) += proc.o
 obj-$(CONFIG_SYSFS) += slot.o
-obj-$(CONFIG_PCI_GUESTDEV) += guestdev.o
-obj-$(CONFIG_PCI_IOMULTI) += pci-iomul.o
-iomul-$(CONFIG_PCI_IOMULTI) := iomulti.o
-obj-y += $(iomul-y) $(iomul-m)
-obj-$(CONFIG_PCI_RESERVE) += reserve.o
 
 obj-$(CONFIG_PCI_QUIRKS) += quirks.o
 
@@ -59,6 +54,9 @@ obj-$(CONFIG_MICROBLAZE) += setup-bus.o
 # ACPI Related PCI FW Functions
 #
 obj-$(CONFIG_ACPI)    += pci-acpi.o
+
+# SMBIOS provided firmware instance and labels
+obj-$(CONFIG_DMI)    += pci-label.o
 
 # Cardbus & CompactPCI use setup-bus
 obj-$(CONFIG_HOTPLUG) += setup-bus.o

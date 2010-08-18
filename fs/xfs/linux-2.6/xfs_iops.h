@@ -27,7 +27,4 @@ extern ssize_t xfs_vn_listxattr(struct dentry *, char *data, size_t size);
 
 extern void xfs_setup_inode(struct xfs_inode *);
 
-extern int xfs_fsync(struct inode *, int);
-
 #endif /* __XFS_IOPS_H__ */
-

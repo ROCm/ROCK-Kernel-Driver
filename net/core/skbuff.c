@@ -634,10 +634,6 @@ static struct sk_buff *__skb_clone(struct sk_buff *n, struct sk_buff *skb)
 	n->hdr_len = skb->nohdr ? skb_headroom(skb) : skb->hdr_len;
 	n->cloned = 1;
 	n->nohdr = 0;
-#ifdef CONFIG_XEN
-	C(proto_data_valid);
-	C(proto_csum_blank);
-#endif
 	n->destructor = NULL;
 	C(tail);
 	C(end);
@@ -902,7 +898,7 @@ int pskb_expand_head(struct sk_buff *skb, int nhead, int ntail,
 	memcpy(data + nhead, skb->head, skb->tail - skb->head);
 #endif
 	memcpy(data + size, skb_end_pointer(skb),
-	       sizeof(struct skb_shared_info));
+	       offsetof(struct skb_shared_info, frags[skb_shinfo(skb)->nr_frags]));
 
 	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++)
 		skb_get_page(skb, skb_shinfo(skb)->frags[i].page);
@@ -2572,7 +2568,6 @@ unsigned char *skb_pull_rcsum(struct sk_buff *skb, unsigned int len)
 	skb_postpull_rcsum(skb, skb->data, len);
 	return skb->data += len;
 }
-
 EXPORT_SYMBOL_GPL(skb_pull_rcsum);
 
 /**

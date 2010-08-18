@@ -24,22 +24,19 @@
 #include "xfs_trans.h"
 #include "xfs_sb.h"
 #include "xfs_ag.h"
-#include "xfs_dir2.h"
-#include "xfs_dmapi.h"
 #include "xfs_mount.h"
 #include "xfs_bmap_btree.h"
 #include "xfs_alloc_btree.h"
 #include "xfs_ialloc_btree.h"
-#include "xfs_dir2_sf.h"
-#include "xfs_attr_sf.h"
 #include "xfs_dinode.h"
 #include "xfs_inode.h"
 #include "xfs_ialloc.h"
 #include "xfs_itable.h"
 #include "xfs_error.h"
 #include "xfs_btree.h"
+#include "xfs_trace.h"
 
-int
+STATIC int
 xfs_internal_inum(
 	xfs_mount_t	*mp,
 	xfs_ino_t	ino)
@@ -61,8 +58,7 @@ xfs_bulkstat_one_int(
 	int			ubsize,		/* size of buffer */
 	bulkstat_one_fmt_pf	formatter,	/* formatter, copy to user */
 	int			*ubused,	/* bytes used by me */
-	int			*stat,		/* BULKSTAT_RV_... */
-	void			*private_data)
+	int			*stat)		/* BULKSTAT_RV_... */
 {
 	struct xfs_icdinode	*dic;		/* dinode core info pointer */
 	struct xfs_inode	*ip;		/* incore inode pointer */
@@ -144,7 +140,8 @@ xfs_bulkstat_one_int(
 		buf->bs_blocks = dic->di_nblocks + ip->i_delayed_blks;
 		break;
 	}
-	xfs_iput(ip, XFS_ILOCK_SHARED);
+	xfs_iunlock(ip, XFS_ILOCK_SHARED);
+	IRELE(ip);
 
 	error = formatter(buffer, ubsize, ubused, buf);
 
@@ -180,11 +177,10 @@ xfs_bulkstat_one(
 	void		__user *buffer,	/* buffer to place output in */
 	int		ubsize,		/* size of buffer */
 	int		*ubused,	/* bytes used by me */
-	int		*stat,		/* BULKSTAT_RV_... */
-	void            *private_data)
+	int		*stat)		/* BULKSTAT_RV_... */
 {
 	return xfs_bulkstat_one_int(mp, ino, buffer, ubsize,
-				    xfs_bulkstat_one_fmt, ubused, stat, NULL);
+				    xfs_bulkstat_one_fmt, ubused, stat);
 }
 
 #define XFS_BULKSTAT_UBLEFT(ubleft)	((ubleft) >= statstruct_size)
@@ -200,8 +196,7 @@ xfs_bulkstat(
 	bulkstat_one_pf		formatter, /* func that'd fill a single buf */
 	size_t			statstruct_size, /* sizeof struct filling */
 	char			__user *ubuffer, /* buffer with inode stats */
-	int			*done,	/* 1 if there are more stats to get */
-	void                    *private_data)/* private data for formatter */
+	int			*done)	/* 1 if there are more stats to get */
 {
 	xfs_agblock_t		agbno=0;/* allocation group block number */
 	xfs_buf_t		*agbp;	/* agi header buffer */
@@ -486,8 +481,7 @@ xfs_bulkstat(
 				 */
 				ubused = statstruct_size;
 				error = formatter(mp, ino, ubufp, ubleft,
-						  &ubused, &fmterror,
-						  private_data);
+						  &ubused, &fmterror);
 				if (fmterror == BULKSTAT_RV_NOTHING) {
 					if (error && error != ENOENT &&
 						error != EINVAL) {
@@ -579,8 +573,7 @@ xfs_bulkstat_single(
 	 */
 
 	ino = (xfs_ino_t)*lastinop;
-	error = xfs_bulkstat_one(mp, ino, buffer, sizeof(xfs_bstat_t), 0, &res,
-				 NULL);
+	error = xfs_bulkstat_one(mp, ino, buffer, sizeof(xfs_bstat_t), 0, &res);
 	if (error) {
 		/*
 		 * Special case way failed, do it the "long" way
@@ -589,7 +582,7 @@ xfs_bulkstat_single(
 		(*lastinop)--;
 		count = 1;
 		if (xfs_bulkstat(mp, lastinop, &count, xfs_bulkstat_one,
-				sizeof(xfs_bstat_t), buffer, done, NULL))
+				sizeof(xfs_bstat_t), buffer, done))
 			return error;
 		if (count == 0 || (xfs_ino_t)*lastinop != ino)
 			return error == EFSCORRUPTED ?

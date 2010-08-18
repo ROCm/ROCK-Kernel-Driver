@@ -4,7 +4,7 @@
  * This file contains AppArmor basic path manipulation function definitions.
  *
  * Copyright (C) 1998-2008 Novell/SUSE
- * Copyright 2009 Canonical Ltd.
+ * Copyright 2009-2010 Canonical Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -15,10 +15,17 @@
 #ifndef __AA_PATH_H
 #define __AA_PATH_H
 
-int aa_get_name_to_buffer(struct path *path, int is_dir, char *buffer, int size,
-			  char **name);
-int aa_get_name(struct path *path, int is_dir, char **buffer, char **name);
-int d_namespace_path(struct path *path, char *buf, int buflen, char **name);
-char *sysctl_pathname(struct ctl_table *table, char *buffer, int buflen);
 
-#endif	/* __AA_PATH_H */
+enum path_flags {
+	PATH_IS_DIR = 0x1,		/* path is a directory */
+	PATH_CONNECT_PATH = 0x4,	/* connect disconnected paths to / */
+	PATH_CHROOT_REL = 0x8,		/* do path lookup relative to chroot */
+	PATH_CHROOT_NSCONNECT = 0x10,	/* connect paths that are at ns root */
+
+	PATH_DELEGATE_DELETED = 0x08000, /* delegate deleted files */
+	PATH_MEDIATE_DELETED = 0x10000,	/* mediate deleted paths */
+};
+
+int aa_get_name(struct path *path, int flags, char **buffer, const char **name);
+
+#endif /* __AA_PATH_H */

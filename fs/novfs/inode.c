@@ -101,7 +101,6 @@ ssize_t novfs_a_direct_IO(int rw, struct kiocb *kiocb, const struct iovec *iov, 
 ssize_t novfs_f_read(struct file *, char *, size_t, loff_t *);
 ssize_t novfs_f_write(struct file *, const char *, size_t, loff_t *);
 int novfs_f_readdir(struct file *, void *, filldir_t);
-int novfs_f_ioctl(struct inode *, struct file *, unsigned int, unsigned long);
 int novfs_f_mmap(struct file *file, struct vm_area_struct *vma);
 int novfs_f_open(struct inode *, struct file *);
 int novfs_f_flush(struct file *, fl_owner_t);
@@ -139,7 +138,7 @@ void update_inode(struct inode *Inode, struct novfs_entry_info *Info);
 void novfs_read_inode(struct inode *inode);
 void novfs_write_inode(struct inode *inode);
 int novfs_notify_change(struct dentry *dentry, struct iattr *attr);
-void novfs_clear_inode(struct inode *inode);
+void novfs_evict_inode(struct inode *inode);
 int novfs_show_options(struct seq_file *s, struct vfsmount *m);
 
 int novfs_statfs(struct dentry *de, struct kstatfs *buf);
@@ -150,8 +149,6 @@ int novfs_statfs(struct dentry *de, struct kstatfs *buf);
 ssize_t novfs_control_Read(struct file *file, char *buf, size_t nbytes, loff_t * ppos);
 
 ssize_t novfs_control_write(struct file *file, const char *buf, size_t nbytes, loff_t * ppos);
-
-int novfs_control_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg);
 
 int __init init_novfs(void);
 void __exit exit_novfs(void);
@@ -197,7 +194,6 @@ static struct file_operations novfs_file_operations = {
 	.read = novfs_f_read,
 	.write = novfs_f_write,
 	.readdir = novfs_f_readdir,
-	.ioctl = novfs_f_ioctl,
 	.mmap = novfs_f_mmap,
 	.open = novfs_f_open,
 	.flush = novfs_f_flush,
@@ -254,7 +250,7 @@ static struct inode_operations novfs_file_inode_operations = {
 
 static struct super_operations novfs_ops = {
 	.statfs = novfs_statfs,
-	.clear_inode = novfs_clear_inode,
+	.evict_inode = novfs_evict_inode,
 	.drop_inode = generic_delete_inode,
 	.show_options = novfs_show_options,
 
@@ -264,7 +260,6 @@ static struct super_operations novfs_ops = {
 static struct file_operations novfs_Control_operations = {
    .read    = novfs_Control_read,
    .write   = novfs_Control_write,
-   .ioctl   = novfs_Control_ioctl,
 };
 */
 
@@ -1275,13 +1270,6 @@ ssize_t novfs_f_write(struct file * file, const char *buf, size_t len, loff_t * 
 int novfs_f_readdir(struct file *file, void *data, filldir_t fill)
 {
 	return -EISDIR;
-}
-
-int novfs_f_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
-{
-	DbgPrint("file=0x%p cmd=0x%x arg=0x%p", file, cmd, arg);
-
-	return -ENOSYS;
 }
 
 int novfs_f_mmap(struct file *file, struct vm_area_struct *vma)
@@ -3155,8 +3143,11 @@ int novfs_notify_change(struct dentry *dentry, struct iattr *attr)
 	return (0);
 }
 
-void novfs_clear_inode(struct inode *inode)
+void novfs_evict_inode(struct inode *inode)
 {
+	truncate_inode_pages(&inode->i_data, 0);
+	end_writeback(inode);
+
 	InodeCount--;
 
 	if (inode->i_private) {
@@ -3468,15 +3459,6 @@ ssize_t novfs_Control_write(struct file * file, const char *buf, size_t nbytes, 
 	DbgPrint("kernel_locked 0x%x", kernel_locked());
 	if (buf && nbytes) {
 	}
-
-	return (retval);
-}
-
-int novfs_Control_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
-{
-	int retval = 0;
-
-	DbgPrint("kernel_locked 0x%x", kernel_locked());
 
 	return (retval);
 }

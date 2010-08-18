@@ -1073,6 +1073,7 @@ ENTRY(\sym)
 END(\sym)
 .endm
 
+#define INIT_TSS_IST(x) PER_CPU_VAR(init_tss) + (TSS_ist + ((x) - 1) * 8)
 .macro paranoidzeroentry_ist sym do_sym ist
 ENTRY(\sym)
 	INTR_FRAME
@@ -1086,10 +1087,9 @@ ENTRY(\sym)
 	TRACE_IRQS_OFF
 	movq %rsp,%rdi		/* pt_regs pointer */
 	xorl %esi,%esi		/* no error code */
-	PER_CPU(init_tss, %r12)
-	subq $EXCEPTION_STKSZ, TSS_ist + (\ist - 1) * 8(%r12)
+	subq $EXCEPTION_STKSZ, INIT_TSS_IST(\ist)
 	call \do_sym
-	addq $EXCEPTION_STKSZ, TSS_ist + (\ist - 1) * 8(%r12)
+	addq $EXCEPTION_STKSZ, INIT_TSS_IST(\ist)
 	jmp paranoid_exit	/* %ebx: no swapgs flag */
 	CFI_ENDPROC
 END(\sym)
@@ -1195,13 +1195,13 @@ END(kernel_thread_helper)
  * execve(). This function needs to use IRET, not SYSRET, to set up all state properly.
  *
  * C extern interface:
- *	 extern long execve(char *name, char **argv, char **envp)
+ *	 extern long execve(const char *name, char **argv, char **envp)
  *
  * asm input arguments:
  *	rdi: name, rsi: argv, rdx: envp
  *
  * We want to fallback into:
- *	extern long sys_execve(char *name, char **argv,char **envp, struct pt_regs *regs)
+ *	extern long sys_execve(const char *name, char **argv,char **envp, struct pt_regs *regs)
  *
  * do_sys_execve asm fallback arguments:
  *	rdi: name, rsi: argv, rdx: envp, rcx: fake frame on the stack
@@ -1276,7 +1276,7 @@ ENTRY(arch_unwind_init_running)
 END(arch_unwind_init_running)
 #endif
 
-#ifdef CONFIG_PARAVIRT_XEN
+#ifdef CONFIG_XEN
 zeroentry xen_hypervisor_callback xen_do_hypervisor_callback
 
 /*
@@ -1373,7 +1373,10 @@ ENTRY(xen_failsafe_callback)
 	CFI_ENDPROC
 END(xen_failsafe_callback)
 
-#endif /* CONFIG_PARAVIRT_XEN */
+apicinterrupt XEN_HVM_EVTCHN_CALLBACK \
+	xen_hvm_callback_vector xen_evtchn_do_upcall
+
+#endif /* CONFIG_XEN */
 
 /*
  * Some functions should be protected against kprobes
@@ -1383,7 +1386,7 @@ END(xen_failsafe_callback)
 paranoidzeroentry_ist debug do_debug DEBUG_STACK
 paranoidzeroentry_ist int3 do_int3 DEBUG_STACK
 paranoiderrorentry stack_segment do_stack_segment
-#ifdef CONFIG_PARAVIRT_XEN
+#ifdef CONFIG_XEN
 zeroentry xen_debug do_debug
 zeroentry xen_int3 do_int3
 errorentry xen_stack_segment do_stack_segment

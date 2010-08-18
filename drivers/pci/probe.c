@@ -163,8 +163,15 @@ int __pci_read_base(struct pci_dev *dev, enum pci_bar_type type,
 			struct resource *res, unsigned int pos)
 {
 	u32 l, sz, mask;
+	u16 orig_cmd;
 
 	mask = type ? PCI_ROM_ADDRESS_MASK : ~0;
+
+	if (!dev->mmio_always_on) {
+		pci_read_config_word(dev, PCI_COMMAND, &orig_cmd);
+		pci_write_config_word(dev, PCI_COMMAND,
+			orig_cmd & ~(PCI_COMMAND_MEMORY | PCI_COMMAND_IO));
+	}
 
 	res->name = pci_name(dev);
 
@@ -172,6 +179,9 @@ int __pci_read_base(struct pci_dev *dev, enum pci_bar_type type,
 	pci_write_config_dword(dev, pos, l | mask);
 	pci_read_config_dword(dev, pos, &sz);
 	pci_write_config_dword(dev, pos, l);
+
+	if (!dev->mmio_always_on)
+		pci_write_config_word(dev, PCI_COMMAND, orig_cmd);
 
 	/*
 	 * All bits set in sz means the device isn't working properly.
@@ -1204,11 +1214,6 @@ static void pci_init_capabilities(struct pci_dev *dev)
 	/* Vital Product Data */
 	pci_vpd_pci22_init(dev);
 
-#ifdef CONFIG_XEN
-	if (!is_initial_xendomain())
-		return;
-#endif
-
 	/* Alternative Routing-ID Forwarding */
 	pci_enable_ari(dev);
 
@@ -1330,20 +1335,13 @@ int pci_scan_slot(struct pci_bus *bus, int devfn)
 		return 0; /* Already scanned the entire slot */
 
 	dev = pci_scan_single_device(bus, devfn);
-	if (!dev) {
-#ifdef pcibios_scan_all_fns
-		if (!pcibios_scan_all_fns(bus, devfn))
-#endif
+	if (!dev)
 		return 0;
-	} else if (!dev->is_added)
+	if (!dev->is_added)
 		nr++;
 
 	if (pci_ari_enabled(bus))
 		next_fn = next_ari_fn;
-#ifdef pcibios_scan_all_fns
-	else if (pcibios_scan_all_fns(bus, devfn))
-		next_fn = next_trad_fn;
-#endif
 	else if (dev->multifunction)
 		next_fn = next_trad_fn;
 

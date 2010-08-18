@@ -92,6 +92,21 @@ void r600_gpu_init(struct radeon_device *rdev);
 void r600_fini(struct radeon_device *rdev);
 void r600_irq_disable(struct radeon_device *rdev);
 
+/* get temperature in millidegrees */
+u32 rv6xx_get_temp(struct radeon_device *rdev)
+{
+	u32 temp = (RREG32(CG_THERMAL_STATUS) & ASIC_T_MASK) >>
+		ASIC_T_SHIFT;
+	u32 actual_temp = 0;
+
+	if ((temp >> 7) & 1)
+		actual_temp = 0;
+	else
+		actual_temp = (temp >> 1) & 0xff;
+
+	return actual_temp * 1000;
+}
+
 void r600_pm_get_dynpm_state(struct radeon_device *rdev)
 {
 	int i;
@@ -256,7 +271,7 @@ void r600_pm_get_dynpm_state(struct radeon_device *rdev)
 		}
 	}
 
-	DRM_DEBUG("Requested: e: %d m: %d p: %d\n",
+	DRM_DEBUG_DRIVER("Requested: e: %d m: %d p: %d\n",
 		  rdev->pm.power_state[rdev->pm.requested_power_state_index].
 		  clock_info[rdev->pm.requested_clock_mode_index].sclk,
 		  rdev->pm.power_state[rdev->pm.requested_power_state_index].
@@ -571,7 +586,7 @@ void r600_pm_misc(struct radeon_device *rdev)
 		if (voltage->voltage != rdev->pm.current_vddc) {
 			radeon_atom_set_voltage(rdev, voltage->voltage);
 			rdev->pm.current_vddc = voltage->voltage;
-			DRM_DEBUG("Setting: v: %d\n", voltage->voltage);
+			DRM_DEBUG_DRIVER("Setting: v: %d\n", voltage->voltage);
 		}
 	}
 }
@@ -1227,8 +1242,8 @@ int r600_mc_init(struct radeon_device *rdev)
 	}
 	rdev->mc.vram_width = numchan * chansize;
 	/* Could aper size report 0 ? */
-	rdev->mc.aper_base = drm_get_resource_start(rdev->ddev, 0);
-	rdev->mc.aper_size = drm_get_resource_len(rdev->ddev, 0);
+	rdev->mc.aper_base = pci_resource_start(rdev->pdev, 0);
+	rdev->mc.aper_size = pci_resource_len(rdev->pdev, 0);
 	/* Setup GPU memory space */
 	rdev->mc.mc_vram_size = RREG32(CONFIG_MEMSIZE);
 	rdev->mc.real_vram_size = RREG32(CONFIG_MEMSIZE);
@@ -1619,7 +1634,7 @@ void r600_gpu_init(struct radeon_device *rdev)
 							 r600_count_pipe_bits((cc_rb_backend_disable &
 									       R6XX_MAX_BACKENDS_MASK) >> 16)),
 							(cc_rb_backend_disable >> 16));
-
+	rdev->config.r600.tile_config = tiling_config;
 	tiling_config |= BACKEND_MAP(backend_map);
 	WREG32(GB_TILING_CONFIG, tiling_config);
 	WREG32(DCP_TILING_CONFIG, tiling_config & 0xffff);

@@ -61,25 +61,6 @@ config FILE_LOCKING
 
 source "fs/notify/Kconfig"
 
-config DMAPI
-	tristate "DMAPI support"
-	help
-	  The Data Management API is a system interface used to implement
-	  the interface defined in the X/Open document:
-	  "Systems Management: Data Storage Management (XDSM) API",
-	  dated February 1997.  This interface is used by hierarchical
-	  storage management systems.
-
-	  If any DMAPI-capable filesystem is built into the kernel, then
-	  DMAPI must also be built into the kernel.
-
-config DMAPI_DEBUG
-	bool "DMAPI debugging support"
-	depends on DMAPI
-	help
-	  If you don't know whether you need it, then you don't need it:
-	  answer N.
-
 source "fs/quota/Kconfig"
 
 source "fs/autofs/Kconfig"
@@ -87,7 +68,7 @@ source "fs/autofs4/Kconfig"
 source "fs/fuse/Kconfig"
 
 config CUSE
-	tristate "Character device in Userpace support"
+	tristate "Character device in Userspace support"
 	depends on FUSE_FS
 	help
 	  This FUSE extension allows character devices to be
@@ -160,7 +141,6 @@ config HUGETLBFS
 	bool "HugeTLB file system support"
 	depends on X86 || IA64 || SPARC64 || (S390 && 64BIT) || \
 		   SYS_SUPPORTS_HUGETLBFS || BROKEN
-	depends on !XEN
 	help
 	  hugetlbfs is a filesystem backing for HugeTLB pages, based on
 	  ramfs. For architectures that support it, say Y here and read

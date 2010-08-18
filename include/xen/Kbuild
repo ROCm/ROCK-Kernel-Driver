@@ -1,1 +1,1 @@
-header-y += public/
+header-y += evtchn.h

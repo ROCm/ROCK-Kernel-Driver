@@ -103,12 +103,7 @@ extern unsigned int kobjsize(const void *objp);
 
 #define VM_CAN_NONLINEAR 0x08000000	/* Has ->fault & does nonlinear pages */
 #define VM_MIXEDMAP	0x10000000	/* Can contain "struct page" and pure PFN pages */
-#ifndef CONFIG_XEN
 #define VM_SAO		0x20000000	/* Strong Access Ordering (powerpc) */
-#else
-#define VM_SAO		0
-#define VM_FOREIGN	0x20000000	/* Has pages belonging to another VM */
-#endif
 #define VM_PFN_AT_MMAP	0x40000000	/* PFNMAP vma that is fully mapped at mmap time */
 #define VM_MERGEABLE	0x80000000	/* KSM may merge identical pages */
 
@@ -135,12 +130,6 @@ extern unsigned int kobjsize(const void *objp);
  * special vmas that are non-mergable, non-mlock()able
  */
 #define VM_SPECIAL (VM_IO | VM_DONTEXPAND | VM_RESERVED | VM_PFNMAP)
-
-#ifdef CONFIG_XEN
-struct vm_foreign_map {
-	struct page **map;
-};
-#endif
 
 /*
  * mapping from the currently active vm_flags protection bits (the
@@ -201,9 +190,6 @@ struct vm_operations_struct {
 	void (*close)(struct vm_area_struct * area);
 	int (*fault)(struct vm_area_struct *vma, struct vm_fault *vmf);
 
-#define HAVE_VMOP_MPROTECT
-	int (*mprotect)(struct vm_area_struct * area, unsigned int newflags);
-
 	/* notification that a previously read-only page is about to become
 	 * writable, if an error is returned it will cause a SIGBUS */
 	int (*page_mkwrite)(struct vm_area_struct *vma, struct vm_fault *vmf);
@@ -213,17 +199,6 @@ struct vm_operations_struct {
 	 */
 	int (*access)(struct vm_area_struct *vma, unsigned long addr,
 		      void *buf, int len, int write);
-
-#ifdef CONFIG_XEN
-	/* Area-specific function for clearing the PTE at @ptep. Returns the
-	 * original value of @ptep. */
-	pte_t (*zap_pte)(struct vm_area_struct *vma,
-			 unsigned long addr, pte_t *ptep, int is_fullmm);
-
-	/* called before close() to indicate no more pages should be mapped */
-	void (*unmap)(struct vm_area_struct *area);
-#endif
-
 #ifdef CONFIG_NUMA
 	/*
 	 * set_policy() op must add a reference to any non-NULL @new mempolicy
@@ -867,6 +842,7 @@ static inline void unmap_shared_mapping_range(struct address_space *mapping,
 }
 
 extern void truncate_pagecache(struct inode *inode, loff_t old, loff_t new);
+extern void truncate_setsize(struct inode *inode, loff_t newsize);
 extern int vmtruncate(struct inode *inode, loff_t offset);
 extern int vmtruncate_range(struct inode *inode, loff_t offset, loff_t end);
 
@@ -1523,6 +1499,14 @@ extern int sysctl_memory_failure_recovery;
 extern void shake_page(struct page *p, int access);
 extern atomic_long_t mce_bad_pages;
 extern int soft_offline_page(struct page *page, int flags);
+#ifdef CONFIG_MEMORY_FAILURE
+int is_hwpoison_address(unsigned long addr);
+#else
+static inline int is_hwpoison_address(unsigned long addr)
+{
+	return 0;
+}
+#endif
 
 extern void dump_page(struct page *page);
 

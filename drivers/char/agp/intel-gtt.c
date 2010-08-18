@@ -25,6 +25,10 @@
 #define USE_PCI_DMA_API 1
 #endif
 
+/* Max amount of stolen space, anything above will be returned to Linux */
+int intel_max_stolen = 32 * 1024 * 1024;
+EXPORT_SYMBOL(intel_max_stolen);
+
 static const struct aper_size_info_fixed intel_i810_sizes[] =
 {
 	{64, 16384, 4},
@@ -104,7 +108,7 @@ static int intel_agp_map_memory(struct agp_memory *mem)
 	DBG("try mapping %lu pages\n", (unsigned long)mem->page_count);
 
 	if (sg_alloc_table(&st, mem->page_count, GFP_KERNEL))
-		return -ENOMEM;
+		goto err;
 
 	mem->sg_list = sg = st.sgl;
 
@@ -113,11 +117,14 @@ static int intel_agp_map_memory(struct agp_memory *mem)
 
 	mem->num_sg = pci_map_sg(intel_private.pcidev, mem->sg_list,
 				 mem->page_count, PCI_DMA_BIDIRECTIONAL);
-	if (unlikely(!mem->num_sg)) {
-		intel_agp_free_sglist(mem);
-		return -ENOMEM;
-	}
+	if (unlikely(!mem->num_sg))
+		goto err;
+
 	return 0;
+
+err:
+	sg_free_table(&st);
+	return -ENOMEM;
 }
 
 static void intel_agp_unmap_memory(struct agp_memory *mem)
@@ -176,7 +183,7 @@ static void intel_agp_insert_sg_entries(struct agp_memory *mem,
 	if (agp_bridge->dev->device == PCI_DEVICE_ID_INTEL_SANDYBRIDGE_HB ||
 	    agp_bridge->dev->device == PCI_DEVICE_ID_INTEL_SANDYBRIDGE_M_HB)
 	{
-		cache_bits = I830_PTE_SYSTEM_CACHED;
+		cache_bits = GEN6_PTE_LLC_MLC;
 	}
 
 	for (i = 0, j = pg_start; i < mem->page_count; i++, j++) {
@@ -278,19 +285,8 @@ static struct page *i8xx_alloc_pages(void)
 	if (page == NULL)
 		return NULL;
 
-#ifdef CONFIG_XEN
-	if (xen_create_contiguous_region((unsigned long)page_address(page), 2, 32)) {
-		__free_pages(page, 2);
-		return NULL;
-	}
-#endif
-
 	if (set_pages_uc(page, 4) < 0) {
 		set_pages_wb(page, 4);
-#ifdef CONFIG_XEN
-		xen_destroy_contiguous_region((unsigned long)page_address(page),
-					      2);
-#endif
 		__free_pages(page, 2);
 		return NULL;
 	}
@@ -305,9 +301,6 @@ static void i8xx_destroy_pages(struct page *page)
 		return;
 
 	set_pages_wb(page, 4);
-#ifdef CONFIG_XEN
-	xen_destroy_contiguous_region((unsigned long)page_address(page), 2);
-#endif
 	put_page(page);
 	__free_pages(page, 2);
 	atomic_dec(&agp_bridge->current_memory_agp);
@@ -440,11 +433,7 @@ static struct agp_memory *alloc_agpphysmem_i8xx(size_t pg_count, int type)
 	new->page_count = pg_count;
 	new->num_scratch_pages = pg_count;
 	new->type = AGP_PHYS_MEMORY;
-#ifndef CONFIG_XEN
 	new->physical = page_to_phys(new->pages[0]);
-#else
-	new->physical = page_to_pseudophys(new->pages[0]);
-#endif
 	return new;
 }
 
@@ -735,7 +724,12 @@ static void intel_i830_init_gtt_entries(void)
 			break;
 		}
 	}
-	if (gtt_entries > 0) {
+	if (!local && gtt_entries > intel_max_stolen) {
+		dev_info(&agp_bridge->dev->dev,
+			 "detected %dK stolen memory, trimming to %dK\n",
+			 gtt_entries / KB(1), intel_max_stolen / KB(1));
+		gtt_entries = intel_max_stolen / KB(4);
+	} else if (gtt_entries > 0) {
 		dev_info(&agp_bridge->dev->dev, "detected %dK %s memory\n",
 		       gtt_entries / KB(1), local ? "local" : "stolen");
 		gtt_entries /= KB(4);
@@ -822,6 +816,10 @@ static int intel_i830_create_gatt_table(struct agp_bridge_data *bridge)
 
 	/* we have to call this as early as possible after the MMIO base address is known */
 	intel_i830_init_gtt_entries();
+	if (intel_private.gtt_entries == 0) {
+		iounmap(intel_private.registers);
+		return -ENOMEM;
+	}
 
 	agp_bridge->gatt_table = NULL;
 
@@ -1307,6 +1305,11 @@ static int intel_i915_create_gatt_table(struct agp_bridge_data *bridge)
 
 	/* we have to call this as early as possible after the MMIO base address is known */
 	intel_i830_init_gtt_entries();
+	if (intel_private.gtt_entries == 0) {
+		iounmap(intel_private.gtt);
+		iounmap(intel_private.registers);
+		return -ENOMEM;
+	}
 
 	agp_bridge->gatt_table = NULL;
 
@@ -1329,6 +1332,16 @@ static unsigned long intel_i965_mask_memory(struct agp_bridge_data *bridge,
 {
 	/* Shift high bits down */
 	addr |= (addr >> 28) & 0xf0;
+
+	/* Type checking must be done elsewhere */
+	return addr | bridge->driver->masks[type].mask;
+}
+
+static unsigned long intel_gen6_mask_memory(struct agp_bridge_data *bridge,
+					    dma_addr_t addr, int type)
+{
+	/* Shift high bits down */
+	addr |= (addr >> 28) & 0xff;
 
 	/* Type checking must be done elsewhere */
 	return addr | bridge->driver->masks[type].mask;
@@ -1415,6 +1428,11 @@ static int intel_i965_create_gatt_table(struct agp_bridge_data *bridge)
 
 	/* we have to call this as early as possible after the MMIO base address is known */
 	intel_i830_init_gtt_entries();
+	if (intel_private.gtt_entries == 0) {
+		iounmap(intel_private.gtt);
+		iounmap(intel_private.registers);
+		return -ENOMEM;
+	}
 
 	agp_bridge->gatt_table = NULL;
 
@@ -1519,6 +1537,39 @@ static const struct agp_bridge_driver intel_i965_driver = {
 	.fetch_size		= intel_i9xx_fetch_size,
 	.cleanup		= intel_i915_cleanup,
 	.mask_memory		= intel_i965_mask_memory,
+	.masks			= intel_i810_masks,
+	.agp_enable		= intel_i810_agp_enable,
+	.cache_flush		= global_cache_flush,
+	.create_gatt_table	= intel_i965_create_gatt_table,
+	.free_gatt_table	= intel_i830_free_gatt_table,
+	.insert_memory		= intel_i915_insert_entries,
+	.remove_memory		= intel_i915_remove_entries,
+	.alloc_by_type		= intel_i830_alloc_by_type,
+	.free_by_type		= intel_i810_free_by_type,
+	.agp_alloc_page		= agp_generic_alloc_page,
+	.agp_alloc_pages        = agp_generic_alloc_pages,
+	.agp_destroy_page	= agp_generic_destroy_page,
+	.agp_destroy_pages      = agp_generic_destroy_pages,
+	.agp_type_to_mask_type	= intel_i830_type_to_mask_type,
+	.chipset_flush		= intel_i915_chipset_flush,
+#ifdef USE_PCI_DMA_API
+	.agp_map_page		= intel_agp_map_page,
+	.agp_unmap_page		= intel_agp_unmap_page,
+	.agp_map_memory		= intel_agp_map_memory,
+	.agp_unmap_memory	= intel_agp_unmap_memory,
+#endif
+};
+
+static const struct agp_bridge_driver intel_gen6_driver = {
+	.owner			= THIS_MODULE,
+	.aperture_sizes		= intel_i830_sizes,
+	.size_type		= FIXED_APER_SIZE,
+	.num_aperture_sizes	= 4,
+	.needs_scratch_page	= true,
+	.configure		= intel_i9xx_configure,
+	.fetch_size		= intel_i9xx_fetch_size,
+	.cleanup		= intel_i915_cleanup,
+	.mask_memory		= intel_gen6_mask_memory,
 	.masks			= intel_i810_masks,
 	.agp_enable		= intel_i810_agp_enable,
 	.cache_flush		= global_cache_flush,

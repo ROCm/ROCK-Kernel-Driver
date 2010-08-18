@@ -1,10 +1,10 @@
 /*
  * AppArmor security module
  *
- * This file contains AppArmor resource limits function defintions.
+ * This file contains AppArmor resource limits function definitions.
  *
  * Copyright (C) 1998-2008 Novell/SUSE
- * Copyright 2009 Canonical Ltd.
+ * Copyright 2009-2010 Canonical Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -20,7 +20,7 @@
 
 struct aa_profile;
 
-/* struct aa_rlimit - rlimits settings for the profile
+/* struct aa_rlimit - rlimit settings for the profile
  * @mask: which hard limits to set
  * @limits: rlimit values that override task limits
  *
@@ -32,7 +32,7 @@ struct aa_rlimit {
 	struct rlimit limits[RLIM_NLIMITS];
 };
 
-
+int aa_map_resource(int resource);
 int aa_task_setrlimit(struct aa_profile *profile, unsigned int resource,
 		      struct rlimit *new_rlim);
 
@@ -43,4 +43,4 @@ static inline void aa_free_rlimit_rules(struct aa_rlimit *rlims)
 	/* NOP */
 }
 
-#endif	/* __AA_RESOURCE_H */
+#endif /* __AA_RESOURCE_H */

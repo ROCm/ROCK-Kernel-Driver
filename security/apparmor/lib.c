@@ -4,7 +4,7 @@
  * This file contains basic common functions used in AppArmor
  *
  * Copyright (C) 1998-2008 Novell/SUSE
- * Copyright 2009 Canonical Ltd.
+ * Copyright 2009-2010 Canonical Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -14,87 +14,120 @@
 
 #include <linux/slab.h>
 #include <linux/string.h>
+#include <linux/vmalloc.h>
 
 #include "include/audit.h"
 
-void info_message(const char *str)
+
+/**
+ * aa_split_fqname - split a fqname into a profile and namespace name
+ * @fqname: a full qualified name in namespace profile format (NOT NULL)
+ * @ns_name: pointer to portion of the string containing the ns name (NOT NULL)
+ *
+ * Returns: profile name or NULL if one is not specified
+ *
+ * Split a namespace name from a profile name (see policy.c for naming
+ * description).  If a portion of the name is missing it returns NULL for
+ * that portion.
+ *
+ * NOTE: may modify the @fqname string.  The pointers returned point
+ *       into the @fqname string.
+ */
+char *aa_split_fqname(char *fqname, char **ns_name)
 {
-	struct aa_audit sa;
-	memset(&sa, 0, sizeof(sa));
-	sa.gfp_mask = GFP_KERNEL;
-	sa.info = str;
-	printk(KERN_INFO "AppArmor: %s\n", str);
-	if (audit_enabled)
-		aa_audit(AUDIT_APPARMOR_STATUS, NULL, &sa, NULL);
-}
+	char *name = strim(fqname);
 
-char *strchrnul(const char *s, int c)
-{
-	for (; *s != (char)c && *s != '\0'; ++s)
-		;
-	return (char *)s;
-}
-
-char *aa_split_name_from_ns(char *args, char **ns_name)
-{
-	char *name = strstrip(args);
-
-	*ns_name  = NULL;
-	if (args[0] == ':') {
-		char *split = strstrip(strchr(&args[1], ':'));
-
-		if (!split)
-			return NULL;
-
-		*split = 0;
-		*ns_name = &args[1];
-		name = strstrip(split + 1);
+	*ns_name = NULL;
+	if (name[0] == ':') {
+		char *split = strchr(&name[1], ':');
+		if (split) {
+			/* overwrite ':' with \0 */
+			*split = 0;
+			name = skip_spaces(split + 1);
+		} else
+			/* a ns name without a following profile is allowed */
+			name = NULL;
+		*ns_name = &name[1];
 	}
-	if (*name == 0)
+	if (name && *name == 0)
 		name = NULL;
 
 	return name;
 }
 
-char *new_compound_name(const char *n1, const char *n2)
+/**
+ * aa_info_message - log a none profile related status message
+ * @str: message to log
+ */
+void aa_info_message(const char *str)
 {
-	char *name = kmalloc(strlen(n1) + strlen(n2) + 3, GFP_KERNEL);
-	if (name)
-		sprintf(name, "%s//%s", n1, n2);
-	return name;
+	if (audit_enabled) {
+		struct common_audit_data sa;
+		COMMON_AUDIT_DATA_INIT(&sa, NONE);
+		sa.aad.info = str;
+		aa_audit_msg(AUDIT_APPARMOR_STATUS, &sa, NULL);
+	}
+	printk(KERN_INFO "AppArmor: %s\n", str);
 }
 
 /**
- * aa_strneq - compare null terminated @str to a non null terminated substring
- * @str: a null terminated string
- * @sub: a substring, not necessarily null terminated
- * @len: length of @sub to compare
+ * kvmalloc - do allocation preferring kmalloc but falling back to vmalloc
+ * @size: size of allocation
  *
- * The @str string must be full consumed for this to be considered a match
+ * Return: allocated buffer or NULL if failed
+ *
+ * It is possible that policy being loaded from the user is larger than
+ * what can be allocated by kmalloc, in those cases fall back to vmalloc.
  */
-int aa_strneq(const char *str, const char *sub, int len)
+void *kvmalloc(size_t size)
 {
-	int res = strncmp(str, sub, len);
-	if (res)
-		return 0;
-	if (str[len] == 0)
-		return 1;
-	return 0;
+	void *buffer = NULL;
+
+	if (size == 0)
+		return NULL;
+
+	/* do not attempt kmalloc if we need more than 16 pages at once */
+	if (size <= (16*PAGE_SIZE))
+		buffer = kmalloc(size, GFP_NOIO | __GFP_NOWARN);
+	if (!buffer) {
+		/* see kvfree for why size must be at least work_struct size
+		 * when allocated via vmalloc
+		 */
+		if (size < sizeof(struct work_struct))
+			size = sizeof(struct work_struct);
+		buffer = vmalloc(size);
+	}
+	return buffer;
 }
 
-const char *fqname_subname(const char *name)
+/**
+ * do_vfree - workqueue routine for freeing vmalloced memory
+ * @work: data to be freed
+ *
+ * The work_struct is overlaid to the data being freed, as at the point
+ * the work is scheduled the data is no longer valid, be its freeing
+ * needs to be delayed until safe.
+ */
+static void do_vfree(struct work_struct *work)
 {
-	char *split;
-	/* check for namespace which begins with a : and ends with : or \0 */
-	name = strstrip((char *) name);
-	if (*name == ':') {
-		split = strchrnul(name + 1, ':');
-		if (*split == '\0')
-			return NULL;
-		name = strstrip(split + 1);
-	}
-	for (split = strstr(name, "//"); split; split = strstr(name, "//")) {
-		name = split + 2;
-	}
-	return name;
+	vfree(work);
+}
+
+/**
+ * kvfree - free an allocation do by kvmalloc
+ * @buffer: buffer to free (MAYBE_NULL)
+ *
+ * Free a buffer allocated by kvmalloc
+ */
+void kvfree(void *buffer)
+{
+	if (is_vmalloc_addr(buffer)) {
+		/* Data is no longer valid so just use the allocated space
+		 * as the work_struct
+		 */
+		struct work_struct *work = (struct work_struct *) buffer;
+		INIT_WORK(work, do_vfree);
+		schedule_work(work);
+	} else
+		kfree(buffer);
 }

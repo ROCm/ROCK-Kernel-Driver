@@ -748,6 +748,7 @@ static struct priority_group *parse_priority_group(struct arg_set *as,
 
 		if (as->argc < nr_params) {
 			ti->error = "not enough path parameters";
+			r = -EINVAL;
 			goto bad;
 		}
 
@@ -938,6 +939,7 @@ static int multipath_ctr(struct dm_target *ti, unsigned int argc,
 	}
 
 	ti->num_flush_requests = 1;
+	ti->num_discard_requests = 1;
 
 	return 0;
 
@@ -1377,6 +1379,15 @@ static int do_end_io(struct multipath *m, struct request *clone,
 	r = eval_scsi_error(clone->errors, clone->sense, clone->sense_len);
 	if (r != DM_ENDIO_REQUEUE)
 		return r;
+
+	if (clone->cmd_flags & REQ_DISCARD)
+		/*
+		 * Pass all discard request failures up.
+		 * FIXME: only fail_path if the discard failed due to a
+		 * transport problem.  This requires precise understanding
+		 * of the underlying failure (e.g. the SCSI sense).
+		 */
+		return error;
 
 	if (mpio->pgpath)
 		fail_path(mpio->pgpath);

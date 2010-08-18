@@ -77,7 +77,7 @@ int novfs_proc_init(void)
 			novfs_daemon_proc_fops.release = novfs_daemon_close_control;
 			novfs_daemon_proc_fops.read = novfs_daemon_cmd_send;
 			novfs_daemon_proc_fops.write = novfs_daemon_recv_reply;
-			novfs_daemon_proc_fops.ioctl = novfs_daemon_ioctl;
+			novfs_daemon_proc_fops.unlocked_ioctl = novfs_daemon_ioctl;
 
 			Novfs_Control->proc_fops = &novfs_daemon_proc_fops;
 		} else {
@@ -99,7 +99,7 @@ int novfs_proc_init(void)
 			novfs_lib_proc_fops.read = novfs_daemon_lib_read;
 			novfs_lib_proc_fops.write = novfs_daemon_lib_write;
 			novfs_lib_proc_fops.llseek = novfs_daemon_lib_llseek;
-			novfs_lib_proc_fops.ioctl = novfs_daemon_lib_ioctl;
+			novfs_lib_proc_fops.unlocked_ioctl = novfs_daemon_lib_ioctl;
 			Novfs_Library->proc_fops = &novfs_lib_proc_fops;
 		} else {
 			remove_proc_entry("Control", novfs_procfs_dir);
