@@ -458,12 +458,7 @@ pci_find_parent_resource(const struct pci_dev *dev, struct resource *res)
  * Restore the BAR values for a given device, so as to make it
  * accessible by its driver.
  */
-#ifndef CONFIG_XEN
 static void
-#else
-EXPORT_SYMBOL_GPL(pci_restore_bars);
-void
-#endif
 pci_restore_bars(struct pci_dev *dev)
 {
 	int i;
@@ -1280,6 +1275,22 @@ bool pci_check_pme_status(struct pci_dev *dev)
 	return ret;
 }
 
+/*
+ * Time to wait before the system can be put into a sleep state after reporting
+ * a wakeup event signaled by a PCI device.
+ */
+#define PCI_WAKEUP_COOLDOWN	100
+
+/**
+ * pci_wakeup_event - Report a wakeup event related to a given PCI device.
+ * @dev: Device to report the wakeup event for.
+ */
+void pci_wakeup_event(struct pci_dev *dev)
+{
+	if (device_may_wakeup(&dev->dev))
+		pm_wakeup_event(&dev->dev, PCI_WAKEUP_COOLDOWN);
+}
+
 /**
  * pci_pme_wakeup - Wake up a PCI device if its PME Status bit is set.
  * @dev: Device to handle.
@@ -1290,8 +1301,10 @@ bool pci_check_pme_status(struct pci_dev *dev)
  */
 static int pci_pme_wakeup(struct pci_dev *dev, void *ign)
 {
-	if (pci_check_pme_status(dev))
+	if (pci_check_pme_status(dev)) {
 		pm_request_resume(&dev->dev);
+		pci_wakeup_event(dev);
+	}
 	return 0;
 }
 
@@ -2299,21 +2312,17 @@ void pci_msi_off(struct pci_dev *dev)
 }
 EXPORT_SYMBOL_GPL(pci_msi_off);
 
-#ifndef HAVE_ARCH_PCI_SET_DMA_MAX_SEGMENT_SIZE
 int pci_set_dma_max_seg_size(struct pci_dev *dev, unsigned int size)
 {
 	return dma_set_max_seg_size(&dev->dev, size);
 }
 EXPORT_SYMBOL(pci_set_dma_max_seg_size);
-#endif
 
-#ifndef HAVE_ARCH_PCI_SET_DMA_SEGMENT_BOUNDARY
 int pci_set_dma_seg_boundary(struct pci_dev *dev, unsigned long mask)
 {
 	return dma_set_seg_boundary(&dev->dev, mask);
 }
 EXPORT_SYMBOL(pci_set_dma_seg_boundary);
-#endif
 
 static int pcie_flr(struct pci_dev *dev, int probe)
 {
@@ -2905,13 +2914,6 @@ resource_size_t pci_specified_resource_alignment(struct pci_dev *dev)
  */
 int pci_is_reassigndev(struct pci_dev *dev)
 {
-#ifdef CONFIG_PCI_GUESTDEV
-	int result;
-
-	result = pci_is_guestdev_to_reassign(dev);
-	if (result)
-		return result;
-#endif /* CONFIG_PCI_GUESTDEV */
 	return (pci_specified_resource_alignment(dev) != 0);
 }
 

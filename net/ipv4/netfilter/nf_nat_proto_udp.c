@@ -19,14 +19,13 @@
 
 static u_int16_t udp_port_rover;
 
-static bool
+static void
 udp_unique_tuple(struct nf_conntrack_tuple *tuple,
 		 const struct nf_nat_range *range,
 		 enum nf_nat_manip_type maniptype,
 		 const struct nf_conn *ct)
 {
-	return nf_nat_proto_unique_tuple(tuple, range, maniptype, ct,
-					 &udp_port_rover);
+	nf_nat_proto_unique_tuple(tuple, range, maniptype, ct, &udp_port_rover);
 }
 
 static bool
@@ -60,10 +59,6 @@ udp_manip_pkt(struct sk_buff *skb,
 		newport = tuple->dst.u.udp.port;
 		portptr = &hdr->dest;
 	}
-
-	if (skb_checksum_setup(skb))
-		return false;
-
 	if (hdr->check || skb->ip_summed == CHECKSUM_PARTIAL) {
 		inet_proto_csum_replace4(&hdr->check, skb, oldip, newip, 1);
 		inet_proto_csum_replace2(&hdr->check, skb, *portptr, newport,

@@ -2,6 +2,7 @@
 #define _LINUX_HIGHMEM_H
 
 #include <linux/fs.h>
+#include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/uaccess.h>
 
@@ -72,7 +73,11 @@ static inline void *kmap_atomic(struct page *page, enum km_type idx)
 }
 #define kmap_atomic_prot(page, idx, prot)	kmap_atomic(page, idx)
 
-#define kunmap_atomic(addr, idx)	do { pagefault_enable(); } while (0)
+static inline void kunmap_atomic_notypecheck(void *addr, enum km_type idx)
+{
+	pagefault_enable();
+}
+
 #define kmap_atomic_pfn(pfn, idx)	kmap_atomic(pfn_to_page(pfn), (idx))
 #define kmap_atomic_to_page(ptr)	virt_to_page(ptr)
 
@@ -80,6 +85,13 @@ static inline void *kmap_atomic(struct page *page, enum km_type idx)
 #endif
 
 #endif /* CONFIG_HIGHMEM */
+
+/* Prevent people trying to call kunmap_atomic() as if it were kunmap() */
+/* kunmap_atomic() should get the return value of kmap_atomic, not the page. */
+#define kunmap_atomic(addr, idx) do { \
+		BUILD_BUG_ON(__same_type((addr), struct page *)); \
+		kunmap_atomic_notypecheck((addr), (idx)); \
+	} while (0)
 
 /* when CONFIG_HIGHMEM is not set these will be plain clear/copy_page */
 #ifndef clear_user_highpage
@@ -136,14 +148,12 @@ alloc_zeroed_user_highpage_movable(struct vm_area_struct *vma,
 	return __alloc_zeroed_user_highpage(__GFP_MOVABLE, vma, vaddr);
 }
 
-#ifndef __HAVE_ARCH_CLEAR_HIGHPAGE
 static inline void clear_highpage(struct page *page)
 {
 	void *kaddr = kmap_atomic(page, KM_USER0);
 	clear_page(kaddr);
 	kunmap_atomic(kaddr, KM_USER0);
 }
-#endif
 
 static inline void zero_user_segments(struct page *page,
 	unsigned start1, unsigned end1,
@@ -197,8 +207,6 @@ static inline void copy_user_highpage(struct page *to, struct page *from,
 
 #endif
 
-#ifndef __HAVE_ARCH_COPY_HIGHPAGE
-
 static inline void copy_highpage(struct page *to, struct page *from)
 {
 	char *vfrom, *vto;
@@ -209,7 +217,5 @@ static inline void copy_highpage(struct page *to, struct page *from)
 	kunmap_atomic(vfrom, KM_USER0);
 	kunmap_atomic(vto, KM_USER1);
 }
-
-#endif
 
 #endif /* _LINUX_HIGHMEM_H */

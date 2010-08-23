@@ -1,10 +1,10 @@
 /*
  * AppArmor security module
  *
- * This file contains AppArmor /proc/<pid>/attr/ interface function defintions.
+ * This file contains AppArmor /proc/<pid>/attr/ interface function definitions.
  *
  * Copyright (C) 1998-2008 Novell/SUSE
- * Copyright 2009 Canonical Ltd.
+ * Copyright 2009-2010 Canonical Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -16,11 +16,11 @@
 #define __AA_PROCATTR_H
 
 #define AA_DO_TEST 1
+#define AA_ONEXEC  1
 
-int aa_getprocattr(struct aa_namespace *ns, struct aa_profile *profile,
-		   char **string);
-int aa_setprocattr_changehat(char *args, int test);
-int aa_setprocattr_changeprofile(char *args, int onexec, int test);
-int aa_setprocattr_permipc(char *args);
+int aa_getprocattr(struct aa_profile *profile, char **string);
+int aa_setprocattr_changehat(char *args, size_t size, int test);
+int aa_setprocattr_changeprofile(char *fqname, bool onexec, int test);
+int aa_setprocattr_permipc(char *fqname);
 
-#endif	/* __AA_PROCATTR_H */
+#endif /* __AA_PROCATTR_H */

@@ -7,9 +7,10 @@
 
 #include <asm/atomic.h>
 #include <asm/pgtable.h>
+#include <asm/mmu.h>
 
-#ifdef CONFIG_X86_XEN
-#define swapper_pg_dir ((pgd_t *)NULL)
+#ifndef INIT_MM_CONTEXT
+#define INIT_MM_CONTEXT(name)
 #endif
 
 struct mm_struct init_mm = {
@@ -21,4 +22,5 @@ struct mm_struct init_mm = {
 	.page_table_lock =  __SPIN_LOCK_UNLOCKED(init_mm.page_table_lock),
 	.mmlist		= LIST_HEAD_INIT(init_mm.mmlist),
 	.cpu_vm_mask	= CPU_MASK_ALL,
+	INIT_MM_CONTEXT(init_mm)
 };

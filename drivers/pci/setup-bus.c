@@ -448,9 +448,6 @@ static void pbus_size_io(struct pci_bus *bus, resource_size_t min_size)
 	size = ALIGN(size + size1, 4096);
 	if (size < old_size)
 		size = old_size;
-	size1 = pci_reserve_size_io(bus);
-	if (size < size1)
-		size = ALIGN(size1, 4096);
 	if (!size) {
 		if (b_res->start || b_res->end)
 			dev_info(&bus->self->dev, "disabling bridge window "
@@ -540,8 +537,7 @@ static int pbus_size_mem(struct pci_bus *bus, unsigned long mask,
 			min_align = align1 >> 1;
 		align += aligns[order];
 	}
-	size = ALIGN(max(size, (resource_size_t)pci_reserve_size_mem(bus)),
-		     min_align);
+	size = ALIGN(size, min_align);
 	if (!size) {
 		if (b_res->start || b_res->end)
 			dev_info(&bus->self->dev, "disabling bridge window "
@@ -878,19 +874,16 @@ void pci_assign_unassigned_bridge_resources(struct pci_dev *bridge)
 again:
 	pci_bus_size_bridges(parent);
 	__pci_bridge_assign_resources(bridge, &head);
-	retval = pci_reenable_device(bridge);
-	pci_set_master(bridge);
-	pci_enable_bridges(parent);
 
 	tried_times++;
 
 	if (!head.next)
-		return;
+		goto enable_all;
 
 	if (tried_times >= 2) {
 		/* still fail, don't need to try more */
 		free_failed_list(&head);
-		return;
+		goto enable_all;
 	}
 
 	printk(KERN_DEBUG "PCI: No. %d try to assign unassigned res\n",
@@ -923,5 +916,10 @@ again:
 	free_failed_list(&head);
 
 	goto again;
+
+enable_all:
+	retval = pci_reenable_device(bridge);
+	pci_set_master(bridge);
+	pci_enable_bridges(parent);
 }
 EXPORT_SYMBOL_GPL(pci_assign_unassigned_bridge_resources);

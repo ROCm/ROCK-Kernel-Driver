@@ -1022,11 +1022,14 @@ int novfs_daemon_debug_cmd_send(char *Command)
 	return (retCode);
 }
 
-int novfs_daemon_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
+int novfs_daemon_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	int retCode = -ENOSYS;
 	unsigned long cpylen;
 	struct novfs_schandle session_id;
+
+	lock_kernel(); /* needed? */
+
 	session_id = novfs_scope_get_sessionId(NULL);
 
 	switch (cmd) {
@@ -1046,8 +1049,10 @@ int novfs_daemon_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			char *buf;
 			io.length = 0;
 			cpylen = copy_from_user(&io, (char *)arg, sizeof(io));
-			if (io.length <= 0 || io.length > 1024)
+			if (io.length <= 0 || io.length > 1024) {
+				unlock_kernel();
 				return -EINVAL;
+			}
 			if (io.length) {
 				buf = kmalloc(io.length + 1, GFP_KERNEL);
 				if (buf) {
@@ -1081,6 +1086,9 @@ int novfs_daemon_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		}
 
 	}
+
+	unlock_kernel();
+
 	return (retCode);
 }
 
@@ -1337,12 +1345,14 @@ loff_t novfs_daemon_lib_llseek(struct file * file, loff_t offset, int origin)
 
 #define DbgIocCall(str)		__DbgPrint("[VFS XPLAT] Call " str "\n")
 
-int novfs_daemon_lib_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
+int novfs_daemon_lib_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	int retCode = -ENOSYS;
 	struct daemon_handle *dh;
 	void *handle = NULL;
 	unsigned long cpylen;
+
+	lock_kernel(); /* needed? */
 
 	dh = file->private_data;
 
@@ -1368,8 +1378,10 @@ int novfs_daemon_lib_ioctl(struct inode *inode, struct file *file, unsigned int 
 				char *buf;
 				io.length = 0;
 				cpylen = copy_from_user(&io, (void *)arg, sizeof(io));
-				if (io.length <= 0 || io.length > 1024)
+				if (io.length <= 0 || io.length > 1024) {
+					unlock_kernel();
 					return -EINVAL;
+				}
 				if (io.length) {
 					buf = kmalloc(io.length + 1, GFP_KERNEL);
 					if (buf) {
@@ -1595,6 +1607,8 @@ int novfs_daemon_lib_ioctl(struct inode *inode, struct file *file, unsigned int 
 			}
 		}
 	}
+
+	unlock_kernel();
 
 	return (retCode);
 }

@@ -4,7 +4,7 @@
  * This file contains AppArmor capability mediation functions
  *
  * Copyright (C) 1998-2008 Novell/SUSE
- * Copyright 2009 Canonical Ltd.
+ * Copyright 2009-2010 Canonical Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -28,96 +28,114 @@
 #include "capability_names.h"
 
 struct audit_cache {
-	struct task_struct *task;
+	struct aa_profile *profile;
 	kernel_cap_t caps;
 };
 
 static DEFINE_PER_CPU(struct audit_cache, audit_cache);
 
-struct aa_audit_caps {
-	struct aa_audit base;
-
-	int cap;
-};
-
+/**
+ * audit_cb - call back for capability components of audit struct
+ * @ab - audit buffer   (NOT NULL)
+ * @va - audit struct to audit data from  (NOT NULL)
+ */
 static void audit_cb(struct audit_buffer *ab, void *va)
 {
-	struct aa_audit_caps *sa = va;
-
-	audit_log_format(ab, " name=");
-	audit_log_untrustedstring(ab, capability_names[sa->cap]);
+	struct common_audit_data *sa = va;
+	audit_log_format(ab, " capname=");
+	audit_log_untrustedstring(ab, capability_names[sa->u.cap]);
 }
 
-static int aa_audit_caps(struct aa_profile *profile, struct aa_audit_caps *sa)
+/**
+ * audit_caps - audit a capability
+ * @profile: profile confining task (NOT NULL)
+ * @task: task capability test was performed against (NOT NULL)
+ * @cap: capability tested
+ * @error: error code returned by test
+ *
+ * Do auditing of capability and handle, audit/complain/kill modes switching
+ * and duplicate message elimination.
+ *
+ * Returns: 0 or sa->error on success,  error code on failure
+ */
+static int audit_caps(struct aa_profile *profile, struct task_struct *task,
+		      int cap, int error)
 {
 	struct audit_cache *ent;
 	int type = AUDIT_APPARMOR_AUTO;
+	struct common_audit_data sa;
+	COMMON_AUDIT_DATA_INIT(&sa, CAP);
+	sa.tsk = task;
+	sa.u.cap = cap;
+	sa.aad.op = OP_CAPABLE;
+	sa.aad.error = error;
 
-	if (likely(!sa->base.error)) {
+	if (likely(!error)) {
 		/* test if auditing is being forced */
-		if (likely((PROFILE_AUDIT_MODE(profile) != AUDIT_ALL) &&
-			   !cap_raised(profile->caps.audit, sa->cap)))
+		if (likely((AUDIT_MODE(profile) != AUDIT_ALL) &&
+			   !cap_raised(profile->caps.audit, cap)))
 			return 0;
 		type = AUDIT_APPARMOR_AUDIT;
-	} else if (PROFILE_KILL(profile) ||
-		   cap_raised(profile->caps.kill, sa->cap)) {
+	} else if (KILL_MODE(profile) ||
+		   cap_raised(profile->caps.kill, cap)) {
 		type = AUDIT_APPARMOR_KILL;
-	} else if (cap_raised(profile->caps.quiet, sa->cap) &&
-		   PROFILE_AUDIT_MODE(profile) != AUDIT_NOQUIET &&
-		   PROFILE_AUDIT_MODE(profile) != AUDIT_ALL) {
+	} else if (cap_raised(profile->caps.quiet, cap) &&
+		   AUDIT_MODE(profile) != AUDIT_NOQUIET &&
+		   AUDIT_MODE(profile) != AUDIT_ALL) {
 		/* quiet auditing */
-		return sa->base.error;
+		return error;
 	}
 
 	/* Do simple duplicate message elimination */
 	ent = &get_cpu_var(audit_cache);
-	if (sa->base.task == ent->task && cap_raised(ent->caps, sa->cap)) {
+	if (profile == ent->profile && cap_raised(ent->caps, cap)) {
 		put_cpu_var(audit_cache);
-		if (PROFILE_COMPLAIN(profile))
-			return 0;
-		return sa->base.error;
+		if (COMPLAIN_MODE(profile))
+			return complain_error(error);
+		return error;
 	} else {
-		ent->task = sa->base.task;
-		cap_raise(ent->caps, sa->cap);
+		aa_put_profile(ent->profile);
+		ent->profile = aa_get_profile(profile);
+		cap_raise(ent->caps, cap);
 	}
 	put_cpu_var(audit_cache);
 
-	return aa_audit(type, profile, &sa->base, audit_cb);
+	return aa_audit(type, profile, GFP_ATOMIC, &sa, audit_cb);
 }
 
-int aa_profile_capable(struct aa_profile *profile, int cap)
+/**
+ * profile_capable - test if profile allows use of capability @cap
+ * @profile: profile being enforced    (NOT NULL, NOT unconfined)
+ * @cap: capability to test if allowed
+ *
+ * Returns: 0 if allowed else -EPERM
+ */
+static int profile_capable(struct aa_profile *profile, int cap)
 {
-	return cap_raised(profile->caps.allowed, cap) ? 0 : -EPERM;
+	return cap_raised(profile->caps.allow, cap) ? 0 : -EPERM;
 }
 
 /**
  * aa_capable - test permission to use capability
- * @task: task doing capability test against
- * @profile: profile confining @task
+ * @task: task doing capability test against (NOT NULL)
+ * @profile: profile confining @task (NOT NULL)
  * @cap: capability to be tested
  * @audit: whether an audit record should be generated
  *
  * Look up capability in profile capability set.
- * Returns 0 on success, or else an error code.
+ *
+ * Returns: 0 on success, or else an error code.
  */
 int aa_capable(struct task_struct *task, struct aa_profile *profile, int cap,
 	       int audit)
 {
-	int error = aa_profile_capable(profile, cap);
-	struct aa_audit_caps sa;
+	int error = profile_capable(profile, cap);
 
 	if (!audit) {
-		if (PROFILE_COMPLAIN(profile))
-			return 0;
+		if (COMPLAIN_MODE(profile))
+			return complain_error(error);
 		return error;
 	}
 
-	memset(&sa, 0, sizeof(sa));
-	sa.base.operation = "capable";
-	sa.base.task = task;
-	sa.base.gfp_mask = GFP_ATOMIC;
-	sa.base.error = error;
-	sa.cap = cap;
-
-	return aa_audit_caps(profile, &sa);
+	return audit_caps(profile, task, cap, error);
 }

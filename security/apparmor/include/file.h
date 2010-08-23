@@ -4,7 +4,7 @@
  * This file contains AppArmor file mediation function definitions.
  *
  * Copyright (C) 1998-2008 Novell/SUSE
- * Copyright 2009 Canonical Ltd.
+ * Copyright 2009-2010 Canonical Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -17,7 +17,6 @@
 
 #include <linux/path.h>
 
-#include "audit.h"
 #include "domain.h"
 #include "match.h"
 
@@ -27,23 +26,27 @@ struct aa_profile;
  * We use MAY_EXEC, MAY_WRITE, MAY_READ, MAY_APPEND and the following flags
  * for profile permissions
  */
-#define AA_MAY_LINK			0x0010
-#define AA_MAY_LOCK			0x0020
-#define AA_EXEC_MMAP			0x0040
+#define AA_MAY_CREATE                  0x0010
+#define AA_MAY_DELETE                  0x0020
+#define AA_MAY_META_WRITE              0x0040
+#define AA_MAY_META_READ               0x0080
 
-#define AA_MAY_CREATE			0x0080
-#define AA_LINK_SUBSET			0x0100
-#define AA_MAY_DELEGATE			0x0200
-#define AA_EXEC_DELEGATE		0x0400		/*exec allows delegate*/
+#define AA_MAY_CHMOD                   0x0100
+#define AA_MAY_CHOWN                   0x0200
+#define AA_MAY_LOCK                    0x0400
+#define AA_EXEC_MMAP                   0x0800
 
-#define AA_MAY_CHANGEHAT		0x2000		/* ctrl auditing only */
-#define AA_MAY_ONEXEC			0x4000		/* exec allows onexec */
-#define AA_MAY_CHANGE_PROFILE		0x8000
-
+#define AA_MAY_LINK			0x1000
+#define AA_LINK_SUBSET			AA_MAY_LOCK	/* overlaid */
+#define AA_MAY_ONEXEC			0x40000000	/* exec allows onexec */
+#define AA_MAY_CHANGE_PROFILE		0x80000000
+#define AA_MAY_CHANGEHAT		0x80000000	/* ctrl auditing only */
 
 #define AA_AUDIT_FILE_MASK	(MAY_READ | MAY_WRITE | MAY_EXEC | MAY_APPEND |\
-				 AA_MAY_LINK | AA_MAY_LOCK | AA_EXEC_MMAP | \
-				 AA_MAY_CREATE)
+				 AA_MAY_CREATE | AA_MAY_DELETE |	\
+				 AA_MAY_META_READ | AA_MAY_META_WRITE | \
+				 AA_MAY_CHMOD | AA_MAY_CHOWN | AA_MAY_LOCK | \
+				 AA_EXEC_MMAP | AA_MAY_LINK)
 
 /*
  * The xindex is broken into 3 parts
@@ -64,38 +67,35 @@ struct aa_profile;
 #define AA_X_INHERIT		0x4000
 #define AA_X_UNCONFINED		0x8000
 
-
 /* AA_SECURE_X_NEEDED - is passed in the bprm->unsafe field */
 #define AA_SECURE_X_NEEDED	0x8000
 
-/* need to conditionalize which ones are being set */
+/* need to make conditional which ones are being set */
 struct path_cond {
 	uid_t uid;
 	umode_t mode;
 };
 
-/* struct file_perms - file permission fo
- * @allowed: mask of permissions that are allowed
+/* struct file_perms - file permission
+ * @allow: mask of permissions that are allowed
  * @audit: mask of permissions to force an audit message for
  * @quiet: mask of permissions to quiet audit messages for
  * @kill: mask of permissions that when matched will kill the task
- * @xindex: exec transition index if @allowed contains MAY_EXEC
- * @dindex: delegate table index if @allowed contain AA_MAY_DELEGATE
+ * @xindex: exec transition index if @allow contains MAY_EXEC
  *
  * The @audit and @queit mask should be mutually exclusive.
  */
 struct file_perms {
-	u16 allowed;
-	u16 audit;
-	u16 quiet;
-	u16 kill;
+	u32 allow;
+	u32 audit;
+	u32 quiet;
+	u32 kill;
 	u16 xindex;
-	u16 dindex;
 };
 
 extern struct file_perms nullperms;
 
-#define COMBINED_PERM_MASK(X) ((X).allowed | (X).audit | (X).quiet | (X).kill)
+#define COMBINED_PERM_MASK(X) ((X).allow | (X).audit | (X).quiet | (X).kill)
 
 /* FIXME: split perms from dfa and match this to description
  *        also add delegation info.
@@ -105,7 +105,6 @@ static inline u16 dfa_map_xindex(u16 mask)
 	u16 old_index = (mask >> 10) & 0xf;
 	u16 index = 0;
 
-//printk("mask x%x\n", mask);
 	if (mask & 0x100)
 		index |= AA_X_UNSAFE;
 	if (mask & 0x200)
@@ -130,32 +129,25 @@ static inline u16 dfa_map_xindex(u16 mask)
 /*
  * map old dfa inline permissions to new format
  */
-#define dfa_user_allow(dfa, state)	((ACCEPT_TABLE(dfa)[state]) & 0x7f)
-#define dfa_user_audit(dfa, state)	((ACCEPT_TABLE2(dfa)[state]) & 0x7f)
-#define dfa_user_quiet(dfa, state)	(((ACCEPT_TABLE2(dfa)[state]) >> 7) & 0x7f)
+#define dfa_user_allow(dfa, state) (((ACCEPT_TABLE(dfa)[state]) & 0x7f) | \
+				    ((ACCEPT_TABLE(dfa)[state]) & 0x80000000))
+#define dfa_user_audit(dfa, state) ((ACCEPT_TABLE2(dfa)[state]) & 0x7f)
+#define dfa_user_quiet(dfa, state) (((ACCEPT_TABLE2(dfa)[state]) >> 7) & 0x7f)
 #define dfa_user_xindex(dfa, state) \
 	(dfa_map_xindex(ACCEPT_TABLE(dfa)[state] & 0x3fff))
 
-#define dfa_other_allow(dfa, state)	(((ACCEPT_TABLE(dfa)[state]) >> 14) & 0x7f)
-#define dfa_other_audit(dfa, state)	(((ACCEPT_TABLE2(dfa)[state]) >> 14) & 0x7f)
-#define dfa_other_quiet(dfa, state)	((((ACCEPT_TABLE2(dfa)[state]) >> 7) >> 14) & 0x7f)
+#define dfa_other_allow(dfa, state) ((((ACCEPT_TABLE(dfa)[state]) >> 14) & \
+				      0x7f) |				\
+				     ((ACCEPT_TABLE(dfa)[state]) & 0x80000000))
+#define dfa_other_audit(dfa, state) (((ACCEPT_TABLE2(dfa)[state]) >> 14) & 0x7f)
+#define dfa_other_quiet(dfa, state) \
+	((((ACCEPT_TABLE2(dfa)[state]) >> 7) >> 14) & 0x7f)
 #define dfa_other_xindex(dfa, state) \
 	dfa_map_xindex((ACCEPT_TABLE(dfa)[state] >> 14) & 0x3fff)
 
-
-struct aa_audit_file {
-	struct aa_audit base;
-
-	const char *name;
-	const char *name2;
-	const char *name3;
-	struct file_perms perms;
-	u16 request;
-	struct path_cond *cond;
-};
-
-int aa_audit_file(struct aa_profile *profile, struct aa_audit_file *sa);
-void file_audit_cb(struct audit_buffer *ab, void *va);
+int aa_audit_file(struct aa_profile *profile, struct file_perms *perms,
+		  gfp_t gfp, int op, u32 request, const char *name,
+		  const char *target, uid_t ouid, const char *info, int error);
 
 /**
  * struct aa_file_rules - components used for file rule permissions
@@ -169,51 +161,47 @@ void file_audit_cb(struct audit_buffer *ab, void *va);
  * looked up in the transition table.
  */
 struct aa_file_rules {
+	unsigned int start;
 	struct aa_dfa *dfa;
 	/* struct perms perms; */
 	struct aa_domain trans;
 	/* TODO: add delegate table */
 };
 
-struct file_perms aa_str_perms(struct aa_dfa *dfa, unsigned int start,
-			       const char *name, struct path_cond *cond,
-			       unsigned int *rstate);
+unsigned int aa_str_perms(struct aa_dfa *dfa, unsigned int start,
+			  const char *name, struct path_cond *cond,
+			  struct file_perms *perms);
 
-int aa_pathstr_perm(struct aa_profile *profile, const char *op,
-		    const char *name, u16 request, struct path_cond *cond);
-
-int aa_path_perm(struct aa_profile *profile, const char *operation,
-		 struct path *path, u16 request, struct path_cond *cond);
+int aa_path_perm(int op, struct aa_profile *profile, struct path *path,
+		 int flags, u32 request, struct path_cond *cond);
 
 int aa_path_link(struct aa_profile *profile, struct dentry *old_dentry,
 		 struct path *new_dir, struct dentry *new_dentry);
 
-int aa_file_common_perm(struct aa_profile *profile, const char *operation,
-			struct file *file, u16 request, const char *name,
-			int error);
-
-int aa_file_perm(struct aa_profile *profile, const char *operation,
-		 struct file *file, u16 request);
-
+int aa_file_perm(int op, struct aa_profile *profile, struct file *file,
+		 u32 request);
 
 static inline void aa_free_file_rules(struct aa_file_rules *rules)
 {
-	aa_match_free(rules->dfa);
+	aa_put_dfa(rules->dfa);
 	aa_free_domain_entries(&rules->trans);
 }
 
 #define ACC_FMODE(x) (("\000\004\002\006"[(x)&O_ACCMODE]) | (((x) << 1) & 0x40))
 
 /* from namei.c */
-#define ACC_MODE(x) ("\000\004\002\006"[(x)&O_ACCMODE])
 #define MAP_OPEN_FLAGS(x) ((((x) + 1) & O_ACCMODE) ? (x) + 1 : (x))
-/*
- * map file flags to AppArmor permissions
+
+/**
+ * aa_map_file_perms - map file flags to AppArmor permissions
+ * @file: open file to map flags to AppArmor permissions
+ *
+ * Returns: apparmor permission set for the file
  */
-static inline u16 aa_map_file_to_perms(struct file *file)
+static inline u32 aa_map_file_to_perms(struct file *file)
 {
 	int flags = MAP_OPEN_FLAGS(file->f_flags);
-	u16 perms = ACC_FMODE(file->f_mode);
+	u32 perms = ACC_FMODE(file->f_mode);
 
 	if ((flags & O_APPEND) && (perms & MAY_WRITE))
 		perms = (perms & ~MAY_WRITE) | MAY_APPEND;
@@ -226,4 +214,4 @@ static inline u16 aa_map_file_to_perms(struct file *file)
 	return perms;
 }
 
-#endif	/* __AA_FILE_H */
+#endif /* __AA_FILE_H */

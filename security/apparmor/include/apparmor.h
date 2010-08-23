@@ -4,7 +4,7 @@
  * This file contains AppArmor basic global and lib definitions
  *
  * Copyright (C) 1998-2008 Novell/SUSE
- * Copyright 2009 Canonical Ltd.
+ * Copyright 2009-2010 Canonical Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -17,15 +17,16 @@
 
 #include <linux/fs.h>
 
-/* Control parameters settable thru module/boot flags or
- * via /sys/kernel/security/apparmor/control */
-extern enum audit_mode g_apparmor_audit;
-extern int g_apparmor_audit_header;
-extern int g_apparmor_debug;
-extern int g_apparmor_lock_policy;
-extern int g_apparmor_logsyscall;
-extern unsigned int g_apparmor_path_max;
+#include "match.h"
 
+/* Control parameters settable through module/boot flags */
+extern enum audit_mode aa_g_audit;
+extern int aa_g_audit_header;
+extern int aa_g_debug;
+extern int aa_g_lock_policy;
+extern int aa_g_logsyscall;
+extern int aa_g_paranoid_load;
+extern unsigned int aa_g_path_max;
 
 /*
  * DEBUG remains global (no per profile flag) since it is mostly used in sysctl
@@ -34,7 +35,7 @@ extern unsigned int g_apparmor_path_max;
 
 #define AA_DEBUG(fmt, args...)						\
 	do {								\
-		if (g_apparmor_debug && printk_ratelimit())		\
+		if (aa_g_debug && printk_ratelimit())			\
 			printk(KERN_DEBUG "AppArmor: " fmt, ##args);	\
 	} while (0)
 
@@ -45,21 +46,47 @@ extern unsigned int g_apparmor_path_max;
 	} while (0)
 
 /* Flag indicating whether initialization completed */
-extern int apparmor_initialized;
-void apparmor_disable(void);
+extern int apparmor_initialized __initdata;
 
 /* fn's in lib */
-void info_message(const char *str);
-char *aa_split_name_from_ns(char *args, char **ns_name);
-char *new_compound_name(const char *n1, const char *n2);
-int aa_strneq(const char *str, const char *sub, int len);
-char *strchrnul(const char *s, int c);
-const char *fqname_subname(const char *name);
+char *aa_split_fqname(char *args, char **ns_name);
+void aa_info_message(const char *str);
+void *kvmalloc(size_t size);
+void kvfree(void *buffer);
 
-static inline int mediated_filesystem(struct inode *inode)
+
+/**
+ * aa_strneq - compare null terminated @str to a non null terminated substring
+ * @str: a null terminated string
+ * @sub: a substring, not necessarily null terminated
+ * @len: length of @sub to compare
+ *
+ * The @str string must be full consumed for this to be considered a match
+ */
+static inline bool aa_strneq(const char *str, const char *sub, int len)
+{
+	return !strncmp(str, sub, len) && !str[len];
+}
+
+/**
+ * aa_dfa_null_transition - step to next state after null character
+ * @dfa: the dfa to match against
+ * @start: the state of the dfa to start matching in
+ *
+ * aa_dfa_null_transition transitions to the next state after a null
+ * character which is not used in standard matching and is only
+ * used to separate pairs.
+ */
+static inline unsigned int aa_dfa_null_transition(struct aa_dfa *dfa,
+						  unsigned int start)
+{
+	/* the null transition only needs the string's null terminator byte */
+	return aa_dfa_match_len(dfa, start, "", 1);
+}
+
+static inline bool mediated_filesystem(struct inode *inode)
 {
 	return !(inode->i_sb->s_flags & MS_NOUSER);
 }
 
-#endif	/* __APPARMOR_H */
-
+#endif /* __APPARMOR_H */

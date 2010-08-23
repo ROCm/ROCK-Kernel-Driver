@@ -126,11 +126,8 @@ static int ip4_frag_match(struct inet_frag_queue *q, void *a)
 }
 
 /* Memory Tracking Functions. */
-static __inline__ void frag_kfree_skb(struct netns_frags *nf,
-		struct sk_buff *skb, int *work)
+static void frag_kfree_skb(struct netns_frags *nf, struct sk_buff *skb)
 {
-	if (work)
-		*work -= skb->truesize;
 	atomic_sub(skb->truesize, &nf->mem);
 	kfree_skb(skb);
 }
@@ -311,7 +308,7 @@ static int ip_frag_reinit(struct ipq *qp)
 	fp = qp->q.fragments;
 	do {
 		struct sk_buff *xp = fp->next;
-		frag_kfree_skb(qp->q.net, fp, NULL);
+		frag_kfree_skb(qp->q.net, fp);
 		fp = xp;
 	} while (fp);
 
@@ -319,6 +316,7 @@ static int ip_frag_reinit(struct ipq *qp)
 	qp->q.len = 0;
 	qp->q.meat = 0;
 	qp->q.fragments = NULL;
+	qp->q.fragments_tail = NULL;
 	qp->iif = 0;
 
 	return 0;
@@ -391,6 +389,11 @@ static int ip_frag_queue(struct ipq *qp, struct sk_buff *skb)
 	 * in the chain of fragments so far.  We must know where to put
 	 * this fragment, right?
 	 */
+	prev = qp->q.fragments_tail;
+	if (!prev || FRAG_CB(prev)->offset < offset) {
+		next = NULL;
+		goto found;
+	}
 	prev = NULL;
 	for (next = qp->q.fragments; next != NULL; next = next->next) {
 		if (FRAG_CB(next)->offset >= offset)
@@ -398,6 +401,7 @@ static int ip_frag_queue(struct ipq *qp, struct sk_buff *skb)
 		prev = next;
 	}
 
+found:
 	/* We found where to put this one.  Check for overlap with
 	 * preceding fragment, and, if needed, align things so that
 	 * any overlaps are eliminated.
@@ -448,7 +452,7 @@ static int ip_frag_queue(struct ipq *qp, struct sk_buff *skb)
 				qp->q.fragments = next;
 
 			qp->q.meat -= free_it->len;
-			frag_kfree_skb(qp->q.net, free_it, NULL);
+			frag_kfree_skb(qp->q.net, free_it);
 		}
 	}
 
@@ -456,6 +460,8 @@ static int ip_frag_queue(struct ipq *qp, struct sk_buff *skb)
 
 	/* Insert this fragment in the chain of fragments. */
 	skb->next = next;
+	if (!next)
+		qp->q.fragments_tail = skb;
 	if (prev)
 		prev->next = skb;
 	else
@@ -509,6 +515,8 @@ static int ip_frag_reasm(struct ipq *qp, struct sk_buff *prev,
 			goto out_nomem;
 
 		fp->next = head->next;
+		if (!fp->next)
+			qp->q.fragments_tail = fp;
 		prev->next = fp;
 
 		skb_morph(head, qp->q.fragments);
@@ -558,7 +566,6 @@ static int ip_frag_reasm(struct ipq *qp, struct sk_buff *prev,
 
 	skb_shinfo(head)->frag_list = head->next;
 	skb_push(head, head->data - skb_network_header(head));
-	atomic_sub(head->truesize, &qp->q.net->mem);
 
 	for (fp=head->next; fp; fp = fp->next) {
 		head->data_len += fp->len;
@@ -568,8 +575,8 @@ static int ip_frag_reasm(struct ipq *qp, struct sk_buff *prev,
 		else if (head->ip_summed == CHECKSUM_COMPLETE)
 			head->csum = csum_add(head->csum, fp->csum);
 		head->truesize += fp->truesize;
-		atomic_sub(fp->truesize, &qp->q.net->mem);
 	}
+	atomic_sub(head->truesize, &qp->q.net->mem);
 
 	head->next = NULL;
 	head->dev = dev;
@@ -580,6 +587,7 @@ static int ip_frag_reasm(struct ipq *qp, struct sk_buff *prev,
 	iph->tot_len = htons(len);
 	IP_INC_STATS_BH(net, IPSTATS_MIB_REASMOKS);
 	qp->q.fragments = NULL;
+	qp->q.fragments_tail = NULL;
 	return 0;
 
 out_nomem:
@@ -626,6 +634,7 @@ int ip_defrag(struct sk_buff *skb, u32 user)
 	kfree_skb(skb);
 	return -ENOMEM;
 }
+EXPORT_SYMBOL(ip_defrag);
 
 #ifdef CONFIG_SYSCTL
 static int
@@ -829,5 +838,3 @@ void __init ipfrag_init(void)
 	ip4_frags.secret_interval = 10 * 60 * HZ;
 	inet_frags_init(&ip4_frags);
 }
-
-EXPORT_SYMBOL(ip_defrag);

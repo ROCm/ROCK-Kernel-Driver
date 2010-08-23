@@ -33,14 +33,11 @@
  * val[63:56] == 1: val[55:0] is a delivery PCI INTx line, as follows:
  *                  Domain = val[47:32], Bus  = val[31:16],
  *                  DevFn  = val[15: 8], IntX = val[ 1: 0]
+ * val[63:56] == 2: val[7:0] is a vector number.
  * If val == 0 then CPU0 event-channel notifications are not delivered.
  */
 #define HVM_PARAM_CALLBACK_IRQ 0
 
-/*
- * These are not used by Xen. They are here for convenience of HVM-guest
- * xenbus implementations.
- */
 #define HVM_PARAM_STORE_PFN    1
 #define HVM_PARAM_STORE_EVTCHN 2
 
@@ -49,19 +46,6 @@
 #define HVM_PARAM_IOREQ_PFN    5
 
 #define HVM_PARAM_BUFIOREQ_PFN 6
-
-#ifdef __ia64__
-
-#define HVM_PARAM_NVRAM_FD     7
-#define HVM_PARAM_VHPT_SIZE    8
-#define HVM_PARAM_BUFPIOREQ_PFN	9
-
-#elif defined(__i386__) || defined(__x86_64__)
-
-/* Expose Viridian interfaces to this HVM guest? */
-#define HVM_PARAM_VIRIDIAN     9
-
-#endif
 
 /*
  * Set mode for virtual timers (currently x86 only):

@@ -48,7 +48,7 @@
 #endif
 
 #ifdef CONFIG_X86_64
-#if defined(CONFIG_PARAVIRT_MMU) || defined(CONFIG_XEN)
+#ifdef CONFIG_PARAVIRT_MMU
 /* Paravirtualized systems may not have PSE or PGE available */
 #define NEED_PSE	0
 #define NEED_PGE	0
@@ -84,5 +84,7 @@
 #define REQUIRED_MASK5	0
 #define REQUIRED_MASK6	0
 #define REQUIRED_MASK7	0
+#define REQUIRED_MASK8	0
+#define REQUIRED_MASK9	0
 
 #endif /* _ASM_X86_REQUIRED_FEATURES_H */

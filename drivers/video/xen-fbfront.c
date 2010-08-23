@@ -674,6 +674,7 @@ static struct xenbus_device_id xenfb_ids[] = {
 
 static struct xenbus_driver xenfb_driver = {
 	.name = "vfb",
+	.owner = THIS_MODULE,
 	.ids = xenfb_ids,
 	.probe = xenfb_probe,
 	.remove = xenfb_remove,
@@ -683,7 +684,7 @@ static struct xenbus_driver xenfb_driver = {
 
 static int __init xenfb_init(void)
 {
-	if (!xen_domain())
+	if (!xen_pv_domain())
 		return -ENODEV;
 
 	/* Nothing to do if running in dom0. */

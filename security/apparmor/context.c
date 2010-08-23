@@ -5,204 +5,211 @@
  * contexts.
  *
  * Copyright (C) 1998-2008 Novell/SUSE
- * Copyright 2009 Canonical Ltd.
+ * Copyright 2009-2010 Canonical Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
  * published by the Free Software Foundation, version 2 of the
  * License.
+ *
+ *
+ * AppArmor sets confinement on every task, via the the aa_task_cxt and
+ * the aa_task_cxt.profile, both of which are required and are not allowed
+ * to be NULL.  The aa_task_cxt is not reference counted and is unique
+ * to each cred (which is reference count).  The profile pointed to by
+ * the task_cxt is reference counted.
+ *
+ * TODO
+ * If a task uses change_hat it currently does not return to the old
+ * cred or task context but instead creates a new one.  Ideally the task
+ * should return to the previous cred if it has not been modified.
+ *
  */
 
 #include "include/context.h"
 #include "include/policy.h"
 
-
-
-struct aa_task_context *aa_alloc_task_context(gfp_t flags)
+/**
+ * aa_alloc_task_context - allocate a new task_cxt
+ * @flags: gfp flags for allocation
+ *
+ * Returns: allocated buffer or NULL on failure
+ */
+struct aa_task_cxt *aa_alloc_task_context(gfp_t flags)
 {
-	return kzalloc(sizeof(struct aa_task_context), flags);
+	return kzalloc(sizeof(struct aa_task_cxt), flags);
 }
 
-void aa_free_task_context(struct aa_task_context *cxt)
+/**
+ * aa_free_task_context - free a task_cxt
+ * @cxt: task_cxt to free (MAYBE NULL)
+ */
+void aa_free_task_context(struct aa_task_cxt *cxt)
 {
 	if (cxt) {
-		aa_put_profile(cxt->sys.profile);
-		aa_put_profile(cxt->sys.previous);
-		aa_put_profile(cxt->sys.onexec);
+		aa_put_profile(cxt->profile);
+		aa_put_profile(cxt->previous);
+		aa_put_profile(cxt->onexec);
 
-		memset(cxt, 0, sizeof(*cxt));
-		kfree(cxt);
+		kzfree(cxt);
 	}
 }
 
-/*
- * duplicate a task context, incrementing reference counts
+/**
+ * aa_dup_task_context - duplicate a task context, incrementing reference counts
+ * @new: a blank task context      (NOT NULL)
+ * @old: the task context to copy  (NOT NULL)
  */
-struct aa_task_context *aa_dup_task_context(struct aa_task_context *old_cxt,
-					    gfp_t gfp)
+void aa_dup_task_context(struct aa_task_cxt *new, const struct aa_task_cxt *old)
 {
-	struct aa_task_context *cxt;
-
-	cxt = kmemdup(old_cxt, sizeof(*cxt), gfp);
-	if (!cxt)
-		return NULL;
-
-	aa_get_profile(cxt->sys.profile);
-	aa_get_profile(cxt->sys.previous);
-	aa_get_profile(cxt->sys.onexec);
-
-	return cxt;
+	*new = *old;
+	aa_get_profile(new->profile);
+	aa_get_profile(new->previous);
+	aa_get_profile(new->onexec);
 }
 
 /**
- * aa_cred_policy - obtain cred's profiles
- * @cred: cred to obtain profiles from
- * @sys: return system profile
- * does NOT increment reference count
- */
-void aa_cred_policy(const struct cred *cred, struct aa_profile **sys)
-{
-	struct aa_task_context *cxt = cred->security;
-	BUG_ON(!cxt);
-	*sys = aa_filtered_profile(aa_profile_newest(cxt->sys.profile));
-}
-
-/**
- * aa_get_task_policy - get the cred with the task policy, and current profiles
- * @task: task to get policy of
- * @sys: return - pointer to system profile
+ * aa_replace_current_profile - replace the current tasks profiles
+ * @profile: new profile  (NOT NULL)
  *
- * Only gets the cred ref count which has ref counts on the profiles returned
+ * Returns: 0 or error on failure
  */
-struct cred *aa_get_task_policy(const struct task_struct *task,
-				struct aa_profile **sys)
+int aa_replace_current_profile(struct aa_profile *profile)
 {
-	struct cred *cred = get_task_cred(task);
-	aa_cred_policy(cred, sys);
-	return cred;
-}
+	struct aa_task_cxt *cxt = current_cred()->security;
+	struct cred *new;
+	BUG_ON(!profile);
 
-void aa_put_task_policy(struct cred *cred)
-{
-	put_cred(cred);
-}
+	if (cxt->profile == profile)
+		return 0;
 
-static void replace_group(struct aa_task_cxt_group *cgrp,
-			  struct aa_profile *profile)
-{
-	if (cgrp->profile == profile)
-		return;
-
-	if (!profile || (profile->flags & PFLAG_UNCONFINED) ||
-	    (cgrp->profile && cgrp->profile->ns != profile->ns)) {
-		aa_put_profile(cgrp->previous);
-		aa_put_profile(cgrp->onexec);
-		cgrp->previous = NULL;
-		cgrp->onexec = NULL;
-		cgrp->token = 0;
-	}
-	aa_put_profile(cgrp->profile);
-	cgrp->profile = aa_get_profile(profile);
-}
-
-/**
- * aa_replace_current_profiles - replace the current tasks profiles
- * @sys: new system profile
- *
- * Returns: error on failure
- */
-int aa_replace_current_profiles(struct aa_profile *sys)
-{
-	struct aa_task_context *cxt;
-	struct cred *new = prepare_creds();
+	new  = prepare_creds();
 	if (!new)
 		return -ENOMEM;
 
 	cxt = new->security;
-	replace_group(&cxt->sys, sys);
+	if (unconfined(profile) || (cxt->profile->ns != profile->ns)) {
+		/* if switching to unconfined or a different profile namespace
+		 * clear out context state
+		 */
+		aa_put_profile(cxt->previous);
+		aa_put_profile(cxt->onexec);
+		cxt->previous = NULL;
+		cxt->onexec = NULL;
+		cxt->token = 0;
+	}
+	/* be careful switching cxt->profile, when racing replacement it
+	 * is possible that cxt->profile->replacedby is the reference keeping
+	 * @profile valid, so make sure to get its reference before dropping
+	 * the reference on cxt->profile */
+	aa_get_profile(profile);
+	aa_put_profile(cxt->profile);
+	cxt->profile = profile;
 
 	commit_creds(new);
 	return 0;
 }
 
-int aa_set_current_onexec(struct aa_profile *sys)
+/**
+ * aa_set_current_onexec - set the tasks change_profile to happen onexec
+ * @profile: system profile to set at exec  (MAYBE NULL to clear value)
+ *
+ * Returns: 0 or error on failure
+ */
+int aa_set_current_onexec(struct aa_profile *profile)
 {
-	struct aa_task_context *cxt;
+	struct aa_task_cxt *cxt;
 	struct cred *new = prepare_creds();
 	if (!new)
 		return -ENOMEM;
 
 	cxt = new->security;
-	aa_put_profile(cxt->sys.onexec);
-	cxt->sys.onexec = aa_get_profile(sys);
+	aa_get_profile(profile);
+	aa_put_profile(cxt->onexec);
+	cxt->onexec = profile;
 
 	commit_creds(new);
 	return 0;
 }
 
-/*
- * Do the actual cred switching of a changehat
- * profile must be valid
+/**
+ * aa_set_current_hat - set the current tasks hat
+ * @profile: profile to set as the current hat  (NOT NULL)
+ * @token: token value that must be specified to change from the hat
+ *
+ * Do switch of tasks hat.  If the task is currently in a hat
+ * validate the token to match.
+ *
+ * Returns: 0 or error on failure
  */
 int aa_set_current_hat(struct aa_profile *profile, u64 token)
 {
-	struct aa_task_context *cxt;
+	struct aa_task_cxt *cxt;
 	struct cred *new = prepare_creds();
 	if (!new)
 		return -ENOMEM;
+	BUG_ON(!profile);
 
 	cxt = new->security;
-	if (!cxt->sys.previous) {
-		cxt->sys.previous = cxt->sys.profile;
-		cxt->sys.token = token;
-	} else if (cxt->sys.token == token) {
-		aa_put_profile(cxt->sys.profile);
+	if (!cxt->previous) {
+		/* transfer refcount */
+		cxt->previous = cxt->profile;
+		cxt->token = token;
+	} else if (cxt->token == token) {
+		aa_put_profile(cxt->profile);
 	} else {
 		/* previous_profile && cxt->token != token */
 		abort_creds(new);
 		return -EACCES;
 	}
-	cxt->sys.profile = aa_get_profile(profile);
+	cxt->profile = aa_get_profile(aa_newest_version(profile));
 	/* clear exec on switching context */
-	aa_put_profile(cxt->sys.onexec);
-	cxt->sys.onexec = NULL;
+	aa_put_profile(cxt->onexec);
+	cxt->onexec = NULL;
 
 	commit_creds(new);
 	return 0;
 }
 
-/*
- * Attempt to return out of a hat to the previous profile
+/**
+ * aa_restore_previous_profile - exit from hat context restoring the profile
+ * @token: the token that must be matched to exit hat context
+ *
+ * Attempt to return out of a hat to the previous profile.  The token
+ * must match the stored token value.
+ *
+ * Returns: 0 or error of failure
  */
 int aa_restore_previous_profile(u64 token)
 {
-	struct aa_task_context *cxt;
+	struct aa_task_cxt *cxt;
 	struct cred *new = prepare_creds();
 	if (!new)
 		return -ENOMEM;
 
 	cxt = new->security;
-	if (cxt->sys.token != token) {
+	if (cxt->token != token) {
 		abort_creds(new);
 		return -EACCES;
 	}
 	/* ignore restores when there is no saved profile */
-	if (!cxt->sys.previous) {
+	if (!cxt->previous) {
 		abort_creds(new);
 		return 0;
 	}
 
-	aa_put_profile(cxt->sys.profile);
-	cxt->sys.profile = aa_profile_newest(cxt->sys.previous);
-	if (unlikely(cxt->sys.profile != cxt->sys.previous)) {
-		aa_get_profile(cxt->sys.profile);
-		aa_put_profile(cxt->sys.previous);
+	aa_put_profile(cxt->profile);
+	cxt->profile = aa_newest_version(cxt->previous);
+	BUG_ON(!cxt->profile);
+	if (unlikely(cxt->profile != cxt->previous)) {
+		aa_get_profile(cxt->profile);
+		aa_put_profile(cxt->previous);
 	}
 	/* clear exec && prev information when restoring to previous context */
-	cxt->sys.previous = NULL;
-	cxt->sys.token = 0;
-	aa_put_profile(cxt->sys.onexec);
-	cxt->sys.onexec = NULL;
+	cxt->previous = NULL;
+	cxt->token = 0;
+	aa_put_profile(cxt->onexec);
+	cxt->onexec = NULL;
 
 	commit_creds(new);
 	return 0;

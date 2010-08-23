@@ -22,7 +22,6 @@
 #include "xfs_sb.h"
 #include "xfs_inum.h"
 #include "xfs_ag.h"
-#include "xfs_dmapi.h"
 #include "xfs_mount.h"
 #include "xfs_error.h"
 
@@ -108,7 +107,6 @@ assfail(char *expr, char *file, int line)
 	printk("Assertion failed: %s, file: %s, line: %d\n", expr, file, line);
 	BUG();
 }
-EXPORT_SYMBOL_GPL(assfail);
 
 void
 xfs_hex_dump(void *p, int length)

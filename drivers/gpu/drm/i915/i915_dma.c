@@ -34,11 +34,14 @@
 #include "i915_drm.h"
 #include "i915_drv.h"
 #include "i915_trace.h"
+#include <linux/pci.h>
 #include <linux/vgaarb.h>
 #include <linux/acpi.h>
 #include <linux/pnp.h>
 #include <linux/vga_switcheroo.h>
 #include <linux/slab.h>
+
+extern int intel_max_stolen; /* from AGP driver */
 
 /**
  * Sets up the hardware status page for devices that need a physical address
@@ -496,6 +499,13 @@ static int i915_dispatch_batchbuffer(struct drm_device * dev,
 		}
 	}
 
+
+	if (IS_G4X(dev) || IS_IRONLAKE(dev)) {
+		BEGIN_LP_RING(2);
+		OUT_RING(MI_FLUSH | MI_NO_WRITE_FLUSH | MI_INVALIDATE_ISP);
+		OUT_RING(MI_NOOP);
+		ADVANCE_LP_RING();
+	}
 	i915_emit_breadcrumb(dev);
 
 	return 0;
@@ -1256,7 +1266,7 @@ static void i915_setup_compression(struct drm_device *dev, int size)
 		drm_mm_put_block(compressed_fb);
 	}
 
-	if (!IS_GM45(dev)) {
+	if (!(IS_GM45(dev) || IS_IRONLAKE_M(dev))) {
 		compressed_llb = drm_mm_search_free(&dev_priv->vram, 4096,
 						    4096, 0);
 		if (!compressed_llb) {
@@ -1282,8 +1292,9 @@ static void i915_setup_compression(struct drm_device *dev, int size)
 
 	intel_disable_fbc(dev);
 	dev_priv->compressed_fb = compressed_fb;
-
-	if (IS_GM45(dev)) {
+	if (IS_IRONLAKE_M(dev))
+		I915_WRITE(ILK_DPFC_CB_BASE, compressed_fb->start);
+	else if (IS_GM45(dev)) {
 		I915_WRITE(DPFC_CB_BASE, compressed_fb->start);
 	} else {
 		I915_WRITE(FBC_CFB_BASE, cfb_base);
@@ -1291,7 +1302,7 @@ static void i915_setup_compression(struct drm_device *dev, int size)
 		dev_priv->compressed_llb = compressed_llb;
 	}
 
-	DRM_DEBUG("FBC base 0x%08lx, ll base 0x%08lx, size %dM\n", cfb_base,
+	DRM_DEBUG_KMS("FBC base 0x%08lx, ll base 0x%08lx, size %dM\n", cfb_base,
 		  ll_base, size >> 20);
 }
 
@@ -1354,7 +1365,7 @@ static int i915_load_modeset_init(struct drm_device *dev,
 	int fb_bar = IS_I9XX(dev) ? 2 : 0;
 	int ret = 0;
 
-	dev->mode_config.fb_base = drm_get_resource_start(dev, fb_bar) &
+	dev->mode_config.fb_base = pci_resource_start(dev->pdev, fb_bar) &
 		0xff000000;
 
 	/* Basic memrange allocator for stolen space (aka vram) */
@@ -2063,8 +2074,8 @@ int i915_driver_load(struct drm_device *dev, unsigned long flags)
 
 	/* Add register map (needed for suspend/resume) */
 	mmio_bar = IS_I9XX(dev) ? 0 : 1;
-	base = drm_get_resource_start(dev, mmio_bar);
-	size = drm_get_resource_len(dev, mmio_bar);
+	base = pci_resource_start(dev->pdev, mmio_bar);
+	size = pci_resource_len(dev->pdev, mmio_bar);
 
 	if (i915_get_bridge_dev(dev)) {
 		ret = -EIO;
@@ -2103,6 +2114,12 @@ int i915_driver_load(struct drm_device *dev, unsigned long flags)
 	ret = i915_probe_agp(dev, &agp_size, &prealloc_size, &prealloc_start);
 	if (ret)
 		goto out_iomapfree;
+
+	if (prealloc_size > intel_max_stolen) {
+		DRM_INFO("detected %dM stolen memory, trimming to %dM\n",
+			 prealloc_size >> 20, intel_max_stolen >> 20);
+		prealloc_size = intel_max_stolen;
+	}
 
 	dev_priv->wq = create_singlethread_workqueue("i915");
 	if (dev_priv->wq == NULL) {

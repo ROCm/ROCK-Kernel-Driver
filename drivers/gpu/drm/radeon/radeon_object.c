@@ -341,7 +341,7 @@ int radeon_bo_list_validate(struct list_head *head)
 		bo = lobj->bo;
 		if (!bo->pin_count) {
 			domain = lobj->wdomain ? lobj->wdomain : lobj->rdomain;
-
+			
 		retry:
 			radeon_ttm_placement_from_domain(bo, domain);
 			r = ttm_bo_validate(&bo->tbo, &bo->placement,

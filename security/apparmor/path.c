@@ -4,7 +4,7 @@
  * This file contains AppArmor function for pathnames
  *
  * Copyright (C) 1998-2008 Novell/SUSE
- * Copyright 2009 Canonical Ltd.
+ * Copyright 2009-2010 Canonical Ltd.
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -12,9 +12,11 @@
  * License.
  */
 
+#include <linux/magic.h>
 #include <linux/mnt_namespace.h>
 #include <linux/mount.h>
 #include <linux/namei.h>
+#include <linux/nsproxy.h>
 #include <linux/path.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
@@ -22,13 +24,155 @@
 
 #include "include/apparmor.h"
 #include "include/path.h"
+#include "include/policy.h"
 
-int aa_get_name_to_buffer(struct path *path, int is_dir, char *buffer, int size,
-			  char **name)
+
+/* modified from dcache.c */
+static int prepend(char **buffer, int buflen, const char *str, int namelen)
 {
-	int error = d_namespace_path(path, buffer, size - is_dir, name);
+	buflen -= namelen;
+	if (buflen < 0)
+		return -ENAMETOOLONG;
+	*buffer -= namelen;
+	memcpy(*buffer, str, namelen);
+	return 0;
+}
 
-	if (!error && is_dir && (*name)[1] != '\0')
+#define CHROOT_NSCONNECT (PATH_CHROOT_REL | PATH_CHROOT_NSCONNECT)
+
+/**
+ * d_namespace_path - lookup a name associated with a given path
+ * @path: path to lookup  (NOT NULL)
+ * @buf:  buffer to store path to  (NOT NULL)
+ * @buflen: length of @buf
+ * @name: Returns - pointer for start of path name with in @buf (NOT NULL)
+ * @flags: flags controlling path lookup
+ *
+ * Handle path name lookup.
+ *
+ * Returns: %0 else error code if path lookup fails
+ *          When no error the path name is returned in @name which points to
+ *          to a position in @buf
+ */
+static int d_namespace_path(struct path *path, char *buf, int buflen,
+			    char **name, int flags)
+{
+	struct path root, tmp;
+	char *res;
+	int deleted, connected;
+	int error = 0;
+
+	/* Get the root we want to resolve too, released below */
+	if (flags & PATH_CHROOT_REL) {
+		/* resolve paths relative to chroot */
+		get_fs_root(current->fs, &root);
+	} else {
+		/* resolve paths relative to namespace */
+		root.mnt = current->nsproxy->mnt_ns->root;
+		root.dentry = root.mnt->mnt_root;
+		path_get(&root);
+	}
+
+	spin_lock(&dcache_lock);
+	/* There is a race window between path lookup here and the
+	 * need to strip the " (deleted) string that __d_path applies
+	 * Detect the race and relookup the path
+	 *
+	 * The stripping of (deleted) is a hack that could be removed
+	 * with an updated __d_path
+	 */
+	do {
+		tmp = root;
+		deleted = d_unlinked(path->dentry);
+		res = __d_path(path, &tmp, buf, buflen);
+
+	} while (deleted != d_unlinked(path->dentry));
+	spin_unlock(&dcache_lock);
+
+	*name = res;
+	/* handle error conditions - and still allow a partial path to
+	 * be returned.
+	 */
+	if (IS_ERR(res)) {
+		error = PTR_ERR(res);
+		*name = buf;
+		goto out;
+	}
+	if (deleted) {
+		/* On some filesystems, newly allocated dentries appear to the
+		 * security_path hooks as a deleted dentry except without an
+		 * inode allocated.
+		 *
+		 * Remove the appended deleted text and return as string for
+		 * normal mediation, or auditing.  The (deleted) string is
+		 * guaranteed to be added in this case, so just strip it.
+		 */
+		buf[buflen - 11] = 0;	/* - (len(" (deleted)") +\0) */
+
+		if (path->dentry->d_inode && !(flags & PATH_MEDIATE_DELETED)) {
+			error = -ENOENT;
+			goto out;
+		}
+	}
+
+	/* Determine if the path is connected to the expected root */
+	connected = tmp.dentry == root.dentry && tmp.mnt == root.mnt;
+
+	/* If the path is not connected,
+	 * check if it is a sysctl and handle specially else remove any
+	 * leading / that __d_path may have returned.
+	 * Unless
+	 *     specifically directed to connect the path,
+	 * OR
+	 *     if in a chroot and doing chroot relative paths and the path
+	 *     resolves to the namespace root (would be connected outside
+	 *     of chroot) and specifically directed to connect paths to
+	 *     namespace root.
+	 */
+	if (!connected) {
+		/* is the disconnect path a sysctl? */
+		if (tmp.dentry->d_sb->s_magic == PROC_SUPER_MAGIC &&
+		    strncmp(*name, "/sys/", 5) == 0) {
+			/* TODO: convert over to using a per namespace
+			 * control instead of hard coded /proc
+			 */
+			error = prepend(name, *name - buf, "/proc", 5);
+		} else if (!(flags & PATH_CONNECT_PATH) &&
+			   !(((flags & CHROOT_NSCONNECT) == CHROOT_NSCONNECT) &&
+			     (tmp.mnt == current->nsproxy->mnt_ns->root &&
+			      tmp.dentry == tmp.mnt->mnt_root))) {
+			/* disconnected path, don't return pathname starting
+			 * with '/'
+			 */
+			error = -ESTALE;
+			if (*res == '/')
+				*name = res + 1;
+		}
+	}
+
+out:
+	path_put(&root);
+
+	return error;
+}
+
+/**
+ * get_name_to_buffer - get the pathname to a buffer ensure dir / is appended
+ * @path: path to get name for  (NOT NULL)
+ * @flags: flags controlling path lookup
+ * @buffer: buffer to put name in  (NOT NULL)
+ * @size: size of buffer
+ * @name: Returns - contains position of path name in @buffer (NOT NULL)
+ *
+ * Returns: %0 else error on failure
+ */
+static int get_name_to_buffer(struct path *path, int flags, char *buffer,
+			      int size, char **name)
+{
+	int adjust = (flags & PATH_IS_DIR) ? 1 : 0;
+	int error = d_namespace_path(path, buffer, size - adjust, name, flags);
+
+	if (!error && (flags & PATH_IS_DIR) && (*name)[1] != '\0')
 		/*
 		 * Append "/" to the pathname.  The root directory is a special
 		 * case; it already ends in slash.
@@ -40,23 +184,23 @@ int aa_get_name_to_buffer(struct path *path, int is_dir, char *buffer, int size,
 
 /**
  * aa_get_name - compute the pathname of a file
- * @path: path the file
- * @is_dir: set if the file is a directory
- * @buffer: buffer that aa_get_name() allocated
- * @name: the error code indicating whether aa_get_name failed
+ * @path: path the file  (NOT NULL)
+ * @flags: flags controlling path name generation
+ * @buffer: buffer that aa_get_name() allocated  (NOT NULL)
+ * @name: Returns - the generated path name if !error (NOT NULL)
  *
- * Returns an error code if the there was a failure in obtaining the
- * name.
- *
- * @name is apointer to the beginning of the pathname (which usually differs
+ * @name is a pointer to the beginning of the pathname (which usually differs
  * from the beginning of the buffer), or NULL.  If there is an error @name
- * may contain a partial or invalid name (in the case of a deleted file), that
- * can be used for audit purposes, but it can not be used for mediation.
+ * may contain a partial or invalid name that can be used for audit purposes,
+ * but it can not be used for mediation.
  *
- * We need @is_dir to indicate whether the file is a directory or not because
- * the file may not yet exist, and so we cannot check the inode's file type.
+ * We need PATH_IS_DIR to indicate whether the file is a directory or not
+ * because the file may not yet exist, and so we cannot check the inode's
+ * file type.
+ *
+ * Returns: %0 else error code if could retrieve name
  */
-int aa_get_name(struct path *path, int is_dir, char **buffer, char **name)
+int aa_get_name(struct path *path, int flags, char **buffer, const char **name)
 {
 	char *buf, *str = NULL;
 	int size = 256;
@@ -65,123 +209,22 @@ int aa_get_name(struct path *path, int is_dir, char **buffer, char **name)
 	*name = NULL;
 	*buffer = NULL;
 	for (;;) {
+		/* freed by caller */
 		buf = kmalloc(size, GFP_KERNEL);
 		if (!buf)
 			return -ENOMEM;
 
-		error = aa_get_name_to_buffer(path, is_dir, buf, size, &str);
-		if (!error || (error == -ENOENT) || (error == -ESTALE))
+		error = get_name_to_buffer(path, flags, buf, size, &str);
+		if (error != -ENAMETOOLONG)
 			break;
 
 		kfree(buf);
 		size <<= 1;
-		if (size > g_apparmor_path_max)
+		if (size > aa_g_path_max)
 			return -ENAMETOOLONG;
 	}
 	*buffer = buf;
 	*name = str;
 
 	return error;
-}
-
-/* Only needed until d_namespace_path is cleaned up and doesn't use
- * vfsmount_lock anymore. -jeffm */
-extern spinlock_t vfsmount_lock;
-
-int d_namespace_path(struct path *path, char *buf, int buflen, char **name)
-{
-	struct path root, tmp, ns_root = { };
-	char *res;
-	int deleted;
-	int error = 0;
-
-	read_lock(&current->fs->lock);
-	root = current->fs->root;
-	path_get(&current->fs->root);
-	read_unlock(&current->fs->lock);
-	spin_lock(&vfsmount_lock);
-	if (root.mnt && root.mnt->mnt_ns)
-		ns_root.mnt = mntget(root.mnt->mnt_ns->root);
-	if (ns_root.mnt)
-		ns_root.dentry = dget(ns_root.mnt->mnt_root);
-	spin_unlock(&vfsmount_lock);
-	spin_lock(&dcache_lock);
-
-	do {
-		tmp = ns_root;
-		deleted = d_unlinked(path->dentry);
-		res = __d_path(path, &tmp, buf, buflen);
-	} while (deleted != d_unlinked(path->dentry));
-
-	*name = res;
-	/* handle error conditions - and still allow a partial path to
-	 * be returned */
-	if (IS_ERR(res)) {
-		error = PTR_ERR(res);
-		*name = buf;
-	} else if (deleted) {
-		/* The stripping of (deleted) is a hack that could be removed
-		 * with an updated __d_path
-		 */
-
-		/* Currently 2 cases fall into here.  Fixing the mediation
-		 * of deleted files for things like trunc.
-		 * And the newly allocated dentry case.  The first case
-		 * means we strip deleted for everything so the new
-		 * dentry test case is commented out below.
-		 */
-		buf[buflen - 11] = 0;	/* - (len(" (deleted)") +\0) */
-
-		/* if (!path->dentry->d_inode) {
-		 * On some filesystems, newly allocated dentries appear
-		 * to the security_path hooks as a deleted
-		 * dentry except without an inode allocated.
-		 *
-		 * Remove the appended deleted text and return as a
-		 * string for normal mediation.  The (deleted) string
-		 * is guarenteed to be added in this case, so just
-		 * strip it.
-		 */
-	} else if (!IS_ROOT(path->dentry) && d_unhashed(path->dentry)) {
-		error = -ENOENT;
-#if 0
-	} else if (tmp.dentry != ns_root.dentry && tmp.mnt != ns_root.mnt) {
-		/* disconnected path don return pathname starting with '/' */
-		error = -ESTALE;
-		if (*res == '/')
-			*name = res + 1;
-#endif
-	}
-
-	spin_unlock(&dcache_lock);
-	path_put(&root);
-	path_put(&ns_root);
-
-	return error;
-}
-
-char *sysctl_pathname(struct ctl_table *table, char *buffer, int buflen)
-{
-	if (buflen < 1)
-		return NULL;
-	buffer += --buflen;
-	*buffer = '\0';
-
-	while (table) {
-		int namelen = strlen(table->procname);
-
-		if (buflen < namelen + 1)
-			return NULL;
-		buflen -= namelen + 1;
-		buffer -= namelen;
-		memcpy(buffer, table->procname, namelen);
-		*--buffer = '/';
-		table = table->parent;
-	}
-	if (buflen < 4)
-		return NULL;
-	buffer -= 4;
-	memcpy(buffer, "/sys", 4);
-
-	return buffer;
 }

@@ -39,7 +39,6 @@
 #include <linux/miscdevice.h>
 #include <linux/magic.h>
 #include <linux/slab.h>
-#include <linux/precache.h>
 #include "compat.h"
 #include "ctree.h"
 #include "disk-io.h"
@@ -480,7 +479,6 @@ static int btrfs_fill_super(struct super_block *sb,
 	sb->s_root = root_dentry;
 
 	save_mount_options(sb, data);
-	precache_init(sb);
 	return 0;
 
 fail_close:
@@ -799,7 +797,7 @@ static int btrfs_unfreeze(struct super_block *sb)
 
 static const struct super_operations btrfs_super_ops = {
 	.drop_inode	= btrfs_drop_inode,
-	.delete_inode	= btrfs_delete_inode,
+	.evict_inode	= btrfs_evict_inode,
 	.put_super	= btrfs_put_super,
 	.sync_fs	= btrfs_sync_fs,
 	.show_options	= btrfs_show_options,

@@ -71,7 +71,8 @@ ext4_file_write(struct kiocb *iocb, const struct iovec *iov,
 		struct ext4_sb_info *sbi = EXT4_SB(inode->i_sb);
 		size_t length = iov_length(iov, nr_segs);
 
-		if (pos > sbi->s_bitmap_maxbytes)
+		if ((pos > sbi->s_bitmap_maxbytes ||
+		    (pos == sbi->s_bitmap_maxbytes && length > 0)))
 			return -EFBIG;
 
 		if (pos + length > sbi->s_bitmap_maxbytes) {
@@ -124,7 +125,7 @@ static int ext4_file_open(struct inode * inode, struct file * filp)
 		if (!IS_ERR(cp)) {
 			memcpy(sbi->s_es->s_last_mounted, cp,
 			       sizeof(sbi->s_es->s_last_mounted));
-			sb->s_dirt = 1;
+			ext4_mark_super_dirty(sb);
 		}
 	}
 	return dquot_file_open(inode, filp);

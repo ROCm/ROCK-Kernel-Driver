@@ -644,13 +644,6 @@ static bool free_pages_prepare(struct page *page, unsigned int order)
 	int i;
 	int bad = 0;
 
-#ifdef CONFIG_XEN
-	if (PageForeign(page)) {
-		PageForeignDestructor(page, order);
-		return false;
-	}
-#endif
-
 	trace_mm_page_free_direct(page, order);
 	kmemcheck_free_shadow(page, order);
 
@@ -680,9 +673,6 @@ static void __free_pages_ok(struct page *page, unsigned int order)
 	unsigned long flags;
 	int wasMlocked = __TestClearPageMlocked(page);
 
-#ifdef CONFIG_XEN
-	WARN_ON(PageForeign(page) && wasMlocked);
-#endif
 	if (!free_pages_prepare(page, order))
 		return;
 
@@ -1171,9 +1161,6 @@ void free_hot_cold_page(struct page *page, int cold)
 	int migratetype;
 	int wasMlocked = __TestClearPageMlocked(page);
 
-#ifdef CONFIG_XEN
-	WARN_ON(PageForeign(page) && wasMlocked);
-#endif
 	if (!free_pages_prepare(page, 0))
 		return;
 
@@ -1743,7 +1730,7 @@ __alloc_pages_may_oom(gfp_t gfp_mask, unsigned int order,
 	struct page *page;
 
 	/* Acquire the OOM killer lock for the zones in zonelist */
-	if (!try_set_zone_oom(zonelist, gfp_mask)) {
+	if (!try_set_zonelist_oom(zonelist, gfp_mask)) {
 		schedule_timeout_uninterruptible(1);
 		return NULL;
 	}
@@ -1763,6 +1750,9 @@ __alloc_pages_may_oom(gfp_t gfp_mask, unsigned int order,
 	if (!(gfp_mask & __GFP_NOFAIL)) {
 		/* The OOM killer will not help higher order allocs */
 		if (order > PAGE_ALLOC_COSTLY_ORDER)
+			goto out;
+		/* The OOM killer does not needlessly kill tasks for lowmem */
+		if (high_zoneidx < ZONE_NORMAL)
 			goto out;
 		/*
 		 * GFP_THISNODE contains __GFP_NORETRY and we never hit this.
@@ -2064,15 +2054,23 @@ rebalance:
 			if (page)
 				goto got_pg;
 
-			/*
-			 * The OOM killer does not trigger for high-order
-			 * ~__GFP_NOFAIL allocations so if no progress is being
-			 * made, there are no other options and retrying is
-			 * unlikely to help.
-			 */
-			if (order > PAGE_ALLOC_COSTLY_ORDER &&
-						!(gfp_mask & __GFP_NOFAIL))
-				goto nopage;
+			if (!(gfp_mask & __GFP_NOFAIL)) {
+				/*
+				 * The oom killer is not called for high-order
+				 * allocations that may fail, so if no progress
+				 * is being made, there are no other options and
+				 * retrying is unlikely to help.
+				 */
+				if (order > PAGE_ALLOC_COSTLY_ORDER)
+					goto nopage;
+				/*
+				 * The oom killer is not called for lowmem
+				 * allocations to prevent needlessly killing
+				 * innocent tasks.
+				 */
+				if (high_zoneidx < ZONE_NORMAL)
+					goto nopage;
+			}
 
 			goto restart;
 		}
@@ -4107,8 +4105,6 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat,
 		zone_seqlock_init(zone);
 		zone->zone_pgdat = pgdat;
 
-		zone->prev_priority = DEF_PRIORITY;
-
 		zone_pcp_init(zone);
 		for_each_lru(l) {
 			INIT_LIST_HEAD(&zone->lru[l].list);
@@ -4909,22 +4905,6 @@ static void __setup_per_zone_wmarks(void)
 		setup_zone_migrate_reserve(zone);
 		spin_unlock_irqrestore(&zone->lock, flags);
 	}
-
-#ifdef CONFIG_XEN
-	for_each_populated_zone(zone) {
-		unsigned int cpu;
-
-		for_each_online_cpu(cpu) {
-			unsigned long high;
-
-			high = percpu_pagelist_fraction
-			       ? zone->present_pages / percpu_pagelist_fraction
-			       : 5 * zone_batchsize(zone);
-			setup_pagelist_highmark(
-				per_cpu_ptr(zone->pageset, cpu), high);
-		}
-	}
-#endif
 
 	/* update totalreserve_pages */
 	calculate_totalreserve_pages();
