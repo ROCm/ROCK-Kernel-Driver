@@ -27,6 +27,7 @@
 #include <linux/kthread.h>
 #include <linux/log2.h>
 #include <linux/init.h>
+#include <linux/smp_lock.h>
 
 /**** Helper functions used for Div, Remainder operation on u64 ****/
 
