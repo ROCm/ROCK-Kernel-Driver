@@ -437,27 +437,6 @@ static unsigned int find_pcpusec(struct load_info *info)
 	return find_sec(info, ".data..percpu");
 }
 
-static unsigned int find_unwind(struct load_info *info)
-{
-	int section = 0;
-#ifdef ARCH_UNWIND_SECTION_NAME
-	section = find_sec(info, ARCH_UNWIND_SECTION_NAME);
-	if (section)
-		info->sechdrs[section].sh_flags |= SHF_ALLOC;
-#endif
-	return section;
-}
-
-static void add_unwind_table(struct module *mod, struct load_info *info)
-{
-	int index = info->index.unwind;
-
-	/* Size of section 0 is 0, so this is ok if there is no unwind info. */
-	mod->unwind_info = unwind_add_table(mod,
-					  (void *)info->sechdrs[index].sh_addr,
-					  info->sechdrs[index].sh_size);
-}
-
 static void percpu_modcopy(struct module *mod,
 			   const void *from, unsigned long size)
 {
@@ -531,6 +510,27 @@ bool is_module_percpu_address(unsigned long addr)
 }
 
 #endif /* CONFIG_SMP */
+
+static unsigned int find_unwind(struct load_info *info)
+{
+	int section = 0;
+#ifdef ARCH_UNWIND_SECTION_NAME
+	section = find_sec(info, ARCH_UNWIND_SECTION_NAME);
+	if (section)
+		info->sechdrs[section].sh_flags |= SHF_ALLOC;
+#endif
+	return section;
+}
+
+static void add_unwind_table(struct module *mod, struct load_info *info)
+{
+	int index = info->index.unwind;
+
+	/* Size of section 0 is 0, so this is ok if there is no unwind info. */
+	mod->unwind_info = unwind_add_table(mod,
+					  (void *)info->sechdrs[index].sh_addr,
+					  info->sechdrs[index].sh_size);
+}
 
 #define MODINFO_ATTR(field)	\
 static void setup_modinfo_##field(struct module *mod, const char *s)  \
