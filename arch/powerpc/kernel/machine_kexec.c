@@ -57,14 +57,6 @@ void arch_crash_save_vmcoreinfo(void)
 #endif
 }
 
-void arch_crash_save_vmcoreinfo(void)
-{
-#ifdef CONFIG_NEED_MULTIPLE_NODES
-	VMCOREINFO_SYMBOL(node_data);
-	VMCOREINFO_LENGTH(node_data, MAX_NUMNODES);
-#endif
-}
-
 /*
  * Do not allocate memory (or fail in any way) in machine_kexec().
  * We are past the point of no return, committed to rebooting now.
