@@ -672,7 +672,7 @@ int printk_dev_hash(const char *, const char *, const char *, ...);
 	dev_printk_hash(KERN_WARNING , dev , format , ## arg)
 #define dev_notice(dev, format, arg...)		\
 	dev_printk_hash(KERN_NOTICE , dev , format , ## arg)
-#define dev_info(dev, format, arg...)		\
+#define _dev_info(dev, format, arg...)		\
 	dev_printk_hash(KERN_INFO , dev , format , ## arg)
 #else
 extern int dev_printk(const char *level, const struct device *dev,
