@@ -1553,7 +1553,7 @@ static int mod_sysfs_setup(struct module *mod,
 			       "Novell, refusing to load. To override, echo "
 			       "1 > /proc/sys/kernel/unsupported\n", mod->name);
 			err = -ENOEXEC;
-			goto free_hdr;
+			goto out_remove_attrs;
 		}
 		add_nonfatal_taint(TAINT_NO_SUPPORT);
 		if (unsupported == 1) {
@@ -1568,6 +1568,11 @@ static int mod_sysfs_setup(struct module *mod,
 	kobject_uevent(&mod->mkobj.kobj, KOBJ_ADD);
 	return 0;
 
+out_remove_attrs:
+	remove_notes_attrs(mod);
+	remove_sect_attrs(mod);
+	del_usage_links(mod);
+	module_remove_modinfo_attrs(mod);
 out_unreg_param:
 	module_param_sysfs_remove(mod);
 out_unreg_holders:
