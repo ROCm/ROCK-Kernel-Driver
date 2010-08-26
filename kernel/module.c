@@ -2714,9 +2714,6 @@ static struct module *load_module(void __user *umod,
 	if (!mod->taints)
 		dynamic_debug_setup(info.debug, info.num_debug);
 
-	/* Initialize unwind table */
-	add_unwind_table(mod, &info);
-
 	/* Find duplicate symbols */
 	err = verify_export_symbols(mod);
 	if (err < 0)
@@ -2734,6 +2731,9 @@ static struct module *load_module(void __user *umod,
 	err = mod_sysfs_setup(mod, &info, mod->kp, mod->num_kp);
 	if (err < 0)
 		goto unlink;
+
+	/* Initialize unwind table */
+	add_unwind_table(mod, &info);
 
 	/* Get rid of temporary copy and strmap. */
 	kfree(info.strmap);
