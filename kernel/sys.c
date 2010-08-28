@@ -1321,14 +1321,11 @@ int do_prlimit(struct task_struct *tsk, unsigned int resource,
 			return -EPERM;
 	}
 
-	/* optimization: 'current' doesn't need locking, e.g. setrlimit */
-	if (tsk != current) {
-		/* protect tsk->signal and tsk->sighand from disappearing */
-		read_lock(&tasklist_lock);
-		if (!tsk->sighand) {
-			retval = -ESRCH;
-			goto out;
-		}
+	/* protect tsk->signal and tsk->sighand from disappearing */
+	read_lock(&tasklist_lock);
+	if (!tsk->sighand) {
+		retval = -ESRCH;
+		goto out;
 	}
 
 	rlim = tsk->signal->rlim + resource;
@@ -1368,8 +1365,7 @@ int do_prlimit(struct task_struct *tsk, unsigned int resource,
 			 new_rlim->rlim_cur != RLIM_INFINITY)
 		update_rlimit_cpu(tsk, new_rlim->rlim_cur);
 out:
-	if (tsk != current)
-		read_unlock(&tasklist_lock);
+	read_unlock(&tasklist_lock);
 	return retval;
 }
 

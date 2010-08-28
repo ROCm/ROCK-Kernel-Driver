@@ -465,30 +465,19 @@ static const struct limit_names lnames[RLIM_NLIMITS] = {
 };
 
 /* Display limits for a process */
-static ssize_t limits_read(struct file *file, char __user *buf, size_t rcount,
-		loff_t *ppos)
+static int proc_pid_limits(struct task_struct *task, char *buffer)
 {
-	struct rlimit rlim[RLIM_NLIMITS];
-	struct task_struct *task;
-	unsigned long flags;
 	unsigned int i;
-	ssize_t count = 0;
-	char *bufptr;
+	int count = 0;
+	unsigned long flags;
+	char *bufptr = buffer;
 
-	task = get_proc_task(file->f_path.dentry->d_inode);
-	if (!task)
-		return -ESRCH;
-	if (!lock_task_sighand(task, &flags)) {
-		put_task_struct(task);
+	struct rlimit rlim[RLIM_NLIMITS];
+
+	if (!lock_task_sighand(task, &flags))
 		return 0;
-	}
 	memcpy(rlim, task->signal->rlim, sizeof(struct rlimit) * RLIM_NLIMITS);
 	unlock_task_sighand(task, &flags);
-	put_task_struct(task);
-
-	bufptr = (char *)__get_free_page(GFP_TEMPORARY);
-	if (!bufptr)
-		return -ENOMEM;
 
 	/*
 	 * print the file header
@@ -517,80 +506,8 @@ static ssize_t limits_read(struct file *file, char __user *buf, size_t rcount,
 			count += sprintf(&bufptr[count], "\n");
 	}
 
-	count = simple_read_from_buffer(buf, rcount, ppos, bufptr, count);
-
-	free_page((unsigned long)bufptr);
-
 	return count;
 }
-
-static ssize_t limits_write(struct file *file, const char __user *buf,
-		size_t count, loff_t *ppos)
-{
-	struct task_struct *task = get_proc_task(file->f_path.dentry->d_inode);
-	char str[32 + 1 + 16 + 1 + 16 + 1], *delim, *next;
-	struct rlimit new_rlimit;
-	unsigned int i;
-	int ret;
-
-	if (!task) {
-		count = -ESRCH;
-		goto out;
-	}
-	if (copy_from_user(str, buf, min(count, sizeof(str) - 1))) {
-		count = -EFAULT;
-		goto put_task;
-	}
-
-	str[min(count, sizeof(str) - 1)] = 0;
-
-	delim = strchr(str, '=');
-	if (!delim) {
-		count = -EINVAL;
-		goto put_task;
-	}
-	*delim++ = 0; /* for easy 'str' usage */
-	new_rlimit.rlim_cur = simple_strtoul(delim, &next, 0);
-	if (*next != ':') {
-		if (strncmp(delim, "unlimited:", 10)) {
-			count = -EINVAL;
-			goto put_task;
-		}
-		new_rlimit.rlim_cur = RLIM_INFINITY;
-		next = delim + 9; /* move to ':' */
-	}
-	delim = next + 1;
-	new_rlimit.rlim_max = simple_strtoul(delim, &next, 0);
-	if (*next != 0) {
-		if (strcmp(delim, "unlimited")) {
-			count = -EINVAL;
-			goto put_task;
-		}
-		new_rlimit.rlim_max = RLIM_INFINITY;
-	}
-
-	for (i = 0; i < RLIM_NLIMITS; i++)
-		if (!strcmp(str, lnames[i].name))
-			break;
-	if (i >= RLIM_NLIMITS) {
-		count = -EINVAL;
-		goto put_task;
-	}
-
-	ret = do_prlimit(task, i, &new_rlimit, NULL);
-	if (ret)
-		count = ret;
-
-put_task:
-	put_task_struct(task);
-out:
-	return count;
-}
-
-static const struct file_operations proc_pid_limits_operations = {
-	.read	= limits_read,
-	.write	= limits_write,
-};
 
 #ifdef CONFIG_HAVE_ARCH_TRACEHOOK
 static int proc_pid_syscall(struct task_struct *task, char *buffer)
@@ -2758,7 +2675,7 @@ static const struct pid_entry tgid_base_stuff[] = {
 	INF("auxv",       S_IRUSR, proc_pid_auxv),
 	ONE("status",     S_IRUGO, proc_pid_status),
 	ONE("personality", S_IRUSR, proc_pid_personality),
-	REG("limits",	  S_IRUSR|S_IWUSR, proc_pid_limits_operations),
+	INF("limits",	  S_IRUSR, proc_pid_limits),
 #ifdef CONFIG_SCHED_DEBUG
 	REG("sched",      S_IRUGO|S_IWUSR, proc_pid_sched_operations),
 #endif
@@ -3094,7 +3011,7 @@ static const struct pid_entry tid_base_stuff[] = {
 	INF("auxv",      S_IRUSR, proc_pid_auxv),
 	ONE("status",    S_IRUGO, proc_pid_status),
 	ONE("personality", S_IRUSR, proc_pid_personality),
-	REG("limits",	  S_IRUSR|S_IWUSR, proc_pid_limits_operations),
+	INF("limits",	 S_IRUSR, proc_pid_limits),
 #ifdef CONFIG_SCHED_DEBUG
 	REG("sched",     S_IRUGO|S_IWUSR, proc_pid_sched_operations),
 #endif
