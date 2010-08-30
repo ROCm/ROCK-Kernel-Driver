@@ -289,7 +289,7 @@ static int do_transfer(struct spectra_nand_dev *tr, struct request *req)
 			IdentifyDeviceData.PagesPerBlock *
 			res_blks_os;
 
-	if (req->cmd_flags & REQ_FLUSH) {
+	if (req->cmd_type & REQ_FLUSH) {
 		if (force_flush_cache()) /* Fail to flush cache */
 			return -EIO;
 		else
@@ -512,9 +512,7 @@ static int GLOB_SBD_getgeo(struct block_device *bdev, struct hd_geometry *geo)
 int GLOB_SBD_ioctl(struct block_device *bdev, fmode_t mode,
 		unsigned int cmd, unsigned long arg)
 {
-	int ret = 0;
-
-	lock_kernel(); /* needed? */
+	int ret;
 
 	nand_dbg_print(NAND_DBG_TRACE, "%s, Line %d, Function: %s\n",
 		       __FILE__, __LINE__, __func__);
@@ -525,23 +523,23 @@ int GLOB_SBD_ioctl(struct block_device *bdev, fmode_t mode,
 			       "Spectra IOCTL: Garbage Collection "
 			       "being performed\n");
 		if (PASS != GLOB_FTL_Garbage_Collection())
-			ret = -EFAULT;
-		break;
+			return -EFAULT;
+		return 0;
 
 	case GLOB_SBD_IOCTL_WL:
 		nand_dbg_print(NAND_DBG_DEBUG,
 			       "Spectra IOCTL: Static Wear Leveling "
 			       "being performed\n");
 		if (PASS != GLOB_FTL_Wear_Leveling())
-			ret = -EFAULT;
-		break;
+			return -EFAULT;
+		return 0;
 
 	case GLOB_SBD_IOCTL_FORMAT:
 		nand_dbg_print(NAND_DBG_DEBUG, "Spectra IOCTL: Flash format "
 			       "being performed\n");
 		if (PASS != GLOB_FTL_Flash_Format())
-			ret = -EFAULT;
-		break;
+			return -EFAULT;
+		return 0;
 
 	case GLOB_SBD_IOCTL_FLUSH_CACHE:
 		nand_dbg_print(NAND_DBG_DEBUG, "Spectra IOCTL: Cache flush "
@@ -549,7 +547,7 @@ int GLOB_SBD_ioctl(struct block_device *bdev, fmode_t mode,
 		mutex_lock(&spectra_lock);
 		ret = force_flush_cache();
 		mutex_unlock(&spectra_lock);
-		break;
+		return ret;
 
 	case GLOB_SBD_IOCTL_COPY_BLK_TABLE:
 		nand_dbg_print(NAND_DBG_DEBUG, "Spectra IOCTL: "
@@ -557,8 +555,8 @@ int GLOB_SBD_ioctl(struct block_device *bdev, fmode_t mode,
 		if (copy_to_user((void __user *)arg,
 			get_blk_table_start_addr(),
 			get_blk_table_len()))
-			ret = -EFAULT;
-		break;
+			return -EFAULT;
+		return 0;
 
 	case GLOB_SBD_IOCTL_COPY_WEAR_LEVELING_TABLE:
 		nand_dbg_print(NAND_DBG_DEBUG, "Spectra IOCTL: "
@@ -566,33 +564,38 @@ int GLOB_SBD_ioctl(struct block_device *bdev, fmode_t mode,
 		if (copy_to_user((void __user *)arg,
 			get_wear_leveling_table_start_addr(),
 			get_wear_leveling_table_len()))
-			ret = -EFAULT;
-		break;
+			return -EFAULT;
+		return 0;
 
 	case GLOB_SBD_IOCTL_GET_NAND_INFO:
 		nand_dbg_print(NAND_DBG_DEBUG, "Spectra IOCTL: "
 			       "Get NAND info\n");
 		if (copy_to_user((void __user *)arg, &IdentifyDeviceData,
 			sizeof(IdentifyDeviceData)))
-			ret = -EFAULT;
-		break;
+			return -EFAULT;
+		return 0;
 
 	case GLOB_SBD_IOCTL_WRITE_DATA:
 		nand_dbg_print(NAND_DBG_DEBUG, "Spectra IOCTL: "
 			       "Write one page data\n");
-		ret = ioctl_write_page_data(arg);
-		break;
+		return ioctl_write_page_data(arg);
 
 	case GLOB_SBD_IOCTL_READ_DATA:
 		nand_dbg_print(NAND_DBG_DEBUG, "Spectra IOCTL: "
 			       "Read one page data\n");
-		ret = ioctl_read_page_data(arg);
-		break;
-	default:
-		ret = -ENOTTY;
-		break;
+		return ioctl_read_page_data(arg);
 	}
 
+	return -ENOTTY;
+}
+
+int GLOB_SBD_unlocked_ioctl(struct block_device *bdev, fmode_t mode,
+		unsigned int cmd, unsigned long arg)
+{
+	int ret;
+
+	lock_kernel();
+	ret = GLOB_SBD_ioctl(bdev, mode, cmd, arg);
 	unlock_kernel();
 
 	return ret;
@@ -602,7 +605,7 @@ static struct block_device_operations GLOB_SBD_ops = {
 	.owner = THIS_MODULE,
 	.open = GLOB_SBD_open,
 	.release = GLOB_SBD_release,
-	.ioctl = GLOB_SBD_ioctl,
+	.ioctl = GLOB_SBD_unlocked_ioctl,
 	.getgeo = GLOB_SBD_getgeo,
 };
 

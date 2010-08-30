@@ -1316,13 +1316,6 @@ static struct ctl_table vm_table[] = {
 		.mode		= 0644,
 		.proc_handler	= scan_unevictable_handler,
 	},
-	{
-		.procname	= "heap-stack-gap",
-		.data		= &heap_stack_gap,
-		.maxlen		= sizeof(int),
-		.mode		= 0644,
-		.proc_handler	= proc_dointvec,
-	},
 #ifdef CONFIG_MEMORY_FAILURE
 	{
 		.procname	= "memory_failure_early_kill",
