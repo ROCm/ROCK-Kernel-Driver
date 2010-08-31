@@ -2798,8 +2798,12 @@ void bond_loadbalance_arp_mon(struct work_struct *work)
 	 */
 	bond_for_each_slave(bond, slave, i) {
 		if (slave->link != BOND_LINK_UP) {
-			if (time_before_eq(jiffies, dev_trans_start(slave->dev) + delta_in_ticks) &&
-			    time_before_eq(jiffies, slave->dev->last_rx + delta_in_ticks)) {
+			if (time_in_range(jiffies,
+				dev_trans_start(slave->dev) - delta_in_ticks,
+				dev_trans_start(slave->dev) + delta_in_ticks) &&
+			    time_in_range(jiffies,
+				slave->dev->last_rx - delta_in_ticks,
+				slave->dev->last_rx + delta_in_ticks)) {
 
 				slave->link  = BOND_LINK_UP;
 				slave->state = BOND_STATE_ACTIVE;
@@ -2827,8 +2831,12 @@ void bond_loadbalance_arp_mon(struct work_struct *work)
 			 * when the source ip is 0, so don't take the link down
 			 * if we don't know our ip yet
 			 */
-			if (time_after_eq(jiffies, dev_trans_start(slave->dev) + 2*delta_in_ticks) ||
-			    (time_after_eq(jiffies, slave->dev->last_rx + 2*delta_in_ticks))) {
+			if (!time_in_range(jiffies,
+				dev_trans_start(slave->dev) - delta_in_ticks,
+				dev_trans_start(slave->dev) + 2*delta_in_ticks) ||
+			    (!time_in_range(jiffies,
+				slave->dev->last_rx - delta_in_ticks,
+				slave->dev->last_rx + 2*delta_in_ticks))) {
 
 				slave->link  = BOND_LINK_DOWN;
 				slave->state = BOND_STATE_BACKUP;
@@ -2888,8 +2896,10 @@ static int bond_ab_arp_inspect(struct bonding *bond, int delta_in_ticks)
 		slave->new_link = BOND_LINK_NOCHANGE;
 
 		if (slave->link != BOND_LINK_UP) {
-			if (time_before_eq(jiffies, slave_last_rx(bond, slave) +
-					   delta_in_ticks)) {
+			if (time_in_range(jiffies,
+				slave_last_rx(bond, slave) - delta_in_ticks,
+				slave_last_rx(bond, slave) + delta_in_ticks)) {
+
 				slave->new_link = BOND_LINK_UP;
 				commit++;
 			}
@@ -2902,8 +2912,9 @@ static int bond_ab_arp_inspect(struct bonding *bond, int delta_in_ticks)
 		 * active.  This avoids bouncing, as the last receive
 		 * times need a full ARP monitor cycle to be updated.
 		 */
-		if (!time_after_eq(jiffies, slave->jiffies +
-				   2 * delta_in_ticks))
+		if (time_in_range(jiffies,
+				  slave->jiffies - delta_in_ticks,
+				  slave->jiffies + 2 * delta_in_ticks))
 			continue;
 
 		/*
@@ -2921,8 +2932,10 @@ static int bond_ab_arp_inspect(struct bonding *bond, int delta_in_ticks)
 		 */
 		if (slave->state == BOND_STATE_BACKUP &&
 		    !bond->current_arp_slave &&
-		    time_after(jiffies, slave_last_rx(bond, slave) +
-			       3 * delta_in_ticks)) {
+		    !time_in_range(jiffies,
+			slave_last_rx(bond, slave) - delta_in_ticks,
+			slave_last_rx(bond, slave) + 3 * delta_in_ticks)) {
+
 			slave->new_link = BOND_LINK_DOWN;
 			commit++;
 		}
@@ -2934,10 +2947,13 @@ static int bond_ab_arp_inspect(struct bonding *bond, int delta_in_ticks)
 		 *    the bond has an IP address)
 		 */
 		if ((slave->state == BOND_STATE_ACTIVE) &&
-		    (time_after_eq(jiffies, dev_trans_start(slave->dev) +
-				    2 * delta_in_ticks) ||
-		      (time_after_eq(jiffies, slave_last_rx(bond, slave)
-				     + 2 * delta_in_ticks)))) {
+		    (!time_in_range(jiffies,
+			dev_trans_start(slave->dev) - delta_in_ticks,
+			dev_trans_start(slave->dev) + 2 * delta_in_ticks) ||
+		     (!time_in_range(jiffies,
+			slave_last_rx(bond, slave) - delta_in_ticks,
+			slave_last_rx(bond, slave) + 2 * delta_in_ticks)))) {
+
 			slave->new_link = BOND_LINK_DOWN;
 			commit++;
 		}
@@ -2964,7 +2980,9 @@ static void bond_ab_arp_commit(struct bonding *bond, int delta_in_ticks)
 
 		case BOND_LINK_UP:
 			if ((!bond->curr_active_slave &&
-			     time_before_eq(jiffies,
+			     time_in_range(jiffies,
+					    dev_trans_start(slave->dev) -
+					    delta_in_ticks,
 					    dev_trans_start(slave->dev) +
 					    delta_in_ticks)) ||
 			    bond->curr_active_slave != slave) {
