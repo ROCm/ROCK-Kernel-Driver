@@ -9,7 +9,7 @@ menuconfig ACPI
 	depends on PCI
 	depends on PM
 	select PNP
-	select CPU_IDLE
+	select CPU_IDLE if !PROCESSOR_EXTERNAL_CONTROL
 	default y
 	help
 	  Advanced Configuration and Power Interface (ACPI) support for 
@@ -318,6 +318,7 @@ config ACPI_PCI_SLOT
 config X86_PM_TIMER
 	bool "Power Management Timer Support" if EMBEDDED
 	depends on X86
+	depends on !XEN
 	default y
 	help
 	  The Power Management Timer is available on all ACPI-capable,
@@ -380,4 +381,13 @@ config ACPI_HED
 
 source "drivers/acpi/apei/Kconfig"
 
+config ACPI_PV_SLEEP
+	bool
+	depends on X86 && XEN && ACPI_SLEEP
+	default y
+
+config PROCESSOR_EXTERNAL_CONTROL
+	bool
+	depends on (X86 || IA64) && XEN
+	default y
 endif	# ACPI
