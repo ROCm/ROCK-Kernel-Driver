@@ -166,7 +166,7 @@ obj-$(CONFIG_PPPOL2TP) += pppox.o
 obj-$(CONFIG_SLIP) += slip.o
 obj-$(CONFIG_SLHC) += slhc.o
 
-obj-$(CONFIG_XEN_NETDEV_FRONTEND) += xen-netfront.o
+obj-$(CONFIG_PARAVIRT_XEN_NETDEV_FRONTEND) += xen-netfront.o
 
 obj-$(CONFIG_DUMMY) += dummy.o
 obj-$(CONFIG_IFB) += ifb.o

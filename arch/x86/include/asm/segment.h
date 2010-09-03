@@ -186,7 +186,9 @@
 #define __KERNEL_DS	(GDT_ENTRY_KERNEL_DS * 8)
 #define __USER_DS     (GDT_ENTRY_DEFAULT_USER_DS* 8 + 3)
 #define __USER_CS     (GDT_ENTRY_DEFAULT_USER_CS* 8 + 3)
-#ifndef CONFIG_PARAVIRT
+#if defined(CONFIG_X86_XEN)
+#define get_kernel_rpl()  (xen_feature(XENFEAT_supervisor_mode_kernel)?0:1)
+#elif !defined(CONFIG_PARAVIRT)
 #define get_kernel_rpl()  0
 #endif
 

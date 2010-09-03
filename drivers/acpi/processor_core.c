@@ -19,6 +19,15 @@
 #define _COMPONENT		ACPI_PROCESSOR_COMPONENT
 ACPI_MODULE_NAME("processor_core");
 
+#ifdef CONFIG_PROCESSOR_EXTERNAL_CONTROL
+/*
+ * External processor control logic may register with its own set of
+ * ops to get ACPI related notification. One example is like VMM.
+ */
+const struct processor_extcntl_ops *processor_extcntl_ops;
+EXPORT_SYMBOL(processor_extcntl_ops);
+#endif
+
 static int set_no_mwait(const struct dmi_system_id *id)
 {
 	printk(KERN_NOTICE PREFIX "%s detected - "
@@ -171,13 +180,20 @@ exit:
 
 int acpi_get_cpuid(acpi_handle handle, int type, u32 acpi_id)
 {
-	int i;
+	int i = 0;
 	int apic_id = -1;
+
+	if (type < 0) {
+		if (!processor_cntl_external())
+			return -1;
+		type = ~type;
+		i = 1;
+	}
 
 	apic_id = map_mat_entry(handle, type, acpi_id);
 	if (apic_id == -1)
 		apic_id = map_madt_entry(type, acpi_id);
-	if (apic_id == -1)
+	if (apic_id == -1 || i)
 		return apic_id;
 
 	for_each_possible_cpu(i) {

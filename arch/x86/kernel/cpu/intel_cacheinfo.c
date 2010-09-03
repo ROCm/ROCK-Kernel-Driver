@@ -306,7 +306,7 @@ struct _cache_attr {
 	ssize_t (*store)(struct _cpuid4_info *, const char *, size_t count);
 };
 
-#ifdef CONFIG_CPU_SUP_AMD
+#if defined(CONFIG_CPU_SUP_AMD) && !defined(CONFIG_XEN)
 
 /*
  * L3 cache descriptors
@@ -758,7 +758,7 @@ unsigned int __cpuinit init_intel_cacheinfo(struct cpuinfo_x86 *c)
 static DEFINE_PER_CPU(struct _cpuid4_info *, ici_cpuid4_info);
 #define CPUID4_INFO_IDX(x, y)	(&((per_cpu(ici_cpuid4_info, x))[y]))
 
-#ifdef CONFIG_SMP
+#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
 static void __cpuinit cache_shared_cpu_map_setup(unsigned int cpu, int index)
 {
 	struct _cpuid4_info	*this_leaf, *sibling_leaf;
@@ -1000,7 +1000,7 @@ static struct attribute *default_attrs[] = {
 
 static struct attribute *default_l3_attrs[] = {
 	DEFAULT_SYSFS_CACHE_ATTRS,
-#ifdef CONFIG_CPU_SUP_AMD
+#if defined(CONFIG_CPU_SUP_AMD) && !defined(CONFIG_XEN)
 	&cache_disable_0.attr,
 	&cache_disable_1.attr,
 #endif

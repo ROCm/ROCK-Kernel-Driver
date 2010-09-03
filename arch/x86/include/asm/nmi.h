@@ -5,8 +5,6 @@
 #include <asm/irq.h>
 #include <asm/io.h>
 
-#ifdef ARCH_HAS_NMI_WATCHDOG
-
 /**
  * do_nmi_callback
  *
@@ -16,6 +14,11 @@
 int do_nmi_callback(struct pt_regs *regs, int cpu);
 
 extern void die_nmi(char *str, struct pt_regs *regs, int do_panic);
+
+extern int unknown_nmi_panic;
+
+#ifdef ARCH_HAS_NMI_WATCHDOG
+
 extern int check_nmi_watchdog(void);
 #if !defined(CONFIG_LOCKUP_DETECTOR)
 extern int nmi_watchdog_enabled;
@@ -43,7 +46,6 @@ extern unsigned int nmi_watchdog;
 struct ctl_table;
 extern int proc_nmi_enabled(struct ctl_table *, int ,
 			void __user *, size_t *, loff_t *);
-extern int unknown_nmi_panic;
 
 void arch_trigger_all_cpu_backtrace(void);
 #define arch_trigger_all_cpu_backtrace arch_trigger_all_cpu_backtrace
@@ -66,7 +68,6 @@ static inline int nmi_watchdog_active(void)
 	 */
 	return nmi_watchdog & (NMI_LOCAL_APIC | NMI_IO_APIC);
 }
-#endif
 
 void lapic_watchdog_stop(void);
 int lapic_watchdog_init(unsigned nmi_hz);
@@ -74,6 +75,9 @@ int lapic_wd_event(unsigned nmi_hz);
 unsigned lapic_adjust_nmi_hz(unsigned hz);
 void disable_lapic_nmi_watchdog(void);
 void enable_lapic_nmi_watchdog(void);
+
+#endif
+
 void stop_nmi(void);
 void restart_nmi(void);
 
