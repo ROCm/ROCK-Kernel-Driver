@@ -54,6 +54,7 @@ static struct usb_driver btusb_driver;
 #define BTUSB_BCM92035		0x10
 #define BTUSB_BROKEN_ISOC	0x20
 #define BTUSB_WRONG_SCO_MTU	0x40
+#define BTUSB_BAD_RESET		0x80
 
 static struct usb_device_id btusb_table[] = {
 	/* Generic Bluetooth USB device */
@@ -102,6 +103,9 @@ static struct usb_device_id blacklist_table[] = {
 	/* IBM/Lenovo ThinkPad with Broadcom chip */
 	{ USB_DEVICE(0x0a5c, 0x201e), .driver_info = BTUSB_WRONG_SCO_MTU },
 	{ USB_DEVICE(0x0a5c, 0x2110), .driver_info = BTUSB_WRONG_SCO_MTU },
+
+	/* Broadcom Matador */
+	{ USB_DEVICE(0x0a5c, 0x21b4), .driver_info = BTUSB_BAD_RESET },
 
 	/* HP laptop with Broadcom chip */
 	{ USB_DEVICE(0x03f0, 0x171d), .driver_info = BTUSB_WRONG_SCO_MTU },
@@ -1003,6 +1007,9 @@ static int btusb_probe(struct usb_interface *intf,
 			skb_queue_tail(&hdev->driver_init, skb);
 		}
 	}
+
+	if (id->driver_info & BTUSB_BAD_RESET)
+		set_bit(HCI_QUIRK_BAD_RESET, &hdev->quirks);
 
 	if (data->isoc) {
 		err = usb_driver_claim_interface(&btusb_driver,

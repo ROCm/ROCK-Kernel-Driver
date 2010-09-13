@@ -180,11 +180,18 @@ static void hci_reset_req(struct hci_dev *hdev, unsigned long opt)
 	hci_send_cmd(hdev, HCI_OP_RESET, 0, NULL);
 }
 
+static int verify_valid_bdaddr(struct hci_dev *hdev)
+{
+	return bacmp(&hdev->bdaddr, BDADDR_ANY);
+}
+
+#define RESET_RETRIES	10
 static void hci_init_req(struct hci_dev *hdev, unsigned long opt)
 {
 	struct sk_buff *skb;
 	__le16 param;
 	__u8 flt_type;
+	int retries = RESET_RETRIES;
 
 	BT_DBG("%s %ld", hdev->name, opt);
 
@@ -202,42 +209,51 @@ static void hci_init_req(struct hci_dev *hdev, unsigned long opt)
 
 	/* Mandatory initialization */
 
-	/* Reset */
-	if (!test_bit(HCI_QUIRK_NO_RESET, &hdev->quirks))
-			hci_send_cmd(hdev, HCI_OP_RESET, 0, NULL);
+	do {
+		if (retries < RESET_RETRIES)
+			mdelay(500);
 
-	/* Read Local Supported Features */
-	hci_send_cmd(hdev, HCI_OP_READ_LOCAL_FEATURES, 0, NULL);
+		/* Reset */
+		if (!test_bit(HCI_QUIRK_NO_RESET, &hdev->quirks))
+				hci_send_cmd(hdev, HCI_OP_RESET, 0, NULL);
 
-	/* Read Local Version */
-	hci_send_cmd(hdev, HCI_OP_READ_LOCAL_VERSION, 0, NULL);
+		if (test_bit(HCI_QUIRK_BAD_RESET, &hdev->quirks) && retries == RESET_RETRIES)
+			mdelay(5000);
 
-	/* Read Buffer Size (ACL mtu, max pkt, etc.) */
-	hci_send_cmd(hdev, HCI_OP_READ_BUFFER_SIZE, 0, NULL);
+		/* Read Local Supported Features */
+		hci_send_cmd(hdev, HCI_OP_READ_LOCAL_FEATURES, 0, NULL);
+
+		/* Read Local Version */
+		hci_send_cmd(hdev, HCI_OP_READ_LOCAL_VERSION, 0, NULL);
+
+		/* Read Buffer Size (ACL mtu, max pkt, etc.) */
+		hci_send_cmd(hdev, HCI_OP_READ_BUFFER_SIZE, 0, NULL);
 
 #if 0
-	/* Host buffer size */
-	{
-		struct hci_cp_host_buffer_size cp;
-		cp.acl_mtu = cpu_to_le16(HCI_MAX_ACL_SIZE);
-		cp.sco_mtu = HCI_MAX_SCO_SIZE;
-		cp.acl_max_pkt = cpu_to_le16(0xffff);
-		cp.sco_max_pkt = cpu_to_le16(0xffff);
-		hci_send_cmd(hdev, HCI_OP_HOST_BUFFER_SIZE, sizeof(cp), &cp);
-	}
+		/* Host buffer size */
+		{
+			struct hci_cp_host_buffer_size cp;
+			cp.acl_mtu = cpu_to_le16(HCI_MAX_ACL_SIZE);
+			cp.sco_mtu = HCI_MAX_SCO_SIZE;
+			cp.acl_max_pkt = cpu_to_le16(0xffff);
+			cp.sco_max_pkt = cpu_to_le16(0xffff);
+			hci_send_cmd(hdev, HCI_OP_HOST_BUFFER_SIZE, sizeof(cp), &cp);
+		}
 #endif
 
-	/* Read BD Address */
-	hci_send_cmd(hdev, HCI_OP_READ_BD_ADDR, 0, NULL);
+		/* Read BD Address */
+		hci_send_cmd(hdev, HCI_OP_READ_BD_ADDR, 0, NULL);			
 
-	/* Read Class of Device */
-	hci_send_cmd(hdev, HCI_OP_READ_CLASS_OF_DEV, 0, NULL);
+		/* Read Class of Device */
+		hci_send_cmd(hdev, HCI_OP_READ_CLASS_OF_DEV, 0, NULL);
 
-	/* Read Local Name */
-	hci_send_cmd(hdev, HCI_OP_READ_LOCAL_NAME, 0, NULL);
+		/* Read Local Name */
+		hci_send_cmd(hdev, HCI_OP_READ_LOCAL_NAME, 0, NULL);
 
-	/* Read Voice Setting */
-	hci_send_cmd(hdev, HCI_OP_READ_VOICE_SETTING, 0, NULL);
+		/* Read Voice Setting */
+		hci_send_cmd(hdev, HCI_OP_READ_VOICE_SETTING, 0, NULL);
+
+	} while(!verify_valid_bdaddr(hdev) && retries--);
 
 	/* Optional initialization */
 
