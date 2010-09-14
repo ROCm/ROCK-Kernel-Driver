@@ -660,6 +660,8 @@ int printk_dev_hash(const char *, const char *, const char *, ...);
 
 #endif
 
+#define dev_printk(level, dev, format, arg...)		\
+	dev_printk_hash(level , dev, format, ## arg)
 #define dev_emerg(dev, format, arg...)		\
 	dev_printk_hash(KERN_EMERG , dev , format , ## arg)
 #define dev_alert(dev, format, arg...)		\
