@@ -421,11 +421,8 @@ and is between 256 and 4096 characters. It is defined in the file
 			See Documentation/s390/CommonIO for details.
 
 	cgroup_disable= [KNL] Disable a particular controller
-	cgroup_enable=  [KNL] Enable a particular controller
-			For both cgroup_enable and cgroup_enable
 			Format: {name of the controller(s) to disable}
 				{Currently supported controllers - "memory"}
-				{Memory controller is disabled by default}
 
 	checkreqprot	[SELINUX] Set initial checkreqprot flag value.
 			Format: { "0" | "1" }

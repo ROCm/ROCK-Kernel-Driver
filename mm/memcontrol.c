@@ -4716,7 +4716,6 @@ struct cgroup_subsys mem_cgroup_subsys = {
 	.attach = mem_cgroup_move_task,
 	.early_init = 0,
 	.use_id = 1,
-	.disabled = 1,
 };
 
 #ifdef CONFIG_CGROUP_MEM_RES_CTLR_SWAP
