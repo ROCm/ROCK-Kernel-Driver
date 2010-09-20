@@ -1686,8 +1686,8 @@ grow_slab:
 		slab_out_of_memory(s, gfpflags, node);
 	return NULL;
 
-slow_path:
-	if (PageSlubDebug(c->page) &&
+debug:
+	if (kmem_cache_debug(s) &&
 			!alloc_debug_processing(s, c->page, object, addr))
 		goto another_slab;
 
