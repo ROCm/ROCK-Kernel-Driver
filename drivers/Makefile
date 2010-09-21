@@ -51,7 +51,7 @@ obj-$(CONFIG_FB_INTEL)          += video/intelfb/
 
 obj-$(CONFIG_ATM)		+= atm/
 obj-$(CONFIG_FUSION)		+= message/
-obj-$(CONFIG_FIREWIRE)		+= firewire/
+obj-y				+= firewire/
 obj-y				+= ieee1394/
 obj-$(CONFIG_UIO)		+= uio/
 obj-y				+= cdrom/
