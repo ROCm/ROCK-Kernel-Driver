@@ -31,12 +31,11 @@
 })
 #define unmap_pages_from_agp(pages, nr) ({ \
 	__typeof__(nr) n__; \
-	int rc__ = 0; \
-	for (n__ = 0; n__ < nr && !rc__; ++n__) \
-		rc__ = xen_destroy_contiguous_region( \
+	for (n__ = 0; n__ < nr; ++n__) \
+		xen_destroy_contiguous_region( \
 			(unsigned long)page_address((pages)[n__]), 0); \
 	/* only a fallback: xen_destroy_contiguous_region uses PAGE_KERNEL */ \
-	rc__ ?: set_pages_array_wb(pages, nr); \
+	set_pages_array_wb(pages, nr); \
 })
 
 /*
