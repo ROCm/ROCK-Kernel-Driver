@@ -39,8 +39,13 @@ struct _ddebug {
 int ddebug_add_module(struct _ddebug *tab, unsigned int n,
 				const char *modname);
 
+struct kernel_param;
+
 #if defined(CONFIG_DYNAMIC_DEBUG)
 extern int ddebug_remove_module(const char *mod_name);
+extern int ddebug_exec_query(char *query_string);
+extern void ddebug_module_parse_args(const char *name, char* args,
+				     struct kernel_param *params, unsigned num);
 
 #define __dynamic_dbg_enabled(dd)  ({	     \
 	int __ret = 0;							     \
@@ -74,6 +79,16 @@ extern int ddebug_remove_module(const char *mod_name);
 #else
 
 static inline int ddebug_remove_module(const char *mod)
+{
+	return 0;
+}
+static inline int ddebug_exec_query(char *query_string)
+{
+	return 0;
+}
+static incline void ddebug_module_parse_args(const char *name, char* args,
+					     struct kernel_param *params,
+					     unsigned num)
 {
 	return 0;
 }
