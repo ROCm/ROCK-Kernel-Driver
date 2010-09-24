@@ -36,7 +36,7 @@
 		rc__ = xen_destroy_contiguous_region( \
 			(unsigned long)page_address((pages)[n__])); \
 	/* only a fallback: xen_destroy_contiguous_region uses PAGE_KERNEL */ \
-	rc__ ?: set_pages_array_wb(pages, nr);
+	rc__ ?: set_pages_array_wb(pages, nr); \
 })
 
 /*
