@@ -18,9 +18,9 @@
 #include <linux/init.h>
 #include <linux/oprofile.h>
 #include <linux/sched.h>
+#include <linux/vmalloc.h>
 #include <asm/pgtable.h>
 
-#include <xen/driver_util.h>
 #include <xen/interface/xen.h>
 #include <xen/interface/xenoprof.h>
 #include <xen/xenoprof.h>

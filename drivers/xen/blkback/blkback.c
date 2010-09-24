@@ -108,7 +108,7 @@ static inline unsigned long vaddr(pending_req_t *req, int seg)
 
 
 static int do_block_io_op(blkif_t *blkif);
-static int dispatch_rw_block_io(blkif_t *blkif,
+static void dispatch_rw_block_io(blkif_t *blkif,
 				 blkif_request_t *req,
 				 pending_req_t *pending_req);
 static void make_response(blkif_t *blkif, u64 id,
@@ -313,13 +313,13 @@ static int do_block_io_op(blkif_t *blkif)
 	blkif_request_t req;
 	pending_req_t *pending_req;
 	RING_IDX rc, rp;
-	int more_to_do = 0, ret;
+	int more_to_do = 0;
 
 	rc = blk_rings->common.req_cons;
 	rp = blk_rings->common.sring->req_prod;
 	rmb(); /* Ensure we see queued requests up to 'rp'. */
 
-	while ((rc != rp) || (blkif->is_suspended_req)) {
+	while ((rc != rp)) {
 
 		if (RING_REQUEST_CONS_OVERFLOW(&blk_rings->common, rc))
 			break;
@@ -335,14 +335,6 @@ static int do_block_io_op(blkif_t *blkif)
 			more_to_do = 1;
 			break;
 		}
-
-        /* Handle the suspended request first, if one exists */
-        if(blkif->is_suspended_req)
-        {
-            memcpy(&req, &blkif->suspended_req, sizeof(req));
-            blkif->is_suspended_req = 0;
-            goto handle_request;
-        }
 
 		switch (blkif->blk_protocol) {
 		case BLKIF_PROTOCOL_NATIVE:
@@ -362,19 +354,17 @@ static int do_block_io_op(blkif_t *blkif)
 		/* Apply all sanity checks to /private copy/ of request. */
 		barrier();
 
-handle_request:
-        ret = 0;
 		switch (req.operation) {
 		case BLKIF_OP_READ:
 			blkif->st_rd_req++;
-			ret = dispatch_rw_block_io(blkif, &req, pending_req); 
+			dispatch_rw_block_io(blkif, &req, pending_req);
 			break;
 		case BLKIF_OP_WRITE_BARRIER:
 			blkif->st_br_req++;
 			/* fall through */
 		case BLKIF_OP_WRITE:
 			blkif->st_wr_req++;
-			ret = dispatch_rw_block_io(blkif, &req, pending_req);
+			dispatch_rw_block_io(blkif, &req, pending_req);
 			break;
 		case BLKIF_OP_PACKET:
 			DPRINTK("error: block operation BLKIF_OP_PACKET not implemented\n");
@@ -394,17 +384,6 @@ handle_request:
 			free_req(pending_req);
 			break;
 		}
-        BUG_ON(ret != 0 && ret != -EAGAIN);
-        /* If we can't handle the request at the moment, save it, and break the
-         * loop */ 
-        if(ret == -EAGAIN)
-        {
-            memcpy(&blkif->suspended_req, &req, sizeof(req));
-            blkif->is_suspended_req = 1;
-            /* Return "no more work pending", restart will be handled 'out of
-             * band' */
-            return 0;
-        }
 
 		/* Yield point for this unbounded loop. */
 		cond_resched();
@@ -413,7 +392,7 @@ handle_request:
 	return more_to_do;
 }
 
-static int dispatch_rw_block_io(blkif_t *blkif,
+static void dispatch_rw_block_io(blkif_t *blkif,
 				 blkif_request_t *req,
 				 pending_req_t *pending_req)
 {
@@ -482,15 +461,13 @@ static int dispatch_rw_block_io(blkif_t *blkif,
 	ret = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, map, nseg);
 	BUG_ON(ret);
 
-#define GENERAL_ERR   (1<<0)
-#define EAGAIN_ERR    (1<<1)
 	for (i = 0; i < nseg; i++) {
-		if (unlikely(map[i].status != 0)) {
+		if (unlikely(map[i].status == GNTST_eagain))
+			gnttab_check_GNTST_eagain_do_while(GNTTABOP_map_grant_ref, &map[i])
+		if (unlikely(map[i].status != GNTST_okay)) {
 			DPRINTK("invalid buffer -- could not remap it\n");
 			map[i].handle = BLKBACK_INVALID_HANDLE;
-			ret |= GENERAL_ERR;
-            if(map[i].status == GNTST_eagain)
-			    ret |= EAGAIN_ERR;
+			ret = 1;
 		} else {
 			blkback_pagemap_set(vaddr_pagenr(pending_req, i),
 					    pending_page(pending_req, i),
@@ -509,14 +486,6 @@ static int dispatch_rw_block_io(blkif_t *blkif,
 		seg[i].buf  = map[i].dev_bus_addr | 
 			(req->seg[i].first_sect << 9);
 	}
-
-    /* If any of grant maps failed with GNTST_eagain, suspend and retry later */
-    if(ret & EAGAIN_ERR)
-    {
-        fast_flush_area(pending_req);
-        free_req(pending_req);
-        return -EAGAIN;
-    }
 
 	if (ret)
 		goto fail_flush;
@@ -583,7 +552,7 @@ static int dispatch_rw_block_io(blkif_t *blkif,
 	else if (operation == WRITE || operation == WRITE_BARRIER)
 		blkif->st_wr_sect += preq.nr_sects;
 
-	return 0;
+	return;
 
  fail_flush:
 	fast_flush_area(pending_req);
@@ -591,7 +560,7 @@ static int dispatch_rw_block_io(blkif_t *blkif,
 	make_response(blkif, req->id, req->operation, BLKIF_RSP_ERROR);
 	free_req(pending_req);
 	msleep(1); /* back off a bit */
-	return 0;
+	return;
 
  fail_put_bio:
 	__end_block_io_op(pending_req, -EINVAL);
@@ -599,7 +568,7 @@ static int dispatch_rw_block_io(blkif_t *blkif,
 		bio_put(bio);
 	unplug_queue(blkif);
 	msleep(1); /* back off a bit */
-	return 0;
+	return;
 }
 
 

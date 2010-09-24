@@ -32,9 +32,9 @@
 
 #include <linux/err.h>
 #include <linux/delay.h>
+#include <linux/vmalloc.h>
 #include <xen/gnttab.h>
 #include <xen/xenbus.h>
-#include <xen/driver_util.h>
 
 /* Based on Rusty Russell's skeleton driver's map_page */
 struct vm_struct *xenbus_map_ring_valloc(struct xenbus_device *dev, int gnt_ref)
@@ -49,11 +49,7 @@ struct vm_struct *xenbus_map_ring_valloc(struct xenbus_device *dev, int gnt_ref)
 	gnttab_set_map_op(&op, (unsigned long)area->addr, GNTMAP_host_map,
 			  gnt_ref, dev->otherend_id);
 	
-    do {
-	    if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1))
-		    BUG();
-        msleep(10);
-    } while(op.status == GNTST_eagain);
+	gnttab_check_GNTST_eagain_do_while(GNTTABOP_map_grant_ref, &op);
 
 	if (op.status != GNTST_okay) {
 		free_vm_area(area);
@@ -61,7 +57,7 @@ struct vm_struct *xenbus_map_ring_valloc(struct xenbus_device *dev, int gnt_ref)
 				 "mapping in shared page %d from domain %d",
 				 gnt_ref, dev->otherend_id);
 		BUG_ON(!IS_ERR(ERR_PTR(op.status)));
-		return ERR_PTR(op.status);
+		return ERR_PTR(-EINVAL);
 	}
 
 	/* Stuff the handle in an unused field */
@@ -76,23 +72,24 @@ int xenbus_map_ring(struct xenbus_device *dev, int gnt_ref,
 		   grant_handle_t *handle, void *vaddr)
 {
 	struct gnttab_map_grant_ref op;
+	int ret;
 	
 	gnttab_set_map_op(&op, (unsigned long)vaddr, GNTMAP_host_map,
 			  gnt_ref, dev->otherend_id);
-    do {
-	    if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1))
-		    BUG();
-        msleep(10);
-    } while(op.status == GNTST_eagain);
+
+	gnttab_check_GNTST_eagain_do_while(GNTTABOP_map_grant_ref, &op);
 
 	if (op.status != GNTST_okay) {
 		xenbus_dev_fatal(dev, op.status,
 				 "mapping in shared page %d from domain %d",
 				 gnt_ref, dev->otherend_id);
-	} else
+		ret = -EINVAL;
+	} else {
 		*handle = op.handle;
+		ret = 0;
+	}
 
-	return op.status;
+	return ret;
 }
 EXPORT_SYMBOL_GPL(xenbus_map_ring);
 
@@ -115,7 +112,7 @@ int xenbus_unmap_ring_vfree(struct xenbus_device *dev, struct vm_struct *area)
 				 "unmapping page at handle %d error %d",
 				 (int16_t)area->phys_addr, op.status);
 
-	return op.status;
+	return op.status == GNTST_okay ? 0 : -EINVAL;
 }
 EXPORT_SYMBOL_GPL(xenbus_unmap_ring_vfree);
 
@@ -135,7 +132,7 @@ int xenbus_unmap_ring(struct xenbus_device *dev,
 				 "unmapping page at handle %d error %d",
 				 handle, op.status);
 
-	return op.status;
+	return op.status == GNTST_okay ? 0 : -EINVAL;
 }
 EXPORT_SYMBOL_GPL(xenbus_unmap_ring);
 

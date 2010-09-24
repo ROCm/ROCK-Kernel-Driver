@@ -285,15 +285,11 @@ static int map_frontend_pages(
 
 	gnttab_set_map_op(&op, (unsigned long)netif->tx_comms_area->addr,
 			  GNTMAP_host_map, tx_ring_ref, netif->domid);
-    do {
-		if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1))
-			BUG();
-        msleep(10);
-    } while(op.status == GNTST_eagain);
+	gnttab_check_GNTST_eagain_do_while(GNTTABOP_map_grant_ref, &op);
 
-	if (op.status) { 
-		DPRINTK(" Gnttab failure mapping tx_ring_ref!\n");
-		return op.status;
+	if (op.status != GNTST_okay) {
+		DPRINTK(" Gnttab failure mapping tx_ring_ref %d!\n", (int)op.status);
+		return -EINVAL;
 	}
 
 	netif->tx_shmem_ref    = tx_ring_ref;
@@ -301,13 +297,9 @@ static int map_frontend_pages(
 
 	gnttab_set_map_op(&op, (unsigned long)netif->rx_comms_area->addr,
 			  GNTMAP_host_map, rx_ring_ref, netif->domid);
-    do {
-	    if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1))
-		    BUG();
-        msleep(10);
-    } while(op.status == GNTST_eagain);
+	gnttab_check_GNTST_eagain_do_while(GNTTABOP_map_grant_ref, &op);
 
-	if (op.status) {
+	if (op.status != GNTST_okay) {
 		struct gnttab_unmap_grant_ref unop;
 
 		gnttab_set_unmap_op(&unop,
@@ -315,8 +307,8 @@ static int map_frontend_pages(
 				    GNTMAP_host_map, netif->tx_shmem_handle);
 		VOID(HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref,
 					       &unop, 1));
-		DPRINTK(" Gnttab failure mapping rx_ring_ref!\n");
-		return op.status;
+		DPRINTK(" Gnttab failure mapping rx_ring_ref %d!\n", (int)op.status);
+		return -EINVAL;
 	}
 
 	netif->rx_shmem_ref    = rx_ring_ref;

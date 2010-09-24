@@ -58,25 +58,23 @@ blkif_t *tap_alloc_blkif(domid_t domid)
 static int map_frontend_page(blkif_t *blkif, unsigned long shared_page)
 {
 	struct gnttab_map_grant_ref op;
+	int ret;
 
 	gnttab_set_map_op(&op, (unsigned long)blkif->blk_ring_area->addr,
 			  GNTMAP_host_map, shared_page, blkif->domid);
 
-    do {
-	    if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1))
-		    BUG();
-        msleep(10);
-    } while(op.status == GNTST_eagain);
+	gnttab_check_GNTST_eagain_do_while(GNTTABOP_map_grant_ref, &op);
 
-	if (op.status) {
-		DPRINTK(" Grant table operation failure !\n");
-		return op.status;
+	if (op.status == GNTST_okay) {
+		blkif->shmem_ref = shared_page;
+		blkif->shmem_handle = op.handle;
+		ret = 0;
+	} else {
+		DPRINTK("Grant table operation failure %d!\n", (int)op.status);
+		ret = -EINVAL;
 	}
 
-	blkif->shmem_ref = shared_page;
-	blkif->shmem_handle = op.handle;
-
-	return 0;
+	return ret;
 }
 
 static void unmap_frontend_page(blkif_t *blkif)

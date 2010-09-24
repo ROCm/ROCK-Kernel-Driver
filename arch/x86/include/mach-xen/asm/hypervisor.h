@@ -43,6 +43,7 @@
 #include <xen/interface/sched.h>
 #include <xen/interface/nmi.h>
 #include <xen/interface/tmem.h>
+#include <xen/interface/vcpu.h>
 #include <xen/interface/arch-x86/xen-mca.h>
 #include <asm/percpu.h>
 #include <asm/ptrace.h>
@@ -85,6 +86,9 @@ extern start_info_t *xen_start_info;
 
 #define init_hypervisor(c) ((void)(c))
 #define init_hypervisor_platform() init_hypervisor(&boot_cpu_data)
+
+DECLARE_PER_CPU(struct vcpu_runstate_info, runstate);
+#define vcpu_running(cpu) (per_cpu(runstate.state, cpu) == RUNSTATE_running)
 
 /* arch/xen/kernel/evtchn.c */
 /* Force a proper event-channel callback from Xen. */

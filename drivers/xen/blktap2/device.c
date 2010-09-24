@@ -500,10 +500,10 @@ blktap_map_foreign(struct blktap *tap,
 
 		uvaddr = MMAP_VADDR(ring->user_vstart, usr_idx, i);
 
-		if (unlikely(table->grants[grant].status)) {
+		if (unlikely(table->grants[grant].status != GNTST_okay)) {
 			BTERR("invalid kernel buffer: could not remap it\n");
-            /* This should never happen: blkback should handle eagain first */
-            BUG_ON(table->grants[grant].status == GNTST_eagain);
+			/* This should never happen: blkback should handle eagain first */
+			BUG_ON(table->grants[grant].status == GNTST_eagain);
 			err |= 1;
 			table->grants[grant].handle = INVALID_GRANT_HANDLE;
 		}
@@ -512,19 +512,18 @@ blktap_map_foreign(struct blktap *tap,
 		foreign_mfn = table->grants[grant].dev_bus_addr >> PAGE_SHIFT;
 		grant++;
 
-		if (xen_feature(XENFEAT_auto_translated_physmap))
-			goto done;
-
-		if (unlikely(table->grants[grant].status)) {
-			BTERR("invalid user buffer: could not remap it\n");
-			err |= 1;
+		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+			if (unlikely(table->grants[grant].status != GNTST_okay)) {
+				/* This should never happen: blkback should handle eagain first */
+				WARN_ON(table->grants[grant].status == GNTST_eagain);
+				BTERR("invalid user buffer: could not remap it\n");
+				err |= 1;
+			}
 			table->grants[grant].handle = INVALID_GRANT_HANDLE;
+			request->handles[i].user = table->grants[grant].handle;
+			grant++;
 		}
 
-		request->handles[i].user = table->grants[grant].handle;
-		grant++;
-
-	done:
 		if (err)
 			continue;
 
@@ -598,11 +597,10 @@ blktap_map(struct blktap *tap,
 		set_page_private(tap_page, page_private(page));
 		SetPageBlkback(tap_page);
 
-		err = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref,
-						&map, 1);
-		BUG_ON(err);
-        /* We are not expecting the grant op to fail */
-        BUG_ON(map.status != GNTST_okay);
+		gnttab_check_GNTST_eagain_do_while(GNTTABOP_map_grant_ref, &map);
+
+		/* We are not expecting the grant op to fail */
+		BUG_ON(map.status != GNTST_okay);
 
 		err = vm_insert_page(ring->vma, uvaddr, tap_page);
 		if (err) {
@@ -1094,6 +1092,12 @@ blktap_device_destroy(struct blktap *tap)
 	return 0;
 }
 
+static char *blktap_devnode(struct gendisk *gd, mode_t *mode)
+{
+	return kasprintf(GFP_KERNEL, BLKTAP2_DEV_DIR "tapdev%u",
+			 gd->first_minor);
+}
+
 int
 blktap_device_create(struct blktap *tap)
 {
@@ -1130,6 +1134,7 @@ blktap_device_create(struct blktap *tap)
 
 	gd->major = blktap_device_major;
 	gd->first_minor = minor;
+	gd->devnode = blktap_devnode;
 	gd->fops = &blktap_device_file_operations;
 	gd->private_data = dev;
 

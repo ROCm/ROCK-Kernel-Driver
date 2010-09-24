@@ -369,6 +369,33 @@ asmlinkage void __irq_entry evtchn_do_upcall(struct pt_regs *regs)
 #else
 		barrier();
 #endif
+
+		/*
+		 * Handle timer interrupts before all others, so that all
+		 * hardirq handlers see an up-to-date system time even if we
+		 * have just woken from a long idle period.
+		 */
+#ifdef PER_CPU_VIRQ_IRQ
+		if ((irq = percpu_read(virq_to_irq[VIRQ_TIMER])) != -1) {
+			port = evtchn_from_irq(irq);
+#else
+		port = percpu_read(virq_to_evtchn[VIRQ_TIMER]);
+		if (VALID_EVTCHN(port)) {
+#endif
+			l1i = port / BITS_PER_LONG;
+			l2i = port % BITS_PER_LONG;
+			if (active_evtchns(l1i) & (1ul<<l2i)) {
+				mask_evtchn(port);
+				clear_evtchn(port);
+#ifndef PER_CPU_VIRQ_IRQ
+				irq = evtchn_to_irq[port];
+				BUG_ON(irq == -1);
+#endif
+				if (!handle_irq(irq, regs))
+					BUG();
+			}
+		}
+
 		l1 = vcpu_info_xchg(evtchn_pending_sel, 0);
 
 		start_l1i = l1i = percpu_read(current_l1i);
@@ -1245,7 +1272,15 @@ static void enable_pirq(unsigned int irq)
 	pirq_unmask_and_notify(evtchn, irq);
 }
 
-static void disable_pirq(unsigned int irq)
+#define disable_pirq mask_pirq
+
+static unsigned int startup_pirq(unsigned int irq)
+{
+	enable_pirq(irq);
+	return 0;
+}
+
+static void shutdown_pirq(unsigned int irq)
 {
 	int evtchn = evtchn_from_irq(irq);
 
@@ -1261,14 +1296,6 @@ static void disable_pirq(unsigned int irq)
 	evtchn_to_irq[evtchn] = -1;
 	irq_cfg(irq)->info = mk_irq_info(IRQT_PIRQ, index_from_irq(irq), 0);
 }
-
-static unsigned int startup_pirq(unsigned int irq)
-{
-	enable_pirq(irq);
-	return 0;
-}
-
-#define shutdown_pirq disable_pirq
 
 static void unmask_pirq(unsigned int irq)
 {

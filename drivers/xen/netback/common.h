@@ -44,7 +44,6 @@
 #include <asm/pgalloc.h>
 #include <xen/interface/grant_table.h>
 #include <xen/gnttab.h>
-#include <xen/driver_util.h>
 #include <xen/xenbus.h>
 
 #define DPRINTK(_f, _a...)			\

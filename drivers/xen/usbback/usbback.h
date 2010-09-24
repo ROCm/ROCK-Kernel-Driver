@@ -57,7 +57,6 @@
 #include <linux/kref.h>
 #include <xen/evtchn.h>
 #include <xen/gnttab.h>
-#include <xen/driver_util.h>
 #include <xen/interface/xen.h>
 #include <xen/xenbus.h>
 #include <xen/interface/io/usbif.h>

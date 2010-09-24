@@ -110,16 +110,11 @@ static int map_frontend_pages(usbif_t *usbif,
 	gnttab_set_map_op(&op, (unsigned long)usbif->urb_ring_area->addr,
 			  GNTMAP_host_map, urb_ring_ref, usbif->domid);
 
+	gnttab_check_GNTST_eagain_do_while(GNTTABOP_map_grant_ref, &op);
 
-    do {
-	    if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1))
-		    BUG();
-        msleep(10);
-    } while (op.status == GNTST_eagain);
-
-	if (op.status) {
-		printk(KERN_ERR "grant table failure mapping urb_ring_ref\n");
-		return op.status;
+	if (op.status != GNTST_okay) {
+		printk(KERN_ERR "grant table failure mapping urb_ring_ref %d\n", (int)op.status);
+		return -EINVAL;
 	}
 
 	usbif->urb_shmem_ref = urb_ring_ref;
@@ -128,21 +123,17 @@ static int map_frontend_pages(usbif_t *usbif,
 	gnttab_set_map_op(&op, (unsigned long)usbif->conn_ring_area->addr,
 			  GNTMAP_host_map, conn_ring_ref, usbif->domid);
 
-    do {
-	    if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1))
-		    BUG();
-        msleep(10);
-    } while (op.status == GNTST_eagain);
+	gnttab_check_GNTST_eagain_do_while(GNTTABOP_map_grant_ref, &op);
 
-	if (op.status) {
+	if (op.status != GNTST_okay) {
 		struct gnttab_unmap_grant_ref unop;
 		gnttab_set_unmap_op(&unop,
 				(unsigned long) usbif->urb_ring_area->addr,
 				GNTMAP_host_map, usbif->urb_shmem_handle);
 		VOID(HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &unop,
 				1));
-		printk(KERN_ERR "grant table failure mapping conn_ring_ref\n");
-		return op.status;
+		printk(KERN_ERR "grant table failure mapping conn_ring_ref %d\n", (int)op.status);
+		return -EINVAL;
 	}
 
 	usbif->conn_shmem_ref = conn_ring_ref;

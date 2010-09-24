@@ -42,9 +42,6 @@
 
 #include <asm/irqflags.h>
 #include <asm/smp-processor-id.h>
-#include <xen/interface/vcpu.h>
-
-DECLARE_PER_CPU(struct vcpu_runstate_info, runstate);
 
 int xen_spinlock_init(unsigned int cpu);
 void xen_spinlock_cleanup(unsigned int cpu);
@@ -193,9 +190,7 @@ static __always_inline int __ticket_spin_trylock(arch_spinlock_t *lock)
 }
 #endif
 
-#define __ticket_spin_count(lock) \
-	(per_cpu(runstate.state, (lock)->owner) == RUNSTATE_running \
-	 ? 1 << 10 : 1)
+#define __ticket_spin_count(lock) (vcpu_running((lock)->owner) ? 1 << 10 : 1)
 
 static inline int __ticket_spin_is_locked(arch_spinlock_t *lock)
 {

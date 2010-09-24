@@ -43,7 +43,6 @@
 #include <asm/synch_bitops.h>
 #include <asm/io.h>
 #include <xen/interface/memory.h>
-#include <xen/driver_util.h>
 #include <asm/gnttab_dma.h>
 
 #ifdef HAVE_XEN_PLATFORM_COMPAT_H
@@ -488,7 +487,7 @@ static int gnttab_map(unsigned int start_idx, unsigned int end_idx)
 		return -ENOSYS;
 	}
 
-	BUG_ON(rc || setup.status);
+	BUG_ON(rc || setup.status != GNTST_okay);
 
 	if (shared == NULL)
 		shared = arch_gnttab_alloc_shared(frames);
@@ -577,7 +576,7 @@ int gnttab_copy_grant_page(grant_ref_t ref, struct page **pagep)
 	err = HYPERVISOR_grant_table_op(GNTTABOP_unmap_and_replace,
 					&unmap, 1);
 	BUG_ON(err);
-	BUG_ON(unmap.status);
+	BUG_ON(unmap.status != GNTST_okay);
 
 	write_sequnlock_bh(&gnttab_dma_lock);
 

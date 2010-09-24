@@ -8,20 +8,22 @@ obj-$(CONFIG_XEN)		+= console/
 obj-y				+= xenbus/
 obj-$(CONFIG_XEN)		+= char/
 
+xen-backend-$(CONFIG_XEN_BACKEND)	:= util.o
+
 nostackp := $(call cc-option, -fno-stack-protector)
 ifeq ($(CONFIG_PARAVIRT_XEN),y)
 CFLAGS_features.o			:= $(nostackp)
 endif
 
-obj-$(CONFIG_XEN)		+= features.o util.o
-obj-$(CONFIG_HOTPLUG_CPU)	+= $(xen-hotplug-y)
-obj-$(CONFIG_XEN_XENCOMM)	+= xencomm.o
-obj-$(CONFIG_XEN_BALLOON)	+= $(xen-balloon-y)
-obj-$(CONFIG_XEN_DEV_EVTCHN)	+= evtchn.o
-obj-$(CONFIG_XENFS)		+= xenfs/
+obj-$(CONFIG_XEN)			+= features.o $(xen-backend-y) $(xen-backend-m)
+obj-$(CONFIG_HOTPLUG_CPU)		+= $(xen-hotplug-y)
+obj-$(CONFIG_XEN_XENCOMM)		+= xencomm.o
+obj-$(CONFIG_XEN_BALLOON)		+= $(xen-balloon-y)
+obj-$(CONFIG_XEN_DEV_EVTCHN)		+= evtchn.o
+obj-$(CONFIG_XENFS)			+= xenfs/
 obj-$(CONFIG_XEN_SYS_HYPERVISOR)	+= sys-hypervisor.o
-obj-$(CONFIG_XEN_PLATFORM_PCI)	+= platform-pci.o
-obj-$(CONFIG_SWIOTLB_XEN)	+= swiotlb-xen.o
+obj-$(CONFIG_XEN_PLATFORM_PCI)		+= platform-pci.o
+obj-$(CONFIG_SWIOTLB_XEN)		+= swiotlb-xen.o
 obj-$(CONFIG_XEN_BLKDEV_BACKEND)	+= blkback/
 obj-$(CONFIG_XEN_BLKDEV_TAP)		+= blktap/
 obj-$(CONFIG_XEN_BLKDEV_TAP2)           += blktap2/

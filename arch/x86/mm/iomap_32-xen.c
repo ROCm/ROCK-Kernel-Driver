@@ -75,7 +75,7 @@ void *kmap_atomic_prot_pfn(unsigned long pfn, enum km_type type, pgprot_t prot)
 /*
  * Map 'mfn' using fixed map 'type' and protections 'prot'
  */
-void *
+void __iomem *
 iomap_atomic_prot_pfn(unsigned long mfn, enum km_type type, pgprot_t prot)
 {
 	/*
@@ -88,12 +88,12 @@ iomap_atomic_prot_pfn(unsigned long mfn, enum km_type type, pgprot_t prot)
 		prot = PAGE_KERNEL_UC_MINUS;
 
 	pgprot_val(prot) |= _PAGE_IOMAP;
-	return kmap_atomic_prot_pfn(mfn, type, prot);
+	return (void __force __iomem *) kmap_atomic_prot_pfn(mfn, type, prot);
 }
 EXPORT_SYMBOL_GPL(iomap_atomic_prot_pfn);
 
 void
-iounmap_atomic(void *kvaddr, enum km_type type)
+iounmap_atomic(void __iomem *kvaddr, enum km_type type)
 {
 	unsigned long vaddr = (unsigned long) kvaddr & PAGE_MASK;
 	enum fixed_addresses idx = type + KM_TYPE_NR*smp_processor_id();

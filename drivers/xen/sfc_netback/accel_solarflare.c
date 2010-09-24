@@ -37,7 +37,6 @@
 #include "ci/efhw/public.h"
 
 #include <xen/evtchn.h>
-#include <xen/driver_util.h>
 #include <linux/list.h>
 #include <linux/mutex.h>
 

@@ -745,6 +745,9 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
 	pgd_ctor(pgd);
 	pgd_prepopulate_pmd(mm, pgd, pmds);
 
+	/* Store a back link for vmalloc_sync_all(). */
+	set_page_private(virt_to_page(pgd), (unsigned long)mm);
+
 	spin_unlock_irqrestore(&pgd_lock, flags);
 
 	return pgd;

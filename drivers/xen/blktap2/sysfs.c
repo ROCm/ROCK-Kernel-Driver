@@ -439,6 +439,12 @@ blktap_sysfs_free(void)
 	class_destroy(class);
 }
 
+static char *blktap_devnode(struct device *dev, mode_t *mode)
+{
+	return kasprintf(GFP_KERNEL, BLKTAP2_DEV_DIR "blktap%u",
+			 MINOR(dev->devt));
+}
+
 int __init
 blktap_sysfs_init(void)
 {
@@ -451,6 +457,8 @@ blktap_sysfs_init(void)
 	cls = class_create(THIS_MODULE, "blktap2");
 	if (IS_ERR(cls))
 		return PTR_ERR(cls);
+
+	cls->devnode = blktap_devnode;
 
 	err = class_create_file(cls, &class_attr_verbosity);
 	if (!err) {

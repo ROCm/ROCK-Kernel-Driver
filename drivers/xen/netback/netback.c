@@ -518,8 +518,7 @@ static inline void netbk_free_pages(int nr_frags, struct netbk_rx_meta *meta)
    used to set up the operations on the top of
    netrx_pending_operations, which have since been done.  Check that
    they didn't give any errors and advance over them. */
-static int netbk_check_gop(int nr_frags, domid_t domid,
-			   struct netrx_pending_operations *npo, int *eagain)
+static int netbk_check_gop(int nr_frags, domid_t domid, struct netrx_pending_operations *npo)
 {
 	multicall_entry_t *mcl;
 	gnttab_transfer_t *gop;
@@ -527,17 +526,15 @@ static int netbk_check_gop(int nr_frags, domid_t domid,
 	int status = NETIF_RSP_OKAY;
 	int i;
 
-    *eagain = 0;
-
 	for (i = 0; i <= nr_frags; i++) {
 		if (npo->meta[npo->meta_cons + i].copy) {
 			copy_op = npo->copy + npo->copy_cons++;
-			if (copy_op->status != GNTST_okay) {
+			if (unlikely(copy_op->status == GNTST_eagain))
+				gnttab_check_GNTST_eagain_while(GNTTABOP_copy, copy_op);
+			if (unlikely(copy_op->status != GNTST_okay)) {
 				DPRINTK("Bad status %d from copy to DOM%d.\n",
 					copy_op->status, domid);
 				status = NETIF_RSP_ERROR;
-                if(copy_op->status == GNTST_eagain)
-                    *eagain = 1;
 			}
 		} else {
 			if (!xen_feature(XENFEAT_auto_translated_physmap)) {
@@ -548,7 +545,7 @@ static int netbk_check_gop(int nr_frags, domid_t domid,
 
 			gop = npo->trans + npo->trans_cons++;
 			/* Check the reassignment error code. */
-			if (gop->status != 0) {
+			if (unlikely(gop->status != GNTST_okay)) {
 				DPRINTK("Bad status %d from grant transfer to DOM%u\n",
 					gop->status, domid);
 				/*
@@ -557,8 +554,6 @@ static int netbk_check_gop(int nr_frags, domid_t domid,
 				 * a fatal error anyway.
 				 */
 				BUG_ON(gop->status == GNTST_bad_page);
-                if(gop->status == GNTST_eagain)
-                    *eagain = 1;
 				status = NETIF_RSP_ERROR;
 			}
 		}
@@ -596,7 +591,7 @@ static void net_rx_action(unsigned long group)
 	struct sk_buff_head rxq;
 	struct sk_buff *skb;
 	int notify_nr = 0;
-	int ret, eagain;
+	int ret;
 	int nr_frags;
 	int count;
 	unsigned long offset;
@@ -693,7 +688,7 @@ static void net_rx_action(unsigned long group)
 
 		netif = netdev_priv(skb->dev);
 
-		status = netbk_check_gop(nr_frags, netif->domid, &npo, &eagain);
+		status = netbk_check_gop(nr_frags, netif->domid, &npo);
 
 		/* We can't rely on skb_release_data to release the
 		   pages used by fragments for us, since it tries to
@@ -704,22 +699,14 @@ static void net_rx_action(unsigned long group)
 		/* (Freeing the fragments is safe since we copy
 		   non-linear skbs destined for flipping interfaces) */
 		if (!netif->copying_receiver) {
-            /* 
-             * Cannot handle failed grant transfers at the moment (because
-             * mmu_updates likely completed)
-             */
-            BUG_ON(eagain);
 			atomic_set(&(skb_shinfo(skb)->dataref), 1);
 			skb_shinfo(skb)->frag_list = NULL;
 			skb_shinfo(skb)->nr_frags = 0;
 			netbk_free_pages(nr_frags, netbk->meta + npo.meta_cons + 1);
 		}
 
-        if(!eagain)
-        {
-		    netif->stats.tx_bytes += skb->len;
-		    netif->stats.tx_packets++;
-        }
+		netif->stats.tx_bytes += skb->len;
+		netif->stats.tx_packets++;
 
 		id = netbk->meta[npo.meta_cons].id;
 		flags = nr_frags ? NETRXF_more_data : 0;
@@ -767,18 +754,8 @@ static void net_rx_action(unsigned long group)
 		    !netbk_queue_full(netif))
 			netif_wake_queue(netif->dev);
 
-        if(!eagain || netbk_queue_full(netif))
-        {
-		    netif_put(netif);
-		    dev_kfree_skb(skb);
-		    netif->stats.tx_dropped += !!eagain;
-        } 
-        else
-        {
-	        netif->rx_req_cons_peek += skb_shinfo(skb)->nr_frags + 1 +
-				   !!skb_shinfo(skb)->gso_size;
-            skb_queue_head(&netbk->rx_queue, skb);
-        }
+		netif_put(netif);
+		dev_kfree_skb(skb);
 
 		npo.meta_cons += nr_frags + 1;
 	}
@@ -856,17 +833,18 @@ static void remove_from_net_schedule_list(netif_t *netif)
 static void add_to_net_schedule_list_tail(netif_t *netif)
 {
 	struct xen_netbk *netbk = &xen_netbk[GET_GROUP_INDEX(netif)];
+	unsigned long flags;
 
 	if (__on_net_schedule_list(netif))
 		return;
 
-	spin_lock_irq(&netbk->net_schedule_list_lock);
+	spin_lock_irqsave(&netbk->net_schedule_list_lock, flags);
 	if (!__on_net_schedule_list(netif) &&
 	    likely(netif_schedulable(netif))) {
 		list_add_tail(&netif->list, &netbk->net_schedule_list);
 		netif_get(netif);
 	}
-	spin_unlock_irq(&netbk->net_schedule_list_lock);
+	spin_unlock_irqrestore(&netbk->net_schedule_list_lock, flags);
 }
 
 /*
@@ -1160,7 +1138,7 @@ static int netbk_tx_check_mop(struct xen_netbk *netbk, struct sk_buff *skb,
 
 	/* Check status of header. */
 	err = mop->status;
-	if (unlikely(err)) {
+	if (unlikely(err != GNTST_okay)) {
 		pending_ring_idx_t index = MASK_PEND_IDX(netbk->pending_prod++);
 
 		txp = &pending_tx_info[pending_idx].req;
@@ -1184,12 +1162,12 @@ static int netbk_tx_check_mop(struct xen_netbk *netbk, struct sk_buff *skb,
 
 		/* Check error status: if okay then remember grant handle. */
 		newerr = (++mop)->status;
-		if (likely(!newerr)) {
+		if (likely(newerr == GNTST_okay)) {
 			set_phys_to_machine(idx_to_pfn(netbk, pending_idx),
 				FOREIGN_FRAME(mop->dev_bus_addr>>PAGE_SHIFT));
 			netbk->grant_tx_handle[pending_idx] = mop->handle;
 			/* Had a previous error? Invalidate this fragment. */
-			if (unlikely(err))
+			if (unlikely(err != GNTST_okay))
 				netif_idx_release(netbk, pending_idx);
 			continue;
 		}
@@ -1202,7 +1180,7 @@ static int netbk_tx_check_mop(struct xen_netbk *netbk, struct sk_buff *skb,
 		netif_put(netif);
 
 		/* Not the first error? Preceding frags already invalidated. */
-		if (err)
+		if (err != GNTST_okay)
 			continue;
 
 		/* First error: invalidate header and preceding fragments. */

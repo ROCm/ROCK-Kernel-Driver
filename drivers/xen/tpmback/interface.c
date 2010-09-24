@@ -81,25 +81,23 @@ tpmif_t *tpmif_find(domid_t domid, struct backend_info *bi)
 static int map_frontend_page(tpmif_t *tpmif, unsigned long shared_page)
 {
 	struct gnttab_map_grant_ref op;
+	int ret;
 
 	gnttab_set_map_op(&op, (unsigned long)tpmif->tx_area->addr,
 			  GNTMAP_host_map, shared_page, tpmif->domid);
 
-    do {
-	    if (HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1))
-		    BUG();
-        msleep(10);
-    } while(op.status == GNTST_eagain);
+	gnttab_check_GNTST_eagain_do_while(GNTTABOP_map_grant_ref, &op);
 
-	if (op.status) {
-		DPRINTK(" Grant table operation failure !\n");
-		return op.status;
+	if (op.status != GNTST_okay) {
+		DPRINTK(" Grant table operation failure %d!\n", (int)op.status);
+		ret = -EINVAL;
+	} else {
+		tpmif->shmem_ref = shared_page;
+		tpmif->shmem_handle = op.handle;
+		ret = 0;
 	}
 
-	tpmif->shmem_ref = shared_page;
-	tpmif->shmem_handle = op.handle;
-
-	return 0;
+	return ret;
 }
 
 static void unmap_frontend_page(tpmif_t *tpmif)

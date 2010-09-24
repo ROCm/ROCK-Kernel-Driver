@@ -564,20 +564,6 @@ u64 jiffies_to_st(unsigned long j)
 }
 EXPORT_SYMBOL(jiffies_to_st);
 
-void xen_safe_halt(void)
-{
-	/* Blocking includes an implicit local_irq_enable(). */
-	HYPERVISOR_block();
-}
-EXPORT_SYMBOL(xen_safe_halt);
-
-void xen_halt(void)
-{
-	if (irqs_disabled())
-		VOID(HYPERVISOR_vcpu_op(VCPUOP_down, smp_processor_id(), NULL));
-}
-EXPORT_SYMBOL(xen_halt);
-
 #ifdef CONFIG_CPU_FREQ
 static int time_cpufreq_notifier(struct notifier_block *nb, unsigned long val, 
 				void *data)

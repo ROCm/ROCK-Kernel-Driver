@@ -176,6 +176,9 @@ force_sig_info_fault(int si_signo, int si_code, unsigned long address,
 DEFINE_SPINLOCK(pgd_lock);
 LIST_HEAD(pgd_list);
 
+#define pgd_page_table(what, pg) \
+	spin_##what(&((struct mm_struct *)(pg)->private)->page_table_lock)
+
 #ifdef CONFIG_X86_32
 static inline pmd_t *vmalloc_sync_one(pgd_t *pgd, unsigned long address)
 {
@@ -237,7 +240,13 @@ void vmalloc_sync_all(void)
 
 		spin_lock_irqsave(&pgd_lock, flags);
 		list_for_each_entry(page, &pgd_list, lru) {
-			if (!vmalloc_sync_one(page_address(page), address))
+			pmd_t *pmd;
+
+			pgd_page_table(lock, page);
+			pmd = vmalloc_sync_one(page_address(page), address);
+			pgd_page_table(unlock, page);
+
+			if (!pmd)
 				break;
 		}
 		spin_unlock_irqrestore(&pgd_lock, flags);
@@ -351,10 +360,12 @@ void vmalloc_sync_all(void)
 		list_for_each_entry(page, &pgd_list, lru) {
 			pgd_t *pgd;
 			pgd = (pgd_t *)page_address(page) + pgd_index(address);
+			pgd_page_table(lock, page);
 			if (pgd_none(*pgd))
 				set_pgd(pgd, *pgd_ref);
 			else
 				BUG_ON(pgd_page_vaddr(*pgd) != pgd_page_vaddr(*pgd_ref));
+			pgd_page_table(unlock, page);
 		}
 		spin_unlock_irqrestore(&pgd_lock, flags);
 	}
