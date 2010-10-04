@@ -397,13 +397,15 @@ static int xencdrom_block_ioctl(struct block_device *bd, fmode_t mode,
 		ret = submit_cdrom_cmd(info, (struct packet_command *)arg);
 		break;
 	default:
-		/* Not supported, augment supported above if necessary */
-		printk("%s():%d Unsupported IOCTL:%x \n", __func__, __LINE__, cmd);
-		ret = -ENOTTY;
-		break;
+out:
+		spin_unlock(&vcd->vcd_cdrom_info_lock);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,28)
+		return blkif_ioctl(inode, file, cmd, arg);
+#else
+		return blkif_ioctl(bd, mode, cmd, arg);
+#endif
 	}
 	spin_unlock(&vcd->vcd_cdrom_info_lock);
-out:
 	return ret;
 }
 

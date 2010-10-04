@@ -257,19 +257,14 @@ int _packet_write(struct packet *pak,
 		gnttab_set_map_op(&map_op, idx_to_kaddr(tpmif, i),
 				  GNTMAP_host_map, tx->ref, tpmif->domid);
 
-        do {
-		    if (unlikely(HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref,
-						       &map_op, 1)))
-			    BUG();
-            if(map_op.status) msleep(10);
-		} while(map_op.status == GNTST_eagain);
+		gnttab_check_GNTST_eagain_do_while(GNTTABOP_map_grant_ref, &map_op);
 
-		handle = map_op.handle;
-
-		if (map_op.status) {
+		if (map_op.status != GNTST_okay) {
 			DPRINTK(" Grant table operation failure !\n");
 			return 0;
 		}
+
+		handle = map_op.handle;
 
 		tocopy = min_t(size_t, size - offset, PAGE_SIZE);
 
@@ -397,14 +392,9 @@ static int packet_read_shmem(struct packet *pak,
 		gnttab_set_map_op(&map_op, idx_to_kaddr(tpmif, i),
 				  GNTMAP_host_map, tx->ref, tpmif->domid);
 
-        do {
-		    if (unlikely(HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref,
-						       &map_op, 1)))
-			    BUG();
-            if(map_op.status) msleep(10);
-		} while(map_op.status == GNTST_eagain);
+		gnttab_check_GNTST_eagain_do_while(GNTTABOP_map_grant_ref, &map_op);
 
-		if (map_op.status) {
+		if (map_op.status != GNTST_okay) {
 			DPRINTK(" Grant table operation failure !\n");
 			return -EFAULT;
 		}

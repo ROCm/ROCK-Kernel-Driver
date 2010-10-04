@@ -63,27 +63,23 @@ static int map_frontend_page( struct vscsibk_info *info,
 				unsigned long ring_ref)
 {
 	struct gnttab_map_grant_ref op;
-	int err;
+	int ret;
 
 	gnttab_set_map_op(&op, (unsigned long)info->ring_area->addr,
 				GNTMAP_host_map, ring_ref,
 				info->domid);
+	gnttab_check_GNTST_eagain_do_while(GNTTABOP_map_grant_ref, &op);
 
-    do {
-	    err = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1);
-	    BUG_ON(err);
-        msleep(10);
-    } while(op.status == GNTST_eagain);
-
-	if (op.status) {
-		printk(KERN_ERR "scsiback: Grant table operation failure !\n");
-		return op.status;
+	if (op.status != GNTST_okay) {
+		printk(KERN_ERR "scsiback: Grant table operation failure %d!\n", (int)op.status);
+		ret = -EINVAL;
+	} else {
+		info->shmem_ref    = ring_ref;
+		info->shmem_handle = op.handle;
+		ret = 0;
 	}
 
-	info->shmem_ref    = ring_ref;
-	info->shmem_handle = op.handle;
-
-	return (GNTST_okay);
+	return ret;
 }
 
 static void unmap_frontend_page(struct vscsibk_info *info)

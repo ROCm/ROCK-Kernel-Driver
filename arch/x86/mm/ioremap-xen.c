@@ -48,7 +48,7 @@ static int __direct_remap_pfn_range(struct mm_struct *mm,
 				    pgprot_t prot,
 				    domid_t  domid)
 {
-	int rc;
+	int rc = 0;
 	unsigned long i, start_address;
 	mmu_update_t *u, *v, *w;
 
@@ -68,8 +68,8 @@ static int __direct_remap_pfn_range(struct mm_struct *mm,
 						 direct_remap_area_pte_fn, &w);
 			if (rc)
 				goto out;
-			rc = -EFAULT;
-			if (HYPERVISOR_mmu_update(u, v - u, NULL, domid) < 0)
+			rc = HYPERVISOR_mmu_update(u, v - u, NULL, domid);
+			if (rc < 0)
 				goto out;
 			v = w = u;
 			start_address = address;
@@ -94,12 +94,8 @@ static int __direct_remap_pfn_range(struct mm_struct *mm,
 					 direct_remap_area_pte_fn, &w);
 		if (rc)
 			goto out;
-		rc = -EFAULT;
-		if (unlikely(HYPERVISOR_mmu_update(u, v - u, NULL, domid) < 0))
-			goto out;
+		rc = HYPERVISOR_mmu_update(u, v - u, NULL, domid);
 	}
-
-	rc = 0;
 
  out:
 	flush_tlb_all();

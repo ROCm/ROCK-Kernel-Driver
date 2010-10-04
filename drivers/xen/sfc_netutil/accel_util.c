@@ -29,7 +29,6 @@
 #include <asm/pgtable.h>
 #include <asm/hypercall.h>
 #include <xen/xenbus.h>
-#include <xen/driver_util.h>
 #include <xen/gnttab.h>
 
 #include "accel_util.h"
@@ -72,24 +71,27 @@ static int net_accel_map_grant(struct xenbus_device *dev, int gnt_ref,
 			       u64 *dev_bus_addr, unsigned flags)
 {
 	struct gnttab_map_grant_ref op;
+	int ret;
 	
 	gnttab_set_map_op(&op, (unsigned long)vaddr, flags,
 			  gnt_ref, dev->otherend_id);
 
-	BUG_ON(HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, &op, 1));
+	gnttab_check_GNTST_eagain_do_while(GNTTABOP_map_grant_ref, &op);
 
 	if (op.status != GNTST_okay) {
 		xenbus_dev_error
 			(dev, op.status,
 			 "failed mapping in shared page %d from domain %d\n",
 			 gnt_ref, dev->otherend_id);
+		ret = -EINVAL;
 	} else {
 		*handle = op.handle;
 		if (dev_bus_addr)
 			*dev_bus_addr = op.dev_bus_addr;
+		ret = 0;
 	}
 
-	return op.status;
+	return ret;
 }
 
 
@@ -113,7 +115,7 @@ static int net_accel_unmap_grant(struct xenbus_device *dev,
 				 "failed unmapping page at handle %d error %d\n",
 				 handle, op.status);
 
-	return op.status;
+	return op.status == GNTST_okay ? 0 : -EINVAL;
 }
 
 
@@ -145,7 +147,7 @@ struct net_accel_valloc_grant_mapping {
 /* Map a series of grants into a contiguous virtual area */
 static void *net_accel_map_grants_valloc(struct xenbus_device *dev, 
 					 unsigned *grants, int npages, 
-					 unsigned flags, void **priv, int *errno)
+					 unsigned flags, void **priv)
 {
 	struct net_accel_valloc_grant_mapping *map;
 	struct vm_struct *vm;
@@ -173,16 +175,12 @@ static void *net_accel_map_grants_valloc(struct xenbus_device *dev,
 
 	/* Do the actual mapping */
 	addr = vm->addr;
-    if(errno != NULL) *errno = 0;
+
 	for (i = 0; i < npages; i++) {
 		rc = net_accel_map_grant(dev, grants[i], map->grant_handles + i, 
 					 addr, NULL, flags);
-		if (rc != 0)
-        {
-            if(errno != NULL) 
-                *errno = (rc == GNTST_eagain ? -EAGAIN : -EINVAL);
+		if (rc < 0)
 			goto undo;
-        }
 		addr = (void*)((unsigned long)addr + PAGE_SIZE);
 	}
 
@@ -231,16 +229,7 @@ void *net_accel_map_grants_contig(struct xenbus_device *dev,
 				unsigned *grants, int npages, 
 				void **priv)
 {
-    int errno;
-    void *ret;
-
-    do {
-	    ret = net_accel_map_grants_valloc(dev, grants, npages,
-					   GNTMAP_host_map, priv, &errno);
-        if(errno) msleep(10);
-    } while(errno == -EAGAIN);
-
-    return ret;
+    return net_accel_map_grants_valloc(dev, grants, npages, GNTMAP_host_map, priv);
 }
 EXPORT_SYMBOL(net_accel_map_grants_contig);
 
@@ -256,16 +245,7 @@ EXPORT_SYMBOL(net_accel_unmap_grants_contig);
 void *net_accel_map_iomem_page(struct xenbus_device *dev, int gnt_ref,
 			     void **priv)
 {
-    int errno;
-    void *ret;
-
-	do {
-        ret = net_accel_map_grants_valloc(dev, &gnt_ref, 1, 
-					   GNTMAP_host_map, priv, &errno);
-        if(errno) msleep(10);
-    } while(errno == -EAGAIN);
-
-    return ret;
+	return net_accel_map_grants_valloc(dev, &gnt_ref, 1, GNTMAP_host_map, priv);
 }
 EXPORT_SYMBOL(net_accel_map_iomem_page);
 

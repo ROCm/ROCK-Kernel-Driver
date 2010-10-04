@@ -41,7 +41,6 @@
 #include <asm/hypervisor.h>
 #include <xen/blkif.h>
 #include <xen/gnttab.h>
-#include <xen/driver_util.h>
 #include <xen/xenbus.h>
 #include "blkback-pagemap.h"
 
@@ -83,8 +82,6 @@ typedef struct blkif_st {
 	struct task_struct  *xenblkd;
 	unsigned int        waiting_reqs;
 	struct request_queue *plug;
-    int                 is_suspended_req;
-    blkif_request_t     suspended_req;
 
 	/* statistics */
 	unsigned long       st_print;

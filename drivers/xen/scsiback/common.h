@@ -55,7 +55,6 @@
 #include <xen/evtchn.h>
 #include <asm/hypervisor.h>
 #include <xen/gnttab.h>
-#include <xen/driver_util.h>
 #include <xen/xenbus.h>
 #include <xen/interface/io/ring.h>
 #include <xen/interface/grant_table.h>

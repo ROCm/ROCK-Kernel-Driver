@@ -625,16 +625,9 @@ swiotlb_sync_single(struct device *hwdev, dma_addr_t dev_addr,
 
 	BUG_ON(dir == DMA_NONE);
 
-	if (is_swiotlb_buffer(dev_addr)) {
+	if (is_swiotlb_buffer(dev_addr))
 		swiotlb_tbl_sync_single(hwdev, phys_to_virt(paddr), size, dir,
 				       target);
-		return;
-	}
-
-	if (dir != DMA_FROM_DEVICE)
-		return;
-
-	dma_mark_clean(phys_to_virt(paddr), size);
 }
 
 void

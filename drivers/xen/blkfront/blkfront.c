@@ -576,6 +576,7 @@ int blkif_ioctl(struct block_device *bd, fmode_t mode,
 		unsigned command, unsigned long argument)
 {
 #endif
+	struct blkfront_info *info = bd->bd_disk->private_data;
 	int i;
 
 	DPRINTK_IOCTL("command: 0x%x, argument: 0x%lx, dev: 0x%04x\n",
@@ -610,13 +611,33 @@ int blkif_ioctl(struct block_device *bd, fmode_t mode,
 		return 0;
 
 	case CDROM_GET_CAPABILITY: {
-		struct blkfront_info *info = bd->bd_disk->private_data;
 		struct gendisk *gd = info->gd;
 		if (gd->flags & GENHD_FL_CD)
 			return 0;
 		return -EINVAL;
 	}
 	default:
+		if (info->mi && info->gd && info->rq) {
+			switch (info->mi->major) {
+			case SCSI_DISK0_MAJOR:
+			case SCSI_DISK1_MAJOR ... SCSI_DISK7_MAJOR:
+		        case SCSI_DISK8_MAJOR ... SCSI_DISK15_MAJOR:
+		        case SCSI_CDROM_MAJOR:
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,23)
+				return scsi_cmd_ioctl(filep, info->gd, command,
+						      (void __user *)argument);
+#elif LINUX_VERSION_CODE < KERNEL_VERSION(2,6,28)
+				return scsi_cmd_ioctl(filep, info->rq,
+						      info->gd, command,
+						      (void __user *)argument);
+#else
+				return scsi_cmd_ioctl(info->rq, info->gd,
+						      mode, command,
+						      (void __user *)argument);
+#endif
+			}
+		}
+
 		/*printk(KERN_ALERT "ioctl %08x not supported by Xen blkdev\n",
 		  command);*/
 		return -EINVAL; /* same return as native Linux */

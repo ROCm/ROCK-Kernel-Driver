@@ -399,7 +399,8 @@ static const struct file_operations pci_iomul_fops = {
 
 static struct miscdevice pci_iomul_miscdev = {
 	.minor = MISC_DYNAMIC_MINOR,
-	.name = "xen/pci_iomul",
+	.name = "pci_iomul",
+	.nodename = "xen/pci_iomul",
 	.fops = &pci_iomul_fops,
 };
 

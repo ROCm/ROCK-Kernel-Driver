@@ -1250,7 +1250,7 @@ int agp_generic_alloc_pages(struct agp_bridge_data *bridge, struct agp_memory *m
 	}
 
 #ifdef CONFIG_X86
-	set_pages_array_uc(mem->pages, num_pages);
+	map_pages_into_agp(mem->pages, num_pages);
 #endif
 	ret = 0;
 out:
@@ -1283,7 +1283,7 @@ void agp_generic_destroy_pages(struct agp_memory *mem)
 		return;
 
 #ifdef CONFIG_X86
-	set_pages_array_wb(mem->pages, mem->page_count);
+	unmap_pages_from_agp(mem->pages, mem->page_count);
 #endif
 
 	for (i = 0; i < mem->page_count; i++) {

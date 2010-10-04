@@ -59,7 +59,6 @@
 
 #define MAX_TAP_DEV 256     /*the maximum number of tapdisk ring devices    */
 #define MAX_DEV_NAME 100    /*the max tapdisk ring device name e.g. blktap0 */
-#define TAP_DEV_NAME "xen/blktap"
 
 /*
  * The maximum number of requests that can be outstanding at any time
@@ -300,6 +299,15 @@ static inline int OFFSET_TO_SEG(int offset)
     } while(0)
 
 
+static char *blktap_devnode(struct device *dev, mode_t *mode)
+{
+	return kasprintf(GFP_KERNEL, "xen/blktap%u", MINOR(dev->devt));
+}
+
+static struct device_type blktap_type = {
+	.devnode = blktap_devnode
+};
+
 /******************************************************************
  * BLKTAP VM OPS
  */
@@ -460,7 +468,6 @@ static const struct file_operations blktap_fops = {
 
 static tap_blkif_t *get_next_free_dev(void)
 {
-	struct class *class;
 	tap_blkif_t *info;
 	int minor;
 
@@ -523,9 +530,9 @@ found:
 		wmb();
 		tapfds[minor] = info;
 
-		if ((class = get_xen_class()) != NULL)
-			device_create(class, NULL, MKDEV(blktap_major, minor),
-				      NULL, TAP_DEV_NAME "%d", minor);
+		xen_class_device_create(&blktap_type, NULL,
+					MKDEV(blktap_major, minor),
+					NULL, "blktap%d", minor);
 	}
 
 out:
@@ -591,18 +598,18 @@ static int blktap_open(struct inode *inode, struct file *filp)
 	if (!idx)
 		return 0;
 	if (idx < 0 || idx >= MAX_TAP_DEV) {
-		WPRINTK("No device /dev/" TAP_DEV_NAME "%d\n", idx);
+		WPRINTK("No device /dev/xen/blktap%d\n", idx);
 		return -ENODEV;
 	}
 
 	info = tapfds[idx];
 	if (!info) {
-		WPRINTK("Unable to open device /dev/" TAP_DEV_NAME "%d\n",
+		WPRINTK("Unable to open device /dev/xen/blktap%d\n",
 			idx);
 		return -ENODEV;
 	}
 
-	DPRINTK("Opening device /dev/" TAP_DEV_NAME "%d\n",idx);
+	DPRINTK("Opening device /dev/xen/blktap%d\n",idx);
 	
 	/*Only one process can access device at a time*/
 	if (test_and_set_bit(0, &info->dev_inuse))
@@ -635,7 +642,7 @@ static int blktap_open(struct inode *inode, struct file *filp)
 			info->idx_map[i] = INVALID_REQ;
 	}
 
-	DPRINTK("Tap open: device /dev/" TAP_DEV_NAME "%d\n",idx);
+	DPRINTK("Tap open: device /dev/xen/blktap%d\n",idx);
 	return 0;
 
  fail_nomem:
@@ -678,7 +685,7 @@ static int blktap_release(struct inode *inode, struct file *filp)
 	}
 
 	clear_bit(0, &info->dev_inuse);
-	DPRINTK("Freeing device [/dev/" TAP_DEV_NAME "%d]\n",info->minor);
+	DPRINTK("Freeing device [/dev/xen/blktap%d]\n",info->minor);
 
 	return 0;
 }
@@ -1555,19 +1562,17 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 
 			uvaddr = MMAP_VADDR(info->user_vstart, usr_idx, i/2);
 
-			if (unlikely(map[i].status != 0)) {
-				WPRINTK("invalid kernel buffer -- "
-					"could not remap it\n");
-                if(map[i].status == GNTST_eagain)
-                    WPRINTK("grant GNTST_eagain: please use blktap2\n");
-				ret |= 1;
+			gnttab_check_GNTST_eagain_while(GNTTABOP_map_grant_ref, &map[i]);
+
+			if (unlikely(map[i].status != GNTST_okay)) {
+				WPRINTK("invalid kernel buffer -- could not remap it\n");
+				ret = 1;
 				map[i].handle = INVALID_GRANT_HANDLE;
 			}
 
-			if (unlikely(map[i+1].status != 0)) {
-				WPRINTK("invalid user buffer -- "
-					"could not remap it\n");
-				ret |= 1;
+			if (unlikely(map[i+1].status != GNTST_okay)) {
+				WPRINTK("invalid kernel buffer -- could not remap it\n");
+				ret = 1;
 				map[i+1].handle = INVALID_GRANT_HANDLE;
 			}
 
@@ -1594,12 +1599,11 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 
 			uvaddr = MMAP_VADDR(info->user_vstart, usr_idx, i);
 
-			if (unlikely(map[i].status != 0)) {
-				WPRINTK("invalid kernel buffer -- "
-					"could not remap it\n");
-                if(map[i].status == GNTST_eagain)
-                    WPRINTK("grant GNTST_eagain: please use blktap2\n");
-				ret |= 1;
+			gnttab_check_GNTST_eagain_while(GNTTABOP_map_grant_ref, &map[i]);
+
+			if (unlikely(map[i].status != GNTST_okay)) {
+				WPRINTK("invalid kernel buffer -- could not remap it\n");
+				ret = 1;
 				map[i].handle = INVALID_GRANT_HANDLE;
 			}
 
@@ -1746,7 +1750,6 @@ static void make_response(blkif_t *blkif, u64 id,
 static int __init blkif_init(void)
 {
 	int i, ret;
-	struct class *class;
 
 	if (!is_running_on_xen())
 		return -ENODEV;
@@ -1767,7 +1770,7 @@ static int __init blkif_init(void)
 	tap_blkif_xenbus_init();
 
 	/* Dynamically allocate a major for this device */
-	ret = register_chrdev(0, "blktap", &blktap_fops);
+	ret = __register_chrdev(0, 0, MAX_TAP_DEV, "blktap", &blktap_fops);
 
 	if (ret < 0) {
 		WPRINTK("Couldn't register /dev/xen/blktap\n");
@@ -1779,10 +1782,10 @@ static int __init blkif_init(void)
 	/* tapfds[0] is always NULL */
 	blktap_next_minor++;
 
-	DPRINTK("Created misc_dev %d:0 [/dev/" TAP_DEV_NAME "0]\n", ret);
+	DPRINTK("Created misc_dev %d:0 [/dev/xen/blktap0]\n", ret);
 
 	/* Make sure the xen class exists */
-	if ((class = get_xen_class()) != NULL) {
+	if (get_xen_class()) {
 		/*
 		 * This will allow udev to create the blktap ctrl device.
 		 * We only want to create blktap0 first.  We don't want
@@ -1790,8 +1793,9 @@ static int __init blkif_init(void)
 		 * We only create the device when a request of a new device is
 		 * made.
 		 */
-		device_create(class, NULL, MKDEV(blktap_major, 0), NULL,
-			      TAP_DEV_NAME "0");
+		xen_class_device_create(&blktap_type, NULL,
+					MKDEV(blktap_major, 0), NULL,
+					"blktap0");
 	} else {
 		/* this is bad, but not fatal */
 		WPRINTK("blktap: sysfs xen_class not created\n");
@@ -1805,4 +1809,4 @@ static int __init blkif_init(void)
 module_init(blkif_init);
 
 MODULE_LICENSE("Dual BSD/GPL");
-MODULE_ALIAS("devname:" TAP_DEV_NAME "0");
+MODULE_ALIAS("devname:xen/blktap0");

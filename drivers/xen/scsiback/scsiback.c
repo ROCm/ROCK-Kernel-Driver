@@ -283,22 +283,14 @@ static int scsiback_gnttab_data_map(vscsiif_request_t *ring_req,
 
 		err = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, map, nr_segments);
 		BUG_ON(err);
-        /* Retry maps with GNTST_eagain */
-        for(i=0; i < nr_segments; i++) {
-            while(unlikely(map[i].status == GNTST_eagain))
-            {
-                msleep(10);
-		        err = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, 
-                                                &map[i], 
-                                                1);
-		        BUG_ON(err);
-            }
-        }
 
 		for_each_sg (pending_req->sgl, sg, nr_segments, i) {
 			struct page *pg;
 
-			if (unlikely(map[i].status != 0)) {
+			/* Retry maps with GNTST_eagain */
+			if (unlikely(map[i].status == GNTST_eagain))
+				gnttab_check_GNTST_eagain_while(GNTTABOP_map_grant_ref, &map[i]);
+			if (unlikely(map[i].status != GNTST_okay)) {
 				printk(KERN_ERR "scsiback: invalid buffer -- could not remap it\n");
 				map[i].handle = SCSIBACK_INVALID_HANDLE;
 				err |= 1;

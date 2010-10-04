@@ -26,7 +26,6 @@
 #include <asm/pgtable.h>
 #include <xen/evtchn.h>
 #include <xen/xenoprof.h>
-#include <xen/driver_util.h>
 #include <xen/interface/xen.h>
 #include <xen/interface/xenoprof.h>
 #include "../../../drivers/oprofile/event_buffer.h"

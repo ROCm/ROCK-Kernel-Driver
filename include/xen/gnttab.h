@@ -40,6 +40,7 @@
 #include <asm/hypervisor.h>
 #include <asm/maddr.h> /* maddr_t */
 #include <linux/mm.h>
+#include <linux/delay.h>
 #include <xen/interface/grant_table.h>
 #include <xen/features.h>
 
@@ -164,6 +165,43 @@ gnttab_set_replace_op(struct gnttab_unmap_and_replace *unmap, maddr_t addr,
 	}
 
 	unmap->handle = handle;
+}
+
+#define gnttab_check_GNTST_eagain_while(__HCop, __HCarg_p)			\
+{										\
+	u8 __hc_delay = 1;							\
+	int __ret;								\
+	while (unlikely((__HCarg_p)->status == GNTST_eagain && __hc_delay)) {	\
+		msleep(__hc_delay++);						\
+		__ret = HYPERVISOR_grant_table_op(__HCop, (__HCarg_p), 1);	\
+		BUG_ON(__ret);							\
+	}									\
+	if (__hc_delay == 0) {							\
+		printk(KERN_ERR "%s: %s gnt busy\n", __func__, current->comm);	\
+		(__HCarg_p)->status = GNTST_bad_page;				\
+	}									\
+	if ((__HCarg_p)->status != GNTST_okay)					\
+		printk(KERN_ERR "%s: %s gnt status %x\n", 			\
+			__func__, current->comm, (__HCarg_p)->status);		\
+}
+
+#define gnttab_check_GNTST_eagain_do_while(__HCop, __HCarg_p)			\
+{										\
+	u8 __hc_delay = 1;							\
+	int __ret;								\
+	do {									\
+		__ret = HYPERVISOR_grant_table_op(__HCop, (__HCarg_p), 1);	\
+		BUG_ON(__ret);							\
+		if ((__HCarg_p)->status == GNTST_eagain)			\
+			msleep(__hc_delay++);					\
+	} while ((__HCarg_p)->status == GNTST_eagain && __hc_delay);		\
+	if (__hc_delay == 0) {							\
+		printk(KERN_ERR "%s: %s gnt busy\n", __func__, current->comm);	\
+		(__HCarg_p)->status = GNTST_bad_page;				\
+	}									\
+	if ((__HCarg_p)->status != GNTST_okay)					\
+		printk(KERN_ERR "%s: %s gnt status %x\n", 			\
+			__func__, current->comm, (__HCarg_p)->status);		\
 }
 
 #endif /* __ASM_GNTTAB_H__ */

@@ -930,7 +930,7 @@ config SENSORS_TMP421
 
 config SENSORS_VIA_CPUTEMP
 	tristate "VIA CPU temperature sensor"
-	depends on X86
+	depends on X86 && !XEN
 	help
 	  If you say yes here you get support for the temperature
 	  sensor inside your CPU. Supported are all known variants of

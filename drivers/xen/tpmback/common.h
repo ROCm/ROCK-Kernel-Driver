@@ -10,7 +10,6 @@
 #include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <xen/evtchn.h>
-#include <xen/driver_util.h>
 #include <xen/interface/grant_table.h>
 #include <xen/interface/io/tpmif.h>
 #include <asm/io.h>

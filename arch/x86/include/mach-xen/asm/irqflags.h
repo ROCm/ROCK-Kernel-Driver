@@ -4,6 +4,7 @@
 #include <asm/smp-processor-id.h>
 
 #ifndef __ASSEMBLY__
+#include <xen/interface/vcpu.h>
 /*
  * The use of 'barrier' in the following reflects their use as local-lock
  * operations. Reentrancy must be prevented (e.g., __cli()) /before/ following
@@ -43,10 +44,6 @@ do {								\
 		force_evtchn_callback();			\
 } while (0)
 
-void xen_safe_halt(void);
-
-void xen_halt(void);
-
 #define __raw_local_save_flags() xen_save_fl()
 
 #define raw_local_irq_restore(flags) xen_restore_fl(flags)
@@ -59,19 +56,16 @@ void xen_halt(void);
  * Used in the idle loop; sti takes one instruction cycle
  * to complete:
  */
-static inline void raw_safe_halt(void)
-{
-	xen_safe_halt();
-}
+#define raw_safe_halt HYPERVISOR_block
 
 /*
  * Used when interrupts are already enabled or to
  * shutdown the processor:
  */
-static inline void halt(void)
-{
-	xen_halt();
-}
+#define halt() VOID(irqs_disabled()					\
+		    ? HYPERVISOR_vcpu_op(VCPUOP_down,			\
+					 smp_processor_id(), NULL)	\
+		    : 0)
 
 /*
  * For spinlocks, etc:

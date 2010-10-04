@@ -153,6 +153,7 @@ static struct file_operations blktap_control_file_operations = {
 static struct miscdevice blktap_misc = {
 	.minor    = MISC_DYNAMIC_MINOR,
 	.name     = "blktap-control",
+	.nodename = BLKTAP2_DEV_DIR "control",
 	.fops     = &blktap_control_file_operations,
 };
 
@@ -281,3 +282,4 @@ fail:
 module_init(blktap_init);
 module_exit(blktap_exit);
 MODULE_LICENSE("Dual BSD/GPL");
+MODULE_ALIAS("devname:" BLKTAP2_DEV_DIR "control");

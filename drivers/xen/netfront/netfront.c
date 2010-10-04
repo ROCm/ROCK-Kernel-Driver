@@ -38,6 +38,7 @@
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/netdevice.h>
+#include <linux/inetdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/init.h>
@@ -234,6 +235,25 @@ static inline int xennet_can_sg(struct net_device *dev)
 	return dev->features & NETIF_F_SG;
 }
 
+/*
+ * Work around net.ipv4.conf.*.arp_notify no being enabled by default.
+ */
+static void __devinit netfront_enable_arp_notify(struct netfront_info *info)
+{
+#ifdef CONFIG_INET
+	struct in_device *in_dev;
+
+	rtnl_lock();
+	in_dev = __in_dev_get_rtnl(info->netdev);
+	if (in_dev && !IN_DEV_CONF_GET(in_dev, ARP_NOTIFY))
+		IN_DEV_CONF_SET(in_dev, ARP_NOTIFY, 1);
+	rtnl_unlock();
+	if (!in_dev)
+		printk(KERN_WARNING "Cannot enable ARP notification on %s\n",
+		       info->xbdev->nodename);
+#endif
+}
+
 /**
  * Entry point to this code when a new device is created.  Allocate the basic
  * structures and the ring buffers for communication with the backend, and
@@ -262,6 +282,8 @@ static int __devinit netfront_probe(struct xenbus_device *dev,
 		       __FUNCTION__, err);
 		goto fail;
 	}
+
+	netfront_enable_arp_notify(info);
 
 	err = xennet_sysfs_addif(info->netdev);
 	if (err) {

@@ -40,7 +40,6 @@
 #include <asm/hypervisor.h>
 #include <xen/blkif.h>
 #include <xen/gnttab.h>
-#include <xen/driver_util.h>
 
 #define DPRINTK(_f, _a...) pr_debug("(file=%s, line=%d) " _f, \
                                     __FILE__ , __LINE__ , ## _a )

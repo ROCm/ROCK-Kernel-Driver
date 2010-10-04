@@ -21,6 +21,23 @@
 	/* only a fallback: xen_destroy_contiguous_region uses PAGE_KERNEL */ \
 	set_pages_wb(page, 1))
 
+#define map_pages_into_agp(pages, nr) ({ \
+	__typeof__(nr) n__; \
+	int rc__ = 0; \
+	for (n__ = 0; n__ < (nr) && !rc__; ++n__) \
+		rc__ = xen_create_contiguous_region( \
+			(unsigned long)page_address((pages)[n__]), 0, 32); \
+	rc__ ?: set_pages_array_uc(pages, nr); \
+})
+#define unmap_pages_from_agp(pages, nr) ({ \
+	__typeof__(nr) n__; \
+	for (n__ = 0; n__ < nr; ++n__) \
+		xen_destroy_contiguous_region( \
+			(unsigned long)page_address((pages)[n__]), 0); \
+	/* only a fallback: xen_destroy_contiguous_region uses PAGE_KERNEL */ \
+	set_pages_array_wb(pages, nr); \
+})
+
 /*
  * Could use CLFLUSH here if the cpu supports it. But then it would
  * need to be called for each cacheline of the whole page so it may

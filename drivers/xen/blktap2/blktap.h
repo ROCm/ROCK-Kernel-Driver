@@ -26,6 +26,8 @@ extern int blktap_debug_level;
 #define BTWARN(_f, _a...)            BTPRINTK(0, KERN_WARNING, 0, _f, ##_a)
 #define BTERR(_f, _a...)             BTPRINTK(0, KERN_ERR, 0, _f, ##_a)
 
+#define BLKTAP2_DEV_DIR "xen/blktap-2/"
+
 #define MAX_BLKTAP_DEVICE            256
 
 #define BLKTAP_CONTROL               1
