@@ -723,7 +723,6 @@ void module_param_sysfs_remove(struct module *mod)
 void destroy_params(const struct kernel_param *params, unsigned num)
 {
 	unsigned int i;
-	char *tmp;
 
 	for (i = 0; i < num; i++)
 		if (params[i].ops->free)

@@ -86,11 +86,10 @@ static inline int ddebug_exec_query(char *query_string)
 {
 	return 0;
 }
-static incline void ddebug_module_parse_args(const char *name, char* args,
-					     struct kernel_param *params,
-					     unsigned num)
+static inline void ddebug_module_parse_args(const char *name, char* args,
+					    struct kernel_param *params,
+					    unsigned num)
 {
-	return 0;
 }
 
 #define dynamic_pr_debug(fmt, ...)					\
