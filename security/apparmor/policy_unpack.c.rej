@@ -1,0 +1,11 @@
+diff a/security/apparmor/policy_unpack.c b/security/apparmor/policy_unpack.c	(rejected hunks)
+@@ -473,7 +473,8 @@ static struct aa_profile *unpack_profile(struct aa_ext *e)
+ {
+ 	struct aa_profile *profile = NULL;
+ 	const char *name = NULL, *info = NULL;
+-	int error = -EPROTO;
++	size_t size = 0;
++	int i, error = -EPROTO;
+ 	kernel_cap_t tmpcap;
+ 	u32 tmp;
+ 	u64 tmp64;
