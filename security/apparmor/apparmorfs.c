@@ -182,7 +182,11 @@ void __init aa_destroy_aafs(void)
 		aafs_remove(".remove");
 		aafs_remove(".replace");
 		aafs_remove(".load");
-
+#ifdef CONFIG_SECURITY_APPARMOR_COMPAT_24
+		aafs_remove("profiles");
+		aafs_remove("matching");
+		aafs_remove("features");
+#endif
 		securityfs_remove(aa_fs_dentry);
 		aa_fs_dentry = NULL;
 	}
@@ -213,7 +217,17 @@ int __init aa_create_aafs(void)
 		aa_fs_dentry = NULL;
 		goto error;
 	}
-
+#ifdef CONFIG_SECURITY_APPARMOR_COMPAT_24
+	error = aafs_create("matching", 0444, &aa_fs_matching_fops);
+	if (error)
+		goto error;
+	error = aafs_create("features", 0444, &aa_fs_features_fops);
+	if (error)
+		goto error;
+#endif
+	error = aafs_create("profiles", 0440, &aa_fs_profiles_fops);
+	if (error)
+		goto error;
 	error = aafs_create(".load", 0640, &aa_fs_profile_load);
 	if (error)
 		goto error;
