@@ -35,7 +35,7 @@
 #include <linux/version.h>
 #include <asm/traps.h>
 
-#define DP(_f, _args...) printk(KERN_ALERT "  " _f "\n" , ## _args )
+#define DP(_f, _args...) pr_alert("  " _f "\n" , ## _args )
 
 dotraplinkage void do_fixup_4gb_segment(struct pt_regs *regs, long error_code)
 {

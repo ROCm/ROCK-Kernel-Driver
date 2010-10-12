@@ -232,7 +232,7 @@ static int usbbk_alloc_urb(usbif_urb_request_t *req, pending_req_t *pending_req)
 	else
 		pending_req->urb = usb_alloc_urb(0, GFP_KERNEL);
 	if (!pending_req->urb) {
-		printk(KERN_ERR "usbback: can't alloc urb\n");
+		pr_err("usbback: can't alloc urb\n");
 		ret = -ENOMEM;
 		goto fail;
 	}
@@ -242,7 +242,7 @@ static int usbbk_alloc_urb(usbif_urb_request_t *req, pending_req_t *pending_req)
 				req->buffer_length, GFP_KERNEL,
 				&pending_req->transfer_dma);
 		if (!pending_req->buffer) {
-			printk(KERN_ERR "usbback: can't alloc urb buffer\n");
+			pr_err("usbback: can't alloc urb buffer\n");
 			ret = -ENOMEM;
 			goto fail_free_urb;
 		}
@@ -252,7 +252,7 @@ static int usbbk_alloc_urb(usbif_urb_request_t *req, pending_req_t *pending_req)
 		pending_req->setup = kmalloc(sizeof(struct usb_ctrlrequest),
 					     GFP_KERNEL);
 		if (!pending_req->setup) {
-			printk(KERN_ERR "usbback: can't alloc usb_ctrlrequest\n");
+			pr_err("usbback: can't alloc usb_ctrlrequest\n");
 			ret = -ENOMEM;
 			goto fail_free_buffer;
 		}
@@ -389,7 +389,7 @@ static int usbbk_gnttab_map(usbif_t *usbif,
 	nr_segs = pending_req->nr_buffer_segs + pending_req->nr_extra_segs;
 
 	if (nr_segs > USBIF_MAX_SEGMENTS_PER_REQUEST) {
-		printk(KERN_ERR "Bad number of segments in request\n");
+		pr_err("Bad number of segments in request\n");
 		ret = -EINVAL;
 		goto fail;
 	}
@@ -432,7 +432,7 @@ static int usbbk_gnttab_map(usbif_t *usbif,
 				gnttab_check_GNTST_eagain_while(GNTTABOP_map_grant_ref, &map[i]);
 
 			if (unlikely(map[i].status != GNTST_okay)) {
-				printk(KERN_ERR "usbback: invalid buffer -- could not remap it\n");
+				pr_err("usbback: invalid buffer -- could not remap it\n");
 				map[i].handle = USBBACK_INVALID_HANDLE;
 				ret |= 1;
 			}
@@ -958,7 +958,7 @@ static void dispatch_request_to_pending_reqs(usbif_t *usbif,
 
 	ret = usbbk_gnttab_map(usbif, req, pending_req);
 	if (ret) {
-		printk(KERN_ERR "usbback: invalid buffer\n");
+		pr_err("usbback: invalid buffer\n");
 		ret = -ESHUTDOWN;
 		goto fail_free_urb;
 	}
@@ -981,7 +981,7 @@ static void dispatch_request_to_pending_reqs(usbif_t *usbif,
 
 	ret = usb_submit_urb(pending_req->urb, GFP_KERNEL);
 	if (ret) {
-		printk(KERN_ERR "usbback: failed submitting urb, error %d\n", ret);
+		pr_err("usbback: failed submitting urb, error %d\n", ret);
 		ret = -ESHUTDOWN;
 		goto fail_flush_area;
 	}
@@ -1013,7 +1013,7 @@ static int usbbk_start_submit_urb(usbif_t *usbif)
 
 	while (rc != rp) {
 		if (RING_REQUEST_CONS_OVERFLOW(urb_ring, rc)) {
-			printk(KERN_WARNING "RING_REQUEST_CONS_OVERFLOW\n");
+			pr_warning("RING_REQUEST_CONS_OVERFLOW\n");
 			break;
 		}
 

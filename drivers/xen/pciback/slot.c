@@ -60,9 +60,9 @@ int pciback_add_pci_dev(struct pciback_device *pdev, struct pci_dev *dev,
 	for (bus = 0; bus < PCI_BUS_NBR; bus++)
 		for (slot = 0; slot < PCI_SLOT_MAX; slot++) {
 			if (slot_dev->slots[bus][slot] == NULL) {
-				printk(KERN_INFO
-				       "pciback: slot: %s: assign to virtual slot %d, bus %d\n",
-				       pci_name(dev), slot, bus);
+				pr_info("pciback: slot: %s: assign to"
+					" virtual slot %d, bus %d\n",
+					pci_name(dev), slot, bus);
 				slot_dev->slots[bus][slot] = dev;
 				goto unlock;
 			}

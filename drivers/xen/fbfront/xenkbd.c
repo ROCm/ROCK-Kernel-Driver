@@ -81,8 +81,8 @@ static irqreturn_t input_handler(int rq, void *dev_id)
 				input_report_key(dev, event->key.keycode,
 						 event->key.pressed);
 			else
-				printk("xenkbd: unhandled keycode 0x%x\n",
-				       event->key.keycode);
+				pr_warning("xenkbd: unhandled keycode 0x%x\n",
+					   event->key.keycode);
 			break;
 		case XENKBD_TYPE_POS:
 			if (event->pos.rel_z)

@@ -39,8 +39,8 @@ blkback_pagemap_set(int idx, struct page *page,
 
 	entry = blkback_pagemap + idx;
 	if (!blkback_pagemap_entry_clear(entry)) {
-		printk("overwriting pagemap %d: d %u b %u g %u\n",
-		       idx, entry->domid, entry->busid, entry->gref);
+		pr_emerg("overwriting pagemap %d: d %u b %u g %u\n",
+			 idx, entry->domid, entry->busid, entry->gref);
 		BUG();
 	}
 
@@ -64,7 +64,7 @@ blkback_pagemap_clear(struct page *page)
 
 	entry = blkback_pagemap + idx;
 	if (blkback_pagemap_entry_clear(entry)) {
-		printk("clearing empty pagemap %d\n", idx);
+		pr_emerg("clearing empty pagemap %d\n", idx);
 		BUG();
 	}
 
@@ -86,7 +86,7 @@ blkback_pagemap_read(struct page *page)
 
 	entry = blkback_pagemap + idx;
 	if (blkback_pagemap_entry_clear(entry)) {
-		printk("reading empty pagemap %d\n", idx);
+		pr_emerg("reading empty pagemap %d\n", idx);
 		BUG();
 	}
 

@@ -105,9 +105,9 @@ void __exit tpmif_exit(void);
 #define DPRINTK(fmt, args...) \
     pr_debug("xen_tpm_fr (%s:%d) " fmt, __FUNCTION__, __LINE__, ##args)
 #define IPRINTK(fmt, args...) \
-    printk(KERN_INFO "xen_tpm_fr: " fmt, ##args)
+    pr_info("xen_tpm_fr: " fmt, ##args)
 #define WPRINTK(fmt, args...) \
-    printk(KERN_WARNING "xen_tpm_fr: " fmt, ##args)
+    pr_warning("xen_tpm_fr: " fmt, ##args)
 
 #define GRANT_INVALID_REF	0
 

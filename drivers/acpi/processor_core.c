@@ -231,6 +231,8 @@ static bool processor_physically_present(acpi_handle handle)
 	}
 
 	type = (acpi_type == ACPI_TYPE_DEVICE) ? 1 : 0;
+	if (processor_cntl_external())
+		type = ~type;
 	cpuid = acpi_get_cpuid(handle, type, acpi_id);
 
 	if ((cpuid == -1) && (num_possible_cpus() > 1))

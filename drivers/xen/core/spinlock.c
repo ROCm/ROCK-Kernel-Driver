@@ -43,11 +43,10 @@ int __cpuinit xen_spinlock_init(unsigned int cpu)
 	if (!rc)
 	 	per_cpu(poll_evtchn, cpu) = bind_ipi.port;
 	else
-		printk(KERN_WARNING
-		       "No spinlock poll event channel for CPU#%u (%d)\n",
-		       cpu, rc);
+		pr_warning("No spinlock poll event channel for CPU#%u (%d)\n",
+			   cpu, rc);
 
-	return 0;
+	return rc;
 }
 
 void __cpuinit xen_spinlock_cleanup(unsigned int cpu)

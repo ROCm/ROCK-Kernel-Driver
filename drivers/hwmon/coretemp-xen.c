@@ -56,6 +56,7 @@ struct pdev_entry {
 	const char *name;
 	u32 cpu_core_id, phys_proc_id;
 	u8 x86_model, x86_mask;
+	u32 ucode_rev;
 	char valid;		/* zero until following fields are valid */
 	unsigned long last_updated;	/* in jiffies */
 	int temp;
@@ -316,11 +317,10 @@ static int coretemp_probe(struct platform_device *pdev)
 
 	if ((data->x86_model == 0xe) && (data->x86_mask < 0xc)) {
 		/* check for microcode update */
-		if (rdmsr_safe_on_pcpu(pdev->id, MSR_IA32_UCODE_REV,
-				       &eax, &edx) < 0)
+		if (!(data->ucode_rev + 1))
 			dev_warn(&pdev->dev,
 				 "Cannot read microcode revision of CPU\n");
-		else if (edx < 0x39) {
+		else if (data->ucode_rev < 0x39) {
 			err = -ENODEV;
 			dev_err(&pdev->dev,
 				"Errata AE18 not fixed, update BIOS or "
@@ -409,8 +409,14 @@ static void get_cpuid_info(void *arg)
 	pdev_entry->x86_model = ((val >> 4) & 0xf) | ((val >> 12) & 0xf0);
 	pdev_entry->x86_mask = val & 0xf;
 
-	if (cpuid_eax(0) >= 6)
-		info->cpuid_6_eax = cpuid_eax(6);
+	if (((val >> 8) & 0xf) != 6 || ((val >> 20) & 0xff)
+	    || !pdev_entry->x86_model
+	    || wrmsr_safe(MSR_IA32_UCODE_REV, 0, 0) < 0
+	    || (sync_core(), rdmsr_safe(MSR_IA32_UCODE_REV,
+					&val, &pdev_entry->ucode_rev)) < 0)
+		pdev_entry->ucode_rev = ~0;
+
+	info->cpuid_6_eax = cpuid_eax(0) >= 6 ? cpuid_eax(6) : 0;
 }
 
 static int coretemp_device_add(unsigned int cpu)

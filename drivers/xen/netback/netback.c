@@ -1657,7 +1657,7 @@ static irqreturn_t netif_be_dbg(int irq, void *dev_id)
 	netif_t *netif;
 	unsigned int i = 0, group;
 
-	printk(KERN_ALERT "netif_schedule_list:\n");
+	pr_alert("netif_schedule_list:\n");
 
 	for (group = 0; group < netbk_nr_groups; ++group) {
 		struct xen_netbk *netbk = &xen_netbk[group];
@@ -1666,25 +1666,28 @@ static irqreturn_t netif_be_dbg(int irq, void *dev_id)
 
 		list_for_each(ent, &netbk->net_schedule_list) {
 			netif = list_entry(ent, netif_t, list);
-			printk(KERN_ALERT " %d: private(rx_req_cons=%08x "
-			       "rx_resp_prod=%08x\n",
-			       i, netif->rx.req_cons, netif->rx.rsp_prod_pvt);
-			printk(KERN_ALERT "   tx_req_cons=%08x tx_resp_prod=%08x)\n",
-			       netif->tx.req_cons, netif->tx.rsp_prod_pvt);
-			printk(KERN_ALERT "   shared(rx_req_prod=%08x "
-			       "rx_resp_prod=%08x\n",
-			       netif->rx.sring->req_prod, netif->rx.sring->rsp_prod);
-			printk(KERN_ALERT "   rx_event=%08x tx_req_prod=%08x\n",
-			       netif->rx.sring->rsp_event, netif->tx.sring->req_prod);
-			printk(KERN_ALERT "   tx_resp_prod=%08x, tx_event=%08x)\n",
-			       netif->tx.sring->rsp_prod, netif->tx.sring->rsp_event);
+			pr_alert(" %d: private(rx_req_cons=%08x "
+				 "rx_resp_prod=%08x\n", i,
+				 netif->rx.req_cons, netif->rx.rsp_prod_pvt);
+			pr_alert("   tx_req_cons=%08x tx_resp_prod=%08x)\n",
+				 netif->tx.req_cons, netif->tx.rsp_prod_pvt);
+			pr_alert("   shared(rx_req_prod=%08x "
+				 "rx_resp_prod=%08x\n",
+				 netif->rx.sring->req_prod,
+				 netif->rx.sring->rsp_prod);
+			pr_alert("   rx_event=%08x tx_req_prod=%08x\n",
+				 netif->rx.sring->rsp_event,
+				 netif->tx.sring->req_prod);
+			pr_alert("   tx_resp_prod=%08x, tx_event=%08x)\n",
+				 netif->tx.sring->rsp_prod,
+				 netif->tx.sring->rsp_event);
 			i++;
 		}
 
 		spin_unlock_irq(&netbk->netbk->net_schedule_list_lock);
 	}
 
-	printk(KERN_ALERT " ** End of netif_schedule_list **\n");
+	pr_alert(" ** End of netif_schedule_list **\n");
 
 	return IRQ_HANDLED;
 }
@@ -1757,13 +1760,12 @@ static int __init netback_init(void)
 				      PAGE_KERNEL);
 	} while (!xen_netbk && (netbk_nr_groups >>= 1));
 	if (!xen_netbk) {
-		printk(KERN_ALERT "%s: out of memory\n", __func__);
+		pr_err("%s: out of memory\n", __func__);
 		return -ENOMEM;
 	}
 	if (group && netbk_nr_groups != group)
-		printk(KERN_WARNING
-		       "netback: only using %u (instead of %u) groups\n",
-		       netbk_nr_groups, group);
+		pr_warning("netback: only using %u (instead of %u) groups\n",
+			   netbk_nr_groups, group);
 
 	/* We can increase reservation by this much in net_rx_action(). */
 	balloon_update_driver_allowance(netbk_nr_groups * NET_RX_RING_SIZE);
@@ -1794,7 +1796,7 @@ static int __init netback_init(void)
 		netbk->mmap_pages =
 			alloc_empty_pages_and_pagevec(MAX_PENDING_REQS);
 		if (netbk->mmap_pages == NULL) {
-			printk(KERN_ALERT "%s: out of memory\n", __func__);
+			pr_err("%s: out of memory\n", __func__);
 			rc = -ENOMEM;
 			goto failed_init;
 		}
@@ -1814,8 +1816,7 @@ static int __init netback_init(void)
 						     "netback/%u", group);
 
 			if (IS_ERR(netbk->task)) {
-				printk(KERN_ALERT
-				       "kthread_create() fails at netback\n");
+				pr_alert("netback: kthread_create() failed\n");
 				rc = PTR_ERR(netbk->task);
 				goto failed_init;
 			}

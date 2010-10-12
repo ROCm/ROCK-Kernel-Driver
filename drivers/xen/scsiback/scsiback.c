@@ -202,14 +202,14 @@ static void scsiback_print_status(char *sense_buffer, int errors,
 {
 	struct scsi_device *sdev = pending_req->sdev;
 	
-	printk(KERN_ERR "scsiback: %d:%d:%d:%d ",sdev->host->host_no,
-			sdev->channel, sdev->id, sdev->lun);
-	printk(KERN_ERR "status = 0x%02x, message = 0x%02x, host = 0x%02x, driver = 0x%02x\n",
-			status_byte(errors), msg_byte(errors),
-			host_byte(errors), driver_byte(errors));
+	pr_err("scsiback: %d:%d:%d:%d ",
+	       sdev->host->host_no, sdev->channel, sdev->id, sdev->lun);
+	pr_err("status = 0x%02x, message = 0x%02x, host = 0x%02x,"
+	       " driver = 0x%02x\n",
+	       status_byte(errors), msg_byte(errors),
+	       host_byte(errors), driver_byte(errors));
 
-	printk(KERN_ERR "scsiback: cmnd[0]=0x%02X\n",
-			pending_req->cmnd[0]);
+	pr_err("scsiback: cmnd[0]=0x%02X\n", pending_req->cmnd[0]);
 
 	if (CHECK_CONDITION & status_byte(errors))
 		__scsi_print_sense("scsiback", sense_buffer, SCSI_SENSE_BUFFERSIZE);
@@ -266,7 +266,7 @@ static int scsiback_gnttab_data_map(vscsiif_request_t *ring_req,
 		pending_req->sgl = kmalloc(sizeof(struct scatterlist) * nr_segments,
 						GFP_KERNEL);
 		if (!pending_req->sgl) {
-			printk(KERN_ERR "scsiback: %s: kmalloc() error.\n", __FUNCTION__);
+			pr_err("scsiback: %s: kmalloc() error\n", __FUNCTION__);
 			return -ENOMEM;
 		}
 
@@ -291,7 +291,7 @@ static int scsiback_gnttab_data_map(vscsiif_request_t *ring_req,
 			if (unlikely(map[i].status == GNTST_eagain))
 				gnttab_check_GNTST_eagain_while(GNTTABOP_map_grant_ref, &map[i]);
 			if (unlikely(map[i].status != GNTST_okay)) {
-				printk(KERN_ERR "scsiback: invalid buffer -- could not remap it\n");
+				pr_err("scsiback: invalid buffer -- could not remap it\n");
 				map[i].handle = SCSIBACK_INVALID_HANDLE;
 				err |= 1;
 			}
@@ -429,14 +429,14 @@ void scsiback_cmd_exec(pending_req_t *pending_req)
 		struct bio *bio = request_map_sg(pending_req);
 
 		if (IS_ERR(bio)) {
-			printk(KERN_ERR "scsiback: SG Request Map Error\n");
+			pr_err("scsiback: SG Request Map Error\n");
 			return;
 		}
 
 		rq = blk_make_request(pending_req->sdev->request_queue, bio,
 				      GFP_KERNEL);
 		if (IS_ERR(rq)) {
-			printk(KERN_ERR "scsiback: Make Request Error\n");
+			pr_err("scsiback: Make Request Error\n");
 			return;
 		}
 
@@ -445,7 +445,7 @@ void scsiback_cmd_exec(pending_req_t *pending_req)
 		rq = blk_get_request(pending_req->sdev->request_queue, write,
 				     GFP_KERNEL);
 		if (unlikely(!rq)) {
-			printk(KERN_ERR "scsiback: Get Request Error\n");
+			pr_err("scsiback: Get Request Error\n");
 			return;
 		}
 	}
@@ -617,7 +617,7 @@ static int scsiback_do_cmd_fn(struct vscsibk_info *info)
 		} else if (pending_req->act == VSCSIIF_ACT_SCSI_RESET) {
 			scsiback_device_reset_exec(pending_req);
 		} else {
-			printk(KERN_ERR "scsiback: invalid parameter for request\n");
+			pr_err("scsiback: invalid parameter for request\n");
 			scsiback_do_resp_with_sense(NULL, (DRIVER_ERROR << 24),
 				0, pending_req);
 			continue;
@@ -703,7 +703,7 @@ out_of_memory:
 	kfree(pending_reqs);
 	kfree(pending_grant_handles);
 	free_empty_pages_and_pagevec(pending_pages, mmap_pages);
-	printk(KERN_ERR "scsiback: %s: out of memory\n", __FUNCTION__);
+	pr_err("scsiback: %s: out of memory\n", __FUNCTION__);
 	return -ENOMEM;
 }
 

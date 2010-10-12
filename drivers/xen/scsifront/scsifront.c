@@ -118,8 +118,8 @@ static void scsifront_gnttab_done(struct vscsifrnt_shadow *s, uint32_t id)
 		for (i = 0; i < s->nr_segments; i++) {
 			if (unlikely(gnttab_query_foreign_access(
 				s->gref[i]) != 0)) {
-				printk(KERN_ALERT "scsifront: "
-					"grant still in use by backend.\n");
+				pr_alert("scsifront: "
+					 "grant still in use by backend\n");
 				BUG();
 			}
 			gnttab_end_foreign_access(s->gref[i], 0UL);
@@ -256,7 +256,7 @@ static int map_data_for_request(struct vscsifrnt_info *info,
 
 	err = gnttab_alloc_grant_references(VSCSIIF_SG_TABLESIZE, &gref_head);
 	if (err) {
-		printk(KERN_ERR "scsifront: gnttab_alloc_grant_references() error\n");
+		pr_err("scsifront: gnttab_alloc_grant_references() error\n");
 		return -ENOMEM;
 	}
 
@@ -267,7 +267,7 @@ static int map_data_for_request(struct vscsifrnt_info *info,
 
 		nr_pages = (data_len + sgl->offset + PAGE_SIZE - 1) >> PAGE_SHIFT;
 		if (nr_pages > VSCSIIF_SG_TABLESIZE) {
-			printk(KERN_ERR "scsifront: Unable to map request_buffer for command!\n");
+			pr_err("scsifront: Unable to map request_buffer for command!\n");
 			ref_cnt = (-E2BIG);
 			goto big_to_sg;
 		}

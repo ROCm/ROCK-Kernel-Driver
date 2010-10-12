@@ -445,11 +445,9 @@ static inline int processor_pmthr_external(void)
 
 extern int processor_notify_external(struct acpi_processor *pr,
 			int event, int type);
-extern void processor_extcntl_init(void);
 extern int processor_extcntl_prepare(struct acpi_processor *pr);
 extern int acpi_processor_get_performance_info(struct acpi_processor *pr);
 extern int acpi_processor_get_psd(struct acpi_processor *pr);
-void arch_acpi_processor_init_extcntl(const struct processor_extcntl_ops **);
 #else
 static inline int processor_cntl_external(void) {return 0;}
 static inline int processor_pm_external(void) {return 0;}
@@ -460,7 +458,6 @@ static inline int processor_notify_external(struct acpi_processor *pr,
 {
 	return 0;
 }
-static inline void processor_extcntl_init(void) {}
 static inline int processor_extcntl_prepare(struct acpi_processor *pr)
 {
 	return 0;

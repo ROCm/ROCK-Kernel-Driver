@@ -50,10 +50,10 @@ cpumask_var_t cpu_initialized_mask;
 #ifndef CONFIG_XEN
 cpumask_var_t cpu_callout_mask;
 cpumask_var_t cpu_callin_mask;
-#endif
 
 /* representing cpus for which sibling maps can be computed */
 cpumask_var_t cpu_sibling_setup_mask;
+#endif
 
 /* correctly size the local cpu masks */
 void __init setup_cpu_local_masks(void)
@@ -62,8 +62,8 @@ void __init setup_cpu_local_masks(void)
 #ifndef CONFIG_XEN
 	alloc_bootmem_cpumask_var(&cpu_callin_mask);
 	alloc_bootmem_cpumask_var(&cpu_callout_mask);
-#endif
 	alloc_bootmem_cpumask_var(&cpu_sibling_setup_mask);
+#endif
 }
 
 static void __cpuinit default_init(struct cpuinfo_x86 *c)
@@ -581,7 +581,7 @@ void __cpuinit cpu_detect(struct cpuinfo_x86 *c)
 	}
 }
 
-static void __cpuinit get_cpu_cap(struct cpuinfo_x86 *c)
+void __cpuinit get_cpu_cap(struct cpuinfo_x86 *c)
 {
 	u32 tfms, xlvl;
 	u32 ebx;
@@ -769,9 +769,10 @@ static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
 
 	get_cpu_cap(c);
 
+#ifndef CONFIG_XEN
 	if (c->cpuid_level >= 0x00000001) {
 		c->initial_apicid = (cpuid_ebx(1) >> 24) & 0xFF;
-#if defined(CONFIG_X86_32) && !defined(CONFIG_XEN)
+#ifdef CONFIG_X86_32
 # ifdef CONFIG_X86_HT
 		c->apicid = apic->phys_pkg_id(c->initial_apicid, 0);
 # else
@@ -783,6 +784,7 @@ static void __cpuinit generic_identify(struct cpuinfo_x86 *c)
 		c->phys_proc_id = c->initial_apicid;
 #endif
 	}
+#endif
 
 	get_model_name(c); /* Default name */
 
@@ -802,8 +804,10 @@ static void __cpuinit identify_cpu(struct cpuinfo_x86 *c)
 	c->x86_model = c->x86_mask = 0;	/* So far unknown... */
 	c->x86_vendor_id[0] = '\0'; /* Unset */
 	c->x86_model_id[0] = '\0';  /* Unset */
+#ifndef CONFIG_XEN
 	c->x86_max_cores = 1;
 	c->x86_coreid_bits = 0;
+#endif
 #ifdef CONFIG_X86_64
 	c->x86_clflush_size = 64;
 	c->x86_phys_bits = 36;

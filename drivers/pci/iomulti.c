@@ -195,29 +195,26 @@ static int __devinit pci_iomul_slot_init(struct pci_dev *pdev,
 	rpcap = pci_find_capability(pdev, PCI_CAP_ID_EXP);
 	if (!rpcap) {
 		/* pci device isn't supported */
-		printk(KERN_INFO
-		       "PCI: sharing io port of non PCIe device %s "
-		       "isn't supported. ignoring.\n",
-		       pci_name(pdev));
+		pr_info("PCI: sharing io port of non PCIe device %s "
+			"isn't supported. ignoring.\n",
+			pci_name(pdev));
 		return -ENOSYS;
 	}
 
 	pci_read_config_word(pdev, rpcap + PCI_CAP_FLAGS, &cap);
 	switch ((cap & PCI_EXP_FLAGS_TYPE) >> 4) {
 	case PCI_EXP_TYPE_RC_END:
-		printk(KERN_INFO
-		       "PCI: io port sharing of root complex integrated "
-		       "endpoint %s isn't supported. ignoring.\n",
-		       pci_name(pdev));
+		pr_info("PCI: io port sharing of root complex integrated "
+			"endpoint %s isn't supported. ignoring.\n",
+			pci_name(pdev));
 		return -ENOSYS;
 	case PCI_EXP_TYPE_ENDPOINT:
 	case PCI_EXP_TYPE_LEG_END:
 		break;
 	default:
-		printk(KERN_INFO
-		       "PCI: io port sharing of non endpoint %s "
-		       "doesn't make sense. ignoring.\n",
-		       pci_name(pdev));
+		pr_info("PCI: io port sharing of non endpoint %s "
+			"doesn't make sense. ignoring.\n",
+			pci_name(pdev));
 		return -EINVAL;
 	}
 
@@ -445,8 +442,8 @@ static void __devinit pci_iomul_fixup_ioresource(struct pci_dev *pdev,
 	uint8_t i;
 	struct resource *r;
 
-	printk(KERN_INFO "PCI: deallocating io resource[%s]. io size 0x%lx\n",
-	       pci_name(pdev), func->io_size);
+	pr_info("PCI: deallocating io resource[%s]. io size 0x%lx\n",
+		pci_name(pdev), func->io_size);
 	for (i = 0; i < PCI_NUM_BARS; i++) {
 		r = &pdev->resource[i];
 		if (!(func->io_bar & (1 << i)))
@@ -541,9 +538,9 @@ static void __devinit quirk_iomul_dealloc_ioresource(struct pci_dev *pdev)
 					    pci_dev_switch_busnr(pdev));
 		if (sw == NULL) {
 			mutex_unlock(&switch_list_lock);
-			printk(KERN_WARNING
-			       "PCI: can't allocate memory "
-			       "for sw of IO mulplexing %s", pci_name(pdev));
+			pr_warn("PCI: can't allocate memory"
+				"for sw of IO multiplexing %s",
+				pci_name(pdev));
 			return;
 		}
 		pci_iomul_switch_add_locked(sw);
@@ -559,15 +556,15 @@ static void __devinit quirk_iomul_dealloc_ioresource(struct pci_dev *pdev)
 		if (slot == NULL) {
 			mutex_unlock(&sw->lock);
 			pci_iomul_switch_put(sw);
-			printk(KERN_WARNING "PCI: can't allocate memory "
-			       "for IO mulplexing %s", pci_name(pdev));
+			pr_warn("PCI: can't allocate memory "
+				"for IO multiplexing %s", pci_name(pdev));
 			return;
 		}
 		pci_iomul_slot_add_locked(sw, slot);
 	}
 
-	printk(KERN_INFO "PCI: disable device and release io resource[%s].\n",
-	       pci_name(pdev));
+	pr_info("PCI: disable device and release io resource[%s].\n",
+		pci_name(pdev));
 	pci_disable_device(pdev);
 
 	__quirk_iomul_dealloc_ioresource(sw, pdev, slot);
@@ -613,8 +610,8 @@ static void __devinit pci_iomul_read_bridge_io(struct pci_iomul_switch *sw)
 	sw->io_limit = io_limit;
 
 	pci_dev_put(pdev);
-	printk(KERN_INFO "PCI: bridge %s base 0x%x limit 0x%x\n",
-	       pci_name(bridge), sw->io_base, sw->io_limit);
+	pr_info("PCI: bridge %s base 0x%x limit 0x%x\n",
+		pci_name(bridge), sw->io_base, sw->io_limit);
 }
 
 static void __devinit pci_iomul_setup_brige(struct pci_dev *bridge,
@@ -632,8 +629,7 @@ static void __devinit pci_iomul_setup_brige(struct pci_dev *bridge,
 	pci_read_config_word(bridge, PCI_COMMAND, &cmd);
 	if (!(cmd & PCI_COMMAND_IO)) {
 		cmd |= PCI_COMMAND_IO;
-		printk(KERN_INFO "PCI: Forcibly Enabling IO %s\n",
-		       pci_name(bridge));
+		pr_info("PCI: forcibly enabling IO %s\n", pci_name(bridge));
 		pci_write_config_word(bridge, PCI_COMMAND, cmd);
 	}
 }
@@ -660,8 +656,8 @@ static void __devinit pci_iomul_setup_dev(struct pci_dev *pdev,
 	uint8_t num_bars = 0;
 	struct resource *r;
 
-	printk(KERN_INFO "PCI: Forcibly assign IO %s from 0x%x\n",
-	       pci_name(pdev), io_base);
+	pr_info("PCI: Forcibly assign IO %s from 0x%x\n",
+		pci_name(pdev), io_base);
 
 	for (i = 0; i < PCI_NUM_BARS; i++) {
 		if (!(f->io_bar & (1 << i)))
@@ -734,8 +730,7 @@ static void __devinit pci_iomul_release_io_resource(
 
 				if (request_resource(parent,
 						     &sw->io_resource))
-					printk(KERN_ERR
-					       "PCI IOMul: can't allocate "
+					pr_err("PCI IOMul: can't allocate "
 					       "resource. [0x%x, 0x%x]",
 					       sw->io_base, sw->io_limit);
 			}
@@ -861,9 +856,9 @@ static int __devinit pci_iomul_notifier_del_device(struct pci_dev *pdev)
 		ret = __pci_iomul_notifier_del_switch(pdev);
 		break;
 	default:
-		printk(KERN_WARNING "PCI IOMUL: "
-		       "device %s has unknown header type %02x, ignoring.\n",
-		       pci_name(pdev), pdev->hdr_type);
+		pr_warn("PCI IOMUL: device %s has unknown "
+			"header type %02x, ignoring.\n",
+			pci_name(pdev), pdev->hdr_type);
 		ret = -EIO;
 		break;
 	}

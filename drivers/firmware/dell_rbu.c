@@ -175,9 +175,8 @@ static int create_packet(void *data, size_t length)
 			(unsigned long)packet_data_temp_buf, ordernum, 0)) {
 			free_pages((unsigned long)packet_data_temp_buf,
 				   ordernum);
-			printk(KERN_WARNING
-				"dell_rbu:%s: failed to adjust new "
-				"packet\n", __func__);
+			pr_warning("dell_rbu:%s: failed to adjust new "
+				   "packet\n", __func__);
 			retval = -ENOMEM;
 			spin_lock(&rbu_data.lock);
 			goto out_alloc_packet_array;

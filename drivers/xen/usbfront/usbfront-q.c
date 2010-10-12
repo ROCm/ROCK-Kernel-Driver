@@ -151,7 +151,7 @@ static int map_urb_for_request(struct usbfront_info *info, struct urb *urb,
 
 		ret = gnttab_alloc_grant_references(USBIF_MAX_SEGMENTS_PER_REQUEST, &gref_head);
 		if (ret) {
-			printk(KERN_ERR "usbfront: gnttab_alloc_grant_references() error\n");
+			pr_err("usbfront: gnttab_alloc_grant_references() error\n");
 			return -ENOMEM;
 		}
 

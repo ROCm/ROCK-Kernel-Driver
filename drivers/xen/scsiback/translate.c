@@ -62,8 +62,8 @@ int scsiback_add_translation_entry(struct vscsibk_info *info,
 		if ((entry->v.chn == v->chn) &&
 		    (entry->v.tgt == v->tgt) &&
 		    (entry->v.lun == v->lun)) {
-			printk(KERN_WARNING "scsiback: Virtual ID is already used. "
-			       "Assignment was not performed.\n");
+			pr_warning("scsiback: Virtual ID is already used. "
+				   "Assignment was not performed.\n");
 			err = -EEXIST;
 			goto out;
 		}
@@ -72,7 +72,7 @@ int scsiback_add_translation_entry(struct vscsibk_info *info,
 
 	/* Create a new translation entry and add to the list */
 	if ((new = kmalloc(sizeof(struct v2p_entry), GFP_ATOMIC)) == NULL) {
-		printk(KERN_ERR "scsiback: %s: kmalloc() error.\n", __FUNCTION__);
+		pr_err("scsiback: %s: kmalloc() error\n", __FUNCTION__);
 		err = -ENOMEM;
 		goto out;
 	}

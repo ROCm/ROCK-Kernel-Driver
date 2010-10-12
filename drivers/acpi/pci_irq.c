@@ -519,10 +519,10 @@ static int __init xen_setup_gsi(void)
 						  &setup_gsi) < 0)
 				continue;
 
-			printk(KERN_INFO "GSI%d: %s-%s\n", gsi,
-			       (triggering == ACPI_LEVEL_SENSITIVE) ? "level"
+			dev_info(&dev->dev, "GSI%d: %s-%s\n", gsi,
+				 triggering == ACPI_LEVEL_SENSITIVE ? "level"
 								    : "edge",
-			       (polarity == ACPI_ACTIVE_LOW) ? "low" : "high");
+				 polarity == ACPI_ACTIVE_LOW ? "low" : "high");
 		} else {
 			/*
 			 * No IRQ known to the ACPI subsystem - maybe the
@@ -532,14 +532,14 @@ static int __init xen_setup_gsi(void)
 				 pin_name(dev->pin));
 			/* Interrupt Line values above 0xF are forbidden */
 			if (dev->irq > 0 && (dev->irq <= 0xF)) {
-				printk(" - using IRQ %d\n", dev->irq);
+				pr_cont(" - using IRQ %d\n", dev->irq);
 				setup_gsi.gsi = dev->irq;
 				setup_gsi.triggering = 1;
 				setup_gsi.polarity = 1;
 				VOID(HYPERVISOR_physdev_op(PHYSDEVOP_setup_gsi,
 							   &setup_gsi));
 			} else
-				printk("\n");
+				pr_cont("\n");
 		}
 	}
 

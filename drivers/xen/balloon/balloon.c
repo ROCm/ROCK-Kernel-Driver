@@ -129,10 +129,8 @@ static struct timer_list balloon_timer;
 		PAGE_TO_LIST(p)->prev = NULL;	\
 	} while(0)
 
-#define IPRINTK(fmt, args...) \
-	printk(KERN_INFO "xen_mem: " fmt, ##args)
-#define WPRINTK(fmt, args...) \
-	printk(KERN_WARNING "xen_mem: " fmt, ##args)
+#define IPRINTK(fmt, args...) pr_info("xen_mem: " fmt, ##args)
+#define WPRINTK(fmt, args...) pr_warning("xen_mem: " fmt, ##args)
 
 /* balloon_append: add the given page to the balloon. */
 static void balloon_append(struct page *page, int account)
@@ -497,7 +495,7 @@ static int balloon_init_watcher(struct notifier_block *notifier,
 
 	err = register_xenbus_watch(&target_watch);
 	if (err)
-		printk(KERN_ERR "Failed to set balloon watcher\n");
+		pr_err("Failed to set balloon watcher\n");
 
 	return NOTIFY_DONE;
 }

@@ -405,14 +405,14 @@ static int __init gntdev_init(void)
 	struct device *device;
 
 	if (!is_running_on_xen()) {
-		printk(KERN_ERR "You must be running Xen to use gntdev\n");
+		pr_err("You must be running Xen to use gntdev\n");
 		return -ENODEV;
 	}
 
 	gntdev_major = __register_chrdev(0, 0, 1, GNTDEV_NAME, &gntdev_fops);
 	if (gntdev_major < 0)
 	{
-		printk(KERN_ERR "Could not register gntdev device\n");
+		pr_err("Could not register gntdev device\n");
 		return -ENOMEM;
 	}
 
@@ -424,9 +424,8 @@ static int __init gntdev_init(void)
 					 MKDEV(gntdev_major, 0),
 					 NULL, GNTDEV_NAME);
 	if (IS_ERR(device)) {
-		printk(KERN_ERR "Error creating gntdev device in xen_class\n");
-		printk(KERN_ERR "gntdev created with major number = %d\n",
-		       gntdev_major);
+		pr_err("Error creating gntdev device in xen_class\n");
+		pr_err("gntdev created, major number = %d\n", gntdev_major);
 		return 0;
 	}
 
@@ -512,7 +511,7 @@ static int gntdev_mmap (struct file *flip, struct vm_area_struct *vma)
 	gntdev_file_private_data_t *private_data = flip->private_data;
 
 	if (unlikely(!private_data)) {
-		printk(KERN_ERR "File's private data is NULL.\n");
+		pr_err("file's private data is NULL\n");
 		return -EINVAL;
 	}
 
@@ -520,21 +519,21 @@ static int gntdev_mmap (struct file *flip, struct vm_area_struct *vma)
 	down_read(&private_data->grants_sem);
 	if (unlikely(!private_data->grants)) {
 		up_read(&private_data->grants_sem);
-		printk(KERN_ERR "Attempted to mmap before ioctl.\n");
+		pr_err("attempted to mmap before ioctl\n");
 		return -EINVAL;
 	}
 	up_read(&private_data->grants_sem);
 
 	if (unlikely((size <= 0) || 
 		     (size + slot_index) > private_data->grants_size)) {
-		printk(KERN_ERR "Invalid number of pages or offset"
-		       "(num_pages = %d, first_slot = %ld).\n",
+		pr_err("Invalid number of pages or offset"
+		       "(num_pages = %d, first_slot = %ld)\n",
 		       size, slot_index);
 		return -ENXIO;
 	}
 
 	if ((vma->vm_flags & VM_WRITE) && !(vma->vm_flags & VM_SHARED)) {
-		printk(KERN_ERR "Writable mappings must be shared.\n");
+		pr_err("writable mappings must be shared\n");
 		return -EINVAL;
 	}
 
@@ -543,8 +542,8 @@ static int gntdev_mmap (struct file *flip, struct vm_area_struct *vma)
 	for (i = 0; i < size; ++i) {
 		if (private_data->grants[slot_index + i].state != 
 		    GNTDEV_SLOT_NOT_YET_MAPPED) {
-			printk(KERN_ERR "Slot (index = %ld) is in the wrong "
-			       "state (%d).\n", slot_index + i, 
+			pr_err("Slot (index = %ld) is in the wrong "
+			       "state (%d)\n", slot_index + i,
 			       private_data->grants[slot_index + i].state);
 			up_write(&private_data->grants_sem);
 			return -EINVAL;
@@ -559,8 +558,7 @@ static int gntdev_mmap (struct file *flip, struct vm_area_struct *vma)
 	vma->vm_private_data = kzalloc(size * sizeof(struct page *),
 				       GFP_KERNEL);
 	if (vma->vm_private_data == NULL) {
-		printk(KERN_ERR "Couldn't allocate mapping structure for VM "
-		       "area.\n");
+		pr_err("couldn't allocate mapping structure for VM area\n");
 		return -ENOMEM;
 	}
 
@@ -605,7 +603,7 @@ static int gntdev_mmap (struct file *flip, struct vm_area_struct *vma)
 		BUG_ON(ret);
 		if (op.status != GNTST_okay) {
 			if (op.status != GNTST_eagain)
-				printk(KERN_ERR "Error mapping the grant reference "
+				pr_err("Error mapping the grant reference "
 				       "into the kernel (%d). domid = %d; ref = %d\n",
 				       op.status,
 				       private_data->grants[slot_index+i]
@@ -652,8 +650,8 @@ static int gntdev_mmap (struct file *flip, struct vm_area_struct *vma)
 							  + (i << PAGE_SHIFT), 
 							  &ptep)))
 			{
-				printk(KERN_ERR "Error obtaining PTE pointer "
-				       "(%d).\n", ret);
+				pr_err("Error obtaining PTE pointer (%d)\n",
+				       ret);
 				goto undo_map_out;
 			}
 			
@@ -684,7 +682,7 @@ static int gntdev_mmap (struct file *flip, struct vm_area_struct *vma)
 							&op, 1);
 			BUG_ON(ret);
 			if (op.status != GNTST_okay) {
-				printk(KERN_ERR "Error mapping the grant "
+				pr_err("Error mapping the grant "
 				       "reference into user space (%d). domid "
 				       "= %d; ref = %d\n", op.status,
 				       private_data->grants[slot_index+i].u
@@ -791,8 +789,8 @@ static pte_t gntdev_clear_pte(struct vm_area_struct *vma, unsigned long addr,
 				GNTTABOP_unmap_grant_ref, &op, 1);
 			BUG_ON(ret);
 			if (op.status != GNTST_okay)
-				printk("User unmap grant status = %d\n", 
-				       op.status);
+				pr_warning("User unmap grant status = %d\n",
+					   op.status);
 		} else {
 			/* USING SHADOW PAGE TABLES. */
 			copy = xen_ptep_get_and_clear_full(vma, addr, ptep, is_fullmm);
@@ -808,7 +806,8 @@ static pte_t gntdev_clear_pte(struct vm_area_struct *vma, unsigned long addr,
 						&op, 1);
 		BUG_ON(ret);
 		if (op.status != GNTST_okay)
-			printk("Kernel unmap grant status = %d\n", op.status);
+			pr_warning("Kernel unmap grant status = %d\n",
+				   op.status);
 
 
 		/* Return slot to the not-yet-mapped state, so that it may be
@@ -866,8 +865,7 @@ static long gntdev_ioctl(struct file *flip,
 		up_write(&private_data->grants_sem);
 
 		if (rc) {
-			printk (KERN_ERR "Initialising gntdev private data "
-				"failed.\n");
+			pr_err("Initialising gntdev private data failed\n");
 			return rc;
 		}
 	}
@@ -893,8 +891,8 @@ private_data_initialised:
 		if (op.count == 1) {
 			if ((rc = add_grant_reference(flip, &op.refs[0],
 						      &op.index)) < 0) {
-				printk(KERN_ERR "Adding grant reference "
-				       "failed (%d).\n", rc);
+				pr_err("Adding grant reference failed (%d)\n",
+				       rc);
 				goto map_out;
 			}
 		} else {
@@ -908,23 +906,23 @@ private_data_initialised:
 			if ((rc = copy_from_user(refs,
 						 (void __user *)u,
 						 sizeof(*refs) * op.count))) {
-				printk(KERN_ERR "Copying refs from user failed"
-				       " (%d).\n", rc);
+				pr_err("Copying refs from user failed (%d)\n",
+				       rc);
 				rc = -EINVAL;
 				goto map_out;
 			}
 			if ((rc = find_contiguous_free_range(flip, op.count))
 			    < 0) {
-				printk(KERN_ERR "Finding contiguous range "
-				       "failed (%d).\n", rc);
+				pr_err("Finding contiguous range failed"
+				       " (%d)\n", rc);
 				kfree(refs);
 				goto map_out;
 			}
 			op.index = rc << PAGE_SHIFT;
 			if ((rc = add_grant_references(flip, op.count,
 						       refs, rc))) {
-				printk(KERN_ERR "Adding grant references "
-				       "failed (%d).\n", rc);
+				pr_err("Adding grant references failed (%d)\n",
+				       rc);
 				kfree(refs);
 				goto map_out;
 			}
@@ -934,8 +932,8 @@ private_data_initialised:
 		if ((rc = copy_to_user((void __user *) arg, 
 				       &op, 
 				       sizeof(op)))) {
-			printk(KERN_ERR "Copying result back to user failed "
-			       "(%d)\n", rc);
+			pr_err("Copying result back to user failed (%d)\n",
+			       rc);
 			rc = -EFAULT;
 			goto map_out;
 		}
@@ -970,15 +968,13 @@ private_data_initialised:
 			     != GNTDEV_SLOT_NOT_YET_MAPPED)) {
 				if (private_data->grants[start_index + i].state
 				    == GNTDEV_SLOT_INVALID) {
-					printk(KERN_ERR
-					       "Tried to remove an invalid "
+					pr_err("Tried to remove an invalid "
 					       "grant at offset 0x%x.",
 					       (start_index + i) 
 					       << PAGE_SHIFT);
 					rc = -EINVAL;
 				} else {
-					printk(KERN_ERR
-					       "Tried to remove a grant which "
+					pr_err("Tried to remove a grant which "
 					       "is currently mmap()-ed at "
 					       "offset 0x%x.",
 					       (start_index + i) 
@@ -1027,13 +1023,13 @@ private_data_initialised:
 			goto get_offset_unlock_out;
 		}
 		if ((!vma->vm_ops) || (vma->vm_ops != &gntdev_vmops)) {
-			printk(KERN_ERR "The vaddr specified does not belong "
+			pr_err("The vaddr specified does not belong "
 			       "to a gntdev instance: %#lx\n", vaddr);
 			rc = -EFAULT;
 			goto get_offset_unlock_out;
 		}
 		if (vma->vm_start != vaddr) {
-			printk(KERN_ERR "The vaddr specified in an "
+			pr_err("The vaddr specified in an "
 			       "IOCTL_GNTDEV_GET_OFFSET_FOR_VADDR must be at "
 			       "the start of the VM area. vma->vm_start = "
 			       "%#lx; vaddr = %#lx\n",

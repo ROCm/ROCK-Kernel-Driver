@@ -185,7 +185,8 @@ xlbd_alloc_major_info(int major, int minor, int index)
 			return NULL;
 		}
 
-		printk("xen-vbd: registered block device major %i\n", ptr->major);
+		pr_info("xen-vbd: registered block device major %i\n",
+			ptr->major);
 	}
 
 	ptr->minors = minors;
@@ -343,7 +344,8 @@ xlvbd_add(blkif_sector_t capacity, int vdevice, u16 vdisk_info,
 
 	if ((vdevice>>EXT_SHIFT) > 1) {
 		/* this is above the extended range; something is wrong */
-		printk(KERN_WARNING "blkfront: vdevice 0x%x is above the extended range; ignoring\n", vdevice);
+		pr_warning("blkfront: vdevice %#x is above the extended range;"
+			   " ignoring\n", vdevice);
 		return -ENODEV;
 	}
 
@@ -484,8 +486,8 @@ xlvbd_barrier(struct blkfront_info *info)
 	err = blk_queue_ordered(info->rq, info->feature_barrier);
 	if (err)
 		return err;
-	printk(KERN_INFO "blkfront: %s: barriers %s\n",
-	       info->gd->disk_name, barrier);
+	pr_info("blkfront: %s: barriers %s\n",
+		info->gd->disk_name, barrier);
 	return 0;
 }
 #else
@@ -493,7 +495,7 @@ int
 xlvbd_barrier(struct blkfront_info *info)
 {
 	if (info->feature_barrier)
-		printk(KERN_INFO "blkfront: %s: barriers disabled\n", info->gd->disk_name);
+		pr_info("blkfront: %s: barriers disabled\n", info->gd->disk_name);
 	return -ENOSYS;
 }
 #endif

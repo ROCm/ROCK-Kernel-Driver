@@ -90,8 +90,8 @@ static inline void create_debug_file(struct usbfront_info *info)
 {
 	struct device *dev = info_to_hcd(info)->self.controller;
 	if (device_create_file(dev, &dev_attr_statistics))
-		printk(KERN_WARNING "statistics file not created for %s\n",
-		       info_to_hcd(info)->self.bus_name);
+		pr_warning("statistics file not created for %s\n",
+			   info_to_hcd(info)->self.bus_name);
 }
 
 static inline void remove_debug_file(struct usbfront_info *info)

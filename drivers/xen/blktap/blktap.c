@@ -803,8 +803,8 @@ static long blktap_ioctl(struct file *filp, unsigned int cmd,
 	case BLKTAP_IOCTL_PRINT_IDXS:
         {
 		if (info) {
-			printk("User Rings: \n-----------\n");
-			printk("UF: rsp_cons: %2d, req_prod_prv: %2d "
+			pr_info("User Rings: \n-----------\n");
+			pr_info("UF: rsp_cons: %2d, req_prod_prv: %2d "
 				"| req_prod: %2d, rsp_prod: %2d\n",
 				info->ufe_ring.rsp_cons,
 				info->ufe_ring.req_prod_pvt,

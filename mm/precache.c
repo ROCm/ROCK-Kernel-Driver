@@ -31,16 +31,57 @@
  */
 
 #include <linux/precache.h>
+#include <linux/exportfs.h>
 #include <linux/module.h>
 #include "tmem.h"
 
 static int precache_auto_allocate; /* set to 1 to auto_allocate */
 
+union precache_filekey {
+	struct tmem_oid oid;
+	u32 fh[0];
+};
+
+/*
+ * If the filesystem uses exportable filehandles, use the filehandle as
+ * the key, else use the inode number.
+ */
+static int precache_get_key(struct inode *inode, union precache_filekey *key)
+{
+#define PRECACHE_KEY_MAX (sizeof(key->oid) / sizeof(*key->fh))
+	struct super_block *sb = inode->i_sb;
+
+	memset(key, 0, sizeof(key));
+	if (sb->s_export_op) {
+		int (*fhfn)(struct dentry *, __u32 *fh, int *, int);
+
+		fhfn = sb->s_export_op->encode_fh;
+		if (fhfn) {
+			struct dentry *d;
+			int ret, maxlen = PRECACHE_KEY_MAX;
+
+			d = list_first_entry(&inode->i_dentry,
+					     struct dentry, d_alias);
+			ret = fhfn(d, key->fh, &maxlen, 0);
+			if (ret < 0)
+				return ret;
+			if (ret >= 255 || maxlen > PRECACHE_KEY_MAX)
+				return -EPERM;
+			if (maxlen > 0)
+				return 0;
+		}
+	}
+	key->oid.oid[0] = inode->i_ino;
+	key->oid.oid[1] = inode->i_generation;
+	return 0;
+#undef PRECACHE_KEY_MAX
+}
+
 int precache_put(struct address_space *mapping, unsigned long index,
- struct page *page)
+		 struct page *page)
 {
 	u32 tmem_pool = mapping->host->i_sb->precache_poolid;
-	u64 obj = (unsigned long) mapping->host->i_ino;
+	union precache_filekey key;
 	u32 ind = (u32) index;
 	unsigned long mfn = pfn_to_mfn(page_to_pfn(page));
 	int ret;
@@ -52,58 +93,57 @@ int precache_put(struct address_space *mapping, unsigned long index,
 		ret = tmem_new_pool(0, 0, 0);
 		if (ret < 0)
 			return 0;
-		printk(KERN_INFO
-			"Mapping superblock for s_id=%s to precache_id=%d\n",
+		pr_info("Mapping superblock for s_id=%s to precache_id=%d\n",
 			mapping->host->i_sb->s_id, tmem_pool);
 		mapping->host->i_sb->precache_poolid = tmem_pool;
 	}
-	if (ind != index)
+	if (ind != index || precache_get_key(mapping->host, &key))
 		return 0;
 	mb(); /* ensure page is quiescent; tmem may address it with an alias */
-	return tmem_put_page(tmem_pool, obj, ind, mfn);
+	return tmem_put_page(tmem_pool, key.oid, ind, mfn);
 }
 
 int precache_get(struct address_space *mapping, unsigned long index,
- struct page *empty_page)
+		 struct page *empty_page)
 {
 	u32 tmem_pool = mapping->host->i_sb->precache_poolid;
-	u64 obj = (unsigned long) mapping->host->i_ino;
+	union precache_filekey key;
 	u32 ind = (u32) index;
 	unsigned long mfn = pfn_to_mfn(page_to_pfn(empty_page));
 
 	if ((s32)tmem_pool < 0)
 		return 0;
-	if (ind != index)
+	if (ind != index || precache_get_key(mapping->host, &key))
 		return 0;
 
-	return tmem_get_page(tmem_pool, obj, ind, mfn);
+	return tmem_get_page(tmem_pool, key.oid, ind, mfn);
 }
 EXPORT_SYMBOL(precache_get);
 
 int precache_flush(struct address_space *mapping, unsigned long index)
 {
 	u32 tmem_pool = mapping->host->i_sb->precache_poolid;
-	u64 obj = (unsigned long) mapping->host->i_ino;
+	union precache_filekey key;
 	u32 ind = (u32) index;
 
 	if ((s32)tmem_pool < 0)
 		return 0;
-	if (ind != index)
+	if (ind != index || precache_get_key(mapping->host, &key))
 		return 0;
 
-	return tmem_flush_page(tmem_pool, obj, ind);
+	return tmem_flush_page(tmem_pool, key.oid, ind);
 }
 EXPORT_SYMBOL(precache_flush);
 
 int precache_flush_inode(struct address_space *mapping)
 {
 	u32 tmem_pool = mapping->host->i_sb->precache_poolid;
-	u64 obj = (unsigned long) mapping->host->i_ino;
+	union precache_filekey key;
 
-	if ((s32)tmem_pool < 0)
+	if ((s32)tmem_pool < 0 || precache_get_key(mapping->host, &key))
 		return 0;
 
-	return tmem_flush_object(tmem_pool, obj);
+	return tmem_flush_object(tmem_pool, key.oid);
 }
 EXPORT_SYMBOL(precache_flush_inode);
 
@@ -117,8 +157,7 @@ int precache_flush_filesystem(struct super_block *sb)
 	ret = tmem_destroy_pool(tmem_pool);
 	if (!ret)
 		return 0;
-	printk(KERN_INFO
-		"Unmapping superblock for s_id=%s from precache_id=%d\n",
+	pr_info("Unmapping superblock for s_id=%s from precache_id=%d\n",
 		sb->s_id, ret);
 	sb->precache_poolid = 0;
 	return 1;

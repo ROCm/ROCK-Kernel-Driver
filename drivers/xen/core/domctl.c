@@ -111,8 +111,8 @@ int xen_guest_address_size(int domid)
 	domctl.v##ver.domain = domid;					\
 	ret = hypervisor_domctl(&domctl) ?: domctl.v##ver.address_size.size; \
 	if (ret == 32 || ret == 64) {					\
-		printk("v" #ver " domctl worked ok: dom%d is %d-bit\n",	\
-		       domid, ret);					\
+		pr_info("v" #ver " domctl worked ok: dom%d is %d-bit\n",\
+			domid, ret);					\
 		return ret;						\
 	}								\
 } while (0)
@@ -130,8 +130,8 @@ int xen_guest_address_size(int domid)
 #endif
 
 	ret = BITS_PER_LONG;
-	printk("v%d...7 domctls failed, assuming dom%d is native: %d\n",
-	       low, domid, ret);
+	pr_warning("v%d...%d domctls failed, assuming dom%d is native: %d\n",
+		   low, XEN_DOMCTL_INTERFACE_VERSION, domid, ret);
 
 	return ret;
 }

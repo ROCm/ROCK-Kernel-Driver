@@ -23,8 +23,8 @@ void smp_resume(void);
 static inline int smp_suspend(void)
 {
 	if (num_online_cpus() > 1) {
-		printk(KERN_WARNING "Can't suspend SMP guests "
-		       "without CONFIG_HOTPLUG_CPU\n");
+		pr_warning("Can't suspend SMP guests without"
+			   " CONFIG_HOTPLUG_CPU\n");
 		return -EOPNOTSUPP;
 	}
 	return 0;

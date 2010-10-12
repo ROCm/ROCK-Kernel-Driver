@@ -214,8 +214,7 @@ int __xen_suspend(int fast_suspend, void (*resume_notifier)(int))
 
 #if defined(__i386__) || defined(__x86_64__)
 	if (xen_feature(XENFEAT_auto_translated_physmap)) {
-		printk(KERN_WARNING "Cannot suspend in "
-		       "auto_translated_physmap mode.\n");
+		pr_warning("Can't suspend in auto_translated_physmap mode\n");
 		return -EOPNOTSUPP;
 	}
 #endif
@@ -228,7 +227,7 @@ int __xen_suspend(int fast_suspend, void (*resume_notifier)(int))
 	suspend.resume_notifier = resume_notifier;
 
 	if (_check(dpm_suspend_start, PMSG_SUSPEND)) {
-		printk(KERN_ERR "%s() failed: %d\n", what, err);
+		pr_err("%s() failed: %d\n", what, err);
 		return err;
 	}
 
@@ -238,7 +237,7 @@ int __xen_suspend(int fast_suspend, void (*resume_notifier)(int))
 		if (_check(dpm_suspend_noirq, PMSG_SUSPEND)) {
 			xenbus_suspend_cancel();
 			dpm_resume_end(PMSG_RESUME);
-			printk(KERN_ERR "%s() failed: %d\n", what, err);
+			pr_err("%s() failed: %d\n", what, err);
 			return err;
 		}
 
@@ -258,8 +257,7 @@ int __xen_suspend(int fast_suspend, void (*resume_notifier)(int))
 			if (err) {
 				xenbus_suspend_cancel();
 				dpm_resume_end(PMSG_RESUME);
-				printk(KERN_ERR "%s() failed: %d\n",
-				       what, err);
+				pr_err("%s() failed: %d\n", what, err);
 				return err;
 			}
 

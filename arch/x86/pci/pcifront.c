@@ -33,7 +33,7 @@ static int __init pcifront_x86_stub_init(void)
 	if (raw_pci_ops)
 		return 0;
 
-	printk(KERN_INFO "PCI: setting up Xen PCI frontend stub\n");
+	pr_info("PCI: setting up Xen PCI frontend stub\n");
 
 	/* Copied from arch/i386/pci/common.c */
 	pci_cache_line_size = 32 >> 2;

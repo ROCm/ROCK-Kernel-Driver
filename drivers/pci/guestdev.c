@@ -193,9 +193,8 @@ static int __init pci_check_extended_guestdev_format(char *str)
 	return TRUE;
 
 format_err_end:
-	printk(KERN_ERR
-		"PCI: The format of the guestdev parameter is illegal. [%s]\n",
-		str);
+	pr_err("PCI: The format of the guestdev parameter is illegal. [%s]\n",
+	       str);
 	return FALSE;
 }
 
@@ -304,7 +303,7 @@ struct guestdev __init *pci_copy_guestdev(struct guestdev *gdev_src)
 allocate_err_end:
 	if (gdev)
 		pci_free_guestdev(gdev);
-	printk(KERN_ERR "PCI: Failed to allocate memory.\n");
+	pr_err("PCI: failed to allocate memory\n");
 	return NULL;
 }
 
@@ -374,9 +373,8 @@ static int __init pci_make_devicepath_guestdev(char *path_str, int options)
 			} else
 				gdev->u.devicepath.child = node;
 		} else if (gdev) {
-			printk(KERN_ERR
-				"PCI: Can't obtain dev# and #func# from %s.\n",
-				sp);
+			pr_err("PCI: Can't obtain dev# and #func# from %s.\n",
+			       sp);
 			ret_val = -EINVAL;
 			if (gdev == gdev_org)
 				goto end;
@@ -416,14 +414,13 @@ static int __init pci_make_devicepath_guestdev(char *path_str, int options)
 	goto end;
 
 format_err_end:
-	printk(KERN_ERR
-		"PCI: The format of the guestdev parameter is illegal. [%s]\n",
-		path_str);
+	pr_err("PCI: The format of the guestdev parameter is illegal. [%s]\n",
+	       path_str);
 	ret_val = -EINVAL;
 	goto end;
 
 allocate_err_end:
-	printk(KERN_ERR "PCI: Failed to allocate memory.\n");
+	pr_err("PCI: failed to allocate memory\n");
 	ret_val = -ENOMEM;
 	goto end;
 
@@ -447,7 +444,7 @@ static int __init pci_make_sbdf_guestdev(char* str, int options)
 	}
 	gdev = kmalloc(sizeof(*gdev), GFP_KERNEL);
 	if (!gdev) {
-		printk(KERN_ERR "PCI: Failed to allocate memory.\n");
+		pr_err("PCI: failed to allocate memory\n");
 		return -ENOMEM;
 	}
 	INIT_LIST_HEAD(&gdev->root_list);
@@ -527,9 +524,8 @@ static int __init pci_parse_guestdev(void)
 	list_for_each(head, &guestdev_list) {
 		gdev = list_entry(head, struct guestdev, root_list);
 		pci_make_guestdev_str(gdev, path_str, GUESTDEV_STR_MAX);
-		printk(KERN_DEBUG
-			"PCI: %s has been reserved for guest domain.\n",
-			path_str);
+		pr_debug("PCI: %s has been reserved for guest domain.\n",
+			 path_str);
 	}
 	return 0;
 }
@@ -629,7 +625,7 @@ static int pci_get_sbdf_from_pcidev(
 	for(;;) {
 		node = kzalloc(sizeof(*node), GFP_KERNEL);
 		if (!node) {
-			printk(KERN_ERR "PCI: Failed to allocate memory.\n");
+			pr_err("PCI: failed to allocate memory\n");
 			goto err_end;
 		}
 		node->dev = PCI_SLOT(dev->devfn);
@@ -843,21 +839,19 @@ static int __init pci_check_guestdev_exists(void)
 				} else {
 					pci_make_guestdev_str(gdev,
 						path_str, GUESTDEV_STR_MAX);
-					printk(KERN_INFO
-					"PCI: Device does not exist. %s\n",
-					path_str);
+					pr_info("PCI: "
+						"device %s does not exist\n",
+						path_str);
 					continue;
 				}
 			}
 
 			bus = pci_find_bus(gdev->u.devicepath.seg,
 						gdev->u.devicepath.bbn);
-			if (!bus ||
-				!pci_check_devicepath_exists(gdev, bus)) {
+			if (!bus || !pci_check_devicepath_exists(gdev, bus)) {
 				pci_make_guestdev_str(gdev, path_str,
 					GUESTDEV_STR_MAX);
-				printk(KERN_INFO
-					"PCI: Device does not exist. %s\n",
+				pr_info("PCI: device %s does not exist\n",
 					path_str);
 			}
 			break;
@@ -873,8 +867,7 @@ static int __init pci_check_guestdev_exists(void)
 				}
 			}
 			pci_make_guestdev_str(gdev, path_str, GUESTDEV_STR_MAX);
-			printk(KERN_INFO "PCI: Device does not exist. %s\n",
-								path_str);
+			pr_info("PCI: device %s does not exist\n", path_str);
 			break;
 		default:
 			BUG();

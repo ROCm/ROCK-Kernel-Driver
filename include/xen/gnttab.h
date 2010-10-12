@@ -177,11 +177,11 @@ gnttab_set_replace_op(struct gnttab_unmap_and_replace *unmap, maddr_t addr,
 		BUG_ON(__ret);							\
 	}									\
 	if (__hc_delay == 0) {							\
-		printk(KERN_ERR "%s: %s gnt busy\n", __func__, current->comm);	\
+		pr_err("%s: %s gnt busy\n", __func__, current->comm);		\
 		(__HCarg_p)->status = GNTST_bad_page;				\
 	}									\
 	if ((__HCarg_p)->status != GNTST_okay)					\
-		printk(KERN_ERR "%s: %s gnt status %x\n", 			\
+		pr_err("%s: %s gnt status %x\n", 				\
 			__func__, current->comm, (__HCarg_p)->status);		\
 }
 
@@ -196,11 +196,11 @@ gnttab_set_replace_op(struct gnttab_unmap_and_replace *unmap, maddr_t addr,
 			msleep(__hc_delay++);					\
 	} while ((__HCarg_p)->status == GNTST_eagain && __hc_delay);		\
 	if (__hc_delay == 0) {							\
-		printk(KERN_ERR "%s: %s gnt busy\n", __func__, current->comm);	\
+		pr_err("%s: %s gnt busy\n", __func__, current->comm);		\
 		(__HCarg_p)->status = GNTST_bad_page;				\
 	}									\
 	if ((__HCarg_p)->status != GNTST_okay)					\
-		printk(KERN_ERR "%s: %s gnt status %x\n", 			\
+		pr_err("%s: %s gnt status %x\n", 				\
 			__func__, current->comm, (__HCarg_p)->status);		\
 }
 

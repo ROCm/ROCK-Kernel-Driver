@@ -113,7 +113,8 @@ static int map_frontend_pages(usbif_t *usbif,
 	gnttab_check_GNTST_eagain_do_while(GNTTABOP_map_grant_ref, &op);
 
 	if (op.status != GNTST_okay) {
-		printk(KERN_ERR "grant table failure mapping urb_ring_ref %d\n", (int)op.status);
+		pr_err("grant table failure mapping urb_ring_ref %d\n",
+		       (int)op.status);
 		return -EINVAL;
 	}
 
@@ -132,7 +133,8 @@ static int map_frontend_pages(usbif_t *usbif,
 				GNTMAP_host_map, usbif->urb_shmem_handle);
 		VOID(HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, &unop,
 				1));
-		printk(KERN_ERR "grant table failure mapping conn_ring_ref %d\n", (int)op.status);
+		pr_err("grant table failure mapping conn_ring_ref %d\n",
+		       (int)op.status);
 		return -EINVAL;
 	}
 

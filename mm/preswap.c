@@ -46,7 +46,8 @@ const unsigned long preswap_zero = 0, preswap_infinity = ~0UL; /* for sysctl */
  */
 #define SWIZ_BITS		4
 #define SWIZ_MASK		((1 << SWIZ_BITS) - 1)
-#define oswiz(_type, _ind)	((_type << SWIZ_BITS) | (_ind & SWIZ_MASK))
+#define oswiz(_type, _ind)	((struct tmem_oid){ \
+	.oid[0] = (_type << SWIZ_BITS) | (_ind & SWIZ_MASK) })
 #define iswiz(_ind)		(_ind >> SWIZ_BITS)
 
 /*

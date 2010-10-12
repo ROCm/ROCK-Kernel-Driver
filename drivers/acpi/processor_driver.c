@@ -514,8 +514,6 @@ static int __cpuinit acpi_processor_add(struct acpi_device *device)
 	strcpy(acpi_device_class(device), ACPI_PROCESSOR_CLASS);
 	device->driver_data = pr;
 
- 	processor_extcntl_init();
-
 	result = acpi_processor_get_info(device);
 	if (result ||
 	    ((pr->id == -1) && !processor_cntl_external())) {

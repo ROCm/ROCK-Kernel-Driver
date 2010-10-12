@@ -472,15 +472,15 @@ static void pcistub_remove(struct pci_dev *dev)
 			found_psdev->pdev);
 
 		if (found_psdev->pdev) {
-			printk(KERN_WARNING "pciback: ****** removing device "
-			       "%s while still in-use! ******\n",
-			       pci_name(found_psdev->dev));
-			printk(KERN_WARNING "pciback: ****** driver domain may "
-			       "still access this device's i/o resources!\n");
-			printk(KERN_WARNING "pciback: ****** shutdown driver "
-			       "domain before binding device\n");
-			printk(KERN_WARNING "pciback: ****** to other drivers "
-			       "or domains\n");
+			pr_warning("pciback: ****** removing device %s"
+				   " while still in-use! ******\n",
+				   pci_name(found_psdev->dev));
+			pr_warning("pciback: ****** driver domain may still"
+				   " access this device's i/o resources!\n");
+			pr_warning("pciback: ****** shutdown driver "
+				   "domain before binding device\n");
+			pr_warning("pciback: ****** to other drivers "
+				   "or domains\n");
 
 			pciback_release_pci_dev(found_psdev->pdev,
 						found_psdev->dev);
@@ -1280,7 +1280,7 @@ static int __init pcistub_init(void)
 	return err;
 
       parse_error:
-	printk(KERN_ERR "pciback: Error parsing pci_devs_to_hide at \"%s\"\n",
+	pr_err("pciback: Error parsing pci_devs_to_hide at \"%s\"\n",
 	       pci_devs_to_hide + pos);
 	return -EINVAL;
 }

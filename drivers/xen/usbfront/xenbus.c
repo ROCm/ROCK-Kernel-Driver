@@ -395,7 +395,7 @@ static int __init usbfront_init(void)
 	xenhcd_urbp_cachep = kmem_cache_create("xenhcd_urb_priv",
 			sizeof(struct urb_priv), 0, 0, NULL);
 	if (!xenhcd_urbp_cachep) {
-		printk(KERN_ERR "usbfront failed to create kmem cache\n");
+		pr_err("usbfront failed to create kmem cache\n");
 		return -ENOMEM;
 	}
 

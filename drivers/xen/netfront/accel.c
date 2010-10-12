@@ -41,10 +41,8 @@
 #define DPRINTK(fmt, args...)				\
 	pr_debug("netfront/accel (%s:%d) " fmt,		\
 	       __FUNCTION__, __LINE__, ##args)
-#define IPRINTK(fmt, args...)				\
-	printk(KERN_INFO "netfront/accel: " fmt, ##args)
-#define WPRINTK(fmt, args...)				\
-	printk(KERN_WARNING "netfront/accel: " fmt, ##args)
+#define IPRINTK(fmt, args...) pr_info("netfront/accel: " fmt, ##args)
+#define WPRINTK(fmt, args...) pr_warning("netfront/accel: " fmt, ##args)
 
 static int netfront_remove_accelerator(struct netfront_info *np,
 				       struct xenbus_device *dev);

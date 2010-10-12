@@ -102,14 +102,13 @@ struct scsi_device *scsiback_get_scsi_device(struct ids_tuple *phy)
 
 	shost = scsi_host_lookup(phy->hst);
 	if (IS_ERR(shost)) {
-		printk(KERN_ERR "scsiback: host%d doesn't exist.\n",
-			phy->hst);
+		pr_err("scsiback: host%d doesn't exist\n", phy->hst);
 		return NULL;
 	}
 	sdev   = scsi_device_lookup(shost, phy->chn, phy->tgt, phy->lun);
 	if (!sdev) {
-		printk(KERN_ERR "scsiback: %d:%d:%d:%d doesn't exist.\n",
-			phy->hst, phy->chn, phy->tgt, phy->lun);
+		pr_err("scsiback: %d:%d:%d:%d doesn't exist\n",
+		       phy->hst, phy->chn, phy->tgt, phy->lun);
 		scsi_host_put(shost);
 		return NULL;
 	}
@@ -178,7 +177,8 @@ static void scsiback_do_lun_hotplug(struct backend_info *be, int op)
 					if (!err) {
 						if (xenbus_printf(XBT_NIL, dev->nodename, state_str, 
 								    "%d", XenbusStateInitialised)) {
-							printk(KERN_ERR "scsiback: xenbus_printf error %s\n", state_str);
+							pr_err("scsiback: xenbus_printf error %s\n",
+							       state_str);
 							scsiback_del_translation_entry(be->info, &vir);
 						}
 					} else {
@@ -193,7 +193,8 @@ static void scsiback_do_lun_hotplug(struct backend_info *be, int op)
 				if (!scsiback_del_translation_entry(be->info, &vir)) {
 					if (xenbus_printf(XBT_NIL, dev->nodename, state_str, 
 							    "%d", XenbusStateClosed))
-						printk(KERN_ERR "scsiback: xenbus_printf error %s\n", state_str);
+						pr_err("scsiback: xenbus_printf error %s\n",
+						       state_str);
 				}
 			}
 			break;
@@ -203,7 +204,8 @@ static void scsiback_do_lun_hotplug(struct backend_info *be, int op)
 				/* modify vscsi-devs/dev-x/state */
 				if (xenbus_printf(XBT_NIL, dev->nodename, state_str, 
 						    "%d", XenbusStateConnected)) {
-					printk(KERN_ERR "scsiback: xenbus_printf error %s\n", state_str);
+					pr_err("scsiback: xenbus_printf error %s\n",
+					       state_str);
 					scsiback_del_translation_entry(be->info, &vir);
 					xenbus_printf(XBT_NIL, dev->nodename, state_str, 
 							    "%d", XenbusStateClosed);
@@ -346,7 +348,7 @@ static int scsiback_probe(struct xenbus_device *dev,
 
 
 fail:
-	printk(KERN_WARNING "scsiback: %s failed\n",__FUNCTION__);
+	pr_warning("scsiback: %s failed\n",__FUNCTION__);
 	scsiback_remove(dev);
 
 	return err;

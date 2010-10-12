@@ -150,7 +150,7 @@ static struct usbstub *usbstub_alloc(struct usb_device *udev,
 
 	stub = kzalloc(sizeof(*stub), GFP_KERNEL);
 	if (!stub) {
-		printk(KERN_ERR "no memory for alloc usbstub\n");
+		pr_err("no memory for usbstub\n");
 		return NULL;
 	}
 	kref_init(&stub->kref);
@@ -304,7 +304,7 @@ int __init usbstub_init(void)
 
 	err = usb_register(&usbback_usb_driver);
 	if (err < 0) {
-		printk(KERN_ERR "usbback: usb_register failed (error %d)\n", err);
+		pr_err("usbback: usb_register failed (%d)\n", err);
 		goto out;
 	}
 

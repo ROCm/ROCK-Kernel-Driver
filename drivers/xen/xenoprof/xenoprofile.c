@@ -564,8 +564,8 @@ int __init xenoprofile_init(struct oprofile_operations * ops)
 		active_defined = 0;
 	}
 
-	printk(KERN_INFO "%s: ret %d, events %d, xenoprof_is_primary %d\n",
-	       __func__, ret, init.num_events, xenoprof_is_primary);
+	pr_info("%s: ret %d, events %d, xenoprof_is_primary %d\n",
+		__func__, ret, init.num_events, xenoprof_is_primary);
 	return ret;
 }
 

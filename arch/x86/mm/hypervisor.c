@@ -108,9 +108,8 @@ void __init adjust_boot_vcpu_info(void)
 	lpfn = mfn_to_local_pfn(lmfn);
 	rpfn = mfn_to_local_pfn(rmfn);
 
-	printk(KERN_INFO
-	       "Swapping MFNs for PFN %lx and %lx (MFN %lx and %lx)\n",
-	       lpfn, rpfn, lmfn, rmfn);
+	pr_info("Swapping MFNs for PFN %lx and %lx (MFN %lx and %lx)\n",
+		lpfn, rpfn, lmfn, rmfn);
 
 	xen_l1_entry_update(lpte, pfn_pte_ma(rmfn, pte_pgprot(*lpte)));
 	xen_l1_entry_update(rpte, pfn_pte_ma(lmfn, pte_pgprot(*rpte)));
@@ -175,8 +174,8 @@ static inline bool use_lazy_mmu_mode(void)
 
 static void multicall_failed(const multicall_entry_t *mc, int rc)
 {
-	printk(KERN_EMERG "hypercall#%lu(%lx, %lx, %lx, %lx)"
-			  " failed: %d (caller %lx)\n",
+	pr_emerg("hypercall#%lu(%lx, %lx, %lx, %lx) failed: %d"
+		 " (caller %lx)\n",
 	       mc->op, mc->args[0], mc->args[1], mc->args[2], mc->args[3],
 	       rc, mc->args[5]);
 	BUG();
@@ -919,9 +918,9 @@ void xen_destroy_contiguous_region(unsigned long vstart, unsigned int order)
 			unsigned int j = 0;
 
 			if (!page) {
-				printk(KERN_WARNING "Xen and kernel out of memory "
-				       "while trying to release an order %u "
-				       "contiguous region\n", order);
+				pr_warning("Xen and kernel out of memory"
+					   " while trying to release an order"
+					   " %u contiguous region\n", order);
 				break;
 			}
 			pfn = page_to_pfn(page);

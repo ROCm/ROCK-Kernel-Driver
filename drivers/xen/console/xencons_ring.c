@@ -125,7 +125,7 @@ int xencons_ring_init(void)
 		xen_start_info->console.domU.evtchn,
 		handle_input, 0, "xencons", NULL);
 	if (irq < 0) {
-		printk(KERN_ERR "XEN console request irq failed %i\n", irq);
+		pr_err("XEN console request irq failed %i\n", irq);
 		return irq;
 	}
 
