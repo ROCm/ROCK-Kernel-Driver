@@ -82,8 +82,10 @@ struct cpuinfo_x86 {
 #endif
 	__u8			x86_virt_bits;
 	__u8			x86_phys_bits;
+#ifndef CONFIG_XEN
 	/* CPUID returned core id bits: */
 	__u8			x86_coreid_bits;
+#endif
 	/* Max extended CPUID function supported: */
 	__u32			extended_cpuid_level;
 	/* Maximum supported CPUID level, -1=no CPUID: */
@@ -96,7 +98,8 @@ struct cpuinfo_x86 {
 	int			x86_cache_alignment;	/* In bytes */
 	int			x86_power;
 	unsigned long		loops_per_jiffy;
-#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
+#ifndef CONFIG_XEN
+#ifdef CONFIG_SMP
 	/* cpus sharing the last level cache: */
 	cpumask_var_t		llc_shared_map;
 #endif
@@ -104,14 +107,17 @@ struct cpuinfo_x86 {
 	u16			 x86_max_cores;
 	u16			apicid;
 	u16			initial_apicid;
+#endif
 	u16			x86_clflush_size;
-#ifdef CONFIG_SMP
+#ifdef CONFIG_X86_HT
 	/* number of cores as seen by the OS: */
 	u16			booted_cores;
 	/* Physical processor id: */
 	u16			phys_proc_id;
 	/* Core id: */
 	u16			cpu_core_id;
+#endif
+#ifdef CONFIG_SMP
 	/* Index into per_cpu list: */
 	u16			cpu_index;
 #endif

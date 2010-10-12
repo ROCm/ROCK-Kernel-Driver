@@ -1105,11 +1105,11 @@ static int __init parse_memopt(char *p)
 	if ((mem_size >> (PAGE_SHIFT + 5)) > xen_start_info->nr_pages) {
 		u64 size = (u64)xen_start_info->nr_pages << 5;
 
-		printk(KERN_WARNING "mem=%Luk is invalid for an initial"
-				    " allocation of %luk, using %Luk\n",
-		       (unsigned long long)mem_size >> 10,
-		       xen_start_info->nr_pages << (PAGE_SHIFT - 10),
-		       (unsigned long long)size << (PAGE_SHIFT - 10));
+		pr_warning("mem=%Luk is invalid for an initial"
+			   " allocation of %luk, using %Luk\n",
+			   (unsigned long long)mem_size >> 10,
+			   xen_start_info->nr_pages << (PAGE_SHIFT - 10),
+			   (unsigned long long)size << (PAGE_SHIFT - 10));
 		mem_size = size << PAGE_SHIFT;
 	}
 #endif
@@ -1344,11 +1344,11 @@ char *__init default_machine_specific_memory_setup(void)
 	if ((maxmem >> (PAGE_SHIFT + 5)) > xen_start_info->nr_pages) {
 		unsigned long long size = (u64)xen_start_info->nr_pages << 5;
 
-		printk(KERN_WARNING "maxmem of %LuM is invalid for an initial"
-				    " allocation of %luM, using %LuM\n",
-		       maxmem >> 20,
-		       xen_start_info->nr_pages >> (20 - PAGE_SHIFT),
-		       size >> (20 - PAGE_SHIFT));
+		pr_warning("maxmem of %LuM is invalid for an initial"
+			   " allocation of %luM, using %LuM\n",
+			   maxmem >> 20,
+			   xen_start_info->nr_pages >> (20 - PAGE_SHIFT),
+			   size >> (20 - PAGE_SHIFT));
 		size <<= PAGE_SHIFT;
 		e820_remove_range(size, ULLONG_MAX - size, E820_RAM, 1);
 	}

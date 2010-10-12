@@ -233,6 +233,7 @@ static int pkgtemp_remove(struct platform_device *pdev)
 
 	hwmon_device_unregister(data->hwmon_dev);
 	sysfs_remove_group(&pdev->dev.kobj, &pkgtemp_group);
+	device_remove_file(&pdev->dev, &sensor_dev_attr_temp1_max.dev_attr);
 	return 0;
 }
 
@@ -256,8 +257,7 @@ static void get_cpuid_info(void *arg)
 {
 	struct cpu_info *info = arg;
 
-	if (cpuid_eax(0) >= 6)
-		info->cpuid_6_eax = cpuid_eax(6);
+	info->cpuid_6_eax = cpuid_eax(0) >= 6 ? cpuid_eax(6) : 0;
 }
 
 static int pkgtemp_device_add(unsigned int cpu)

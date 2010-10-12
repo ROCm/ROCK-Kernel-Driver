@@ -710,10 +710,10 @@ static int __init xencons_init(void)
 	tty_set_operations(xencons_driver, &xencons_ops);
 
 	if ((rc = tty_register_driver(DRV(xencons_driver))) != 0) {
-		printk("WARNING: Failed to register Xen virtual "
-		       "console driver as '%s%d'\n",
-		       DRV(xencons_driver)->name,
-		       DRV(xencons_driver)->name_base);
+		pr_warning("WARNING: Failed to register Xen virtual "
+			   "console driver as '%s%d'\n",
+			   DRV(xencons_driver)->name,
+			   DRV(xencons_driver)->name_base);
 		put_tty_driver(xencons_driver);
 		xencons_driver = NULL;
 		return rc;
@@ -730,8 +730,8 @@ static int __init xencons_init(void)
 		BUG_ON(xencons_priv_irq < 0);
 	}
 
-	printk("Xen virtual console successfully installed as %s%d\n",
-	       DRV(xencons_driver)->name, xc_num);
+	pr_info("Xen virtual console successfully installed as %s%d\n",
+		DRV(xencons_driver)->name, xc_num);
 
 	return 0;
 }

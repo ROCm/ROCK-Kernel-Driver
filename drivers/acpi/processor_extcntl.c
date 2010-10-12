@@ -88,26 +88,11 @@ int processor_notify_external(struct acpi_processor *pr, int event, int type)
 			ret = processor_extcntl_ops->hotplug(pr, type);
 		break;
 	default:
-		printk(KERN_ERR "Unsupport processor events %d.\n", event);
+		pr_err("Unsupported processor event %d.\n", event);
 		break;
 	}
 
 	return ret;
-}
-
-/*
- * External control logic can decide to grab full or part of physical
- * processor control bits. Take a VMM for example, physical processors
- * are owned by VMM and thus existence information like hotplug is
- * always required to be notified to VMM. Similar is processor idle
- * state which is also necessarily controlled by VMM. But for other
- * control bits like performance/throttle states, VMM may choose to
- * control or not upon its own policy.
- */
-void processor_extcntl_init(void)
-{
-	if (!processor_extcntl_ops)
-		arch_acpi_processor_init_extcntl(&processor_extcntl_ops);
 }
 
 /*

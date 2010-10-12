@@ -15,7 +15,8 @@ int pciback_enable_msi(struct pciback_device *pdev,
 	status = pci_enable_msi(dev);
 
 	if (status) {
-		printk("error enable msi for guest %x status %x\n", otherend, status);
+		pr_err("error enable msi for guest %x status %x\n",
+		       otherend, status);
 		op->value = 0;
 		return XEN_PCI_ERR_op_failed;
 	}

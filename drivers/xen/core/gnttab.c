@@ -786,7 +786,7 @@ int gnttab_resume(void)
 		resume_frames = alloc_xen_mmio(PAGE_SIZE * max_nr_gframes);
 		shared = ioremap(resume_frames, PAGE_SIZE * max_nr_gframes);
 		if (shared == NULL) {
-			printk("error to ioremap gnttab share frames\n");
+			pr_warning("error to ioremap gnttab share frames\n");
 			return -1;
 		}
 	}

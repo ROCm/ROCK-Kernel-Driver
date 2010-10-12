@@ -242,8 +242,8 @@ static void xenfb_update_screen(struct xenfb_info *info)
 	mutex_unlock(&info->mm_lock);
 
 	if (x2 < x1 || y2 < y1) {
-		printk("xenfb_update_screen bogus rect %d %d %d %d\n",
-		       x1, x2, y1, y2);
+		pr_warning("xenfb_update_screen bogus rect %d %d %d %d\n",
+			   x1, x2, y1, y2);
 		WARN_ON(1);
 	}
 	xenfb_do_update(info, x1, y1, x2 - x1, y2 - y1);

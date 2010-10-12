@@ -340,8 +340,7 @@ static void connect(struct blkfront_info *info)
 				   "sectors", "%Lu", &sectors);
 		if (XENBUS_EXIST_ERR(err))
 			return;
-		printk(KERN_INFO "Setting capacity to %Lu\n",
-		       sectors);
+		pr_info("Setting capacity to %Lu\n", sectors);
 		set_capacity(info->gd, sectors);
 		revalidate_disk(info->gd);
 
@@ -638,8 +637,6 @@ int blkif_ioctl(struct block_device *bd, fmode_t mode,
 			}
 		}
 
-		/*printk(KERN_ALERT "ioctl %08x not supported by Xen blkdev\n",
-		  command);*/
 		return -EINVAL; /* same return as native Linux */
 	}
 
@@ -833,8 +830,9 @@ static irqreturn_t blkif_int(int irq, void *dev_id)
 		switch (bret->operation) {
 		case BLKIF_OP_WRITE_BARRIER:
 			if (unlikely(bret->status == BLKIF_RSP_EOPNOTSUPP)) {
-				printk("blkfront: %s: write barrier op failed\n",
-				       info->gd->disk_name);
+				pr_warning("blkfront: %s:"
+					   " write barrier op failed\n",
+					   info->gd->disk_name);
 				ret = -EOPNOTSUPP;
 				info->feature_barrier = QUEUE_ORDERED_NONE;
 			        xlvbd_barrier(info);

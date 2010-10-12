@@ -71,7 +71,8 @@ static int map_frontend_page( struct vscsibk_info *info,
 	gnttab_check_GNTST_eagain_do_while(GNTTABOP_map_grant_ref, &op);
 
 	if (op.status != GNTST_okay) {
-		printk(KERN_ERR "scsiback: Grant table operation failure %d!\n", (int)op.status);
+		pr_err("scsiback: Grant table operation failure %d!\n",
+		       (int)op.status);
 		ret = -EINVAL;
 	} else {
 		info->shmem_ref    = ring_ref;
@@ -102,7 +103,7 @@ int scsiback_init_sring(struct vscsibk_info *info,
 	int err;
 
 	if (info->irq) {
-		printk(KERN_ERR "scsiback: Already connected through?\n");
+		pr_err("scsiback: Already connected through?\n");
 		return -1;
 	}
 
@@ -168,7 +169,7 @@ int __init scsiback_interface_init(void)
 	scsiback_cachep = kmem_cache_create("vscsiif_cache",
 		sizeof(struct vscsibk_info), 0, 0, NULL);
 	if (!scsiback_cachep) {
-		printk(KERN_ERR "scsiback: can't init scsi cache\n");
+		pr_err("scsiback: can't init scsi cache\n");
 		return -ENOMEM;
 	}
 	

@@ -205,10 +205,8 @@ static inline grant_ref_t xennet_get_rx_ref(struct netfront_info *np,
 #define DPRINTK(fmt, args...)				\
 	pr_debug("netfront (%s:%d) " fmt,		\
 		 __FUNCTION__, __LINE__, ##args)
-#define IPRINTK(fmt, args...)				\
-	printk(KERN_INFO "netfront: " fmt, ##args)
-#define WPRINTK(fmt, args...)				\
-	printk(KERN_WARNING "netfront: " fmt, ##args)
+#define IPRINTK(fmt, args...) pr_info("netfront: " fmt, ##args)
+#define WPRINTK(fmt, args...) pr_warning("netfront: " fmt, ##args)
 
 static int setup_device(struct xenbus_device *, struct netfront_info *);
 static struct net_device *create_netdev(struct xenbus_device *);
@@ -278,8 +276,8 @@ static int __devinit netfront_probe(struct xenbus_device *dev,
 
 	err = register_netdev(info->netdev);
 	if (err) {
-		printk(KERN_WARNING "%s: register_netdev err=%d\n",
-		       __FUNCTION__, err);
+		pr_warning("%s: register_netdev err=%d\n",
+			   __FUNCTION__, err);
 		goto fail;
 	}
 
@@ -288,8 +286,8 @@ static int __devinit netfront_probe(struct xenbus_device *dev,
 	err = xennet_sysfs_addif(info->netdev);
 	if (err) {
 		unregister_netdev(info->netdev);
-		printk(KERN_WARNING "%s: add sysfs failed err=%d\n",
-		       __FUNCTION__, err);
+		pr_warning("%s: add sysfs failed err=%d\n",
+			   __FUNCTION__, err);
 		goto fail;
 	}
 
@@ -658,9 +656,8 @@ static void network_tx_buf_gc(struct net_device *dev)
 			skb = np->tx_skbs[id];
 			if (unlikely(gnttab_query_foreign_access(
 				np->grant_tx_ref[id]) != 0)) {
-				printk(KERN_ALERT "network_tx_buf_gc: warning "
-				       "-- grant still in use by backend "
-				       "domain.\n");
+				pr_alert("network_tx_buf_gc: grant still"
+					 " in use by backend domain\n");
 				BUG();
 			}
 			gnttab_end_foreign_access_ref(np->grant_tx_ref[id]);
@@ -947,8 +944,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	frags += DIV_ROUND_UP(offset + len, PAGE_SIZE);
 	if (unlikely(frags > MAX_SKB_FRAGS + 1)) {
-		printk(KERN_ALERT "xennet: skb rides the rocket: %d frags\n",
-		       frags);
+		pr_alert("xennet: skb rides the rocket: %d frags\n", frags);
 		dump_stack();
 		goto drop;
 	}
@@ -2039,8 +2035,7 @@ static struct net_device * __devinit create_netdev(struct xenbus_device *dev)
 
 	netdev = alloc_etherdev(sizeof(struct netfront_info));
 	if (!netdev) {
-		printk(KERN_WARNING "%s> alloc_etherdev failed.\n",
-		       __FUNCTION__);
+		pr_warning("%s: alloc_etherdev failed\n", __FUNCTION__);
 		return ERR_PTR(-ENOMEM);
 	}
 
@@ -2075,14 +2070,14 @@ static struct net_device * __devinit create_netdev(struct xenbus_device *dev)
 	/* A grant for every tx ring slot */
 	if (gnttab_alloc_grant_references(TX_MAX_TARGET,
 					  &np->gref_tx_head) < 0) {
-		printk(KERN_ALERT "#### netfront can't alloc tx grant refs\n");
+		pr_alert("#### netfront can't alloc tx grant refs\n");
 		err = -ENOMEM;
 		goto exit;
 	}
 	/* A grant for every rx ring slot */
 	if (gnttab_alloc_grant_references(RX_MAX_TARGET,
 					  &np->gref_rx_head) < 0) {
-		printk(KERN_ALERT "#### netfront can't alloc rx grant refs\n");
+		pr_alert("#### netfront can't alloc rx grant refs\n");
 		err = -ENOMEM;
 		goto exit_free_tx;
 	}

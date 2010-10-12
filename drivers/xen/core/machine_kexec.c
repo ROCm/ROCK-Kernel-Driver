@@ -31,8 +31,8 @@ void __init xen_machine_kexec_setup_resources(void)
 	int rc;
 
 	if (strstr(boot_command_line, "crashkernel="))
-		printk(KERN_WARNING "Ignoring crashkernel command line, "
-		       "parameter will be supplied by xen\n");
+		pr_warning("Ignoring crashkernel command line, "
+			   "parameter will be supplied by xen\n");
 
 	if (!is_initial_xendomain())
 		return;

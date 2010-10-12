@@ -242,8 +242,9 @@ static int connect_rings(usbif_t *usbif)
 		return err;
 	}
 
-	printk("usbback: urb-ring-ref %ld, conn-ring-ref %ld, event-channel %d\n",
-	       urb_ring_ref, conn_ring_ref, evtchn);
+	pr_info("usbback: urb-ring-ref %ld, conn-ring-ref %ld,"
+		" event-channel %d\n",
+		urb_ring_ref, conn_ring_ref, evtchn);
 
 	err = usbif_map(usbif, urb_ring_ref, conn_ring_ref, evtchn);
 	if (err) {
@@ -270,8 +271,8 @@ static void frontend_changed(struct xenbus_device *dev,
 
 	case XenbusStateInitialising:
 		if (dev->state == XenbusStateClosed) {
-			printk("%s: %s: prepare for reconnect\n",
-			       __FUNCTION__, dev->nodename);
+			pr_info("%s: %s: prepare for reconnect\n",
+				__FUNCTION__, dev->nodename);
 			xenbus_switch_state(dev, XenbusStateInitWait);
 		}
 		break;

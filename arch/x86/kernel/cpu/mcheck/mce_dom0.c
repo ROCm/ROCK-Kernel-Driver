@@ -23,7 +23,7 @@ static int convert_log(struct mc_info *mi)
 	x86_mcinfo_lookup(mic, mi, MC_TYPE_GLOBAL);
 	if (mic == NULL)
 	{
-		printk(KERN_ERR "DOM0_MCE_LOG: global data is NULL\n");
+		pr_err("DOM0_MCE_LOG: global data is NULL\n");
 		return -1;
 	}
 
@@ -38,7 +38,7 @@ static int convert_log(struct mc_info *mi)
 			break;
 		}
 	WARN_ON_ONCE(!found);
-	m.socketid = g_physinfo[i].mc_chipid;
+	m.socketid = mc_global->mc_socketid;
 	m.cpu = m.extcpu = g_physinfo[i].mc_cpunr;
 	m.cpuvendor = (__u8)g_physinfo[i].mc_vendor;
 
@@ -92,7 +92,7 @@ urgent:
 	{
 		result = convert_log(g_mi);
 		if (result) {
-			printk(KERN_ERR "MCE_DOM0_LOG: Log conversion failed\n");
+			pr_err("MCE_DOM0_LOG: Log conversion failed\n");
 			goto end;
 		}
 		/* After fetching the telem from DOM0, we need to dec the telem's
@@ -117,7 +117,7 @@ nonurgent:
 	{
 		result = convert_log(g_mi);
 		if (result) {
-			printk(KERN_ERR "MCE_DOM0_LOG: Log conversion failed\n");
+			pr_err("MCE_DOM0_LOG: Log conversion failed\n");
 			goto end;
 		}
 		/* After fetching the telem from DOM0, we need to dec the telem's
@@ -148,7 +148,7 @@ int __init bind_virq_for_mce(void)
 	set_xen_guest_handle(mc_op.u.mc_physcpuinfo.info, NULL);
 	ret = HYPERVISOR_mca(&mc_op);
 	if (ret) {
-		printk(KERN_ERR "MCE: Failed to get physical CPU count\n");
+		pr_err("MCE: Failed to get physical CPU count\n");
 		kfree(g_mi);
 		return ret;
 	}
@@ -163,7 +163,7 @@ int __init bind_virq_for_mce(void)
 	set_xen_guest_handle(mc_op.u.mc_physcpuinfo.info, g_physinfo);
 	ret = HYPERVISOR_mca(&mc_op);
 	if (ret) {
-		printk(KERN_ERR "MCE: Failed to get physical CPUs' info\n");
+		pr_err("MCE: Failed to get physical CPUs' info\n");
 		kfree(g_mi);
 		kfree(g_physinfo);
 		return ret;
@@ -173,7 +173,7 @@ int __init bind_virq_for_mce(void)
 		mce_dom0_interrupt, 0, "mce", NULL);
 
 	if (ret < 0) {
-		printk(KERN_ERR "MCE: Failed to bind vIRQ for Dom0\n");
+		pr_err("MCE: Failed to bind vIRQ for Dom0\n");
 		kfree(g_mi);
 		kfree(g_physinfo);
 		return ret;

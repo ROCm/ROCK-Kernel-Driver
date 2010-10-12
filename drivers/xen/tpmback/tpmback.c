@@ -908,8 +908,7 @@ static int __init tpmback_init(void)
 	int rc;
 
 	if ((rc = misc_register(&vtpms_miscdevice)) != 0) {
-		printk(KERN_ALERT
-		       "Could not register misc device for TPM BE.\n");
+		pr_alert("Could not register misc device for TPM BE\n");
 		return rc;
 	}
 
@@ -929,7 +928,7 @@ static int __init tpmback_init(void)
 		return rc;
 	}
 
-	printk(KERN_ALERT "Successfully initialized TPM backend driver.\n");
+	pr_alert("Successfully initialized TPM backend driver\n");
 
 	return 0;
 }

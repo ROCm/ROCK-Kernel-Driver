@@ -107,9 +107,9 @@ int pciback_add_pci_dev(struct pciback_device *pdev, struct pci_dev *dev,
 	/* Assign to a new slot on the virtual PCI bus */
 	for (slot = 0; slot < PCI_SLOT_MAX; slot++) {
 		if (list_empty(&vpci_dev->dev_list[slot])) {
-			printk(KERN_INFO
-			       "pciback: vpci: %s: assign to virtual slot %d\n",
-			       pci_name(dev), slot);
+			pr_info("pciback: vpci: %s:"
+				" assign to virtual slot %d\n",
+				pci_name(dev), slot);
 			list_add_tail(&dev_entry->list,
 				      &vpci_dev->dev_list[slot]);
 			func = PCI_FUNC(dev->devfn);

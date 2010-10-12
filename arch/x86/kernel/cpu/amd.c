@@ -459,10 +459,16 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 			u64 val;
 
 			clear_cpu_cap(c, X86_FEATURE_LAHF_LM);
+#ifndef CONFIG_XEN
 			if (!rdmsrl_amd_safe(0xc001100d, &val)) {
 				val &= ~(1ULL << 32);
 				wrmsrl_amd_safe(0xc001100d, val);
 			}
+#else
+			pr_warning("Long-mode LAHF feature wrongly enabled -"
+				   "hypervisor update needed\n");
+			(void)&val;
+#endif
 		}
 
 	}

@@ -695,8 +695,7 @@ int __init pciback_xenbus_register(void)
 		return -ENODEV;
 	pciback_wq = create_workqueue("pciback_workqueue");
 	if (!pciback_wq) {
-		printk(KERN_ERR "pciback_xenbus_register: create"
-			"pciback_workqueue failed\n");
+		pr_err("pciback_xenbus_register: create workqueue failed\n");
 		return -EFAULT;
 	}
 	return xenbus_register_backend(&xenbus_pciback_driver);

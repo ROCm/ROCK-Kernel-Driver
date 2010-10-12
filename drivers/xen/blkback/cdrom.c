@@ -35,9 +35,9 @@
 #include "common.h"
 
 #undef DPRINTK
-#define DPRINTK(_f, _a...)			\
-	printk("(%s() file=%s, line=%d) " _f "\n",	\
-		 __PRETTY_FUNCTION__, __FILE__ , __LINE__ , ##_a )
+#define DPRINTK(_f, _a...) \
+	printk(KERN_DEBUG "(%s() file=%s, line=%d) " _f "\n", \
+	       __func__, __FILE__ , __LINE__ , ##_a )
 
 
 #define MEDIA_PRESENT "media-present"

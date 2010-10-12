@@ -410,10 +410,10 @@ static int __init pci_iomul_init(void)
 
 	error = misc_register(&pci_iomul_miscdev);
 	if (error != 0) {
-		printk(KERN_ALERT "Couldn't register /dev/xen/pci_iomul");
+		pr_alert("Couldn't register /dev/xen/pci_iomul");
 		return error;
 	}
-	printk("PCI IO multiplexer device installed.\n");
+	pr_info("PCI IO multiplexer device installed\n");
 	return 0;
 }
 

@@ -68,7 +68,7 @@ static int xen_cx_notifier(struct acpi_processor *pr, int action)
 
 		/* Get dependency relationships */
 		if (cx->csd_count) {
-			printk("Wow! _CSD is found. Not support for now!\n");
+			pr_warning("_CSD found: Not supported for now!\n");
 			kfree(buf);
 			return -EINVAL;
 		} else {
@@ -81,7 +81,7 @@ static int xen_cx_notifier(struct acpi_processor *pr, int action)
 	}
 
 	if (!count) {
-		printk("No available Cx info for cpu %d\n", pr->acpi_id);
+		pr_info("No available Cx info for cpu %d\n", pr->acpi_id);
 		kfree(buf);
 		return -EINVAL;
 	}
@@ -190,12 +190,12 @@ static struct processor_extcntl_ops xen_extcntl_ops = {
 	.hotplug		= xen_hotplug_notifier,
 };
 
-void arch_acpi_processor_init_extcntl(const struct processor_extcntl_ops **ops)
+static int __init init_extcntl(void)
 {
 	unsigned int pmbits = (xen_start_info->flags & SIF_PM_MASK) >> 8;
 
 	if (!pmbits)
-		return;
+		return 0;
 	if (pmbits & XEN_PROCESSOR_PM_CX)
 		xen_extcntl_ops.pm_ops[PM_TYPE_IDLE] = xen_cx_notifier;
 	if (pmbits & XEN_PROCESSOR_PM_PX)
@@ -203,9 +203,11 @@ void arch_acpi_processor_init_extcntl(const struct processor_extcntl_ops **ops)
 	if (pmbits & XEN_PROCESSOR_PM_TX)
 		xen_extcntl_ops.pm_ops[PM_TYPE_THR] = xen_tx_notifier;
 
-	*ops = &xen_extcntl_ops;
+	processor_extcntl_ops = &xen_extcntl_ops;
+
+	return 0;
 }
-EXPORT_SYMBOL(arch_acpi_processor_init_extcntl);
+arch_initcall(init_extcntl);
 
 unsigned int cpufreq_quick_get(unsigned int cpu)
 {

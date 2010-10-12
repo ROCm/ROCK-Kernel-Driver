@@ -260,9 +260,8 @@ void xenbus_backend_bus_register(void)
 {
 	xenbus_backend.error = bus_register(&xenbus_backend.bus);
 	if (xenbus_backend.error)
-		printk(KERN_WARNING
-		       "XENBUS: Error registering backend bus: %i\n",
-		       xenbus_backend.error);
+		pr_warning("XENBUS: Error registering backend bus: %i\n",
+			   xenbus_backend.error);
 }
 
 void xenbus_backend_device_register(void)
@@ -273,9 +272,8 @@ void xenbus_backend_device_register(void)
 	xenbus_backend.error = device_register(&xenbus_backend.dev);
 	if (xenbus_backend.error) {
 		bus_unregister(&xenbus_backend.bus);
-		printk(KERN_WARNING
-		       "XENBUS: Error registering backend device: %i\n",
-		       xenbus_backend.error);
+		pr_warning("XENBUS: Error registering backend device: %i\n",
+			   xenbus_backend.error);
 	}
 }
 

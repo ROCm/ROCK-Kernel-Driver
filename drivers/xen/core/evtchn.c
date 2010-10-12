@@ -498,8 +498,8 @@ static int find_unbound_irq(unsigned int cpu, bool percpu)
 
 	if (!warned) {
 		warned = 1;
-		printk(KERN_WARNING "No available IRQ to bind to: "
-		       "increase NR_DYNIRQS.\n");
+		pr_warning("No available IRQ to bind to: "
+			   "increase NR_DYNIRQS.\n");
 	}
 
 	return -ENOSPC;
@@ -1256,8 +1256,7 @@ static void enable_pirq(unsigned int irq)
 			  ? 0 : BIND_PIRQ__WILL_SHARE;
 	if (HYPERVISOR_event_channel_op(EVTCHNOP_bind_pirq, &bind_pirq) != 0) {
 		if (bind_pirq.flags)
-			printk(KERN_INFO "Failed to obtain physical IRQ %d\n",
-			       irq);
+			pr_info("Failed to obtain physical IRQ %d\n", irq);
 		return;
 	}
 	evtchn = bind_pirq.port;
@@ -1650,7 +1649,7 @@ int arch_init_chip_data(struct irq_desc *desc, int cpu)
 		desc->chip_data = kzalloc(sizeof(struct irq_cfg), GFP_ATOMIC);
 	}
 	if (!desc->chip_data) {
-		printk(KERN_ERR "cannot alloc irq_cfg\n");
+		pr_emerg("cannot alloc irq_cfg\n");
 		BUG();
 	}
 
@@ -1759,8 +1758,8 @@ int evtchn_map_pirq(int irq, int xen_pirq)
 		return 0;
 	} else if (type_from_irq(irq) != IRQT_PIRQ
 		   || index_from_irq(irq) != xen_pirq) {
-		printk(KERN_ERR "IRQ#%d is already mapped to %d:%u - "
-				"cannot map to PIRQ#%u\n",
+		pr_err("IRQ#%d is already mapped to %d:%u - "
+		       "cannot map to PIRQ#%u\n",
 		       irq, type_from_irq(irq), index_from_irq(irq), xen_pirq);
 		return -EINVAL;
 	}

@@ -14,7 +14,7 @@ static struct class *_get_xen_class(void)
 		xen_class = class_create(THIS_MODULE, "xen");
 	mutex_unlock(&xc_mutex);
 	if (IS_ERR(xen_class))
-		printk("Failed to create xen sysfs class.\n");
+		pr_err("failed to create xen sysfs class\n");
 
 	return xen_class;
 }

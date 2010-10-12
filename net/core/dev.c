@@ -2125,7 +2125,7 @@ inline int skb_checksum_setup(struct sk_buff *skb)
 		break;
 	default:
 		if (net_ratelimit())
-			printk(KERN_ERR "Attempting to checksum a non-"
+			pr_err("Attempting to checksum a non-"
 			       "TCP/UDP packet, dropping a protocol"
 			       " %d packet", iph->protocol);
 		goto out;

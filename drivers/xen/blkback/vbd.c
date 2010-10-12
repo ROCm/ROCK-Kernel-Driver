@@ -130,18 +130,18 @@ void vbd_resize(blkif_t *blkif)
 	struct xenbus_device *dev = blkif->be->dev;
 	unsigned long long new_size = vbd_size(vbd);
 
-	printk(KERN_INFO "VBD Resize: new size %Lu\n", new_size);
+	pr_info("VBD Resize: new size %Lu\n", new_size);
 	vbd->size = new_size;
 again:
 	err = xenbus_transaction_start(&xbt);
 	if (err) {
-		printk(KERN_WARNING "Error starting transaction");
+		pr_warning("Error %d starting transaction", err);
 		return;
 	}
 	err = xenbus_printf(xbt, dev->nodename, "sectors", "%Lu",
 			    vbd_size(vbd));
 	if (err) {
-		printk(KERN_WARNING "Error writing new size");
+		pr_warning("Error %d writing new size", err);
 		goto abort;
 	}
 	/*
@@ -151,7 +151,7 @@ again:
 	 */
 	err = xenbus_printf(xbt, dev->nodename, "state", "%d", dev->state);
 	if (err) {
-		printk(KERN_WARNING "Error writing the state");
+		pr_warning("Error %d writing the state", err);
 		goto abort;
 	}
 
@@ -159,7 +159,7 @@ again:
 	if (err == -EAGAIN)
 		goto again;
 	if (err)
-		printk(KERN_WARNING "Error ending transaction");
+		pr_warning("Error %d ending transaction", err);
 abort:
 	xenbus_transaction_end(xbt, 1);
 }

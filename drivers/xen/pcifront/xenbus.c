@@ -44,6 +44,7 @@ static struct pcifront_device *alloc_pdev(struct xenbus_device *xdev)
 
 	pdev->evtchn = INVALID_EVTCHN;
 	pdev->gnt_ref = INVALID_GRANT_REF;
+	pdev->irq = -1;
 
 	INIT_WORK(&pdev->op_work, pcifront_do_aer);
 
@@ -61,7 +62,9 @@ static void free_pdev(struct pcifront_device *pdev)
 
 	/*For PCIE_AER error handling job*/
 	flush_scheduled_work();
-	unbind_from_irqhandler(pdev->evtchn, pdev);
+
+	if (pdev->irq > 0)
+		unbind_from_irqhandler(pdev->irq, pdev);
 
 	if (pdev->evtchn != INVALID_EVTCHN)
 		xenbus_free_evtchn(pdev->xdev, pdev->evtchn);
@@ -69,6 +72,8 @@ static void free_pdev(struct pcifront_device *pdev)
 	if (pdev->gnt_ref != INVALID_GRANT_REF)
 		gnttab_end_foreign_access(pdev->gnt_ref,
 					  (unsigned long)pdev->sh_info);
+	else
+		free_page((unsigned long)pdev->sh_info);
 
 	dev_set_drvdata(&pdev->xdev->dev, NULL);
 
@@ -90,8 +95,16 @@ static int pcifront_publish_info(struct pcifront_device *pdev)
 	if (err)
 		goto out;
 
-	bind_caller_port_to_irqhandler(pdev->evtchn, pcifront_handler_aer, 
-		IRQF_SAMPLE_RANDOM, "pcifront", pdev);
+	err = bind_caller_port_to_irqhandler(pdev->evtchn,
+					     pcifront_handler_aer,
+					     IRQF_SAMPLE_RANDOM,
+					     "pcifront", pdev);
+	if (err < 0) {
+		xenbus_dev_fatal(pdev->xdev, err,
+				 "Failed to bind event channel");
+		goto out;
+	}
+	pdev->irq = err;
 
       do_publish:
 	err = xenbus_transaction_start(&trans);
@@ -424,6 +437,8 @@ static int pcifront_xenbus_probe(struct xenbus_device *xdev,
 	}
 
 	err = pcifront_publish_info(pdev);
+	if (err)
+		free_pdev(pdev);
 
       out:
 	return err;

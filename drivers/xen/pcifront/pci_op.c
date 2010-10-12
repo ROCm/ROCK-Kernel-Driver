@@ -67,7 +67,7 @@ static void pcifront_init_sd(struct pcifront_sd *sd,
 		return; /* No resources, nothing to do */
 
 	if (magic != (sizeof(res) * 2) + 1) {
-		printk(KERN_WARNING "pcifront: resource magic mismatch\n");
+		pr_warning("pcifront: resource magic mismatch\n");
 		return;
 	}
 
@@ -105,9 +105,9 @@ static void pcifront_init_sd(struct pcifront_sd *sd,
 		err = xenbus_scanf(XBT_NIL, pdev->xdev->otherend, str,
 				   "%s", buf);
 		if (err != 1) {
-			printk(KERN_WARNING "pcifront: error reading "
-			       "resource %d on bus %04x:%02x\n",
-			       j, domain, bus);
+			pr_warning("pcifront: error reading "
+				   "resource %d on bus %04x:%02x\n",
+				   j, domain, bus);
 			continue;
 		}
 
@@ -317,7 +317,7 @@ int pci_frontend_enable_msix(struct pci_dev *dev,
 	struct pcifront_device *pdev = pcifront_get_pdev(sd);
 
 	if (nvec > SH_INFO_MAX_VEC) {
-		printk("too much vector for pci frontend%x\n", nvec);
+		pr_warning("too many vectors (%#x) for pci frontend\n", nvec);
 		return -EINVAL;
 	}
 
@@ -336,12 +336,12 @@ int pci_frontend_enable_msix(struct pci_dev *dev,
 			return 0;
 		}
 		else {
-            printk("enable msix get value %x\n", op.value);
+			pr_err("enable msix get value %#x\n", op.value);
 			return op.value;
 		}
 	}
 	else {
-        printk("enable msix get err %x\n", err);
+		pr_err("enable msix err %#x\n", err);
 		return err;
 	}
 }
@@ -362,7 +362,7 @@ void pci_frontend_disable_msix(struct pci_dev* dev)
 
 	/* What should do for error ? */
 	if (err)
-		printk("pci_disable_msix get err %x\n", err);
+		pr_err("disable msix err %#x\n", err);
 }
 
 int pci_frontend_enable_msi(struct pci_dev *dev)
@@ -382,8 +382,8 @@ int pci_frontend_enable_msi(struct pci_dev *dev)
 		dev->irq = op.value;
 	}
 	else {
-		printk("pci frontend enable msi failed for dev %x:%x \n",
-				op.bus, op.devfn);
+		pr_err("pci frontend enable msi failed for dev %x:%x\n",
+		       op.bus, op.devfn);
 		err = -EINVAL;
 	}
 	return err;
@@ -404,19 +404,19 @@ void pci_frontend_disable_msi(struct pci_dev* dev)
 	err = do_pci_op(pdev, &op);
 	if (err == XEN_PCI_ERR_dev_not_found) {
 		/* XXX No response from backend, what shall we do? */
-		printk("get no response from backend for disable MSI\n");
+		pr_err("no response from backend for disable MSI\n");
 		return;
 	}
 	if (likely(!err))
 		dev->irq = op.value;
 	else
 		/* how can pciback notify us fail? */
-		printk("get fake response frombackend \n");
+		pr_err("got bogus response from backend\n");
 }
 #endif /* CONFIG_PCI_MSI */
 
 /* Claim resources for the PCI frontend as-is, backend won't allow changes */
-static int pcifront_claim_resource(struct pci_dev *dev, void *data)
+static int __devinit pcifront_claim_resource(struct pci_dev *dev, void *data)
 {
 	struct pcifront_device *pdev = data;
 	int i;
@@ -531,19 +531,17 @@ int __devinit pcifront_rescan_root(struct pcifront_device *pdev,
 		}
 
 		d = pci_scan_single_device(b, devfn);
-		if (d) {
-			int err;
-
+		if (d)
 			dev_info(&pdev->xdev->dev, "New device on "
 				 "%04x:%02x:%02x.%02x found.\n", domain, bus,
 				 PCI_SLOT(devfn), PCI_FUNC(devfn));
-			err = pci_bus_add_device(d);
-			if (err)
-				dev_err(&pdev->xdev->dev,
-				        "error %d adding device, continuing.\n",
-					err);
-		}
 	}
+
+	/* Claim resources before going "live" with our devices */
+	pci_walk_bus(b, pcifront_claim_resource, pdev);
+
+	/* Create SysFS and notify udev of the devices. Aka: "going live" */
+	pci_bus_add_devices(b);
 
 	return 0;
 }

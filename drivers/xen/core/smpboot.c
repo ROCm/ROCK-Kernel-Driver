@@ -33,9 +33,6 @@ extern void failsafe_callback(void);
 extern void system_call(void);
 extern void smp_trap_init(trap_info_t *);
 
-/* Number of siblings per CPU package */
-int smp_num_siblings = 1;
-
 cpumask_var_t vcpu_initialized_mask;
 
 DEFINE_PER_CPU(struct cpuinfo_x86, cpu_info);
@@ -48,9 +45,6 @@ static int __read_mostly ipi_irq = -1;
 #else
 #define set_cpu_to_apicid(cpu, apicid)
 #endif
-
-DEFINE_PER_CPU(cpumask_var_t, cpu_sibling_map);
-DEFINE_PER_CPU(cpumask_var_t, cpu_core_map);
 
 void __init prefill_possible_map(void)
 {
@@ -75,30 +69,6 @@ void __init prefill_possible_map(void)
 	for (; HYPERVISOR_vcpu_op(VCPUOP_is_up, i, NULL) >= 0; ++i)
 		if (i != smp_processor_id())
 			++total_cpus;
-}
-
-static inline void
-set_cpu_sibling_map(unsigned int cpu)
-{
-	cpu_data(cpu).phys_proc_id = cpu;
-	cpu_data(cpu).cpu_core_id  = 0;
-
-	cpumask_copy(cpu_sibling_mask(cpu), cpumask_of(cpu));
-	cpumask_copy(cpu_core_mask(cpu), cpumask_of(cpu));
-
-	cpu_data(cpu).booted_cores = 1;
-}
-
-static void
-remove_siblinginfo(unsigned int cpu)
-{
-	cpu_data(cpu).phys_proc_id = BAD_APICID;
-	cpu_data(cpu).cpu_core_id  = BAD_APICID;
-
-	cpumask_clear(cpu_sibling_mask(cpu));
-	cpumask_clear(cpu_core_mask(cpu));
-
-	cpu_data(cpu).booted_cores = 0;
 }
 
 static irqreturn_t ipi_interrupt(int irq, void *dev_id)
@@ -256,21 +226,11 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	apicid = 0;
 	if (HYPERVISOR_vcpu_op(VCPUOP_get_physid, 0, &cpu_id) == 0)
 		apicid = xen_vcpu_physid_to_x86_apicid(cpu_id.phys_id);
-	boot_cpu_data.apicid = apicid;
 	cpu_data(0) = boot_cpu_data;
 
 	set_cpu_to_apicid(0, apicid);
 
 	current_thread_info()->cpu = 0;
-
-	for_each_possible_cpu (cpu) {
-		alloc_cpumask_var(&per_cpu(cpu_sibling_map, cpu), GFP_KERNEL);
-		alloc_cpumask_var(&per_cpu(cpu_core_map, cpu), GFP_KERNEL);
-		cpumask_clear(cpu_sibling_mask(cpu));
-		cpumask_clear(cpu_core_mask(cpu));
-	}
-
-	set_cpu_sibling_map(0);
 
 	if (xen_smp_intr_init(0))
 		BUG();
@@ -302,7 +262,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 			apicid = xen_vcpu_physid_to_x86_apicid(cpu_id.phys_id);
 		cpu_data(cpu) = boot_cpu_data;
 		cpu_data(cpu).cpu_index = cpu;
-		cpu_data(cpu).apicid = apicid;
 
 		set_cpu_to_apicid(cpu, apicid);
 
@@ -363,14 +322,12 @@ static int __init initialize_cpu_present_map(void)
 }
 core_initcall(initialize_cpu_present_map);
 
-int __cpuexit __cpu_disable(void)
+int __cpuinit __cpu_disable(void)
 {
 	unsigned int cpu = smp_processor_id();
 
 	if (cpu == 0)
 		return -EBUSY;
-
-	remove_siblinginfo(cpu);
 
 	set_cpu_online(cpu, false);
 	fixup_irqs();
@@ -407,14 +364,11 @@ int __cpuinit __cpu_up(unsigned int cpu)
 		alternatives_smp_switch(1);
 
 	/* This must be done before setting cpu_online_map */
-	set_cpu_sibling_map(cpu);
 	wmb();
 
 	rc = xen_smp_intr_init(cpu);
-	if (rc) {
-		remove_siblinginfo(cpu);
+	if (rc)
 		return rc;
-	}
 
 	set_cpu_online(cpu, true);
 
@@ -429,6 +383,7 @@ void __ref play_dead(void)
 	idle_task_exit();
 	local_irq_disable();
 	cpumask_clear_cpu(smp_processor_id(), cpu_initialized_mask);
+	cpumask_clear_cpu(smp_processor_id(), vcpu_initialized_mask);
 	preempt_enable_no_resched();
 	VOID(HYPERVISOR_vcpu_op(VCPUOP_down, smp_processor_id(), NULL));
 #ifdef CONFIG_HOTPLUG_CPU

@@ -69,9 +69,9 @@ static int command_write(struct pci_dev *dev, int offset, u16 value, void *data)
 			       pci_name(dev));
 		err = pci_set_mwi(dev);
 		if (err) {
-			printk(KERN_WARNING
-			       "pciback: %s: cannot enable memory-write-invalidate (%d)\n",
-			       pci_name(dev), err);
+			pr_warning("pciback: %s: cannot enable"
+				   " memory-write-invalidate (%d)\n",
+				   pci_name(dev), err);
 			value &= ~PCI_COMMAND_INVALIDATE;
 		}
 	}
@@ -84,8 +84,8 @@ static int rom_write(struct pci_dev *dev, int offset, u32 value, void *data)
 	struct pci_bar_info *bar = data;
 
 	if (unlikely(!bar)) {
-		printk(KERN_WARNING "pciback: driver data not found for %s\n",
-		       pci_name(dev));
+		pr_warning("pciback: driver data not found for %s\n",
+			   pci_name(dev));
 		return XEN_PCI_ERR_op_failed;
 	}
 
@@ -118,8 +118,8 @@ static int bar_write(struct pci_dev *dev, int offset, u32 value, void *data)
 	struct pci_bar_info *bar = data;
 
 	if (unlikely(!bar)) {
-		printk(KERN_WARNING "pciback: driver data not found for %s\n",
-		       pci_name(dev));
+		pr_warning("pciback: driver data not found for %s\n",
+			   pci_name(dev));
 		return XEN_PCI_ERR_op_failed;
 	}
 
@@ -146,8 +146,8 @@ static int bar_read(struct pci_dev *dev, int offset, u32 * value, void *data)
 	struct pci_bar_info *bar = data;
 
 	if (unlikely(!bar)) {
-		printk(KERN_WARNING "pciback: driver data not found for %s\n",
-		       pci_name(dev));
+		pr_warning("pciback: driver data not found for %s\n",
+			   pci_name(dev));
 		return XEN_PCI_ERR_op_failed;
 	}
 
@@ -368,7 +368,7 @@ int pciback_config_header_add_fields(struct pci_dev *dev)
 
 	default:
 		err = -EINVAL;
-		printk(KERN_ERR "pciback: %s: Unsupported header type %d!\n",
+		pr_err("pciback: %s: Unsupported header type %d!\n",
 		       pci_name(dev), dev->hdr_type);
 		break;
 	}
