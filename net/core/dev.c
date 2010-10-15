@@ -3028,7 +3028,7 @@ ncls:
 		}
 		skb = rx_handler(skb);
 		if (!skb)
-			goto out;
+			goto unlock;
 	}
 
 	/*
