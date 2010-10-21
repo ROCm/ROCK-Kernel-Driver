@@ -1665,11 +1665,11 @@ int xs_swapper(struct rpc_xprt *xprt, int enable)
 		 */
 		err = sk_adjust_memalloc(1, RPC_RESERVE_PAGES);
 		if (!err) {
-			xprt->swapper = 1;
+			xprt->swapper++;
 			xs_set_memalloc(xprt);
 		}
 	} else if (xprt->swapper) {
-		xprt->swapper = 0;
+		xprt->swapper--;
 		sk_clear_memalloc(transport->inet);
 		sk_adjust_memalloc(-1, -RPC_RESERVE_PAGES);
 	}
