@@ -4,19 +4,12 @@
 
 #include <linux/init.h>
 #include <linux/interrupt.h>
-#include <linux/module.h>
 
 #include <asm/smp.h>
 #include <asm/proto.h>
 #include <asm/apic.h>
 
 unsigned int num_processors;
-
-/*
- * Map cpu index to physical APIC ID
- */
-DEFINE_PER_CPU(u16, x86_cpu_to_apicid) = BAD_APICID;
-EXPORT_PER_CPU_SYMBOL(x86_cpu_to_apicid);
 
 /*
  * Debug level, exported for io_apic.c

@@ -40,12 +40,6 @@ EXPORT_PER_CPU_SYMBOL(cpu_info);
 
 static int __read_mostly ipi_irq = -1;
 
-#ifdef CONFIG_X86_LOCAL_APIC
-#define set_cpu_to_apicid(cpu, apicid) (per_cpu(x86_cpu_to_apicid, cpu) = (apicid))
-#else
-#define set_cpu_to_apicid(cpu, apicid)
-#endif
-
 void __init prefill_possible_map(void)
 {
 	int i, rc;
@@ -227,9 +221,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	if (HYPERVISOR_vcpu_op(VCPUOP_get_physid, 0, &cpu_id) == 0)
 		apicid = xen_vcpu_physid_to_x86_apicid(cpu_id.phys_id);
 	cpu_data(0) = boot_cpu_data;
-
-	set_cpu_to_apicid(0, apicid);
-
 	current_thread_info()->cpu = 0;
 
 	if (xen_smp_intr_init(0))
@@ -241,7 +232,7 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 
 	/* Restrict the possible_map according to max_cpus. */
 	while ((num_possible_cpus() > 1) && (num_possible_cpus() > max_cpus)) {
-		for (cpu = nr_cpu_ids-1; !cpumask_test_cpu(cpu, cpu_possible_mask); cpu--)
+		for (cpu = nr_cpu_ids-1; !cpu_possible(cpu); cpu--)
 			continue;
 		set_cpu_possible(cpu, false);
 	}
@@ -262,8 +253,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 			apicid = xen_vcpu_physid_to_x86_apicid(cpu_id.phys_id);
 		cpu_data(cpu) = boot_cpu_data;
 		cpu_data(cpu).cpu_index = cpu;
-
-		set_cpu_to_apicid(cpu, apicid);
 
 #ifdef __x86_64__
 		clear_tsk_thread_flag(idle, TIF_FORK);

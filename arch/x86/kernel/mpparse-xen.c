@@ -623,6 +623,11 @@ void __init default_get_smp_config(unsigned int early)
 	if (!mpf)
 		return;
 
+#ifdef CONFIG_XEN
+	BUG_ON(early);
+#define early 0
+#endif
+
 	if (acpi_lapic && early)
 		return;
 
@@ -648,15 +653,15 @@ void __init default_get_smp_config(unsigned int early)
 	 * Now see if we need to read further.
 	 */
 	if (mpf->feature1 != 0) {
-		if (early) {
 #ifndef CONFIG_XEN
+		if (early) {
 			/*
 			 * local APIC has default address
 			 */
 			mp_lapic_addr = APIC_DEFAULT_PHYS_BASE;
-#endif
 			return;
 		}
+#endif
 
 		printk(KERN_INFO "Default MP configuration #%d\n",
 		       mpf->feature1);
@@ -673,6 +678,7 @@ void __init default_get_smp_config(unsigned int early)
 	/*
 	 * Only use the first configuration found.
 	 */
+#undef early
 }
 
 #ifndef CONFIG_XEN

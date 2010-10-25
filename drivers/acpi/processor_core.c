@@ -190,10 +190,20 @@ int acpi_get_cpuid(acpi_handle handle, int type, u32 acpi_id)
 	if (apic_id == -1 || i)
 		return apic_id;
 
+#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
 	for_each_possible_cpu(i) {
 		if (cpu_physical_id(i) == apic_id)
 			return i;
 	}
+#else
+	/*
+	 * Use of cpu_physical_id() is bogus here. Rather than defining a
+	 * stub enforcing a 1:1 mapping, we keep it undefined to catch bad
+	 * uses. Return as if there was a 1:1 mapping.
+	 */
+	if (apic_id < nr_cpu_ids && cpu_possible(apic_id))
+		return apic_id;
+#endif
 	return -1;
 }
 EXPORT_SYMBOL_GPL(acpi_get_cpuid);

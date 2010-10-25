@@ -85,11 +85,6 @@ void __init xen_start_kernel(void)
 	unsigned int i;
 	struct xen_machphys_mapping mapping;
 	unsigned long machine_to_phys_nr_ents;
-#ifdef CONFIG_X86_32
-	struct xen_platform_parameters pp;
-	extern pte_t swapper_pg_fixmap[PTRS_PER_PTE];
-	unsigned long addr;
-#endif
 
 	xen_setup_features();
 
@@ -114,17 +109,9 @@ void __init xen_start_kernel(void)
 		      "Xen provided");
 
 #ifdef CONFIG_X86_32
-	WARN_ON(HYPERVISOR_vm_assist(VMASST_CMD_enable,
-				     VMASST_TYPE_4gb_segments));
-
-	init_mm.pgd = swapper_pg_dir = (pgd_t *)xen_start_info->pt_base;
-
-	if (HYPERVISOR_xen_version(XENVER_platform_parameters, &pp) == 0) {
-		hypervisor_virt_start = pp.virt_start;
-		reserve_top_address(0UL - pp.virt_start);
-	}
-
-	BUG_ON(pte_index(hypervisor_virt_start));
+{
+	extern pte_t swapper_pg_fixmap[PTRS_PER_PTE];
+	unsigned long addr;
 
 	/* Do an early initialization of the fixmap area */
 	make_lowmem_page_readonly(swapper_pg_fixmap, XENFEAT_writable_page_tables);
@@ -133,6 +120,7 @@ void __init xen_start_kernel(void)
 				      addr),
 			   addr),
 		__pmd(__pa_symbol(swapper_pg_fixmap) | _PAGE_TABLE));
+}
 #else
 	x86_configure_nx();
 	xen_init_pt();

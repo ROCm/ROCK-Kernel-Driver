@@ -4136,10 +4136,9 @@ u8 __init io_apic_unique_id(u8 id)
 #endif
 }
 
-#ifdef CONFIG_X86_32
+#if defined(CONFIG_X86_32) && !defined(CONFIG_XEN)
 int __init io_apic_get_unique_id(int ioapic, int apic_id)
 {
-#ifndef CONFIG_XEN
 	union IO_APIC_reg_00 reg_00;
 	static physid_mask_t apic_id_map = PHYSID_MASK_NONE;
 	physid_mask_t tmp;
@@ -4208,7 +4207,6 @@ int __init io_apic_get_unique_id(int ioapic, int apic_id)
 
 	apic_printk(APIC_VERBOSE, KERN_INFO
 			"IOAPIC[%d]: Assigned apic_id %d\n", ioapic, apic_id);
-#endif /* !CONFIG_XEN */
 
 	return apic_id;
 }

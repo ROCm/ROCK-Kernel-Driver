@@ -20,7 +20,11 @@
 
 extern unsigned int num_processors;
 
+#ifndef CONFIG_XEN
+DECLARE_PER_CPU(cpumask_t, cpu_sibling_map);
+DECLARE_PER_CPU(cpumask_t, cpu_core_map);
 DECLARE_PER_CPU(u16, cpu_llc_id);
+#endif
 DECLARE_PER_CPU(int, cpu_number);
 
 static inline const struct cpumask *cpu_sibling_mask(int cpu)
@@ -33,8 +37,10 @@ static inline const struct cpumask *cpu_core_mask(int cpu)
 	return cpumask_of(cpu);
 }
 
-DECLARE_PER_CPU(u16, x86_cpu_to_apicid);
-DECLARE_PER_CPU(u16, x86_bios_cpu_apicid);
+#ifndef CONFIG_XEN
+DECLARE_EARLY_PER_CPU(u16, x86_cpu_to_apicid);
+DECLARE_EARLY_PER_CPU(u16, x86_bios_cpu_apicid);
+#endif
 
 #ifdef CONFIG_SMP
 
@@ -135,6 +141,9 @@ void play_dead_common(void);
 void wbinvd_on_cpu(int cpu);
 int wbinvd_on_all_cpus(void);
 
+void smp_store_cpu_info(int id);
+#define cpu_physical_id(cpu)	per_cpu(x86_cpu_to_apicid, cpu)
+
 #else /* CONFIG_XEN */
 
 extern int __cpu_disable(void);
@@ -152,9 +161,6 @@ void xen_send_call_func_single_ipi(int cpu);
 void play_dead(void);
 
 #endif /* CONFIG_XEN */
-
-void smp_store_cpu_info(int id);
-#define cpu_physical_id(cpu)	per_cpu(x86_cpu_to_apicid, cpu)
 
 /* We don't mark CPUs online until __cpu_up(), so we need another measure */
 static inline int num_booting_cpus(void)

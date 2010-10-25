@@ -177,7 +177,7 @@ static inline void maybe_schedule_tx_action(unsigned int group)
 
 	smp_mb();
 	if ((nr_pending_reqs(netbk) < (MAX_PENDING_REQS/2)) &&
-	    !list_empty(&netbk->net_schedule_list)) {
+	    !list_empty(&netbk->schedule_list)) {
 		if (use_kthreads)
 			wake_up(&netbk->netbk_action_wq);
 		else
@@ -817,17 +817,28 @@ static int __on_net_schedule_list(netif_t *netif)
 	return netif->list.next != NULL;
 }
 
+/* Must be called with netbk->schedule_list_lock held. */
 static void remove_from_net_schedule_list(netif_t *netif)
 {
-	struct xen_netbk *netbk = &xen_netbk[GET_GROUP_INDEX(netif)];
-
-	spin_lock_irq(&netbk->net_schedule_list_lock);
 	if (likely(__on_net_schedule_list(netif))) {
 		list_del(&netif->list);
 		netif->list.next = NULL;
 		netif_put(netif);
 	}
-	spin_unlock_irq(&netbk->net_schedule_list_lock);
+}
+
+static netif_t *poll_net_schedule_list(struct xen_netbk *netbk)
+{
+	netif_t *netif = NULL;
+
+	spin_lock_irq(&netbk->schedule_list_lock);
+	if (!list_empty(&netbk->schedule_list)) {
+		netif = list_first_entry(&netbk->schedule_list, netif_t, list);
+		netif_get(netif);
+		remove_from_net_schedule_list(netif);
+	}
+	spin_unlock_irq(&netbk->schedule_list_lock);
+	return netif;
 }
 
 static void add_to_net_schedule_list_tail(netif_t *netif)
@@ -838,13 +849,13 @@ static void add_to_net_schedule_list_tail(netif_t *netif)
 	if (__on_net_schedule_list(netif))
 		return;
 
-	spin_lock_irqsave(&netbk->net_schedule_list_lock, flags);
+	spin_lock_irqsave(&netbk->schedule_list_lock, flags);
 	if (!__on_net_schedule_list(netif) &&
 	    likely(netif_schedulable(netif))) {
-		list_add_tail(&netif->list, &netbk->net_schedule_list);
+		list_add_tail(&netif->list, &netbk->schedule_list);
 		netif_get(netif);
 	}
-	spin_unlock_irqrestore(&netbk->net_schedule_list_lock, flags);
+	spin_unlock_irqrestore(&netbk->schedule_list_lock, flags);
 }
 
 /*
@@ -873,7 +884,11 @@ void netif_schedule_work(netif_t *netif)
 
 void netif_deschedule_work(netif_t *netif)
 {
+	struct xen_netbk *netbk = &xen_netbk[GET_GROUP_INDEX(netif)];
+
+	spin_lock_irq(&netbk->schedule_list_lock);
 	remove_from_net_schedule_list(netif);
+	spin_unlock_irq(&netbk->schedule_list_lock);
 }
 
 
@@ -1298,12 +1313,11 @@ static void net_tx_action(unsigned long group)
 	mop = netbk->tx_map_ops;
 	BUILD_BUG_ON(MAX_SKB_FRAGS >= MAX_PENDING_REQS);
 	while (((nr_pending_reqs(netbk) + MAX_SKB_FRAGS) < MAX_PENDING_REQS) &&
-		!list_empty(&netbk->net_schedule_list)) {
+	       !list_empty(&netbk->schedule_list)) {
 		/* Get a netif from the list with work to do. */
-		netif = list_first_entry(&netbk->net_schedule_list,
-					 netif_t, list);
-		netif_get(netif);
-		remove_from_net_schedule_list(netif);
+		netif = poll_net_schedule_list(netbk);
+		if (!netif)
+			continue;
 
 		RING_FINAL_CHECK_FOR_REQUESTS(&netif->tx, work_to_do);
 		if (!work_to_do) {
@@ -1653,7 +1667,6 @@ static netif_rx_response_t *make_rx_response(netif_t *netif,
 #ifdef NETBE_DEBUG_INTERRUPT
 static irqreturn_t netif_be_dbg(int irq, void *dev_id)
 {
-	struct list_head *ent;
 	netif_t *netif;
 	unsigned int i = 0, group;
 
@@ -1662,10 +1675,9 @@ static irqreturn_t netif_be_dbg(int irq, void *dev_id)
 	for (group = 0; group < netbk_nr_groups; ++group) {
 		struct xen_netbk *netbk = &xen_netbk[group];
 
-		spin_lock_irq(&netbk->net_schedule_list_lock);
+		spin_lock_irq(&netbk->schedule_list_lock);
 
-		list_for_each(ent, &netbk->net_schedule_list) {
-			netif = list_entry(ent, netif_t, list);
+		list_for_each_entry(netif, &netbk->schedule_list, list) {
 			pr_alert(" %d: private(rx_req_cons=%08x "
 				 "rx_resp_prod=%08x\n", i,
 				 netif->rx.req_cons, netif->rx.rsp_prod_pvt);
@@ -1684,7 +1696,7 @@ static irqreturn_t netif_be_dbg(int irq, void *dev_id)
 			i++;
 		}
 
-		spin_unlock_irq(&netbk->netbk->net_schedule_list_lock);
+		spin_unlock_irq(&netbk->netbk->schedule_list_lock);
 	}
 
 	pr_alert(" ** End of netif_schedule_list **\n");
@@ -1710,7 +1722,7 @@ static inline int tx_work_todo(struct xen_netbk *netbk)
 		return 1;
 
 	if (nr_pending_reqs(netbk) + MAX_SKB_FRAGS < MAX_PENDING_REQS &&
-	    !list_empty(&netbk->net_schedule_list))
+	    !list_empty(&netbk->schedule_list))
 		return 1;
 
 	return 0;
@@ -1788,9 +1800,9 @@ static int __init netback_init(void)
 		netbk->pending_prod = MAX_PENDING_REQS;
 
 		INIT_LIST_HEAD(&netbk->pending_inuse_head);
-		INIT_LIST_HEAD(&netbk->net_schedule_list);
+		INIT_LIST_HEAD(&netbk->schedule_list);
 
-		spin_lock_init(&netbk->net_schedule_list_lock);
+		spin_lock_init(&netbk->schedule_list_lock);
 		spin_lock_init(&netbk->release_lock);
 
 		netbk->mmap_pages =

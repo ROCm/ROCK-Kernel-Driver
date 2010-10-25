@@ -33,6 +33,22 @@ static void __init i386_default_early_setup(void)
 
 void __init i386_start_kernel(void)
 {
+#ifdef CONFIG_XEN
+	struct xen_platform_parameters pp;
+
+	WARN_ON(HYPERVISOR_vm_assist(VMASST_CMD_enable,
+				     VMASST_TYPE_4gb_segments));
+
+	init_mm.pgd = swapper_pg_dir = (pgd_t *)xen_start_info->pt_base;
+
+	if (HYPERVISOR_xen_version(XENVER_platform_parameters, &pp) == 0) {
+		hypervisor_virt_start = pp.virt_start;
+		reserve_top_address(0UL - pp.virt_start);
+	}
+
+	BUG_ON(pte_index(hypervisor_virt_start));
+#endif
+
 #ifdef CONFIG_X86_TRAMPOLINE
 	/*
 	 * But first pinch a few for the stack/trampoline stuff

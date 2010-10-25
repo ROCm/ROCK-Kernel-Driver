@@ -288,6 +288,7 @@ static void __cpuinit intel_workarounds(struct cpuinfo_x86 *c)
 }
 #endif
 
+#ifndef CONFIG_XEN
 static void __cpuinit srat_detect_node(struct cpuinfo_x86 *c)
 {
 #if defined(CONFIG_NUMA) && defined(CONFIG_X86_64)
@@ -308,7 +309,6 @@ static void __cpuinit srat_detect_node(struct cpuinfo_x86 *c)
 #endif
 }
 
-#ifndef CONFIG_XEN
 /*
  * find out the number of processor cores on the die
  */
@@ -326,7 +326,6 @@ static int __cpuinit intel_num_cpu_cores(struct cpuinfo_x86 *c)
 	else
 		return 1;
 }
-#endif
 
 static void __cpuinit detect_vmx_virtcap(struct cpuinfo_x86 *c)
 {
@@ -365,6 +364,7 @@ static void __cpuinit detect_vmx_virtcap(struct cpuinfo_x86 *c)
 			set_cpu_cap(c, X86_FEATURE_VPID);
 	}
 }
+#endif
 
 static void __cpuinit init_intel(struct cpuinfo_x86 *c)
 {
@@ -461,13 +461,13 @@ static void __cpuinit init_intel(struct cpuinfo_x86 *c)
 		detect_ht(c);
 #endif
 	}
-#endif
 
 	/* Work around errata */
 	srat_detect_node(c);
 
 	if (cpu_has(c, X86_FEATURE_VMX))
 		detect_vmx_virtcap(c);
+#endif
 }
 
 #ifdef CONFIG_X86_32

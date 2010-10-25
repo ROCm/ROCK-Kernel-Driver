@@ -259,9 +259,9 @@ struct xen_netbk {
 	pending_ring_idx_t dealloc_cons;
 
 	struct list_head pending_inuse_head;
-	struct list_head net_schedule_list;
+	struct list_head schedule_list;
 
-	spinlock_t net_schedule_list_lock;
+	spinlock_t schedule_list_lock;
 	spinlock_t release_lock;
 
 	struct page **mmap_pages;

@@ -370,6 +370,7 @@ asmlinkage void __irq_entry evtchn_do_upcall(struct pt_regs *regs)
 		barrier();
 #endif
 
+#ifndef CONFIG_NO_HZ
 		/*
 		 * Handle timer interrupts before all others, so that all
 		 * hardirq handlers see an up-to-date system time even if we
@@ -395,6 +396,7 @@ asmlinkage void __irq_entry evtchn_do_upcall(struct pt_regs *regs)
 					BUG();
 			}
 		}
+#endif /* CONFIG_NO_HZ */
 
 		l1 = vcpu_info_xchg(evtchn_pending_sel, 0);
 
