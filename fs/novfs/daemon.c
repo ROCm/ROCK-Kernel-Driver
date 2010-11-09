@@ -1871,14 +1871,15 @@ static long local_unlink(const char *pathname)
 	while (*c != '\0') {
 		if (*c == '/')
 			name = ++c;
-		c++;
+		else
+			c++;
 	}
 	dentry = lookup_one_len(name, nd.path.dentry, strlen(name));
 	error = PTR_ERR(dentry);
 
 	if (!IS_ERR(dentry)) {
 		DbgPrint("dentry %p", dentry);
-		if (!(dentry->d_inode->i_mode & S_IFLNK)) {
+		if (!(dentry->d_inode) || !(dentry->d_inode->i_mode & S_IFLNK)) {
 			DbgPrint("%s not a link", name);
 			error = -ENOENT;
 			goto exit1;
