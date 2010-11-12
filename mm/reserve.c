@@ -628,6 +628,7 @@ struct page *__alloc_pages_reserve(int node, gfp_t flags, int order,
 out:
 	return page;
 }
+EXPORT_SYMBOL_GPL(__alloc_pages_reserve);
 
 void __free_pages_reserve(struct page *page, int order,
 			  struct mem_reserve *res, int emerg)
@@ -635,3 +636,4 @@ void __free_pages_reserve(struct page *page, int order,
 	__free_pages(page, order);
 	mem_reserve_pages_charge(res, -(1 << order));
 }
+EXPORT_SYMBOL_GPL(__free_pages_reserve);

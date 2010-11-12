@@ -437,11 +437,6 @@ int agp_bind_memory(struct agp_memory *curr, off_t pg_start)
 		curr->is_flushed = true;
 	}
 
-	if (curr->bridge->driver->agp_map_memory) {
-		ret_val = curr->bridge->driver->agp_map_memory(curr);
-		if (ret_val)
-			return ret_val;
-	}
 	ret_val = curr->bridge->driver->insert_memory(curr, pg_start, curr->type);
 
 	if (ret_val != 0)
@@ -482,9 +477,6 @@ int agp_unbind_memory(struct agp_memory *curr)
 
 	if (ret_val != 0)
 		return ret_val;
-
-	if (curr->bridge->driver->agp_unmap_memory)
-		curr->bridge->driver->agp_unmap_memory(curr);
 
 	curr->is_bound = false;
 	curr->pg_start = 0;
@@ -984,10 +976,12 @@ int agp_generic_create_gatt_table(struct agp_bridge_data *bridge)
 
 	bridge->driver->cache_flush();
 #ifdef CONFIG_X86
-	set_memory_uc((unsigned long)table, 1 << page_order);
+	if (set_memory_uc((unsigned long)table, 1 << page_order))
+		printk(KERN_WARNING "Could not set GATT table memory to UC!");
+
 	bridge->gatt_table = (void *)table;
 #else
-	bridge->gatt_table = ioremap_nocache(virt_to_gart(table),
+	bridge->gatt_table = ioremap_nocache(virt_to_phys(table),
 					(PAGE_SIZE * (1 << page_order)));
 	bridge->driver->cache_flush();
 #endif
@@ -1000,7 +994,7 @@ int agp_generic_create_gatt_table(struct agp_bridge_data *bridge)
 
 		return -ENOMEM;
 	}
-	bridge->gatt_bus_addr = virt_to_gart(bridge->gatt_table_real);
+	bridge->gatt_bus_addr = virt_to_phys(bridge->gatt_table_real);
 
 	/* AK: bogus, should encode addresses > 4GB */
 	for (i = 0; i < num_entries; i++) {
@@ -1250,7 +1244,7 @@ int agp_generic_alloc_pages(struct agp_bridge_data *bridge, struct agp_memory *m
 	}
 
 #ifdef CONFIG_X86
-	map_pages_into_agp(mem->pages, num_pages);
+	set_pages_array_uc(mem->pages, num_pages);
 #endif
 	ret = 0;
 out:
@@ -1283,7 +1277,7 @@ void agp_generic_destroy_pages(struct agp_memory *mem)
 		return;
 
 #ifdef CONFIG_X86
-	unmap_pages_from_agp(mem->pages, mem->page_count);
+	set_pages_array_wb(mem->pages, mem->page_count);
 #endif
 
 	for (i = 0; i < mem->page_count; i++) {

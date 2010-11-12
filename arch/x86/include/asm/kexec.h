@@ -5,30 +5,14 @@
 # define PA_CONTROL_PAGE	0
 # define VA_CONTROL_PAGE	1
 # define PA_PGD			2
-# ifndef CONFIG_XEN
 # define PA_SWAP_PAGE		3
 # define PAGES_NR		4
-# else /* CONFIG_XEN */
-/*
- * The hypervisor interface implicitly requires that all entries (except
- * for possibly the final one) are arranged in matching PA_/VA_ pairs.
-#  define VA_PGD		3
- */
-#  define PA_SWAP_PAGE		4
-#  define PAGES_NR		5
-# endif /* CONFIG_XEN */
 #else
 # define PA_CONTROL_PAGE	0
 # define VA_CONTROL_PAGE	1
 # define PA_TABLE_PAGE		2
-# ifndef CONFIG_XEN
 # define PA_SWAP_PAGE		3
 # define PAGES_NR		4
-# else /* CONFIG_XEN, see comment above
-#  define VA_TABLE_PAGE		3 */
-#  define PA_SWAP_PAGE		4
-#  define PAGES_NR		5
-# endif /* CONFIG_XEN */
 #endif
 
 # define KEXEC_CONTROL_CODE_MAX_SIZE	2048
@@ -177,19 +161,6 @@ struct kimage_arch {
 	pmd_t *pmd;
 	pte_t *pte;
 };
-#endif
-
-/* Under Xen we need to work with machine addresses. These macros give the
- * machine address of a certain page to the generic kexec code instead of
- * the pseudo physical address which would be given by the default macros.
- */
-
-#ifdef CONFIG_XEN
-#define KEXEC_ARCH_HAS_PAGE_MACROS
-#define kexec_page_to_pfn(page)  pfn_to_mfn(page_to_pfn(page))
-#define kexec_pfn_to_page(pfn)   pfn_to_page(mfn_to_pfn(pfn))
-#define kexec_virt_to_phys(addr) virt_to_machine(addr)
-#define kexec_phys_to_virt(addr) phys_to_virt(machine_to_phys(addr))
 #endif
 
 #endif /* __ASSEMBLY__ */

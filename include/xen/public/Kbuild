@@ -1,5 +1,0 @@
-header-y += evtchn.h
-header-y += gntdev.h
-header-y += iomulti.h
-header-y += privcmd.h
-header-y += xenbus.h

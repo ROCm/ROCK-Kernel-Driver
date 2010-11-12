@@ -85,7 +85,7 @@ enum {
 
 /* ec.c is compiled in acpi namespace so this shows up as acpi.ec_delay param */
 static unsigned int ec_delay __read_mostly = ACPI_EC_DELAY;
-module_param(ec_delay, uint, 0444);
+module_param(ec_delay, uint, 0644);
 MODULE_PARM_DESC(ec_delay, "Timeout(ms) waited until an EC command completes");
 
 /* If we find an EC via the ECDT, we need to keep a ptr to its context */

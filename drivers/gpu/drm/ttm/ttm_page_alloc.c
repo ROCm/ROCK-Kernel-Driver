@@ -514,21 +514,6 @@ static int ttm_alloc_new_pages(struct list_head *pages, gfp_t gfp_flags,
 			goto out;
 		}
 
-#ifdef CONFIG_XEN
-		if (gfp_flags & __GFP_DMA32) {
-			r = xen_limit_pages_to_max_mfn(p, 0, 32);
-
-			if (r) {
-				__free_page(p);
-				printk(KERN_ERR TTM_PFX
-				       "Cannot restrict page (%d).", r);
-				break;
-			}
-			if (gfp_flags & __GFP_ZERO)
-				clear_page(page_address(p));
-		}
-#endif
-
 #ifdef CONFIG_HIGHMEM
 		/* gfp flags of highmem page should never be dma32 so we
 		 * we should be fine in such case
@@ -703,22 +688,6 @@ int ttm_get_pages(struct list_head *pages, int flags,
 				       "Unable to allocate page.");
 				return -ENOMEM;
 			}
-
-#ifdef CONFIG_XEN
-			if (flags & TTM_PAGE_FLAG_DMA32) {
-				int rc = xen_limit_pages_to_max_mfn(p, 0, 32);
-
-				if (rc) {
-					__free_page(p);
-					printk(KERN_ERR TTM_PFX
-					       "Unable to restrict page (%d).",
-					       rc);
-					return rc;
-				}
-				if (flags & TTM_PAGE_FLAG_ZERO_ALLOC)
-					clear_page(page_address(p));
-			}
-#endif
 
 			list_add(&p->lru, pages);
 		}

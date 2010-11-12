@@ -60,7 +60,7 @@ static struct proc_dir_entry *dbg_file = NULL;
 static struct proc_dir_entry *dentry_file = NULL;
 static struct proc_dir_entry *inode_file = NULL;
 
-static DECLARE_MUTEX(LocalPrint_lock);
+static DEFINE_MUTEX(LocalPrint_lock);
 
 static ssize_t User_proc_write_DbgBuffer(struct file *file, const char __user * buf, size_t nbytes, loff_t * ppos)
 {
@@ -513,7 +513,7 @@ static ssize_t novfs_profile_read_inode(struct file *file, char *buf, size_t len
 	static char save_DbgPrintOn;
 
 	if (offset == 0) {
-		down(&LocalPrint_lock);
+		mutex_lock(&LocalPrint_lock);
 		save_DbgPrintOn = DbgPrintOn;
 		DbgPrintOn = 0;
 
@@ -527,7 +527,7 @@ static ssize_t novfs_profile_read_inode(struct file *file, char *buf, size_t len
 		DbgPrintOn = save_DbgPrintOn;
 		DbgPrintBufferOffset = DbgPrintBufferReadOffset = 0;
 
-		up(&LocalPrint_lock);
+		mutex_unlock(&LocalPrint_lock);
 	}
 
 	return retval;
@@ -541,7 +541,7 @@ static ssize_t novfs_profile_dentry_read(struct file *file, char *buf, size_t le
 	static char save_DbgPrintOn;
 
 	if (offset == 0) {
-		down(&LocalPrint_lock);
+		mutex_lock(&LocalPrint_lock);
 		save_DbgPrintOn = DbgPrintOn;
 		DbgPrintOn = 0;
 		DbgPrintBufferOffset = DbgPrintBufferReadOffset = 0;
@@ -554,7 +554,7 @@ static ssize_t novfs_profile_dentry_read(struct file *file, char *buf, size_t le
 		DbgPrintBufferOffset = DbgPrintBufferReadOffset = 0;
 		DbgPrintOn = save_DbgPrintOn;
 
-		up(&LocalPrint_lock);
+		mutex_unlock(&LocalPrint_lock);
 	}
 
 	return retval;

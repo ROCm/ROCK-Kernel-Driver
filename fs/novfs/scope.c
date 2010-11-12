@@ -601,8 +601,8 @@ char *novfs_scope_dget_path(struct dentry *Dentry, char *Buf, unsigned int Bufle
 void novfs_scope_init(void)
 {
 	INIT_LIST_HEAD(&Scope_List);
-	init_MUTEX(&Scope_Lock);
-	init_MUTEX_LOCKED(&Scope_Thread_Delay);
+	sema_init(&Scope_Lock, 1);
+	sema_init(&Scope_Thread_Delay, 0);
 	kthread_run(Scope_Cleanup_Thread, NULL, "novfs_ST");
 }
 

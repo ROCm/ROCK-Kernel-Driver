@@ -44,7 +44,7 @@ static int amd_create_page_map(struct amd_page_map *page_map)
 #ifndef CONFIG_X86
 	SetPageReserved(virt_to_page(page_map->real));
 	global_cache_flush();
-	page_map->remapped = ioremap_nocache(virt_to_gart(page_map->real),
+	page_map->remapped = ioremap_nocache(virt_to_phys(page_map->real),
 					    PAGE_SIZE);
 	if (page_map->remapped == NULL) {
 		ClearPageReserved(virt_to_page(page_map->real));
@@ -161,7 +161,7 @@ static int amd_create_gatt_table(struct agp_bridge_data *bridge)
 
 	agp_bridge->gatt_table_real = (u32 *)page_dir.real;
 	agp_bridge->gatt_table = (u32 __iomem *)page_dir.remapped;
-	agp_bridge->gatt_bus_addr = virt_to_gart(page_dir.real);
+	agp_bridge->gatt_bus_addr = virt_to_phys(page_dir.real);
 
 	/* Get the address for the gart region.
 	 * This is a bus address even on the alpha, b/c its
@@ -174,7 +174,7 @@ static int amd_create_gatt_table(struct agp_bridge_data *bridge)
 
 	/* Calculate the agp offset */
 	for (i = 0; i < value->num_entries / 1024; i++, addr += 0x00400000) {
-		writel(virt_to_gart(amd_irongate_private.gatt_pages[i]->real) | 1,
+		writel(virt_to_phys(amd_irongate_private.gatt_pages[i]->real) | 1,
 			page_dir.remapped+GET_PAGE_DIR_OFF(addr));
 		readl(page_dir.remapped+GET_PAGE_DIR_OFF(addr));	/* PCI Posting. */
 	}
@@ -309,7 +309,8 @@ static int amd_insert_memory(struct agp_memory *mem, off_t pg_start, int type)
 
 	num_entries = A_SIZE_LVL2(agp_bridge->current_size)->num_entries;
 
-	if (type != 0 || mem->type != 0)
+	if (type != mem->type ||
+	    agp_bridge->driver->agp_type_to_mask_type(agp_bridge, type))
 		return -EINVAL;
 
 	if ((pg_start + mem->page_count) > num_entries)
@@ -348,7 +349,8 @@ static int amd_remove_memory(struct agp_memory *mem, off_t pg_start, int type)
 	unsigned long __iomem *cur_gatt;
 	unsigned long addr;
 
-	if (type != 0 || mem->type != 0)
+	if (type != mem->type ||
+	    agp_bridge->driver->agp_type_to_mask_type(agp_bridge, type))
 		return -EINVAL;
 
 	for (i = pg_start; i < (mem->page_count + pg_start); i++) {

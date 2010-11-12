@@ -14,15 +14,11 @@ typedef struct {
 #endif
 	unsigned int x86_platform_ipis;	/* arch dependent */
 	unsigned int apic_perf_irqs;
-	unsigned int apic_pending_irqs;
+	unsigned int apic_irq_work_irqs;
 #ifdef CONFIG_SMP
 	unsigned int irq_resched_count;
 	unsigned int irq_call_count;
-#ifndef CONFIG_XEN
 	unsigned int irq_tlb_count;
-#else
-	unsigned int irq_lock_count;
-#endif
 #endif
 #ifdef CONFIG_X86_THERMAL_VECTOR
 	unsigned int irq_thermal_count;
