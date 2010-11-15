@@ -1034,7 +1034,7 @@ static int __init apparmor_init(void)
 	error = register_security(&apparmor_ops);
 	if (error) {
 		AA_ERROR("Unable to register AppArmor\n");
-		goto register_security_out;
+		goto set_init_cxt_out;
 	}
 
 	/* Report that AppArmor successfully initialized */
@@ -1048,6 +1048,9 @@ static int __init apparmor_init(void)
 
 	return error;
 
+set_init_cxt_out:
+	aa_free_task_context(current->real_cred->security);
+
 register_security_out:
 	aa_free_root_ns();
 
@@ -1056,7 +1059,6 @@ alloc_out:
 
 	apparmor_enabled = 0;
 	return error;
-
 }
 
 security_initcall(apparmor_init);
