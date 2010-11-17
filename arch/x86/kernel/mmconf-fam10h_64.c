@@ -215,25 +215,15 @@ void __cpuinit fam10h_check_enable_mmcfg(void)
 	val |= fam10h_pci_mmconf_base | (8 << FAM10H_MMIO_CONF_BUSRANGE_SHIFT) |
 	       FAM10H_MMIO_CONF_ENABLE;
 	wrmsrl(address, val);
-
-#ifdef CONFIG_XEN
-	{
-		u64 val2;
-
-		rdmsrl(address, val2);
-		if (val2 != val)
-			pci_probe &= ~PCI_CHECK_ENABLE_AMD_MMCONF;
-	}
-#endif
 }
 
-static int __devinit set_check_enable_amd_mmconf(const struct dmi_system_id *d)
+static int __init set_check_enable_amd_mmconf(const struct dmi_system_id *d)
 {
         pci_probe |= PCI_CHECK_ENABLE_AMD_MMCONF;
         return 0;
 }
 
-static const struct dmi_system_id __cpuinitconst mmconf_dmi_table[] = {
+static const struct dmi_system_id __initconst mmconf_dmi_table[] = {
         {
                 .callback = set_check_enable_amd_mmconf,
                 .ident = "Sun Microsystems Machine",
@@ -244,7 +234,8 @@ static const struct dmi_system_id __cpuinitconst mmconf_dmi_table[] = {
 	{}
 };
 
-void __cpuinit check_enable_amd_mmconf_dmi(void)
+/* Called from a __cpuinit function, but only on the BSP. */
+void __ref check_enable_amd_mmconf_dmi(void)
 {
 	dmi_check_system(mmconf_dmi_table);
 }

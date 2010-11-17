@@ -35,8 +35,9 @@ obj-$(CONFIG_BLK_DEV_SX8)	+= sx8.o
 obj-$(CONFIG_BLK_DEV_UB)	+= ub.o
 obj-$(CONFIG_BLK_DEV_HD)	+= hd.o
 
-obj-$(CONFIG_PARAVIRT_XEN_BLKDEV_FRONTEND) += xen-blkfront.o
+obj-$(CONFIG_XEN_BLKDEV_FRONTEND)	+= xen-blkfront.o
 obj-$(CONFIG_BLK_DEV_DRBD)     += drbd/
+obj-$(CONFIG_BLK_DEV_RBD)     += rbd.o
 
 obj-$(CONFIG_CIPHER_TWOFISH)	+= loop_fish2.o
 

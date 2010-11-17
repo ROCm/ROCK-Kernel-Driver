@@ -43,7 +43,7 @@ struct inode_data {
 	struct inode *Inode;
 	unsigned long cntDC;
 	struct list_head DirCache;
-	struct semaphore DirCacheLock;
+	struct mutex DirCacheLock;
 	void *FileHandle;
 	int CacheFlag;
 	char Name[1];		/* Needs to be last entry */
@@ -268,11 +268,11 @@ static atomic_t novfs_Inode_Number = ATOMIC_INIT(0);
 struct dentry *novfs_root = NULL;
 char *novfs_current_mnt = NULL;
 
-DECLARE_MUTEX(InodeList_lock);
+DEFINE_MUTEX(InodeList_lock);
 
 LIST_HEAD(InodeList);
 
-DECLARE_MUTEX(TimeDir_Lock);
+DEFINE_MUTEX(TimeDir_Lock);
 uint64_t lastTime;
 char lastDir[PATH_MAX];
 
@@ -1050,7 +1050,7 @@ int novfs_dir_readdir(struct file *file, void *dirent, filldir_t filldir)
 // Use this hack by default
 #ifndef SKIP_CROSSOVER_HACK
 	// Hack for crossover - begin
-	down(&TimeDir_Lock);
+	mutex_lock(&TimeDir_Lock);
 	if ((file->f_dentry->d_name.len == 7) &&
 	    ((0 == strncmp(file->f_dentry->d_name.name, " !xover", 7)) ||
 	     (0 == strncmp(file->f_dentry->d_name.name, "z!xover", 7)))) {
@@ -1076,7 +1076,7 @@ int novfs_dir_readdir(struct file *file, void *dirent, filldir_t filldir)
 		}
 	}
 
-	up(&TimeDir_Lock);
+	mutex_unlock(&TimeDir_Lock);
 	// Hack for crossover - end
 #endif
 
@@ -3157,9 +3157,9 @@ void novfs_evict_inode(struct inode *inode)
 
 		novfs_free_inode_cache(inode);
 
-		down(&InodeList_lock);
+		mutex_lock(&InodeList_lock);
 		list_del(&id->IList);
-		up(&InodeList_lock);
+		mutex_unlock(&InodeList_lock);
 
 		kfree(inode->i_private);
 		inode->i_private = NULL;
@@ -3292,15 +3292,15 @@ struct inode *novfs_get_inode(struct super_block *sb, int mode, int dev, uid_t U
 			id->cntDC = 1;
 
 			INIT_LIST_HEAD(&id->DirCache);
-			init_MUTEX(&id->DirCacheLock);
+			mutex_init(&id->DirCacheLock);
 
 			id->FileHandle = 0;
 			id->CacheFlag = 0;
 
-			down(&InodeList_lock);
+			mutex_lock(&InodeList_lock);
 
 			list_add_tail(&id->IList, &InodeList);
-			up(&InodeList_lock);
+			mutex_unlock(&InodeList_lock);
 
 			id->Name[0] = '\0';
 
@@ -3532,7 +3532,7 @@ int novfs_lock_inode_cache(struct inode *i)
 
 	DbgPrint("0x%p", i);
 	if (i && (id = i->i_private) && id->DirCache.next) {
-		down(&id->DirCacheLock);
+		mutex_lock(&id->DirCacheLock);
 		retVal = 1;
 	}
 	DbgPrint("return %d", retVal);
@@ -3544,7 +3544,7 @@ void novfs_unlock_inode_cache(struct inode *i)
 	struct inode_data *id;
 
 	if (i && (id = i->i_private) && id->DirCache.next) {
-		up(&id->DirCacheLock);
+		mutex_unlock(&id->DirCacheLock);
 	}
 }
 
@@ -4042,7 +4042,7 @@ void novfs_dump_inode(void *pf)
 	char ctime_buf[32];
 	unsigned long icnt = 0, dccnt = 0;
 
-	down(&InodeList_lock);
+	mutex_lock(&InodeList_lock);
 	list_for_each(il, &InodeList) {
 		id = list_entry(il, struct inode_data, IList);
 		inode = id->Inode;
@@ -4087,7 +4087,7 @@ void novfs_dump_inode(void *pf)
 			}
 		}
 	}
-	up(&InodeList_lock);
+	mutex_unlock(&InodeList_lock);
 
 	pfunc("Inodes: %d(%d) DirCache: %d(%d)\n", InodeCount, icnt, DCCount, dccnt);
 

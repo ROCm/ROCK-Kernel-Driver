@@ -7,7 +7,6 @@ source "virt/kvm/Kconfig"
 menuconfig VIRTUALIZATION
 	bool "Virtualization"
 	depends on HAVE_KVM || X86
-	depends on !XEN
 	default y
 	---help---
 	  Say Y here to get to see options for using your Linux host to run other
@@ -64,6 +63,13 @@ config KVM_AMD
 
 	  To compile this as a module, choose M here: the module
 	  will be called kvm-amd.
+
+config KVM_MMU_AUDIT
+	bool "Audit KVM MMU"
+	depends on KVM && TRACEPOINTS
+	---help---
+	 This option adds a R/W kVM module parameter 'mmu_audit', which allows
+	 audit  KVM MMU at runtime.
 
 # OK, it's a little counter-intuitive to do this, but it puts it neatly under
 # the virtualization menu.

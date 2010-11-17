@@ -48,7 +48,3 @@ extern const struct hypervisor_x86 x86_hyper_ms_hyperv;
 extern const struct hypervisor_x86 x86_hyper_xen_hvm;
 
 #endif
-
-#ifdef HAVE_XEN_PLATFORM_COMPAT_H
-#include_next <asm/hypervisor.h>
-#endif

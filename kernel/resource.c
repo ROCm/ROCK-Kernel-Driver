@@ -361,7 +361,6 @@ int walk_system_ram_range(unsigned long start_pfn, unsigned long nr_pages,
 
 #endif
 
-#if !defined(CONFIG_XEN) || !defined(CONFIG_ARCH_HAS_WALK_MEMORY)
 static int __is_ram(unsigned long pfn, unsigned long nr_pages, void *arg)
 {
 	return 1;
@@ -374,7 +373,6 @@ int __weak page_is_ram(unsigned long pfn)
 {
 	return walk_system_ram_range(pfn, 1, NULL, __is_ram) == 1;
 }
-#endif
 
 static resource_size_t simple_align_resource(void *data,
 					     const struct resource *avail,
@@ -573,6 +571,8 @@ static struct resource * __insert_resource(struct resource *parent, struct resou
 			return first;
 
 		if (first == parent)
+			return first;
+		if (WARN_ON(first == new))	/* duplicated insertion */
 			return first;
 
 		if ((first->start > new->start) || (first->end < new->end))

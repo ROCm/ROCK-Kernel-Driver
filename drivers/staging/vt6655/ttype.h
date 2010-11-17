@@ -30,22 +30,12 @@
 #ifndef __TTYPE_H__
 #define __TTYPE_H__
 
-#ifdef CONFIG_XEN
-#include <asm/hypervisor.h>
-#endif
 
 /******* Common definitions and typedefs ***********************************/
 
 #ifndef TxInSleep
 #define TxInSleep
 #endif
-
-//2007-0809-01<Add>by MikeLiu
-#ifndef  update_BssList
-#define update_BssList
-#endif
-
-
 
 #ifndef WPA_SM_Transtatus
 #define WPA_SM_Transtatus

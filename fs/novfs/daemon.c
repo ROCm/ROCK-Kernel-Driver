@@ -109,7 +109,7 @@ static atomic_t Daemon_Open_Count = ATOMIC_INIT(0);
 
 static unsigned long Daemon_Command_Timeout = TIMEOUT_VALUE;
 
-static DECLARE_MUTEX(DriveMapLock);
+static DEFINE_MUTEX(DriveMapLock);
 static LIST_HEAD(DriveMapList);
 
 int novfs_max_iosize = PAGE_SIZE;
@@ -118,7 +118,7 @@ void novfs_daemon_queue_init()
 {
 	INIT_LIST_HEAD(&Daemon_Queue.list);
 	spin_lock_init(&Daemon_Queue.lock);
-	init_MUTEX_LOCKED(&Daemon_Queue.semaphore);
+	sema_init(&Daemon_Queue.semaphore, 0);
 }
 
 void novfs_daemon_queue_exit(void)
@@ -159,7 +159,7 @@ int Queue_Daemon_Command(void *request,
 			que->status = QUEUE_SENDING;
 			que->flags = 0;
 
-			init_MUTEX_LOCKED(&que->semaphore);
+			sema_init(&que->semaphore, 0);
 
 			que->sequence = atomic_inc_return(&Sequence);
 
@@ -881,7 +881,7 @@ int novfs_daemon_destroy_sessionId(struct novfs_schandle SessionId)
 			 * When destroying the session check to see if there are any
 			 * mapped drives.  If there are then remove them.
 			 */
-			down(&DriveMapLock);
+			mutex_lock(&DriveMapLock);
 			list_for_each(list, &DriveMapList) {
 				dm = list_entry(list, struct drive_map, list);
 				if (SC_EQUAL(SessionId, dm->session)) {
@@ -892,7 +892,7 @@ int novfs_daemon_destroy_sessionId(struct novfs_schandle SessionId)
 				}
 
 			}
-			up(&DriveMapLock);
+			mutex_unlock(&DriveMapLock);
 
 		} else {
 			retCode = -EIO;
@@ -1740,7 +1740,7 @@ static int set_map_drive(struct novfs_xplat *pdata, struct novfs_schandle Sessio
 
 	dm = (struct drive_map *)&DriveMapList.next;
 
-	down(&DriveMapLock);
+	mutex_lock(&DriveMapLock);
 
 	list_for_each(list, &DriveMapList) {
 		dm = list_entry(list, struct drive_map, list);
@@ -1766,7 +1766,7 @@ static int set_map_drive(struct novfs_xplat *pdata, struct novfs_schandle Sessio
 		}
 	} else
 		kfree(drivemap);
-	up(&DriveMapLock);
+	mutex_unlock(&DriveMapLock);
 	return (retVal);
 }
 
@@ -1799,7 +1799,7 @@ static int unmap_drive(struct novfs_xplat *pdata, struct novfs_schandle Session)
 
 	dm = NULL;
 
-	down(&DriveMapLock);
+	mutex_lock(&DriveMapLock);
 
 	list_for_each(list, &DriveMapList) {
 		dm = list_entry(list, struct drive_map, list);
@@ -1823,7 +1823,7 @@ static int unmap_drive(struct novfs_xplat *pdata, struct novfs_schandle Session)
 		kfree(dm);
 	}
 
-	up(&DriveMapLock);
+	mutex_unlock(&DriveMapLock);
 	return (retVal);
 }
 
@@ -1832,7 +1832,7 @@ static void RemoveDriveMaps(void)
 	struct drive_map *dm;
 	struct list_head *list;
 
-	down(&DriveMapLock);
+	mutex_lock(&DriveMapLock);
 	list_for_each(list, &DriveMapList) {
 		dm = list_entry(list, struct drive_map, list);
 
@@ -1844,7 +1844,7 @@ static void RemoveDriveMaps(void)
 		list_del(&dm->list);
 		kfree(dm);
 	}
-	up(&DriveMapLock);
+	mutex_unlock(&DriveMapLock);
 }
 
 /* As picked from do_unlinkat() */

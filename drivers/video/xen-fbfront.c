@@ -631,6 +631,8 @@ static void xenfb_backend_changed(struct xenbus_device *dev,
 	switch (backend_state) {
 	case XenbusStateInitialising:
 	case XenbusStateInitialised:
+	case XenbusStateReconfiguring:
+	case XenbusStateReconfigured:
 	case XenbusStateUnknown:
 	case XenbusStateClosed:
 		break;
@@ -674,6 +676,7 @@ static struct xenbus_device_id xenfb_ids[] = {
 
 static struct xenbus_driver xenfb_driver = {
 	.name = "vfb",
+	.owner = THIS_MODULE,
 	.ids = xenfb_ids,
 	.probe = xenfb_probe,
 	.remove = xenfb_remove,

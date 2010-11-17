@@ -36,6 +36,8 @@
 #include <linux/skbuff.h>
 #include <linux/ethtool.h>
 #include <linux/if_ether.h>
+#include <linux/tcp.h>
+#include <linux/udp.h>
 #include <linux/moduleparam.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
@@ -133,7 +135,7 @@ static void skb_entry_set_link(union skb_entry *list, unsigned short id)
 static int skb_entry_is_link(const union skb_entry *list)
 {
 	BUILD_BUG_ON(sizeof(list->skb) != sizeof(list->link));
-	return ((unsigned long)list->skb < PAGE_OFFSET);
+	return (unsigned long)list->skb < PAGE_OFFSET;
 }
 
 /*
@@ -201,8 +203,8 @@ static void rx_refill_timeout(unsigned long data)
 
 static int netfront_tx_slot_available(struct netfront_info *np)
 {
-	return ((np->tx.req_prod_pvt - np->tx.rsp_cons) <
-		(TX_MAX_TARGET - MAX_SKB_FRAGS - 2));
+	return (np->tx.req_prod_pvt - np->tx.rsp_cons) <
+		(TX_MAX_TARGET - MAX_SKB_FRAGS - 2);
 }
 
 static void xennet_maybe_wake_tx(struct net_device *dev)
@@ -766,6 +768,45 @@ static RING_IDX xennet_fill_frags(struct netfront_info *np,
 
 	shinfo->nr_frags = nr_frags;
 	return cons;
+}
+
+static int skb_checksum_setup(struct sk_buff *skb)
+{
+	struct iphdr *iph;
+	unsigned char *th;
+	int err = -EPROTO;
+
+	if (skb->protocol != htons(ETH_P_IP))
+		goto out;
+
+	iph = (void *)skb->data;
+	th = skb->data + 4 * iph->ihl;
+	if (th >= skb_tail_pointer(skb))
+		goto out;
+
+	skb->csum_start = th - skb->head;
+	switch (iph->protocol) {
+	case IPPROTO_TCP:
+		skb->csum_offset = offsetof(struct tcphdr, check);
+		break;
+	case IPPROTO_UDP:
+		skb->csum_offset = offsetof(struct udphdr, check);
+		break;
+	default:
+		if (net_ratelimit())
+			printk(KERN_ERR "Attempting to checksum a non-"
+			       "TCP/UDP packet, dropping a protocol"
+			       " %d packet", iph->protocol);
+		goto out;
+	}
+
+	if ((th + skb->csum_offset + 2) > skb_tail_pointer(skb))
+		goto out;
+
+	err = 0;
+
+out:
+	return err;
 }
 
 static int handle_incoming_queue(struct net_device *dev,
@@ -1354,7 +1395,7 @@ static int setup_netfront(struct xenbus_device *dev, struct netfront_info *info)
 }
 
 /* Common code used when first setting up, and when resuming. */
-static int talk_to_backend(struct xenbus_device *dev,
+static int talk_to_netback(struct xenbus_device *dev,
 			   struct netfront_info *info)
 {
 	const char *message;
@@ -1504,7 +1545,7 @@ static int xennet_connect(struct net_device *dev)
 		return -ENODEV;
 	}
 
-	err = talk_to_backend(np->xbdev, np);
+	err = talk_to_netback(np->xbdev, np);
 	if (err)
 		return err;
 
@@ -1558,7 +1599,7 @@ static int xennet_connect(struct net_device *dev)
 /**
  * Callback received when the backend's state changes.
  */
-static void backend_changed(struct xenbus_device *dev,
+static void netback_changed(struct xenbus_device *dev,
 			    enum xenbus_state backend_state)
 {
 	struct netfront_info *np = dev_get_drvdata(&dev->dev);
@@ -1569,6 +1610,8 @@ static void backend_changed(struct xenbus_device *dev,
 	switch (backend_state) {
 	case XenbusStateInitialising:
 	case XenbusStateInitialised:
+	case XenbusStateReconfiguring:
+	case XenbusStateReconfigured:
 	case XenbusStateConnected:
 	case XenbusStateUnknown:
 	case XenbusStateClosed:
@@ -1755,11 +1798,12 @@ static int __devexit xennet_remove(struct xenbus_device *dev)
 
 static struct xenbus_driver netfront_driver = {
 	.name = "vif",
+	.owner = THIS_MODULE,
 	.ids = netfront_ids,
 	.probe = netfront_probe,
 	.remove = __devexit_p(xennet_remove),
 	.resume = netfront_resume,
-	.otherend_changed = backend_changed,
+	.otherend_changed = netback_changed,
 };
 
 static int __init netif_init(void)

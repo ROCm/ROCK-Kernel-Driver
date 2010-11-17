@@ -17,8 +17,6 @@
  */
 #define IO_APIC_SLOT_SIZE		1024
 
-#ifndef CONFIG_XEN
-
 #define	APIC_ID		0x20
 
 #define	APIC_LVR	0x30
@@ -133,6 +131,7 @@
 #define APIC_EILVTn(n)	(0x500 + 0x10 * n)
 #define		APIC_EILVT_NR_AMD_K8	1	/* # of extended interrupts */
 #define		APIC_EILVT_NR_AMD_10H	4
+#define		APIC_EILVT_NR_MAX	APIC_EILVT_NR_AMD_10H
 #define		APIC_EILVT_LVTOFF(x)	(((x) >> 4) & 0xF)
 #define		APIC_EILVT_MSG_FIX	0x0
 #define		APIC_EILVT_MSG_SMI	0x2
@@ -144,24 +143,12 @@
 #define APIC_BASE_MSR	0x800
 #define X2APIC_ENABLE	(1UL << 10)
 
-#else /* CONFIG_XEN */
-
-enum {
-	APIC_DEST_ALLBUT = 0x1,
-	APIC_DEST_SELF,
-	APIC_DEST_ALLINC
-};
-
-#endif /* CONFIG_XEN */
-
 #ifdef CONFIG_X86_32
 # define MAX_IO_APICS 64
 #else
 # define MAX_IO_APICS 128
 # define MAX_LOCAL_APIC 32768
 #endif
-
-#ifndef CONFIG_XEN
 
 /*
  * All x86-64 systems are xAPIC compatible.
@@ -432,8 +419,6 @@ struct local_apic {
 } __attribute__ ((packed));
 
 #undef u32
-
-#endif /* CONFIG_XEN */
 
 #ifdef CONFIG_X86_32
  #define BAD_APICID 0xFFu

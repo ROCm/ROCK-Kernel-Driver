@@ -5,10 +5,6 @@
  * @remark Read the file COPYING
  *
  * @author John Levon <levon@movementarian.org>
- *
- * Modified by Aravind Menon for Xen
- * These modifications are:
- * Copyright (C) 2005 Hewlett-Packard Co.
  */
 
 #include <linux/kernel.h>
@@ -38,34 +34,6 @@ static DEFINE_MUTEX(start_mutex);
    1 - use the timer int mechanism regardless
  */
 static int timer = 0;
-
-#ifdef CONFIG_XEN
-int oprofile_set_active(int active_domains[], unsigned int adomains)
-{
-	int err;
-
-	if (!oprofile_ops.set_active)
-		return -EINVAL;
-
-	mutex_lock(&start_mutex);
-	err = oprofile_ops.set_active(active_domains, adomains);
-	mutex_unlock(&start_mutex);
-	return err;
-}
-
-int oprofile_set_passive(int passive_domains[], unsigned int pdomains)
-{
-	int err;
-
-	if (!oprofile_ops.set_passive)
-		return -EINVAL;
-
-	mutex_lock(&start_mutex);
-	err = oprofile_ops.set_passive(passive_domains, pdomains);
-	mutex_unlock(&start_mutex);
-	return err;
-}
-#endif
 
 int oprofile_setup(void)
 {
@@ -257,26 +225,17 @@ post_sync:
 	mutex_unlock(&start_mutex);
 }
 
-int oprofile_set_backtrace(unsigned long val)
+int oprofile_set_ulong(unsigned long *addr, unsigned long val)
 {
-	int err = 0;
+	int err = -EBUSY;
 
 	mutex_lock(&start_mutex);
-
-	if (oprofile_started) {
-		err = -EBUSY;
-		goto out;
+	if (!oprofile_started) {
+		*addr = val;
+		err = 0;
 	}
-
-	if (!oprofile_ops.backtrace) {
-		err = -EINVAL;
-		goto out;
-	}
-
-	oprofile_backtrace_depth = val;
-
-out:
 	mutex_unlock(&start_mutex);
+
 	return err;
 }
 
@@ -289,16 +248,9 @@ static int __init oprofile_init(void)
 		printk(KERN_INFO "oprofile: using timer interrupt.\n");
 		err = oprofile_timer_init(&oprofile_ops);
 		if (err)
-			goto out_arch;
+			return err;
 	}
-	err = oprofilefs_register();
-	if (err)
-		goto out_arch;
-	return 0;
-
-out_arch:
-	oprofile_arch_exit();
-	return err;
+	return oprofilefs_register();
 }
 
 
