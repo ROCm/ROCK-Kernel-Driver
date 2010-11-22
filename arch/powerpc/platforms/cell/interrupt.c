@@ -268,7 +268,7 @@ static void handle_iic_irq(unsigned int irq, struct irq_desc *desc)
 		raw_spin_unlock(&desc->lock);
 		action_ret = handle_IRQ_event(irq, action);
 		if (!noirqdebug)
-			note_interrupt(irq, desc, action_ret, false);
+			note_interrupt(irq, desc, action_ret);
 		raw_spin_lock(&desc->lock);
 
 	} while ((desc->status & (IRQ_PENDING | IRQ_DISABLED)) == IRQ_PENDING);

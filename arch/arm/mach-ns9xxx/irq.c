@@ -85,7 +85,7 @@ static void handle_prio_irq(unsigned int irq, struct irq_desc *desc)
 	/* XXX: There is no direct way to access noirqdebug, so check
 	 * unconditionally for spurious irqs...
 	 * Maybe this function should go to kernel/irq/chip.c? */
-	note_interrupt(irq, desc, action_ret, false);
+	note_interrupt(irq, desc, action_ret);
 
 	raw_spin_lock(&desc->lock);
 	desc->status &= ~IRQ_INPROGRESS;

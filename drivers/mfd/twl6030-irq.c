@@ -146,7 +146,7 @@ static int twl6030_irq_thread(void *data)
 				 */
 				if (d->status & IRQ_DISABLED)
 					note_interrupt(module_irq, d,
-							IRQ_NONE, false);
+							IRQ_NONE);
 				else
 					d->handle_irq(module_irq, d);
 

@@ -215,17 +215,9 @@ try_misrouted_irq(unsigned int irq, struct irq_desc *desc,
 	return action && (action->flags & IRQF_IRQPOLL);
 }
 
-/*
- * The parameter "only_fixup" means that the function should be only executed
- * if this parameter is set either to false or to true simultaneously with
- * irqfixup enabled.
- */
 void note_interrupt(unsigned int irq, struct irq_desc *desc,
-		    irqreturn_t action_ret, bool only_fixup)
+		    irqreturn_t action_ret)
 {
-	if (only_fixup && irqfixup == 0)
-		return;
-
 	if (unlikely(action_ret != IRQ_HANDLED)) {
 		/*
 		 * If we are seeing only the odd spurious IRQ caused by

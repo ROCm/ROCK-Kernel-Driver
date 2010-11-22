@@ -204,8 +204,7 @@ static void pcap_isr_work(struct work_struct *work)
 					break;
 
 				if (desc->status & IRQ_DISABLED)
-					note_interrupt(irq, desc, IRQ_NONE,
-							false);
+					note_interrupt(irq, desc, IRQ_NONE);
 				else
 					desc->handle_irq(irq, desc);
 			}
