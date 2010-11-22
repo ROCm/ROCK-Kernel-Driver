@@ -28,6 +28,7 @@
 */
 /*****************************************************************************/
 
+#include <linux/smp_lock.h>
 #include "easycap.h"
 #include "easycap_standard.h"
 

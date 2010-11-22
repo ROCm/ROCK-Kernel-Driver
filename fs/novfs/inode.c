@@ -3443,6 +3443,11 @@ static void novfs_kill_sb(struct super_block *super)
 	kill_litter_super(super);
 }
 
+/* This should be removed */
+#ifndef kernel_locked
+#define kernel_locked() (current->lock_depth >= 0)
+#endif
+
 ssize_t novfs_Control_read(struct file *file, char *buf, size_t nbytes, loff_t * ppos)
 {
 	ssize_t retval = 0;
