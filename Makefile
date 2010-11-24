@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 37
-EXTRAVERSION = -rc3
+EXTRAVERSION = -rc3-git1
 NAME = Flesh-Eating Bats with Fangs
 
 # *DOCUMENTATION*
