@@ -33,6 +33,7 @@
 #include <linux/cpuset.h>
 #include <linux/hardirq.h> /* for BUG_ON(!in_atomic()) only */
 #include <linux/memcontrol.h>
+#include <linux/precache.h>
 #include <linux/mm_inline.h> /* for page_is_file_cache() */
 #include "internal.h"
 
@@ -118,6 +119,16 @@
 void __remove_from_page_cache(struct page *page)
 {
 	struct address_space *mapping = page->mapping;
+
+	/*
+	 * if we're uptodate, flush out into the precache, otherwise
+	 * invalidate any existing precache entries.  We can't leave
+	 * stale data around in the precache once our page is gone
+	 */
+	if (PageUptodate(page))
+		precache_put(page->mapping, page->index, page);
+	else
+		precache_flush(page->mapping, page->index);
 
 	radix_tree_delete(&mapping->page_tree, page->index);
 	page->mapping = NULL;

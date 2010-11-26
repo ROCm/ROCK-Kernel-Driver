@@ -28,7 +28,11 @@
 #include <linux/kdebug.h>
 #include <linux/smp.h>
 
+#ifdef ARCH_HAS_NMI_WATCHDOG
 #include <asm/i8259.h>
+#else
+#include <asm/nmi.h>
+#endif
 #include <asm/io_apic.h>
 #include <asm/proto.h>
 #include <asm/timer.h>
@@ -38,6 +42,9 @@
 #include <asm/mach_traps.h>
 
 int unknown_nmi_panic;
+
+#ifdef ARCH_HAS_NMI_WATCHDOG
+
 int nmi_watchdog_enabled;
 
 /* For reliability, we're prepared to waste bits here. */
@@ -463,8 +470,11 @@ nmi_watchdog_tick(struct pt_regs *regs, unsigned reason)
 	return rc;
 }
 
+#endif /* ARCH_HAS_NMI_WATCHDOG */
+
 #ifdef CONFIG_SYSCTL
 
+#ifdef ARCH_HAS_NMI_WATCHDOG
 static void enable_ioapic_nmi_watchdog_single(void *unused)
 {
 	__get_cpu_var(wd_enabled) = 1;
@@ -482,6 +492,7 @@ static void disable_ioapic_nmi_watchdog(void)
 {
 	on_each_cpu(stop_apic_nmi_watchdog, NULL, 1);
 }
+#endif
 
 static int __init setup_unknown_nmi_panic(char *str)
 {
@@ -500,6 +511,7 @@ static int unknown_nmi_panic_callback(struct pt_regs *regs, int cpu)
 	return 0;
 }
 
+#ifdef ARCH_HAS_NMI_WATCHDOG
 /*
  * proc handler for /proc/sys/kernel/nmi
  */
@@ -537,6 +549,7 @@ int proc_nmi_enabled(struct ctl_table *table, int write,
 	}
 	return 0;
 }
+#endif
 
 #endif /* CONFIG_SYSCTL */
 
@@ -549,6 +562,7 @@ int do_nmi_callback(struct pt_regs *regs, int cpu)
 	return 0;
 }
 
+#ifdef ARCH_HAS_NMI_WATCHDOG
 void arch_trigger_all_cpu_backtrace(void)
 {
 	int i;
@@ -565,3 +579,4 @@ void arch_trigger_all_cpu_backtrace(void)
 		mdelay(1);
 	}
 }
+#endif

@@ -171,6 +171,11 @@ int update_persistent_clock(struct timespec now)
 	unsigned long flags;
 	int retval;
 
+#ifdef CONFIG_XEN
+	if (xen_update_persistent_clock() < 0 || xen_independent_wallclock())
+		return 0;
+#endif
+
 	spin_lock_irqsave(&rtc_lock, flags);
 	retval = x86_platform.set_wallclock(now.tv_sec);
 	spin_unlock_irqrestore(&rtc_lock, flags);
@@ -183,6 +188,12 @@ void read_persistent_clock(struct timespec *ts)
 {
 	unsigned long retval, flags;
 
+#ifdef CONFIG_XEN
+	if (!is_initial_xendomain()) {
+		xen_read_persistent_clock(ts);
+		return;
+	}
+#endif
 	spin_lock_irqsave(&rtc_lock, flags);
 	retval = x86_platform.get_wallclock();
 	spin_unlock_irqrestore(&rtc_lock, flags);

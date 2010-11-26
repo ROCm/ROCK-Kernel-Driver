@@ -3973,6 +3973,12 @@ need_resched_nonpreemptible:
 EXPORT_SYMBOL(schedule);
 
 #ifdef CONFIG_MUTEX_SPIN_ON_OWNER
+#include <asm/mutex.h>
+
+#ifndef arch_cpu_is_running
+#define arch_cpu_is_running(cpu) true
+#endif
+
 /*
  * Look out! "owner" is an entirely speculative pointer
  * access and not reliable.
@@ -4031,7 +4037,8 @@ int mutex_spin_on_owner(struct mutex *lock, struct thread_info *owner)
 		/*
 		 * Is that owner really running on that cpu?
 		 */
-		if (task_thread_info(rq->curr) != owner || need_resched())
+		if (task_thread_info(rq->curr) != owner || need_resched()
+		    || !arch_cpu_is_running(cpu))
 			return 0;
 
 		cpu_relax();

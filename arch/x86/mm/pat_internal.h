@@ -21,6 +21,10 @@ static inline char *cattr_name(unsigned long flags)
 	case _PAGE_CACHE_UC_MINUS:	return "uncached-minus";
 	case _PAGE_CACHE_WB:		return "write-back";
 	case _PAGE_CACHE_WC:		return "write-combining";
+#ifdef CONFIG_XEN
+	case _PAGE_CACHE_WP:		return "write-protected";
+	case _PAGE_CACHE_WT:		return "write-through";
+#endif
 	default:			return "broken";
 	}
 }
