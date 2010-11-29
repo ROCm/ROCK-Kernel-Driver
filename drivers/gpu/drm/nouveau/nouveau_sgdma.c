@@ -251,6 +251,12 @@ nouveau_sgdma_init(struct drm_device *dev)
 		nouveau_gpuobj_ref(NULL, &gpuobj);
 		return -ENOMEM;
 	}
+#ifdef CONFIG_XEN
+	ret = xen_limit_pages_to_max_mfn(dev_priv->gart_info.sg_dummy_page,
+					 0, 32);
+	if (ret)
+		NV_WARN(dev, "Error restricting SG dummy page: %d\n", ret);
+#endif
 
 	set_bit(PG_locked, &dev_priv->gart_info.sg_dummy_page->flags);
 	dev_priv->gart_info.sg_dummy_bus =
