@@ -2393,13 +2393,10 @@ and is between 256 and 4096 characters. It is defined in the file
 			improve throughput, but will also increase the
 			amount of memory reserved for use by the client.
 
-	unsupported	Allow loading of unsupported kernel modules:
-			0 = only allow supported modules,
-			1 = warn when loading unsupported modules,
-			2 = don't warn.
-
-			CONFIG_ENTERPRISE_SUPPORT must be enabled for this
-			to have any effect.
+	swapaccount[=0|1]
+			[KNL] Enable accounting of swap in memory resource
+			controller if no parameter or 1 is given or disable
+			it if 0 is given (See Documentation/cgroups/memory.txt)
 
 	swiotlb=	[IA-64] Number of I/O TLB slabs
 
@@ -2514,6 +2511,14 @@ and is between 256 and 4096 characters. It is defined in the file
 	unknown_nmi_panic
 			[X86]
 			Set unknown_nmi_panic=1 early on boot.
+
+	unsupported	Allow loading of unsupported kernel modules:
+			0 = only allow supported modules,
+			1 = warn when loading unsupported modules,
+			2 = don't warn.
+
+			CONFIG_ENTERPRISE_SUPPORT must be enabled for this
+			to have any effect.
 
 	usbcore.autosuspend=
 			[USB] The autosuspend time delay (in seconds) used
