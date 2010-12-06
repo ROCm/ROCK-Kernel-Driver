@@ -296,6 +296,6 @@ source "net/caif/Kconfig"
 source "net/ceph/Kconfig"
 
 config NETVM
-	def_bool n
+	bool
 
 endif   # if NET

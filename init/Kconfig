@@ -1,11 +1,9 @@
 config SUSE_KERNEL
-	bool
-	default y
+	def_bool y
 
 config ENTERPRISE_SUPPORT
 	bool "Enable enterprise support facility"
 	depends on SUSE_KERNEL
-	default n
 	help
 	  This feature enables the handling of the "supported" module flag.
 	  This flag can be used to report unsupported module loads or even
@@ -34,7 +32,6 @@ config SPLIT_PACKAGE
 
 config KERNEL_DESKTOP
 	bool "Kernel to suit desktop workloads"
-	default n
 	help
 	  This is an option used to tune kernel parameters to better suit
 	  desktop workloads.
@@ -544,8 +541,7 @@ config HAVE_UNSTABLE_SCHED_CLOCK
 menuconfig CGROUPS
 	boolean "Control Group support"
 	depends on EVENTFD
-	default n if KERNEL_DESKTOP
-	default y
+	default !KERNEL_DESKTOP
 	help
 	  This option adds support for grouping sets of processes together, for
 	  use with process control subsystems such as Cpusets, CFS, memory
@@ -673,8 +669,7 @@ config CGROUP_MEM_RES_CTLR_SWAP_ENABLED
 menuconfig CGROUP_SCHED
 	bool "Group CPU scheduler"
 	depends on EXPERIMENTAL
-	default n if KERNEL_DESKTOP
-	default y
+	default !KERNEL_DESKTOP
 	help
 	  This feature lets CPU scheduler recognize task groups and control CPU
 	  bandwidth allocation to such task groups. It uses cgroups to group

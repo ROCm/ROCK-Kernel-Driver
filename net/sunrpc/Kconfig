@@ -18,7 +18,7 @@ config SUNRPC_XPRT_RDMA
 	  If unsure, say N.
 
 config SUNRPC_SWAP
-	def_bool n
+	bool
 	depends on SUNRPC
 	select NETVM
 
