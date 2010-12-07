@@ -246,9 +246,9 @@ extern int novfs_daemon_get_userspace(struct novfs_schandle SessionId,
 extern int novfs_daemon_debug_cmd_send(char *Command);
 extern ssize_t novfs_daemon_recv_reply(struct file *file, const char *buf, size_t nbytes, loff_t * ppos);
 extern ssize_t novfs_daemon_cmd_send(struct file *file, char *buf, size_t len, loff_t * off);
-extern int novfs_daemon_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
+extern long novfs_daemon_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
 extern int novfs_daemon_lib_close(struct inode *inode, struct file *file);
-extern int novfs_daemon_lib_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
+extern long novfs_daemon_lib_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
 extern int novfs_daemon_lib_open(struct inode *inode, struct file *file);
 extern ssize_t novfs_daemon_lib_read(struct file *file, char *buf, size_t len, loff_t * off);
 extern ssize_t novfs_daemon_lib_write(struct file *file, const char *buf, size_t len, loff_t * off);

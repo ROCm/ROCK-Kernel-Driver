@@ -1022,7 +1022,7 @@ int novfs_daemon_debug_cmd_send(char *Command)
 	return (retCode);
 }
 
-int novfs_daemon_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+long novfs_daemon_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	int retCode = -ENOSYS;
 	unsigned long cpylen;
@@ -1345,7 +1345,7 @@ loff_t novfs_daemon_lib_llseek(struct file * file, loff_t offset, int origin)
 
 #define DbgIocCall(str)		__DbgPrint("[VFS XPLAT] Call " str "\n")
 
-int novfs_daemon_lib_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+long novfs_daemon_lib_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	int retCode = -ENOSYS;
 	struct daemon_handle *dh;
