@@ -38,7 +38,6 @@
  */
 
 #include <linux/linkage.h>
-#include <linux/stringify.h>
 #include <asm/segment.h>
 #include <asm/cache.h>
 #include <asm/errno.h>
@@ -246,7 +245,7 @@ ENDPROC(native_usergs_sysret64)
  */
 	.macro INTR_FRAME start=1 offset=0
 	.if \start
-	EMPTY_FRAME __stringify(SS+8+\offset-RIP)
+	EMPTY_FRAME SS+8+\offset-RIP
 	.else
 	CFI_DEF_CFA_OFFSET SS+8+\offset-RIP
 	.endif
@@ -262,7 +261,7 @@ ENDPROC(native_usergs_sysret64)
  * with vector already pushed)
  */
 	.macro XCPT_FRAME start=1 offset=0
-	INTR_FRAME \start, __stringify(RIP+\offset-ORIG_RAX)
+	INTR_FRAME \start, RIP+\offset-ORIG_RAX
 	.endm
 
 /*
@@ -270,7 +269,7 @@ ENDPROC(native_usergs_sysret64)
  */
 	.macro PARTIAL_FRAME start=1 offset=0
 	.if \start >= 0
-	XCPT_FRAME \start, __stringify(ORIG_RAX+\offset-ARGOFFSET)
+	XCPT_FRAME \start, ORIG_RAX+\offset-ARGOFFSET
 	.endif
 	CFI_REL_OFFSET rdi, RDI+\offset-ARGOFFSET
 	CFI_REL_OFFSET rsi, RSI+\offset-ARGOFFSET
@@ -288,7 +287,7 @@ ENDPROC(native_usergs_sysret64)
  */
 	.macro DEFAULT_FRAME start=1 offset=0
 	.if \start >= -1
-	PARTIAL_FRAME \start, __stringify(R11+\offset-R15)
+	PARTIAL_FRAME \start, R11+\offset-R15
 	.endif
 	CFI_REL_OFFSET rbx, RBX+\offset
 	CFI_REL_OFFSET rbp, RBP+\offset
@@ -301,17 +300,17 @@ ENDPROC(native_usergs_sysret64)
 /* save partial stack frame */
 	.pushsection .kprobes.text, "ax"
 ENTRY(save_args)
-	XCPT_FRAME offset=__stringify(ORIG_RAX-ARGOFFSET+16)
+	XCPT_FRAME offset=ORIG_RAX-ARGOFFSET+16
 	cld
 	movq %rdi, RDI+16-ARGOFFSET(%rsp)
 	movq %rsi, RSI+16-ARGOFFSET(%rsp)
 	movq %rdx, RDX+16-ARGOFFSET(%rsp)
 	movq %rcx, RCX+16-ARGOFFSET(%rsp)
-	movq_cfi rax, __stringify(RAX+16-ARGOFFSET)
+	movq_cfi rax, RAX+16-ARGOFFSET
 	movq  %r8,  R8+16-ARGOFFSET(%rsp)
 	movq  %r9,  R9+16-ARGOFFSET(%rsp)
 	movq %r10, R10+16-ARGOFFSET(%rsp)
-	movq_cfi r11, __stringify(R11+16-ARGOFFSET)
+	movq_cfi r11, R11+16-ARGOFFSET
 
 	leaq -ARGOFFSET+16(%rsp),%rdi	/* arg1 for handler */
 	movq_cfi rbp, 8		/* push %rbp */
@@ -360,18 +359,18 @@ END(save_rest)
 /* save complete stack frame */
 	.pushsection .kprobes.text, "ax"
 ENTRY(save_paranoid)
-	XCPT_FRAME offset=__stringify(ORIG_RAX-R15+8)
+	XCPT_FRAME offset=ORIG_RAX-R15+8
 	cld
 	movq %rdi, RDI+8(%rsp)
 	movq %rsi, RSI+8(%rsp)
-	movq_cfi rdx, __stringify(RDX+8)
-	movq_cfi rcx, __stringify(RCX+8)
-	movq_cfi rax, __stringify(RAX+8)
+	movq_cfi rdx, RDX+8
+	movq_cfi rcx, RCX+8
+	movq_cfi rax, RAX+8
 	movq %r8, R8+8(%rsp)
 	movq %r9, R9+8(%rsp)
 	movq %r10, R10+8(%rsp)
 	movq %r11, R11+8(%rsp)
-	movq_cfi rbx, __stringify(RBX+8)
+	movq_cfi rbx, RBX+8
 	movq %rbp, RBP+8(%rsp)
 	movq %r12, R12+8(%rsp)
 	movq %r13, R13+8(%rsp)
@@ -695,12 +694,12 @@ END(\label)
 ENTRY(ptregscall_common)
 	DEFAULT_FRAME 1 8	/* offset 8: return address */
 	RESTORE_TOP_OF_STACK %r11, 8
-	movq_cfi_restore __stringify(R15+8), r15
-	movq_cfi_restore __stringify(R14+8), r14
-	movq_cfi_restore __stringify(R13+8), r13
-	movq_cfi_restore __stringify(R12+8), r12
-	movq_cfi_restore __stringify(RBP+8), rbp
-	movq_cfi_restore __stringify(RBX+8), rbx
+	movq_cfi_restore R15+8, r15
+	movq_cfi_restore R14+8, r14
+	movq_cfi_restore R13+8, r13
+	movq_cfi_restore R12+8, r12
+	movq_cfi_restore RBP+8, rbp
+	movq_cfi_restore RBX+8, rbx
 	ret $REST_SKIP		/* pop extended registers */
 	CFI_ENDPROC
 END(ptregscall_common)
@@ -1429,7 +1428,7 @@ END(paranoid_exit)
  * returns in "no swapgs flag" in %ebx.
  */
 ENTRY(error_entry)
-	XCPT_FRAME offset=__stringify(ORIG_RAX-R15+8)
+	XCPT_FRAME offset=ORIG_RAX-R15+8
 	/* oldrax contains error code */
 	cld
 	movq %rdi, RDI+8(%rsp)
@@ -1441,7 +1440,7 @@ ENTRY(error_entry)
 	movq  %r9,  R9+8(%rsp)
 	movq %r10, R10+8(%rsp)
 	movq %r11, R11+8(%rsp)
-	movq_cfi rbx, __stringify(RBX+8)
+	movq_cfi rbx, RBX+8
 	movq %rbp, RBP+8(%rsp)
 	movq %r12, R12+8(%rsp)
 	movq %r13, R13+8(%rsp)
