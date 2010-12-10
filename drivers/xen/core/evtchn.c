@@ -68,11 +68,11 @@ static struct percpu_irqaction {
 /* IRQ <-> VIRQ mapping. */
 static DECLARE_BITMAP(virq_per_cpu, NR_VIRQS) __read_mostly;
 static DEFINE_PER_CPU(int[NR_VIRQS], virq_to_evtchn);
-#define BUG_IF_VIRQ_PER_CPU(irq) \
-	BUG_ON(type_from_irq(irq) == IRQT_VIRQ \
-	       && test_bit(index_from_irq(irq), virq_per_cpu))
+#define BUG_IF_VIRQ_PER_CPU(irq_data) \
+	BUG_ON(type_from_irq_data(irq_data) == IRQT_VIRQ \
+	       && test_bit(index_from_irq_data(irq_data), virq_per_cpu))
 #else
-#define BUG_IF_VIRQ_PER_CPU(irq) ((void)(irq))
+#define BUG_IF_VIRQ_PER_CPU(irq) ((void)0)
 #define PER_CPU_VIRQ_IRQ
 #endif
 
@@ -85,9 +85,9 @@ static DEFINE_PER_CPU(evtchn_port_t, ipi_evtchn);
 #define PER_CPU_IPI_IRQ
 #endif
 #if !defined(CONFIG_SMP) || !defined(PER_CPU_IPI_IRQ)
-#define BUG_IF_IPI(irq) BUG_ON(type_from_irq(irq) == IRQT_IPI)
+#define BUG_IF_IPI(irq_data) BUG_ON(type_from_irq_data(irq_data) == IRQT_IPI)
 #else
-#define BUG_IF_IPI(irq) ((void)(irq))
+#define BUG_IF_IPI(irq_data) ((void)0)
 #endif
 
 /* Binding types. */
@@ -153,28 +153,42 @@ static inline u32 mk_irq_info(u32 type, u32 index, u32 evtchn)
  * Accessors for packed IRQ information.
  */
 
-static inline unsigned int index_from_irq(int irq)
+static inline unsigned int index_from_irq_data(struct irq_data *data)
 {
-	const struct irq_cfg *cfg = irq_cfg(irq);
+	const struct irq_cfg *cfg = irq_data_cfg(data);
 
 	return cfg ? (cfg->info >> _EVTCHN_BITS) & ((1U << _INDEX_BITS) - 1)
 		   : 0;
 }
 
-static inline unsigned int type_from_irq(int irq)
+static inline unsigned int index_from_irq(int irq)
 {
-	const struct irq_cfg *cfg = irq_cfg(irq);
+	struct irq_data *data = irq_get_irq_data(irq);
+
+	return data ? index_from_irq_data(data) : 0;
+}
+
+static inline unsigned int type_from_irq_data(struct irq_data *data)
+{
+	const struct irq_cfg *cfg = irq_data_cfg(data);
 
 	return cfg ? cfg->info >> (32 - _IRQT_BITS) : IRQT_UNBOUND;
 }
 
-static inline unsigned int evtchn_from_per_cpu_irq(unsigned int irq,
-						    unsigned int cpu)
+static inline unsigned int type_from_irq(int irq)
 {
-	switch (type_from_irq(irq)) {
+	struct irq_data *data = irq_get_irq_data(irq);
+
+	return data ? type_from_irq_data(data) : IRQT_UNBOUND;
+}
+
+static inline unsigned int evtchn_from_per_cpu_irq(struct irq_data *data,
+						   unsigned int cpu)
+{
+	switch (type_from_irq_data(data)) {
 #ifndef PER_CPU_VIRQ_IRQ
 	case IRQT_VIRQ:
-		return per_cpu(virq_to_evtchn, cpu)[index_from_irq(irq)];
+		return per_cpu(virq_to_evtchn, cpu)[index_from_irq_data(data)];
 #endif
 #ifndef PER_CPU_IPI_IRQ
 	case IRQT_IPI:
@@ -185,21 +199,28 @@ static inline unsigned int evtchn_from_per_cpu_irq(unsigned int irq,
 	return 0;
 }
 
-static inline unsigned int evtchn_from_irq(unsigned int irq)
+static inline unsigned int evtchn_from_irq_data(struct irq_data *data)
 {
 	const struct irq_cfg *cfg;
 
-	switch (type_from_irq(irq)) {
+	switch (type_from_irq_data(data)) {
 #ifndef PER_CPU_VIRQ_IRQ
 	case IRQT_VIRQ:
 #endif
 #ifndef PER_CPU_IPI_IRQ
 	case IRQT_IPI:
 #endif
-		return evtchn_from_per_cpu_irq(irq, smp_processor_id());
+		return evtchn_from_per_cpu_irq(data, smp_processor_id());
 	}
-	cfg = irq_cfg(irq);
+	cfg = irq_data_cfg(data);
 	return cfg ? cfg->info & ((1U << _EVTCHN_BITS) - 1) : 0;
+}
+
+static inline unsigned int evtchn_from_irq(int irq)
+{
+	struct irq_data *data = irq_get_irq_data(irq);
+
+	return data ? evtchn_from_irq_data(data) : 0;
 }
 
 unsigned int irq_from_evtchn(unsigned int port)
@@ -484,19 +505,28 @@ asmlinkage void __irq_entry evtchn_do_upcall(struct pt_regs *regs)
 
 static struct irq_chip dynirq_chip;
 
-static int find_unbound_irq(unsigned int cpu, bool percpu)
+static int find_unbound_irq(unsigned int node, struct irq_cfg **pcfg,
+			    bool percpu)
 {
 	static int warned;
 	int irq;
 
 	for (irq = DYNIRQ_BASE; irq < (DYNIRQ_BASE + NR_DYNIRQS); irq++) {
-		struct irq_cfg *cfg = alloc_irq_and_cfg_at(irq, cpu_to_node(cpu));
+		struct irq_cfg *cfg = alloc_irq_and_cfg_at(irq, node);
+		struct irq_desc *desc = irq_to_desc(irq);
+
+		if (unlikely(!cfg))
+			return -ENOMEM;
+		if (desc->irq_data.chip != &no_irq_chip &&
+		    desc->irq_data.chip != &dynirq_chip)
+			continue;
 
 		if (!cfg->bindcount) {
 			irq_flow_handler_t handle;
 			const char *name;
 
-			irq_to_desc(irq)->status |= IRQ_NOPROBE;
+			*pcfg = cfg;
+			desc->status |= IRQ_NOPROBE;
 			if (!percpu) {
 				handle = handle_fasteoi_irq;
 				name = "fasteoi";
@@ -521,20 +551,21 @@ static int find_unbound_irq(unsigned int cpu, bool percpu)
 
 static int bind_caller_port_to_irq(unsigned int caller_port)
 {
+	struct irq_cfg *cfg;
 	int irq;
 
 	spin_lock(&irq_mapping_update_lock);
 
 	if ((irq = evtchn_to_irq[caller_port]) == -1) {
-		if ((irq = find_unbound_irq(smp_processor_id(), false)) < 0)
+		if ((irq = find_unbound_irq(numa_node_id(), &cfg, false)) < 0)
 			goto out;
 
 		evtchn_to_irq[caller_port] = irq;
-		irq_cfg(irq)->info = mk_irq_info(IRQT_CALLER_PORT,
-						  0, caller_port);
-	}
+		cfg->info = mk_irq_info(IRQT_CALLER_PORT, 0, caller_port);
+	} else
+		cfg = irq_cfg(irq);
 
-	irq_cfg(irq)->bindcount++;
+	cfg->bindcount++;
 
  out:
 	spin_unlock(&irq_mapping_update_lock);
@@ -543,21 +574,22 @@ static int bind_caller_port_to_irq(unsigned int caller_port)
 
 static int bind_local_port_to_irq(unsigned int local_port)
 {
+	struct irq_cfg *cfg;
 	int irq;
 
 	spin_lock(&irq_mapping_update_lock);
 
 	BUG_ON(evtchn_to_irq[local_port] != -1);
 
-	if ((irq = find_unbound_irq(smp_processor_id(), false)) < 0) {
+	if ((irq = find_unbound_irq(numa_node_id(), &cfg, false)) < 0) {
 		if (close_evtchn(local_port))
 			BUG();
 		goto out;
 	}
 
 	evtchn_to_irq[local_port] = irq;
-	irq_cfg(irq)->info = mk_irq_info(IRQT_LOCAL_PORT, 0, local_port);
-	irq_cfg(irq)->bindcount++;
+	cfg->info = mk_irq_info(IRQT_LOCAL_PORT, 0, local_port);
+	cfg->bindcount++;
 
  out:
 	spin_unlock(&irq_mapping_update_lock);
@@ -596,12 +628,14 @@ static int bind_interdomain_evtchn_to_irq(unsigned int remote_domain,
 static int bind_virq_to_irq(unsigned int virq, unsigned int cpu)
 {
 	struct evtchn_bind_virq bind_virq;
+	struct irq_cfg *cfg;
 	int evtchn, irq;
 
 	spin_lock(&irq_mapping_update_lock);
 
 	if ((irq = per_cpu(virq_to_irq, cpu)[virq]) == -1) {
-		if ((irq = find_unbound_irq(cpu, false)) < 0)
+		if ((irq = find_unbound_irq(cpu_to_node(cpu), &cfg,
+					    false)) < 0)
 			goto out;
 
 		bind_virq.virq = virq;
@@ -620,14 +654,15 @@ static int bind_virq_to_irq(unsigned int virq, unsigned int cpu)
 				per_cpu(virq_to_evtchn, cpu)[virq] = evtchn;
 		}
 #endif
-		irq_cfg(irq)->info = mk_irq_info(IRQT_VIRQ, virq, evtchn);
+		cfg->info = mk_irq_info(IRQT_VIRQ, virq, evtchn);
 
 		per_cpu(virq_to_irq, cpu)[virq] = irq;
 
 		bind_evtchn_to_cpu(evtchn, cpu);
-	}
+	} else
+		cfg = irq_cfg(irq);
 
-	irq_cfg(irq)->bindcount++;
+	cfg->bindcount++;
 
  out:
 	spin_unlock(&irq_mapping_update_lock);
@@ -638,12 +673,14 @@ static int bind_virq_to_irq(unsigned int virq, unsigned int cpu)
 static int bind_ipi_to_irq(unsigned int ipi, unsigned int cpu)
 {
 	struct evtchn_bind_ipi bind_ipi;
+	struct irq_cfg *cfg;
 	int evtchn, irq;
 
 	spin_lock(&irq_mapping_update_lock);
 
 	if ((irq = per_cpu(ipi_to_irq, cpu)[ipi]) == -1) {
-		if ((irq = find_unbound_irq(cpu, false)) < 0)
+		if ((irq = find_unbound_irq(cpu_to_node(cpu), &cfg,
+					    false)) < 0)
 			goto out;
 
 		bind_ipi.vcpu = cpu;
@@ -653,14 +690,15 @@ static int bind_ipi_to_irq(unsigned int ipi, unsigned int cpu)
 		evtchn = bind_ipi.port;
 
 		evtchn_to_irq[evtchn] = irq;
-		irq_cfg(irq)->info = mk_irq_info(IRQT_IPI, ipi, evtchn);
+		cfg->info = mk_irq_info(IRQT_IPI, ipi, evtchn);
 
 		per_cpu(ipi_to_irq, cpu)[ipi] = irq;
 
 		bind_evtchn_to_cpu(evtchn, cpu);
-	}
+	} else
+		cfg = irq_cfg(irq);
 
-	irq_cfg(irq)->bindcount++;
+	cfg->bindcount++;
 
  out:
 	spin_unlock(&irq_mapping_update_lock);
@@ -671,32 +709,33 @@ static int bind_ipi_to_irq(unsigned int ipi, unsigned int cpu)
 static void unbind_from_irq(unsigned int irq)
 {
 	unsigned int cpu;
-	int evtchn = evtchn_from_irq(irq);
+	struct irq_data *data = irq_get_irq_data(irq);
+	int evtchn = evtchn_from_irq_data(data);
 
-	BUG_IF_VIRQ_PER_CPU(irq);
-	BUG_IF_IPI(irq);
+	BUG_IF_VIRQ_PER_CPU(data);
+	BUG_IF_IPI(data);
 
 	spin_lock(&irq_mapping_update_lock);
 
-	if (!--irq_cfg(irq)->bindcount && VALID_EVTCHN(evtchn)) {
-		if ((type_from_irq(irq) != IRQT_CALLER_PORT) &&
+	if (!--irq_data_cfg(data)->bindcount && VALID_EVTCHN(evtchn)) {
+		if ((type_from_irq_data(data) != IRQT_CALLER_PORT) &&
 		    close_evtchn(evtchn))
 			BUG();
 
-		switch (type_from_irq(irq)) {
+		switch (type_from_irq_data(data)) {
 		case IRQT_VIRQ:
 			per_cpu(virq_to_irq, cpu_from_evtchn(evtchn))
-				[index_from_irq(irq)] = -1;
+				[index_from_irq_data(data)] = -1;
 #ifndef PER_CPU_VIRQ_IRQ
 			for_each_possible_cpu(cpu)
 				per_cpu(virq_to_evtchn, cpu)
-					[index_from_irq(irq)] = 0;
+					[index_from_irq_data(data)] = 0;
 #endif
 			break;
 #if defined(CONFIG_SMP) && defined(PER_CPU_IPI_IRQ)
 		case IRQT_IPI:
 			per_cpu(ipi_to_irq, cpu_from_evtchn(evtchn))
-				[index_from_irq(irq)] = -1;
+				[index_from_irq_data(data)] = -1;
 			break;
 #endif
 		default:
@@ -707,7 +746,7 @@ static void unbind_from_irq(unsigned int irq)
 		bind_evtchn_to_cpu(evtchn, 0);
 
 		evtchn_to_irq[evtchn] = -1;
-		irq_cfg(irq)->info = IRQ_UNBOUND;
+		irq_data_cfg(data)->info = IRQ_UNBOUND;
 
 		/* Zap stats across IRQ changes of use. */
 		for_each_possible_cpu(cpu)
@@ -745,7 +784,8 @@ void unbind_from_per_cpu_irq(unsigned int irq, unsigned int cpu,
 			     struct irqaction *action)
 {
 	struct evtchn_close close;
-	int evtchn = evtchn_from_per_cpu_irq(irq, cpu);
+	struct irq_data *data = irq_get_irq_data(irq);
+	int evtchn = evtchn_from_per_cpu_irq(data, cpu);
 	struct percpu_irqaction *free_action = NULL;
 
 	spin_lock(&irq_mapping_update_lock);
@@ -753,12 +793,12 @@ void unbind_from_per_cpu_irq(unsigned int irq, unsigned int cpu,
 	if (VALID_EVTCHN(evtchn)) {
 		mask_evtchn(evtchn);
 
-		BUG_ON(irq_cfg(irq)->bindcount <= 1);
-		irq_cfg(irq)->bindcount--;
+		BUG_ON(irq_data_cfg(data)->bindcount <= 1);
+		irq_data_cfg(data)->bindcount--;
 
 #ifndef PER_CPU_VIRQ_IRQ
 		if (type_from_irq(irq) == IRQT_VIRQ) {
-			unsigned int virq = index_from_irq(irq);
+			unsigned int virq = index_from_irq_data(data);
 			struct percpu_irqaction *cur, *prev = NULL;
 
 			cur = virq_actions[virq];
@@ -783,16 +823,17 @@ void unbind_from_per_cpu_irq(unsigned int irq, unsigned int cpu,
 		}
 #endif
 
-		cpumask_clear_cpu(cpu, irq_get_irq_data(irq)->affinity);
+		cpumask_clear_cpu(cpu, data->affinity);
 
 		close.port = evtchn;
 		if (HYPERVISOR_event_channel_op(EVTCHNOP_close, &close))
 			BUG();
 
-		switch (type_from_irq(irq)) {
+		switch (type_from_irq_data(data)) {
 #ifndef PER_CPU_VIRQ_IRQ
 		case IRQT_VIRQ:
-			per_cpu(virq_to_evtchn, cpu)[index_from_irq(irq)] = 0;
+			per_cpu(virq_to_evtchn, cpu)
+				[index_from_irq_data(data)] = 0;
 			break;
 #endif
 #ifndef PER_CPU_IPI_IRQ
@@ -904,7 +945,9 @@ int bind_virq_to_irqhandler(
 {
 	int irq, retval;
 
-	BUG_IF_VIRQ_PER_CPU(virq);
+#ifndef PER_CPU_VIRQ_IRQ
+	BUG_ON(test_bit(virq, virq_per_cpu));
+#endif
 
 	irq = bind_virq_to_irq(virq, cpu);
 	if (irq < 0)
@@ -928,6 +971,7 @@ int bind_virq_to_irqaction(
 	struct irqaction *action)
 {
 	struct evtchn_bind_virq bind_virq;
+	struct irq_cfg *cfg;
 	int evtchn, irq, retval = 0;
 	struct percpu_irqaction *cur = NULL, *new;
 
@@ -965,7 +1009,8 @@ int bind_virq_to_irqaction(
 
 		BUG_ON(!retval);
 
-		if ((irq = find_unbound_irq(cpu, true)) < 0) {
+		if ((irq = find_unbound_irq(cpu_to_node(cpu), &cfg,
+					    true)) < 0) {
 			virq_actions[virq] = cur->next;
 			spin_unlock(&irq_mapping_update_lock);
 			free_percpu_irqaction(new);
@@ -973,12 +1018,13 @@ int bind_virq_to_irqaction(
 		}
 
 		/* Extra reference so count will never drop to zero. */
-		irq_cfg(irq)->bindcount++;
+		cfg->bindcount++;
 
 		for_each_possible_cpu(nr)
 			per_cpu(virq_to_irq, nr)[virq] = irq;
-		irq_cfg(irq)->info = mk_irq_info(IRQT_VIRQ, virq, 0);
-	}
+		cfg->info = mk_irq_info(IRQT_VIRQ, virq, 0);
+	} else
+		cfg = irq_cfg(irq);
 
 	evtchn = per_cpu(virq_to_evtchn, cpu)[virq];
 	if (!VALID_EVTCHN(evtchn)) {
@@ -994,7 +1040,7 @@ int bind_virq_to_irqaction(
 		bind_evtchn_to_cpu(evtchn, cpu);
 	}
 
-	irq_cfg(irq)->bindcount++;
+	cfg->bindcount++;
 
 	spin_unlock(&irq_mapping_update_lock);
 
@@ -1051,6 +1097,7 @@ int __cpuinit bind_ipi_to_irqaction(
 	struct irqaction *action)
 {
 	struct evtchn_bind_ipi bind_ipi;
+	struct irq_cfg *cfg;
 	int evtchn, retval = 0;
 
 	spin_lock(&irq_mapping_update_lock);
@@ -1061,17 +1108,19 @@ int __cpuinit bind_ipi_to_irqaction(
 	}
 
 	if (ipi_irq < 0) {
-		if ((ipi_irq = find_unbound_irq(cpu, true)) < 0) {
+		if ((ipi_irq = find_unbound_irq(cpu_to_node(cpu), &cfg,
+						true)) < 0) {
 			spin_unlock(&irq_mapping_update_lock);
 			return ipi_irq;
 		}
 
 		/* Extra reference so count will never drop to zero. */
-		irq_cfg(ipi_irq)->bindcount++;
+		cfg->bindcount++;
 
-		irq_cfg(ipi_irq)->info = mk_irq_info(IRQT_IPI, 0, 0);
+		cfg->info = mk_irq_info(IRQT_IPI, 0, 0);
 		retval = 1;
-	}
+	} else
+		cfg = irq_cfg(ipi_irq);
 
 	bind_ipi.vcpu = cpu;
 	if (HYPERVISOR_event_channel_op(EVTCHNOP_bind_ipi, &bind_ipi))
@@ -1083,7 +1132,7 @@ int __cpuinit bind_ipi_to_irqaction(
 
 	bind_evtchn_to_cpu(evtchn, cpu);
 
-	irq_cfg(ipi_irq)->bindcount++;
+	cfg->bindcount++;
 
 	spin_unlock(&irq_mapping_update_lock);
 
@@ -1130,10 +1179,10 @@ void rebind_evtchn_to_cpu(int port, unsigned int cpu)
 
 static void rebind_irq_to_cpu(struct irq_data *data, unsigned int tcpu)
 {
-	int evtchn = evtchn_from_irq(data->irq);
+	int evtchn = evtchn_from_irq_data(data);
 
-	BUG_IF_VIRQ_PER_CPU(data->irq);
-	BUG_IF_IPI(data->irq);
+	BUG_IF_VIRQ_PER_CPU(data);
+	BUG_IF_IPI(data);
 
 	if (VALID_EVTCHN(evtchn))
 		rebind_evtchn_to_cpu(evtchn, tcpu);
@@ -1150,7 +1199,7 @@ static int set_affinity_irq(struct irq_data *data,
 
 int resend_irq_on_evtchn(struct irq_data *data)
 {
-	int masked, evtchn = evtchn_from_irq(data->irq);
+	int masked, evtchn = evtchn_from_irq_data(data);
 
 	if (!VALID_EVTCHN(evtchn))
 		return 1;
@@ -1169,7 +1218,7 @@ int resend_irq_on_evtchn(struct irq_data *data)
 
 static void unmask_dynirq(struct irq_data *data)
 {
-	int evtchn = evtchn_from_irq(data->irq);
+	int evtchn = evtchn_from_irq_data(data);
 
 	if (VALID_EVTCHN(evtchn))
 		unmask_evtchn(evtchn);
@@ -1177,7 +1226,7 @@ static void unmask_dynirq(struct irq_data *data)
 
 static void mask_dynirq(struct irq_data *data)
 {
-	int evtchn = evtchn_from_irq(data->irq);
+	int evtchn = evtchn_from_irq_data(data);
 
 	if (VALID_EVTCHN(evtchn))
 		mask_evtchn(evtchn);
@@ -1276,7 +1325,7 @@ static void enable_pirq(struct irq_data *data)
 {
 	struct evtchn_bind_pirq bind_pirq;
 	unsigned int irq = data->irq;
-	int evtchn = evtchn_from_irq(irq);
+	int evtchn = evtchn_from_irq_data(data);
 
 	if (VALID_EVTCHN(evtchn)) {
 		clear_bit(irq - PIRQ_BASE, probing_pirq);
@@ -1316,8 +1365,7 @@ static unsigned int startup_pirq(struct irq_data *data)
 
 static void shutdown_pirq(struct irq_data *data)
 {
-	unsigned int irq = data->irq;
-	int evtchn = evtchn_from_irq(irq);
+	int evtchn = evtchn_from_irq_data(data);
 
 	if (!VALID_EVTCHN(evtchn))
 		return;
@@ -1330,12 +1378,12 @@ static void shutdown_pirq(struct irq_data *data)
 	bind_evtchn_to_cpu(evtchn, 0);
 	evtchn_to_irq[evtchn] = -1;
 	irq_data_cfg(data)->info = mk_irq_info(IRQT_PIRQ,
-					       index_from_irq(irq), 0);
+					       index_from_irq_data(data), 0);
 }
 
 static void unmask_pirq(struct irq_data *data)
 {
-	int evtchn = evtchn_from_irq(data->irq);
+	int evtchn = evtchn_from_irq_data(data);
 
 	if (VALID_EVTCHN(evtchn))
 		pirq_unmask_and_notify(evtchn, data->irq);
@@ -1407,11 +1455,15 @@ void clear_ipi_evtchn(void)
 
 void notify_remote_via_irq(int irq)
 {
-	int evtchn = evtchn_from_irq(irq);
+	struct irq_data *data = irq_get_irq_data(irq);
+	int evtchn;
 
+	if (WARN_ON_ONCE(!data))
+		return;
 	BUG_ON(type_from_irq(irq) == IRQT_VIRQ);
-	BUG_IF_IPI(irq);
+	BUG_IF_IPI(data);
 
+	evtchn = evtchn_from_irq_data(data);
 	if (VALID_EVTCHN(evtchn))
 		notify_remote_via_evtchn(evtchn);
 }
@@ -1419,11 +1471,15 @@ EXPORT_SYMBOL_GPL(notify_remote_via_irq);
 
 int multi_notify_remote_via_irq(multicall_entry_t *mcl, int irq)
 {
-	int evtchn = evtchn_from_irq(irq);
+	struct irq_data *data = irq_get_irq_data(irq);
+	int evtchn;
 
-	BUG_ON(type_from_irq(irq) == IRQT_VIRQ);
-	BUG_IF_IPI(irq);
+	if (WARN_ON_ONCE(!data))
+		return -EINVAL;
+	BUG_ON(type_from_irq_data(data) == IRQT_VIRQ);
+	BUG_IF_IPI(data);
 
+	evtchn = evtchn_from_irq_data(data);
 	if (!VALID_EVTCHN(evtchn))
 		return -EINVAL;
 
@@ -1434,9 +1490,13 @@ EXPORT_SYMBOL_GPL(multi_notify_remote_via_irq);
 
 int irq_to_evtchn_port(int irq)
 {
-	BUG_IF_VIRQ_PER_CPU(irq);
-	BUG_IF_IPI(irq);
-	return evtchn_from_irq(irq);
+	struct irq_data *data = irq_get_irq_data(irq);
+
+	if (!data)
+		return 0;
+	BUG_IF_VIRQ_PER_CPU(data);
+	BUG_IF_IPI(data);
+	return evtchn_from_irq_data(data);
 }
 EXPORT_SYMBOL_GPL(irq_to_evtchn_port);
 
@@ -1766,10 +1826,12 @@ int assign_irq_vector(int irq, struct irq_cfg *cfg, const struct cpumask *mask)
 
 void evtchn_register_pirq(int irq)
 {
+	struct irq_data *data = irq_get_irq_data(irq);
+
 	BUG_ON(irq < PIRQ_BASE || irq - PIRQ_BASE >= nr_pirqs);
-	if (identity_mapped_irq(irq) || type_from_irq(irq) != IRQT_UNBOUND)
+	if (identity_mapped_irq(irq) || type_from_irq_data(data) != IRQT_UNBOUND)
 		return;
-	irq_cfg(irq)->info = mk_irq_info(IRQT_PIRQ, irq, 0);
+	irq_data_cfg(data)->info = mk_irq_info(IRQT_PIRQ, irq, 0);
 	set_irq_chip_and_handler_name(irq, &pirq_chip, handle_fasteoi_irq,
 				      "fasteoi");
 }
@@ -1787,6 +1849,10 @@ int evtchn_map_pirq(int irq, int xen_pirq)
 			if (identity_mapped_irq(irq))
 				continue;
 			cfg = alloc_irq_and_cfg_at(irq, numa_node_id());
+			if (unlikely(!cfg)) {
+				spin_unlock(&irq_alloc_lock);
+				return -ENOMEM;
+			}
 			if (!index_from_irq(irq)) {
 				BUG_ON(type_from_irq(irq) != IRQT_UNBOUND);
 				cfg->info = mk_irq_info(IRQT_PIRQ,
@@ -1823,10 +1889,12 @@ int evtchn_map_pirq(int irq, int xen_pirq)
 
 int evtchn_get_xen_pirq(int irq)
 {
+	struct irq_data *data = irq_get_irq_data(irq);
+
 	if (identity_mapped_irq(irq))
 		return irq;
-	BUG_ON(type_from_irq(irq) != IRQT_PIRQ);
-	return index_from_irq(irq);
+	BUG_ON(type_from_irq_data(data) != IRQT_PIRQ);
+	return index_from_irq_data(data);
 }
 
 void __init xen_init_IRQ(void)

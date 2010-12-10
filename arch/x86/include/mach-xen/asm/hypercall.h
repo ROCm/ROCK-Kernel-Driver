@@ -265,7 +265,7 @@ HYPERVISOR_memory_op(
 	unsigned int cmd, void *arg)
 {
 	if (arch_use_lazy_mmu_mode())
-		xen_multicall_flush(false);
+		xen_multicall_flush();
 	return _hypercall2(int, memory_op, cmd, arg);
 }
 
@@ -336,7 +336,7 @@ HYPERVISOR_grant_table_op(
 	int rc;
 
 	if (arch_use_lazy_mmu_mode())
-		xen_multicall_flush(false);
+		xen_multicall_flush();
 #ifdef GNTTABOP_map_grant_ref
 	if (cmd == GNTTABOP_map_grant_ref)
 #endif

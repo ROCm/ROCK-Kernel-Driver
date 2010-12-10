@@ -607,12 +607,10 @@ int netfront_check_queue_ready(struct net_device *dev)
 }
 EXPORT_SYMBOL(netfront_check_queue_ready);
 
-
 static int network_open(struct net_device *dev)
 {
 	struct netfront_info *np = netdev_priv(dev);
 
-	memset(&np->stats, 0, sizeof(np->stats));
 	napi_enable(&np->napi);
 
 	spin_lock_bh(&np->rx_lock);
@@ -1015,8 +1013,8 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	if (notify)
 		notify_remote_via_irq(np->irq);
 
-	np->stats.tx_bytes += skb->len;
-	np->stats.tx_packets++;
+	dev->stats.tx_bytes += skb->len;
+	dev->stats.tx_packets++;
 	dev->trans_start = jiffies;
 
 	/* Note: It is not safe to access skb after network_tx_buf_gc()! */
@@ -1030,7 +1028,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	return NETDEV_TX_OK;
 
  drop:
-	np->stats.tx_dropped++;
+	dev->stats.tx_dropped++;
 	dev_kfree_skb(skb);
 	return NETDEV_TX_OK;
 }
@@ -1347,7 +1345,7 @@ static int netif_poll(struct napi_struct *napi, int budget)
 err:	
 			while ((skb = __skb_dequeue(&tmpq)))
 				__skb_queue_tail(&errq, skb);
-			np->stats.rx_errors++;
+			dev->stats.rx_errors++;
 			i = np->rx.rsp_cons;
 			continue;
 		}
@@ -1420,8 +1418,8 @@ err:
 		skb->proto_data_valid = (skb->ip_summed != CHECKSUM_NONE);
 		skb->proto_csum_blank = !!(rx->flags & NETRXF_csum_blank);
 #endif
-		np->stats.rx_packets++;
-		np->stats.rx_bytes += skb->len;
+		dev->stats.rx_packets++;
+		dev->stats.rx_bytes += skb->len;
 
 		__skb_queue_tail(&rxq, skb);
 
@@ -1666,10 +1664,8 @@ static int network_close(struct net_device *dev)
 
 static struct net_device_stats *network_get_stats(struct net_device *dev)
 {
-	struct netfront_info *np = netdev_priv(dev);
-
-	netfront_accelerator_call_get_stats(np, dev);
-	return &np->stats;
+	netfront_accelerator_call_get_stats(dev);
+	return &dev->stats;
 }
 
 static int xennet_set_mac_address(struct net_device *dev, void *p)

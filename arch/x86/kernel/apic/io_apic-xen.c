@@ -3089,7 +3089,7 @@ static int __init io_apic_bug_finalize(void)
 {
 	if (sis_apic_bug == -1)
 		sis_apic_bug = 0;
-#ifdef CONFIG_XEN
+#ifdef CONFIG_X86_XEN
 	if (is_initial_xendomain()) {
 		struct xen_platform_op op = { .cmd = XENPF_platform_quirk };
 		op.u.platform_quirk.quirk_id = sis_apic_bug ?
