@@ -424,7 +424,8 @@ static int privcmd_mmap(struct file * file, struct vm_area_struct * vma)
 	if (xen_feature(XENFEAT_auto_translated_physmap))
 		return -ENOSYS;
 
-	/* DONTCOPY is essential for Xen as copy_page_range is broken. */
+	/* DONTCOPY is essential for Xen because copy_page_range doesn't know
+	 * how to recreate these mappings */
 	vma->vm_flags |= VM_RESERVED | VM_IO | VM_PFNMAP | VM_DONTCOPY;
 	vma->vm_ops = &privcmd_vm_ops;
 	vma->vm_private_data = NULL;

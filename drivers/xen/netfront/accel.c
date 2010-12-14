@@ -547,7 +547,7 @@ static void accelerator_remove_hooks(struct netfront_accelerator *accelerator)
 
 			/* Last chance to get statistics from the accelerator */
 			vif_state->hooks->get_stats(vif_state->np->netdev,
-						    &vif_state->np->stats);
+						    &vif_state->np->netdev->stats);
 
 			spin_unlock_irqrestore(&accelerator->vif_states_lock,
 					       flags);
@@ -603,7 +603,8 @@ static int do_remove(struct netfront_info *np, struct xenbus_device *dev)
 		spin_lock_irqsave(&accelerator->vif_states_lock, flags);
 
 		/* Last chance to get statistics from the accelerator */
-		np->accel_vif_state.hooks->get_stats(np->netdev, &np->stats);
+		np->accel_vif_state.hooks->get_stats(np->netdev,
+						     &np->netdev->stats);
 
 		spin_unlock_irqrestore(&accelerator->vif_states_lock, 
 				       flags);
@@ -803,9 +804,9 @@ void netfront_accelerator_call_stop_napi_irq(struct netfront_info *np,
 /*
  * No lock pre-requisites.  Takes the vif_states_lock spinlock
  */
-int netfront_accelerator_call_get_stats(struct netfront_info *np,
-					struct net_device *dev)
+int netfront_accelerator_call_get_stats(struct net_device *dev)
 {
+	struct netfront_info *np = netdev_priv(dev);
 	struct netfront_accelerator *accelerator;
 	unsigned long flags;
 	int rc = 0;
@@ -818,7 +819,7 @@ int netfront_accelerator_call_get_stats(struct netfront_info *np,
 		if (np->accel_vif_state.hooks && 
 		    np->accelerator == accelerator)
  			rc = np->accel_vif_state.hooks->get_stats(dev,
-								  &np->stats);
+								  &dev->stats);
 		spin_unlock_irqrestore(&accelerator->vif_states_lock, flags);
 	}
 	return rc;

@@ -724,9 +724,6 @@ static int splash_getraw(unsigned char *start, unsigned char *end, int *update)
 		}
 		if (update)
 		    *update = up;
-		vfree(sd->splash_pic);
-		sd->splash_pic = NULL;
-		sd->splash_pic_size = 0;
 	    }
 	    return unit;
 	}

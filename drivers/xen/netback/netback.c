@@ -351,7 +351,7 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	return NETDEV_TX_OK;
 
  drop:
-	netif->stats.tx_dropped++;
+	dev->stats.tx_dropped++;
 	dev_kfree_skb(skb);
 	return NETDEV_TX_OK;
 }
@@ -705,8 +705,8 @@ static void net_rx_action(unsigned long group)
 			netbk_free_pages(nr_frags, netbk->meta + npo.meta_cons + 1);
 		}
 
-		netif->stats.tx_bytes += skb->len;
-		netif->stats.tx_packets++;
+		skb->dev->stats.tx_bytes += skb->len;
+		skb->dev->stats.tx_packets++;
 
 		id = netbk->meta[npo.meta_cons].id;
 		flags = nr_frags ? NETRXF_more_data : 0;
@@ -804,12 +804,6 @@ static void netbk_tx_pending_timeout(unsigned long group)
 		wake_up(&xen_netbk[group].netbk_action_wq);
 	else
 		tasklet_schedule(&xen_netbk[group].net_tx_tasklet);
-}
-
-struct net_device_stats *netif_be_get_stats(struct net_device *dev)
-{
-	netif_t *netif = netdev_priv(dev);
-	return &netif->stats;
 }
 
 static int __on_net_schedule_list(netif_t *netif)
@@ -1475,17 +1469,20 @@ static void net_tx_action(unsigned long group)
 
 	mop = netbk->tx_map_ops;
 	while ((skb = __skb_dequeue(&netbk->tx_queue)) != NULL) {
+		struct net_device *dev;
 		netif_tx_request_t *txp;
 
 		pending_idx = *((u16 *)skb->data);
-		netif = netbk->pending_tx_info[pending_idx].netif;
-		txp = &netbk->pending_tx_info[pending_idx].req;
+		netif       = netbk->pending_tx_info[pending_idx].netif;
+		dev         = netif->dev;
+		txp         = &netbk->pending_tx_info[pending_idx].req;
 
 		/* Check the remap error code. */
 		if (unlikely(netbk_tx_check_mop(netbk, skb, &mop))) {
 			DPRINTK("netback grant failed.\n");
 			skb_shinfo(skb)->nr_frags = 0;
 			kfree_skb(skb);
+			dev->stats.rx_dropped++;
 			continue;
 		}
 
@@ -1527,18 +1524,19 @@ static void net_tx_action(unsigned long group)
 			__pskb_pull_tail(skb, target - skb_headlen(skb));
 		}
 
-		skb->dev      = netif->dev;
-		skb->protocol = eth_type_trans(skb, skb->dev);
-
-		netif->stats.rx_bytes += skb->len;
-		netif->stats.rx_packets++;
+		skb->dev      = dev;
+		skb->protocol = eth_type_trans(skb, dev);
 
 		if (unlikely(netbk_copy_skb_mode == NETBK_ALWAYS_COPY_SKB) &&
 		    unlikely(skb_linearize(skb))) {
 			DPRINTK("Can't linearize skb in net_tx_action.\n");
+			dev->stats.rx_dropped++;
 			kfree_skb(skb);
 			continue;
 		}
+
+		dev->stats.rx_bytes += skb->len;
+		dev->stats.rx_packets++;
 
 		if (use_kthreads)
 			netif_rx_ni(skb);

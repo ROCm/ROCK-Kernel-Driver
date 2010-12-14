@@ -150,8 +150,6 @@ struct netfront_info {
 	struct list_head list;
 	struct net_device *netdev;
 
-	struct net_device_stats stats;
-
 	struct netif_tx_front_ring tx;
 	struct netif_rx_front_ring rx;
 
@@ -261,8 +259,7 @@ extern
 void netfront_accelerator_call_stop_napi_irq(struct netfront_info *np,
 					     struct net_device *dev);
 extern
-int netfront_accelerator_call_get_stats(struct netfront_info *np,
-					struct net_device *dev);
+int netfront_accelerator_call_get_stats(struct net_device *dev);
 extern
 void netfront_accelerator_add_watch(struct netfront_info *np);
 

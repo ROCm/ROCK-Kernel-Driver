@@ -83,7 +83,7 @@ struct xlbd_major_info
 
 struct blk_shadow {
 	blkif_request_t req;
-	unsigned long request;
+	struct request *request;
 	unsigned long frame[BLKIF_MAX_SEGMENTS_PER_REQUEST];
 };
 

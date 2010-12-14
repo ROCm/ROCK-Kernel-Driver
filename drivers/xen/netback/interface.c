@@ -210,7 +210,6 @@ static const struct net_device_ops netif_be_netdev_ops = {
 	.ndo_stop               = net_close,
 	.ndo_start_xmit         = netif_be_start_xmit,
 	.ndo_change_mtu	        = netbk_change_mtu,
-	.ndo_get_stats          = netif_be_get_stats,
 };
 
 netif_t *netif_alloc(struct device *parent, domid_t domid, unsigned int handle)

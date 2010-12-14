@@ -62,14 +62,17 @@ MODULE_PARM_DESC(nloopbacks, "Number of netback-loopback devices to create");
 
 struct net_private {
 	struct net_device *loopback_dev;
-	struct net_device_stats stats;
 	int loop_idx;
 };
 
+static inline struct net_private *loopback_priv(struct net_device *dev)
+{
+	return netdev_priv(dev);
+}
+
 static int loopback_open(struct net_device *dev)
 {
-	struct net_private *np = netdev_priv(dev);
-	memset(&np->stats, 0, sizeof(np->stats));
+	memset(&dev->stats, 0, sizeof(dev->stats));
 	netif_start_queue(dev);
 	return 0;
 }
@@ -130,10 +133,8 @@ static int skb_remove_foreign_references(struct sk_buff *skb)
 
 static int loopback_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct net_private *np = netdev_priv(dev);
-
 	if (!skb_remove_foreign_references(skb)) {
-		np->stats.tx_dropped++;
+		dev->stats.tx_dropped++;
 		dev_kfree_skb(skb);
 		return NETDEV_TX_OK;
 	}
@@ -143,15 +144,14 @@ static int loopback_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	skb_orphan(skb);
 
-	np->stats.tx_bytes += skb->len;
-	np->stats.tx_packets++;
+	dev->stats.tx_bytes += skb->len;
+	dev->stats.tx_packets++;
 
 	/* Switch to loopback context. */
-	dev = np->loopback_dev;
-	np  = netdev_priv(dev);
+	dev = loopback_priv(dev)->loopback_dev;
 
-	np->stats.rx_bytes += skb->len;
-	np->stats.rx_packets++;
+	dev->stats.rx_bytes += skb->len;
+	dev->stats.rx_packets++;
 
 	if (skb->ip_summed == CHECKSUM_PARTIAL) {
 		/* Defer checksum calculation. */
@@ -177,17 +177,11 @@ static int loopback_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	return NETDEV_TX_OK;
 }
 
-static struct net_device_stats *loopback_get_stats(struct net_device *dev)
-{
-	struct net_private *np = netdev_priv(dev);
-	return &np->stats;
-}
-
 static void get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 {
 	strcpy(info->driver, "netloop");
 	snprintf(info->bus_info, ETHTOOL_BUSINFO_LEN, "vif-0-%d",
-		 ((struct net_private *)netdev_priv(dev))->loop_idx);
+		 loopback_priv(dev)->loop_idx);
 }
 
 static const struct ethtool_ops network_ethtool_ops =
@@ -217,13 +211,12 @@ static const struct net_device_ops loopback_netdev_ops = {
 	.ndo_start_xmit         = loopback_start_xmit,
 	.ndo_set_multicast_list = loopback_set_multicast_list,
 	.ndo_change_mtu	        = NULL, /* allow arbitrary mtu */
-	.ndo_get_stats          = loopback_get_stats,
 };
 
 static void loopback_construct(struct net_device *dev, struct net_device *lo,
 			       int loop_idx)
 {
-	struct net_private *np = netdev_priv(dev);
+	struct net_private *np = loopback_priv(dev);
 
 	np->loopback_dev     = lo;
 	np->loop_idx         = loop_idx;

@@ -154,7 +154,6 @@ void __init adjust_boot_vcpu_info(void)
 #define NR_MMUEXT (BITS_PER_LONG / 4)
 
 DEFINE_PER_CPU(bool, xen_lazy_mmu);
-EXPORT_PER_CPU_SYMBOL(xen_lazy_mmu);
 struct lazy_mmu {
 	unsigned int nr_mc, nr_mmu, nr_mmuext;
 	multicall_entry_t mc[NR_MC];
@@ -215,11 +214,10 @@ static int _xen_multicall_flush(bool ret_last) {
 	return 0;
 }
 
-void xen_multicall_flush(bool force) {
-	if (force || use_lazy_mmu_mode())
+void xen_multicall_flush(void) {
+	if (use_lazy_mmu_mode())
 		_xen_multicall_flush(false);
 }
-EXPORT_SYMBOL(xen_multicall_flush);
 
 int xen_multi_update_va_mapping(unsigned long va, pte_t pte,
 				unsigned long uvmf)

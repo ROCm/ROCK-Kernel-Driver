@@ -160,7 +160,7 @@ void scrub_pages(void *, unsigned int);
 
 DECLARE_PER_CPU(bool, xen_lazy_mmu);
 
-void xen_multicall_flush(bool);
+void xen_multicall_flush(void);
 
 int __must_check xen_multi_update_va_mapping(unsigned long va, pte_t,
 					     unsigned long flags);
@@ -178,7 +178,7 @@ static inline void arch_enter_lazy_mmu_mode(void)
 static inline void arch_leave_lazy_mmu_mode(void)
 {
 	percpu_write(xen_lazy_mmu, false);
-	xen_multicall_flush(false);
+	xen_multicall_flush();
 }
 
 #define arch_use_lazy_mmu_mode() unlikely(percpu_read(xen_lazy_mmu))
@@ -192,13 +192,13 @@ static inline void arch_leave_lazy_mmu_mode(void)
 static inline void arch_flush_lazy_mmu_mode(void)
 {
 	if (arch_use_lazy_mmu_mode())
-		xen_multicall_flush(false);
+		xen_multicall_flush();
 }
 #endif
 
 #else /* !CONFIG_XEN || MODULE */
 
-static inline void xen_multicall_flush(bool ignore) {}
+static inline void xen_multicall_flush(void) {}
 #define arch_use_lazy_mmu_mode() false
 #define xen_multi_update_va_mapping(...) ({ BUG(); -ENOSYS; })
 #define xen_multi_mmu_update(...) ({ BUG(); -ENOSYS; })
