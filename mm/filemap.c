@@ -155,13 +155,18 @@ EXPORT_SYMBOL_GPL(__remove_from_page_cache);
 void remove_from_page_cache(struct page *page)
 {
 	struct address_space *mapping = page->mapping;
+	void (*freepage)(struct page *);
 
 	BUG_ON(!PageLocked(page));
 
+	freepage = mapping->a_ops->freepage;
 	spin_lock_irq(&mapping->tree_lock);
 	__remove_from_page_cache(page);
 	spin_unlock_irq(&mapping->tree_lock);
 	mem_cgroup_uncharge_cache_page(page);
+
+	if (freepage)
+		freepage(page);
 }
 EXPORT_SYMBOL(remove_from_page_cache);
 
