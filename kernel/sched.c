@@ -8643,6 +8643,7 @@ static void free_sched_group(struct task_group *tg)
 {
 	free_fair_sched_group(tg);
 	free_rt_sched_group(tg);
+	autogroup_free(tg);
 	kfree(tg);
 }
 
@@ -9200,6 +9201,16 @@ cpu_cgroup_attach(struct cgroup_subsys *ss, struct cgroup *cgrp,
 static void
 cpu_cgroup_exit(struct cgroup_subsys *ss, struct task_struct *task)
 {
+	/*
+	 * cgroup_exit() is called in the copy_process failure path.
+	 * The task isn't hashed, and we don't want to make autogroup
+	 * dig into a freed signal_struct, so just go away.
+	 *
+	 * XXX: why are cgroup methods diddling unattached tasks?
+	 */
+	if (!(task->flags & PF_EXITING))
+		return;
+
 	sched_move_task(task);
 }
 
