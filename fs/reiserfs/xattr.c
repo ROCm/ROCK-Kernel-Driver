@@ -1047,3 +1047,24 @@ error:
 
 	return err;
 }
+
+void reiserfs_xattr_shutdown(struct super_block *s)
+{
+	struct dentry *priv_root = REISERFS_SB(s)->priv_root;
+
+	if (REISERFS_SB(s)->xattr_root) {
+		dput(REISERFS_SB(s)->xattr_root);
+		REISERFS_SB(s)->xattr_root = NULL;
+	}
+
+	if (priv_root) {
+		dput(priv_root);
+		REISERFS_SB(s)->priv_root = NULL;
+
+		/* This will drop the final reference to priv_root and
+		 * clean up anything that was deleted during the call in
+		 * generic_shutdown_super(). */
+		shrink_dcache_for_umount_subtree(priv_root);
+		sync_filesystem(s);
+	}
+}

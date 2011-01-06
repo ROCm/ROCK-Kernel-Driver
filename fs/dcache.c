@@ -637,7 +637,7 @@ EXPORT_SYMBOL(shrink_dcache_sb);
  * - see the comments on shrink_dcache_for_umount() for a description of the
  *   locking
  */
-static void shrink_dcache_for_umount_subtree(struct dentry *dentry)
+void shrink_dcache_for_umount_subtree(struct dentry *dentry)
 {
 	struct dentry *parent;
 	unsigned detached = 0;
@@ -725,6 +725,7 @@ static void shrink_dcache_for_umount_subtree(struct dentry *dentry)
 				    struct dentry, d_u.d_child);
 	}
 }
+EXPORT_SYMBOL_GPL(shrink_dcache_for_umount_subtree);
 
 /*
  * destroy the dentries attached to a superblock on unmounting
