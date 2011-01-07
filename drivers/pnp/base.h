@@ -171,16 +171,12 @@ struct pnp_resource *pnp_add_bus_resource(struct pnp_dev *dev,
 					  resource_size_t start,
 					  resource_size_t end);
 
-#if defined(CONFIG_DYNAMIC_DEBUG)
-#define pnp_dbg(dev, format, arg...)					\
-	({ dev_dbg(dev, format, ## arg); 0; })
-#else
-#if defined(CONFIG_PNP_DEBUG_MESSAGES)
 extern int pnp_debug;
+
+#if defined(CONFIG_PNP_DEBUG_MESSAGES)
 #define pnp_dbg(dev, format, arg...)					\
 	({ if (pnp_debug) dev_printk(KERN_DEBUG, dev, format, ## arg); 0; })
 #else
 #define pnp_dbg(dev, format, arg...)					\
 	({ if (0) dev_printk(KERN_DEBUG, dev, format, ## arg); 0; })
-#endif
 #endif

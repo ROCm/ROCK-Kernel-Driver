@@ -91,7 +91,6 @@ static int parse_one(char *param,
 {
 	unsigned int i;
 	int err;
-	char *tmp;
 
 	/* Find parameter */
 	for (i = 0; i < num_params; i++) {
@@ -108,16 +107,6 @@ static int parse_one(char *param,
 		}
 	}
 
-	/*
-	 * Ignore ddebug module params and module.ddebug boot params:
-	 * Documentation/dynamic-debug-howto.txt
-	 */
-	tmp = strstr(param, ".ddebug");
-	if (parameq(param, "ddebug") || (tmp && strlen(tmp) == 7)) {
-		DEBUGP("Ignoring ddebug parameter %s\n", param);
-		return 0;
-	}
-
 	if (handle_unknown) {
 		DEBUGP("Unknown argument: calling %p\n", handle_unknown);
 		return handle_unknown(param, val);
@@ -129,7 +118,7 @@ static int parse_one(char *param,
 
 /* You can use " around spaces, but can't escape ". */
 /* Hyphens and underscores equivalent in parameter names. */
-char *next_arg(char *args, char **param, char **val)
+static char *next_arg(char *args, char **param, char **val)
 {
 	unsigned int i, equals = 0;
 	int in_quote = 0, quoted = 0;
@@ -189,6 +178,7 @@ int parse_args(const char *name,
 	char *param, *val;
 
 	DEBUGP("Parsing ARGS: %s\n", args);
+
 	/* Chew leading spaces */
 	args = skip_spaces(args);
 

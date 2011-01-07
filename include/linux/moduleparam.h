@@ -405,7 +405,4 @@ static inline void module_param_sysfs_remove(struct module *mod)
 { }
 #endif
 
-/* For being able to parse parameters the same way params.c does */
-extern char *next_arg(char *args, char **param, char **val);
-
 #endif /* _LINUX_MODULE_PARAMS_H */

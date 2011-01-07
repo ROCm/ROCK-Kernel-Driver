@@ -1872,6 +1872,7 @@ static void layout_sections(struct module *mod, struct load_info *info)
 			    || strstarts(sname, ".init"))
 				continue;
 			s->sh_entsize = get_offset(mod, &mod->core_size, s, i);
+			DEBUGP("\t%s\n", name);
 		}
 		if (m == 0)
 			mod->core_text_size = mod->core_size;
@@ -2507,8 +2508,8 @@ static int move_module(struct module *mod, struct load_info *info)
 			memcpy(dest, (void *)shdr->sh_addr, shdr->sh_size);
 		/* Update sh_addr to point to copy in image. */
 		shdr->sh_addr = (unsigned long)dest;
-		DEBUGP("\t0x%p %s\n",
-		       (void *)shdr->sh_addr, info->secstrings + shdr->sh_name);
+		DEBUGP("\t0x%lx %s\n",
+		       shdr->sh_addr, info->secstrings + shdr->sh_name);
 	}
 
 	return 0;
@@ -2746,7 +2747,6 @@ static struct module *load_module(void __user *umod,
 	list_add_rcu(&mod->list, &modules);
 	mutex_unlock(&module_mutex);
 
-	ddebug_module_parse_args(mod->name, mod->args, mod->kp, mod->num_kp);
 	/* Module is ready to execute: parsing args may do that. */
 	err = parse_args(mod->name, mod->args, mod->kp, mod->num_kp, NULL);
 	if (err < 0)
