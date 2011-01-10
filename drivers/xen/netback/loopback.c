@@ -153,16 +153,6 @@ static int loopback_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	dev->stats.rx_bytes += skb->len;
 	dev->stats.rx_packets++;
 
-	if (skb->ip_summed == CHECKSUM_PARTIAL) {
-		/* Defer checksum calculation. */
-		skb->proto_csum_blank = 1;
-		/* Must be a local packet: assert its integrity. */
-		skb->proto_data_valid = 1;
-	}
-
-	skb->ip_summed = skb->proto_data_valid ?
-		CHECKSUM_UNNECESSARY : CHECKSUM_NONE;
-
 	skb->pkt_type = PACKET_HOST; /* overridden by eth_type_trans() */
 	skb->protocol = eth_type_trans(skb, dev);
 	skb->dev      = dev;
@@ -287,23 +277,6 @@ static int __init make_loopback(int i)
 	return err;
 }
 
-static void __exit clean_loopback(int i)
-{
-	struct net_device *dev1, *dev2;
-	char dev_name[IFNAMSIZ];
-
-	sprintf(dev_name, "vif0.%d", i);
-	dev1 = dev_get_by_name(&init_net, dev_name);
-	sprintf(dev_name, "veth%d", i);
-	dev2 = dev_get_by_name(&init_net, dev_name);
-	if (dev1 && dev2) {
-		unregister_netdev(dev2);
-		unregister_netdev(dev1);
-		free_netdev(dev2);
-		free_netdev(dev1);
-	}
-}
-
 static int __init loopback_init(void)
 {
 	int i, err = 0;
@@ -319,15 +292,5 @@ static int __init loopback_init(void)
 }
 
 module_init(loopback_init);
-
-static void __exit loopback_exit(void)
-{
-	int i;
-
-	for (i = nloopbacks; i-- > 0; )
-		clean_loopback(i);
-}
-
-module_exit(loopback_exit);
 
 MODULE_LICENSE("Dual BSD/GPL");

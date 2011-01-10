@@ -246,11 +246,7 @@ static void frontend_changed(struct xenbus_device *dev,
 		if (dev->state == XenbusStateConnected)
 			break;
 
-		/* Enforce precondition before potential leak point.
-		 * netback_disconnect(..., 0) is idempotent.
-		 */
-		netback_disconnect(&dev->dev, 0);
-
+		/* backend_create_netif() is idempotent */
 		backend_create_netif(be);
 		if (be->netif)
 			connect(be);

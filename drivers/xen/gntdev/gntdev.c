@@ -206,18 +206,11 @@ static inline unsigned long get_kernel_vaddr (gntdev_file_private_data_t *priv,
  * value of *offset to the offset that should be mmap()-ed in order to map the
  * grant reference.
  */
-static int add_grant_reference(struct file *flip,
+static int add_grant_reference(gntdev_file_private_data_t *private_data,
 			       struct ioctl_gntdev_grant_ref *op,
 			       uint64_t *offset)
 {
-	gntdev_file_private_data_t *private_data 
-		= (gntdev_file_private_data_t *) flip->private_data;
-
 	uint32_t slot_index;
-
-	if (unlikely(private_data->free_list_size == 0)) {
-		return -ENOMEM;
-	}
 
 	slot_index = private_data->free_list[--private_data->free_list_size];
 	private_data->free_list[private_data->free_list_size]
@@ -242,19 +235,17 @@ static int add_grant_reference(struct file *flip,
  * previous invocation of find_contiguous_free_range(), during the same
  * invocation of the driver.
  */
-static int add_grant_references(struct file *flip,
-				int count,
+static int add_grant_references(gntdev_file_private_data_t *private_data,
+				uint32_t count,
 				struct ioctl_gntdev_grant_ref *ops,
 				uint32_t first_slot)
 {
-	gntdev_file_private_data_t *private_data 
-		= (gntdev_file_private_data_t *) flip->private_data;
-	int i;
+	uint32_t i;
 	
 	for (i = 0; i < count; ++i) {
 
 		/* First, mark the slot's entry in the free list as invalid. */
-		int free_list_index = 
+		uint32_t free_list_index =
 			private_data->grants[first_slot+i].u.free_list_index;
 		private_data->free_list[free_list_index] = 
 			GNTDEV_FREE_LIST_INVALID;
@@ -274,16 +265,16 @@ static int add_grant_references(struct file *flip,
  * GNTDEV_SLOT_INVALID. This will reduce the recorded size of the free list to
  * the number of valid entries.
  */
-static void compress_free_list(struct file *flip) 
+static void compress_free_list(gntdev_file_private_data_t *private_data)
 {
-	gntdev_file_private_data_t *private_data 
-		= (gntdev_file_private_data_t *) flip->private_data;
-	int i, j = 0, old_size, slot_index;
+	uint32_t i, j = 0, old_size;
 	
 	old_size = private_data->free_list_size;
 	for (i = 0; i < old_size; ++i) {
 		if (private_data->free_list[i] != GNTDEV_FREE_LIST_INVALID) {
 			if (i > j) {
+				int32_t slot_index;
+
 				slot_index = private_data->free_list[i];
 				private_data->free_list[j] = slot_index;
 				private_data->grants[slot_index].u
@@ -303,19 +294,11 @@ static void compress_free_list(struct file *flip)
  *
  * Returns the index of the first slot if a range is found, otherwise -ENOMEM.
  */
-static int find_contiguous_free_range(struct file *flip,
+static int find_contiguous_free_range(gntdev_file_private_data_t *private_data,
 				      uint32_t num_slots) 
 {
-	gntdev_file_private_data_t *private_data 
-		= (gntdev_file_private_data_t *) flip->private_data;
-	
-	int i;
-	int start_index = private_data->next_fit_index;
-	int range_start = 0, range_length;
-
-	if (private_data->free_list_size < num_slots) {
-		return -ENOMEM;
-	}
+	uint32_t i, start_index = private_data->next_fit_index;
+	uint32_t range_start = 0, range_length;
 
 	/* First search from the start_index to the end of the array. */
 	range_length = 0;
@@ -878,89 +861,82 @@ private_data_initialised:
 	case IOCTL_GNTDEV_MAP_GRANT_REF:
 	{
 		struct ioctl_gntdev_map_grant_ref op;
+		struct ioctl_gntdev_grant_ref *refs = NULL;
+
+		if (copy_from_user(&op, (void __user *)arg, sizeof(op)))
+			return -EFAULT;
+		if (unlikely(op.count <= 0))
+			return -EINVAL;
+
+		if (op.count > 1 && op.count <= private_data->grants_size) {
+			struct ioctl_gntdev_grant_ref *u;
+
+			refs = kmalloc(op.count * sizeof(*refs), GFP_KERNEL);
+			if (!refs)
+				return -ENOMEM;
+			u = ((struct ioctl_gntdev_map_grant_ref *)arg)->refs;
+			if (copy_from_user(refs, (void __user *)u,
+					   sizeof(*refs) * op.count)) {
+				kfree(refs);
+				return -EFAULT;
+			}
+		}
+
 		down_write(&private_data->grants_sem);
 		down_write(&private_data->free_list_sem);
 
-		if ((rc = copy_from_user(&op, (void __user *) arg, 
-					 sizeof(op)))) {
-			rc = -EFAULT;
-			goto map_out;
-		}
-		if (unlikely(op.count <= 0)) {
-			rc = -EINVAL;
+		if (unlikely(op.count > private_data->free_list_size)) {
+			rc = -ENOMEM;
 			goto map_out;
 		}
 
 		if (op.count == 1) {
-			if ((rc = add_grant_reference(flip, &op.refs[0],
+			if ((rc = add_grant_reference(private_data, op.refs,
 						      &op.index)) < 0) {
 				pr_err("Adding grant reference failed (%d)\n",
 				       rc);
 				goto map_out;
 			}
 		} else {
-			struct ioctl_gntdev_grant_ref *refs, *u;
-			refs = kmalloc(op.count * sizeof(*refs), GFP_KERNEL);
-			if (!refs) {
-				rc = -ENOMEM;
-				goto map_out;
-			}
-			u = ((struct ioctl_gntdev_map_grant_ref *)arg)->refs;
-			if ((rc = copy_from_user(refs,
-						 (void __user *)u,
-						 sizeof(*refs) * op.count))) {
-				pr_err("Copying refs from user failed (%d)\n",
-				       rc);
-				rc = -EINVAL;
-				goto map_out;
-			}
-			if ((rc = find_contiguous_free_range(flip, op.count))
-			    < 0) {
+			if ((rc = find_contiguous_free_range(private_data,
+							     op.count)) < 0) {
 				pr_err("Finding contiguous range failed"
 				       " (%d)\n", rc);
-				kfree(refs);
 				goto map_out;
 			}
 			op.index = rc << PAGE_SHIFT;
-			if ((rc = add_grant_references(flip, op.count,
+			if ((rc = add_grant_references(private_data, op.count,
 						       refs, rc))) {
 				pr_err("Adding grant references failed (%d)\n",
 				       rc);
-				kfree(refs);
 				goto map_out;
 			}
-			compress_free_list(flip);
-			kfree(refs);
+			compress_free_list(private_data);
 		}
-		if ((rc = copy_to_user((void __user *) arg, 
-				       &op, 
-				       sizeof(op)))) {
-			pr_err("Copying result back to user failed (%d)\n",
-			       rc);
-			rc = -EFAULT;
-			goto map_out;
-		}
+
 	map_out:
-		up_write(&private_data->grants_sem);
 		up_write(&private_data->free_list_sem);
+		up_write(&private_data->grants_sem);
+
+		kfree(refs);
+
+		if (!rc && copy_to_user((void __user *)arg, &op, sizeof(op)))
+			rc = -EFAULT;
 		return rc;
 	}
 	case IOCTL_GNTDEV_UNMAP_GRANT_REF:
 	{
 		struct ioctl_gntdev_unmap_grant_ref op;
-		int i, start_index;
+		uint32_t i, start_index;
 
-		down_write(&private_data->grants_sem);
-		down_write(&private_data->free_list_sem);
-
-		if ((rc = copy_from_user(&op, 
-					 (void __user *) arg, 
-					 sizeof(op)))) {
-			rc = -EFAULT;
-			goto unmap_out;
-		}
+		if (copy_from_user(&op, (void __user *)arg, sizeof(op)))
+			return -EFAULT;
 
 		start_index = op.index >> PAGE_SHIFT;
+		if (start_index + op.count > private_data->grants_size)
+			return -EINVAL;
+
+		down_write(&private_data->grants_sem);
 
 		/* First, check that all pages are in the NOT_YET_MAPPED
 		 * state.
@@ -988,6 +964,8 @@ private_data_initialised:
 			}
 		}
 
+		down_write(&private_data->free_list_sem);
+
 		/* Unmap pages and add them to the free list.
 		 */
 		for (i = 0; i < op.count; ++i) {
@@ -1000,9 +978,9 @@ private_data_initialised:
 			++private_data->free_list_size;
 		}
 
+		up_write(&private_data->free_list_sem);
 	unmap_out:
 		up_write(&private_data->grants_sem);
-		up_write(&private_data->free_list_sem);
 		return rc;
 	}
 	case IOCTL_GNTDEV_GET_OFFSET_FOR_VADDR:
@@ -1011,25 +989,16 @@ private_data_initialised:
 		struct vm_area_struct *vma;
 		unsigned long vaddr;
 
-		if ((rc = copy_from_user(&op, 
-					 (void __user *) arg, 
-					 sizeof(op)))) {
-			rc = -EFAULT;
-			goto get_offset_out;
-		}
+		if (copy_from_user(&op, (void __user *)arg, sizeof(op)))
+			return -EFAULT;
+
 		vaddr = (unsigned long)op.vaddr;
 
 		down_read(&current->mm->mmap_sem);		
 		vma = find_vma(current->mm, vaddr);
-		if (vma == NULL) {
+		if (!vma || vma->vm_ops != &gntdev_vmops) {
 			rc = -EFAULT;
-			goto get_offset_unlock_out;
-		}
-		if ((!vma->vm_ops) || (vma->vm_ops != &gntdev_vmops)) {
-			pr_err("The vaddr specified does not belong "
-			       "to a gntdev instance: %#lx\n", vaddr);
-			rc = -EFAULT;
-			goto get_offset_unlock_out;
+			goto get_offset_out;
 		}
 		if (vma->vm_start != vaddr) {
 			pr_err("The vaddr specified in an "
@@ -1038,45 +1007,31 @@ private_data_initialised:
 			       "%#lx; vaddr = %#lx\n",
 			       vma->vm_start, vaddr);
 			rc = -EFAULT;
-			goto get_offset_unlock_out;
+			goto get_offset_out;
 		}
 		op.offset = vma->vm_pgoff << PAGE_SHIFT;
 		op.count = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
-		up_read(&current->mm->mmap_sem);
-		if ((rc = copy_to_user((void __user *) arg, 
-				       &op, 
-				       sizeof(op)))) {
-			rc = -EFAULT;
-			goto get_offset_out;
-		}
-		goto get_offset_out;
-	get_offset_unlock_out:
-		up_read(&current->mm->mmap_sem);
 	get_offset_out:
+		up_read(&current->mm->mmap_sem);
+		if (!rc && copy_to_user((void __user *)arg, &op, sizeof(op)))
+			rc = -EFAULT;
 		return rc;
 	}
 	case IOCTL_GNTDEV_SET_MAX_GRANTS:
 	{
 		struct ioctl_gntdev_set_max_grants op;
-		if ((rc = copy_from_user(&op, 
-					 (void __user *) arg, 
-					 sizeof(op)))) {
-			rc = -EFAULT;
-			goto set_max_out;
-		}
+
+		if (copy_from_user(&op, (void __user *)arg, sizeof(op)))
+			return -EFAULT;
+		if (op.count > MAX_GRANTS_LIMIT)
+			return -EINVAL;
+
 		down_write(&private_data->grants_sem);
-		if (private_data->grants) {
+		if (unlikely(private_data->grants))
 			rc = -EBUSY;
-			goto set_max_unlock_out;
-		}
-		if (op.count > MAX_GRANTS_LIMIT) {
-			rc = -EINVAL;
-			goto set_max_unlock_out;
-		}						 
-		rc = init_private_data(private_data, op.count);
-	set_max_unlock_out:
+		else
+			rc = init_private_data(private_data, op.count);
 		up_write(&private_data->grants_sem);
-	set_max_out:
 		return rc;
 	}
 	default:

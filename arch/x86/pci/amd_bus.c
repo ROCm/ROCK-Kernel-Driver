@@ -349,6 +349,7 @@ static int __init early_fill_mp_bus_info(void)
 
 #define ENABLE_CF8_EXT_CFG      (1ULL << 46)
 
+#ifndef CONFIG_XEN
 static void enable_pci_io_ecs(void *unused)
 {
 	u64 reg;
@@ -377,6 +378,7 @@ static int __cpuinit amd_cpu_notify(struct notifier_block *self,
 static struct notifier_block __cpuinitdata amd_cpu_notifier = {
 	.notifier_call	= amd_cpu_notify,
 };
+#endif /* CONFIG_XEN */
 
 static int __init pci_io_ecs_init(void)
 {
@@ -386,12 +388,13 @@ static int __init pci_io_ecs_init(void)
         if (boot_cpu_data.x86 < 0x10)
 		return 0;
 
+#ifndef CONFIG_XEN
 	register_cpu_notifier(&amd_cpu_notifier);
 	for_each_online_cpu(cpu)
 		amd_cpu_notify(&amd_cpu_notifier, (unsigned long)CPU_ONLINE,
 			       (void *)(long)cpu);
-#ifdef CONFIG_XEN
-	{
+#else
+	if (cpu = 1, cpu) {
 		u64 reg;
 		rdmsrl(MSR_AMD64_NB_CFG, reg);
 		if (!(reg & ENABLE_CF8_EXT_CFG))

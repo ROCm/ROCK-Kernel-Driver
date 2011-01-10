@@ -1045,7 +1045,7 @@ static int xsd_port_read(char *page, char **start, off_t off,
 }
 #endif
 
-#if defined(CONFIG_XEN) || defined(MODULE)
+#if defined(CONFIG_XEN_XENBUS_DEV) || defined(MODULE)
 int xenbus_conn(domid_t remote_dom, unsigned long *grant_ref, evtchn_port_t *local_port)
 {
 	struct evtchn_alloc_unbound alloc_unbound;
@@ -1054,7 +1054,7 @@ int xenbus_conn(domid_t remote_dom, unsigned long *grant_ref, evtchn_port_t *loc
 	BUG_ON(atomic_read(&xenbus_xsd_state) != XENBUS_XSD_FOREIGN_INIT);
 	BUG_ON(!is_initial_xendomain());
 
-#if defined(CONFIG_PROC_FS) && defined(CONFIG_XEN_PRIVILEGED_GUEST)
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
 	remove_xen_proc_entry("xsd_kva");
 	remove_xen_proc_entry("xsd_port");
 #endif

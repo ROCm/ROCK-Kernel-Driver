@@ -495,7 +495,7 @@ static void pcistub_remove(struct pci_dev *dev)
 	}
 }
 
-static const struct pci_device_id pcistub_ids[] = {
+static DEFINE_PCI_DEVICE_TABLE(pcistub_ids) = {
 	{
 	 .vendor = PCI_ANY_ID,
 	 .device = PCI_ANY_ID,

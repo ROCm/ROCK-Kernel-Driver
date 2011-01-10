@@ -62,6 +62,7 @@
 #include <asm/uaccess.h>
 #include <xen/interface/grant_table.h>
 #include <xen/gnttab.h>
+#include <xen/net-util.h>
 
 struct netfront_cb {
 	struct page *page;
@@ -978,10 +979,8 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	if (skb->ip_summed == CHECKSUM_PARTIAL) /* local packet? */
 		tx->flags |= NETTXF_csum_blank | NETTXF_data_validated;
-#ifdef CONFIG_XEN
-	if (skb->proto_data_valid) /* remote but checksummed? */
+	else if (skb->ip_summed == CHECKSUM_UNNECESSARY)
 		tx->flags |= NETTXF_data_validated;
-#endif
 
 #if HAVE_TSO
 	if (skb_shinfo(skb)->gso_size) {
@@ -1406,18 +1405,13 @@ err:
 		skb->truesize += skb->data_len - (RX_COPY_THRESHOLD - len);
 		skb->len += skb->data_len;
 
-		/*
-		 * Old backends do not assert data_validated but we
-		 * can infer it from csum_blank so test both flags.
-		 */
-		if (rx->flags & (NETRXF_data_validated|NETRXF_csum_blank))
+		if (rx->flags & NETRXF_csum_blank)
+			skb->ip_summed = CHECKSUM_PARTIAL;
+		else if (rx->flags & NETRXF_data_validated)
 			skb->ip_summed = CHECKSUM_UNNECESSARY;
 		else
 			skb->ip_summed = CHECKSUM_NONE;
-#ifdef CONFIG_XEN
-		skb->proto_data_valid = (skb->ip_summed != CHECKSUM_NONE);
-		skb->proto_csum_blank = !!(rx->flags & NETRXF_csum_blank);
-#endif
+
 		dev->stats.rx_packets++;
 		dev->stats.rx_bytes += skb->len;
 
@@ -1460,6 +1454,13 @@ err:
 
 		/* Ethernet work: Delayed to here as it peeks the header. */
 		skb->protocol = eth_type_trans(skb, dev);
+
+		if (skb->ip_summed == CHECKSUM_PARTIAL
+		    ? skb_checksum_setup(skb) : skb_is_gso(skb)) {
+			kfree_skb(skb);
+			dev->stats.rx_errors++;
+			continue;
+		}
 
 		/* Pass it up. */
 		netif_receive_skb(skb);

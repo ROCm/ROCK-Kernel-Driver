@@ -361,6 +361,7 @@ static int xenbus_dev_release(struct inode *inode, struct file *filp)
 	struct xenbus_dev_data *u = filp->private_data;
 	struct xenbus_dev_transaction *trans, *tmp;
 	struct watch_adapter *watch, *tmp_watch;
+	struct read_buffer *rb, *tmp_rb;
 
 	list_for_each_entry_safe(trans, tmp, &u->transactions, list) {
 		xenbus_transaction_end(trans->handle, 1);
@@ -374,6 +375,10 @@ static int xenbus_dev_release(struct inode *inode, struct file *filp)
 		free_watch_adapter(watch);
 	}
 
+	list_for_each_entry_safe(rb, tmp_rb, &u->read_buffers, list) {
+		list_del(&rb->list);
+		kfree(rb);
+	}
 	kfree(u);
 
 	return 0;
