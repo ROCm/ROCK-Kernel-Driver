@@ -40,13 +40,8 @@ struct _ddebug {
 int ddebug_add_module(struct _ddebug *tab, unsigned int n,
 				const char *modname);
 
-struct kernel_param;
-
 #if defined(CONFIG_DYNAMIC_DEBUG)
 extern int ddebug_remove_module(const char *mod_name);
-extern int ddebug_exec_query(char *query_string);
-extern void ddebug_module_parse_args(const char *name, char* args,
-				     struct kernel_param *params, unsigned num);
 
 #define dynamic_pr_debug(fmt, ...) do {					\
 	__label__ do_printk;						\
@@ -84,15 +79,6 @@ out:	;								\
 static inline int ddebug_remove_module(const char *mod)
 {
 	return 0;
-}
-static inline int ddebug_exec_query(char *query_string)
-{
-	return 0;
-}
-static inline void ddebug_module_parse_args(const char *name, char* args,
-					    struct kernel_param *params,
-					    unsigned num)
-{
 }
 
 #define dynamic_pr_debug(fmt, ...)					\

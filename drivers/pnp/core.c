@@ -217,27 +217,13 @@ static int __init pnp_init(void)
 
 subsys_initcall(pnp_init);
 
-#if defined(CONFIG_DYNAMIC_DEBUG)
-static int __init pnp_debug_setup(char *__unused)
-{
-	printk(KERN_INFO "DYNAMIC_DEBUG enabled use pnp.ddebug instead of "
-	       "pnp.debug boot param\n");
-	return 1;
-}
-__setup("pnp.debug", pnp_debug_setup);
-
-#else
-
-#if defined(CONFIG_PNP_DEBUG_MESSAGES)
-
 int pnp_debug;
 
+#if defined(CONFIG_PNP_DEBUG_MESSAGES)
 static int __init pnp_debug_setup(char *__unused)
 {
 	pnp_debug = 1;
 	return 1;
 }
 __setup("pnp.debug", pnp_debug_setup);
-#endif
-
 #endif

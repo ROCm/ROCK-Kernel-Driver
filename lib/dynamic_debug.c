@@ -10,7 +10,6 @@
  */
 
 #include <linux/kernel.h>
-#include <linux/init.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/kallsyms.h>
@@ -29,12 +28,8 @@
 #include <linux/slab.h>
 #include <linux/jump_label.h>
 
-#include <asm/setup.h>
-
 extern struct _ddebug __start___verbose[];
 extern struct _ddebug __stop___verbose[];
-
-#define DDEBUG_STRING_SIZE 1024
 
 struct ddebug_table {
 	struct list_head link;
@@ -398,16 +393,13 @@ static int ddebug_parse_flags(const char *str, unsigned int *flagsp,
 	return 0;
 }
 
-int ddebug_exec_query(char *query_string)
+static int ddebug_exec_query(char *query_string)
 {
 	unsigned int flags = 0, mask = 0;
 	struct ddebug_query query;
 #define MAXWORDS 9
 	int nwords;
 	char *words[MAXWORDS];
-
-	if (verbose)
-		printk(KERN_INFO "%s: got query: %s\n", __func__, query_string);
 
 	nwords = ddebug_tokenize(query_string, words, MAXWORDS);
 	if (nwords <= 0)
@@ -422,10 +414,10 @@ int ddebug_exec_query(char *query_string)
 	return 0;
 }
 
-static __initdata char ddebug_setup_string[DDEBUG_STRING_SIZE];
+static __initdata char ddebug_setup_string[1024];
 static __init int ddebug_setup_query(char *str)
 {
-	if (strlen(str) >= DDEBUG_STRING_SIZE) {
+	if (strlen(str) >= 1024) {
 		pr_warning("ddebug boot param string too large\n");
 		return 0;
 	}
@@ -676,81 +668,6 @@ int ddebug_add_module(struct _ddebug *tab, unsigned int n,
 }
 EXPORT_SYMBOL_GPL(ddebug_add_module);
 
-/* We search for *ddebug* module params */
-void ddebug_module_parse_args(const char *name, char* args,
-			      struct kernel_param *params, unsigned num)
-{
-	char *ddebug, *param, *val, *args_it, *arg_dup_ptr;
-	int i;
-
-	/*
-	 * We must not modify the passed args string and need to store the
-	 * kstrdup pointer to be able to free memory later, TBD: find a way
-	 * to do this nicer
-	 */
-	arg_dup_ptr = args_it = kstrdup(args, GFP_KERNEL);
-	ddebug = kzalloc(DDEBUG_STRING_SIZE, GFP_KERNEL);
-	if (verbose)
-		printk(KERN_INFO "%s: Parsing ARGS: -%s- of %s\n",
-		       __func__, args_it, name);
-
-	for (i = 0; i < num; i++) {
-		if (!strcmp("ddebug", params[i].name))
-			pr_warning("Module %s uses reserved keyword "
-				   "*ddebug* as parameter\n", name);
-	}
-
-	/* Chew leading spaces */
-	args_it = skip_spaces(args_it);
-
-	while (*args_it) {
-		args_it = next_arg(args_it, &param, &val);
-		if (verbose)
-			printk(KERN_INFO "%s: Param: %s, val: %s\n",
-			       __func__, param, val);
-		if (!strcmp(param, "ddebug")) {
-			pr_info("Enabling debugging for module %s\n", name);
-			snprintf(ddebug, DDEBUG_STRING_SIZE, "module %s +p",
-				 name);
-			ddebug_exec_query(ddebug);
-		}
-	}
-	kfree(arg_dup_ptr);
-	kfree(ddebug);
-}
-
-/* We search for module.ddebug kernel boot params */
-static void __init ddebug_boot_parse_args(void)
-{
-	char *param, *val, *tmp, *args_it, *arg_dup_ptr;
-	char module[MODULE_NAME_LEN], *ddebug;
-
-	/* next_arg touches the passed buffer and chops each argument */
-	arg_dup_ptr = args_it = kstrdup(saved_command_line, GFP_KERNEL);
-
-	ddebug = kzalloc(DDEBUG_STRING_SIZE, GFP_KERNEL);
-
-	/* Chew leading spaces */
-	args_it = skip_spaces(args_it);
-
-	while (*args_it) {
-		args_it = next_arg(args_it, &param, &val);
-		if (verbose)
-			printk(KERN_INFO "%s: Param: %s, val: %s\n",
-			       __func__, param, val);
-		tmp = strstr(param, ".ddebug");
-		if (tmp && strlen(tmp) == 7) {
-			strlcpy(module, param, tmp - param + 1);
-			pr_info("Enabling debugging for module %s\n", module);
-			snprintf(ddebug, DDEBUG_STRING_SIZE, "module %s +p",
-				 module);
-			ddebug_exec_query(ddebug);
-		}
-	}
-	kfree(ddebug);
-	kfree(arg_dup_ptr);
-}
-
 static void ddebug_table_free(struct ddebug_table *dt)
 {
 	list_del_init(&dt->link);
@@ -851,8 +768,6 @@ static int __init dynamic_debug_init(void)
 			pr_info("ddebug initialized with string %s",
 				ddebug_setup_string);
 	}
-
-	ddebug_boot_parse_args();
 
 out_free:
 	if (ret)
