@@ -378,7 +378,6 @@ void __ref play_dead(void)
 	idle_task_exit();
 	local_irq_disable();
 	cpumask_clear_cpu(smp_processor_id(), cpu_initialized_mask);
-	cpumask_clear_cpu(smp_processor_id(), vcpu_initialized_mask);
 	preempt_enable_no_resched();
 	VOID(HYPERVISOR_vcpu_op(VCPUOP_down, smp_processor_id(), NULL));
 #ifdef CONFIG_HOTPLUG_CPU
