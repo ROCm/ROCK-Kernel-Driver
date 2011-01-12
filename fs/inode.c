@@ -82,6 +82,7 @@ static struct hlist_head *inode_hashtable __read_mostly;
  * the i_state of an inode while it is in use..
  */
 DEFINE_SPINLOCK(inode_lock);
+EXPORT_SYMBOL_GPL(inode_lock);
 
 /*
  * iprune_sem provides exclusion between the kswapd or try_to_free_pages

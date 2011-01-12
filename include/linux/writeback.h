@@ -64,6 +64,9 @@ int writeback_inodes_sb_nr_if_idle(struct super_block *, unsigned long nr);
 void sync_inodes_sb(struct super_block *);
 void writeback_inodes_wb(struct bdi_writeback *wb,
 		struct writeback_control *wbc);
+void __writeback_inodes_sb(struct super_block *sb,
+			   struct bdi_writeback *wb,
+			   struct writeback_control *wbc);
 long wb_do_writeback(struct bdi_writeback *wb, int force_wait);
 void wakeup_flusher_threads(long nr_pages);
 
