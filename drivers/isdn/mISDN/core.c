@@ -21,10 +21,13 @@
 #include "core.h"
 
 static u_int debug;
+u_int misdn_permitted_gid;
 
 MODULE_AUTHOR("Karsten Keil");
 MODULE_LICENSE("GPL");
 module_param(debug, uint, S_IRUGO | S_IWUSR);
+module_param_named(gid, misdn_permitted_gid, uint, 0);
+MODULE_PARM_DESC(gid, "Unix group for accessing misdn socket (default 0)");
 
 static u64		device_ids;
 #define MAX_DEVICE_ID	63
