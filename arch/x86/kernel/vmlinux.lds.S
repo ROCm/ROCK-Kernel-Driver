@@ -16,10 +16,8 @@
 
 #ifdef CONFIG_X86_32
 #define LOAD_OFFSET __PAGE_OFFSET
-#elif !defined(CONFIG_XEN) || CONFIG_XEN_COMPAT > 0x030002
-#define LOAD_OFFSET __START_KERNEL_map
 #else
-#define LOAD_OFFSET 0
+#define LOAD_OFFSET __START_KERNEL_map
 #endif
 
 #include <asm-generic/vmlinux.lds.h>
@@ -36,14 +34,12 @@ OUTPUT_FORMAT(CONFIG_OUTPUT_FORMAT, CONFIG_OUTPUT_FORMAT, CONFIG_OUTPUT_FORMAT)
 #ifdef CONFIG_X86_32
 OUTPUT_ARCH(i386)
 ENTRY(phys_startup_32)
-jiffies = jiffies_64;
 #else
 OUTPUT_ARCH(i386:x86-64)
 ENTRY(phys_startup_64)
-jiffies_64 = jiffies;
 #endif
 
-#if defined(CONFIG_X86_64) && defined(CONFIG_DEBUG_RODATA) && !defined(CONFIG_XEN)
+#if defined(CONFIG_X86_64) && defined(CONFIG_DEBUG_RODATA)
 /*
  * On 64-bit, align RODATA to 2MB so that even with CONFIG_DEBUG_RODATA
  * we retain large page mappings for boundaries spanning kernel text, rodata
@@ -71,7 +67,7 @@ jiffies_64 = jiffies;
 
 PHDRS {
 	text PT_LOAD FLAGS(5);          /* R_E */
-	data PT_LOAD FLAGS(7);          /* RWE */
+	data PT_LOAD FLAGS(6);          /* RW_ */
 #ifdef CONFIG_X86_64
 	user PT_LOAD FLAGS(5);          /* R_E */
 #ifdef CONFIG_SMP
@@ -86,10 +82,6 @@ SECTIONS
 {
 #ifdef CONFIG_X86_32
         . = LOAD_OFFSET + LOAD_PHYSICAL_ADDR;
-#if defined(CONFIG_XEN) && CONFIG_XEN_COMPAT <= 0x030002
-#undef LOAD_OFFSET
-#define LOAD_OFFSET 0
-#endif
         phys_startup_32 = startup_32 - LOAD_OFFSET;
 #else
         . = __START_KERNEL;
@@ -122,6 +114,10 @@ SECTIONS
 
 	EXCEPTION_TABLE(16) :text = 0x9090
 
+#if defined(CONFIG_DEBUG_RODATA)
+	/* .text should occupy whole number of pages */
+	. = ALIGN(PAGE_SIZE);
+#endif
 	X64_ALIGN_DEBUG_RODATA_BEGIN
 	RO_DATA(PAGE_SIZE)
 	X64_ALIGN_DEBUG_RODATA_END
@@ -144,6 +140,15 @@ SECTIONS
 		CACHELINE_ALIGNED_DATA(L1_CACHE_BYTES)
 
 		DATA_DATA
+		/*
+		 * Workaround a binutils (2.20.51.0.12 to 2.21.51.0.3) bug.
+		 * This makes jiffies relocatable in such binutils
+		 */
+#ifdef CONFIG_X86_32
+		jiffies = jiffies_64;
+#else
+		jiffies_64 = jiffies;
+#endif
 		CONSTRUCTORS
 
 		/* rarely changed data like cpu maps */
@@ -341,7 +346,7 @@ SECTIONS
 		__bss_start = .;
 		*(.bss..page_aligned)
 		*(.bss)
-		. = ALIGN(4);
+		. = ALIGN(PAGE_SIZE);
 		__bss_stop = .;
 	}
 
@@ -360,9 +365,7 @@ SECTIONS
 
 	/* Sections to be discarded */
 	DISCARDS
-#ifndef CONFIG_UNWIND_INFO
 	/DISCARD/ : { *(.eh_frame) }
-#endif
 }
 
 

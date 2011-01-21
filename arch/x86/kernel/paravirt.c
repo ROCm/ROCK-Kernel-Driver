@@ -124,21 +124,11 @@ static void *get_call_destination(u8 type)
 {
 	struct paravirt_patch_template tmpl = {
 		.pv_init_ops = pv_init_ops,
-#ifdef CONFIG_PARAVIRT_TIME
 		.pv_time_ops = pv_time_ops,
-#endif
-#ifdef CONFIG_PARAVIRT_CPU
 		.pv_cpu_ops = pv_cpu_ops,
-#endif
-#ifdef CONFIG_PARAVIRT_IRQ
 		.pv_irq_ops = pv_irq_ops,
-#endif
-#ifdef CONFIG_PARAVIRT_APIC
 		.pv_apic_ops = pv_apic_ops,
-#endif
-#ifdef CONFIG_PARAVIRT_MMU
 		.pv_mmu_ops = pv_mmu_ops,
-#endif
 #ifdef CONFIG_PARAVIRT_SPINLOCKS
 		.pv_lock_ops = pv_lock_ops,
 #endif
@@ -165,14 +155,12 @@ unsigned paravirt_patch_default(u8 type, u16 clobbers, void *insnbuf,
 	else if (opfunc == _paravirt_ident_64)
 		ret = paravirt_patch_ident_64(insnbuf, len);
 
-#ifdef CONFIG_PARAVIRT_CPU
 	else if (type == PARAVIRT_PATCH(pv_cpu_ops.iret) ||
 		 type == PARAVIRT_PATCH(pv_cpu_ops.irq_enable_sysexit) ||
 		 type == PARAVIRT_PATCH(pv_cpu_ops.usergs_sysret32) ||
 		 type == PARAVIRT_PATCH(pv_cpu_ops.usergs_sysret64))
 		/* If operation requires a jmp, then jmp */
 		ret = paravirt_patch_jmp(insnbuf, opfunc, addr, len);
-#endif
 	else
 		/* Otherwise call the function; assume target could
 		   clobber any caller-save reg */
@@ -195,7 +183,6 @@ unsigned paravirt_patch_insns(void *insnbuf, unsigned len,
 	return insn_len;
 }
 
-#ifdef CONFIG_PARAVIRT_MMU
 static void native_flush_tlb(void)
 {
 	__native_flush_tlb();
@@ -214,7 +201,6 @@ static void native_flush_tlb_single(unsigned long addr)
 {
 	__native_flush_tlb_single(addr);
 }
-#endif  /* CONFIG_PARAVIRT_MMU */
 
 /* These are in entry.S */
 extern void native_iret(void);
@@ -296,7 +282,6 @@ enum paravirt_lazy_mode paravirt_get_lazy_mode(void)
 	return percpu_read(paravirt_lazy_mode);
 }
 
-#ifdef CONFIG_PARAVIRT_MMU
 void arch_flush_lazy_mmu_mode(void)
 {
 	preempt_disable();
@@ -308,7 +293,6 @@ void arch_flush_lazy_mmu_mode(void)
 
 	preempt_enable();
 }
-#endif  /* CONFIG_PARAVIRT_MMU */
 
 struct pv_info pv_info = {
 	.name = "bare hardware",
@@ -320,16 +304,11 @@ struct pv_info pv_info = {
 struct pv_init_ops pv_init_ops = {
 	.patch = native_patch,
 };
-EXPORT_SYMBOL_GPL(pv_info);
 
-#ifdef CONFIG_PARAVIRT_TIME
 struct pv_time_ops pv_time_ops = {
 	.sched_clock = native_sched_clock,
 };
-EXPORT_SYMBOL_GPL(pv_time_ops);
-#endif
 
-#ifdef CONFIG_PARAVIRT_IRQ
 struct pv_irq_ops pv_irq_ops = {
 	.save_fl = __PV_IS_CALLEE_SAVE(native_save_fl),
 	.restore_fl = __PV_IS_CALLEE_SAVE(native_restore_fl),
@@ -341,10 +320,7 @@ struct pv_irq_ops pv_irq_ops = {
 	.adjust_exception_frame = paravirt_nop,
 #endif
 };
-EXPORT_SYMBOL    (pv_irq_ops);
-#endif
 
-#ifdef CONFIG_PARAVIRT_CPU
 struct pv_cpu_ops pv_cpu_ops = {
 	.cpuid = native_cpuid,
 	.get_debugreg = native_get_debugreg,
@@ -405,17 +381,12 @@ struct pv_cpu_ops pv_cpu_ops = {
 	.start_context_switch = paravirt_nop,
 	.end_context_switch = paravirt_nop,
 };
-EXPORT_SYMBOL    (pv_cpu_ops);
-#endif
 
-#ifdef CONFIG_PARAVIRT_APIC
 struct pv_apic_ops pv_apic_ops = {
 #ifdef CONFIG_X86_LOCAL_APIC
 	.startup_ipi_hook = paravirt_nop,
 #endif
 };
-EXPORT_SYMBOL_GPL(pv_apic_ops);
-#endif
 
 #if defined(CONFIG_X86_32) && !defined(CONFIG_X86_PAE)
 /* 32-bit pagetable entries */
@@ -425,7 +396,6 @@ EXPORT_SYMBOL_GPL(pv_apic_ops);
 #define PTE_IDENT	__PV_IS_CALLEE_SAVE(_paravirt_ident_64)
 #endif
 
-#ifdef CONFIG_PARAVIRT_MMU
 struct pv_mmu_ops pv_mmu_ops = {
 
 	.read_cr2 = native_read_cr2,
@@ -451,8 +421,11 @@ struct pv_mmu_ops pv_mmu_ops = {
 	.set_pte = native_set_pte,
 	.set_pte_at = native_set_pte_at,
 	.set_pmd = native_set_pmd,
+	.set_pmd_at = native_set_pmd_at,
 	.pte_update = paravirt_nop,
 	.pte_update_defer = paravirt_nop,
+	.pmd_update = paravirt_nop,
+	.pmd_update_defer = paravirt_nop,
 
 	.ptep_modify_prot_start = __ptep_modify_prot_start,
 	.ptep_modify_prot_commit = __ptep_modify_prot_commit,
@@ -493,5 +466,10 @@ struct pv_mmu_ops pv_mmu_ops = {
 
 	.set_fixmap = native_set_fixmap,
 };
+
+EXPORT_SYMBOL_GPL(pv_time_ops);
+EXPORT_SYMBOL    (pv_cpu_ops);
 EXPORT_SYMBOL    (pv_mmu_ops);
-#endif
+EXPORT_SYMBOL_GPL(pv_apic_ops);
+EXPORT_SYMBOL_GPL(pv_info);
+EXPORT_SYMBOL    (pv_irq_ops);

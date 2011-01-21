@@ -547,7 +547,7 @@ static void xlvbd_release_gendisk(struct blkfront_info *info)
 	spin_unlock_irqrestore(&blkif_io_lock, flags);
 
 	/* Flush gnttab callback work. Must be done with no locks held. */
-	flush_scheduled_work();
+	flush_work_sync(&info->work);
 
 	del_gendisk(info->gd);
 
@@ -596,7 +596,7 @@ static void blkif_free(struct blkfront_info *info, int suspend)
 	spin_unlock_irq(&blkif_io_lock);
 
 	/* Flush gnttab callback work. Must be done with no locks held. */
-	flush_scheduled_work();
+	flush_work_sync(&info->work);
 
 	/* Free resources associated with old device channel. */
 	if (info->ring_ref != GRANT_INVALID_REF) {
@@ -1282,6 +1282,7 @@ static const struct xenbus_device_id blkfront_ids[] = {
 
 static struct xenbus_driver blkfront = {
 	.name = "vbd",
+	.owner = THIS_MODULE,
 	.ids = blkfront_ids,
 	.probe = blkfront_probe,
 	.remove = blkfront_remove,

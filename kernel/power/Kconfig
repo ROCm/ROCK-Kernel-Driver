@@ -65,7 +65,7 @@ config PM_TRACE
 config PM_TRACE_RTC
 	bool "Suspend/resume event tracing"
 	depends on CAN_PM_TRACE
-	depends on X86 && !XEN_UNPRIVILEGED_GUEST
+	depends on X86
 	select PM_TRACE
 	default n
 	---help---
@@ -100,13 +100,9 @@ config PM_SLEEP_ADVANCED_DEBUG
 	depends on PM_ADVANCED_DEBUG
 	default n
 
-config SUSPEND_NVS
-       bool
-
 config SUSPEND
 	bool "Suspend to RAM and standby"
 	depends on PM && ARCH_SUSPEND_POSSIBLE
-	select SUSPEND_NVS if HAS_IOMEM && !XEN_UNPRIVILEGED_GUEST
 	default y
 	---help---
 	  Allow the system to enter sleep states in which main memory is
@@ -115,7 +111,7 @@ config SUSPEND
 
 config PM_TEST_SUSPEND
 	bool "Test suspend/resume and wakealarm during bootup"
-	depends on SUSPEND && PM_DEBUG && RTC_CLASS=y && !XEN_UNPRIVILEGED_GUEST
+	depends on SUSPEND && PM_DEBUG && RTC_CLASS=y
 	---help---
 	This option will let you suspend your machine during bootup, and
 	make it wake up a few seconds later using an RTC wakeup alarm.
@@ -140,7 +136,6 @@ config HIBERNATION
 	depends on PM && SWAP && ARCH_HIBERNATION_POSSIBLE
 	select LZO_COMPRESS
 	select LZO_DECOMPRESS
-	select SUSPEND_NVS if HAS_IOMEM
 	---help---
 	  Enable the suspend to disk (STD) functionality, which is usually
 	  called "hibernation" in user interfaces.  STD checkpoints the

@@ -140,8 +140,6 @@ EXPORT_SYMBOL(tty_mutex);
 /* Spinlock to protect the tty->tty_files list */
 DEFINE_SPINLOCK(tty_files_lock);
 
-int console_use_vt = 1;
-
 static ssize_t tty_read(struct file *, char __user *, size_t, loff_t *);
 static ssize_t tty_write(struct file *, const char __user *, size_t, loff_t *);
 ssize_t redirected_tty_write(struct file *, const char __user *,
@@ -1836,7 +1834,7 @@ retry_open:
 		goto got_driver;
 	}
 #ifdef CONFIG_VT
-	if (console_use_vt && device == MKDEV(TTY_MAJOR, 0)) {
+	if (device == MKDEV(TTY_MAJOR, 0)) {
 		extern struct tty_driver *console_driver;
 		driver = tty_driver_kref_get(console_driver);
 		index = fg_console;
@@ -2629,21 +2627,11 @@ long tty_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		return put_user(tty->ldisc->ops->num, (int __user *)p);
 	case TIOCSETD:
 		return tiocsetd(tty, p);
-	/*
-	 * Without the real device to which /dev/console is connected,
-	 * blogd can not work.
-	 *	blogd spawns a pty/tty pair,
-	 *	set /dev/console to the tty of that pair (ioctl TIOCCONS),
-	 *	then reads in all input from the current /dev/console,
-	 *	buffer or write the readed data to /var/log/boot.msg
-	 *	_and_ to the original real device.
-	 */
 	case TIOCGDEV:
 	{
 		unsigned int ret = new_encode_dev(tty_devnum(real_tty));
 		return put_user(ret, (unsigned int __user *)p);
 	}
-
 	/*
 	 * Break handling
 	 */
@@ -3258,8 +3246,44 @@ static int __init tty_class_init(void)
 postcore_initcall(tty_class_init);
 
 /* 3/2004 jmc: why do these devices exist? */
-
 static struct cdev tty_cdev, console_cdev;
+
+static ssize_t show_cons_active(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct console *cs[16];
+	int i = 0;
+	struct console *c;
+	ssize_t count = 0;
+
+	acquire_console_sem();
+	for (c = console_drivers; c; c = c->next) {
+		if (!c->device)
+			continue;
+		if (!c->write)
+			continue;
+		if ((c->flags & CON_ENABLED) == 0)
+			continue;
+		cs[i++] = c;
+		if (i >= ARRAY_SIZE(cs))
+			break;
+	}
+	while (i--)
+		count += sprintf(buf + count, "%s%d%c",
+				 cs[i]->name, cs[i]->index, i ? ' ':'\n');
+	release_console_sem();
+
+	return count;
+}
+static DEVICE_ATTR(active, S_IRUGO, show_cons_active, NULL);
+
+static struct device *consdev;
+
+void console_sysfs_notify(void)
+{
+	if (consdev)
+		sysfs_notify(&consdev->kobj, NULL, "active");
+}
 
 /*
  * Ok, now we can initialize the rest of the tty devices and can count
@@ -3271,19 +3295,21 @@ int __init tty_init(void)
 	if (cdev_add(&tty_cdev, MKDEV(TTYAUX_MAJOR, 0), 1) ||
 	    register_chrdev_region(MKDEV(TTYAUX_MAJOR, 0), 1, "/dev/tty") < 0)
 		panic("Couldn't register /dev/tty driver\n");
-	device_create(tty_class, NULL, MKDEV(TTYAUX_MAJOR, 0), NULL,
-			      "tty");
+	device_create(tty_class, NULL, MKDEV(TTYAUX_MAJOR, 0), NULL, "tty");
 
 	cdev_init(&console_cdev, &console_fops);
 	if (cdev_add(&console_cdev, MKDEV(TTYAUX_MAJOR, 1), 1) ||
 	    register_chrdev_region(MKDEV(TTYAUX_MAJOR, 1), 1, "/dev/console") < 0)
 		panic("Couldn't register /dev/console driver\n");
-	device_create(tty_class, NULL, MKDEV(TTYAUX_MAJOR, 1), NULL,
+	consdev = device_create(tty_class, NULL, MKDEV(TTYAUX_MAJOR, 1), NULL,
 			      "console");
+	if (IS_ERR(consdev))
+		consdev = NULL;
+	else
+		device_create_file(consdev, &dev_attr_active);
 
 #ifdef CONFIG_VT
-	if (console_use_vt)
-		vty_init(&console_fops);
+	vty_init(&console_fops);
 #endif
 	return 0;
 }

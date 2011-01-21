@@ -48,7 +48,6 @@
 #include <linux/rmap.h>
 #include <linux/mempolicy.h>
 #include <linux/key.h>
-#include <linux/unwind.h>
 #include <linux/buffer_head.h>
 #include <linux/page_cgroup.h>
 #include <linux/debug_locks.h>
@@ -68,6 +67,7 @@
 #include <linux/sfi.h>
 #include <linux/shmem_fs.h>
 #include <linux/slab.h>
+#include <linux/perf_event.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
@@ -543,7 +543,6 @@ asmlinkage void __init start_kernel(void)
 	 * Need to run as early as possible, to initialize the
 	 * lockdep hash:
 	 */
-	unwind_init();
 	lockdep_init();
 	debug_objects_early_init();
 
@@ -568,7 +567,6 @@ asmlinkage void __init start_kernel(void)
 	setup_arch(&command_line);
 	mm_init_owner(&init_mm, &init_task);
 	setup_command_line(command_line);
-	unwind_setup();
 	setup_nr_cpu_ids();
 	setup_per_cpu_areas();
 	smp_prepare_boot_cpu();	/* arch-specific boot-cpu hooks */
@@ -606,6 +604,8 @@ asmlinkage void __init start_kernel(void)
 				"enabled *very* early, fixing it\n");
 		local_irq_disable();
 	}
+	idr_init_cache();
+	perf_event_init();
 	rcu_init();
 	radix_tree_init();
 	/* init some links before init_ISA_irqs() */
@@ -661,7 +661,6 @@ asmlinkage void __init start_kernel(void)
 	enable_debug_pagealloc();
 	kmemleak_init();
 	debug_objects_mem_init();
-	idr_init_cache();
 	setup_per_cpu_pageset();
 	numa_policy_init();
 	if (late_time_init)
@@ -778,9 +777,6 @@ static void __init do_initcalls(void)
 
 	for (fn = __early_initcall_end; fn < __initcall_end; fn++)
 		do_one_initcall(*fn);
-
-	/* Make sure there is no pending stuff from the initcall sequence */
-	flush_scheduled_work();
 }
 
 /*
@@ -885,6 +881,7 @@ static int __init kernel_init(void * unused)
 	smp_prepare_cpus(setup_max_cpus);
 
 	do_pre_smp_initcalls();
+	lockup_detector_init();
 
 	smp_init();
 	sched_init_smp();

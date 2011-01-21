@@ -488,7 +488,7 @@ static int xennet_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	if (unlikely(!netif_carrier_ok(dev) ||
 		     (frags > 1 && !xennet_can_sg(dev)) ||
-		     netif_needs_gso(dev, skb))) {
+		     netif_needs_gso(skb, netif_skb_features(skb)))) {
 		spin_unlock_irq(&np->tx_lock);
 		goto drop;
 	}
@@ -1798,6 +1798,7 @@ static int __devexit xennet_remove(struct xenbus_device *dev)
 
 static struct xenbus_driver netfront_driver = {
 	.name = "vif",
+	.owner = THIS_MODULE,
 	.ids = netfront_ids,
 	.probe = netfront_probe,
 	.remove = __devexit_p(xennet_remove),

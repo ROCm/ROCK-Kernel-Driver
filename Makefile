@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 6
-SUBLEVEL = 37
-EXTRAVERSION =
+SUBLEVEL = 38
+EXTRAVERSION = -rc1
 NAME = Flesh-Eating Bats with Fangs
 
 # *DOCUMENTATION*
@@ -238,6 +238,7 @@ ifeq ($(ARCH),m68knommu)
 endif
 
 KCONFIG_CONFIG	?= .config
+export KCONFIG_CONFIG
 
 # SHELL used by kbuild
 CONFIG_SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
@@ -586,11 +587,6 @@ else
 ifndef CONFIG_FUNCTION_TRACER
 KBUILD_CFLAGS	+= -fomit-frame-pointer
 endif
-endif
-
-ifdef CONFIG_UNWIND_INFO
-KBUILD_CFLAGS	+= -fasynchronous-unwind-tables
-LDFLAGS_vmlinux	+= --eh-frame-hdr
 endif
 
 ifdef CONFIG_DEBUG_INFO

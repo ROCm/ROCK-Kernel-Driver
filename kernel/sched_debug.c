@@ -169,15 +169,22 @@ void print_cfs_rq(struct seq_file *m, int cpu, struct cfs_rq *cfs_rq)
 	spread0 = min_vruntime - rq0_min_vruntime;
 	SEQ_printf(m, "  .%-30s: %Ld.%06ld\n", "spread0",
 			SPLIT_NS(spread0));
-	SEQ_printf(m, "  .%-30s: %ld\n", "nr_running", cfs_rq->nr_running);
-	SEQ_printf(m, "  .%-30s: %ld\n", "load", cfs_rq->load.weight);
-
 	SEQ_printf(m, "  .%-30s: %d\n", "nr_spread_over",
 			cfs_rq->nr_spread_over);
+	SEQ_printf(m, "  .%-30s: %ld\n", "nr_running", cfs_rq->nr_running);
+	SEQ_printf(m, "  .%-30s: %ld\n", "load", cfs_rq->load.weight);
 #ifdef CONFIG_FAIR_GROUP_SCHED
 #ifdef CONFIG_SMP
-	SEQ_printf(m, "  .%-30s: %lu\n", "shares", cfs_rq->shares);
+	SEQ_printf(m, "  .%-30s: %Ld.%06ld\n", "load_avg",
+			SPLIT_NS(cfs_rq->load_avg));
+	SEQ_printf(m, "  .%-30s: %Ld.%06ld\n", "load_period",
+			SPLIT_NS(cfs_rq->load_period));
+	SEQ_printf(m, "  .%-30s: %ld\n", "load_contrib",
+			cfs_rq->load_contribution);
+	SEQ_printf(m, "  .%-30s: %d\n", "load_tg",
+			atomic_read(&cfs_rq->tg->load_weight));
 #endif
+
 	print_cfs_group_stats(m, cpu, cfs_rq->tg);
 #endif
 }
@@ -199,6 +206,8 @@ void print_rt_rq(struct seq_file *m, int cpu, struct rt_rq *rt_rq)
 #undef PN
 #undef P
 }
+
+extern __read_mostly int sched_clock_running;
 
 static void print_cpu(struct seq_file *m, int cpu)
 {
@@ -271,21 +280,42 @@ static const char *sched_tunable_scaling_names[] = {
 
 static int sched_debug_show(struct seq_file *m, void *v)
 {
-	u64 now = ktime_to_ns(ktime_get());
+	u64 ktime, sched_clk, cpu_clk;
+	unsigned long flags;
 	int cpu;
 
-	SEQ_printf(m, "Sched Debug Version: v0.09, %s %.*s\n",
+	local_irq_save(flags);
+	ktime = ktime_to_ns(ktime_get());
+	sched_clk = sched_clock();
+	cpu_clk = local_clock();
+	local_irq_restore(flags);
+
+	SEQ_printf(m, "Sched Debug Version: v0.10, %s %.*s\n",
 		init_utsname()->release,
 		(int)strcspn(init_utsname()->version, " "),
 		init_utsname()->version);
 
-	SEQ_printf(m, "now at %Lu.%06ld msecs\n", SPLIT_NS(now));
+#define P(x) \
+	SEQ_printf(m, "%-40s: %Ld\n", #x, (long long)(x))
+#define PN(x) \
+	SEQ_printf(m, "%-40s: %Ld.%06ld\n", #x, SPLIT_NS(x))
+	PN(ktime);
+	PN(sched_clk);
+	PN(cpu_clk);
+	P(jiffies);
+#ifdef CONFIG_HAVE_UNSTABLE_SCHED_CLOCK
+	P(sched_clock_stable);
+#endif
+#undef PN
+#undef P
+
+	SEQ_printf(m, "\n");
+	SEQ_printf(m, "sysctl_sched\n");
 
 #define P(x) \
 	SEQ_printf(m, "  .%-40s: %Ld\n", #x, (long long)(x))
 #define PN(x) \
 	SEQ_printf(m, "  .%-40s: %Ld.%06ld\n", #x, SPLIT_NS(x))
-	P(jiffies);
 	PN(sysctl_sched_latency);
 	PN(sysctl_sched_min_granularity);
 	PN(sysctl_sched_wakeup_granularity);

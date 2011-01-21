@@ -14,14 +14,12 @@
 #include <linux/bug.h>
 #include <linux/nmi.h>
 
-#include <linux/unwind.h>
 #include <asm/stacktrace.h>
 
 
 #define N_EXCEPTION_STACKS_END \
 		(N_EXCEPTION_STACKS + DEBUG_STKSZ/EXCEPTION_STKSZ - 2)
 
-#ifndef CONFIG_X86_NO_TSS
 static char x86_stack_ids[][8] = {
 		[ DEBUG_STACK-1			]	= "#DB",
 		[ NMI_STACK-1			]	= "NMI",
@@ -33,12 +31,10 @@ static char x86_stack_ids[][8] = {
 		  N_EXCEPTION_STACKS_END	]	= "#DB[?]"
 #endif
 };
-#endif
 
 static unsigned long *in_exception_stack(unsigned cpu, unsigned long stack,
 					 unsigned *usedp, char **idp)
 {
-#ifndef CONFIG_X86_NO_TSS
 	unsigned k;
 
 	/*
@@ -98,7 +94,6 @@ static unsigned long *in_exception_stack(unsigned cpu, unsigned long stack,
 		}
 #endif
 	}
-#endif /* CONFIG_X86_NO_TSS */
 	return NULL;
 }
 
@@ -144,8 +139,8 @@ fixup_bp_irq_link(unsigned long bp, unsigned long *stack,
  * severe exception (double fault, nmi, stack fault, debug, mce) hardware stack
  */
 
-void dump_trace(struct task_struct *task, struct pt_regs *regs,
-		unsigned long *stack, unsigned long bp,
+void dump_trace(struct task_struct *task,
+		struct pt_regs *regs, unsigned long *stack,
 		const struct stacktrace_ops *ops, void *data)
 {
 	const unsigned cpu = get_cpu();
@@ -154,26 +149,10 @@ void dump_trace(struct task_struct *task, struct pt_regs *regs,
 	unsigned used = 0;
 	struct thread_info *tinfo;
 	int graph = 0;
+	unsigned long bp;
 
 	if (!task)
 		task = current;
-
-#ifdef CONFIG_FRAME_POINTER
-	if (!bp) {
-		if (task == current) {
-			/* Grab bp right from our regs */
-			get_bp(bp);
-		} else {
-			/* bp is the last reg pushed by switch_to */
-			bp = *(unsigned long *) task->thread.sp;
-		}
-	}
-#endif
-
-	if (try_stack_unwind(task, regs, &stack, &bp, ops, data)) {
-		put_cpu();
-		return;
-	}
 
 	if (!stack) {
 		unsigned long dummy;
@@ -182,6 +161,7 @@ void dump_trace(struct task_struct *task, struct pt_regs *regs,
 			stack = (unsigned long *)task->thread.sp;
 	}
 
+	bp = stack_frame(task, regs);
 	/*
 	 * Print function call entries in all stacks, starting at the
 	 * current stack address. If the stacks consist of nested
@@ -245,7 +225,7 @@ EXPORT_SYMBOL(dump_trace);
 
 void
 show_stack_log_lvl(struct task_struct *task, struct pt_regs *regs,
-		   unsigned long *sp, unsigned long bp, char *log_lvl)
+		   unsigned long *sp, char *log_lvl)
 {
 	unsigned long *irq_stack_end;
 	unsigned long *irq_stack;
@@ -289,7 +269,7 @@ show_stack_log_lvl(struct task_struct *task, struct pt_regs *regs,
 	preempt_enable();
 
 	printk(KERN_CONT "\n");
-	show_trace_log_lvl(task, regs, sp, bp, log_lvl);
+	show_trace_log_lvl(task, regs, sp, log_lvl);
 }
 
 void show_registers(struct pt_regs *regs)
@@ -318,7 +298,7 @@ void show_registers(struct pt_regs *regs)
 
 		printk(KERN_EMERG "Stack:\n");
 		show_stack_log_lvl(NULL, regs, (unsigned long *)sp,
-				regs->bp, KERN_EMERG);
+				   KERN_EMERG);
 
 		printk(KERN_EMERG "Code: ");
 

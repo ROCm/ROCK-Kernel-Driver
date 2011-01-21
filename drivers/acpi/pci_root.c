@@ -36,6 +36,7 @@
 #include <linux/slab.h>
 #include <acpi/acpi_bus.h>
 #include <acpi/acpi_drivers.h>
+#include <acpi/apei.h>
 
 #define PREFIX "ACPI: "
 
@@ -46,6 +47,11 @@ ACPI_MODULE_NAME("pci_root");
 static int acpi_pci_root_add(struct acpi_device *device);
 static int acpi_pci_root_remove(struct acpi_device *device, int type);
 static int acpi_pci_root_start(struct acpi_device *device);
+
+#define ACPI_PCIE_REQ_SUPPORT (OSC_EXT_PCI_CONFIG_SUPPORT \
+				| OSC_ACTIVE_STATE_PWR_SUPPORT \
+				| OSC_CLOCK_PWR_CAPABILITY_SUPPORT \
+				| OSC_MSI_SUPPORT)
 
 static const struct acpi_device_id root_device_ids[] = {
 	{"PNP0A03", 0},
@@ -442,41 +448,6 @@ out:
 }
 EXPORT_SYMBOL(acpi_pci_osc_control_set);
 
-#ifdef CONFIG_PCI_GUESTDEV
-#include <linux/sysfs.h>
-
-static ssize_t seg_show(struct device *dev,
-			struct device_attribute *attr, char *buf)
-{
-	struct list_head *entry;
-
-	list_for_each(entry, &acpi_pci_roots) {
-		struct acpi_pci_root *root;
-		root = list_entry(entry, struct acpi_pci_root, node);
-		if (&root->device->dev == dev)
-			return sprintf(buf, "%04x\n", root->segment);
-	}
-	return 0;
-}
-static DEVICE_ATTR(seg, 0444, seg_show, NULL);
-
-static ssize_t bbn_show(struct device *dev,
-			struct device_attribute *attr, char *buf)
-{
-	struct list_head *entry;
-
-	list_for_each(entry, &acpi_pci_roots) {
-		struct acpi_pci_root *root;
-		root = list_entry(entry, struct acpi_pci_root, node);
-		if (&root->device->dev == dev)
-			return sprintf(buf, "%02x\n",
-				       (unsigned int)root->secondary.start);
-	}
-	return 0;
-}
-static DEVICE_ATTR(bbn, 0444, bbn_show, NULL);
-#endif
-
 static int __devinit acpi_pci_root_add(struct acpi_device *device)
 {
 	unsigned long long segment, bus;
@@ -601,12 +572,32 @@ static int __devinit acpi_pci_root_add(struct acpi_device *device)
 	if (flags != base_flags)
 		acpi_pci_osc_support(root, flags);
 
-#ifdef CONFIG_PCI_GUESTDEV
-	if (device_create_file(&device->dev, &dev_attr_seg))
-		dev_warn(&device->dev, "could not create seg attr\n");
-	if (device_create_file(&device->dev, &dev_attr_bbn))
-		dev_warn(&device->dev, "could not create bbn attr\n");
-#endif
+	if (!pcie_ports_disabled
+	    && (flags & ACPI_PCIE_REQ_SUPPORT) == ACPI_PCIE_REQ_SUPPORT) {
+		flags = OSC_PCI_EXPRESS_CAP_STRUCTURE_CONTROL
+			| OSC_PCI_EXPRESS_NATIVE_HP_CONTROL
+			| OSC_PCI_EXPRESS_PME_CONTROL;
+
+		if (pci_aer_available()) {
+			if (aer_acpi_firmware_first())
+				dev_dbg(root->bus->bridge,
+					"PCIe errors handled by BIOS.\n");
+			else
+				flags |= OSC_PCI_EXPRESS_AER_CONTROL;
+		}
+
+		dev_info(root->bus->bridge,
+			"Requesting ACPI _OSC control (0x%02x)\n", flags);
+
+		status = acpi_pci_osc_control_set(device->handle, &flags,
+					OSC_PCI_EXPRESS_CAP_STRUCTURE_CONTROL);
+		if (ACPI_SUCCESS(status))
+			dev_info(root->bus->bridge,
+				"ACPI _OSC control (0x%02x) granted\n", flags);
+		else
+			dev_dbg(root->bus->bridge,
+				"ACPI _OSC request failed (code %d)\n", status);
+	}
 
 	pci_acpi_add_bus_pm_notifier(device, root->bus);
 	if (device->wakeup.flags.run_wake)
@@ -642,6 +633,8 @@ static int acpi_pci_root_remove(struct acpi_device *device, int type)
 
 static int __init acpi_pci_root_init(void)
 {
+	acpi_hest_init();
+
 	if (acpi_pci_disabled)
 		return 0;
 
@@ -653,31 +646,3 @@ static int __init acpi_pci_root_init(void)
 }
 
 subsys_initcall(acpi_pci_root_init);
-
-#ifdef CONFIG_PCI_GUESTDEV
-int acpi_pci_get_root_seg_bbn(char *hid, char *uid, int *seg, int *bbn)
-{
-	struct list_head *entry;
-
-	list_for_each(entry, &acpi_pci_roots) {
-		struct acpi_pci_root *root;
-
-		root = list_entry(entry, struct acpi_pci_root, node);
-		if (strcmp(acpi_device_hid(root->device), hid))
-			continue;
-
-		if (!root->device->pnp.unique_id) {
-			if (strlen(uid))
-				continue;
-		} else {
-			if (strcmp(root->device->pnp.unique_id, uid))
-				continue;
-		}
-
-		*seg = (int)root->segment;
-		*bbn = (int)root->secondary.start;
-		return TRUE;
-	}
-	return FALSE;
-}
-#endif

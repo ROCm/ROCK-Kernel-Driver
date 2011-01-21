@@ -76,6 +76,8 @@ static void edac_mc_dump_mci(struct mem_ctl_info *mci)
 	debugf3("\tpvt_info = %p\n\n", mci->pvt_info);
 }
 
+#endif				/* CONFIG_EDAC_DEBUG */
+
 /*
  * keep those in sync with the enum mem_type
  */
@@ -99,8 +101,6 @@ const char *edac_mem_types[] = {
 	"Registered DDR3 RAM",
 };
 EXPORT_SYMBOL_GPL(edac_mem_types);
-
-#endif				/* CONFIG_EDAC_DEBUG */
 
 /* 'ptr' points to a possibly unaligned item X such that sizeof(X) is 'size'.
  * Adjust 'ptr' so that its alignment is at least as stringent as what the
@@ -614,10 +614,6 @@ static void edac_mc_scrub_block(unsigned long page, unsigned long offset,
 	unsigned long flags = 0;
 
 	debugf3("%s()\n", __func__);
-
-#ifdef CONFIG_XEN
-	page = mfn_to_local_pfn(page);
-#endif
 
 	/* ECC error page was not in our memory. Ignore it. */
 	if (!pfn_valid(page))

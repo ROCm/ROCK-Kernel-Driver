@@ -135,7 +135,7 @@ static inline unsigned long long native_read_pmc(int counter)
 	return EAX_EDX_VAL(val, low, high);
 }
 
-#ifdef CONFIG_PARAVIRT_CPU
+#ifdef CONFIG_PARAVIRT
 #include <asm/paravirt.h>
 #else
 #include <linux/errno.h>
@@ -246,7 +246,7 @@ do {                                                            \
 
 #define rdtscpll(val, aux) (val) = native_read_tscp(&(aux))
 
-#endif	/* !CONFIG_PARAVIRT_CPU */
+#endif	/* !CONFIG_PARAVIRT */
 
 
 #define checking_wrmsrl(msr, val) wrmsr_safe((msr), (u32)(val),		\

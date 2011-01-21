@@ -30,10 +30,6 @@
 #include <asm/mmu.h>
 #include <asm/mpspec.h>
 
-#ifdef CONFIG_XEN
-#include <xen/interface/platform.h>
-#endif
-
 #define COMPILER_DEPENDENT_INT64   long long
 #define COMPILER_DEPENDENT_UINT64  unsigned long long
 
@@ -125,33 +121,11 @@ extern unsigned long acpi_wakeup_address;
 /* early initialization routine */
 extern void acpi_reserve_wakeup_memory(void);
 
-#ifdef CONFIG_XEN
-static inline int acpi_notify_hypervisor_state(u8 sleep_state,
-					       u32 pm1a_cnt_val,
-					       u32 pm1b_cnt_val)
-{
-	struct xen_platform_op op = {
-		.cmd = XENPF_enter_acpi_sleep,
-		.interface_version = XENPF_INTERFACE_VERSION,
-		.u = {
-			.enter_acpi_sleep = {
-				.pm1a_cnt_val = pm1a_cnt_val,
-				.pm1b_cnt_val = pm1b_cnt_val,
-				.sleep_state = sleep_state,
-			},
-		},
-	};
-
-	return HYPERVISOR_platform_op(&op);
-}
-#endif /* CONFIG_XEN */
-
 /*
  * Check if the CPU can handle C2 and deeper
  */
 static inline unsigned int acpi_processor_cstate_check(unsigned int max_cstate)
 {
-#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
 	/*
 	 * Early models (<=5) of AMD Opterons are not supposed to go into
 	 * C2 state.
@@ -166,7 +140,6 @@ static inline unsigned int acpi_processor_cstate_check(unsigned int max_cstate)
 	else if (c1e_detected)
 		return 1;
 	else
-#endif
 		return max_cstate;
 }
 
@@ -206,25 +179,22 @@ static inline void disable_acpi(void) { }
 
 #endif /* !CONFIG_ACPI */
 
-#ifndef CONFIG_XEN
 #define ARCH_HAS_POWER_INIT	1
-#endif
 
 struct bootnode;
 
 #ifdef CONFIG_ACPI_NUMA
 extern int acpi_numa;
-extern int acpi_get_nodes(struct bootnode *physnodes);
+extern void acpi_get_nodes(struct bootnode *physnodes, unsigned long start,
+				unsigned long end);
 extern int acpi_scan_nodes(unsigned long start, unsigned long end);
 #define NR_NODE_MEMBLKS (MAX_NUMNODES*2)
+
+#ifdef CONFIG_NUMA_EMU
 extern void acpi_fake_nodes(const struct bootnode *fake_nodes,
 				   int num_nodes);
-#else
-static inline void acpi_fake_nodes(const struct bootnode *fake_nodes,
-				   int num_nodes)
-{
-}
 #endif
+#endif /* CONFIG_ACPI_NUMA */
 
 #define acpi_unlazy_tlb(x)	leave_mm(x)
 

@@ -70,15 +70,11 @@ int acpi_strict;
 
 u8 acpi_sci_flags __initdata;
 int acpi_sci_override_gsi __initdata;
-#ifndef CONFIG_XEN
 int acpi_skip_timer_override __initdata;
 int acpi_use_timer_override __initdata;
 
 #ifdef CONFIG_X86_LOCAL_APIC
 static u64 acpi_lapic_addr __initdata = APIC_DEFAULT_PHYS_BASE;
-#endif
-#else
-#define acpi_skip_timer_override 0
 #endif
 
 #ifndef __HAVE_ARCH_CMPXCHG
@@ -185,7 +181,6 @@ static int __init acpi_parse_madt(struct acpi_table_header *table)
 		return -ENODEV;
 	}
 
-#ifndef CONFIG_XEN
 	if (madt->address) {
 		acpi_lapic_addr = (u64) madt->address;
 
@@ -195,15 +190,18 @@ static int __init acpi_parse_madt(struct acpi_table_header *table)
 
 	default_acpi_madt_oem_check(madt->header.oem_id,
 				    madt->header.oem_table_id);
-#endif
 
 	return 0;
 }
 
 static void __cpuinit acpi_register_lapic(int id, u8 enabled)
 {
-#ifndef CONFIG_XEN
 	unsigned int ver = 0;
+
+	if (id >= (MAX_LOCAL_APIC-1)) {
+		printk(KERN_INFO PREFIX "skipped apicid that is too big\n");
+		return;
+	}
 
 	if (!enabled) {
 		++disabled_cpus;
@@ -214,7 +212,6 @@ static void __cpuinit acpi_register_lapic(int id, u8 enabled)
 		ver = apic_version[boot_cpu_physical_apicid];
 
 	generic_processor_info(id, ver);
-#endif
 }
 
 static int __init
@@ -293,7 +290,6 @@ static int __init
 acpi_parse_lapic_addr_ovr(struct acpi_subtable_header * header,
 			  const unsigned long end)
 {
-#ifndef CONFIG_XEN
 	struct acpi_madt_local_apic_override *lapic_addr_ovr = NULL;
 
 	lapic_addr_ovr = (struct acpi_madt_local_apic_override *)header;
@@ -302,7 +298,6 @@ acpi_parse_lapic_addr_ovr(struct acpi_subtable_header * header,
 		return -EINVAL;
 
 	acpi_lapic_addr = lapic_addr_ovr->address;
-#endif
 
 	return 0;
 }
@@ -514,6 +509,7 @@ int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
 
 int acpi_isa_irq_to_gsi(unsigned isa_irq, u32 *gsi)
 {
@@ -585,7 +581,6 @@ void __init acpi_set_irq_model_ioapic(void)
 #ifdef CONFIG_ACPI_HOTPLUG_CPU
 #include <acpi/processor.h>
 
-#ifndef CONFIG_XEN
 static void acpi_map_cpu2node(acpi_handle handle, int cpu, int physid)
 {
 #ifdef CONFIG_ACPI_NUMA
@@ -677,9 +672,6 @@ free_tmp_map:
 out:
 	return retval;
 }
-#else
-#define _acpi_map_lsapic(h, p) (-EINVAL)
-#endif
 
 /* wrapper to silence section mismatch warning */
 int __ref acpi_map_lsapic(acpi_handle handle, int *pcpu)
@@ -690,11 +682,9 @@ EXPORT_SYMBOL(acpi_map_lsapic);
 
 int acpi_unmap_lsapic(int cpu)
 {
-#ifndef CONFIG_XEN
 	per_cpu(x86_cpu_to_apicid, cpu) = -1;
 	set_cpu_present(cpu, false);
 	num_processors--;
-#endif
 
 	return (0);
 }
@@ -863,22 +853,6 @@ static int __init acpi_parse_fadt(struct acpi_table_header *table)
  * returns 0 on success, < 0 on error
  */
 
-#ifndef CONFIG_XEN
-static void __init acpi_register_lapic_address(unsigned long address)
-{
-	mp_lapic_addr = address;
-
-	set_fixmap_nocache(FIX_APIC_BASE, address);
-	if (boot_cpu_physical_apicid == -1U) {
-		boot_cpu_physical_apicid  = read_apic_id();
-		apic_version[boot_cpu_physical_apicid] =
-			 GET_APIC_VERSION(apic_read(APIC_LVR));
-	}
-}
-#else
-#define acpi_register_lapic_address(address)
-#endif
-
 static int __init early_acpi_parse_madt_lapic_addr_ovr(void)
 {
 	int count;
@@ -900,7 +874,7 @@ static int __init early_acpi_parse_madt_lapic_addr_ovr(void)
 		return count;
 	}
 
-	acpi_register_lapic_address(acpi_lapic_addr);
+	register_lapic_address(acpi_lapic_addr);
 
 	return count;
 }
@@ -927,16 +901,16 @@ static int __init acpi_parse_madt_lapic_entries(void)
 		return count;
 	}
 
-	acpi_register_lapic_address(acpi_lapic_addr);
+	register_lapic_address(acpi_lapic_addr);
 
 	count = acpi_table_parse_madt(ACPI_MADT_TYPE_LOCAL_SAPIC,
-				      acpi_parse_sapic, MAX_APICS);
+				      acpi_parse_sapic, MAX_LOCAL_APIC);
 
 	if (!count) {
 		x2count = acpi_table_parse_madt(ACPI_MADT_TYPE_LOCAL_X2APIC,
-						acpi_parse_x2apic, MAX_APICS);
+					acpi_parse_x2apic, MAX_LOCAL_APIC);
 		count = acpi_table_parse_madt(ACPI_MADT_TYPE_LOCAL_APIC,
-					      acpi_parse_lapic, MAX_APICS);
+					acpi_parse_lapic, MAX_LOCAL_APIC);
 	}
 	if (!count && !x2count) {
 		printk(KERN_ERR PREFIX "No LAPIC entries present\n");
@@ -969,32 +943,6 @@ static int __init acpi_parse_madt_lapic_entries(void)
 extern int es7000_plat;
 #endif
 
-static void assign_to_mp_irq(struct mpc_intsrc *m,
-				    struct mpc_intsrc *mp_irq)
-{
-	memcpy(mp_irq, m, sizeof(struct mpc_intsrc));
-}
-
-static int mp_irq_cmp(struct mpc_intsrc *mp_irq,
-				struct mpc_intsrc *m)
-{
-	return memcmp(mp_irq, m, sizeof(struct mpc_intsrc));
-}
-
-static void save_mp_irq(struct mpc_intsrc *m)
-{
-	int i;
-
-	for (i = 0; i < mp_irq_entries; i++) {
-		if (!mp_irq_cmp(&mp_irqs[i], m))
-			return;
-	}
-
-	assign_to_mp_irq(m, &mp_irqs[mp_irq_entries]);
-	if (++mp_irq_entries == MAX_IRQ_SOURCES)
-		panic("Max # of irq sources exceeded!!\n");
-}
-
 void __init mp_override_legacy_irq(u8 bus_irq, u8 polarity, u8 trigger, u32 gsi)
 {
 	int ioapic;
@@ -1025,7 +973,7 @@ void __init mp_override_legacy_irq(u8 bus_irq, u8 polarity, u8 trigger, u32 gsi)
 	mp_irq.dstapic = mp_ioapics[ioapic].apicid; /* APIC ID */
 	mp_irq.dstirq = pin;	/* INTIN# */
 
-	save_mp_irq(&mp_irq);
+	mp_save_irq(&mp_irq);
 
 	isa_irq_to_gsi[bus_irq] = gsi;
 }
@@ -1100,7 +1048,7 @@ void __init mp_config_acpi_legacy_irqs(void)
 		mp_irq.srcbusirq = i; /* Identity mapped */
 		mp_irq.dstirq = pin;
 
-		save_mp_irq(&mp_irq);
+		mp_save_irq(&mp_irq);
 	}
 }
 
@@ -1137,7 +1085,7 @@ static int mp_config_acpi_gsi(struct device *dev, u32 gsi, int trigger,
 	mp_irq.dstapic = mp_ioapics[ioapic].apicid;
 	mp_irq.dstirq = mp_find_ioapic_pin(ioapic, gsi);
 
-	save_mp_irq(&mp_irq);
+	mp_save_irq(&mp_irq);
 #endif
 	return 0;
 }
@@ -1378,7 +1326,6 @@ static int __init dmi_disable_acpi(const struct dmi_system_id *d)
 	return 0;
 }
 
-#ifndef CONFIG_XEN
 /*
  * Force ignoring BIOS IRQ0 pin2 override
  */
@@ -1396,7 +1343,6 @@ static int __init dmi_ignore_irq0_timer_override(const struct dmi_system_id *d)
 	}
 	return 0;
 }
-#endif
 
 static int __init force_acpi_rsdt(const struct dmi_system_id *d)
 {
@@ -1517,7 +1463,6 @@ static struct dmi_system_id __initdata acpi_dmi_table[] = {
 	{}
 };
 
-#ifndef CONFIG_XEN
 /* second table for DMI checks that should run after early-quirks */
 static struct dmi_system_id __initdata acpi_dmi_table_late[] = {
 	/*
@@ -1564,7 +1509,6 @@ static struct dmi_system_id __initdata acpi_dmi_table_late[] = {
 	 },
 	{}
 };
-#endif
 
 /*
  * acpi_boot_table_init() and acpi_boot_init()
@@ -1637,10 +1581,8 @@ int __init early_acpi_boot_init(void)
 
 int __init acpi_boot_init(void)
 {
-#ifndef CONFIG_XEN
 	/* those are executed after early-quirks are executed */
 	dmi_check_system(acpi_dmi_table_late);
-#endif
 
 	/*
 	 * If acpi_disabled, bail out
@@ -1740,7 +1682,7 @@ int __init acpi_mps_check(void)
 	return 0;
 }
 
-#if defined(CONFIG_X86_IO_APIC) && !defined(CONFIG_XEN)
+#ifdef CONFIG_X86_IO_APIC
 static int __init parse_acpi_skip_timer_override(char *arg)
 {
 	acpi_skip_timer_override = 1;

@@ -4,6 +4,7 @@
 #include <linux/cpu.h>
 #include <linux/range.h>
 
+#include <asm/amd_nb.h>
 #include <asm/pci_x86.h>
 
 #include <asm/pci-direct.h>
@@ -349,7 +350,6 @@ static int __init early_fill_mp_bus_info(void)
 
 #define ENABLE_CF8_EXT_CFG      (1ULL << 46)
 
-#ifndef CONFIG_XEN
 static void enable_pci_io_ecs(void *unused)
 {
 	u64 reg;
@@ -378,7 +378,34 @@ static int __cpuinit amd_cpu_notify(struct notifier_block *self,
 static struct notifier_block __cpuinitdata amd_cpu_notifier = {
 	.notifier_call	= amd_cpu_notify,
 };
-#endif /* CONFIG_XEN */
+
+static void __init pci_enable_pci_io_ecs(void)
+{
+#ifdef CONFIG_AMD_NB
+	unsigned int i, n;
+
+	for (n = i = 0; !n && amd_nb_bus_dev_ranges[i].dev_limit; ++i) {
+		u8 bus = amd_nb_bus_dev_ranges[i].bus;
+		u8 slot = amd_nb_bus_dev_ranges[i].dev_base;
+		u8 limit = amd_nb_bus_dev_ranges[i].dev_limit;
+
+		for (; slot < limit; ++slot) {
+			u32 val = read_pci_config(bus, slot, 3, 0);
+
+			if (!early_is_amd_nb(val))
+				continue;
+
+			val = read_pci_config(bus, slot, 3, 0x8c);
+			if (!(val & (ENABLE_CF8_EXT_CFG >> 32))) {
+				val |= ENABLE_CF8_EXT_CFG >> 32;
+				write_pci_config(bus, slot, 3, 0x8c, val);
+			}
+			++n;
+		}
+	}
+	pr_info("Extended Config Space enabled on %u nodes\n", n);
+#endif
+}
 
 static int __init pci_io_ecs_init(void)
 {
@@ -388,19 +415,14 @@ static int __init pci_io_ecs_init(void)
         if (boot_cpu_data.x86 < 0x10)
 		return 0;
 
-#ifndef CONFIG_XEN
+	/* Try the PCI method first. */
+	if (early_pci_allowed())
+		pci_enable_pci_io_ecs();
+
 	register_cpu_notifier(&amd_cpu_notifier);
 	for_each_online_cpu(cpu)
 		amd_cpu_notify(&amd_cpu_notifier, (unsigned long)CPU_ONLINE,
 			       (void *)(long)cpu);
-#else
-	if (cpu = 1, cpu) {
-		u64 reg;
-		rdmsrl(MSR_AMD64_NB_CFG, reg);
-		if (!(reg & ENABLE_CF8_EXT_CFG))
-			return 0;
-	}
-#endif
 	pci_probe |= PCI_HAS_IO_ECS;
 
 	return 0;
@@ -408,10 +430,6 @@ static int __init pci_io_ecs_init(void)
 
 static int __init amd_postcore_init(void)
 {
-#ifdef CONFIG_XEN
-	if (!is_initial_xendomain())
-		return 0;
-#endif
 	if (boot_cpu_data.x86_vendor != X86_VENDOR_AMD)
 		return 0;
 

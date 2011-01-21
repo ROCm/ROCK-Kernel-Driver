@@ -76,21 +76,6 @@ ifndef obj
 $(warning kbuild: Makefile.build is included improperly)
 endif
 
-ifeq ($(CONFIG_XEN),y)
-Makefile.xen := $(if $(KBUILD_EXTMOD),$(KBUILD_EXTMOD),$(objtree)/scripts)/Makefile.xen
-$(Makefile.xen): $(srctree)/scripts/Makefile.xen.awk $(srctree)/scripts/Makefile.build
-	@echo '  Updating $@'
-	$(if $(shell echo a | $(AWK) '{ print gensub(/a/, "AA", "g"); }'),\
-        ,$(error 'Your awk program does not define gensub.  Use gawk or another awk with gensub'))
-	@$(AWK) -f $< $(filter-out $<,$^) >$@
-
-xen-src-single-used-m	:= $(patsubst $(srctree)/%,%,$(wildcard $(addprefix $(srctree)/,$(single-used-m:.o=-xen.c))))
-xen-single-used-m	:= $(xen-src-single-used-m:-xen.c=.o)
-single-used-m		:= $(filter-out $(xen-single-used-m),$(single-used-m))
-
--include $(Makefile.xen)
-endif
-
 # ===========================================================================
 
 ifneq ($(strip $(lib-y) $(lib-m) $(lib-n) $(lib-)),)
@@ -230,17 +215,22 @@ ifdef BUILD_C_RECORDMCOUNT
 # The empty.o file is created in the make process in order to determine
 #  the target endianness and word size. It is made before all other C
 #  files, including recordmcount.
-cmd_record_mcount = if [ $(@) != "scripts/mod/empty.o" ]; then			\
-			$(objtree)/scripts/recordmcount "$(@)";			\
-		    fi;
+sub_cmd_record_mcount =					\
+	if [ $(@) != "scripts/mod/empty.o" ]; then	\
+		$(objtree)/scripts/recordmcount "$(@)";	\
+	fi;
 else
-cmd_record_mcount = set -e ; perl $(srctree)/scripts/recordmcount.pl "$(ARCH)" \
+sub_cmd_record_mcount = set -e ; perl $(srctree)/scripts/recordmcount.pl "$(ARCH)" \
 	"$(if $(CONFIG_CPU_BIG_ENDIAN),big,little)" \
 	"$(if $(CONFIG_64BIT),64,32)" \
 	"$(OBJDUMP)" "$(OBJCOPY)" "$(CC) $(KBUILD_CFLAGS)" \
 	"$(LD)" "$(NM)" "$(RM)" "$(MV)" \
 	"$(if $(part-of-module),1,0)" "$(@)";
 endif
+cmd_record_mcount = 						\
+	if [ "$(findstring -pg,$(_c_flags))" = "-pg" ]; then	\
+		$(sub_cmd_record_mcount)			\
+	fi;
 endif
 
 define rule_cc_o_c

@@ -136,7 +136,6 @@ static const struct bin_table bin_kern_table[] = {
 	{ CTL_INT,	KERN_IA64_UNALIGNED,		"ignore-unaligned-usertrap" },
 	{ CTL_INT,	KERN_COMPAT_LOG,		"compat-log" },
 	{ CTL_INT,	KERN_MAX_LOCK_DEPTH,		"max_lock_depth" },
-	{ CTL_INT,	KERN_NMI_WATCHDOG,		"nmi_watchdog" },
 	{ CTL_INT,	KERN_PANIC_ON_NMI,		"panic_on_unrecovered_nmi" },
 	{ CTL_INT,	KERN_SETUID_DUMPABLE,		"suid_dumpable" },
 	{}
@@ -874,15 +873,6 @@ static const struct bin_table bin_bus_table[] = {
 };
 
 
-#ifdef CONFIG_XEN
-#include <xen/sysctl.h>
-static const struct bin_table bin_xen_table[] = {
-	{ CTL_INT,	CTL_XEN_INDEPENDENT_WALLCLOCK,	"independent_wallclock" },
-	{ CTL_ULONG,	CTL_XEN_PERMITTED_CLOCK_JITTER,	"permitted_clock_jitter" },
-	{}
-};
-#endif
-
 static const struct bin_table bin_s390dbf_table[] = {
 	{ CTL_INT,	5678 /* CTL_S390DBF_STOPPABLE */, "debug_stoppable" },
 	{ CTL_INT,	5679 /* CTL_S390DBF_ACTIVE */,	  "debug_active" },
@@ -922,9 +912,6 @@ static const struct bin_table bin_root_table[] = {
 	{ CTL_DIR,	CTL_BUS,	"bus",		bin_bus_table },
 	{ CTL_DIR,	CTL_ABI,	"abi" },
 	/* CTL_CPU not used */
-#ifdef CONFIG_XEN
-	{ CTL_DIR,	CTL_XEN,	"xen",		bin_xen_table },
-#endif
 	/* CTL_ARLAN "arlan" no longer used */
 	{ CTL_DIR,	CTL_S390DBF,	"s390dbf",	bin_s390dbf_table },
 	{ CTL_DIR,	CTL_SUNRPC,	"sunrpc",	bin_sunrpc_table },
@@ -1206,7 +1193,7 @@ static ssize_t bin_dn_node_address(struct file *file,
 
 		buf[result] = '\0';
 
-		/* Convert the decnet addresss to binary */
+		/* Convert the decnet address to binary */
 		result = -EIO;
 		nodep = strchr(buf, '.') + 1;
 		if (!nodep)

@@ -74,6 +74,12 @@ extern void pci_pm_init(struct pci_dev *dev);
 extern void platform_pci_wakeup_init(struct pci_dev *dev);
 extern void pci_allocate_cap_save_buffers(struct pci_dev *dev);
 
+static inline void pci_wakeup_event(struct pci_dev *dev)
+{
+	/* Wait 100 ms before the system can be put into a sleep state. */
+	pm_wakeup_event(&dev->dev, 100);
+}
+
 static inline bool pci_is_bridge(struct pci_dev *pci_dev)
 {
 	return !!(pci_dev->subordinate);
@@ -138,14 +144,6 @@ extern void pci_msi_init_pci_dev(struct pci_dev *dev);
 #else
 static inline void pci_no_msi(void) { }
 static inline void pci_msi_init_pci_dev(struct pci_dev *dev) { }
-#endif
-
-#ifdef CONFIG_PCIEAER
-void pci_no_aer(void);
-bool pci_aer_available(void);
-#else
-static inline void pci_no_aer(void) { }
-static inline bool pci_aer_available(void) { return false; }
 #endif
 
 static inline int pci_no_d1d2(struct pci_dev *dev)
@@ -351,27 +349,5 @@ static inline int pci_dev_specific_reset(struct pci_dev *dev, int probe)
 	return -ENOTTY;
 }
 #endif
-
-#ifdef CONFIG_PCI_GUESTDEV
-extern int pci_is_guestdev_to_reassign(struct pci_dev *dev);
-extern int pci_is_iomuldev(struct pci_dev *dev);
-#else
-#define pci_is_iomuldev(dev)	0
-#endif
-
-#ifdef CONFIG_PCI_RESERVE
-unsigned long pci_reserve_size_io(struct pci_bus *bus);
-unsigned long pci_reserve_size_mem(struct pci_bus *bus);
-#else
-static inline unsigned long pci_reserve_size_io(struct pci_bus *bus)
-{
-	return 0;
-}
-
-static inline unsigned long pci_reserve_size_mem(struct pci_bus *bus)
-{
-	return 0;
-}
-#endif /* CONFIG_PCI_RESERVE */
 
 #endif /* DRIVERS_PCI_H */

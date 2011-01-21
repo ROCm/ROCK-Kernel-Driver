@@ -34,46 +34,18 @@
 #ifndef _XENBUS_PROBE_H
 #define _XENBUS_PROBE_H
 
-#ifndef BUS_ID_SIZE
 #define XEN_BUS_ID_SIZE			20
-#else
-#define XEN_BUS_ID_SIZE			BUS_ID_SIZE
-#endif
-
-#ifdef CONFIG_PARAVIRT_XEN
-#define is_running_on_xen() xen_domain()
-#define is_initial_xendomain() xen_initial_domain()
-#endif
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,26)
-#define dev_name(dev) ((dev)->bus_id)
-#endif
-
-#if defined(CONFIG_XEN_BACKEND) || defined(CONFIG_XEN_BACKEND_MODULE)
-extern void xenbus_backend_suspend(int (*fn)(struct device *, void *));
-extern void xenbus_backend_resume(int (*fn)(struct device *, void *));
-extern void xenbus_backend_probe_and_watch(void);
-extern void xenbus_backend_bus_register(void);
-extern void xenbus_backend_device_register(void);
-#else
-static inline void xenbus_backend_suspend(int (*fn)(struct device *, void *)) {}
-static inline void xenbus_backend_resume(int (*fn)(struct device *, void *)) {}
-static inline void xenbus_backend_probe_and_watch(void) {}
-static inline void xenbus_backend_bus_register(void) {}
-static inline void xenbus_backend_device_register(void) {}
-#endif
 
 struct xen_bus_type
 {
 	char *root;
-	int error;
 	unsigned int levels;
 	int (*get_bus_id)(char bus_id[XEN_BUS_ID_SIZE], const char *nodename);
-	int (*probe)(const char *type, const char *dir);
+	int (*probe)(struct xen_bus_type *bus, const char *type,
+		     const char *dir);
+	void (*otherend_changed)(struct xenbus_watch *watch, const char **vec,
+				 unsigned int len);
 	struct bus_type bus;
-#if defined(CONFIG_XEN) || defined(MODULE)
-	struct device dev;
-#endif
 };
 
 extern int xenbus_match(struct device *_dev, struct device_driver *_drv);
@@ -89,5 +61,17 @@ extern int xenbus_probe_node(struct xen_bus_type *bus,
 extern int xenbus_probe_devices(struct xen_bus_type *bus);
 
 extern void xenbus_dev_changed(const char *node, struct xen_bus_type *bus);
+
+extern void xenbus_dev_shutdown(struct device *_dev);
+
+extern int xenbus_dev_suspend(struct device *dev, pm_message_t state);
+extern int xenbus_dev_resume(struct device *dev);
+
+extern void xenbus_otherend_changed(struct xenbus_watch *watch,
+				    const char **vec, unsigned int len,
+				    int ignore_on_shutdown);
+
+extern int xenbus_read_otherend_details(struct xenbus_device *xendev,
+					char *id_node, char *path_node);
 
 #endif

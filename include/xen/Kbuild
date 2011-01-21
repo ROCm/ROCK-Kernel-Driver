@@ -1,1 +1,2 @@
-header-y += public/
+header-y += evtchn.h
+header-y += privcmd.h

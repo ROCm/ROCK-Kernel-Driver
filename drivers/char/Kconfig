@@ -669,7 +669,7 @@ config HVC_IUCV
 
 config HVC_XEN
 	bool "Xen Hypervisor Console support"
-	depends on PARAVIRT_XEN
+	depends on XEN
 	select HVC_DRIVER
 	select HVC_IRQ
 	default y
@@ -681,6 +681,15 @@ config HVC_UDBG
        depends on PPC && EXPERIMENTAL
        select HVC_DRIVER
        default n
+
+config HVC_DCC
+       bool "ARM JTAG DCC console"
+       depends on ARM
+       select HVC_DRIVER
+       help
+         This console uses the JTAG DCC on ARM to create a console under the HVC
+	 driver. This console is used through a JTAG only on ARM. If you don't have
+	 a JTAG then you probably don't want this option.
 
 config VIRTIO_CONSOLE
 	tristate "Virtio console"
@@ -1038,15 +1047,6 @@ config NSC_GPIO
 	  pc8736x_gpio drivers.  If those drivers are built as
 	  modules, this one will be too, named nsc_gpio
 
-config CS5535_GPIO
-	tristate "AMD CS5535/CS5536 GPIO (Geode Companion Device)"
-	depends on X86_32
-	help
-	  Give userspace access to the GPIO pins on the AMD CS5535 and
-	  CS5536 Geode companion devices.
-
-	  If compiled as a module, it will be called cs5535_gpio.
-
 config RAW_DRIVER
 	tristate "RAW driver (/dev/raw/rawN)"
 	depends on BLOCK
@@ -1070,7 +1070,7 @@ config MAX_RAW_DEVS
 config HPET
 	bool "HPET - High Precision Event Timer" if (X86 || IA64)
 	default n
-	depends on ACPI && !XEN
+	depends on ACPI
 	help
 	  If you say Y here, you will have a miscdevice named "/dev/hpet/".  Each
 	  open selects one of the timers supported by the HPET.  The timers are

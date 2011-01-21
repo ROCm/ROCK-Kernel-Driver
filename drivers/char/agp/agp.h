@@ -31,10 +31,6 @@
 
 #include <asm/agp.h>	/* for flush_agp_cache() */
 
-#ifndef virt_to_gart
-#define virt_to_gart virt_to_phys
-#endif
-
 #define PFX "agpgart: "
 
 //#define AGP_DEBUG 1
@@ -124,7 +120,6 @@ struct agp_bridge_driver {
 	void (*agp_destroy_page)(struct page *, int flags);
 	void (*agp_destroy_pages)(struct agp_memory *);
 	int (*agp_type_to_mask_type) (struct agp_bridge_data *, int);
-	void (*chipset_flush)(struct agp_bridge_data *);
 };
 
 struct agp_bridge_data {

@@ -450,33 +450,6 @@ int remove_save_link(struct inode *inode, int truncate)
 	return journal_end(&th, inode->i_sb, JOURNAL_PER_BALANCE_CNT);
 }
 
-/*
- * Detach the priv root from the root. Technically this becomes anonymous
- * but we don't want it added to the anon list. This is necessary to
- * work around shrink_dcache_for_umount BUG'ing on the xattr dentries if
- * we don't clean them up before the call and Oopsing on cleaning up
- * xattrs during inode deletion if we do.
- */
-static void detach_privroot(struct super_block *s)
-{
-	struct dentry *root = REISERFS_SB(s)->priv_root;
-	if (!root)
-		return;
-
-	d_drop(root);
-	dput(root->d_parent);
-	spin_lock(&dcache_lock);
-	list_del_init(&root->d_u.d_child);
-	root->d_parent = root;
-	spin_unlock(&dcache_lock);
-}
-
-static void reiserfs_kill_sb(struct super_block *s)
-{
-	detach_privroot(s);
-	kill_block_super(s);
-}
-
 static void reiserfs_put_super(struct super_block *s)
 {
 	struct reiserfs_transaction_handle th;
@@ -540,9 +513,16 @@ static struct inode *reiserfs_alloc_inode(struct super_block *sb)
 	return &ei->vfs_inode;
 }
 
+static void reiserfs_i_callback(struct rcu_head *head)
+{
+	struct inode *inode = container_of(head, struct inode, i_rcu);
+	INIT_LIST_HEAD(&inode->i_dentry);
+	kmem_cache_free(reiserfs_inode_cachep, REISERFS_I(inode));
+}
+
 static void reiserfs_destroy_inode(struct inode *inode)
 {
-	kmem_cache_free(reiserfs_inode_cachep, REISERFS_I(inode));
+	call_rcu(&inode->i_rcu, reiserfs_i_callback);
 }
 
 static void init_once(void *foo)
@@ -2275,7 +2255,7 @@ struct file_system_type reiserfs_fs_type = {
 	.owner = THIS_MODULE,
 	.name = "reiserfs",
 	.mount = get_super_block,
-	.kill_sb = reiserfs_kill_sb,
+	.kill_sb = kill_block_super,
 	.fs_flags = FS_REQUIRES_DEV,
 };
 
