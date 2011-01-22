@@ -3,9 +3,7 @@
 #define XEN_HVM_H__
 
 #include <xen/interface/hvm/params.h>
-#ifndef HAVE_XEN_PLATFORM_COMPAT_H
 #include <asm/xen/hypercall.h>
-#endif
 
 static inline int hvm_get_parameter(int idx, uint64_t *value)
 {
@@ -16,7 +14,8 @@ static inline int hvm_get_parameter(int idx, uint64_t *value)
 	xhv.index = idx;
 	r = HYPERVISOR_hvm_op(HVMOP_get_param, &xhv);
 	if (r < 0) {
-		pr_err("Cannot get hvm parameter %d: %d!\n", idx, r);
+		printk(KERN_ERR "Cannot get hvm parameter %d: %d!\n",
+			idx, r);
 		return r;
 	}
 	*value = xhv.value;

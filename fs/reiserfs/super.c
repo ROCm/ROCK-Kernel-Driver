@@ -450,33 +450,6 @@ int remove_save_link(struct inode *inode, int truncate)
 	return journal_end(&th, inode->i_sb, JOURNAL_PER_BALANCE_CNT);
 }
 
-/*
- * Detach the priv root from the root. Technically this becomes anonymous
- * but we don't want it added to the anon list. This is necessary to
- * work around shrink_dcache_for_umount BUG'ing on the xattr dentries if
- * we don't clean them up before the call and Oopsing on cleaning up
- * xattrs during inode deletion if we do.
- */
-static void detach_privroot(struct super_block *s)
-{
-	struct dentry *root = REISERFS_SB(s)->priv_root;
-	if (!root)
-		return;
-
-	d_drop(root);
-	dput(root->d_parent);
-	spin_lock(&dcache_lock);
-	list_del_init(&root->d_u.d_child);
-	root->d_parent = root;
-	spin_unlock(&dcache_lock);
-}
-
-static void reiserfs_kill_sb(struct super_block *s)
-{
-	detach_privroot(s);
-	kill_block_super(s);
-}
-
 static void reiserfs_put_super(struct super_block *s)
 {
 	struct reiserfs_transaction_handle th;
@@ -540,9 +513,16 @@ static struct inode *reiserfs_alloc_inode(struct super_block *sb)
 	return &ei->vfs_inode;
 }
 
+static void reiserfs_i_callback(struct rcu_head *head)
+{
+	struct inode *inode = container_of(head, struct inode, i_rcu);
+	INIT_LIST_HEAD(&inode->i_dentry);
+	kmem_cache_free(reiserfs_inode_cachep, REISERFS_I(inode));
+}
+
 static void reiserfs_destroy_inode(struct inode *inode)
 {
-	kmem_cache_free(reiserfs_inode_cachep, REISERFS_I(inode));
+	call_rcu(&inode->i_rcu, reiserfs_i_callback);
 }
 
 static void init_once(void *foo)
@@ -636,7 +616,7 @@ static int reiserfs_acquire_dquot(struct dquot *);
 static int reiserfs_release_dquot(struct dquot *);
 static int reiserfs_mark_dquot_dirty(struct dquot *);
 static int reiserfs_write_info(struct super_block *, int);
-static int reiserfs_quota_on(struct super_block *, int, int, char *);
+static int reiserfs_quota_on(struct super_block *, int, int, struct path *);
 
 static const struct dquot_operations reiserfs_quota_operations = {
 	.write_dquot = reiserfs_write_dquot,
@@ -2064,25 +2044,21 @@ static int reiserfs_quota_on_mount(struct super_block *sb, int type)
  * Standard function to be called on quota_on
  */
 static int reiserfs_quota_on(struct super_block *sb, int type, int format_id,
-			     char *name)
+			     struct path *path)
 {
 	int err;
-	struct path path;
 	struct inode *inode;
 	struct reiserfs_transaction_handle th;
 
 	if (!(REISERFS_SB(sb)->s_mount_opt & (1 << REISERFS_QUOTA)))
 		return -EINVAL;
 
-	err = kern_path(name, LOOKUP_FOLLOW, &path);
-	if (err)
-		return err;
 	/* Quotafile not on the same filesystem? */
-	if (path.mnt->mnt_sb != sb) {
+	if (path->mnt->mnt_sb != sb) {
 		err = -EXDEV;
 		goto out;
 	}
-	inode = path.dentry->d_inode;
+	inode = path->dentry->d_inode;
 	/* We must not pack tails for quota files on reiserfs for quota IO to work */
 	if (!(REISERFS_I(inode)->i_flags & i_nopack_mask)) {
 		err = reiserfs_unpack(inode, NULL);
@@ -2098,7 +2074,7 @@ static int reiserfs_quota_on(struct super_block *sb, int type, int format_id,
 	/* Journaling quota? */
 	if (REISERFS_SB(sb)->s_qf_names[type]) {
 		/* Quotafile not of fs root? */
-		if (path.dentry->d_parent != sb->s_root)
+		if (path->dentry->d_parent != sb->s_root)
 			reiserfs_warning(sb, "super-6521",
 				 "Quota file not on filesystem root. "
 				 "Journalled quota will not work.");
@@ -2117,9 +2093,8 @@ static int reiserfs_quota_on(struct super_block *sb, int type, int format_id,
 		if (err)
 			goto out;
 	}
-	err = dquot_quota_on_path(sb, type, format_id, &path);
+	err = dquot_quota_on(sb, type, format_id, path);
 out:
-	path_put(&path);
 	return err;
 }
 
@@ -2275,7 +2250,7 @@ struct file_system_type reiserfs_fs_type = {
 	.owner = THIS_MODULE,
 	.name = "reiserfs",
 	.mount = get_super_block,
-	.kill_sb = reiserfs_kill_sb,
+	.kill_sb = kill_block_super,
 	.fs_flags = FS_REQUIRES_DEV,
 };
 

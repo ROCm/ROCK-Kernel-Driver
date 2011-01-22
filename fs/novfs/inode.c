@@ -64,8 +64,10 @@ static void novfs_kill_sb(struct super_block *SB);
  * Declared dentry_operations
  */
 int novfs_d_revalidate(struct dentry *, struct nameidata *);
-int novfs_d_hash(struct dentry *, struct qstr *);
-int novfs_d_compare(struct dentry *, struct qstr *, struct qstr *);
+int novfs_d_hash(const struct dentry *, const struct inode *, struct qstr *);
+int novfs_d_compare(const struct dentry *, const struct inode *,
+		    const struct dentry *, const struct inode *,
+		    unsigned int, const char *, const struct qstr *);
 int novfs_d_delete(struct dentry *dentry);
 void novfs_d_release(struct dentry *dentry);
 void novfs_d_iput(struct dentry *dentry, struct inode *inode);
@@ -306,7 +308,6 @@ static void PRINT_DENTRY(const char *s, struct dentry *d)
 	__DbgPrint("   d_op:         0x%p\n", d->d_op);
 	__DbgPrint("   d_sb:         0x%p\n", d->d_sb);
 	__DbgPrint("   d_flags:      0x%x\n", d->d_flags);
-	__DbgPrint("   d_mounted:    0x%x\n", d->d_mounted);
 	__DbgPrint("   d_fsdata:     0x%p\n", d->d_fsdata);
 /*   DbgPrint("   d_cookie:     0x%x\n", d->d_cookie); */
 	__DbgPrint("   d_parent:     0x%p\n", d->d_parent);
@@ -327,7 +328,7 @@ int novfs_remove_from_root(char *RemoveName)
 	DbgPrint("%s", RemoveName);
 	name.len = strlen(RemoveName);
 	name.name = RemoveName;
-	novfs_d_hash(novfs_root, &name);
+	novfs_d_hash(novfs_root, novfs_root->d_inode, &name);
 
 	dentry = d_lookup(novfs_root, &name);
 	if (dentry) {
@@ -358,7 +359,7 @@ int novfs_add_to_root(char *AddName)
 	DbgPrint("%s", AddName);
 	name.len = strlen(AddName);
 	name.name = AddName;
-	novfs_d_hash(novfs_root, &name);
+	novfs_d_hash(novfs_root, novfs_root->d_inode, &name);
 
 	dir = novfs_root->d_inode;
 
@@ -392,7 +393,7 @@ int novfs_Add_to_Root2(char *AddName)
 	name.len = strlen(AddName);
 	name.name = AddName;
 
-	novfs_d_hash(novfs_root, &name);
+	novfs_d_hash(novfs_root, novfs_root->d_inode, &name);
 
 	entry = d_lookup(novfs_root, &name);
 	DbgPrint("novfs_d_lookup 0x%p", entry);
@@ -735,7 +736,8 @@ static unsigned long novfs_internal_hash(struct qstr *name)
 	return (hash);
 }
 
-int novfs_d_hash(struct dentry *dentry, struct qstr *name)
+int novfs_d_hash(const struct dentry *dentry, const struct inode *inode,
+		 struct qstr *name)
 {
 	DbgPrint("%.*s", name->len, name->name);
 
@@ -744,18 +746,15 @@ int novfs_d_hash(struct dentry *dentry, struct qstr *name)
 	return (0);
 }
 
-int novfs_d_strcmp(struct qstr *s1, struct qstr *s2)
+static int novfs_d_strcmp(const char *str1, unsigned int len,
+			  const struct qstr *s2)
 {
 	int retCode = 1;
-	unsigned char *str1, *str2;
-	unsigned int len;
+	const unsigned char *str2 = s2->name;
 
-	DbgPrint("s1=%.*s s2=%.*s", s1->len, s1->name, s2->len, s2->name);
+	DbgPrint("s1=%.*s s2=%.*s", len, str1, s2->len, s2->name);
 
-	if (s1->len && (s1->len == s2->len) && (s1->hash == s2->hash)) {
-		len = s1->len;
-		str1 = (unsigned char *)s1->name;
-		str2 = (unsigned char *)s2->name;
+	if (len && (len == s2->len)) {
 		for (retCode = 0; len--; str1++, str2++) {
 			if (*str1 != *str2) {
 				if (tolower(*str1) != tolower(*str2)) {
@@ -770,11 +769,14 @@ int novfs_d_strcmp(struct qstr *s1, struct qstr *s2)
 	return (retCode);
 }
 
-int novfs_d_compare(struct dentry *parent, struct qstr *s1, struct qstr *s2)
+int novfs_d_compare(const struct dentry *parent,
+	            const struct inode *parent_inode,
+		    const struct dentry *dentry, const struct inode *inode,
+		    unsigned int len, const char *s1, const struct qstr *s2)
 {
 	int retCode;
 
-	retCode = novfs_d_strcmp(s1, s2);
+	retCode = novfs_d_strcmp(s1, len, s2);
 
 	DbgPrint("retCode=0x%x", retCode);
 	return (retCode);
@@ -2647,7 +2649,7 @@ int novfs_i_rename(struct inode *odir, struct dentry *od, struct inode *ndir, st
 	int retCode = -ENOTEMPTY;
 	char *newpath, *newbuf, *newcon;
 	char *oldpath, *oldbuf, *oldcon;
-	struct qstr newname, oldname;
+	struct qstr oldname;
 	struct novfs_entry_info *info = NULL;
 	int oldlen, newlen;
 	struct novfs_schandle session;
@@ -2693,14 +2695,12 @@ int novfs_i_rename(struct inode *odir, struct dentry *od, struct inode *ndir, st
 				DbgPrint("2; newcon=0x%p newpath=0x%p", newcon, newpath);
 				DbgPrint("2; oldcon=0x%p oldpath=0x%p", oldcon, oldpath);
 				if (newcon && oldcon && ((int)(newcon - newpath) == (int)(oldcon - oldpath))) {
-					newname.name = newpath;
-					newname.len = (int)(newcon - newpath);
-					newname.hash = 0;
-
 					oldname.name = oldpath;
 					oldname.len = (int)(oldcon - oldpath);
 					oldname.hash = 0;
-					if (!novfs_d_strcmp(&newname, &oldname)) {
+					if (!novfs_d_strcmp(newpath,
+						    newcon - newpath,
+						    &oldname)) {
 
 						if (od->d_inode && od->d_inode->i_private) {
 

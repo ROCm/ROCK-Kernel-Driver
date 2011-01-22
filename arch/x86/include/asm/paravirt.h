@@ -18,7 +18,6 @@ static inline int paravirt_enabled(void)
 	return pv_info.paravirt_enabled;
 }
 
-#ifdef CONFIG_PARAVIRT_CPU
 static inline void load_sp0(struct tss_struct *tss,
 			     struct thread_struct *thread)
 {
@@ -59,9 +58,7 @@ static inline void write_cr0(unsigned long x)
 {
 	PVOP_VCALL1(pv_cpu_ops.write_cr0, x);
 }
-#endif  /* CONFIG_PARAVIRT_CPU */
 
-#ifdef CONFIG_PARAVIRT_MMU
 static inline unsigned long read_cr2(void)
 {
 	return PVOP_CALL0(unsigned long, pv_mmu_ops.read_cr2);
@@ -81,9 +78,7 @@ static inline void write_cr3(unsigned long x)
 {
 	PVOP_VCALL1(pv_mmu_ops.write_cr3, x);
 }
-#endif  /* CONFIG_PARAVIRT_MMU */
 
-#ifdef CONFIG_PARAVIRT_CPU
 static inline unsigned long read_cr4(void)
 {
 	return PVOP_CALL0(unsigned long, pv_cpu_ops.read_cr4);
@@ -97,9 +92,8 @@ static inline void write_cr4(unsigned long x)
 {
 	PVOP_VCALL1(pv_cpu_ops.write_cr4, x);
 }
-#endif  /* CONFIG_PARAVIRT_CPU */
 
-#if defined(CONFIG_X86_64) && defined(CONFIG_PARAVIRT_CPU)
+#ifdef CONFIG_X86_64
 static inline unsigned long read_cr8(void)
 {
 	return PVOP_CALL0(unsigned long, pv_cpu_ops.read_cr8);
@@ -111,7 +105,6 @@ static inline void write_cr8(unsigned long x)
 }
 #endif
 
-#ifdef CONFIG_PARAVIRT_IRQ
 static inline void arch_safe_halt(void)
 {
 	PVOP_VCALL0(pv_irq_ops.safe_halt);
@@ -119,20 +112,16 @@ static inline void arch_safe_halt(void)
 
 static inline void halt(void)
 {
-	PVOP_VCALL0(pv_irq_ops.safe_halt);
+	PVOP_VCALL0(pv_irq_ops.halt);
 }
-#endif  /* CONFIG_PARAVIRT_IRQ */
 
-#ifdef CONFIG_PARAVIRT_CPU
 static inline void wbinvd(void)
 {
 	PVOP_VCALL0(pv_cpu_ops.wbinvd);
 }
-#endif
 
 #define get_kernel_rpl()  (pv_info.kernel_rpl)
 
-#ifdef CONFIG_PARAVIRT_CPU
 static inline u64 paravirt_read_msr(unsigned msr, int *err)
 {
 	return PVOP_CALL2(u64, pv_cpu_ops.read_msr, msr, err);
@@ -235,16 +224,12 @@ do {						\
 } while (0)
 
 #define rdtscll(val) (val = paravirt_read_tsc())
-#endif  /* CONFIG_PARAVIRT_CPU */
 
-#ifdef CONFIG_PARAVIRT_TIME
 static inline unsigned long long paravirt_sched_clock(void)
 {
 	return PVOP_CALL0(unsigned long long, pv_time_ops.sched_clock);
 }
-#endif  /* CONFIG_PARAVIRT_TIME */
 
-#ifdef CONFIG_PARAVIRT_CPU
 static inline unsigned long long paravirt_read_pmc(int counter)
 {
 	return PVOP_CALL1(u64, pv_cpu_ops.read_pmc, counter);
@@ -360,9 +345,8 @@ static inline void slow_down_io(void)
 	pv_cpu_ops.io_delay();
 #endif
 }
-#endif  /* CONFIG_PARAVIRT_CPU */
 
-#if defined(CONFIG_SMP) && defined(CONFIG_PARAVIRT_APIC)
+#ifdef CONFIG_SMP
 static inline void startup_ipi_hook(int phys_apicid, unsigned long start_eip,
 				    unsigned long start_esp)
 {
@@ -371,7 +355,6 @@ static inline void startup_ipi_hook(int phys_apicid, unsigned long start_eip,
 }
 #endif
 
-#ifdef CONFIG_PARAVIRT_MMU
 static inline void paravirt_activate_mm(struct mm_struct *prev,
 					struct mm_struct *next)
 {
@@ -452,11 +435,22 @@ static inline void pte_update(struct mm_struct *mm, unsigned long addr,
 {
 	PVOP_VCALL3(pv_mmu_ops.pte_update, mm, addr, ptep);
 }
+static inline void pmd_update(struct mm_struct *mm, unsigned long addr,
+			      pmd_t *pmdp)
+{
+	PVOP_VCALL3(pv_mmu_ops.pmd_update, mm, addr, pmdp);
+}
 
 static inline void pte_update_defer(struct mm_struct *mm, unsigned long addr,
 				    pte_t *ptep)
 {
 	PVOP_VCALL3(pv_mmu_ops.pte_update_defer, mm, addr, ptep);
+}
+
+static inline void pmd_update_defer(struct mm_struct *mm, unsigned long addr,
+				    pmd_t *pmdp)
+{
+	PVOP_VCALL3(pv_mmu_ops.pmd_update_defer, mm, addr, pmdp);
 }
 
 static inline pte_t __pte(pteval_t val)
@@ -559,6 +553,20 @@ static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
 	else
 		PVOP_VCALL4(pv_mmu_ops.set_pte_at, mm, addr, ptep, pte.pte);
 }
+
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+static inline void set_pmd_at(struct mm_struct *mm, unsigned long addr,
+			      pmd_t *pmdp, pmd_t pmd)
+{
+#if PAGETABLE_LEVELS >= 3
+	if (sizeof(pmdval_t) > sizeof(long))
+		/* 5 arg words */
+		pv_mmu_ops.set_pmd_at(mm, addr, pmdp, pmd);
+	else
+		PVOP_VCALL4(pv_mmu_ops.set_pmd_at, mm, addr, pmdp, pmd.pmd);
+#endif
+}
+#endif
 
 static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
 {
@@ -701,9 +709,7 @@ static inline void pmd_clear(pmd_t *pmdp)
 	set_pmd(pmdp, __pmd(0));
 }
 #endif	/* CONFIG_X86_PAE */
-#endif  /* CONFIG_PARAVIRT_MMU */
 
-#ifdef CONFIG_PARAVIRT_CPU
 #define  __HAVE_ARCH_START_CONTEXT_SWITCH
 static inline void arch_start_context_switch(struct task_struct *prev)
 {
@@ -714,9 +720,7 @@ static inline void arch_end_context_switch(struct task_struct *next)
 {
 	PVOP_VCALL1(pv_cpu_ops.end_context_switch, next);
 }
-#endif  /* CONFIG_PARAVIRT_CPU */
 
-#ifdef CONFIG_PARAVIRT_MMU
 #define  __HAVE_ARCH_ENTER_LAZY_MMU_MODE
 static inline void arch_enter_lazy_mmu_mode(void)
 {
@@ -735,7 +739,6 @@ static inline void __set_fixmap(unsigned /* enum fixed_addresses */ idx,
 {
 	pv_mmu_ops.set_fixmap(idx, phys, flags);
 }
-#endif  /* CONFIG_PARAVIRT_MMU */
 
 #if defined(CONFIG_SMP) && defined(CONFIG_PARAVIRT_SPINLOCKS)
 
@@ -846,7 +849,6 @@ static __always_inline void arch_spin_unlock(struct arch_spinlock *lock)
 #define __PV_IS_CALLEE_SAVE(func)			\
 	((struct paravirt_callee_save) { func })
 
-#ifdef CONFIG_PARAVIRT_IRQ
 static inline notrace unsigned long arch_local_save_flags(void)
 {
 	return PVOP_CALLEE0(unsigned long, pv_irq_ops.save_fl);
@@ -875,7 +877,6 @@ static inline notrace unsigned long arch_local_irq_save(void)
 	arch_local_irq_disable();
 	return f;
 }
-#endif  /* CONFIG_PARAVIRT_IRQ */
 
 
 /* Make sure as little as possible of this mess escapes. */
@@ -958,13 +959,10 @@ extern void default_banner(void);
 #define PARA_INDIRECT(addr)	*%cs:addr
 #endif
 
-#ifdef CONFIG_PARAVIRT_CPU
 #define INTERRUPT_RETURN						\
 	PARA_SITE(PARA_PATCH(pv_cpu_ops, PV_CPU_iret), CLBR_NONE,	\
 		  jmp PARA_INDIRECT(pv_cpu_ops+PV_CPU_iret))
-#endif  /* CONFIG_PARAVIRT_CPU */
 
-#ifdef CONFIG_PARAVIRT_IRQ
 #define DISABLE_INTERRUPTS(clobbers)					\
 	PARA_SITE(PARA_PATCH(pv_irq_ops, PV_IRQ_irq_disable), clobbers, \
 		  PV_SAVE_REGS(clobbers | CLBR_CALLEE_SAVE);		\
@@ -976,17 +974,13 @@ extern void default_banner(void);
 		  PV_SAVE_REGS(clobbers | CLBR_CALLEE_SAVE);		\
 		  call PARA_INDIRECT(pv_irq_ops+PV_IRQ_irq_enable);	\
 		  PV_RESTORE_REGS(clobbers | CLBR_CALLEE_SAVE);)
-#endif  /* CONFIG_PARAVIRT_IRQ */
 
-#ifdef CONFIG_PARAVIRT_CPU
 #define USERGS_SYSRET32							\
 	PARA_SITE(PARA_PATCH(pv_cpu_ops, PV_CPU_usergs_sysret32),	\
 		  CLBR_NONE,						\
 		  jmp PARA_INDIRECT(pv_cpu_ops+PV_CPU_usergs_sysret32))
-#endif  /* CONFIG_PARAVIRT_CPU */
 
 #ifdef CONFIG_X86_32
-#ifdef CONFIG_PARAVIRT_CPU
 #define GET_CR0_INTO_EAX				\
 	push %ecx; push %edx;				\
 	call PARA_INDIRECT(pv_cpu_ops+PV_CPU_read_cr0);	\
@@ -996,12 +990,10 @@ extern void default_banner(void);
 	PARA_SITE(PARA_PATCH(pv_cpu_ops, PV_CPU_irq_enable_sysexit),	\
 		  CLBR_NONE,						\
 		  jmp PARA_INDIRECT(pv_cpu_ops+PV_CPU_irq_enable_sysexit))
-#endif  /* CONFIG_PARAVIRT_CPU */
 
 
 #else	/* !CONFIG_X86_32 */
 
-#ifdef CONFIG_PARAVIRT_CPU
 /*
  * If swapgs is used while the userspace stack is still current,
  * there's no way to call a pvop.  The PV replacement *must* be
@@ -1021,23 +1013,17 @@ extern void default_banner(void);
 	PARA_SITE(PARA_PATCH(pv_cpu_ops, PV_CPU_swapgs), CLBR_NONE,	\
 		  call PARA_INDIRECT(pv_cpu_ops+PV_CPU_swapgs)		\
 		 )
-#endif  /* CONFIG_PARAVIRT_CPU */
 
-#ifdef CONFIG_PARAVIRT_MMU
 #define GET_CR2_INTO_RCX				\
 	call PARA_INDIRECT(pv_mmu_ops+PV_MMU_read_cr2);	\
 	movq %rax, %rcx;				\
 	xorq %rax, %rax;
-#endif  /* CONFIG_PARAVIRT_MMU */
 
-#ifdef CONFIG_PARAVIRT_IRQ
 #define PARAVIRT_ADJUST_EXCEPTION_FRAME					\
 	PARA_SITE(PARA_PATCH(pv_irq_ops, PV_IRQ_adjust_exception_frame), \
 		  CLBR_NONE,						\
 		  call PARA_INDIRECT(pv_irq_ops+PV_IRQ_adjust_exception_frame))
-#endif  /* CONFIG_PARAVIRT_IRQ */
 
-#ifdef CONFIG_PARAVIRT_CPU
 #define USERGS_SYSRET64							\
 	PARA_SITE(PARA_PATCH(pv_cpu_ops, PV_CPU_usergs_sysret64),	\
 		  CLBR_NONE,						\
@@ -1047,7 +1033,6 @@ extern void default_banner(void);
 	PARA_SITE(PARA_PATCH(pv_cpu_ops, PV_CPU_irq_enable_sysexit),	\
 		  CLBR_NONE,						\
 		  jmp PARA_INDIRECT(pv_cpu_ops+PV_CPU_irq_enable_sysexit))
-#endif  /* CONFIG_PARAVIRT_CPU */
 #endif	/* CONFIG_X86_32 */
 
 #endif /* __ASSEMBLY__ */

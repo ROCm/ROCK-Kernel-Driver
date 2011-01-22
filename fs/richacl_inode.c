@@ -23,14 +23,15 @@
  */
 int
 richacl_may_create(struct inode *dir, int isdir,
-		int (*richacl_permission)(struct inode *, unsigned int))
+		int (*richacl_permission)(struct inode *, unsigned int,
+					  unsigned int))
 {
 	if (IS_RICHACL(dir))
 		return richacl_permission(dir,
 				ACE4_EXECUTE | (isdir ?
-				ACE4_ADD_SUBDIRECTORY : ACE4_ADD_FILE));
+				ACE4_ADD_SUBDIRECTORY : ACE4_ADD_FILE), 0);
 	else
-		return generic_permission(dir, MAY_WRITE | MAY_EXEC,
+		return generic_permission(dir, MAY_WRITE | MAY_EXEC, 0,
 					  dir->i_op->check_acl);
 }
 EXPORT_SYMBOL(richacl_may_create);
@@ -52,23 +53,25 @@ check_sticky(struct inode *dir, struct inode *inode)
  */
 int
 richacl_may_delete(struct inode *dir, struct inode *inode, int replace,
-		   int (*richacl_permission)(struct inode *, unsigned int))
+		   int (*richacl_permission)(struct inode *, unsigned int,
+					     unsigned int))
 {
 	int error;
 
 	if (IS_RICHACL(inode)) {
 		error = richacl_permission(dir,
-				ACE4_EXECUTE | ACE4_DELETE_CHILD);
+				ACE4_EXECUTE | ACE4_DELETE_CHILD, 0);
 		if (!error && check_sticky(dir, inode))
 			error = -EPERM;
-		if (error && !richacl_permission(inode, ACE4_DELETE))
+		if (error && !richacl_permission(inode, ACE4_DELETE, 0))
 			error = 0;
 		if (!error && replace)
 			error = richacl_permission(dir,
 					ACE4_EXECUTE | (S_ISDIR(inode->i_mode) ?
-					ACE4_ADD_SUBDIRECTORY : ACE4_ADD_FILE));
+					ACE4_ADD_SUBDIRECTORY : ACE4_ADD_FILE),
+					0);
 	} else {
-		error = generic_permission(dir, MAY_WRITE | MAY_EXEC,
+		error = generic_permission(dir, MAY_WRITE | MAY_EXEC, 0,
 					   dir->i_op->check_acl);
 		if (!error && check_sticky(dir, inode))
 			error = -EPERM;
@@ -89,10 +92,10 @@ EXPORT_SYMBOL(richacl_may_delete);
  */
 int
 richacl_inode_permission(struct inode *inode, const struct richacl *acl,
-			 unsigned int mask)
+			 unsigned int mask, unsigned int flags)
 {
 	if (acl) {
-		if (!richacl_permission(inode, acl, mask))
+		if (!richacl_permission(inode, acl, mask, flags))
 			return 0;
 	} else {
 		int mode = inode->i_mode;
@@ -140,7 +143,8 @@ EXPORT_SYMBOL_GPL(richacl_inode_permission);
  */
 int
 richacl_inode_change_ok(struct inode *inode, struct iattr *attr,
-			int (*richacl_permission)(struct inode *, unsigned int))
+			int (*richacl_permission)(struct inode *, unsigned int,
+						  unsigned int))
 {
 	unsigned int ia_valid = attr->ia_valid;
 
@@ -153,7 +157,7 @@ richacl_inode_change_ok(struct inode *inode, struct iattr *attr,
 	    (current_fsuid() != inode->i_uid ||
 	     attr->ia_uid != inode->i_uid) &&
 	    (current_fsuid() != attr->ia_uid ||
-	     richacl_permission(inode, ACE4_WRITE_OWNER)) &&
+	     richacl_permission(inode, ACE4_WRITE_OWNER, 0)) &&
 	    !capable(CAP_CHOWN))
 		goto error;
 
@@ -163,7 +167,7 @@ richacl_inode_change_ok(struct inode *inode, struct iattr *attr,
 		if ((current_fsuid() != inode->i_uid ||
 		    (!in_group && attr->ia_gid != inode->i_gid)) &&
 		    (!in_group ||
-		     richacl_permission(inode, ACE4_WRITE_OWNER)) &&
+		     richacl_permission(inode, ACE4_WRITE_OWNER, 0)) &&
 		    !capable(CAP_CHOWN))
 			goto error;
 	}
@@ -171,7 +175,7 @@ richacl_inode_change_ok(struct inode *inode, struct iattr *attr,
 	/* Make sure a caller can chmod. */
 	if (ia_valid & ATTR_MODE) {
 		if (current_fsuid() != inode->i_uid &&
-		    richacl_permission(inode, ACE4_WRITE_ACL) &&
+		    richacl_permission(inode, ACE4_WRITE_ACL, 0) &&
 		    !capable(CAP_FOWNER))
 			goto error;
 		/* Also check the setgid bit! */
@@ -183,7 +187,7 @@ richacl_inode_change_ok(struct inode *inode, struct iattr *attr,
 	/* Check for setting the inode time. */
 	if (ia_valid & (ATTR_MTIME_SET | ATTR_ATIME_SET)) {
 		if (current_fsuid() != inode->i_uid &&
-		    richacl_permission(inode, ACE4_WRITE_ATTRIBUTES) &&
+		    richacl_permission(inode, ACE4_WRITE_ATTRIBUTES, 0) &&
 		    !capable(CAP_FOWNER))
 			goto error;
 	}

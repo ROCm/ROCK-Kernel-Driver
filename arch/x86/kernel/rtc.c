@@ -76,7 +76,7 @@ int mach_set_rtc_mmss(unsigned long nowtime)
 		CMOS_WRITE(real_seconds, RTC_SECONDS);
 		CMOS_WRITE(real_minutes, RTC_MINUTES);
 	} else {
-		printk(KERN_WARNING
+		printk_once(KERN_NOTICE
 		       "set_rtc_mmss: can't update from %d to %d\n",
 		       cmos_minutes, real_minutes);
 		retval = -1;
@@ -171,11 +171,6 @@ int update_persistent_clock(struct timespec now)
 	unsigned long flags;
 	int retval;
 
-#ifdef CONFIG_XEN
-	if (xen_update_persistent_clock() < 0 || xen_independent_wallclock())
-		return 0;
-#endif
-
 	spin_lock_irqsave(&rtc_lock, flags);
 	retval = x86_platform.set_wallclock(now.tv_sec);
 	spin_unlock_irqrestore(&rtc_lock, flags);
@@ -188,12 +183,6 @@ void read_persistent_clock(struct timespec *ts)
 {
 	unsigned long retval, flags;
 
-#ifdef CONFIG_XEN
-	if (!is_initial_xendomain()) {
-		xen_read_persistent_clock(ts);
-		return;
-	}
-#endif
 	spin_lock_irqsave(&rtc_lock, flags);
 	retval = x86_platform.get_wallclock();
 	spin_unlock_irqrestore(&rtc_lock, flags);

@@ -325,7 +325,7 @@ struct pci_dev {
 	int rom_attr_enabled;		/* has display of the rom attribute been enabled? */
 	struct bin_attribute *res_attr[DEVICE_COUNT_RESOURCE]; /* sysfs file for resources */
 	struct bin_attribute *res_attr_wc[DEVICE_COUNT_RESOURCE]; /* sysfs file for WC mapping of resources */
-#if defined(CONFIG_PCI_MSI) && !defined(CONFIG_XEN)
+#ifdef CONFIG_PCI_MSI
 	struct list_head msi_list;
 #endif
 	struct pci_vpd *vpd;
@@ -796,9 +796,6 @@ int pci_reset_function(struct pci_dev *dev);
 void pci_update_resource(struct pci_dev *dev, int resno);
 int __must_check pci_assign_resource(struct pci_dev *dev, int i);
 int pci_select_bars(struct pci_dev *dev, unsigned long flags);
-#ifdef CONFIG_XEN
-void pci_restore_bars(struct pci_dev *);
-#endif
 
 /* ROM control related routines */
 int pci_enable_rom(struct pci_dev *pdev);
@@ -809,7 +806,7 @@ size_t pci_get_rom_size(struct pci_dev *pdev, void __iomem *rom, size_t size);
 
 /* Power management related routines */
 int pci_save_state(struct pci_dev *dev);
-int pci_restore_state(struct pci_dev *dev);
+void pci_restore_state(struct pci_dev *dev);
 int __pci_complete_power_transition(struct pci_dev *dev, pci_power_t state);
 int pci_set_power_state(struct pci_dev *dev, pci_power_t state);
 pci_power_t pci_choose_state(struct pci_dev *dev, pm_message_t state);
@@ -823,7 +820,6 @@ int pci_prepare_to_sleep(struct pci_dev *dev);
 int pci_back_from_sleep(struct pci_dev *dev);
 bool pci_dev_run_wake(struct pci_dev *dev);
 bool pci_check_pme_status(struct pci_dev *dev);
-void pci_wakeup_event(struct pci_dev *dev);
 void pci_pme_wakeup_bus(struct pci_bus *bus);
 
 static inline int pci_enable_wake(struct pci_dev *dev, pci_power_t state,
@@ -983,11 +979,6 @@ static inline int pci_msi_enabled(void)
 {
 	return 0;
 }
-
-#ifdef CONFIG_XEN
-#define register_msi_get_owner(func) 0
-#define unregister_msi_get_owner(func) 0
-#endif
 #else
 extern int pci_enable_msi_block(struct pci_dev *dev, unsigned int nvec);
 extern void pci_msi_shutdown(struct pci_dev *dev);
@@ -1000,10 +991,14 @@ extern void pci_disable_msix(struct pci_dev *dev);
 extern void msi_remove_pci_irq_vectors(struct pci_dev *dev);
 extern void pci_restore_msi_state(struct pci_dev *dev);
 extern int pci_msi_enabled(void);
-#ifdef CONFIG_XEN
-extern int register_msi_get_owner(int (*func)(struct pci_dev *dev));
-extern int unregister_msi_get_owner(int (*func)(struct pci_dev *dev));
 #endif
+
+#ifdef CONFIG_PCIEPORTBUS
+extern bool pcie_ports_disabled;
+extern bool pcie_ports_auto;
+#else
+#define pcie_ports_disabled	true
+#define pcie_ports_auto		false
 #endif
 
 #ifndef CONFIG_PCIEASPM
@@ -1013,6 +1008,14 @@ static inline int pcie_aspm_enabled(void)
 }
 #else
 extern int pcie_aspm_enabled(void);
+#endif
+
+#ifdef CONFIG_PCIEAER
+void pci_no_aer(void);
+bool pci_aer_available(void);
+#else
+static inline void pci_no_aer(void) { }
+static inline bool pci_aer_available(void) { return false; }
 #endif
 
 #ifndef CONFIG_PCIE_ECRC
@@ -1180,10 +1183,8 @@ static inline int pci_save_state(struct pci_dev *dev)
 	return 0;
 }
 
-static inline int pci_restore_state(struct pci_dev *dev)
-{
-	return 0;
-}
+static inline void pci_restore_state(struct pci_dev *dev)
+{ }
 
 static inline int pci_set_power_state(struct pci_dev *dev, pci_power_t state)
 {
@@ -1536,12 +1537,6 @@ int pci_vpd_find_tag(const u8 *buf, unsigned int off, unsigned int len, u8 rdt);
  */
 int pci_vpd_find_info_keyword(const u8 *buf, unsigned int off,
 			      unsigned int len, const char *kw);
-
-#ifdef CONFIG_PCI_GUESTDEV
-int pci_is_guestdev(struct pci_dev *dev);
-#else
-#define pci_is_guestdev(dev)	0
-#endif
 
 #endif /* __KERNEL__ */
 #endif /* LINUX_PCI_H */

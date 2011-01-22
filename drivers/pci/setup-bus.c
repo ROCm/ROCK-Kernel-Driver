@@ -448,9 +448,6 @@ static void pbus_size_io(struct pci_bus *bus, resource_size_t min_size)
 	size = ALIGN(size + size1, 4096);
 	if (size < old_size)
 		size = old_size;
-	size1 = pci_reserve_size_io(bus);
-	if (size < size1)
-		size = ALIGN(size1, 4096);
 	if (!size) {
 		if (b_res->start || b_res->end)
 			dev_info(&bus->self->dev, "disabling bridge window "
@@ -540,8 +537,7 @@ static int pbus_size_mem(struct pci_bus *bus, unsigned long mask,
 			min_align = align1 >> 1;
 		align += aligns[order];
 	}
-	size = ALIGN(max(size, (resource_size_t)pci_reserve_size_mem(bus)),
-		     min_align);
+	size = ALIGN(size, min_align);
 	if (!size) {
 		if (b_res->start || b_res->end)
 			dev_info(&bus->self->dev, "disabling bridge window "

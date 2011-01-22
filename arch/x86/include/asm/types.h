@@ -9,7 +9,7 @@
 #ifndef __ASSEMBLY__
 
 typedef u64 dma64_addr_t;
-#if defined(CONFIG_X86_64) || defined(CONFIG_XEN) || defined(CONFIG_HIGHMEM64G)
+#if defined(CONFIG_X86_64) || defined(CONFIG_HIGHMEM64G)
 /* DMA addresses come in 32-bit and 64-bit flavours. */
 typedef u64 dma_addr_t;
 #else

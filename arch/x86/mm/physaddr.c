@@ -8,10 +8,6 @@
 
 #ifdef CONFIG_X86_64
 
-#ifdef CONFIG_XEN
-#define phys_base 0
-#endif
-
 unsigned long __phys_addr(unsigned long x)
 {
 	if (x >= __START_KERNEL_map) {

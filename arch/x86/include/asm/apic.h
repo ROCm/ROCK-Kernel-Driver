@@ -10,16 +10,12 @@
 #include <asm/processor.h>
 #include <asm/apicdef.h>
 #include <asm/atomic.h>
-#ifndef CONFIG_XEN
 #include <asm/fixmap.h>
-#endif
 #include <asm/mpspec.h>
 #include <asm/system.h>
 #include <asm/msr.h>
 
-#ifndef CONFIG_XEN
 #define ARCH_APICTIMER_STOPS_ON_C3	1
-#endif
 
 /*
  * Debugging macros
@@ -51,7 +47,6 @@ static inline void generic_apic_probe(void)
 #ifdef CONFIG_X86_LOCAL_APIC
 
 extern unsigned int apic_verbosity;
-#ifndef CONFIG_XEN
 extern int local_apic_timer_c2_ok;
 
 extern int disable_apic;
@@ -86,7 +81,7 @@ static inline bool apic_from_smp_config(void)
 /*
  * Basic functions accessing APICs.
  */
-#ifdef CONFIG_PARAVIRT_APIC
+#ifdef CONFIG_PARAVIRT
 #include <asm/paravirt.h>
 #endif
 
@@ -123,8 +118,6 @@ extern void native_apic_icr_write(u32 low, u32 id);
 extern u64 native_apic_icr_read(void);
 
 extern int x2apic_mode;
-
-#endif /* CONFIG_XEN */
 
 #ifdef CONFIG_X86_X2APIC
 /*
@@ -241,16 +234,17 @@ extern void init_bsp_APIC(void);
 extern void setup_local_APIC(void);
 extern void end_local_APIC_setup(void);
 extern void init_apic_mappings(void);
+void register_lapic_address(unsigned long address);
 extern void setup_boot_APIC_clock(void);
 extern void setup_secondary_APIC_clock(void);
 extern int APIC_init_uniprocessor(void);
 extern void enable_NMI_through_LVT0(void);
+extern int apic_force_enable(void);
 
 /*
  * On 32bit this is mach-xxx local
  */
 #ifdef CONFIG_X86_64
-extern void early_init_lapic_mapping(void);
 extern int apic_is_clustered_box(void);
 #else
 static inline int apic_is_clustered_box(void)
@@ -370,8 +364,6 @@ struct apic {
  */
 extern struct apic *apic;
 
-#ifndef CONFIG_XEN
-
 /*
  * APIC functionality to boot other CPUs - only used on SMP:
  */
@@ -474,8 +466,6 @@ static inline void default_wait_for_init_deassert(atomic_t *deassert)
 
 extern void generic_bigsmp_probe(void);
 
-#endif /* CONFIG_XEN */
-
 
 #ifdef CONFIG_X86_LOCAL_APIC
 
@@ -494,8 +484,6 @@ static inline const struct cpumask *default_target_cpus(void)
 
 DECLARE_EARLY_PER_CPU(u16, x86_bios_cpu_apicid);
 
-
-#ifndef CONFIG_XEN
 
 static inline unsigned int read_apic_id(void)
 {
@@ -604,8 +592,6 @@ default_check_phys_apicid_present(int phys_apicid)
 extern int default_cpu_present_to_apicid(int mps_cpu);
 extern int default_check_phys_apicid_present(int phys_apicid);
 #endif
-
-#endif /* CONFIG_XEN */
 
 #endif /* CONFIG_X86_LOCAL_APIC */
 

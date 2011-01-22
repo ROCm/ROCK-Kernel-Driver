@@ -51,12 +51,7 @@ config ACPI_PROCFS
 	  For backwards compatibility, this option allows
 	  deprecated /proc/acpi/ files to exist, even when
 	  they have been replaced by functions in /sys.
-	  The deprecated files (and their replacements) include:
 
-	  /proc/acpi/processor/*/throttling (/sys/class/thermal/
-		cooling_device*/*)
-	  /proc/acpi/video/*/brightness (/sys/class/backlight/)
-	  /proc/acpi/thermal_zone/*/* (/sys/class/thermal/)
 	  This option has no effect on /proc/acpi/ files
 	  and functions which do not yet exist in /sys.
 
@@ -74,6 +69,8 @@ config ACPI_PROCFS_POWER
 	  /proc/acpi/ac_adapter/* (sys/class/power_supply/*)
 	  This option has no effect on /proc/acpi/ directories
 	  and functions, which do not yet exist in /sys
+	  This option, together with the proc directories, will be
+	  deleted in 2.6.39.
 
 	  Say N to delete power /proc/acpi/ directories that have moved to /sys/
 
@@ -199,7 +196,7 @@ config ACPI_DOCK
 config ACPI_PROCESSOR
 	tristate "Processor"
 	select THERMAL
-	select CPU_IDLE if !PROCESSOR_EXTERNAL_CONTROL
+	select CPU_IDLE
 	default y
 	help
 	  This driver installs ACPI as the idle handler for Linux and uses
@@ -209,6 +206,17 @@ config ACPI_PROCESSOR
 
 	  To compile this driver as a module, choose M here:
 	  the module will be called processor.
+config ACPI_IPMI
+	tristate "IPMI"
+	depends on EXPERIMENTAL && IPMI_SI && IPMI_HANDLER
+	default n
+	help
+	  This driver enables the ACPI to access the BMC controller. And it
+	  uses the IPMI request/response message to communicate with BMC
+	  controller, which can be found on on the server.
+
+	  To compile this driver as a module, choose M here:
+	  the module will be called as acpi_ipmi.
 
 config ACPI_HOTPLUG_CPU
 	bool
@@ -310,9 +318,8 @@ config ACPI_PCI_SLOT
 	  the module will be called pci_slot.
 
 config X86_PM_TIMER
-	bool "Power Management Timer Support" if EMBEDDED
+	bool "Power Management Timer Support" if EXPERT
 	depends on X86
-	depends on !XEN
 	default y
 	help
 	  The Power Management Timer is available on all ACPI-capable,
@@ -341,7 +348,7 @@ config ACPI_CONTAINER
 
 config ACPI_HOTPLUG_MEMORY
 	tristate "Memory Hotplug"
-	depends on MEMORY_HOTPLUG || XEN_PRIVILEGED_GUEST
+	depends on MEMORY_HOTPLUG
 	default n
 	help
 	  This driver supports ACPI memory hotplug.  The driver
@@ -376,13 +383,4 @@ config ACPI_HED
 
 source "drivers/acpi/apei/Kconfig"
 
-config ACPI_PV_SLEEP
-	bool
-	depends on X86 && XEN && ACPI_SLEEP
-	default y
-
-config PROCESSOR_EXTERNAL_CONTROL
-	bool
-	depends on (X86 || IA64) && XEN
-	default y
 endif	# ACPI

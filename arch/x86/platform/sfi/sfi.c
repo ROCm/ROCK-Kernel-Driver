@@ -31,26 +31,15 @@
 #include <asm/setup.h>
 #include <asm/apic.h>
 
-#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
+#ifdef CONFIG_X86_LOCAL_APIC
 static unsigned long sfi_lapic_addr __initdata = APIC_DEFAULT_PHYS_BASE;
-
-static void __init mp_sfi_register_lapic_address(unsigned long address)
-{
-	mp_lapic_addr = address;
-
-	set_fixmap_nocache(FIX_APIC_BASE, mp_lapic_addr);
-	if (boot_cpu_physical_apicid == -1U)
-		boot_cpu_physical_apicid = read_apic_id();
-
-	pr_info("Boot CPU = %d\n", boot_cpu_physical_apicid);
-}
 
 /* All CPUs enumerated by SFI must be present and enabled */
 static void __cpuinit mp_sfi_register_lapic(u8 id)
 {
-	if (MAX_APICS - id <= 0) {
+	if (MAX_LOCAL_APIC - id <= 0) {
 		pr_warning("Processor #%d invalid (max %d)\n",
-			id, MAX_APICS);
+			id, MAX_LOCAL_APIC);
 		return;
 	}
 
@@ -97,12 +86,9 @@ static int __init sfi_parse_ioapic(struct sfi_table_header *table)
 		pentry++;
 	}
 
-#ifndef CONFIG_XEN
 	WARN(pic_mode, KERN_WARNING
 		"SFI: pic_mod shouldn't be 1 when IOAPIC table is present\n");
 	pic_mode = 0;
-#endif
-
 	return 0;
 }
 #endif /* CONFIG_X86_IO_APIC */
@@ -112,8 +98,8 @@ static int __init sfi_parse_ioapic(struct sfi_table_header *table)
  */
 int __init sfi_platform_init(void)
 {
-#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
-	mp_sfi_register_lapic_address(sfi_lapic_addr);
+#ifdef CONFIG_X86_LOCAL_APIC
+	register_lapic_address(sfi_lapic_addr);
 	sfi_table_parse(SFI_SIG_CPUS, NULL, NULL, sfi_parse_cpus);
 #endif
 #ifdef CONFIG_X86_IO_APIC

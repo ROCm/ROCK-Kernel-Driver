@@ -101,7 +101,7 @@ static void __iomem * __ref sfi_map_memory(u64 phys, u32 size)
 		return NULL;
 
 	if (sfi_use_ioremap)
-		return ioremap(phys, size);
+		return ioremap_cache(phys, size);
 	else
 		return early_ioremap(phys, size);
 }
@@ -485,11 +485,6 @@ void __init sfi_init(void)
 {
 	if (!acpi_disabled)
 		disable_sfi();
-
-#ifdef CONFIG_XEN
-	if (!is_initial_xendomain())
-		disable_sfi();
-#endif
 
 	if (sfi_disabled)
 		return;

@@ -34,8 +34,7 @@
 #define CFI_SIGNAL_FRAME
 #endif
 
-#if !defined(CONFIG_UNWIND_INFO) && defined(CONFIG_AS_CFI_SECTIONS) \
-    && defined(__ASSEMBLY__)
+#if defined(CONFIG_AS_CFI_SECTIONS) && defined(__ASSEMBLY__)
 	/*
 	 * Emit CFI data in .debug_frame sections, not .eh_frame sections.
 	 * The latter we currently just discard since we don't do DWARF

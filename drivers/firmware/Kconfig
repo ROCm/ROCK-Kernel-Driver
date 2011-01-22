@@ -27,7 +27,7 @@ config EDD_OFF
 	  using the kernel parameter 'edd={on|skipmbr|off}'.
 
 config FIRMWARE_MEMMAP
-    bool "Add firmware-provided memory map to sysfs" if EMBEDDED
+    bool "Add firmware-provided memory map to sysfs" if EXPERT
     default X86
     help
       Add the firmware-provided (unmodified) memory map to /sys/firmware/memmap.
@@ -91,7 +91,6 @@ config DELL_RBU
 config DCDBAS
 	tristate "Dell Systems Management Base Driver"
 	depends on X86
-	select XEN_DOMCTL if XEN
 	help
 	  The Dell Systems Management Base Driver provides a sysfs interface
 	  for systems management software to perform System Management
