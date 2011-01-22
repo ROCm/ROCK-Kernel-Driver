@@ -553,9 +553,6 @@ struct rq {
 	/* try_to_wake_up() stats */
 	unsigned int ttwu_count;
 	unsigned int ttwu_local;
-
-	/* BKL stats */
-	unsigned int bkl_count;
 #endif
 };
 
@@ -3890,7 +3887,7 @@ static inline void schedule_debug(struct task_struct *prev)
 	schedstat_inc(this_rq(), sched_count);
 #ifdef CONFIG_SCHEDSTATS
 	if (unlikely(prev->lock_depth >= 0)) {
-		schedstat_inc(this_rq(), bkl_count);
+		schedstat_inc(this_rq(), rq_sched_info.bkl_count);
 		schedstat_inc(prev, sched_info.bkl_count);
 	}
 #endif
@@ -4874,7 +4871,8 @@ recheck:
 		 * assigned.
 		 */
 		if (rt_bandwidth_enabled() && rt_policy(policy) &&
-				task_group(p)->rt_bandwidth.rt_runtime == 0) {
+				task_group(p)->rt_bandwidth.rt_runtime == 0 &&
+				!task_group_is_autogroup(task_group(p))) {
 			__task_rq_unlock(rq);
 			raw_spin_unlock_irqrestore(&p->pi_lock, flags);
 			return -EPERM;
@@ -8889,11 +8887,9 @@ static void
 cpu_cgroup_exit(struct cgroup_subsys *ss, struct task_struct *task)
 {
 	/*
-	 * cgroup_exit() is called in the copy_process failure path.
-	 * The task isn't hashed, and we don't want to make autogroup
-	 * dig into a freed signal_struct, so just go away.
-	 *
-	 * XXX: why are cgroup methods diddling unattached tasks?
+	 * cgroup_exit() is called in the copy_process() failure path.
+	 * Ignore this case since the task hasn't ran yet, this avoids
+	 * trying to poke a half freed task state from generic code.
 	 */
 	if (!(task->flags & PF_EXITING))
 		return;

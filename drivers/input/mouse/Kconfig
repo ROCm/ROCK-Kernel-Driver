@@ -40,7 +40,7 @@ config MOUSE_PS2
 	  module will be called psmouse.
 
 config MOUSE_PS2_ALPS
-	bool "ALPS PS/2 mouse protocol extension" if EMBEDDED
+	bool "ALPS PS/2 mouse protocol extension" if EXPERT
 	default y
 	depends on MOUSE_PS2
 	help
@@ -50,7 +50,7 @@ config MOUSE_PS2_ALPS
 	  If unsure, say Y.
 
 config MOUSE_PS2_LOGIPS2PP
-	bool "Logitech PS/2++ mouse protocol extension" if EMBEDDED
+	bool "Logitech PS/2++ mouse protocol extension" if EXPERT
 	default y
 	depends on MOUSE_PS2
 	help
@@ -60,7 +60,7 @@ config MOUSE_PS2_LOGIPS2PP
 	  If unsure, say Y.
 
 config MOUSE_PS2_SYNAPTICS
-	bool "Synaptics PS/2 mouse protocol extension" if EMBEDDED
+	bool "Synaptics PS/2 mouse protocol extension" if EXPERT
 	default y
 	depends on MOUSE_PS2
 	help
@@ -78,7 +78,7 @@ config MOUSE_PS2_SYNAPTICS_LED
 	  This will enable LED class driver to control the LED device.
 
 config MOUSE_PS2_LIFEBOOK
-	bool "Fujitsu Lifebook PS/2 mouse protocol extension" if EMBEDDED
+	bool "Fujitsu Lifebook PS/2 mouse protocol extension" if EXPERT
 	default y
 	depends on MOUSE_PS2 && X86 && DMI
 	help
@@ -88,7 +88,7 @@ config MOUSE_PS2_LIFEBOOK
 	  If unsure, say Y.
 
 config MOUSE_PS2_TRACKPOINT
-	bool "IBM Trackpoint PS/2 mouse protocol extension" if EMBEDDED
+	bool "IBM Trackpoint PS/2 mouse protocol extension" if EXPERT
 	default y
 	depends on MOUSE_PS2
 	help
