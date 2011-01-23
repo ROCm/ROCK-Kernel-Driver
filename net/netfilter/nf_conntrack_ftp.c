@@ -54,6 +54,7 @@ unsigned int (*nf_nat_ftp_hook)(struct sk_buff *skb,
 EXPORT_SYMBOL_GPL(nf_nat_ftp_hook);
 
 static int try_rfc959(const char *, size_t, struct nf_conntrack_man *, char);
+static int try_rfc1123(const char *, size_t, struct nf_conntrack_man *, char);
 static int try_eprt(const char *, size_t, struct nf_conntrack_man *, char);
 static int try_epsv_response(const char *, size_t, struct nf_conntrack_man *,
 			     char);
@@ -88,10 +89,10 @@ static struct ftp_search {
 		{
 			.pattern	= "227 ",
 			.plen		= sizeof("227 ") - 1,
-			.skip		= '(',
-			.term		= ')',
+			.skip		= ' ',
+			.term		= '\0',
 			.ftptype	= NF_CT_FTP_PASV,
-			.getnum		= try_rfc959,
+			.getnum		= try_rfc1123,
 		},
 		{
 			.pattern	= "229 ",
@@ -130,8 +131,9 @@ static int try_number(const char *data, size_t dlen, u_int32_t array[],
 			i++;
 		else {
 			/* Unexpected character; true if it's the
-			   terminator and we're finished. */
-			if (*data == term && i == array_size - 1)
+			   terminator (or we don't care about one)
+			   and we're finished. */
+			if ((*data == term || !term) && i == array_size - 1)
 				return len;
 
 			pr_debug("Char %u (got %u nums) `%u' unexpected\n",
@@ -159,6 +161,30 @@ static int try_rfc959(const char *data, size_t dlen,
 				    (array[2] << 8) | array[3]);
 	cmd->u.tcp.port = htons((array[4] << 8) | array[5]);
 	return length;
+}
+
+/*
+ * From RFC 1123:
+ * The format of the 227 reply to a PASV command is not
+ * well standardized.  In particular, an FTP client cannot
+ * assume that the parentheses shown on page 40 of RFC-959
+ * will be present (and in fact, Figure 3 on page 43 omits
+ * them).  Therefore, a User-FTP program that interprets
+ * the PASV reply must scan the reply for the first digit
+ * of the host and port numbers.
+ */
+static int try_rfc1123(const char *data, size_t dlen,
+		       struct nf_conntrack_man *cmd, char term)
+{
+	int i;
+	for (i = 0; i < dlen; i++)
+		if (isdigit(data[i]))
+			break;
+
+	if (i == dlen)
+		return 0;
+
+	return try_rfc959(data + i, dlen - i, cmd, 0);
 }
 
 /* Grab port: number up to delimiter */
