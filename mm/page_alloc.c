@@ -1091,8 +1091,10 @@ static void drain_pages(unsigned int cpu)
 		pset = per_cpu_ptr(zone->pageset, cpu);
 
 		pcp = &pset->pcp;
-		free_pcppages_bulk(zone, pcp->count, pcp);
-		pcp->count = 0;
+		if (pcp->count) {
+			free_pcppages_bulk(zone, pcp->count, pcp);
+			pcp->count = 0;
+		}
 		local_irq_restore(flags);
 	}
 }
@@ -2028,6 +2030,14 @@ restart:
 	 */
 	alloc_flags = gfp_to_alloc_flags(gfp_mask);
 
+	/*
+	 * Find the true preferred zone if the allocation is unconstrained by
+	 * cpusets.
+	 */
+	if (!(alloc_flags & ALLOC_CPUSET) && !nodemask)
+		first_zones_zonelist(zonelist, high_zoneidx, NULL,
+					&preferred_zone);
+
 	/* This is the last chance, in general, before the goto nopage. */
 	page = get_page_from_freelist(gfp_mask, nodemask, order, zonelist,
 			high_zoneidx, alloc_flags & ~ALLOC_NO_WATERMARKS,
@@ -2198,7 +2208,9 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order,
 
 	get_mems_allowed();
 	/* The preferred zone is used for statistics later */
-	first_zones_zonelist(zonelist, high_zoneidx, nodemask, &preferred_zone);
+	first_zones_zonelist(zonelist, high_zoneidx,
+				nodemask ? : &cpuset_current_mems_allowed,
+				&preferred_zone);
 	if (!preferred_zone) {
 		put_mems_allowed();
 		return NULL;

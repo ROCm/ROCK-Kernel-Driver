@@ -1120,10 +1120,17 @@ static int ata_scsi_dev_config(struct scsi_device *sdev,
 	}
 
 	/*
-	 * ata_pio_sectors() expect sector alignment on buffers.  ATAPI
-	 * devices also need the alignment as IDENTIFY_PACKET is executed
-	 * as ATA_PROT_PIO.
+	 * ata_pio_sectors() expects buffer for each sector to not cross
+	 * page boundary.  Enforce it by requiring buffers to be sector
+	 * aligned, which works iff sector_size is not larger than
+	 * PAGE_SIZE.  ATAPI devices also need the alignment as
+	 * IDENTIFY_PACKET is executed as ATA_PROT_PIO.
 	 */
+	if (sdev->sector_size > PAGE_SIZE)
+		ata_dev_printk(dev, KERN_WARNING,
+			"sector_size=%u > PAGE_SIZE, PIO may malfunction\n",
+			sdev->sector_size);
+
 	blk_queue_update_dma_alignment(sdev->request_queue,
 				       sdev->sector_size - 1);
 
