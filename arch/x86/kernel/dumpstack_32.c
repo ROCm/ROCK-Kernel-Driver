@@ -27,6 +27,10 @@ void dump_trace(struct task_struct *task,
 	if (!task)
 		task = current;
 
+	bp = stack_frame(task, regs);
+	if (try_stack_unwind(task, regs, &stack, &bp, ops, data))
+		return;
+
 	if (!stack) {
 		unsigned long dummy;
 
@@ -35,7 +39,6 @@ void dump_trace(struct task_struct *task,
 			stack = (unsigned long *)task->thread.sp;
 	}
 
-	bp = stack_frame(task, regs);
 	for (;;) {
 		struct thread_info *context;
 

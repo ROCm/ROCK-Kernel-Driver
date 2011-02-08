@@ -14,6 +14,7 @@
 #include <linux/bug.h>
 #include <linux/nmi.h>
 
+#include <linux/unwind.h>
 #include <asm/stacktrace.h>
 
 
@@ -155,13 +156,18 @@ void dump_trace(struct task_struct *task,
 	if (!task)
 		task = current;
 
+	bp = stack_frame(task, regs);
+	if (try_stack_unwind(task, regs, &stack, &bp, ops, data)) {
+		put_cpu();
+		return;
+	}
+
 	if (!stack) {
 		stack = &dummy;
 		if (task && task != current)
 			stack = (unsigned long *)task->thread.sp;
 	}
 
-	bp = stack_frame(task, regs);
 	/*
 	 * Print function call entries in all stacks, starting at the
 	 * current stack address. If the stacks consist of nested
