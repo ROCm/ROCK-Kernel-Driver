@@ -1425,6 +1425,9 @@ struct super_block {
 	/* Granularity of c/m/atime in ns.
 	   Cannot be worse than a second */
 	u32		   s_time_gran;
+#ifdef CONFIG_PRECACHE
+	u32                precache_poolid;
+#endif
 
 	/*
 	 * The next field is for VFS *only*. No filesystems have any business

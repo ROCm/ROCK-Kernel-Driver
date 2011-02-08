@@ -1119,6 +1119,16 @@ config WATCHDOG_RIO
 
 # XTENSA Architecture
 
+# Xen Architecture
+
+config XEN_WDT
+	tristate "Xen Watchdog support"
+	depends on PARAVIRT_XEN || XEN
+	help
+	  Say Y here to support the hypervisor watchdog capability provided
+	  by Xen 4.0 and newer.  The watchdog timeout period is normally one
+	  minute but can be changed with a boot-time parameter.
+
 #
 # ISA-based Watchdog Cards
 #

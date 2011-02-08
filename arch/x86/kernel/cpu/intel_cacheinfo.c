@@ -290,8 +290,9 @@ amd_cpuid4(int leaf, union _cpuid4_leaf_eax *eax,
 	eax->split.type = types[leaf];
 	eax->split.level = levels[leaf];
 	eax->split.num_threads_sharing = 0;
+#ifndef CONFIG_XEN
 	eax->split.num_cores_on_die = __this_cpu_read(cpu_info.x86_max_cores) - 1;
-
+#endif
 
 	if (assoc == 0xffff)
 		eax->split.is_fully_associative = 1;
@@ -308,7 +309,7 @@ struct _cache_attr {
 	ssize_t (*store)(struct _cpuid4_info *, const char *, size_t count);
 };
 
-#ifdef CONFIG_AMD_NB
+#if defined(CONFIG_AMD_NB) && !defined(CONFIG_XEN)
 
 /*
  * L3 cache descriptors
@@ -578,8 +579,8 @@ unsigned int __cpuinit init_intel_cacheinfo(struct cpuinfo_x86 *c)
 	unsigned int trace = 0, l1i = 0, l1d = 0, l2 = 0, l3 = 0;
 	unsigned int new_l1d = 0, new_l1i = 0; /* Cache sizes from cpuid(4) */
 	unsigned int new_l2 = 0, new_l3 = 0, i; /* Cache sizes from cpuid(4) */
-	unsigned int l2_id = 0, l3_id = 0, num_threads_sharing, index_msb;
 #ifdef CONFIG_X86_HT
+	unsigned int l2_id = 0, l3_id = 0, num_threads_sharing, index_msb;
 	unsigned int cpu = c->cpu_index;
 #endif
 
@@ -613,16 +614,20 @@ unsigned int __cpuinit init_intel_cacheinfo(struct cpuinfo_x86 *c)
 					break;
 				case 2:
 					new_l2 = this_leaf.size/1024;
+#ifdef CONFIG_X86_HT
 					num_threads_sharing = 1 + this_leaf.eax.split.num_threads_sharing;
 					index_msb = get_count_order(num_threads_sharing);
 					l2_id = c->apicid >> index_msb;
+#endif
 					break;
 				case 3:
 					new_l3 = this_leaf.size/1024;
+#ifdef CONFIG_X86_HT
 					num_threads_sharing = 1 + this_leaf.eax.split.num_threads_sharing;
 					index_msb = get_count_order(
 							num_threads_sharing);
 					l3_id = c->apicid >> index_msb;
+#endif
 					break;
 				default:
 					break;
@@ -723,7 +728,7 @@ unsigned int __cpuinit init_intel_cacheinfo(struct cpuinfo_x86 *c)
 static DEFINE_PER_CPU(struct _cpuid4_info *, ici_cpuid4_info);
 #define CPUID4_INFO_IDX(x, y)	(&((per_cpu(ici_cpuid4_info, x))[y]))
 
-#ifdef CONFIG_SMP
+#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
 static void __cpuinit cache_shared_cpu_map_setup(unsigned int cpu, int index)
 {
 	struct _cpuid4_info	*this_leaf, *sibling_leaf;
@@ -960,7 +965,7 @@ static struct attribute *default_attrs[] = {
 	NULL
 };
 
-#ifdef CONFIG_AMD_NB
+#if defined(CONFIG_AMD_NB) && !defined(CONFIG_XEN)
 static struct attribute ** __cpuinit amd_l3_attrs(void)
 {
 	static struct attribute **attrs;
@@ -1100,7 +1105,7 @@ static int __cpuinit cache_add_dev(struct sys_device * sys_dev)
 		this_leaf = CPUID4_INFO_IDX(cpu, i);
 
 		ktype_cache.default_attrs = default_attrs;
-#ifdef CONFIG_AMD_NB
+#if defined(CONFIG_AMD_NB) && !defined(CONFIG_XEN)
 		if (this_leaf->l3)
 			ktype_cache.default_attrs = amd_l3_attrs();
 #endif

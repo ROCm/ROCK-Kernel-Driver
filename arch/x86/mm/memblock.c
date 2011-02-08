@@ -293,6 +293,11 @@ static int __init memblock_x86_find_active_region(const struct memblock_region *
 {
 	u64 align = PAGE_SIZE;
 
+#ifdef CONFIG_XEN
+	if (last_pfn > xen_start_info->nr_pages)
+		last_pfn = xen_start_info->nr_pages;
+#endif
+
 	*ei_startpfn = round_up(ei->base, align) >> PAGE_SHIFT;
 	*ei_endpfn = round_down(ei->base + ei->size, align) >> PAGE_SHIFT;
 
@@ -325,6 +330,11 @@ void __init memblock_x86_register_active_regions(int nid, unsigned long start_pf
 		if (memblock_x86_find_active_region(r, start_pfn, last_pfn,
 					   &ei_startpfn, &ei_endpfn))
 			add_active_range(nid, ei_startpfn, ei_endpfn);
+
+#ifdef CONFIG_XEN
+	BUG_ON(nid);
+	add_active_range(nid, last_pfn, last_pfn);
+#endif
 }
 
 /*

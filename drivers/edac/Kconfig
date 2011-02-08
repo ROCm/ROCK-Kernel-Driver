@@ -77,6 +77,7 @@ config EDAC_MCE
 config EDAC_AMD64
 	tristate "AMD64 (Opteron, Athlon64) K8, F10h"
 	depends on EDAC_MM_EDAC && AMD_NB && X86_64 && EDAC_DECODE_MCE
+	depends on !XEN
 	help
 	  Support for error detection and correction of DRAM ECC errors on
 	  the AMD64 families of memory controllers (K8 and F10h)

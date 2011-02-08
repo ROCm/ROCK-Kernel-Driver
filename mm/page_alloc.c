@@ -647,6 +647,13 @@ static bool free_pages_prepare(struct page *page, unsigned int order)
 	int i;
 	int bad = 0;
 
+#ifdef CONFIG_XEN
+	if (PageForeign(page)) {
+		PageForeignDestructor(page, order);
+		return false;
+	}
+#endif
+
 	trace_mm_page_free_direct(page, order);
 	kmemcheck_free_shadow(page, order);
 
@@ -673,6 +680,9 @@ static void __free_pages_ok(struct page *page, unsigned int order)
 	unsigned long flags;
 	int wasMlocked = __TestClearPageMlocked(page);
 
+#ifdef CONFIG_XEN
+	WARN_ON(PageForeign(page) && wasMlocked);
+#endif
 	if (!free_pages_prepare(page, order))
 		return;
 
@@ -1163,6 +1173,9 @@ void free_hot_cold_page(struct page *page, int cold)
 	int migratetype;
 	int wasMlocked = __TestClearPageMlocked(page);
 
+#ifdef CONFIG_XEN
+	WARN_ON(PageForeign(page) && wasMlocked);
+#endif
 	if (!free_pages_prepare(page, 0))
 		return;
 
@@ -4996,6 +5009,22 @@ static void __setup_per_zone_wmarks(void)
 		setup_zone_migrate_reserve(zone);
 		spin_unlock_irqrestore(&zone->lock, flags);
 	}
+
+#ifdef CONFIG_XEN
+	for_each_populated_zone(zone) {
+		unsigned int cpu;
+
+		for_each_online_cpu(cpu) {
+			unsigned long high;
+
+			high = percpu_pagelist_fraction
+			       ? zone->present_pages / percpu_pagelist_fraction
+			       : 5 * zone_batchsize(zone);
+			setup_pagelist_highmark(
+				per_cpu_ptr(zone->pageset, cpu), high);
+		}
+	}
+#endif
 
 	/* update totalreserve_pages */
 	calculate_totalreserve_pages();

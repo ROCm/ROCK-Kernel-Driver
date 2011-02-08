@@ -10,6 +10,7 @@
 #include <linux/swap.h>
 #include <linux/writeback.h>
 #include <linux/pagevec.h>
+#include <linux/precache.h>
 #include "extent_io.h"
 #include "extent_map.h"
 #include "compat.h"
@@ -1981,6 +1982,13 @@ static int __extent_read_full_page(struct extent_io_tree *tree,
 
 	set_page_extent_mapped(page);
 
+	if (!PageUptodate(page)) {
+		if (precache_get(page->mapping, page->index, page) == 1) {
+			BUG_ON(blocksize != PAGE_SIZE);
+			goto out;
+		}
+	}
+
 	end = page_end;
 	while (1) {
 		lock_extent(tree, start, end, GFP_NOFS);
@@ -2108,6 +2116,7 @@ static int __extent_read_full_page(struct extent_io_tree *tree,
 		cur = cur + iosize;
 		page_offset += iosize;
 	}
+out:
 	if (!nr) {
 		if (!PageError(page))
 			SetPageUptodate(page);

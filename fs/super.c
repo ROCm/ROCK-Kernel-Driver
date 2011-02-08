@@ -31,6 +31,7 @@
 #include <linux/mutex.h>
 #include <linux/backing-dev.h>
 #include <linux/rculist_bl.h>
+#include <linux/precache.h>
 #include "internal.h"
 
 
@@ -111,6 +112,9 @@ static struct super_block *alloc_super(struct file_system_type *type)
 		s->s_maxbytes = MAX_NON_LFS;
 		s->s_op = &default_op;
 		s->s_time_gran = 1000000000;
+#ifdef CONFIG_PRECACHE
+		s->precache_poolid = -1;
+#endif
 	}
 out:
 	return s;
@@ -177,6 +181,7 @@ void deactivate_locked_super(struct super_block *s)
 	struct file_system_type *fs = s->s_type;
 	if (atomic_dec_and_test(&s->s_active)) {
 		fs->kill_sb(s);
+		precache_flush_filesystem(s);
 		put_filesystem(fs);
 		put_super(s);
 	} else {
