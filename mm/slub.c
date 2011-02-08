@@ -2856,10 +2856,10 @@ unsigned kmalloc_estimate_bytes(gfp_t flags, size_t bytes)
 
 #ifdef CONFIG_ZONE_DMA
 		if (unlikely(flags & SLUB_DMA))
-			s = dma_kmalloc_cache(i, flags);
+			s = kmalloc_dma_caches[i];
 		else
 #endif
-			s = &kmalloc_caches[i];
+			s = kmalloc_caches[i];
 
 		if (s)
 			pages += kmem_alloc_estimate(s, flags, 0);
