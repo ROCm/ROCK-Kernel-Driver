@@ -1049,21 +1049,21 @@ int unwind(struct unwind_frame_info *frame)
 		if (!fde)
 			dprintk(1, "FDE validation failed (%p,%p).", ptr, end);
 	}
-#ifdef CONFIG_FRAME_POINTER
 	if (cie == NULL || fde == NULL) {
+#ifdef CONFIG_FRAME_POINTER
 		unsigned long top = TSK_STACK_TOP(frame->task);
 		unsigned long bottom = STACK_BOTTOM(frame->task);
 		unsigned long fp = UNW_FP(frame);
 		unsigned long sp = UNW_SP(frame);
 		unsigned long link;
 
-		if ((sp | fp) & sizeof(unsigned long))
+		if ((sp | fp) & (sizeof(unsigned long) - 1))
 			return -EPERM;
 
 # if FRAME_RETADDR_OFFSET < 0
 		if (!(sp < top && fp <= sp && bottom < fp))
 # else
-		if (!(sp < top && fp >= sp && bottom < fp))
+		if (!(sp > top && fp >= sp && bottom > fp))
 # endif
 			return -ENXIO;
 
@@ -1073,11 +1073,11 @@ int unwind(struct unwind_frame_info *frame)
 # if FRAME_RETADDR_OFFSET < 0
 		if (!(link > bottom && link < fp))
 # else
-		if (!(link > bottom && link > fp))
+		if (!(link < bottom && link > fp))
 # endif
 			return -ENXIO;
 
-		if (link & (sizeof(unsigned long) - 1))
+		if (link & (sizeof(link) - 1))
 			return -ENXIO;
 
 		fp += FRAME_RETADDR_OFFSET;
@@ -1092,8 +1092,10 @@ int unwind(struct unwind_frame_info *frame)
 # endif
 		UNW_FP(frame) = link;
 		return 0;
-	}
+#else
+		return -ENXIO;
 #endif
+	}
 	state.org = startLoc;
 	memcpy(&state.cfa, &badCFA, sizeof(state.cfa));
 	/* process instructions */
