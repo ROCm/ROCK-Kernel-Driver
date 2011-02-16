@@ -794,7 +794,9 @@ END(interrupt)
 	subq $ORIG_RAX-RBP, %rsp
 	CFI_ADJUST_CFA_OFFSET ORIG_RAX-RBP
 	call save_args
-	PARTIAL_FRAME 0
+	PARTIAL_FRAME -1 ARGOFFSET-RBP
+	CFI_REL_OFFSET rbp, 0
+	CFI_DEF_CFA_REGISTER rbp
 	call \func
 	.endm
 
