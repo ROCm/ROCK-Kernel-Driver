@@ -455,14 +455,6 @@ static int nameidata_dentry_drop_rcu(struct nameidata *nd, struct dentry *dentry
 	struct fs_struct *fs = current->fs;
 	struct dentry *parent = nd->path.dentry;
 
-	/*
-	 * It can be possible to revalidate the dentry that we started
-	 * the path walk with. force_reval_path may also revalidate the
-	 * dentry already committed to the nameidata.
-	 */
-	if (unlikely(parent == dentry))
-		return nameidata_drop_rcu(nd);
-
 	BUG_ON(!(nd->flags & LOOKUP_RCU));
 	if (nd->root.mnt) {
 		spin_lock(&fs->lock);
@@ -561,40 +553,26 @@ static inline int nameidata_drop_rcu_last_maybe(struct nameidata *nd)
  */
 void release_open_intent(struct nameidata *nd)
 {
-	if (nd->intent.open.file->f_path.dentry == NULL)
-		put_filp(nd->intent.open.file);
-	else
-		fput(nd->intent.open.file);
+	struct file *file = nd->intent.open.file;
+
+	if (file && !IS_ERR(file)) {
+		if (file->f_path.dentry == NULL)
+			put_filp(file);
+		else
+			fput(file);
+	}
 }
 EXPORT_SYMBOL_GPL(release_open_intent);
 
-/*
- * Call d_revalidate and handle filesystems that request rcu-walk
- * to be dropped. This may be called and return in rcu-walk mode,
- * regardless of success or error. If -ECHILD is returned, the caller
- * must return -ECHILD back up the path walk stack so path walk may
- * be restarted in ref-walk mode.
- */
-static int d_revalidate(struct dentry *dentry, struct nameidata *nd)
+static inline int d_revalidate(struct dentry *dentry, struct nameidata *nd)
 {
-	int status;
-
-	status = dentry->d_op->d_revalidate(dentry, nd);
-	if (status == -ECHILD) {
-		if (nameidata_dentry_drop_rcu(nd, dentry))
-			return status;
-		status = dentry->d_op->d_revalidate(dentry, nd);
-	}
-
-	return status;
+	return dentry->d_op->d_revalidate(dentry, nd);
 }
 
-static inline struct dentry *
+static struct dentry *
 do_revalidate(struct dentry *dentry, struct nameidata *nd)
 {
-	int status;
-
-	status = d_revalidate(dentry, nd);
+	int status = d_revalidate(dentry, nd);
 	if (unlikely(status <= 0)) {
 		/*
 		 * The dentry failed validation.
@@ -603,20 +581,35 @@ do_revalidate(struct dentry *dentry, struct nameidata *nd)
 		 * to return a fail status.
 		 */
 		if (status < 0) {
-			/* If we're in rcu-walk, we don't have a ref */
-			if (!(nd->flags & LOOKUP_RCU))
-				dput(dentry);
+			dput(dentry);
 			dentry = ERR_PTR(status);
-
-		} else {
-			/* Don't d_invalidate in rcu-walk mode */
-			if (nameidata_dentry_drop_rcu_maybe(nd, dentry))
-				return ERR_PTR(-ECHILD);
-			if (!d_invalidate(dentry)) {
-				dput(dentry);
-				dentry = NULL;
-			}
+		} else if (!d_invalidate(dentry)) {
+			dput(dentry);
+			dentry = NULL;
 		}
+	}
+	return dentry;
+}
+
+static inline struct dentry *
+do_revalidate_rcu(struct dentry *dentry, struct nameidata *nd)
+{
+	int status = d_revalidate(dentry, nd);
+	if (likely(status > 0))
+		return dentry;
+	if (status == -ECHILD) {
+		if (nameidata_dentry_drop_rcu(nd, dentry))
+			return ERR_PTR(-ECHILD);
+		return do_revalidate(dentry, nd);
+	}
+	if (status < 0)
+		return ERR_PTR(status);
+	/* Don't d_invalidate in rcu-walk mode */
+	if (nameidata_dentry_drop_rcu(nd, dentry))
+		return ERR_PTR(-ECHILD);
+	if (!d_invalidate(dentry)) {
+		dput(dentry);
+		dentry = NULL;
 	}
 	return dentry;
 }
@@ -665,9 +658,6 @@ force_reval_path(struct path *path, struct nameidata *nd)
 		return 0;
 
 	if (!status) {
-		/* Don't d_invalidate in rcu-walk mode */
-		if (nameidata_drop_rcu(nd))
-			return -ECHILD;
 		d_invalidate(dentry);
 		status = -ESTALE;
 	}
@@ -774,6 +764,8 @@ __do_follow_link(const struct path *link, struct nameidata *nd, void **p)
 	int error;
 	struct dentry *dentry = link->dentry;
 
+	BUG_ON(nd->flags & LOOKUP_RCU);
+
 	touch_atime(link->mnt, dentry);
 	nd_set_link(nd, NULL);
 
@@ -808,6 +800,11 @@ static inline int do_follow_link(struct path *path, struct nameidata *nd)
 {
 	void *cookie;
 	int err = -ELOOP;
+
+	/* We drop rcu-walk here */
+	if (nameidata_dentry_drop_rcu_maybe(nd, path->dentry))
+		return -ECHILD;
+
 	if (current->link_count >= MAX_NESTED_LINKS)
 		goto loop;
 	if (current->total_link_count >= 40)
@@ -1252,9 +1249,15 @@ static int do_lookup(struct nameidata *nd, struct qstr *name,
 			return -ECHILD;
 
 		nd->seq = seq;
-		if (dentry->d_flags & DCACHE_OP_REVALIDATE)
-			goto need_revalidate;
-done2:
+		if (unlikely(dentry->d_flags & DCACHE_OP_REVALIDATE)) {
+			dentry = do_revalidate_rcu(dentry, nd);
+			if (!dentry)
+				goto need_lookup;
+			if (IS_ERR(dentry))
+				goto fail;
+			if (!(nd->flags & LOOKUP_RCU))
+				goto done;
+		}
 		path->mnt = mnt;
 		path->dentry = dentry;
 		if (likely(__follow_mount_rcu(nd, path, inode, false)))
@@ -1267,8 +1270,13 @@ done2:
 	if (!dentry)
 		goto need_lookup;
 found:
-	if (dentry->d_flags & DCACHE_OP_REVALIDATE)
-		goto need_revalidate;
+	if (unlikely(dentry->d_flags & DCACHE_OP_REVALIDATE)) {
+		dentry = do_revalidate(dentry, nd);
+		if (!dentry)
+			goto need_lookup;
+		if (IS_ERR(dentry))
+			goto fail;
+	}
 done:
 	path->mnt = mnt;
 	path->dentry = dentry;
@@ -1309,16 +1317,6 @@ need_lookup:
 	 */
 	mutex_unlock(&dir->i_mutex);
 	goto found;
-
-need_revalidate:
-	dentry = do_revalidate(dentry, nd);
-	if (!dentry)
-		goto need_lookup;
-	if (IS_ERR(dentry))
-		goto fail;
-	if (nd->flags & LOOKUP_RCU)
-		goto done2;
-	goto done;
 
 fail:
 	return PTR_ERR(dentry);
@@ -1416,9 +1414,6 @@ exec_again:
 			goto out_dput;
 
 		if (inode->i_op->follow_link) {
-			/* We commonly drop rcu-walk here */
-			if (nameidata_dentry_drop_rcu_maybe(nd, next.dentry))
-				return -ECHILD;
 			BUG_ON(inode != next.dentry->d_inode);
 			err = do_follow_link(&next, nd);
 			if (err)
@@ -1464,8 +1459,6 @@ last_component:
 			break;
 		if (inode && unlikely(inode->i_op->follow_link) &&
 		    (lookup_flags & LOOKUP_FOLLOW)) {
-			if (nameidata_dentry_drop_rcu_maybe(nd, next.dentry))
-				return -ECHILD;
 			BUG_ON(inode != next.dentry->d_inode);
 			err = do_follow_link(&next, nd);
 			if (err)
@@ -1501,12 +1494,15 @@ return_reval:
 		 * We may need to check the cached dentry for staleness.
 		 */
 		if (need_reval_dot(nd->path.dentry)) {
+			if (nameidata_drop_rcu_last_maybe(nd))
+				return -ECHILD;
 			/* Note: we do not d_invalidate() */
 			err = d_revalidate(nd->path.dentry, nd);
 			if (!err)
 				err = -ESTALE;
 			if (err < 0)
 				break;
+			return 0;
 		}
 return_base:
 		if (nameidata_drop_rcu_last_maybe(nd))
@@ -2314,8 +2310,6 @@ static struct file *finish_open(struct nameidata *nd,
 	return filp;
 
 exit:
-	if (!IS_ERR(nd->intent.open.file))
-		release_open_intent(nd);
 	path_put(&nd->path);
 	return ERR_PTR(error);
 }
@@ -2438,8 +2432,6 @@ exit_mutex_unlock:
 exit_dput:
 	path_put_conditional(path, nd);
 exit:
-	if (!IS_ERR(nd->intent.open.file))
-		release_open_intent(nd);
 	path_put(&nd->path);
 	return ERR_PTR(error);
 }
@@ -2526,6 +2518,7 @@ struct file *do_filp_open(int dfd, const char *pathname,
 	}
 	audit_inode(pathname, nd.path.dentry);
 	filp = finish_open(&nd, open_flag, acc_mode);
+	release_open_intent(&nd);
 	return filp;
 
 creat:
@@ -2602,6 +2595,7 @@ out:
 		path_put(&nd.root);
 	if (filp == ERR_PTR(-ESTALE) && !(flags & LOOKUP_REVAL))
 		goto reval;
+	release_open_intent(&nd);
 	return filp;
 
 exit_dput:
@@ -2609,8 +2603,6 @@ exit_dput:
 out_path:
 	path_put(&nd.path);
 out_filp:
-	if (!IS_ERR(nd.intent.open.file))
-		release_open_intent(&nd);
 	filp = ERR_PTR(error);
 	goto out;
 }

@@ -41,4 +41,4 @@ obj-$(CONFIG_BLK_DEV_RBD)     += rbd.o
 
 obj-$(CONFIG_CIPHER_TWOFISH)	+= loop_fish2.o
 
-swim_mod-objs	:= swim.o swim_asm.o
+swim_mod-y	:= swim.o swim_asm.o
