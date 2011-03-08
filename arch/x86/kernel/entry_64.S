@@ -314,7 +314,7 @@ ENTRY(save_args)
 	movq  %r8,  R8+8-RBP(%rsp)
 	movq  %r9,  R9+8-RBP(%rsp)
 	movq %r10, R10+8-RBP(%rsp)
-	movq %r11, R11+8-RBP
+	movq %r11, R11+8-RBP(%rsp)
 
 	leaq -RBP+8(%rsp),%rdi	/* arg1 for handler */
 	movq_cfi rbp, 8		/* push %rbp */
