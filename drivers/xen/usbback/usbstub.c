@@ -280,8 +280,7 @@ static ssize_t usbstub_show_portids(struct device_driver *driver,
 
 	return count;
 }
-
-DRIVER_ATTR(port_ids, S_IRUSR, usbstub_show_portids, NULL);
+static DRIVER_ATTR(port_ids, S_IRUSR, usbstub_show_portids, NULL);
 
 /* table of devices that matches any usbdevice */
 static const struct usb_device_id usbstub_table[] = {

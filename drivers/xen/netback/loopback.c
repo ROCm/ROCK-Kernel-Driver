@@ -155,7 +155,6 @@ static int loopback_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	skb->pkt_type = PACKET_HOST; /* overridden by eth_type_trans() */
 	skb->protocol = eth_type_trans(skb, dev);
-	dev->last_rx  = jiffies;
 
 	/* Flush netfilter context: rx'ed skbuffs not expected to have any. */
 	nf_reset(skb);

@@ -69,13 +69,17 @@ struct cpuinfo_x86 {
 	char			wp_works_ok;	/* It doesn't on 386's */
 
 	/* Problems on some 486Dx4's and old 386's: */
+#ifndef CONFIG_XEN
 	char			hlt_works_ok;
+#endif
 	char			hard_math;
+#ifndef CONFIG_XEN
 	char			rfu;
 	char			fdiv_bug;
 	char			f00f_bug;
 	char			coma_bug;
 	char			pad0;
+#endif
 #else
 	/* Number of 4K pages in DTLB/ITLB combined(in pages): */
 	int			x86_tlbsize;
@@ -157,7 +161,7 @@ extern const struct seq_operations cpuinfo_op;
 
 static inline int hlt_works(int cpu)
 {
-#ifdef CONFIG_X86_32
+#if defined(CONFIG_X86_32) && !defined(CONFIG_XEN)
 	return cpu_data(cpu).hlt_works_ok;
 #else
 	return 1;
@@ -529,7 +533,7 @@ native_load_sp0(struct tss_struct *tss, struct thread_struct *thread)
 #endif
 
 #define __cpuid			xen_cpuid
-#define paravirt_enabled()	0
+#define paravirt_enabled()	1
 
 /*
  * These special macros can be used to get or set a debugging register

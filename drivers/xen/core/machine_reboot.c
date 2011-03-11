@@ -222,6 +222,7 @@ int __xen_suspend(int fast_suspend, void (*resume_notifier)(int))
 	suspend.resume_notifier = resume_notifier;
 
 	if (_check(dpm_suspend_start, PMSG_SUSPEND)) {
+		dpm_resume_end(PMSG_RESUME);
 		pr_err("%s() failed: %d\n", what, err);
 		return err;
 	}

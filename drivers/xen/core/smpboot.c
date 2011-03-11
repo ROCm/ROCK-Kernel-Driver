@@ -34,7 +34,7 @@ extern void smp_trap_init(trap_info_t *);
 
 cpumask_var_t vcpu_initialized_mask;
 
-DEFINE_PER_CPU(struct cpuinfo_x86, cpu_info);
+DEFINE_PER_CPU_READ_MOSTLY(struct cpuinfo_x86, cpu_info);
 EXPORT_PER_CPU_SYMBOL(cpu_info);
 
 static int __read_mostly ipi_irq = -1;

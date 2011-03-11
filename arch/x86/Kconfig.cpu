@@ -8,7 +8,7 @@ choice
 
 config M386
 	bool "386"
-	depends on X86_32 && !UML
+	depends on X86_32 && !UML && !XEN
 	---help---
 	  This is the processor type of your CPU. This information is used for
 	  optimizing purposes. In order to compile a kernel that can run on
@@ -49,7 +49,7 @@ config M386
 
 config M486
 	bool "486"
-	depends on X86_32
+	depends on X86_32 && !XEN
 	---help---
 	  Select this for a 486 series processor, either Intel or one of the
 	  compatible processors from AMD, Cyrix, IBM, or Intel.  Includes DX,
@@ -58,7 +58,7 @@ config M486
 
 config M586
 	bool "586/K5/5x86/6x86/6x86MX"
-	depends on X86_32
+	depends on X86_32 && !XEN
 	---help---
 	  Select this for an 586 or 686 series processor such as the AMD K5,
 	  the Cyrix 5x86, 6x86 and 6x86MX.  This choice does not
@@ -66,14 +66,14 @@ config M586
 
 config M586TSC
 	bool "Pentium-Classic"
-	depends on X86_32
+	depends on X86_32 && !XEN
 	---help---
 	  Select this for a Pentium Classic processor with the RDTSC (Read
 	  Time Stamp Counter) instruction for benchmarking.
 
 config M586MMX
 	bool "Pentium-MMX"
-	depends on X86_32
+	depends on X86_32 && !XEN
 	---help---
 	  Select this for a Pentium with the MMX graphics/multimedia
 	  extended instructions.
@@ -339,11 +339,11 @@ config X86_PPRO_FENCE
 
 config X86_F00F_BUG
 	def_bool y
-	depends on (M586MMX || M586TSC || M586 || M486 || M386) && !X86_NO_IDT
+	depends on M586MMX || M586TSC || M586 || M486 || M386
 
 config X86_INVD_BUG
 	def_bool y
-	depends on (M486 || M386) && !X86_XEN
+	depends on M486 || M386
 
 config X86_WP_WORKS_OK
 	def_bool y
@@ -446,7 +446,7 @@ config CPU_SUP_INTEL
 config CPU_SUP_CYRIX_32
 	default y
 	bool "Support Cyrix processors" if PROCESSOR_SELECT
-	depends on !64BIT
+	depends on !64BIT && !XEN
 	---help---
 	  This enables detection, tunings and quirks for Cyrix processors
 
@@ -486,7 +486,7 @@ config CPU_SUP_CENTAUR
 config CPU_SUP_TRANSMETA_32
 	default y
 	bool "Support Transmeta processors" if PROCESSOR_SELECT
-	depends on !64BIT
+	depends on !64BIT && !XEN
 	---help---
 	  This enables detection, tunings and quirks for Transmeta processors
 

@@ -386,7 +386,8 @@ void fixup_irqs(void)
 			continue;
 
 		if (xen_test_irq_pending(irq)) {
-			data = irq_get_irq_data(irq);
+			desc = irq_to_desc(irq);
+			data = &desc->irq_data;
 			raw_spin_lock(&desc->lock);
 			if (data->chip->irq_retrigger)
 				data->chip->irq_retrigger(data);

@@ -10,13 +10,14 @@
 
 #define RESCHEDULE_VECTOR		0
 #define CALL_FUNCTION_VECTOR		1
-#define CALL_FUNC_SINGLE_VECTOR		2
-#define REBOOT_VECTOR			3
+#define NMI_VECTOR			0x02
+#define CALL_FUNC_SINGLE_VECTOR		3
+#define REBOOT_VECTOR			4
 #ifdef CONFIG_IRQ_WORK
-#define IRQ_WORK_VECTOR			4
-#define NR_IPIS				5
+#define IRQ_WORK_VECTOR			5
+#define NR_IPIS				6
 #else
-#define NR_IPIS				4
+#define NR_IPIS				5
 #endif
 
 /*
@@ -73,10 +74,7 @@ static inline int invalid_vm86_irq(int irq)
 
 #if defined(CONFIG_X86_IO_APIC)
 # ifdef CONFIG_SPARSE_IRQ
-#  define NR_PIRQS					\
-	(CPU_VECTOR_LIMIT > IO_APIC_VECTOR_LIMIT ?	\
-		(NR_VECTORS + CPU_VECTOR_LIMIT)  :	\
-		(NR_VECTORS + IO_APIC_VECTOR_LIMIT))
+#  define NR_PIRQS			(NR_VECTORS + IO_APIC_VECTOR_LIMIT)
 # else
 #  define NR_PIRQS					\
 	(CPU_VECTOR_LIMIT < IO_APIC_VECTOR_LIMIT ?	\
@@ -90,7 +88,7 @@ static inline int invalid_vm86_irq(int irq)
 #endif
 
 #ifndef __ASSEMBLY__
-#if defined(CONFIG_X86_IO_APIC) && defined(CONFIG_SPARSE_IRQ)
+#ifdef CONFIG_SPARSE_IRQ
 extern int nr_pirqs;
 #else
 # define nr_pirqs			NR_PIRQS
@@ -98,7 +96,11 @@ extern int nr_pirqs;
 #endif
 
 #define DYNIRQ_BASE			(PIRQ_BASE + nr_pirqs)
+#ifdef CONFIG_SPARSE_IRQ
+#define NR_DYNIRQS			(CPU_VECTOR_LIMIT + CONFIG_XEN_NR_GUEST_DEVICES)
+#else
 #define NR_DYNIRQS			(64 + CONFIG_XEN_NR_GUEST_DEVICES)
+#endif
 
 #define NR_IRQS				(NR_PIRQS + NR_DYNIRQS)
 

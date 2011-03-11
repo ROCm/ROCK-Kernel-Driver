@@ -477,7 +477,7 @@ static unsigned int blktap_ring_poll(struct file *filp, poll_table *wait)
 	return 0;
 }
 
-static struct file_operations blktap_ring_file_operations = {
+static const struct file_operations blktap_ring_file_operations = {
 	.owner    = THIS_MODULE,
 	.open     = blktap_ring_open,
 	.release  = blktap_ring_release,

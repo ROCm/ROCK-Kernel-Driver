@@ -115,29 +115,69 @@ static int netbk_change_mtu(struct net_device *dev, int mtu)
 	return 0;
 }
 
-static int netbk_set_sg(struct net_device *dev, u32 data)
+void netif_set_features(netif_t *netif)
 {
-	if (data) {
-		netif_t *netif = netdev_priv(dev);
+	struct net_device *dev = netif->dev;
+	int features = dev->features;
 
-		if (!(netif->features & NETIF_F_SG))
-			return -ENOSYS;
-	} else if (dev->mtu > ETH_DATA_LEN)
+	if (netif->can_sg)
+		features |= NETIF_F_SG;
+	if (netif->gso)
+		features |= NETIF_F_TSO;
+	if (netif->csum)
+		features |= NETIF_F_IP_CSUM;
+
+	features &= ~(netif->features_disabled);
+
+	if (!(features & NETIF_F_SG) && dev->mtu > ETH_DATA_LEN)
 		dev->mtu = ETH_DATA_LEN;
 
-	return ethtool_op_set_sg(dev, data);
+	dev->features = features;
+}
+
+static int netbk_set_tx_csum(struct net_device *dev, u32 data)
+{
+	netif_t *netif = netdev_priv(dev);
+	if (data) {
+		if (!netif->csum)
+			return -ENOSYS;
+		netif->features_disabled &= ~NETIF_F_IP_CSUM;
+	} else {
+		netif->features_disabled |= NETIF_F_IP_CSUM;
+	}
+
+	netif_set_features(netif);
+	return 0;
+}
+
+static int netbk_set_sg(struct net_device *dev, u32 data)
+{
+	netif_t *netif = netdev_priv(dev);
+	if (data) {
+		if (!netif->can_sg)
+			return -ENOSYS;
+		netif->features_disabled &= ~NETIF_F_SG;
+	} else {
+		netif->features_disabled |= NETIF_F_SG;
+	}
+
+	netif_set_features(netif);
+	return 0;
 }
 
 static int netbk_set_tso(struct net_device *dev, u32 data)
 {
+	netif_t *netif = netdev_priv(dev);
 	if (data) {
-		netif_t *netif = netdev_priv(dev);
-
-		if (!(netif->features & NETIF_F_TSO))
+		if (!netif->gso)
 			return -ENOSYS;
+		netif->features_disabled &= ~NETIF_F_TSO;
+	} else {
+		netif->features_disabled |= NETIF_F_TSO;
 	}
 
-	return ethtool_op_set_tso(dev, data);
+	netif_set_features(netif);
+	return 0;
 }
 
 static void netbk_get_drvinfo(struct net_device *dev,
@@ -152,6 +192,7 @@ static const struct netif_stat {
 	u16 offset;
 } netbk_stats[] = {
 	{ "copied_skbs", offsetof(netif_t, nr_copied_skbs) },
+	{ "rx_gso_csum_fixups", offsetof(netif_t, rx_gso_csum_fixups) },
 };
 
 static int netbk_get_sset_count(struct net_device *dev, int sset)
@@ -160,7 +201,7 @@ static int netbk_get_sset_count(struct net_device *dev, int sset)
 	case ETH_SS_STATS:
 		return ARRAY_SIZE(netbk_stats);
 	}
-	return -EINVAL;
+	return -EOPNOTSUPP;
 }
 
 static void netbk_get_ethtool_stats(struct net_device *dev,
@@ -191,7 +232,7 @@ static const struct ethtool_ops network_ethtool_ops =
 	.get_drvinfo = netbk_get_drvinfo,
 
 	.get_tx_csum = ethtool_op_get_tx_csum,
-	.set_tx_csum = ethtool_op_set_tx_csum,
+	.set_tx_csum = netbk_set_tx_csum,
 	.get_sg = ethtool_op_get_sg,
 	.set_sg = netbk_set_sg,
 	.get_tso = ethtool_op_get_tso,
@@ -232,7 +273,8 @@ netif_t *netif_alloc(struct device *parent, domid_t domid, unsigned int handle)
 	netif->domid  = domid;
 	netif->group = UINT_MAX;
 	netif->handle = handle;
-	netif->features = NETIF_F_SG;
+	netif->can_sg = 1;
+	netif->csum = 1;
 	atomic_set(&netif->refcnt, 1);
 	init_waitqueue_head(&netif->waiting_to_free);
 	netif->dev = dev;
@@ -247,8 +289,9 @@ netif_t *netif_alloc(struct device *parent, domid_t domid, unsigned int handle)
 
 	init_timer(&netif->tx_queue_timeout);
 
-	dev->netdev_ops	     = &netif_be_netdev_ops;
-	dev->features        = NETIF_F_IP_CSUM|NETIF_F_SG;
+	dev->netdev_ops = &netif_be_netdev_ops;
+
+	netif_set_features(netif);
 
 	SET_ETHTOOL_OPS(dev, &network_ethtool_ops);
 

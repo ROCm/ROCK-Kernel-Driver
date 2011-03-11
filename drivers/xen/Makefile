@@ -38,7 +38,7 @@ xen-platform-pci-y			:= platform-pci.o
 
 obj-$(CONFIG_XEN_BLKDEV_BACKEND)	+= blkback/
 obj-$(CONFIG_XEN_BLKDEV_TAP)		+= blktap/
-obj-$(CONFIG_XEN_BLKDEV_TAP2)           += blktap2/
+obj-$(CONFIG_XEN_BLKDEV_TAP2)		+= blktap2/ blktap2-new/
 obj-$(CONFIG_XEN_NETDEV_BACKEND)	+= netback/
 obj-$(CONFIG_XEN_TPMDEV_BACKEND)	+= tpmback/
 obj-$(CONFIG_XEN_BLKDEV_FRONTEND)	+= blkfront/

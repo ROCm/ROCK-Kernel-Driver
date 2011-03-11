@@ -1923,7 +1923,11 @@ static int set_rx_csum(struct net_device *dev, u32 data)
 	} else {
 		int i;
 
+#ifndef CONFIG_XEN
 		p->rx_offload &= ~(T3_RX_CSUM | T3_LRO);
+#else
+		p->rx_offload &= ~(T3_RX_CSUM);
+#endif
 		for (i = p->first_qset; i < p->first_qset + p->nqsets; i++)
 			set_qset_lro(dev, i, 0);
 	}
@@ -3298,7 +3302,11 @@ static int __devinit init_one(struct pci_dev *pdev,
 		adapter->port[i] = netdev;
 		pi = netdev_priv(netdev);
 		pi->adapter = adapter;
+#ifndef CONFIG_XEN
 		pi->rx_offload = T3_RX_CSUM | T3_LRO;
+#else
+		pi->rx_offload = T3_RX_CSUM;
+#endif
 		pi->port_id = i;
 		netif_carrier_off(netdev);
 		netdev->irq = pdev->irq;

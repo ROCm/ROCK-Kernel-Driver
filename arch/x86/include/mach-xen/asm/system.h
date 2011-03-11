@@ -92,10 +92,12 @@ do {									\
 			"memory");					\
 } while (0)
 
+#ifndef CONFIG_XEN
 /*
  * disable hlt during certain critical i/o operations
  */
 #define HAVE_DISABLE_HLT
+#endif
 #else
 #define __SAVE(reg, offset) "movq %%" #reg ",(14-" #offset ")*8(%%rsp)\n\t"
 #define __RESTORE(reg, offset) "movq (14-" #offset ")*8(%%rsp),%%" #reg "\n\t"

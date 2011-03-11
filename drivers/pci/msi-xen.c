@@ -199,7 +199,7 @@ static int msi_unmap_pirq(struct pci_dev *dev, int pirq)
 		? pirq : evtchn_get_xen_pirq(pirq);
 
 	if ((rc = HYPERVISOR_physdev_op(PHYSDEVOP_unmap_pirq, &unmap)))
-		dev_warn(&dev->dev, "unmap irq %x failed\n", pirq);
+		dev_warn(&dev->dev, "unmap irq %d failed\n", pirq);
 
 	if (rc < 0)
 		return rc;

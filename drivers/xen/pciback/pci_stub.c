@@ -1009,8 +1009,7 @@ static ssize_t pcistub_slot_add(struct device_driver *drv, const char *buf,
 		err = count;
 	return err;
 }
-
-DRIVER_ATTR(new_slot, S_IWUSR, NULL, pcistub_slot_add);
+static DRIVER_ATTR(new_slot, S_IWUSR, NULL, pcistub_slot_add);
 
 static ssize_t pcistub_slot_remove(struct device_driver *drv, const char *buf,
 				   size_t count)
@@ -1029,8 +1028,7 @@ static ssize_t pcistub_slot_remove(struct device_driver *drv, const char *buf,
 		err = count;
 	return err;
 }
-
-DRIVER_ATTR(remove_slot, S_IWUSR, NULL, pcistub_slot_remove);
+static DRIVER_ATTR(remove_slot, S_IWUSR, NULL, pcistub_slot_remove);
 
 static ssize_t pcistub_slot_show(struct device_driver *drv, char *buf)
 {
@@ -1053,8 +1051,7 @@ static ssize_t pcistub_slot_show(struct device_driver *drv, char *buf)
 
 	return count;
 }
-
-DRIVER_ATTR(slots, S_IRUSR, pcistub_slot_show, NULL);
+static DRIVER_ATTR(slots, S_IRUSR, pcistub_slot_show, NULL);
 
 static ssize_t pcistub_quirk_add(struct device_driver *drv, const char *buf,
 				 size_t count)
@@ -1118,8 +1115,7 @@ static ssize_t pcistub_quirk_show(struct device_driver *drv, char *buf)
 
 	return count;
 }
-
-DRIVER_ATTR(quirks, S_IRUSR | S_IWUSR, pcistub_quirk_show, pcistub_quirk_add);
+static DRIVER_ATTR(quirks, S_IRUSR | S_IWUSR, pcistub_quirk_show, pcistub_quirk_add);
 
 static ssize_t permissive_add(struct device_driver *drv, const char *buf,
 			      size_t count)
@@ -1184,8 +1180,7 @@ static ssize_t permissive_show(struct device_driver *drv, char *buf)
 	spin_unlock_irqrestore(&pcistub_devices_lock, flags);
 	return count;
 }
-
-DRIVER_ATTR(permissive, S_IRUSR | S_IWUSR, permissive_show, permissive_add);
+static DRIVER_ATTR(permissive, S_IRUSR | S_IWUSR, permissive_show, permissive_add);
 
 #ifdef CONFIG_PCI_MSI
 
