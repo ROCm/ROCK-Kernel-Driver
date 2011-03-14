@@ -172,7 +172,7 @@ static inline bool exclude_ptrace(struct task_struct *task)
 	return unlikely(!!task_utrace_flags(task));
 }
 
-int ptrace_attach(struct task_struct *task)
+static int ptrace_attach(struct task_struct *task)
 {
 	int retval;
 
@@ -230,7 +230,7 @@ out:
  * Performs checks and sets PT_PTRACED.
  * Should be used by all ptrace implementations for PTRACE_TRACEME.
  */
-int ptrace_traceme(void)
+static int ptrace_traceme(void)
 {
 	int ret = -EPERM;
 
@@ -307,7 +307,7 @@ static bool __ptrace_detach(struct task_struct *tracer, struct task_struct *p)
 	return false;
 }
 
-int ptrace_detach(struct task_struct *child, unsigned int data)
+static int ptrace_detach(struct task_struct *child, unsigned int data)
 {
 	bool dead = false;
 
