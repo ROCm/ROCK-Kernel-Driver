@@ -571,6 +571,15 @@ dma_addr_t swiotlb_map_page(struct device *dev, struct page *page,
 	}
 
 	dev_addr = swiotlb_virt_to_bus(dev, map);
+
+	/*
+	 * Ensure that the address returned is DMA'ble
+	 */
+	if (!dma_capable(dev, dev_addr, size)) {
+		swiotlb_tbl_unmap_single(dev, map, size, dir);
+		dev_addr = swiotlb_virt_to_bus(dev, io_tlb_overflow_buffer);
+	}
+
 	return dev_addr;
 }
 EXPORT_SYMBOL_GPL(swiotlb_map_page);

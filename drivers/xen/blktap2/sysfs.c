@@ -398,8 +398,8 @@ blktap_sysfs_set_verbosity(struct class *class, struct class_attribute *attr,
 
 	return -EINVAL;
 }
-CLASS_ATTR(verbosity, S_IRUSR | S_IWUSR,
-	   blktap_sysfs_show_verbosity, blktap_sysfs_set_verbosity);
+static CLASS_ATTR(verbosity, S_IRUSR | S_IWUSR,
+		  blktap_sysfs_show_verbosity, blktap_sysfs_set_verbosity);
 
 static ssize_t
 blktap_sysfs_show_devices(struct class *class, struct class_attribute *attr,
@@ -425,7 +425,7 @@ blktap_sysfs_show_devices(struct class *class, struct class_attribute *attr,
 
 	return ret;
 }
-CLASS_ATTR(devices, S_IRUSR, blktap_sysfs_show_devices, NULL);
+static CLASS_ATTR(devices, S_IRUSR, blktap_sysfs_show_devices, NULL);
 
 void
 blktap_sysfs_free(void)

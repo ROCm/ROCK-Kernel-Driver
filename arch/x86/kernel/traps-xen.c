@@ -882,4 +882,7 @@ void __cpuinit smp_trap_init(trap_info_t *trap_ctxt)
 		trap_ctxt[t->vector].cs = t->cs;
 		trap_ctxt[t->vector].address = t->address;
 	}
+	TI_SET_IF(trap_ctxt + NMI_VECTOR, 1);
+	trap_ctxt[NMI_VECTOR].cs = __KERNEL_CS;
+	trap_ctxt[NMI_VECTOR].address = (unsigned long)nmi;
 }

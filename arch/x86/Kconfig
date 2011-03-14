@@ -1066,7 +1066,7 @@ config X86_CPUID
 
 choice
 	prompt "High Memory Support"
-	default HIGHMEM64G if X86_NUMAQ
+	default HIGHMEM64G if X86_NUMAQ || XEN
 	default HIGHMEM4G
 	depends on X86_32
 
@@ -1109,7 +1109,7 @@ config NOHIGHMEM
 
 config HIGHMEM4G
 	bool "4GB"
-	depends on !X86_NUMAQ
+	depends on !X86_NUMAQ && !XEN
 	---help---
 	  Select this if you have a 32-bit processor and between 1 and 4
 	  gigabytes of physical RAM.

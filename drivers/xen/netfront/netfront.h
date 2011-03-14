@@ -193,6 +193,9 @@ struct netfront_info {
 	struct multicall_entry rx_mcl[NET_RX_RING_SIZE+1];
 	struct mmu_update rx_mmu[NET_RX_RING_SIZE];
 
+	/* Statistics */
+	unsigned long rx_gso_csum_fixups;
+
 	/* Private pointer to state internal to accelerator module */
 	void *accel_priv;
 	/* The accelerator used by this netfront device */

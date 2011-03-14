@@ -48,6 +48,11 @@ int setup_profiling_timer(unsigned int multiplier)
 	return -EINVAL;
 }
 
+#ifndef CONFIG_SMP
+/*
+ * This initializes the IO-APIC and APIC hardware if this is
+ * a UP kernel.
+ */
 int __init APIC_init_uniprocessor(void)
 {
 #ifdef CONFIG_X86_IO_APIC
@@ -61,3 +66,4 @@ int __init APIC_init_uniprocessor(void)
 
 	return 0;
 }
+#endif

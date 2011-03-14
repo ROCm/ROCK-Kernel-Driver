@@ -60,8 +60,6 @@ ENTRY(startup_32)
 	movb %cl,X86_MASK
 	movl %edx,X86_CAPABILITY
 
-	movb $1,X86_HARD_MATH
-
 #ifdef CONFIG_CC_STACKPROTECTOR
 	/*
 	 * The linker can't handle this by relocation.  Manually set

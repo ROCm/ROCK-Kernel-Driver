@@ -173,6 +173,9 @@ static int ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 		pgprot_val(vma->vm_page_prot) |= _PAGE_IOMAP;
 #endif
 	} else {
+#if defined(CONFIG_XEN) && defined(_PAGE_IOMAP)
+		pgprot_val(vma->vm_page_prot) &= ~_PAGE_IOMAP;
+#endif
 		ttm = bo->ttm;
 		vma->vm_page_prot = (bo->mem.placement & TTM_PL_FLAG_CACHED) ?
 		    vm_get_page_prot(vma->vm_flags) :

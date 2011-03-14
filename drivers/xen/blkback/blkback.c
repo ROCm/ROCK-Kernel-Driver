@@ -73,10 +73,9 @@ module_param(debug_lvl, int, 0644);
 typedef struct {
 	blkif_t       *blkif;
 	u64            id;
-	int            nr_pages;
 	atomic_t       pendcnt;
+	unsigned short nr_pages;
 	unsigned short operation;
-	int            status;
 	struct list_head free_list;
 } pending_req_t;
 
@@ -257,22 +256,24 @@ int blkif_schedule(void *arg)
 
 static void __end_block_io_op(pending_req_t *pending_req, int error)
 {
+	int status = BLKIF_RSP_OKAY;
+
 	/* An error fails the entire request. */
 	if ((pending_req->operation == BLKIF_OP_WRITE_BARRIER) &&
 	    (error == -EOPNOTSUPP)) {
 		DPRINTK("blkback: write barrier op failed, not supported\n");
 		blkback_barrier(XBT_NIL, pending_req->blkif->be, 0);
-		pending_req->status = BLKIF_RSP_EOPNOTSUPP;
+		status = BLKIF_RSP_EOPNOTSUPP;
 	} else if (error) {
 		DPRINTK("Buffer not up-to-date at end of operation, "
 			"error=%d\n", error);
-		pending_req->status = BLKIF_RSP_ERROR;
+		status = BLKIF_RSP_ERROR;
 	}
 
 	if (atomic_dec_and_test(&pending_req->pendcnt)) {
 		fast_flush_area(pending_req);
 		make_response(pending_req->blkif, pending_req->id,
-			      pending_req->operation, pending_req->status);
+			      pending_req->operation, status);
 		blkif_put(pending_req->blkif);
 		free_req(pending_req);
 	}
@@ -396,7 +397,6 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 				 blkif_request_t *req,
 				 pending_req_t *pending_req)
 {
-	extern void ll_rw_block(int rw, int nr, struct buffer_head * bhs[]);
 	struct gnttab_map_grant_ref map[BLKIF_MAX_SEGMENTS_PER_REQUEST];
 	struct phys_req preq;
 	struct { 
@@ -404,6 +404,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 	} seg[BLKIF_MAX_SEGMENTS_PER_REQUEST];
 	unsigned int nseg;
 	struct bio *bio = NULL;
+	uint32_t flags;
 	int ret, i;
 	int operation;
 
@@ -424,7 +425,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 
 	/* Check that number of segments is sane. */
 	nseg = req->nr_segments;
-	if (unlikely(nseg == 0 && !(operation & (REQ_FLUSH|REQ_FUA))) ||
+	if (unlikely(nseg == 0 && req->operation != BLKIF_OP_WRITE_BARRIER) ||
 	    unlikely(nseg > BLKIF_MAX_SEGMENTS_PER_REQUEST)) {
 		DPRINTK("Bad number of segments in request (%d)\n", nseg);
 		goto fail_response;
@@ -437,12 +438,13 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 	pending_req->blkif     = blkif;
 	pending_req->id        = req->id;
 	pending_req->operation = req->operation;
-	pending_req->status    = BLKIF_RSP_OKAY;
 	pending_req->nr_pages  = nseg;
 
-	for (i = 0; i < nseg; i++) {
-		uint32_t flags;
+	flags = GNTMAP_host_map;
+	if (operation != READ)
+		flags |= GNTMAP_readonly;
 
+	for (i = 0; i < nseg; i++) {
 		seg[i].nsec = req->seg[i].last_sect -
 			req->seg[i].first_sect + 1;
 
@@ -451,9 +453,6 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 			goto fail_response;
 		preq.nr_sects += seg[i].nsec;
 
-		flags = GNTMAP_host_map;
-		if (operation != READ)
-			flags |= GNTMAP_readonly;
 		gnttab_set_map_op(&map[i], vaddr(pending_req, i), flags,
 				  req->seg[i].gref, blkif->domid);
 	}

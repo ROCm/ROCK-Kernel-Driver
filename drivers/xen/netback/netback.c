@@ -175,18 +175,27 @@ static int check_mfn(struct xen_netbk *netbk, unsigned int nr)
 	return netbk->alloc_index >= nr ? 0 : -ENOMEM;
 }
 
+static void netbk_schedule(struct xen_netbk *netbk)
+{
+	if (use_kthreads)
+		wake_up(&netbk->netbk_action_wq);
+	else
+		tasklet_schedule(&netbk->net_tx_tasklet);
+}
+
+static void netbk_schedule_group(unsigned long group)
+{
+	netbk_schedule(&xen_netbk[group]);
+}
+
 static inline void maybe_schedule_tx_action(unsigned int group)
 {
 	struct xen_netbk *netbk = &xen_netbk[group];
 
 	smp_mb();
 	if ((nr_pending_reqs(netbk) < (MAX_PENDING_REQS/2)) &&
-	    !list_empty(&netbk->schedule_list)) {
-		if (use_kthreads)
-			wake_up(&netbk->netbk_action_wq);
-		else
-			tasklet_schedule(&netbk->net_tx_tasklet);
-	}
+	    !list_empty(&netbk->schedule_list))
+		netbk_schedule(netbk);
 }
 
 static struct sk_buff *netbk_copy_skb(struct sk_buff *skb)
@@ -271,7 +280,7 @@ static struct sk_buff *netbk_copy_skb(struct sk_buff *skb)
 
 static inline int netbk_max_required_rx_slots(netif_t *netif)
 {
-	if (netif->features & (NETIF_F_SG|NETIF_F_TSO))
+	if (netif->can_sg || netif->gso)
 		return MAX_SKB_FRAGS + 2; /* header + extra_info + frags */
 	return 1; /* all in one */
 }
@@ -346,10 +355,7 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	netbk = &xen_netbk[GET_GROUP_INDEX(netif)];
 	skb_queue_tail(&netbk->rx_queue, skb);
-	if (use_kthreads)
-		wake_up(&netbk->netbk_action_wq);
-	else
-		tasklet_schedule(&netbk->net_rx_tasklet);
+	netbk_schedule(netbk);
 
 	return NETDEV_TX_OK;
 
@@ -785,32 +791,12 @@ static void net_rx_action(unsigned long group)
 
 	/* More work to do? */
 	if (!skb_queue_empty(&netbk->rx_queue) &&
-	    !timer_pending(&netbk->net_timer)) {
-		if (use_kthreads)
-			wake_up(&netbk->netbk_action_wq);
-		else
-			tasklet_schedule(&netbk->net_rx_tasklet);
-	}
+	    !timer_pending(&netbk->net_timer))
+		netbk_schedule(netbk);
 #if 0
 	else
 		xen_network_done_notify();
 #endif
-}
-
-static void net_alarm(unsigned long group)
-{
-	if (use_kthreads)
-		wake_up(&xen_netbk[group].netbk_action_wq);
-	else
-		tasklet_schedule(&xen_netbk[group].net_rx_tasklet);
-}
-
-static void netbk_tx_pending_timeout(unsigned long group)
-{
-	if (use_kthreads)
-		wake_up(&xen_netbk[group].netbk_action_wq);
-	else
-		tasklet_schedule(&xen_netbk[group].net_tx_tasklet);
 }
 
 static int __on_net_schedule_list(netif_t *netif)
@@ -1526,13 +1512,9 @@ static void net_tx_action(unsigned long group)
 
 		skb->protocol = eth_type_trans(skb, dev);
 
-		if (skb->ip_summed == CHECKSUM_PARTIAL
-		    ? skb_checksum_setup(skb) : 0 /* ??? skb_is_gso(skb) */) {
-			DPRINTK("%s\n", skb->ip_summed == CHECKSUM_PARTIAL
-				? "Can't setup checksum in net_tx_action"
-				: "Dropping GSO w/o CHECKSUM_PARTIAL skb");
+		if (skb_checksum_setup(skb, &netif->rx_gso_csum_fixups)) {
+			DPRINTK("Can't setup checksum in net_tx_action\n");
 			kfree_skb(skb);
-			dev->stats.rx_errors++;
 			continue;
 		}
 
@@ -1551,7 +1533,6 @@ static void net_tx_action(unsigned long group)
 			netif_rx_ni(skb);
 		else
 			netif_rx(skb);
-		dev->last_rx = jiffies;
 	}
 
  out:
@@ -1576,10 +1557,7 @@ static void netif_idx_release(struct xen_netbk *netbk, u16 pending_idx)
 	netbk->dealloc_prod++;
 	spin_unlock_irqrestore(&netbk->release_lock, flags);
 
-	if (use_kthreads)
-		wake_up(&netbk->netbk_action_wq);
-	else
-		tasklet_schedule(&netbk->net_tx_tasklet);
+	netbk_schedule(netbk);
 }
 
 static void netif_page_release(struct page *page, unsigned int order)
@@ -1801,12 +1779,11 @@ static int __init netback_init(void)
 
 		init_timer(&netbk->net_timer);
 		netbk->net_timer.data = group;
-		netbk->net_timer.function = net_alarm;
+		netbk->net_timer.function = netbk_schedule_group;
 
 		init_timer(&netbk->tx_pending_timer);
 		netbk->tx_pending_timer.data = group;
-		netbk->tx_pending_timer.function =
-			netbk_tx_pending_timeout;
+		netbk->tx_pending_timer.function = netbk_schedule_group;
 
 		netbk->pending_prod = MAX_PENDING_REQS;
 

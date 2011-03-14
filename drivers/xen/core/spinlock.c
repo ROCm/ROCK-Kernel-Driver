@@ -22,11 +22,11 @@ struct spinning {
 	struct spinning *prev;
 };
 static DEFINE_PER_CPU(struct spinning *, _spinning);
-static DEFINE_PER_CPU(evtchn_port_t, poll_evtchn);
+static DEFINE_PER_CPU_READ_MOSTLY(evtchn_port_t, poll_evtchn);
 /*
  * Protect removal of objects: Addition can be done lockless, and even
  * removal itself doesn't need protection - what needs to be prevented is
- * removed objects going out of scope (as they're allocated on the stack.
+ * removed objects going out of scope (as they're allocated on the stack).
  */
 static DEFINE_PER_CPU(arch_rwlock_t, spinning_rm_lock) = __ARCH_RW_LOCK_UNLOCKED;
 

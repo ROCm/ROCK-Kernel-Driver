@@ -24,7 +24,7 @@ static int command_read(struct pci_dev *dev, int offset, u16 *value, void *data)
 	int ret;
 
 	ret = pciback_read_config_word(dev, offset, value, data);
-	if (!atomic_read(&dev->enable_cnt))
+	if (!pci_is_enabled(dev))
 		return ret;
 
 	for (i = 0; i < PCI_ROM_RESOURCE; i++) {
@@ -41,14 +41,14 @@ static int command_write(struct pci_dev *dev, int offset, u16 value, void *data)
 {
 	int err;
 
-	if (!atomic_read(&dev->enable_cnt) && is_enable_cmd(value)) {
+	if (!pci_is_enabled(dev) && is_enable_cmd(value)) {
 		if (unlikely(verbose_request))
 			printk(KERN_DEBUG "pciback: %s: enable\n",
 			       pci_name(dev));
 		err = pci_enable_device(dev);
 		if (err)
 			return err;
-	} else if (atomic_read(&dev->enable_cnt) && !is_enable_cmd(value)) {
+	} else if (pci_is_enabled(dev) && !is_enable_cmd(value)) {
 		if (unlikely(verbose_request))
 			printk(KERN_DEBUG "pciback: %s: disable\n",
 			       pci_name(dev));

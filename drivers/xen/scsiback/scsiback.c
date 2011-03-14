@@ -272,14 +272,14 @@ static int scsiback_gnttab_data_map(vscsiif_request_t *ring_req,
 
 		sg_init_table(pending_req->sgl, nr_segments);
 
-		for (i = 0; i < nr_segments; i++) {
-			flags = GNTMAP_host_map;
-			if (write)
-				flags |= GNTMAP_readonly;
+		flags = GNTMAP_host_map;
+		if (write)
+			flags |= GNTMAP_readonly;
+
+		for (i = 0; i < nr_segments; i++)
 			gnttab_set_map_op(&map[i], vaddr(pending_req, i), flags,
 						ring_req->seg[i].gref,
 						info->domid);
-		}
 
 		err = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, map, nr_segments);
 		BUG_ON(err);

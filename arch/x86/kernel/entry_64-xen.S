@@ -331,7 +331,7 @@ ENTRY(save_args)
 	 * start from rbp in pt_regs and jump over
 	 * return address.
 	 */
-	movq %rdi, RDI+8-RBP(%rsp)
+	movq_cfi rdi, RDI+8-RBP
 	movq %rsi, RSI+8-RBP(%rsp)
 	movq %rdx, RDX+8-RBP(%rsp)
 	movq %rcx, RCX+8-RBP(%rsp)
@@ -339,7 +339,7 @@ ENTRY(save_args)
 	movq  %r8,  R8+8-RBP(%rsp)
 	movq  %r9,  R9+8-RBP(%rsp)
 	movq %r10, R10+8-RBP(%rsp)
-	movq_cfi r11, R11+8-RBP
+	movq %r11, R11+8-RBP(%rsp)
 
 	leaq -RBP+8(%rsp),%rdi	/* arg1 for handler */
 	movq_cfi rbp, 8		/* push %rbp */

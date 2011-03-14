@@ -780,7 +780,7 @@ static int xenfb_connect_backend(struct xenbus_device *dev,
 	if (ret)
 		goto error_xenbus;
 	ret = xenbus_printf(xbt, dev->nodename, "event-channel", "%u",
-			    irq_to_evtchn_port(info->irq));
+			    irq_to_evtchn_port(irq));
 	if (ret)
 		goto error_xenbus;
 	ret = xenbus_printf(xbt, dev->nodename, "protocol", "%s",

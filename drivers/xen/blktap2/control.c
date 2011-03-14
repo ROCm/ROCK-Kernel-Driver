@@ -145,7 +145,7 @@ blktap_control_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	return -ENOIOCTLCMD;
 }
 
-static struct file_operations blktap_control_file_operations = {
+static const struct file_operations blktap_control_file_operations = {
 	.owner    = THIS_MODULE,
 	.unlocked_ioctl = blktap_control_ioctl,
 };

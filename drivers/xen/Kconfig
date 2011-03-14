@@ -19,7 +19,8 @@ config XEN_PRIVILEGED_GUEST
 	  Support for privileged operation (domain 0)
 
 config XEN_UNPRIVILEGED_GUEST
-	def_bool !XEN_PRIVILEGED_GUEST
+	def_bool y
+	depends on !XEN_PRIVILEGED_GUEST
 	select PM
 	select SUSPEND
 
@@ -47,7 +48,7 @@ config XEN_BACKEND
 
 config XEN_BLKDEV_BACKEND
 	tristate "Block-device backend driver"
-        depends on XEN_BACKEND
+	depends on BLOCK && XEN_BACKEND
 	default XEN_BACKEND
 	select XEN_DOMCTL
 	help
@@ -57,7 +58,7 @@ config XEN_BLKDEV_BACKEND
 
 config XEN_BLKDEV_TAP
 	tristate "Block-device tap backend driver"
-	depends on XEN_BACKEND
+	depends on BLOCK && XEN_BACKEND
 	default XEN_BACKEND
 	select XEN_DOMCTL
 	help
@@ -70,7 +71,7 @@ config XEN_BLKDEV_TAP
 
 config XEN_BLKDEV_TAP2
 	tristate "Block-device tap backend driver 2"
-	depends on XEN_BACKEND
+	depends on BLOCK && XEN_BACKEND
 	default XEN_BACKEND
 	help
 	  The block tap driver is an alternative to the block back driver
@@ -387,9 +388,6 @@ endmenu
 
 config HAVE_IRQ_IGNORE_UNHANDLED
 	def_bool y
-
-config IRQ_PER_CPU
-	bool
 
 config ARCH_HAS_WALK_MEMORY
 	def_bool y
