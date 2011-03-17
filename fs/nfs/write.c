@@ -502,7 +502,8 @@ static void
 nfs_mark_request_dirty(struct nfs_page *req)
 {
 	__set_page_dirty_nobuffers(req->wb_page);
-	__mark_inode_dirty(req->wb_page->mapping->host, I_DIRTY_DATASYNC);
+	__mark_inode_dirty(page_file_mapping(req->wb_page)->host,
+							I_DIRTY_DATASYNC);
 }
 
 #if defined(CONFIG_NFS_V3) || defined(CONFIG_NFS_V4)
