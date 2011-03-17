@@ -230,7 +230,6 @@ struct rt_hash_bucket {
 #  define RT_HASH_LOCK_SZ	256
 # endif
 #endif
-#include <linux/reserve.h>
 
 static spinlock_t	*rt_hash_locks;
 # define rt_hash_lock_addr(slot) &rt_hash_locks[(slot) & (RT_HASH_LOCK_SZ - 1)]
@@ -274,8 +273,6 @@ static inline int rt_genid(struct net *net)
 {
 	return atomic_read(&net->ipv4.rt_genid);
 }
-
-static struct mem_reserve ipv4_route_reserve;
 
 static struct mem_reserve ipv4_route_reserve;
 
@@ -435,8 +432,6 @@ proc_dointvec_route(struct ctl_table *table, int write, void __user *buffer,
 
 	return ret;
 }
-
-static struct mutex ipv4_route_lock;
 
 static const struct seq_operations rt_cache_seq_ops = {
 	.start  = rt_cache_seq_start,
@@ -3144,7 +3139,7 @@ static ctl_table ipv4_route_table[] = {
 		.data		= &ip_rt_redirect_load,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
-		.proc_handler	= proc_dointvec_route,
+		.proc_handler	= proc_dointvec,
 	},
 	{
 		.procname	= "redirect_number",
@@ -3345,15 +3340,6 @@ int __init ip_rt_init(void)
 	ip_rt_max_size = (rt_hash_mask + 1) * 16;
 
 #ifdef CONFIG_PROC_FS
-	mutex_init(&ipv4_route_lock);
-#endif
-
-	mem_reserve_init(&ipv4_route_reserve, "IPv4 route cache",
-			&net_rx_reserve);
-	mem_reserve_kmem_cache_set(&ipv4_route_reserve,
-			ipv4_dst_ops.kmem_cachep, ip_rt_max_size);
-
-#ifdef CONFIG_PROCFS
 	mutex_init(&ipv4_route_lock);
 #endif
 
