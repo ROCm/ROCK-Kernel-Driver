@@ -300,6 +300,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_domctl_max_vcpus_t);
 #define XEN_SCHEDULER_SEDF     4
 #define XEN_SCHEDULER_CREDIT   5
 #define XEN_SCHEDULER_CREDIT2  6
+#define XEN_SCHEDULER_ARINC653 7
 /* Set or get info? */
 #define XEN_DOMCTL_SCHEDOP_putinfo 0
 #define XEN_DOMCTL_SCHEDOP_getinfo 1
@@ -713,13 +714,26 @@ struct xen_domctl_gdbsx_domstatus {
 /*
  * Page memory in and out. 
  */
-#define XEN_DOMCTL_MEM_EVENT_OP_PAGING (1 << 0)
+#define XEN_DOMCTL_MEM_EVENT_OP_PAGING            1
 
 /* Domain memory paging */
 #define XEN_DOMCTL_MEM_EVENT_OP_PAGING_NOMINATE   0
 #define XEN_DOMCTL_MEM_EVENT_OP_PAGING_EVICT      1
 #define XEN_DOMCTL_MEM_EVENT_OP_PAGING_PREP       2
 #define XEN_DOMCTL_MEM_EVENT_OP_PAGING_RESUME     3
+
+/*
+ * Access permissions.
+ *
+ * There are HVM hypercalls to set the per-page access permissions of every
+ * page in a domain.  When one of these permissions--independent, read, 
+ * write, and execute--is violated, the VCPU is paused and a memory event 
+ * is sent with what happened.  (See public/mem_event.h)  The memory event 
+ * handler can then resume the VCPU and redo the access with an 
+ * ACCESS_RESUME mode for the following domctl.
+ */
+#define XEN_DOMCTL_MEM_EVENT_OP_ACCESS            2
+#define XEN_DOMCTL_MEM_EVENT_OP_ACCESS_RESUME     0 
 
 struct xen_domctl_mem_event_op {
     uint32_t       op;           /* XEN_DOMCTL_MEM_EVENT_OP_* */
@@ -781,6 +795,41 @@ struct xen_domctl_mem_sharing_op {
 typedef struct xen_domctl_mem_sharing_op xen_domctl_mem_sharing_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_mem_sharing_op_t);
 
+#if defined(__i386__) || defined(__x86_64__)
+/* XEN_DOMCTL_setvcpuextstate */
+/* XEN_DOMCTL_getvcpuextstate */
+struct xen_domctl_vcpuextstate {
+    /* IN: VCPU that this call applies to. */
+    uint32_t         vcpu;
+    /*
+     * SET: xfeature support mask of struct (IN)
+     * GET: xfeature support mask of struct (IN/OUT)
+     * xfeature mask is served as identifications of the saving format
+     * so that compatible CPUs can have a check on format to decide
+     * whether it can restore.
+     */
+    uint64_aligned_t         xfeature_mask;
+    /*
+     * SET: Size of struct (IN)
+     * GET: Size of struct (IN/OUT)
+     */
+    uint64_aligned_t         size;
+    XEN_GUEST_HANDLE_64(uint64) buffer;
+};
+typedef struct xen_domctl_vcpuextstate xen_domctl_vcpuextstate_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_vcpuextstate_t);
+#endif
+
+/* XEN_DOMCTL_set_access_required: sets whether a memory event listener
+ * must be present to handle page access events: if false, the page
+ * access will revert to full permissions if no one is listening;
+ *  */
+struct xen_domctl_set_access_required {
+    uint8_t access_required;
+};
+typedef struct xen_domctl_set_access_required xen_domctl_set_access_required_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_set_access_required_t);
+
 struct xen_domctl {
     uint32_t cmd;
 #define XEN_DOMCTL_createdomain                   1
@@ -841,6 +890,9 @@ struct xen_domctl {
 #define XEN_DOMCTL_gettscinfo                    59
 #define XEN_DOMCTL_settscinfo                    60
 #define XEN_DOMCTL_getpageframeinfo3             61
+#define XEN_DOMCTL_setvcpuextstate               62
+#define XEN_DOMCTL_getvcpuextstate               63
+#define XEN_DOMCTL_set_access_required           64
 #define XEN_DOMCTL_gdbsx_guestmemio            1000
 #define XEN_DOMCTL_gdbsx_pausevcpu             1001
 #define XEN_DOMCTL_gdbsx_unpausevcpu           1002
@@ -891,7 +943,9 @@ struct xen_domctl {
         struct xen_domctl_mem_sharing_op    mem_sharing_op;
 #if defined(__i386__) || defined(__x86_64__)
         struct xen_domctl_cpuid             cpuid;
+        struct xen_domctl_vcpuextstate      vcpuextstate;
 #endif
+        struct xen_domctl_set_access_required access_required;
         struct xen_domctl_gdbsx_memio       gdbsx_guest_memio;
         struct xen_domctl_gdbsx_pauseunp_vcpu gdbsx_pauseunp_vcpu;
         struct xen_domctl_gdbsx_domstatus   gdbsx_domstatus;

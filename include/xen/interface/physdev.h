@@ -236,11 +236,7 @@ struct physdev_setup_gsi {
 typedef struct physdev_setup_gsi physdev_setup_gsi_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_setup_gsi_t);
 
-#define PHYSDEVOP_get_nr_pirqs    22
-struct physdev_nr_pirqs {
-    /* OUT */
-    uint32_t nr_pirqs;
-};
+/* leave PHYSDEVOP 22 free */
 
 /* type is MAP_PIRQ_TYPE_GSI or MAP_PIRQ_TYPE_MSI
  * the hypercall returns a free pirq */
@@ -251,6 +247,9 @@ struct physdev_get_free_pirq {
     /* OUT */
     uint32_t pirq;
 };
+
+typedef struct physdev_get_free_pirq physdev_get_free_pirq_t;
+DEFINE_XEN_GUEST_HANDLE(physdev_get_free_pirq_t);
 
 /*
  * Notify that some PIRQ-bound event channels have been unmasked.

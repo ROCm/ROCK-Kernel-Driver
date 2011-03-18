@@ -1753,7 +1753,7 @@ static const struct xennet_stat {
 } xennet_stats[] = {
 	{
 		"rx_gso_csum_fixups",
-		offsetof(struct netfront_info, rx_gso_csum_fixups)
+		offsetof(struct netfront_info, rx_gso_csum_fixups) / sizeof(long)
 	},
 };
 
@@ -1769,11 +1769,11 @@ static int xennet_get_sset_count(struct net_device *dev, int sset)
 static void xennet_get_ethtool_stats(struct net_device *dev,
 				     struct ethtool_stats *stats, u64 *data)
 {
-	void *np = netdev_priv(dev);
+	unsigned long *np = netdev_priv(dev);
 	unsigned int i;
 
 	for (i = 0; i < ARRAY_SIZE(xennet_stats); i++)
-		data[i] = *(unsigned int *)(np + xennet_stats[i].offset);
+		data[i] = np[xennet_stats[i].offset];
 }
 
 static void xennet_get_strings(struct net_device *dev, u32 stringset, u8 *data)

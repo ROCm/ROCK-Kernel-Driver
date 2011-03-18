@@ -113,6 +113,30 @@
 #define HVM_PARAM_CONSOLE_PFN    17
 #define HVM_PARAM_CONSOLE_EVTCHN 18
 
-#define HVM_NR_PARAMS          19
+/*
+ * Select location of ACPI PM1a and TMR control blocks. Currently two locations
+ * are supported, specified by version 0 or 1 in this parameter:
+ *   - 0: default, use the old addresses
+ *        PM1A_EVT == 0x1f40; PM1A_CNT == 0x1f44; PM_TMR == 0x1f48
+ *   - 1: use the new default qemu addresses
+ *        PM1A_EVT == 0xb000; PM1A_CNT == 0xb004; PM_TMR == 0xb008
+ * You can find these address definitions in <hvm/ioreq.h>
+ */
+#define HVM_PARAM_ACPI_IOPORTS_LOCATION 19
+
+/* Enable blocking memory events, async or sync (pause vcpu until response) 
+ * onchangeonly indicates messages only on a change of value */
+#define HVM_PARAM_MEMORY_EVENT_CR0   20
+#define HVM_PARAM_MEMORY_EVENT_CR3   21
+#define HVM_PARAM_MEMORY_EVENT_CR4   22
+#define HVM_PARAM_MEMORY_EVENT_INT3  23
+
+#define HVMPME_MODE_MASK       (3 << 0)
+#define HVMPME_mode_disabled   0
+#define HVMPME_mode_async      1
+#define HVMPME_mode_sync       2
+#define HVMPME_onchangeonly    (1 << 2)
+
+#define HVM_NR_PARAMS          24
 
 #endif /* __XEN_PUBLIC_HVM_PARAMS_H__ */

@@ -253,21 +253,12 @@ struct xen_sysctl_get_pmstat {
 typedef struct xen_sysctl_get_pmstat xen_sysctl_get_pmstat_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_get_pmstat_t);
 
-/*
- * Status codes. Must be greater than 0 to avoid confusing
- * sysctl callers that see 0 as a plain successful return.
- */
-#define XEN_CPU_HOTPLUG_STATUS_OFFLINE 1
-#define XEN_CPU_HOTPLUG_STATUS_ONLINE  2
-#define XEN_CPU_HOTPLUG_STATUS_NEW     3
-
 /* XEN_SYSCTL_cpu_hotplug */
 struct xen_sysctl_cpu_hotplug {
     /* IN variables */
     uint32_t cpu;   /* Physical cpu. */
 #define XEN_SYSCTL_CPU_HOTPLUG_ONLINE  0
 #define XEN_SYSCTL_CPU_HOTPLUG_OFFLINE 1
-#define XEN_SYSCTL_CPU_HOTPLUG_STATUS 2
     uint32_t op;    /* hotplug opcode */
 };
 typedef struct xen_sysctl_cpu_hotplug xen_sysctl_cpu_hotplug_t;
@@ -542,6 +533,34 @@ struct xen_sysctl_cpupool_op {
 typedef struct xen_sysctl_cpupool_op xen_sysctl_cpupool_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_cpupool_op_t);
 
+#define ARINC653_MAX_DOMAINS_PER_SCHEDULE   64
+/*
+ * This structure is used to pass a new ARINC653 schedule from a
+ * privileged domain (ie dom0) to Xen.
+ */
+struct xen_sysctl_arinc653_schedule {
+    /* major_frame holds the time for the new schedule's major frame
+     * in nanoseconds. */
+    uint64_aligned_t     major_frame;
+    /* num_sched_entries holds how many of the entries in the
+     * sched_entries[] array are valid. */
+    uint8_t     num_sched_entries;
+    /* The sched_entries array holds the actual schedule entries. */
+    struct {
+        /* dom_handle must match a domain's UUID */
+        xen_domain_handle_t dom_handle;
+        /* If a domain has multiple VCPUs, vcpu_id specifies which one
+         * this schedule entry applies to. It should be set to 0 if
+         * there is only one VCPU for the domain. */
+        unsigned int vcpu_id;
+        /* runtime specifies the amount of time that should be allocated
+         * to this VCPU per major frame. It is specified in nanoseconds */
+        uint64_aligned_t runtime;
+    } sched_entries[ARINC653_MAX_DOMAINS_PER_SCHEDULE];
+};
+typedef struct xen_sysctl_arinc653_schedule xen_sysctl_arinc653_schedule_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_arinc653_schedule_t);
+
 /* XEN_SYSCTL_scheduler_op */
 /* Set or get info? */
 #define XEN_SYSCTL_SCHEDOP_putinfo 0
@@ -551,6 +570,9 @@ struct xen_sysctl_scheduler_op {
     uint32_t sched_id;   /* XEN_SCHEDULER_* (domctl.h) */
     uint32_t cmd;        /* XEN_SYSCTL_SCHEDOP_* */
     union {
+        struct xen_sysctl_sched_arinc653 {
+            XEN_GUEST_HANDLE_64(xen_sysctl_arinc653_schedule_t) schedule;
+        } sched_arinc653;
     } u;
 };
 typedef struct xen_sysctl_scheduler_op xen_sysctl_scheduler_op_t;

@@ -28,7 +28,11 @@ static DEFINE_PER_CPU_READ_MOSTLY(evtchn_port_t, poll_evtchn);
  * removal itself doesn't need protection - what needs to be prevented is
  * removed objects going out of scope (as they're allocated on the stack).
  */
-static DEFINE_PER_CPU(arch_rwlock_t, spinning_rm_lock) = __ARCH_RW_LOCK_UNLOCKED;
+struct rm_seq {
+	unsigned int idx;
+	atomic_t ctr[2];
+};
+static DEFINE_PER_CPU(struct rm_seq, rm_seq);
 
 int __cpuinit xen_spinlock_init(unsigned int cpu)
 {
@@ -125,10 +129,9 @@ unsigned int xen_spin_adjust(const arch_spinlock_t *lock, unsigned int token)
 unsigned int xen_spin_wait(arch_spinlock_t *lock, unsigned int *ptok,
 			   unsigned int flags)
 {
-	unsigned int cpu = raw_smp_processor_id();
+	unsigned int rm_idx, cpu = raw_smp_processor_id();
 	bool rc;
 	typeof(vcpu_info(0)->evtchn_upcall_mask) upcall_mask;
-	arch_rwlock_t *rm_lock;
 	struct spinning spinning, *other;
 
 	/* If kicker interrupt not initialized yet, just spin. */
@@ -228,10 +231,11 @@ unsigned int xen_spin_wait(arch_spinlock_t *lock, unsigned int *ptok,
 	/* announce we're done */
 	other = spinning.prev;
 	percpu_write(_spinning, other);
-	rm_lock = &__get_cpu_var(spinning_rm_lock);
 	arch_local_irq_disable();
-	arch_write_lock(rm_lock);
-	arch_write_unlock(rm_lock);
+	rm_idx = percpu_read(rm_seq.idx);
+	smp_wmb();
+	percpu_write(rm_seq.idx, rm_idx + 1);
+	mb();
 
 	/*
 	 * Obtain new tickets for (or acquire) all those locks where
@@ -255,6 +259,9 @@ unsigned int xen_spin_wait(arch_spinlock_t *lock, unsigned int *ptok,
 		lock = spinning.lock;
 	}
 
+	rm_idx &= 1;
+	while (percpu_read(rm_seq.ctr[rm_idx].counter))
+		cpu_relax();
 	arch_local_irq_restore(upcall_mask);
 	*ptok = lock->cur | (spinning.ticket << TICKET_SHIFT);
 
@@ -263,30 +270,50 @@ unsigned int xen_spin_wait(arch_spinlock_t *lock, unsigned int *ptok,
 
 void xen_spin_kick(arch_spinlock_t *lock, unsigned int token)
 {
-	unsigned int cpu;
+	unsigned int cpu = raw_smp_processor_id(), ancor = cpu;
+
+	if (unlikely(!cpu_online(cpu)))
+		cpu = -1, ancor = nr_cpu_ids;
 
 	token &= (1U << TICKET_SHIFT) - 1;
-	for_each_online_cpu(cpu) {
-		arch_rwlock_t *rm_lock;
+	while ((cpu = cpumask_next(cpu, cpu_online_mask)) != ancor) {
 		unsigned int flags;
+		atomic_t *rm_ctr;
 		struct spinning *spinning;
 
-		if (cpu == raw_smp_processor_id())
-			continue;
+		if (cpu >= nr_cpu_ids) {
+			if (ancor == nr_cpu_ids)
+				return;
+			cpu = cpumask_first(cpu_online_mask);
+			if (cpu == ancor)
+				return;
+		}
 
-		rm_lock = &per_cpu(spinning_rm_lock, cpu);
 		flags = arch_local_irq_save();
-		arch_read_lock(rm_lock);
+		for (;;) {
+			unsigned int rm_idx = per_cpu(rm_seq.idx, cpu);
 
-		spinning = per_cpu(_spinning, cpu);
-		smp_rmb();
+			rm_ctr = per_cpu(rm_seq.ctr, cpu) + (rm_idx & 1);
+			atomic_inc(rm_ctr);
+#ifdef CONFIG_X86 /* atomic ops are full barriers */
+			barrier();
+#else
+			smp_mb();
+#endif
+			spinning = per_cpu(_spinning, cpu);
+			smp_rmb();
+			if (rm_idx == per_cpu(rm_seq.idx, cpu))
+				break;
+			atomic_dec(rm_ctr);
+		}
+
 		while (spinning) {
 			if (spinning->lock == lock && spinning->ticket == token)
 				break;
 			spinning = spinning->prev;
 		}
 
-		arch_read_unlock(rm_lock);
+		atomic_dec(rm_ctr);
 		arch_local_irq_restore(flags);
 
 		if (unlikely(spinning)) {

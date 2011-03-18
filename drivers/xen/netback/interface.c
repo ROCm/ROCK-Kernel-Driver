@@ -191,8 +191,8 @@ static const struct netif_stat {
 	char name[ETH_GSTRING_LEN];
 	u16 offset;
 } netbk_stats[] = {
-	{ "copied_skbs", offsetof(netif_t, nr_copied_skbs) },
-	{ "rx_gso_csum_fixups", offsetof(netif_t, rx_gso_csum_fixups) },
+	{ "copied_skbs", offsetof(netif_t, nr_copied_skbs) / sizeof(long) },
+	{ "rx_gso_csum_fixups", offsetof(netif_t, rx_gso_csum_fixups) / sizeof(long) },
 };
 
 static int netbk_get_sset_count(struct net_device *dev, int sset)
@@ -207,11 +207,11 @@ static int netbk_get_sset_count(struct net_device *dev, int sset)
 static void netbk_get_ethtool_stats(struct net_device *dev,
 				   struct ethtool_stats *stats, u64 * data)
 {
-	void *netif = netdev_priv(dev);
+	unsigned long *np = netdev_priv(dev);
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(netbk_stats); i++)
-		data[i] = *(int *)(netif + netbk_stats[i].offset);
+		data[i] = np[netbk_stats[i].offset];
 }
 
 static void netbk_get_strings(struct net_device *dev, u32 stringset, u8 * data)

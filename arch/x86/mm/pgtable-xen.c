@@ -410,23 +410,23 @@ void mm_unpin(struct mm_struct *mm)
 void mm_pin_all(void)
 {
 	struct page *page;
-	unsigned long flags;
 
 	if (xen_feature(XENFEAT_writable_page_tables))
 		return;
 
 	/*
 	 * Allow uninterrupted access to the pgd_list. Also protects
-	 * __pgd_pin() by disabling preemption.
+	 * __pgd_pin() by ensuring preemption is disabled.
 	 * All other CPUs must be at a safe point (e.g., in stop_machine
 	 * or offlined entirely).
 	 */
-	spin_lock_irqsave(&pgd_lock, flags);
+	BUG_ON(!irqs_disabled());
+	spin_lock(&pgd_lock);
 	list_for_each_entry(page, &pgd_list, lru) {
 		if (!PagePinned(page))
 			__pgd_pin((pgd_t *)page_address(page));
 	}
-	spin_unlock_irqrestore(&pgd_lock, flags);
+	spin_unlock(&pgd_lock);
 }
 
 void arch_dup_mmap(struct mm_struct *oldmm, struct mm_struct *mm)
@@ -539,12 +539,10 @@ static void pgd_ctor(struct mm_struct *mm, pgd_t *pgd)
 
 static void pgd_dtor(pgd_t *pgd)
 {
-	unsigned long flags; /* can be called from interrupt context */
-
 	if (!SHARED_KERNEL_PMD) {
-		spin_lock_irqsave(&pgd_lock, flags);
+		spin_lock(&pgd_lock);
 		pgd_list_del(pgd);
-		spin_unlock_irqrestore(&pgd_lock, flags);
+		spin_unlock(&pgd_lock);
 	}
 
 	pgd_test_and_unpin(pgd);
@@ -722,7 +720,6 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
 {
 	pgd_t *pgd;
 	pmd_t *pmds[PREALLOCATED_PMDS];
-	unsigned long flags;
 
 	pgd = user_pgd_alloc((void *)__get_free_page(PGALLOC_GFP));
 
@@ -742,13 +739,13 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
 	 * respect to anything walking the pgd_list, so that they
 	 * never see a partially populated pgd.
 	 */
-	spin_lock_irqsave(&pgd_lock, flags);
+	spin_lock(&pgd_lock);
 
 #ifdef CONFIG_X86_PAE
 	/* Protect against save/restore: move below 4GB under pgd_lock. */
 	if (!xen_feature(XENFEAT_pae_pgdir_above_4gb)
 	    && xen_create_contiguous_region((unsigned long)pgd, 0, 32)) {
-		spin_unlock_irqrestore(&pgd_lock, flags);
+		spin_unlock(&pgd_lock);
 		goto out_free_pmds;
 	}
 #endif
@@ -756,7 +753,7 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
 	pgd_ctor(mm, pgd);
 	pgd_prepopulate_pmd(mm, pgd, pmds);
 
-	spin_unlock_irqrestore(&pgd_lock, flags);
+	spin_unlock(&pgd_lock);
 
 	return pgd;
 

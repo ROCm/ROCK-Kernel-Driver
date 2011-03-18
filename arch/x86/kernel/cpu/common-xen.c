@@ -164,7 +164,6 @@ __setup("noxsaveopt", x86_xsaveopt_setup);
 
 #ifdef CONFIG_X86_32
 static int cachesize_override __cpuinitdata = -1;
-static int disable_x86_serial_nr __cpuinitdata = 1;
 
 static int __init cachesize_setup(char *str)
 {
@@ -187,7 +186,9 @@ static int __init x86_sep_setup(char *s)
 	return 1;
 }
 __setup("nosep", x86_sep_setup);
+#endif
 
+#if defined(CONFIG_X86_32) && !defined(CONFIG_XEN)
 /* Standard macro to see if a specific flag is changeable */
 static inline int flag_is_changeable_p(u32 flag)
 {
@@ -222,6 +223,8 @@ static int __cpuinit have_cpuid_p(void)
 {
 	return flag_is_changeable_p(X86_EFLAGS_ID);
 }
+
+static int disable_x86_serial_nr __cpuinitdata = 1;
 
 static void __cpuinit squash_the_stupid_serial_number(struct cpuinfo_x86 *c)
 {
