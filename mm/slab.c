@@ -3104,11 +3104,11 @@ static void *cache_alloc_refill(struct kmem_cache *cachep,
 	struct array_cache *ac;
 	int node;
 
-retry:
 	check_irq_off();
 	node = numa_slab_nid(cachep, flags);
 	if (unlikely(must_refill))
 		goto force_grow;
+retry:
 	ac = cpu_cache_get(cachep);
 	batchcount = ac->batchcount;
 	if (!ac->touched && batchcount > BATCHREFILL_LIMIT) {
@@ -3188,8 +3188,10 @@ force_grow:
 		if (!x && (ac->avail == 0 || must_refill))
 			return NULL;
 
-		if (!ac->avail)		/* objects refilled by interrupt? */
+		if (!ac->avail)	{	/* objects refilled by interrupt? */
+			node = numa_node_id();
 			goto retry;
+		}
 	}
 	ac->touched = 1;
 	return ac->entry[--ac->avail];
