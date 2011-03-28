@@ -2057,7 +2057,7 @@ azx_attach_pcm_stream(struct hda_bus *bus, struct hda_codec *codec,
 	/* buffer pre-allocation */
 	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV_SG,
 					      snd_dma_pci_data(chip->pci),
-					      1024 * 64, 32 * 1024 * 1024);
+					      1024 * 1024, 32 * 1024 * 1024);
 	return 0;
 }
 
