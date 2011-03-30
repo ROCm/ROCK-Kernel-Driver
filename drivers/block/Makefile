@@ -39,6 +39,4 @@ obj-$(CONFIG_PARAVIRT_XEN_BLKDEV_FRONTEND) += xen-blkfront.o
 obj-$(CONFIG_BLK_DEV_DRBD)     += drbd/
 obj-$(CONFIG_BLK_DEV_RBD)     += rbd.o
 
-obj-$(CONFIG_CIPHER_TWOFISH)	+= loop_fish2.o
-
 swim_mod-y	:= swim.o swim_asm.o

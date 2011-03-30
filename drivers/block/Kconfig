@@ -452,12 +452,6 @@ config SUNVDC
 	  Support for virtual disk devices as a client under Sun
 	  Logical Domains.
 
-config CIPHER_TWOFISH
-	tristate "Twofish encryption for loop device for old S.u.S.E. crypto partitions"
-	depends on BLK_DEV_LOOP
-	help
-	  Say Y here if you want to support old S.u.S.E. crypto partitions.
-
 source "drivers/s390/block/Kconfig"
 
 config XILINX_SYSACE
