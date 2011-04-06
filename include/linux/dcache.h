@@ -246,7 +246,6 @@ extern struct dentry * d_obtain_alias(struct inode *);
 extern void shrink_dcache_sb(struct super_block *);
 extern void shrink_dcache_parent(struct dentry *);
 extern void shrink_dcache_for_umount(struct super_block *);
-extern void shrink_dcache_for_umount_subtree(struct dentry *);
 extern int d_invalidate(struct dentry *);
 
 /* only used at mount-time */

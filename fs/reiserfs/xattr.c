@@ -987,36 +987,18 @@ static const struct dentry_operations xattr_lookup_poison_ops = {
 
 int reiserfs_lookup_privroot(struct super_block *s)
 {
-	struct qstr fake_name = {
-		.name = ".priv_root",
-		.len = strlen(".priv_root"),
-	};
-	struct dentry *fake_root = d_alloc_pseudo(s, &fake_name);
 	struct dentry *dentry;
 	int err = 0;
-
-	if (!fake_root) {
-		reiserfs_warning(s, "", "Couldn't initalize fake root for "
-				 "extended attributes.");
-		return -ENOMEM;
-	}
 
 	/* If we don't have the privroot located yet - go find it */
 	reiserfs_mutex_lock_safe(&s->s_root->d_inode->i_mutex, s);
 	dentry = lookup_one_len(PRIVROOT_NAME, s->s_root,
 				strlen(PRIVROOT_NAME));
 	if (!IS_ERR(dentry)) {
-		REISERFS_SB(s)->priv_root = fake_root;
+		REISERFS_SB(s)->priv_root = dentry;
 		d_set_d_op(dentry, &xattr_lookup_poison_ops);
-		if (dentry->d_inode) {
+		if (dentry->d_inode)
 			dentry->d_inode->i_flags |= S_PRIVATE;
-
-			/* This is disconnected from the root */
-			ihold(dentry->d_inode);
-			d_add(fake_root, dentry->d_inode);
-		}
-		d_delete(dentry);
-		dput(dentry);
 	} else
 		err = PTR_ERR(dentry);
 	mutex_unlock(&s->s_root->d_inode->i_mutex);
@@ -1070,25 +1052,4 @@ error:
 		s->s_flags &= ~MS_POSIXACL;
 
 	return err;
-}
-
-void reiserfs_xattr_shutdown(struct super_block *s)
-{
-	struct dentry *priv_root = REISERFS_SB(s)->priv_root;
-
-	if (REISERFS_SB(s)->xattr_root) {
-		dput(REISERFS_SB(s)->xattr_root);
-		REISERFS_SB(s)->xattr_root = NULL;
-	}
-
-	if (priv_root) {
-		dput(priv_root);
-		REISERFS_SB(s)->priv_root = NULL;
-
-		/* This will drop the final reference to priv_root and
-		 * clean up anything that was deleted during the call in
-		 * generic_shutdown_super(). */
-		shrink_dcache_for_umount_subtree(priv_root);
-		sync_filesystem(s);
-	}
 }
