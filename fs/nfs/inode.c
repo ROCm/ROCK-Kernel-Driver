@@ -505,6 +505,15 @@ int nfs_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
 	struct inode *inode = dentry->d_inode;
 	int need_atime = NFS_I(inode)->cache_validity & NFS_INO_INVALID_ATIME;
 	int err;
+	struct dentry *p;
+	struct inode *pi;
+
+	rcu_read_lock();
+	p = dentry->d_parent;
+	pi = rcu_dereference(p)->d_inode;
+	if (pi && !test_bit(NFS_INO_SEEN_GETATTR, &NFS_I(pi)->flags))
+		set_bit(NFS_INO_SEEN_GETATTR, &NFS_I(pi)->flags);
+	rcu_read_unlock();
 
 	/* Flush out writes to the server in order to update c/mtime.  */
 	if (S_ISREG(inode->i_mode)) {
