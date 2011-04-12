@@ -1,7 +1,9 @@
-/*  HID driver for various devices which are apparently based on the same chipset
+/*
+ *  HID driver for various devices which are apparently based on the same chipset
  *  from certain vendor which produces chips that contain wrong LogicalMaximum
  *  value in their HID report descriptor. Currently supported devices are:
  *
+ *    Ortek PKB-1700
  *    Ortek WKB-2000
  *    Skycable wireless presenter
  *
@@ -26,7 +28,7 @@ static __u8 *ortek_report_fixup(struct hid_device *hdev, __u8 *rdesc,
 		unsigned int *rsize)
 {
 	if (*rsize >= 56 && rdesc[54] == 0x25 && rdesc[55] == 0x01) {
-		hid_info(hdev, "Fixing up Ortek WKB-2000 report descriptor\n");
+		hid_info(hdev, "Fixing up logical minimum in report descriptor (Ortek)\n");
 		rdesc[55] = 0x92;
 	} else if (*rsize >= 54 && rdesc[52] == 0x25 && rdesc[53] == 0x01) {
 		hid_info(hdev, "Fixing up logical minimum in report descriptor (Skycable)\n");
