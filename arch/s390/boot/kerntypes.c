@@ -159,7 +159,6 @@ typedef char *COMPILE_VERSION;
 #include <linux/signalfd.h>
 #include <linux/skbuff.h>
 #include <linux/smp.h>
-#include <linux/smp_lock.h>
 #include <linux/socket.h>
 #include <linux/sockios.h>
 #include <linux/spinlock.h>
