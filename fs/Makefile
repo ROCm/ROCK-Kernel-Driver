@@ -51,6 +51,8 @@ obj-$(CONFIG_GENERIC_ACL)	+= generic_acl.o
 obj-$(CONFIG_FS_RICHACL)	+= richacl.o
 richacl-y			:= richacl_base.o richacl_inode.o richacl_xattr.o
 
+obj-$(CONFIG_FHANDLE)		+= fhandle.o
+
 obj-y				+= quota/
 
 obj-$(CONFIG_PROC_FS)		+= proc/
@@ -125,3 +127,4 @@ obj-$(CONFIG_GFS2_FS)           += gfs2/
 obj-$(CONFIG_EXOFS_FS)          += exofs/
 obj-$(CONFIG_NOVFS)		+= novfs/
 obj-$(CONFIG_CEPH_FS)		+= ceph/
+obj-$(CONFIG_PSTORE)		+= pstore/

@@ -823,7 +823,7 @@ cmds(struct pt_regs *excp)
 				memzcan();
 				break;
 			case 'i':
-				show_mem();
+				show_mem(0);
 				break;
 			default:
 				termch = cmd;

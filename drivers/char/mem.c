@@ -47,10 +47,7 @@ static inline unsigned long size_inside_page(unsigned long start,
 #ifndef ARCH_HAS_VALID_PHYS_ADDR_RANGE
 static inline int valid_phys_addr_range(unsigned long addr, size_t count)
 {
-	if (addr + count > __pa(high_memory))
-		return 0;
-
-	return 1;
+	return addr + count <= __pa(high_memory);
 }
 
 static inline int valid_mmap_phys_addr_range(unsigned long pfn, size_t size)
@@ -89,7 +86,6 @@ void __weak unxlate_dev_mem_ptr(unsigned long phys, void *addr)
 {
 }
 
-#ifndef ARCH_HAS_DEV_MEM
 /*
  * This funcion reads the *physical* memory. The f_pos points directly to the
  * memory location.
@@ -212,7 +208,6 @@ static ssize_t write_mem(struct file *file, const char __user *buf,
 	*ppos += written;
 	return written;
 }
-#endif
 
 int __weak phys_mem_access_prot_allowed(struct file *file,
 	unsigned long pfn, unsigned long size, pgprot_t *vma_prot)
@@ -339,9 +334,6 @@ static int mmap_mem(struct file *file, struct vm_area_struct *vma)
 static int mmap_kmem(struct file *file, struct vm_area_struct *vma)
 {
 	unsigned long pfn;
-#ifdef CONFIG_XEN
-	unsigned long i, count;
-#endif
 
 	/* Turn a kernel-virtual address into a physical page frame */
 	pfn = __pa((u64)vma->vm_pgoff << PAGE_SHIFT) >> PAGE_SHIFT;
@@ -355,13 +347,6 @@ static int mmap_kmem(struct file *file, struct vm_area_struct *vma)
 	 */
 	if (!pfn_valid(pfn))
 		return -EIO;
-
-#ifdef CONFIG_XEN
-	count = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
-	for (i = 0; i < count; i++)
-		if ((pfn + i) != mfn_to_local_pfn(pfn_to_mfn(pfn + i)))
-			return -EIO;
-#endif
 
 	vma->vm_pgoff = pfn;
 	return mmap_mem(file, vma);
@@ -857,7 +842,6 @@ static int open_port(struct inode * inode, struct file * filp)
 #define open_kmem	open_mem
 #define open_oldmem	open_mem
 
-#ifndef ARCH_HAS_DEV_MEM
 static const struct file_operations mem_fops = {
 	.llseek		= memory_lseek,
 	.read		= read_mem,
@@ -866,9 +850,6 @@ static const struct file_operations mem_fops = {
 	.open		= open_mem,
 	.get_unmapped_area = get_unmapped_area_mem,
 };
-#else
-extern const struct file_operations mem_fops;
-#endif
 
 #ifdef CONFIG_DEVKMEM
 static const struct file_operations kmem_fops = {

@@ -183,7 +183,7 @@ SECTIONS {
 		__start_gate_section = .;
 		*(.data..gate)
 		__stop_gate_section = .;
-#ifdef CONFIG_PARAVIRT_XEN
+#ifdef CONFIG_XEN
 		. = ALIGN(PAGE_SIZE);
 		__xen_start_gate_section = .;
 		*(.data..gate.xen)
@@ -198,7 +198,7 @@ SECTIONS {
 
 	/* Per-cpu data: */
 	. = ALIGN(PERCPU_PAGE_SIZE);
-	PERCPU_VADDR(PERCPU_ADDR, :percpu)
+	PERCPU_VADDR(SMP_CACHE_BYTES, PERCPU_ADDR, :percpu)
 	__phys_per_cpu_start = __per_cpu_load;
 	/*
 	 * ensure percpu data fits

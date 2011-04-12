@@ -1923,11 +1923,7 @@ static int set_rx_csum(struct net_device *dev, u32 data)
 	} else {
 		int i;
 
-#ifndef CONFIG_XEN
 		p->rx_offload &= ~(T3_RX_CSUM | T3_LRO);
-#else
-		p->rx_offload &= ~(T3_RX_CSUM);
-#endif
 		for (i = p->first_qset; i < p->first_qset + p->nqsets; i++)
 			set_qset_lro(dev, i, 0);
 	}
@@ -1987,14 +1983,20 @@ static int set_coalesce(struct net_device *dev, struct ethtool_coalesce *c)
 {
 	struct port_info *pi = netdev_priv(dev);
 	struct adapter *adapter = pi->adapter;
-	struct qset_params *qsp = &adapter->params.sge.qset[0];
-	struct sge_qset *qs = &adapter->sge.qs[0];
+	struct qset_params *qsp;
+	struct sge_qset *qs;
+	int i;
 
 	if (c->rx_coalesce_usecs * 10 > M_NEWTIMER)
 		return -EINVAL;
 
-	qsp->coalesce_usecs = c->rx_coalesce_usecs;
-	t3_update_qset_coalesce(qs, qsp);
+	for (i = 0; i < pi->nqsets; i++) {
+		qsp = &adapter->params.sge.qset[i];
+		qs = &adapter->sge.qs[i];
+		qsp->coalesce_usecs = c->rx_coalesce_usecs;
+		t3_update_qset_coalesce(qs, qsp);
+	}
+
 	return 0;
 }
 
@@ -3302,11 +3304,7 @@ static int __devinit init_one(struct pci_dev *pdev,
 		adapter->port[i] = netdev;
 		pi = netdev_priv(netdev);
 		pi->adapter = adapter;
-#ifndef CONFIG_XEN
 		pi->rx_offload = T3_RX_CSUM | T3_LRO;
-#else
-		pi->rx_offload = T3_RX_CSUM;
-#endif
 		pi->port_id = i;
 		netif_carrier_off(netdev);
 		netdev->irq = pdev->irq;

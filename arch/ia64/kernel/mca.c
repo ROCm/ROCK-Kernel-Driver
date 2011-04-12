@@ -617,6 +617,8 @@ out:
 	recover = (ia64_mca_ce_extension && ia64_mca_ce_extension(
 				IA64_LOG_CURR_BUFFER(SAL_INFO_TYPE_CPE)));
 
+	local_irq_disable();
+
 	return IRQ_HANDLED;
 }
 
@@ -2158,7 +2160,6 @@ ia64_mca_late_init(void)
 	cpe_poll_timer.function = ia64_mca_cpe_poll;
 
 	{
-		struct irq_desc *desc;
 		unsigned int irq;
 
 		if (cpe_vector >= 0) {
@@ -2166,8 +2167,7 @@ ia64_mca_late_init(void)
 			irq = local_vector_to_irq(cpe_vector);
 			if (irq > 0) {
 				cpe_poll_enabled = 0;
-				desc = irq_desc + irq;
-				desc->status |= IRQ_PER_CPU;
+				irq_set_status_flags(irq, IRQ_PER_CPU);
 				setup_irq(irq, &mca_cpe_irqaction);
 				ia64_cpe_irq = irq;
 				ia64_mca_register_cpev(cpe_vector);

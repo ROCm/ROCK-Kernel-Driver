@@ -944,8 +944,8 @@ static const struct dmi_system_id __initconst toshiba_dmi_table[] = {
 		},
 
 	},
-	{ }
 #endif
+	{ }
 };
 
 static bool broken_olpc_ec;
@@ -959,8 +959,8 @@ static const struct dmi_system_id __initconst olpc_dmi_table[] = {
 			DMI_MATCH(DMI_PRODUCT_NAME, "XO"),
 		},
 	},
-	{ }
 #endif
+	{ }
 };
 
 void __init synaptics_module_init(void)

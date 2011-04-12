@@ -11,7 +11,7 @@
 extern int pci_uevent(struct device *dev, struct kobj_uevent_env *env);
 extern int pci_create_sysfs_dev_files(struct pci_dev *pdev);
 extern void pci_remove_sysfs_dev_files(struct pci_dev *pdev);
-#ifndef CONFIG_DMI
+#if !defined(CONFIG_DMI) && !defined(CONFIG_ACPI)
 static inline void pci_create_firmware_label_files(struct pci_dev *pdev)
 { return; }
 static inline void pci_remove_firmware_label_files(struct pci_dev *pdev)
@@ -349,27 +349,5 @@ static inline int pci_dev_specific_reset(struct pci_dev *dev, int probe)
 	return -ENOTTY;
 }
 #endif
-
-#ifdef CONFIG_PCI_GUESTDEV
-extern int pci_is_guestdev_to_reassign(struct pci_dev *dev);
-extern int pci_is_iomuldev(struct pci_dev *dev);
-#else
-#define pci_is_iomuldev(dev)	0
-#endif
-
-#ifdef CONFIG_PCI_RESERVE
-unsigned long pci_reserve_size_io(struct pci_bus *bus);
-unsigned long pci_reserve_size_mem(struct pci_bus *bus);
-#else
-static inline unsigned long pci_reserve_size_io(struct pci_bus *bus)
-{
-	return 0;
-}
-
-static inline unsigned long pci_reserve_size_mem(struct pci_bus *bus)
-{
-	return 0;
-}
-#endif /* CONFIG_PCI_RESERVE */
 
 #endif /* DRIVERS_PCI_H */

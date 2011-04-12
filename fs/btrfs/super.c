@@ -39,7 +39,6 @@
 #include <linux/miscdevice.h>
 #include <linux/magic.h>
 #include <linux/slab.h>
-#include <linux/precache.h>
 #include "compat.h"
 #include "ctree.h"
 #include "disk-io.h"
@@ -52,6 +51,9 @@
 #include "version.h"
 #include "export.h"
 #include "compression.h"
+
+#define CREATE_TRACE_POINTS
+#include <trace/events/btrfs.h>
 
 static const struct super_operations btrfs_super_ops;
 
@@ -608,7 +610,6 @@ static int btrfs_fill_super(struct super_block *sb,
 	sb->s_root = root_dentry;
 
 	save_mount_options(sb, data);
-	precache_init(sb);
 	return 0;
 
 fail_close:
@@ -621,6 +622,8 @@ int btrfs_sync_fs(struct super_block *sb, int wait)
 	struct btrfs_trans_handle *trans;
 	struct btrfs_root *root = btrfs_sb(sb);
 	int ret;
+
+	trace_btrfs_sync_fs(wait);
 
 	if (!wait) {
 		filemap_flush(root->fs_info->btree_inode->i_mapping);
@@ -641,6 +644,7 @@ static int btrfs_show_options(struct seq_file *seq, struct vfsmount *vfs)
 {
 	struct btrfs_root *root = btrfs_sb(vfs->mnt_sb);
 	struct btrfs_fs_info *info = root->fs_info;
+	char *compress_type;
 
 	if (btrfs_test_opt(root, DEGRADED))
 		seq_puts(seq, ",degraded");
@@ -659,8 +663,16 @@ static int btrfs_show_options(struct seq_file *seq, struct vfsmount *vfs)
 	if (info->thread_pool_size !=  min_t(unsigned long,
 					     num_online_cpus() + 2, 8))
 		seq_printf(seq, ",thread_pool=%d", info->thread_pool_size);
-	if (btrfs_test_opt(root, COMPRESS))
-		seq_puts(seq, ",compress");
+	if (btrfs_test_opt(root, COMPRESS)) {
+		if (info->compress_type == BTRFS_COMPRESS_ZLIB)
+			compress_type = "zlib";
+		else
+			compress_type = "lzo";
+		if (btrfs_test_opt(root, FORCE_COMPRESS))
+			seq_printf(seq, ",compress-force=%s", compress_type);
+		else
+			seq_printf(seq, ",compress=%s", compress_type);
+	}
 	if (btrfs_test_opt(root, NOSSD))
 		seq_puts(seq, ",nossd");
 	if (btrfs_test_opt(root, SSD_SPREAD))
@@ -675,6 +687,12 @@ static int btrfs_show_options(struct seq_file *seq, struct vfsmount *vfs)
 		seq_puts(seq, ",discard");
 	if (!(root->fs_info->sb->s_flags & MS_POSIXACL))
 		seq_puts(seq, ",noacl");
+	if (btrfs_test_opt(root, SPACE_CACHE))
+		seq_puts(seq, ",space_cache");
+	if (btrfs_test_opt(root, CLEAR_CACHE))
+		seq_puts(seq, ",clear_cache");
+	if (btrfs_test_opt(root, USER_SUBVOL_RM_ALLOWED))
+		seq_puts(seq, ",user_subvol_rm_allowed");
 	return 0;
 }
 

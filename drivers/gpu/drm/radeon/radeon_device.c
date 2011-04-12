@@ -85,6 +85,7 @@ static const char radeon_family_name[][16] = {
 	"BARTS",
 	"TURKS",
 	"CAICOS",
+	"CAYMAN",
 	"LAST",
 };
 
@@ -184,7 +185,7 @@ int radeon_wb_init(struct radeon_device *rdev)
 	int r;
 
 	if (rdev->wb.wb_obj == NULL) {
-		r = radeon_bo_create(rdev, NULL, RADEON_GPU_PAGE_SIZE, PAGE_SIZE, true,
+		r = radeon_bo_create(rdev, RADEON_GPU_PAGE_SIZE, PAGE_SIZE, true,
 				RADEON_GEM_DOMAIN_GTT, &rdev->wb.wb_obj);
 		if (r) {
 			dev_warn(rdev->dev, "(%d) create WB bo failed\n", r);
@@ -430,18 +431,6 @@ int radeon_dummy_page_init(struct radeon_device *rdev)
 	rdev->dummy_page.page = alloc_page(GFP_DMA32 | GFP_KERNEL | __GFP_ZERO);
 	if (rdev->dummy_page.page == NULL)
 		return -ENOMEM;
-#ifdef CONFIG_XEN
-	{
-		int ret = xen_limit_pages_to_max_mfn(rdev->dummy_page.page,
-						     0, 32);
-
-		if (!ret)
-			clear_page(page_address(rdev->dummy_page.page));
-		else
-			dev_warn(rdev->dev,
-				 "Error restricting dummy page: %d\n", ret);
-	}
-#endif
 	rdev->dummy_page.addr = pci_map_page(rdev->pdev, rdev->dummy_page.page,
 					0, PAGE_SIZE, PCI_DMA_BIDIRECTIONAL);
 	if (pci_dma_mapping_error(rdev->pdev, rdev->dummy_page.addr)) {
@@ -872,7 +861,7 @@ int radeon_suspend_kms(struct drm_device *dev, pm_message_t state)
 		if (rfb == NULL || rfb->obj == NULL) {
 			continue;
 		}
-		robj = rfb->obj->driver_private;
+		robj = gem_to_radeon_bo(rfb->obj);
 		/* don't unpin kernel fb objects */
 		if (!radeon_fbdev_robj_is_fb(rdev, robj)) {
 			r = radeon_bo_reserve(robj, false);

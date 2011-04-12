@@ -102,6 +102,9 @@ struct inodes_stat_t {
 /* File is huge (eg. /dev/kmem): treat loff_t as unsigned */
 #define FMODE_UNSIGNED_OFFSET	((__force fmode_t)0x2000)
 
+/* File is opened with O_PATH; almost nothing can be done with it */
+#define FMODE_PATH		((__force fmode_t)0x4000)
+
 /* File was opened by fanotify and shouldn't generate fanotify events */
 #define FMODE_NONOTIFY		((__force fmode_t)0x1000000)
 
@@ -135,16 +138,10 @@ struct inodes_stat_t {
  *			block layer could (in theory) choose to ignore this
  *			request if it runs into resource problems.
  * WRITE		A normal async write. Device will be plugged.
- * WRITE_SYNC_PLUG	Synchronous write. Identical to WRITE, but passes down
+ * WRITE_SYNC		Synchronous write. Identical to WRITE, but passes down
  *			the hint that someone will be waiting on this IO
- *			shortly. The device must still be unplugged explicitly,
- *			WRITE_SYNC_PLUG does not do this as we could be
- *			submitting more writes before we actually wait on any
- *			of them.
- * WRITE_SYNC		Like WRITE_SYNC_PLUG, but also unplugs the device
- *			immediately after submission. The write equivalent
- *			of READ_SYNC.
- * WRITE_ODIRECT_PLUG	Special case write for O_DIRECT only.
+ *			shortly. The write equivalent of READ_SYNC.
+ * WRITE_ODIRECT	Special case write for O_DIRECT only.
  * WRITE_FLUSH		Like WRITE_SYNC but with preceding cache flush.
  * WRITE_FUA		Like WRITE_SYNC but data is guaranteed to be on
  *			non-volatile media on completion.
@@ -160,18 +157,14 @@ struct inodes_stat_t {
 #define WRITE			RW_MASK
 #define READA			RWA_MASK
 
-#define READ_SYNC		(READ | REQ_SYNC | REQ_UNPLUG)
+#define READ_SYNC		(READ | REQ_SYNC)
 #define READ_META		(READ | REQ_META)
-#define WRITE_SYNC_PLUG		(WRITE | REQ_SYNC | REQ_NOIDLE)
-#define WRITE_SYNC		(WRITE | REQ_SYNC | REQ_NOIDLE | REQ_UNPLUG)
-#define WRITE_ODIRECT_PLUG	(WRITE | REQ_SYNC)
+#define WRITE_SYNC		(WRITE | REQ_SYNC | REQ_NOIDLE)
+#define WRITE_ODIRECT		(WRITE | REQ_SYNC)
 #define WRITE_META		(WRITE | REQ_META)
-#define WRITE_FLUSH		(WRITE | REQ_SYNC | REQ_NOIDLE | REQ_UNPLUG | \
-				 REQ_FLUSH)
-#define WRITE_FUA		(WRITE | REQ_SYNC | REQ_NOIDLE | REQ_UNPLUG | \
-				 REQ_FUA)
-#define WRITE_FLUSH_FUA		(WRITE | REQ_SYNC | REQ_NOIDLE | REQ_UNPLUG | \
-				 REQ_FLUSH | REQ_FUA)
+#define WRITE_FLUSH		(WRITE | REQ_SYNC | REQ_NOIDLE | REQ_FLUSH)
+#define WRITE_FUA		(WRITE | REQ_SYNC | REQ_NOIDLE | REQ_FUA)
+#define WRITE_FLUSH_FUA		(WRITE | REQ_SYNC | REQ_NOIDLE | REQ_FLUSH | REQ_FUA)
 
 #define SEL_IN		1
 #define SEL_OUT		2
@@ -372,6 +365,8 @@ struct inodes_stat_t {
 #define FS_TOPDIR_FL			0x00020000 /* Top of directory hierarchies*/
 #define FS_EXTENT_FL			0x00080000 /* Extents */
 #define FS_DIRECTIO_FL			0x00100000 /* Use direct i/o */
+#define FS_NOCOW_FL			0x00800000 /* Do not cow file */
+#define FS_COW_FL			0x02000000 /* Cow file */
 #define FS_RESERVED_FL			0x80000000 /* reserved for ext2 lib */
 
 #define FS_FL_USER_VISIBLE		0x0003DFFF /* User visible flags */
@@ -533,7 +528,6 @@ enum positive_aop_returns {
 struct page;
 struct address_space;
 struct writeback_control;
-struct bdi_writeback;
 
 struct iov_iter {
 	const struct iovec *iov;
@@ -592,7 +586,6 @@ typedef int (*read_actor_t)(read_descriptor_t *, struct page *,
 struct address_space_operations {
 	int (*writepage)(struct page *page, struct writeback_control *wbc);
 	int (*readpage)(struct file *, struct page *);
-	void (*sync_page)(struct page *);
 
 	/* Write back some dirty pages from this mapping. */
 	int (*writepages)(struct address_space *, struct writeback_control *);
@@ -626,16 +619,9 @@ struct address_space_operations {
 	int (*is_partially_uptodate) (struct page *, read_descriptor_t *,
 					unsigned long);
 	int (*error_remove_page)(struct address_space *, struct page *);
-
-	/*
-	 * swapfile support
-	 */
-	int (*swapon)(struct file *file);
-	int (*swapoff)(struct file *file);
-	int (*swap_out)(struct file *file, struct page *page,
-			struct writeback_control *wbc);
-	int (*swap_in)(struct file *file, struct page *page);
 };
+
+extern const struct address_space_operations empty_aops;
 
 /*
  * pagecache_write_begin/pagecache_write_end must be used by general code
@@ -677,9 +663,9 @@ struct address_space {
 
 struct block_device {
 	dev_t			bd_dev;  /* not a kdev_t - it's a search key */
+	int			bd_openers;
 	struct inode *		bd_inode;	/* will die */
 	struct super_block *	bd_super;
-	int			bd_openers;
 	struct mutex		bd_mutex;	/* open/close mutex */
 	struct list_head	bd_inodes;
 	void *			bd_claiming;
@@ -816,8 +802,7 @@ struct inode {
 #endif
 
 #ifdef CONFIG_IMA
-	/* protected by i_lock */
-	unsigned int		i_readcount; /* struct files open RO */
+	atomic_t		i_readcount; /* struct files open RO */
 #endif
 	atomic_t		i_writecount;
 #ifdef CONFIG_SECURITY
@@ -994,6 +979,13 @@ struct file {
 #ifdef CONFIG_DEBUG_WRITECOUNT
 	unsigned long f_mnt_write_state;
 #endif
+};
+
+struct file_handle {
+	__u32 handle_bytes;
+	int handle_type;
+	/* file identifier */
+	unsigned char f_handle[0];
 };
 
 #define get_file(x)	atomic_long_inc(&(x)->f_count)
@@ -1419,6 +1411,7 @@ struct super_block {
 	wait_queue_head_t	s_wait_unfrozen;
 
 	char s_id[32];				/* Informational name */
+	u8 s_uuid[16];				/* UUID */
 
 	void 			*s_fs_info;	/* Filesystem private info */
 	fmode_t			s_mode;
@@ -1426,9 +1419,6 @@ struct super_block {
 	/* Granularity of c/m/atime in ns.
 	   Cannot be worse than a second */
 	u32		   s_time_gran;
-#ifdef CONFIG_PRECACHE
-	u32                precache_poolid;
-#endif
 
 	/*
 	 * The next field is for VFS *only*. No filesystems have any business
@@ -1468,8 +1458,13 @@ enum {
 #define put_fs_excl() atomic_dec(&current->fs_excl)
 #define has_fs_excl() atomic_read(&current->fs_excl)
 
-#define is_owner_or_cap(inode)	\
-	((current_fsuid() == (inode)->i_uid) || capable(CAP_FOWNER))
+/*
+ * until VFS tracks user namespaces for inodes, just make all files
+ * belong to init_user_ns
+ */
+extern struct user_namespace init_user_ns;
+#define inode_userns(inode) (&init_user_ns)
+extern bool inode_owner_or_capable(const struct inode *inode);
 
 /* not quite ready to be deprecated, but... */
 extern void lock_super(struct super_block *);
@@ -1644,13 +1639,10 @@ struct super_operations {
 	int (*statfs) (struct dentry *, struct kstatfs *);
 	int (*remount_fs) (struct super_block *, int *, char *);
 	void (*umount_begin) (struct super_block *);
-	int (*writeback_inodes)(struct super_block *sb,
-				struct bdi_writeback *wb,
-				struct writeback_control *wbc,
-				bool only_this_sb);
-	void (*sync_inodes) (struct super_block *sb,
-				struct writeback_control *wbc);
+
 	int (*show_options)(struct seq_file *, struct vfsmount *);
+	int (*show_devname)(struct seq_file *, struct vfsmount *);
+	int (*show_path)(struct seq_file *, struct vfsmount *);
 	int (*show_stats)(struct seq_file *, struct vfsmount *);
 #ifdef CONFIG_QUOTA
 	ssize_t (*quota_read)(struct super_block *, int, char *, size_t, loff_t);
@@ -1660,7 +1652,7 @@ struct super_operations {
 };
 
 /*
- * Inode state bits.  Protected by inode_lock.
+ * Inode state bits.  Protected by inode->i_lock
  *
  * Three bits determine the dirty state of the inode, I_DIRTY_SYNC,
  * I_DIRTY_DATASYNC and I_DIRTY_PAGES.
@@ -1814,8 +1806,6 @@ int sync_inode_metadata(struct inode *inode, int wait);
 struct file_system_type {
 	const char *name;
 	int fs_flags;
-	int (*get_sb) (struct file_system_type *, int,
-		       const char *, void *, struct vfsmount *);
 	struct dentry *(*mount) (struct file_system_type *, int,
 		       const char *, void *);
 	void (*kill_sb) (struct super_block *);
@@ -1838,24 +1828,12 @@ extern struct dentry *mount_ns(struct file_system_type *fs_type, int flags,
 extern struct dentry *mount_bdev(struct file_system_type *fs_type,
 	int flags, const char *dev_name, void *data,
 	int (*fill_super)(struct super_block *, void *, int));
-extern int get_sb_bdev(struct file_system_type *fs_type,
-	int flags, const char *dev_name, void *data,
-	int (*fill_super)(struct super_block *, void *, int),
-	struct vfsmount *mnt);
 extern struct dentry *mount_single(struct file_system_type *fs_type,
 	int flags, void *data,
 	int (*fill_super)(struct super_block *, void *, int));
-extern int get_sb_single(struct file_system_type *fs_type,
-	int flags, void *data,
-	int (*fill_super)(struct super_block *, void *, int),
-	struct vfsmount *mnt);
 extern struct dentry *mount_nodev(struct file_system_type *fs_type,
 	int flags, void *data,
 	int (*fill_super)(struct super_block *, void *, int));
-extern int get_sb_nodev(struct file_system_type *fs_type,
-	int flags, void *data,
-	int (*fill_super)(struct super_block *, void *, int),
-	struct vfsmount *mnt);
 void generic_shutdown_super(struct super_block *sb);
 void kill_block_super(struct super_block *sb);
 void kill_anon_super(struct super_block *sb);
@@ -1871,7 +1849,6 @@ extern struct dentry *mount_pseudo(struct file_system_type *, char *,
 	const struct super_operations *ops,
 	const struct dentry_operations *dops,
 	unsigned long);
-extern void simple_set_mnt(struct vfsmount *mnt, struct super_block *sb);
 
 static inline void sb_mark_dirty(struct super_block *sb)
 {
@@ -1904,6 +1881,8 @@ extern void drop_collected_mounts(struct vfsmount *);
 extern int iterate_mounts(int (*)(struct vfsmount *, void *), void *,
 			  struct vfsmount *);
 extern int vfs_statfs(struct path *, struct kstatfs *);
+extern int user_statfs(const char __user *, struct kstatfs *);
+extern int fd_statfs(int, struct kstatfs *);
 extern int statfs_by_dentry(struct dentry *, struct kstatfs *);
 extern int freeze_super(struct super_block *super);
 extern int thaw_super(struct super_block *super);
@@ -2020,6 +1999,8 @@ extern int do_fallocate(struct file *file, int mode, loff_t offset,
 extern long do_sys_open(int dfd, const char __user *filename, int flags,
 			int mode);
 extern struct file *filp_open(const char *, int, int);
+extern struct file *file_open_root(struct dentry *, struct vfsmount *,
+				   const char *, int);
 extern struct file * dentry_open(struct dentry *, struct vfsmount *, int,
 				 const struct cred *);
 extern int filp_close(struct file *, fl_owner_t id);
@@ -2186,12 +2167,6 @@ extern int invalidate_inode_pages2(struct address_space *mapping);
 extern int invalidate_inode_pages2_range(struct address_space *mapping,
 					 pgoff_t start, pgoff_t end);
 extern int write_inode_now(struct inode *, int);
-extern void writeback_skip_sb_inodes(struct super_block *sb,
-				     struct bdi_writeback *wb);
-extern int generic_writeback_sb_inodes(struct super_block *sb,
-				       struct bdi_writeback *wb,
-				       struct writeback_control *wbc,
-				       bool only_this_sb);
 extern int filemap_fdatawrite(struct address_space *);
 extern int filemap_flush(struct address_space *);
 extern int filemap_fdatawait(struct address_space *);
@@ -2236,14 +2211,30 @@ static inline void allow_write_access(struct file *file)
 	if (file)
 		atomic_inc(&file->f_path.dentry->d_inode->i_writecount);
 }
+#ifdef CONFIG_IMA
+static inline void i_readcount_dec(struct inode *inode)
+{
+	BUG_ON(!atomic_read(&inode->i_readcount));
+	atomic_dec(&inode->i_readcount);
+}
+static inline void i_readcount_inc(struct inode *inode)
+{
+	atomic_inc(&inode->i_readcount);
+}
+#else
+static inline void i_readcount_dec(struct inode *inode)
+{
+	return;
+}
+static inline void i_readcount_inc(struct inode *inode)
+{
+	return;
+}
+#endif
 extern int do_pipe_flags(int *, int);
 extern struct file *create_read_pipe(struct file *f, int flags);
 extern struct file *create_write_pipe(int flags);
 extern void free_write_pipe(struct file *);
-
-extern struct file *do_filp_open(int dfd, const char *pathname,
-		int open_flag, int mode, int acc_mode);
-extern int may_open(struct path *, int, int);
 
 extern int kernel_read(struct file *, loff_t, char *, unsigned long);
 extern struct file * open_exec(const char *);

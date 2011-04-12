@@ -8,10 +8,6 @@
  * @author Barry Kasindorf <barry.kasindorf@amd.com>
  * @author Robert Richter <robert.richter@amd.com>
  *
- * Modified by Aravind Menon for Xen
- * These modifications are:
- * Copyright (C) 2005 Hewlett-Packard Co.
- *
  * Each CPU has a local buffer that stores PC value/event
  * pairs. We also log context switches when we notice them.
  * Eventually each CPU's buffer is processed into the global
@@ -41,12 +37,6 @@ static void wq_sync_buffer(struct work_struct *work);
 
 #define DEFAULT_TIMER_EXPIRE (HZ / 10)
 static int work_enabled;
-
-#ifndef CONFIG_XEN
-#define current_domain COORDINATOR_DOMAIN
-#else
-static int32_t current_domain = COORDINATOR_DOMAIN;
-#endif
 
 unsigned long oprofile_get_cpu_buffer_size(void)
 {
@@ -85,7 +75,7 @@ int alloc_cpu_buffers(void)
 		struct oprofile_cpu_buffer *b = &per_cpu(op_cpu_buffer, i);
 
 		b->last_task = NULL;
-		b->last_cpu_mode = -1;
+		b->last_is_kernel = -1;
 		b->tracing = 0;
 		b->buffer_size = buffer_size;
 		b->sample_received = 0;
@@ -190,7 +180,7 @@ unsigned long op_cpu_buffer_entries(int cpu)
 
 static int
 op_add_code(struct oprofile_cpu_buffer *cpu_buf, unsigned long backtrace,
-	    int cpu_mode, struct task_struct *task)
+	    int is_kernel, struct task_struct *task)
 {
 	struct op_entry entry;
 	struct op_sample *sample;
@@ -203,15 +193,16 @@ op_add_code(struct oprofile_cpu_buffer *cpu_buf, unsigned long backtrace,
 		flags |= TRACE_BEGIN;
 
 	/* notice a switch from user->kernel or vice versa */
-	if (cpu_buf->last_cpu_mode != cpu_mode) {
-		cpu_buf->last_cpu_mode = cpu_mode;
-		flags |= KERNEL_CTX_SWITCH | cpu_mode;
+	is_kernel = !!is_kernel;
+	if (cpu_buf->last_is_kernel != is_kernel) {
+		cpu_buf->last_is_kernel = is_kernel;
+		flags |= KERNEL_CTX_SWITCH;
+		if (is_kernel)
+			flags |= IS_KERNEL;
 	}
 
 	/* notice a task switch */
-	/* if not processing other domain samples */
-	if (cpu_buf->last_task != task &&
-	    current_domain == COORDINATOR_DOMAIN) {
+	if (cpu_buf->last_task != task) {
 		cpu_buf->last_task = task;
 		flags |= USER_CTX_SWITCH;
 	}
@@ -260,15 +251,17 @@ op_add_sample(struct oprofile_cpu_buffer *cpu_buf,
 /*
  * This must be safe from any context.
  *
- * cpu_mode is needed because on some architectures you cannot
+ * is_kernel is needed because on some architectures you cannot
  * tell if you are in kernel or user space simply by looking at
- * pc. We tag this in the buffer by generating kernel/user (and
- * xen) enter events whenever cpu_mode changes
+ * pc. We tag this in the buffer by generating kernel enter/exit
+ * events whenever is_kernel changes
  */
 static int
 log_sample(struct oprofile_cpu_buffer *cpu_buf, unsigned long pc,
-	   unsigned long backtrace, int cpu_mode, unsigned long event)
+	   unsigned long backtrace, int is_kernel, unsigned long event,
+	   struct task_struct *task)
 {
+	struct task_struct *tsk = task ? task : current;
 	cpu_buf->sample_received++;
 
 	if (pc == ESCAPE_CODE) {
@@ -276,7 +269,7 @@ log_sample(struct oprofile_cpu_buffer *cpu_buf, unsigned long pc,
 		return 0;
 	}
 
-	if (op_add_code(cpu_buf, backtrace, cpu_mode, current))
+	if (op_add_code(cpu_buf, backtrace, is_kernel, tsk))
 		goto fail;
 
 	if (op_add_sample(cpu_buf, pc, event))
@@ -301,7 +294,8 @@ static inline void oprofile_end_trace(struct oprofile_cpu_buffer *cpu_buf)
 
 static inline void
 __oprofile_add_ext_sample(unsigned long pc, struct pt_regs * const regs,
-			  unsigned long event, int is_kernel)
+			  unsigned long event, int is_kernel,
+			  struct task_struct *task)
 {
 	struct oprofile_cpu_buffer *cpu_buf = &__get_cpu_var(op_cpu_buffer);
 	unsigned long backtrace = oprofile_backtrace_depth;
@@ -310,7 +304,7 @@ __oprofile_add_ext_sample(unsigned long pc, struct pt_regs * const regs,
 	 * if log_sample() fail we can't backtrace since we lost the
 	 * source of this event
 	 */
-	if (!log_sample(cpu_buf, pc, backtrace, is_kernel, event))
+	if (!log_sample(cpu_buf, pc, backtrace, is_kernel, event, task))
 		/* failed */
 		return;
 
@@ -322,10 +316,17 @@ __oprofile_add_ext_sample(unsigned long pc, struct pt_regs * const regs,
 	oprofile_end_trace(cpu_buf);
 }
 
+void oprofile_add_ext_hw_sample(unsigned long pc, struct pt_regs * const regs,
+				unsigned long event, int is_kernel,
+				struct task_struct *task)
+{
+	__oprofile_add_ext_sample(pc, regs, event, is_kernel, task);
+}
+
 void oprofile_add_ext_sample(unsigned long pc, struct pt_regs * const regs,
 			     unsigned long event, int is_kernel)
 {
-	__oprofile_add_ext_sample(pc, regs, event, is_kernel);
+	__oprofile_add_ext_sample(pc, regs, event, is_kernel, NULL);
 }
 
 void oprofile_add_sample(struct pt_regs * const regs, unsigned long event)
@@ -341,7 +342,7 @@ void oprofile_add_sample(struct pt_regs * const regs, unsigned long event)
 		pc = ESCAPE_CODE; /* as this causes an early return. */
 	}
 
-	__oprofile_add_ext_sample(pc, regs, event, is_kernel);
+	__oprofile_add_ext_sample(pc, regs, event, is_kernel, NULL);
 }
 
 /*
@@ -412,22 +413,8 @@ int oprofile_write_commit(struct op_entry *entry)
 void oprofile_add_pc(unsigned long pc, int is_kernel, unsigned long event)
 {
 	struct oprofile_cpu_buffer *cpu_buf = &__get_cpu_var(op_cpu_buffer);
-	log_sample(cpu_buf, pc, 0, is_kernel, event);
+	log_sample(cpu_buf, pc, 0, is_kernel, event, NULL);
 }
-
-#ifdef CONFIG_XEN
-/*
- * This is basically log_sample(b, ESCAPE_CODE, 1, cpu_mode, CPU_TRACE_BEGIN),
- * as was previously accessible through oprofile_add_pc().
- */
-void oprofile_add_mode(int cpu_mode)
-{
-	struct oprofile_cpu_buffer *cpu_buf = &__get_cpu_var(op_cpu_buffer);
-
-	if (op_add_code(cpu_buf, 1, cpu_mode, current))
-		cpu_buf->sample_lost_overflow++;
-}
-#endif
 
 void oprofile_add_trace(unsigned long pc)
 {
@@ -452,28 +439,6 @@ fail:
 	cpu_buf->backtrace_aborted++;
 	return;
 }
-
-#ifdef CONFIG_XEN
-int oprofile_add_domain_switch(int32_t domain_id)
-{
-	struct op_entry entry;
-	struct op_sample *sample;
-
-	sample = op_cpu_buffer_write_reserve(&entry, 1);
-	if (!sample)
-		return 0;
-
-	sample->eip = ESCAPE_CODE;
-	sample->event = DOMAIN_SWITCH;
-
-	op_cpu_buffer_add_data(&entry, domain_id);
-	op_cpu_buffer_write_commit(&entry);
-
-	current_domain = domain_id;
-
-	return 1;
-}
-#endif
 
 /*
  * This serves to avoid cpu buffer overflow, and makes sure

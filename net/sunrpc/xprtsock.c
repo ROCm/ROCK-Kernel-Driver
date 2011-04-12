@@ -710,6 +710,8 @@ static void xs_reset_transport(struct sock_xprt *transport)
 	if (sk == NULL)
 		return;
 
+	transport->srcport = 0;
+
 	write_lock_bh(&sk->sk_callback_lock);
 	transport->inet = NULL;
 	transport->sock = NULL;
@@ -1642,57 +1644,6 @@ out:
 	return ERR_PTR(err);
 }
 
-#ifdef CONFIG_SUNRPC_SWAP
-static void xs_set_memalloc(struct rpc_xprt *xprt)
-{
-	struct sock_xprt *transport = container_of(xprt, struct sock_xprt,
-			xprt);
-
-	if (xprt->swapper)
-		sk_set_memalloc(transport->inet);
-}
-
-#define RPC_BUF_RESERVE_PAGES \
-	kmalloc_estimate_objs(sizeof(struct rpc_rqst), GFP_KERNEL, RPC_MAX_SLOT_TABLE)
-#define RPC_RESERVE_PAGES	(RPC_BUF_RESERVE_PAGES + TX_RESERVE_PAGES)
-
-/**
- * xs_swapper - Tag this transport as being used for swap.
- * @xprt: transport to tag
- * @enable: enable/disable
- *
- */
-int xs_swapper(struct rpc_xprt *xprt, int enable)
-{
-	struct sock_xprt *transport = container_of(xprt, struct sock_xprt,
-			xprt);
-	int err = 0;
-
-	if (enable) {
-		/*
-		 * keep one extra sock reference so the reserve won't dip
-		 * when the socket gets reconnected.
-		 */
-		err = sk_adjust_memalloc(1, RPC_RESERVE_PAGES);
-		if (!err) {
-			xprt->swapper++;
-			xs_set_memalloc(xprt);
-		}
-	} else if (xprt->swapper) {
-		xprt->swapper--;
-		sk_clear_memalloc(transport->inet);
-		sk_adjust_memalloc(-1, -RPC_RESERVE_PAGES);
-	}
-
-	return err;
-}
-EXPORT_SYMBOL_GPL(xs_swapper);
-#else
-static void xs_set_memalloc(struct rpc_xprt *xprt)
-{
-}
-#endif
-
 static void xs_udp_finish_connecting(struct rpc_xprt *xprt, struct socket *sock)
 {
 	struct sock_xprt *transport = container_of(xprt, struct sock_xprt, xprt);
@@ -1717,8 +1668,6 @@ static void xs_udp_finish_connecting(struct rpc_xprt *xprt, struct socket *sock)
 		transport->sock = sock;
 		transport->inet = sk;
 
-		xs_set_memalloc(xprt);
-
 		write_unlock_bh(&sk->sk_callback_lock);
 	}
 	xs_udp_do_set_buffer_size(xprt);
@@ -1730,14 +1679,10 @@ static void xs_udp_setup_socket(struct work_struct *work)
 		container_of(work, struct sock_xprt, connect_worker.work);
 	struct rpc_xprt *xprt = &transport->xprt;
 	struct socket *sock = transport->sock;
-	unsigned long pflags = current->flags;
 	int status = -EIO;
 
 	if (xprt->shutdown)
 		goto out;
-
-	if (xprt->swapper)
-		current->flags |= PF_MEMALLOC;
 
 	/* Start by resetting any existing state */
 	xs_reset_transport(transport);
@@ -1757,7 +1702,6 @@ static void xs_udp_setup_socket(struct work_struct *work)
 out:
 	xprt_clear_connecting(xprt);
 	xprt_wake_pending_tasks(xprt, status);
-	tsk_restore_flags(current, pflags, PF_MEMALLOC);
 }
 
 /*
@@ -1847,8 +1791,6 @@ static int xs_tcp_finish_connecting(struct rpc_xprt *xprt, struct socket *sock)
 	if (!xprt_bound(xprt))
 		return -ENOTCONN;
 
-	xs_set_memalloc(xprt);
-
 	/* Tell the socket layer to start connecting... */
 	xprt->stat.connect_count++;
 	xprt->stat.connect_start = jiffies;
@@ -1869,14 +1811,10 @@ static void xs_tcp_setup_socket(struct work_struct *work)
 		container_of(work, struct sock_xprt, connect_worker.work);
 	struct socket *sock = transport->sock;
 	struct rpc_xprt *xprt = &transport->xprt;
-	unsigned long pflags = current->flags;
 	int status = -EIO;
 
 	if (xprt->shutdown)
 		goto out;
-
-	if (xprt->swapper)
-		current->flags |= PF_MEMALLOC;
 
 	if (!sock) {
 		clear_bit(XPRT_CONNECTION_ABORT, &xprt->state);
@@ -1939,7 +1877,6 @@ out_eagain:
 out:
 	xprt_clear_connecting(xprt);
 	xprt_wake_pending_tasks(xprt, status);
-	tsk_restore_flags(current, pflags, PF_MEMALLOC);
 }
 
 /**

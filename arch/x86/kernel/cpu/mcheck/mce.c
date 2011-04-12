@@ -21,6 +21,7 @@
 #include <linux/percpu.h>
 #include <linux/string.h>
 #include <linux/sysdev.h>
+#include <linux/syscore_ops.h>
 #include <linux/delay.h>
 #include <linux/ctype.h>
 #include <linux/sched.h>
@@ -135,12 +136,10 @@ void mce_setup(struct mce *m)
 	m->time = get_seconds();
 	m->cpuvendor = boot_cpu_data.x86_vendor;
 	m->cpuid = cpuid_eax(1);
-#ifndef CONFIG_XEN
 #ifdef CONFIG_SMP
 	m->socketid = cpu_data(m->extcpu).phys_proc_id;
 #endif
 	m->apicid = cpu_data(m->extcpu).initial_apicid;
-#endif
 	rdmsrl(MSR_IA32_MCG_CAP, m->mcgcap);
 }
 
@@ -478,9 +477,7 @@ static inline void mce_get_rip(struct mce *m, struct pt_regs *regs)
  */
 asmlinkage void smp_mce_self_interrupt(struct pt_regs *regs)
 {
-#ifndef CONFIG_XEN
 	ack_APIC_irq();
-#endif
 	exit_idle();
 	irq_enter();
 	mce_notify_irq();
@@ -503,7 +500,7 @@ static void mce_report_event(struct pt_regs *regs)
 		return;
 	}
 
-#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
+#ifdef CONFIG_X86_LOCAL_APIC
 	/*
 	 * Without APIC do not notify. The event will be picked
 	 * up eventually.
@@ -885,7 +882,7 @@ reset:
  * Check if the address reported by the CPU is in a format we can parse.
  * It would be possible to add code for most other cases, but all would
  * be somewhat complicated (e.g. segment offset would require an instruction
- * parser). So only support physical addresses upto page granuality for now.
+ * parser). So only support physical addresses up to page granuality for now.
  */
 static int mce_usable_address(struct mce *m)
 {
@@ -1150,15 +1147,8 @@ void mce_log_therm_throt_event(__u64 status)
  * Periodic polling timer for "silent" machine check errors.  If the
  * poller finds an MCE, poll 2x faster.  When the poller finds no more
  * errors, poll 2x slower (up to check_interval seconds).
- *
- * We will disable polling in DOM0 since all CMCI/Polling
- * mechanism will be done in XEN for Intel CPUs
  */
-#if defined (CONFIG_X86_XEN_MCE)
-static int check_interval = 0; /* disable polling */
-#else
 static int check_interval = 5 * 60; /* 5 minutes */
-#endif
 
 static DEFINE_PER_CPU(int, mce_next_interval); /* in jiffies */
 static DEFINE_PER_CPU(struct timer_list, mce_timer);
@@ -1323,7 +1313,6 @@ static int __cpuinit __mcheck_cpu_apply_quirks(struct cpuinfo_x86 *c)
 
 	/* This should be disabled by the BIOS, but isn't always */
 	if (c->x86_vendor == X86_VENDOR_AMD) {
-#ifndef CONFIG_XEN
 		if (c->x86 == 15 && banks > 4) {
 			/*
 			 * disable GART TBL walk error reporting, which
@@ -1332,7 +1321,6 @@ static int __cpuinit __mcheck_cpu_apply_quirks(struct cpuinfo_x86 *c)
 			 */
 			clear_bit(10, (unsigned long *)&mce_banks[4].ctl);
 		}
-#endif
 		if (c->x86 <= 17 && mce_bootlog < 0) {
 			/*
 			 * Lots of broken BIOS around that don't clear them
@@ -1400,7 +1388,6 @@ static void __cpuinit __mcheck_cpu_ancient_init(struct cpuinfo_x86 *c)
 
 static void __mcheck_cpu_init_vendor(struct cpuinfo_x86 *c)
 {
-#ifndef CONFIG_X86_64_XEN
 	switch (c->x86_vendor) {
 	case X86_VENDOR_INTEL:
 		mce_intel_feature_init(c);
@@ -1411,7 +1398,6 @@ static void __mcheck_cpu_init_vendor(struct cpuinfo_x86 *c)
 	default:
 		break;
 	}
-#endif
 }
 
 static void __mcheck_cpu_init_timer(void)
@@ -1640,7 +1626,7 @@ out:
 static unsigned int mce_poll(struct file *file, poll_table *wait)
 {
 	poll_wait(file, &mce_wait, wait);
-	if (rcu_dereference_check_mce(mcelog.next))
+	if (rcu_access_index(mcelog.next))
 		return POLLIN | POLLRDNORM;
 	if (!mce_apei_read_done && apei_check_mce())
 		return POLLIN | POLLRDNORM;
@@ -1764,14 +1750,14 @@ static int mce_disable_error_reporting(void)
 	return 0;
 }
 
-static int mce_suspend(struct sys_device *dev, pm_message_t state)
+static int mce_suspend(void)
 {
 	return mce_disable_error_reporting();
 }
 
-static int mce_shutdown(struct sys_device *dev)
+static void mce_shutdown(void)
 {
-	return mce_disable_error_reporting();
+	mce_disable_error_reporting();
 }
 
 /*
@@ -1779,13 +1765,17 @@ static int mce_shutdown(struct sys_device *dev)
  * Only one CPU is active at this time, the others get re-added later using
  * CPU hotplug:
  */
-static int mce_resume(struct sys_device *dev)
+static void mce_resume(void)
 {
 	__mcheck_cpu_init_generic();
 	__mcheck_cpu_init_vendor(__this_cpu_ptr(&cpu_info));
-
-	return 0;
 }
+
+static struct syscore_ops mce_syscore_ops = {
+	.suspend	= mce_suspend,
+	.shutdown	= mce_shutdown,
+	.resume		= mce_resume,
+};
 
 static void mce_cpu_restart(void *data)
 {
@@ -1823,9 +1813,6 @@ static void mce_enable_ce(void *all)
 }
 
 static struct sysdev_class mce_sysclass = {
-	.suspend	= mce_suspend,
-	.shutdown	= mce_shutdown,
-	.resume		= mce_resume,
 	.name		= "machinecheck",
 };
 
@@ -2154,18 +2141,9 @@ static __init int mcheck_init_device(void)
 			return err;
 	}
 
+	register_syscore_ops(&mce_syscore_ops);
 	register_hotcpu_notifier(&mce_cpu_notifier);
 	misc_register(&mce_log_device);
-
-#ifdef CONFIG_X86_XEN_MCE
-	if (is_initial_xendomain()) {
-		/* Register vIRQ handler for MCE LOG processing */
-		extern int bind_virq_for_mce(void);
-
-		printk(KERN_DEBUG "MCE: bind virq for DOM0 logging\n");
-		bind_virq_for_mce();
-	}
-#endif
 
 	return err;
 }

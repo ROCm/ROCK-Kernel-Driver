@@ -16,10 +16,8 @@
 
 #ifdef CONFIG_X86_32
 #define LOAD_OFFSET __PAGE_OFFSET
-#elif !defined(CONFIG_XEN) || CONFIG_XEN_COMPAT > 0x030002
-#define LOAD_OFFSET __START_KERNEL_map
 #else
-#define LOAD_OFFSET 0
+#define LOAD_OFFSET __START_KERNEL_map
 #endif
 
 #include <asm-generic/vmlinux.lds.h>
@@ -43,7 +41,7 @@ ENTRY(phys_startup_64)
 jiffies_64 = jiffies;
 #endif
 
-#if defined(CONFIG_X86_64) && defined(CONFIG_DEBUG_RODATA) && !defined(CONFIG_XEN)
+#if defined(CONFIG_X86_64) && defined(CONFIG_DEBUG_RODATA)
 /*
  * On 64-bit, align RODATA to 2MB so that even with CONFIG_DEBUG_RODATA
  * we retain large page mappings for boundaries spanning kernel text, rodata
@@ -86,10 +84,6 @@ SECTIONS
 {
 #ifdef CONFIG_X86_32
         . = LOAD_OFFSET + LOAD_PHYSICAL_ADDR;
-#if defined(CONFIG_XEN) && CONFIG_XEN_COMPAT <= 0x030002
-#undef LOAD_OFFSET
-#define LOAD_OFFSET 0
-#endif
         phys_startup_32 = startup_32 - LOAD_OFFSET;
 #else
         . = __START_KERNEL;
@@ -111,6 +105,7 @@ SECTIONS
 		SCHED_TEXT
 		LOCK_TEXT
 		KPROBES_TEXT
+		ENTRY_TEXT
 		IRQENTRY_TEXT
 		*(.fixup)
 		*(.gnu.warning)
@@ -236,7 +231,7 @@ SECTIONS
 	 * output PHDR, so the next output section - .init.text - should
 	 * start another segment - init.
 	 */
-	PERCPU_VADDR(0, :percpu)
+	PERCPU_VADDR(INTERNODE_CACHE_BYTES, 0, :percpu)
 #endif
 
 	INIT_TEXT_SECTION(PAGE_SIZE)
@@ -245,6 +240,18 @@ SECTIONS
 #endif
 
 	INIT_DATA_SECTION(16)
+
+	/*
+	 * Code and data for a variety of lowlevel trampolines, to be
+	 * copied into base memory (< 1 MiB) during initialization.
+	 * Since it is copied early, the main copy can be discarded
+	 * afterwards.
+	 */
+	 .x86_trampoline : AT(ADDR(.x86_trampoline) - LOAD_OFFSET) {
+		x86_trampoline_start = .;
+		*(.x86_trampoline)
+		x86_trampoline_end = .;
+	}
 
 	.x86_cpu_dev.init : AT(ADDR(.x86_cpu_dev.init) - LOAD_OFFSET) {
 		__x86_cpu_dev_start = .;
@@ -297,6 +304,7 @@ SECTIONS
 		*(.iommu_table)
 		__iommu_table_end = .;
 	}
+
 	. = ALIGN(8);
 	/*
 	 * .exit.text is discard at runtime, not link time, to deal with
@@ -311,7 +319,7 @@ SECTIONS
 	}
 
 #if !defined(CONFIG_X86_64) || !defined(CONFIG_SMP)
-	PERCPU(THREAD_SIZE)
+	PERCPU(INTERNODE_CACHE_BYTES, PAGE_SIZE)
 #endif
 
 	. = ALIGN(PAGE_SIZE);

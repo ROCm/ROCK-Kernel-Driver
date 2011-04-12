@@ -99,8 +99,7 @@ struct scsi_device {
 	void *hostdata;		/* available to low-level driver */
 	char type;
 	char scsi_level;
-	char inq_periph_qual;	/* PQ from INQUIRY data */
-	char tgps;		/* Target port group support */
+	char inq_periph_qual;	/* PQ from INQUIRY data */	
 	unsigned char inquiry_len;	/* valid bytes in 'inquiry' */
 	unsigned char * inquiry;	/* INQUIRY response data */
 	const char * vendor;		/* [back_compat] point into 'inquiry' ... */
@@ -179,13 +178,13 @@ struct scsi_device {
 struct scsi_dh_devlist {
 	char *vendor;
 	char *model;
-	char tgps;
 };
 
 typedef void (*activate_complete)(void *, int);
 struct scsi_device_handler {
 	/* Used by the infrastructure */
 	struct list_head list; /* list of scsi_device_handlers */
+	int idx;
 
 	/* Filled by the hardware handler */
 	struct module *module;
@@ -464,7 +463,7 @@ static inline int scsi_device_qas(struct scsi_device *sdev)
 }
 static inline int scsi_device_enclosure(struct scsi_device *sdev)
 {
-	return sdev->inquiry[6] & (1<<6);
+	return sdev->inquiry ? (sdev->inquiry[6] & (1<<6)) : 1;
 }
 
 static inline int scsi_device_protection(struct scsi_device *sdev)

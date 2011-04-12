@@ -8,7 +8,7 @@ choice
 
 config M386
 	bool "386"
-	depends on X86_32 && !UML && !XEN
+	depends on X86_32 && !UML
 	---help---
 	  This is the processor type of your CPU. This information is used for
 	  optimizing purposes. In order to compile a kernel that can run on
@@ -49,7 +49,7 @@ config M386
 
 config M486
 	bool "486"
-	depends on X86_32 && !XEN
+	depends on X86_32
 	---help---
 	  Select this for a 486 series processor, either Intel or one of the
 	  compatible processors from AMD, Cyrix, IBM, or Intel.  Includes DX,
@@ -58,7 +58,7 @@ config M486
 
 config M586
 	bool "586/K5/5x86/6x86/6x86MX"
-	depends on X86_32 && !XEN
+	depends on X86_32
 	---help---
 	  Select this for an 586 or 686 series processor such as the AMD K5,
 	  the Cyrix 5x86, 6x86 and 6x86MX.  This choice does not
@@ -66,14 +66,14 @@ config M586
 
 config M586TSC
 	bool "Pentium-Classic"
-	depends on X86_32 && !XEN
+	depends on X86_32
 	---help---
 	  Select this for a Pentium Classic processor with the RDTSC (Read
 	  Time Stamp Counter) instruction for benchmarking.
 
 config M586MMX
 	bool "Pentium-MMX"
-	depends on X86_32 && !XEN
+	depends on X86_32
 	---help---
 	  Select this for a Pentium with the MMX graphics/multimedia
 	  extended instructions.
@@ -294,11 +294,6 @@ config X86_GENERIC
 
 endif
 
-config X86_CPU
-	def_bool y
-	select GENERIC_FIND_FIRST_BIT
-	select GENERIC_FIND_NEXT_BIT
-
 #
 # Define implied options from the CPU selection here
 config X86_INTERNODE_CACHE_SHIFT
@@ -331,7 +326,7 @@ config X86_PPRO_FENCE
 	  Old PentiumPro multiprocessor systems had errata that could cause
 	  memory operations to violate the x86 ordering standard in rare cases.
 	  Enabling this option will attempt to work around some (but not all)
-	  occurances of this problem, at the cost of much heavier spinlock and
+	  occurrences of this problem, at the cost of much heavier spinlock and
 	  memory barrier operations.
 
 	  If unsure, say n here. Even distro kernels should think twice before
@@ -371,7 +366,7 @@ config X86_INTEL_USERCOPY
 
 config X86_USE_PPRO_CHECKSUM
 	def_bool y
-	depends on MWINCHIP3D || MWINCHIPC6 || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMM || MPENTIUMIII || MPENTIUMII || M686 || MK8 || MVIAC3_2 || MEFFICEON || MGEODE_LX || MCORE2 || MATOM
+	depends on MWINCHIP3D || MWINCHIPC6 || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMM || MPENTIUMIII || MPENTIUMII || M686 || MK8 || MVIAC3_2 || MVIAC7 || MEFFICEON || MGEODE_LX || MCORE2 || MATOM
 
 config X86_USE_3DNOW
 	def_bool y
@@ -400,7 +395,6 @@ config X86_P6_NOP
 config X86_TSC
 	def_bool y
 	depends on ((MWINCHIP3D || MCRUSOE || MEFFICEON || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMM || MPENTIUMIII || MPENTIUMII || M686 || M586MMX || M586TSC || MK8 || MVIAC3_2 || MVIAC7 || MGEODEGX1 || MGEODE_LX || MCORE2 || MATOM) && !X86_NUMAQ) || X86_64
-	depends on !XEN
 
 config X86_CMPXCHG64
 	def_bool y
@@ -446,7 +440,7 @@ config CPU_SUP_INTEL
 config CPU_SUP_CYRIX_32
 	default y
 	bool "Support Cyrix processors" if PROCESSOR_SELECT
-	depends on !64BIT && !XEN
+	depends on !64BIT
 	---help---
 	  This enables detection, tunings and quirks for Cyrix processors
 
@@ -486,7 +480,7 @@ config CPU_SUP_CENTAUR
 config CPU_SUP_TRANSMETA_32
 	default y
 	bool "Support Transmeta processors" if PROCESSOR_SELECT
-	depends on !64BIT && !XEN
+	depends on !64BIT
 	---help---
 	  This enables detection, tunings and quirks for Transmeta processors
 
@@ -500,7 +494,7 @@ config CPU_SUP_TRANSMETA_32
 config CPU_SUP_UMC_32
 	default y
 	bool "Support UMC processors" if PROCESSOR_SELECT
-	depends on !64BIT && !XEN
+	depends on !64BIT
 	---help---
 	  This enables detection, tunings and quirks for UMC processors
 

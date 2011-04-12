@@ -128,6 +128,43 @@ static struct request *get_alua_req(struct scsi_device *sdev,
 }
 
 /*
+ * submit_std_inquiry - Issue a standard INQUIRY command
+ * @sdev: sdev the command should be send to
+ */
+static int submit_std_inquiry(struct scsi_device *sdev, struct alua_dh_data *h)
+{
+	struct request *rq;
+	int err = SCSI_DH_RES_TEMP_UNAVAIL;
+
+	rq = get_alua_req(sdev, h->inq, ALUA_INQUIRY_SIZE, READ);
+	if (!rq)
+		goto done;
+
+	/* Prepare the command. */
+	rq->cmd[0] = INQUIRY;
+	rq->cmd[1] = 0;
+	rq->cmd[2] = 0;
+	rq->cmd[4] = ALUA_INQUIRY_SIZE;
+	rq->cmd_len = COMMAND_SIZE(INQUIRY);
+
+	rq->sense = h->sense;
+	memset(rq->sense, 0, SCSI_SENSE_BUFFERSIZE);
+	rq->sense_len = h->senselen = 0;
+
+	err = blk_execute_rq(rq->q, NULL, rq, 1);
+	if (err == -EIO) {
+		sdev_printk(KERN_INFO, sdev,
+			    "%s: std inquiry failed with %x\n",
+			    ALUA_DH_NAME, rq->errors);
+		h->senselen = rq->sense_len;
+		err = SCSI_DH_IO;
+	}
+	blk_put_request(rq);
+done:
+	return err;
+}
+
+/*
  * submit_vpd_inquiry - Issue an INQUIRY VPD page 0x83 command
  * @sdev: sdev the command should be sent to
  */
@@ -216,13 +253,15 @@ static void stpg_endio(struct request *req, int error)
 {
 	struct alua_dh_data *h = req->end_io_data;
 	struct scsi_sense_hdr sense_hdr;
-	unsigned err = SCSI_DH_IO;
+	unsigned err = SCSI_DH_OK;
 
 	if (error || host_byte(req->errors) != DID_OK ||
-			msg_byte(req->errors) != COMMAND_COMPLETE)
+			msg_byte(req->errors) != COMMAND_COMPLETE) {
+		err = SCSI_DH_IO;
 		goto done;
+	}
 
-	if (err == SCSI_DH_IO && h->senselen > 0) {
+	if (h->senselen > 0) {
 		err = scsi_normalize_sense(h->sense, SCSI_SENSE_BUFFERSIZE,
 					   &sense_hdr);
 		if (!err) {
@@ -248,7 +287,8 @@ static void stpg_endio(struct request *req, int error)
 			    print_alua_state(h->state));
 	}
 done:
-	blk_put_request(req);
+	req->end_io_data = NULL;
+	__blk_put_request(req->q, req);
 	if (h->callback_fn) {
 		h->callback_fn(h->callback_data, err);
 		h->callback_fn = h->callback_data = NULL;
@@ -266,7 +306,6 @@ done:
 static unsigned submit_stpg(struct alua_dh_data *h)
 {
 	struct request *rq;
-	int err = SCSI_DH_RES_TEMP_UNAVAIL;
 	int stpg_len = 8;
 	struct scsi_device *sdev = h->sdev;
 
@@ -295,23 +334,27 @@ static unsigned submit_stpg(struct alua_dh_data *h)
 	rq->end_io_data = h;
 
 	blk_execute_rq_nowait(rq->q, NULL, rq, 1, stpg_endio);
-	return err;
+	return SCSI_DH_OK;
 }
 
 /*
- * alua_check_tgps - Evaluate TGPS setting
+ * alua_std_inquiry - Evaluate standard INQUIRY command
  * @sdev: device to be checked
  *
- * Just examine the TPGS setting of the device to find out if ALUA
+ * Just extract the TPGS setting to find out if ALUA
  * is supported.
  */
-static int alua_check_tgps(struct scsi_device *sdev, struct alua_dh_data *h)
+static int alua_std_inquiry(struct scsi_device *sdev, struct alua_dh_data *h)
 {
-	int err = SCSI_DH_OK;
+	int err;
+
+	err = submit_std_inquiry(sdev, h);
+
+	if (err != SCSI_DH_OK)
+		return err;
 
 	/* Check TPGS setting */
-	h->tpgs = sdev->tgps;
-
+	h->tpgs = (h->inq[5] >> 4) & 0x3;
 	switch (h->tpgs) {
 	case TPGS_MODE_EXPLICIT|TPGS_MODE_IMPLICIT:
 		sdev_printk(KERN_INFO, sdev,
@@ -576,7 +619,7 @@ static int alua_initialize(struct scsi_device *sdev, struct alua_dh_data *h)
 {
 	int err;
 
-	err = alua_check_tgps(sdev, h);
+	err = alua_std_inquiry(sdev, h);
 	if (err != SCSI_DH_OK)
 		goto out;
 
@@ -653,8 +696,21 @@ static int alua_prep_fn(struct scsi_device *sdev, struct request *req)
 }
 
 static const struct scsi_dh_devlist alua_dev_list[] = {
-	{"", "", 3 },
-	{NULL, NULL, 0}
+	{"HP", "MSA VOLUME" },
+	{"HP", "HSV101" },
+	{"HP", "HSV111" },
+	{"HP", "HSV200" },
+	{"HP", "HSV210" },
+	{"HP", "HSV300" },
+	{"IBM", "2107900" },
+	{"IBM", "2145" },
+	{"Pillar", "Axiom" },
+	{"Intel", "Multi-Flex"},
+	{"NETAPP", "LUN"},
+	{"NETAPP", "LUN C-Mode"},
+	{"AIX", "NVDISK"},
+	{"Promise", "VTrak"},
+	{NULL, NULL}
 };
 
 static int alua_bus_attach(struct scsi_device *sdev);
@@ -682,7 +738,7 @@ static int alua_bus_attach(struct scsi_device *sdev)
 	unsigned long flags;
 	int err = SCSI_DH_OK;
 
-	scsi_dh_data = kzalloc(sizeof(struct scsi_device_handler *)
+	scsi_dh_data = kzalloc(sizeof(*scsi_dh_data)
 			       + sizeof(*h) , GFP_KERNEL);
 	if (!scsi_dh_data) {
 		sdev_printk(KERN_ERR, sdev, "%s: Attach failed\n",

@@ -32,7 +32,7 @@ static void inject_mce(struct mce *m)
 {
 	struct mce *i = &per_cpu(injectm, m->extcpu);
 
-	/* Make sure noone reads partially written injectm */
+	/* Make sure no one reads partially written injectm */
 	i->finished = 0;
 	mb();
 	m->finished = 0;
@@ -145,7 +145,7 @@ static void raise_mce(struct mce *m)
 	if (context == MCJ_CTX_RANDOM)
 		return;
 
-#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
+#ifdef CONFIG_X86_LOCAL_APIC
 	if (m->inject_flags & MCJ_NMI_BROADCAST) {
 		unsigned long start;
 		int cpu;

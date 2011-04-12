@@ -52,8 +52,9 @@ extern void *__memcpy(void *, const void *, __kernel_size_t);
 EXPORT_SYMBOL(memset);
 EXPORT_SYMBOL(memcpy);
 EXPORT_SYMBOL(__memcpy);
+EXPORT_SYMBOL(memmove);
 
 EXPORT_SYMBOL(empty_zero_page);
-#if !defined(CONFIG_PARAVIRT) && !defined(CONFIG_XEN)
+#ifndef CONFIG_PARAVIRT
 EXPORT_SYMBOL(native_load_gs_index);
 #endif

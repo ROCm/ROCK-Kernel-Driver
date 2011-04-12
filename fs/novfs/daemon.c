@@ -21,8 +21,8 @@
 #include <linux/timer.h>
 #include <linux/poll.h>
 #include <linux/pagemap.h>
-#include <linux/smp_lock.h>
 #include <linux/semaphore.h>
+#include <linux/sched.h>
 #include <asm/uaccess.h>
 #include <asm/atomic.h>
 #include <linux/time.h>
@@ -1028,8 +1028,6 @@ long novfs_daemon_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	unsigned long cpylen;
 	struct novfs_schandle session_id;
 
-	lock_kernel(); /* needed? */
-
 	session_id = novfs_scope_get_sessionId(NULL);
 
 	switch (cmd) {
@@ -1049,10 +1047,8 @@ long novfs_daemon_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			char *buf;
 			io.length = 0;
 			cpylen = copy_from_user(&io, (char *)arg, sizeof(io));
-			if (io.length <= 0 || io.length > 1024) {
-				unlock_kernel();
+			if (io.length <= 0 || io.length > 1024)
 				return -EINVAL;
-			}
 			if (io.length) {
 				buf = kmalloc(io.length + 1, GFP_KERNEL);
 				if (buf) {
@@ -1086,9 +1082,6 @@ long novfs_daemon_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		}
 
 	}
-
-	unlock_kernel();
-
 	return (retCode);
 }
 
@@ -1352,8 +1345,6 @@ long novfs_daemon_lib_ioctl(struct file *file, unsigned int cmd, unsigned long a
 	void *handle = NULL;
 	unsigned long cpylen;
 
-	lock_kernel(); /* needed? */
-
 	dh = file->private_data;
 
 	DbgPrint("file=0x%p 0x%x 0x%p dh=0x%p", file, cmd, arg, dh);
@@ -1378,10 +1369,8 @@ long novfs_daemon_lib_ioctl(struct file *file, unsigned int cmd, unsigned long a
 				char *buf;
 				io.length = 0;
 				cpylen = copy_from_user(&io, (void *)arg, sizeof(io));
-				if (io.length <= 0 || io.length > 1024) {
-					unlock_kernel();
+				if (io.length <= 0 || io.length > 1024)
 					return -EINVAL;
-				}
 				if (io.length) {
 					buf = kmalloc(io.length + 1, GFP_KERNEL);
 					if (buf) {
@@ -1607,8 +1596,6 @@ long novfs_daemon_lib_ioctl(struct file *file, unsigned int cmd, unsigned long a
 			}
 		}
 	}
-
-	unlock_kernel();
 
 	return (retCode);
 }
@@ -1857,8 +1844,8 @@ static long local_unlink(const char *pathname)
 	struct nameidata nd;
 	struct inode *inode = NULL;
 
-	error = path_lookup(pathname, LOOKUP_PARENT, &nd);
-	DbgPrint("path_lookup %s error: %d\n", pathname, error);
+	error = kern_path_parent(pathname, &nd);
+	DbgPrint("kern_path_parent %s error: %d\n", pathname, error);
 	if (error)
 		return error;
 

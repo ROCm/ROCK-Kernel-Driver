@@ -148,6 +148,8 @@ static void del_nbp(struct net_bridge_port *p)
 
 	netdev_rx_handler_unregister(dev);
 
+	netdev_set_master(dev, NULL);
+
 	br_multicast_del_port(p);
 
 	kobject_uevent(&p->kobj, KOBJ_REMOVE);
@@ -374,7 +376,7 @@ int br_min_mtu(const struct net_bridge *br)
 void br_features_recompute(struct net_bridge *br)
 {
 	struct net_bridge_port *p;
-	unsigned long features, mask;
+	u32 features, mask;
 
 	features = mask = br->feature_mask;
 	if (list_empty(&br->port_list))
@@ -388,7 +390,7 @@ void br_features_recompute(struct net_bridge *br)
 	}
 
 done:
-	br->dev->features = netdev_fix_features(features, NULL);
+	br->dev->features = netdev_fix_features(br->dev, features);
 }
 
 /* called with RTNL */
@@ -396,6 +398,7 @@ int br_add_if(struct net_bridge *br, struct net_device *dev)
 {
 	struct net_bridge_port *p;
 	int err = 0;
+	bool changed_addr;
 
 	/* Don't allow bridging non-ethernet like devices */
 	if ((dev->flags & IFF_LOOPBACK) ||
@@ -438,9 +441,13 @@ int br_add_if(struct net_bridge *br, struct net_device *dev)
 	if (br_netpoll_info(br) && ((err = br_netpoll_enable(p))))
 		goto err3;
 
-	err = netdev_rx_handler_register(dev, br_handle_frame, p);
+	err = netdev_set_master(dev, br->dev);
 	if (err)
 		goto err3;
+
+	err = netdev_rx_handler_register(dev, br_handle_frame, p);
+	if (err)
+		goto err4;
 
 	dev->priv_flags |= IFF_BRIDGE_PORT;
 
@@ -449,7 +456,7 @@ int br_add_if(struct net_bridge *br, struct net_device *dev)
 	list_add_rcu(&p->list, &br->port_list);
 
 	spin_lock_bh(&br->lock);
-	br_stp_recalculate_bridge_id(br);
+	changed_addr = br_stp_recalculate_bridge_id(br);
 	br_features_recompute(br);
 
 	if ((dev->flags & IFF_UP) && netif_carrier_ok(dev) &&
@@ -459,11 +466,17 @@ int br_add_if(struct net_bridge *br, struct net_device *dev)
 
 	br_ifinfo_notify(RTM_NEWLINK, p);
 
+	if (changed_addr)
+		call_netdevice_notifiers(NETDEV_CHANGEADDR, dev);
+
 	dev_set_mtu(br->dev, br_min_mtu(br));
 
 	kobject_uevent(&p->kobj, KOBJ_ADD);
 
 	return 0;
+
+err4:
+	netdev_set_master(dev, NULL);
 err3:
 	sysfs_remove_link(br->ifobj, p->dev->name);
 err2:

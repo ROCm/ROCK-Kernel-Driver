@@ -66,11 +66,7 @@ struct e820map {
 	struct e820entry map[E820_X_MAX];
 };
 
-#ifndef CONFIG_XEN
 #define ISA_START_ADDRESS	0xa0000
-#else
-#define ISA_START_ADDRESS	0
-#endif
 #define ISA_END_ADDRESS		0x100000
 
 #define BIOS_BEGIN		0x000a0000
@@ -100,7 +96,7 @@ extern void e820_setup_gap(void);
 extern int e820_search_gap(unsigned long *gapstart, unsigned long *gapsize,
 			unsigned long start_addr, unsigned long long end_addr);
 struct setup_data;
-extern void parse_e820_ext(struct setup_data *data, unsigned long pa_data);
+extern void parse_e820_ext(struct setup_data *data);
 
 #if defined(CONFIG_X86_64) || \
 	(defined(CONFIG_X86_32) && defined(CONFIG_HIBERNATION))

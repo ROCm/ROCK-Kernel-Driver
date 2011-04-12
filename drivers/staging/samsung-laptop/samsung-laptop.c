@@ -1,14 +1,16 @@
 /*
  * Samsung Laptop driver
  *
- * Copyright (C) 2009 Greg Kroah-Hartman (gregkh@suse.de)
- * Copyright (C) 2009 Novell Inc.
+ * Copyright (C) 2009,2011 Greg Kroah-Hartman (gregkh@suse.de)
+ * Copyright (C) 2009,2011 Novell Inc.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License version 2 as published by
  * the Free Software Foundation.
  *
  */
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/module.h>
@@ -106,16 +108,18 @@ struct sabi_performance_level {
 struct sabi_config {
 	const char *test_string;
 	u16 main_function;
-	struct sabi_header_offsets header_offsets;
-	struct sabi_commands commands;
-	struct sabi_performance_level performance_levels[4];
+	const struct sabi_header_offsets header_offsets;
+	const struct sabi_commands commands;
+	const struct sabi_performance_level performance_levels[4];
+	u8 min_brightness;
+	u8 max_brightness;
 };
 
-static struct sabi_config sabi_configs[] = {
+static const struct sabi_config sabi_configs[] = {
 	{
 		.test_string = "SECLINUX",
 
-		.main_function = 0x4c59,
+		.main_function = 0x4c49,
 
 		.header_offsets = {
 			.port = 0x00,
@@ -156,6 +160,8 @@ static struct sabi_config sabi_configs[] = {
 			},
 			{ },
 		},
+		.min_brightness = 1,
+		.max_brightness = 8,
 	},
 	{
 		.test_string = "SwSmi@",
@@ -205,11 +211,13 @@ static struct sabi_config sabi_configs[] = {
 			},
 			{ },
 		},
+		.min_brightness = 0,
+		.max_brightness = 8,
 	},
 	{ },
 };
 
-static struct sabi_config *sabi_config;
+static const struct sabi_config *sabi_config;
 
 static void __iomem *sabi;
 static void __iomem *sabi_iface;
@@ -232,6 +240,7 @@ static int sabi_get_command(u8 command, struct sabi_retval *sretval)
 {
 	int retval = 0;
 	u16 port = readw(sabi + sabi_config->header_offsets.port);
+	u8 complete, iface_data;
 
 	mutex_lock(&sabi_mutex);
 
@@ -248,27 +257,25 @@ static int sabi_get_command(u8 command, struct sabi_retval *sretval)
 	outb(readb(sabi + sabi_config->header_offsets.re_mem), port);
 
 	/* see if the command actually succeeded */
-	if (readb(sabi_iface + SABI_IFACE_COMPLETE) == 0xaa &&
-	    readb(sabi_iface + SABI_IFACE_DATA) != 0xff) {
-		/*
-		 * It did!
-		 * Save off the data into a structure so the caller use it.
-		 * Right now we only care about the first 4 bytes,
-		 * I suppose there are commands that need more, but I don't
-		 * know about them.
-		 */
-		sretval->retval[0] = readb(sabi_iface + SABI_IFACE_DATA);
-		sretval->retval[1] = readb(sabi_iface + SABI_IFACE_DATA + 1);
-		sretval->retval[2] = readb(sabi_iface + SABI_IFACE_DATA + 2);
-		sretval->retval[3] = readb(sabi_iface + SABI_IFACE_DATA + 3);
+	complete = readb(sabi_iface + SABI_IFACE_COMPLETE);
+	iface_data = readb(sabi_iface + SABI_IFACE_DATA);
+	if (complete != 0xaa || iface_data == 0xff) {
+		pr_warn("SABI get command 0x%02x failed with completion flag 0x%02x and data 0x%02x\n",
+		        command, complete, iface_data);
+		retval = -EINVAL;
 		goto exit;
 	}
+	/*
+	 * Save off the data into a structure so the caller use it.
+	 * Right now we only want the first 4 bytes,
+	 * There are commands that need more, but not for the ones we
+	 * currently care about.
+	 */
+	sretval->retval[0] = readb(sabi_iface + SABI_IFACE_DATA);
+	sretval->retval[1] = readb(sabi_iface + SABI_IFACE_DATA + 1);
+	sretval->retval[2] = readb(sabi_iface + SABI_IFACE_DATA + 2);
+	sretval->retval[3] = readb(sabi_iface + SABI_IFACE_DATA + 3);
 
-	/* Something bad happened, so report it and error out */
-	printk(KERN_WARNING "SABI command 0x%02x failed with completion flag 0x%02x and output 0x%02x\n",
-		command, readb(sabi_iface + SABI_IFACE_COMPLETE),
-		readb(sabi_iface + SABI_IFACE_DATA));
-	retval = -EINVAL;
 exit:
 	mutex_unlock(&sabi_mutex);
 	return retval;
@@ -279,6 +286,7 @@ static int sabi_set_command(u8 command, u8 data)
 {
 	int retval = 0;
 	u16 port = readw(sabi + sabi_config->header_offsets.port);
+	u8 complete, iface_data;
 
 	mutex_lock(&sabi_mutex);
 
@@ -296,18 +304,14 @@ static int sabi_set_command(u8 command, u8 data)
 	outb(readb(sabi + sabi_config->header_offsets.re_mem), port);
 
 	/* see if the command actually succeeded */
-	if (readb(sabi_iface + SABI_IFACE_COMPLETE) == 0xaa &&
-	    readb(sabi_iface + SABI_IFACE_DATA) != 0xff) {
-		/* it did! */
-		goto exit;
+	complete = readb(sabi_iface + SABI_IFACE_COMPLETE);
+	iface_data = readb(sabi_iface + SABI_IFACE_DATA);
+	if (complete != 0xaa || iface_data == 0xff) {
+		pr_warn("SABI set command 0x%02x failed with completion flag 0x%02x and data 0x%02x\n",
+		       command, complete, iface_data);
+		retval = -EINVAL;
 	}
 
-	/* Something bad happened, so report it and error out */
-	printk(KERN_WARNING "SABI command 0x%02x failed with completion flag 0x%02x and output 0x%02x\n",
-		command, readb(sabi_iface + SABI_IFACE_COMPLETE),
-		readb(sabi_iface + SABI_IFACE_DATA));
-	retval = -EINVAL;
-exit:
 	mutex_unlock(&sabi_mutex);
 	return retval;
 }
@@ -364,17 +368,19 @@ static u8 read_brightness(void)
 
 	retval = sabi_get_command(sabi_config->commands.get_brightness,
 				  &sretval);
-	if (!retval)
+	if (!retval) {
 		user_brightness = sretval.retval[0];
 		if (user_brightness != 0)
-			--user_brightness;
+			user_brightness -= sabi_config->min_brightness;
+	}
 	return user_brightness;
 }
 
 static void set_brightness(u8 user_brightness)
 {
-	sabi_set_command(sabi_config->commands.set_brightness,
-			 user_brightness + 1);
+	u8 user_level = user_brightness - sabi_config->min_brightness;
+
+	sabi_set_command(sabi_config->commands.set_brightness, user_level);
 }
 
 static int get_brightness(struct backlight_device *bd)
@@ -469,7 +475,7 @@ static ssize_t set_performance_level(struct device *dev,
 	if (count >= 1) {
 		int i;
 		for (i = 0; sabi_config->performance_levels[i].name; ++i) {
-			struct sabi_performance_level *level =
+			const struct sabi_performance_level *level =
 				&sabi_config->performance_levels[i];
 			if (!strncasecmp(level->name, buf, strlen(level->name))) {
 				sabi_set_command(sabi_config->commands.set_performance_level,
@@ -488,7 +494,7 @@ static DEVICE_ATTR(performance_level, S_IWUSR | S_IRUGO,
 
 static int __init dmi_check_cb(const struct dmi_system_id *id)
 {
-	printk(KERN_INFO KBUILD_MODNAME ": found laptop model '%s'\n",
+	pr_info("found laptop model '%s'\n",
 		id->ident);
 	return 0;
 }
@@ -525,6 +531,16 @@ static struct dmi_system_id __initdata samsung_dmi_table[] = {
 		.callback = dmi_check_cb,
 	},
 	{
+		.ident = "X120/X170",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR,
+					"SAMSUNG ELECTRONICS CO., LTD."),
+			DMI_MATCH(DMI_PRODUCT_NAME, "X120/X170"),
+			DMI_MATCH(DMI_BOARD_NAME, "X120/X170"),
+		},
+		.callback = dmi_check_cb,
+	},
+	{
 		.ident = "NC10",
 		.matches = {
 			DMI_MATCH(DMI_SYS_VENDOR,
@@ -555,6 +571,16 @@ static struct dmi_system_id __initdata samsung_dmi_table[] = {
 		.callback = dmi_check_cb,
 	},
 	{
+		.ident = "R410 Plus",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR,
+					"SAMSUNG ELECTRONICS CO., LTD."),
+			DMI_MATCH(DMI_PRODUCT_NAME, "R410P"),
+			DMI_MATCH(DMI_BOARD_NAME, "R460"),
+		},
+		.callback = dmi_check_cb,
+	},
+	{
 		.ident = "R518",
 		.matches = {
 			DMI_MATCH(DMI_SYS_VENDOR,
@@ -565,12 +591,32 @@ static struct dmi_system_id __initdata samsung_dmi_table[] = {
 		.callback = dmi_check_cb,
 	},
 	{
-		.ident = "N150/N210/N220",
+		.ident = "R519/R719",
 		.matches = {
 			DMI_MATCH(DMI_SYS_VENDOR,
 					"SAMSUNG ELECTRONICS CO., LTD."),
-			DMI_MATCH(DMI_PRODUCT_NAME, "N150/N210/N220"),
-			DMI_MATCH(DMI_BOARD_NAME, "N150/N210/N220"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "R519/R719"),
+			DMI_MATCH(DMI_BOARD_NAME, "R519/R719"),
+		},
+		.callback = dmi_check_cb,
+	},
+	{
+		.ident = "N150/N210/N220/N230",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR,
+					"SAMSUNG ELECTRONICS CO., LTD."),
+			DMI_MATCH(DMI_PRODUCT_NAME, "N150/N210/N220/N230"),
+			DMI_MATCH(DMI_BOARD_NAME, "N150/N210/N220/N230"),
+		},
+		.callback = dmi_check_cb,
+	},
+	{
+		.ident = "N150P/N210P/N220P",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR,
+					"SAMSUNG ELECTRONICS CO., LTD."),
+			DMI_MATCH(DMI_PRODUCT_NAME, "N150P/N210P/N220P"),
+			DMI_MATCH(DMI_BOARD_NAME, "N150P/N210P/N220P"),
 		},
 		.callback = dmi_check_cb,
 	},
@@ -589,6 +635,34 @@ static struct dmi_system_id __initdata samsung_dmi_table[] = {
 			DMI_MATCH(DMI_SYS_VENDOR, "SAMSUNG ELECTRONICS CO., LTD."),
 			DMI_MATCH(DMI_PRODUCT_NAME, "NF110/NF210/NF310"),
 			DMI_MATCH(DMI_BOARD_NAME, "NF110/NF210/NF310"),
+		},
+		.callback = dmi_check_cb,
+	},
+	{
+		.ident = "N145P/N250P/N260P",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "SAMSUNG ELECTRONICS CO., LTD."),
+			DMI_MATCH(DMI_PRODUCT_NAME, "N145P/N250P/N260P"),
+			DMI_MATCH(DMI_BOARD_NAME, "N145P/N250P/N260P"),
+		},
+		.callback = dmi_check_cb,
+	},
+	{
+		.ident = "R70/R71",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR,
+					"SAMSUNG ELECTRONICS CO., LTD."),
+			DMI_MATCH(DMI_PRODUCT_NAME, "R70/R71"),
+			DMI_MATCH(DMI_BOARD_NAME, "R70/R71"),
+		},
+		.callback = dmi_check_cb,
+	},
+	{
+		.ident = "P460",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "SAMSUNG ELECTRONICS CO., LTD."),
+			DMI_MATCH(DMI_PRODUCT_NAME, "P460"),
+			DMI_MATCH(DMI_BOARD_NAME, "P460"),
 		},
 		.callback = dmi_check_cb,
 	},
@@ -629,9 +703,9 @@ static int __init samsung_init(void)
 	if (!force && !dmi_check_system(samsung_dmi_table))
 		return -ENODEV;
 
-	f0000_segment = ioremap(0xf0000, 0xffff);
+	f0000_segment = ioremap_nocache(0xf0000, 0xffff);
 	if (!f0000_segment) {
-		printk(KERN_ERR "Can't map the segment at 0xf0000\n");
+		pr_err("Can't map the segment at 0xf0000\n");
 		return -EINVAL;
 	}
 
@@ -644,7 +718,7 @@ static int __init samsung_init(void)
 	}
 
 	if (loca == 0xffff) {
-		printk(KERN_ERR "This computer does not support SABI\n");
+		pr_err("This computer does not support SABI\n");
 		goto error_no_signature;
 	}
 
@@ -673,9 +747,9 @@ static int __init samsung_init(void)
 	/* Get a pointer to the SABI Interface */
 	ifaceP = (readw(sabi + sabi_config->header_offsets.data_segment) & 0x0ffff) << 4;
 	ifaceP += readw(sabi + sabi_config->header_offsets.data_offset) & 0x0ffff;
-	sabi_iface = ioremap(ifaceP, 16);
+	sabi_iface = ioremap_nocache(ifaceP, 16);
 	if (!sabi_iface) {
-		printk(KERN_ERR "Can't remap %x\n", ifaceP);
+		pr_err("Can't remap %x\n", ifaceP);
 		goto exit;
 	}
 	if (debug) {
@@ -695,7 +769,7 @@ static int __init samsung_init(void)
 		retval = sabi_set_command(sabi_config->commands.set_linux,
 					  0x81);
 		if (retval) {
-			printk(KERN_ERR KBUILD_MODNAME ": Linux mode was not set!\n");
+			pr_warn("Linux mode was not set!\n");
 			goto error_no_platform;
 		}
 	}
@@ -707,7 +781,8 @@ static int __init samsung_init(void)
 
 	/* create a backlight device to talk to this one */
 	memset(&props, 0, sizeof(struct backlight_properties));
-	props.max_brightness = MAX_BRIGHT;
+	props.type = BACKLIGHT_PLATFORM;
+	props.max_brightness = sabi_config->max_brightness;
 	backlight_device = backlight_device_register("samsung", &sdev->dev,
 						     NULL, &backlight_ops,
 						     &props);

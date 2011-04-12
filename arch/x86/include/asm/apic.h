@@ -2,7 +2,6 @@
 #define _ASM_X86_APIC_H
 
 #include <linux/cpumask.h>
-#include <linux/delay.h>
 #include <linux/pm.h>
 
 #include <asm/alternative.h>
@@ -10,16 +9,12 @@
 #include <asm/processor.h>
 #include <asm/apicdef.h>
 #include <asm/atomic.h>
-#ifndef CONFIG_XEN
 #include <asm/fixmap.h>
-#endif
 #include <asm/mpspec.h>
 #include <asm/system.h>
 #include <asm/msr.h>
 
-#ifndef CONFIG_XEN
 #define ARCH_APICTIMER_STOPS_ON_C3	1
-#endif
 
 /*
  * Debugging macros
@@ -51,7 +46,6 @@ static inline void generic_apic_probe(void)
 #ifdef CONFIG_X86_LOCAL_APIC
 
 extern unsigned int apic_verbosity;
-#ifndef CONFIG_XEN
 extern int local_apic_timer_c2_ok;
 
 extern int disable_apic;
@@ -123,8 +117,6 @@ extern void native_apic_icr_write(u32 low, u32 id);
 extern u64 native_apic_icr_read(void);
 
 extern int x2apic_mode;
-
-#endif /* CONFIG_XEN */
 
 #ifdef CONFIG_X86_X2APIC
 /*
@@ -227,7 +219,6 @@ extern void enable_IR_x2apic(void);
 
 extern int get_physical_broadcast(void);
 
-extern void apic_disable(void);
 extern int lapic_get_maxlvt(void);
 extern void clear_local_APIC(void);
 extern void connect_bsp_APIC(void);
@@ -235,23 +226,17 @@ extern void disconnect_bsp_APIC(int virt_wire_setup);
 extern void disable_local_APIC(void);
 extern void lapic_shutdown(void);
 extern int verify_local_APIC(void);
-extern void cache_APIC_registers(void);
 extern void sync_Arb_IDs(void);
 extern void init_bsp_APIC(void);
 extern void setup_local_APIC(void);
 extern void end_local_APIC_setup(void);
 extern void bsp_end_local_APIC_setup(void);
 extern void init_apic_mappings(void);
-#ifndef CONFIG_XEN
 void register_lapic_address(unsigned long address);
-#else
-#define register_lapic_address(address)
-#endif
 extern void setup_boot_APIC_clock(void);
 extern void setup_secondary_APIC_clock(void);
 extern int APIC_init_uniprocessor(void);
-extern void enable_NMI_through_LVT0(void);
-extern int apic_force_enable(void);
+extern int apic_force_enable(unsigned long addr);
 
 /*
  * On 32bit this is mach-xxx local
@@ -272,7 +257,6 @@ static inline void lapic_shutdown(void) { }
 #define local_apic_timer_c2_ok		1
 static inline void init_apic_mappings(void) { }
 static inline void disable_local_APIC(void) { }
-static inline void apic_disable(void) { }
 # define setup_boot_APIC_clock x86_init_noop
 # define setup_secondary_APIC_clock x86_init_noop
 #endif /* !CONFIG_X86_LOCAL_APIC */
@@ -318,8 +302,6 @@ struct apic {
 
 	void (*setup_apic_routing)(void);
 	int (*multi_timer_check)(int apic, int irq);
-	int (*apicid_to_node)(int logical_apicid);
-	int (*cpu_to_logical_apicid)(int cpu);
 	int (*cpu_present_to_apicid)(int mps_cpu);
 	void (*apicid_to_cpu_present)(int phys_apicid, physid_mask_t *retmap);
 	void (*setup_portio_remap)(void);
@@ -367,6 +349,23 @@ struct apic {
 	void (*icr_write)(u32 low, u32 high);
 	void (*wait_icr_idle)(void);
 	u32 (*safe_wait_icr_idle)(void);
+
+#ifdef CONFIG_X86_32
+	/*
+	 * Called very early during boot from get_smp_config().  It should
+	 * return the logical apicid.  x86_[bios]_cpu_to_apicid is
+	 * initialized before this function is called.
+	 *
+	 * If logical apicid can't be determined that early, the function
+	 * may return BAD_APICID.  Logical apicid will be configured after
+	 * init_apic_ldr() while bringing up CPUs.  Note that NUMA affinity
+	 * won't be applied properly during early boot in this case.
+	 */
+	int (*x86_32_early_logical_apicid)(int cpu);
+
+	/* determine CPU -> NUMA node mapping */
+	int (*x86_32_numa_cpu_node)(int cpu);
+#endif
 };
 
 /*
@@ -375,8 +374,6 @@ struct apic {
  * early probing process which one it picks - and then sticks to it):
  */
 extern struct apic *apic;
-
-#ifndef CONFIG_XEN
 
 /*
  * APIC functionality to boot other CPUs - only used on SMP:
@@ -480,8 +477,6 @@ static inline void default_wait_for_init_deassert(atomic_t *deassert)
 
 extern void generic_bigsmp_probe(void);
 
-#endif /* CONFIG_XEN */
-
 
 #ifdef CONFIG_X86_LOCAL_APIC
 
@@ -501,8 +496,6 @@ static inline const struct cpumask *default_target_cpus(void)
 DECLARE_EARLY_PER_CPU(u16, x86_bios_cpu_apicid);
 
 
-#ifndef CONFIG_XEN
-
 static inline unsigned int read_apic_id(void)
 {
 	unsigned int reg;
@@ -519,6 +512,11 @@ extern struct apic apic_noop;
 #ifdef CONFIG_X86_32
 
 extern struct apic apic_default;
+
+static inline int noop_x86_32_early_logical_apicid(int cpu)
+{
+	return BAD_APICID;
+}
 
 /*
  * Set up the logical destination ID.
@@ -539,7 +537,7 @@ static inline int default_phys_pkg_id(int cpuid_apic, int index_msb)
 	return cpuid_apic >> index_msb;
 }
 
-extern int default_apicid_to_node(int logical_apicid);
+extern int default_x86_32_numa_cpu_node(int cpu);
 
 #endif
 
@@ -575,12 +573,6 @@ static inline void default_ioapic_phys_id_map(physid_mask_t *phys_map, physid_ma
 	*retmap = *phys_map;
 }
 
-/* Mapping from cpu number to logical apicid */
-static inline int default_cpu_to_logical_apicid(int cpu)
-{
-	return 1 << cpu;
-}
-
 static inline int __default_cpu_present_to_apicid(int mps_cpu)
 {
 	if (mps_cpu < nr_cpu_ids && cpu_present(mps_cpu))
@@ -611,12 +603,6 @@ extern int default_cpu_present_to_apicid(int mps_cpu);
 extern int default_check_phys_apicid_present(int phys_apicid);
 #endif
 
-#endif /* CONFIG_XEN */
-
 #endif /* CONFIG_X86_LOCAL_APIC */
-
-#ifdef CONFIG_X86_32
-extern u8 cpu_2_logical_apicid[NR_CPUS];
-#endif
 
 #endif /* _ASM_X86_APIC_H */

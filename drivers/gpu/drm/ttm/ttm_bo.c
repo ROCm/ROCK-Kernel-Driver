@@ -406,11 +406,12 @@ static int ttm_bo_handle_move_mem(struct ttm_buffer_object *bo,
 		}
 
 		if (bo->mem.mem_type == TTM_PL_SYSTEM) {
+			if (bdev->driver->move_notify)
+				bdev->driver->move_notify(bo, mem);
 			bo->mem = *mem;
 			mem->mm_node = NULL;
 			goto moved;
 		}
-
 	}
 
 	if (bdev->driver->move_notify)
@@ -1167,7 +1168,7 @@ int ttm_bo_init(struct ttm_bo_device *bdev,
 		uint32_t page_alignment,
 		unsigned long buffer_start,
 		bool interruptible,
-		struct file *persistant_swap_storage,
+		struct file *persistent_swap_storage,
 		size_t acc_size,
 		void (*destroy) (struct ttm_buffer_object *))
 {
@@ -1210,7 +1211,7 @@ int ttm_bo_init(struct ttm_bo_device *bdev,
 	bo->priv_flags = 0;
 	bo->mem.placement = (TTM_PL_FLAG_SYSTEM | TTM_PL_FLAG_CACHED);
 	bo->seq_valid = false;
-	bo->persistant_swap_storage = persistant_swap_storage;
+	bo->persistent_swap_storage = persistent_swap_storage;
 	bo->acc_size = acc_size;
 	atomic_inc(&bo->glob->bo_count);
 
@@ -1259,7 +1260,7 @@ int ttm_bo_create(struct ttm_bo_device *bdev,
 			uint32_t page_alignment,
 			unsigned long buffer_start,
 			bool interruptible,
-			struct file *persistant_swap_storage,
+			struct file *persistent_swap_storage,
 			struct ttm_buffer_object **p_bo)
 {
 	struct ttm_buffer_object *bo;
@@ -1281,7 +1282,7 @@ int ttm_bo_create(struct ttm_bo_device *bdev,
 
 	ret = ttm_bo_init(bdev, bo, size, type, placement, page_alignment,
 				buffer_start, interruptible,
-				persistant_swap_storage, acc_size, NULL);
+				persistent_swap_storage, acc_size, NULL);
 	if (likely(ret == 0))
 		*p_bo = bo;
 
@@ -1440,14 +1441,6 @@ int ttm_bo_global_init(struct drm_global_reference *ref)
 		ret = -ENOMEM;
 		goto out_no_drp;
 	}
-#ifdef CONFIG_XEN
-	ret = xen_limit_pages_to_max_mfn(glob->dummy_read_page, 0, 32);
-	if (!ret)
-		clear_page(page_address(glob->dummy_read_page));
-	else
-		printk(KERN_WARNING
-		       "Error restricting dummy read page: %d\n", ret);
-#endif
 
 	INIT_LIST_HEAD(&glob->swap_lru);
 	INIT_LIST_HEAD(&glob->device_list);
@@ -1870,7 +1863,7 @@ static int ttm_bo_swapout(struct ttm_mem_shrink *shrink)
 	if (bo->bdev->driver->swap_notify)
 		bo->bdev->driver->swap_notify(bo);
 
-	ret = ttm_tt_swapout(bo->ttm, bo->persistant_swap_storage);
+	ret = ttm_tt_swapout(bo->ttm, bo->persistent_swap_storage);
 out:
 
 	/**

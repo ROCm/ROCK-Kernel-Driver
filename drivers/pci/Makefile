@@ -7,11 +7,6 @@ obj-y		+= access.o bus.o probe.o remove.o pci.o \
 			irq.o vpd.o
 obj-$(CONFIG_PROC_FS) += proc.o
 obj-$(CONFIG_SYSFS) += slot.o
-obj-$(CONFIG_PCI_GUESTDEV) += guestdev.o
-obj-$(CONFIG_PCI_IOMULTI) += pci-iomul.o
-iomul-$(CONFIG_PCI_IOMULTI) := iomulti.o
-obj-y += $(iomul-y) $(iomul-m)
-obj-$(CONFIG_PCI_RESERVE) += reserve.o
 
 obj-$(CONFIG_PCI_QUIRKS) += quirks.o
 
@@ -47,6 +42,7 @@ obj-$(CONFIG_PCI_IOV) += iov.o
 obj-$(CONFIG_X86) += setup-bus.o
 obj-$(CONFIG_ALPHA) += setup-bus.o setup-irq.o
 obj-$(CONFIG_ARM) += setup-bus.o setup-irq.o
+obj-$(CONFIG_UNICORE32) += setup-bus.o setup-irq.o
 obj-$(CONFIG_PARISC) += setup-bus.o
 obj-$(CONFIG_SUPERH) += setup-bus.o setup-irq.o
 obj-$(CONFIG_PPC) += setup-bus.o
@@ -58,8 +54,9 @@ obj-$(CONFIG_TILE) += setup-bus.o setup-irq.o
 
 #
 # ACPI Related PCI FW Functions
+# ACPI _DSM provided firmware instance and string name
 #
-obj-$(CONFIG_ACPI)    += pci-acpi.o
+obj-$(CONFIG_ACPI)    += pci-acpi.o pci-label.o
 
 # SMBIOS provided firmware instance and labels
 obj-$(CONFIG_DMI)    += pci-label.o
@@ -71,6 +68,6 @@ obj-$(CONFIG_PCI_SYSCALL) += syscall.o
 
 obj-$(CONFIG_PCI_STUB) += pci-stub.o
 
-obj-$(CONFIG_PARAVIRT_XEN_PCIDEV_FRONTEND) += xen-pcifront.o
+obj-$(CONFIG_XEN_PCIDEV_FRONTEND) += xen-pcifront.o
 
 ccflags-$(CONFIG_PCI_DEBUG) := -DDEBUG

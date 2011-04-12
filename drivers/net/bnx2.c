@@ -1,6 +1,6 @@
 /* bnx2.c: Broadcom NX2 network driver.
  *
- * Copyright (c) 2004-2010 Broadcom Corporation
+ * Copyright (c) 2004-2011 Broadcom Corporation
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -56,11 +56,11 @@
 #include "bnx2_fw.h"
 
 #define DRV_MODULE_NAME		"bnx2"
-#define DRV_MODULE_VERSION	"2.0.21"
-#define DRV_MODULE_RELDATE	"Dec 23, 2010"
+#define DRV_MODULE_VERSION	"2.1.6"
+#define DRV_MODULE_RELDATE	"Mar 7, 2011"
 #define FW_MIPS_FILE_06		"bnx2/bnx2-mips-06-6.2.1.fw"
 #define FW_RV2P_FILE_06		"bnx2/bnx2-rv2p-06-6.0.15.fw"
-#define FW_MIPS_FILE_09		"bnx2/bnx2-mips-09-6.2.1.fw"
+#define FW_MIPS_FILE_09		"bnx2/bnx2-mips-09-6.2.1a.fw"
 #define FW_RV2P_FILE_09_Ax	"bnx2/bnx2-rv2p-09ax-6.0.17.fw"
 #define FW_RV2P_FILE_09		"bnx2/bnx2-rv2p-09-6.0.17.fw"
 
@@ -439,7 +439,8 @@ bnx2_cnic_stop(struct bnx2 *bp)
 	struct cnic_ctl_info info;
 
 	mutex_lock(&bp->cnic_lock);
-	c_ops = bp->cnic_ops;
+	c_ops = rcu_dereference_protected(bp->cnic_ops,
+					  lockdep_is_held(&bp->cnic_lock));
 	if (c_ops) {
 		info.cmd = CNIC_CTL_STOP_CMD;
 		c_ops->cnic_ctl(bp->cnic_data, &info);
@@ -454,7 +455,8 @@ bnx2_cnic_start(struct bnx2 *bp)
 	struct cnic_ctl_info info;
 
 	mutex_lock(&bp->cnic_lock);
-	c_ops = bp->cnic_ops;
+	c_ops = rcu_dereference_protected(bp->cnic_ops,
+					  lockdep_is_held(&bp->cnic_lock));
 	if (c_ops) {
 		if (!(bp->flags & BNX2_FLAG_USING_MSIX)) {
 			struct bnx2_napi *bnapi = &bp->bnx2_napi[0];
@@ -2651,7 +2653,7 @@ bnx2_alloc_rx_page(struct bnx2 *bp, struct bnx2_rx_ring_info *rxr, u16 index, gf
 	struct sw_pg *rx_pg = &rxr->rx_pg_ring[index];
 	struct rx_bd *rxbd =
 		&rxr->rx_pg_desc_ring[RX_RING(index)][RX_IDX(index)];
-	struct page *page = __netdev_alloc_page(bp->dev, gfp);
+	struct page *page = alloc_page(gfp);
 
 	if (!page)
 		return -ENOMEM;
@@ -2681,7 +2683,7 @@ bnx2_free_rx_page(struct bnx2 *bp, struct bnx2_rx_ring_info *rxr, u16 index)
 	dma_unmap_page(&bp->pdev->dev, dma_unmap_addr(rx_pg, mapping),
 		       PAGE_SIZE, PCI_DMA_FROMDEVICE);
 
-	netdev_free_page(bp->dev, page);
+	__free_page(page);
 	rx_pg->page = NULL;
 }
 
@@ -3016,7 +3018,7 @@ bnx2_rx_skb(struct bnx2 *bp, struct bnx2_rx_ring_info *rxr, struct sk_buff *skb,
 			if (i == pages - 1)
 				frag_len -= 4;
 
-			skb_add_rx_frag(skb, i, rx_pg->page, 0, frag_len);
+			skb_fill_page_desc(skb, i, rx_pg->page, 0, frag_len);
 			rx_pg->page = NULL;
 
 			err = bnx2_alloc_rx_page(bp, rxr,
@@ -3034,6 +3036,9 @@ bnx2_rx_skb(struct bnx2 *bp, struct bnx2_rx_ring_info *rxr, struct sk_buff *skb,
 				       PAGE_SIZE, PCI_DMA_FROMDEVICE);
 
 			frag_size -= frag_len;
+			skb->data_len += frag_len;
+			skb->truesize += frag_len;
+			skb->len += frag_len;
 
 			pg_prod = NEXT_RX_BD(pg_prod);
 			pg_cons = RX_PG_RING_IDX(NEXT_RX_BD(pg_cons));
@@ -8319,7 +8324,7 @@ static const struct net_device_ops bnx2_netdev_ops = {
 #endif
 };
 
-static void inline vlan_features_add(struct net_device *dev, unsigned long flags)
+static inline void vlan_features_add(struct net_device *dev, u32 flags)
 {
 	dev->vlan_features |= flags;
 }

@@ -12,7 +12,6 @@
 #include <linux/uio.h>
 #include <linux/socket.h>
 #include <linux/in.h>
-#include <linux/kref.h>
 #include <linux/ktime.h>
 #include <linux/sunrpc/sched.h>
 #include <linux/sunrpc/xdr.h>
@@ -146,7 +145,7 @@ enum xprt_transports {
 };
 
 struct rpc_xprt {
-	struct kref		kref;		/* Reference count */
+	atomic_t		count;		/* Reference count */
 	struct rpc_xprt_ops *	ops;		/* transport methods */
 
 	const struct rpc_timeout *timeout;	/* timeout parms */
@@ -173,8 +172,6 @@ struct rpc_xprt {
 	unsigned long		state;		/* transport state */
 	unsigned char		shutdown   : 1,	/* being shut down */
 				resvport   : 1; /* use a reserved port */
-	unsigned int		swapper; 	/* we're swapping over this
-						   transport */
 	unsigned int		bind_index;	/* bind function index */
 
 	/*
@@ -310,7 +307,6 @@ void			xprt_release_rqst_cong(struct rpc_task *task);
 void			xprt_disconnect_done(struct rpc_xprt *xprt);
 void			xprt_force_disconnect(struct rpc_xprt *xprt);
 void			xprt_conditional_disconnect(struct rpc_xprt *xprt, unsigned int cookie);
-int			xs_swapper(struct rpc_xprt *xprt, int enable);
 
 /*
  * Reserved bit positions in xprt->state

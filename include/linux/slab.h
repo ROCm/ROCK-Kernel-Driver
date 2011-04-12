@@ -105,9 +105,6 @@ void kmem_cache_destroy(struct kmem_cache *);
 int kmem_cache_shrink(struct kmem_cache *);
 void kmem_cache_free(struct kmem_cache *, void *);
 unsigned int kmem_cache_size(struct kmem_cache *);
-const char *kmem_cache_name(struct kmem_cache *);
-unsigned kmem_alloc_estimate(struct kmem_cache *cachep,
-			gfp_t flags, int objects);
 
 /*
  * Please use this macro to create slab caches. Simply specify the
@@ -144,8 +141,6 @@ void * __must_check krealloc(const void *, size_t, gfp_t);
 void kfree(const void *);
 void kzfree(const void *);
 size_t ksize(const void *);
-unsigned kmalloc_estimate_objs(size_t, gfp_t, int);
-unsigned kmalloc_estimate_bytes(gfp_t, size_t);
 
 /*
  * Allocator specific definitions. These are mainly used to establish optimized

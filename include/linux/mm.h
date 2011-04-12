@@ -113,12 +113,7 @@ extern unsigned int kobjsize(const void *objp);
 
 #define VM_CAN_NONLINEAR 0x08000000	/* Has ->fault & does nonlinear pages */
 #define VM_MIXEDMAP	0x10000000	/* Can contain "struct page" and pure PFN pages */
-#ifndef CONFIG_XEN
 #define VM_SAO		0x20000000	/* Strong Access Ordering (powerpc) */
-#else
-#define VM_SAO		0
-#define VM_FOREIGN	0x20000000	/* Has pages belonging to another VM */
-#endif
 #define VM_PFN_AT_MMAP	0x40000000	/* PFNMAP vma that is fully mapped at mmap time */
 #define VM_MERGEABLE	0x80000000	/* KSM may merge identical pages */
 
@@ -146,12 +141,6 @@ extern unsigned int kobjsize(const void *objp);
  */
 #define VM_SPECIAL (VM_IO | VM_DONTEXPAND | VM_RESERVED | VM_PFNMAP)
 
-#ifdef CONFIG_XEN
-struct vm_foreign_map {
-	struct page **map;
-};
-#endif
-
 /*
  * mapping from the currently active vm_flags protection bits (the
  * low four bits) to a page protection mask..
@@ -162,6 +151,7 @@ extern pgprot_t protection_map[16];
 #define FAULT_FLAG_NONLINEAR	0x02	/* Fault was via a nonlinear mapping */
 #define FAULT_FLAG_MKWRITE	0x04	/* Fault was mkwrite of existing pte */
 #define FAULT_FLAG_ALLOW_RETRY	0x08	/* Retry fault if blocking */
+#define FAULT_FLAG_RETRY_NOWAIT	0x10	/* Don't drop mmap_sem and wait when retrying */
 
 /*
  * This interface is used by x86 PAT code to identify a pfn mapping that is
@@ -221,17 +211,6 @@ struct vm_operations_struct {
 	 */
 	int (*access)(struct vm_area_struct *vma, unsigned long addr,
 		      void *buf, int len, int write);
-
-#ifdef CONFIG_XEN
-	/* Area-specific function for clearing the PTE at @ptep. Returns the
-	 * original value of @ptep. */
-	pte_t (*zap_pte)(struct vm_area_struct *vma,
-			 unsigned long addr, pte_t *ptep, int is_fullmm);
-
-	/* called before close() to indicate no more pages should be mapped */
-	void (*unmap)(struct vm_area_struct *area);
-#endif
-
 #ifdef CONFIG_NUMA
 	/*
 	 * set_policy() op must add a reference to any non-NULL @new mempolicy
@@ -424,16 +403,23 @@ static inline void init_page_count(struct page *page)
 /*
  * PageBuddy() indicate that the page is free and in the buddy system
  * (see mm/page_alloc.c).
+ *
+ * PAGE_BUDDY_MAPCOUNT_VALUE must be <= -2 but better not too close to
+ * -2 so that an underflow of the page_mapcount() won't be mistaken
+ * for a genuine PAGE_BUDDY_MAPCOUNT_VALUE. -128 can be created very
+ * efficiently by most CPU architectures.
  */
+#define PAGE_BUDDY_MAPCOUNT_VALUE (-128)
+
 static inline int PageBuddy(struct page *page)
 {
-	return atomic_read(&page->_mapcount) == -2;
+	return atomic_read(&page->_mapcount) == PAGE_BUDDY_MAPCOUNT_VALUE;
 }
 
 static inline void __SetPageBuddy(struct page *page)
 {
 	VM_BUG_ON(atomic_read(&page->_mapcount) != -1);
-	atomic_set(&page->_mapcount, -2);
+	atomic_set(&page->_mapcount, PAGE_BUDDY_MAPCOUNT_VALUE);
 }
 
 static inline void __ClearPageBuddy(struct page *page)
@@ -800,17 +786,6 @@ static inline void *page_rmapping(struct page *page)
 	return (void *)((unsigned long)page->mapping & ~PAGE_MAPPING_FLAGS);
 }
 
-extern struct address_space *__page_file_mapping(struct page *);
-
-static inline
-struct address_space *page_file_mapping(struct page *page)
-{
-	if (unlikely(PageSwapCache(page)))
-		return __page_file_mapping(page);
-
-	return page->mapping;
-}
-
 static inline int PageAnon(struct page *page)
 {
 	return ((unsigned long)page->mapping & PAGE_MAPPING_ANON) != 0;
@@ -824,20 +799,6 @@ static inline pgoff_t page_index(struct page *page)
 {
 	if (unlikely(PageSwapCache(page)))
 		return page_private(page);
-	return page->index;
-}
-
-extern pgoff_t __page_file_index(struct page *page);
-
-/*
- * Return the file index of the page. Regular pagecache pages use ->index
- * whereas swapcache pages use swp_offset(->private)
- */
-static inline pgoff_t page_file_index(struct page *page)
-{
-	if (unlikely(PageSwapCache(page)))
-		return __page_file_index(page);
-
 	return page->index;
 }
 
@@ -899,7 +860,14 @@ extern void pagefault_out_of_memory(void);
 
 #define offset_in_page(p)	((unsigned long)(p) & ~PAGE_MASK)
 
+/*
+ * Flags passed to show_mem() and __show_free_areas() to suppress output in
+ * various contexts.
+ */
+#define SHOW_MEM_FILTER_NODES	(0x0001u)	/* filter disallowed nodes */
+
 extern void show_free_areas(void);
+extern void __show_free_areas(unsigned int flags);
 
 int shmem_lock(struct file *file, int lock, struct user_struct *user);
 struct file *shmem_file_setup(const char *name, loff_t size, unsigned long flags);
@@ -946,6 +914,9 @@ unsigned long unmap_vmas(struct mmu_gather **tlb,
  * @pgd_entry: if set, called for each non-empty PGD (top-level) entry
  * @pud_entry: if set, called for each non-empty PUD (2nd-level) entry
  * @pmd_entry: if set, called for each non-empty PMD (3rd-level) entry
+ *	       this handler is required to be able to handle
+ *	       pmd_trans_huge() pmds.  They may simply choose to
+ *	       split_huge_page() instead of handling it explicitly.
  * @pte_entry: if set, called for each non-empty PTE (4th-level) entry
  * @pte_hole: if set, called for each hole at all levels
  * @hugetlb_entry: if set, called for each hugetlb entry
@@ -1013,7 +984,13 @@ static inline int handle_mm_fault(struct mm_struct *mm,
 
 extern int make_pages_present(unsigned long addr, unsigned long end);
 extern int access_process_vm(struct task_struct *tsk, unsigned long addr, void *buf, int len, int write);
+extern int access_remote_vm(struct mm_struct *mm, unsigned long addr,
+		void *buf, int len, int write);
 
+int __get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
+		     unsigned long start, int len, unsigned int foll_flags,
+		     struct page **pages, struct vm_area_struct **vmas,
+		     int *nonblocking);
 int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 			unsigned long start, int nr_pages, int write, int force,
 			struct page **pages, struct vm_area_struct **vmas);
@@ -1032,7 +1009,6 @@ void account_page_dirtied(struct page *page, struct address_space *mapping);
 void account_page_writeback(struct page *page);
 int set_page_dirty(struct page *page);
 int set_page_dirty_lock(struct page *page);
-int set_page_dirty_notag(struct page *page);
 int clear_page_dirty_for_io(struct page *page);
 
 /* Is the vma a continuation of the stack vma above it? */
@@ -1359,8 +1335,6 @@ int add_from_early_node_map(struct range *range, int az,
 				   int nr_range, int nid);
 u64 __init find_memory_core_early(int nid, u64 size, u64 align,
 					u64 goal, u64 limit);
-void *__alloc_memory_core_early(int nodeid, u64 size, u64 align,
-				 u64 goal, u64 limit);
 typedef int (*work_fn_t)(unsigned long, unsigned long, void *);
 extern void work_with_active_regions(int nid, work_fn_t work_fn, void *data);
 extern void sparse_memory_present_with_active_regions(int nid);
@@ -1388,7 +1362,7 @@ extern void setup_per_zone_wmarks(void);
 extern void calculate_zone_inactive_ratio(struct zone *zone);
 extern void mem_init(void);
 extern void __init mmap_init(void);
-extern void show_mem(void);
+extern void show_mem(unsigned int flags);
 extern void si_meminfo(struct sysinfo * val);
 extern void si_meminfo_node(struct sysinfo *val, int nid);
 extern int after_bootmem;
@@ -1582,8 +1556,11 @@ struct page *follow_page(struct vm_area_struct *, unsigned long address,
 #define FOLL_GET	0x04	/* do get_page on page */
 #define FOLL_DUMP	0x08	/* give error on hole if it would be zero */
 #define FOLL_FORCE	0x10	/* get_user_pages read/write w/o permission */
+#define FOLL_NOWAIT	0x20	/* if a disk transfer is needed, start the IO
+				 * and return without waiting upon it */
 #define FOLL_MLOCK	0x40	/* mark page as mlocked */
 #define FOLL_SPLIT	0x80	/* don't return transhuge pages, split them */
+#define FOLL_HWPOISON	0x100	/* check page is hwpoisoned */
 
 typedef int (*pte_fn_t)(pte_t *pte, pgtable_t token, unsigned long addr,
 			void *data);
@@ -1622,13 +1599,13 @@ static inline bool kernel_page_present(struct page *page) { return true; }
 #endif /* CONFIG_HIBERNATION */
 #endif
 
-extern struct vm_area_struct *get_gate_vma(struct task_struct *tsk);
+extern struct vm_area_struct *get_gate_vma(struct mm_struct *mm);
 #ifdef	__HAVE_ARCH_GATE_AREA
-int in_gate_area_no_task(unsigned long addr);
-int in_gate_area(struct task_struct *task, unsigned long addr);
+int in_gate_area_no_mm(unsigned long addr);
+int in_gate_area(struct mm_struct *mm, unsigned long addr);
 #else
-int in_gate_area_no_task(unsigned long addr);
-#define in_gate_area(task, addr) ({(void)task; in_gate_area_no_task(addr);})
+int in_gate_area_no_mm(unsigned long addr);
+#define in_gate_area(mm, addr) ({(void)mm; in_gate_area_no_mm(addr);})
 #endif	/* __HAVE_ARCH_GATE_AREA */
 
 int drop_caches_sysctl_handler(struct ctl_table *, int,
@@ -1676,14 +1653,6 @@ extern int sysctl_memory_failure_recovery;
 extern void shake_page(struct page *p, int access);
 extern atomic_long_t mce_bad_pages;
 extern int soft_offline_page(struct page *page, int flags);
-#ifdef CONFIG_MEMORY_FAILURE
-int is_hwpoison_address(unsigned long addr);
-#else
-static inline int is_hwpoison_address(unsigned long addr)
-{
-	return 0;
-}
-#endif
 
 extern void dump_page(struct page *page);
 

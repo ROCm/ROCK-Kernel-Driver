@@ -73,7 +73,7 @@ struct pt_regs {
 	unsigned long r12;
 	unsigned long rbp;
 	unsigned long rbx;
-/* arguments: non interrupts/non tracing syscalls only save upto here*/
+/* arguments: non interrupts/non tracing syscalls only save up to here*/
 	unsigned long r11;
 	unsigned long r10;
 	unsigned long r9;
@@ -103,7 +103,7 @@ struct pt_regs {
 	unsigned long r12;
 	unsigned long bp;
 	unsigned long bx;
-/* arguments: non interrupts/non tracing syscalls only save upto here*/
+/* arguments: non interrupts/non tracing syscalls only save up to here*/
 	unsigned long r11;
 	unsigned long r10;
 	unsigned long r9;
@@ -275,9 +275,7 @@ static inline unsigned long regs_get_kernel_stack_nth(struct pt_regs *regs,
 }
 
 #define arch_has_single_step()	(1)
-#if defined(CONFIG_XEN)
-#define arch_has_block_step()	(0)
-#elif defined(CONFIG_X86_DEBUGCTLMSR)
+#ifdef CONFIG_X86_DEBUGCTLMSR
 #define arch_has_block_step()	(1)
 #else
 #define arch_has_block_step()	(boot_cpu_data.x86 >= 6)

@@ -13,9 +13,9 @@ chk-option = $(shell if $(CC) $(CFLAGS) $(1) -S -o /dev/null -xc /dev/null \
 # Remove possible '-g' from CFLAGS_KERNEL, since we want to use stabs
 # debug format.
 override CFLAGS_KERNEL := $(shell echo $(CFLAGS_KERNEL) | sed 's/-g//')
-EXTRA_CFLAGS  := -DCOMPILE_VERSION=$(COMPILE_VERSION) -gstabs -I.
+ccflags-y  := -DCOMPILE_VERSION=$(COMPILE_VERSION) -gstabs -I.
 # Assume we don't need the flag if the compiler doesn't know about it
-EXTRA_CFLAGS  += $(call chk-option,-fno-eliminate-unused-debug-types)
+ccflags-y  += $(call chk-option,-fno-eliminate-unused-debug-types)
 
 
 targets := image

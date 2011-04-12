@@ -168,21 +168,14 @@ static void skb_under_panic(struct sk_buff *skb, int sz, void *here)
  *	%GFP_ATOMIC.
  */
 struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
-			    int flags, int node)
+			    int fclone, int node)
 {
 	struct kmem_cache *cache;
 	struct skb_shared_info *shinfo;
 	struct sk_buff *skb;
 	u8 *data;
-	int emergency = 0;
-	int memalloc = sk_memalloc_socks();
 
-	size = SKB_DATA_ALIGN(size);
-	cache = (flags & SKB_ALLOC_FCLONE)
-		? skbuff_fclone_cache : skbuff_head_cache;
-
-	if (memalloc && (flags & SKB_ALLOC_RX))
-		gfp_mask |= __GFP_MEMALLOC;
+	cache = fclone ? skbuff_fclone_cache : skbuff_head_cache;
 
 	/* Get the HEAD */
 	skb = kmem_cache_alloc_node(cache, gfp_mask & ~__GFP_DMA, node);
@@ -190,8 +183,9 @@ struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 		goto out;
 	prefetchw(skb);
 
-	data = kmalloc_reserve(size + sizeof(struct skb_shared_info),
-			gfp_mask, node, &net_skb_reserve, &emergency);
+	size = SKB_DATA_ALIGN(size);
+	data = kmalloc_node_track_caller(size + sizeof(struct skb_shared_info),
+			gfp_mask, node);
 	if (!data)
 		goto nodata;
 	prefetchw(data + size);
@@ -202,9 +196,6 @@ struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 	 * the tail pointer in struct sk_buff!
 	 */
 	memset(skb, 0, offsetof(struct sk_buff, tail));
-#ifdef CONFIG_NETVM
-	skb->emergency = emergency;
-#endif
 	skb->truesize = size + sizeof(struct sk_buff);
 	atomic_set(&skb->users, 1);
 	skb->head = data;
@@ -221,7 +212,7 @@ struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 	atomic_set(&shinfo->dataref, 1);
 	kmemcheck_annotate_variable(shinfo->destructor_arg);
 
-	if (flags & SKB_ALLOC_FCLONE) {
+	if (fclone) {
 		struct sk_buff *child = skb + 1;
 		atomic_t *fclone_ref = (atomic_t *) (child + 1);
 
@@ -231,9 +222,6 @@ struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 		atomic_set(fclone_ref, 1);
 
 		child->fclone = SKB_FCLONE_UNAVAILABLE;
-#ifdef CONFIG_NETVM
-		child->emergency = skb->emergency;
-#endif
 	}
 out:
 	return skb;
@@ -262,7 +250,7 @@ struct sk_buff *__netdev_alloc_skb(struct net_device *dev,
 {
 	struct sk_buff *skb;
 
-	skb = __alloc_skb(length + NET_SKB_PAD, gfp_mask, SKB_ALLOC_RX, NUMA_NO_NODE);
+	skb = __alloc_skb(length + NET_SKB_PAD, gfp_mask, 0, NUMA_NO_NODE);
 	if (likely(skb)) {
 		skb_reserve(skb, NET_SKB_PAD);
 		skb->dev = dev;
@@ -278,27 +266,6 @@ void skb_add_rx_frag(struct sk_buff *skb, int i, struct page *page, int off,
 	skb->len += size;
 	skb->data_len += size;
 	skb->truesize += size;
-
-#ifdef CONFIG_NETVM
-	/*
-	 * In the rare case that skb_emergency() != page->reserved we'll
-	 * skew the accounting slightly, but since its only a 'small' constant
-	 * shift its ok.
-	 */
-	if (skb_emergency(skb)) {
-		/*
-		 * We need to track fragment pages so that we properly
-		 * release their reserve in skb_put_page().
-		 */
-		atomic_set(&page->frag_count, 1);
-	} else if (unlikely(page->reserve)) {
-		/*
-		 * Release the reserve now, because normal skbs don't
-		 * do the emergency accounting.
-		 */
-		mem_reserve_pages_charge(&net_skb_reserve, -1);
-	}
-#endif
 }
 EXPORT_SYMBOL(skb_add_rx_frag);
 
@@ -350,38 +317,21 @@ static void skb_clone_fraglist(struct sk_buff *skb)
 		skb_get(list);
 }
 
-static void skb_get_page(struct sk_buff *skb, struct page *page)
-{
-	get_page(page);
-	if (skb_emergency(skb))
-		atomic_inc(&page->frag_count);
-}
-
-static void skb_put_page(struct sk_buff *skb, struct page *page)
-{
-	if (skb_emergency(skb) && atomic_dec_and_test(&page->frag_count))
-		mem_reserve_pages_charge(&net_skb_reserve, -1);
-	put_page(page);
-}
-
 static void skb_release_data(struct sk_buff *skb)
 {
 	if (!skb->cloned ||
 	    !atomic_sub_return(skb->nohdr ? (1 << SKB_DATAREF_SHIFT) + 1 : 1,
 			       &skb_shinfo(skb)->dataref)) {
-
 		if (skb_shinfo(skb)->nr_frags) {
 			int i;
-			for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
-				skb_put_page(skb,
-					     skb_shinfo(skb)->frags[i].page);
-			}
+			for (i = 0; i < skb_shinfo(skb)->nr_frags; i++)
+				put_page(skb_shinfo(skb)->frags[i].page);
 		}
 
 		if (skb_has_frag_list(skb))
 			skb_drop_fraglist(skb);
 
-		kfree_reserve(skb->head, &net_skb_reserve, skb_emergency(skb));
+		kfree(skb->head);
 	}
 }
 
@@ -573,12 +523,8 @@ static void __copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 	new->ip_summed		= old->ip_summed;
 	skb_copy_queue_mapping(new, old);
 	new->priority		= old->priority;
-	new->deliver_no_wcard	= old->deliver_no_wcard;
 #if defined(CONFIG_IP_VS) || defined(CONFIG_IP_VS_MODULE)
 	new->ipvs_property	= old->ipvs_property;
-#endif
-#ifdef CONFIG_NETVM
-	new->emergency		= old->emergency;
 #endif
 	new->protocol		= old->protocol;
 	new->mark		= old->mark;
@@ -674,9 +620,6 @@ struct sk_buff *skb_clone(struct sk_buff *skb, gfp_t gfp_mask)
 		n->fclone = SKB_FCLONE_CLONE;
 		atomic_inc(fclone_ref);
 	} else {
-		if (skb_emergency(skb))
-			gfp_mask |= __GFP_MEMALLOC;
-
 		n = kmem_cache_alloc(skbuff_head_cache, gfp_mask);
 		if (!n)
 			return NULL;
@@ -713,14 +656,6 @@ static void copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 	skb_shinfo(new)->gso_type = skb_shinfo(old)->gso_type;
 }
 
-static inline int skb_alloc_rx_flag(const struct sk_buff *skb)
-{
-	if (skb_emergency(skb))
-		return SKB_ALLOC_RX;
-
-	return 0;
-}
-
 /**
  *	skb_copy	-	create private copy of an sk_buff
  *	@skb: buffer to copy
@@ -742,8 +677,7 @@ struct sk_buff *skb_copy(const struct sk_buff *skb, gfp_t gfp_mask)
 {
 	int headerlen = skb_headroom(skb);
 	unsigned int size = (skb_end_pointer(skb) - skb->head) + skb->data_len;
-	struct sk_buff *n = __alloc_skb(size, gfp_mask, skb_alloc_rx_flag(skb),
-					NUMA_NO_NODE);
+	struct sk_buff *n = alloc_skb(size, gfp_mask);
 
 	if (!n)
 		return NULL;
@@ -777,8 +711,7 @@ EXPORT_SYMBOL(skb_copy);
 struct sk_buff *pskb_copy(struct sk_buff *skb, gfp_t gfp_mask)
 {
 	unsigned int size = skb_end_pointer(skb) - skb->head;
-	struct sk_buff *n = __alloc_skb(size, gfp_mask, skb_alloc_rx_flag(skb),
-					NUMA_NO_NODE);
+	struct sk_buff *n = alloc_skb(size, gfp_mask);
 
 	if (!n)
 		goto out;
@@ -798,9 +731,8 @@ struct sk_buff *pskb_copy(struct sk_buff *skb, gfp_t gfp_mask)
 		int i;
 
 		for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
-			skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
-			skb_shinfo(n)->frags[i] = *frag;
-			skb_get_page(n, frag->page);
+			skb_shinfo(n)->frags[i] = skb_shinfo(skb)->frags[i];
+			get_page(skb_shinfo(n)->frags[i].page);
 		}
 		skb_shinfo(n)->nr_frags = i;
 	}
@@ -870,11 +802,7 @@ int pskb_expand_head(struct sk_buff *skb, int nhead, int ntail,
 		goto adjust_others;
 	}
 
-	if (skb_emergency(skb))
-		gfp_mask |= __GFP_MEMALLOC;
-
-	data = kmalloc_reserve(size + sizeof(struct skb_shared_info),
-			gfp_mask, -1, &net_skb_reserve, NULL);
+	data = kmalloc(size + sizeof(struct skb_shared_info), gfp_mask);
 	if (!data)
 		goto nodata;
 
@@ -891,7 +819,7 @@ int pskb_expand_head(struct sk_buff *skb, int nhead, int ntail,
 		kfree(skb->head);
 	} else {
 		for (i = 0; i < skb_shinfo(skb)->nr_frags; i++)
-			skb_get_page(skb, skb_shinfo(skb)->frags[i].page);
+			get_page(skb_shinfo(skb)->frags[i].page);
 
 		if (skb_has_frag_list(skb))
 			skb_clone_fraglist(skb);
@@ -975,8 +903,8 @@ struct sk_buff *skb_copy_expand(const struct sk_buff *skb,
 	/*
 	 *	Allocate the copy buffer
 	 */
-	struct sk_buff *n = __alloc_skb(newheadroom + skb->len + newtailroom,
-					gfp_mask, skb_alloc_rx_flag(skb), -1);
+	struct sk_buff *n = alloc_skb(newheadroom + skb->len + newtailroom,
+				      gfp_mask);
 	int oldheadroom = skb_headroom(skb);
 	int head_copy_len, head_copy_off;
 	int off;
@@ -1169,7 +1097,7 @@ drop_pages:
 		skb_shinfo(skb)->nr_frags = i;
 
 		for (; i < nfrags; i++)
-			skb_put_page(skb, skb_shinfo(skb)->frags[i].page);
+			put_page(skb_shinfo(skb)->frags[i].page);
 
 		if (skb_has_frag_list(skb))
 			skb_drop_fraglist(skb);
@@ -1338,7 +1266,7 @@ pull_pages:
 	k = 0;
 	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
 		if (skb_shinfo(skb)->frags[i].size <= eat) {
-			skb_put_page(skb, skb_shinfo(skb)->frags[i].page);
+			put_page(skb_shinfo(skb)->frags[i].page);
 			eat -= skb_shinfo(skb)->frags[i].size;
 		} else {
 			skb_shinfo(skb)->frags[k] = skb_shinfo(skb)->frags[i];
@@ -2120,7 +2048,6 @@ static inline void skb_split_no_header(struct sk_buff *skb,
 			skb_shinfo(skb1)->frags[k] = skb_shinfo(skb)->frags[i];
 
 			if (pos < len) {
-				struct page *page = skb_shinfo(skb)->frags[i].page;
 				/* Split frag.
 				 * We have two variants in this case:
 				 * 1. Move all the frag to the second
@@ -2129,7 +2056,7 @@ static inline void skb_split_no_header(struct sk_buff *skb,
 				 *    where splitting is expensive.
 				 * 2. Split is accurately. We make this.
 				 */
-				skb_get_page(skb1, page);
+				get_page(skb_shinfo(skb)->frags[i].page);
 				skb_shinfo(skb1)->frags[0].page_offset += len - pos;
 				skb_shinfo(skb1)->frags[0].size -= len - pos;
 				skb_shinfo(skb)->frags[i].size	= len - pos;
@@ -2506,8 +2433,6 @@ int skb_append_datato_frags(struct sock *sk, struct sk_buff *skb,
 			return -ENOMEM;
 
 		/* initialize the next frag */
-		sk->sk_sndmsg_page = page;
-		sk->sk_sndmsg_off = 0;
 		skb_fill_page_desc(skb, frg_cnt, page, 0, 0);
 		skb->truesize += PAGE_SIZE;
 		atomic_add(PAGE_SIZE, &sk->sk_wmem_alloc);
@@ -2527,7 +2452,6 @@ int skb_append_datato_frags(struct sock *sk, struct sk_buff *skb,
 			return -EFAULT;
 
 		/* copy was successful so update the size parameters */
-		sk->sk_sndmsg_off += copy;
 		frag->size += copy;
 		skb->len += copy;
 		skb->data_len += copy;
@@ -2570,7 +2494,7 @@ EXPORT_SYMBOL_GPL(skb_pull_rcsum);
  *	a pointer to the first in a list of new skbs for the segments.
  *	In case of error it returns ERR_PTR(err).
  */
-struct sk_buff *skb_segment(struct sk_buff *skb, int features)
+struct sk_buff *skb_segment(struct sk_buff *skb, u32 features)
 {
 	struct sk_buff *segs = NULL;
 	struct sk_buff *tail = NULL;
@@ -2580,7 +2504,7 @@ struct sk_buff *skb_segment(struct sk_buff *skb, int features)
 	unsigned int offset = doffset;
 	unsigned int headroom;
 	unsigned int len;
-	int sg = features & NETIF_F_SG;
+	int sg = !!(features & NETIF_F_SG);
 	int nfrags = skb_shinfo(skb)->nr_frags;
 	int err = -ENOMEM;
 	int i = 0;
@@ -2627,9 +2551,8 @@ struct sk_buff *skb_segment(struct sk_buff *skb, int features)
 			skb_release_head_state(nskb);
 			__skb_push(nskb, doffset);
 		} else {
-			nskb = __alloc_skb(hsize + doffset + headroom,
-					 GFP_ATOMIC, skb_alloc_rx_flag(skb),
-					 -1);
+			nskb = alloc_skb(hsize + doffset + headroom,
+					 GFP_ATOMIC);
 
 			if (unlikely(!nskb))
 				goto err;
@@ -2675,7 +2598,7 @@ struct sk_buff *skb_segment(struct sk_buff *skb, int features)
 
 		while (pos < offset + len && i < nfrags) {
 			*frag = skb_shinfo(skb)->frags[i];
-			skb_get_page(nskb, frag->page);
+			get_page(frag->page);
 			size = frag->size;
 
 			if (pos < offset) {

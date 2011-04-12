@@ -225,7 +225,8 @@ static void start_stop_endio(struct request *req, int error)
 		}
 	}
 done:
-	blk_put_request(req);
+	req->end_io_data = NULL;
+	__blk_put_request(req->q, req);
 	if (h->callback_fn) {
 		h->callback_fn(h->callback_data, err);
 		h->callback_fn = h->callback_data = NULL;
@@ -311,11 +312,11 @@ static int hp_sw_activate(struct scsi_device *sdev,
 }
 
 static const struct scsi_dh_devlist hp_sw_dh_data_list[] = {
-	{"COMPAQ", "MSA1000 VOLUME", 0},
-	{"COMPAQ", "HSV110", 0},
-	{"HP", "HSV100", 0},
-	{"DEC", "HSG80", 0},
-	{NULL, NULL, 0},
+	{"COMPAQ", "MSA1000 VOLUME"},
+	{"COMPAQ", "HSV110"},
+	{"HP", "HSV100"},
+	{"DEC", "HSG80"},
+	{NULL, NULL},
 };
 
 static int hp_sw_bus_attach(struct scsi_device *sdev);
@@ -338,8 +339,8 @@ static int hp_sw_bus_attach(struct scsi_device *sdev)
 	unsigned long flags;
 	int ret;
 
-	scsi_dh_data = kzalloc(sizeof(struct scsi_device_handler *)
-			       + sizeof(struct hp_sw_dh_data) , GFP_KERNEL);
+	scsi_dh_data = kzalloc(sizeof(*scsi_dh_data)
+			       + sizeof(*h) , GFP_KERNEL);
 	if (!scsi_dh_data) {
 		sdev_printk(KERN_ERR, sdev, "%s: Attach Failed\n",
 			    HP_SW_NAME);

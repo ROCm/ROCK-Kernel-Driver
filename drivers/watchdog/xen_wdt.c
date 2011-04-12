@@ -27,10 +27,8 @@
 #include <linux/spinlock.h>
 #include <linux/uaccess.h>
 #include <linux/watchdog.h>
-#ifdef CONFIG_PARAVIRT_XEN
 #include <xen/xen.h>
 #include <asm/xen/hypercall.h>
-#endif
 #include <xen/interface/sched.h>
 
 static struct platform_device *platform_device;
@@ -136,7 +134,8 @@ static int xen_wdt_release(struct inode *inode, struct file *file)
 	if (expect_release)
 		xen_wdt_stop();
 	else {
-		pr_crit(PFX "unexpected close, not stopping watchdog!\n");
+		printk(KERN_CRIT PFX
+		       "unexpected close, not stopping watchdog!\n");
 		xen_wdt_kick();
 	}
 	is_active = false;
@@ -252,28 +251,30 @@ static int __devinit xen_wdt_probe(struct platform_device *dev)
 	case -EINVAL:
 		if (!timeout) {
 			timeout = WATCHDOG_TIMEOUT;
-			pr_info(PFX "timeout value invalid, using %d\n",
-				timeout);
+			printk(KERN_INFO PFX
+			       "timeout value invalid, using %d\n", timeout);
 		}
 
 		ret = misc_register(&xen_wdt_miscdev);
 		if (ret) {
-			pr_err(PFX "can't register miscdev on minor=%d (%d)\n",
+			printk(KERN_ERR PFX
+			       "cannot register miscdev on minor=%d (%d)\n",
 			       WATCHDOG_MINOR, ret);
 			break;
 		}
 
-		pr_info(PFX "initialized (timeout=%ds, nowayout=%d)\n",
-			timeout, nowayout);
+		printk(KERN_INFO PFX
+		       "initialized (timeout=%ds, nowayout=%d)\n",
+		       timeout, nowayout);
 		break;
 
 	case -ENOSYS:
-		pr_info(PFX "not supported\n");
+		printk(KERN_INFO PFX "not supported\n");
 		ret = -ENODEV;
 		break;
 
 	default:
-		pr_warning(PFX "bogus return value %d\n", ret);
+		printk(KERN_INFO PFX "bogus return value %d\n", ret);
 		break;
 	}
 
@@ -322,12 +323,10 @@ static int __init xen_wdt_init_module(void)
 {
 	int err;
 
-#ifdef CONFIG_PARAVIRT_XEN
 	if (!xen_domain())
 		return -ENODEV;
-#endif
 
-	pr_info(PFX "Xen WatchDog Timer Driver v%s\n", DRV_VERSION);
+	printk(KERN_INFO PFX "Xen WatchDog Timer Driver v%s\n", DRV_VERSION);
 
 	err = platform_driver_register(&xen_wdt_driver);
 	if (err)
@@ -347,7 +346,7 @@ static void __exit xen_wdt_cleanup_module(void)
 {
 	platform_device_unregister(platform_device);
 	platform_driver_unregister(&xen_wdt_driver);
-	pr_info(PFX "module unloaded\n");
+	printk(KERN_INFO PFX "module unloaded\n");
 }
 
 module_init(xen_wdt_init_module);

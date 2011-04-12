@@ -21,7 +21,6 @@
 #define N_EXCEPTION_STACKS_END \
 		(N_EXCEPTION_STACKS + DEBUG_STKSZ/EXCEPTION_STKSZ - 2)
 
-#ifndef CONFIG_X86_NO_TSS
 static char x86_stack_ids[][8] = {
 		[ DEBUG_STACK-1			]	= "#DB",
 		[ NMI_STACK-1			]	= "NMI",
@@ -33,12 +32,10 @@ static char x86_stack_ids[][8] = {
 		  N_EXCEPTION_STACKS_END	]	= "#DB[?]"
 #endif
 };
-#endif
 
 static unsigned long *in_exception_stack(unsigned cpu, unsigned long stack,
 					 unsigned *usedp, char **idp)
 {
-#ifndef CONFIG_X86_NO_TSS
 	unsigned k;
 
 	/*
@@ -98,7 +95,6 @@ static unsigned long *in_exception_stack(unsigned cpu, unsigned long stack,
 		}
 #endif
 	}
-#endif /* CONFIG_X86_NO_TSS */
 	return NULL;
 }
 
@@ -144,8 +140,8 @@ fixup_bp_irq_link(unsigned long bp, unsigned long *stack,
  * severe exception (double fault, nmi, stack fault, debug, mce) hardware stack
  */
 
-void dump_trace(struct task_struct *task,
-		struct pt_regs *regs, unsigned long *stack,
+void dump_trace(struct task_struct *task, struct pt_regs *regs,
+		unsigned long *stack, unsigned long bp,
 		const struct stacktrace_ops *ops, void *data)
 {
 	const unsigned cpu = get_cpu();
@@ -155,7 +151,6 @@ void dump_trace(struct task_struct *task,
 	struct thread_info *tinfo;
 	int graph = 0;
 	unsigned long dummy;
-	unsigned long bp;
 
 	if (!task)
 		task = current;
@@ -172,6 +167,8 @@ void dump_trace(struct task_struct *task,
 			stack = (unsigned long *)task->thread.sp;
 	}
 
+	if (!bp)
+		bp = stack_frame(task, regs);
 	/*
 	 * Print function call entries in all stacks, starting at the
 	 * current stack address. If the stacks consist of nested
@@ -235,7 +232,7 @@ EXPORT_SYMBOL(dump_trace);
 
 void
 show_stack_log_lvl(struct task_struct *task, struct pt_regs *regs,
-		   unsigned long *sp, char *log_lvl)
+		   unsigned long *sp, unsigned long bp, char *log_lvl)
 {
 	unsigned long *irq_stack_end;
 	unsigned long *irq_stack;
@@ -279,7 +276,7 @@ show_stack_log_lvl(struct task_struct *task, struct pt_regs *regs,
 	preempt_enable();
 
 	printk(KERN_CONT "\n");
-	show_trace_log_lvl(task, regs, sp, log_lvl);
+	show_trace_log_lvl(task, regs, sp, bp, log_lvl);
 }
 
 void show_registers(struct pt_regs *regs)
@@ -308,7 +305,7 @@ void show_registers(struct pt_regs *regs)
 
 		printk(KERN_EMERG "Stack:\n");
 		show_stack_log_lvl(NULL, regs, (unsigned long *)sp,
-				   KERN_EMERG);
+				   0, KERN_EMERG);
 
 		printk(KERN_EMERG "Code: ");
 

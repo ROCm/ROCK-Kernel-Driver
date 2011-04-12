@@ -19,7 +19,6 @@
 #include <linux/time.h>
 #include <linux/workqueue.h>
 #include <scsi/scsi_dh.h>
-#include <scsi/scsi_eh.h>
 #include <asm/atomic.h>
 
 #define DM_MSG_PREFIX "multipath"
@@ -114,7 +113,6 @@ struct multipath {
 struct dm_mpath_io {
 	struct pgpath *pgpath;
 	size_t nr_bytes;
-	char sense[SCSI_SENSE_BUFFERSIZE];
 };
 
 typedef int (*action_fn) (struct pgpath *pgpath);
@@ -885,6 +883,13 @@ static int multipath_ctr(struct dm_target *ti, unsigned int argc,
 	if (r)
 		goto bad;
 
+	if ((!m->nr_priority_groups && next_pg_num) ||
+	    (m->nr_priority_groups && !next_pg_num)) {
+		ti->error = "invalid initial priority group";
+		r = -EINVAL;
+		goto bad;
+	}
+
 	/* parse the priority groups */
 	while (as.argc) {
 		struct priority_group *pg;
@@ -977,9 +982,6 @@ static int multipath_map(struct dm_target *ti, struct request *clone,
 
 	map_context->ptr = mpio;
 	clone->cmd_flags |= REQ_FAILFAST_TRANSPORT;
-	/* Always attach a sense buffer */
-	if (!clone->sense)
-		clone->sense = mpio->sense;
 	r = map_io(m, clone, mpio, 0);
 	if (r < 0 || r == DM_MAPIO_REQUEUE)
 		mempool_free(mpio, m->mpio_pool);
@@ -1074,7 +1076,7 @@ out:
 static int action_dev(struct multipath *m, struct dm_dev *dev,
 		      action_fn action)
 {
-	int r = 0;
+	int r = -EINVAL;
 	struct pgpath *pgpath;
 	struct priority_group *pg;
 
@@ -1276,44 +1278,6 @@ static void activate_path(struct work_struct *work)
 }
 
 /*
- * Evaluate scsi return code
- */
-static int eval_scsi_error(int result, char *sense, int sense_len)
-{
-	struct scsi_sense_hdr sshdr;
-	int r = DM_ENDIO_REQUEUE;
-
-	if (host_byte(result) != DID_OK)
-		return r;
-
-	if (msg_byte(result) != COMMAND_COMPLETE)
-		return r;
-
-	if (status_byte(result) == RESERVATION_CONFLICT)
-		/* Do not retry here, possible data corruption */
-		return -EIO;
-
-#if defined(CONFIG_SCSI) || defined(CONFIG_SCSI_MODULE)
-	if (status_byte(result) == CHECK_CONDITION &&
-	    !scsi_normalize_sense(sense, sense_len, &sshdr)) {
-
-		switch (sshdr.sense_key) {
-		case MEDIUM_ERROR:
-		case DATA_PROTECT:
-		case BLANK_CHECK:
-		case COPY_ABORTED:
-		case VOLUME_OVERFLOW:
-		case MISCOMPARE:
-			r = -EIO;
-			break;
-		}
-	}
-#endif
-
-	return r;
-}
-
-/*
  * end_io handling
  */
 static int do_end_io(struct multipath *m, struct request *clone,
@@ -1336,28 +1300,22 @@ static int do_end_io(struct multipath *m, struct request *clone,
 	if (!error && !clone->errors)
 		return 0;	/* I/O complete */
 
-	if (error == -EOPNOTSUPP)
-		return error;
-
-	r = eval_scsi_error(clone->errors, clone->sense, clone->sense_len);
-	if (r != DM_ENDIO_REQUEUE)
-		return r;
-
-	if (clone->cmd_flags & REQ_DISCARD)
-		/*
-		 * Pass all discard request failures up.
-		 * FIXME: only fail_path if the discard failed due to a
-		 * transport problem.  This requires precise understanding
-		 * of the underlying failure (e.g. the SCSI sense).
-		 */
+	if (error == -EOPNOTSUPP || error == -EREMOTEIO)
 		return error;
 
 	if (mpio->pgpath)
 		fail_path(mpio->pgpath);
 
 	spin_lock_irqsave(&m->lock, flags);
-	if (!m->nr_valid_paths && !m->queue_if_no_path && !__must_push_back(m))
-		r = -EIO;
+	if (!m->nr_valid_paths) {
+		if (!m->queue_if_no_path) {
+			if (!__must_push_back(m))
+				r = -EIO;
+		} else {
+			if (error == -EBADE)
+				r = error;
+		}
+	}
 	spin_unlock_irqrestore(&m->lock, flags);
 
 	return r;
@@ -1377,10 +1335,6 @@ static int multipath_end_io(struct dm_target *ti, struct request *clone,
 		ps = &pgpath->pg->ps;
 		if (ps->type->end_io)
 			ps->type->end_io(ps, &pgpath->path, mpio->nr_bytes);
-	}
-	if (clone->sense == mpio->sense) {
-		clone->sense = NULL;
-		clone->sense_len = 0;
 	}
 	mempool_free(mpio, m->mpio_pool);
 
@@ -1481,7 +1435,7 @@ static int multipath_status(struct dm_target *ti, status_type_t type,
 	else if (m->current_pg)
 		pg_num = m->current_pg->pg_num;
 	else
-			pg_num = 1;
+		pg_num = (m->nr_priority_groups ? 1 : 0);
 
 	DMEMIT("%u ", pg_num);
 
@@ -1735,7 +1689,7 @@ out:
  *---------------------------------------------------------------*/
 static struct target_type multipath_target = {
 	.name = "multipath",
-	.version = {1, 2, 0},
+	.version = {1, 3, 0},
 	.module = THIS_MODULE,
 	.ctr = multipath_ctr,
 	.dtr = multipath_dtr,

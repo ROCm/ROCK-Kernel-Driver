@@ -20,7 +20,6 @@
 #include <linux/mount.h>
 #include <linux/pagemap.h>
 #include <linux/string.h>
-#include <linux/smp_lock.h>
 #include <linux/slab.h>
 #include <linux/unistd.h>
 #include <asm/statfs.h>
@@ -55,8 +54,6 @@ struct inode_data {
 
 static unsigned long novfs_internal_hash(struct qstr *name);
 static int novfs_d_add(struct dentry *p, struct dentry *d, struct inode *i, int add);
-
-static int novfs_get_sb(struct file_system_type *Fstype, int Flags, const char *Dev_name, void *Data, struct vfsmount *Mnt);
 
 static void novfs_kill_sb(struct super_block *SB);
 
@@ -213,7 +210,6 @@ struct backing_dev_info novfs_backing_dev_info = {
 	.ra_pages = (VM_MAX_READAHEAD * 1024) / PAGE_CACHE_SIZE,
 	.state = 0,
 	.capabilities = BDI_CAP_NO_WRITEBACK | BDI_CAP_MAP_COPY,
-	.unplug_io_fn = default_unplug_io_fn,
 };
 
 static struct address_space_operations novfs_aops = {
@@ -3431,10 +3427,11 @@ int novfs_fill_super(struct super_block *SB, void *Data, int Silent)
 	return (0);
 }
 
-static int novfs_get_sb(struct file_system_type *Fstype, int Flags, const char *Dev_name, void *Data, struct vfsmount *Mnt)
+static struct dentry *novfs_mount(struct file_system_type *fs_type, int flags,
+		       const char *dev_name, void *data)
 {
-	DbgPrint("Fstype=0x%x Dev_name=%s", Fstype, Dev_name);
-	return get_sb_nodev(Fstype, Flags, Data, novfs_fill_super, Mnt);
+	DbgPrint("Fstype=0x%x Dev_name=%s", fs_type, dev_name);
+	return mount_nodev(fs_type, flags, data, novfs_fill_super);
 }
 
 static void novfs_kill_sb(struct super_block *super)
@@ -3470,7 +3467,7 @@ ssize_t novfs_Control_write(struct file * file, const char *buf, size_t nbytes, 
 
 static struct file_system_type novfs_fs_type = {
 	.name = "novfs",
-	.get_sb = novfs_get_sb,
+	.mount = novfs_mount,
 	.kill_sb = novfs_kill_sb,
 	.owner = THIS_MODULE,
 };

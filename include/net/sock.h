@@ -52,7 +52,6 @@
 #include <linux/mm.h>
 #include <linux/security.h>
 #include <linux/slab.h>
-#include <linux/reserve.h>
 
 #include <linux/filter.h>
 #include <linux/rculist_nulls.h>
@@ -282,7 +281,7 @@ struct sock {
 	int			sk_rcvbuf;
 
 	struct sk_filter __rcu	*sk_filter;
-	struct socket_wq	*sk_wq;
+	struct socket_wq __rcu	*sk_wq;
 
 #ifdef CONFIG_NET_DMA
 	struct sk_buff_head	sk_async_wait_queue;
@@ -554,7 +553,6 @@ enum sock_flags {
 	SOCK_RCVTSTAMPNS, /* %SO_TIMESTAMPNS setting */
 	SOCK_LOCALROUTE, /* route locally only, %SO_DONTROUTE setting */
 	SOCK_QUEUE_SHRUNK, /* write queue has been shrunk recently */
-	SOCK_MEMALLOC, /* the VM depends on us - make sure we're serviced */
 	SOCK_TIMESTAMPING_TX_HARDWARE,  /* %SOF_TIMESTAMPING_TX_HARDWARE */
 	SOCK_TIMESTAMPING_TX_SOFTWARE,  /* %SOF_TIMESTAMPING_TX_SOFTWARE */
 	SOCK_TIMESTAMPING_RX_HARDWARE,  /* %SOF_TIMESTAMPING_RX_HARDWARE */
@@ -584,50 +582,6 @@ static inline void sock_reset_flag(struct sock *sk, enum sock_flags flag)
 static inline int sock_flag(struct sock *sk, enum sock_flags flag)
 {
 	return test_bit(flag, &sk->sk_flags);
-}
-
-static inline int sk_has_memalloc(struct sock *sk)
-{
-	return sock_flag(sk, SOCK_MEMALLOC);
-}
-
-extern struct mem_reserve net_rx_reserve;
-extern struct mem_reserve net_skb_reserve;
-
-#ifdef CONFIG_NETVM
-/*
- * Guestimate the per request queue TX upper bound.
- *
- * Max packet size is 64k, and we need to reserve that much since the data
- * might need to bounce it. Double it to be on the safe side.
- */
-#define TX_RESERVE_PAGES DIV_ROUND_UP(2*65536, PAGE_SIZE)
-
-extern int memalloc_socks;
-
-static inline int sk_memalloc_socks(void)
-{
-	return memalloc_socks;
-}
-
-extern int sk_adjust_memalloc(int socks, long tx_reserve_pages);
-extern int sk_set_memalloc(struct sock *sk);
-extern int sk_clear_memalloc(struct sock *sk);
-#else
-static inline int sk_memalloc_socks(void)
-{
-	return 0;
-}
-
-static inline int sk_clear_memalloc(struct sock *sk)
-{
-	return 0;
-}
-#endif
-
-static inline gfp_t sk_allocation(struct sock *sk, gfp_t gfp_mask)
-{
-	return gfp_mask | (sk->sk_allocation & __GFP_MEMALLOC);
 }
 
 static inline void sk_acceptq_removed(struct sock *sk)
@@ -701,13 +655,8 @@ static inline __must_check int sk_add_backlog(struct sock *sk, struct sk_buff *s
 	return 0;
 }
 
-extern int __sk_backlog_rcv(struct sock *sk, struct sk_buff *skb);
-
 static inline int sk_backlog_rcv(struct sock *sk, struct sk_buff *skb)
 {
-	if (skb_emergency(skb))
-		return __sk_backlog_rcv(sk, skb);
-
 	return sk->sk_backlog_rcv(sk, skb);
 }
 
@@ -1010,13 +959,12 @@ static inline int sk_wmem_schedule(struct sock *sk, int size)
 		__sk_mem_schedule(sk, size, SK_MEM_SEND);
 }
 
-static inline int sk_rmem_schedule(struct sock *sk, struct sk_buff *skb)
+static inline int sk_rmem_schedule(struct sock *sk, int size)
 {
 	if (!sk_has_account(sk))
 		return 1;
-	return skb->truesize <= sk->sk_forward_alloc ||
-		__sk_mem_schedule(sk, skb->truesize, SK_MEM_RECV) ||
-		skb_emergency(skb);
+	return size <= sk->sk_forward_alloc ||
+		__sk_mem_schedule(sk, size, SK_MEM_RECV);
 }
 
 static inline void sk_mem_reclaim(struct sock *sk)
@@ -1243,7 +1191,7 @@ extern void sk_filter_release_rcu(struct rcu_head *rcu);
 static inline void sk_filter_release(struct sk_filter *fp)
 {
 	if (atomic_dec_and_test(&fp->refcnt))
-		call_rcu_bh(&fp->rcu, sk_filter_release_rcu);
+		call_rcu(&fp->rcu, sk_filter_release_rcu);
 }
 
 static inline void sk_filter_uncharge(struct sock *sk, struct sk_filter *fp)
@@ -1318,7 +1266,8 @@ static inline void sk_set_socket(struct sock *sk, struct socket *sock)
 
 static inline wait_queue_head_t *sk_sleep(struct sock *sk)
 {
-	return &sk->sk_wq->wait;
+	BUILD_BUG_ON(offsetof(struct socket_wq, wait) != 0);
+	return &rcu_dereference_raw(sk->sk_wq)->wait;
 }
 /* Detach socket from process context.
  * Announce socket dead, detach it from wait queue and inode.
@@ -1339,7 +1288,7 @@ static inline void sock_orphan(struct sock *sk)
 static inline void sock_graft(struct sock *sk, struct socket *parent)
 {
 	write_lock_bh(&sk->sk_callback_lock);
-	rcu_assign_pointer(sk->sk_wq, parent->wq);
+	sk->sk_wq = parent->wq;
 	parent->sk = sk;
 	sk_set_socket(sk, parent);
 	security_sock_graft(sk, parent);

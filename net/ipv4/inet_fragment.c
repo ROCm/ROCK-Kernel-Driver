@@ -20,7 +20,6 @@
 #include <linux/skbuff.h>
 #include <linux/rtnetlink.h>
 #include <linux/slab.h>
-#include <linux/reserve.h>
 
 #include <net/inet_frag.h>
 
@@ -76,8 +75,6 @@ void inet_frags_init_net(struct netns_frags *nf)
 	nf->nqueues = 0;
 	atomic_set(&nf->mem, 0);
 	INIT_LIST_HEAD(&nf->lru_list);
-	mutex_init(&nf->lock);
-	mem_reserve_init(&nf->reserve, "IP fragement cache", NULL);
 }
 EXPORT_SYMBOL(inet_frags_init_net);
 

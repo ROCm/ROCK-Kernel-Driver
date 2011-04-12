@@ -22,7 +22,6 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/synclink.h>
-#include <linux/smp_lock.h>
 #include <linux/semaphore.h>
 #include <linux/security.h>
 #include <linux/syscalls.h>

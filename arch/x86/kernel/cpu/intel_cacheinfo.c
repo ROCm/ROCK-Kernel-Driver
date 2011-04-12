@@ -290,9 +290,8 @@ amd_cpuid4(int leaf, union _cpuid4_leaf_eax *eax,
 	eax->split.type = types[leaf];
 	eax->split.level = levels[leaf];
 	eax->split.num_threads_sharing = 0;
-#ifndef CONFIG_XEN
 	eax->split.num_cores_on_die = __this_cpu_read(cpu_info.x86_max_cores) - 1;
-#endif
+
 
 	if (assoc == 0xffff)
 		eax->split.is_fully_associative = 1;
@@ -305,11 +304,12 @@ amd_cpuid4(int leaf, union _cpuid4_leaf_eax *eax,
 
 struct _cache_attr {
 	struct attribute attr;
-	ssize_t (*show)(struct _cpuid4_info *, char *);
-	ssize_t (*store)(struct _cpuid4_info *, const char *, size_t count);
+	ssize_t (*show)(struct _cpuid4_info *, char *, unsigned int);
+	ssize_t (*store)(struct _cpuid4_info *, const char *, size_t count,
+			 unsigned int);
 };
 
-#if defined(CONFIG_AMD_NB) && !defined(CONFIG_XEN)
+#ifdef CONFIG_AMD_NB
 
 /*
  * L3 cache descriptors
@@ -401,7 +401,8 @@ static ssize_t show_cache_disable(struct _cpuid4_info *this_leaf, char *buf,
 
 #define SHOW_CACHE_DISABLE(slot)					\
 static ssize_t								\
-show_cache_disable_##slot(struct _cpuid4_info *this_leaf, char *buf)	\
+show_cache_disable_##slot(struct _cpuid4_info *this_leaf, char *buf,	\
+			  unsigned int cpu)				\
 {									\
 	return show_cache_disable(this_leaf, buf, slot);		\
 }
@@ -513,7 +514,8 @@ static ssize_t store_cache_disable(struct _cpuid4_info *this_leaf,
 #define STORE_CACHE_DISABLE(slot)					\
 static ssize_t								\
 store_cache_disable_##slot(struct _cpuid4_info *this_leaf,		\
-			   const char *buf, size_t count)		\
+			   const char *buf, size_t count,		\
+			   unsigned int cpu)				\
 {									\
 	return store_cache_disable(this_leaf, buf, count, slot);	\
 }
@@ -525,6 +527,39 @@ static struct _cache_attr cache_disable_0 = __ATTR(cache_disable_0, 0644,
 static struct _cache_attr cache_disable_1 = __ATTR(cache_disable_1, 0644,
 		show_cache_disable_1, store_cache_disable_1);
 
+static ssize_t
+show_subcaches(struct _cpuid4_info *this_leaf, char *buf, unsigned int cpu)
+{
+	if (!this_leaf->l3 || !amd_nb_has_feature(AMD_NB_L3_PARTITIONING))
+		return -EINVAL;
+
+	return sprintf(buf, "%x\n", amd_get_subcaches(cpu));
+}
+
+static ssize_t
+store_subcaches(struct _cpuid4_info *this_leaf, const char *buf, size_t count,
+		unsigned int cpu)
+{
+	unsigned long val;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	if (!this_leaf->l3 || !amd_nb_has_feature(AMD_NB_L3_PARTITIONING))
+		return -EINVAL;
+
+	if (strict_strtoul(buf, 16, &val) < 0)
+		return -EINVAL;
+
+	if (amd_set_subcaches(cpu, val))
+		return -EINVAL;
+
+	return count;
+}
+
+static struct _cache_attr subcaches =
+	__ATTR(subcaches, 0644, show_subcaches, store_subcaches);
+
 #else	/* CONFIG_AMD_NB */
 #define amd_init_l3_cache(x, y)
 #endif /* CONFIG_AMD_NB */
@@ -533,9 +568,9 @@ static int
 __cpuinit cpuid4_cache_lookup_regs(int index,
 				   struct _cpuid4_info_regs *this_leaf)
 {
-	union _cpuid4_leaf_eax 	eax;
-	union _cpuid4_leaf_ebx 	ebx;
-	union _cpuid4_leaf_ecx 	ecx;
+	union _cpuid4_leaf_eax	eax;
+	union _cpuid4_leaf_ebx	ebx;
+	union _cpuid4_leaf_ecx	ecx;
 	unsigned		edx;
 
 	if (boot_cpu_data.x86_vendor == X86_VENDOR_AMD) {
@@ -579,8 +614,8 @@ unsigned int __cpuinit init_intel_cacheinfo(struct cpuinfo_x86 *c)
 	unsigned int trace = 0, l1i = 0, l1d = 0, l2 = 0, l3 = 0;
 	unsigned int new_l1d = 0, new_l1i = 0; /* Cache sizes from cpuid(4) */
 	unsigned int new_l2 = 0, new_l3 = 0, i; /* Cache sizes from cpuid(4) */
-#ifdef CONFIG_X86_HT
 	unsigned int l2_id = 0, l3_id = 0, num_threads_sharing, index_msb;
+#ifdef CONFIG_X86_HT
 	unsigned int cpu = c->cpu_index;
 #endif
 
@@ -614,20 +649,16 @@ unsigned int __cpuinit init_intel_cacheinfo(struct cpuinfo_x86 *c)
 					break;
 				case 2:
 					new_l2 = this_leaf.size/1024;
-#ifdef CONFIG_X86_HT
 					num_threads_sharing = 1 + this_leaf.eax.split.num_threads_sharing;
 					index_msb = get_count_order(num_threads_sharing);
 					l2_id = c->apicid >> index_msb;
-#endif
 					break;
 				case 3:
 					new_l3 = this_leaf.size/1024;
-#ifdef CONFIG_X86_HT
 					num_threads_sharing = 1 + this_leaf.eax.split.num_threads_sharing;
 					index_msb = get_count_order(
 							num_threads_sharing);
 					l3_id = c->apicid >> index_msb;
-#endif
 					break;
 				default:
 					break;
@@ -728,7 +759,7 @@ unsigned int __cpuinit init_intel_cacheinfo(struct cpuinfo_x86 *c)
 static DEFINE_PER_CPU(struct _cpuid4_info *, ici_cpuid4_info);
 #define CPUID4_INFO_IDX(x, y)	(&((per_cpu(ici_cpuid4_info, x))[y]))
 
-#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
+#ifdef CONFIG_SMP
 static void __cpuinit cache_shared_cpu_map_setup(unsigned int cpu, int index)
 {
 	struct _cpuid4_info	*this_leaf, *sibling_leaf;
@@ -737,11 +768,11 @@ static void __cpuinit cache_shared_cpu_map_setup(unsigned int cpu, int index)
 	struct cpuinfo_x86 *c = &cpu_data(cpu);
 
 	if ((index == 3) && (c->x86_vendor == X86_VENDOR_AMD)) {
-		for_each_cpu(i, c->llc_shared_map) {
+		for_each_cpu(i, cpu_llc_shared_mask(cpu)) {
 			if (!per_cpu(ici_cpuid4_info, i))
 				continue;
 			this_leaf = CPUID4_INFO_IDX(i, index);
-			for_each_cpu(sibling, c->llc_shared_map) {
+			for_each_cpu(sibling, cpu_llc_shared_mask(cpu)) {
 				if (!cpu_online(sibling))
 					continue;
 				set_bit(sibling, this_leaf->shared_cpu_map);
@@ -875,8 +906,8 @@ static DEFINE_PER_CPU(struct _index_kobject *, ici_index_kobject);
 #define INDEX_KOBJECT_PTR(x, y)		(&((per_cpu(ici_index_kobject, x))[y]))
 
 #define show_one_plus(file_name, object, val)				\
-static ssize_t show_##file_name						\
-			(struct _cpuid4_info *this_leaf, char *buf)	\
+static ssize_t show_##file_name(struct _cpuid4_info *this_leaf, char *buf, \
+				unsigned int cpu)			\
 {									\
 	return sprintf(buf, "%lu\n", (unsigned long)this_leaf->object + val); \
 }
@@ -887,7 +918,8 @@ show_one_plus(physical_line_partition, ebx.split.physical_line_partition, 1);
 show_one_plus(ways_of_associativity, ebx.split.ways_of_associativity, 1);
 show_one_plus(number_of_sets, ecx.split.number_of_sets, 1);
 
-static ssize_t show_size(struct _cpuid4_info *this_leaf, char *buf)
+static ssize_t show_size(struct _cpuid4_info *this_leaf, char *buf,
+			 unsigned int cpu)
 {
 	return sprintf(buf, "%luK\n", this_leaf->size / 1024);
 }
@@ -911,17 +943,20 @@ static ssize_t show_shared_cpu_map_func(struct _cpuid4_info *this_leaf,
 	return n;
 }
 
-static inline ssize_t show_shared_cpu_map(struct _cpuid4_info *leaf, char *buf)
+static inline ssize_t show_shared_cpu_map(struct _cpuid4_info *leaf, char *buf,
+					  unsigned int cpu)
 {
 	return show_shared_cpu_map_func(leaf, 0, buf);
 }
 
-static inline ssize_t show_shared_cpu_list(struct _cpuid4_info *leaf, char *buf)
+static inline ssize_t show_shared_cpu_list(struct _cpuid4_info *leaf, char *buf,
+					   unsigned int cpu)
 {
 	return show_shared_cpu_map_func(leaf, 1, buf);
 }
 
-static ssize_t show_type(struct _cpuid4_info *this_leaf, char *buf)
+static ssize_t show_type(struct _cpuid4_info *this_leaf, char *buf,
+			 unsigned int cpu)
 {
 	switch (this_leaf->eax.split.type) {
 	case CACHE_TYPE_DATA:
@@ -965,7 +1000,7 @@ static struct attribute *default_attrs[] = {
 	NULL
 };
 
-#if defined(CONFIG_AMD_NB) && !defined(CONFIG_XEN)
+#ifdef CONFIG_AMD_NB
 static struct attribute ** __cpuinit amd_l3_attrs(void)
 {
 	static struct attribute **attrs;
@@ -979,6 +1014,9 @@ static struct attribute ** __cpuinit amd_l3_attrs(void)
 	if (amd_nb_has_feature(AMD_NB_L3_INDEX_DISABLE))
 		n += 2;
 
+	if (amd_nb_has_feature(AMD_NB_L3_PARTITIONING))
+		n += 1;
+
 	attrs = kzalloc(n * sizeof (struct attribute *), GFP_KERNEL);
 	if (attrs == NULL)
 		return attrs = default_attrs;
@@ -990,6 +1028,9 @@ static struct attribute ** __cpuinit amd_l3_attrs(void)
 		attrs[n++] = &cache_disable_0.attr;
 		attrs[n++] = &cache_disable_1.attr;
 	}
+
+	if (amd_nb_has_feature(AMD_NB_L3_PARTITIONING))
+		attrs[n++] = &subcaches.attr;
 
 	return attrs;
 }
@@ -1003,7 +1044,7 @@ static ssize_t show(struct kobject *kobj, struct attribute *attr, char *buf)
 
 	ret = fattr->show ?
 		fattr->show(CPUID4_INFO_IDX(this_leaf->cpu, this_leaf->index),
-			buf) :
+			buf, this_leaf->cpu) :
 		0;
 	return ret;
 }
@@ -1017,7 +1058,7 @@ static ssize_t store(struct kobject *kobj, struct attribute *attr,
 
 	ret = fattr->store ?
 		fattr->store(CPUID4_INFO_IDX(this_leaf->cpu, this_leaf->index),
-			buf, count) :
+			buf, count, this_leaf->cpu) :
 		0;
 	return ret;
 }
@@ -1105,7 +1146,7 @@ static int __cpuinit cache_add_dev(struct sys_device * sys_dev)
 		this_leaf = CPUID4_INFO_IDX(cpu, i);
 
 		ktype_cache.default_attrs = default_attrs;
-#if defined(CONFIG_AMD_NB) && !defined(CONFIG_XEN)
+#ifdef CONFIG_AMD_NB
 		if (this_leaf->l3)
 			ktype_cache.default_attrs = amd_l3_attrs();
 #endif

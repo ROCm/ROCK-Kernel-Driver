@@ -29,7 +29,6 @@
 #include <linux/rcupdate.h>
 #include <linux/dmaengine.h>
 #include <linux/hrtimer.h>
-#include <linux/reserve.h>
 
 /* Don't change this without changing skb_csum_unnecessary! */
 #define CHECKSUM_NONE 0
@@ -123,8 +122,14 @@ struct sk_buff_head {
 
 struct sk_buff;
 
-/* To allow 64K frame to be packed as single skb without frag_list */
+/* To allow 64K frame to be packed as single skb without frag_list. Since
+ * GRO uses frags we allocate at least 16 regardless of page size.
+ */
+#if (65536/PAGE_SIZE + 2) < 16
+#define MAX_SKB_FRAGS 16UL
+#else
 #define MAX_SKB_FRAGS (65536/PAGE_SIZE + 2)
+#endif
 
 typedef struct skb_frag_struct skb_frag_t;
 
@@ -389,18 +394,12 @@ struct sk_buff {
 	kmemcheck_bitfield_begin(flags2);
 	__u16			queue_mapping:16;
 #ifdef CONFIG_IPV6_NDISC_NODETYPE
-	__u8			ndisc_nodetype:2,
-				deliver_no_wcard:1;
-#else
-	__u8			deliver_no_wcard:1;
+	__u8			ndisc_nodetype:2;
 #endif
 	__u8			ooo_okay:1;
-#ifdef	CONFIG_NETVM
-	__u8			emergency:1;
-#endif
 	kmemcheck_bitfield_end(flags2);
 
-	/* 0/12 bit hole */
+	/* 0/13 bit hole */
 
 #ifdef CONFIG_NET_DMA
 	dma_cookie_t		dma_cookie;
@@ -434,18 +433,6 @@ struct sk_buff {
 #include <linux/slab.h>
 
 #include <asm/system.h>
-
-#define SKB_ALLOC_FCLONE	0x01
-#define SKB_ALLOC_RX		0x02
-
-static inline bool skb_emergency(const struct sk_buff *skb)
-{
-#ifdef CONFIG_NETVM
-	return unlikely(skb->emergency);
-#else
-	return false;
-#endif
-}
 
 /*
  * skb might have a dst pointer attached, refcounted or not.
@@ -504,7 +491,7 @@ extern void kfree_skb(struct sk_buff *skb);
 extern void consume_skb(struct sk_buff *skb);
 extern void	       __kfree_skb(struct sk_buff *skb);
 extern struct sk_buff *__alloc_skb(unsigned int size,
-				   gfp_t priority, int flags, int node);
+				   gfp_t priority, int fclone, int node);
 static inline struct sk_buff *alloc_skb(unsigned int size,
 					gfp_t priority)
 {
@@ -514,7 +501,7 @@ static inline struct sk_buff *alloc_skb(unsigned int size,
 static inline struct sk_buff *alloc_skb_fclone(unsigned int size,
 					       gfp_t priority)
 {
-	return __alloc_skb(size, priority, SKB_ALLOC_FCLONE, NUMA_NO_NODE);
+	return __alloc_skb(size, priority, 1, NUMA_NO_NODE);
 }
 
 extern bool skb_recycle_check(struct sk_buff *skb, int skb_size);
@@ -1540,8 +1527,7 @@ static inline void __skb_queue_purge(struct sk_buff_head *list)
 static inline struct sk_buff *__dev_alloc_skb(unsigned int length,
 					      gfp_t gfp_mask)
 {
-	struct sk_buff *skb =
-		__alloc_skb(length + NET_SKB_PAD, gfp_mask, SKB_ALLOC_RX, -1);
+	struct sk_buff *skb = alloc_skb(length + NET_SKB_PAD, gfp_mask);
 	if (likely(skb))
 		skb_reserve(skb, NET_SKB_PAD);
 	return skb;
@@ -1581,8 +1567,6 @@ static inline struct sk_buff *netdev_alloc_skb_ip_align(struct net_device *dev,
 	return skb;
 }
 
-extern struct mem_reserve net_skb_reserve;
-
 /**
  *	__netdev_alloc_page - allocate a page for ps-rx on a specific device
  *	@dev: network device to receive on
@@ -1594,8 +1578,7 @@ extern struct mem_reserve net_skb_reserve;
  */
 static inline struct page *__netdev_alloc_page(struct net_device *dev, gfp_t gfp_mask)
 {
-	return alloc_pages_reserve(NUMA_NO_NODE, gfp_mask | __GFP_MEMALLOC, 0,
-			&net_skb_reserve, NULL);
+	return alloc_pages_node(NUMA_NO_NODE, gfp_mask, 0);
 }
 
 /**
@@ -1611,14 +1594,9 @@ static inline struct page *netdev_alloc_page(struct net_device *dev)
 	return __netdev_alloc_page(dev, GFP_ATOMIC);
 }
 
-static inline void __netdev_free_page(struct net_device *dev, struct page *page)
-{
-	free_pages_reserve(page, 0, &net_skb_reserve, page->reserve);
-}
-
 static inline void netdev_free_page(struct net_device *dev, struct page *page)
 {
-	__netdev_free_page(dev, page);
+	__free_page(page);
 }
 
 /**
@@ -1826,6 +1804,15 @@ static inline int pskb_trim_rcsum(struct sk_buff *skb, unsigned int len)
 		     prefetch(skb->prev), (skb != (struct sk_buff *)(queue));	\
 		     skb = skb->prev)
 
+#define skb_queue_reverse_walk_safe(queue, skb, tmp)				\
+		for (skb = (queue)->prev, tmp = skb->prev;			\
+		     skb != (struct sk_buff *)(queue);				\
+		     skb = tmp, tmp = skb->prev)
+
+#define skb_queue_reverse_walk_from_safe(queue, skb, tmp)			\
+		for (tmp = skb->prev;						\
+		     skb != (struct sk_buff *)(queue);				\
+		     skb = tmp, tmp = skb->prev)
 
 static inline bool skb_has_frag_list(const struct sk_buff *skb)
 {
@@ -1893,7 +1880,7 @@ extern void	       skb_split(struct sk_buff *skb,
 extern int	       skb_shift(struct sk_buff *tgt, struct sk_buff *skb,
 				 int shiftlen);
 
-extern struct sk_buff *skb_segment(struct sk_buff *skb, int features);
+extern struct sk_buff *skb_segment(struct sk_buff *skb, u32 features);
 
 static inline void *skb_header_pointer(const struct sk_buff *skb, int offset,
 				       int len, void *buffer)

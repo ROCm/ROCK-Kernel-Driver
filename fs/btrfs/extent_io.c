@@ -10,7 +10,6 @@
 #include <linux/swap.h>
 #include <linux/writeback.h>
 #include <linux/pagevec.h>
-#include <linux/precache.h>
 #include "extent_io.h"
 #include "extent_map.h"
 #include "compat.h"
@@ -1991,13 +1990,6 @@ static int __extent_read_full_page(struct extent_io_tree *tree,
 
 	set_page_extent_mapped(page);
 
-	if (!PageUptodate(page)) {
-		if (precache_get(page->mapping, page->index, page) == 1) {
-			BUG_ON(blocksize != PAGE_SIZE);
-			goto out;
-		}
-	}
-
 	end = page_end;
 	while (1) {
 		lock_extent(tree, start, end, GFP_NOFS);
@@ -2125,7 +2117,6 @@ static int __extent_read_full_page(struct extent_io_tree *tree,
 		cur = cur + iosize;
 		page_offset += iosize;
 	}
-out:
 	if (!nr) {
 		if (!PageError(page))
 			SetPageUptodate(page);
@@ -2197,9 +2188,11 @@ static int __extent_writepage(struct page *page, struct writeback_control *wbc,
 	unsigned long nr_written = 0;
 
 	if (wbc->sync_mode == WB_SYNC_ALL)
-		write_flags = WRITE_SYNC_PLUG;
+		write_flags = WRITE_SYNC;
 	else
 		write_flags = WRITE;
+
+	trace___extent_writepage(page, inode, wbc);
 
 	WARN_ON(!PageLocked(page));
 	pg_offset = i_size & (PAGE_CACHE_SIZE - 1);
@@ -3699,6 +3692,7 @@ int map_private_extent_buffer(struct extent_buffer *eb, unsigned long start,
 		       "wanted %lu %lu\n", (unsigned long long)eb->start,
 		       eb->len, start, min_len);
 		WARN_ON(1);
+		return -EINVAL;
 	}
 
 	p = extent_buffer_page(eb, i);

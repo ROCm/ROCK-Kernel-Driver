@@ -7,7 +7,6 @@
 
 #ifdef CONFIG_X86_LOCAL_APIC
 
-extern void die_nmi(char *str, struct pt_regs *regs, int do_panic);
 extern int avail_to_resrv_perfctr_nmi_bit(unsigned int);
 extern int reserve_perfctr_nmi(unsigned int);
 extern void release_perfctr_nmi(unsigned int);
@@ -18,10 +17,7 @@ struct ctl_table;
 extern int proc_nmi_enabled(struct ctl_table *, int ,
 			void __user *, size_t *, loff_t *);
 extern int unknown_nmi_panic;
-#endif
 
-#if defined(CONFIG_X86_LOCAL_APIC) || \
-    (defined(CONFIG_XEN_SMPBOOT) && CONFIG_XEN_COMPAT >= 0x030200)
 void arch_trigger_all_cpu_backtrace(void);
 #define arch_trigger_all_cpu_backtrace arch_trigger_all_cpu_backtrace
 #endif
@@ -33,8 +29,8 @@ void arch_trigger_all_cpu_backtrace(void);
  * external nmis, because the local ones are more frequent.
  *
  * Also setup some default high/normal/low settings for
- * subsystems to registers with.  Using 4 bits to seperate
- * the priorities.  This can go alot higher if needed be.
+ * subsystems to registers with.  Using 4 bits to separate
+ * the priorities.  This can go a lot higher if needed be.
  */
 
 #define NMI_LOCAL_SHIFT		16	/* randomly picked */

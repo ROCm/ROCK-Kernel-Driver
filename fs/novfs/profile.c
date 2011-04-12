@@ -439,8 +439,7 @@ static void dump(struct dentry *parent, void *pf)
 								     d->d_name.len,
 								     d->d_name.name,
 								     d->d_parent,
-								     atomic_read
-								     (&d->d_count), d->d_flags, d->d_subdirs.next, d->d_inode);
+								     d->d_count, d->d_flags, d->d_subdirs.next, d->d_inode);
 							}
 						}
 					}
@@ -466,8 +465,9 @@ static void dump(struct dentry *parent, void *pf)
 						      "   d_subdirs: 0x%p%s\n"
 						      "   d_inode:   0x%p%s\n",
 						      d, path, d->d_parent,
-						      atomic_read(&d->d_count),
-						      d->d_flags, d->d_subdirs.next, sd, d->d_inode, inode_number);
+						      d->d_count, d->d_flags,
+						      d->d_subdirs.next, sd,
+						      d->d_inode, inode_number);
 					}
 
 					n = l;
