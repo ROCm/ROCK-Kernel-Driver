@@ -9,6 +9,7 @@
 #include <linux/acpi.h>
 #include <linux/pci.h>
 #include <linux/gpio.h>
+#include <linux/delay.h>
 #include <asm/olpc.h>
 
 /* TODO: this eventually belongs in linux/vx855.h */
