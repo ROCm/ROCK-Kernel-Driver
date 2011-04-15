@@ -10,7 +10,7 @@
 static void show_cpuinfo_core(struct seq_file *m, struct cpuinfo_x86 *c,
 			      unsigned int cpu)
 {
-#ifdef CONFIG_SMP
+#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
 	if (c->x86_max_cores * smp_num_siblings > 1) {
 		seq_printf(m, "physical id\t: %d\n", c->phys_proc_id);
 		seq_printf(m, "siblings\t: %d\n",
@@ -32,18 +32,22 @@ static void show_cpuinfo_misc(struct seq_file *m, struct cpuinfo_x86 *c)
 	 */
 	int fpu_exception = c->hard_math && (ignore_fpu_irq || cpu_has_fpu);
 	seq_printf(m,
+#ifndef CONFIG_XEN
 		   "fdiv_bug\t: %s\n"
 		   "hlt_bug\t\t: %s\n"
 		   "f00f_bug\t: %s\n"
 		   "coma_bug\t: %s\n"
+#endif
 		   "fpu\t\t: %s\n"
 		   "fpu_exception\t: %s\n"
 		   "cpuid level\t: %d\n"
 		   "wp\t\t: %s\n",
+#ifndef CONFIG_XEN
 		   c->fdiv_bug ? "yes" : "no",
 		   c->hlt_works_ok ? "no" : "yes",
 		   c->f00f_bug ? "yes" : "no",
 		   c->coma_bug ? "yes" : "no",
+#endif
 		   c->hard_math ? "yes" : "no",
 		   fpu_exception ? "yes" : "no",
 		   c->cpuid_level,

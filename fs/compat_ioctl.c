@@ -114,6 +114,13 @@
 #include <asm/fbio.h>
 #endif
 
+#ifdef CONFIG_XEN
+#include <xen/interface/xen.h>
+#include <xen/public/evtchn.h>
+#include <xen/public/privcmd.h>
+#include <xen/compat_ioctl.h>
+#endif
+
 static int w_long(unsigned int fd, unsigned int cmd,
 		compat_ulong_t __user *argp)
 {
@@ -1408,6 +1415,16 @@ IGNORE_IOCTL(FBIOGETCMAP32)
 IGNORE_IOCTL(FBIOSCURSOR32)
 IGNORE_IOCTL(FBIOGCURSOR32)
 #endif
+
+#ifdef CONFIG_XEN
+COMPATIBLE_IOCTL(IOCTL_PRIVCMD_HYPERCALL)
+COMPATIBLE_IOCTL(IOCTL_EVTCHN_BIND_VIRQ)
+COMPATIBLE_IOCTL(IOCTL_EVTCHN_BIND_INTERDOMAIN)
+COMPATIBLE_IOCTL(IOCTL_EVTCHN_BIND_UNBOUND_PORT)
+COMPATIBLE_IOCTL(IOCTL_EVTCHN_UNBIND)
+COMPATIBLE_IOCTL(IOCTL_EVTCHN_NOTIFY)
+COMPATIBLE_IOCTL(IOCTL_EVTCHN_RESET)
+#endif
 };
 
 /*
@@ -1464,6 +1481,12 @@ static long do_ioctl_trans(int fd, unsigned int cmd,
 		return do_video_stillpicture(fd, cmd, argp);
 	case VIDEO_SET_SPU_PALETTE:
 		return do_video_set_spu_palette(fd, cmd, argp);
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+	case IOCTL_PRIVCMD_MMAP_32:
+	case IOCTL_PRIVCMD_MMAPBATCH_32:
+	case IOCTL_PRIVCMD_MMAPBATCH_V2_32:
+		return privcmd_ioctl_32(fd, cmd, argp);
+#endif
 	}
 
 	/*

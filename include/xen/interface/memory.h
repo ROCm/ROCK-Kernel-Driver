@@ -3,13 +3,31 @@
  *
  * Memory reservation and information.
  *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ *
  * Copyright (c) 2005, Keir Fraser <keir@xensource.com>
  */
 
 #ifndef __XEN_PUBLIC_MEMORY_H__
 #define __XEN_PUBLIC_MEMORY_H__
 
-#include <linux/spinlock.h>
+#include "xen.h"
 
 /*
  * Increase or decrease the specified domain's memory reservation. Returns a
@@ -19,6 +37,26 @@
 #define XENMEM_increase_reservation 0
 #define XENMEM_decrease_reservation 1
 #define XENMEM_populate_physmap     6
+
+#if __XEN_INTERFACE_VERSION__ >= 0x00030209
+/*
+ * Maximum # bits addressable by the user of the allocated region (e.g., I/O
+ * devices often have a 32-bit limitation even in 64-bit systems). If zero
+ * then the user has no addressing restriction. This field is not used by
+ * XENMEM_decrease_reservation.
+ */
+#define XENMEMF_address_bits(x)     (x)
+#define XENMEMF_get_address_bits(x) ((x) & 0xffu)
+/* NUMA node to allocate from. */
+#define XENMEMF_node(x)     (((x) + 1) << 8)
+#define XENMEMF_get_node(x) ((((x) >> 8) - 1) & 0xffu)
+/* Flag to populate physmap with populate-on-demand entries */
+#define XENMEMF_populate_on_demand (1<<16)
+/* Flag to request allocation only from the node specified */
+#define XENMEMF_exact_node_request  (1<<17)
+#define XENMEMF_exact_node(n) (XENMEMF_node(n) | XENMEMF_exact_node_request)
+#endif
+
 struct xen_memory_reservation {
 
     /*
@@ -31,28 +69,28 @@ struct xen_memory_reservation {
      *   OUT: GMFN bases of extents that were allocated
      *   (NB. This command also updates the mach_to_phys translation table)
      */
-    GUEST_HANDLE(ulong) extent_start;
+    XEN_GUEST_HANDLE(xen_pfn_t) extent_start;
 
     /* Number of extents, and size/alignment of each (2^extent_order pages). */
-    unsigned long  nr_extents;
+    xen_ulong_t    nr_extents;
     unsigned int   extent_order;
 
-    /*
-     * Maximum # bits addressable by the user of the allocated region (e.g.,
-     * I/O devices often have a 32-bit limitation even in 64-bit systems). If
-     * zero then the user has no addressing restriction.
-     * This field is not used by XENMEM_decrease_reservation.
-     */
+#if __XEN_INTERFACE_VERSION__ >= 0x00030209
+    /* XENMEMF flags. */
+    unsigned int   mem_flags;
+#else
     unsigned int   address_bits;
+#endif
 
     /*
      * Domain whose reservation is being changed.
      * Unprivileged domains can specify only DOMID_SELF.
      */
     domid_t        domid;
-
 };
 DEFINE_GUEST_HANDLE_STRUCT(xen_memory_reservation);
+typedef struct xen_memory_reservation xen_memory_reservation_t;
+DEFINE_XEN_GUEST_HANDLE(xen_memory_reservation_t);
 
 /*
  * An atomic exchange of memory pages. If return code is zero then
@@ -92,10 +130,12 @@ struct xen_memory_exchange {
      *     command will be non-zero.
      *  5. THIS FIELD MUST BE INITIALISED TO ZERO BY THE CALLER!
      */
-    unsigned long nr_exchanged;
+    xen_ulong_t nr_exchanged;
 };
-
 DEFINE_GUEST_HANDLE_STRUCT(xen_memory_exchange);
+typedef struct xen_memory_exchange xen_memory_exchange_t;
+DEFINE_XEN_GUEST_HANDLE(xen_memory_exchange_t);
+
 /*
  * Returns the maximum machine frame number of mapped RAM in this system.
  * This command always succeeds (it never returns an error code).
@@ -110,6 +150,11 @@ DEFINE_GUEST_HANDLE_STRUCT(xen_memory_exchange);
  */
 #define XENMEM_current_reservation  3
 #define XENMEM_maximum_reservation  4
+
+/*
+ * Returns the maximum GPFN in use by the guest, or -ve errcode on failure.
+ */
+#define XENMEM_maximum_gpfn         14
 
 /*
  * Returns a list of MFN bases of 2MB extents comprising the machine_to_phys
@@ -130,7 +175,7 @@ struct xen_machphys_mfn_list {
      * any large discontiguities in the machine address space, 2MB gaps in
      * the machphys table will be represented by an MFN base of zero.
      */
-    GUEST_HANDLE(ulong) extent_start;
+    XEN_GUEST_HANDLE(xen_pfn_t) extent_start;
 
     /*
      * Number of extents written to the above array. This will be smaller
@@ -139,6 +184,8 @@ struct xen_machphys_mfn_list {
     unsigned int nr_extents;
 };
 DEFINE_GUEST_HANDLE_STRUCT(xen_machphys_mfn_list);
+typedef struct xen_machphys_mfn_list xen_machphys_mfn_list_t;
+DEFINE_XEN_GUEST_HANDLE(xen_machphys_mfn_list_t);
 
 /*
  * Returns the location in virtual address space of the machine_to_phys
@@ -148,10 +195,12 @@ DEFINE_GUEST_HANDLE_STRUCT(xen_machphys_mfn_list);
  */
 #define XENMEM_machphys_mapping     12
 struct xen_machphys_mapping {
-    unsigned long v_start, v_end; /* Start and end virtual addresses.   */
-    unsigned long max_mfn;        /* Maximum MFN that can be looked up. */
+    xen_ulong_t v_start, v_end; /* Start and end virtual addresses.   */
+    xen_ulong_t max_mfn;        /* Maximum MFN that can be looked up. */
 };
-DEFINE_GUEST_HANDLE_STRUCT(xen_machphys_mapping_t);
+DEFINE_GUEST_HANDLE_STRUCT(xen_machphys_mapping);
+typedef struct xen_machphys_mapping xen_machphys_mapping_t;
+DEFINE_XEN_GUEST_HANDLE(xen_machphys_mapping_t);
 
 /*
  * Sets the GPFN at which a particular page appears in the specified guest's
@@ -166,38 +215,23 @@ struct xen_add_to_physmap {
     /* Source mapping space. */
 #define XENMAPSPACE_shared_info 0 /* shared info page */
 #define XENMAPSPACE_grant_table 1 /* grant table page */
+#define XENMAPSPACE_gmfn        2 /* GMFN */
     unsigned int space;
 
+#define XENMAPIDX_grant_table_status 0x80000000
+
     /* Index into source mapping space. */
-    unsigned long idx;
+    xen_ulong_t idx;
 
     /* GPFN where the source mapping page should appear. */
-    unsigned long gpfn;
+    xen_pfn_t     gpfn;
 };
 DEFINE_GUEST_HANDLE_STRUCT(xen_add_to_physmap);
+typedef struct xen_add_to_physmap xen_add_to_physmap_t;
+DEFINE_XEN_GUEST_HANDLE(xen_add_to_physmap_t);
 
-/*
- * Translates a list of domain-specific GPFNs into MFNs. Returns a -ve error
- * code on failure. This call only works for auto-translated guests.
- */
-#define XENMEM_translate_gpfn_list  8
-struct xen_translate_gpfn_list {
-    /* Which domain to translate for? */
-    domid_t domid;
-
-    /* Length of list. */
-    unsigned long nr_gpfns;
-
-    /* List of GPFNs to translate. */
-    GUEST_HANDLE(ulong) gpfn_list;
-
-    /*
-     * Output list to contain MFN translations. May be the same as the input
-     * list (in which case each input GPFN is overwritten with the output MFN).
-     */
-    GUEST_HANDLE(ulong) mfn_list;
-};
-DEFINE_GUEST_HANDLE_STRUCT(xen_translate_gpfn_list);
+/*** REMOVED ***/
+/*#define XENMEM_translate_gpfn_list  8*/
 
 /*
  * Returns the pseudo-physical memory map as it was when the domain
@@ -217,9 +251,11 @@ struct xen_memory_map {
      * Entries in the buffer are in the same format as returned by the
      * BIOS INT 0x15 EAX=0xE820 call.
      */
-    GUEST_HANDLE(void) buffer;
+    XEN_GUEST_HANDLE(void) buffer;
 };
 DEFINE_GUEST_HANDLE_STRUCT(xen_memory_map);
+typedef struct xen_memory_map xen_memory_map_t;
+DEFINE_XEN_GUEST_HANDLE(xen_memory_map_t);
 
 /*
  * Returns the real physical memory map. Passes the same structure as
@@ -228,10 +264,47 @@ DEFINE_GUEST_HANDLE_STRUCT(xen_memory_map);
  */
 #define XENMEM_machine_memory_map   10
 
+/*
+ * Set the pseudo-physical memory map of a domain, as returned by
+ * XENMEM_memory_map.
+ * arg == addr of xen_foreign_memory_map_t.
+ */
+#define XENMEM_set_memory_map       13
+struct xen_foreign_memory_map {
+    domid_t domid;
+    struct xen_memory_map map;
+};
+typedef struct xen_foreign_memory_map xen_foreign_memory_map_t;
+DEFINE_XEN_GUEST_HANDLE(xen_foreign_memory_map_t);
+
+#define XENMEM_set_pod_target       16
+#define XENMEM_get_pod_target       17
+struct xen_pod_target {
+    /* IN */
+    uint64_t target_pages;
+    /* OUT */
+    uint64_t tot_pages;
+    uint64_t pod_cache_pages;
+    uint64_t pod_entries;
+    /* IN */
+    domid_t domid;
+};
+typedef struct xen_pod_target xen_pod_target_t;
+
+/*
+ * Get the number of MFNs saved through memory sharing.
+ * The call never fails.
+ */
+#define XENMEM_get_sharing_freed_pages    18
+
+#ifndef CONFIG_XEN
+#include <linux/spinlock.h>
 
 /*
  * Prevent the balloon driver from changing the memory reservation
  * during a driver critical region.
  */
 extern spinlock_t xen_reservation_lock;
+#endif
+
 #endif /* __XEN_PUBLIC_MEMORY_H__ */

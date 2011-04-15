@@ -17,6 +17,7 @@
 #include <asm/paravirt.h>
 #include <asm/alternative.h>
 
+#ifndef CONFIG_XEN
 static int __init no_halt(char *s)
 {
 	boot_cpu_data.hlt_works_ok = 0;
@@ -24,6 +25,7 @@ static int __init no_halt(char *s)
 }
 
 __setup("no-hlt", no_halt);
+#endif
 
 static int __init no_387(char *s)
 {
@@ -79,13 +81,16 @@ static void __init check_fpu(void)
 		: "=m" (*&fdiv_bug)
 		: "m" (*&x), "m" (*&y));
 
+#ifndef CONFIG_XEN
 	boot_cpu_data.fdiv_bug = fdiv_bug;
 	if (boot_cpu_data.fdiv_bug)
 		printk(KERN_WARNING "Hmm, FPU with FDIV bug.\n");
+#endif
 }
 
 static void __init check_hlt(void)
 {
+#ifndef CONFIG_XEN
 	if (boot_cpu_data.x86 >= 5 || paravirt_enabled())
 		return;
 
@@ -99,6 +104,7 @@ static void __init check_hlt(void)
 	halt();
 	halt();
 	printk(KERN_CONT "OK.\n");
+#endif
 }
 
 /*
