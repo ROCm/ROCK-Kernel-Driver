@@ -3355,7 +3355,7 @@ int novfs_fill_super(struct super_block *SB, void *Data, int Silent)
 	name.len = 1;
 	name.name = "/";
 
-	inode = novfs_get_inode(SB, S_IFDIR | 0777, 0, 0, 0, &name);
+	inode = novfs_get_inode(SB, S_IFDIR | 01777, 0, 0, 0, &name);
 	if (!inode) {
 		return (-ENOMEM);
 	}
@@ -3381,7 +3381,7 @@ int novfs_fill_super(struct super_block *SB, void *Data, int Silent)
 		name.len = strlen(SERVER_DIRECTORY_NAME);
 		name.hash = novfs_internal_hash(&name);
 
-		inode = novfs_get_inode(SB, S_IFDIR | 0777, 0, 0, 0, &name);
+		inode = novfs_get_inode(SB, S_IFDIR | 01777, 0, 0, 0, &name);
 		if (inode) {
 			info.mode = inode->i_mode;
 			info.namelength = 0;
@@ -3404,7 +3404,7 @@ int novfs_fill_super(struct super_block *SB, void *Data, int Silent)
 		name.len = strlen(TREE_DIRECTORY_NAME);
 		name.hash = novfs_internal_hash(&name);
 
-		inode = novfs_get_inode(SB, S_IFDIR | 0777, 0, 0, 0, &name);
+		inode = novfs_get_inode(SB, S_IFDIR | 01777, 0, 0, 0, &name);
 		if (inode) {
 			info.mode = inode->i_mode;
 			info.namelength = 0;
