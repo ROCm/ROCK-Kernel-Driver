@@ -52,7 +52,7 @@
 4484:.balign 4				;	\
 .popsection				;
 
-#define ELFNOTE(name, type, desc)		\
+#define ELFNOTE(name, type, desc...)		\
 	ELFNOTE_START(name, type, "")		\
 		desc			;	\
 	ELFNOTE_END

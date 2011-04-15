@@ -344,6 +344,7 @@ int walk_system_ram_range(unsigned long start_pfn, unsigned long nr_pages,
 
 #endif
 
+#if !defined(CONFIG_XEN) || !defined(CONFIG_ARCH_HAS_WALK_MEMORY)
 static int __is_ram(unsigned long pfn, unsigned long nr_pages, void *arg)
 {
 	return 1;
@@ -356,6 +357,7 @@ int __weak page_is_ram(unsigned long pfn)
 {
 	return walk_system_ram_range(pfn, 1, NULL, __is_ram) == 1;
 }
+#endif
 
 void __weak arch_remove_reservations(struct resource *avail)
 {

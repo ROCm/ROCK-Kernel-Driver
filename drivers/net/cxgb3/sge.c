@@ -58,11 +58,24 @@
  * It must be a divisor of PAGE_SIZE.  If set to 0 FL0 will use sk_buffs
  * directly.
  */
+#ifndef CONFIG_XEN
 #define FL0_PG_CHUNK_SIZE  2048
+#else
+/* Use skbuffs for XEN kernels. LRO is already disabled */
+#define FL0_PG_CHUNK_SIZE  0
+#endif
+
 #define FL0_PG_ORDER 0
 #define FL0_PG_ALLOC_SIZE (PAGE_SIZE << FL0_PG_ORDER)
+
+#ifndef CONFIG_XEN
 #define FL1_PG_CHUNK_SIZE (PAGE_SIZE > 8192 ? 16384 : 8192)
 #define FL1_PG_ORDER (PAGE_SIZE > 8192 ? 0 : 1)
+#else
+#define FL1_PG_CHUNK_SIZE 0
+#define FL1_PG_ORDER 0
+#endif
+
 #define FL1_PG_ALLOC_SIZE (PAGE_SIZE << FL1_PG_ORDER)
 
 #define SGE_RX_DROP_THRES 16
@@ -1267,7 +1280,27 @@ netdev_tx_t t3_eth_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	gen = q->gen;
 	q->unacked += ndesc;
+#ifdef CONFIG_XEN
+	/*
+	 * Some Guest OS clients get terrible performance when they have bad
+	 * message size / socket send buffer space parameters.  For instance,
+	 * if an application selects an 8KB message size and an 8KB send
+	 * socket buffer size.  This forces the application into a single
+	 * packet stop-and-go mode where it's only willing to have a single
+	 * message outstanding.  The next message is only sent when the
+	 * previous message is noted as having been sent.  Until we issue a
+	 * kfree_skb() against the TX skb, the skb is charged against the
+	 * application's send buffer space.  We only free up TX skbs when we
+	 * get a TX credit return from the hardware / firmware which is fairly
+	 * lazy about this.  So we request a TX WR Completion Notification on
+	 * every TX descriptor in order to accellerate TX credit returns.  See
+	 * also the change in handle_rsp_cntrl_info() to free up TX skb's when
+	 * we receive the TX WR Completion Notifications ...
+	 */
+	compl = F_WR_COMPL;
+#else
 	compl = (q->unacked & 8) << (S_WR_COMPL - 3);
+#endif
 	q->unacked &= 7;
 	pidx = q->pidx;
 	q->pidx += ndesc;
@@ -2176,8 +2209,35 @@ static inline void handle_rsp_cntrl_info(struct sge_qset *qs, u32 flags)
 #endif
 
 	credits = G_RSPD_TXQ0_CR(flags);
-	if (credits)
+	if (credits) {
 		qs->txq[TXQ_ETH].processed += credits;
+#ifdef CONFIG_XEN
+		/*
+		 * In the normal Linux driver t3_eth_xmit() routine, we call
+		 * skb_orphan() on unshared TX skb.  This results in a call to
+		 * the destructor for the skb which frees up the send buffer
+		 * space it was holding down.  This, in turn, allows the
+		 * application to make forward progress generating more data
+		 * which is important at 10Gb/s.  For Virtual Machine Guest
+		 * Operating Systems this doesn't work since the send buffer
+		 * space is being held down in the Virtual Machine.  Thus we
+		 * need to get the TX skb's freed up as soon as possible in
+		 * order to prevent applications from stalling.
+		 *
+		 * This code is largely copied from the corresponding code in
+		 * sge_timer_tx() and should probably be kept in sync with any
+		 * changes there.
+		 */
+		if (__netif_tx_trylock(qs->tx_q)) {
+			struct port_info *pi = netdev_priv(qs->netdev);
+			struct adapter *adap = pi->adapter;
+
+			reclaim_completed_tx(adap, &qs->txq[TXQ_ETH],
+				TX_RECLAIM_CHUNK);
+			__netif_tx_unlock(qs->tx_q);
+		}
+#endif
+	}
 
 	credits = G_RSPD_TXQ2_CR(flags);
 	if (credits)

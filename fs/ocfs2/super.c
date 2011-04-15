@@ -41,6 +41,7 @@
 #include <linux/mount.h>
 #include <linux/seq_file.h>
 #include <linux/quotaops.h>
+#include <linux/precache.h>
 
 #define CREATE_TRACE_POINTS
 #include "ocfs2_trace.h"
@@ -2352,6 +2353,7 @@ static int ocfs2_initialize_super(struct super_block *sb,
 		mlog_errno(status);
 		goto bail;
 	}
+	shared_precache_init(sb, &di->id2.i_super.s_uuid[0]);
 
 bail:
 	return status;

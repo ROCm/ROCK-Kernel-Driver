@@ -176,4 +176,10 @@ int ioat2_quiesce(struct ioat_chan_common *chan, unsigned long tmo);
 int ioat2_reset_sync(struct ioat_chan_common *chan, unsigned long tmo);
 extern struct kobj_type ioat2_ktype;
 extern struct kmem_cache *ioat2_cache;
+
+#ifdef CONFIG_XEN
+#define ioat2_dca_init __ioat_dca_init
+#define ioat3_dca_init __ioat_dca_init
+#endif
+
 #endif /* IOATDMA_V2_H */
