@@ -510,6 +510,7 @@ module_init(intel_idle_init);
 module_exit(intel_idle_exit);
 
 module_param(max_cstate, int, 0444);
+module_param(lapic_timer_reliable_states, int, 0444);
 
 MODULE_AUTHOR("Len Brown <len.brown@intel.com>");
 MODULE_DESCRIPTION("Cpuidle driver for Intel Hardware v" INTEL_IDLE_VERSION);
