@@ -50,6 +50,8 @@
 #include <linux/uaccess.h>
 #include <linux/module.h>
 
+#include <linux/bootsplash.h>
+
 #include <asm/system.h>
 
 /* number of characters left in xmit buffer before select has we have room */
@@ -1796,15 +1798,15 @@ do_it_again:
 			tty->minimum_to_wake = (minimum - (b - buf));
 
 		if (!input_available_p(tty, 0)) {
-#ifdef CONFIG_BOOTSPLASH
-			if (file->f_dentry->d_inode->i_rdev == MKDEV(TTY_MAJOR,0) ||
-			    file->f_dentry->d_inode->i_rdev == MKDEV(TTY_MAJOR,1) ||
-			    file->f_dentry->d_inode->i_rdev == MKDEV(TTYAUX_MAJOR,0) ||
-			    file->f_dentry->d_inode->i_rdev == MKDEV(TTYAUX_MAJOR,1)) {
-				extern int splash_verbose(void);
-				(void)splash_verbose();
+			dev_t i_rdev = file->f_dentry->d_inode->i_rdev;
+
+			if (i_rdev == MKDEV(TTY_MAJOR, 0) ||
+			    i_rdev == MKDEV(TTY_MAJOR, 1) ||
+			    i_rdev == MKDEV(TTYAUX_MAJOR, 0) ||
+			    i_rdev == MKDEV(TTYAUX_MAJOR, 1)) {
+				SPLASH_VERBOSE();
 			}
-#endif
+
 			if (test_bit(TTY_OTHER_CLOSED, &tty->flags)) {
 				retval = -EIO;
 				break;

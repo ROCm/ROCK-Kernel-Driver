@@ -18,9 +18,9 @@
 #include <linux/console.h>
 #include <asm/types.h>
 #include "fbcon.h"
-#ifdef CONFIG_BOOTSPLASH
-#include "../bootsplash/bootsplash.h"
-#endif
+
+#include <linux/bootsplash.h>
+
 
 /*
  * Accelerated handlers.
@@ -51,13 +51,12 @@ static void bit_bmove(struct vc_data *vc, struct fb_info *info, int sy,
 {
 	struct fb_copyarea area;
 
-#ifdef CONFIG_BOOTSPLASH
-	if (info->splash_data) {
+	if (SPLASH_DATA(info)) {
 		splash_bmove(vc, info,
 			sy, sx, dy, dx, height, width);
 		return;
 	}
-#endif
+
 	area.sx = sx * vc->vc_font.width;
 	area.sy = sy * vc->vc_font.height;
 	area.dx = dx * vc->vc_font.width;
@@ -74,13 +73,12 @@ static void bit_clear(struct vc_data *vc, struct fb_info *info, int sy,
 	int bgshift = (vc->vc_hi_font_mask) ? 13 : 12;
 	struct fb_fillrect region;
 
-#ifdef CONFIG_BOOTSPLASH
-	if (info->splash_data) {
+	if (SPLASH_DATA(info)) {
 		splash_clear(vc, info,
 			     sy, sx, height, width);
 		return;
 	}
-#endif
+
 	region.color = attr_bgcol_ec(bgshift, vc, info);
 	region.dx = sx * vc->vc_font.width;
 	region.dy = sy * vc->vc_font.height;
@@ -178,12 +176,10 @@ static void bit_putcs(struct vc_data *vc, struct fb_info *info,
 	image.height = vc->vc_font.height;
 	image.depth = 1;
 
-#ifdef CONFIG_BOOTSPLASH
-	if (info->splash_data) {
+	if (SPLASH_DATA(info)) {
 		splash_putcs(vc, info, s, count, yy, xx);
 		return;
 	}
-#endif
 
 	if (attribute) {
 		buf = kmalloc(cellsize, GFP_KERNEL);
@@ -238,12 +234,10 @@ static void bit_clear_margins(struct vc_data *vc, struct fb_info *info,
 	unsigned int bs = info->var.yres - bh;
 	struct fb_fillrect region;
 
-#ifdef CONFIG_BOOTSPLASH
-	if (info->splash_data) {
+	if (SPLASH_DATA(info)) {
 		splash_clear_margins(vc, info, bottom_only);
 		return;
 	}
-#endif
 
 	region.color = attr_bgcol_ec(bgshift, vc, info);
 	region.rop = ROP_COPY;
@@ -411,13 +405,11 @@ static void bit_cursor(struct vc_data *vc, struct fb_info *info, int mode,
 	cursor.image.depth = 1;
 	cursor.rop = ROP_XOR;
 
-#ifdef CONFIG_BOOTSPLASH
-	if (info->splash_data) {
+	if (SPLASH_DATA(info)) {
 		splash_cursor(info, &cursor);
 		ops->cursor_reset = 0;
 		return;
 	}
-#endif
 
 	if (info->fbops->fb_cursor)
 		err = info->fbops->fb_cursor(info, &cursor);
