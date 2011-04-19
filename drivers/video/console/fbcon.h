@@ -26,40 +26,47 @@
     */
 
 #ifdef CONFIG_BOOTSPLASH
-struct splash_data {
-    int splash_state;			/* show splash? */
-    int splash_color;			/* transparent color */
-    int splash_fg_color;		/* foreground color */
-    int splash_width;			/* width of image */
-    int splash_height;			/* height of image */
-    int splash_text_xo;			/* text area origin */
-    int splash_text_yo;
-    int splash_text_wi;			/* text area size used*/
-    int splash_text_he;
-    int splash_jpg_text_wi;		/* text area size of jpeg*/
-    int splash_jpg_text_he;
-    int splash_showtext;		/* silent/verbose mode */
-    int splash_boxcount;
-    int splash_percent;
-    int splash_overpaintok;		/* is it ok to overpaint boxes */
-    int splash_palcnt;
-    char *oldscreen_base;		/* pointer to top of virtual screen */
-    unsigned char *splash_boxes;
-    unsigned char *splash_jpeg;		/* jpeg */
-    unsigned char *splash_palette;	/* palette for 8-bit */
-    int splash_boxes_xoff;
-    int splash_boxes_yoff;
+struct splash_img_data {
+	int ref_cnt;
+	int splash_color;	/* transparent color */
+	int splash_fg_color;	/* foreground color */
+	int splash_width;	/* width of image */
+	int splash_height;	/* height of image */
+	int splash_text_xo;	/* text area origin of origin */
+	int splash_text_yo;
+	int splash_text_wi;	/* text area size of jpeg*/
+	int splash_text_he;
+	int splash_boxcount;
+	int splash_sboxcount;
+	int splash_overpaintok;	/* is it ok to overpaint boxes */
+	unsigned char *splash_boxes;
+	unsigned char *splash_jpeg;		/* jpeg */
+	unsigned char *splash_sboxes;
+	unsigned char *splash_silentjpeg;
+	unsigned char *splash_palette;		/* palette for 8-bit */
+};
 
-    int splash_dosilent;		/* show silent jpeg */
-    unsigned char *splash_silentjpeg;
-    unsigned char *splash_sboxes;
-    int splash_sboxcount;
-    struct splash_data *next;
-    int splash_sboxes_xoff;
-    int splash_sboxes_yoff;
-    int splash_pic_stride;
-    unsigned char *splash_pic;
-    int splash_pic_size;
+struct splash_pic_data {
+	int ref_cnt;
+	unsigned char *splash_pic;
+	int splash_pic_stride;
+	int splash_pic_size;
+};
+
+struct splash_data {
+	struct splash_data *next;
+	struct splash_img_data *imgd;
+	struct splash_pic_data *pic;
+	int splash_state;			/* show splash? */
+	int splash_percent;
+	int splash_dosilent;			/* show silent jpeg */
+
+	int splash_vc_text_wi;			/* text area size used*/
+	int splash_vc_text_he;
+	int splash_boxes_xoff;
+	int splash_boxes_yoff;
+	int splash_sboxes_xoff;
+	int splash_sboxes_yoff;
 };
 #endif
 

@@ -4204,27 +4204,29 @@ void vcs_scr_updated(struct vc_data *vc)
 #ifdef CONFIG_BOOTSPLASH
 void con_remap_def_color(struct vc_data *vc, int new_color)
 {
-       unsigned short *sbuf = screenpos(vc, 0, 1);
-       unsigned c, len = vc->vc_screenbuf_size >> 1;
-       int old_color;
+	unsigned short *sbuf = screenpos(vc, 0, 1);
+	unsigned c, len = vc->vc_screenbuf_size >> 1;
+	unsigned int bits, old_color;
 
-       if (sbuf) {
-	       old_color = vc->vc_def_color << 8;
-	       new_color <<= 8;
-	       while(len--) {
-		       c = scr_readw(sbuf);
-		       if (((c ^ old_color) & 0xf000) == 0)
-			     scr_writew(c ^ ((old_color ^ new_color) & 0xf000), sbuf);
-		       *sbuf ^= (old_color ^ new_color) & 0xf000;
-		       if (((c ^ old_color) & 0x0f00) == 0)
-			     scr_writew(c ^ ((old_color ^ new_color) & 0x0f00), sbuf);
-		       *sbuf ^= (old_color ^ new_color) & 0x0f00;
-		       sbuf++;
-	       }
-	       new_color >>= 8;
-       }
-       vc->vc_def_color = vc->vc_color = new_color;
-       update_attr(vc);
+	if (sbuf) {
+		old_color = vc->vc_def_color << 8;
+		new_color <<= 8;
+		while (len--) {
+			c = scr_readw(sbuf);
+			bits = (old_color ^ new_color) & 0xf000;
+			if (((c ^ old_color) & 0xf000) == 0)
+				scr_writew((c ^ bits), sbuf);
+			*sbuf ^= bits;
+			bits = (old_color ^ new_color) & 0x0f00;
+			if (((c ^ old_color) & 0x0f00) == 0)
+				scr_writew((c ^ bits), sbuf);
+			*sbuf ^= bits;
+			sbuf++;
+		}
+		new_color >>= 8;
+	}
+	vc->vc_def_color = vc->vc_color = new_color;
+	update_attr(vc);
 }
 #endif
 
