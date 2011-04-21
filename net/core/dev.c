@@ -962,12 +962,8 @@ static int dev_get_valid_name(struct net_device *dev, const char *name, bool fmt
 		return dev_alloc_name(dev, name);
 	else if (__dev_get_by_name(net, name))
 		return -EEXIST;
-	else if (dev->name != name) {
-		if (strncmp(name, dev->name, IFNAMSIZ))
-			printk(KERN_INFO "%s renamed to %s by %s [%u]\n",
-			       dev->name, name, current->comm, current->pid);
+	else if (dev->name != name)
 		strlcpy(dev->name, name, IFNAMSIZ);
-	}
 
 	return 0;
 }
