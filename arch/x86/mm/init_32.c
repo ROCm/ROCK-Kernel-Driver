@@ -966,19 +966,5 @@ void mark_rodata_ro(void)
 #endif
 	mark_nxdata_nx();
 }
-EXPORT_SYMBOL_GPL(mark_rodata_ro);
-
-void mark_rodata_rw(void)
-{
-	unsigned long start = PFN_ALIGN(_text);
-	unsigned long size = PFN_ALIGN(_etext) - start;
-
-	start += size;
-	size = (unsigned long)__end_rodata - start;
-	set_pages_rw_force(virt_to_page(start), size >> PAGE_SHIFT);
-	printk(KERN_INFO "Write enabling the kernel read-only data: %luk\n",
-		size >> 10);
-}
-EXPORT_SYMBOL_GPL(mark_rodata_rw);
 #endif
 
