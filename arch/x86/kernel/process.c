@@ -137,7 +137,6 @@ static void hard_disable_TSC(void)
 
 void disable_TSC(void)
 {
-#ifdef CONFIG_SECCOMP_DISABLE_TSC
 	preempt_disable();
 	if (!test_and_set_thread_flag(TIF_NOTSC))
 		/*
@@ -146,7 +145,6 @@ void disable_TSC(void)
 		 */
 		hard_disable_TSC();
 	preempt_enable();
-#endif
 }
 
 static void hard_enable_TSC(void)
