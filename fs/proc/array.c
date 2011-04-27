@@ -81,7 +81,6 @@
 #include <linux/pid_namespace.h>
 #include <linux/ptrace.h>
 #include <linux/tracehook.h>
-#include <linux/utrace.h>
 
 #include <asm/pgtable.h>
 #include <asm/processor.h>
@@ -192,8 +191,6 @@ static inline void task_state(struct seq_file *m, struct pid_namespace *ns,
 		ppid, tpid,
 		cred->uid, cred->euid, cred->suid, cred->fsuid,
 		cred->gid, cred->egid, cred->sgid, cred->fsgid);
-
-	task_utrace_proc_status(m, p);
 
 	task_lock(p);
 	if (p->files)

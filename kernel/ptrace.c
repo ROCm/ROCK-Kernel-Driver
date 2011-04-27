@@ -15,7 +15,6 @@
 #include <linux/highmem.h>
 #include <linux/pagemap.h>
 #include <linux/ptrace.h>
-#include <linux/utrace.h>
 #include <linux/security.h>
 #include <linux/signal.h>
 #include <linux/audit.h>
@@ -167,14 +166,6 @@ bool ptrace_may_access(struct task_struct *task, unsigned int mode)
 	return !err;
 }
 
-/*
- * For experimental use of utrace, exclude ptrace on the same task.
- */
-static inline bool exclude_ptrace(struct task_struct *task)
-{
-	return unlikely(!!task_utrace_flags(task));
-}
-
 static int ptrace_attach(struct task_struct *task)
 {
 	int retval;
@@ -198,8 +189,6 @@ static int ptrace_attach(struct task_struct *task)
 
 	task_lock(task);
 	retval = __ptrace_may_access(task, PTRACE_MODE_ATTACH);
-	if (!retval && exclude_ptrace(task))
-		retval = -EBUSY;
 	task_unlock(task);
 	if (retval)
 		goto unlock_creds;
@@ -236,9 +225,6 @@ out:
 static int ptrace_traceme(void)
 {
 	int ret = -EPERM;
-
-	if (exclude_ptrace(current)) /* XXX locking */
-		return -EBUSY;
 
 	write_lock_irq(&tasklist_lock);
 	/* Are we already being traced? */
