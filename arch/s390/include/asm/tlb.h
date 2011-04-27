@@ -35,19 +35,6 @@
 #define TLB_NR_PTRS	508
 #endif
 
-/* Lifted from asm-generic/tlb.h; Is used by patches.suse/unmap_vmas-lat */
-/*
- * For UP we don't need to worry about TLB flush
- * and page free order so much..
- */
-#ifdef CONFIG_SMP
-  #define FREE_PTE_NR 506
-  #define tlb_fast_mode(tlb) ((tlb)->nr == ~0U)
-#else
-  #define FREE_PTE_NR   1
-  #define tlb_fast_mode(tlb) 1
-#endif
-
 struct mmu_gather {
 	struct mm_struct *mm;
 	unsigned int fullmm;
