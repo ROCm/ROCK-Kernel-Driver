@@ -1216,7 +1216,6 @@ int isolate_lru_page(struct page *page)
 	}
 	return ret;
 }
-EXPORT_SYMBOL(isolate_lru_page);
 
 /*
  * Are there way too many processes in the direct reclaim path already?

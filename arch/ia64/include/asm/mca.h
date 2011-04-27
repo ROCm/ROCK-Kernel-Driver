@@ -142,7 +142,6 @@ extern unsigned long __per_cpu_mca[NR_CPUS];
 
 extern int cpe_vector;
 extern int ia64_cpe_irq;
-extern int cpe_poll_enabled;
 extern void ia64_mca_init(void);
 extern void ia64_mca_cpu_init(void *);
 extern void ia64_os_mca_dispatch(void);
@@ -157,15 +156,10 @@ extern void ia64_slave_init_handler(void);
 extern void ia64_mca_cmc_vector_setup(void);
 extern int  ia64_reg_MCA_extension(int (*fn)(void *, struct ia64_sal_os_state *));
 extern void ia64_unreg_MCA_extension(void);
-extern int  ia64_reg_CE_extension(int (*fn)(void *));
-extern void ia64_unreg_CE_extension(void);
 extern unsigned long ia64_get_rnat(unsigned long *);
 extern void ia64_set_psr_mc(void);
 extern void ia64_mca_printk(const char * fmt, ...)
 	 __attribute__ ((format (printf, 1, 2)));
-
-extern struct list_head badpagelist;
-extern unsigned int total_badpages;
 
 struct ia64_mca_notify_die {
 	struct ia64_sal_os_state *sos;
