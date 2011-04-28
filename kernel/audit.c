@@ -1230,7 +1230,7 @@ static inline int audit_expand(struct audit_buffer *ab, int extra)
  * will be called a second time.  Currently, we assume that a printk
  * can't format message larger than 1024 bytes, so we don't either.
  */
-void audit_log_vformat(struct audit_buffer *ab, const char *fmt,
+static void audit_log_vformat(struct audit_buffer *ab, const char *fmt,
 			      va_list args)
 {
 	int len, avail;
@@ -1506,5 +1506,3 @@ EXPORT_SYMBOL(audit_log_start);
 EXPORT_SYMBOL(audit_log_end);
 EXPORT_SYMBOL(audit_log_format);
 EXPORT_SYMBOL(audit_log);
-EXPORT_SYMBOL_GPL(audit_log_vformat);
-EXPORT_SYMBOL_GPL(audit_log_untrustedstring);
