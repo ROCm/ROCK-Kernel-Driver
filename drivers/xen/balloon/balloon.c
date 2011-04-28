@@ -115,8 +115,8 @@ static DECLARE_WORK(balloon_worker, balloon_process);
 
 /* When ballooning out (allocating memory to return to Xen) we don't really 
    want the kernel to try too hard since that can trigger the oom killer. */
-#define GFP_BALLOON \
-	(GFP_HIGHUSER|__GFP_NOWARN|__GFP_NORETRY|__GFP_NOMEMALLOC|__GFP_COLD)
+#define GFP_BALLOON (GFP_HIGHUSER|__GFP_NOWARN|__GFP_NORETRY|__GFP_NOMEMALLOC|\
+		     __GFP_NOTRACK|__GFP_COLD)
 
 #define PAGE_TO_LIST(p) (&(p)->lru)
 #define LIST_TO_PAGE(l) list_entry((l), struct page, lru)
@@ -705,7 +705,7 @@ struct page **alloc_empty_pages_and_pagevec(int nr_pages)
 		}
 		balloon_unlock(flags);
 
-		page = pagevec[i] = alloc_page(GFP_KERNEL|__GFP_COLD);
+		page = pagevec[i] = alloc_page(GFP_KERNEL|__GFP_NOTRACK|__GFP_COLD);
 		if (page == NULL)
 			goto err;
 

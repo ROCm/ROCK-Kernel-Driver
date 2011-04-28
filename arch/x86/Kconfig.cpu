@@ -481,7 +481,7 @@ config CPU_SUP_CENTAUR
 config CPU_SUP_TRANSMETA_32
 	default y
 	bool "Support Transmeta processors" if PROCESSOR_SELECT
-	depends on !64BIT && !XEN
+	depends on !64BIT
 	---help---
 	  This enables detection, tunings and quirks for Transmeta processors
 

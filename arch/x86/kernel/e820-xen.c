@@ -1274,7 +1274,7 @@ void __init memblock_x86_fill(void)
 
 void __init memblock_find_dma_reserve(void)
 {
-#ifdef CONFIG_X86_64
+#if defined(CONFIG_X86_64) && !defined(CONFIG_XEN)
 	u64 free_size_pfn;
 	u64 mem_size_pfn;
 	/*
