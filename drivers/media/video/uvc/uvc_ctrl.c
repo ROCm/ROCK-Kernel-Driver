@@ -867,10 +867,6 @@ int uvc_query_v4l2_ctrl(struct uvc_video_chain *chain,
 	if (ret < 0)
 		return -ERESTARTSYS;
 
-	if ((chain->dev->quirks & UVC_QUIRK_HUE_EPIPE) &&
-		(v4l2_ctrl->id == V4L2_CID_HUE))
-		return -EINVAL;
-
 	ctrl = uvc_find_control(chain, v4l2_ctrl->id, &mapping);
 	if (ctrl == NULL) {
 		ret = -EINVAL;
