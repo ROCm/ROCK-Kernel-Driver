@@ -411,18 +411,4 @@ static __devinit void via_no_dac(struct pci_dev *dev)
 	}
 }
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_VIA, PCI_ANY_ID, via_no_dac);
-
-/*
- * MCP51 PCI bridge corrupts data for DAC.  Disable it.  Reported in
- * bnc#463829.
- */
-static __devinit void mcp51_no_dac(struct pci_dev *dev)
-{
-	if (forbid_dac == 0) {
-		printk(KERN_INFO
-		       "PCI: MCP51 PCI bridge detected. Disabling DAC.\n");
-		forbid_dac = 1;
-	}
-}
-DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_NVIDIA, 0x026f, mcp51_no_dac);
 #endif
