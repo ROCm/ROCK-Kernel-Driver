@@ -47,7 +47,7 @@
 /*
  * The default maximum commit age, in seconds.
  */
-#define JBD_DEFAULT_MAX_COMMIT_AGE 15
+#define JBD_DEFAULT_MAX_COMMIT_AGE 5
 
 #ifdef CONFIG_JBD_DEBUG
 /*

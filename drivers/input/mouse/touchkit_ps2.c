@@ -50,11 +50,6 @@
 #define TOUCHKIT_GET_X(packet)		(((packet)[1] << 7) | (packet)[2])
 #define TOUCHKIT_GET_Y(packet)		(((packet)[3] << 7) | (packet)[4])
 
-#define ELFTOUCH_MAX_XC			0x0fff
-#define ELFTOUCH_MAX_YC			0x0fff
-#define ELFTOUCH_GET_X(packet)		(((packet)[3] << 7) | (packet)[4])
-#define ELFTOUCH_GET_Y(packet)		(((packet)[1] << 7) | (packet)[2])
-
 static psmouse_ret_t touchkit_ps2_process_byte(struct psmouse *psmouse)
 {
 	unsigned char *packet = psmouse->packet;
@@ -63,15 +58,9 @@ static psmouse_ret_t touchkit_ps2_process_byte(struct psmouse *psmouse)
 	if (psmouse->pktcnt != 5)
 		return PSMOUSE_GOOD_DATA;
 
-        if(psmouse->type==PSMOUSE_ELFTOUCH_PS2) {
-		input_report_abs(dev, ABS_X, ELFTOUCH_GET_X(packet));
-		input_report_abs(dev, ABS_Y, ELFTOUCH_GET_Y(packet));
-        } else {
-		input_report_abs(dev, ABS_X, TOUCHKIT_GET_X(packet));
-		input_report_abs(dev, ABS_Y, TOUCHKIT_GET_Y(packet));
-        }
+	input_report_abs(dev, ABS_X, TOUCHKIT_GET_X(packet));
+	input_report_abs(dev, ABS_Y, TOUCHKIT_GET_Y(packet));
 	input_report_key(dev, BTN_TOUCH, TOUCHKIT_GET_TOUCHED(packet));
-
 	input_sync(dev);
 
 	return PSMOUSE_FULL_PACKET;
@@ -107,35 +96,5 @@ int touchkit_ps2_detect(struct psmouse *psmouse, bool set_properties)
 		psmouse->pktsize = 5;
 	}
 
-	return 0;
-}
-
-int elftouch_ps2_detect(struct psmouse *psmouse, bool set_properties)
-{
-	struct input_dev *dev = psmouse->dev;
-	unsigned char param[16];
-	int command, res;
-
-	param[0]=0x0f4;
-	command = TOUCHKIT_SEND_PARMS(1, 0, TOUCHKIT_CMD);
-	res=ps2_command(&psmouse->ps2dev, param, command);
-	if(res) { return -ENODEV; }
-
-	param[0]=0x0b0;
-	command = TOUCHKIT_SEND_PARMS(1, 1, TOUCHKIT_CMD);
-	res=ps2_command(&psmouse->ps2dev, param, command);
-	if(res) { return -ENODEV; }
-
-	if (set_properties) {
-		dev->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS);
-		set_bit(BTN_TOUCH, dev->keybit);
-		input_set_abs_params(dev, ABS_X, 0, ELFTOUCH_MAX_XC, 0, 0);
-		input_set_abs_params(dev, ABS_Y, 0, ELFTOUCH_MAX_YC, 0, 0);
-
-		psmouse->vendor = "ElfTouch";
-		psmouse->name = "Touchscreen";
-		psmouse->protocol_handler = touchkit_ps2_process_byte;
-		psmouse->pktsize = 5;
-	}
 	return 0;
 }
