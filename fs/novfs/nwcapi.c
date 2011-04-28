@@ -480,7 +480,7 @@ int novfs_login_id(struct novfs_xplat *pdata, struct novfs_schandle Session)
 	DbgPrint("DomainName\n");
 	novfs_dump(sizeof(nwcStr), &nwcStr);
 
-	if (nwcStr.DataLen > MAX_NAME_LEN)
+	if (nwcStr.DataLen > MAX_DOMAIN_LEN)
 		return -EINVAL;
 
 	if ((server.buffer = kmalloc(nwcStr.DataLen, GFP_KERNEL))) {
@@ -492,7 +492,7 @@ int novfs_login_id(struct novfs_xplat *pdata, struct novfs_schandle Session)
 
 			cpylen = copy_from_user(&nwcStr, lgn.pObjectName, sizeof(nwcStr));
 			DbgPrint("ObjectName");
-			if (nwcStr.DataLen > MAX_OBJECT_NAME_LENGTH) {
+			if (nwcStr.DataLen > NW_MAX_DN_BYTES) {
 				retCode = -EINVAL;
 				goto out;
 			}

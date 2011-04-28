@@ -780,9 +780,15 @@ phys_pud_init(pud_t *pud_page, unsigned long addr, unsigned long end,
 			if (max_pfn_mapped)
 				make_page_readonly(__va(pmd_phys),
 						   XENFEAT_writable_page_tables);
-			if (page_size_mask & (1 << PG_LEVEL_NUM))
-				xen_l3_entry_update(pud, __pud(pmd_phys | _PAGE_TABLE));
-			else
+			if (page_size_mask & (1 << PG_LEVEL_NUM)) {
+				mmu_update_t u;
+
+				u.ptr = arbitrary_virt_to_machine(pud);
+				u.val = phys_to_machine(pmd_phys) | _PAGE_TABLE;
+				if (HYPERVISOR_mmu_update(&u, 1, NULL,
+							  DOMID_SELF) < 0)
+					BUG();
+			} else
 				*pud = __pud(pmd_phys | _PAGE_TABLE);
 		} else {
 			spin_lock(&init_mm.page_table_lock);
@@ -1149,7 +1155,6 @@ void set_kernel_text_ro(void)
 	set_memory_ro(start, (end - start) >> PAGE_SHIFT);
 }
 
-static int initmem_freed __read_mostly = 0;
 void mark_rodata_ro(void)
 {
 	unsigned long start = PFN_ALIGN(_text);
@@ -1182,33 +1187,15 @@ void mark_rodata_ro(void)
 	set_memory_ro(start, (end-start) >> PAGE_SHIFT);
 #endif
 
-	if (!initmem_freed) {
-		initmem_freed = 1;
-		free_init_pages("unused kernel memory",
-				(unsigned long)
-				 page_address(virt_to_page(text_end)),
-				(unsigned long)
+	free_init_pages("unused kernel memory",
+			(unsigned long) page_address(virt_to_page(text_end)),
+			(unsigned long)
 				 page_address(virt_to_page(rodata_start)));
-		free_init_pages("unused kernel memory",
-				(unsigned long)
-				 page_address(virt_to_page(rodata_end)),
-				(unsigned long)
-				 page_address(virt_to_page(data_start)));
-	}
+	free_init_pages("unused kernel memory",
+			(unsigned long) page_address(virt_to_page(rodata_end)),
+			(unsigned long) page_address(virt_to_page(data_start)));
 }
-EXPORT_SYMBOL_GPL(mark_rodata_ro);
 
-void mark_rodata_rw(void)
-{
-	unsigned long rodata_start =
-		((unsigned long)__start_rodata + PAGE_SIZE - 1) & PAGE_MASK;
-	unsigned long end = (unsigned long) &__end_rodata;
-
-	printk(KERN_INFO "Write enabling the kernel read-only data: %luk\n",
-	       (end - rodata_start) >> 10);
-	set_memory_rw_force(rodata_start, (end - rodata_start) >> PAGE_SHIFT);
-}
-EXPORT_SYMBOL_GPL(mark_rodata_rw);
 #endif
 
 int kern_addr_valid(unsigned long addr)

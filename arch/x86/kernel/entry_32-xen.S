@@ -1221,6 +1221,7 @@ ENTRY(spurious_interrupt_bug)
 	pushl_cfi $do_spurious_interrupt_bug
 	jmp error_code
 	CFI_ENDPROC
+END(spurious_interrupt_bug)
 #endif /* !CONFIG_XEN */
 
 ENTRY(fixup_4gb_segment)
@@ -1228,7 +1229,7 @@ ENTRY(fixup_4gb_segment)
 	pushl_cfi $do_fixup_4gb_segment
 	jmp error_code
 	CFI_ENDPROC
-END(spurious_interrupt_bug)
+END(fixup_4gb_segment)
 /*
  * End of kprobes section
  */

@@ -54,6 +54,8 @@ struct novfs_schandle {
 
 #define PATH_LENGTH_BUFFER	PATH_MAX
 #define NW_MAX_PATH_LENGTH	255
+#define NW_MAX_DN_CHARS        256
+#define NW_MAX_DN_BYTES        (2*(NW_MAX_DN_CHARS+1))
 
 #define XA_BUFFER		(8 * 1024)
 
