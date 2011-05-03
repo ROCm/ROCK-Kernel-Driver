@@ -27,19 +27,6 @@
 #include "op_counter.h"
 #include "op_x86_model.h"
 
-static const char RSVD_MSG[] =
-	KERN_INFO "oprofile: performance counter #%d may already be"
-	" reserved."
-	" For counter #%d, EvntSel 0x%lx has value: 0x%llx.\n";
-static const char PMC_MSG[] =
-	KERN_INFO "oprofile: if oprofile doesn't collect data, then"
-	" try using a different performance counter on your platform"
-	" to monitor the desired event."
-	" Delete counter #%d from the desired event by editing the"
-	" /usr/share/oprofile/%s/<cpu>/events file."
-	" If the event cannot be monitored by any other counter,"
-	" contact your hardware or BIOS vendor.\n";
-
 static struct op_x86_model_spec *model;
 static DEFINE_PER_CPU(struct op_msrs, cpu_msrs);
 static DEFINE_PER_CPU(unsigned long, saved_lvtpc);
@@ -483,50 +470,6 @@ static struct notifier_block oprofile_cpu_nb = {
 	.notifier_call = oprofile_cpu_notifier
 };
 
-#define P4_CCCR_ENABLE	(1 << 12)
-
-/* check if the counter/evtsel is already enabled, say, by firmware */
-static void nmi_is_counter_enabled(struct op_msrs * const msrs)
-{
-	__u8 vendor = boot_cpu_data.x86_vendor;
-	__u8 family = boot_cpu_data.x86;
-	u64 val;
-	unsigned int i;
-	char *arch = "arch";
-
-	/* Fill in at least the "arch" value to help the user */
-	if (vendor == X86_VENDOR_AMD) {
-		if (family == 6)
-			arch = "i386";
-		else
-			arch = "x86-64";
-	} else if (vendor == X86_VENDOR_INTEL) {
-		arch = "i386";
-	}
-
-	for (i = 0; i < model->num_controls; ++i) {
-		if (!counter_config[i].enabled)
-			continue;
-		rdmsrl(msrs->controls[i].addr, val);
-
-		/* P4 is special. Other Intel, and all AMD CPUs
-		** are consistent in using "bit 22" as "enable"
-		*/
-		if ((vendor == X86_VENDOR_INTEL) && (family == 0xf)) {
-			if (val & P4_CCCR_ENABLE)
-				goto err_rsvd;
-		} else if (val & ARCH_PERFMON_EVENTSEL_ENABLE) {
-			goto err_rsvd;
-		}
-	}
-	return;
-
-err_rsvd:
-	printk(RSVD_MSG, i, i, msrs->controls[i].addr, val);
-	printk(PMC_MSG, i, arch);
-	return;
-}
-
 static int nmi_setup(void)
 {
 	int err = 0;
@@ -544,7 +487,6 @@ static int nmi_setup(void)
 	if (err)
 		goto fail;
 
-	nmi_is_counter_enabled(&per_cpu(cpu_msrs, 0));
 	for_each_possible_cpu(cpu) {
 		if (!cpu)
 			continue;
