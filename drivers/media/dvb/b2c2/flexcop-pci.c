@@ -38,8 +38,7 @@ MODULE_PARM_DESC(debug,
 	DEBSTATUS);
 
 #define DRIVER_VERSION "0.1"
-#define DRIVER_NAME "Technisat/B2C2 FlexCop II/IIb/III Digital TV PCI Driver"
-#define FLEXCOP_MODULE_NAME "b2c2-flexcop"
+#define DRIVER_NAME "flexcop-pci"
 #define DRIVER_AUTHOR "Patrick Boettcher <patrick.boettcher@desy.de>"
 
 struct flexcop_pci {
@@ -300,7 +299,7 @@ static int flexcop_pci_init(struct flexcop_pci *fc_pci)
 		return ret;
 	pci_set_master(fc_pci->pdev);
 
-	if ((ret = pci_request_regions(fc_pci->pdev, FLEXCOP_MODULE_NAME)) != 0)
+	if ((ret = pci_request_regions(fc_pci->pdev, DRIVER_NAME)) != 0)
 		goto err_pci_disable_device;
 
 	fc_pci->io_mem = pci_iomap(fc_pci->pdev, 0, 0x800);
@@ -314,7 +313,7 @@ static int flexcop_pci_init(struct flexcop_pci *fc_pci)
 	pci_set_drvdata(fc_pci->pdev, fc_pci);
 	spin_lock_init(&fc_pci->irq_lock);
 	if ((ret = request_irq(fc_pci->pdev->irq, flexcop_pci_isr,
-					IRQF_SHARED, FLEXCOP_MODULE_NAME, fc_pci)) != 0)
+					IRQF_SHARED, DRIVER_NAME, fc_pci)) != 0)
 		goto err_pci_iounmap;
 
 	fc_pci->init_state |= FC_PCI_INIT;
