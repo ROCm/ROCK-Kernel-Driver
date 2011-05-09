@@ -13,11 +13,9 @@
 #include <asm/setup.h>
 #include <asm/sections.h>
 #include <asm/e820.h>
-#include <asm/page.h>
 #include <asm/trampoline.h>
 #include <asm/apic.h>
 #include <asm/io_apic.h>
-#include <asm/bios_ebda.h>
 #include <asm/tlbflush.h>
 
 static void __init i386_default_early_setup(void)

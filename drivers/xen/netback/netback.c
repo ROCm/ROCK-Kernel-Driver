@@ -1817,7 +1817,7 @@ static int __init netback_init(void)
 						     "netback/%u", group);
 
 			if (IS_ERR(netbk->task)) {
-				pr_alert("netback: kthread_create() failed\n");
+				pr_err("netback: kthread_create() failed\n");
 				rc = PTR_ERR(netbk->task);
 				goto failed_init;
 			}
