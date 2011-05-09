@@ -505,7 +505,6 @@ extern void e1000e_release_hw_control(struct e1000_adapter *adapter);
 extern void e1000e_disable_aspm(struct pci_dev *pdev, u16 state);
 
 extern unsigned int copybreak;
-extern int entropy;
 
 extern char *e1000e_get_hw_dev_name(struct e1000_hw *hw);
 
