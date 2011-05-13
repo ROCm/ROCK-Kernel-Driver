@@ -57,11 +57,6 @@ const char ixgbe_driver_version[] = DRV_VERSION;
 static const char ixgbe_copyright[] =
 				"Copyright (c) 1999-2011 Intel Corporation.";
 
-static int entropy = 0;
-module_param(entropy, int, 0);
-MODULE_PARM_DESC(entropy, "Allow ixgbe to populate the /dev/random entropy pool");
-
-
 static const struct ixgbe_info *ixgbe_info_tbl[] = {
 	[board_82598] = &ixgbe_82598_info,
 	[board_82599] = &ixgbe_82599_info,
@@ -2326,7 +2321,6 @@ static int ixgbe_request_msix_irqs(struct ixgbe_adapter *adapter)
 	irqreturn_t (*handler)(int, void *);
 	int i, vector, q_vectors, err;
 	int ri = 0, ti = 0;
-	int irq_flags;
 
 	/* Decrement for Other and TCP Timer vectors */
 	q_vectors = adapter->num_msix_vectors - NON_Q_VECTORS;
@@ -2344,27 +2338,22 @@ static int ixgbe_request_msix_irqs(struct ixgbe_adapter *adapter)
 		struct ixgbe_q_vector *q_vector = adapter->q_vector[vector];
 		handler = SET_HANDLER(q_vector);
 
-		irq_flags = 0;
 		if (handler == &ixgbe_msix_clean_rx) {
 			snprintf(q_vector->name, sizeof(q_vector->name) - 1,
 			         "%s-%s-%d", netdev->name, "rx", ri++);
-			if (entropy)
-				irq_flags = IRQF_SAMPLE_RANDOM;
 		} else if (handler == &ixgbe_msix_clean_tx) {
 			snprintf(q_vector->name, sizeof(q_vector->name) - 1,
 			         "%s-%s-%d", netdev->name, "tx", ti++);
 		} else if (handler == &ixgbe_msix_clean_many) {
 			snprintf(q_vector->name, sizeof(q_vector->name) - 1,
 			         "%s-%s-%d", netdev->name, "TxRx", ri++);
-			if (entropy)
-				irq_flags = IRQF_SAMPLE_RANDOM;
 			ti++;
 		} else {
 			/* skip this unused q_vector */
 			continue;
 		}
 		err = request_irq(adapter->msix_entries[vector].vector,
-				  handler, irq_flags, q_vector->name,
+				  handler, 0, q_vector->name,
 				  q_vector);
 		if (err) {
 			e_err(probe, "request_irq failed for MSIX interrupt "
@@ -2578,19 +2567,14 @@ static int ixgbe_request_irq(struct ixgbe_adapter *adapter)
 {
 	struct net_device *netdev = adapter->netdev;
 	int err;
-	int irq_flags = 0;
-
-	if (entropy)
-		irq_flags = IRQF_SAMPLE_RANDOM;
 
 	if (adapter->flags & IXGBE_FLAG_MSIX_ENABLED) {
 		err = ixgbe_request_msix_irqs(adapter);
 	} else if (adapter->flags & IXGBE_FLAG_MSI_ENABLED) {
-		err = request_irq(adapter->pdev->irq, ixgbe_intr, irq_flags,
+		err = request_irq(adapter->pdev->irq, ixgbe_intr, 0,
 				  netdev->name, netdev);
 	} else {
-		irq_flags |= IRQF_SHARED;
-		err = request_irq(adapter->pdev->irq, ixgbe_intr, irq_flags,
+		err = request_irq(adapter->pdev->irq, ixgbe_intr, IRQF_SHARED,
 				  netdev->name, netdev);
 	}
 

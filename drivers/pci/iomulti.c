@@ -538,7 +538,7 @@ static void __devinit quirk_iomul_dealloc_ioresource(struct pci_dev *pdev)
 					    pci_dev_switch_busnr(pdev));
 		if (sw == NULL) {
 			mutex_unlock(&switch_list_lock);
-			pr_warn("PCI: can't allocate memory"
+			pr_warn("PCI: can't allocate memory "
 				"for sw of IO multiplexing %s",
 				pci_name(pdev));
 			return;

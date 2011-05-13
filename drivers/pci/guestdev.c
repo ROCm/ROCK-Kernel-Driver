@@ -524,8 +524,9 @@ static int __init pci_parse_guestdev(void)
 	list_for_each(head, &guestdev_list) {
 		gdev = list_entry(head, struct guestdev, root_list);
 		pci_make_guestdev_str(gdev, path_str, GUESTDEV_STR_MAX);
-		pr_debug("PCI: %s has been reserved for guest domain.\n",
-			 path_str);
+		printk(KERN_DEBUG
+			"PCI: %s has been reserved for guest domain.\n",
+			path_str);
 	}
 	return 0;
 }

@@ -397,8 +397,8 @@ static int xencdrom_block_ioctl(struct block_device *bd, fmode_t mode,
 		ret = submit_cdrom_cmd(info, (struct packet_command *)arg);
 		break;
 	default:
-out:
 		spin_unlock(&vcd->vcd_cdrom_info_lock);
+out:
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,28)
 		return blkif_ioctl(inode, file, cmd, arg);
 #else

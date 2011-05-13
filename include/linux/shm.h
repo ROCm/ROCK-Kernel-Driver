@@ -14,7 +14,7 @@
  * be increased by sysctl
  */
 
-#define SHMMAX ULONG_MAX		 /* max shared seg size (bytes) */
+#define SHMMAX 0x2000000		 /* max shared seg size (bytes) */
 #define SHMMIN 1			 /* min shared seg size (bytes) */
 #define SHMMNI 4096			 /* max num of segs system wide */
 #ifdef __KERNEL__

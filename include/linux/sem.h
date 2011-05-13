@@ -63,7 +63,7 @@ struct  seminfo {
 	int semaem;
 };
 
-#define SEMMNI  1024            /* <= IPCMNI  max # of semaphore identifiers */
+#define SEMMNI  128             /* <= IPCMNI  max # of semaphore identifiers */
 #define SEMMSL  250             /* <= 8 000 max num of semaphores per id */
 #define SEMMNS  (SEMMNI*SEMMSL) /* <= INT_MAX max # of semaphores in system */
 #define SEMOPM  32	        /* <= 1 000 max num of ops per semop call */
