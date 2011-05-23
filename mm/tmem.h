@@ -25,7 +25,7 @@ struct tmem_oid {
 
 extern int xen_tmem_op(u32 tmem_cmd, u32 tmem_pool, struct tmem_oid, u32 index,
 	unsigned long gmfn, u32 tmem_offset, u32 pfn_offset, u32 len);
-extern int xen_tmem_new_pool(struct tmem_pool_uuid, u32 flags);
+extern int xen_tmem_new_pool(u32 tmem_cmd, struct tmem_pool_uuid, u32 flags);
 
 static inline int tmem_put_page(u32 pool_id, struct tmem_oid oid, u32 index,
 	unsigned long gmfn)
@@ -59,7 +59,7 @@ static inline int tmem_new_pool(u64 uuid_lo, u64 uuid_hi, u32 flags)
 	BUILD_BUG_ON((TMEM_POOL_PAGEORDER < 0) ||
 		(TMEM_POOL_PAGEORDER >= TMEM_POOL_PAGESIZE_MASK));
 	flags |= TMEM_POOL_PAGEORDER << TMEM_POOL_PAGESIZE_SHIFT;
-	return xen_tmem_new_pool(uuid, flags);
+	return xen_tmem_new_pool(TMEM_NEW_POOL, uuid, flags);
 }
 
 static inline int tmem_destroy_pool(u32 pool_id)

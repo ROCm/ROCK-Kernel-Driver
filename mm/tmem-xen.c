@@ -28,14 +28,15 @@ int xen_tmem_op(u32 tmem_cmd, u32 tmem_pool, struct tmem_oid oid, u32 index,
 	return rc;
 }
 
-int xen_tmem_new_pool(struct tmem_pool_uuid uuid, uint32_t flags)
+int xen_tmem_new_pool(uint32_t tmem_cmd, struct tmem_pool_uuid uuid,
+	uint32_t flags)
 {
 	struct tmem_op op;
 	int rc = 0;
 
-	op.cmd = TMEM_NEW_POOL;
-	op.u.new.uuid[0] = uuid.lo;
-	op.u.new.uuid[1] = uuid.hi;
+	op.cmd = tmem_cmd;
+	op.u.creat.uuid[0] = uuid.lo;
+	op.u.creat.uuid[1] = uuid.hi;
 #ifdef TMEM_SPEC_VERSION
 	switch (flags >> TMEM_POOL_VERSION_SHIFT) {
 	case 0:
@@ -49,7 +50,7 @@ int xen_tmem_new_pool(struct tmem_pool_uuid uuid, uint32_t flags)
 		return -ENOSYS;
 	}
 #endif
-	op.u.new.flags = flags;
+	op.u.creat.flags = flags;
 	rc = HYPERVISOR_tmem_op(&op);
 	return rc;
 }

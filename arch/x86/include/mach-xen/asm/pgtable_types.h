@@ -358,6 +358,8 @@ int phys_mem_access_prot_allowed(struct file *file, unsigned long pfn,
 /* Install a pte for a particular vaddr in kernel space. */
 void set_pte_vaddr(unsigned long vaddr, pte_t pte);
 
+extern void xen_pagetable_reserve(u64 start, u64 end);
+
 struct seq_file;
 extern void arch_report_meminfo(struct seq_file *m);
 

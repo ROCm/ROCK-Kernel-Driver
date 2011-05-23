@@ -699,6 +699,10 @@ static void __init early_identify_cpu(struct cpuinfo_x86 *c)
 	get_cpu_vendor(c);
 
 	get_cpu_cap(c);
+#ifdef CONFIG_XEN
+	if (!cpu_has_xsave)
+		x86_xsave_setup(NULL);
+#endif
 
 	if (this_cpu->c_early_init)
 		this_cpu->c_early_init(c);

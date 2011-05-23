@@ -117,7 +117,6 @@ static struct pci_iomul_slot *pci_iomul_find_slot_locked(
 	return NULL;
 }
 
-static void pci_iomul_switch_get(struct pci_iomul_switch *sw);
 /* on successfull exit, sw->lock is locked for use slot and
  * refrence count of sw is incremented.
  */

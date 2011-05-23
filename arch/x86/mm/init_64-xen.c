@@ -263,11 +263,9 @@ void __init reserve_pgtable_low(void)
 
 		if (!range->nr)
 			break;
-		if (pgt_buf_start <= range->pfn
-		    && pgt_buf_top > range->pfn) {
-			memblock_x86_reserve_range(pgt_buf_start << PAGE_SHIFT,
-						   range->pfn << PAGE_SHIFT,
-						   "PGTABLE");
+		if (pgt_buf_start <= range->pfn && pgt_buf_top > range->pfn) {
+			x86_init.mapping.pagetable_reserve(PFN_PHYS(pgt_buf_start),
+					PFN_PHYS(range->pfn));
 			pgt_buf_start = range->pfn + range->nr;
 		}
 	}

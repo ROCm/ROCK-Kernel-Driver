@@ -59,6 +59,10 @@ struct x86_init_ops x86_init __initdata = {
 		.banner			= x86_init_noop,
 	},
 
+	.mapping = {
+		.pagetable_reserve		= xen_pagetable_reserve,
+	},
+
 	.paging = {
 		.pagetable_setup_start	= x86_init_pgd_noop,
 		.pagetable_setup_done	= x86_init_pgd_noop,

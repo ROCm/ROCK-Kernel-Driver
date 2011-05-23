@@ -518,6 +518,8 @@ netfront_accel_enqueue_skb_multi(netfront_accel_vnic *vnic, struct sk_buff *skb)
 	}
 	
 	rc = ef_vi_transmitv(&vnic->vi, iovecs, state.buffers, dma_id);
+	/* We checked for space already, so it really should succeed */
+	BUG_ON(rc != 0);
 
 	/* Track number of tx fastpath stats */
 	vnic->netdev_stats.fastpath_tx_bytes += skb->len;

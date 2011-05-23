@@ -364,7 +364,7 @@ static void connect(struct blkfront_info *info)
 	}
 
 	err = xenbus_gather(XBT_NIL, info->xbdev->otherend,
-			    "feature-barrier", "%lu", &barrier,
+			    "feature-barrier", "%d", &barrier,
 			    NULL);
 	/*
 	 * If there's no "feature-barrier" defined, then it means
