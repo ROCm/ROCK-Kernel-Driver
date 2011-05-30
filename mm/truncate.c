@@ -294,6 +294,13 @@ void truncate_inode_pages_range(struct address_space *mapping,
 		pagevec_release(&pvec);
 		mem_cgroup_uncharge_end();
 	}
+	/*
+	 * Cycle the tree_lock to make sure all __delete_from_page_cache()
+	 * calls run from page reclaim have finished as well (this handles the
+	 * case when page reclaim took the last page from our range).
+	 */
+	spin_lock_irq(&mapping->tree_lock);
+	spin_unlock_irq(&mapping->tree_lock);
 	precache_flush_inode(mapping);
 }
 EXPORT_SYMBOL(truncate_inode_pages_range);
