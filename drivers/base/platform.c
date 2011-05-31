@@ -192,18 +192,18 @@ EXPORT_SYMBOL_GPL(platform_device_alloc);
 int platform_device_add_resources(struct platform_device *pdev,
 				  const struct resource *res, unsigned int num)
 {
-	struct resource *r = NULL;
+	struct resource *r;
 
-	if (res) {
-		r = kmemdup(res, sizeof(struct resource) * num, GFP_KERNEL);
-		if (!r)
-			return -ENOMEM;
+	if (!res)
+		return 0;
+
+	r = kmemdup(res, sizeof(struct resource) * num, GFP_KERNEL);
+	if (r) {
+		pdev->resource = r;
+		pdev->num_resources = num;
+		return 0;
 	}
-
-	kfree(pdev->resource);
-	pdev->resource = r;
-	pdev->num_resources = num;
-	return 0;
+	return -ENOMEM;
 }
 EXPORT_SYMBOL_GPL(platform_device_add_resources);
 
@@ -220,17 +220,17 @@ EXPORT_SYMBOL_GPL(platform_device_add_resources);
 int platform_device_add_data(struct platform_device *pdev, const void *data,
 			     size_t size)
 {
-	void *d = NULL;
+	void *d;
 
-	if (data) {
-		d = kmemdup(data, size, GFP_KERNEL);
-		if (!d)
-			return -ENOMEM;
+	if (!data)
+		return 0;
+
+	d = kmemdup(data, size, GFP_KERNEL);
+	if (d) {
+		pdev->dev.platform_data = d;
+		return 0;
 	}
-
-	kfree(pdev->dev.platform_data);
-	pdev->dev.platform_data = d;
-	return 0;
+	return -ENOMEM;
 }
 EXPORT_SYMBOL_GPL(platform_device_add_data);
 
@@ -667,7 +667,7 @@ static int platform_legacy_resume(struct device *dev)
 	return ret;
 }
 
-int platform_pm_prepare(struct device *dev)
+static int platform_pm_prepare(struct device *dev)
 {
 	struct device_driver *drv = dev->driver;
 	int ret = 0;
@@ -678,7 +678,7 @@ int platform_pm_prepare(struct device *dev)
 	return ret;
 }
 
-void platform_pm_complete(struct device *dev)
+static void platform_pm_complete(struct device *dev)
 {
 	struct device_driver *drv = dev->driver;
 
@@ -686,11 +686,16 @@ void platform_pm_complete(struct device *dev)
 		drv->pm->complete(dev);
 }
 
-#endif /* CONFIG_PM_SLEEP */
+#else /* !CONFIG_PM_SLEEP */
+
+#define platform_pm_prepare		NULL
+#define platform_pm_complete		NULL
+
+#endif /* !CONFIG_PM_SLEEP */
 
 #ifdef CONFIG_SUSPEND
 
-int platform_pm_suspend(struct device *dev)
+int __weak platform_pm_suspend(struct device *dev)
 {
 	struct device_driver *drv = dev->driver;
 	int ret = 0;
@@ -708,7 +713,7 @@ int platform_pm_suspend(struct device *dev)
 	return ret;
 }
 
-int platform_pm_suspend_noirq(struct device *dev)
+int __weak platform_pm_suspend_noirq(struct device *dev)
 {
 	struct device_driver *drv = dev->driver;
 	int ret = 0;
@@ -724,7 +729,7 @@ int platform_pm_suspend_noirq(struct device *dev)
 	return ret;
 }
 
-int platform_pm_resume(struct device *dev)
+int __weak platform_pm_resume(struct device *dev)
 {
 	struct device_driver *drv = dev->driver;
 	int ret = 0;
@@ -742,7 +747,7 @@ int platform_pm_resume(struct device *dev)
 	return ret;
 }
 
-int platform_pm_resume_noirq(struct device *dev)
+int __weak platform_pm_resume_noirq(struct device *dev)
 {
 	struct device_driver *drv = dev->driver;
 	int ret = 0;
@@ -758,11 +763,18 @@ int platform_pm_resume_noirq(struct device *dev)
 	return ret;
 }
 
-#endif /* CONFIG_SUSPEND */
+#else /* !CONFIG_SUSPEND */
+
+#define platform_pm_suspend		NULL
+#define platform_pm_resume		NULL
+#define platform_pm_suspend_noirq	NULL
+#define platform_pm_resume_noirq	NULL
+
+#endif /* !CONFIG_SUSPEND */
 
 #ifdef CONFIG_HIBERNATE_CALLBACKS
 
-int platform_pm_freeze(struct device *dev)
+static int platform_pm_freeze(struct device *dev)
 {
 	struct device_driver *drv = dev->driver;
 	int ret = 0;
@@ -780,7 +792,7 @@ int platform_pm_freeze(struct device *dev)
 	return ret;
 }
 
-int platform_pm_freeze_noirq(struct device *dev)
+static int platform_pm_freeze_noirq(struct device *dev)
 {
 	struct device_driver *drv = dev->driver;
 	int ret = 0;
@@ -796,7 +808,7 @@ int platform_pm_freeze_noirq(struct device *dev)
 	return ret;
 }
 
-int platform_pm_thaw(struct device *dev)
+static int platform_pm_thaw(struct device *dev)
 {
 	struct device_driver *drv = dev->driver;
 	int ret = 0;
@@ -814,7 +826,7 @@ int platform_pm_thaw(struct device *dev)
 	return ret;
 }
 
-int platform_pm_thaw_noirq(struct device *dev)
+static int platform_pm_thaw_noirq(struct device *dev)
 {
 	struct device_driver *drv = dev->driver;
 	int ret = 0;
@@ -830,7 +842,7 @@ int platform_pm_thaw_noirq(struct device *dev)
 	return ret;
 }
 
-int platform_pm_poweroff(struct device *dev)
+static int platform_pm_poweroff(struct device *dev)
 {
 	struct device_driver *drv = dev->driver;
 	int ret = 0;
@@ -848,7 +860,7 @@ int platform_pm_poweroff(struct device *dev)
 	return ret;
 }
 
-int platform_pm_poweroff_noirq(struct device *dev)
+static int platform_pm_poweroff_noirq(struct device *dev)
 {
 	struct device_driver *drv = dev->driver;
 	int ret = 0;
@@ -864,7 +876,7 @@ int platform_pm_poweroff_noirq(struct device *dev)
 	return ret;
 }
 
-int platform_pm_restore(struct device *dev)
+static int platform_pm_restore(struct device *dev)
 {
 	struct device_driver *drv = dev->driver;
 	int ret = 0;
@@ -882,7 +894,7 @@ int platform_pm_restore(struct device *dev)
 	return ret;
 }
 
-int platform_pm_restore_noirq(struct device *dev)
+static int platform_pm_restore_noirq(struct device *dev)
 {
 	struct device_driver *drv = dev->driver;
 	int ret = 0;
@@ -898,13 +910,62 @@ int platform_pm_restore_noirq(struct device *dev)
 	return ret;
 }
 
-#endif /* CONFIG_HIBERNATE_CALLBACKS */
+#else /* !CONFIG_HIBERNATE_CALLBACKS */
+
+#define platform_pm_freeze		NULL
+#define platform_pm_thaw		NULL
+#define platform_pm_poweroff		NULL
+#define platform_pm_restore		NULL
+#define platform_pm_freeze_noirq	NULL
+#define platform_pm_thaw_noirq		NULL
+#define platform_pm_poweroff_noirq	NULL
+#define platform_pm_restore_noirq	NULL
+
+#endif /* !CONFIG_HIBERNATE_CALLBACKS */
+
+#ifdef CONFIG_PM_RUNTIME
+
+int __weak platform_pm_runtime_suspend(struct device *dev)
+{
+	return pm_generic_runtime_suspend(dev);
+};
+
+int __weak platform_pm_runtime_resume(struct device *dev)
+{
+	return pm_generic_runtime_resume(dev);
+};
+
+int __weak platform_pm_runtime_idle(struct device *dev)
+{
+	return pm_generic_runtime_idle(dev);
+};
+
+#else /* !CONFIG_PM_RUNTIME */
+
+#define platform_pm_runtime_suspend NULL
+#define platform_pm_runtime_resume NULL
+#define platform_pm_runtime_idle NULL
+
+#endif /* !CONFIG_PM_RUNTIME */
 
 static const struct dev_pm_ops platform_dev_pm_ops = {
-	.runtime_suspend = pm_generic_runtime_suspend,
-	.runtime_resume = pm_generic_runtime_resume,
-	.runtime_idle = pm_generic_runtime_idle,
-	USE_PLATFORM_PM_SLEEP_OPS
+	.prepare = platform_pm_prepare,
+	.complete = platform_pm_complete,
+	.suspend = platform_pm_suspend,
+	.resume = platform_pm_resume,
+	.freeze = platform_pm_freeze,
+	.thaw = platform_pm_thaw,
+	.poweroff = platform_pm_poweroff,
+	.restore = platform_pm_restore,
+	.suspend_noirq = platform_pm_suspend_noirq,
+	.resume_noirq = platform_pm_resume_noirq,
+	.freeze_noirq = platform_pm_freeze_noirq,
+	.thaw_noirq = platform_pm_thaw_noirq,
+	.poweroff_noirq = platform_pm_poweroff_noirq,
+	.restore_noirq = platform_pm_restore_noirq,
+	.runtime_suspend = platform_pm_runtime_suspend,
+	.runtime_resume = platform_pm_runtime_resume,
+	.runtime_idle = platform_pm_runtime_idle,
 };
 
 struct bus_type platform_bus_type = {
@@ -915,6 +976,41 @@ struct bus_type platform_bus_type = {
 	.pm		= &platform_dev_pm_ops,
 };
 EXPORT_SYMBOL_GPL(platform_bus_type);
+
+/**
+ * platform_bus_get_pm_ops() - return pointer to busses dev_pm_ops
+ *
+ * This function can be used by platform code to get the current
+ * set of dev_pm_ops functions used by the platform_bus_type.
+ */
+const struct dev_pm_ops * __init platform_bus_get_pm_ops(void)
+{
+	return platform_bus_type.pm;
+}
+
+/**
+ * platform_bus_set_pm_ops() - update dev_pm_ops for the platform_bus_type
+ *
+ * @pm: pointer to new dev_pm_ops struct to be used for platform_bus_type
+ *
+ * Platform code can override the dev_pm_ops methods of
+ * platform_bus_type by using this function.  It is expected that
+ * platform code will first do a platform_bus_get_pm_ops(), then
+ * kmemdup it, then customize selected methods and pass a pointer to
+ * the new struct dev_pm_ops to this function.
+ *
+ * Since platform-specific code is customizing methods for *all*
+ * devices (not just platform-specific devices) it is expected that
+ * any custom overrides of these functions will keep existing behavior
+ * and simply extend it.  For example, any customization of the
+ * runtime PM methods should continue to call the pm_generic_*
+ * functions as the default ones do in addition to the
+ * platform-specific behavior.
+ */
+void __init platform_bus_set_pm_ops(const struct dev_pm_ops *pm)
+{
+	platform_bus_type.pm = pm;
+}
 
 int __init platform_bus_init(void)
 {

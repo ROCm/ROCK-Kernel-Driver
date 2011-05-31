@@ -205,7 +205,6 @@ static void fc_disc_recv_req(struct fc_lport *lport, struct fc_frame *fp)
 	default:
 		FC_DISC_DBG(disc, "Received an unsupported request, "
 			    "the opcode is (%x)\n", op);
-		fc_frame_free(fp);
 		break;
 	}
 }

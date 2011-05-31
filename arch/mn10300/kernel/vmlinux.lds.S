@@ -70,7 +70,7 @@ SECTIONS
 	.exit.text : { EXIT_TEXT; }
 	.exit.data : { EXIT_DATA; }
 
-  PERCPU_SECTION(32)
+  PERCPU(32, PAGE_SIZE)
   . = ALIGN(PAGE_SIZE);
   __init_end = .;
   /* freed after init ends here */

@@ -106,6 +106,17 @@ static ssize_t ad5446_show_scale(struct device *dev,
 }
 static IIO_DEVICE_ATTR(out_scale, S_IRUGO, ad5446_show_scale, NULL, 0);
 
+static ssize_t ad5446_show_name(struct device *dev,
+				 struct device_attribute *attr,
+				 char *buf)
+{
+	struct iio_dev *dev_info = dev_get_drvdata(dev);
+	struct ad5446_state *st = iio_dev_get_devdata(dev_info);
+
+	return sprintf(buf, "%s\n", spi_get_device_id(st->spi)->name);
+}
+static IIO_DEVICE_ATTR(name, S_IRUGO, ad5446_show_name, NULL, 0);
+
 static ssize_t ad5446_write_powerdown_mode(struct device *dev,
 				       struct device_attribute *attr,
 				       const char *buf, size_t len)
@@ -193,6 +204,7 @@ static struct attribute *ad5446_attributes[] = {
 	&iio_dev_attr_out0_powerdown.dev_attr.attr,
 	&iio_dev_attr_out_powerdown_mode.dev_attr.attr,
 	&iio_const_attr_out_powerdown_mode_available.dev_attr.attr,
+	&iio_dev_attr_name.dev_attr.attr,
 	NULL,
 };
 
@@ -232,12 +244,6 @@ static const struct ad5446_chip_info ad5446_chip_info_tbl[] = {
 		.storagebits = 16,
 		.left_shift = 0,
 		.store_sample = ad5446_store_sample,
-	},
-	[ID_AD5541A] = {
-		.bits = 16,
-		.storagebits = 16,
-		.left_shift = 0,
-		.store_sample = ad5542_store_sample,
 	},
 	[ID_AD5542A] = {
 		.bits = 16,
@@ -334,11 +340,6 @@ static const struct ad5446_chip_info ad5446_chip_info_tbl[] = {
 	},
 };
 
-static const struct iio_info ad5446_info = {
-	.attrs = &ad5446_attribute_group,
-	.driver_module = THIS_MODULE,
-};
-
 static int __devinit ad5446_probe(struct spi_device *spi)
 {
 	struct ad5446_state *st;
@@ -366,7 +367,7 @@ static int __devinit ad5446_probe(struct spi_device *spi)
 
 	st->spi = spi;
 
-	st->indio_dev = iio_allocate_device(0);
+	st->indio_dev = iio_allocate_device();
 	if (st->indio_dev == NULL) {
 		ret = -ENOMEM;
 		goto error_disable_reg;
@@ -374,9 +375,9 @@ static int __devinit ad5446_probe(struct spi_device *spi)
 
 	/* Estabilish that the iio_dev is a child of the spi device */
 	st->indio_dev->dev.parent = &spi->dev;
-	st->indio_dev->name = spi_get_device_id(spi)->name;
-	st->indio_dev->info = &ad5446_info;
+	st->indio_dev->attrs = &ad5446_attribute_group;
 	st->indio_dev->dev_data = (void *)(st);
+	st->indio_dev->driver_module = THIS_MODULE;
 	st->indio_dev->modes = INDIO_DIRECT_MODE;
 
 	/* Setup default message */
@@ -441,7 +442,6 @@ static const struct spi_device_id ad5446_id[] = {
 	{"ad5444", ID_AD5444},
 	{"ad5446", ID_AD5446},
 	{"ad5512a", ID_AD5512A},
-	{"ad5541a", ID_AD5541A},
 	{"ad5542a", ID_AD5542A},
 	{"ad5543", ID_AD5543},
 	{"ad5553", ID_AD5553},

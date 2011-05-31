@@ -177,6 +177,7 @@ static struct clocksource clocksource_apbt = {
 	.rating		= APBT_CLOCKSOURCE_RATING,
 	.read		= apbt_read_clocksource,
 	.mask		= APBT_MASK,
+	.shift		= APBT_SHIFT,
 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
 	.resume		= apbt_restart_clocksource,
 };
@@ -542,7 +543,14 @@ static int apbt_clocksource_register(void)
 	if (t1 == apbt_read_clocksource(&clocksource_apbt))
 		panic("APBT counter not counting. APBT disabled\n");
 
-	clocksource_register_khz(&clocksource_apbt, (u32)apbt_freq*1000);
+	/*
+	 * initialize and register APBT clocksource
+	 * convert that to ns/clock cycle
+	 * mult = (ns/c) * 2^APBT_SHIFT
+	 */
+	clocksource_apbt.mult = div_sc(MSEC_PER_SEC,
+				       (unsigned long) apbt_freq, APBT_SHIFT);
+	clocksource_register(&clocksource_apbt);
 
 	return 0;
 }

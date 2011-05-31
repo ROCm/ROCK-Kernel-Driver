@@ -684,10 +684,9 @@ static int __init lart_flash_init (void)
 #endif
 
 #ifndef HAVE_PARTITIONS
-   result = mtd_device_register(&mtd, NULL, 0);
+   result = add_mtd_device (&mtd);
 #else
-   result = mtd_device_register(&mtd, lart_partitions,
-                                ARRAY_SIZE(lart_partitions));
+   result = add_mtd_partitions (&mtd,lart_partitions, ARRAY_SIZE(lart_partitions));
 #endif
 
    return (result);
@@ -696,9 +695,9 @@ static int __init lart_flash_init (void)
 static void __exit lart_flash_exit (void)
 {
 #ifndef HAVE_PARTITIONS
-   mtd_device_unregister(&mtd);
+   del_mtd_device (&mtd);
 #else
-   mtd_device_unregister(&mtd);
+   del_mtd_partitions (&mtd);
 #endif
 }
 

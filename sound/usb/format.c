@@ -30,7 +30,6 @@
 #include "helper.h"
 #include "debug.h"
 #include "clock.h"
-#include "format.h"
 
 /*
  * parse the audio format type I descriptor

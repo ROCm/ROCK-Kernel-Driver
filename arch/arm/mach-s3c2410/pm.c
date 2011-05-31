@@ -25,7 +25,6 @@
 #include <linux/errno.h>
 #include <linux/time.h>
 #include <linux/sysdev.h>
-#include <linux/syscore_ops.h>
 #include <linux/gpio.h>
 #include <linux/io.h>
 
@@ -93,7 +92,7 @@ static void s3c2410_pm_prepare(void)
 	}
 }
 
-static void s3c2410_pm_resume(void)
+static int s3c2410_pm_resume(struct sys_device *dev)
 {
 	unsigned long tmp;
 
@@ -105,11 +104,9 @@ static void s3c2410_pm_resume(void)
 
 	if ( machine_is_aml_m5900() )
 		s3c2410_gpio_setpin(S3C2410_GPF(2), 0);
-}
 
-struct syscore_ops s3c2410_pm_syscore_ops = {
-	.resume		= s3c2410_pm_resume,
-};
+	return 0;
+}
 
 static int s3c2410_pm_add(struct sys_device *dev)
 {
@@ -122,6 +119,7 @@ static int s3c2410_pm_add(struct sys_device *dev)
 #if defined(CONFIG_CPU_S3C2410)
 static struct sysdev_driver s3c2410_pm_driver = {
 	.add		= s3c2410_pm_add,
+	.resume		= s3c2410_pm_resume,
 };
 
 /* register ourselves */
@@ -135,6 +133,7 @@ arch_initcall(s3c2410_pm_drvinit);
 
 static struct sysdev_driver s3c2410a_pm_driver = {
 	.add		= s3c2410_pm_add,
+	.resume		= s3c2410_pm_resume,
 };
 
 static int __init s3c2410a_pm_drvinit(void)
@@ -148,6 +147,7 @@ arch_initcall(s3c2410a_pm_drvinit);
 #if defined(CONFIG_CPU_S3C2440)
 static struct sysdev_driver s3c2440_pm_driver = {
 	.add		= s3c2410_pm_add,
+	.resume		= s3c2410_pm_resume,
 };
 
 static int __init s3c2440_pm_drvinit(void)
@@ -161,6 +161,7 @@ arch_initcall(s3c2440_pm_drvinit);
 #if defined(CONFIG_CPU_S3C2442)
 static struct sysdev_driver s3c2442_pm_driver = {
 	.add		= s3c2410_pm_add,
+	.resume		= s3c2410_pm_resume,
 };
 
 static int __init s3c2442_pm_drvinit(void)

@@ -67,9 +67,9 @@ struct kparam_string {
 struct kparam_array
 {
 	unsigned int max;
-	unsigned int elemsize;
 	unsigned int *num;
 	const struct kernel_param_ops *ops;
+	unsigned int elemsize;
 	void *elem;
 };
 
@@ -371,9 +371,8 @@ extern int param_get_invbool(char *buffer, const struct kernel_param *kp);
  */
 #define module_param_array_named(name, array, type, nump, perm)		\
 	static const struct kparam_array __param_arr_##name		\
-	= { .max = ARRAY_SIZE(array), .num = nump,                      \
-	    .ops = &param_ops_##type,					\
-	    .elemsize = sizeof(array[0]), .elem = array };		\
+	= { ARRAY_SIZE(array), nump, &param_ops_##type,			\
+	    sizeof(array[0]), array };					\
 	__module_param_call(MODULE_PARAM_PREFIX, name,			\
 			    &param_array_ops,				\
 			    .arr = &__param_arr_##name,			\

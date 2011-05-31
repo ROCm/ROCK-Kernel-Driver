@@ -591,11 +591,10 @@ static void etherh_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *i
 static int etherh_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 {
 	cmd->supported	= etherh_priv(dev)->supported;
-	ethtool_cmd_speed_set(cmd, SPEED_10);
+	cmd->speed	= SPEED_10;
 	cmd->duplex	= DUPLEX_HALF;
 	cmd->port	= dev->if_port == IF_PORT_10BASET ? PORT_TP : PORT_BNC;
-	cmd->autoneg	= (dev->flags & IFF_AUTOMEDIA ?
-			   AUTONEG_ENABLE : AUTONEG_DISABLE);
+	cmd->autoneg	= dev->flags & IFF_AUTOMEDIA ? AUTONEG_ENABLE : AUTONEG_DISABLE;
 	return 0;
 }
 

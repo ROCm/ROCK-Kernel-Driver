@@ -18,46 +18,38 @@
 
 static struct xfrm_policy_afinfo xfrm4_policy_afinfo;
 
-static struct dst_entry *__xfrm4_dst_lookup(struct net *net, struct flowi4 *fl4,
-					    int tos,
-					    const xfrm_address_t *saddr,
-					    const xfrm_address_t *daddr)
+static struct dst_entry *xfrm4_dst_lookup(struct net *net, int tos,
+					  const xfrm_address_t *saddr,
+					  const xfrm_address_t *daddr)
 {
+	struct flowi4 fl4 = {
+		.daddr = daddr->a4,
+		.flowi4_tos = tos,
+	};
 	struct rtable *rt;
 
-	memset(fl4, 0, sizeof(*fl4));
-	fl4->daddr = daddr->a4;
-	fl4->flowi4_tos = tos;
 	if (saddr)
-		fl4->saddr = saddr->a4;
+		fl4.saddr = saddr->a4;
 
-	rt = __ip_route_output_key(net, fl4);
+	rt = __ip_route_output_key(net, &fl4);
 	if (!IS_ERR(rt))
 		return &rt->dst;
 
 	return ERR_CAST(rt);
 }
 
-static struct dst_entry *xfrm4_dst_lookup(struct net *net, int tos,
-					  const xfrm_address_t *saddr,
-					  const xfrm_address_t *daddr)
-{
-	struct flowi4 fl4;
-
-	return __xfrm4_dst_lookup(net, &fl4, tos, saddr, daddr);
-}
-
 static int xfrm4_get_saddr(struct net *net,
 			   xfrm_address_t *saddr, xfrm_address_t *daddr)
 {
 	struct dst_entry *dst;
-	struct flowi4 fl4;
+	struct rtable *rt;
 
-	dst = __xfrm4_dst_lookup(net, &fl4, 0, NULL, daddr);
+	dst = xfrm4_dst_lookup(net, 0, NULL, daddr);
 	if (IS_ERR(dst))
 		return -EHOSTUNREACH;
 
-	saddr->a4 = fl4.saddr;
+	rt = (struct rtable *)dst;
+	saddr->a4 = rt->rt_src;
 	dst_release(dst);
 	return 0;
 }
@@ -81,7 +73,7 @@ static int xfrm4_fill_dst(struct xfrm_dst *xdst, struct net_device *dev,
 
 	rt->rt_key_dst = fl4->daddr;
 	rt->rt_key_src = fl4->saddr;
-	rt->rt_key_tos = fl4->flowi4_tos;
+	rt->rt_tos = fl4->flowi4_tos;
 	rt->rt_route_iif = fl4->flowi4_iif;
 	rt->rt_iif = fl4->flowi4_iif;
 	rt->rt_oif = fl4->flowi4_oif;
@@ -110,7 +102,7 @@ static int xfrm4_fill_dst(struct xfrm_dst *xdst, struct net_device *dev,
 static void
 _decode_session4(struct sk_buff *skb, struct flowi *fl, int reverse)
 {
-	const struct iphdr *iph = ip_hdr(skb);
+	struct iphdr *iph = ip_hdr(skb);
 	u8 *xprth = skb_network_header(skb) + iph->ihl * 4;
 	struct flowi4 *fl4 = &fl->u.ip4;
 

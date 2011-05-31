@@ -203,7 +203,7 @@ struct dst_entry *__inet6_csk_dst_check(struct sock *sk, u32 cookie)
 	return dst;
 }
 
-int inet6_csk_xmit(struct sk_buff *skb, struct flowi *fl_unused)
+int inet6_csk_xmit(struct sk_buff *skb)
 {
 	struct sock *sk = skb->sk;
 	struct inet_sock *inet = inet_sk(sk);

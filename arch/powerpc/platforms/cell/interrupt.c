@@ -176,14 +176,14 @@ EXPORT_SYMBOL_GPL(iic_get_target_id);
 #ifdef CONFIG_SMP
 
 /* Use the highest interrupt priorities for IPI */
-static inline int iic_msg_to_irq(int msg)
+static inline int iic_ipi_to_irq(int ipi)
 {
-	return IIC_IRQ_TYPE_IPI + 0xf - msg;
+	return IIC_IRQ_TYPE_IPI + 0xf - ipi;
 }
 
-void iic_message_pass(int cpu, int msg)
+void iic_cause_IPI(int cpu, int mesg)
 {
-	out_be64(&per_cpu(cpu_iic, cpu).regs->generate, (0xf - msg) << 4);
+	out_be64(&per_cpu(cpu_iic, cpu).regs->generate, (0xf - mesg) << 4);
 }
 
 struct irq_host *iic_get_irq_host(int node)
@@ -192,31 +192,38 @@ struct irq_host *iic_get_irq_host(int node)
 }
 EXPORT_SYMBOL_GPL(iic_get_irq_host);
 
-static void iic_request_ipi(int msg)
+static irqreturn_t iic_ipi_action(int irq, void *dev_id)
+{
+	int ipi = (int)(long)dev_id;
+
+	smp_message_recv(ipi);
+
+	return IRQ_HANDLED;
+}
+static void iic_request_ipi(int ipi, const char *name)
 {
 	int virq;
 
-	virq = irq_create_mapping(iic_host, iic_msg_to_irq(msg));
+	virq = irq_create_mapping(iic_host, iic_ipi_to_irq(ipi));
 	if (virq == NO_IRQ) {
 		printk(KERN_ERR
-		       "iic: failed to map IPI %s\n", smp_ipi_name[msg]);
+		       "iic: failed to map IPI %s\n", name);
 		return;
 	}
-
-	/*
-	 * If smp_request_message_ipi encounters an error it will notify
-	 * the error.  If a message is not needed it will return non-zero.
-	 */
-	if (smp_request_message_ipi(virq, msg))
-		irq_dispose_mapping(virq);
+	if (request_irq(virq, iic_ipi_action, IRQF_DISABLED, name,
+			(void *)(long)ipi))
+		printk(KERN_ERR
+		       "iic: failed to request IPI %s\n", name);
 }
 
 void iic_request_IPIs(void)
 {
-	iic_request_ipi(PPC_MSG_CALL_FUNCTION);
-	iic_request_ipi(PPC_MSG_RESCHEDULE);
-	iic_request_ipi(PPC_MSG_CALL_FUNC_SINGLE);
-	iic_request_ipi(PPC_MSG_DEBUGGER_BREAK);
+	iic_request_ipi(PPC_MSG_CALL_FUNCTION, "IPI-call");
+	iic_request_ipi(PPC_MSG_RESCHEDULE, "IPI-resched");
+	iic_request_ipi(PPC_MSG_CALL_FUNC_SINGLE, "IPI-call-single");
+#ifdef CONFIG_DEBUGGER
+	iic_request_ipi(PPC_MSG_DEBUGGER_BREAK, "IPI-debug");
+#endif /* CONFIG_DEBUGGER */
 }
 
 #endif /* CONFIG_SMP */

@@ -182,7 +182,6 @@ struct s3c_fb_vsync {
 
 /**
  * struct s3c_fb - overall hardware state of the hardware
- * @slock: The spinlock protection for this data sturcture.
  * @dev: The device that we bound to, for printing, etc.
  * @regs_res: The resource we claimed for the IO registers.
  * @bus_clk: The clk (hclk) feeding our interface and possibly pixclk.
@@ -196,7 +195,6 @@ struct s3c_fb_vsync {
  * @vsync_info: VSYNC-related information (count, queues...)
  */
 struct s3c_fb {
-	spinlock_t		slock;
 	struct device		*dev;
 	struct resource		*regs_res;
 	struct clk		*bus_clk;
@@ -302,7 +300,6 @@ static int s3c_fb_check_var(struct fb_var_screeninfo *var,
 		var->blue.length	= 5;
 		break;
 
-	case 32:
 	case 28:
 	case 25:
 		var->transp.length	= var->bits_per_pixel - 24;
@@ -311,6 +308,7 @@ static int s3c_fb_check_var(struct fb_var_screeninfo *var,
 	case 24:
 		/* our 24bpp is unpacked, so 32bpp */
 		var->bits_per_pixel	= 32;
+	case 32:
 		var->red.offset		= 16;
 		var->red.length		= 8;
 		var->green.offset	= 8;
@@ -949,8 +947,6 @@ static irqreturn_t s3c_fb_irq(int irq, void *dev_id)
 	void __iomem  *regs = sfb->regs;
 	u32 irq_sts_reg;
 
-	spin_lock(&sfb->slock);
-
 	irq_sts_reg = readl(regs + VIDINTCON1);
 
 	if (irq_sts_reg & VIDINTCON1_INT_FRAME) {
@@ -967,7 +963,6 @@ static irqreturn_t s3c_fb_irq(int irq, void *dev_id)
 	 */
 	s3c_fb_disable_irq(sfb);
 
-	spin_unlock(&sfb->slock);
 	return IRQ_HANDLED;
 }
 
@@ -1344,8 +1339,6 @@ static int __devinit s3c_fb_probe(struct platform_device *pdev)
 	sfb->pdata = pd;
 	sfb->variant = fbdrv->variant;
 
-	spin_lock_init(&sfb->slock);
-
 	sfb->bus_clk = clk_get(dev, "lcd");
 	if (IS_ERR(sfb->bus_clk)) {
 		dev_err(dev, "failed to get bus clock\n");
@@ -1449,7 +1442,8 @@ err_ioremap:
 	iounmap(sfb->regs);
 
 err_req_region:
-	release_mem_region(sfb->regs_res->start, resource_size(sfb->regs_res));
+	release_resource(sfb->regs_res);
+	kfree(sfb->regs_res);
 
 err_clk:
 	clk_disable(sfb->bus_clk);
@@ -1485,7 +1479,8 @@ static int __devexit s3c_fb_remove(struct platform_device *pdev)
 	clk_disable(sfb->bus_clk);
 	clk_put(sfb->bus_clk);
 
-	release_mem_region(sfb->regs_res->start, resource_size(sfb->regs_res));
+	release_resource(sfb->regs_res);
+	kfree(sfb->regs_res);
 
 	kfree(sfb);
 
@@ -1526,8 +1521,7 @@ static int s3c_fb_resume(struct device *dev)
 
 	clk_enable(sfb->bus_clk);
 
-	/* setup gpio and output polarity controls */
-	pd->setup_gpio();
+	/* setup registers */
 	writel(pd->vidcon1, sfb->regs + VIDCON1);
 
 	/* zero all windows before we do anything */
@@ -1555,7 +1549,7 @@ static int s3c_fb_resume(struct device *dev)
 	return 0;
 }
 
-static int s3c_fb_runtime_suspend(struct device *dev)
+int s3c_fb_runtime_suspend(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct s3c_fb *sfb = platform_get_drvdata(pdev);
@@ -1575,7 +1569,7 @@ static int s3c_fb_runtime_suspend(struct device *dev)
 	return 0;
 }
 
-static int s3c_fb_runtime_resume(struct device *dev)
+int s3c_fb_runtime_resume(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct s3c_fb *sfb = platform_get_drvdata(pdev);
@@ -1585,8 +1579,7 @@ static int s3c_fb_runtime_resume(struct device *dev)
 
 	clk_enable(sfb->bus_clk);
 
-	/* setup gpio and output polarity controls */
-	pd->setup_gpio();
+	/* setup registers */
 	writel(pd->vidcon1, sfb->regs + VIDCON1);
 
 	/* zero all windows before we do anything */
@@ -1630,31 +1623,28 @@ static struct s3c_fb_win_variant s3c_fb_data_64xx_wins[] = {
 		.has_osd_c	= 1,
 		.osd_size_off	= 0x8,
 		.palette_sz	= 256,
-		.valid_bpp	= (VALID_BPP1248 | VALID_BPP(16) |
-				   VALID_BPP(18) | VALID_BPP(24)),
+		.valid_bpp	= VALID_BPP1248 | VALID_BPP(16) | VALID_BPP(24),
 	},
 	[1] = {
 		.has_osd_c	= 1,
 		.has_osd_d	= 1,
-		.osd_size_off	= 0xc,
+		.osd_size_off	= 0x12,
 		.has_osd_alpha	= 1,
 		.palette_sz	= 256,
 		.valid_bpp	= (VALID_BPP1248 | VALID_BPP(16) |
 				   VALID_BPP(18) | VALID_BPP(19) |
-				   VALID_BPP(24) | VALID_BPP(25) |
-				   VALID_BPP(28)),
+				   VALID_BPP(24) | VALID_BPP(25)),
 	},
 	[2] = {
 		.has_osd_c	= 1,
 		.has_osd_d	= 1,
-		.osd_size_off	= 0xc,
+		.osd_size_off	= 0x12,
 		.has_osd_alpha	= 1,
 		.palette_sz	= 16,
 		.palette_16bpp	= 1,
 		.valid_bpp	= (VALID_BPP1248 | VALID_BPP(16) |
 				   VALID_BPP(18) | VALID_BPP(19) |
-				   VALID_BPP(24) | VALID_BPP(25) |
-				   VALID_BPP(28)),
+				   VALID_BPP(24) | VALID_BPP(25)),
 	},
 	[3] = {
 		.has_osd_c	= 1,
@@ -1663,8 +1653,7 @@ static struct s3c_fb_win_variant s3c_fb_data_64xx_wins[] = {
 		.palette_16bpp	= 1,
 		.valid_bpp	= (VALID_BPP124  | VALID_BPP(16) |
 				   VALID_BPP(18) | VALID_BPP(19) |
-				   VALID_BPP(24) | VALID_BPP(25) |
-				   VALID_BPP(28)),
+				   VALID_BPP(24) | VALID_BPP(25)),
 	},
 	[4] = {
 		.has_osd_c	= 1,
@@ -1673,65 +1662,7 @@ static struct s3c_fb_win_variant s3c_fb_data_64xx_wins[] = {
 		.palette_16bpp	= 1,
 		.valid_bpp	= (VALID_BPP(1) | VALID_BPP(2) |
 				   VALID_BPP(16) | VALID_BPP(18) |
-				   VALID_BPP(19) | VALID_BPP(24) |
-				   VALID_BPP(25) | VALID_BPP(28)),
-	},
-};
-
-static struct s3c_fb_win_variant s3c_fb_data_s5p_wins[] = {
-	[0] = {
-		.has_osd_c	= 1,
-		.osd_size_off	= 0x8,
-		.palette_sz	= 256,
-		.valid_bpp	= (VALID_BPP1248 | VALID_BPP(13) |
-				   VALID_BPP(15) | VALID_BPP(16) |
-				   VALID_BPP(18) | VALID_BPP(19) |
-				   VALID_BPP(24) | VALID_BPP(25) |
-				   VALID_BPP(32)),
-	},
-	[1] = {
-		.has_osd_c	= 1,
-		.has_osd_d	= 1,
-		.osd_size_off	= 0xc,
-		.has_osd_alpha	= 1,
-		.palette_sz	= 256,
-		.valid_bpp	= (VALID_BPP1248 | VALID_BPP(13) |
-				   VALID_BPP(15) | VALID_BPP(16) |
-				   VALID_BPP(18) | VALID_BPP(19) |
-				   VALID_BPP(24) | VALID_BPP(25) |
-				   VALID_BPP(32)),
-	},
-	[2] = {
-		.has_osd_c	= 1,
-		.has_osd_d	= 1,
-		.osd_size_off	= 0xc,
-		.has_osd_alpha	= 1,
-		.palette_sz	= 256,
-		.valid_bpp	= (VALID_BPP1248 | VALID_BPP(13) |
-				   VALID_BPP(15) | VALID_BPP(16) |
-				   VALID_BPP(18) | VALID_BPP(19) |
-				   VALID_BPP(24) | VALID_BPP(25) |
-				   VALID_BPP(32)),
-	},
-	[3] = {
-		.has_osd_c	= 1,
-		.has_osd_alpha	= 1,
-		.palette_sz	= 256,
-		.valid_bpp	= (VALID_BPP1248 | VALID_BPP(13) |
-				   VALID_BPP(15) | VALID_BPP(16) |
-				   VALID_BPP(18) | VALID_BPP(19) |
-				   VALID_BPP(24) | VALID_BPP(25) |
-				   VALID_BPP(32)),
-	},
-	[4] = {
-		.has_osd_c	= 1,
-		.has_osd_alpha	= 1,
-		.palette_sz	= 256,
-		.valid_bpp	= (VALID_BPP1248 | VALID_BPP(13) |
-				   VALID_BPP(15) | VALID_BPP(16) |
-				   VALID_BPP(18) | VALID_BPP(19) |
-				   VALID_BPP(24) | VALID_BPP(25) |
-				   VALID_BPP(32)),
+				   VALID_BPP(24) | VALID_BPP(25)),
 	},
 };
 
@@ -1788,11 +1719,11 @@ static struct s3c_fb_driverdata s3c_fb_data_s5pc100 = {
 
 		.has_prtcon	= 1,
 	},
-	.win[0]	= &s3c_fb_data_s5p_wins[0],
-	.win[1]	= &s3c_fb_data_s5p_wins[1],
-	.win[2]	= &s3c_fb_data_s5p_wins[2],
-	.win[3]	= &s3c_fb_data_s5p_wins[3],
-	.win[4]	= &s3c_fb_data_s5p_wins[4],
+	.win[0]	= &s3c_fb_data_64xx_wins[0],
+	.win[1]	= &s3c_fb_data_64xx_wins[1],
+	.win[2]	= &s3c_fb_data_64xx_wins[2],
+	.win[3]	= &s3c_fb_data_64xx_wins[3],
+	.win[4]	= &s3c_fb_data_64xx_wins[4],
 };
 
 static struct s3c_fb_driverdata s3c_fb_data_s5pv210 = {
@@ -1818,11 +1749,11 @@ static struct s3c_fb_driverdata s3c_fb_data_s5pv210 = {
 
 		.has_shadowcon	= 1,
 	},
-	.win[0]	= &s3c_fb_data_s5p_wins[0],
-	.win[1]	= &s3c_fb_data_s5p_wins[1],
-	.win[2]	= &s3c_fb_data_s5p_wins[2],
-	.win[3]	= &s3c_fb_data_s5p_wins[3],
-	.win[4]	= &s3c_fb_data_s5p_wins[4],
+	.win[0]	= &s3c_fb_data_64xx_wins[0],
+	.win[1]	= &s3c_fb_data_64xx_wins[1],
+	.win[2]	= &s3c_fb_data_64xx_wins[2],
+	.win[3]	= &s3c_fb_data_64xx_wins[3],
+	.win[4]	= &s3c_fb_data_64xx_wins[4],
 };
 
 /* S3C2443/S3C2416 style hardware */

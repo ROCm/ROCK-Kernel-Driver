@@ -1445,7 +1445,7 @@ static void falc_update_stats(pc300_t * card, int ch)
  * Description:	In the remote loopback mode the clock and data recovered
  *		from the line inputs RL1/2 or RDIP/RDIN are routed back
  *		to the line outputs XL1/2 or XDOP/XDON via the analog
- *		transmitter. As in normal mode they are processed by
+ *		transmitter. As in normal mode they are processsed by
  *		the synchronizer and then sent to the system interface.
  *----------------------------------------------------------------------------
  */
@@ -3242,7 +3242,8 @@ static inline void show_version(void)
 	rcsdate++;
 	tmp = strrchr(rcsdate, ' ');
 	*tmp = '\0';
-	printk(KERN_INFO "Cyclades-PC300 driver %s %s\n", rcsvers, rcsdate);
+	printk(KERN_INFO "Cyclades-PC300 driver %s %s (built %s %s)\n", 
+		rcsvers, rcsdate, __DATE__, __TIME__);
 }				/* show_version */
 
 static const struct net_device_ops cpc_netdev_ops = {

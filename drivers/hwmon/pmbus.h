@@ -281,11 +281,13 @@ struct pmbus_driver_info {
 
 	u32 func[PMBUS_PAGES];	/* Functionality, per page */
 	/*
-	 * The following functions map manufacturing specific register values
-	 * to PMBus standard register values. Specify only if mapping is
-	 * necessary.
+	 * The get_status function maps manufacturing specific status values
+	 * into PMBus standard status values.
+	 * This function is optional and only necessary if chip specific status
+	 * register values have to be mapped into standard PMBus status register
+	 * values.
 	 */
-	int (*read_byte_data)(struct i2c_client *client, int page, int reg);
+	int (*get_status)(struct i2c_client *client, int page, int reg);
 	/*
 	 * The identify function determines supported PMBus functionality.
 	 * This function is only necessary if a chip driver supports multiple

@@ -1489,7 +1489,8 @@ void ConfigMainWindow::saveConfigAs(void)
 	QString s = Q3FileDialog::getSaveFileName(conf_get_configname(), NULL, this);
 	if (s.isNull())
 		return;
-	saveConfig();
+	if (conf_write(QFile::encodeName(s)))
+		QMessageBox::information(this, "qconf", _("Unable to save configuration!"));
 }
 
 void ConfigMainWindow::searchConfig(void)
@@ -1642,7 +1643,7 @@ void ConfigMainWindow::closeEvent(QCloseEvent* e)
 	mb.setButtonText(QMessageBox::Cancel, _("Cancel Exit"));
 	switch (mb.exec()) {
 	case QMessageBox::Yes:
-		saveConfig();
+		conf_write(NULL);
 	case QMessageBox::No:
 		e->accept();
 		break;

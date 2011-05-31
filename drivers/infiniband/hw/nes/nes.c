@@ -1138,9 +1138,7 @@ static ssize_t nes_store_wqm_quanta(struct device_driver *ddp,
 	u32 i = 0;
 	struct nes_device *nesdev;
 
-	if (kstrtoul(buf, 0, &wqm_quanta_value) < 0)
-		return -EINVAL;
-
+	strict_strtoul(buf, 0, &wqm_quanta_value);
 	list_for_each_entry(nesdev, &nes_dev_list, list) {
 		if (i == ee_flsh_adapter) {
 			nesdev->nesadapter->wqm_quanta = wqm_quanta_value;

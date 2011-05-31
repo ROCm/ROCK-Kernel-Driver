@@ -1307,7 +1307,7 @@ void play_dead_common(void)
 {
 	idle_task_exit();
 	reset_lazy_tlbstate();
-	amd_e400_remove_cpu(raw_smp_processor_id());
+	c1e_remove_cpu(raw_smp_processor_id());
 
 	mb();
 	/* Ack it */
@@ -1332,9 +1332,9 @@ static inline void mwait_play_dead(void)
 	void *mwait_ptr;
 	struct cpuinfo_x86 *c = __this_cpu_ptr(&cpu_info);
 
-	if (!this_cpu_has(X86_FEATURE_MWAIT) && mwait_usable(c))
+	if (!(cpu_has(c, X86_FEATURE_MWAIT) && mwait_usable(c)))
 		return;
-	if (!this_cpu_has(X86_FEATURE_CLFLSH))
+	if (!cpu_has(__this_cpu_ptr(&cpu_info), X86_FEATURE_CLFLSH))
 		return;
 	if (__this_cpu_read(cpu_info.cpuid_level) < CPUID_MWAIT_LEAF)
 		return;

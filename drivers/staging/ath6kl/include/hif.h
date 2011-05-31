@@ -32,6 +32,7 @@ extern "C" {
 /* Header files */
 #include "a_config.h"
 #include "athdefs.h"
+#include "a_types.h"
 #include "a_osapi.h"
 #include "dl_list.h"
 
@@ -147,7 +148,7 @@ typedef enum {
  *
  *   HIF_DEVICE_GET_MBOX_BLOCK_SIZE
  *   input : none
- *   output : array of 4 u32s
+ *   output : array of 4 A_UINT32s
  *   notes: block size is returned for each mailbox (4)
  *
  *   HIF_DEVICE_GET_MBOX_ADDR

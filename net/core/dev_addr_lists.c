@@ -68,6 +68,14 @@ static int __hw_addr_add(struct netdev_hw_addr_list *list, unsigned char *addr,
 	return __hw_addr_add_ex(list, addr, addr_len, addr_type, false);
 }
 
+static void ha_rcu_free(struct rcu_head *head)
+{
+	struct netdev_hw_addr *ha;
+
+	ha = container_of(head, struct netdev_hw_addr, rcu_head);
+	kfree(ha);
+}
+
 static int __hw_addr_del_ex(struct netdev_hw_addr_list *list,
 			    unsigned char *addr, int addr_len,
 			    unsigned char addr_type, bool global)
@@ -86,7 +94,7 @@ static int __hw_addr_del_ex(struct netdev_hw_addr_list *list,
 			if (--ha->refcount)
 				return 0;
 			list_del_rcu(&ha->list);
-			kfree_rcu(ha, rcu_head);
+			call_rcu(&ha->rcu_head, ha_rcu_free);
 			list->count--;
 			return 0;
 		}
@@ -189,7 +197,7 @@ void __hw_addr_flush(struct netdev_hw_addr_list *list)
 
 	list_for_each_entry_safe(ha, tmp, &list->list, list) {
 		list_del_rcu(&ha->list);
-		kfree_rcu(ha, rcu_head);
+		call_rcu(&ha->rcu_head, ha_rcu_free);
 	}
 	list->count = 0;
 }

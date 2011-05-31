@@ -30,6 +30,11 @@
 #define SCREEN_Y_RES      600
 #define SCREEN_BPP        16
 
+#ifndef FIELD_OFFSET
+#define FIELD_OFSFET(type, field) \
+	((unsigned long) (PUCHAR) & (((type *)0)->field))
+#endif
+
 /*Assume SM712 graphics chip has 4MB VRAM */
 #define SM712_VIDEOMEMORYSIZE	  0x00400000
 /*Assume SM722 graphics chip has 8MB VRAM */
@@ -785,4 +790,4 @@ struct ModeInit VGAMode[] = {
 	 },
 };
 
-#define numVGAModes		ARRAY_SIZE(VGAMode)
+#define numVGAModes		(sizeof(VGAMode) / sizeof(struct ModeInit))

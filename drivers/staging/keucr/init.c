@@ -11,6 +11,9 @@
 #include "transport.h"
 #include "init.h"
 
+BYTE IsSSFDCCompliance;
+BYTE IsXDCompliance;
+
 /*
  * ENE_InitMedia():
  */

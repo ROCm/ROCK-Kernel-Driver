@@ -1007,11 +1007,21 @@ out:
 }
 
 /**
+ * struct scan_check_data - data provided to scan callback function.
+ * @lst: LEB properties statistics
+ * @err: error code
+ */
+struct scan_check_data {
+	struct ubifs_lp_stats lst;
+	int err;
+};
+
+/**
  * scan_check_cb - scan callback.
  * @c: the UBIFS file-system description object
  * @lp: LEB properties to scan
  * @in_tree: whether the LEB properties are in main memory
- * @lst: lprops statistics to update
+ * @data: information passed to and from the caller of the scan
  *
  * This function returns a code that indicates whether the scan should continue
  * (%LPT_SCAN_CONTINUE), whether the LEB properties should be added to the tree
@@ -1020,10 +1030,11 @@ out:
  */
 static int scan_check_cb(struct ubifs_info *c,
 			 const struct ubifs_lprops *lp, int in_tree,
-			 struct ubifs_lp_stats *lst)
+			 struct scan_check_data *data)
 {
 	struct ubifs_scan_leb *sleb;
 	struct ubifs_scan_node *snod;
+	struct ubifs_lp_stats *lst = &data->lst;
 	int cat, lnum = lp->lnum, is_idx = 0, used = 0, free, dirty, ret;
 	void *buf = NULL;
 
@@ -1033,7 +1044,7 @@ static int scan_check_cb(struct ubifs_info *c,
 		if (cat != (lp->flags & LPROPS_CAT_MASK)) {
 			ubifs_err("bad LEB category %d expected %d",
 				  (lp->flags & LPROPS_CAT_MASK), cat);
-			return -EINVAL;
+			goto out;
 		}
 	}
 
@@ -1067,7 +1078,7 @@ static int scan_check_cb(struct ubifs_info *c,
 			}
 			if (!found) {
 				ubifs_err("bad LPT list (category %d)", cat);
-				return -EINVAL;
+				goto out;
 			}
 		}
 	}
@@ -1079,40 +1090,45 @@ static int scan_check_cb(struct ubifs_info *c,
 		if ((lp->hpos != -1 && heap->arr[lp->hpos]->lnum != lnum) ||
 		    lp != heap->arr[lp->hpos]) {
 			ubifs_err("bad LPT heap (category %d)", cat);
-			return -EINVAL;
+			goto out;
 		}
 	}
 
 	buf = __vmalloc(c->leb_size, GFP_NOFS, PAGE_KERNEL);
-	if (!buf)
-		return -ENOMEM;
-
-	/*
-	 * After an unclean unmount, empty and freeable LEBs
-	 * may contain garbage - do not scan them.
-	 */
-	if (lp->free == c->leb_size) {
-		lst->empty_lebs += 1;
-		lst->total_free += c->leb_size;
-		lst->total_dark += ubifs_calc_dark(c, c->leb_size);
-		return LPT_SCAN_CONTINUE;
-	}
-	if (lp->free + lp->dirty == c->leb_size &&
-	    !(lp->flags & LPROPS_INDEX)) {
-		lst->total_free  += lp->free;
-		lst->total_dirty += lp->dirty;
-		lst->total_dark  +=  ubifs_calc_dark(c, c->leb_size);
-		return LPT_SCAN_CONTINUE;
+	if (!buf) {
+		ubifs_err("cannot allocate memory to scan LEB %d", lnum);
+		goto out;
 	}
 
 	sleb = ubifs_scan(c, lnum, 0, buf, 0);
 	if (IS_ERR(sleb)) {
-		ret = PTR_ERR(sleb);
-		if (ret == -EUCLEAN) {
-			dbg_dump_lprops(c);
-			dbg_dump_budg(c, &c->bi);
+		/*
+		 * After an unclean unmount, empty and freeable LEBs
+		 * may contain garbage.
+		 */
+		if (lp->free == c->leb_size) {
+			ubifs_err("scan errors were in empty LEB "
+				  "- continuing checking");
+			lst->empty_lebs += 1;
+			lst->total_free += c->leb_size;
+			lst->total_dark += ubifs_calc_dark(c, c->leb_size);
+			ret = LPT_SCAN_CONTINUE;
+			goto exit;
 		}
-		goto out;
+
+		if (lp->free + lp->dirty == c->leb_size &&
+		    !(lp->flags & LPROPS_INDEX)) {
+			ubifs_err("scan errors were in freeable LEB "
+				  "- continuing checking");
+			lst->total_free  += lp->free;
+			lst->total_dirty += lp->dirty;
+			lst->total_dark  +=  ubifs_calc_dark(c, c->leb_size);
+			ret = LPT_SCAN_CONTINUE;
+			goto exit;
+		}
+		data->err = PTR_ERR(sleb);
+		ret = LPT_SCAN_STOP;
+		goto exit;
 	}
 
 	is_idx = -1;
@@ -1230,8 +1246,10 @@ static int scan_check_cb(struct ubifs_info *c,
 	}
 
 	ubifs_scan_destroy(sleb);
+	ret = LPT_SCAN_CONTINUE;
+exit:
 	vfree(buf);
-	return LPT_SCAN_CONTINUE;
+	return ret;
 
 out_print:
 	ubifs_err("bad accounting of LEB %d: free %d, dirty %d flags %#x, "
@@ -1240,10 +1258,10 @@ out_print:
 	dbg_dump_leb(c, lnum);
 out_destroy:
 	ubifs_scan_destroy(sleb);
-	ret = -EINVAL;
 out:
 	vfree(buf);
-	return ret;
+	data->err = -EINVAL;
+	return LPT_SCAN_STOP;
 }
 
 /**
@@ -1260,7 +1278,8 @@ out:
 int dbg_check_lprops(struct ubifs_info *c)
 {
 	int i, err;
-	struct ubifs_lp_stats lst;
+	struct scan_check_data data;
+	struct ubifs_lp_stats *lst = &data.lst;
 
 	if (!(ubifs_chk_flags & UBIFS_CHK_LPROPS))
 		return 0;
@@ -1275,23 +1294,29 @@ int dbg_check_lprops(struct ubifs_info *c)
 			return err;
 	}
 
-	memset(&lst, 0, sizeof(struct ubifs_lp_stats));
+	memset(lst, 0, sizeof(struct ubifs_lp_stats));
+
+	data.err = 0;
 	err = ubifs_lpt_scan_nolock(c, c->main_first, c->leb_cnt - 1,
 				    (ubifs_lpt_scan_callback)scan_check_cb,
-				    &lst);
+				    &data);
 	if (err && err != -ENOSPC)
 		goto out;
+	if (data.err) {
+		err = data.err;
+		goto out;
+	}
 
-	if (lst.empty_lebs != c->lst.empty_lebs ||
-	    lst.idx_lebs != c->lst.idx_lebs ||
-	    lst.total_free != c->lst.total_free ||
-	    lst.total_dirty != c->lst.total_dirty ||
-	    lst.total_used != c->lst.total_used) {
+	if (lst->empty_lebs != c->lst.empty_lebs ||
+	    lst->idx_lebs != c->lst.idx_lebs ||
+	    lst->total_free != c->lst.total_free ||
+	    lst->total_dirty != c->lst.total_dirty ||
+	    lst->total_used != c->lst.total_used) {
 		ubifs_err("bad overall accounting");
 		ubifs_err("calculated: empty_lebs %d, idx_lebs %d, "
 			  "total_free %lld, total_dirty %lld, total_used %lld",
-			  lst.empty_lebs, lst.idx_lebs, lst.total_free,
-			  lst.total_dirty, lst.total_used);
+			  lst->empty_lebs, lst->idx_lebs, lst->total_free,
+			  lst->total_dirty, lst->total_used);
 		ubifs_err("read from lprops: empty_lebs %d, idx_lebs %d, "
 			  "total_free %lld, total_dirty %lld, total_used %lld",
 			  c->lst.empty_lebs, c->lst.idx_lebs, c->lst.total_free,
@@ -1300,11 +1325,11 @@ int dbg_check_lprops(struct ubifs_info *c)
 		goto out;
 	}
 
-	if (lst.total_dead != c->lst.total_dead ||
-	    lst.total_dark != c->lst.total_dark) {
+	if (lst->total_dead != c->lst.total_dead ||
+	    lst->total_dark != c->lst.total_dark) {
 		ubifs_err("bad dead/dark space accounting");
 		ubifs_err("calculated: total_dead %lld, total_dark %lld",
-			  lst.total_dead, lst.total_dark);
+			  lst->total_dead, lst->total_dark);
 		ubifs_err("read from lprops: total_dead %lld, total_dark %lld",
 			  c->lst.total_dead, c->lst.total_dark);
 		err = -EINVAL;

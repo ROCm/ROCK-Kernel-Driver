@@ -17,7 +17,7 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/io.h>
-#include <linux/syscore_ops.h>
+#include <linux/sysdev.h>
 
 #include <mach/hardware.h>
 #include <mach/mfp-pxa3xx.h>
@@ -31,13 +31,13 @@
  * a pull-down mode if they're an active low chip select, and we're
  * just entering standby.
  */
-static int pxa3xx_mfp_suspend(void)
+static int pxa3xx_mfp_suspend(struct sys_device *d, pm_message_t state)
 {
 	mfp_config_lpm();
 	return 0;
 }
 
-static void pxa3xx_mfp_resume(void)
+static int pxa3xx_mfp_resume(struct sys_device *d)
 {
 	mfp_config_run();
 
@@ -47,13 +47,24 @@ static void pxa3xx_mfp_resume(void)
 	 * preserve them here in case they will be referenced later
 	 */
 	ASCR &= ~(ASCR_RDH | ASCR_D1S | ASCR_D2S | ASCR_D3S);
+	return 0;
 }
 #else
 #define pxa3xx_mfp_suspend	NULL
 #define pxa3xx_mfp_resume	NULL
 #endif
 
-struct syscore_ops pxa3xx_mfp_syscore_ops = {
+struct sysdev_class pxa3xx_mfp_sysclass = {
+	.name		= "mfp",
 	.suspend	= pxa3xx_mfp_suspend,
-	.resume		= pxa3xx_mfp_resume,
+	.resume 	= pxa3xx_mfp_resume,
 };
+
+static int __init mfp_init_devicefs(void)
+{
+	if (cpu_is_pxa3xx())
+		return sysdev_class_register(&pxa3xx_mfp_sysclass);
+
+	return 0;
+}
+postcore_initcall(mfp_init_devicefs);

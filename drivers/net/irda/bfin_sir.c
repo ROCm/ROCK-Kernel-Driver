@@ -67,27 +67,27 @@ static void bfin_sir_stop_tx(struct bfin_sir_port *port)
 	disable_dma(port->tx_dma_channel);
 #endif
 
-	while (!(UART_GET_LSR(port) & THRE)) {
+	while (!(SIR_UART_GET_LSR(port) & THRE)) {
 		cpu_relax();
 		continue;
 	}
 
-	UART_CLEAR_IER(port, ETBEI);
+	SIR_UART_STOP_TX(port);
 }
 
 static void bfin_sir_enable_tx(struct bfin_sir_port *port)
 {
-	UART_SET_IER(port, ETBEI);
+	SIR_UART_ENABLE_TX(port);
 }
 
 static void bfin_sir_stop_rx(struct bfin_sir_port *port)
 {
-	UART_CLEAR_IER(port, ERBFI);
+	SIR_UART_STOP_RX(port);
 }
 
 static void bfin_sir_enable_rx(struct bfin_sir_port *port)
 {
-	UART_SET_IER(port, ERBFI);
+	SIR_UART_ENABLE_RX(port);
 }
 
 static int bfin_sir_set_speed(struct bfin_sir_port *port, int speed)
@@ -116,7 +116,7 @@ static int bfin_sir_set_speed(struct bfin_sir_port *port, int speed)
 
 		do {
 			udelay(utime);
-			lsr = UART_GET_LSR(port);
+			lsr = SIR_UART_GET_LSR(port);
 		} while (!(lsr & TEMT) && count--);
 
 		/* The useconds for 1 bits to transmit */
@@ -125,27 +125,27 @@ static int bfin_sir_set_speed(struct bfin_sir_port *port, int speed)
 		/* Clear UCEN bit to reset the UART state machine
 		 * and control registers
 		 */
-		val = UART_GET_GCTL(port);
+		val = SIR_UART_GET_GCTL(port);
 		val &= ~UCEN;
-		UART_PUT_GCTL(port, val);
+		SIR_UART_PUT_GCTL(port, val);
 
 		/* Set DLAB in LCR to Access THR RBR IER */
-		UART_SET_DLAB(port);
+		SIR_UART_SET_DLAB(port);
 		SSYNC();
 
-		UART_PUT_DLL(port, quot & 0xFF);
-		UART_PUT_DLH(port, (quot >> 8) & 0xFF);
+		SIR_UART_PUT_DLL(port, quot & 0xFF);
+		SIR_UART_PUT_DLH(port, (quot >> 8) & 0xFF);
 		SSYNC();
 
 		/* Clear DLAB in LCR */
-		UART_CLEAR_DLAB(port);
+		SIR_UART_CLEAR_DLAB(port);
 		SSYNC();
 
-		UART_PUT_LCR(port, lcr);
+		SIR_UART_PUT_LCR(port, lcr);
 
-		val = UART_GET_GCTL(port);
+		val = SIR_UART_GET_GCTL(port);
 		val |= UCEN;
-		UART_PUT_GCTL(port, val);
+		SIR_UART_PUT_GCTL(port, val);
 
 		ret = 0;
 		break;
@@ -154,12 +154,12 @@ static int bfin_sir_set_speed(struct bfin_sir_port *port, int speed)
 		break;
 	}
 
-	val = UART_GET_GCTL(port);
+	val = SIR_UART_GET_GCTL(port);
 	/* If not add the 'RPOLC', we can't catch the receive interrupt.
 	 * It's related with the HW layout and the IR transiver.
 	 */
 	val |= IREN | RPOLC;
-	UART_PUT_GCTL(port, val);
+	SIR_UART_PUT_GCTL(port, val);
 	return ret;
 }
 
@@ -168,7 +168,7 @@ static int bfin_sir_is_receiving(struct net_device *dev)
 	struct bfin_sir_self *self = netdev_priv(dev);
 	struct bfin_sir_port *port = self->sir_port;
 
-	if (!(UART_GET_IER(port) & ERBFI))
+	if (!(SIR_UART_GET_IER(port) & ERBFI))
 		return 0;
 	return self->rx_buff.state != OUTSIDE_FRAME;
 }
@@ -182,7 +182,7 @@ static void bfin_sir_tx_chars(struct net_device *dev)
 
 	if (self->tx_buff.len != 0) {
 		chr = *(self->tx_buff.data);
-		UART_PUT_CHAR(port, chr);
+		SIR_UART_PUT_CHAR(port, chr);
 		self->tx_buff.data++;
 		self->tx_buff.len--;
 	} else {
@@ -206,8 +206,8 @@ static void bfin_sir_rx_chars(struct net_device *dev)
 	struct bfin_sir_port *port = self->sir_port;
 	unsigned char ch;
 
-	UART_CLEAR_LSR(port);
-	ch = UART_GET_CHAR(port);
+	SIR_UART_CLEAR_LSR(port);
+	ch = SIR_UART_GET_CHAR(port);
 	async_unwrap_char(dev, &self->stats, &self->rx_buff, ch);
 	dev->last_rx = jiffies;
 }
@@ -219,7 +219,7 @@ static irqreturn_t bfin_sir_rx_int(int irq, void *dev_id)
 	struct bfin_sir_port *port = self->sir_port;
 
 	spin_lock(&self->lock);
-	while ((UART_GET_LSR(port) & DR))
+	while ((SIR_UART_GET_LSR(port) & DR))
 		bfin_sir_rx_chars(dev);
 	spin_unlock(&self->lock);
 
@@ -233,7 +233,7 @@ static irqreturn_t bfin_sir_tx_int(int irq, void *dev_id)
 	struct bfin_sir_port *port = self->sir_port;
 
 	spin_lock(&self->lock);
-	if (UART_GET_LSR(port) & THRE)
+	if (SIR_UART_GET_LSR(port) & THRE)
 		bfin_sir_tx_chars(dev);
 	spin_unlock(&self->lock);
 
@@ -312,7 +312,7 @@ static void bfin_sir_dma_rx_chars(struct net_device *dev)
 	struct bfin_sir_port *port = self->sir_port;
 	int i;
 
-	UART_CLEAR_LSR(port);
+	SIR_UART_CLEAR_LSR(port);
 
 	for (i = port->rx_dma_buf.head; i < port->rx_dma_buf.tail; i++)
 		async_unwrap_char(dev, &self->stats, &self->rx_buff, port->rx_dma_buf.buf[i]);
@@ -430,10 +430,11 @@ static void bfin_sir_shutdown(struct bfin_sir_port *port, struct net_device *dev
 	unsigned short val;
 
 	bfin_sir_stop_rx(port);
+	SIR_UART_DISABLE_INTS(port);
 
-	val = UART_GET_GCTL(port);
+	val = SIR_UART_GET_GCTL(port);
 	val &= ~(UCEN | IREN | RPOLC);
-	UART_PUT_GCTL(port, val);
+	SIR_UART_PUT_GCTL(port, val);
 
 #ifdef CONFIG_SIR_BFIN_DMA
 	disable_dma(port->tx_dma_channel);
@@ -517,12 +518,12 @@ static void bfin_sir_send_work(struct work_struct *work)
 	 * sending data. We also can set the speed, which will
 	 * reset all the UART.
 	 */
-	val = UART_GET_GCTL(port);
+	val = SIR_UART_GET_GCTL(port);
 	val &= ~(IREN | RPOLC);
-	UART_PUT_GCTL(port, val);
+	SIR_UART_PUT_GCTL(port, val);
 	SSYNC();
 	val |= IREN | RPOLC;
-	UART_PUT_GCTL(port, val);
+	SIR_UART_PUT_GCTL(port, val);
 	SSYNC();
 	/* bfin_sir_set_speed(port, self->speed); */
 

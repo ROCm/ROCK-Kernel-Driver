@@ -285,7 +285,7 @@ static void __init construct_default_ioirq_mptable(int mpc_default_type)
 	intsrc.type = MP_INTSRC;
 	intsrc.irqflag = 0;	/* conforming */
 	intsrc.srcbus = 0;
-	intsrc.dstapic = mpc_ioapic_id(0);
+	intsrc.dstapic = mp_ioapics[0].apicid;
 
 	intsrc.irqtype = mp_INT;
 
@@ -715,15 +715,17 @@ static void __init check_irq_src(struct mpc_intsrc *m, int *nr_m_spare)
 	}
 }
 
-static int __init
+static int
 check_slot(unsigned long mpc_new_phys, unsigned long mpc_new_length, int count)
 {
+	int ret = 0;
+
 	if (!mpc_new_phys || count <= mpc_new_length) {
 		WARN(1, "update_mptable: No spare slots (length: %x)\n", count);
 		return -1;
 	}
 
-	return 0;
+	return ret;
 }
 #else /* CONFIG_X86_IO_APIC */
 static

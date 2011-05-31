@@ -60,15 +60,14 @@ int rt2x00pci_regbusy_read(struct rt2x00_dev *rt2x00dev,
 }
 EXPORT_SYMBOL_GPL(rt2x00pci_regbusy_read);
 
-bool rt2x00pci_rxdone(struct rt2x00_dev *rt2x00dev)
+void rt2x00pci_rxdone(struct rt2x00_dev *rt2x00dev)
 {
 	struct data_queue *queue = rt2x00dev->rx;
 	struct queue_entry *entry;
 	struct queue_entry_priv_pci *entry_priv;
 	struct skb_frame_desc *skbdesc;
-	int max_rx = 16;
 
-	while (--max_rx) {
+	while (1) {
 		entry = rt2x00queue_get_entry(queue, Q_INDEX);
 		entry_priv = entry->priv_data;
 
@@ -94,19 +93,8 @@ bool rt2x00pci_rxdone(struct rt2x00_dev *rt2x00dev)
 		 */
 		rt2x00lib_rxdone(entry);
 	}
-
-	return !max_rx;
 }
 EXPORT_SYMBOL_GPL(rt2x00pci_rxdone);
-
-void rt2x00pci_flush_queue(struct data_queue *queue, bool drop)
-{
-	unsigned int i;
-
-	for (i = 0; !rt2x00queue_empty(queue) && i < 10; i++)
-		msleep(10);
-}
-EXPORT_SYMBOL_GPL(rt2x00pci_flush_queue);
 
 /*
  * Device initialization handlers.
@@ -251,8 +239,9 @@ exit:
 	return -ENOMEM;
 }
 
-int rt2x00pci_probe(struct pci_dev *pci_dev, const struct rt2x00_ops *ops)
+int rt2x00pci_probe(struct pci_dev *pci_dev, const struct pci_device_id *id)
 {
+	struct rt2x00_ops *ops = (struct rt2x00_ops *)id->driver_data;
 	struct ieee80211_hw *hw;
 	struct rt2x00_dev *rt2x00dev;
 	int retval;

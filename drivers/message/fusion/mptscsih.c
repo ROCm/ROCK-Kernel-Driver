@@ -1415,8 +1415,11 @@ mptscsih_qcmd(struct scsi_cmnd *SCpnt, void (*done)(struct scsi_cmnd *))
 	dmfprintk(ioc, printk(MYIOC_s_DEBUG_FMT "qcmd: SCpnt=%p, done()=%p\n",
 		ioc->name, SCpnt, done));
 
-	if (ioc->taskmgmt_quiesce_io)
+	if (ioc->taskmgmt_quiesce_io) {
+		dtmprintk(ioc, printk(MYIOC_s_WARN_FMT "qcmd: SCpnt=%p timeout + 60HZ\n",
+			ioc->name, SCpnt));
 		return SCSI_MLQUEUE_HOST_BUSY;
+	}
 
 	/*
 	 *  Put together a MPT SCSI request...
@@ -1770,6 +1773,7 @@ mptscsih_abort(struct scsi_cmnd * SCpnt)
 	int		 scpnt_idx;
 	int		 retval;
 	VirtDevice	 *vdevice;
+	ulong	 	 sn = SCpnt->serial_number;
 	MPT_ADAPTER	*ioc;
 
 	/* If we can't locate our host adapter structure, return FAILED status.
@@ -1855,7 +1859,8 @@ mptscsih_abort(struct scsi_cmnd * SCpnt)
 			 vdevice->vtarget->id, vdevice->lun,
 			 ctx2abort, mptscsih_get_tm_timeout(ioc));
 
-	if (SCPNT_TO_LOOKUP_IDX(ioc, SCpnt) == scpnt_idx) {
+	if (SCPNT_TO_LOOKUP_IDX(ioc, SCpnt) == scpnt_idx &&
+	    SCpnt->serial_number == sn) {
 		dtmprintk(ioc, printk(MYIOC_s_DEBUG_FMT
 		    "task abort: command still in active list! (sc=%p)\n",
 		    ioc->name, SCpnt));
@@ -1868,9 +1873,9 @@ mptscsih_abort(struct scsi_cmnd * SCpnt)
 	}
 
  out:
-	printk(MYIOC_s_INFO_FMT "task abort: %s (rv=%04x) (sc=%p)\n",
+	printk(MYIOC_s_INFO_FMT "task abort: %s (rv=%04x) (sc=%p) (sn=%ld)\n",
 	    ioc->name, ((retval == SUCCESS) ? "SUCCESS" : "FAILED"), retval,
-	    SCpnt);
+	    SCpnt, SCpnt->serial_number);
 
 	return retval;
 }

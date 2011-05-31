@@ -23,6 +23,29 @@
 #include <asm/gptimers.h>
 #include <asm/nmi.h>
 
+/* Accelerators for sched_clock()
+ * convert from cycles(64bits) => nanoseconds (64bits)
+ *  basic equation:
+ *		ns = cycles / (freq / ns_per_sec)
+ *		ns = cycles * (ns_per_sec / freq)
+ *		ns = cycles * (10^9 / (cpu_khz * 10^3))
+ *		ns = cycles * (10^6 / cpu_khz)
+ *
+ *	Then we use scaling math (suggested by george@mvista.com) to get:
+ *		ns = cycles * (10^6 * SC / cpu_khz) / SC
+ *		ns = cycles * cyc2ns_scale / SC
+ *
+ *	And since SC is a constant power of two, we can convert the div
+ *  into a shift.
+ *
+ *  We can use khz divisor instead of mhz to keep a better precision, since
+ *  cyc2ns_scale is limited to 10^6 * 2^10, which fits in 32 bits.
+ *  (mathieu.desnoyers@polymtl.ca)
+ *
+ *			-johnstul@us.ibm.com "math is hard, lets go shopping!"
+ */
+
+#define CYC2NS_SCALE_FACTOR 10 /* 2^10, carefully chosen */
 
 #if defined(CONFIG_CYCLES_CLOCKSOURCE)
 
@@ -40,6 +63,7 @@ static struct clocksource bfin_cs_cycles = {
 	.rating		= 400,
 	.read		= bfin_read_cycles,
 	.mask		= CLOCKSOURCE_MASK(64),
+	.shift		= CYC2NS_SCALE_FACTOR,
 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
 };
 
@@ -51,7 +75,10 @@ static inline unsigned long long bfin_cs_cycles_sched_clock(void)
 
 static int __init bfin_cs_cycles_init(void)
 {
-	if (clocksource_register_hz(&bfin_cs_cycles, get_cclk()))
+	bfin_cs_cycles.mult = \
+		clocksource_hz2mult(get_cclk(), bfin_cs_cycles.shift);
+
+	if (clocksource_register(&bfin_cs_cycles))
 		panic("failed to register clocksource");
 
 	return 0;
@@ -84,6 +111,7 @@ static struct clocksource bfin_cs_gptimer0 = {
 	.rating		= 350,
 	.read		= bfin_read_gptimer0,
 	.mask		= CLOCKSOURCE_MASK(32),
+	.shift		= CYC2NS_SCALE_FACTOR,
 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
 };
 
@@ -97,7 +125,10 @@ static int __init bfin_cs_gptimer0_init(void)
 {
 	setup_gptimer0();
 
-	if (clocksource_register_hz(&bfin_cs_gptimer0, get_sclk()))
+	bfin_cs_gptimer0.mult = \
+		clocksource_hz2mult(get_sclk(), bfin_cs_gptimer0.shift);
+
+	if (clocksource_register(&bfin_cs_gptimer0))
 		panic("failed to register clocksource");
 
 	return 0;

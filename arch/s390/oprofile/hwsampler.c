@@ -5,7 +5,6 @@
  * Author: Heinz Graalfs <graalfs@de.ibm.com>
  */
 
-#include <linux/kernel_stat.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/smp.h>
@@ -19,7 +18,7 @@
 #include <linux/oprofile.h>
 
 #include <asm/lowcore.h>
-#include <asm/irq.h>
+#include <asm/s390_ext.h>
 
 #include "hwsampler.h"
 
@@ -580,7 +579,7 @@ static int hws_cpu_callback(struct notifier_block *nfb,
 {
 	/* We do not have sampler space available for all possible CPUs.
 	   All CPUs should be online when hw sampling is activated. */
-	return (hws_state <= HWS_DEALLOCATED) ? NOTIFY_OK : NOTIFY_BAD;
+	return NOTIFY_BAD;
 }
 
 static struct notifier_block hws_cpu_notifier = {
@@ -675,11 +674,17 @@ int hwsampler_activate(unsigned int cpu)
 static void hws_ext_handler(unsigned int ext_int_code,
 			    unsigned int param32, unsigned long param64)
 {
+	int cpu;
 	struct hws_cpu_buffer *cb;
 
-	kstat_cpu(smp_processor_id()).irqs[EXTINT_CPM]++;
-	cb = &__get_cpu_var(sampler_cpu_buffer);
-	atomic_xchg(&cb->ext_params, atomic_read(&cb->ext_params) | param32);
+	cpu = smp_processor_id();
+	cb = &per_cpu(sampler_cpu_buffer, cpu);
+
+	atomic_xchg(
+			&cb->ext_params,
+			atomic_read(&cb->ext_params)
+				| S390_lowcore.ext_params);
+
 	if (hws_wq)
 		queue_work(hws_wq, &cb->worker);
 }
@@ -759,7 +764,7 @@ static int worker_check_error(unsigned int cpu, int ext_params)
 	if (!sdbt || !*sdbt)
 		return -EINVAL;
 
-	if (ext_params & EI_PRA)
+	if (ext_params & EI_IEA)
 		cb->req_alert++;
 
 	if (ext_params & EI_LSDA)
@@ -1004,7 +1009,7 @@ int hwsampler_deallocate()
 	if (hws_state != HWS_STOPPED)
 		goto deallocate_exit;
 
-	ctl_clear_bit(0, 5); /* set bit 58 CR0 off */
+	smp_ctl_clear_bit(0, 5); /* set bit 58 CR0 off */
 	deallocate_sdbt();
 
 	hws_state = HWS_DEALLOCATED;
@@ -1118,7 +1123,7 @@ int hwsampler_shutdown()
 		mutex_lock(&hws_sem);
 
 		if (hws_state == HWS_STOPPED) {
-			ctl_clear_bit(0, 5); /* set bit 58 CR0 off */
+			smp_ctl_clear_bit(0, 5); /* set bit 58 CR0 off */
 			deallocate_sdbt();
 		}
 		if (hws_wq) {
@@ -1193,7 +1198,7 @@ start_all_exit:
 	hws_oom = 1;
 	hws_flush_all = 0;
 	/* now let them in, 1407 CPUMF external interrupts */
-	ctl_set_bit(0, 5); /* set CR0 bit 58 */
+	smp_ctl_set_bit(0, 5); /* set CR0 bit 58 */
 
 	return 0;
 }

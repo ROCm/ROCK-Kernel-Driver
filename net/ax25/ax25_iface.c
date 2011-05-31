@@ -58,7 +58,7 @@ EXPORT_SYMBOL_GPL(ax25_register_pid);
 
 void ax25_protocol_release(unsigned int pid)
 {
-	struct ax25_protocol *protocol;
+	struct ax25_protocol *s, *protocol;
 
 	write_lock_bh(&protocol_list_lock);
 	protocol = protocol_list;
@@ -72,6 +72,7 @@ void ax25_protocol_release(unsigned int pid)
 
 	while (protocol != NULL && protocol->next != NULL) {
 		if (protocol->next->pid == pid) {
+			s = protocol->next;
 			protocol->next = protocol->next->next;
 			goto out;
 		}

@@ -316,23 +316,16 @@ static void op_amd_stop_ibs(void)
 		wrmsrl(MSR_AMD64_IBSOPCTL, 0);
 }
 
-static inline int get_eilvt(int offset)
+static inline int eilvt_is_available(int offset)
 {
+	/* check if we may assign a vector */
 	return !setup_APIC_eilvt(offset, 0, APIC_EILVT_MSG_NMI, 1);
-}
-
-static inline int put_eilvt(int offset)
-{
-	return !setup_APIC_eilvt(offset, 0, 0, 1);
 }
 
 static inline int ibs_eilvt_valid(void)
 {
 	int offset;
 	u64 val;
-	int valid = 0;
-
-	preempt_disable();
 
 	rdmsrl(MSR_AMD64_IBSCTL, val);
 	offset = val & IBSCTL_LVT_OFFSET_MASK;
@@ -340,20 +333,16 @@ static inline int ibs_eilvt_valid(void)
 	if (!(val & IBSCTL_LVT_OFFSET_VALID)) {
 		pr_err(FW_BUG "cpu %d, invalid IBS interrupt offset %d (MSR%08X=0x%016llx)\n",
 		       smp_processor_id(), offset, MSR_AMD64_IBSCTL, val);
-		goto out;
+		return 0;
 	}
 
-	if (!get_eilvt(offset)) {
+	if (!eilvt_is_available(offset)) {
 		pr_err(FW_BUG "cpu %d, IBS interrupt offset %d not available (MSR%08X=0x%016llx)\n",
 		       smp_processor_id(), offset, MSR_AMD64_IBSCTL, val);
-		goto out;
+		return 0;
 	}
 
-	valid = 1;
-out:
-	preempt_enable();
-
-	return valid;
+	return 1;
 }
 
 static inline int get_ibs_offset(void)
@@ -611,69 +600,67 @@ static int setup_ibs_ctl(int ibs_eilvt_off)
 
 static int force_ibs_eilvt_setup(void)
 {
-	int offset;
+	int i;
 	int ret;
 
-	/*
-	 * find the next free available EILVT entry, skip offset 0,
-	 * pin search to this cpu
-	 */
-	preempt_disable();
-	for (offset = 1; offset < APIC_EILVT_NR_MAX; offset++) {
-		if (get_eilvt(offset))
-			break;
-	}
-	preempt_enable();
-
-	if (offset == APIC_EILVT_NR_MAX) {
-		printk(KERN_DEBUG "No EILVT entry available\n");
-		return -EBUSY;
+	/* find the next free available EILVT entry */
+	for (i = 1; i < 4; i++) {
+		if (!eilvt_is_available(i))
+			continue;
+		ret = setup_ibs_ctl(i);
+		if (ret)
+			return ret;
+		pr_err(FW_BUG "using offset %d for IBS interrupts\n", i);
+		return 0;
 	}
 
-	ret = setup_ibs_ctl(offset);
+	printk(KERN_DEBUG "No EILVT entry available\n");
+
+	return -EBUSY;
+}
+
+static int __init_ibs_nmi(void)
+{
+	int ret;
+
+	if (ibs_eilvt_valid())
+		return 0;
+
+	ret = force_ibs_eilvt_setup();
 	if (ret)
-		goto out;
+		return ret;
 
-	if (!ibs_eilvt_valid()) {
-		ret = -EFAULT;
-		goto out;
-	}
+	if (!ibs_eilvt_valid())
+		return -EFAULT;
 
-	pr_err(FW_BUG "using offset %d for IBS interrupts\n", offset);
 	pr_err(FW_BUG "workaround enabled for IBS LVT offset\n");
 
 	return 0;
-out:
-	preempt_disable();
-	put_eilvt(offset);
-	preempt_enable();
-	return ret;
 }
 
 /*
  * check and reserve APIC extended interrupt LVT offset for IBS if
  * available
+ *
+ * init_ibs() preforms implicitly cpu-local operations, so pin this
+ * thread to its current CPU
  */
 
 static void init_ibs(void)
 {
+	preempt_disable();
+
 	ibs_caps = get_ibs_caps();
-
 	if (!ibs_caps)
-		return;
-
-	if (ibs_eilvt_valid())
 		goto out;
 
-	if (!force_ibs_eilvt_setup())
-		goto out;
-
-	/* Failed to setup ibs */
-	ibs_caps = 0;
-	return;
+	if (__init_ibs_nmi() < 0)
+		ibs_caps = 0;
+	else
+		printk(KERN_INFO "oprofile: AMD IBS detected (0x%08x)\n", ibs_caps);
 
 out:
-	printk(KERN_INFO "oprofile: AMD IBS detected (0x%08x)\n", ibs_caps);
+	preempt_enable();
 }
 
 static int (*create_arch_files)(struct super_block *sb, struct dentry *root);

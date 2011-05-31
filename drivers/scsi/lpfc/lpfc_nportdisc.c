@@ -350,7 +350,11 @@ lpfc_rcv_plogi(struct lpfc_vport *vport, struct lpfc_nodelist *ndlp,
 	ndlp->nlp_maxframe =
 		((sp->cmn.bbRcvSizeMsb & 0x0F) << 8) | sp->cmn.bbRcvSizeLsb;
 
-	/* no need to reg_login if we are already in one of these states */
+	/*
+	 * Need to unreg_login if we are already in one of these states and
+	 * change to NPR state. This will block the port until after the ACC
+	 * completes and the reg_login is issued and completed.
+	 */
 	switch (ndlp->nlp_state) {
 	case  NLP_STE_NPR_NODE:
 		if (!(ndlp->nlp_flag & NLP_NPR_ADISC))
@@ -359,8 +363,9 @@ lpfc_rcv_plogi(struct lpfc_vport *vport, struct lpfc_nodelist *ndlp,
 	case  NLP_STE_PRLI_ISSUE:
 	case  NLP_STE_UNMAPPED_NODE:
 	case  NLP_STE_MAPPED_NODE:
-		lpfc_els_rsp_acc(vport, ELS_CMD_PLOGI, cmdiocb, ndlp, NULL);
-		return 1;
+		lpfc_unreg_rpi(vport, ndlp);
+		ndlp->nlp_prev_state = ndlp->nlp_state;
+		lpfc_nlp_set_state(vport, ndlp, NLP_STE_NPR_NODE);
 	}
 
 	if ((vport->fc_flag & FC_PT2PT) &&
@@ -652,7 +657,6 @@ lpfc_disc_set_adisc(struct lpfc_vport *vport, struct lpfc_nodelist *ndlp)
 	lpfc_unreg_rpi(vport, ndlp);
 	return 0;
 }
-
 /**
  * lpfc_release_rpi - Release a RPI by issuing unreg_login mailbox cmd.
  * @phba : Pointer to lpfc_hba structure.
@@ -1395,11 +1399,8 @@ lpfc_cmpl_reglogin_reglogin_issue(struct lpfc_vport *vport,
 	if (mb->mbxStatus) {
 		/* RegLogin failed */
 		lpfc_printf_vlog(vport, KERN_ERR, LOG_DISCOVERY,
-				"0246 RegLogin failed Data: x%x x%x x%x x%x "
-				 "x%x\n",
-				 did, mb->mbxStatus, vport->port_state,
-				 mb->un.varRegLogin.vpi,
-				 mb->un.varRegLogin.rpi);
+				"0246 RegLogin failed Data: x%x x%x x%x\n",
+				did, mb->mbxStatus, vport->port_state);
 		/*
 		 * If RegLogin failed due to lack of HBA resources do not
 		 * retry discovery.
@@ -1423,10 +1424,7 @@ lpfc_cmpl_reglogin_reglogin_issue(struct lpfc_vport *vport,
 		return ndlp->nlp_state;
 	}
 
-	/* SLI4 ports have preallocated logical rpis. */
-	if (vport->phba->sli_rev < LPFC_SLI_REV4)
-		ndlp->nlp_rpi = mb->un.varWords[0];
-
+	ndlp->nlp_rpi = mb->un.varWords[0];
 	ndlp->nlp_flag |= NLP_RPI_REGISTERED;
 
 	/* Only if we are not a fabric nport do we issue PRLI */
@@ -2027,9 +2025,7 @@ lpfc_cmpl_reglogin_npr_node(struct lpfc_vport *vport,
 	MAILBOX_t    *mb = &pmb->u.mb;
 
 	if (!mb->mbxStatus) {
-		/* SLI4 ports have preallocated logical rpis. */
-		if (vport->phba->sli_rev < LPFC_SLI_REV4)
-			ndlp->nlp_rpi = mb->un.varWords[0];
+		ndlp->nlp_rpi = mb->un.varWords[0];
 		ndlp->nlp_flag |= NLP_RPI_REGISTERED;
 	} else {
 		if (ndlp->nlp_flag & NLP_NODEV_REMOVE) {

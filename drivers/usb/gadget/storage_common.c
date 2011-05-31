@@ -708,14 +708,13 @@ static ssize_t fsg_show_file(struct device *dev, struct device_attribute *attr,
 static ssize_t fsg_store_ro(struct device *dev, struct device_attribute *attr,
 			    const char *buf, size_t count)
 {
-	ssize_t		rc;
+	ssize_t		rc = count;
 	struct fsg_lun	*curlun = fsg_lun_from_dev(dev);
 	struct rw_semaphore	*filesem = dev_get_drvdata(dev);
-	unsigned	ro;
+	unsigned long	ro;
 
-	rc = kstrtouint(buf, 2, &ro);
-	if (rc)
-		return rc;
+	if (strict_strtoul(buf, 2, &ro))
+		return -EINVAL;
 
 	/*
 	 * Allow the write-enable status to change only while the
@@ -729,7 +728,6 @@ static ssize_t fsg_store_ro(struct device *dev, struct device_attribute *attr,
 		curlun->ro = ro;
 		curlun->initially_ro = ro;
 		LDBG(curlun, "read-only status set to %d\n", curlun->ro);
-		rc = count;
 	}
 	up_read(filesem);
 	return rc;
@@ -740,12 +738,10 @@ static ssize_t fsg_store_nofua(struct device *dev,
 			       const char *buf, size_t count)
 {
 	struct fsg_lun	*curlun = fsg_lun_from_dev(dev);
-	unsigned	nofua;
-	int		ret;
+	unsigned long	nofua;
 
-	ret = kstrtouint(buf, 2, &nofua);
-	if (ret)
-		return ret;
+	if (strict_strtoul(buf, 2, &nofua))
+		return -EINVAL;
 
 	/* Sync data when switching from async mode to sync */
 	if (!nofua && curlun->nofua)

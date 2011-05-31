@@ -374,6 +374,10 @@ void online_page(struct page *page)
 		totalhigh_pages++;
 #endif
 
+#ifdef CONFIG_FLATMEM
+	max_mapnr = max(pfn, max_mapnr);
+#endif
+
 	ClearPageReserved(page);
 	init_page_count(page);
 	__free_page(page);
@@ -396,7 +400,7 @@ static int online_pages_range(unsigned long start_pfn, unsigned long nr_pages,
 }
 
 
-int __ref online_pages(unsigned long pfn, unsigned long nr_pages)
+int online_pages(unsigned long pfn, unsigned long nr_pages)
 {
 	unsigned long onlined_pages = 0;
 	struct zone *zone;
@@ -455,9 +459,8 @@ int __ref online_pages(unsigned long pfn, unsigned long nr_pages)
 		zone_pcp_update(zone);
 
 	mutex_unlock(&zonelists_mutex);
-
-	init_per_zone_wmark_min();
-
+	setup_per_zone_wmarks();
+	calculate_zone_inactive_ratio(zone);
 	if (onlined_pages) {
 		kswapd_run(zone_to_nid(zone));
 		node_set_state(zone_to_nid(zone), N_HIGH_MEMORY);
@@ -702,7 +705,7 @@ do_migrate_range(unsigned long start_pfn, unsigned long end_pfn)
 		if (!pfn_valid(pfn))
 			continue;
 		page = pfn_to_page(pfn);
-		if (!get_page_unless_zero(page))
+		if (!page_count(page))
 			continue;
 		/*
 		 * We can skip free pages. And we can only deal with pages on
@@ -710,7 +713,6 @@ do_migrate_range(unsigned long start_pfn, unsigned long end_pfn)
 		 */
 		ret = isolate_lru_page(page);
 		if (!ret) { /* Success */
-			put_page(page);
 			list_add_tail(&page->lru, &source);
 			move_pages--;
 			inc_zone_page_state(page, NR_ISOLATED_ANON +
@@ -722,7 +724,6 @@ do_migrate_range(unsigned long start_pfn, unsigned long end_pfn)
 			       pfn);
 			dump_page(page);
 #endif
-			put_page(page);
 			/* Because we don't have big zone->lock. we should
 			   check this again here. */
 			if (page_count(page)) {
@@ -794,7 +795,7 @@ check_pages_isolated(unsigned long start_pfn, unsigned long end_pfn)
 	return offlined;
 }
 
-static int __ref offline_pages(unsigned long start_pfn,
+static int offline_pages(unsigned long start_pfn,
 		  unsigned long end_pfn, unsigned long timeout)
 {
 	unsigned long pfn, nr_pages, expire;
@@ -892,8 +893,8 @@ repeat:
 	zone->zone_pgdat->node_present_pages -= offlined_pages;
 	totalram_pages -= offlined_pages;
 
-	init_per_zone_wmark_min();
-
+	setup_per_zone_wmarks();
+	calculate_zone_inactive_ratio(zone);
 	if (!node_present_pages(node)) {
 		node_clear_state(node, N_HIGH_MEMORY);
 		kswapd_stop(node);

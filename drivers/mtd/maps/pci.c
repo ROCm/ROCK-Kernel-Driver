@@ -313,7 +313,7 @@ mtd_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
 		goto release;
 
 	mtd->owner = THIS_MODULE;
-	mtd_device_register(mtd, NULL, 0);
+	add_mtd_device(mtd);
 
 	pci_set_drvdata(dev, mtd);
 
@@ -336,7 +336,7 @@ mtd_pci_remove(struct pci_dev *dev)
 	struct mtd_info *mtd = pci_get_drvdata(dev);
 	struct map_pci_info *map = mtd->priv;
 
-	mtd_device_unregister(mtd);
+	del_mtd_device(mtd);
 	map_destroy(mtd);
 	map->exit(dev, map);
 	kfree(map);

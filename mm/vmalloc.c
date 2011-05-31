@@ -375,7 +375,7 @@ nocache:
 	/* find starting point for our search */
 	if (free_vmap_cache) {
 		first = rb_entry(free_vmap_cache, struct vmap_area, rb_node);
-		addr = ALIGN(first->va_end, align);
+		addr = ALIGN(first->va_end + PAGE_SIZE, align);
 		if (addr < vstart)
 			goto nocache;
 		if (addr + size - 1 < addr)
@@ -406,10 +406,10 @@ nocache:
 	}
 
 	/* from the starting point, walk areas until a suitable hole is found */
-	while (addr + size > first->va_start && addr + size <= vend) {
+	while (addr + size >= first->va_start && addr + size <= vend) {
 		if (addr + cached_hole_size < first->va_start)
 			cached_hole_size = first->va_start - addr;
-		addr = ALIGN(first->va_end, align);
+		addr = ALIGN(first->va_end + PAGE_SIZE, align);
 		if (addr + size - 1 < addr)
 			goto overflow;
 
@@ -1534,10 +1534,16 @@ static void *__vmalloc_node(unsigned long size, unsigned long align,
 static void *__vmalloc_area_node(struct vm_struct *area, gfp_t gfp_mask,
 				 pgprot_t prot, int node, void *caller)
 {
-	const int order = 0;
 	struct page **pages;
 	unsigned int nr_pages, array_size, i;
 	gfp_t nested_gfp = (gfp_mask & GFP_RECLAIM_MASK) | __GFP_ZERO;
+#ifdef CONFIG_XEN
+	gfp_t dma_mask = gfp_mask & (__GFP_DMA | __GFP_DMA32);
+
+	BUILD_BUG_ON((__GFP_DMA | __GFP_DMA32) != (__GFP_DMA + __GFP_DMA32));
+	if (dma_mask == (__GFP_DMA | __GFP_DMA32))
+		gfp_mask &= ~(__GFP_DMA | __GFP_DMA32);
+#endif
 
 	nr_pages = (area->size - PAGE_SIZE) >> PAGE_SHIFT;
 	array_size = (nr_pages * sizeof(struct page *));
@@ -1561,12 +1567,11 @@ static void *__vmalloc_area_node(struct vm_struct *area, gfp_t gfp_mask,
 
 	for (i = 0; i < area->nr_pages; i++) {
 		struct page *page;
-		gfp_t tmp_mask = gfp_mask | __GFP_NOWARN;
 
 		if (node < 0)
-			page = alloc_page(tmp_mask);
+			page = alloc_page(gfp_mask);
 		else
-			page = alloc_pages_node(node, tmp_mask, order);
+			page = alloc_pages_node(node, gfp_mask, 0);
 
 		if (unlikely(!page)) {
 			/* Successfully allocated i pages, free them in __vunmap() */
@@ -1574,6 +1579,16 @@ static void *__vmalloc_area_node(struct vm_struct *area, gfp_t gfp_mask,
 			goto fail;
 		}
 		area->pages[i] = page;
+#ifdef CONFIG_XEN
+		if (dma_mask) {
+			if (xen_limit_pages_to_max_mfn(page, 0, 32)) {
+				area->nr_pages = i + 1;
+				goto fail;
+			}
+			if (gfp_mask & __GFP_ZERO)
+				clear_highpage(page);
+		}
+#endif
 	}
 
 	if (map_vm_area(area, prot, &pages))
@@ -1581,9 +1596,6 @@ static void *__vmalloc_area_node(struct vm_struct *area, gfp_t gfp_mask,
 	return area->addr;
 
 fail:
-	warn_alloc_failed(gfp_mask, order, "vmalloc: allocation failure, "
-			  "allocated %ld of %ld bytes\n",
-			  (area->nr_pages*PAGE_SIZE), area->size);
 	vfree(area->addr);
 	return NULL;
 }
@@ -1786,6 +1798,8 @@ void *vmalloc_exec(unsigned long size)
 #define GFP_VMALLOC32 GFP_DMA32 | GFP_KERNEL
 #elif defined(CONFIG_64BIT) && defined(CONFIG_ZONE_DMA)
 #define GFP_VMALLOC32 GFP_DMA | GFP_KERNEL
+#elif defined(CONFIG_XEN)
+#define GFP_VMALLOC32 __GFP_DMA | __GFP_DMA32 | GFP_KERNEL
 #else
 #define GFP_VMALLOC32 GFP_KERNEL
 #endif
@@ -2152,6 +2166,10 @@ struct vm_struct *alloc_vm_area(size_t size)
 		free_vm_area(area);
 		return NULL;
 	}
+
+	/* Make sure the pagetables are constructed in process kernel
+	   mappings */
+	vmalloc_sync_all();
 
 	return area;
 }

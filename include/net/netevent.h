@@ -10,6 +10,7 @@
  *
  * 	Changes:
  */
+#ifdef __KERNEL__
 
 struct dst_entry;
 
@@ -27,4 +28,5 @@ extern int register_netevent_notifier(struct notifier_block *nb);
 extern int unregister_netevent_notifier(struct notifier_block *nb);
 extern int call_netevent_notifiers(unsigned long val, void *v);
 
+#endif
 #endif

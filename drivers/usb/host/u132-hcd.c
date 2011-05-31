@@ -3230,7 +3230,8 @@ static int __init u132_hcd_init(void)
 	mutex_init(&u132_module_lock);
 	if (usb_disabled())
 		return -ENODEV;
-	printk(KERN_INFO "driver %s\n", hcd_name);
+	printk(KERN_INFO "driver %s built at %s on %s\n", hcd_name, __TIME__,
+		__DATE__);
 	workqueue = create_singlethread_workqueue("u132");
 	retval = platform_driver_register(&u132_platform_driver);
 	return retval;

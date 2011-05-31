@@ -125,6 +125,12 @@ config PM_DEBUG
 	code. This is helpful when debugging and reporting PM bugs, like
 	suspend support.
 
+config PM_VERBOSE
+	bool "Verbose Power Management debugging"
+	depends on PM_DEBUG
+	---help---
+	This option enables verbose messages from the Power Management code.
+
 config PM_ADVANCED_DEBUG
 	bool "Extra PM attributes in sysfs for low-level debugging/testing"
 	depends on PM_DEBUG
@@ -135,7 +141,7 @@ config PM_ADVANCED_DEBUG
 
 config PM_TEST_SUSPEND
 	bool "Test suspend/resume and wakealarm during bootup"
-	depends on SUSPEND && PM_DEBUG && RTC_CLASS=y
+	depends on SUSPEND && PM_DEBUG && RTC_CLASS=y && !XEN_UNPRIVILEGED_GUEST
 	---help---
 	This option will let you suspend your machine during bootup, and
 	make it wake up a few seconds later using an RTC wakeup alarm.
@@ -166,7 +172,7 @@ config PM_TRACE
 config PM_TRACE_RTC
 	bool "Suspend/resume event tracing"
 	depends on CAN_PM_TRACE
-	depends on X86
+	depends on X86 && !XEN_UNPRIVILEGED_GUEST
 	select PM_TRACE
 	---help---
 	This enables some cheesy code to save the last PM event point in the
@@ -223,7 +229,3 @@ config PM_OPP
 	  representing individual voltage domains and provides SOC
 	  implementations a ready to use framework to manage OPPs.
 	  For more information, read <file:Documentation/power/opp.txt>
-
-config PM_RUNTIME_CLK
-	def_bool y
-	depends on PM_RUNTIME && HAVE_CLK

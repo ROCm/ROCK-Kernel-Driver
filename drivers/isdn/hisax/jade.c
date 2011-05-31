@@ -23,9 +23,10 @@
 int
 JadeVersion(struct IsdnCardState *cs, char *s)
 {
-    int ver;
+    int ver,i;
     int to = 50;
     cs->BC_Write_Reg(cs, -1, 0x50, 0x19);
+    i=0;
     while (to) {
     	udelay(1);
 	ver = cs->BC_Read_Reg(cs, -1, 0x60);

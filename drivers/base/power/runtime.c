@@ -168,6 +168,7 @@ static int rpm_check_suspend_allowed(struct device *dev)
 static int rpm_idle(struct device *dev, int rpmflags)
 {
 	int (*callback)(struct device *);
+	int (*domain_callback)(struct device *);
 	int retval;
 
 	retval = rpm_check_suspend_allowed(dev);
@@ -213,9 +214,7 @@ static int rpm_idle(struct device *dev, int rpmflags)
 
 	dev->power.idle_notification = true;
 
-	if (dev->pwr_domain)
-		callback = dev->pwr_domain->ops.runtime_idle;
-	else if (dev->type && dev->type->pm)
+	if (dev->type && dev->type->pm)
 		callback = dev->type->pm->runtime_idle;
 	else if (dev->class && dev->class->pm)
 		callback = dev->class->pm->runtime_idle;
@@ -224,10 +223,19 @@ static int rpm_idle(struct device *dev, int rpmflags)
 	else
 		callback = NULL;
 
-	if (callback) {
+	if (dev->pwr_domain)
+		domain_callback = dev->pwr_domain->ops.runtime_idle;
+	else
+		domain_callback = NULL;
+
+	if (callback || domain_callback) {
 		spin_unlock_irq(&dev->power.lock);
 
-		callback(dev);
+		if (domain_callback)
+			retval = domain_callback(dev);
+
+		if (!retval && callback)
+			callback(dev);
 
 		spin_lock_irq(&dev->power.lock);
 	}
@@ -374,9 +382,7 @@ static int rpm_suspend(struct device *dev, int rpmflags)
 
 	__update_runtime_status(dev, RPM_SUSPENDING);
 
-	if (dev->pwr_domain)
-		callback = dev->pwr_domain->ops.runtime_suspend;
-	else if (dev->type && dev->type->pm)
+	if (dev->type && dev->type->pm)
 		callback = dev->type->pm->runtime_suspend;
 	else if (dev->class && dev->class->pm)
 		callback = dev->class->pm->runtime_suspend;
@@ -394,6 +400,8 @@ static int rpm_suspend(struct device *dev, int rpmflags)
 		else
 			pm_runtime_cancel_pending(dev);
 	} else {
+		if (dev->pwr_domain)
+			rpm_callback(dev->pwr_domain->ops.runtime_suspend, dev);
  no_callback:
 		__update_runtime_status(dev, RPM_SUSPENDED);
 		pm_runtime_deactivate_timer(dev);
@@ -574,8 +582,9 @@ static int rpm_resume(struct device *dev, int rpmflags)
 	__update_runtime_status(dev, RPM_RESUMING);
 
 	if (dev->pwr_domain)
-		callback = dev->pwr_domain->ops.runtime_resume;
-	else if (dev->type && dev->type->pm)
+		rpm_callback(dev->pwr_domain->ops.runtime_resume, dev);
+
+	if (dev->type && dev->type->pm)
 		callback = dev->type->pm->runtime_resume;
 	else if (dev->class && dev->class->pm)
 		callback = dev->class->pm->runtime_resume;

@@ -11,7 +11,6 @@ platforms += dec
 platforms += emma
 platforms += jazz
 platforms += jz4740
-platforms += lantiq
 platforms += lasat
 platforms += loongson
 platforms += mipssim

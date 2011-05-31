@@ -29,77 +29,65 @@
 #include <asm/smp.h>
 #include <asm/tlbflush.h>
 
+#ifndef CONFIG_SMP
+#define TLB_NR_PTRS	1
+#else
+#define TLB_NR_PTRS	508
+#endif
+
 struct mmu_gather {
 	struct mm_struct *mm;
 	unsigned int fullmm;
 	unsigned int nr_ptes;
 	unsigned int nr_pxds;
-	unsigned int max;
-	void **array;
-	void *local[8];
+	void *array[TLB_NR_PTRS];
 };
 
-static inline void __tlb_alloc_page(struct mmu_gather *tlb)
-{
-	unsigned long addr = __get_free_pages(GFP_NOWAIT | __GFP_NOWARN, 0);
+DECLARE_PER_CPU(struct mmu_gather, mmu_gathers);
 
-	if (addr) {
-		tlb->array = (void *) addr;
-		tlb->max = PAGE_SIZE / sizeof(void *);
-	}
-}
-
-static inline void tlb_gather_mmu(struct mmu_gather *tlb,
-				  struct mm_struct *mm,
-				  unsigned int full_mm_flush)
+static inline struct mmu_gather *tlb_gather_mmu(struct mm_struct *mm,
+						unsigned int full_mm_flush)
 {
+	struct mmu_gather *tlb = &get_cpu_var(mmu_gathers);
+
 	tlb->mm = mm;
-	tlb->max = ARRAY_SIZE(tlb->local);
-	tlb->array = tlb->local;
 	tlb->fullmm = full_mm_flush;
+	tlb->nr_ptes = 0;
+	tlb->nr_pxds = TLB_NR_PTRS;
 	if (tlb->fullmm)
 		__tlb_flush_mm(mm);
-	else
-		__tlb_alloc_page(tlb);
-	tlb->nr_ptes = 0;
-	tlb->nr_pxds = tlb->max;
+	return tlb;
 }
 
-static inline void tlb_flush_mmu(struct mmu_gather *tlb)
+static inline void tlb_flush_mmu(struct mmu_gather *tlb,
+				 unsigned long start, unsigned long end)
 {
-	if (!tlb->fullmm && (tlb->nr_ptes > 0 || tlb->nr_pxds < tlb->max))
+	if (!tlb->fullmm && (tlb->nr_ptes > 0 || tlb->nr_pxds < TLB_NR_PTRS))
 		__tlb_flush_mm(tlb->mm);
 	while (tlb->nr_ptes > 0)
 		page_table_free_rcu(tlb->mm, tlb->array[--tlb->nr_ptes]);
-	while (tlb->nr_pxds < tlb->max)
+	while (tlb->nr_pxds < TLB_NR_PTRS)
 		crst_table_free_rcu(tlb->mm, tlb->array[tlb->nr_pxds++]);
 }
 
 static inline void tlb_finish_mmu(struct mmu_gather *tlb,
 				  unsigned long start, unsigned long end)
 {
-	tlb_flush_mmu(tlb);
+	tlb_flush_mmu(tlb, start, end);
 
 	rcu_table_freelist_finish();
 
 	/* keep the page table cache within bounds */
 	check_pgt_cache();
 
-	if (tlb->array != tlb->local)
-		free_pages((unsigned long) tlb->array, 0);
+	put_cpu_var(mmu_gathers);
 }
 
 /*
  * Release the page cache reference for a pte removed by
- * tlb_ptep_clear_flush. In both flush modes the tlb for a page cache page
+ * tlb_ptep_clear_flush. In both flush modes the tlb fo a page cache page
  * has already been freed, so just do free_page_and_swap_cache.
  */
-static inline int __tlb_remove_page(struct mmu_gather *tlb, struct page *page)
-{
-	free_page_and_swap_cache(page);
-	return 1; /* avoid calling tlb_flush_mmu */
-}
-
 static inline void tlb_remove_page(struct mmu_gather *tlb, struct page *page)
 {
 	free_page_and_swap_cache(page);
@@ -115,7 +103,7 @@ static inline void pte_free_tlb(struct mmu_gather *tlb, pgtable_t pte,
 	if (!tlb->fullmm) {
 		tlb->array[tlb->nr_ptes++] = pte;
 		if (tlb->nr_ptes >= tlb->nr_pxds)
-			tlb_flush_mmu(tlb);
+			tlb_flush_mmu(tlb, 0, 0);
 	} else
 		page_table_free(tlb->mm, (unsigned long *) pte);
 }
@@ -136,7 +124,7 @@ static inline void pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmd,
 	if (!tlb->fullmm) {
 		tlb->array[--tlb->nr_pxds] = pmd;
 		if (tlb->nr_ptes >= tlb->nr_pxds)
-			tlb_flush_mmu(tlb);
+			tlb_flush_mmu(tlb, 0, 0);
 	} else
 		crst_table_free(tlb->mm, (unsigned long *) pmd);
 #endif
@@ -158,7 +146,7 @@ static inline void pud_free_tlb(struct mmu_gather *tlb, pud_t *pud,
 	if (!tlb->fullmm) {
 		tlb->array[--tlb->nr_pxds] = pud;
 		if (tlb->nr_ptes >= tlb->nr_pxds)
-			tlb_flush_mmu(tlb);
+			tlb_flush_mmu(tlb, 0, 0);
 	} else
 		crst_table_free(tlb->mm, (unsigned long *) pud);
 #endif

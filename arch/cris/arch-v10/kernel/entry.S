@@ -937,7 +937,6 @@ sys_call_table:
 	.long sys_inotify_init1
 	.long sys_preadv
 	.long sys_pwritev
-	.long sys_setns			/* 335 */
 
         /*
          * NOTE!! This doesn't have to be exact - we just have

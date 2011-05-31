@@ -7,11 +7,15 @@
  */
 
 #include <linux/interrupt.h>
+#include <linux/gpio.h>
+#include <linux/workqueue.h>
 #include <linux/device.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/sysfs.h>
+#include <linux/list.h>
 #include <linux/i2c.h>
+#include <linux/rtc.h>
 
 #include "../iio.h"
 #include "../sysfs.h"
@@ -50,6 +54,7 @@
  */
 
 struct ad7152_chip_info {
+	const char *name;
 	struct i2c_client *client;
 	struct iio_dev *indio_dev;
 	u16 ch1_offset;     /* Channel 1 offset calibration coefficient */
@@ -67,8 +72,7 @@ struct ad7152_conversion_mode {
 	u8 reg_cfg;
 };
 
-static struct ad7152_conversion_mode
-ad7152_conv_mode_table[AD7152_MAX_CONV_MODE] = {
+struct ad7152_conversion_mode ad7152_conv_mode_table[AD7152_MAX_CONV_MODE] = {
 	{ "idle", 0 },
 	{ "continuous-conversion", 1 },
 	{ "single-conversion", 2 },
@@ -478,6 +482,17 @@ static IIO_DEV_ATTR_FILTER_RATE_SETUP(S_IRUGO | S_IWUSR,
 		ad7152_show_filter_rate_setup,
 		ad7152_store_filter_rate_setup);
 
+static ssize_t ad7152_show_name(struct device *dev,
+		struct device_attribute *attr,
+		char *buf)
+{
+	struct iio_dev *dev_info = dev_get_drvdata(dev);
+	struct ad7152_chip_info *chip = dev_info->dev_data;
+	return sprintf(buf, "%s\n", chip->name);
+}
+
+static IIO_DEVICE_ATTR(name, S_IRUGO, ad7152_show_name, NULL, 0);
+
 static struct attribute *ad7152_attributes[] = {
 	&iio_dev_attr_available_conversion_modes.dev_attr.attr,
 	&iio_dev_attr_conversion_mode.dev_attr.attr,
@@ -490,6 +505,7 @@ static struct attribute *ad7152_attributes[] = {
 	&iio_dev_attr_ch1_setup.dev_attr.attr,
 	&iio_dev_attr_ch2_setup.dev_attr.attr,
 	&iio_dev_attr_filter_rate_setup.dev_attr.attr,
+	&iio_dev_attr_name.dev_attr.attr,
 	NULL,
 };
 
@@ -497,10 +513,6 @@ static const struct attribute_group ad7152_attribute_group = {
 	.attrs = ad7152_attributes,
 };
 
-static const struct iio_info ad7152_info = {
-	.attrs = &ad7152_attribute_group,
-	.driver_module = THIS_MODULE,
-};
 /*
  * device probe and remove
  */
@@ -519,18 +531,19 @@ static int __devinit ad7152_probe(struct i2c_client *client,
 	i2c_set_clientdata(client, chip);
 
 	chip->client = client;
+	chip->name = id->name;
 
-	chip->indio_dev = iio_allocate_device(0);
+	chip->indio_dev = iio_allocate_device();
 	if (chip->indio_dev == NULL) {
 		ret = -ENOMEM;
 		goto error_free_chip;
 	}
 
 	/* Echipabilish that the iio_dev is a child of the i2c device */
-	chip->indio_dev->name = id->name;
 	chip->indio_dev->dev.parent = &client->dev;
-	chip->indio_dev->info = &ad7152_info;
+	chip->indio_dev->attrs = &ad7152_attribute_group;
 	chip->indio_dev->dev_data = (void *)(chip);
+	chip->indio_dev->driver_module = THIS_MODULE;
 	chip->indio_dev->modes = INDIO_DIRECT_MODE;
 
 	ret = iio_device_register(chip->indio_dev);
@@ -554,6 +567,8 @@ static int __devexit ad7152_remove(struct i2c_client *client)
 	struct ad7152_chip_info *chip = i2c_get_clientdata(client);
 	struct iio_dev *indio_dev = chip->indio_dev;
 
+	if (client->irq && gpio_is_valid(irq_to_gpio(client->irq)) > 0)
+		iio_unregister_interrupt_line(indio_dev, 0);
 	iio_device_unregister(indio_dev);
 	kfree(chip);
 

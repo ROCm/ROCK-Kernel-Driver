@@ -847,7 +847,7 @@ int i_EepromReadMainHeader(unsigned short w_PCIBoardEepromAddress,
 				pc_PCIChipInformation,
 				s_MainHeader.s_Functions[i].w_Address,
 				&s_DigitalInputHeader);
-			devpriv->s_EeParameters.i_NbrDiChannel =
+			this_board->i_NbrDiChannel =
 				s_DigitalInputHeader.w_Nchannel;
 			break;
 
@@ -856,12 +856,11 @@ int i_EepromReadMainHeader(unsigned short w_PCIBoardEepromAddress,
 				pc_PCIChipInformation,
 				s_MainHeader.s_Functions[i].w_Address,
 				&s_DigitalOutputHeader);
-			devpriv->s_EeParameters.i_NbrDoChannel =
+			this_board->i_NbrDoChannel =
 				s_DigitalOutputHeader.w_Nchannel;
 			ui_Temp = 0xffffffff;
-			devpriv->s_EeParameters.i_DoMaxdata =
-				ui_Temp >> (32 -
-					devpriv->s_EeParameters.i_NbrDoChannel);
+			this_board->i_DoMaxdata =
+				ui_Temp >> (32 - this_board->i_NbrDoChannel);
 			break;
 
 		case EEPROM_ANALOGINPUT:
@@ -870,21 +869,20 @@ int i_EepromReadMainHeader(unsigned short w_PCIBoardEepromAddress,
 				s_MainHeader.s_Functions[i].w_Address,
 				&s_AnalogInputHeader);
 			if (!(strcmp(this_board->pc_DriverName, "apci3200")))
-				devpriv->s_EeParameters.i_NbrAiChannel =
+				this_board->i_NbrAiChannel =
 					s_AnalogInputHeader.w_Nchannel * 4;
 			else
-				devpriv->s_EeParameters.i_NbrAiChannel =
+				this_board->i_NbrAiChannel =
 					s_AnalogInputHeader.w_Nchannel;
-			devpriv->s_EeParameters.i_Dma =
-				s_AnalogInputHeader.b_HasDma;
-			devpriv->s_EeParameters.ui_MinAcquisitiontimeNs =
+			this_board->i_Dma = s_AnalogInputHeader.b_HasDma;
+			this_board->ui_MinAcquisitiontimeNs =
 				(unsigned int) s_AnalogInputHeader.w_MinConvertTiming *
 				1000;
-			devpriv->s_EeParameters.ui_MinDelaytimeNs =
+			this_board->ui_MinDelaytimeNs =
 				(unsigned int) s_AnalogInputHeader.w_MinDelayTiming *
 				1000;
 			ui_Temp = 0xffff;
-			devpriv->s_EeParameters.i_AiMaxdata =
+			this_board->i_AiMaxdata =
 				ui_Temp >> (16 -
 				s_AnalogInputHeader.b_Resolution);
 			break;
@@ -894,28 +892,24 @@ int i_EepromReadMainHeader(unsigned short w_PCIBoardEepromAddress,
 				pc_PCIChipInformation,
 				s_MainHeader.s_Functions[i].w_Address,
 				&s_AnalogOutputHeader);
-			devpriv->s_EeParameters.i_NbrAoChannel =
+			this_board->i_NbrAoChannel =
 				s_AnalogOutputHeader.w_Nchannel;
 			ui_Temp = 0xffff;
-			devpriv->s_EeParameters.i_AoMaxdata =
+			this_board->i_AoMaxdata =
 				ui_Temp >> (16 -
 				s_AnalogOutputHeader.b_Resolution);
 			break;
 
 		case EEPROM_TIMER:
-			/* Timer subdevice present */
-			devpriv->s_EeParameters.i_Timer = 1;
+			this_board->i_Timer = 1;	/* Timer subdevice present */
 			break;
 
 		case EEPROM_WATCHDOG:
-			/* Timer subdevice present */
-			devpriv->s_EeParameters.i_Timer = 1;
+			this_board->i_Timer = 1;	/* Timer subdevice present */
 			break;
 
 		case EEPROM_TIMER_WATCHDOG_COUNTER:
-			/* Timer subdevice present */
-			devpriv->s_EeParameters.i_Timer = 1;
-			break;
+			this_board->i_Timer = 1;	/* Timer subdevice present */
 		}
 	}
 

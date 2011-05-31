@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2005 - 2011 Emulex
+ * Copyright (C) 2005 - 2010 ServerEngines
  * All rights reserved.
  *
  * This program is free software; you can redistribute it and/or
@@ -7,16 +7,16 @@
  * as published by the Free Software Foundation.  The full GNU General
  * Public License is included in this distribution in the file called COPYING.
  *
- * Written by: Jayamohan Kallickal (jayamohan.kallickal@emulex.com)
+ * Written by: Jayamohan Kallickal (jayamohank@serverengines.com)
  *
  * Contact Information:
- * linux-drivers@emulex.com
+ * linux-drivers@serverengines.com
  *
- * Emulex
- * 3333 Susan Street
- * Costa Mesa, CA 92626
+ *  ServerEngines
+ * 209 N. Fair Oaks Ave
+ * Sunnyvale, CA 94085
+ *
  */
-
 #include <linux/reboot.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
@@ -420,8 +420,7 @@ static int beiscsi_setup_boot_info(struct beiscsi_hba *phba)
 	return 0;
 
 free_kset:
-	if (phba->boot_kset)
-		iscsi_boot_destroy_kset(phba->boot_kset);
+	iscsi_boot_destroy_kset(phba->boot_kset);
 	return -ENOMEM;
 }
 
@@ -619,7 +618,7 @@ static void beiscsi_get_params(struct beiscsi_hba *phba)
 				    + BE2_NOPOUT_REQ));
 	phba->params.cxns_per_ctrl = phba->fw_config.iscsi_cid_count;
 	phba->params.asyncpdus_per_ctrl = phba->fw_config.iscsi_cid_count * 2;
-	phba->params.icds_per_ctrl = phba->fw_config.iscsi_icd_count;
+	phba->params.icds_per_ctrl = phba->fw_config.iscsi_icd_count;;
 	phba->params.num_sge_per_io = BE2_SGE;
 	phba->params.defpdu_hdr_sz = BE2_DEFPDU_HDR_SZ;
 	phba->params.defpdu_data_sz = BE2_DEFPDU_DATA_SZ;
@@ -782,7 +781,7 @@ static irqreturn_t be_isr(int irq, void *dev_id)
 	int isr;
 
 	phba = dev_id;
-	ctrl = &phba->ctrl;
+	ctrl = &phba->ctrl;;
 	isr = ioread32(ctrl->csr + CEV_ISR0_OFFSET +
 		       (PCI_FUNC(ctrl->pdev->devfn) * CEV_ISR_SIZE));
 	if (!isr)
@@ -3465,23 +3464,23 @@ static void hwi_enable_intr(struct beiscsi_hba *phba)
 	addr = (u8 __iomem *) ((u8 __iomem *) ctrl->pcicfg +
 			PCICFG_MEMBAR_CTRL_INT_CTRL_OFFSET);
 	reg = ioread32(addr);
+	SE_DEBUG(DBG_LVL_8, "reg =x%08x\n", reg);
 
 	enabled = reg & MEMBAR_CTRL_INT_CTRL_HOSTINTR_MASK;
 	if (!enabled) {
 		reg |= MEMBAR_CTRL_INT_CTRL_HOSTINTR_MASK;
 		SE_DEBUG(DBG_LVL_8, "reg =x%08x addr=%p\n", reg, addr);
 		iowrite32(reg, addr);
-	}
-
-	if (!phba->msix_enabled) {
-		eq = &phwi_context->be_eq[0].q;
-		SE_DEBUG(DBG_LVL_8, "eq->id=%d\n", eq->id);
-		hwi_ring_eq_db(phba, eq->id, 0, 0, 1, 1);
-	} else {
-		for (i = 0; i <= phba->num_cpus; i++) {
-			eq = &phwi_context->be_eq[i].q;
+		if (!phba->msix_enabled) {
+			eq = &phwi_context->be_eq[0].q;
 			SE_DEBUG(DBG_LVL_8, "eq->id=%d\n", eq->id);
 			hwi_ring_eq_db(phba, eq->id, 0, 0, 1, 1);
+		} else {
+			for (i = 0; i <= phba->num_cpus; i++) {
+				eq = &phwi_context->be_eq[i].q;
+				SE_DEBUG(DBG_LVL_8, "eq->id=%d\n", eq->id);
+				hwi_ring_eq_db(phba, eq->id, 0, 0, 1, 1);
+			}
 		}
 	}
 }
@@ -4020,17 +4019,12 @@ static int beiscsi_mtask(struct iscsi_task *task)
 		hwi_write_buffer(pwrb, task);
 		break;
 	case ISCSI_OP_NOOP_OUT:
-		if (task->hdr->ttt != ISCSI_RESERVED_TAG) {
-			AMAP_SET_BITS(struct amap_iscsi_wrb, type, pwrb,
-				      TGT_DM_CMD);
-			AMAP_SET_BITS(struct amap_iscsi_wrb, cmdsn_itt,
-				      pwrb, 0);
+		AMAP_SET_BITS(struct amap_iscsi_wrb, type, pwrb,
+			      INI_RD_CMD);
+		if (task->hdr->ttt == ISCSI_RESERVED_TAG)
 			AMAP_SET_BITS(struct amap_iscsi_wrb, dmsg, pwrb, 0);
-		} else {
-			AMAP_SET_BITS(struct amap_iscsi_wrb, type, pwrb,
-				      INI_RD_CMD);
+		else
 			AMAP_SET_BITS(struct amap_iscsi_wrb, dmsg, pwrb, 1);
-		}
 		hwi_write_buffer(pwrb, task);
 		break;
 	case ISCSI_OP_TEXT:
@@ -4150,11 +4144,10 @@ static void beiscsi_remove(struct pci_dev *pcidev)
 			    phba->ctrl.mbox_mem_alloced.size,
 			    phba->ctrl.mbox_mem_alloced.va,
 			    phba->ctrl.mbox_mem_alloced.dma);
-	if (phba->boot_kset)
-		iscsi_boot_destroy_kset(phba->boot_kset);
 	iscsi_host_remove(phba->shost);
 	pci_dev_put(phba->pcidev);
 	iscsi_host_free(phba->shost);
+	iscsi_boot_destroy_kset(phba->boot_kset);
 }
 
 static void beiscsi_msix_enable(struct beiscsi_hba *phba)

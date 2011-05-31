@@ -23,6 +23,10 @@
 #ifndef __GMBOXIF_H__
 #define __GMBOXIF_H__
 
+#ifndef ATH_TARGET
+#include "athstartpack.h"
+#endif
+
 /* GMBOX interface definitions */
     
 #define AR6K_GMBOX_CREDIT_COUNTER       1   /* we use credit counter 1 to track credits */
@@ -65,6 +69,10 @@ typedef PREPACK struct {
 #define MBOX_SIG_HCI_BRIDGE_PWR_SAV_ON    3
 #define MBOX_SIG_HCI_BRIDGE_PWR_SAV_OFF   4
 
+
+#ifndef ATH_TARGET
+#include "athendpack.h"
+#endif
 
 #endif /* __GMBOXIF_H__ */
 

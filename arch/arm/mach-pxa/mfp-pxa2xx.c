@@ -16,7 +16,7 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
-#include <linux/syscore_ops.h>
+#include <linux/sysdev.h>
 
 #include <mach/gpio.h>
 #include <mach/pxa2xx-regs.h>
@@ -338,7 +338,7 @@ static unsigned long saved_gafr[2][4];
 static unsigned long saved_gpdr[4];
 static unsigned long saved_pgsr[4];
 
-static int pxa2xx_mfp_suspend(void)
+static int pxa2xx_mfp_suspend(struct sys_device *d, pm_message_t state)
 {
 	int i;
 
@@ -365,7 +365,7 @@ static int pxa2xx_mfp_suspend(void)
 	return 0;
 }
 
-static void pxa2xx_mfp_resume(void)
+static int pxa2xx_mfp_resume(struct sys_device *d)
 {
 	int i;
 
@@ -376,13 +376,15 @@ static void pxa2xx_mfp_resume(void)
 		PGSR(i) = saved_pgsr[i];
 	}
 	PSSR = PSSR_RDH | PSSR_PH;
+	return 0;
 }
 #else
 #define pxa2xx_mfp_suspend	NULL
 #define pxa2xx_mfp_resume	NULL
 #endif
 
-struct syscore_ops pxa2xx_mfp_syscore_ops = {
+struct sysdev_class pxa2xx_mfp_sysclass = {
+	.name		= "mfp",
 	.suspend	= pxa2xx_mfp_suspend,
 	.resume		= pxa2xx_mfp_resume,
 };
@@ -407,6 +409,6 @@ static int __init pxa2xx_mfp_init(void)
 	for (i = 0; i <= gpio_to_bank(pxa_last_gpio); i++)
 		gpdr_lpm[i] = GPDR(i * 32);
 
-	return 0;
+	return sysdev_class_register(&pxa2xx_mfp_sysclass);
 }
 postcore_initcall(pxa2xx_mfp_init);

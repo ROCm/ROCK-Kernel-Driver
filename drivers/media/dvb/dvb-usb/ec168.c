@@ -36,9 +36,7 @@ static int ec168_rw_udev(struct usb_device *udev, struct ec168_req *req)
 	int ret;
 	unsigned int pipe;
 	u8 request, requesttype;
-	u8 *buf;
-
-
+	u8 buf[req->size];
 
 	switch (req->cmd) {
 	case DOWNLOAD_FIRMWARE:
@@ -74,12 +72,6 @@ static int ec168_rw_udev(struct usb_device *udev, struct ec168_req *req)
 		goto error;
 	}
 
-	buf = kmalloc(req->size, GFP_KERNEL);
-	if (!buf) {
-		ret = -ENOMEM;
-		goto error;
-	}
-
 	if (requesttype == (USB_TYPE_VENDOR | USB_DIR_OUT)) {
 		/* write */
 		memcpy(buf, req->data, req->size);
@@ -92,13 +84,13 @@ static int ec168_rw_udev(struct usb_device *udev, struct ec168_req *req)
 	msleep(1); /* avoid I2C errors */
 
 	ret = usb_control_msg(udev, pipe, request, requesttype, req->value,
-		req->index, buf, req->size, EC168_USB_TIMEOUT);
+		req->index, buf, sizeof(buf), EC168_USB_TIMEOUT);
 
 	ec168_debug_dump(request, requesttype, req->value, req->index, buf,
 		req->size, deb_xfer);
 
 	if (ret < 0)
-		goto err_dealloc;
+		goto error;
 	else
 		ret = 0;
 
@@ -106,11 +98,7 @@ static int ec168_rw_udev(struct usb_device *udev, struct ec168_req *req)
 	if (!ret && requesttype == (USB_TYPE_VENDOR | USB_DIR_IN))
 		memcpy(req->data, buf, req->size);
 
-	kfree(buf);
 	return ret;
-
-err_dealloc:
-	kfree(buf);
 error:
 	deb_info("%s: failed:%d\n", __func__, ret);
 	return ret;

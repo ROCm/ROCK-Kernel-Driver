@@ -37,7 +37,7 @@ static int show_schedstat(struct seq_file *seq, void *v)
 
 #ifdef CONFIG_SMP
 		/* domain-specific stats */
-		rcu_read_lock();
+		preempt_disable();
 		for_each_domain(cpu, sd) {
 			enum cpu_idle_type itype;
 
@@ -64,7 +64,7 @@ static int show_schedstat(struct seq_file *seq, void *v)
 			    sd->ttwu_wake_remote, sd->ttwu_move_affine,
 			    sd->ttwu_move_balance);
 		}
-		rcu_read_unlock();
+		preempt_enable();
 #endif
 	}
 	kfree(mask_str);

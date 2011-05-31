@@ -52,7 +52,7 @@ static inline unsigned int ip_hdrlen(const struct sk_buff *skb)
 struct ipcm_cookie {
 	__be32			addr;
 	int			oif;
-	struct ip_options_rcu	*opt;
+	struct ip_options	*opt;
 	__u8			tx_flags;
 };
 
@@ -92,7 +92,7 @@ extern int		igmp_mc_proc_init(void);
 
 extern int		ip_build_and_send_pkt(struct sk_buff *skb, struct sock *sk,
 					      __be32 saddr, __be32 daddr,
-					      struct ip_options_rcu *opt);
+					      struct ip_options *opt);
 extern int		ip_rcv(struct sk_buff *skb, struct net_device *dev,
 			       struct packet_type *pt, struct net_device *orig_dev);
 extern int		ip_local_deliver(struct sk_buff *skb);
@@ -104,9 +104,9 @@ extern int		ip_do_nat(struct sk_buff *skb);
 extern void		ip_send_check(struct iphdr *ip);
 extern int		__ip_local_out(struct sk_buff *skb);
 extern int		ip_local_out(struct sk_buff *skb);
-extern int		ip_queue_xmit(struct sk_buff *skb, struct flowi *fl);
+extern int		ip_queue_xmit(struct sk_buff *skb);
 extern void		ip_init(void);
-extern int		ip_append_data(struct sock *sk, struct flowi4 *fl4,
+extern int		ip_append_data(struct sock *sk,
 				       int getfrag(void *from, char *to, int offset, int len,
 						   int odd, struct sk_buff *skb),
 				void *from, int len, int protolen,
@@ -114,17 +114,15 @@ extern int		ip_append_data(struct sock *sk, struct flowi4 *fl4,
 				struct rtable **rt,
 				unsigned int flags);
 extern int		ip_generic_getfrag(void *from, char *to, int offset, int len, int odd, struct sk_buff *skb);
-extern ssize_t		ip_append_page(struct sock *sk, struct flowi4 *fl4, struct page *page,
+extern ssize_t		ip_append_page(struct sock *sk, struct page *page,
 				int offset, size_t size, int flags);
 extern struct sk_buff  *__ip_make_skb(struct sock *sk,
-				      struct flowi4 *fl4,
 				      struct sk_buff_head *queue,
 				      struct inet_cork *cork);
 extern int		ip_send_skb(struct sk_buff *skb);
-extern int		ip_push_pending_frames(struct sock *sk, struct flowi4 *fl4);
+extern int		ip_push_pending_frames(struct sock *sk);
 extern void		ip_flush_pending_frames(struct sock *sk);
 extern struct sk_buff  *ip_make_skb(struct sock *sk,
-				    struct flowi4 *fl4,
 				    int getfrag(void *from, char *to, int offset, int len,
 						int odd, struct sk_buff *skb),
 				    void *from, int length, int transhdrlen,
@@ -132,9 +130,9 @@ extern struct sk_buff  *ip_make_skb(struct sock *sk,
 				    struct rtable **rtp,
 				    unsigned int flags);
 
-static inline struct sk_buff *ip_finish_skb(struct sock *sk, struct flowi4 *fl4)
+static inline struct sk_buff *ip_finish_skb(struct sock *sk)
 {
-	return __ip_make_skb(sk, fl4, &sk->sk_write_queue, &inet_sk(sk)->cork.base);
+	return __ip_make_skb(sk, &sk->sk_write_queue, &inet_sk(sk)->cork);
 }
 
 /* datagram.c */
@@ -174,8 +172,8 @@ static inline __u8 ip_reply_arg_flowi_flags(const struct ip_reply_arg *arg)
 	return (arg->flags & IP_REPLY_ARG_NOSRCCHECK) ? FLOWI_FLAG_ANYSRC : 0;
 }
 
-void ip_send_reply(struct sock *sk, struct sk_buff *skb, __be32 daddr,
-		   struct ip_reply_arg *arg, unsigned int len);
+void ip_send_reply(struct sock *sk, struct sk_buff *skb, struct ip_reply_arg *arg,
+		   unsigned int len); 
 
 struct ipv4_config {
 	int	log_martians;
@@ -418,15 +416,14 @@ extern int ip_forward(struct sk_buff *skb);
  *	Functions provided by ip_options.c
  */
  
-extern void ip_options_build(struct sk_buff *skb, struct ip_options *opt,
-			     __be32 daddr, struct rtable *rt, int is_frag);
+extern void ip_options_build(struct sk_buff *skb, struct ip_options *opt, __be32 daddr, struct rtable *rt, int is_frag);
 extern int ip_options_echo(struct ip_options *dopt, struct sk_buff *skb);
 extern void ip_options_fragment(struct sk_buff *skb);
 extern int ip_options_compile(struct net *net,
 			      struct ip_options *opt, struct sk_buff *skb);
-extern int ip_options_get(struct net *net, struct ip_options_rcu **optp,
+extern int ip_options_get(struct net *net, struct ip_options **optp,
 			  unsigned char *data, int optlen);
-extern int ip_options_get_from_user(struct net *net, struct ip_options_rcu **optp,
+extern int ip_options_get_from_user(struct net *net, struct ip_options **optp,
 				    unsigned char __user *data, int optlen);
 extern void ip_options_undo(struct ip_options * opt);
 extern void ip_forward_options(struct sk_buff *skb);

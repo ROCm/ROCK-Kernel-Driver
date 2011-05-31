@@ -38,6 +38,7 @@ static struct mtd_info *h1910_nand_mtd = NULL;
  * Module stuff
  */
 
+#ifdef CONFIG_MTD_PARTITIONS
 /*
  * Define static partitions for flash device
  */
@@ -48,6 +49,8 @@ static struct mtd_partition partition_info[] = {
 };
 
 #define NUM_PARTITIONS 1
+
+#endif
 
 /*
  *	hardware specific access to control-lines
@@ -151,7 +154,7 @@ static int __init h1910_init(void)
 
 	/* Register the partitions */
 	printk(KERN_NOTICE "Using %s partition definition\n", part_type);
-	mtd_device_register(h1910_nand_mtd, mtd_parts, mtd_parts_nb);
+	add_mtd_partitions(h1910_nand_mtd, mtd_parts, mtd_parts_nb);
 
 	/* Return happy */
 	return 0;

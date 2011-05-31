@@ -69,6 +69,18 @@ error:
 EXPORT_SYMBOL_GPL(user_instantiate);
 
 /*
+ * dispose of the old data from an updated user defined key
+ */
+static void user_update_rcu_disposal(struct rcu_head *rcu)
+{
+	struct user_key_payload *upayload;
+
+	upayload = container_of(rcu, struct user_key_payload, rcu);
+
+	kfree(upayload);
+}
+
+/*
  * update a user defined key
  * - the key's semaphore is write-locked
  */
@@ -102,7 +114,7 @@ int user_update(struct key *key, const void *data, size_t datalen)
 		key->expiry = 0;
 	}
 
-	kfree_rcu(zap, rcu);
+	call_rcu(&zap->rcu, user_update_rcu_disposal);
 
 error:
 	return ret;
@@ -133,7 +145,7 @@ void user_revoke(struct key *key)
 
 	if (upayload) {
 		rcu_assign_pointer(key->payload.data, NULL);
-		kfree_rcu(upayload, rcu);
+		call_rcu(&upayload->rcu, user_update_rcu_disposal);
 	}
 }
 
@@ -157,8 +169,8 @@ EXPORT_SYMBOL_GPL(user_destroy);
 void user_describe(const struct key *key, struct seq_file *m)
 {
 	seq_puts(m, key->description);
-	if (key_is_instantiated(key))
-		seq_printf(m, ": %u", key->datalen);
+
+	seq_printf(m, ": %u", key->datalen);
 }
 
 EXPORT_SYMBOL_GPL(user_describe);

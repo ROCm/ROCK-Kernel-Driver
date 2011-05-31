@@ -130,7 +130,7 @@ struct page *lookup_cgroup_page(struct page_cgroup *pc)
 	return page;
 }
 
-static void *__meminit alloc_page_cgroup(size_t size, int nid)
+static void *__init_refok alloc_page_cgroup(size_t size, int nid)
 {
 	void *addr = NULL;
 
@@ -162,7 +162,7 @@ static void free_page_cgroup(void *addr)
 }
 #endif
 
-static int __meminit init_section_page_cgroup(unsigned long pfn)
+static int __init_refok init_section_page_cgroup(unsigned long pfn)
 {
 	struct page_cgroup *base, *pc;
 	struct mem_section *section;
@@ -475,7 +475,7 @@ int swap_cgroup_swapon(int type, unsigned long max_pages)
 	if (!do_swap_account)
 		return 0;
 
-	length = DIV_ROUND_UP(max_pages, SC_PER_PAGE);
+	length = ((max_pages/SC_PER_PAGE) + 1);
 	array_size = length * sizeof(void *);
 
 	array = vmalloc(array_size);
@@ -492,8 +492,8 @@ int swap_cgroup_swapon(int type, unsigned long max_pages)
 		/* memory shortage */
 		ctrl->map = NULL;
 		ctrl->length = 0;
-		mutex_unlock(&swap_cgroup_mutex);
 		vfree(array);
+		mutex_unlock(&swap_cgroup_mutex);
 		goto nomem;
 	}
 	mutex_unlock(&swap_cgroup_mutex);
@@ -508,8 +508,7 @@ nomem:
 
 void swap_cgroup_swapoff(int type)
 {
-	struct page **map;
-	unsigned long i, length;
+	int i;
 	struct swap_cgroup_ctrl *ctrl;
 
 	if (!do_swap_account)
@@ -517,20 +516,17 @@ void swap_cgroup_swapoff(int type)
 
 	mutex_lock(&swap_cgroup_mutex);
 	ctrl = &swap_cgroup_ctrl[type];
-	map = ctrl->map;
-	length = ctrl->length;
-	ctrl->map = NULL;
-	ctrl->length = 0;
-	mutex_unlock(&swap_cgroup_mutex);
-
-	if (map) {
-		for (i = 0; i < length; i++) {
-			struct page *page = map[i];
+	if (ctrl->map) {
+		for (i = 0; i < ctrl->length; i++) {
+			struct page *page = ctrl->map[i];
 			if (page)
 				__free_page(page);
 		}
-		vfree(map);
+		vfree(ctrl->map);
+		ctrl->map = NULL;
+		ctrl->length = 0;
 	}
+	mutex_unlock(&swap_cgroup_mutex);
 }
 
 #endif

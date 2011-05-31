@@ -139,7 +139,7 @@ int sm_register_device(struct mtd_info *mtd, int smartmedia)
 	if (ret)
 		return ret;
 
-	return mtd_device_register(mtd, NULL, 0);
+	return add_mtd_device(mtd);
 }
 EXPORT_SYMBOL_GPL(sm_register_device);
 

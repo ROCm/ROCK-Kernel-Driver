@@ -1359,35 +1359,26 @@ out:
 }
 
 static void filename_compute_type(struct policydb *p, struct context *newcontext,
-				  u32 stype, u32 ttype, u16 tclass,
-				  const char *objname)
+				  u32 scon, u32 tcon, u16 tclass,
+				  const struct qstr *qstr)
 {
-	struct filename_trans ft;
-	struct filename_trans_datum *otype;
-
-	/*
-	 * Most filename trans rules are going to live in specific directories
-	 * like /dev or /var/run.  This bitmap will quickly skip rule searches
-	 * if the ttype does not contain any rules.
-	 */
-	if (!ebitmap_get_bit(&p->filename_trans_ttypes, ttype))
-		return;
-
-	ft.stype = stype;
-	ft.ttype = ttype;
-	ft.tclass = tclass;
-	ft.name = objname;
-
-	otype = hashtab_search(p->filename_trans, &ft);
-	if (otype)
-		newcontext->type = otype->otype;
+	struct filename_trans *ft;
+	for (ft = p->filename_trans; ft; ft = ft->next) {
+		if (ft->stype == scon &&
+		    ft->ttype == tcon &&
+		    ft->tclass == tclass &&
+		    !strcmp(ft->name, qstr->name)) {
+			newcontext->type = ft->otype;
+			return;
+		}
+	}
 }
 
 static int security_compute_sid(u32 ssid,
 				u32 tsid,
 				u16 orig_tclass,
 				u32 specified,
-				const char *objname,
+				const struct qstr *qstr,
 				u32 *out_sid,
 				bool kern)
 {
@@ -1487,21 +1478,23 @@ static int security_compute_sid(u32 ssid,
 		newcontext.type = avdatum->data;
 	}
 
-	/* if we have a objname this is a file trans check so check those rules */
-	if (objname)
+	/* if we have a qstr this is a file trans check so check those rules */
+	if (qstr)
 		filename_compute_type(&policydb, &newcontext, scontext->type,
-				      tcontext->type, tclass, objname);
+				      tcontext->type, tclass, qstr);
 
 	/* Check for class-specific changes. */
-	if (specified & AVTAB_TRANSITION) {
-		/* Look for a role transition rule. */
-		for (roletr = policydb.role_tr; roletr; roletr = roletr->next) {
-			if ((roletr->role == scontext->role) &&
-			    (roletr->type == tcontext->type) &&
-			    (roletr->tclass == tclass)) {
-				/* Use the role transition rule. */
-				newcontext.role = roletr->new_role;
-				break;
+	if  (tclass == policydb.process_class) {
+		if (specified & AVTAB_TRANSITION) {
+			/* Look for a role transition rule. */
+			for (roletr = policydb.role_tr; roletr;
+			     roletr = roletr->next) {
+				if (roletr->role == scontext->role &&
+				    roletr->type == tcontext->type) {
+					/* Use the role transition rule. */
+					newcontext.role = roletr->new_role;
+					break;
+				}
 			}
 		}
 	}
@@ -1548,14 +1541,13 @@ int security_transition_sid(u32 ssid, u32 tsid, u16 tclass,
 			    const struct qstr *qstr, u32 *out_sid)
 {
 	return security_compute_sid(ssid, tsid, tclass, AVTAB_TRANSITION,
-				    qstr ? qstr->name : NULL, out_sid, true);
+				    qstr, out_sid, true);
 }
 
-int security_transition_sid_user(u32 ssid, u32 tsid, u16 tclass,
-				 const char *objname, u32 *out_sid)
+int security_transition_sid_user(u32 ssid, u32 tsid, u16 tclass, u32 *out_sid)
 {
 	return security_compute_sid(ssid, tsid, tclass, AVTAB_TRANSITION,
-				    objname, out_sid, false);
+				    NULL, out_sid, false);
 }
 
 /**
@@ -2217,11 +2209,10 @@ out_unlock:
 		goto out;
 	}
 	for (i = 0, j = 0; i < mynel; i++) {
-		struct av_decision dummy_avd;
 		rc = avc_has_perm_noaudit(fromsid, mysids[i],
 					  SECCLASS_PROCESS, /* kernel value */
 					  PROCESS__TRANSITION, AVC_STRICT,
-					  &dummy_avd);
+					  NULL);
 		if (!rc)
 			mysids2[j++] = mysids[i];
 		cond_resched();
@@ -3199,7 +3190,7 @@ out:
  * @len: length of data in bytes
  *
  */
-int security_read_policy(void **data, size_t *len)
+int security_read_policy(void **data, ssize_t *len)
 {
 	int rc;
 	struct policy_file fp;

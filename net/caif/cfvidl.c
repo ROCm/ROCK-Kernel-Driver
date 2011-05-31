@@ -60,5 +60,8 @@ static int cfvidl_transmit(struct cflayer *layr, struct cfpkt *pkt)
 	info = cfpkt_info(pkt);
 	info->channel_id = service->layer.id;
 	info->dev_info = &service->dev_info;
-	return layr->dn->transmit(layr->dn, pkt);
+	ret = layr->dn->transmit(layr->dn, pkt);
+	if (ret < 0)
+		cfpkt_extr_head(pkt, &videoheader, 4);
+	return ret;
 }

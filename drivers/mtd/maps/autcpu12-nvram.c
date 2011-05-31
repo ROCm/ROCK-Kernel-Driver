@@ -88,7 +88,7 @@ map:
 	sram_mtd->owner = THIS_MODULE;
 	sram_mtd->erasesize = 16;
 
-	if (mtd_device_register(sram_mtd, NULL, 0)) {
+	if (add_mtd_device(sram_mtd)) {
 		printk("NV-RAM device addition failed\n");
 		err = -ENOMEM;
 		goto out_probe;
@@ -111,7 +111,7 @@ out:
 static void __exit cleanup_autcpu12_maps(void)
 {
 	if (sram_mtd) {
-		mtd_device_unregister(sram_mtd);
+		del_mtd_device(sram_mtd);
 		map_destroy(sram_mtd);
 		iounmap((void *)autcpu12_sram_map.virt);
 	}

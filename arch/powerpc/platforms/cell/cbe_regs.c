@@ -45,8 +45,8 @@ static struct cbe_thread_map
 	unsigned int cbe_id;
 } cbe_thread_map[NR_CPUS];
 
-static cpumask_t cbe_local_mask[MAX_CBE] = { [0 ... MAX_CBE-1] = {CPU_BITS_NONE} };
-static cpumask_t cbe_first_online_cpu = { CPU_BITS_NONE };
+static cpumask_t cbe_local_mask[MAX_CBE] = { [0 ... MAX_CBE-1] = CPU_MASK_NONE };
+static cpumask_t cbe_first_online_cpu = CPU_MASK_NONE;
 
 static struct cbe_regs_map *cbe_find_map(struct device_node *np)
 {
@@ -159,8 +159,7 @@ EXPORT_SYMBOL_GPL(cbe_cpu_to_node);
 
 u32 cbe_node_to_cpu(int node)
 {
-	return cpumask_first(&cbe_local_mask[node]);
-
+	return find_first_bit( (unsigned long *) &cbe_local_mask[node], sizeof(cpumask_t));
 }
 EXPORT_SYMBOL_GPL(cbe_node_to_cpu);
 
@@ -269,9 +268,9 @@ void __init cbe_regs_init(void)
 				thread->regs = map;
 				thread->cbe_id = cbe_id;
 				map->be_node = thread->be_node;
-				cpumask_set_cpu(i, &cbe_local_mask[cbe_id]);
+				cpu_set(i, cbe_local_mask[cbe_id]);
 				if(thread->thread_id == 0)
-					cpumask_set_cpu(i, &cbe_first_online_cpu);
+					cpu_set(i, cbe_first_online_cpu);
 			}
 		}
 

@@ -246,7 +246,23 @@ static inline int __test_and_clear_bit_le(int nr, volatile void *addr)
 	return retval;
 }
 
-#include <asm-generic/bitops/ext2-atomic.h>
+#define ext2_set_bit_atomic(lock, nr, addr)		\
+	({						\
+		int ret;				\
+		spin_lock(lock);			\
+		ret = __test_and_set_bit_le((nr), (addr));	\
+		spin_unlock(lock);			\
+		ret;					\
+	})
+
+#define ext2_clear_bit_atomic(lock, nr, addr)		\
+	({						\
+		int ret;				\
+		spin_lock(lock);			\
+		ret = __test_and_clear_bit_le((nr), (addr));	\
+		spin_unlock(lock);			\
+		ret;					\
+	})
 
 static inline int test_bit_le(int nr, const volatile void *addr)
 {
@@ -319,10 +335,6 @@ found_first:
 found_middle:
 	return result + ffz(__swab32(tmp));
 }
-#define find_next_zero_bit_le find_next_zero_bit_le
-
-extern unsigned long find_next_bit_le(const void *addr,
-		unsigned long size, unsigned long offset);
 
 #endif /* __KERNEL__ */
 

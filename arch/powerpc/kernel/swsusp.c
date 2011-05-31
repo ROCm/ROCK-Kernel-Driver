@@ -10,6 +10,7 @@
  */
 
 #include <linux/sched.h>
+#include <asm/suspend.h>
 #include <asm/system.h>
 #include <asm/current.h>
 #include <asm/mmu_context.h>

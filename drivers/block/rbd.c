@@ -1191,19 +1191,14 @@ static int rbd_req_sync_notify_ack(struct rbd_device *dev,
 static void rbd_watch_cb(u64 ver, u64 notify_id, u8 opcode, void *data)
 {
 	struct rbd_device *dev = (struct rbd_device *)data;
-	int rc;
-
 	if (!dev)
 		return;
 
 	dout("rbd_watch_cb %s notify_id=%lld opcode=%d\n", dev->obj_md_name,
 		notify_id, (int)opcode);
 	mutex_lock_nested(&ctl_mutex, SINGLE_DEPTH_NESTING);
-	rc = __rbd_update_snaps(dev);
+	__rbd_update_snaps(dev);
 	mutex_unlock(&ctl_mutex);
-	if (rc)
-		pr_warning(DRV_NAME "%d got notification but failed to update"
-			   " snaps: %d\n", dev->major, rc);
 
 	rbd_req_sync_notify_ack(dev, ver, notify_id, dev->obj_md_name);
 }
@@ -1602,7 +1597,7 @@ static int rbd_header_add_snap(struct rbd_device *dev,
 	int name_len = strlen(snap_name);
 	u64 new_snapid;
 	int ret;
-	void *data, *p, *e;
+	void *data, *data_start, *data_end;
 	u64 ver;
 
 	/* we should create a snapshot only if we're pointing at the head */
@@ -1619,16 +1614,16 @@ static int rbd_header_add_snap(struct rbd_device *dev,
 	if (!data)
 		return -ENOMEM;
 
-	p = data;
-	e = data + name_len + 16;
+	data_start = data;
+	data_end = data + name_len + 16;
 
-	ceph_encode_string_safe(&p, e, snap_name, name_len, bad);
-	ceph_encode_64_safe(&p, e, new_snapid, bad);
+	ceph_encode_string_safe(&data, data_end, snap_name, name_len, bad);
+	ceph_encode_64_safe(&data, data_end, new_snapid, bad);
 
 	ret = rbd_req_sync_exec(dev, dev->obj_md_name, "rbd", "snap_add",
-				data, p - data, &ver);
+				data_start, data - data_start, &ver);
 
-	kfree(data);
+	kfree(data_start);
 
 	if (ret < 0)
 		return ret;
@@ -1663,9 +1658,6 @@ static int __rbd_update_snaps(struct rbd_device *rbd_dev)
 	ret = rbd_read_header(rbd_dev, &h);
 	if (ret < 0)
 		return ret;
-
-	/* resized? */
-	set_capacity(rbd_dev->disk, h.image_size / 512ULL);
 
 	down_write(&rbd_dev->header.snap_rwsem);
 
@@ -1724,8 +1716,7 @@ static int rbd_init_disk(struct rbd_device *rbd_dev)
 	if (!disk)
 		goto out;
 
-	snprintf(disk->disk_name, sizeof(disk->disk_name), DRV_NAME "%d",
-		 rbd_dev->id);
+	sprintf(disk->disk_name, DRV_NAME "%d", rbd_dev->id);
 	disk->major = rbd_dev->major;
 	disk->first_minor = 0;
 	disk->fops = &rbd_bd_ops;

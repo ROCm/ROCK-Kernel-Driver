@@ -151,13 +151,8 @@ static inline int h4_check_data_len(struct h4_struct *h4, int len)
 /* Recv data */
 static int h4_recv(struct hci_uart *hu, void *data, int count)
 {
-	int ret;
-
-	ret = hci_recv_stream_fragment(hu->hdev, data, count);
-	if (ret < 0) {
+	if (hci_recv_stream_fragment(hu->hdev, data, count) < 0)
 		BT_ERR("Frame Reassembly Failed");
-		return ret;
-	}
 
 	return count;
 }

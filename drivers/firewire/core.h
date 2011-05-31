@@ -97,8 +97,6 @@ struct fw_card_driver {
 			 struct fw_iso_buffer *buffer,
 			 unsigned long payload);
 
-	void (*flush_queue_iso)(struct fw_iso_context *ctx);
-
 	int (*stop_iso)(struct fw_iso_context *ctx);
 };
 

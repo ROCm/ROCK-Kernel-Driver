@@ -51,7 +51,6 @@ static unsigned int fmax = 515633;
  *		  is asserted (likewise for RX)
  * @sdio: variant supports SDIO
  * @st_clkdiv: true if using a ST-specific clock divider algorithm
- * @blksz_datactrl16: true if Block size is at b16..b30 position in datactrl register
  */
 struct variant_data {
 	unsigned int		clkreg;
@@ -61,7 +60,6 @@ struct variant_data {
 	unsigned int		fifohalfsize;
 	bool			sdio;
 	bool			st_clkdiv;
-	bool			blksz_datactrl16;
 };
 
 static struct variant_data variant_arm = {
@@ -79,7 +77,7 @@ static struct variant_data variant_arm_extended_fifo = {
 static struct variant_data variant_u300 = {
 	.fifosize		= 16 * 4,
 	.fifohalfsize		= 8 * 4,
-	.clkreg_enable		= MCI_ST_U300_HWFCEN,
+	.clkreg_enable		= 1 << 13, /* HWFCEN */
 	.datalength_bits	= 16,
 	.sdio			= true,
 };
@@ -88,21 +86,10 @@ static struct variant_data variant_ux500 = {
 	.fifosize		= 30 * 4,
 	.fifohalfsize		= 8 * 4,
 	.clkreg			= MCI_CLK_ENABLE,
-	.clkreg_enable		= MCI_ST_UX500_HWFCEN,
+	.clkreg_enable		= 1 << 14, /* HWFCEN */
 	.datalength_bits	= 24,
 	.sdio			= true,
 	.st_clkdiv		= true,
-};
-
-static struct variant_data variant_ux500v2 = {
-	.fifosize		= 30 * 4,
-	.fifohalfsize		= 8 * 4,
-	.clkreg			= MCI_CLK_ENABLE,
-	.clkreg_enable		= MCI_ST_UX500_HWFCEN,
-	.datalength_bits	= 24,
-	.sdio			= true,
-	.st_clkdiv		= true,
-	.blksz_datactrl16	= true,
 };
 
 /*
@@ -116,8 +103,6 @@ static void mmci_set_clkreg(struct mmci_host *host, unsigned int desired)
 	if (desired) {
 		if (desired >= host->mclk) {
 			clk = MCI_CLK_BYPASS;
-			if (variant->st_clkdiv)
-				clk |= MCI_ST_UX500_NEG_EDGE;
 			host->cclk = host->mclk;
 		} else if (variant->st_clkdiv) {
 			/*
@@ -478,10 +463,7 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
 	blksz_bits = ffs(data->blksz) - 1;
 	BUG_ON(1 << blksz_bits != data->blksz);
 
-	if (variant->blksz_datactrl16)
-		datactrl = MCI_DPSM_ENABLE | (data->blksz << 16);
-	else
-		datactrl = MCI_DPSM_ENABLE | blksz_bits << 4;
+	datactrl = MCI_DPSM_ENABLE | blksz_bits << 4;
 
 	if (data->flags & MMC_DATA_READ)
 		datactrl |= MCI_DPSM_DIRECTION;
@@ -1327,13 +1309,8 @@ static struct amba_id mmci_ids[] = {
 	},
 	{
 		.id     = 0x00480180,
-		.mask   = 0xf0ffffff,
+		.mask   = 0x00ffffff,
 		.data	= &variant_ux500,
-	},
-	{
-		.id     = 0x10480180,
-		.mask   = 0xf0ffffff,
-		.data	= &variant_ux500v2,
 	},
 	{ 0, 0 },
 };

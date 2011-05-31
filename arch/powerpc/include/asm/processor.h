@@ -238,10 +238,6 @@ struct thread_struct {
 #ifdef CONFIG_KVM_BOOK3S_32_HANDLER
 	void*		kvm_shadow_vcpu; /* KVM internal data */
 #endif /* CONFIG_KVM_BOOK3S_32_HANDLER */
-#ifdef CONFIG_PPC64
-	unsigned long	dscr;
-	int		dscr_inherit;
-#endif
 };
 
 #define ARCH_MIN_TASKALIGN 16

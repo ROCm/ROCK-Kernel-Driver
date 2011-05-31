@@ -70,6 +70,19 @@ static void clockevent_set_mode(enum clock_event_mode mode,
 static int clockevent_next_event(unsigned long evt,
 				 struct clock_event_device *clk_event_dev);
 
+static cycle_t clocksource_read_cycles(struct clocksource *cs)
+{
+	return (cycle_t) readw(gpt_base + COUNT(CLKSRC));
+}
+
+static struct clocksource clksrc = {
+	.name = "tmr1",
+	.rating = 200,		/* its a pretty decent clock */
+	.read = clocksource_read_cycles,
+	.mask = 0xFFFF,		/* 16 bits */
+	.flags = CLOCK_SOURCE_IS_CONTINUOUS,
+};
+
 static void spear_clocksource_init(void)
 {
 	u32 tick_rate;
@@ -90,8 +103,7 @@ static void spear_clocksource_init(void)
 	writew(val, gpt_base + CR(CLKSRC));
 
 	/* register the clocksource */
-	clocksource_mmio_init(gpt_base + COUNT(CLKSRC), "tmr1", tick_rate,
-		200, 16, clocksource_mmio_readw_up);
+	clocksource_register_hz(&clksrc, tick_rate);
 }
 
 static struct clock_event_device clkevt = {

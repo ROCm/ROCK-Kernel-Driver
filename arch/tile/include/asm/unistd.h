@@ -15,7 +15,7 @@
 #if !defined(_ASM_TILE_UNISTD_H) || defined(__SYSCALL)
 #define _ASM_TILE_UNISTD_H
 
-#if !defined(__LP64__) || defined(__SYSCALL_COMPAT)
+#ifndef __LP64__
 /* Use the flavor of this syscall that matches the 32-bit API better. */
 #define __ARCH_WANT_SYNC_FILE_RANGE2
 #endif

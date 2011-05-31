@@ -93,7 +93,7 @@ static int __init init_dbox2_flash(void)
 		mymtd->owner = THIS_MODULE;
 
                 /* Create MTD devices for each partition. */
-		mtd_device_register(mymtd, partition_info, NUM_PARTITIONS);
+	        add_mtd_partitions(mymtd, partition_info, NUM_PARTITIONS);
 
 		return 0;
 	}
@@ -105,7 +105,7 @@ static int __init init_dbox2_flash(void)
 static void __exit cleanup_dbox2_flash(void)
 {
 	if (mymtd) {
-		mtd_device_unregister(mymtd);
+		del_mtd_partitions(mymtd);
 		map_destroy(mymtd);
 	}
 	if (dbox2_flash_map.virt) {

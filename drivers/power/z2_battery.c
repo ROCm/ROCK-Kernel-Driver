@@ -271,33 +271,24 @@ static int __devexit z2_batt_remove(struct i2c_client *client)
 }
 
 #ifdef CONFIG_PM
-static int z2_batt_suspend(struct device *dev)
+static int z2_batt_suspend(struct i2c_client *client, pm_message_t state)
 {
-	struct i2c_client *client = to_i2c_client(dev);
 	struct z2_charger *charger = i2c_get_clientdata(client);
 
 	flush_work_sync(&charger->bat_work);
 	return 0;
 }
 
-static int z2_batt_resume(struct device *dev)
+static int z2_batt_resume(struct i2c_client *client)
 {
-	struct i2c_client *client = to_i2c_client(dev);
 	struct z2_charger *charger = i2c_get_clientdata(client);
 
 	schedule_work(&charger->bat_work);
 	return 0;
 }
-
-static const struct dev_pm_ops z2_battery_pm_ops = {
-	.suspend	= z2_batt_suspend,
-	.resume		= z2_batt_resume,
-};
-
-#define	Z2_BATTERY_PM_OPS	(&z2_battery_pm_ops)
-
 #else
-#define	Z2_BATTERY_PM_OPS	(NULL)
+#define z2_batt_suspend NULL
+#define z2_batt_resume NULL
 #endif
 
 static const struct i2c_device_id z2_batt_id[] = {
@@ -310,10 +301,11 @@ static struct i2c_driver z2_batt_driver = {
 	.driver	= {
 		.name	= "z2-battery",
 		.owner	= THIS_MODULE,
-		.pm	= Z2_BATTERY_PM_OPS
 	},
 	.probe		= z2_batt_probe,
 	.remove		= z2_batt_remove,
+	.suspend	= z2_batt_suspend,
+	.resume		= z2_batt_resume,
 	.id_table	= z2_batt_id,
 };
 

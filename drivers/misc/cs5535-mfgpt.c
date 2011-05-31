@@ -329,7 +329,7 @@ done:
 	return err;
 }
 
-static struct platform_driver cs5535_mfgpt_driver = {
+static struct platform_driver cs5535_mfgpt_drv = {
 	.driver = {
 		.name = DRV_NAME,
 		.owner = THIS_MODULE,
@@ -340,7 +340,7 @@ static struct platform_driver cs5535_mfgpt_driver = {
 
 static int __init cs5535_mfgpt_init(void)
 {
-	return platform_driver_register(&cs5535_mfgpt_driver);
+	return platform_driver_register(&cs5535_mfgpt_drv);
 }
 
 module_init(cs5535_mfgpt_init);

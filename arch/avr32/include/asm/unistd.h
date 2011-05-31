@@ -299,10 +299,9 @@
 #define __NR_signalfd		279
 /* 280 was __NR_timerfd */
 #define __NR_eventfd		281
-#define __NR_setns		283
 
 #ifdef __KERNEL__
-#define NR_syscalls		284
+#define NR_syscalls		282
 
 /* Old stuff */
 #define __IGNORE_uselib

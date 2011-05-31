@@ -58,7 +58,6 @@
 #include <linux/kmemleak.h>
 #include <linux/jump_label.h>
 #include <linux/pfn.h>
-#include <linux/bsearch.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/module.h>
@@ -258,24 +257,23 @@ static bool each_symbol_in_section(const struct symsearch *arr,
 				   struct module *owner,
 				   bool (*fn)(const struct symsearch *syms,
 					      struct module *owner,
-					      void *data),
+					      unsigned int symnum, void *data),
 				   void *data)
 {
-	unsigned int j;
+	unsigned int i, j;
 
 	for (j = 0; j < arrsize; j++) {
-		if (fn(&arr[j], owner, data))
-			return true;
+		for (i = 0; i < arr[j].stop - arr[j].start; i++)
+			if (fn(&arr[j], owner, i, data))
+				return true;
 	}
 
 	return false;
 }
 
 /* Returns true as soon as fn returns true, otherwise false. */
-bool each_symbol_section(bool (*fn)(const struct symsearch *arr,
-				    struct module *owner,
-				    void *data),
-			 void *data)
+bool each_symbol(bool (*fn)(const struct symsearch *arr, struct module *owner,
+			    unsigned int symnum, void *data), void *data)
 {
 	struct module *mod;
 	static const struct symsearch arr[] = {
@@ -328,7 +326,7 @@ bool each_symbol_section(bool (*fn)(const struct symsearch *arr,
 	}
 	return false;
 }
-EXPORT_SYMBOL_GPL(each_symbol_section);
+EXPORT_SYMBOL_GPL(each_symbol);
 
 struct find_symbol_arg {
 	/* Input */
@@ -342,11 +340,14 @@ struct find_symbol_arg {
 	const struct kernel_symbol *sym;
 };
 
-static bool check_symbol(const struct symsearch *syms,
-				 struct module *owner,
-				 unsigned int symnum, void *data)
+static bool find_symbol_in_section(const struct symsearch *syms,
+				   struct module *owner,
+				   unsigned int symnum, void *data)
 {
 	struct find_symbol_arg *fsa = data;
+
+	if (strcmp(syms->start[symnum].name, fsa->name) != 0)
+		return false;
 
 	if (!fsa->gplok) {
 		if (syms->licence == GPL_ONLY)
@@ -381,30 +382,6 @@ static bool check_symbol(const struct symsearch *syms,
 	return true;
 }
 
-static int cmp_name(const void *va, const void *vb)
-{
-	const char *a;
-	const struct kernel_symbol *b;
-	a = va; b = vb;
-	return strcmp(a, b->name);
-}
-
-static bool find_symbol_in_section(const struct symsearch *syms,
-				   struct module *owner,
-				   void *data)
-{
-	struct find_symbol_arg *fsa = data;
-	struct kernel_symbol *sym;
-
-	sym = bsearch(fsa->name, syms->start, syms->stop - syms->start,
-			sizeof(struct kernel_symbol), cmp_name);
-
-	if (sym != NULL && check_symbol(syms, owner, sym - syms->start, data))
-		return true;
-
-	return false;
-}
-
 /* Find a symbol and return it, along with, (optional) crc and
  * (optional) module which owns it.  Needs preempt disabled or module_mutex. */
 const struct kernel_symbol *find_symbol(const char *name,
@@ -419,7 +396,7 @@ const struct kernel_symbol *find_symbol(const char *name,
 	fsa.gplok = gplok;
 	fsa.warn = warn;
 
-	if (each_symbol_section(find_symbol_in_section, &fsa)) {
+	if (each_symbol(find_symbol_in_section, &fsa)) {
 		if (owner)
 			*owner = fsa.owner;
 		if (crc)
@@ -1725,28 +1702,27 @@ static void set_section_ro_nx(void *base,
 	}
 }
 
-static void unset_module_core_ro_nx(struct module *mod)
+/* Setting memory back to RW+NX before releasing it */
+void unset_section_ro_nx(struct module *mod, void *module_region)
 {
-	set_page_attributes(mod->module_core + mod->core_text_size,
-		mod->module_core + mod->core_size,
-		set_memory_x);
-	set_page_attributes(mod->module_core,
-		mod->module_core + mod->core_ro_size,
-		set_memory_rw);
-}
+	unsigned long total_pages;
 
-static void unset_module_init_ro_nx(struct module *mod)
-{
-	set_page_attributes(mod->module_init + mod->init_text_size,
-		mod->module_init + mod->init_size,
-		set_memory_x);
-	set_page_attributes(mod->module_init,
-		mod->module_init + mod->init_ro_size,
-		set_memory_rw);
+	if (mod->module_core == module_region) {
+		/* Set core as NX+RW */
+		total_pages = MOD_NUMBER_OF_PAGES(mod->module_core, mod->core_size);
+		set_memory_nx((unsigned long)mod->module_core, total_pages);
+		set_memory_rw((unsigned long)mod->module_core, total_pages);
+
+	} else if (mod->module_init == module_region) {
+		/* Set init as NX+RW */
+		total_pages = MOD_NUMBER_OF_PAGES(mod->module_init, mod->init_size);
+		set_memory_nx((unsigned long)mod->module_init, total_pages);
+		set_memory_rw((unsigned long)mod->module_init, total_pages);
+	}
 }
 
 /* Iterate through all modules and set each module's text as RW */
-void set_all_modules_text_rw(void)
+void set_all_modules_text_rw()
 {
 	struct module *mod;
 
@@ -1767,7 +1743,7 @@ void set_all_modules_text_rw(void)
 }
 
 /* Iterate through all modules and set each module's text as RO */
-void set_all_modules_text_ro(void)
+void set_all_modules_text_ro()
 {
 	struct module *mod;
 
@@ -1788,8 +1764,7 @@ void set_all_modules_text_ro(void)
 }
 #else
 static inline void set_section_ro_nx(void *base, unsigned long text_size, unsigned long ro_size, unsigned long total_size) { }
-static void unset_module_core_ro_nx(struct module *mod) { }
-static void unset_module_init_ro_nx(struct module *mod) { }
+static inline void unset_section_ro_nx(struct module *mod, void *module_region) { }
 #endif
 
 /* Free a module, remove from lists, etc. */
@@ -1818,7 +1793,7 @@ static void free_module(struct module *mod)
 	destroy_params(mod->kp, mod->num_kp);
 
 	/* This may be NULL, but that's OK */
-	unset_module_init_ro_nx(mod);
+	unset_section_ro_nx(mod, mod->module_init);
 	module_free(mod, mod->module_init);
 	kfree(mod->args);
 	percpu_modfree(mod);
@@ -1827,7 +1802,7 @@ static void free_module(struct module *mod)
 	lockdep_free_key_range(mod->module_core, mod->core_size);
 
 	/* Finally, free the core (containing the module structure) */
-	unset_module_core_ro_nx(mod);
+	unset_section_ro_nx(mod, mod->module_core);
 	module_free(mod, mod->module_core);
 
 #ifdef CONFIG_MPU
@@ -2152,8 +2127,11 @@ static const struct kernel_symbol *lookup_symbol(const char *name,
 	const struct kernel_symbol *start,
 	const struct kernel_symbol *stop)
 {
-	return bsearch(name, start, stop - start,
-			sizeof(struct kernel_symbol), cmp_name);
+	const struct kernel_symbol *ks = start;
+	for (; ks < stop; ks++)
+		if (strcmp(ks->name, name) == 0)
+			return ks;
+	return NULL;
 }
 
 static int is_exported(const char *name, unsigned long value,
@@ -2911,7 +2889,7 @@ static struct module *load_module(void __user *umod,
 	}
 
 	/* This has to be done once we're sure module name is unique. */
-	if (!mod->taints || mod->taints == (1U<<TAINT_CRAP))
+	if (!mod->taints)
 		dynamic_debug_setup(info.debug, info.num_debug);
 
 	/* Find duplicate symbols */
@@ -2951,7 +2929,7 @@ static struct module *load_module(void __user *umod,
 	module_bug_cleanup(mod);
 
  ddebug:
-	if (!mod->taints || mod->taints == (1U<<TAINT_CRAP))
+	if (!mod->taints)
 		dynamic_debug_remove(info.debug);
  unlock:
 	mutex_unlock(&module_mutex);
@@ -3056,11 +3034,10 @@ SYSCALL_DEFINE3(init_module, void __user *, umod,
 	mod->symtab = mod->core_symtab;
 	mod->strtab = mod->core_strtab;
 #endif
-	unset_module_init_ro_nx(mod);
+	unset_section_ro_nx(mod, mod->module_init);
 	module_free(mod, mod->module_init);
 	mod->module_init = NULL;
 	mod->init_size = 0;
-	mod->init_ro_size = 0;
 	mod->init_text_size = 0;
 	mutex_unlock(&module_mutex);
 

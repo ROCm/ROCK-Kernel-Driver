@@ -90,18 +90,18 @@ static int igbvf_get_settings(struct net_device *netdev,
 	status = er32(STATUS);
 	if (status & E1000_STATUS_LU) {
 		if (status & E1000_STATUS_SPEED_1000)
-			ethtool_cmd_speed_set(ecmd, SPEED_1000);
+			ecmd->speed = 1000;
 		else if (status & E1000_STATUS_SPEED_100)
-			ethtool_cmd_speed_set(ecmd, SPEED_100);
+			ecmd->speed = 100;
 		else
-			ethtool_cmd_speed_set(ecmd, SPEED_10);
+			ecmd->speed = 10;
 
 		if (status & E1000_STATUS_FD)
 			ecmd->duplex = DUPLEX_FULL;
 		else
 			ecmd->duplex = DUPLEX_HALF;
 	} else {
-		ethtool_cmd_speed_set(ecmd, -1);
+		ecmd->speed = -1;
 		ecmd->duplex = -1;
 	}
 
@@ -391,6 +391,11 @@ static int igbvf_set_wol(struct net_device *netdev,
 	return -EOPNOTSUPP;
 }
 
+static int igbvf_phys_id(struct net_device *netdev, u32 data)
+{
+	return 0;
+}
+
 static int igbvf_get_coalesce(struct net_device *netdev,
                               struct ethtool_coalesce *ec)
 {
@@ -522,6 +527,7 @@ static const struct ethtool_ops igbvf_ethtool_ops = {
 	.self_test		= igbvf_diag_test,
 	.get_sset_count		= igbvf_get_sset_count,
 	.get_strings		= igbvf_get_strings,
+	.phys_id		= igbvf_phys_id,
 	.get_ethtool_stats	= igbvf_get_ethtool_stats,
 	.get_coalesce		= igbvf_get_coalesce,
 	.set_coalesce		= igbvf_set_coalesce,

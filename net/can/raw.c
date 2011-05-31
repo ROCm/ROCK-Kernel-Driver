@@ -774,7 +774,7 @@ static struct proto raw_proto __read_mostly = {
 	.init       = raw_init,
 };
 
-static const struct can_proto raw_can_proto = {
+static struct can_proto raw_can_proto __read_mostly = {
 	.type       = SOCK_RAW,
 	.protocol   = CAN_RAW,
 	.ops        = &raw_ops,

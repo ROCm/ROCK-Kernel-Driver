@@ -152,27 +152,21 @@ EXPORT_SYMBOL_GPL(pstore_register);
 void pstore_get_records(void)
 {
 	struct pstore_info *psi = psinfo;
-	ssize_t			size;
+	size_t			size;
 	u64			id;
 	enum pstore_type_id	type;
 	struct timespec		time;
-	int			failed = 0, rc;
+	int			failed = 0;
 
 	if (!psi)
 		return;
 
 	mutex_lock(&psinfo->buf_mutex);
-	rc = psi->open(psi);
-	if (rc)
-		goto out;
-
 	while ((size = psi->read(&id, &type, &time)) > 0) {
-		if (pstore_mkfile(type, psi->name, id, psi->buf, (size_t)size,
+		if (pstore_mkfile(type, psi->name, id, psi->buf, size,
 				  time, psi->erase))
 			failed++;
 	}
-	psi->close(psi);
-out:
 	mutex_unlock(&psinfo->buf_mutex);
 
 	if (failed)

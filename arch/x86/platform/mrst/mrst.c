@@ -194,7 +194,7 @@ static unsigned long __init mrst_calibrate_tsc(void)
 	return 0;
 }
 
-static void __init mrst_time_init(void)
+void __init mrst_time_init(void)
 {
 	sfi_table_parse(SFI_SIG_MTMR, NULL, NULL, sfi_parse_mtmr);
 	switch (mrst_timer_options) {
@@ -216,7 +216,7 @@ static void __init mrst_time_init(void)
 	apbt_time_init();
 }
 
-static void __cpuinit mrst_arch_setup(void)
+void __cpuinit mrst_arch_setup(void)
 {
 	if (boot_cpu_data.x86 == 6 && boot_cpu_data.x86_model == 0x27)
 		__mrst_cpu_chip = MRST_CPU_CHIP_PENWELL;

@@ -156,7 +156,7 @@ nouveau_pm_perflvl_get(struct drm_device *dev, struct nouveau_pm_level *perflvl)
 static void
 nouveau_pm_perflvl_info(struct nouveau_pm_level *perflvl, char *ptr, int len)
 {
-	char c[16], s[16], v[16], f[16], t[16];
+	char c[16], s[16], v[16], f[16];
 
 	c[0] = '\0';
 	if (perflvl->core)
@@ -174,12 +174,8 @@ nouveau_pm_perflvl_info(struct nouveau_pm_level *perflvl, char *ptr, int len)
 	if (perflvl->fanspeed)
 		snprintf(f, sizeof(f), " fanspeed %d%%", perflvl->fanspeed);
 
-	t[0] = '\0';
-	if (perflvl->timing)
-		snprintf(t, sizeof(t), " timing %d", perflvl->timing->id);
-
-	snprintf(ptr, len, "memory %dMHz%s%s%s%s%s\n", perflvl->memory / 1000,
-		 c, s, v, f, t);
+	snprintf(ptr, len, "memory %dMHz%s%s%s%s\n", perflvl->memory / 1000,
+		 c, s, v, f);
 }
 
 static ssize_t
@@ -453,7 +449,7 @@ nouveau_hwmon_fini(struct drm_device *dev)
 #endif
 }
 
-#if defined(CONFIG_ACPI) && defined(CONFIG_POWER_SUPPLY)
+#ifdef CONFIG_ACPI
 static int
 nouveau_pm_acpi_event(struct notifier_block *nb, unsigned long val, void *data)
 {
@@ -480,10 +476,10 @@ nouveau_pm_init(struct drm_device *dev)
 	char info[256];
 	int ret, i;
 
-	nouveau_mem_timing_init(dev);
 	nouveau_volt_init(dev);
 	nouveau_perf_init(dev);
 	nouveau_temp_init(dev);
+	nouveau_mem_timing_init(dev);
 
 	NV_INFO(dev, "%d available performance level(s)\n", pm->nr_perflvl);
 	for (i = 0; i < pm->nr_perflvl; i++) {
@@ -494,7 +490,6 @@ nouveau_pm_init(struct drm_device *dev)
 	/* determine current ("boot") performance level */
 	ret = nouveau_pm_perflvl_get(dev, &pm->boot);
 	if (ret == 0) {
-		strncpy(pm->boot.name, "boot", 4);
 		pm->cur = &pm->boot;
 
 		nouveau_pm_perflvl_info(&pm->boot, info, sizeof(info));
@@ -512,7 +507,7 @@ nouveau_pm_init(struct drm_device *dev)
 
 	nouveau_sysfs_init(dev);
 	nouveau_hwmon_init(dev);
-#if defined(CONFIG_ACPI) && defined(CONFIG_POWER_SUPPLY)
+#ifdef CONFIG_ACPI
 	pm->acpi_nb.notifier_call = nouveau_pm_acpi_event;
 	register_acpi_notifier(&pm->acpi_nb);
 #endif
@@ -529,12 +524,12 @@ nouveau_pm_fini(struct drm_device *dev)
 	if (pm->cur != &pm->boot)
 		nouveau_pm_perflvl_set(dev, &pm->boot);
 
+	nouveau_mem_timing_fini(dev);
 	nouveau_temp_fini(dev);
 	nouveau_perf_fini(dev);
 	nouveau_volt_fini(dev);
-	nouveau_mem_timing_fini(dev);
 
-#if defined(CONFIG_ACPI) && defined(CONFIG_POWER_SUPPLY)
+#ifdef CONFIG_ACPI
 	unregister_acpi_notifier(&pm->acpi_nb);
 #endif
 	nouveau_hwmon_fini(dev);

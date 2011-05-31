@@ -1483,6 +1483,7 @@ lcs_tasklet(unsigned long data)
 	struct lcs_channel *channel;
 	struct lcs_buffer *iob;
 	int buf_idx;
+	int rc;
 
 	channel = (struct lcs_channel *) data;
 	LCS_DBF_TEXT_(5, trace, "tlet%s", dev_name(&channel->ccwdev->dev));
@@ -1499,11 +1500,14 @@ lcs_tasklet(unsigned long data)
 	channel->buf_idx = buf_idx;
 
 	if (channel->state == LCS_CH_STATE_STOPPED)
-		lcs_start_channel(channel);
+		// FIXME: what if rc != 0 ??
+		rc = lcs_start_channel(channel);
 	spin_lock_irqsave(get_ccwdev_lock(channel->ccwdev), flags);
 	if (channel->state == LCS_CH_STATE_SUSPENDED &&
-	    channel->iob[channel->io_idx].state == LCS_BUF_STATE_READY)
-		__lcs_resume_channel(channel);
+	    channel->iob[channel->io_idx].state == LCS_BUF_STATE_READY) {
+		// FIXME: what if rc != 0 ??
+		rc = __lcs_resume_channel(channel);
+	}
 	spin_unlock_irqrestore(get_ccwdev_lock(channel->ccwdev), flags);
 
 	/* Something happened on the channel. Wake up waiters. */

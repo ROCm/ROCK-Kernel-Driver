@@ -19,7 +19,6 @@
  */
 
 #include <linux/kernel.h>
-#include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/cpu.h>
 #include <asm/system.h>
@@ -29,7 +28,7 @@
 #include <asm/machdep.h>
 #include <asm/vdso_datapage.h>
 #include <asm/pSeries_reconfig.h>
-#include <asm/xics.h>
+#include "xics.h"
 #include "plpar_wrappers.h"
 #include "offline_states.h"
 
@@ -281,7 +280,7 @@ static int pseries_add_processor(struct device_node *np)
 	}
 
 	for_each_cpu(cpu, tmp) {
-		BUG_ON(cpu_present(cpu));
+		BUG_ON(cpumask_test_cpu(cpu, cpu_present_mask));
 		set_cpu_present(cpu, true);
 		set_hard_smp_processor_id(cpu, *intserv++);
 	}

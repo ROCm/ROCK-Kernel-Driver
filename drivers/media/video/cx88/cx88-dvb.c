@@ -133,7 +133,6 @@ static int cx88_dvb_bus_ctrl(struct dvb_frontend* fe, int acquire)
 		return -EINVAL;
 	}
 
-	mutex_lock(&dev->core->lock);
 	drv = cx8802_get_driver(dev, CX88_MPEG_DVB);
 	if (drv) {
 		if (acquire){
@@ -144,7 +143,6 @@ static int cx88_dvb_bus_ctrl(struct dvb_frontend* fe, int acquire)
 			dev->frontends.active_fe_id = 0;
 		}
 	}
-	mutex_unlock(&dev->core->lock);
 
 	return ret;
 }

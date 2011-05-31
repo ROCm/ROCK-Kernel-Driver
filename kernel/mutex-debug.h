@@ -29,7 +29,7 @@ extern void debug_mutex_init(struct mutex *lock, const char *name,
 
 static inline void mutex_set_owner(struct mutex *lock)
 {
-	lock->owner = current;
+	lock->owner = current_thread_info();
 }
 
 static inline void mutex_clear_owner(struct mutex *lock)

@@ -28,10 +28,9 @@
 #include "tegra_asoc_utils.h"
 
 int tegra_asoc_utils_set_rate(struct tegra_asoc_utils_data *data, int srate,
-			      int mclk)
+			      int mclk, int *mclk_change)
 {
 	int new_baseclock;
-	bool clk_change;
 	int err;
 
 	switch (srate) {
@@ -53,10 +52,10 @@ int tegra_asoc_utils_set_rate(struct tegra_asoc_utils_data *data, int srate,
 		return -EINVAL;
 	}
 
-	clk_change = ((new_baseclock != data->set_baseclock) ||
+	*mclk_change = ((new_baseclock != data->set_baseclock) ||
 			(mclk != data->set_mclk));
-	if (!clk_change)
-		return 0;
+	if (!*mclk_change)
+	    return 0;
 
 	data->set_baseclock = 0;
 	data->set_mclk = 0;

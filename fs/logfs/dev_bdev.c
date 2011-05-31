@@ -10,7 +10,6 @@
 #include <linux/blkdev.h>
 #include <linux/buffer_head.h>
 #include <linux/gfp.h>
-#include <linux/prefetch.h>
 
 #define PAGE_OFS(ofs) ((ofs) & (PAGE_SIZE-1))
 

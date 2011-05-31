@@ -37,8 +37,7 @@ static void lprintk(char *buf)
 	}
 }
 
-static int uhci_show_td(struct uhci_hcd *uhci, struct uhci_td *td, char *buf,
-			int len, int space)
+static int uhci_show_td(struct uhci_td *td, char *buf, int len, int space)
 {
 	char *out = buf;
 	char *spid;
@@ -48,9 +47,8 @@ static int uhci_show_td(struct uhci_hcd *uhci, struct uhci_td *td, char *buf,
 	if (len < 160)
 		return 0;
 
-	status = td_status(uhci, td);
-	out += sprintf(out, "%*s[%p] link (%08x) ", space, "", td,
-		hc32_to_cpu(uhci, td->link));
+	status = td_status(td);
+	out += sprintf(out, "%*s[%p] link (%08x) ", space, "", td, le32_to_cpu(td->link));
 	out += sprintf(out, "e%d %s%s%s%s%s%s%s%s%s%sLength=%x ",
 		((status >> 27) & 3),
 		(status & TD_CTRL_SPD) ?      "SPD " : "",
@@ -65,7 +63,7 @@ static int uhci_show_td(struct uhci_hcd *uhci, struct uhci_td *td, char *buf,
 		(status & TD_CTRL_BITSTUFF) ? "BitStuff " : "",
 		status & 0x7ff);
 
-	token = td_token(uhci, td);
+	token = td_token(td);
 	switch (uhci_packetid(token)) {
 		case USB_PID_SETUP:
 			spid = "SETUP";
@@ -88,13 +86,12 @@ static int uhci_show_td(struct uhci_hcd *uhci, struct uhci_td *td, char *buf,
 		(token >> 8) & 127,
 		(token & 0xff),
 		spid);
-	out += sprintf(out, "(buf=%08x)\n", hc32_to_cpu(uhci, td->buffer));
+	out += sprintf(out, "(buf=%08x)\n", le32_to_cpu(td->buffer));
 
 	return out - buf;
 }
 
-static int uhci_show_urbp(struct uhci_hcd *uhci, struct urb_priv *urbp,
-			char *buf, int len, int space)
+static int uhci_show_urbp(struct urb_priv *urbp, char *buf, int len, int space)
 {
 	char *out = buf;
 	struct uhci_td *td;
@@ -133,10 +130,9 @@ static int uhci_show_urbp(struct uhci_hcd *uhci, struct urb_priv *urbp,
 		if (urbp->qh->type != USB_ENDPOINT_XFER_ISOC &&
 				(++i <= 10 || debug > 2)) {
 			out += sprintf(out, "%*s%d: ", space + 2, "", i);
-			out += uhci_show_td(uhci, td, out,
-					len - (out - buf), 0);
+			out += uhci_show_td(td, out, len - (out - buf), 0);
 		} else {
-			if (td_status(uhci, td) & TD_CTRL_ACTIVE)
+			if (td_status(td) & TD_CTRL_ACTIVE)
 				++nactive;
 			else
 				++ninactive;
@@ -155,7 +151,7 @@ static int uhci_show_qh(struct uhci_hcd *uhci,
 {
 	char *out = buf;
 	int i, nurbs;
-	__hc32 element = qh_element(qh);
+	__le32 element = qh_element(qh);
 	char *qtype;
 
 	/* Try to make sure there's enough memory */
@@ -172,8 +168,7 @@ static int uhci_show_qh(struct uhci_hcd *uhci,
 
 	out += sprintf(out, "%*s[%p] %s QH link (%08x) element (%08x)\n",
 			space, "", qh, qtype,
-			hc32_to_cpu(uhci, qh->link),
-			hc32_to_cpu(uhci, element));
+			le32_to_cpu(qh->link), le32_to_cpu(element));
 	if (qh->type == USB_ENDPOINT_XFER_ISOC)
 		out += sprintf(out, "%*s    period %d phase %d load %d us, "
 				"frame %x desc [%p]\n",
@@ -183,22 +178,22 @@ static int uhci_show_qh(struct uhci_hcd *uhci,
 		out += sprintf(out, "%*s    period %d phase %d load %d us\n",
 				space, "", qh->period, qh->phase, qh->load);
 
-	if (element & UHCI_PTR_QH(uhci))
+	if (element & UHCI_PTR_QH)
 		out += sprintf(out, "%*s  Element points to QH (bug?)\n", space, "");
 
-	if (element & UHCI_PTR_DEPTH(uhci))
+	if (element & UHCI_PTR_DEPTH)
 		out += sprintf(out, "%*s  Depth traverse\n", space, "");
 
-	if (element & cpu_to_hc32(uhci, 8))
+	if (element & cpu_to_le32(8))
 		out += sprintf(out, "%*s  Bit 3 set (bug?)\n", space, "");
 
-	if (!(element & ~(UHCI_PTR_QH(uhci) | UHCI_PTR_DEPTH(uhci))))
+	if (!(element & ~(UHCI_PTR_QH | UHCI_PTR_DEPTH)))
 		out += sprintf(out, "%*s  Element is NULL (bug?)\n", space, "");
 
 	if (list_empty(&qh->queue)) {
 		out += sprintf(out, "%*s  queue is empty\n", space, "");
 		if (qh == uhci->skel_async_qh)
-			out += uhci_show_td(uhci, uhci->term_td, out,
+			out += uhci_show_td(uhci->term_td, out,
 					len - (out - buf), 0);
 	} else {
 		struct urb_priv *urbp = list_entry(qh->queue.next,
@@ -206,13 +201,13 @@ static int uhci_show_qh(struct uhci_hcd *uhci,
 		struct uhci_td *td = list_entry(urbp->td_list.next,
 				struct uhci_td, list);
 
-		if (element != LINK_TO_TD(uhci, td))
+		if (element != LINK_TO_TD(td))
 			out += sprintf(out, "%*s Element != First TD\n",
 					space, "");
 		i = nurbs = 0;
 		list_for_each_entry(urbp, &qh->queue, node) {
 			if (++i <= 10)
-				out += uhci_show_urbp(uhci, urbp, out,
+				out += uhci_show_urbp(urbp, out,
 						len - (out - buf), space + 2);
 			else
 				++nurbs;
@@ -224,8 +219,7 @@ static int uhci_show_qh(struct uhci_hcd *uhci,
 
 	if (qh->dummy_td) {
 		out += sprintf(out, "%*s  Dummy TD\n", space, "");
-		out += uhci_show_td(uhci, qh->dummy_td, out,
-				len - (out - buf), 0);
+		out += uhci_show_td(qh->dummy_td, out, len - (out - buf), 0);
 	}
 
 	return out - buf;
@@ -291,6 +285,7 @@ static int uhci_show_root_hub_state(struct uhci_hcd *uhci, char *buf, int len)
 static int uhci_show_status(struct uhci_hcd *uhci, char *buf, int len)
 {
 	char *out = buf;
+	unsigned long io_addr = uhci->io_addr;
 	unsigned short usbcmd, usbstat, usbint, usbfrnum;
 	unsigned int flbaseadd;
 	unsigned char sof;
@@ -300,14 +295,14 @@ static int uhci_show_status(struct uhci_hcd *uhci, char *buf, int len)
 	if (len < 80 * 9)
 		return 0;
 
-	usbcmd    = uhci_readw(uhci, 0);
-	usbstat   = uhci_readw(uhci, 2);
-	usbint    = uhci_readw(uhci, 4);
-	usbfrnum  = uhci_readw(uhci, 6);
-	flbaseadd = uhci_readl(uhci, 8);
-	sof       = uhci_readb(uhci, 12);
-	portsc1   = uhci_readw(uhci, 16);
-	portsc2   = uhci_readw(uhci, 18);
+	usbcmd    = inw(io_addr + 0);
+	usbstat   = inw(io_addr + 2);
+	usbint    = inw(io_addr + 4);
+	usbfrnum  = inw(io_addr + 6);
+	flbaseadd = inl(io_addr + 8);
+	sof       = inb(io_addr + 12);
+	portsc1   = inw(io_addr + 16);
+	portsc2   = inw(io_addr + 18);
 
 	out += sprintf(out, "  usbcmd    =     %04x   %s%s%s%s%s%s%s%s\n",
 		usbcmd,
@@ -352,8 +347,8 @@ static int uhci_sprint_schedule(struct uhci_hcd *uhci, char *buf, int len)
 	struct uhci_td *td;
 	struct list_head *tmp, *head;
 	int nframes, nerrs;
-	__hc32 link;
-	__hc32 fsbr_link;
+	__le32 link;
+	__le32 fsbr_link;
 
 	static const char * const qh_names[] = {
 		"unlink", "iso", "int128", "int64", "int32", "int16",
@@ -381,7 +376,7 @@ static int uhci_sprint_schedule(struct uhci_hcd *uhci, char *buf, int len)
 	nframes = 10;
 	nerrs = 0;
 	for (i = 0; i < UHCI_NUMFRAMES; ++i) {
-		__hc32 qh_dma;
+		__le32 qh_dma;
 
 		j = 0;
 		td = uhci->frame_cpu[i];
@@ -391,7 +386,7 @@ static int uhci_sprint_schedule(struct uhci_hcd *uhci, char *buf, int len)
 
 		if (nframes > 0) {
 			out += sprintf(out, "- Frame %d -> (%08x)\n",
-					i, hc32_to_cpu(uhci, link));
+					i, le32_to_cpu(link));
 			j = 1;
 		}
 
@@ -400,7 +395,7 @@ static int uhci_sprint_schedule(struct uhci_hcd *uhci, char *buf, int len)
 		do {
 			td = list_entry(tmp, struct uhci_td, fl_list);
 			tmp = tmp->next;
-			if (link != LINK_TO_TD(uhci, td)) {
+			if (link != LINK_TO_TD(td)) {
 				if (nframes > 0)
 					out += sprintf(out, "    link does "
 						"not match list entry!\n");
@@ -408,7 +403,7 @@ static int uhci_sprint_schedule(struct uhci_hcd *uhci, char *buf, int len)
 					++nerrs;
 			}
 			if (nframes > 0)
-				out += uhci_show_td(uhci, td, out,
+				out += uhci_show_td(td, out,
 						len - (out - buf), 4);
 			link = td->link;
 		} while (tmp != head);
@@ -420,12 +415,11 @@ check_link:
 				if (!j) {
 					out += sprintf(out,
 						"- Frame %d -> (%08x)\n",
-						i, hc32_to_cpu(uhci, link));
+						i, le32_to_cpu(link));
 					j = 1;
 				}
 				out += sprintf(out, "   link does not match "
-					"QH (%08x)!\n",
-					hc32_to_cpu(uhci, qh_dma));
+					"QH (%08x)!\n", le32_to_cpu(qh_dma));
 			} else
 				++nerrs;
 		}
@@ -446,11 +440,11 @@ check_link:
 
 		/* Last QH is the Terminating QH, it's different */
 		if (i == SKEL_TERM) {
-			if (qh_element(qh) != LINK_TO_TD(uhci, uhci->term_td))
+			if (qh_element(qh) != LINK_TO_TD(uhci->term_td))
 				out += sprintf(out, "    skel_term_qh element is not set to term_td!\n");
 			link = fsbr_link;
 			if (!link)
-				link = LINK_TO_QH(uhci, uhci->skel_term_qh);
+				link = LINK_TO_QH(uhci->skel_term_qh);
 			goto check_qh_link;
 		}
 
@@ -464,20 +458,20 @@ check_link:
 				out += uhci_show_qh(uhci, qh, out,
 						len - (out - buf), 4);
 			if (!fsbr_link && qh->skel >= SKEL_FSBR)
-				fsbr_link = LINK_TO_QH(uhci, qh);
+				fsbr_link = LINK_TO_QH(qh);
 		}
 		if ((cnt -= 10) > 0)
 			out += sprintf(out, "    Skipped %d QHs\n", cnt);
 
-		link = UHCI_PTR_TERM(uhci);
+		link = UHCI_PTR_TERM;
 		if (i <= SKEL_ISO)
 			;
 		else if (i < SKEL_ASYNC)
-			link = LINK_TO_QH(uhci, uhci->skel_async_qh);
+			link = LINK_TO_QH(uhci->skel_async_qh);
 		else if (!uhci->fsbr_is_on)
 			;
 		else
-			link = LINK_TO_QH(uhci, uhci->skel_term_qh);
+			link = LINK_TO_QH(uhci->skel_term_qh);
 check_qh_link:
 		if (qh->link != link)
 			out += sprintf(out, "    last QH not linked to next skeleton!\n");

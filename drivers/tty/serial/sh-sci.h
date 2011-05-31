@@ -270,12 +270,12 @@
 #elif defined(CONFIG_CPU_SUBTYPE_SH7705) || \
       defined(CONFIG_CPU_SUBTYPE_SH7720) || \
       defined(CONFIG_CPU_SUBTYPE_SH7721) || \
-      defined(CONFIG_ARCH_SH7367)
+      defined(CONFIG_ARCH_SH73A0) || \
+      defined(CONFIG_ARCH_SH7367) || \
+      defined(CONFIG_ARCH_SH7377)
 #define SCIF_FNS(name, scif_offset, scif_size) \
   CPU_SCIF_FNS(name, scif_offset, scif_size)
-#elif defined(CONFIG_ARCH_SH7377) || \
-      defined(CONFIG_ARCH_SH7372) || \
-      defined(CONFIG_ARCH_SH73A0)
+#elif defined(CONFIG_ARCH_SH7372)
 #define SCIx_FNS(name, sh4_scifa_offset, sh4_scifa_size, sh4_scifb_offset, sh4_scifb_size) \
   CPU_SCIx_FNS(name, sh4_scifa_offset, sh4_scifa_size, sh4_scifb_offset, sh4_scifb_size)
 #define SCIF_FNS(name, scif_offset, scif_size) \
@@ -313,7 +313,9 @@
 #if defined(CONFIG_CPU_SUBTYPE_SH7705) || \
     defined(CONFIG_CPU_SUBTYPE_SH7720) || \
     defined(CONFIG_CPU_SUBTYPE_SH7721) || \
-    defined(CONFIG_ARCH_SH7367)
+    defined(CONFIG_ARCH_SH73A0) || \
+    defined(CONFIG_ARCH_SH7367) || \
+    defined(CONFIG_ARCH_SH7377)
 
 SCIF_FNS(SCSMR,  0x00, 16)
 SCIF_FNS(SCBRR,  0x04,  8)
@@ -324,9 +326,7 @@ SCIF_FNS(SCFDR,  0x1c, 16)
 SCIF_FNS(SCxTDR, 0x20,  8)
 SCIF_FNS(SCxRDR, 0x24,  8)
 SCIF_FNS(SCLSR,  0x00,  0)
-#elif defined(CONFIG_ARCH_SH7377) || \
-      defined(CONFIG_ARCH_SH7372) || \
-      defined(CONFIG_ARCH_SH73A0)
+#elif defined(CONFIG_ARCH_SH7372)
 SCIF_FNS(SCSMR,  0x00, 16)
 SCIF_FNS(SCBRR,  0x04,  8)
 SCIF_FNS(SCSCR,  0x08, 16)

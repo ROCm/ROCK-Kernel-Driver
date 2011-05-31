@@ -125,6 +125,9 @@ MODULE_PARM_DESC(workarounds, "Work around device bugs (default = 0"
 	", override internal blacklist = " __stringify(SBP2_WORKAROUND_OVERRIDE)
 	", or a combination)");
 
+/* I don't know why the SCSI stack doesn't define something like this... */
+typedef void (*scsi_done_fn_t)(struct scsi_cmnd *);
+
 static const char sbp2_driver_name[] = "sbp2";
 
 /*
@@ -258,6 +261,7 @@ struct sbp2_orb {
 	struct kref kref;
 	dma_addr_t request_bus;
 	int rcode;
+	struct sbp2_pointer pointer;
 	void (*callback)(struct sbp2_orb * orb, struct sbp2_status * status);
 	struct list_head link;
 };
@@ -310,6 +314,7 @@ struct sbp2_command_orb {
 		u8 command_block[SBP2_MAX_CDB_SIZE];
 	} request;
 	struct scsi_cmnd *cmd;
+	scsi_done_fn_t done;
 	struct sbp2_logical_unit *lu;
 
 	struct sbp2_pointer page_table[SG_ALL] __attribute__((aligned(8)));
@@ -489,11 +494,10 @@ static void sbp2_send_orb(struct sbp2_orb *orb, struct sbp2_logical_unit *lu,
 			  int node_id, int generation, u64 offset)
 {
 	struct fw_device *device = target_device(lu->tgt);
-	struct sbp2_pointer orb_pointer;
 	unsigned long flags;
 
-	orb_pointer.high = 0;
-	orb_pointer.low = cpu_to_be32(orb->request_bus);
+	orb->pointer.high = 0;
+	orb->pointer.low = cpu_to_be32(orb->request_bus);
 
 	spin_lock_irqsave(&device->card->lock, flags);
 	list_add_tail(&orb->link, &lu->orb_list);
@@ -504,7 +508,7 @@ static void sbp2_send_orb(struct sbp2_orb *orb, struct sbp2_logical_unit *lu,
 
 	fw_send_request(device->card, &orb->t, TCODE_WRITE_BLOCK_REQUEST,
 			node_id, generation, device->max_speed, offset,
-			&orb_pointer, 8, complete_transaction, orb);
+			&orb->pointer, 8, complete_transaction, orb);
 }
 
 static int sbp2_cancel_orbs(struct sbp2_logical_unit *lu)
@@ -826,6 +830,8 @@ static void sbp2_target_put(struct sbp2_target *tgt)
 	kref_put(&tgt->kref, sbp2_release_target);
 }
 
+static struct workqueue_struct *sbp2_wq;
+
 /*
  * Always get the target's kref when scheduling work on one its units.
  * Each workqueue job is responsible to call sbp2_target_put() upon return.
@@ -833,7 +839,7 @@ static void sbp2_target_put(struct sbp2_target *tgt)
 static void sbp2_queue_work(struct sbp2_logical_unit *lu, unsigned long delay)
 {
 	sbp2_target_get(lu->tgt);
-	if (!queue_delayed_work(fw_workqueue, &lu->work, delay))
+	if (!queue_delayed_work(sbp2_wq, &lu->work, delay))
 		sbp2_target_put(lu->tgt);
 }
 
@@ -1392,7 +1398,7 @@ static void complete_command_orb(struct sbp2_orb *base_orb,
 	sbp2_unmap_scatterlist(device->card->device, orb);
 
 	orb->cmd->result = result;
-	orb->cmd->scsi_done(orb->cmd);
+	orb->done(orb->cmd);
 }
 
 static int sbp2_map_scatterlist(struct sbp2_command_orb *orb,
@@ -1457,8 +1463,7 @@ static int sbp2_map_scatterlist(struct sbp2_command_orb *orb,
 
 /* SCSI stack integration */
 
-static int sbp2_scsi_queuecommand(struct Scsi_Host *shost,
-				  struct scsi_cmnd *cmd)
+static int sbp2_scsi_queuecommand_lck(struct scsi_cmnd *cmd, scsi_done_fn_t done)
 {
 	struct sbp2_logical_unit *lu = cmd->device->hostdata;
 	struct fw_device *device = target_device(lu->tgt);
@@ -1472,7 +1477,7 @@ static int sbp2_scsi_queuecommand(struct Scsi_Host *shost,
 	if (cmd->sc_data_direction == DMA_BIDIRECTIONAL) {
 		fw_error("Can't handle DMA_BIDIRECTIONAL, rejecting command\n");
 		cmd->result = DID_ERROR << 16;
-		cmd->scsi_done(cmd);
+		done(cmd);
 		return 0;
 	}
 
@@ -1485,8 +1490,11 @@ static int sbp2_scsi_queuecommand(struct Scsi_Host *shost,
 	/* Initialize rcode to something not RCODE_COMPLETE. */
 	orb->base.rcode = -1;
 	kref_init(&orb->base.kref);
-	orb->lu = lu;
-	orb->cmd = cmd;
+
+	orb->lu   = lu;
+	orb->done = done;
+	orb->cmd  = cmd;
+
 	orb->request.next.high = cpu_to_be32(SBP2_ORB_NULL);
 	orb->request.misc = cpu_to_be32(
 		COMMAND_ORB_MAX_PAYLOAD(lu->tgt->max_payload) |
@@ -1520,6 +1528,8 @@ static int sbp2_scsi_queuecommand(struct Scsi_Host *shost,
 	kref_put(&orb->base.kref, free_orb);
 	return retval;
 }
+
+static DEF_SCSI_QCMD(sbp2_scsi_queuecommand)
 
 static int sbp2_scsi_slave_alloc(struct scsi_device *sdev)
 {
@@ -1643,12 +1653,17 @@ MODULE_ALIAS("sbp2");
 
 static int __init sbp2_init(void)
 {
+	sbp2_wq = create_singlethread_workqueue(KBUILD_MODNAME);
+	if (!sbp2_wq)
+		return -ENOMEM;
+
 	return driver_register(&sbp2_driver.driver);
 }
 
 static void __exit sbp2_cleanup(void)
 {
 	driver_unregister(&sbp2_driver.driver);
+	destroy_workqueue(sbp2_wq);
 }
 
 module_init(sbp2_init);

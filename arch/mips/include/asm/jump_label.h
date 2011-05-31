@@ -20,18 +20,16 @@
 #define WORD_INSN ".word"
 #endif
 
-static __always_inline bool arch_static_branch(struct jump_label_key *key)
-{
-	asm goto("1:\tnop\n\t"
-		"nop\n\t"
-		".pushsection __jump_table,  \"aw\"\n\t"
-		WORD_INSN " 1b, %l[l_yes], %0\n\t"
-		".popsection\n\t"
-		: :  "i" (key) : : l_yes);
-	return false;
-l_yes:
-	return true;
-}
+#define JUMP_LABEL(key, label)						\
+	do {								\
+		asm goto("1:\tnop\n\t"					\
+			"nop\n\t"					\
+			".pushsection __jump_table,  \"a\"\n\t"		\
+			WORD_INSN " 1b, %l[" #label "], %0\n\t"		\
+			".popsection\n\t"				\
+			: :  "i" (key) :  : label);			\
+	} while (0)
+
 
 #endif /* __KERNEL__ */
 

@@ -1884,7 +1884,6 @@ static int enable_periodic(struct oxu_hcd *oxu)
 	status = handshake(oxu, &oxu->regs->status, STS_PSS, 0, 9 * 125);
 	if (status != 0) {
 		oxu_to_hcd(oxu)->state = HC_STATE_HALT;
-		usb_hc_died(oxu_to_hcd(oxu));
 		return status;
 	}
 
@@ -1910,7 +1909,6 @@ static int disable_periodic(struct oxu_hcd *oxu)
 	status = handshake(oxu, &oxu->regs->status, STS_PSS, STS_PSS, 9 * 125);
 	if (status != 0) {
 		oxu_to_hcd(oxu)->state = HC_STATE_HALT;
-		usb_hc_died(oxu_to_hcd(oxu));
 		return status;
 	}
 
@@ -2451,9 +2449,8 @@ static irqreturn_t oxu210_hcd_irq(struct usb_hcd *hcd)
 		goto dead;
 	}
 
-	/* Shared IRQ? */
 	status &= INTR_MASK;
-	if (!status || unlikely(hcd->state == HC_STATE_HALT)) {
+	if (!status) {			/* irq sharing? */
 		spin_unlock(&oxu->lock);
 		return IRQ_NONE;
 	}
@@ -2519,7 +2516,6 @@ static irqreturn_t oxu210_hcd_irq(struct usb_hcd *hcd)
 dead:
 			ehci_reset(oxu);
 			writel(0, &oxu->regs->configured_flag);
-			usb_hc_died(hcd);
 			/* generic layer kills/unlinks all urbs, then
 			 * uses oxu_stop to clean up the rest
 			 */

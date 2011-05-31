@@ -21,13 +21,25 @@
 #include "delegation.h"
 #include "internal.h"
 
+static void nfs_do_free_delegation(struct nfs_delegation *delegation)
+{
+	kfree(delegation);
+}
+
+static void nfs_free_delegation_callback(struct rcu_head *head)
+{
+	struct nfs_delegation *delegation = container_of(head, struct nfs_delegation, rcu);
+
+	nfs_do_free_delegation(delegation);
+}
+
 static void nfs_free_delegation(struct nfs_delegation *delegation)
 {
 	if (delegation->cred) {
 		put_rpccred(delegation->cred);
 		delegation->cred = NULL;
 	}
-	kfree_rcu(delegation, rcu);
+	call_rcu(&delegation->rcu, nfs_free_delegation_callback);
 }
 
 /**

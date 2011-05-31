@@ -372,7 +372,8 @@ static int eata_pio_queue_lck(struct scsi_cmnd *cmd,
 	cp->status = USED;	/* claim free slot */
 
 	DBG(DBG_QUEUE, scmd_printk(KERN_DEBUG, cmd,
-		"eata_pio_queue 0x%p, y %d\n", cmd, y));
+		"eata_pio_queue pid %ld, y %d\n",
+		cmd->serial_number, y));
 
 	cmd->scsi_done = (void *) done;
 
@@ -416,8 +417,8 @@ static int eata_pio_queue_lck(struct scsi_cmnd *cmd,
 	if (eata_pio_send_command(base, EATA_CMD_PIO_SEND_CP)) {
 		cmd->result = DID_BUS_BUSY << 16;
 		scmd_printk(KERN_NOTICE, cmd,
-			"eata_pio_queue pid 0x%p, HBA busy, "
-			"returning DID_BUS_BUSY, done.\n", cmd);
+			"eata_pio_queue pid %ld, HBA busy, "
+			"returning DID_BUS_BUSY, done.\n", cmd->serial_number);
 		done(cmd);
 		cp->status = FREE;
 		return 0;
@@ -431,8 +432,8 @@ static int eata_pio_queue_lck(struct scsi_cmnd *cmd,
 		outw(0, base + HA_RDATA);
 
 	DBG(DBG_QUEUE, scmd_printk(KERN_DEBUG, cmd,
-		"Queued base %#.4lx cmd: 0x%p "
-		"slot %d irq %d\n", sh->base, cmd, y, sh->irq));
+		"Queued base %#.4lx pid: %ld "
+		"slot %d irq %d\n", sh->base, cmd->serial_number, y, sh->irq));
 
 	return 0;
 }
@@ -444,7 +445,8 @@ static int eata_pio_abort(struct scsi_cmnd *cmd)
 	unsigned int loop = 100;
 
 	DBG(DBG_ABNORM, scmd_printk(KERN_WARNING, cmd,
-		"eata_pio_abort called pid: 0x%p\n", cmd));
+		"eata_pio_abort called pid: %ld\n",
+		cmd->serial_number));
 
 	while (inb(cmd->device->host->base + HA_RAUXSTAT) & HA_ABUSY)
 		if (--loop == 0) {
@@ -479,7 +481,8 @@ static int eata_pio_host_reset(struct scsi_cmnd *cmd)
 	struct Scsi_Host *host = cmd->device->host;
 
 	DBG(DBG_ABNORM, scmd_printk(KERN_WARNING, cmd,
-		"eata_pio_reset called\n"));
+		"eata_pio_reset called pid:%ld\n",
+		cmd->serial_number));
 
 	spin_lock_irq(host->host_lock);
 
@@ -498,7 +501,7 @@ static int eata_pio_host_reset(struct scsi_cmnd *cmd)
 
 		sp = HD(cmd)->ccb[x].cmd;
 		HD(cmd)->ccb[x].status = RESET;
-		printk(KERN_WARNING "eata_pio_reset: slot %d in reset.\n", x);
+		printk(KERN_WARNING "eata_pio_reset: slot %d in reset, pid %ld.\n", x, sp->serial_number);
 
 		if (sp == NULL)
 			panic("eata_pio_reset: slot %d, sp==NULL.\n", x);

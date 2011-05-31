@@ -18,9 +18,6 @@
 
 #define PCI_VENDOR_ID_HILSCHER		0x15CF
 #define PCI_DEVICE_ID_HILSCHER_NETX	0x0000
-#define PCI_DEVICE_ID_HILSCHER_NETPLC	0x0010
-#define PCI_SUBDEVICE_ID_NETPLC_RAM	0x0000
-#define PCI_SUBDEVICE_ID_NETPLC_FLASH	0x0001
 #define PCI_SUBDEVICE_ID_NXSB_PCA	0x3235
 #define PCI_SUBDEVICE_ID_NXPCA		0x3335
 
@@ -68,10 +65,6 @@ static int __devinit netx_pci_probe(struct pci_dev *dev,
 	case PCI_DEVICE_ID_HILSCHER_NETX:
 		bar = 0;
 		info->name = "netx";
-		break;
-	case PCI_DEVICE_ID_HILSCHER_NETPLC:
-		bar = 0;
-		info->name = "netplc";
 		break;
 	default:
 		bar = 2;
@@ -139,18 +132,6 @@ static struct pci_device_id netx_pci_ids[] = {
 		.device =	PCI_DEVICE_ID_HILSCHER_NETX,
 		.subvendor =	0,
 		.subdevice =	0,
-	},
-	{
-		.vendor =       PCI_VENDOR_ID_HILSCHER,
-		.device =       PCI_DEVICE_ID_HILSCHER_NETPLC,
-		.subvendor =    PCI_VENDOR_ID_HILSCHER,
-		.subdevice =    PCI_SUBDEVICE_ID_NETPLC_RAM,
-	},
-	{
-		.vendor =       PCI_VENDOR_ID_HILSCHER,
-		.device =       PCI_DEVICE_ID_HILSCHER_NETPLC,
-		.subvendor =    PCI_VENDOR_ID_HILSCHER,
-		.subdevice =    PCI_SUBDEVICE_ID_NETPLC_FLASH,
 	},
 	{
 		.vendor =	PCI_VENDOR_ID_PLX,

@@ -900,8 +900,7 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
 		 */
 		new->handler = irq_nested_primary_handler;
 	} else {
-		if (irq_settings_can_thread(desc))
-			irq_setup_forced_threading(new);
+		irq_setup_forced_threading(new);
 	}
 
 	/*

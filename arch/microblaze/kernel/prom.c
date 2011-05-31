@@ -130,7 +130,7 @@ void __init early_init_devtree(void *params)
 	 * device-tree, including the platform type, initrd location and
 	 * size, TCE reserve, and more ...
 	 */
-	of_scan_flat_dt(early_init_dt_scan_chosen, cmd_line);
+	of_scan_flat_dt(early_init_dt_scan_chosen, NULL);
 
 	/* Scan memory nodes and rebuild MEMBLOCKs */
 	memblock_init();

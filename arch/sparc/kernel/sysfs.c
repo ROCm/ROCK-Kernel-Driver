@@ -103,10 +103,9 @@ static unsigned long run_on_cpu(unsigned long cpu,
 			        unsigned long (*func)(unsigned long),
 				unsigned long arg)
 {
-	cpumask_t old_affinity;
+	cpumask_t old_affinity = current->cpus_allowed;
 	unsigned long ret;
 
-	cpumask_copy(&old_affinity, tsk_cpus_allowed(current));
 	/* should return -EINVAL to userspace */
 	if (set_cpus_allowed_ptr(current, cpumask_of(cpu)))
 		return 0;

@@ -138,7 +138,7 @@ static int __init init_l440gx(void)
 	if (mymtd) {
 		mymtd->owner = THIS_MODULE;
 
-		mtd_device_register(mymtd, NULL, 0);
+		add_mtd_device(mymtd);
 		return 0;
 	}
 
@@ -148,7 +148,7 @@ static int __init init_l440gx(void)
 
 static void __exit cleanup_l440gx(void)
 {
-	mtd_device_unregister(mymtd);
+	del_mtd_device(mymtd);
 	map_destroy(mymtd);
 
 	iounmap(l440gx_map.virt);

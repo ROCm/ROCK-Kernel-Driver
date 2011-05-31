@@ -1,4 +1,6 @@
 /*
+ *  linux/drivers/char/tty_io.c
+ *
  *  Copyright (C) 1991, 1992  Linus Torvalds
  */
 
@@ -136,6 +138,8 @@ EXPORT_SYMBOL(tty_mutex);
 
 /* Spinlock to protect the tty->tty_files list */
 DEFINE_SPINLOCK(tty_files_lock);
+
+int console_use_vt = 1;
 
 static ssize_t tty_read(struct file *, char __user *, size_t, loff_t *);
 static ssize_t tty_write(struct file *, const char __user *, size_t, loff_t *);
@@ -962,14 +966,12 @@ static ssize_t tty_read(struct file *file, char __user *buf, size_t count,
 }
 
 void tty_write_unlock(struct tty_struct *tty)
-	__releases(&tty->atomic_write_lock)
 {
 	mutex_unlock(&tty->atomic_write_lock);
 	wake_up_interruptible_poll(&tty->write_wait, POLLOUT);
 }
 
 int tty_write_lock(struct tty_struct *tty, int ndelay)
-	__acquires(&tty->atomic_write_lock)
 {
 	if (!mutex_trylock(&tty->atomic_write_lock)) {
 		if (ndelay)
@@ -1391,15 +1393,16 @@ struct tty_struct *tty_init_dev(struct tty_driver *driver, int idx,
 		return ERR_PTR(-ENODEV);
 
 	tty = alloc_tty_struct();
-	if (!tty) {
-		retval = -ENOMEM;
-		goto err_module_put;
-	}
+	if (!tty)
+		goto fail_no_mem;
 	initialize_tty_struct(tty, driver, idx);
 
 	retval = tty_driver_install_tty(driver, tty);
-	if (retval < 0)
-		goto err_deinit_tty;
+	if (retval < 0) {
+		free_tty_struct(tty);
+		module_put(driver->owner);
+		return ERR_PTR(retval);
+	}
 
 	/*
 	 * Structures all installed ... call the ldisc open routines.
@@ -1408,18 +1411,15 @@ struct tty_struct *tty_init_dev(struct tty_driver *driver, int idx,
 	 */
 	retval = tty_ldisc_setup(tty, tty->link);
 	if (retval)
-		goto err_release_tty;
+		goto release_mem_out;
 	return tty;
 
-err_deinit_tty:
-	deinitialize_tty_struct(tty);
-	free_tty_struct(tty);
-err_module_put:
+fail_no_mem:
 	module_put(driver->owner);
-	return ERR_PTR(retval);
+	return ERR_PTR(-ENOMEM);
 
 	/* call the tty release_tty routine to clean out this slot */
-err_release_tty:
+release_mem_out:
 	if (printk_ratelimit())
 		printk(KERN_INFO "tty_init_dev: ldisc open failed, "
 				 "clearing slot %d\n", idx);
@@ -1835,7 +1835,7 @@ retry_open:
 		goto got_driver;
 	}
 #ifdef CONFIG_VT
-	if (device == MKDEV(TTY_MAJOR, 0)) {
+	if (console_use_vt && device == MKDEV(TTY_MAJOR, 0)) {
 		extern struct tty_driver *console_driver;
 		driver = tty_driver_kref_get(console_driver);
 		index = fg_console;
@@ -1894,7 +1894,6 @@ got_driver:
 	retval = tty_add_file(tty, filp);
 	if (retval) {
 		tty_unlock();
-		tty_release(inode, filp);
 		return retval;
 	}
 
@@ -1905,10 +1904,12 @@ got_driver:
 #ifdef TTY_DEBUG_HANGUP
 	printk(KERN_DEBUG "opening %s...", tty->name);
 #endif
-	if (tty->ops->open)
-		retval = tty->ops->open(tty, filp);
-	else
-		retval = -ENODEV;
+	if (!retval) {
+		if (tty->ops->open)
+			retval = tty->ops->open(tty, filp);
+		else
+			retval = -ENODEV;
+	}
 	filp->f_flags = saved_flags;
 
 	if (!retval && test_bit(TTY_EXCLUSIVE, &tty->flags) &&
@@ -2889,20 +2890,6 @@ void initialize_tty_struct(struct tty_struct *tty,
 }
 
 /**
- *	deinitialize_tty_struct
- *	@tty: tty to deinitialize
- *
- *	This subroutine deinitializes a tty structure that has been newly
- *	allocated but tty_release cannot be called on that yet.
- *
- *	Locking: none - tty in question must not be exposed at this point
- */
-void deinitialize_tty_struct(struct tty_struct *tty)
-{
-	tty_ldisc_deinit(tty);
-}
-
-/**
  *	tty_put_char	-	write one character to a tty
  *	@tty: tty
  *	@ch: character
@@ -3327,7 +3314,8 @@ int __init tty_init(void)
 		WARN_ON(device_create_file(consdev, &dev_attr_active) < 0);
 
 #ifdef CONFIG_VT
-	vty_init(&console_fops);
+	if (console_use_vt)
+		vty_init(&console_fops);
 #endif
 	return 0;
 }

@@ -832,7 +832,6 @@ static int video_open(struct file *file)
 
        if (NULL == dev) {
 		mutex_unlock(&cx25821_devlist_mutex);
-		kfree(fh);
 		return -ENODEV;
        }
 
@@ -1574,7 +1573,7 @@ int cx25821_set_control(struct cx25821_dev *dev,
 		break;
 	default:
 		/* nothing */ ;
-	}
+	};
 
 	switch (ctl->id) {
 	case V4L2_CID_BRIGHTNESS:

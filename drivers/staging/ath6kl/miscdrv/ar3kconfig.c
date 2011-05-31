@@ -24,6 +24,7 @@
 
 #include "a_config.h"
 #include "athdefs.h"
+#include "a_types.h"
 #include "a_osapi.h"
 #define ATH_MODULE_NAME misc
 #include "a_debug.h"
@@ -77,7 +78,7 @@ static int SendHCICommand(struct ar3k_config_info *pConfig,
     } while (false);
    
     if (pPacket != NULL) {
-        kfree(pPacket);
+        A_FREE(pPacket);
     }
         
     return status;
@@ -115,7 +116,7 @@ static int RecvHCIEvent(struct ar3k_config_info *pConfig,
     } while (false);
        
     if (pRecvPacket != NULL) {
-        kfree(pRecvPacket);    
+        A_FREE(pRecvPacket);    
     }
     
     return status;
@@ -202,7 +203,7 @@ int SendHCICommandWaitCommandComplete(struct ar3k_config_info *pConfig,
     } while (false);
 
     if (pBuffer != NULL) {
-        kfree(pBuffer);    
+        A_FREE(pBuffer);    
     }
     
     return status;    
@@ -267,7 +268,7 @@ static int AR3KConfigureHCIBaud(struct ar3k_config_info *pConfig)
     } while (false);
                         
     if (pBufferToFree != NULL) {
-        kfree(pBufferToFree);    
+        A_FREE(pBufferToFree);    
     }
         
     return status;
@@ -303,7 +304,7 @@ static int AR3KExitMinBoot(struct ar3k_config_info *pConfig)
     }
     
     if (pBufferToFree != NULL) {
-        kfree(pBufferToFree);    
+        A_FREE(pBufferToFree);    
     }
     
     return status;                                              
@@ -327,7 +328,7 @@ static int AR3KConfigureSendHCIReset(struct ar3k_config_info *pConfig)
     }
 
     if (pBufferToFree != NULL) {
-        kfree(pBufferToFree);
+        A_FREE(pBufferToFree);
     }
 
     return status;
@@ -381,7 +382,7 @@ static int AR3KEnableTLPM(struct ar3k_config_info *pConfig)
                                                &pEvent,
                                                &pBufferToFree);
     if (pBufferToFree != NULL) {
-        kfree(pBufferToFree);    
+        A_FREE(pBufferToFree);    
     }
     if (status) {
         AR_DEBUG_PRINTF(ATH_DEBUG_ERR,("HostWakeup Config Failed! \n"));    
@@ -396,7 +397,7 @@ static int AR3KEnableTLPM(struct ar3k_config_info *pConfig)
                                                &pEvent,
                                                &pBufferToFree);
     if (pBufferToFree != NULL) {
-        kfree(pBufferToFree);    
+        A_FREE(pBufferToFree);    
     }
     if (status) {
         AR_DEBUG_PRINTF(ATH_DEBUG_ERR,("Target Wakeup Config Failed! \n"));    
@@ -411,7 +412,7 @@ static int AR3KEnableTLPM(struct ar3k_config_info *pConfig)
                                                &pEvent,
                                                &pBufferToFree);
     if (pBufferToFree != NULL) {
-        kfree(pBufferToFree);    
+        A_FREE(pBufferToFree);    
     }
     if (status) {
         AR_DEBUG_PRINTF(ATH_DEBUG_ERR,("HostWakeup Enable Failed! \n"));    
@@ -426,7 +427,7 @@ static int AR3KEnableTLPM(struct ar3k_config_info *pConfig)
                                                &pEvent,
                                                &pBufferToFree);
     if (pBufferToFree != NULL) {
-        kfree(pBufferToFree);    
+        A_FREE(pBufferToFree);    
     }
     if (status) {
         AR_DEBUG_PRINTF(ATH_DEBUG_ERR,("Target Wakeup Enable Failed! \n"));    
@@ -441,7 +442,7 @@ static int AR3KEnableTLPM(struct ar3k_config_info *pConfig)
                                                &pEvent,
                                                &pBufferToFree);
     if (pBufferToFree != NULL) {
-        kfree(pBufferToFree);    
+        A_FREE(pBufferToFree);    
     }
     if (status) {
         AR_DEBUG_PRINTF(ATH_DEBUG_ERR,("Sleep Enable Failed! \n"));    

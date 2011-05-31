@@ -499,7 +499,7 @@ void DoCMilPlus_init(struct mtd_info *mtd)
 		docmilpluslist = mtd;
 		mtd->size  = this->totlen;
 		mtd->erasesize = this->erasesize;
-		mtd_device_register(mtd, NULL, 0);
+		add_mtd_device(mtd);
 		return;
 	}
 }
@@ -1091,7 +1091,7 @@ static void __exit cleanup_doc2001plus(void)
 		this = mtd->priv;
 		docmilpluslist = this->nextdoc;
 
-		mtd_device_unregister(mtd);
+		del_mtd_device(mtd);
 
 		iounmap(this->virtadr);
 		kfree(this->chips);

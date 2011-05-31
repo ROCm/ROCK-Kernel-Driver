@@ -999,8 +999,7 @@ new_segment:
 				/* We have some space in skb head. Superb! */
 				if (copy > skb_tailroom(skb))
 					copy = skb_tailroom(skb);
-				err = skb_add_data_nocache(sk, skb, from, copy);
-				if (err)
+				if ((err = skb_add_data(skb, from, copy)) != 0)
 					goto do_fault;
 			} else {
 				int merge = 0;
@@ -1043,8 +1042,8 @@ new_segment:
 
 				/* Time to copy data. We are close to
 				 * the end! */
-				err = skb_copy_to_page_nocache(sk, from, skb,
-							       page, off, copy);
+				err = skb_copy_to_page(sk, from, skb, page,
+						       off, copy);
 				if (err) {
 					/* If this page was new, give it to the
 					 * socket so it does not get leaked.

@@ -65,10 +65,6 @@ static inline int pcibus_to_node(struct pci_bus *pbus)
 #define smt_capable()				(sparc64_multi_core)
 #endif /* CONFIG_SMP */
 
-extern cpumask_t cpu_core_map[NR_CPUS];
-static inline const struct cpumask *cpu_coregroup_mask(int cpu)
-{
-        return &cpu_core_map[cpu];
-}
+#define cpu_coregroup_mask(cpu)			(&cpu_core_map[cpu])
 
 #endif /* _ASM_SPARC64_TOPOLOGY_H */

@@ -38,7 +38,11 @@
 #define AVC_CACHE_RECLAIM		16
 
 #ifdef CONFIG_SECURITY_SELINUX_AVC_STATS
-#define avc_cache_stats_incr(field)	this_cpu_inc(avc_cache_stats.field)
+#define avc_cache_stats_incr(field)				\
+do {								\
+	per_cpu(avc_cache_stats, get_cpu()).field++;		\
+	put_cpu();						\
+} while (0)
 #else
 #define avc_cache_stats_incr(field)	do {} while (0)
 #endif
@@ -343,10 +347,11 @@ static struct avc_node *avc_lookup(u32 ssid, u32 tsid, u16 tclass)
 	node = avc_search_node(ssid, tsid, tclass);
 
 	if (node)
-		return node;
+		avc_cache_stats_incr(hits);
+	else
+		avc_cache_stats_incr(misses);
 
-	avc_cache_stats_incr(misses);
-	return NULL;
+	return node;
 }
 
 static int avc_latest_notif_update(int seqno, int is_insert)
@@ -526,7 +531,7 @@ int avc_audit(u32 ssid, u32 tsid,
 	 * during retry. However this is logically just as if the operation
 	 * happened a little later.
 	 */
-	if ((a->type == LSM_AUDIT_DATA_INODE) &&
+	if ((a->type == LSM_AUDIT_DATA_FS) &&
 	    (flags & IPERM_FLAG_RCU))
 		return -ECHILD;
 
@@ -752,9 +757,10 @@ int avc_ss_reset(u32 seqno)
 int avc_has_perm_noaudit(u32 ssid, u32 tsid,
 			 u16 tclass, u32 requested,
 			 unsigned flags,
-			 struct av_decision *avd)
+			 struct av_decision *in_avd)
 {
 	struct avc_node *node;
+	struct av_decision avd_entry, *avd;
 	int rc = 0;
 	u32 denied;
 
@@ -763,13 +769,20 @@ int avc_has_perm_noaudit(u32 ssid, u32 tsid,
 	rcu_read_lock();
 
 	node = avc_lookup(ssid, tsid, tclass);
-	if (unlikely(!node)) {
+	if (!node) {
 		rcu_read_unlock();
+
+		if (in_avd)
+			avd = in_avd;
+		else
+			avd = &avd_entry;
+
 		security_compute_av(ssid, tsid, tclass, avd);
 		rcu_read_lock();
 		node = avc_insert(ssid, tsid, tclass, avd);
 	} else {
-		memcpy(avd, &node->ae.avd, sizeof(*avd));
+		if (in_avd)
+			memcpy(in_avd, &node->ae.avd, sizeof(*in_avd));
 		avd = &node->ae.avd;
 	}
 

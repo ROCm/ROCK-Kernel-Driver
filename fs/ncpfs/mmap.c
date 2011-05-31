@@ -16,7 +16,6 @@
 #include <linux/mman.h>
 #include <linux/string.h>
 #include <linux/fcntl.h>
-#include <linux/memcontrol.h>
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
@@ -93,7 +92,6 @@ static int ncp_file_mmap_fault(struct vm_area_struct *area,
 	 * -- wli
 	 */
 	count_vm_event(PGMAJFAULT);
-	mem_cgroup_count_vm_event(area->vm_mm, PGMAJFAULT);
 	return VM_FAULT_MAJOR;
 }
 

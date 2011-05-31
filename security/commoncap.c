@@ -529,10 +529,15 @@ skip:
 	new->suid = new->fsuid = new->euid;
 	new->sgid = new->fsgid = new->egid;
 
-	if (effective)
-		new->cap_effective = new->cap_permitted;
-	else
-		cap_clear(new->cap_effective);
+	/* For init, we want to retain the capabilities set in the initial
+	 * task.  Thus we skip the usual capability rules
+	 */
+	if (!is_global_init(current)) {
+		if (effective)
+			new->cap_effective = new->cap_permitted;
+		else
+			cap_clear(new->cap_effective);
+	}
 	bprm->cap_effective = effective;
 
 	/*

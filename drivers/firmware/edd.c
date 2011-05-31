@@ -531,8 +531,8 @@ static int
 edd_has_edd30(struct edd_device *edev)
 {
 	struct edd_info *info;
-	int i;
-	u8 csum = 0;
+	int i, nonzero_path = 0;
+	char c;
 
 	if (!edev)
 		return 0;
@@ -544,16 +544,16 @@ edd_has_edd30(struct edd_device *edev)
 		return 0;
 	}
 
-
-	/* We support only T13 spec */
-	if (info->params.device_path_info_length != 44)
+	for (i = 30; i <= 73; i++) {
+		c = *(((uint8_t *) info) + i + 4);
+		if (c) {
+			nonzero_path++;
+			break;
+		}
+	}
+	if (!nonzero_path) {
 		return 0;
-
-	for (i = 30; i < info->params.device_path_info_length + 30; i++)
-		csum += *(((u8 *)&info->params) + i);
-
-	if (csum)
-		return 0;
+	}
 
 	return 1;
 }

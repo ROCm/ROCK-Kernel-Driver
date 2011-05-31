@@ -253,8 +253,8 @@ void __sync_icache_dcache(pte_t pteval)
 
 	if (!test_and_set_bit(PG_dcache_clean, &page->flags))
 		__flush_dcache_page(mapping, page);
-
-	if (pte_exec(pteval))
+	/* pte_exec() already checked above for non-aliasing VIPT cache */
+	if (cache_is_vipt_nonaliasing() || pte_exec(pteval))
 		__flush_icache_all();
 }
 #endif
@@ -275,8 +275,7 @@ void __sync_icache_dcache(pte_t pteval)
  *  kernel cache lines for later.  Otherwise, we assume we have
  *  aliasing mappings.
  *
- * Note that we disable the lazy flush for SMP configurations where
- * the cache maintenance operations are not automatically broadcasted.
+ * Note that we disable the lazy flush for SMP.
  */
 void flush_dcache_page(struct page *page)
 {

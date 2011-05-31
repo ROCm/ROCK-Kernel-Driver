@@ -46,6 +46,8 @@
 #define GEF_PIC_CPU0_MCP_MASK	GEF_PIC_MCP_MASK(0)
 #define GEF_PIC_CPU1_MCP_MASK	GEF_PIC_MCP_MASK(1)
 
+#define gef_irq_to_hw(virq)    ((unsigned int)irq_map[virq].hwirq)
+
 
 static DEFINE_RAW_SPINLOCK(gef_pic_lock);
 
@@ -111,8 +113,10 @@ void gef_pic_cascade(unsigned int irq, struct irq_desc *desc)
 static void gef_pic_mask(struct irq_data *d)
 {
 	unsigned long flags;
-	unsigned int hwirq = irqd_to_hwirq(d);
+	unsigned int hwirq;
 	u32 mask;
+
+	hwirq = gef_irq_to_hw(d->irq);
 
 	raw_spin_lock_irqsave(&gef_pic_lock, flags);
 	mask = in_be32(gef_pic_irq_reg_base + GEF_PIC_INTR_MASK(0));
@@ -132,8 +136,10 @@ static void gef_pic_mask_ack(struct irq_data *d)
 static void gef_pic_unmask(struct irq_data *d)
 {
 	unsigned long flags;
-	unsigned int hwirq = irqd_to_hwirq(d);
+	unsigned int hwirq;
 	u32 mask;
+
+	hwirq = gef_irq_to_hw(d->irq);
 
 	raw_spin_lock_irqsave(&gef_pic_lock, flags);
 	mask = in_be32(gef_pic_irq_reg_base + GEF_PIC_INTR_MASK(0));

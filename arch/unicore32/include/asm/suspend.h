@@ -14,6 +14,7 @@
 #define __UNICORE_SUSPEND_H__
 
 #ifndef __ASSEMBLY__
+static inline int arch_prepare_suspend(void) { return 0; }
 
 #include <asm/ptrace.h>
 

@@ -17,9 +17,8 @@
  * USA.
  */
 
-#include <linux/kthread.h>
-
 #include "usbip_common.h"
+#include <linux/kthread.h>
 
 static int event_handler(struct usbip_device *ud)
 {
@@ -37,18 +36,21 @@ static int event_handler(struct usbip_device *ud)
 		 */
 		if (ud->event & USBIP_EH_SHUTDOWN) {
 			ud->eh_ops.shutdown(ud);
+
 			ud->event &= ~USBIP_EH_SHUTDOWN;
 		}
 
 		/* Reset the device. */
 		if (ud->event & USBIP_EH_RESET) {
 			ud->eh_ops.reset(ud);
+
 			ud->event &= ~USBIP_EH_RESET;
 		}
 
 		/* Mark the device as unusable. */
 		if (ud->event & USBIP_EH_UNUSABLE) {
 			ud->eh_ops.unusable(ud);
+
 			ud->event &= ~USBIP_EH_UNUSABLE;
 		}
 
@@ -66,14 +68,13 @@ static int event_handler_loop(void *data)
 
 	while (!kthread_should_stop()) {
 		wait_event_interruptible(ud->eh_waitq,
-					 usbip_event_happened(ud) ||
-					 kthread_should_stop());
+					usbip_event_happened(ud) ||
+					kthread_should_stop());
 		usbip_dbg_eh("wakeup\n");
 
 		if (event_handler(ud) < 0)
 			break;
 	}
-
 	return 0;
 }
 
@@ -84,10 +85,10 @@ int usbip_start_eh(struct usbip_device *ud)
 
 	ud->eh = kthread_run(event_handler_loop, ud, "usbip_eh");
 	if (IS_ERR(ud->eh)) {
-		pr_warning("Unable to start control thread\n");
+		printk(KERN_WARNING
+			"Unable to start control thread\n");
 		return PTR_ERR(ud->eh);
 	}
-
 	return 0;
 }
 EXPORT_SYMBOL_GPL(usbip_start_eh);
@@ -105,8 +106,11 @@ EXPORT_SYMBOL_GPL(usbip_stop_eh);
 void usbip_event_add(struct usbip_device *ud, unsigned long event)
 {
 	spin_lock(&ud->lock);
+
 	ud->event |= event;
+
 	wake_up(&ud->eh_waitq);
+
 	spin_unlock(&ud->lock);
 }
 EXPORT_SYMBOL_GPL(usbip_event_add);
@@ -116,8 +120,10 @@ int usbip_event_happened(struct usbip_device *ud)
 	int happened = 0;
 
 	spin_lock(&ud->lock);
+
 	if (ud->event != 0)
 		happened = 1;
+
 	spin_unlock(&ud->lock);
 
 	return happened;

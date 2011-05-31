@@ -2748,12 +2748,11 @@ static void iwl3945_bg_init_alive_start(struct work_struct *data)
 	struct iwl_priv *priv =
 	    container_of(data, struct iwl_priv, init_alive_start.work);
 
-	mutex_lock(&priv->mutex);
 	if (test_bit(STATUS_EXIT_PENDING, &priv->status))
-		goto out;
+		return;
 
+	mutex_lock(&priv->mutex);
 	iwl3945_init_alive_start(priv);
-out:
 	mutex_unlock(&priv->mutex);
 }
 
@@ -2762,12 +2761,11 @@ static void iwl3945_bg_alive_start(struct work_struct *data)
 	struct iwl_priv *priv =
 	    container_of(data, struct iwl_priv, alive_start.work);
 
-	mutex_lock(&priv->mutex);
 	if (test_bit(STATUS_EXIT_PENDING, &priv->status))
-		goto out;
+		return;
 
+	mutex_lock(&priv->mutex);
 	iwl3945_alive_start(priv);
-out:
 	mutex_unlock(&priv->mutex);
 }
 
@@ -2997,12 +2995,10 @@ static void iwl3945_bg_restart(struct work_struct *data)
 	} else {
 		iwl3945_down(priv);
 
-		mutex_lock(&priv->mutex);
-		if (test_bit(STATUS_EXIT_PENDING, &priv->status)) {
-			mutex_unlock(&priv->mutex);
+		if (test_bit(STATUS_EXIT_PENDING, &priv->status))
 			return;
-		}
 
+		mutex_lock(&priv->mutex);
 		__iwl3945_up(priv);
 		mutex_unlock(&priv->mutex);
 	}
@@ -3013,12 +3009,11 @@ static void iwl3945_bg_rx_replenish(struct work_struct *data)
 	struct iwl_priv *priv =
 	    container_of(data, struct iwl_priv, rx_replenish);
 
-	mutex_lock(&priv->mutex);
 	if (test_bit(STATUS_EXIT_PENDING, &priv->status))
-		goto out;
+		return;
 
+	mutex_lock(&priv->mutex);
 	iwl3945_rx_replenish(priv);
-out:
 	mutex_unlock(&priv->mutex);
 }
 
@@ -3815,6 +3810,7 @@ static int iwl3945_init_drv(struct iwl_priv *priv)
 	INIT_LIST_HEAD(&priv->free_frames);
 
 	mutex_init(&priv->mutex);
+	mutex_init(&priv->sync_cmd_mutex);
 
 	priv->ieee_channels = NULL;
 	priv->ieee_rates = NULL;

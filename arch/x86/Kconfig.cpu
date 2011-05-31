@@ -1,4 +1,6 @@
 # Put here option for CPU selection and depending optimization
+if !X86_ELAN
+
 choice
 	prompt "Processor family"
 	default M686 if X86_32
@@ -6,7 +8,7 @@ choice
 
 config M386
 	bool "386"
-	depends on X86_32 && !UML
+	depends on X86_32 && !UML && !XEN
 	---help---
 	  This is the processor type of your CPU. This information is used for
 	  optimizing purposes. In order to compile a kernel that can run on
@@ -47,7 +49,7 @@ config M386
 
 config M486
 	bool "486"
-	depends on X86_32
+	depends on X86_32 && !XEN
 	---help---
 	  Select this for a 486 series processor, either Intel or one of the
 	  compatible processors from AMD, Cyrix, IBM, or Intel.  Includes DX,
@@ -56,7 +58,7 @@ config M486
 
 config M586
 	bool "586/K5/5x86/6x86/6x86MX"
-	depends on X86_32
+	depends on X86_32 && !XEN
 	---help---
 	  Select this for an 586 or 686 series processor such as the AMD K5,
 	  the Cyrix 5x86, 6x86 and 6x86MX.  This choice does not
@@ -64,14 +66,14 @@ config M586
 
 config M586TSC
 	bool "Pentium-Classic"
-	depends on X86_32
+	depends on X86_32 && !XEN
 	---help---
 	  Select this for a Pentium Classic processor with the RDTSC (Read
 	  Time Stamp Counter) instruction for benchmarking.
 
 config M586MMX
 	bool "Pentium-MMX"
-	depends on X86_32
+	depends on X86_32 && !XEN
 	---help---
 	  Select this for a Pentium with the MMX graphics/multimedia
 	  extended instructions.
@@ -201,14 +203,6 @@ config MWINCHIP3D
 	  stores for this CPU, which can increase performance of some
 	  operations.
 
-config MELAN
-	bool "AMD Elan"
-	depends on X86_32
-	---help---
-	  Select this for an AMD Elan processor.
-
-	  Do not use this option for K6/Athlon/Opteron processors!
-
 config MGEODEGX1
 	bool "GeodeGX1"
 	depends on X86_32
@@ -298,6 +292,8 @@ config X86_GENERIC
 	  This is really intended for distributors who need more
 	  generic optimizations.
 
+endif
+
 #
 # Define implied options from the CPU selection here
 config X86_INTERNODE_CACHE_SHIFT
@@ -316,7 +312,7 @@ config X86_L1_CACHE_SHIFT
 	int
 	default "7" if MPENTIUM4 || MPSC
 	default "6" if MK7 || MK8 || MPENTIUMM || MCORE2 || MATOM || MVIAC7 || X86_GENERIC || GENERIC_CPU
-	default "4" if MELAN || M486 || M386 || MGEODEGX1
+	default "4" if X86_ELAN || M486 || M386 || MGEODEGX1
 	default "5" if MWINCHIP3D || MWINCHIPC6 || MCRUSOE || MEFFICEON || MCYRIXIII || MK6 || MPENTIUMIII || MPENTIUMII || M686 || M586MMX || M586TSC || M586 || MVIAC3_2 || MGEODE_LX
 
 config X86_XADD
@@ -362,7 +358,7 @@ config X86_POPAD_OK
 
 config X86_ALIGNMENT_16
 	def_bool y
-	depends on MWINCHIP3D || MWINCHIPC6 || MCYRIXIII || MELAN || MK6 || M586MMX || M586TSC || M586 || M486 || MVIAC3_2 || MGEODEGX1
+	depends on MWINCHIP3D || MWINCHIPC6 || MCYRIXIII || X86_ELAN || MK6 || M586MMX || M586TSC || M586 || M486 || MVIAC3_2 || MGEODEGX1
 
 config X86_INTEL_USERCOPY
 	def_bool y
@@ -399,6 +395,7 @@ config X86_P6_NOP
 config X86_TSC
 	def_bool y
 	depends on ((MWINCHIP3D || MCRUSOE || MEFFICEON || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMM || MPENTIUMIII || MPENTIUMII || M686 || M586MMX || M586TSC || MK8 || MVIAC3_2 || MVIAC7 || MGEODEGX1 || MGEODE_LX || MCORE2 || MATOM) && !X86_NUMAQ) || X86_64
+	depends on !XEN
 
 config X86_CMPXCHG64
 	def_bool y
@@ -444,7 +441,7 @@ config CPU_SUP_INTEL
 config CPU_SUP_CYRIX_32
 	default y
 	bool "Support Cyrix processors" if PROCESSOR_SELECT
-	depends on !64BIT
+	depends on !64BIT && !XEN
 	---help---
 	  This enables detection, tunings and quirks for Cyrix processors
 
@@ -498,7 +495,7 @@ config CPU_SUP_TRANSMETA_32
 config CPU_SUP_UMC_32
 	default y
 	bool "Support UMC processors" if PROCESSOR_SELECT
-	depends on !64BIT
+	depends on !64BIT && !XEN
 	---help---
 	  This enables detection, tunings and quirks for UMC processors
 

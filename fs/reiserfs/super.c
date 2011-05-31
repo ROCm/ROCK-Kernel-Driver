@@ -572,7 +572,7 @@ static void destroy_inodecache(void)
 }
 
 /* we don't mark inodes dirty, we just log them */
-static void reiserfs_dirty_inode(struct inode *inode, int flags)
+static void reiserfs_dirty_inode(struct inode *inode)
 {
 	struct reiserfs_transaction_handle th;
 

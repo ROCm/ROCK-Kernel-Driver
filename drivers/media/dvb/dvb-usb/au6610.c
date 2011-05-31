@@ -33,16 +33,8 @@ static int au6610_usb_msg(struct dvb_usb_device *d, u8 operation, u8 addr,
 {
 	int ret;
 	u16 index;
-	u8 *usb_buf;
-
-	/*
-	 * allocate enough for all known requests,
-	 * read returns 5 and write 6 bytes
-	 */
-	usb_buf = kmalloc(6, GFP_KERNEL);
-	if (!usb_buf)
-		return -ENOMEM;
-
+	u8 usb_buf[6]; /* enough for all known requests,
+			  read returns 5 and write 6 bytes */
 	switch (wlen) {
 	case 1:
 		index = wbuf[0] << 8;
@@ -53,15 +45,14 @@ static int au6610_usb_msg(struct dvb_usb_device *d, u8 operation, u8 addr,
 		break;
 	default:
 		warn("wlen = %x, aborting.", wlen);
-		ret = -EINVAL;
-		goto error;
+		return -EINVAL;
 	}
 
 	ret = usb_control_msg(d->udev, usb_rcvctrlpipe(d->udev, 0), operation,
 			      USB_TYPE_VENDOR|USB_DIR_IN, addr << 1, index,
-			      usb_buf, 6, AU6610_USB_TIMEOUT);
+			      usb_buf, sizeof(usb_buf), AU6610_USB_TIMEOUT);
 	if (ret < 0)
-		goto error;
+		return ret;
 
 	switch (operation) {
 	case AU6610_REQ_I2C_READ:
@@ -69,8 +60,7 @@ static int au6610_usb_msg(struct dvb_usb_device *d, u8 operation, u8 addr,
 		/* requested value is always 5th byte in buffer */
 		rbuf[0] = usb_buf[4];
 	}
-error:
-	kfree(usb_buf);
+
 	return ret;
 }
 

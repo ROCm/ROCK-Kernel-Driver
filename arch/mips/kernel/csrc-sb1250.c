@@ -65,5 +65,6 @@ void __init sb1250_clocksource_init(void)
 		     IOADDR(A_SCD_TIMER_REGISTER(SB1250_HPT_NUM,
 						 R_SCD_TIMER_CFG)));
 
-	clocksource_register_hz(cs, V_SCD_TIMER_FREQ);
+	clocksource_set_clock(cs, V_SCD_TIMER_FREQ);
+	clocksource_register(cs);
 }

@@ -5012,6 +5012,7 @@ mptsas_event_process(MPT_ADAPTER *ioc, EventNotificationReply_t *reply)
 			(ioc_stat & MPI_IOCSTATUS_FLAG_LOG_INFO_AVAILABLE)) {
 			VirtTarget *vtarget = NULL;
 			u8		id, channel;
+			u32	 log_info = le32_to_cpu(reply->IOCLogInfo);
 
 			id = sas_event_data->TargetID;
 			channel = sas_event_data->Bus;
@@ -5022,8 +5023,7 @@ mptsas_event_process(MPT_ADAPTER *ioc, EventNotificationReply_t *reply)
 				    "LogInfo (0x%x) available for "
 				   "INTERNAL_DEVICE_RESET"
 				   "fw_id %d fw_channel %d\n", ioc->name,
-				   le32_to_cpu(reply->IOCLogInfo),
-				   id, channel));
+				   log_info, id, channel));
 				if (vtarget->raidVolume) {
 					devtprintk(ioc, printk(MYIOC_s_DEBUG_FMT
 					"Skipping Raid Volume for inDMD\n",

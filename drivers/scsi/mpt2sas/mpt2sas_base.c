@@ -522,8 +522,7 @@ _base_display_event_data(struct MPT2SAS_ADAPTER *ioc,
 		desc = "Device Status Change";
 		break;
 	case MPI2_EVENT_IR_OPERATION_STATUS:
-		if (!ioc->hide_ir_msg)
-			desc = "IR Operation Status";
+		desc = "IR Operation Status";
 		break;
 	case MPI2_EVENT_SAS_DISCOVERY:
 	{
@@ -554,20 +553,16 @@ _base_display_event_data(struct MPT2SAS_ADAPTER *ioc,
 		desc = "SAS Enclosure Device Status Change";
 		break;
 	case MPI2_EVENT_IR_VOLUME:
-		if (!ioc->hide_ir_msg)
-			desc = "IR Volume";
+		desc = "IR Volume";
 		break;
 	case MPI2_EVENT_IR_PHYSICAL_DISK:
-		if (!ioc->hide_ir_msg)
-			desc = "IR Physical Disk";
+		desc = "IR Physical Disk";
 		break;
 	case MPI2_EVENT_IR_CONFIGURATION_CHANGE_LIST:
-		if (!ioc->hide_ir_msg)
-			desc = "IR Configuration Change List";
+		desc = "IR Configuration Change List";
 		break;
 	case MPI2_EVENT_LOG_ENTRY_ADDED:
-		if (!ioc->hide_ir_msg)
-			desc = "Log Entry Added";
+		desc = "Log Entry Added";
 		break;
 	}
 
@@ -621,10 +616,7 @@ _base_sas_log_info(struct MPT2SAS_ADAPTER *ioc , u32 log_info)
 		originator_str = "PL";
 		break;
 	case 2:
-		if (!ioc->hide_ir_msg)
-			originator_str = "IR";
-		else
-			originator_str = "WarpDrive";
+		originator_str = "IR";
 		break;
 	}
 
@@ -1516,7 +1508,6 @@ mpt2sas_base_free_smid(struct MPT2SAS_ADAPTER *ioc, u16 smid)
 		}
 		ioc->scsi_lookup[i].cb_idx = 0xFF;
 		ioc->scsi_lookup[i].scmd = NULL;
-		ioc->scsi_lookup[i].direct_io = 0;
 		list_add_tail(&ioc->scsi_lookup[i].tracker_list,
 		    &ioc->free_list);
 		spin_unlock_irqrestore(&ioc->scsi_lookup_lock, flags);
@@ -1853,12 +1844,10 @@ _base_display_ioc_capabilities(struct MPT2SAS_ADAPTER *ioc)
 	printk("), ");
 	printk("Capabilities=(");
 
-	if (!ioc->hide_ir_msg) {
-		if (ioc->facts.IOCCapabilities &
-		    MPI2_IOCFACTS_CAPABILITY_INTEGRATED_RAID) {
-			printk("Raid");
-			i++;
-		}
+	if (ioc->facts.IOCCapabilities &
+	    MPI2_IOCFACTS_CAPABILITY_INTEGRATED_RAID) {
+		printk("Raid");
+		i++;
 	}
 
 	if (ioc->facts.IOCCapabilities & MPI2_IOCFACTS_CAPABILITY_TLR) {
@@ -3691,7 +3680,6 @@ _base_make_ioc_operational(struct MPT2SAS_ADAPTER *ioc, int sleep_flag)
 	u32 reply_address;
 	u16 smid;
 	struct _tr_list *delayed_tr, *delayed_tr_next;
-	u8 hide_flag;
 
 	dinitprintk(ioc, printk(MPT2SAS_INFO_FMT "%s\n", ioc->name,
 	    __func__));
@@ -3718,7 +3706,6 @@ _base_make_ioc_operational(struct MPT2SAS_ADAPTER *ioc, int sleep_flag)
 		ioc->scsi_lookup[i].cb_idx = 0xFF;
 		ioc->scsi_lookup[i].smid = smid;
 		ioc->scsi_lookup[i].scmd = NULL;
-		ioc->scsi_lookup[i].direct_io = 0;
 		list_add_tail(&ioc->scsi_lookup[i].tracker_list,
 		    &ioc->free_list);
 	}
@@ -3778,15 +3765,6 @@ _base_make_ioc_operational(struct MPT2SAS_ADAPTER *ioc, int sleep_flag)
 
 	if (sleep_flag == CAN_SLEEP)
 		_base_static_config_pages(ioc);
-
-	if (ioc->wait_for_port_enable_to_complete && ioc->is_warpdrive) {
-		if (ioc->manu_pg10.OEMIdentifier  == 0x80) {
-			hide_flag = (u8) (ioc->manu_pg10.OEMSpecificFlags0 &
-			    MFG_PAGE10_HIDE_SSDS_MASK);
-			if (hide_flag != MFG_PAGE10_HIDE_SSDS_MASK)
-				ioc->mfg_pg10_hide_flag = hide_flag;
-		}
-	}
 
 	if (ioc->wait_for_port_enable_to_complete) {
 		if (diag_buffer_enable != 0)

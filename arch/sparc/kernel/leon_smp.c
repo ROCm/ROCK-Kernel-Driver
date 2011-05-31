@@ -14,7 +14,6 @@
 #include <linux/smp.h>
 #include <linux/interrupt.h>
 #include <linux/kernel_stat.h>
-#include <linux/of.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
 #include <linux/mm.h>
@@ -30,7 +29,6 @@
 #include <asm/ptrace.h>
 #include <asm/atomic.h>
 #include <asm/irq_regs.h>
-#include <asm/traps.h>
 
 #include <asm/delay.h>
 #include <asm/irq.h>
@@ -52,12 +50,9 @@
 extern ctxd_t *srmmu_ctx_table_phys;
 static int smp_processors_ready;
 extern volatile unsigned long cpu_callin_map[NR_CPUS];
+extern unsigned char boot_cpu_id;
 extern cpumask_t smp_commenced_mask;
 void __init leon_configure_cache_smp(void);
-static void leon_ipi_init(void);
-
-/* IRQ number of LEON IPIs */
-int leon_ipi_irq = LEON3_IRQ_IPI_DEFAULT;
 
 static inline unsigned long do_swap(volatile unsigned long *ptr,
 				    unsigned long val)
@@ -99,6 +94,8 @@ void __cpuinit leon_callin(void)
 	local_flush_cache_all();
 	local_flush_tlb_all();
 
+	cpu_probe();
+
 	/* Fix idle thread fields. */
 	__asm__ __volatile__("ld [%0], %%g6\n\t" : : "r"(&current_set[cpuid])
 			     : "memory" /* paranoid */);
@@ -107,11 +104,11 @@ void __cpuinit leon_callin(void)
 	atomic_inc(&init_mm.mm_count);
 	current->active_mm = &init_mm;
 
-	while (!cpumask_test_cpu(cpuid, &smp_commenced_mask))
+	while (!cpu_isset(cpuid, smp_commenced_mask))
 		mb();
 
 	local_irq_enable();
-	set_cpu_online(cpuid, true);
+	cpu_set(cpuid, cpu_online_map);
 }
 
 /*
@@ -182,16 +179,13 @@ void __init leon_boot_cpus(void)
 	int nrcpu = leon_smp_nrcpus();
 	int me = smp_processor_id();
 
-	/* Setup IPI */
-	leon_ipi_init();
-
 	printk(KERN_INFO "%d:(%d:%d) cpus mpirq at 0x%x\n", (unsigned int)me,
 	       (unsigned int)nrcpu, (unsigned int)NR_CPUS,
 	       (unsigned int)&(leon3_irqctrl_regs->mpstatus));
 
 	leon_enable_irq_cpu(LEON3_IRQ_CROSS_CALL, me);
 	leon_enable_irq_cpu(LEON3_IRQ_TICKER, me);
-	leon_enable_irq_cpu(leon_ipi_irq, me);
+	leon_enable_irq_cpu(LEON3_IRQ_RESCHEDULE, me);
 
 	leon_smp_setbroadcast(1 << LEON3_IRQ_TICKER);
 
@@ -226,10 +220,6 @@ int __cpuinit leon_boot_one_cpu(int i)
 	       (unsigned int)&leon3_irqctrl_regs->mpstatus);
 	local_flush_cache_all();
 
-	/* Make sure all IRQs are of from the start for this new CPU */
-	LEON_BYPASS_STORE_PA(&leon3_irqctrl_regs->mask[i], 0);
-
-	/* Wake one CPU */
 	LEON_BYPASS_STORE_PA(&(leon3_irqctrl_regs->mpstatus), 1 << i);
 
 	/* wheee... it's going... */
@@ -246,7 +236,7 @@ int __cpuinit leon_boot_one_cpu(int i)
 	} else {
 		leon_enable_irq_cpu(LEON3_IRQ_CROSS_CALL, i);
 		leon_enable_irq_cpu(LEON3_IRQ_TICKER, i);
-		leon_enable_irq_cpu(leon_ipi_irq, i);
+		leon_enable_irq_cpu(LEON3_IRQ_RESCHEDULE, i);
 	}
 
 	local_flush_cache_all();
@@ -272,21 +262,21 @@ void __init leon_smp_done(void)
 	local_flush_cache_all();
 
 	/* Free unneeded trap tables */
-	if (!cpu_present(1)) {
+	if (!cpu_isset(1, cpu_present_map)) {
 		ClearPageReserved(virt_to_page(&trapbase_cpu1));
 		init_page_count(virt_to_page(&trapbase_cpu1));
 		free_page((unsigned long)&trapbase_cpu1);
 		totalram_pages++;
 		num_physpages++;
 	}
-	if (!cpu_present(2)) {
+	if (!cpu_isset(2, cpu_present_map)) {
 		ClearPageReserved(virt_to_page(&trapbase_cpu2));
 		init_page_count(virt_to_page(&trapbase_cpu2));
 		free_page((unsigned long)&trapbase_cpu2);
 		totalram_pages++;
 		num_physpages++;
 	}
-	if (!cpu_present(3)) {
+	if (!cpu_isset(3, cpu_present_map)) {
 		ClearPageReserved(virt_to_page(&trapbase_cpu3));
 		init_page_count(virt_to_page(&trapbase_cpu3));
 		free_page((unsigned long)&trapbase_cpu3);
@@ -300,99 +290,6 @@ void __init leon_smp_done(void)
 
 void leon_irq_rotate(int cpu)
 {
-}
-
-struct leon_ipi_work {
-	int single;
-	int msk;
-	int resched;
-};
-
-static DEFINE_PER_CPU_SHARED_ALIGNED(struct leon_ipi_work, leon_ipi_work);
-
-/* Initialize IPIs on the LEON, in order to save IRQ resources only one IRQ
- * is used for all three types of IPIs.
- */
-static void __init leon_ipi_init(void)
-{
-	int cpu, len;
-	struct leon_ipi_work *work;
-	struct property *pp;
-	struct device_node *rootnp;
-	struct tt_entry *trap_table;
-	unsigned long flags;
-
-	/* Find IPI IRQ or stick with default value */
-	rootnp = of_find_node_by_path("/ambapp0");
-	if (rootnp) {
-		pp = of_find_property(rootnp, "ipi_num", &len);
-		if (pp && (*(int *)pp->value))
-			leon_ipi_irq = *(int *)pp->value;
-	}
-	printk(KERN_INFO "leon: SMP IPIs at IRQ %d\n", leon_ipi_irq);
-
-	/* Adjust so that we jump directly to smpleon_ipi */
-	local_irq_save(flags);
-	trap_table = &sparc_ttable[SP_TRAP_IRQ1 + (leon_ipi_irq - 1)];
-	trap_table->inst_three += smpleon_ipi - real_irq_entry;
-	local_flush_cache_all();
-	local_irq_restore(flags);
-
-	for_each_possible_cpu(cpu) {
-		work = &per_cpu(leon_ipi_work, cpu);
-		work->single = work->msk = work->resched = 0;
-	}
-}
-
-static void leon_ipi_single(int cpu)
-{
-	struct leon_ipi_work *work = &per_cpu(leon_ipi_work, cpu);
-
-	/* Mark work */
-	work->single = 1;
-
-	/* Generate IRQ on the CPU */
-	set_cpu_int(cpu, leon_ipi_irq);
-}
-
-static void leon_ipi_mask_one(int cpu)
-{
-	struct leon_ipi_work *work = &per_cpu(leon_ipi_work, cpu);
-
-	/* Mark work */
-	work->msk = 1;
-
-	/* Generate IRQ on the CPU */
-	set_cpu_int(cpu, leon_ipi_irq);
-}
-
-static void leon_ipi_resched(int cpu)
-{
-	struct leon_ipi_work *work = &per_cpu(leon_ipi_work, cpu);
-
-	/* Mark work */
-	work->resched = 1;
-
-	/* Generate IRQ on the CPU (any IRQ will cause resched) */
-	set_cpu_int(cpu, leon_ipi_irq);
-}
-
-void leonsmp_ipi_interrupt(void)
-{
-	struct leon_ipi_work *work = &__get_cpu_var(leon_ipi_work);
-
-	if (work->single) {
-		work->single = 0;
-		smp_call_function_single_interrupt();
-	}
-	if (work->msk) {
-		work->msk = 0;
-		smp_call_function_interrupt();
-	}
-	if (work->resched) {
-		work->resched = 0;
-		smp_resched_interrupt();
-	}
 }
 
 static struct smp_funcall {
@@ -440,10 +337,10 @@ static void leon_cross_call(smpfunc_t func, cpumask_t mask, unsigned long arg1,
 		{
 			register int i;
 
-			cpumask_clear_cpu(smp_processor_id(), &mask);
-			cpumask_and(&mask, cpu_online_mask, &mask);
+			cpu_clear(smp_processor_id(), mask);
+			cpus_and(mask, cpu_online_map, mask);
 			for (i = 0; i <= high; i++) {
-				if (cpumask_test_cpu(i, &mask)) {
+				if (cpu_isset(i, mask)) {
 					ccall_info.processors_in[i] = 0;
 					ccall_info.processors_out[i] = 0;
 					set_cpu_int(i, LEON3_IRQ_CROSS_CALL);
@@ -457,7 +354,7 @@ static void leon_cross_call(smpfunc_t func, cpumask_t mask, unsigned long arg1,
 
 			i = 0;
 			do {
-				if (!cpumask_test_cpu(i, &mask))
+				if (!cpu_isset(i, mask))
 					continue;
 
 				while (!ccall_info.processors_in[i])
@@ -466,7 +363,7 @@ static void leon_cross_call(smpfunc_t func, cpumask_t mask, unsigned long arg1,
 
 			i = 0;
 			do {
-				if (!cpumask_test_cpu(i, &mask))
+				if (!cpu_isset(i, mask))
 					continue;
 
 				while (!ccall_info.processors_out[i])
@@ -489,23 +386,27 @@ void leon_cross_call_irq(void)
 	ccall_info.processors_out[i] = 1;
 }
 
-irqreturn_t leon_percpu_timer_interrupt(int irq, void *unused)
+void leon_percpu_timer_interrupt(struct pt_regs *regs)
 {
+	struct pt_regs *old_regs;
 	int cpu = smp_processor_id();
+
+	old_regs = set_irq_regs(regs);
 
 	leon_clear_profile_irq(cpu);
 
 	profile_tick(CPU_PROFILING);
 
 	if (!--prof_counter(cpu)) {
-		int user = user_mode(get_irq_regs());
+		int user = user_mode(regs);
 
+		irq_enter();
 		update_process_times(user);
+		irq_exit();
 
 		prof_counter(cpu) = prof_multiplier(cpu);
 	}
-
-	return IRQ_HANDLED;
+	set_irq_regs(old_regs);
 }
 
 static void __init smp_setup_percpu_timer(void)
@@ -548,9 +449,6 @@ void __init leon_init_smp(void)
 	BTFIXUPSET_CALL(smp_cross_call, leon_cross_call, BTFIXUPCALL_NORM);
 	BTFIXUPSET_CALL(__hard_smp_processor_id, __leon_processor_id,
 			BTFIXUPCALL_NORM);
-	BTFIXUPSET_CALL(smp_ipi_resched, leon_ipi_resched, BTFIXUPCALL_NORM);
-	BTFIXUPSET_CALL(smp_ipi_single, leon_ipi_single, BTFIXUPCALL_NORM);
-	BTFIXUPSET_CALL(smp_ipi_mask_one, leon_ipi_mask_one, BTFIXUPCALL_NORM);
 }
 
 #endif /* CONFIG_SPARC_LEON */

@@ -197,10 +197,12 @@ static inline struct qe_ic *qe_ic_from_irq_data(struct irq_data *d)
 	return irq_data_get_irq_chip_data(d);
 }
 
+#define virq_to_hw(virq)	((unsigned int)irq_map[virq].hwirq)
+
 static void qe_ic_unmask_irq(struct irq_data *d)
 {
 	struct qe_ic *qe_ic = qe_ic_from_irq_data(d);
-	unsigned int src = irqd_to_hwirq(d);
+	unsigned int src = virq_to_hw(d->irq);
 	unsigned long flags;
 	u32 temp;
 
@@ -216,7 +218,7 @@ static void qe_ic_unmask_irq(struct irq_data *d)
 static void qe_ic_mask_irq(struct irq_data *d)
 {
 	struct qe_ic *qe_ic = qe_ic_from_irq_data(d);
-	unsigned int src = irqd_to_hwirq(d);
+	unsigned int src = virq_to_hw(d->irq);
 	unsigned long flags;
 	u32 temp;
 

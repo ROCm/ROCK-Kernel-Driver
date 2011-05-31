@@ -5,7 +5,7 @@
  *
  * cmdline.c: Kernel command line creation using ARCS argc/argv.
  *
- * Copyright (C) 1996 David S. Miller (davem@davemloft.net)
+ * Copyright (C) 1996 David S. Miller (dm@engr.sgi.com)
  */
 #include <linux/init.h>
 #include <linux/kernel.h>

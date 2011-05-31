@@ -46,17 +46,18 @@ static irqreturn_t xen_call_function_interrupt(int irq, void *dev_id);
 static irqreturn_t xen_call_function_single_interrupt(int irq, void *dev_id);
 
 /*
- * Reschedule call back.
+ * Reschedule call back. Nothing to do,
+ * all the work is done automatically when
+ * we return from the interrupt.
  */
 static irqreturn_t xen_reschedule_interrupt(int irq, void *dev_id)
 {
 	inc_irq_stat(irq_resched_count);
-	scheduler_ipi();
 
 	return IRQ_HANDLED;
 }
 
-static void __cpuinit cpu_bringup(void)
+static __cpuinit void cpu_bringup(void)
 {
 	int cpu = smp_processor_id();
 
@@ -84,7 +85,7 @@ static void __cpuinit cpu_bringup(void)
 	wmb();			/* make sure everything is out */
 }
 
-static void __cpuinit cpu_bringup_and_idle(void)
+static __cpuinit void cpu_bringup_and_idle(void)
 {
 	cpu_bringup();
 	cpu_idle();
@@ -241,7 +242,7 @@ static void __init xen_smp_prepare_cpus(unsigned int max_cpus)
 	}
 }
 
-static int __cpuinit
+static __cpuinit int
 cpu_initialize_context(unsigned int cpu, struct task_struct *idle)
 {
 	struct vcpu_guest_context *ctxt;
@@ -485,7 +486,7 @@ static irqreturn_t xen_call_function_single_interrupt(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-static const struct smp_ops xen_smp_ops __initconst = {
+static const struct smp_ops xen_smp_ops __initdata = {
 	.smp_prepare_boot_cpu = xen_smp_prepare_boot_cpu,
 	.smp_prepare_cpus = xen_smp_prepare_cpus,
 	.smp_cpus_done = xen_smp_cpus_done,

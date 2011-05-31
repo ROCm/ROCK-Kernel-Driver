@@ -36,7 +36,7 @@ static int __init init_rpxlite(void)
 	mymtd = do_map_probe("cfi_probe", &rpxlite_map);
 	if (mymtd) {
 		mymtd->owner = THIS_MODULE;
-		mtd_device_register(mymtd, NULL, 0);
+		add_mtd_device(mymtd);
 		return 0;
 	}
 
@@ -47,7 +47,7 @@ static int __init init_rpxlite(void)
 static void __exit cleanup_rpxlite(void)
 {
 	if (mymtd) {
-		mtd_device_unregister(mymtd);
+		del_mtd_device(mymtd);
 		map_destroy(mymtd);
 	}
 	if (rpxlite_map.virt) {

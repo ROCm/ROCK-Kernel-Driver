@@ -22,7 +22,6 @@
 
 static unsigned int offset;
 static unsigned int ino = 721;
-static time_t default_mtime;
 
 struct file_handler {
 	const char *type;
@@ -103,6 +102,7 @@ static int cpio_mkslink(const char *name, const char *target,
 			 unsigned int mode, uid_t uid, gid_t gid)
 {
 	char s[256];
+	time_t mtime = time(NULL);
 
 	if (name[0] == '/')
 		name++;
@@ -114,7 +114,7 @@ static int cpio_mkslink(const char *name, const char *target,
 		(long) uid,		/* uid */
 		(long) gid,		/* gid */
 		1,			/* nlink */
-		(long) default_mtime,	/* mtime */
+		(long) mtime,		/* mtime */
 		(unsigned)strlen(target)+1, /* filesize */
 		3,			/* major */
 		1,			/* minor */
@@ -152,6 +152,7 @@ static int cpio_mkgeneric(const char *name, unsigned int mode,
 		       uid_t uid, gid_t gid)
 {
 	char s[256];
+	time_t mtime = time(NULL);
 
 	if (name[0] == '/')
 		name++;
@@ -163,7 +164,7 @@ static int cpio_mkgeneric(const char *name, unsigned int mode,
 		(long) uid,		/* uid */
 		(long) gid,		/* gid */
 		2,			/* nlink */
-		(long) default_mtime,	/* mtime */
+		(long) mtime,		/* mtime */
 		0,			/* filesize */
 		3,			/* major */
 		1,			/* minor */
@@ -241,6 +242,7 @@ static int cpio_mknod(const char *name, unsigned int mode,
 		       unsigned int maj, unsigned int min)
 {
 	char s[256];
+	time_t mtime = time(NULL);
 
 	if (dev_type == 'b')
 		mode |= S_IFBLK;
@@ -257,7 +259,7 @@ static int cpio_mknod(const char *name, unsigned int mode,
 		(long) uid,		/* uid */
 		(long) gid,		/* gid */
 		1,			/* nlink */
-		(long) default_mtime,	/* mtime */
+		(long) mtime,		/* mtime */
 		0,			/* filesize */
 		3,			/* major */
 		1,			/* minor */
@@ -458,7 +460,7 @@ static int cpio_mkfile_line(const char *line)
 static void usage(const char *prog)
 {
 	fprintf(stderr, "Usage:\n"
-		"\t%s [-t <timestamp>] <cpio_list>\n"
+		"\t%s <cpio_list>\n"
 		"\n"
 		"<cpio_list> is a file containing newline separated entries that\n"
 		"describe the files to be included in the initramfs archive:\n"
@@ -489,11 +491,7 @@ static void usage(const char *prog)
 		"nod /dev/console 0600 0 0 c 5 1\n"
 		"dir /root 0700 0 0\n"
 		"dir /sbin 0755 0 0\n"
-		"file /sbin/kinit /usr/src/klibc/kinit/kinit 0755 0 0\n"
-		"\n"
-		"<timestamp> is time in seconds since Epoch that will be used\n"
-		"as mtime for symlinks, special files and directories. The default\n"
-		"is to use the current time for these entries.\n",
+		"file /sbin/kinit /usr/src/klibc/kinit/kinit 0755 0 0\n",
 		prog);
 }
 
@@ -531,42 +529,17 @@ int main (int argc, char *argv[])
 	char *args, *type;
 	int ec = 0;
 	int line_nr = 0;
-	const char *filename;
 
-	default_mtime = time(NULL);
-	while (1) {
-		int opt = getopt(argc, argv, "t:h");
-		char *invalid;
-
-		if (opt == -1)
-			break;
-		switch (opt) {
-		case 't':
-			default_mtime = strtol(optarg, &invalid, 10);
-			if (!*optarg || *invalid) {
-				fprintf(stderr, "Invalid timestamp: %s\n",
-						optarg);
-				usage(argv[0]);
-				exit(1);
-			}
-			break;
-		case 'h':
-		case '?':
-			usage(argv[0]);
-			exit(opt == 'h' ? 0 : 1);
-		}
-	}
-
-	if (argc - optind != 1) {
+	if (2 != argc) {
 		usage(argv[0]);
 		exit(1);
 	}
-	filename = argv[optind];
-	if (!strcmp(filename, "-"))
+
+	if (!strcmp(argv[1], "-"))
 		cpio_list = stdin;
-	else if (!(cpio_list = fopen(filename, "r"))) {
+	else if (! (cpio_list = fopen(argv[1], "r"))) {
 		fprintf(stderr, "ERROR: unable to open '%s': %s\n\n",
-			filename, strerror(errno));
+			argv[1], strerror(errno));
 		usage(argv[0]);
 		exit(1);
 	}

@@ -93,7 +93,7 @@ static int wiphy_suspend(struct device *dev, pm_message_t state)
 
 	if (rdev->ops->suspend) {
 		rtnl_lock();
-		ret = rdev->ops->suspend(&rdev->wiphy, rdev->wowlan);
+		ret = rdev->ops->suspend(&rdev->wiphy);
 		rtnl_unlock();
 	}
 

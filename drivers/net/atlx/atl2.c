@@ -1411,8 +1411,9 @@ static int __devinit atl2_probe(struct pci_dev *pdev,
 
 	err = -EIO;
 
-	netdev->hw_features = NETIF_F_SG;
+#ifdef NETIF_F_HW_VLAN_TX
 	netdev->features |= (NETIF_F_HW_VLAN_TX | NETIF_F_HW_VLAN_RX);
+#endif
 
 	/* Init PHY as early as possible due to power saving issue  */
 	atl2_phy_init(&adapter->hw);
@@ -1769,13 +1770,13 @@ static int atl2_get_settings(struct net_device *netdev,
 	ecmd->transceiver = XCVR_INTERNAL;
 
 	if (adapter->link_speed != SPEED_0) {
-		ethtool_cmd_speed_set(ecmd, adapter->link_speed);
+		ecmd->speed = adapter->link_speed;
 		if (adapter->link_duplex == FULL_DUPLEX)
 			ecmd->duplex = DUPLEX_FULL;
 		else
 			ecmd->duplex = DUPLEX_HALF;
 	} else {
-		ethtool_cmd_speed_set(ecmd, -1);
+		ecmd->speed = -1;
 		ecmd->duplex = -1;
 	}
 
@@ -1837,6 +1838,11 @@ static int atl2_set_settings(struct net_device *netdev,
 
 	clear_bit(__ATL2_RESETTING, &adapter->flags);
 	return 0;
+}
+
+static u32 atl2_get_tx_csum(struct net_device *netdev)
+{
+	return (netdev->features & NETIF_F_HW_CSUM) != 0;
 }
 
 static u32 atl2_get_msglevel(struct net_device *netdev)
@@ -2106,6 +2112,12 @@ static const struct ethtool_ops atl2_ethtool_ops = {
 	.get_eeprom_len		= atl2_get_eeprom_len,
 	.get_eeprom		= atl2_get_eeprom,
 	.set_eeprom		= atl2_set_eeprom,
+	.get_tx_csum		= atl2_get_tx_csum,
+	.get_sg			= ethtool_op_get_sg,
+	.set_sg			= ethtool_op_set_sg,
+#ifdef NETIF_F_TSO
+	.get_tso		= ethtool_op_get_tso,
+#endif
 };
 
 static void atl2_set_ethtool_ops(struct net_device *netdev)

@@ -20,7 +20,7 @@
 #include <linux/input.h>
 #include <linux/input/sh_keysc.h>
 #include <linux/bitmap.h>
-#include <linux/pm_runtime.h>
+#include <linux/clk.h>
 #include <linux/io.h>
 #include <linux/slab.h>
 
@@ -37,6 +37,7 @@ static const struct {
 
 struct sh_keysc_priv {
 	void __iomem *iomem_base;
+	struct clk *clk;
 	DECLARE_BITMAP(last_keys, SH_KEYSC_MAXKEYS);
 	struct input_dev *input;
 	struct sh_keysc_info pdata;
@@ -168,6 +169,7 @@ static int __devinit sh_keysc_probe(struct platform_device *pdev)
 	struct sh_keysc_info *pdata;
 	struct resource *res;
 	struct input_dev *input;
+	char clk_name[8];
 	int i;
 	int irq, error;
 
@@ -208,11 +210,19 @@ static int __devinit sh_keysc_probe(struct platform_device *pdev)
 		goto err1;
 	}
 
+	snprintf(clk_name, sizeof(clk_name), "keysc%d", pdev->id);
+	priv->clk = clk_get(&pdev->dev, clk_name);
+	if (IS_ERR(priv->clk)) {
+		dev_err(&pdev->dev, "cannot get clock \"%s\"\n", clk_name);
+		error = PTR_ERR(priv->clk);
+		goto err2;
+	}
+
 	priv->input = input_allocate_device();
 	if (!priv->input) {
 		dev_err(&pdev->dev, "failed to allocate input device\n");
 		error = -ENOMEM;
-		goto err2;
+		goto err3;
 	}
 
 	input = priv->input;
@@ -231,11 +241,10 @@ static int __devinit sh_keysc_probe(struct platform_device *pdev)
 	input->keycodesize = sizeof(pdata->keycodes[0]);
 	input->keycodemax = ARRAY_SIZE(pdata->keycodes);
 
-	error = request_threaded_irq(irq, NULL, sh_keysc_isr, IRQF_ONESHOT,
-				     dev_name(&pdev->dev), pdev);
+	error = request_irq(irq, sh_keysc_isr, 0, pdev->name, pdev);
 	if (error) {
 		dev_err(&pdev->dev, "failed to request IRQ\n");
-		goto err3;
+		goto err4;
 	}
 
 	for (i = 0; i < SH_KEYSC_MAXKEYS; i++)
@@ -245,11 +254,10 @@ static int __devinit sh_keysc_probe(struct platform_device *pdev)
 	error = input_register_device(input);
 	if (error) {
 		dev_err(&pdev->dev, "failed to register input device\n");
-		goto err4;
+		goto err5;
 	}
 
-	pm_runtime_enable(&pdev->dev);
-	pm_runtime_get_sync(&pdev->dev);
+	clk_enable(priv->clk);
 
 	sh_keysc_write(priv, KYCR1, (sh_keysc_mode[pdata->mode].kymd << 8) |
 		       pdata->scan_timing);
@@ -259,10 +267,12 @@ static int __devinit sh_keysc_probe(struct platform_device *pdev)
 
 	return 0;
 
- err4:
+ err5:
 	free_irq(irq, pdev);
- err3:
+ err4:
 	input_free_device(input);
+ err3:
+	clk_put(priv->clk);
  err2:
 	iounmap(priv->iomem_base);
  err1:
@@ -282,8 +292,8 @@ static int __devexit sh_keysc_remove(struct platform_device *pdev)
 	free_irq(platform_get_irq(pdev, 0), pdev);
 	iounmap(priv->iomem_base);
 
-	pm_runtime_put_sync(&pdev->dev);
-	pm_runtime_disable(&pdev->dev);
+	clk_disable(priv->clk);
+	clk_put(priv->clk);
 
 	platform_set_drvdata(pdev, NULL);
 	kfree(priv);
@@ -291,7 +301,6 @@ static int __devexit sh_keysc_remove(struct platform_device *pdev)
 	return 0;
 }
 
-#if CONFIG_PM_SLEEP
 static int sh_keysc_suspend(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
@@ -302,12 +311,13 @@ static int sh_keysc_suspend(struct device *dev)
 	value = sh_keysc_read(priv, KYCR1);
 
 	if (device_may_wakeup(dev)) {
-		sh_keysc_write(priv, KYCR1, value | 0x80);
+		value |= 0x80;
 		enable_irq_wake(irq);
 	} else {
-		sh_keysc_write(priv, KYCR1, value & ~0x80);
-		pm_runtime_put_sync(dev);
+		value &= ~0x80;
 	}
+
+	sh_keysc_write(priv, KYCR1, value);
 
 	return 0;
 }
@@ -319,17 +329,16 @@ static int sh_keysc_resume(struct device *dev)
 
 	if (device_may_wakeup(dev))
 		disable_irq_wake(irq);
-	else
-		pm_runtime_get_sync(dev);
 
 	return 0;
 }
-#endif
 
-static SIMPLE_DEV_PM_OPS(sh_keysc_dev_pm_ops,
-			 sh_keysc_suspend, sh_keysc_resume);
+static const struct dev_pm_ops sh_keysc_dev_pm_ops = {
+	.suspend = sh_keysc_suspend,
+	.resume = sh_keysc_resume,
+};
 
-static struct platform_driver sh_keysc_device_driver = {
+struct platform_driver sh_keysc_device_driver = {
 	.probe		= sh_keysc_probe,
 	.remove		= __devexit_p(sh_keysc_remove),
 	.driver		= {

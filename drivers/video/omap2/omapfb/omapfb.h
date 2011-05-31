@@ -29,15 +29,13 @@
 
 #include <linux/rwsem.h>
 
-#include <video/omapdss.h>
+#include <plat/display.h>
 
 #ifdef DEBUG
 extern unsigned int omapfb_debug;
 #define DBG(format, ...) \
-	do { \
-		if (omapfb_debug) \
-			printk(KERN_DEBUG "OMAPFB: " format, ## __VA_ARGS__); \
-	} while (0)
+	if (omapfb_debug) \
+		printk(KERN_DEBUG "OMAPFB: " format, ## __VA_ARGS__)
 #else
 #define DBG(format, ...)
 #endif

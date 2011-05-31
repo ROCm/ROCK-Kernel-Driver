@@ -73,7 +73,8 @@ static uint _init_intf_hdl(struct _adapter *padapter,
 		goto _init_intf_hdl_fail;
 	return _SUCCESS;
 _init_intf_hdl_fail:
-	kfree(pintf_priv);
+	if (pintf_priv)
+		kfree((u8 *)pintf_priv);
 	return _FAIL;
 }
 
@@ -83,7 +84,8 @@ static void _unload_intf_hdl(struct intf_priv *pintfpriv)
 
 	unload_intf_priv = &r8712_usb_unload_intf_priv;
 	unload_intf_priv(pintfpriv);
-	kfree(pintfpriv);
+	if (pintfpriv)
+		kfree((u8 *)pintfpriv);
 }
 
 static uint register_intf_hdl(u8 *dev, struct intf_hdl *pintfhdl)

@@ -363,6 +363,7 @@ int sst_parse_target(struct snd_sst_slot_info *slot)
 				pr_err("SST_Activate_target_fail\n");
 			else
 				pr_err("SST_Activate_target_pass\n");
+		return retval;
 	} else if (slot->action == SND_SST_PORT_PREPARE &&
 			slot->device_type == SND_SST_DEVICE_PCM) {
 				retval = sst_prepare_target(slot);
@@ -370,11 +371,12 @@ int sst_parse_target(struct snd_sst_slot_info *slot)
 				pr_err("SST_prepare_target_fail\n");
 			else
 				pr_err("SST_prepare_target_pass\n");
+			return retval;
 	} else {
 		pr_err("slot_action : %d, device_type: %d\n",
 				slot->action, slot->device_type);
+		return retval;
 	}
-	return retval;
 }
 
 int sst_send_target(struct snd_sst_target_device *target)
@@ -884,7 +886,8 @@ static int sst_prepare_input_buffers_rar(struct stream_info *str_info,
 			int *input_index, int *in_copied,
 			int *input_index_valid_size, int *new_entry_flag)
 {
-	int retval = 0, i;
+	int retval = 0;
+	int i;
 
 	if (str_info->ops == STREAM_OPS_PLAYBACK_DRM) {
 		struct RAR_buffer rar_buffers;
@@ -921,6 +924,7 @@ static int sst_prepare_input_buffers_rar(struct stream_info *str_info,
 	return retval;
 }
 #endif
+
 /*This function is used to prepare the kernel input buffers with contents
 before sending for decode*/
 static int sst_prepare_input_buffers(struct stream_info *str_info,

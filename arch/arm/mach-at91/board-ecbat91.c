@@ -38,18 +38,14 @@
 
 #include <mach/board.h>
 #include <mach/gpio.h>
-#include <mach/cpu.h>
 
 #include "generic.h"
 
 
-static void __init ecb_at91init_early(void)
+static void __init ecb_at91map_io(void)
 {
-	/* Set cpu type: PQFP */
-	at91rm9200_set_type(ARCH_REVISON_9200_PQFP);
-
 	/* Initialize processor: 18.432 MHz crystal */
-	at91rm9200_initialize(18432000);
+	at91rm9200_initialize(18432000, AT91RM9200_PQFP);
 
 	/* Setup the LEDs */
 	at91_init_leds(AT91_PIN_PC7, AT91_PIN_PC7);
@@ -172,9 +168,9 @@ static void __init ecb_at91board_init(void)
 
 MACHINE_START(ECBAT91, "emQbit's ECB_AT91")
 	/* Maintainer: emQbit.com */
+	.boot_params	= AT91_SDRAM_BASE + 0x100,
 	.timer		= &at91rm9200_timer,
-	.map_io		= at91rm9200_map_io,
-	.init_early	= ecb_at91init_early,
+	.map_io		= ecb_at91map_io,
 	.init_irq	= ecb_at91init_irq,
 	.init_machine	= ecb_at91board_init,
 MACHINE_END

@@ -250,6 +250,7 @@
 
 #ifndef __NET__WIMAX_H__
 #define __NET__WIMAX_H__
+#ifdef __KERNEL__
 
 #include <linux/wimax.h>
 #include <net/genetlink.h>
@@ -517,4 +518,8 @@ extern ssize_t wimax_msg_len(struct sk_buff *);
 extern int wimax_rfkill(struct wimax_dev *, enum wimax_rf_state);
 extern int wimax_reset(struct wimax_dev *);
 
+#else
+/* You might be looking for linux/wimax.h */
+#error This file should not be included from user space.
+#endif /* #ifdef __KERNEL__ */
 #endif /* #ifndef __NET__WIMAX_H__ */

@@ -160,7 +160,7 @@ static void freezer_destroy(struct cgroup_subsys *ss,
  */
 static int freezer_can_attach(struct cgroup_subsys *ss,
 			      struct cgroup *new_cgroup,
-			      struct task_struct *task)
+			      struct task_struct *task, bool threadgroup)
 {
 	struct freezer *freezer;
 
@@ -172,17 +172,26 @@ static int freezer_can_attach(struct cgroup_subsys *ss,
 	if (freezer->state != CGROUP_THAWED)
 		return -EBUSY;
 
-	return 0;
-}
-
-static int freezer_can_attach_task(struct cgroup *cgrp, struct task_struct *tsk)
-{
 	rcu_read_lock();
-	if (__cgroup_freezing_or_frozen(tsk)) {
+	if (__cgroup_freezing_or_frozen(task)) {
 		rcu_read_unlock();
 		return -EBUSY;
 	}
 	rcu_read_unlock();
+
+	if (threadgroup) {
+		struct task_struct *c;
+
+		rcu_read_lock();
+		list_for_each_entry_rcu(c, &task->thread_group, thread_group) {
+			if (__cgroup_freezing_or_frozen(c)) {
+				rcu_read_unlock();
+				return -EBUSY;
+			}
+		}
+		rcu_read_unlock();
+	}
+
 	return 0;
 }
 
@@ -381,9 +390,6 @@ struct cgroup_subsys freezer_subsys = {
 	.populate	= freezer_populate,
 	.subsys_id	= freezer_subsys_id,
 	.can_attach	= freezer_can_attach,
-	.can_attach_task = freezer_can_attach_task,
-	.pre_attach	= NULL,
-	.attach_task	= NULL,
 	.attach		= NULL,
 	.fork		= freezer_fork,
 	.exit		= NULL,

@@ -55,8 +55,6 @@ void titan_mailbox_irq(void)
 
 		if (status & 0x2)
 			smp_call_function_interrupt();
-		if (status & 0x4)
-			scheduler_ipi();
 		break;
 
 	case 1:
@@ -65,8 +63,6 @@ void titan_mailbox_irq(void)
 
 		if (status & 0x2)
 			smp_call_function_interrupt();
-		if (status & 0x4)
-			scheduler_ipi();
 		break;
 	}
 }

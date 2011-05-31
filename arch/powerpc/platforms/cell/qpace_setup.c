@@ -42,6 +42,7 @@
 #include "interrupt.h"
 #include "pervasive.h"
 #include "ras.h"
+#include "io-workarounds.h"
 
 static void qpace_show_cpuinfo(struct seq_file *m)
 {

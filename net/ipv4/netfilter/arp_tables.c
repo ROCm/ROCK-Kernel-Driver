@@ -260,7 +260,6 @@ unsigned int arpt_do_table(struct sk_buff *skb,
 	void *table_base;
 	const struct xt_table_info *private;
 	struct xt_action_param acpar;
-	unsigned int addend;
 
 	if (!pskb_may_pull(skb, arp_hdr_len(skb->dev)))
 		return NF_DROP;
@@ -268,8 +267,7 @@ unsigned int arpt_do_table(struct sk_buff *skb,
 	indev = in ? in->name : nulldevname;
 	outdev = out ? out->name : nulldevname;
 
-	local_bh_disable();
-	addend = xt_write_recseq_begin();
+	xt_info_rdlock_bh();
 	private = table->private;
 	table_base = private->entries[smp_processor_id()];
 
@@ -340,8 +338,7 @@ unsigned int arpt_do_table(struct sk_buff *skb,
 			/* Verdict */
 			break;
 	} while (!acpar.hotdrop);
-	xt_write_recseq_end(addend);
-	local_bh_enable();
+	xt_info_rdunlock_bh();
 
 	if (acpar.hotdrop)
 		return NF_DROP;
@@ -715,7 +712,7 @@ static void get_counters(const struct xt_table_info *t,
 	unsigned int i;
 
 	for_each_possible_cpu(cpu) {
-		seqcount_t *s = &per_cpu(xt_recseq, cpu);
+		seqlock_t *lock = &per_cpu(xt_info_locks, cpu).lock;
 
 		i = 0;
 		xt_entry_foreach(iter, t->entries[cpu], t->size) {
@@ -723,10 +720,10 @@ static void get_counters(const struct xt_table_info *t,
 			unsigned int start;
 
 			do {
-				start = read_seqcount_begin(s);
+				start = read_seqbegin(lock);
 				bcnt = iter->counters.bcnt;
 				pcnt = iter->counters.pcnt;
-			} while (read_seqcount_retry(s, start));
+			} while (read_seqretry(lock, start));
 
 			ADD_COUNTER(counters[i], bcnt, pcnt);
 			++i;
@@ -1118,7 +1115,6 @@ static int do_add_counters(struct net *net, const void __user *user,
 	int ret = 0;
 	void *loc_cpu_entry;
 	struct arpt_entry *iter;
-	unsigned int addend;
 #ifdef CONFIG_COMPAT
 	struct compat_xt_counters_info compat_tmp;
 
@@ -1175,12 +1171,12 @@ static int do_add_counters(struct net *net, const void __user *user,
 	/* Choose the copy that is on our node */
 	curcpu = smp_processor_id();
 	loc_cpu_entry = private->entries[curcpu];
-	addend = xt_write_recseq_begin();
+	xt_info_wrlock(curcpu);
 	xt_entry_foreach(iter, loc_cpu_entry, private->size) {
 		ADD_COUNTER(iter->counters, paddc[i].bcnt, paddc[i].pcnt);
 		++i;
 	}
-	xt_write_recseq_end(addend);
+	xt_info_wrunlock(curcpu);
  unlock_up_free:
 	local_bh_enable();
 	xt_table_unlock(t);

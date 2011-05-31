@@ -291,8 +291,7 @@ static inline char *translate_scan(struct _adapter *padapter,
 			memset(buf, 0, MAX_WPA_IE_LEN);
 			n = sprintf(buf, "wpa_ie=");
 			for (i = 0; i < wpa_len; i++) {
-				n += snprintf(buf + n, MAX_WPA_IE_LEN - n,
-							"%02x", wpa_ie[i]);
+				n += snprintf(buf + n, MAX_WPA_IE_LEN - n, "%02x", wpa_ie[i]);
 				if (n >= MAX_WPA_IE_LEN)
 					break;
 			}
@@ -311,8 +310,7 @@ static inline char *translate_scan(struct _adapter *padapter,
 			memset(buf, 0, MAX_WPA_IE_LEN);
 			n = sprintf(buf, "rsn_ie=");
 			for (i = 0; i < rsn_len; i++) {
-				n += snprintf(buf + n, MAX_WPA_IE_LEN - n,
-							"%02x", rsn_ie[i]);
+				n += snprintf(buf + n, MAX_WPA_IE_LEN - n, "%02x", rsn_ie[i]);
 				if (n >= MAX_WPA_IE_LEN)
 					break;
 			}
@@ -1734,7 +1732,8 @@ static int r871x_wx_set_enc_ext(struct net_device *dev,
 		memcpy(param + 1, pext + 1, pext->key_len);
 	}
 	ret = wpa_set_encryption(dev, param, param_len);
-	kfree(param);
+	if (param)
+		kfree((u8 *)param);
 	return ret;
 }
 

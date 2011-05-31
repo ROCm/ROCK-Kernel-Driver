@@ -163,13 +163,19 @@ static int suspend_enter(suspend_state_t state)
 	arch_suspend_disable_irqs();
 	BUG_ON(!irqs_disabled());
 
-	error = syscore_suspend();
+	error = sysdev_suspend(PMSG_SUSPEND);
+	if (!error) {
+		error = syscore_suspend();
+		if (error)
+			sysdev_resume();
+	}
 	if (!error) {
 		if (!(suspend_test(TEST_CORE) || pm_wakeup_pending())) {
 			error = suspend_ops->enter(state);
 			events_check_enabled = false;
 		}
 		syscore_resume();
+		sysdev_resume();
 	}
 
 	arch_suspend_enable_irqs();
@@ -220,7 +226,7 @@ int suspend_devices_and_enter(suspend_state_t state)
 	if (suspend_test(TEST_DEVICES))
 		goto Recover_platform;
 
-	error = suspend_enter(state);
+	suspend_enter(state);
 
  Resume_devices:
 	suspend_test_start();

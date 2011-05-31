@@ -40,8 +40,9 @@
 #include <asm/system.h>
 
 #define user_mode(regs)			(((regs)->sr & 0x40000000)==0)
+#define user_stack_pointer(_regs)	((unsigned long)(_regs)->regs[15])
 #define kernel_stack_pointer(_regs)	((unsigned long)(_regs)->regs[15])
-#define GET_USP(regs) ((regs)->regs[15])
+#define instruction_pointer(regs)	((unsigned long)(regs)->pc)
 
 extern void show_regs(struct pt_regs *);
 
@@ -138,9 +139,6 @@ static inline unsigned long profile_pc(struct pt_regs *regs)
 
 	return pc;
 }
-#define profile_pc profile_pc
-
-#include <asm-generic/ptrace.h>
 #endif /* __KERNEL__ */
 
 #endif /* __ASM_SH_PTRACE_H */

@@ -3,7 +3,6 @@
  *
  * Copyright 2007 Red Hat, Inc.
  * Copyright 2008 Marvell. <kewei@marvell.com>
- * Copyright 2009-2011 Marvell. <yuxiangl@marvell.com>
  *
  * This file is licensed under GPLv2.
  *
@@ -35,8 +34,6 @@ enum chip_flavors {
 	chip_6485,
 	chip_9480,
 	chip_9180,
-	chip_9445,
-	chip_9485,
 	chip_1300,
 	chip_1320
 };

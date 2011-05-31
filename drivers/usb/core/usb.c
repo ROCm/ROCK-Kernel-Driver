@@ -953,7 +953,8 @@ static int usb_bus_notify(struct notifier_block *nb, unsigned long action,
 		if (dev->type == &usb_device_type)
 			(void) usb_create_sysfs_dev_files(to_usb_device(dev));
 		else if (dev->type == &usb_if_device_type)
-			usb_create_sysfs_intf_files(to_usb_interface(dev));
+			(void) usb_create_sysfs_intf_files(
+					to_usb_interface(dev));
 		break;
 
 	case BUS_NOTIFY_DEL_DEVICE:

@@ -11,7 +11,7 @@
 #ifndef OMAP_VOUTDEF_H
 #define OMAP_VOUTDEF_H
 
-#include <video/omapdss.h>
+#include <plat/display.h>
 
 #define YUYV_BPP        2
 #define RGB565_BPP      2

@@ -128,6 +128,10 @@ static void __init celleb_setup_arch_beat(void)
 	spu_management_ops	= &spu_management_of_ops;
 #endif
 
+#ifdef CONFIG_SMP
+	smp_init_celleb();
+#endif
+
 	celleb_setup_arch_common();
 }
 

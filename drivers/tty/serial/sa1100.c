@@ -1,4 +1,6 @@
 /*
+ *  linux/drivers/char/sa1100.c
+ *
  *  Driver for SA11x0 serial ports
  *
  *  Based on drivers/char/serial.c, by Linus Torvalds, Theodore Ts'o.

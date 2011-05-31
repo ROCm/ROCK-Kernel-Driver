@@ -47,7 +47,6 @@ enum vic_generic_prov_os_type {
 	VIC_GENERIC_PROV_OS_TYPE_ESX = 1,
 	VIC_GENERIC_PROV_OS_TYPE_LINUX = 2,
 	VIC_GENERIC_PROV_OS_TYPE_WINDOWS = 3,
-	VIC_GENERIC_PROV_OS_TYPE_SOLARIS = 4,
 };
 
 struct vic_provinfo {
@@ -62,22 +61,14 @@ struct vic_provinfo {
 	} tlv[0];
 } __packed;
 
-#define VIC_PROVINFO_ADD_TLV(vp, tlvtype, tlvlen, data) \
-	do { \
-		err = vic_provinfo_add_tlv(vp, tlvtype, tlvlen, data); \
-		if (err) \
-			goto add_tlv_failure; \
-	} while (0)
-
 #define VIC_PROVINFO_MAX_DATA		1385
 #define VIC_PROVINFO_MAX_TLV_DATA (VIC_PROVINFO_MAX_DATA - \
 	sizeof(struct vic_provinfo))
 
-struct vic_provinfo *vic_provinfo_alloc(gfp_t flags, const u8 *oui,
-	const u8 type);
+struct vic_provinfo *vic_provinfo_alloc(gfp_t flags, u8 *oui, u8 type);
 void vic_provinfo_free(struct vic_provinfo *vp);
 int vic_provinfo_add_tlv(struct vic_provinfo *vp, u16 type, u16 length,
-	const void *value);
+	void *value);
 size_t vic_provinfo_size(struct vic_provinfo *vp);
 
 #endif	/* _VNIC_VIC_H_ */

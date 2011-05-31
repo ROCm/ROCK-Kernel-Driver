@@ -30,6 +30,8 @@ add_arcofi_timer(struct IsdnCardState *cs) {
 
 static void
 send_arcofi(struct IsdnCardState *cs) {
+	u_char val;
+	
 	add_arcofi_timer(cs);
 	cs->dc.isac.mon_txp = 0;
 	cs->dc.isac.mon_txc = cs->dc.isac.arcofi_list->len;
@@ -43,7 +45,7 @@ send_arcofi(struct IsdnCardState *cs) {
 	cs->dc.isac.mocr &= 0x0f;
 	cs->dc.isac.mocr |= 0xa0;
 	cs->writeisac(cs, ISAC_MOCR, cs->dc.isac.mocr);
-	(void) cs->readisac(cs, ISAC_MOSR);
+	val = cs->readisac(cs, ISAC_MOSR);
 	cs->writeisac(cs, ISAC_MOX1, cs->dc.isac.mon_tx[cs->dc.isac.mon_txp++]);
 	cs->dc.isac.mocr |= 0x10;
 	cs->writeisac(cs, ISAC_MOCR, cs->dc.isac.mocr);

@@ -242,7 +242,6 @@ static int hiddev_release(struct inode * inode, struct file * file)
 	list_del(&list->node);
 	spin_unlock_irqrestore(&list->hiddev->list_lock, flags);
 
-	mutex_lock(&list->hiddev->existancelock);
 	if (!--list->hiddev->open) {
 		if (list->hiddev->exist) {
 			usbhid_close(list->hiddev->hid);
@@ -253,7 +252,6 @@ static int hiddev_release(struct inode * inode, struct file * file)
 	}
 
 	kfree(list);
-	mutex_unlock(&list->hiddev->existancelock);
 
 	return 0;
 }
@@ -302,21 +300,17 @@ static int hiddev_open(struct inode *inode, struct file *file)
 	list_add_tail(&list->node, &hiddev->list);
 	spin_unlock_irq(&list->hiddev->list_lock);
 
-	mutex_lock(&hiddev->existancelock);
 	if (!list->hiddev->open++)
 		if (list->hiddev->exist) {
 			struct hid_device *hid = hiddev->hid;
 			res = usbhid_get_power(hid);
 			if (res < 0) {
 				res = -EIO;
-				goto bail_unlock;
+				goto bail;
 			}
 			usbhid_open(hid);
 		}
-	mutex_unlock(&hiddev->existancelock);
 	return 0;
-bail_unlock:
-	mutex_unlock(&hiddev->existancelock);
 bail:
 	file->private_data = NULL;
 	kfree(list);
@@ -373,10 +367,8 @@ static ssize_t hiddev_read(struct file * file, char __user * buffer, size_t coun
 				/* let O_NONBLOCK tasks run */
 				mutex_unlock(&list->thread_lock);
 				schedule();
-				if (mutex_lock_interruptible(&list->thread_lock)) {
-					finish_wait(&list->hiddev->wait, &wait);
+				if (mutex_lock_interruptible(&list->thread_lock))
 					return -EINTR;
-				}
 				set_current_state(TASK_INTERRUPTIBLE);
 			}
 			finish_wait(&list->hiddev->wait, &wait);
@@ -517,7 +509,7 @@ static noinline int hiddev_ioctl_usage(struct hiddev *hiddev, unsigned int cmd, 
 				 (uref_multi->num_values > HID_MAX_MULTI_USAGES ||
 				  uref->usage_index + uref_multi->num_values > field->report_count))
 				goto inval;
-		}
+			}
 
 		switch (cmd) {
 		case HIDIOCGUSAGE:
@@ -809,7 +801,14 @@ static long hiddev_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			break;
 
 		if (_IOC_NR(cmd) == _IOC_NR(HIDIOCGNAME(0))) {
-			int len = strlen(hid->name) + 1;
+			int len;
+
+			if (!hid->name) {
+				r = 0;
+				break;
+			}
+
+			len = strlen(hid->name) + 1;
 			if (len > _IOC_SIZE(cmd))
 				 len = _IOC_SIZE(cmd);
 			r = copy_to_user(user_arg, hid->name, len) ?
@@ -818,7 +817,14 @@ static long hiddev_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		}
 
 		if (_IOC_NR(cmd) == _IOC_NR(HIDIOCGPHYS(0))) {
-			int len = strlen(hid->phys) + 1;
+			int len;
+
+			if (!hid->phys) {
+				r = 0;
+				break;
+			}
+
+			len = strlen(hid->phys) + 1;
 			if (len > _IOC_SIZE(cmd))
 				len = _IOC_SIZE(cmd);
 			r = copy_to_user(user_arg, hid->phys, len) ?
@@ -919,6 +925,7 @@ void hiddev_disconnect(struct hid_device *hid)
 
 	mutex_lock(&hiddev->existancelock);
 	hiddev->exist = 0;
+	mutex_unlock(&hiddev->existancelock);
 
 	usb_deregister_dev(usbhid->intf, &hiddev_class);
 
@@ -928,5 +935,4 @@ void hiddev_disconnect(struct hid_device *hid)
 	} else {
 		kfree(hiddev);
 	}
-	mutex_unlock(&hiddev->existancelock);
 }

@@ -50,16 +50,13 @@ int omap4430_phy_init(struct device *dev)
 {
 	ctrl_base = ioremap(OMAP443X_SCM_BASE, SZ_1K);
 	if (!ctrl_base) {
-		pr_err("control module ioremap failed\n");
+		dev_err(dev, "control module ioremap failed\n");
 		return -ENOMEM;
 	}
 	/* Power down the phy */
 	__raw_writel(PHY_PD, ctrl_base + CONTROL_DEV_CONF);
-
-	if (!dev)
-		return 0;
-
 	phyclk = clk_get(dev, "ocp2scp_usb_phy_ick");
+
 	if (IS_ERR(phyclk)) {
 		dev_err(dev, "cannot clk_get ocp2scp_usb_phy_ick\n");
 		iounmap(ctrl_base);
@@ -231,7 +228,7 @@ void am35x_musb_clear_irq(void)
 	regval = omap_ctrl_readl(AM35XX_CONTROL_LVL_INTR_CLEAR);
 }
 
-void am35x_set_mode(u8 musb_mode)
+void am35x_musb_set_mode(u8 musb_mode)
 {
 	u32 devconf2 = omap_ctrl_readl(AM35XX_CONTROL_DEVCONF2);
 

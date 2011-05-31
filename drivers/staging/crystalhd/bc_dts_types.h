@@ -65,6 +65,7 @@ typedef unsigned char	*PUCHAR;
 #else
 
 /* For Kernel usage.. */
+typedef bool	bc_bool_t;
 #endif
 
 #else

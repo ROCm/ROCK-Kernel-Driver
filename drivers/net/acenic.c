@@ -68,7 +68,6 @@
 #include <linux/sockios.h>
 #include <linux/firmware.h>
 #include <linux/slab.h>
-#include <linux/prefetch.h>
 
 #if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
 #include <linux/if_vlan.h>
@@ -2659,15 +2658,15 @@ static int ace_get_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
 
 	link = readl(&regs->GigLnkState);
 	if (link & LNK_1000MB)
-		ethtool_cmd_speed_set(ecmd, SPEED_1000);
+		ecmd->speed = SPEED_1000;
 	else {
 		link = readl(&regs->FastLnkState);
 		if (link & LNK_100MB)
-			ethtool_cmd_speed_set(ecmd, SPEED_100);
+			ecmd->speed = SPEED_100;
 		else if (link & LNK_10MB)
-			ethtool_cmd_speed_set(ecmd, SPEED_10);
+			ecmd->speed = SPEED_10;
 		else
-			ethtool_cmd_speed_set(ecmd, 0);
+			ecmd->speed = 0;
 	}
 	if (link & LNK_FULL_DUPLEX)
 		ecmd->duplex = DUPLEX_FULL;
@@ -2719,9 +2718,9 @@ static int ace_set_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
 		link |= LNK_TX_FLOW_CTL_Y;
 	if (ecmd->autoneg == AUTONEG_ENABLE)
 		link |= LNK_NEGOTIATE;
-	if (ethtool_cmd_speed(ecmd) != speed) {
+	if (ecmd->speed != speed) {
 		link &= ~(LNK_1000MB | LNK_100MB | LNK_10MB);
-		switch (ethtool_cmd_speed(ecmd)) {
+		switch (speed) {
 		case SPEED_1000:
 			link |= LNK_1000MB;
 			break;

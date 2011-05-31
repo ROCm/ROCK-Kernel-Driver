@@ -35,7 +35,6 @@ struct bfin_glue {
  */
 void musb_write_fifo(struct musb_hw_ep *hw_ep, u16 len, const u8 *src)
 {
-	struct musb *musb = hw_ep->musb;
 	void __iomem *fifo = hw_ep->fifo;
 	void __iomem *epio = hw_ep->regs;
 	u8 epnum = hw_ep->epnum;
@@ -44,7 +43,7 @@ void musb_write_fifo(struct musb_hw_ep *hw_ep, u16 len, const u8 *src)
 
 	musb_writew(epio, MUSB_TXCOUNT, len);
 
-	dev_dbg(musb->controller, "TX ep%d fifo %p count %d buf %p, epio %p\n",
+	DBG(4, "TX ep%d fifo %p count %d buf %p, epio %p\n",
 			hw_ep->epnum, fifo, len, src, epio);
 
 	dump_fifo_data(src, len);
@@ -99,7 +98,6 @@ void musb_write_fifo(struct musb_hw_ep *hw_ep, u16 len, const u8 *src)
  */
 void musb_read_fifo(struct musb_hw_ep *hw_ep, u16 len, u8 *dst)
 {
-	struct musb *musb = hw_ep->musb;
 	void __iomem *fifo = hw_ep->fifo;
 	u8 epnum = hw_ep->epnum;
 
@@ -156,7 +154,7 @@ void musb_read_fifo(struct musb_hw_ep *hw_ep, u16 len, u8 *dst)
 				*(dst + len - 1) = (u8)inw((unsigned long)fifo + 4);
 		}
 	}
-	dev_dbg(musb->controller, "%cX ep%d fifo %p count %d buf %p\n",
+	DBG(4, "%cX ep%d fifo %p count %d buf %p\n",
 			'R', hw_ep->epnum, fifo, len, dst);
 
 	dump_fifo_data(dst, len);
@@ -281,14 +279,12 @@ static void musb_conn_timer_handler(unsigned long _musb)
 		}
 		break;
 	default:
-		dev_dbg(musb->controller, "%s state not handled\n",
-			otg_state_string(musb->xceiv->state));
+		DBG(1, "%s state not handled\n", otg_state_string(musb));
 		break;
 	}
 	spin_unlock_irqrestore(&musb->lock, flags);
 
-	dev_dbg(musb->controller, "state is %s\n",
-		otg_state_string(musb->xceiv->state));
+	DBG(4, "state is %s\n", otg_state_string(musb));
 }
 
 static void bfin_musb_enable(struct musb *musb)
@@ -310,9 +306,9 @@ static void bfin_musb_set_vbus(struct musb *musb, int is_on)
 		value = !value;
 	gpio_set_value(musb->config->gpio_vrsel, value);
 
-	dev_dbg(musb->controller, "VBUS %s, devctl %02x "
+	DBG(1, "VBUS %s, devctl %02x "
 		/* otg %3x conf %08x prcm %08x */ "\n",
-		otg_state_string(musb->xceiv->state),
+		otg_state_string(musb),
 		musb_readb(musb->mregs, MUSB_DEVCTL));
 }
 

@@ -16,6 +16,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/interrupt.h>
+#include <linux/sysdev.h>
 
 #include <plat/cpu.h>
 #include <plat/irqs.h>
@@ -76,15 +77,17 @@ static struct sleep_save eint_save[] = {
 	SAVE_ITEM(S5P_EINT_MASK(3)),
 };
 
-int s3c24xx_irq_suspend(void)
+int s3c24xx_irq_suspend(struct sys_device *dev, pm_message_t state)
 {
 	s3c_pm_do_save(eint_save, ARRAY_SIZE(eint_save));
 
 	return 0;
 }
 
-void s3c24xx_irq_resume(void)
+int s3c24xx_irq_resume(struct sys_device *dev)
 {
 	s3c_pm_do_restore(eint_save, ARRAY_SIZE(eint_save));
+
+	return 0;
 }
 

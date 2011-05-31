@@ -398,9 +398,9 @@ static void vfp_enable(void *unused)
 }
 
 #ifdef CONFIG_PM
-#include <linux/syscore_ops.h>
+#include <linux/sysdev.h>
 
-static int vfp_pm_suspend(void)
+static int vfp_pm_suspend(struct sys_device *dev, pm_message_t state)
 {
 	struct thread_info *ti = current_thread_info();
 	u32 fpexc = fmrx(FPEXC);
@@ -420,24 +420,33 @@ static int vfp_pm_suspend(void)
 	return 0;
 }
 
-static void vfp_pm_resume(void)
+static int vfp_pm_resume(struct sys_device *dev)
 {
 	/* ensure we have access to the vfp */
 	vfp_enable(NULL);
 
 	/* and disable it to ensure the next usage restores the state */
 	fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
+
+	return 0;
 }
 
-static struct syscore_ops vfp_pm_syscore_ops = {
+static struct sysdev_class vfp_pm_sysclass = {
+	.name		= "vfp",
 	.suspend	= vfp_pm_suspend,
 	.resume		= vfp_pm_resume,
 };
 
+static struct sys_device vfp_pm_sysdev = {
+	.cls	= &vfp_pm_sysclass,
+};
+
 static void vfp_pm_init(void)
 {
-	register_syscore_ops(&vfp_pm_syscore_ops);
+	sysdev_class_register(&vfp_pm_sysclass);
+	sysdev_register(&vfp_pm_sysdev);
 }
+
 
 #else
 static inline void vfp_pm_init(void) { }

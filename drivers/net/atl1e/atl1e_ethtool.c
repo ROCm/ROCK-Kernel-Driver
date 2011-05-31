@@ -51,13 +51,13 @@ static int atl1e_get_settings(struct net_device *netdev,
 	ecmd->transceiver = XCVR_INTERNAL;
 
 	if (adapter->link_speed != SPEED_0) {
-		ethtool_cmd_speed_set(ecmd, adapter->link_speed);
+		ecmd->speed = adapter->link_speed;
 		if (adapter->link_duplex == FULL_DUPLEX)
 			ecmd->duplex = DUPLEX_FULL;
 		else
 			ecmd->duplex = DUPLEX_HALF;
 	} else {
-		ethtool_cmd_speed_set(ecmd, -1);
+		ecmd->speed = -1;
 		ecmd->duplex = -1;
 	}
 
@@ -382,6 +382,9 @@ static const struct ethtool_ops atl1e_ethtool_ops = {
 	.get_eeprom_len         = atl1e_get_eeprom_len,
 	.get_eeprom             = atl1e_get_eeprom,
 	.set_eeprom             = atl1e_set_eeprom,
+	.set_tx_csum            = ethtool_op_set_tx_hw_csum,
+	.set_sg                 = ethtool_op_set_sg,
+	.set_tso                = ethtool_op_set_tso,
 };
 
 void atl1e_set_ethtool_ops(struct net_device *netdev)

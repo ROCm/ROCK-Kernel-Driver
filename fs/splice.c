@@ -162,14 +162,6 @@ static const struct pipe_buf_operations user_page_pipe_buf_ops = {
 	.get = generic_pipe_buf_get,
 };
 
-static void wakeup_pipe_readers(struct pipe_inode_info *pipe)
-{
-	smp_mb();
-	if (waitqueue_active(&pipe->wait))
-		wake_up_interruptible(&pipe->wait);
-	kill_fasync(&pipe->fasync_readers, SIGIO, POLL_IN);
-}
-
 /**
  * splice_to_pipe - fill passed data into a pipe
  * @pipe:	pipe to fill
@@ -255,8 +247,12 @@ ssize_t splice_to_pipe(struct pipe_inode_info *pipe,
 
 	pipe_unlock(pipe);
 
-	if (do_wakeup)
-		wakeup_pipe_readers(pipe);
+	if (do_wakeup) {
+		smp_mb();
+		if (waitqueue_active(&pipe->wait))
+			wake_up_interruptible(&pipe->wait);
+		kill_fasync(&pipe->fasync_readers, SIGIO, POLL_IN);
+	}
 
 	while (page_nr < spd_pages)
 		spd->spd_release(spd, page_nr++);
@@ -1896,9 +1892,12 @@ retry:
 	/*
 	 * If we put data in the output pipe, wakeup any potential readers.
 	 */
-	if (ret > 0)
-		wakeup_pipe_readers(opipe);
-
+	if (ret > 0) {
+		smp_mb();
+		if (waitqueue_active(&opipe->wait))
+			wake_up_interruptible(&opipe->wait);
+		kill_fasync(&opipe->fasync_readers, SIGIO, POLL_IN);
+	}
 	if (input_wakeup)
 		wakeup_pipe_writers(ipipe);
 
@@ -1977,8 +1976,12 @@ static int link_pipe(struct pipe_inode_info *ipipe,
 	/*
 	 * If we put data in the output pipe, wakeup any potential readers.
 	 */
-	if (ret > 0)
-		wakeup_pipe_readers(opipe);
+	if (ret > 0) {
+		smp_mb();
+		if (waitqueue_active(&opipe->wait))
+			wake_up_interruptible(&opipe->wait);
+		kill_fasync(&opipe->fasync_readers, SIGIO, POLL_IN);
+	}
 
 	return ret;
 }

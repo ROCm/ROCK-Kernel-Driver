@@ -116,28 +116,22 @@ static inline void __finv_buffer(void *buffer, size_t size)
 }
 
 
-/* Invalidate a VA range and wait for it to be complete. */
+/* Invalidate a VA range, then memory fence. */
 static inline void inv_buffer(void *buffer, size_t size)
 {
 	__inv_buffer(buffer, size);
-	mb();
+	mb_incoherent();
 }
 
-/*
- * Flush a locally-homecached VA range and wait for the evicted
- * cachelines to hit memory.
- */
-static inline void flush_buffer_local(void *buffer, size_t size)
+/* Flush a VA range, then memory fence. */
+static inline void flush_buffer(void *buffer, size_t size)
 {
 	__flush_buffer(buffer, size);
 	mb_incoherent();
 }
 
-/*
- * Flush and invalidate a locally-homecached VA range and wait for the
- * evicted cachelines to hit memory.
- */
-static inline void finv_buffer_local(void *buffer, size_t size)
+/* Flush & invalidate a VA range, then memory fence. */
+static inline void finv_buffer(void *buffer, size_t size)
 {
 	__finv_buffer(buffer, size);
 	mb_incoherent();

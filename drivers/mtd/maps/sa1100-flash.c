@@ -226,7 +226,12 @@ static void sa1100_destroy(struct sa_info *info, struct flash_platform_data *pla
 	int i;
 
 	if (info->mtd) {
-		mtd_device_unregister(info->mtd);
+		if (info->nr_parts == 0)
+			del_mtd_device(info->mtd);
+#ifdef CONFIG_MTD_PARTITIONS
+		else
+			del_mtd_partitions(info->mtd);
+#endif
 		if (info->mtd != info->subdev[0].mtd)
 			mtd_concat_destroy(info->mtd);
 	}
@@ -358,24 +363,28 @@ static int __devinit sa1100_mtd_probe(struct platform_device *pdev)
 	/*
 	 * Partition selection stuff.
 	 */
+#ifdef CONFIG_MTD_PARTITIONS
 	nr_parts = parse_mtd_partitions(info->mtd, part_probes, &parts, 0);
 	if (nr_parts > 0) {
 		info->parts = parts;
 		part_type = "dynamic";
-	} else {
+	} else
+#endif
+	{
 		parts = plat->parts;
 		nr_parts = plat->nr_parts;
 		part_type = "static";
 	}
 
-	if (nr_parts == 0)
+	if (nr_parts == 0) {
 		printk(KERN_NOTICE "SA1100 flash: no partition info "
 			"available, registering whole flash\n");
-	else
+		add_mtd_device(info->mtd);
+	} else {
 		printk(KERN_NOTICE "SA1100 flash: using %s partition "
 			"definition\n", part_type);
-
-	mtd_device_register(info->mtd, parts, nr_parts);
+		add_mtd_partitions(info->mtd, parts, nr_parts);
+	}
 
 	info->nr_parts = nr_parts;
 

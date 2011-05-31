@@ -34,7 +34,6 @@
 	    (\intno == BOOK3S_INTERRUPT_DATA_SEGMENT) || \
 	    (\intno == BOOK3S_INTERRUPT_INST_SEGMENT) || \
 	    (\intno == BOOK3S_INTERRUPT_EXTERNAL) || \
-	    (\intno == BOOK3S_INTERRUPT_EXTERNAL_HV) || \
 	    (\intno == BOOK3S_INTERRUPT_ALIGNMENT) || \
 	    (\intno == BOOK3S_INTERRUPT_PROGRAM) || \
 	    (\intno == BOOK3S_INTERRUPT_FP_UNAVAIL) || \

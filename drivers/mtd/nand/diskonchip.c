@@ -1360,9 +1360,11 @@ static int __init nftl_scan_bbt(struct mtd_info *mtd)
 	   At least as nand_bbt.c is currently written. */
 	if ((ret = nand_scan_bbt(mtd, NULL)))
 		return ret;
-	mtd_device_register(mtd, NULL, 0);
+	add_mtd_device(mtd);
+#ifdef CONFIG_MTD_PARTITIONS
 	if (!no_autopart)
-		mtd_device_register(mtd, parts, numparts);
+		add_mtd_partitions(mtd, parts, numparts);
+#endif
 	return 0;
 }
 
@@ -1417,9 +1419,11 @@ static int __init inftl_scan_bbt(struct mtd_info *mtd)
 	   autopartitioning, but I want to give it more thought. */
 	if (!numparts)
 		return -EIO;
-	mtd_device_register(mtd, NULL, 0);
+	add_mtd_device(mtd);
+#ifdef CONFIG_MTD_PARTITIONS
 	if (!no_autopart)
-		mtd_device_register(mtd, parts, numparts);
+		add_mtd_partitions(mtd, parts, numparts);
+#endif
 	return 0;
 }
 
@@ -1674,9 +1678,9 @@ static int __init doc_probe(unsigned long physadr)
 		/* DBB note: i believe nand_release is necessary here, as
 		   buffers may have been allocated in nand_base.  Check with
 		   Thomas. FIX ME! */
-		/* nand_release will call mtd_device_unregister, but we
-		   haven't yet added it.  This is handled without incident by
-		   mtd_device_unregister, as far as I can tell. */
+		/* nand_release will call del_mtd_device, but we haven't yet
+		   added it.  This is handled without incident by
+		   del_mtd_device, as far as I can tell. */
 		nand_release(mtd);
 		kfree(mtd);
 		goto fail;

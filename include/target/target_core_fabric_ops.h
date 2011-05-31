@@ -77,6 +77,7 @@ struct target_core_fabric_ops {
 	u16 (*set_fabric_sense_len)(struct se_cmd *, u32);
 	u16 (*get_fabric_sense_len)(void);
 	int (*is_state_remove)(struct se_cmd *);
+	u64 (*pack_lun)(unsigned int);
 	/*
 	 * fabric module calls for target_core_fabric_configfs.c
 	 */

@@ -30,15 +30,17 @@ int ieee80211_wep_init(struct ieee80211_local *local)
 	/* start WEP IV from a random value */
 	get_random_bytes(&local->wep_iv, WEP_IV_LEN);
 
-	local->wep_tx_tfm = crypto_alloc_cipher("arc4", 0, CRYPTO_ALG_ASYNC);
+	local->wep_tx_tfm = crypto_alloc_blkcipher("ecb(arc4)", 0,
+						CRYPTO_ALG_ASYNC);
 	if (IS_ERR(local->wep_tx_tfm)) {
 		local->wep_rx_tfm = ERR_PTR(-EINVAL);
 		return PTR_ERR(local->wep_tx_tfm);
 	}
 
-	local->wep_rx_tfm = crypto_alloc_cipher("arc4", 0, CRYPTO_ALG_ASYNC);
+	local->wep_rx_tfm = crypto_alloc_blkcipher("ecb(arc4)", 0,
+						CRYPTO_ALG_ASYNC);
 	if (IS_ERR(local->wep_rx_tfm)) {
-		crypto_free_cipher(local->wep_tx_tfm);
+		crypto_free_blkcipher(local->wep_tx_tfm);
 		local->wep_tx_tfm = ERR_PTR(-EINVAL);
 		return PTR_ERR(local->wep_rx_tfm);
 	}
@@ -49,9 +51,9 @@ int ieee80211_wep_init(struct ieee80211_local *local)
 void ieee80211_wep_free(struct ieee80211_local *local)
 {
 	if (!IS_ERR(local->wep_tx_tfm))
-		crypto_free_cipher(local->wep_tx_tfm);
+		crypto_free_blkcipher(local->wep_tx_tfm);
 	if (!IS_ERR(local->wep_rx_tfm))
-		crypto_free_cipher(local->wep_rx_tfm);
+		crypto_free_blkcipher(local->wep_rx_tfm);
 }
 
 static inline bool ieee80211_wep_weak_iv(u32 iv, int keylen)
@@ -125,11 +127,12 @@ static void ieee80211_wep_remove_iv(struct ieee80211_local *local,
 /* Perform WEP encryption using given key. data buffer must have tailroom
  * for 4-byte ICV. data_len must not include this ICV. Note: this function
  * does _not_ add IV. data = RC4(data | CRC32(data)) */
-int ieee80211_wep_encrypt_data(struct crypto_cipher *tfm, u8 *rc4key,
+int ieee80211_wep_encrypt_data(struct crypto_blkcipher *tfm, u8 *rc4key,
 			       size_t klen, u8 *data, size_t data_len)
 {
+	struct blkcipher_desc desc = { .tfm = tfm };
+	struct scatterlist sg;
 	__le32 icv;
-	int i;
 
 	if (IS_ERR(tfm))
 		return -1;
@@ -137,9 +140,9 @@ int ieee80211_wep_encrypt_data(struct crypto_cipher *tfm, u8 *rc4key,
 	icv = cpu_to_le32(~crc32_le(~0, data, data_len));
 	put_unaligned(icv, (__le32 *)(data + data_len));
 
-	crypto_cipher_setkey(tfm, rc4key, klen);
-	for (i = 0; i < data_len + WEP_ICV_LEN; i++)
-		crypto_cipher_encrypt_one(tfm, data + i, data + i);
+	crypto_blkcipher_setkey(tfm, rc4key, klen);
+	sg_init_one(&sg, data, data_len + WEP_ICV_LEN);
+	crypto_blkcipher_encrypt(&desc, &sg, &sg, sg.length);
 
 	return 0;
 }
@@ -183,18 +186,19 @@ int ieee80211_wep_encrypt(struct ieee80211_local *local,
 /* Perform WEP decryption using given key. data buffer includes encrypted
  * payload, including 4-byte ICV, but _not_ IV. data_len must not include ICV.
  * Return 0 on success and -1 on ICV mismatch. */
-int ieee80211_wep_decrypt_data(struct crypto_cipher *tfm, u8 *rc4key,
+int ieee80211_wep_decrypt_data(struct crypto_blkcipher *tfm, u8 *rc4key,
 			       size_t klen, u8 *data, size_t data_len)
 {
+	struct blkcipher_desc desc = { .tfm = tfm };
+	struct scatterlist sg;
 	__le32 crc;
-	int i;
 
 	if (IS_ERR(tfm))
 		return -1;
 
-	crypto_cipher_setkey(tfm, rc4key, klen);
-	for (i = 0; i < data_len + WEP_ICV_LEN; i++)
-		crypto_cipher_decrypt_one(tfm, data + i, data + i);
+	crypto_blkcipher_setkey(tfm, rc4key, klen);
+	sg_init_one(&sg, data, data_len + WEP_ICV_LEN);
+	crypto_blkcipher_decrypt(&desc, &sg, &sg, sg.length);
 
 	crc = cpu_to_le32(~crc32_le(~0, data, data_len));
 	if (memcmp(&crc, data + data_len, WEP_ICV_LEN) != 0)

@@ -43,7 +43,6 @@
 #include <linux/sh_intc.h>
 #include <linux/tca6416_keypad.h>
 #include <linux/usb/r8a66597.h>
-#include <linux/usb/renesas_usbhs.h>
 
 #include <video/sh_mobile_hdmi.h>
 #include <video/sh_mobile_lcdc.h>
@@ -144,30 +143,7 @@
  * open      | external VBUS | Function
  *
  * *1
- * CN31 is used as
- * CONFIG_USB_R8A66597_HCD	Host
- * CONFIG_USB_RENESAS_USBHS	Function
- *
- * CAUTION
- *
- * renesas_usbhs driver can use external interrupt mode
- * (which come from USB-PHY) or autonomy mode (it use own interrupt)
- * for detecting connection/disconnection when Function.
- * USB will be power OFF while it has been disconnecting
- * if external interrupt mode, and it is always power ON if autonomy mode,
- *
- * mackerel can not use external interrupt (IRQ7-PORT167) mode on "USB0",
- * because Touchscreen is using IRQ7-PORT40.
- * It is impossible to use IRQ7 demux on this board.
- *
- * We can use external interrupt mode USB-Function on "USB1".
- * USB1 can become Host by r8a66597, and become Function by renesas_usbhs.
- * But don't select both drivers in same time.
- * These uses same IRQ number for request_irq(), and aren't supporting
- * IRQF_SHARD / IORESOURCE_IRQ_SHAREABLE.
- *
- * Actually these are old/new version of USB driver.
- * This mean its register will be broken if it supports SHARD IRQ,
+ * CN31 is used as Host in Linux.
  */
 
 /*
@@ -209,7 +185,6 @@
  * FIXME !!
  *
  * gpio_no_direction
- * gpio_pull_down
  * are quick_hack.
  *
  * current gpio frame work doesn't have
@@ -219,16 +194,6 @@
 static void __init gpio_no_direction(u32 addr)
 {
 	__raw_writeb(0x00, addr);
-}
-
-static void __init gpio_pull_down(u32 addr)
-{
-	u8 data = __raw_readb(addr);
-
-	data &= 0x0F;
-	data |= 0xA0;
-
-	__raw_writeb(data, addr);
 }
 
 /* MTD */
@@ -493,6 +458,12 @@ static void __init hdmi_init_pm_clock(void)
 		goto out;
 	}
 
+	ret = clk_enable(&sh7372_pllc2_clk);
+	if (ret < 0) {
+		pr_err("Cannot enable pllc2 clock\n");
+		goto out;
+	}
+
 	pr_debug("PLLC2 set frequency %lu\n", rate);
 
 	ret = clk_set_parent(hdmi_ick, &sh7372_pllc2_clk);
@@ -543,157 +514,6 @@ static struct platform_device usb1_host_device = {
 	.num_resources	= ARRAY_SIZE(usb1_host_resources),
 	.resource	= usb1_host_resources,
 };
-
-/* USB1 (Function) */
-#define USB_PHY_MODE		(1 << 4)
-#define USB_PHY_INT_EN		((1 << 3) | (1 << 2))
-#define USB_PHY_ON		(1 << 1)
-#define USB_PHY_OFF		(1 << 0)
-#define USB_PHY_INT_CLR		(USB_PHY_ON | USB_PHY_OFF)
-
-struct usbhs_private {
-	unsigned int irq;
-	unsigned int usbphyaddr;
-	unsigned int usbcrcaddr;
-	struct renesas_usbhs_platform_info info;
-};
-
-#define usbhs_get_priv(pdev)				\
-	container_of(renesas_usbhs_get_info(pdev),	\
-		     struct usbhs_private, info)
-
-#define usbhs_is_connected(priv)			\
-	(!((1 << 7) & __raw_readw(priv->usbcrcaddr)))
-
-static int usbhs1_get_id(struct platform_device *pdev)
-{
-	return USBHS_GADGET;
-}
-
-static int usbhs1_get_vbus(struct platform_device *pdev)
-{
-	return usbhs_is_connected(usbhs_get_priv(pdev));
-}
-
-static irqreturn_t usbhs1_interrupt(int irq, void *data)
-{
-	struct platform_device *pdev = data;
-	struct usbhs_private *priv = usbhs_get_priv(pdev);
-
-	dev_dbg(&pdev->dev, "%s\n", __func__);
-
-	renesas_usbhs_call_notify_hotplug(pdev);
-
-	/* clear status */
-	__raw_writew(__raw_readw(priv->usbphyaddr) | USB_PHY_INT_CLR,
-		     priv->usbphyaddr);
-
-	return IRQ_HANDLED;
-}
-
-static int usbhs1_hardware_init(struct platform_device *pdev)
-{
-	struct usbhs_private *priv = usbhs_get_priv(pdev);
-	int ret;
-
-	irq_set_irq_type(priv->irq, IRQ_TYPE_LEVEL_HIGH);
-
-	/* clear interrupt status */
-	__raw_writew(USB_PHY_MODE | USB_PHY_INT_CLR, priv->usbphyaddr);
-
-	ret = request_irq(priv->irq, usbhs1_interrupt, 0,
-			  dev_name(&pdev->dev), pdev);
-	if (ret) {
-		dev_err(&pdev->dev, "request_irq err\n");
-		return ret;
-	}
-
-	/* enable USB phy interrupt */
-	__raw_writew(USB_PHY_MODE | USB_PHY_INT_EN, priv->usbphyaddr);
-
-	return 0;
-}
-
-static void usbhs1_hardware_exit(struct platform_device *pdev)
-{
-	struct usbhs_private *priv = usbhs_get_priv(pdev);
-
-	/* clear interrupt status */
-	__raw_writew(USB_PHY_MODE | USB_PHY_INT_CLR, priv->usbphyaddr);
-
-	free_irq(priv->irq, pdev);
-}
-
-static void usbhs1_phy_reset(struct platform_device *pdev)
-{
-	struct usbhs_private *priv = usbhs_get_priv(pdev);
-
-	/* init phy */
-	__raw_writew(0x8a0a, priv->usbcrcaddr);
-}
-
-static u32 usbhs1_pipe_cfg[] = {
-	USB_ENDPOINT_XFER_CONTROL,
-	USB_ENDPOINT_XFER_ISOC,
-	USB_ENDPOINT_XFER_ISOC,
-	USB_ENDPOINT_XFER_BULK,
-	USB_ENDPOINT_XFER_BULK,
-	USB_ENDPOINT_XFER_BULK,
-	USB_ENDPOINT_XFER_INT,
-	USB_ENDPOINT_XFER_INT,
-	USB_ENDPOINT_XFER_INT,
-	USB_ENDPOINT_XFER_BULK,
-	USB_ENDPOINT_XFER_BULK,
-	USB_ENDPOINT_XFER_BULK,
-	USB_ENDPOINT_XFER_BULK,
-	USB_ENDPOINT_XFER_BULK,
-	USB_ENDPOINT_XFER_BULK,
-	USB_ENDPOINT_XFER_BULK,
-};
-
-static struct usbhs_private usbhs1_private = {
-	.irq		= evt2irq(0x0300),	/* IRQ8 */
-	.usbphyaddr	= 0xE60581E2,		/* USBPHY1INTAP */
-	.usbcrcaddr	= 0xE6058130,		/* USBCR4 */
-	.info = {
-		.platform_callback = {
-			.hardware_init	= usbhs1_hardware_init,
-			.hardware_exit	= usbhs1_hardware_exit,
-			.phy_reset	= usbhs1_phy_reset,
-			.get_id		= usbhs1_get_id,
-			.get_vbus	= usbhs1_get_vbus,
-		},
-		.driver_param = {
-			.buswait_bwait	= 4,
-			.pipe_type	= usbhs1_pipe_cfg,
-			.pipe_size	= ARRAY_SIZE(usbhs1_pipe_cfg),
-		},
-	},
-};
-
-static struct resource usbhs1_resources[] = {
-	[0] = {
-		.name	= "USBHS",
-		.start	= 0xE68B0000,
-		.end	= 0xE68B00E6 - 1,
-		.flags	= IORESOURCE_MEM,
-	},
-	[1] = {
-		.start	= evt2irq(0x1ce0) /* USB1_USB1I0 */,
-		.flags	= IORESOURCE_IRQ,
-	},
-};
-
-static struct platform_device usbhs1_device = {
-	.name	= "renesas_usbhs",
-	.id	= 1,
-	.dev = {
-		.platform_data		= &usbhs1_private.info,
-	},
-	.num_resources	= ARRAY_SIZE(usbhs1_resources),
-	.resource	= usbhs1_resources,
-};
-
 
 /* LED */
 static struct gpio_led mackerel_leds[] = {
@@ -870,15 +690,7 @@ static struct resource sdhi0_resources[] = {
 		.flags	= IORESOURCE_MEM,
 	},
 	[1] = {
-		.start	= evt2irq(0x0e00) /* SDHI0_SDHI0I0 */,
-		.flags	= IORESOURCE_IRQ,
-	},
-	[2] = {
-		.start	= evt2irq(0x0e20) /* SDHI0_SDHI0I1 */,
-		.flags	= IORESOURCE_IRQ,
-	},
-	[3] = {
-		.start	= evt2irq(0x0e40) /* SDHI0_SDHI0I2 */,
+		.start	= evt2irq(0x0e00) /* SDHI0 */,
 		.flags	= IORESOURCE_IRQ,
 	},
 };
@@ -893,7 +705,7 @@ static struct platform_device sdhi0_device = {
 	},
 };
 
-#if !defined(CONFIG_MMC_SH_MMCIF) && !defined(CONFIG_MMC_SH_MMCIF_MODULE)
+#if !defined(CONFIG_MMC_SH_MMCIF)
 /* SDHI1 */
 static struct sh_mobile_sdhi_info sdhi1_info = {
 	.dma_slave_tx	= SHDMA_SLAVE_SDHI1_TX,
@@ -913,15 +725,7 @@ static struct resource sdhi1_resources[] = {
 		.flags	= IORESOURCE_MEM,
 	},
 	[1] = {
-		.start	= evt2irq(0x0e80), /* SDHI1_SDHI1I0 */
-		.flags	= IORESOURCE_IRQ,
-	},
-	[2] = {
-		.start	= evt2irq(0x0ea0), /* SDHI1_SDHI1I1 */
-		.flags	= IORESOURCE_IRQ,
-	},
-	[3] = {
-		.start	= evt2irq(0x0ec0), /* SDHI1_SDHI1I2 */
+		.start	= evt2irq(0x0e80),
 		.flags	= IORESOURCE_IRQ,
 	},
 };
@@ -964,15 +768,7 @@ static struct resource sdhi2_resources[] = {
 		.flags	= IORESOURCE_MEM,
 	},
 	[1] = {
-		.start	= evt2irq(0x1200), /* SDHI2_SDHI2I0 */
-		.flags	= IORESOURCE_IRQ,
-	},
-	[2] = {
-		.start	= evt2irq(0x1220), /* SDHI2_SDHI2I1 */
-		.flags	= IORESOURCE_IRQ,
-	},
-	[3] = {
-		.start	= evt2irq(0x1240), /* SDHI2_SDHI2I2 */
+		.start	= evt2irq(0x1200),
 		.flags	= IORESOURCE_IRQ,
 	},
 };
@@ -1007,15 +803,6 @@ static struct resource sh_mmcif_resources[] = {
 	},
 };
 
-static struct sh_mmcif_dma sh_mmcif_dma = {
-	.chan_priv_rx	= {
-		.slave_id	= SHDMA_SLAVE_MMCIF_RX,
-	},
-	.chan_priv_tx	= {
-		.slave_id	= SHDMA_SLAVE_MMCIF_TX,
-	},
-};
-
 static struct sh_mmcif_plat_data sh_mmcif_plat = {
 	.sup_pclk	= 0,
 	.ocr		= MMC_VDD_165_195 | MMC_VDD_32_33 | MMC_VDD_33_34,
@@ -1023,7 +810,6 @@ static struct sh_mmcif_plat_data sh_mmcif_plat = {
 			  MMC_CAP_8_BIT_DATA |
 			  MMC_CAP_NEEDS_POLL,
 	.get_cd		= slot_cn7_get_cd,
-	.dma		= &sh_mmcif_dma,
 };
 
 static struct platform_device sh_mmcif_device = {
@@ -1072,23 +858,37 @@ static struct soc_camera_link camera_link = {
 	.priv		= &camera_info,
 };
 
-static struct platform_device *camera_device;
-
-static void mackerel_camera_release(struct device *dev)
+static void dummy_release(struct device *dev)
 {
-	soc_camera_platform_release(&camera_device);
 }
+
+static struct platform_device camera_device = {
+	.name		= "soc_camera_platform",
+	.dev		= {
+		.platform_data	= &camera_info,
+		.release	= dummy_release,
+	},
+};
 
 static int mackerel_camera_add(struct soc_camera_link *icl,
 			       struct device *dev)
 {
-	return soc_camera_platform_add(icl, dev, &camera_device, &camera_link,
-				       mackerel_camera_release, 0);
+	if (icl != &camera_link)
+		return -ENODEV;
+
+	camera_info.dev = dev;
+
+	return platform_device_register(&camera_device);
 }
 
 static void mackerel_camera_del(struct soc_camera_link *icl)
 {
-	soc_camera_platform_del(icl, camera_device, &camera_link);
+	if (icl != &camera_link)
+		return;
+
+	platform_device_unregister(&camera_device);
+	memset(&camera_device.dev.kobj, 0,
+	       sizeof(camera_device.dev.kobj));
 }
 
 static struct sh_mobile_ceu_info sh_mobile_ceu_info = {
@@ -1135,13 +935,12 @@ static struct platform_device *mackerel_devices[] __initdata = {
 	&smc911x_device,
 	&lcdc_device,
 	&usb1_host_device,
-	&usbhs1_device,
 	&leds_device,
 	&fsi_device,
 	&fsi_ak4643_device,
 	&fsi_hdmi_device,
 	&sdhi0_device,
-#if !defined(CONFIG_MMC_SH_MMCIF) && !defined(CONFIG_MMC_SH_MMCIF_MODULE)
+#if !defined(CONFIG_MMC_SH_MMCIF)
 	&sdhi1_device,
 #endif
 	&sdhi2_device,
@@ -1231,7 +1030,6 @@ static void __init mackerel_map_io(void)
 
 #define GPIO_PORT9CR	0xE6051009
 #define GPIO_PORT10CR	0xE605100A
-#define GPIO_PORT168CR	0xE60520A8
 #define SRCR4		0xe61580bc
 #define USCCR1		0xE6058144
 static void __init mackerel_init(void)
@@ -1290,7 +1088,6 @@ static void __init mackerel_init(void)
 	gpio_request(GPIO_FN_OVCN_1_114, NULL);
 	gpio_request(GPIO_FN_EXTLP_1,    NULL);
 	gpio_request(GPIO_FN_OVCN2_1,    NULL);
-	gpio_pull_down(GPIO_PORT168CR);
 
 	/* setup USB phy */
 	__raw_writew(0x8a0a, 0xE6058130);	/* USBCR4 */
@@ -1343,7 +1140,7 @@ static void __init mackerel_init(void)
 	gpio_request(GPIO_FN_SDHID0_1, NULL);
 	gpio_request(GPIO_FN_SDHID0_0, NULL);
 
-#if !defined(CONFIG_MMC_SH_MMCIF) && !defined(CONFIG_MMC_SH_MMCIF_MODULE)
+#if !defined(CONFIG_MMC_SH_MMCIF)
 	/* enable SDHI1 */
 	gpio_request(GPIO_FN_SDHICMD1, NULL);
 	gpio_request(GPIO_FN_SDHICLK1, NULL);
@@ -1419,7 +1216,6 @@ static void __init mackerel_init(void)
 	platform_add_devices(mackerel_devices, ARRAY_SIZE(mackerel_devices));
 
 	hdmi_init_pm_clock();
-	sh7372_pm_init();
 }
 
 static void __init mackerel_timer_init(void)

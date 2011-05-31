@@ -15,14 +15,12 @@
 #include <linux/mman.h>
 #include <linux/nodemask.h>
 #include <linux/initrd.h>
-#include <linux/of_fdt.h>
 #include <linux/highmem.h>
 #include <linux/gfp.h>
 #include <linux/memblock.h>
 #include <linux/sort.h>
 
 #include <asm/mach-types.h>
-#include <asm/prom.h>
 #include <asm/sections.h>
 #include <asm/setup.h>
 #include <asm/sizes.h>
@@ -73,14 +71,6 @@ static int __init parse_tag_initrd2(const struct tag *tag)
 
 __tagtable(ATAG_INITRD2, parse_tag_initrd2);
 
-#ifdef CONFIG_OF_FLATTREE
-void __init early_init_dt_setup_initrd_arch(unsigned long start, unsigned long end)
-{
-	phys_initrd_start = start;
-	phys_initrd_size = end - start;
-}
-#endif /* CONFIG_OF_FLATTREE */
-
 /*
  * This keeps memory configuration data used by a couple memory
  * initialization functions, as well as show_mem() for the skipping
@@ -95,7 +85,7 @@ void show_mem(unsigned int filter)
 	struct meminfo * mi = &meminfo;
 
 	printk("Mem-info:\n");
-	show_free_areas(filter);
+	show_free_areas();
 
 	for_each_bank (i, mi) {
 		struct membank *bank = &mi->bank[i];
@@ -211,20 +201,6 @@ static void __init arm_bootmem_init(unsigned long start_pfn,
 	}
 }
 
-#ifdef CONFIG_ZONE_DMA
-static void __init arm_adjust_dma_zone(unsigned long *size, unsigned long *hole,
-	unsigned long dma_size)
-{
-	if (size[0] <= dma_size)
-		return;
-
-	size[ZONE_NORMAL] = size[0] - dma_size;
-	size[ZONE_DMA] = dma_size;
-	hole[ZONE_NORMAL] = hole[0];
-	hole[ZONE_DMA] = 0;
-}
-#endif
-
 static void __init arm_bootmem_free(unsigned long min, unsigned long max_low,
 	unsigned long max_high)
 {
@@ -267,31 +243,22 @@ static void __init arm_bootmem_free(unsigned long min, unsigned long max_low,
 #endif
 	}
 
-#ifdef ARM_DMA_ZONE_SIZE
-#ifndef CONFIG_ZONE_DMA
-#error ARM_DMA_ZONE_SIZE set but no DMA zone to limit allocations
-#endif
-
 	/*
 	 * Adjust the sizes according to any special requirements for
 	 * this machine type.
 	 */
-	arm_adjust_dma_zone(zone_size, zhole_size,
-		ARM_DMA_ZONE_SIZE >> PAGE_SHIFT);
-#endif
+	arch_adjust_zones(zone_size, zhole_size);
 
 	free_area_init_node(0, zone_size, min, zhole_size);
 }
 
-#ifdef CONFIG_HAVE_ARCH_PFN_VALID
+#ifndef CONFIG_SPARSEMEM
 int pfn_valid(unsigned long pfn)
 {
 	return memblock_is_memory(pfn << PAGE_SHIFT);
 }
 EXPORT_SYMBOL(pfn_valid);
-#endif
 
-#ifndef CONFIG_SPARSEMEM
 static void arm_memory_present(void)
 {
 }
@@ -346,7 +313,6 @@ void __init arm_memblock_init(struct meminfo *mi, struct machine_desc *mdesc)
 #endif
 
 	arm_mm_memblock_reserve();
-	arm_dt_memblock_reserve();
 
 	/* reserve any platform specific memblock areas */
 	if (mdesc->reserve)

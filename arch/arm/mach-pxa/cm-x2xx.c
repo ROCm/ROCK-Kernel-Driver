@@ -10,7 +10,7 @@
  */
 
 #include <linux/platform_device.h>
-#include <linux/syscore_ops.h>
+#include <linux/sysdev.h>
 #include <linux/irq.h>
 #include <linux/gpio.h>
 
@@ -388,7 +388,7 @@ static inline void cmx2xx_init_display(void) {}
 #ifdef CONFIG_PM
 static unsigned long sleep_save_msc[10];
 
-static int cmx2xx_suspend(void)
+static int cmx2xx_suspend(struct sys_device *dev, pm_message_t state)
 {
 	cmx2xx_pci_suspend();
 
@@ -412,7 +412,7 @@ static int cmx2xx_suspend(void)
 	return 0;
 }
 
-static void cmx2xx_resume(void)
+static int cmx2xx_resume(struct sys_device *dev)
 {
 	cmx2xx_pci_resume();
 
@@ -420,18 +420,27 @@ static void cmx2xx_resume(void)
 	__raw_writel(sleep_save_msc[0], MSC0);
 	__raw_writel(sleep_save_msc[1], MSC1);
 	__raw_writel(sleep_save_msc[2], MSC2);
+
+	return 0;
 }
 
-static struct syscore_ops cmx2xx_pm_syscore_ops = {
+static struct sysdev_class cmx2xx_pm_sysclass = {
+	.name = "pm",
 	.resume = cmx2xx_resume,
 	.suspend = cmx2xx_suspend,
 };
 
+static struct sys_device cmx2xx_pm_device = {
+	.cls = &cmx2xx_pm_sysclass,
+};
+
 static int __init cmx2xx_pm_init(void)
 {
-	register_syscore_ops(&cmx2xx_pm_syscore_ops);
-
-	return 0;
+	int error;
+	error = sysdev_class_register(&cmx2xx_pm_sysclass);
+	if (error == 0)
+		error = sysdev_register(&cmx2xx_pm_device);
+	return error;
 }
 #else
 static int __init cmx2xx_pm_init(void) { return 0; }

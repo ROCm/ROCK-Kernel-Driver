@@ -274,12 +274,8 @@ int mmc_add_card(struct mmc_card *card)
 		break;
 	case MMC_TYPE_SD:
 		type = "SD";
-		if (mmc_card_blockaddr(card)) {
-			if (mmc_card_ext_capacity(card))
-				type = "SDXC";
-			else
-				type = "SDHC";
-		}
+		if (mmc_card_blockaddr(card))
+			type = "SDHC";
 		break;
 	case MMC_TYPE_SDIO:
 		type = "SDIO";
@@ -303,8 +299,7 @@ int mmc_add_card(struct mmc_card *card)
 	} else {
 		printk(KERN_INFO "%s: new %s%s%s card at address %04x\n",
 			mmc_hostname(card->host),
-			mmc_sd_card_uhs(card) ? "ultra high speed " :
-			(mmc_card_highspeed(card) ? "high speed " : ""),
+			mmc_card_highspeed(card) ? "high speed " : "",
 			mmc_card_ddr_mode(card) ? "DDR " : "",
 			type, card->rca);
 	}

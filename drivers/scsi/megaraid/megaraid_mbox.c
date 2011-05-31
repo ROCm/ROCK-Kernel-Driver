@@ -2322,8 +2322,8 @@ megaraid_mbox_dpc(unsigned long devp)
 		// Was an abort issued for this command earlier
 		if (scb->state & SCB_ABORT) {
 			con_log(CL_ANN, (KERN_NOTICE
-			"megaraid: aborted cmd [%x] completed\n",
-				scb->sno));
+			"megaraid: aborted cmd %lx[%x] completed\n",
+				scp->serial_number, scb->sno));
 		}
 
 		/*
@@ -2490,8 +2490,8 @@ megaraid_abort_handler(struct scsi_cmnd *scp)
 	raid_dev	= ADAP2RAIDDEV(adapter);
 
 	con_log(CL_ANN, (KERN_WARNING
-		"megaraid: aborting cmd=%x <c=%d t=%d l=%d>\n",
-		scp->cmnd[0], SCP2CHANNEL(scp),
+		"megaraid: aborting-%ld cmd=%x <c=%d t=%d l=%d>\n",
+		scp->serial_number, scp->cmnd[0], SCP2CHANNEL(scp),
 		SCP2TARGET(scp), SCP2LUN(scp)));
 
 	// If FW has stopped responding, simply return failure
@@ -2514,8 +2514,9 @@ megaraid_abort_handler(struct scsi_cmnd *scp)
 			list_del_init(&scb->list);	// from completed list
 
 			con_log(CL_ANN, (KERN_WARNING
-			"megaraid: %d[%d:%d], abort from completed list\n",
-				scb->sno, scb->dev_channel, scb->dev_target));
+			"megaraid: %ld:%d[%d:%d], abort from completed list\n",
+				scp->serial_number, scb->sno,
+				scb->dev_channel, scb->dev_target));
 
 			scp->result = (DID_ABORT << 16);
 			scp->scsi_done(scp);
@@ -2544,8 +2545,9 @@ megaraid_abort_handler(struct scsi_cmnd *scp)
 			ASSERT(!(scb->state & SCB_ISSUED));
 
 			con_log(CL_ANN, (KERN_WARNING
-				"megaraid abort: [%d:%d], driver owner\n",
-				scb->dev_channel, scb->dev_target));
+				"megaraid abort: %ld[%d:%d], driver owner\n",
+				scp->serial_number, scb->dev_channel,
+				scb->dev_target));
 
 			scp->result = (DID_ABORT << 16);
 			scp->scsi_done(scp);
@@ -2576,21 +2578,25 @@ megaraid_abort_handler(struct scsi_cmnd *scp)
 
 			if (!(scb->state & SCB_ISSUED)) {
 				con_log(CL_ANN, (KERN_WARNING
-				"megaraid abort: %d[%d:%d], invalid state\n",
-				scb->sno, scb->dev_channel, scb->dev_target));
+				"megaraid abort: %ld%d[%d:%d], invalid state\n",
+				scp->serial_number, scb->sno, scb->dev_channel,
+				scb->dev_target));
 				BUG();
 			}
 			else {
 				con_log(CL_ANN, (KERN_WARNING
-				"megaraid abort: %d[%d:%d], fw owner\n",
-				scb->sno, scb->dev_channel, scb->dev_target));
+				"megaraid abort: %ld:%d[%d:%d], fw owner\n",
+				scp->serial_number, scb->sno, scb->dev_channel,
+				scb->dev_target));
 			}
 		}
 	}
 	spin_unlock_irq(&adapter->lock);
 
 	if (!found) {
-		con_log(CL_ANN, (KERN_WARNING "megaraid abort: do now own\n"));
+		con_log(CL_ANN, (KERN_WARNING
+			"megaraid abort: scsi cmd:%ld, do now own\n",
+			scp->serial_number));
 
 		// FIXME: Should there be a callback for this command?
 		return SUCCESS;
@@ -2661,8 +2667,9 @@ megaraid_reset_handler(struct scsi_cmnd *scp)
 		} else {
 			if (scb->scp == scp) {	// Found command
 				con_log(CL_ANN, (KERN_WARNING
-					"megaraid: %d[%d:%d], reset from pending list\n",
-					scb->sno, scb->dev_channel, scb->dev_target));
+					"megaraid: %ld:%d[%d:%d], reset from pending list\n",
+					scp->serial_number, scb->sno,
+					scb->dev_channel, scb->dev_target));
 			} else {
 				con_log(CL_ANN, (KERN_WARNING
 				"megaraid: IO packet with %d[%d:%d] being reset\n",

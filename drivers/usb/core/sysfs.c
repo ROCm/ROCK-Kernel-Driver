@@ -842,19 +842,22 @@ const struct attribute_group *usb_interface_groups[] = {
 	NULL
 };
 
-void usb_create_sysfs_intf_files(struct usb_interface *intf)
+int usb_create_sysfs_intf_files(struct usb_interface *intf)
 {
 	struct usb_device *udev = interface_to_usbdev(intf);
 	struct usb_host_interface *alt = intf->cur_altsetting;
+	int retval;
 
 	if (intf->sysfs_files_created || intf->unregistering)
-		return;
+		return 0;
 
-	if (!alt->string && !(udev->quirks & USB_QUIRK_CONFIG_INTF_STRINGS))
+	if (alt->string == NULL &&
+			!(udev->quirks & USB_QUIRK_CONFIG_INTF_STRINGS))
 		alt->string = usb_cache_string(udev, alt->desc.iInterface);
-	if (alt->string && device_create_file(&intf->dev, &dev_attr_interface))
-		;	/* We don't actually care if the function fails. */
+	if (alt->string)
+		retval = device_create_file(&intf->dev, &dev_attr_interface);
 	intf->sysfs_files_created = 1;
+	return 0;
 }
 
 void usb_remove_sysfs_intf_files(struct usb_interface *intf)

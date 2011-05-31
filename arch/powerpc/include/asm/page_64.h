@@ -59,7 +59,24 @@ static __inline__ void clear_page(void *addr)
 	: "ctr", "memory");
 }
 
-extern void copy_page(void *to, void *from);
+extern void copy_4K_page(void *to, void *from);
+
+#ifdef CONFIG_PPC_64K_PAGES
+static inline void copy_page(void *to, void *from)
+{
+	unsigned int i;
+	for (i=0; i < (1 << (PAGE_SHIFT - 12)); i++) {
+		copy_4K_page(to, from);
+		to += 4096;
+		from += 4096;
+	}
+}
+#else /* CONFIG_PPC_64K_PAGES */
+static inline void copy_page(void *to, void *from)
+{
+	copy_4K_page(to, from);
+}
+#endif /* CONFIG_PPC_64K_PAGES */
 
 /* Log 2 of page table size */
 extern u64 ppc64_pft_size;
@@ -113,7 +130,7 @@ extern void slice_set_user_psize(struct mm_struct *mm, unsigned int psize);
 extern void slice_set_range_psize(struct mm_struct *mm, unsigned long start,
 				  unsigned long len, unsigned int psize);
 
-#define slice_mm_new_context(mm)	((mm)->context.id == MMU_NO_CONTEXT)
+#define slice_mm_new_context(mm)	((mm)->context.id == 0)
 
 #endif /* __ASSEMBLY__ */
 #else

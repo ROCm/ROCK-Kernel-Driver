@@ -28,10 +28,9 @@ int acpi_scan_init(void);
 int acpi_sysfs_init(void);
 
 #ifdef CONFIG_DEBUG_FS
-extern struct dentry *acpi_debugfs_dir;
 int acpi_debugfs_init(void);
 #else
-static inline void acpi_debugfs_init(void) { return; }
+static inline int acpi_debugfs_init(void) { return 0; }
 #endif
 
 /* --------------------------------------------------------------------------

@@ -381,13 +381,7 @@ static int uio_get_minor(struct uio_device *idev)
 			retval = -ENOMEM;
 		goto exit;
 	}
-	if (id < UIO_MAX_DEVICES) {
-		idev->minor = id;
-	} else {
-		dev_err(idev->dev, "too many uio devices\n");
-		retval = -EINVAL;
-		idr_remove(&uio_idr, id);
-	}
+	idev->minor = id & MAX_ID_MASK;
 exit:
 	mutex_unlock(&minor_lock);
 	return retval;
@@ -593,12 +587,14 @@ static ssize_t uio_write(struct file *filep, const char __user *buf,
 
 static int uio_find_mem_index(struct vm_area_struct *vma)
 {
+	int mi;
 	struct uio_device *idev = vma->vm_private_data;
 
-	if (vma->vm_pgoff < MAX_UIO_MAPS) {
-		if (idev->info->mem[vma->vm_pgoff].size == 0)
+	for (mi = 0; mi < MAX_UIO_MAPS; mi++) {
+		if (idev->info->mem[mi].size == 0)
 			return -1;
-		return (int)vma->vm_pgoff;
+		if (vma->vm_pgoff == mi)
+			return mi;
 	}
 	return -1;
 }

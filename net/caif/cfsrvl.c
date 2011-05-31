@@ -10,7 +10,6 @@
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
-#include <linux/module.h>
 #include <net/caif/caif_layer.h>
 #include <net/caif/cfsrvl.h>
 #include <net/caif/cfpkt.h>
@@ -28,8 +27,8 @@ static void cfservl_ctrlcmd(struct cflayer *layr, enum caif_ctrlcmd ctrl,
 {
 	struct cfsrvl *service = container_obj(layr);
 
-	if (layr->up == NULL || layr->up->ctrlcmd == NULL)
-		return;
+	caif_assert(layr->up != NULL);
+	caif_assert(layr->up->ctrlcmd != NULL);
 
 	switch (ctrl) {
 	case CAIF_CTRLCMD_INIT_RSP:
@@ -152,9 +151,14 @@ static int cfservl_modemcmd(struct cflayer *layr, enum caif_modemcmd ctrl)
 	return -EINVAL;
 }
 
-static void cfsrvl_release(struct cflayer *layer)
+void cfservl_destroy(struct cflayer *layer)
 {
-	struct cfsrvl *service = container_of(layer, struct cfsrvl, layer);
+	kfree(layer);
+}
+
+void cfsrvl_release(struct kref *kref)
+{
+	struct cfsrvl *service = container_of(kref, struct cfsrvl, ref);
 	kfree(service);
 }
 
@@ -174,7 +178,9 @@ void cfsrvl_init(struct cfsrvl *service,
 	service->dev_info = *dev_info;
 	service->supports_flowctrl = supports_flowctrl;
 	service->release = cfsrvl_release;
+	kref_init(&service->ref);
 }
+
 
 bool cfsrvl_ready(struct cfsrvl *service, int *err)
 {
@@ -188,7 +194,6 @@ bool cfsrvl_ready(struct cfsrvl *service, int *err)
 	*err = -EAGAIN;
 	return false;
 }
-
 u8 cfsrvl_getphyid(struct cflayer *layer)
 {
 	struct cfsrvl *servl = container_obj(layer);
@@ -200,26 +205,3 @@ bool cfsrvl_phyid_match(struct cflayer *layer, int phyid)
 	struct cfsrvl *servl = container_obj(layer);
 	return servl->dev_info.id == phyid;
 }
-
-void caif_free_client(struct cflayer *adap_layer)
-{
-	struct cfsrvl *servl;
-	if (adap_layer == NULL || adap_layer->dn == NULL)
-		return;
-	servl = container_obj(adap_layer->dn);
-	servl->release(&servl->layer);
-}
-EXPORT_SYMBOL(caif_free_client);
-
-void caif_client_register_refcnt(struct cflayer *adapt_layer,
-					void (*hold)(struct cflayer *lyr),
-					void (*put)(struct cflayer *lyr))
-{
-	struct cfsrvl *service;
-	service = container_of(adapt_layer->dn, struct cfsrvl, layer);
-
-	WARN_ON(adapt_layer == NULL || adapt_layer->dn == NULL);
-	service->hold = hold;
-	service->put = put;
-}
-EXPORT_SYMBOL(caif_client_register_refcnt);

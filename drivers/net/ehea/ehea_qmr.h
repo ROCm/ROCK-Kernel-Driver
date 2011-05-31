@@ -29,7 +29,6 @@
 #ifndef __EHEA_QMR_H__
 #define __EHEA_QMR_H__
 
-#include <linux/prefetch.h>
 #include "ehea.h"
 #include "ehea_hw.h"
 

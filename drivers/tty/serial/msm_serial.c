@@ -1,5 +1,5 @@
 /*
- * Driver for msm7k serial device and console
+ * drivers/serial/msm_serial.c - driver for msm7k serial device and console
  *
  * Copyright (C) 2007 Google, Inc.
  * Author: Robert Love <rlove@google.com>

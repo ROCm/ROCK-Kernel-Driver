@@ -236,6 +236,13 @@ EXPORT_SYMBOL_GPL(usb_register_dev);
 void usb_deregister_dev(struct usb_interface *intf,
 			struct usb_class_driver *class_driver)
 {
+	int minor_base = class_driver->minor_base;
+	char name[20];
+
+#ifdef CONFIG_USB_DYNAMIC_MINORS
+	minor_base = 0;
+#endif
+
 	if (intf->minor == -1)
 		return;
 
@@ -245,6 +252,7 @@ void usb_deregister_dev(struct usb_interface *intf,
 	usb_minors[intf->minor] = NULL;
 	up_write(&minor_rwsem);
 
+	snprintf(name, sizeof(name), class_driver->name, intf->minor - minor_base);
 	device_destroy(usb_class->class, MKDEV(USB_MAJOR, intf->minor));
 	intf->usb_dev = NULL;
 	intf->minor = -1;

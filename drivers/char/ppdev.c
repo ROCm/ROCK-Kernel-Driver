@@ -457,7 +457,6 @@ static int pp_do_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			return -ENODEV;
 
 		modes = port->modes;
-		parport_put_port(port);
 		if (copy_to_user (argp, &modes, sizeof (modes))) {
 			return -EFAULT;
 		}

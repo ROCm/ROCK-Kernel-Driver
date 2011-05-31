@@ -120,7 +120,7 @@ static void alauda_delete(struct kref *kref)
 	struct alauda *al = container_of(kref, struct alauda, kref);
 
 	if (al->mtd) {
-		mtd_device_unregister(al->mtd);
+		del_mtd_device(al->mtd);
 		kfree(al->mtd);
 	}
 	usb_put_dev(al->dev);
@@ -592,7 +592,7 @@ static int alauda_init_media(struct alauda *al)
 	mtd->priv = al;
 	mtd->owner = THIS_MODULE;
 
-	err = mtd_device_register(mtd, NULL, 0);
+	err = add_mtd_device(mtd);
 	if (err) {
 		err = -ENFILE;
 		goto error;

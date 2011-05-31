@@ -16,6 +16,7 @@
 #include <linux/gpio_keys.h>
 #include <linux/input.h>
 #include <linux/gpio.h>
+#include <linux/sysdev.h>
 #include <linux/usb/gpio_vbus.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/partitions.h>

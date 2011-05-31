@@ -449,9 +449,11 @@ enum nic_state {
 struct efx_nic;
 
 /* Pseudo bit-mask flow control field */
-#define EFX_FC_RX	FLOW_CTRL_RX
-#define EFX_FC_TX	FLOW_CTRL_TX
-#define EFX_FC_AUTO	4
+enum efx_fc_type {
+	EFX_FC_RX = FLOW_CTRL_RX,
+	EFX_FC_TX = FLOW_CTRL_TX,
+	EFX_FC_AUTO = 4,
+};
 
 /**
  * struct efx_link_state - Current state of the link
@@ -463,7 +465,7 @@ struct efx_nic;
 struct efx_link_state {
 	bool up;
 	bool fd;
-	u8 fc;
+	enum efx_fc_type fc;
 	unsigned int speed;
 };
 
@@ -668,14 +670,16 @@ struct efx_filter_state;
  * @mtd_list: List of MTDs attached to the NIC
  * @nic_data: Hardware dependent state
  * @mac_lock: MAC access lock. Protects @port_enabled, @phy_mode,
- *	efx_monitor() and efx_reconfigure_port()
+ *	@port_inhibited, efx_monitor() and efx_reconfigure_port()
  * @port_enabled: Port enabled indicator.
  *	Serialises efx_stop_all(), efx_start_all(), efx_monitor() and
  *	efx_mac_work() with kernel interfaces. Safe to read under any
  *	one of the rtnl_lock, mac_lock, or netif_tx_lock, but all three must
  *	be held to modify it.
+ * @port_inhibited: If set, the netif_carrier is always off. Hold the mac_lock
  * @port_initialized: Port initialized?
  * @net_dev: Operating system network device. Consider holding the rtnl lock
+ * @rx_checksum_enabled: RX checksumming enabled
  * @stats_buffer: DMA buffer for statistics
  * @mac_op: MAC interface
  * @phy_type: PHY type
@@ -761,16 +765,18 @@ struct efx_nic {
 	struct mutex mac_lock;
 	struct work_struct mac_work;
 	bool port_enabled;
+	bool port_inhibited;
 
 	bool port_initialized;
 	struct net_device *net_dev;
+	bool rx_checksum_enabled;
 
 	struct efx_buffer stats_buffer;
 
-	const struct efx_mac_operations *mac_op;
+	struct efx_mac_operations *mac_op;
 
 	unsigned int phy_type;
-	const struct efx_phy_operations *phy_op;
+	struct efx_phy_operations *phy_op;
 	void *phy_data;
 	struct mdio_if_info mdio;
 	unsigned int mdio_bus;
@@ -782,7 +788,7 @@ struct efx_nic {
 
 	bool promiscuous;
 	union efx_multicast_hash multicast_hash;
-	u8 wanted_fc;
+	enum efx_fc_type wanted_fc;
 
 	atomic_t rx_reset;
 	enum efx_loopback_mode loopback_mode;
@@ -891,7 +897,7 @@ struct efx_nic_type {
 	void (*resume_wol)(struct efx_nic *efx);
 	int (*test_registers)(struct efx_nic *efx);
 	int (*test_nvram)(struct efx_nic *efx);
-	const struct efx_mac_operations *default_mac_ops;
+	struct efx_mac_operations *default_mac_ops;
 
 	int revision;
 	unsigned int mem_map_size;

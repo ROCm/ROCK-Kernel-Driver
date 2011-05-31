@@ -1119,7 +1119,10 @@ static int pxa3xx_nand_remove(struct platform_device *pdev)
 	clk_put(info->clk);
 
 	if (mtd) {
-		mtd_device_unregister(mtd);
+		del_mtd_device(mtd);
+#ifdef CONFIG_MTD_PARTITIONS
+		del_mtd_partitions(mtd);
+#endif
 		kfree(mtd);
 	}
 	return 0;
@@ -1146,6 +1149,7 @@ static int pxa3xx_nand_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
+#ifdef CONFIG_MTD_PARTITIONS
 	if (mtd_has_cmdlinepart()) {
 		const char *probes[] = { "cmdlinepart", NULL };
 		struct mtd_partition *parts;
@@ -1154,10 +1158,13 @@ static int pxa3xx_nand_probe(struct platform_device *pdev)
 		nr_parts = parse_mtd_partitions(info->mtd, probes, &parts, 0);
 
 		if (nr_parts)
-			return mtd_device_register(info->mtd, parts, nr_parts);
+			return add_mtd_partitions(info->mtd, parts, nr_parts);
 	}
 
-	return mtd_device_register(info->mtd, pdata->parts, pdata->nr_parts);
+	return add_mtd_partitions(info->mtd, pdata->parts, pdata->nr_parts);
+#else
+	return 0;
+#endif
 }
 
 #ifdef CONFIG_PM

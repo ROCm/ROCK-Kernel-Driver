@@ -29,6 +29,7 @@
 #include <asm/mach/map.h>
 #include <linux/gpio.h>
 #include <mach/iomux-mx27.h>
+#include <mach/mxc_nand.h>
 #include <linux/i2c/pca953x.h>
 
 #include "devices-imx27.h"

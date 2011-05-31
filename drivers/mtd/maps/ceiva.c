@@ -224,7 +224,7 @@ static void __exit clps_destroy_mtd(struct clps_info *clps, struct mtd_info *mtd
 {
 	int i;
 
-	mtd_device_unregister(mtd);
+	del_mtd_partitions(mtd);
 
 	if (mtd != clps[0].mtd)
 		mtd_concat_destroy(mtd);
@@ -292,11 +292,11 @@ static void __init clps_locate_partitions(struct mtd_info *mtd)
 	if (nr_parts == 0) {
 		printk(KERN_NOTICE "clps flash: no partition info "
 			"available, registering whole flash\n");
-		mtd_device_register(mtd, NULL, 0);
+		add_mtd_device(mtd);
 	} else {
 		printk(KERN_NOTICE "clps flash: using %s partition "
 			"definition\n", part_type);
-		mtd_device_register(mtd, parsed_parts, nr_parts);
+		add_mtd_partitions(mtd, parsed_parts, nr_parts);
 	}
 
 	/* Always succeeds. */

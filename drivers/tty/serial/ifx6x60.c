@@ -41,6 +41,7 @@
 #include <linux/tty.h>
 #include <linux/device.h>
 #include <linux/spi/spi.h>
+#include <linux/tty.h>
 #include <linux/kfifo.h>
 #include <linux/tty_flip.h>
 #include <linux/timer.h>
@@ -55,6 +56,7 @@
 #include <linux/sched.h>
 #include <linux/time.h>
 #include <linux/wait.h>
+#include <linux/tty.h>
 #include <linux/pm.h>
 #include <linux/pm_runtime.h>
 #include <linux/spi/ifx_modem.h>

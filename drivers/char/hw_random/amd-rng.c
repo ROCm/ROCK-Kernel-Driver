@@ -133,12 +133,6 @@ found:
 	pmbase &= 0x0000FF00;
 	if (pmbase == 0)
 		goto out;
-	if (!request_region(pmbase + 0xF0, 8, "AMD HWRNG")) {
-		dev_err(&pdev->dev, "AMD HWRNG region 0x%x already in use!\n",
-			pmbase + 0xF0);
-		err = -EBUSY;
-		goto out;
-	}
 	amd_rng.priv = (unsigned long)pmbase;
 	amd_pdev = pdev;
 
@@ -147,7 +141,6 @@ found:
 	if (err) {
 		printk(KERN_ERR PFX "RNG registering failed (%d)\n",
 		       err);
-		release_region(pmbase + 0xF0, 8);
 		goto out;
 	}
 out:
@@ -156,8 +149,6 @@ out:
 
 static void __exit mod_exit(void)
 {
-	u32 pmbase = (unsigned long)amd_rng.priv;
-	release_region(pmbase + 0xF0, 8);
 	hwrng_unregister(&amd_rng);
 }
 

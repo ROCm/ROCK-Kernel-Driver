@@ -451,6 +451,7 @@ int input_grab_device(struct input_handle *handle)
 	}
 
 	rcu_assign_pointer(dev->grab, handle);
+	synchronize_rcu();
 
  out:
 	mutex_unlock(&dev->mutex);

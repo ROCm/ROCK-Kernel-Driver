@@ -449,7 +449,7 @@ static void qt202x_phy_remove(struct efx_nic *efx)
 	efx->phy_data = NULL;
 }
 
-const struct efx_phy_operations falcon_qt202x_phy_ops = {
+struct efx_phy_operations falcon_qt202x_phy_ops = {
 	.probe		 = qt202x_phy_probe,
 	.init		 = qt202x_phy_init,
 	.reconfigure	 = qt202x_phy_reconfigure,

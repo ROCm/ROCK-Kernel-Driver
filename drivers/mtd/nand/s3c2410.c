@@ -55,7 +55,7 @@ static int hardware_ecc = 0;
 #endif
 
 #ifdef CONFIG_MTD_NAND_S3C2410_CLKSTOP
-static const int clock_stop = 1;
+static int clock_stop = 1;
 #else
 static const int clock_stop = 0;
 #endif
@@ -96,12 +96,6 @@ enum s3c_cpu_type {
 	TYPE_S3C2440,
 };
 
-enum s3c_nand_clk_state {
-	CLOCK_DISABLE	= 0,
-	CLOCK_ENABLE,
-	CLOCK_SUSPEND,
-};
-
 /* overview of the s3c2410 nand state */
 
 /**
@@ -117,7 +111,6 @@ enum s3c_nand_clk_state {
  * @mtd_count: The number of MTDs created from this controller.
  * @save_sel: The contents of @sel_reg to be saved over suspend.
  * @clk_rate: The clock rate from @clk.
- * @clk_state: The current clock state.
  * @cpu_type: The exact type of this controller.
  */
 struct s3c2410_nand_info {
@@ -136,7 +129,6 @@ struct s3c2410_nand_info {
 	int				mtd_count;
 	unsigned long			save_sel;
 	unsigned long			clk_rate;
-	enum s3c_nand_clk_state		clk_state;
 
 	enum s3c_cpu_type		cpu_type;
 
@@ -167,31 +159,9 @@ static struct s3c2410_platform_nand *to_nand_plat(struct platform_device *dev)
 	return dev->dev.platform_data;
 }
 
-static inline int allow_clk_suspend(struct s3c2410_nand_info *info)
+static inline int allow_clk_stop(struct s3c2410_nand_info *info)
 {
 	return clock_stop;
-}
-
-/**
- * s3c2410_nand_clk_set_state - Enable, disable or suspend NAND clock.
- * @info: The controller instance.
- * @new_state: State to which clock should be set.
- */
-static void s3c2410_nand_clk_set_state(struct s3c2410_nand_info *info,
-		enum s3c_nand_clk_state new_state)
-{
-	if (!allow_clk_suspend(info) && new_state == CLOCK_SUSPEND)
-		return;
-
-	if (info->clk_state == CLOCK_ENABLE) {
-		if (new_state != CLOCK_ENABLE)
-			clk_disable(info->clk);
-	} else {
-		if (new_state == CLOCK_ENABLE)
-			clk_enable(info->clk);
-	}
-
-	info->clk_state = new_state;
 }
 
 /* timing calculations */
@@ -363,8 +333,8 @@ static void s3c2410_nand_select_chip(struct mtd_info *mtd, int chip)
 	nmtd = this->priv;
 	info = nmtd->info;
 
-	if (chip != -1)
-		s3c2410_nand_clk_set_state(info, CLOCK_ENABLE);
+	if (chip != -1 && allow_clk_stop(info))
+		clk_enable(info->clk);
 
 	cur = readl(info->sel_reg);
 
@@ -386,8 +356,8 @@ static void s3c2410_nand_select_chip(struct mtd_info *mtd, int chip)
 
 	writel(cur, info->sel_reg);
 
-	if (chip == -1)
-		s3c2410_nand_clk_set_state(info, CLOCK_SUSPEND);
+	if (chip == -1 && allow_clk_stop(info))
+		clk_disable(info->clk);
 }
 
 /* s3c2410_nand_hwcontrol
@@ -724,7 +694,8 @@ static int s3c24xx_nand_remove(struct platform_device *pdev)
 	/* free the common resources */
 
 	if (info->clk != NULL && !IS_ERR(info->clk)) {
-		s3c2410_nand_clk_set_state(info, CLOCK_DISABLE);
+		if (!allow_clk_stop(info))
+			clk_disable(info->clk);
 		clk_put(info->clk);
 	}
 
@@ -744,6 +715,7 @@ static int s3c24xx_nand_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_MTD_PARTITIONS
 const char *part_probes[] = { "cmdlinepart", NULL };
 static int s3c2410_nand_add_partition(struct s3c2410_nand_info *info,
 				      struct s3c2410_nand_mtd *mtd,
@@ -753,7 +725,7 @@ static int s3c2410_nand_add_partition(struct s3c2410_nand_info *info,
 	int nr_part = 0;
 
 	if (set == NULL)
-		return mtd_device_register(&mtd->mtd, NULL, 0);
+		return add_mtd_device(&mtd->mtd);
 
 	mtd->mtd.name = set->name;
 	nr_part = parse_mtd_partitions(&mtd->mtd, part_probes, &part_info, 0);
@@ -763,8 +735,19 @@ static int s3c2410_nand_add_partition(struct s3c2410_nand_info *info,
 		part_info = set->partitions;
 	}
 
-	return mtd_device_register(&mtd->mtd, part_info, nr_part);
+	if (nr_part > 0 && part_info)
+		return add_mtd_partitions(&mtd->mtd, part_info, nr_part);
+
+	return add_mtd_device(&mtd->mtd);
 }
+#else
+static int s3c2410_nand_add_partition(struct s3c2410_nand_info *info,
+				      struct s3c2410_nand_mtd *mtd,
+				      struct s3c2410_nand_set *set)
+{
+	return add_mtd_device(&mtd->mtd);
+}
+#endif
 
 /**
  * s3c2410_nand_init_chip - initialise a single instance of an chip
@@ -964,7 +947,7 @@ static int s3c24xx_nand_probe(struct platform_device *pdev)
 		goto exit_error;
 	}
 
-	s3c2410_nand_clk_set_state(info, CLOCK_ENABLE);
+	clk_enable(info->clk);
 
 	/* allocate and map the resource */
 
@@ -1043,9 +1026,9 @@ static int s3c24xx_nand_probe(struct platform_device *pdev)
 		goto exit_error;
 	}
 
-	if (allow_clk_suspend(info)) {
+	if (allow_clk_stop(info)) {
 		dev_info(&pdev->dev, "clock idle support enabled\n");
-		s3c2410_nand_clk_set_state(info, CLOCK_SUSPEND);
+		clk_disable(info->clk);
 	}
 
 	pr_debug("initialised ok\n");
@@ -1076,7 +1059,8 @@ static int s3c24xx_nand_suspend(struct platform_device *dev, pm_message_t pm)
 
 		writel(info->save_sel | info->sel_bit, info->sel_reg);
 
-		s3c2410_nand_clk_set_state(info, CLOCK_DISABLE);
+		if (!allow_clk_stop(info))
+			clk_disable(info->clk);
 	}
 
 	return 0;
@@ -1088,7 +1072,7 @@ static int s3c24xx_nand_resume(struct platform_device *dev)
 	unsigned long sel;
 
 	if (info) {
-		s3c2410_nand_clk_set_state(info, CLOCK_ENABLE);
+		clk_enable(info->clk);
 		s3c2410_nand_inithw(info);
 
 		/* Restore the state of the nFCE line. */
@@ -1098,7 +1082,8 @@ static int s3c24xx_nand_resume(struct platform_device *dev)
 		sel |= info->save_sel & info->sel_bit;
 		writel(sel, info->sel_reg);
 
-		s3c2410_nand_clk_set_state(info, CLOCK_SUSPEND);
+		if (allow_clk_stop(info))
+			clk_disable(info->clk);
 	}
 
 	return 0;

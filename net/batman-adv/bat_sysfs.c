@@ -488,24 +488,22 @@ static ssize_t store_mesh_iface(struct kobject *kobj, struct attribute *attr,
 	    (strncmp(hard_iface->soft_iface->name, buff, IFNAMSIZ) == 0))
 		goto out;
 
-	if (!rtnl_trylock()) {
-		ret = -ERESTARTSYS;
+	if (status_tmp == IF_NOT_IN_USE) {
+		rtnl_lock();
+		hardif_disable_interface(hard_iface);
+		rtnl_unlock();
 		goto out;
 	}
 
-	if (status_tmp == IF_NOT_IN_USE) {
-		hardif_disable_interface(hard_iface);
-		goto unlock;
-	}
-
 	/* if the interface already is in use */
-	if (hard_iface->if_status != IF_NOT_IN_USE)
+	if (hard_iface->if_status != IF_NOT_IN_USE) {
+		rtnl_lock();
 		hardif_disable_interface(hard_iface);
+		rtnl_unlock();
+	}
 
 	ret = hardif_enable_interface(hard_iface, buff);
 
-unlock:
-	rtnl_unlock();
 out:
 	hardif_free_ref(hard_iface);
 	return ret;

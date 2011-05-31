@@ -25,7 +25,6 @@
 #include <linux/kmod.h>
 #include <linux/slab.h>
 #include <linux/completion.h>
-#include <linux/cred.h>
 #include <linux/file.h>
 #include <linux/fdtable.h>
 #include <linux/workqueue.h>
@@ -43,13 +42,6 @@
 extern int max_threads;
 
 static struct workqueue_struct *khelper_wq;
-
-#define CAP_BSET	(void *)1
-#define CAP_PI		(void *)2
-
-static kernel_cap_t usermodehelper_bset = CAP_FULL_SET;
-static kernel_cap_t usermodehelper_inheritable = CAP_FULL_SET;
-static DEFINE_SPINLOCK(umh_sysctl_lock);
 
 #ifdef CONFIG_MODULES
 
@@ -140,7 +132,6 @@ EXPORT_SYMBOL(__request_module);
 static int ____call_usermodehelper(void *data)
 {
 	struct subprocess_info *sub_info = data;
-	struct cred *new;
 	int retval;
 
 	spin_lock_irq(&current->sighand->siglock);
@@ -161,19 +152,6 @@ static int ____call_usermodehelper(void *data)
 		if (retval)
 			goto fail;
 	}
-
-	retval = -ENOMEM;
-	new = prepare_kernel_cred(current);
-	if (!new)
-		goto fail;
-
-	spin_lock(&umh_sysctl_lock);
-	new->cap_bset = cap_intersect(usermodehelper_bset, new->cap_bset);
-	new->cap_inheritable = cap_intersect(usermodehelper_inheritable,
-					     new->cap_inheritable);
-	spin_unlock(&umh_sysctl_lock);
-
-	commit_creds(new);
 
 	retval = kernel_execve(sub_info->path,
 			       (const char *const *)sub_info->argv,
@@ -267,6 +245,7 @@ static void __call_usermodehelper(struct work_struct *work)
 	}
 }
 
+#ifdef CONFIG_PM_SLEEP
 /*
  * If set, call_usermodehelper_exec() will exit immediately returning -EBUSY
  * (used for preventing user land processes from being created after the user
@@ -342,6 +321,12 @@ static void helper_unlock(void)
 	if (atomic_dec_and_test(&running_helpers))
 		wake_up(&running_helpers_waitq);
 }
+#else /* CONFIG_PM_SLEEP */
+#define usermodehelper_disabled	0
+
+static inline void helper_lock(void) {}
+static inline void helper_unlock(void) {}
+#endif /* CONFIG_PM_SLEEP */
 
 /**
  * call_usermodehelper_setup - prepare to call a usermode helper
@@ -441,84 +426,6 @@ unlock:
 	return retval;
 }
 EXPORT_SYMBOL(call_usermodehelper_exec);
-
-static int proc_cap_handler(struct ctl_table *table, int write,
-			 void __user *buffer, size_t *lenp, loff_t *ppos)
-{
-	struct ctl_table t;
-	unsigned long cap_array[_KERNEL_CAPABILITY_U32S];
-	kernel_cap_t new_cap;
-	int err, i;
-
-	if (write && (!capable(CAP_SETPCAP) ||
-		      !capable(CAP_SYS_MODULE)))
-		return -EPERM;
-
-	/*
-	 * convert from the global kernel_cap_t to the ulong array to print to
-	 * userspace if this is a read.
-	 */
-	spin_lock(&umh_sysctl_lock);
-	for (i = 0; i < _KERNEL_CAPABILITY_U32S; i++)  {
-		if (table->data == CAP_BSET)
-			cap_array[i] = usermodehelper_bset.cap[i];
-		else if (table->data == CAP_PI)
-			cap_array[i] = usermodehelper_inheritable.cap[i];
-		else
-			BUG();
-	}
-	spin_unlock(&umh_sysctl_lock);
-
-	t = *table;
-	t.data = &cap_array;
-
-	/*
-	 * actually read or write and array of ulongs from userspace.  Remember
-	 * these are least significant 32 bits first
-	 */
-	err = proc_doulongvec_minmax(&t, write, buffer, lenp, ppos);
-	if (err < 0)
-		return err;
-
-	/*
-	 * convert from the sysctl array of ulongs to the kernel_cap_t
-	 * internal representation
-	 */
-	for (i = 0; i < _KERNEL_CAPABILITY_U32S; i++)
-		new_cap.cap[i] = cap_array[i];
-
-	/*
-	 * Drop everything not in the new_cap (but don't add things)
-	 */
-	spin_lock(&umh_sysctl_lock);
-	if (write) {
-		if (table->data == CAP_BSET)
-			usermodehelper_bset = cap_intersect(usermodehelper_bset, new_cap);
-		if (table->data == CAP_PI)
-			usermodehelper_inheritable = cap_intersect(usermodehelper_inheritable, new_cap);
-	}
-	spin_unlock(&umh_sysctl_lock);
-
-	return 0;
-}
-
-struct ctl_table usermodehelper_table[] = {
-	{
-		.procname	= "bset",
-		.data		= CAP_BSET,
-		.maxlen		= _KERNEL_CAPABILITY_U32S * sizeof(unsigned long),
-		.mode		= 0600,
-		.proc_handler	= proc_cap_handler,
-	},
-	{
-		.procname	= "inheritable",
-		.data		= CAP_PI,
-		.maxlen		= _KERNEL_CAPABILITY_U32S * sizeof(unsigned long),
-		.mode		= 0600,
-		.proc_handler	= proc_cap_handler,
-	},
-	{ }
-};
 
 void __init usermodehelper_init(void)
 {

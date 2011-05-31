@@ -167,6 +167,7 @@ static int parse_opts(char *params, struct p9_rdma_opts *opts)
 	substring_t args[MAX_OPT_ARGS];
 	int option;
 	char *options, *tmp_options;
+	int ret;
 
 	opts->port = P9_PORT;
 	opts->sq_depth = P9_RDMA_SQ_DEPTH;
@@ -194,6 +195,7 @@ static int parse_opts(char *params, struct p9_rdma_opts *opts)
 		if (r < 0) {
 			P9_DPRINTK(P9_DEBUG_ERROR,
 				   "integer field, but no integer?\n");
+			ret = r;
 			continue;
 		}
 		switch (token) {
@@ -589,8 +591,7 @@ rdma_create_trans(struct p9_client *client, const char *addr, char *args)
 		return -ENOMEM;
 
 	/* Create the RDMA CM ID */
-	rdma->cm_id = rdma_create_id(p9_cm_event_handler, client, RDMA_PS_TCP,
-				     IB_QPT_RC);
+	rdma->cm_id = rdma_create_id(p9_cm_event_handler, client, RDMA_PS_TCP);
 	if (IS_ERR(rdma->cm_id))
 		goto error;
 

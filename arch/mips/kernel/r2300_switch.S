@@ -5,7 +5,7 @@
  * Copyright (C) 1994, 1995, 1996 by Andreas Busse
  *
  * Multi-cpu abstraction and macros for easier reading:
- * Copyright (C) 1996 David S. Miller (davem@davemloft.net)
+ * Copyright (C) 1996 David S. Miller (dm@engr.sgi.com)
  *
  * Further modifications to make this work:
  * Copyright (c) 1998-2000 Harald Koerfgen

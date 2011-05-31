@@ -126,6 +126,7 @@ struct apm_user {
 /*
  * Local variables
  */
+static DEFINE_MUTEX(apm_mutex);
 static atomic_t suspend_acks_pending = ATOMIC_INIT(0);
 static atomic_t userspace_notification_inhibit = ATOMIC_INIT(0);
 static int apm_disabled;
@@ -274,6 +275,7 @@ apm_ioctl(struct file *filp, u_int cmd, u_long arg)
 	if (!as->suser || !as->writer)
 		return -EPERM;
 
+	mutex_lock(&apm_mutex);
 	switch (cmd) {
 	case APM_IOC_SUSPEND:
 		mutex_lock(&state_lock);
@@ -334,6 +336,7 @@ apm_ioctl(struct file *filp, u_int cmd, u_long arg)
 		mutex_unlock(&state_lock);
 		break;
 	}
+	mutex_unlock(&apm_mutex);
 
 	return err;
 }
@@ -368,6 +371,7 @@ static int apm_open(struct inode * inode, struct file * filp)
 {
 	struct apm_user *as;
 
+	mutex_lock(&apm_mutex);
 	as = kzalloc(sizeof(*as), GFP_KERNEL);
 	if (as) {
 		/*
@@ -387,6 +391,7 @@ static int apm_open(struct inode * inode, struct file * filp)
 
 		filp->private_data = as;
 	}
+	mutex_unlock(&apm_mutex);
 
 	return as ? 0 : -ENOMEM;
 }

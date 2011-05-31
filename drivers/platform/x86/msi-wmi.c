@@ -20,7 +20,6 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
 #include <linux/kernel.h>
 #include <linux/input.h>
@@ -37,9 +36,12 @@ MODULE_ALIAS("wmi:551A1F84-FBDD-4125-91DB-3EA8F44F1D45");
 MODULE_ALIAS("wmi:B6F3EEF2-3D2F-49DC-9DE3-85BCE18C62F2");
 
 #define DRV_NAME "msi-wmi"
+#define DRV_PFX DRV_NAME ": "
 
 #define MSIWMI_BIOS_GUID "551A1F84-FBDD-4125-91DB-3EA8F44F1D45"
 #define MSIWMI_EVENT_GUID "B6F3EEF2-3D2F-49DC-9DE3-85BCE18C62F2"
+
+#define dprintk(msg...) pr_debug(DRV_PFX msg)
 
 #define SCANCODE_BASE 0xD0
 #define MSI_WMI_BRIGHTNESSUP   SCANCODE_BASE
@@ -76,7 +78,7 @@ static int msi_wmi_query_block(int instance, int *ret)
 
 	if (!obj || obj->type != ACPI_TYPE_INTEGER) {
 		if (obj) {
-			pr_err("query block returned object "
+			printk(KERN_ERR DRV_PFX "query block returned object "
 			       "type: %d - buffer length:%d\n", obj->type,
 			       obj->type == ACPI_TYPE_BUFFER ?
 			       obj->buffer.length : 0);
@@ -95,8 +97,8 @@ static int msi_wmi_set_block(int instance, int value)
 
 	struct acpi_buffer input = { sizeof(int), &value };
 
-	pr_debug("Going to set block of instance: %d - value: %d\n",
-		 instance, value);
+	dprintk("Going to set block of instance: %d - value: %d\n",
+		instance, value);
 
 	status = wmi_set_block(MSIWMI_BIOS_GUID, instance, &input);
 
@@ -110,19 +112,20 @@ static int bl_get(struct backlight_device *bd)
 	/* Instance 1 is "get backlight", cmp with DSDT */
 	err = msi_wmi_query_block(1, &ret);
 	if (err) {
-		pr_err("Could not query backlight: %d\n", err);
+		printk(KERN_ERR DRV_PFX "Could not query backlight: %d\n", err);
 		return -EINVAL;
 	}
-	pr_debug("Get: Query block returned: %d\n", ret);
+	dprintk("Get: Query block returned: %d\n", ret);
 	for (level = 0; level < ARRAY_SIZE(backlight_map); level++) {
 		if (backlight_map[level] == ret) {
-			pr_debug("Current backlight level: 0x%X - index: %d\n",
-				 backlight_map[level], level);
+			dprintk("Current backlight level: 0x%X - index: %d\n",
+				backlight_map[level], level);
 			break;
 		}
 	}
 	if (level == ARRAY_SIZE(backlight_map)) {
-		pr_err("get: Invalid brightness value: 0x%X\n", ret);
+		printk(KERN_ERR DRV_PFX "get: Invalid brightness value: 0x%X\n",
+		       ret);
 		return -EINVAL;
 	}
 	return level;
@@ -153,7 +156,7 @@ static void msi_wmi_notify(u32 value, void *context)
 
 	status = wmi_get_event_data(value, &response);
 	if (status != AE_OK) {
-		pr_info("bad event status 0x%x\n", status);
+		printk(KERN_INFO DRV_PFX "bad event status 0x%x\n", status);
 		return;
 	}
 
@@ -161,7 +164,7 @@ static void msi_wmi_notify(u32 value, void *context)
 
 	if (obj && obj->type == ACPI_TYPE_INTEGER) {
 		int eventcode = obj->integer.value;
-		pr_debug("Eventcode: 0x%x\n", eventcode);
+		dprintk("Eventcode: 0x%x\n", eventcode);
 		key = sparse_keymap_entry_from_scancode(msi_wmi_input_dev,
 				eventcode);
 		if (key) {
@@ -172,8 +175,8 @@ static void msi_wmi_notify(u32 value, void *context)
 			/* Ignore event if the same event happened in a 50 ms
 			   timeframe -> Key press may result in 10-20 GPEs */
 			if (ktime_to_us(diff) < 1000 * 50) {
-				pr_debug("Suppressed key event 0x%X - "
-					 "Last press was %lld us ago\n",
+				dprintk("Suppressed key event 0x%X - "
+					"Last press was %lld us ago\n",
 					 key->code, ktime_to_us(diff));
 				return;
 			}
@@ -184,16 +187,17 @@ static void msi_wmi_notify(u32 value, void *context)
 			(!acpi_video_backlight_support() ||
 			(key->code != MSI_WMI_BRIGHTNESSUP &&
 			key->code != MSI_WMI_BRIGHTNESSDOWN))) {
-				pr_debug("Send key: 0x%X - "
-					 "Input layer keycode: %d\n",
-					 key->code, key->keycode);
+				dprintk("Send key: 0x%X - "
+					"Input layer keycode: %d\n", key->code,
+					 key->keycode);
 				sparse_keymap_report_entry(msi_wmi_input_dev,
 						key, 1, true);
 			}
 		} else
-			pr_info("Unknown key pressed - %x\n", eventcode);
+			printk(KERN_INFO "Unknown key pressed - %x\n",
+			       eventcode);
 	} else
-		pr_info("Unknown event received\n");
+		printk(KERN_INFO DRV_PFX "Unknown event received\n");
 	kfree(response.pointer);
 }
 
@@ -234,7 +238,8 @@ static int __init msi_wmi_init(void)
 	int err;
 
 	if (!wmi_has_guid(MSIWMI_EVENT_GUID)) {
-		pr_err("This machine doesn't have MSI-hotkeys through WMI\n");
+		printk(KERN_ERR
+		       "This machine doesn't have MSI-hotkeys through WMI\n");
 		return -ENODEV;
 	}
 	err = wmi_install_notify_handler(MSIWMI_EVENT_GUID,
@@ -265,7 +270,7 @@ static int __init msi_wmi_init(void)
 
 		backlight->props.brightness = err;
 	}
-	pr_debug("Event handler installed\n");
+	dprintk("Event handler installed\n");
 
 	return 0;
 

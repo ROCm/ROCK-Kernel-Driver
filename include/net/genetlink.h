@@ -260,7 +260,7 @@ static inline int genlmsg_reply(struct sk_buff *skb, struct genl_info *info)
 
 /**
  * gennlmsg_data - head of message payload
- * @gnlh: genetlink message header
+ * @gnlh: genetlink messsage header
  */
 static inline void *genlmsg_data(const struct genlmsghdr *gnlh)
 {

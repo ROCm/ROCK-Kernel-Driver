@@ -23,6 +23,7 @@
 #include <linux/gpio.h>
 #include <linux/delay.h>
 #include <linux/io.h>
+#include <linux/fsl_devices.h>
 
 #include <mach/common.h>
 #include <mach/hardware.h>

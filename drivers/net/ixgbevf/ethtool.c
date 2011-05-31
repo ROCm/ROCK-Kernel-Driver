@@ -104,13 +104,11 @@ static int ixgbevf_get_settings(struct net_device *netdev,
 	hw->mac.ops.check_link(hw, &link_speed, &link_up, false);
 
 	if (link_up) {
-		ethtool_cmd_speed_set(
-			ecmd,
-			(link_speed == IXGBE_LINK_SPEED_10GB_FULL) ?
-			SPEED_10000 : SPEED_1000);
+		ecmd->speed = (link_speed == IXGBE_LINK_SPEED_10GB_FULL) ?
+			       SPEED_10000 : SPEED_1000;
 		ecmd->duplex = DUPLEX_FULL;
 	} else {
-		ethtool_cmd_speed_set(ecmd, -1);
+		ecmd->speed = -1;
 		ecmd->duplex = -1;
 	}
 

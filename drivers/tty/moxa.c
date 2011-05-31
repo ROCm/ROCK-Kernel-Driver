@@ -371,7 +371,7 @@ static int moxa_ioctl(struct tty_struct *tty,
 					tmp.cflag = p->cflag;
 				else
 					tmp.cflag = ttyp->termios->c_cflag;
-				tty_kref_put(ttyp);
+				tty_kref_put(tty);
 copy:
 				if (copy_to_user(argm, &tmp, sizeof(tmp)))
 					return -EFAULT;
@@ -1129,6 +1129,7 @@ static void moxa_shutdown(struct tty_port *port)
 	struct moxa_port *ch = container_of(port, struct moxa_port, port);
         MoxaPortDisable(ch);
 	MoxaPortFlushData(ch, 2);
+	clear_bit(ASYNCB_NORMAL_ACTIVE, &port->flags);
 }
 
 static int moxa_carrier_raised(struct tty_port *port)
@@ -1154,6 +1155,7 @@ static int moxa_open(struct tty_struct *tty, struct file *filp)
 	struct moxa_board_conf *brd;
 	struct moxa_port *ch;
 	int port;
+	int retval;
 
 	port = tty->index;
 	if (port == MAX_PORTS) {
@@ -1188,7 +1190,10 @@ static int moxa_open(struct tty_struct *tty, struct file *filp)
 	mutex_unlock(&ch->port.mutex);
 	mutex_unlock(&moxa_openlock);
 
-	return tty_port_block_til_ready(&ch->port, tty, filp);
+	retval = tty_port_block_til_ready(&ch->port, tty, filp);
+	if (retval == 0)
+	        set_bit(ASYNCB_NORMAL_ACTIVE, &ch->port.flags);
+	return retval;
 }
 
 static void moxa_close(struct tty_struct *tty, struct file *filp)
@@ -1202,15 +1207,14 @@ static int moxa_write(struct tty_struct *tty,
 		      const unsigned char *buf, int count)
 {
 	struct moxa_port *ch = tty->driver_data;
-	unsigned long flags;
 	int len;
 
 	if (ch == NULL)
 		return 0;
 
-	spin_lock_irqsave(&moxa_lock, flags);
+	spin_lock_bh(&moxa_lock);
 	len = MoxaPortWriteData(tty, buf, count);
-	spin_unlock_irqrestore(&moxa_lock, flags);
+	spin_unlock_bh(&moxa_lock);
 
 	set_bit(LOWWAIT, &ch->statusflags);
 	return len;
@@ -1277,8 +1281,10 @@ static int moxa_tiocmset(struct tty_struct *tty,
 			 unsigned int set, unsigned int clear)
 {
 	struct moxa_port *ch;
+	int port;
 	int dtr, rts;
 
+	port = tty->index;
 	mutex_lock(&moxa_openlock);
 	ch = tty->driver_data;
 	if (!ch) {
@@ -1750,9 +1756,11 @@ static int MoxaPortSetTermio(struct moxa_port *port, struct ktermios *termio,
 		speed_t baud)
 {
 	void __iomem *ofsAddr;
+	tcflag_t cflag;
 	tcflag_t mode = 0;
 
 	ofsAddr = port->tableAddr;
+	cflag = termio->c_cflag;	/* termio->c_cflag */
 
 	mode = termio->c_cflag & CSIZE;
 	if (mode == CS5)

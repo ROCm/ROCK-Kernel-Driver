@@ -37,17 +37,14 @@
 #ifndef _TIPC_ADDR_H
 #define _TIPC_ADDR_H
 
-#define TIPC_ZONE_MASK		0xff000000u
-#define TIPC_CLUSTER_MASK	0xfffff000u
-
 static inline u32 tipc_zone_mask(u32 addr)
 {
-	return addr & TIPC_ZONE_MASK;
+	return addr & 0xff000000u;
 }
 
 static inline u32 tipc_cluster_mask(u32 addr)
 {
-	return addr & TIPC_CLUSTER_MASK;
+	return addr & 0xfffff000u;
 }
 
 static inline int in_own_cluster(u32 addr)

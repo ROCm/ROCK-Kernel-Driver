@@ -148,15 +148,10 @@ static snd_pcm_uframes_t bf5xx_pcm_pointer(struct snd_pcm_substream *substream)
 
 static int bf5xx_pcm_open(struct snd_pcm_substream *substream)
 {
-	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
-	struct sport_device *sport_handle = snd_soc_dai_get_drvdata(cpu_dai);
 	struct snd_pcm_runtime *runtime = substream->runtime;
-	struct snd_dma_buffer *buf = &substream->dma_buffer;
 	int ret;
 
 	pr_debug("%s enter\n", __func__);
-
 	snd_soc_set_runtime_hwparams(substream, &bf5xx_pcm_hardware);
 
 	ret = snd_pcm_hw_constraint_integer(runtime, \
@@ -164,14 +159,9 @@ static int bf5xx_pcm_open(struct snd_pcm_substream *substream)
 	if (ret < 0)
 		goto out;
 
-	if (sport_handle != NULL) {
-		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-			sport_handle->tx_buf = buf->area;
-		else
-			sport_handle->rx_buf = buf->area;
-
+	if (sport_handle != NULL)
 		runtime->private_data = sport_handle;
-	} else {
+	else {
 		pr_err("sport_handle is NULL\n");
 		return -1;
 	}
@@ -224,6 +214,11 @@ static int bf5xx_pcm_preallocate_dma_buffer(struct snd_pcm *pcm, int stream)
 	pr_debug("%s, area:%p, size:0x%08lx\n", __func__,
 		buf->area, buf->bytes);
 
+	if (stream == SNDRV_PCM_STREAM_PLAYBACK)
+		sport_handle->tx_buf = buf->area;
+	else
+		sport_handle->rx_buf = buf->area;
+
 	return 0;
 }
 
@@ -244,6 +239,8 @@ static void bf5xx_pcm_free_dma_buffers(struct snd_pcm *pcm)
 		dma_free_coherent(NULL, buf->bytes, buf->area, 0);
 		buf->area = NULL;
 	}
+	if (sport_handle)
+		sport_done(sport_handle);
 }
 
 static u64 bf5xx_pcm_dmamask = DMA_BIT_MASK(32);
@@ -295,7 +292,7 @@ static int __devexit bfin_i2s_soc_platform_remove(struct platform_device *pdev)
 
 static struct platform_driver bfin_i2s_pcm_driver = {
 	.driver = {
-			.name = "bfin-i2s-pcm-audio",
+			.name = "bfin-pcm-audio",
 			.owner = THIS_MODULE,
 	},
 

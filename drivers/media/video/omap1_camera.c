@@ -990,80 +990,63 @@ static void omap1_cam_remove_device(struct soc_camera_device *icd)
 }
 
 /* Duplicate standard formats based on host capability of byte swapping */
-static const struct soc_mbus_lookup omap1_cam_formats[] = {
-{
-	.code = V4L2_MBUS_FMT_UYVY8_2X8,
-	.fmt = {
+static const struct soc_mbus_pixelfmt omap1_cam_formats[] = {
+	[V4L2_MBUS_FMT_UYVY8_2X8] = {
 		.fourcc			= V4L2_PIX_FMT_YUYV,
 		.name			= "YUYV",
 		.bits_per_sample	= 8,
 		.packing		= SOC_MBUS_PACKING_2X8_PADHI,
 		.order			= SOC_MBUS_ORDER_BE,
 	},
-}, {
-	.code = V4L2_MBUS_FMT_VYUY8_2X8,
-	.fmt = {
+	[V4L2_MBUS_FMT_VYUY8_2X8] = {
 		.fourcc			= V4L2_PIX_FMT_YVYU,
 		.name			= "YVYU",
 		.bits_per_sample	= 8,
 		.packing		= SOC_MBUS_PACKING_2X8_PADHI,
 		.order			= SOC_MBUS_ORDER_BE,
 	},
-}, {
-	.code = V4L2_MBUS_FMT_YUYV8_2X8,
-	.fmt = {
+	[V4L2_MBUS_FMT_YUYV8_2X8] = {
 		.fourcc			= V4L2_PIX_FMT_UYVY,
 		.name			= "UYVY",
 		.bits_per_sample	= 8,
 		.packing		= SOC_MBUS_PACKING_2X8_PADHI,
 		.order			= SOC_MBUS_ORDER_BE,
 	},
-}, {
-	.code = V4L2_MBUS_FMT_YVYU8_2X8,
-	.fmt = {
+	[V4L2_MBUS_FMT_YVYU8_2X8] = {
 		.fourcc			= V4L2_PIX_FMT_VYUY,
 		.name			= "VYUY",
 		.bits_per_sample	= 8,
 		.packing		= SOC_MBUS_PACKING_2X8_PADHI,
 		.order			= SOC_MBUS_ORDER_BE,
 	},
-}, {
-	.code = V4L2_MBUS_FMT_RGB555_2X8_PADHI_BE,
-	.fmt = {
+	[V4L2_MBUS_FMT_RGB555_2X8_PADHI_BE] = {
 		.fourcc			= V4L2_PIX_FMT_RGB555,
 		.name			= "RGB555",
 		.bits_per_sample	= 8,
 		.packing		= SOC_MBUS_PACKING_2X8_PADHI,
 		.order			= SOC_MBUS_ORDER_BE,
 	},
-}, {
-	.code = V4L2_MBUS_FMT_RGB555_2X8_PADHI_LE,
-	.fmt = {
+	[V4L2_MBUS_FMT_RGB555_2X8_PADHI_LE] = {
 		.fourcc			= V4L2_PIX_FMT_RGB555X,
 		.name			= "RGB555X",
 		.bits_per_sample	= 8,
 		.packing		= SOC_MBUS_PACKING_2X8_PADHI,
 		.order			= SOC_MBUS_ORDER_BE,
 	},
-}, {
-	.code = V4L2_MBUS_FMT_RGB565_2X8_BE,
-	.fmt = {
+	[V4L2_MBUS_FMT_RGB565_2X8_BE] = {
 		.fourcc			= V4L2_PIX_FMT_RGB565,
 		.name			= "RGB565",
 		.bits_per_sample	= 8,
 		.packing		= SOC_MBUS_PACKING_2X8_PADHI,
 		.order			= SOC_MBUS_ORDER_BE,
 	},
-}, {
-	.code = V4L2_MBUS_FMT_RGB565_2X8_LE,
-	.fmt = {
+	[V4L2_MBUS_FMT_RGB565_2X8_LE] = {
 		.fourcc			= V4L2_PIX_FMT_RGB565X,
 		.name			= "RGB565X",
 		.bits_per_sample	= 8,
 		.packing		= SOC_MBUS_PACKING_2X8_PADHI,
 		.order			= SOC_MBUS_ORDER_BE,
 	},
-},
 };
 
 static int omap1_cam_get_formats(struct soc_camera_device *icd,
@@ -1082,7 +1065,7 @@ static int omap1_cam_get_formats(struct soc_camera_device *icd,
 
 	fmt = soc_mbus_get_fmtdesc(code);
 	if (!fmt) {
-		dev_warn(dev, "%s: unsupported format code #%d: %d\n", __func__,
+		dev_err(dev, "%s: invalid format code #%d: %d\n", __func__,
 				idx, code);
 		return 0;
 	}
@@ -1102,14 +1085,12 @@ static int omap1_cam_get_formats(struct soc_camera_device *icd,
 	case V4L2_MBUS_FMT_RGB565_2X8_LE:
 		formats++;
 		if (xlate) {
-			xlate->host_fmt	= soc_mbus_find_fmtdesc(code,
-						omap1_cam_formats,
-						ARRAY_SIZE(omap1_cam_formats));
+			xlate->host_fmt	= &omap1_cam_formats[code];
 			xlate->code	= code;
 			xlate++;
 			dev_dbg(dev,
 				"%s: providing format %s as byte swapped code #%d\n",
-				__func__, xlate->host_fmt->name, code);
+				__func__, omap1_cam_formats[code].name, code);
 		}
 	default:
 		if (xlate)

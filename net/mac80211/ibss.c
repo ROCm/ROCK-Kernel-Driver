@@ -40,7 +40,7 @@ static void ieee80211_rx_mgmt_auth_ibss(struct ieee80211_sub_if_data *sdata,
 					struct ieee80211_mgmt *mgmt,
 					size_t len)
 {
-	u16 auth_alg, auth_transaction;
+	u16 auth_alg, auth_transaction, status_code;
 
 	lockdep_assert_held(&sdata->u.ibss.mtx);
 
@@ -49,6 +49,7 @@ static void ieee80211_rx_mgmt_auth_ibss(struct ieee80211_sub_if_data *sdata,
 
 	auth_alg = le16_to_cpu(mgmt->u.auth.auth_alg);
 	auth_transaction = le16_to_cpu(mgmt->u.auth.auth_transaction);
+	status_code = le16_to_cpu(mgmt->u.auth.status_code);
 
 	/*
 	 * IEEE 802.11 standard does not require authentication in IBSS
@@ -526,6 +527,8 @@ static void ieee80211_sta_merge_ibss(struct ieee80211_sub_if_data *sdata)
 static void ieee80211_sta_create_ibss(struct ieee80211_sub_if_data *sdata)
 {
 	struct ieee80211_if_ibss *ifibss = &sdata->u.ibss;
+	struct ieee80211_local *local = sdata->local;
+	struct ieee80211_supported_band *sband;
 	u8 bssid[ETH_ALEN];
 	u16 capability;
 	int i;
@@ -547,6 +550,8 @@ static void ieee80211_sta_create_ibss(struct ieee80211_sub_if_data *sdata)
 
 	printk(KERN_DEBUG "%s: Creating new IBSS network, BSSID %pM\n",
 	       sdata->name, bssid);
+
+	sband = local->hw.wiphy->bands[ifibss->channel->band];
 
 	capability = WLAN_CAPABILITY_IBSS;
 
@@ -656,22 +661,19 @@ static void ieee80211_sta_find_ibss(struct ieee80211_sub_if_data *sdata)
 static void ieee80211_rx_mgmt_probe_req(struct ieee80211_sub_if_data *sdata,
 					struct sk_buff *req)
 {
+	struct ieee80211_rx_status *rx_status = IEEE80211_SKB_RXCB(req);
 	struct ieee80211_mgmt *mgmt = (void *)req->data;
 	struct ieee80211_if_ibss *ifibss = &sdata->u.ibss;
 	struct ieee80211_local *local = sdata->local;
 	int tx_last_beacon, len = req->len;
 	struct sk_buff *skb;
 	struct ieee80211_mgmt *resp;
-	struct sk_buff *presp;
 	u8 *pos, *end;
 
 	lockdep_assert_held(&ifibss->mtx);
 
-	presp = rcu_dereference_protected(ifibss->presp,
-					  lockdep_is_held(&ifibss->mtx));
-
 	if (ifibss->state != IEEE80211_IBSS_MLME_JOINED ||
-	    len < 24 + 2 || !presp)
+	    len < 24 + 2 || !ifibss->presp)
 		return;
 
 	tx_last_beacon = drv_tx_last_beacon(local);
@@ -683,7 +685,7 @@ static void ieee80211_rx_mgmt_probe_req(struct ieee80211_sub_if_data *sdata,
 	       mgmt->bssid, tx_last_beacon);
 #endif /* CONFIG_MAC80211_IBSS_DEBUG */
 
-	if (!tx_last_beacon && is_multicast_ether_addr(mgmt->da))
+	if (!tx_last_beacon && !(rx_status->rx_flags & IEEE80211_RX_RA_MATCH))
 		return;
 
 	if (memcmp(mgmt->bssid, ifibss->bssid, ETH_ALEN) != 0 &&
@@ -709,7 +711,7 @@ static void ieee80211_rx_mgmt_probe_req(struct ieee80211_sub_if_data *sdata,
 	}
 
 	/* Reply with ProbeResp */
-	skb = skb_copy(presp, GFP_KERNEL);
+	skb = skb_copy(ifibss->presp, GFP_KERNEL);
 	if (!skb)
 		return;
 
@@ -989,8 +991,7 @@ int ieee80211_ibss_leave(struct ieee80211_sub_if_data *sdata)
 
 	/* remove beacon */
 	kfree(sdata->u.ibss.ie);
-	skb = rcu_dereference_protected(sdata->u.ibss.presp,
-					lockdep_is_held(&sdata->u.ibss.mtx));
+	skb = sdata->u.ibss.presp;
 	rcu_assign_pointer(sdata->u.ibss.presp, NULL);
 	sdata->vif.bss_conf.ibss_joined = false;
 	ieee80211_bss_info_change_notify(sdata, BSS_CHANGED_BEACON_ENABLED |

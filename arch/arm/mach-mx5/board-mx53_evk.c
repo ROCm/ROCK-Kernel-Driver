@@ -21,6 +21,7 @@
 
 #include <linux/init.h>
 #include <linux/clk.h>
+#include <linux/fec.h>
 #include <linux/delay.h>
 #include <linux/gpio.h>
 #include <linux/spi/flash.h>
@@ -30,6 +31,7 @@
 #include <asm/mach-types.h>
 #include <asm/mach/arch.h>
 #include <asm/mach/time.h>
+#include <mach/imx-uart.h>
 #include <mach/iomux-mx53.h>
 
 #define MX53_EVK_FEC_PHY_RST	IMX_GPIO_NR(7, 6)

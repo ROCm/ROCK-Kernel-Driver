@@ -22,7 +22,6 @@
 #include <linux/io.h>
 #include <linux/gfp.h>
 #include <linux/clkdev.h>
-#include <linux/mtd/physmap.h>
 
 #include <mach/hardware.h>
 #include <mach/platform.h>
@@ -36,6 +35,7 @@
 #include <mach/lm.h>
 
 #include <asm/mach/arch.h>
+#include <asm/mach/flash.h>
 #include <asm/mach/irq.h>
 #include <asm/mach/map.h>
 #include <asm/mach/time.h>
@@ -229,24 +229,17 @@ static struct clk cp_auxclk = {
 	.vcoreg	= CM_AUXOSC,
 };
 
-static struct clk sp804_clk = {
-	.rate	= 1000000,
-};
-
 static struct clk_lookup cp_lookups[] = {
 	{	/* CLCD */
 		.dev_id		= "mb:c0",
 		.clk		= &cp_auxclk,
-	}, {	/* SP804 timers */
-		.dev_id		= "sp804",
-		.clk		= &sp804_clk,
 	},
 };
 
 /*
  * Flash handling.
  */
-static int intcp_flash_init(struct platform_device *dev)
+static int intcp_flash_init(void)
 {
 	u32 val;
 
@@ -257,7 +250,7 @@ static int intcp_flash_init(struct platform_device *dev)
 	return 0;
 }
 
-static void intcp_flash_exit(struct platform_device *dev)
+static void intcp_flash_exit(void)
 {
 	u32 val;
 
@@ -266,7 +259,7 @@ static void intcp_flash_exit(struct platform_device *dev)
 	writel(val, INTCP_VA_CTRL_BASE + INTCP_FLASHPROG);
 }
 
-static void intcp_flash_set_vpp(struct platform_device *pdev, int on)
+static void intcp_flash_set_vpp(int on)
 {
 	u32 val;
 
@@ -278,7 +271,8 @@ static void intcp_flash_set_vpp(struct platform_device *pdev, int on)
 	writel(val, INTCP_VA_CTRL_BASE + INTCP_FLASHPROG);
 }
 
-static struct physmap_flash_data intcp_flash_data = {
+static struct flash_platform_data intcp_flash_data = {
+	.map_name	= "cfi_probe",
 	.width		= 4,
 	.init		= intcp_flash_init,
 	.exit		= intcp_flash_exit,
@@ -292,7 +286,7 @@ static struct resource intcp_flash_resource = {
 };
 
 static struct platform_device intcp_flash_device = {
-	.name		= "physmap-flash",
+	.name		= "armflash",
 	.id		= 0,
 	.dev		= {
 		.platform_data	= &intcp_flash_data,
@@ -482,8 +476,8 @@ static void __init intcp_timer_init(void)
 	writel(0, TIMER1_VA_BASE + TIMER_CTRL);
 	writel(0, TIMER2_VA_BASE + TIMER_CTRL);
 
-	sp804_clocksource_init(TIMER2_VA_BASE, "timer2");
-	sp804_clockevents_init(TIMER1_VA_BASE, IRQ_TIMERINT1, "timer1");
+	sp804_clocksource_init(TIMER2_VA_BASE);
+	sp804_clockevents_init(TIMER1_VA_BASE, IRQ_TIMERINT1);
 }
 
 static struct sys_timer cp_timer = {

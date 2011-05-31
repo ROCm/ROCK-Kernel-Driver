@@ -1,4 +1,6 @@
 /*
+ *  drivers/serial/serial_ks8695.c
+ *
  *  Driver for KS8695 serial ports
  *
  *  Based on drivers/serial/serial_amba.c, by Kam Lee.

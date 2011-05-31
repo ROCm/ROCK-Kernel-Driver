@@ -1,7 +1,9 @@
 #include <asm/ucontext.h>
 
+#ifdef CONFIG_LGUEST_GUEST
 #include <linux/lguest.h>
 #include "../../../drivers/lguest/lg.h"
+#endif
 
 /* workaround for a warning with -Wmissing-prototypes */
 void foo(void);
@@ -55,9 +57,19 @@ void foo(void)
 	OFFSET(IA32_RT_SIGFRAME_sigcontext, rt_sigframe, uc.uc_mcontext);
 	BLANK();
 
+#ifndef CONFIG_X86_NO_TSS
 	/* Offset from the sysenter stack to tss.sp0 */
-	DEFINE(TSS_sysenter_sp0, offsetof(struct tss_struct, x86_tss.sp0) -
+	DEFINE(SYSENTER_stack_sp0, offsetof(struct tss_struct, x86_tss.sp0) -
 		 sizeof(struct tss_struct));
+#else
+	/* sysenter stack points directly to sp0 */
+	DEFINE(SYSENTER_stack_sp0, 0);
+#endif
+
+#ifdef CONFIG_XEN
+	BLANK();
+	OFFSET(XEN_START_mfn_list, start_info, mfn_list);
+#endif
 
 #if defined(CONFIG_LGUEST) || defined(CONFIG_LGUEST_GUEST) || defined(CONFIG_LGUEST_MODULE)
 	BLANK();

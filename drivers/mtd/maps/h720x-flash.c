@@ -92,16 +92,18 @@ static int __init h720x_mtd_init(void)
 	if (mymtd) {
 		mymtd->owner = THIS_MODULE;
 
+#ifdef CONFIG_MTD_PARTITIONS
 		nr_mtd_parts = parse_mtd_partitions(mymtd, probes, &mtd_parts, 0);
 		if (nr_mtd_parts > 0)
 			part_type = "command line";
+#endif
 		if (nr_mtd_parts <= 0) {
 			mtd_parts = h720x_partitions;
 			nr_mtd_parts = NUM_PARTITIONS;
 			part_type = "builtin";
 		}
 		printk(KERN_INFO "Using %s partition table\n", part_type);
-		mtd_device_register(mymtd, mtd_parts, nr_mtd_parts);
+		add_mtd_partitions(mymtd, mtd_parts, nr_mtd_parts);
 		return 0;
 	}
 
@@ -116,7 +118,7 @@ static void __exit h720x_mtd_cleanup(void)
 {
 
 	if (mymtd) {
-		mtd_device_unregister(mymtd);
+		del_mtd_partitions(mymtd);
 		map_destroy(mymtd);
 	}
 

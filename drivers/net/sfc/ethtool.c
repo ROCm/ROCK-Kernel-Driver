@@ -178,27 +178,19 @@ static struct efx_ethtool_stat efx_ethtool_stats[] = {
  */
 
 /* Identify device by flashing LEDs */
-static int efx_ethtool_phys_id(struct net_device *net_dev,
-			       enum ethtool_phys_id_state state)
+static int efx_ethtool_phys_id(struct net_device *net_dev, u32 count)
 {
 	struct efx_nic *efx = netdev_priv(net_dev);
-	enum efx_led_mode mode = EFX_LED_DEFAULT;
 
-	switch (state) {
-	case ETHTOOL_ID_ON:
-		mode = EFX_LED_ON;
-		break;
-	case ETHTOOL_ID_OFF:
-		mode = EFX_LED_OFF;
-		break;
-	case ETHTOOL_ID_INACTIVE:
-		mode = EFX_LED_DEFAULT;
-		break;
-	case ETHTOOL_ID_ACTIVE:
-		return 1;	/* cycle on/off once per second */
-	}
+	do {
+		efx->type->set_id_led(efx, EFX_LED_ON);
+		schedule_timeout_interruptible(HZ / 2);
 
-	efx->type->set_id_led(efx, mode);
+		efx->type->set_id_led(efx, EFX_LED_OFF);
+		schedule_timeout_interruptible(HZ / 2);
+	} while (!signal_pending(current) && --count != 0);
+
+	efx->type->set_id_led(efx, EFX_LED_DEFAULT);
 	return 0;
 }
 
@@ -219,7 +211,7 @@ static int efx_ethtool_get_settings(struct net_device *net_dev,
 	ecmd->supported |= SUPPORTED_Pause | SUPPORTED_Asym_Pause;
 
 	if (LOOPBACK_INTERNAL(efx)) {
-		ethtool_cmd_speed_set(ecmd, link_state->speed);
+		ecmd->speed = link_state->speed;
 		ecmd->duplex = link_state->fd ? DUPLEX_FULL : DUPLEX_HALF;
 	}
 
@@ -234,8 +226,7 @@ static int efx_ethtool_set_settings(struct net_device *net_dev,
 	int rc;
 
 	/* GMAC does not support 1000Mbps HD */
-	if ((ethtool_cmd_speed(ecmd) == SPEED_1000) &&
-	    (ecmd->duplex != DUPLEX_FULL)) {
+	if (ecmd->speed == SPEED_1000 && ecmd->duplex != DUPLEX_FULL) {
 		netif_dbg(efx, drv, efx->net_dev,
 			  "rejecting unsupported 1000Mbps HD setting\n");
 		return -EINVAL;
@@ -527,6 +518,72 @@ static void efx_ethtool_get_stats(struct net_device *net_dev,
 	}
 }
 
+static int efx_ethtool_set_tso(struct net_device *net_dev, u32 enable)
+{
+	struct efx_nic *efx __attribute__ ((unused)) = netdev_priv(net_dev);
+	u32 features;
+
+	features = NETIF_F_TSO;
+	if (efx->type->offload_features & NETIF_F_V6_CSUM)
+		features |= NETIF_F_TSO6;
+
+	if (enable)
+		net_dev->features |= features;
+	else
+		net_dev->features &= ~features;
+
+	return 0;
+}
+
+static int efx_ethtool_set_tx_csum(struct net_device *net_dev, u32 enable)
+{
+	struct efx_nic *efx = netdev_priv(net_dev);
+	u32 features = efx->type->offload_features & NETIF_F_ALL_CSUM;
+
+	if (enable)
+		net_dev->features |= features;
+	else
+		net_dev->features &= ~features;
+
+	return 0;
+}
+
+static int efx_ethtool_set_rx_csum(struct net_device *net_dev, u32 enable)
+{
+	struct efx_nic *efx = netdev_priv(net_dev);
+
+	/* No way to stop the hardware doing the checks; we just
+	 * ignore the result.
+	 */
+	efx->rx_checksum_enabled = !!enable;
+
+	return 0;
+}
+
+static u32 efx_ethtool_get_rx_csum(struct net_device *net_dev)
+{
+	struct efx_nic *efx = netdev_priv(net_dev);
+
+	return efx->rx_checksum_enabled;
+}
+
+static int efx_ethtool_set_flags(struct net_device *net_dev, u32 data)
+{
+	struct efx_nic *efx = netdev_priv(net_dev);
+	u32 supported = (efx->type->offload_features &
+			 (ETH_FLAG_RXHASH | ETH_FLAG_NTUPLE));
+	int rc;
+
+	rc = ethtool_op_set_flags(net_dev, data, supported);
+	if (rc)
+		return rc;
+
+	if (!(data & ETH_FLAG_NTUPLE))
+		efx_filter_clear_rx(efx, EFX_FILTER_PRI_MANUAL);
+
+	return 0;
+}
+
 static void efx_ethtool_self_test(struct net_device *net_dev,
 				  struct ethtool_test *test, u64 *data)
 {
@@ -698,7 +755,7 @@ static int efx_ethtool_set_pauseparam(struct net_device *net_dev,
 				      struct ethtool_pauseparam *pause)
 {
 	struct efx_nic *efx = netdev_priv(net_dev);
-	u8 wanted_fc, old_fc;
+	enum efx_fc_type wanted_fc, old_fc;
 	u32 old_adv;
 	bool reset;
 	int rc = 0;
@@ -955,9 +1012,8 @@ static int efx_ethtool_set_rx_ntuple(struct net_device *net_dev,
 
 	if (ntuple->fs.action == ETHTOOL_RXNTUPLE_ACTION_CLEAR)
 		return efx_filter_remove_filter(efx, &filter);
-
-	rc = efx_filter_insert_filter(efx, &filter, true);
-	return rc < 0 ? rc : 0;
+	else
+		return efx_filter_insert_filter(efx, &filter, true);
 }
 
 static int efx_ethtool_get_rxfh_indir(struct net_device *net_dev,
@@ -1014,10 +1070,22 @@ const struct ethtool_ops efx_ethtool_ops = {
 	.set_ringparam		= efx_ethtool_set_ringparam,
 	.get_pauseparam         = efx_ethtool_get_pauseparam,
 	.set_pauseparam         = efx_ethtool_set_pauseparam,
+	.get_rx_csum		= efx_ethtool_get_rx_csum,
+	.set_rx_csum		= efx_ethtool_set_rx_csum,
+	.get_tx_csum		= ethtool_op_get_tx_csum,
+	/* Need to enable/disable IPv6 too */
+	.set_tx_csum		= efx_ethtool_set_tx_csum,
+	.get_sg			= ethtool_op_get_sg,
+	.set_sg			= ethtool_op_set_sg,
+	.get_tso		= ethtool_op_get_tso,
+	/* Need to enable/disable TSO-IPv6 too */
+	.set_tso		= efx_ethtool_set_tso,
+	.get_flags		= ethtool_op_get_flags,
+	.set_flags		= efx_ethtool_set_flags,
 	.get_sset_count		= efx_ethtool_get_sset_count,
 	.self_test		= efx_ethtool_self_test,
 	.get_strings		= efx_ethtool_get_strings,
-	.set_phys_id		= efx_ethtool_phys_id,
+	.phys_id		= efx_ethtool_phys_id,
 	.get_ethtool_stats	= efx_ethtool_get_stats,
 	.get_wol                = efx_ethtool_get_wol,
 	.set_wol                = efx_ethtool_set_wol,

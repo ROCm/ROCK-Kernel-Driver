@@ -15,6 +15,7 @@
 #include <linux/platform_device.h>
 #include <linux/regulator/driver.h>
 #include <linux/regulator/machine.h>
+#include <linux/mfd/core.h>
 #include <linux/mfd/88pm860x.h>
 
 struct pm8607_regulator_info {
@@ -398,33 +399,36 @@ static int __devinit pm8607_regulator_probe(struct platform_device *pdev)
 {
 	struct pm860x_chip *chip = dev_get_drvdata(pdev->dev.parent);
 	struct pm8607_regulator_info *info = NULL;
-	struct regulator_init_data *pdata = pdev->dev.platform_data;
-	struct resource *res;
+	struct regulator_init_data *pdata;
+	struct mfd_cell *cell;
 	int i;
 
-	res = platform_get_resource(pdev, IORESOURCE_IO, 0);
-	if (res == NULL) {
-		dev_err(&pdev->dev, "No I/O resource!\n");
+	cell = pdev->dev.platform_data;
+	if (cell == NULL)
+		return -ENODEV;
+	pdata = cell->mfd_data;
+	if (pdata == NULL)
 		return -EINVAL;
-	}
+
 	for (i = 0; i < ARRAY_SIZE(pm8607_regulator_info); i++) {
 		info = &pm8607_regulator_info[i];
-		if (info->desc.id == res->start)
+		if (!strcmp(info->desc.name, pdata->constraints.name))
 			break;
 	}
-	if ((i < 0) || (i > PM8607_ID_RG_MAX)) {
-		dev_err(&pdev->dev, "Failed to find regulator %llu\n",
-			(unsigned long long)res->start);
+	if (i > ARRAY_SIZE(pm8607_regulator_info)) {
+		dev_err(&pdev->dev, "Failed to find regulator %s\n",
+			pdata->constraints.name);
 		return -EINVAL;
 	}
+
 	info->i2c = (chip->id == CHIP_PM8607) ? chip->client : chip->companion;
 	info->chip = chip;
 
 	/* check DVC ramp slope double */
-	if ((i == PM8607_ID_BUCK3) && info->chip->buck3_double)
-		info->slope_double = 1;
+	if (!strcmp(info->desc.name, "BUCK3"))
+		if (info->chip->buck3_double)
+			info->slope_double = 1;
 
-	/* replace driver_data with info */
 	info->regulator = regulator_register(&info->desc, &pdev->dev,
 					     pdata, info);
 	if (IS_ERR(info->regulator)) {

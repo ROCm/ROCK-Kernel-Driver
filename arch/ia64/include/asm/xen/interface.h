@@ -56,29 +56,21 @@
 #ifndef _ASM_IA64_XEN_INTERFACE_H
 #define _ASM_IA64_XEN_INTERFACE_H
 
-#define __DEFINE_GUEST_HANDLE(name, type)	\
+#define __DEFINE_XEN_GUEST_HANDLE(name, type)	\
 	typedef struct { type *p; } __guest_handle_ ## name
 
 #define DEFINE_GUEST_HANDLE_STRUCT(name)	\
-	__DEFINE_GUEST_HANDLE(name, struct name)
-#define DEFINE_GUEST_HANDLE(name)	__DEFINE_GUEST_HANDLE(name, name)
-#define GUEST_HANDLE(name)		__guest_handle_ ## name
-#define GUEST_HANDLE_64(name)		GUEST_HANDLE(name)
+	__DEFINE_XEN_GUEST_HANDLE(name, struct name)
+#define DEFINE_XEN_GUEST_HANDLE(name)	__DEFINE_XEN_GUEST_HANDLE(name, name)
+#define XEN_GUEST_HANDLE(name)		__guest_handle_ ## name
+#define XEN_GUEST_HANDLE_64(name)	XEN_GUEST_HANDLE(name)
 #define set_xen_guest_handle(hnd, val)	do { (hnd).p = val; } while (0)
 
 #ifndef __ASSEMBLY__
-/* Guest handles for primitive C types. */
-__DEFINE_GUEST_HANDLE(uchar, unsigned char);
-__DEFINE_GUEST_HANDLE(uint, unsigned int);
-__DEFINE_GUEST_HANDLE(ulong, unsigned long);
-__DEFINE_GUEST_HANDLE(u64, unsigned long);
-DEFINE_GUEST_HANDLE(char);
-DEFINE_GUEST_HANDLE(int);
-DEFINE_GUEST_HANDLE(long);
-DEFINE_GUEST_HANDLE(void);
+__DEFINE_XEN_GUEST_HANDLE(u64, unsigned long);
 
+typedef unsigned long xen_ulong_t;
 typedef unsigned long xen_pfn_t;
-DEFINE_GUEST_HANDLE(xen_pfn_t);
 #define PRI_xen_pfn	"lx"
 #endif
 
@@ -90,7 +82,7 @@ DEFINE_GUEST_HANDLE(xen_pfn_t);
 /* Maximum number of virtual CPUs in multi-processor guests. */
 /* keep sizeof(struct shared_page) <= PAGE_SIZE.
  * this is checked in arch/ia64/xen/hypervisor.c. */
-#define MAX_VIRT_CPUS	64
+#define XEN_LEGACY_MAX_VCPUS 64
 
 #ifndef __ASSEMBLY__
 

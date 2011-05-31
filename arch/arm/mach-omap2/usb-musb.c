@@ -108,13 +108,7 @@ static void usb_musb_mux_init(struct omap_musb_board_data *board_data)
 	}
 }
 
-static struct omap_musb_board_data musb_default_board_data = {
-	.interface_type		= MUSB_INTERFACE_ULPI,
-	.mode			= MUSB_OTG,
-	.power			= 100,
-};
-
-void __init usb_musb_init(struct omap_musb_board_data *musb_board_data)
+void __init usb_musb_init(struct omap_musb_board_data *board_data)
 {
 	struct omap_hwmod		*oh;
 	struct omap_device		*od;
@@ -122,12 +116,11 @@ void __init usb_musb_init(struct omap_musb_board_data *musb_board_data)
 	struct device			*dev;
 	int				bus_id = -1;
 	const char			*oh_name, *name;
-	struct omap_musb_board_data	*board_data;
 
-	if (musb_board_data)
-		board_data = musb_board_data;
-	else
-		board_data = &musb_default_board_data;
+	if (cpu_is_omap3517() || cpu_is_omap3505()) {
+	} else if (cpu_is_omap44xx()) {
+		usb_musb_mux_init(board_data);
+	}
 
 	/*
 	 * REVISIT: This line can be removed once all the platforms using
@@ -171,15 +164,10 @@ void __init usb_musb_init(struct omap_musb_board_data *musb_board_data)
 	dev->dma_mask = &musb_dmamask;
 	dev->coherent_dma_mask = musb_dmamask;
 	put_device(dev);
-
-	if (cpu_is_omap44xx())
-		omap4430_phy_init(dev);
 }
 
 #else
 void __init usb_musb_init(struct omap_musb_board_data *board_data)
 {
-	if (cpu_is_omap44xx())
-		omap4430_phy_init(NULL);
 }
 #endif /* CONFIG_USB_MUSB_SOC */

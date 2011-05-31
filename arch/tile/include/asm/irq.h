@@ -23,8 +23,6 @@
 /* IRQ numbers used for linux IPIs. */
 #define IRQ_RESCHEDULE 1
 
-#define irq_canonicalize(irq)   (irq)
-
 void ack_bad_irq(unsigned int irq);
 
 /*

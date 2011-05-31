@@ -150,12 +150,18 @@ static struct crypto_template crypto_fpu_tmpl = {
 	.module = THIS_MODULE,
 };
 
-int __init crypto_fpu_init(void)
+static int __init crypto_fpu_module_init(void)
 {
 	return crypto_register_template(&crypto_fpu_tmpl);
 }
 
-void __exit crypto_fpu_exit(void)
+static void __exit crypto_fpu_module_exit(void)
 {
 	crypto_unregister_template(&crypto_fpu_tmpl);
 }
+
+module_init(crypto_fpu_module_init);
+module_exit(crypto_fpu_module_exit);
+
+MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("FPU block cipher wrapper");

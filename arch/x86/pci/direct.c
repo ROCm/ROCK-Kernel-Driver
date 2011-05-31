@@ -280,9 +280,12 @@ void __init pci_direct_init(int type)
 
 int __init pci_direct_probe(void)
 {
+	struct resource *region, *region2;
+
 	if ((pci_probe & PCI_PROBE_CONF1) == 0)
 		goto type2;
-	if (!request_region(0xCF8, 8, "PCI conf1"))
+	region = request_region(0xCF8, 8, "PCI conf1");
+	if (!region)
 		goto type2;
 
 	if (pci_check_type1()) {
@@ -290,14 +293,16 @@ int __init pci_direct_probe(void)
 		port_cf9_safe = true;
 		return 1;
 	}
-	release_region(0xCF8, 8);
+	release_resource(region);
 
  type2:
 	if ((pci_probe & PCI_PROBE_CONF2) == 0)
 		return 0;
-	if (!request_region(0xCF8, 4, "PCI conf2"))
+	region = request_region(0xCF8, 4, "PCI conf2");
+	if (!region)
 		return 0;
-	if (!request_region(0xC000, 0x1000, "PCI conf2"))
+	region2 = request_region(0xC000, 0x1000, "PCI conf2");
+	if (!region2)
 		goto fail2;
 
 	if (pci_check_type2()) {
@@ -306,8 +311,8 @@ int __init pci_direct_probe(void)
 		return 2;
 	}
 
-	release_region(0xC000, 0x1000);
+	release_resource(region2);
  fail2:
-	release_region(0xCF8, 4);
+	release_resource(region);
 	return 0;
 }

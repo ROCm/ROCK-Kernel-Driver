@@ -25,6 +25,7 @@
 
 #include "a_config.h"
 #include "athdefs.h"
+#include "a_types.h"
 #include "a_osapi.h"
 #include <wmi.h>
 #include <ieee80211.h>

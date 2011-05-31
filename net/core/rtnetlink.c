@@ -850,7 +850,6 @@ static int rtnl_fill_ifinfo(struct sk_buff *skb, struct net_device *dev,
 	struct nlattr *attr, *af_spec;
 	struct rtnl_af_ops *af_ops;
 
-	ASSERT_RTNL();
 	nlh = nlmsg_put(skb, pid, seq, type, sizeof(*ifm), flags);
 	if (nlh == NULL)
 		return -EMSGSIZE;
@@ -1008,11 +1007,10 @@ static int rtnl_dump_ifinfo(struct sk_buff *skb, struct netlink_callback *cb)
 	s_h = cb->args[0];
 	s_idx = cb->args[1];
 
-	rcu_read_lock();
 	for (h = s_h; h < NETDEV_HASHENTRIES; h++, s_idx = 0) {
 		idx = 0;
 		head = &net->dev_index_head[h];
-		hlist_for_each_entry_rcu(dev, node, head, index_hlist) {
+		hlist_for_each_entry(dev, node, head, index_hlist) {
 			if (idx < s_idx)
 				goto cont;
 			if (rtnl_fill_ifinfo(skb, dev, RTM_NEWLINK,
@@ -1025,7 +1023,6 @@ cont:
 		}
 	}
 out:
-	rcu_read_unlock();
 	cb->args[1] = idx;
 	cb->args[0] = h;
 
@@ -1046,7 +1043,6 @@ const struct nla_policy ifla_policy[IFLA_MAX+1] = {
 	[IFLA_LINKMODE]		= { .type = NLA_U8 },
 	[IFLA_LINKINFO]		= { .type = NLA_NESTED },
 	[IFLA_NET_NS_PID]	= { .type = NLA_U32 },
-	[IFLA_NET_NS_FD]	= { .type = NLA_U32 },
 	[IFLA_IFALIAS]	        = { .type = NLA_STRING, .len = IFALIASZ-1 },
 	[IFLA_VFINFO_LIST]	= {. type = NLA_NESTED },
 	[IFLA_VF_PORTS]		= { .type = NLA_NESTED },
@@ -1095,8 +1091,6 @@ struct net *rtnl_link_get_net(struct net *src_net, struct nlattr *tb[])
 	 */
 	if (tb[IFLA_NET_NS_PID])
 		net = get_net_ns_by_pid(nla_get_u32(tb[IFLA_NET_NS_PID]));
-	else if (tb[IFLA_NET_NS_FD])
-		net = get_net_ns_by_fd(nla_get_u32(tb[IFLA_NET_NS_FD]));
 	else
 		net = get_net(src_net);
 	return net;
@@ -1227,7 +1221,7 @@ static int do_setlink(struct net_device *dev, struct ifinfomsg *ifm,
 	int send_addr_notify = 0;
 	int err;
 
-	if (tb[IFLA_NET_NS_PID] || tb[IFLA_NET_NS_FD]) {
+	if (tb[IFLA_NET_NS_PID]) {
 		struct net *net = rtnl_link_get_net(dev_net(dev), tb);
 		if (IS_ERR(net)) {
 			err = PTR_ERR(net);
@@ -1505,7 +1499,6 @@ static int rtnl_dellink(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 	char ifname[IFNAMSIZ];
 	struct nlattr *tb[IFLA_MAX+1];
 	int err;
-	LIST_HEAD(list_kill);
 
 	err = nlmsg_parse(nlh, sizeof(*ifm), tb, IFLA_MAX, ifla_policy);
 	if (err < 0)
@@ -1529,9 +1522,7 @@ static int rtnl_dellink(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 	if (!ops)
 		return -EOPNOTSUPP;
 
-	ops->dellink(dev, &list_kill);
-	unregister_netdevice_many(&list_kill);
-	list_del(&list_kill);
+	ops->dellink(dev, NULL);
 	return 0;
 }
 
@@ -1579,6 +1570,12 @@ struct net_device *rtnl_create_link(struct net *src_net, struct net *net,
 	dev->rtnl_link_state = RTNL_LINK_INITIALIZING;
 	dev->real_num_tx_queues = real_num_queues;
 
+	if (strchr(dev->name, '%')) {
+		err = dev_alloc_name(dev, dev->name);
+		if (err < 0)
+			goto err_free;
+	}
+
 	if (tb[IFLA_MTU])
 		dev->mtu = nla_get_u32(tb[IFLA_MTU]);
 	if (tb[IFLA_ADDRESS])
@@ -1598,6 +1595,8 @@ struct net_device *rtnl_create_link(struct net *src_net, struct net *net,
 
 	return dev;
 
+err_free:
+	free_netdev(dev);
 err:
 	return ERR_PTR(err);
 }
@@ -1964,8 +1963,6 @@ static int rtnetlink_event(struct notifier_block *this, unsigned long event, voi
 	case NETDEV_GOING_DOWN:
 	case NETDEV_UNREGISTER:
 	case NETDEV_UNREGISTER_BATCH:
-	case NETDEV_RELEASE:
-	case NETDEV_JOIN:
 		break;
 	default:
 		rtmsg_ifinfo(RTM_NEWLINK, dev, 0);

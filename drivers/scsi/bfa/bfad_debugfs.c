@@ -28,10 +28,10 @@
  * mount -t debugfs none /sys/kernel/debug
  *
  * BFA Hierarchy:
- *	- bfa/pci_dev:<pci_name>
- * where the pci_name corresponds to the one under /sys/bus/pci/drivers/bfa
+ *	- bfa/host#
+ * where the host number corresponds to the one under /sys/class/scsi_host/host#
  *
- * Debugging service available per pci_dev:
+ * Debugging service available per host:
  * fwtrc:  To collect current firmware trace.
  * drvtrc: To collect current driver trace
  * fwsave: To collect last saved fw trace as a result of firmware crash.
@@ -489,9 +489,11 @@ static atomic_t bfa_debugfs_port_count;
 inline void
 bfad_debugfs_init(struct bfad_port_s *port)
 {
-	struct bfad_s *bfad = port->bfad;
+	struct bfad_im_port_s *im_port = port->im_port;
+	struct bfad_s *bfad = im_port->bfad;
+	struct Scsi_Host *shost = im_port->shost;
 	const struct bfad_debugfs_entry *file;
-	char name[64];
+	char name[16];
 	int i;
 
 	if (!bfa_debugfs_enable)
@@ -508,15 +510,17 @@ bfad_debugfs_init(struct bfad_port_s *port)
 		}
 	}
 
-	/* Setup the pci_dev debugfs directory for the port */
-	snprintf(name, sizeof(name), "pci_dev:%s", bfad->pci_name);
+	/*
+	 * Setup the host# directory for the port,
+	 * corresponds to the scsi_host num of this port.
+	 */
+	snprintf(name, sizeof(name), "host%d", shost->host_no);
 	if (!port->port_debugfs_root) {
 		port->port_debugfs_root =
 			debugfs_create_dir(name, bfa_debugfs_root);
 		if (!port->port_debugfs_root) {
 			printk(KERN_WARNING
-				"bfa %s: debugfs root creation failed\n",
-				bfad->pci_name);
+				"BFA host root dir creation failed\n");
 			goto err;
 		}
 
@@ -532,8 +536,8 @@ bfad_debugfs_init(struct bfad_port_s *port)
 							file->fops);
 			if (!bfad->bfad_dentry_files[i]) {
 				printk(KERN_WARNING
-					"bfa %s: debugfs %s creation failed\n",
-					bfad->pci_name, file->name);
+					"BFA host%d: create %s entry failed\n",
+					shost->host_no, file->name);
 				goto err;
 			}
 		}
@@ -546,7 +550,8 @@ err:
 inline void
 bfad_debugfs_exit(struct bfad_port_s *port)
 {
-	struct bfad_s *bfad = port->bfad;
+	struct bfad_im_port_s *im_port = port->im_port;
+	struct bfad_s *bfad = im_port->bfad;
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(bfad_debugfs_files); i++) {
@@ -557,7 +562,9 @@ bfad_debugfs_exit(struct bfad_port_s *port)
 	}
 
 	/*
-	 * Remove the pci_dev debugfs directory for the port */
+	 * Remove the host# directory for the port,
+	 * corresponds to the scsi_host num of this port.
+	*/
 	if (port->port_debugfs_root) {
 		debugfs_remove(port->port_debugfs_root);
 		port->port_debugfs_root = NULL;

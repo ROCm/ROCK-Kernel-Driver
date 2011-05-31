@@ -14,6 +14,16 @@
 #include <asm/unwinder.h>
 #include <asm/ptrace.h>
 
+
+static void callchain_warning(void *data, char *msg)
+{
+}
+
+static void
+callchain_warning_symbol(void *data, char *msg, unsigned long symbol)
+{
+}
+
 static int callchain_stack(void *data, char *name)
 {
 	return 0;
@@ -28,6 +38,8 @@ static void callchain_address(void *data, unsigned long addr, int reliable)
 }
 
 static const struct stacktrace_ops callchain_ops = {
+	.warning	= callchain_warning,
+	.warning_symbol	= callchain_warning_symbol,
 	.stack		= callchain_stack,
 	.address	= callchain_address,
 };

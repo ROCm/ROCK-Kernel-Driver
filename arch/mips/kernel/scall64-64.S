@@ -91,7 +91,8 @@ syscall_trace_entry:
 	SAVE_STATIC
 	move	s0, t2
 	move	a0, sp
-	jal	syscall_trace_enter
+	li	a1, 0
+	jal	do_syscall_trace
 
 	move	t0, s0
 	RESTORE_STATIC
@@ -428,5 +429,4 @@ sys_call_table:
 	PTR	sys_open_by_handle_at
 	PTR	sys_clock_adjtime		/* 5300 */
 	PTR	sys_syncfs
-	PTR	sys_setns
 	.size	sys_call_table,.-sys_call_table

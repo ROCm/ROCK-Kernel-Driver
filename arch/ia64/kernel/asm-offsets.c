@@ -290,7 +290,7 @@ void foo(void)
 	DEFINE(IA64_ITC_LASTCYCLE_OFFSET,
 		offsetof (struct itc_jitter_data_t, itc_lastcycle));
 
-#ifdef CONFIG_XEN
+#ifdef CONFIG_PARAVIRT_XEN
 	BLANK();
 
 	DEFINE(XEN_NATIVE_ASM, XEN_NATIVE);

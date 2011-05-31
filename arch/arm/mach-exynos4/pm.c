@@ -16,7 +16,6 @@
 
 #include <linux/init.h>
 #include <linux/suspend.h>
-#include <linux/syscore_ops.h>
 #include <linux/io.h>
 
 #include <asm/cacheflush.h>
@@ -373,27 +372,7 @@ void exynos4_scu_enable(void __iomem *scu_base)
 	flush_cache_all();
 }
 
-static struct sysdev_driver exynos4_pm_driver = {
-	.add		= exynos4_pm_add,
-};
-
-static __init int exynos4_pm_drvinit(void)
-{
-	unsigned int tmp;
-
-	s3c_pm_init();
-
-	/* All wakeup disable */
-
-	tmp = __raw_readl(S5P_WAKEUP_MASK);
-	tmp |= ((0xFF << 8) | (0x1F << 1));
-	__raw_writel(tmp, S5P_WAKEUP_MASK);
-
-	return sysdev_driver_register(&exynos4_sysclass, &exynos4_pm_driver);
-}
-arch_initcall(exynos4_pm_drvinit);
-
-static void exynos4_pm_resume(void)
+static int exynos4_pm_resume(struct sys_device *dev)
 {
 	/* For release retention */
 
@@ -415,15 +394,27 @@ static void exynos4_pm_resume(void)
 	/* enable L2X0*/
 	writel_relaxed(1, S5P_VA_L2CC + L2X0_CTRL);
 #endif
+
+	return 0;
 }
 
-static struct syscore_ops exynos4_pm_syscore_ops = {
+static struct sysdev_driver exynos4_pm_driver = {
+	.add		= exynos4_pm_add,
 	.resume		= exynos4_pm_resume,
 };
 
-static __init int exynos4_pm_syscore_init(void)
+static __init int exynos4_pm_drvinit(void)
 {
-	register_syscore_ops(&exynos4_pm_syscore_ops);
-	return 0;
+	unsigned int tmp;
+
+	s3c_pm_init();
+
+	/* All wakeup disable */
+
+	tmp = __raw_readl(S5P_WAKEUP_MASK);
+	tmp |= ((0xFF << 8) | (0x1F << 1));
+	__raw_writel(tmp, S5P_WAKEUP_MASK);
+
+	return sysdev_driver_register(&exynos4_sysclass, &exynos4_pm_driver);
 }
-arch_initcall(exynos4_pm_syscore_init);
+arch_initcall(exynos4_pm_drvinit);

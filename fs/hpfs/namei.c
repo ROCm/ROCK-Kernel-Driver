@@ -395,6 +395,7 @@ again:
 
 		dentry_unhash(dentry);
 		if (!d_unhashed(dentry)) {
+			dput(dentry);
 			hpfs_unlock(dir->i_sb);
 			return -ENOSPC;
 		}
@@ -402,6 +403,7 @@ again:
 		    !S_ISREG(inode->i_mode) ||
 		    get_write_access(inode)) {
 			d_rehash(dentry);
+			dput(dentry);
 		} else {
 			struct iattr newattrs;
 			/*printk("HPFS: truncating file before delete.\n");*/
@@ -409,6 +411,7 @@ again:
 			newattrs.ia_valid = ATTR_SIZE | ATTR_CTIME;
 			err = notify_change(dentry, &newattrs);
 			put_write_access(inode);
+			dput(dentry);
 			if (!err)
 				goto again;
 		}
@@ -532,7 +535,6 @@ static int hpfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	struct buffer_head *bh;
 	struct fnode *fnode;
 	int err;
-
 	if ((err = hpfs_chk_name(new_name, &new_len))) return err;
 	err = 0;
 	hpfs_adjust_length(old_name, &old_len);

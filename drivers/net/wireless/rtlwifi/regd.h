@@ -32,7 +32,7 @@
 
 struct country_code_to_enum_rd {
 	u16 countrycode;
-	const char *iso_name;
+	const char *isoName;
 };
 
 enum country_code_type_t {

@@ -166,23 +166,10 @@ static int mtd_close(struct inode *inode, struct file *file)
 	return 0;
 } /* mtd_close */
 
-/* Back in June 2001, dwmw2 wrote:
- *
- *   FIXME: This _really_ needs to die. In 2.5, we should lock the
- *   userspace buffer down and use it directly with readv/writev.
- *
- * The implementation below, using mtd_kmalloc_up_to, mitigates
- * allocation failures when the system is under low-memory situations
- * or if memory is highly fragmented at the cost of reducing the
- * performance of the requested transfer due to a smaller buffer size.
- *
- * A more complex but more memory-efficient implementation based on
- * get_user_pages and iovecs to cover extents of those pages is a
- * longer-term goal, as intimated by dwmw2 above. However, for the
- * write case, this requires yet more complex head and tail transfer
- * handling when those head and tail offsets and sizes are such that
- * alignment requirements are not met in the NAND subdriver.
- */
+/* FIXME: This _really_ needs to die. In 2.5, we should lock the
+   userspace buffer down and use it directly with readv/writev.
+*/
+#define MAX_KMALLOC_SIZE 0x20000
 
 static ssize_t mtd_read(struct file *file, char __user *buf, size_t count,loff_t *ppos)
 {
@@ -192,7 +179,6 @@ static ssize_t mtd_read(struct file *file, char __user *buf, size_t count,loff_t
 	size_t total_retlen=0;
 	int ret=0;
 	int len;
-	size_t size = count;
 	char *kbuf;
 
 	DEBUG(MTD_DEBUG_LEVEL0,"MTD_read\n");
@@ -203,12 +189,23 @@ static ssize_t mtd_read(struct file *file, char __user *buf, size_t count,loff_t
 	if (!count)
 		return 0;
 
-	kbuf = mtd_kmalloc_up_to(mtd, &size);
+	/* FIXME: Use kiovec in 2.5 to lock down the user's buffers
+	   and pass them directly to the MTD functions */
+
+	if (count > MAX_KMALLOC_SIZE)
+		kbuf=kmalloc(MAX_KMALLOC_SIZE, GFP_KERNEL);
+	else
+		kbuf=kmalloc(count, GFP_KERNEL);
+
 	if (!kbuf)
 		return -ENOMEM;
 
 	while (count) {
-		len = min_t(size_t, count, size);
+
+		if (count > MAX_KMALLOC_SIZE)
+			len = MAX_KMALLOC_SIZE;
+		else
+			len = count;
 
 		switch (mfi->mode) {
 		case MTD_MODE_OTP_FACTORY:
@@ -271,7 +268,6 @@ static ssize_t mtd_write(struct file *file, const char __user *buf, size_t count
 {
 	struct mtd_file_info *mfi = file->private_data;
 	struct mtd_info *mtd = mfi->mtd;
-	size_t size = count;
 	char *kbuf;
 	size_t retlen;
 	size_t total_retlen=0;
@@ -289,12 +285,20 @@ static ssize_t mtd_write(struct file *file, const char __user *buf, size_t count
 	if (!count)
 		return 0;
 
-	kbuf = mtd_kmalloc_up_to(mtd, &size);
+	if (count > MAX_KMALLOC_SIZE)
+		kbuf=kmalloc(MAX_KMALLOC_SIZE, GFP_KERNEL);
+	else
+		kbuf=kmalloc(count, GFP_KERNEL);
+
 	if (!kbuf)
 		return -ENOMEM;
 
 	while (count) {
-		len = min_t(size_t, count, size);
+
+		if (count > MAX_KMALLOC_SIZE)
+			len = MAX_KMALLOC_SIZE;
+		else
+			len = count;
 
 		if (copy_from_user(kbuf, buf, len)) {
 			kfree(kbuf);
@@ -508,6 +512,7 @@ static int shrink_ecclayout(const struct nand_ecclayout *from,
 	return 0;
 }
 
+#ifdef CONFIG_MTD_PARTITIONS
 static int mtd_blkpg_ioctl(struct mtd_info *mtd,
 			   struct blkpg_ioctl_arg __user *arg)
 {
@@ -543,6 +548,8 @@ static int mtd_blkpg_ioctl(struct mtd_info *mtd,
 		return -EINVAL;
 	}
 }
+#endif
+
 
 static int mtd_ioctl(struct file *file, u_int cmd, u_long arg)
 {
@@ -934,6 +941,7 @@ static int mtd_ioctl(struct file *file, u_int cmd, u_long arg)
 		break;
 	}
 
+#ifdef CONFIG_MTD_PARTITIONS
 	case BLKPG:
 	{
 		ret = mtd_blkpg_ioctl(mtd,
@@ -947,6 +955,7 @@ static int mtd_ioctl(struct file *file, u_int cmd, u_long arg)
 		ret = 0;
 		break;
 	}
+#endif
 
 	default:
 		ret = -ENOTTY;

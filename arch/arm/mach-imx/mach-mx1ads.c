@@ -25,6 +25,7 @@
 
 #include <mach/common.h>
 #include <mach/hardware.h>
+#include <mach/i2c.h>
 #include <mach/iomux-mx1.h>
 #include <mach/irqs.h>
 

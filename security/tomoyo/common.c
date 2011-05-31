@@ -108,9 +108,10 @@ static bool tomoyo_flush(struct tomoyo_io_buffer *head)
 			head->read_user_buf += len;
 			w += len;
 		}
-		head->r.w[0] = w;
-		if (*w)
+		if (*w) {
+			head->r.w[0] = w;
 			return false;
+		}
 		/* Add '\0' for query. */
 		if (head->poll) {
 			if (!head->read_user_buf_avail ||
@@ -458,16 +459,8 @@ static int tomoyo_write_profile(struct tomoyo_io_buffer *head)
 	if (profile == &tomoyo_default_profile)
 		return -EINVAL;
 	if (!strcmp(data, "COMMENT")) {
-		static DEFINE_SPINLOCK(lock);
-		const struct tomoyo_path_info *new_comment
-			= tomoyo_get_name(cp);
-		const struct tomoyo_path_info *old_comment;
-		if (!new_comment)
-			return -ENOMEM;
-		spin_lock(&lock);
-		old_comment = profile->comment;
-		profile->comment = new_comment;
-		spin_unlock(&lock);
+		const struct tomoyo_path_info *old_comment = profile->comment;
+		profile->comment = tomoyo_get_name(cp);
 		tomoyo_put_name(old_comment);
 		return 0;
 	}

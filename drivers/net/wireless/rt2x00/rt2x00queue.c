@@ -60,7 +60,7 @@ struct sk_buff *rt2x00queue_alloc_rxskb(struct queue_entry *entry)
 	 * at least 8 bytes bytes available in headroom for IV/EIV
 	 * and 8 bytes for ICV data as tailroon.
 	 */
-	if (test_bit(CAPABILITY_HW_CRYPTO, &rt2x00dev->cap_flags)) {
+	if (test_bit(CONFIG_SUPPORT_HW_CRYPTO, &rt2x00dev->flags)) {
 		head_size += 8;
 		tail_size += 8;
 	}
@@ -86,7 +86,7 @@ struct sk_buff *rt2x00queue_alloc_rxskb(struct queue_entry *entry)
 	memset(skbdesc, 0, sizeof(*skbdesc));
 	skbdesc->entry = entry;
 
-	if (test_bit(REQUIRE_DMA, &rt2x00dev->cap_flags)) {
+	if (test_bit(DRIVER_REQUIRE_DMA, &rt2x00dev->flags)) {
 		skbdesc->skb_dma = dma_map_single(rt2x00dev->dev,
 						  skb->data,
 						  skb->len,
@@ -139,6 +139,19 @@ void rt2x00queue_align_frame(struct sk_buff *skb)
 {
 	unsigned int frame_length = skb->len;
 	unsigned int align = ALIGN_SIZE(skb, 0);
+
+	if (!align)
+		return;
+
+	skb_push(skb, align);
+	memmove(skb->data, skb->data + align, frame_length);
+	skb_trim(skb, frame_length);
+}
+
+void rt2x00queue_align_payload(struct sk_buff *skb, unsigned int header_length)
+{
+	unsigned int frame_length = skb->len;
+	unsigned int align = ALIGN_SIZE(skb, header_length);
 
 	if (!align)
 		return;
@@ -213,7 +226,7 @@ static void rt2x00queue_create_tx_descriptor_seq(struct queue_entry *entry,
 
 	__set_bit(ENTRY_TXD_GENERATE_SEQ, &txdesc->flags);
 
-	if (!test_bit(REQUIRE_SW_SEQNO, &entry->queue->rt2x00dev->cap_flags))
+	if (!test_bit(DRIVER_REQUIRE_SW_SEQNO, &entry->queue->rt2x00dev->flags))
 		return;
 
 	/*
@@ -300,85 +313,6 @@ static void rt2x00queue_create_tx_descriptor_plcp(struct queue_entry *entry,
 		if (txrate->flags & IEEE80211_TX_RC_USE_SHORT_PREAMBLE)
 			txdesc->u.plcp.signal |= 0x08;
 	}
-}
-
-static void rt2x00queue_create_tx_descriptor_ht(struct queue_entry *entry,
-						struct txentry_desc *txdesc,
-						const struct rt2x00_rate *hwrate)
-{
-	struct ieee80211_tx_info *tx_info = IEEE80211_SKB_CB(entry->skb);
-	struct ieee80211_tx_rate *txrate = &tx_info->control.rates[0];
-	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)entry->skb->data;
-
-	if (tx_info->control.sta)
-		txdesc->u.ht.mpdu_density =
-		    tx_info->control.sta->ht_cap.ampdu_density;
-
-	txdesc->u.ht.ba_size = 7;	/* FIXME: What value is needed? */
-
-	/*
-	 * Only one STBC stream is supported for now.
-	 */
-	if (tx_info->flags & IEEE80211_TX_CTL_STBC)
-		txdesc->u.ht.stbc = 1;
-
-	/*
-	 * If IEEE80211_TX_RC_MCS is set txrate->idx just contains the
-	 * mcs rate to be used
-	 */
-	if (txrate->flags & IEEE80211_TX_RC_MCS) {
-		txdesc->u.ht.mcs = txrate->idx;
-
-		/*
-		 * MIMO PS should be set to 1 for STA's using dynamic SM PS
-		 * when using more then one tx stream (>MCS7).
-		 */
-		if (tx_info->control.sta && txdesc->u.ht.mcs > 7 &&
-		    ((tx_info->control.sta->ht_cap.cap &
-		      IEEE80211_HT_CAP_SM_PS) >>
-		     IEEE80211_HT_CAP_SM_PS_SHIFT) ==
-		    WLAN_HT_CAP_SM_PS_DYNAMIC)
-			__set_bit(ENTRY_TXD_HT_MIMO_PS, &txdesc->flags);
-	} else {
-		txdesc->u.ht.mcs = rt2x00_get_rate_mcs(hwrate->mcs);
-		if (txrate->flags & IEEE80211_TX_RC_USE_SHORT_PREAMBLE)
-			txdesc->u.ht.mcs |= 0x08;
-	}
-
-	/*
-	 * This frame is eligible for an AMPDU, however, don't aggregate
-	 * frames that are intended to probe a specific tx rate.
-	 */
-	if (tx_info->flags & IEEE80211_TX_CTL_AMPDU &&
-	    !(tx_info->flags & IEEE80211_TX_CTL_RATE_CTRL_PROBE))
-		__set_bit(ENTRY_TXD_HT_AMPDU, &txdesc->flags);
-
-	/*
-	 * Set 40Mhz mode if necessary (for legacy rates this will
-	 * duplicate the frame to both channels).
-	 */
-	if (txrate->flags & IEEE80211_TX_RC_40_MHZ_WIDTH ||
-	    txrate->flags & IEEE80211_TX_RC_DUP_DATA)
-		__set_bit(ENTRY_TXD_HT_BW_40, &txdesc->flags);
-	if (txrate->flags & IEEE80211_TX_RC_SHORT_GI)
-		__set_bit(ENTRY_TXD_HT_SHORT_GI, &txdesc->flags);
-
-	/*
-	 * Determine IFS values
-	 * - Use TXOP_BACKOFF for management frames except beacons
-	 * - Use TXOP_SIFS for fragment bursts
-	 * - Use TXOP_HTTXOP for everything else
-	 *
-	 * Note: rt2800 devices won't use CTS protection (if used)
-	 * for frames not transmitted with TXOP_HTTXOP
-	 */
-	if (ieee80211_is_mgmt(hdr->frame_control) &&
-	    !ieee80211_is_beacon(hdr->frame_control))
-		txdesc->u.ht.txop = TXOP_BACKOFF;
-	else if (!(tx_info->flags & IEEE80211_TX_CTL_FIRST_FRAGMENT))
-		txdesc->u.ht.txop = TXOP_SIFS;
-	else
-		txdesc->u.ht.txop = TXOP_HTTXOP;
 }
 
 static void rt2x00queue_create_tx_descriptor(struct queue_entry *entry,
@@ -475,8 +409,8 @@ static void rt2x00queue_create_tx_descriptor(struct queue_entry *entry,
 	rt2x00crypto_create_tx_descriptor(entry, txdesc);
 	rt2x00queue_create_tx_descriptor_seq(entry, txdesc);
 
-	if (test_bit(REQUIRE_HT_TX_DESC, &rt2x00dev->cap_flags))
-		rt2x00queue_create_tx_descriptor_ht(entry, txdesc, hwrate);
+	if (test_bit(DRIVER_REQUIRE_HT_TX_DESC, &rt2x00dev->flags))
+		rt2x00ht_create_tx_descriptor(entry, txdesc, hwrate);
 	else
 		rt2x00queue_create_tx_descriptor_plcp(entry, txdesc, hwrate);
 }
@@ -515,7 +449,7 @@ static int rt2x00queue_write_tx_data(struct queue_entry *entry,
 	/*
 	 * Map the skb to DMA.
 	 */
-	if (test_bit(REQUIRE_DMA, &rt2x00dev->cap_flags))
+	if (test_bit(DRIVER_REQUIRE_DMA, &rt2x00dev->flags))
 		rt2x00queue_map_txskb(entry);
 
 	return 0;
@@ -561,11 +495,8 @@ int rt2x00queue_write_tx_frame(struct data_queue *queue, struct sk_buff *skb,
 	struct skb_frame_desc *skbdesc;
 	u8 rate_idx, rate_flags;
 
-	if (unlikely(rt2x00queue_full(queue))) {
-		ERROR(queue->rt2x00dev,
-		      "Dropping frame due to full tx queue %d.\n", queue->qid);
+	if (unlikely(rt2x00queue_full(queue)))
 		return -ENOBUFS;
-	}
 
 	if (unlikely(test_and_set_bit(ENTRY_OWNER_DEVICE_DATA,
 				      &entry->flags))) {
@@ -608,7 +539,7 @@ int rt2x00queue_write_tx_frame(struct data_queue *queue, struct sk_buff *skb,
 	 */
 	if (test_bit(ENTRY_TXD_ENCRYPT, &txdesc.flags) &&
 	    !test_bit(ENTRY_TXD_ENCRYPT_IV, &txdesc.flags)) {
-		if (test_bit(REQUIRE_COPY_IV, &queue->rt2x00dev->cap_flags))
+		if (test_bit(DRIVER_REQUIRE_COPY_IV, &queue->rt2x00dev->flags))
 			rt2x00crypto_tx_copy_iv(skb, &txdesc);
 		else
 			rt2x00crypto_tx_remove_iv(skb, &txdesc);
@@ -622,9 +553,9 @@ int rt2x00queue_write_tx_frame(struct data_queue *queue, struct sk_buff *skb,
 	 * PCI and USB devices, while header alignment only is valid
 	 * for PCI devices.
 	 */
-	if (test_bit(REQUIRE_L2PAD, &queue->rt2x00dev->cap_flags))
+	if (test_bit(DRIVER_REQUIRE_L2PAD, &queue->rt2x00dev->flags))
 		rt2x00queue_insert_l2pad(entry->skb, txdesc.header_length);
-	else if (test_bit(REQUIRE_DMA, &queue->rt2x00dev->cap_flags))
+	else if (test_bit(DRIVER_REQUIRE_DMA, &queue->rt2x00dev->flags))
 		rt2x00queue_align_frame(entry->skb);
 
 	/*
@@ -640,7 +571,7 @@ int rt2x00queue_write_tx_frame(struct data_queue *queue, struct sk_buff *skb,
 
 	set_bit(ENTRY_DATA_PENDING, &entry->flags);
 
-	rt2x00queue_index_inc(entry, Q_INDEX);
+	rt2x00queue_index_inc(queue, Q_INDEX);
 	rt2x00queue_write_tx_descriptor(entry, &txdesc);
 	rt2x00queue_kick_tx_queue(queue, &txdesc);
 
@@ -729,12 +660,10 @@ int rt2x00queue_update_beacon(struct rt2x00_dev *rt2x00dev,
 	return ret;
 }
 
-bool rt2x00queue_for_each_entry(struct data_queue *queue,
+void rt2x00queue_for_each_entry(struct data_queue *queue,
 				enum queue_index start,
 				enum queue_index end,
-				void *data,
-				bool (*fn)(struct queue_entry *entry,
-					   void *data))
+				void (*fn)(struct queue_entry *entry))
 {
 	unsigned long irqflags;
 	unsigned int index_start;
@@ -745,7 +674,7 @@ bool rt2x00queue_for_each_entry(struct data_queue *queue,
 		ERROR(queue->rt2x00dev,
 		      "Entry requested from invalid index range (%d - %d)\n",
 		      start, end);
-		return true;
+		return;
 	}
 
 	/*
@@ -764,23 +693,15 @@ bool rt2x00queue_for_each_entry(struct data_queue *queue,
 	 * send out all frames in the correct order.
 	 */
 	if (index_start < index_end) {
-		for (i = index_start; i < index_end; i++) {
-			if (fn(&queue->entries[i], data))
-				return true;
-		}
+		for (i = index_start; i < index_end; i++)
+			fn(&queue->entries[i]);
 	} else {
-		for (i = index_start; i < queue->limit; i++) {
-			if (fn(&queue->entries[i], data))
-				return true;
-		}
+		for (i = index_start; i < queue->limit; i++)
+			fn(&queue->entries[i]);
 
-		for (i = 0; i < index_end; i++) {
-			if (fn(&queue->entries[i], data))
-				return true;
-		}
+		for (i = 0; i < index_end; i++)
+			fn(&queue->entries[i]);
 	}
-
-	return false;
 }
 EXPORT_SYMBOL_GPL(rt2x00queue_for_each_entry);
 
@@ -806,9 +727,8 @@ struct queue_entry *rt2x00queue_get_entry(struct data_queue *queue,
 }
 EXPORT_SYMBOL_GPL(rt2x00queue_get_entry);
 
-void rt2x00queue_index_inc(struct queue_entry *entry, enum queue_index index)
+void rt2x00queue_index_inc(struct data_queue *queue, enum queue_index index)
 {
-	struct data_queue *queue = entry->queue;
 	unsigned long irqflags;
 
 	if (unlikely(index >= Q_INDEX_MAX)) {
@@ -823,7 +743,7 @@ void rt2x00queue_index_inc(struct queue_entry *entry, enum queue_index index)
 	if (queue->index[index] >= queue->limit)
 		queue->index[index] = 0;
 
-	entry->last_action = jiffies;
+	queue->last_action[index] = jiffies;
 
 	if (index == Q_INDEX) {
 		queue->length++;
@@ -928,6 +848,7 @@ EXPORT_SYMBOL_GPL(rt2x00queue_stop_queue);
 
 void rt2x00queue_flush_queue(struct data_queue *queue, bool drop)
 {
+	unsigned int i;
 	bool started;
 	bool tx_queue =
 		(queue->qid == QID_AC_VO) ||
@@ -962,12 +883,20 @@ void rt2x00queue_flush_queue(struct data_queue *queue, bool drop)
 	}
 
 	/*
-	 * Check if driver supports flushing, if that is the case we can
-	 * defer the flushing to the driver. Otherwise we must use the
-	 * alternative which just waits for the queue to become empty.
+	 * Check if driver supports flushing, we can only guarantee
+	 * full support for flushing if the driver is able
+	 * to cancel all pending frames (drop = true).
 	 */
-	if (likely(queue->rt2x00dev->ops->lib->flush_queue))
-		queue->rt2x00dev->ops->lib->flush_queue(queue, drop);
+	if (drop && queue->rt2x00dev->ops->lib->flush_queue)
+		queue->rt2x00dev->ops->lib->flush_queue(queue);
+
+	/*
+	 * When we don't want to drop any frames, or when
+	 * the driver doesn't fully flush the queue correcly,
+	 * we must wait for the queue to become empty.
+	 */
+	for (i = 0; !rt2x00queue_empty(queue) && i < 100; i++)
+		msleep(10);
 
 	/*
 	 * The queue flush has failed...
@@ -1040,8 +969,10 @@ static void rt2x00queue_reset(struct data_queue *queue)
 	queue->count = 0;
 	queue->length = 0;
 
-	for (i = 0; i < Q_INDEX_MAX; i++)
+	for (i = 0; i < Q_INDEX_MAX; i++) {
 		queue->index[i] = 0;
+		queue->last_action[i] = jiffies;
+	}
 
 	spin_unlock_irqrestore(&queue->index_lock, irqflags);
 }
@@ -1148,7 +1079,7 @@ int rt2x00queue_initialize(struct rt2x00_dev *rt2x00dev)
 	if (status)
 		goto exit;
 
-	if (test_bit(REQUIRE_ATIM_QUEUE, &rt2x00dev->cap_flags)) {
+	if (test_bit(DRIVER_REQUIRE_ATIM_QUEUE, &rt2x00dev->flags)) {
 		status = rt2x00queue_alloc_entries(rt2x00dev->atim,
 						   rt2x00dev->ops->atim);
 		if (status)
@@ -1200,7 +1131,7 @@ int rt2x00queue_allocate(struct rt2x00_dev *rt2x00dev)
 	struct data_queue *queue;
 	enum data_queue_qid qid;
 	unsigned int req_atim =
-	    !!test_bit(REQUIRE_ATIM_QUEUE, &rt2x00dev->cap_flags);
+	    !!test_bit(DRIVER_REQUIRE_ATIM_QUEUE, &rt2x00dev->flags);
 
 	/*
 	 * We need the following queues:

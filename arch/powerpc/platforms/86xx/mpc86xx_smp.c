@@ -56,7 +56,7 @@ smp_86xx_release_core(int nr)
 }
 
 
-static int __init
+static void __init
 smp_86xx_kick_cpu(int nr)
 {
 	unsigned int save_vector;
@@ -65,7 +65,7 @@ smp_86xx_kick_cpu(int nr)
 	unsigned int *vector = (unsigned int *)(KERNELBASE + 0x100);
 
 	if (nr < 0 || nr >= NR_CPUS)
-		return -ENOENT;
+		return;
 
 	pr_debug("smp_86xx_kick_cpu: kick CPU #%d\n", nr);
 
@@ -92,8 +92,6 @@ smp_86xx_kick_cpu(int nr)
 	local_irq_restore(flags);
 
 	pr_debug("wait CPU #%d for %d msecs.\n", nr, n);
-
-	return 0;
 }
 
 

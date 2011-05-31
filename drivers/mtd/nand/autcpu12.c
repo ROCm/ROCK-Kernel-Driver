@@ -185,20 +185,20 @@ static int __init autcpu12_init(void)
 	/* Register the partitions */
 	switch (autcpu12_mtd->size) {
 		case SZ_16M:
-			mtd_device_register(autcpu12_mtd, partition_info16k,
-					    NUM_PARTITIONS16K);
+			add_mtd_partitions(autcpu12_mtd, partition_info16k,
+					   NUM_PARTITIONS16K);
 			break;
 		case SZ_32M:
-			mtd_device_register(autcpu12_mtd, partition_info32k,
-					    NUM_PARTITIONS32K);
+			add_mtd_partitions(autcpu12_mtd, partition_info32k,
+					   NUM_PARTITIONS32K);
 			break;
 		case SZ_64M:
-			mtd_device_register(autcpu12_mtd, partition_info64k,
-					    NUM_PARTITIONS64K);
+			add_mtd_partitions(autcpu12_mtd, partition_info64k,
+					   NUM_PARTITIONS64K);
 			break;
 		case SZ_128M:
-			mtd_device_register(autcpu12_mtd, partition_info128k,
-					    NUM_PARTITIONS128K);
+			add_mtd_partitions(autcpu12_mtd, partition_info128k,
+					   NUM_PARTITIONS128K);
 			break;
 		default:
 			printk("Unsupported SmartMedia device\n");

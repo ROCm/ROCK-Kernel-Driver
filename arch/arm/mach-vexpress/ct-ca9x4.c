@@ -71,9 +71,8 @@ static void __init ct_ca9x4_timer_init(void)
 	writel(0, MMIO_P2V(CT_CA9X4_TIMER0) + TIMER_CTRL);
 	writel(0, MMIO_P2V(CT_CA9X4_TIMER1) + TIMER_CTRL);
 
-	sp804_clocksource_init(MMIO_P2V(CT_CA9X4_TIMER1), "ct-timer1");
-	sp804_clockevents_init(MMIO_P2V(CT_CA9X4_TIMER0), IRQ_CT_CA9X4_TIMER0,
-		"ct-timer0");
+	sp804_clocksource_init(MMIO_P2V(CT_CA9X4_TIMER1));
+	sp804_clockevents_init(MMIO_P2V(CT_CA9X4_TIMER0), IRQ_CT_CA9X4_TIMER0);
 }
 
 static struct sys_timer ct_ca9x4_timer = {
@@ -142,22 +141,10 @@ static struct clk osc1_clk = {
 	.rate	= 24000000,
 };
 
-static struct clk ct_sp804_clk = {
-	.rate	= 1000000,
-};
-
 static struct clk_lookup lookups[] = {
 	{	/* CLCD */
 		.dev_id		= "ct:clcd",
 		.clk		= &osc1_clk,
-	}, {	/* SP804 timers */
-		.dev_id		= "sp804",
-		.con_id		= "ct-timer0",
-		.clk		= &ct_sp804_clk,
-	}, {	/* SP804 timers */
-		.dev_id		= "sp804",
-		.con_id		= "ct-timer1",
-		.clk		= &ct_sp804_clk,
 	},
 };
 
@@ -223,8 +210,6 @@ static void ct_ca9x4_init_cpu_map(void)
 
 	for (i = 0; i < ncores; ++i)
 		set_cpu_possible(i, true);
-
-	set_smp_cross_call(gic_raise_softirq);
 }
 
 static void ct_ca9x4_smp_enable(unsigned int max_cpus)

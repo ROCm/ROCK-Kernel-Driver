@@ -296,12 +296,12 @@ out_in_use:
 
 static int l2tp_ip_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 {
-	struct sockaddr_l2tpip *lsa = (struct sockaddr_l2tpip *) uaddr;
+	int rc;
 	struct inet_sock *inet = inet_sk(sk);
-	struct flowi4 *fl4;
+	struct sockaddr_l2tpip *lsa = (struct sockaddr_l2tpip *) uaddr;
 	struct rtable *rt;
 	__be32 saddr;
-	int oif, rc;
+	int oif;
 
 	rc = -EINVAL;
 	if (addr_len < sizeof(*lsa))
@@ -310,8 +310,6 @@ static int l2tp_ip_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len
 	rc = -EAFNOSUPPORT;
 	if (lsa->l2tp_family != AF_INET)
 		goto out;
-
-	lock_sock(sk);
 
 	sk_dst_reset(sk);
 
@@ -322,8 +320,7 @@ static int l2tp_ip_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len
 	if (ipv4_is_multicast(lsa->l2tp_addr.s_addr))
 		goto out;
 
-	fl4 = &inet->cork.fl.u.ip4;
-	rt = ip_route_connect(fl4, lsa->l2tp_addr.s_addr, saddr,
+	rt = ip_route_connect(lsa->l2tp_addr.s_addr, saddr,
 			      RT_CONN_FLAGS(sk), oif,
 			      IPPROTO_L2TP,
 			      0, 0, sk, true);
@@ -343,10 +340,10 @@ static int l2tp_ip_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len
 	l2tp_ip_sk(sk)->peer_conn_id = lsa->l2tp_conn_id;
 
 	if (!inet->inet_saddr)
-		inet->inet_saddr = fl4->saddr;
+		inet->inet_saddr = rt->rt_src;
 	if (!inet->inet_rcv_saddr)
-		inet->inet_rcv_saddr = fl4->saddr;
-	inet->inet_daddr = fl4->daddr;
+		inet->inet_rcv_saddr = rt->rt_src;
+	inet->inet_daddr = rt->rt_dst;
 	sk->sk_state = TCP_ESTABLISHED;
 	inet->inet_id = jiffies;
 
@@ -359,7 +356,6 @@ static int l2tp_ip_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len
 
 	rc = 0;
 out:
-	release_sock(sk);
 	return rc;
 }
 
@@ -420,28 +416,23 @@ static int l2tp_ip_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *m
 	int rc;
 	struct l2tp_ip_sock *lsa = l2tp_ip_sk(sk);
 	struct inet_sock *inet = inet_sk(sk);
+	struct ip_options *opt = inet->opt;
 	struct rtable *rt = NULL;
-	struct flowi4 *fl4;
 	int connected = 0;
 	__be32 daddr;
 
-	lock_sock(sk);
-
-	rc = -ENOTCONN;
 	if (sock_flag(sk, SOCK_DEAD))
-		goto out;
+		return -ENOTCONN;
 
 	/* Get and verify the address. */
 	if (msg->msg_name) {
 		struct sockaddr_l2tpip *lip = (struct sockaddr_l2tpip *) msg->msg_name;
-		rc = -EINVAL;
 		if (msg->msg_namelen < sizeof(*lip))
-			goto out;
+			return -EINVAL;
 
 		if (lip->l2tp_family != AF_INET) {
-			rc = -EAFNOSUPPORT;
 			if (lip->l2tp_family != AF_UNSPEC)
-				goto out;
+				return -EAFNOSUPPORT;
 		}
 
 		daddr = lip->l2tp_addr.s_addr;
@@ -476,27 +467,19 @@ static int l2tp_ip_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *m
 		goto error;
 	}
 
-	fl4 = &inet->cork.fl.u.ip4;
 	if (connected)
 		rt = (struct rtable *) __sk_dst_check(sk, 0);
 
 	if (rt == NULL) {
-		struct ip_options_rcu *inet_opt;
-
-		rcu_read_lock();
-		inet_opt = rcu_dereference(inet->inet_opt);
-
 		/* Use correct destination address if we have options. */
-		if (inet_opt && inet_opt->opt.srr)
-			daddr = inet_opt->opt.faddr;
-
-		rcu_read_unlock();
+		if (opt && opt->srr)
+			daddr = opt->faddr;
 
 		/* If this fails, retransmit mechanism of transport layer will
 		 * keep trying until route appears or the connection times
 		 * itself out.
 		 */
-		rt = ip_route_output_ports(sock_net(sk), fl4, sk,
+		rt = ip_route_output_ports(sock_net(sk), sk,
 					   daddr, inet->inet_saddr,
 					   inet->inet_dport, inet->inet_sport,
 					   sk->sk_protocol, RT_CONN_FLAGS(sk),
@@ -508,7 +491,7 @@ static int l2tp_ip_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *m
 	skb_dst_set(skb, dst_clone(&rt->dst));
 
 	/* Queue the packet to IP for output */
-	rc = ip_queue_xmit(skb, &inet->cork.fl);
+	rc = ip_queue_xmit(skb);
 
 error:
 	/* Update stats */
@@ -520,15 +503,12 @@ error:
 		lsa->tx_errors++;
 	}
 
-out:
-	release_sock(sk);
 	return rc;
 
 no_route:
 	IP_INC_STATS(sock_net(sk), IPSTATS_MIB_OUTNOROUTES);
 	kfree_skb(skb);
-	rc = -EHOSTUNREACH;
-	goto out;
+	return -EHOSTUNREACH;
 }
 
 static int l2tp_ip_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,

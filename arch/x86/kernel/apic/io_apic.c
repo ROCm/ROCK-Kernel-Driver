@@ -76,40 +76,17 @@ int sis_apic_bug = -1;
 static DEFINE_RAW_SPINLOCK(ioapic_lock);
 static DEFINE_RAW_SPINLOCK(vector_lock);
 
-static struct ioapic {
-	/*
-	 * # of IRQ routing registers
-	 */
-	int nr_registers;
-	/*
-	 * Saved state during suspend/resume, or while enabling intr-remap.
-	 */
-	struct IO_APIC_route_entry *saved_registers;
-	/* I/O APIC config */
-	struct mpc_ioapic mp_config;
-	/* IO APIC gsi routing info */
-	struct mp_ioapic_gsi  gsi_config;
-	DECLARE_BITMAP(pin_programmed, MP_MAX_IOAPIC_PIN + 1);
-} ioapics[MAX_IO_APICS];
+/*
+ * # of IRQ routing registers
+ */
+int nr_ioapic_registers[MAX_IO_APICS];
 
-#define mpc_ioapic_ver(id)		ioapics[id].mp_config.apicver
-
-int mpc_ioapic_id(int id)
-{
-	return ioapics[id].mp_config.apicid;
-}
-
-unsigned int mpc_ioapic_addr(int id)
-{
-	return ioapics[id].mp_config.apicaddr;
-}
-
-struct mp_ioapic_gsi *mp_ioapic_gsi_routing(int id)
-{
-	return &ioapics[id].gsi_config;
-}
-
+/* I/O APIC entries */
+struct mpc_ioapic mp_ioapics[MAX_IO_APICS];
 int nr_ioapics;
+
+/* IO APIC gsi routing info */
+struct mp_ioapic_gsi  mp_gsi_routing[MAX_IO_APICS];
 
 /* The one past the highest gsi number used */
 u32 gsi_top;
@@ -200,14 +177,6 @@ int __init arch_early_irq_init(void)
 	if (!legacy_pic->nr_legacy_irqs) {
 		nr_irqs_gsi = 0;
 		io_apic_irqs = ~0UL;
-	}
-
-	for (i = 0; i < nr_ioapics; i++) {
-		ioapics[i].saved_registers =
-			kzalloc(sizeof(struct IO_APIC_route_entry) *
-				ioapics[i].nr_registers, GFP_KERNEL);
-		if (!ioapics[i].saved_registers)
-			pr_err("IOAPIC %d: suspend/resume impossible!\n", i);
 	}
 
 	cfg = irq_cfgx;
@@ -328,7 +297,7 @@ struct io_apic {
 static __attribute_const__ struct io_apic __iomem *io_apic_base(int idx)
 {
 	return (void __iomem *) __fix_to_virt(FIX_IO_APIC_BASE_0 + idx)
-		+ (mpc_ioapic_addr(idx) & ~PAGE_MASK);
+		+ (mp_ioapics[idx].apicaddr & ~PAGE_MASK);
 }
 
 static inline void io_apic_eoi(unsigned int apic, unsigned int vector)
@@ -604,7 +573,7 @@ static void clear_IO_APIC (void)
 	int apic, pin;
 
 	for (apic = 0; apic < nr_ioapics; apic++)
-		for (pin = 0; pin < ioapics[apic].nr_registers; pin++)
+		for (pin = 0; pin < nr_ioapic_registers[apic]; pin++)
 			clear_IO_APIC_pin(apic, pin);
 }
 
@@ -646,43 +615,74 @@ static int __init ioapic_pirq_setup(char *str)
 __setup("pirq=", ioapic_pirq_setup);
 #endif /* CONFIG_X86_32 */
 
+struct IO_APIC_route_entry **alloc_ioapic_entries(void)
+{
+	int apic;
+	struct IO_APIC_route_entry **ioapic_entries;
+
+	ioapic_entries = kzalloc(sizeof(*ioapic_entries) * nr_ioapics,
+				GFP_KERNEL);
+	if (!ioapic_entries)
+		return 0;
+
+	for (apic = 0; apic < nr_ioapics; apic++) {
+		ioapic_entries[apic] =
+			kzalloc(sizeof(struct IO_APIC_route_entry) *
+				nr_ioapic_registers[apic], GFP_KERNEL);
+		if (!ioapic_entries[apic])
+			goto nomem;
+	}
+
+	return ioapic_entries;
+
+nomem:
+	while (--apic >= 0)
+		kfree(ioapic_entries[apic]);
+	kfree(ioapic_entries);
+
+	return 0;
+}
+
 /*
  * Saves all the IO-APIC RTE's
  */
-int save_ioapic_entries(void)
+int save_IO_APIC_setup(struct IO_APIC_route_entry **ioapic_entries)
 {
 	int apic, pin;
-	int err = 0;
+
+	if (!ioapic_entries)
+		return -ENOMEM;
 
 	for (apic = 0; apic < nr_ioapics; apic++) {
-		if (!ioapics[apic].saved_registers) {
-			err = -ENOMEM;
-			continue;
-		}
+		if (!ioapic_entries[apic])
+			return -ENOMEM;
 
-		for (pin = 0; pin < ioapics[apic].nr_registers; pin++)
-			ioapics[apic].saved_registers[pin] =
+		for (pin = 0; pin < nr_ioapic_registers[apic]; pin++)
+			ioapic_entries[apic][pin] =
 				ioapic_read_entry(apic, pin);
 	}
 
-	return err;
+	return 0;
 }
 
 /*
  * Mask all IO APIC entries.
  */
-void mask_ioapic_entries(void)
+void mask_IO_APIC_setup(struct IO_APIC_route_entry **ioapic_entries)
 {
 	int apic, pin;
 
-	for (apic = 0; apic < nr_ioapics; apic++) {
-		if (!ioapics[apic].saved_registers)
-			continue;
+	if (!ioapic_entries)
+		return;
 
-		for (pin = 0; pin < ioapics[apic].nr_registers; pin++) {
+	for (apic = 0; apic < nr_ioapics; apic++) {
+		if (!ioapic_entries[apic])
+			break;
+
+		for (pin = 0; pin < nr_ioapic_registers[apic]; pin++) {
 			struct IO_APIC_route_entry entry;
 
-			entry = ioapics[apic].saved_registers[pin];
+			entry = ioapic_entries[apic][pin];
 			if (!entry.mask) {
 				entry.mask = 1;
 				ioapic_write_entry(apic, pin, entry);
@@ -692,21 +692,34 @@ void mask_ioapic_entries(void)
 }
 
 /*
- * Restore IO APIC entries which was saved in the ioapic structure.
+ * Restore IO APIC entries which was saved in ioapic_entries.
  */
-int restore_ioapic_entries(void)
+int restore_IO_APIC_setup(struct IO_APIC_route_entry **ioapic_entries)
 {
 	int apic, pin;
 
-	for (apic = 0; apic < nr_ioapics; apic++) {
-		if (!ioapics[apic].saved_registers)
-			continue;
+	if (!ioapic_entries)
+		return -ENOMEM;
 
-		for (pin = 0; pin < ioapics[apic].nr_registers; pin++)
+	for (apic = 0; apic < nr_ioapics; apic++) {
+		if (!ioapic_entries[apic])
+			return -ENOMEM;
+
+		for (pin = 0; pin < nr_ioapic_registers[apic]; pin++)
 			ioapic_write_entry(apic, pin,
-					   ioapics[apic].saved_registers[pin]);
+					ioapic_entries[apic][pin]);
 	}
 	return 0;
+}
+
+void free_ioapic_entries(struct IO_APIC_route_entry **ioapic_entries)
+{
+	int apic;
+
+	for (apic = 0; apic < nr_ioapics; apic++)
+		kfree(ioapic_entries[apic]);
+
+	kfree(ioapic_entries);
 }
 
 /*
@@ -718,7 +731,7 @@ static int find_irq_entry(int apic, int pin, int type)
 
 	for (i = 0; i < mp_irq_entries; i++)
 		if (mp_irqs[i].irqtype == type &&
-		    (mp_irqs[i].dstapic == mpc_ioapic_id(apic) ||
+		    (mp_irqs[i].dstapic == mp_ioapics[apic].apicid ||
 		     mp_irqs[i].dstapic == MP_APIC_ALL) &&
 		    mp_irqs[i].dstirq == pin)
 			return i;
@@ -760,7 +773,7 @@ static int __init find_isa_irq_apic(int irq, int type)
 	if (i < mp_irq_entries) {
 		int apic;
 		for(apic = 0; apic < nr_ioapics; apic++) {
-			if (mpc_ioapic_id(apic) == mp_irqs[i].dstapic)
+			if (mp_ioapics[apic].apicid == mp_irqs[i].dstapic)
 				return apic;
 		}
 	}
@@ -929,7 +942,6 @@ static int pin_2_irq(int idx, int apic, int pin)
 {
 	int irq;
 	int bus = mp_irqs[idx].srcbus;
-	struct mp_ioapic_gsi *gsi_cfg = mp_ioapic_gsi_routing(apic);
 
 	/*
 	 * Debugging check, we are in big trouble if this message pops up!
@@ -940,7 +952,7 @@ static int pin_2_irq(int idx, int apic, int pin)
 	if (test_bit(bus, mp_bus_not_pci)) {
 		irq = mp_irqs[idx].srcbusirq;
 	} else {
-		u32 gsi = gsi_cfg->gsi_base + pin;
+		u32 gsi = mp_gsi_routing[apic].gsi_base + pin;
 
 		if (gsi >= NR_IRQS_LEGACY)
 			irq = gsi;
@@ -991,7 +1003,7 @@ int IO_APIC_get_PCI_irq_vector(int bus, int slot, int pin,
 		int lbus = mp_irqs[i].srcbus;
 
 		for (apic = 0; apic < nr_ioapics; apic++)
-			if (mpc_ioapic_id(apic) == mp_irqs[i].dstapic ||
+			if (mp_ioapics[apic].apicid == mp_irqs[i].dstapic ||
 			    mp_irqs[i].dstapic == MP_APIC_ALL)
 				break;
 
@@ -1210,7 +1222,7 @@ static inline int IO_APIC_irq_trigger(int irq)
 	int apic, idx, pin;
 
 	for (apic = 0; apic < nr_ioapics; apic++) {
-		for (pin = 0; pin < ioapics[apic].nr_registers; pin++) {
+		for (pin = 0; pin < nr_ioapic_registers[apic]; pin++) {
 			idx = find_irq_entry(apic, pin, mp_INT);
 			if ((idx != -1) && (irq == pin_2_irq(idx, apic, pin)))
 				return irq_trigger(idx);
@@ -1338,14 +1350,14 @@ static void setup_ioapic_irq(int apic_id, int pin, unsigned int irq,
 	apic_printk(APIC_VERBOSE,KERN_DEBUG
 		    "IOAPIC[%d]: Set routing entry (%d-%d -> 0x%x -> "
 		    "IRQ %d Mode:%i Active:%i)\n",
-		    apic_id, mpc_ioapic_id(apic_id), pin, cfg->vector,
+		    apic_id, mp_ioapics[apic_id].apicid, pin, cfg->vector,
 		    irq, trigger, polarity);
 
 
-	if (setup_ioapic_entry(mpc_ioapic_id(apic_id), irq, &entry,
+	if (setup_ioapic_entry(mp_ioapics[apic_id].apicid, irq, &entry,
 			       dest, trigger, polarity, cfg->vector, pin)) {
 		printk("Failed to setup ioapic entry for ioapic  %d, pin %d\n",
-		       mpc_ioapic_id(apic_id), pin);
+		       mp_ioapics[apic_id].apicid, pin);
 		__clear_irq_vector(irq, cfg);
 		return;
 	}
@@ -1357,13 +1369,17 @@ static void setup_ioapic_irq(int apic_id, int pin, unsigned int irq,
 	ioapic_write_entry(apic_id, pin, entry);
 }
 
+static struct {
+	DECLARE_BITMAP(pin_programmed, MP_MAX_IOAPIC_PIN + 1);
+} mp_ioapic_routing[MAX_IO_APICS];
+
 static bool __init io_apic_pin_not_connected(int idx, int apic_id, int pin)
 {
 	if (idx != -1)
 		return false;
 
 	apic_printk(APIC_VERBOSE, KERN_DEBUG " apic %d pin %d not connected\n",
-		    mpc_ioapic_id(apic_id), pin);
+		    mp_ioapics[apic_id].apicid, pin);
 	return true;
 }
 
@@ -1373,7 +1389,7 @@ static void __init __io_apic_setup_irqs(unsigned int apic_id)
 	struct io_apic_irq_attr attr;
 	unsigned int pin, irq;
 
-	for (pin = 0; pin < ioapics[apic_id].nr_registers; pin++) {
+	for (pin = 0; pin < nr_ioapic_registers[apic_id]; pin++) {
 		idx = find_irq_entry(apic_id, pin, mp_INT);
 		if (io_apic_pin_not_connected(idx, apic_id, pin))
 			continue;
@@ -1495,7 +1511,7 @@ __apicdebuginit(void) print_IO_APIC(void)
 	printk(KERN_DEBUG "number of MP IRQ sources: %d.\n", mp_irq_entries);
 	for (i = 0; i < nr_ioapics; i++)
 		printk(KERN_DEBUG "number of IO-APIC #%d registers: %d.\n",
-		       mpc_ioapic_id(i), ioapics[i].nr_registers);
+		       mp_ioapics[i].apicid, nr_ioapic_registers[i]);
 
 	/*
 	 * We are a bit conservative about what we expect.  We have to
@@ -1515,7 +1531,7 @@ __apicdebuginit(void) print_IO_APIC(void)
 	raw_spin_unlock_irqrestore(&ioapic_lock, flags);
 
 	printk("\n");
-	printk(KERN_DEBUG "IO APIC #%d......\n", mpc_ioapic_id(apic));
+	printk(KERN_DEBUG "IO APIC #%d......\n", mp_ioapics[apic].apicid);
 	printk(KERN_DEBUG ".... register #00: %08X\n", reg_00.raw);
 	printk(KERN_DEBUG ".......    : physical APIC id: %02X\n", reg_00.bits.ID);
 	printk(KERN_DEBUG ".......    : Delivery Type: %X\n", reg_00.bits.delivery_type);
@@ -1809,7 +1825,7 @@ void __init enable_IO_APIC(void)
 	for(apic = 0; apic < nr_ioapics; apic++) {
 		int pin;
 		/* See if any of the pins is in ExtINT mode */
-		for (pin = 0; pin < ioapics[apic].nr_registers; pin++) {
+		for (pin = 0; pin < nr_ioapic_registers[apic]; pin++) {
 			struct IO_APIC_route_entry entry;
 			entry = ioapic_read_entry(apic, pin);
 
@@ -1933,14 +1949,14 @@ void __init setup_ioapic_ids_from_mpc_nocheck(void)
 		reg_00.raw = io_apic_read(apic_id, 0);
 		raw_spin_unlock_irqrestore(&ioapic_lock, flags);
 
-		old_id = mpc_ioapic_id(apic_id);
+		old_id = mp_ioapics[apic_id].apicid;
 
-		if (mpc_ioapic_id(apic_id) >= get_physical_broadcast()) {
+		if (mp_ioapics[apic_id].apicid >= get_physical_broadcast()) {
 			printk(KERN_ERR "BIOS bug, IO-APIC#%d ID is %d in the MPC table!...\n",
-				apic_id, mpc_ioapic_id(apic_id));
+				apic_id, mp_ioapics[apic_id].apicid);
 			printk(KERN_ERR "... fixing up to %d. (tell your hw vendor)\n",
 				reg_00.bits.ID);
-			ioapics[apic_id].mp_config.apicid = reg_00.bits.ID;
+			mp_ioapics[apic_id].apicid = reg_00.bits.ID;
 		}
 
 		/*
@@ -1949,9 +1965,9 @@ void __init setup_ioapic_ids_from_mpc_nocheck(void)
 		 * 'stuck on smp_invalidate_needed IPI wait' messages.
 		 */
 		if (apic->check_apicid_used(&phys_id_present_map,
-					    mpc_ioapic_id(apic_id))) {
+					mp_ioapics[apic_id].apicid)) {
 			printk(KERN_ERR "BIOS bug, IO-APIC#%d ID %d is already used!...\n",
-				apic_id, mpc_ioapic_id(apic_id));
+				apic_id, mp_ioapics[apic_id].apicid);
 			for (i = 0; i < get_physical_broadcast(); i++)
 				if (!physid_isset(i, phys_id_present_map))
 					break;
@@ -1960,14 +1976,13 @@ void __init setup_ioapic_ids_from_mpc_nocheck(void)
 			printk(KERN_ERR "... fixing up to %d. (tell your hw vendor)\n",
 				i);
 			physid_set(i, phys_id_present_map);
-			ioapics[apic_id].mp_config.apicid = i;
+			mp_ioapics[apic_id].apicid = i;
 		} else {
 			physid_mask_t tmp;
-			apic->apicid_to_cpu_present(mpc_ioapic_id(apic_id),
-						    &tmp);
+			apic->apicid_to_cpu_present(mp_ioapics[apic_id].apicid, &tmp);
 			apic_printk(APIC_VERBOSE, "Setting %d in the "
 					"phys_id_present_map\n",
-					mpc_ioapic_id(apic_id));
+					mp_ioapics[apic_id].apicid);
 			physids_or(phys_id_present_map, phys_id_present_map, tmp);
 		}
 
@@ -1975,24 +1990,24 @@ void __init setup_ioapic_ids_from_mpc_nocheck(void)
 		 * We need to adjust the IRQ routing table
 		 * if the ID changed.
 		 */
-		if (old_id != mpc_ioapic_id(apic_id))
+		if (old_id != mp_ioapics[apic_id].apicid)
 			for (i = 0; i < mp_irq_entries; i++)
 				if (mp_irqs[i].dstapic == old_id)
 					mp_irqs[i].dstapic
-						= mpc_ioapic_id(apic_id);
+						= mp_ioapics[apic_id].apicid;
 
 		/*
 		 * Update the ID register according to the right value
 		 * from the MPC table if they are different.
 		 */
-		if (mpc_ioapic_id(apic_id) == reg_00.bits.ID)
+		if (mp_ioapics[apic_id].apicid == reg_00.bits.ID)
 			continue;
 
 		apic_printk(APIC_VERBOSE, KERN_INFO
 			"...changing IO-APIC physical APIC ID to %d ...",
-			mpc_ioapic_id(apic_id));
+			mp_ioapics[apic_id].apicid);
 
-		reg_00.bits.ID = mpc_ioapic_id(apic_id);
+		reg_00.bits.ID = mp_ioapics[apic_id].apicid;
 		raw_spin_lock_irqsave(&ioapic_lock, flags);
 		io_apic_write(apic_id, 0, reg_00.raw);
 		raw_spin_unlock_irqrestore(&ioapic_lock, flags);
@@ -2003,7 +2018,7 @@ void __init setup_ioapic_ids_from_mpc_nocheck(void)
 		raw_spin_lock_irqsave(&ioapic_lock, flags);
 		reg_00.raw = io_apic_read(apic_id, 0);
 		raw_spin_unlock_irqrestore(&ioapic_lock, flags);
-		if (reg_00.bits.ID != mpc_ioapic_id(apic_id))
+		if (reg_00.bits.ID != mp_ioapics[apic_id].apicid)
 			printk("could not set ID!\n");
 		else
 			apic_printk(APIC_VERBOSE, " ok.\n");
@@ -2389,7 +2404,7 @@ static void eoi_ioapic_irq(unsigned int irq, struct irq_cfg *cfg)
 
 	raw_spin_lock_irqsave(&ioapic_lock, flags);
 	for_each_irq_pin(entry, cfg->irq_2_pin) {
-		if (mpc_ioapic_ver(entry->apic) >= 0x20) {
+		if (mp_ioapics[entry->apic].apicver >= 0x20) {
 			/*
 			 * Intr-remapping uses pin number as the virtual vector
 			 * in the RTE. Actual vector is programmed in
@@ -2903,19 +2918,49 @@ static int __init io_apic_bug_finalize(void)
 
 late_initcall(io_apic_bug_finalize);
 
-static void resume_ioapic_id(int ioapic_id)
+static struct IO_APIC_route_entry *ioapic_saved_data[MAX_IO_APICS];
+
+static void suspend_ioapic(int ioapic_id)
 {
+	struct IO_APIC_route_entry *saved_data = ioapic_saved_data[ioapic_id];
+	int i;
+
+	if (!saved_data)
+		return;
+
+	for (i = 0; i < nr_ioapic_registers[ioapic_id]; i++)
+		saved_data[i] = ioapic_read_entry(ioapic_id, i);
+}
+
+static int ioapic_suspend(void)
+{
+	int ioapic_id;
+
+	for (ioapic_id = 0; ioapic_id < nr_ioapics; ioapic_id++)
+		suspend_ioapic(ioapic_id);
+
+	return 0;
+}
+
+static void resume_ioapic(int ioapic_id)
+{
+	struct IO_APIC_route_entry *saved_data = ioapic_saved_data[ioapic_id];
 	unsigned long flags;
 	union IO_APIC_reg_00 reg_00;
+	int i;
 
+	if (!saved_data)
+		return;
 
 	raw_spin_lock_irqsave(&ioapic_lock, flags);
 	reg_00.raw = io_apic_read(ioapic_id, 0);
-	if (reg_00.bits.ID != mpc_ioapic_id(ioapic_id)) {
-		reg_00.bits.ID = mpc_ioapic_id(ioapic_id);
+	if (reg_00.bits.ID != mp_ioapics[ioapic_id].apicid) {
+		reg_00.bits.ID = mp_ioapics[ioapic_id].apicid;
 		io_apic_write(ioapic_id, 0, reg_00.raw);
 	}
 	raw_spin_unlock_irqrestore(&ioapic_lock, flags);
+	for (i = 0; i < nr_ioapic_registers[ioapic_id]; i++)
+		ioapic_write_entry(ioapic_id, i, saved_data[i]);
 }
 
 static void ioapic_resume(void)
@@ -2923,18 +2968,28 @@ static void ioapic_resume(void)
 	int ioapic_id;
 
 	for (ioapic_id = nr_ioapics - 1; ioapic_id >= 0; ioapic_id--)
-		resume_ioapic_id(ioapic_id);
-
-	restore_ioapic_entries();
+		resume_ioapic(ioapic_id);
 }
 
 static struct syscore_ops ioapic_syscore_ops = {
-	.suspend = save_ioapic_entries,
+	.suspend = ioapic_suspend,
 	.resume = ioapic_resume,
 };
 
 static int __init ioapic_init_ops(void)
 {
+	int i;
+
+	for (i = 0; i < nr_ioapics; i++) {
+		unsigned int size;
+
+		size = nr_ioapic_registers[i]
+			* sizeof(struct IO_APIC_route_entry);
+		ioapic_saved_data[i] = kzalloc(size, GFP_KERNEL);
+		if (!ioapic_saved_data[i])
+			pr_err("IOAPIC %d: suspend/resume impossible!\n", i);
+	}
+
 	register_syscore_ops(&ioapic_syscore_ops);
 
 	return 0;
@@ -3537,14 +3592,14 @@ int io_apic_setup_irq_pin_once(unsigned int irq, int node,
 	int ret;
 
 	/* Avoid redundant programming */
-	if (test_bit(pin, ioapics[id].pin_programmed)) {
+	if (test_bit(pin, mp_ioapic_routing[id].pin_programmed)) {
 		pr_debug("Pin %d-%d already programmed\n",
-			 mpc_ioapic_id(id), pin);
+			 mp_ioapics[id].apicid, pin);
 		return 0;
 	}
 	ret = io_apic_setup_irq_pin(irq, node, attr);
 	if (!ret)
-		set_bit(pin, ioapics[id].pin_programmed);
+		set_bit(pin, mp_ioapic_routing[id].pin_programmed);
 	return ret;
 }
 
@@ -3709,7 +3764,8 @@ static u8 __init io_apic_unique_id(u8 id)
 
 	bitmap_zero(used, 256);
 	for (i = 0; i < nr_ioapics; i++) {
-		__set_bit(mpc_ioapic_id(i), used);
+		struct mpc_ioapic *ia = &mp_ioapics[i];
+		__set_bit(ia->apicid, used);
 	}
 	if (!test_bit(id, used))
 		return id;
@@ -3769,7 +3825,7 @@ void __init setup_ioapic_dest(void)
 		return;
 
 	for (ioapic = 0; ioapic < nr_ioapics; ioapic++)
-	for (pin = 0; pin < ioapics[ioapic].nr_registers; pin++) {
+	for (pin = 0; pin < nr_ioapic_registers[ioapic]; pin++) {
 		irq_entry = find_irq_entry(ioapic, pin, mp_INT);
 		if (irq_entry == -1)
 			continue;
@@ -3840,7 +3896,7 @@ void __init ioapic_and_gsi_init(void)
 	ioapic_res = ioapic_setup_resources(nr_ioapics);
 	for (i = 0; i < nr_ioapics; i++) {
 		if (smp_found_config) {
-			ioapic_phys = mpc_ioapic_addr(i);
+			ioapic_phys = mp_ioapics[i].apicaddr;
 #ifdef CONFIG_X86_32
 			if (!ioapic_phys) {
 				printk(KERN_ERR
@@ -3900,9 +3956,8 @@ int mp_find_ioapic(u32 gsi)
 
 	/* Find the IOAPIC that manages this GSI. */
 	for (i = 0; i < nr_ioapics; i++) {
-		struct mp_ioapic_gsi *gsi_cfg = mp_ioapic_gsi_routing(i);
-		if ((gsi >= gsi_cfg->gsi_base)
-		    && (gsi <= gsi_cfg->gsi_end))
+		if ((gsi >= mp_gsi_routing[i].gsi_base)
+		    && (gsi <= mp_gsi_routing[i].gsi_end))
 			return i;
 	}
 
@@ -3912,16 +3967,12 @@ int mp_find_ioapic(u32 gsi)
 
 int mp_find_ioapic_pin(int ioapic, u32 gsi)
 {
-	struct mp_ioapic_gsi *gsi_cfg;
-
 	if (WARN_ON(ioapic == -1))
 		return -1;
-
-	gsi_cfg = mp_ioapic_gsi_routing(ioapic);
-	if (WARN_ON(gsi > gsi_cfg->gsi_end))
+	if (WARN_ON(gsi > mp_gsi_routing[ioapic].gsi_end))
 		return -1;
 
-	return gsi - gsi_cfg->gsi_base;
+	return gsi - mp_gsi_routing[ioapic].gsi_base;
 }
 
 static __init int bad_ioapic(unsigned long address)
@@ -3943,42 +3994,40 @@ void __init mp_register_ioapic(int id, u32 address, u32 gsi_base)
 {
 	int idx = 0;
 	int entries;
-	struct mp_ioapic_gsi *gsi_cfg;
 
 	if (bad_ioapic(address))
 		return;
 
 	idx = nr_ioapics;
 
-	ioapics[idx].mp_config.type = MP_IOAPIC;
-	ioapics[idx].mp_config.flags = MPC_APIC_USABLE;
-	ioapics[idx].mp_config.apicaddr = address;
+	mp_ioapics[idx].type = MP_IOAPIC;
+	mp_ioapics[idx].flags = MPC_APIC_USABLE;
+	mp_ioapics[idx].apicaddr = address;
 
 	set_fixmap_nocache(FIX_IO_APIC_BASE_0 + idx, address);
-	ioapics[idx].mp_config.apicid = io_apic_unique_id(id);
-	ioapics[idx].mp_config.apicver = io_apic_get_version(idx);
+	mp_ioapics[idx].apicid = io_apic_unique_id(id);
+	mp_ioapics[idx].apicver = io_apic_get_version(idx);
 
 	/*
 	 * Build basic GSI lookup table to facilitate gsi->io_apic lookups
 	 * and to prevent reprogramming of IOAPIC pins (PCI GSIs).
 	 */
 	entries = io_apic_get_redir_entries(idx);
-	gsi_cfg = mp_ioapic_gsi_routing(idx);
-	gsi_cfg->gsi_base = gsi_base;
-	gsi_cfg->gsi_end = gsi_base + entries - 1;
+	mp_gsi_routing[idx].gsi_base = gsi_base;
+	mp_gsi_routing[idx].gsi_end = gsi_base + entries - 1;
 
 	/*
 	 * The number of IO-APIC IRQ registers (== #pins):
 	 */
-	ioapics[idx].nr_registers = entries;
+	nr_ioapic_registers[idx] = entries;
 
-	if (gsi_cfg->gsi_end >= gsi_top)
-		gsi_top = gsi_cfg->gsi_end + 1;
+	if (mp_gsi_routing[idx].gsi_end >= gsi_top)
+		gsi_top = mp_gsi_routing[idx].gsi_end + 1;
 
 	printk(KERN_INFO "IOAPIC[%d]: apic_id %d, version %d, address 0x%x, "
-	       "GSI %d-%d\n", idx, mpc_ioapic_id(idx),
-	       mpc_ioapic_ver(idx), mpc_ioapic_addr(idx),
-	       gsi_cfg->gsi_base, gsi_cfg->gsi_end);
+	       "GSI %d-%d\n", idx, mp_ioapics[idx].apicid,
+	       mp_ioapics[idx].apicver, mp_ioapics[idx].apicaddr,
+	       mp_gsi_routing[idx].gsi_base, mp_gsi_routing[idx].gsi_end);
 
 	nr_ioapics++;
 }

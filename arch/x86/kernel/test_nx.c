@@ -161,7 +161,7 @@ static int test_NX(void)
 	}
 
 #endif
-	return ret;
+	return 0;
 }
 
 static void test_exit(void)

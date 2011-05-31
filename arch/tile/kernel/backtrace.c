@@ -14,11 +14,19 @@
 
 #include <linux/kernel.h>
 #include <linux/string.h>
-#include <asm/backtrace.h>
-#include <asm/opcode-tile.h>
-#include <arch/abi.h>
 
-#ifdef __tilegx__
+#include <asm/backtrace.h>
+
+#include <arch/chip.h>
+
+#include <asm/opcode-tile.h>
+
+
+#define TREG_SP 54
+#define TREG_LR 55
+
+
+#if TILE_CHIP >= 10
 #define tile_bundle_bits tilegx_bundle_bits
 #define TILE_MAX_INSTRUCTIONS_PER_BUNDLE TILEGX_MAX_INSTRUCTIONS_PER_BUNDLE
 #define TILE_BUNDLE_ALIGNMENT_IN_BYTES TILEGX_BUNDLE_ALIGNMENT_IN_BYTES
@@ -39,7 +47,7 @@ typedef long long bt_int_reg_t;
 typedef int bt_int_reg_t;
 #endif
 
-/* A decoded bundle used for backtracer analysis. */
+/** A decoded bundle used for backtracer analysis. */
 struct BacktraceBundle {
 	tile_bundle_bits bits;
 	int num_insns;
@@ -48,7 +56,23 @@ struct BacktraceBundle {
 };
 
 
-/* Locates an instruction inside the given bundle that
+/* This implementation only makes sense for native tools. */
+/** Default function to read memory. */
+static bool bt_read_memory(void *result, VirtualAddress addr,
+			   unsigned int size, void *extra)
+{
+	/* FIXME: this should do some horrible signal stuff to catch
+	 * SEGV cleanly and fail.
+	 *
+	 * Or else the caller should do the setjmp for efficiency.
+	 */
+
+	memcpy(result, (const void *)addr, size);
+	return true;
+}
+
+
+/** Locates an instruction inside the given bundle that
  * has the specified mnemonic, and whose first 'num_operands_to_match'
  * operands exactly match those in 'operand_values'.
  */
@@ -83,13 +107,13 @@ static const struct tile_decoded_instruction *find_matching_insn(
 	return NULL;
 }
 
-/* Does this bundle contain an 'iret' instruction? */
+/** Does this bundle contain an 'iret' instruction? */
 static inline bool bt_has_iret(const struct BacktraceBundle *bundle)
 {
 	return find_matching_insn(bundle, TILE_OPC_IRET, NULL, 0) != NULL;
 }
 
-/* Does this bundle contain an 'addi sp, sp, OFFSET' or
+/** Does this bundle contain an 'addi sp, sp, OFFSET' or
  * 'addli sp, sp, OFFSET' instruction, and if so, what is OFFSET?
  */
 static bool bt_has_addi_sp(const struct BacktraceBundle *bundle, int *adjust)
@@ -100,7 +124,7 @@ static bool bt_has_addi_sp(const struct BacktraceBundle *bundle, int *adjust)
 		find_matching_insn(bundle, TILE_OPC_ADDI, vals, 2);
 	if (insn == NULL)
 		insn = find_matching_insn(bundle, TILE_OPC_ADDLI, vals, 2);
-#ifdef __tilegx__
+#if TILE_CHIP >= 10
 	if (insn == NULL)
 		insn = find_matching_insn(bundle, TILEGX_OPC_ADDXLI, vals, 2);
 	if (insn == NULL)
@@ -113,7 +137,7 @@ static bool bt_has_addi_sp(const struct BacktraceBundle *bundle, int *adjust)
 	return true;
 }
 
-/* Does this bundle contain any 'info OP' or 'infol OP'
+/** Does this bundle contain any 'info OP' or 'infol OP'
  * instruction, and if so, what are their OP?  Note that OP is interpreted
  * as an unsigned value by this code since that's what the caller wants.
  * Returns the number of info ops found.
@@ -137,7 +161,7 @@ static int bt_get_info_ops(const struct BacktraceBundle *bundle,
 	return num_ops;
 }
 
-/* Does this bundle contain a jrp instruction, and if so, to which
+/** Does this bundle contain a jrp instruction, and if so, to which
  * register is it jumping?
  */
 static bool bt_has_jrp(const struct BacktraceBundle *bundle, int *target_reg)
@@ -151,7 +175,7 @@ static bool bt_has_jrp(const struct BacktraceBundle *bundle, int *target_reg)
 	return true;
 }
 
-/* Does this bundle modify the specified register in any way? */
+/** Does this bundle modify the specified register in any way? */
 static bool bt_modifies_reg(const struct BacktraceBundle *bundle, int reg)
 {
 	int i, j;
@@ -171,34 +195,34 @@ static bool bt_modifies_reg(const struct BacktraceBundle *bundle, int reg)
 	return false;
 }
 
-/* Does this bundle modify sp? */
+/** Does this bundle modify sp? */
 static inline bool bt_modifies_sp(const struct BacktraceBundle *bundle)
 {
 	return bt_modifies_reg(bundle, TREG_SP);
 }
 
-/* Does this bundle modify lr? */
+/** Does this bundle modify lr? */
 static inline bool bt_modifies_lr(const struct BacktraceBundle *bundle)
 {
 	return bt_modifies_reg(bundle, TREG_LR);
 }
 
-/* Does this bundle contain the instruction 'move fp, sp'? */
+/** Does this bundle contain the instruction 'move fp, sp'? */
 static inline bool bt_has_move_r52_sp(const struct BacktraceBundle *bundle)
 {
 	static const int vals[2] = { 52, TREG_SP };
 	return find_matching_insn(bundle, TILE_OPC_MOVE, vals, 2) != NULL;
 }
 
-/* Does this bundle contain a store of lr to sp? */
+/** Does this bundle contain a store of lr to sp? */
 static inline bool bt_has_sw_sp_lr(const struct BacktraceBundle *bundle)
 {
 	static const int vals[2] = { TREG_SP, TREG_LR };
 	return find_matching_insn(bundle, OPCODE_STORE, vals, 2) != NULL;
 }
 
-#ifdef __tilegx__
-/* Track moveli values placed into registers. */
+#if TILE_CHIP >= 10
+/** Track moveli values placed into registers. */
 static inline void bt_update_moveli(const struct BacktraceBundle *bundle,
 				    int moveli_args[])
 {
@@ -214,7 +238,7 @@ static inline void bt_update_moveli(const struct BacktraceBundle *bundle,
 	}
 }
 
-/* Does this bundle contain an 'add sp, sp, reg' instruction
+/** Does this bundle contain an 'add sp, sp, reg' instruction
  * from a register that we saw a moveli into, and if so, what
  * is the value in the register?
  */
@@ -236,11 +260,11 @@ static bool bt_has_add_sp(const struct BacktraceBundle *bundle, int *adjust,
 }
 #endif
 
-/* Locates the caller's PC and SP for a program starting at the
+/** Locates the caller's PC and SP for a program starting at the
  * given address.
  */
 static void find_caller_pc_and_caller_sp(CallerLocation *location,
-					 const unsigned long start_pc,
+					 const VirtualAddress start_pc,
 					 BacktraceMemoryReader read_memory_func,
 					 void *read_memory_func_extra)
 {
@@ -264,9 +288,9 @@ static void find_caller_pc_and_caller_sp(CallerLocation *location,
 	tile_bundle_bits prefetched_bundles[32];
 	int num_bundles_prefetched = 0;
 	int next_bundle = 0;
-	unsigned long pc;
+	VirtualAddress pc;
 
-#ifdef __tilegx__
+#if TILE_CHIP >= 10
 	/* Naively try to track moveli values to support addx for -m32. */
 	int moveli_args[TILEGX_NUM_REGISTERS] = { 0 };
 #endif
@@ -343,6 +367,10 @@ static void find_caller_pc_and_caller_sp(CallerLocation *location,
 				int info_operand = info_operands[i];
 				if (info_operand < CALLER_UNKNOWN_BASE)	{
 					/* Weird; reserved value, ignore it. */
+					continue;
+				}
+				if (info_operand & ENTRY_POINT_INFO_OP)	{
+					/* This info op is ignored by the backtracer. */
 					continue;
 				}
 
@@ -425,7 +453,7 @@ static void find_caller_pc_and_caller_sp(CallerLocation *location,
 		if (!sp_determined) {
 			int adjust;
 			if (bt_has_addi_sp(&bundle, &adjust)
-#ifdef __tilegx__
+#if TILE_CHIP >= 10
 			    || bt_has_add_sp(&bundle, &adjust, moveli_args)
 #endif
 				) {
@@ -476,7 +504,7 @@ static void find_caller_pc_and_caller_sp(CallerLocation *location,
 				}
 			}
 
-#ifdef __tilegx__
+#if TILE_CHIP >= 10
 			/* Track moveli arguments for -m32 mode. */
 			bt_update_moveli(&bundle, moveli_args);
 #endif
@@ -518,26 +546,18 @@ static void find_caller_pc_and_caller_sp(CallerLocation *location,
 	}
 }
 
-/* Initializes a backtracer to start from the given location.
- *
- * If the frame pointer cannot be determined it is set to -1.
- *
- * state: The state to be filled in.
- * read_memory_func: A callback that reads memory.
- * read_memory_func_extra: An arbitrary argument to read_memory_func.
- * pc: The current PC.
- * lr: The current value of the 'lr' register.
- * sp: The current value of the 'sp' register.
- * r52: The current value of the 'r52' register.
- */
 void backtrace_init(BacktraceIterator *state,
 		    BacktraceMemoryReader read_memory_func,
 		    void *read_memory_func_extra,
-		    unsigned long pc, unsigned long lr,
-		    unsigned long sp, unsigned long r52)
+		    VirtualAddress pc, VirtualAddress lr,
+		    VirtualAddress sp, VirtualAddress r52)
 {
 	CallerLocation location;
-	unsigned long fp, initial_frame_caller_pc;
+	VirtualAddress fp, initial_frame_caller_pc;
+
+	if (read_memory_func == NULL) {
+		read_memory_func = bt_read_memory;
+	}
 
 	/* Find out where we are in the initial frame. */
 	find_caller_pc_and_caller_sp(&location, pc,
@@ -610,15 +630,12 @@ void backtrace_init(BacktraceIterator *state,
 /* Handle the case where the register holds more bits than the VA. */
 static bool valid_addr_reg(bt_int_reg_t reg)
 {
-	return ((unsigned long)reg == reg);
+	return ((VirtualAddress)reg == reg);
 }
 
-/* Advances the backtracing state to the calling frame, returning
- * true iff successful.
- */
 bool backtrace_next(BacktraceIterator *state)
 {
-	unsigned long next_fp, next_pc;
+	VirtualAddress next_fp, next_pc;
 	bt_int_reg_t next_frame[2];
 
 	if (state->fp == -1) {

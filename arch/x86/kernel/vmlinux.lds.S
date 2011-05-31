@@ -16,8 +16,10 @@
 
 #ifdef CONFIG_X86_32
 #define LOAD_OFFSET __PAGE_OFFSET
-#else
+#elif !defined(CONFIG_XEN) || CONFIG_XEN_COMPAT > 0x030002
 #define LOAD_OFFSET __START_KERNEL_map
+#else
+#define LOAD_OFFSET 0
 #endif
 
 #include <asm-generic/vmlinux.lds.h>
@@ -41,7 +43,7 @@ ENTRY(phys_startup_64)
 jiffies_64 = jiffies;
 #endif
 
-#if defined(CONFIG_X86_64) && defined(CONFIG_DEBUG_RODATA)
+#if defined(CONFIG_X86_64) && defined(CONFIG_DEBUG_RODATA) && !defined(CONFIG_XEN)
 /*
  * On 64-bit, align RODATA to 2MB so that even with CONFIG_DEBUG_RODATA
  * we retain large page mappings for boundaries spanning kernel text, rodata
@@ -84,6 +86,10 @@ SECTIONS
 {
 #ifdef CONFIG_X86_32
         . = LOAD_OFFSET + LOAD_PHYSICAL_ADDR;
+#if defined(CONFIG_XEN) && CONFIG_XEN_COMPAT <= 0x030002
+#undef LOAD_OFFSET
+#define LOAD_OFFSET 0
+#endif
         phys_startup_32 = startup_32 - LOAD_OFFSET;
 #else
         . = __START_KERNEL;
@@ -161,12 +167,6 @@ SECTIONS
 
 #define VVIRT_OFFSET (VSYSCALL_ADDR - __vsyscall_0)
 #define VVIRT(x) (ADDR(x) - VVIRT_OFFSET)
-#define EMIT_VVAR(x, offset) .vsyscall_var_ ## x	\
-	ADDR(.vsyscall_0) + offset		 	\
-	: AT(VLOAD(.vsyscall_var_ ## x)) {     		\
-		*(.vsyscall_var_ ## x)			\
-	}						\
-	x = VVIRT(.vsyscall_var_ ## x);
 
 	. = ALIGN(4096);
 	__vsyscall_0 = .;
@@ -181,6 +181,18 @@ SECTIONS
 		*(.vsyscall_fn)
 	}
 
+	. = ALIGN(L1_CACHE_BYTES);
+	.vsyscall_gtod_data : AT(VLOAD(.vsyscall_gtod_data)) {
+		*(.vsyscall_gtod_data)
+	}
+
+	vsyscall_gtod_data = VVIRT(.vsyscall_gtod_data);
+	.vsyscall_clock : AT(VLOAD(.vsyscall_clock)) {
+		*(.vsyscall_clock)
+	}
+	vsyscall_clock = VVIRT(.vsyscall_clock);
+
+
 	.vsyscall_1 ADDR(.vsyscall_0) + 1024: AT(VLOAD(.vsyscall_1)) {
 		*(.vsyscall_1)
 	}
@@ -188,13 +200,20 @@ SECTIONS
 		*(.vsyscall_2)
 	}
 
+	.vgetcpu_mode : AT(VLOAD(.vgetcpu_mode)) {
+		*(.vgetcpu_mode)
+	}
+	vgetcpu_mode = VVIRT(.vgetcpu_mode);
+
+	. = ALIGN(L1_CACHE_BYTES);
+	.jiffies : AT(VLOAD(.jiffies)) {
+		*(.jiffies)
+	}
+	jiffies = VVIRT(.jiffies);
+
 	.vsyscall_3 ADDR(.vsyscall_0) + 3072: AT(VLOAD(.vsyscall_3)) {
 		*(.vsyscall_3)
 	}
-
-#define __VVAR_KERNEL_LDS
-#include <asm/vvar.h>
-#undef __VVAR_KERNEL_LDS
 
 	. = __vsyscall_0 + PAGE_SIZE;
 
@@ -203,7 +222,6 @@ SECTIONS
 #undef VLOAD
 #undef VVIRT_OFFSET
 #undef VVIRT
-#undef EMIT_VVAR
 
 #endif /* CONFIG_X86_64 */
 
@@ -294,13 +312,6 @@ SECTIONS
 	}
 
 	. = ALIGN(8);
-	.apicdrivers : AT(ADDR(.apicdrivers) - LOAD_OFFSET) {
-		__apicdrivers = .;
-		*(.apicdrivers);
-		__apicdrivers_end = .;
-	}
-
-	. = ALIGN(8);
 	/*
 	 * .exit.text is discard at runtime, not link time, to deal with
 	 *  references from .altinstructions and .eh_frame
@@ -314,7 +325,7 @@ SECTIONS
 	}
 
 #if !defined(CONFIG_X86_64) || !defined(CONFIG_SMP)
-	PERCPU_SECTION(INTERNODE_CACHE_BYTES)
+	PERCPU(INTERNODE_CACHE_BYTES, PAGE_SIZE)
 #endif
 
 	. = ALIGN(PAGE_SIZE);

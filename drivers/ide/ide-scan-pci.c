@@ -88,7 +88,7 @@ static int __init ide_scan_pcibus(void)
 	struct list_head *l, *n;
 
 	pre_init = 0;
-	for_each_pci_dev(dev)
+	while ((dev = pci_get_device(PCI_ANY_ID, PCI_ANY_ID, dev)))
 		ide_scan_pcidev(dev);
 
 	/*

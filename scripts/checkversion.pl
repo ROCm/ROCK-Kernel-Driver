@@ -12,7 +12,6 @@ $| = 1;
 my $debugging;
 
 foreach my $file (@ARGV) {
-    next if $file =~ "include/linux/version\.h";
     # Open this file.
     open( my $f, '<', $file )
       or die "Can't open $file: $!\n";

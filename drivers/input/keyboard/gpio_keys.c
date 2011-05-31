@@ -324,12 +324,7 @@ static void gpio_keys_report_event(struct gpio_button_data *bdata)
 	unsigned int type = button->type ?: EV_KEY;
 	int state = (gpio_get_value_cansleep(button->gpio) ? 1 : 0) ^ button->active_low;
 
-	if (type == EV_ABS) {
-		if (state)
-			input_event(input, type, button->code, button->value);
-	} else {
-		input_event(input, type, button->code, !!state);
-	}
+	input_event(input, type, button->code, !!state);
 	input_sync(input);
 }
 
@@ -368,7 +363,7 @@ static int __devinit gpio_keys_setup_key(struct platform_device *pdev,
 					 struct gpio_button_data *bdata,
 					 struct gpio_keys_button *button)
 {
-	const char *desc = button->desc ? button->desc : "gpio_keys";
+	char *desc = button->desc ? button->desc : "gpio_keys";
 	struct device *dev = &pdev->dev;
 	unsigned long irqflags;
 	int irq, error;
@@ -473,7 +468,7 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, ddata);
 	input_set_drvdata(input, ddata);
 
-	input->name = pdata->name ? : pdev->name;
+	input->name = pdev->name;
 	input->phys = "gpio-keys/input0";
 	input->dev.parent = &pdev->dev;
 	input->open = gpio_keys_open;

@@ -1206,7 +1206,7 @@ static void nonpaging_invlpg(struct kvm_vcpu *vcpu, gva_t gva)
 
 static void nonpaging_update_pte(struct kvm_vcpu *vcpu,
 				 struct kvm_mmu_page *sp, u64 *spte,
-				 const void *pte)
+				 const void *pte, unsigned long mmu_seq)
 {
 	WARN_ON(1);
 }
@@ -3163,8 +3163,9 @@ static void mmu_pte_write_zap_pte(struct kvm_vcpu *vcpu,
 }
 
 static void mmu_pte_write_new_pte(struct kvm_vcpu *vcpu,
-				  struct kvm_mmu_page *sp, u64 *spte,
-				  const void *new)
+				  struct kvm_mmu_page *sp,
+				  u64 *spte,
+				  const void *new, unsigned long mmu_seq)
 {
 	if (sp->role.level != PT_PAGE_TABLE_LEVEL) {
 		++vcpu->kvm->stat.mmu_pde_zapped;
@@ -3172,7 +3173,7 @@ static void mmu_pte_write_new_pte(struct kvm_vcpu *vcpu,
         }
 
 	++vcpu->kvm->stat.mmu_pte_updated;
-	vcpu->arch.mmu.update_pte(vcpu, sp, spte, new);
+	vcpu->arch.mmu.update_pte(vcpu, sp, spte, new, mmu_seq);
 }
 
 static bool need_remote_flush(u64 old, u64 new)
@@ -3228,6 +3229,7 @@ void kvm_mmu_pte_write(struct kvm_vcpu *vcpu, gpa_t gpa,
 	struct kvm_mmu_page *sp;
 	struct hlist_node *node;
 	LIST_HEAD(invalid_list);
+	unsigned long mmu_seq;
 	u64 entry, gentry, *spte;
 	unsigned pte_size, page_offset, misaligned, quadrant, offset;
 	int level, npte, invlpg_counter, r, flooded = 0;
@@ -3268,6 +3270,9 @@ void kvm_mmu_pte_write(struct kvm_vcpu *vcpu, gpa_t gpa,
 		gentry = 0;
 		break;
 	}
+
+	mmu_seq = vcpu->kvm->mmu_notifier_seq;
+	smp_rmb();
 
 	spin_lock(&vcpu->kvm->mmu_lock);
 	if (atomic_read(&vcpu->kvm->arch.invlpg_counter) != invlpg_counter)
@@ -3340,7 +3345,8 @@ void kvm_mmu_pte_write(struct kvm_vcpu *vcpu, gpa_t gpa,
 			if (gentry &&
 			      !((sp->role.word ^ vcpu->arch.mmu.base_role.word)
 			      & mask.word))
-				mmu_pte_write_new_pte(vcpu, sp, spte, &gentry);
+				mmu_pte_write_new_pte(vcpu, sp, spte, &gentry,
+						      mmu_seq);
 			if (!remote_flush && need_remote_flush(entry, *spte))
 				remote_flush = true;
 			++spte;
@@ -3545,11 +3551,10 @@ static int kvm_mmu_remove_some_alloc_mmu_pages(struct kvm *kvm,
 	return kvm_mmu_prepare_zap_page(kvm, page, invalid_list);
 }
 
-static int mmu_shrink(struct shrinker *shrink, struct shrink_control *sc)
+static int mmu_shrink(struct shrinker *shrink, int nr_to_scan, gfp_t gfp_mask)
 {
 	struct kvm *kvm;
 	struct kvm *kvm_freed = NULL;
-	int nr_to_scan = sc->nr_to_scan;
 
 	if (nr_to_scan == 0)
 		goto out;

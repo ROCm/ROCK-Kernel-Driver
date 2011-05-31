@@ -139,7 +139,7 @@ void platform_pm_runtime_suspend_idle(void)
 	queue_work(pm_wq, &hwblk_work);
 }
 
-static int default_platform_runtime_suspend(struct device *dev)
+int platform_pm_runtime_suspend(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct pdev_archdata *ad = &pdev->archdata;
@@ -147,7 +147,7 @@ static int default_platform_runtime_suspend(struct device *dev)
 	int hwblk = ad->hwblk_id;
 	int ret = 0;
 
-	dev_dbg(dev, "%s() [%d]\n", __func__, hwblk);
+	dev_dbg(dev, "platform_pm_runtime_suspend() [%d]\n", hwblk);
 
 	/* ignore off-chip platform devices */
 	if (!hwblk)
@@ -157,7 +157,7 @@ static int default_platform_runtime_suspend(struct device *dev)
 	might_sleep();
 
 	/* catch misconfigured drivers not starting with resume */
-	if (test_bit(PDEV_ARCHDATA_FLAG_INIT, &ad->flags)) {
+	if (test_bit(PDEV_ARCHDATA_FLAG_INIT, &pdev->archdata.flags)) {
 		ret = -EINVAL;
 		goto out;
 	}
@@ -170,8 +170,8 @@ static int default_platform_runtime_suspend(struct device *dev)
 
 	/* put device on idle list */
 	spin_lock_irqsave(&hwblk_lock, flags);
-	list_add_tail(&ad->entry, &hwblk_idle_list);
-	__set_bit(PDEV_ARCHDATA_FLAG_IDLE, &ad->flags);
+	list_add_tail(&pdev->archdata.entry, &hwblk_idle_list);
+	__set_bit(PDEV_ARCHDATA_FLAG_IDLE, &pdev->archdata.flags);
 	spin_unlock_irqrestore(&hwblk_lock, flags);
 
 	/* increase idle count */
@@ -183,20 +183,20 @@ static int default_platform_runtime_suspend(struct device *dev)
 	mutex_unlock(&ad->mutex);
 
 out:
-	dev_dbg(dev, "%s() [%d] returns %d\n",
-		 __func__, hwblk, ret);
+	dev_dbg(dev, "platform_pm_runtime_suspend() [%d] returns %d\n",
+		hwblk, ret);
 
 	return ret;
 }
 
-static int default_platform_runtime_resume(struct device *dev)
+int platform_pm_runtime_resume(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct pdev_archdata *ad = &pdev->archdata;
 	int hwblk = ad->hwblk_id;
 	int ret = 0;
 
-	dev_dbg(dev, "%s() [%d]\n", __func__, hwblk);
+	dev_dbg(dev, "platform_pm_runtime_resume() [%d]\n", hwblk);
 
 	/* ignore off-chip platform devices */
 	if (!hwblk)
@@ -228,19 +228,19 @@ static int default_platform_runtime_resume(struct device *dev)
 	 */
 	mutex_unlock(&ad->mutex);
 out:
-	dev_dbg(dev, "%s() [%d] returns %d\n",
-		__func__, hwblk, ret);
+	dev_dbg(dev, "platform_pm_runtime_resume() [%d] returns %d\n",
+		hwblk, ret);
 
 	return ret;
 }
 
-static int default_platform_runtime_idle(struct device *dev)
+int platform_pm_runtime_idle(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	int hwblk = pdev->archdata.hwblk_id;
 	int ret = 0;
 
-	dev_dbg(dev, "%s() [%d]\n", __func__, hwblk);
+	dev_dbg(dev, "platform_pm_runtime_idle() [%d]\n", hwblk);
 
 	/* ignore off-chip platform devices */
 	if (!hwblk)
@@ -252,18 +252,9 @@ static int default_platform_runtime_idle(struct device *dev)
 	/* suspend synchronously to disable clocks immediately */
 	ret = pm_runtime_suspend(dev);
 out:
-	dev_dbg(dev, "%s() [%d] done!\n", __func__, hwblk);
+	dev_dbg(dev, "platform_pm_runtime_idle() [%d] done!\n", hwblk);
 	return ret;
 }
-
-static struct dev_power_domain default_power_domain = {
-	.ops = {
-		.runtime_suspend = default_platform_runtime_suspend,
-		.runtime_resume = default_platform_runtime_resume,
-		.runtime_idle = default_platform_runtime_idle,
-		USE_PLATFORM_PM_SLEEP_OPS
-	},
-};
 
 static int platform_bus_notify(struct notifier_block *nb,
 			       unsigned long action, void *data)
@@ -285,7 +276,6 @@ static int platform_bus_notify(struct notifier_block *nb,
 		hwblk_disable(hwblk_info, hwblk);
 		/* make sure driver re-inits itself once */
 		__set_bit(PDEV_ARCHDATA_FLAG_INIT, &pdev->archdata.flags);
-		dev->pwr_domain = &default_power_domain;
 		break;
 	/* TODO: add BUS_NOTIFY_BIND_DRIVER and increase idle count */
 	case BUS_NOTIFY_BOUND_DRIVER:
@@ -299,7 +289,6 @@ static int platform_bus_notify(struct notifier_block *nb,
 		__set_bit(PDEV_ARCHDATA_FLAG_INIT, &pdev->archdata.flags);
 		break;
 	case BUS_NOTIFY_DEL_DEVICE:
-		dev->pwr_domain = NULL;
 		break;
 	}
 	return 0;

@@ -87,7 +87,7 @@ static void mn10300_cpupic_mask_ack(struct irq_data *d)
 		tmp2 = GxICR(irq);
 
 		irq_affinity_online[irq] =
-			cpumask_any_and(d->affinity, cpu_online_mask);
+			any_online_cpu(*d->affinity);
 		CROSS_GxICR(irq, irq_affinity_online[irq]) =
 			(tmp & (GxICR_LEVEL | GxICR_ENABLE)) | GxICR_DETECT;
 		tmp = CROSS_GxICR(irq, irq_affinity_online[irq]);
@@ -124,8 +124,7 @@ static void mn10300_cpupic_unmask_clear(struct irq_data *d)
 	} else {
 		tmp = GxICR(irq);
 
-		irq_affinity_online[irq] = cpumask_any_and(d->affinity,
-							   cpu_online_mask);
+		irq_affinity_online[irq] = any_online_cpu(*d->affinity);
 		CROSS_GxICR(irq, irq_affinity_online[irq]) = (tmp & GxICR_LEVEL) | GxICR_ENABLE | GxICR_DETECT;
 		tmp = CROSS_GxICR(irq, irq_affinity_online[irq]);
 	}
@@ -367,11 +366,11 @@ void migrate_irqs(void)
 		if (irqd_is_per_cpu(data))
 			continue;
 
-		if (cpumask_test_cpu(self, &data->affinity) &&
-		    !cpumask_intersects(&irq_affinity[irq], cpu_online_mask)) {
+		if (cpu_isset(self, data->affinity) &&
+		    !cpus_intersects(irq_affinity[irq], cpu_online_map)) {
 			int cpu_id;
-			cpu_id = cpumask_first(cpu_online_mask);
-			cpumask_set_cpu(cpu_id, &data->affinity);
+			cpu_id = first_cpu(cpu_online_map);
+			cpu_set(cpu_id, data->affinity);
 		}
 		/* We need to operate irq_affinity_online atomically. */
 		arch_local_cli_save(flags);
@@ -382,8 +381,7 @@ void migrate_irqs(void)
 			GxICR(irq) = x & GxICR_LEVEL;
 			tmp = GxICR(irq);
 
-			new = cpumask_any_and(&data->affinity,
-					      cpu_online_mask);
+			new = any_online_cpu(data->affinity);
 			irq_affinity_online[irq] = new;
 
 			CROSS_GxICR(irq, new) =

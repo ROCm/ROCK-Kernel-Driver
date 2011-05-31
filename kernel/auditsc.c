@@ -443,24 +443,16 @@ static int match_tree_refs(struct audit_context *ctx, struct audit_tree *tree)
 
 /* Determine if any context name data matches a rule's watch data */
 /* Compare a task_struct with an audit_rule.  Return 1 on match, 0
- * otherwise.
- *
- * If task_creation is true, this is an explicit indication that we are
- * filtering a task rule at task creation time.  This and tsk == current are
- * the only situations where tsk->cred may be accessed without an rcu read lock.
- */
+ * otherwise. */
 static int audit_filter_rules(struct task_struct *tsk,
 			      struct audit_krule *rule,
 			      struct audit_context *ctx,
 			      struct audit_names *name,
-			      enum audit_state *state,
-			      bool task_creation)
+			      enum audit_state *state)
 {
-	const struct cred *cred;
+	const struct cred *cred = get_task_cred(tsk);
 	int i, j, need_sid = 1;
 	u32 sid;
-
-	cred = rcu_dereference_check(tsk->cred, tsk == current || task_creation);
 
 	for (i = 0; i < rule->field_count; i++) {
 		struct audit_field *f = &rule->fields[i];
@@ -645,8 +637,10 @@ static int audit_filter_rules(struct task_struct *tsk,
 			break;
 		}
 
-		if (!result)
+		if (!result) {
+			put_cred(cred);
 			return 0;
+		}
 	}
 
 	if (ctx) {
@@ -662,6 +656,7 @@ static int audit_filter_rules(struct task_struct *tsk,
 	case AUDIT_NEVER:    *state = AUDIT_DISABLED;	    break;
 	case AUDIT_ALWAYS:   *state = AUDIT_RECORD_CONTEXT; break;
 	}
+	put_cred(cred);
 	return 1;
 }
 
@@ -676,8 +671,7 @@ static enum audit_state audit_filter_task(struct task_struct *tsk, char **key)
 
 	rcu_read_lock();
 	list_for_each_entry_rcu(e, &audit_filter_list[AUDIT_FILTER_TASK], list) {
-		if (audit_filter_rules(tsk, &e->rule, NULL, NULL,
-				       &state, true)) {
+		if (audit_filter_rules(tsk, &e->rule, NULL, NULL, &state)) {
 			if (state == AUDIT_RECORD_CONTEXT)
 				*key = kstrdup(e->rule.filterkey, GFP_ATOMIC);
 			rcu_read_unlock();
@@ -711,7 +705,7 @@ static enum audit_state audit_filter_syscall(struct task_struct *tsk,
 		list_for_each_entry_rcu(e, list, list) {
 			if ((e->rule.mask[word] & bit) == bit &&
 			    audit_filter_rules(tsk, &e->rule, ctx, NULL,
-					       &state, false)) {
+					       &state)) {
 				rcu_read_unlock();
 				ctx->current_state = state;
 				return state;
@@ -749,8 +743,7 @@ void audit_filter_inodes(struct task_struct *tsk, struct audit_context *ctx)
 
 		list_for_each_entry_rcu(e, list, list) {
 			if ((e->rule.mask[word] & bit) == bit &&
-			    audit_filter_rules(tsk, &e->rule, ctx, n,
-				    	       &state, false)) {
+			    audit_filter_rules(tsk, &e->rule, ctx, n, &state)) {
 				rcu_read_unlock();
 				ctx->current_state = state;
 				return;

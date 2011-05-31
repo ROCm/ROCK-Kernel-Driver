@@ -12,15 +12,6 @@
  *   more details.
  */
 
-/* Include the proper base SPR definition file. */
-#ifdef __tilegx__
-#include <arch/spr_def_64.h>
-#else
-#include <arch/spr_def_32.h>
-#endif
-
-#ifdef __KERNEL__
-
 /*
  * In addition to including the proper base SPR definition file, depending
  * on machine architecture, this file defines several macros which allow
@@ -38,6 +29,7 @@
 #define _concat4(a, b, c, d)  __concat4(a, b, c, d)
 
 #ifdef __tilegx__
+#include <arch/spr_def_64.h>
 
 /* TILE-Gx dependent, protection-level dependent SPRs. */
 
@@ -73,6 +65,7 @@
 	_concat4(INT_SINGLE_STEP_, CONFIG_KERNEL_PL,,)
 
 #else
+#include <arch/spr_def_32.h>
 
 /* TILEPro dependent, protection-level dependent SPRs. */
 
@@ -109,5 +102,3 @@
 	_concat4(SPR_INTCTRL_, CONFIG_KERNEL_PL, _STATUS,)
 #define INT_INTCTRL_K \
 	_concat4(INT_INTCTRL_, CONFIG_KERNEL_PL,,)
-
-#endif /* __KERNEL__ */

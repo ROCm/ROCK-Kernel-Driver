@@ -72,22 +72,18 @@ error_ret:
 	return ret;
 }
 
+static IIO_TRIGGER_NAME_ATTR;
 static DEVICE_ATTR(frequency, S_IRUGO | S_IWUSR,
 	    iio_trig_periodic_read_freq,
 	    iio_trig_periodic_write_freq);
 
 static struct attribute *iio_trig_prtc_attrs[] = {
 	&dev_attr_frequency.attr,
+	&dev_attr_name.attr,
 	NULL,
 };
-
 static const struct attribute_group iio_trig_prtc_attr_group = {
 	.attrs = iio_trig_prtc_attrs,
-};
-
-static const struct attribute_group *iio_trig_prtc_attr_groups[] = {
-	&iio_trig_prtc_attr_group,
-	NULL
 };
 
 static void iio_prtc_trigger_poll(void *private_data)
@@ -107,7 +103,7 @@ static int iio_trig_periodic_rtc_probe(struct platform_device *dev)
 	for (i = 0;; i++) {
 		if (pdata[i] == NULL)
 			break;
-		trig = iio_allocate_trigger("periodic%s", pdata[i]);
+		trig = iio_allocate_trigger();
 		if (!trig) {
 			ret = -ENOMEM;
 			goto error_free_completed_registrations;
@@ -122,19 +118,25 @@ static int iio_trig_periodic_rtc_probe(struct platform_device *dev)
 		trig->private_data = trig_info;
 		trig->owner = THIS_MODULE;
 		trig->set_trigger_state = &iio_trig_periodic_rtc_set_state;
+		trig->name = kasprintf(GFP_KERNEL, "periodic%s", pdata[i]);
+		if (trig->name == NULL) {
+			ret = -ENOMEM;
+			goto error_free_trig_info;
+		}
+
 		/* RTC access */
 		trig_info->rtc
 			= rtc_class_open(pdata[i]);
 		if (trig_info->rtc == NULL) {
 			ret = -EINVAL;
-			goto error_free_trig_info;
+			goto error_free_name;
 		}
 		trig_info->task.func = iio_prtc_trigger_poll;
 		trig_info->task.private_data = trig;
 		ret = rtc_irq_register(trig_info->rtc, &trig_info->task);
 		if (ret)
 			goto error_close_rtc;
-		trig->dev.groups = iio_trig_prtc_attr_groups;
+		trig->control_attrs = &iio_trig_prtc_attr_group;
 		ret = iio_trigger_register(trig);
 		if (ret)
 			goto error_unregister_rtc_irq;
@@ -144,6 +146,8 @@ error_unregister_rtc_irq:
 	rtc_irq_unregister(trig_info->rtc, &trig_info->task);
 error_close_rtc:
 	rtc_class_close(trig_info->rtc);
+error_free_name:
+	kfree(trig->name);
 error_free_trig_info:
 	kfree(trig_info);
 error_put_trigger_and_remove_from_list:
@@ -157,6 +161,7 @@ error_free_completed_registrations:
 		trig_info = trig->private_data;
 		rtc_irq_unregister(trig_info->rtc, &trig_info->task);
 		rtc_class_close(trig_info->rtc);
+		kfree(trig->name);
 		kfree(trig_info);
 		iio_trigger_unregister(trig);
 	}
@@ -175,6 +180,7 @@ static int iio_trig_periodic_rtc_remove(struct platform_device *dev)
 		trig_info = trig->private_data;
 		rtc_irq_unregister(trig_info->rtc, &trig_info->task);
 		rtc_class_close(trig_info->rtc);
+		kfree(trig->name);
 		kfree(trig_info);
 		iio_trigger_unregister(trig);
 	}

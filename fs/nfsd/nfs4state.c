@@ -1519,9 +1519,6 @@ nfsd4_create_session(struct svc_rqst *rqstp,
 	bool confirm_me = false;
 	int status = 0;
 
-	if (cr_ses->flags & ~SESSION4_FLAG_MASK_A)
-		return nfserr_inval;
-
 	nfs4_lock_state();
 	unconf = find_unconfirmed_client(&cr_ses->clientid);
 	conf = find_confirmed_client(&cr_ses->clientid);
@@ -1640,9 +1637,8 @@ __be32 nfsd4_bind_conn_to_session(struct svc_rqst *rqstp,
 		return nfserr_badsession;
 
 	status = nfsd4_map_bcts_dir(&bcts->dir);
-	if (!status)
-		nfsd4_new_conn(rqstp, cstate->session, bcts->dir);
-	return status;
+	nfsd4_new_conn(rqstp, cstate->session, bcts->dir);
+	return nfs_ok;
 }
 
 static bool nfsd4_compound_in_session(struct nfsd4_session *session, struct nfs4_sessionid *sid)
@@ -1729,13 +1725,6 @@ static void nfsd4_sequence_check_conn(struct nfsd4_conn *new, struct nfsd4_sessi
 	return;
 }
 
-static bool nfsd4_session_too_many_ops(struct svc_rqst *rqstp, struct nfsd4_session *session)
-{
-	struct nfsd4_compoundargs *args = rqstp->rq_argp;
-
-	return args->opcnt > session->se_fchannel.maxops;
-}
-
 __be32
 nfsd4_sequence(struct svc_rqst *rqstp,
 	       struct nfsd4_compound_state *cstate,
@@ -1762,10 +1751,6 @@ nfsd4_sequence(struct svc_rqst *rqstp,
 	status = nfserr_badsession;
 	session = find_in_sessionid_hashtbl(&seq->sessionid);
 	if (!session)
-		goto out;
-
-	status = nfserr_too_many_ops;
-	if (nfsd4_session_too_many_ops(rqstp, session))
 		goto out;
 
 	status = nfserr_badslot;
@@ -1823,8 +1808,6 @@ out:
 __be32
 nfsd4_reclaim_complete(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate, struct nfsd4_reclaim_complete *rc)
 {
-	int status = 0;
-
 	if (rc->rca_one_fs) {
 		if (!cstate->current_fh.fh_dentry)
 			return nfserr_nofilehandle;
@@ -1834,14 +1817,9 @@ nfsd4_reclaim_complete(struct svc_rqst *rqstp, struct nfsd4_compound_state *csta
 		 */
 		 return nfs_ok;
 	}
-
 	nfs4_lock_state();
-	status = nfserr_complete_already;
-	if (cstate->session->se_client->cl_firststate)
-		goto out;
-
-	status = nfserr_stale_clientid;
-	if (is_client_expired(cstate->session->se_client))
+	if (is_client_expired(cstate->session->se_client)) {
+		nfs4_unlock_state();
 		/*
 		 * The following error isn't really legal.
 		 * But we only get here if the client just explicitly
@@ -1849,13 +1827,11 @@ nfsd4_reclaim_complete(struct svc_rqst *rqstp, struct nfsd4_compound_state *csta
 		 * error it gets back on an operation for the dead
 		 * client.
 		 */
-		goto out;
-
-	status = nfs_ok;
+		return nfserr_stale_clientid;
+	}
 	nfsd4_create_clid_dir(cstate->session->se_client);
-out:
 	nfs4_unlock_state();
-	return status;
+	return nfs_ok;
 }
 
 __be32
@@ -2486,7 +2462,7 @@ find_delegation_file(struct nfs4_file *fp, stateid_t *stid)
 	return NULL;
 }
 
-static int share_access_to_flags(u32 share_access)
+int share_access_to_flags(u32 share_access)
 {
 	share_access &= ~NFS4_SHARE_WANT_MASK;
 
@@ -2906,7 +2882,7 @@ out:
 	return status;
 }
 
-static struct lock_manager nfsd4_manager = {
+struct lock_manager nfsd4_manager = {
 };
 
 static void

@@ -1,4 +1,6 @@
 /*
+ *  linux/drivers/serial/8250_mca.c
+ *
  *  Copyright (C) 2005 Russell King.
  *  Data taken from include/asm-i386/serial.h
  *

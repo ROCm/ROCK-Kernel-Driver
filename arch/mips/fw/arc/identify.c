@@ -9,7 +9,7 @@
  *
  * This code is based on arch/mips/sgi/kernel/system.c, which is
  *
- * Copyright (C) 1996 David S. Miller (davem@davemloft.net)
+ * Copyright (C) 1996 David S. Miller (dm@engr.sgi.com)
  */
 #include <linux/init.h>
 #include <linux/kernel.h>

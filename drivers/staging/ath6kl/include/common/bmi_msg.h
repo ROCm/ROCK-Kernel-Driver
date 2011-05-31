@@ -22,6 +22,10 @@
 #ifndef __BMI_MSG_H__
 #define __BMI_MSG_H__
 
+#ifndef ATH_TARGET
+#include "athstartpack.h"
+#endif
+
 /*
  * Bootloader Messaging Interface (BMI)
  *
@@ -229,5 +233,9 @@ PREPACK struct bmi_target_info {
          * Response format: none
          * Note: Not supported on all versions of ROM firmware.
          */
+
+#ifndef ATH_TARGET
+#include "athendpack.h"
+#endif
 
 #endif /* __BMI_MSG_H__ */

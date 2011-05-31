@@ -9,7 +9,5 @@ typedef u16 *PWORD;
 typedef u32 DWORD;
 typedef u32 *PDWORD;
 
-#define BYTE_MASK	0xff
-
 #endif
 

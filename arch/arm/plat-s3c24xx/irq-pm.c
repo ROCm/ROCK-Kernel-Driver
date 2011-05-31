@@ -14,6 +14,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/interrupt.h>
+#include <linux/sysdev.h>
 #include <linux/irq.h>
 
 #include <plat/cpu.h>
@@ -64,7 +65,7 @@ static unsigned long save_extint[3];
 static unsigned long save_eintflt[4];
 static unsigned long save_eintmask;
 
-int s3c24xx_irq_suspend(void)
+int s3c24xx_irq_suspend(struct sys_device *dev, pm_message_t state)
 {
 	unsigned int i;
 
@@ -80,7 +81,7 @@ int s3c24xx_irq_suspend(void)
 	return 0;
 }
 
-void s3c24xx_irq_resume(void)
+int s3c24xx_irq_resume(struct sys_device *dev)
 {
 	unsigned int i;
 
@@ -92,4 +93,6 @@ void s3c24xx_irq_resume(void)
 
 	s3c_pm_do_restore(irq_save, ARRAY_SIZE(irq_save));
 	__raw_writel(save_eintmask, S3C24XX_EINTMASK);
+
+	return 0;
 }

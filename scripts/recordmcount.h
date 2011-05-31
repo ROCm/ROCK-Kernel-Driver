@@ -22,15 +22,11 @@
 #undef is_fake_mcount
 #undef fn_is_fake_mcount
 #undef MIPS_is_fake_mcount
-#undef mcount_adjust
 #undef sift_rel_mcount
-#undef nop_mcount
 #undef find_secsym_ndx
 #undef __has_rel_mcount
 #undef has_rel_mcount
 #undef tot_relsize
-#undef get_mcountsym
-#undef get_sym_str_and_relp
 #undef do_func
 #undef Elf_Addr
 #undef Elf_Ehdr
@@ -43,7 +39,6 @@
 #undef ELF_R_INFO
 #undef Elf_r_info
 #undef ELF_ST_BIND
-#undef ELF_ST_TYPE
 #undef fn_ELF_R_SYM
 #undef fn_ELF_R_INFO
 #undef uint_t
@@ -54,18 +49,14 @@
 #ifdef RECORD_MCOUNT_64
 # define append_func		append64
 # define sift_rel_mcount	sift64_rel_mcount
-# define nop_mcount		nop_mcount_64
 # define find_secsym_ndx	find64_secsym_ndx
 # define __has_rel_mcount	__has64_rel_mcount
 # define has_rel_mcount		has64_rel_mcount
 # define tot_relsize		tot64_relsize
-# define get_sym_str_and_relp	get_sym_str_and_relp_64
 # define do_func		do64
-# define get_mcountsym		get_mcountsym_64
 # define is_fake_mcount		is_fake_mcount64
 # define fn_is_fake_mcount	fn_is_fake_mcount64
 # define MIPS_is_fake_mcount	MIPS64_is_fake_mcount
-# define mcount_adjust		mcount_adjust_64
 # define Elf_Addr		Elf64_Addr
 # define Elf_Ehdr		Elf64_Ehdr
 # define Elf_Shdr		Elf64_Shdr
@@ -77,7 +68,6 @@
 # define ELF_R_INFO		ELF64_R_INFO
 # define Elf_r_info		Elf64_r_info
 # define ELF_ST_BIND		ELF64_ST_BIND
-# define ELF_ST_TYPE		ELF64_ST_TYPE
 # define fn_ELF_R_SYM		fn_ELF64_R_SYM
 # define fn_ELF_R_INFO		fn_ELF64_R_INFO
 # define uint_t			uint64_t
@@ -87,18 +77,14 @@
 #else
 # define append_func		append32
 # define sift_rel_mcount	sift32_rel_mcount
-# define nop_mcount		nop_mcount_32
 # define find_secsym_ndx	find32_secsym_ndx
 # define __has_rel_mcount	__has32_rel_mcount
 # define has_rel_mcount		has32_rel_mcount
 # define tot_relsize		tot32_relsize
-# define get_sym_str_and_relp	get_sym_str_and_relp_32
 # define do_func		do32
-# define get_mcountsym		get_mcountsym_32
 # define is_fake_mcount		is_fake_mcount32
 # define fn_is_fake_mcount	fn_is_fake_mcount32
 # define MIPS_is_fake_mcount	MIPS32_is_fake_mcount
-# define mcount_adjust		mcount_adjust_32
 # define Elf_Addr		Elf32_Addr
 # define Elf_Ehdr		Elf32_Ehdr
 # define Elf_Shdr		Elf32_Shdr
@@ -110,7 +96,6 @@
 # define ELF_R_INFO		ELF32_R_INFO
 # define Elf_r_info		Elf32_r_info
 # define ELF_ST_BIND		ELF32_ST_BIND
-# define ELF_ST_TYPE		ELF32_ST_TYPE
 # define fn_ELF_R_SYM		fn_ELF32_R_SYM
 # define fn_ELF_R_INFO		fn_ELF32_R_INFO
 # define uint_t			uint32_t
@@ -137,8 +122,6 @@ static void fn_ELF_R_INFO(Elf_Rel *const rp, unsigned sym, unsigned type)
 	rp->r_info = _w(ELF_R_INFO(sym, type));
 }
 static void (*Elf_r_info)(Elf_Rel *const rp, unsigned sym, unsigned type) = fn_ELF_R_INFO;
-
-static int mcount_adjust = 0;
 
 /*
  * MIPS mcount long call has 2 _mcount symbols, only the position of the 1st
@@ -251,49 +234,6 @@ static void append_func(Elf_Ehdr *const ehdr,
 	uwrite(fd_map, ehdr, sizeof(*ehdr));
 }
 
-static unsigned get_mcountsym(Elf_Sym const *const sym0,
-			      Elf_Rel const *relp,
-			      char const *const str0)
-{
-	unsigned mcountsym = 0;
-
-	Elf_Sym const *const symp =
-		&sym0[Elf_r_sym(relp)];
-	char const *symname = &str0[w(symp->st_name)];
-	char const *mcount = gpfx == '_' ? "_mcount" : "mcount";
-
-	if (symname[0] == '.')
-		++symname;  /* ppc64 hack */
-	if (strcmp(mcount, symname) == 0 ||
-	    (altmcount && strcmp(altmcount, symname) == 0))
-		mcountsym = Elf_r_sym(relp);
-
-	return mcountsym;
-}
-
-static void get_sym_str_and_relp(Elf_Shdr const *const relhdr,
-				 Elf_Ehdr const *const ehdr,
-				 Elf_Sym const **sym0,
-				 char const **str0,
-				 Elf_Rel const **relp)
-{
-	Elf_Shdr *const shdr0 = (Elf_Shdr *)(_w(ehdr->e_shoff)
-		+ (void *)ehdr);
-	unsigned const symsec_sh_link = w(relhdr->sh_link);
-	Elf_Shdr const *const symsec = &shdr0[symsec_sh_link];
-	Elf_Shdr const *const strsec = &shdr0[w(symsec->sh_link)];
-	Elf_Rel const *const rel0 = (Elf_Rel const *)(_w(relhdr->sh_offset)
-		+ (void *)ehdr);
-
-	*sym0 = (Elf_Sym const *)(_w(symsec->sh_offset)
-				  + (void *)ehdr);
-
-	*str0 = (char const *)(_w(strsec->sh_offset)
-			       + (void *)ehdr);
-
-	*relp = rel0;
-}
-
 /*
  * Look at the relocations in order to find the calls to mcount.
  * Accumulate the section offsets that are found, and their relocation info,
@@ -310,27 +250,47 @@ static uint_t *sift_rel_mcount(uint_t *mlocp,
 {
 	uint_t *const mloc0 = mlocp;
 	Elf_Rel *mrelp = *mrelpp;
-	Elf_Sym const *sym0;
-	char const *str0;
-	Elf_Rel const *relp;
+	Elf_Shdr *const shdr0 = (Elf_Shdr *)(_w(ehdr->e_shoff)
+		+ (void *)ehdr);
+	unsigned const symsec_sh_link = w(relhdr->sh_link);
+	Elf_Shdr const *const symsec = &shdr0[symsec_sh_link];
+	Elf_Sym const *const sym0 = (Elf_Sym const *)(_w(symsec->sh_offset)
+		+ (void *)ehdr);
+
+	Elf_Shdr const *const strsec = &shdr0[w(symsec->sh_link)];
+	char const *const str0 = (char const *)(_w(strsec->sh_offset)
+		+ (void *)ehdr);
+
+	Elf_Rel const *const rel0 = (Elf_Rel const *)(_w(relhdr->sh_offset)
+		+ (void *)ehdr);
 	unsigned rel_entsize = _w(relhdr->sh_entsize);
 	unsigned const nrel = _w(relhdr->sh_size) / rel_entsize;
+	Elf_Rel const *relp = rel0;
+
 	unsigned mcountsym = 0;
 	unsigned t;
 
-	get_sym_str_and_relp(relhdr, ehdr, &sym0, &str0, &relp);
-
 	for (t = nrel; t; --t) {
-		if (!mcountsym)
-			mcountsym = get_mcountsym(sym0, relp, str0);
+		if (!mcountsym) {
+			Elf_Sym const *const symp =
+				&sym0[Elf_r_sym(relp)];
+			char const *symname = &str0[w(symp->st_name)];
+			char const *mcount = '_' == gpfx ? "_mcount" : "mcount";
+
+			if ('.' == symname[0])
+				++symname;  /* ppc64 hack */
+			if (0 == strcmp(mcount, symname) ||
+			    (altmcount && 0 == strcmp(altmcount, symname)))
+				mcountsym = Elf_r_sym(relp);
+		}
 
 		if (mcountsym == Elf_r_sym(relp) && !is_fake_mcount(relp)) {
-			uint_t const addend =
-				_w(_w(relp->r_offset) - recval + mcount_adjust);
+			uint_t const addend = _w(_w(relp->r_offset) - recval);
+
 			mrelp->r_offset = _w(offbase
 				+ ((void *)mlocp - (void *)mloc0));
 			Elf_r_info(mrelp, recsym, reltype);
-			if (rel_entsize == sizeof(Elf_Rela)) {
+			if (sizeof(Elf_Rela) == rel_entsize) {
 				((Elf_Rela *)mrelp)->r_addend = addend;
 				*mlocp++ = 0;
 			} else
@@ -342,63 +302,6 @@ static uint_t *sift_rel_mcount(uint_t *mlocp,
 	}
 	*mrelpp = mrelp;
 	return mlocp;
-}
-
-/*
- * Read the relocation table again, but this time its called on sections
- * that are not going to be traced. The mcount calls here will be converted
- * into nops.
- */
-static void nop_mcount(Elf_Shdr const *const relhdr,
-		       Elf_Ehdr const *const ehdr,
-		       const char *const txtname)
-{
-	Elf_Shdr *const shdr0 = (Elf_Shdr *)(_w(ehdr->e_shoff)
-		+ (void *)ehdr);
-	Elf_Sym const *sym0;
-	char const *str0;
-	Elf_Rel const *relp;
-	Elf_Shdr const *const shdr = &shdr0[w(relhdr->sh_info)];
-	unsigned rel_entsize = _w(relhdr->sh_entsize);
-	unsigned const nrel = _w(relhdr->sh_size) / rel_entsize;
-	unsigned mcountsym = 0;
-	unsigned t;
-	int once = 0;
-
-	get_sym_str_and_relp(relhdr, ehdr, &sym0, &str0, &relp);
-
-	for (t = nrel; t; --t) {
-		int ret = -1;
-
-		if (!mcountsym)
-			mcountsym = get_mcountsym(sym0, relp, str0);
-
-		if (mcountsym == Elf_r_sym(relp) && !is_fake_mcount(relp)) {
-			if (make_nop)
-				ret = make_nop((void *)ehdr, shdr->sh_offset + relp->r_offset);
-			if (warn_on_notrace_sect && !once) {
-				printf("Section %s has mcount callers being ignored\n",
-				       txtname);
-				once = 1;
-				/* just warn? */
-				if (!make_nop)
-					return;
-			}
-		}
-
-		/*
-		 * If we successfully removed the mcount, mark the relocation
-		 * as a nop (don't do anything with it).
-		 */
-		if (!ret) {
-			Elf_Rel rel;
-			rel = *(Elf_Rel *)relp;
-			Elf_r_info(&rel, Elf_r_sym(relp), rel_type_nop);
-			ulseek(fd_map, (void *)relp - (void *)ehdr, SEEK_SET);
-			uwrite(fd_map, &rel, sizeof(rel));
-		}
-		relp = (Elf_Rel const *)(rel_entsize + (void *)relp);
-	}
 }
 
 
@@ -430,11 +333,6 @@ static unsigned find_secsym_ndx(unsigned const txtndx,
 		if (txtndx == w2(symp->st_shndx)
 			/* avoid STB_WEAK */
 		    && (STB_LOCAL == st_bind || STB_GLOBAL == st_bind)) {
-			/* function symbols on ARM have quirks, avoid them */
-			if (w2(ehdr->e_machine) == EM_ARM
-			    && ELF_ST_TYPE(symp->st_info) == STT_FUNC)
-				continue;
-
 			*recvalp = _w(symp->st_value);
 			return symp - sym0;
 		}
@@ -456,13 +354,13 @@ __has_rel_mcount(Elf_Shdr const *const relhdr,  /* is SHT_REL or SHT_RELA */
 	Elf_Shdr const *const txthdr = &shdr0[w(relhdr->sh_info)];
 	char const *const txtname = &shstrtab[w(txthdr->sh_name)];
 
-	if (strcmp("__mcount_loc", txtname) == 0) {
+	if (0 == strcmp("__mcount_loc", txtname)) {
 		fprintf(stderr, "warning: __mcount_loc already exists: %s\n",
 			fname);
 		succeed_file();
 	}
-	if (w(txthdr->sh_type) != SHT_PROGBITS ||
-	    !(w(txthdr->sh_flags) & SHF_EXECINSTR))
+	if (SHT_PROGBITS != w(txthdr->sh_type) ||
+	    !is_mcounted_section_name(txtname))
 		return NULL;
 	return txtname;
 }
@@ -472,7 +370,7 @@ static char const *has_rel_mcount(Elf_Shdr const *const relhdr,
 				  char const *const shstrtab,
 				  char const *const fname)
 {
-	if (w(relhdr->sh_type) != SHT_REL && w(relhdr->sh_type) != SHT_RELA)
+	if (SHT_REL  != w(relhdr->sh_type) && SHT_RELA != w(relhdr->sh_type))
 		return NULL;
 	return __has_rel_mcount(relhdr, shdr0, shstrtab, fname);
 }
@@ -485,11 +383,9 @@ static unsigned tot_relsize(Elf_Shdr const *const shdr0,
 {
 	unsigned totrelsz = 0;
 	Elf_Shdr const *shdrp = shdr0;
-	char const *txtname;
 
 	for (; nhdr; --nhdr, ++shdrp) {
-		txtname = has_rel_mcount(shdrp, shdr0, shstrtab, fname);
-		if (txtname && is_mcounted_section_name(txtname))
+		if (has_rel_mcount(shdrp, shdr0, shstrtab, fname))
 			totrelsz += _w(shdrp->sh_size);
 	}
 	return totrelsz;
@@ -525,7 +421,7 @@ do_func(Elf_Ehdr *const ehdr, char const *const fname, unsigned const reltype)
 	for (relhdr = shdr0, k = nhdr; k; --k, ++relhdr) {
 		char const *const txtname = has_rel_mcount(relhdr, shdr0,
 			shstrtab, fname);
-		if (txtname && is_mcounted_section_name(txtname)) {
+		if (txtname) {
 			uint_t recval = 0;
 			unsigned const recsym = find_secsym_ndx(
 				w(relhdr->sh_info), txtname, &recval,
@@ -536,12 +432,6 @@ do_func(Elf_Ehdr *const ehdr, char const *const fname, unsigned const reltype)
 			mlocp = sift_rel_mcount(mlocp,
 				(void *)mlocp - (void *)mloc0, &mrelp,
 				relhdr, ehdr, recsym, recval, reltype);
-		} else if (txtname && (warn_on_notrace_sect || make_nop)) {
-			/*
-			 * This section is ignored by ftrace, but still
-			 * has mcount calls. Convert them to nops now.
-			 */
-			nop_mcount(relhdr, ehdr, txtname);
 		}
 	}
 	if (mloc0 != mlocp) {

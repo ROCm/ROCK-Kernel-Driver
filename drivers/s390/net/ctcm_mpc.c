@@ -653,6 +653,7 @@ static void ctcmpc_send_sweep_resp(struct channel *rch)
 	struct net_device *dev = rch->netdev;
 	struct ctcm_priv *priv = dev->ml_priv;
 	struct mpc_group *grp = priv->mpcg;
+	int rc = 0;
 	struct th_sweep *header;
 	struct sk_buff *sweep_skb;
 	struct channel *ch  = priv->channel[CTCM_WRITE];
@@ -664,14 +665,16 @@ static void ctcmpc_send_sweep_resp(struct channel *rch)
 		CTCM_DBF_TEXT_(MPC_ERROR, CTC_DBF_ERROR,
 			"%s(%s): sweep_skb allocation ERROR\n",
 			CTCM_FUNTAIL, rch->id);
-		goto done;
+		rc = -ENOMEM;
+				goto done;
 	}
 
 	header = kmalloc(sizeof(struct th_sweep), gfp_type());
 
 	if (!header) {
 		dev_kfree_skb_any(sweep_skb);
-		goto done;
+		rc = -ENOMEM;
+				goto done;
 	}
 
 	header->th.th_seg	= 0x00 ;
@@ -1367,7 +1370,8 @@ static void mpc_action_go_inop(fsm_instance *fi, int event, void *arg)
 	struct net_device  *dev = arg;
 	struct ctcm_priv    *priv;
 	struct mpc_group *grp;
-	struct channel *wch;
+	int rc = 0;
+	struct channel *wch, *rch;
 
 	BUG_ON(dev == NULL);
 	CTCM_PR_DEBUG("Enter %s: %s\n",	__func__, dev->name);
@@ -1392,6 +1396,7 @@ static void mpc_action_go_inop(fsm_instance *fi, int event, void *arg)
 		fsm_deltimer(&priv->restart_timer);
 
 	wch = priv->channel[CTCM_WRITE];
+	rch = priv->channel[CTCM_READ];
 
 	switch (grp->saved_state) {
 	case MPCG_STATE_RESET:
@@ -1430,7 +1435,7 @@ static void mpc_action_go_inop(fsm_instance *fi, int event, void *arg)
 
 	if (grp->send_qllc_disc == 1) {
 		grp->send_qllc_disc = 0;
-		mpc_send_qllc_discontact(dev);
+		rc = mpc_send_qllc_discontact(dev);
 	}
 
 	/* DO NOT issue DEV_EVENT_STOP directly out of this code */

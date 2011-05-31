@@ -27,7 +27,6 @@
  */
 
 /*-------------------------------------------------------------------------*/
-#include <linux/usb/otg.h>
 
 #define	PORT_WAKE_BITS	(PORT_WKOC_E|PORT_WKDISC_E|PORT_WKCONN_E)
 
@@ -128,7 +127,7 @@ static int ehci_port_change(struct ehci_hcd *ehci)
 	return 0;
 }
 
-static __maybe_unused void ehci_adjust_port_wakeup_flags(struct ehci_hcd *ehci,
+static void ehci_adjust_port_wakeup_flags(struct ehci_hcd *ehci,
 		bool suspending, bool do_wakeup)
 {
 	int		port;
@@ -802,13 +801,6 @@ static int ehci_hub_control (
 				goto error;
 			if (ehci->no_selective_suspend)
 				break;
-#ifdef CONFIG_USB_OTG
-			if ((hcd->self.otg_port == (wIndex + 1))
-			    && hcd->self.b_hnp_enable) {
-				otg_start_hnp(ehci->transceiver);
-				break;
-			}
-#endif
 			if (!(temp & PORT_SUSPEND))
 				break;
 			if ((temp & PORT_PE) == 0)

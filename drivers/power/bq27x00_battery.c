@@ -4,7 +4,6 @@
  * Copyright (C) 2008 Rodolfo Giometti <giometti@linux.it>
  * Copyright (C) 2008 Eurotech S.p.A. <info@eurotech.it>
  * Copyright (C) 2010-2011 Lars-Peter Clausen <lars@metafoo.de>
- * Copyright (C) 2011 Pali Rohár <pali.rohar@gmail.com>
  *
  * Based on a previous work by Copyright (C) 2008 Texas Instruments, Inc.
  *
@@ -77,7 +76,7 @@ struct bq27x00_reg_cache {
 	int time_to_empty_avg;
 	int time_to_full;
 	int charge_full;
-	int cycle_count;
+	int charge_counter;
 	int capacity;
 	int flags;
 
@@ -116,7 +115,7 @@ static enum power_supply_property bq27x00_battery_props[] = {
 	POWER_SUPPLY_PROP_CHARGE_FULL,
 	POWER_SUPPLY_PROP_CHARGE_NOW,
 	POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN,
-	POWER_SUPPLY_PROP_CYCLE_COUNT,
+	POWER_SUPPLY_PROP_CHARGE_COUNTER,
 	POWER_SUPPLY_PROP_ENERGY_NOW,
 };
 
@@ -268,7 +267,7 @@ static void bq27x00_update(struct bq27x00_device_info *di)
 		cache.time_to_empty_avg = bq27x00_battery_read_time(di, BQ27x00_REG_TTECP);
 		cache.time_to_full = bq27x00_battery_read_time(di, BQ27x00_REG_TTF);
 		cache.charge_full = bq27x00_battery_read_lmd(di);
-		cache.cycle_count = bq27x00_battery_read_cyct(di);
+		cache.charge_counter = bq27x00_battery_read_cyct(di);
 
 		if (!is_bq27500)
 			cache.current_now = bq27x00_read(di, BQ27x00_REG_AI, false);
@@ -497,8 +496,8 @@ static int bq27x00_battery_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN:
 		ret = bq27x00_simple_value(di->charge_design_full, val);
 		break;
-	case POWER_SUPPLY_PROP_CYCLE_COUNT:
-		ret = bq27x00_simple_value(di->cache.cycle_count, val);
+	case POWER_SUPPLY_PROP_CHARGE_COUNTER:
+		ret = bq27x00_simple_value(di->cache.charge_counter, val);
 		break;
 	case POWER_SUPPLY_PROP_ENERGY_NOW:
 		ret = bq27x00_battery_energy(di, val);

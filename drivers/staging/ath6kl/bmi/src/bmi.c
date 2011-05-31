@@ -95,12 +95,12 @@ void
 BMICleanup(void)
 {
     if (pBMICmdCredits) {
-        kfree(pBMICmdCredits);
+        A_FREE(pBMICmdCredits);
         pBMICmdCredits = NULL;
     }
 
     if (pBMICmdBuf) {
-        kfree(pBMICmdBuf);
+        A_FREE(pBMICmdBuf);
         pBMICmdBuf = NULL;
     }
 }
@@ -127,12 +127,12 @@ BMIDone(struct hif_device *device)
     }
 
     if (pBMICmdCredits) {
-        kfree(pBMICmdCredits);
+        A_FREE(pBMICmdCredits);
         pBMICmdCredits = NULL;
     }
 
     if (pBMICmdBuf) {
-        kfree(pBMICmdBuf);
+        A_FREE(pBMICmdBuf);
         pBMICmdBuf = NULL;
     }
 

@@ -141,7 +141,6 @@ static struct sel_netnode *sel_netnode_find(const void *addr, u16 family)
 		break;
 	default:
 		BUG();
-		return NULL;
 	}
 
 	list_for_each_entry_rcu(node, &sel_netnode_hash[idx].list, list)

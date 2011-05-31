@@ -1,4 +1,6 @@
 /*
+ *  linux/drivers/serial/pxa.c
+ *
  *  Based on drivers/serial/8250.c by Russell King.
  *
  *  Author:	Nicolas Pitre

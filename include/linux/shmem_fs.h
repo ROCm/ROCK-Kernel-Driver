@@ -9,8 +9,6 @@
 
 #define SHMEM_NR_DIRECT 16
 
-#define SHMEM_SYMLINK_INLINE_LEN (SHMEM_NR_DIRECT * sizeof(swp_entry_t))
-
 struct shmem_inode_info {
 	spinlock_t		lock;
 	unsigned long		flags;
@@ -19,12 +17,8 @@ struct shmem_inode_info {
 	unsigned long		next_index;	/* highest alloced index + 1 */
 	struct shared_policy	policy;		/* NUMA memory alloc policy */
 	struct page		*i_indirect;	/* top indirect blocks page */
-	union {
-		swp_entry_t	i_direct[SHMEM_NR_DIRECT]; /* first blocks */
-		char		inline_symlink[SHMEM_SYMLINK_INLINE_LEN];
-	};
+	swp_entry_t		i_direct[SHMEM_NR_DIRECT]; /* first blocks */
 	struct list_head	swaplist;	/* chain of maybes on swap */
-	struct list_head	xattr_list;	/* list of shmem_xattr */
 	struct inode		vfs_inode;
 };
 

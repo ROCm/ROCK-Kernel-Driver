@@ -29,17 +29,11 @@ struct linux_pcic {
 	int			pcic_imdim;
 };
 
-#ifdef CONFIG_PCI
-extern int pcic_present(void);
 extern int pcic_probe(void);
-extern void pci_time_init(void);
+/* Erm... MJ redefined pcibios_present() so that it does not work early. */
+extern int pcic_present(void);
 extern void sun4m_pci_init_IRQ(void);
-#else
-static inline int pcic_present(void) { return 0; }
-static inline int pcic_probe(void) { return 0; }
-static inline void pci_time_init(void) {}
-static inline void sun4m_pci_init_IRQ(void) {}
-#endif
+
 #endif
 
 /* Size of PCI I/O space which we relocate. */

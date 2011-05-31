@@ -73,6 +73,7 @@ __setup("ppchameleon_fio_pbase=", ppchameleon_fio_pbase);
 __setup("ppchameleonevb_fio_pbase=", ppchameleonevb_fio_pbase);
 #endif
 
+#ifdef CONFIG_MTD_PARTITIONS
 /*
  * Define static partitions for flash devices
  */
@@ -100,6 +101,7 @@ static struct mtd_partition partition_info_evb[] = {
 #define NUM_PARTITIONS 1
 
 extern int parse_cmdline_partitions(struct mtd_info *master, struct mtd_partition **pparts, const char *mtd_id);
+#endif
 
 /*
  *	hardware specific access to control-lines
@@ -187,8 +189,10 @@ static int ppchameleonevb_device_ready(struct mtd_info *minfo)
 }
 #endif
 
+#ifdef CONFIG_MTD_PARTITIONS
 const char *part_probes[] = { "cmdlinepart", NULL };
 const char *part_probes_evb[] = { "cmdlinepart", NULL };
+#endif
 
 /*
  * Main initialization routine
@@ -280,13 +284,14 @@ static int __init ppchameleonevb_init(void)
 		this->chip_delay = NAND_SMALL_DELAY_US;
 #endif
 
+#ifdef CONFIG_MTD_PARTITIONS
 	ppchameleon_mtd->name = "ppchameleon-nand";
 	mtd_parts_nb = parse_mtd_partitions(ppchameleon_mtd, part_probes, &mtd_parts, 0);
 	if (mtd_parts_nb > 0)
 		part_type = "command line";
 	else
 		mtd_parts_nb = 0;
-
+#endif
 	if (mtd_parts_nb == 0) {
 		if (ppchameleon_mtd->size == NAND_SMALL_SIZE)
 			mtd_parts = partition_info_me;
@@ -298,7 +303,7 @@ static int __init ppchameleonevb_init(void)
 
 	/* Register the partitions */
 	printk(KERN_NOTICE "Using %s partition definition\n", part_type);
-	mtd_device_register(ppchameleon_mtd, mtd_parts, mtd_parts_nb);
+	add_mtd_partitions(ppchameleon_mtd, mtd_parts, mtd_parts_nb);
 
  nand_evb_init:
 	/****************************
@@ -380,14 +385,14 @@ static int __init ppchameleonevb_init(void)
 			iounmap(ppchameleon_fio_base);
 		return -ENXIO;
 	}
-
+#ifdef CONFIG_MTD_PARTITIONS
 	ppchameleonevb_mtd->name = NAND_EVB_MTD_NAME;
 	mtd_parts_nb = parse_mtd_partitions(ppchameleonevb_mtd, part_probes_evb, &mtd_parts, 0);
 	if (mtd_parts_nb > 0)
 		part_type = "command line";
 	else
 		mtd_parts_nb = 0;
-
+#endif
 	if (mtd_parts_nb == 0) {
 		mtd_parts = partition_info_evb;
 		mtd_parts_nb = NUM_PARTITIONS;
@@ -396,7 +401,7 @@ static int __init ppchameleonevb_init(void)
 
 	/* Register the partitions */
 	printk(KERN_NOTICE "Using %s partition definition\n", part_type);
-	mtd_device_register(ppchameleonevb_mtd, mtd_parts, mtd_parts_nb);
+	add_mtd_partitions(ppchameleonevb_mtd, mtd_parts, mtd_parts_nb);
 
 	/* Return happy */
 	return 0;

@@ -24,7 +24,6 @@
  * Hsinchu 300, Taiwan.
  *
  * Larry Finger <Larry.Finger@lwfinger.net>
- *
  *****************************************************************************/
 
 #ifndef __RTL_CORE_H__

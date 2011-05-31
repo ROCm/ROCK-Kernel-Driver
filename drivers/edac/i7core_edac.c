@@ -59,7 +59,7 @@ MODULE_PARM_DESC(use_pci_fixup, "Enable PCI fixup to seek for hidden devices");
 /*
  * Alter this version for the module when modifications are made
  */
-#define I7CORE_REVISION    " Ver: 1.0.0"
+#define I7CORE_REVISION    " Ver: 1.0.0 " __DATE__
 #define EDAC_MOD_STR      "i7core_edac"
 
 /*
@@ -1842,8 +1842,11 @@ static int i7core_mce_check_error(void *priv, struct mce *mce)
 	if (mce->bank != 8)
 		return 0;
 
-#ifdef CONFIG_SMP
 	/* Only handle if it is the right mc controller */
+#if defined(CONFIG_XEN) /* Could easily be used for native too. */
+	if (mce->socketid != pvt->i7core_dev->socket)
+		return 0;
+#elif defined(CONFIG_SMP)
 	if (cpu_data(mce->cpu).phys_proc_id != pvt->i7core_dev->socket)
 		return 0;
 #endif

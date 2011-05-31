@@ -54,6 +54,7 @@ extern struct irq_chip i8259A_chip;
 
 struct legacy_pic {
 	int nr_legacy_irqs;
+#ifndef CONFIG_XEN
 	struct irq_chip *chip;
 	void (*mask)(unsigned int irq);
 	void (*unmask)(unsigned int irq);
@@ -61,6 +62,7 @@ struct legacy_pic {
 	void (*restore_mask)(void);
 	void (*init)(int auto_eoi);
 	int (*irq_pending)(unsigned int irq);
+#endif
 	void (*make_irq)(unsigned int irq);
 };
 

@@ -338,9 +338,8 @@ static struct rtable *find_route(struct t3cdev *dev, __be32 local_ip,
 				 __be16 peer_port, u8 tos)
 {
 	struct rtable *rt;
-	struct flowi4 fl4;
 
-	rt = ip_route_output_ports(&init_net, &fl4, NULL, peer_ip, local_ip,
+	rt = ip_route_output_ports(&init_net, NULL, peer_ip, local_ip,
 				   peer_port, local_port, IPPROTO_TCP,
 				   tos, 0);
 	if (IS_ERR(rt))
@@ -914,7 +913,7 @@ static void process_mpa_reply(struct iwch_ep *ep, struct sk_buff *skb)
 		goto err;
 
 	if (peer2peer && iwch_rqes_posted(ep->com.qp) == 0) {
-		iwch_post_zb_read(ep);
+		iwch_post_zb_read(ep->com.qp);
 	}
 
 	goto out;
@@ -1078,8 +1077,6 @@ static int tx_ack(struct t3cdev *tdev, struct sk_buff *skb, void *ctx)
 	struct iwch_ep *ep = ctx;
 	struct cpl_wr_ack *hdr = cplhdr(skb);
 	unsigned int credits = ntohs(hdr->credits);
-	unsigned long flags;
-	int post_zb = 0;
 
 	PDBG("%s ep %p credits %u\n", __func__, ep, credits);
 
@@ -1089,34 +1086,28 @@ static int tx_ack(struct t3cdev *tdev, struct sk_buff *skb, void *ctx)
 		return CPL_RET_BUF_DONE;
 	}
 
-	spin_lock_irqsave(&ep->com.lock, flags);
 	BUG_ON(credits != 1);
 	dst_confirm(ep->dst);
 	if (!ep->mpa_skb) {
 		PDBG("%s rdma_init wr_ack ep %p state %u\n",
-			__func__, ep, ep->com.state);
+			__func__, ep, state_read(&ep->com));
 		if (ep->mpa_attr.initiator) {
 			PDBG("%s initiator ep %p state %u\n",
-				__func__, ep, ep->com.state);
-			if (peer2peer && ep->com.state == FPDU_MODE)
-				post_zb = 1;
+				__func__, ep, state_read(&ep->com));
+			if (peer2peer)
+				iwch_post_zb_read(ep->com.qp);
 		} else {
 			PDBG("%s responder ep %p state %u\n",
-				__func__, ep, ep->com.state);
-			if (ep->com.state == MPA_REQ_RCVD) {
-				ep->com.rpl_done = 1;
-				wake_up(&ep->com.waitq);
-			}
+				__func__, ep, state_read(&ep->com));
+			ep->com.rpl_done = 1;
+			wake_up(&ep->com.waitq);
 		}
 	} else {
 		PDBG("%s lsm ack ep %p state %u freeing skb\n",
-			__func__, ep, ep->com.state);
+			__func__, ep, state_read(&ep->com));
 		kfree_skb(ep->mpa_skb);
 		ep->mpa_skb = NULL;
 	}
-	spin_unlock_irqrestore(&ep->com.lock, flags);
-	if (post_zb)
-		iwch_post_zb_read(ep);
 	return CPL_RET_BUF_DONE;
 }
 

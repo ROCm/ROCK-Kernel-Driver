@@ -84,6 +84,7 @@ static struct scsi_host_template cciss_driver_template = {
 	.proc_name		= "cciss",
 	.proc_info		= cciss_scsi_proc_info,
 	.queuecommand		= cciss_scsi_queue_command,
+	.can_queue		= SCSI_CCISS_CAN_QUEUE,
 	.this_id		= 7,
 	.cmd_per_lun		= 1,
 	.use_clustering		= DISABLE_CLUSTERING,
@@ -107,13 +108,16 @@ struct cciss_scsi_cmd_stack_elem_t {
 
 #pragma pack()
 
+#define CMD_STACK_SIZE (SCSI_CCISS_CAN_QUEUE * \
+		CCISS_MAX_SCSI_DEVS_PER_HBA + 2)
+			// plus two for init time usage
+
 #pragma pack(1)
 struct cciss_scsi_cmd_stack_t {
 	struct cciss_scsi_cmd_stack_elem_t *pool;
-	struct cciss_scsi_cmd_stack_elem_t **elem;
+	struct cciss_scsi_cmd_stack_elem_t *elem[CMD_STACK_SIZE];
 	dma_addr_t cmd_pool_handle;
 	int top;
-	int nelems;
 };
 #pragma pack()
 
@@ -187,7 +191,7 @@ scsi_cmd_free(ctlr_info_t *h, CommandList_struct *c)
 	sa = h->scsi_ctlr;
 	stk = &sa->cmd_stack; 
 	stk->top++;
-	if (stk->top >= stk->nelems) {
+	if (stk->top >= CMD_STACK_SIZE) {
 		dev_err(&h->pdev->dev,
 			"scsi_cmd_free called too many times.\n");
 		BUG();
@@ -202,14 +206,13 @@ scsi_cmd_stack_setup(ctlr_info_t *h, struct cciss_scsi_adapter_data_t *sa)
 	struct cciss_scsi_cmd_stack_t *stk;
 	size_t size;
 
-	stk = &sa->cmd_stack;
-	stk->nelems = cciss_tape_cmds + 2;
 	sa->cmd_sg_list = cciss_allocate_sg_chain_blocks(h,
-		h->chainsize, stk->nelems);
+		h->chainsize, CMD_STACK_SIZE);
 	if (!sa->cmd_sg_list && h->chainsize > 0)
 		return -ENOMEM;
 
-	size = sizeof(struct cciss_scsi_cmd_stack_elem_t) * stk->nelems;
+	stk = &sa->cmd_stack; 
+	size = sizeof(struct cciss_scsi_cmd_stack_elem_t) * CMD_STACK_SIZE;
 
 	/* Check alignment, see cciss_cmd.h near CommandList_struct def. */
 	BUILD_BUG_ON((sizeof(*stk->pool) % COMMANDLIST_ALIGNMENT) != 0);
@@ -218,23 +221,18 @@ scsi_cmd_stack_setup(ctlr_info_t *h, struct cciss_scsi_adapter_data_t *sa)
 		pci_alloc_consistent(h->pdev, size, &stk->cmd_pool_handle);
 
 	if (stk->pool == NULL) {
-		cciss_free_sg_chain_blocks(sa->cmd_sg_list, stk->nelems);
+		cciss_free_sg_chain_blocks(sa->cmd_sg_list, CMD_STACK_SIZE);
 		sa->cmd_sg_list = NULL;
 		return -ENOMEM;
 	}
-	stk->elem = kmalloc(sizeof(stk->elem[0]) * stk->nelems, GFP_KERNEL);
-	if (!stk->elem) {
-		pci_free_consistent(h->pdev, size, stk->pool,
-		stk->cmd_pool_handle);
-		return -1;
-	}
-	for (i = 0; i < stk->nelems; i++) {
+
+	for (i=0; i<CMD_STACK_SIZE; i++) {
 		stk->elem[i] = &stk->pool[i];
 		stk->elem[i]->busaddr = (__u32) (stk->cmd_pool_handle + 
 			(sizeof(struct cciss_scsi_cmd_stack_elem_t) * i));
 		stk->elem[i]->cmdindex = i;
 	}
-	stk->top = stk->nelems-1;
+	stk->top = CMD_STACK_SIZE-1;
 	return 0;
 }
 
@@ -247,18 +245,16 @@ scsi_cmd_stack_free(ctlr_info_t *h)
 
 	sa = h->scsi_ctlr;
 	stk = &sa->cmd_stack; 
-	if (stk->top != stk->nelems-1) {
+	if (stk->top != CMD_STACK_SIZE-1) {
 		dev_warn(&h->pdev->dev,
 			"bug: %d scsi commands are still outstanding.\n",
-			stk->nelems - stk->top);
+			CMD_STACK_SIZE - stk->top);
 	}
-	size = sizeof(struct cciss_scsi_cmd_stack_elem_t) * stk->nelems;
+	size = sizeof(struct cciss_scsi_cmd_stack_elem_t) * CMD_STACK_SIZE;
 
 	pci_free_consistent(h->pdev, size, stk->pool, stk->cmd_pool_handle);
 	stk->pool = NULL;
-	cciss_free_sg_chain_blocks(sa->cmd_sg_list, stk->nelems);
-	kfree(stk->elem);
-	stk->elem = NULL;
+	cciss_free_sg_chain_blocks(sa->cmd_sg_list, CMD_STACK_SIZE);
 }
 
 #if 0
@@ -863,7 +859,6 @@ cciss_scsi_detect(ctlr_info_t *h)
 	sh->io_port = 0;	// good enough?  FIXME, 
 	sh->n_io_port = 0;	// I don't think we use these two...
 	sh->this_id = SELF_SCSI_ID;  
-	sh->can_queue = cciss_tape_cmds;
 	sh->sg_tablesize = h->maxsgentries;
 	sh->max_cmd_len = MAX_COMMAND_SIZE;
 

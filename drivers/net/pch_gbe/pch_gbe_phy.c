@@ -247,7 +247,7 @@ inline void pch_gbe_phy_set_rgmii(struct pch_gbe_hw *hw)
 void pch_gbe_phy_init_setting(struct pch_gbe_hw *hw)
 {
 	struct pch_gbe_adapter *adapter;
-	struct ethtool_cmd     cmd = { .cmd = ETHTOOL_GSET };
+	struct ethtool_cmd     cmd;
 	int ret;
 	u16 mii_reg;
 
@@ -256,7 +256,7 @@ void pch_gbe_phy_init_setting(struct pch_gbe_hw *hw)
 	if (ret)
 		pr_err("Error: mii_ethtool_gset\n");
 
-	ethtool_cmd_speed_set(&cmd, hw->mac.link_speed);
+	cmd.speed = hw->mac.link_speed;
 	cmd.duplex = hw->mac.link_duplex;
 	cmd.advertising = hw->phy.autoneg_advertised;
 	cmd.autoneg = hw->mac.autoneg;

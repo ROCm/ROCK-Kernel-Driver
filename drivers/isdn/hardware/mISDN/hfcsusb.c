@@ -118,12 +118,14 @@ static void
 ctrl_complete(struct urb *urb)
 {
 	struct hfcsusb *hw = (struct hfcsusb *) urb->context;
+	struct ctrl_buf *buf;
 
 	if (debug & DBG_HFC_CALL_TRACE)
 		printk(KERN_DEBUG "%s: %s\n", hw->name, __func__);
 
 	urb->dev = hw->dev;
 	if (hw->ctrl_cnt) {
+		buf = &hw->ctrl_buff[hw->ctrl_out_idx];
 		hw->ctrl_cnt--;	/* decrement actual count */
 		if (++hw->ctrl_out_idx >= HFC_CTRL_BUFSIZE)
 			hw->ctrl_out_idx = 0;	/* pointer wrap */
@@ -1724,6 +1726,7 @@ hfcsusb_stop_endpoint(struct hfcsusb *hw, int channel)
 static int
 setup_hfcsusb(struct hfcsusb *hw)
 {
+	int err;
 	u_char b;
 
 	if (debug & DBG_HFC_CALL_TRACE)
@@ -1742,7 +1745,7 @@ setup_hfcsusb(struct hfcsusb *hw)
 	}
 
 	/* first set the needed config, interface and alternate */
-	(void) usb_set_interface(hw->dev, hw->if_used, hw->alt_used);
+	err = usb_set_interface(hw->dev, hw->if_used, hw->alt_used);
 
 	hw->led_state = 0;
 

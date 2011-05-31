@@ -48,6 +48,8 @@
 #include <asm/e820.h>
 #include <asm/ipi.h>
 
+#define	MB_TO_PAGES(addr)		((addr) << (20 - PAGE_SHIFT))
+
 int found_numaq;
 
 /*
@@ -77,20 +79,31 @@ int					quad_local_to_mp_bus_id[NR_CPUS/4][4];
 static inline void numaq_register_node(int node, struct sys_cfg_data *scd)
 {
 	struct eachquadmem *eq = scd->eq + node;
-	u64 start = (u64)(eq->hi_shrd_mem_start - eq->priv_mem_size) << 20;
-	u64 end = (u64)(eq->hi_shrd_mem_start + eq->hi_shrd_mem_size) << 20;
-	int ret;
 
-	node_set(node, numa_nodes_parsed);
-	ret = numa_add_memblk(node, start, end);
-	BUG_ON(ret < 0);
+	node_set_online(node);
+
+	/* Convert to pages */
+	node_start_pfn[node] =
+		 MB_TO_PAGES(eq->hi_shrd_mem_start - eq->priv_mem_size);
+
+	node_end_pfn[node] =
+		 MB_TO_PAGES(eq->hi_shrd_mem_start + eq->hi_shrd_mem_size);
+
+	memblock_x86_register_active_regions(node, node_start_pfn[node],
+						node_end_pfn[node]);
+
+	memory_present(node, node_start_pfn[node], node_end_pfn[node]);
+
+	node_remap_size[node] = node_memmap_size_bytes(node,
+					node_start_pfn[node],
+					node_end_pfn[node]);
 }
 
 /*
  * Function: smp_dump_qct()
  *
  * Description: gets memory layout from the quad config table.  This
- * function also updates numa_nodes_parsed with the nodes (quads) present.
+ * function also updates node_online_map with the nodes (quads) present.
  */
 static void __init smp_dump_qct(void)
 {
@@ -99,6 +112,7 @@ static void __init smp_dump_qct(void)
 
 	scd = (void *)__va(SYS_CFG_DATA_PRIV_ADDR);
 
+	nodes_clear(node_online_map);
 	for_each_node(node) {
 		if (scd->quads_present31_0 & (1 << node))
 			numaq_register_node(node, scd);
@@ -268,14 +282,14 @@ static __init void early_check_numaq(void)
 	}
 }
 
-int __init numaq_numa_init(void)
+int __init get_memcfg_numaq(void)
 {
 	early_check_numaq();
 	if (!found_numaq)
-		return -ENOENT;
+		return 0;
 	smp_dump_qct();
 
-	return 0;
+	return 1;
 }
 
 #define NUMAQ_APIC_DFR_VALUE	(APIC_DFR_CLUSTER)
@@ -472,8 +486,8 @@ static void numaq_setup_portio_remap(void)
 		(u_long) xquad_portio, (u_long) num_quads*XQUAD_PORTIO_QUAD);
 }
 
-/* Use __refdata to keep false positive warning calm.  */
-static struct apic __refdata apic_numaq = {
+/* Use __refdata to keep false positive warning calm.	*/
+struct apic __refdata apic_numaq = {
 
 	.name				= "NUMAQ",
 	.probe				= probe_numaq,
@@ -537,5 +551,3 @@ static struct apic __refdata apic_numaq = {
 	.x86_32_early_logical_apicid	= noop_x86_32_early_logical_apicid,
 	.x86_32_numa_cpu_node		= numaq_numa_cpu_node,
 };
-
-apic_driver(apic_numaq);

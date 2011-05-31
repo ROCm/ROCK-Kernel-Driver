@@ -50,6 +50,7 @@
 #include <mach/hardware.h>
 #include <mach/regs-fb.h>
 #include <mach/map.h>
+#include <mach/gpio-bank-f.h>
 
 #include <asm/irq.h>
 #include <asm/mach-types.h>

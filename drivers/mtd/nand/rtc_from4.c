@@ -580,8 +580,7 @@ static int __init rtc_from4_init(void)
 #endif
 
 	/* Register the partitions */
-	ret = mtd_device_register(rtc_from4_mtd, partition_info,
-				  NUM_PARTITIONS);
+	ret = add_mtd_partitions(rtc_from4_mtd, partition_info, NUM_PARTITIONS);
 	if (ret)
 		goto err_3;
 

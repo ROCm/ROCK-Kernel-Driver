@@ -213,7 +213,7 @@ static const struct dev_pm_ops jc42_dev_pm_ops = {
 
 /* This is the driver that will be inserted */
 static struct i2c_driver jc42_driver = {
-	.class		= I2C_CLASS_SPD,
+	.class		= I2C_CLASS_HWMON,
 	.driver = {
 		.name	= "jc42",
 		.pm = JC42_DEV_PM_OPS,

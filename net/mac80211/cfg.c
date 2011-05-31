@@ -136,10 +136,7 @@ static int ieee80211_add_key(struct wiphy *wiphy, struct net_device *dev,
 	mutex_lock(&sdata->local->sta_mtx);
 
 	if (mac_addr) {
-		if (ieee80211_vif_is_mesh(&sdata->vif))
-			sta = sta_info_get(sdata, mac_addr);
-		else
-			sta = sta_info_get_bss(sdata, mac_addr);
+		sta = sta_info_get_bss(sdata, mac_addr);
 		if (!sta) {
 			ieee80211_key_free(sdata->local, key);
 			err = -ENOENT;
@@ -160,14 +157,13 @@ static int ieee80211_add_key(struct wiphy *wiphy, struct net_device *dev,
 static int ieee80211_del_key(struct wiphy *wiphy, struct net_device *dev,
 			     u8 key_idx, bool pairwise, const u8 *mac_addr)
 {
-	struct ieee80211_sub_if_data *sdata = IEEE80211_DEV_TO_SUB_IF(dev);
-	struct ieee80211_local *local = sdata->local;
+	struct ieee80211_sub_if_data *sdata;
 	struct sta_info *sta;
-	struct ieee80211_key *key = NULL;
 	int ret;
 
-	mutex_lock(&local->sta_mtx);
-	mutex_lock(&local->key_mtx);
+	sdata = IEEE80211_DEV_TO_SUB_IF(dev);
+
+	mutex_lock(&sdata->local->sta_mtx);
 
 	if (mac_addr) {
 		ret = -ENOENT;
@@ -176,24 +172,33 @@ static int ieee80211_del_key(struct wiphy *wiphy, struct net_device *dev,
 		if (!sta)
 			goto out_unlock;
 
-		if (pairwise)
-			key = key_mtx_dereference(local, sta->ptk);
-		else
-			key = key_mtx_dereference(local, sta->gtk[key_idx]);
-	} else
-		key = key_mtx_dereference(local, sdata->keys[key_idx]);
+		if (pairwise) {
+			if (sta->ptk) {
+				ieee80211_key_free(sdata->local, sta->ptk);
+				ret = 0;
+			}
+		} else {
+			if (sta->gtk[key_idx]) {
+				ieee80211_key_free(sdata->local,
+						   sta->gtk[key_idx]);
+				ret = 0;
+			}
+		}
 
-	if (!key) {
+		goto out_unlock;
+	}
+
+	if (!sdata->keys[key_idx]) {
 		ret = -ENOENT;
 		goto out_unlock;
 	}
 
-	__ieee80211_key_free(key);
+	ieee80211_key_free(sdata->local, sdata->keys[key_idx]);
+	WARN_ON(sdata->keys[key_idx]);
 
 	ret = 0;
  out_unlock:
-	mutex_unlock(&local->key_mtx);
-	mutex_unlock(&local->sta_mtx);
+	mutex_unlock(&sdata->local->sta_mtx);
 
 	return ret;
 }
@@ -223,11 +228,11 @@ static int ieee80211_get_key(struct wiphy *wiphy, struct net_device *dev,
 			goto out;
 
 		if (pairwise)
-			key = rcu_dereference(sta->ptk);
+			key = sta->ptk;
 		else if (key_idx < NUM_DEFAULT_KEYS)
-			key = rcu_dereference(sta->gtk[key_idx]);
+			key = sta->gtk[key_idx];
 	} else
-		key = rcu_dereference(sdata->keys[key_idx]);
+		key = sdata->keys[key_idx];
 
 	if (!key)
 		goto out;
@@ -325,7 +330,6 @@ static void rate_idx_to_bitrate(struct rate_info *rate, struct sta_info *sta, in
 static void sta_set_sinfo(struct sta_info *sta, struct station_info *sinfo)
 {
 	struct ieee80211_sub_if_data *sdata = sta->sdata;
-	struct timespec uptime;
 
 	sinfo->generation = sdata->local->sta_generation;
 
@@ -338,12 +342,7 @@ static void sta_set_sinfo(struct sta_info *sta, struct station_info *sinfo)
 			STATION_INFO_TX_FAILED |
 			STATION_INFO_TX_BITRATE |
 			STATION_INFO_RX_BITRATE |
-			STATION_INFO_RX_DROP_MISC |
-			STATION_INFO_BSS_PARAM |
-			STATION_INFO_CONNECTED_TIME;
-
-	do_posix_clock_monotonic_gettime(&uptime);
-	sinfo->connected_time = uptime.tv_sec - sta->last_connected;
+			STATION_INFO_RX_DROP_MISC;
 
 	sinfo->inactive_time = jiffies_to_msecs(jiffies - sta->last_rx);
 	sinfo->rx_bytes = sta->rx_bytes;
@@ -390,16 +389,6 @@ static void sta_set_sinfo(struct sta_info *sta, struct station_info *sinfo)
 		sinfo->plink_state = sta->plink_state;
 #endif
 	}
-
-	sinfo->bss_param.flags = 0;
-	if (sdata->vif.bss_conf.use_cts_prot)
-		sinfo->bss_param.flags |= BSS_PARAM_FLAGS_CTS_PROT;
-	if (sdata->vif.bss_conf.use_short_preamble)
-		sinfo->bss_param.flags |= BSS_PARAM_FLAGS_SHORT_PREAMBLE;
-	if (sdata->vif.bss_conf.use_short_slot)
-		sinfo->bss_param.flags |= BSS_PARAM_FLAGS_SHORT_SLOT_TIME;
-	sinfo->bss_param.dtim_period = sdata->local->hw.conf.ps_dtim_period;
-	sinfo->bss_param.beacon_interval = sdata->vif.bss_conf.beacon_int;
 }
 
 
@@ -463,7 +452,7 @@ static int ieee80211_config_beacon(struct ieee80211_sub_if_data *sdata,
 	int size;
 	int err = -EINVAL;
 
-	old = rtnl_dereference(sdata->u.ap.beacon);
+	old = sdata->u.ap.beacon;
 
 	/* head must not be zero-length */
 	if (params->head && !params->head_len)
@@ -558,7 +547,8 @@ static int ieee80211_add_beacon(struct wiphy *wiphy, struct net_device *dev,
 
 	sdata = IEEE80211_DEV_TO_SUB_IF(dev);
 
-	old = rtnl_dereference(sdata->u.ap.beacon);
+	old = sdata->u.ap.beacon;
+
 	if (old)
 		return -EALREADY;
 
@@ -573,7 +563,8 @@ static int ieee80211_set_beacon(struct wiphy *wiphy, struct net_device *dev,
 
 	sdata = IEEE80211_DEV_TO_SUB_IF(dev);
 
-	old = rtnl_dereference(sdata->u.ap.beacon);
+	old = sdata->u.ap.beacon;
+
 	if (!old)
 		return -ENOENT;
 
@@ -587,7 +578,8 @@ static int ieee80211_del_beacon(struct wiphy *wiphy, struct net_device *dev)
 
 	sdata = IEEE80211_DEV_TO_SUB_IF(dev);
 
-	old = rtnl_dereference(sdata->u.ap.beacon);
+	old = sdata->u.ap.beacon;
+
 	if (!old)
 		return -ENOENT;
 
@@ -683,12 +675,6 @@ static void sta_apply_parameters(struct ieee80211_local *local,
 		if (set & BIT(NL80211_STA_FLAG_MFP))
 			sta->flags |= WLAN_STA_MFP;
 	}
-
-	if (mask & BIT(NL80211_STA_FLAG_AUTHENTICATED)) {
-		sta->flags &= ~WLAN_STA_AUTH;
-		if (set & BIT(NL80211_STA_FLAG_AUTHENTICATED))
-			sta->flags |= WLAN_STA_AUTH;
-	}
 	spin_unlock_irqrestore(&sta->flaglock, flags);
 
 	/*
@@ -726,29 +712,15 @@ static void sta_apply_parameters(struct ieee80211_local *local,
 						  params->ht_capa,
 						  &sta->sta.ht_cap);
 
-	if (ieee80211_vif_is_mesh(&sdata->vif)) {
-#ifdef CONFIG_MAC80211_MESH
-		if (sdata->u.mesh.security & IEEE80211_MESH_SEC_SECURED)
-			switch (params->plink_state) {
-			case NL80211_PLINK_LISTEN:
-			case NL80211_PLINK_ESTAB:
-			case NL80211_PLINK_BLOCKED:
-				sta->plink_state = params->plink_state;
-				break;
-			default:
-				/*  nothing  */
-				break;
-			}
-		else
-			switch (params->plink_action) {
-			case PLINK_ACTION_OPEN:
-				mesh_plink_open(sta);
-				break;
-			case PLINK_ACTION_BLOCK:
-				mesh_plink_block(sta);
-				break;
-			}
-#endif
+	if (ieee80211_vif_is_mesh(&sdata->vif) && params->plink_action) {
+		switch (params->plink_action) {
+		case PLINK_ACTION_OPEN:
+			mesh_plink_open(sta);
+			break;
+		case PLINK_ACTION_BLOCK:
+			mesh_plink_block(sta);
+			break;
+		}
 	}
 }
 
@@ -949,10 +921,8 @@ static int ieee80211_change_mpath(struct wiphy *wiphy,
 static void mpath_set_pinfo(struct mesh_path *mpath, u8 *next_hop,
 			    struct mpath_info *pinfo)
 {
-	struct sta_info *next_hop_sta = rcu_dereference(mpath->next_hop);
-
-	if (next_hop_sta)
-		memcpy(next_hop, next_hop_sta->sta.addr, ETH_ALEN);
+	if (mpath->next_hop)
+		memcpy(next_hop, mpath->next_hop->sta.addr, ETH_ALEN);
 	else
 		memset(next_hop, 0, ETH_ALEN);
 
@@ -1053,30 +1023,26 @@ static int copy_mesh_setup(struct ieee80211_if_mesh *ifmsh,
 	u8 *new_ie;
 	const u8 *old_ie;
 
-	/* allocate information elements */
+	/* first allocate the new vendor information element */
 	new_ie = NULL;
-	old_ie = ifmsh->ie;
+	old_ie = ifmsh->vendor_ie;
 
-	if (setup->ie_len) {
-		new_ie = kmemdup(setup->ie, setup->ie_len,
+	ifmsh->vendor_ie_len = setup->vendor_ie_len;
+	if (setup->vendor_ie_len) {
+		new_ie = kmemdup(setup->vendor_ie, setup->vendor_ie_len,
 				GFP_KERNEL);
 		if (!new_ie)
 			return -ENOMEM;
 	}
-	ifmsh->ie_len = setup->ie_len;
-	ifmsh->ie = new_ie;
-	kfree(old_ie);
 
 	/* now copy the rest of the setup parameters */
 	ifmsh->mesh_id_len = setup->mesh_id_len;
 	memcpy(ifmsh->mesh_id, setup->mesh_id, ifmsh->mesh_id_len);
 	ifmsh->mesh_pp_id = setup->path_sel_proto;
 	ifmsh->mesh_pm_id = setup->path_metric;
-	ifmsh->security = IEEE80211_MESH_SEC_NONE;
-	if (setup->is_authenticated)
-		ifmsh->security |= IEEE80211_MESH_SEC_AUTHED;
-	if (setup->is_secure)
-		ifmsh->security |= IEEE80211_MESH_SEC_SECURED;
+	ifmsh->vendor_ie = new_ie;
+
+	kfree(old_ie);
 
 	return 0;
 }
@@ -1309,10 +1275,9 @@ static int ieee80211_set_channel(struct wiphy *wiphy,
 }
 
 #ifdef CONFIG_PM
-static int ieee80211_suspend(struct wiphy *wiphy,
-			     struct cfg80211_wowlan *wowlan)
+static int ieee80211_suspend(struct wiphy *wiphy)
 {
-	return __ieee80211_suspend(wiphy_priv(wiphy), wowlan);
+	return __ieee80211_suspend(wiphy_priv(wiphy));
 }
 
 static int ieee80211_resume(struct wiphy *wiphy)
@@ -1353,30 +1318,6 @@ static int ieee80211_scan(struct wiphy *wiphy,
 	}
 
 	return ieee80211_request_scan(sdata, req);
-}
-
-static int
-ieee80211_sched_scan_start(struct wiphy *wiphy,
-			   struct net_device *dev,
-			   struct cfg80211_sched_scan_request *req)
-{
-	struct ieee80211_sub_if_data *sdata = IEEE80211_DEV_TO_SUB_IF(dev);
-
-	if (!sdata->local->ops->sched_scan_start)
-		return -EOPNOTSUPP;
-
-	return ieee80211_request_sched_scan_start(sdata, req);
-}
-
-static int
-ieee80211_sched_scan_stop(struct wiphy *wiphy, struct net_device *dev)
-{
-	struct ieee80211_sub_if_data *sdata = IEEE80211_DEV_TO_SUB_IF(dev);
-
-	if (!sdata->local->ops->sched_scan_stop)
-		return -EOPNOTSUPP;
-
-	return ieee80211_request_sched_scan_stop(sdata);
 }
 
 static int ieee80211_auth(struct wiphy *wiphy, struct net_device *dev,
@@ -1670,13 +1611,16 @@ static int ieee80211_set_bitrate_mask(struct wiphy *wiphy,
 {
 	struct ieee80211_sub_if_data *sdata = IEEE80211_DEV_TO_SUB_IF(dev);
 	struct ieee80211_local *local = wdev_priv(dev->ieee80211_ptr);
-	int i, ret;
+	int i;
 
-	if (local->hw.flags & IEEE80211_HW_HAS_RATE_CONTROL) {
-		ret = drv_set_bitrate_mask(local, sdata, mask);
-		if (ret)
-			return ret;
-	}
+	/*
+	 * This _could_ be supported by providing a hook for
+	 * drivers for this function, but at this point it
+	 * doesn't seem worth bothering.
+	 */
+	if (local->hw.flags & IEEE80211_HW_HAS_RATE_CONTROL)
+		return -EOPNOTSUPP;
+
 
 	for (i = 0; i < IEEE80211_NUM_BANDS; i++)
 		sdata->rc_rateidx_mask[i] = mask->control[i].legacy;
@@ -2120,8 +2064,6 @@ struct cfg80211_ops mac80211_config_ops = {
 	.suspend = ieee80211_suspend,
 	.resume = ieee80211_resume,
 	.scan = ieee80211_scan,
-	.sched_scan_start = ieee80211_sched_scan_start,
-	.sched_scan_stop = ieee80211_sched_scan_stop,
 	.auth = ieee80211_auth,
 	.assoc = ieee80211_assoc,
 	.deauth = ieee80211_deauth,

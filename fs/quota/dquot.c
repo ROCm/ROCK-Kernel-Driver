@@ -691,11 +691,8 @@ static void prune_dqcache(int count)
  * This is called from kswapd when we think we need some
  * more memory
  */
-static int shrink_dqcache_memory(struct shrinker *shrink,
-				 struct shrink_control *sc)
+static int shrink_dqcache_memory(struct shrinker *shrink, int nr, gfp_t gfp_mask)
 {
-	int nr = sc->nr_to_scan;
-
 	if (nr) {
 		spin_lock(&dq_list_lock);
 		prune_dqcache(nr);

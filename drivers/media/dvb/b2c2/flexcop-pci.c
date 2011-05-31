@@ -290,8 +290,10 @@ static void flexcop_pci_dma_exit(struct flexcop_pci *fc_pci)
 static int flexcop_pci_init(struct flexcop_pci *fc_pci)
 {
 	int ret;
+	u8 card_rev;
 
-	info("card revision %x", fc_pci->pdev->revision);
+	pci_read_config_byte(fc_pci->pdev, PCI_CLASS_REVISION, &card_rev);
+	info("card revision %x", card_rev);
 
 	if ((ret = pci_enable_device(fc_pci->pdev)) != 0)
 		return ret;

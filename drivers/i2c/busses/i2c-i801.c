@@ -50,7 +50,6 @@
   Patsburg (PCH) IDF    0x1d71     32     hard     yes     yes     yes
   Patsburg (PCH) IDF    0x1d72     32     hard     yes     yes     yes
   DH89xxCC (PCH)        0x2330     32     hard     yes     yes     yes
-  Panther Point (PCH)   0x1e22     32     hard     yes     yes     yes
 
   Features supported by this driver:
   Software PEC                     no
@@ -142,7 +141,6 @@
 #define PCI_DEVICE_ID_INTEL_PATSBURG_SMBUS_IDF0	0x1d70
 #define PCI_DEVICE_ID_INTEL_PATSBURG_SMBUS_IDF1	0x1d71
 #define PCI_DEVICE_ID_INTEL_PATSBURG_SMBUS_IDF2	0x1d72
-#define PCI_DEVICE_ID_INTEL_PANTHERPOINT_SMBUS	0x1e22
 #define PCI_DEVICE_ID_INTEL_DH89XXCC_SMBUS	0x2330
 #define PCI_DEVICE_ID_INTEL_5_3400_SERIES_SMBUS	0x3b30
 
@@ -160,8 +158,6 @@ static struct pci_driver i801_driver;
 #define FEATURE_BLOCK_BUFFER	(1 << 1)
 #define FEATURE_BLOCK_PROC	(1 << 2)
 #define FEATURE_I2C_BLOCK_READ	(1 << 3)
-/* Not really a feature, but it's convenient to handle it as such */
-#define FEATURE_IDF		(1 << 15)
 
 static const char *i801_feature_names[] = {
 	"SMBus PEC",
@@ -632,13 +628,12 @@ static const struct pci_device_id i801_ids[] = {
 	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_PATSBURG_SMBUS_IDF1) },
 	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_PATSBURG_SMBUS_IDF2) },
 	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_DH89XXCC_SMBUS) },
-	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_PANTHERPOINT_SMBUS) },
 	{ 0, }
 };
 
 MODULE_DEVICE_TABLE(pci, i801_ids);
 
-#if defined CONFIG_X86 && defined CONFIG_DMI
+#if defined CONFIG_INPUT_APANEL || defined CONFIG_INPUT_APANEL_MODULE
 static unsigned char apanel_addr;
 
 /* Scan the system ROM for the signature "FJKEYINF" */
@@ -668,7 +663,11 @@ static void __init input_apanel_init(void)
 	}
 	iounmap(bios);
 }
+#else
+static void __init input_apanel_init(void) {}
+#endif
 
+#if defined CONFIG_SENSORS_FSCHMD || defined CONFIG_SENSORS_FSCHMD_MODULE
 struct dmi_onboard_device_info {
 	const char *name;
 	u8 type;
@@ -734,30 +733,7 @@ static void __devinit dmi_check_onboard_devices(const struct dmi_header *dm,
 		dmi_check_onboard_device(type, name, adap);
 	}
 }
-
-/* Register optional slaves */
-static void __devinit i801_probe_optional_slaves(struct i801_priv *priv)
-{
-	/* Only register slaves on main SMBus channel */
-	if (priv->features & FEATURE_IDF)
-		return;
-
-	if (apanel_addr) {
-		struct i2c_board_info info;
-
-		memset(&info, 0, sizeof(struct i2c_board_info));
-		info.addr = apanel_addr;
-		strlcpy(info.type, "fujitsu_apanel", I2C_NAME_SIZE);
-		i2c_new_device(&priv->adapter, &info);
-	}
-
-	if (dmi_name_in_vendors("FUJITSU"))
-		dmi_walk(dmi_check_onboard_devices, &priv->adapter);
-}
-#else
-static void __init input_apanel_init(void) {}
-static void __devinit i801_probe_optional_slaves(struct i801_priv *priv) {}
-#endif	/* CONFIG_X86 && CONFIG_DMI */
+#endif
 
 static int __devinit i801_probe(struct pci_dev *dev,
 				const struct pci_device_id *id)
@@ -777,11 +753,6 @@ static int __devinit i801_probe(struct pci_dev *dev,
 
 	priv->pci_dev = dev;
 	switch (dev->device) {
-	case PCI_DEVICE_ID_INTEL_PATSBURG_SMBUS_IDF0:
-	case PCI_DEVICE_ID_INTEL_PATSBURG_SMBUS_IDF1:
-	case PCI_DEVICE_ID_INTEL_PATSBURG_SMBUS_IDF2:
-		priv->features |= FEATURE_IDF;
-		/* fall through */
 	default:
 		priv->features |= FEATURE_I2C_BLOCK_READ;
 		/* fall through */
@@ -867,7 +838,21 @@ static int __devinit i801_probe(struct pci_dev *dev,
 		goto exit_release;
 	}
 
-	i801_probe_optional_slaves(priv);
+	/* Register optional slaves */
+#if defined CONFIG_INPUT_APANEL || defined CONFIG_INPUT_APANEL_MODULE
+	if (apanel_addr) {
+		struct i2c_board_info info;
+
+		memset(&info, 0, sizeof(struct i2c_board_info));
+		info.addr = apanel_addr;
+		strlcpy(info.type, "fujitsu_apanel", I2C_NAME_SIZE);
+		i2c_new_device(&priv->adapter, &info);
+	}
+#endif
+#if defined CONFIG_SENSORS_FSCHMD || defined CONFIG_SENSORS_FSCHMD_MODULE
+	if (dmi_name_in_vendors("FUJITSU"))
+		dmi_walk(dmi_check_onboard_devices, &priv->adapter);
+#endif
 
 	pci_set_drvdata(dev, priv);
 	return 0;
@@ -927,8 +912,7 @@ static struct pci_driver i801_driver = {
 
 static int __init i2c_i801_init(void)
 {
-	if (dmi_name_in_vendors("FUJITSU"))
-		input_apanel_init();
+	input_apanel_init();
 	return pci_register_driver(&i801_driver);
 }
 

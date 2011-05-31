@@ -39,6 +39,7 @@
 #include <asm/atomic.h>
 #include <asm/mathemu.h>
 #include <asm/cpcmd.h>
+#include <asm/s390_ext.h>
 #include <asm/lowcore.h>
 #include <asm/debug.h>
 #include "entry.h"

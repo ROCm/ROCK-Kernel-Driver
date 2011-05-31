@@ -69,8 +69,8 @@ static int __init init_mbx(void)
 	mymtd = do_map_probe("jedec_probe", &mbx_map);
 	if (mymtd) {
 		mymtd->owner = THIS_MODULE;
-		mtd_device_register(mymtd, NULL, 0);
-		mtd_device_register(mymtd, partition_info, NUM_PARTITIONS);
+		add_mtd_device(mymtd);
+                add_mtd_partitions(mymtd, partition_info, NUM_PARTITIONS);
 		return 0;
 	}
 
@@ -81,7 +81,7 @@ static int __init init_mbx(void)
 static void __exit cleanup_mbx(void)
 {
 	if (mymtd) {
-		mtd_device_unregister(mymtd);
+		del_mtd_device(mymtd);
 		map_destroy(mymtd);
 	}
 	if (mbx_map.virt) {

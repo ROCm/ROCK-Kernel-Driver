@@ -76,7 +76,7 @@ extern void crash_send_ipi(void (*crash_ipi_callback)(struct pt_regs *));
 extern cpumask_t cpus_in_sr;
 static inline int kexec_sr_activated(int cpu)
 {
-	return cpumask_test_cpu(cpu, &cpus_in_sr);
+	return cpu_isset(cpu,cpus_in_sr);
 }
 
 struct kimage;

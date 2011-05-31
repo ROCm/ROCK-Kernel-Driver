@@ -46,22 +46,18 @@ xattr_permission(struct inode *inode, const char *name, int mask)
 		return 0;
 
 	/*
-	 * The trusted.* namespace can only be accessed by privileged users.
+	 * The trusted.* namespace can only be accessed by a privileged user.
 	 */
-	if (!strncmp(name, XATTR_TRUSTED_PREFIX, XATTR_TRUSTED_PREFIX_LEN)) {
-		if (!capable(CAP_SYS_ADMIN))
-			return (mask & MAY_WRITE) ? -EPERM : -ENODATA;
-		return 0;
-	}
+	if (!strncmp(name, XATTR_TRUSTED_PREFIX, XATTR_TRUSTED_PREFIX_LEN))
+		return (capable(CAP_SYS_ADMIN) ? 0 : -EPERM);
 
-	/*
-	 * In the user.* namespace, only regular files and directories can have
+	/* In user.* namespace, only regular files and directories can have
 	 * extended attributes. For sticky directories, only the owner and
-	 * privileged users can write attributes.
+	 * privileged user can write attributes.
 	 */
 	if (!strncmp(name, XATTR_USER_PREFIX, XATTR_USER_PREFIX_LEN)) {
 		if (!S_ISREG(inode->i_mode) && !S_ISDIR(inode->i_mode))
-			return (mask & MAY_WRITE) ? -EPERM : -ENODATA;
+			return -EPERM;
 		if (S_ISDIR(inode->i_mode) && (inode->i_mode & S_ISVTX) &&
 		    (mask & MAY_WRITE) && !inode_owner_or_capable(inode))
 			return -EPERM;
@@ -91,11 +87,7 @@ int __vfs_setxattr_noperm(struct dentry *dentry, const char *name,
 {
 	struct inode *inode = dentry->d_inode;
 	int error = -EOPNOTSUPP;
-	int issec = !strncmp(name, XATTR_SECURITY_PREFIX,
-				   XATTR_SECURITY_PREFIX_LEN);
 
-	if (issec)
-		inode->i_flags &= ~S_NOSEC;
 	if (inode->i_op->setxattr) {
 		error = inode->i_op->setxattr(dentry, name, value, size, flags);
 		if (!error) {
@@ -103,7 +95,8 @@ int __vfs_setxattr_noperm(struct dentry *dentry, const char *name,
 			security_inode_post_setxattr(dentry, name, value,
 						     size, flags);
 		}
-	} else if (issec) {
+	} else if (!strncmp(name, XATTR_SECURITY_PREFIX,
+				XATTR_SECURITY_PREFIX_LEN)) {
 		const char *suffix = name + XATTR_SECURITY_PREFIX_LEN;
 		error = security_inode_setsecurity(inode, suffix, value,
 						   size, flags);

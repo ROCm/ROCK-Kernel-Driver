@@ -43,7 +43,6 @@
 #include <linux/moduleparam.h>
 #include <asm/system.h>
 #include <linux/sched.h>
-#include <linux/seq_file.h>
 #include <linux/timer.h>
 #include <linux/errno.h>
 #include <linux/spinlock.h>
@@ -2806,73 +2805,54 @@ static int try_enable_event_buffer(struct smi_info *smi_info)
 	return rv;
 }
 
-static int smi_type_proc_show(struct seq_file *m, void *v)
+static int type_file_read_proc(char *page, char **start, off_t off,
+			       int count, int *eof, void *data)
 {
-	struct smi_info *smi = m->private;
+	struct smi_info *smi = data;
 
-	return seq_printf(m, "%s\n", si_to_str[smi->si_type]);
+	return sprintf(page, "%s\n", si_to_str[smi->si_type]);
 }
 
-static int smi_type_proc_open(struct inode *inode, struct file *file)
+static int stat_file_read_proc(char *page, char **start, off_t off,
+			       int count, int *eof, void *data)
 {
-	return single_open(file, smi_type_proc_show, PDE(inode)->data);
-}
+	char            *out = (char *) page;
+	struct smi_info *smi = data;
 
-static const struct file_operations smi_type_proc_ops = {
-	.open		= smi_type_proc_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
-};
-
-static int smi_si_stats_proc_show(struct seq_file *m, void *v)
-{
-	struct smi_info *smi = m->private;
-
-	seq_printf(m, "interrupts_enabled:    %d\n",
+	out += sprintf(out, "interrupts_enabled:    %d\n",
 		       smi->irq && !smi->interrupt_disabled);
-	seq_printf(m, "short_timeouts:        %u\n",
+	out += sprintf(out, "short_timeouts:        %u\n",
 		       smi_get_stat(smi, short_timeouts));
-	seq_printf(m, "long_timeouts:         %u\n",
+	out += sprintf(out, "long_timeouts:         %u\n",
 		       smi_get_stat(smi, long_timeouts));
-	seq_printf(m, "idles:                 %u\n",
+	out += sprintf(out, "idles:                 %u\n",
 		       smi_get_stat(smi, idles));
-	seq_printf(m, "interrupts:            %u\n",
+	out += sprintf(out, "interrupts:            %u\n",
 		       smi_get_stat(smi, interrupts));
-	seq_printf(m, "attentions:            %u\n",
+	out += sprintf(out, "attentions:            %u\n",
 		       smi_get_stat(smi, attentions));
-	seq_printf(m, "flag_fetches:          %u\n",
+	out += sprintf(out, "flag_fetches:          %u\n",
 		       smi_get_stat(smi, flag_fetches));
-	seq_printf(m, "hosed_count:           %u\n",
+	out += sprintf(out, "hosed_count:           %u\n",
 		       smi_get_stat(smi, hosed_count));
-	seq_printf(m, "complete_transactions: %u\n",
+	out += sprintf(out, "complete_transactions: %u\n",
 		       smi_get_stat(smi, complete_transactions));
-	seq_printf(m, "events:                %u\n",
+	out += sprintf(out, "events:                %u\n",
 		       smi_get_stat(smi, events));
-	seq_printf(m, "watchdog_pretimeouts:  %u\n",
+	out += sprintf(out, "watchdog_pretimeouts:  %u\n",
 		       smi_get_stat(smi, watchdog_pretimeouts));
-	seq_printf(m, "incoming_messages:     %u\n",
+	out += sprintf(out, "incoming_messages:     %u\n",
 		       smi_get_stat(smi, incoming_messages));
-	return 0;
+
+	return out - page;
 }
 
-static int smi_si_stats_proc_open(struct inode *inode, struct file *file)
+static int param_read_proc(char *page, char **start, off_t off,
+			   int count, int *eof, void *data)
 {
-	return single_open(file, smi_si_stats_proc_show, PDE(inode)->data);
-}
+	struct smi_info *smi = data;
 
-static const struct file_operations smi_si_stats_proc_ops = {
-	.open		= smi_si_stats_proc_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
-};
-
-static int smi_params_proc_show(struct seq_file *m, void *v)
-{
-	struct smi_info *smi = m->private;
-
-	return seq_printf(m,
+	return sprintf(page,
 		       "%s,%s,0x%lx,rsp=%d,rsi=%d,rsh=%d,irq=%d,ipmb=%d\n",
 		       si_to_str[smi->si_type],
 		       addr_space_to_str[smi->io.addr_type],
@@ -2883,18 +2863,6 @@ static int smi_params_proc_show(struct seq_file *m, void *v)
 		       smi->irq,
 		       smi->slave_addr);
 }
-
-static int smi_params_proc_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, smi_params_proc_show, PDE(inode)->data);
-}
-
-static const struct file_operations smi_params_proc_ops = {
-	.open		= smi_params_proc_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
-};
 
 /*
  * oem_data_avail_to_receive_msg_avail
@@ -3289,7 +3257,7 @@ static int try_smi_init(struct smi_info *new_smi)
 	}
 
 	rv = ipmi_smi_add_proc_entry(new_smi->intf, "type",
-				     &smi_type_proc_ops,
+				     type_file_read_proc,
 				     new_smi);
 	if (rv) {
 		dev_err(new_smi->dev, "Unable to create proc entry: %d\n", rv);
@@ -3297,7 +3265,7 @@ static int try_smi_init(struct smi_info *new_smi)
 	}
 
 	rv = ipmi_smi_add_proc_entry(new_smi->intf, "si_stats",
-				     &smi_si_stats_proc_ops,
+				     stat_file_read_proc,
 				     new_smi);
 	if (rv) {
 		dev_err(new_smi->dev, "Unable to create proc entry: %d\n", rv);
@@ -3305,7 +3273,7 @@ static int try_smi_init(struct smi_info *new_smi)
 	}
 
 	rv = ipmi_smi_add_proc_entry(new_smi->intf, "params",
-				     &smi_params_proc_ops,
+				     param_read_proc,
 				     new_smi);
 	if (rv) {
 		dev_err(new_smi->dev, "Unable to create proc entry: %d\n", rv);

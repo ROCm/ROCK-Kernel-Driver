@@ -97,7 +97,7 @@ static int monwrite_new_hdr(struct mon_private *monpriv)
 {
 	struct monwrite_hdr *monhdr = &monpriv->hdr;
 	struct mon_buf *monbuf;
-	int rc = 0;
+	int rc;
 
 	if (monhdr->datalen > MONWRITE_MAX_DATALEN ||
 	    monhdr->mon_function > MONWRITE_START_CONFIG ||
@@ -135,7 +135,7 @@ static int monwrite_new_hdr(struct mon_private *monpriv)
 			mon_buf_count++;
 	}
 	monpriv->current_buf = monbuf;
-	return rc;
+	return 0;
 }
 
 static int monwrite_new_data(struct mon_private *monpriv)

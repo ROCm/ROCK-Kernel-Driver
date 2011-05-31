@@ -12,7 +12,7 @@
 
 #include <linux/bitops.h>
 #include <linux/hardirq.h>
-#include <linux/syscore_ops.h>
+#include <linux/sysdev.h>
 #include <linux/pm.h>
 #include <linux/nmi.h>
 #include <linux/smp.h>
@@ -145,16 +145,16 @@ int check_nmi_wdt_touched(void)
 {
 	unsigned int this_cpu = smp_processor_id();
 	unsigned int cpu;
-	cpumask_t mask;
 
-	cpumask_copy(&mask, cpu_online_mask);
+	cpumask_t mask = cpu_online_map;
+
 	if (!atomic_read(&nmi_touched[this_cpu]))
 		return 0;
 
 	atomic_set(&nmi_touched[this_cpu], 0);
 
-	cpumask_clear_cpu(this_cpu, &mask);
-	for_each_cpu(cpu, &mask) {
+	cpu_clear(this_cpu, mask);
+	for_each_cpu_mask(cpu, mask) {
 		invalidate_dcache_range((unsigned long)(&nmi_touched[cpu]),
 				(unsigned long)(&nmi_touched[cpu]));
 		if (!atomic_read(&nmi_touched[cpu]))
@@ -196,31 +196,43 @@ void touch_nmi_watchdog(void)
 
 /* Suspend/resume support */
 #ifdef CONFIG_PM
-static int nmi_wdt_suspend(void)
+static int nmi_wdt_suspend(struct sys_device *dev, pm_message_t state)
 {
 	nmi_wdt_stop();
 	return 0;
 }
 
-static void nmi_wdt_resume(void)
+static int nmi_wdt_resume(struct sys_device *dev)
 {
 	if (nmi_active)
 		nmi_wdt_start();
+	return 0;
 }
 
-static struct syscore_ops nmi_syscore_ops = {
+static struct sysdev_class nmi_sysclass = {
+	.name		= DRV_NAME,
 	.resume		= nmi_wdt_resume,
 	.suspend	= nmi_wdt_suspend,
 };
 
-static int __init init_nmi_wdt_syscore(void)
-{
-	if (nmi_active)
-		register_syscore_ops(&nmi_syscore_ops);
+static struct sys_device device_nmi_wdt = {
+	.id	= 0,
+	.cls	= &nmi_sysclass,
+};
 
-	return 0;
+static int __init init_nmi_wdt_sysfs(void)
+{
+	int error;
+
+	if (!nmi_active)
+		return 0;
+
+	error = sysdev_class_register(&nmi_sysclass);
+	if (!error)
+		error = sysdev_register(&device_nmi_wdt);
+	return error;
 }
-late_initcall(init_nmi_wdt_syscore);
+late_initcall(init_nmi_wdt_sysfs);
 
 #endif	/* CONFIG_PM */
 

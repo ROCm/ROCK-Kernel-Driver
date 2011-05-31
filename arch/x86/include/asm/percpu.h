@@ -311,6 +311,40 @@ do {									\
 	pxo_ret__;							\
 })
 
+#define percpu_exchange_op(op, var, val)		\
+({							\
+	typedef typeof(var) pxo_T__;			\
+	pxo_T__ pxo_ret__;				\
+	if (0) {					\
+		pxo_ret__ = (val);			\
+		(void)pxo_ret__;			\
+	}						\
+	switch (sizeof(var)) {				\
+	case 1:						\
+		asm(op "b %0,"__percpu_arg(1)		\
+		    : "=q" (pxo_ret__), "+m" (var)	\
+		    : "0" ((pxo_T__)(val)));		\
+		break;					\
+	case 2:						\
+		asm(op "w %0,"__percpu_arg(1)		\
+		    : "=r" (pxo_ret__), "+m" (var)	\
+		    : "0" ((pxo_T__)(val)));		\
+		break;					\
+	case 4:						\
+		asm(op "l %0,"__percpu_arg(1)		\
+		    : "=r" (pxo_ret__), "+m" (var)	\
+		    : "0" ((pxo_T__)(val)));		\
+		break;					\
+	case 8:						\
+		asm(op "q %0,"__percpu_arg(1)		\
+		    : "=r" (pxo_ret__), "+m" (var)	\
+		    : "0" ((pxo_T__)(val)));		\
+		break;					\
+	default: __bad_percpu_size();			\
+	}						\
+	pxo_ret__;					\
+})
+
 /*
  * cmpxchg has no such implied lock semantics as a result it is much
  * more efficient for cpu local operations.
@@ -368,6 +402,10 @@ do {									\
 #define percpu_or(var, val)		percpu_to_op("or", var, val)
 #define percpu_xor(var, val)		percpu_to_op("xor", var, val)
 #define percpu_inc(var)		percpu_unary_op("inc", var)
+#define percpu_xchg(var, val)		percpu_exchange_op("xchg", var, val)
+#ifdef CONFIG_X86_XADD
+#define percpu_xadd(var, val)		percpu_exchange_op("xadd", var, val)
+#endif
 
 #define __this_cpu_read_1(pcp)		percpu_from_op("mov", (pcp), "m"(pcp))
 #define __this_cpu_read_2(pcp)		percpu_from_op("mov", (pcp), "m"(pcp))
@@ -509,11 +547,6 @@ do {									\
  * it in software.  The address used in the cmpxchg16 instruction must be
  * aligned to a 16 byte boundary.
  */
-#ifdef CONFIG_SMP
-#define CMPXCHG16B_EMU_CALL "call this_cpu_cmpxchg16b_emu\n\t" ASM_NOP3
-#else
-#define CMPXCHG16B_EMU_CALL "call this_cpu_cmpxchg16b_emu\n\t" ASM_NOP2
-#endif
 #define percpu_cmpxchg16b_double(pcp1, o1, o2, n1, n2)			\
 ({									\
 	char __ret;							\
@@ -522,7 +555,7 @@ do {									\
 	typeof(o2) __o2 = o2;						\
 	typeof(o2) __n2 = n2;						\
 	typeof(o2) __dummy;						\
-	alternative_io(CMPXCHG16B_EMU_CALL,				\
+	alternative_io("call this_cpu_cmpxchg16b_emu\n\t" P6_NOP4,	\
 		       "cmpxchg16b " __percpu_prefix "(%%rsi)\n\tsetz %0\n\t",	\
 		       X86_FEATURE_CX16,				\
 		       ASM_OUTPUT2("=a"(__ret), "=d"(__dummy)),		\
@@ -546,33 +579,6 @@ do {									\
 		     : "dIr" (bit));					\
 	old__;								\
 })
-
-static __always_inline int x86_this_cpu_constant_test_bit(unsigned int nr,
-                        const unsigned long __percpu *addr)
-{
-	unsigned long __percpu *a = (unsigned long *)addr + nr / BITS_PER_LONG;
-
-	return ((1UL << (nr % BITS_PER_LONG)) & percpu_read(*a)) != 0;
-}
-
-static inline int x86_this_cpu_variable_test_bit(int nr,
-                        const unsigned long __percpu *addr)
-{
-	int oldbit;
-
-	asm volatile("bt "__percpu_arg(2)",%1\n\t"
-			"sbb %0,%0"
-			: "=r" (oldbit)
-			: "m" (*(unsigned long *)addr), "Ir" (nr));
-
-	return oldbit;
-}
-
-#define x86_this_cpu_test_bit(nr, addr)			\
-	(__builtin_constant_p((nr))			\
-	 ? x86_this_cpu_constant_test_bit((nr), (addr))	\
-	 : x86_this_cpu_variable_test_bit((nr), (addr)))
-
 
 #include <asm-generic/percpu.h>
 

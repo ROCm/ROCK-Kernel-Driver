@@ -1,45 +1,43 @@
-config USBIP_CORE
-	tristate "USB/IP support (EXPERIMENTAL)"
+config USB_IP_COMMON
+	tristate "USB IP support (EXPERIMENTAL)"
 	depends on USB && NET && EXPERIMENTAL
 	default N
 	---help---
 	  This enables pushing USB packets over IP to allow remote
-	  machines direct access to USB devices. It provides the
-	  USB/IP core that is required by both drivers.
+	  machines access to USB devices directly.  For more details,
+	  and links to the userspace utility programs to let this work
+	  properly, see http://usbip.sourceforge.net/.
 
-	  For more details, and to get the userspace utility
-	  programs, please see http://usbip.sourceforge.net/.
-
-	  To compile this as a module, choose M here: the module will
-	  be called usbip-core.
+	  To compile this driver as a module, choose M here: the
+	  module will be called usbip_common_mod.
 
 	  If unsure, say N.
 
-config USBIP_VHCI_HCD
-	tristate "VHCI hcd"
-	depends on USBIP_CORE
+config USB_IP_VHCI_HCD
+	tristate "USB IP client driver"
+	depends on USB_IP_COMMON
 	default N
 	---help---
-	  This enables the USB/IP virtual host controller driver,
-	  which is run on the remote machine.
+	 This enables the USB IP host controller driver which will
+	 run on the client machine.
 
-	  To compile this driver as a module, choose M here: the
-	  module will be called vhci-hcd.
+	 To compile this driver as a module, choose M here: the
+	 module will be called vhci_hcd.
 
-config USBIP_HOST
-	tristate "Host driver"
-	depends on USBIP_CORE
+config USB_IP_HOST
+	tristate "USB IP host driver"
+	depends on USB_IP_COMMON
 	default N
 	---help---
-	  This enables the USB/IP host driver, which is run on the
-	  machine that is sharing the USB devices.
+	 This enables the USB IP device driver which will run on the
+	 host machine.
 
-	  To compile this driver as a module, choose M here: the
-	  module will be called usbip-host.
+	 To compile this driver as a module, choose M here: the
+	 module will be called usbip.
 
-config USBIP_DEBUG
-	bool "Debug messages for USB/IP"
-	depends on USBIP_CORE
+config USB_IP_DEBUG_ENABLE
+	bool "USB-IP Debug Enable"
+	depends on USB_IP_COMMON
 	default N
 	---help---
-	  This enables the debug messages from the USB/IP drivers.
+	  This enables the debug messages from the USB-IP drivers.

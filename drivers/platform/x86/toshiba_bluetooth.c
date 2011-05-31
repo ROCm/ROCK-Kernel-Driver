@@ -17,8 +17,6 @@
  * delivered.
  */
 
-#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/init.h>
@@ -72,13 +70,14 @@ static int toshiba_bluetooth_enable(acpi_handle handle)
 	if (!(result & 0x01))
 		return 0;
 
-	pr_info("Re-enabling Toshiba Bluetooth\n");
+	printk(KERN_INFO "toshiba_bluetooth: Re-enabling Toshiba Bluetooth\n");
 	res1 = acpi_evaluate_object(handle, "AUSB", NULL, NULL);
 	res2 = acpi_evaluate_object(handle, "BTPO", NULL, NULL);
 	if (!ACPI_FAILURE(res1) || !ACPI_FAILURE(res2))
 		return 0;
 
-	pr_warn("Failed to re-enable Toshiba Bluetooth\n");
+	printk(KERN_WARNING "toshiba_bluetooth: Failed to re-enable "
+	       "Toshiba Bluetooth\n");
 
 	return -ENODEV;
 }
@@ -108,8 +107,8 @@ static int toshiba_bt_rfkill_add(struct acpi_device *device)
 				       &bt_present);
 
 	if (!ACPI_FAILURE(status) && bt_present) {
-		pr_info("Detected Toshiba ACPI Bluetooth device - "
-			"installing RFKill handler\n");
+		printk(KERN_INFO "Detected Toshiba ACPI Bluetooth device - "
+		      "installing RFKill handler\n");
 		result = toshiba_bluetooth_enable(device->handle);
 	}
 

@@ -16,6 +16,7 @@
 
 static struct map_info flash_map;
 static struct mtd_info *mymtd;
+#ifdef CONFIG_MTD_PARTITIONS
 static int nr_parts;
 static struct mtd_partition *parts;
 static const char *part_probe_types[] = {
@@ -25,6 +26,7 @@ static const char *part_probe_types[] = {
 #endif
 	NULL
 };
+#endif
 
 /**
  * Module/ driver initialization.
@@ -61,10 +63,17 @@ static int __init flash_init(void)
 		if (mymtd) {
 			mymtd->owner = THIS_MODULE;
 
+#ifdef CONFIG_MTD_PARTITIONS
 			nr_parts = parse_mtd_partitions(mymtd,
 							part_probe_types,
 							&parts, 0);
-			mtd_device_register(mymtd, parts, nr_parts);
+			if (nr_parts > 0)
+				add_mtd_partitions(mymtd, parts, nr_parts);
+			else
+				add_mtd_device(mymtd);
+#else
+			add_mtd_device(mymtd);
+#endif
 		} else {
 			pr_err("Failed to register MTD device for flash\n");
 		}

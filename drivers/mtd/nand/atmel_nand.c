@@ -30,7 +30,6 @@
 #include <linux/mtd/nand.h>
 #include <linux/mtd/partitions.h>
 
-#include <linux/dmaengine.h>
 #include <linux/gpio.h>
 #include <linux/io.h>
 
@@ -495,8 +494,11 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
 	struct resource *regs;
 	struct resource *mem;
 	int res;
+
+#ifdef CONFIG_MTD_PARTITIONS
 	struct mtd_partition *partitions = NULL;
 	int num_partitions = 0;
+#endif
 
 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!mem) {
@@ -654,6 +656,7 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
 		goto err_scan_tail;
 	}
 
+#ifdef CONFIG_MTD_PARTITIONS
 #ifdef CONFIG_MTD_CMDLINE_PARTS
 	mtd->name = "atmel_nand";
 	num_partitions = parse_mtd_partitions(mtd, part_probes,
@@ -669,11 +672,17 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
 		goto err_no_partitions;
 	}
 
-	res = mtd_device_register(mtd, partitions, num_partitions);
+	res = add_mtd_partitions(mtd, partitions, num_partitions);
+#else
+	res = add_mtd_device(mtd);
+#endif
+
 	if (!res)
 		return res;
 
+#ifdef CONFIG_MTD_PARTITIONS
 err_no_partitions:
+#endif
 	nand_release(mtd);
 err_scan_tail:
 err_scan_ident:

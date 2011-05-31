@@ -14,6 +14,7 @@
 
 #include <linux/netfilter/nf_conntrack_common.h>
 
+#ifdef __KERNEL__
 #include <linux/bitops.h>
 #include <linux/compiler.h>
 #include <asm/atomic.h>
@@ -325,4 +326,5 @@ do {							\
 #define MODULE_ALIAS_NFCT_HELPER(helper) \
         MODULE_ALIAS("nfct-helper-" helper)
 
+#endif /* __KERNEL__ */
 #endif /* _NF_CONNTRACK_H */

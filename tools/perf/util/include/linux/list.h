@@ -1,6 +1,4 @@
 #include <linux/kernel.h>
-#include <linux/prefetch.h>
-
 #include "../../../../include/linux/list.h"
 
 #ifndef PERF_LIST_H
@@ -25,5 +23,5 @@ static inline void list_del_range(struct list_head *begin,
  * @head: the head for your list.
  */
 #define list_for_each_from(pos, head) \
-	for (; pos != (head); pos = pos->next)
+	for (; prefetch(pos->next), pos != (head); pos = pos->next)
 #endif

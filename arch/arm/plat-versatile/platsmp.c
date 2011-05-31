@@ -16,7 +16,6 @@
 #include <linux/smp.h>
 
 #include <asm/cacheflush.h>
-#include <asm/hardware/gic.h>
 
 /*
  * control for which core is the next to come out of the secondary
@@ -84,7 +83,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
 	 * the boot monitor to read the system wide flags register,
 	 * and branch to the address found there.
 	 */
-	gic_raise_softirq(cpumask_of(cpu), 1);
+	smp_cross_call(cpumask_of(cpu), 1);
 
 	timeout = jiffies + (1 * HZ);
 	while (time_before(jiffies, timeout)) {

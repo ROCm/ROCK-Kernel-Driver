@@ -526,8 +526,11 @@ static int qib_tune_pcie_coalesce(struct qib_devdata *dd)
 	 */
 	devid = parent->device;
 	if (devid >= 0x25e2 && devid <= 0x25fa) {
+		u8 rev;
+
 		/* 5000 P/V/X/Z */
-		if (parent->revision <= 0xb2)
+		pci_read_config_byte(parent, PCI_REVISION_ID, &rev);
+		if (rev <= 0xb2)
 			bits = 1U << 10;
 		else
 			bits = 7U << 10;

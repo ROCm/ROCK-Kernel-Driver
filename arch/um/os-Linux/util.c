@@ -139,8 +139,3 @@ void os_dump_core(void)
 
 	uml_abort();
 }
-
-void um_early_printk(const char *s, unsigned int n)
-{
-	printf("%.*s", n, s);
-}

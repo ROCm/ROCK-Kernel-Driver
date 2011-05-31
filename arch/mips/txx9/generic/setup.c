@@ -639,6 +639,7 @@ void __init txx9_physmap_flash_init(int no, unsigned long addr,
 		.flags = IORESOURCE_MEM,
 	};
 	struct platform_device *pdev;
+#ifdef CONFIG_MTD_PARTITIONS
 	static struct mtd_partition parts[2];
 	struct physmap_flash_data pdata_part;
 
@@ -657,7 +658,7 @@ void __init txx9_physmap_flash_init(int no, unsigned long addr,
 		pdata_part.parts = parts;
 		pdata = &pdata_part;
 	}
-
+#endif
 	pdev = platform_device_alloc("physmap-flash", no);
 	if (!pdev ||
 	    platform_device_add_resources(pdev, &res, 1) ||

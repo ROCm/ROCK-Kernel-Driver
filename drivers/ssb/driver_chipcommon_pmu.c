@@ -423,8 +423,6 @@ static void ssb_pmu_resources_init(struct ssb_chipcommon *cc)
 
 	switch (bus->chip_id) {
 	case 0x4312:
-		 min_msk = 0xCBB;
-		 break;
 	case 0x4322:
 		/* We keep the default settings:
 		 * min_msk = 0xCBB

@@ -9,6 +9,8 @@
 #include <asm/desc.h>
 #include <asm/i387.h>
 
+static inline int arch_prepare_suspend(void) { return 0; }
+
 /* image of the saved processor state */
 struct saved_context {
 	u16 es, fs, gs, ss;

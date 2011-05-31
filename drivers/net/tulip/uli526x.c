@@ -209,7 +209,8 @@ enum uli526x_CR6_bits {
 /* Global variable declaration ----------------------------- */
 static int __devinitdata printed_version;
 static const char version[] __devinitconst =
-	"ULi M5261/M5263 net driver, version " DRV_VERSION " (" DRV_RELDATE ")";
+	KERN_INFO DRV_NAME ": ULi M5261/M5263 net driver, version "
+	DRV_VERSION " (" DRV_RELDATE ")\n";
 
 static int uli526x_debug;
 static unsigned char uli526x_media_mode = ULI526X_AUTO;
@@ -282,7 +283,7 @@ static int __devinit uli526x_init_one (struct pci_dev *pdev,
 	ULI526X_DBUG(0, "uli526x_init_one()", 0);
 
 	if (!printed_version++)
-		pr_info("%s\n", version);
+		printk(version);
 
 	/* Init network device */
 	dev = alloc_etherdev(sizeof(*db));
@@ -291,7 +292,7 @@ static int __devinit uli526x_init_one (struct pci_dev *pdev,
 	SET_NETDEV_DEV(dev, &pdev->dev);
 
 	if (pci_set_dma_mask(pdev, DMA_BIT_MASK(32))) {
-		pr_warn("32-bit PCI DMA not available\n");
+		pr_warning("32-bit PCI DMA not available\n");
 		err = -ENODEV;
 		goto err_out_free;
 	}
@@ -389,9 +390,9 @@ static int __devinit uli526x_init_one (struct pci_dev *pdev,
 	if (err)
 		goto err_out_res;
 
-	netdev_info(dev, "ULi M%04lx at pci%s, %pM, irq %d\n",
-		    ent->driver_data >> 16, pci_name(pdev),
-		    dev->dev_addr, dev->irq);
+	dev_info(&dev->dev, "ULi M%04lx at pci%s, %pM, irq %d\n",
+		 ent->driver_data >> 16, pci_name(pdev),
+		 dev->dev_addr, dev->irq);
 
 	pci_set_master(pdev);
 
@@ -523,7 +524,7 @@ static void uli526x_init(struct net_device *dev)
 		}
 	}
 	if(phy_tmp == 32)
-		pr_warn("Can not find the phy address!!!\n");
+		pr_warning("Can not find the phy address!!!");
 	/* Parser SROM and media mode */
 	db->media_mode = uli526x_media_mode;
 
@@ -589,7 +590,7 @@ static netdev_tx_t uli526x_start_xmit(struct sk_buff *skb,
 
 	/* Too large packet check */
 	if (skb->len > MAX_PACKET_SIZE) {
-		netdev_err(dev, "big packet = %d\n", (u16)skb->len);
+		pr_err("big packet = %d\n", (u16)skb->len);
 		dev_kfree_skb(skb);
 		return NETDEV_TX_OK;
 	}
@@ -599,7 +600,7 @@ static netdev_tx_t uli526x_start_xmit(struct sk_buff *skb,
 	/* No Tx resource check, it never happen nromally */
 	if (db->tx_packet_cnt >= TX_FREE_DESC_CNT) {
 		spin_unlock_irqrestore(&db->lock, flags);
-		netdev_err(dev, "No Tx resource %ld\n", db->tx_packet_cnt);
+		pr_err("No Tx resource %ld\n", db->tx_packet_cnt);
 		return NETDEV_TX_BUSY;
 	}
 
@@ -665,6 +666,15 @@ static int uli526x_stop(struct net_device *dev)
 
 	/* free allocated rx buffer */
 	uli526x_free_rxbuffer(db);
+
+#if 0
+	/* show statistic counter */
+	printk(DRV_NAME ": FU:%lx EC:%lx LC:%lx NC:%lx LOC:%lx TXJT:%lx RESET:%lx RCR8:%lx FAL:%lx TT:%lx\n",
+		db->tx_fifo_underrun, db->tx_excessive_collision,
+		db->tx_late_collision, db->tx_no_carrier, db->tx_loss_carrier,
+		db->tx_jabber_timeout, db->reset_count, db->reset_cr8,
+		db->reset_fatal, db->reset_TXtimeout);
+#endif
 
 	return 0;
 }
@@ -745,6 +755,7 @@ static void uli526x_free_tx_pkt(struct net_device *dev,
 	txptr = db->tx_remove_ptr;
 	while(db->tx_packet_cnt) {
 		tdes0 = le32_to_cpu(txptr->tdes0);
+		/* printk(DRV_NAME ": tdes0=%x\n", tdes0); */
 		if (tdes0 & 0x80000000)
 			break;
 
@@ -754,6 +765,7 @@ static void uli526x_free_tx_pkt(struct net_device *dev,
 
 		/* Transmit statistic counter */
 		if ( tdes0 != 0x7fffffff ) {
+			/* printk(DRV_NAME ": tdes0=%x\n", tdes0); */
 			dev->stats.collisions += (tdes0 >> 3) & 0xf;
 			dev->stats.tx_bytes += le32_to_cpu(txptr->tdes1) & 0x7ff;
 			if (tdes0 & TDES0_ERR_MASK) {
@@ -826,6 +838,7 @@ static void uli526x_rx_packet(struct net_device *dev, struct uli526x_board_info 
 			/* error summary bit check */
 			if (rdes0 & 0x8000) {
 				/* This is a error packet */
+				//printk(DRV_NAME ": rdes0: %lx\n", rdes0);
 				dev->stats.rx_errors++;
 				if (rdes0 & 1)
 					dev->stats.rx_fifo_errors++;
@@ -932,12 +945,12 @@ ULi_ethtool_gset(struct uli526x_board_info *db, struct ethtool_cmd *ecmd)
 
 	ecmd->transceiver = XCVR_EXTERNAL;
 
-	ethtool_cmd_speed_set(ecmd, SPEED_10);
+	ecmd->speed = 10;
 	ecmd->duplex = DUPLEX_HALF;
 
 	if(db->op_mode==ULI526X_100MHF || db->op_mode==ULI526X_100MFD)
 	{
-		ethtool_cmd_speed_set(ecmd, SPEED_100);
+		ecmd->speed = 100;
 	}
 	if(db->op_mode==ULI526X_10MFD || db->op_mode==ULI526X_100MFD)
 	{
@@ -945,7 +958,7 @@ ULi_ethtool_gset(struct uli526x_board_info *db, struct ethtool_cmd *ecmd)
 	}
 	if(db->link_failed)
 	{
-		ethtool_cmd_speed_set(ecmd, -1);
+		ecmd->speed = -1;
 		ecmd->duplex = -1;
 	}
 
@@ -1011,6 +1024,7 @@ static void uli526x_timer(unsigned long data)
 	struct net_device *dev = (struct net_device *) data;
 	struct uli526x_board_info *db = netdev_priv(dev);
  	unsigned long flags;
+	u8 TmpSpeed=10;
 
 	//ULI526X_DBUG(0, "uli526x_timer()", 0);
 	spin_lock_irqsave(&db->lock, flags);
@@ -1033,7 +1047,8 @@ static void uli526x_timer(unsigned long data)
 		if ( time_after(jiffies, dev_trans_start(dev) + ULI526X_TX_TIMEOUT) ) {
 			db->reset_TXtimeout++;
 			db->wait_reset = 1;
-			netdev_err(dev, " Tx timeout - resetting\n");
+			printk( "%s: Tx timeout - resetting\n",
+			       dev->name);
 		}
 	}
 
@@ -1055,7 +1070,7 @@ static void uli526x_timer(unsigned long data)
 		/* Link Failed */
 		ULI526X_DBUG(0, "Link Failed", tmp_cr12);
 		netif_carrier_off(dev);
-		netdev_info(dev, "NIC Link is Down\n");
+		pr_info("%s NIC Link is Down\n",dev->name);
 		db->link_failed = 1;
 
 		/* For Force 10/100M Half/Full mode: Enable Auto-Nego mode */
@@ -1081,13 +1096,18 @@ static void uli526x_timer(unsigned long data)
 
 			if(db->link_failed==0)
 			{
-				netdev_info(dev, "NIC Link is Up %d Mbps %s duplex\n",
-					    (db->op_mode == ULI526X_100MHF ||
-					     db->op_mode == ULI526X_100MFD)
-					    ? 100 : 10,
-					    (db->op_mode == ULI526X_10MFD ||
-					     db->op_mode == ULI526X_100MFD)
-					    ? "Full" : "Half");
+				if(db->op_mode==ULI526X_100MHF || db->op_mode==ULI526X_100MFD)
+				{
+					TmpSpeed = 100;
+				}
+				if(db->op_mode==ULI526X_10MFD || db->op_mode==ULI526X_100MFD)
+				{
+					pr_info("%s NIC Link is Up %d Mbps Full duplex\n",dev->name,TmpSpeed);
+				}
+				else
+				{
+					pr_info("%s NIC Link is Up %d Mbps Half duplex\n",dev->name,TmpSpeed);
+				}
 				netif_carrier_on(dev);
 			}
 			/* SHOW_MEDIA_TYPE(db->op_mode); */
@@ -1096,7 +1116,7 @@ static void uli526x_timer(unsigned long data)
 		{
 			if(db->init==1)
 			{
-				netdev_info(dev, "NIC Link is Down\n");
+				pr_info("%s NIC Link is Down\n",dev->name);
 				netif_carrier_off(dev);
 			}
 		}
@@ -1222,7 +1242,7 @@ static int uli526x_resume(struct pci_dev *pdev)
 
 	err = pci_set_power_state(pdev, PCI_D0);
 	if (err) {
-		netdev_warn(dev, "Could not put device into D0\n");
+		dev_warn(&dev->dev, "Could not put device into D0\n");
 		return err;
 	}
 
@@ -1423,7 +1443,7 @@ static void send_filter_frame(struct net_device *dev, int mc_cnt)
 		update_cr6(db->cr6_data, dev->base_addr);
 		dev->trans_start = jiffies;
 	} else
-		netdev_err(dev, "No Tx resource - Send_filter_frame!\n");
+		pr_err("No Tx resource - Send_filter_frame!\n");
 }
 
 
@@ -1520,6 +1540,7 @@ static u8 uli526x_sense_speed(struct uli526x_board_info * db)
 		else
 			phy_mode = 0x1000;
 
+		/* printk(DRV_NAME ": Phy_mode %x ",phy_mode); */
 		switch (phy_mode) {
 		case 0x1000: db->op_mode = ULI526X_10MHF; break;
 		case 0x2000: db->op_mode = ULI526X_10MFD; break;
@@ -1808,7 +1829,7 @@ MODULE_PARM_DESC(mode, "ULi M5261/M5263: Bit 0: 10/100Mbps, bit 2: duplex, bit 8
 static int __init uli526x_init_module(void)
 {
 
-	pr_info("%s\n", version);
+	printk(version);
 	printed_version = 1;
 
 	ULI526X_DBUG(0, "init_module() ", debug);

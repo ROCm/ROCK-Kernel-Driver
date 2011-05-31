@@ -28,7 +28,6 @@
 static const char fmt_hex[] = "%#x\n";
 static const char fmt_long_hex[] = "%#lx\n";
 static const char fmt_dec[] = "%d\n";
-static const char fmt_udec[] = "%u\n";
 static const char fmt_ulong[] = "%lu\n";
 static const char fmt_u64[] = "%llu\n";
 
@@ -146,10 +145,13 @@ static ssize_t show_speed(struct device *dev,
 	if (!rtnl_trylock())
 		return restart_syscall();
 
-	if (netif_running(netdev)) {
-		struct ethtool_cmd cmd;
-		if (!dev_ethtool_get_settings(netdev, &cmd))
-			ret = sprintf(buf, fmt_udec, ethtool_cmd_speed(&cmd));
+	if (netif_running(netdev) &&
+	    netdev->ethtool_ops &&
+	    netdev->ethtool_ops->get_settings) {
+		struct ethtool_cmd cmd = { ETHTOOL_GSET };
+
+		if (!netdev->ethtool_ops->get_settings(netdev, &cmd))
+			ret = sprintf(buf, fmt_dec, ethtool_cmd_speed(&cmd));
 	}
 	rtnl_unlock();
 	return ret;
@@ -164,11 +166,13 @@ static ssize_t show_duplex(struct device *dev,
 	if (!rtnl_trylock())
 		return restart_syscall();
 
-	if (netif_running(netdev)) {
-		struct ethtool_cmd cmd;
-		if (!dev_ethtool_get_settings(netdev, &cmd))
-			ret = sprintf(buf, "%s\n",
-				      cmd.duplex ? "full" : "half");
+	if (netif_running(netdev) &&
+	    netdev->ethtool_ops &&
+	    netdev->ethtool_ops->get_settings) {
+		struct ethtool_cmd cmd = { ETHTOOL_GSET };
+
+		if (!netdev->ethtool_ops->get_settings(netdev, &cmd))
+			ret = sprintf(buf, "%s\n", cmd.duplex ? "full" : "half");
 	}
 	rtnl_unlock();
 	return ret;
@@ -561,6 +565,13 @@ static ssize_t show_rps_map(struct netdev_rx_queue *queue,
 	return len;
 }
 
+static void rps_map_release(struct rcu_head *rcu)
+{
+	struct rps_map *map = container_of(rcu, struct rps_map, rcu);
+
+	kfree(map);
+}
+
 static ssize_t store_rps_map(struct netdev_rx_queue *queue,
 		      struct rx_queue_attribute *attribute,
 		      const char *buf, size_t len)
@@ -608,7 +619,7 @@ static ssize_t store_rps_map(struct netdev_rx_queue *queue,
 	spin_unlock(&rps_map_lock);
 
 	if (old_map)
-		kfree_rcu(old_map, rcu);
+		call_rcu(&old_map->rcu, rps_map_release);
 
 	free_cpumask_var(mask);
 	return len;
@@ -717,7 +728,7 @@ static void rx_queue_release(struct kobject *kobj)
 	map = rcu_dereference_raw(queue->rps_map);
 	if (map) {
 		RCU_INIT_POINTER(queue->rps_map, NULL);
-		kfree_rcu(map, rcu);
+		call_rcu(&map->rcu, rps_map_release);
 	}
 
 	flow_table = rcu_dereference_raw(queue->rps_flow_table);
@@ -887,6 +898,21 @@ static ssize_t show_xps_map(struct netdev_queue *queue,
 	return len;
 }
 
+static void xps_map_release(struct rcu_head *rcu)
+{
+	struct xps_map *map = container_of(rcu, struct xps_map, rcu);
+
+	kfree(map);
+}
+
+static void xps_dev_maps_release(struct rcu_head *rcu)
+{
+	struct xps_dev_maps *dev_maps =
+	    container_of(rcu, struct xps_dev_maps, rcu);
+
+	kfree(dev_maps);
+}
+
 static DEFINE_MUTEX(xps_map_mutex);
 #define xmap_dereference(P)		\
 	rcu_dereference_protected((P), lockdep_is_held(&xps_map_mutex))
@@ -942,7 +968,7 @@ static ssize_t store_xps_map(struct netdev_queue *queue,
 		} else
 			pos = map_len = alloc_len = 0;
 
-		need_set = cpumask_test_cpu(cpu, mask) && cpu_online(cpu);
+		need_set = cpu_isset(cpu, *mask) && cpu_online(cpu);
 #ifdef CONFIG_NUMA
 		if (need_set) {
 			if (numa_node == -2)
@@ -983,7 +1009,7 @@ static ssize_t store_xps_map(struct netdev_queue *queue,
 		map = dev_maps ?
 			xmap_dereference(dev_maps->cpu_map[cpu]) : NULL;
 		if (map && xmap_dereference(new_dev_maps->cpu_map[cpu]) != map)
-			kfree_rcu(map, rcu);
+			call_rcu(&map->rcu, xps_map_release);
 		if (new_dev_maps->cpu_map[cpu])
 			nonempty = 1;
 	}
@@ -996,7 +1022,7 @@ static ssize_t store_xps_map(struct netdev_queue *queue,
 	}
 
 	if (dev_maps)
-		kfree_rcu(dev_maps, rcu);
+		call_rcu(&dev_maps->rcu, xps_dev_maps_release);
 
 	netdev_queue_numa_node_write(queue, (numa_node >= 0) ? numa_node :
 					    NUMA_NO_NODE);
@@ -1058,7 +1084,7 @@ static void netdev_queue_release(struct kobject *kobj)
 				else {
 					RCU_INIT_POINTER(dev_maps->cpu_map[i],
 					    NULL);
-					kfree_rcu(map, rcu);
+					call_rcu(&map->rcu, xps_map_release);
 					map = NULL;
 				}
 			}
@@ -1068,7 +1094,7 @@ static void netdev_queue_release(struct kobject *kobj)
 
 		if (!nonempty) {
 			RCU_INIT_POINTER(dev->xps_maps, NULL);
-			kfree_rcu(dev_maps, rcu);
+			call_rcu(&dev_maps->rcu, xps_dev_maps_release);
 		}
 	}
 

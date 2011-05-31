@@ -311,13 +311,14 @@ EXPORT_SYMBOL_GPL(of_node_to_nid);
 static int __init find_min_common_depth(void)
 {
 	int depth;
+	struct device_node *rtas_root;
 	struct device_node *chosen;
-	struct device_node *root;
 	const char *vec5;
 
-	root = of_find_node_by_path("/rtas");
-	if (!root)
-		root = of_find_node_by_path("/");
+	rtas_root = of_find_node_by_path("/rtas");
+
+	if (!rtas_root)
+		return -1;
 
 	/*
 	 * This property is a set of 32-bit integers, each representing
@@ -331,7 +332,7 @@ static int __init find_min_common_depth(void)
 	 * NUMA boundary and the following are progressively less significant
 	 * boundaries. There can be more than one level of NUMA.
 	 */
-	distance_ref_points = of_get_property(root,
+	distance_ref_points = of_get_property(rtas_root,
 					"ibm,associativity-reference-points",
 					&distance_ref_points_depth);
 
@@ -375,11 +376,11 @@ static int __init find_min_common_depth(void)
 		distance_ref_points_depth = MAX_DISTANCE_REF_POINTS;
 	}
 
-	of_node_put(root);
+	of_node_put(rtas_root);
 	return depth;
 
 err:
-	of_node_put(root);
+	of_node_put(rtas_root);
 	return -1;
 }
 
@@ -1452,7 +1453,7 @@ int arch_update_cpu_topology(void)
 	unsigned int associativity[VPHN_ASSOC_BUFSIZE] = {0};
 	struct sys_device *sysdev;
 
-	for_each_cpu(cpu,&cpu_associativity_changes_mask) {
+	for_each_cpu_mask(cpu, cpu_associativity_changes_mask) {
 		vphn_get_associativity(cpu, associativity);
 		nid = associativity_to_nid(associativity);
 

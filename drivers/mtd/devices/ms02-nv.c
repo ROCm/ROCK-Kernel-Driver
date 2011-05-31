@@ -220,7 +220,7 @@ static int __init ms02nv_init_one(ulong addr)
 	mtd->writesize = 1;
 
 	ret = -EIO;
-	if (mtd_device_register(mtd, NULL, 0)) {
+	if (add_mtd_device(mtd)) {
 		printk(KERN_ERR
 			"ms02-nv: Unable to register MTD device, aborting!\n");
 		goto err_out_csr_res;
@@ -262,7 +262,7 @@ static void __exit ms02nv_remove_one(void)
 
 	root_ms02nv_mtd = mp->next;
 
-	mtd_device_unregister(mtd);
+	del_mtd_device(mtd);
 
 	release_resource(mp->resource.csr);
 	kfree(mp->resource.csr);

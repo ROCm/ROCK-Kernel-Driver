@@ -124,7 +124,6 @@ static struct scsi_host_template qla4xxx_driver_template = {
 	.sg_tablesize		= SG_ALL,
 
 	.max_sectors		= 0xFFFF,
-	.shost_attrs		= qla4xxx_host_attrs,
 };
 
 static struct iscsi_transport qla4xxx_iscsi_transport = {
@@ -413,7 +412,8 @@ void qla4xxx_mark_all_devices_missing(struct scsi_qla_host *ha)
 
 static struct srb* qla4xxx_get_new_srb(struct scsi_qla_host *ha,
 				       struct ddb_entry *ddb_entry,
-				       struct scsi_cmnd *cmd)
+				       struct scsi_cmnd *cmd,
+				       void (*done)(struct scsi_cmnd *))
 {
 	struct srb *srb;
 
@@ -427,6 +427,7 @@ static struct srb* qla4xxx_get_new_srb(struct scsi_qla_host *ha,
 	srb->cmd = cmd;
 	srb->flags = 0;
 	CMD_SP(cmd) = (void *)srb;
+	cmd->scsi_done = done;
 
 	return srb;
 }
@@ -457,8 +458,9 @@ void qla4xxx_srb_compl(struct kref *ref)
 
 /**
  * qla4xxx_queuecommand - scsi layer issues scsi command to driver.
- * @host: scsi host
  * @cmd: Pointer to Linux's SCSI command structure
+ * @done_fn: Function that the driver calls to notify the SCSI mid-layer
+ *	that the command has been processed.
  *
  * Remarks:
  * This routine is invoked by Linux to send a SCSI command to the driver.
@@ -468,9 +470,10 @@ void qla4xxx_srb_compl(struct kref *ref)
  * completion handling).   Unfortunely, it sometimes calls the scheduler
  * in interrupt context which is a big NO! NO!.
  **/
-static int qla4xxx_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *cmd)
+static int qla4xxx_queuecommand_lck(struct scsi_cmnd *cmd,
+				void (*done)(struct scsi_cmnd *))
 {
-	struct scsi_qla_host *ha = to_qla_host(host);
+	struct scsi_qla_host *ha = to_qla_host(cmd->device->host);
 	struct ddb_entry *ddb_entry = cmd->device->hostdata;
 	struct iscsi_cls_session *sess = ddb_entry->sess;
 	struct srb *srb;
@@ -512,28 +515,36 @@ static int qla4xxx_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *cmd)
 	    test_bit(DPC_RESET_HA_FW_CONTEXT, &ha->dpc_flags))
 		goto qc_host_busy;
 
-	srb = qla4xxx_get_new_srb(ha, ddb_entry, cmd);
+	spin_unlock_irq(ha->host->host_lock);
+
+	srb = qla4xxx_get_new_srb(ha, ddb_entry, cmd, done);
 	if (!srb)
-		goto qc_host_busy;
+		goto qc_host_busy_lock;
 
 	rval = qla4xxx_send_command_to_isp(ha, srb);
 	if (rval != QLA_SUCCESS)
 		goto qc_host_busy_free_sp;
 
+	spin_lock_irq(ha->host->host_lock);
 	return 0;
 
 qc_host_busy_free_sp:
 	qla4xxx_srb_free_dma(ha, srb);
 	mempool_free(srb, ha->srb_mempool);
 
+qc_host_busy_lock:
+	spin_lock_irq(ha->host->host_lock);
+
 qc_host_busy:
 	return SCSI_MLQUEUE_HOST_BUSY;
 
 qc_fail_command:
-	cmd->scsi_done(cmd);
+	done(cmd);
 
 	return 0;
 }
+
+static DEF_SCSI_QCMD(qla4xxx_queuecommand)
 
 /**
  * qla4xxx_mem_free - frees memory allocated to adapter
@@ -668,27 +679,7 @@ static void qla4_8xxx_check_fw_alive(struct scsi_qla_host *ha)
 		if (ha->seconds_since_last_heartbeat == 2) {
 			ha->seconds_since_last_heartbeat = 0;
 			halt_status = qla4_8xxx_rd_32(ha,
-						      QLA82XX_PEG_HALT_STATUS1);
-
-			ql4_printk(KERN_INFO, ha,
-				   "scsi(%ld): %s, Dumping hw/fw registers:\n "
-				   " PEG_HALT_STATUS1: 0x%x, PEG_HALT_STATUS2:"
-				   " 0x%x,\n PEG_NET_0_PC: 0x%x, PEG_NET_1_PC:"
-				   " 0x%x,\n PEG_NET_2_PC: 0x%x, PEG_NET_3_PC:"
-				   " 0x%x,\n PEG_NET_4_PC: 0x%x\n",
-				   ha->host_no, __func__, halt_status,
-				   qla4_8xxx_rd_32(ha,
-						   QLA82XX_PEG_HALT_STATUS2),
-				   qla4_8xxx_rd_32(ha, QLA82XX_CRB_PEG_NET_0 +
-						   0x3c),
-				   qla4_8xxx_rd_32(ha, QLA82XX_CRB_PEG_NET_1 +
-						   0x3c),
-				   qla4_8xxx_rd_32(ha, QLA82XX_CRB_PEG_NET_2 +
-						   0x3c),
-				   qla4_8xxx_rd_32(ha, QLA82XX_CRB_PEG_NET_3 +
-						   0x3c),
-				   qla4_8xxx_rd_32(ha, QLA82XX_CRB_PEG_NET_4 +
-						   0x3c));
+			    QLA82XX_PEG_HALT_STATUS1);
 
 			/* Since we cannot change dev_state in interrupt
 			 * context, set appropriate DPC flag then wakeup
@@ -724,7 +715,7 @@ void qla4_8xxx_watchdog(struct scsi_qla_host *ha)
 	/* don't poll if reset is going on */
 	if (!(test_bit(DPC_RESET_ACTIVE, &ha->dpc_flags) ||
 	    test_bit(DPC_RESET_HA, &ha->dpc_flags) ||
-	    test_bit(DPC_RETRY_RESET_HA, &ha->dpc_flags))) {
+	    test_bit(DPC_RESET_ACTIVE, &ha->dpc_flags))) {
 		if (dev_state == QLA82XX_DEV_NEED_RESET &&
 		    !test_bit(DPC_RESET_HA, &ha->dpc_flags)) {
 			if (!ql4xdontresethba) {
@@ -848,7 +839,7 @@ static void qla4xxx_timer(struct scsi_qla_host *ha)
 	}
 
 	/* Wakeup the dpc routine for this adapter, if needed. */
-	if (start_dpc ||
+	if ((start_dpc ||
 	     test_bit(DPC_RESET_HA, &ha->dpc_flags) ||
 	     test_bit(DPC_RETRY_RESET_HA, &ha->dpc_flags) ||
 	     test_bit(DPC_RELOGIN_DEVICE, &ha->dpc_flags) ||
@@ -858,7 +849,9 @@ static void qla4xxx_timer(struct scsi_qla_host *ha)
 	     test_bit(DPC_LINK_CHANGED, &ha->dpc_flags) ||
 	     test_bit(DPC_HA_UNRECOVERABLE, &ha->dpc_flags) ||
 	     test_bit(DPC_HA_NEED_QUIESCENT, &ha->dpc_flags) ||
-	     test_bit(DPC_AEN, &ha->dpc_flags)) {
+	     test_bit(DPC_AEN, &ha->dpc_flags)) &&
+	     !test_bit(AF_DPC_SCHEDULED, &ha->flags) &&
+	     ha->dpc_thread) {
 		DEBUG2(printk("scsi%ld: %s: scheduling dpc routine"
 			      " - dpc flags = 0x%lx\n",
 			      ha->host_no, __func__, ha->dpc_flags));
@@ -1248,8 +1241,11 @@ static void qla4xxx_relogin_all_devices(struct scsi_qla_host *ha)
 
 void qla4xxx_wake_dpc(struct scsi_qla_host *ha)
 {
-	if (ha->dpc_thread)
+	if (ha->dpc_thread &&
+	    !test_bit(AF_DPC_SCHEDULED, &ha->flags)) {
+		set_bit(AF_DPC_SCHEDULED, &ha->flags);
 		queue_work(ha->dpc_thread, &ha->dpc_work);
+	}
 }
 
 /**
@@ -1276,12 +1272,12 @@ static void qla4xxx_do_dpc(struct work_struct *work)
 
 	/* Initialization not yet finished. Don't do anything yet. */
 	if (!test_bit(AF_INIT_DONE, &ha->flags))
-		return;
+		goto do_dpc_exit;
 
 	if (test_bit(AF_EEH_BUSY, &ha->flags)) {
 		DEBUG2(printk(KERN_INFO "scsi%ld: %s: flags = %lx\n",
 		    ha->host_no, __func__, ha->flags));
-		return;
+		goto do_dpc_exit;
 	}
 
 	if (is_qla8022(ha)) {
@@ -1388,6 +1384,8 @@ dpc_post_reset_ha:
 		}
 	}
 
+do_dpc_exit:
+	clear_bit(AF_DPC_SCHEDULED, &ha->flags);
 }
 
 /**
@@ -2070,14 +2068,15 @@ static int qla4xxx_eh_abort(struct scsi_cmnd *cmd)
 	struct scsi_qla_host *ha = to_qla_host(cmd->device->host);
 	unsigned int id = cmd->device->id;
 	unsigned int lun = cmd->device->lun;
+	unsigned long serial = cmd->serial_number;
 	unsigned long flags;
 	struct srb *srb = NULL;
 	int ret = SUCCESS;
 	int wait = 0;
 
 	ql4_printk(KERN_INFO, ha,
-	    "scsi%ld:%d:%d: Abort command issued cmd=%p\n",
-	    ha->host_no, id, lun, cmd);
+	    "scsi%ld:%d:%d: Abort command issued cmd=%p, pid=%ld\n",
+	    ha->host_no, id, lun, cmd, serial);
 
 	spin_lock_irqsave(&ha->hardware_lock, flags);
 	srb = (struct srb *) CMD_SP(cmd);

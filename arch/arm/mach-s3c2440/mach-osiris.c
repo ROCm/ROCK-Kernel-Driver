@@ -17,7 +17,7 @@
 #include <linux/init.h>
 #include <linux/gpio.h>
 #include <linux/device.h>
-#include <linux/syscore_ops.h>
+#include <linux/sysdev.h>
 #include <linux/serial_core.h>
 #include <linux/clk.h>
 #include <linux/i2c.h>
@@ -284,7 +284,7 @@ static struct platform_device osiris_pcmcia = {
 #ifdef CONFIG_PM
 static unsigned char pm_osiris_ctrl0;
 
-static int osiris_pm_suspend(void)
+static int osiris_pm_suspend(struct sys_device *sd, pm_message_t state)
 {
 	unsigned int tmp;
 
@@ -304,7 +304,7 @@ static int osiris_pm_suspend(void)
 	return 0;
 }
 
-static void osiris_pm_resume(void)
+static int osiris_pm_resume(struct sys_device *sd)
 {
 	if (pm_osiris_ctrl0 & OSIRIS_CTRL0_FIX8)
 		__raw_writeb(OSIRIS_CTRL1_FIX8, OSIRIS_VA_CTRL1);
@@ -312,6 +312,8 @@ static void osiris_pm_resume(void)
 	__raw_writeb(pm_osiris_ctrl0, OSIRIS_VA_CTRL0);
 
 	s3c_gpio_cfgpin(S3C2410_GPA(21), S3C2410_GPA21_nRSTOUT);
+
+	return 0;
 }
 
 #else
@@ -319,9 +321,14 @@ static void osiris_pm_resume(void)
 #define osiris_pm_resume NULL
 #endif
 
-static struct syscore_ops osiris_pm_syscore_ops = {
+static struct sysdev_class osiris_pm_sysclass = {
+	.name		= "mach-osiris",
 	.suspend	= osiris_pm_suspend,
 	.resume		= osiris_pm_resume,
+};
+
+static struct sys_device osiris_pm_sysdev = {
+	.cls		= &osiris_pm_sysclass,
 };
 
 /* Link for DVS driver to TPS65011 */
@@ -432,7 +439,8 @@ static void __init osiris_map_io(void)
 
 static void __init osiris_init(void)
 {
-	register_syscore_ops(&osiris_pm_syscore_ops);
+	sysdev_class_register(&osiris_pm_sysclass);
+	sysdev_register(&osiris_pm_sysdev);
 
 	s3c_i2c0_set_platdata(NULL);
 	s3c_nand_set_platdata(&osiris_nand_info);

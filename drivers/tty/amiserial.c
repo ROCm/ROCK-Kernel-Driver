@@ -1,4 +1,6 @@
 /*
+ *  linux/drivers/char/amiserial.c
+ *
  * Serial driver for the amiga builtin port.
  *
  * This code was created by taking serial.c version 4.30 from kernel

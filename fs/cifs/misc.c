@@ -67,12 +67,12 @@ _FreeXid(unsigned int xid)
 	spin_unlock(&GlobalMid_Lock);
 }
 
-struct cifs_ses *
+struct cifsSesInfo *
 sesInfoAlloc(void)
 {
-	struct cifs_ses *ret_buf;
+	struct cifsSesInfo *ret_buf;
 
-	ret_buf = kzalloc(sizeof(struct cifs_ses), GFP_KERNEL);
+	ret_buf = kzalloc(sizeof(struct cifsSesInfo), GFP_KERNEL);
 	if (ret_buf) {
 		atomic_inc(&sesInfoAllocCount);
 		ret_buf->status = CifsNew;
@@ -85,7 +85,7 @@ sesInfoAlloc(void)
 }
 
 void
-sesInfoFree(struct cifs_ses *buf_to_free)
+sesInfoFree(struct cifsSesInfo *buf_to_free)
 {
 	if (buf_to_free == NULL) {
 		cFYI(1, "Null buffer passed to sesInfoFree");
@@ -105,11 +105,11 @@ sesInfoFree(struct cifs_ses *buf_to_free)
 	kfree(buf_to_free);
 }
 
-struct cifs_tcon *
+struct cifsTconInfo *
 tconInfoAlloc(void)
 {
-	struct cifs_tcon *ret_buf;
-	ret_buf = kzalloc(sizeof(struct cifs_tcon), GFP_KERNEL);
+	struct cifsTconInfo *ret_buf;
+	ret_buf = kzalloc(sizeof(struct cifsTconInfo), GFP_KERNEL);
 	if (ret_buf) {
 		atomic_inc(&tconInfoAllocCount);
 		ret_buf->tidStatus = CifsNew;
@@ -124,7 +124,7 @@ tconInfoAlloc(void)
 }
 
 void
-tconInfoFree(struct cifs_tcon *buf_to_free)
+tconInfoFree(struct cifsTconInfo *buf_to_free)
 {
 	if (buf_to_free == NULL) {
 		cFYI(1, "Null buffer passed to tconInfoFree");
@@ -295,19 +295,21 @@ __u16 GetNextMid(struct TCP_Server_Info *server)
    case it is responsbility of caller to set the mid */
 void
 header_assemble(struct smb_hdr *buffer, char smb_command /* command */ ,
-		const struct cifs_tcon *treeCon, int word_count
+		const struct cifsTconInfo *treeCon, int word_count
 		/* length of fixed section (word count) in two byte units  */)
 {
 	struct list_head *temp_item;
-	struct cifs_ses *ses;
+	struct cifsSesInfo *ses;
 	char *temp = (char *) buffer;
 
 	memset(temp, 0, 256); /* bigger than MAX_CIFS_HDR_SIZE */
 
-	buffer->smb_buf_length = cpu_to_be32(
+	buffer->smb_buf_length =
 	    (2 * word_count) + sizeof(struct smb_hdr) -
 	    4 /*  RFC 1001 length field does not count */  +
-	    2 /* for bcc field itself */) ;
+	    2 /* for bcc field itself */ ;
+	/* Note that this is the only network field that has to be converted
+	   to big endian and it is done just before we send it */
 
 	buffer->Protocol[0] = 0xFF;
 	buffer->Protocol[1] = 'S';
@@ -359,7 +361,7 @@ header_assemble(struct smb_hdr *buffer, char smb_command /* command */ ,
 						 "did not match tcon uid");
 					spin_lock(&cifs_tcp_ses_lock);
 					list_for_each(temp_item, &treeCon->ses->server->smb_ses_list) {
-						ses = list_entry(temp_item, struct cifs_ses, smb_ses_list);
+						ses = list_entry(temp_item, struct cifsSesInfo, smb_ses_list);
 						if (ses->linux_uid == current_fsuid()) {
 							if (ses->server == treeCon->ses->server) {
 								cFYI(1, "found matching uid substitute right smb_uid");
@@ -380,7 +382,7 @@ header_assemble(struct smb_hdr *buffer, char smb_command /* command */ ,
 		if (treeCon->nocase)
 			buffer->Flags  |= SMBFLG_CASELESS;
 		if ((treeCon->ses) && (treeCon->ses->server))
-			if (treeCon->ses->server->sec_mode &
+			if (treeCon->ses->server->secMode &
 			  (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
 				buffer->Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
 	}
@@ -422,7 +424,7 @@ check_smb_hdr(struct smb_hdr *smb, __u16 mid)
 int
 checkSMB(struct smb_hdr *smb, __u16 mid, unsigned int length)
 {
-	__u32 len = be32_to_cpu(smb->smb_buf_length);
+	__u32 len = smb->smb_buf_length;
 	__u32 clc_len;  /* calculated length */
 	cFYI(0, "checkSMB Length: 0x%x, smb_buf_length: 0x%x", length, len);
 
@@ -462,7 +464,7 @@ checkSMB(struct smb_hdr *smb, __u16 mid, unsigned int length)
 
 	if (check_smb_hdr(smb, mid))
 		return 1;
-	clc_len = smbCalcSize(smb);
+	clc_len = smbCalcSize_LE(smb);
 
 	if (4 + len != length) {
 		cERROR(1, "Length read does not match RFC1001 length %d",
@@ -507,8 +509,8 @@ is_valid_oplock_break(struct smb_hdr *buf, struct TCP_Server_Info *srv)
 {
 	struct smb_com_lock_req *pSMB = (struct smb_com_lock_req *)buf;
 	struct list_head *tmp, *tmp1, *tmp2;
-	struct cifs_ses *ses;
-	struct cifs_tcon *tcon;
+	struct cifsSesInfo *ses;
+	struct cifsTconInfo *tcon;
 	struct cifsInodeInfo *pCifsInode;
 	struct cifsFileInfo *netfile;
 
@@ -519,7 +521,7 @@ is_valid_oplock_break(struct smb_hdr *buf, struct TCP_Server_Info *srv)
 			(struct smb_com_transaction_change_notify_rsp *)buf;
 		struct file_notify_information *pnotify;
 		__u32 data_offset = 0;
-		if (get_bcc(buf) > sizeof(struct file_notify_information)) {
+		if (get_bcc_le(buf) > sizeof(struct file_notify_information)) {
 			data_offset = le32_to_cpu(pSMBr->DataOffset);
 
 			pnotify = (struct file_notify_information *)
@@ -566,9 +568,9 @@ is_valid_oplock_break(struct smb_hdr *buf, struct TCP_Server_Info *srv)
 	/* look up tcon based on tid & uid */
 	spin_lock(&cifs_tcp_ses_lock);
 	list_for_each(tmp, &srv->smb_ses_list) {
-		ses = list_entry(tmp, struct cifs_ses, smb_ses_list);
+		ses = list_entry(tmp, struct cifsSesInfo, smb_ses_list);
 		list_for_each(tmp1, &ses->tcon_list) {
-			tcon = list_entry(tmp1, struct cifs_tcon, tcon_list);
+			tcon = list_entry(tmp1, struct cifsTconInfo, tcon_list);
 			if (tcon->tid != buf->Tid)
 				continue;
 

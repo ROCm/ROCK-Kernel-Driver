@@ -116,14 +116,14 @@ static int __init init_netsc520(void)
 	}
 
 	mymtd->owner = THIS_MODULE;
-	mtd_device_register(mymtd, partition_info, NUM_PARTITIONS);
+	add_mtd_partitions( mymtd, partition_info, NUM_PARTITIONS );
 	return 0;
 }
 
 static void __exit cleanup_netsc520(void)
 {
 	if (mymtd) {
-		mtd_device_unregister(mymtd);
+		del_mtd_partitions(mymtd);
 		map_destroy(mymtd);
 	}
 	if (netsc520_map.virt) {

@@ -15,6 +15,7 @@
 #include <linux/regulator/driver.h>
 #include <linux/platform_device.h>
 #include <linux/kernel.h>
+#include <linux/mfd/core.h>
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/err.h>
@@ -431,8 +432,7 @@ static int mc13892_sw_regulator_set_voltage(struct regulator_dev *rdev,
 		int min_uV, int max_uV, unsigned *selector)
 {
 	struct mc13xxx_regulator_priv *priv = rdev_get_drvdata(rdev);
-	int hi, value, mask, id = rdev_get_id(rdev);
-	u32 valread;
+	int hi, value, val, mask, id = rdev_get_id(rdev);
 	int ret;
 
 	dev_dbg(rdev_get_dev(rdev), "%s id: %d min_uV: %d max_uV: %d\n",
@@ -448,16 +448,15 @@ static int mc13892_sw_regulator_set_voltage(struct regulator_dev *rdev,
 
 	mc13xxx_lock(priv->mc13xxx);
 	ret = mc13xxx_reg_read(priv->mc13xxx,
-		mc13892_regulators[id].vsel_reg, &valread);
+		mc13892_regulators[id].vsel_reg, &val);
 	if (ret)
 		goto err;
 
-	if (value > 1375000)
+	hi  = val & MC13892_SWITCHERS0_SWxHI;
+	if (value > 1375)
 		hi = 1;
-	else if (value < 1100000)
+	if (value < 1100)
 		hi = 0;
-	else
-		hi = valread & MC13892_SWITCHERS0_SWxHI;
 
 	if (hi) {
 		value = (value - 1100000) / 25000;
@@ -466,10 +465,8 @@ static int mc13892_sw_regulator_set_voltage(struct regulator_dev *rdev,
 		value = (value - 600000) / 25000;
 
 	mask = mc13892_regulators[id].vsel_mask | MC13892_SWITCHERS0_SWxHI;
-	valread = (valread & ~mask) |
-			(value << mc13892_regulators[id].vsel_shift);
-	ret = mc13xxx_reg_write(priv->mc13xxx, mc13892_regulators[id].vsel_reg,
-			valread);
+	ret = mc13xxx_reg_rmw(priv->mc13xxx, mc13892_regulators[id].vsel_reg,
+			mask, value << mc13892_regulators[id].vsel_shift);
 err:
 	mc13xxx_unlock(priv->mc13xxx);
 
@@ -524,8 +521,7 @@ static int __devinit mc13892_regulator_probe(struct platform_device *pdev)
 {
 	struct mc13xxx_regulator_priv *priv;
 	struct mc13xxx *mc13892 = dev_get_drvdata(pdev->dev.parent);
-	struct mc13xxx_regulator_platform_data *pdata =
-		dev_get_platdata(&pdev->dev);
+	struct mc13xxx_regulator_platform_data *pdata = mfd_get_data(pdev);
 	struct mc13xxx_regulator_init_data *init_data;
 	int i, ret;
 	u32 val;
@@ -599,8 +595,7 @@ err_free:
 static int __devexit mc13892_regulator_remove(struct platform_device *pdev)
 {
 	struct mc13xxx_regulator_priv *priv = platform_get_drvdata(pdev);
-	struct mc13xxx_regulator_platform_data *pdata =
-		dev_get_platdata(&pdev->dev);
+	struct mc13xxx_regulator_platform_data *pdata = mfd_get_data(pdev);
 	int i;
 
 	platform_set_drvdata(pdev, NULL);

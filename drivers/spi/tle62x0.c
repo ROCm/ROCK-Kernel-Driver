@@ -283,7 +283,7 @@ static int __devinit tle62x0_probe(struct spi_device *spi)
 	return 0;
 
  err_gpios:
-	while (--ptr >= 0)
+	for (; ptr > 0; ptr--)
 		device_remove_file(&spi->dev, gpio_attrs[ptr]);
 
 	device_remove_file(&spi->dev, &dev_attr_status_show);
@@ -301,7 +301,6 @@ static int __devexit tle62x0_remove(struct spi_device *spi)
 	for (ptr = 0; ptr < st->nr_gpio; ptr++)
 		device_remove_file(&spi->dev, gpio_attrs[ptr]);
 
-	device_remove_file(&spi->dev, &dev_attr_status_show);
 	kfree(st);
 	return 0;
 }

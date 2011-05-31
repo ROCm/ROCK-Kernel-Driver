@@ -42,7 +42,6 @@
 #include <asm/time.h>
 #include <asm/mmu.h>
 #include <asm/topology.h>
-#include <asm/pSeries_reconfig.h>
 
 struct rtas_t rtas = {
 	.lock = __ARCH_SPIN_LOCK_UNLOCKED
@@ -495,7 +494,7 @@ unsigned int rtas_busy_delay(int status)
 
 	might_sleep();
 	ms = rtas_busy_delay_time(status);
-	if (ms && need_resched())
+	if (ms)
 		msleep(ms);
 
 	return ms;
@@ -732,7 +731,6 @@ static int __rtas_suspend_last_cpu(struct rtas_suspend_me_data *data, int wake_w
 
 	atomic_set(&data->error, rc);
 	start_topology_update();
-	pSeries_coalesce_init();
 
 	if (wake_when_done) {
 		atomic_set(&data->done, 1);

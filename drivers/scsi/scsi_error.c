@@ -54,8 +54,6 @@
 #define BUS_RESET_SETTLE_TIME   (10)
 #define HOST_RESET_SETTLE_TIME  (10)
 
-static int scsi_eh_try_stu(struct scsi_cmnd *scmd);
-
 /* called with shost->host_lock held */
 void scsi_eh_wakeup(struct Scsi_Host *shost)
 {
@@ -403,12 +401,6 @@ static int scsi_check_sense(struct scsi_cmnd *scmd)
 				    "operating parameters on this target have "
 				    "changed. The Linux SCSI layer does not "
 				    "automatically adjust these parameters.\n");
-
-		if (sshdr.asc == 0x38 && sshdr.ascq == 0x07)
-			scmd_printk(KERN_WARNING, scmd,
-				    "Warning! Received an indication that the "
-				    "LUN reached a thin provisioning soft "
-				    "threshold.\n");
 
 		/*
 		 * Pass the UA upwards for a determination in the completion
@@ -1030,48 +1022,6 @@ retry_tur:
 }
 
 /**
- * scsi_eh_test_devices - check if devices are responding from error recovery.
- * @cmd_list:	scsi commands in error recovery.
- * @work_q:     queue for commands which still need more error recovery
- * @done_q:     queue for commands which are finished
- * @try_stu:    boolean on if a STU command should be tried in addition to TUR.
- *
- * Decription:
- *    Tests if devices are in a working state.  Commands to devices now in
- *    a working state are sent to the done_q while commands to devices which
- *    are still failing to respond are returned to the work_q for more
- *    processing.
- **/
-static int scsi_eh_test_devices(struct list_head *cmd_list,
-				struct list_head *work_q,
-				struct list_head *done_q, int try_stu)
-{
-	struct scsi_cmnd *scmd, *next;
-	struct scsi_device *sdev;
-	int finish_cmds;
-
-	while (!list_empty(cmd_list)) {
-		scmd = list_entry(cmd_list->next, struct scsi_cmnd, eh_entry);
-		sdev = scmd->device;
-
-		finish_cmds = !scsi_device_online(scmd->device) ||
-			(try_stu && !scsi_eh_try_stu(scmd) &&
-			 !scsi_eh_tur(scmd)) ||
-			!scsi_eh_tur(scmd);
-
-		list_for_each_entry_safe(scmd, next, cmd_list, eh_entry)
-			if (scmd->device == sdev) {
-				if (finish_cmds)
-					scsi_eh_finish_cmd(scmd, done_q);
-				else
-					list_move_tail(&scmd->eh_entry, work_q);
-			}
-	}
-	return list_empty(work_q);
-}
-
-
-/**
  * scsi_eh_abort_cmds - abort pending commands.
  * @work_q:	&list_head for pending commands.
  * @done_q:	&list_head for processed commands.
@@ -1087,7 +1037,6 @@ static int scsi_eh_abort_cmds(struct list_head *work_q,
 			      struct list_head *done_q)
 {
 	struct scsi_cmnd *scmd, *next;
-	LIST_HEAD(check_list);
 	int rtn;
 
 	list_for_each_entry_safe(scmd, next, work_q, eh_entry) {
@@ -1099,10 +1048,11 @@ static int scsi_eh_abort_cmds(struct list_head *work_q,
 		rtn = scsi_try_to_abort_cmd(scmd->device->host->hostt, scmd);
 		if (rtn == SUCCESS || rtn == FAST_IO_FAIL) {
 			scmd->eh_eflags &= ~SCSI_EH_CANCEL_CMD;
-			if (rtn == FAST_IO_FAIL)
+			if (!scsi_device_online(scmd->device) ||
+			    rtn == FAST_IO_FAIL ||
+			    !scsi_eh_tur(scmd)) {
 				scsi_eh_finish_cmd(scmd, done_q);
-			else
-				list_move_tail(&scmd->eh_entry, &check_list);
+			}
 		} else
 			SCSI_LOG_ERROR_RECOVERY(3, printk("%s: aborting"
 							  " cmd failed:"
@@ -1111,7 +1061,7 @@ static int scsi_eh_abort_cmds(struct list_head *work_q,
 							  scmd));
 	}
 
-	return scsi_eh_test_devices(&check_list, work_q, done_q, 0);
+	return list_empty(work_q);
 }
 
 /**
@@ -1262,7 +1212,6 @@ static int scsi_eh_target_reset(struct Scsi_Host *shost,
 				struct list_head *done_q)
 {
 	LIST_HEAD(tmp_list);
-	LIST_HEAD(check_list);
 
 	list_splice_init(work_q, &tmp_list);
 
@@ -1287,9 +1236,9 @@ static int scsi_eh_target_reset(struct Scsi_Host *shost,
 			if (scmd_id(scmd) != id)
 				continue;
 
-			if (rtn == SUCCESS)
-				list_move_tail(&scmd->eh_entry, &check_list);
-			else if (rtn == FAST_IO_FAIL)
+			if ((rtn == SUCCESS || rtn == FAST_IO_FAIL)
+			    && (!scsi_device_online(scmd->device) ||
+				 rtn == FAST_IO_FAIL || !scsi_eh_tur(scmd)))
 				scsi_eh_finish_cmd(scmd, done_q);
 			else
 				/* push back on work queue for further processing */
@@ -1297,7 +1246,7 @@ static int scsi_eh_target_reset(struct Scsi_Host *shost,
 		}
 	}
 
-	return scsi_eh_test_devices(&check_list, work_q, done_q, 0);
+	return list_empty(work_q);
 }
 
 /**
@@ -1311,7 +1260,6 @@ static int scsi_eh_bus_reset(struct Scsi_Host *shost,
 			     struct list_head *done_q)
 {
 	struct scsi_cmnd *scmd, *chan_scmd, *next;
-	LIST_HEAD(check_list);
 	unsigned int channel;
 	int rtn;
 
@@ -1343,14 +1291,12 @@ static int scsi_eh_bus_reset(struct Scsi_Host *shost,
 		rtn = scsi_try_bus_reset(chan_scmd);
 		if (rtn == SUCCESS || rtn == FAST_IO_FAIL) {
 			list_for_each_entry_safe(scmd, next, work_q, eh_entry) {
-				if (channel == scmd_channel(scmd)) {
-					if (rtn == FAST_IO_FAIL)
+				if (channel == scmd_channel(scmd))
+					if (!scsi_device_online(scmd->device) ||
+					    rtn == FAST_IO_FAIL ||
+					    !scsi_eh_tur(scmd))
 						scsi_eh_finish_cmd(scmd,
 								   done_q);
-					else
-						list_move_tail(&scmd->eh_entry,
-							       &check_list);
-				}
 			}
 		} else {
 			SCSI_LOG_ERROR_RECOVERY(3, printk("%s: BRST"
@@ -1359,7 +1305,7 @@ static int scsi_eh_bus_reset(struct Scsi_Host *shost,
 							  channel));
 		}
 	}
-	return scsi_eh_test_devices(&check_list, work_q, done_q, 0);
+	return list_empty(work_q);
 }
 
 /**
@@ -1371,7 +1317,6 @@ static int scsi_eh_host_reset(struct list_head *work_q,
 			      struct list_head *done_q)
 {
 	struct scsi_cmnd *scmd, *next;
-	LIST_HEAD(check_list);
 	int rtn;
 
 	if (!list_empty(work_q)) {
@@ -1382,10 +1327,12 @@ static int scsi_eh_host_reset(struct list_head *work_q,
 						  , current->comm));
 
 		rtn = scsi_try_host_reset(scmd);
-		if (rtn == SUCCESS) {
-			list_splice_init(work_q, &check_list);
-		} else if (rtn == FAST_IO_FAIL) {
+		if (rtn == SUCCESS || rtn == FAST_IO_FAIL) {
 			list_for_each_entry_safe(scmd, next, work_q, eh_entry) {
+				if (!scsi_device_online(scmd->device) ||
+				    rtn == FAST_IO_FAIL ||
+				    (!scsi_eh_try_stu(scmd) && !scsi_eh_tur(scmd)) ||
+				    !scsi_eh_tur(scmd))
 					scsi_eh_finish_cmd(scmd, done_q);
 			}
 		} else {
@@ -1394,7 +1341,7 @@ static int scsi_eh_host_reset(struct list_head *work_q,
 							  current->comm));
 		}
 	}
-	return scsi_eh_test_devices(&check_list, work_q, done_q, 1);
+	return list_empty(work_q);
 }
 
 /**

@@ -70,7 +70,7 @@ static void (*pmac_tb_freeze)(int freeze);
 static u64 timebase;
 static int tb_req;
 
-#ifdef CONFIG_PPC_PMAC32_PSURGE
+#ifdef CONFIG_PPC32
 
 /*
  * Powersurge (old powermac SMP) support.
@@ -124,10 +124,6 @@ static volatile u32 __iomem *psurge_start;
 /* what sort of powersurge board we have */
 static int psurge_type = PSURGE_NONE;
 
-/* irq for secondary cpus to report */
-static struct irq_host *psurge_host;
-int psurge_secondary_virq;
-
 /*
  * Set and clear IPIs for powersurge.
  */
@@ -160,52 +156,51 @@ static inline void psurge_clr_ipi(int cpu)
 /*
  * On powersurge (old SMP powermac architecture) we don't have
  * separate IPIs for separate messages like openpic does.  Instead
- * use the generic demux helpers
+ * we have a bitmap for each processor, where a 1 bit means that
+ * the corresponding message is pending for that processor.
+ * Ideally each cpu's entry would be in a different cache line.
  *  -- paulus.
  */
-static irqreturn_t psurge_ipi_intr(int irq, void *d)
-{
-	psurge_clr_ipi(smp_processor_id());
-	smp_ipi_demux();
+static unsigned long psurge_smp_message[NR_CPUS];
 
+void psurge_smp_message_recv(void)
+{
+	int cpu = smp_processor_id();
+	int msg;
+
+	/* clear interrupt */
+	psurge_clr_ipi(cpu);
+
+	if (num_online_cpus() < 2)
+		return;
+
+	/* make sure there is a message there */
+	for (msg = 0; msg < 4; msg++)
+		if (test_and_clear_bit(msg, &psurge_smp_message[cpu]))
+			smp_message_recv(msg);
+}
+
+irqreturn_t psurge_primary_intr(int irq, void *d)
+{
+	psurge_smp_message_recv();
 	return IRQ_HANDLED;
 }
 
-static void smp_psurge_cause_ipi(int cpu, unsigned long data)
+static void smp_psurge_message_pass(int target, int msg)
 {
-	psurge_set_ipi(cpu);
-}
+	int i;
 
-static int psurge_host_map(struct irq_host *h, unsigned int virq,
-			 irq_hw_number_t hw)
-{
-	irq_set_chip_and_handler(virq, &dummy_irq_chip, handle_percpu_irq);
+	if (num_online_cpus() < 2)
+		return;
 
-	return 0;
-}
-
-struct irq_host_ops psurge_host_ops = {
-	.map	= psurge_host_map,
-};
-
-static int psurge_secondary_ipi_init(void)
-{
-	int rc = -ENOMEM;
-
-	psurge_host = irq_alloc_host(NULL, IRQ_HOST_MAP_NOMAP, 0,
-		&psurge_host_ops, 0);
-
-	if (psurge_host)
-		psurge_secondary_virq = irq_create_direct_mapping(psurge_host);
-
-	if (psurge_secondary_virq)
-		rc = request_irq(psurge_secondary_virq, psurge_ipi_intr,
-			IRQF_DISABLED|IRQF_PERCPU, "IPI", NULL);
-
-	if (rc)
-		pr_err("Failed to setup secondary cpu IPI\n");
-
-	return rc;
+	for_each_online_cpu(i) {
+		if (target == MSG_ALL
+		    || (target == MSG_ALL_BUT_SELF && i != smp_processor_id())
+		    || target == i) {
+			set_bit(msg, &psurge_smp_message[i]);
+			psurge_set_ipi(i);
+		}
+	}
 }
 
 /*
@@ -316,9 +311,6 @@ static int __init smp_psurge_probe(void)
 		ncpus = 2;
 	}
 
-	if (psurge_secondary_ipi_init())
-		return 1;
-
 	psurge_start = ioremap(PSURGE_START, 4);
 	psurge_pri_intr = ioremap(PSURGE_PRI_INTR, 4);
 
@@ -337,7 +329,7 @@ static int __init smp_psurge_probe(void)
 	return ncpus;
 }
 
-static int __init smp_psurge_kick_cpu(int nr)
+static void __init smp_psurge_kick_cpu(int nr)
 {
 	unsigned long start = __pa(__secondary_start_pmac_0) + nr * 8;
 	unsigned long a, flags;
@@ -402,13 +394,11 @@ static int __init smp_psurge_kick_cpu(int nr)
 		psurge_set_ipi(1);
 
 	if (ppc_md.progress) ppc_md.progress("smp_psurge_kick_cpu - done", 0x354);
-
-	return 0;
 }
 
 static struct irqaction psurge_irqaction = {
-	.handler = psurge_ipi_intr,
-	.flags = IRQF_DISABLED|IRQF_PERCPU,
+	.handler = psurge_primary_intr,
+	.flags = IRQF_DISABLED,
 	.name = "primary IPI",
 };
 
@@ -447,15 +437,14 @@ void __init smp_psurge_give_timebase(void)
 
 /* PowerSurge-style Macs */
 struct smp_ops_t psurge_smp_ops = {
-	.message_pass	= smp_muxed_ipi_message_pass,
-	.cause_ipi	= smp_psurge_cause_ipi,
+	.message_pass	= smp_psurge_message_pass,
 	.probe		= smp_psurge_probe,
 	.kick_cpu	= smp_psurge_kick_cpu,
 	.setup_cpu	= smp_psurge_setup_cpu,
 	.give_timebase	= smp_psurge_give_timebase,
 	.take_timebase	= smp_psurge_take_timebase,
 };
-#endif /* CONFIG_PPC_PMAC32_PSURGE */
+#endif /* CONFIG_PPC32 - actually powersurge support */
 
 /*
  * Core 99 and later support
@@ -802,14 +791,14 @@ static int __init smp_core99_probe(void)
 	return ncpus;
 }
 
-static int __devinit smp_core99_kick_cpu(int nr)
+static void __devinit smp_core99_kick_cpu(int nr)
 {
 	unsigned int save_vector;
 	unsigned long target, flags;
 	unsigned int *vector = (unsigned int *)(PAGE_OFFSET+0x100);
 
 	if (nr < 0 || nr > 3)
-		return -ENOENT;
+		return;
 
 	if (ppc_md.progress)
 		ppc_md.progress("smp_core99_kick_cpu", 0x346);
@@ -841,8 +830,6 @@ static int __devinit smp_core99_kick_cpu(int nr)
 
 	local_irq_restore(flags);
 	if (ppc_md.progress) ppc_md.progress("smp_core99_kick_cpu done", 0x347);
-
-	return 0;
 }
 
 static void __devinit smp_core99_setup_cpu(int cpu_nr)
@@ -1015,7 +1002,7 @@ void __init pmac_setup_smp(void)
 		of_node_put(np);
 		smp_ops = &core99_smp_ops;
 	}
-#ifdef CONFIG_PPC_PMAC32_PSURGE
+#ifdef CONFIG_PPC32
 	else {
 		/* We have to set bits in cpu_possible_mask here since the
 		 * secondary CPU(s) aren't in the device tree. Various
@@ -1028,7 +1015,7 @@ void __init pmac_setup_smp(void)
 			set_cpu_possible(cpu, true);
 		smp_ops = &psurge_smp_ops;
 	}
-#endif /* CONFIG_PPC_PMAC32_PSURGE */
+#endif /* CONFIG_PPC32 */
 
 #ifdef CONFIG_HOTPLUG_CPU
 	ppc_md.cpu_die = pmac_cpu_die;

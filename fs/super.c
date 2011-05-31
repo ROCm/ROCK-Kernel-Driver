@@ -31,7 +31,7 @@
 #include <linux/mutex.h>
 #include <linux/backing-dev.h>
 #include <linux/rculist_bl.h>
-#include <linux/cleancache.h>
+#include <linux/precache.h>
 #include "internal.h"
 
 
@@ -113,7 +113,9 @@ static struct super_block *alloc_super(struct file_system_type *type)
 		s->s_maxbytes = MAX_NON_LFS;
 		s->s_op = &default_op;
 		s->s_time_gran = 1000000000;
-		s->cleancache_poolid = -1;
+#ifdef CONFIG_PRECACHE
+		s->precache_poolid = -1;
+#endif
 	}
 out:
 	return s;
@@ -179,13 +181,13 @@ void deactivate_locked_super(struct super_block *s)
 {
 	struct file_system_type *fs = s->s_type;
 	if (atomic_dec_and_test(&s->s_active)) {
-		cleancache_flush_fs(s);
 		fs->kill_sb(s);
 		/*
 		 * We need to call rcu_barrier so all the delayed rcu free
 		 * inodes are flushed before we release the fs module.
 		 */
 		rcu_barrier();
+		precache_flush_filesystem(s);
 		put_filesystem(fs);
 		put_super(s);
 	} else {
@@ -961,7 +963,8 @@ mount_fs(struct file_system_type *type, int flags, const char *name, void *data)
 	 * filesystems should never set s_maxbytes larger than MAX_LFS_FILESIZE
 	 * but s_maxbytes was an unsigned long long for many releases. Throw
 	 * this warning for a little while to try and catch filesystems that
-	 * violate this rule.
+	 * violate this rule. This warning should be either removed or
+	 * converted to a BUG() in 2.6.34.
 	 */
 	WARN((sb->s_maxbytes < 0), "%s set sb->s_maxbytes to "
 		"negative value (%lld)\n", type->name, sb->s_maxbytes);

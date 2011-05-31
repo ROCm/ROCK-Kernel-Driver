@@ -48,6 +48,7 @@ static struct _lcd_scaling_factor lcd_scaling_factor_CLE = {
 	{LCD_VER_SCALING_FACTOR_REG_NUM_CLE, {{CR78, 0, 7}, {CR79, 6, 7} } }
 };
 
+static int check_lvds_chip(int device_id_subaddr, int device_id);
 static bool lvds_identify_integratedlvds(void);
 static void __devinit fp_id_to_vindex(int panel_id);
 static int lvds_register_read(int index);
@@ -83,9 +84,12 @@ static struct display_timing lcd_centering_timging(struct display_timing
 					    mode_crt_reg,
 					   struct display_timing panel_crt_reg);
 
-static inline bool check_lvds_chip(int device_id_subaddr, int device_id)
+static int check_lvds_chip(int device_id_subaddr, int device_id)
 {
-	return lvds_register_read(device_id_subaddr) == device_id;
+	if (lvds_register_read(device_id_subaddr) == device_id)
+		return OK;
+	else
+		return FAIL;
 }
 
 void __devinit viafb_init_lcd_size(void)
@@ -146,7 +150,7 @@ static bool lvds_identify_integratedlvds(void)
 	return true;
 }
 
-bool __devinit viafb_lvds_trasmitter_identify(void)
+int __devinit viafb_lvds_trasmitter_identify(void)
 {
 	if (viafb_lvds_identify_vt1636(VIA_PORT_31)) {
 		viaparinfo->chip_info->lvds_chip_info.i2c_port = VIA_PORT_31;
@@ -171,20 +175,20 @@ bool __devinit viafb_lvds_trasmitter_identify(void)
 	viaparinfo->chip_info->lvds_chip_info.lvds_chip_slave_addr =
 		VT1631_LVDS_I2C_ADDR;
 
-	if (check_lvds_chip(VT1631_DEVICE_ID_REG, VT1631_DEVICE_ID)) {
+	if (check_lvds_chip(VT1631_DEVICE_ID_REG, VT1631_DEVICE_ID) != FAIL) {
 		DEBUG_MSG(KERN_INFO "\n VT1631 LVDS ! \n");
 		DEBUG_MSG(KERN_INFO "\n %2d",
 			  viaparinfo->chip_info->lvds_chip_info.lvds_chip_name);
 		DEBUG_MSG(KERN_INFO "\n %2d",
 			  viaparinfo->chip_info->lvds_chip_info.lvds_chip_name);
-		return true;
+		return OK;
 	}
 
 	viaparinfo->chip_info->lvds_chip_info.lvds_chip_name =
 		NON_LVDS_TRANSMITTER;
 	viaparinfo->chip_info->lvds_chip_info.lvds_chip_slave_addr =
 		VT1631_LVDS_I2C_ADDR;
-	return false;
+	return FAIL;
 }
 
 static void __devinit fp_id_to_vindex(int panel_id)
@@ -558,7 +562,7 @@ void viafb_lcd_set_mode(struct crt_mode_table *mode_crt_table,
 	int set_vres = plvds_setting_info->v_active;
 	int panel_hres = plvds_setting_info->lcd_panel_hres;
 	int panel_vres = plvds_setting_info->lcd_panel_vres;
-	u32 clock;
+	u32 pll_D_N, clock;
 	struct display_timing mode_crt_reg, panel_crt_reg;
 	struct crt_mode_table *panel_crt_table = NULL;
 	struct VideoModeTable *vmode_tbl = viafb_get_mode(panel_hres,
@@ -609,7 +613,10 @@ void viafb_lcd_set_mode(struct crt_mode_table *mode_crt_table,
 		viafb_load_FIFO_reg(set_iga, set_hres, set_vres);
 
 	fill_lcd_format();
-	viafb_set_vclock(clock, set_iga);
+
+	pll_D_N = viafb_get_clk_value(clock);
+	DEBUG_MSG(KERN_INFO "PLL=0x%x", pll_D_N);
+	viafb_set_vclock(pll_D_N, set_iga);
 	lcd_patch_skew(plvds_setting_info, plvds_chip_info);
 
 	/* If K8M800, enable LCD Prefetch Mode. */

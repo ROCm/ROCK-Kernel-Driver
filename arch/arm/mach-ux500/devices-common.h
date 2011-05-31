@@ -28,20 +28,18 @@ dbx500_add_msp_spi(const char *name, resource_size_t base, int irq,
 
 static inline struct amba_device *
 dbx500_add_spi(const char *name, resource_size_t base, int irq,
-	       struct spi_master_cntlr *pdata,
-	       u32 periphid)
+				   struct spi_master_cntlr *pdata)
 {
-	return dbx500_add_amba_device(name, base, irq, pdata, periphid);
+	return dbx500_add_amba_device(name, base, irq, pdata, 0);
 }
 
 struct mmci_platform_data;
 
 static inline struct amba_device *
 dbx500_add_sdi(const char *name, resource_size_t base, int irq,
-	       struct mmci_platform_data *pdata,
-	       u32 periphid)
+	       struct mmci_platform_data *pdata)
 {
-	return dbx500_add_amba_device(name, base, irq, pdata, periphid);
+	return dbx500_add_amba_device(name, base, irq, pdata, 0);
 }
 
 struct amba_pl011_data;

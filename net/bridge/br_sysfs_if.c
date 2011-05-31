@@ -23,7 +23,7 @@
 struct brport_attribute {
 	struct attribute	attr;
 	ssize_t (*show)(struct net_bridge_port *, char *);
-	int (*store)(struct net_bridge_port *, unsigned long);
+	ssize_t (*store)(struct net_bridge_port *, unsigned long);
 };
 
 #define BRPORT_ATTR(_name,_mode,_show,_store)		        \
@@ -38,17 +38,27 @@ static ssize_t show_path_cost(struct net_bridge_port *p, char *buf)
 {
 	return sprintf(buf, "%d\n", p->path_cost);
 }
-
+static ssize_t store_path_cost(struct net_bridge_port *p, unsigned long v)
+{
+	br_stp_set_path_cost(p, v);
+	return 0;
+}
 static BRPORT_ATTR(path_cost, S_IRUGO | S_IWUSR,
-		   show_path_cost, br_stp_set_path_cost);
+		   show_path_cost, store_path_cost);
 
 static ssize_t show_priority(struct net_bridge_port *p, char *buf)
 {
 	return sprintf(buf, "%d\n", p->priority);
 }
-
+static ssize_t store_priority(struct net_bridge_port *p, unsigned long v)
+{
+	if (v >= (1<<(16-BR_PORT_BITS)))
+		return -ERANGE;
+	br_stp_set_port_priority(p, v);
+	return 0;
+}
 static BRPORT_ATTR(priority, S_IRUGO | S_IWUSR,
-			 show_priority, br_stp_set_port_priority);
+			 show_priority, store_priority);
 
 static ssize_t show_designated_root(struct net_bridge_port *p, char *buf)
 {
@@ -126,7 +136,7 @@ static ssize_t show_hold_timer(struct net_bridge_port *p,
 }
 static BRPORT_ATTR(hold_timer, S_IRUGO, show_hold_timer, NULL);
 
-static int store_flush(struct net_bridge_port *p, unsigned long v)
+static ssize_t store_flush(struct net_bridge_port *p, unsigned long v)
 {
 	br_fdb_delete_by_port(p->br, p, 0); // Don't delete local entry
 	return 0;
@@ -138,7 +148,7 @@ static ssize_t show_hairpin_mode(struct net_bridge_port *p, char *buf)
 	int hairpin_mode = (p->flags & BR_HAIRPIN_MODE) ? 1 : 0;
 	return sprintf(buf, "%d\n", hairpin_mode);
 }
-static int store_hairpin_mode(struct net_bridge_port *p, unsigned long v)
+static ssize_t store_hairpin_mode(struct net_bridge_port *p, unsigned long v)
 {
 	if (v)
 		p->flags |= BR_HAIRPIN_MODE;
@@ -155,7 +165,7 @@ static ssize_t show_multicast_router(struct net_bridge_port *p, char *buf)
 	return sprintf(buf, "%d\n", p->multicast_router);
 }
 
-static int store_multicast_router(struct net_bridge_port *p,
+static ssize_t store_multicast_router(struct net_bridge_port *p,
 				      unsigned long v)
 {
 	return br_multicast_set_port_router(p, v);

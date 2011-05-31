@@ -21,10 +21,12 @@
 
 int mmc_send_io_op_cond(struct mmc_host *host, u32 ocr, u32 *rocr)
 {
-	struct mmc_command cmd = {0};
+	struct mmc_command cmd;
 	int i, err = 0;
 
 	BUG_ON(!host);
+
+	memset(&cmd, 0, sizeof(struct mmc_command));
 
 	cmd.opcode = SD_IO_SEND_OP_COND;
 	cmd.arg = ocr;
@@ -68,7 +70,7 @@ int mmc_send_io_op_cond(struct mmc_host *host, u32 ocr, u32 *rocr)
 static int mmc_io_rw_direct_host(struct mmc_host *host, int write, unsigned fn,
 	unsigned addr, u8 in, u8 *out)
 {
-	struct mmc_command cmd = {0};
+	struct mmc_command cmd;
 	int err;
 
 	BUG_ON(!host);
@@ -77,6 +79,8 @@ static int mmc_io_rw_direct_host(struct mmc_host *host, int write, unsigned fn,
 	/* sanity check */
 	if (addr & ~0x1FFFF)
 		return -EINVAL;
+
+	memset(&cmd, 0, sizeof(struct mmc_command));
 
 	cmd.opcode = SD_IO_RW_DIRECT;
 	cmd.arg = write ? 0x80000000 : 0x00000000;
@@ -121,9 +125,9 @@ int mmc_io_rw_direct(struct mmc_card *card, int write, unsigned fn,
 int mmc_io_rw_extended(struct mmc_card *card, int write, unsigned fn,
 	unsigned addr, int incr_addr, u8 *buf, unsigned blocks, unsigned blksz)
 {
-	struct mmc_request mrq = {0};
-	struct mmc_command cmd = {0};
-	struct mmc_data data = {0};
+	struct mmc_request mrq;
+	struct mmc_command cmd;
+	struct mmc_data data;
 	struct scatterlist sg;
 
 	BUG_ON(!card);
@@ -135,6 +139,10 @@ int mmc_io_rw_extended(struct mmc_card *card, int write, unsigned fn,
 	/* sanity check */
 	if (addr & ~0x1FFFF)
 		return -EINVAL;
+
+	memset(&mrq, 0, sizeof(struct mmc_request));
+	memset(&cmd, 0, sizeof(struct mmc_command));
+	memset(&data, 0, sizeof(struct mmc_data));
 
 	mrq.cmd = &cmd;
 	mrq.data = &data;

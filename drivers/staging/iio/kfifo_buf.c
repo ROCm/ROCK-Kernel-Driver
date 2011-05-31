@@ -8,8 +8,6 @@
 
 #include "kfifo_buf.h"
 
-#define iio_to_kfifo(r) container_of(r, struct iio_kfifo, ring)
-
 static inline int __iio_allocate_kfifo(struct iio_kfifo *buf,
 				int bytes_per_datum, int length)
 {
@@ -20,7 +18,7 @@ static inline int __iio_allocate_kfifo(struct iio_kfifo *buf,
 	return kfifo_alloc(&buf->kf, bytes_per_datum*length, GFP_KERNEL);
 }
 
-static int iio_request_update_kfifo(struct iio_ring_buffer *r)
+int iio_request_update_kfifo(struct iio_ring_buffer *r)
 {
 	int ret = 0;
 	struct iio_kfifo *buf = iio_to_kfifo(r);
@@ -39,27 +37,31 @@ error_ret:
 	mutex_unlock(&buf->use_lock);
 	return ret;
 }
+EXPORT_SYMBOL(iio_request_update_kfifo);
 
-static void iio_mark_kfifo_in_use(struct iio_ring_buffer *r)
+void iio_mark_kfifo_in_use(struct iio_ring_buffer *r)
 {
 	struct iio_kfifo *buf = iio_to_kfifo(r);
 	mutex_lock(&buf->use_lock);
 	buf->use_count++;
 	mutex_unlock(&buf->use_lock);
 }
+EXPORT_SYMBOL(iio_mark_kfifo_in_use);
 
-static void iio_unmark_kfifo_in_use(struct iio_ring_buffer *r)
+void iio_unmark_kfifo_in_use(struct iio_ring_buffer *r)
 {
 	struct iio_kfifo *buf = iio_to_kfifo(r);
 	mutex_lock(&buf->use_lock);
 	buf->use_count--;
 	mutex_unlock(&buf->use_lock);
 }
+EXPORT_SYMBOL(iio_unmark_kfifo_in_use);
 
-static int iio_get_length_kfifo(struct iio_ring_buffer *r)
+int iio_get_length_kfifo(struct iio_ring_buffer *r)
 {
 	return r->length;
 }
+EXPORT_SYMBOL(iio_get_length_kfifo);
 
 static inline void __iio_init_kfifo(struct iio_kfifo *kf)
 {
@@ -106,7 +108,6 @@ struct iio_ring_buffer *iio_kfifo_allocate(struct iio_dev *indio_dev)
 	kf = kzalloc(sizeof *kf, GFP_KERNEL);
 	if (!kf)
 		return NULL;
-	kf->update_needed = true;
 	iio_ring_buffer_init(&kf->ring, indio_dev);
 	__iio_init_kfifo(kf);
 	kf->ring.dev.type = &iio_kfifo_type;
@@ -119,37 +120,41 @@ struct iio_ring_buffer *iio_kfifo_allocate(struct iio_dev *indio_dev)
 }
 EXPORT_SYMBOL(iio_kfifo_allocate);
 
-static int iio_get_bytes_per_datum_kfifo(struct iio_ring_buffer *r)
+int iio_get_bytes_per_datum_kfifo(struct iio_ring_buffer *r)
 {
 	return r->bytes_per_datum;
 }
+EXPORT_SYMBOL(iio_get_bytes_per_datum_kfifo);
 
-static int iio_set_bytes_per_datum_kfifo(struct iio_ring_buffer *r, size_t bpd)
+int iio_set_bytes_per_datum_kfifo(struct iio_ring_buffer *r, size_t bpd)
 {
 	if (r->bytes_per_datum != bpd) {
 		r->bytes_per_datum = bpd;
-		if (r->access->mark_param_change)
-			r->access->mark_param_change(r);
+		if (r->access.mark_param_change)
+			r->access.mark_param_change(r);
 	}
 	return 0;
 }
+EXPORT_SYMBOL(iio_set_bytes_per_datum_kfifo);
 
-static int iio_mark_update_needed_kfifo(struct iio_ring_buffer *r)
+int iio_mark_update_needed_kfifo(struct iio_ring_buffer *r)
 {
 	struct iio_kfifo *kf = iio_to_kfifo(r);
 	kf->update_needed = true;
 	return 0;
 }
+EXPORT_SYMBOL(iio_mark_update_needed_kfifo);
 
-static int iio_set_length_kfifo(struct iio_ring_buffer *r, int length)
+int iio_set_length_kfifo(struct iio_ring_buffer *r, int length)
 {
 	if (r->length != length) {
 		r->length = length;
-		if (r->access->mark_param_change)
-			r->access->mark_param_change(r);
+		if (r->access.mark_param_change)
+			r->access.mark_param_change(r);
 	}
 	return 0;
 }
+EXPORT_SYMBOL(iio_set_length_kfifo);
 
 void iio_kfifo_free(struct iio_ring_buffer *r)
 {
@@ -158,9 +163,7 @@ void iio_kfifo_free(struct iio_ring_buffer *r)
 }
 EXPORT_SYMBOL(iio_kfifo_free);
 
-static int iio_store_to_kfifo(struct iio_ring_buffer *r,
-			      u8 *data,
-			      s64 timestamp)
+int iio_store_to_kfifo(struct iio_ring_buffer *r, u8 *data, s64 timestamp)
 {
 	int ret;
 	struct iio_kfifo *kf = iio_to_kfifo(r);
@@ -176,30 +179,18 @@ static int iio_store_to_kfifo(struct iio_ring_buffer *r,
 	kfree(datal);
 	return 0;
 }
+EXPORT_SYMBOL(iio_store_to_kfifo);
 
-static int iio_read_first_n_kfifo(struct iio_ring_buffer *r,
-			   size_t n, char __user *buf)
+int iio_rip_kfifo(struct iio_ring_buffer *r,
+		size_t count, char __user *buf, int *deadoffset)
 {
 	int ret, copied;
 	struct iio_kfifo *kf = iio_to_kfifo(r);
 
-	ret = kfifo_to_user(&kf->kf, buf, r->bytes_per_datum*n, &copied);
+	*deadoffset = 0;
+	ret = kfifo_to_user(&kf->kf, buf, r->bytes_per_datum*count, &copied);
 
 	return copied;
 }
-
-const struct iio_ring_access_funcs kfifo_access_funcs = {
-	.mark_in_use = &iio_mark_kfifo_in_use,
-	.unmark_in_use = &iio_unmark_kfifo_in_use,
-	.store_to = &iio_store_to_kfifo,
-	.read_first_n = &iio_read_first_n_kfifo,
-	.mark_param_change = &iio_mark_update_needed_kfifo,
-	.request_update = &iio_request_update_kfifo,
-	.get_bytes_per_datum = &iio_get_bytes_per_datum_kfifo,
-	.set_bytes_per_datum = &iio_set_bytes_per_datum_kfifo,
-	.get_length = &iio_get_length_kfifo,
-	.set_length = &iio_set_length_kfifo,
-};
-EXPORT_SYMBOL(kfifo_access_funcs);
-
+EXPORT_SYMBOL(iio_rip_kfifo);
 MODULE_LICENSE("GPL");

@@ -5,9 +5,14 @@ extern pmd_t *top_pmd;
 
 #define TOP_PTE(x)	pte_offset_kernel(top_pmd, x)
 
+static inline pmd_t *pmd_off(pgd_t *pgd, unsigned long virt)
+{
+	return pmd_offset(pud_offset(pgd, virt), virt);
+}
+
 static inline pmd_t *pmd_off_k(unsigned long virt)
 {
-	return pmd_offset(pud_offset(pgd_offset_k(virt), virt), virt);
+	return pmd_off(pgd_offset_k(virt), virt);
 }
 
 struct mem_type {

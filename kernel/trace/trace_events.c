@@ -1657,12 +1657,7 @@ static struct ftrace_ops trace_ops __initdata  =
 
 static __init void event_trace_self_test_with_function(void)
 {
-	int ret;
-	ret = register_ftrace_function(&trace_ops);
-	if (WARN_ON(ret < 0)) {
-		pr_info("Failed to enable function tracer for event tests\n");
-		return;
-	}
+	register_ftrace_function(&trace_ops);
 	pr_info("Running tests again, along with the function tracer\n");
 	event_trace_self_tests();
 	unregister_ftrace_function(&trace_ops);

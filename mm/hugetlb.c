@@ -475,7 +475,7 @@ static struct page *dequeue_huge_page_vma(struct hstate *h,
 
 	/* If reserves cannot be used, ensure enough pages are in the pool */
 	if (avoid_reserve && h->free_huge_pages - h->resv_huge_pages == 0)
-		goto err;
+		goto err;;
 
 	for_each_zone_zonelist_nodemask(zone, z, zonelist,
 						MAX_NR_ZONES - 1, nodemask) {
@@ -2205,7 +2205,7 @@ void __unmap_hugepage_range(struct vm_area_struct *vma, unsigned long start,
 	unsigned long sz = huge_page_size(h);
 
 	/*
-	 * A page gathering list, protected by per file i_mmap_mutex. The
+	 * A page gathering list, protected by per file i_mmap_lock. The
 	 * lock is used to avoid list corruption from multiple unmapping
 	 * of the same page since we are using page->lru.
 	 */
@@ -2274,9 +2274,9 @@ void __unmap_hugepage_range(struct vm_area_struct *vma, unsigned long start,
 void unmap_hugepage_range(struct vm_area_struct *vma, unsigned long start,
 			  unsigned long end, struct page *ref_page)
 {
-	mutex_lock(&vma->vm_file->f_mapping->i_mmap_mutex);
+	spin_lock(&vma->vm_file->f_mapping->i_mmap_lock);
 	__unmap_hugepage_range(vma, start, end, ref_page);
-	mutex_unlock(&vma->vm_file->f_mapping->i_mmap_mutex);
+	spin_unlock(&vma->vm_file->f_mapping->i_mmap_lock);
 }
 
 /*
@@ -2308,7 +2308,7 @@ static int unmap_ref_private(struct mm_struct *mm, struct vm_area_struct *vma,
 	 * this mapping should be shared between all the VMAs,
 	 * __unmap_hugepage_range() is called as the lock is already held
 	 */
-	mutex_lock(&mapping->i_mmap_mutex);
+	spin_lock(&mapping->i_mmap_lock);
 	vma_prio_tree_foreach(iter_vma, &iter, &mapping->i_mmap, pgoff, pgoff) {
 		/* Do not unmap the current VMA */
 		if (iter_vma == vma)
@@ -2326,7 +2326,7 @@ static int unmap_ref_private(struct mm_struct *mm, struct vm_area_struct *vma,
 				address, address + huge_page_size(h),
 				page);
 	}
-	mutex_unlock(&mapping->i_mmap_mutex);
+	spin_unlock(&mapping->i_mmap_lock);
 
 	return 1;
 }
@@ -2810,7 +2810,7 @@ void hugetlb_change_protection(struct vm_area_struct *vma,
 	BUG_ON(address >= end);
 	flush_cache_range(vma, address, end);
 
-	mutex_lock(&vma->vm_file->f_mapping->i_mmap_mutex);
+	spin_lock(&vma->vm_file->f_mapping->i_mmap_lock);
 	spin_lock(&mm->page_table_lock);
 	for (; address < end; address += huge_page_size(h)) {
 		ptep = huge_pte_offset(mm, address);
@@ -2825,7 +2825,7 @@ void hugetlb_change_protection(struct vm_area_struct *vma,
 		}
 	}
 	spin_unlock(&mm->page_table_lock);
-	mutex_unlock(&vma->vm_file->f_mapping->i_mmap_mutex);
+	spin_unlock(&vma->vm_file->f_mapping->i_mmap_lock);
 
 	flush_tlb_range(vma, start, end);
 }
@@ -2833,7 +2833,7 @@ void hugetlb_change_protection(struct vm_area_struct *vma,
 int hugetlb_reserve_pages(struct inode *inode,
 					long from, long to,
 					struct vm_area_struct *vma,
-					vm_flags_t vm_flags)
+					int acctflag)
 {
 	long ret, chg;
 	struct hstate *h = hstate_inode(inode);
@@ -2843,7 +2843,7 @@ int hugetlb_reserve_pages(struct inode *inode,
 	 * attempt will be made for VM_NORESERVE to allocate a page
 	 * and filesystem quota without using reserves
 	 */
-	if (vm_flags & VM_NORESERVE)
+	if (acctflag & VM_NORESERVE)
 		return 0;
 
 	/*

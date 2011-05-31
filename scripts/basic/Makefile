@@ -7,8 +7,9 @@
 # .config is included by main Makefile.
 # ---------------------------------------------------------------------------
 # fixdep: 	 Used to generate dependency information during build process
+# docproc:	 Used in Documentation/DocBook
 
-hostprogs-y	:= fixdep
+hostprogs-y	:= fixdep docproc
 always		:= $(hostprogs-y)
 
 # fixdep is needed to compile other host programs

@@ -29,14 +29,14 @@
 #include <bcmdefs.h>
 #include <bcmutils.h>
 #include <bcmwifi.h>
-#include <aiutils.h>
+#include <siutils.h>
 #include <wlioctl.h>
 #include <sbconfig.h>
 #include <sbchipc.h>
 #include <pcicfg.h>
 #include <sbhnddma.h>
 #include <hnddma.h>
-#include <wlc_pmu.h>
+#include <hndpmu.h>
 
 #include "wlc_types.h"
 #include "wl_dbg.h"
@@ -68,9 +68,8 @@ wlc_phy_shim_info_t *wlc_phy_shim_attach(struct wlc_hw_info *wlc_hw,
 
 	physhim = kzalloc(sizeof(wlc_phy_shim_info_t), GFP_ATOMIC);
 	if (!physhim) {
-		wiphy_err(wlc_hw->wlc->wiphy,
-			  "wl%d: wlc_phy_shim_attach: out of mem\n",
-			  wlc_hw->unit);
+		WL_ERROR("wl%d: wlc_phy_shim_attach: out of mem\n",
+			 wlc_hw->unit);
 		return NULL;
 	}
 	physhim->wlc_hw = wlc_hw;

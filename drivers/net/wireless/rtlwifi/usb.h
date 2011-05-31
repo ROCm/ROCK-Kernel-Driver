@@ -31,8 +31,6 @@
 #include <linux/usb.h>
 #include <linux/skbuff.h>
 
-#define RTL_RX_DESC_SIZE		24
-
 #define RTL_USB_DEVICE(vend, prod, cfg) \
 	.match_flags = USB_DEVICE_ID_MATCH_DEVICE, \
 	.idVendor = (vend), \

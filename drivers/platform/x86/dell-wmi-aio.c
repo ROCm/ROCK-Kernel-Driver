@@ -15,7 +15,6 @@
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
 #include <linux/kernel.h>
@@ -139,7 +138,7 @@ static int __init dell_wmi_aio_init(void)
 
 	guid = dell_wmi_aio_find();
 	if (!guid) {
-		pr_warn("No known WMI GUID found\n");
+		pr_warning("No known WMI GUID found\n");
 		return -ENXIO;
 	}
 

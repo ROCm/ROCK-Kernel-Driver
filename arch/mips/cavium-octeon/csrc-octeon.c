@@ -105,7 +105,8 @@ unsigned long long notrace sched_clock(void)
 void __init plat_time_init(void)
 {
 	clocksource_mips.rating = 300;
-	clocksource_register_hz(&clocksource_mips, octeon_get_clock_rate());
+	clocksource_set_clock(&clocksource_mips, octeon_get_clock_rate());
+	clocksource_register(&clocksource_mips);
 }
 
 static u64 octeon_udelay_factor;

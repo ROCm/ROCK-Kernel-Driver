@@ -11,13 +11,14 @@
 #include <linux/time.h>
 #include <asm/vsyscall.h>
 #include <asm/vgtod.h>
+#include "vextern.h"
 
 notrace long
 __vdso_getcpu(unsigned *cpu, unsigned *node, struct getcpu_cache *unused)
 {
 	unsigned int p;
 
-	if (VVAR(vgetcpu_mode) == VGETCPU_RDTSCP) {
+	if (*vdso_vgetcpu_mode == VGETCPU_RDTSCP) {
 		/* Load per CPU data from RDTSCP */
 		native_read_tscp(&p);
 	} else {

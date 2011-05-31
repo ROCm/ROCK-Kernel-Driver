@@ -907,10 +907,9 @@ static int m32r_sio_request_port(struct uart_port *port)
 	return ret;
 }
 
-static void m32r_sio_config_port(struct uart_port *port, int unused)
+static void m32r_sio_config_port(struct uart_port *port, int flags)
 {
 	struct uart_sio_port *up = (struct uart_sio_port *)port;
-	unsigned long flags;
 
 	spin_lock_irqsave(&up->port.lock, flags);
 

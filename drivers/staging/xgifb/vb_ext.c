@@ -1,5 +1,5 @@
 #include <linux/version.h>
-#include <linux/io.h>
+#include <asm/io.h>
 #include <linux/types.h>
 #include "XGIfb.h"
 
@@ -26,9 +26,7 @@ static unsigned char XGINew_Is301B(struct vb_device_info *pVBInfo)
 		return 1;
 }
 
-static unsigned char XGINew_Sense(unsigned short tempbx,
-				  unsigned short tempcx,
-				  struct vb_device_info *pVBInfo)
+static unsigned char XGINew_Sense(unsigned short tempbx, unsigned short tempcx, struct vb_device_info *pVBInfo)
 {
 	unsigned short temp, i, tempch;
 
@@ -52,9 +50,7 @@ static unsigned char XGINew_Sense(unsigned short tempbx,
 		return 0;
 }
 
-static unsigned char
-XGINew_GetLCDDDCInfo(struct xgi_hw_device_info *HwDeviceExtension,
-		     struct vb_device_info *pVBInfo)
+static unsigned char XGINew_GetLCDDDCInfo(struct xgi_hw_device_info *HwDeviceExtension, struct vb_device_info *pVBInfo)
 {
 	unsigned short temp;
 
@@ -158,9 +154,7 @@ static unsigned char XGINew_GetPanelID(struct vb_device_info *pVBInfo)
 	}
 }
 
-static unsigned char
-XGINew_BridgeIsEnable(struct xgi_hw_device_info *HwDeviceExtension,
-		      struct vb_device_info *pVBInfo)
+static unsigned char XGINew_BridgeIsEnable(struct xgi_hw_device_info *HwDeviceExtension, struct vb_device_info *pVBInfo)
 {
 	unsigned short flag;
 
@@ -176,9 +170,7 @@ XGINew_BridgeIsEnable(struct xgi_hw_device_info *HwDeviceExtension,
 	return 0;
 }
 
-static unsigned char
-XGINew_SenseHiTV(struct xgi_hw_device_info *HwDeviceExtension,
-		 struct vb_device_info *pVBInfo)
+static unsigned char XGINew_SenseHiTV(struct xgi_hw_device_info *HwDeviceExtension, struct vb_device_info *pVBInfo)
 {
 	unsigned short tempbx, tempcx, temp, i, tempch;
 
@@ -246,29 +238,21 @@ XGINew_SenseHiTV(struct xgi_hw_device_info *HwDeviceExtension,
 	}
 }
 
-void XGI_GetSenseStatus(struct xgi_hw_device_info *HwDeviceExtension,
-			struct vb_device_info *pVBInfo)
+void XGI_GetSenseStatus(struct xgi_hw_device_info *HwDeviceExtension, struct vb_device_info *pVBInfo)
 {
-	unsigned short  tempax = 0, tempbx, tempcx, temp,
-			P2reg0 = 0, SenseModeNo = 0,
-			OutputSelect = *pVBInfo->pOutputSelect,
-			ModeIdIndex, i;
+	unsigned short tempax = 0, tempbx, tempcx, temp, P2reg0 = 0, SenseModeNo = 0,
+			OutputSelect = *pVBInfo->pOutputSelect, ModeIdIndex, i;
 	pVBInfo->BaseAddr = (unsigned long) HwDeviceExtension->pjIOAddress;
 
 	if (pVBInfo->IF_DEF_LVDS == 1) {
-		/* ynlai 02/27/2002 */
-		tempax = xgifb_reg_get(pVBInfo->P3c4, 0x1A);
+		tempax = xgifb_reg_get(pVBInfo->P3c4, 0x1A); /* ynlai 02/27/2002 */
 		tempbx = xgifb_reg_get(pVBInfo->P3c4, 0x1B);
 		tempax = ((tempax & 0xFE) >> 1) | (tempbx << 8);
 		if (tempax == 0x00) { /* Get Panel id from DDC */
 			temp = XGINew_GetLCDDDCInfo(HwDeviceExtension, pVBInfo);
 			if (temp == 1) { /* LCD connect */
-				/* set CR39 bit0="1" */
-				xgifb_reg_and_or(pVBInfo->P3d4,
-						 0x39, 0xFF, 0x01);
-				/* clean CR37 bit4="0" */
-				xgifb_reg_and_or(pVBInfo->P3d4,
-						 0x37, 0xEF, 0x00);
+				xgifb_reg_and_or(pVBInfo->P3d4, 0x39, 0xFF, 0x01); /* set CR39 bit0="1" */
+				xgifb_reg_and_or(pVBInfo->P3d4, 0x37, 0xEF, 0x00); /* clean CR37 bit4="0" */
 				temp = LCDSense;
 			} else { /* LCD don't connect */
 				temp = 0;
@@ -289,47 +273,25 @@ void XGI_GetSenseStatus(struct xgi_hw_device_info *HwDeviceExtension,
 			xgifb_reg_and_or(pVBInfo->P3d4, 0x32, 0xA0, temp);
 		} else {
 			if (XGI_BridgeIsOn(pVBInfo)) {
-				P2reg0 = xgifb_reg_get(pVBInfo->Part2Port,
-						       0x00);
-				if (!XGINew_BridgeIsEnable(HwDeviceExtension,
-							   pVBInfo)) {
+				P2reg0 = xgifb_reg_get(pVBInfo->Part2Port, 0x00);
+				if (!XGINew_BridgeIsEnable(HwDeviceExtension, pVBInfo)) {
 					SenseModeNo = 0x2e;
-				/* xgifb_reg_set(pVBInfo->P3d4, 0x30, 0x41);
-				 * XGISetModeNew(HwDeviceExtension, 0x2e);
-				 * // ynlai InitMode */
+					/* xgifb_reg_set(pVBInfo->P3d4, 0x30, 0x41); */
+					/* XGISetModeNew(HwDeviceExtension, 0x2e); // ynlai InitMode */
 
-					temp = XGI_SearchModeID(SenseModeNo,
-								&ModeIdIndex,
-								pVBInfo);
-					XGI_GetVGAType(HwDeviceExtension,
-						       pVBInfo);
+					temp = XGI_SearchModeID(SenseModeNo, &ModeIdIndex, pVBInfo);
+					XGI_GetVGAType(HwDeviceExtension, pVBInfo);
 					XGI_GetVBType(pVBInfo);
 					pVBInfo->SetFlag = 0x00;
 					pVBInfo->ModeType = ModeVGA;
-					pVBInfo->VBInfo = SetCRT2ToRAMDAC |
-							  LoadDACFlag |
-							  SetInSlaveMode;
-					XGI_GetLCDInfo(0x2e,
-						       ModeIdIndex,
-						       pVBInfo);
-					XGI_GetTVInfo(0x2e,
-						      ModeIdIndex,
-						      pVBInfo);
-					XGI_EnableBridge(HwDeviceExtension,
-							 pVBInfo);
-					XGI_SetCRT2Group301(SenseModeNo,
-							    HwDeviceExtension,
-							    pVBInfo);
-					XGI_SetCRT2ModeRegs(0x2e,
-							    HwDeviceExtension,
-							    pVBInfo);
-					/* XGI_DisableBridge(HwDeviceExtension,
-					 *		     pVBInfo ) ; */
-					/* Display Off 0212 */
-					xgifb_reg_and_or(pVBInfo->P3c4,
-							 0x01,
-							 0xDF,
-							 0x20);
+					pVBInfo->VBInfo = SetCRT2ToRAMDAC | LoadDACFlag | SetInSlaveMode;
+					XGI_GetLCDInfo(0x2e, ModeIdIndex, pVBInfo);
+					XGI_GetTVInfo(0x2e, ModeIdIndex, pVBInfo);
+					XGI_EnableBridge(HwDeviceExtension, pVBInfo);
+					XGI_SetCRT2Group301(SenseModeNo, HwDeviceExtension, pVBInfo);
+					XGI_SetCRT2ModeRegs(0x2e, HwDeviceExtension, pVBInfo);
+					/* XGI_DisableBridge( HwDeviceExtension, pVBInfo ) ; */
+					xgifb_reg_and_or(pVBInfo->P3c4, 0x01, 0xDF, 0x20); /* Display Off 0212 */
 					for (i = 0; i < 20; i++)
 						XGI_LongWait(pVBInfo);
 				}
@@ -342,38 +304,29 @@ void XGI_GetSenseStatus(struct xgi_hw_device_info *HwDeviceExtension,
 
 				tempcx = 0x0E08;
 				if (XGINew_Sense(tempbx, tempcx, pVBInfo)) {
-					if (XGINew_Sense(tempbx,
-							 tempcx,
-							 pVBInfo))
+					if (XGINew_Sense(tempbx, tempcx, pVBInfo))
 						tempax |= Monitor2Sense;
 				}
 
 				if (pVBInfo->VBType & VB_XGI301C)
-					xgifb_reg_or(pVBInfo->Part4Port,
-						     0x0d,
-						     0x04);
+					xgifb_reg_or(pVBInfo->Part4Port, 0x0d, 0x04);
 
-				/* add by kuku for Multi-adapter sense HiTV */
-				if (XGINew_SenseHiTV(HwDeviceExtension,
-						     pVBInfo)) {
+				if (XGINew_SenseHiTV(HwDeviceExtension, pVBInfo)) { /* add by kuku for Multi-adapter sense HiTV */
 					tempax |= HiTVSense;
 					if ((pVBInfo->VBType & VB_XGI301C))
-						tempax ^= (HiTVSense |
-							   YPbPrSense);
+						tempax ^= (HiTVSense | YPbPrSense);
 				}
 
-				/* start */
-				if (!(tempax & (HiTVSense | YPbPrSense))) {
+				if (!(tempax & (HiTVSense | YPbPrSense))) { /* start */
+
 					tempbx = *pVBInfo->pYCSenseData;
+
 					if (!(XGINew_Is301B(pVBInfo)))
 						tempbx = *pVBInfo->pYCSenseData2;
+
 					tempcx = 0x0604;
-					if (XGINew_Sense(tempbx,
-							 tempcx,
-							 pVBInfo)) {
-						if (XGINew_Sense(tempbx,
-								 tempcx,
-								 pVBInfo))
+					if (XGINew_Sense(tempbx, tempcx, pVBInfo)) {
+						if (XGINew_Sense(tempbx, tempcx, pVBInfo))
 							tempax |= SVIDEOSense;
 					}
 
@@ -384,12 +337,8 @@ void XGI_GetSenseStatus(struct xgi_hw_device_info *HwDeviceExtension,
 							tempbx = *pVBInfo->pVideoSenseData2;
 
 						tempcx = 0x0804;
-						if (XGINew_Sense(tempbx,
-								 tempcx,
-								 pVBInfo)) {
-							if (XGINew_Sense(tempbx,
-									 tempcx,
-									 pVBInfo))
+						if (XGINew_Sense(tempbx, tempcx, pVBInfo)) {
+							if (XGINew_Sense(tempbx, tempcx, pVBInfo))
 								tempax |= AVIDEOSense;
 						}
 					} else {
@@ -400,9 +349,7 @@ void XGI_GetSenseStatus(struct xgi_hw_device_info *HwDeviceExtension,
 								tempbx = *pVBInfo->pVideoSenseData2;
 
 							tempcx = 0x0804;
-							if (XGINew_Sense(tempbx,
-									 tempcx,
-									 pVBInfo)) {
+							if (XGINew_Sense(tempbx, tempcx, pVBInfo)) {
 								if (XGINew_Sense(tempbx, tempcx, pVBInfo))
 									tempax |= AVIDEOSense;
 							}
@@ -423,9 +370,7 @@ void XGI_GetSenseStatus(struct xgi_hw_device_info *HwDeviceExtension,
 
 			if (!(P2reg0 & 0x20)) {
 				pVBInfo->VBInfo = DisableCRT2Display;
-				/* XGI_SetCRT2Group301(SenseModeNo,
-				 *		       HwDeviceExtension,
-				 *		       pVBInfo); */
+				/* XGI_SetCRT2Group301(SenseModeNo, HwDeviceExtension, pVBInfo); */
 			}
 		}
 	}
@@ -433,8 +378,7 @@ void XGI_GetSenseStatus(struct xgi_hw_device_info *HwDeviceExtension,
 
 }
 
-unsigned short XGINew_SenseLCD(struct xgi_hw_device_info *HwDeviceExtension,
-			       struct vb_device_info *pVBInfo)
+unsigned short XGINew_SenseLCD(struct xgi_hw_device_info *HwDeviceExtension, struct vb_device_info *pVBInfo)
 {
 	/* unsigned short SoftSetting ; */
 	unsigned short temp;

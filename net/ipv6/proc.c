@@ -141,11 +141,7 @@ static const struct snmp_mib snmp6_udplite6_list[] = {
 	SNMP_MIB_SENTINEL
 };
 
-/* can be called either with percpu mib (pcpumib != NULL),
- * or shared one (smib != NULL)
- */
-static void snmp6_seq_show_icmpv6msg(struct seq_file *seq, void __percpu **pcpumib,
-				     atomic_long_t *smib)
+static void snmp6_seq_show_icmpv6msg(struct seq_file *seq, void __percpu **mib)
 {
 	char name[32];
 	int i;
@@ -162,14 +158,14 @@ static void snmp6_seq_show_icmpv6msg(struct seq_file *seq, void __percpu **pcpum
 		snprintf(name, sizeof(name), "Icmp6%s%s",
 			i & 0x100 ? "Out" : "In", p);
 		seq_printf(seq, "%-32s\t%lu\n", name,
-			pcpumib ? snmp_fold_field(pcpumib, i) : atomic_long_read(smib + i));
+			snmp_fold_field(mib, i));
 	}
 
 	/* print by number (nonzero only) - ICMPMsgStat format */
 	for (i = 0; i < ICMP6MSG_MIB_MAX; i++) {
 		unsigned long val;
 
-		val = pcpumib ? snmp_fold_field(pcpumib, i) : atomic_long_read(smib + i);
+		val = snmp_fold_field(mib, i);
 		if (!val)
 			continue;
 		snprintf(name, sizeof(name), "Icmp6%sType%u",
@@ -178,22 +174,14 @@ static void snmp6_seq_show_icmpv6msg(struct seq_file *seq, void __percpu **pcpum
 	}
 }
 
-/* can be called either with percpu mib (pcpumib != NULL),
- * or shared one (smib != NULL)
- */
-static void snmp6_seq_show_item(struct seq_file *seq, void __percpu **pcpumib,
-				atomic_long_t *smib,
+static void snmp6_seq_show_item(struct seq_file *seq, void __percpu **mib,
 				const struct snmp_mib *itemlist)
 {
 	int i;
-	unsigned long val;
 
-	for (i = 0; itemlist[i].name; i++) {
-		val = pcpumib ?
-			snmp_fold_field(pcpumib, itemlist[i].entry) :
-			atomic_long_read(smib + itemlist[i].entry);
-		seq_printf(seq, "%-32s\t%lu\n", itemlist[i].name, val);
-	}
+	for (i = 0; itemlist[i].name; i++)
+		seq_printf(seq, "%-32s\t%lu\n", itemlist[i].name,
+			   snmp_fold_field(mib, itemlist[i].entry));
 }
 
 static void snmp6_seq_show_item64(struct seq_file *seq, void __percpu **mib,
@@ -213,13 +201,13 @@ static int snmp6_seq_show(struct seq_file *seq, void *v)
 	snmp6_seq_show_item64(seq, (void __percpu **)net->mib.ipv6_statistics,
 			    snmp6_ipstats_list, offsetof(struct ipstats_mib, syncp));
 	snmp6_seq_show_item(seq, (void __percpu **)net->mib.icmpv6_statistics,
-			    NULL, snmp6_icmp6_list);
+			    snmp6_icmp6_list);
 	snmp6_seq_show_icmpv6msg(seq,
-			    (void __percpu **)net->mib.icmpv6msg_statistics, NULL);
+			    (void __percpu **)net->mib.icmpv6msg_statistics);
 	snmp6_seq_show_item(seq, (void __percpu **)net->mib.udp_stats_in6,
-			    NULL, snmp6_udp6_list);
+			    snmp6_udp6_list);
 	snmp6_seq_show_item(seq, (void __percpu **)net->mib.udplite_stats_in6,
-			    NULL, snmp6_udplite6_list);
+			    snmp6_udplite6_list);
 	return 0;
 }
 
@@ -241,11 +229,11 @@ static int snmp6_dev_seq_show(struct seq_file *seq, void *v)
 	struct inet6_dev *idev = (struct inet6_dev *)seq->private;
 
 	seq_printf(seq, "%-32s\t%u\n", "ifIndex", idev->dev->ifindex);
-	snmp6_seq_show_item(seq, (void __percpu **)idev->stats.ipv6, NULL,
+	snmp6_seq_show_item(seq, (void __percpu **)idev->stats.ipv6,
 			    snmp6_ipstats_list);
-	snmp6_seq_show_item(seq, NULL, idev->stats.icmpv6dev->mibs,
+	snmp6_seq_show_item(seq, (void __percpu **)idev->stats.icmpv6,
 			    snmp6_icmp6_list);
-	snmp6_seq_show_icmpv6msg(seq, NULL, idev->stats.icmpv6msgdev->mibs);
+	snmp6_seq_show_icmpv6msg(seq, (void __percpu **)idev->stats.icmpv6msg);
 	return 0;
 }
 

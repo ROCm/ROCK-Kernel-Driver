@@ -1361,14 +1361,15 @@ intel_tv_detect(struct drm_connector *connector, bool force)
 	if (intel_tv->base.base.crtc && intel_tv->base.base.crtc->enabled) {
 		type = intel_tv_detect_type(intel_tv, connector);
 	} else if (force) {
-		struct intel_load_detect_pipe tmp;
+		struct drm_crtc *crtc;
+		int dpms_mode;
 
-		if (intel_get_load_detect_pipe(&intel_tv->base, connector,
-					       &mode, &tmp)) {
+		crtc = intel_get_load_detect_pipe(&intel_tv->base, connector,
+						  &mode, &dpms_mode);
+		if (crtc) {
 			type = intel_tv_detect_type(intel_tv, connector);
-			intel_release_load_detect_pipe(&intel_tv->base,
-						       connector,
-						       &tmp);
+			intel_release_load_detect_pipe(&intel_tv->base, connector,
+						       dpms_mode);
 		} else
 			return connector_status_unknown;
 	} else

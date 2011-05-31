@@ -54,12 +54,13 @@ void ieee80211_aes_ccm_encrypt(struct crypto_cipher *tfm, u8 *scratch,
 			       u8 *cdata, u8 *mic)
 {
 	int i, j, last_len, num_blocks;
-	u8 *pos, *cpos, *b, *s_0, *e, *b_0;
+	u8 *pos, *cpos, *b, *s_0, *e, *b_0, *aad;
 
 	b = scratch;
 	s_0 = scratch + AES_BLOCK_LEN;
 	e = scratch + 2 * AES_BLOCK_LEN;
 	b_0 = scratch + 3 * AES_BLOCK_LEN;
+	aad = scratch + 4 * AES_BLOCK_LEN;
 
 	num_blocks = DIV_ROUND_UP(data_len, AES_BLOCK_LEN);
 	last_len = data_len % AES_BLOCK_LEN;
@@ -93,12 +94,13 @@ int ieee80211_aes_ccm_decrypt(struct crypto_cipher *tfm, u8 *scratch,
 			      u8 *cdata, size_t data_len, u8 *mic, u8 *data)
 {
 	int i, j, last_len, num_blocks;
-	u8 *pos, *cpos, *b, *s_0, *a, *b_0;
+	u8 *pos, *cpos, *b, *s_0, *a, *b_0, *aad;
 
 	b = scratch;
 	s_0 = scratch + AES_BLOCK_LEN;
 	a = scratch + 2 * AES_BLOCK_LEN;
 	b_0 = scratch + 3 * AES_BLOCK_LEN;
+	aad = scratch + 4 * AES_BLOCK_LEN;
 
 	num_blocks = DIV_ROUND_UP(data_len, AES_BLOCK_LEN);
 	last_len = data_len % AES_BLOCK_LEN;

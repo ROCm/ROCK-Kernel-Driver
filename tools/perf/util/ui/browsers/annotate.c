@@ -5,6 +5,7 @@
 #include "../../hist.h"
 #include "../../sort.h"
 #include "../../symbol.h"
+#include "../../annotate.h"
 #include <pthread.h>
 
 static void ui__error_window(const char *fmt, ...)

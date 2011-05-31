@@ -243,9 +243,8 @@ static int __init init_fortunet(void)
 					&map_regions[ix].map_info);
 			}
 			map_regions[ix].mymtd->owner = THIS_MODULE;
-			mtd_device_register(map_regions[ix].mymtd,
-					    map_regions[ix].parts,
-					    map_regions_parts[ix]);
+			add_mtd_partitions(map_regions[ix].mymtd,
+				map_regions[ix].parts,map_regions_parts[ix]);
 		}
 	}
 	if(iy)
@@ -262,7 +261,7 @@ static void __exit cleanup_fortunet(void)
 		{
 			if( map_regions[ix].mymtd )
 			{
-				mtd_device_unregister(map_regions[ix].mymtd);
+				del_mtd_partitions( map_regions[ix].mymtd );
 				map_destroy( map_regions[ix].mymtd );
 			}
 			iounmap((void *)map_regions[ix].map_info.virt);

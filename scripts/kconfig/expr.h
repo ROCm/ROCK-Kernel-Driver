@@ -20,7 +20,11 @@ struct file {
 	struct file *parent;
 	const char *name;
 	int lineno;
+	int flags;
 };
+
+#define FILE_BUSY		0x0001
+#define FILE_SCANNED		0x0002
 
 typedef enum tristate {
 	no, mod, yes

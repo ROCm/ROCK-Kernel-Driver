@@ -27,6 +27,9 @@
 #include <linux/i2c.h>
 #include <linux/i2c/tsc2007.h>
 
+#define TS_POLL_DELAY			1 /* ms delay between samples */
+#define TS_POLL_PERIOD			1 /* ms delay between samples */
+
 #define TSC2007_MEASURE_TEMP0		(0x0 << 4)
 #define TSC2007_MEASURE_AUX		(0x2 << 4)
 #define TSC2007_MEASURE_TEMP1		(0x4 << 4)
@@ -72,9 +75,6 @@ struct tsc2007 {
 
 	u16			model;
 	u16			x_plate_ohms;
-	u16			max_rt;
-	unsigned long		poll_delay;
-	unsigned long		poll_period;
 
 	bool			pendown;
 	int			irq;
@@ -156,7 +156,6 @@ static void tsc2007_work(struct work_struct *work)
 {
 	struct tsc2007 *ts =
 		container_of(to_delayed_work(work), struct tsc2007, work);
-	bool debounced = false;
 	struct ts_event tc;
 	u32 rt;
 
@@ -185,14 +184,13 @@ static void tsc2007_work(struct work_struct *work)
 	tsc2007_read_values(ts, &tc);
 
 	rt = tsc2007_calculate_pressure(ts, &tc);
-	if (rt > ts->max_rt) {
+	if (rt > MAX_12BIT) {
 		/*
 		 * Sample found inconsistent by debouncing or pressure is
 		 * beyond the maximum. Don't report it to user space,
 		 * repeat at least once more the measurement.
 		 */
 		dev_dbg(&ts->client->dev, "ignored pressure %d\n", rt);
-		debounced = true;
 		goto out;
 
 	}
@@ -227,9 +225,9 @@ static void tsc2007_work(struct work_struct *work)
 	}
 
  out:
-	if (ts->pendown || debounced)
+	if (ts->pendown)
 		schedule_delayed_work(&ts->work,
-				      msecs_to_jiffies(ts->poll_period));
+				      msecs_to_jiffies(TS_POLL_PERIOD));
 	else
 		enable_irq(ts->irq);
 }
@@ -241,7 +239,7 @@ static irqreturn_t tsc2007_irq(int irq, void *handle)
 	if (!ts->get_pendown_state || likely(ts->get_pendown_state())) {
 		disable_irq_nosync(ts->irq);
 		schedule_delayed_work(&ts->work,
-				      msecs_to_jiffies(ts->poll_delay));
+				      msecs_to_jiffies(TS_POLL_DELAY));
 	}
 
 	if (ts->clear_penirq)
@@ -294,9 +292,6 @@ static int __devinit tsc2007_probe(struct i2c_client *client,
 
 	ts->model             = pdata->model;
 	ts->x_plate_ohms      = pdata->x_plate_ohms;
-	ts->max_rt            = pdata->max_rt ? : MAX_12BIT;
-	ts->poll_delay        = pdata->poll_delay ? : 1;
-	ts->poll_period       = pdata->poll_period ? : 1;
 	ts->get_pendown_state = pdata->get_pendown_state;
 	ts->clear_penirq      = pdata->clear_penirq;
 
@@ -310,10 +305,9 @@ static int __devinit tsc2007_probe(struct i2c_client *client,
 	input_dev->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS);
 	input_dev->keybit[BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH);
 
-	input_set_abs_params(input_dev, ABS_X, 0, MAX_12BIT, pdata->fuzzx, 0);
-	input_set_abs_params(input_dev, ABS_Y, 0, MAX_12BIT, pdata->fuzzy, 0);
-	input_set_abs_params(input_dev, ABS_PRESSURE, 0, MAX_12BIT,
-			pdata->fuzzz, 0);
+	input_set_abs_params(input_dev, ABS_X, 0, MAX_12BIT, 0, 0);
+	input_set_abs_params(input_dev, ABS_Y, 0, MAX_12BIT, 0, 0);
+	input_set_abs_params(input_dev, ABS_PRESSURE, 0, MAX_12BIT, 0, 0);
 
 	if (pdata->init_platform_hw)
 		pdata->init_platform_hw();

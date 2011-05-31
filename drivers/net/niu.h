@@ -3279,7 +3279,6 @@ struct niu {
 	unsigned long			xpcs_off;
 
 	struct timer_list		timer;
-	u64				orig_led_state;
 	const struct niu_phy_ops	*phy_ops;
 	int				phy_addr;
 

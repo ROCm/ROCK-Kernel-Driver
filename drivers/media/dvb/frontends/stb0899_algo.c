@@ -23,7 +23,7 @@
 #include "stb0899_priv.h"
 #include "stb0899_reg.h"
 
-static inline u32 stb0899_do_div(u64 n, u32 d)
+inline u32 stb0899_do_div(u64 n, u32 d)
 {
 	/* wrap do_div() for ease of use */
 

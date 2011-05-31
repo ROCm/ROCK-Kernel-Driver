@@ -529,10 +529,9 @@ struct transaction_s
 	enum {
 		T_RUNNING,
 		T_LOCKED,
+		T_RUNDOWN,
 		T_FLUSH,
 		T_COMMIT,
-		T_COMMIT_DFLUSH,
-		T_COMMIT_JFLUSH,
 		T_FINISHED
 	}			t_state;
 
@@ -659,9 +658,7 @@ struct transaction_s
 	 * waiting for it to finish.
 	 */
 	unsigned int t_synchronous_commit:1;
-
-	/* Disk flush needs to be sent to fs partition [no locking] */
-	int			t_need_data_flush;
+	unsigned int t_flushed_data_blocks:1;
 
 	/*
 	 * For use by the filesystem to store fs-specific data
@@ -1231,7 +1228,6 @@ int jbd2_journal_start_commit(journal_t *journal, tid_t *tid);
 int jbd2_journal_force_commit_nested(journal_t *journal);
 int jbd2_log_wait_commit(journal_t *journal, tid_t tid);
 int jbd2_log_do_checkpoint(journal_t *journal);
-int jbd2_trans_will_send_data_barrier(journal_t *journal, tid_t tid);
 
 void __jbd2_log_wait_for_space(journal_t *journal);
 extern void __jbd2_journal_drop_transaction(journal_t *, transaction_t *);

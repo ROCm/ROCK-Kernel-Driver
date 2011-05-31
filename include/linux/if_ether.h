@@ -132,7 +132,10 @@ static inline struct ethhdr *eth_hdr(const struct sk_buff *skb)
 
 int eth_header_parse(const struct sk_buff *skb, unsigned char *haddr);
 
-int mac_pton(const char *s, u8 *mac);
+#ifdef CONFIG_SYSCTL
+extern struct ctl_table ether_table[];
+#endif
+
 extern ssize_t sysfs_format_mac(char *buf, const unsigned char *addr, int len);
 
 #endif

@@ -111,7 +111,7 @@ dhdcdc_query_ioctl(dhd_pub_t *dhd, int ifidx, uint cmd, void *buf, uint len)
 	/* Respond "bcmerror" and "bcmerrorstr" with local cache */
 	if (cmd == WLC_GET_VAR && buf) {
 		if (!strcmp((char *)buf, "bcmerrorstr")) {
-			strncpy((char *)buf, "bcm_error",
+			strncpy((char *)buf, bcmerrorstr(dhd->dongle_error),
 				BCME_STRLEN);
 			goto done;
 		} else if (!strcmp((char *)buf, "bcmerror")) {
@@ -253,9 +253,9 @@ dhd_prot_ioctl(dhd_pub_t *dhd, int ifidx, wl_ioctl_t *ioc, void *buf, int len)
 			"lastcmd=0x%x (%lu)\n",
 			ioc->cmd, (unsigned long)ioc->cmd, prot->lastcmd,
 			(unsigned long)prot->lastcmd));
-		if ((ioc->cmd == WLC_SET_VAR) || (ioc->cmd == WLC_GET_VAR))
+		if ((ioc->cmd == WLC_SET_VAR) || (ioc->cmd == WLC_GET_VAR)) {
 			DHD_TRACE(("iovar cmd=%s\n", (char *)buf));
-
+		}
 		goto done;
 	}
 
@@ -309,7 +309,7 @@ int
 dhd_prot_iovar_op(dhd_pub_t *dhdp, const char *name,
 		  void *params, int plen, void *arg, int len, bool set)
 {
-	return -ENOTSUPP;
+	return BCME_UNSUPPORTED;
 }
 
 void dhd_prot_dump(dhd_pub_t *dhdp, struct bcmstrbuf *strbuf)
@@ -357,7 +357,7 @@ int dhd_prot_hdrpull(dhd_pub_t *dhd, int *ifidx, struct sk_buff *pktbuf)
 	if (pktbuf->len < BDC_HEADER_LEN) {
 		DHD_ERROR(("%s: rx data too short (%d < %d)\n", __func__,
 			   pktbuf->len, BDC_HEADER_LEN));
-		return -EBADE;
+		return BCME_ERROR;
 	}
 
 	h = (struct bdc_header *)(pktbuf->data);
@@ -366,14 +366,14 @@ int dhd_prot_hdrpull(dhd_pub_t *dhd, int *ifidx, struct sk_buff *pktbuf)
 	if (*ifidx >= DHD_MAX_IFS) {
 		DHD_ERROR(("%s: rx data ifnum out of range (%d)\n",
 			   __func__, *ifidx));
-		return -EBADE;
+		return BCME_ERROR;
 	}
 
 	if (((h->flags & BDC_FLAG_VER_MASK) >> BDC_FLAG_VER_SHIFT) !=
 	    BDC_PROTO_VER) {
 		DHD_ERROR(("%s: non-BDC packet received, flags 0x%x\n",
 			   dhd_ifname(dhd, *ifidx), h->flags));
-		return -EBADE;
+		return BCME_ERROR;
 	}
 
 	if (h->flags & BDC_FLAG_SUM_GOOD) {
@@ -416,7 +416,7 @@ int dhd_prot_attach(dhd_pub_t *dhd)
 
 fail:
 	kfree(cdc);
-	return -ENOMEM;
+	return BCME_NOMEM;
 }
 
 /* ~NOTE~ What if another thread is waiting on the semaphore?  Holding it? */

@@ -13,7 +13,7 @@
  */
 
 #include <linux/kernel.h>
-#include <linux/syscore_ops.h>
+#include <linux/sysdev.h>
 #include <linux/interrupt.h>
 #include <linux/serial_core.h>
 #include <linux/irq.h>
@@ -54,7 +54,7 @@ static struct irq_grp_save {
 
 static u32 irq_uart_mask[CONFIG_SERIAL_SAMSUNG_UARTS];
 
-static int s3c64xx_irq_pm_suspend(void)
+static int s3c64xx_irq_pm_suspend(struct sys_device *dev, pm_message_t state)
 {
 	struct irq_grp_save *grp = eint_grp_save;
 	int i;
@@ -75,7 +75,7 @@ static int s3c64xx_irq_pm_suspend(void)
 	return 0;
 }
 
-static void s3c64xx_irq_pm_resume(void)
+static int s3c64xx_irq_pm_resume(struct sys_device *dev)
 {
 	struct irq_grp_save *grp = eint_grp_save;
 	int i;
@@ -94,18 +94,18 @@ static void s3c64xx_irq_pm_resume(void)
 	}
 
 	S3C_PMDBG("%s: IRQ configuration restored\n", __func__);
+	return 0;
 }
 
-struct syscore_ops s3c64xx_irq_syscore_ops = {
+static struct sysdev_driver s3c64xx_irq_driver = {
 	.suspend = s3c64xx_irq_pm_suspend,
 	.resume	 = s3c64xx_irq_pm_resume,
 };
 
-static __init int s3c64xx_syscore_init(void)
+static int __init s3c64xx_irq_pm_init(void)
 {
-	register_syscore_ops(&s3c64xx_irq_syscore_ops);
-
-	return 0;
+	return sysdev_driver_register(&s3c64xx_sysclass, &s3c64xx_irq_driver);
 }
 
-core_initcall(s3c64xx_syscore_init);
+arch_initcall(s3c64xx_irq_pm_init);
+

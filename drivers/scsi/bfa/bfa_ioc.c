@@ -56,8 +56,6 @@ BFA_TRC_FILE(CNA, IOC);
 #define bfa_ioc_map_port(__ioc) ((__ioc)->ioc_hwif->ioc_map_port(__ioc))
 #define bfa_ioc_notify_fail(__ioc)              \
 			((__ioc)->ioc_hwif->ioc_notify_fail(__ioc))
-#define bfa_ioc_sync_start(__ioc)               \
-			((__ioc)->ioc_hwif->ioc_sync_start(__ioc))
 #define bfa_ioc_sync_join(__ioc)                \
 			((__ioc)->ioc_hwif->ioc_sync_join(__ioc))
 #define bfa_ioc_sync_leave(__ioc)               \
@@ -649,7 +647,7 @@ bfa_iocpf_sm_fwcheck(struct bfa_iocpf_s *iocpf, enum iocpf_event event)
 	switch (event) {
 	case IOCPF_E_SEMLOCKED:
 		if (bfa_ioc_firmware_lock(ioc)) {
-			if (bfa_ioc_sync_start(ioc)) {
+			if (bfa_ioc_sync_complete(ioc)) {
 				iocpf->retry_count = 0;
 				bfa_ioc_sync_join(ioc);
 				bfa_fsm_set_state(iocpf, bfa_iocpf_sm_hwinit);

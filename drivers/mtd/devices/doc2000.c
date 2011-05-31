@@ -597,7 +597,7 @@ void DoC2k_init(struct mtd_info *mtd)
 		doc2klist = mtd;
 		mtd->size = this->totlen;
 		mtd->erasesize = this->erasesize;
-		mtd_device_register(mtd, NULL, 0);
+		add_mtd_device(mtd);
 		return;
 	}
 }
@@ -1185,7 +1185,7 @@ static void __exit cleanup_doc2000(void)
 		this = mtd->priv;
 		doc2klist = this->nextdoc;
 
-		mtd_device_unregister(mtd);
+		del_mtd_device(mtd);
 
 		iounmap(this->virtadr);
 		kfree(this->chips);

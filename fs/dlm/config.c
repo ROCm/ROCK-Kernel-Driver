@@ -100,7 +100,6 @@ struct dlm_cluster {
 	unsigned int cl_log_debug;
 	unsigned int cl_protocol;
 	unsigned int cl_timewarn_cs;
-	unsigned int cl_waitwarn_us;
 };
 
 enum {
@@ -115,7 +114,6 @@ enum {
 	CLUSTER_ATTR_LOG_DEBUG,
 	CLUSTER_ATTR_PROTOCOL,
 	CLUSTER_ATTR_TIMEWARN_CS,
-	CLUSTER_ATTR_WAITWARN_US,
 };
 
 struct cluster_attribute {
@@ -168,7 +166,6 @@ CLUSTER_ATTR(scan_secs, 1);
 CLUSTER_ATTR(log_debug, 0);
 CLUSTER_ATTR(protocol, 0);
 CLUSTER_ATTR(timewarn_cs, 1);
-CLUSTER_ATTR(waitwarn_us, 0);
 
 static struct configfs_attribute *cluster_attrs[] = {
 	[CLUSTER_ATTR_TCP_PORT] = &cluster_attr_tcp_port.attr,
@@ -182,7 +179,6 @@ static struct configfs_attribute *cluster_attrs[] = {
 	[CLUSTER_ATTR_LOG_DEBUG] = &cluster_attr_log_debug.attr,
 	[CLUSTER_ATTR_PROTOCOL] = &cluster_attr_protocol.attr,
 	[CLUSTER_ATTR_TIMEWARN_CS] = &cluster_attr_timewarn_cs.attr,
-	[CLUSTER_ATTR_WAITWARN_US] = &cluster_attr_waitwarn_us.attr,
 	NULL,
 };
 
@@ -443,7 +439,6 @@ static struct config_group *make_cluster(struct config_group *g,
 	cl->cl_log_debug = dlm_config.ci_log_debug;
 	cl->cl_protocol = dlm_config.ci_protocol;
 	cl->cl_timewarn_cs = dlm_config.ci_timewarn_cs;
-	cl->cl_waitwarn_us = dlm_config.ci_waitwarn_us;
 
 	space_list = &sps->ss_group;
 	comm_list = &cms->cs_group;
@@ -991,7 +986,6 @@ int dlm_our_addr(struct sockaddr_storage *addr, int num)
 #define DEFAULT_LOG_DEBUG          0
 #define DEFAULT_PROTOCOL           0
 #define DEFAULT_TIMEWARN_CS      500 /* 5 sec = 500 centiseconds */
-#define DEFAULT_WAITWARN_US	   0
 
 struct dlm_config_info dlm_config = {
 	.ci_tcp_port = DEFAULT_TCP_PORT,
@@ -1004,7 +998,6 @@ struct dlm_config_info dlm_config = {
 	.ci_scan_secs = DEFAULT_SCAN_SECS,
 	.ci_log_debug = DEFAULT_LOG_DEBUG,
 	.ci_protocol = DEFAULT_PROTOCOL,
-	.ci_timewarn_cs = DEFAULT_TIMEWARN_CS,
-	.ci_waitwarn_us = DEFAULT_WAITWARN_US
+	.ci_timewarn_cs = DEFAULT_TIMEWARN_CS
 };
 

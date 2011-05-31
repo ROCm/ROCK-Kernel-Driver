@@ -49,7 +49,6 @@ struct probe_finder {
 	Dwarf_Addr		addr;		/* Address */
 	const char		*fname;		/* Real file name */
 	Dwarf_Die		cu_die;		/* Current CU */
-	Dwarf_Die		sp_die;
 	struct list_head	lcache;		/* Line cache for lazy match */
 
 	/* For variable searching */
@@ -84,7 +83,6 @@ struct line_finder {
 	int			lno_s;		/* Start line number */
 	int			lno_e;		/* End line number */
 	Dwarf_Die		cu_die;		/* Current CU */
-	Dwarf_Die		sp_die;
 	int			found;
 };
 

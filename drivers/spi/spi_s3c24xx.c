@@ -668,7 +668,7 @@ static int __exit s3c24xx_spi_remove(struct platform_device *dev)
 
 	platform_set_drvdata(dev, NULL);
 
-	spi_bitbang_stop(&hw->bitbang);
+	spi_unregister_master(hw->master);
 
 	clk_disable(hw->clk);
 	clk_put(hw->clk);

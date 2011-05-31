@@ -332,9 +332,14 @@ static struct dn_ifaddr *dn_dev_alloc_ifa(void)
 	return ifa;
 }
 
+static void dn_dev_free_ifa_rcu(struct rcu_head *head)
+{
+	kfree(container_of(head, struct dn_ifaddr, rcu));
+}
+
 static void dn_dev_free_ifa(struct dn_ifaddr *ifa)
 {
-	kfree_rcu(ifa, rcu);
+	call_rcu(&ifa->rcu, dn_dev_free_ifa_rcu);
 }
 
 static void dn_dev_del_ifa(struct dn_dev *dn_db, struct dn_ifaddr __rcu **ifap, int destroy)
@@ -747,8 +752,7 @@ static int dn_nl_dump_ifaddr(struct sk_buff *skb, struct netlink_callback *cb)
 	skip_naddr = cb->args[1];
 
 	idx = 0;
-	rcu_read_lock();
-	for_each_netdev_rcu(&init_net, dev) {
+	for_each_netdev(&init_net, dev) {
 		if (idx < skip_ndevs)
 			goto cont;
 		else if (idx > skip_ndevs) {
@@ -757,11 +761,11 @@ static int dn_nl_dump_ifaddr(struct sk_buff *skb, struct netlink_callback *cb)
 			skip_naddr = 0;
 		}
 
-		if ((dn_db = rcu_dereference(dev->dn_ptr)) == NULL)
+		if ((dn_db = rtnl_dereference(dev->dn_ptr)) == NULL)
 			goto cont;
 
-		for (ifa = rcu_dereference(dn_db->ifa_list), dn_idx = 0; ifa;
-		     ifa = rcu_dereference(ifa->ifa_next), dn_idx++) {
+		for (ifa = rtnl_dereference(dn_db->ifa_list), dn_idx = 0; ifa;
+		     ifa = rtnl_dereference(ifa->ifa_next), dn_idx++) {
 			if (dn_idx < skip_naddr)
 				continue;
 
@@ -774,7 +778,6 @@ cont:
 		idx++;
 	}
 done:
-	rcu_read_unlock();
 	cb->args[0] = idx;
 	cb->args[1] = dn_idx;
 

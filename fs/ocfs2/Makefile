@@ -30,7 +30,6 @@ ocfs2-objs := \
 	namei.o 		\
 	refcounttree.o		\
 	reservations.o		\
-	move_extents.o		\
 	resize.o		\
 	slot_map.o 		\
 	suballoc.o 		\

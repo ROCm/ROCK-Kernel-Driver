@@ -47,13 +47,12 @@ void flush_tsb_kernel_range(unsigned long start, unsigned long end)
 	}
 }
 
-static void __flush_tsb_one(struct tlb_batch *tb, unsigned long hash_shift,
-			    unsigned long tsb, unsigned long nentries)
+static void __flush_tsb_one(struct mmu_gather *mp, unsigned long hash_shift, unsigned long tsb, unsigned long nentries)
 {
 	unsigned long i;
 
-	for (i = 0; i < tb->tlb_nr; i++) {
-		unsigned long v = tb->vaddrs[i];
+	for (i = 0; i < mp->tlb_nr; i++) {
+		unsigned long v = mp->vaddrs[i];
 		unsigned long tag, ent, hash;
 
 		v &= ~0x1UL;
@@ -66,9 +65,9 @@ static void __flush_tsb_one(struct tlb_batch *tb, unsigned long hash_shift,
 	}
 }
 
-void flush_tsb_user(struct tlb_batch *tb)
+void flush_tsb_user(struct mmu_gather *mp)
 {
-	struct mm_struct *mm = tb->mm;
+	struct mm_struct *mm = mp->mm;
 	unsigned long nentries, base, flags;
 
 	spin_lock_irqsave(&mm->context.lock, flags);
@@ -77,7 +76,7 @@ void flush_tsb_user(struct tlb_batch *tb)
 	nentries = mm->context.tsb_block[MM_TSB_BASE].tsb_nentries;
 	if (tlb_type == cheetah_plus || tlb_type == hypervisor)
 		base = __pa(base);
-	__flush_tsb_one(tb, PAGE_SHIFT, base, nentries);
+	__flush_tsb_one(mp, PAGE_SHIFT, base, nentries);
 
 #ifdef CONFIG_HUGETLB_PAGE
 	if (mm->context.tsb_block[MM_TSB_HUGE].tsb) {
@@ -85,7 +84,7 @@ void flush_tsb_user(struct tlb_batch *tb)
 		nentries = mm->context.tsb_block[MM_TSB_HUGE].tsb_nentries;
 		if (tlb_type == cheetah_plus || tlb_type == hypervisor)
 			base = __pa(base);
-		__flush_tsb_one(tb, HPAGE_SHIFT, base, nentries);
+		__flush_tsb_one(mp, HPAGE_SHIFT, base, nentries);
 	}
 #endif
 	spin_unlock_irqrestore(&mm->context.lock, flags);

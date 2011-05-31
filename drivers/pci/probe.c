@@ -43,6 +43,43 @@ int no_pci_devices(void)
 EXPORT_SYMBOL(no_pci_devices);
 
 /*
+ * PCI Bus Class Devices
+ */
+static ssize_t pci_bus_show_cpuaffinity(struct device *dev,
+					int type,
+					struct device_attribute *attr,
+					char *buf)
+{
+	int ret;
+	const struct cpumask *cpumask;
+
+	cpumask = cpumask_of_pcibus(to_pci_bus(dev));
+	ret = type?
+		cpulist_scnprintf(buf, PAGE_SIZE-2, cpumask) :
+		cpumask_scnprintf(buf, PAGE_SIZE-2, cpumask);
+	buf[ret++] = '\n';
+	buf[ret] = '\0';
+	return ret;
+}
+
+static ssize_t inline pci_bus_show_cpumaskaffinity(struct device *dev,
+					struct device_attribute *attr,
+					char *buf)
+{
+	return pci_bus_show_cpuaffinity(dev, 0, attr, buf);
+}
+
+static ssize_t inline pci_bus_show_cpulistaffinity(struct device *dev,
+					struct device_attribute *attr,
+					char *buf)
+{
+	return pci_bus_show_cpuaffinity(dev, 1, attr, buf);
+}
+
+DEVICE_ATTR(cpuaffinity,     S_IRUGO, pci_bus_show_cpumaskaffinity, NULL);
+DEVICE_ATTR(cpulistaffinity, S_IRUGO, pci_bus_show_cpulistaffinity, NULL);
+
+/*
  * PCI Bus Class
  */
 static void release_pcibus_dev(struct device *dev)
@@ -58,7 +95,6 @@ static void release_pcibus_dev(struct device *dev)
 static struct class pcibus_class = {
 	.name		= "pci_bus",
 	.dev_release	= &release_pcibus_dev,
-	.dev_attrs	= pcibus_dev_attrs,
 };
 
 static int __init pcibus_class_init(void)
@@ -1180,6 +1216,11 @@ static void pci_init_capabilities(struct pci_dev *dev)
 	/* Vital Product Data */
 	pci_vpd_pci22_init(dev);
 
+#ifdef CONFIG_XEN
+	if (!is_initial_xendomain())
+		return;
+#endif
+
 	/* Alternative Routing-ID Forwarding */
 	pci_enable_ari(dev);
 
@@ -1301,13 +1342,20 @@ int pci_scan_slot(struct pci_bus *bus, int devfn)
 		return 0; /* Already scanned the entire slot */
 
 	dev = pci_scan_single_device(bus, devfn);
-	if (!dev)
+	if (!dev) {
+#ifdef pcibios_scan_all_fns
+		if (!pcibios_scan_all_fns(bus, devfn))
+#endif
 		return 0;
-	if (!dev->is_added)
+	} else if (!dev->is_added)
 		nr++;
 
 	if (pci_ari_enabled(bus))
 		next_fn = next_ari_fn;
+#ifdef pcibios_scan_all_fns
+	else if (pcibios_scan_all_fns(bus, devfn))
+		next_fn = next_trad_fn;
+#endif
 	else if (dev->multifunction)
 		next_fn = next_trad_fn;
 
@@ -1419,6 +1467,9 @@ struct pci_bus * pci_create_bus(struct device *parent,
 	error = device_register(&b->dev);
 	if (error)
 		goto class_dev_reg_err;
+	error = device_create_file(&b->dev, &dev_attr_cpuaffinity);
+	if (error)
+		goto dev_create_file_err;
 
 	/* Create legacy_io and legacy_mem files for this bus */
 	pci_create_legacy_files(b);
@@ -1429,6 +1480,8 @@ struct pci_bus * pci_create_bus(struct device *parent,
 
 	return b;
 
+dev_create_file_err:
+	device_unregister(&b->dev);
 class_dev_reg_err:
 	device_unregister(dev);
 dev_reg_err:

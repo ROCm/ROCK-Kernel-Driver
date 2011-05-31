@@ -152,8 +152,7 @@ static ssize_t queue_discard_granularity_show(struct request_queue *q, char *pag
 
 static ssize_t queue_discard_max_show(struct request_queue *q, char *page)
 {
-	return sprintf(page, "%llu\n",
-		       (unsigned long long)q->limits.max_discard_sectors << 9);
+	return queue_var_show(q->limits.max_discard_sectors << 9, page);
 }
 
 static ssize_t queue_discard_zeroes_data_show(struct request_queue *q, char *page)

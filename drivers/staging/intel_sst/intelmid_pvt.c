@@ -31,6 +31,7 @@
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/pcm.h>
+#include "jack.h"
 #include "intel_sst.h"
 #include "intel_sst_ioctl.h"
 #include "intelmid_snd_control.h"

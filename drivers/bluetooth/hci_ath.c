@@ -201,13 +201,8 @@ static struct sk_buff *ath_dequeue(struct hci_uart *hu)
 /* Recv data */
 static int ath_recv(struct hci_uart *hu, void *data, int count)
 {
-	int ret;
-
-	ret = hci_recv_stream_fragment(hu->hdev, data, count);
-	if (ret < 0) {
+	if (hci_recv_stream_fragment(hu->hdev, data, count) < 0)
 		BT_ERR("Frame Reassembly Failed");
-		return ret;
-	}
 
 	return count;
 }

@@ -37,6 +37,30 @@
 #define NFSDBG_FACILITY		NFSDBG_PNFS_LD
 
 /*
+ * Device ID RCU cache. A device ID is unique per client ID and layout type.
+ */
+#define NFS4_FL_DEVICE_ID_HASH_BITS	5
+#define NFS4_FL_DEVICE_ID_HASH_SIZE	(1 << NFS4_FL_DEVICE_ID_HASH_BITS)
+#define NFS4_FL_DEVICE_ID_HASH_MASK	(NFS4_FL_DEVICE_ID_HASH_SIZE - 1)
+
+static inline u32
+nfs4_fl_deviceid_hash(struct nfs4_deviceid *id)
+{
+	unsigned char *cptr = (unsigned char *)id->data;
+	unsigned int nbytes = NFS4_DEVICEID4_SIZE;
+	u32 x = 0;
+
+	while (nbytes--) {
+		x *= 37;
+		x += *cptr++;
+	}
+	return x & NFS4_FL_DEVICE_ID_HASH_MASK;
+}
+
+static struct hlist_head filelayout_deviceid_cache[NFS4_FL_DEVICE_ID_HASH_SIZE];
+static DEFINE_SPINLOCK(filelayout_deviceid_lock);
+
+/*
  * Data server cache
  *
  * Data servers can be mapped to different device ids.
@@ -63,6 +87,27 @@ print_ds(struct nfs4_pnfs_ds *ds)
 		ntohl(ds->ds_ip_addr), ntohs(ds->ds_port),
 		atomic_read(&ds->ds_count), ds->ds_clp,
 		ds->ds_clp ? ds->ds_clp->cl_exchange_flags : 0);
+}
+
+void
+print_ds_list(struct nfs4_file_layout_dsaddr *dsaddr)
+{
+	int i;
+
+	ifdebug(FACILITY) {
+		printk("%s dsaddr->ds_num %d\n", __func__,
+		       dsaddr->ds_num);
+		for (i = 0; i < dsaddr->ds_num; i++)
+			print_ds(dsaddr->ds_list[i]);
+	}
+}
+
+void print_deviceid(struct nfs4_deviceid *id)
+{
+	u32 *p = (u32 *)id;
+
+	dprintk("%s: device id= [%x%x%x%x]\n", __func__,
+		p[0], p[1], p[2], p[3]);
 }
 
 /* nfs4_ds_cache_lock is held */
@@ -156,13 +201,13 @@ destroy_ds(struct nfs4_pnfs_ds *ds)
 	kfree(ds);
 }
 
-void
+static void
 nfs4_fl_free_deviceid(struct nfs4_file_layout_dsaddr *dsaddr)
 {
 	struct nfs4_pnfs_ds *ds;
 	int i;
 
-	nfs4_print_deviceid(&dsaddr->id_node.deviceid);
+	print_deviceid(&dsaddr->deviceid);
 
 	for (i = 0; i < dsaddr->ds_num; i++) {
 		ds = dsaddr->ds_list[i];
@@ -308,7 +353,12 @@ decode_device(struct inode *ino, struct pnfs_device *pdev, gfp_t gfp_flags)
 	u8 max_stripe_index;
 	struct nfs4_file_layout_dsaddr *dsaddr = NULL;
 	struct xdr_stream stream;
-	struct xdr_buf buf;
+	struct xdr_buf buf = {
+		.pages = pdev->pages,
+		.page_len = pdev->pglen,
+		.buflen = pdev->pglen,
+		.len = pdev->pglen,
+	};
 	struct page *scratch;
 
 	/* set up xdr stream */
@@ -316,7 +366,7 @@ decode_device(struct inode *ino, struct pnfs_device *pdev, gfp_t gfp_flags)
 	if (!scratch)
 		goto out_err;
 
-	xdr_init_decode_pages(&stream, &buf, pdev->pages, pdev->pglen);
+	xdr_init_decode(&stream, &buf, NULL);
 	xdr_set_scratch_buffer(&stream, page_address(scratch), PAGE_SIZE);
 
 	/* Get the stripe count (number of stripe index) */
@@ -381,10 +431,8 @@ decode_device(struct inode *ino, struct pnfs_device *pdev, gfp_t gfp_flags)
 	dsaddr->stripe_indices = stripe_indices;
 	stripe_indices = NULL;
 	dsaddr->ds_num = num;
-	nfs4_init_deviceid_node(&dsaddr->id_node,
-				NFS_SERVER(ino)->pnfs_curr_ld,
-				NFS_SERVER(ino)->nfs_client,
-				&pdev->dev_id);
+
+	memcpy(&dsaddr->deviceid, &pdev->dev_id, sizeof(pdev->dev_id));
 
 	for (i = 0; i < dsaddr->ds_num; i++) {
 		int j;
@@ -457,8 +505,8 @@ out_err:
 static struct nfs4_file_layout_dsaddr *
 decode_and_add_device(struct inode *inode, struct pnfs_device *dev, gfp_t gfp_flags)
 {
-	struct nfs4_deviceid_node *d;
-	struct nfs4_file_layout_dsaddr *n, *new;
+	struct nfs4_file_layout_dsaddr *d, *new;
+	long hash;
 
 	new = decode_device(inode, dev, gfp_flags);
 	if (!new) {
@@ -467,12 +515,19 @@ decode_and_add_device(struct inode *inode, struct pnfs_device *dev, gfp_t gfp_fl
 		return NULL;
 	}
 
-	d = nfs4_insert_deviceid_node(&new->id_node);
-	n = container_of(d, struct nfs4_file_layout_dsaddr, id_node);
-	if (n != new) {
+	spin_lock(&filelayout_deviceid_lock);
+	d = nfs4_fl_find_get_deviceid(&new->deviceid);
+	if (d) {
+		spin_unlock(&filelayout_deviceid_lock);
 		nfs4_fl_free_deviceid(new);
-		return n;
+		return d;
 	}
+
+	INIT_HLIST_NODE(&new->node);
+	atomic_set(&new->ref, 1);
+	hash = nfs4_fl_deviceid_hash(&new->deviceid);
+	hlist_add_head_rcu(&new->node, &filelayout_deviceid_cache[hash]);
+	spin_unlock(&filelayout_deviceid_lock);
 
 	return new;
 }
@@ -545,7 +600,35 @@ out_free:
 void
 nfs4_fl_put_deviceid(struct nfs4_file_layout_dsaddr *dsaddr)
 {
-	nfs4_put_deviceid_node(&dsaddr->id_node);
+	if (atomic_dec_and_lock(&dsaddr->ref, &filelayout_deviceid_lock)) {
+		hlist_del_rcu(&dsaddr->node);
+		spin_unlock(&filelayout_deviceid_lock);
+
+		synchronize_rcu();
+		nfs4_fl_free_deviceid(dsaddr);
+	}
+}
+
+struct nfs4_file_layout_dsaddr *
+nfs4_fl_find_get_deviceid(struct nfs4_deviceid *id)
+{
+	struct nfs4_file_layout_dsaddr *d;
+	struct hlist_node *n;
+	long hash = nfs4_fl_deviceid_hash(id);
+
+
+	rcu_read_lock();
+	hlist_for_each_entry_rcu(d, n, &filelayout_deviceid_cache[hash], node) {
+		if (!memcmp(&d->deviceid, id, sizeof(*id))) {
+			if (!atomic_inc_not_zero(&d->ref))
+				goto fail;
+			rcu_read_unlock();
+			return d;
+		}
+	}
+fail:
+	rcu_read_unlock();
+	return NULL;
 }
 
 /*
@@ -593,15 +676,15 @@ static void
 filelayout_mark_devid_negative(struct nfs4_file_layout_dsaddr *dsaddr,
 			       int err, u32 ds_addr)
 {
-	u32 *p = (u32 *)&dsaddr->id_node.deviceid;
+	u32 *p = (u32 *)&dsaddr->deviceid;
 
 	printk(KERN_ERR "NFS: data server %x connection error %d."
 		" Deviceid [%x%x%x%x] marked out of use.\n",
 		ds_addr, err, p[0], p[1], p[2], p[3]);
 
-	spin_lock(&nfs4_ds_cache_lock);
+	spin_lock(&filelayout_deviceid_lock);
 	dsaddr->flags |= NFS4_DEVICE_ID_NEG_ENTRY;
-	spin_unlock(&nfs4_ds_cache_lock);
+	spin_unlock(&filelayout_deviceid_lock);
 }
 
 struct nfs4_pnfs_ds *

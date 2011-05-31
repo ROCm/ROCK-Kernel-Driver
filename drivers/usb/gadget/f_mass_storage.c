@@ -347,7 +347,6 @@ struct fsg_operations {
 /* Data shared by all the FSG instances. */
 struct fsg_common {
 	struct usb_gadget	*gadget;
-	struct usb_composite_dev *cdev;
 	struct fsg_dev		*fsg, *new_fsg;
 	wait_queue_head_t	fsg_wait;
 
@@ -613,11 +612,6 @@ static int fsg_setup(struct usb_function *f,
 
 	if (!fsg_is_set(fsg->common))
 		return -EOPNOTSUPP;
-
-	++fsg->common->ep0_req_tag;	/* Record arrival of a new request */
-	req->context = NULL;
-	req->length = 0;
-	dump_msg(fsg, "ep0-setup", (u8 *) ctrl, sizeof(*ctrl));
 
 	switch (ctrl->bRequest) {
 
@@ -1590,6 +1584,37 @@ static int wedge_bulk_in_endpoint(struct fsg_dev *fsg)
 	return rc;
 }
 
+static int pad_with_zeros(struct fsg_dev *fsg)
+{
+	struct fsg_buffhd	*bh = fsg->common->next_buffhd_to_fill;
+	u32			nkeep = bh->inreq->length;
+	u32			nsend;
+	int			rc;
+
+	bh->state = BUF_STATE_EMPTY;		/* For the first iteration */
+	fsg->common->usb_amount_left = nkeep + fsg->common->residue;
+	while (fsg->common->usb_amount_left > 0) {
+
+		/* Wait for the next buffer to be free */
+		while (bh->state != BUF_STATE_EMPTY) {
+			rc = sleep_thread(fsg->common);
+			if (rc)
+				return rc;
+		}
+
+		nsend = min(fsg->common->usb_amount_left, FSG_BUFLEN);
+		memset(bh->buf + nkeep, 0, nsend - nkeep);
+		bh->inreq->length = nsend;
+		bh->inreq->zero = 0;
+		start_transfer(fsg, fsg->bulk_in, bh->inreq,
+			       &bh->inreq_busy, &bh->state);
+		bh = fsg->common->next_buffhd_to_fill = bh->next;
+		fsg->common->usb_amount_left -= nsend;
+		nkeep = 0;
+	}
+	return 0;
+}
+
 static int throw_away_data(struct fsg_common *common)
 {
 	struct fsg_buffhd	*bh;
@@ -1677,10 +1702,6 @@ static int finish_reply(struct fsg_common *common)
 		if (common->data_size == 0) {
 			/* Nothing to send */
 
-		/* Don't know what to do if common->fsg is NULL */
-		} else if (!fsg_is_set(common)) {
-			rc = -EIO;
-
 		/* If there's no residue, simply send the last buffer */
 		} else if (common->residue == 0) {
 			bh->inreq->zero = 0;
@@ -1689,19 +1710,24 @@ static int finish_reply(struct fsg_common *common)
 			common->next_buffhd_to_fill = bh->next;
 
 		/*
-		 * For Bulk-only, mark the end of the data with a short
-		 * packet.  If we are allowed to stall, halt the bulk-in
-		 * endpoint.  (Note: This violates the Bulk-Only Transport
-		 * specification, which requires us to pad the data if we
-		 * don't halt the endpoint.  Presumably nobody will mind.)
+		 * For Bulk-only, if we're allowed to stall then send the
+		 * short packet and halt the bulk-in endpoint.  If we can't
+		 * stall, pad out the remaining data with 0's.
 		 */
-		} else {
+		} else if (common->can_stall) {
 			bh->inreq->zero = 1;
 			if (!start_in_transfer(common, bh))
+				/* Don't know what to do if
+				 * common->fsg is NULL */
 				rc = -EIO;
 			common->next_buffhd_to_fill = bh->next;
-			if (common->can_stall)
+			if (common->fsg)
 				rc = halt_bulk_in_endpoint(common->fsg);
+		} else if (fsg_is_set(common)) {
+			rc = pad_with_zeros(common->fsg);
+		} else {
+			/* Don't know what to do if common->fsg is NULL */
+			rc = -EIO;
 		}
 		break;
 
@@ -1884,7 +1910,7 @@ static int check_command(struct fsg_common *common, int cmnd_size,
 		    common->lun, lun);
 
 	/* Check the LUN */
-	if (common->lun < common->nluns) {
+	if (common->lun >= 0 && common->lun < common->nluns) {
 		curlun = &common->luns[common->lun];
 		common->curlun = curlun;
 		if (common->cmnd[0] != REQUEST_SENSE) {
@@ -2442,7 +2468,7 @@ static int fsg_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 	struct fsg_dev *fsg = fsg_from_func(f);
 	fsg->common->new_fsg = fsg;
 	raise_exception(fsg->common, FSG_STATE_CONFIG_CHANGE);
-	return USB_GADGET_DELAYED_STATUS;
+	return 0;
 }
 
 static void fsg_disable(struct usb_function *f)
@@ -2578,8 +2604,6 @@ static void handle_exception(struct fsg_common *common)
 
 	case FSG_STATE_CONFIG_CHANGE:
 		do_set_interface(common, common->new_fsg);
-		if (common->new_fsg)
-			usb_composite_setup_continue(common->cdev);
 		break;
 
 	case FSG_STATE_EXIT:
@@ -2750,7 +2774,6 @@ static struct fsg_common *fsg_common_init(struct fsg_common *common,
 	common->gadget = gadget;
 	common->ep0 = gadget->ep0;
 	common->ep0req = cdev->req;
-	common->cdev = cdev;
 
 	/* Maybe allocate device-global string IDs, and patch descriptors */
 	if (fsg_strings[FSG_STRING_INTERFACE].id == 0) {
@@ -2777,7 +2800,6 @@ static struct fsg_common *fsg_common_init(struct fsg_common *common,
 	for (i = 0, lcfg = cfg->luns; i < nluns; ++i, ++curlun, ++lcfg) {
 		curlun->cdrom = !!lcfg->cdrom;
 		curlun->ro = lcfg->cdrom || lcfg->ro;
-		curlun->initially_ro = curlun->ro;
 		curlun->removable = lcfg->removable;
 		curlun->dev.release = fsg_lun_release;
 		curlun->dev.parent = &gadget->dev;

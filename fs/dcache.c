@@ -35,7 +35,6 @@
 #include <linux/hardirq.h>
 #include <linux/bit_spinlock.h>
 #include <linux/rculist_bl.h>
-#include <linux/prefetch.h>
 #include "internal.h"
 
 /*
@@ -1220,7 +1219,7 @@ void shrink_dcache_parent(struct dentry * parent)
 EXPORT_SYMBOL(shrink_dcache_parent);
 
 /*
- * Scan `sc->nr_slab_to_reclaim' dentries and return the number which remain.
+ * Scan `nr' dentries and return the number which remain.
  *
  * We need to avoid reentering the filesystem if the caller is performing a
  * GFP_NOFS allocation attempt.  One example deadlock is:
@@ -1231,12 +1230,8 @@ EXPORT_SYMBOL(shrink_dcache_parent);
  *
  * In this case we return -1 to tell the caller that we baled.
  */
-static int shrink_dcache_memory(struct shrinker *shrink,
-				struct shrink_control *sc)
+static int shrink_dcache_memory(struct shrinker *shrink, int nr, gfp_t gfp_mask)
 {
-	int nr = sc->nr_to_scan;
-	gfp_t gfp_mask = sc->gfp_mask;
-
 	if (nr) {
 		if (!(gfp_mask & __GFP_FS))
 			return -1;

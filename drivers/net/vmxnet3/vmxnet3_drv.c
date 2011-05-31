@@ -1083,7 +1083,7 @@ vmxnet3_rx_csum(struct vmxnet3_adapter *adapter,
 		struct sk_buff *skb,
 		union Vmxnet3_GenericDesc *gdesc)
 {
-	if (!gdesc->rcd.cnc && adapter->netdev->features & NETIF_F_RXCSUM) {
+	if (!gdesc->rcd.cnc && adapter->rxcsum) {
 		/* typical case: TCP/UDP over IP and both csums are correct */
 		if ((le32_to_cpu(gdesc->dword[3]) & VMXNET3_RCD_CSUM_OK) ==
 							VMXNET3_RCD_CSUM_OK) {
@@ -2082,10 +2082,10 @@ vmxnet3_setup_driver_shared(struct vmxnet3_adapter *adapter)
 	devRead->misc.ddLen = cpu_to_le32(sizeof(struct vmxnet3_adapter));
 
 	/* set up feature flags */
-	if (adapter->netdev->features & NETIF_F_RXCSUM)
+	if (adapter->rxcsum)
 		devRead->misc.uptFeatures |= UPT1_F_RXCSUM;
 
-	if (adapter->netdev->features & NETIF_F_LRO) {
+	if (adapter->lro) {
 		devRead->misc.uptFeatures |= UPT1_F_LRO;
 		devRead->misc.maxNumRxSG = cpu_to_le16(1 + MAX_SKB_FRAGS);
 	}
@@ -2594,6 +2594,9 @@ vmxnet3_change_mtu(struct net_device *netdev, int new_mtu)
 	if (new_mtu < VMXNET3_MIN_MTU || new_mtu > VMXNET3_MAX_MTU)
 		return -EINVAL;
 
+	if (new_mtu > 1500 && !adapter->jumbo_frame)
+		return -EINVAL;
+
 	netdev->mtu = new_mtu;
 
 	/*
@@ -2639,18 +2642,28 @@ vmxnet3_declare_features(struct vmxnet3_adapter *adapter, bool dma64)
 {
 	struct net_device *netdev = adapter->netdev;
 
-	netdev->hw_features = NETIF_F_SG | NETIF_F_RXCSUM |
-		NETIF_F_HW_CSUM | NETIF_F_HW_VLAN_TX |
-		NETIF_F_TSO | NETIF_F_TSO6 | NETIF_F_LRO;
-	if (dma64)
-		netdev->features |= NETIF_F_HIGHDMA;
-	netdev->vlan_features = netdev->hw_features & ~NETIF_F_HW_VLAN_TX;
-	netdev->features = netdev->hw_features |
-		NETIF_F_HW_VLAN_RX | NETIF_F_HW_VLAN_FILTER;
+	netdev->features = NETIF_F_SG |
+		NETIF_F_HW_CSUM |
+		NETIF_F_HW_VLAN_TX |
+		NETIF_F_HW_VLAN_RX |
+		NETIF_F_HW_VLAN_FILTER |
+		NETIF_F_TSO |
+		NETIF_F_TSO6 |
+		NETIF_F_LRO;
 
-	netdev_info(adapter->netdev,
-		"features: sg csum vlan jf tso tsoIPv6 lro%s\n",
-		dma64 ? " highDMA" : "");
+	printk(KERN_INFO "features: sg csum vlan jf tso tsoIPv6 lro");
+
+	adapter->rxcsum = true;
+	adapter->jumbo_frame = true;
+	adapter->lro = true;
+
+	if (dma64) {
+		netdev->features |= NETIF_F_HIGHDMA;
+		printk(" highDMA");
+	}
+
+	netdev->vlan_features = netdev->features;
+	printk("\n");
 }
 
 
@@ -2863,7 +2876,6 @@ vmxnet3_probe_device(struct pci_dev *pdev,
 		.ndo_start_xmit = vmxnet3_xmit_frame,
 		.ndo_set_mac_address = vmxnet3_set_mac_addr,
 		.ndo_change_mtu = vmxnet3_change_mtu,
-		.ndo_set_features = vmxnet3_set_features,
 		.ndo_get_stats = vmxnet3_get_stats,
 		.ndo_tx_timeout = vmxnet3_tx_timeout,
 		.ndo_set_multicast_list = vmxnet3_set_mc,
@@ -2883,9 +2895,6 @@ vmxnet3_probe_device(struct pci_dev *pdev,
 	int size;
 	int num_tx_queues;
 	int num_rx_queues;
-
-	if (!pci_msi_enabled())
-		enable_mq = 0;
 
 #ifdef VMXNET3_RSS
 	if (enable_mq)

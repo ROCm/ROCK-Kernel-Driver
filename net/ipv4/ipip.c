@@ -276,6 +276,11 @@ static struct ip_tunnel * ipip_tunnel_locate(struct net *net,
 
 	dev_net_set(dev, net);
 
+	if (strchr(name, '%')) {
+		if (dev_alloc_name(dev, name) < 0)
+			goto failed_free;
+	}
+
 	nt = netdev_priv(dev);
 	nt->parms = *parms;
 
@@ -314,7 +319,7 @@ static int ipip_err(struct sk_buff *skb, u32 info)
    8 bytes of packet payload. It means, that precise relaying of
    ICMP in the real Internet is absolutely infeasible.
  */
-	const struct iphdr *iph = (const struct iphdr *)skb->data;
+	struct iphdr *iph = (struct iphdr *)skb->data;
 	const int type = icmp_hdr(skb)->type;
 	const int code = icmp_hdr(skb)->code;
 	struct ip_tunnel *t;
@@ -428,16 +433,15 @@ static netdev_tx_t ipip_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct ip_tunnel *tunnel = netdev_priv(dev);
 	struct pcpu_tstats *tstats;
-	const struct iphdr  *tiph = &tunnel->parms.iph;
+	struct iphdr  *tiph = &tunnel->parms.iph;
 	u8     tos = tunnel->parms.iph.tos;
 	__be16 df = tiph->frag_off;
 	struct rtable *rt;     			/* Route to the other host */
 	struct net_device *tdev;		/* Device to other host */
-	const struct iphdr  *old_iph = ip_hdr(skb);
+	struct iphdr  *old_iph = ip_hdr(skb);
 	struct iphdr  *iph;			/* Our new IP header */
 	unsigned int max_headroom;		/* The extra header space needed */
 	__be32 dst = tiph->daddr;
-	struct flowi4 fl4;
 	int    mtu;
 
 	if (skb->protocol != htons(ETH_P_IP))
@@ -456,7 +460,7 @@ static netdev_tx_t ipip_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 			goto tx_error_icmp;
 	}
 
-	rt = ip_route_output_ports(dev_net(dev), &fl4, NULL,
+	rt = ip_route_output_ports(dev_net(dev), NULL,
 				   dst, tiph->saddr,
 				   0, 0,
 				   IPPROTO_IPIP, RT_TOS(tos),
@@ -545,8 +549,8 @@ static netdev_tx_t ipip_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 	iph->frag_off		=	df;
 	iph->protocol		=	IPPROTO_IPIP;
 	iph->tos		=	INET_ECN_encapsulate(tos, old_iph->tos);
-	iph->daddr		=	fl4.daddr;
-	iph->saddr		=	fl4.saddr;
+	iph->daddr		=	rt->rt_dst;
+	iph->saddr		=	rt->rt_src;
 
 	if ((iph->ttl = tiph->ttl) == 0)
 		iph->ttl	=	old_iph->ttl;
@@ -568,21 +572,19 @@ static void ipip_tunnel_bind_dev(struct net_device *dev)
 {
 	struct net_device *tdev = NULL;
 	struct ip_tunnel *tunnel;
-	const struct iphdr *iph;
+	struct iphdr *iph;
 
 	tunnel = netdev_priv(dev);
 	iph = &tunnel->parms.iph;
 
 	if (iph->daddr) {
-		struct rtable *rt;
-		struct flowi4 fl4;
+		struct rtable *rt = ip_route_output_ports(dev_net(dev), NULL,
+							  iph->daddr, iph->saddr,
+							  0, 0,
+							  IPPROTO_IPIP,
+							  RT_TOS(iph->tos),
+							  tunnel->parms.link);
 
-		rt = ip_route_output_ports(dev_net(dev), &fl4, NULL,
-					   iph->daddr, iph->saddr,
-					   0, 0,
-					   IPPROTO_IPIP,
-					   RT_TOS(iph->tos),
-					   tunnel->parms.link);
 		if (!IS_ERR(rt)) {
 			tdev = rt->dst.dev;
 			ip_rt_put(rt);

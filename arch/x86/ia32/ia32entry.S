@@ -848,6 +848,4 @@ ia32_sys_call_table:
 	.quad compat_sys_open_by_handle_at
 	.quad compat_sys_clock_adjtime
 	.quad sys_syncfs
-	.quad compat_sys_sendmmsg	/* 345 */
-	.quad sys_setns
 ia32_syscall_end:

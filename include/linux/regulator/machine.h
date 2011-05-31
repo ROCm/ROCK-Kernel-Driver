@@ -68,8 +68,6 @@ struct regulator_state {
  *
  * @min_uV: Smallest voltage consumers may set.
  * @max_uV: Largest voltage consumers may set.
- * @uV_offset: Offset applied to voltages from consumer to compensate for
- *             voltage drops.
  *
  * @min_uA: Smallest consumers consumers may set.
  * @max_uA: Largest current consumers may set.
@@ -100,8 +98,6 @@ struct regulation_constraints {
 	/* voltage output range (inclusive) - for voltage control */
 	int min_uV;
 	int max_uV;
-
-	int uV_offset;
 
 	/* current output range (inclusive) - for current control */
 	int min_uA;
@@ -164,6 +160,8 @@ struct regulator_consumer_supply {
  * @supply_regulator: Parent regulator.  Specified using the regulator name
  *                    as it appears in the name field in sysfs, which can
  *                    be explicitly set using the constraints field 'name'.
+ * @supply_regulator_dev: Parent regulator (if any) - DEPRECATED in favour
+ *                        of supply_regulator.
  *
  * @constraints: Constraints.  These must be specified for the regulator to
  *               be usable.
@@ -175,6 +173,7 @@ struct regulator_consumer_supply {
  */
 struct regulator_init_data {
 	const char *supply_regulator;        /* or NULL for system supply */
+	struct device *supply_regulator_dev; /* or NULL for system supply */
 
 	struct regulation_constraints constraints;
 

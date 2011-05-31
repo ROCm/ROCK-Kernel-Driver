@@ -21,31 +21,30 @@
 #ifndef Ndis802_11AuthModeWPA2PSK
 #define Ndis802_11AuthModeWPA2PSK (Ndis802_11AuthModeWPANone + 2)
 #endif
-
 union pn48 {
 	u64 val;
 #if defined(__BIG_ENDIAN)
-	struct {
-		u8 TSC7;
-		u8 TSC6;
-		u8 TSC5;
-		u8 TSC4;
-		u8 TSC3;
-		u8 TSC2;
-		u8 TSC1;
-		u8 TSC0;
-	} _byte_;
+struct {
+  u8 TSC7;
+  u8 TSC6;
+  u8 TSC5;
+  u8 TSC4;
+  u8 TSC3;
+  u8 TSC2;
+  u8 TSC1;
+  u8 TSC0;
+} _byte_;
 #else
-	struct {
-		u8 TSC0;
-		u8 TSC1;
-		u8 TSC2;
-		u8 TSC3;
-		u8 TSC4;
-		u8 TSC5;
-		u8 TSC6;
-		u8 TSC7;
-	} _byte_;
+struct {
+  u8 TSC0;
+  u8 TSC1;
+  u8 TSC2;
+  u8 TSC3;
+  u8 TSC4;
+  u8 TSC5;
+  u8 TSC6;
+  u8 TSC7;
+} _byte_;
 #endif
 };
 
@@ -175,11 +174,11 @@ struct mic_data {
 };
 
 void seccalctkipmic(
-	u8  *key,
-	u8  *header,
-	u8  *data,
-	u32  data_len,
-	u8  *Miccode,
+	u8 *key,
+	u8 *header,
+	u8 *data,
+	u32 data_len,
+	u8 *Miccode,
 	u8   priority);
 
 void r8712_secmicsetkey(struct mic_data *pmicdata, u8 * key);

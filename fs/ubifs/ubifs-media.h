@@ -408,11 +408,9 @@ enum {
  * Superblock flags.
  *
  * UBIFS_FLG_BIGLPT: if "big" LPT model is used if set
- * UBIFS_FLG_SPACE_FIXUP: first-mount "fixup" of free space within LEBs needed
  */
 enum {
 	UBIFS_FLG_BIGLPT = 0x02,
-	UBIFS_FLG_SPACE_FIXUP = 0x04,
 };
 
 /**
@@ -436,7 +434,7 @@ struct ubifs_ch {
 	__u8 node_type;
 	__u8 group_type;
 	__u8 padding[2];
-} __packed;
+} __attribute__ ((packed));
 
 /**
  * union ubifs_dev_desc - device node descriptor.
@@ -450,7 +448,7 @@ struct ubifs_ch {
 union ubifs_dev_desc {
 	__le32 new;
 	__le64 huge;
-} __packed;
+} __attribute__ ((packed));
 
 /**
  * struct ubifs_ino_node - inode node.
@@ -511,7 +509,7 @@ struct ubifs_ino_node {
 	__le16 compr_type;
 	__u8 padding2[26]; /* Watch 'zero_ino_node_unused()' if changing! */
 	__u8 data[];
-} __packed;
+} __attribute__ ((packed));
 
 /**
  * struct ubifs_dent_node - directory entry node.
@@ -536,7 +534,7 @@ struct ubifs_dent_node {
 	__le16 nlen;
 	__u8 padding2[4]; /* Watch 'zero_dent_node_unused()' if changing! */
 	__u8 name[];
-} __packed;
+} __attribute__ ((packed));
 
 /**
  * struct ubifs_data_node - data node.
@@ -557,7 +555,7 @@ struct ubifs_data_node {
 	__le16 compr_type;
 	__u8 padding[2]; /* Watch 'zero_data_node_unused()' if changing! */
 	__u8 data[];
-} __packed;
+} __attribute__ ((packed));
 
 /**
  * struct ubifs_trun_node - truncation node.
@@ -577,7 +575,7 @@ struct ubifs_trun_node {
 	__u8 padding[12]; /* Watch 'zero_trun_node_unused()' if changing! */
 	__le64 old_size;
 	__le64 new_size;
-} __packed;
+} __attribute__ ((packed));
 
 /**
  * struct ubifs_pad_node - padding node.
@@ -588,7 +586,7 @@ struct ubifs_trun_node {
 struct ubifs_pad_node {
 	struct ubifs_ch ch;
 	__le32 pad_len;
-} __packed;
+} __attribute__ ((packed));
 
 /**
  * struct ubifs_sb_node - superblock node.
@@ -646,7 +644,7 @@ struct ubifs_sb_node {
 	__u8 uuid[16];
 	__le32 ro_compat_version;
 	__u8 padding2[3968];
-} __packed;
+} __attribute__ ((packed));
 
 /**
  * struct ubifs_mst_node - master node.
@@ -713,7 +711,7 @@ struct ubifs_mst_node {
 	__le32 idx_lebs;
 	__le32 leb_cnt;
 	__u8 padding[344];
-} __packed;
+} __attribute__ ((packed));
 
 /**
  * struct ubifs_ref_node - logical eraseblock reference node.
@@ -729,7 +727,7 @@ struct ubifs_ref_node {
 	__le32 offs;
 	__le32 jhead;
 	__u8 padding[28];
-} __packed;
+} __attribute__ ((packed));
 
 /**
  * struct ubifs_branch - key/reference/length branch
@@ -743,7 +741,7 @@ struct ubifs_branch {
 	__le32 offs;
 	__le32 len;
 	__u8 key[];
-} __packed;
+} __attribute__ ((packed));
 
 /**
  * struct ubifs_idx_node - indexing node.
@@ -757,7 +755,7 @@ struct ubifs_idx_node {
 	__le16 child_cnt;
 	__le16 level;
 	__u8 branches[];
-} __packed;
+} __attribute__ ((packed));
 
 /**
  * struct ubifs_cs_node - commit start node.
@@ -767,7 +765,7 @@ struct ubifs_idx_node {
 struct ubifs_cs_node {
 	struct ubifs_ch ch;
 	__le64 cmt_no;
-} __packed;
+} __attribute__ ((packed));
 
 /**
  * struct ubifs_orph_node - orphan node.
@@ -779,6 +777,6 @@ struct ubifs_orph_node {
 	struct ubifs_ch ch;
 	__le64 cmt_no;
 	__le64 inos[];
-} __packed;
+} __attribute__ ((packed));
 
 #endif /* __UBIFS_MEDIA_H__ */

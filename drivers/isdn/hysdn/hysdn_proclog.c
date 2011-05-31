@@ -155,6 +155,7 @@ put_log_buffer(hysdn_card * card, char *cp)
 static ssize_t
 hysdn_log_write(struct file *file, const char __user *buf, size_t count, loff_t * off)
 {
+	unsigned long u = 0;
 	int rc;
 	unsigned char valbuf[128];
 	hysdn_card *card = file->private_data;
@@ -166,10 +167,12 @@ hysdn_log_write(struct file *file, const char __user *buf, size_t count, loff_t 
 
 	valbuf[count] = 0;	/* terminating 0 */
 
-	rc = kstrtoul(valbuf, 0, &card->debug_flags);
-	if (rc < 0)
-		return rc;
-	hysdn_addlog(card, "debug set to 0x%lx", card->debug_flags);
+	rc = strict_strtoul(valbuf, 0, &u);
+
+	if (rc == 0) {
+		card->debug_flags = u;	/* remember debug flags */
+		hysdn_addlog(card, "debug set to 0x%lx", card->debug_flags);
+	}
 	return (count);
 }				/* hysdn_log_write */
 

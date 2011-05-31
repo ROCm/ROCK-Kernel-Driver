@@ -52,6 +52,31 @@ static int __init print_ipi_mode(void)
 }
 late_initcall(print_ipi_mode);
 
+void __init default_setup_apic_routing(void)
+{
+	int version = apic_version[boot_cpu_physical_apicid];
+
+	if (num_possible_cpus() > 8) {
+		switch (boot_cpu_data.x86_vendor) {
+		case X86_VENDOR_INTEL:
+			if (!APIC_XAPIC(version)) {
+				def_to_bigsmp = 0;
+				break;
+			}
+			/* If P4 and above fall through */
+		case X86_VENDOR_AMD:
+			def_to_bigsmp = 1;
+		}
+	}
+
+#ifdef CONFIG_X86_BIGSMP
+	generic_bigsmp_probe();
+#endif
+
+	if (apic->setup_apic_routing)
+		apic->setup_apic_routing();
+}
+
 static int default_x86_32_early_logical_apicid(int cpu)
 {
 	return 1 << cpu;
@@ -87,7 +112,7 @@ static int probe_default(void)
 	return 1;
 }
 
-static struct apic apic_default = {
+struct apic apic_default = {
 
 	.name				= "default",
 	.probe				= probe_default,
@@ -147,24 +172,47 @@ static struct apic apic_default = {
 	.safe_wait_icr_idle		= native_safe_apic_wait_icr_idle,
 
 	.x86_32_early_logical_apicid	= default_x86_32_early_logical_apicid,
+	.x86_32_numa_cpu_node		= default_x86_32_numa_cpu_node,
 };
 
-apic_driver(apic_default);
+extern struct apic apic_numaq;
+extern struct apic apic_summit;
+extern struct apic apic_bigsmp;
+extern struct apic apic_es7000;
+extern struct apic apic_es7000_cluster;
 
 struct apic *apic = &apic_default;
 EXPORT_SYMBOL_GPL(apic);
 
+static struct apic *apic_probe[] __initdata = {
+#ifdef CONFIG_X86_NUMAQ
+	&apic_numaq,
+#endif
+#ifdef CONFIG_X86_SUMMIT
+	&apic_summit,
+#endif
+#ifdef CONFIG_X86_BIGSMP
+	&apic_bigsmp,
+#endif
+#ifdef CONFIG_X86_ES7000
+	&apic_es7000,
+	&apic_es7000_cluster,
+#endif
+	&apic_default,	/* must be last */
+	NULL,
+};
+
 static int cmdline_apic __initdata;
 static int __init parse_apic(char *arg)
 {
-	struct apic **drv;
+	int i;
 
 	if (!arg)
 		return -EINVAL;
 
-	for (drv = __apicdrivers; drv < __apicdrivers_end; drv++) {
-		if (!strcmp((*drv)->name, arg)) {
-			apic = *drv;
+	for (i = 0; apic_probe[i]; i++) {
+		if (!strcmp(apic_probe[i]->name, arg)) {
+			apic = apic_probe[i];
 			cmdline_apic = 1;
 			return 0;
 		}
@@ -175,58 +223,38 @@ static int __init parse_apic(char *arg)
 }
 early_param("apic", parse_apic);
 
-void __init default_setup_apic_routing(void)
+void __init generic_bigsmp_probe(void)
 {
-	int version = apic_version[boot_cpu_physical_apicid];
-
-	if (num_possible_cpus() > 8) {
-		switch (boot_cpu_data.x86_vendor) {
-		case X86_VENDOR_INTEL:
-			if (!APIC_XAPIC(version)) {
-				def_to_bigsmp = 0;
-				break;
-			}
-			/* If P4 and above fall through */
-		case X86_VENDOR_AMD:
-			def_to_bigsmp = 1;
-		}
-	}
-
 #ifdef CONFIG_X86_BIGSMP
 	/*
-	 * This is used to switch to bigsmp mode when
+	 * This routine is used to switch to bigsmp mode when
 	 * - There is no apic= option specified by the user
 	 * - generic_apic_probe() has chosen apic_default as the sub_arch
 	 * - we find more than 8 CPUs in acpi LAPIC listing with xAPIC support
 	 */
 
 	if (!cmdline_apic && apic == &apic_default) {
-		struct apic *bigsmp = generic_bigsmp_probe();
-		if (bigsmp) {
-			apic = bigsmp;
+		if (apic_bigsmp.probe()) {
+			apic = &apic_bigsmp;
 			printk(KERN_INFO "Overriding APIC driver with %s\n",
 			       apic->name);
 		}
 	}
 #endif
-
-	if (apic->setup_apic_routing)
-		apic->setup_apic_routing();
 }
 
 void __init generic_apic_probe(void)
 {
 	if (!cmdline_apic) {
-		struct apic **drv;
-
-		for (drv = __apicdrivers; drv < __apicdrivers_end; drv++) {
-			if ((*drv)->probe()) {
-				apic = *drv;
+		int i;
+		for (i = 0; apic_probe[i]; i++) {
+			if (apic_probe[i]->probe()) {
+				apic = apic_probe[i];
 				break;
 			}
 		}
 		/* Not visible without early console */
-		if (drv == __apicdrivers_end)
+		if (!apic_probe[i])
 			panic("Didn't find an APIC driver");
 	}
 	printk(KERN_INFO "Using APIC driver %s\n", apic->name);
@@ -237,16 +265,16 @@ void __init generic_apic_probe(void)
 int __init
 generic_mps_oem_check(struct mpc_table *mpc, char *oem, char *productid)
 {
-	struct apic **drv;
+	int i;
 
-	for (drv = __apicdrivers; drv < __apicdrivers_end; drv++) {
-		if (!((*drv)->mps_oem_check))
+	for (i = 0; apic_probe[i]; ++i) {
+		if (!apic_probe[i]->mps_oem_check)
 			continue;
-		if (!(*drv)->mps_oem_check(mpc, oem, productid))
+		if (!apic_probe[i]->mps_oem_check(mpc, oem, productid))
 			continue;
 
 		if (!cmdline_apic && apic == &apic_default) {
-			apic = *drv;
+			apic = apic_probe[i];
 			printk(KERN_INFO "Switched to APIC driver `%s'.\n",
 			       apic->name);
 		}
@@ -257,16 +285,16 @@ generic_mps_oem_check(struct mpc_table *mpc, char *oem, char *productid)
 
 int __init default_acpi_madt_oem_check(char *oem_id, char *oem_table_id)
 {
-	struct apic **drv;
+	int i;
 
-	for (drv = __apicdrivers; drv < __apicdrivers_end; drv++) {
-		if (!(*drv)->acpi_madt_oem_check)
+	for (i = 0; apic_probe[i]; ++i) {
+		if (!apic_probe[i]->acpi_madt_oem_check)
 			continue;
-		if (!(*drv)->acpi_madt_oem_check(oem_id, oem_table_id))
+		if (!apic_probe[i]->acpi_madt_oem_check(oem_id, oem_table_id))
 			continue;
 
 		if (!cmdline_apic && apic == &apic_default) {
-			apic = *drv;
+			apic = apic_probe[i];
 			printk(KERN_INFO "Switched to APIC driver `%s'.\n",
 			       apic->name);
 		}

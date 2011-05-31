@@ -136,7 +136,7 @@ SECTIONS
 
 	. = ALIGN(16);
 	INIT_DATA_SECTION(16)
-	PERCPU_SECTION(32)
+	PERCPU(32, PAGE_SIZE)
 
 	.exit.data :
 	{
@@ -155,8 +155,14 @@ SECTIONS
 		SECURITY_INITCALL
 		INIT_RAM_FS
 
+		. = ALIGN(4);
 		___per_cpu_load = .;
-		PERCPU_INPUT(32)
+		___per_cpu_start = .;
+		*(.data.percpu.first)
+		*(.data.percpu.page_aligned)
+		*(.data.percpu)
+		*(.data.percpu.shared_aligned)
+		___per_cpu_end = .;
 
 		EXIT_DATA
 		__einitdata = .;

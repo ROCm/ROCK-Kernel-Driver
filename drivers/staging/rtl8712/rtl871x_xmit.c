@@ -996,7 +996,8 @@ static void free_hwxmits(struct _adapter *padapter)
 {
 	struct xmit_priv *pxmitpriv = &padapter->xmitpriv;
 
-	kfree(pxmitpriv->hwxmits);
+	if (pxmitpriv->hwxmits)
+		kfree((u8 *)pxmitpriv->hwxmits);
 }
 
 static void init_hwxmits(struct hw_xmit *phwxmit, sint entry)

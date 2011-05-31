@@ -1189,10 +1189,10 @@ static int rio_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 		cmd->transceiver = XCVR_INTERNAL;
 	}
 	if ( np->link_status ) {
-		ethtool_cmd_speed_set(cmd, np->speed);
+		cmd->speed = np->speed;
 		cmd->duplex = np->full_duplex ? DUPLEX_FULL : DUPLEX_HALF;
 	} else {
-		ethtool_cmd_speed_set(cmd, -1);
+		cmd->speed = -1;
 		cmd->duplex = -1;
 	}
 	if ( np->an_enable)
@@ -1219,20 +1219,31 @@ static int rio_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 	} else {
 		np->an_enable = 0;
 		if (np->speed == 1000) {
-			ethtool_cmd_speed_set(cmd, SPEED_100);
+			cmd->speed = SPEED_100;
 			cmd->duplex = DUPLEX_FULL;
 			printk("Warning!! Can't disable Auto negotiation in 1000Mbps, change to Manual 100Mbps, Full duplex.\n");
 		}
-		switch (ethtool_cmd_speed(cmd)) {
-		case SPEED_10:
+		switch(cmd->speed + cmd->duplex) {
+
+		case SPEED_10 + DUPLEX_HALF:
 			np->speed = 10;
-			np->full_duplex = (cmd->duplex == DUPLEX_FULL);
+			np->full_duplex = 0;
 			break;
-		case SPEED_100:
+
+		case SPEED_10 + DUPLEX_FULL:
+			np->speed = 10;
+			np->full_duplex = 1;
+			break;
+		case SPEED_100 + DUPLEX_HALF:
 			np->speed = 100;
-			np->full_duplex = (cmd->duplex == DUPLEX_FULL);
+			np->full_duplex = 0;
 			break;
-		case SPEED_1000: /* not supported */
+		case SPEED_100 + DUPLEX_FULL:
+			np->speed = 100;
+			np->full_duplex = 1;
+			break;
+		case SPEED_1000 + DUPLEX_HALF:/* not supported */
+		case SPEED_1000 + DUPLEX_FULL:/* not supported */
 		default:
 			return -EINVAL;
 		}

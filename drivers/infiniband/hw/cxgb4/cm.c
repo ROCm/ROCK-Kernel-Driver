@@ -315,9 +315,8 @@ static struct rtable *find_route(struct c4iw_dev *dev, __be32 local_ip,
 				 __be16 peer_port, u8 tos)
 {
 	struct rtable *rt;
-	struct flowi4 fl4;
 
-	rt = ip_route_output_ports(&init_net, &fl4, NULL, peer_ip, local_ip,
+	rt = ip_route_output_ports(&init_net, NULL, peer_ip, local_ip,
 				   peer_port, local_port, IPPROTO_TCP,
 				   tos, 0);
 	if (IS_ERR(rt))
@@ -1199,7 +1198,9 @@ static int pass_open_rpl(struct c4iw_dev *dev, struct sk_buff *skb)
 	}
 	PDBG("%s ep %p status %d error %d\n", __func__, ep,
 	     rpl->status, status2errno(rpl->status));
-	c4iw_wake_up(&ep->com.wr_wait, status2errno(rpl->status));
+	ep->com.wr_wait.ret = status2errno(rpl->status);
+	ep->com.wr_wait.done = 1;
+	wake_up(&ep->com.wr_wait.wait);
 
 	return 0;
 }
@@ -1233,7 +1234,9 @@ static int close_listsrv_rpl(struct c4iw_dev *dev, struct sk_buff *skb)
 	struct c4iw_listen_ep *ep = lookup_stid(t, stid);
 
 	PDBG("%s ep %p\n", __func__, ep);
-	c4iw_wake_up(&ep->com.wr_wait, status2errno(rpl->status));
+	ep->com.wr_wait.ret = status2errno(rpl->status);
+	ep->com.wr_wait.done = 1;
+	wake_up(&ep->com.wr_wait.wait);
 	return 0;
 }
 
@@ -1463,7 +1466,7 @@ static int peer_close(struct c4iw_dev *dev, struct sk_buff *skb)
 	struct c4iw_qp_attributes attrs;
 	int disconnect = 1;
 	int release = 0;
-	int abort = 0;
+	int closing = 0;
 	struct tid_info *t = dev->rdev.lldi.tids;
 	unsigned int tid = GET_TID(hdr);
 
@@ -1489,22 +1492,23 @@ static int peer_close(struct c4iw_dev *dev, struct sk_buff *skb)
 		 * in rdma connection migration (see c4iw_accept_cr()).
 		 */
 		__state_set(&ep->com, CLOSING);
+		ep->com.wr_wait.done = 1;
+		ep->com.wr_wait.ret = -ECONNRESET;
 		PDBG("waking up ep %p tid %u\n", ep, ep->hwtid);
-		c4iw_wake_up(&ep->com.wr_wait, -ECONNRESET);
+		wake_up(&ep->com.wr_wait.wait);
 		break;
 	case MPA_REP_SENT:
 		__state_set(&ep->com, CLOSING);
+		ep->com.wr_wait.done = 1;
+		ep->com.wr_wait.ret = -ECONNRESET;
 		PDBG("waking up ep %p tid %u\n", ep, ep->hwtid);
-		c4iw_wake_up(&ep->com.wr_wait, -ECONNRESET);
+		wake_up(&ep->com.wr_wait.wait);
 		break;
 	case FPDU_MODE:
 		start_ep_timer(ep);
 		__state_set(&ep->com, CLOSING);
-		attrs.next_state = C4IW_QP_STATE_CLOSING;
-		abort = c4iw_modify_qp(ep->com.qp->rhp, ep->com.qp,
-				       C4IW_QP_ATTR_NEXT_STATE, &attrs, 1);
+		closing = 1;
 		peer_close_upcall(ep);
-		disconnect = 1;
 		break;
 	case ABORTING:
 		disconnect = 0;
@@ -1532,6 +1536,11 @@ static int peer_close(struct c4iw_dev *dev, struct sk_buff *skb)
 		BUG_ON(1);
 	}
 	mutex_unlock(&ep->com.mutex);
+	if (closing) {
+		attrs.next_state = C4IW_QP_STATE_CLOSING;
+		c4iw_modify_qp(ep->com.qp->rhp, ep->com.qp,
+			       C4IW_QP_ATTR_NEXT_STATE, &attrs, 1);
+	}
 	if (disconnect)
 		c4iw_ep_disconnect(ep, 0, GFP_KERNEL);
 	if (release)
@@ -1572,7 +1581,9 @@ static int peer_abort(struct c4iw_dev *dev, struct sk_buff *skb)
 	/*
 	 * Wake up any threads in rdma_init() or rdma_fini().
 	 */
-	c4iw_wake_up(&ep->com.wr_wait, -ECONNRESET);
+	ep->com.wr_wait.done = 1;
+	ep->com.wr_wait.ret = -ECONNRESET;
+	wake_up(&ep->com.wr_wait.wait);
 
 	mutex_lock(&ep->com.mutex);
 	switch (ep->com.state) {
@@ -1699,14 +1710,14 @@ static int terminate(struct c4iw_dev *dev, struct sk_buff *skb)
 	ep = lookup_tid(t, tid);
 	BUG_ON(!ep);
 
-	if (ep && ep->com.qp) {
+	if (ep->com.qp) {
 		printk(KERN_WARNING MOD "TERM received tid %u qpid %u\n", tid,
 		       ep->com.qp->wq.sq.qid);
 		attrs.next_state = C4IW_QP_STATE_TERMINATE;
 		c4iw_modify_qp(ep->com.qp->rhp, ep->com.qp,
 			       C4IW_QP_ATTR_NEXT_STATE, &attrs, 1);
 	} else
-		printk(KERN_WARNING MOD "TERM received tid %u no ep/qp\n", tid);
+		printk(KERN_WARNING MOD "TERM received tid %u no qp\n", tid);
 
 	return 0;
 }
@@ -2285,8 +2296,14 @@ static int fw6_msg(struct c4iw_dev *dev, struct sk_buff *skb)
 		ret = (int)((be64_to_cpu(rpl->data[0]) >> 8) & 0xff);
 		wr_waitp = (struct c4iw_wr_wait *)(__force unsigned long) rpl->data[1];
 		PDBG("%s wr_waitp %p ret %u\n", __func__, wr_waitp, ret);
-		if (wr_waitp)
-			c4iw_wake_up(wr_waitp, ret ? -ret : 0);
+		if (wr_waitp) {
+			if (ret)
+				wr_waitp->ret = -ret;
+			else
+				wr_waitp->ret = 0;
+			wr_waitp->done = 1;
+			wake_up(&wr_waitp->wait);
+		}
 		kfree_skb(skb);
 		break;
 	case 2:

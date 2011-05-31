@@ -48,7 +48,6 @@
 #include <linux/usb/audio.h>
 #include <linux/usb/audio-v2.h>
 
-#include <sound/control.h>
 #include <sound/core.h>
 #include <sound/info.h>
 #include <sound/pcm.h>
@@ -493,14 +492,6 @@ static void *snd_usb_audio_probe(struct usb_device *dev,
 		}
 	}
 
-	/*
-	 * For devices with more than one control interface, we assume the
-	 * first contains the audio controls. We might need a more specific
-	 * check here in the future.
-	 */
-	if (!chip->ctrl_intf)
-		chip->ctrl_intf = alts;
-
 	chip->txfr_quirk = 0;
 	err = 1; /* continue */
 	if (quirk && quirk->ifnum != QUIRK_NO_INTERFACE) {
@@ -508,6 +499,14 @@ static void *snd_usb_audio_probe(struct usb_device *dev,
 		if ((err = snd_usb_create_quirk(chip, intf, &usb_audio_driver, quirk)) < 0)
 			goto __error;
 	}
+
+	/*
+	 * For devices with more than one control interface, we assume the
+	 * first contains the audio controls. We might need a more specific
+	 * check here in the future.
+	 */
+	if (!chip->ctrl_intf)
+		chip->ctrl_intf = alts;
 
 	if (err > 0) {
 		/* create normal USB audio interfaces */

@@ -99,11 +99,8 @@ static void sdi0_configure(void)
 	gpio_direction_output(sdi0_vsel, 0);
 	gpio_direction_output(sdi0_en, 1);
 
-	/* Add the device, force v2 to subrevision 1 */
-	if (cpu_is_u8500v2())
-		db8500_add_sdi0(&mop500_sdi0_data, 0x10480180);
-	else
-		db8500_add_sdi0(&mop500_sdi0_data, 0);
+	/* Add the device */
+	db8500_add_sdi0(&mop500_sdi0_data);
 }
 
 void mop500_sdi_tc35892_init(void)
@@ -191,18 +188,13 @@ static struct mmci_platform_data mop500_sdi4_data = {
 
 void __init mop500_sdi_init(void)
 {
-	u32 periphid = 0;
-
-	/* v2 has a new version of this block that need to be forced */
-	if (cpu_is_u8500v2())
-		periphid = 0x10480180;
 	/* PoP:ed eMMC on top of DB8500 v1.0 has problems with high speed */
 	if (!cpu_is_u8500v10())
 		mop500_sdi2_data.capabilities |= MMC_CAP_MMC_HIGHSPEED;
-	db8500_add_sdi2(&mop500_sdi2_data, periphid);
+	db8500_add_sdi2(&mop500_sdi2_data);
 
 	/* On-board eMMC */
-	db8500_add_sdi4(&mop500_sdi4_data, periphid);
+	db8500_add_sdi4(&mop500_sdi4_data);
 
 	if (machine_is_hrefv60()) {
 		mop500_sdi0_data.gpio_cd = HREFV60_SDMMC_CD_GPIO;

@@ -891,16 +891,15 @@ ks8695_wan_get_settings(struct net_device *ndev, struct ethtool_cmd *cmd)
 			cmd->advertising |= ADVERTISED_Pause;
 		cmd->autoneg = AUTONEG_ENABLE;
 
-		ethtool_cmd_speed_set(cmd,
-				      (ctrl & WMC_WSS) ? SPEED_100 : SPEED_10);
+		cmd->speed = (ctrl & WMC_WSS) ? SPEED_100 : SPEED_10;
 		cmd->duplex = (ctrl & WMC_WDS) ?
 			DUPLEX_FULL : DUPLEX_HALF;
 	} else {
 		/* auto-negotiation is disabled */
 		cmd->autoneg = AUTONEG_DISABLE;
 
-		ethtool_cmd_speed_set(cmd, ((ctrl & WMC_WANF100) ?
-					    SPEED_100 : SPEED_10));
+		cmd->speed = (ctrl & WMC_WANF100) ?
+			SPEED_100 : SPEED_10;
 		cmd->duplex = (ctrl & WMC_WANFF) ?
 			DUPLEX_FULL : DUPLEX_HALF;
 	}

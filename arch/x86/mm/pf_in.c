@@ -414,17 +414,22 @@ unsigned long get_ins_reg_val(unsigned long ins_addr, struct pt_regs *regs)
 	unsigned char *p;
 	struct prefix_bits prf;
 	int i;
+	unsigned long rv;
 
 	p = (unsigned char *)ins_addr;
 	p += skip_prefix(p, &prf);
 	p += get_opcode(p, &opcode);
 	for (i = 0; i < ARRAY_SIZE(reg_rop); i++)
-		if (reg_rop[i] == opcode)
+		if (reg_rop[i] == opcode) {
+			rv = REG_READ;
 			goto do_work;
+		}
 
 	for (i = 0; i < ARRAY_SIZE(reg_wop); i++)
-		if (reg_wop[i] == opcode)
+		if (reg_wop[i] == opcode) {
+			rv = REG_WRITE;
 			goto do_work;
+		}
 
 	printk(KERN_ERR "mmiotrace: Not a register instruction, opcode "
 							"0x%02x\n", opcode);
@@ -469,13 +474,16 @@ unsigned long get_ins_imm_val(unsigned long ins_addr)
 	unsigned char *p;
 	struct prefix_bits prf;
 	int i;
+	unsigned long rv;
 
 	p = (unsigned char *)ins_addr;
 	p += skip_prefix(p, &prf);
 	p += get_opcode(p, &opcode);
 	for (i = 0; i < ARRAY_SIZE(imm_wop); i++)
-		if (imm_wop[i] == opcode)
+		if (imm_wop[i] == opcode) {
+			rv = IMM_WRITE;
 			goto do_work;
+		}
 
 	printk(KERN_ERR "mmiotrace: Not an immediate instruction, opcode "
 							"0x%02x\n", opcode);

@@ -2,7 +2,7 @@
 # This Kconfig describes xen options
 #
 
-config XEN
+config PARAVIRT_XEN
 	bool "Xen guest support"
 	select PARAVIRT
 	select PARAVIRT_CLOCK
@@ -15,36 +15,39 @@ config XEN
 
 config XEN_DOM0
 	def_bool y
-	depends on XEN && PCI_XEN && SWIOTLB_XEN
+	depends on PARAVIRT_XEN && PCI_XEN && SWIOTLB_XEN
 	depends on X86_LOCAL_APIC && X86_IO_APIC && ACPI && PCI
 
 # Dummy symbol since people have come to rely on the PRIVILEGED_GUEST
 # name in tools.
-config XEN_PRIVILEGED_GUEST
-	def_bool XEN_DOM0
+# This doesn't work together with our identical symbol in drivers/xen/Kconfig
+# (produces a recursive dependency), and renaming it is pointless given that
+# it's meant as a compatibility thing.
+#config XEN_PRIVILEGED_GUEST
+#	def_bool XEN_DOM0
 
 config XEN_PVHVM
 	def_bool y
-	depends on XEN
+	depends on PARAVIRT_XEN
 	depends on X86_LOCAL_APIC
 
 config XEN_MAX_DOMAIN_MEMORY
        int
        default 128
-       depends on XEN
+       depends on PARAVIRT_XEN
        help
          This only affects the sizing of some bss arrays, the unused
          portions of which are freed.
 
 config XEN_SAVE_RESTORE
        bool
-       depends on XEN
+       depends on PARAVIRT_XEN
        select HIBERNATE_CALLBACKS
        default y
 
 config XEN_DEBUG_FS
 	bool "Enable Xen debug and tuning parameters in debugfs"
-	depends on XEN && DEBUG_FS
+	depends on PARAVIRT_XEN && DEBUG_FS
 	default n
 	help
 	  Enable statistics output and various tuning options in debugfs.
@@ -52,7 +55,7 @@ config XEN_DEBUG_FS
 
 config XEN_DEBUG
 	bool "Enable Xen debug checks"
-	depends on XEN
+	depends on PARAVIRT_XEN
 	default n
 	help
 	  Enable various WARN_ON checks in the Xen MMU code.

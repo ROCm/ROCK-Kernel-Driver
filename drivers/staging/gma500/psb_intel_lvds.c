@@ -32,6 +32,13 @@
 #include "psb_powermgmt.h"
 #include <linux/pm_runtime.h>
 
+/* MRST defines start */
+uint8_t blc_freq;
+uint8_t blc_minbrightness;
+uint8_t blc_i2caddr;
+uint8_t blc_brightnesscmd;
+int lvds_backlight;		/* restore backlight to this value */
+
 u32 CoreClock;
 u32 PWMControlRegFreq;
 
@@ -76,12 +83,13 @@ static u32 psb_intel_lvds_get_max_backlight(struct drm_device *dev)
 	struct drm_psb_private *dev_priv = dev->dev_private;
 	u32 retVal;
 
-	if (gma_power_begin(dev, false)) {
+	if (ospm_power_using_hw_begin(OSPM_DISPLAY_ISLAND,
+					OSPM_UHB_ONLY_IF_ON)) {
 		retVal = ((REG_READ(BLC_PWM_CTL) &
 			  BACKLIGHT_MODULATION_FREQ_MASK) >>
 			  BACKLIGHT_MODULATION_FREQ_SHIFT) * 2;
 
-		gma_power_end(dev);
+		ospm_power_using_hw_end(OSPM_DISPLAY_ISLAND);
 	} else
 		retVal = ((dev_priv->saveBLC_PWM_CTL &
 			  BACKLIGHT_MODULATION_FREQ_MASK) >>
@@ -90,11 +98,8 @@ static u32 psb_intel_lvds_get_max_backlight(struct drm_device *dev)
 	return retVal;
 }
 
-/*
+/**
  * Set LVDS backlight level by I2C command
- *
- * FIXME: at some point we need to both track this for PM and also
- * disable runtime pm on MRST if the brightness is nil (ie blanked)
  */
 static int psb_lvds_i2c_set_brightness(struct drm_device *dev,
 					unsigned int level)
@@ -127,7 +132,7 @@ static int psb_lvds_i2c_set_brightness(struct drm_device *dev,
 
 	if (i2c_transfer(&lvds_i2c_bus->adapter, msgs, 1) == 1) {
 		DRM_DEBUG("I2C set brightness.(command, value) (%d, %d)\n",
-			dev_priv->lvds_bl->brightnesscmd,
+			blc_brightnesscmd,
 			blc_i2c_brightness);
 		return 0;
 	}
@@ -195,13 +200,14 @@ static void psb_intel_lvds_set_backlight(struct drm_device *dev, int level)
 	struct drm_psb_private *dev_priv = dev->dev_private;
 	u32 blc_pwm_ctl;
 
-	if (gma_power_begin(dev, false)) {
+	if (ospm_power_using_hw_begin(OSPM_DISPLAY_ISLAND,
+					OSPM_UHB_ONLY_IF_ON)) {
 		blc_pwm_ctl =
 			REG_READ(BLC_PWM_CTL) & ~BACKLIGHT_DUTY_CYCLE_MASK;
 		REG_WRITE(BLC_PWM_CTL,
 				(blc_pwm_ctl |
 				(level << BACKLIGHT_DUTY_CYCLE_SHIFT)));
-		gma_power_end(dev);
+		ospm_power_using_hw_end(OSPM_DISPLAY_ISLAND);
 	} else {
 		blc_pwm_ctl = dev_priv->saveBLC_PWM_CTL &
 				~BACKLIGHT_DUTY_CYCLE_MASK;
@@ -218,7 +224,8 @@ static void psb_intel_lvds_set_power(struct drm_device *dev,
 {
 	u32 pp_status;
 
-	if (!gma_power_begin(dev, true))
+	if (!ospm_power_using_hw_begin(OSPM_DISPLAY_ISLAND,
+					OSPM_UHB_FORCE_POWER_ON))
 		return;
 
 	if (on) {
@@ -241,7 +248,7 @@ static void psb_intel_lvds_set_power(struct drm_device *dev,
 		} while (pp_status & PP_ON);
 	}
 
-	gma_power_end(dev);
+	ospm_power_using_hw_end(OSPM_DISPLAY_ISLAND);
 }
 
 static void psb_intel_lvds_encoder_dpms(struct drm_encoder *encoder, int mode)
@@ -393,13 +400,9 @@ bool psb_intel_lvds_mode_fixup(struct drm_encoder *encoder,
 	if (psb_intel_output->type == INTEL_OUTPUT_MIPI2)
 		panel_fixed_mode = mode_dev->panel_fixed_mode2;
 
-	/* PSB requires the LVDS is on pipe B, MRST has only one pipe anyway */
-	if (!IS_MRST(dev) && psb_intel_crtc->pipe == 0) {
+	/* PSB doesn't appear to be GEN4 */
+	if (psb_intel_crtc->pipe == 0) {
 		printk(KERN_ERR "Can't support LVDS on pipe A\n");
-		return false;
-	}
-	if (IS_MRST(dev) && psb_intel_crtc->pipe != 0) {
-		printk(KERN_ERR "Must use PIPE A\n");
 		return false;
 	}
 	/* Should never happen!! */
@@ -442,7 +445,7 @@ bool psb_intel_lvds_mode_fixup(struct drm_encoder *encoder,
 	return true;
 }
 
-void psb_intel_lvds_prepare(struct drm_encoder *encoder)
+static void psb_intel_lvds_prepare(struct drm_encoder *encoder)
 {
 	struct drm_device *dev = encoder->dev;
 	struct psb_intel_output *output = enc_to_psb_intel_output(encoder);
@@ -450,7 +453,8 @@ void psb_intel_lvds_prepare(struct drm_encoder *encoder)
 
 	PSB_DEBUG_ENTRY("\n");
 
-	if (!gma_power_begin(dev, true))
+	if (!ospm_power_using_hw_begin(OSPM_DISPLAY_ISLAND,
+					OSPM_UHB_FORCE_POWER_ON))
 		return;
 
 	mode_dev->saveBLC_PWM_CTL = REG_READ(BLC_PWM_CTL);
@@ -459,10 +463,10 @@ void psb_intel_lvds_prepare(struct drm_encoder *encoder)
 
 	psb_intel_lvds_set_power(dev, output, false);
 
-	gma_power_end(dev);
+	ospm_power_using_hw_end(OSPM_DISPLAY_ISLAND);
 }
 
-void psb_intel_lvds_commit(struct drm_encoder *encoder)
+static void psb_intel_lvds_commit(struct drm_encoder *encoder)
 {
 	struct drm_device *dev = encoder->dev;
 	struct psb_intel_output *output = enc_to_psb_intel_output(encoder);
@@ -665,14 +669,14 @@ static const struct drm_encoder_helper_funcs psb_intel_lvds_helper_funcs = {
 	.commit = psb_intel_lvds_commit,
 };
 
-const struct drm_connector_helper_funcs
+static const struct drm_connector_helper_funcs
 				psb_intel_lvds_connector_helper_funcs = {
 	.get_modes = psb_intel_lvds_get_modes,
 	.mode_valid = psb_intel_lvds_mode_valid,
 	.best_encoder = psb_intel_best_encoder,
 };
 
-const struct drm_connector_funcs psb_intel_lvds_connector_funcs = {
+static const struct drm_connector_funcs psb_intel_lvds_connector_funcs = {
 	.dpms = drm_helper_connector_dpms,
 	.save = psb_intel_lvds_save,
 	.restore = psb_intel_lvds_restore,

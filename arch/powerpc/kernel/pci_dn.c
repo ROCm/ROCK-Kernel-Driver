@@ -43,9 +43,10 @@ void * __devinit update_dn_pci_info(struct device_node *dn, void *data)
 	const u32 *regs;
 	struct pci_dn *pdn;
 
-	pdn = zalloc_maybe_bootmem(sizeof(*pdn), GFP_KERNEL);
+	pdn = alloc_maybe_bootmem(sizeof(*pdn), GFP_KERNEL);
 	if (pdn == NULL)
 		return NULL;
+	memset(pdn, 0, sizeof(*pdn));
 	dn->data = pdn;
 	pdn->node = dn;
 	pdn->phb = phb;

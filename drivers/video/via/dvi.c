@@ -28,11 +28,17 @@ static int tmds_register_read_bytes(int index, u8 *buff, int buff_len);
 static void __devinit dvi_get_panel_size_from_DDCv1(
 	struct tmds_chip_information *tmds_chip,
 	struct tmds_setting_information *tmds_setting);
+static void __devinit dvi_get_panel_size_from_DDCv2(
+	struct tmds_chip_information *tmds_chip,
+	struct tmds_setting_information *tmds_setting);
 static int viafb_dvi_query_EDID(void);
 
-static inline bool check_tmds_chip(int device_id_subaddr, int device_id)
+static int check_tmds_chip(int device_id_subaddr, int device_id)
 {
-	return tmds_register_read(device_id_subaddr) == device_id;
+	if (tmds_register_read(device_id_subaddr) == device_id)
+		return OK;
+	else
+		return FAIL;
 }
 
 void __devinit viafb_init_dvi_size(struct tmds_chip_information *tmds_chip,
@@ -41,13 +47,22 @@ void __devinit viafb_init_dvi_size(struct tmds_chip_information *tmds_chip,
 	DEBUG_MSG(KERN_INFO "viafb_init_dvi_size()\n");
 
 	viafb_dvi_sense();
-	if (viafb_dvi_query_EDID() == 1)
+	switch (viafb_dvi_query_EDID()) {
+	case 1:
 		dvi_get_panel_size_from_DDCv1(tmds_chip, tmds_setting);
+		break;
+	case 2:
+		dvi_get_panel_size_from_DDCv2(tmds_chip, tmds_setting);
+		break;
+	default:
+		printk(KERN_WARNING "viafb_init_dvi_size: DVI panel size undetected!\n");
+		break;
+	}
 
 	return;
 }
 
-bool __devinit viafb_tmds_trasmitter_identify(void)
+int __devinit viafb_tmds_trasmitter_identify(void)
 {
 	unsigned char sr2a = 0, sr1e = 0, sr3e = 0;
 
@@ -86,7 +101,7 @@ bool __devinit viafb_tmds_trasmitter_identify(void)
 	viaparinfo->chip_info->
 		tmds_chip_info.tmds_chip_slave_addr = VT1632_TMDS_I2C_ADDR;
 	viaparinfo->chip_info->tmds_chip_info.i2c_port = VIA_PORT_31;
-	if (check_tmds_chip(VT1632_DEVICE_ID_REG, VT1632_DEVICE_ID)) {
+	if (check_tmds_chip(VT1632_DEVICE_ID_REG, VT1632_DEVICE_ID) != FAIL) {
 		/*
 		 * Currently only support 12bits,dual edge,add 24bits mode later
 		 */
@@ -97,10 +112,11 @@ bool __devinit viafb_tmds_trasmitter_identify(void)
 			  viaparinfo->chip_info->tmds_chip_info.tmds_chip_name);
 		DEBUG_MSG(KERN_INFO "\n %2d",
 			  viaparinfo->chip_info->tmds_chip_info.i2c_port);
-		return true;
+		return OK;
 	} else {
 		viaparinfo->chip_info->tmds_chip_info.i2c_port = VIA_PORT_2C;
-		if (check_tmds_chip(VT1632_DEVICE_ID_REG, VT1632_DEVICE_ID)) {
+		if (check_tmds_chip(VT1632_DEVICE_ID_REG, VT1632_DEVICE_ID)
+		    != FAIL) {
 			tmds_register_write(0x08, 0x3b);
 			DEBUG_MSG(KERN_INFO "\n VT1632 TMDS ! \n");
 			DEBUG_MSG(KERN_INFO "\n %2d",
@@ -109,7 +125,7 @@ bool __devinit viafb_tmds_trasmitter_identify(void)
 			DEBUG_MSG(KERN_INFO "\n %2d",
 				  viaparinfo->chip_info->
 				  tmds_chip_info.i2c_port);
-			return true;
+			return OK;
 		}
 	}
 
@@ -119,7 +135,7 @@ bool __devinit viafb_tmds_trasmitter_identify(void)
 	    ((viafb_display_hardware_layout == HW_LAYOUT_DVI_ONLY) ||
 	     (viafb_display_hardware_layout == HW_LAYOUT_LCD_DVI))) {
 		DEBUG_MSG(KERN_INFO "\n Integrated TMDS ! \n");
-		return true;
+		return OK;
 	}
 
 	switch (viaparinfo->chip_info->gfx_chip_name) {
@@ -143,7 +159,7 @@ bool __devinit viafb_tmds_trasmitter_identify(void)
 		tmds_chip_info.tmds_chip_name = NON_TMDS_TRANSMITTER;
 	viaparinfo->chip_info->tmds_chip_info.
 		tmds_chip_slave_addr = VT1632_TMDS_I2C_ADDR;
-	return false;
+	return FAIL;
 }
 
 static void tmds_register_write(int index, u8 data)
@@ -290,7 +306,12 @@ static int viafb_dvi_query_EDID(void)
 		return EDID_VERSION_1;	/* Found EDID1 Table */
 	}
 
-	return false;
+	data0 = (u8) tmds_register_read(0x00);
+	viaparinfo->chip_info->tmds_chip_info.tmds_chip_slave_addr = restore;
+	if (data0 == 0x20)
+		return EDID_VERSION_2;	/* Found EDID2 Table */
+	else
+		return false;
 }
 
 /* Get Panel Size Using EDID1 Table */
@@ -298,15 +319,50 @@ static void __devinit dvi_get_panel_size_from_DDCv1(
 	struct tmds_chip_information *tmds_chip,
 	struct tmds_setting_information *tmds_setting)
 {
-	int i, restore;
+	int i, max_h = 0, tmp, restore;
+	unsigned char rData;
 	unsigned char EDID_DATA[18];
 
 	DEBUG_MSG(KERN_INFO "\n dvi_get_panel_size_from_DDCv1 \n");
 
 	restore = tmds_chip->tmds_chip_slave_addr;
 	tmds_chip->tmds_chip_slave_addr = 0xA0;
+
+	rData = tmds_register_read(0x23);
+	if (rData & 0x3C)
+		max_h = 640;
+	if (rData & 0xC0)
+		max_h = 720;
+	if (rData & 0x03)
+		max_h = 800;
+
+	rData = tmds_register_read(0x24);
+	if (rData & 0xC0)
+		max_h = 800;
+	if (rData & 0x1E)
+		max_h = 1024;
+	if (rData & 0x01)
+		max_h = 1280;
+
 	for (i = 0x25; i < 0x6D; i++) {
 		switch (i) {
+		case 0x26:
+		case 0x28:
+		case 0x2A:
+		case 0x2C:
+		case 0x2E:
+		case 0x30:
+		case 0x32:
+		case 0x34:
+			rData = tmds_register_read(i);
+			if (rData == 1)
+				break;
+			/* data = (data + 31) * 8 */
+			tmp = (rData + 31) << 3;
+			if (tmp > max_h)
+				max_h = tmp;
+			break;
+
 		case 0x36:
 		case 0x48:
 		case 0x5A:
@@ -327,8 +383,88 @@ static void __devinit dvi_get_panel_size_from_DDCv1(
 		}
 	}
 
+	tmds_setting->max_hres = max_h;
+	switch (max_h) {
+	case 640:
+		tmds_setting->max_vres = 480;
+		break;
+	case 800:
+		tmds_setting->max_vres = 600;
+		break;
+	case 1024:
+		tmds_setting->max_vres = 768;
+		break;
+	case 1280:
+		tmds_setting->max_vres = 1024;
+		break;
+	case 1400:
+		tmds_setting->max_vres = 1050;
+		break;
+	case 1440:
+		tmds_setting->max_vres = 1050;
+		break;
+	case 1600:
+		tmds_setting->max_vres = 1200;
+		break;
+	case 1920:
+		tmds_setting->max_vres = 1080;
+		break;
+	default:
+		DEBUG_MSG(KERN_INFO "Unknown panel size max resolution = %d ! "
+					 "set default panel size.\n", max_h);
+		break;
+	}
+
 	DEBUG_MSG(KERN_INFO "DVI max pixelclock = %d\n",
 		tmds_setting->max_pixel_clock);
+	tmds_chip->tmds_chip_slave_addr = restore;
+}
+
+/* Get Panel Size Using EDID2 Table */
+static void __devinit dvi_get_panel_size_from_DDCv2(
+	struct tmds_chip_information *tmds_chip,
+	struct tmds_setting_information *tmds_setting)
+{
+	int restore;
+	unsigned char R_Buffer[2];
+
+	DEBUG_MSG(KERN_INFO "\n dvi_get_panel_size_from_DDCv2 \n");
+
+	restore = tmds_chip->tmds_chip_slave_addr;
+	tmds_chip->tmds_chip_slave_addr = 0xA2;
+
+	/* Horizontal: 0x76, 0x77 */
+	tmds_register_read_bytes(0x76, R_Buffer, 2);
+	tmds_setting->max_hres = R_Buffer[0] + (R_Buffer[1] << 8);
+
+	switch (tmds_setting->max_hres) {
+	case 640:
+		tmds_setting->max_vres = 480;
+		break;
+	case 800:
+		tmds_setting->max_vres = 600;
+		break;
+	case 1024:
+		tmds_setting->max_vres = 768;
+		break;
+	case 1280:
+		tmds_setting->max_vres = 1024;
+		break;
+	case 1400:
+		tmds_setting->max_vres = 1050;
+		break;
+	case 1440:
+		tmds_setting->max_vres = 1050;
+		break;
+	case 1600:
+		tmds_setting->max_vres = 1200;
+		break;
+	default:
+		DEBUG_MSG(KERN_INFO "Unknown panel size max resolution = %d! "
+			"set default panel size.\n", tmds_setting->max_hres);
+		break;
+	}
+
 	tmds_chip->tmds_chip_slave_addr = restore;
 }
 

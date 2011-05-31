@@ -3,6 +3,7 @@
 
 #ifndef __ASSEMBLY__
 #include <linux/notifier.h>
+static inline int arch_prepare_suspend(void) { return 0; }
 
 #include <asm/ptrace.h>
 

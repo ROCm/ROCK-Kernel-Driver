@@ -510,6 +510,11 @@ static void es7000_setup_apic_routing(void)
 		nr_ioapics, cpumask_bits(es7000_target_cpus())[0]);
 }
 
+static int es7000_numa_cpu_node(int cpu)
+{
+	return 0;
+}
+
 static int es7000_cpu_present_to_apicid(int mps_cpu)
 {
 	if (!mps_cpu)
@@ -620,7 +625,7 @@ static int es7000_mps_oem_check_cluster(struct mpc_table *mpc, char *oem,
 }
 
 /* We've been warned by a false positive warning.Use __refdata to keep calm. */
-static struct apic __refdata apic_es7000_cluster = {
+struct apic __refdata apic_es7000_cluster = {
 
 	.name				= "es7000",
 	.probe				= probe_es7000,
@@ -683,9 +688,10 @@ static struct apic __refdata apic_es7000_cluster = {
 	.safe_wait_icr_idle		= native_safe_apic_wait_icr_idle,
 
 	.x86_32_early_logical_apicid	= es7000_early_logical_apicid,
+	.x86_32_numa_cpu_node		= es7000_numa_cpu_node,
 };
 
-static struct apic __refdata apic_es7000 = {
+struct apic __refdata apic_es7000 = {
 
 	.name				= "es7000",
 	.probe				= probe_es7000,
@@ -746,10 +752,5 @@ static struct apic __refdata apic_es7000 = {
 	.safe_wait_icr_idle		= native_safe_apic_wait_icr_idle,
 
 	.x86_32_early_logical_apicid	= es7000_early_logical_apicid,
+	.x86_32_numa_cpu_node		= es7000_numa_cpu_node,
 };
-
-/*
- * Need to check for es7000 followed by es7000_cluster, so this order
- * in apic_drivers is important.
- */
-apic_drivers(apic_es7000, apic_es7000_cluster);

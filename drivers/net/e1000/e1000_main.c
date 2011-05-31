@@ -29,7 +29,6 @@
 #include "e1000.h"
 #include <net/ip6_checksum.h>
 #include <linux/io.h>
-#include <linux/prefetch.h>
 
 /* Intel Media SOC GbE MDIO physical base address */
 static unsigned long ce4100_gbe_mdio_base_phy;
@@ -97,6 +96,7 @@ int e1000_up(struct e1000_adapter *adapter);
 void e1000_down(struct e1000_adapter *adapter);
 void e1000_reinit_locked(struct e1000_adapter *adapter);
 void e1000_reset(struct e1000_adapter *adapter);
+int e1000_set_spd_dplx(struct e1000_adapter *adapter, u16 spddplx);
 int e1000_setup_all_tx_resources(struct e1000_adapter *adapter);
 int e1000_setup_all_rx_resources(struct e1000_adapter *adapter);
 void e1000_free_all_tx_resources(struct e1000_adapter *adapter);
@@ -4385,6 +4385,7 @@ static int e1000_mii_ioctl(struct net_device *netdev, struct ifreq *ifr,
 	struct mii_ioctl_data *data = if_mii(ifr);
 	int retval;
 	u16 mii_reg;
+	u16 spddplx;
 	unsigned long flags;
 
 	if (hw->media_type != e1000_media_type_copper)
@@ -4423,18 +4424,17 @@ static int e1000_mii_ioctl(struct net_device *netdev, struct ifreq *ifr,
 					hw->autoneg = 1;
 					hw->autoneg_advertised = 0x2F;
 				} else {
-					u32 speed;
 					if (mii_reg & 0x40)
-						speed = SPEED_1000;
+						spddplx = SPEED_1000;
 					else if (mii_reg & 0x2000)
-						speed = SPEED_100;
+						spddplx = SPEED_100;
 					else
-						speed = SPEED_10;
-					retval = e1000_set_spd_dplx(
-						adapter, speed,
-						((mii_reg & 0x100)
-						 ? DUPLEX_FULL :
-						 DUPLEX_HALF));
+						spddplx = SPEED_10;
+					spddplx += (mii_reg & 0x100)
+						   ? DUPLEX_FULL :
+						   DUPLEX_HALF;
+					retval = e1000_set_spd_dplx(adapter,
+								    spddplx);
 					if (retval)
 						return retval;
 				}
@@ -4596,24 +4596,20 @@ static void e1000_restore_vlan(struct e1000_adapter *adapter)
 	}
 }
 
-int e1000_set_spd_dplx(struct e1000_adapter *adapter, u32 spd, u8 dplx)
+int e1000_set_spd_dplx(struct e1000_adapter *adapter, u16 spddplx)
 {
 	struct e1000_hw *hw = &adapter->hw;
 
 	hw->autoneg = 0;
 
-	/* Make sure dplx is at most 1 bit and lsb of speed is not set
-	 * for the switch() below to work */
-	if ((spd & 1) || (dplx & ~1))
-		goto err_inval;
-
 	/* Fiber NICs only allow 1000 gbps Full duplex */
 	if ((hw->media_type == e1000_media_type_fiber) &&
-	    spd != SPEED_1000 &&
-	    dplx != DUPLEX_FULL)
-		goto err_inval;
+		spddplx != (SPEED_1000 + DUPLEX_FULL)) {
+		e_err(probe, "Unsupported Speed/Duplex configuration\n");
+		return -EINVAL;
+	}
 
-	switch (spd + dplx) {
+	switch (spddplx) {
 	case SPEED_10 + DUPLEX_HALF:
 		hw->forced_speed_duplex = e1000_10_half;
 		break;
@@ -4632,13 +4628,10 @@ int e1000_set_spd_dplx(struct e1000_adapter *adapter, u32 spd, u8 dplx)
 		break;
 	case SPEED_1000 + DUPLEX_HALF: /* not supported */
 	default:
-		goto err_inval;
+		e_err(probe, "Unsupported Speed/Duplex configuration\n");
+		return -EINVAL;
 	}
 	return 0;
-
-err_inval:
-	e_err(probe, "Unsupported Speed/Duplex configuration\n");
-	return -EINVAL;
 }
 
 static int __e1000_shutdown(struct pci_dev *pdev, bool *enable_wake)

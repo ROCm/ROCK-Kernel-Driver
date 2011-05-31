@@ -223,9 +223,8 @@ static int __init atakbd_init(void)
 		return -ENODEV;
 
 	// need to init core driver if not already done so
-	error = atari_keyb_init();
-	if (error)
-		return error;
+	if (atari_keyb_init())
+		return -ENODEV;
 
 	atakbd_dev = input_allocate_device();
 	if (!atakbd_dev)

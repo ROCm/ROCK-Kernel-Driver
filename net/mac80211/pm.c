@@ -6,7 +6,7 @@
 #include "driver-ops.h"
 #include "led.h"
 
-int __ieee80211_suspend(struct ieee80211_hw *hw, struct cfg80211_wowlan *wowlan)
+int __ieee80211_suspend(struct ieee80211_hw *hw)
 {
 	struct ieee80211_local *local = hw_to_local(hw);
 	struct ieee80211_sub_if_data *sdata;
@@ -14,22 +14,11 @@ int __ieee80211_suspend(struct ieee80211_hw *hw, struct cfg80211_wowlan *wowlan)
 
 	ieee80211_scan_cancel(local);
 
-	if (hw->flags & IEEE80211_HW_AMPDU_AGGREGATION) {
-		mutex_lock(&local->sta_mtx);
-		list_for_each_entry(sta, &local->sta_list, list) {
-			set_sta_flags(sta, WLAN_STA_BLOCK_BA);
-			ieee80211_sta_tear_down_BA_sessions(sta, true);
-		}
-		mutex_unlock(&local->sta_mtx);
-	}
-
 	ieee80211_stop_queues_by_reason(hw,
 			IEEE80211_QUEUE_STOP_REASON_SUSPEND);
 
 	/* flush out all packets */
 	synchronize_net();
-
-	drv_flush(local, false);
 
 	local->quiescing = true;
 	/* make quiescing visible to timers everywhere */
@@ -47,16 +36,6 @@ int __ieee80211_suspend(struct ieee80211_hw *hw, struct cfg80211_wowlan *wowlan)
 	cancel_work_sync(&local->dynamic_ps_enable_work);
 	del_timer_sync(&local->dynamic_ps_timer);
 
-	local->wowlan = wowlan && local->open_count;
-	if (local->wowlan) {
-		int err = drv_suspend(local, wowlan);
-		if (err) {
-			local->quiescing = false;
-			return err;
-		}
-		goto suspend;
-	}
-
 	/* disable keys */
 	list_for_each_entry(sdata, &local->interfaces, list)
 		ieee80211_disable_keys(sdata);
@@ -64,6 +43,11 @@ int __ieee80211_suspend(struct ieee80211_hw *hw, struct cfg80211_wowlan *wowlan)
 	/* tear down aggregation sessions and remove STAs */
 	mutex_lock(&local->sta_mtx);
 	list_for_each_entry(sta, &local->sta_list, list) {
+		if (hw->flags & IEEE80211_HW_AMPDU_AGGREGATION) {
+			set_sta_flags(sta, WLAN_STA_BLOCK_BA);
+			ieee80211_sta_tear_down_BA_sessions(sta, true);
+		}
+
 		if (sta->uploaded) {
 			sdata = sta->sdata;
 			if (sdata->vif.type == NL80211_IFTYPE_AP_VLAN)
@@ -114,7 +98,6 @@ int __ieee80211_suspend(struct ieee80211_hw *hw, struct cfg80211_wowlan *wowlan)
 	if (local->open_count)
 		ieee80211_stop_device(local);
 
- suspend:
 	local->suspended = true;
 	/* need suspended to be visible before quiescing is false */
 	barrier();

@@ -637,7 +637,7 @@ acpi_ev_initialize_region(union acpi_operand_object *region_obj,
 
 					status =
 					    acpi_ev_execute_reg_method
-					    (region_obj, ACPI_REG_CONNECT);
+					    (region_obj, 1);
 
 					if (acpi_ns_locked) {
 						status =

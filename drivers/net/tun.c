@@ -123,9 +123,6 @@ struct tun_struct {
 	gid_t			group;
 
 	struct net_device	*dev;
-	u32			set_features;
-#define TUN_USER_FEATURES (NETIF_F_HW_CSUM|NETIF_F_TSO_ECN|NETIF_F_TSO| \
-			  NETIF_F_TSO6|NETIF_F_UFO)
 	struct fasync_struct	*fasync;
 
 	struct tap_filter       txflt;
@@ -454,20 +451,12 @@ tun_net_change_mtu(struct net_device *dev, int new_mtu)
 	return 0;
 }
 
-static u32 tun_net_fix_features(struct net_device *dev, u32 features)
-{
-	struct tun_struct *tun = netdev_priv(dev);
-
-	return (features & tun->set_features) | (features & ~TUN_USER_FEATURES);
-}
-
 static const struct net_device_ops tun_netdev_ops = {
 	.ndo_uninit		= tun_net_uninit,
 	.ndo_open		= tun_net_open,
 	.ndo_stop		= tun_net_close,
 	.ndo_start_xmit		= tun_net_xmit,
 	.ndo_change_mtu		= tun_net_change_mtu,
-	.ndo_fix_features	= tun_net_fix_features,
 };
 
 static const struct net_device_ops tap_netdev_ops = {
@@ -476,7 +465,6 @@ static const struct net_device_ops tap_netdev_ops = {
 	.ndo_stop		= tun_net_close,
 	.ndo_start_xmit		= tun_net_xmit,
 	.ndo_change_mtu		= tun_net_change_mtu,
-	.ndo_fix_features	= tun_net_fix_features,
 	.ndo_set_multicast_list	= tun_net_mclist,
 	.ndo_set_mac_address	= eth_mac_addr,
 	.ndo_validate_addr	= eth_validate_addr,
@@ -640,7 +628,8 @@ static __inline__ ssize_t tun_get_user(struct tun_struct *tun,
 			kfree_skb(skb);
 			return -EINVAL;
 		}
-	}
+	} else if (tun->flags & TUN_NOCHECKSUM)
+		skb->ip_summed = CHECKSUM_UNNECESSARY;
 
 	switch (tun->flags & TUN_TYPE_MASK) {
 	case TUN_TUN_DEV:
@@ -1099,9 +1088,11 @@ static int tun_set_iff(struct net *net, struct file *file, struct ifreq *ifr)
 
 		tun_net_init(dev);
 
-		dev->hw_features = NETIF_F_SG | NETIF_F_FRAGLIST |
-			TUN_USER_FEATURES;
-		dev->features = dev->hw_features;
+		if (strchr(dev->name, '%')) {
+			err = dev_alloc_name(dev, dev->name);
+			if (err < 0)
+				goto err_free_sk;
+		}
 
 		err = register_netdevice(tun->dev);
 		if (err < 0)
@@ -1167,12 +1158,18 @@ static int tun_get_iff(struct net *net, struct tun_struct *tun,
 
 /* This is like a cut-down ethtool ops, except done via tun fd so no
  * privs required. */
-static int set_offload(struct tun_struct *tun, unsigned long arg)
+static int set_offload(struct net_device *dev, unsigned long arg)
 {
-	u32 features = 0;
+	u32 old_features, features;
+
+	old_features = dev->features;
+	/* Unset features, set them as we chew on the arg. */
+	features = (old_features & ~(NETIF_F_HW_CSUM|NETIF_F_SG|NETIF_F_FRAGLIST
+				    |NETIF_F_TSO_ECN|NETIF_F_TSO|NETIF_F_TSO6
+				    |NETIF_F_UFO));
 
 	if (arg & TUN_F_CSUM) {
-		features |= NETIF_F_HW_CSUM;
+		features |= NETIF_F_HW_CSUM|NETIF_F_SG|NETIF_F_FRAGLIST;
 		arg &= ~TUN_F_CSUM;
 
 		if (arg & (TUN_F_TSO4|TUN_F_TSO6)) {
@@ -1198,8 +1195,9 @@ static int set_offload(struct tun_struct *tun, unsigned long arg)
 	if (arg)
 		return -EINVAL;
 
-	tun->set_features = features;
-	netdev_update_features(tun->dev);
+	dev->features = features;
+	if (old_features != dev->features)
+		netdev_features_change(dev);
 
 	return 0;
 }
@@ -1264,9 +1262,12 @@ static long __tun_chr_ioctl(struct file *file, unsigned int cmd,
 
 	case TUNSETNOCSUM:
 		/* Disable/Enable checksum */
+		if (arg)
+			tun->flags |= TUN_NOCHECKSUM;
+		else
+			tun->flags &= ~TUN_NOCHECKSUM;
 
-		/* [unimplemented] */
-		tun_debug(KERN_INFO, tun, "ignored: set checksum %s\n",
+		tun_debug(KERN_INFO, tun, "checksum %s\n",
 			  arg ? "disabled" : "enabled");
 		break;
 
@@ -1315,7 +1316,7 @@ static long __tun_chr_ioctl(struct file *file, unsigned int cmd,
 		break;
 #endif
 	case TUNSETOFFLOAD:
-		ret = set_offload(tun, arg);
+		ret = set_offload(tun->dev, arg);
 		break;
 
 	case TUNSETTXFILTER:
@@ -1547,7 +1548,7 @@ static int tun_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
 {
 	cmd->supported		= 0;
 	cmd->advertising	= 0;
-	ethtool_cmd_speed_set(cmd, SPEED_10);
+	cmd->speed		= SPEED_10;
 	cmd->duplex		= DUPLEX_FULL;
 	cmd->port		= PORT_TP;
 	cmd->phy_address	= 0;
@@ -1594,12 +1595,30 @@ static void tun_set_msglevel(struct net_device *dev, u32 value)
 #endif
 }
 
+static u32 tun_get_rx_csum(struct net_device *dev)
+{
+	struct tun_struct *tun = netdev_priv(dev);
+	return (tun->flags & TUN_NOCHECKSUM) == 0;
+}
+
+static int tun_set_rx_csum(struct net_device *dev, u32 data)
+{
+	struct tun_struct *tun = netdev_priv(dev);
+	if (data)
+		tun->flags &= ~TUN_NOCHECKSUM;
+	else
+		tun->flags |= TUN_NOCHECKSUM;
+	return 0;
+}
+
 static const struct ethtool_ops tun_ethtool_ops = {
 	.get_settings	= tun_get_settings,
 	.get_drvinfo	= tun_get_drvinfo,
 	.get_msglevel	= tun_get_msglevel,
 	.set_msglevel	= tun_set_msglevel,
 	.get_link	= ethtool_op_get_link,
+	.get_rx_csum	= tun_get_rx_csum,
+	.set_rx_csum	= tun_set_rx_csum
 };
 
 

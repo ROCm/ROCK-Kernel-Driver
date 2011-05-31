@@ -29,6 +29,8 @@ static struct clocksource clocksource_cyclone = {
 	.rating		= 250,
 	.read		= read_cyclone,
 	.mask		= CYCLONE_TIMER_MASK,
+	.mult		= 10,
+	.shift		= 0,
 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
 };
 
@@ -106,8 +108,12 @@ static int __init init_cyclone_clocksource(void)
 	}
 	cyclone_ptr = cyclone_timer;
 
-	return clocksource_register_hz(&clocksource_cyclone,
-					CYCLONE_TIMER_FREQ);
+	/* sort out mult/shift values: */
+	clocksource_cyclone.shift = 22;
+	clocksource_cyclone.mult = clocksource_hz2mult(CYCLONE_TIMER_FREQ,
+						clocksource_cyclone.shift);
+
+	return clocksource_register(&clocksource_cyclone);
 }
 
 arch_initcall(init_cyclone_clocksource);

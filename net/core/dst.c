@@ -19,7 +19,6 @@
 #include <linux/types.h>
 #include <net/net_namespace.h>
 #include <linux/sched.h>
-#include <linux/prefetch.h>
 
 #include <net/dst.h>
 
@@ -34,6 +33,9 @@
  * 3) This list is guarded by a mutex,
  *    so that the gc_task and dst_dev_event() can be synchronized.
  */
+#if RT_CACHE_DEBUG >= 2
+static atomic_t			 dst_total = ATOMIC_INIT(0);
+#endif
 
 /*
  * We want to keep lock & list close together
@@ -67,6 +69,10 @@ static void dst_gc_task(struct work_struct *work)
 	unsigned long expires = ~0L;
 	struct dst_entry *dst, *next, head;
 	struct dst_entry *last = &head;
+#if RT_CACHE_DEBUG >= 2
+	ktime_t time_start = ktime_get();
+	struct timespec elapsed;
+#endif
 
 	mutex_lock(&dst_gc_mutex);
 	next = dst_busy_list;
@@ -140,6 +146,15 @@ loop:
 
 	spin_unlock_bh(&dst_garbage.lock);
 	mutex_unlock(&dst_gc_mutex);
+#if RT_CACHE_DEBUG >= 2
+	elapsed = ktime_to_timespec(ktime_sub(ktime_get(), time_start));
+	printk(KERN_DEBUG "dst_total: %d delayed: %d work_perf: %d"
+		" expires: %lu elapsed: %lu us\n",
+		atomic_read(&dst_total), delayed, work_performed,
+		expires,
+		elapsed.tv_sec * USEC_PER_SEC +
+		  elapsed.tv_nsec / NSEC_PER_USEC);
+#endif
 }
 
 int dst_discard(struct sk_buff *skb)
@@ -151,8 +166,7 @@ EXPORT_SYMBOL(dst_discard);
 
 const u32 dst_default_metrics[RTAX_MAX];
 
-void *dst_alloc(struct dst_ops *ops, struct net_device *dev,
-		int initial_ref, int initial_obsolete, int flags)
+void *dst_alloc(struct dst_ops *ops, int initial_ref)
 {
 	struct dst_entry *dst;
 
@@ -160,36 +174,18 @@ void *dst_alloc(struct dst_ops *ops, struct net_device *dev,
 		if (ops->gc(ops))
 			return NULL;
 	}
-	dst = kmem_cache_alloc(ops->kmem_cachep, GFP_ATOMIC);
+	dst = kmem_cache_zalloc(ops->kmem_cachep, GFP_ATOMIC);
 	if (!dst)
 		return NULL;
-	dst->child = NULL;
-	dst->dev = dev;
-	if (dev)
-		dev_hold(dev);
-	dst->ops = ops;
-	dst_init_metrics(dst, dst_default_metrics, true);
-	dst->expires = 0UL;
-	dst->path = dst;
-	dst->neighbour = NULL;
-	dst->hh = NULL;
-#ifdef CONFIG_XFRM
-	dst->xfrm = NULL;
-#endif
-	dst->input = dst_discard;
-	dst->output = dst_discard;
-	dst->error = 0;
-	dst->obsolete = initial_obsolete;
-	dst->header_len = 0;
-	dst->trailer_len = 0;
-#ifdef CONFIG_IP_ROUTE_CLASSID
-	dst->tclassid = 0;
-#endif
 	atomic_set(&dst->__refcnt, initial_ref);
-	dst->__use = 0;
+	dst->ops = ops;
 	dst->lastuse = jiffies;
-	dst->flags = flags;
-	dst->next = NULL;
+	dst->path = dst;
+	dst->input = dst->output = dst_discard;
+	dst_init_metrics(dst, dst_default_metrics, true);
+#if RT_CACHE_DEBUG >= 2
+	atomic_inc(&dst_total);
+#endif
 	dst_entries_add(ops, 1);
 	return dst;
 }
@@ -249,6 +245,9 @@ again:
 		dst->ops->destroy(dst);
 	if (dst->dev)
 		dev_put(dst->dev);
+#if RT_CACHE_DEBUG >= 2
+	atomic_dec(&dst_total);
+#endif
 	kmem_cache_free(dst->ops->kmem_cachep, dst);
 
 	dst = child;
@@ -315,7 +314,7 @@ void __dst_destroy_metrics_generic(struct dst_entry *dst, unsigned long old)
 {
 	unsigned long prev, new;
 
-	new = ((unsigned long) dst_default_metrics) | DST_METRICS_READ_ONLY;
+	new = (unsigned long) dst_default_metrics;
 	prev = cmpxchg(&dst->_metrics, old, new);
 	if (prev == old)
 		kfree(__DST_METRICS_PTR(old));

@@ -8,7 +8,7 @@
  * as published by the Free Software Foundation; either version
  * 2 of the License, or (at your option) any later version.
  *
- * See Documentation/security/keys-request-key.txt
+ * See Documentation/keys-request-key.txt
  */
 
 #include <linux/module.h>
@@ -59,8 +59,7 @@ static void request_key_auth_describe(const struct key *key,
 
 	seq_puts(m, "key:");
 	seq_puts(m, key->description);
-	if (key_is_instantiated(key))
-		seq_printf(m, " pid:%d ci:%zu", rka->pid, rka->callout_len);
+	seq_printf(m, " pid:%d ci:%zu", rka->pid, rka->callout_len);
 }
 
 /*

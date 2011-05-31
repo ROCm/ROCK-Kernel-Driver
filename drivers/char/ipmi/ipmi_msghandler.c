@@ -36,7 +36,6 @@
 #include <asm/system.h>
 #include <linux/poll.h>
 #include <linux/sched.h>
-#include <linux/seq_file.h>
 #include <linux/spinlock.h>
 #include <linux/mutex.h>
 #include <linux/slab.h>
@@ -1897,128 +1896,102 @@ int ipmi_request_supply_msgs(ipmi_user_t          user,
 EXPORT_SYMBOL(ipmi_request_supply_msgs);
 
 #ifdef CONFIG_PROC_FS
-static int smi_ipmb_proc_show(struct seq_file *m, void *v)
+static int ipmb_file_read_proc(char *page, char **start, off_t off,
+			       int count, int *eof, void *data)
 {
-	ipmi_smi_t intf = m->private;
+	char       *out = (char *) page;
+	ipmi_smi_t intf = data;
 	int        i;
+	int        rv = 0;
 
-	seq_printf(m, "%x", intf->channels[0].address);
-	for (i = 1; i < IPMI_MAX_CHANNELS; i++)
-		seq_printf(m, " %x", intf->channels[i].address);
-	return seq_putc(m, '\n');
+	for (i = 0; i < IPMI_MAX_CHANNELS; i++)
+		rv += sprintf(out+rv, "%x ", intf->channels[i].address);
+	out[rv-1] = '\n'; /* Replace the final space with a newline */
+	out[rv] = '\0';
+	rv++;
+	return rv;
 }
 
-static int smi_ipmb_proc_open(struct inode *inode, struct file *file)
+static int version_file_read_proc(char *page, char **start, off_t off,
+				  int count, int *eof, void *data)
 {
-	return single_open(file, smi_ipmb_proc_show, PDE(inode)->data);
-}
+	char       *out = (char *) page;
+	ipmi_smi_t intf = data;
 
-static const struct file_operations smi_ipmb_proc_ops = {
-	.open		= smi_ipmb_proc_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
-};
-
-static int smi_version_proc_show(struct seq_file *m, void *v)
-{
-	ipmi_smi_t intf = m->private;
-
-	return seq_printf(m, "%u.%u\n",
+	return sprintf(out, "%u.%u\n",
 		       ipmi_version_major(&intf->bmc->id),
 		       ipmi_version_minor(&intf->bmc->id));
 }
 
-static int smi_version_proc_open(struct inode *inode, struct file *file)
+static int stat_file_read_proc(char *page, char **start, off_t off,
+			       int count, int *eof, void *data)
 {
-	return single_open(file, smi_version_proc_show, PDE(inode)->data);
-}
+	char       *out = (char *) page;
+	ipmi_smi_t intf = data;
 
-static const struct file_operations smi_version_proc_ops = {
-	.open		= smi_version_proc_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
-};
-
-static int smi_stats_proc_show(struct seq_file *m, void *v)
-{
-	ipmi_smi_t intf = m->private;
-
-	seq_printf(m, "sent_invalid_commands:       %u\n",
+	out += sprintf(out, "sent_invalid_commands:       %u\n",
 		       ipmi_get_stat(intf, sent_invalid_commands));
-	seq_printf(m, "sent_local_commands:         %u\n",
+	out += sprintf(out, "sent_local_commands:         %u\n",
 		       ipmi_get_stat(intf, sent_local_commands));
-	seq_printf(m, "handled_local_responses:     %u\n",
+	out += sprintf(out, "handled_local_responses:     %u\n",
 		       ipmi_get_stat(intf, handled_local_responses));
-	seq_printf(m, "unhandled_local_responses:   %u\n",
+	out += sprintf(out, "unhandled_local_responses:   %u\n",
 		       ipmi_get_stat(intf, unhandled_local_responses));
-	seq_printf(m, "sent_ipmb_commands:          %u\n",
+	out += sprintf(out, "sent_ipmb_commands:          %u\n",
 		       ipmi_get_stat(intf, sent_ipmb_commands));
-	seq_printf(m, "sent_ipmb_command_errs:      %u\n",
+	out += sprintf(out, "sent_ipmb_command_errs:      %u\n",
 		       ipmi_get_stat(intf, sent_ipmb_command_errs));
-	seq_printf(m, "retransmitted_ipmb_commands: %u\n",
+	out += sprintf(out, "retransmitted_ipmb_commands: %u\n",
 		       ipmi_get_stat(intf, retransmitted_ipmb_commands));
-	seq_printf(m, "timed_out_ipmb_commands:     %u\n",
+	out += sprintf(out, "timed_out_ipmb_commands:     %u\n",
 		       ipmi_get_stat(intf, timed_out_ipmb_commands));
-	seq_printf(m, "timed_out_ipmb_broadcasts:   %u\n",
+	out += sprintf(out, "timed_out_ipmb_broadcasts:   %u\n",
 		       ipmi_get_stat(intf, timed_out_ipmb_broadcasts));
-	seq_printf(m, "sent_ipmb_responses:         %u\n",
+	out += sprintf(out, "sent_ipmb_responses:         %u\n",
 		       ipmi_get_stat(intf, sent_ipmb_responses));
-	seq_printf(m, "handled_ipmb_responses:      %u\n",
+	out += sprintf(out, "handled_ipmb_responses:      %u\n",
 		       ipmi_get_stat(intf, handled_ipmb_responses));
-	seq_printf(m, "invalid_ipmb_responses:      %u\n",
+	out += sprintf(out, "invalid_ipmb_responses:      %u\n",
 		       ipmi_get_stat(intf, invalid_ipmb_responses));
-	seq_printf(m, "unhandled_ipmb_responses:    %u\n",
+	out += sprintf(out, "unhandled_ipmb_responses:    %u\n",
 		       ipmi_get_stat(intf, unhandled_ipmb_responses));
-	seq_printf(m, "sent_lan_commands:           %u\n",
+	out += sprintf(out, "sent_lan_commands:           %u\n",
 		       ipmi_get_stat(intf, sent_lan_commands));
-	seq_printf(m, "sent_lan_command_errs:       %u\n",
+	out += sprintf(out, "sent_lan_command_errs:       %u\n",
 		       ipmi_get_stat(intf, sent_lan_command_errs));
-	seq_printf(m, "retransmitted_lan_commands:  %u\n",
+	out += sprintf(out, "retransmitted_lan_commands:  %u\n",
 		       ipmi_get_stat(intf, retransmitted_lan_commands));
-	seq_printf(m, "timed_out_lan_commands:      %u\n",
+	out += sprintf(out, "timed_out_lan_commands:      %u\n",
 		       ipmi_get_stat(intf, timed_out_lan_commands));
-	seq_printf(m, "sent_lan_responses:          %u\n",
+	out += sprintf(out, "sent_lan_responses:          %u\n",
 		       ipmi_get_stat(intf, sent_lan_responses));
-	seq_printf(m, "handled_lan_responses:       %u\n",
+	out += sprintf(out, "handled_lan_responses:       %u\n",
 		       ipmi_get_stat(intf, handled_lan_responses));
-	seq_printf(m, "invalid_lan_responses:       %u\n",
+	out += sprintf(out, "invalid_lan_responses:       %u\n",
 		       ipmi_get_stat(intf, invalid_lan_responses));
-	seq_printf(m, "unhandled_lan_responses:     %u\n",
+	out += sprintf(out, "unhandled_lan_responses:     %u\n",
 		       ipmi_get_stat(intf, unhandled_lan_responses));
-	seq_printf(m, "handled_commands:            %u\n",
+	out += sprintf(out, "handled_commands:            %u\n",
 		       ipmi_get_stat(intf, handled_commands));
-	seq_printf(m, "invalid_commands:            %u\n",
+	out += sprintf(out, "invalid_commands:            %u\n",
 		       ipmi_get_stat(intf, invalid_commands));
-	seq_printf(m, "unhandled_commands:          %u\n",
+	out += sprintf(out, "unhandled_commands:          %u\n",
 		       ipmi_get_stat(intf, unhandled_commands));
-	seq_printf(m, "invalid_events:              %u\n",
+	out += sprintf(out, "invalid_events:              %u\n",
 		       ipmi_get_stat(intf, invalid_events));
-	seq_printf(m, "events:                      %u\n",
+	out += sprintf(out, "events:                      %u\n",
 		       ipmi_get_stat(intf, events));
-	seq_printf(m, "failed rexmit LAN msgs:      %u\n",
+	out += sprintf(out, "failed rexmit LAN msgs:      %u\n",
 		       ipmi_get_stat(intf, dropped_rexmit_lan_commands));
-	seq_printf(m, "failed rexmit IPMB msgs:     %u\n",
+	out += sprintf(out, "failed rexmit IPMB msgs:     %u\n",
 		       ipmi_get_stat(intf, dropped_rexmit_ipmb_commands));
-	return 0;
-}
 
-static int smi_stats_proc_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, smi_stats_proc_show, PDE(inode)->data);
+	return (out - ((char *) page));
 }
-
-static const struct file_operations smi_stats_proc_ops = {
-	.open		= smi_stats_proc_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
-};
 #endif /* CONFIG_PROC_FS */
 
 int ipmi_smi_add_proc_entry(ipmi_smi_t smi, char *name,
-			    const struct file_operations *proc_ops,
+			    read_proc_t *read_proc,
 			    void *data)
 {
 	int                    rv = 0;
@@ -2037,12 +2010,15 @@ int ipmi_smi_add_proc_entry(ipmi_smi_t smi, char *name,
 	}
 	strcpy(entry->name, name);
 
-	file = proc_create_data(name, 0, smi->proc_dir, proc_ops, data);
+	file = create_proc_entry(name, 0, smi->proc_dir);
 	if (!file) {
 		kfree(entry->name);
 		kfree(entry);
 		rv = -ENOMEM;
 	} else {
+		file->data = data;
+		file->read_proc = read_proc;
+
 		mutex_lock(&smi->proc_entry_lock);
 		/* Stick it on the list. */
 		entry->next = smi->proc_entries;
@@ -2067,17 +2043,17 @@ static int add_proc_entries(ipmi_smi_t smi, int num)
 
 	if (rv == 0)
 		rv = ipmi_smi_add_proc_entry(smi, "stats",
-					     &smi_stats_proc_ops,
+					     stat_file_read_proc,
 					     smi);
 
 	if (rv == 0)
 		rv = ipmi_smi_add_proc_entry(smi, "ipmb",
-					     &smi_ipmb_proc_ops,
+					     ipmb_file_read_proc,
 					     smi);
 
 	if (rv == 0)
 		rv = ipmi_smi_add_proc_entry(smi, "version",
-					     &smi_version_proc_ops,
+					     version_file_read_proc,
 					     smi);
 #endif /* CONFIG_PROC_FS */
 

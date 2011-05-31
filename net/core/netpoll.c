@@ -539,7 +539,7 @@ int __netpoll_rx(struct sk_buff *skb)
 {
 	int proto, len, ulen;
 	int hits = 0;
-	const struct iphdr *iph;
+	struct iphdr *iph;
 	struct udphdr *uh;
 	struct netpoll_info *npinfo = skb->dev->npinfo;
 	struct netpoll *np, *tmp;
@@ -698,8 +698,32 @@ int netpoll_parse_options(struct netpoll *np, char *opt)
 
 	if (*cur != 0) {
 		/* MAC address */
-		if (!mac_pton(cur, np->remote_mac))
+		if ((delim = strchr(cur, ':')) == NULL)
 			goto parse_failed;
+		*delim = 0;
+		np->remote_mac[0] = simple_strtol(cur, NULL, 16);
+		cur = delim + 1;
+		if ((delim = strchr(cur, ':')) == NULL)
+			goto parse_failed;
+		*delim = 0;
+		np->remote_mac[1] = simple_strtol(cur, NULL, 16);
+		cur = delim + 1;
+		if ((delim = strchr(cur, ':')) == NULL)
+			goto parse_failed;
+		*delim = 0;
+		np->remote_mac[2] = simple_strtol(cur, NULL, 16);
+		cur = delim + 1;
+		if ((delim = strchr(cur, ':')) == NULL)
+			goto parse_failed;
+		*delim = 0;
+		np->remote_mac[3] = simple_strtol(cur, NULL, 16);
+		cur = delim + 1;
+		if ((delim = strchr(cur, ':')) == NULL)
+			goto parse_failed;
+		*delim = 0;
+		np->remote_mac[4] = simple_strtol(cur, NULL, 16);
+		cur = delim + 1;
+		np->remote_mac[5] = simple_strtol(cur, NULL, 16);
 	}
 
 	netpoll_print_options(np);

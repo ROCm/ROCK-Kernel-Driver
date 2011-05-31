@@ -104,25 +104,53 @@ cifs_sb_deactive(struct super_block *sb)
 }
 
 static int
-cifs_read_super(struct super_block *sb, struct smb_vol *volume_info,
+cifs_read_super(struct super_block *sb, void *data,
 		const char *devname, int silent)
 {
 	struct inode *inode;
 	struct cifs_sb_info *cifs_sb;
 	int rc = 0;
 
+	/* BB should we make this contingent on mount parm? */
+	sb->s_flags |= MS_NODIRATIME | MS_NOATIME;
+	sb->s_fs_info = kzalloc(sizeof(struct cifs_sb_info), GFP_KERNEL);
 	cifs_sb = CIFS_SB(sb);
+	if (cifs_sb == NULL)
+		return -ENOMEM;
 
 	spin_lock_init(&cifs_sb->tlink_tree_lock);
 	cifs_sb->tlink_tree = RB_ROOT;
 
 	rc = bdi_setup_and_register(&cifs_sb->bdi, "cifs", BDI_CAP_MAP_COPY);
-	if (rc)
+	if (rc) {
+		kfree(cifs_sb);
 		return rc;
-
+	}
 	cifs_sb->bdi.ra_pages = default_backing_dev_info.ra_pages;
 
-	rc = cifs_mount(sb, cifs_sb, volume_info, devname);
+#ifdef CONFIG_CIFS_DFS_UPCALL
+	/* copy mount params to sb for use in submounts */
+	/* BB: should we move this after the mount so we
+	 * do not have to do the copy on failed mounts?
+	 * BB: May be it is better to do simple copy before
+	 * complex operation (mount), and in case of fail
+	 * just exit instead of doing mount and attempting
+	 * undo it if this copy fails?*/
+	if (data) {
+		int len = strlen(data);
+		cifs_sb->mountdata = kzalloc(len + 1, GFP_KERNEL);
+		if (cifs_sb->mountdata == NULL) {
+			bdi_destroy(&cifs_sb->bdi);
+			kfree(sb->s_fs_info);
+			sb->s_fs_info = NULL;
+			return -ENOMEM;
+		}
+		strncpy(cifs_sb->mountdata, data, len + 1);
+		cifs_sb->mountdata[len] = '\0';
+	}
+#endif
+
+	rc = cifs_mount(sb, cifs_sb, data, devname);
 
 	if (rc) {
 		if (!silent)
@@ -135,7 +163,7 @@ cifs_read_super(struct super_block *sb, struct smb_vol *volume_info,
 	sb->s_bdi = &cifs_sb->bdi;
 	sb->s_blocksize = CIFS_MAX_MSGSIZE;
 	sb->s_blocksize_bits = 14;	/* default 2**14 = CIFS_MAX_MSGSIZE */
-	inode = cifs_root_iget(sb);
+	inode = cifs_root_iget(sb, ROOT_I);
 
 	if (IS_ERR(inode)) {
 		rc = PTR_ERR(inode);
@@ -156,12 +184,12 @@ cifs_read_super(struct super_block *sb, struct smb_vol *volume_info,
 	else
 		sb->s_d_op = &cifs_dentry_ops;
 
-#ifdef CIFS_NFSD_EXPORT
+#ifdef CONFIG_CIFS_EXPERIMENTAL
 	if (cifs_sb->mnt_cifs_flags & CIFS_MOUNT_SERVER_INUM) {
 		cFYI(1, "export ops supported");
 		sb->s_export_op = &cifs_export_ops;
 	}
-#endif /* CIFS_NFSD_EXPORT */
+#endif /* EXPERIMENTAL */
 
 	return 0;
 
@@ -173,7 +201,17 @@ out_no_root:
 	cifs_umount(sb, cifs_sb);
 
 out_mount_failed:
-	bdi_destroy(&cifs_sb->bdi);
+	if (cifs_sb) {
+#ifdef CONFIG_CIFS_DFS_UPCALL
+		if (cifs_sb->mountdata) {
+			kfree(cifs_sb->mountdata);
+			cifs_sb->mountdata = NULL;
+		}
+#endif
+		unload_nls(cifs_sb->local_nls);
+		bdi_destroy(&cifs_sb->bdi);
+		kfree(cifs_sb);
+	}
 	return rc;
 }
 
@@ -193,10 +231,12 @@ cifs_put_super(struct super_block *sb)
 	rc = cifs_umount(sb, cifs_sb);
 	if (rc)
 		cERROR(1, "cifs_umount failed with return code %d", rc);
+#ifdef CONFIG_CIFS_DFS_UPCALL
 	if (cifs_sb->mountdata) {
 		kfree(cifs_sb->mountdata);
 		cifs_sb->mountdata = NULL;
 	}
+#endif
 
 	unload_nls(cifs_sb->local_nls);
 	bdi_destroy(&cifs_sb->bdi);
@@ -208,7 +248,7 @@ cifs_statfs(struct dentry *dentry, struct kstatfs *buf)
 {
 	struct super_block *sb = dentry->d_sb;
 	struct cifs_sb_info *cifs_sb = CIFS_SB(sb);
-	struct cifs_tcon *tcon = cifs_sb_master_tcon(cifs_sb);
+	struct cifsTconInfo *tcon = cifs_sb_master_tcon(cifs_sb);
 	int rc = -EOPNOTSUPP;
 	int xid;
 
@@ -361,7 +401,7 @@ static int
 cifs_show_options(struct seq_file *s, struct vfsmount *m)
 {
 	struct cifs_sb_info *cifs_sb = CIFS_SB(m->mnt_sb);
-	struct cifs_tcon *tcon = cifs_sb_master_tcon(cifs_sb);
+	struct cifsTconInfo *tcon = cifs_sb_master_tcon(cifs_sb);
 	struct sockaddr *srcaddr;
 	srcaddr = (struct sockaddr *)&tcon->ses->server->srcaddr;
 
@@ -415,20 +455,14 @@ cifs_show_options(struct seq_file *s, struct vfsmount *m)
 		seq_printf(s, ",nocase");
 	if (tcon->retry)
 		seq_printf(s, ",hard");
-	if (tcon->unix_ext)
-		seq_printf(s, ",unix");
-	else
-		seq_printf(s, ",nounix");
+	if (cifs_sb->prepath)
+		seq_printf(s, ",prepath=%s", cifs_sb->prepath);
 	if (cifs_sb->mnt_cifs_flags & CIFS_MOUNT_POSIX_PATHS)
 		seq_printf(s, ",posixpaths");
 	if (cifs_sb->mnt_cifs_flags & CIFS_MOUNT_SET_UID)
 		seq_printf(s, ",setuids");
 	if (cifs_sb->mnt_cifs_flags & CIFS_MOUNT_SERVER_INUM)
 		seq_printf(s, ",serverino");
-	if (cifs_sb->mnt_cifs_flags & CIFS_MOUNT_RWPIDFORWARD)
-		seq_printf(s, ",rwpidforward");
-	if (cifs_sb->mnt_cifs_flags & CIFS_MOUNT_NOPOSIXBRL)
-		seq_printf(s, ",forcemand");
 	if (cifs_sb->mnt_cifs_flags & CIFS_MOUNT_DIRECT_IO)
 		seq_printf(s, ",directio");
 	if (cifs_sb->mnt_cifs_flags & CIFS_MOUNT_NO_XATTR)
@@ -461,7 +495,7 @@ cifs_show_options(struct seq_file *s, struct vfsmount *m)
 static void cifs_umount_begin(struct super_block *sb)
 {
 	struct cifs_sb_info *cifs_sb = CIFS_SB(sb);
-	struct cifs_tcon *tcon;
+	struct cifsTconInfo *tcon;
 
 	if (cifs_sb == NULL)
 		return;
@@ -536,189 +570,29 @@ static const struct super_operations cifs_super_ops = {
 #endif
 };
 
-/*
- * Get root dentry from superblock according to prefix path mount option.
- * Return dentry with refcount + 1 on success and NULL otherwise.
- */
-static struct dentry *
-cifs_get_root(struct smb_vol *vol, struct super_block *sb)
-{
-	int xid, rc;
-	struct inode *inode;
-	struct qstr name;
-	struct dentry *dparent = NULL, *dchild = NULL, *alias;
-	struct cifs_sb_info *cifs_sb = CIFS_SB(sb);
-	unsigned int i, full_len, len;
-	char *full_path = NULL, *pstart;
-	char sep;
-
-	full_path = cifs_build_path_to_root(vol, cifs_sb,
-					    cifs_sb_master_tcon(cifs_sb));
-	if (full_path == NULL)
-		return NULL;
-
-	cFYI(1, "Get root dentry for %s", full_path);
-
-	xid = GetXid();
-	sep = CIFS_DIR_SEP(cifs_sb);
-	dparent = dget(sb->s_root);
-	full_len = strlen(full_path);
-	full_path[full_len] = sep;
-	pstart = full_path + 1;
-
-	for (i = 1, len = 0; i <= full_len; i++) {
-		if (full_path[i] != sep || !len) {
-			len++;
-			continue;
-		}
-
-		full_path[i] = 0;
-		cFYI(1, "get dentry for %s", pstart);
-
-		name.name = pstart;
-		name.len = len;
-		name.hash = full_name_hash(pstart, len);
-		dchild = d_lookup(dparent, &name);
-		if (dchild == NULL) {
-			cFYI(1, "not exists");
-			dchild = d_alloc(dparent, &name);
-			if (dchild == NULL) {
-				dput(dparent);
-				dparent = NULL;
-				goto out;
-			}
-		}
-
-		cFYI(1, "get inode");
-		if (dchild->d_inode == NULL) {
-			cFYI(1, "not exists");
-			inode = NULL;
-			if (cifs_sb_master_tcon(CIFS_SB(sb))->unix_ext)
-				rc = cifs_get_inode_info_unix(&inode, full_path,
-							      sb, xid);
-			else
-				rc = cifs_get_inode_info(&inode, full_path,
-							 NULL, sb, xid, NULL);
-			if (rc) {
-				dput(dchild);
-				dput(dparent);
-				dparent = NULL;
-				goto out;
-			}
-			alias = d_materialise_unique(dchild, inode);
-			if (alias != NULL) {
-				dput(dchild);
-				if (IS_ERR(alias)) {
-					dput(dparent);
-					dparent = NULL;
-					goto out;
-				}
-				dchild = alias;
-			}
-		}
-		cFYI(1, "parent %p, child %p", dparent, dchild);
-
-		dput(dparent);
-		dparent = dchild;
-		len = 0;
-		pstart = full_path + i + 1;
-		full_path[i] = sep;
-	}
-out:
-	_FreeXid(xid);
-	kfree(full_path);
-	return dparent;
-}
-
 static struct dentry *
 cifs_do_mount(struct file_system_type *fs_type,
-	      int flags, const char *dev_name, void *data)
+	    int flags, const char *dev_name, void *data)
 {
 	int rc;
 	struct super_block *sb;
-	struct cifs_sb_info *cifs_sb;
-	struct smb_vol *volume_info;
-	struct cifs_mnt_data mnt_data;
-	struct dentry *root;
+
+	sb = sget(fs_type, NULL, set_anon_super, NULL);
 
 	cFYI(1, "Devname: %s flags: %d ", dev_name, flags);
 
-	rc = cifs_setup_volume_info(&volume_info, (char *)data, dev_name);
-	if (rc)
-		return ERR_PTR(rc);
-
-	cifs_sb = kzalloc(sizeof(struct cifs_sb_info), GFP_KERNEL);
-	if (cifs_sb == NULL) {
-		root = ERR_PTR(-ENOMEM);
-		goto out;
-	}
-
-	cifs_setup_cifs_sb(volume_info, cifs_sb);
-
-	mnt_data.vol = volume_info;
-	mnt_data.cifs_sb = cifs_sb;
-	mnt_data.flags = flags;
-
-	sb = sget(fs_type, cifs_match_super, set_anon_super, &mnt_data);
-	if (IS_ERR(sb)) {
-		root = ERR_CAST(sb);
-		goto out_cifs_sb;
-	}
-
-	if (sb->s_fs_info) {
-		cFYI(1, "Use existing superblock");
-		goto out_shared;
-	}
-
-	/*
-	 * Copy mount params for use in submounts. Better to do
-	 * the copy here and deal with the error before cleanup gets
-	 * complicated post-mount.
-	 */
-	cifs_sb->mountdata = kstrndup(data, PAGE_SIZE, GFP_KERNEL);
-	if (cifs_sb->mountdata == NULL) {
-		root = ERR_PTR(-ENOMEM);
-		goto out_super;
-	}
+	if (IS_ERR(sb))
+		return ERR_CAST(sb);
 
 	sb->s_flags = flags;
-	/* BB should we make this contingent on mount parm? */
-	sb->s_flags |= MS_NODIRATIME | MS_NOATIME;
-	sb->s_fs_info = cifs_sb;
 
-	rc = cifs_read_super(sb, volume_info, dev_name,
-			     flags & MS_SILENT ? 1 : 0);
+	rc = cifs_read_super(sb, data, dev_name, flags & MS_SILENT ? 1 : 0);
 	if (rc) {
-		root = ERR_PTR(rc);
-		goto out_super;
+		deactivate_locked_super(sb);
+		return ERR_PTR(rc);
 	}
-
 	sb->s_flags |= MS_ACTIVE;
-
-	root = cifs_get_root(volume_info, sb);
-	if (root == NULL)
-		goto out_super;
-
-	cFYI(1, "dentry root is: %p", root);
-	goto out;
-
-out_shared:
-	root = cifs_get_root(volume_info, sb);
-	if (root)
-		cFYI(1, "dentry root is: %p", root);
-	goto out;
-
-out_super:
-	kfree(cifs_sb->mountdata);
-	deactivate_locked_super(sb);
-
-out_cifs_sb:
-	unload_nls(cifs_sb->local_nls);
-	kfree(cifs_sb);
-
-out:
-	cifs_cleanup_volume_info(&volume_info);
-	return root;
+	return dget(sb->s_root);
 }
 
 static ssize_t cifs_file_aio_write(struct kiocb *iocb, const struct iovec *iov,
@@ -744,31 +618,16 @@ static loff_t cifs_llseek(struct file *file, loff_t offset, int origin)
 {
 	/* origin == SEEK_END => we must revalidate the cached file length */
 	if (origin == SEEK_END) {
-		int rc;
-		struct inode *inode = file->f_path.dentry->d_inode;
+		int retval;
 
-		/*
-		 * We need to be sure that all dirty pages are written and the
-		 * server has the newest file length.
-		 */
-		if (!CIFS_I(inode)->clientCanCacheRead && inode->i_mapping &&
-		    inode->i_mapping->nrpages != 0) {
-			rc = filemap_fdatawait(inode->i_mapping);
-			if (rc) {
-				mapping_set_error(inode->i_mapping, rc);
-				return rc;
-			}
-		}
-		/*
-		 * Some applications poll for the file length in this strange
-		 * way so we must seek to end on non-oplocked files by
-		 * setting the revalidate time to zero.
-		 */
-		CIFS_I(inode)->time = 0;
+		/* some applications poll for the file length in this strange
+		   way so we must seek to end on non-oplocked files by
+		   setting the revalidate time to zero */
+		CIFS_I(file->f_path.dentry->d_inode)->time = 0;
 
-		rc = cifs_revalidate_file_attr(file);
-		if (rc < 0)
-			return (loff_t)rc;
+		retval = cifs_revalidate_file(file);
+		if (retval < 0)
+			return (loff_t)retval;
 	}
 	return generic_file_llseek_unlocked(file, offset, origin);
 }
@@ -901,11 +760,10 @@ const struct file_operations cifs_file_strict_ops = {
 };
 
 const struct file_operations cifs_file_direct_ops = {
-	/* BB reevaluate whether they can be done with directio, no cache */
-	.read = do_sync_read,
-	.write = do_sync_write,
-	.aio_read = cifs_user_readv,
-	.aio_write = cifs_user_writev,
+	/* no aio, no readv -
+	   BB reevaluate whether they can be done with directio, no cache */
+	.read = cifs_user_read,
+	.write = cifs_user_write,
 	.open = cifs_open,
 	.release = cifs_close,
 	.lock = cifs_lock,
@@ -957,11 +815,10 @@ const struct file_operations cifs_file_strict_nobrl_ops = {
 };
 
 const struct file_operations cifs_file_direct_nobrl_ops = {
-	/* BB reevaluate whether they can be done with directio, no cache */
-	.read = do_sync_read,
-	.write = do_sync_write,
-	.aio_read = cifs_user_readv,
-	.aio_write = cifs_user_writev,
+	/* no mmap, no aio, no readv -
+	   BB reevaluate whether they can be done with directio, no cache */
+	.read = cifs_user_read,
+	.write = cifs_user_write,
 	.open = cifs_open,
 	.release = cifs_close,
 	.fsync = cifs_fsync,
@@ -1124,10 +981,10 @@ init_cifs(void)
 	int rc = 0;
 	cifs_proc_init();
 	INIT_LIST_HEAD(&cifs_tcp_ses_list);
-#ifdef CONFIG_CIFS_DNOTIFY_EXPERIMENTAL /* unused temporarily */
+#ifdef CONFIG_CIFS_EXPERIMENTAL
 	INIT_LIST_HEAD(&GlobalDnotifyReqList);
 	INIT_LIST_HEAD(&GlobalDnotifyRsp_Q);
-#endif /* was needed for dnotify, and will be needed for inotify when VFS fix */
+#endif
 /*
  *  Initialize Global counters
  */
@@ -1176,33 +1033,22 @@ init_cifs(void)
 	if (rc)
 		goto out_destroy_mids;
 
+	rc = register_filesystem(&cifs_fs_type);
+	if (rc)
+		goto out_destroy_request_bufs;
 #ifdef CONFIG_CIFS_UPCALL
 	rc = register_key_type(&cifs_spnego_key_type);
 	if (rc)
-		goto out_destroy_request_bufs;
-#endif /* CONFIG_CIFS_UPCALL */
-
-#ifdef CONFIG_CIFS_ACL
-	rc = init_cifs_idmap();
-	if (rc)
-		goto out_register_key_type;
-#endif /* CONFIG_CIFS_ACL */
-
-	rc = register_filesystem(&cifs_fs_type);
-	if (rc)
-		goto out_init_cifs_idmap;
+		goto out_unregister_filesystem;
+#endif
 
 	return 0;
 
-out_init_cifs_idmap:
-#ifdef CONFIG_CIFS_ACL
-	exit_cifs_idmap();
-out_register_key_type:
-#endif
 #ifdef CONFIG_CIFS_UPCALL
-	unregister_key_type(&cifs_spnego_key_type);
-out_destroy_request_bufs:
+out_unregister_filesystem:
+	unregister_filesystem(&cifs_fs_type);
 #endif
+out_destroy_request_bufs:
 	cifs_destroy_request_bufs();
 out_destroy_mids:
 	cifs_destroy_mids();
@@ -1223,10 +1069,6 @@ exit_cifs(void)
 	cifs_fscache_unregister();
 #ifdef CONFIG_CIFS_DFS_UPCALL
 	cifs_dfs_release_automount_timer();
-#endif
-#ifdef CONFIG_CIFS_ACL
-	cifs_destroy_idmaptrees();
-	exit_cifs_idmap();
 #endif
 #ifdef CONFIG_CIFS_UPCALL
 	unregister_key_type(&cifs_spnego_key_type);

@@ -139,7 +139,7 @@ void v9fs_put_trans(struct p9_trans_module *m)
 }
 
 /**
- * init_p9 - Initialize module
+ * v9fs_init - Initialize module
  *
  */
 static int __init init_p9(void)
@@ -154,7 +154,7 @@ static int __init init_p9(void)
 }
 
 /**
- * exit_p9 - shutdown module
+ * v9fs_init - shutdown module
  *
  */
 

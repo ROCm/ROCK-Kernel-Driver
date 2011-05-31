@@ -539,8 +539,7 @@ static int __init onenand_sim_init(void)
 		return -ENXIO;
 	}
 
-	mtd_device_register(&info->mtd, info->parts,
-			    ARRAY_SIZE(os_partitions));
+	add_mtd_partitions(&info->mtd, info->parts, ARRAY_SIZE(os_partitions));
 
 	return 0;
 }

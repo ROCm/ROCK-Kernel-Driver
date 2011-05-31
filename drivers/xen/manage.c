@@ -70,7 +70,12 @@ static int xen_suspend(void *data)
 
 	BUG_ON(!irqs_disabled());
 
-	err = syscore_suspend();
+	err = sysdev_suspend(PMSG_FREEZE);
+	if (!err) {
+		err = syscore_suspend();
+		if (err)
+			sysdev_resume();
+	}
 	if (err) {
 		printk(KERN_ERR "xen_suspend: system core suspend failed: %d\n",
 			err);
@@ -97,6 +102,7 @@ static int xen_suspend(void *data)
 	}
 
 	syscore_resume();
+	sysdev_resume();
 
 	return 0;
 }

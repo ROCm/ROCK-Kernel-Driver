@@ -27,9 +27,6 @@
 #include <linux/mmc/sdio_func.h>
 #include <linux/mmc/sdio_ids.h>
 
-#include "dngl_stats.h"
-#include "dhd.h"
-
 #if !defined(SDIO_VENDOR_ID_BROADCOM)
 #define SDIO_VENDOR_ID_BROADCOM		0x02d0
 #endif				/* !defined(SDIO_VENDOR_ID_BROADCOM) */
@@ -154,11 +151,11 @@ int sdioh_sdmmc_osinit(sdioh_info_t *sd)
 	sdos = kmalloc(sizeof(struct sdos_info), GFP_ATOMIC);
 	sd->sdos_info = (void *)sdos;
 	if (sdos == NULL)
-		return -ENOMEM;
+		return BCME_NOMEM;
 
 	sdos->sd = sd;
 	spin_lock_init(&sdos->lock);
-	return 0;
+	return BCME_OK;
 }
 
 void sdioh_sdmmc_osfree(sdioh_info_t *sd)

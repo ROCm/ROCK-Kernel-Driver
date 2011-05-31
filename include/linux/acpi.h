@@ -150,7 +150,8 @@ extern int ec_read(u8 addr, u8 *val);
 extern int ec_write(u8 addr, u8 val);
 extern int ec_transaction(u8 command,
                           const u8 *wdata, unsigned wdata_len,
-                          u8 *rdata, unsigned rdata_len);
+                          u8 *rdata, unsigned rdata_len,
+			  int force_poll);
 
 #if defined(CONFIG_ACPI_WMI) || defined(CONFIG_ACPI_WMI_MODULE)
 
@@ -246,6 +247,8 @@ int acpi_check_region(resource_size_t start, resource_size_t n,
 		      const char *name);
 
 int acpi_resources_are_enforced(void);
+
+int acpi_pci_get_root_seg_bbn(char *hid, char *uid, int *seg, int *bbn);
 
 #ifdef CONFIG_PM_SLEEP
 void __init acpi_no_s4_hw_signature(void);

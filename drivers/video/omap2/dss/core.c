@@ -33,7 +33,7 @@
 #include <linux/device.h>
 #include <linux/regulator/consumer.h>
 
-#include <video/omapdss.h>
+#include <plat/display.h>
 
 #include "dss.h"
 #include "dss_features.h"
@@ -53,9 +53,6 @@ MODULE_PARM_DESC(def_disp, "default display name");
 unsigned int dss_debug;
 module_param_named(debug, dss_debug, bool, 0644);
 #endif
-
-static int omap_dss_register_device(struct omap_dss_device *);
-static void omap_dss_unregister_device(struct omap_dss_device *);
 
 /* REGULATORS */
 
@@ -127,7 +124,8 @@ static int dss_initialize_debugfs(void)
 #endif
 
 #if defined(CONFIG_OMAP2_DSS_DSI) && defined(CONFIG_OMAP2_DSS_COLLECT_IRQ_STATS)
-	dsi_create_debugfs_files_irq(dss_debugfs_dir, &dss_debug_fops);
+	debugfs_create_file("dsi_irq", S_IRUGO, dss_debugfs_dir,
+			&dsi_dump_irqs, &dss_debug_fops);
 #endif
 
 	debugfs_create_file("dss", S_IRUGO, dss_debugfs_dir,
@@ -139,7 +137,8 @@ static int dss_initialize_debugfs(void)
 			&rfbi_dump_regs, &dss_debug_fops);
 #endif
 #ifdef CONFIG_OMAP2_DSS_DSI
-	dsi_create_debugfs_files_reg(dss_debugfs_dir, &dss_debug_fops);
+	debugfs_create_file("dsi", S_IRUGO, dss_debugfs_dir,
+			&dsi_dump_regs, &dss_debug_fops);
 #endif
 #ifdef CONFIG_OMAP2_DSS_VENC
 	debugfs_create_file("venc", S_IRUGO, dss_debugfs_dir,
@@ -481,7 +480,7 @@ static void omap_dss_dev_release(struct device *dev)
 	reset_device(dev, 0);
 }
 
-static int omap_dss_register_device(struct omap_dss_device *dssdev)
+int omap_dss_register_device(struct omap_dss_device *dssdev)
 {
 	static int dev_num;
 
@@ -495,7 +494,7 @@ static int omap_dss_register_device(struct omap_dss_device *dssdev)
 	return device_register(&dssdev->dev);
 }
 
-static void omap_dss_unregister_device(struct omap_dss_device *dssdev)
+void omap_dss_unregister_device(struct omap_dss_device *dssdev)
 {
 	device_unregister(&dssdev->dev);
 }

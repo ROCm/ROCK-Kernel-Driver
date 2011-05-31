@@ -30,6 +30,8 @@
 #define IF_PREFIX_ONLINK	0x01
 #define IF_PREFIX_AUTOCONF	0x02
 
+#ifdef __KERNEL__
+
 enum {
 	INET6_IFADDR_STATE_DAD,
 	INET6_IFADDR_STATE_POSTDAD,
@@ -154,8 +156,8 @@ struct ifacaddr6 {
 struct ipv6_devstat {
 	struct proc_dir_entry	*proc_dir_entry;
 	DEFINE_SNMP_STAT(struct ipstats_mib, ipv6);
-	DEFINE_SNMP_STAT_ATOMIC(struct icmpv6_mib_device, icmpv6dev);
-	DEFINE_SNMP_STAT_ATOMIC(struct icmpv6msg_mib_device, icmpv6msgdev);
+	DEFINE_SNMP_STAT(struct icmpv6_mib, icmpv6);
+	DEFINE_SNMP_STAT(struct icmpv6msg_mib, icmpv6msg);
 };
 
 struct inet6_dev {
@@ -194,7 +196,7 @@ struct inet6_dev {
 	struct rcu_head		rcu;
 };
 
-static inline void ipv6_eth_mc_map(const struct in6_addr *addr, char *buf)
+static inline void ipv6_eth_mc_map(struct in6_addr *addr, char *buf)
 {
 	/*
 	 *	+-------+-------+-------+-------+-------+-------+
@@ -208,7 +210,7 @@ static inline void ipv6_eth_mc_map(const struct in6_addr *addr, char *buf)
 	memcpy(buf + 2, &addr->s6_addr32[3], sizeof(__u32));
 }
 
-static inline void ipv6_tr_mc_map(const struct in6_addr *addr, char *buf)
+static inline void ipv6_tr_mc_map(struct in6_addr *addr, char *buf)
 {
 	/* All nodes FF01::1, FF02::1, FF02::1:FFxx:xxxx */
 
@@ -300,4 +302,5 @@ static inline int ipv6_ipgre_mc_map(const struct in6_addr *addr,
 	return 0;
 }
 
+#endif
 #endif

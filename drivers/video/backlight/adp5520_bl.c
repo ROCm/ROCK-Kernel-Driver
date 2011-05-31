@@ -211,12 +211,8 @@ static ssize_t adp5520_bl_daylight_max_store(struct device *dev,
 			const char *buf, size_t count)
 {
 	struct adp5520_bl *data = dev_get_drvdata(dev);
-	int ret;
 
-	ret = strict_strtoul(buf, 10, &data->cached_daylight_max);
-	if (ret < 0)
-		return ret;
-
+	strict_strtoul(buf, 10, &data->cached_daylight_max);
 	return adp5520_store(dev, buf, count, ADP5520_DAYLIGHT_MAX);
 }
 static DEVICE_ATTR(daylight_max, 0664, adp5520_bl_daylight_max_show,

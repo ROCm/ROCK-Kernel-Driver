@@ -14,26 +14,19 @@
 /* Allow IO space to be anywhere in the memory */
 #define IO_SPACE_LIMIT 0xffffffff
 
-#if defined(CONFIG_SOC_IMX31) || defined(CONFIG_SOC_IMX35)
-#include <mach/hardware.h>
-
-#define __arch_ioremap __imx_ioremap
+#ifdef CONFIG_ARCH_MX3
+#define __arch_ioremap __mx3_ioremap
 #define __arch_iounmap __iounmap
 
-#define addr_in_module(addr, mod) \
-	((unsigned long)(addr) - mod ## _BASE_ADDR < mod ## _SIZE)
-
 static inline void __iomem *
-__imx_ioremap(unsigned long phys_addr, size_t size, unsigned int mtype)
+__mx3_ioremap(unsigned long phys_addr, size_t size, unsigned int mtype)
 {
-	if (mtype == MT_DEVICE && (cpu_is_mx31() || cpu_is_mx35())) {
-		/*
-		 * Access all peripherals below 0x80000000 as nonshared device
-		 * on mx3, but leave l2cc alone.  Otherwise cache corruptions
-		 * can occur.
+	if (mtype == MT_DEVICE) {
+		/* Access all peripherals below 0x80000000 as nonshared device
+		 * but leave l2cc alone.
 		 */
-		if (phys_addr < 0x80000000 &&
-				!addr_in_module(phys_addr, MX3x_L2CC))
+		if ((phys_addr < 0x80000000) && ((phys_addr < 0x30000000) ||
+			(phys_addr >= 0x30000000 + SZ_1M)))
 			mtype = MT_DEVICE_NONSHARED;
 	}
 

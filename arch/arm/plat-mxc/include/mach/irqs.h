@@ -35,6 +35,8 @@
 #define MXC_GPIO_IRQS		(32 * 4)
 #elif defined CONFIG_SOC_IMX51
 #define MXC_GPIO_IRQS		(32 * 4)
+#elif defined CONFIG_ARCH_MXC91231
+#define MXC_GPIO_IRQS		(32 * 4)
 #elif defined CONFIG_ARCH_MX3
 #define MXC_GPIO_IRQS		(32 * 3)
 #endif

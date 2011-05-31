@@ -13,6 +13,7 @@
  * There should not be more than (0xd0000000 - 0xc0000000)
  * bytes of RAM.
  */
-#define ARM_DMA_ZONE_SIZE	SZ_256M
+#define ISA_DMA_THRESHOLD	(PHYS_OFFSET + SZ_256M - 1)
+#define MAX_DMA_ADDRESS		(PAGE_OFFSET + SZ_256M)
 
 #endif

@@ -27,6 +27,7 @@
 #include <linux/mtd/physmap.h>
 #include <linux/i2c.h>
 #include <linux/i2c/pca953x.h>
+#include <linux/gpio_keys.h>
 #include <linux/input.h>
 #include <linux/gpio.h>
 #include <linux/delay.h>
@@ -129,10 +130,17 @@ static struct gpio_keys_button visstrim_gpio_keys[] = {
 	}
 };
 
-static const struct gpio_keys_platform_data
-		visstrim_gpio_keys_platform_data __initconst = {
+static struct gpio_keys_platform_data visstrim_gpio_keys_platform_data = {
 	.buttons	= visstrim_gpio_keys,
 	.nbuttons	= ARRAY_SIZE(visstrim_gpio_keys),
+};
+
+static struct platform_device visstrim_gpio_keys_device = {
+	.name	= "gpio-keys",
+	.id	= -1,
+	.dev	= {
+		.platform_data	= &visstrim_gpio_keys_platform_data,
+	},
 };
 
 /* Visstrim_SM10 has a microSD slot connected to sdhc1 */
@@ -178,6 +186,7 @@ static struct platform_device visstrim_m10_nor_mtd_device = {
 };
 
 static struct platform_device *platform_devices[] __initdata = {
+	&visstrim_gpio_keys_device,
 	&visstrim_m10_nor_mtd_device,
 };
 
@@ -246,7 +255,6 @@ static void __init visstrim_m10_board_init(void)
 	imx27_add_mxc_mmc(0, &visstrim_m10_sdhc_pdata);
 	imx27_add_mxc_ehci_otg(&visstrim_m10_usbotg_pdata);
 	imx27_add_fec(NULL);
-	imx_add_gpio_keys(&visstrim_gpio_keys_platform_data);
 	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
 }
 

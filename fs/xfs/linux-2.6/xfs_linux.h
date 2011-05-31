@@ -70,7 +70,6 @@
 #include <linux/ctype.h>
 #include <linux/writeback.h>
 #include <linux/capability.h>
-#include <linux/list_sort.h>
 
 #include <asm/page.h>
 #include <asm/div64.h>

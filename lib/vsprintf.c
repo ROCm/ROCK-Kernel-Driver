@@ -898,7 +898,7 @@ char *pointer(const char *fmt, char *buf, char *end, void *ptr,
 	case 'U':
 		return uuid_string(buf, end, ptr, spec, fmt);
 	case 'V':
-		return buf + vsnprintf(buf, end > buf ? end - buf : 0,
+		return buf + vsnprintf(buf, end - buf,
 				       ((struct va_format *)ptr)->fmt,
 				       *(((struct va_format *)ptr)->va));
 	case 'K':
@@ -1161,7 +1161,8 @@ qualifier:
  * return is greater than or equal to @size, the resulting
  * string is truncated.
  *
- * If you're not already dealing with a va_list consider using snprintf().
+ * Call this function if you are already dealing with a va_list.
+ * You probably want snprintf() instead.
  */
 int vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
 {
@@ -1335,7 +1336,8 @@ EXPORT_SYMBOL(vsnprintf);
  * the @buf not including the trailing '\0'. If @size is == 0 the function
  * returns 0.
  *
- * If you're not already dealing with a va_list consider using scnprintf().
+ * Call this function if you are already dealing with a va_list.
+ * You probably want scnprintf() instead.
  *
  * See the vsnprintf() documentation for format string extensions over C99.
  */
@@ -1414,7 +1416,8 @@ EXPORT_SYMBOL(scnprintf);
  * into @buf. Use vsnprintf() or vscnprintf() in order to avoid
  * buffer overflows.
  *
- * If you're not already dealing with a va_list consider using sprintf().
+ * Call this function if you are already dealing with a va_list.
+ * You probably want sprintf() instead.
  *
  * See the vsnprintf() documentation for format string extensions over C99.
  */

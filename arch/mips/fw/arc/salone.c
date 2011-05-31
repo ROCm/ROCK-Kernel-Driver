@@ -2,7 +2,7 @@
  * Routines to load into memory and execute stand-along program images using
  * ARCS PROM firmware.
  *
- * Copyright (C) 1996 David S. Miller (davem@davemloft.net)
+ * Copyright (C) 1996 David S. Miller (dm@engr.sgi.com)
  */
 #include <linux/init.h>
 #include <asm/sgialib.h>

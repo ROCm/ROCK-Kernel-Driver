@@ -19,13 +19,17 @@
 #include <linux/delay.h>
 
 #ifdef CONFIG_HARDLOCKUP_DETECTOR
-u64 hw_nmi_get_sample_period(int watchdog_thresh)
+u64 hw_nmi_get_sample_period(void)
 {
-	return (u64)(cpu_khz) * 1000 * watchdog_thresh;
+	return (u64)(cpu_khz) * 1000 * 60;
 }
 #endif
 
 #ifdef arch_trigger_all_cpu_backtrace
+#ifdef CONFIG_XEN
+#include <asm/ipi.h>
+#endif
+
 /* For reliability, we're prepared to waste bits here. */
 static DECLARE_BITMAP(backtrace_mask, NR_CPUS) __read_mostly;
 
@@ -46,7 +50,11 @@ void arch_trigger_all_cpu_backtrace(void)
 	cpumask_copy(to_cpumask(backtrace_mask), cpu_online_mask);
 
 	printk(KERN_INFO "sending NMI to all CPUs:\n");
+#ifndef CONFIG_XEN
 	apic->send_IPI_all(NMI_VECTOR);
+#else /* this works even without CONFIG_X86_LOCAL_APIC */
+	xen_send_IPI_all(NMI_VECTOR);
+#endif
 
 	/* Wait for up to 10 seconds for all CPUs to do the backtrace */
 	for (i = 0; i < 10 * 1000; i++) {

@@ -31,7 +31,6 @@
 #include <linux/amba/mmci.h>
 #include <linux/gfp.h>
 #include <linux/clkdev.h>
-#include <linux/mtd/physmap.h>
 
 #include <asm/system.h>
 #include <mach/hardware.h>
@@ -42,6 +41,7 @@
 #include <asm/hardware/icst.h>
 
 #include <asm/mach/arch.h>
+#include <asm/mach/flash.h>
 #include <asm/mach/irq.h>
 #include <asm/mach/map.h>
 
@@ -56,9 +56,48 @@
 
 #include "core.h"
 
+#ifdef CONFIG_ZONE_DMA
+/*
+ * Adjust the zones if there are restrictions for DMA access.
+ */
+void __init realview_adjust_zones(unsigned long *size, unsigned long *hole)
+{
+	unsigned long dma_size = SZ_256M >> PAGE_SHIFT;
+
+	if (!machine_is_realview_pbx() || size[0] <= dma_size)
+		return;
+
+	size[ZONE_NORMAL] = size[0] - dma_size;
+	size[ZONE_DMA] = dma_size;
+	hole[ZONE_NORMAL] = hole[0];
+	hole[ZONE_DMA] = 0;
+}
+#endif
+
+
 #define REALVIEW_FLASHCTRL    (__io_address(REALVIEW_SYS_BASE) + REALVIEW_SYS_FLASH_OFFSET)
 
-static void realview_flash_set_vpp(struct platform_device *pdev, int on)
+static int realview_flash_init(void)
+{
+	u32 val;
+
+	val = __raw_readl(REALVIEW_FLASHCTRL);
+	val &= ~REALVIEW_FLASHPROG_FLVPPEN;
+	__raw_writel(val, REALVIEW_FLASHCTRL);
+
+	return 0;
+}
+
+static void realview_flash_exit(void)
+{
+	u32 val;
+
+	val = __raw_readl(REALVIEW_FLASHCTRL);
+	val &= ~REALVIEW_FLASHPROG_FLVPPEN;
+	__raw_writel(val, REALVIEW_FLASHCTRL);
+}
+
+static void realview_flash_set_vpp(int on)
 {
 	u32 val;
 
@@ -70,13 +109,16 @@ static void realview_flash_set_vpp(struct platform_device *pdev, int on)
 	__raw_writel(val, REALVIEW_FLASHCTRL);
 }
 
-static struct physmap_flash_data realview_flash_data = {
+static struct flash_platform_data realview_flash_data = {
+	.map_name		= "cfi_probe",
 	.width			= 4,
+	.init			= realview_flash_init,
+	.exit			= realview_flash_exit,
 	.set_vpp		= realview_flash_set_vpp,
 };
 
 struct platform_device realview_flash_device = {
-	.name			= "physmap-flash",
+	.name			= "armflash",
 	.id			= 0,
 	.dev			= {
 		.platform_data	= &realview_flash_data,
@@ -273,10 +315,6 @@ static struct clk ref24_clk = {
 	.rate	= 24000000,
 };
 
-static struct clk sp804_clk = {
-	.rate	= 1000000,
-};
-
 static struct clk dummy_apb_pclk;
 
 static struct clk_lookup lookups[] = {
@@ -319,10 +357,7 @@ static struct clk_lookup lookups[] = {
 	}, {	/* SSP */
 		.dev_id		= "dev:ssp0",
 		.clk		= &ref24_clk,
-	}, {	/* SP804 timers */
-		.dev_id		= "sp804",
-		.clk		= &sp804_clk,
-	},
+	}
 };
 
 void __init realview_init_early(void)
@@ -510,8 +545,8 @@ void __init realview_timer_init(unsigned int timer_irq)
 	writel(0, timer2_va_base + TIMER_CTRL);
 	writel(0, timer3_va_base + TIMER_CTRL);
 
-	sp804_clocksource_init(timer3_va_base, "timer3");
-	sp804_clockevents_init(timer0_va_base, timer_irq, "timer0");
+	sp804_clocksource_init(timer3_va_base);
+	sp804_clockevents_init(timer0_va_base, timer_irq);
 }
 
 /*

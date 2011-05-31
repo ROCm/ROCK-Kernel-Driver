@@ -1,4 +1,6 @@
 /*
+ *	drivers/serial/sb1250-duart.c
+ *
  *	Support for the asynchronous serial interface (DUART) included
  *	in the BCM1250 and derived System-On-a-Chip (SOC) devices.
  *

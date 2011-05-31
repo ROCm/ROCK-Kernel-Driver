@@ -22,16 +22,17 @@
 #include <linux/init.h>
 #include <linux/list.h>
 #include <linux/io.h>
-#include <linux/syscore_ops.h>
+#include <linux/sysdev.h>
 #include <linux/device.h>
 #include <linux/amba/bus.h>
 
 #include <asm/mach/irq.h>
 #include <asm/hardware/vic.h>
 
-#ifdef CONFIG_PM
+#if defined(CONFIG_PM)
 /**
  * struct vic_device - VIC PM device
+ * @sysdev: The system device which is registered.
  * @irq: The IRQ number for the base of the VIC.
  * @base: The register base for the VIC.
  * @resume_sources: A bitmask of interrupts for resume.
@@ -42,6 +43,8 @@
  * @protect: Save for VIC_PROTECT.
  */
 struct vic_device {
+	struct sys_device sysdev;
+
 	void __iomem	*base;
 	int		irq;
 	u32		resume_sources;
@@ -56,6 +59,11 @@ struct vic_device {
 static struct vic_device vic_devices[CONFIG_ARM_VIC_NR];
 
 static int vic_id;
+
+static inline struct vic_device *to_vic(struct sys_device *sys)
+{
+	return container_of(sys, struct vic_device, sysdev);
+}
 #endif /* CONFIG_PM */
 
 /**
@@ -77,9 +85,10 @@ static void vic_init2(void __iomem *base)
 	writel(32, base + VIC_PL190_DEF_VECT_ADDR);
 }
 
-#ifdef CONFIG_PM
-static void resume_one_vic(struct vic_device *vic)
+#if defined(CONFIG_PM)
+static int vic_class_resume(struct sys_device *dev)
 {
+	struct vic_device *vic = to_vic(dev);
 	void __iomem *base = vic->base;
 
 	printk(KERN_DEBUG "%s: resuming vic at %p\n", __func__, base);
@@ -98,18 +107,13 @@ static void resume_one_vic(struct vic_device *vic)
 
 	writel(vic->soft_int, base + VIC_INT_SOFT);
 	writel(~vic->soft_int, base + VIC_INT_SOFT_CLEAR);
+
+	return 0;
 }
 
-static void vic_resume(void)
+static int vic_class_suspend(struct sys_device *dev, pm_message_t state)
 {
-	int id;
-
-	for (id = vic_id - 1; id >= 0; id--)
-		resume_one_vic(vic_devices + id);
-}
-
-static void suspend_one_vic(struct vic_device *vic)
-{
+	struct vic_device *vic = to_vic(dev);
 	void __iomem *base = vic->base;
 
 	printk(KERN_DEBUG "%s: suspending vic at %p\n", __func__, base);
@@ -124,21 +128,14 @@ static void suspend_one_vic(struct vic_device *vic)
 
 	writel(vic->resume_irqs, base + VIC_INT_ENABLE);
 	writel(~vic->resume_irqs, base + VIC_INT_ENABLE_CLEAR);
-}
-
-static int vic_suspend(void)
-{
-	int id;
-
-	for (id = 0; id < vic_id; id++)
-		suspend_one_vic(vic_devices + id);
 
 	return 0;
 }
 
-struct syscore_ops vic_syscore_ops = {
-	.suspend	= vic_suspend,
-	.resume		= vic_resume,
+struct sysdev_class vic_class = {
+	.name		= "vic",
+	.suspend	= vic_class_suspend,
+	.resume		= vic_class_resume,
 };
 
 /**
@@ -150,8 +147,30 @@ struct syscore_ops vic_syscore_ops = {
 */
 static int __init vic_pm_init(void)
 {
-	if (vic_id > 0)
-		register_syscore_ops(&vic_syscore_ops);
+	struct vic_device *dev = vic_devices;
+	int err;
+	int id;
+
+	if (vic_id == 0)
+		return 0;
+
+	err = sysdev_class_register(&vic_class);
+	if (err) {
+		printk(KERN_ERR "%s: cannot register class\n", __func__);
+		return err;
+	}
+
+	for (id = 0; id < vic_id; id++, dev++) {
+		dev->sysdev.id = id;
+		dev->sysdev.cls = &vic_class;
+
+		err = sysdev_register(&dev->sysdev);
+		if (err) {
+			printk(KERN_ERR "%s: failed to register device\n",
+			       __func__);
+			return err;
+		}
+	}
 
 	return 0;
 }

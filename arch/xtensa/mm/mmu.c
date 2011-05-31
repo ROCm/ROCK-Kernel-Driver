@@ -14,6 +14,8 @@
 #include <asm/mmu_context.h>
 #include <asm/page.h>
 
+DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
+
 void __init paging_init(void)
 {
 	memset(swapper_pg_dir, 0, PAGE_SIZE);

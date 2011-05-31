@@ -58,25 +58,21 @@ static struct platform_device leds_gpio = {
 	},
 };
 
-/*
- * cpuidle C-states definition override from the default values.
- * The 'exit_latency' field is the sum of sleep and wake-up latencies.
- */
 static struct cpuidle_params rx51_cpuidle_params[] = {
 	/* C1 */
-	{110 + 162, 5 , 1},
+	{1, 110, 162, 5},
 	/* C2 */
-	{106 + 180, 309, 1},
+	{1, 106, 180, 309},
 	/* C3 */
-	{107 + 410, 46057, 0},
+	{0, 107, 410, 46057},
 	/* C4 */
-	{121 + 3374, 46057, 0},
+	{0, 121, 3374, 46057},
 	/* C5 */
-	{855 + 1146, 46057, 1},
+	{1, 855, 1146, 46057},
 	/* C6 */
-	{7580 + 4134, 484329, 0},
+	{0, 7580, 4134, 484329},
 	/* C7 */
-	{7505 + 15274, 484329, 1},
+	{1, 7505, 15274, 484329},
 };
 
 static struct omap_lcd_config rx51_lcd_config = {

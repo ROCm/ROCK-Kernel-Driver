@@ -48,8 +48,7 @@ static const char *memory_uevent_name(struct kset *kset, struct kobject *kobj)
 	return MEMORY_CLASS_NAME;
 }
 
-static int memory_uevent(struct kset *kset, struct kobject *obj,
-			struct kobj_uevent_env *env)
+static int memory_uevent(struct kset *kset, struct kobject *obj, struct kobj_uevent_env *env)
 {
 	int retval = 0;
 
@@ -229,11 +228,10 @@ int memory_isolate_notify(unsigned long val, void *v)
  * OK to have direct references to sparsemem variables in here.
  */
 static int
-memory_block_action(unsigned long phys_index, unsigned long action)
+memory_section_action(unsigned long phys_index, unsigned long action)
 {
 	int i;
 	unsigned long start_pfn, start_paddr;
-	unsigned long nr_pages = PAGES_PER_SECTION * sections_per_block;
 	struct page *first_page;
 	int ret;
 
@@ -245,7 +243,7 @@ memory_block_action(unsigned long phys_index, unsigned long action)
 	 * that way.
 	 */
 	if (action == MEM_ONLINE) {
-		for (i = 0; i < nr_pages; i++) {
+		for (i = 0; i < PAGES_PER_SECTION; i++) {
 			if (PageReserved(first_page+i))
 				continue;
 
@@ -259,12 +257,12 @@ memory_block_action(unsigned long phys_index, unsigned long action)
 	switch (action) {
 		case MEM_ONLINE:
 			start_pfn = page_to_pfn(first_page);
-			ret = online_pages(start_pfn, nr_pages);
+			ret = online_pages(start_pfn, PAGES_PER_SECTION);
 			break;
 		case MEM_OFFLINE:
 			start_paddr = page_to_pfn(first_page) << PAGE_SHIFT;
 			ret = remove_memory(start_paddr,
-					    nr_pages << PAGE_SHIFT);
+					    PAGES_PER_SECTION << PAGE_SHIFT);
 			break;
 		default:
 			WARN(1, KERN_WARNING "%s(%ld, %ld) unknown action: "
@@ -278,7 +276,7 @@ memory_block_action(unsigned long phys_index, unsigned long action)
 static int memory_block_change_state(struct memory_block *mem,
 		unsigned long to_state, unsigned long from_state_req)
 {
-	int ret = 0;
+	int i, ret = 0;
 
 	mutex_lock(&mem->state_mutex);
 
@@ -290,11 +288,20 @@ static int memory_block_change_state(struct memory_block *mem,
 	if (to_state == MEM_OFFLINE)
 		mem->state = MEM_GOING_OFFLINE;
 
-	ret = memory_block_action(mem->start_section_nr, to_state);
+	for (i = 0; i < sections_per_block; i++) {
+		ret = memory_section_action(mem->start_section_nr + i,
+					    to_state);
+		if (ret)
+			break;
+	}
 
-	if (ret)
+	if (ret) {
+		for (i = 0; i < sections_per_block; i++)
+			memory_section_action(mem->start_section_nr + i,
+					      from_state_req);
+
 		mem->state = from_state_req;
-	else
+	} else
 		mem->state = to_state;
 
 out:
@@ -389,14 +396,15 @@ memory_probe_store(struct class *class, struct class_attribute *attr,
 		ret = add_memory(nid, phys_addr,
 				 PAGES_PER_SECTION << PAGE_SHIFT);
 		if (ret)
-			goto out;
+			break;
 
 		phys_addr += MIN_MEMORY_BLOCK_SIZE;
 	}
 
-	ret = count;
-out:
-	return ret;
+	if (ret)
+		count = ret;
+
+	return count;
 }
 static CLASS_ATTR(probe, S_IWUSR, NULL, memory_probe_store);
 

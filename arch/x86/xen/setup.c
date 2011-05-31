@@ -50,7 +50,7 @@ phys_addr_t xen_extra_mem_start, xen_extra_mem_size;
  */
 #define EXTRA_MEM_RATIO		(10)
 
-static void __init xen_add_extra_mem(unsigned long pages)
+static __init void xen_add_extra_mem(unsigned long pages)
 {
 	unsigned long pfn;
 
@@ -166,7 +166,7 @@ static unsigned long __init xen_set_identity(const struct e820entry *list,
 		if (last > end)
 			continue;
 
-		if ((entry->type == E820_RAM) || (entry->type == E820_UNUSABLE)) {
+		if (entry->type == E820_RAM) {
 			if (start > start_pci)
 				identity += set_phys_range_identity(
 						PFN_UP(start_pci), PFN_DOWN(start));
@@ -227,11 +227,7 @@ char * __init xen_memory_setup(void)
 
 	memcpy(map_raw, map, sizeof(map));
 	e820.nr_map = 0;
-#ifdef CONFIG_X86_32
-	xen_extra_mem_start = mem_end;
-#else
 	xen_extra_mem_start = max((1ULL << 32), mem_end);
-#endif
 	for (i = 0; i < memmap.nr_entries; i++) {
 		unsigned long long end;
 
@@ -340,7 +336,7 @@ static void __init fiddle_vdso(void)
 #endif
 }
 
-static int __cpuinit register_callback(unsigned type, const void *func)
+static __cpuinit int register_callback(unsigned type, const void *func)
 {
 	struct callback_register callback = {
 		.type = type,

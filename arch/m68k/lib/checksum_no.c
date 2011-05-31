@@ -101,7 +101,6 @@ __sum16 ip_fast_csum(const void *iph, unsigned int ihl)
 {
 	return (__force __sum16)~do_csum(iph,ihl*4);
 }
-EXPORT_SYMBOL(ip_fast_csum);
 #endif
 
 /*
@@ -141,7 +140,6 @@ csum_partial_copy_from_user(const void __user *src, void *dst,
 	memcpy(dst, (__force const void *)src, len);
 	return csum_partial(dst, len, sum);
 }
-EXPORT_SYMBOL(csum_partial_copy_from_user);
 
 /*
  * copy from ds while checksumming, otherwise like csum_partial
@@ -153,4 +151,3 @@ csum_partial_copy_nocheck(const void *src, void *dst, int len, __wsum sum)
 	memcpy(dst, src, len);
 	return csum_partial(dst, len, sum);
 }
-EXPORT_SYMBOL(csum_partial_copy_nocheck);

@@ -120,6 +120,8 @@ static struct fsmc_eccplace fsmc_ecc4_sp_place = {
 	}
 };
 
+
+#ifdef CONFIG_MTD_PARTITIONS
 /*
  * Default partition tables to be used if the partition information not
  * provided through platform data.
@@ -179,6 +181,7 @@ static struct mtd_partition partition_info_128KB_blk[] = {
 
 #ifdef CONFIG_MTD_CMDLINE_PARTS
 const char *part_probes[] = { "cmdlinepart", NULL };
+#endif
 #endif
 
 /**
@@ -716,6 +719,7 @@ static int __init fsmc_nand_probe(struct platform_device *pdev)
 	 * platform data,
 	 * default partition information present in driver.
 	 */
+#ifdef CONFIG_MTD_PARTITIONS
 #ifdef CONFIG_MTD_CMDLINE_PARTS
 	/*
 	 * Check if partition info passed via command line
@@ -773,10 +777,19 @@ static int __init fsmc_nand_probe(struct platform_device *pdev)
 	}
 #endif
 
-	ret = mtd_device_register(&host->mtd, host->partitions,
-				  host->nr_partitions);
-	if (ret)
+	if (host->partitions) {
+		ret = add_mtd_partitions(&host->mtd, host->partitions,
+				host->nr_partitions);
+		if (ret)
+			goto err_probe;
+	}
+#else
+	dev_info(&pdev->dev, "Registering %s as whole device\n", mtd->name);
+	if (!add_mtd_device(mtd)) {
+		ret = -ENXIO;
 		goto err_probe;
+	}
+#endif
 
 	platform_set_drvdata(pdev, host);
 	dev_info(&pdev->dev, "FSMC NAND driver registration successful\n");
@@ -822,7 +835,11 @@ static int fsmc_nand_remove(struct platform_device *pdev)
 	platform_set_drvdata(pdev, NULL);
 
 	if (host) {
-		mtd_device_unregister(&host->mtd);
+#ifdef CONFIG_MTD_PARTITIONS
+		del_mtd_partitions(&host->mtd);
+#else
+		del_mtd_device(&host->mtd);
+#endif
 		clk_disable(host->clk);
 		clk_put(host->clk);
 

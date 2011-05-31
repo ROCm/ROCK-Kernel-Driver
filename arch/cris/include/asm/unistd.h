@@ -339,11 +339,10 @@
 #define __NR_inotify_init1	332
 #define __NR_preadv		333
 #define __NR_pwritev		334
-#define __NR_setns		335
 
 #ifdef __KERNEL__
 
-#define NR_syscalls 336
+#define NR_syscalls 335
 
 #include <arch/unistd.h>
 

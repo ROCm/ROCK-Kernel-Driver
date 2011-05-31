@@ -9,6 +9,11 @@
 #include <asm/desc.h>
 #include <asm/i387.h>
 
+static inline int arch_prepare_suspend(void)
+{
+	return 0;
+}
+
 /*
  * Image of the saved processor state, used by the low level ACPI suspend to
  * RAM code and by the low level hibernation code.

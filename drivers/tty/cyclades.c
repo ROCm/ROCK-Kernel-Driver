@@ -3,6 +3,8 @@
 #undef	Z_EXT_CHARS_IN_BUFFER
 
 /*
+ *  linux/drivers/char/cyclades.c
+ *
  * This file contains the driver for the Cyclades async multiport
  * serial boards.
  *
@@ -1443,11 +1445,13 @@ static void cy_shutdown(struct cyclades_port *info, struct tty_struct *tty)
 {
 	struct cyclades_card *card;
 	unsigned long flags;
+	int channel;
 
 	if (!(info->port.flags & ASYNC_INITIALIZED))
 		return;
 
 	card = info->card;
+	channel = info->line - card->first_line;
 	if (!cy_is_Z(card)) {
 		spin_lock_irqsave(&card->card_lock, flags);
 
@@ -1472,7 +1476,6 @@ static void cy_shutdown(struct cyclades_port *info, struct tty_struct *tty)
 		spin_unlock_irqrestore(&card->card_lock, flags);
 	} else {
 #ifdef CY_DEBUG_OPEN
-		int channel = info->line - card->first_line;
 		printk(KERN_DEBUG "cyc shutdown Z card %d, channel %d, "
 			"base_addr %p\n", card, channel, card->base_addr);
 #endif
@@ -4096,7 +4099,8 @@ static int __init cy_init(void)
 	if (!cy_serial_driver)
 		goto err;
 
-	printk(KERN_INFO "Cyclades driver " CY_VERSION "\n");
+	printk(KERN_INFO "Cyclades driver " CY_VERSION " (built %s %s)\n",
+			__DATE__, __TIME__);
 
 	/* Initialize the tty_driver structure */
 

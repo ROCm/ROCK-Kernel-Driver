@@ -2229,10 +2229,13 @@ void
 bna_rit_create(struct bna_rx *rx)
 {
 	struct list_head	*qe_rxp;
+	struct bna *bna;
 	struct bna_rxp *rxp;
 	struct bna_rxq *q0 = NULL;
 	struct bna_rxq *q1 = NULL;
 	int offset;
+
+	bna = rx->bna;
 
 	offset = 0;
 	list_for_each(qe_rxp, &rx->rxp_q) {
@@ -2827,7 +2830,7 @@ bna_rx_create(struct bna *bna, struct bnad *bnad,
 	struct bna_mem_descr *dsqpt_mem;	/* s/w qpt for data */
 	struct bna_mem_descr *hpage_mem;	/* hdr page mem */
 	struct bna_mem_descr *dpage_mem;	/* data page mem */
-	int i, cpage_idx = 0, dpage_idx = 0, hpage_idx = 0;
+	int i, cpage_idx = 0, dpage_idx = 0, hpage_idx = 0, ret;
 	int dpage_count, hpage_count, rcb_idx;
 	struct bna_ib_config ibcfg;
 	/* Fail if we don't have enough RXPs, RXQs */
@@ -2921,7 +2924,7 @@ bna_rx_create(struct bna *bna, struct bnad *bnad,
 		ibcfg.interpkt_timeo = BFI_RX_INTERPKT_TIMEO;
 		ibcfg.ctrl_flags = BFI_IB_CF_INT_ENABLE;
 
-		bna_ib_config(rxp->cq.ib, &ibcfg);
+		ret = bna_ib_config(rxp->cq.ib, &ibcfg);
 
 		/* Link rxqs to rxp */
 		_rxp_add_rxqs(rxp, q0, q1);

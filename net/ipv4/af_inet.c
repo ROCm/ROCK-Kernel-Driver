@@ -105,7 +105,6 @@
 #include <net/tcp.h>
 #include <net/udp.h>
 #include <net/udplite.h>
-#include <net/ping.h>
 #include <linux/skbuff.h>
 #include <net/sock.h>
 #include <net/raw.h>
@@ -154,7 +153,7 @@ void inet_sock_destruct(struct sock *sk)
 	WARN_ON(sk->sk_wmem_queued);
 	WARN_ON(sk->sk_forward_alloc);
 
-	kfree(rcu_dereference_protected(inet->inet_opt, 1));
+	kfree(inet->opt);
 	dst_release(rcu_dereference_check(sk->sk_dst_cache, 1));
 	sk_refcnt_debug_dec(sk);
 }
@@ -1009,14 +1008,6 @@ static struct inet_protosw inetsw_array[] =
 		.flags =      INET_PROTOSW_PERMANENT,
        },
 
-       {
-		.type =       SOCK_DGRAM,
-		.protocol =   IPPROTO_ICMP,
-		.prot =       &ping_prot,
-		.ops =        &inet_dgram_ops,
-		.no_check =   UDP_CSUM_DEFAULT,
-		.flags =      INET_PROTOSW_REUSE,
-       },
 
        {
 	       .type =       SOCK_RAW,
@@ -1112,19 +1103,14 @@ static int inet_sk_reselect_saddr(struct sock *sk)
 	struct inet_sock *inet = inet_sk(sk);
 	__be32 old_saddr = inet->inet_saddr;
 	__be32 daddr = inet->inet_daddr;
-	struct flowi4 *fl4;
 	struct rtable *rt;
 	__be32 new_saddr;
-	struct ip_options_rcu *inet_opt;
 
-	inet_opt = rcu_dereference_protected(inet->inet_opt,
-					     sock_owned_by_user(sk));
-	if (inet_opt && inet_opt->opt.srr)
-		daddr = inet_opt->opt.faddr;
+	if (inet->opt && inet->opt->srr)
+		daddr = inet->opt->faddr;
 
 	/* Query new route. */
-	fl4 = &inet->cork.fl.u.ip4;
-	rt = ip_route_connect(fl4, daddr, 0, RT_CONN_FLAGS(sk),
+	rt = ip_route_connect(daddr, 0, RT_CONN_FLAGS(sk),
 			      sk->sk_bound_dev_if, sk->sk_protocol,
 			      inet->inet_sport, inet->inet_dport, sk, false);
 	if (IS_ERR(rt))
@@ -1132,7 +1118,7 @@ static int inet_sk_reselect_saddr(struct sock *sk)
 
 	sk_setup_caps(sk, &rt->dst);
 
-	new_saddr = fl4->saddr;
+	new_saddr = rt->rt_src;
 
 	if (new_saddr == old_saddr)
 		return 0;
@@ -1161,8 +1147,6 @@ int inet_sk_rebuild_header(struct sock *sk)
 	struct inet_sock *inet = inet_sk(sk);
 	struct rtable *rt = (struct rtable *)__sk_dst_check(sk, 0);
 	__be32 daddr;
-	struct ip_options_rcu *inet_opt;
-	struct flowi4 *fl4;
 	int err;
 
 	/* Route is OK, nothing to do. */
@@ -1170,14 +1154,10 @@ int inet_sk_rebuild_header(struct sock *sk)
 		return 0;
 
 	/* Reroute. */
-	rcu_read_lock();
-	inet_opt = rcu_dereference(inet->inet_opt);
 	daddr = inet->inet_daddr;
-	if (inet_opt && inet_opt->opt.srr)
-		daddr = inet_opt->opt.faddr;
-	rcu_read_unlock();
-	fl4 = &inet->cork.fl.u.ip4;
-	rt = ip_route_output_ports(sock_net(sk), fl4, sk, daddr, inet->inet_saddr,
+	if (inet->opt && inet->opt->srr)
+		daddr = inet->opt->faddr;
+	rt = ip_route_output_ports(sock_net(sk), sk, daddr, inet->inet_saddr,
 				   inet->inet_dport, inet->inet_sport,
 				   sk->sk_protocol, RT_CONN_FLAGS(sk),
 				   sk->sk_bound_dev_if);
@@ -1206,7 +1186,7 @@ EXPORT_SYMBOL(inet_sk_rebuild_header);
 
 static int inet_gso_send_check(struct sk_buff *skb)
 {
-	const struct iphdr *iph;
+	struct iphdr *iph;
 	const struct net_protocol *ops;
 	int proto;
 	int ihl;
@@ -1313,7 +1293,7 @@ static struct sk_buff **inet_gro_receive(struct sk_buff **head,
 	const struct net_protocol *ops;
 	struct sk_buff **pp = NULL;
 	struct sk_buff *p;
-	const struct iphdr *iph;
+	struct iphdr *iph;
 	unsigned int hlen;
 	unsigned int off;
 	unsigned int id;
@@ -1536,7 +1516,6 @@ static const struct net_protocol udp_protocol = {
 
 static const struct net_protocol icmp_protocol = {
 	.handler =	icmp_rcv,
-	.err_handler =	ping_err,
 	.no_policy =	1,
 	.netns_ok =	1,
 };
@@ -1652,10 +1631,6 @@ static int __init inet_init(void)
 	if (rc)
 		goto out_unregister_udp_proto;
 
-	rc = proto_register(&ping_prot, 1);
-	if (rc)
-		goto out_unregister_raw_proto;
-
 	/*
 	 *	Tell SOCKET that we are alive...
 	 */
@@ -1711,8 +1686,6 @@ static int __init inet_init(void)
 	/* Add UDP-Lite (RFC 3828) */
 	udplite4_register();
 
-	ping_init();
-
 	/*
 	 *	Set the ICMP layer up
 	 */
@@ -1743,8 +1716,6 @@ static int __init inet_init(void)
 	rc = 0;
 out:
 	return rc;
-out_unregister_raw_proto:
-	proto_unregister(&raw_prot);
 out_unregister_udp_proto:
 	proto_unregister(&udp_prot);
 out_unregister_tcp_proto:
@@ -1769,15 +1740,11 @@ static int __init ipv4_proc_init(void)
 		goto out_tcp;
 	if (udp4_proc_init())
 		goto out_udp;
-	if (ping_proc_init())
-		goto out_ping;
 	if (ip_misc_proc_init())
 		goto out_misc;
 out:
 	return rc;
 out_misc:
-	ping_proc_exit();
-out_ping:
 	udp4_proc_exit();
 out_udp:
 	tcp4_proc_exit();

@@ -41,6 +41,7 @@ struct sk_buff;
  */
 struct avc_cache_stats {
 	unsigned int lookups;
+	unsigned int hits;
 	unsigned int misses;
 	unsigned int allocations;
 	unsigned int reclaims;

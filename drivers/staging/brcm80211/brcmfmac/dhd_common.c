@@ -189,7 +189,7 @@ static int dhd_dump(dhd_pub_t *dhdp, char *buf, int buflen)
 	/* Add any bus info */
 	dhd_bus_dump(dhdp, strbuf);
 
-	return !strbuf->size ? -EOVERFLOW : 0;
+	return !strbuf->size ? BCME_BUFTOOSHORT : 0;
 }
 
 static int
@@ -225,7 +225,7 @@ dhd_doiovar(dhd_pub_t *dhd_pub, const bcm_iovar_t *vi, u32 actionid,
 		break;
 
 	case IOV_GVAL(IOV_BCMERRORSTR):
-		strncpy((char *)arg, "bcm_error",
+		strncpy((char *)arg, bcmerrorstr(dhd_pub->bcmerror),
 			BCME_STRLEN);
 		((char *)arg)[BCME_STRLEN - 1] = 0x00;
 		break;
@@ -242,7 +242,7 @@ dhd_doiovar(dhd_pub_t *dhd_pub, const bcm_iovar_t *vi, u32 actionid,
 
 	case IOV_SVAL(IOV_WDTICK):
 		if (!dhd_pub->up) {
-			bcmerror = -ENOLINK;
+			bcmerror = BCME_NOTUP;
 			break;
 		}
 		dhd_os_wd_timer(dhd_pub, (uint) int_val);
@@ -289,7 +289,7 @@ dhd_doiovar(dhd_pub_t *dhd_pub, const bcm_iovar_t *vi, u32 actionid,
 
 	case IOV_SVAL(IOV_IOCTLTIMEOUT):{
 			if (int_val <= 0)
-				bcmerror = -EINVAL;
+				bcmerror = BCME_BADARG;
 			else
 				dhd_os_set_ioctl_resp_timeout((unsigned int)
 							      int_val);
@@ -297,7 +297,7 @@ dhd_doiovar(dhd_pub_t *dhd_pub, const bcm_iovar_t *vi, u32 actionid,
 		}
 
 	default:
-		bcmerror = -ENOTSUPP;
+		bcmerror = BCME_UNSUPPORTED;
 		break;
 	}
 
@@ -316,7 +316,7 @@ bool dhd_prec_enq(dhd_pub_t *dhdp, struct pktq *q, struct sk_buff *pkt,
 	 * exceeding total queue length
 	 */
 	if (!pktq_pfull(q, prec) && !pktq_full(q)) {
-		bcm_pktq_penq(q, prec, pkt);
+		pktq_penq(q, prec, pkt);
 		return true;
 	}
 
@@ -324,7 +324,7 @@ bool dhd_prec_enq(dhd_pub_t *dhdp, struct pktq *q, struct sk_buff *pkt,
 	if (pktq_pfull(q, prec))
 		eprec = prec;
 	else if (pktq_full(q)) {
-		p = bcm_pktq_peek_tail(q, &eprec);
+		p = pktq_peek_tail(q, &eprec);
 		ASSERT(p);
 		if (eprec > prec)
 			return false;
@@ -338,21 +338,21 @@ bool dhd_prec_enq(dhd_pub_t *dhdp, struct pktq *q, struct sk_buff *pkt,
 		if (eprec == prec && !discard_oldest)
 			return false;	/* refuse newer (incoming) packet */
 		/* Evict packet according to discard policy */
-		p = discard_oldest ? bcm_pktq_pdeq(q, eprec) :
-			bcm_pktq_pdeq_tail(q, eprec);
+		p = discard_oldest ? pktq_pdeq(q, eprec) : pktq_pdeq_tail(q,
+						  eprec);
 		if (p == NULL) {
-			DHD_ERROR(("%s: bcm_pktq_penq() failed, oldest %d.",
+			DHD_ERROR(("%s: pktq_penq() failed, oldest %d.",
 				   __func__, discard_oldest));
 			ASSERT(p);
 		}
 
-		bcm_pkt_buf_free_skb(p);
+		pkt_buf_free_skb(p);
 	}
 
 	/* Enqueue */
-	p = bcm_pktq_penq(q, prec, pkt);
+	p = pktq_penq(q, prec, pkt);
 	if (p == NULL) {
-		DHD_ERROR(("%s: bcm_pktq_penq() failed.", __func__));
+		DHD_ERROR(("%s: pktq_penq() failed.", __func__));
 		ASSERT(p);
 	}
 
@@ -381,7 +381,7 @@ dhd_iovar_op(dhd_pub_t *dhd_pub, const char *name,
 
 	vi = bcm_iovar_lookup(dhd_iovars, name);
 	if (vi == NULL) {
-		bcmerror = -ENOTSUPP;
+		bcmerror = BCME_UNSUPPORTED;
 		goto exit;
 	}
 
@@ -420,19 +420,19 @@ int dhd_ioctl(dhd_pub_t *dhd_pub, dhd_ioctl_t *ioc, void *buf, uint buflen)
 	DHD_TRACE(("%s: Enter\n", __func__));
 
 	if (!buf)
-		return -EINVAL;
+		return BCME_BADARG;
 
 	switch (ioc->cmd) {
 	case DHD_GET_MAGIC:
 		if (buflen < sizeof(int))
-			bcmerror = -EOVERFLOW;
+			bcmerror = BCME_BUFTOOSHORT;
 		else
 			*(int *)buf = DHD_IOCTL_MAGIC;
 		break;
 
 	case DHD_GET_VERSION:
 		if (buflen < sizeof(int))
-			bcmerror = -EOVERFLOW;
+			bcmerror = -BCME_BUFTOOSHORT;
 		else
 			*(int *)buf = DHD_IOCTL_VERSION;
 		break;
@@ -448,7 +448,7 @@ int dhd_ioctl(dhd_pub_t *dhd_pub, dhd_ioctl_t *ioc, void *buf, uint buflen)
 				;
 
 			if (*arg) {
-				bcmerror = -EOVERFLOW;
+				bcmerror = BCME_BUFTOOSHORT;
 				break;
 			}
 
@@ -464,7 +464,7 @@ int dhd_ioctl(dhd_pub_t *dhd_pub, dhd_ioctl_t *ioc, void *buf, uint buflen)
 				bcmerror =
 				    dhd_iovar_op(dhd_pub, buf, NULL, 0, arg,
 						 arglen, IOV_SET);
-			if (bcmerror != -ENOTSUPP)
+			if (bcmerror != BCME_UNSUPPORTED)
 				break;
 
 			/* not in generic table, try protocol module */
@@ -476,7 +476,7 @@ int dhd_ioctl(dhd_pub_t *dhd_pub, dhd_ioctl_t *ioc, void *buf, uint buflen)
 				bcmerror = dhd_prot_iovar_op(dhd_pub, buf,
 							     NULL, 0, arg,
 							     arglen, IOV_SET);
-			if (bcmerror != -ENOTSUPP)
+			if (bcmerror != BCME_UNSUPPORTED)
 				break;
 
 			/* if still not found, try bus module */
@@ -493,7 +493,7 @@ int dhd_ioctl(dhd_pub_t *dhd_pub, dhd_ioctl_t *ioc, void *buf, uint buflen)
 		}
 
 	default:
-		bcmerror = -ENOTSUPP;
+		bcmerror = BCME_UNSUPPORTED;
 	}
 
 	return bcmerror;
@@ -586,8 +586,6 @@ static void wl_show_host_event(wl_event_msg_t *event, void *event_data)
 	}
 
 	DHD_EVENT(("EVENT: %s, event ID = %d\n", event_name, event_type));
-	DHD_EVENT(("flags 0x%04x, status %d, reason %d, auth_type %d MAC %s\n",
-				flags, status, reason, auth_type, eabuf));
 
 	if (flags & WLC_EVENT_MSG_LINK)
 		link = true;
@@ -817,14 +815,14 @@ wl_host_event(struct dhd_info *dhd, int *ifidx, void *pktdata,
 
 	if (memcmp(BRCM_OUI, &pvt_data->bcm_hdr.oui[0], DOT11_OUI_LEN)) {
 		DHD_ERROR(("%s: mismatched OUI, bailing\n", __func__));
-		return -EBADE;
+		return BCME_ERROR;
 	}
 
 	/* BRCM event pkt may be unaligned - use xxx_ua to load user_subtype. */
 	if (get_unaligned_be16(&pvt_data->bcm_hdr.usr_subtype) !=
 	    BCMILCP_BCM_SUBTYPE_EVENT) {
 		DHD_ERROR(("%s: mismatched subtype, bailing\n", __func__));
-		return -EBADE;
+		return BCME_ERROR;
 	}
 
 	*data_ptr = &pvt_data[1];
@@ -904,7 +902,7 @@ wl_host_event(struct dhd_info *dhd, int *ifidx, void *pktdata,
 	wl_show_host_event(event, event_data);
 #endif				/* SHOW_EVENTS */
 
-	return 0;
+	return BCME_OK;
 }
 
 /* Convert user's input in hex pattern to byte-size mask */

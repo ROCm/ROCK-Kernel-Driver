@@ -132,20 +132,17 @@ static int __init init_sbc82xx_flash(void)
 		nr_parts = parse_mtd_partitions(sbcmtd[i], part_probes,
 						&sbcmtd_parts[i], 0);
 		if (nr_parts > 0) {
-			mtd_device_register(sbcmtd[i], sbcmtd_parts[i],
-					    nr_parts);
+			add_mtd_partitions (sbcmtd[i], sbcmtd_parts[i], nr_parts);
 			continue;
 		}
 
 		/* No partitioning detected. Use default */
 		if (i == 2) {
-			mtd_device_register(sbcmtd[i], NULL, 0);
+			add_mtd_device(sbcmtd[i]);
 		} else if (i == bigflash) {
-			mtd_device_register(sbcmtd[i], bigflash_parts,
-					    ARRAY_SIZE(bigflash_parts));
+			add_mtd_partitions (sbcmtd[i], bigflash_parts, ARRAY_SIZE(bigflash_parts));
 		} else {
-			mtd_device_register(sbcmtd[i], smallflash_parts,
-					    ARRAY_SIZE(smallflash_parts));
+			add_mtd_partitions (sbcmtd[i], smallflash_parts, ARRAY_SIZE(smallflash_parts));
 		}
 	}
 	return 0;
@@ -160,9 +157,9 @@ static void __exit cleanup_sbc82xx_flash(void)
 			continue;
 
 		if (i<2 || sbcmtd_parts[i])
-			mtd_device_unregister(sbcmtd[i]);
+			del_mtd_partitions(sbcmtd[i]);
 		else
-			mtd_device_unregister(sbcmtd[i]);
+			del_mtd_device(sbcmtd[i]);
 
 		kfree(sbcmtd_parts[i]);
 		map_destroy(sbcmtd[i]);

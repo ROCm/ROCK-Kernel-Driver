@@ -1155,11 +1155,15 @@ static int pxa_camera_set_bus_param(struct soc_camera_device *icd, __u32 pixfmt)
 	struct soc_camera_host *ici = to_soc_camera_host(icd->dev.parent);
 	struct pxa_camera_dev *pcdev = ici->priv;
 	unsigned long bus_flags, camera_flags, common_flags;
+	const struct soc_mbus_pixelfmt *fmt;
 	int ret;
 	struct pxa_cam *cam = icd->host_priv;
 
-	ret = test_platform_param(pcdev, icd->current_fmt->host_fmt->bits_per_sample,
-				  &bus_flags);
+	fmt = soc_mbus_get_fmtdesc(icd->current_fmt->code);
+	if (!fmt)
+		return -EINVAL;
+
+	ret = test_platform_param(pcdev, fmt->bits_per_sample, &bus_flags);
 	if (ret < 0)
 		return ret;
 

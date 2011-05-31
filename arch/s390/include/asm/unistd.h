@@ -276,8 +276,7 @@
 #define __NR_open_by_handle_at	336
 #define __NR_clock_adjtime	337
 #define __NR_syncfs		338
-#define __NR_setns		339
-#define NR_syscalls 340
+#define NR_syscalls 339
 
 /* 
  * There are some system calls that are not present on 64 bit, some
@@ -386,7 +385,6 @@
 
 /* Ignore system calls that are also reachable via sys_socket */
 #define __IGNORE_recvmmsg
-#define __IGNORE_sendmmsg
 
 #define __ARCH_WANT_IPC_PARSE_VERSION
 #define __ARCH_WANT_OLD_READDIR

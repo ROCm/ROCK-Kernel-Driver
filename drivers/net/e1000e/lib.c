@@ -144,7 +144,7 @@ void e1000_write_vfta_generic(struct e1000_hw *hw, u32 offset, u32 value)
  *  @hw: pointer to the HW structure
  *  @rar_count: receive address registers
  *
- *  Setup the receive address registers by setting the base receive address
+ *  Setups the receive address registers by setting the base receive address
  *  register to the devices MAC address and clearing all the other receive
  *  address registers to 0.
  **/
@@ -868,7 +868,7 @@ static s32 e1000_poll_fiber_serdes_link_generic(struct e1000_hw *hw)
 	 * milliseconds even if the other end is doing it in SW).
 	 */
 	for (i = 0; i < FIBER_LINK_UP_LIMIT; i++) {
-		usleep_range(10000, 20000);
+		msleep(10);
 		status = er32(STATUS);
 		if (status & E1000_STATUS_LU)
 			break;
@@ -930,7 +930,7 @@ s32 e1000e_setup_fiber_serdes_link(struct e1000_hw *hw)
 
 	ew32(CTRL, ctrl);
 	e1e_flush();
-	usleep_range(1000, 2000);
+	msleep(1);
 
 	/*
 	 * For these adapters, the SW definable pin 1 is set when the optics
@@ -1181,7 +1181,7 @@ s32 e1000e_config_fc_after_link_up(struct e1000_hw *hw)
 			 * of pause frames.  In this case, we had to advertise
 			 * FULL flow control because we could not advertise Rx
 			 * ONLY. Hence, we must now check to see if we need to
-			 * turn OFF the TRANSMISSION of PAUSE frames.
+			 * turn OFF  the TRANSMISSION of PAUSE frames.
 			 */
 			if (hw->fc.requested_mode == e1000_fc_full) {
 				hw->fc.current_mode = e1000_fc_full;
@@ -1385,7 +1385,7 @@ s32 e1000e_get_auto_rd_done(struct e1000_hw *hw)
 	while (i < AUTO_READ_DONE_TIMEOUT) {
 		if (er32(EECD) & E1000_EECD_AUTO_RD)
 			break;
-		usleep_range(1000, 2000);
+		msleep(1);
 		i++;
 	}
 
@@ -1530,12 +1530,12 @@ s32 e1000e_cleanup_led_generic(struct e1000_hw *hw)
 }
 
 /**
- *  e1000e_blink_led_generic - Blink LED
+ *  e1000e_blink_led - Blink LED
  *  @hw: pointer to the HW structure
  *
  *  Blink the LEDs which are set to be on.
  **/
-s32 e1000e_blink_led_generic(struct e1000_hw *hw)
+s32 e1000e_blink_led(struct e1000_hw *hw)
 {
 	u32 ledctl_blink = 0;
 	u32 i;
@@ -2087,6 +2087,8 @@ s32 e1000e_write_nvm_spi(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
 	if (ret_val)
 		return ret_val;
 
+	msleep(10);
+
 	while (widx < words) {
 		u8 write_opcode = NVM_WRITE_OPCODE_SPI;
 
@@ -2130,7 +2132,7 @@ s32 e1000e_write_nvm_spi(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
 		}
 	}
 
-	usleep_range(10000, 20000);
+	msleep(10);
 	nvm->ops.release(hw);
 	return 0;
 }

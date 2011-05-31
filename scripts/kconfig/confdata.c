@@ -560,6 +560,8 @@ int conf_write(const char *name)
 	const char *basename;
 	const char *str;
 	char dirname[PATH_MAX+1], tmpname[PATH_MAX+1], newname[PATH_MAX+1];
+	time_t now;
+	int use_timestamp = 1;
 	char *env;
 
 	dirname[0] = 0;
@@ -596,11 +598,19 @@ int conf_write(const char *name)
 	if (!out)
 		return 1;
 
+	time(&now);
+	env = getenv("KCONFIG_NOTIMESTAMP");
+	if (env && *env)
+		use_timestamp = 0;
+
 	fprintf(out, _("#\n"
 		       "# Automatically generated make config: don't edit\n"
 		       "# %s\n"
+		       "%s%s"
 		       "#\n"),
-		     rootmenu.prompt->text);
+		     rootmenu.prompt->text,
+		     use_timestamp ? "# " : "",
+		     use_timestamp ? ctime(&now) : "");
 
 	if (!conf_get_changed())
 		sym_clear_all_valid();
@@ -774,6 +784,7 @@ int conf_write_autoconf(void)
 	const char *str;
 	const char *name;
 	FILE *out, *tristate, *out_h;
+	time_t now;
 	int i;
 
 	sym_clear_all_valid();
@@ -800,19 +811,22 @@ int conf_write_autoconf(void)
 		return 1;
 	}
 
+	time(&now);
 	fprintf(out, "#\n"
 		     "# Automatically generated make config: don't edit\n"
 		     "# %s\n"
+		     "# %s"
 		     "#\n",
-		     rootmenu.prompt->text);
+		     rootmenu.prompt->text, ctime(&now));
 	fprintf(tristate, "#\n"
 			  "# Automatically generated - do not edit\n"
 			  "\n");
 	fprintf(out_h, "/*\n"
 		       " * Automatically generated C config: don't edit\n"
 		       " * %s\n"
+		       " * %s"
 		       " */\n",
-		       rootmenu.prompt->text);
+		       rootmenu.prompt->text, ctime(&now));
 
 	for_all_symbols(i, sym) {
 		sym_calc_value(sym);

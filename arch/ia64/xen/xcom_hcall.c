@@ -343,7 +343,7 @@ xencommize_memory_reservation(struct xencomm_mini *xc_area,
 int
 xencomm_hypercall_memory_op(unsigned int cmd, void *arg)
 {
-	GUEST_HANDLE(xen_pfn_t) extent_start_va[2] = { {NULL}, {NULL} };
+	XEN_GUEST_HANDLE(xen_pfn_t) extent_start_va[2] = { {NULL}, {NULL} };
 	struct xen_memory_reservation *xmr = NULL;
 	int rc;
 	struct xencomm_handle *desc;

@@ -1450,13 +1450,7 @@ static void mtdswap_add_mtd(struct mtd_blktrans_ops *tr, struct mtd_info *mtd)
 	}
 
 	oinfo = mtd->ecclayout;
-	if (!oinfo) {
-		printk(KERN_ERR "%s: mtd%d does not have OOB\n",
-			MTDSWAP_PREFIX, mtd->index);
-		return;
-	}
-
-	if (!mtd->oobsize || oinfo->oobavail < MTDSWAP_OOBSIZE) {
+	if (!mtd->oobsize || !oinfo || oinfo->oobavail < MTDSWAP_OOBSIZE) {
 		printk(KERN_ERR "%s: Not enough free bytes in OOB, "
 			"%d available, %zu needed.\n",
 			MTDSWAP_PREFIX, oinfo->oobavail, MTDSWAP_OOBSIZE);

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2005 - 2011 Emulex
+ * Copyright (C) 2005 - 2010 ServerEngines
  * All rights reserved.
  *
  * This program is free software; you can redistribute it and/or
@@ -8,11 +8,11 @@
  * Public License is included in this distribution in the file called COPYING.
  *
  * Contact Information:
- * linux-drivers@emulex.com
+ * linux-drivers@serverengines.com
  *
- * Emulex
- * 3333 Susan Street
- * Costa Mesa, CA 92626
+ * ServerEngines
+ * 209 N. Fair Oaks Ave
+ * Sunnyvale, CA 94085
  */
 
 #ifndef BEISCSI_H

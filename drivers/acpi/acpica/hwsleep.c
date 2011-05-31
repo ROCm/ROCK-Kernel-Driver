@@ -236,7 +236,11 @@ acpi_status asmlinkage acpi_enter_sleep_state(u8 sleep_state)
 	u32 pm1b_control;
 	struct acpi_bit_register_info *sleep_type_reg_info;
 	struct acpi_bit_register_info *sleep_enable_reg_info;
+#if !(defined(CONFIG_XEN) && defined(CONFIG_X86))
 	u32 in_value;
+#else
+	int err;
+#endif
 	struct acpi_object_list arg_list;
 	union acpi_object arg;
 	acpi_status status;
@@ -347,6 +351,7 @@ acpi_status asmlinkage acpi_enter_sleep_state(u8 sleep_state)
 
 	/* Write #2: Write both SLP_TYP + SLP_EN */
 
+#if !(defined(CONFIG_XEN) && defined(CONFIG_X86))
 	status = acpi_hw_write_pm1_control(pm1a_control, pm1b_control);
 	if (ACPI_FAILURE(status)) {
 		return_ACPI_STATUS(status);
@@ -386,6 +391,15 @@ acpi_status asmlinkage acpi_enter_sleep_state(u8 sleep_state)
 		/* Spin until we wake */
 
 	} while (!in_value);
+#else
+	/* PV ACPI just need check hypercall return value */
+	err = acpi_notify_hypervisor_state(sleep_state,
+			pm1a_control, pm1b_control);
+	if (err) {
+		printk(KERN_ERR "ACPI: Hypervisor failure [%d]\n", err);
+		return_ACPI_STATUS(AE_ERROR);
+	}
+#endif
 
 	return_ACPI_STATUS(AE_OK);
 }
@@ -404,6 +418,7 @@ ACPI_EXPORT_SYMBOL(acpi_enter_sleep_state)
  *              THIS FUNCTION MUST BE CALLED WITH INTERRUPTS DISABLED
  *
  ******************************************************************************/
+#ifndef CONFIG_XEN
 acpi_status asmlinkage acpi_enter_sleep_state_s4bios(void)
 {
 	u32 in_value;
@@ -457,6 +472,7 @@ acpi_status asmlinkage acpi_enter_sleep_state_s4bios(void)
 }
 
 ACPI_EXPORT_SYMBOL(acpi_enter_sleep_state_s4bios)
+#endif
 
 /*******************************************************************************
  *

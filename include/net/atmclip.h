@@ -54,6 +54,8 @@ struct clip_priv {
 };
 
 
+#ifdef __KERNEL__
 extern struct neigh_table *clip_tbl_hook;
+#endif
 
 #endif

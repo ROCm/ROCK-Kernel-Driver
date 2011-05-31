@@ -24,6 +24,7 @@
 //==============================================================================
 #include <a_config.h>
 #include <athdefs.h>
+#include <a_types.h>
 #include <a_osapi.h>
 #define ATH_MODULE_NAME wlan
 #include <a_debug.h>
@@ -53,7 +54,7 @@ ATH_DEBUG_INSTANTIATE_MODULE_VAR(wlan,
 #endif
 
 #ifdef THREAD_X
-static void wlan_node_timeout(unsigned long arg);
+static void wlan_node_timeout(A_ATH_TIMER arg);
 #endif
 
 static bss_t * _ieee80211_find_node (struct ieee80211_node_table *nt,
@@ -71,7 +72,7 @@ wlan_node_alloc(struct ieee80211_node_table *nt, int wh_size)
         {
         ni->ni_buf = A_MALLOC_NOWAIT(wh_size);
         if (ni->ni_buf == NULL) {
-            kfree(ni);
+            A_FREE(ni);
             ni = NULL;
             return ni;
         }
@@ -103,9 +104,9 @@ void
 wlan_node_free(bss_t *ni)
 {
     if (ni->ni_buf != NULL) {
-        kfree(ni->ni_buf);
+        A_FREE(ni->ni_buf);
     }
-    kfree(ni);
+    A_FREE(ni);
 }
 
 void
@@ -374,7 +375,7 @@ wlan_refresh_inactive_nodes (struct ieee80211_node_table *nt)
 
 #ifdef THREAD_X
 static void
-wlan_node_timeout (unsigned long arg)
+wlan_node_timeout (A_ATH_TIMER arg)
 {
     struct ieee80211_node_table *nt = (struct ieee80211_node_table *)arg;
     bss_t *bss, *nextBss;

@@ -18,8 +18,6 @@
  *   Haiyang Zhang <haiyangz@microsoft.com>
  *   Hank Janssen  <hjanssen@microsoft.com>
  */
-#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/highmem.h>
@@ -38,9 +36,11 @@
 #include <net/route.h>
 #include <net/sock.h>
 #include <net/pkt_sched.h>
-
-#include "hyperv.h"
-#include "hyperv_net.h"
+#include "hv_api.h"
+#include "logging.h"
+#include "version_info.h"
+#include "vmbus.h"
+#include "netvsc_api.h"
 
 struct net_device_context {
 	/* point back to our device context */
@@ -57,6 +57,9 @@ struct net_device_context {
 static int ring_size = 128;
 module_param(ring_size, int, S_IRUGO);
 MODULE_PARM_DESC(ring_size, "Ring buffer size (# of pages)");
+
+/* The one and only one */
+static struct  netvsc_driver g_netvsc_drv;
 
 /* no-op so the netdev core doesn't return -EINVAL when modifying the the
  * multicast address list in SIOCADDMULTI. hv is setup to get all multicast
@@ -75,14 +78,14 @@ static int netvsc_open(struct net_device *net)
 		/* Open up the device */
 		ret = rndis_filter_open(device_obj);
 		if (ret != 0) {
-			netdev_err(net, "unable to open device (ret %d).\n",
-				   ret);
+			DPRINT_ERR(NETVSC_DRV,
+				   "unable to open device (ret %d).", ret);
 			return ret;
 		}
 
 		netif_start_queue(net);
 	} else {
-		netdev_err(net, "unable to open device...link is down.\n");
+		DPRINT_ERR(NETVSC_DRV, "unable to open device...link is down.");
 	}
 
 	return ret;
@@ -98,7 +101,7 @@ static int netvsc_close(struct net_device *net)
 
 	ret = rndis_filter_close(device_obj);
 	if (ret != 0)
-		netdev_err(net, "unable to close device (ret %d).\n", ret);
+		DPRINT_ERR(NETVSC_DRV, "unable to close device (ret %d).", ret);
 
 	return ret;
 }
@@ -127,9 +130,15 @@ static void netvsc_xmit_completion(void *context)
 static int netvsc_start_xmit(struct sk_buff *skb, struct net_device *net)
 {
 	struct net_device_context *net_device_ctx = netdev_priv(net);
+	struct hv_driver *drv =
+	    drv_to_hv_drv(net_device_ctx->device_ctx->device.driver);
+	struct netvsc_driver *net_drv_obj = drv->priv;
 	struct hv_netvsc_packet *packet;
 	int ret;
 	unsigned int i, num_pages;
+
+	DPRINT_DBG(NETVSC_DRV, "xmit packet - len %d data_len %d",
+		   skb->len, skb->data_len);
 
 	/* Add 1 for skb->data and additional one for RNDIS */
 	num_pages = skb_shinfo(skb)->nr_frags + 1 + 1;
@@ -139,10 +148,10 @@ static int netvsc_start_xmit(struct sk_buff *skb, struct net_device *net)
 	/* Allocate a netvsc packet based on # of frags. */
 	packet = kzalloc(sizeof(struct hv_netvsc_packet) +
 			 (num_pages * sizeof(struct hv_page_buffer)) +
-			 sizeof(struct rndis_filter_packet), GFP_ATOMIC);
+			 net_drv_obj->req_ext_size, GFP_ATOMIC);
 	if (!packet) {
 		/* out of memory, silently drop packet */
-		netdev_err(net, "unable to allocate hv_netvsc_packet\n");
+		DPRINT_ERR(NETVSC_DRV, "unable to allocate hv_netvsc_packet");
 
 		dev_kfree_skb(skb);
 		net->stats.tx_dropped++;
@@ -182,11 +191,15 @@ static int netvsc_start_xmit(struct sk_buff *skb, struct net_device *net)
 	packet->completion.send.send_completion_ctx = packet;
 	packet->completion.send.send_completion_tid = (unsigned long)skb;
 
-	ret = rndis_filter_send(net_device_ctx->device_ctx,
+	ret = net_drv_obj->send(net_device_ctx->device_ctx,
 				  packet);
 	if (ret == 0) {
 		net->stats.tx_bytes += skb->len;
 		net->stats.tx_packets++;
+
+		DPRINT_DBG(NETVSC_DRV, "# of xmits %lu total size %lu",
+			   net->stats.tx_packets,
+			   net->stats.tx_bytes);
 
 		net_device_ctx->avail -= num_pages;
 		if (net_device_ctx->avail < PACKET_PAGES_LOWATER)
@@ -203,15 +216,15 @@ static int netvsc_start_xmit(struct sk_buff *skb, struct net_device *net)
 /*
  * netvsc_linkstatus_callback - Link up/down notification
  */
-void netvsc_linkstatus_callback(struct hv_device *device_obj,
+static void netvsc_linkstatus_callback(struct hv_device *device_obj,
 				       unsigned int status)
 {
 	struct net_device *net = dev_get_drvdata(&device_obj->device);
 	struct net_device_context *ndev_ctx;
 
 	if (!net) {
-		netdev_err(net, "got link status but net device "
-				"not initialized yet\n");
+		DPRINT_ERR(NETVSC_DRV, "got link status but net device "
+				"not initialized yet");
 		return;
 	}
 
@@ -231,7 +244,7 @@ void netvsc_linkstatus_callback(struct hv_device *device_obj,
  * netvsc_recv_callback -  Callback when we receive a packet from the
  * "wire" on the specified device.
  */
-int netvsc_recv_callback(struct hv_device *device_obj,
+static int netvsc_recv_callback(struct hv_device *device_obj,
 				struct hv_netvsc_packet *packet)
 {
 	struct net_device *net = dev_get_drvdata(&device_obj->device);
@@ -241,8 +254,8 @@ int netvsc_recv_callback(struct hv_device *device_obj,
 	unsigned long flags;
 
 	if (!net) {
-		netdev_err(net, "got receive callback but net device"
-			" not initialized yet\n");
+		DPRINT_ERR(NETVSC_DRV, "got receive callback but net device "
+				"not initialized yet");
 		return 0;
 	}
 
@@ -288,6 +301,9 @@ int netvsc_recv_callback(struct hv_device *device_obj,
 	 */
 	netif_rx(skb);
 
+	DPRINT_DBG(NETVSC_DRV, "# of recvs %lu total size %lu",
+		   net->stats.rx_packets, net->stats.rx_bytes);
+
 	return 0;
 }
 
@@ -301,6 +317,8 @@ static void netvsc_get_drvinfo(struct net_device *net,
 
 static const struct ethtool_ops ethtool_ops = {
 	.get_drvinfo	= netvsc_get_drvinfo,
+	.get_sg		= ethtool_op_get_sg,
+	.set_sg		= ethtool_op_set_sg,
 	.get_link	= ethtool_op_get_link,
 };
 
@@ -333,12 +351,19 @@ static void netvsc_send_garp(struct work_struct *w)
 }
 
 
-static int netvsc_probe(struct hv_device *dev)
+static int netvsc_probe(struct device *device)
 {
+	struct hv_driver *drv =
+		drv_to_hv_drv(device->driver);
+	struct netvsc_driver *net_drv_obj = drv->priv;
+	struct hv_device *device_obj = device_to_hv_device(device);
 	struct net_device *net = NULL;
 	struct net_device_context *net_device_ctx;
 	struct netvsc_device_info device_info;
 	int ret;
+
+	if (!net_drv_obj->base.dev_add)
+		return -1;
 
 	net = alloc_etherdev(sizeof(struct net_device_context));
 	if (!net)
@@ -348,19 +373,19 @@ static int netvsc_probe(struct hv_device *dev)
 	netif_carrier_off(net);
 
 	net_device_ctx = netdev_priv(net);
-	net_device_ctx->device_ctx = dev;
+	net_device_ctx->device_ctx = device_obj;
 	net_device_ctx->avail = ring_size;
-	dev_set_drvdata(&dev->device, net);
+	dev_set_drvdata(device, net);
 	INIT_WORK(&net_device_ctx->work, netvsc_send_garp);
 
 	/* Notify the netvsc driver of the new device */
-	device_info.ring_size = ring_size;
-	ret = rndis_filte_device_add(dev, &device_info);
+	ret = net_drv_obj->base.dev_add(device_obj, &device_info);
 	if (ret != 0) {
 		free_netdev(net);
-		dev_set_drvdata(&dev->device, NULL);
+		dev_set_drvdata(device, NULL);
 
-		netdev_err(net, "unable to add netvsc device (ret %d)\n", ret);
+		DPRINT_ERR(NETVSC_DRV, "unable to add netvsc device (ret %d)",
+			   ret);
 		return ret;
 	}
 
@@ -381,31 +406,37 @@ static int netvsc_probe(struct hv_device *dev)
 	net->netdev_ops = &device_ops;
 
 	/* TODO: Add GSO and Checksum offload */
-	net->hw_features = NETIF_F_SG;
 	net->features = NETIF_F_SG;
 
 	SET_ETHTOOL_OPS(net, &ethtool_ops);
-	SET_NETDEV_DEV(net, &dev->device);
+	SET_NETDEV_DEV(net, device);
 
 	ret = register_netdev(net);
 	if (ret != 0) {
 		/* Remove the device and release the resource */
-		rndis_filter_device_remove(dev);
+		net_drv_obj->base.dev_rm(device_obj);
 		free_netdev(net);
 	}
 
 	return ret;
 }
 
-static int netvsc_remove(struct hv_device *dev)
+static int netvsc_remove(struct device *device)
 {
-	struct net_device *net = dev_get_drvdata(&dev->device);
+	struct hv_driver *drv =
+		drv_to_hv_drv(device->driver);
+	struct netvsc_driver *net_drv_obj = drv->priv;
+	struct hv_device *device_obj = device_to_hv_device(device);
+	struct net_device *net = dev_get_drvdata(&device_obj->device);
 	int ret;
 
 	if (net == NULL) {
-		dev_err(&dev->device, "No net device to remove\n");
+		DPRINT_INFO(NETVSC, "no net device to remove");
 		return 0;
 	}
+
+	if (!net_drv_obj->base.dev_rm)
+		return -1;
 
 	/* Stop outbound asap */
 	netif_stop_queue(net);
@@ -417,27 +448,84 @@ static int netvsc_remove(struct hv_device *dev)
 	 * Call to the vsc driver to let it know that the device is being
 	 * removed
 	 */
-	ret = rndis_filter_device_remove(dev);
+	ret = net_drv_obj->base.dev_rm(device_obj);
 	if (ret != 0) {
 		/* TODO: */
-		netdev_err(net, "unable to remove vsc device (ret %d)\n", ret);
+		DPRINT_ERR(NETVSC, "unable to remove vsc device (ret %d)", ret);
 	}
 
 	free_netdev(net);
 	return ret;
 }
 
-/* The one and only one */
-static struct  hv_driver netvsc_drv = {
-	.probe = netvsc_probe,
-	.remove = netvsc_remove,
-};
-
-static void __exit netvsc_drv_exit(void)
+static int netvsc_drv_exit_cb(struct device *dev, void *data)
 {
-	vmbus_child_driver_unregister(&netvsc_drv.driver);
+	struct device **curr = (struct device **)data;
+
+	*curr = dev;
+	/* stop iterating */
+	return 1;
 }
 
+static void netvsc_drv_exit(void)
+{
+	struct netvsc_driver *netvsc_drv_obj = &g_netvsc_drv;
+	struct hv_driver *drv = &g_netvsc_drv.base;
+	struct device *current_dev;
+	int ret;
+
+	while (1) {
+		current_dev = NULL;
+
+		/* Get the device */
+		ret = driver_for_each_device(&drv->driver, NULL,
+					     &current_dev, netvsc_drv_exit_cb);
+		if (ret)
+			DPRINT_WARN(NETVSC_DRV,
+				    "driver_for_each_device returned %d", ret);
+
+		if (current_dev == NULL)
+			break;
+
+		/* Initiate removal from the top-down */
+		DPRINT_INFO(NETVSC_DRV, "unregistering device (%p)...",
+			    current_dev);
+
+		device_unregister(current_dev);
+	}
+
+	if (netvsc_drv_obj->base.cleanup)
+		netvsc_drv_obj->base.cleanup(&netvsc_drv_obj->base);
+
+	vmbus_child_driver_unregister(&drv->driver);
+
+	return;
+}
+
+static int netvsc_drv_init(int (*drv_init)(struct hv_driver *drv))
+{
+	struct netvsc_driver *net_drv_obj = &g_netvsc_drv;
+	struct hv_driver *drv = &g_netvsc_drv.base;
+	int ret;
+
+	net_drv_obj->ring_buf_size = ring_size * PAGE_SIZE;
+	net_drv_obj->recv_cb = netvsc_recv_callback;
+	net_drv_obj->link_status_change = netvsc_linkstatus_callback;
+	drv->priv = net_drv_obj;
+
+	/* Callback to client driver to complete the initialization */
+	drv_init(&net_drv_obj->base);
+
+	drv->driver.name = net_drv_obj->base.name;
+
+	drv->driver.probe = netvsc_probe;
+	drv->driver.remove = netvsc_remove;
+
+	/* The driver belongs to vmbus */
+	ret = vmbus_child_driver_register(&drv->driver);
+
+	return ret;
+}
 
 static const struct dmi_system_id __initconst
 hv_netvsc_dmi_table[] __maybe_unused  = {
@@ -453,26 +541,19 @@ hv_netvsc_dmi_table[] __maybe_unused  = {
 };
 MODULE_DEVICE_TABLE(dmi, hv_netvsc_dmi_table);
 
-static int __init netvsc_drv_init(void)
+static int __init netvsc_init(void)
 {
-	struct hv_driver *drv = &netvsc_drv;
-	int ret;
-
-	pr_info("initializing....");
+	DPRINT_INFO(NETVSC_DRV, "Netvsc initializing....");
 
 	if (!dmi_check_system(hv_netvsc_dmi_table))
 		return -ENODEV;
 
+	return netvsc_drv_init(netvsc_initialize);
+}
 
-	/* Callback to client driver to complete the initialization */
-	netvsc_initialize(drv);
-
-	drv->driver.name = drv->name;
-
-	/* The driver belongs to vmbus */
-	ret = vmbus_child_driver_register(&drv->driver);
-
-	return ret;
+static void __exit netvsc_exit(void)
+{
+	netvsc_drv_exit();
 }
 
 static const struct pci_device_id __initconst
@@ -486,5 +567,5 @@ MODULE_LICENSE("GPL");
 MODULE_VERSION(HV_DRV_VERSION);
 MODULE_DESCRIPTION("Microsoft Hyper-V network driver");
 
-module_init(netvsc_drv_init);
-module_exit(netvsc_drv_exit);
+module_init(netvsc_init);
+module_exit(netvsc_exit);

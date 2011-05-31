@@ -41,6 +41,7 @@ struct unix_skb_parms {
 				spin_lock_nested(&unix_sk(s)->lock, \
 				SINGLE_DEPTH_NESTING)
 
+#ifdef __KERNEL__
 /* The AF_UNIX socket */
 struct unix_sock {
 	/* WARNING: sk has to be the first member */
@@ -69,5 +70,6 @@ extern void unix_sysctl_unregister(struct net *net);
 #else
 static inline int unix_sysctl_register(struct net *net) { return 0; }
 static inline void unix_sysctl_unregister(struct net *net) {}
+#endif
 #endif
 #endif

@@ -1,4 +1,6 @@
 /*
+ *  linux/drivers/serial/8250_exar.c
+ *
  *  Written by Paul B Schroeder < pschroeder "at" uplogix "dot" com >
  *  Based on 8250_boca.
  *

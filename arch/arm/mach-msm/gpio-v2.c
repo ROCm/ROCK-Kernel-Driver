@@ -27,9 +27,6 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/spinlock.h>
-
-#include <asm/mach/irq.h>
-
 #include <mach/msm_iomap.h>
 #include "gpiomux.h"
 
@@ -312,10 +309,8 @@ static int msm_gpio_irq_set_type(struct irq_data *d, unsigned int flow_type)
  */
 static void msm_summary_irq_handler(unsigned int irq, struct irq_desc *desc)
 {
+	struct irq_data *data = irq_desc_get_irq_data(desc);
 	unsigned long i;
-	struct irq_chip *chip = irq_desc_get_chip(desc);
-
-	chained_irq_enter(chip, desc);
 
 	for (i = find_first_bit(msm_gpio.enabled_irqs, NR_GPIO_IRQS);
 	     i < NR_GPIO_IRQS;
@@ -324,8 +319,7 @@ static void msm_summary_irq_handler(unsigned int irq, struct irq_desc *desc)
 			generic_handle_irq(msm_gpio_to_irq(&msm_gpio.gpio_chip,
 							   i));
 	}
-
-	chained_irq_exit(chip, desc);
+	data->chip->irq_ack(data);
 }
 
 static int msm_gpio_irq_set_wake(struct irq_data *d, unsigned int on)

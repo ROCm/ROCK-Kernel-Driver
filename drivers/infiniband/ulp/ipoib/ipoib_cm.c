@@ -1463,7 +1463,8 @@ static ssize_t set_mode(struct device *d, struct device_attribute *attr,
 		set_bit(IPOIB_FLAG_ADMIN_CM, &priv->flags);
 		ipoib_warn(priv, "enabling connected mode "
 			   "will cause multicast packet drops\n");
-		netdev_update_features(dev);
+
+		dev->features &= ~(NETIF_F_IP_CSUM | NETIF_F_SG | NETIF_F_TSO);
 		rtnl_unlock();
 		priv->tx_wr.send_flags &= ~IB_SEND_IP_CSUM;
 
@@ -1473,7 +1474,13 @@ static ssize_t set_mode(struct device *d, struct device_attribute *attr,
 
 	if (!strcmp(buf, "datagram\n")) {
 		clear_bit(IPOIB_FLAG_ADMIN_CM, &priv->flags);
-		netdev_update_features(dev);
+
+		if (test_bit(IPOIB_FLAG_CSUM, &priv->flags)) {
+			dev->features |= NETIF_F_IP_CSUM | NETIF_F_SG;
+			priv->dev->features |= NETIF_F_GRO;
+			if (priv->hca_caps & IB_DEVICE_UD_TSO)
+				dev->features |= NETIF_F_TSO;
+		}
 		dev_set_mtu(dev, min(priv->mcast_mtu, dev->mtu));
 		rtnl_unlock();
 		ipoib_flush_paths(dev);

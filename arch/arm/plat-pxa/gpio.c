@@ -15,7 +15,7 @@
 #include <linux/init.h>
 #include <linux/irq.h>
 #include <linux/io.h>
-#include <linux/syscore_ops.h>
+#include <linux/sysdev.h>
 #include <linux/slab.h>
 
 #include <mach/gpio.h>
@@ -295,7 +295,7 @@ void __init pxa_init_gpio(int mux_irq, int start, int end, set_wake_t fn)
 }
 
 #ifdef CONFIG_PM
-static int pxa_gpio_suspend(void)
+static int pxa_gpio_suspend(struct sys_device *dev, pm_message_t state)
 {
 	struct pxa_gpio_chip *c;
 	int gpio;
@@ -312,7 +312,7 @@ static int pxa_gpio_suspend(void)
 	return 0;
 }
 
-static void pxa_gpio_resume(void)
+static int pxa_gpio_resume(struct sys_device *dev)
 {
 	struct pxa_gpio_chip *c;
 	int gpio;
@@ -326,13 +326,22 @@ static void pxa_gpio_resume(void)
 		__raw_writel(c->saved_gfer, c->regbase + GFER_OFFSET);
 		__raw_writel(c->saved_gpdr, c->regbase + GPDR_OFFSET);
 	}
+	return 0;
 }
 #else
 #define pxa_gpio_suspend	NULL
 #define pxa_gpio_resume		NULL
 #endif
 
-struct syscore_ops pxa_gpio_syscore_ops = {
+struct sysdev_class pxa_gpio_sysclass = {
+	.name		= "gpio",
 	.suspend	= pxa_gpio_suspend,
 	.resume		= pxa_gpio_resume,
 };
+
+static int __init pxa_gpio_init(void)
+{
+	return sysdev_class_register(&pxa_gpio_sysclass);
+}
+
+core_initcall(pxa_gpio_init);

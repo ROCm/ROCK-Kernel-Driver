@@ -147,6 +147,7 @@ struct datalink_proto *register_snap_client(const unsigned char *desc,
 out:
 	spin_unlock_bh(&snap_lock);
 
+	synchronize_net();
 	return proto;
 }
 

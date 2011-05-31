@@ -129,12 +129,6 @@ enum wl1251_partition_type {
 	PART_TABLE_LEN
 };
 
-enum wl1251_station_mode {
-	STATION_ACTIVE_MODE,
-	STATION_POWER_SAVE_MODE,
-	STATION_IDLE,
-};
-
 struct wl1251_partition {
 	u32 size;
 	u32 start;
@@ -364,7 +358,8 @@ struct wl1251 {
 
 	struct delayed_work elp_work;
 
-	enum wl1251_station_mode station_mode;
+	/* we can be in psm, but not in elp, we have to differentiate */
+	bool psm;
 
 	/* PSM mode requested */
 	bool psm_requested;

@@ -33,7 +33,6 @@
 #include <linux/io.h>
 #include <linux/gpio.h>
 #include <linux/slab.h>
-#include <linux/pm_runtime.h>
 
 /*
  * Langwell chip has 64 pins and thus there are 2 32bit registers to control
@@ -64,7 +63,6 @@ struct lnw_gpio {
 	void				*reg_base;
 	spinlock_t			lock;
 	unsigned			irq_base;
-	struct pci_dev			*pdev;
 };
 
 static void __iomem *gpio_reg(struct gpio_chip *chip, unsigned offset,
@@ -106,18 +104,11 @@ static int lnw_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
 	u32 value;
 	unsigned long flags;
 
-	if (lnw->pdev)
-		pm_runtime_get(&lnw->pdev->dev);
-
 	spin_lock_irqsave(&lnw->lock, flags);
 	value = readl(gpdr);
 	value &= ~BIT(offset % 32);
 	writel(value, gpdr);
 	spin_unlock_irqrestore(&lnw->lock, flags);
-
-	if (lnw->pdev)
-		pm_runtime_put(&lnw->pdev->dev);
-
 	return 0;
 }
 
@@ -129,19 +120,11 @@ static int lnw_gpio_direction_output(struct gpio_chip *chip,
 	unsigned long flags;
 
 	lnw_gpio_set(chip, offset, value);
-
-	if (lnw->pdev)
-		pm_runtime_get(&lnw->pdev->dev);
-
 	spin_lock_irqsave(&lnw->lock, flags);
 	value = readl(gpdr);
-	value |= BIT(offset % 32);
+	value |= BIT(offset % 32);;
 	writel(value, gpdr);
 	spin_unlock_irqrestore(&lnw->lock, flags);
-
-	if (lnw->pdev)
-		pm_runtime_put(&lnw->pdev->dev);
-
 	return 0;
 }
 
@@ -162,10 +145,6 @@ static int lnw_irq_type(struct irq_data *d, unsigned type)
 
 	if (gpio >= lnw->chip.ngpio)
 		return -EINVAL;
-
-	if (lnw->pdev)
-		pm_runtime_get(&lnw->pdev->dev);
-
 	spin_lock_irqsave(&lnw->lock, flags);
 	if (type & IRQ_TYPE_EDGE_RISING)
 		value = readl(grer) | BIT(gpio % 32);
@@ -179,9 +158,6 @@ static int lnw_irq_type(struct irq_data *d, unsigned type)
 		value = readl(gfer) & (~BIT(gpio % 32));
 	writel(value, gfer);
 	spin_unlock_irqrestore(&lnw->lock, flags);
-
-	if (lnw->pdev)
-		pm_runtime_put(&lnw->pdev->dev);
 
 	return 0;
 }
@@ -234,39 +210,6 @@ static void lnw_irq_handler(unsigned irq, struct irq_desc *desc)
 
 	chip->irq_eoi(data);
 }
-
-#ifdef CONFIG_PM
-static int lnw_gpio_runtime_resume(struct device *dev)
-{
-	return 0;
-}
-
-static int lnw_gpio_runtime_suspend(struct device *dev)
-{
-	return 0;
-}
-
-static int lnw_gpio_runtime_idle(struct device *dev)
-{
-	int err = pm_schedule_suspend(dev, 500);
-
-	if (!err)
-		return 0;
-
-	return -EBUSY;
-}
-
-#else
-#define lnw_gpio_runtime_suspend	NULL
-#define lnw_gpio_runtime_resume		NULL
-#define lnw_gpio_runtime_idle		NULL
-#endif
-
-static const struct dev_pm_ops lnw_gpio_pm_ops = {
-	.runtime_suspend = lnw_gpio_runtime_suspend,
-	.runtime_resume = lnw_gpio_runtime_resume,
-	.runtime_idle = lnw_gpio_runtime_idle,
-};
 
 static int __devinit lnw_gpio_probe(struct pci_dev *pdev,
 			const struct pci_device_id *id)
@@ -327,7 +270,6 @@ static int __devinit lnw_gpio_probe(struct pci_dev *pdev,
 	lnw->chip.base = gpio_base;
 	lnw->chip.ngpio = id->driver_data;
 	lnw->chip.can_sleep = 0;
-	lnw->pdev = pdev;
 	pci_set_drvdata(pdev, lnw);
 	retval = gpiochip_add(&lnw->chip);
 	if (retval) {
@@ -343,10 +285,6 @@ static int __devinit lnw_gpio_probe(struct pci_dev *pdev,
 	}
 
 	spin_lock_init(&lnw->lock);
-
-	pm_runtime_put_noidle(&pdev->dev);
-	pm_runtime_allow(&pdev->dev);
-
 	goto done;
 err5:
 	kfree(lnw);
@@ -364,9 +302,6 @@ static struct pci_driver lnw_gpio_driver = {
 	.name		= "langwell_gpio",
 	.id_table	= lnw_gpio_ids,
 	.probe		= lnw_gpio_probe,
-	.driver		= {
-		.pm	= &lnw_gpio_pm_ops,
-	},
 };
 
 

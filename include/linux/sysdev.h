@@ -34,6 +34,12 @@ struct sysdev_class {
 	struct list_head	drivers;
 	struct sysdev_class_attribute **attrs;
 	struct kset		kset;
+#ifndef CONFIG_ARCH_NO_SYSDEV_OPS
+	/* Default operations for these types of devices */
+	int	(*shutdown)(struct sys_device *);
+	int	(*suspend)(struct sys_device *, pm_message_t state);
+	int	(*resume)(struct sys_device *);
+#endif
 };
 
 struct sysdev_class_attribute {
@@ -71,6 +77,11 @@ struct sysdev_driver {
 	struct list_head	entry;
 	int	(*add)(struct sys_device *);
 	int	(*remove)(struct sys_device *);
+#ifndef CONFIG_ARCH_NO_SYSDEV_OPS
+	int	(*shutdown)(struct sys_device *);
+	int	(*suspend)(struct sys_device *, pm_message_t state);
+	int	(*resume)(struct sys_device *);
+#endif
 };
 
 

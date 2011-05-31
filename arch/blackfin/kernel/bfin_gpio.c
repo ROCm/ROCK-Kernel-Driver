@@ -10,12 +10,10 @@
 #include <linux/module.h>
 #include <linux/err.h>
 #include <linux/proc_fs.h>
-#include <linux/seq_file.h>
 #include <asm/blackfin.h>
 #include <asm/gpio.h>
 #include <asm/portmux.h>
 #include <linux/irq.h>
-#include <asm/irq_handler.h>
 
 #if ANOMALY_05000311 || ANOMALY_05000323
 enum {
@@ -536,7 +534,7 @@ static const unsigned int sic_iwr_irqs[] = {
 #if defined(BF533_FAMILY)
 	IRQ_PROG_INTB
 #elif defined(BF537_FAMILY)
-	IRQ_PF_INTB_WATCH, IRQ_PORTG_INTB, IRQ_PH_INTB_MAC_TX
+	IRQ_PROG_INTB, IRQ_PORTG_INTB, IRQ_MAC_TX
 #elif defined(BF538_FAMILY)
 	IRQ_PORTF_INTB
 #elif defined(CONFIG_BF52x) || defined(CONFIG_BF51x)
@@ -1205,43 +1203,35 @@ void bfin_reset_boot_spi_cs(unsigned short pin)
 }
 
 #if defined(CONFIG_PROC_FS)
-static int gpio_proc_show(struct seq_file *m, void *v)
+static int gpio_proc_read(char *buf, char **start, off_t offset,
+			  int len, int *unused_i, void *unused_v)
 {
-	int c, irq, gpio;
+	int c, irq, gpio, outlen = 0;
 
 	for (c = 0; c < MAX_RESOURCES; c++) {
 		irq = is_reserved(gpio_irq, c, 1);
 		gpio = is_reserved(gpio, c, 1);
 		if (!check_gpio(c) && (gpio || irq))
-			seq_printf(m, "GPIO_%d: \t%s%s \t\tGPIO %s\n", c,
+			len = sprintf(buf, "GPIO_%d: \t%s%s \t\tGPIO %s\n", c,
 				 get_label(c), (gpio && irq) ? " *" : "",
 				 get_gpio_dir(c) ? "OUTPUT" : "INPUT");
 		else if (is_reserved(peri, c, 1))
-			seq_printf(m, "GPIO_%d: \t%s \t\tPeripheral\n", c, get_label(c));
+			len = sprintf(buf, "GPIO_%d: \t%s \t\tPeripheral\n", c, get_label(c));
 		else
 			continue;
+		buf += len;
+		outlen += len;
 	}
-
-	return 0;
+	return outlen;
 }
-
-static int gpio_proc_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, gpio_proc_show, NULL);
-}
-
-static const struct file_operations gpio_proc_ops = {
-	.open		= gpio_proc_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
-};
 
 static __init int gpio_register_proc(void)
 {
 	struct proc_dir_entry *proc_gpio;
 
-	proc_gpio = proc_create("gpio", S_IRUGO, NULL, &gpio_proc_ops);
+	proc_gpio = create_proc_entry("gpio", S_IRUGO, NULL);
+	if (proc_gpio)
+		proc_gpio->read_proc = gpio_proc_read;
 	return proc_gpio != NULL;
 }
 __initcall(gpio_register_proc);

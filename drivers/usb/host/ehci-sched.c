@@ -471,10 +471,8 @@ static int enable_periodic (struct ehci_hcd *ehci)
 	 */
 	status = handshake_on_error_set_halt(ehci, &ehci->regs->status,
 					     STS_PSS, 0, 9 * 125);
-	if (status) {
-		usb_hc_died(ehci_to_hcd(ehci));
+	if (status)
 		return status;
-	}
 
 	cmd = ehci_readl(ehci, &ehci->regs->command) | CMD_PSE;
 	ehci_writel(ehci, cmd, &ehci->regs->command);
@@ -512,10 +510,8 @@ static int disable_periodic (struct ehci_hcd *ehci)
 	 */
 	status = handshake_on_error_set_halt(ehci, &ehci->regs->status,
 					     STS_PSS, STS_PSS, 9 * 125);
-	if (status) {
-		usb_hc_died(ehci_to_hcd(ehci));
+	if (status)
 		return status;
-	}
 
 	cmd = ehci_readl(ehci, &ehci->regs->command) & ~CMD_PSE;
 	ehci_writel(ehci, cmd, &ehci->regs->command);
@@ -2291,7 +2287,6 @@ scan_periodic (struct ehci_hcd *ehci)
 	}
 	clock &= mod - 1;
 	clock_frame = clock >> 3;
-	++ehci->periodic_stamp;
 
 	for (;;) {
 		union ehci_shadow	q, *q_p;
@@ -2320,14 +2315,10 @@ restart:
 				temp.qh = qh_get (q.qh);
 				type = Q_NEXT_TYPE(ehci, q.qh->hw->hw_next);
 				q = q.qh->qh_next;
-				if (temp.qh->stamp != ehci->periodic_stamp) {
-					modified = qh_completions(ehci, temp.qh);
-					if (!modified)
-						temp.qh->stamp = ehci->periodic_stamp;
-					if (unlikely(list_empty(&temp.qh->qtd_list) ||
-							temp.qh->needs_rescan))
-						intr_deschedule(ehci, temp.qh);
-				}
+				modified = qh_completions (ehci, temp.qh);
+				if (unlikely(list_empty(&temp.qh->qtd_list) ||
+						temp.qh->needs_rescan))
+					intr_deschedule (ehci, temp.qh);
 				qh_put (temp.qh);
 				break;
 			case Q_TYPE_FSTN:
@@ -2469,7 +2460,6 @@ restart:
 			if (ehci->clock_frame != clock_frame) {
 				free_cached_lists(ehci);
 				ehci->clock_frame = clock_frame;
-				++ehci->periodic_stamp;
 			}
 		} else {
 			now_uframe++;

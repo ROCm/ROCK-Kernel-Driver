@@ -1014,7 +1014,6 @@ static struct platform_device *__initdata at32_usarts[4];
 void __init at32_map_usart(unsigned int hw_id, unsigned int line, int flags)
 {
 	struct platform_device *pdev;
-	struct atmel_uart_data *pdata;
 
 	switch (hw_id) {
 	case 0:
@@ -1043,8 +1042,7 @@ void __init at32_map_usart(unsigned int hw_id, unsigned int line, int flags)
 		data->regs = (void __iomem *)pdev->resource[0].start;
 	}
 
-	pdata = pdev->dev.platform_data;
-	pdata->num = portnr;
+	pdev->id = line;
 	at32_usarts[line] = pdev;
 }
 

@@ -254,6 +254,13 @@ static struct super_operations novfs_ops = {
 
 };
 
+/* Not currently used
+static struct file_operations novfs_Control_operations = {
+   .read    = novfs_Control_read,
+   .write   = novfs_Control_write,
+};
+*/
+
 static atomic_t novfs_Inode_Number = ATOMIC_INIT(0);
 
 struct dentry *novfs_root = NULL;
@@ -3431,6 +3438,31 @@ static void novfs_kill_sb(struct super_block *super)
 {
 	shrink_dcache_sb(super);
 	kill_litter_super(super);
+}
+
+/* This should be removed */
+#ifndef kernel_locked
+#define kernel_locked() (current->lock_depth >= 0)
+#endif
+
+ssize_t novfs_Control_read(struct file *file, char *buf, size_t nbytes, loff_t * ppos)
+{
+	ssize_t retval = 0;
+
+	DbgPrint("kernel_locked 0x%x", kernel_locked());
+
+	return retval;
+}
+
+ssize_t novfs_Control_write(struct file * file, const char *buf, size_t nbytes, loff_t * ppos)
+{
+	ssize_t retval = 0;
+
+	DbgPrint("kernel_locked 0x%x", kernel_locked());
+	if (buf && nbytes) {
+	}
+
+	return (retval);
 }
 
 static struct file_system_type novfs_fs_type = {

@@ -1,4 +1,5 @@
-/*
+/* linux/drivers/serial/s3c6400.c
+ *
  * Driver for Samsung S3C6400 and S3C6410 SoC onboard UARTs.
  *
  * Copyright 2008 Openmoko,  Inc.

@@ -318,15 +318,19 @@ void __init tx4939_sio_init(unsigned int sclk, unsigned int cts_mask)
 }
 
 #if defined(CONFIG_TC35815) || defined(CONFIG_TC35815_MODULE)
-static u32 tx4939_get_eth_speed(struct net_device *dev)
+static int tx4939_get_eth_speed(struct net_device *dev)
 {
-	struct ethtool_cmd cmd;
-	if (dev_ethtool_get_settings(dev, &cmd))
-		return 100;	/* default 100Mbps */
-
-	return ethtool_cmd_speed(&cmd);
+	struct ethtool_cmd cmd = { ETHTOOL_GSET };
+	int speed = 100;	/* default 100Mbps */
+	int err;
+	if (!dev->ethtool_ops || !dev->ethtool_ops->get_settings)
+		return speed;
+	err = dev->ethtool_ops->get_settings(dev, &cmd);
+	if (err < 0)
+		return speed;
+	speed = cmd.speed == SPEED_100 ? 100 : 10;
+	return speed;
 }
-
 static int tx4939_netdev_event(struct notifier_block *this,
 			       unsigned long event,
 			       void *ptr)
@@ -339,7 +343,8 @@ static int tx4939_netdev_event(struct notifier_block *this,
 		else if (dev->irq == TXX9_IRQ_BASE + TX4939_IR_ETH(1))
 			bit = TX4939_PCFG_SPEED1;
 		if (bit) {
-			if (tx4939_get_eth_speed(dev) == 100)
+			int speed = tx4939_get_eth_speed(dev);
+			if (speed == 100)
 				txx9_set64(&tx4939_ccfgptr->pcfg, bit);
 			else
 				txx9_clear64(&tx4939_ccfgptr->pcfg, bit);

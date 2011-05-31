@@ -310,7 +310,6 @@ handle_simple_irq(unsigned int irq, struct irq_desc *desc)
 out_unlock:
 	raw_spin_unlock(&desc->lock);
 }
-EXPORT_SYMBOL_GPL(handle_simple_irq);
 
 /**
  *	handle_level_irq - Level type irq handler
@@ -574,7 +573,6 @@ __irq_set_handler(unsigned int irq, irq_flow_handler_t handle, int is_chained,
 	if (handle != handle_bad_irq && is_chained) {
 		irq_settings_set_noprobe(desc);
 		irq_settings_set_norequest(desc);
-		irq_settings_set_nothread(desc);
 		irq_startup(desc);
 	}
 out:
@@ -614,7 +612,6 @@ void irq_modify_status(unsigned int irq, unsigned long clr, unsigned long set)
 
 	irq_put_desc_unlock(desc, flags);
 }
-EXPORT_SYMBOL_GPL(irq_modify_status);
 
 /**
  *	irq_cpu_online - Invoke all irq_cpu_online functions.

@@ -30,7 +30,7 @@
 #include <linux/interrupt.h>
 #include <linux/irq.h>
 #include <linux/slab.h>
-#include <linux/syscore_ops.h>
+#include <linux/sysdev.h>
 
 #include <asm/irq_cpu.h>
 #include <asm/mipsregs.h>
@@ -38,36 +38,6 @@
 #ifdef CONFIG_MIPS_PB1000
 #include <asm/mach-pb1x00/pb1000.h>
 #endif
-
-/* Interrupt Controller register offsets */
-#define IC_CFG0RD	0x40
-#define IC_CFG0SET	0x40
-#define IC_CFG0CLR	0x44
-#define IC_CFG1RD	0x48
-#define IC_CFG1SET	0x48
-#define IC_CFG1CLR	0x4C
-#define IC_CFG2RD	0x50
-#define IC_CFG2SET	0x50
-#define IC_CFG2CLR	0x54
-#define IC_REQ0INT	0x54
-#define IC_SRCRD	0x58
-#define IC_SRCSET	0x58
-#define IC_SRCCLR	0x5C
-#define IC_REQ1INT	0x5C
-#define IC_ASSIGNRD	0x60
-#define IC_ASSIGNSET	0x60
-#define IC_ASSIGNCLR	0x64
-#define IC_WAKERD	0x68
-#define IC_WAKESET	0x68
-#define IC_WAKECLR	0x6C
-#define IC_MASKRD	0x70
-#define IC_MASKSET	0x70
-#define IC_MASKCLR	0x74
-#define IC_RISINGRD	0x78
-#define IC_RISINGCLR	0x78
-#define IC_FALLINGRD	0x7C
-#define IC_FALLINGCLR	0x7C
-#define IC_TESTBIT	0x80
 
 static int au1x_ic_settype(struct irq_data *d, unsigned int flow_type);
 
@@ -251,101 +221,89 @@ struct au1xxx_irqmap au1200_irqmap[] __initdata = {
 static void au1x_ic0_unmask(struct irq_data *d)
 {
 	unsigned int bit = d->irq - AU1000_INTC0_INT_BASE;
-	void __iomem *base = (void __iomem *)KSEG1ADDR(AU1000_IC0_PHYS_ADDR);
-
-	__raw_writel(1 << bit, base + IC_MASKSET);
-	__raw_writel(1 << bit, base + IC_WAKESET);
-	wmb();
+	au_writel(1 << bit, IC0_MASKSET);
+	au_writel(1 << bit, IC0_WAKESET);
+	au_sync();
 }
 
 static void au1x_ic1_unmask(struct irq_data *d)
 {
 	unsigned int bit = d->irq - AU1000_INTC1_INT_BASE;
-	void __iomem *base = (void __iomem *)KSEG1ADDR(AU1000_IC1_PHYS_ADDR);
-
-	__raw_writel(1 << bit, base + IC_MASKSET);
-	__raw_writel(1 << bit, base + IC_WAKESET);
+	au_writel(1 << bit, IC1_MASKSET);
+	au_writel(1 << bit, IC1_WAKESET);
 
 /* very hacky. does the pb1000 cpld auto-disable this int?
  * nowhere in the current kernel sources is it disabled.	--mlau
  */
 #if defined(CONFIG_MIPS_PB1000)
 	if (d->irq == AU1000_GPIO15_INT)
-		__raw_writel(0x4000, (void __iomem *)PB1000_MDR); /* enable int */
+		au_writel(0x4000, PB1000_MDR); /* enable int */
 #endif
-	wmb();
+	au_sync();
 }
 
 static void au1x_ic0_mask(struct irq_data *d)
 {
 	unsigned int bit = d->irq - AU1000_INTC0_INT_BASE;
-	void __iomem *base = (void __iomem *)KSEG1ADDR(AU1000_IC0_PHYS_ADDR);
-
-	__raw_writel(1 << bit, base + IC_MASKCLR);
-	__raw_writel(1 << bit, base + IC_WAKECLR);
-	wmb();
+	au_writel(1 << bit, IC0_MASKCLR);
+	au_writel(1 << bit, IC0_WAKECLR);
+	au_sync();
 }
 
 static void au1x_ic1_mask(struct irq_data *d)
 {
 	unsigned int bit = d->irq - AU1000_INTC1_INT_BASE;
-	void __iomem *base = (void __iomem *)KSEG1ADDR(AU1000_IC1_PHYS_ADDR);
-
-	__raw_writel(1 << bit, base + IC_MASKCLR);
-	__raw_writel(1 << bit, base + IC_WAKECLR);
-	wmb();
+	au_writel(1 << bit, IC1_MASKCLR);
+	au_writel(1 << bit, IC1_WAKECLR);
+	au_sync();
 }
 
 static void au1x_ic0_ack(struct irq_data *d)
 {
 	unsigned int bit = d->irq - AU1000_INTC0_INT_BASE;
-	void __iomem *base = (void __iomem *)KSEG1ADDR(AU1000_IC0_PHYS_ADDR);
 
 	/*
 	 * This may assume that we don't get interrupts from
 	 * both edges at once, or if we do, that we don't care.
 	 */
-	__raw_writel(1 << bit, base + IC_FALLINGCLR);
-	__raw_writel(1 << bit, base + IC_RISINGCLR);
-	wmb();
+	au_writel(1 << bit, IC0_FALLINGCLR);
+	au_writel(1 << bit, IC0_RISINGCLR);
+	au_sync();
 }
 
 static void au1x_ic1_ack(struct irq_data *d)
 {
 	unsigned int bit = d->irq - AU1000_INTC1_INT_BASE;
-	void __iomem *base = (void __iomem *)KSEG1ADDR(AU1000_IC1_PHYS_ADDR);
 
 	/*
 	 * This may assume that we don't get interrupts from
 	 * both edges at once, or if we do, that we don't care.
 	 */
-	__raw_writel(1 << bit, base + IC_FALLINGCLR);
-	__raw_writel(1 << bit, base + IC_RISINGCLR);
-	wmb();
+	au_writel(1 << bit, IC1_FALLINGCLR);
+	au_writel(1 << bit, IC1_RISINGCLR);
+	au_sync();
 }
 
 static void au1x_ic0_maskack(struct irq_data *d)
 {
 	unsigned int bit = d->irq - AU1000_INTC0_INT_BASE;
-	void __iomem *base = (void __iomem *)KSEG1ADDR(AU1000_IC0_PHYS_ADDR);
 
-	__raw_writel(1 << bit, base + IC_WAKECLR);
-	__raw_writel(1 << bit, base + IC_MASKCLR);
-	__raw_writel(1 << bit, base + IC_RISINGCLR);
-	__raw_writel(1 << bit, base + IC_FALLINGCLR);
-	wmb();
+	au_writel(1 << bit, IC0_WAKECLR);
+	au_writel(1 << bit, IC0_MASKCLR);
+	au_writel(1 << bit, IC0_RISINGCLR);
+	au_writel(1 << bit, IC0_FALLINGCLR);
+	au_sync();
 }
 
 static void au1x_ic1_maskack(struct irq_data *d)
 {
 	unsigned int bit = d->irq - AU1000_INTC1_INT_BASE;
-	void __iomem *base = (void __iomem *)KSEG1ADDR(AU1000_IC1_PHYS_ADDR);
 
-	__raw_writel(1 << bit, base + IC_WAKECLR);
-	__raw_writel(1 << bit, base + IC_MASKCLR);
-	__raw_writel(1 << bit, base + IC_RISINGCLR);
-	__raw_writel(1 << bit, base + IC_FALLINGCLR);
-	wmb();
+	au_writel(1 << bit, IC1_WAKECLR);
+	au_writel(1 << bit, IC1_MASKCLR);
+	au_writel(1 << bit, IC1_RISINGCLR);
+	au_writel(1 << bit, IC1_FALLINGCLR);
+	au_sync();
 }
 
 static int au1x_ic1_setwake(struct irq_data *d, unsigned int on)
@@ -360,13 +318,13 @@ static int au1x_ic1_setwake(struct irq_data *d, unsigned int on)
 		return -EINVAL;
 
 	local_irq_save(flags);
-	wakemsk = __raw_readl((void __iomem *)SYS_WAKEMSK);
+	wakemsk = au_readl(SYS_WAKEMSK);
 	if (on)
 		wakemsk |= 1 << bit;
 	else
 		wakemsk &= ~(1 << bit);
-	__raw_writel(wakemsk, (void __iomem *)SYS_WAKEMSK);
-	wmb();
+	au_writel(wakemsk, SYS_WAKEMSK);
+	au_sync();
 	local_irq_restore(flags);
 
 	return 0;
@@ -398,74 +356,81 @@ static struct irq_chip au1x_ic1_chip = {
 static int au1x_ic_settype(struct irq_data *d, unsigned int flow_type)
 {
 	struct irq_chip *chip;
-	unsigned int bit, irq = d->irq;
+	unsigned long icr[6];
+	unsigned int bit, ic, irq = d->irq;
 	irq_flow_handler_t handler = NULL;
 	unsigned char *name = NULL;
-	void __iomem *base;
 	int ret;
 
 	if (irq >= AU1000_INTC1_INT_BASE) {
 		bit = irq - AU1000_INTC1_INT_BASE;
 		chip = &au1x_ic1_chip;
-		base = (void __iomem *)KSEG1ADDR(AU1000_IC1_PHYS_ADDR);
+		ic = 1;
 	} else {
 		bit = irq - AU1000_INTC0_INT_BASE;
 		chip = &au1x_ic0_chip;
-		base = (void __iomem *)KSEG1ADDR(AU1000_IC0_PHYS_ADDR);
+		ic = 0;
 	}
 
 	if (bit > 31)
 		return -EINVAL;
 
+	icr[0] = ic ? IC1_CFG0SET : IC0_CFG0SET;
+	icr[1] = ic ? IC1_CFG1SET : IC0_CFG1SET;
+	icr[2] = ic ? IC1_CFG2SET : IC0_CFG2SET;
+	icr[3] = ic ? IC1_CFG0CLR : IC0_CFG0CLR;
+	icr[4] = ic ? IC1_CFG1CLR : IC0_CFG1CLR;
+	icr[5] = ic ? IC1_CFG2CLR : IC0_CFG2CLR;
+
 	ret = 0;
 
 	switch (flow_type) {	/* cfgregs 2:1:0 */
 	case IRQ_TYPE_EDGE_RISING:	/* 0:0:1 */
-		__raw_writel(1 << bit, base + IC_CFG2CLR);
-		__raw_writel(1 << bit, base + IC_CFG1CLR);
-		__raw_writel(1 << bit, base + IC_CFG0SET);
+		au_writel(1 << bit, icr[5]);
+		au_writel(1 << bit, icr[4]);
+		au_writel(1 << bit, icr[0]);
 		handler = handle_edge_irq;
 		name = "riseedge";
 		break;
 	case IRQ_TYPE_EDGE_FALLING:	/* 0:1:0 */
-		__raw_writel(1 << bit, base + IC_CFG2CLR);
-		__raw_writel(1 << bit, base + IC_CFG1SET);
-		__raw_writel(1 << bit, base + IC_CFG0CLR);
+		au_writel(1 << bit, icr[5]);
+		au_writel(1 << bit, icr[1]);
+		au_writel(1 << bit, icr[3]);
 		handler = handle_edge_irq;
 		name = "falledge";
 		break;
 	case IRQ_TYPE_EDGE_BOTH:	/* 0:1:1 */
-		__raw_writel(1 << bit, base + IC_CFG2CLR);
-		__raw_writel(1 << bit, base + IC_CFG1SET);
-		__raw_writel(1 << bit, base + IC_CFG0SET);
+		au_writel(1 << bit, icr[5]);
+		au_writel(1 << bit, icr[1]);
+		au_writel(1 << bit, icr[0]);
 		handler = handle_edge_irq;
 		name = "bothedge";
 		break;
 	case IRQ_TYPE_LEVEL_HIGH:	/* 1:0:1 */
-		__raw_writel(1 << bit, base + IC_CFG2SET);
-		__raw_writel(1 << bit, base + IC_CFG1CLR);
-		__raw_writel(1 << bit, base + IC_CFG0SET);
+		au_writel(1 << bit, icr[2]);
+		au_writel(1 << bit, icr[4]);
+		au_writel(1 << bit, icr[0]);
 		handler = handle_level_irq;
 		name = "hilevel";
 		break;
 	case IRQ_TYPE_LEVEL_LOW:	/* 1:1:0 */
-		__raw_writel(1 << bit, base + IC_CFG2SET);
-		__raw_writel(1 << bit, base + IC_CFG1SET);
-		__raw_writel(1 << bit, base + IC_CFG0CLR);
+		au_writel(1 << bit, icr[2]);
+		au_writel(1 << bit, icr[1]);
+		au_writel(1 << bit, icr[3]);
 		handler = handle_level_irq;
 		name = "lowlevel";
 		break;
 	case IRQ_TYPE_NONE:		/* 0:0:0 */
-		__raw_writel(1 << bit, base + IC_CFG2CLR);
-		__raw_writel(1 << bit, base + IC_CFG1CLR);
-		__raw_writel(1 << bit, base + IC_CFG0CLR);
+		au_writel(1 << bit, icr[5]);
+		au_writel(1 << bit, icr[4]);
+		au_writel(1 << bit, icr[3]);
 		break;
 	default:
 		ret = -EINVAL;
 	}
 	__irq_set_chip_handler_name_locked(d->irq, chip, handler, name);
 
-	wmb();
+	au_sync();
 
 	return ret;
 }
@@ -479,21 +444,21 @@ asmlinkage void plat_irq_dispatch(void)
 		off = MIPS_CPU_IRQ_BASE + 7;
 		goto handle;
 	} else if (pending & CAUSEF_IP2) {
-		s = KSEG1ADDR(AU1000_IC0_PHYS_ADDR) + IC_REQ0INT;
+		s = IC0_REQ0INT;
 		off = AU1000_INTC0_INT_BASE;
 	} else if (pending & CAUSEF_IP3) {
-		s = KSEG1ADDR(AU1000_IC0_PHYS_ADDR) + IC_REQ1INT;
+		s = IC0_REQ1INT;
 		off = AU1000_INTC0_INT_BASE;
 	} else if (pending & CAUSEF_IP4) {
-		s = KSEG1ADDR(AU1000_IC1_PHYS_ADDR) + IC_REQ0INT;
+		s = IC1_REQ0INT;
 		off = AU1000_INTC1_INT_BASE;
 	} else if (pending & CAUSEF_IP5) {
-		s = KSEG1ADDR(AU1000_IC1_PHYS_ADDR) + IC_REQ1INT;
+		s = IC1_REQ1INT;
 		off = AU1000_INTC1_INT_BASE;
 	} else
 		goto spurious;
 
-	s = __raw_readl((void __iomem *)s);
+	s = au_readl(s);
 	if (unlikely(!s)) {
 spurious:
 		spurious_interrupt();
@@ -504,42 +469,48 @@ handle:
 	do_IRQ(off);
 }
 
-
-static inline void ic_init(void __iomem *base)
-{
-	/* initialize interrupt controller to a safe state */
-	__raw_writel(0xffffffff, base + IC_CFG0CLR);
-	__raw_writel(0xffffffff, base + IC_CFG1CLR);
-	__raw_writel(0xffffffff, base + IC_CFG2CLR);
-	__raw_writel(0xffffffff, base + IC_MASKCLR);
-	__raw_writel(0xffffffff, base + IC_ASSIGNCLR);
-	__raw_writel(0xffffffff, base + IC_WAKECLR);
-	__raw_writel(0xffffffff, base + IC_SRCSET);
-	__raw_writel(0xffffffff, base + IC_FALLINGCLR);
-	__raw_writel(0xffffffff, base + IC_RISINGCLR);
-	__raw_writel(0x00000000, base + IC_TESTBIT);
-	wmb();
-}
-
 static void __init au1000_init_irq(struct au1xxx_irqmap *map)
 {
 	unsigned int bit, irq_nr;
-	void __iomem *base;
+	int i;
 
-	ic_init((void __iomem *)KSEG1ADDR(AU1000_IC0_PHYS_ADDR));
-	ic_init((void __iomem *)KSEG1ADDR(AU1000_IC1_PHYS_ADDR));
+	/*
+	 * Initialize interrupt controllers to a safe state.
+	 */
+	au_writel(0xffffffff, IC0_CFG0CLR);
+	au_writel(0xffffffff, IC0_CFG1CLR);
+	au_writel(0xffffffff, IC0_CFG2CLR);
+	au_writel(0xffffffff, IC0_MASKCLR);
+	au_writel(0xffffffff, IC0_ASSIGNCLR);
+	au_writel(0xffffffff, IC0_WAKECLR);
+	au_writel(0xffffffff, IC0_SRCSET);
+	au_writel(0xffffffff, IC0_FALLINGCLR);
+	au_writel(0xffffffff, IC0_RISINGCLR);
+	au_writel(0x00000000, IC0_TESTBIT);
+
+	au_writel(0xffffffff, IC1_CFG0CLR);
+	au_writel(0xffffffff, IC1_CFG1CLR);
+	au_writel(0xffffffff, IC1_CFG2CLR);
+	au_writel(0xffffffff, IC1_MASKCLR);
+	au_writel(0xffffffff, IC1_ASSIGNCLR);
+	au_writel(0xffffffff, IC1_WAKECLR);
+	au_writel(0xffffffff, IC1_SRCSET);
+	au_writel(0xffffffff, IC1_FALLINGCLR);
+	au_writel(0xffffffff, IC1_RISINGCLR);
+	au_writel(0x00000000, IC1_TESTBIT);
+
 	mips_cpu_irq_init();
 
 	/* register all 64 possible IC0+IC1 irq sources as type "none".
 	 * Use set_irq_type() to set edge/level behaviour at runtime.
 	 */
-	for (irq_nr = AU1000_INTC0_INT_BASE;
-	     (irq_nr < AU1000_INTC0_INT_BASE + 32); irq_nr++)
-		au1x_ic_settype(irq_get_irq_data(irq_nr), IRQ_TYPE_NONE);
+	for (i = AU1000_INTC0_INT_BASE;
+	     (i < AU1000_INTC0_INT_BASE + 32); i++)
+		au1x_ic_settype(irq_get_irq_data(i), IRQ_TYPE_NONE);
 
-	for (irq_nr = AU1000_INTC1_INT_BASE;
-	     (irq_nr < AU1000_INTC1_INT_BASE + 32); irq_nr++)
-		au1x_ic_settype(irq_get_irq_data(irq_nr), IRQ_TYPE_NONE);
+	for (i = AU1000_INTC1_INT_BASE;
+	     (i < AU1000_INTC1_INT_BASE + 32); i++)
+		au1x_ic_settype(irq_get_irq_data(i), IRQ_TYPE_NONE);
 
 	/*
 	 * Initialize IC0, which is fixed per processor.
@@ -549,13 +520,13 @@ static void __init au1000_init_irq(struct au1xxx_irqmap *map)
 
 		if (irq_nr >= AU1000_INTC1_INT_BASE) {
 			bit = irq_nr - AU1000_INTC1_INT_BASE;
-			base = (void __iomem *)KSEG1ADDR(AU1000_IC1_PHYS_ADDR);
+			if (map->im_request)
+				au_writel(1 << bit, IC1_ASSIGNSET);
 		} else {
 			bit = irq_nr - AU1000_INTC0_INT_BASE;
-			base = (void __iomem *)KSEG1ADDR(AU1000_IC0_PHYS_ADDR);
+			if (map->im_request)
+				au_writel(1 << bit, IC0_ASSIGNSET);
 		}
-		if (map->im_request)
-			__raw_writel(1 << bit, base + IC_ASSIGNSET);
 
 		au1x_ic_settype(irq_get_irq_data(irq_nr), map->im_type);
 		++map;
@@ -585,62 +556,90 @@ void __init arch_init_irq(void)
 	}
 }
 
+struct alchemy_ic_sysdev {
+	struct sys_device sysdev;
+	void __iomem *base;
+	unsigned long pmdata[7];
+};
 
-static unsigned long alchemy_ic_pmdata[7 * 2];
-
-static inline void alchemy_ic_suspend_one(void __iomem *base, unsigned long *d)
+static int alchemy_ic_suspend(struct sys_device *dev, pm_message_t state)
 {
-	d[0] = __raw_readl(base + IC_CFG0RD);
-	d[1] = __raw_readl(base + IC_CFG1RD);
-	d[2] = __raw_readl(base + IC_CFG2RD);
-	d[3] = __raw_readl(base + IC_SRCRD);
-	d[4] = __raw_readl(base + IC_ASSIGNRD);
-	d[5] = __raw_readl(base + IC_WAKERD);
-	d[6] = __raw_readl(base + IC_MASKRD);
-	ic_init(base);		/* shut it up too while at it */
-}
+	struct alchemy_ic_sysdev *icdev =
+			container_of(dev, struct alchemy_ic_sysdev, sysdev);
 
-static inline void alchemy_ic_resume_one(void __iomem *base, unsigned long *d)
-{
-	ic_init(base);
+	icdev->pmdata[0] = __raw_readl(icdev->base + IC_CFG0RD);
+	icdev->pmdata[1] = __raw_readl(icdev->base + IC_CFG1RD);
+	icdev->pmdata[2] = __raw_readl(icdev->base + IC_CFG2RD);
+	icdev->pmdata[3] = __raw_readl(icdev->base + IC_SRCRD);
+	icdev->pmdata[4] = __raw_readl(icdev->base + IC_ASSIGNRD);
+	icdev->pmdata[5] = __raw_readl(icdev->base + IC_WAKERD);
+	icdev->pmdata[6] = __raw_readl(icdev->base + IC_MASKRD);
 
-	__raw_writel(d[0], base + IC_CFG0SET);
-	__raw_writel(d[1], base + IC_CFG1SET);
-	__raw_writel(d[2], base + IC_CFG2SET);
-	__raw_writel(d[3], base + IC_SRCSET);
-	__raw_writel(d[4], base + IC_ASSIGNSET);
-	__raw_writel(d[5], base + IC_WAKESET);
-	wmb();
-
-	__raw_writel(d[6], base + IC_MASKSET);
-	wmb();
-}
-
-static int alchemy_ic_suspend(void)
-{
-	alchemy_ic_suspend_one((void __iomem *)KSEG1ADDR(AU1000_IC0_PHYS_ADDR),
-			       alchemy_ic_pmdata);
-	alchemy_ic_suspend_one((void __iomem *)KSEG1ADDR(AU1000_IC1_PHYS_ADDR),
-			       &alchemy_ic_pmdata[7]);
 	return 0;
 }
 
-static void alchemy_ic_resume(void)
+static int alchemy_ic_resume(struct sys_device *dev)
 {
-	alchemy_ic_resume_one((void __iomem *)KSEG1ADDR(AU1000_IC1_PHYS_ADDR),
-			      &alchemy_ic_pmdata[7]);
-	alchemy_ic_resume_one((void __iomem *)KSEG1ADDR(AU1000_IC0_PHYS_ADDR),
-			      alchemy_ic_pmdata);
+	struct alchemy_ic_sysdev *icdev =
+			container_of(dev, struct alchemy_ic_sysdev, sysdev);
+
+	__raw_writel(0xffffffff, icdev->base + IC_MASKCLR);
+	__raw_writel(0xffffffff, icdev->base + IC_CFG0CLR);
+	__raw_writel(0xffffffff, icdev->base + IC_CFG1CLR);
+	__raw_writel(0xffffffff, icdev->base + IC_CFG2CLR);
+	__raw_writel(0xffffffff, icdev->base + IC_SRCCLR);
+	__raw_writel(0xffffffff, icdev->base + IC_ASSIGNCLR);
+	__raw_writel(0xffffffff, icdev->base + IC_WAKECLR);
+	__raw_writel(0xffffffff, icdev->base + IC_RISINGCLR);
+	__raw_writel(0xffffffff, icdev->base + IC_FALLINGCLR);
+	__raw_writel(0x00000000, icdev->base + IC_TESTBIT);
+	wmb();
+	__raw_writel(icdev->pmdata[0], icdev->base + IC_CFG0SET);
+	__raw_writel(icdev->pmdata[1], icdev->base + IC_CFG1SET);
+	__raw_writel(icdev->pmdata[2], icdev->base + IC_CFG2SET);
+	__raw_writel(icdev->pmdata[3], icdev->base + IC_SRCSET);
+	__raw_writel(icdev->pmdata[4], icdev->base + IC_ASSIGNSET);
+	__raw_writel(icdev->pmdata[5], icdev->base + IC_WAKESET);
+	wmb();
+
+	__raw_writel(icdev->pmdata[6], icdev->base + IC_MASKSET);
+	wmb();
+
+	return 0;
 }
 
-static struct syscore_ops alchemy_ic_syscore_ops = {
+static struct sysdev_class alchemy_ic_sysdev_class = {
+	.name		= "ic",
 	.suspend	= alchemy_ic_suspend,
 	.resume		= alchemy_ic_resume,
 };
 
-static int __init alchemy_ic_pm_init(void)
+static int __init alchemy_ic_sysdev_init(void)
 {
-	register_syscore_ops(&alchemy_ic_syscore_ops);
+	struct alchemy_ic_sysdev *icdev;
+	unsigned long icbase[2] = { IC0_PHYS_ADDR, IC1_PHYS_ADDR };
+	int err, i;
+
+	err = sysdev_class_register(&alchemy_ic_sysdev_class);
+	if (err)
+		return err;
+
+	for (i = 0; i < 2; i++) {
+		icdev = kzalloc(sizeof(struct alchemy_ic_sysdev), GFP_KERNEL);
+		if (!icdev)
+			return -ENOMEM;
+
+		icdev->base = ioremap(icbase[i], 0x1000);
+
+		icdev->sysdev.id = i;
+		icdev->sysdev.cls = &alchemy_ic_sysdev_class;
+		err = sysdev_register(&icdev->sysdev);
+		if (err) {
+			kfree(icdev);
+			return err;
+		}
+	}
+
 	return 0;
 }
-device_initcall(alchemy_ic_pm_init);
+device_initcall(alchemy_ic_sysdev_init);

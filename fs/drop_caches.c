@@ -40,12 +40,9 @@ static void drop_pagecache_sb(struct super_block *sb, void *unused)
 static void drop_slab(void)
 {
 	int nr_objects;
-	struct shrink_control shrink = {
-		.gfp_mask = GFP_KERNEL,
-	};
 
 	do {
-		nr_objects = shrink_slab(&shrink, 1000, 1000);
+		nr_objects = shrink_slab(1000, GFP_KERNEL, 1000);
 	} while (nr_objects > 10);
 }
 

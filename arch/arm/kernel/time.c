@@ -21,7 +21,7 @@
 #include <linux/timex.h>
 #include <linux/errno.h>
 #include <linux/profile.h>
-#include <linux/syscore_ops.h>
+#include <linux/sysdev.h>
 #include <linux/timer.h>
 #include <linux/irq.h>
 
@@ -115,37 +115,48 @@ void timer_tick(void)
 #endif
 
 #if defined(CONFIG_PM) && !defined(CONFIG_GENERIC_CLOCKEVENTS)
-static int timer_suspend(void)
+static int timer_suspend(struct sys_device *dev, pm_message_t state)
 {
-	if (system_timer->suspend)
-		system_timer->suspend();
+	struct sys_timer *timer = container_of(dev, struct sys_timer, dev);
+
+	if (timer->suspend != NULL)
+		timer->suspend();
 
 	return 0;
 }
 
-static void timer_resume(void)
+static int timer_resume(struct sys_device *dev)
 {
-	if (system_timer->resume)
-		system_timer->resume();
+	struct sys_timer *timer = container_of(dev, struct sys_timer, dev);
+
+	if (timer->resume != NULL)
+		timer->resume();
+
+	return 0;
 }
 #else
 #define timer_suspend NULL
 #define timer_resume NULL
 #endif
 
-static struct syscore_ops timer_syscore_ops = {
+static struct sysdev_class timer_sysclass = {
+	.name		= "timer",
 	.suspend	= timer_suspend,
 	.resume		= timer_resume,
 };
 
-static int __init timer_init_syscore_ops(void)
+static int __init timer_init_sysfs(void)
 {
-	register_syscore_ops(&timer_syscore_ops);
+	int ret = sysdev_class_register(&timer_sysclass);
+	if (ret == 0) {
+		system_timer->dev.cls = &timer_sysclass;
+		ret = sysdev_register(&system_timer->dev);
+	}
 
-	return 0;
+	return ret;
 }
 
-device_initcall(timer_init_syscore_ops);
+device_initcall(timer_init_sysfs);
 
 void __init time_init(void)
 {

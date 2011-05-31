@@ -24,14 +24,13 @@
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/string.h>
-#include <linux/syscore_ops.h>
+#include <linux/sysdev.h>
 #include <linux/amba/bus.h>
 #include <linux/amba/kmi.h>
 #include <linux/clocksource.h>
 #include <linux/clockchips.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
-#include <linux/mtd/physmap.h>
 
 #include <mach/hardware.h>
 #include <mach/platform.h>
@@ -44,6 +43,7 @@
 #include <mach/lm.h>
 
 #include <asm/mach/arch.h>
+#include <asm/mach/flash.h>
 #include <asm/mach/irq.h>
 #include <asm/mach/map.h>
 #include <asm/mach/time.h>
@@ -180,13 +180,13 @@ static void __init ap_init_irq(void)
 #ifdef CONFIG_PM
 static unsigned long ic_irq_enable;
 
-static int irq_suspend(void)
+static int irq_suspend(struct sys_device *dev, pm_message_t state)
 {
 	ic_irq_enable = readl(VA_IC_BASE + IRQ_ENABLE);
 	return 0;
 }
 
-static void irq_resume(void)
+static int irq_resume(struct sys_device *dev)
 {
 	/* disable all irq sources */
 	writel(-1, VA_CMIC_BASE + IRQ_ENABLE_CLEAR);
@@ -194,25 +194,33 @@ static void irq_resume(void)
 	writel(-1, VA_IC_BASE + FIQ_ENABLE_CLEAR);
 
 	writel(ic_irq_enable, VA_IC_BASE + IRQ_ENABLE_SET);
+	return 0;
 }
 #else
 #define irq_suspend NULL
 #define irq_resume NULL
 #endif
 
-static struct syscore_ops irq_syscore_ops = {
+static struct sysdev_class irq_class = {
+	.name		= "irq",
 	.suspend	= irq_suspend,
 	.resume		= irq_resume,
 };
 
-static int __init irq_syscore_init(void)
-{
-	register_syscore_ops(&irq_syscore_ops);
+static struct sys_device irq_device = {
+	.id	= 0,
+	.cls	= &irq_class,
+};
 
-	return 0;
+static int __init irq_init_sysfs(void)
+{
+	int ret = sysdev_class_register(&irq_class);
+	if (ret == 0)
+		ret = sysdev_register(&irq_device);
+	return ret;
 }
 
-device_initcall(irq_syscore_init);
+device_initcall(irq_init_sysfs);
 
 /*
  * Flash handling.
@@ -222,7 +230,7 @@ device_initcall(irq_syscore_init);
 #define EBI_CSR1 (VA_EBI_BASE + INTEGRATOR_EBI_CSR1_OFFSET)
 #define EBI_LOCK (VA_EBI_BASE + INTEGRATOR_EBI_LOCK_OFFSET)
 
-static int ap_flash_init(struct platform_device *dev)
+static int ap_flash_init(void)
 {
 	u32 tmp;
 
@@ -239,7 +247,7 @@ static int ap_flash_init(struct platform_device *dev)
 	return 0;
 }
 
-static void ap_flash_exit(struct platform_device *dev)
+static void ap_flash_exit(void)
 {
 	u32 tmp;
 
@@ -255,14 +263,15 @@ static void ap_flash_exit(struct platform_device *dev)
 	}
 }
 
-static void ap_flash_set_vpp(struct platform_device *pdev, int on)
+static void ap_flash_set_vpp(int on)
 {
 	void __iomem *reg = on ? SC_CTRLS : SC_CTRLC;
 
 	writel(INTEGRATOR_SC_CTRL_nFLVPPEN, reg);
 }
 
-static struct physmap_flash_data ap_flash_data = {
+static struct flash_platform_data ap_flash_data = {
+	.map_name	= "cfi_probe",
 	.width		= 4,
 	.init		= ap_flash_init,
 	.exit		= ap_flash_exit,
@@ -276,7 +285,7 @@ static struct resource cfi_flash_resource = {
 };
 
 static struct platform_device cfi_flash_device = {
-	.name		= "physmap-flash",
+	.name		= "armflash",
 	.id		= 0,
 	.dev		= {
 		.platform_data	= &ap_flash_data,
@@ -334,9 +343,25 @@ static void __init ap_init(void)
 
 static unsigned long timer_reload;
 
+static void __iomem * const clksrc_base = (void __iomem *)TIMER2_VA_BASE;
+
+static cycle_t timersp_read(struct clocksource *cs)
+{
+	return ~(readl(clksrc_base + TIMER_VALUE) & 0xffff);
+}
+
+static struct clocksource clocksource_timersp = {
+	.name		= "timer2",
+	.rating		= 200,
+	.read		= timersp_read,
+	.mask		= CLOCKSOURCE_MASK(16),
+	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+};
+
 static void integrator_clocksource_init(u32 khz)
 {
-	void __iomem *base = (void __iomem *)TIMER2_VA_BASE;
+	struct clocksource *cs = &clocksource_timersp;
+	void __iomem *base = clksrc_base;
 	u32 ctrl = TIMER_CTRL_ENABLE;
 
 	if (khz >= 1500) {
@@ -347,8 +372,7 @@ static void integrator_clocksource_init(u32 khz)
 	writel(ctrl, base + TIMER_CTRL);
 	writel(0xffff, base + TIMER_LOAD);
 
-	clocksource_mmio_init(base + TIMER_VALUE, "timer2",
-		khz * 1000, 200, 16, clocksource_mmio_readl_down);
+	clocksource_register_khz(cs, khz);
 }
 
 static void __iomem * const clkevt_base = (void __iomem *)TIMER1_VA_BASE;

@@ -17,6 +17,7 @@
 #include <linux/smp.h>
 #include <linux/cpuset.h>
 #include <asm/delay.h>
+#include <asm/s390_ext.h>
 
 #define PTF_HORIZONTAL	(0UL)
 #define PTF_VERTICAL	(1UL)
@@ -51,20 +52,20 @@ static cpumask_t cpu_group_map(struct mask_info *info, unsigned int cpu)
 {
 	cpumask_t mask;
 
-	cpumask_clear(&mask);
+	cpus_clear(mask);
 	if (!topology_enabled || !MACHINE_HAS_TOPOLOGY) {
 		cpumask_copy(&mask, cpumask_of(cpu));
 		return mask;
 	}
 	while (info) {
-		if (cpumask_test_cpu(cpu, &info->mask)) {
+		if (cpu_isset(cpu, info->mask)) {
 			mask = info->mask;
 			break;
 		}
 		info = info->next;
 	}
-	if (cpumask_empty(&mask))
-		cpumask_copy(&mask, cpumask_of(cpu));
+	if (cpus_empty(mask))
+		mask = cpumask_of_cpu(cpu);
 	return mask;
 }
 
@@ -84,10 +85,10 @@ static void add_cpus_to_mask(struct topology_cpu *tl_cpu,
 			if (cpu_logical_map(lcpu) != rcpu)
 				continue;
 #ifdef CONFIG_SCHED_BOOK
-			cpumask_set_cpu(lcpu, &book->mask);
+			cpu_set(lcpu, book->mask);
 			cpu_book_id[lcpu] = book->id;
 #endif
-			cpumask_set_cpu(lcpu, &core->mask);
+			cpu_set(lcpu, core->mask);
 			cpu_core_id[lcpu] = core->id;
 			smp_cpu_polarization[lcpu] = tl_cpu->pp;
 		}
@@ -100,13 +101,13 @@ static void clear_masks(void)
 
 	info = &core_info;
 	while (info) {
-		cpumask_clear(&info->mask);
+		cpus_clear(info->mask);
 		info = info->next;
 	}
 #ifdef CONFIG_SCHED_BOOK
 	info = &book_info;
 	while (info) {
-		cpumask_clear(&info->mask);
+		cpus_clear(info->mask);
 		info = info->next;
 	}
 #endif

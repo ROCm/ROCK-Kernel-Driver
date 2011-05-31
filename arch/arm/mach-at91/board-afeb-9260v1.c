@@ -48,7 +48,7 @@
 #include "generic.h"
 
 
-static void __init afeb9260_init_early(void)
+static void __init afeb9260_map_io(void)
 {
 	/* Initialize processor: 18.432 MHz crystal */
 	at91sam9260_initialize(18432000);
@@ -218,9 +218,9 @@ static void __init afeb9260_board_init(void)
 
 MACHINE_START(AFEB9260, "Custom afeb9260 board")
 	/* Maintainer: Sergey Lapin <slapin@ossfans.org> */
+	.boot_params	= AT91_SDRAM_BASE + 0x100,
 	.timer		= &at91sam926x_timer,
-	.map_io		= at91sam9260_map_io,
-	.init_early	= afeb9260_init_early,
+	.map_io		= afeb9260_map_io,
 	.init_irq	= afeb9260_init_irq,
 	.init_machine	= afeb9260_board_init,
 MACHINE_END

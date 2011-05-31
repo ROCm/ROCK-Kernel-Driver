@@ -1,7 +1,7 @@
 /*
  * ALSA SoC Texas Instruments TLV320DAC33 codec driver
  *
- * Author: Peter Ujfalusi <peter.ujfalusi@ti.com>
+ * Author:	Peter Ujfalusi <peter.ujfalusi@nokia.com>
  *
  * Copyright:   (C) 2009 Nokia Corporation
  *

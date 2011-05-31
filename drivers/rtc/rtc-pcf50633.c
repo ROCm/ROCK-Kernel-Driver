@@ -58,6 +58,7 @@ struct pcf50633_time {
 
 struct pcf50633_rtc {
 	int alarm_enabled;
+	int second_enabled;
 	int alarm_pending;
 
 	struct pcf50633 *pcf;
@@ -142,7 +143,7 @@ static int pcf50633_rtc_set_time(struct device *dev, struct rtc_time *tm)
 {
 	struct pcf50633_rtc *rtc;
 	struct pcf50633_time pcf_tm;
-	int alarm_masked, ret = 0;
+	int second_masked, alarm_masked, ret = 0;
 
 	rtc = dev_get_drvdata(dev);
 
@@ -161,8 +162,11 @@ static int pcf50633_rtc_set_time(struct device *dev, struct rtc_time *tm)
 		pcf_tm.time[PCF50633_TI_SEC]);
 
 
+	second_masked = pcf50633_irq_mask_get(rtc->pcf, PCF50633_IRQ_SECOND);
 	alarm_masked = pcf50633_irq_mask_get(rtc->pcf, PCF50633_IRQ_ALARM);
 
+	if (!second_masked)
+		pcf50633_irq_mask(rtc->pcf, PCF50633_IRQ_SECOND);
 	if (!alarm_masked)
 		pcf50633_irq_mask(rtc->pcf, PCF50633_IRQ_ALARM);
 
@@ -171,6 +175,8 @@ static int pcf50633_rtc_set_time(struct device *dev, struct rtc_time *tm)
 					     PCF50633_TI_EXTENT,
 					     &pcf_tm.time[0]);
 
+	if (!second_masked)
+		pcf50633_irq_unmask(rtc->pcf, PCF50633_IRQ_SECOND);
 	if (!alarm_masked)
 		pcf50633_irq_unmask(rtc->pcf, PCF50633_IRQ_ALARM);
 
@@ -244,8 +250,15 @@ static void pcf50633_rtc_irq(int irq, void *data)
 {
 	struct pcf50633_rtc *rtc = data;
 
-	rtc_update_irq(rtc->rtc_dev, 1, RTC_AF | RTC_IRQF);
-	rtc->alarm_pending = 1;
+	switch (irq) {
+	case PCF50633_IRQ_ALARM:
+		rtc_update_irq(rtc->rtc_dev, 1, RTC_AF | RTC_IRQF);
+		rtc->alarm_pending = 1;
+		break;
+	case PCF50633_IRQ_SECOND:
+		rtc_update_irq(rtc->rtc_dev, 1, RTC_UF | RTC_IRQF);
+		break;
+	}
 }
 
 static int __devinit pcf50633_rtc_probe(struct platform_device *pdev)
@@ -269,6 +282,9 @@ static int __devinit pcf50633_rtc_probe(struct platform_device *pdev)
 
 	pcf50633_register_irq(rtc->pcf, PCF50633_IRQ_ALARM,
 					pcf50633_rtc_irq, rtc);
+	pcf50633_register_irq(rtc->pcf, PCF50633_IRQ_SECOND,
+					pcf50633_rtc_irq, rtc);
+
 	return 0;
 }
 
@@ -279,6 +295,7 @@ static int __devexit pcf50633_rtc_remove(struct platform_device *pdev)
 	rtc = platform_get_drvdata(pdev);
 
 	pcf50633_free_irq(rtc->pcf, PCF50633_IRQ_ALARM);
+	pcf50633_free_irq(rtc->pcf, PCF50633_IRQ_SECOND);
 
 	rtc_device_unregister(rtc->rtc_dev);
 	kfree(rtc);

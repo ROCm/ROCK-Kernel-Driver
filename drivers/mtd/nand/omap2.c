@@ -94,7 +94,9 @@
 #define P4e_s(a)	(TF(a & NAND_Ecc_P4e)		<< 0)
 #define P4o_s(a)	(TF(a & NAND_Ecc_P4o)		<< 1)
 
+#ifdef CONFIG_MTD_PARTITIONS
 static const char *part_probes[] = { "cmdlinepart", NULL };
+#endif
 
 /* oob info generated runtime depending on ecc algorithm and layout selected */
 static struct nand_ecclayout omap_oobinfo;
@@ -261,10 +263,11 @@ static void omap_read_buf_pref(struct mtd_info *mtd, u_char *buf, int len)
 	if (ret) {
 		/* PFPW engine is busy, use cpu copy method */
 		if (info->nand.options & NAND_BUSWIDTH_16)
-			omap_read_buf16(mtd, (u_char *)p, len);
+			omap_read_buf16(mtd, buf, len);
 		else
-			omap_read_buf8(mtd, (u_char *)p, len);
+			omap_read_buf8(mtd, buf, len);
 	} else {
+		p = (u32 *) buf;
 		do {
 			r_count = gpmc_read_status(GPMC_PREFETCH_FIFO_CNT);
 			r_count = r_count >> 2;
@@ -290,7 +293,7 @@ static void omap_write_buf_pref(struct mtd_info *mtd,
 						struct omap_nand_info, mtd);
 	uint32_t w_count = 0;
 	int i = 0, ret = 0;
-	u16 *p = (u16 *)buf;
+	u16 *p;
 	unsigned long tim, limit;
 
 	/* take care of subpage writes */
@@ -306,10 +309,11 @@ static void omap_write_buf_pref(struct mtd_info *mtd,
 	if (ret) {
 		/* PFPW engine is busy, use cpu copy method */
 		if (info->nand.options & NAND_BUSWIDTH_16)
-			omap_write_buf16(mtd, (u_char *)p, len);
+			omap_write_buf16(mtd, buf, len);
 		else
-			omap_write_buf8(mtd, (u_char *)p, len);
+			omap_write_buf8(mtd, buf, len);
 	} else {
+		p = (u16 *) buf;
 		while (len) {
 			w_count = gpmc_read_status(GPMC_PREFETCH_FIFO_CNT);
 			w_count = w_count >> 1;
@@ -1069,9 +1073,9 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
 	/* DIP switches on some boards change between 8 and 16 bit
 	 * bus widths for flash.  Try the other width if the first try fails.
 	 */
-	if (nand_scan_ident(&info->mtd, 1, NULL)) {
+	if (nand_scan(&info->mtd, 1)) {
 		info->nand.options ^= NAND_BUSWIDTH_16;
-		if (nand_scan_ident(&info->mtd, 1, NULL)) {
+		if (nand_scan(&info->mtd, 1)) {
 			err = -ENXIO;
 			goto out_release_mem_region;
 		}
@@ -1097,19 +1101,15 @@ static int __devinit omap_nand_probe(struct platform_device *pdev)
 		info->nand.ecc.layout = &omap_oobinfo;
 	}
 
-	/* second phase scan */
-	if (nand_scan_tail(&info->mtd)) {
-		err = -ENXIO;
-		goto out_release_mem_region;
-	}
-
+#ifdef CONFIG_MTD_PARTITIONS
 	err = parse_mtd_partitions(&info->mtd, part_probes, &info->parts, 0);
 	if (err > 0)
-		mtd_device_register(&info->mtd, info->parts, err);
+		add_mtd_partitions(&info->mtd, info->parts, err);
 	else if (pdata->parts)
-		mtd_device_register(&info->mtd, pdata->parts, pdata->nr_parts);
+		add_mtd_partitions(&info->mtd, pdata->parts, pdata->nr_parts);
 	else
-		mtd_device_register(&info->mtd, NULL, 0);
+#endif
+		add_mtd_device(&info->mtd);
 
 	platform_set_drvdata(pdev, &info->mtd);
 

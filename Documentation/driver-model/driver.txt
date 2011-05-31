@@ -1,7 +1,23 @@
 
 Device Drivers
 
-See the kerneldoc for the struct device_driver.
+struct device_driver {
+        char                    * name;
+        struct bus_type         * bus;
+
+        struct completion	unloaded;
+        struct kobject		kobj;
+        list_t                  devices;
+
+        struct module		*owner;
+
+        int     (*probe)        (struct device * dev);
+        int     (*remove)       (struct device * dev);
+
+        int     (*suspend)      (struct device * dev, pm_message_t state);
+        int     (*resume)       (struct device * dev);
+};
+
 
 
 Allocation

@@ -27,47 +27,9 @@
 #include <asm/cacheflush.h>
 #include <asm/debugreg.h>
 
-static void set_idt(void *newidt, __u16 limit)
-{
-	struct desc_ptr curidt;
-
-	/* ia32 supports unaliged loads & stores */
-	curidt.size    = limit;
-	curidt.address = (unsigned long)newidt;
-
-	load_idt(&curidt);
-}
-
-
-static void set_gdt(void *newgdt, __u16 limit)
-{
-	struct desc_ptr curgdt;
-
-	/* ia32 supports unaligned loads & stores */
-	curgdt.size    = limit;
-	curgdt.address = (unsigned long)newgdt;
-
-	load_gdt(&curgdt);
-}
-
-static void load_segments(void)
-{
-#define __STR(X) #X
-#define STR(X) __STR(X)
-
-	__asm__ __volatile__ (
-		"\tljmp $"STR(__KERNEL_CS)",$1f\n"
-		"\t1:\n"
-		"\tmovl $"STR(__KERNEL_DS)",%%eax\n"
-		"\tmovl %%eax,%%ds\n"
-		"\tmovl %%eax,%%es\n"
-		"\tmovl %%eax,%%fs\n"
-		"\tmovl %%eax,%%gs\n"
-		"\tmovl %%eax,%%ss\n"
-		: : : "eax", "memory");
-#undef STR
-#undef __STR
-}
+#ifdef CONFIG_XEN
+#include <xen/interface/kexec.h>
+#endif
 
 static void machine_kexec_free_page_tables(struct kimage *image)
 {
@@ -84,6 +46,17 @@ static int machine_kexec_alloc_page_tables(struct kimage *image)
 {
 	image->arch.pgd = (pgd_t *)get_zeroed_page(GFP_KERNEL);
 #ifdef CONFIG_X86_PAE
+#ifdef CONFIG_XEN /* machine address must fit into xki->page_list[PA_PGD] */
+	if (image->arch.pgd) {
+		struct page *pg = virt_to_page(image->arch.pgd);
+
+		if (xen_limit_pages_to_max_mfn(pg, 0, BITS_PER_LONG) < 0) {
+			image->arch.pgd = NULL;
+			__free_page(pg);
+			return -ENOMEM;
+		}
+	}
+#endif
 	image->arch.pmd0 = (pmd_t *)get_zeroed_page(GFP_KERNEL);
 	image->arch.pmd1 = (pmd_t *)get_zeroed_page(GFP_KERNEL);
 #endif
@@ -139,6 +112,51 @@ static void machine_kexec_prepare_page_tables(struct kimage *image)
 		__pa(control_page), __pa(control_page));
 }
 
+#ifdef CONFIG_XEN
+
+#define __ma(x) (pfn_to_mfn(__pa((x)) >> PAGE_SHIFT) << PAGE_SHIFT)
+
+#if PAGES_NR > KEXEC_XEN_NO_PAGES
+#error PAGES_NR is greater than KEXEC_XEN_NO_PAGES - Xen support will break
+#endif
+
+#if PA_CONTROL_PAGE != 0
+#error PA_CONTROL_PAGE is non zero - Xen support will break
+#endif
+
+void machine_kexec_setup_load_arg(xen_kexec_image_t *xki, struct kimage *image)
+{
+	void *control_page;
+
+	memset(xki->page_list, 0, sizeof(xki->page_list));
+
+	control_page = page_address(image->control_code_page);
+	memcpy(control_page, relocate_kernel, PAGE_SIZE);
+
+	xki->page_list[PA_CONTROL_PAGE] = __ma(control_page);
+	xki->page_list[PA_PGD] = __ma(image->arch.pgd);
+
+	if (image->type == KEXEC_TYPE_DEFAULT)
+		xki->page_list[PA_SWAP_PAGE] = page_to_phys(image->swap_page);
+}
+
+int __init machine_kexec_setup_resources(struct resource *hypervisor,
+					 struct resource *phys_cpus,
+					 int nr_phys_cpus)
+{
+	int k;
+
+	/* The per-cpu crash note resources belong to the hypervisor resource */
+	for (k = 0; k < nr_phys_cpus; k++)
+		request_resource(hypervisor, phys_cpus + k);
+
+	return 0;
+}
+
+void machine_kexec_register_resources(struct resource *res) { ; }
+
+#endif /* CONFIG_XEN */
+
 /*
  * A architecture hook called to validate the
  * proposed image and prepare the control pages
@@ -176,6 +194,7 @@ void machine_kexec_cleanup(struct kimage *image)
 	machine_kexec_free_page_tables(image);
 }
 
+#ifndef CONFIG_XEN
 /*
  * Do not allocate memory (or fail in any way) in machine_kexec().
  * We are past the point of no return, committed to rebooting now.
@@ -228,24 +247,6 @@ void machine_kexec(struct kimage *image)
 		page_list[PA_SWAP_PAGE] = (page_to_pfn(image->swap_page)
 						<< PAGE_SHIFT);
 
-	/*
-	 * The segment registers are funny things, they have both a
-	 * visible and an invisible part.  Whenever the visible part is
-	 * set to a specific selector, the invisible part is loaded
-	 * with from a table in memory.  At no other time is the
-	 * descriptor table in memory accessed.
-	 *
-	 * I take advantage of this here by force loading the
-	 * segments, before I zap the gdt with an invalid value.
-	 */
-	load_segments();
-	/*
-	 * The gdt & idt are now invalid.
-	 * If you want to load them you must set up your own idt & gdt.
-	 */
-	set_gdt(phys_to_virt(0), 0);
-	set_idt(phys_to_virt(0), 0);
-
 	/* now call it */
 	image->start = relocate_kernel_ptr((unsigned long)image->head,
 					   (unsigned long)page_list,
@@ -259,6 +260,7 @@ void machine_kexec(struct kimage *image)
 
 	__ftrace_enabled_restore(save_ftrace_enabled);
 }
+#endif
 
 void arch_crash_save_vmcoreinfo(void)
 {

@@ -16,7 +16,6 @@
 
 #include <linux/init.h>
 #include <linux/suspend.h>
-#include <linux/syscore_ops.h>
 #include <linux/io.h>
 
 #include <plat/cpu.h>
@@ -141,17 +140,7 @@ static int s5pv210_pm_add(struct sys_device *sysdev)
 	return 0;
 }
 
-static struct sysdev_driver s5pv210_pm_driver = {
-	.add		= s5pv210_pm_add,
-};
-
-static __init int s5pv210_pm_drvinit(void)
-{
-	return sysdev_driver_register(&s5pv210_sysclass, &s5pv210_pm_driver);
-}
-arch_initcall(s5pv210_pm_drvinit);
-
-static void s5pv210_pm_resume(void)
+static int s5pv210_pm_resume(struct sys_device *dev)
 {
 	u32 tmp;
 
@@ -161,15 +150,17 @@ static void s5pv210_pm_resume(void)
 	__raw_writel(tmp , S5P_OTHERS);
 
 	s3c_pm_do_restore_core(s5pv210_core_save, ARRAY_SIZE(s5pv210_core_save));
+
+	return 0;
 }
 
-static struct syscore_ops s5pv210_pm_syscore_ops = {
+static struct sysdev_driver s5pv210_pm_driver = {
+	.add		= s5pv210_pm_add,
 	.resume		= s5pv210_pm_resume,
 };
 
-static __init int s5pv210_pm_syscore_init(void)
+static __init int s5pv210_pm_drvinit(void)
 {
-	register_syscore_ops(&s5pv210_pm_syscore_ops);
-	return 0;
+	return sysdev_driver_register(&s5pv210_sysclass, &s5pv210_pm_driver);
 }
-arch_initcall(s5pv210_pm_syscore_init);
+arch_initcall(s5pv210_pm_drvinit);

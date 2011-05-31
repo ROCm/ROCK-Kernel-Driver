@@ -42,8 +42,10 @@ struct SSFDCTYPE                Ssfdc;
 struct ADDRESS                  Media;
 struct CIS_AREA                 CisArea;
 
-static BYTE                            EccBuf[6];
+BYTE                            EccBuf[6];
 extern PBYTE                    SMHostAddr;
+extern BYTE                     IsSSFDCCompliance;
+extern BYTE                     IsXDCompliance;
 extern DWORD                    ErrXDCode;
 
 extern WORD  ReadBlock;
@@ -65,7 +67,7 @@ int Check_D_DataBlank(BYTE *redundant)
 		if (*redundant++!=0xFF)
 			return(ERROR);
 
-	return(SMSUCCESS);
+	return(SUCCESS);
 }
 
 //----- Check_D_FailBlock() --------------------------------------------
@@ -74,13 +76,13 @@ int Check_D_FailBlock(BYTE *redundant)
 	redundant+=REDT_BLOCK;
 
 	if (*redundant==0xFF)
-		return(SMSUCCESS);
+		return(SUCCESS);
 	if (!*redundant)
 		return(ERROR);
 	if (hweight8(*redundant)<7)
 		return(ERROR);
 
-	return(SMSUCCESS);
+	return(SUCCESS);
 }
 
 //----- Check_D_DataStatus() -------------------------------------------
@@ -89,7 +91,7 @@ int Check_D_DataStatus(BYTE *redundant)
 	redundant+=REDT_DATA;
 
 	if (*redundant==0xFF)
-		return(SMSUCCESS);
+		return(SUCCESS);
 	if (!*redundant)
 	{
 		ErrXDCode = ERR_DataStatus;
@@ -101,7 +103,7 @@ int Check_D_DataStatus(BYTE *redundant)
 	if (hweight8(*redundant)<5)
 		return(ERROR);
 
-	return(SMSUCCESS);
+	return(SUCCESS);
 }
 
 //----- Load_D_LogBlockAddr() ------------------------------------------
@@ -116,17 +118,17 @@ int Load_D_LogBlockAddr(BYTE *redundant)
 
 	if (addr1==addr2)
 		if ((addr1 &0xF000)==0x1000)
-		{ Media.LogBlock=(addr1 &0x0FFF)/2; return(SMSUCCESS); }
+		{ Media.LogBlock=(addr1 &0x0FFF)/2; return(SUCCESS); }
 
 	if (hweight16((WORD)(addr1^addr2))!=0x01) return(ERROR);
 
 	if ((addr1 &0xF000)==0x1000)
 		if (!(hweight16(addr1) &0x01))
-		{ Media.LogBlock=(addr1 &0x0FFF)/2; return(SMSUCCESS); }
+		{ Media.LogBlock=(addr1 &0x0FFF)/2; return(SUCCESS); }
 
 	if ((addr2 &0xF000)==0x1000)
 		if (!(hweight16(addr2) &0x01))
-		{ Media.LogBlock=(addr2 &0x0FFF)/2; return(SMSUCCESS); }
+		{ Media.LogBlock=(addr2 &0x0FFF)/2; return(SUCCESS); }
 
 	return(ERROR);
 }
@@ -220,7 +222,7 @@ int Ssfdc_D_ReadCisSect(struct us_data *us, BYTE *buf,BYTE *redundant)
 	}
 
 	Media.Zone=zone; Media.PhyBlock=block; Media.Sector=sector;
-	return(SMSUCCESS);
+	return(SUCCESS);
 }
 /*
 ////----- Ssfdc_D_WriteRedtMode() ----------------------------------------
@@ -426,7 +428,7 @@ int Ssfdc_D_ReadBlock(struct us_data *us, WORD count, BYTE *buf,BYTE *redundant)
 //
 //    if (!_Hw_D_ChkCardIn())
 //       return(ERROR);
-//    return(SMSUCCESS);
+//    return(SUCCESS);
 //}
 //
 ////----- Ssfdc_D_ReadSect_PIO() ---------------------------------------------
@@ -449,7 +451,7 @@ int Ssfdc_D_ReadBlock(struct us_data *us, WORD count, BYTE *buf,BYTE *redundant)
 //
 //    _Calc_D_ECCdata(buf);
 //    _Set_D_SsfdcRdStandby();
-//    return(SMSUCCESS);
+//    return(SUCCESS);
 //}
 
 // 6250 CMD 3
@@ -507,7 +509,7 @@ int Ssfdc_D_WriteSect(PFDO_DEVICE_EXTENSION fdoExt, BYTE *buf,BYTE *redundant)
 //        ENE_Print("Error\n");
 //  }
 
-    return(SMSUCCESS);
+    return(SUCCESS);
 }
 */
 //----- Ssfdc_D_CopyBlock() --------------------------------------------
@@ -612,7 +614,7 @@ int Ssfdc_D_WriteBlock(PFDO_DEVICE_EXTENSION fdoExt, WORD count, BYTE *buf,BYTE 
 //        ENE_Print("Error\n");
 //  }
 
-    return(SMSUCCESS);
+    return(SUCCESS);
 }
 //
 ////----- Ssfdc_D_WriteSect_DMA() --------------------------------------------
@@ -702,7 +704,7 @@ int Ssfdc_D_WriteBlock(PFDO_DEVICE_EXTENSION fdoExt, WORD count, BYTE *buf,BYTE 
 //    if (!_Hw_D_ChkCardIn())
 //       return(ERROR);
 //
-//    return(SMSUCCESS);
+//    return(SUCCESS);
 //}
 //
 ////----- Ssfdc_D_WriteSect_PIO() --------------------------------------------
@@ -727,7 +729,7 @@ int Ssfdc_D_WriteBlock(PFDO_DEVICE_EXTENSION fdoExt, WORD count, BYTE *buf,BYTE 
 //
 //    _Set_D_SsfdcWrStandby();
 //    _Set_D_SsfdcRdStandby();
-//    return(SMSUCCESS);
+//    return(SUCCESS);
 //}
 */
 //----- Ssfdc_D_WriteSectForCopy() -------------------------------------
@@ -891,14 +893,14 @@ int Ssfdc_D_WriteRedtData(struct us_data *us, BYTE *redundant)
 int Ssfdc_D_CheckStatus(void)
 {
     // Driver ¤£°µ
-    return(SMSUCCESS);
+    return(SUCCESS);
     //_Set_D_SsfdcRdCmd(RDSTATUS);
     //
     //if (_Check_D_SsfdcStatus())
     //{ _Set_D_SsfdcRdStandby(); return(ERROR); }
     //
     //_Set_D_SsfdcRdStandby();
-    //return(SMSUCCESS);
+    //return(SUCCESS);
 }
 /*
 ////NAND Memory (SmartMedia) Control Subroutine for Read Data
@@ -1093,7 +1095,7 @@ int Ssfdc_D_CheckStatus(void)
 //
 //    do {
 //        if (!_Hw_D_ChkBusy())
-//            return(SMSUCCESS);
+//            return(SUCCESS);
 //        EDelay(100);
 //        count++;
 //    } while (count<=time);
@@ -1107,7 +1109,7 @@ int Ssfdc_D_CheckStatus(void)
 //    if (_Hw_D_InData() & WR_FAIL)
 //        return(ERROR);
 //
-//    return(SMSUCCESS);
+//    return(SUCCESS);
 //}
 //
 //// For 712
@@ -1337,7 +1339,7 @@ int Set_D_SsfdcModel(BYTE dcode)
             return(ERROR);
     }
 
-    return(SMSUCCESS);
+    return(SUCCESS);
 }
 
 //----- _Check_D_DevCode() ---------------------------------------------
@@ -1386,7 +1388,7 @@ BYTE _Check_D_DevCode(BYTE dcode)
 //    if (_Hw_D_ChkPower())
 //    {
 //        _Hw_D_EnableOB();                       // Set SM_REG_CTRL_5 Reg. to 0x83
-//        return(SMSUCCESS);
+//        return(SUCCESS);
 //    }
 //
 //    _Hw_D_SetVccOff();
@@ -1417,7 +1419,7 @@ BYTE _Check_D_DevCode(BYTE dcode)
 //int Check_D_CntPower(void)
 //{
 //    if (_Hw_D_ChkPower())
-//        return(SMSUCCESS); // Power On
+//        return(SUCCESS); // Power On
 //
 //    return(ERROR);       // Power Off
 //}
@@ -1429,7 +1431,7 @@ BYTE _Check_D_DevCode(BYTE dcode)
 //
 //    if (!_Hw_D_ChkStatus()) // Not Status Change
 //        if (_Hw_D_ChkCardIn())
-//            return(SMSUCCESS); // Card exist in Slot
+//            return(SUCCESS); // Card exist in Slot
 //
 //    for(i=0,j=0,k=0; i<16; i++) {
 //        if (_Hw_D_ChkCardIn()) // Status Change
@@ -1442,7 +1444,7 @@ BYTE _Check_D_DevCode(BYTE dcode)
 //        }
 //
 //        if (j>3)
-//            return(SMSUCCESS); // Card exist in Slot
+//            return(SUCCESS); // Card exist in Slot
 //        if (k>3)
 //            return(ERROR); // NO Card exist in Slot
 //
@@ -1458,12 +1460,12 @@ BYTE _Check_D_DevCode(BYTE dcode)
 //    if (_Hw_D_ChkStatus())
 //        return(ERROR); // Status Change
 //
-//    return(SMSUCCESS);   // Not Status Change
+//    return(SUCCESS);   // Not Status Change
 //}
 //
 ////----- Check_D_SsfdcWP() ----------------------------------------------
 //int Check_D_SsfdcWP(void)
-//{ // ERROR: WP, SMSUCCESS: Not WP
+//{ // ERROR: WP, SUCCESS: Not WP
 //    char i;
 //
 //    for(i=0; i<8; i++) {
@@ -1472,7 +1474,7 @@ BYTE _Check_D_DevCode(BYTE dcode)
 //        _Wait_D_Timer(TIME_WPCHK);
 //    }
 //
-//    return(SMSUCCESS);
+//    return(SUCCESS);
 //}
 //
 */
@@ -1480,13 +1482,13 @@ BYTE _Check_D_DevCode(BYTE dcode)
 //----- Check_D_ReadError() ----------------------------------------------
 int Check_D_ReadError(BYTE *redundant)
 {
-	return SMSUCCESS;
+	return SUCCESS;
 }
 
 //----- Check_D_Correct() ----------------------------------------------
 int Check_D_Correct(BYTE *buf,BYTE *redundant)
 {
-	return SMSUCCESS;
+	return SUCCESS;
 }
 
 //----- Check_D_CISdata() ----------------------------------------------
@@ -1498,7 +1500,7 @@ int Check_D_CISdata(BYTE *buf, BYTE *redundant)
 	int cis_len = sizeof(cis);
 
 	if (!IsSSFDCCompliance && !IsXDCompliance)
-		return SMSUCCESS;
+		return SUCCESS;
 
 	if (!memcmp(redundant + 0x0D, EccBuf, 3))
 		return memcmp(buf, cis, cis_len);
@@ -1597,5 +1599,5 @@ int SM_ReadBlock(PFDO_DEVICE_EXTENSION fdoExt, BYTE *buf,BYTE *redundant)
     if (!NT_SUCCESS(ntStatus))
        return(ERROR);
 
-    return(SMSUCCESS);
+    return(SUCCESS);
 }*/

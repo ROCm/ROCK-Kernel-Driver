@@ -128,16 +128,8 @@ void cpu_idle(void)
         set_thread_flag(TIF_POLLING_NRFLAG);
 	/* endless idle loop with no priority at all */
 	while(1) {
-#ifdef CONFIG_SPARC_LEON
-		if (pm_idle) {
-			while (!need_resched())
-				(*pm_idle)();
-		} else
-#endif
-		{
-			while (!need_resched())
-				cpu_relax();
-		}
+		while (!need_resched())
+			cpu_relax();
 		preempt_enable_no_resched();
 		schedule();
 		preempt_disable();

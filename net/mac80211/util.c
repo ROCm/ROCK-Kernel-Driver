@@ -1125,26 +1125,8 @@ int ieee80211_reconfig(struct ieee80211_local *local)
 	struct sta_info *sta;
 	int res;
 
-#ifdef CONFIG_PM
 	if (local->suspended)
 		local->resuming = true;
-
-	if (local->wowlan) {
-		local->wowlan = false;
-		res = drv_resume(local);
-		if (res < 0) {
-			local->resuming = false;
-			return res;
-		}
-		if (res == 0)
-			goto wake_up;
-		WARN_ON(res > 1);
-		/*
-		 * res is 1, which means the driver requested
-		 * to go through a regular reset on wakeup.
-		 */
-	}
-#endif
 
 	/* restart hardware */
 	if (local->open_count) {
@@ -1276,7 +1258,6 @@ int ieee80211_reconfig(struct ieee80211_local *local)
 		if (ieee80211_sdata_running(sdata))
 			ieee80211_enable_keys(sdata);
 
- wake_up:
 	ieee80211_wake_queues_by_reason(hw,
 			IEEE80211_QUEUE_STOP_REASON_SUSPEND);
 
@@ -1309,7 +1290,7 @@ int ieee80211_reconfig(struct ieee80211_local *local)
 		}
 	}
 
-	mod_timer(&local->sta_cleanup, jiffies + 1);
+	add_timer(&local->sta_cleanup);
 
 	mutex_lock(&local->sta_mtx);
 	list_for_each_entry(sta, &local->sta_list, list)

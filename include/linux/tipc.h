@@ -101,7 +101,7 @@ static inline unsigned int tipc_node(__u32 addr)
  * Limiting values for messages
  */
 
-#define TIPC_MAX_USER_MSG_SIZE	66000U
+#define TIPC_MAX_USER_MSG_SIZE	66000
 
 /*
  * Message importance levels
