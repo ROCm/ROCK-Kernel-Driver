@@ -26,7 +26,7 @@ struct backend_info {
 	struct xenvif *vif;
 	enum xenbus_state frontend_state;
 	struct xenbus_watch hotplug_status_watch;
-	int have_hotplug_status_watch:1;
+	u8 have_hotplug_status_watch:1;
 };
 
 static int connect_rings(struct backend_info *);
@@ -476,6 +476,7 @@ static const struct xenbus_device_id netback_ids[] = {
 
 static struct xenbus_driver netback = {
 	.name = "vif",
+	.owner = THIS_MODULE,
 	.ids = netback_ids,
 	.probe = netback_probe,
 	.remove = netback_remove,

@@ -91,7 +91,6 @@ config DELL_RBU
 config DCDBAS
 	tristate "Dell Systems Management Base Driver"
 	depends on X86
-	select XEN_DOMCTL if XEN
 	help
 	  The Dell Systems Management Base Driver provides a sysfs interface
 	  for systems management software to perform System Management
@@ -157,5 +156,7 @@ config SIGMA
 
 	  If unsure, say N here.  Drivers that need these helpers will select
 	  this option automatically.
+
+source "drivers/firmware/google/Kconfig"
 
 endmenu

@@ -245,7 +245,7 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 
 	acpi_sleep=	[HW,ACPI] Sleep options
 			Format: { s3_bios, s3_mode, s3_beep, s4_nohwsig,
-				  old_ordering, s4_nonvs, sci_force_enable }
+				  old_ordering, nonvs, sci_force_enable }
 			See Documentation/power/video.txt for information on
 			s3_bios and s3_mode.
 			s3_beep is for debugging; it makes the PC's speaker beep
@@ -818,24 +818,6 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 
 	gpt		[EFI] Forces disk with valid GPT signature but
 			invalid Protective MBR to be treated as GPT.
-
-	guestdev=	[PCI,ACPI,XEN]
-			Format: {<device path>|<sbdf>}][,{<device path>|<sbdf>}[,...]]
-			Format of device path: <hid>[:<uid>]-<dev>.<func>[-<dev>.<func>[,...]][+iomul]
-			Format of sbdf: [<segment>:]<bus>:<dev>.<func>[+iomul]
-			Specifies PCI device for guest domain.
-			If PCI-PCI bridge is specified, all PCI devices
-			behind PCI-PCI bridge are reserved.
-			+iomul means that this PCI function will share
-			IO ports with other +iomul functions under same
-			switch. NOTE: if +iomul is specfied, all the functions
-			of the device will share IO ports.
-
-	guestiomuldev=	[PCI,ACPI,XEN]
-			Format: [sbd][,<sbd>][,...]
-			Format of sbdf: [<segment>:]<bus>:<dev>
-			Note: function shouldn't be specified.
-			Specifies PCI device for IO port multiplexing driver.
 
 	hashdist=	[KNL,NUMA] Large hashes allocated during boot
 			are distributed across NUMA nodes.  Defaults on
@@ -1682,6 +1664,10 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			noexec=on: enable non-executable mappings (default)
 			noexec=off: disable non-executable mappings
 
+	nosmep		[X86]
+			Disable SMEP (Supervisor Mode Execution Protection)
+			even if it is supported by processor.
+
 	noexec32	[X86-64]
 			This affects only 32-bit executables.
 			noexec32=on: enable non-executable mappings (default)
@@ -1796,9 +1782,6 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			and disable the IO APIC.  legacy for "maxcpus=0".
 
 	nosoftlockup	[KNL] Disable the soft-lockup detector.
-
-	noswapaccount	[KNL] Disable accounting of swap in memory resource
-			controller. (See Documentation/cgroups/memory.txt)
 
 	nosync		[HW,M68K] Disables sync negotiation for all devices.
 
@@ -2036,13 +2019,6 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 				off: Turn ECRC off
 				on: Turn ECRC on.
 
-	pci_reserve=	[PCI]
-			Format: [<sbdf>[+IO<size>][+MEM<size>]][,<sbdf>...]
-			Format of sbdf: [<segment>:]<bus>:<dev>.<func>
-			Specifies the least reserved io size or memory size
-			which is assigned to PCI bridge even when no child
-			pci device exists. This is useful with PCI hotplug.
-
 	pcie_aspm=	[PCIE] Forcibly enable or disable PCIe Active State Power
 			Management.
 		off	Disable ASPM.
@@ -2212,10 +2188,6 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			Format: <full_path>
 			Run specified binary instead of /init from the ramdisk,
 			used for early userspace startup. See initrd.
-
-	reassign_resources	[PCI,ACPI,XEN]
-			Use guestdev= parameter to reassign device's
-			resources, or specify =all here.
 
 	reboot=		[BUGS=X86-32,BUGS=ARM,BUGS=IA-64] Rebooting mode
 			Format: <reboot_mode>[,<reboot_mode2>[,...]]
@@ -2624,6 +2596,10 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 					bytes of sense data);
 				c = FIX_CAPACITY (decrease the reported
 					device capacity by one sector);
+				d = NO_READ_DISC_INFO (don't use
+					READ_DISC_INFO command);
+				e = NO_READ_CAPACITY_16 (don't use
+					READ_CAPACITY_16 command);
 				h = CAPACITY_HEURISTICS (decrease the
 					reported device capacity by one
 					sector if the number is odd);

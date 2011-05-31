@@ -2,7 +2,7 @@
 obj-$(CONFIG_KVM) += kvm/
 
 # Xen paravirtualization support
-obj-$(CONFIG_PARAVIRT_XEN) += xen/
+obj-$(CONFIG_XEN) += xen/
 
 # lguest paravirtualization support
 obj-$(CONFIG_LGUEST_GUEST) += lguest/
@@ -15,3 +15,4 @@ obj-y += vdso/
 obj-$(CONFIG_IA32_EMULATION) += ia32/
 
 obj-y += platform/
+obj-y += net/

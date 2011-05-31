@@ -43,27 +43,4 @@ int xs_input_avail(void);
 extern struct xenstore_domain_interface *xen_store_interface;
 extern int xen_store_evtchn;
 
-/* For xenbus internal use. */
-enum {
-	XENBUS_XSD_UNCOMMITTED = 0,
-	XENBUS_XSD_FOREIGN_INIT,
-	XENBUS_XSD_FOREIGN_READY,
-	XENBUS_XSD_LOCAL_INIT,
-	XENBUS_XSD_LOCAL_READY,
-};
-extern atomic_t xenbus_xsd_state;
-
-static inline int is_xenstored_ready(void)
-{
-	int s = atomic_read(&xenbus_xsd_state);
-	return s == XENBUS_XSD_FOREIGN_READY || s == XENBUS_XSD_LOCAL_READY;
-}
-
-#if defined(CONFIG_XEN_XENBUS_DEV) && defined(CONFIG_XEN_PRIVILEGED_GUEST)
-#include <xen/interface/event_channel.h>
-#include <xen/interface/grant_table.h>
-
-int xenbus_conn(domid_t, grant_ref_t *, evtchn_port_t *);
-#endif
-
 #endif /* _XENBUS_COMMS_H */
