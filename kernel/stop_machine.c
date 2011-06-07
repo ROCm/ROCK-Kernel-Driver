@@ -136,11 +136,34 @@ void stop_one_cpu_nowait(unsigned int cpu, cpu_stop_fn_t fn, void *arg,
 static DEFINE_MUTEX(stop_cpus_mutex);
 static DEFINE_PER_CPU(struct cpu_stop_work, stop_cpus_work);
 
+/**
+ * __stop_cpus - stop multiple cpus
+ * @cpumask: cpus to stop
+ * @fn: function to execute
+ * @arg: argument to @fn
+ *
+ * Execute @fn(@arg) on online cpus in @cpumask. If @cpumask is NULL, @fn
+ * is run on all the online cpus including the current cpu (even if it
+ * is not online).
+ * On each target cpu, @fn is run in a process context (except when run on
+ * the cpu that is in the process of coming online, in which case @fn is run
+ * in the same context as __stop_cpus()) with the highest priority
+ * preempting any task on the cpu and monopolizing it.  This function
+ * returns after all executions are complete.
+ */
 int __stop_cpus(const struct cpumask *cpumask, cpu_stop_fn_t fn, void *arg)
 {
+	int online = cpu_online(smp_processor_id());
+	int include_this_offline = 0;
 	struct cpu_stop_work *work;
 	struct cpu_stop_done done;
+	unsigned int weight;
 	unsigned int cpu;
+
+	if (!cpumask) {
+		cpumask = cpu_online_mask;
+		include_this_offline = 1;
+	}
 
 	/* initialize works and done */
 	for_each_cpu(cpu, cpumask) {
@@ -149,7 +172,12 @@ int __stop_cpus(const struct cpumask *cpumask, cpu_stop_fn_t fn, void *arg)
 		work->arg = arg;
 		work->done = &done;
 	}
-	cpu_stop_init_done(&done, cpumask_weight(cpumask));
+
+	weight = cpumask_weight(cpumask);
+	if (!online && include_this_offline)
+		weight++;
+
+	cpu_stop_init_done(&done, weight);
 
 	/*
 	 * Disable preemption while queueing to avoid getting
@@ -162,7 +190,20 @@ int __stop_cpus(const struct cpumask *cpumask, cpu_stop_fn_t fn, void *arg)
 				    &per_cpu(stop_cpus_work, cpu));
 	preempt_enable();
 
-	wait_for_completion(&done.completion);
+	if (online)
+		wait_for_completion(&done.completion);
+	else {
+		/*
+		 * This cpu is not yet online. If @fn needs to be run on this
+		 * cpu, run it now. Also, we can't afford to sleep here,
+		 * so poll till the work is completed on all the cpu's.
+		 */
+		if (include_this_offline)
+			fn(arg);
+		while (atomic_read(&done.nr_todo) > 1)
+			cpu_relax();
+	}
+
 	return done.executed ? done.ret : -ENOENT;
 }
 
@@ -431,6 +472,7 @@ static int stop_machine_cpu_stop(void *data)
 	struct stop_machine_data *smdata = data;
 	enum stopmachine_state curstate = STOPMACHINE_NONE;
 	int cpu = smp_processor_id(), err = 0;
+	unsigned long flags = 0;
 	bool is_active;
 
 	if (!smdata->active_cpus)
@@ -446,7 +488,7 @@ static int stop_machine_cpu_stop(void *data)
 			curstate = smdata->state;
 			switch (curstate) {
 			case STOPMACHINE_DISABLE_IRQ:
-				local_irq_disable();
+				local_irq_save(flags);
 				hard_irq_disable();
 				break;
 			case STOPMACHINE_RUN:
@@ -460,7 +502,7 @@ static int stop_machine_cpu_stop(void *data)
 		}
 	} while (curstate != STOPMACHINE_EXIT);
 
-	local_irq_enable();
+	local_irq_restore(flags);
 	return err;
 }
 
@@ -470,9 +512,19 @@ int __stop_machine(int (*fn)(void *), void *data, const struct cpumask *cpus)
 					    .num_threads = num_online_cpus(),
 					    .active_cpus = cpus };
 
+	/* Include the calling cpu that might not be online yet. */
+	if (!cpu_online(smp_processor_id()))
+		smdata.num_threads++;
+
 	/* Set the initial state and stop all online cpus. */
 	set_state(&smdata, STOPMACHINE_PREPARE);
-	return stop_cpus(cpu_online_mask, stop_machine_cpu_stop, &smdata);
+
+	if (cpu_online(smp_processor_id()))
+		return stop_cpus(cpu_online_mask, stop_machine_cpu_stop,
+				 &smdata);
+	else
+		return __stop_cpus(NULL, stop_machine_cpu_stop,
+				   &smdata);
 }
 
 int stop_machine(int (*fn)(void *), void *data, const struct cpumask *cpus)
