@@ -153,7 +153,7 @@ static DEFINE_PER_CPU(struct cpu_stop_work, stop_cpus_work);
  */
 int __stop_cpus(const struct cpumask *cpumask, cpu_stop_fn_t fn, void *arg)
 {
-	int online = cpu_online(smp_processor_id());
+	int online = percpu_read(cpu_stopper.enabled);
 	int include_this_offline = 0;
 	struct cpu_stop_work *work;
 	struct cpu_stop_done done;
@@ -513,13 +513,13 @@ int __stop_machine(int (*fn)(void *), void *data, const struct cpumask *cpus)
 					    .active_cpus = cpus };
 
 	/* Include the calling cpu that might not be online yet. */
-	if (!cpu_online(smp_processor_id()))
+	if (!percpu_read(cpu_stopper.enabled))
 		smdata.num_threads++;
 
 	/* Set the initial state and stop all online cpus. */
 	set_state(&smdata, STOPMACHINE_PREPARE);
 
-	if (cpu_online(smp_processor_id()))
+	if (percpu_read(cpu_stopper.enabled))
 		return stop_cpus(cpu_online_mask, stop_machine_cpu_stop,
 				 &smdata);
 	else
