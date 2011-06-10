@@ -25,7 +25,7 @@ const kernel_cap_t __cap_empty_set = CAP_EMPTY_SET;
 
 EXPORT_SYMBOL(__cap_empty_set);
 
-int file_caps_enabled;
+int file_caps_enabled = 1;
 
 static int __init file_caps_disable(char *str)
 {
@@ -33,13 +33,6 @@ static int __init file_caps_disable(char *str)
 	return 1;
 }
 __setup("no_file_caps", file_caps_disable);
-
-static int __init file_caps_enable(char *str)
-{
-	file_caps_enabled = 1;
-	return 1;
-}
-__setup("file_caps", file_caps_enable);
 
 /*
  * More recent versions of libcap are available from:

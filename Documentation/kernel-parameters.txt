@@ -1698,13 +1698,7 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 
 	no_file_caps	Tells the kernel not to honor file capabilities.  The
 			only way then for a file to be executed with privilege
-			is to be setuid root or executed by root. They
-			default to disabled.
-
-	file_caps	Tells the kernel to honor file capabilities.  The
-			only way then for a file to be executed with privilege
-			is to be setuid root or executed by root. They default
-			to disabled.
+			is to be setuid root or executed by root.
 
 	nohalt		[IA-64] Tells the kernel not to use the power saving
 			function PAL_HALT_LIGHT when idle. This increases
