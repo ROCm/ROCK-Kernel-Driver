@@ -28,6 +28,7 @@
 struct cpu_stop_done {
 	atomic_t		nr_todo;	/* nr left to execute */
 	bool			executed;	/* actually executed? */
+	bool			offline_ctxt;	/* stop_cpu from offline ctxt */
 	int			ret;		/* collected return value */
 	struct completion	completion;	/* fired if nr_todo reaches 0 */
 };
@@ -47,15 +48,32 @@ static void cpu_stop_init_done(struct cpu_stop_done *done, unsigned int nr_todo)
 	memset(done, 0, sizeof(*done));
 	atomic_set(&done->nr_todo, nr_todo);
 	init_completion(&done->completion);
+	done->offline_ctxt = !percpu_read(cpu_stopper.enabled);
+}
+
+static inline void cpu_stop_wait_for_completion(struct cpu_stop_done *done)
+{
+	if (!done->offline_ctxt)
+		wait_for_completion(&done->completion);
+	else {
+		/*
+		 * If the calling cpu is not online, then we can't afford to
+		 * sleep, so poll till the work is completed on the target
+		 * cpu's.
+		 */
+		while (atomic_read(&done->nr_todo))
+			cpu_relax();
+	}
 }
 
 /* signal completion unless @done is NULL */
 static void cpu_stop_signal_done(struct cpu_stop_done *done, bool executed)
 {
 	if (done) {
+		bool offline_ctxt = done->offline_ctxt;
 		if (executed)
 			done->executed = true;
-		if (atomic_dec_and_test(&done->nr_todo))
+		if (atomic_dec_and_test(&done->nr_todo) &&  !offline_ctxt)
 			complete(&done->completion);
 	}
 }
@@ -108,7 +126,7 @@ int stop_one_cpu(unsigned int cpu, cpu_stop_fn_t fn, void *arg)
 
 	cpu_stop_init_done(&done, 1);
 	cpu_stop_queue_work(&per_cpu(cpu_stopper, cpu), &work);
-	wait_for_completion(&done.completion);
+	cpu_stop_wait_for_completion(&done);
 	return done.executed ? done.ret : -ENOENT;
 }
 
@@ -136,47 +154,23 @@ void stop_one_cpu_nowait(unsigned int cpu, cpu_stop_fn_t fn, void *arg,
 static DEFINE_MUTEX(stop_cpus_mutex);
 static DEFINE_PER_CPU(struct cpu_stop_work, stop_cpus_work);
 
-/**
- * __stop_cpus - stop multiple cpus
- * @cpumask: cpus to stop
- * @fn: function to execute
- * @arg: argument to @fn
- *
- * Execute @fn(@arg) on online cpus in @cpumask. If @cpumask is NULL, @fn
- * is run on all the online cpus including the current cpu (even if it
- * is not online).
- * On each target cpu, @fn is run in a process context (except when run on
- * the cpu that is in the process of coming online, in which case @fn is run
- * in the same context as __stop_cpus()) with the highest priority
- * preempting any task on the cpu and monopolizing it.  This function
- * returns after all executions are complete.
- */
+static
 int __stop_cpus(const struct cpumask *cpumask, cpu_stop_fn_t fn, void *arg)
 {
 	int online = percpu_read(cpu_stopper.enabled);
-	int include_this_offline = 0;
 	struct cpu_stop_work *work;
 	struct cpu_stop_done done;
-	unsigned int weight;
+	unsigned int weight = 0;
 	unsigned int cpu;
 
-	if (!cpumask) {
-		cpumask = cpu_online_mask;
-		include_this_offline = 1;
-	}
-
 	/* initialize works and done */
-	for_each_cpu(cpu, cpumask) {
+	for_each_cpu_and(cpu, cpumask, cpu_online_mask) {
 		work = &per_cpu(stop_cpus_work, cpu);
 		work->fn = fn;
 		work->arg = arg;
 		work->done = &done;
-	}
-
-	weight = cpumask_weight(cpumask);
-	if (!online && include_this_offline)
 		weight++;
-
+	}
 	cpu_stop_init_done(&done, weight);
 
 	/*
@@ -185,25 +179,19 @@ int __stop_cpus(const struct cpumask *cpumask, cpu_stop_fn_t fn, void *arg)
 	 * to enter @fn which can lead to deadlock.
 	 */
 	preempt_disable();
-	for_each_cpu(cpu, cpumask)
+	for_each_cpu_and(cpu, cpumask, cpu_online_mask)
 		cpu_stop_queue_work(&per_cpu(cpu_stopper, cpu),
 				    &per_cpu(stop_cpus_work, cpu));
+
+	/*
+	 * This cpu is not yet online. If @fn needs to be run on this
+	 * cpu, run it now.
+	 */
+	if (!online && cpu_isset(smp_processor_id(), *cpumask))
+		fn(arg);
 	preempt_enable();
 
-	if (online)
-		wait_for_completion(&done.completion);
-	else {
-		/*
-		 * This cpu is not yet online. If @fn needs to be run on this
-		 * cpu, run it now. Also, we can't afford to sleep here,
-		 * so poll till the work is completed on all the cpu's.
-		 */
-		if (include_this_offline)
-			fn(arg);
-		while (atomic_read(&done.nr_todo) > 1)
-			cpu_relax();
-	}
-
+	cpu_stop_wait_for_completion(&done);
 	return done.executed ? done.ret : -ENOENT;
 }
 
@@ -523,7 +511,7 @@ int __stop_machine(int (*fn)(void *), void *data, const struct cpumask *cpus)
 		return stop_cpus(cpu_online_mask, stop_machine_cpu_stop,
 				 &smdata);
 	else
-		return __stop_cpus(NULL, stop_machine_cpu_stop,
+		return __stop_cpus(cpu_all_mask, stop_machine_cpu_stop,
 				   &smdata);
 }
 
