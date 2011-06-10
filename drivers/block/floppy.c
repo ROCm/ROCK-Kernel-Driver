@@ -146,9 +146,7 @@
 
 #undef  FLOPPY_SILENT_DCL_CLEAR
 
-#ifndef CONFIG_XEN
 #define REALLY_SLOW_IO
-#endif
 
 #define DEBUGT 2
 
@@ -1040,6 +1038,7 @@ static void floppy_disable_hlt(void)
 {
 	unsigned long flags;
 
+	WARN_ONCE(1, "floppy_disable_hlt() scheduled for removal in 2012");
 	spin_lock_irqsave(&floppy_hlt_lock, flags);
 	if (!hlt_disabled) {
 		hlt_disabled = 1;

@@ -27,7 +27,7 @@
 #include <linux/writeback.h>
 #include <linux/backing-dev.h>
 #include <linux/pagevec.h>
-#include <linux/precache.h>
+#include <linux/cleancache.h>
 
 /*
  * I/O completion handler for multipage BIOs.
@@ -273,7 +273,7 @@ do_mpage_readpage(struct bio *bio, struct page *page, unsigned nr_pages,
 	}
 
 	if (fully_mapped && blocks_per_page == 1 && !PageUptodate(page) &&
-	    precache_get(page->mapping, page->index, page) == 1) {
+	    cleancache_get_page(page) == 0) {
 		SetPageUptodate(page);
 		goto confused;
 	}
