@@ -298,11 +298,19 @@ N_EXTERN_LIBRARY(NWRCODE)
 
 #define MAX_NAME_LEN			1024
 #define MAX_NUM_REPLIES		4096
-#define MIN_NUM_REPLIES		1
+/*
+ * MIN_NUM_REPLIES should be zero,as some calls like ScanSalvagableFiles are asynchronous.
+ * The server will not be sending responses to these requests.
+ */
+#define MIN_NUM_REPLIES		0
 #define MAX_NUM_REQUESTS		4096
 #define MIN_NUM_REQUESTS		1
 #define MAX_FRAG_SIZE			65536
-#define MIN_FRAG_SIZE			1
+/* 
+ * Certain calls like SetFileSize do not have any payload associated with the request.
+ * All the needed information are passed along just as headers.So the minimum fragment size can be zero.
+ */ 
+#define MIN_FRAG_SIZE			0
 #define MAX_INFO_LEN			4096
 #define MAX_DOMAIN_LEN			MAX_NETWORK_NAME_LENGTH
 #define MAX_OFFSET_LEN			4096

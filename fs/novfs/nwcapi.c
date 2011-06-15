@@ -274,28 +274,30 @@ int novfs_raw_send(struct novfs_xplat *pdata, struct novfs_schandle Session)
 	/*
 	 * Figure out the length of the request
 	 */
-	frag = kmalloc(xRequest.uNumReplyFrags * sizeof(struct nwc_frag), GFP_KERNEL);
-
-	DbgPrint("[XPLAT RawNCP] - Reply Frag Count 0x%X", xRequest.uNumReplyFrags);
-
-	if (!frag)
-		return -ENOMEM;
-
-	if(copy_from_user(frag, xRequest.pReplyFrags, xRequest.uNumReplyFrags * sizeof(struct nwc_frag))) {
-		retCode = -EFAULT;
-		goto out_frag;
-	}
 	totalLen = 0;
+	if(xRequest.uNumReplyFrags) {
+		frag = kmalloc(xRequest.uNumReplyFrags * sizeof(struct nwc_frag), GFP_KERNEL);
 
-	cFrag = frag;
-	for (x = 0; x < xRequest.uNumReplyFrags; x++) {
-		DbgPrint("[XPLAT - RawNCP] - Frag Len = %d", cFrag->uLength);
-		if (cFrag->uLength > MAX_FRAG_SIZE || cFrag->uLength < MIN_FRAG_SIZE) {
-			retCode = -EINVAL;
-			goto out;
+		DbgPrint("[XPLAT RawNCP] - Reply Frag Count 0x%X", xRequest.uNumReplyFrags);
+
+		if (!frag)
+			return -ENOMEM;
+
+		if(copy_from_user(frag, xRequest.pReplyFrags, xRequest.uNumReplyFrags * sizeof(struct nwc_frag))) {
+			retCode = -EFAULT;
+			goto out_frag;
 		}
-		totalLen += cFrag->uLength;
-		cFrag++;
+
+		cFrag = frag;
+		for (x = 0; x < xRequest.uNumReplyFrags; x++) {
+			DbgPrint("[XPLAT - RawNCP] - Frag Len = %d", cFrag->uLength);
+			if (cFrag->uLength > MAX_FRAG_SIZE || cFrag->uLength < MIN_FRAG_SIZE) {
+				retCode = -EINVAL;
+				goto out;
+			}
+			totalLen += cFrag->uLength;
+			cFrag++;
+ 		}
 	}
 
 	DbgPrint("[XPLAT - RawNCP] - totalLen = %d", totalLen);
