@@ -399,9 +399,8 @@ ssize_t novfs_daemon_cmd_send(struct file * file, char *buf, size_t len, loff_t 
 	size_t retValue = 0;
 	int Finished = 0;
 	struct novfs_data_list *dlist;
-	int i, dcnt, bcnt, ccnt, error;
+	int i, dcnt, bcnt, error;
 	char *vadr;
-	unsigned long cpylen;
 
 	DbgPrint("%u %lld", len, *off);
 	if (len > novfs_max_iosize) {
@@ -421,7 +420,10 @@ ssize_t novfs_daemon_cmd_send(struct file * file, char *buf, size_t len, loff_t 
 			else
 				novfs_dump(retValue, que->request);
 
-			cpylen = copy_to_user(buf, que->request, retValue);
+			if(copy_to_user(buf, que->request, retValue)) {
+				Queue_put(que);
+				return -EFAULT;
+			}
 			if (que->datalen && (retValue < len)) {
 				buf += retValue;
 				dlist = que->data;
@@ -443,7 +445,12 @@ ssize_t novfs_daemon_cmd_send(struct file * file, char *buf, size_t len, loff_t 
 								vadr = dlist->offset;
 							}
 
-							ccnt = copy_to_user(buf, vadr, bcnt);
+							if (copy_to_user(buf, vadr, bcnt)) {
+								if (km_adr) 
+									kunmap(dlist->page);
+								Queue_put(que);
+								return -EFAULT;
+							}
 
 							DbgPrint("Copy %d from 0x%p to 0x%p.", bcnt, vadr, buf);
 							if (bcnt > 0x80)
@@ -492,7 +499,7 @@ ssize_t novfs_daemon_recv_reply(struct file * file, const char *buf, size_t nbyt
 	struct daemon_cmd *que;
 	size_t retValue = 0;
 	void *reply;
-	unsigned long sequence, cpylen;
+	unsigned long sequence;
 
 	struct novfs_data_list *dlist;
 	char *vadr;
@@ -504,7 +511,8 @@ ssize_t novfs_daemon_recv_reply(struct file * file, const char *buf, size_t nbyt
 	 * Get sequence number from reply buffer
 	 */
 
-	cpylen = copy_from_user(&sequence, buf, sizeof(sequence));
+	if(copy_from_user(&sequence, buf, sizeof(sequence)))
+		return -EFAULT;
 
 	/*
 	 * Find item based on sequence number
@@ -553,7 +561,14 @@ ssize_t novfs_daemon_recv_reply(struct file * file, const char *buf, size_t nbyt
 							thiscopy = left;
 							dlist->len = left;
 						}
-						cpylen = copy_from_user(vadr, buf, thiscopy);
+
+						if(copy_from_user(vadr, buf, thiscopy)) {
+							if (km_adr)
+								kunmap(dlist->page);
+							retValue = -EFAULT;
+							que->status = QUEUE_DONE;
+							break;
+						}
 
 						if (thiscopy > 0x80)
 							novfs_dump(0x80, vadr);
@@ -791,16 +806,20 @@ static int daemon_login(struct novfs_login *Login, struct novfs_schandle *Sessio
 										novfs_add_to_root(username);
 									}
 								}
-							}
+							} else
+								retCode = -EFAULT;
 							kfree(password.buffer);
 						}
-					}
+					} else
+						retCode = -EFAULT;
 					kfree(username.buffer);
 				}
-			}
+			} else
+				retCode = -EFAULT;
 			kfree(server.buffer);
 		}
-	}
+	} else
+		retCode = -EFAULT;
 
 	return (retCode);
 }
@@ -819,8 +838,10 @@ static int daemon_logout(struct novfs_logout *Logout, struct novfs_schandle *Ses
 	if (!server.name)
 		return -ENOMEM;
 	server.len = lLogout.Server.length;
-	if (copy_from_user((void *)server.name, lLogout.Server.data, server.len))
+	if (copy_from_user((void *)server.name, lLogout.Server.data, server.len)) {
+		retCode = -EFAULT;
 		goto exit;
+	}
 	retCode = novfs_daemon_logout(&server, Session);
 exit:
 	kfree(server.name);
@@ -1025,7 +1046,6 @@ int novfs_daemon_debug_cmd_send(char *Command)
 long novfs_daemon_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	int retCode = -ENOSYS;
-	unsigned long cpylen;
 	struct novfs_schandle session_id;
 
 	session_id = novfs_scope_get_sessionId(NULL);
@@ -1046,14 +1066,18 @@ long novfs_daemon_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			} io;
 			char *buf;
 			io.length = 0;
-			cpylen = copy_from_user(&io, (char *)arg, sizeof(io));
+			if(copy_from_user(&io, (char *)arg, sizeof(io)))
+				return -EFAULT;
 			if (io.length <= 0 || io.length > 1024)
 				return -EINVAL;
 			if (io.length) {
 				buf = kmalloc(io.length + 1, GFP_KERNEL);
 				if (buf) {
 					buf[0] = 0;
-					cpylen = copy_from_user(buf, io.data, io.length);
+					if(copy_from_user(buf, io.data, io.length)) {
+						kfree(buf);
+						return -EFAULT;
+					}
 					buf[io.length] = '\0';
 					DbgPrint("%s", buf);
 					kfree(buf);
@@ -1067,7 +1091,8 @@ long novfs_daemon_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		{
 			struct novfs_xplat data;
 
-			cpylen = copy_from_user(&data, (void *)arg, sizeof(data));
+			if(copy_from_user(&data, (void *)arg, sizeof(data)))
+				return -EFAULT;
 			retCode = ((data.xfunction & 0x0000FFFF) | 0xCC000000);
 
 			switch (data.xfunction) {
@@ -1343,7 +1368,6 @@ long novfs_daemon_lib_ioctl(struct file *file, unsigned int cmd, unsigned long a
 	int retCode = -ENOSYS;
 	struct daemon_handle *dh;
 	void *handle = NULL;
-	unsigned long cpylen;
 
 	dh = file->private_data;
 
@@ -1368,14 +1392,18 @@ long novfs_daemon_lib_ioctl(struct file *file, unsigned int cmd, unsigned long a
 				} io;
 				char *buf;
 				io.length = 0;
-				cpylen = copy_from_user(&io, (void *)arg, sizeof(io));
+				if(copy_from_user(&io, (void *)arg, sizeof(io)))
+					return -EFAULT;
 				if (io.length <= 0 || io.length > 1024)
 					return -EINVAL;
 				if (io.length) {
 					buf = kmalloc(io.length + 1, GFP_KERNEL);
 					if (buf) {
 						buf[0] = 0;
-						cpylen = copy_from_user(buf, io.data, io.length);
+						if(copy_from_user(buf, io.data, io.length)) {
+							kfree(buf);
+							return -EFAULT;
+						}
 						buf[io.length] = '\0';
 						__DbgPrint("%s", buf);
 						kfree(buf);
@@ -1389,7 +1417,8 @@ long novfs_daemon_lib_ioctl(struct file *file, unsigned int cmd, unsigned long a
 			{
 				struct novfs_xplat data;
 
-				cpylen = copy_from_user(&data, (void *)arg, sizeof(data));
+				if(copy_from_user(&data, (void *)arg, sizeof(data)))
+					return -EFAULT;
 				retCode = ((data.xfunction & 0x0000FFFF) | 0xCC000000);
 
 				switch (data.xfunction) {
@@ -1615,11 +1644,11 @@ static int NwdConvertNetwareHandle(struct novfs_xplat *pdata, struct daemon_hand
 {
 	int retVal;
 	struct nwc_convert_netware_handle nh;
-	unsigned long cpylen;
 
 	DbgPrint("DHandle=0x%p", DHandle);
 
-	cpylen = copy_from_user(&nh, pdata->reqData, sizeof(struct nwc_convert_netware_handle));
+	if(copy_from_user(&nh, pdata->reqData, sizeof(struct nwc_convert_netware_handle)))
+		return -EFAULT;
 
 	retVal =
 	    daemon_added_resource(DHandle, DH_TYPE_STREAM,
@@ -1634,7 +1663,6 @@ static int NwdConvertLocalHandle(struct novfs_xplat *pdata, struct daemon_handle
 	struct daemon_resource *resource;
 	struct nwc_convert_local_handle lh;
 	struct list_head *l;
-	unsigned long cpylen;
 
 	DbgPrint("DHandle=0x%p", DHandle);
 
@@ -1649,8 +1677,10 @@ static int NwdConvertLocalHandle(struct novfs_xplat *pdata, struct daemon_handle
 //sgled         memcpy(lh.NwWareHandle, resource->handle, sizeof(resource->handle));
 			memcpy(lh.NetWareHandle, resource->handle, sizeof(resource->handle));	//sgled
 			if (pdata->repLen >= sizeof(struct nwc_convert_local_handle)) {
-				cpylen = copy_to_user(pdata->repData, &lh, sizeof(struct nwc_convert_local_handle));
-				retVal = 0;
+				if(copy_to_user(pdata->repData, &lh, sizeof(struct nwc_convert_local_handle)))
+					retVal = -EFAULT;
+				else
+					retVal = 0;
 			} else {
 				retVal = NWE_BUFFER_OVERFLOW;
 			}
@@ -1667,12 +1697,12 @@ static int NwdGetMountPath(struct novfs_xplat *pdata)
 {
 	int retVal = NWE_REQUESTER_FAILURE;
 	int len;
-	unsigned long cpylen;
 	struct nwc_get_mount_path mp;
 
 	if (pdata->reqLen != sizeof(mp))
 		return -EINVAL;
-	cpylen = copy_from_user(&mp, pdata->reqData, pdata->reqLen);
+	if(copy_from_user(&mp, pdata->reqData, pdata->reqLen))
+		return -EFAULT;
 
 	if (novfs_current_mnt) {
 
@@ -1681,7 +1711,8 @@ static int NwdGetMountPath(struct novfs_xplat *pdata)
 			retVal = NWE_BUFFER_OVERFLOW;
 		} else {
 			if (mp.pMountPath) {
-				cpylen = copy_to_user(mp.pMountPath, novfs_current_mnt, len);
+				if(copy_to_user(mp.pMountPath, novfs_current_mnt, len))
+					return -EFAULT;
 			}
 			retVal = 0;
 		}
@@ -1689,7 +1720,8 @@ static int NwdGetMountPath(struct novfs_xplat *pdata)
 		mp.MountPathLen = len;
 
 		if (pdata->repData && (pdata->repLen >= sizeof(mp))) {
-			cpylen = copy_to_user(pdata->repData, &mp, sizeof(mp));
+			if(copy_to_user(pdata->repData, &mp, sizeof(mp)))
+				return -EFAULT;
 		}
 	}
 
@@ -1699,7 +1731,6 @@ static int NwdGetMountPath(struct novfs_xplat *pdata)
 static int set_map_drive(struct novfs_xplat *pdata, struct novfs_schandle Session)
 {
 	int retVal;
-	unsigned long cpylen;
 	struct nwc_map_drive_ex symInfo;
 	char *path;
 	struct drive_map *drivemap, *dm;
@@ -1718,7 +1749,10 @@ static int set_map_drive(struct novfs_xplat *pdata, struct novfs_schandle Sessio
 
 	path = (char *)pdata->reqData;
 	path += symInfo.linkOffset;
-	cpylen = copy_from_user(drivemap->name, path, symInfo.linkOffsetLength);
+	if(copy_from_user(drivemap->name, path, symInfo.linkOffsetLength)) {
+		kfree(drivemap);
+		return -EFAULT;
+	}
 
 	drivemap->session = Session;
 	drivemap->hash = full_name_hash(drivemap->name, symInfo.linkOffsetLength - 1);
