@@ -259,7 +259,6 @@ source "fs/ncpfs/Kconfig"
 source "fs/coda/Kconfig"
 source "fs/afs/Kconfig"
 source "fs/9p/Kconfig"
-source "fs/novfs/Kconfig"
 
 endif # NETWORK_FILESYSTEMS
 
