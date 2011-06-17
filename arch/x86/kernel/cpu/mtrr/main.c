@@ -211,7 +211,7 @@ static inline int types_compatible(mtrr_type type1, mtrr_type type2)
  * 14. Wait for buddies to catch up
  * 15. Enable interrupts.
  *
- * What does that mean for us? Well, __stop_machine() will ensure that
+ * What does that mean for us? Well, stop_machine() will ensure that
  * the rendezvous handler is started on each CPU. And in lockstep they
  * do the state transition of disabling interrupts, updating MTRR's
  * (the CPU vendors may each do it differently, so we call mtrr_if->set()
@@ -229,7 +229,20 @@ set_mtrr(unsigned int reg, unsigned long base, unsigned long size, mtrr_type typ
 				      .smp_type = type
 				    };
 
-	__stop_machine(mtrr_work_handler, &data, cpu_callout_mask);
+	stop_machine(mtrr_work_handler, &data, cpu_online_mask);
+}
+
+static void set_mtrr_from_offline_cpu(unsigned int reg, unsigned long base,
+				      unsigned long size, mtrr_type type)
+{
+	struct set_mtrr_data data = { .smp_reg = reg,
+				      .smp_base = base,
+				      .smp_size = size,
+				      .smp_type = type
+				    };
+
+	stop_machine_from_offline_cpu(mtrr_work_handler, &data,
+				      cpu_callout_mask);
 }
 
 /**
@@ -683,7 +696,7 @@ void mtrr_ap_init(void)
 	 *   2. cpu hotadd time. We let mtrr_add/del_page hold cpuhotplug
 	 *      lock to prevent mtrr entry changes
 	 */
-	set_mtrr(~0U, 0, 0, 0);
+	set_mtrr_from_offline_cpu(~0U, 0, 0, 0);
 }
 
 /**

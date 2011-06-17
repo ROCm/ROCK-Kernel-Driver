@@ -28,7 +28,6 @@
 struct cpu_stop_done {
 	atomic_t		nr_todo;	/* nr left to execute */
 	bool			executed;	/* actually executed? */
-	bool			offline_ctxt;	/* stop_cpu from offline ctxt */
 	int			ret;		/* collected return value */
 	struct completion	completion;	/* fired if nr_todo reaches 0 */
 };
@@ -48,32 +47,15 @@ static void cpu_stop_init_done(struct cpu_stop_done *done, unsigned int nr_todo)
 	memset(done, 0, sizeof(*done));
 	atomic_set(&done->nr_todo, nr_todo);
 	init_completion(&done->completion);
-	done->offline_ctxt = !percpu_read(cpu_stopper.enabled);
-}
-
-static inline void cpu_stop_wait_for_completion(struct cpu_stop_done *done)
-{
-	if (!done->offline_ctxt)
-		wait_for_completion(&done->completion);
-	else {
-		/*
-		 * If the calling cpu is not online, then we can't afford to
-		 * sleep, so poll till the work is completed on the target
-		 * cpu's.
-		 */
-		while (atomic_read(&done->nr_todo))
-			cpu_relax();
-	}
 }
 
 /* signal completion unless @done is NULL */
 static void cpu_stop_signal_done(struct cpu_stop_done *done, bool executed)
 {
 	if (done) {
-		bool offline_ctxt = done->offline_ctxt;
 		if (executed)
 			done->executed = true;
-		if (atomic_dec_and_test(&done->nr_todo) &&  !offline_ctxt)
+		if (atomic_dec_and_test(&done->nr_todo))
 			complete(&done->completion);
 	}
 }
@@ -126,7 +108,7 @@ int stop_one_cpu(unsigned int cpu, cpu_stop_fn_t fn, void *arg)
 
 	cpu_stop_init_done(&done, 1);
 	cpu_stop_queue_work(&per_cpu(cpu_stopper, cpu), &work);
-	cpu_stop_wait_for_completion(&done);
+	wait_for_completion(&done.completion);
 	return done.executed ? done.ret : -ENOENT;
 }
 
@@ -154,24 +136,20 @@ void stop_one_cpu_nowait(unsigned int cpu, cpu_stop_fn_t fn, void *arg,
 static DEFINE_MUTEX(stop_cpus_mutex);
 static DEFINE_PER_CPU(struct cpu_stop_work, stop_cpus_work);
 
-static
-int __stop_cpus(const struct cpumask *cpumask, cpu_stop_fn_t fn, void *arg)
+static void queue_stop_cpus_work(const struct cpumask *cpumask,
+				 cpu_stop_fn_t fn, void *arg,
+				 struct cpu_stop_done *done)
 {
-	int online = percpu_read(cpu_stopper.enabled);
 	struct cpu_stop_work *work;
-	struct cpu_stop_done done;
-	unsigned int weight = 0;
 	unsigned int cpu;
 
 	/* initialize works and done */
-	for_each_cpu_and(cpu, cpumask, cpu_online_mask) {
+	for_each_cpu(cpu, cpumask) {
 		work = &per_cpu(stop_cpus_work, cpu);
 		work->fn = fn;
 		work->arg = arg;
-		work->done = &done;
-		weight++;
+		work->done = done;
 	}
-	cpu_stop_init_done(&done, weight);
 
 	/*
 	 * Disable preemption while queueing to avoid getting
@@ -179,19 +157,20 @@ int __stop_cpus(const struct cpumask *cpumask, cpu_stop_fn_t fn, void *arg)
 	 * to enter @fn which can lead to deadlock.
 	 */
 	preempt_disable();
-	for_each_cpu_and(cpu, cpumask, cpu_online_mask)
+	for_each_cpu(cpu, cpumask)
 		cpu_stop_queue_work(&per_cpu(cpu_stopper, cpu),
 				    &per_cpu(stop_cpus_work, cpu));
-
-	/*
-	 * This cpu is not yet online. If @fn needs to be run on this
-	 * cpu, run it now.
-	 */
-	if (!online && cpu_isset(smp_processor_id(), *cpumask))
-		fn(arg);
 	preempt_enable();
+}
 
-	cpu_stop_wait_for_completion(&done);
+static int __stop_cpus(const struct cpumask *cpumask,
+		       cpu_stop_fn_t fn, void *arg)
+{
+	struct cpu_stop_done done;
+
+	cpu_stop_init_done(&done, cpumask_weight(cpumask));
+	queue_stop_cpus_work(cpumask, fn, arg, &done);
+	wait_for_completion(&done.completion);
 	return done.executed ? done.ret : -ENOENT;
 }
 
@@ -460,8 +439,14 @@ static int stop_machine_cpu_stop(void *data)
 	struct stop_machine_data *smdata = data;
 	enum stopmachine_state curstate = STOPMACHINE_NONE;
 	int cpu = smp_processor_id(), err = 0;
-	unsigned long flags = 0;
+	unsigned long flags;
 	bool is_active;
+
+	/*
+	 * When called from stop_machine_from_offline_cpu(), irq might
+	 * already be disabled.  Save the state and restore it on exit.
+	 */
+	local_save_flags(flags);
 
 	if (!smdata->active_cpus)
 		is_active = cpu == cpumask_first(cpu_online_mask);
@@ -476,7 +461,7 @@ static int stop_machine_cpu_stop(void *data)
 			curstate = smdata->state;
 			switch (curstate) {
 			case STOPMACHINE_DISABLE_IRQ:
-				local_irq_save(flags);
+				local_irq_disable();
 				hard_irq_disable();
 				break;
 			case STOPMACHINE_RUN:
@@ -494,37 +479,96 @@ static int stop_machine_cpu_stop(void *data)
 	return err;
 }
 
-int __stop_machine(int (*fn)(void *), void *data, const struct cpumask *cpus)
-{
-	struct stop_machine_data smdata = { .fn = fn, .data = data,
-					    .num_threads = num_online_cpus(),
-					    .active_cpus = cpus };
-
-	/* Include the calling cpu that might not be online yet. */
-	if (!percpu_read(cpu_stopper.enabled))
-		smdata.num_threads++;
-
-	/* Set the initial state and stop all online cpus. */
-	set_state(&smdata, STOPMACHINE_PREPARE);
-
-	if (percpu_read(cpu_stopper.enabled))
-		return stop_cpus(cpu_online_mask, stop_machine_cpu_stop,
-				 &smdata);
-	else
-		return __stop_cpus(cpu_all_mask, stop_machine_cpu_stop,
-				   &smdata);
-}
-
+/**
+ * stop_machine - freeze the machine on all online CPUs and run this function
+ * @fn: the function to run
+ * @data: the data ptr for the @fn()
+ * @cpus: the cpus to run the @fn() on (NULL = any online cpu)
+ *
+ * This causes a thread to be scheduled on every cpu, each of which
+ * disables interrupts.  The result is that no one is holding a spinlock or
+ * inside any other preempt-disabled region when @fn() runs.
+ *
+ * This can be thought of as a very heavy write lock, equivalent to
+ * grabbing every spinlock in the kernel.
+ *
+ * CONTEXT:
+ * Might sleep.  Temporarily stops all online CPUs.
+ *
+ * RETURNS:
+ * 0 if all executions of @fn returned 0, any non zero return value if any
+ * returned non zero.
+ */
 int stop_machine(int (*fn)(void *), void *data, const struct cpumask *cpus)
 {
+	struct stop_machine_data smdata = { .fn = fn, .data = data,
+					    .active_cpus = cpus };
 	int ret;
 
 	/* No CPUs can come up or down during this. */
 	get_online_cpus();
-	ret = __stop_machine(fn, data, cpus);
+	smdata.num_threads = num_online_cpus(),
+
+	/* Set the initial state and stop all online cpus. */
+	set_state(&smdata, STOPMACHINE_PREPARE);
+	ret = stop_cpus(cpu_online_mask, stop_machine_cpu_stop, &smdata);
+
 	put_online_cpus();
 	return ret;
 }
 EXPORT_SYMBOL_GPL(stop_machine);
+
+/**
+ * stop_machine_from_offline_cpu - stop_machine() from offline CPU
+ * @fn: the function to run
+ * @data: the data ptr for the @fn()
+ * @cpus: the cpus to run the @fn() on (NULL = any online cpu)
+ *
+ * This is identical to stop_machine() but can be called from a CPU which
+ * isn't online.  The local CPU is in the process of hotplug (so no other
+ * CPU hotplug can start) and not marked online and doesn't have enough
+ * context to sleep.
+ *
+ * This function provides stop_machine() functionality for such state by
+ * using busy-wait for synchronization and executing @fn directly for local
+ * CPU.
+ *
+ * CONTEXT:
+ * Local CPU is offline.  Temporarily stops all online CPUs.
+ *
+ * RETURNS:
+ * 0 if all executions of @fn returned 0, any non zero return value if any
+ * returned non zero.
+ */
+int stop_machine_from_offline_cpu(int (*fn)(void *), void *data,
+				  const struct cpumask *cpus)
+{
+	struct stop_machine_data smdata = { .fn = fn, .data = data,
+					    .active_cpus = cpus };
+	struct cpu_stop_done done;
+	int ret;
+
+	/* Local CPU must be offline and CPU hotplug in progress. */
+	BUG_ON(cpu_online(raw_smp_processor_id()));
+	smdata.num_threads = num_online_cpus() + 1;	/* +1 for local */
+
+	/* No proper task established and can't sleep - busy wait for lock. */
+	while (!mutex_trylock(&stop_cpus_mutex))
+		cpu_relax();
+
+	/* Schedule work on other CPUs and execute directly for local CPU */
+	set_state(&smdata, STOPMACHINE_PREPARE);
+	cpu_stop_init_done(&done, num_online_cpus());
+	queue_stop_cpus_work(cpu_online_mask, stop_machine_cpu_stop, &smdata,
+			     &done);
+	ret = stop_machine_cpu_stop(&smdata);
+
+	/* Busy wait for completion. */
+	while (!completion_done(&done.completion))
+		cpu_relax();
+
+	mutex_unlock(&stop_cpus_mutex);
+	return ret ?: done.ret;
+}
 
 #endif	/* CONFIG_STOP_MACHINE */

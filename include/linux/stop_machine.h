@@ -98,48 +98,28 @@ static inline int try_stop_cpus(const struct cpumask *cpumask,
  */
 #if defined(CONFIG_STOP_MACHINE) && defined(CONFIG_SMP)
 
-/**
- * stop_machine: freeze the machine on all CPUs and run this function
- * @fn: the function to run
- * @data: the data ptr for the @fn()
- * @cpus: the cpus to run the @fn() on (NULL = any online cpu)
- *
- * Description: This causes a thread to be scheduled on every cpu,
- * each of which disables interrupts.  The result is that no one is
- * holding a spinlock or inside any other preempt-disabled region when
- * @fn() runs.
- *
- * This can be thought of as a very heavy write lock, equivalent to
- * grabbing every spinlock in the kernel. */
 int stop_machine(int (*fn)(void *), void *data, const struct cpumask *cpus);
-
-/**
- * __stop_machine: freeze the machine on all CPUs and run this function
- * @fn: the function to run
- * @data: the data ptr for the @fn
- * @cpus: the cpus to run the @fn() on (NULL = any online cpu)
- *
- * Description: This is a special version of the above, which assumes cpus
- * won't come or go while it's being called.  Used by hotplug cpu.
- */
-int __stop_machine(int (*fn)(void *), void *data, const struct cpumask *cpus);
+int stop_machine_from_offline_cpu(int (*fn)(void *), void *data,
+				  const struct cpumask *cpus);
 
 #else	 /* CONFIG_STOP_MACHINE && CONFIG_SMP */
-
-static inline int __stop_machine(int (*fn)(void *), void *data,
-				 const struct cpumask *cpus)
-{
-	int ret;
-	local_irq_disable();
-	ret = fn(data);
-	local_irq_enable();
-	return ret;
-}
 
 static inline int stop_machine(int (*fn)(void *), void *data,
 			       const struct cpumask *cpus)
 {
-	return __stop_machine(fn, data, cpus);
+	unsigned long flags;
+	int ret;
+
+	local_irq_save(flags);
+	ret = fn(data);
+	local_irq_restore(flags);
+	return ret;
+}
+
+static inline int stop_machine_from_offline_cpu(int (*fn)(void *), void *data,
+						const struct cpumask *cpus)
+{
+	return stop_machine(fn, data, cpus);
 }
 
 #endif	/* CONFIG_STOP_MACHINE && CONFIG_SMP */
