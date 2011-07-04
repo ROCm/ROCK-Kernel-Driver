@@ -1055,6 +1055,14 @@ static int splash_getraw(unsigned char *start, unsigned char *end, int *update)
 	return -1;
 }
 
+static void splash_update_redraw(struct vc_data *vc, struct fb_info *info)
+{
+	update_region(vc,
+		      vc->vc_origin + vc->vc_size_row * vc->vc_top,
+		      vc->vc_size_row * (vc->vc_bottom - vc->vc_top) / 2);
+	splash_clear_margins(vc, info, 0);
+}
+
 int splash_do_verbose(void)
 {
 	struct vc_data *vc;
@@ -1086,10 +1094,7 @@ int splash_do_verbose(void)
 	if (!info || !info->splash_data)
 		goto done;
 
-	update_region(vc,
-		      vc->vc_origin + vc->vc_size_row * vc->vc_top,
-		      vc->vc_size_row * (vc->vc_bottom - vc->vc_top) / 2);
-	splash_clear_margins(vc, info, 0);
+	splash_update_redraw(vc, info);
 	ret = 0;
 
  done:
@@ -1124,8 +1129,6 @@ static void splash_off(struct vc_data *vc, struct fb_info *info)
 	info->splash_data = 0;
 	if (rows != vc->vc_rows || cols != vc->vc_cols)
 		vc_resize(vc, rows, cols);
-	if (vc->vc_def_color != 0x07)
-		con_remap_def_color(vc, 0x07);
 }
 
 /* look for the splash with the matching size and set it as the current */
@@ -1202,6 +1205,25 @@ static int splash_look_for_jpeg(struct vc_data *vc, int width, int height)
 		return 0;
 	}
 	return -1;
+}
+
+static int splash_recolor(struct vc_data *vc, struct fb_info *info)
+{
+	int color;
+
+	SPLASH_DEBUG();
+	if (!vc->vc_splash_data)
+		return -1;
+	if (!vc->vc_splash_data->splash_state)
+		return 0;
+	color = vc->vc_splash_data->imgd->splash_color << 4 |
+		vc->vc_splash_data->imgd->splash_fg_color;
+	if (vc->vc_def_color != color)
+		con_remap_def_color(vc, color);
+	if (info && fg_console == vc->vc_num)
+		splash_update_redraw(vc, info);
+	vc->vc_splash_data->color_set = 1;
+	return 0;
 }
 
 int splash_prepare(struct vc_data *vc, struct fb_info *info)
@@ -1341,16 +1363,14 @@ int splash_prepare(struct vc_data *vc, struct fb_info *info)
 			/ vc->vc_font.width;
 		int rows = vc->vc_splash_data->splash_vc_text_he
 			/ vc->vc_font.height;
-		int color = vc->vc_splash_data->imgd->splash_color << 4 |
-			vc->vc_splash_data->imgd->splash_fg_color;
+
 		info->splash_data = vc->vc_splash_data;
 
 		/* vc_resize also calls con_switch which resets yscroll */
 		if (rows != vc->vc_rows || cols != vc->vc_cols)
 			vc_resize(vc, cols, rows);
-		if (vc->vc_def_color != color)
-			con_remap_def_color(vc, color);
-
+		if (!vc->vc_splash_data->color_set)
+			splash_recolor(vc, NULL);
 	} else {
 		splash_off(vc, info);
 		return -5;
@@ -1368,32 +1388,9 @@ static int splash_read_proc(char *buffer, char **start, off_t offset, int size,
 static int splash_write_proc(struct file *file, const char *buffer,
 			     unsigned long count, void *data);
 static int splash_status(struct vc_data *vc);
-static int splash_recolor(struct vc_data *vc);
 static int splash_proc_register(void);
 
 static struct proc_dir_entry *proc_splash;
-
-static int splash_recolor(struct vc_data *vc)
-{
-	int color;
-
-	SPLASH_DEBUG();
-	if (!vc->vc_splash_data)
-		return -1;
-	if (!vc->vc_splash_data->splash_state)
-		return 0;
-	color = vc->vc_splash_data->imgd->splash_color << 4 |
-		vc->vc_splash_data->imgd->splash_fg_color;
-	if (vc->vc_def_color != color)
-		con_remap_def_color(vc, color);
-	if (fg_console == vc->vc_num) {
-		update_region(vc,
-			      vc->vc_origin + vc->vc_size_row * vc->vc_top,
-			      vc->vc_size_row
-			      * (vc->vc_bottom - vc->vc_top) / 2);
-	}
-	return 0;
-}
 
 static int splash_status(struct vc_data *vc)
 {
@@ -1410,20 +1407,13 @@ static int splash_status(struct vc_data *vc)
 
 	if (fg_console == vc->vc_num)
 		splash_prepare(vc, info);
-	if (vc->vc_splash_data && vc->vc_splash_data->splash_state) {
-		if (info->splash_data) {
-			if (fg_console == vc->vc_num) {
-				update_region(vc,
-					      vc->vc_origin
-					      + vc->vc_size_row * vc->vc_top,
-					      vc->vc_size_row
-					      * (vc->vc_bottom - vc->vc_top)
-					      / 2);
-				splash_clear_margins(vc, info, 0);
-			}
-		}
-	} else
+	if (vc->vc_splash_data && vc->vc_splash_data->splash_state)
+		splash_recolor(vc, info);
+	else {
 		splash_off(vc, info);
+		if (vc->vc_def_color != 0x07)
+			con_remap_def_color(vc, 0x07);
+	}
 
 	return 0;
 }
@@ -1814,7 +1804,7 @@ static int splash_write_proc(struct file *file, const char *buffer,
 		vc_splash_data->imgd->splash_fg_color = uval >> 4 & 0x0f;
 	}
 	if ((uval & 1) == vc_splash_data->splash_state)
-		splash_recolor(vc);
+		splash_recolor(vc, NULL);
 	else {
 		vc_splash_data->splash_state = uval & 1;
 		splash_status(vc);

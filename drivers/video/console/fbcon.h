@@ -67,6 +67,8 @@ struct splash_data {
 	int splash_boxes_yoff;
 	int splash_sboxes_xoff;
 	int splash_sboxes_yoff;
+
+	bool color_set;
 };
 #endif
 
