@@ -69,8 +69,10 @@ int main(void)
 	BLANK();
 #undef ENTRY
 
+#ifndef CONFIG_X86_NO_TSS
 	OFFSET(TSS_ist, tss_struct, x86_tss.ist);
 	BLANK();
+#endif
 
 	DEFINE(__NR_syscall_max, sizeof(syscalls) - 1);
 

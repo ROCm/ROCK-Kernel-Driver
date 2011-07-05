@@ -469,3 +469,80 @@ void acpi_pci_irq_disable(struct pci_dev *dev)
 	dev_info(&dev->dev, "PCI INT %c disabled\n", pin_name(pin));
 	acpi_unregister_gsi(gsi);
 }
+
+#if defined(CONFIG_XEN) && defined(CONFIG_PCI)
+static int __init xen_setup_gsi(void)
+{
+	struct pci_dev *dev = NULL;
+
+	if (acpi_noirq)
+		return 0;
+
+	/* Loop body is a clone of acpi_pci_irq_enable(). */
+	for_each_pci_dev(dev) {
+		const struct acpi_prt_entry *entry;
+		int gsi;
+		int triggering = ACPI_LEVEL_SENSITIVE;
+		int polarity = ACPI_ACTIVE_LOW;
+		struct physdev_setup_gsi setup_gsi;
+
+		if (!dev->pin)
+			continue;
+
+		entry = acpi_pci_irq_lookup(dev, dev->pin);
+		if (!entry) {
+			/*
+			 * IDE legacy mode controller IRQs are magic. Why do
+			 * compat extensions always make such a nasty mess.
+			 */
+			if ((dev->class >> 8) == PCI_CLASS_STORAGE_IDE &&
+			    (dev->class & 0x05) == 0)
+				continue;
+		}
+
+		gsi = entry
+		      ? entry->link
+			? acpi_pci_link_allocate_irq(entry->link,
+						     entry->index,
+						     &triggering, &polarity,
+						     NULL)
+			: entry->index
+		      : -1;
+
+		if (gsi >= 0) {
+			setup_gsi.gsi = gsi;
+			setup_gsi.triggering
+				= (triggering == ACPI_LEVEL_SENSITIVE);
+			setup_gsi.polarity = (polarity == ACPI_ACTIVE_LOW);
+			if (HYPERVISOR_physdev_op(PHYSDEVOP_setup_gsi,
+						  &setup_gsi) < 0)
+				continue;
+
+			dev_info(&dev->dev, "GSI%d: %s-%s\n", gsi,
+				 triggering == ACPI_LEVEL_SENSITIVE ? "level"
+								    : "edge",
+				 polarity == ACPI_ACTIVE_LOW ? "low" : "high");
+		} else {
+			/*
+			 * No IRQ known to the ACPI subsystem - maybe the
+			 * BIOS / driver reported one, then use it.
+			 */
+			dev_warn(&dev->dev, "PCI INT %c: no GSI",
+				 pin_name(dev->pin));
+			/* Interrupt Line values above 0xF are forbidden */
+			if (dev->irq > 0 && (dev->irq <= 0xF)) {
+				pr_cont(" - using IRQ %d\n", dev->irq);
+				setup_gsi.gsi = dev->irq;
+				setup_gsi.triggering = 1;
+				setup_gsi.polarity = 1;
+				VOID(HYPERVISOR_physdev_op(PHYSDEVOP_setup_gsi,
+							   &setup_gsi));
+			} else
+				pr_cont("\n");
+		}
+	}
+
+	return 0;
+}
+subsys_initcall(xen_setup_gsi);
+#endif

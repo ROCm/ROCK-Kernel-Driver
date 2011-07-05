@@ -1876,7 +1876,6 @@ static int __devexit xennet_remove(struct xenbus_device *dev)
 
 static struct xenbus_driver netfront_driver = {
 	.name = "vif",
-	.owner = THIS_MODULE,
 	.ids = netfront_ids,
 	.probe = netfront_probe,
 	.remove = __devexit_p(xennet_remove),

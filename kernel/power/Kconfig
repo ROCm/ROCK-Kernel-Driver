@@ -135,7 +135,7 @@ config PM_ADVANCED_DEBUG
 
 config PM_TEST_SUSPEND
 	bool "Test suspend/resume and wakealarm during bootup"
-	depends on SUSPEND && PM_DEBUG && RTC_CLASS=y
+	depends on SUSPEND && PM_DEBUG && RTC_CLASS=y && !XEN_UNPRIVILEGED_GUEST
 	---help---
 	This option will let you suspend your machine during bootup, and
 	make it wake up a few seconds later using an RTC wakeup alarm.
@@ -166,7 +166,7 @@ config PM_TRACE
 config PM_TRACE_RTC
 	bool "Suspend/resume event tracing"
 	depends on CAN_PM_TRACE
-	depends on X86
+	depends on X86 && !XEN_UNPRIVILEGED_GUEST
 	select PM_TRACE
 	---help---
 	This enables some cheesy code to save the last PM event point in the

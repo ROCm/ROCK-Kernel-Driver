@@ -31,6 +31,27 @@ config PCI_DEBUG
 
 	  When in doubt, say N.
 
+config PCI_GUESTDEV
+	bool "PCI Device Reservation for Passthrough"
+	depends on PCI && ACPI && XEN
+	default y
+	help
+	  Say Y here if you want to reserve PCI device for passthrough.
+
+config PCI_IOMULTI
+	tristate "PCI Device IO Multiplex for Passthrough"
+	depends on PCI && ACPI && XEN
+	default y
+	help
+	  Say Y here if you need io multiplexing.
+
+config PCI_RESERVE
+	bool "PCI IO/MEMORY space reserve"
+	depends on PCI && XEN_PRIVILEGED_GUEST
+	default y
+	help
+	  Say Y here if you need PCI IO/MEMORY space reserve
+
 config PCI_STUB
 	tristate "PCI Stub driver"
 	depends on PCI
@@ -40,9 +61,9 @@ config PCI_STUB
 
 	  When in doubt, say N.
 
-config XEN_PCIDEV_FRONTEND
+config PARAVIRT_XEN_PCIDEV_FRONTEND
         tristate "Xen PCI Frontend"
-        depends on PCI && X86 && XEN
+        depends on PCI && X86 && PARAVIRT_XEN
         select HOTPLUG
         select PCI_XEN
 	select XEN_XENBUS_FRONTEND
@@ -51,9 +72,18 @@ config XEN_PCIDEV_FRONTEND
           The PCI device frontend driver allows the kernel to import arbitrary
           PCI devices from a PCI backend to support PCI driver domains.
 
+config XEN_PCIDEV_FRONTEND
+	def_bool y
+	prompt "Xen PCI Frontend" if X86_64 && !XEN_UNPRIVILEGED_GUEST
+	depends on PCI && XEN && (PCI_GOXEN_FE || PCI_GOANY || X86_64)
+ 	select HOTPLUG
+	help
+	  The PCI device frontend driver allows the kernel to import arbitrary
+	  PCI devices from a PCI backend to support PCI driver domains.
+
 config XEN_PCIDEV_FE_DEBUG
         bool "Xen PCI Frontend debugging"
-        depends on XEN_PCIDEV_FRONTEND && PCI_DEBUG
+        depends on XEN_PCIDEV_FRONTEND || (PARAVIRT_XEN_PCIDEV_FRONTEND && PCI_DEBUG)
 	help
 	  Say Y here if you want the Xen PCI frontend to produce a bunch of debug
 	  messages to the system log.  Select this if you are having a
@@ -65,7 +95,7 @@ config XEN_PCIDEV_FE_DEBUG
 config HT_IRQ
 	bool "Interrupts on hypertransport devices"
 	default y
-	depends on PCI && X86_LOCAL_APIC && X86_IO_APIC
+	depends on PCI && X86_LOCAL_APIC && X86_IO_APIC && !XEN
 	help
 	   This allows native hypertransport devices to use interrupts.
 
@@ -83,7 +113,7 @@ config PCI_IOV
 
 config PCI_IOAPIC
 	bool
-	depends on PCI
+	depends on PCI && !XEN
 	depends on ACPI
 	depends on HOTPLUG
 	default y

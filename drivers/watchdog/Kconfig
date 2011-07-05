@@ -1139,7 +1139,7 @@ config WATCHDOG_RIO
 
 config XEN_WDT
 	tristate "Xen Watchdog support"
-	depends on XEN
+	depends on XEN || PARAVIRT_XEN
 	help
 	  Say Y here to support the hypervisor watchdog capability provided
 	  by Xen 4.0 and newer.  The watchdog timeout period is normally one

@@ -34,13 +34,13 @@
 #define _ASM_IA64_XEN_HYPERVISOR_H
 
 #include <linux/err.h>
+#include <xen/xen.h>
+#ifdef CONFIG_PARAVIRT_XEN
 #include <xen/interface/xen.h>
 #include <xen/interface/version.h>	/* to compile feature.c */
 #include <xen/features.h>		/* to comiple xen-netfront.c */
-#include <xen/xen.h>
 #include <asm/xen/hypercall.h>
 
-#ifdef CONFIG_XEN
 extern struct shared_info *HYPERVISOR_shared_info;
 extern struct start_info *xen_start_info;
 

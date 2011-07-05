@@ -19,6 +19,9 @@
 #include <linux/errno.h>
 #include <linux/printk.h>
 #include <asm/atomic.h>
+#ifdef CONFIG_XEN
+#include <xen/interface/xenoprof.h>
+#endif
  
 /* Each escaped entry is prefixed by ESCAPE_CODE
  * then one of the following codes, then the
@@ -31,14 +34,18 @@
 #define CPU_SWITCH_CODE			2
 #define COOKIE_SWITCH_CODE		3
 #define KERNEL_ENTER_SWITCH_CODE	4
-#define KERNEL_EXIT_SWITCH_CODE		5
+#define USER_ENTER_SWITCH_CODE		5
 #define MODULE_LOADED_CODE		6
 #define CTX_TGID_CODE			7
 #define TRACE_BEGIN_CODE		8
 #define TRACE_END_CODE			9
 #define XEN_ENTER_SWITCH_CODE		10
+#ifndef CONFIG_XEN
 #define SPU_PROFILING_CODE		11
 #define SPU_CTX_SWITCH_CODE		12
+#else
+#define DOMAIN_SWITCH_CODE		11
+#endif
 #define IBS_FETCH_CODE			13
 #define IBS_OP_CODE			14
 
@@ -52,6 +59,12 @@ struct oprofile_operations {
 	/* create any necessary configuration files in the oprofile fs.
 	 * Optional. */
 	int (*create_files)(struct super_block * sb, struct dentry * root);
+#ifdef CONFIG_XEN
+	/* setup active domains with Xen */
+	int (*set_active)(int *active_domains, unsigned int adomains);
+	/* setup passive domains with Xen */
+	int (*set_passive)(int *passive_domains, unsigned int pdomains);
+#endif
 	/* Do any necessary interrupt setup. Optional. */
 	int (*setup)(void);
 	/* Do any necessary interrupt shutdown. Optional. */
@@ -117,8 +130,13 @@ void oprofile_add_ext_hw_sample(unsigned long pc, struct pt_regs * const regs,
  * backtrace. */
 void oprofile_add_pc(unsigned long pc, int is_kernel, unsigned long event);
 
+void oprofile_add_mode(int cpu_mode);
+
 /* add a backtrace entry, to be called from the ->backtrace callback */
 void oprofile_add_trace(unsigned long eip);
+
+/* add a domain switch entry */
+int oprofile_add_domain_switch(int32_t domain_id);
 
 
 /**

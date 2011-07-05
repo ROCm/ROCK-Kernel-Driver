@@ -147,8 +147,19 @@ static struct page *i8xx_alloc_pages(void)
 	if (page == NULL)
 		return NULL;
 
+#ifdef CONFIG_XEN
+	if (xen_create_contiguous_region((unsigned long)page_address(page), 2, 32)) {
+		__free_pages(page, 2);
+		return NULL;
+	}
+#endif
+
 	if (set_pages_uc(page, 4) < 0) {
 		set_pages_wb(page, 4);
+#ifdef CONFIG_XEN
+		xen_destroy_contiguous_region((unsigned long)page_address(page),
+					      2);
+#endif
 		__free_pages(page, 2);
 		return NULL;
 	}
@@ -163,6 +174,9 @@ static void i8xx_destroy_pages(struct page *page)
 		return;
 
 	set_pages_wb(page, 4);
+#ifdef CONFIG_XEN
+	xen_destroy_contiguous_region((unsigned long)page_address(page), 2);
+#endif
 	put_page(page);
 	__free_pages(page, 2);
 	atomic_dec(&agp_bridge->current_memory_agp);
@@ -268,7 +282,11 @@ static struct agp_memory *alloc_agpphysmem_i8xx(size_t pg_count, int type)
 	new->page_count = pg_count;
 	new->num_scratch_pages = pg_count;
 	new->type = AGP_PHYS_MEMORY;
+#ifndef CONFIG_XEN
 	new->physical = page_to_phys(new->pages[0]);
+#else
+	new->physical = page_to_pseudophys(new->pages[0]);
+#endif
 	return new;
 }
 

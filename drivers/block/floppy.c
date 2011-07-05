@@ -146,7 +146,9 @@
 
 #undef  FLOPPY_SILENT_DCL_CLEAR
 
+#ifndef CONFIG_XEN
 #define REALLY_SLOW_IO
+#endif
 
 #define DEBUGT 2
 

@@ -322,7 +322,7 @@ static inline unsigned int cpufreq_get(unsigned int cpu)
 #endif
 
 /* query the last known CPU freq (in kHz). If zero, cpufreq couldn't detect it */
-#ifdef CONFIG_CPU_FREQ
+#if defined(CONFIG_CPU_FREQ) || defined(CONFIG_PROCESSOR_EXTERNAL_CONTROL)
 unsigned int cpufreq_quick_get(unsigned int cpu);
 #else
 static inline unsigned int cpufreq_quick_get(unsigned int cpu)

@@ -60,3 +60,7 @@ static inline bool hypervisor_x2apic_available(void)
 }
 
 #endif
+
+#ifdef HAVE_XEN_PLATFORM_COMPAT_H
+#include_next <asm/hypervisor.h>
+#endif

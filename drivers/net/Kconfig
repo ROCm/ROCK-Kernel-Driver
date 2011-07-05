@@ -2961,9 +2961,9 @@ config TILE_NET
 	  To compile this driver as a module, choose M here: the module
 	  will be called tile_net.
 
-config XEN_NETDEV_FRONTEND
+config PARAVIRT_XEN_NETDEV_FRONTEND
 	tristate "Xen network device frontend driver"
-	depends on XEN
+	depends on PARAVIRT_XEN
 	select XEN_XENBUS_FRONTEND
 	default y
 	help
@@ -2972,15 +2972,15 @@ config XEN_NETDEV_FRONTEND
 	  domain 0).
 
 	  The corresponding Linux backend driver is enabled by the
-	  CONFIG_XEN_NETDEV_BACKEND option.
+	  PARAVIRT_XEN_NETDEV_BACKEND option.
 
 	  If you are compiling a kernel for use as Xen guest, you
 	  should say Y here. To compile this driver as a module, chose
 	  M here: the module will be called xen-netfront.
 
-config XEN_NETDEV_BACKEND
+config PARAVIRT_XEN_NETDEV_BACKEND
 	tristate "Xen backend network device"
-	depends on XEN_BACKEND
+	depends on PARAVIRT_XEN_BACKEND
 	help
 	  This driver allows the kernel to act as a Xen network driver
 	  domain which exports paravirtual network devices to other
@@ -2988,7 +2988,7 @@ config XEN_NETDEV_BACKEND
 	  system that implements a compatible front end.
 
 	  The corresponding Linux frontend driver is enabled by the
-	  CONFIG_XEN_NETDEV_FRONTEND configuration option.
+	  PARAVIRT_XEN_NETDEV_FRONTEND configuration option.
 
 	  The backend driver presents a standard network device
 	  endpoint for each paravirtual network device to the driver
@@ -3443,7 +3443,7 @@ config VIRTIO_NET
 
 config VMXNET3
 	tristate "VMware VMXNET3 ethernet driver"
-	depends on PCI && INET
+	depends on PCI && INET && !XEN
 	help
 	  This driver supports VMware's vmxnet3 virtual ethernet NIC.
 	  To compile this driver as a module, choose M here: the

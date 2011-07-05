@@ -460,9 +460,9 @@ config XILINX_SYSACE
 	help
 	  Include support for the Xilinx SystemACE CompactFlash interface
 
-config XEN_BLKDEV_FRONTEND
+config PARAVIRT_XEN_BLKDEV_FRONTEND
 	tristate "Xen virtual block device support"
-	depends on XEN
+	depends on PARAVIRT_XEN
 	default y
 	select XEN_XENBUS_FRONTEND
 	help
@@ -470,16 +470,16 @@ config XEN_BLKDEV_FRONTEND
 	  block device driver.  It communicates with a back-end driver
 	  in another domain which drives the actual block device.
 
-config XEN_BLKDEV_BACKEND
+config PARAVIRT_XEN_BLKDEV_BACKEND
 	tristate "Block-device backend driver"
-	depends on XEN_BACKEND
+	depends on PARAVIRT_XEN_BACKEND
 	help
 	  The block-device backend driver allows the kernel to export its
 	  block devices to other guests via a high-performance shared-memory
 	  interface.
 
 	  The corresponding Linux frontend driver is enabled by the
-	  CONFIG_XEN_BLKDEV_FRONTEND configuration option.
+	  CONFIG_PARAVIRT_XEN_BLKDEV_FRONTEND configuration option.
 
 	  The backend driver attaches itself to a any block device specified
 	  in the XenBus configuration. There are no limits to what the block

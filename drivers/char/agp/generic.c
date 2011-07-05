@@ -960,7 +960,7 @@ int agp_generic_create_gatt_table(struct agp_bridge_data *bridge)
 
 	bridge->gatt_table = (void *)table;
 #else
-	bridge->gatt_table = ioremap_nocache(virt_to_phys(table),
+	bridge->gatt_table = ioremap_nocache(virt_to_gart(table),
 					(PAGE_SIZE * (1 << page_order)));
 	bridge->driver->cache_flush();
 #endif
@@ -973,7 +973,7 @@ int agp_generic_create_gatt_table(struct agp_bridge_data *bridge)
 
 		return -ENOMEM;
 	}
-	bridge->gatt_bus_addr = virt_to_phys(bridge->gatt_table_real);
+	bridge->gatt_bus_addr = virt_to_gart(bridge->gatt_table_real);
 
 	/* AK: bogus, should encode addresses > 4GB */
 	for (i = 0; i < num_entries; i++) {
@@ -1228,7 +1228,7 @@ int agp_generic_alloc_pages(struct agp_bridge_data *bridge, struct agp_memory *m
 	}
 
 #ifdef CONFIG_X86
-	set_pages_array_uc(mem->pages, num_pages);
+	map_pages_into_agp(mem->pages, num_pages);
 #endif
 	ret = 0;
 out:
@@ -1261,7 +1261,7 @@ void agp_generic_destroy_pages(struct agp_memory *mem)
 		return;
 
 #ifdef CONFIG_X86
-	set_pages_array_wb(mem->pages, mem->page_count);
+	unmap_pages_from_agp(mem->pages, mem->page_count);
 #endif
 
 	for (i = 0; i < mem->page_count; i++) {

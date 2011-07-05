@@ -1170,6 +1170,17 @@ i915_gem_mmap_ioctl(struct drm_device *dev, void *data,
 	return 0;
 }
 
+#ifdef CONFIG_XEN
+int i915_gem_mmap(struct file *filp, struct vm_area_struct *vma)
+{
+	int ret = drm_gem_mmap(filp, vma);
+
+	pgprot_val(vma->vm_page_prot) |= _PAGE_IOMAP;
+
+	return ret;
+}
+#endif
+
 /**
  * i915_gem_fault - fault a page into the GTT
  * vma: VMA in question

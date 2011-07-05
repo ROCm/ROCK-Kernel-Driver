@@ -819,6 +819,24 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 	gpt		[EFI] Forces disk with valid GPT signature but
 			invalid Protective MBR to be treated as GPT.
 
+	guestdev=	[PCI,ACPI,XEN]
+			Format: {<device path>|<sbdf>}][,{<device path>|<sbdf>}[,...]]
+			Format of device path: <hid>[:<uid>]-<dev>.<func>[-<dev>.<func>[,...]][+iomul]
+			Format of sbdf: [<segment>:]<bus>:<dev>.<func>[+iomul]
+			Specifies PCI device for guest domain.
+			If PCI-PCI bridge is specified, all PCI devices
+			behind PCI-PCI bridge are reserved.
+			+iomul means that this PCI function will share
+			IO ports with other +iomul functions under same
+			switch. NOTE: if +iomul is specfied, all the functions
+			of the device will share IO ports.
+
+	guestiomuldev=	[PCI,ACPI,XEN]
+			Format: [sbd][,<sbd>][,...]
+			Format of sbdf: [<segment>:]<bus>:<dev>
+			Note: function shouldn't be specified.
+			Specifies PCI device for IO port multiplexing driver.
+
 	hashdist=	[KNL,NUMA] Large hashes allocated during boot
 			are distributed across NUMA nodes.  Defaults on
 			for 64bit NUMA, off otherwise.
@@ -2016,6 +2034,13 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 				off: Turn ECRC off
 				on: Turn ECRC on.
 
+	pci_reserve=	[PCI]
+			Format: [<sbdf>[+IO<size>][+MEM<size>]][,<sbdf>...]
+			Format of sbdf: [<segment>:]<bus>:<dev>.<func>
+			Specifies the least reserved io size or memory size
+			which is assigned to PCI bridge even when no child
+			pci device exists. This is useful with PCI hotplug.
+
 	pcie_aspm=	[PCIE] Forcibly enable or disable PCIe Active State Power
 			Management.
 		off	Disable ASPM.
@@ -2185,6 +2210,10 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			Format: <full_path>
 			Run specified binary instead of /init from the ramdisk,
 			used for early userspace startup. See initrd.
+
+	reassign_resources	[PCI,ACPI,XEN]
+			Use guestdev= parameter to reassign device's
+			resources, or specify =all here.
 
 	reboot=		[BUGS=X86-32,BUGS=ARM,BUGS=IA-64] Rebooting mode
 			Format: <reboot_mode>[,<reboot_mode2>[,...]]

@@ -288,7 +288,7 @@ void note_interrupt(unsigned int irq, struct irq_desc *desc,
 		 */
 		if (time_after(jiffies, desc->last_unhandled + HZ/10))
 			desc->irqs_unhandled = 1;
-		else
+		else if (!irq_ignore_unhandled(irq))
 			desc->irqs_unhandled++;
 		desc->last_unhandled = jiffies;
 	}
