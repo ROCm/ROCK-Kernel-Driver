@@ -2033,6 +2033,8 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 				the default.
 				off: Turn ECRC off
 				on: Turn ECRC on.
+		realloc		reallocate PCI resources if allocations done by BIOS
+				are erroneous.
 
 	pci_reserve=	[PCI]
 			Format: [<sbdf>[+IO<size>][+MEM<size>]][,<sbdf>...]
