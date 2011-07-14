@@ -1235,12 +1235,14 @@ int splash_prepare(struct vc_data *vc, struct fb_info *info)
 
 	SPLASH_DEBUG("vc_num: %i", vc->vc_num);
 
+#if 0 /* Nouveau fb sets a different ops, so we can't use the condition */
 	if (info->fbops->fb_imageblit != cfb_imageblit) {
 		printk(KERN_ERR "bootsplash: "
 		       "found, but framebuffer can't "
 		       "handle it!\n");
 		return -1;
 	}
+#endif
 
 	if (!vc->vc_splash_data || !vc->vc_splash_data->splash_state) {
 		splash_off(vc, info);
