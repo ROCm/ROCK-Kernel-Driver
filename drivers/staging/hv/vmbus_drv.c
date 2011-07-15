@@ -32,6 +32,7 @@
 #include <linux/dmi.h>
 #include <linux/slab.h>
 #include <linux/acpi.h>
+#include <linux/dmi.h>
 #include <acpi/acpi_bus.h>
 #include <linux/completion.h>
 
@@ -824,9 +825,26 @@ static struct pci_driver hv_bus_driver = {
 	.id_table =       microsoft_hv_pci_table,
 };
 
+static const struct dmi_system_id __initconst
+hv_vmbus_dmi_table[] __maybe_unused  = {
+	{
+		.ident = "Hyper-V",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Microsoft Corporation"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "Virtual Machine"),
+			DMI_MATCH(DMI_BOARD_NAME, "Virtual Machine"),
+		},
+	},
+	{ },
+};
+MODULE_DEVICE_TABLE(dmi, hv_vmbus_dmi_table);
+
 static int __init hv_pci_init(void)
 {
 	int ret;
+
+	if (!dmi_check_system(hv_vmbus_dmi_table))
+		return -ENODEV;
 
 	init_completion(&probe_event);
 
