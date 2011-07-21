@@ -133,7 +133,7 @@ static struct notifier_block xen_panic_block = {
 unsigned long *phys_to_machine_mapping;
 EXPORT_SYMBOL(phys_to_machine_mapping);
 
-unsigned long *pfn_to_mfn_frame_list_list, **pfn_to_mfn_frame_list;
+static unsigned long *pfn_to_mfn_frame_list_list, **pfn_to_mfn_frame_list;
 
 /* Raw start-of-day parameters from the hypervisor. */
 start_info_t *xen_start_info;
@@ -174,6 +174,56 @@ struct boot_params __initdata boot_params;
 #else
 struct boot_params boot_params;
 #endif
+#else /* CONFIG_XEN */
+/*
+ * Initialise the list of the frames that specify the list of
+ * frames that make up the p2m table. Used by save/restore and
+ * kexec/crash.
+ */
+#ifdef CONFIG_PM_SLEEP
+void
+#else
+static void __init
+#endif
+setup_pfn_to_mfn_frame_list(typeof(__alloc_bootmem) *__alloc_bootmem)
+{
+	unsigned long i, j, size;
+	unsigned int k, fpp = PAGE_SIZE / sizeof(unsigned long);
+
+	size = (max_pfn + fpp - 1) / fpp;
+	size = (size + fpp - 1) / fpp;
+	++size; /* include a zero terminator for crash tools */
+	size *= sizeof(unsigned long);
+	if (__alloc_bootmem)
+		pfn_to_mfn_frame_list_list = alloc_bootmem_pages(size);
+	if (size > PAGE_SIZE
+	    && xen_create_contiguous_region((unsigned long)
+					    pfn_to_mfn_frame_list_list,
+					    get_order(size), 0))
+		BUG();
+	size -= sizeof(unsigned long);
+	if (__alloc_bootmem)
+		pfn_to_mfn_frame_list = alloc_bootmem(size);
+
+	for (i = j = 0, k = -1; i < max_pfn; i += fpp, j++) {
+		if (j == fpp)
+			j = 0;
+		if (j == 0) {
+			k++;
+			BUG_ON(k * sizeof(unsigned long) >= size);
+			if (__alloc_bootmem)
+				pfn_to_mfn_frame_list[k] =
+					alloc_bootmem_pages(PAGE_SIZE);
+			pfn_to_mfn_frame_list_list[k] =
+				virt_to_mfn(pfn_to_mfn_frame_list[k]);
+		}
+		pfn_to_mfn_frame_list[k][j] =
+			virt_to_mfn(&phys_to_machine_mapping[i]);
+	}
+	HYPERVISOR_shared_info->arch.max_pfn = max_pfn;
+	HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list_list =
+		virt_to_mfn(pfn_to_mfn_frame_list_list);
+}
 #endif
 
 /*
@@ -1216,19 +1266,33 @@ void __init setup_arch(char **cmdline_p)
 		p2m_pages = xen_start_info->nr_pages;
 
 	if (!xen_feature(XENFEAT_auto_translated_physmap)) {
-		unsigned long i, j, size;
-		unsigned int k, fpp;
-
 		/* Make sure we have a large enough P->M table. */
 		phys_to_machine_mapping = alloc_bootmem_pages(
 			max_pfn * sizeof(unsigned long));
+#ifdef CONFIG_X86_32
 		memcpy(phys_to_machine_mapping,
-		       __va(__pa(xen_start_info->mfn_list)),
+		       (unsigned long *)xen_start_info->mfn_list,
 		       p2m_pages * sizeof(unsigned long));
 		memset(phys_to_machine_mapping + p2m_pages, ~0,
 		       (max_pfn - p2m_pages) * sizeof(unsigned long));
+#else /* We must not use memcpy() and memset() here, as they're
+         not capable of dealing with 4Gb or more at a time. */
+		{
+			void *src = __va(__pa(xen_start_info->mfn_list));
+			unsigned long size, *dst = phys_to_machine_mapping;
+			unsigned int fpp = PAGE_SIZE / sizeof(*dst);
 
-#ifdef CONFIG_X86_64
+			for (size = p2m_pages; size >= fpp; size -= fpp) {
+				copy_page(dst, src);
+				src += PAGE_SIZE;
+				dst += fpp;
+			}
+			memcpy(dst, src, size * sizeof(*dst));
+			dst += size;
+			for (size = max_pfn - p2m_pages; size; --size)
+				*dst++ = INVALID_P2M_ENTRY;
+		}
+
 		if (xen_start_info->mfn_list == VMEMMAP_START) {
 			/*
 			 * Since it is well isolated we can (and since it is
@@ -1303,42 +1367,10 @@ void __init setup_arch(char **cmdline_p)
 				PFN_PHYS(PFN_UP(xen_start_info->nr_pages *
 						sizeof(unsigned long))));
 
-
-		/*
-		 * Initialise the list of the frames that specify the list of
-		 * frames that make up the p2m table. Used by save/restore.
-		 */
-		fpp = PAGE_SIZE/sizeof(unsigned long);
-		size = (max_pfn + fpp - 1) / fpp;
-		size = (size + fpp - 1) / fpp;
-		++size; /* include a zero terminator for crash tools */
-		size *= sizeof(unsigned long);
-		pfn_to_mfn_frame_list_list = alloc_bootmem_pages(size);
-		if (size > PAGE_SIZE
-		    && xen_create_contiguous_region((unsigned long)
-						    pfn_to_mfn_frame_list_list,
-						    get_order(size), 0))
-			BUG();
-		size -= sizeof(unsigned long);
-		pfn_to_mfn_frame_list = alloc_bootmem(size);
-
-		for (i = j = 0, k = -1; i < max_pfn; i += fpp, j++) {
-			if (j == fpp)
-				j = 0;
-			if (j == 0) {
-				k++;
-				BUG_ON(k * sizeof(unsigned long) >= size);
-				pfn_to_mfn_frame_list[k] =
-					alloc_bootmem_pages(PAGE_SIZE);
-				pfn_to_mfn_frame_list_list[k] =
-					virt_to_mfn(pfn_to_mfn_frame_list[k]);
-			}
-			pfn_to_mfn_frame_list[k][j] =
-				virt_to_mfn(&phys_to_machine_mapping[i]);
-		}
-		HYPERVISOR_shared_info->arch.max_pfn = max_pfn;
-		HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list_list =
-			virt_to_mfn(pfn_to_mfn_frame_list_list);
+#ifndef CONFIG_KEXEC
+		if (!is_initial_xendomain())
+#endif
+			setup_pfn_to_mfn_frame_list(__alloc_bootmem);
 	}
 
 	/* Mark all ISA DMA channels in-use - using them wouldn't work. */

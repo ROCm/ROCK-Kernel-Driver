@@ -624,12 +624,11 @@ int blkif_ioctl(struct block_device *bd, fmode_t mode,
 				return -EFAULT;
 		return 0;
 
-	case CDROM_GET_CAPABILITY: {
-		struct gendisk *gd = info->gd;
-		if (gd->flags & GENHD_FL_CD)
+	case CDROM_GET_CAPABILITY:
+		if (info->gd && (info->gd->flags & GENHD_FL_CD))
 			return 0;
 		return -EINVAL;
-	}
+
 	default:
 		if (info->mi && info->gd && info->rq) {
 			switch (info->mi->major) {

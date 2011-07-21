@@ -406,7 +406,7 @@ static notrace __kprobes void default_do_nmi(struct pt_regs *regs)
 			pci_serr_error(reason, regs);
 		else if (reason & NMI_REASON_IOCHK)
 			io_check_error(reason, regs);
-#ifdef CONFIG_X86_32
+#if defined(CONFIG_X86_32) && !defined(CONFIG_XEN)
 		/*
 		 * Reassert NMI in case it became active
 		 * meanwhile as it's edge-triggered:

@@ -72,11 +72,6 @@ static int __init __independent_wallclock(char *str)
 }
 __setup("independent_wallclock", __independent_wallclock);
 
-int xen_independent_wallclock(void)
-{
-	return independent_wallclock;
-}
-
 /* Permitted clock jitter, in nsecs, beyond which a warning will be printed. */
 static unsigned long permitted_clock_jitter = 10000000UL; /* 10ms */
 static int __init __permitted_clock_jitter(char *str)
@@ -174,7 +169,7 @@ static inline u64 processed_system_time(u64 jiffies_64)
 	return (jiffies_64 - jiffies_bias) * NS_PER_TICK + system_time_bias;
 }
 
-static void update_wallclock(void)
+static void update_wallclock(bool local)
 {
 	static DEFINE_MUTEX(uwc_mutex);
 	shared_info_t *s = HYPERVISOR_shared_info;
@@ -189,7 +184,7 @@ static void update_wallclock(void)
 		rmb();
 	} while ((s->wc_version & 1) | (shadow_tv_version ^ s->wc_version));
 
-	if (!independent_wallclock) {
+	if (local) {
 		u64 tmp = processed_system_time(get_jiffies_64());
 		long nsec = do_div(tmp, NSEC_PER_SEC);
 		struct timespec tv;
@@ -204,13 +199,14 @@ static void update_wallclock(void)
 
 static void _update_wallclock(struct work_struct *unused)
 {
-	update_wallclock();
+	update_wallclock(true);
 }
 static DECLARE_WORK(update_wallclock_work, _update_wallclock);
 
 void xen_check_wallclock_update(void)
 {
 	if (shadow_tv_version != HYPERVISOR_shared_info->wc_version
+	    && !is_initial_xendomain() && !independent_wallclock
 	    && keventd_up())
 		schedule_work(&update_wallclock_work);
 }
@@ -253,6 +249,43 @@ static inline int time_values_up_to_date(void)
 	return percpu_read(shadow_time.version) == vcpu_info_read(time.version);
 }
 
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+int xen_update_wallclock(const struct timespec *tv)
+{
+	struct timespec now;
+	s64 nsec;
+	struct shadow_time_info *shadow;
+	struct xen_platform_op op;
+
+	if (!is_initial_xendomain() || independent_wallclock)
+		return -EPERM;
+
+	shadow = &__get_cpu_var(shadow_time);
+
+	/*
+	 * Ensure we don't get blocked for a long time so that our time delta
+	 * overflows. If that were to happen then our shadow time values would
+	 * be stale, so we can retry with fresh ones.
+	 */
+	for (;;) {
+		nsec = tv->tv_nsec - get_nsec_offset(shadow);
+		if (time_values_up_to_date())
+			break;
+		get_time_values_from_xen(smp_processor_id());
+	}
+	set_normalized_timespec(&now, tv->tv_sec, nsec);
+
+	op.cmd = XENPF_settime;
+	op.u.settime.secs        = now.tv_sec;
+	op.u.settime.nsecs       = now.tv_nsec;
+	op.u.settime.system_time = shadow->system_timestamp;
+	WARN_ON(HYPERVISOR_platform_op(&op));
+	update_wallclock(false);
+
+	return 0;
+}
+#endif
+
 static void sync_xen_wallclock(unsigned long dummy);
 static DEFINE_TIMER(sync_xen_wallclock_timer, sync_xen_wallclock, 0, 0);
 static void sync_xen_wallclock(unsigned long dummy)
@@ -273,7 +306,7 @@ static void sync_xen_wallclock(unsigned long dummy)
 	op.u.settime.system_time = processed_system_time(get_jiffies_64());
 	WARN_ON(HYPERVISOR_platform_op(&op));
 
-	update_wallclock();
+	update_wallclock(false);
 
 	/* Once per minute. */
 	mod_timer(&sync_xen_wallclock_timer, jiffies + 60*HZ);
@@ -298,6 +331,36 @@ unsigned long long xen_local_clock(void)
 	put_cpu();
 
 	return time;
+}
+
+unsigned long xen_read_wallclock(void)
+{
+	const shared_info_t *s = HYPERVISOR_shared_info;
+	u32 version, sec, nsec;
+	u64 delta;
+
+	do {
+		version = s->wc_version;
+		rmb();
+		sec     = s->wc_sec;
+		nsec    = s->wc_nsec;
+		rmb();
+	} while ((s->wc_version & 1) | (version ^ s->wc_version));
+
+	delta = xen_local_clock() + (u64)sec * NSEC_PER_SEC + nsec;
+	do_div(delta, NSEC_PER_SEC);
+
+	return delta;
+}
+
+int xen_write_wallclock(unsigned long now)
+{
+	if (!is_initial_xendomain() || independent_wallclock)
+		return 0;
+
+	mod_timer(&sync_xen_wallclock_timer, jiffies + 1);
+
+	return mach_set_rtc_mmss(now);
 }
 
 /*
@@ -470,38 +533,9 @@ struct vcpu_runstate_info *setup_runstate_area(unsigned int cpu)
 	return rs;
 }
 
-void xen_read_persistent_clock(struct timespec *ts)
-{
-	const shared_info_t *s = HYPERVISOR_shared_info;
-	u32 version, sec, nsec;
-	u64 delta;
-
-	do {
-		version = s->wc_version;
-		rmb();
-		sec     = s->wc_sec;
-		nsec    = s->wc_nsec;
-		rmb();
-	} while ((s->wc_version & 1) | (version ^ s->wc_version));
-
-	delta = xen_local_clock() + (u64)sec * NSEC_PER_SEC + nsec;
-	do_div(delta, NSEC_PER_SEC);
-
-	ts->tv_sec = delta;
-	ts->tv_nsec = 0;
-}
-
-int xen_update_persistent_clock(void)
-{
-	if (!is_initial_xendomain())
-		return -1;
-	mod_timer(&sync_xen_wallclock_timer, jiffies + 1);
-	return 0;
-}
-
 static void __init _late_time_init(void)
 {
-	update_wallclock();
+	update_wallclock(false);
 	xen_clockevents_init();
 }
 

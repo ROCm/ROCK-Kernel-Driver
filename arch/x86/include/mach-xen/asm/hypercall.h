@@ -43,6 +43,8 @@
 
 #if CONFIG_XEN_COMPAT <= 0x030002
 # include <linux/string.h> /* memcpy() */
+# include <xen/interface/event_channel.h>
+# include <xen/interface/physdev.h>
 #endif
 
 #ifdef CONFIG_XEN
@@ -420,11 +422,13 @@ HYPERVISOR_kexec_op(
 	return _hypercall2(int, kexec_op, op, args);
 }
 
+struct tmem_op;
+
 static inline int __must_check
 HYPERVISOR_tmem_op(
 	struct tmem_op *op)
 {
-	return _hypercall1(int, tmem_op, op);
+	return _hypercall1(int, tmem_op, (void *)op);
 }
 
 #endif /* __HYPERCALL_H__ */

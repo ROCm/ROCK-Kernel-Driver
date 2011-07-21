@@ -38,11 +38,7 @@
 #include <linux/errno.h>
 #include <xen/interface/xen.h>
 #include <xen/interface/platform.h>
-#include <xen/interface/event_channel.h>
-#include <xen/interface/physdev.h>
 #include <xen/interface/sched.h>
-#include <xen/interface/nmi.h>
-#include <xen/interface/tmem.h>
 #include <xen/interface/vcpu.h>
 #include <xen/interface/arch-x86/xen-mca.h>
 #include <asm/percpu.h>
@@ -120,6 +116,10 @@ void xen_pgd_pin(pgd_t *);
 void xen_pgd_unpin(pgd_t *);
 
 void xen_init_pgd_pin(void);
+#ifdef CONFIG_PM_SLEEP
+void setup_pfn_to_mfn_frame_list(void *(*)(unsigned long, unsigned long,
+					   unsigned long));
+#endif
 
 void xen_set_ldt(const void *ptr, unsigned int ents);
 

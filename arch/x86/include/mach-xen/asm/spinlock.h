@@ -27,9 +27,13 @@
 # define REG_PTR_MODE "q"
 #endif
 
-#if defined(CONFIG_X86_32) && \
-	(defined(CONFIG_X86_OOSTORE) || defined(CONFIG_X86_PPRO_FENCE))
+#if defined(CONFIG_XEN) || (defined(CONFIG_X86_32) && \
+	(defined(CONFIG_X86_OOSTORE) || defined(CONFIG_X86_PPRO_FENCE)))
 /*
+ * On Xen, as we read back the result of the unlocking increment, we must use
+ * a locked access (or insert a full memory barrier) in all cases (so that we
+ * read what is globally visible).
+ *
  * On PPro SMP or if we are using OOSTORE, we use a locked operation to unlock
  * (PPro errata 66, 92)
  */
