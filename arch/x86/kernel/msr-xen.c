@@ -328,7 +328,7 @@ static void __exit msr_exit(void)
 
 		unregister_pcpu_notifier(&pmsr_cpu_notifier);
 		for_each_set_bit(cpu, xen_cpu_online_map, nr_xen_cpu_ids)
-			msr_device_destroy(cpu);
+			pmsr_device_destroy(cpu);
 		class_destroy(pmsr_class);
 		__unregister_chrdev(MSR_MAJOR, minor_bias,
 				    MINORMASK + 1 - minor_bias, "pcpu/msr");
