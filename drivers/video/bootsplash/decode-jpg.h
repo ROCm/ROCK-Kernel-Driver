@@ -29,7 +29,8 @@ struct jpeg_decdata {
 	int dquant[3][64];
 };
 
-extern int jpeg_decode(unsigned char *, unsigned char *, int, int, int,
+extern int jpeg_decode(unsigned char *buf, unsigned char *pic, 
+		       int width, int height, enum splash_color_format cf,
 		       struct jpeg_decdata *);
 extern void jpeg_get_size(unsigned char *, int *, int *);
 

@@ -7,7 +7,7 @@
 
 #include <linux/string.h>
 #include <asm/byteorder.h>
-
+#include <linux/bootsplash.h>
 #include "decode-jpg.h"
 
 #define ISHIFT 11
@@ -80,9 +80,10 @@ static void scaleidctqtab(PREC *, PREC);
 
 static void initcol(PREC[][64]);
 
-static void col221111(int *, unsigned char *, int);
-static void col221111_16(int *, unsigned char *, int);
-static void col221111_32(int *, unsigned char *, int);
+static void col221111(int *out, unsigned char *pic, int width);
+static void col221111_15(int *out, unsigned char *pic, int width);
+static void col221111_16(int *out, unsigned char *pic, int width);
+static void col221111_32(int *out, unsigned char *pic, int width);
 
 /*********************************/
 
@@ -250,7 +251,7 @@ void jpeg_get_size(unsigned char *buf, int *width, int *height)
 }
 
 int jpeg_decode(unsigned char *buf, unsigned char *pic,
-		int width, int height, int depth,
+		int width, int height, enum splash_color_format cf,
 		struct jpeg_decdata *decdata)
 {
 	int i, j, m, tac, tdc;
@@ -377,21 +378,26 @@ int jpeg_decode(unsigned char *buf, unsigned char *pic,
 			     decdata->out + 320,
 			     decdata->dquant[2], IFIX(0.5), max[5]);
 
-			switch (depth) {
-			case 32:
+			switch (cf) {
+			case SPLASH_DEPTH_24:
 				col221111_32(decdata->out,
 					     (pic + (my * 16 * mcusx + mx)
 					      * 16 * 4),
 					     mcusx * 16 * 4);
 				break;
-			case 24:
+			case SPLASH_DEPTH_24_PACKED:
 				col221111(decdata->out,
 					  (pic + (my * 16 * mcusx + mx)
 					   * 16 * 3),
 					  mcusx * 16 * 3);
 				break;
-			case 16:
+			case SPLASH_DEPTH_16:
 				col221111_16(decdata->out,
+					     (pic + (my * 16 * mcusx + mx)
+					      * 16 * 2), mcusx * 16 * 2);
+				break;
+			case SPLASH_DEPTH_15:
+				col221111_15(decdata->out,
 					     (pic + (my * 16 * mcusx + mx)
 					      * 16 * 2), mcusx * 16 * 2);
 				break;
@@ -856,6 +862,16 @@ PREC q[][64];
 						)
 
 #ifdef __LITTLE_ENDIAN
+#define PIC_15(yin, xin, p, xout, add)				\
+	(							\
+	 y = outy[(yin) * 8 + xin],				\
+	 y = ((CLAMP(y + cr + add * 2 + 1) & 0xf8) <<  7) |	\
+	 ((CLAMP(y - cg + add * 2 + 1) & 0xf8) <<  2) |		\
+	 ((CLAMP(y + cb + add * 2 + 1)) >>  3),			\
+	 p[(xout) * 2 + 0] = y & 0xff,				\
+	 p[(xout) * 2 + 1] = y >> 8				\
+						 )
+
 #define PIC_16(yin, xin, p, xout, add)			    \
 	(						    \
 	 y = outy[(yin) * 8 + xin],			    \
@@ -866,8 +882,7 @@ PREC q[][64];
 	 p[(xout) * 2 + 1] = y >> 8			    \
 						 )
 #else
-#ifdef CONFIG_PPC
-#define PIC_16(yin, xin, p, xout, add)				\
+#define PIC_15(yin, xin, p, xout, add)				\
 	(							\
 	 y = outy[(yin) * 8 + xin],				\
 	 y = ((CLAMP(y + cr + add * 2 + 1) & 0xf8) <<  7) |	\
@@ -876,7 +891,7 @@ PREC q[][64];
 	 p[(xout) * 2 + 0] = y >> 8,				\
 	 p[(xout) * 2 + 1] = y & 0xff				\
 						 )
-#else
+
 #define PIC_16(yin, xin, p, xout, add)			    \
 	(						    \
 	 y = outy[(yin) * 8 + xin],			    \
@@ -886,7 +901,6 @@ PREC q[][64];
 	 p[(xout) * 2 + 0] = y >> 8,			    \
 	 p[(xout) * 2 + 1] = y & 0xff			    \
 						 )
-#endif
 #endif
 
 #define PIC_32(yin, xin, p, xout)		\
@@ -906,6 +920,15 @@ PREC q[][64];
 	 PIC(xin / 4 * 8 + 1, (xin & 3) * 2 + 0, pic1, xin * 2 + 0),	\
 	 PIC(xin / 4 * 8 + 1, (xin & 3) * 2 + 1, pic1, xin * 2 + 1)	\
 								)
+
+#define PIC221111_15(xin)                                               \
+	(								\
+	 CBCRCG(0, xin),						\
+	 PIC_15(xin / 4 * 8 + 0, (xin & 3) * 2 + 0, pic0, xin * 2 + 0, 3), \
+	 PIC_15(xin / 4 * 8 + 0, (xin & 3) * 2 + 1, pic0, xin * 2 + 1, 0), \
+	 PIC_15(xin / 4 * 8 + 1, (xin & 3) * 2 + 0, pic1, xin * 2 + 0, 1), \
+	 PIC_15(xin / 4 * 8 + 1, (xin & 3) * 2 + 1, pic1, xin * 2 + 1, 2) \
+									)
 
 #define PIC221111_16(xin)                                               \
 	(								\
@@ -940,6 +963,30 @@ static void col221111(int *out, unsigned char *pic, int width)
 		for (j = 4; j > 0; j--) {
 			for (k = 0; k < 8; k++)
 				PIC221111(k);
+			outc += 8;
+			outy += 16;
+			pic0 += 2 * width;
+			pic1 += 2 * width;
+		}
+		outy += 64 * 2 - 16 * 4;
+	}
+}
+
+static void col221111_15(int *out, unsigned char *pic, int width)
+{
+	int i, j, k;
+	unsigned char *pic0, *pic1;
+	int *outy, *outc;
+	int cr, cg, cb, y;
+
+	pic0 = pic;
+	pic1 = pic + width;
+	outy = out;
+	outc = out + 64 * 4;
+	for (i = 2; i > 0; i--) {
+		for (j = 4; j > 0; j--) {
+			for (k = 0; k < 8; k++)
+				PIC221111_15(k);
 			outc += 8;
 			outy += 16;
 			pic0 += 2 * width;

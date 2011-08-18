@@ -66,7 +66,7 @@ static int splash_usesilent;
 static unsigned long splash_default = 0xf01;
 
 static int jpeg_get(unsigned char *buf, unsigned char *pic,
-		    int width, int height, int depth,
+		    int width, int height, enum splash_color_format cf,
 		    struct jpeg_decdata *decdata);
 static int splash_look_for_jpeg(struct vc_data *vc, int width, int height);
 
@@ -85,7 +85,9 @@ static int __init splash_setup(char *options)
 	if (!strncmp("verbose", options, 7)) {
 		printk(KERN_INFO "bootsplash: verbose mode.\n");
 		splash_usesilent = 0;
-		return 0;
+		if (strlen(options) == 7)
+			return 0;
+		options += 8;
 	}
 	if (strict_strtoul(options, 0, &splash_default) == -EINVAL)
 		splash_default = 0;
@@ -130,7 +132,8 @@ static int boxextract(unsigned char *buf, unsigned short *dp,
 }
 
 static void boxit(unsigned char *pic, int bytes, unsigned char *buf, int num,
-		  int percent, int xoff, int yoff, int overpaint, int octpp)
+		  int percent, int xoff, int yoff, int overpaint,
+		  enum splash_color_format cf)
 {
 	int x, y, p, doblend, r, g, b, a, add;
 	unsigned int i = 0;
@@ -142,6 +145,7 @@ static void boxit(unsigned char *pic, int bytes, unsigned char *buf, int num,
 	union pt picp;
 	unsigned int stipple[32], sti, stin, stinn, stixs, stixe, stiys, stiye;
 	int xs, xe, ys, ye, xo, yo;
+	int octpp = splash_octpp(cf);
 
 	SPLASH_DEBUG();
 	if (num == 0 || percent < -1)
@@ -309,8 +313,23 @@ static void boxit(unsigned char *pic, int bytes, unsigned char *buf, int num,
 				b = cols2[2];
 #define CLAMP(x) ((x) >= 256 ? 255 : (x))
 #define BLEND(x, v, a) ((x * (255 - a) + v * a) / 255)
-				switch (octpp) {
-				case 2:
+				switch (cf) {
+				case SPLASH_DEPTH_15:
+					if (a != 255) {
+						i = *picp.us;
+						r = BLEND((i>>7 & 0xf8), r, a);
+						g = BLEND((i>>2 & 0xf8), g, a);
+						b = BLEND((i<<3 & 0xf8), b, a);
+					}
+					r += add * 2 + 1;
+					g += add;
+					b += add * 2 + 1;
+					i =     ((CLAMP(r) & 0xf8) <<  7) |
+						((CLAMP(g) & 0xf8) <<  2) |
+						((CLAMP(b))        >>  3);
+					*(picp.us++) = i;
+					break;
+				case SPLASH_DEPTH_16:
 					if (a != 255) {
 						i = *picp.us;
 						r = BLEND((i>>8 & 0xf8), r, a);
@@ -320,12 +339,12 @@ static void boxit(unsigned char *pic, int bytes, unsigned char *buf, int num,
 					r += add * 2 + 1;
 					g += add;
 					b += add * 2 + 1;
-					i =     ((CLAMP(r) & 0xf8) <<  8) |
-						((CLAMP(g) & 0xfc) <<  3) |
-						((CLAMP(b))        >>  3);
+						i = ((CLAMP(r) & 0xf8) <<  8) |
+						    ((CLAMP(g) & 0xfc) <<  3) |
+						    ((CLAMP(b))        >>  3);
 					*(picp.us++) = i;
 					break;
-				case 3:
+				case SPLASH_DEPTH_24_PACKED:
 					if (a != 255) {
 						i = *picp.ub;
 						r = BLEND((i & 0xff), r, a);
@@ -337,9 +356,8 @@ static void boxit(unsigned char *pic, int bytes, unsigned char *buf, int num,
 					*(picp.ub++) = CLAMP(r);
 					*(picp.ub++) = CLAMP(g);
 					*(picp.ub++) = CLAMP(b);
-					picp.ub += 3;
 					break;
-				case 4:
+				case SPLASH_DEPTH_24:
 					if (a != 255) {
 						i = *picp.ul;
 						r = BLEND((i>>16 & 0xff), r, a);
@@ -350,6 +368,8 @@ static void boxit(unsigned char *pic, int bytes, unsigned char *buf, int num,
 					     | (CLAMP(g) << 8)
 					     | (CLAMP(b)));
 					*(picp.ul++) = i;
+					break;
+				default:
 					break;
 				}
 				add ^= 3;
@@ -507,15 +527,14 @@ static void box_offsets(unsigned char *buf, int num,
 }
 
 static int splash_check_jpeg(unsigned char *jpeg,
-			     int width, int height, int depth)
+			     int width, int height)
 {
 	int size, err;
 	unsigned char *mem;
 	struct jpeg_decdata *decdata; /* private decoder data */
 
 
-	size = ((width + 15) & ~15) * ((height + 15) & ~15)
-		* ((depth + 1) >> 3);
+	size = ((width + 15) & ~15) * ((height + 15) & ~15) * 2;
 	mem = vmalloc(size);
 	if (!mem) {
 		printk(KERN_INFO "bootsplash: no memory for decoded picture.\n");
@@ -527,8 +546,10 @@ static int splash_check_jpeg(unsigned char *jpeg,
 		vfree(mem);
 		return -1;
 	}
+	/* test decode: use fixed depth of 16 */
 	err = jpeg_decode(jpeg, mem,
-			  ((width + 15) & ~15), ((height + 15) & ~15), depth,
+			  ((width + 15) & ~15), ((height + 15) & ~15),
+			  SPLASH_DEPTH_16,
 			  decdata);
 	if (err)
 		printk(KERN_INFO "bootsplash: "
@@ -930,8 +951,8 @@ static int splash_getraw(unsigned char *start, unsigned char *end, int *update)
 		jpeg_get_size(ndata + len + boxcnt * 12 + palcnt,
 			      &imgd->splash_width, &imgd->splash_height);
 		if (splash_check_jpeg(ndata + len + boxcnt * 12 + palcnt,
-				      imgd->splash_width, imgd->splash_height,
-				      info ? info->var.bits_per_pixel : 16)) {
+				      imgd->splash_width,
+				      imgd->splash_height)) {
 			ndata += len + splash_size - 1;
 			vfree(imgd);
 			vfree(sd);
@@ -961,7 +982,6 @@ static int splash_getraw(unsigned char *start, unsigned char *end, int *update)
 			imgd->splash_text_he *= 16;
 			imgd->splash_color    = (splash_default >> 8) & 0x0f;
 			imgd->splash_fg_color = (splash_default >> 4) & 0x0f;
-			sd->splash_state    = splash_default & 1;  /*@!@*/
 		}
 
 		/* fake penguin box for older formats */
@@ -1229,7 +1249,8 @@ static int splash_recolor(struct vc_data *vc, struct fb_info *info)
 int splash_prepare(struct vc_data *vc, struct fb_info *info)
 {
 	int err;
-	int width, height, depth, octpp, size, sbytes;
+	int width, height, octpp, size, sbytes;
+	enum splash_color_format cf = SPLASH_DEPTH_UNKNOWN;
 	int pic_update = 0;
 	struct jpeg_decdata *decdata; /* private decoder data */
 
@@ -1251,13 +1272,30 @@ int splash_prepare(struct vc_data *vc, struct fb_info *info)
 
 	width = info->var.xres;
 	height = info->var.yres;
-	depth = info->var.bits_per_pixel;
-	octpp = (depth + 1) >> 3;
-
-	if (depth == 24 || depth < 15) {   /* Other targets might need fixing */
+	switch (info->var.bits_per_pixel) {
+	case 16:
+		if ((info->var.red.length +
+		     info->var.green.length +
+		     info->var.blue.length) == 15)
+			cf = SPLASH_DEPTH_15;
+		else
+			cf = SPLASH_DEPTH_16;
+		break;
+	case 24:
+		cf = SPLASH_DEPTH_24_PACKED;
+		break;
+	case 32:
+		cf = SPLASH_DEPTH_24;
+		break;
+	}
+	if (cf == SPLASH_DEPTH_UNKNOWN) {
+	        printk(KERN_INFO "bootsplash: unsupported pixel format: %i\n",
+		       info->var.bits_per_pixel);
 		splash_off(vc, info);
 		return -2;
 	}
+	octpp = splash_octpp(cf);
+
 	if (splash_look_for_jpeg(vc, width, height) < 0) {
 		printk(KERN_INFO "bootsplash: no matching splash %dx%d\n",
 		       width, height);
@@ -1303,7 +1341,7 @@ int splash_prepare(struct vc_data *vc, struct fb_info *info)
 		pic_update = 1;
 		err = jpeg_get(vc->vc_splash_data->imgd->splash_silentjpeg,
 			       vc->vc_splash_data->pic->splash_pic,
-			       width, height, depth, decdata);
+			       width, height, cf, decdata);
 		if (err) {
 			printk(KERN_INFO "bootsplash: "
 			       "error while decompressing silent picture: "
@@ -1321,7 +1359,7 @@ int splash_prepare(struct vc_data *vc, struct fb_info *info)
 				      vc->vc_splash_data->splash_sboxes_yoff,
 				      vc->vc_splash_data->splash_percent < 0 ?
 				      1 : 0,
-				      octpp);
+				      cf);
 			splashcopy(info->screen_base,
 				   vc->vc_splash_data->pic->splash_pic,
 				   info->var.yres,
@@ -1335,7 +1373,7 @@ int splash_prepare(struct vc_data *vc, struct fb_info *info)
 	if (pic_update) {
 		err = jpeg_get(vc->vc_splash_data->imgd->splash_jpeg,
 			       vc->vc_splash_data->pic->splash_pic,
-			       width, height, depth, decdata);
+			       width, height, cf, decdata);
 		if (err) {
 			printk(KERN_INFO "bootsplash: "
 			       "error while decompressing picture: %s (%d) .\n",
@@ -1359,7 +1397,7 @@ int splash_prepare(struct vc_data *vc, struct fb_info *info)
 		      vc->vc_splash_data->splash_boxes_xoff,
 		      vc->vc_splash_data->splash_boxes_yoff,
 		      0,
-		      octpp);
+		      cf);
 	if (vc->vc_splash_data->splash_state) {
 		int cols = vc->vc_splash_data->splash_vc_text_wi
 			/ vc->vc_font.width;
@@ -1374,6 +1412,7 @@ int splash_prepare(struct vc_data *vc, struct fb_info *info)
 		if (!vc->vc_splash_data->color_set)
 			splash_recolor(vc, NULL);
 	} else {
+	        SPLASH_DEBUG("Splash Status is off\n");
 		splash_off(vc, info);
 		return -5;
 	}
@@ -1565,9 +1604,26 @@ void splash_set_percent(struct vc_data *vc, int pe)
 		} else
 			splash_prepare(vc, info);
 	} else {
-		int octpp = (info->var.bits_per_pixel + 1) >> 3;
 		struct splash_data *splash_data = info->splash_data;
-
+		enum splash_color_format cf = SPLASH_DEPTH_UNKNOWN;
+		switch (info->var.bits_per_pixel) {
+		case 16:
+			if ((info->var.red.length +
+			     info->var.green.length +
+			     info->var.blue.length) == 15)
+				cf = SPLASH_DEPTH_15;
+			else
+				cf = SPLASH_DEPTH_16;
+			break;
+		case 24:
+			cf = SPLASH_DEPTH_24_PACKED;
+			break;
+		case 32:
+			cf = SPLASH_DEPTH_24;
+			break;
+		}
+		if (cf == SPLASH_DEPTH_UNKNOWN)
+			return;
 		if (splash_data) {
 			if (splash_data->imgd->splash_silentjpeg
 			    && splash_data->splash_dosilent)
@@ -1579,19 +1635,7 @@ void splash_set_percent(struct vc_data *vc, int pe)
 				      splash_data->splash_sboxes_xoff,
 				      splash_data->splash_sboxes_yoff,
 				      1,
-				      octpp);
-#if 0
-			if (!info->splash_dosilent)
-				boxit(info->screen_base,
-				      info->fix.line_length,
-				      splash_data->imgd->splash_boxes,
-				      splash_data->imgd->splash_boxcount,
-				      splash_data->splash_percent,
-				      splash_data->splash_boxes_xoff,
-				      splash_data->splash_boxes_yoff,
-				      1,
-				      octpp);
-#endif
+				      cf);
 		}
 	}
 }
@@ -1752,7 +1796,26 @@ static int splash_write_proc(struct file *file, const char *buffer,
 				struct splash_data *splash_data
 					= info->splash_data;
 				struct fbcon_ops *ops = info->fbcon_par;
-				int octpp = (info->var.bits_per_pixel + 1) >> 3;
+				enum splash_color_format cf = SPLASH_DEPTH_UNKNOWN;
+
+				switch (info->var.bits_per_pixel) {
+				case 16:
+					if ((info->var.red.length +
+					     info->var.green.length +
+					     info->var.blue.length) == 15)
+						cf = SPLASH_DEPTH_15;
+					else
+						cf = SPLASH_DEPTH_16;
+					break;
+				case 24:
+					cf = SPLASH_DEPTH_24_PACKED;
+					break;
+				case 32:
+					cf = SPLASH_DEPTH_24;
+					break;
+				}
+				if (cf == SPLASH_DEPTH_UNKNOWN)
+					up = 0;
 				if (ops->blank_state ||
 				    !vc_splash_data ||
 				    !splash_data)
@@ -1768,7 +1831,7 @@ static int splash_write_proc(struct file *file, const char *buffer,
 					      splash_data->splash_sboxes_xoff,
 					      splash_data->splash_sboxes_yoff,
 					      1,
-					      octpp);
+					      cf);
 				} else if ((up & 1) != 0) {
 					boxit(info->screen_base,
 					      info->fix.line_length,
@@ -1778,7 +1841,7 @@ static int splash_write_proc(struct file *file, const char *buffer,
 					      splash_data->splash_boxes_xoff,
 					      splash_data->splash_boxes_yoff,
 					      1,
-					      octpp);
+					      cf);
 				}
 			}
 		}
@@ -1847,8 +1910,7 @@ void splash_init(void)
 	info = registered_fb[(int)con2fb_map[INIT_CONSOLE]];
 	if (!vc
 	    || !info
-	    || info->var.bits_per_pixel == 24 /* not tested */
-	    || info->var.bits_per_pixel < 15) /* not supported */
+	    || info->var.bits_per_pixel < 16) /* not supported */
 		return;
 #ifdef CONFIG_PROC_FS
 	splash_proc_register();
@@ -1997,59 +2059,63 @@ struct pixel {
 	u32 blue;
 };
 
-#define put_pixel(pix, buf, depth)					\
-	switch (depth) {						\
-	case 15:							\
+#define put_pixel(pix, buf, cf)						\
+	switch (cf) {							\
+	case SPLASH_DEPTH_15:						\
 		*(u16 *)(buf) = (u16)((pix).red << 10 |                 \
 				      (pix).green << 5 | (pix).blue);	\
 	(buf) += 2;							\
 	break;								\
-	case 16:							\
+	case SPLASH_DEPTH_16:						\
 		*(u16 *)(buf) = (u16)((pix).red << 11 |			\
 				      (pix).green << 5 | (pix).blue);	\
 		(buf) += 2;						\
 		break;							\
-	case 24:							\
+	case SPLASH_DEPTH_24_PACKED:					\
 		*(u16 *)(buf) = (u16)((pix).red << 8 | (pix).green);	\
 		buf += 2;						\
 		*((buf)++) = (pix).blue;				\
 		break;							\
-	case 32:							\
+	case SPLASH_DEPTH_24:						\
 		*(u32 *)(buf) = (u32)((pix).red << 16 |			\
 				      (pix).green << 8 | (pix).blue);	\
 		(buf) += 4;						\
+		break;							\
+        case SPLASH_DEPTH_UNKNOWN:					\
 		break;							\
 	}
 
 #define get_pixel(pix, buf, depth)				       \
 	switch (depth) {					       \
-	case 15:						       \
+	case SPLASH_DEPTH_15:					       \
 		(pix).red = ((*(u16 *)(buf)) >> 10) & 0x1f;	       \
 		(pix).green = ((*(u16 *)(buf)) >> 5) & 0x1f;	       \
 		(pix).blue = (*(u16 *)(buf)) & 0x1f;		       \
 		(buf) += 2;					       \
 		break;						       \
-	case 16:						       \
+	case SPLASH_DEPTH_16:					       \
 		(pix).red = ((*(u16 *)(buf)) >> 11) & 0x1f;	       \
 		(pix).green = ((*(u16 *)(buf)) >> 5) & 0x3f;	       \
 		(pix).blue = (*(u16 *)(buf)) & 0x1f;		       \
 		(buf) += 2;					       \
 		break;						       \
-	case 24:						       \
+	case SPLASH_DEPTH_24_PACKED:				       \
 		(pix).blue = *(((buf))++);			       \
 		(pix).green = *(((buf))++);			       \
 		(pix).red = *(((buf))++);			       \
 		break;						       \
-	case 32:						       \
+	case SPLASH_DEPTH_24:					       \
 		(pix).blue = *(((buf))++);			       \
 		(pix).green = *(((buf))++);			       \
 		(pix).red = *(((buf))++);			       \
 		(buf)++;					       \
 		break;						       \
+	 case SPLASH_DEPTH_UNKNOWN:				       \
+		break;						       \
 	}
 
 static inline void
-scale_x_down(int depth, int src_w,
+scale_x_down(enum splash_color_format cf, int src_w,
 	     unsigned char **src_p, u32 *x_coeff,
 	     u32 x_shift,  u32 y_coeff, struct pixel *row_buffer)
 {
@@ -2064,7 +2130,7 @@ scale_x_down(int depth, int src_w,
 
 	for (i = 0; i < src_w; ) {
 		curr_x_coeff = 1;
-		get_pixel(tmp_pixel, *src_p, depth);
+		get_pixel(tmp_pixel, *src_p, cf);
 		i++;
 		for (l = 0; l < x_array_size; l++) {
 			x_column_num = x_coeff[curr_x_coeff++];
@@ -2079,7 +2145,7 @@ scale_x_down(int depth, int src_w,
 				curr_pixel.blue += tmp_pixel.blue
 					* x_coeff[curr_x_coeff];
 				curr_x_coeff++;
-				get_pixel(tmp_pixel, *src_p, depth);
+				get_pixel(tmp_pixel, *src_p, cf);
 				i++;
 			}
 			curr_pixel.red += tmp_pixel.red * x_coeff[curr_x_coeff];
@@ -2100,7 +2166,8 @@ scale_x_down(int depth, int src_w,
 }
 
 static inline void
-scale_x_up(int depth, int src_w, unsigned char **src_p, u32 *x_coeff,
+scale_x_up(enum splash_color_format cf, int src_w,
+	   unsigned char **src_p, u32 *x_coeff,
 	   u32 x_shift,  u32 y_coeff, struct pixel *row_buffer)
 {
 	u32 curr_x_coeff = 1;
@@ -2114,7 +2181,7 @@ scale_x_up(int depth, int src_w, unsigned char **src_p, u32 *x_coeff,
 
 	for (i = 0; i < src_w;) {
 		curr_x_coeff = 1;
-		get_pixel(tmp_pixel, *src_p, depth);
+		get_pixel(tmp_pixel, *src_p, cf);
 		i++;
 		for (l = 0; l < x_array_size - 1; l++) {
 			x_column_num = x_coeff[curr_x_coeff++];
@@ -2129,7 +2196,7 @@ scale_x_up(int depth, int src_w, unsigned char **src_p, u32 *x_coeff,
 				* x_coeff[curr_x_coeff];
 			curr_pixel.blue = tmp_pixel.blue * x_coeff[curr_x_coeff];
 			curr_x_coeff++;
-			get_pixel(tmp_pixel, *src_p, depth);
+			get_pixel(tmp_pixel, *src_p, cf);
 			i++;
 			row_buffer[k].red += ((curr_pixel.red
 					       + (tmp_pixel.red
@@ -2156,9 +2223,10 @@ scale_x_up(int depth, int src_w, unsigned char **src_p, u32 *x_coeff,
 }
 
 static int scale_y_down(unsigned char *src, unsigned char *dst,
-			int depth, int src_w, int src_h, int dst_w, int dst_h)
+			enum splash_color_format cf,
+			int src_w, int src_h, int dst_w, int dst_h)
 {
-	int octpp = (depth + 1) >> 3;
+	int octpp = splash_octpp(cf);
 	int src_x_bytes = octpp * ((src_w + SPLASH_ALIGN) & ~SPLASH_ALIGN);
 	int dst_x_bytes = octpp * ((dst_w + SPLASH_ALIGN) & ~SPLASH_ALIGN);
 	int j;
@@ -2204,11 +2272,11 @@ static int scale_y_down(unsigned char *src, unsigned char *dst,
 			}
 			src_p = src_p_line;
 			if (xup)
-				scale_x_up(depth,  src_w, &src_p, x_coeff,
+				scale_x_up(cf,  src_w, &src_p, x_coeff,
 					   x_shift, y_coeff[curr_y_coeff],
 					   row_buffer);
 			else
-				scale_x_down(depth,  src_w, &src_p, x_coeff,
+				scale_x_down(cf,  src_w, &src_p, x_coeff,
 					     x_shift, y_coeff[curr_y_coeff],
 					     row_buffer);
 			curr_y_coeff++;
@@ -2216,12 +2284,12 @@ static int scale_y_down(unsigned char *src, unsigned char *dst,
 				src_p = src_p_line = src_p_line + src_x_bytes;
 				j++;
 				if (xup)
-					scale_x_up(depth,  src_w, &src_p,
+					scale_x_up(cf,  src_w, &src_p,
 						   x_coeff, x_shift,
 						   y_coeff[curr_y_coeff],
 						   row_buffer);
 				else
-					scale_x_down(depth,  src_w, &src_p,
+					scale_x_down(cf,  src_w, &src_p,
 						     x_coeff, x_shift,
 						     y_coeff[curr_y_coeff],
 						     row_buffer);
@@ -2235,7 +2303,7 @@ static int scale_y_down(unsigned char *src, unsigned char *dst,
 					>> y_shift;
 				row_buffer[k].blue = (row_buffer[k].blue + rnd)
 					>> y_shift;
-				put_pixel(row_buffer[k], dst, depth);
+				put_pixel(row_buffer[k], dst, cf);
 			}
 			dst = dst_p_line = dst_p_line + dst_x_bytes;
 		}
@@ -2249,9 +2317,10 @@ static int scale_y_down(unsigned char *src, unsigned char *dst,
 }
 
 static int scale_y_up(unsigned char *src, unsigned char *dst,
-		      int depth, int src_w, int src_h, int dst_w, int dst_h)
+		      enum splash_color_format cf,
+		      int src_w, int src_h, int dst_w, int dst_h)
 {
-	int octpp = (depth + 1) >> 3;
+	int octpp = splash_octpp(cf);
 	int src_x_bytes = octpp * ((src_w + SPLASH_ALIGN) & ~SPLASH_ALIGN);
 	int dst_x_bytes = octpp * ((dst_w + SPLASH_ALIGN) & ~SPLASH_ALIGN);
 	int j;
@@ -2301,10 +2370,10 @@ static int scale_y_up(unsigned char *src, unsigned char *dst,
 					    * (dst_w + 1)));
 		curr_y_coeff = 1;
 		if (xup)
-			scale_x_up(depth,  src_w, &src_p, x_coeff,
+			scale_x_up(cf,  src_w, &src_p, x_coeff,
 				   x_shift, 1, row_buffer);
 		else
-			scale_x_down(depth,  src_w, &src_p, x_coeff, x_shift, 1,
+			scale_x_down(cf,  src_w, &src_p, x_coeff, x_shift, 1,
 				     row_buffer);
 		src_p = src_p_line = src_p_line + src_x_bytes;
 		j++;
@@ -2315,7 +2384,7 @@ static int scale_y_up(unsigned char *src, unsigned char *dst,
 			y_column_num = y_coeff[curr_y_coeff];
 			for (s = 0; s < y_column_num; s++) {
 				for (k = 0; k < dst_w; k++)
-					put_pixel(row_buffer[k], dst, depth);
+					put_pixel(row_buffer[k], dst, cf);
 				dst = dst_p_line = dst_p_line + dst_x_bytes;
 				writes++;
 			}
@@ -2323,10 +2392,10 @@ static int scale_y_up(unsigned char *src, unsigned char *dst,
 			row_buffer = row_buf_list[(bi++) % 2];
 			prev_y_coeff_val = y_coeff[curr_y_coeff++];
 			if (xup)
-				scale_x_up(depth,  src_w, &src_p, x_coeff,
+				scale_x_up(cf,  src_w, &src_p, x_coeff,
 					   x_shift, 1, row_buffer);
 			else
-				scale_x_down(depth,  src_w, &src_p, x_coeff,
+				scale_x_down(cf,  src_w, &src_p, x_coeff,
 					     x_shift, 1, row_buffer);
 			src_p = src_p_line = src_p_line + src_x_bytes;
 			j++;
@@ -2350,7 +2419,7 @@ static int scale_y_up(unsigned char *src, unsigned char *dst,
 				old_row_buffer[k].red = 0;
 				old_row_buffer[k].green = 0;
 				old_row_buffer[k].blue = 0;
-				put_pixel(pix, dst, depth);
+				put_pixel(pix, dst, cf);
 			}
 			dst = dst_p_line = dst_p_line + dst_x_bytes;
 			writes++;
@@ -2358,7 +2427,7 @@ static int scale_y_up(unsigned char *src, unsigned char *dst,
 		}
 		for (r = 0; r < y_coeff[curr_y_coeff]; r++) {
 			for (k = 0; k < dst_w; k++)
-				put_pixel(row_buffer[k], dst, depth);
+				put_pixel(row_buffer[k], dst, cf);
 
 			dst = dst_p_line = dst_p_line + dst_x_bytes;
 			writes++;
@@ -2372,22 +2441,23 @@ static int scale_y_up(unsigned char *src, unsigned char *dst,
 }
 
 static int jpeg_get(unsigned char *buf, unsigned char *pic,
-		    int width, int height, int depth,
+		    int width, int height, enum splash_color_format cf,
 		    struct jpeg_decdata *decdata)
 {
 	int my_width, my_height;
 	int err;
+	int octpp = splash_octpp(cf);
 
 	jpeg_get_size(buf, &my_width, &my_height);
 
 	if (my_height != height || my_width != width) {
 		int my_size = ((my_width + 15) & ~15)
-		    * ((my_height + 15) & ~15) * ((depth + 1) >> 3);
+		    * ((my_height + 15) & ~15) * octpp;
 		unsigned char *mem = vmalloc(my_size);
 		if (!mem)
 			return 17;
 		err = jpeg_decode(buf, mem, ((my_width + 15) & ~15),
-				  ((my_height + 15) & ~15), depth, decdata);
+				  ((my_height + 15) & ~15), cf, decdata);
 		if (err) {
 			vfree(mem);
 			return err;
@@ -2396,11 +2466,11 @@ static int jpeg_get(unsigned char *buf, unsigned char *pic,
 		       "bootsplash: scaling image from %dx%d to %dx%d\n",
 		       my_width, my_height, width, height);
 		if (my_height <= height)
-			err = scale_y_up(mem, pic, depth, my_width, my_height,
+			err = scale_y_up(mem, pic, cf, my_width, my_height,
 					 ((width + 15) & ~15),
 					 ((height + 15) & ~15));
 		else
-			err = scale_y_down(mem, pic, depth, my_width, my_height,
+			err = scale_y_down(mem, pic, cf, my_width, my_height,
 					   ((width + 15) & ~15),
 					   ((height + 15) & ~15));
 		vfree(mem);
@@ -2408,7 +2478,7 @@ static int jpeg_get(unsigned char *buf, unsigned char *pic,
 			return 17;
 	} else {
 		err = jpeg_decode(buf, pic, ((width + 15) & ~15),
-				  ((height + 15) & ~15), depth, decdata);
+				  ((height + 15) & ~15), cf, decdata);
 		if (err)
 			return err;
 	}

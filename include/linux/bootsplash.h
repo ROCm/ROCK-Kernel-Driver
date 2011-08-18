@@ -20,6 +20,16 @@ union pt {
 	u8  *ub;
 };
 
+enum splash_color_format {
+	SPLASH_DEPTH_UNKNOWN = 0,
+	SPLASH_DEPTH_15 = 15,
+	SPLASH_DEPTH_16 = 16,
+	SPLASH_DEPTH_24_PACKED = 24,
+	SPLASH_DEPTH_24 = 32
+};
+
+#define splash_octpp(cf) (((int)cf + 1) >> 3)
+
 struct vc_data;
 struct fb_info;
 struct fb_cursor;
@@ -35,7 +45,7 @@ extern void splash_putcs(struct vc_data *vc, struct fb_info *info,
 			const unsigned short *s, int count,
 			 int ypos, int xpos);
 extern void splashcopy(u8 *dst, u8 *src, int height, int width,
-		       int dstbytes, int srcbytes, int depth);
+		       int dstbytes, int srcbytes, int octpp);
 extern void splash_clear(struct vc_data *vc, struct fb_info *info, int sy,
 			int sx, int height, int width);
 extern void splash_bmove(struct vc_data *vc, struct fb_info *info, int sy,
