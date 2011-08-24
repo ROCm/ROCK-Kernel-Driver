@@ -797,8 +797,6 @@ static const struct scsi_dh_devlist rdac_dev_list[] = {
 	{"SGI", "TP9500"},
 	{"SGI", "IS"},
 	{"STK", "OPENstorage D280"},
-	{"STK", "FLEXLINE 380"},
-	{"SUN", "STK6580_6780"},
 	{"SUN", "CSM200_R"},
 	{"SUN", "LCSM100_I"},
 	{"SUN", "LCSM100_S"},
