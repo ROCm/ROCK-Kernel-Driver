@@ -501,6 +501,8 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			Range: 0 - 8192
 			Default: 64
 
+	hpet64		[X86-64,HPET] enable 64-bit mode of the HPET timer (bnc#456700)
+
 	com20020=	[HW,NET] ARCnet - COM20020 chipset
 			Format:
 			<io>[,<irq>[,<nodeID>[,<backplane>[,<ckp>[,<timeout>]]]]]

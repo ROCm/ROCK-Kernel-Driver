@@ -44,6 +44,7 @@ u8					hpet_msi_disable;
 static unsigned long			hpet_num_timers;
 #endif
 static void __iomem			*hpet_virt_address;
+static int hpet_legacy_use_64_bits;
 
 struct hpet_dev {
 	struct clock_event_device	evt;
@@ -66,6 +67,33 @@ static inline void hpet_writel(unsigned int d, unsigned int a)
 
 #ifdef CONFIG_X86_64
 #include <asm/pgtable.h>
+static inline unsigned long hpet_read_value(unsigned long a)
+{
+	if (hpet_legacy_use_64_bits)
+		return readq(hpet_virt_address + a);
+	else
+		return readl(hpet_virt_address + a);
+}
+
+static void hpet_write_value(unsigned long d, unsigned long a)
+{
+	if (hpet_legacy_use_64_bits)
+		writeq(d, hpet_virt_address + a);
+	else
+		writel(d, hpet_virt_address + a);
+}
+
+#else
+
+static inline unsigned long hpet_read_value(unsigned long a)
+{
+	return readl(hpet_virt_address + a);
+}
+
+static void hpet_write_value(unsigned long d, unsigned long a)
+{
+	writel(d, hpet_virt_address + a);
+}
 #endif
 
 static inline void hpet_set_mapping(void)
@@ -109,6 +137,17 @@ static int __init disable_hpet(char *str)
 	return 1;
 }
 __setup("nohpet", disable_hpet);
+
+#ifdef CONFIG_X86_64
+static int hpet64 = 0;
+static int __init hpet64_setup(char *str)
+{
+	hpet64 = 1;
+	return 1;
+}
+__setup("hpet64", hpet64_setup);
+#endif
+
 
 static inline int is_hpet_capable(void)
 {
@@ -219,6 +258,7 @@ static void hpet_reserve_platform_timers(unsigned int id) { }
  * Common hpet info
  */
 static unsigned long hpet_freq;
+static int hpet_legacy_use_64_bits; /* configure T0 in 64-bit mode? */
 
 static void hpet_legacy_set_mode(enum clock_event_mode mode,
 			  struct clock_event_device *evt);
@@ -284,10 +324,38 @@ static void hpet_enable_legacy_int(void)
 	hpet_legacy_int_enabled = 1;
 }
 
+static int timer0_use_64_bits(void)
+{
+#ifndef CONFIG_X86_64
+	/* using the HPET in 64-bit mode without atomic 64-bit
+	 * accesses is too inefficient
+	 */
+	return 0;
+#else
+
+	if (unlikely(hpet64)) {
+		u32 id, t0_cfg;
+		id = hpet_readl(HPET_ID);
+		t0_cfg = hpet_readl(HPET_Tn_CFG(0));
+
+		if ((id & HPET_ID_64BIT) && (t0_cfg & HPET_TN_64BIT_CAP)) {
+			printk(KERN_DEBUG "hpet timer0 configured in 64-bit mode\n");
+			return 1;
+		}
+		else {
+			printk(KERN_DEBUG "hpet timer0 does not support 64-bit mode\n");
+			return 0;
+		}
+	}
+	else return 0;
+#endif
+}
+
 static void hpet_legacy_clockevent_register(void)
 {
 	/* Start HPET legacy interrupts */
 	hpet_enable_legacy_int();
+	hpet_legacy_use_64_bits = timer0_use_64_bits();
 
 	/*
 	 * Start hpet with the boot cpu mask and make it
@@ -319,9 +387,10 @@ static void hpet_set_mode(enum clock_event_mode mode,
 		/* Make sure we use edge triggered interrupts */
 		cfg &= ~HPET_TN_LEVEL;
 		cfg |= HPET_TN_ENABLE | HPET_TN_PERIODIC |
-		       HPET_TN_SETVAL | HPET_TN_32BIT;
+		       HPET_TN_SETVAL |
+		       (hpet_legacy_use_64_bits ? 0 : HPET_TN_32BIT);
 		hpet_writel(cfg, HPET_Tn_CFG(timer));
-		hpet_writel(cmp, HPET_Tn_CMP(timer));
+		hpet_write_value(cmp, HPET_Tn_CMP(timer));
 		udelay(1);
 		/*
 		 * HPET on AMD 81xx needs a second write (with HPET_TN_SETVAL
@@ -330,7 +399,7 @@ static void hpet_set_mode(enum clock_event_mode mode,
 		 * (See AMD-8111 HyperTransport I/O Hub Data Sheet,
 		 * Publication # 24674)
 		 */
-		hpet_writel((unsigned int) delta, HPET_Tn_CMP(timer));
+		hpet_write_value((unsigned long) delta, HPET_Tn_CMP(timer));
 		hpet_start_counter();
 		hpet_print_config();
 		break;
@@ -338,7 +407,8 @@ static void hpet_set_mode(enum clock_event_mode mode,
 	case CLOCK_EVT_MODE_ONESHOT:
 		cfg = hpet_readl(HPET_Tn_CFG(timer));
 		cfg &= ~HPET_TN_PERIODIC;
-		cfg |= HPET_TN_ENABLE | HPET_TN_32BIT;
+		cfg |= HPET_TN_ENABLE |
+		       (hpet_legacy_use_64_bits ? 0 : HPET_TN_32BIT);
 		hpet_writel(cfg, HPET_Tn_CFG(timer));
 		break;
 
@@ -367,12 +437,12 @@ static void hpet_set_mode(enum clock_event_mode mode,
 static int hpet_next_event(unsigned long delta,
 			   struct clock_event_device *evt, int timer)
 {
-	u32 cnt;
+	unsigned long cnt;
 	s32 res;
 
-	cnt = hpet_readl(HPET_COUNTER);
+	cnt = hpet_read_value(HPET_COUNTER);
 	cnt += (u32) delta;
-	hpet_writel(cnt, HPET_Tn_CMP(timer));
+	hpet_write_value(cnt, HPET_Tn_CMP(timer));
 
 	/*
 	 * HPETs are a complete disaster. The compare register is
@@ -396,7 +466,7 @@ static int hpet_next_event(unsigned long delta,
 	 * the event. The minimum programming delta for the generic
 	 * clockevents code is set to 1.5 * HPET_MIN_CYCLES.
 	 */
-	res = (s32)(cnt - hpet_readl(HPET_COUNTER));
+	res = (s32)((u32)cnt - (u32)hpet_readl(HPET_COUNTER));
 
 	return res < HPET_MIN_CYCLES ? -ETIME : 0;
 }
