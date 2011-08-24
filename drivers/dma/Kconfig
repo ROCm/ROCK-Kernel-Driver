@@ -61,7 +61,7 @@ config INTEL_IOATDMA
 	tristate "Intel I/OAT DMA support"
 	depends on PCI && X86
 	select DMA_ENGINE
-	select DCA if !XEN
+	select DCA
 	select ASYNC_TX_DISABLE_PQ_VAL_DMA
 	select ASYNC_TX_DISABLE_XOR_VAL_DMA
 	help
@@ -236,6 +236,13 @@ config MXS_DMA
 	help
 	  Support the MXS DMA engine. This engine including APBH-DMA
 	  and APBX-DMA is integrated into Freescale i.MX23/28 chips.
+
+config EP93XX_DMA
+	bool "Cirrus Logic EP93xx DMA support"
+	depends on ARCH_EP93XX
+	select DMA_ENGINE
+	help
+	  Enable support for the Cirrus Logic EP93xx M2P/M2M DMA controller.
 
 config DMA_ENGINE
 	bool

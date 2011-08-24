@@ -303,6 +303,61 @@ void acpi_pci_irq_del_prt(struct pci_bus *bus)
 /* --------------------------------------------------------------------------
                           PCI Interrupt Routing Support
    -------------------------------------------------------------------------- */
+#ifdef CONFIG_X86_IO_APIC
+extern int noioapicquirk;
+extern int noioapicreroute;
+
+static int bridge_has_boot_interrupt_variant(struct pci_bus *bus)
+{
+	struct pci_bus *bus_it;
+
+	for (bus_it = bus ; bus_it ; bus_it = bus_it->parent) {
+		if (!bus_it->self)
+			return 0;
+		if (bus_it->self->irq_reroute_variant)
+			return bus_it->self->irq_reroute_variant;
+	}
+	return 0;
+}
+
+/*
+ * Some chipsets (e.g. Intel 6700PXH) generate a legacy INTx when the IRQ
+ * entry in the chipset's IO-APIC is masked (as, e.g. the RT kernel does
+ * during interrupt handling). When this INTx generation cannot be disabled,
+ * we reroute these interrupts to their legacy equivalent to get rid of
+ * spurious interrupts.
+ */
+static int acpi_reroute_boot_interrupt(struct pci_dev *dev,
+				       struct acpi_prt_entry *entry)
+{
+	if (noioapicquirk || noioapicreroute) {
+		return 0;
+	} else {
+		switch (bridge_has_boot_interrupt_variant(dev->bus)) {
+		case 0:
+			/* no rerouting necessary */
+			return 0;
+		case INTEL_IRQ_REROUTE_VARIANT:
+			/*
+			 * Remap according to INTx routing table in 6700PXH
+			 * specs, intel order number 302628-002, section
+			 * 2.15.2. Other chipsets (80332, ...) have the same
+			 * mapping and are handled here as well.
+			 */
+			dev_info(&dev->dev, "PCI IRQ %d -> rerouted to legacy "
+				 "IRQ %d\n", entry->index,
+				 (entry->index % 4) + 16);
+			entry->index = (entry->index % 4) + 16;
+			return 1;
+		default:
+			dev_warn(&dev->dev, "Cannot reroute IRQ %d to legacy "
+				 "IRQ: unknown mapping\n", entry->index);
+			return -1;
+		}
+	}
+}
+#endif /* CONFIG_X86_IO_APIC */
+
 static struct acpi_prt_entry *acpi_pci_irq_lookup(struct pci_dev *dev, int pin)
 {
 	struct acpi_prt_entry *entry;
@@ -311,6 +366,9 @@ static struct acpi_prt_entry *acpi_pci_irq_lookup(struct pci_dev *dev, int pin)
 
 	entry = acpi_pci_irq_find_prt_entry(dev, pin);
 	if (entry) {
+#ifdef CONFIG_X86_IO_APIC
+		acpi_reroute_boot_interrupt(dev, entry);
+#endif /* CONFIG_X86_IO_APIC */
 		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Found %s[%c] _PRT entry\n",
 				  pci_name(dev), pin_name(pin)));
 		return entry;
@@ -469,80 +527,3 @@ void acpi_pci_irq_disable(struct pci_dev *dev)
 	dev_info(&dev->dev, "PCI INT %c disabled\n", pin_name(pin));
 	acpi_unregister_gsi(gsi);
 }
-
-#if defined(CONFIG_XEN) && defined(CONFIG_PCI)
-static int __init xen_setup_gsi(void)
-{
-	struct pci_dev *dev = NULL;
-
-	if (acpi_noirq)
-		return 0;
-
-	/* Loop body is a clone of acpi_pci_irq_enable(). */
-	for_each_pci_dev(dev) {
-		const struct acpi_prt_entry *entry;
-		int gsi;
-		int triggering = ACPI_LEVEL_SENSITIVE;
-		int polarity = ACPI_ACTIVE_LOW;
-		struct physdev_setup_gsi setup_gsi;
-
-		if (!dev->pin)
-			continue;
-
-		entry = acpi_pci_irq_lookup(dev, dev->pin);
-		if (!entry) {
-			/*
-			 * IDE legacy mode controller IRQs are magic. Why do
-			 * compat extensions always make such a nasty mess.
-			 */
-			if ((dev->class >> 8) == PCI_CLASS_STORAGE_IDE &&
-			    (dev->class & 0x05) == 0)
-				continue;
-		}
-
-		gsi = entry
-		      ? entry->link
-			? acpi_pci_link_allocate_irq(entry->link,
-						     entry->index,
-						     &triggering, &polarity,
-						     NULL)
-			: entry->index
-		      : -1;
-
-		if (gsi >= 0) {
-			setup_gsi.gsi = gsi;
-			setup_gsi.triggering
-				= (triggering == ACPI_LEVEL_SENSITIVE);
-			setup_gsi.polarity = (polarity == ACPI_ACTIVE_LOW);
-			if (HYPERVISOR_physdev_op(PHYSDEVOP_setup_gsi,
-						  &setup_gsi) < 0)
-				continue;
-
-			dev_info(&dev->dev, "GSI%d: %s-%s\n", gsi,
-				 triggering == ACPI_LEVEL_SENSITIVE ? "level"
-								    : "edge",
-				 polarity == ACPI_ACTIVE_LOW ? "low" : "high");
-		} else {
-			/*
-			 * No IRQ known to the ACPI subsystem - maybe the
-			 * BIOS / driver reported one, then use it.
-			 */
-			dev_warn(&dev->dev, "PCI INT %c: no GSI",
-				 pin_name(dev->pin));
-			/* Interrupt Line values above 0xF are forbidden */
-			if (dev->irq > 0 && (dev->irq <= 0xF)) {
-				pr_cont(" - using IRQ %d\n", dev->irq);
-				setup_gsi.gsi = dev->irq;
-				setup_gsi.triggering = 1;
-				setup_gsi.polarity = 1;
-				VOID(HYPERVISOR_physdev_op(PHYSDEVOP_setup_gsi,
-							   &setup_gsi));
-			} else
-				pr_cont("\n");
-		}
-	}
-
-	return 0;
-}
-subsys_initcall(xen_setup_gsi);
-#endif

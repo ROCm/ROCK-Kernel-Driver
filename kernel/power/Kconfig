@@ -135,7 +135,7 @@ config PM_ADVANCED_DEBUG
 
 config PM_TEST_SUSPEND
 	bool "Test suspend/resume and wakealarm during bootup"
-	depends on SUSPEND && PM_DEBUG && RTC_CLASS=y && !XEN_UNPRIVILEGED_GUEST
+	depends on SUSPEND && PM_DEBUG && RTC_CLASS=y
 	---help---
 	This option will let you suspend your machine during bootup, and
 	make it wake up a few seconds later using an RTC wakeup alarm.
@@ -166,7 +166,7 @@ config PM_TRACE
 config PM_TRACE_RTC
 	bool "Suspend/resume event tracing"
 	depends on CAN_PM_TRACE
-	depends on X86 && !XEN_UNPRIVILEGED_GUEST
+	depends on X86
 	select PM_TRACE
 	---help---
 	This enables some cheesy code to save the last PM event point in the
@@ -193,8 +193,8 @@ config APM_EMULATION
 	  notification of APM "events" (e.g. battery status change).
 
 	  In order to use APM, you will need supporting software. For location
-	  and more information, read <file:Documentation/power/pm.txt> and the
-	  Battery Powered Linux mini-HOWTO, available from
+	  and more information, read <file:Documentation/power/apm-acpi.txt>
+	  and the Battery Powered Linux mini-HOWTO, available from
 	  <http://www.tldp.org/docs.html#howto>.
 
 	  This driver does not spin down disk drives (see the hdparm(8)
@@ -224,6 +224,14 @@ config PM_OPP
 	  implementations a ready to use framework to manage OPPs.
 	  For more information, read <file:Documentation/power/opp.txt>
 
-config PM_RUNTIME_CLK
+config PM_CLK
 	def_bool y
-	depends on PM_RUNTIME && HAVE_CLK
+	depends on PM && HAVE_CLK
+
+config PM_GENERIC_DOMAINS
+	bool
+	depends on PM
+
+config PM_GENERIC_DOMAINS_RUNTIME
+	def_bool y
+	depends on PM_RUNTIME && PM_GENERIC_DOMAINS

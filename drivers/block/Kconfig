@@ -256,6 +256,21 @@ config BLK_DEV_LOOP
 
 	  Most users will answer N here.
 
+config BLK_DEV_LOOP_MIN_COUNT
+	int "Number of loop devices to pre-create at init time"
+	depends on BLK_DEV_LOOP
+	default 8
+	help
+	  Static number of loop devices to be unconditionally pre-created
+	  at init time.
+
+	  This default value can be overwritten on the kernel command
+	  line or with module-parameter loop.max_loop.
+
+	  The historic default is 8. If a late 2011 version of losetup(8)
+	  is used, it can be set to 0, since needed loop devices can be
+	  dynamically allocated with the /dev/loop-control interface.
+
 config BLK_DEV_CRYPTOLOOP
 	tristate "Cryptoloop Support"
 	select CRYPTO
@@ -460,9 +475,9 @@ config XILINX_SYSACE
 	help
 	  Include support for the Xilinx SystemACE CompactFlash interface
 
-config PARAVIRT_XEN_BLKDEV_FRONTEND
+config XEN_BLKDEV_FRONTEND
 	tristate "Xen virtual block device support"
-	depends on PARAVIRT_XEN
+	depends on XEN
 	default y
 	select XEN_XENBUS_FRONTEND
 	help
@@ -470,16 +485,16 @@ config PARAVIRT_XEN_BLKDEV_FRONTEND
 	  block device driver.  It communicates with a back-end driver
 	  in another domain which drives the actual block device.
 
-config PARAVIRT_XEN_BLKDEV_BACKEND
-	tristate "Block-device backend driver"
-	depends on PARAVIRT_XEN_BACKEND
+config XEN_BLKDEV_BACKEND
+	tristate "Xen block-device backend driver"
+	depends on XEN_BACKEND
 	help
 	  The block-device backend driver allows the kernel to export its
 	  block devices to other guests via a high-performance shared-memory
 	  interface.
 
 	  The corresponding Linux frontend driver is enabled by the
-	  CONFIG_PARAVIRT_XEN_BLKDEV_FRONTEND configuration option.
+	  CONFIG_XEN_BLKDEV_FRONTEND configuration option.
 
 	  The backend driver attaches itself to a any block device specified
 	  in the XenBus configuration. There are no limits to what the block

@@ -16,7 +16,7 @@
 #include <xen/interface/io/pciif.h>
 #include <asm/xen/pci.h>
 #include <linux/interrupt.h>
-#include <asm/atomic.h>
+#include <linux/atomic.h>
 #include <linux/workqueue.h>
 #include <linux/bitops.h>
 #include <linux/time.h>
@@ -1129,6 +1129,7 @@ static const struct xenbus_device_id xenpci_ids[] = {
 
 static struct xenbus_driver xenbus_pcifront_driver = {
 	.name			= "pcifront",
+	.owner			= THIS_MODULE,
 	.ids			= xenpci_ids,
 	.probe			= pcifront_xenbus_probe,
 	.remove			= pcifront_xenbus_remove,

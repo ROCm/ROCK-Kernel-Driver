@@ -7,7 +7,7 @@
 #include <linux/uio.h>
 #include <linux/rcupdate.h>
 
-#include <asm/atomic.h>
+#include <linux/atomic.h>
 
 #define AIO_MAXSEGS		4
 #define AIO_KIOGRP_NR_ATOMIC	8
@@ -198,12 +198,6 @@ struct kioctx {
 	struct aio_ring_info	ring_info;
 
 	struct delayed_work	wq;
-
-#ifdef CONFIG_EPOLL
-	/* poll integration */
-	wait_queue_head_t       poll_wait;
-	struct file		*file;
-#endif
 
 	struct rcu_head		rcu_head;
 };

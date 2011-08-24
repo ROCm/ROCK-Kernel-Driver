@@ -381,7 +381,7 @@ EXPORT_SYMBOL_GPL(richacl_chmod);
  */
 int
 richacl_permission(struct inode *inode, const struct richacl *acl,
-		   unsigned int mask, unsigned int flags)
+		   unsigned int mask)
 {
 	const struct richace *ace;
 	unsigned int file_mask, requested = mask, denied = 0;

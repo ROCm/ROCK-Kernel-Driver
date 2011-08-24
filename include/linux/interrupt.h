@@ -17,7 +17,7 @@
 #include <linux/kref.h>
 #include <linux/workqueue.h>
 
-#include <asm/atomic.h>
+#include <linux/atomic.h>
 #include <asm/ptrace.h>
 #include <asm/system.h>
 #include <trace/events/irq.h>
@@ -375,11 +375,6 @@ static inline int disable_irq_wake(unsigned int irq)
 }
 #endif /* CONFIG_GENERIC_HARDIRQS */
 
-#ifdef CONFIG_HAVE_IRQ_IGNORE_UNHANDLED
-int irq_ignore_unhandled(unsigned int irq);
-#else
-#define irq_ignore_unhandled(irq) 0
-#endif
 
 #ifdef CONFIG_IRQ_FORCED_THREADING
 extern bool force_irqthreads;

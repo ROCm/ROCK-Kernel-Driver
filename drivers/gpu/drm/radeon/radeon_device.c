@@ -32,6 +32,7 @@
 #include <drm/radeon_drm.h>
 #include <linux/vgaarb.h>
 #include <linux/vga_switcheroo.h>
+#include <linux/efi.h>
 #include "radeon_reg.h"
 #include "radeon.h"
 #include "atom.h"
@@ -348,6 +349,9 @@ bool radeon_card_posted(struct radeon_device *rdev)
 {
 	uint32_t reg;
 
+	if (efi_enabled && rdev->pdev->subsystem_vendor == PCI_VENDOR_ID_APPLE)
+		return false;
+
 	/* first check CRTCs */
 	if (ASIC_IS_DCE41(rdev)) {
 		reg = RREG32(EVERGREEN_CRTC_CONTROL + EVERGREEN_CRTC0_REGISTER_OFFSET) |
@@ -435,18 +439,6 @@ int radeon_dummy_page_init(struct radeon_device *rdev)
 	rdev->dummy_page.page = alloc_page(GFP_DMA32 | GFP_KERNEL | __GFP_ZERO);
 	if (rdev->dummy_page.page == NULL)
 		return -ENOMEM;
-#ifdef CONFIG_XEN
-	{
-		int ret = xen_limit_pages_to_max_mfn(rdev->dummy_page.page,
-						     0, 32);
-
-		if (!ret)
-			clear_page(page_address(rdev->dummy_page.page));
-		else
-			dev_warn(rdev->dev,
-				 "Error restricting dummy page: %d\n", ret);
-	}
-#endif
 	rdev->dummy_page.addr = pci_map_page(rdev->pdev, rdev->dummy_page.page,
 					0, PAGE_SIZE, PCI_DMA_BIDIRECTIONAL);
 	if (pci_dma_mapping_error(rdev->pdev, rdev->dummy_page.addr)) {
@@ -716,8 +708,9 @@ int radeon_device_init(struct radeon_device *rdev,
 	rdev->gpu_lockup = false;
 	rdev->accel_working = false;
 
-	DRM_INFO("initializing kernel modesetting (%s 0x%04X:0x%04X).\n",
-		radeon_family_name[rdev->family], pdev->vendor, pdev->device);
+	DRM_INFO("initializing kernel modesetting (%s 0x%04X:0x%04X 0x%04X:0x%04X).\n",
+		radeon_family_name[rdev->family], pdev->vendor, pdev->device,
+		pdev->subsystem_vendor, pdev->subsystem_device);
 
 	/* mutex initialization are all done here so we
 	 * can recall function without having locking issues */

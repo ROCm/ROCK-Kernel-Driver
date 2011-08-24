@@ -21,7 +21,6 @@
 #define N_EXCEPTION_STACKS_END \
 		(N_EXCEPTION_STACKS + DEBUG_STKSZ/EXCEPTION_STKSZ - 2)
 
-#ifndef CONFIG_X86_NO_TSS
 static char x86_stack_ids[][8] = {
 		[ DEBUG_STACK-1			]	= "#DB",
 		[ NMI_STACK-1			]	= "NMI",
@@ -33,12 +32,10 @@ static char x86_stack_ids[][8] = {
 		  N_EXCEPTION_STACKS_END	]	= "#DB[?]"
 #endif
 };
-#endif
 
 static unsigned long *in_exception_stack(unsigned cpu, unsigned long stack,
 					 unsigned *usedp, char **idp)
 {
-#ifndef CONFIG_X86_NO_TSS
 	unsigned k;
 
 	/*
@@ -98,7 +95,6 @@ static unsigned long *in_exception_stack(unsigned cpu, unsigned long stack,
 		}
 #endif
 	}
-#endif /* CONFIG_X86_NO_TSS */
 	return NULL;
 }
 
@@ -107,34 +103,6 @@ in_irq_stack(unsigned long *stack, unsigned long *irq_stack,
 	     unsigned long *irq_stack_end)
 {
 	return (stack >= irq_stack && stack < irq_stack_end);
-}
-
-/*
- * We are returning from the irq stack and go to the previous one.
- * If the previous stack is also in the irq stack, then bp in the first
- * frame of the irq stack points to the previous, interrupted one.
- * Otherwise we have another level of indirection: We first save
- * the bp of the previous stack, then we switch the stack to the irq one
- * and save a new bp that links to the previous one.
- * (See save_args())
- */
-static inline unsigned long
-fixup_bp_irq_link(unsigned long bp, unsigned long *stack,
-		  unsigned long *irq_stack, unsigned long *irq_stack_end)
-{
-#ifdef CONFIG_FRAME_POINTER
-	struct stack_frame *frame = (struct stack_frame *)bp;
-	unsigned long next;
-
-	if (!in_irq_stack(stack, irq_stack, irq_stack_end)) {
-		if (!probe_kernel_address(&frame->next_frame, next))
-			return next;
-		else
-			WARN_ONCE(1, "Perf: bad frame pointer = %p in "
-				  "callchain\n", &frame->next_frame);
-	}
-#endif
-	return bp;
 }
 
 /*
@@ -166,9 +134,12 @@ void dump_trace(struct task_struct *task, struct pt_regs *regs,
 	}
 
 	if (!stack) {
-		stack = &dummy;
-		if (task && task != current)
+		if (regs)
+			stack = (unsigned long *)regs->sp;
+		else if (task && task != current)
 			stack = (unsigned long *)task->thread.sp;
+		else
+			stack = &dummy;
 	}
 
 	if (!bp)
@@ -216,8 +187,6 @@ void dump_trace(struct task_struct *task, struct pt_regs *regs,
 				 * pointer (index -1 to end) in the IRQ stack:
 				 */
 				stack = (unsigned long *) (irq_stack_end[-1]);
-				bp = fixup_bp_irq_link(bp, stack, irq_stack,
-						       irq_stack_end);
 				irq_stack_end = NULL;
 				ops->stack(data, "EOI");
 				continue;

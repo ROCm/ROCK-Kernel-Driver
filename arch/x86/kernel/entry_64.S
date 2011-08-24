@@ -9,6 +9,8 @@
 /*
  * entry.S contains the system-call and fault low-level handling routines.
  *
+ * Some of this is documented in Documentation/x86/entry_64.txt
+ *
  * NOTE: This code handles signal-recognition, which happens every time
  * after an interrupt and after each system call.
  *
@@ -236,21 +238,21 @@ ENDPROC(native_usergs_sysret64)
 /*
  * initial frame state for interrupts (and exceptions without error code)
  */
-	.macro EMPTY_FRAME offset=0
+	.macro EMPTY_FRAME start=1 offset=0
+	.if \start
 	CFI_STARTPROC simple
 	CFI_SIGNAL_FRAME
-	CFI_DEF_CFA rsp,\offset
+	CFI_DEF_CFA rsp,8+\offset
+	.else
+	CFI_DEF_CFA_OFFSET 8+\offset
+	.endif
 	.endm
 
 /*
  * initial frame state for interrupts (and exceptions without error code)
  */
 	.macro INTR_FRAME start=1 offset=0
-	.if \start
-	EMPTY_FRAME SS+8+\offset-RIP
-	.else
-	CFI_DEF_CFA_OFFSET SS+8+\offset-RIP
-	.endif
+	EMPTY_FRAME \start, SS+8+\offset-RIP
 	/*CFI_REL_OFFSET ss, SS+\offset-RIP*/
 	CFI_REL_OFFSET rsp, RSP+\offset-RIP
 	/*CFI_REL_OFFSET rflags, EFLAGS+\offset-RIP*/
@@ -264,15 +266,14 @@ ENDPROC(native_usergs_sysret64)
  */
 	.macro XCPT_FRAME start=1 offset=0
 	INTR_FRAME \start, RIP+\offset-ORIG_RAX
+	/*CFI_REL_OFFSET orig_rax, ORIG_RAX-ORIG_RAX*/
 	.endm
 
 /*
  * frame that enables calling into C.
  */
 	.macro PARTIAL_FRAME start=1 offset=0
-	.if \start >= 0
 	XCPT_FRAME \start, ORIG_RAX+\offset-ARGOFFSET
-	.endif
 	CFI_REL_OFFSET rdi, RDI+\offset-ARGOFFSET
 	CFI_REL_OFFSET rsi, RSI+\offset-ARGOFFSET
 	CFI_REL_OFFSET rdx, RDX+\offset-ARGOFFSET
@@ -288,9 +289,7 @@ ENDPROC(native_usergs_sysret64)
  * frame that enables passing a complete pt_regs to a C function.
  */
 	.macro DEFAULT_FRAME start=1 offset=0
-	.if \start >= -1
 	PARTIAL_FRAME \start, R11+\offset-R15
-	.endif
 	CFI_REL_OFFSET rbx, RBX+\offset
 	CFI_REL_OFFSET rbp, RBP+\offset
 	CFI_REL_OFFSET r12, R12+\offset
@@ -300,29 +299,26 @@ ENDPROC(native_usergs_sysret64)
 	.endm
 
 /* save partial stack frame */
-	.pushsection .kprobes.text, "ax"
-ENTRY(save_args)
-	XCPT_FRAME offset=ORIG_RAX-RBP+8
+	.macro SAVE_ARGS_IRQ
 	cld
-	/*
-	 * start from rbp in pt_regs and jump over
-	 * return address.
-	 */
-	movq_cfi rdi, RDI+8-RBP
-	movq %rsi, RSI+8-RBP(%rsp)
-	movq %rdx, RDX+8-RBP(%rsp)
-	movq %rcx, RCX+8-RBP(%rsp)
-	movq_cfi rax, RAX+8-RBP
-	movq  %r8,  R8+8-RBP(%rsp)
-	movq  %r9,  R9+8-RBP(%rsp)
-	movq %r10, R10+8-RBP(%rsp)
-	movq %r11, R11+8-RBP(%rsp)
+	/* start from rbp in pt_regs and jump over */
+	movq_cfi rdi, RDI-RBP
+	movq_cfi rsi, RSI-RBP
+	movq_cfi rdx, RDX-RBP
+	movq_cfi rcx, RCX-RBP
+	movq_cfi rax, RAX-RBP
+	movq_cfi  r8,  R8-RBP
+	movq_cfi  r9,  R9-RBP
+	movq_cfi r10, R10-RBP
+	movq_cfi r11, R11-RBP
 
-	leaq -RBP+8(%rsp),%rdi	/* arg1 for handler */
-	movq_cfi rbp, 8		/* push %rbp */
-	leaq 8(%rsp), %rbp		/* mov %rsp, %ebp */
-	CFI_DEF_CFA_REGISTER rbp
-	CFI_ADJUST_CFA_OFFSET -8
+	/* Save rbp so that we can unwind from get_irq_regs() */
+	movq_cfi rbp, 0
+
+	/* Save previous stack value */
+	movq %rsp, %rsi
+
+	leaq -RBP(%rsp),%rdi	/* arg1 for handler */
 	testl $3, CS(%rdi)
 	je 1f
 	SWAPGS
@@ -334,28 +330,24 @@ ENTRY(save_args)
 	 */
 1:	incl PER_CPU_VAR(irq_count)
 	jne 2f
-	popq %rax			/* move return address... */
 	mov PER_CPU_VAR(irq_stack_ptr),%rsp
-	pushq %rbp			/* backlink for unwinder */
-	pushq %rax			/* ... to the new stack */
-	/*
-	 * We entered an interrupt context - irqs are off:
-	 */
-2:	TRACE_IRQS_OFF
-	ret
-	CFI_ENDPROC
-END(save_args)
-	.popsection
+	EMPTY_FRAME 0
+
+2:	/* Store previous stack value */
+	pushq %rsi
+	/* We entered an interrupt context - irqs are off: */
+	TRACE_IRQS_OFF
+	.endm
 
 ENTRY(save_rest)
-	CFI_STARTPROC
+	PARTIAL_FRAME 1 REST_SKIP+8
 	movq 5*8+16(%rsp), %r11	/* save return address */
-	movq %rbx, RBX+16(%rsp)
-	movq %rbp, RBP+16(%rsp)
-	movq %r12, R12+16(%rsp)
-	movq %r13, R13+16(%rsp)
-	movq %r14, R14+16(%rsp)
-	movq %r15, R15+16(%rsp)
+	movq_cfi rbx, RBX+16
+	movq_cfi rbp, RBP+16
+	movq_cfi r12, R12+16
+	movq_cfi r13, R13+16
+	movq_cfi r14, R14+16
+	movq_cfi r15, R15+16
 	movq %r11, 8(%rsp)	/* return address */
 	FIXUP_TOP_OF_STACK %r11, 16
 	ret
@@ -365,23 +357,23 @@ END(save_rest)
 /* save complete stack frame */
 	.pushsection .kprobes.text, "ax"
 ENTRY(save_paranoid)
-	XCPT_FRAME offset=ORIG_RAX-R15+8
+	XCPT_FRAME 1 RDI+8
 	cld
-	movq %rdi, RDI+8(%rsp)
-	movq %rsi, RSI+8(%rsp)
+	movq_cfi rdi, RDI+8
+	movq_cfi rsi, RSI+8
 	movq_cfi rdx, RDX+8
 	movq_cfi rcx, RCX+8
 	movq_cfi rax, RAX+8
-	movq %r8, R8+8(%rsp)
-	movq %r9, R9+8(%rsp)
-	movq %r10, R10+8(%rsp)
-	movq %r11, R11+8(%rsp)
+	movq_cfi r8, R8+8
+	movq_cfi r9, R9+8
+	movq_cfi r10, R10+8
+	movq_cfi r11, R11+8
 	movq_cfi rbx, RBX+8
-	movq %rbp, RBP+8(%rsp)
-	movq %r12, R12+8(%rsp)
-	movq %r13, R13+8(%rsp)
-	movq %r14, R14+8(%rsp)
-	movq %r15, R15+8(%rsp)
+	movq_cfi rbp, RBP+8
+	movq_cfi r12, R12+8
+	movq_cfi r13, R13+8
+	movq_cfi r14, R14+8
+	movq_cfi r15, R15+8
 	movl $1,%ebx
 	movl $MSR_GS_BASE,%ecx
 	rdmsr
@@ -477,7 +469,7 @@ ENTRY(system_call_after_swapgs)
 	 * and short:
 	 */
 	ENABLE_INTERRUPTS(CLBR_NONE)
-	SAVE_ARGS 8,1
+	SAVE_ARGS 8,0
 	movq  %rax,ORIG_RAX-ARGOFFSET(%rsp)
 	movq  %rcx,RIP-ARGOFFSET(%rsp)
 	CFI_REL_OFFSET rip,RIP-ARGOFFSET
@@ -512,7 +504,7 @@ sysret_check:
 	TRACE_IRQS_ON
 	movq RIP-ARGOFFSET(%rsp),%rcx
 	CFI_REGISTER	rip,rcx
-	RESTORE_ARGS 0,-ARG_SKIP,1
+	RESTORE_ARGS 1,-ARG_SKIP,0
 	/*CFI_REGISTER	rflags,r11*/
 	movq	PER_CPU_VAR(old_rsp), %rsp
 	USERGS_SYSRET64
@@ -683,7 +675,7 @@ ENTRY(\label)
 	subq $REST_SKIP, %rsp
 	CFI_ADJUST_CFA_OFFSET REST_SKIP
 	call save_rest
-	DEFAULT_FRAME -2 8		/* offset 8: return address */
+	DEFAULT_FRAME 0 8		/* offset 8: return address */
 	leaq 8(%rsp), \arg	/* pt_regs pointer */
 	call \func
 	jmp ptregscall_common
@@ -795,10 +787,8 @@ END(interrupt)
 	/* reserve pt_regs for scratch regs and rbp */
 	subq $ORIG_RAX-RBP, %rsp
 	CFI_ADJUST_CFA_OFFSET ORIG_RAX-RBP
-	call save_args
-	PARTIAL_FRAME -1 ARGOFFSET-RBP
-	CFI_REL_OFFSET rbp, 0
-	CFI_DEF_CFA_REGISTER rbp
+	SAVE_ARGS_IRQ
+	PARTIAL_FRAME 0
 	call \func
 	.endm
 
@@ -820,14 +810,14 @@ ret_from_intr:
 	DISABLE_INTERRUPTS(CLBR_NONE)
 	TRACE_IRQS_OFF
 	decl PER_CPU_VAR(irq_count)
-	leaveq
-	CFI_RESTORE		rbp
-	CFI_DEF_CFA_REGISTER	rsp
-	CFI_ADJUST_CFA_OFFSET	-8
 
-	/* we did not save rbx, restore only from ARGOFFSET */
-	addq $8, %rsp
-	CFI_ADJUST_CFA_OFFSET	-8
+	/* Restore saved previous stack */
+	popq %rsi
+	leaq 16(%rsi), %rsp
+
+	CFI_DEF_CFA_REGISTER	rsp
+	CFI_ADJUST_CFA_OFFSET	-16
+
 exit_intr:
 	GET_THREAD_INFO(%rcx)
 	testl $3,CS-ARGOFFSET(%rsp)
@@ -863,7 +853,7 @@ retint_restore_args:	/* return to kernel space */
 	 */
 	TRACE_IRQS_IRETQ
 restore_args:
-	RESTORE_ARGS 0,8,0
+	RESTORE_ARGS 1,8,1
 
 irq_return:
 	INTERRUPT_RETURN
@@ -996,11 +986,6 @@ apicinterrupt THRESHOLD_APIC_VECTOR \
 apicinterrupt THERMAL_APIC_VECTOR \
 	thermal_interrupt smp_thermal_interrupt
 
-#ifdef CONFIG_X86_MCE
-apicinterrupt MCE_SELF_VECTOR \
-	mce_self_interrupt smp_mce_self_interrupt
-#endif
-
 #ifdef CONFIG_SMP
 apicinterrupt CALL_FUNCTION_SINGLE_VECTOR \
 	call_function_single_interrupt smp_call_function_single_interrupt
@@ -1031,7 +1016,7 @@ ENTRY(\sym)
 	subq $ORIG_RAX-R15, %rsp
 	CFI_ADJUST_CFA_OFFSET ORIG_RAX-R15
 	call error_entry
-	DEFAULT_FRAME -1
+	DEFAULT_FRAME 0
 	movq %rsp,%rdi		/* pt_regs pointer */
 	xorl %esi,%esi		/* no error code */
 	call \do_sym
@@ -1048,7 +1033,6 @@ ENTRY(\sym)
 	subq $ORIG_RAX-R15, %rsp
 	CFI_ADJUST_CFA_OFFSET ORIG_RAX-R15
 	call save_paranoid
-	DEFAULT_FRAME -1
 	TRACE_IRQS_OFF
 	movq %rsp,%rdi		/* pt_regs pointer */
 	xorl %esi,%esi		/* no error code */
@@ -1067,7 +1051,6 @@ ENTRY(\sym)
 	subq $ORIG_RAX-R15, %rsp
 	CFI_ADJUST_CFA_OFFSET ORIG_RAX-R15
 	call save_paranoid
-	DEFAULT_FRAME -1
 	TRACE_IRQS_OFF
 	movq %rsp,%rdi		/* pt_regs pointer */
 	xorl %esi,%esi		/* no error code */
@@ -1086,7 +1069,7 @@ ENTRY(\sym)
 	subq $ORIG_RAX-R15, %rsp
 	CFI_ADJUST_CFA_OFFSET ORIG_RAX-R15
 	call error_entry
-	DEFAULT_FRAME -1
+	DEFAULT_FRAME 0
 	movq %rsp,%rdi			/* pt_regs pointer */
 	movq ORIG_RAX(%rsp),%rsi	/* get error code */
 	movq $-1,ORIG_RAX(%rsp)		/* no syscall to restart */
@@ -1104,7 +1087,7 @@ ENTRY(\sym)
 	subq $ORIG_RAX-R15, %rsp
 	CFI_ADJUST_CFA_OFFSET ORIG_RAX-R15
 	call save_paranoid
-	DEFAULT_FRAME -1
+	DEFAULT_FRAME 0
 	TRACE_IRQS_OFF
 	movq %rsp,%rdi			/* pt_regs pointer */
 	movq ORIG_RAX(%rsp),%rsi	/* get error code */
@@ -1128,6 +1111,7 @@ zeroentry spurious_interrupt_bug do_spurious_interrupt_bug
 zeroentry coprocessor_error do_coprocessor_error
 errorentry alignment_check do_alignment_check
 zeroentry simd_coprocessor_error do_simd_coprocessor_error
+
 
 	/* Reload gs selector with exception handling */
 	/* edi:  new selector */
@@ -1258,7 +1242,7 @@ ENTRY(arch_unwind_init_running)
 END(arch_unwind_init_running)
 #endif
 
-#ifdef CONFIG_PARAVIRT_XEN
+#ifdef CONFIG_XEN
 zeroentry xen_hypervisor_callback xen_do_hypervisor_callback
 
 /*
@@ -1358,7 +1342,7 @@ END(xen_failsafe_callback)
 apicinterrupt XEN_HVM_EVTCHN_CALLBACK \
 	xen_hvm_callback_vector xen_evtchn_do_upcall
 
-#endif /* CONFIG_PARAVIRT_XEN */
+#endif /* CONFIG_XEN */
 
 /*
  * Some functions should be protected against kprobes
@@ -1368,7 +1352,7 @@ apicinterrupt XEN_HVM_EVTCHN_CALLBACK \
 paranoidzeroentry_ist debug do_debug DEBUG_STACK
 paranoidzeroentry_ist int3 do_int3 DEBUG_STACK
 paranoiderrorentry stack_segment do_stack_segment
-#ifdef CONFIG_PARAVIRT_XEN
+#ifdef CONFIG_XEN
 zeroentry xen_debug do_debug
 zeroentry xen_int3 do_int3
 errorentry xen_stack_segment do_stack_segment
@@ -1447,24 +1431,25 @@ END(paranoid_exit)
  * returns in "no swapgs flag" in %ebx.
  */
 ENTRY(error_entry)
-	XCPT_FRAME offset=ORIG_RAX-R15+8
+	XCPT_FRAME
+	CFI_ADJUST_CFA_OFFSET 15*8
 	/* oldrax contains error code */
 	cld
-	movq %rdi, RDI+8(%rsp)
-	movq %rsi, RSI+8(%rsp)
-	movq %rdx, RDX+8(%rsp)
-	movq %rcx, RCX+8(%rsp)
-	movq %rax, RAX+8(%rsp)
-	movq  %r8,  R8+8(%rsp)
-	movq  %r9,  R9+8(%rsp)
-	movq %r10, R10+8(%rsp)
-	movq %r11, R11+8(%rsp)
+	movq_cfi rdi, RDI+8
+	movq_cfi rsi, RSI+8
+	movq_cfi rdx, RDX+8
+	movq_cfi rcx, RCX+8
+	movq_cfi rax, RAX+8
+	movq_cfi  r8,  R8+8
+	movq_cfi  r9,  R9+8
+	movq_cfi r10, R10+8
+	movq_cfi r11, R11+8
 	movq_cfi rbx, RBX+8
-	movq %rbp, RBP+8(%rsp)
-	movq %r12, R12+8(%rsp)
-	movq %r13, R13+8(%rsp)
-	movq %r14, R14+8(%rsp)
-	movq %r15, R15+8(%rsp)
+	movq_cfi rbp, RBP+8
+	movq_cfi r12, R12+8
+	movq_cfi r13, R13+8
+	movq_cfi r14, R14+8
+	movq_cfi r15, R15+8
 	xorl %ebx,%ebx
 	testl $3,CS+8(%rsp)
 	je error_kernelspace
@@ -1482,7 +1467,6 @@ error_sti:
  * compat mode. Check for these here too.
  */
 error_kernelspace:
-	CFI_REL_OFFSET rcx, RCX+8
 	incl %ebx
 	leaq irq_return(%rip),%rcx
 	cmpq %rcx,RIP+8(%rsp)
@@ -1530,7 +1514,7 @@ ENTRY(nmi)
 	subq $ORIG_RAX-R15, %rsp
 	CFI_ADJUST_CFA_OFFSET ORIG_RAX-R15
 	call save_paranoid
-	DEFAULT_FRAME -1
+	DEFAULT_FRAME 0
 	/* paranoidentry do_nmi, 0; without TRACE_IRQS_OFF */
 	movq %rsp,%rdi
 	movq $-1,%rsi

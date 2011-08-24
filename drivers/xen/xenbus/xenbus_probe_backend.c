@@ -36,34 +36,22 @@
 		 __func__, __LINE__, ##args)
 
 #include <linux/kernel.h>
-#include <linux/version.h>
 #include <linux/err.h>
 #include <linux/string.h>
 #include <linux/ctype.h>
 #include <linux/fcntl.h>
 #include <linux/mm.h>
-#include <linux/slab.h>
 #include <linux/notifier.h>
 
 #include <asm/page.h>
 #include <asm/pgtable.h>
-#if !defined(CONFIG_XEN) && !defined(HAVE_XEN_PLATFORM_COMPAT_H)
 #include <asm/xen/hypervisor.h>
-#endif
 #include <asm/hypervisor.h>
 #include <xen/xenbus.h>
-#if defined(CONFIG_XEN) || defined(HAVE_XEN_PLATFORM_COMPAT_H)
-#include <xen/xen_proc.h>
-#include <xen/evtchn.h>
-#endif
 #include <xen/features.h>
 
 #include "xenbus_comms.h"
 #include "xenbus_probe.h"
-
-#ifdef HAVE_XEN_PLATFORM_COMPAT_H
-#include <xen/platform-compat.h>
-#endif
 
 /* backend/<type>/<fe-uuid>/<id> => <type>-<fe-domid>-<id> */
 static int backend_bus_id(char bus_id[XEN_BUS_ID_SIZE], const char *nodename)
@@ -118,6 +106,9 @@ static int xenbus_uevent_backend(struct device *dev,
 	bus = container_of(xdev->dev.bus, struct xen_bus_type, bus);
 	if (xdev == NULL)
 		return -ENODEV;
+
+	if (add_uevent_var(env, "MODALIAS=xen-backend:%s", xdev->devicetype))
+		return -ENOMEM;
 
 	/* stuff we want to pass to /sbin/hotplug */
 	if (add_uevent_var(env, "XENBUS_TYPE=%s", xdev->devicetype))
@@ -189,41 +180,26 @@ static int xenbus_probe_backend(struct xen_bus_type *bus, const char *type,
 	return err;
 }
 
-#if !defined(CONFIG_XEN) && !defined(HAVE_XEN_PLATFORM_COMPAT_H)
 static void frontend_changed(struct xenbus_watch *watch,
 			    const char **vec, unsigned int len)
 {
 	xenbus_otherend_changed(watch, vec, len, 0);
 }
-#endif
-
-static struct device_attribute xenbus_backend_dev_attrs[] = {
-	__ATTR_NULL
-};
 
 static struct xen_bus_type xenbus_backend = {
 	.root = "backend",
 	.levels = 3,		/* backend/type/<frontend>/<id> */
 	.get_bus_id = backend_bus_id,
 	.probe = xenbus_probe_backend,
-#if !defined(CONFIG_XEN) && !defined(HAVE_XEN_PLATFORM_COMPAT_H)
 	.otherend_changed = frontend_changed,
-#else
-	.dev = {
-		.init_name = "xen-backend",
-	},
-#endif
-	.error = -ENODEV,
 	.bus = {
 		.name		= "xen-backend",
 		.match		= xenbus_match,
 		.uevent		= xenbus_uevent_backend,
 		.probe		= xenbus_dev_probe,
 		.remove		= xenbus_dev_remove,
-#if !defined(CONFIG_XEN) && !defined(HAVE_XEN_PLATFORM_COMPAT_H)
 		.shutdown	= xenbus_dev_shutdown,
-#endif
-		.dev_attrs	= xenbus_backend_dev_attrs,
+		.dev_attrs	= xenbus_dev_attrs,
 	},
 };
 
@@ -245,7 +221,6 @@ static int read_frontend_details(struct xenbus_device *xendev)
 	return xenbus_read_otherend_details(xendev, "frontend-id", "frontend");
 }
 
-#if !defined(CONFIG_XEN) && !defined(HAVE_XEN_PLATFORM_COMPAT_H)
 int xenbus_dev_is_online(struct xenbus_device *dev)
 {
 	int rc, val;
@@ -257,7 +232,6 @@ int xenbus_dev_is_online(struct xenbus_device *dev)
 	return val;
 }
 EXPORT_SYMBOL_GPL(xenbus_dev_is_online);
-#endif
 
 int __xenbus_register_backend(struct xenbus_driver *drv,
 			      struct module *owner, const char *mod_name)
@@ -269,42 +243,16 @@ int __xenbus_register_backend(struct xenbus_driver *drv,
 }
 EXPORT_SYMBOL_GPL(__xenbus_register_backend);
 
-#if defined(CONFIG_XEN) || defined(HAVE_XEN_PLATFORM_COMPAT_H)
-
-void xenbus_backend_suspend(int (*fn)(struct device *, void *))
-{
-	DPRINTK("");
-	if (!xenbus_backend.error)
-		bus_for_each_dev(&xenbus_backend.bus, NULL, NULL, fn);
-}
-
-void xenbus_backend_resume(int (*fn)(struct device *, void *))
-{
-	DPRINTK("");
-	if (!xenbus_backend.error)
-		bus_for_each_dev(&xenbus_backend.bus, NULL, NULL, fn);
-}
-
-#endif
-
-#if !defined(CONFIG_XEN) && !defined(HAVE_XEN_PLATFORM_COMPAT_H)
 static int backend_probe_and_watch(struct notifier_block *notifier,
 				   unsigned long event,
 				   void *data)
-#else
-void xenbus_backend_probe_and_watch(void)
-#endif
 {
 	/* Enumerate devices in xenstore and watch for changes. */
 	xenbus_probe_devices(&xenbus_backend);
 	register_xenbus_watch(&be_watch);
 
-#if !defined(CONFIG_XEN) && !defined(HAVE_XEN_PLATFORM_COMPAT_H)
 	return NOTIFY_DONE;
-#endif
 }
-
-#if !defined(CONFIG_XEN) && !defined(HAVE_XEN_PLATFORM_COMPAT_H)
 
 static int __init xenbus_probe_backend_init(void)
 {
@@ -325,34 +273,3 @@ static int __init xenbus_probe_backend_init(void)
 	return 0;
 }
 subsys_initcall(xenbus_probe_backend_init);
-
-#else
-
-void xenbus_backend_bus_register(void)
-{
-	xenbus_backend.error = bus_register(&xenbus_backend.bus);
-	if (xenbus_backend.error)
-		pr_warning("XENBUS: Error registering backend bus: %i\n",
-			   xenbus_backend.error);
-}
-
-void xenbus_backend_device_register(void)
-{
-	if (xenbus_backend.error)
-		return;
-
-	xenbus_backend.error = device_register(&xenbus_backend.dev);
-	if (xenbus_backend.error) {
-		bus_unregister(&xenbus_backend.bus);
-		pr_warning("XENBUS: Error registering backend device: %i\n",
-			   xenbus_backend.error);
-	}
-}
-
-int xenbus_for_each_backend(void *arg, int (*fn)(struct device *, void *))
-{
-	return bus_for_each_dev(&xenbus_backend.bus, NULL, arg, fn);
-}
-EXPORT_SYMBOL_GPL(xenbus_for_each_backend);
-
-#endif

@@ -399,7 +399,7 @@ int br_add_if(struct net_bridge *br, struct net_device *dev)
 	br_ifinfo_notify(RTM_NEWLINK, p);
 
 	if (changed_addr)
-		call_netdevice_notifiers(NETDEV_CHANGEADDR, dev);
+		call_netdevice_notifiers(NETDEV_CHANGEADDR, br->dev);
 
 	dev_set_mtu(br->dev, br_min_mtu(br));
 
@@ -428,6 +428,7 @@ put_back:
 int br_del_if(struct net_bridge *br, struct net_device *dev)
 {
 	struct net_bridge_port *p;
+	bool changed_addr;
 
 	p = br_port_get_rtnl(dev);
 	if (!p || p->br != br)
@@ -436,8 +437,11 @@ int br_del_if(struct net_bridge *br, struct net_device *dev)
 	del_nbp(p);
 
 	spin_lock_bh(&br->lock);
-	br_stp_recalculate_bridge_id(br);
+	changed_addr = br_stp_recalculate_bridge_id(br);
 	spin_unlock_bh(&br->lock);
+
+	if (changed_addr)
+		call_netdevice_notifiers(NETDEV_CHANGEADDR, br->dev);
 
 	netdev_update_features(br->dev);
 

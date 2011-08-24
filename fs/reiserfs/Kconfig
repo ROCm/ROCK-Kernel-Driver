@@ -52,28 +52,6 @@ config REISERFS_PROC_INFO
 	  Almost everyone but ReiserFS developers and people fine-tuning
 	  reiserfs or tracing problems should say N.
 
-config REISERFS_DEFAULTS_TO_BARRIERS_ENABLED
-	bool "Default to 'barrier=flush' in reiserfs"
-	depends on REISERFS_FS
-        help
-	  Modern disk drives support write caches that can speed up writeback.
-	  Some devices, in order to improve their performance statistics,
-	  report that the write has been completed even when it has only
-	  been committed to volatile cache memory. This can result in
-	  severe corruption in the event of power loss.
-
-	  The -o barrier option enables the file system to direct the block
-	  layer to issue a barrier, which ensures that the cache has been
-	  flushed before proceeding. This can produce some slowdown in
-	  certain environments, but allows higher end storage arrays with
-	  battery-backed caches to report completes writes sooner than
-	  would be otherwise possible.
-
-	  Without this option, disk write caches should be disabled if
-	  you value data integrity over writeback performance.
-
-	  If unsure, say N.
-
 config REISERFS_FS_XATTR
 	bool "ReiserFS extended attributes"
 	depends on REISERFS_FS

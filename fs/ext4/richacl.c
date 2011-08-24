@@ -120,8 +120,7 @@ ext4_set_richacl(handle_t *handle, struct inode *inode, struct richacl *acl)
 }
 
 int
-ext4_richacl_permission(struct inode *inode, unsigned int mask,
-			unsigned int flags)
+ext4_richacl_permission(struct inode *inode, unsigned int mask)
 {
 	struct richacl *acl;
 	int retval;
@@ -133,20 +132,20 @@ ext4_richacl_permission(struct inode *inode, unsigned int mask,
 	if (acl && IS_ERR(acl))
 		retval = PTR_ERR(acl);
 	else {
-		retval = richacl_inode_permission(inode, acl, mask, flags);
+		retval = richacl_inode_permission(inode, acl, mask);
 		richacl_put(acl);
 	}
 
 	return retval;
 }
 
-int ext4_permission(struct inode *inode, int mask, unsigned int flags)
+int ext4_permission(struct inode *inode, int mask)
 {
 	if (IS_RICHACL(inode))
 		return ext4_richacl_permission(inode,
-					richacl_want_to_mask(mask), flags);
+					richacl_want_to_mask(mask));
 	else
-		return generic_permission(inode, mask, flags, ext4_check_acl);
+		return generic_permission(inode, mask);
 }
 
 int ext4_may_create(struct inode *dir, int isdir)
@@ -261,7 +260,7 @@ ext4_xattr_set_richacl(struct dentry *dentry, const char *name,
 	if (strcmp(name, "") != 0)
 		return -EINVAL;
 	if (current_fsuid() != inode->i_uid &&
-	    ext4_richacl_permission(inode, ACE4_WRITE_ACL, 0) &&
+	    ext4_richacl_permission(inode, ACE4_WRITE_ACL) &&
 	    !capable(CAP_FOWNER))
 		return -EPERM;
 	if (value) {

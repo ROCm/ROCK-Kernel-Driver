@@ -684,7 +684,7 @@ again:
 
 	err = xenbus_switch_state(dev, XenbusStateConnected);
 	if (err)
-		xenbus_dev_fatal(dev, err, "switching to Connected state",
+		xenbus_dev_fatal(dev, err, "%s: switching to Connected state",
 				 dev->nodename);
 
 	return;
@@ -753,6 +753,7 @@ static const struct xenbus_device_id xen_blkbk_ids[] = {
 
 static struct xenbus_driver xen_blkbk = {
 	.name = "vbd",
+	.owner = THIS_MODULE,
 	.ids = xen_blkbk_ids,
 	.probe = xen_blkbk_probe,
 	.remove = xen_blkbk_remove,

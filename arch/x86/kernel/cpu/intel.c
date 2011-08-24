@@ -36,15 +36,10 @@ static void __cpuinit early_init_intel(struct cpuinfo_x86 *c)
 		rdmsrl(MSR_IA32_MISC_ENABLE, misc_enable);
 
 		if (misc_enable & MSR_IA32_MISC_ENABLE_LIMIT_CPUID) {
-#ifndef CONFIG_XEN
 			misc_enable &= ~MSR_IA32_MISC_ENABLE_LIMIT_CPUID;
 			wrmsrl(MSR_IA32_MISC_ENABLE, misc_enable);
 			c->cpuid_level = cpuid_eax(0);
 			get_cpu_cap(c);
-#else
-			pr_warning("CPUID levels are restricted -"
-				   " update hypervisor\n");
-#endif
 		}
 	}
 
@@ -60,9 +55,6 @@ static void __cpuinit early_init_intel(struct cpuinfo_x86 *c)
 	 * need the microcode to have already been loaded... so if it is
 	 * not, recommend a BIOS update and disable large pages.
 	 */
-#ifdef CONFIG_XEN
-	if (cpu_has(c, X86_FEATURE_PSE))
-#endif
 	if (c->x86 == 6 && c->x86_model == 0x1c && c->x86_mask <= 2) {
 		u32 ucode, junk;
 
@@ -99,10 +91,8 @@ static void __cpuinit early_init_intel(struct cpuinfo_x86 *c)
 	if (c->x86_power & (1 << 8)) {
 		set_cpu_cap(c, X86_FEATURE_CONSTANT_TSC);
 		set_cpu_cap(c, X86_FEATURE_NONSTOP_TSC);
-#ifndef CONFIG_XEN
 		if (!check_tsc_unstable())
 			sched_clock_stable = 1;
-#endif
 	}
 
 	/*
@@ -248,13 +238,9 @@ static void __cpuinit intel_workarounds(struct cpuinfo_x86 *c)
 		rdmsr(MSR_IA32_MISC_ENABLE, lo, hi);
 		if ((lo & MSR_IA32_MISC_ENABLE_PREFETCH_DISABLE) == 0) {
 			printk (KERN_INFO "CPU: C0 stepping P4 Xeon detected.\n");
-#ifndef CONFIG_XEN
 			printk (KERN_INFO "CPU: Disabling hardware prefetching (Errata 037)\n");
 			lo |= MSR_IA32_MISC_ENABLE_PREFETCH_DISABLE;
 			wrmsr(MSR_IA32_MISC_ENABLE, lo, hi);
-#else
-			pr_warning("CPU: Hypervisor update needed\n");
-#endif
 		}
 	}
 
@@ -299,7 +285,6 @@ static void __cpuinit intel_workarounds(struct cpuinfo_x86 *c)
 }
 #endif
 
-#ifndef CONFIG_XEN
 static void __cpuinit srat_detect_node(struct cpuinfo_x86 *c)
 {
 #ifdef CONFIG_NUMA
@@ -372,7 +357,6 @@ static void __cpuinit detect_vmx_virtcap(struct cpuinfo_x86 *c)
 			set_cpu_cap(c, X86_FEATURE_VPID);
 	}
 }
-#endif
 
 static void __cpuinit init_intel(struct cpuinfo_x86 *c)
 {
@@ -456,7 +440,6 @@ static void __cpuinit init_intel(struct cpuinfo_x86 *c)
 		set_cpu_cap(c, X86_FEATURE_P3);
 #endif
 
-#ifndef CONFIG_XEN
 	if (!cpu_has(c, X86_FEATURE_XTOPOLOGY)) {
 		/*
 		 * let's use the legacy cpuid vector 0x1 and 0x4 for topology
@@ -473,7 +456,24 @@ static void __cpuinit init_intel(struct cpuinfo_x86 *c)
 
 	if (cpu_has(c, X86_FEATURE_VMX))
 		detect_vmx_virtcap(c);
-#endif
+
+	/*
+	 * Initialize MSR_IA32_ENERGY_PERF_BIAS if BIOS did not.
+	 * x86_energy_perf_policy(8) is available to change it at run-time
+	 */
+	if (cpu_has(c, X86_FEATURE_EPB)) {
+		u64 epb;
+
+		rdmsrl(MSR_IA32_ENERGY_PERF_BIAS, epb);
+		if ((epb & 0xF) == ENERGY_PERF_BIAS_PERFORMANCE) {
+			printk_once(KERN_WARNING "ENERGY_PERF_BIAS:"
+				" Set to 'normal', was 'performance'\n"
+				"ENERGY_PERF_BIAS: View and update with"
+				" x86_energy_perf_policy(8)\n");
+			epb = (epb & ~0xF) | ENERGY_PERF_BIAS_NORMAL;
+			wrmsrl(MSR_IA32_ENERGY_PERF_BIAS, epb);
+		}
+	}
 }
 
 #ifdef CONFIG_X86_32

@@ -40,7 +40,7 @@
 #include "hyperv_vmbus.h"
 
 
-static struct pci_dev *hv_pci_dev;
+static struct acpi_device  *hv_acpi_dev;
 
 static struct tasklet_struct msg_dpc;
 static struct tasklet_struct event_dpc;
@@ -50,7 +50,6 @@ EXPORT_SYMBOL(vmbus_loglevel);
 	/* (ALL_MODULES << 16 | DEBUG_LVL_ENTEREXIT); */
 	/* (((VMBUS | VMBUS_DRV)<<16) | DEBUG_LVL_ENTEREXIT); */
 
-static int pci_probe_error;
 static struct completion probe_event;
 static int irq;
 
@@ -109,12 +108,12 @@ static ssize_t vmbus_show_device_attr(struct device *dev,
 				      struct device_attribute *dev_attr,
 				      char *buf)
 {
-	struct hv_device *device_ctx = device_to_hv_device(dev);
+	struct hv_device *hv_dev = device_to_hv_device(dev);
 	struct hv_device_info device_info;
 
 	memset(&device_info, 0, sizeof(struct hv_device_info));
 
-	get_channel_info(device_ctx, &device_info);
+	get_channel_info(hv_dev, &device_info);
 
 	if (!strcmp(dev_attr->attr.name, "class_id")) {
 		return sprintf(buf, "{%02x%02x%02x%02x-%02x%02x-%02x%02x-"
@@ -302,10 +301,10 @@ static int vmbus_match(struct device *device, struct device_driver *driver)
 {
 	int match = 0;
 	struct hv_driver *drv = drv_to_hv_drv(driver);
-	struct hv_device *device_ctx = device_to_hv_device(device);
+	struct hv_device *hv_dev = device_to_hv_device(device);
 
 	/* We found our driver ? */
-	if (memcmp(&device_ctx->dev_type, &drv->dev_type,
+	if (memcmp(&hv_dev->dev_type, &drv->dev_type,
 		   sizeof(struct hv_guid)) == 0)
 		match = 1;
 
@@ -331,7 +330,7 @@ static int vmbus_probe(struct device *child_device)
 	} else {
 		pr_err("probe not set for driver %s\n",
 		       dev_name(child_device));
-		ret = -1;
+		ret = -ENODEV;
 	}
 	return ret;
 }
@@ -354,7 +353,7 @@ static int vmbus_remove(struct device *child_device)
 		} else {
 			pr_err("remove not set for driver %s\n",
 				dev_name(child_device));
-			ret = -1;
+			ret = -ENODEV;
 		}
 	}
 
@@ -389,9 +388,9 @@ static void vmbus_shutdown(struct device *child_device)
  */
 static void vmbus_device_release(struct device *device)
 {
-	struct hv_device *device_ctx = device_to_hv_device(device);
+	struct hv_device *hv_dev = device_to_hv_device(device);
 
-	kfree(device_ctx);
+	kfree(hv_dev);
 
 }
 
@@ -457,7 +456,7 @@ static void vmbus_on_msg_dpc(unsigned long data)
 		 * will not deliver any more messages since there is
 		 * no empty slot
 		 */
-		mb();
+		smp_mb();
 
 		if (msg->header.message_flags.msg_pending) {
 			/*
@@ -488,7 +487,6 @@ static int vmbus_on_isr(void)
 	if (msg->header.message_type != HVMSG_NONE)
 		ret |= 0x1;
 
-	/* TODO: Check if there are events to be process */
 	page_addr = hv_context.synic_event_page[cpu];
 	event = (union hv_synic_event_flags *)page_addr + VMBUS_MESSAGE_SINT;
 
@@ -529,7 +527,7 @@ static irqreturn_t vmbus_isr(int irq, void *dev_id)
  *	- get the irq resource
  *	- retrieve the channel offers
  */
-static int vmbus_bus_init(struct pci_dev *pdev)
+static int vmbus_bus_init(int irq)
 {
 	int ret;
 	unsigned int vector;
@@ -538,7 +536,7 @@ static int vmbus_bus_init(struct pci_dev *pdev)
 	ret = hv_init();
 	if (ret != 0) {
 		pr_err("Unable to initialize the hypervisor - 0x%x\n", ret);
-		goto cleanup;
+		return ret;
 	}
 
 	/* Initialize the bus context */
@@ -547,27 +545,23 @@ static int vmbus_bus_init(struct pci_dev *pdev)
 
 	/* Now, register the bus  with LDM */
 	ret = bus_register(&hv_bus);
-	if (ret) {
-		ret = -1;
-		goto cleanup;
-	}
+	if (ret)
+		return ret;
 
 	/* Get the interrupt resource */
-	ret = request_irq(pdev->irq, vmbus_isr,
-			  IRQF_SHARED | IRQF_SAMPLE_RANDOM,
-			  driver_name, pdev);
+	ret = request_irq(irq, vmbus_isr, IRQF_SAMPLE_RANDOM,
+			driver_name, hv_acpi_dev);
 
 	if (ret != 0) {
 		pr_err("Unable to request IRQ %d\n",
-			   pdev->irq);
+			   irq);
 
 		bus_unregister(&hv_bus);
 
-		ret = -1;
-		goto cleanup;
+		return ret;
 	}
 
-	vector = IRQ0_VECTOR + pdev->irq;
+	vector = IRQ0_VECTOR + irq;
 
 	/*
 	 * Notify the hypervisor of our irq and
@@ -576,16 +570,15 @@ static int vmbus_bus_init(struct pci_dev *pdev)
 	on_each_cpu(hv_synic_init, (void *)&vector, 1);
 	ret = vmbus_connect();
 	if (ret) {
-		free_irq(pdev->irq, pdev);
+		free_irq(irq, hv_acpi_dev);
 		bus_unregister(&hv_bus);
-		goto cleanup;
+		return ret;
 	}
 
 
 	vmbus_request_offers();
 
-cleanup:
-	return ret;
+	return 0;
 }
 
 /**
@@ -632,7 +625,6 @@ void vmbus_child_driver_unregister(struct device_driver *drv)
 
 	driver_unregister(drv);
 
-	drv->bus = NULL;
 }
 EXPORT_SYMBOL(vmbus_child_driver_unregister);
 
@@ -677,7 +669,7 @@ int vmbus_child_device_register(struct hv_device *child_device_obj)
 
 	/* The new device belongs to this bus */
 	child_device_obj->device.bus = &hv_bus; /* device->dev.bus; */
-	child_device_obj->device.parent = &hv_pci_dev->dev;
+	child_device_obj->device.parent = &hv_acpi_dev->dev;
 	child_device_obj->device.release = vmbus_device_release;
 
 	/*
@@ -734,6 +726,8 @@ static int vmbus_acpi_add(struct acpi_device *device)
 {
 	acpi_status result;
 
+	hv_acpi_dev = device;
+
 	result =
 	acpi_walk_resources(device->handle, METHOD_NAME__CRS,
 			vmbus_walk_resources, &irq);
@@ -748,6 +742,7 @@ static int vmbus_acpi_add(struct acpi_device *device)
 
 static const struct acpi_device_id vmbus_acpi_device_ids[] = {
 	{"VMBUS", 0},
+	{"VMBus", 0},
 	{"", 0},
 };
 MODULE_DEVICE_TABLE(acpi, vmbus_acpi_device_ids);
@@ -760,53 +755,6 @@ static struct acpi_driver vmbus_acpi_driver = {
 	},
 };
 
-static int vmbus_acpi_init(void)
-{
-	int result;
-
-
-	result = acpi_bus_register_driver(&vmbus_acpi_driver);
-	if (result < 0)
-		return result;
-
-	return 0;
-}
-
-static void vmbus_acpi_exit(void)
-{
-	acpi_bus_unregister_driver(&vmbus_acpi_driver);
-
-	return;
-}
-
-
-static int __devinit hv_pci_probe(struct pci_dev *pdev,
-				const struct pci_device_id *ent)
-{
-	hv_pci_dev = pdev;
-
-	pci_probe_error = pci_enable_device(pdev);
-	if (pci_probe_error)
-		goto probe_cleanup;
-
-	/*
-	 * If the PCI sub-sytem did not assign us an
-	 * irq, use the bios provided one.
-	 */
-
-	if (pdev->irq == 0)
-		pdev->irq = irq;
-
-	pci_probe_error = vmbus_bus_init(pdev);
-
-	if (pci_probe_error)
-		pci_disable_device(pdev);
-
-probe_cleanup:
-	complete(&probe_event);
-	return pci_probe_error;
-}
-
 /*
  * We use a PCI table to determine if we should autoload this driver  This is
  * needed by distro tools to determine if the hyperv drivers should be
@@ -818,12 +766,6 @@ static const struct pci_device_id microsoft_hv_pci_table[] = {
 	{ 0 }
 };
 MODULE_DEVICE_TABLE(pci, microsoft_hv_pci_table);
-
-static struct pci_driver hv_bus_driver = {
-	.name =           "hv_bus",
-	.probe =          hv_pci_probe,
-	.id_table =       microsoft_hv_pci_table,
-};
 
 static const struct dmi_system_id __initconst
 hv_vmbus_dmi_table[] __maybe_unused  = {
@@ -839,7 +781,7 @@ hv_vmbus_dmi_table[] __maybe_unused  = {
 };
 MODULE_DEVICE_TABLE(dmi, hv_vmbus_dmi_table);
 
-static int __init hv_pci_init(void)
+static int __init hv_acpi_init(void)
 {
 	int ret;
 
@@ -852,32 +794,22 @@ static int __init hv_pci_init(void)
 	 * Get irq resources first.
 	 */
 
-	ret = vmbus_acpi_init();
+	ret = acpi_bus_register_driver(&vmbus_acpi_driver);
+
 	if (ret)
 		return ret;
 
 	wait_for_completion(&probe_event);
 
 	if (irq <= 0) {
-		vmbus_acpi_exit();
+		acpi_bus_unregister_driver(&vmbus_acpi_driver);
 		return -ENODEV;
 	}
 
-	vmbus_acpi_exit();
-	init_completion(&probe_event);
-	ret = pci_register_driver(&hv_bus_driver);
+	ret = vmbus_bus_init(irq);
 	if (ret)
-		return ret;
-	/*
-	 * All the vmbus initialization occurs within the
-	 * hv_pci_probe() function. Wait for hv_pci_probe()
-	 * to complete.
-	 */
-	wait_for_completion(&probe_event);
-
-	if (pci_probe_error)
-		pci_unregister_driver(&hv_bus_driver);
-	return pci_probe_error;
+		acpi_bus_unregister_driver(&vmbus_acpi_driver);
+	return ret;
 }
 
 
@@ -885,4 +817,4 @@ MODULE_LICENSE("GPL");
 MODULE_VERSION(HV_DRV_VERSION);
 module_param(vmbus_loglevel, int, S_IRUGO|S_IWUSR);
 
-module_init(hv_pci_init);
+module_init(hv_acpi_init);

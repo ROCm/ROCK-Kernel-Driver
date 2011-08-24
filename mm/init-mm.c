@@ -5,16 +5,12 @@
 #include <linux/list.h>
 #include <linux/cpumask.h>
 
-#include <asm/atomic.h>
+#include <linux/atomic.h>
 #include <asm/pgtable.h>
 #include <asm/mmu.h>
 
 #ifndef INIT_MM_CONTEXT
 #define INIT_MM_CONTEXT(name)
-#endif
-
-#ifdef CONFIG_X86_XEN
-#define swapper_pg_dir ((pgd_t *)NULL)
 #endif
 
 struct mm_struct init_mm = {

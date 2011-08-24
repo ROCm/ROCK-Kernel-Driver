@@ -24,8 +24,8 @@
 /* Value for i_richacl if RICHACL has not been cached */
 # define EXT4_RICHACL_NOT_CACHED ((void *)-1)
 
-extern int ext4_permission(struct inode *, int, unsigned int);
-extern int ext4_richacl_permission(struct inode *, unsigned int, unsigned int);
+extern int ext4_permission(struct inode *, int);
+extern int ext4_richacl_permission(struct inode *, unsigned int);
 extern int ext4_may_create(struct inode *, int);
 extern int ext4_may_delete(struct inode *, struct inode *, int);
 extern int ext4_init_richacl(handle_t *, struct inode *, struct inode *);

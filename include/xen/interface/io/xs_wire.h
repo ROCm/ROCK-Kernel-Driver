@@ -1,25 +1,6 @@
 /*
  * Details of the "wire" protocol between Xen Store Daemon and client
  * library or guest kernel.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to
- * deal in the Software without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- * sell copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
- *
  * Copyright (C) 2005 Rusty Russell IBM Corporation
  */
 
@@ -45,10 +26,7 @@ enum xsd_sockmsg_type
     XS_SET_PERMS,
     XS_WATCH_EVENT,
     XS_ERROR,
-    XS_IS_DOMAIN_INTRODUCED,
-    XS_RESUME,
-    XS_SET_TARGET,
-    XS_RESTRICT
+    XS_IS_DOMAIN_INTRODUCED
 };
 
 #define XS_WRITE_NONE "NONE"
@@ -61,14 +39,8 @@ struct xsd_errors
     int errnum;
     const char *errstring;
 };
-#ifdef EINVAL
 #define XSD_ERROR(x) { x, #x }
-/* LINTED: static unused */
-static struct xsd_errors xsd_errors[]
-#if defined(__GNUC__)
-__attribute__((unused))
-#endif
-    = {
+static struct xsd_errors xsd_errors[] __attribute__((unused)) = {
     XSD_ERROR(EINVAL),
     XSD_ERROR(EACCES),
     XSD_ERROR(EEXIST),
@@ -84,7 +56,6 @@ __attribute__((unused))
     XSD_ERROR(EAGAIN),
     XSD_ERROR(EISCONN)
 };
-#endif
 
 struct xsd_sockmsg
 {
@@ -112,12 +83,5 @@ struct xenstore_domain_interface {
     XENSTORE_RING_IDX req_cons, req_prod;
     XENSTORE_RING_IDX rsp_cons, rsp_prod;
 };
-
-/* Violating this is very bad.  See docs/misc/xenstore.txt. */
-#define XENSTORE_PAYLOAD_MAX 4096
-
-/* Violating these just gets you an error back */
-#define XENSTORE_ABS_PATH_MAX 3072
-#define XENSTORE_REL_PATH_MAX 2048
 
 #endif /* _XS_WIRE_H */

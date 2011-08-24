@@ -94,6 +94,7 @@
 #include <linux/delay.h>
 #include <linux/seq_file.h>
 #include <linux/serial.h>
+#include <linux/ratelimit.h>
 
 #include <linux/uaccess.h>
 #include <asm/system.h>
@@ -136,8 +137,6 @@ EXPORT_SYMBOL(tty_mutex);
 
 /* Spinlock to protect the tty->tty_files list */
 DEFINE_SPINLOCK(tty_files_lock);
-
-int console_use_vt = 1;
 
 static ssize_t tty_read(struct file *, char __user *, size_t, loff_t *);
 static ssize_t tty_write(struct file *, const char __user *, size_t, loff_t *);
@@ -1422,8 +1421,7 @@ err_module_put:
 
 	/* call the tty release_tty routine to clean out this slot */
 err_release_tty:
-	if (printk_ratelimit())
-		printk(KERN_INFO "tty_init_dev: ldisc open failed, "
+	printk_ratelimited(KERN_INFO "tty_init_dev: ldisc open failed, "
 				 "clearing slot %d\n", idx);
 	release_tty(tty, idx);
 	return ERR_PTR(retval);
@@ -1837,7 +1835,7 @@ retry_open:
 		goto got_driver;
 	}
 #ifdef CONFIG_VT
-	if (console_use_vt && device == MKDEV(TTY_MAJOR, 0)) {
+	if (device == MKDEV(TTY_MAJOR, 0)) {
 		extern struct tty_driver *console_driver;
 		driver = tty_driver_kref_get(console_driver);
 		index = fg_console;
@@ -3329,8 +3327,7 @@ int __init tty_init(void)
 		WARN_ON(device_create_file(consdev, &dev_attr_active) < 0);
 
 #ifdef CONFIG_VT
-	if (console_use_vt)
-		vty_init(&console_fops);
+	vty_init(&console_fops);
 #endif
 	return 0;
 }

@@ -238,7 +238,6 @@ extern int acpi_paddr_to_node(u64 start_addr, u64 size);
 extern int pnpacpi_disabled;
 
 #define PXM_INVAL	(-1)
-#define NID_INVAL	(-1)
 
 int acpi_check_resource_conflict(const struct resource *res);
 
@@ -246,8 +245,6 @@ int acpi_check_region(resource_size_t start, resource_size_t n,
 		      const char *name);
 
 int acpi_resources_are_enforced(void);
-
-int acpi_pci_get_root_seg_bbn(char *hid, char *uid, int *seg, int *bbn);
 
 #ifdef CONFIG_PM_SLEEP
 void __init acpi_no_s4_hw_signature(void);
@@ -281,6 +278,8 @@ acpi_status acpi_run_osc(acpi_handle handle, struct acpi_osc_context *context);
 #define OSC_SB_PR3_SUPPORT		4
 #define OSC_SB_CPUHP_OST_SUPPORT	8
 #define OSC_SB_APEI_SUPPORT		16
+
+extern bool osc_sb_apei_support_acked;
 
 /* PCI defined _OSC bits */
 /* _OSC DW1 Definition (OS Support Fields) */

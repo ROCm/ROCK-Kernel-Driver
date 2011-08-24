@@ -583,9 +583,9 @@ static void setup_modinfo_##field(struct module *mod, const char *s)  \
 	mod->field = kstrdup(s, GFP_KERNEL);                          \
 }                                                                     \
 static ssize_t show_modinfo_##field(struct module_attribute *mattr,   \
-	                struct module *mod, char *buffer)             \
+			struct module_kobject *mk, char *buffer)      \
 {                                                                     \
-	return sprintf(buffer, "%s\n", mod->field);                   \
+	return sprintf(buffer, "%s\n", mk->mod->field);               \
 }                                                                     \
 static int modinfo_##field##_exists(struct module *mod)               \
 {                                                                     \
@@ -940,9 +940,9 @@ void symbol_put_addr(void *addr)
 EXPORT_SYMBOL_GPL(symbol_put_addr);
 
 static ssize_t show_refcnt(struct module_attribute *mattr,
-			   struct module *mod, char *buffer)
+			   struct module_kobject *mk, char *buffer)
 {
-	return sprintf(buffer, "%u\n", module_refcount(mod));
+	return sprintf(buffer, "%u\n", module_refcount(mk->mod));
 }
 
 static struct module_attribute refcnt = {
@@ -990,11 +990,11 @@ static inline int module_unload_init(struct module *mod)
 #endif /* CONFIG_MODULE_UNLOAD */
 
 static ssize_t show_initstate(struct module_attribute *mattr,
-			   struct module *mod, char *buffer)
+			      struct module_kobject *mk, char *buffer)
 {
 	const char *state = "unknown";
 
-	switch (mod->state) {
+	switch (mk->mod->state) {
 	case MODULE_STATE_LIVE:
 		state = "live";
 		break;
@@ -1011,6 +1011,22 @@ static ssize_t show_initstate(struct module_attribute *mattr,
 static struct module_attribute initstate = {
 	.attr = { .name = "initstate", .mode = 0444 },
 	.show = show_initstate,
+};
+
+static ssize_t store_uevent(struct module_attribute *mattr,
+			    struct module_kobject *mk,
+			    const char *buffer, size_t count)
+{
+	enum kobject_action action;
+
+	if (kobject_action_type(buffer, count, &action) == 0)
+		kobject_uevent(&mk->kobj, action);
+	return count;
+}
+
+struct module_attribute module_uevent = {
+	.attr = { .name = "uevent", .mode = 0200 },
+	.store = store_uevent,
 };
 
 #ifdef CONFIG_ENTERPRISE_SUPPORT
@@ -1044,6 +1060,7 @@ static struct module_attribute *modinfo_attrs[] = {
 	&modinfo_version,
 	&modinfo_srcversion,
 	&initstate,
+	&module_uevent,
 #ifdef CONFIG_ENTERPRISE_SUPPORT
 	&modinfo_supported,
 #endif
@@ -1255,7 +1272,7 @@ struct module_sect_attrs
 };
 
 static ssize_t module_sect_show(struct module_attribute *mattr,
-				struct module *mod, char *buf)
+				struct module_kobject *mk, char *buf)
 {
 	struct module_sect_attr *sattr =
 		container_of(mattr, struct module_sect_attr, mattr);
@@ -1792,6 +1809,15 @@ static void unset_module_core_ro_nx(struct module *mod) { }
 static void unset_module_init_ro_nx(struct module *mod) { }
 #endif
 
+void __weak module_free(struct module *mod, void *module_region)
+{
+	vfree(module_region);
+}
+
+void __weak module_arch_cleanup(struct module *mod)
+{
+}
+
 /* Free a module, remove from lists, etc. */
 static void free_module(struct module *mod)
 {
@@ -1946,6 +1972,26 @@ static int simplify_symbols(struct module *mod, const struct load_info *info)
 	}
 
 	return ret;
+}
+
+int __weak apply_relocate(Elf_Shdr *sechdrs,
+			  const char *strtab,
+			  unsigned int symindex,
+			  unsigned int relsec,
+			  struct module *me)
+{
+	pr_err("module %s: REL relocation unsupported\n", me->name);
+	return -ENOEXEC;
+}
+
+int __weak apply_relocate_add(Elf_Shdr *sechdrs,
+			      const char *strtab,
+			      unsigned int symindex,
+			      unsigned int relsec,
+			      struct module *me)
+{
+	pr_err("module %s: RELA relocation unsupported\n", me->name);
+	return -ENOEXEC;
 }
 
 static int apply_relocations(struct module *mod, const struct load_info *info)
@@ -2330,6 +2376,11 @@ static void dynamic_debug_remove(struct _ddebug *debug)
 {
 	if (debug)
 		ddebug_remove_module(debug->modname);
+}
+
+void * __weak module_alloc(unsigned long size)
+{
+	return size == 0 ? NULL : vmalloc_exec(size);
 }
 
 static void *module_alloc_update_bounds(unsigned long size)
@@ -2744,6 +2795,14 @@ static void flush_module_icache(const struct module *mod)
 	set_fs(old_fs);
 }
 
+int __weak module_frob_arch_sections(Elf_Ehdr *hdr,
+				     Elf_Shdr *sechdrs,
+				     char *secstrings,
+				     struct module *mod)
+{
+	return 0;
+}
+
 static struct module *layout_and_allocate(struct load_info *info)
 {
 	/* Module within temporary copy. */
@@ -2813,6 +2872,13 @@ static void module_deallocate(struct module *mod, struct load_info *info)
 	percpu_modfree(mod);
 	module_free(mod, mod->module_init);
 	module_free(mod, mod->module_core);
+}
+
+int __weak module_finalize(const Elf_Ehdr *hdr,
+			   const Elf_Shdr *sechdrs,
+			   struct module *me)
+{
+	return 0;
 }
 
 static int post_relocation(struct module *mod, const struct load_info *info)
