@@ -148,7 +148,6 @@ config INTEL_MID_PTI
 	tristate "Parallel Trace Interface for MIPI P1149.7 cJTAG standard"
 	depends on PCI
 	default n
-	depends on X86_INTEL_MID
 	help
 	  The PTI (Parallel Trace Interface) driver directs
 	  trace data routed from various parts in the system out
