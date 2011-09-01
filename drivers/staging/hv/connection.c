@@ -25,6 +25,7 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/wait.h>
+#include <linux/delay.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
@@ -48,10 +49,6 @@ int vmbus_connect(void)
 	struct vmbus_channel_msginfo *msginfo = NULL;
 	struct vmbus_channel_initiate_contact *msg;
 	unsigned long flags;
-
-	/* Make sure we are not connecting or connected */
-	if (vmbus_connection.conn_state != DISCONNECTED)
-		return -EISCONN;
 
 	/* Initialize the vmbus connection */
 	vmbus_connection.conn_state = CONNECTING;
@@ -214,8 +211,7 @@ struct vmbus_channel *relid2channel(u32 relid)
 static void process_chn_event(u32 relid)
 {
 	struct vmbus_channel *channel;
-
-	/* ASSERT(relId > 0); */
+	unsigned long flags;
 
 	/*
 	 * Find the channel based on this relid and invokes the
@@ -223,11 +219,13 @@ static void process_chn_event(u32 relid)
 	 */
 	channel = relid2channel(relid);
 
-	if (channel) {
+	spin_lock_irqsave(&channel->inbound_lock, flags);
+	if (channel && (channel->onchannel_callback != NULL))
 		channel->onchannel_callback(channel->channel_callback_context);
-	} else {
+	else
 		pr_err("channel not found for relid - %u\n", relid);
-	}
+
+	spin_unlock_irqrestore(&channel->inbound_lock, flags);
 }
 
 /*
@@ -248,16 +246,17 @@ void vmbus_on_event(unsigned long data)
 		if (!recv_int_page[dword])
 			continue;
 		for (bit = 0; bit < 32; bit++) {
-			if (sync_test_and_clear_bit(bit, (unsigned long *)&recv_int_page[dword])) {
+			if (sync_test_and_clear_bit(bit,
+				(unsigned long *)&recv_int_page[dword])) {
 				relid = (dword << 5) + bit;
 
-				if (relid == 0) {
+				if (relid == 0)
 					/*
 					 * Special case - vmbus
 					 * channel protocol msg
 					 */
 					continue;
-				}
+
 				process_chn_event(relid);
 			}
 		}
@@ -270,10 +269,25 @@ void vmbus_on_event(unsigned long data)
 int vmbus_post_msg(void *buffer, size_t buflen)
 {
 	union hv_connection_id conn_id;
+	int ret = 0;
+	int retries = 0;
 
 	conn_id.asu32 = 0;
 	conn_id.u.id = VMBUS_MESSAGE_CONNECTION_ID;
-	return hv_post_message(conn_id, 1, buffer, buflen);
+
+	/*
+	 * hv_post_message() can have transient failures because of
+	 * insufficient resources. Retry the operation a couple of
+	 * times before giving up.
+	 */
+	while (retries < 3) {
+		ret =  hv_post_message(conn_id, 1, buffer, buflen);
+		if (ret != HV_STATUS_INSUFFICIENT_BUFFERS)
+			return ret;
+		retries++;
+		msleep(100);
+	}
+	return ret;
 }
 
 /*
