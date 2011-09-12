@@ -151,8 +151,27 @@ boot := arch/x86/boot
 
 BOOT_TARGETS = bzlilo bzdisk fdimage fdimage144 fdimage288 isoimage
 
-PHONY += bzImage $(BOOT_TARGETS)
+PHONY += bzImage vmlinuz $(BOOT_TARGETS)
 
+ifdef CONFIG_XEN
+LINUXINCLUDE := -D__XEN_INTERFACE_VERSION__=$(CONFIG_XEN_INTERFACE_VERSION) \
+	-I$(srctree)/arch/x86/include/mach-xen $(LINUXINCLUDE)
+
+ifdef CONFIG_X86_64
+LDFLAGS_vmlinux := -e startup_64
+endif
+
+# Default kernel to build
+all: vmlinuz
+
+# KBUILD_IMAGE specifies the target image being built
+KBUILD_IMAGE := $(boot)/vmlinuz
+
+vmlinuz: vmlinux
+	$(Q)$(MAKE) $(build)=$(boot) $(KBUILD_IMAGE)
+	$(Q)mkdir -p $(objtree)/arch/$(UTS_MACHINE)/boot
+	$(Q)ln -fsn ../../x86/boot/$@ $(objtree)/arch/$(UTS_MACHINE)/boot/$@
+else
 # Default kernel to build
 all: bzImage
 
@@ -166,6 +185,7 @@ endif
 	$(Q)$(MAKE) $(build)=$(boot) $(KBUILD_IMAGE)
 	$(Q)mkdir -p $(objtree)/arch/$(UTS_MACHINE)/boot
 	$(Q)ln -fsn ../../x86/boot/bzImage $(objtree)/arch/$(UTS_MACHINE)/boot/$@
+endif
 
 $(BOOT_TARGETS): vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $@

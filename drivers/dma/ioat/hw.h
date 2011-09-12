@@ -39,7 +39,11 @@
 #define IOAT_VER_3_0            0x30    /* Version 3.0 */
 #define IOAT_VER_3_2            0x32    /* Version 3.2 */
 
+#ifndef CONFIG_XEN
 int system_has_dca_enabled(struct pci_dev *pdev);
+#else
+static inline int system_has_dca_enabled(struct pci_dev *pdev) { return 0; }
+#endif
 
 struct ioat_dma_descriptor {
 	uint32_t	size;

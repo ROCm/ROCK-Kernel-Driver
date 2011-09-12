@@ -7708,6 +7708,7 @@ void gen6_update_ring_freq(struct drm_i915_private *dev_priv)
 	int gpu_freq, ia_freq, max_ia_freq;
 	int scaling_factor = 180;
 
+#ifndef CONFIG_XEN
 	max_ia_freq = cpufreq_quick_get_max(0);
 	/*
 	 * Default to measured freq if none found, PCU will ensure we don't go
@@ -7715,6 +7716,9 @@ void gen6_update_ring_freq(struct drm_i915_private *dev_priv)
 	 */
 	if (!max_ia_freq)
 		max_ia_freq = tsc_khz;
+#else
+	max_ia_freq = cpu_khz;
+#endif
 
 	/* Convert from kHz to MHz */
 	max_ia_freq /= 1000;

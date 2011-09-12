@@ -311,6 +311,40 @@ do {									\
 	pxo_ret__;							\
 })
 
+#define percpu_exchange_op(op, var, val)		\
+({							\
+	typedef typeof(var) pxo_T__;			\
+	pxo_T__ pxo_ret__;				\
+	if (0) {					\
+		pxo_ret__ = (val);			\
+		(void)pxo_ret__;			\
+	}						\
+	switch (sizeof(var)) {				\
+	case 1:						\
+		asm(op "b %0,"__percpu_arg(1)		\
+		    : "=q" (pxo_ret__), "+m" (var)	\
+		    : "0" ((pxo_T__)(val)));		\
+		break;					\
+	case 2:						\
+		asm(op "w %0,"__percpu_arg(1)		\
+		    : "=r" (pxo_ret__), "+m" (var)	\
+		    : "0" ((pxo_T__)(val)));		\
+		break;					\
+	case 4:						\
+		asm(op "l %0,"__percpu_arg(1)		\
+		    : "=r" (pxo_ret__), "+m" (var)	\
+		    : "0" ((pxo_T__)(val)));		\
+		break;					\
+	case 8:						\
+		asm(op "q %0,"__percpu_arg(1)		\
+		    : "=r" (pxo_ret__), "+m" (var)	\
+		    : "0" ((pxo_T__)(val)));		\
+		break;					\
+	default: __bad_percpu_size();			\
+	}						\
+	pxo_ret__;					\
+})
+
 /*
  * cmpxchg has no such implied lock semantics as a result it is much
  * more efficient for cpu local operations.
@@ -368,6 +402,10 @@ do {									\
 #define percpu_or(var, val)		percpu_to_op("or", var, val)
 #define percpu_xor(var, val)		percpu_to_op("xor", var, val)
 #define percpu_inc(var)		percpu_unary_op("inc", var)
+#define percpu_xchg(var, val)		percpu_exchange_op("xchg", var, val)
+#ifdef CONFIG_X86_XADD
+#define percpu_xadd(var, val)		percpu_exchange_op("xadd", var, val)
+#endif
 
 #define __this_cpu_read_1(pcp)		percpu_from_op("mov", (pcp), "m"(pcp))
 #define __this_cpu_read_2(pcp)		percpu_from_op("mov", (pcp), "m"(pcp))

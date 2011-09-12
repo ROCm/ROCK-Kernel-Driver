@@ -717,7 +717,6 @@ static const struct xenbus_device_id xenpci_ids[] = {
 
 static struct xenbus_driver xenbus_xen_pcibk_driver = {
 	.name			= DRV_NAME,
-	.owner			= THIS_MODULE,
 	.ids			= xenpci_ids,
 	.probe			= xen_pcibk_xenbus_probe,
 	.remove			= xen_pcibk_xenbus_remove,

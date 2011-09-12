@@ -284,7 +284,11 @@ extern const char * const x86_power_flags[32];
 #define cpu_has_xmm4_1		boot_cpu_has(X86_FEATURE_XMM4_1)
 #define cpu_has_xmm4_2		boot_cpu_has(X86_FEATURE_XMM4_2)
 #define cpu_has_x2apic		boot_cpu_has(X86_FEATURE_X2APIC)
+#ifndef CONFIG_XEN
 #define cpu_has_xsave		boot_cpu_has(X86_FEATURE_XSAVE)
+#else
+#define cpu_has_xsave		boot_cpu_has(X86_FEATURE_OSXSAVE)
+#endif
 #define cpu_has_hypervisor	boot_cpu_has(X86_FEATURE_HYPERVISOR)
 #define cpu_has_pclmulqdq	boot_cpu_has(X86_FEATURE_PCLMULQDQ)
 #define cpu_has_perfctr_core	boot_cpu_has(X86_FEATURE_PERFCTR_CORE)

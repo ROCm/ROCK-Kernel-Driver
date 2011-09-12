@@ -22,8 +22,12 @@
 #include <xen/interface/physdev.h>
 #include <xen/interface/xen.h>
 
+#ifdef CONFIG_PARAVIRT_XEN
 #include <asm/xen/hypervisor.h>
 #include <asm/xen/hypercall.h>
+#else
+#include <asm/hypervisor.h>
+#endif
 #include "../pci/pci.h"
 
 static int xen_add_device(struct device *dev)
@@ -86,23 +90,22 @@ static int xen_pci_notifier(struct notifier_block *nb,
 			    unsigned long action, void *data)
 {
 	struct device *dev = data;
-	int r = 0;
 
 	switch (action) {
 	case BUS_NOTIFY_ADD_DEVICE:
-		r = xen_add_device(dev);
+		xen_add_device(dev);
 		break;
 	case BUS_NOTIFY_DEL_DEVICE:
-		r = xen_remove_device(dev);
+		xen_remove_device(dev);
 		break;
 	default:
-		break;
+		return NOTIFY_DONE;
 	}
 
-	return r;
+	return NOTIFY_OK;
 }
 
-struct notifier_block device_nb = {
+static struct notifier_block device_nb = {
 	.notifier_call = xen_pci_notifier,
 };
 

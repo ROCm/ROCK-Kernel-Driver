@@ -753,7 +753,6 @@ static const struct xenbus_device_id xen_blkbk_ids[] = {
 
 static struct xenbus_driver xen_blkbk = {
 	.name = "vbd",
-	.owner = THIS_MODULE,
 	.ids = xen_blkbk_ids,
 	.probe = xen_blkbk_probe,
 	.remove = xen_blkbk_remove,

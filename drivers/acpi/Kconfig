@@ -184,7 +184,7 @@ config ACPI_DOCK
 config ACPI_PROCESSOR
 	tristate "Processor"
 	select THERMAL
-	select CPU_IDLE
+	select CPU_IDLE if !PROCESSOR_EXTERNAL_CONTROL
 	default y
 	help
 	  This driver installs ACPI as the idle handler for Linux and uses
@@ -216,7 +216,7 @@ config ACPI_PROCESSOR_AGGREGATOR
 	tristate "Processor Aggregator"
 	depends on ACPI_PROCESSOR
 	depends on EXPERIMENTAL
-	depends on X86
+	depends on X86 && !XEN
 	help
 	  ACPI 4.0 defines processor Aggregator, which enables OS to perform
 	  specific processor configuration and control that applies to all
@@ -308,6 +308,7 @@ config ACPI_PCI_SLOT
 config X86_PM_TIMER
 	bool "Power Management Timer Support" if EXPERT
 	depends on X86
+	depends on !XEN
 	default y
 	help
 	  The Power Management Timer is available on all ACPI-capable,
@@ -336,7 +337,7 @@ config ACPI_CONTAINER
 
 config ACPI_HOTPLUG_MEMORY
 	tristate "Memory Hotplug"
-	depends on MEMORY_HOTPLUG
+	depends on MEMORY_HOTPLUG || XEN_PRIVILEGED_GUEST
 	default n
 	help
 	  This driver supports ACPI memory hotplug.  The driver
@@ -386,4 +387,13 @@ config ACPI_CUSTOM_METHOD
 
 source "drivers/acpi/apei/Kconfig"
 
+config ACPI_PV_SLEEP
+	bool
+	depends on X86 && XEN && ACPI_SLEEP
+	default y
+
+config PROCESSOR_EXTERNAL_CONTROL
+	bool
+	depends on (X86 || IA64) && XEN
+	default y
 endif	# ACPI

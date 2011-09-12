@@ -534,7 +534,7 @@ config MAX_RAW_DEVS
 config HPET
 	bool "HPET - High Precision Event Timer" if (X86 || IA64)
 	default n
-	depends on ACPI
+	depends on ACPI && !XEN
 	help
 	  If you say Y here, you will have a miscdevice named "/dev/hpet/".  Each
 	  open selects one of the timers supported by the HPET.  The timers are

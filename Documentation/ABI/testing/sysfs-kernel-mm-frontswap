@@ -1,0 +1,16 @@
+What:		/sys/kernel/mm/frontswap/
+Date:		August 2011
+Contact:	Dan Magenheimer <dan.magenheimer@oracle.com>
+Description:
+		/sys/kernel/mm/frontswap/ contains a number of files which
+		record a count of various frontswap operations (sum across
+		all swap devices):
+			succ_puts
+			failed_puts
+			gets
+			flushes
+		In addition, reading the curr_pages file shows how many
+		pages are currently contained in frontswap and writing this
+		file with an integer performs a "partial swapoff", reducing
+		the number of frontswap pages to that integer if memory
+		constraints permit.

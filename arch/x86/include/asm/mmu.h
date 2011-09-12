@@ -16,12 +16,15 @@ typedef struct {
 	/* True if mm supports a task running in 32 bit compatibility mode. */
 	unsigned short ia32_compat;
 #endif
+#ifdef CONFIG_XEN
+	bool has_foreign_mappings:1;
+#endif
 
 	struct mutex lock;
 	void *vdso;
 } mm_context_t;
 
-#ifdef CONFIG_SMP
+#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
 void leave_mm(int cpu);
 #else
 static inline void leave_mm(int cpu)

@@ -17,6 +17,12 @@
 #define ACPI_PROCESSOR_MAX_THROTTLE	250	/* 25% */
 #define ACPI_PROCESSOR_MAX_DUTY_WIDTH	4
 
+#ifdef CONFIG_XEN
+#define NR_ACPI_CPUS			(NR_CPUS < 256 ? 256 : NR_CPUS)
+#else
+#define NR_ACPI_CPUS			NR_CPUS
+#endif /* CONFIG_XEN */
+
 #define ACPI_PDC_REVISION_ID		0x1
 
 #define ACPI_PSD_REV0_REVISION		0	/* Support for _PSD as in ACPI 3.0 */
@@ -42,6 +48,17 @@
 
 struct acpi_processor_cx;
 
+#ifdef CONFIG_PROCESSOR_EXTERNAL_CONTROL
+struct acpi_csd_package {
+	acpi_integer num_entries;
+	acpi_integer revision;
+	acpi_integer domain;
+	acpi_integer coord_type;
+	acpi_integer num_processors;
+	acpi_integer index;
+} __attribute__ ((packed));
+#endif
+
 struct acpi_power_register {
 	u8 descriptor;
 	u16 length;
@@ -63,18 +80,36 @@ struct acpi_processor_cx {
 	u32 power;
 	u32 usage;
 	u64 time;
+#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
 	u8 bm_sts_skip;
+#else
+	/* Require raw information for external control logic */
+	struct acpi_power_register reg;
+	u32 csd_count;
+	struct acpi_csd_package *domain_info;
+#endif
 	char desc[ACPI_CX_DESC_LEN];
 };
 
 struct acpi_processor_power {
+#ifdef CONFIG_PROCESSOR_EXTERNAL_CONTROL
+	union { /* 'dev' is actually only used for taking its address. */
+#endif
 	struct cpuidle_device dev;
+#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
 	struct acpi_processor_cx *state;
 	unsigned long bm_check_timestamp;
 	u32 default_state;
+#else
+	struct {
+#endif
 	int count;
 	struct acpi_processor_cx states[ACPI_PROCESSOR_MAX_POWER];
+#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
 	int timer_broadcast_on_state;
+#else
+	}; };
+#endif
 };
 
 /* Performance Management */
@@ -288,6 +323,9 @@ static inline void acpi_processor_ppc_exit(void)
 {
 	return;
 }
+#ifdef CONFIG_PROCESSOR_EXTERNAL_CONTROL
+int acpi_processor_ppc_has_changed(struct acpi_processor *, int event_flag);
+#else
 static inline int acpi_processor_ppc_has_changed(struct acpi_processor *pr,
 								int event_flag)
 {
@@ -305,6 +343,7 @@ static inline int acpi_processor_get_bios_limit(int cpu, unsigned int *limit)
 {
 	return -ENODEV;
 }
+#endif				/* CONFIG_PROCESSOR_EXTERNAL_CONTROL */
 
 #endif				/* CONFIG_CPU_FREQ */
 
@@ -351,5 +390,120 @@ static inline void acpi_thermal_cpufreq_exit(void)
 	return;
 }
 #endif
+
+/*
+ * Following are interfaces geared to external processor PM control
+ * logic like a VMM
+ */
+/* Events notified to external control logic */
+#define PROCESSOR_PM_INIT	1
+#define PROCESSOR_PM_CHANGE	2
+#define PROCESSOR_HOTPLUG	3
+
+/* Objects for the PM events */
+#define PM_TYPE_IDLE		0
+#define PM_TYPE_PERF		1
+#define PM_TYPE_THR		2
+#define PM_TYPE_MAX		3
+
+/* Processor hotplug events */
+#define HOTPLUG_TYPE_ADD	0
+#define HOTPLUG_TYPE_REMOVE	1
+
+#ifdef CONFIG_PROCESSOR_EXTERNAL_CONTROL
+struct processor_extcntl_ops {
+	/* Transfer processor PM events to external control logic */
+	int (*pm_ops[PM_TYPE_MAX])(struct acpi_processor *pr, int event);
+	/* Notify physical processor status to external control logic */
+	int (*hotplug)(struct acpi_processor *pr, int type);
+};
+extern const struct processor_extcntl_ops *processor_extcntl_ops;
+
+static inline int processor_cntl_external(void)
+{
+	return (processor_extcntl_ops != NULL);
+}
+
+static inline int processor_pm_external(void)
+{
+	return processor_cntl_external() &&
+		(processor_extcntl_ops->pm_ops[PM_TYPE_IDLE] != NULL);
+}
+
+static inline int processor_pmperf_external(void)
+{
+	return processor_cntl_external() &&
+		(processor_extcntl_ops->pm_ops[PM_TYPE_PERF] != NULL);
+}
+
+static inline int processor_pmthr_external(void)
+{
+	return processor_cntl_external() &&
+		(processor_extcntl_ops->pm_ops[PM_TYPE_THR] != NULL);
+}
+
+extern int processor_notify_external(struct acpi_processor *pr,
+			int event, int type);
+extern int processor_extcntl_prepare(struct acpi_processor *pr);
+extern int acpi_processor_get_performance_info(struct acpi_processor *pr);
+extern int acpi_processor_get_psd(struct acpi_processor *pr);
+#else
+static inline int processor_cntl_external(void) {return 0;}
+static inline int processor_pm_external(void) {return 0;}
+static inline int processor_pmperf_external(void) {return 0;}
+static inline int processor_pmthr_external(void) {return 0;}
+static inline int processor_notify_external(struct acpi_processor *pr,
+			int event, int type)
+{
+	return 0;
+}
+static inline int processor_extcntl_prepare(struct acpi_processor *pr)
+{
+	return 0;
+}
+#endif /* CONFIG_PROCESSOR_EXTERNAL_CONTROL */
+
+#ifdef CONFIG_XEN
+static inline void xen_convert_pct_reg(struct xen_pct_register *xpct,
+	struct acpi_pct_register *apct)
+{
+	xpct->descriptor = apct->descriptor;
+	xpct->length     = apct->length;
+	xpct->space_id   = apct->space_id;
+	xpct->bit_width  = apct->bit_width;
+	xpct->bit_offset = apct->bit_offset;
+	xpct->reserved   = apct->reserved;
+	xpct->address    = apct->address;
+}
+
+static inline void xen_convert_pss_states(struct xen_processor_px *xpss,
+	struct acpi_processor_px *apss, int state_count)
+{
+	int i;
+	for(i=0; i<state_count; i++) {
+		xpss->core_frequency     = apss->core_frequency;
+		xpss->power              = apss->power;
+		xpss->transition_latency = apss->transition_latency;
+		xpss->bus_master_latency = apss->bus_master_latency;
+		xpss->control            = apss->control;
+		xpss->status             = apss->status;
+		xpss++;
+		apss++;
+	}
+}
+
+static inline void xen_convert_psd_pack(struct xen_psd_package *xpsd,
+	struct acpi_psd_package *apsd)
+{
+	xpsd->num_entries    = apsd->num_entries;
+	xpsd->revision       = apsd->revision;
+	xpsd->domain         = apsd->domain;
+	xpsd->coord_type     = apsd->coord_type;
+	xpsd->num_processors = apsd->num_processors;
+}
+
+extern int xen_pcpu_hotplug(int type);
+extern int xen_pcpu_index(uint32_t id, bool is_acpiid);
+#endif /* CONFIG_XEN */
 
 #endif
