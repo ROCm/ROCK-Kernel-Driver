@@ -1044,9 +1044,9 @@ static void setup_modinfo_supported(struct module *mod, const char *s)
 }
 
 static ssize_t show_modinfo_supported(struct module_attribute *mattr,
-	                struct module *mod, char *buffer)
+				      struct module_kobject *mk, char *buffer)
 {
-	return sprintf(buffer, "%s\n", supported_printable(mod->taints));
+	return sprintf(buffer, "%s\n", supported_printable(mk->mod->taints));
 }
 
 static struct module_attribute modinfo_supported = {
