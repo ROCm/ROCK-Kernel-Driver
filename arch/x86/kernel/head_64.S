@@ -283,6 +283,8 @@ early_idt_handlers:
 
 ENTRY(early_idt_handler)
 #ifdef CONFIG_EARLY_PRINTK
+#include <asm/calling.h>
+#include <asm/dwarf2.h>
 	cmpl $2,early_recursion_flag(%rip)
 	jz  1f
 	incl early_recursion_flag(%rip)
@@ -298,6 +300,16 @@ ENTRY(early_idt_handler)
 	testl $0x27d00,%eax
 	je 0f
 	popq %r8		# get error code
+
+	CFI_STARTPROC	simple
+	CFI_SIGNAL_FRAME
+	CFI_DEF_CFA	rsp, SS+8-RIP
+#	CFI_REL_OFFSET	ss, SS-RIP
+	CFI_REL_OFFSET	rsp, RSP-RIP
+#	CFI_REL_OFFSET	rflags, EFLAGS-RIP
+#	CFI_REL_OFFSET	cs, CS-RIP
+	CFI_REL_OFFSET	rip, RIP-RIP
+
 0:	movq 0(%rsp),%rcx	# get ip
 	movq 8(%rsp),%rdx	# get cs
 	xorl %eax,%eax
@@ -311,6 +323,7 @@ ENTRY(early_idt_handler)
 	movq 0(%rsp),%rsi	# get rip again
 	call __print_symbol
 #endif
+	CFI_ENDPROC
 #endif /* EARLY_PRINTK */
 1:	hlt
 	jmp 1b
