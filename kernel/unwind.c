@@ -93,6 +93,62 @@ static const struct {
 #define DW_EH_PE_indirect 0x80
 #define DW_EH_PE_omit     0xff
 
+#define DW_OP_addr        0x03
+#define DW_OP_deref       0x06
+#define DW_OP_const1u     0x08
+#define DW_OP_const1s     0x09
+#define DW_OP_const2u     0x0a
+#define DW_OP_const2s     0x0b
+#define DW_OP_const4u     0x0c
+#define DW_OP_const4s     0x0d
+#define DW_OP_const8u     0x0e
+#define DW_OP_const8s     0x0f
+#define DW_OP_constu      0x10
+#define DW_OP_consts      0x11
+#define DW_OP_dup         0x12
+#define DW_OP_drop        0x13
+#define DW_OP_over        0x14
+#define DW_OP_pick        0x15
+#define DW_OP_swap        0x16
+#define DW_OP_rot         0x17
+#define DW_OP_xderef      0x18
+#define DW_OP_abs         0x19
+#define DW_OP_and         0x1a
+#define DW_OP_div         0x1b
+#define DW_OP_minus       0x1c
+#define DW_OP_mod         0x1d
+#define DW_OP_mul         0x1e
+#define DW_OP_neg         0x1f
+#define DW_OP_not         0x20
+#define DW_OP_or          0x21
+#define DW_OP_plus        0x22
+#define DW_OP_plus_uconst 0x23
+#define DW_OP_shl         0x24
+#define DW_OP_shr         0x25
+#define DW_OP_shra        0x26
+#define DW_OP_xor         0x27
+#define DW_OP_bra         0x28
+#define DW_OP_eq          0x29
+#define DW_OP_ge          0x2a
+#define DW_OP_gt          0x2b
+#define DW_OP_le          0x2c
+#define DW_OP_lt          0x2d
+#define DW_OP_ne          0x2e
+#define DW_OP_skip        0x2f
+#define DW_OP_lit0        0x30
+#define DW_OP_lit31       0x4f
+#define DW_OP_reg0        0x50
+#define DW_OP_reg31       0x6f
+#define DW_OP_breg0       0x70
+#define DW_OP_breg31      0x8f
+#define DW_OP_regx        0x90
+#define DW_OP_fbreg       0x91
+#define DW_OP_bregx       0x92
+#define DW_OP_piece       0x93
+#define DW_OP_deref_size  0x94
+#define DW_OP_xderef_size 0x95
+#define DW_OP_nop         0x96
+
 typedef unsigned long uleb128_t;
 typedef   signed long sleb128_t;
 #define sleb128abs __builtin_labs
@@ -126,7 +182,8 @@ struct unwind_state {
 	uleb128_t codeAlign;
 	sleb128_t dataAlign;
 	struct cfa {
-		uleb128_t reg, offs;
+		uleb128_t reg, offs, elen;
+		const u8 *expr;
 	} cfa;
 	struct unwind_item regs[ARRAY_SIZE(reg_info)];
 	unsigned stackDepth:8;
@@ -740,6 +797,8 @@ static int processCFI(const u8 *start,
 				value = get_uleb128(&ptr.p8, end);
 				set_rule(value, Value, get_sleb128(&ptr.p8, end), state);
 				break;
+			/*todo case DW_CFA_expression: */
+			/*todo case DW_CFA_val_expression: */
 			case DW_CFA_restore_extended:
 			case DW_CFA_undefined:
 			case DW_CFA_same_value:
@@ -781,12 +840,14 @@ static int processCFI(const u8 *start,
 				break;
 			case DW_CFA_def_cfa:
 				state->cfa.reg = get_uleb128(&ptr.p8, end);
+				state->cfa.elen = 0;
 				/*nobreak*/
 			case DW_CFA_def_cfa_offset:
 				state->cfa.offs = get_uleb128(&ptr.p8, end);
 				break;
 			case DW_CFA_def_cfa_sf:
 				state->cfa.reg = get_uleb128(&ptr.p8, end);
+				state->cfa.elen = 0;
 				/*nobreak*/
 			case DW_CFA_def_cfa_offset_sf:
 				state->cfa.offs = get_sleb128(&ptr.p8, end)
@@ -794,10 +855,17 @@ static int processCFI(const u8 *start,
 				break;
 			case DW_CFA_def_cfa_register:
 				state->cfa.reg = get_uleb128(&ptr.p8, end);
+				state->cfa.elen = 0;
 				break;
-			/*todo case DW_CFA_def_cfa_expression: */
-			/*todo case DW_CFA_expression: */
-			/*todo case DW_CFA_val_expression: */
+			case DW_CFA_def_cfa_expression:
+				state->cfa.elen = get_uleb128(&ptr.p8, end);
+				if (!state->cfa.elen) {
+					dprintk(1, "Zero-length CFA expression.");
+					return 0;
+				}
+				state->cfa.expr = ptr.p8;
+				ptr.p8 += state->cfa.elen;
+				break;
 			case DW_CFA_GNU_args_size:
 				get_uleb128(&ptr.p8, end);
 				break;
@@ -843,6 +911,265 @@ static int processCFI(const u8 *start,
 	                 everything past the function prolog, and hence the location
 	                 never reaches the end of the function.
 	               targetLoc < state->loc &&*/ state->label == NULL));
+}
+
+static unsigned long evaluate(const u8 *expr, const u8 *end,
+			      const struct unwind_frame_info *frame)
+{
+	union {
+		const u8 *pu8;
+		const s8 *ps8;
+		const u16 *pu16;
+		const s16 *ps16;
+		const u32 *pu32;
+		const s32 *ps32;
+		const u64 *pu64;
+		const s64 *ps64;
+	} ptr = { expr };
+	unsigned long stack[8], val1, val2;
+	unsigned int stidx = 0;
+#define PUSH(v) ({ unsigned long v__ = (v); if (stidx >= ARRAY_SIZE(stack)) return 0; stack[stidx++] = v__; })
+#define POP() ({ if (!stidx) return 0; stack[--stidx]; })
+
+	while (ptr.pu8 < end) {
+		switch (*ptr.pu8++) {
+		/*todo case DW_OP_addr: */
+		case DW_OP_deref:
+			val1 = POP();
+			if (probe_kernel_address(val1, val2)) {
+				dprintk(1, "Cannot de-reference %lx (%p,%p).", val1, ptr.pu8 - 1, end);
+				return 0;
+			}
+			PUSH(val2);
+			break;
+		/*todo? case DW_OP_xderef: */
+		/*todo case DW_OP_deref_size: */
+		/*todo? case DW_OP_xderef_size: */
+		case DW_OP_const1u:
+			if (ptr.pu8 < end)
+				PUSH(*ptr.pu8);
+			++ptr.pu8;
+			break;
+		case DW_OP_const1s:
+			if (ptr.pu8 < end)
+				PUSH(*ptr.ps8);
+			++ptr.ps8;
+			break;
+		case DW_OP_const2u:
+			if (ptr.pu8 + 1 < end)
+				PUSH(*ptr.pu16);
+			++ptr.pu16;
+			break;
+		case DW_OP_const2s:
+			if (ptr.pu8 + 1 < end)
+				PUSH(*ptr.ps16);
+			++ptr.ps16;
+			break;
+		case DW_OP_const4u:
+			if (ptr.pu8 + 3 < end)
+				PUSH(*ptr.pu32);
+			++ptr.pu32;
+			break;
+		case DW_OP_const4s:
+			if (ptr.pu8 + 3 < end)
+				PUSH(*ptr.ps32);
+			++ptr.ps32;
+			break;
+		case DW_OP_const8u:
+			if (ptr.pu8 + 7 < end)
+				PUSH(*ptr.pu64);
+			++ptr.pu64;
+			break;
+		case DW_OP_const8s:
+			if (ptr.pu8 + 7 < end)
+				PUSH(*ptr.ps64);
+			++ptr.ps64;
+			break;
+		case DW_OP_constu:
+			PUSH(get_uleb128(&ptr.pu8, end));
+			break;
+		case DW_OP_consts:
+			PUSH(get_sleb128(&ptr.pu8, end));
+			break;
+		case DW_OP_dup:
+			if (!stidx)
+				return 0;
+			PUSH(stack[stidx - 1]);
+			break;
+		case DW_OP_drop:
+			(void)POP();
+			break;
+		case DW_OP_over:
+			if (stidx <= 1)
+				return 0;
+			PUSH(stack[stidx - 2]);
+			break;
+		case DW_OP_pick:
+			if (ptr.pu8 < end) {
+				if (stidx <= *ptr.pu8)
+					return 0;
+				PUSH(stack[stidx - *ptr.pu8 - 1]);
+			}
+			++ptr.pu8;
+			break;
+		case DW_OP_swap:
+			if (stidx <= 1)
+				return 0;
+			val1 = stack[stidx - 1];
+			stack[stidx - 1] = stack[stidx - 2];
+			stack[stidx - 2] = val1;
+			break;
+		case DW_OP_rot:
+			if (stidx <= 2)
+				return 0;
+			val1 = stack[stidx - 1];
+			stack[stidx - 1] = stack[stidx - 2];
+			stack[stidx - 2] = stack[stidx - 3];
+			stack[stidx - 3] = val1;
+			break;
+		case DW_OP_abs:
+			PUSH(__builtin_labs(POP()));
+			break;
+		case DW_OP_and:
+			val1 = POP();
+			val2 = POP();
+			PUSH(val2 & val1);
+			break;
+		case DW_OP_div:
+			val1 = POP();
+			if (!val1)
+				return 0;
+			val2 = POP();
+			PUSH(val2 / val1);
+			break;
+		case DW_OP_minus:
+			val1 = POP();
+			val2 = POP();
+			PUSH(val2 - val1);
+			break;
+		case DW_OP_mod:
+			val1 = POP();
+			if (!val1)
+				return 0;
+			val2 = POP();
+			PUSH(val2 % val1);
+			break;
+		case DW_OP_mul:
+			val1 = POP();
+			val2 = POP();
+			PUSH(val2 * val1);
+			break;
+		case DW_OP_neg:
+			PUSH(-(long)POP());
+			break;
+		case DW_OP_not:
+			PUSH(~POP());
+			break;
+		case DW_OP_or:
+			val1 = POP();
+			val2 = POP();
+			PUSH(val2 | val1);
+			break;
+		case DW_OP_plus:
+			val1 = POP();
+			val2 = POP();
+			PUSH(val2 + val1);
+			break;
+		case DW_OP_plus_uconst:
+			PUSH(POP() + get_uleb128(&ptr.pu8, end));
+			break;
+		case DW_OP_shl:
+			val1 = POP();
+			val2 = POP();
+			PUSH(val1 < BITS_PER_LONG ? val2 << val1 : 0);
+			break;
+		case DW_OP_shr:
+			val1 = POP();
+			val2 = POP();
+			PUSH(val1 < BITS_PER_LONG ? val2 >> val1 : 0);
+			break;
+		case DW_OP_shra:
+			val1 = POP();
+			val2 = POP();
+			PUSH(val1 < BITS_PER_LONG ? (long)val2 >> val1 : (val2 < 0 ? -1 : 0));
+			break;
+		case DW_OP_xor:
+			val1 = POP();
+			val2 = POP();
+			PUSH(val2 ^ val1);
+			break;
+		case DW_OP_bra:
+			if (!POP()) {
+				++ptr.ps16;
+				break;
+			}
+			/*nobreak*/
+		case DW_OP_skip:
+			if (ptr.pu8 + 1 < end) {
+				ptr.pu8 += *ptr.ps16;
+				if (ptr.pu8 < expr)
+					return 0;
+			} else
+				++ptr.ps16;
+			break;
+		case DW_OP_eq:
+			val1 = POP();
+			val2 = POP();
+			PUSH(val2 == val1);
+			break;
+		case DW_OP_ne:
+			val1 = POP();
+			val2 = POP();
+			PUSH(val2 != val1);
+			break;
+		case DW_OP_lt:
+			val1 = POP();
+			val2 = POP();
+			PUSH(val2 < val1);
+			break;
+		case DW_OP_le:
+			val1 = POP();
+			val2 = POP();
+			PUSH(val2 <= val1);
+		case DW_OP_ge:
+			val1 = POP();
+			val2 = POP();
+			PUSH(val2 >= val1);
+			break;
+		case DW_OP_gt:
+			val1 = POP();
+			val2 = POP();
+			PUSH(val2 > val1);
+			break;
+		case DW_OP_lit0 ... DW_OP_lit31:
+			PUSH(ptr.pu8[-1] - DW_OP_lit0);
+			break;
+		case DW_OP_breg0 ... DW_OP_breg31:
+			val1 = ptr.pu8[-1] - DW_OP_breg0;
+			if (0)
+		case DW_OP_bregx:
+				val1 = get_uleb128(&ptr.pu8, end);
+			if (val1 >= ARRAY_SIZE(reg_info)
+			    || reg_info[val1].width != sizeof(unsigned long))
+				return 0;
+			PUSH(((const unsigned long *)frame)[reg_info[val1].offs]
+			     + get_sleb128(&ptr.pu8, end));
+			break;
+		/*todo? case DW_OP_fbreg: */
+		/*todo? case DW_OP_piece: */
+		case DW_OP_nop:
+			break;
+		default:
+			dprintk(1, "Unsupported expression op %02x (%p,%p).", ptr.pu8[-1], ptr.pu8 - 1, end);
+			return 0;
+		}
+	}
+	if (ptr.pu8 > end)
+		return 0;
+	val1 = POP();
+#undef POP
+#undef PUSH
+	return val1;
 }
 
 /* Unwind to previous to frame.  Returns 0 if successful, negative
@@ -1101,21 +1428,30 @@ int unwind(struct unwind_frame_info *frame)
 	/* process instructions */
 	if (!processCFI(ptr, end, pc, ptrType, &state)
 	    || state.loc > endLoc
-	    || state.regs[retAddrReg].where == Nowhere
-	    || state.cfa.reg >= ARRAY_SIZE(reg_info)
-	    || reg_info[state.cfa.reg].width != sizeof(unsigned long)
-	    || FRAME_REG(state.cfa.reg, unsigned long) % sizeof(unsigned long)
-	    || state.cfa.offs % sizeof(unsigned long)) {
+	    || state.regs[retAddrReg].where == Nowhere) {
 		dprintk(1, "Unusable unwind info (%p,%p).", ptr, end);
 		return -EIO;
 	}
+	if (state.cfa.elen) {
+		cfa = evaluate(state.cfa.expr, state.cfa.expr + state.cfa.elen, frame);
+		if (!cfa) {
+			dprintk(1, "Bad CFA expr (%p:%lu).", state.cfa.expr, state.cfa.elen);
+			return -EIO;
+		}
+	} else if (state.cfa.reg >= ARRAY_SIZE(reg_info)
+	           || reg_info[state.cfa.reg].width != sizeof(unsigned long)
+	           || FRAME_REG(state.cfa.reg, unsigned long) % sizeof(unsigned long)
+	           || state.cfa.offs % sizeof(unsigned long)) {
+		dprintk(1, "Bad CFA (%lu,%lx).", state.cfa.reg, state.cfa.offs);
+		return -EIO;
+	} else
+		cfa = FRAME_REG(state.cfa.reg, unsigned long) + state.cfa.offs;
 	/* update frame */
 #ifndef CONFIG_AS_CFI_SIGNAL_FRAME
 	if (frame->call_frame
 	    && !UNW_DEFAULT_RA(state.regs[retAddrReg], state.dataAlign))
 		frame->call_frame = 0;
 #endif
-	cfa = FRAME_REG(state.cfa.reg, unsigned long) + state.cfa.offs;
 	startLoc = min((unsigned long)UNW_SP(frame), cfa);
 	endLoc = max((unsigned long)UNW_SP(frame), cfa);
 	if (STACK_LIMIT(startLoc) != STACK_LIMIT(endLoc)) {
