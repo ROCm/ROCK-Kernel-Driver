@@ -1,0 +1,110 @@
+Overriding ACPI tables via initrd
+=================================
+
+1) Introduction (What is this about)
+2) What is this for
+3) How does it work
+4) References (Where to retrieve userspace tools)
+
+1) What is this about
+---------------------
+
+If ACPI_INITRD_TABLE_OVERRIDE compile option is true, it is possible to
+override nearly any ACPI table provided by the BIOS with an instrumented,
+modified one.
+
+Up to 10 arbitrary ACPI tables can be passed.
+For a full list of ACPI tables that can be overridden, take a look at
+the char *table_sigs[MAX_ACPI_SIGNATURE]; definition in drivers/acpi/osl.c
+All ACPI tables iasl (Intel's ACPI compiler and disassembler) knows should
+be overridable, except:
+   - ACPI_SIG_RSDP (has a signature of 6 bytes)
+   - ACPI_SIG_FACS (does not have an ordinary ACPI table header)
+Both could get implemented as well.
+
+
+2) What is this for
+-------------------
+
+Please keep in mind that this is a debug option.
+ACPI tables should not get overridden for productive use.
+If BIOS ACPI tables are overridden the kernel will get tainted with the
+TAINT_OVERRIDDEN_ACPI_TABLE flag.
+Complain to your platform/BIOS vendor if you find a bug which is that sever
+that a workaround is not accepted in the Linus kernel.
+
+Still, it can and should be enabled in any kernel, because:
+  - There is no functional change with not instrumented initrds
+  - It provides a powerful feature to easily debug and test ACPI BIOS table
+    compatibility with the Linux kernel.
+
+Until now it was only possible to override the DSDT by compiling it into
+the kernel. This is a nightmare when trying to work on ACPI related bugs
+and a lot bugs got stuck because of that.
+Even for people with enough kernel knowledge, building a kernel to try out
+things is very time consuming. Also people may have to browse and modify the
+ACPI interpreter code to find a possible BIOS bug. With this feature, people
+can correct the ACPI tables and try out quickly whether this is the root cause
+that needs to get addressed in the kernel.
+
+This could even ease up testing for BIOS providers who could flush their BIOS
+to test, but overriding table via initrd is much easier and quicker.
+For example one could prepare different initrds overriding NUMA tables with
+different affinity settings. Set up a script, let the machine reboot and
+run tests over night and one can get a picture how these settings influence
+the Linux kernel and which values are best.
+
+People can instrument the dynamic ACPI (ASL) code (for example with debug
+statements showing up in syslog when the ACPI code is processed, etc.),
+to better understand BIOS to OS interfaces, to hunt down ACPI BIOS code related
+bugs quickly or to easier develop ACPI based drivers.
+
+Intstrumenting ACPI code in SSDTs is now much easier. Before, one had to copy
+all SSDTs into the DSDT to compile it into the kernel for testing
+(because only DSDT could get overridden). That's what the acpi_no_auto_ssdt
+boot param is for: the BIOS provided SSDTs are ignored and all have to get
+copied into the DSDT, complicated and time consuming.
+
+Much more use cases, depending on which ACPI parts you are working on...
+
+
+3) How does it work
+-------------------
+
+# Extract the machine's ACPI tables:
+acpidump >acpidump
+acpixtract -a acpidump
+# Disassemble, modify and recompile them:
+iasl -d *.dat
+# For example add this statement into a _PRT (PCI Routing Table) function
+# of the DSDT:
+Store("Hello World", debug)
+iasl -sa *.dsl
+# glue them together with the initrd. ACPI tables go first, original initrd
+# goes on top:
+cat TBL1.dat >>instrumented_initrd
+cat TBL2.dat >>instrumented_initrd
+cat TBL3.dat >>instrumented_initrd
+cat /boot/initrd >>instrumented_initrd
+# reboot with increased acpi debug level, e.g. boot params:
+acpi.debug_level=0x2 acpi.debug_layer=0xFFFFFFFF
+# and check your syslog:
+[    1.268089] ACPI: PCI Interrupt Routing Table [\_SB_.PCI0._PRT]
+[    1.272091] [ACPI Debug]  String [0x0B] "HELLO WORLD"
+
+iasl is able to disassemble and recompile quite a lot different,
+also static ACPI tables.
+
+4) Where to retrieve userspace tools
+------------------------------------
+
+iasl and acpixtract are part of Intel's ACPICA project:
+http://acpica.org/
+and should be packaged by distributions (for example in the acpica package
+on SUSE).
+
+acpidump can be found in Len Browns pmtools:
+ftp://kernel.org/pub/linux/kernel/people/lenb/acpi/utils/pmtools/acpidump
+This tool is also part of the acpica package on SUSE.
+Alternatively used ACPI tables can be retrieved via sysfs in latest kernels:
+/sys/firmware/acpi/tables

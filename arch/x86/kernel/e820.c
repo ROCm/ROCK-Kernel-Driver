@@ -963,7 +963,8 @@ void __init e820_reserve_resources(void)
 		 * pcibios_resource_survey()
 		 */
 		if (e820.map[i].type != E820_RESERVED || res->start < (1ULL<<20)) {
-			res->flags |= IORESOURCE_BUSY;
+			if (e820.map[i].type != E820_NVS)
+				res->flags |= IORESOURCE_BUSY;
 			insert_resource(&iomem_resource, res);
 		}
 		res++;

@@ -411,12 +411,20 @@ static void __init reserve_initrd(void)
 		 */
 		initrd_start = ramdisk_image + PAGE_OFFSET;
 		initrd_end = initrd_start + ramdisk_size;
-		return;
+	} else {
+		relocate_initrd();
+		memblock_x86_free_range(ramdisk_image, ramdisk_end);
 	}
-
-	relocate_initrd();
-
-	memblock_x86_free_range(ramdisk_image, ramdisk_end);
+#ifdef CONFIG_ACPI_INITRD_TABLE_OVERRIDE
+	acpi_initrd_offset = acpi_initrd_table_override((void *)initrd_start,
+							(void *)initrd_end);
+	if (!acpi_initrd_offset)
+		return;
+	printk(KERN_INFO "Found acpi tables of size: %lu at 0x%lx\n",
+	       acpi_initrd_offset, initrd_start);
+	initrd_start += acpi_initrd_offset;
+	return;
+#endif
 }
 #else
 static void __init reserve_initrd(void)

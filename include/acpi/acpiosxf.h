@@ -95,6 +95,10 @@ acpi_status
 acpi_os_table_override(struct acpi_table_header *existing_table,
 		       struct acpi_table_header **new_table);
 
+acpi_status
+acpi_os_phys_table_override(struct acpi_table_header *existing_table,
+			    acpi_physical_address *address, u32 *table_length);
+
 /*
  * Spinlock primitives
  */

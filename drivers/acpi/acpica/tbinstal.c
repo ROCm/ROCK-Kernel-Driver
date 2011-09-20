@@ -242,6 +242,21 @@ acpi_tb_add_table(struct acpi_table_desc *table_desc, u32 *table_index)
 		table_desc->pointer = override_table;
 		table_desc->length = override_table->length;
 		table_desc->flags = ACPI_TABLE_ORIGIN_OVERRIDE;
+	} else {
+		acpi_physical_address address = 0;
+		u32 table_len = 0;
+		status = acpi_os_phys_table_override(table_desc->pointer,
+						     &address, &table_len);
+		if (ACPI_SUCCESS(status) && table_len && address) {
+			ACPI_INFO((AE_INFO, "%4.4s @ 0x%p "
+				   "Phys table override, replaced with:",
+				   table_desc->pointer->signature,
+				   ACPI_CAST_PTR(void, table_desc->address)));
+			table_desc->address = address;
+			table_desc->pointer = acpi_os_map_memory(address,
+								 table_len);
+			table_desc->length = table_len;
+		}
 	}
 
 	/* Add the table to the global root table list */

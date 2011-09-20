@@ -499,8 +499,24 @@ acpi_tb_install_table(acpi_physical_address address,
 		table_to_install = override_table;
 		flags = ACPI_TABLE_ORIGIN_OVERRIDE;
 	} else {
-		table_to_install = mapped_table;
+		u32 table_len = 0;
+		acpi_physical_address tmp_addr = 0;
+
+		status = acpi_os_phys_table_override(mapped_table,
+						     &tmp_addr, &table_len);
+		if (ACPI_SUCCESS(status) && table_len && tmp_addr) {
+			ACPI_INFO((AE_INFO, "%4.4s @ 0x%p "
+				   "Phys table override, replaced with:",
+				   mapped_table->signature,
+				   ACPI_CAST_PTR(void, address)));
+			acpi_os_unmap_memory(mapped_table,
+					     sizeof(struct acpi_table_header));
+			address = tmp_addr;
+			mapped_table = acpi_os_map_memory(address,
+					  sizeof(struct acpi_table_header));
+		}
 		flags = ACPI_TABLE_ORIGIN_MAPPED;
+		table_to_install = mapped_table;
 	}
 
 	/* Initialize the table entry */

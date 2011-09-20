@@ -44,9 +44,11 @@
 #include <linux/list.h>
 #include <linux/jiffies.h>
 #include <linux/semaphore.h>
+#include <linux/memblock.h>
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
+#include <asm/e820.h>
 
 #include <acpi/acpi.h>
 #include <acpi/acpi_bus.h>
@@ -499,6 +501,107 @@ acpi_os_predefined_override(const struct acpi_predefined_names *init_val,
 	return AE_OK;
 }
 
+#ifdef CONFIG_ACPI_INITRD_TABLE_OVERRIDE
+#define ACPI_OVERRIDE_TABLES 10
+
+static unsigned long acpi_table_override_offset[ACPI_OVERRIDE_TABLES];
+static u64 acpi_tables_inram;
+
+unsigned long __initdata acpi_initrd_offset;
+
+/* Copied from acpica/tbutils.c:acpi_tb_checksum() */
+u8 __init acpi_table_checksum(u8 *buffer, u32 length)
+{
+	u8 sum = 0;
+	u8 *end = buffer + length;
+
+	while (buffer < end)
+		sum = (u8) (sum + *(buffer++));
+	return sum;
+}
+
+/* All but ACPI_SIG_RSDP and ACPI_SIG_FACS: */
+#define MAX_ACPI_SIGNATURE 35
+static const char *table_sigs[MAX_ACPI_SIGNATURE] = {
+	ACPI_SIG_BERT, ACPI_SIG_CPEP, ACPI_SIG_ECDT, ACPI_SIG_EINJ,
+	ACPI_SIG_ERST, ACPI_SIG_HEST, ACPI_SIG_MADT, ACPI_SIG_MSCT,
+	ACPI_SIG_SBST, ACPI_SIG_SLIT, ACPI_SIG_SRAT, ACPI_SIG_ASF,
+	ACPI_SIG_BOOT, ACPI_SIG_DBGP, ACPI_SIG_DMAR, ACPI_SIG_HPET,
+	ACPI_SIG_IBFT, ACPI_SIG_IVRS, ACPI_SIG_MCFG, ACPI_SIG_MCHI,
+	ACPI_SIG_SLIC, ACPI_SIG_SPCR, ACPI_SIG_SPMI, ACPI_SIG_TCPA,
+	ACPI_SIG_UEFI, ACPI_SIG_WAET, ACPI_SIG_WDAT, ACPI_SIG_WDDT,
+	ACPI_SIG_WDRT, ACPI_SIG_DSDT, ACPI_SIG_FADT, ACPI_SIG_PSDT,
+	ACPI_SIG_RSDT, ACPI_SIG_XSDT, ACPI_SIG_SSDT };
+
+int __init acpi_initrd_table_override(void *start_addr, void *end_addr)
+{
+	int table_nr, sig;
+	unsigned long offset = 0, max_len = end_addr - start_addr;
+	char *p;
+
+	for (table_nr = 0; table_nr < ACPI_OVERRIDE_TABLES; table_nr++) {
+		struct acpi_table_header *table;
+		if (max_len < offset + sizeof(struct acpi_table_header)) {
+			WARN_ON(1);
+			return 0;
+		}
+		table = start_addr + offset;
+
+		for (sig = 0; sig < MAX_ACPI_SIGNATURE; sig++)
+			if (!memcmp(table->signature, table_sigs[sig], 4))
+				break;
+
+		if (sig >= MAX_ACPI_SIGNATURE)
+			break;
+
+		if (max_len < offset + table->length) {
+			WARN_ON(1);
+			return 0;
+		}
+
+		if (acpi_table_checksum(start_addr + offset, table->length)) {
+			WARN(1, "%4.4s has invalid checksum\n",
+			     table->signature);
+			continue;
+		}
+		printk(KERN_INFO "%4.4s ACPI table found in initrd"
+		       " - size: %d\n", table->signature, table->length);
+
+		offset += table->length;
+		acpi_table_override_offset[table_nr] = offset;
+	}
+	if (!offset)
+		return 0;
+
+	acpi_tables_inram =
+		memblock_find_in_range(0, max_low_pfn_mapped << PAGE_SHIFT,
+				       offset, PAGE_SIZE);
+	if (acpi_tables_inram == MEMBLOCK_ERROR)
+		panic("Cannot find place for ACPI override tables\n");
+
+	/*
+	 * Only calling e820_add_reserve does not work and the
+	 * tables are invalid (memory got used) later.
+	 * memblock_x86_reserve_range works as expected and the tables
+	 * won't get modified. But it's not enough because ioremap will
+	 * complain later (used by acpi_os_map_memory) that the pages
+	 * that should get mapped are not marked "reserved".
+	 * Both memblock_x86_reserve_range and e820_add_region works fine.
+	 */
+	memblock_x86_reserve_range(acpi_tables_inram,
+				   acpi_tables_inram + offset,
+				   "ACPI TABLE OVERRIDE");
+	e820_add_region(acpi_tables_inram, offset, E820_ACPI);
+	update_e820();
+
+	p = early_ioremap(acpi_tables_inram, offset);
+	memcpy(p, start_addr, offset);
+	early_iounmap(p, offset);
+	return offset;
+}
+
+#endif
+
 acpi_status
 acpi_os_table_override(struct acpi_table_header * existing_table,
 		       struct acpi_table_header ** new_table)
@@ -520,6 +623,57 @@ acpi_os_table_override(struct acpi_table_header * existing_table,
 		add_taint(TAINT_OVERRIDDEN_ACPI_TABLE);
 	}
 	return AE_OK;
+}
+
+acpi_status
+acpi_os_phys_table_override(struct acpi_table_header *existing_table,
+			    acpi_physical_address *address, u32 *table_length)
+{
+
+#ifndef CONFIG_ACPI_INITRD_TABLE_OVERRIDE
+	*table_length = 0;
+	*address = 0;
+	return AE_OK;
+#else
+	int table_nr = 0;
+	*table_length = 0;
+	*address = 0;
+	for (; table_nr < ACPI_OVERRIDE_TABLES &&
+		     acpi_table_override_offset[table_nr]; table_nr++) {
+		int table_offset;
+		int table_len;
+		struct acpi_table_header *table;
+
+		if (table_nr == 0)
+			table_offset = 0;
+		else
+			table_offset = acpi_table_override_offset[table_nr - 1];
+
+		table_len = acpi_table_override_offset[table_nr] - table_offset;
+
+		table = acpi_os_map_memory(acpi_tables_inram + table_offset,
+					   table_len);
+
+		if (memcmp(existing_table->signature, table->signature, 4)) {
+			acpi_os_unmap_memory(table, table_len);
+			continue;
+		}
+
+		/* Only override tables with matching oem id */
+		if (memcmp(table->oem_table_id, existing_table->oem_table_id,
+			   ACPI_OEM_TABLE_ID_SIZE)) {
+			acpi_os_unmap_memory(table, table_len);
+			continue;
+		}
+
+		acpi_os_unmap_memory(table, table_len);
+		*address = acpi_tables_inram + table_offset;
+		*table_length = table_len;
+		add_taint(TAINT_OVERRIDDEN_ACPI_TABLE);
+		break;
+	}
+	return AE_OK;
+#endif
 }
 
 static irqreturn_t acpi_irq(int irq, void *dev_id)
