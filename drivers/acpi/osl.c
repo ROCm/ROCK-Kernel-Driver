@@ -48,7 +48,6 @@
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
-#include <asm/e820.h>
 
 #include <acpi/acpi.h>
 #include <acpi/acpi_bus.h>
@@ -502,6 +501,8 @@ acpi_os_predefined_override(const struct acpi_predefined_names *init_val,
 }
 
 #ifdef CONFIG_ACPI_INITRD_TABLE_OVERRIDE
+#include <asm/e820.h>
+
 #define ACPI_OVERRIDE_TABLES 10
 
 static unsigned long acpi_table_override_offset[ACPI_OVERRIDE_TABLES];
