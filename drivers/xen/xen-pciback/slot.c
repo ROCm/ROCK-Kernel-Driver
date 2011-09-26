@@ -6,6 +6,7 @@
  *   Author: Tristan Gingold <tristan.gingold@bull.net>, from vpci.c
  */
 
+#include <linux/spinlock.h>
 #include "pciback.h"
 
 /* There are at most 32 slots in a pci bus.  */
@@ -19,9 +20,10 @@ struct slot_dev_data {
 	spinlock_t lock;
 };
 
-struct pci_dev *pciback_get_pci_dev(struct pciback_device *pdev,
-				    unsigned int domain, unsigned int bus,
-				    unsigned int devfn)
+static struct pci_dev *_xen_pcibk_get_pci_dev(struct xen_pcibk_device *pdev,
+					      unsigned int domain,
+					      unsigned int bus,
+					      unsigned int devfn)
 {
 	struct pci_dev *dev = NULL;
 	struct slot_dev_data *slot_dev = pdev->pci_dev_data;
@@ -40,8 +42,9 @@ struct pci_dev *pciback_get_pci_dev(struct pciback_device *pdev,
 	return dev;
 }
 
-int pciback_add_pci_dev(struct pciback_device *pdev, struct pci_dev *dev,
-			int devid, publish_pci_dev_cb publish_cb)
+static int _xen_pcibk_add_pci_dev(struct xen_pcibk_device *pdev,
+				  struct pci_dev *dev, int devid,
+				  publish_pci_dev_cb publish_cb)
 {
 	int err = 0, slot, bus;
 	struct slot_dev_data *slot_dev = pdev->pci_dev_data;
@@ -83,7 +86,8 @@ int pciback_add_pci_dev(struct pciback_device *pdev, struct pci_dev *dev,
 	return err;
 }
 
-void pciback_release_pci_dev(struct pciback_device *pdev, struct pci_dev *dev)
+static void _xen_pcibk_release_pci_dev(struct xen_pcibk_device *pdev,
+				       struct pci_dev *dev)
 {
 	int slot, bus;
 	struct slot_dev_data *slot_dev = pdev->pci_dev_data;
@@ -108,7 +112,7 @@ void pciback_release_pci_dev(struct pciback_device *pdev, struct pci_dev *dev)
 		pcistub_put_pci_dev(found_dev);
 }
 
-int pciback_init_devices(struct pciback_device *pdev)
+static int _xen_pcibk_init_devices(struct xen_pcibk_device *pdev)
 {
 	int slot, bus;
 	struct slot_dev_data *slot_dev;
@@ -128,14 +132,14 @@ int pciback_init_devices(struct pciback_device *pdev)
 	return 0;
 }
 
-int pciback_publish_pci_roots(struct pciback_device *pdev,
-			      publish_pci_root_cb publish_cb)
+static int _xen_pcibk_publish_pci_roots(struct xen_pcibk_device *pdev,
+					publish_pci_root_cb publish_cb)
 {
 	/* The Virtual PCI bus has only one root */
 	return publish_cb(pdev, 0, 0);
 }
 
-void pciback_release_devices(struct pciback_device *pdev)
+static void _xen_pcibk_release_devices(struct xen_pcibk_device *pdev)
 {
 	int slot, bus;
 	struct slot_dev_data *slot_dev = pdev->pci_dev_data;
@@ -152,8 +156,10 @@ void pciback_release_devices(struct pciback_device *pdev)
 	pdev->pci_dev_data = NULL;
 }
 
-int pciback_get_pcifront_dev(struct pci_dev *pcidev, struct pciback_device *pdev, 
-		unsigned int *domain, unsigned int *bus, unsigned int *devfn)
+static int _xen_pcibk_get_pcifront_dev(struct pci_dev *pcidev,
+				       struct xen_pcibk_device *pdev,
+				       unsigned int *domain,
+				       unsigned int *bus, unsigned int *devfn)
 {
 	int slot, busnr;
 	struct slot_dev_data *slot_dev = pdev->pci_dev_data;
@@ -181,3 +187,14 @@ out:
 	return found;
 
 }
+
+const struct xen_pcibk_backend xen_pcibk_slot_backend = {
+	.name		= "slot",
+	.init		= _xen_pcibk_init_devices,
+	.free		= _xen_pcibk_release_devices,
+	.find		= _xen_pcibk_get_pcifront_dev,
+	.publish	= _xen_pcibk_publish_pci_roots,
+	.release	= _xen_pcibk_release_pci_dev,
+	.add		= _xen_pcibk_add_pci_dev,
+	.get		= _xen_pcibk_get_pci_dev,
+};

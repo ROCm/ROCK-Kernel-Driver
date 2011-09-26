@@ -39,11 +39,14 @@
  * next kernel with full memory.
  */
 struct e820map e820;
-#ifndef CONFIG_XEN
+#if !defined(CONFIG_XEN)
 struct e820map e820_saved;
+#elif defined(CONFIG_XEN_PRIVILEGED_GUEST)
+struct e820map machine_e820;
+# define e820_saved machine_e820
 #else
-static struct e820map machine_e820;
-#define e820_saved machine_e820
+# define machine_e820 e820
+# define e820_saved e820
 #endif
 
 /* For PCI or other memory-mapped resources */
@@ -528,18 +531,21 @@ u64 __init e820_update_range(u64 start, u64 size, unsigned old_type,
 	return __e820_update_range(&e820, start, size, old_type, new_type);
 }
 
+#ifndef CONFIG_XEN_UNPRIVILEGED_GUEST
 static u64 __init e820_update_range_saved(u64 start, u64 size,
 					  unsigned old_type, unsigned new_type)
 {
 #ifdef CONFIG_XEN
-	if (is_initial_xendomain())
-		return __e820_update_range(&machine_e820,
-					   phys_to_machine(start), size,
-					   old_type, new_type);
-#endif
+	if (!is_initial_xendomain())
+		return 0;
+	return __e820_update_range(&machine_e820, phys_to_machine(start),
+				   size, old_type, new_type);
+#else
 	return __e820_update_range(&e820_saved, start, size, old_type,
 				     new_type);
+#endif
 }
+#endif
 
 /* make e820 not cover the range */
 u64 __init e820_remove_range(u64 start, u64 size, unsigned old_type,
@@ -614,6 +620,7 @@ void __init update_e820(void)
 	printk(KERN_INFO "modified physical RAM map:\n");
 	_e820_print_map(&e820, "modified");
 }
+#ifndef CONFIG_XEN_UNPRIVILEGED_GUEST
 static void __init update_e820_saved(void)
 {
 	u32 nr_map;
@@ -623,6 +630,7 @@ static void __init update_e820_saved(void)
 		return;
 	e820_saved.nr_map = nr_map;
 }
+#endif
 
 #ifdef CONFIG_XEN
 #define e820 machine_e820
@@ -782,6 +790,7 @@ core_initcall(e820_mark_nvs_memory);
 #endif
 #endif
 
+#ifndef CONFIG_XEN_UNPRIVILEGED_GUEST
 /*
  * pre allocated 4k and reserved it in memblock and e820_saved
  */
@@ -792,12 +801,14 @@ u64 __init early_reserve_e820(u64 startt, u64 sizet, u64 align)
 	u64 start;
 #ifdef CONFIG_XEN
 	unsigned int order = get_order(sizet);
+	int rc;
+	unsigned long max_initmap_pfn;
 
-	if (is_initial_xendomain()) {
-		sizet = PAGE_SIZE << order;
-		if (align < PAGE_SIZE)
-			align = PAGE_SIZE;
-	}
+	if (!is_initial_xendomain())
+		return 0;
+	sizet = PAGE_SIZE << order;
+	if (align < PAGE_SIZE)
+		align = PAGE_SIZE;
 #endif
 	for (start = startt; ; start += size) {
 		start = memblock_x86_find_in_range_size(start, &size, align);
@@ -824,36 +835,28 @@ u64 __init early_reserve_e820(u64 startt, u64 sizet, u64 align)
 	if (addr < start)
 		return 0;
 #ifdef CONFIG_XEN
-	if (is_initial_xendomain()) {
-		int rc;
-		unsigned long max_initmap_pfn;
-
-		max_initmap_pfn = ALIGN(PFN_UP(__pa(xen_start_info->pt_base))
-					       + xen_start_info->nr_pt_frames
-					       + 1 + (1 << (19 - PAGE_SHIFT)),
-					1UL << (22 - PAGE_SHIFT));
+	max_initmap_pfn = ALIGN(PFN_UP(__pa(xen_start_info->pt_base))
+				       + xen_start_info->nr_pt_frames
+				       + 1 + (1 << (19 - PAGE_SHIFT)),
+				1UL << (22 - PAGE_SHIFT));
 #ifdef CONFIG_X86_32
-		if ((addr >> PAGE_SHIFT)
-		    < max(max_initmap_pfn, max_pfn_mapped))
-			rc = xen_create_contiguous_region((unsigned long)
-							  __va(addr),
-							  order, 32);
+	if ((addr >> PAGE_SHIFT)
+	    < max(max_initmap_pfn, max_pfn_mapped))
+		rc = xen_create_contiguous_region((unsigned long)__va(addr),
+						  order, 32);
 #else
-		if ((addr >> PAGE_SHIFT) < max_pfn_mapped)
-			rc = xen_create_contiguous_region((unsigned long)
-							  __va(addr),
-							  order, 32);
-		else if ((addr >> PAGE_SHIFT) < max_initmap_pfn)
-			rc = xen_create_contiguous_region(__START_KERNEL_map
-							  + addr,
-							  order, 32);
+	if ((addr >> PAGE_SHIFT) < max_pfn_mapped)
+		rc = xen_create_contiguous_region((unsigned long)__va(addr),
+						  order, 32);
+	else if ((addr >> PAGE_SHIFT) < max_initmap_pfn)
+		rc = xen_create_contiguous_region(__START_KERNEL_map + addr,
+						  order, 32);
 #endif
-		else
-			rc = early_create_contiguous_region(addr >> PAGE_SHIFT,
-							    order, 32);
-		if (rc)
-			return 0;
-	}
+	else
+		rc = early_create_contiguous_region(addr >> PAGE_SHIFT,
+						    order, 32);
+	if (rc)
+		return 0;
 #endif
 	memblock_x86_reserve_range(addr, addr + sizet, "new next");
 	e820_update_range_saved(addr, sizet, E820_RAM, E820_RESERVED);
@@ -862,6 +865,7 @@ u64 __init early_reserve_e820(u64 startt, u64 sizet, u64 align)
 
 	return addr;
 }
+#endif
 
 #ifdef CONFIG_X86_32
 # ifdef CONFIG_X86_PAE
@@ -1099,7 +1103,8 @@ void __init e820_reserve_resources(void)
 		 * pcibios_resource_survey()
 		 */
 		if (e820.map[i].type != E820_RESERVED || res->start < (1ULL<<20)) {
-			res->flags |= IORESOURCE_BUSY;
+			if (e820.map[i].type != E820_NVS)
+				res->flags |= IORESOURCE_BUSY;
 			insert_resource(&iomem_resource, res);
 		}
 		res++;
@@ -1232,6 +1237,7 @@ void __init setup_memory_map(void)
 	char *who;
 
 	who = x86_init.resources.memory_setup();
+#ifndef CONFIG_XEN_UNPRIVILEGED_GUEST
 #ifdef CONFIG_XEN
 	if (is_initial_xendomain()) {
 		printk(KERN_INFO "Xen-provided machine memory map:\n");
@@ -1239,6 +1245,7 @@ void __init setup_memory_map(void)
 	} else
 #endif
 		memcpy(&e820_saved, &e820, sizeof(struct e820map));
+#endif
 	printk(KERN_INFO "Xen-provided physical RAM map:\n");
 	_e820_print_map(&e820, who);
 }

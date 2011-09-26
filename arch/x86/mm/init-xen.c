@@ -467,6 +467,12 @@ void free_initrd_mem(unsigned long start, unsigned long end)
 	 *   - relocate_initrd()
 	 * So here We can do PAGE_ALIGN() safely to get partial page to be freed
 	 */
+#ifdef CONFIG_ACPI_INITRD_TABLE_OVERRIDE
+	if (acpi_initrd_offset)
+		free_init_pages("initrd memory", start - acpi_initrd_offset,
+				PAGE_ALIGN(end));
+	else
+#endif
 	free_init_pages("initrd memory", start, PAGE_ALIGN(end));
 }
 #endif

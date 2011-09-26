@@ -25,9 +25,6 @@
  */
 
 #include <linux/acpi.h>
-#include <linux/list.h>
-#include <linux/pci.h>
-#include <linux/spinlock.h>
 #include "pciback.h"
 
 #define PCI_MAX_BUSSES	255
@@ -56,22 +53,22 @@ struct controller_dev_data {
 };
 
 struct walk_info {
-	struct pciback_device *pdev;
+	struct xen_pcibk_device *pdev;
 	int resource_count;
 	int root_num;
 };
 
-struct pci_dev *pciback_get_pci_dev(struct pciback_device *pdev,
-				    unsigned int domain, unsigned int bus,
-				    unsigned int devfn)
+static struct pci_dev *_xen_pcibk_get_pci_dev(struct xen_pcibk_device *pdev,
+					      unsigned int domain,
+					      unsigned int bus,
+					      unsigned int devfn)
 {
 	struct controller_dev_data *dev_data = pdev->pci_dev_data;
 	struct controller_dev_entry *dev_entry;
 	struct controller_list_entry *cntrl_entry;
 	struct pci_dev *dev = NULL;
-	unsigned long flags;
 
-	spin_lock_irqsave(&dev_data->lock, flags);
+	mutex_lock(&dev_data->lock);
 
 	list_for_each_entry(cntrl_entry, &dev_data->list, list) {
 		if (cntrl_entry->domain != domain ||
@@ -86,22 +83,22 @@ struct pci_dev *pciback_get_pci_dev(struct pciback_device *pdev,
 		}
 	}
 found:
-	spin_unlock_irqrestore(&dev_data->lock, flags);
+	mutex_unlock(&dev_data->lock);
 
 	return dev;
 }
 
-int pciback_add_pci_dev(struct pciback_device *pdev, struct pci_dev *dev,
-			int devid, publish_pci_dev_cb publish_cb)
+static int _xen_pcibk_add_pci_dev(struct xen_pcibk_device *pdev,
+				  struct pci_dev *dev, int devid,
+				  publish_pci_dev_cb publish_cb)
 {
 	struct controller_dev_data *dev_data = pdev->pci_dev_data;
 	struct controller_dev_entry *dev_entry;
 	struct controller_list_entry *cntrl_entry;
 	struct pci_controller *dev_controller = PCI_CONTROLLER(dev);
-	unsigned long flags;
 	int ret = 0, found = 0;
 
-	spin_lock_irqsave(&dev_data->lock, flags);
+	mutex_lock(&dev_data->lock);
 
 	/* Look to see if we already have a domain:bus for this controller */
 	list_for_each_entry(cntrl_entry, &dev_data->list, list) {
@@ -165,22 +162,22 @@ int pciback_add_pci_dev(struct pciback_device *pdev, struct pci_dev *dev,
 	cntrl_entry->next_devfn += PCI_DEVFN(1, 0);
 
 out:
-	spin_unlock_irqrestore(&dev_data->lock, flags);
+	mutex_unlock(&dev_data->lock);
 
 	/* TODO: Publish virtual domain:bus:slot.func here. */
 
 	return ret;
 }
 
-void pciback_release_pci_dev(struct pciback_device *pdev, struct pci_dev *dev)
+static void _xen_pcibk_release_pci_dev(struct xen_pcibk_device *pdev,
+				       struct pci_dev *dev)
 {
 	struct controller_dev_data *dev_data = pdev->pci_dev_data;
 	struct controller_list_entry *cntrl_entry;
 	struct controller_dev_entry *dev_entry = NULL;
 	struct pci_dev *found_dev = NULL;
-	unsigned long flags;
 
-	spin_lock_irqsave(&dev_data->lock, flags);
+	mutex_lock(&dev_data->lock);
 
 	list_for_each_entry(cntrl_entry, &dev_data->list, list) {
 		if (cntrl_entry->controller != PCI_CONTROLLER(dev))
@@ -195,7 +192,7 @@ void pciback_release_pci_dev(struct pciback_device *pdev, struct pci_dev *dev)
 	}
 
 	if (!found_dev) {
-		spin_unlock_irqrestore(&dev_data->lock, flags);
+		mutex_unlock(&dev_data->lock);
 		return;
 	}
 
@@ -207,11 +204,11 @@ void pciback_release_pci_dev(struct pciback_device *pdev, struct pci_dev *dev)
 		kfree(cntrl_entry);
 	}
 
-	spin_unlock_irqrestore(&dev_data->lock, flags);
+	mutex_unlock(&dev_data->lock);
 	pcistub_put_pci_dev(found_dev);
 }
 
-int pciback_init_devices(struct pciback_device *pdev)
+static int _xen_pcibk_init_devices(struct xen_pcibk_device *pdev)
 {
 	struct controller_dev_data *dev_data;
 
@@ -219,7 +216,7 @@ int pciback_init_devices(struct pciback_device *pdev)
 	if (!dev_data)
 		return -ENOMEM;
 
-	spin_lock_init(&dev_data->lock);
+	mutex_init(&dev_data->lock);
 
 	INIT_LIST_HEAD(&dev_data->list);
 
@@ -294,8 +291,8 @@ static acpi_status write_xenbus_resource(struct acpi_resource *res, void *data)
 	return AE_OK;
 }
 
-int pciback_publish_pci_roots(struct pciback_device *pdev,
-			      publish_pci_root_cb publish_root_cb)
+static int _xen_pcibk_publish_pci_roots(struct xen_pcibk_device *pdev,
+					publish_pci_root_cb publish_root_cb)
 {
 	struct controller_dev_data *dev_data = pdev->pci_dev_data;
 	struct controller_list_entry *cntrl_entry;
@@ -304,7 +301,7 @@ int pciback_publish_pci_roots(struct pciback_device *pdev,
 	char str[64];
 	struct walk_info info;
 
-	spin_lock(&dev_data->lock);
+	mutex_lock(&dev_data->lock);
 
 	list_for_each_entry(cntrl_entry, &dev_data->list, list) {
 		/* First publish all the domain:bus info */
@@ -381,12 +378,12 @@ int pciback_publish_pci_roots(struct pciback_device *pdev,
 			    "%lx", (sizeof(struct acpi_resource) * 2) + 1);
 
 out:
-	spin_unlock(&dev_data->lock);
+	mutex_unlock(&dev_data->lock);
 
 	return err;
 }
 
-void pciback_release_devices(struct pciback_device *pdev)
+static void _xen_pcibk_release_devices(struct xen_pcibk_device *pdev)
 {
 	struct controller_dev_data *dev_data = pdev->pci_dev_data;
 	struct controller_list_entry *cntrl_entry, *c;
@@ -407,17 +404,17 @@ void pciback_release_devices(struct pciback_device *pdev)
 	pdev->pci_dev_data = NULL;
 }
 
-int pciback_get_pcifront_dev(struct pci_dev *pcidev, 
-		struct pciback_device *pdev, 
-		unsigned int *domain, unsigned int *bus, unsigned int *devfn)
+static int _xen_pcibk_get_pcifront_dev(struct pci_dev *pcidev,
+				       struct xen_pcibk_device *pdev,
+				       unsigned int *domain,
+				       unsigned int *bus, unsigned int *devfn)
 {
 	struct controller_dev_data *dev_data = pdev->pci_dev_data;
 	struct controller_dev_entry *dev_entry;
 	struct controller_list_entry *cntrl_entry;
-	unsigned long flags;
 	int found = 0;
-	spin_lock_irqsave(&dev_data->lock, flags);
 
+	mutex_lock(&dev_data->lock);
 	list_for_each_entry(cntrl_entry, &dev_data->list, list) {
 		list_for_each_entry(dev_entry, &cntrl_entry->dev_list, list) {
 			if ( (dev_entry->dev->bus->number == 
@@ -436,8 +433,18 @@ int pciback_get_pcifront_dev(struct pci_dev *pcidev,
 		}
 	}
 out:
-	spin_unlock_irqrestore(&dev_data->lock, flags);
+	mutex_unlock(&dev_data->lock);
 	return found;
 
 }
 
+const struct xen_pcibk_backend xen_pcibk_controller_backend = {
+	.name		= "controller",
+	.init		= _xen_pcibk_init_devices,
+	.free		= _xen_pcibk_release_devices,
+	.find		= _xen_pcibk_get_pcifront_dev,
+	.publish	= _xen_pcibk_publish_pci_roots,
+	.release	= _xen_pcibk_release_pci_dev,
+	.add		= _xen_pcibk_add_pci_dev,
+	.get		= _xen_pcibk_get_pci_dev,
+};

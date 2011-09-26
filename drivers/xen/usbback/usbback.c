@@ -1195,3 +1195,4 @@ module_exit(usbback_exit);
 MODULE_AUTHOR("");
 MODULE_DESCRIPTION("Xen USB backend driver (usbback)");
 MODULE_LICENSE("Dual BSD/GPL");
+MODULE_ALIAS("xen-backend:vusb");

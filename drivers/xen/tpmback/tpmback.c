@@ -944,3 +944,4 @@ static void __exit tpmback_exit(void)
 module_exit(tpmback_exit)
 
 MODULE_LICENSE("Dual BSD/GPL");
+MODULE_ALIAS("xen-backend:vtpm");

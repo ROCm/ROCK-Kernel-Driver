@@ -729,3 +729,4 @@ module_exit(scsiback_exit);
 
 MODULE_DESCRIPTION("Xen SCSI backend driver");
 MODULE_LICENSE("Dual BSD/GPL");
+MODULE_ALIAS("xen-backend:vscsi");

@@ -202,10 +202,21 @@ static efi_status_t xen_efi_query_variable_info(u32 attr,
 						u64 *remaining_space,
 						u64 *max_variable_size)
 {
+	int err;
+	DECLARE_CALL(query_variable_info);
+
 	if (efi.runtime_version < EFI_2_00_SYSTEM_TABLE_REVISION)
 		return EFI_UNSUPPORTED;
 
-	return EFI_UNSUPPORTED;//todo
+	err = HYPERVISOR_platform_op(&op);
+	if (err)
+		return EFI_UNSUPPORTED;
+
+	*storage_space = call.u.query_variable_info.max_store_size;
+	*remaining_space = call.u.query_variable_info.remain_store_size;
+	*max_variable_size = call.u.query_variable_info.max_size;
+
+	return call.status;
 }
 
 static efi_status_t xen_efi_get_next_high_mono_count(u32 *count)
@@ -226,10 +237,17 @@ static efi_status_t xen_efi_update_capsule(efi_capsule_header_t **capsules,
 					   unsigned long count,
 					   unsigned long sg_list)
 {
+	DECLARE_CALL(update_capsule);
+
 	if (efi.runtime_version < EFI_2_00_SYSTEM_TABLE_REVISION)
 		return EFI_UNSUPPORTED;
 
-	return EFI_UNSUPPORTED;//todo
+	set_xen_guest_handle(call.u.update_capsule.capsule_header_array,
+			     capsules);
+	call.u.update_capsule.capsule_count = count;
+	call.u.update_capsule.sg_list = sg_list;
+
+	return HYPERVISOR_platform_op(&op) ? EFI_UNSUPPORTED : call.status;
 }
 
 static efi_status_t xen_efi_query_capsule_caps(efi_capsule_header_t **capsules,
@@ -237,10 +255,24 @@ static efi_status_t xen_efi_query_capsule_caps(efi_capsule_header_t **capsules,
 					       u64 *max_size,
 					       int *reset_type)
 {
+	int err;
+	DECLARE_CALL(query_capsule_capabilities);
+
 	if (efi.runtime_version < EFI_2_00_SYSTEM_TABLE_REVISION)
 		return EFI_UNSUPPORTED;
 
-	return EFI_UNSUPPORTED;//todo
+	set_xen_guest_handle(call.u.query_capsule_capabilities.capsule_header_array,
+			     capsules);
+	call.u.query_capsule_capabilities.capsule_count = count;
+
+	err = HYPERVISOR_platform_op(&op);
+	if (err)
+		return EFI_UNSUPPORTED;
+
+	*max_size = call.u.query_capsule_capabilities.max_capsule_size;
+	*reset_type = call.u.query_capsule_capabilities.reset_type;
+
+	return call.status;
 }
 
 #undef DECLARE_CALL
@@ -373,6 +405,13 @@ void __init efi_init(void)
 		       info->version & 0xffff, vendor);
 	else
 		printk(KERN_ERR PFX "Could not get EFI revision!\n");
+
+	op.u.firmware_info.index = XEN_FW_EFI_RT_VERSION;
+	ret = HYPERVISOR_platform_op(&op);
+	if (!ret)
+		efi.runtime_version = info->version;
+	else
+		pr_warn(PFX "Could not get runtime services revision.\n");
 
 	/*
 	 * Let's see what config tables the firmware passed to us.

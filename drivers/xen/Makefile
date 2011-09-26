@@ -36,7 +36,7 @@ obj-$(CONFIG_XEN_PLATFORM_PCI)		+= xen-platform-pci.o
 obj-$(CONFIG_XEN_TMEM)			+= tmem.o
 obj-$(CONFIG_SWIOTLB_XEN)		+= swiotlb-xen.o
 obj-$(CONFIG_XEN_DOM0)			+= pci.o
-obj-$(CONFIG_PARAVIRT_XEN_PCIDEV_BACKEND) += xen-pciback/
+obj-$(CONFIG_XEN_PCIDEV_BACKEND)	+= xen-pciback/
 
 xen-evtchn-y				:= evtchn.o
 xen-gntdev-y				:= gntdev.o
@@ -51,7 +51,6 @@ obj-$(CONFIG_XEN_NETDEV_BACKEND)	+= netback/
 obj-$(CONFIG_XEN_TPMDEV_BACKEND)	+= tpmback/
 obj-$(CONFIG_XEN_BLKDEV_FRONTEND)	+= blkfront/
 obj-$(CONFIG_XEN_NETDEV_FRONTEND)	+= netfront/
-obj-$(CONFIG_XEN_PCIDEV_BACKEND)	+= pciback/
 obj-$(CONFIG_XEN_PCIDEV_FRONTEND)	+= pcifront/
 obj-$(CONFIG_XEN_FRAMEBUFFER)		+= fbfront/
 obj-$(CONFIG_XEN_KEYBOARD)		+= fbfront/

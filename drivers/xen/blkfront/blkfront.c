@@ -808,8 +808,10 @@ void do_blkif_request(struct request_queue *rq)
 
 		blk_start_request(req);
 
-		if (req->cmd_type != REQ_TYPE_FS
-		    && req->cmd_type != REQ_TYPE_BLOCK_PC) {
+		if ((req->cmd_type != REQ_TYPE_FS
+		     && req->cmd_type != REQ_TYPE_BLOCK_PC) ||
+		    ((req->cmd_flags & (REQ_FLUSH | REQ_FUA)) &&
+		     !info->flush_op)) {
 			__blk_end_request_all(req, -EIO);
 			continue;
 		}

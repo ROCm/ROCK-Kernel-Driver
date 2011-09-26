@@ -26,6 +26,11 @@
 #include "msi.h"
 
 static int pci_msi_enable = 1;
+#if CONFIG_XEN_COMPAT < 0x040200
+static bool pci_seg_supported = true;
+#else
+#define pci_seg_supported true
+#endif
 
 static LIST_HEAD(msi_dev_head);
 DEFINE_SPINLOCK(msi_dev_lock);
@@ -232,21 +237,34 @@ static u64 find_table_base(struct pci_dev *dev, int pos)
 static int msi_map_vector(struct pci_dev *dev, int entry_nr, u64 table_base)
 {
 	struct physdev_map_pirq map_irq;
-	int rc;
+	int rc = -EINVAL;
 	domid_t domid = DOMID_SELF;
 
 	domid = msi_get_dev_owner(dev);
 
 	map_irq.domid = domid;
-	map_irq.type = MAP_PIRQ_TYPE_MSI;
+	map_irq.type = MAP_PIRQ_TYPE_MSI_SEG;
 	map_irq.index = -1;
 	map_irq.pirq = -1;
-	map_irq.bus = dev->bus->number;
+	map_irq.bus = dev->bus->number | (pci_domain_nr(dev->bus) << 16);
 	map_irq.devfn = dev->devfn;
 	map_irq.entry_nr = entry_nr;
 	map_irq.table_base = table_base;
 
-	if ((rc = HYPERVISOR_physdev_op(PHYSDEVOP_map_pirq, &map_irq)))
+	if (pci_seg_supported)
+		rc = HYPERVISOR_physdev_op(PHYSDEVOP_map_pirq, &map_irq);
+#if CONFIG_XEN_COMPAT < 0x040200
+	if (rc == -EINVAL && !pci_domain_nr(dev->bus)) {
+		map_irq.type = MAP_PIRQ_TYPE_MSI;
+		map_irq.index = -1;
+		map_irq.pirq = -1;
+		map_irq.bus = dev->bus->number;
+		rc = HYPERVISOR_physdev_op(PHYSDEVOP_map_pirq, &map_irq);
+		if (rc != -EINVAL)
+			pci_seg_supported = false;
+	}
+#endif
+	if (rc)
 		dev_warn(&dev->dev, "map irq failed\n");
 
 	if (rc < 0)
@@ -282,8 +300,7 @@ static void pci_intx_for_msi(struct pci_dev *dev, int enable)
 
 void pci_restore_msi_state(struct pci_dev *dev)
 {
-	int rc;
-	struct physdev_restore_msi restore;
+	int rc = -ENOSYS;
 
 	if (!dev->msi_enabled && !dev->msix_enabled)
 		return;
@@ -297,9 +314,27 @@ void pci_restore_msi_state(struct pci_dev *dev)
 	if (dev->msix_enabled)
 		msix_set_enable(dev, 0);
 
-	restore.bus = dev->bus->number;
-	restore.devfn = dev->devfn;
-	rc = HYPERVISOR_physdev_op(PHYSDEVOP_restore_msi, &restore);
+	if (pci_seg_supported) {
+		struct physdev_pci_device restore = {
+			.seg = pci_domain_nr(dev->bus),
+			.bus = dev->bus->number,
+			.devfn = dev->devfn
+		};
+
+		rc = HYPERVISOR_physdev_op(PHYSDEVOP_restore_msi_ext,
+					   &restore);
+	}
+#if CONFIG_XEN_COMPAT < 0x040200
+	if (rc == -ENOSYS && !pci_domain_nr(dev->bus)) {
+		struct physdev_restore_msi restore = {
+			.bus = dev->bus->number,
+			.devfn = dev->devfn
+		};
+
+		pci_seg_supported = false;
+		rc = HYPERVISOR_physdev_op(PHYSDEVOP_restore_msi, &restore);
+	}
+#endif
 	WARN(rc && rc != -ENOSYS, "restore_msi -> %d\n", rc);
 }
 EXPORT_SYMBOL_GPL(pci_restore_msi_state);

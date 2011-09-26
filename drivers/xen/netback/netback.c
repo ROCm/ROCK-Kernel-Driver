@@ -306,9 +306,15 @@ static void tx_queue_callback(unsigned long data)
 int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	netif_t *netif = netdev_priv(dev);
+	unsigned int group = GET_GROUP_INDEX(netif);
 	struct xen_netbk *netbk;
 
 	BUG_ON(skb->dev != dev);
+
+	if (unlikely(group >= netbk_nr_groups)) {
+		BUG_ON(group != UINT_MAX);
+		goto drop;
+	}
 
 	/* Drop the packet if the target domain has no receive buffers. */
 	if (unlikely(!netif_schedulable(netif) || netbk_queue_full(netif)))
@@ -355,7 +361,7 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		}
 	}
 
-	netbk = &xen_netbk[GET_GROUP_INDEX(netif)];
+	netbk = &xen_netbk[group];
 	skb_queue_tail(&netbk->rx_queue, skb);
 	netbk_schedule(netbk);
 

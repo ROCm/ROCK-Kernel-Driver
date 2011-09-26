@@ -597,7 +597,12 @@ static int create_core_data(struct platform_device *pdev,
 	err = rdmsr_safe_on_pcpu(cpu, tdata->intrpt_reg, &eax, &edx);
 	if (err >= 0) {
 		tdata->attr_size += MAX_THRESH_ATTRS;
-		tdata->ttarget = tdata->tjmax - ((eax >> 16) & 0x7f) * 1000;
+		tdata->tmin = tdata->tjmax -
+			      ((eax & THERM_MASK_THRESHOLD0) >>
+			       THERM_SHIFT_THRESHOLD0) * 1000;
+		tdata->ttarget = tdata->tjmax -
+				 ((eax & THERM_MASK_THRESHOLD1) >>
+				  THERM_SHIFT_THRESHOLD1) * 1000;
 	}
 
 	/* Create sysfs interfaces */
