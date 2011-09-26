@@ -336,7 +336,6 @@ static __always_inline __pure bool __static_cpu_has(u16 bit)
 		asm goto("1: jmp %l[t_no]\n"
 			 "2:\n"
 			 ".section .altinstructions,\"a\"\n"
-			 _ASM_ALIGN "\n"
 			 " .long 1b - .\n"
 			 " .long 0\n"		/* no replacement */
 			 " .word %P0\n"		/* feature bit */
@@ -354,7 +353,6 @@ static __always_inline __pure bool __static_cpu_has(u16 bit)
 		asm volatile("1: movb $0,%0\n"
 			     "2:\n"
 			     ".section .altinstructions,\"a\"\n"
-			     _ASM_ALIGN "\n"
 			     " .long 1b - .\n"
 			     " .long 3f - .\n"
 			     " .word %P1\n"		/* feature bit */

@@ -2159,7 +2159,6 @@ struct vm_struct *alloc_vm_area(size_t size)
 		return NULL;
 	}
 
-#ifdef CONFIG_XEN
 	/*
 	 * If the allocated address space is passed to a hypercall
 	 * before being used then we cannot rely on a page fault to
@@ -2167,7 +2166,6 @@ struct vm_struct *alloc_vm_area(size_t size)
 	 * tables here.
 	 */
 	vmalloc_sync_all();
-#endif
 
 	return area;
 }
