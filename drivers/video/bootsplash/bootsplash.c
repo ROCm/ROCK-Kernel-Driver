@@ -731,7 +731,7 @@ static void splash_pivot_current(struct vc_data *vc, struct splash_data *new)
 	}
 }
 
-static int get_raw_v2(struct vc_data *vc,
+static int update_boxes(struct vc_data *vc,
 	       const int *offsets,
 	       unsigned char *ndata, int len, unsigned char * end,
 	       int *update)
@@ -802,19 +802,6 @@ static int get_raw_v2(struct vc_data *vc,
 		}
 		if (update)
 			*update = up;
-
-		if (sd->pic->ref_cnt > 1) {
-			struct splash_pic_data *pic;
-			pic = kzalloc(sizeof
-				      (struct splash_pic_data),
-				      GFP_KERNEL);
-			if (!pic)
-				return -1;
-			sd->pic = pic;
-		}
-		sd->pic->ref_cnt = 1;
-		sd->pic->splash_pic = NULL;
-		sd->pic->splash_pic_size = 0;
 	}
 	return 0;
 }
@@ -890,7 +877,7 @@ static int splash_getraw(unsigned char *start, unsigned char *end, int *update)
 		 * since we can have multiple splash_data records
 		 */
 		if (splash_size == (int)0xffffffff && version > 1) {
-			if (get_raw_v2(vc, offsets, ndata, len, end, update) < 0)
+			if (update_boxes(vc, offsets, ndata, len, end, update) < 0)
 				return -1;
 
 			return unit;
