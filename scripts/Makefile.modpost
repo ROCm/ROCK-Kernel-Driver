@@ -81,10 +81,11 @@ modpost = scripts/mod/modpost                    \
  $(if $(KBUILD_EXTMOD),-o $(modulesymfile))      \
  $(if $(CONFIG_DEBUG_SECTION_MISMATCH),,-S)      \
  $(if $(KBUILD_EXTMOD)$(KBUILD_MODPOST_WARN),-w) \
- $(if $(cross_build),-c)			 \
+ $(if $(cross_build),-c)                         \
  $(if $(CONFIG_ENTERPRISE_SUPPORT),              \
       -N $(firstword $(wildcard $(dir $(MODVERDIR))/Module.supported \
-				  $(objtree)/Module.supported /dev/null)))
+				$(objtree)/Module.supported \
+				$(srctree)/Module.supported /dev/null)))
 
 quiet_cmd_modpost = MODPOST $(words $(filter-out vmlinux FORCE, $^)) modules
       cmd_modpost = $(modpost) -s
