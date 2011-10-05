@@ -382,9 +382,6 @@ static noinline void __init_refok rest_init(void)
 	preempt_enable_no_resched();
 	schedule();
 
-	/* At this point, we can enable user mode helper functionality */
-	usermodehelper_enable();
-
 	/* Call into cpu_idle with preempt disabled */
 	preempt_disable();
 	cpu_idle();
@@ -736,6 +733,7 @@ static void __init do_basic_setup(void)
 	driver_init();
 	init_irq_proc();
 	do_ctors();
+	usermodehelper_enable();
 	do_initcalls();
 }
 
