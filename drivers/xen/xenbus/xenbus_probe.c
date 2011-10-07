@@ -959,72 +959,100 @@ void unregister_xenstore_notifier(struct notifier_block *nb)
 EXPORT_SYMBOL_GPL(unregister_xenstore_notifier);
 #endif
 
-#ifdef CONFIG_CRASH_DUMP
-static DECLARE_WAIT_QUEUE_HEAD(be_state_wq);
-static int be_state;
+#ifndef CONFIG_XEN
+static DECLARE_WAIT_QUEUE_HEAD(backend_state_wq);
+static int backend_state;
 
-static void xenbus_reset_state_changed(struct xenbus_watch *w, const char **v, unsigned int l)
+static void xenbus_reset_backend_state_changed(struct xenbus_watch *w,
+					const char **v, unsigned int l)
 {
-	if (xenbus_scanf(XBT_NIL, v[XS_WATCH_PATH], "", "%i", &be_state) != 1)
-		be_state = XenbusStateUnknown;
-	pr_info("XENBUS: %s %s\n", v[XS_WATCH_PATH], xenbus_strstate(be_state));
-	wake_up(&be_state_wq);
+	if (xenbus_scanf(XBT_NIL, v[XS_WATCH_PATH], "", "%i", &backend_state) != 1)
+		backend_state = XenbusStateUnknown;
+	printk(KERN_DEBUG "XENBUS: backend %s %s\n",
+			v[XS_WATCH_PATH], xenbus_strstate(backend_state));
+	wake_up(&backend_state_wq);
 }
 
-static int xenbus_reset_check_final(int *st)
+static void xenbus_reset_wait_for_backend(char *be, int expected)
 {
-	return *st == XenbusStateInitialising || *st == XenbusStateInitWait;
+	long timeout;
+	timeout = wait_event_interruptible_timeout(backend_state_wq,
+			backend_state == expected, 5 * HZ);
+	if (timeout <= 0)
+		pr_info("XENBUS: backend %s timed out.\n", be);
 }
 
-static void xenbus_reset_frontend_state(char *backend, char *frontend)
+/*
+ * Reset frontend if it is in Connected or Closed state.
+ * Wait for backend to catch up.
+ * State Connected happens during kdump, Closed after kexec.
+ */
+static void xenbus_reset_frontend(char *fe, char *be, int be_state)
 {
-	struct xenbus_watch watch;
+	struct xenbus_watch be_watch;
 
-	memset(&watch, 0, sizeof(watch));
-	watch.node = kasprintf(GFP_NOIO | __GFP_HIGH, "%s/state", backend);
-	if (!watch.node)
+	printk(KERN_DEBUG "XENBUS: backend %s %s\n",
+			be, xenbus_strstate(be_state));
+
+	memset(&be_watch, 0, sizeof(be_watch));
+	be_watch.node = kasprintf(GFP_NOIO | __GFP_HIGH, "%s/state", be);
+	if (!be_watch.node)
 		return;
 
-	watch.callback = xenbus_reset_state_changed;
-	be_state = XenbusStateUnknown;
+	be_watch.callback = xenbus_reset_backend_state_changed;
+	backend_state = XenbusStateUnknown;
 
-	pr_info("XENBUS: triggering reconnect on %s\n", backend);
-	register_xenbus_watch(&watch);
+	pr_info("XENBUS: triggering reconnect on %s\n", be);
+	register_xenbus_watch(&be_watch);
 
-	xenbus_printf(XBT_NIL, frontend, "state", "%d", XenbusStateClosing);
-	wait_event_interruptible(be_state_wq, be_state == XenbusStateClosing);
+	/* fall through to forward backend to state XenbusStateInitialising */
+	switch (be_state) {
+	case XenbusStateConnected:
+		xenbus_printf(XBT_NIL, fe, "state", "%d", XenbusStateClosing);
+		xenbus_reset_wait_for_backend(be, XenbusStateClosing);
 
-	xenbus_printf(XBT_NIL, frontend, "state", "%d", XenbusStateClosed);
-	wait_event_interruptible(be_state_wq, be_state == XenbusStateClosed);
+	case XenbusStateClosing:
+		xenbus_printf(XBT_NIL, fe, "state", "%d", XenbusStateClosed);
+		xenbus_reset_wait_for_backend(be, XenbusStateClosed);
 
-	xenbus_printf(XBT_NIL, frontend, "state", "%d", XenbusStateInitialising);
-	wait_event_interruptible(be_state_wq, xenbus_reset_check_final(&be_state));
+	case XenbusStateClosed:
+		xenbus_printf(XBT_NIL, fe, "state", "%d", XenbusStateInitialising);
+		xenbus_reset_wait_for_backend(be, XenbusStateInitWait);
+	}
 
-	unregister_xenbus_watch(&watch);
-	pr_info("XENBUS: reconnect done on %s\n", backend);
-	kfree(watch.node);
+	unregister_xenbus_watch(&be_watch);
+	pr_info("XENBUS: reconnect done on %s\n", be);
+	kfree(be_watch.node);
 }
 
-static void xenbus_reset_check_state(char *class, char *dev)
+static void xenbus_check_frontend(char *class, char *dev)
 {
-	int state, err;
+	int be_state, fe_state, err;
 	char *backend, *frontend;
 
 	frontend = kasprintf(GFP_NOIO | __GFP_HIGH, "device/%s/%s", class, dev);
 	if (!frontend)
 		return;
 
-	err = xenbus_scanf(XBT_NIL, frontend, "state", "%i", &state);
-	/* frontend connected? */
-	if (err == 1 && state == XenbusStateConnected) {
+	err = xenbus_scanf(XBT_NIL, frontend, "state", "%i", &fe_state);
+	if (err != 1)
+		goto out;
+
+	switch (fe_state) {
+	case XenbusStateConnected:
+	case XenbusStateClosed:
+		printk(KERN_DEBUG "XENBUS: frontend %s %s\n",
+				frontend, xenbus_strstate(fe_state));
 		backend = xenbus_read(XBT_NIL, frontend, "backend", NULL);
 		if (!backend || IS_ERR(backend))
 			goto out;
-		err = xenbus_scanf(XBT_NIL, backend, "state", "%i", &state);
-		/* backend connected? */
-		if (err == 1 && state == XenbusStateConnected)
-			xenbus_reset_frontend_state(backend, frontend);
+		err = xenbus_scanf(XBT_NIL, backend, "state", "%i", &be_state);
+		if (err == 1)
+			xenbus_reset_frontend(frontend, backend, be_state);
 		kfree(backend);
+		break;
+	default:
+		break;
 	}
 out:
 	kfree(frontend);
@@ -1045,7 +1073,7 @@ static void xenbus_reset_state(void)
 		if (IS_ERR(dev))
 			continue;
 		for (j = 0; j < dev_n; j++)
-			xenbus_reset_check_state(devclass[i], dev[j]);
+			xenbus_check_frontend(devclass[i], dev[j]);
 		kfree(dev);
 	}
 	kfree(devclass);
@@ -1062,11 +1090,11 @@ xenbus_probe(struct work_struct *unused)
 {
 	BUG_ON(!is_xenstored_ready());
 
-#ifdef CONFIG_CRASH_DUMP
-	/* reset devices in XenbusStateConnected state */
-	if (!is_initial_xendomain() && reset_devices)
-		xenbus_reset_state();
+#ifndef CONFIG_XEN
+	/* reset devices in Connected or Closed state */
+	xenbus_reset_state();
 #endif
+
 #if defined(CONFIG_XEN) || defined(MODULE)
 	/* Enumerate devices in xenstore and watch for changes. */
 	xenbus_probe_devices(&xenbus_frontend);

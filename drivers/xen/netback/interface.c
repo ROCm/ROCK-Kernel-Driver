@@ -311,12 +311,12 @@ int netif_map(struct backend_info *be, grant_ref_t tx_ring_ref,
 	netif_get(netif);
 
 	rtnl_lock();
-	if (netif_running(netif->dev))
-		__netif_up(netif);
 	if (!netif->can_sg && netif->dev->mtu > ETH_DATA_LEN)
 		dev_set_mtu(netif->dev, ETH_DATA_LEN);
 	netdev_update_features(netif->dev);
 	netback_carrier_on(netif);
+	if (netif_running(netif->dev))
+		__netif_up(netif);
 	rtnl_unlock();
 
 	return 0;

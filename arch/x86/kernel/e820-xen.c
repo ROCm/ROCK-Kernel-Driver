@@ -1177,7 +1177,8 @@ void __init e820_reserve_resources_late(void)
 char *__init default_machine_specific_memory_setup(void)
 {
 	int rc, nr_map;
-	unsigned long long maxmem;
+	unsigned long maxmem;
+	domid_t domid = DOMID_SELF;
 	struct xen_memory_map memmap;
 	static struct e820entry __initdata map[E820MAX];
 
@@ -1206,13 +1207,16 @@ char *__init default_machine_specific_memory_setup(void)
 	/* See the comment in parse_memopt(). */
 	for (maxmem = rc = 0; rc < e820.nr_map; ++rc)
 		if (e820.map[rc].type == E820_RAM)
-			maxmem += e820.map[rc].size;
-	if ((maxmem >> (PAGE_SHIFT + 5)) > xen_start_info->nr_pages) {
+			maxmem += e820.map[rc].size >> PAGE_SHIFT;
+	rc = HYPERVISOR_memory_op(XENMEM_maximum_reservation, &domid);
+	if (rc > 0 && maxmem > rc)
+		maxmem = rc;
+	if ((maxmem >> 5) > xen_start_info->nr_pages) {
 		unsigned long long size = (u64)xen_start_info->nr_pages << 5;
 
-		pr_warn("maxmem of %LuM is invalid for an initial"
+		pr_warn("maxmem of %luM is invalid for an initial"
 			" allocation of %luM, using %LuM\n",
-			maxmem >> 20,
+			maxmem >> (20 - PAGE_SHIFT),
 			xen_start_info->nr_pages >> (20 - PAGE_SHIFT),
 			size >> (20 - PAGE_SHIFT));
 		size <<= PAGE_SHIFT;

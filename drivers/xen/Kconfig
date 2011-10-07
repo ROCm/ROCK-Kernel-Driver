@@ -537,6 +537,37 @@ config XEN_PCIDEV_BACKEND
 menu "PCI Backend Mode"
 	depends on XEN_PCIDEV_BACKEND
 
+choice
+	prompt "Default PCI backend mode"
+	default XEN_PCIDEV_BACKEND_DEFAULT_CONTROLLER if IA64
+	default XEN_PCIDEV_BACKEND_DEFAULT_VPCI
+
+config XEN_PCIDEV_BACKEND_DEFAULT_VPCI
+	bool "Virtual PCI"
+	select XEN_PCIDEV_BACKEND_VPCI
+
+config XEN_PCIDEV_BACKEND_DEFAULT_PASSTHROUGH
+	bool "Passthrough"
+	select XEN_PCIDEV_BACKEND_PASSTHROUGH
+
+config XEN_PCIDEV_BACKEND_DEFAULT_SLOT
+	bool "Slot"
+	select XEN_PCIDEV_BACKEND_SLOT
+
+config XEN_PCIDEV_BACKEND_DEFAULT_CONTROLLER
+	bool "Controller"
+	depends on IA64
+	select XEN_PCIDEV_BACKEND_CONTROLLER
+
+endchoice
+
+config XEN_PCIDEV_BACKEND_DEFAULT
+	string
+	default "vpci" if XEN_PCIDEV_BACKEND_DEFAULT_VPCI
+	default "passthrough" if XEN_PCIDEV_BACKEND_DEFAULT_PASSTHROUGH
+	default "slot" if XEN_PCIDEV_BACKEND_DEFAULT_SLOT
+	default "controller" if XEN_PCIDEV_BACKEND_DEFAULT_CONTROLLER
+
 config XEN_PCIDEV_BACKEND_VPCI
 	bool "Virtual PCI"
 	default X86
@@ -577,7 +608,6 @@ config XEN_PCIDEV_BACKEND_SLOT
 config XEN_PCIDEV_BACKEND_CONTROLLER
 	bool "Controller"
 	depends on IA64
-	default y
 	---help---
 	  This PCI backend virtualizes the PCI bus topology by providing a
 	  virtual bus per PCI root device.  Devices which are physically under
@@ -592,37 +622,6 @@ config XEN_PCIDEV_BACKEND_CONTROLLER
 
 	  If not the default, the parameter "mode=controller" allows you to
 	  use this mode.
-
-choice
-	prompt "Default guest PCI bus topology representation"
-	default XEN_PCIDEV_BACKEND_DEFAULT_CONTROLLER if IA64
-	default XEN_PCIDEV_BACKEND_DEFAULT_VPCI
-
-config XEN_PCIDEV_BACKEND_DEFAULT_VPCI
-	bool "Virtual PCI"
-	select XEN_PCIDEV_BACKEND_VPCI
-
-config XEN_PCIDEV_BACKEND_DEFAULT_PASSTHROUGH
-	bool "Passthrough"
-	select XEN_PCIDEV_BACKEND_PASSTHROUGH
-
-config XEN_PCIDEV_BACKEND_DEFAULT_SLOT
-	bool "Slot"
-	select XEN_PCIDEV_BACKEND_SLOT
-
-config XEN_PCIDEV_BACKEND_DEFAULT_CONTROLLER
-	bool "Controller"
-	depends on IA64
-	select XEN_PCIDEV_BACKEND_CONTROLLER
-
-endchoice
-
-config XEN_PCIDEV_BACKEND_DEFAULT
-	string
-	default "vpci" if XEN_PCIDEV_BACKEND_DEFAULT_VPCI
-	default "passthrough" if XEN_PCIDEV_BACKEND_DEFAULT_PASSTHROUGH
-	default "slot" if XEN_PCIDEV_BACKEND_DEFAULT_SLOT
-	default "controller" if XEN_PCIDEV_BACKEND_DEFAULT_CONTROLLER
 
 endmenu
 

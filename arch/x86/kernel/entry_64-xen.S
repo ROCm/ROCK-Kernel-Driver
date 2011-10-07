@@ -306,6 +306,7 @@ NMI_MASK = 0x80000000
          * with rax, r11, and rcx being taken care of in the hypercall stub.
          */
 	.macro HYPERVISOR_IRET flag
+	.if \flag == 0	# return from syscall always uses the hypercall
 	testb $3,1*8(%rsp)
 	jnz   2f
 	testl $NMI_MASK,2*8(%rsp)
@@ -318,10 +319,11 @@ NMI_MASK = 0x80000000
 	orl   $3,1*8(%rsp)
 	orl   $3,4*8(%rsp)
 1:	iretq
+	.endif
 
 2:	/* Slow iret via hypervisor. */
 	andl  $~NMI_MASK, 2*8(%rsp)
-	pushq $\flag
+	pushq $\flag & VGCF_in_syscall
 	jmp  hypercall_page + (__HYPERVISOR_iret * 32)
 	.endm
 
@@ -481,7 +483,7 @@ END(ret_from_fork)
 
 ENTRY(system_call)
 	INTR_FRAME start=2 offset=2*8
-	SAVE_ARGS -8,1
+	SAVE_ARGS -8,0
 	movq  %rax,ORIG_RAX-ARGOFFSET(%rsp)
 	GET_THREAD_INFO(%rcx)
 	testl $_TIF_WORK_SYSCALL_ENTRY,TI_flags(%rcx)
@@ -512,8 +514,9 @@ sysret_check:
 	 * sysretq will re-enable interrupts:
 	 */
 	TRACE_IRQS_ON
-	ENABLE_INTERRUPTS(CLBR_NONE)
-	RESTORE_ARGS 1,8,1
+	RESTORE_ARGS 1,8,0,0
+	xor %ecx,%ecx
+	xor %r11,%r11
         HYPERVISOR_IRET VGCF_IN_SYSCALL
 
 	CFI_RESTORE_STATE
@@ -1347,7 +1350,8 @@ ENTRY(ignore_sysret)
 	popq_cfi %r11
 	CFI_RESTORE r11
 	mov $-ENOSYS,%eax
-	HYPERVISOR_IRET 0
+	# any non-zero value not having VGCF_in_syscall set will do:
+	HYPERVISOR_IRET VGCF_i387_valid
 	CFI_ENDPROC
 END(ignore_sysret)
 #endif

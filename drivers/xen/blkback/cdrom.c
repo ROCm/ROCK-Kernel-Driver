@@ -102,8 +102,8 @@ void cdrom_add_media_watch(struct backend_info *be)
 	DPRINTK("nodename:%s", dev->nodename);
 	if (cdrom_is_type(be)) {
 		DPRINTK("is a cdrom");
-		if ( cdrom_xenstore_write_media_present(be) == 0 ) {
-			DPRINTK( "xenstore wrote OK");
+		if (cdrom_xenstore_write_media_present(be) == 0) {
+			DPRINTK("xenstore wrote OK");
 			err = xenbus_watch_path2(dev, dev->nodename, MEDIA_PRESENT,
 						 &be->cdrom_watch,
 						 cdrom_media_changed);

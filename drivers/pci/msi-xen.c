@@ -27,9 +27,9 @@
 
 static int pci_msi_enable = 1;
 #if CONFIG_XEN_COMPAT < 0x040200
-static bool pci_seg_supported = true;
+static int pci_seg_supported = 1;
 #else
-#define pci_seg_supported true
+#define pci_seg_supported 1
 #endif
 
 static LIST_HEAD(msi_dev_head);
@@ -153,6 +153,7 @@ static void detach_pirq_entry(int entry_nr,
 	}
 }
 
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
 /*
  * pciback will provide device's owner
  */
@@ -161,7 +162,7 @@ static int (*get_owner)(struct pci_dev *dev);
 int register_msi_get_owner(int (*func)(struct pci_dev *dev))
 {
 	if (get_owner) {
-		printk(KERN_WARNING "register msi_get_owner again\n");
+		pr_warning("register msi_get_owner again\n");
 		return -EEXIST;
 	}
 	get_owner = func;
@@ -190,6 +191,9 @@ static int msi_get_dev_owner(struct pci_dev *dev)
 
 	return DOMID_SELF;
 }
+#else
+#define msi_get_dev_owner(dev) ({ BUG(); DOMID_SELF; })
+#endif
 
 static int msi_unmap_pirq(struct pci_dev *dev, int pirq)
 {
@@ -261,7 +265,7 @@ static int msi_map_vector(struct pci_dev *dev, int entry_nr, u64 table_base)
 		map_irq.bus = dev->bus->number;
 		rc = HYPERVISOR_physdev_op(PHYSDEVOP_map_pirq, &map_irq);
 		if (rc != -EINVAL)
-			pci_seg_supported = false;
+			pci_seg_supported = 0;
 	}
 #endif
 	if (rc)
@@ -541,7 +545,7 @@ int pci_enable_msi_block(struct pci_dev *dev, unsigned int nvec)
 
 	status = pci_msi_check_device(dev, nvec, PCI_CAP_ID_MSI);
 	if (status)
- 		return status;
+		return status;
 
 #ifdef CONFIG_XEN_PCIDEV_FRONTEND
 	if (!is_initial_xendomain())
