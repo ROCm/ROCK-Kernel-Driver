@@ -601,12 +601,12 @@ extern struct vmbus_connection vmbus_connection;
 
 /* General vmbus interface */
 
-struct hv_device *vmbus_child_device_create(uuid_le *type,
+struct hv_device *vmbus_device_create(uuid_le *type,
 					 uuid_le *instance,
 					 struct vmbus_channel *channel);
 
-int vmbus_child_device_register(struct hv_device *child_device_obj);
-void vmbus_child_device_unregister(struct hv_device *device_obj);
+int vmbus_device_register(struct hv_device *child_device_obj);
+void vmbus_device_unregister(struct hv_device *device_obj);
 
 /* static void */
 /* VmbusChildDeviceDestroy( */

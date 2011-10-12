@@ -158,118 +158,6 @@ void prep_negotiate_resp(struct icmsg_hdr *icmsghdrp,
 }
 EXPORT_SYMBOL(prep_negotiate_resp);
 
-/**
- * chn_cb_negotiate() - Default handler for non IDE/SCSI/NETWORK
- * Hyper-V requests
- * @context: Pointer to argument structure.
- *
- * Set up the default handler for non device driver specific requests
- * from Hyper-V. This stub responds to the default negotiate messages
- * that come in for every non IDE/SCSI/Network request.
- * This behavior is normally overwritten in the hv_utils driver. That
- * driver handles requests like graceful shutdown, heartbeats etc.
- *
- * Mainly used by Hyper-V drivers.
- */
-void chn_cb_negotiate(void *context)
-{
-	struct vmbus_channel *channel = context;
-	u8 *buf;
-	u32 buflen, recvlen;
-	u64 requestid;
-
-	struct icmsg_hdr *icmsghdrp;
-	struct icmsg_negotiate *negop = NULL;
-
-	if (channel->util_index >= 0) {
-		/*
-		 * This is a properly initialized util channel.
-		 * Route this callback appropriately and setup state
-		 * so that we don't need to reroute again.
-		 */
-		if (hv_cb_utils[channel->util_index].callback != NULL) {
-			/*
-			 * The util driver has established a handler for
-			 * this service; do the magic.
-			 */
-			channel->onchannel_callback =
-			hv_cb_utils[channel->util_index].callback;
-			(hv_cb_utils[channel->util_index].callback)(channel);
-			return;
-		}
-	}
-
-	buflen = PAGE_SIZE;
-	buf = kmalloc(buflen, GFP_ATOMIC);
-
-	vmbus_recvpacket(channel, buf, buflen, &recvlen, &requestid);
-
-	if (recvlen > 0) {
-		icmsghdrp = (struct icmsg_hdr *)&buf[
-			sizeof(struct vmbuspipe_hdr)];
-
-		prep_negotiate_resp(icmsghdrp, negop, buf);
-
-		icmsghdrp->icflags = ICMSGHDRFLAG_TRANSACTION
-			| ICMSGHDRFLAG_RESPONSE;
-
-		vmbus_sendpacket(channel, buf,
-				       recvlen, requestid,
-				       VM_PKT_DATA_INBAND, 0);
-	}
-
-	kfree(buf);
-}
-EXPORT_SYMBOL(chn_cb_negotiate);
-
-/*
- * Function table used for message responses for non IDE/SCSI/Network type
- * messages. (Such as KVP/Shutdown etc)
- */
-struct hyperv_service_callback hv_cb_utils[MAX_MSG_TYPES] = {
-	/* 0E0B6031-5213-4934-818B-38D90CED39DB */
-	/* Shutdown */
-	{
-		.msg_type = HV_SHUTDOWN_MSG,
-		.data.b = {
-			0x31, 0x60, 0x0B, 0X0E, 0x13, 0x52, 0x34, 0x49,
-			0x81, 0x8B, 0x38, 0XD9, 0x0C, 0xED, 0x39, 0xDB
-		},
-		.log_msg = "Shutdown channel functionality initialized"
-	},
-
-	/* {9527E630-D0AE-497b-ADCE-E80AB0175CAF} */
-	/* TimeSync */
-	{
-		.msg_type = HV_TIMESYNC_MSG,
-		.data.b = {
-			0x30, 0xe6, 0x27, 0x95, 0xae, 0xd0, 0x7b, 0x49,
-			0xad, 0xce, 0xe8, 0x0a, 0xb0, 0x17, 0x5c, 0xaf
-		},
-		.log_msg = "Timesync channel functionality initialized"
-	},
-	/* {57164f39-9115-4e78-ab55-382f3bd5422d} */
-	/* Heartbeat */
-	{
-		.msg_type = HV_HEARTBEAT_MSG,
-		.data.b = {
-			0x39, 0x4f, 0x16, 0x57, 0x15, 0x91, 0x78, 0x4e,
-			0xab, 0x55, 0x38, 0x2f, 0x3b, 0xd5, 0x42, 0x2d
-		},
-		.log_msg = "Heartbeat channel functionality initialized"
-	},
-	/* {A9A0F4E7-5A45-4d96-B827-8A841E8C03E6} */
-	/* KVP */
-	{
-		.data.b = {
-			0xe7, 0xf4, 0xa0, 0xa9, 0x45, 0x5a, 0x96, 0x4d,
-			0xb8, 0x27, 0x8a, 0x84, 0x1e, 0x8c, 0x3,  0xe6
-		},
-		.log_msg = "KVP channel functionality initialized"
-	},
-};
-EXPORT_SYMBOL(hv_cb_utils);
-
 /*
  * alloc_channel - Allocate and initialize a vmbus channel object
  */
@@ -333,7 +221,7 @@ static void vmbus_process_rescind_offer(struct work_struct *work)
 						     struct vmbus_channel,
 						     work);
 
-	vmbus_child_device_unregister(channel->device_obj);
+	vmbus_device_unregister(channel->device_obj);
 }
 
 /*
@@ -348,7 +236,6 @@ static void vmbus_process_offer(struct work_struct *work)
 	struct vmbus_channel *channel;
 	bool fnew = true;
 	int ret;
-	int cnt;
 	unsigned long flags;
 
 	/* The next possible work is rescind handling */
@@ -383,7 +270,7 @@ static void vmbus_process_offer(struct work_struct *work)
 	 * We need to set the DeviceObject field before calling
 	 * vmbus_child_dev_add()
 	 */
-	newchannel->device_obj = vmbus_child_device_create(
+	newchannel->device_obj = vmbus_device_create(
 		&newchannel->offermsg.offer.if_type,
 		&newchannel->offermsg.offer.if_instance,
 		newchannel);
@@ -393,7 +280,7 @@ static void vmbus_process_offer(struct work_struct *work)
 	 * binding which eventually invokes the device driver's AddDevice()
 	 * method.
 	 */
-	ret = vmbus_child_device_register(newchannel->device_obj);
+	ret = vmbus_device_register(newchannel->device_obj);
 	if (ret != 0) {
 		pr_err("unable to add child device object (relid %d)\n",
 			   newchannel->offermsg.child_relid);
@@ -410,32 +297,12 @@ static void vmbus_process_offer(struct work_struct *work)
 		 * can cleanup properly
 		 */
 		newchannel->state = CHANNEL_OPEN_STATE;
-		newchannel->util_index = -1; /* Invalid index */
-
-		/* Open IC channels */
-		for (cnt = 0; cnt < MAX_MSG_TYPES; cnt++) {
-			if (!uuid_le_cmp(newchannel->offermsg.offer.if_type,
-				   hv_cb_utils[cnt].data) &&
-				vmbus_open(newchannel, 2 * PAGE_SIZE,
-						 2 * PAGE_SIZE, NULL, 0,
-						 chn_cb_negotiate,
-						 newchannel) == 0) {
-				hv_cb_utils[cnt].channel = newchannel;
-				newchannel->util_index = cnt;
-
-				pr_info("%s\n", hv_cb_utils[cnt].log_msg);
-
-			}
-		}
 	}
 }
 
 /*
  * vmbus_onoffer - Handler for channel offers from vmbus in parent partition.
  *
- * We ignore all offers except network and storage offers. For each network and
- * storage offers, we create a channel object and queue a work item to the
- * channel object to process the offer synchronously
  */
 static void vmbus_onoffer(struct vmbus_channel_message_header *hdr)
 {

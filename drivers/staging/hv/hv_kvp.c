@@ -44,21 +44,24 @@
 static struct {
 	bool active; /* transaction status - active or not */
 	int recv_len; /* number of bytes received. */
+	int index; /* current index */
 	struct vmbus_channel *recv_channel; /* chn we got the request */
 	u64 recv_req_id; /* request ID. */
 } kvp_transaction;
 
-static int kvp_send_key(int index);
+static void kvp_send_key(struct work_struct *dummy);
+
+#define TIMEOUT_FIRED 1
 
 static void kvp_respond_to_host(char *key, char *value, int error);
 static void kvp_work_func(struct work_struct *dummy);
 static void kvp_register(void);
 
 static DECLARE_DELAYED_WORK(kvp_work, kvp_work_func);
+static DECLARE_WORK(kvp_sendkey_work, kvp_send_key);
 
 static struct cb_id kvp_id = { CN_KVP_IDX, CN_KVP_VAL };
 static const char kvp_name[] = "kvp_kernel_module";
-static int timeout_fired;
 static u8 *recv_buffer;
 /*
  * Register the kernel component with the user-level daemon.
@@ -90,8 +93,7 @@ kvp_work_func(struct work_struct *dummy)
 	 * If the timer fires, the user-mode component has not responded;
 	 * process the pending transaction.
 	 */
-	kvp_respond_to_host("Unknown key", "Guest timed out", timeout_fired);
-	timeout_fired = 1;
+	kvp_respond_to_host("Unknown key", "Guest timed out", TIMEOUT_FIRED);
 }
 
 /*
@@ -121,10 +123,11 @@ kvp_cn_callback(struct cn_msg *msg, struct netlink_skb_parms *nsp)
 	}
 }
 
-static int
-kvp_send_key(int index)
+static void
+kvp_send_key(struct work_struct *dummy)
 {
 	struct cn_msg *msg;
+	int index = kvp_transaction.index;
 
 	msg = kzalloc(sizeof(*msg) + sizeof(struct hv_kvp_msg) , GFP_ATOMIC);
 
@@ -136,9 +139,8 @@ kvp_send_key(int index)
 		msg->len = sizeof(struct hv_ku_msg);
 		cn_netlink_send(msg, 0, GFP_ATOMIC);
 		kfree(msg);
-		return 0;
 	}
-	return 1;
+	return;
 }
 
 /*
@@ -176,6 +178,15 @@ kvp_respond_to_host(char *key, char *value, int error)
 	buf_len = kvp_transaction.recv_len;
 	channel = kvp_transaction.recv_channel;
 	req_id = kvp_transaction.recv_req_id;
+
+	kvp_transaction.active = false;
+
+	if (channel->onchannel_callback == NULL)
+		/*
+		 * We have raced with util driver being unloaded;
+		 * silently return.
+		 */
+		return;
 
 	icmsghdrp = (struct icmsg_hdr *)
 			&recv_buffer[sizeof(struct vmbuspipe_hdr)];
@@ -217,7 +228,6 @@ response_done:
 	vmbus_sendpacket(channel, recv_buffer, buf_len, req_id,
 				VM_PKT_DATA_INBAND, 0);
 
-	kvp_transaction.active = false;
 }
 
 /*
@@ -241,10 +251,6 @@ void hv_kvp_onchannelcallback(void *context)
 
 	struct icmsg_hdr *icmsghdrp;
 	struct icmsg_negotiate *negop = NULL;
-
-
-	if (kvp_transaction.active)
-		return;
 
 
 	vmbus_recvpacket(channel, recv_buffer, PAGE_SIZE, &recvlen, &requestid);
@@ -282,6 +288,7 @@ void hv_kvp_onchannelcallback(void *context)
 			kvp_transaction.recv_channel = channel;
 			kvp_transaction.recv_req_id = requestid;
 			kvp_transaction.active = true;
+			kvp_transaction.index = kvp_data->index;
 
 			/*
 			 * Get the information from the
@@ -292,8 +299,8 @@ void hv_kvp_onchannelcallback(void *context)
 			 * Set a timeout to deal with
 			 * user-mode not responding.
 			 */
-			kvp_send_key(kvp_data->index);
-			schedule_delayed_work(&kvp_work, 100);
+			schedule_work(&kvp_sendkey_work);
+			schedule_delayed_work(&kvp_work, 5*HZ);
 
 			return;
 
@@ -312,16 +319,14 @@ callback_done:
 }
 
 int
-hv_kvp_init(void)
+hv_kvp_init(struct hv_util_service *srv)
 {
 	int err;
 
 	err = cn_add_callback(&kvp_id, kvp_name, kvp_cn_callback);
 	if (err)
 		return err;
-	recv_buffer = kmalloc(PAGE_SIZE, GFP_KERNEL);
-	if (!recv_buffer)
-		return -ENOMEM;
+	recv_buffer = srv->recv_buffer;
 
 	return 0;
 }
@@ -330,5 +335,5 @@ void hv_kvp_deinit(void)
 {
 	cn_del_callback(&kvp_id);
 	cancel_delayed_work_sync(&kvp_work);
-	kfree(recv_buffer);
+	cancel_work_sync(&kvp_sendkey_work);
 }

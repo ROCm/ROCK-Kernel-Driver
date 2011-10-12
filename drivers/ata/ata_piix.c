@@ -98,10 +98,6 @@
 #define DRV_NAME	"ata_piix"
 #define DRV_VERSION	"2.13"
 
-#if defined(CONFIG_HYPERV_STORAGE) || defined(CONFIG_HYPERV_STORAGE_MODULE)
-#define PIIX_IGNORE_ATA_ON_HYPERV 1
-#endif
-
 enum {
 	PIIX_IOCFG		= 0x54, /* IDE I/O configuration register */
 	ICH5_PMR		= 0x90, /* port mapping register */
@@ -625,7 +621,7 @@ MODULE_LICENSE("GPL");
 MODULE_DEVICE_TABLE(pci, piix_pci_tbl);
 MODULE_VERSION(DRV_VERSION);
 
-#if defined(PIIX_IGNORE_ATA_ON_HYPERV)
+#if defined(CONFIG_HYPERV_STORAGE) || defined(CONFIG_HYPERV_STORAGE_MODULE)
 static int piix_msft_hyperv(void)
 {
 	static const struct dmi_system_id hv_dmi_ident[]  = {
@@ -640,6 +636,11 @@ static int piix_msft_hyperv(void)
 		{ }	/* terminate list */
 	};
 	return !!dmi_check_system(hv_dmi_ident);
+}
+#else
+static inline int piix_msft_hyperv(void)
+{
+	return 0;
 }
 #endif
 
@@ -726,13 +727,9 @@ static int piix_pata_prereset(struct ata_link *link, unsigned long deadline)
 	return ata_sff_prereset(link, deadline);
 }
 
-/**
- *
- */
 static unsigned int piix_pata_read_id(struct ata_device *adev, struct ata_taskfile *tf, u16 *id)
 {
 	unsigned int err_mask = ata_do_dev_read_id(adev, tf, id);
-#if defined(PIIX_IGNORE_ATA_ON_HYPERV)
 	/*
 	 * Ignore disks in a hyper-v guest.
 	 * There is no unplug protocol like it is done with xen_emul_unplug= option.
@@ -745,7 +742,6 @@ static unsigned int piix_pata_read_id(struct ata_device *adev, struct ata_taskfi
 		ata_dev_printk(adev, KERN_WARNING, "ATA device ignored in Hyper-V guest\n");
 		id[ATA_ID_CONFIG] |= (1 << 15);
 	}
-#endif
 	return err_mask;
 }
 
@@ -1724,13 +1720,11 @@ static int __init piix_init(void)
 {
 	int rc;
 
-#if defined(PIIX_IGNORE_ATA_ON_HYPERV)
 	/* disabled until hv_storvsc drives also cdrom devices */
 	if (0 && piix_msft_hyperv()) {
 		printk(KERN_DEBUG "%s: hv_storvsc will bind to storage\n", __func__);
 		return -ENODEV;
 	}
-#endif
 	DPRINTK("pci_register_driver\n");
 	rc = pci_register_driver(&piix_pci_driver);
 	if (rc)

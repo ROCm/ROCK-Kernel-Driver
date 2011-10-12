@@ -581,11 +581,6 @@ struct vmbus_channel {
 	struct work_struct work;
 
 	enum vmbus_channel_state state;
-	/*
-	 * For util channels, stash the
-	 * the service index for easy access.
-	 */
-	s8 util_index;
 
 	struct vmbus_channel_offer_channel offermsg;
 	/*
@@ -810,7 +805,7 @@ struct hv_driver {
 
 	struct device_driver driver;
 
-	int (*probe)(struct hv_device *);
+	int (*probe)(struct hv_device *, const struct hv_vmbus_device_id *);
 	int (*remove)(struct hv_device *);
 	void (*shutdown)(struct hv_device *);
 
@@ -827,9 +822,6 @@ struct hv_device {
 	struct device device;
 
 	struct vmbus_channel *channel;
-
-	/* Device extension; */
-	void *ext;
 };
 
 
@@ -843,6 +835,15 @@ static inline struct hv_driver *drv_to_hv_drv(struct device_driver *d)
 	return container_of(d, struct hv_driver, driver);
 }
 
+static inline void hv_set_drvdata(struct hv_device *dev, void *data)
+{
+	dev_set_drvdata(&dev->device, data);
+}
+
+static inline void *hv_get_drvdata(struct hv_device *dev)
+{
+	return dev_get_drvdata(&dev->device);
+}
 
 /* Vmbus interface */
 #define vmbus_driver_register(driver)	\
@@ -882,6 +883,19 @@ void vmbus_driver_unregister(struct hv_driver *hv_driver);
 #define HV_E_FAIL			0x80004005
 #define HV_ERROR_NOT_SUPPORTED		0x80070032
 #define HV_ERROR_MACHINE_LOCKED		0x800704F7
+
+/*
+ * While we want to handle util services as regular devices,
+ * there is only one instance of each of these services; so
+ * we statically allocate the service specific state.
+ */
+
+struct hv_util_service {
+	u8 *recv_buffer;
+	void (*util_cb)(void *);
+	int (*util_init)(struct hv_util_service *);
+	void (*util_deinit)(void);
+};
 
 struct vmbuspipe_hdr {
 	u32 flags;
@@ -941,12 +955,6 @@ struct ictimesync_data {
 	u8 flags;
 } __packed;
 
-/* Index for each IC struct in array hv_cb_utils[] */
-#define HV_SHUTDOWN_MSG		0
-#define HV_TIMESYNC_MSG		1
-#define HV_HEARTBEAT_MSG	2
-#define HV_KVP_MSG		3
-
 struct hyperv_service_callback {
 	u8 msg_type;
 	char *log_msg;
@@ -957,7 +965,5 @@ struct hyperv_service_callback {
 
 extern void prep_negotiate_resp(struct icmsg_hdr *,
 				struct icmsg_negotiate *, u8 *);
-extern void chn_cb_negotiate(void *);
-extern struct hyperv_service_callback hv_cb_utils[];
 
 #endif /* _HYPERV_H */
