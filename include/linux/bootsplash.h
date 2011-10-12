@@ -76,7 +76,6 @@ extern void con_remap_def_color(struct vc_data *vc, int new_color);
 #  define splash_clear(vc, info, sy, sx, height, width)
 #  define splash_clear_margins(vc, info, bottom_only)
 #  define splash_putcs(vc, info, s, count, ypos, xpos)
-#  define splash_clear_margins(vc, info, bottom_only)
 
 #  define SPLASH_DATA(x) 0
 #  define TEXT_WIDTH_FROM_SPLASH_DATA(x) 0

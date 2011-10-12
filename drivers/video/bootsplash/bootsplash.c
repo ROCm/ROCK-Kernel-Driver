@@ -1227,7 +1227,7 @@ static int splash_recolor(struct vc_data *vc, struct fb_info *info)
 		vc->vc_splash_data->imgd->splash_fg_color;
 	if (vc->vc_def_color != color)
 		con_remap_def_color(vc, color);
-	if (info && fg_console == vc->vc_num)
+	if (info && info->splash_data && fg_console == vc->vc_num)
 		splash_update_redraw(vc, info);
 	vc->vc_splash_data->color_set = 1;
 	return 0;
