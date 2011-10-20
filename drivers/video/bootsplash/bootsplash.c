@@ -30,7 +30,7 @@
 #include "../console/fbcon.h"
 #include <linux/bootsplash.h>
 #include "decode-jpg.h"
-
+#define DEBUG
 #ifndef DEBUG
 # define SPLASH_DEBUG(fmt, args...)
 #else
@@ -496,13 +496,13 @@ static void box_offsets(unsigned char *buf, int num,
 		if (screen_w == pic_w)
 			*x_off = 0;
 		else {
-			if (x_center < (pic_w + pic_w / 10) >> 1
-			    && x_center > (pic_w - pic_w / 10) >> 1) {
+			if (x_center < (pic_w + pic_w / 5) >> 1 &&
+			    x_center > (pic_w - pic_w / 5) >> 1) {
 				*x_off = (screen_w - pic_w) >> 1;
 			} else {
 				int x = x_center * screen_w / pic_w;
 				*x_off = x - x_center;
-				if (x_min + x_off > 0)
+				if (x_min + *x_off < 0)
 					*x_off = 0;
 				if (x_max + *x_off > screen_w)
 					*x_off = screen_w - pic_w;
@@ -511,13 +511,13 @@ static void box_offsets(unsigned char *buf, int num,
 		if (screen_h == pic_h)
 			*y_off = 0;
 		else {
-			if (y_center < (pic_h + pic_h / 10) >> 1 &&
-			    y_center > (pic_h - pic_h / 10) >> 1)
+			if (y_center < (pic_h + pic_h / 5) >> 1 &&
+			    y_center > (pic_h - pic_h / 5) >> 1)
 				*y_off = (screen_h - pic_h) >> 1;
 			else {
 				int x = y_center * screen_h / pic_h;
 				*y_off = x - y_center;
-				if (y_min + y_off > 0)
+				if (y_min + *y_off < 0)
 					*y_off = 0;
 				if (y_max + *x_off > screen_h)
 					*y_off = screen_h - pic_h;
