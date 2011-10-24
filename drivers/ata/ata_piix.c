@@ -621,9 +621,10 @@ MODULE_LICENSE("GPL");
 MODULE_DEVICE_TABLE(pci, piix_pci_tbl);
 MODULE_VERSION(DRV_VERSION);
 
-#if defined(CONFIG_HYPERV_STORAGE) || defined(CONFIG_HYPERV_STORAGE_MODULE)
 static int piix_msft_hyperv(void)
 {
+	int hv = 0;
+#if defined(CONFIG_HYPERV_STORAGE) || defined(CONFIG_HYPERV_STORAGE_MODULE)
 	static const struct dmi_system_id hv_dmi_ident[]  = {
 		{
 			.ident = "Hyper-V",
@@ -635,14 +636,10 @@ static int piix_msft_hyperv(void)
 		},
 		{ }	/* terminate list */
 	};
-	return !!dmi_check_system(hv_dmi_ident);
-}
-#else
-static inline int piix_msft_hyperv(void)
-{
-	return 0;
-}
+	hv = !!dmi_check_system(hv_dmi_ident);
 #endif
+	return hv;
+}
 
 struct ich_laptop {
 	u16 device;
@@ -734,9 +731,11 @@ static unsigned int piix_pata_read_id(struct ata_device *adev, struct ata_taskfi
 	 * Ignore disks in a hyper-v guest.
 	 * There is no unplug protocol like it is done with xen_emul_unplug= option.
 	 * Emulate the unplug by ignoring disks when the hv_storvsc driver is enabled.
-	 * If the disks are not ignored, they will appear twice: once through piix and once through hv_storvsc.
-	 * Because hv_storvsc does not handle ATAPI devices, the piix driver is still required.
-	 * Once hv_storvsc handles all devices, this function can be removed and the whole driver should be disabled in a hyper-v guest.
+	 * If the disks are not ignored, they will appear twice: once through
+	 * piix and once through hv_storvsc.
+	 * hv_storvsc can not handle ATAPI devices because they can only be
+	 * accessed through the emulated code path (not through the vm_bus
+	 * channel), the piix driver is still required.
 	 */
 	if (ata_id_is_ata(id) && piix_msft_hyperv()) {
 		ata_dev_printk(adev, KERN_WARNING, "ATA device ignored in Hyper-V guest\n");
@@ -1720,11 +1719,6 @@ static int __init piix_init(void)
 {
 	int rc;
 
-	/* disabled until hv_storvsc drives also cdrom devices */
-	if (0 && piix_msft_hyperv()) {
-		printk(KERN_DEBUG "%s: hv_storvsc will bind to storage\n", __func__);
-		return -ENODEV;
-	}
 	DPRINTK("pci_register_driver\n");
 	rc = pci_register_driver(&piix_pci_driver);
 	if (rc)
