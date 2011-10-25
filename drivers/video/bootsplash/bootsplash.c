@@ -30,7 +30,7 @@
 #include "../console/fbcon.h"
 #include <linux/bootsplash.h>
 #include "decode-jpg.h"
-#define DEBUG
+
 #ifndef DEBUG
 # define SPLASH_DEBUG(fmt, args...)
 #else
