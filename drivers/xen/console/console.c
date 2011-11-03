@@ -623,7 +623,14 @@ static void xencons_close(struct tty_struct *tty, struct file *filp)
 	if (DUMMY_TTY(tty))
 		return;
 
+	/*
+	 * Must follow lock nesting; callers are prepared for this
+	 * (__tty_hangup) or don't care as they drop the lock right after our
+	 * return (tty_release) in order to then acquire both in proper order.
+	 */
+	tty_unlock();
 	mutex_lock(&tty_mutex);
+	tty_lock();
 
 	if (tty->count != 1) {
 		mutex_unlock(&tty_mutex);

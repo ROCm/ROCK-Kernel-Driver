@@ -547,9 +547,8 @@ int pci_enable_msi_block(struct pci_dev *dev, unsigned int nvec)
 	if (status)
 		return status;
 
+	if (!is_initial_xendomain()) {
 #ifdef CONFIG_XEN_PCIDEV_FRONTEND
-	if (!is_initial_xendomain())
-	{
 		int ret;
 
 		temp = dev->irq;
@@ -563,8 +562,10 @@ int pci_enable_msi_block(struct pci_dev *dev, unsigned int nvec)
 		msi_dev_entry->default_irq = temp;
 
 		return ret;
-	}
+#else
+		return -EOPNOTSUPP;
 #endif
+	}
 
 	temp = dev->irq;
 
@@ -592,15 +593,15 @@ void pci_msi_shutdown(struct pci_dev *dev)
 	if (!pci_msi_enable || !dev || !dev->msi_enabled)
 		return;
 
-#ifdef CONFIG_XEN_PCIDEV_FRONTEND
 	if (!is_initial_xendomain()) {
+#ifdef CONFIG_XEN_PCIDEV_FRONTEND
 		evtchn_map_pirq(dev->irq, 0);
 		pci_frontend_disable_msi(dev);
 		dev->irq = msi_dev_entry->default_irq;
 		dev->msi_enabled = 0;
+#endif
 		return;
 	}
-#endif
 
 	pirq = dev->irq;
 	/* Restore dev->irq to its default pin-assertion vector */
@@ -663,8 +664,8 @@ int pci_enable_msix(struct pci_dev *dev, struct msix_entry *entries, int nvec)
 	if (!entries)
 		return -EINVAL;
 
-#ifdef CONFIG_XEN_PCIDEV_FRONTEND
 	if (!is_initial_xendomain()) {
+#ifdef CONFIG_XEN_PCIDEV_FRONTEND
 		struct msi_pirq_entry *pirq_entry;
 		int ret, irq;
 
@@ -696,9 +697,11 @@ int pci_enable_msix(struct pci_dev *dev, struct msix_entry *entries, int nvec)
 			attach_pirq_entry(irq, entries[i].entry, msi_dev_entry);
 			entries[i].vector = irq;
 		}
-        return 0;
-	}
+		return 0;
+#else
+		return -EOPNOTSUPP;
 #endif
+	}
 
 	status = pci_msi_check_device(dev, nvec, PCI_CAP_ID_MSIX);
 	if (status)
@@ -741,32 +744,20 @@ void pci_msix_shutdown(struct pci_dev *dev)
 	if (!pci_msi_enable || !dev || !dev->msix_enabled)
 		return;
 
+	if (!is_initial_xendomain())
 #ifdef CONFIG_XEN_PCIDEV_FRONTEND
-	if (!is_initial_xendomain()) {
-		struct msi_dev_list *msi_dev_entry;
-		struct msi_pirq_entry *pirq_entry, *tmp;
-
 		pci_frontend_disable_msix(dev);
-
-		msi_dev_entry = get_msi_dev_pirq_list(dev);
-		list_for_each_entry_safe(pirq_entry, tmp,
-		                         &msi_dev_entry->pirq_list_head, list) {
-			evtchn_map_pirq(pirq_entry->pirq, 0);
-			list_del(&pirq_entry->list);
-			kfree(pirq_entry);
-		}
-
-		dev->irq = msi_dev_entry->default_irq;
-		dev->msix_enabled = 0;
+#else
 		return;
-	}
 #endif
 
 	msi_remove_pci_irq_vectors(dev);
 
 	/* Disable MSI mode */
-	msix_set_enable(dev, 0);
-	pci_intx_for_msi(dev, 1);
+	if (is_initial_xendomain()) {
+		msix_set_enable(dev, 0);
+		pci_intx_for_msi(dev, 1);
+	}
 	dev->msix_enabled = 0;
 }
 
@@ -800,7 +791,10 @@ void msi_remove_pci_irq_vectors(struct pci_dev *dev)
 	if (!list_empty(&msi_dev_entry->pirq_list_head))
 		list_for_each_entry_safe(pirq_entry, tmp,
 		                         &msi_dev_entry->pirq_list_head, list) {
-			msi_unmap_pirq(dev, pirq_entry->pirq);
+			if (is_initial_xendomain())
+				msi_unmap_pirq(dev, pirq_entry->pirq);
+			else
+				evtchn_map_pirq(pirq_entry->pirq, 0);
 			list_del(&pirq_entry->list);
 			kfree(pirq_entry);
 		}

@@ -80,6 +80,18 @@ config XEN_BLKDEV_TAP2
 	  as files, in memory, or on other hosts across the network.  This
 	  driver can safely coexist with the existing blockback driver.
 
+choice
+	prompt "Select blktap2 driver"
+	depends on XEN_BLKDEV_TAP2=y
+
+config XEN_BLKDEV_TAP2_LEGACY
+	bool "legacy"
+
+config XEN_BLKDEV_TAP2_NEW
+	bool "'new'"
+
+endchoice
+
 config XEN_NR_TAP2_DEVICES
 	int "Number of devices the version 2 tap backend driver can handle"
 	range 2 1048575

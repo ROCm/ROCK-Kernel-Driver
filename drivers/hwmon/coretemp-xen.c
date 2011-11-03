@@ -146,7 +146,7 @@ static ssize_t show_crit_alarm(struct device *dev,
 	struct temp_data *tdata = pdata->core_data[attr->index];
 
 	if (rdmsr_safe_on_pcpu(tdata->cpu, tdata->status_reg, &eax, &edx) < 0)
-		eax = ~0;
+		return sprintf(buf, "\n");
 
 	return sprintf(buf, "%d\n", (eax >> 5) & 1);
 }
