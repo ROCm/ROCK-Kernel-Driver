@@ -2158,7 +2158,11 @@ static void xs_tcp_setup_socket(struct work_struct *work)
 	case -ECONNREFUSED:
 	case -ECONNRESET:
 	case -ENETUNREACH:
-		/* retry with existing socket, after a delay */
+		/* Retry with existing socket after a delay, except
+		 * for SOFTCONN tasks which fail. */
+		xprt_clear_connecting(xprt);
+		rpc_wake_up_softconn_status(&xprt->pending, status);
+		return;
 	case 0:
 	case -EINPROGRESS:
 	case -EALREADY:

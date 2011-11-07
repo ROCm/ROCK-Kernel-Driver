@@ -543,6 +543,35 @@ void rpc_wake_up_status(struct rpc_wait_queue *queue, int status)
 }
 EXPORT_SYMBOL_GPL(rpc_wake_up_status);
 
+/**
+ * rpc_wake_up_softconn_status - wake up all SOFTCONN rpc_tasks and set their
+ * status value.
+ * @queue: rpc_wait_queue on which the tasks are sleeping
+ * @status: status value to set
+ *
+ * Grabs queue->lock
+ */
+void rpc_wake_up_softconn_status(struct rpc_wait_queue *queue, int status)
+{
+	struct rpc_task *task, *next;
+	struct list_head *head;
+
+	spin_lock_bh(&queue->lock);
+	head = &queue->tasks[queue->maxpriority];
+	for (;;) {
+		list_for_each_entry_safe(task, next, head, u.tk_wait.list)
+			if (RPC_IS_SOFTCONN(task)) {
+				task->tk_status = status;
+				rpc_wake_up_task_queue_locked(queue, task);
+			}
+		if (head == &queue->tasks[0])
+			break;
+		head--;
+	}
+	spin_unlock_bh(&queue->lock);
+}
+EXPORT_SYMBOL_GPL(rpc_wake_up_softconn_status);
+
 static void __rpc_queue_timer_fn(unsigned long ptr)
 {
 	struct rpc_wait_queue *queue = (struct rpc_wait_queue *)ptr;
