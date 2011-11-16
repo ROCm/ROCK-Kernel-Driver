@@ -177,6 +177,7 @@ static const struct tnt tnts[] = {
 	{ TAINT_WARN,			'W', ' ' },
 	{ TAINT_CRAP,			'C', ' ' },
 	{ TAINT_FIRMWARE_WORKAROUND,	'I', ' ' },
+	{ TAINT_OOT_MODULE,		'O', ' ' },
 #ifdef CONFIG_ENTERPRISE_SUPPORT
 	{ TAINT_NO_SUPPORT,		'N', ' ' },
 	{ TAINT_EXTERNAL_SUPPORT,	'X', ' ' },
@@ -198,6 +199,7 @@ static const struct tnt tnts[] = {
  *  'W' - Taint on warning.
  *  'C' - modules from drivers/staging are loaded.
  *  'I' - Working around severe firmware bug.
+ *  'O' - Out-of-tree module has been loaded.
  *  'N' - Unsuported modules loaded.
  *  'X' - Modules with external support loaded.
  *

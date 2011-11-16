@@ -1,5 +1,4 @@
 #include <generated/utsrelease.h>
-#include <linux/module.h>
 
 /* Simply sanity version stamp for modules. */
 #ifdef CONFIG_SMP
@@ -22,11 +21,6 @@
 #else
 #define MODULE_VERMAGIC_MODVERSIONS ""
 #endif
-#ifdef CONFIG_XEN
-#define MODULE_VERMAGIC_XEN "Xen "
-#else
-#define MODULE_VERMAGIC_XEN
-#endif
 #ifndef MODULE_ARCH_VERMAGIC
 #define MODULE_ARCH_VERMAGIC ""
 #endif
@@ -35,5 +29,5 @@
 	UTS_RELEASE " "							\
 	MODULE_VERMAGIC_SMP MODULE_VERMAGIC_PREEMPT 			\
 	MODULE_VERMAGIC_MODULE_UNLOAD MODULE_VERMAGIC_MODVERSIONS	\
-	MODULE_VERMAGIC_XEN MODULE_ARCH_VERMAGIC
+	MODULE_ARCH_VERMAGIC
 

@@ -8,7 +8,7 @@ config RTC_LIB
 menuconfig RTC_CLASS
 	bool "Real Time Clock"
 	default n
-	depends on !S390
+	depends on !S390 && !UML
 	select RTC_LIB
 	help
 	  Generic RTC class support. If you say yes here, you will
@@ -556,7 +556,7 @@ config RTC_DRV_DS1742
 
 config RTC_DRV_EFI
 	tristate "EFI RTC"
-	depends on IA64 || (XEN && EFI)
+	depends on IA64
 	help
 	  If you say yes here you will get support for the EFI
 	  Real Time Clock.

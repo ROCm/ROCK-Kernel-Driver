@@ -215,7 +215,7 @@ static const struct bin_table bin_net_ipv4_route_table[] = {
 	{ CTL_INT,	NET_IPV4_ROUTE_GC_MIN_INTERVAL,		"gc_min_interval" },
 	{ CTL_INT,	NET_IPV4_ROUTE_GC_MIN_INTERVAL_MS,	"gc_min_interval_ms" },
 	{ CTL_INT,	NET_IPV4_ROUTE_GC_TIMEOUT,		"gc_timeout" },
-	{ CTL_INT,	NET_IPV4_ROUTE_GC_INTERVAL,		"gc_interval" },
+	/* NET_IPV4_ROUTE_GC_INTERVAL "gc_interval" no longer used */
 	{ CTL_INT,	NET_IPV4_ROUTE_REDIRECT_LOAD,		"redirect_load" },
 	{ CTL_INT,	NET_IPV4_ROUTE_REDIRECT_NUMBER,		"redirect_number" },
 	{ CTL_INT,	NET_IPV4_ROUTE_REDIRECT_SILENCE,	"redirect_silence" },
@@ -873,15 +873,6 @@ static const struct bin_table bin_bus_table[] = {
 };
 
 
-#ifdef CONFIG_XEN
-#include <xen/sysctl.h>
-static const struct bin_table bin_xen_table[] = {
-	{ CTL_INT,	CTL_XEN_INDEPENDENT_WALLCLOCK,	"independent_wallclock" },
-	{ CTL_ULONG,	CTL_XEN_PERMITTED_CLOCK_JITTER,	"permitted_clock_jitter" },
-	{}
-};
-#endif
-
 static const struct bin_table bin_s390dbf_table[] = {
 	{ CTL_INT,	5678 /* CTL_S390DBF_STOPPABLE */, "debug_stoppable" },
 	{ CTL_INT,	5679 /* CTL_S390DBF_ACTIVE */,	  "debug_active" },
@@ -921,9 +912,6 @@ static const struct bin_table bin_root_table[] = {
 	{ CTL_DIR,	CTL_BUS,	"bus",		bin_bus_table },
 	{ CTL_DIR,	CTL_ABI,	"abi" },
 	/* CTL_CPU not used */
-#ifdef CONFIG_XEN
-	{ CTL_DIR,	CTL_XEN,	"xen",		bin_xen_table },
-#endif
 	/* CTL_ARLAN "arlan" no longer used */
 	{ CTL_DIR,	CTL_S390DBF,	"s390dbf",	bin_s390dbf_table },
 	{ CTL_DIR,	CTL_SUNRPC,	"sunrpc",	bin_sunrpc_table },

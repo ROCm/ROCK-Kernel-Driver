@@ -22,8 +22,7 @@
 #include <linux/input.h>
 #include <linux/hid.h>
 #include <linux/hiddev.h>
-
-#include "hyperv.h"
+#include <linux/hyperv.h>
 
 
 struct hv_input_dev_info {
@@ -598,4 +597,3 @@ MODULE_LICENSE("GPL");
 MODULE_VERSION(HV_DRV_VERSION);
 module_init(mousevsc_init);
 module_exit(mousevsc_exit);
-

@@ -21,6 +21,7 @@
  */
 #include <linux/slab.h>
 #include <linux/delay.h>
+#include <linux/module.h>
 #include <scsi/scsi.h>
 #include <scsi/scsi_eh.h>
 #include <scsi/scsi_dh.h>
@@ -465,27 +466,28 @@ static int alua_check_sense(struct scsi_device *sdev,
 			 * Power On, Reset, or Bus Device Reset, just retry.
 			 */
 			return ADD_TO_MLQUEUE;
-		if (sense_hdr->asc == 0x2a && sense_hdr->ascq == 0x06) {
+		if (sense_hdr->asc == 0x2a && sense_hdr->ascq == 0x06)
 			/*
 			 * ALUA state changed
 			 */
 			return ADD_TO_MLQUEUE;
-		}
-		if (sense_hdr->asc == 0x2a && sense_hdr->ascq == 0x07) {
+		if (sense_hdr->asc == 0x2a && sense_hdr->ascq == 0x07)
 			/*
 			 * Implicit ALUA state transition failed
 			 */
 			return ADD_TO_MLQUEUE;
-		}
-		if (sense_hdr->asc == 0x3f && sense_hdr->ascq == 0x0e) {
+		if (sense_hdr->asc == 0x3f && sense_hdr->ascq == 0x03)
+			/*
+			 * Inquiry data has changed
+			 */
+			return ADD_TO_MLQUEUE;
+		if (sense_hdr->asc == 0x3f && sense_hdr->ascq == 0x0e)
 			/*
 			 * REPORTED_LUNS_DATA_HAS_CHANGED is reported
 			 * when switching controllers on targets like
 			 * Intel Multi-Flex. We can just retry.
 			 */
 			return ADD_TO_MLQUEUE;
-		}
-
 		break;
 	}
 
@@ -504,9 +506,9 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_dh_data *h)
 {
 	struct scsi_sense_hdr sense_hdr;
 	int len, k, off, valid_states = 0;
-	char *ucp;
+	unsigned char *ucp;
 	unsigned err;
-	unsigned long expiry, interval = 10;
+	unsigned long expiry, interval = 1000;
 
 	expiry = round_jiffies_up(jiffies + ALUA_FAILOVER_TIMEOUT);
  retry:
@@ -567,7 +569,7 @@ static int alua_rtpg(struct scsi_device *sdev, struct alua_dh_data *h)
 	case TPGS_STATE_TRANSITIONING:
 		if (time_before(jiffies, expiry)) {
 			/* State transition, retry */
-			interval *= 10;
+			interval *= 2;
 			msleep(interval);
 			goto retry;
 		}
@@ -733,6 +735,7 @@ static int alua_bus_attach(struct scsi_device *sdev)
 	spin_lock_irqsave(sdev->request_queue->queue_lock, flags);
 	sdev->scsi_dh_data = scsi_dh_data;
 	spin_unlock_irqrestore(sdev->request_queue->queue_lock, flags);
+	sdev_printk(KERN_NOTICE, sdev, "%s: Attached\n", ALUA_DH_NAME);
 
 	return 0;
 

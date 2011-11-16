@@ -61,7 +61,7 @@ config INTEL_IOATDMA
 	tristate "Intel I/OAT DMA support"
 	depends on PCI && X86
 	select DMA_ENGINE
-	select DCA if !XEN
+	select DCA
 	select ASYNC_TX_DISABLE_PQ_VAL_DMA
 	select ASYNC_TX_DISABLE_XOR_VAL_DMA
 	help
@@ -193,7 +193,8 @@ config ARCH_HAS_ASYNC_TX_FIND_CHANNEL
 config PL330_DMA
 	tristate "DMA API Driver for PL330"
 	select DMA_ENGINE
-	depends on PL330
+	depends on ARM_AMBA
+	select PL330
 	help
 	  Select if your platform has one or more PL330 DMACs.
 	  You need to provide platform specific settings via

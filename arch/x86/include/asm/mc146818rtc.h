@@ -14,7 +14,7 @@
 #define RTC_ALWAYS_BCD	1	/* RTC operates in binary mode */
 #endif
 
-#if defined(CONFIG_X86_32) && !defined(CONFIG_XEN) && defined(__HAVE_ARCH_CMPXCHG)
+#if defined(CONFIG_X86_32) && defined(__HAVE_ARCH_CMPXCHG)
 /*
  * This lock provides nmi access to the CMOS/RTC registers.  It has some
  * special properties.  It is owned by a CPU and stores the index register

@@ -33,6 +33,14 @@
 #error KEXEC_ARCH not defined
 #endif
 
+#ifndef KEXEC_CRASH_CONTROL_MEMORY_LIMIT
+#define KEXEC_CRASH_CONTROL_MEMORY_LIMIT KEXEC_CONTROL_MEMORY_LIMIT
+#endif
+
+#ifndef KEXEC_CRASH_MEM_ALIGN
+#define KEXEC_CRASH_MEM_ALIGN PAGE_SIZE
+#endif
+
 #define KEXEC_NOTE_HEAD_BYTES ALIGN(sizeof(struct elf_note), 4)
 #define KEXEC_CORE_NOTE_NAME "CORE"
 #define KEXEC_CORE_NOTE_NAME_BYTES ALIGN(sizeof(KEXEC_CORE_NOTE_NAME), 4)
@@ -45,13 +53,6 @@
 #define KEXEC_NOTE_BYTES ( (KEXEC_NOTE_HEAD_BYTES * 2) +		\
 			    KEXEC_CORE_NOTE_NAME_BYTES +		\
 			    KEXEC_CORE_NOTE_DESC_BYTES )
-
-#ifndef KEXEC_ARCH_HAS_PAGE_MACROS
-#define kexec_page_to_pfn(page)  page_to_pfn(page)
-#define kexec_pfn_to_page(pfn)   pfn_to_page(pfn)
-#define kexec_virt_to_phys(addr) virt_to_phys(addr)
-#define kexec_phys_to_virt(addr) phys_to_virt(addr)
-#endif
 
 /*
  * This structure is used to hold the arguments that are used when loading
@@ -119,12 +120,6 @@ struct kimage {
 extern void machine_kexec(struct kimage *image);
 extern int machine_kexec_prepare(struct kimage *image);
 extern void machine_kexec_cleanup(struct kimage *image);
-#ifdef CONFIG_XEN
-extern int xen_machine_kexec_load(struct kimage *image);
-extern void xen_machine_kexec_unload(struct kimage *image);
-extern void xen_machine_kexec_setup_resources(void);
-extern void xen_machine_kexec_register_resources(struct resource *res);
-#endif
 extern asmlinkage long sys_kexec_load(unsigned long entry,
 					unsigned long nr_segments,
 					struct kexec_segment __user *segments,
@@ -142,9 +137,11 @@ extern void crash_kexec(struct pt_regs *);
 int kexec_should_crash(struct task_struct *);
 void crash_save_cpu(struct pt_regs *regs, int cpu);
 void crash_save_vmcoreinfo(void);
+void crash_map_reserved_pages(void);
+void crash_unmap_reserved_pages(void);
 void arch_crash_save_vmcoreinfo(void);
-void vmcoreinfo_append_str(const char *fmt, ...)
-	__attribute__ ((format (printf, 1, 2)));
+__printf(1, 2)
+void vmcoreinfo_append_str(const char *fmt, ...);
 unsigned long paddr_vmcoreinfo_note(void);
 
 #define VMCOREINFO_OSRELEASE(value) \
@@ -205,15 +202,8 @@ extern struct kimage *kexec_crash_image;
 #define VMCOREINFO_BYTES           (4096)
 #define VMCOREINFO_NOTE_NAME       "VMCOREINFO"
 #define VMCOREINFO_NOTE_NAME_BYTES ALIGN(sizeof(VMCOREINFO_NOTE_NAME), 4)
-#if !defined(CONFIG_XEN) || !defined(CONFIG_X86)
 #define VMCOREINFO_NOTE_SIZE       (KEXEC_NOTE_HEAD_BYTES*2 + VMCOREINFO_BYTES \
 				    + VMCOREINFO_NOTE_NAME_BYTES)
-#else
-#define VMCOREINFO_NOTE_SIZE       ALIGN(KEXEC_NOTE_HEAD_BYTES*2 \
-					 + VMCOREINFO_BYTES \
-					 + VMCOREINFO_NOTE_NAME_BYTES, \
-					 PAGE_SIZE)
-#endif
 
 /* Location of a reserved region to hold the crash kernel.
  */

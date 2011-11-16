@@ -30,10 +30,10 @@
 /*
  * If we have Intel graphics, we're not going to have anything other than
  * an Intel IOMMU. So make the correct use of the PCI DMA API contingent
- * on the Intel IOMMU support (CONFIG_DMAR).
+ * on the Intel IOMMU support (CONFIG_INTEL_IOMMU).
  * Only newer chipsets need to bother with this, of course.
  */
-#ifdef CONFIG_DMAR
+#ifdef CONFIG_INTEL_IOMMU
 #define USE_PCI_DMA_API 1
 #else
 #define USE_PCI_DMA_API 0
@@ -147,19 +147,8 @@ static struct page *i8xx_alloc_pages(void)
 	if (page == NULL)
 		return NULL;
 
-#ifdef CONFIG_XEN
-	if (xen_create_contiguous_region((unsigned long)page_address(page), 2, 32)) {
-		__free_pages(page, 2);
-		return NULL;
-	}
-#endif
-
 	if (set_pages_uc(page, 4) < 0) {
 		set_pages_wb(page, 4);
-#ifdef CONFIG_XEN
-		xen_destroy_contiguous_region((unsigned long)page_address(page),
-					      2);
-#endif
 		__free_pages(page, 2);
 		return NULL;
 	}
@@ -174,9 +163,6 @@ static void i8xx_destroy_pages(struct page *page)
 		return;
 
 	set_pages_wb(page, 4);
-#ifdef CONFIG_XEN
-	xen_destroy_contiguous_region((unsigned long)page_address(page), 2);
-#endif
 	put_page(page);
 	__free_pages(page, 2);
 	atomic_dec(&agp_bridge->current_memory_agp);
@@ -282,11 +268,7 @@ static struct agp_memory *alloc_agpphysmem_i8xx(size_t pg_count, int type)
 	new->page_count = pg_count;
 	new->num_scratch_pages = pg_count;
 	new->type = AGP_PHYS_MEMORY;
-#ifndef CONFIG_XEN
 	new->physical = page_to_phys(new->pages[0]);
-#else
-	new->physical = page_to_pseudophys(new->pages[0]);
-#endif
 	return new;
 }
 
@@ -941,6 +923,9 @@ static int intel_fake_agp_insert_entries(struct agp_memory *mem,
 {
 	int ret = -EINVAL;
 
+	if (intel_private.base.do_idle_maps)
+		return -ENODEV;
+
 	if (intel_private.clear_fake_agp) {
 		int start = intel_private.base.stolen_size / PAGE_SIZE;
 		int end = intel_private.base.gtt_mappable_entries;
@@ -1002,6 +987,9 @@ static int intel_fake_agp_remove_entries(struct agp_memory *mem,
 {
 	if (mem->page_count == 0)
 		return 0;
+
+	if (intel_private.base.do_idle_maps)
+		return -ENODEV;
 
 	intel_gtt_clear_range(pg_start, mem->page_count);
 
@@ -1195,6 +1183,25 @@ static void gen6_cleanup(void)
 {
 }
 
+/* Certain Gen5 chipsets require require idling the GPU before
+ * unmapping anything from the GTT when VT-d is enabled.
+ */
+extern int intel_iommu_gfx_mapped;
+static inline int needs_idle_maps(void)
+{
+	const unsigned short gpu_devid = intel_private.pcidev->device;
+
+	/* Query intel_iommu to see if we need the workaround. Presumably that
+	 * was loaded first.
+	 */
+	if ((gpu_devid == PCI_DEVICE_ID_INTEL_IRONLAKE_M_HB ||
+	     gpu_devid == PCI_DEVICE_ID_INTEL_IRONLAKE_M_IG) &&
+	     intel_iommu_gfx_mapped)
+		return 1;
+
+	return 0;
+}
+
 static int i9xx_setup(void)
 {
 	u32 reg_addr;
@@ -1228,6 +1235,9 @@ static int i9xx_setup(void)
 		}
 		intel_private.gtt_bus_addr = reg_addr + gtt_offset;
 	}
+
+	if (needs_idle_maps());
+		intel_private.base.do_idle_maps = 1;
 
 	intel_i9xx_setup_flush();
 

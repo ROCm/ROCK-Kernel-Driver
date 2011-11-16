@@ -26,10 +26,6 @@ u64 hw_nmi_get_sample_period(int watchdog_thresh)
 #endif
 
 #ifdef arch_trigger_all_cpu_backtrace
-#ifdef CONFIG_XEN
-#include <asm/ipi.h>
-#endif
-
 /* For reliability, we're prepared to waste bits here. */
 static DECLARE_BITMAP(backtrace_mask, NR_CPUS) __read_mostly;
 
@@ -50,11 +46,7 @@ void arch_trigger_all_cpu_backtrace(void)
 	cpumask_copy(to_cpumask(backtrace_mask), cpu_online_mask);
 
 	printk(KERN_INFO "sending NMI to all CPUs:\n");
-#ifndef CONFIG_XEN
 	apic->send_IPI_all(NMI_VECTOR);
-#else /* this works even without CONFIG_X86_LOCAL_APIC */
-	xen_send_IPI_all(NMI_VECTOR);
-#endif
 
 	/* Wait for up to 10 seconds for all CPUs to do the backtrace */
 	for (i = 0; i < 10 * 1000; i++) {
@@ -68,22 +60,10 @@ void arch_trigger_all_cpu_backtrace(void)
 }
 
 static int __kprobes
-arch_trigger_all_cpu_backtrace_handler(struct notifier_block *self,
-			 unsigned long cmd, void *__args)
+arch_trigger_all_cpu_backtrace_handler(unsigned int cmd, struct pt_regs *regs)
 {
-	struct die_args *args = __args;
-	struct pt_regs *regs;
 	int cpu;
 
-	switch (cmd) {
-	case DIE_NMI:
-		break;
-
-	default:
-		return NOTIFY_DONE;
-	}
-
-	regs = args->regs;
 	cpu = smp_processor_id();
 
 	if (cpumask_test_cpu(cpu, to_cpumask(backtrace_mask))) {
@@ -94,21 +74,16 @@ arch_trigger_all_cpu_backtrace_handler(struct notifier_block *self,
 		show_regs(regs);
 		arch_spin_unlock(&lock);
 		cpumask_clear_cpu(cpu, to_cpumask(backtrace_mask));
-		return NOTIFY_STOP;
+		return NMI_HANDLED;
 	}
 
-	return NOTIFY_DONE;
+	return NMI_DONE;
 }
-
-static __read_mostly struct notifier_block backtrace_notifier = {
-	.notifier_call          = arch_trigger_all_cpu_backtrace_handler,
-	.next                   = NULL,
-	.priority               = NMI_LOCAL_LOW_PRIOR,
-};
 
 static int __init register_trigger_all_cpu_backtrace(void)
 {
-	register_die_notifier(&backtrace_notifier);
+	register_nmi_handler(NMI_LOCAL, arch_trigger_all_cpu_backtrace_handler,
+				0, "arch_bt");
 	return 0;
 }
 early_initcall(register_trigger_all_cpu_backtrace);

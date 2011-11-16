@@ -68,6 +68,7 @@ static const char *version = "v0.2597k";
 #include <linux/vmalloc.h>
 #include <linux/raid/xor.h>
 #include <linux/slab.h>
+#include <linux/module.h>
 
 #include <linux/bio.h>
 #include <linux/dm-io.h>

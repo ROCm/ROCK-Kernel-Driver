@@ -8,7 +8,6 @@ config VIRTIO_RING
 	depends on VIRTIO
 
 menu "Virtio drivers"
-	depends on !XEN
 
 config VIRTIO_PCI
 	tristate "PCI driver for virtio devices (EXPERIMENTAL)"
@@ -35,5 +34,16 @@ config VIRTIO_BALLOON
 	 of memory within a KVM guest.
 
 	 If unsure, say M.
+
+ config VIRTIO_MMIO
+ 	tristate "Platform bus driver for memory mapped virtio devices (EXPERIMENTAL)"
+ 	depends on EXPERIMENTAL
+ 	select VIRTIO
+ 	select VIRTIO_RING
+ 	---help---
+ 	 This drivers provides support for memory mapped virtio
+	 platform device driver.
+
+ 	 If unsure, say N.
 
 endmenu

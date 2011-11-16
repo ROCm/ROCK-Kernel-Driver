@@ -10,9 +10,9 @@
 #include <linux/dmi.h>
 #include <linux/pfn.h>
 #include <linux/pci.h>
+#include <linux/export.h>
+
 #include <asm/pci-direct.h>
-
-
 #include <asm/e820.h>
 #include <asm/mmzone.h>
 #include <asm/setup.h>
@@ -113,11 +113,6 @@ static struct resource *find_oprom(struct pci_dev *pdev)
 {
 	struct resource *oprom = NULL;
 	int i;
-
-#ifdef CONFIG_XEN
-	if (!is_initial_xendomain())
-		return NULL;
-#endif
 
 	for (i = 0; i < ARRAY_SIZE(adapter_rom_resources); i++) {
 		struct resource *res = &adapter_rom_resources[i];
@@ -237,7 +232,7 @@ void __init probe_roms(void)
 	upper = system_rom_resource.start;
 
 	/* check for extension rom (ignore length byte!) */
-	rom = isa_bus_to_virt((unsigned long)extension_rom_resource.start);
+	rom = isa_bus_to_virt(extension_rom_resource.start);
 	if (romsignature(rom)) {
 		length = resource_size(&extension_rom_resource);
 		if (romchecksum(rom, length)) {

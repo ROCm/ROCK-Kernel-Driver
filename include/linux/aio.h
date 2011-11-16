@@ -117,6 +117,7 @@ struct kiocb {
 
 	struct list_head	ki_list;	/* the aio core uses this
 						 * for cancellation */
+	struct list_head	ki_batch;	/* batch allocation */
 
 	/*
 	 * If the aio_resfd field of the userspace iocb is not zero,
@@ -198,12 +199,6 @@ struct kioctx {
 	struct aio_ring_info	ring_info;
 
 	struct delayed_work	wq;
-
-#ifdef CONFIG_EPOLL
-	/* poll integration */
-	wait_queue_head_t       poll_wait;
-	struct file		*file;
-#endif
 
 	struct rcu_head		rcu_head;
 };

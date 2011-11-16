@@ -34,6 +34,15 @@ config HVC_ISERIES
 	help
 	  iSeries machines support a hypervisor virtual console.
 
+config HVC_OPAL
+	bool "OPAL Console support"
+	depends on PPC_POWERNV
+	select HVC_DRIVER
+	select HVC_IRQ
+	default y
+	help
+	  PowerNV machines running under OPAL need that driver to get a console
+
 config HVC_RTAS
 	bool "IBM RTAS Console support"
 	depends on PPC_RTAS
@@ -60,7 +69,7 @@ config HVC_IUCV
 
 config HVC_XEN
 	bool "Xen Hypervisor Console support"
-	depends on PARAVIRT_XEN
+	depends on XEN
 	select HVC_DRIVER
 	select HVC_IRQ
 	default y
