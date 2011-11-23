@@ -139,11 +139,13 @@
 #define page_to_phys(page)	(__pfn_to_phys(page_to_pfn(page)))
 #define phys_to_page(phys)	(pfn_to_page(__phys_to_pfn(phys)))
 
+#ifndef CONFIG_ARM_PATCH_PHYS_VIRT
 #ifndef PHYS_OFFSET
 #ifdef PLAT_PHYS_OFFSET
 #define PHYS_OFFSET	PLAT_PHYS_OFFSET
 #else
 #define PHYS_OFFSET	UL(CONFIG_PHYS_OFFSET)
+#endif
 #endif
 #endif
 
