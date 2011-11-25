@@ -54,7 +54,7 @@
  * Due to the structure of pre-exisiting code, don't use assembler line
  * comment character # to ignore the arguments. Instead, use a dummy macro.
  */
-.macro cfi_ignore a=0, b=0, c=0, d=0
+.macro cfi_ignore a=0, b=0, c=0, d=0, e=0, f=0, g=0, h=0
 .endm
 
 #define CFI_STARTPROC		cfi_ignore
