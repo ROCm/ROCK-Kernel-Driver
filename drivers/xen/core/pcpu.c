@@ -4,10 +4,10 @@
 #include <linux/acpi.h>
 #include <linux/cpu.h>
 #include <linux/err.h>
+#include <linux/export.h>
 #include <linux/interrupt.h>
 #include <linux/kobject.h>
 #include <linux/list.h>
-#include <linux/module.h>
 #include <linux/spinlock.h>
 #include <linux/sysdev.h>
 #include <asm/hypervisor.h>

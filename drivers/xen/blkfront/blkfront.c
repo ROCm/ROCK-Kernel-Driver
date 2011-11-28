@@ -789,7 +789,7 @@ static int blkif_queue_request(struct request *req)
 
 		/* id, sector_number and handle are set above. */
 		discard->operation = BLKIF_OP_DISCARD;
-		discard->reserved = 0;
+		discard->flag = 0;
 		discard->nr_sectors = blk_rq_sectors(req);
 	} else {
 		ring_req->nr_segments = blk_rq_map_sg(req->q, req, info->sg);
