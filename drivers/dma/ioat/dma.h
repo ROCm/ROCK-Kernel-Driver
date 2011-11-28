@@ -347,4 +347,21 @@ void ioat_kobject_del(struct ioatdma_device *device);
 extern const struct sysfs_ops ioat_sysfs_ops;
 extern struct ioat_sysfs_entry ioat_version_attr;
 extern struct ioat_sysfs_entry ioat_cap_attr;
+
+#ifndef CONFIG_XEN
+void ioat_remove_dca_provider(struct pci_dev *);
+#else
+static inline void ioat_remove_dca_provider(struct pci_dev *pdev)
+{
+	struct ioatdma_device *device = pci_get_drvdata(pdev);
+	BUG_ON(device->dca);
+}
+static inline struct dca_provider *__devinit
+__ioat_dca_init(struct pci_dev *pdev, void __iomem *iobase)
+{
+	return NULL;
+}
+#define ioat_dca_init __ioat_dca_init
+#endif
+
 #endif /* IOATDMA_H */

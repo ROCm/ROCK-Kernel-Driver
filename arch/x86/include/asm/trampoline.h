@@ -1,4 +1,4 @@
-#ifndef _ASM_X86_TRAMPOLINE_H
+#if !defined(_ASM_X86_TRAMPOLINE_H) && !defined(CONFIG_XEN)
 #define _ASM_X86_TRAMPOLINE_H
 
 #ifndef __ASSEMBLY__

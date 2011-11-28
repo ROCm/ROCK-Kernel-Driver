@@ -3,6 +3,24 @@
  *
  * Unified block-device I/O interface for Xen guest OSes.
  *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ *
  * Copyright (c) 2003-2004, Keir Fraser
  */
 
@@ -24,8 +42,10 @@
  * rsp_event appropriately (e.g., using RING_FINAL_CHECK_FOR_RESPONSES()).
  */
 
-typedef uint16_t blkif_vdev_t;
-typedef uint64_t blkif_sector_t;
+#ifndef blkif_vdev_t
+#define blkif_vdev_t   uint16_t
+#endif
+#define blkif_sector_t uint64_t
 
 /*
  * REQUEST CODES.
@@ -34,7 +54,7 @@ typedef uint64_t blkif_sector_t;
 #define BLKIF_OP_WRITE             1
 /*
  * Recognised only if "feature-barrier" is present in backend xenbus info.
- * The "feature_barrier" node contains a boolean indicating whether barrier
+ * The "feature-barrier" node contains a boolean indicating whether barrier
  * requests are likely to succeed or fail. Either way, a barrier request
  * may fail at any time with BLKIF_RSP_EOPNOTSUPP if it is unsupported by
  * the underlying block-device hardware. The boolean simply indicates whether
@@ -43,7 +63,6 @@ typedef uint64_t blkif_sector_t;
  * create the "feature-barrier" node!
  */
 #define BLKIF_OP_WRITE_BARRIER     2
-
 /*
  * Recognised if "feature-flush-cache" is present in backend xenbus
  * info.  A flush will ask the underlying storage hardware to flush its
@@ -57,7 +76,10 @@ typedef uint64_t blkif_sector_t;
  * "feature-flush-cache" node!
  */
 #define BLKIF_OP_FLUSH_DISKCACHE   3
-
+/*
+ * Device specific command packet contained within the request
+ */
+#define BLKIF_OP_PACKET            4
 /*
  * Recognised only if "feature-discard" is present in backend xenbus info.
  * The "feature-discard" node contains a boolean indicating whether trim
@@ -84,47 +106,92 @@ typedef uint64_t blkif_sector_t;
  *     e07154r6-Data_Set_Management_Proposal_for_ATA-ACS2.doc
  * http://www.seagate.com/staticfiles/support/disc/manuals/
  *     Interface%20manuals/100293068c.pdf
+ * The backend can optionally provide these extra XenBus attributes to
+ * further optimize the discard functionality:
+ * 'discard-aligment' - Devices that support discard functionality may
+ * internally allocate space in units that are bigger than the exported
+ * logical block size. The discard-alignment parameter indicates how many bytes
+ * the beginning of the partition is offset from the internal allocation unit's
+ * natural alignment. Do not confuse this with natural disk alignment offset.
+ * 'discard-granularity'  - Devices that support discard functionality may
+ * internally allocate space using units that are bigger than the logical block
+ * size. The discard-granularity parameter indicates the size of the internal
+ * allocation unit in bytes if reported by the device. Otherwise the
+ * discard-granularity will be set to match the device's physical block size.
+ * It is the minimum size you can discard.
+ * 'discard-secure' - All copies of the discarded sectors (potentially created
+ * by garbage collection) must also be erased.  To use this feature, the flag
+ * BLKIF_DISCARD_SECURE must be set in the blkif_request_discard.
  */
 #define BLKIF_OP_DISCARD           5
 
 /*
  * Maximum scatter/gather segments per request.
- * This is carefully chosen so that sizeof(struct blkif_ring) <= PAGE_SIZE.
+ * This is carefully chosen so that sizeof(blkif_ring_t) <= PAGE_SIZE.
  * NB. This could be 12 if the ring indexes weren't stored in the same page.
  */
 #define BLKIF_MAX_SEGMENTS_PER_REQUEST 11
 
-struct blkif_request_rw {
-	blkif_sector_t sector_number;/* start sector idx on disk (r/w only)  */
-	struct blkif_request_segment {
-		grant_ref_t gref;        /* reference to I/O buffer frame        */
-		/* @first_sect: first sector in frame to transfer (inclusive).   */
-		/* @last_sect: last sector in frame to transfer (inclusive).     */
-		uint8_t     first_sect, last_sect;
-	} seg[BLKIF_MAX_SEGMENTS_PER_REQUEST];
-};
-
-struct blkif_request_discard {
-	blkif_sector_t sector_number;
-	uint64_t nr_sectors;
+/*
+ * NB. first_sect and last_sect in blkif_request_segment, as well as
+ * sector_number in blkif_request, are always expressed in 512-byte units.
+ * However they must be properly aligned to the real sector size of the
+ * physical disk, which is reported in the "sector-size" node in the backend
+ * xenbus info. Also the xenbus "sectors" node is expressed in 512-byte units.
+ */
+struct blkif_request_segment {
+    grant_ref_t gref;        /* reference to I/O buffer frame        */
+    /* @first_sect: first sector in frame to transfer (inclusive).   */
+    /* @last_sect: last sector in frame to transfer (inclusive).     */
+    uint8_t     first_sect, last_sect;
 };
 
 struct blkif_request {
-	uint8_t        operation;    /* BLKIF_OP_???                         */
-	uint8_t        nr_segments;  /* number of segments                   */
-	blkif_vdev_t   handle;       /* only for read/write requests         */
-	uint64_t       id;           /* private guest value, echoed in resp  */
-	union {
-		struct blkif_request_rw rw;
-		struct blkif_request_discard discard;
-	} u;
+    uint8_t        operation;    /* BLKIF_OP_???                         */
+    uint8_t        nr_segments;  /* number of segments                   */
+    blkif_vdev_t   handle;       /* only for read/write requests         */
+    uint64_t       id;           /* private guest value, echoed in resp  */
+#if !defined(CONFIG_PARAVIRT_XEN) || defined(HAVE_XEN_PLATFORM_COMPAT_H)
+    blkif_sector_t sector_number;/* start sector idx on disk (r/w only)  */
+    struct blkif_request_segment seg[BLKIF_MAX_SEGMENTS_PER_REQUEST];
+#else
+    union {
+        struct blkif_request_rw {
+            blkif_sector_t sector_number;/* start sector idx on disk (r/w only) */
+            struct blkif_request_segment seg[BLKIF_MAX_SEGMENTS_PER_REQUEST];
+        } rw;
+        struct blkif_request_discard {
+            blkif_sector_t sector_number;
+            uint64_t nr_sectors;
+        } discard;
+    } u;
+#endif
 };
+typedef struct blkif_request blkif_request_t;
+
+#if !defined(CONFIG_PARAVIRT_XEN) || defined(HAVE_XEN_PLATFORM_COMPAT_H)
+/*
+ * Cast to this structure when blkif_request.operation == BLKIF_OP_TRIM
+ * sizeof(struct blkif_request_discard) <= sizeof(struct blkif_request)
+ */
+struct blkif_request_discard {
+    uint8_t        operation;    /* BLKIF_OP_DISCARD                     */
+    uint8_t        flag;         /* BLKIF_DISCARD_SECURE or zero         */
+#define BLKIF_DISCARD_SECURE (1<<0)  /* ignored if discard-secure=0      */
+    blkif_vdev_t   handle;       /* same as for read/write requests      */
+    uint64_t       id;           /* private guest value, echoed in resp  */
+    blkif_sector_t sector_number;/* start sector idx on disk             */
+    uint64_t       nr_sectors;   /* number of contiguous sectors to discard*/
+};
+typedef struct blkif_request_discard blkif_request_discard_t;
+#endif
 
 struct blkif_response {
-	uint64_t        id;              /* copied from request */
-	uint8_t         operation;       /* copied from request */
-	int16_t         status;          /* BLKIF_RSP_???       */
+    uint64_t        id;              /* copied from request */
+    uint8_t         operation;       /* copied from request */
+    int16_t         status;          /* BLKIF_RSP_???       */
 };
+typedef struct blkif_response blkif_response_t;
 
 /*
  * STATUS RETURN CODES.

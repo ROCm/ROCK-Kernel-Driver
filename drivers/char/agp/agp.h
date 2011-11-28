@@ -31,6 +31,10 @@
 
 #include <asm/agp.h>	/* for flush_agp_cache() */
 
+#ifndef virt_to_gart
+#define virt_to_gart virt_to_phys
+#endif
+
 #define PFX "agpgart: "
 
 //#define AGP_DEBUG 1

@@ -25,6 +25,7 @@ config STRICT_DEVMEM
 config X86_VERBOSE_BOOTUP
 	bool "Enable verbose x86 bootup info messages"
 	default y
+	depends on !XEN
 	---help---
 	  Enables the informational output from the decompression stage
 	  (e.g. bzImage) of the boot. If you disable this you will still
@@ -32,6 +33,7 @@ config X86_VERBOSE_BOOTUP
 
 config EARLY_PRINTK
 	bool "Early printk" if EXPERT
+	depends on !XEN_UNPRIVILEGED_GUEST
 	default y
 	---help---
 	  Write kernel log output directly into the VGA buffer or to a serial
@@ -119,7 +121,7 @@ config DEBUG_NX_TEST
 config DOUBLEFAULT
 	default y
 	bool "Enable doublefault exception handler" if EXPERT
-	depends on X86_32
+	depends on X86_32 && !X86_NO_TSS
 	---help---
 	  This option allows trapping of rare doublefault exceptions that
 	  would otherwise cause a system to silently reboot. Disabling this
@@ -159,6 +161,7 @@ config IOMMU_LEAK
 
 config HAVE_MMIOTRACE_SUPPORT
 	def_bool y
+	depends on !XEN
 
 config X86_DECODER_SELFTEST
 	bool "x86 instruction decoder selftest"
@@ -247,6 +250,7 @@ config DEBUG_BOOT_PARAMS
 	bool "Debug boot parameters"
 	depends on DEBUG_KERNEL
 	depends on DEBUG_FS
+	depends on !XEN
 	---help---
 	  This option will cause struct boot_params to be exported via debugfs.
 

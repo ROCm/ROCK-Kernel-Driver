@@ -1932,7 +1932,7 @@ static int i7core_mce_check_error(struct notifier_block *nb, unsigned long val,
 	if (mce->bank != 8)
 		return NOTIFY_DONE;
 
-#ifdef CONFIG_SMP
+#if defined(CONFIG_SMP) || defined(CONFIG_XEN)
 	/* Only handle if it is the right mc controller */
 	if (mce->socketid != pvt->i7core_dev->socket)
 		return NOTIFY_DONE;

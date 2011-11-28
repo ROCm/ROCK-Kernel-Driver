@@ -1609,8 +1609,11 @@ static int sbridge_mce_check_error(struct notifier_block *nb, unsigned long val,
 		mce->cpuvendor, mce->cpuid, mce->time,
 		mce->socketid, mce->apicid);
 
-#ifdef CONFIG_SMP
 	/* Only handle if it is the right mc controller */
+#if defined(CONFIG_XEN) /* Could easily be used for non-Xen too. */
+	if (mce->socketid != pvt->sbridge_dev->mc)
+		return NOTIFY_DONE;
+#elif defined(CONFIG_SMP)
 	if (cpu_data(mce->cpu).phys_proc_id != pvt->sbridge_dev->mc)
 		return NOTIFY_DONE;
 #endif
