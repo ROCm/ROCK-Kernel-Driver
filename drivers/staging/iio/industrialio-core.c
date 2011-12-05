@@ -254,8 +254,8 @@ static int iio_event_getfd(struct iio_dev *indio_dev)
 		return -EBUSY;
 	}
 	mutex_unlock(&ev_int->event_list_lock);
-	fd = anon_inode_getfd("iio:event", &iio_event_chrdev_fileops,
-				ev_int, O_RDONLY);
+	fd = anon_inode_getfd("iio:event",
+				&iio_event_chrdev_fileops, ev_int, O_RDONLY);
 	if (fd < 0) {
 		mutex_lock(&ev_int->event_list_lock);
 		clear_bit(IIO_BUSY_BIT_POS, &ev_int->flags);
