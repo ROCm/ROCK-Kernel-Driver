@@ -442,10 +442,6 @@ static void __cpuinit bsp_init_amd(struct cpuinfo_x86 *c)
 
 static void __cpuinit early_init_amd(struct cpuinfo_x86 *c)
 {
-#ifndef CONFIG_XEN
-	u32 dummy;
-#endif
-
 	early_init_amd_mc(c);
 
 	/*
@@ -475,14 +471,12 @@ static void __cpuinit early_init_amd(struct cpuinfo_x86 *c)
 			set_cpu_cap(c, X86_FEATURE_EXTD_APICID);
 	}
 #endif
-
-#ifndef CONFIG_XEN
-	rdmsr_safe(MSR_AMD64_PATCH_LEVEL, &c->microcode, &dummy);
-#endif
 }
 
 static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 {
+	u32 dummy;
+
 #ifdef CONFIG_SMP
 	unsigned long long value;
 
@@ -671,6 +665,8 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 			checking_wrmsrl(MSR_AMD64_MCx_MASK(4), mask);
 		}
 	}
+
+	rdmsr_safe(MSR_AMD64_PATCH_LEVEL, &c->microcode, &dummy);
 }
 
 #ifdef CONFIG_X86_32
