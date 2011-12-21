@@ -454,7 +454,7 @@ void register_vcd(struct blkfront_info *info)
 	}
 
 	/* Create new vcd_disk and fill in cdrom_info */
-	vcd = (struct vcd_disk *)kzalloc(sizeof(struct vcd_disk), GFP_KERNEL);
+	vcd = kzalloc(sizeof(*vcd), GFP_KERNEL);
 	if (!vcd) {
 		pr_info("%s(): Unable to allocate vcd struct!\n", __func__);
 		goto out;

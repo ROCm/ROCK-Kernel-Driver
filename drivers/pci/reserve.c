@@ -129,7 +129,7 @@ unsigned long pci_reserve_size_mem(struct pci_bus *pbus)
 
 static int __init pci_reserve_setup(char *str)
 {
-	if (strlen(str) >= sizeof(pci_reserve_param))
+	if (!is_initial_xendomain() || strlen(str) >= sizeof(pci_reserve_param))
 		return 0;
 	strlcpy(pci_reserve_param, str, sizeof(pci_reserve_param));
 	return 1;

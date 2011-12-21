@@ -27,7 +27,7 @@
 #include <linux/acpi.h>
 #include <linux/pm.h>
 #include <linux/cpu.h>
-
+#include <linux/export.h>
 #include <linux/cpufreq.h>
 #include <acpi/processor.h>
 #include <asm/hypercall.h>
@@ -275,3 +275,13 @@ unsigned int cpufreq_quick_get(unsigned int cpu)
 	op.u.get_cpu_freq.vcpu = cpu;
 	return HYPERVISOR_platform_op(&op) == 0 ? op.u.get_cpu_freq.freq : 0;
 }
+
+unsigned int cpufreq_quick_get_max(unsigned int cpu)
+{
+	xen_platform_op_t op;
+
+	op.cmd = XENPF_get_cpu_freq_max;
+	op.u.get_cpu_freq.vcpu = cpu;
+	return HYPERVISOR_platform_op(&op) == 0 ? op.u.get_cpu_freq.freq : 0;
+}
+EXPORT_SYMBOL(cpufreq_quick_get_max);

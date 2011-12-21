@@ -437,19 +437,15 @@ static const struct xenbus_device_id netback_ids[] = {
 	{ "" }
 };
 
-
-static struct xenbus_driver netback = {
-	.name = "vif",
-	.ids = netback_ids,
+static DEFINE_XENBUS_DRIVER(netback, ,
 	.probe = netback_probe,
 	.remove = netback_remove,
 	.uevent = netback_uevent,
 	.otherend_changed = frontend_changed,
-};
+);
 
 
 void netif_xenbus_init(void)
 {
-	if (xenbus_register_backend(&netback))
-		BUG();
+	WARN_ON(xenbus_register_backend(&netback_driver));
 }

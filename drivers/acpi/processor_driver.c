@@ -110,7 +110,9 @@ static struct acpi_driver acpi_processor_driver = {
 #define UNINSTALL_NOTIFY_HANDLER	2
 
 DEFINE_PER_CPU(struct acpi_processor *, processors);
+#ifndef CONFIG_XEN
 EXPORT_PER_CPU_SYMBOL(processors);
+#endif
 
 struct acpi_processor_errata errata __read_mostly;
 
@@ -392,7 +394,10 @@ static int acpi_processor_get_info(struct acpi_device *device)
 #ifndef CONFIG_XEN
 static DEFINE_PER_CPU(void *, processor_device_array);
 #else
-static void *processor_device_array[NR_ACPI_CPUS];
+#include <linux/mutex.h>
+#include <linux/radix-tree.h>
+static DEFINE_MUTEX(processor_device_mutex);
+static RADIX_TREE(processor_device_tree, GFP_KERNEL);
 #endif
 
 static void acpi_processor_notify(struct acpi_device *device, u32 event)
@@ -506,9 +511,20 @@ static int __cpuinit acpi_processor_add(struct acpi_device *device)
 	if (per_cpu(processor_device_array, pr->id) != NULL &&
 	    per_cpu(processor_device_array, pr->id) != device) {
 #else
-	BUG_ON(pr->acpi_id >= NR_ACPI_CPUS);
-	if (processor_device_array[pr->acpi_id] != NULL &&
-	    processor_device_array[pr->acpi_id] != device) {
+	mutex_lock(&processor_device_mutex);
+	result = radix_tree_insert(&processor_device_tree,
+				   pr->acpi_id, device);
+	switch (result) {
+	default:
+		goto err_unlock_free_cpumask;
+	case -EEXIST:
+		if (radix_tree_lookup(&processor_device_tree,
+				      pr->acpi_id) == device) {
+	case 0:
+			mutex_unlock(&processor_device_mutex);
+			break;
+		}
+		mutex_unlock(&processor_device_mutex);
 #endif
 		printk(KERN_WARNING "BIOS reported wrong ACPI id "
 			"for the processor\n");
@@ -517,21 +533,19 @@ static int __cpuinit acpi_processor_add(struct acpi_device *device)
 	}
 #ifndef CONFIG_XEN
 	per_cpu(processor_device_array, pr->id) = device;
-
-	per_cpu(processors, pr->id) = pr;
 #else
-	processor_device_array[pr->acpi_id] = device;
-	if (pr->id != -1)
-		per_cpu(processors, pr->id) = pr;
-#endif
-
 	if (pr->id != -1) {
-		sysdev = get_cpu_sysdev(pr->id);
-		if (sysfs_create_link(&device->dev.kobj, &sysdev->kobj, "sysdev")) {
-			result = -EFAULT;
-			goto err_free_cpumask;
-		}
+#endif
+	per_cpu(processors, pr->id) = pr;
+
+	sysdev = get_cpu_sysdev(pr->id);
+	if (sysfs_create_link(&device->dev.kobj, &sysdev->kobj, "sysdev")) {
+		result = -EFAULT;
+		goto err_free_cpumask;
 	}
+#ifdef CONFIG_XEN
+	}
+#endif
 
 #if defined(CONFIG_CPU_FREQ) || defined(CONFIG_PROCESSOR_EXTERNAL_CONTROL)
 	acpi_processor_ppc_has_changed(pr, 0);
@@ -589,6 +603,14 @@ err_thermal_unregister:
 err_power_exit:
 	acpi_processor_power_exit(pr, device);
 err_free_cpumask:
+#ifdef CONFIG_XEN
+	mutex_lock(&processor_device_mutex);
+	if (radix_tree_lookup(&processor_device_tree,
+			      pr->acpi_id) == device)
+		radix_tree_delete(&processor_device_tree, pr->acpi_id);
+err_unlock_free_cpumask:
+	mutex_unlock(&processor_device_mutex);
+#endif
 	free_cpumask_var(pr->throttling.shared_cpu_map);
 
 	return result;
@@ -630,7 +652,9 @@ static int acpi_processor_remove(struct acpi_device *device, int type)
 #else
 	if (pr->id != -1)
 		per_cpu(processors, pr->id) = NULL;
-	processor_device_array[pr->acpi_id] = NULL;
+	mutex_lock(&processor_device_mutex);
+	radix_tree_delete(&processor_device_tree, pr->acpi_id);
+	mutex_unlock(&processor_device_mutex);
 #endif
 
 free:
@@ -914,6 +938,30 @@ static void __exit acpi_processor_exit(void)
 	acpi_bus_unregister_driver(&acpi_processor_driver);
 
 	cpuidle_unregister_driver(&acpi_idle_driver);
+
+#ifdef CONFIG_XEN
+	{
+		struct acpi_device *dev;
+		unsigned int idx = 0;
+
+		while (radix_tree_gang_lookup(&processor_device_tree,
+					      (void **)&dev, idx, 1)) {
+			struct acpi_processor *pr = acpi_driver_data(dev);
+
+			/* prevent live lock */
+			if (pr->acpi_id < idx) {
+				printk(KERN_WARNING PREFIX "ID %u unexpected"
+				       " (less than %u); leaking memory\n",
+				       pr->acpi_id, idx);
+				break;
+			}
+			idx = pr->acpi_id;
+			radix_tree_delete(&processor_device_tree, idx);
+			if (!++idx)
+				break;
+		}
+	}
+#endif
 
 	return;
 }

@@ -194,7 +194,7 @@ static int pmsr_device_create(unsigned int cpu)
 			return -EDOM;
 		}
 
-		map = kzalloc(BITS_TO_LONGS(cpu + 1) * sizeof(*map),
+		map = kcalloc(BITS_TO_LONGS(cpu + 1), sizeof(*map),
 			      GFP_KERNEL);
 		if (!map) {
 			if (!warned) {
@@ -278,8 +278,8 @@ static int __init msr_init(void)
 	if ((minor_bias + nr_xen_cpu_ids - 1) >> MINORBITS)
 		nr_xen_cpu_ids = MINORMASK + 1 - NR_CPUS;
 
-	xen_cpu_online_map = kzalloc(BITS_TO_LONGS(nr_xen_cpu_ids)
-				     * sizeof(*xen_cpu_online_map),
+	xen_cpu_online_map = kcalloc(BITS_TO_LONGS(nr_xen_cpu_ids),
+				     sizeof(*xen_cpu_online_map),
 				     GFP_KERNEL);
 	if (!xen_cpu_online_map) {
 		err = -ENOMEM;

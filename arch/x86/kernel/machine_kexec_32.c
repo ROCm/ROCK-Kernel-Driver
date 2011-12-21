@@ -140,20 +140,7 @@ void machine_kexec_setup_load_arg(xen_kexec_image_t *xki, struct kimage *image)
 		xki->page_list[PA_SWAP_PAGE] = page_to_phys(image->swap_page);
 }
 
-int __init machine_kexec_setup_resources(struct resource *hypervisor,
-					 struct resource *phys_cpus,
-					 int nr_phys_cpus)
-{
-	int k;
-
-	/* The per-cpu crash note resources belong to the hypervisor resource */
-	for (k = 0; k < nr_phys_cpus; k++)
-		request_resource(hypervisor, phys_cpus + k);
-
-	return 0;
-}
-
-void machine_kexec_register_resources(struct resource *res) { ; }
+#include "machine_kexec_xen.c"
 
 #endif /* CONFIG_XEN */
 

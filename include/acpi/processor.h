@@ -17,12 +17,6 @@
 #define ACPI_PROCESSOR_MAX_THROTTLE	250	/* 25% */
 #define ACPI_PROCESSOR_MAX_DUTY_WIDTH	4
 
-#ifdef CONFIG_XEN
-#define NR_ACPI_CPUS			(NR_CPUS < 256 ? 256 : NR_CPUS)
-#else
-#define NR_ACPI_CPUS			NR_CPUS
-#endif /* CONFIG_XEN */
-
 #define ACPI_PDC_REVISION_ID		0x1
 
 #define ACPI_PSD_REV0_REVISION		0	/* Support for _PSD as in ACPI 3.0 */

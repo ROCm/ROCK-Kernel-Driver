@@ -1161,6 +1161,7 @@ size_t crash_get_memory_size(void)
 	return size;
 }
 
+#ifndef CONFIG_XEN
 void __weak crash_free_reserved_phys_range(unsigned long begin,
 					   unsigned long end)
 {
@@ -1210,6 +1211,7 @@ unlock:
 	mutex_unlock(&kexec_mutex);
 	return ret;
 }
+#endif /* !CONFIG_XEN */
 
 static u32 *append_elf_note(u32 *buf, char *name, unsigned type, void *data,
 			    size_t data_len)

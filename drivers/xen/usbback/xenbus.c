@@ -317,13 +317,11 @@ static const struct xenbus_device_id usbback_ids[] = {
 	{ "" },
 };
 
-static struct xenbus_driver usbback_driver = {
-	.name = "vusb",
-	.ids = usbback_ids,
+static DEFINE_XENBUS_DRIVER(usbback, ,
 	.probe = usbback_probe,
 	.otherend_changed = frontend_changed,
 	.remove = usbback_remove,
-};
+);
 
 int __init usbback_xenbus_init(void)
 {

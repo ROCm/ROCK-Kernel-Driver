@@ -268,10 +268,12 @@ u8 mtrr_type_lookup(u64 start, u64 end)
 #define Tom2Enabled (1U << 21)
 #define Tom2ForceMemTypeWB (1U << 22)
 
-int __init amd_special_default_mtrr(void)
+static int __init _amd_special_default_mtrr(void)
 {
 	u32 l, h;
 
+	if (!is_initial_xendomain())
+		return 0;
 	if (boot_cpu_data.x86_vendor != X86_VENDOR_AMD)
 		return 0;
 	if (boot_cpu_data.x86 < 0xf || boot_cpu_data.x86 > 0x11)
@@ -291,7 +293,7 @@ int __init amd_special_default_mtrr(void)
 
 void __init mtrr_bp_init(void)
 {
-	if (amd_special_default_mtrr()) {
+	if (_amd_special_default_mtrr()) {
 		/* TOP_MEM2 */
 		rdmsrl(MSR_K8_TOP_MEM2, tom2);
 		tom2 &= 0xffffff8000000ULL;

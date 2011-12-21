@@ -1,5 +1,5 @@
 /*
- *	Intel CPU Microcode Update Driver for Linux
+ *	CPU Microcode Update Driver for Linux on Xen
  *
  *	Copyright (C) 2000-2006 Tigran Aivazian <tigran@aivazian.fsnet.co.uk>
  *		      2006	Shaohua Li <shaohua.li@intel.com>
@@ -39,6 +39,8 @@
 
 #include <asm/microcode.h>
 #include <asm/processor.h>
+
+#include <xen/pcpu.h>
 
 MODULE_DESCRIPTION("Microcode Update Driver");
 MODULE_AUTHOR("Tigran Aivazian <tigran@aivazian.fsnet.co.uk>");
@@ -131,6 +133,9 @@ static int __init microcode_dev_init(void)
 {
 	int error;
 
+	if (!is_initial_xendomain())
+		return -ENODEV;
+
 	error = misc_register(&microcode_dev);
 	if (error) {
 		pr_err("can't misc_register on minor=%d\n", MICROCODE_MINOR);
@@ -140,7 +145,7 @@ static int __init microcode_dev_init(void)
 	return 0;
 }
 
-static void microcode_dev_exit(void)
+static void __exit microcode_dev_exit(void)
 {
 	misc_deregister(&microcode_dev);
 }
@@ -180,6 +185,46 @@ static int request_microcode(const char *name)
 	return error;
 }
 
+static const char amd_fw_name[] = "amd-ucode/microcode_amd.bin";
+
+static int ucode_cpu_callback(struct notifier_block *nfb,
+			      unsigned long action, void *hcpu)
+{
+	unsigned int cpu = (unsigned long)hcpu;
+	struct xen_platform_op op;
+
+	switch (action) {
+	case CPU_ONLINE:
+		op.cmd = XENPF_get_cpu_version;
+		op.u.pcpu_version.xen_cpuid = cpu;
+		if (HYPERVISOR_platform_op(&op))
+			break;
+		if (op.u.pcpu_version.family == boot_cpu_data.x86
+		    && op.u.pcpu_version.model == boot_cpu_data.x86_model
+		    && op.u.pcpu_version.stepping == boot_cpu_data.x86_mask)
+			break;
+		if (strncmp(op.u.pcpu_version.vendor_id,
+			    "GenuineIntel", 12) == 0) {
+			char buf[32];
+
+			sprintf(buf, "intel-ucode/%02x-%02x-%02x",
+				op.u.pcpu_version.family,
+				op.u.pcpu_version.model,
+				op.u.pcpu_version.stepping);
+			request_microcode(buf);
+		} else if (strncmp(op.u.pcpu_version.vendor_id,
+				   "AuthenicAMD", 12) == 0)
+			request_microcode(amd_fw_name);
+		break;
+	}
+
+	return NOTIFY_OK;
+}
+
+static struct notifier_block ucode_cpu_notifier = {
+	.notifier_call = ucode_cpu_callback
+};
+
 static int __init microcode_init(void)
 {
 	const struct cpuinfo_x86 *c = &boot_cpu_data;
@@ -191,7 +236,7 @@ static int __init microcode_init(void)
 		sprintf(buf, "intel-ucode/%02x-%02x-%02x",
 			c->x86, c->x86_model, c->x86_mask);
 	else if (c->x86_vendor == X86_VENDOR_AMD)
-		fw_name = "amd-ucode/microcode_amd.bin";
+		fw_name = amd_fw_name;
 	else {
 		pr_err("no support for this CPU vendor\n");
 		return -ENODEV;
@@ -199,18 +244,23 @@ static int __init microcode_init(void)
 
 	microcode_pdev = platform_device_register_simple("microcode", -1,
 							 NULL, 0);
-	if (IS_ERR(microcode_pdev)) {
+	if (IS_ERR(microcode_pdev))
 		return PTR_ERR(microcode_pdev);
-	}
-
-	error = microcode_dev_init();
-	if (error)
-		return error;
 
 	request_microcode(fw_name);
 
+	error = microcode_dev_init();
+	if (error) {
+		platform_device_unregister(microcode_pdev);
+		return error;
+	}
+
 	pr_info("Microcode Update Driver: v" MICROCODE_VERSION
 		" <tigran@aivazian.fsnet.co.uk>, Peter Oruba\n");
+
+	error = register_pcpu_notifier(&ucode_cpu_notifier);
+	if (error)
+		pr_warn("pCPU notifier registration failed (%d)\n", error);
 
 	return 0;
 }
@@ -218,6 +268,7 @@ module_init(microcode_init);
 
 static void __exit microcode_exit(void)
 {
+	unregister_pcpu_notifier(&ucode_cpu_notifier);
 	microcode_dev_exit();
 	platform_device_unregister(microcode_pdev);
 

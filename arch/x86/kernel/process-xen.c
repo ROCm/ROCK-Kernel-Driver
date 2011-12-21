@@ -355,6 +355,14 @@ void xen_idle(void)
 EXPORT_SYMBOL(default_idle);
 #endif
 
+bool __init set_pm_idle_to_default(void)
+{
+	bool ret = !!pm_idle;
+
+	pm_idle = xen_idle;
+
+	return ret;
+}
 void stop_this_cpu(void *dummy)
 {
 	local_irq_disable();

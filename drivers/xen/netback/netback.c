@@ -1832,7 +1832,8 @@ static int __init netback_init(void)
 				goto failed_init;
 			}
 			if (bind_threads)
-				kthread_bind(netbk->task, group);
+				kthread_bind(netbk->task,
+					     group % num_online_cpus());
 			wake_up_process(netbk->task);
 		} else {
 			tasklet_init(&netbk->net_tx_tasklet, net_tx_action, group);

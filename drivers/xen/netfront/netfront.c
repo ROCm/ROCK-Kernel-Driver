@@ -2224,17 +2224,14 @@ static const struct xenbus_device_id netfront_ids[] = {
 };
 MODULE_ALIAS("xen:vif");
 
-
-static struct xenbus_driver netfront_driver = {
-	.name = "vif",
-	.ids = netfront_ids,
+static DEFINE_XENBUS_DRIVER(netfront, ,
 	.probe = netfront_probe,
 	.remove = __devexit_p(netfront_remove),
 	.suspend = netfront_suspend,
 	.suspend_cancel = netfront_suspend_cancel,
 	.resume = netfront_resume,
 	.otherend_changed = backend_changed,
-};
+);
 
 
 static int __init netif_init(void)

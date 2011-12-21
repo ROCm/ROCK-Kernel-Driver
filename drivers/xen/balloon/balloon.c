@@ -772,42 +772,39 @@ EXPORT_SYMBOL_GPL(alloc_empty_pages_and_pagevec);
 #endif /* CONFIG_XEN_BACKEND */
 
 #ifdef CONFIG_XEN
-static void _free_empty_pages_and_pagevec(struct page **pagevec, int nr_pages,
-					  bool free_vec)
+static void _free_empty_pages(struct page **pagevec, int nr_pages,
+			      bool account)
 {
 	unsigned long flags;
 	int i;
 
-	if (pagevec == NULL)
-		return;
-
 	balloon_lock(flags);
 	for (i = 0; i < nr_pages; i++) {
 		BUG_ON(page_count(pagevec[i]) != 1);
-		balloon_append(pagevec[i], !free_vec);
+		balloon_append(pagevec[i], account);
 	}
-	if (!free_vec) {
+	if (account) {
 		bs.current_pages -= nr_pages;
 		totalram_pages = bs.current_pages - totalram_bias;
 	}
 	balloon_unlock(flags);
-
-	if (free_vec)
-		kfree(pagevec);
 
 	schedule_work(&balloon_worker);
 }
 
 void free_empty_pages(struct page **pagevec, int nr_pages)
 {
-	_free_empty_pages_and_pagevec(pagevec, nr_pages, false);
+	_free_empty_pages(pagevec, nr_pages, true);
 }
 #endif
 
 #if defined(CONFIG_XEN_BACKEND) || defined(CONFIG_XEN_BACKEND_MODULE)
 void free_empty_pages_and_pagevec(struct page **pagevec, int nr_pages)
 {
-	_free_empty_pages_and_pagevec(pagevec, nr_pages, true);
+	if (pagevec) {
+		_free_empty_pages(pagevec, nr_pages, false);
+		kfree(pagevec);
+	}
 }
 EXPORT_SYMBOL_GPL(free_empty_pages_and_pagevec);
 #endif

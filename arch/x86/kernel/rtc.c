@@ -252,7 +252,7 @@ static __init int add_rtc_cmos(void)
 
 #ifdef CONFIG_XEN
 	if (!is_initial_xendomain())
-		return 0;
+		return -ENODEV;
 #endif
 
 	platform_device_register(&rtc_device);

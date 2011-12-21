@@ -153,9 +153,8 @@ static DEFINE_PER_CPU(struct clock_event_device, xen_clock_event) = {
 /* snapshots of runstate info */
 static DEFINE_PER_CPU(struct vcpu_runstate_info, xen_runstate_snapshot);
 
-/* unused ns of stolen and blocked time */
+/* unused ns of stolen time */
 static DEFINE_PER_CPU(unsigned int, xen_residual_stolen);
-static DEFINE_PER_CPU(unsigned int, xen_residual_blocked);
 
 static void init_missing_ticks_accounting(unsigned int cpu)
 {
@@ -163,14 +162,13 @@ static void init_missing_ticks_accounting(unsigned int cpu)
 	if (cpu == smp_processor_id())
 		get_runstate_snapshot(&__get_cpu_var(xen_runstate_snapshot));
 	per_cpu(xen_residual_stolen, cpu) = 0;
-	per_cpu(xen_residual_blocked, cpu) = 0;
 }
 
 static irqreturn_t timer_interrupt(int irq, void *dev_id)
 {
 	struct clock_event_device *evt = &__get_cpu_var(xen_clock_event);
 	struct vcpu_runstate_info state, *snap;
-	s64 blocked, stolen;
+	s64 stolen;
 	irqreturn_t ret = IRQ_NONE;
 
 	if (evt->event_handler) {
@@ -192,15 +190,6 @@ static irqreturn_t timer_interrupt(int irq, void *dev_id)
 				    &__get_cpu_var(xen_residual_stolen)));
 	else
 		percpu_write(xen_residual_stolen, stolen > 0 ? stolen : 0);
-
-	blocked = state.time[RUNSTATE_blocked] - snap->time[RUNSTATE_blocked]
-		+ percpu_read(xen_residual_blocked);
-
-	if (blocked >= NS_PER_TICK)
-		account_idle_ticks(div_u64_rem(blocked, NS_PER_TICK,
-				   &__get_cpu_var(xen_residual_blocked)));
-	else
-		percpu_write(xen_residual_blocked, blocked > 0 ? blocked : 0);
 
 	*snap = state;
 

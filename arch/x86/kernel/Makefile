@@ -113,6 +113,7 @@ ifeq ($(CONFIG_X86_64),y)
 	obj-y				+= vsmp_64.o
 endif
 
-disabled-obj-$(CONFIG_XEN) := crash.o early-quirks.o hpet.o i8253.o i8259.o \
-	irqinit.o pci-swiotlb.o reboot.o smpboot.o trampoline%.o tsc.o tsc_sync.o vsmp_64.o
+disabled-obj-$(CONFIG_XEN) := crash.o early-quirks.o hpet.o i8237.o i8253.o \
+	i8259.o irqinit.o pci-swiotlb.o reboot.o smpboot.o trampoline%.o \
+	tsc.o tsc_sync.o vsmp_64.o
 disabled-obj-$(CONFIG_XEN_UNPRIVILEGED_GUEST) += probe_roms.o

@@ -405,14 +405,12 @@ static const struct xenbus_device_id scsifront_ids[] = {
 };
 MODULE_ALIAS("xen:vscsi");
 
-static struct xenbus_driver scsifront_driver = {
-	.name			= "vscsi",
-	.ids			= scsifront_ids,
+static DEFINE_XENBUS_DRIVER(scsifront, ,
 	.probe			= scsifront_probe,
 	.remove			= scsifront_remove,
 /* 	.resume			= scsifront_resume, */
 	.otherend_changed	= scsifront_backend_changed,
-};
+);
 
 int scsifront_xenbus_init(void)
 {

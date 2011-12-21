@@ -359,8 +359,8 @@ int xen_set_physical_cpu_affinity(int pcpu)
 
 		rc = get_vcpuaffinity(BITS_PER_PAGE, oldmap);
 		if (!rc) {
-			void *newmap = kzalloc(BITS_TO_LONGS(pcpu + 1)
-					       * sizeof(long), GFP_KERNEL);
+			void *newmap = kcalloc(BITS_TO_LONGS(pcpu + 1),
+					       sizeof(long), GFP_KERNEL);
 
 			if (newmap) {
 				__set_bit(pcpu, newmap);

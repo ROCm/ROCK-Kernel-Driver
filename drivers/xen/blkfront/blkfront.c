@@ -1103,15 +1103,13 @@ static const struct xenbus_device_id blkfront_ids[] = {
 };
 MODULE_ALIAS("xen:vbd");
 
-static struct xenbus_driver blkfront = {
-	.name = "vbd",
-	.ids = blkfront_ids,
+static DEFINE_XENBUS_DRIVER(blkfront, ,
 	.probe = blkfront_probe,
 	.remove = blkfront_remove,
 	.resume = blkfront_resume,
 	.otherend_changed = backend_changed,
 	.is_ready = blkfront_is_ready,
-};
+);
 
 
 static int __init xlblk_init(void)
@@ -1119,14 +1117,14 @@ static int __init xlblk_init(void)
 	if (!is_running_on_xen())
 		return -ENODEV;
 
-	return xenbus_register_frontend(&blkfront);
+	return xenbus_register_frontend(&blkfront_driver);
 }
 module_init(xlblk_init);
 
 
 static void __exit xlblk_exit(void)
 {
-	return xenbus_unregister_driver(&blkfront);
+	return xenbus_unregister_driver(&blkfront_driver);
 }
 module_exit(xlblk_exit);
 

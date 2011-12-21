@@ -452,26 +452,24 @@ static int pcifront_xenbus_remove(struct xenbus_device *xdev)
 	return 0;
 }
 
-static const struct xenbus_device_id xenpci_ids[] = {
+static const struct xenbus_device_id pcifront_ids[] = {
 	{"pci"},
 	{{0}},
 };
 MODULE_ALIAS("xen:pci");
 
-static struct xenbus_driver xenbus_pcifront_driver = {
-	.name 			= "pcifront",
-	.ids 			= xenpci_ids,
+static DEFINE_XENBUS_DRIVER(pcifront, "pcifront",
 	.probe 			= pcifront_xenbus_probe,
 	.remove 		= pcifront_xenbus_remove,
 	.otherend_changed 	= pcifront_backend_changed,
-};
+);
 
 static int __init pcifront_init(void)
 {
 	if (!is_running_on_xen())
 		return -ENODEV;
 
-	return xenbus_register_frontend(&xenbus_pcifront_driver);
+	return xenbus_register_frontend(&pcifront_driver);
 }
 
 /* Initialize after the Xen PCI Frontend Stub is initialized */

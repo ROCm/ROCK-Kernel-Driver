@@ -2,7 +2,6 @@
  * pcpu.c - management physical cpu in dom0 environment
  */
 #include <linux/acpi.h>
-#include <linux/cpu.h>
 #include <linux/err.h>
 #include <linux/export.h>
 #include <linux/interrupt.h>

@@ -358,20 +358,18 @@ static const struct xenbus_device_id scsiback_ids[] = {
 	{ "" }
 };
 
-static struct xenbus_driver scsiback = {
-	.name			= "vscsi",
-	.ids			= scsiback_ids,
+static DEFINE_XENBUS_DRIVER(scsiback, ,
 	.probe			= scsiback_probe,
 	.remove			= scsiback_remove,
 	.otherend_changed	= scsiback_frontend_changed
-};
+);
 
 int scsiback_xenbus_init(void)
 {
-	return xenbus_register_backend(&scsiback);
+	return xenbus_register_backend(&scsiback_driver);
 }
 
 void scsiback_xenbus_unregister(void)
 {
-	xenbus_unregister_driver(&scsiback);
+	xenbus_unregister_driver(&scsiback_driver);
 }

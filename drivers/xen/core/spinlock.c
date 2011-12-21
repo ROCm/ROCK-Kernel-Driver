@@ -226,7 +226,7 @@ unsigned int xen_spin_wait(arch_spinlock_t *lock, struct __raw_tickets *ptok,
 	rm_idx = percpu_read(rm_seq.idx);
 	smp_wmb();
 	percpu_write(rm_seq.idx, rm_idx + 1);
-	mb();
+	smp_mb();
 
 	/*
 	 * Obtain new tickets for (or acquire) all those locks where
@@ -262,21 +262,21 @@ unsigned int xen_spin_wait(arch_spinlock_t *lock, struct __raw_tickets *ptok,
 
 void xen_spin_kick(arch_spinlock_t *lock, __ticket_t ticket)
 {
-	unsigned int cpu = raw_smp_processor_id(), ancor = cpu;
+	unsigned int cpu = raw_smp_processor_id(), anchor = cpu;
 
 	if (unlikely(!cpu_online(cpu)))
-		cpu = -1, ancor = nr_cpu_ids;
+		cpu = -1, anchor = nr_cpu_ids;
 
-	while ((cpu = cpumask_next(cpu, cpu_online_mask)) != ancor) {
+	while ((cpu = cpumask_next(cpu, cpu_online_mask)) != anchor) {
 		unsigned int flags;
 		atomic_t *rm_ctr;
 		struct spinning *spinning;
 
 		if (cpu >= nr_cpu_ids) {
-			if (ancor == nr_cpu_ids)
+			if (anchor == nr_cpu_ids)
 				return;
 			cpu = cpumask_first(cpu_online_mask);
-			if (cpu == ancor)
+			if (cpu == anchor)
 				return;
 		}
 

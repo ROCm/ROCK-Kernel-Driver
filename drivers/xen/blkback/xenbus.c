@@ -637,18 +637,14 @@ static const struct xenbus_device_id blkback_ids[] = {
 	{ "" }
 };
 
-
-static struct xenbus_driver blkback = {
-	.name = "vbd",
-	.ids = blkback_ids,
+static DEFINE_XENBUS_DRIVER(blkback, ,
 	.probe = blkback_probe,
 	.remove = blkback_remove,
 	.otherend_changed = frontend_changed
-};
+);
 
 
 void blkif_xenbus_init(void)
 {
-	if (xenbus_register_backend(&blkback))
-		BUG();
+	WARN_ON(xenbus_register_backend(&blkback_driver));
 }

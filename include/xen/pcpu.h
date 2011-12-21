@@ -1,6 +1,7 @@
 #ifndef _XEN_SYSCTL_H
 #define _XEN_SYSCTL_H
 
+#include <linux/cpu.h>
 #include <linux/notifier.h>
 
 int register_pcpu_notifier(struct notifier_block *);

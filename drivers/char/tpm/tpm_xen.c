@@ -475,25 +475,24 @@ static int tpmif_connect(struct xenbus_device *dev,
 	return 0;
 }
 
-static struct xenbus_device_id tpmfront_ids[] = {
+static const struct xenbus_device_id tpmfront_ids[] = {
 	{ "vtpm" },
 	{ "" }
 };
+MODULE_ALIAS("xen:vtpm");
 
-static struct xenbus_driver tpmfront = {
-	.name = "vtpm",
-	.ids = tpmfront_ids,
+static DEFINE_XENBUS_DRIVER(tpmfront, ,
 	.probe = tpmfront_probe,
 	.remove =  tpmfront_remove,
 	.resume = tpmfront_resume,
 	.otherend_changed = backend_changed,
 	.suspend = tpmfront_suspend,
 	.suspend_cancel = tpmfront_suspend_cancel,
-};
+);
 
 static int __init init_tpm_xenbus(void)
 {
-	return xenbus_register_frontend(&tpmfront);
+	return xenbus_register_frontend(&tpmfront_driver);
 }
 
 static int tpmif_allocate_tx_buffers(struct tpm_private *tp)
