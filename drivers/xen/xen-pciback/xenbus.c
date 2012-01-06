@@ -786,7 +786,7 @@ static const struct xenbus_device_id pciback_ids[] = {
 	{""},
 };
 
-static DEFINE_XENBUS_DRIVER(pciback, "pciback",
+static DEFINE_XENBUS_DRIVER(pciback, DRV_NAME,
 	.probe			= xen_pcibk_xenbus_probe,
 	.remove			= xen_pcibk_xenbus_remove,
 	.otherend_changed	= xen_pcibk_frontend_changed,

@@ -151,23 +151,28 @@ static DEFINE_PER_CPU(struct clock_event_device, xen_clock_event) = {
 };
 
 /* snapshots of runstate info */
-static DEFINE_PER_CPU(struct vcpu_runstate_info, xen_runstate_snapshot);
+static DEFINE_PER_CPU(u64, runnable_snapshot);
+static DEFINE_PER_CPU(u64, offline_snapshot);
 
 /* unused ns of stolen time */
-static DEFINE_PER_CPU(unsigned int, xen_residual_stolen);
+static DEFINE_PER_CPU(unsigned int, residual_stolen);
 
 static void init_missing_ticks_accounting(unsigned int cpu)
 {
-	per_cpu(xen_runstate_snapshot, cpu) = *setup_runstate_area(cpu);
-	if (cpu == smp_processor_id())
-		get_runstate_snapshot(&__get_cpu_var(xen_runstate_snapshot));
-	per_cpu(xen_residual_stolen, cpu) = 0;
+	setup_runstate_area(cpu);
+	if (cpu == smp_processor_id()) {
+		this_cpu_write(runnable_snapshot,
+			       this_vcpu_read(runstate.time[RUNSTATE_runnable]));
+		this_cpu_write(offline_snapshot,
+			       this_vcpu_read(runstate.time[RUNSTATE_offline]));
+	}
+	per_cpu(residual_stolen, cpu) = 0;
 }
 
 static irqreturn_t timer_interrupt(int irq, void *dev_id)
 {
 	struct clock_event_device *evt = &__get_cpu_var(xen_clock_event);
-	struct vcpu_runstate_info state, *snap;
+	u64 runnable, offline;
 	s64 stolen;
 	irqreturn_t ret = IRQ_NONE;
 
@@ -178,20 +183,21 @@ static irqreturn_t timer_interrupt(int irq, void *dev_id)
 
 	xen_check_wallclock_update();
 
-	get_runstate_snapshot(&state);
-	snap = &__get_cpu_var(xen_runstate_snapshot);
+	runnable = this_vcpu_read(runstate.time[RUNSTATE_runnable]);
+	offline = this_vcpu_read(runstate.time[RUNSTATE_offline]);
 
-	stolen = state.time[RUNSTATE_runnable] - snap->time[RUNSTATE_runnable]
-		+ state.time[RUNSTATE_offline] - snap->time[RUNSTATE_offline]
-		+ percpu_read(xen_residual_stolen);
+	stolen = runnable - __this_cpu_read(runnable_snapshot)
+		 + offline - __this_cpu_read(offline_snapshot)
+		 + __this_cpu_read(residual_stolen);
 
 	if (stolen >= NS_PER_TICK)
 		account_steal_ticks(div_u64_rem(stolen, NS_PER_TICK,
-				    &__get_cpu_var(xen_residual_stolen)));
+						&__get_cpu_var(residual_stolen)));
 	else
-		percpu_write(xen_residual_stolen, stolen > 0 ? stolen : 0);
+		__this_cpu_write(residual_stolen, stolen > 0 ? stolen : 0);
 
-	*snap = state;
+	__this_cpu_write(runnable_snapshot, runnable);
+	__this_cpu_write(offline_snapshot, offline);
 
 	return ret;
 }

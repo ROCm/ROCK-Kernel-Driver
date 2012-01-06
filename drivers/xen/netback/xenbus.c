@@ -33,7 +33,8 @@ static DECLARE_RWSEM(teardown_sem);
 static int connect_rings(struct backend_info *);
 static void connect(struct backend_info *);
 static void backend_create_netif(struct backend_info *be);
-static void netback_disconnect(struct device *, int);
+static void unregister_hotplug_status_watch(struct backend_info *be);
+static void netback_disconnect(struct device *, bool);
 
 static int netback_remove(struct xenbus_device *dev)
 {
@@ -41,17 +42,20 @@ static int netback_remove(struct xenbus_device *dev)
 
 	netback_remove_accelerators(be, dev);
 
-	netback_disconnect(&dev->dev, 1);
+	netback_disconnect(&dev->dev, true);
 	kfree(be);
 	return 0;
 }
 
-static void netback_disconnect(struct device *xbdev_dev, int clear)
+static void netback_disconnect(struct device *xbdev_dev, bool clear)
 {
 	struct backend_info *be = dev_get_drvdata(xbdev_dev);
 
+	unregister_hotplug_status_watch(be);
 	if (be->netif)
 		kobject_uevent(&xbdev_dev->kobj, KOBJ_OFFLINE);
+
+	xenbus_rm(XBT_NIL, be->dev->nodename, "hotplug-status");
 
 	down_write(&teardown_sem);
 	if (be->netif) {
@@ -252,7 +256,7 @@ static void frontend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateClosing:
-		netback_disconnect(&dev->dev, 0);
+		netback_disconnect(&dev->dev, false);
 		xenbus_switch_state(dev, XenbusStateClosing);
 		break;
 
@@ -332,6 +336,36 @@ static int xen_net_read_mac(struct xenbus_device *dev, u8 mac[])
 	return 0;
 }
 
+static void unregister_hotplug_status_watch(struct backend_info *be)
+{
+	if (be->have_hotplug_status_watch) {
+		unregister_xenbus_watch(&be->hotplug_status_watch);
+		kfree(be->hotplug_status_watch.node);
+	}
+	be->have_hotplug_status_watch = 0;
+}
+
+static void hotplug_status_changed(struct xenbus_watch *watch,
+				   const char **vec,
+				   unsigned int vec_size)
+{
+	struct backend_info *be = container_of(watch,
+					       struct backend_info,
+					       hotplug_status_watch);
+	char *str;
+	unsigned int len;
+
+	str = xenbus_read(XBT_NIL, be->dev->nodename, "hotplug-status", &len);
+	if (IS_ERR(str))
+		return;
+	if (len == sizeof("connected")-1 && !memcmp(str, "connected", len)) {
+		xenbus_switch_state(be->dev, XenbusStateConnected);
+		/* Not interested in this watch anymore. */
+		unregister_hotplug_status_watch(be);
+	}
+	kfree(str);
+}
+
 static void connect(struct backend_info *be)
 {
 	int err;
@@ -351,7 +385,16 @@ static void connect(struct backend_info *be)
 			  &be->netif->credit_usec);
 	be->netif->remaining_credit = be->netif->credit_bytes;
 
-	xenbus_switch_state(dev, XenbusStateConnected);
+	unregister_hotplug_status_watch(be);
+	err = xenbus_watch_path2(dev, dev->nodename, "hotplug-status",
+				 &be->hotplug_status_watch,
+				 hotplug_status_changed);
+	if (err) {
+		/* Switch now, since we can't do a watch. */
+		xenbus_switch_state(dev, XenbusStateConnected);
+	} else {
+		be->have_hotplug_status_watch = 1;
+	}
 
 	netif_wake_queue(be->netif->dev);
 }

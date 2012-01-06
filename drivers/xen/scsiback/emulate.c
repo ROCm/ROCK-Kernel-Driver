@@ -400,8 +400,8 @@ void scsiback_emulation_init(void)
 	NO_EMULATE(INQUIRY);               /*0x12*/
 	/*NO_EMULATE(RECOVER_BUFFERED_DATA); *//*0x14*/
 	NO_EMULATE(MODE_SELECT);           /*0x15*/ /* st */
-	/*NO_EMULATE(RESERVE);               *//*0x16*/
-	/*NO_EMULATE(RELEASE);               *//*0x17*/
+	NO_EMULATE(RESERVE);               /*0x16*/
+	NO_EMULATE(RELEASE);               /*0x17*/
 	/*NO_EMULATE(COPY);                  *//*0x18*/
 	NO_EMULATE(ERASE);                 /*0x19*/ /* st */
 	NO_EMULATE(MODE_SENSE);            /*0x1a*/ /* st */

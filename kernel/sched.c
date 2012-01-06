@@ -3858,6 +3858,47 @@ unsigned long long task_sched_runtime(struct task_struct *p)
 	return ns;
 }
 
+#if !defined(CONFIG_XEN) || defined(CONFIG_VIRT_CPU_ACCOUNTING)
+# define cputime_adjust_to_64 cputime_to_cputime64
+#else
+# include <linux/syscore_ops.h>
+# define NS_PER_TICK (1000000000 / HZ)
+
+static DEFINE_PER_CPU(u64, steal_snapshot);
+static DEFINE_PER_CPU(unsigned int, steal_residual);
+
+static cputime64_t cputime_adjust_to_64(cputime_t t)
+{
+	u64 s = this_vcpu_read(runstate.time[RUNSTATE_runnable]);
+	unsigned long adj = div_u64_rem(s - __this_cpu_read(steal_snapshot)
+					  + __this_cpu_read(steal_residual),
+					NS_PER_TICK,
+					&__get_cpu_var(steal_residual));
+
+	__this_cpu_write(steal_snapshot, s);
+	if (cputime_le(t, jiffies_to_cputime(adj)))
+		return cputime64_zero;
+
+	return cputime_to_cputime64(cputime_sub(t, jiffies_to_cputime(adj)));
+}
+
+static void steal_resume(void)
+{
+	cputime_adjust_to_64(cputime_max);
+}
+
+static struct syscore_ops steal_syscore_ops = {
+	.resume	= steal_resume,
+};
+
+static int __init steal_register(void)
+{
+	register_syscore_ops(&steal_syscore_ops);
+	return 0;
+}
+core_initcall(steal_register);
+#endif
+
 /*
  * Account user cpu time to a process.
  * @p: the process that the cpu time gets accounted to
@@ -3876,7 +3917,7 @@ void account_user_time(struct task_struct *p, cputime_t cputime,
 	account_group_user_time(p, cputime);
 
 	/* Add user time to cpustat. */
-	tmp = cputime_to_cputime64(cputime);
+	tmp = cputime_adjust_to_64(cputime);
 	if (TASK_NICE(p) > 0)
 		cpustat->nice = cputime64_add(cpustat->nice, tmp);
 	else
@@ -3928,7 +3969,7 @@ static inline
 void __account_system_time(struct task_struct *p, cputime_t cputime,
 			cputime_t cputime_scaled, cputime64_t *target_cputime64)
 {
-	cputime64_t tmp = cputime_to_cputime64(cputime);
+	cputime64_t tmp = cputime_adjust_to_64(cputime);
 
 	/* Add system time to process. */
 	p->stime = cputime_add(p->stime, cputime);
@@ -3990,7 +4031,7 @@ void account_steal_time(cputime_t cputime)
 void account_idle_time(cputime_t cputime)
 {
 	struct cpu_usage_stat *cpustat = &kstat_this_cpu.cpustat;
-	cputime64_t cputime64 = cputime_to_cputime64(cputime);
+	cputime64_t cputime64 = cputime_adjust_to_64(cputime);
 	struct rq *rq = this_rq();
 
 	if (atomic_read(&rq->nr_iowait) > 0)
@@ -4046,7 +4087,7 @@ static void irqtime_account_process_tick(struct task_struct *p, int user_tick,
 						struct rq *rq)
 {
 	cputime_t one_jiffy_scaled = cputime_to_scaled(cputime_one_jiffy);
-	cputime64_t tmp = cputime_to_cputime64(cputime_one_jiffy);
+	cputime64_t tmp = cputime_adjust_to_64(cputime_one_jiffy);
 	struct cpu_usage_stat *cpustat = &kstat_this_cpu.cpustat;
 
 	if (steal_account_process_tick())

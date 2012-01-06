@@ -80,7 +80,7 @@ struct xenbus_dev_data {
 	unsigned int len;
 	union {
 		struct xsd_sockmsg msg;
-		char buffer[PAGE_SIZE];
+		char buffer[XENSTORE_PAYLOAD_MAX];
 	} u;
 
 	/* Response queue. */

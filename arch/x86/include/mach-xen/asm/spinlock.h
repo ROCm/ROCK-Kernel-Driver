@@ -52,7 +52,7 @@ unsigned int xen_spin_wait(arch_spinlock_t *, struct __raw_tickets *,
 			   unsigned int flags);
 struct __raw_tickets xen_spin_adjust(const arch_spinlock_t *,
 				     struct __raw_tickets);
-void xen_spin_kick(arch_spinlock_t *, __ticket_t);
+void xen_spin_kick(const arch_spinlock_t *, __ticket_t);
 
 /*
  * Ticket locks are conceptually two parts, one indicating the current head of
@@ -67,7 +67,7 @@ void xen_spin_kick(arch_spinlock_t *, __ticket_t);
  * in the high part, because a wide xadd increment of the low part would carry
  * up and contaminate the high part.
  */
-#define __ticket_spin_count(lock) (vcpu_running((lock)->owner) ? 1 << 10 : 1)
+#define __spin_count_dec(c, l) (vcpu_running((l)->owner) ? --(c) : ((c) >>= 1))
 
 static __always_inline void __ticket_spin_lock(arch_spinlock_t *lock)
 {
@@ -80,9 +80,10 @@ static __always_inline void __ticket_spin_lock(arch_spinlock_t *lock)
 	else {
 		inc = xen_spin_adjust(lock, inc);
 		arch_local_irq_restore(flags);
-		count = __ticket_spin_count(lock);
+		count = 1 << 12;
 		do {
-			while (inc.head != inc.tail && --count) {
+			while (inc.head != inc.tail
+			       && __spin_count_dec(count, lock)) {
 				cpu_relax();
 				inc.head = ACCESS_ONCE(lock->tickets.head);
 			}
@@ -102,9 +103,10 @@ static __always_inline void __ticket_spin_lock_flags(arch_spinlock_t *lock,
 	inc = xadd(&lock->tickets, inc);
 	if (unlikely(inc.head != inc.tail)) {
 		inc = xen_spin_adjust(lock, inc);
-		count = __ticket_spin_count(lock);
+		count = 1 << 12;
 		do {
-			while (inc.head != inc.tail && --count) {
+			while (inc.head != inc.tail
+			       && __spin_count_dec(count, lock)) {
 				cpu_relax();
 				inc.head = ACCESS_ONCE(lock->tickets.head);
 			}
@@ -114,6 +116,8 @@ static __always_inline void __ticket_spin_lock_flags(arch_spinlock_t *lock,
 	barrier();		/* make sure nothing creeps before the lock is taken */
 	lock->owner = raw_smp_processor_id();
 }
+
+#undef __spin_count_dec
 
 static __always_inline int __ticket_spin_trylock(arch_spinlock_t *lock)
 {
@@ -150,7 +154,6 @@ static __always_inline void __ticket_spin_unlock(arch_spinlock_t *lock)
 #ifndef XEN_SPINLOCK_SOURCE
 # undef UNLOCK_SUFFIX
 # undef UNLOCK_LOCK_PREFIX
-# undef __ticket_spin_count
 #endif
 	new = ACCESS_ONCE(lock->tickets);
 	if (new.head != new.tail)

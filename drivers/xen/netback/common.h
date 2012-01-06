@@ -139,6 +139,8 @@ struct backend_info {
 	struct xenbus_device *dev;
 	netif_t *netif;
 	enum xenbus_state frontend_state;
+	struct xenbus_watch hotplug_status_watch;
+	int have_hotplug_status_watch:1;
 
 	/* State relating to the netback accelerator */
 	void *netback_accel_priv;

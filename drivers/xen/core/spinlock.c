@@ -88,28 +88,30 @@ static int __init spinlock_register(void)
 core_initcall(spinlock_register);
 #endif
 
-static struct __raw_tickets spin_adjust(struct spinning *spinning,
-					const arch_spinlock_t *lock,
-					struct __raw_tickets token)
+static __ticket_t spin_adjust(struct spinning *spinning,
+			      const arch_spinlock_t *lock,
+			      __ticket_t ticket)
 {
 	for (; spinning; spinning = spinning->prev)
 		if (spinning->lock == lock) {
-			unsigned int ticket = spinning->ticket;
+			unsigned int old = spinning->ticket;
 
-			if (unlikely(!(ticket + 1)))
-				break;
-			spinning->ticket = token.tail;
-			token.tail = ticket;
+			if (likely(old + 1)) {
+				spinning->ticket = ticket;
+				ticket = old;
+			}
 			break;
 		}
 
-	return token;
+	return ticket;
 }
 
 struct __raw_tickets xen_spin_adjust(const arch_spinlock_t *lock,
 				     struct __raw_tickets token)
 {
-	return spin_adjust(percpu_read(_spinning), lock, token);
+	token.tail = spin_adjust(percpu_read(_spinning), lock, token.tail);
+	token.head = ACCESS_ONCE(lock->tickets.head);
+	return token;
 }
 
 unsigned int xen_spin_wait(arch_spinlock_t *lock, struct __raw_tickets *ptok,
@@ -155,62 +157,56 @@ unsigned int xen_spin_wait(arch_spinlock_t *lock, struct __raw_tickets *ptok,
 		}
 
 		for (other = spinning.prev; other; other = other->prev) {
-			if (other->lock == lock)
+			arch_spinlock_t *lk = other->lock;
+
+			if (lk == lock) {
 				nested = true;
-			else {
-				/*
-				 * Return the ticket if we now own the lock.
-				 * While just being desirable generally (to
-				 * reduce latency on other CPUs), this is
-				 * essential in the case where interrupts
-				 * get re-enabled below.
-				 * Try to get a new ticket right away (to
-				 * reduce latency after the current lock was
-				 * released), but don't acquire the lock.
-				 */
-				arch_spinlock_t *lock = other->lock;
+				continue;
+			}
 
-				arch_local_irq_disable();
-				while (lock->tickets.head == other->ticket) {
-					struct __raw_tickets token;
+			/*
+			 * Return the ticket if we now own the lock. While
+			 * just being desirable generally (to reduce latency
+			 * on other CPUs), this is essential in the case where
+			 * interrupts get re-enabled below.
+			 * Try to get a new ticket right away (to reduce
+			 * latency after the current lock was released), but
+			 * don't acquire the lock.
+			 */
+			arch_local_irq_disable();
+			while (lk->tickets.head == other->ticket) {
+				struct __raw_tickets token;
 
-					other->ticket = -1;
-					asm volatile(UNLOCK_LOCK_PREFIX
-						     "inc" UNLOCK_SUFFIX(0) " %0"
-						     : "+m" (lock->tickets.head)
-						     : : "memory", "cc");
-					token = ACCESS_ONCE(lock->tickets);
-					if (token.head == token.tail)
-						break;
-					xen_spin_kick(lock, token.head);
-					token = xadd(&lock->tickets,
-						     ((struct __raw_tickets)
-						      { .tail = 1 }));
-					if (token.head != token.tail)
-						token = spin_adjust(
-							other->prev, lock,
-							token);
-					other->ticket = token.tail;
-					smp_mb();
-				}
+				lk->owner = cpu;
+				other->ticket = -1;
+				asm volatile(UNLOCK_LOCK_PREFIX
+					     "inc" UNLOCK_SUFFIX(0) " %0"
+					     : "+m" (lk->tickets.head)
+					     : : "memory", "cc");
+				token = ACCESS_ONCE(lk->tickets);
+				if (token.head == token.tail)
+					break;
+				xen_spin_kick(lk, token.head);
+				token = xadd(&lk->tickets,
+					     ((struct __raw_tickets)
+					      { .tail = 1 }));
+				other->ticket = token.head == token.tail
+						? token.tail
+						: spin_adjust(other->prev,
+							      lk, token.tail);
+				smp_mb();
 			}
 		}
 
-		/*
-		 * No need to use arch_local_irq_restore() here, as the
-		 * intended event processing will happen with the poll
-		 * call.
-		 */
-		vcpu_info_write(evtchn_upcall_mask,
-				nested ? upcall_mask : flags);
+		arch_local_irq_restore(nested ? upcall_mask : flags);
 
-		if (HYPERVISOR_poll_no_timeout(&__get_cpu_var(poll_evtchn), 1))
+		if ((rc = !test_evtchn(percpu_read(poll_evtchn))) &&
+		    HYPERVISOR_poll_no_timeout(&__get_cpu_var(poll_evtchn), 1))
 			BUG();
 
 		vcpu_info_write(evtchn_upcall_mask, upcall_mask);
 
-		rc = !test_evtchn(percpu_read(poll_evtchn));
-		if (!rc)
+		if (rc && !(rc = !test_evtchn(percpu_read(poll_evtchn))))
 			inc_irq_stat(irq_lock_count);
 	} while (spinning.prev || rc);
 
@@ -234,20 +230,20 @@ unsigned int xen_spin_wait(arch_spinlock_t *lock, struct __raw_tickets *ptok,
 	 */
 	if (other) {
 		do {
+			arch_spinlock_t *lk = other->lock;
 			struct __raw_tickets token;
 
 			if (other->ticket + 1)
 				continue;
-			lock = other->lock;
-			token = xadd(&lock->tickets,
+			token = xadd(&lk->tickets,
 				     ((struct __raw_tickets){ .tail = 1 }));
-			if (token.head != token.tail)
-				token = spin_adjust(other->prev, lock, token);
-			other->ticket = token.tail;
-			if (lock->tickets.head == other->ticket)
-				lock->owner = cpu;
+			other->ticket = token.head == token.tail
+					? token.tail
+					: spin_adjust(other->prev, lk,
+						      token.tail);
+			if (lk->tickets.head == other->ticket)
+				lk->owner = cpu;
 		} while ((other = other->prev) != NULL);
-		lock = spinning.lock;
 	}
 
 	rm_idx &= 1;
@@ -257,10 +253,10 @@ unsigned int xen_spin_wait(arch_spinlock_t *lock, struct __raw_tickets *ptok,
 	ptok->head = lock->tickets.head;
 	ptok->tail = spinning.ticket;
 
-	return rc ? 0 : __ticket_spin_count(lock);
+	return rc ? 0 : 1 << 10;
 }
 
-void xen_spin_kick(arch_spinlock_t *lock, __ticket_t ticket)
+void xen_spin_kick(const arch_spinlock_t *lock, __ticket_t ticket)
 {
 	unsigned int cpu = raw_smp_processor_id(), anchor = cpu;
 
