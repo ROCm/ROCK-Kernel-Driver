@@ -72,7 +72,7 @@ int asmlinkage dump_trace_unwind(struct unwind_frame_info *info,
 		      const struct stacktrace_ops *ops, void *data)
 {
 	int n = 0;
-#ifdef CONFIG_UNWIND_INFO
+#ifdef CONFIG_STACK_UNWIND
 	unsigned long sp = UNW_SP(info);
 
 	if (arch_unw_user_mode(info))
@@ -95,7 +95,7 @@ int try_stack_unwind(struct task_struct *task, struct pt_regs *regs,
 		     unsigned long **stack, unsigned long *bp,
 		     const struct stacktrace_ops *ops, void *data)
 {
-#ifdef CONFIG_UNWIND_INFO
+#ifdef CONFIG_STACK_UNWIND
 	int unw_ret = 0;
 	struct unwind_frame_info info;
 	if (call_trace < 0)
@@ -106,27 +106,25 @@ int try_stack_unwind(struct task_struct *task, struct pt_regs *regs,
 			unw_ret = dump_trace_unwind(&info, ops, data);
 	} else if (task == current)
 		unw_ret = unwind_init_running(&info, dump_trace_unwind, ops, data);
-	else {
-		if (unwind_init_blocked(&info, task) == 0)
-			unw_ret = dump_trace_unwind(&info, ops, data);
-	}
+#ifdef CONFIG_SMP
+	else if (task->on_cpu)
+		/* nothing */;
+#endif
+	else if (unwind_init_blocked(&info, task) == 0)
+		unw_ret = dump_trace_unwind(&info, ops, data);
 	if (unw_ret > 0) {
 		if (call_trace == 1 && !arch_unw_user_mode(&info)) {
 			ops->warning_symbol(data, "DWARF2 unwinder stuck at %s\n",
-				     UNW_PC(&info));
-			if ((long)UNW_SP(&info) < 0) {
+					    UNW_PC(&info));
+			if (UNW_SP(&info) >= PAGE_OFFSET) {
 				ops->warning(data, "Leftover inexact backtrace:\n");
-				*stack = (unsigned long *)UNW_SP(&info);
-				if (!stack) {
-					*bp = UNW_FP(&info);
-					return -1;
-				}
-			} else
-				ops->warning(data, "Full inexact backtrace again:\n");
-		} else if (call_trace >= 1) {
+				*stack = (void *)UNW_SP(&info);
+				*bp = UNW_FP(&info);
+				return 0;
+			}
+		} else if (call_trace >= 1)
 			return -1;
-		} else
-			ops->warning(data, "Full inexact backtrace again:\n");
+		ops->warning(data, "Full inexact backtrace again:\n");
 	} else
 		ops->warning(data, "Inexact backtrace:\n");
 #endif
