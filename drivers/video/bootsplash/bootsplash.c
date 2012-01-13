@@ -1087,14 +1087,14 @@ int splash_do_verbose(void)
 
 	if (!vc || !vc->vc_splash_data || !vc->vc_splash_data->splash_state)
 		goto done;
-	if (fg_console != vc->vc_num)
-		goto done;
 	if (!vc->vc_splash_data->imgd->splash_silentjpeg)
 		goto done;
 
 	if (!vc->vc_splash_data->splash_dosilent)
 		goto done;
 	vc->vc_splash_data->splash_dosilent = 0;
+	if (fg_console != vc->vc_num)
+		goto done;
 
 	info = registered_fb[(int)con2fb_map[0]];
 
@@ -1393,6 +1393,18 @@ int splash_prepare(struct vc_data *vc, struct fb_info *info)
 
 		info->splash_data = vc->vc_splash_data;
 
+		info->splash_data->need_sync = 0;
+		/* XEN fb needs some sync after the direct modification of
+		 * fb area; maybe other FBs would need similar hack, but
+		 * so far I don't care.
+		 */
+		if (!strcmp(info->fix.id, "xen")) {
+			info->splash_data->need_sync = 1;
+			/* sync the whole splash once */
+			splash_sync_region(info, 0, 0,
+					   info->var.xres, info->var.yres);
+		}
+
 		/* vc_resize also calls con_switch which resets yscroll */
 		if (rows != vc->vc_rows || cols != vc->vc_cols)
 			vc_resize(vc, cols, rows);
@@ -1613,7 +1625,7 @@ void splash_set_percent(struct vc_data *vc, int pe)
 			return;
 		if (splash_data) {
 			if (splash_data->imgd->splash_silentjpeg
-			    && splash_data->splash_dosilent)
+			    && splash_data->splash_dosilent) {
 				boxit(info->screen_base,
 				      info->fix.line_length,
 				      splash_data->imgd->splash_sboxes,
@@ -1623,6 +1635,14 @@ void splash_set_percent(struct vc_data *vc, int pe)
 				      splash_data->splash_sboxes_yoff,
 				      1,
 				      cf);
+				/* FIXME: get a proper width/height */
+				splash_sync_region(info,
+					splash_data->splash_sboxes_xoff,
+					splash_data->splash_sboxes_yoff,
+					info->var.xres -
+					splash_data->splash_sboxes_xoff,
+					8);
+			}
 		}
 	}
 }

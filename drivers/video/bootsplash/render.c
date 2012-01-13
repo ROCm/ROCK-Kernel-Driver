@@ -20,6 +20,25 @@
 	printk(KERN_WARNING "%s: " fmt "\n", __func__, ##args)
 #endif
 
+/* fake a region sync */
+void splash_sync_region(struct fb_info *info, int x, int y,
+			int width, int height)
+{
+	struct splash_data *sd = info->splash_data;
+	if (sd && sd->need_sync) {
+		/* issue a fake copyarea (copy to the very same position)
+		 * for marking the dirty region; this is required for Xen fb
+		 * (bnc#739020)
+		 */
+		struct fb_copyarea area;
+		area.sx = area.dx = x;
+		area.sy = area.dy = y;
+		area.width = width;
+		area.height = height;
+		info->fbops->fb_copyarea(info, &area);
+	}
+}
+
 void splash_putcs(struct vc_data *vc, struct fb_info *info,
 		   const unsigned short *s, int count, int ypos, int xpos)
 {
@@ -35,6 +54,7 @@ void splash_putcs(struct vc_data *vc, struct fb_info *info,
 	int fg_color, bg_color, transparent;
 	int n;
 	int octpp = (info->var.bits_per_pixel + 1) >> 3;
+	int drawn_width;
 
 	if (!oops_in_progress
 	    && (console_blanked || info->splash_data->splash_dosilent))
@@ -63,6 +83,7 @@ void splash_putcs(struct vc_data *vc, struct fb_info *info,
 	}
 	bgx = ((u32 *)info->pseudo_palette)[bg_color];
 	d = 0;
+	drawn_width = 0;
 	while (count--) {
 		c = scr_readw(s++);
 		src.ub = vc->vc_font.data
@@ -126,7 +147,9 @@ void splash_putcs(struct vc_data *vc, struct fb_info *info,
 			- vc->vc_font.width * octpp;
 		splashsrc.ub -= sd->pic->splash_pic_stride * vc->vc_font.height
 			- vc->vc_font.width * octpp;
+		drawn_width += vc->vc_font.width;
 	}
+	splash_sync_region(info, xpos, ypos, drawn_width, vc->vc_font.height);
 }
 
 static void splash_renderc(struct fb_info *info,
@@ -217,6 +240,7 @@ static void splash_renderc(struct fb_info *info,
 		dst.ub += info->fix.line_length - width * octpp;
 		splashsrc.ub += sd->pic->splash_pic_stride - width * octpp;
 	}
+	splash_sync_region(info, xpos, ypos, width, height);
 }
 
 void splashcopy(u8 *dst, u8 *src, int height, int width,
@@ -279,6 +303,7 @@ static void splashfill(struct fb_info *info, int sy, int sx,
 		   height, width, info->fix.line_length,
 		   sd->pic->splash_pic_stride,
 		   octpp);
+	splash_sync_region(info, sx, sy, width, height);
 }
 
 void splash_clear(struct vc_data *vc, struct fb_info *info, int sy,
@@ -317,6 +342,7 @@ void splash_clear(struct vc_data *vc, struct fb_info *info, int sy,
 		  info->fix.line_length,
 		  bgx,
 		  (info->var.bits_per_pixel + 1) >> 3);
+	splash_sync_region(info, sx, sy, width, height);
 }
 
 void splash_bmove(struct vc_data *vc, struct fb_info *info, int sy,
@@ -482,6 +508,7 @@ void splash_blank(struct vc_data *vc, struct fb_info *info, int blank)
 			  info->fix.line_length,
 			  0,
 			  (info->var.bits_per_pixel + 1) >> 3);
+		splash_sync_region(info, 0, 0, info->var.xres, info->var.yres);
 	} else {
 		/* splash_prepare(vc, info);  *//* do we really need this? */
 		splash_clear_margins(vc, info, 0);

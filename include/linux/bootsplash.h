@@ -44,6 +44,8 @@ extern int splash_verbose(void);
 extern void splash_putcs(struct vc_data *vc, struct fb_info *info,
 			const unsigned short *s, int count,
 			 int ypos, int xpos);
+extern void splash_sync_region(struct fb_info *info, int x, int y,
+			       int width, int height);
 extern void splashcopy(u8 *dst, u8 *src, int height, int width,
 		       int dstbytes, int srcbytes, int octpp);
 extern void splash_clear(struct vc_data *vc, struct fb_info *info, int sy,
