@@ -51,9 +51,21 @@ long kvmppc_alloc_hpt(struct kvm *kvm)
 {
 	unsigned long hpt;
 	unsigned long lpid;
+	struct kvmppc_linear_info *li;
 
+	/* using preallocated memory */
+	li = kvm_alloc_hpt();
+	if (li) {
+		hpt = (ulong)li->base_virt;
+		kvm->arch.hpt_li = li;
+		memset(li->base_virt, 0, li->npages << PAGE_SHIFT);
+		goto has_hpt;
+	}
+
+	/* using dynamic memory */
 	hpt = __get_free_pages(GFP_KERNEL|__GFP_ZERO|__GFP_REPEAT|__GFP_NOWARN,
 			       HPT_ORDER - PAGE_SHIFT);
+has_hpt:
 	if (!hpt) {
 		pr_err("kvm_alloc_hpt: Couldn't alloc HPT\n");
 		return -ENOMEM;
@@ -80,6 +92,10 @@ void kvmppc_free_hpt(struct kvm *kvm)
 {
 	clear_bit(kvm->arch.lpid, lpid_inuse);
 	free_pages(kvm->arch.hpt_virt, HPT_ORDER - PAGE_SHIFT);
+	if (kvm->arch.hpt_li)
+		kvm_release_hpt(kvm->arch.hpt_li);
+	else
+		free_pages(kvm->arch.hpt_virt, HPT_ORDER - PAGE_SHIFT);
 }
 
 void kvmppc_map_vrma(struct kvm *kvm, struct kvm_userspace_memory_region *mem)
