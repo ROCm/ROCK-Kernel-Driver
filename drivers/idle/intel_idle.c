@@ -93,7 +93,6 @@ static struct cpuidle_state *cpuidle_state_table;
  */
 static unsigned long long auto_demotion_disable_flags;
 
-static int tlb_flushing;
 /*
  * Set this flag for states where the HW flushes the TLB for us
  * and so we don't need cross-calls to keep it consistent.
@@ -254,7 +253,7 @@ static int intel_idle(struct cpuidle_device *dev,
 	 * leave_mm() to avoid costly and often unnecessary wakeups
 	 * for flushing the user TLB's associated with the active mm.
 	 */
-	if (!tlb_flushing && state->flags & CPUIDLE_FLAG_TLB_FLUSHED)
+	if (state->flags & CPUIDLE_FLAG_TLB_FLUSHED)
 		leave_mm(cpu);
 
 	if (!(lapic_timer_reliable_states & (1 << (cstate))))
@@ -580,8 +579,6 @@ module_init(intel_idle_init);
 module_exit(intel_idle_exit);
 
 module_param(max_cstate, int, 0444);
-module_param(lapic_timer_reliable_states, uint, 0444);
-module_param(tlb_flushing, int, 0644);
 
 MODULE_AUTHOR("Len Brown <len.brown@intel.com>");
 MODULE_DESCRIPTION("Cpuidle driver for Intel Hardware v" INTEL_IDLE_VERSION);
