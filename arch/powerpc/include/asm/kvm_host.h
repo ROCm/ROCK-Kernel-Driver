@@ -158,12 +158,13 @@ struct kvmppc_spapr_tce_table {
 	struct page *pages[0];
 };
 
-struct kvmppc_rma_info {
+struct kvmppc_linear_info {
 	void		*base_virt;
 	unsigned long	 base_pfn;
 	unsigned long	 npages;
 	struct list_head list;
-	atomic_t 	 use_count;
+	atomic_t	 use_count;
+	int		 type;
 };
 
 struct kvm_arch {
@@ -182,7 +183,7 @@ struct kvm_arch {
 	int n_rma_pages;
 	unsigned long lpcr;
 	unsigned long rmor;
-	struct kvmppc_rma_info *rma;
+	struct kvmppc_linear_info *rma;
 	struct list_head spapr_tce_tables;
 	unsigned short last_vcpu[NR_CPUS];
 	struct kvmppc_vcore *vcores[KVM_MAX_VCORES];

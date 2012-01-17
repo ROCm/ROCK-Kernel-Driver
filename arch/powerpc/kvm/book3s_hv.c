@@ -1001,7 +1001,7 @@ static inline int lpcr_rmls(unsigned long rma_size)
 
 static int kvm_rma_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
-	struct kvmppc_rma_info *ri = vma->vm_file->private_data;
+	struct kvmppc_linear_info *ri = vma->vm_file->private_data;
 	struct page *page;
 
 	if (vmf->pgoff >= ri->npages)
@@ -1026,7 +1026,7 @@ static int kvm_rma_mmap(struct file *file, struct vm_area_struct *vma)
 
 static int kvm_rma_release(struct inode *inode, struct file *filp)
 {
-	struct kvmppc_rma_info *ri = filp->private_data;
+	struct kvmppc_linear_info *ri = filp->private_data;
 
 	kvm_release_rma(ri);
 	return 0;
@@ -1039,7 +1039,7 @@ static struct file_operations kvm_rma_fops = {
 
 long kvm_vm_ioctl_allocate_rma(struct kvm *kvm, struct kvm_allocate_rma *ret)
 {
-	struct kvmppc_rma_info *ri;
+	struct kvmppc_linear_info *ri;
 	long fd;
 
 	ri = kvm_alloc_rma();
@@ -1077,7 +1077,7 @@ int kvmppc_core_prepare_memory_region(struct kvm *kvm,
 	unsigned long pg_ix;
 	struct kvmppc_pginfo *pginfo;
 	unsigned long hva;
-	struct kvmppc_rma_info *ri = NULL;
+	struct kvmppc_linear_info *ri = NULL;
 	struct page *page;
 
 	/* For now, only allow 16MB pages */
