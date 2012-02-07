@@ -25,7 +25,8 @@ obj-$(CONFIG_IRQ_WORK)  += irq_work.o
 obj-y			+= probe_roms.o
 obj-$(CONFIG_X86_32)	+= sys_i386_32.o i386_ksyms_32.o
 obj-$(CONFIG_X86_64)	+= sys_x86_64.o x8664_ksyms_64.o
-obj-$(CONFIG_X86_64)	+= syscall_64.o vsyscall_64.o
+obj-y			+= syscall_$(BITS).o
+obj-$(CONFIG_X86_64)	+= vsyscall_64.o
 obj-$(CONFIG_X86_64)	+= vsyscall_emu_64.o
 obj-y			+= bootflag.o e820.o
 obj-y			+= pci-dma.o quirks.o topology.o kdebugfs.o
@@ -80,6 +81,7 @@ obj-$(CONFIG_APB_TIMER)		+= apb_timer.o
 obj-$(CONFIG_AMD_NB)		+= amd_nb.o
 obj-$(CONFIG_DEBUG_RODATA_TEST)	+= test_rodata.o
 obj-$(CONFIG_DEBUG_NX_TEST)	+= test_nx.o
+obj-$(CONFIG_DEBUG_NMI_SELFTEST) += nmi_selftest.o
 
 obj-$(CONFIG_KVM_GUEST)		+= kvm.o
 obj-$(CONFIG_KVM_CLOCK)		+= kvmclock.o
@@ -99,8 +101,6 @@ obj-$(CONFIG_X86_CHECK_BIOS_CORRUPTION) += check.o
 obj-$(CONFIG_SWIOTLB)			+= pci-swiotlb.o
 obj-$(CONFIG_OF)			+= devicetree.o
 
-obj-$(CONFIG_X86_XEN)		+= fixup.o
-
 ###
 # 64 bit specific files
 ifeq ($(CONFIG_X86_64),y)
@@ -112,8 +112,3 @@ ifeq ($(CONFIG_X86_64),y)
 	obj-$(CONFIG_PCI_MMCONFIG)	+= mmconf-fam10h_64.o
 	obj-y				+= vsmp_64.o
 endif
-
-disabled-obj-$(CONFIG_XEN) := crash.o early-quirks.o hpet.o i8237.o i8253.o \
-	i8259.o irqinit.o pci-swiotlb.o reboot.o smpboot.o trampoline%.o \
-	tsc.o tsc_sync.o vsmp_64.o
-disabled-obj-$(CONFIG_XEN_UNPRIVILEGED_GUEST) += probe_roms.o

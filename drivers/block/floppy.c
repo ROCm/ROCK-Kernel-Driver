@@ -146,9 +146,7 @@
 
 #undef  FLOPPY_SILENT_DCL_CLEAR
 
-#ifndef CONFIG_XEN
 #define REALLY_SLOW_IO
-#endif
 
 #define DEBUGT 2
 
@@ -190,7 +188,6 @@ static int print_unex = 1;
 #include <linux/init.h>
 #include <linux/platform_device.h>
 #include <linux/mod_devicetable.h>
-#include <linux/buffer_head.h>	/* for invalidate_buffers() */
 #include <linux/mutex.h>
 #include <linux/io.h>
 #include <linux/uaccess.h>

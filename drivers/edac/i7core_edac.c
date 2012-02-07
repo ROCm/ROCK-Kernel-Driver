@@ -1932,7 +1932,7 @@ static int i7core_mce_check_error(struct notifier_block *nb, unsigned long val,
 	if (mce->bank != 8)
 		return NOTIFY_DONE;
 
-#if defined(CONFIG_SMP) || defined(CONFIG_XEN)
+#ifdef CONFIG_SMP
 	/* Only handle if it is the right mc controller */
 	if (mce->socketid != pvt->i7core_dev->socket)
 		return NOTIFY_DONE;
@@ -2234,7 +2234,7 @@ static void i7core_unregister_mci(struct i7core_dev *i7core_dev)
 	if (pvt->enable_scrub)
 		disable_sdram_scrub_setting(mci);
 
-	atomic_notifier_chain_unregister(&x86_mce_decoder_chain, &i7_mce_dec);
+	mce_unregister_decode_chain(&i7_mce_dec);
 
 	/* Disable EDAC polling */
 	i7core_pci_ctl_release(pvt);
@@ -2336,7 +2336,7 @@ static int i7core_register_mci(struct i7core_dev *i7core_dev)
 	/* DCLK for scrub rate setting */
 	pvt->dclk_freq = get_dclk_freq();
 
-	atomic_notifier_chain_register(&x86_mce_decoder_chain, &i7_mce_dec);
+	mce_register_decode_chain(&i7_mce_dec);
 
 	return 0;
 

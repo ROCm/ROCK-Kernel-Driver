@@ -20,9 +20,6 @@
 #include <linux/time.h>
 #include <linux/tick.h>
 #include <linux/stop_machine.h>
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
-#include <asm/time.h>
-#endif
 
 /* Structure holding internal timekeeping values. */
 struct timekeeper {
@@ -134,7 +131,7 @@ static inline s64 timekeeping_get_ns_raw(void)
 	/* calculate the delta since the last update_wall_time: */
 	cycle_delta = (cycle_now - clock->cycle_last) & clock->mask;
 
-	/* return delta convert to nanoseconds using ntp adjusted mult. */
+	/* return delta convert to nanoseconds. */
 	return clocksource_cyc2ns(cycle_delta, clock->mult, clock->shift);
 }
 
@@ -383,9 +380,6 @@ int do_settimeofday(const struct timespec *tv)
 
 	update_vsyscall(&xtime, &wall_to_monotonic, timekeeper.clock,
 				timekeeper.mult);
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
-	xen_update_wallclock(tv);
-#endif
 
 	write_sequnlock_irqrestore(&xtime_lock, flags);
 
@@ -819,11 +813,11 @@ static void timekeeping_adjust(s64 offset)
 	 * First we shift it down from NTP_SHIFT to clocksource->shifted nsecs.
 	 *
 	 * Note we subtract one in the shift, so that error is really error*2.
-	 * This "saves" dividing(shifting) intererval twice, but keeps the
-	 * (error > interval) comparision as still measuring if error is
+	 * This "saves" dividing(shifting) interval twice, but keeps the
+	 * (error > interval) comparison as still measuring if error is
 	 * larger then half an interval.
 	 *
-	 * Note: It does not "save" on aggrivation when reading the code.
+	 * Note: It does not "save" on aggravation when reading the code.
 	 */
 	error = timekeeper.ntp_error >> (timekeeper.ntp_error_shift - 1);
 	if (error > interval) {
@@ -839,7 +833,7 @@ static void timekeeping_adjust(s64 offset)
 		 * nanosecond, and store the amount rounded up into
 		 * the error. This causes the likely below to be unlikely.
 		 *
-		 * The properfix is to avoid rounding up by using
+		 * The proper fix is to avoid rounding up by using
 		 * the high precision timekeeper.xtime_nsec instead of
 		 * xtime.tv_nsec everywhere. Fixing this will take some
 		 * time.

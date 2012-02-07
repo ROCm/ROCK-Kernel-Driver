@@ -105,6 +105,7 @@
 
 #include <linux/hiddev.h>
 
+#define __DVB_CORE__
 #include <linux/dvb/audio.h>
 #include <linux/dvb/dmx.h>
 #include <linux/dvb/frontend.h>
@@ -114,13 +115,6 @@
 
 #ifdef CONFIG_SPARC
 #include <asm/fbio.h>
-#endif
-
-#ifdef CONFIG_XEN
-#include <xen/interface/xen.h>
-#include <xen/public/evtchn.h>
-#include <xen/public/privcmd.h>
-#include <xen/compat_ioctl.h>
 #endif
 
 static int w_long(unsigned int fd, unsigned int cmd,
@@ -1421,16 +1415,6 @@ IGNORE_IOCTL(FBIOGETCMAP32)
 IGNORE_IOCTL(FBIOSCURSOR32)
 IGNORE_IOCTL(FBIOGCURSOR32)
 #endif
-
-#ifdef CONFIG_XEN
-COMPATIBLE_IOCTL(IOCTL_PRIVCMD_HYPERCALL)
-COMPATIBLE_IOCTL(IOCTL_EVTCHN_BIND_VIRQ)
-COMPATIBLE_IOCTL(IOCTL_EVTCHN_BIND_INTERDOMAIN)
-COMPATIBLE_IOCTL(IOCTL_EVTCHN_BIND_UNBOUND_PORT)
-COMPATIBLE_IOCTL(IOCTL_EVTCHN_UNBIND)
-COMPATIBLE_IOCTL(IOCTL_EVTCHN_NOTIFY)
-COMPATIBLE_IOCTL(IOCTL_EVTCHN_RESET)
-#endif
 };
 
 /*
@@ -1487,12 +1471,6 @@ static long do_ioctl_trans(int fd, unsigned int cmd,
 		return do_video_stillpicture(fd, cmd, argp);
 	case VIDEO_SET_SPU_PALETTE:
 		return do_video_set_spu_palette(fd, cmd, argp);
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
-	case IOCTL_PRIVCMD_MMAP_32:
-	case IOCTL_PRIVCMD_MMAPBATCH_32:
-	case IOCTL_PRIVCMD_MMAPBATCH_V2_32:
-		return privcmd_ioctl_32(fd, cmd, argp);
-#endif
 	}
 
 	/*
@@ -1527,35 +1505,6 @@ static long do_ioctl_trans(int fd, unsigned int cmd,
 	}
 
 	return -ENOIOCTLCMD;
-}
-
-static void compat_ioctl_error(struct file *filp, unsigned int fd,
-		unsigned int cmd, unsigned long arg)
-{
-	char buf[10];
-	char *fn = "?";
-	char *path;
-
-	/* find the name of the device. */
-	path = (char *)__get_free_page(GFP_KERNEL);
-	if (path) {
-		fn = d_path(&filp->f_path, path, PAGE_SIZE);
-		if (IS_ERR(fn))
-			fn = "?";
-	}
-
-	 sprintf(buf,"'%c'", (cmd>>_IOC_TYPESHIFT) & _IOC_TYPEMASK);
-	if (!isprint(buf[1]))
-		sprintf(buf, "%02x", buf[1]);
-	compat_printk("ioctl32(%s:%d): Unknown cmd fd(%d) "
-			"cmd(%08x){t:%s;sz:%u} arg(%08x) on %s\n",
-			current->comm, current->pid,
-			(int)fd, (unsigned int)cmd, buf,
-			(cmd >> _IOC_SIZESHIFT) & _IOC_SIZEMASK,
-			(unsigned int)arg, fn);
-
-	if (path)
-		free_page((unsigned long)path);
 }
 
 static int compat_ioctl_check_table(unsigned int xcmd)
@@ -1644,13 +1593,8 @@ asmlinkage long compat_sys_ioctl(unsigned int fd, unsigned int cmd,
 		goto found_handler;
 
 	error = do_ioctl_trans(fd, cmd, arg, filp);
-	if (error == -ENOIOCTLCMD) {
-		static int count;
-
-		if (++count <= 50)
-			compat_ioctl_error(filp, fd, cmd, arg);
-		error = -EINVAL;
-	}
+	if (error == -ENOIOCTLCMD)
+		error = -ENOTTY;
 
 	goto out_fput;
 

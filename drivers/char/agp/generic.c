@@ -514,12 +514,12 @@ static void agp_v2_parse_one(u32 *requested_mode, u32 *bridge_agpstat, u32 *vga_
 	switch (*bridge_agpstat & 7) {
 	case 4:
 		*bridge_agpstat |= (AGPSTAT2_2X | AGPSTAT2_1X);
-		printk(KERN_INFO PFX "BIOS bug. AGP bridge claims to only support x4 rate"
+		printk(KERN_INFO PFX "BIOS bug. AGP bridge claims to only support x4 rate. "
 			"Fixing up support for x2 & x1\n");
 		break;
 	case 2:
 		*bridge_agpstat |= AGPSTAT2_1X;
-		printk(KERN_INFO PFX "BIOS bug. AGP bridge claims to only support x2 rate"
+		printk(KERN_INFO PFX "BIOS bug. AGP bridge claims to only support x2 rate. "
 			"Fixing up support for x1\n");
 		break;
 	default:
@@ -693,7 +693,7 @@ static void agp_v3_parse_one(u32 *requested_mode, u32 *bridge_agpstat, u32 *vga_
 			*bridge_agpstat &= ~(AGPSTAT3_4X | AGPSTAT3_RSVD);
 			*vga_agpstat &= ~(AGPSTAT3_4X | AGPSTAT3_RSVD);
 		} else {
-			printk(KERN_INFO PFX "Fell back to AGPx4 mode because");
+			printk(KERN_INFO PFX "Fell back to AGPx4 mode because ");
 			if (!(*bridge_agpstat & AGPSTAT3_8X)) {
 				printk(KERN_INFO PFX "bridge couldn't do x8. bridge_agpstat:%x (orig=%x)\n",
 					*bridge_agpstat, origbridge);
@@ -956,11 +956,11 @@ int agp_generic_create_gatt_table(struct agp_bridge_data *bridge)
 	bridge->driver->cache_flush();
 #ifdef CONFIG_X86
 	if (set_memory_uc((unsigned long)table, 1 << page_order))
-		printk(KERN_WARNING "Could not set GATT table memory to UC!");
+		printk(KERN_WARNING "Could not set GATT table memory to UC!\n");
 
 	bridge->gatt_table = (void *)table;
 #else
-	bridge->gatt_table = ioremap_nocache(virt_to_gart(table),
+	bridge->gatt_table = ioremap_nocache(virt_to_phys(table),
 					(PAGE_SIZE * (1 << page_order)));
 	bridge->driver->cache_flush();
 #endif
@@ -973,7 +973,7 @@ int agp_generic_create_gatt_table(struct agp_bridge_data *bridge)
 
 		return -ENOMEM;
 	}
-	bridge->gatt_bus_addr = virt_to_gart(bridge->gatt_table_real);
+	bridge->gatt_bus_addr = virt_to_phys(bridge->gatt_table_real);
 
 	/* AK: bogus, should encode addresses > 4GB */
 	for (i = 0; i < num_entries; i++) {
@@ -1228,7 +1228,7 @@ int agp_generic_alloc_pages(struct agp_bridge_data *bridge, struct agp_memory *m
 	}
 
 #ifdef CONFIG_X86
-	map_pages_into_agp(mem->pages, num_pages);
+	set_pages_array_uc(mem->pages, num_pages);
 #endif
 	ret = 0;
 out:
@@ -1261,7 +1261,7 @@ void agp_generic_destroy_pages(struct agp_memory *mem)
 		return;
 
 #ifdef CONFIG_X86
-	unmap_pages_from_agp(mem->pages, mem->page_count);
+	set_pages_array_wb(mem->pages, mem->page_count);
 #endif
 
 	for (i = 0; i < mem->page_count; i++) {

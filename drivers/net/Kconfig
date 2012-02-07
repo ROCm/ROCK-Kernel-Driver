@@ -125,6 +125,8 @@ config IFB
 	  'ifb1' etc.
 	  Look at the iproute2 documentation directory for usage etc
 
+source "drivers/net/team/Kconfig"
+
 config MACVLAN
 	tristate "MAC-VLAN support (EXPERIMENTAL)"
 	depends on EXPERIMENTAL
@@ -241,6 +243,8 @@ source "drivers/atm/Kconfig"
 
 source "drivers/net/caif/Kconfig"
 
+source "drivers/net/dsa/Kconfig"
+
 source "drivers/net/ethernet/Kconfig"
 
 source "drivers/net/fddi/Kconfig"
@@ -291,9 +295,9 @@ source "drivers/net/wimax/Kconfig"
 
 source "drivers/net/wan/Kconfig"
 
-config PARAVIRT_XEN_NETDEV_FRONTEND
+config XEN_NETDEV_FRONTEND
 	tristate "Xen network device frontend driver"
-	depends on PARAVIRT_XEN
+	depends on XEN
 	select XEN_XENBUS_FRONTEND
 	default y
 	help
@@ -302,15 +306,15 @@ config PARAVIRT_XEN_NETDEV_FRONTEND
 	  domain 0).
 
 	  The corresponding Linux backend driver is enabled by the
-	  PARAVIRT_XEN_NETDEV_BACKEND option.
+	  CONFIG_XEN_NETDEV_BACKEND option.
 
 	  If you are compiling a kernel for use as Xen guest, you
 	  should say Y here. To compile this driver as a module, chose
 	  M here: the module will be called xen-netfront.
 
-config PARAVIRT_XEN_NETDEV_BACKEND
+config XEN_NETDEV_BACKEND
 	tristate "Xen backend network device"
-	depends on PARAVIRT_XEN_BACKEND
+	depends on XEN_BACKEND
 	help
 	  This driver allows the kernel to act as a Xen network driver
 	  domain which exports paravirtual network devices to other
@@ -318,7 +322,7 @@ config PARAVIRT_XEN_NETDEV_BACKEND
 	  system that implements a compatible front end.
 
 	  The corresponding Linux frontend driver is enabled by the
-	  PARAVIRT_XEN_NETDEV_FRONTEND configuration option.
+	  CONFIG_XEN_NETDEV_FRONTEND configuration option.
 
 	  The backend driver presents a standard network device
 	  endpoint for each paravirtual network device to the driver
@@ -332,10 +336,12 @@ config PARAVIRT_XEN_NETDEV_BACKEND
 
 config VMXNET3
 	tristate "VMware VMXNET3 ethernet driver"
-	depends on PCI && INET && !XEN
+	depends on PCI && INET
 	help
 	  This driver supports VMware's vmxnet3 virtual ethernet NIC.
 	  To compile this driver as a module, choose M here: the
 	  module will be called vmxnet3.
+
+source "drivers/net/hyperv/Kconfig"
 
 endif # NETDEVICES

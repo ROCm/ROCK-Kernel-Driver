@@ -367,11 +367,11 @@ config SENSORS_F71882FG
 	  will be called f71882fg.
 
 config SENSORS_F75375S
-	tristate "Fintek F75375S/SP and F75373"
+	tristate "Fintek F75375S/SP, F75373 and F75387"
 	depends on I2C
 	help
 	  If you say yes here you get support for hardware monitoring
-	  features of the Fintek F75375S/SP and F75373
+	  features of the Fintek F75375S/SP, F75373 and F75387
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called f75375s.
@@ -434,8 +434,7 @@ config SENSORS_GPIO_FAN
 
 config SENSORS_CORETEMP
 	tristate "Intel Core/Core2/Atom temperature sensor"
-	depends on X86 && PCI && !XEN_UNPRIVILEGED_GUEST && EXPERIMENTAL
-	select XEN_DOMCTL if XEN
+	depends on X86 && PCI && EXPERIMENTAL
 	help
 	  If you say yes here you get support for the temperature
 	  sensor inside your CPU. Most of the family 6 CPUs
@@ -475,8 +474,8 @@ config SENSORS_IT87
 	select HWMON_VID
 	help
 	  If you say yes here you get support for ITE IT8705F, IT8712F,
-	  IT8716F, IT8718F, IT8720F, IT8721F, IT8726F and IT8758E sensor
-	  chips, and the SiS960 clone.
+	  IT8716F, IT8718F, IT8720F, IT8721F, IT8726F, IT8728F and IT8758E
+	  sensor chips, and the SiS960 clone.
 
 	  This driver can also be built as a module.  If so, the module
 	  will be called it87.
@@ -516,11 +515,11 @@ config SENSORS_LINEAGE
 	  will be called lineage-pem.
 
 config SENSORS_LM63
-	tristate "National Semiconductor LM63 and LM64"
+	tristate "National Semiconductor LM63 and compatibles"
 	depends on I2C
 	help
 	  If you say yes here you get support for the National
-	  Semiconductor LM63 and LM64 remote diode digital temperature
+	  Semiconductor LM63, LM64, and LM96163 remote diode digital temperature
 	  sensors with integrated fan control.  Such chips are found
 	  on the Tyan S4882 (Thunder K8QS Pro) motherboard, among
 	  others.
@@ -1140,9 +1139,8 @@ config SENSORS_TWL4030_MADC
 
 config SENSORS_VIA_CPUTEMP
 	tristate "VIA CPU temperature sensor"
-	depends on X86 && !XEN_UNPRIVILEGED_GUEST
+	depends on X86
 	select HWMON_VID
-	select XEN_DOMCTL if XEN
 	help
 	  If you say yes here you get support for the temperature
 	  sensor inside your CPU. Supported are all known variants of

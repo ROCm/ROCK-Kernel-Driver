@@ -279,9 +279,8 @@ amd_cpuid4(int leaf, union _cpuid4_leaf_eax *eax,
 	eax->split.type = types[leaf];
 	eax->split.level = levels[leaf];
 	eax->split.num_threads_sharing = 0;
-#ifndef CONFIG_XEN
 	eax->split.num_cores_on_die = __this_cpu_read(cpu_info.x86_max_cores) - 1;
-#endif
+
 
 	if (assoc == 0xffff)
 		eax->split.is_fully_associative = 1;
@@ -299,7 +298,7 @@ struct _cache_attr {
 			 unsigned int);
 };
 
-#if defined(CONFIG_AMD_NB) && !defined(CONFIG_XEN)
+#ifdef CONFIG_AMD_NB
 
 /*
  * L3 cache descriptors
@@ -580,8 +579,8 @@ unsigned int __cpuinit init_intel_cacheinfo(struct cpuinfo_x86 *c)
 	unsigned int trace = 0, l1i = 0, l1d = 0, l2 = 0, l3 = 0;
 	unsigned int new_l1d = 0, new_l1i = 0; /* Cache sizes from cpuid(4) */
 	unsigned int new_l2 = 0, new_l3 = 0, i; /* Cache sizes from cpuid(4) */
-#ifdef CONFIG_X86_HT
 	unsigned int l2_id = 0, l3_id = 0, num_threads_sharing, index_msb;
+#ifdef CONFIG_X86_HT
 	unsigned int cpu = c->cpu_index;
 #endif
 
@@ -615,20 +614,16 @@ unsigned int __cpuinit init_intel_cacheinfo(struct cpuinfo_x86 *c)
 					break;
 				case 2:
 					new_l2 = this_leaf.size/1024;
-#ifdef CONFIG_X86_HT
 					num_threads_sharing = 1 + this_leaf.eax.split.num_threads_sharing;
 					index_msb = get_count_order(num_threads_sharing);
 					l2_id = c->apicid >> index_msb;
-#endif
 					break;
 				case 3:
 					new_l3 = this_leaf.size/1024;
-#ifdef CONFIG_X86_HT
 					num_threads_sharing = 1 + this_leaf.eax.split.num_threads_sharing;
 					index_msb = get_count_order(
 							num_threads_sharing);
 					l3_id = c->apicid >> index_msb;
-#endif
 					break;
 				default:
 					break;
@@ -729,7 +724,7 @@ unsigned int __cpuinit init_intel_cacheinfo(struct cpuinfo_x86 *c)
 static DEFINE_PER_CPU(struct _cpuid4_info *, ici_cpuid4_info);
 #define CPUID4_INFO_IDX(x, y)	(&((per_cpu(ici_cpuid4_info, x))[y]))
 
-#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
+#ifdef CONFIG_SMP
 static void __cpuinit cache_shared_cpu_map_setup(unsigned int cpu, int index)
 {
 	struct _cpuid4_info	*this_leaf, *sibling_leaf;
@@ -849,8 +844,7 @@ static int __cpuinit detect_cache_attributes(unsigned int cpu)
 
 #include <linux/kobject.h>
 #include <linux/sysfs.h>
-
-extern struct sysdev_class cpu_sysdev_class; /* from drivers/base/cpu.c */
+#include <linux/cpu.h>
 
 /* pointer to kobject for cpuX/cache */
 static DEFINE_PER_CPU(struct kobject *, ici_cache_kobject);
@@ -960,7 +954,7 @@ static struct attribute *default_attrs[] = {
 	NULL
 };
 
-#if defined(CONFIG_AMD_NB) && !defined(CONFIG_XEN)
+#ifdef CONFIG_AMD_NB
 static struct attribute ** __cpuinit amd_l3_attrs(void)
 {
 	static struct attribute **attrs;
@@ -1078,9 +1072,9 @@ err_out:
 static DECLARE_BITMAP(cache_dev_map, NR_CPUS);
 
 /* Add/Remove cache interface for CPU device */
-static int __cpuinit cache_add_dev(struct sys_device * sys_dev)
+static int __cpuinit cache_add_dev(struct device *dev)
 {
-	unsigned int cpu = sys_dev->id;
+	unsigned int cpu = dev->id;
 	unsigned long i, j;
 	struct _index_kobject *this_object;
 	struct _cpuid4_info   *this_leaf;
@@ -1092,7 +1086,7 @@ static int __cpuinit cache_add_dev(struct sys_device * sys_dev)
 
 	retval = kobject_init_and_add(per_cpu(ici_cache_kobject, cpu),
 				      &ktype_percpu_entry,
-				      &sys_dev->kobj, "%s", "cache");
+				      &dev->kobj, "%s", "cache");
 	if (retval < 0) {
 		cpuid4_cache_sysfs_exit(cpu);
 		return retval;
@@ -1106,7 +1100,7 @@ static int __cpuinit cache_add_dev(struct sys_device * sys_dev)
 		this_leaf = CPUID4_INFO_IDX(cpu, i);
 
 		ktype_cache.default_attrs = default_attrs;
-#if defined(CONFIG_AMD_NB) && !defined(CONFIG_XEN)
+#ifdef CONFIG_AMD_NB
 		if (this_leaf->base.nb)
 			ktype_cache.default_attrs = amd_l3_attrs();
 #endif
@@ -1129,9 +1123,9 @@ static int __cpuinit cache_add_dev(struct sys_device * sys_dev)
 	return 0;
 }
 
-static void __cpuinit cache_remove_dev(struct sys_device * sys_dev)
+static void __cpuinit cache_remove_dev(struct device *dev)
 {
-	unsigned int cpu = sys_dev->id;
+	unsigned int cpu = dev->id;
 	unsigned long i;
 
 	if (per_cpu(ici_cpuid4_info, cpu) == NULL)
@@ -1150,17 +1144,17 @@ static int __cpuinit cacheinfo_cpu_callback(struct notifier_block *nfb,
 					unsigned long action, void *hcpu)
 {
 	unsigned int cpu = (unsigned long)hcpu;
-	struct sys_device *sys_dev;
+	struct device *dev;
 
-	sys_dev = get_cpu_sysdev(cpu);
+	dev = get_cpu_device(cpu);
 	switch (action) {
 	case CPU_ONLINE:
 	case CPU_ONLINE_FROZEN:
-		cache_add_dev(sys_dev);
+		cache_add_dev(dev);
 		break;
 	case CPU_DEAD:
 	case CPU_DEAD_FROZEN:
-		cache_remove_dev(sys_dev);
+		cache_remove_dev(dev);
 		break;
 	}
 	return NOTIFY_OK;
@@ -1179,9 +1173,9 @@ static int __cpuinit cache_sysfs_init(void)
 
 	for_each_online_cpu(i) {
 		int err;
-		struct sys_device *sys_dev = get_cpu_sysdev(i);
+		struct device *dev = get_cpu_device(i);
 
-		err = cache_add_dev(sys_dev);
+		err = cache_add_dev(dev);
 		if (err)
 			return err;
 	}

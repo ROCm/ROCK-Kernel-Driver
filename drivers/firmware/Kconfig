@@ -91,7 +91,6 @@ config DELL_RBU
 config DCDBAS
 	tristate "Dell Systems Management Base Driver"
 	depends on X86
-	select XEN_DOMCTL if XEN
 	help
 	  The Dell Systems Management Base Driver provides a sysfs interface
 	  for systems management software to perform System Management
@@ -145,18 +144,6 @@ config ISCSI_IBFT
 	  Boot Firmware Table (iBFT) via sysfs to userspace. If you wish to
 	  detect iSCSI boot parameters dynamically during system boot, say Y.
 	  Otherwise, say N.
-
-config SIGMA
-	tristate "SigmaStudio firmware loader"
-	depends on I2C
-	select CRC32
-	default n
-	help
-	  Enable helper functions for working with Analog Devices SigmaDSP
-	  parts and binary firmwares produced by Analog Devices SigmaStudio.
-
-	  If unsure, say N here.  Drivers that need these helpers will select
-	  this option automatically.
 
 source "drivers/firmware/google/Kconfig"
 

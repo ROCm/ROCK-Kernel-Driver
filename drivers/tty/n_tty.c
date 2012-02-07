@@ -63,7 +63,7 @@
  * controlling the space in the read buffer.
  */
 #define TTY_THRESHOLD_THROTTLE		128 /* now based on remaining room */
-#define TTY_THRESHOLD_UNTHROTTLE 	128
+#define TTY_THRESHOLD_UNTHROTTLE	128
 
 /*
  * Special byte codes used in the echo buffer to represent operations
@@ -407,7 +407,7 @@ static ssize_t process_output_block(struct tty_struct *tty,
 				    const unsigned char *buf, unsigned int nr)
 {
 	int	space;
-	int 	i;
+	int	i;
 	const unsigned char *cp;
 
 	mutex_lock(&tty->output_lock);
@@ -1609,7 +1609,7 @@ static inline int input_available_p(struct tty_struct *tty, int amt)
 }
 
 /**
- * 	copy_from_read_buf	-	copy read data directly
+ *	copy_from_read_buf	-	copy read data directly
  *	@tty: terminal device
  *	@b: user data
  *	@nr: size of data
@@ -1920,7 +1920,7 @@ do_it_again:
 		if (nr)
 			clear_bit(TTY_PUSH, &tty->flags);
 	} else if (test_and_clear_bit(TTY_PUSH, &tty->flags))
-		 goto do_it_again;
+		goto do_it_again;
 
 	n_tty_set_room(tty);
 	return retval;

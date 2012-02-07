@@ -290,7 +290,7 @@ void note_interrupt(unsigned int irq, struct irq_desc *desc,
 		 */
 		if (time_after(jiffies, desc->last_unhandled + HZ/10))
 			desc->irqs_unhandled = 1;
-		else if (!irq_ignore_unhandled(irq))
+		else
 			desc->irqs_unhandled++;
 		desc->last_unhandled = jiffies;
 	}
@@ -325,7 +325,7 @@ void note_interrupt(unsigned int irq, struct irq_desc *desc,
 	desc->irqs_unhandled = 0;
 }
 
-int noirqdebug __read_mostly;
+bool noirqdebug __read_mostly;
 
 int noirqdebug_setup(char *str)
 {

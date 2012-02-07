@@ -165,7 +165,6 @@ config HUGETLBFS
 	bool "HugeTLB file system support"
 	depends on X86 || IA64 || SPARC64 || (S390 && 64BIT) || \
 		   SYS_SUPPORTS_HUGETLBFS || BROKEN
-	depends on !XEN
 	help
 	  hugetlbfs is a filesystem backing for HugeTLB pages, based on
 	  ramfs. For architectures that support it, say Y here and read
@@ -222,6 +221,8 @@ source "fs/exofs/Kconfig"
 
 endif # MISC_FILESYSTEMS
 
+source "fs/exofs/Kconfig.ore"
+
 menuconfig NETWORK_FILESYSTEMS
 	bool "Network File Systems"
 	default y
@@ -269,14 +270,6 @@ source "fs/afs/Kconfig"
 source "fs/9p/Kconfig"
 
 endif # NETWORK_FILESYSTEMS
-
-if BLOCK
-menu "Partition Types"
-
-source "fs/partitions/Kconfig"
-
-endmenu
-endif
 
 source "fs/nls/Kconfig"
 source "fs/dlm/Kconfig"

@@ -25,13 +25,6 @@
 
 #define gtod (&VVAR(vsyscall_gtod_data))
 
-#ifndef CONFIG_XEN
-#define using_vclock likely(gtod->clock.vclock_mode != VCLOCK_NONE)
-#else
-#define using_vclock 0
-#define VCLOCK_TSC (-1)
-#endif
-
 notrace static cycle_t vread_tsc(void)
 {
 	cycle_t ret;
@@ -165,11 +158,11 @@ notrace int __vdso_clock_gettime(clockid_t clock, struct timespec *ts)
 {
 	switch (clock) {
 	case CLOCK_REALTIME:
-		if (using_vclock)
+		if (likely(gtod->clock.vclock_mode != VCLOCK_NONE))
 			return do_realtime(ts);
 		break;
 	case CLOCK_MONOTONIC:
-		if (using_vclock)
+		if (likely(gtod->clock.vclock_mode != VCLOCK_NONE))
 			return do_monotonic(ts);
 		break;
 	case CLOCK_REALTIME_COARSE:
@@ -186,7 +179,7 @@ int clock_gettime(clockid_t, struct timespec *)
 notrace int __vdso_gettimeofday(struct timeval *tv, struct timezone *tz)
 {
 	long ret;
-	if (using_vclock) {
+	if (likely(gtod->clock.vclock_mode != VCLOCK_NONE)) {
 		if (likely(tv != NULL)) {
 			BUILD_BUG_ON(offsetof(struct timeval, tv_usec) !=
 				     offsetof(struct timespec, tv_nsec) ||

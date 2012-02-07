@@ -159,6 +159,7 @@
 #define X86_FEATURE_WDT		(6*32+13) /* Watchdog timer */
 #define X86_FEATURE_LWP		(6*32+15) /* Light Weight Profiling */
 #define X86_FEATURE_FMA4	(6*32+16) /* 4 operands MAC instructions */
+#define X86_FEATURE_TCE		(6*32+17) /* translation cache extension */
 #define X86_FEATURE_NODEID_MSR	(6*32+19) /* NodeId MSR */
 #define X86_FEATURE_TBM		(6*32+21) /* trailing bit manipulations */
 #define X86_FEATURE_TOPOEXT	(6*32+22) /* topology extensions CPUID leafs */
@@ -197,7 +198,10 @@
 
 /* Intel-defined CPU features, CPUID level 0x00000007:0 (ebx), word 9 */
 #define X86_FEATURE_FSGSBASE	(9*32+ 0) /* {RD/WR}{FS/GS}BASE instructions*/
+#define X86_FEATURE_BMI1	(9*32+ 3) /* 1st group bit manipulation extensions */
+#define X86_FEATURE_AVX2	(9*32+ 5) /* AVX2 instructions */
 #define X86_FEATURE_SMEP	(9*32+ 7) /* Supervisor Mode Execution Protection */
+#define X86_FEATURE_BMI2	(9*32+ 8) /* 2nd group bit manipulation extensions */
 #define X86_FEATURE_ERMS	(9*32+ 9) /* Enhanced REP MOVSB/STOSB */
 
 #if defined(__KERNEL__) && !defined(__ASSEMBLY__)
@@ -288,11 +292,7 @@ extern const char * const x86_power_flags[32];
 #define cpu_has_xmm4_1		boot_cpu_has(X86_FEATURE_XMM4_1)
 #define cpu_has_xmm4_2		boot_cpu_has(X86_FEATURE_XMM4_2)
 #define cpu_has_x2apic		boot_cpu_has(X86_FEATURE_X2APIC)
-#ifndef CONFIG_XEN
 #define cpu_has_xsave		boot_cpu_has(X86_FEATURE_XSAVE)
-#else
-#define cpu_has_xsave		boot_cpu_has(X86_FEATURE_OSXSAVE)
-#endif
 #define cpu_has_osxsave		boot_cpu_has(X86_FEATURE_OSXSAVE)
 #define cpu_has_hypervisor	boot_cpu_has(X86_FEATURE_HYPERVISOR)
 #define cpu_has_pclmulqdq	boot_cpu_has(X86_FEATURE_PCLMULQDQ)

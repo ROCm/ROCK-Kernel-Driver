@@ -25,7 +25,6 @@
 #include <linux/jiffies.h>
 #include <linux/spinlock.h>
 #include <linux/list.h>
-#include <linux/sysdev.h>
 #include <linux/ctype.h>
 #include <linux/edac.h>
 #include <asm/uaccess.h>
@@ -610,10 +609,6 @@ static void edac_mc_scrub_block(unsigned long page, unsigned long offset,
 	unsigned long flags = 0;
 
 	debugf3("%s()\n", __func__);
-
-#ifdef CONFIG_XEN
-	page = mfn_to_local_pfn(page);
-#endif
 
 	/* ECC error page was not in our memory. Ignore it. */
 	if (!pfn_valid(page))

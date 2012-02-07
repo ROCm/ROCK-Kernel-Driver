@@ -136,6 +136,8 @@ static inline void pci_remove_legacy_files(struct pci_bus *bus) { return; }
 /* Lock for read/write access to pci device and bus lists */
 extern struct rw_semaphore pci_bus_sem;
 
+extern raw_spinlock_t pci_lock;
+
 extern unsigned int pci_pm_d3_delay;
 
 #ifdef CONFIG_PCI_MSI
@@ -249,6 +251,14 @@ struct pci_sriov {
 	u8 __iomem *mstate;	/* VF Migration State Array */
 };
 
+#ifdef CONFIG_PCI_ATS
+extern void pci_restore_ats_state(struct pci_dev *dev);
+#else
+static inline void pci_restore_ats_state(struct pci_dev *dev)
+{
+}
+#endif /* CONFIG_PCI_ATS */
+
 #ifdef CONFIG_PCI_IOV
 extern int pci_iov_init(struct pci_dev *dev);
 extern void pci_iov_release(struct pci_dev *dev);
@@ -315,27 +325,5 @@ static inline int pci_dev_specific_reset(struct pci_dev *dev, int probe)
 	return -ENOTTY;
 }
 #endif
-
-#ifdef CONFIG_PCI_GUESTDEV
-extern int pci_is_guestdev_to_reassign(struct pci_dev *dev);
-extern int pci_is_iomuldev(struct pci_dev *dev);
-#else
-#define pci_is_iomuldev(dev)	0
-#endif
-
-#ifdef CONFIG_PCI_RESERVE
-unsigned long pci_reserve_size_io(struct pci_bus *bus);
-unsigned long pci_reserve_size_mem(struct pci_bus *bus);
-#else
-static inline unsigned long pci_reserve_size_io(struct pci_bus *bus)
-{
-	return 0;
-}
-
-static inline unsigned long pci_reserve_size_mem(struct pci_bus *bus)
-{
-	return 0;
-}
-#endif /* CONFIG_PCI_RESERVE */
 
 #endif /* DRIVERS_PCI_H */

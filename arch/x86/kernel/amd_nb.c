@@ -15,10 +15,6 @@ static u32 *flush_words;
 const struct pci_device_id amd_nb_misc_ids[] = {
 	{ PCI_DEVICE(PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_K8_NB_MISC) },
 	{ PCI_DEVICE(PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_10H_NB_MISC) },
-#ifdef CONFIG_XEN
-	{ PCI_DEVICE(PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_11H_NB_MISC) },
-	{ PCI_DEVICE(PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_CNB17H_F3) }, /* Fam12, Fam14 */
-#endif
 	{ PCI_DEVICE(PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_15H_NB_F3) },
 	{}
 };
@@ -123,21 +119,49 @@ bool __init early_is_amd_nb(u32 device)
 	return false;
 }
 
-#ifndef CONFIG_XEN
+struct resource *amd_get_mmconfig_range(struct resource *res)
+{
+	u32 address;
+	u64 base, msr;
+	unsigned segn_busn_bits;
+
+	if (boot_cpu_data.x86_vendor != X86_VENDOR_AMD)
+		return NULL;
+
+	/* assume all cpus from fam10h have mmconfig */
+        if (boot_cpu_data.x86 < 0x10)
+		return NULL;
+
+	address = MSR_FAM10H_MMIO_CONF_BASE;
+	rdmsrl(address, msr);
+
+	/* mmconfig is not enabled */
+	if (!(msr & FAM10H_MMIO_CONF_ENABLE))
+		return NULL;
+
+	base = msr & (FAM10H_MMIO_CONF_BASE_MASK<<FAM10H_MMIO_CONF_BASE_SHIFT);
+
+	segn_busn_bits = (msr >> FAM10H_MMIO_CONF_BUSRANGE_SHIFT) &
+			 FAM10H_MMIO_CONF_BUSRANGE_MASK;
+
+	res->flags = IORESOURCE_MEM;
+	res->start = base;
+	res->end = base + (1ULL<<(segn_busn_bits + 20)) - 1;
+	return res;
+}
+
 int amd_get_subcaches(int cpu)
 {
 	struct pci_dev *link = node_to_amd_nb(amd_get_nb_id(cpu))->link;
 	unsigned int mask;
-	int cuid = 0;
+	int cuid;
 
 	if (!amd_nb_has_feature(AMD_NB_L3_PARTITIONING))
 		return 0;
 
 	pci_read_config_dword(link, 0x1d4, &mask);
 
-#ifdef CONFIG_SMP
 	cuid = cpu_data(cpu).compute_unit_id;
-#endif
 	return (mask >> (4 * cuid)) & 0xf;
 }
 
@@ -146,7 +170,7 @@ int amd_set_subcaches(int cpu, int mask)
 	static unsigned int reset, ban;
 	struct amd_northbridge *nb = node_to_amd_nb(amd_get_nb_id(cpu));
 	unsigned int reg;
-	int cuid = 0;
+	int cuid;
 
 	if (!amd_nb_has_feature(AMD_NB_L3_PARTITIONING) || mask > 0xf)
 		return -EINVAL;
@@ -164,9 +188,7 @@ int amd_set_subcaches(int cpu, int mask)
 		pci_write_config_dword(nb->misc, 0x1b8, reg & ~0x180000);
 	}
 
-#ifdef CONFIG_SMP
 	cuid = cpu_data(cpu).compute_unit_id;
-#endif
 	mask <<= 4 * cuid;
 	mask |= (0xf ^ (1 << cuid)) << 26;
 
@@ -182,7 +204,6 @@ int amd_set_subcaches(int cpu, int mask)
 
 	return 0;
 }
-#endif
 
 static int amd_cache_gart(void)
 {
