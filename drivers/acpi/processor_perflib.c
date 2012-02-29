@@ -75,6 +75,7 @@ MODULE_PARM_DESC(ignore_ppc, "If the frequency of your machine gets wrongly" \
 
 static int acpi_processor_ppc_status;
 
+#ifdef CONFIG_CPU_FREQ
 static int acpi_processor_ppc_notifier(struct notifier_block *nb,
 				       unsigned long event, void *data)
 {
@@ -117,6 +118,7 @@ static int acpi_processor_ppc_notifier(struct notifier_block *nb,
 static struct notifier_block acpi_ppc_notifier_block = {
 	.notifier_call = acpi_processor_ppc_notifier,
 };
+#endif	/* CONFIG_CPU_FREQ */
 
 static int acpi_processor_get_platform_limit(struct acpi_processor *pr)
 {
@@ -181,6 +183,12 @@ int acpi_processor_ppc_has_changed(struct acpi_processor *pr, int event_flag)
 {
 	int ret;
 
+#ifdef CONFIG_PROCESSOR_EXTERNAL_CONTROL
+	/* Xen hypervisor can handle cpufreq _PPC event */
+	if (ignore_ppc < 0 && processor_pmperf_external())
+		ignore_ppc = 0;
+#endif
+
 	if (ignore_ppc) {
 		/*
 		 * Only when it is notification event, the _OST object
@@ -205,7 +213,12 @@ int acpi_processor_ppc_has_changed(struct acpi_processor *pr, int event_flag)
 	if (ret < 0)
 		return (ret);
 	else
+#ifdef CONFIG_CPU_FREQ
 		return cpufreq_update_policy(pr->id);
+#elif defined(CONFIG_PROCESSOR_EXTERNAL_CONTROL)
+		return processor_notify_external(pr,
+				PROCESSOR_PM_CHANGE, PM_TYPE_PERF);
+#endif
 }
 
 int acpi_processor_get_bios_limit(int cpu, unsigned int *limit)
@@ -221,6 +234,7 @@ int acpi_processor_get_bios_limit(int cpu, unsigned int *limit)
 }
 EXPORT_SYMBOL(acpi_processor_get_bios_limit);
 
+#ifdef CONFIG_CPU_FREQ
 void acpi_processor_ppc_init(void)
 {
 	if (!cpufreq_register_notifier
@@ -261,6 +275,7 @@ void acpi_processor_load_module(struct acpi_processor *pr)
 	}
 	kfree(buffer.pointer);
 }
+#endif	/* CONFIG_CPU_FREQ */
 
 static int acpi_processor_get_performance_control(struct acpi_processor *pr)
 {
@@ -408,7 +423,10 @@ static int acpi_processor_get_performance_states(struct acpi_processor *pr)
 	return result;
 }
 
-static int acpi_processor_get_performance_info(struct acpi_processor *pr)
+#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
+static
+#endif
+int acpi_processor_get_performance_info(struct acpi_processor *pr)
 {
 	int result = 0;
 	acpi_status status = AE_OK;
@@ -453,6 +471,7 @@ static int acpi_processor_get_performance_info(struct acpi_processor *pr)
 	return result;
 }
 
+#ifdef CONFIG_CPU_FREQ
 int acpi_processor_notify_smm(struct module *calling_module)
 {
 	acpi_status status;
@@ -513,8 +532,12 @@ int acpi_processor_notify_smm(struct module *calling_module)
 }
 
 EXPORT_SYMBOL(acpi_processor_notify_smm);
+#endif	/* CONFIG_CPU_FREQ */
 
-static int acpi_processor_get_psd(struct acpi_processor	*pr)
+#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
+static
+#endif
+int acpi_processor_get_psd(struct acpi_processor *pr)
 {
 	int result = 0;
 	acpi_status status = AE_OK;
@@ -578,6 +601,8 @@ end:
 	kfree(buffer.pointer);
 	return result;
 }
+
+#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
 
 int acpi_processor_preregister_performance(
 		struct acpi_processor_performance __percpu *performance)
@@ -794,3 +819,5 @@ acpi_processor_unregister_performance(struct acpi_processor_performance
 }
 
 EXPORT_SYMBOL(acpi_processor_unregister_performance);
+
+#endif /* !CONFIG_PROCESSOR_EXTERNAL_CONTROL */

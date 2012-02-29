@@ -324,7 +324,11 @@ acpi_map_lookup_virt(void __iomem *virt, acpi_size size)
 }
 
 #ifndef CONFIG_IA64
+#ifndef CONFIG_XEN
 #define should_use_kmap(pfn)   page_is_ram(pfn)
+#else
+#define should_use_kmap(mfn)   pfn_valid(pfn = mfn_to_local_pfn(mfn))
+#endif
 #else
 /* ioremap will take care of cache attributes */
 #define should_use_kmap(pfn)   0
@@ -348,7 +352,7 @@ static void acpi_unmap(acpi_physical_address pg_off, void __iomem *vaddr)
 	unsigned long pfn;
 
 	pfn = pg_off >> PAGE_SHIFT;
-	if (page_is_ram(pfn))
+	if (should_use_kmap(pfn))
 		kunmap(pfn_to_page(pfn));
 	else
 		iounmap(vaddr);

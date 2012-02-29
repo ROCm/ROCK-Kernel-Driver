@@ -35,7 +35,11 @@
 #define DRV_DESC "Chelsio T3 Network Driver"
 #define DRV_NAME "cxgb3"
 /* Driver version */
+#ifndef CONFIG_XEN
 #define DRV_VERSION "1.1.4-ko"
+#else
+#define DRV_VERSION "1.1.4-xen-ko"
+#endif
 
 /* Firmware version */
 #define FW_VERSION_MAJOR 7

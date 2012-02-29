@@ -21,6 +21,10 @@
 #include <asm/pci_x86.h>
 #include <asm/acpi.h>
 
+#ifdef CONFIG_XEN
+#include <xen/interface/physdev.h>
+#endif
+
 #define PREFIX "PCI: "
 
 /* Indicate if the mmcfg resources have been placed into the resource table. */
@@ -470,6 +474,31 @@ static int __init is_mmconf_reserved(check_reserved_t is_reserved,
 			       &cfg->res, (unsigned long) cfg->address);
 		}
 	}
+
+#ifdef CONFIG_XEN
+	if (!with_e820)	{
+		struct physdev_pci_mmcfg_reserved r = {
+			.address = cfg->address,
+			.segment = cfg->segment,
+			.start_bus = cfg->start_bus,
+			.end_bus = cfg->end_bus,
+			.flags = valid ? XEN_PCI_MMCFG_RESERVED : 0
+		};
+		int rc;
+
+		rc = HYPERVISOR_physdev_op(PHYSDEVOP_pci_mmcfg_reserved, &r);
+		switch (rc) {
+		case 0: case -ENOSYS:
+			break;
+		default:
+			pr_warn(PREFIX "Failed to report MMCONFIG reservation"
+				" state for %04x [bus%02x-%02x] to hypervisor"
+				" (%d)\n",
+				cfg->segment, cfg->start_bus, cfg->end_bus,
+				rc);
+		}
+	}
+#endif
 
 	return valid;
 }
