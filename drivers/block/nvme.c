@@ -998,7 +998,6 @@ static int __devinit nvme_configure_admin_queue(struct nvme_dev *dev)
 
 	writel(0, &dev->bar->cc);
 	writel(aqa, &dev->bar->aqa);
-	/* These are not defined on all archs */
 	writeq(nvmeq->sq_dma_addr, &dev->bar->asq);
 	writeq(nvmeq->cq_dma_addr, &dev->bar->acq);
 	writel(dev->ctrl_config, &dev->bar->cc);
