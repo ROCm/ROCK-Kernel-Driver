@@ -18,8 +18,8 @@ static struct completion startup = COMPLETION_INITIALIZER(startup);
 static unsigned long rand_seed = 152L;
 static unsigned long seed = 152L;
 static int threads = 1;
-static int call_panic, call_bug, call_warn;
-static int trap_null, call_null, jump_null;
+static bool call_panic, call_bug, call_warn;
+static bool trap_null, call_null, jump_null;
 static long trap_read, trap_write, call_bad, jump_bad;
 
 module_param(seed, ulong, 0);
