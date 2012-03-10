@@ -3803,7 +3803,7 @@ void free_extent_buffer(struct extent_buffer *eb)
 	WARN_ON(1);
 }
 
-int clear_extent_buffer_dirty(struct extent_io_tree *tree,
+void clear_extent_buffer_dirty(struct extent_io_tree *tree,
 			      struct extent_buffer *eb)
 {
 	unsigned long i;
@@ -3835,7 +3835,6 @@ int clear_extent_buffer_dirty(struct extent_io_tree *tree,
 		ClearPageError(page);
 		unlock_page(page);
 	}
-	return 0;
 }
 
 int set_extent_buffer_dirty(struct extent_io_tree *tree,
