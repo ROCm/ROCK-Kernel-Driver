@@ -465,8 +465,8 @@ void btrfs_remove_ordered_extent(struct inode *inode,
  * wait for all the ordered extents in a root.  This is done when balancing
  * space between drives.
  */
-int btrfs_wait_ordered_extents(struct btrfs_root *root,
-			       int nocow_only, int delay_iput)
+void btrfs_wait_ordered_extents(struct btrfs_root *root,
+				int nocow_only, int delay_iput)
 {
 	struct list_head splice;
 	struct list_head *cur;
@@ -514,7 +514,6 @@ int btrfs_wait_ordered_extents(struct btrfs_root *root,
 		spin_lock(&root->fs_info->ordered_extent_lock);
 	}
 	spin_unlock(&root->fs_info->ordered_extent_lock);
-	return 0;
 }
 
 /*

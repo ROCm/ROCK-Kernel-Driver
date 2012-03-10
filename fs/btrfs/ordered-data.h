@@ -174,6 +174,6 @@ int btrfs_run_ordered_operations(struct btrfs_root *root, int wait);
 int btrfs_add_ordered_operation(struct btrfs_trans_handle *trans,
 				struct btrfs_root *root,
 				struct inode *inode);
-int btrfs_wait_ordered_extents(struct btrfs_root *root,
-			       int nocow_only, int delay_iput);
+void btrfs_wait_ordered_extents(struct btrfs_root *root,
+				int nocow_only, int delay_iput);
 #endif
