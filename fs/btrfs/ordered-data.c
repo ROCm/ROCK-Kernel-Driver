@@ -257,9 +257,9 @@ int btrfs_add_ordered_extent_compress(struct inode *inode, u64 file_offset,
  * when an ordered extent is finished.  If the list covers more than one
  * ordered extent, it is split across multiples.
  */
-int btrfs_add_ordered_sum(struct inode *inode,
-			  struct btrfs_ordered_extent *entry,
-			  struct btrfs_ordered_sum *sum)
+void btrfs_add_ordered_sum(struct inode *inode,
+			   struct btrfs_ordered_extent *entry,
+			   struct btrfs_ordered_sum *sum)
 {
 	struct btrfs_ordered_inode_tree *tree;
 
@@ -267,7 +267,6 @@ int btrfs_add_ordered_sum(struct inode *inode,
 	spin_lock(&tree->lock);
 	list_add_tail(&sum->list, &entry->list);
 	spin_unlock(&tree->lock);
-	return 0;
 }
 
 /*
