@@ -4101,10 +4101,11 @@ out:
 static noinline_for_stack int mark_garbage_root(struct btrfs_root *root)
 {
 	struct btrfs_trans_handle *trans;
-	int ret;
+	int ret, err;
 
 	trans = btrfs_start_transaction(root->fs_info->tree_root, 0);
-	BUG_ON(IS_ERR(trans));
+	if (IS_ERR(trans))
+		return PTR_ERR(trans);
 
 	memset(&root->root_item.drop_progress, 0,
 		sizeof(root->root_item.drop_progress));
@@ -4112,11 +4113,11 @@ static noinline_for_stack int mark_garbage_root(struct btrfs_root *root)
 	btrfs_set_root_refs(&root->root_item, 0);
 	ret = btrfs_update_root(trans, root->fs_info->tree_root,
 				&root->root_key, &root->root_item);
-	BUG_ON(ret);
 
-	ret = btrfs_end_transaction(trans, root->fs_info->tree_root);
-	BUG_ON(ret);
-	return 0;
+	err = btrfs_end_transaction(trans, root->fs_info->tree_root);
+	if (err)
+		return err;
+	return ret;
 }
 
 /*
@@ -4184,7 +4185,11 @@ int btrfs_recover_relocation(struct btrfs_root *root)
 					err = ret;
 					goto out;
 				}
-				mark_garbage_root(reloc_root);
+				ret = mark_garbage_root(reloc_root);
+				if (ret < 0) {
+					err = ret;
+					goto out;
+				}
 			}
 		}
 
@@ -4230,14 +4235,19 @@ int btrfs_recover_relocation(struct btrfs_root *root)
 
 		fs_root = read_fs_root(root->fs_info,
 				       reloc_root->root_key.offset);
-		BUG_ON(IS_ERR(fs_root));
+		if (IS_ERR(fs_root)) {
+			err = PTR_ERR(fs_root);
+			goto out_free;
+		}
 
 		err = __add_reloc_root(reloc_root);
-		BUG_ON(err < 0);
+		BUG_ON(err < 0); /* -ENOMEM or logic error */
 		fs_root->reloc_root = reloc_root;
 	}
 
-	btrfs_commit_transaction(trans, rc->extent_root);
+	err = btrfs_commit_transaction(trans, rc->extent_root);
+	if (err)
+		goto out_free;
 
 	merge_reloc_roots(rc);
 
@@ -4247,7 +4257,7 @@ int btrfs_recover_relocation(struct btrfs_root *root)
 	if (IS_ERR(trans))
 		err = PTR_ERR(trans);
 	else
-		btrfs_commit_transaction(trans, rc->extent_root);
+		err = btrfs_commit_transaction(trans, rc->extent_root);
 out_free:
 	kfree(rc);
 out:
@@ -4296,6 +4306,8 @@ int btrfs_reloc_clone_csums(struct inode *inode, u64 file_pos, u64 len)
 	disk_bytenr = file_pos + BTRFS_I(inode)->index_cnt;
 	ret = btrfs_lookup_csums_range(root->fs_info->csum_root, disk_bytenr,
 				       disk_bytenr + len - 1, &list, 0);
+	if (ret)
+		goto out;
 
 	while (!list_empty(&list)) {
 		sums = list_entry(list.next, struct btrfs_ordered_sum, list);
@@ -4313,6 +4325,7 @@ int btrfs_reloc_clone_csums(struct inode *inode, u64 file_pos, u64 len)
 
 		btrfs_add_ordered_sum(inode, ordered, sums);
 	}
+out:
 	btrfs_put_ordered_extent(ordered);
 	return ret;
 }
@@ -4409,7 +4422,7 @@ void btrfs_reloc_pre_snapshot(struct btrfs_trans_handle *trans,
  * called after snapshot is created. migrate block reservation
  * and create reloc root for the newly created snapshot
  */
-void btrfs_reloc_post_snapshot(struct btrfs_trans_handle *trans,
+int btrfs_reloc_post_snapshot(struct btrfs_trans_handle *trans,
 			       struct btrfs_pending_snapshot *pending)
 {
 	struct btrfs_root *root = pending->root;
@@ -4419,7 +4432,7 @@ void btrfs_reloc_post_snapshot(struct btrfs_trans_handle *trans,
 	int ret;
 
 	if (!root->reloc_root)
-		return;
+		return 0;
 
 	rc = root->fs_info->reloc_ctl;
 	rc->merging_rsv_size += rc->nodes_relocated;
@@ -4428,19 +4441,21 @@ void btrfs_reloc_post_snapshot(struct btrfs_trans_handle *trans,
 		ret = btrfs_block_rsv_migrate(&pending->block_rsv,
 					      rc->block_rsv,
 					      rc->nodes_relocated);
-		BUG_ON(ret);
+		if (ret)
+			return ret;
 	}
 
 	new_root = pending->snap;
 	reloc_root = create_reloc_root(trans, root->reloc_root,
 				       new_root->root_key.objectid);
+	if (IS_ERR(reloc_root))
+		return PTR_ERR(reloc_root);
 
 	ret = __add_reloc_root(reloc_root);
 	BUG_ON(ret < 0);
 	new_root->reloc_root = reloc_root;
 
-	if (rc->create_reloc_tree) {
+	if (rc->create_reloc_tree)
 		ret = clone_backref_node(trans, rc, root, reloc_root);
-		BUG_ON(ret);
-	}
+	return ret;
 }
