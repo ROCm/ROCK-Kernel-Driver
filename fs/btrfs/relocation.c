@@ -2271,7 +2271,8 @@ again:
 		} else {
 			list_del_init(&reloc_root->root_list);
 		}
-		btrfs_drop_snapshot(reloc_root, rc->block_rsv, 0, 1);
+		ret = btrfs_drop_snapshot(reloc_root, rc->block_rsv, 0, 1);
+		BUG_ON(ret < 0);
 	}
 
 	if (found) {
