@@ -483,11 +483,11 @@ int btrfs_csum_one_bio(struct btrfs_root *root, struct inode *inode,
  * This calls btrfs_truncate_item with the correct args based on the
  * overlap, and fixes up the key as required.
  */
-static noinline int truncate_one_csum(struct btrfs_trans_handle *trans,
-				      struct btrfs_root *root,
-				      struct btrfs_path *path,
-				      struct btrfs_key *key,
-				      u64 bytenr, u64 len)
+static noinline void truncate_one_csum(struct btrfs_trans_handle *trans,
+				       struct btrfs_root *root,
+				       struct btrfs_path *path,
+				       struct btrfs_key *key,
+				       u64 bytenr, u64 len)
 {
 	struct extent_buffer *leaf;
 	u16 csum_size = btrfs_super_csum_size(root->fs_info->super_copy);
@@ -525,12 +525,10 @@ static noinline int truncate_one_csum(struct btrfs_trans_handle *trans,
 		btrfs_truncate_item(trans, root, path, new_size, 0);
 
 		key->offset = end_byte;
-		ret = btrfs_set_item_key_safe(trans, root, path, key);
-		BUG_ON(ret);
+		btrfs_set_item_key_safe(trans, root, path, key);
 	} else {
 		BUG();
 	}
-	return 0;
 }
 
 /*
@@ -639,9 +637,7 @@ int btrfs_del_csums(struct btrfs_trans_handle *trans,
 
 			key.offset = end_byte - 1;
 		} else {
-			ret = truncate_one_csum(trans, root, path,
-						&key, bytenr, len);
-			BUG_ON(ret);
+			truncate_one_csum(trans, root, path, &key, bytenr, len);
 			if (key.offset < bytenr)
 				break;
 		}
