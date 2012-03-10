@@ -2925,7 +2925,7 @@ static void free_fs_root(struct btrfs_root *root)
 	kfree(root);
 }
 
-static int del_fs_roots(struct btrfs_fs_info *fs_info)
+static void del_fs_roots(struct btrfs_fs_info *fs_info)
 {
 	int ret;
 	struct btrfs_root *gang[8];
@@ -2954,7 +2954,6 @@ static int del_fs_roots(struct btrfs_fs_info *fs_info)
 		for (i = 0; i < ret; i++)
 			btrfs_free_fs_root(fs_info, gang[i]);
 	}
-	return 0;
 }
 
 int btrfs_cleanup_fs_roots(struct btrfs_fs_info *fs_info)
