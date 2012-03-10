@@ -946,9 +946,8 @@ out:
  * If trans is not null, we'll do a friendly check for a transaction that
  * is already flushing things and force the IO down ourselves.
  */
-int btrfs_add_ordered_operation(struct btrfs_trans_handle *trans,
-				struct btrfs_root *root,
-				struct inode *inode)
+void btrfs_add_ordered_operation(struct btrfs_trans_handle *trans,
+				 struct btrfs_root *root, struct inode *inode)
 {
 	u64 last_mod;
 
@@ -959,7 +958,7 @@ int btrfs_add_ordered_operation(struct btrfs_trans_handle *trans,
 	 * commit, we can safely return without doing anything
 	 */
 	if (last_mod < root->fs_info->last_trans_committed)
-		return 0;
+		return;
 
 	/*
 	 * the transaction is already committing.  Just start the IO and
@@ -967,7 +966,7 @@ int btrfs_add_ordered_operation(struct btrfs_trans_handle *trans,
 	 */
 	if (trans && root->fs_info->running_transaction->blocked) {
 		btrfs_wait_ordered_range(inode, 0, (u64)-1);
-		return 0;
+		return;
 	}
 
 	spin_lock(&root->fs_info->ordered_extent_lock);
@@ -976,6 +975,4 @@ int btrfs_add_ordered_operation(struct btrfs_trans_handle *trans,
 			      &root->fs_info->ordered_operations);
 	}
 	spin_unlock(&root->fs_info->ordered_extent_lock);
-
-	return 0;
 }
