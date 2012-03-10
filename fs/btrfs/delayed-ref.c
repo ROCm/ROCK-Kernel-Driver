@@ -558,7 +558,7 @@ static noinline void add_delayed_tree_ref(struct btrfs_fs_info *fs_info,
 /*
  * helper to insert a delayed data ref into the rbtree.
  */
-static noinline int add_delayed_data_ref(struct btrfs_fs_info *fs_info,
+static noinline void add_delayed_data_ref(struct btrfs_fs_info *fs_info,
 					 struct btrfs_trans_handle *trans,
 					 struct btrfs_delayed_ref_node *ref,
 					 u64 bytenr, u64 num_bytes, u64 parent,
@@ -614,7 +614,6 @@ static noinline int add_delayed_data_ref(struct btrfs_fs_info *fs_info,
 		delayed_refs->num_entries++;
 		trans->delayed_ref_updates++;
 	}
-	return 0;
 }
 
 /*
@@ -680,7 +679,6 @@ int btrfs_add_delayed_data_ref(struct btrfs_fs_info *fs_info,
 	struct btrfs_delayed_data_ref *ref;
 	struct btrfs_delayed_ref_head *head_ref;
 	struct btrfs_delayed_ref_root *delayed_refs;
-	int ret;
 
 	BUG_ON(extent_op && !extent_op->is_data);
 	ref = kmalloc(sizeof(*ref), GFP_NOFS);
@@ -705,10 +703,9 @@ int btrfs_add_delayed_data_ref(struct btrfs_fs_info *fs_info,
 	add_delayed_ref_head(fs_info, trans, &head_ref->node, bytenr,
 				   num_bytes, action, 1);
 
-	ret = add_delayed_data_ref(fs_info, trans, &ref->node, bytenr,
+	add_delayed_data_ref(fs_info, trans, &ref->node, bytenr,
 				   num_bytes, parent, ref_root, owner, offset,
 				   action, for_cow);
-	BUG_ON(ret);
 	if (!need_ref_seq(for_cow, ref_root) &&
 	    waitqueue_active(&delayed_refs->seq_wait))
 		wake_up(&delayed_refs->seq_wait);
