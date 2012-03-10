@@ -415,8 +415,8 @@ void btrfs_put_ordered_extent(struct btrfs_ordered_extent *entry)
  * and you must wake_up entry->wait.  You must hold the tree lock
  * while you call this function.
  */
-static int __btrfs_remove_ordered_extent(struct inode *inode,
-				struct btrfs_ordered_extent *entry)
+static void __btrfs_remove_ordered_extent(struct inode *inode,
+					  struct btrfs_ordered_extent *entry)
 {
 	struct btrfs_ordered_inode_tree *tree;
 	struct btrfs_root *root = BTRFS_I(inode)->root;
@@ -443,27 +443,22 @@ static int __btrfs_remove_ordered_extent(struct inode *inode,
 		list_del_init(&BTRFS_I(inode)->ordered_operations);
 	}
 	spin_unlock(&root->fs_info->ordered_extent_lock);
-
-	return 0;
 }
 
 /*
  * remove an ordered extent from the tree.  No references are dropped
  * but any waiters are woken.
  */
-int btrfs_remove_ordered_extent(struct inode *inode,
-				struct btrfs_ordered_extent *entry)
+void btrfs_remove_ordered_extent(struct inode *inode,
+				 struct btrfs_ordered_extent *entry)
 {
 	struct btrfs_ordered_inode_tree *tree;
-	int ret;
 
 	tree = &BTRFS_I(inode)->ordered_tree;
 	spin_lock(&tree->lock);
-	ret = __btrfs_remove_ordered_extent(inode, entry);
+	__btrfs_remove_ordered_extent(inode, entry);
 	spin_unlock(&tree->lock);
 	wake_up(&entry->wait);
-
-	return ret;
 }
 
 /*
