@@ -138,7 +138,7 @@ btrfs_ordered_inode_tree_init(struct btrfs_ordered_inode_tree *t)
 	t->last = NULL;
 }
 
-int btrfs_put_ordered_extent(struct btrfs_ordered_extent *entry);
+void btrfs_put_ordered_extent(struct btrfs_ordered_extent *entry);
 int btrfs_remove_ordered_extent(struct inode *inode,
 				struct btrfs_ordered_extent *entry);
 int btrfs_dec_test_ordered_pending(struct inode *inode,

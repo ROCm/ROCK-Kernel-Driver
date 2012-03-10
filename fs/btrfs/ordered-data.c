@@ -392,7 +392,7 @@ out:
  * used to drop a reference on an ordered extent.  This will free
  * the extent if the last reference is dropped
  */
-int btrfs_put_ordered_extent(struct btrfs_ordered_extent *entry)
+void btrfs_put_ordered_extent(struct btrfs_ordered_extent *entry)
 {
 	struct list_head *cur;
 	struct btrfs_ordered_sum *sum;
@@ -408,7 +408,6 @@ int btrfs_put_ordered_extent(struct btrfs_ordered_extent *entry)
 		}
 		kfree(entry);
 	}
-	return 0;
 }
 
 /*
