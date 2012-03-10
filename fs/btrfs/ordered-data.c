@@ -526,7 +526,7 @@ void btrfs_wait_ordered_extents(struct btrfs_root *root,
  * extra check to make sure the ordered operation list really is empty
  * before we return
  */
-int btrfs_run_ordered_operations(struct btrfs_root *root, int wait)
+void btrfs_run_ordered_operations(struct btrfs_root *root, int wait)
 {
 	struct btrfs_inode *btrfs_inode;
 	struct inode *inode;
@@ -574,8 +574,6 @@ again:
 
 	spin_unlock(&root->fs_info->ordered_extent_lock);
 	mutex_unlock(&root->fs_info->ordered_operations_mutex);
-
-	return 0;
 }
 
 /*
