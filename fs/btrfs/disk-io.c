@@ -50,7 +50,7 @@ static void end_workqueue_fn(struct btrfs_work *work);
 static void free_fs_root(struct btrfs_root *root);
 static void btrfs_check_super_valid(struct btrfs_fs_info *fs_info,
 				    int read_only);
-static int btrfs_destroy_ordered_operations(struct btrfs_root *root);
+static void btrfs_destroy_ordered_operations(struct btrfs_root *root);
 static int btrfs_destroy_ordered_extents(struct btrfs_root *root);
 static int btrfs_destroy_delayed_refs(struct btrfs_transaction *trans,
 				      struct btrfs_root *root);
@@ -3296,7 +3296,7 @@ int btrfs_error_commit_super(struct btrfs_root *root)
 	return ret;
 }
 
-static int btrfs_destroy_ordered_operations(struct btrfs_root *root)
+static void btrfs_destroy_ordered_operations(struct btrfs_root *root)
 {
 	struct btrfs_inode *btrfs_inode;
 	struct list_head splice;
@@ -3318,8 +3318,6 @@ static int btrfs_destroy_ordered_operations(struct btrfs_root *root)
 
 	spin_unlock(&root->fs_info->ordered_extent_lock);
 	mutex_unlock(&root->fs_info->ordered_operations_mutex);
-
-	return 0;
 }
 
 static int btrfs_destroy_ordered_extents(struct btrfs_root *root)
