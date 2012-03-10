@@ -4734,7 +4734,7 @@ static int btrfs_update_reserved_bytes(struct btrfs_block_group_cache *cache,
 	return ret;
 }
 
-int btrfs_prepare_extent_commit(struct btrfs_trans_handle *trans,
+void btrfs_prepare_extent_commit(struct btrfs_trans_handle *trans,
 				struct btrfs_root *root)
 {
 	struct btrfs_fs_info *fs_info = root->fs_info;
@@ -4764,7 +4764,6 @@ int btrfs_prepare_extent_commit(struct btrfs_trans_handle *trans,
 	up_write(&fs_info->extent_commit_sem);
 
 	update_global_block_rsv(fs_info);
-	return 0;
 }
 
 static int unpin_extent_range(struct btrfs_root *root, u64 start, u64 end)
