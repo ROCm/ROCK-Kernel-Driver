@@ -44,6 +44,8 @@
 #include <xen/interface/grant_table.h>
 #include <xen/features.h>
 
+#define GRANT_INVALID_REF	0
+
 struct gnttab_free_callback {
 	struct gnttab_free_callback *next;
 	void (*fn)(void *);

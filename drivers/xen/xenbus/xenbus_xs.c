@@ -640,7 +640,7 @@ static void xs_reset_watches(void)
 
 	err = xs_error(xs_single(XBT_NIL, XS_RESET_WATCHES, "", NULL));
 	if (err && err != -EEXIST)
-		printk(KERN_WARNING "xs_reset_watches failed: %d\n", err);
+		pr_warning("xs_reset_watches failed: %d\n", err);
 #endif
 }
 

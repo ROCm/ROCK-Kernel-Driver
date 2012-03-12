@@ -109,8 +109,6 @@ void __exit tpmif_exit(void);
 #define WPRINTK(fmt, args...) \
     pr_warning("xen_tpm_fr: " fmt, ##args)
 
-#define GRANT_INVALID_REF	0
-
 
 static inline int
 tx_buffer_copy(struct tx_buffer *txb, const u8 *src, int len,

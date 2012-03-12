@@ -45,8 +45,6 @@
 
 #include "usbfront.h"
 
-#define GRANT_INVALID_REF 0
-
 static void destroy_rings(struct usbfront_info *info)
 {
 	if (info->irq)

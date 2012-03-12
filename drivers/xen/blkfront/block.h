@@ -47,6 +47,7 @@
 #include <linux/hdreg.h>
 #include <linux/blkdev.h>
 #include <linux/major.h>
+#include <linux/mutex.h>
 #include <asm/hypervisor.h>
 #include <xen/xenbus.h>
 #include <xen/gnttab.h>
@@ -64,20 +65,12 @@
 #define DPRINTK_IOCTL(_f, _a...) ((void)0)
 #endif
 
-struct xlbd_type_info
-{
-	int partn_shift;
-	int disks_per_major;
-	char *devname;
-	char *diskname;
-};
-
 struct xlbd_major_info
 {
 	int major;
 	int index;
 	int usage;
-	struct xlbd_type_info *type;
+	const struct xlbd_type_info *type;
 	struct xlbd_minor_state *minors;
 };
 
@@ -98,6 +91,7 @@ struct blkfront_info
 {
 	struct xenbus_device *xbdev;
  	struct gendisk *gd;
+	struct mutex mutex;
 	int vdevice;
 	blkif_vdev_t handle;
 	int connected;
@@ -119,12 +113,6 @@ struct blkfront_info
 	unsigned int discard_granularity;
 	unsigned int discard_alignment;
 	int is_ready;
-
-	/**
-	 * The number of people holding this device open.  We won't allow a
-	 * hot-unplug unless this is 0.
-	 */
-	int users;
 };
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,28)
@@ -167,8 +155,15 @@ static inline void xlvbd_sysfs_delif(struct blkfront_info *info)
 }
 #endif
 
+void xlbd_release_major_info(void);
+
 /* Virtual cdrom block-device */
+#ifdef CONFIG_XEN
 extern void register_vcd(struct blkfront_info *info);
 extern void unregister_vcd(struct blkfront_info *info);
+#else
+static inline void register_vcd(struct blkfront_info *info) {}
+static inline void unregister_vcd(struct blkfront_info *info) {}
+#endif
 
 #endif /* __XEN_DRIVERS_BLOCK_H__ */

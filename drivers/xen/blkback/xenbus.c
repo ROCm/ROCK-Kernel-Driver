@@ -492,13 +492,11 @@ static void frontend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateClosing:
-		blkif_disconnect(be->blkif);
-		xenbus_switch_state(dev, XenbusStateClosing);
-		break;
-
 	case XenbusStateClosed:
-		xenbus_switch_state(dev, XenbusStateClosed);
-		if (xenbus_dev_is_online(dev))
+		blkif_disconnect(be->blkif);
+		xenbus_switch_state(dev, frontend_state);
+		if (frontend_state != XenbusStateClosed ||
+		    xenbus_dev_is_online(dev))
 			break;
 		/* fall through if not online */
 	case XenbusStateUnknown:

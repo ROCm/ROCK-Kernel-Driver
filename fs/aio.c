@@ -1438,7 +1438,7 @@ SYSCALL_DEFINE2(io_setup, unsigned, nr_events, aio_context_t __user *, ctxp)
 	if (!IS_ERR(ioctx)) {
 		ret = put_user(ioctx->user_id, ctxp);
 #ifdef CONFIG_EPOLL
-		if (make_fd && ret >= 0)
+		if (make_fd && !ret)
 			ret = make_aio_fd(ioctx);
 #endif
 		if (ret >= 0) {

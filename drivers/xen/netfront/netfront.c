@@ -148,8 +148,6 @@ static inline int netif_needs_gso(struct sk_buff *skb, int features)
 #define ethtool_op_set_tso(dev, data)	(-ENOSYS)
 #endif
 
-#define GRANT_INVALID_REF	0
-
 struct netfront_rx_info {
 	struct netif_rx_response rx;
 	struct netif_extra_info extras[XEN_NETIF_EXTRA_TYPE_MAX - 1];

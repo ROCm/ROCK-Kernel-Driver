@@ -36,6 +36,7 @@
 #include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/seqlock.h>
+#include <linux/timer.h>
 #include <xen/interface/xen.h>
 #include <xen/gnttab.h>
 #include <asm/pgtable.h>
@@ -183,22 +184,110 @@ int gnttab_query_foreign_access(grant_ref_t ref)
 }
 EXPORT_SYMBOL_GPL(gnttab_query_foreign_access);
 
-int gnttab_end_foreign_access_ref(grant_ref_t ref)
+static inline int _gnttab_end_foreign_access_ref(grant_ref_t ref)
 {
 	u16 flags, nflags;
 
 	nflags = shared[ref].flags;
 	do {
-		if ((flags = nflags) & (GTF_reading|GTF_writing)) {
-			printk(KERN_DEBUG "WARNING: g.e. still in use!\n");
+		if ((flags = nflags) & (GTF_reading|GTF_writing))
 			return 0;
-		}
 	} while ((nflags = sync_cmpxchg(&shared[ref].flags, flags, 0)) !=
 		 flags);
 
 	return 1;
 }
+
+int gnttab_end_foreign_access_ref(grant_ref_t ref)
+{
+	if (_gnttab_end_foreign_access_ref(ref))
+		return 1;
+	printk(KERN_DEBUG "WARNING: g.e. %#x still in use!\n", ref);
+	return 0;
+}
 EXPORT_SYMBOL_GPL(gnttab_end_foreign_access_ref);
+
+struct deferred_entry {
+	struct list_head list;
+	grant_ref_t ref;
+	uint16_t warn_delay;
+	struct page *page;
+};
+static LIST_HEAD(deferred_list);
+static void gnttab_handle_deferred(unsigned long);
+static DEFINE_TIMER(deferred_timer, gnttab_handle_deferred, 0, 0);
+
+static void gnttab_handle_deferred(unsigned long unused)
+{
+	unsigned int nr = 10;
+	struct deferred_entry *first = NULL;
+	unsigned long flags;
+
+	spin_lock_irqsave(&gnttab_list_lock, flags);
+	while (nr--) {
+		struct deferred_entry *entry
+			= list_first_entry(&deferred_list,
+					   struct deferred_entry, list);
+
+		if (entry == first)
+			break;
+		list_del(&entry->list);
+		spin_unlock_irqrestore(&gnttab_list_lock, flags);
+		if (_gnttab_end_foreign_access_ref(entry->ref)) {
+			put_free_entry(entry->ref);
+			if (entry->page) {
+				printk(KERN_DEBUG
+				       "freeing g.e. %#x (pfn %#lx)\n",
+				       entry->ref, page_to_pfn(entry->page));
+				__free_page(entry->page);
+			} else
+				printk(KERN_DEBUG "freeing g.e. %#x\n",
+				       entry->ref);
+			kfree(entry);
+			entry = NULL;
+		} else {
+			if (!--entry->warn_delay)
+				pr_info("g.e. %#x still pending\n",
+					entry->ref);
+			if (!first)
+				first = entry;
+		}
+		spin_lock_irqsave(&gnttab_list_lock, flags);
+		if (entry)
+			list_add_tail(&entry->list, &deferred_list);
+		else if (list_empty(&deferred_list))
+			break;
+	}
+	if (!list_empty(&deferred_list) && !timer_pending(&deferred_timer)) {
+		deferred_timer.expires = jiffies + HZ;
+		add_timer(&deferred_timer);
+	}
+	spin_unlock_irqrestore(&gnttab_list_lock, flags);
+}
+
+static void gnttab_add_deferred(grant_ref_t ref, struct page *page)
+{
+	struct deferred_entry *entry = kmalloc(sizeof(*entry), GFP_ATOMIC);
+	const char *what = KERN_WARNING "leaking";
+
+	if (entry) {
+		unsigned long flags;
+
+		entry->ref = ref;
+		entry->page = page;
+		entry->warn_delay = 60;
+		spin_lock_irqsave(&gnttab_list_lock, flags);
+		list_add_tail(&entry->list, &deferred_list);
+		if (!timer_pending(&deferred_timer)) {
+			deferred_timer.expires = jiffies + HZ;
+			add_timer(&deferred_timer);
+		}
+		spin_unlock_irqrestore(&gnttab_list_lock, flags);
+		what = KERN_DEBUG "deferring";
+	}
+	printk("%s g.e. %#x (pfn %lx)\n", what,
+	       ref, page ? page_to_pfn(page) : -1);
+}
 
 void gnttab_end_foreign_access(grant_ref_t ref, unsigned long page)
 {
@@ -206,12 +295,8 @@ void gnttab_end_foreign_access(grant_ref_t ref, unsigned long page)
 		put_free_entry(ref);
 		if (page != 0)
 			free_page(page);
-	} else {
-		/* XXX This needs to be fixed so that the ref and page are
-		   placed on a list to be freed up later. */
-		printk(KERN_DEBUG
-		       "WARNING: leaking g.e. and page still in use!\n");
-	}
+	} else
+		gnttab_add_deferred(ref, page ? virt_to_page(page) : NULL);
 }
 EXPORT_SYMBOL_GPL(gnttab_end_foreign_access);
 

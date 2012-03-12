@@ -309,7 +309,6 @@ static int xencdrom_block_open(struct block_device *bd, fmode_t mode)
 #else
 		ret = cdrom_open(&vcd->vcd_cdrom_info, bd, mode);
 #endif
-		info->users = vcd->vcd_cdrom_info.use_count;
 		spin_unlock(&vcd->vcd_cdrom_info_lock);
 	}
 
@@ -336,7 +335,6 @@ static int xencdrom_block_release(struct gendisk *gd, fmode_t mode)
 #endif
 		spin_unlock(&vcd->vcd_cdrom_info_lock);
 		if (vcd->vcd_cdrom_info.use_count == 0) {
-			info->users = 1;
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,28)
 			blkif_release(inode, file);
 #else

@@ -41,6 +41,10 @@
 #include <xen/platform-compat.h>
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,23)
+#define XENVBD_MAJOR 202
+#endif
+
 #define BLKIF_MAJOR(dev) ((dev)>>8)
 #define BLKIF_MINOR(dev) ((dev) & 0xff)
 
@@ -62,46 +66,63 @@ struct xlbd_minor_state {
  */
 
 #define NUM_IDE_MAJORS 10
-#define NUM_SCSI_MAJORS 17
+#define NUM_SD_MAJORS 16
 #define NUM_VBD_MAJORS 2
 
-static struct xlbd_type_info xlbd_ide_type = {
+struct xlbd_type_info
+{
+	int partn_shift;
+	int disks_per_major;
+	char *devname;
+	char *diskname;
+};
+
+static const struct xlbd_type_info xlbd_ide_type = {
 	.partn_shift = 6,
 	.disks_per_major = 2,
 	.devname = "ide",
 	.diskname = "hd",
 };
 
-static struct xlbd_type_info xlbd_scsi_type = {
+static const struct xlbd_type_info xlbd_sd_type = {
 	.partn_shift = 4,
 	.disks_per_major = 16,
 	.devname = "sd",
 	.diskname = "sd",
 };
 
-static struct xlbd_type_info xlbd_vbd_type = {
+static const struct xlbd_type_info xlbd_sr_type = {
+	.partn_shift = 0,
+	.disks_per_major = 256,
+	.devname = "sr",
+	.diskname = "sr",
+};
+
+static const struct xlbd_type_info xlbd_vbd_type = {
 	.partn_shift = 4,
 	.disks_per_major = 16,
 	.devname = "xvd",
 	.diskname = "xvd",
 };
 
-static struct xlbd_type_info xlbd_vbd_type_ext = {
+static const struct xlbd_type_info xlbd_vbd_type_ext = {
 	.partn_shift = 8,
 	.disks_per_major = 256,
 	.devname = "xvd",
 	.diskname = "xvd",
 };
 
-static struct xlbd_major_info *major_info[NUM_IDE_MAJORS + NUM_SCSI_MAJORS +
+static struct xlbd_major_info *major_info[NUM_IDE_MAJORS + NUM_SD_MAJORS + 1 +
 					 NUM_VBD_MAJORS];
 
 #define XLBD_MAJOR_IDE_START	0
-#define XLBD_MAJOR_SCSI_START	(NUM_IDE_MAJORS)
-#define XLBD_MAJOR_VBD_START	(NUM_IDE_MAJORS + NUM_SCSI_MAJORS)
+#define XLBD_MAJOR_SD_START	(NUM_IDE_MAJORS)
+#define XLBD_MAJOR_SR_START	(NUM_IDE_MAJORS + NUM_SD_MAJORS)
+#define XLBD_MAJOR_VBD_START	(NUM_IDE_MAJORS + NUM_SD_MAJORS + 1)
 
-#define XLBD_MAJOR_IDE_RANGE	XLBD_MAJOR_IDE_START ... XLBD_MAJOR_SCSI_START - 1
-#define XLBD_MAJOR_SCSI_RANGE	XLBD_MAJOR_SCSI_START ... XLBD_MAJOR_VBD_START - 1
+#define XLBD_MAJOR_IDE_RANGE	XLBD_MAJOR_IDE_START ... XLBD_MAJOR_SD_START - 1
+#define XLBD_MAJOR_SD_RANGE	XLBD_MAJOR_SD_START ... XLBD_MAJOR_SR_START - 1
+#define XLBD_MAJOR_SR_RANGE	XLBD_MAJOR_SR_START
 #define XLBD_MAJOR_VBD_RANGE	XLBD_MAJOR_VBD_START ... XLBD_MAJOR_VBD_START + NUM_VBD_MAJORS - 1
 
 #define XLBD_MAJOR_VBD_ALT(idx) ((idx) ^ XLBD_MAJOR_VBD_START ^ (XLBD_MAJOR_VBD_START + 1))
@@ -152,9 +173,13 @@ xlbd_alloc_major_info(int major, int minor, int index)
 		ptr->type = &xlbd_ide_type;
 		ptr->index = index - XLBD_MAJOR_IDE_START;
 		break;
-	case XLBD_MAJOR_SCSI_RANGE:
-		ptr->type = &xlbd_scsi_type;
-		ptr->index = index - XLBD_MAJOR_SCSI_START;
+	case XLBD_MAJOR_SD_RANGE:
+		ptr->type = &xlbd_sd_type;
+		ptr->index = index - XLBD_MAJOR_SD_START;
+		break;
+	case XLBD_MAJOR_SR_RANGE:
+		ptr->type = &xlbd_sr_type;
+		ptr->index = index - XLBD_MAJOR_SR_START;
 		break;
 	case XLBD_MAJOR_VBD_RANGE:
 		ptr->index = 0;
@@ -164,7 +189,7 @@ xlbd_alloc_major_info(int major, int minor, int index)
 			ptr->type = &xlbd_vbd_type_ext;
 
 		/* 
-		 * if someone already registered block major 202,
+		 * if someone already registered block major XENVBD_MAJOR,
 		 * don't try to register it again
 		 */
 		if (major_info[XLBD_MAJOR_VBD_ALT(index)] != NULL) {
@@ -210,20 +235,21 @@ xlbd_get_major_info(int major, int minor, int vdevice)
 	case IDE7_MAJOR: index = 7; break;
 	case IDE8_MAJOR: index = 8; break;
 	case IDE9_MAJOR: index = 9; break;
-	case SCSI_DISK0_MAJOR: index = 10; break;
+	case SCSI_DISK0_MAJOR: index = XLBD_MAJOR_SD_START; break;
 	case SCSI_DISK1_MAJOR ... SCSI_DISK7_MAJOR:
-		index = 11 + major - SCSI_DISK1_MAJOR;
+		index = XLBD_MAJOR_SD_START + 1 + major - SCSI_DISK1_MAJOR;
 		break;
-        case SCSI_DISK8_MAJOR ... SCSI_DISK15_MAJOR:
-                index = 18 + major - SCSI_DISK8_MAJOR;
-                break;
-        case SCSI_CDROM_MAJOR: index = 26; break;
-        default:
-		if (!VDEV_IS_EXTENDED(vdevice))
-			index = 27;
-		else
-			index = 28;
+	case SCSI_DISK8_MAJOR ... SCSI_DISK15_MAJOR:
+		index = XLBD_MAJOR_SD_START + 8 + major - SCSI_DISK8_MAJOR;
 		break;
+	case SCSI_CDROM_MAJOR:
+		index = XLBD_MAJOR_SR_START;
+		break;
+	case XENVBD_MAJOR:
+		index = XLBD_MAJOR_VBD_START + !!VDEV_IS_EXTENDED(vdevice);
+		break;
+	default:
+		return NULL;
 	}
 
 	mi = ((major_info[index] != NULL) ? major_info[index] :
@@ -238,6 +264,31 @@ xlbd_put_major_info(struct xlbd_major_info *mi)
 {
 	mi->usage--;
 	/* XXX: release major if 0 */
+}
+
+void __exit
+xlbd_release_major_info(void)
+{
+	unsigned int i;
+	int vbd_done = 0;
+
+	for (i = 0; i < ARRAY_SIZE(major_info); ++i) {
+		struct xlbd_major_info *mi = major_info[i];
+
+		if (!mi)
+			continue;
+		if (mi->usage)
+			pr_warning("vbd: major %u still in use (%u times)\n",
+				   mi->major, mi->usage);
+		if (mi->major != XENVBD_MAJOR || !vbd_done) {
+			unregister_blkdev(mi->major, mi->type->devname);
+			kfree(mi->minors->bitmap);
+			kfree(mi->minors);
+		}
+		if (mi->major == XENVBD_MAJOR)
+			vbd_done = 1;
+		kfree(mi);
+	}
 }
 
 static int
@@ -290,6 +341,14 @@ xlbd_release_minors(struct xlbd_major_info *mi, unsigned int minor,
 	spin_lock(&ms->lock);
 	bitmap_clear(ms->bitmap, minor, nr_minors);
 	spin_unlock(&ms->lock);
+}
+
+static char *encode_disk_name(char *ptr, unsigned int n)
+{
+	if (n >= 26)
+		ptr = encode_disk_name(ptr, n / 26 - 1);
+	*ptr = 'a' + n % 26;
+	return ptr + 1;
 }
 
 static int
@@ -347,6 +406,7 @@ xlvbd_add(blkif_sector_t capacity, int vdevice, u16 vdisk_info,
 	struct xlbd_major_info *mi;
 	int nr_minors = 1;
 	int err = -ENODEV;
+	char *ptr;
 	unsigned int offset;
 
 	if ((vdevice>>EXT_SHIFT) > 1) {
@@ -361,8 +421,13 @@ xlvbd_add(blkif_sector_t capacity, int vdevice, u16 vdisk_info,
 		minor = BLKIF_MINOR(vdevice);
 	}
 	else {
-		major = 202;
+		major = XENVBD_MAJOR;
 		minor = BLKIF_MINOR_EXT(vdevice);
+		if (minor >> MINORBITS) {
+			pr_warning("blkfront: %#x's minor (%#x) out of range;"
+				   " ignoring\n", vdevice, minor);
+			return -ENODEV;
+		}
 	}
 
 	BUG_ON(info->gd != NULL);
@@ -374,46 +439,34 @@ xlvbd_add(blkif_sector_t capacity, int vdevice, u16 vdisk_info,
 		goto out;
 	info->mi = mi;
 
-	if (!(vdisk_info & VDISK_CDROM) &&
-	    (minor & ((1 << mi->type->partn_shift) - 1)) == 0)
+	if ((vdisk_info & VDISK_CDROM) ||
+	    !(minor & ((1 << mi->type->partn_shift) - 1)))
 		nr_minors = 1 << mi->type->partn_shift;
 
-	err = xlbd_reserve_minors(mi, minor, nr_minors);
+	err = xlbd_reserve_minors(mi, minor & ~(nr_minors - 1), nr_minors);
 	if (err)
 		goto out;
 	err = -ENODEV;
 
-	gd = alloc_disk(nr_minors);
+	gd = alloc_disk(vdisk_info & VDISK_CDROM ? 1 : nr_minors);
 	if (gd == NULL)
 		goto release;
 
-	offset =  mi->index * mi->type->disks_per_major +
-			(minor >> mi->type->partn_shift);
-	if (nr_minors > 1 || (vdisk_info & VDISK_CDROM)) {
-		if (offset < 26) {
-			sprintf(gd->disk_name, "%s%c",
-				 mi->type->diskname, 'a' + offset );
-		}
-		else {
-			sprintf(gd->disk_name, "%s%c%c",
-				mi->type->diskname,
-				'a' + ((offset/26)-1), 'a' + (offset%26) );
-		}
-	}
-	else {
-		if (offset < 26) {
-			sprintf(gd->disk_name, "%s%c%d",
-				mi->type->diskname,
-				'a' + offset,
-				minor & ((1 << mi->type->partn_shift) - 1));
-		}
-		else {
-			sprintf(gd->disk_name, "%s%c%c%d",
-				mi->type->diskname,
-				'a' + ((offset/26)-1), 'a' + (offset%26),
-				minor & ((1 << mi->type->partn_shift) - 1));
-		}
-	}
+	strcpy(gd->disk_name, mi->type->diskname);
+	ptr = gd->disk_name + strlen(mi->type->diskname);
+	offset = mi->index * mi->type->disks_per_major +
+		 (minor >> mi->type->partn_shift);
+	if (mi->type->partn_shift) {
+		ptr = encode_disk_name(ptr, offset);
+		offset = minor & ((1 << mi->type->partn_shift) - 1);
+	} else
+		gd->flags |= GENHD_FL_CD;
+	BUG_ON(ptr >= gd->disk_name + ARRAY_SIZE(gd->disk_name));
+	if (nr_minors > 1)
+		*ptr = 0;
+	else
+		snprintf(ptr, gd->disk_name + ARRAY_SIZE(gd->disk_name) - ptr,
+			 "%u", offset);
 
 	gd->major = mi->major;
 	gd->first_minor = minor;
@@ -461,12 +514,14 @@ xlvbd_del(struct blkfront_info *info)
 
 	BUG_ON(info->gd == NULL);
 	minor = info->gd->first_minor;
-	nr_minors = info->gd->minors;
+	nr_minors = (info->gd->flags & GENHD_FL_CD)
+		    || !(minor & ((1 << info->mi->type->partn_shift) - 1))
+		    ? 1 << info->mi->type->partn_shift : 1;
 	del_gendisk(info->gd);
 	put_disk(info->gd);
 	info->gd = NULL;
 
-	xlbd_release_minors(info->mi, minor, nr_minors);
+	xlbd_release_minors(info->mi, minor & ~(nr_minors - 1), nr_minors);
 	xlbd_put_major_info(info->mi);
 	info->mi = NULL;
 
