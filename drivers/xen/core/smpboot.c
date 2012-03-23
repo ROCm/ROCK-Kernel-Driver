@@ -128,7 +128,6 @@ static int __cpuinit xen_smp_intr_init(unsigned int cpu)
 	return rc;
 }
 
-#ifdef CONFIG_HOTPLUG_CPU
 static void __cpuinit xen_smp_intr_exit(unsigned int cpu)
 {
 	if (cpu != 0)
@@ -137,16 +136,21 @@ static void __cpuinit xen_smp_intr_exit(unsigned int cpu)
 	unbind_from_per_cpu_irq(ipi_irq, cpu, NULL);
 	xen_spinlock_cleanup(cpu);
 }
-#endif
 
 static void __cpuinit cpu_bringup(void)
 {
+	unsigned int cpu;
+
 	cpu_init();
 	identify_secondary_cpu(__this_cpu_ptr(&cpu_info));
 	touch_softlockup_watchdog();
 	preempt_disable();
 	xen_setup_cpu_clockevents();
-	local_irq_enable();
+	cpu = smp_processor_id();
+	notify_cpu_starting(cpu);
+	ipi_call_lock_irq();
+	set_cpu_online(cpu, true);
+	ipi_call_unlock_irq();
 }
 
 static void __cpuinit cpu_bringup_and_idle(void)
@@ -363,12 +367,26 @@ int __cpuinit __cpu_up(unsigned int cpu)
 	if (rc)
 		return rc;
 
-	set_cpu_online(cpu, true);
-
 	rc = HYPERVISOR_vcpu_op(VCPUOP_up, cpu, NULL);
-	BUG_ON(rc);
+	if (!rc) {
+		/* Wait 5s total for a response. */
+		unsigned long timeout = jiffies + 5 * HZ;
 
-	return 0;
+		while (!cpu_online(cpu) && time_before_eq(jiffies, timeout))
+			HYPERVISOR_yield();
+		if (!cpu_online(cpu)) {
+			VOID(HYPERVISOR_vcpu_op(VCPUOP_down, cpu, NULL));
+			rc = -ETIMEDOUT;
+		}
+	}
+
+	if (rc) {
+		xen_smp_intr_exit(cpu);
+		if (num_online_cpus() == 1)
+			alternatives_smp_switch(0);
+	}
+
+	return rc;
 }
 
 void __ref play_dead(void)

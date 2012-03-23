@@ -248,8 +248,8 @@ static void __devinit netfront_enable_arp_notify(struct netfront_info *info)
 		IN_DEV_CONF_SET(in_dev, ARP_NOTIFY, 1);
 	rtnl_unlock();
 	if (!in_dev)
-		printk(KERN_WARNING "Cannot enable ARP notification on %s\n",
-		       info->xbdev->nodename);
+		pr_warn("Cannot enable ARP notification on %s\n",
+			info->xbdev->nodename);
 #endif
 }
 

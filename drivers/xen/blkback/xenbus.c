@@ -213,97 +213,65 @@ static int blkback_remove(struct xenbus_device *dev)
 	return 0;
 }
 
-int blkback_barrier(struct xenbus_transaction xbt,
-		    struct backend_info *be, int state)
+void blkback_barrier(struct xenbus_transaction xbt,
+		     struct backend_info *be, int state)
 {
 	struct xenbus_device *dev = be->dev;
-	int err;
+	int err = xenbus_printf(xbt, dev->nodename, "feature-barrier",
+				"%d", state);
 
-	err = xenbus_printf(xbt, dev->nodename, "feature-barrier",
-			    "%d", state);
 	if (err)
-		xenbus_dev_fatal(dev, err, "writing feature-barrier");
-
-	return err;
+		xenbus_dev_error(dev, err, "writing feature-barrier");
 }
 
-int blkback_flush_diskcache(struct xenbus_transaction xbt,
-			    struct backend_info *be, int state)
+void blkback_flush_diskcache(struct xenbus_transaction xbt,
+			     struct backend_info *be, int state)
 {
 	struct xenbus_device *dev = be->dev;
-	int err;
+	int err = xenbus_printf(xbt, dev->nodename, "feature-flush-cache",
+				"%d", state);
 
-	err = xenbus_printf(xbt, dev->nodename, "feature-flush-cache",
-			    "%d", state);
 	if (err)
-		xenbus_dev_fatal(dev, err, "writing feature-flush-cache");
-
-	return err;
+		xenbus_dev_error(dev, err, "writing feature-flush-cache");
 }
 
-static int xen_blkbk_discard(struct xenbus_transaction xbt,
-			     struct backend_info *be)
+static void blkback_discard(struct xenbus_transaction xbt,
+			    struct backend_info *be)
 {
 	struct xenbus_device *dev = be->dev;
-	blkif_t *blkif = be->blkif;
-	char *type;
-	int err;
-	int state = 0;
+	struct vbd *vbd = &be->blkif->vbd;
+	struct request_queue *q = bdev_get_queue(vbd->bdev);
+	int err, state = 0;
 
-	type = xenbus_read(XBT_NIL, dev->nodename, "type", NULL);
-	if (!IS_ERR(type)) {
-		if (strncmp(type, "file", 4) == 0) {
+	if (blk_queue_discard(q)) {
+		err = xenbus_printf(xbt, dev->nodename, "discard-granularity",
+				    "%u", q->limits.discard_granularity);
+		if (!err)
 			state = 1;
-			blkif->blk_backend_type = BLKIF_BACKEND_FILE;
+		else
+			xenbus_dev_error(dev, err,
+					 "writing discard-granularity");
+		err = xenbus_printf(xbt, dev->nodename, "discard-alignment",
+				    "%u", q->limits.discard_alignment);
+		if (err) {
+			xenbus_dev_error(dev, err,
+					 "writing discard-alignment");
+			state = 0;
 		}
-		if (strncmp(type, "phy", 3) == 0) {
-			struct request_queue *q;
+	}
 
-			q = bdev_get_queue(blkif->vbd.bdev);
-			if (blk_queue_discard(q)) {
-				err = xenbus_printf(xbt, dev->nodename,
-					"discard-granularity", "%u",
-					q->limits.discard_granularity);
-				if (err) {
-					xenbus_dev_fatal(dev, err,
-						"writing discard-granularity");
-					goto kfree;
-				}
-				err = xenbus_printf(xbt, dev->nodename,
-					"discard-alignment", "%u",
-					q->limits.discard_alignment);
-				if (err) {
-					xenbus_dev_fatal(dev, err,
-						"writing discard-alignment");
-					goto kfree;
-				}
-				state = 1;
-				blkif->blk_backend_type = BLKIF_BACKEND_PHY;
-			}
-			/* Optional. */
-			err = xenbus_printf(xbt, dev->nodename,
-					    "discard-secure", "%d",
-					    blkif->vbd.discard_secure);
-			if (err) {
-				xenbus_dev_fatal(dev, err,
-						 "writing discard-secure");
-				goto kfree;
-			}
-		}
-	} else {
-		err = PTR_ERR(type);
-		xenbus_dev_fatal(dev, err, "reading type");
-		goto out;
+	/* Optional. */
+	if (state) {
+		err = xenbus_printf(xbt, dev->nodename, "discard-secure",
+				    "%d", vbd->discard_secure);
+		if (err)
+			xenbus_dev_error(dev, err, "writing discard-secure");
 	}
 
 	err = xenbus_printf(xbt, dev->nodename, "feature-discard",
 			    "%d", state);
 	if (err)
-		xenbus_dev_fatal(dev, err, "writing feature-discard");
-kfree:
-	kfree(type);
-out:
-	return err;
+		xenbus_dev_error(dev, err, "writing feature-discard");
 }
 
 /**
@@ -535,15 +503,9 @@ again:
 		return;
 	}
 
-	err = blkback_flush_diskcache(xbt, be, be->blkif->vbd.flush_support);
-	if (err)
-		goto abort;
-
-	err = blkback_barrier(xbt, be, be->blkif->vbd.flush_support);
-	if (err)
-		goto abort;
-
-	err = xen_blkbk_discard(xbt, be);
+	blkback_flush_diskcache(xbt, be, be->blkif->vbd.flush_support);
+	blkback_barrier(xbt, be, be->blkif->vbd.flush_support);
+	blkback_discard(xbt, be);
 
 	err = xenbus_printf(xbt, dev->nodename, "sectors", "%llu",
 			    vbd_size(&be->blkif->vbd));

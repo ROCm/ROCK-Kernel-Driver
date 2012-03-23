@@ -42,11 +42,6 @@
 	pr_debug("(file=%s, line=%d) " _f,	\
 		 __FILE__ , __LINE__ , ## _a )
 
-enum blkif_backend_type {
-	BLKIF_BACKEND_PHY  = 1,
-	BLKIF_BACKEND_FILE = 2,
-};
-
 struct vbd {
 	blkif_vdev_t   handle;      /* what the domain refers to this vbd as */
 	fmode_t        mode;        /* FMODE_xxx */
@@ -68,7 +63,6 @@ typedef struct blkif_st {
 	unsigned int      irq;
 	/* Comms information. */
 	enum blkif_protocol blk_protocol;
-	enum blkif_backend_type blk_backend_type;
 	blkif_back_rings_t blk_rings;
 	struct vm_struct *blk_ring_area;
 	/* The VBD attached to this interface. */
@@ -150,10 +144,10 @@ void blkif_xenbus_init(void);
 irqreturn_t blkif_be_int(int irq, void *dev_id);
 int blkif_schedule(void *arg);
 
-int blkback_barrier(struct xenbus_transaction xbt,
-		    struct backend_info *be, int state);
-int blkback_flush_diskcache(struct xenbus_transaction,
-			    struct backend_info *, int state);
+void blkback_barrier(struct xenbus_transaction, struct backend_info *,
+		     int state);
+void blkback_flush_diskcache(struct xenbus_transaction,
+			     struct backend_info *, int state);
 
 /* cdrom media change */
 void cdrom_add_media_watch(struct backend_info *be);

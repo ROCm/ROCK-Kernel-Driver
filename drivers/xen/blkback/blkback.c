@@ -258,26 +258,24 @@ int blkif_schedule(void *arg)
 
 static void do_discard(blkif_t *blkif, struct blkif_request_discard *req)
 {
-	int err = -EOPNOTSUPP;
 	int status = BLKIF_RSP_OKAY;
-	struct block_device *bdev = blkif->vbd.bdev;
+	unsigned long secure = (blkif->vbd.discard_secure &&
+				(req->flag & BLKIF_DISCARD_SECURE)) ?
+			       BLKDEV_DISCARD_SECURE : 0;
 
-	if (blkif->blk_backend_type == BLKIF_BACKEND_PHY ||
-	    blkif->blk_backend_type == BLKIF_BACKEND_FILE) {
-		unsigned long secure = (blkif->vbd.discard_secure &&
-			(req->flag & BLKIF_DISCARD_SECURE)) ?
-			BLKDEV_DISCARD_SECURE : 0;
-
-		err = blkdev_issue_discard(bdev, req->sector_number,
-					   req->nr_sectors, GFP_KERNEL,
-					   secure);
-	}
-
-	if (err == -EOPNOTSUPP) {
+	switch (blkdev_issue_discard(blkif->vbd.bdev, req->sector_number,
+				     req->nr_sectors, GFP_KERNEL, secure))
+	{
+	case 0:
+		break;
+	case -EOPNOTSUPP:
 		DPRINTK("discard op failed, not supported\n");
 		status = BLKIF_RSP_EOPNOTSUPP;
-	} else if (err)
+		break;
+	default:
 		status = BLKIF_RSP_ERROR;
+		break;
+	}
 
 	make_response(blkif, req->id, req->operation, status);
 }

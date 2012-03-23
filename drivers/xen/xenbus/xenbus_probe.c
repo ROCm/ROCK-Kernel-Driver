@@ -794,7 +794,7 @@ static struct xenbus_watch fe_watch = {
 	.callback = frontend_changed,
 };
 
-static int suspend_dev(struct device *dev, void *data)
+static int __maybe_unused suspend_dev(struct device *dev, void *data)
 #else
 int xenbus_dev_suspend(struct device *dev)
 #endif
@@ -819,7 +819,7 @@ int xenbus_dev_suspend(struct device *dev)
 PARAVIRT_EXPORT_SYMBOL(xenbus_dev_suspend);
 
 #if defined(CONFIG_XEN) || defined(MODULE)
-static int suspend_cancel_dev(struct device *dev, void *data)
+static int __maybe_unused suspend_cancel_dev(struct device *dev, void *data)
 {
 	int err = 0;
 	struct xenbus_driver *drv;
@@ -839,7 +839,7 @@ static int suspend_cancel_dev(struct device *dev, void *data)
 	return 0;
 }
 
-static int resume_dev(struct device *dev, void *data)
+static int __maybe_unused resume_dev(struct device *dev, void *data)
 #else
 int xenbus_dev_resume(struct device *dev)
 #endif
@@ -891,7 +891,7 @@ int xenbus_dev_cancel(struct device *dev)
 	return 0;
 }
 PARAVIRT_EXPORT_SYMBOL(xenbus_dev_cancel);
-#else
+#elif defined(CONFIG_PM_SLEEP) || defined(MODULE)
 void xenbus_suspend(void)
 {
 	DPRINTK("");
@@ -918,7 +918,7 @@ void xenbus_suspend_cancel(void)
 		bus_for_each_dev(&xenbus_frontend.bus, NULL, NULL, suspend_cancel_dev);
 	xenbus_backend_resume(suspend_cancel_dev);
 }
-#endif
+#endif /* CONFIG_PM_SLEEP || MODULE */
 
 /* A flag to determine if xenstored is 'ready' (i.e. has started) */
 atomic_t xenbus_xsd_state = ATOMIC_INIT(XENBUS_XSD_UNCOMMITTED);

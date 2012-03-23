@@ -25,26 +25,9 @@
  */
 
 #include <linux/errno.h>
-#include <linux/signal.h>
-#include <linux/sched.h>
 #include <linux/interrupt.h>
-#include <linux/tty.h>
-#include <linux/tty_flip.h>
-#include <linux/serial.h>
-#include <linux/major.h>
-#include <linux/ptrace.h>
-#include <linux/ioport.h>
-#include <linux/mm.h>
-#include <linux/slab.h>
-
-#include <asm/hypervisor.h>
-#include <xen/evtchn.h>
-#include <xen/xencons.h>
-#include <linux/wait.h>
-#include <linux/interrupt.h>
-#include <linux/sched.h>
-#include <linux/err.h>
 #include <xen/interface/io/console.h>
+#include "xencons.h"
 
 static int xencons_irq;
 
@@ -106,17 +89,15 @@ static irqreturn_t handle_input(int irq, void *unused)
 	return IRQ_HANDLED;
 }
 
-int xencons_ring_init(void)
+int
+#ifndef CONFIG_PM_SLEEP
+__init
+#endif
+xencons_ring_init(void)
 {
 	int irq;
 
-	if (xencons_irq)
-		unbind_from_irqhandler(xencons_irq, NULL);
-	xencons_irq = 0;
-
-	if (!is_running_on_xen() ||
-	    is_initial_xendomain() ||
-	    !xen_start_info->console.domU.evtchn)
+	if (!xen_start_info->console.domU.evtchn)
 		return -ENODEV;
 
 	irq = bind_caller_port_to_irqhandler(
@@ -129,13 +110,20 @@ int xencons_ring_init(void)
 
 	xencons_irq = irq;
 
-	/* In case we have in-flight data after save/restore... */
-	notify_daemon();
-
 	return 0;
 }
 
+#ifdef CONFIG_PM_SLEEP
 void xencons_resume(void)
 {
-	(void)xencons_ring_init();
+	if (xencons_irq)
+		unbind_from_irqhandler(xencons_irq, NULL);
+	xencons_irq = 0;
+
+	if (is_running_on_xen() && !is_initial_xendomain())
+		xencons_ring_init();
+
+	/* In case we have in-flight data after save/restore... */
+	notify_daemon();
 }
+#endif

@@ -188,6 +188,7 @@ static void transaction_end(void)
 		wake_up(&xs_state.transaction_wq);
 }
 
+#if !defined(CONFIG_XEN) || defined(CONFIG_PM_SLEEP)
 static void transaction_suspend(void)
 {
 	mutex_lock(&xs_state.transaction_mutex);
@@ -199,6 +200,7 @@ static void transaction_resume(void)
 {
 	mutex_unlock(&xs_state.transaction_mutex);
 }
+#endif
 
 void *xenbus_dev_request_and_reply(struct xsd_sockmsg *msg)
 {
@@ -721,6 +723,7 @@ void unregister_xenbus_watch(struct xenbus_watch *watch)
 }
 EXPORT_SYMBOL_GPL(unregister_xenbus_watch);
 
+#if !defined(CONFIG_XEN) || defined(CONFIG_PM_SLEEP)
 void xs_suspend(void)
 {
 	transaction_suspend();
@@ -758,6 +761,7 @@ void xs_suspend_cancel(void)
 	up_write(&xs_state.watch_mutex);
 	mutex_unlock(&xs_state.transaction_mutex);
 }
+#endif
 
 #if defined(CONFIG_XEN) || defined(MODULE)
 static int xenwatch_handle_callback(void *data)
@@ -945,7 +949,13 @@ static int xenbus_thread(void *unused)
 	return 0;
 }
 
-int xs_init(void)
+int
+#ifndef MODULE
+__init
+#else
+__devinit
+#endif
+xs_init(void)
 {
 	struct task_struct *task;
 

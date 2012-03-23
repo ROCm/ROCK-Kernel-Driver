@@ -39,7 +39,6 @@
 #include <linux/tty_flip.h>
 #include <linux/serial.h>
 #include <linux/major.h>
-#include <linux/ptrace.h>
 #include <linux/ioport.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
@@ -47,15 +46,9 @@
 #include <linux/console.h>
 #include <linux/sysrq.h>
 #include <linux/vt.h>
-#include <asm/io.h>
-#include <asm/irq.h>
-#include <asm/uaccess.h>
 #include <xen/interface/xen.h>
 #include <xen/interface/event_channel.h>
-#include <asm/hypervisor.h>
-#include <xen/evtchn.h>
-#include <xen/xenbus.h>
-#include <xen/xencons.h>
+#include "xencons.h"
 
 /*
  * Modes:
@@ -244,7 +237,7 @@ console_initcall(xen_console_init);
 
 #ifdef CONFIG_XEN_PRIVILEGED_GUEST
 /*** Useful function for console debugging -- goes straight to Xen. ***/
-asmlinkage int xprintk(const char *fmt, ...)
+int xprintk(const char *fmt, ...)
 {
 	va_list args;
 	int printk_len;

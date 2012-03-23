@@ -2,6 +2,7 @@
  *	Xen Watchdog Driver
  *
  *	(c) Copyright 2010,2011 Novell, Inc.
+ *	(c) Copyright 2011,2012 SuSE
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -133,15 +134,17 @@ static int xen_wdt_open(struct inode *inode, struct file *file)
 
 static int xen_wdt_release(struct inode *inode, struct file *file)
 {
+	int err = 0;
+
 	if (expect_release)
-		xen_wdt_stop();
+		err = xen_wdt_stop();
 	else {
 		pr_crit("unexpected close, not stopping watchdog!\n");
 		xen_wdt_kick();
 	}
-	is_active = false;
+	is_active = err;
 	expect_release = false;
-	return 0;
+	return err;
 }
 
 static ssize_t xen_wdt_write(struct file *file, const char __user *data,
@@ -297,11 +300,18 @@ static void xen_wdt_shutdown(struct platform_device *dev)
 
 static int xen_wdt_suspend(struct platform_device *dev, pm_message_t state)
 {
-	return xen_wdt_stop();
+	typeof(wdt.id) id = wdt.id;
+	int rc = xen_wdt_stop();
+
+	wdt.id = id;
+	return rc;
 }
 
 static int xen_wdt_resume(struct platform_device *dev)
 {
+	if (!wdt.id)
+		return 0;
+	wdt.id = 0;
 	return xen_wdt_start();
 }
 
