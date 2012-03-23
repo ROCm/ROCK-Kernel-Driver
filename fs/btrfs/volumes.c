@@ -4031,6 +4031,7 @@ static noinline void schedule_bio(struct btrfs_root *root,
 		bio_get(bio);
 		btrfsic_submit_bio(rw, bio);
 		bio_put(bio);
+		return;
 	}
 
 	/*
