@@ -785,12 +785,24 @@ static void storvsc_command_completion(struct storvsc_cmd_request *cmd_request)
 	/*
 	 * If there is an error; offline the device since all
 	 * error recovery strategies would have already been
-	 * deployed on the host side.
+	 * deployed on the host side. However, if the command
+	 * were a pass-through command deal with it appropriately.
 	 */
-	if (vm_srb->srb_status == SRB_STATUS_ERROR)
-		scmnd->result = DID_TARGET_FAILURE << 16;
-	else
+	switch (vm_srb->srb_status) {
+	case SRB_STATUS_ERROR:
+		switch (scmnd->cmnd[0]) {
+		case ATA_16:
+		case ATA_12:
+			scmnd->result = DID_PASSTHROUGH << 16;
+			break;
+		default:
+			scmnd->result = DID_TARGET_FAILURE << 16;
+		}
+		break;
+	default:
 		scmnd->result = vm_srb->scsi_status;
+	}
+
 
 	/*
 	 * If the LUN is invalid; remove the device.
