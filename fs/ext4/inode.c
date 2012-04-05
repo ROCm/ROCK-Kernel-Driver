@@ -42,6 +42,7 @@
 #include "xattr.h"
 #include "acl.h"
 #include "truncate.h"
+#include "richacl.h"
 
 #include <trace/events/ext4.h>
 
@@ -3654,6 +3655,9 @@ struct inode *ext4_iget(struct super_block *sb, unsigned long ino)
 	set_nlink(inode, le16_to_cpu(raw_inode->i_links_count));
 
 	ext4_clear_state_flags(ei);	/* Only relevant on 32-bit archs */
+#ifdef CONFIG_EXT4_FS_RICHACL
+	ei->i_richacl = EXT4_RICHACL_NOT_CACHED;
+#endif
 	ei->i_dir_start_lookup = 0;
 	ei->i_dtime = le32_to_cpu(raw_inode->i_dtime);
 	/* We now have enough fields to check if the inode was active or not.
@@ -4078,7 +4082,11 @@ int ext4_setattr(struct dentry *dentry, struct iattr *attr)
 	int orphan = 0;
 	const unsigned int ia_valid = attr->ia_valid;
 
-	error = inode_change_ok(inode, attr);
+	if (EXT4_IS_RICHACL(inode))
+		error = richacl_inode_change_ok(inode, attr,
+						ext4_richacl_permission);
+	else
+		error = inode_change_ok(inode, attr);
 	if (error)
 		return error;
 
@@ -4178,9 +4186,12 @@ int ext4_setattr(struct dentry *dentry, struct iattr *attr)
 	if (orphan && inode->i_nlink)
 		ext4_orphan_del(NULL, inode);
 
-	if (!rc && (ia_valid & ATTR_MODE))
-		rc = ext4_acl_chmod(inode);
-
+	if (!rc && (ia_valid & ATTR_MODE)) {
+		if (EXT4_IS_RICHACL(inode))
+			rc = ext4_richacl_chmod(inode);
+		else
+			rc = ext4_acl_chmod(inode);
+	}
 err_out:
 	ext4_std_error(inode->i_sb, error);
 	if (!error)

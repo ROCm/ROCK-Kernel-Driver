@@ -908,6 +908,10 @@ struct ext4_inode_info {
 	 */
 	tid_t i_sync_tid;
 	tid_t i_datasync_tid;
+#ifdef CONFIG_EXT4_FS_RICHACL
+	struct richacl   *i_richacl;
+#endif
+
 };
 
 /*
