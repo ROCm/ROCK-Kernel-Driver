@@ -76,10 +76,6 @@ typedef int (*acpi_table_handler) (struct acpi_table_header *table);
 
 typedef int (*acpi_table_entry_handler) (struct acpi_subtable_header *header, const unsigned long end);
 
-#ifdef CONFIG_ACPI_INITRD_TABLE_OVERRIDE
-int __init acpi_initrd_table_override(void *start_addr, void *end_addr);
-#endif
-
 char * __acpi_map_table (unsigned long phys_addr, unsigned long size);
 void __acpi_unmap_table(char *map, unsigned long size);
 int early_acpi_boot_init(void);
@@ -155,6 +151,7 @@ extern int ec_write(u8 addr, u8 val);
 extern int ec_transaction(u8 command,
                           const u8 *wdata, unsigned wdata_len,
                           u8 *rdata, unsigned rdata_len);
+extern acpi_handle ec_get_handle(void);
 
 #if defined(CONFIG_ACPI_WMI) || defined(CONFIG_ACPI_WMI_MODULE)
 
@@ -249,8 +246,6 @@ int acpi_check_region(resource_size_t start, resource_size_t n,
 		      const char *name);
 
 int acpi_resources_are_enforced(void);
-
-int acpi_pci_get_root_seg_bbn(char *hid, char *uid, int *seg, int *bbn);
 
 #ifdef CONFIG_PM_SLEEP
 void __init acpi_no_s4_hw_signature(void);
@@ -376,5 +371,15 @@ static inline int acpi_nvs_for_each_region(int (*func)(__u64, __u64, void *),
 }
 
 #endif	/* !CONFIG_ACPI */
+
+#ifdef CONFIG_ACPI
+void acpi_os_set_prepare_sleep(int (*func)(u8 sleep_state,
+			       u32 pm1a_ctrl,  u32 pm1b_ctrl));
+
+acpi_status acpi_os_prepare_sleep(u8 sleep_state,
+				  u32 pm1a_control, u32 pm1b_control);
+#else
+#define acpi_os_set_prepare_sleep(func, pm1a_ctrl, pm1b_ctrl) do { } while (0)
+#endif
 
 #endif	/*_LINUX_ACPI_H*/

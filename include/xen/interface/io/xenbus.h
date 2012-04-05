@@ -36,7 +36,6 @@ enum xenbus_state
 
 	XenbusStateReconfigured  = 8
 };
-typedef enum xenbus_state XenbusState;
 
 #endif /* _XEN_PUBLIC_IO_XENBUS_H */
 

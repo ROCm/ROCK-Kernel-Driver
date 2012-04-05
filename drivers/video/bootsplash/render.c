@@ -8,7 +8,6 @@
 #include <linux/vt_kern.h>
 #include <linux/selection.h>
 #include <asm/irq.h>
-#include <asm/system.h>
 
 #include "../console/fbcon.h"
 #include <linux/bootsplash.h>

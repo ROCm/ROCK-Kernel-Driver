@@ -14,13 +14,10 @@
  * may be used to reset the timeout - for code which intentionally
  * disables interrupts for a long time. This call is stateless.
  */
-#if defined(ARCH_HAS_NMI_WATCHDOG) || defined(CONFIG_HARDLOCKUP_DETECTOR)
+#if defined(CONFIG_HAVE_NMI_WATCHDOG) || defined(CONFIG_HARDLOCKUP_DETECTOR)
 #include <asm/nmi.h>
 extern void touch_nmi_watchdog(void);
 #else
-#ifdef CONFIG_XEN
-#include <asm/nmi.h>
-#endif
 static inline void touch_nmi_watchdog(void)
 {
 	touch_softlockup_watchdog();

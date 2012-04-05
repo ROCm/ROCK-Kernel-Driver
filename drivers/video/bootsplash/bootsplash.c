@@ -25,7 +25,6 @@
 #include <linux/slab.h>
 
 #include <asm/irq.h>
-#include <asm/system.h>
 
 #include "../console/fbcon.h"
 #include <linux/bootsplash.h>

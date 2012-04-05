@@ -21,7 +21,6 @@
 #include <linux/path.h>
 #include <linux/key.h>
 #include <linux/skbuff.h>
-#include <asm/system.h>
 
 
 /* Auxiliary data to use in generating the audit record. */
@@ -124,10 +123,6 @@ struct common_audit_data {
 					u32 denied;
 					uid_t ouid;
 				} fs;
-				struct {
-					int type, protocol;
-					struct sock *sk;
-				} net;
 			};
 		} apparmor_audit_data;
 #endif

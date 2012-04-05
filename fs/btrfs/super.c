@@ -216,7 +216,7 @@ void __btrfs_abort_transaction(struct btrfs_trans_handle *trans,
 			       struct btrfs_root *root, const char *function,
 			       unsigned int line, int errno)
 {
-	WARN_ON_ONCE(1);
+	WARN_ONCE(1, KERN_DEBUG "btrfs: Transaction aborted");
 	trans->aborted = errno;
 	/* Nothing used. The other threads that have joined this
 	 * transaction may be able to continue. */
@@ -755,7 +755,6 @@ static int btrfs_fill_super(struct super_block *sb,
 			    void *data, int silent)
 {
 	struct inode *inode;
-	struct dentry *root_dentry;
 	struct btrfs_fs_info *fs_info = btrfs_sb(sb);
 	struct btrfs_key key;
 	int err;
@@ -786,14 +785,11 @@ static int btrfs_fill_super(struct super_block *sb,
 		goto fail_close;
 	}
 
-	root_dentry = d_alloc_root(inode);
-	if (!root_dentry) {
-		iput(inode);
+	sb->s_root = d_make_root(inode);
+	if (!sb->s_root) {
 		err = -ENOMEM;
 		goto fail_close;
 	}
-
-	sb->s_root = root_dentry;
 
 	save_mount_options(sb, data);
 	cleancache_init_fs(sb);
@@ -1152,15 +1148,13 @@ static int btrfs_remount(struct super_block *sb, int *flags, char *data)
 		if (ret)
 			goto restore;
 	} else {
-		if (fs_info->fs_devices->rw_devices == 0) {
+		if (fs_info->fs_devices->rw_devices == 0)
 			ret = -EACCES;
 			goto restore;
-		}
 
-		if (btrfs_super_log_root(fs_info->super_copy) != 0) {
+		if (btrfs_super_log_root(fs_info->super_copy) != 0)
 			ret = -EINVAL;
 			goto restore;
-		}
 
 		ret = btrfs_cleanup_fs_roots(fs_info);
 		if (ret)
@@ -1542,6 +1536,8 @@ static int __init init_btrfs_fs(void)
 	err = register_filesystem(&btrfs_fs_type);
 	if (err)
 		goto unregister_ioctl;
+
+	btrfs_init_lockdep();
 
 	printk(KERN_INFO "%s loaded\n", BTRFS_BUILD_VERSION);
 	return 0;

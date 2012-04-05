@@ -96,8 +96,9 @@ acpi_os_table_override(struct acpi_table_header *existing_table,
 		       struct acpi_table_header **new_table);
 
 acpi_status
-acpi_os_phys_table_override(struct acpi_table_header *existing_table,
-			    acpi_physical_address *address, u32 *table_length);
+acpi_os_physical_table_override(struct acpi_table_header *existing_table,
+				acpi_physical_address * new_address,
+				u32 *new_table_length);
 
 /*
  * Spinlock primitives
@@ -221,14 +222,10 @@ acpi_status acpi_os_write_port(acpi_io_address address, u32 value, u32 width);
  * Platform and hardware-independent physical memory interfaces
  */
 acpi_status
-acpi_os_read_memory(acpi_physical_address address, u32 * value, u32 width);
-acpi_status
-acpi_os_read_memory64(acpi_physical_address address, u64 *value, u32 width);
+acpi_os_read_memory(acpi_physical_address address, u64 *value, u32 width);
 
 acpi_status
-acpi_os_write_memory(acpi_physical_address address, u32 value, u32 width);
-acpi_status
-acpi_os_write_memory64(acpi_physical_address address, u64 value, u32 width);
+acpi_os_write_memory(acpi_physical_address address, u64 value, u32 width);
 
 /*
  * Platform and hardware-independent PCI configuration space access

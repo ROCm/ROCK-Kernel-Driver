@@ -27,10 +27,9 @@
 #include "capability.h"
 #include "domain.h"
 #include "file.h"
-#include "net.h"
 #include "resource.h"
 
-extern const char *profile_mode_names[];
+extern const char *const profile_mode_names[];
 #define APPARMOR_NAMES_MAX_INDEX 3
 
 #define COMPLAIN_MODE(_profile)	\
@@ -130,6 +129,17 @@ struct aa_namespace {
 	struct list_head sub_ns;
 };
 
+/* struct aa_policydb - match engine for a policy
+ * dfa: dfa pattern match
+ * start: set of start states for the different classes of data
+ */
+struct aa_policydb {
+	/* Generic policy DFA specific rule types will be subsections of it */
+	struct aa_dfa *dfa;
+	unsigned int start[AA_CLASS_LAST + 1];
+
+};
+
 /* struct aa_profile - basic confinement data
  * @base - base components of the profile (name, refcount, lists, lock ...)
  * @parent: parent of profile
@@ -144,9 +154,9 @@ struct aa_namespace {
  * @flags: flags controlling profile behavior
  * @path_flags: flags controlling path generation behavior
  * @size: the memory consumed by this profiles rules
+ * @policy: general match rules governing policy
  * @file: The set of rules governing basic file access and domain transitions
  * @caps: capabilities for the profile
- * @net: network controls for the profile
  * @rlimits: rlimits for the profile
  *
  * The AppArmor profile contains the basic confinement data.  Each profile
@@ -181,9 +191,9 @@ struct aa_profile {
 	u32 path_flags;
 	int size;
 
+	struct aa_policydb policy;
 	struct aa_file_rules file;
 	struct aa_caps caps;
-	struct aa_net net;
 	struct aa_rlimit rlimits;
 };
 

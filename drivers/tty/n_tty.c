@@ -52,8 +52,6 @@
 
 #include <linux/bootsplash.h>
 
-#include <asm/system.h>
-
 /* number of characters left in xmit buffer before select has we have room */
 #define WAKEUP_CHARS 256
 

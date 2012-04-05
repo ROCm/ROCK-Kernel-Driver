@@ -9,21 +9,14 @@
 #include <linux/cache.h>
 #include <linux/module.h>
 
-#ifdef CONFIG_PARAVIRT_XEN
 #include <asm/xen/hypercall.h>
-#else
-#include <asm/hypervisor.h>
-#endif
-#ifdef HAVE_XEN_PLATFORM_COMPAT_H
-#include <xen/platform-compat.h>
-#endif
 
 #include <xen/interface/xen.h>
 #include <xen/interface/version.h>
 #include <xen/features.h>
 
 u8 xen_features[XENFEAT_NR_SUBMAPS * 32] __read_mostly;
-EXPORT_SYMBOL(xen_features);
+EXPORT_SYMBOL_GPL(xen_features);
 
 void xen_setup_features(void)
 {

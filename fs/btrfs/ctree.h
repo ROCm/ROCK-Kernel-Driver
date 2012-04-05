@@ -48,6 +48,8 @@ struct btrfs_ordered_sum;
 
 #define BTRFS_MAGIC "_BHRfS_M"
 
+#define BTRFS_MAX_MIRRORS 2
+
 #define BTRFS_MAX_LEVEL 8
 
 #define BTRFS_COMPAT_EXTENT_TREE_V0
@@ -136,6 +138,12 @@ struct btrfs_ordered_sum;
 #define BTRFS_BTREE_INODE_OBJECTID 1
 
 #define BTRFS_EMPTY_SUBVOL_DIR_OBJECTID 2
+
+/*
+ * the max metadata block size.  This limit is somewhat artificial,
+ * but the memmove costs go through the roof for larger blocks.
+ */
+#define BTRFS_MAX_METADATA_BLOCKSIZE 65536
 
 /*
  * we can actually store much bigger names, but lets not confuse the rest
@@ -461,6 +469,19 @@ struct btrfs_super_block {
 #define BTRFS_FEATURE_INCOMPAT_DEFAULT_SUBVOL	(1ULL << 1)
 #define BTRFS_FEATURE_INCOMPAT_MIXED_GROUPS	(1ULL << 2)
 #define BTRFS_FEATURE_INCOMPAT_COMPRESS_LZO	(1ULL << 3)
+/*
+ * some patches floated around with a second compression method
+ * lets save that incompat here for when they do get in
+ * Note we don't actually support it, we're just reserving the
+ * number
+ */
+#define BTRFS_FEATURE_INCOMPAT_COMPRESS_LZOv2	(1ULL << 4)
+
+/*
+ * older kernels tried to do bigger metadata blocks, but the
+ * code was pretty buggy.  Lets not let them try anymore.
+ */
+#define BTRFS_FEATURE_INCOMPAT_BIG_METADATA	(1ULL << 5)
 
 #define BTRFS_FEATURE_COMPAT_SUPP		0ULL
 #define BTRFS_FEATURE_COMPAT_RO_SUPP		0ULL
@@ -468,6 +489,7 @@ struct btrfs_super_block {
 	(BTRFS_FEATURE_INCOMPAT_MIXED_BACKREF |		\
 	 BTRFS_FEATURE_INCOMPAT_DEFAULT_SUBVOL |	\
 	 BTRFS_FEATURE_INCOMPAT_MIXED_GROUPS |		\
+	 BTRFS_FEATURE_INCOMPAT_BIG_METADATA |		\
 	 BTRFS_FEATURE_INCOMPAT_COMPRESS_LZO)
 
 /*
@@ -828,6 +850,21 @@ struct btrfs_csum_item {
  * to avoid remappings between two formats in future.
  */
 #define BTRFS_AVAIL_ALLOC_BIT_SINGLE	(1ULL << 48)
+
+#define BTRFS_EXTENDED_PROFILE_MASK	(BTRFS_BLOCK_GROUP_PROFILE_MASK | \
+					 BTRFS_AVAIL_ALLOC_BIT_SINGLE)
+
+static inline u64 chunk_to_extended(u64 flags)
+{
+	if ((flags & BTRFS_BLOCK_GROUP_PROFILE_MASK) == 0)
+		flags |= BTRFS_AVAIL_ALLOC_BIT_SINGLE;
+
+	return flags;
+}
+static inline u64 extended_to_chunk(u64 flags)
+{
+	return flags & ~BTRFS_AVAIL_ALLOC_BIT_SINGLE;
+}
 
 struct btrfs_block_group_item {
 	__le64 used;
@@ -1527,6 +1564,17 @@ struct btrfs_ioctl_defrag_range_args {
 
 #define BTRFS_INODE_ROOT_ITEM_INIT	(1 << 31)
 
+struct btrfs_map_token {
+	struct extent_buffer *eb;
+	char *kaddr;
+	unsigned long offset;
+};
+
+static inline void btrfs_init_map_token (struct btrfs_map_token *token)
+{
+	memset(token, 0, sizeof(*token));
+}
+
 /* some macros to generate set/get funcs for the struct fields.  This
  * assumes there is a lefoo_to_cpu for every type, so lets make a simple
  * one for u8:
@@ -1550,20 +1598,22 @@ struct btrfs_ioctl_defrag_range_args {
 #ifndef BTRFS_SETGET_FUNCS
 #define BTRFS_SETGET_FUNCS(name, type, member, bits)			\
 u##bits btrfs_##name(struct extent_buffer *eb, type *s);		\
+u##bits btrfs_token_##name(struct extent_buffer *eb, type *s, struct btrfs_map_token *token);		\
+void btrfs_set_token_##name(struct extent_buffer *eb, type *s, u##bits val, struct btrfs_map_token *token);\
 void btrfs_set_##name(struct extent_buffer *eb, type *s, u##bits val);
 #endif
 
 #define BTRFS_SETGET_HEADER_FUNCS(name, type, member, bits)		\
 static inline u##bits btrfs_##name(struct extent_buffer *eb)		\
 {									\
-	type *p = page_address(eb->first_page);				\
+	type *p = page_address(eb->pages[0]);				\
 	u##bits res = le##bits##_to_cpu(p->member);			\
 	return res;							\
 }									\
 static inline void btrfs_set_##name(struct extent_buffer *eb,		\
 				    u##bits val)			\
 {									\
-	type *p = page_address(eb->first_page);				\
+	type *p = page_address(eb->pages[0]);				\
 	p->member = cpu_to_le##bits(val);				\
 }
 
@@ -2467,8 +2517,7 @@ int btrfs_reserve_extent(struct btrfs_trans_handle *trans,
 				  struct btrfs_root *root,
 				  u64 num_bytes, u64 min_alloc_size,
 				  u64 empty_size, u64 hint_byte,
-				  u64 search_end, struct btrfs_key *ins,
-				  u64 data);
+				  struct btrfs_key *ins, u64 data);
 int btrfs_inc_ref(struct btrfs_trans_handle *trans, struct btrfs_root *root,
 		  struct extent_buffer *buf, int full_backref, int for_cow);
 int btrfs_dec_ref(struct btrfs_trans_handle *trans, struct btrfs_root *root,
@@ -2688,24 +2737,6 @@ static inline void free_fs_info(struct btrfs_fs_info *fs_info)
 	kfree(fs_info->super_copy);
 	kfree(fs_info->super_for_commit);
 	kfree(fs_info);
-}
-/**
- * profile_is_valid - tests whether a given profile is valid and reduced
- * @flags: profile to validate
- * @extended: if true @flags is treated as an extended profile
- */
-static inline int profile_is_valid(u64 flags, int extended)
-{
-	u64 mask = ~BTRFS_BLOCK_GROUP_PROFILE_MASK;
-
-	flags &= ~BTRFS_BLOCK_GROUP_TYPE_MASK;
-	if (extended)
-		mask &= ~BTRFS_AVAIL_ALLOC_BIT_SINGLE;
-
-	if (flags & mask)
-		return 0;
-	/* true if zero or exactly one bit set */
-	return (flags & (~flags + 1)) == flags;
 }
 
 /* root-item.c */

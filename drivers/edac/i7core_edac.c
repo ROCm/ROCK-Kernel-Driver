@@ -391,7 +391,7 @@ static const struct pci_id_table pci_dev_table[] = {
 /*
  *	pci_device_id	table for which devices we are looking for
  */
-static const struct pci_device_id i7core_pci_tbl[] __devinitdata = {
+static DEFINE_PCI_DEVICE_TABLE(i7core_pci_tbl) = {
 	{PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_X58_HUB_MGMT)},
 	{PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_LYNNFIELD_QPI_LINK0)},
 	{0,}			/* 0 terminated list. */
@@ -1932,7 +1932,7 @@ static int i7core_mce_check_error(struct notifier_block *nb, unsigned long val,
 	if (mce->bank != 8)
 		return NOTIFY_DONE;
 
-#if defined(CONFIG_SMP) || defined(CONFIG_XEN)
+#ifdef CONFIG_SMP
 	/* Only handle if it is the right mc controller */
 	if (mce->socketid != pvt->i7core_dev->socket)
 		return NOTIFY_DONE;

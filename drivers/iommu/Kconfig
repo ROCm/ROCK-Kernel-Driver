@@ -4,7 +4,6 @@ config IOMMU_API
 
 menuconfig IOMMU_SUPPORT
 	bool "IOMMU Hardware Support"
-	depends on !XEN
 	default y
 	---help---
 	  Say Y here if you want to compile device drivers for IO Memory
@@ -142,5 +141,25 @@ config OMAP_IOMMU_DEBUG
          the internal state of OMAP IOMMU/IOVMM in debugfs.
 
          Say N unless you know you need this.
+
+config TEGRA_IOMMU_GART
+	bool "Tegra GART IOMMU Support"
+	depends on ARCH_TEGRA_2x_SOC
+	select IOMMU_API
+	help
+	  Enables support for remapping discontiguous physical memory
+	  shared with the operating system into contiguous I/O virtual
+	  space through the GART (Graphics Address Relocation Table)
+	  hardware included on Tegra SoCs.
+
+config TEGRA_IOMMU_SMMU
+	bool "Tegra SMMU IOMMU Support"
+	depends on ARCH_TEGRA_3x_SOC
+	select IOMMU_API
+	help
+	  Enables support for remapping discontiguous physical memory
+	  shared with the operating system into contiguous I/O virtual
+	  space through the SMMU (System Memory Management Unit)
+	  hardware included on Tegra SoCs.
 
 endif # IOMMU_SUPPORT

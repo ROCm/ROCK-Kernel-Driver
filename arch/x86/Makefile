@@ -82,6 +82,22 @@ ifdef CONFIG_CC_STACKPROTECTOR
         endif
 endif
 
+ifdef CONFIG_X86_X32
+	x32_ld_ok := $(call try-run,\
+			/bin/echo -e '1: .quad 1b' | \
+			$(CC) $(KBUILD_AFLAGS) -c -xassembler -o "$$TMP" - && \
+			$(OBJCOPY) -O elf32-x86-64 "$$TMP" "$$TMPO" && \
+			$(LD) -m elf32_x86_64 "$$TMPO" -o "$$TMP",y,n)
+        ifeq ($(x32_ld_ok),y)
+                CONFIG_X86_X32_ABI := y
+                KBUILD_AFLAGS += -DCONFIG_X86_X32_ABI
+                KBUILD_CFLAGS += -DCONFIG_X86_X32_ABI
+        else
+                $(warning CONFIG_X86_X32 enabled but no binutils support)
+        endif
+endif
+export CONFIG_X86_X32_ABI
+
 # Don't unroll struct assignments with kmemcheck enabled
 ifeq ($(CONFIG_KMEMCHECK),y)
 	KBUILD_CFLAGS += $(call cc-option,-fno-builtin-memcpy)
@@ -157,27 +173,8 @@ boot := arch/x86/boot
 
 BOOT_TARGETS = bzlilo bzdisk fdimage fdimage144 fdimage288 isoimage
 
-PHONY += bzImage vmlinuz $(BOOT_TARGETS)
+PHONY += bzImage $(BOOT_TARGETS)
 
-ifdef CONFIG_XEN
-LINUXINCLUDE := -D__XEN_INTERFACE_VERSION__=$(CONFIG_XEN_INTERFACE_VERSION) \
-	-I$(srctree)/arch/x86/include/mach-xen $(LINUXINCLUDE)
-
-ifdef CONFIG_X86_64
-LDFLAGS_vmlinux := -e startup_64
-endif
-
-# Default kernel to build
-all: vmlinuz
-
-# KBUILD_IMAGE specifies the target image being built
-KBUILD_IMAGE := $(boot)/vmlinuz
-
-vmlinuz: vmlinux
-	$(Q)$(MAKE) $(build)=$(boot) $(KBUILD_IMAGE)
-	$(Q)mkdir -p $(objtree)/arch/$(UTS_MACHINE)/boot
-	$(Q)ln -fsn ../../x86/boot/$@ $(objtree)/arch/$(UTS_MACHINE)/boot/$@
-else
 # Default kernel to build
 all: bzImage
 
@@ -191,7 +188,6 @@ endif
 	$(Q)$(MAKE) $(build)=$(boot) $(KBUILD_IMAGE)
 	$(Q)mkdir -p $(objtree)/arch/$(UTS_MACHINE)/boot
 	$(Q)ln -fsn ../../x86/boot/bzImage $(objtree)/arch/$(UTS_MACHINE)/boot/$@
-endif
 
 $(BOOT_TARGETS): vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $@

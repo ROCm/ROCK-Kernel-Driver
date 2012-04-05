@@ -93,7 +93,7 @@
 /* root profile namespace */
 struct aa_namespace *root_ns;
 
-const char *profile_mode_names[] = {
+const char *const profile_mode_names[] = {
 	"enforce",
 	"complain",
 	"kill",
@@ -745,11 +745,11 @@ static void free_profile(struct aa_profile *profile)
 
 	aa_free_file_rules(&profile->file);
 	aa_free_cap_rules(&profile->caps);
-	aa_free_net_rules(&profile->net);
 	aa_free_rlimit_rules(&profile->rlimits);
 
 	aa_free_sid(profile->sid);
 	aa_put_dfa(profile->xmatch);
+	aa_put_dfa(profile->policy.dfa);
 
 	aa_put_profile(profile->replacedby);
 

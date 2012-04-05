@@ -22,12 +22,6 @@ obj-m := $(filter-out $(obj-y),$(obj-m))
 
 lib-y := $(filter-out $(obj-y), $(sort $(lib-y) $(lib-m)))
 
-# Remove objects forcibly disabled
-
-obj-y := $(filter-out $(disabled-obj-y),$(obj-y))
-obj-m := $(filter-out $(disabled-obj-y),$(obj-m))
-lib-y := $(filter-out $(disabled-obj-y),$(lib-y))
-
 
 # Handle objects in subdirs
 # ---------------------------------------------------------------------------
@@ -309,6 +303,30 @@ quiet_cmd_lzo = LZO     $@
 cmd_lzo = (cat $(filter-out FORCE,$^) | \
 	lzop -9 && $(call size_append, $(filter-out FORCE,$^))) > $@ || \
 	(rm -f $@ ; false)
+
+# U-Boot mkimage
+# ---------------------------------------------------------------------------
+
+MKIMAGE := $(srctree)/scripts/mkuboot.sh
+
+# SRCARCH just happens to match slightly more than ARCH (on sparc), so reduces
+# the number of overrides in arch makefiles
+UIMAGE_ARCH ?= $(SRCARCH)
+UIMAGE_COMPRESSION ?= $(if $(2),$(2),none)
+UIMAGE_OPTS-y ?=
+UIMAGE_TYPE ?= kernel
+UIMAGE_LOADADDR ?= arch_must_set_this
+UIMAGE_ENTRYADDR ?= $(UIMAGE_LOADADDR)
+UIMAGE_NAME ?= 'Linux-$(KERNELRELEASE)'
+UIMAGE_IN ?= $<
+UIMAGE_OUT ?= $@
+
+quiet_cmd_uimage = UIMAGE  $(UIMAGE_OUT)
+      cmd_uimage = $(CONFIG_SHELL) $(MKIMAGE) -A $(UIMAGE_ARCH) -O linux \
+			-C $(UIMAGE_COMPRESSION) $(UIMAGE_OPTS-y) \
+			-T $(UIMAGE_TYPE) \
+			-a $(UIMAGE_LOADADDR) -e $(UIMAGE_ENTRYADDR) \
+			-n $(UIMAGE_NAME) -d $(UIMAGE_IN) $(UIMAGE_OUT)
 
 # XZ
 # ---------------------------------------------------------------------------

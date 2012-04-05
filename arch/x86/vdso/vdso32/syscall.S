@@ -19,10 +19,8 @@ __kernel_vsyscall:
 .Lpush_ebp:
 	movl	%ecx, %ebp
 	syscall
-#ifndef CONFIG_XEN
 	movl	$__USER32_DS, %ecx
 	movl	%ecx, %ss
-#endif
 	movl	%ebp, %ecx
 	popl	%ebp
 .Lpop_ebp:

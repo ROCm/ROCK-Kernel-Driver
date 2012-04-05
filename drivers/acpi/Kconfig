@@ -184,7 +184,7 @@ config ACPI_DOCK
 config ACPI_PROCESSOR
 	tristate "Processor"
 	select THERMAL
-	select CPU_IDLE if !PROCESSOR_EXTERNAL_CONTROL
+	select CPU_IDLE
 	default y
 	help
 	  This driver installs ACPI as the idle handler for Linux and uses
@@ -216,7 +216,7 @@ config ACPI_PROCESSOR_AGGREGATOR
 	tristate "Processor Aggregator"
 	depends on ACPI_PROCESSOR
 	depends on EXPERIMENTAL
-	depends on X86 && !XEN
+	depends on X86
 	help
 	  ACPI 4.0 defines processor Aggregator, which enables OS to perform
 	  specific processor configuration and control that applies to all
@@ -260,16 +260,6 @@ config ACPI_CUSTOM_DSDT_FILE
 config ACPI_CUSTOM_DSDT
 	bool
 	default ACPI_CUSTOM_DSDT_FILE != ""
-
-config ACPI_INITRD_TABLE_OVERRIDE
-	bool
-	depends on X86
-	default y
-	help
-	  This option provides functionality to override arbitrary ACPI tables
-	  via initrd. No functional change if no ACPI tables are glued to the
-	  initrd, therefore it's safe to say Y.
-	  See Documentation/acpi/initrd_table_override.txt for details
 
 config ACPI_BLACKLIST_YEAR
 	int "Disable ACPI for systems before Jan 1st this year" if X86_32
@@ -318,7 +308,6 @@ config ACPI_PCI_SLOT
 config X86_PM_TIMER
 	bool "Power Management Timer Support" if EXPERT
 	depends on X86
-	depends on !XEN
 	default y
 	help
 	  The Power Management Timer is available on all ACPI-capable,
@@ -347,7 +336,7 @@ config ACPI_CONTAINER
 
 config ACPI_HOTPLUG_MEMORY
 	tristate "Memory Hotplug"
-	depends on MEMORY_HOTPLUG || XEN_PRIVILEGED_GUEST
+	depends on MEMORY_HOTPLUG
 	default n
 	help
 	  This driver supports ACPI memory hotplug.  The driver
@@ -395,15 +384,15 @@ config ACPI_CUSTOM_METHOD
 	  load additional kernel modules after boot, this feature may be used
 	  to override that restriction).
 
+config ACPI_BGRT
+        tristate "Boottime Graphics Resource Table support"
+        default n
+        help
+	  This driver adds support for exposing the ACPI Boottime Graphics
+	  Resource Table, which allows the operating system to obtain
+	  data from the firmware boot splash. It will appear under
+	  /sys/firmware/acpi/bgrt/ .
+
 source "drivers/acpi/apei/Kconfig"
 
-config ACPI_PV_SLEEP
-	bool
-	depends on X86 && XEN && ACPI_SLEEP
-	default y
-
-config PROCESSOR_EXTERNAL_CONTROL
-	bool
-	depends on (X86 || IA64) && XEN
-	default y
 endif	# ACPI

@@ -97,7 +97,6 @@
 #include <linux/ratelimit.h>
 
 #include <linux/uaccess.h>
-#include <asm/system.h>
 
 #include <linux/kbd_kern.h>
 #include <linux/vt_kern.h>
@@ -137,8 +136,6 @@ EXPORT_SYMBOL(tty_mutex);
 
 /* Spinlock to protect the tty->tty_files list */
 DEFINE_SPINLOCK(tty_files_lock);
-
-bool __read_mostly console_use_vt = true;
 
 static ssize_t tty_read(struct file *, char __user *, size_t, loff_t *);
 static ssize_t tty_write(struct file *, const char __user *, size_t, loff_t *);
@@ -1232,13 +1229,10 @@ static void tty_line_name(struct tty_driver *driver, int index, char *p)
 static struct tty_struct *tty_driver_lookup_tty(struct tty_driver *driver,
 		struct inode *inode, int idx)
 {
-	struct tty_struct *tty;
-
 	if (driver->ops->lookup)
 		return driver->ops->lookup(driver, inode, idx);
 
-	tty = driver->ttys[idx];
-	return tty;
+	return driver->ttys[idx];
 }
 
 /**
@@ -1273,6 +1267,19 @@ int tty_init_termios(struct tty_struct *tty)
 }
 EXPORT_SYMBOL_GPL(tty_init_termios);
 
+int tty_standard_install(struct tty_driver *driver, struct tty_struct *tty)
+{
+	int ret = tty_init_termios(tty);
+	if (ret)
+		return ret;
+
+	tty_driver_kref_get(driver);
+	tty->count++;
+	driver->ttys[tty->index] = tty;
+	return 0;
+}
+EXPORT_SYMBOL_GPL(tty_standard_install);
+
 /**
  *	tty_driver_install_tty() - install a tty entry in the driver
  *	@driver: the driver for the tty
@@ -1288,21 +1295,8 @@ EXPORT_SYMBOL_GPL(tty_init_termios);
 static int tty_driver_install_tty(struct tty_driver *driver,
 						struct tty_struct *tty)
 {
-	int idx = tty->index;
-	int ret;
-
-	if (driver->ops->install) {
-		ret = driver->ops->install(driver, tty);
-		return ret;
-	}
-
-	if (tty_init_termios(tty) == 0) {
-		tty_driver_kref_get(driver);
-		tty->count++;
-		driver->ttys[idx] = tty;
-		return 0;
-	}
-	return -ENOMEM;
+	return driver->ops->install ? driver->ops->install(driver, tty) :
+		tty_standard_install(driver, tty);
 }
 
 /**
@@ -1353,7 +1347,6 @@ static int tty_reopen(struct tty_struct *tty)
 		tty->link->count++;
 	}
 	tty->count++;
-	tty->driver = driver; /* N.B. why do this every time?? */
 
 	mutex_lock(&tty->ldisc_mutex);
 	WARN_ON(!test_bit(TTY_LDISC, &tty->flags));
@@ -1367,7 +1360,6 @@ static int tty_reopen(struct tty_struct *tty)
  *	@driver: tty driver we are opening a device on
  *	@idx: device index
  *	@ret_tty: returned tty structure
- *	@first_ok: ok to open a new device (used by ptmx)
  *
  *	Prepare a tty device. This may not be a "new" clean device but
  *	could also be an active device. The pty drivers require special
@@ -1387,17 +1379,10 @@ static int tty_reopen(struct tty_struct *tty)
  * relaxed for the (most common) case of reopening a tty.
  */
 
-struct tty_struct *tty_init_dev(struct tty_driver *driver, int idx,
-								int first_ok)
+struct tty_struct *tty_init_dev(struct tty_driver *driver, int idx)
 {
 	struct tty_struct *tty;
 	int retval;
-
-	/* Check if pty master is being opened multiple times */
-	if (driver->subtype == PTY_TYPE_MASTER &&
-		(driver->flags & TTY_DRIVER_DEVPTS_MEM) && !first_ok) {
-		return ERR_PTR(-EIO);
-	}
 
 	/*
 	 * First time open is complex, especially for PTY devices.
@@ -1856,10 +1841,6 @@ static struct tty_driver *tty_lookup_driver(dev_t device, struct file *filp,
 #ifdef CONFIG_VT
 	case MKDEV(TTY_MAJOR, 0): {
 		extern struct tty_driver *console_driver;
-
-		if (!console_use_vt)
-			return get_tty_driver(device, index)
-			       ?: ERR_PTR(-ENODEV);
 		driver = tty_driver_kref_get(console_driver);
 		*index = fg_console;
 		*noctty = 1;
@@ -1956,7 +1937,7 @@ retry_open:
 		if (retval)
 			tty = ERR_PTR(retval);
 	} else
-		tty = tty_init_dev(driver, index, 0);
+		tty = tty_init_dev(driver, index);
 
 	mutex_unlock(&tty_mutex);
 	if (driver)
@@ -2947,7 +2928,6 @@ void initialize_tty_struct(struct tty_struct *tty,
 	tty->session = NULL;
 	tty->pgrp = NULL;
 	tty->overrun_time = jiffies;
-	tty->buf.head = tty->buf.tail = NULL;
 	tty_buffer_init(tty);
 	mutex_init(&tty->termios_mutex);
 	mutex_init(&tty->ldisc_mutex);
@@ -3064,7 +3044,7 @@ void tty_unregister_device(struct tty_driver *driver, unsigned index)
 }
 EXPORT_SYMBOL(tty_unregister_device);
 
-struct tty_driver *alloc_tty_driver(int lines)
+struct tty_driver *__alloc_tty_driver(int lines, struct module *owner)
 {
 	struct tty_driver *driver;
 
@@ -3073,11 +3053,12 @@ struct tty_driver *alloc_tty_driver(int lines)
 		kref_init(&driver->kref);
 		driver->magic = TTY_DRIVER_MAGIC;
 		driver->num = lines;
+		driver->owner = owner;
 		/* later we'll move allocation of tables here */
 	}
 	return driver;
 }
-EXPORT_SYMBOL(alloc_tty_driver);
+EXPORT_SYMBOL(__alloc_tty_driver);
 
 static void destruct_tty_driver(struct kref *kref)
 {
@@ -3409,8 +3390,7 @@ int __init tty_init(void)
 		WARN_ON(device_create_file(consdev, &dev_attr_active) < 0);
 
 #ifdef CONFIG_VT
-	if (console_use_vt)
-		vty_init(&console_fops);
+	vty_init(&console_fops);
 #endif
 	return 0;
 }

@@ -33,7 +33,7 @@
 #include <asm/uaccess.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
-#include <asm/system.h>
+#include <asm/switch_to.h>
 
 #include "ppc32.h"
 

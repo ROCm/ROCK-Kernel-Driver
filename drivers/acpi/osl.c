@@ -45,7 +45,6 @@
 #include <linux/list.h>
 #include <linux/jiffies.h>
 #include <linux/semaphore.h>
-#include <linux/memblock.h>
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
@@ -77,6 +76,9 @@ EXPORT_SYMBOL(acpi_in_debugger);
 
 extern char line_buf[80];
 #endif				/*ENABLE_DEBUGGER */
+
+static int (*__acpi_os_prepare_sleep)(u8 sleep_state, u32 pm1a_ctrl,
+				      u32 pm1b_ctrl);
 
 static acpi_osd_handler acpi_irq_handler;
 static void *acpi_irq_context;
@@ -324,11 +326,7 @@ acpi_map_lookup_virt(void __iomem *virt, acpi_size size)
 }
 
 #ifndef CONFIG_IA64
-#ifndef CONFIG_XEN
 #define should_use_kmap(pfn)   page_is_ram(pfn)
-#else
-#define should_use_kmap(mfn)   pfn_valid(pfn = mfn_to_local_pfn(mfn))
-#endif
 #else
 /* ioremap will take care of cache attributes */
 #define should_use_kmap(pfn)   0
@@ -536,107 +534,6 @@ acpi_os_predefined_override(const struct acpi_predefined_names *init_val,
 	return AE_OK;
 }
 
-#ifdef CONFIG_ACPI_INITRD_TABLE_OVERRIDE
-#include <asm/e820.h>
-
-#define ACPI_OVERRIDE_TABLES 10
-
-static unsigned long acpi_table_override_offset[ACPI_OVERRIDE_TABLES];
-static u64 acpi_tables_inram;
-
-unsigned long __initdata acpi_initrd_offset;
-
-/* Copied from acpica/tbutils.c:acpi_tb_checksum() */
-u8 __init acpi_table_checksum(u8 *buffer, u32 length)
-{
-	u8 sum = 0;
-	u8 *end = buffer + length;
-
-	while (buffer < end)
-		sum = (u8) (sum + *(buffer++));
-	return sum;
-}
-
-/* All but ACPI_SIG_RSDP and ACPI_SIG_FACS: */
-#define MAX_ACPI_SIGNATURE 35
-static const char *table_sigs[MAX_ACPI_SIGNATURE] = {
-	ACPI_SIG_BERT, ACPI_SIG_CPEP, ACPI_SIG_ECDT, ACPI_SIG_EINJ,
-	ACPI_SIG_ERST, ACPI_SIG_HEST, ACPI_SIG_MADT, ACPI_SIG_MSCT,
-	ACPI_SIG_SBST, ACPI_SIG_SLIT, ACPI_SIG_SRAT, ACPI_SIG_ASF,
-	ACPI_SIG_BOOT, ACPI_SIG_DBGP, ACPI_SIG_DMAR, ACPI_SIG_HPET,
-	ACPI_SIG_IBFT, ACPI_SIG_IVRS, ACPI_SIG_MCFG, ACPI_SIG_MCHI,
-	ACPI_SIG_SLIC, ACPI_SIG_SPCR, ACPI_SIG_SPMI, ACPI_SIG_TCPA,
-	ACPI_SIG_UEFI, ACPI_SIG_WAET, ACPI_SIG_WDAT, ACPI_SIG_WDDT,
-	ACPI_SIG_WDRT, ACPI_SIG_DSDT, ACPI_SIG_FADT, ACPI_SIG_PSDT,
-	ACPI_SIG_RSDT, ACPI_SIG_XSDT, ACPI_SIG_SSDT };
-
-int __init acpi_initrd_table_override(void *start_addr, void *end_addr)
-{
-	int table_nr, sig;
-	unsigned long offset = 0, max_len = end_addr - start_addr;
-	char *p;
-
-	for (table_nr = 0; table_nr < ACPI_OVERRIDE_TABLES; table_nr++) {
-		struct acpi_table_header *table;
-		if (max_len < offset + sizeof(struct acpi_table_header)) {
-			WARN_ON(1);
-			return 0;
-		}
-		table = start_addr + offset;
-
-		for (sig = 0; sig < MAX_ACPI_SIGNATURE; sig++)
-			if (!memcmp(table->signature, table_sigs[sig], 4))
-				break;
-
-		if (sig >= MAX_ACPI_SIGNATURE)
-			break;
-
-		if (max_len < offset + table->length) {
-			WARN_ON(1);
-			return 0;
-		}
-
-		if (acpi_table_checksum(start_addr + offset, table->length)) {
-			WARN(1, "%4.4s has invalid checksum\n",
-			     table->signature);
-			continue;
-		}
-		printk(KERN_INFO "%4.4s ACPI table found in initrd"
-		       " - size: %d\n", table->signature, table->length);
-
-		offset += table->length;
-		acpi_table_override_offset[table_nr] = offset;
-	}
-	if (!offset)
-		return 0;
-
-	acpi_tables_inram =
-		memblock_find_in_range(0, max_low_pfn_mapped << PAGE_SHIFT,
-				       offset, PAGE_SIZE);
-	if (!acpi_tables_inram)
-		panic("Cannot find place for ACPI override tables\n");
-
-	/*
-	 * Only calling e820_add_reserve does not work and the
-	 * tables are invalid (memory got used) later.
-	 * memblock_x86_reserve_range works as expected and the tables
-	 * won't get modified. But it's not enough because ioremap will
-	 * complain later (used by acpi_os_map_memory) that the pages
-	 * that should get mapped are not marked "reserved".
-	 * Both memblock_x86_reserve_range and e820_add_region works fine.
-	 */
-	memblock_reserve(acpi_tables_inram, acpi_tables_inram + offset);
-	e820_add_region(acpi_tables_inram, offset, E820_ACPI);
-	update_e820();
-
-	p = early_ioremap(acpi_tables_inram, offset);
-	memcpy(p, start_addr, offset);
-	early_iounmap(p, offset);
-	return offset;
-}
-
-#endif
-
 acpi_status
 acpi_os_table_override(struct acpi_table_header * existing_table,
 		       struct acpi_table_header ** new_table)
@@ -661,55 +558,13 @@ acpi_os_table_override(struct acpi_table_header * existing_table,
 }
 
 acpi_status
-acpi_os_phys_table_override(struct acpi_table_header *existing_table,
-			    acpi_physical_address *address, u32 *table_length)
+acpi_os_physical_table_override(struct acpi_table_header *existing_table,
+				acpi_physical_address * new_address,
+				u32 *new_table_length)
 {
-
-#ifndef CONFIG_ACPI_INITRD_TABLE_OVERRIDE
-	*table_length = 0;
-	*address = 0;
-	return AE_OK;
-#else
-	int table_nr = 0;
-	*table_length = 0;
-	*address = 0;
-	for (; table_nr < ACPI_OVERRIDE_TABLES &&
-		     acpi_table_override_offset[table_nr]; table_nr++) {
-		int table_offset;
-		int table_len;
-		struct acpi_table_header *table;
-
-		if (table_nr == 0)
-			table_offset = 0;
-		else
-			table_offset = acpi_table_override_offset[table_nr - 1];
-
-		table_len = acpi_table_override_offset[table_nr] - table_offset;
-
-		table = acpi_os_map_memory(acpi_tables_inram + table_offset,
-					   table_len);
-
-		if (memcmp(existing_table->signature, table->signature, 4)) {
-			acpi_os_unmap_memory(table, table_len);
-			continue;
-		}
-
-		/* Only override tables with matching oem id */
-		if (memcmp(table->oem_table_id, existing_table->oem_table_id,
-			   ACPI_OEM_TABLE_ID_SIZE)) {
-			acpi_os_unmap_memory(table, table_len);
-			continue;
-		}
-
-		acpi_os_unmap_memory(table, table_len);
-		*address = acpi_tables_inram + table_offset;
-		*table_length = table_len;
-		add_taint(TAINT_OVERRIDDEN_ACPI_TABLE);
-		break;
-	}
-	return AE_OK;
-#endif
+	return AE_SUPPORT;
 }
+
 
 static irqreturn_t acpi_irq(int irq, void *dev_id)
 {
@@ -752,7 +607,8 @@ acpi_os_install_interrupt_handler(u32 gsi, acpi_osd_handler handler,
 
 	acpi_irq_handler = handler;
 	acpi_irq_context = context;
-	if (request_irq(irq, acpi_irq, IRQF_SHARED, "acpi", acpi_irq)) {
+	if (request_threaded_irq(irq, NULL, acpi_irq, IRQF_SHARED, "acpi",
+				 acpi_irq)) {
 		printk(KERN_ERR PREFIX "SCI (IRQ%d) allocation failed\n", irq);
 		acpi_irq_handler = NULL;
 		return AE_NOT_ACQUIRED;
@@ -856,49 +712,6 @@ acpi_status acpi_os_write_port(acpi_io_address port, u32 value, u32 width)
 
 EXPORT_SYMBOL(acpi_os_write_port);
 
-acpi_status
-acpi_os_read_memory(acpi_physical_address phys_addr, u32 * value, u32 width)
-{
-	void __iomem *virt_addr;
-	unsigned int size = width / 8;
-	bool unmap = false;
-	u32 dummy;
-
-	rcu_read_lock();
-	virt_addr = acpi_map_vaddr_lookup(phys_addr, size);
-	if (!virt_addr) {
-		rcu_read_unlock();
-		virt_addr = acpi_os_ioremap(phys_addr, size);
-		if (!virt_addr)
-			return AE_BAD_ADDRESS;
-		unmap = true;
-	}
-
-	if (!value)
-		value = &dummy;
-
-	switch (width) {
-	case 8:
-		*(u8 *) value = readb(virt_addr);
-		break;
-	case 16:
-		*(u16 *) value = readw(virt_addr);
-		break;
-	case 32:
-		*(u32 *) value = readl(virt_addr);
-		break;
-	default:
-		BUG();
-	}
-
-	if (unmap)
-		iounmap(virt_addr);
-	else
-		rcu_read_unlock();
-
-	return AE_OK;
-}
-
 #ifdef readq
 static inline u64 read64(const volatile void __iomem *addr)
 {
@@ -915,7 +728,7 @@ static inline u64 read64(const volatile void __iomem *addr)
 #endif
 
 acpi_status
-acpi_os_read_memory64(acpi_physical_address phys_addr, u64 *value, u32 width)
+acpi_os_read_memory(acpi_physical_address phys_addr, u64 *value, u32 width)
 {
 	void __iomem *virt_addr;
 	unsigned int size = width / 8;
@@ -960,45 +773,6 @@ acpi_os_read_memory64(acpi_physical_address phys_addr, u64 *value, u32 width)
 	return AE_OK;
 }
 
-acpi_status
-acpi_os_write_memory(acpi_physical_address phys_addr, u32 value, u32 width)
-{
-	void __iomem *virt_addr;
-	unsigned int size = width / 8;
-	bool unmap = false;
-
-	rcu_read_lock();
-	virt_addr = acpi_map_vaddr_lookup(phys_addr, size);
-	if (!virt_addr) {
-		rcu_read_unlock();
-		virt_addr = acpi_os_ioremap(phys_addr, size);
-		if (!virt_addr)
-			return AE_BAD_ADDRESS;
-		unmap = true;
-	}
-
-	switch (width) {
-	case 8:
-		writeb(value, virt_addr);
-		break;
-	case 16:
-		writew(value, virt_addr);
-		break;
-	case 32:
-		writel(value, virt_addr);
-		break;
-	default:
-		BUG();
-	}
-
-	if (unmap)
-		iounmap(virt_addr);
-	else
-		rcu_read_unlock();
-
-	return AE_OK;
-}
-
 #ifdef writeq
 static inline void write64(u64 val, volatile void __iomem *addr)
 {
@@ -1013,7 +787,7 @@ static inline void write64(u64 val, volatile void __iomem *addr)
 #endif
 
 acpi_status
-acpi_os_write_memory64(acpi_physical_address phys_addr, u64 value, u32 width)
+acpi_os_write_memory(acpi_physical_address phys_addr, u64 value, u32 width)
 {
 	void __iomem *virt_addr;
 	unsigned int size = width / 8;
@@ -1797,4 +1571,25 @@ acpi_status acpi_os_terminate(void)
 	destroy_workqueue(kacpi_hotplug_wq);
 
 	return AE_OK;
+}
+
+acpi_status acpi_os_prepare_sleep(u8 sleep_state, u32 pm1a_control,
+				  u32 pm1b_control)
+{
+	int rc = 0;
+	if (__acpi_os_prepare_sleep)
+		rc = __acpi_os_prepare_sleep(sleep_state,
+					     pm1a_control, pm1b_control);
+	if (rc < 0)
+		return AE_ERROR;
+	else if (rc > 0)
+		return AE_CTRL_SKIP;
+
+	return AE_OK;
+}
+
+void acpi_os_set_prepare_sleep(int (*func)(u8 sleep_state,
+			       u32 pm1a_ctrl, u32 pm1b_ctrl))
+{
+	__acpi_os_prepare_sleep = func;
 }

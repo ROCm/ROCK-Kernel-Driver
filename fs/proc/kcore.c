@@ -130,7 +130,7 @@ static void __kcore_update_ram(struct list_head *list)
 }
 
 
-#if defined(CONFIG_HIGHMEM) || defined(CONFIG_XEN)
+#ifdef CONFIG_HIGHMEM
 /*
  * If no highmem, we can assume [0...max_low_pfn) continuous range of memory
  * because memory hole is not as big as !HIGHMEM case.
@@ -146,11 +146,7 @@ static int kcore_update_ram(void)
 	if (!ent)
 		return -ENOMEM;
 	ent->addr = (unsigned long)__va(0);
-#ifdef CONFIG_HIGHMEM
 	ent->size = max_low_pfn << PAGE_SHIFT;
-#else
-	ent->size = max_pfn << PAGE_SHIFT;
-#endif
 	ent->type = KCORE_RAM;
 	list_add(&ent->list, &head);
 	__kcore_update_ram(&head);
@@ -161,7 +157,8 @@ static int kcore_update_ram(void)
 
 #ifdef CONFIG_SPARSEMEM_VMEMMAP
 /* calculate vmemmap's address from given system ram pfn and register it */
-int get_sparsemem_vmemmap_info(struct kcore_list *ent, struct list_head *head)
+static int
+get_sparsemem_vmemmap_info(struct kcore_list *ent, struct list_head *head)
 {
 	unsigned long pfn = __pa(ent->addr) >> PAGE_SHIFT;
 	unsigned long nr_pages = ent->size >> PAGE_SHIFT;
@@ -193,7 +190,8 @@ int get_sparsemem_vmemmap_info(struct kcore_list *ent, struct list_head *head)
 
 }
 #else
-int get_sparsemem_vmemmap_info(struct kcore_list *ent, struct list_head *head)
+static int
+get_sparsemem_vmemmap_info(struct kcore_list *ent, struct list_head *head)
 {
 	return 1;
 }
@@ -517,7 +515,7 @@ read_kcore(struct file *file, char __user *buffer, size_t buflen, loff_t *fpos)
 
 				n = copy_to_user(buffer, (char *)start, tsz);
 				/*
-				 * We cannot distingush between fault on source
+				 * We cannot distinguish between fault on source
 				 * and fault on destination. When this happens
 				 * we clear too and hope it will trigger the
 				 * EFAULT again.

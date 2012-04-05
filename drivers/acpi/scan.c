@@ -175,16 +175,6 @@ acpi_device_hid_show(struct device *dev, struct device_attribute *attr, char *bu
 }
 static DEVICE_ATTR(hid, 0444, acpi_device_hid_show, NULL);
 
-#ifdef CONFIG_PCI_GUESTDEV
-static ssize_t
-acpi_device_uid_show(struct device *dev, struct device_attribute *attr, char *buf) {
-	struct acpi_device *acpi_dev = to_acpi_device(dev);
-
-	return sprintf(buf, "%s\n", acpi_dev->pnp.unique_id);
-}
-static DEVICE_ATTR(uid, 0444, acpi_device_uid_show, NULL);
-#endif
-
 static ssize_t
 acpi_device_path_show(struct device *dev, struct device_attribute *attr, char *buf) {
 	struct acpi_device *acpi_dev = to_acpi_device(dev);
@@ -227,13 +217,6 @@ static int acpi_device_setup_files(struct acpi_device *dev)
 			goto end;
 	}
 
-#ifdef CONFIG_PCI_GUESTDEV
-	if(dev->pnp.unique_id) {
-		result = device_create_file(&dev->dev, &dev_attr_uid);
-		if(result)
-			goto end;
-	}
-#endif
         /*
          * If device has _EJ0, 'eject' file is created that is used to trigger
          * hot-removal function from userland.
@@ -297,9 +280,6 @@ static void acpi_free_ids(struct acpi_device *device)
 		kfree(id->id);
 		kfree(id);
 	}
-#ifdef CONFIG_PCI_GUESTDEV
-	kfree(device->pnp.unique_id);
-#endif
 }
 
 static void acpi_device_release(struct device *dev)
@@ -900,18 +880,22 @@ static int acpi_bus_get_power_flags(struct acpi_device *device)
 			int j;
 
 			device->power.flags.power_resources = 1;
-			ps->flags.valid = 1;
 			for (j = 0; j < ps->resources.count; j++)
 				acpi_bus_add_power_resource(ps->resources.handles[j]);
+		}
+
+		/* The exist of _PR3 indicates D3Cold support */
+		if (i == ACPI_STATE_D3) {
+			status = acpi_get_handle(device->handle, object_name, &handle);
+			if (ACPI_SUCCESS(status))
+				device->power.states[ACPI_STATE_D3_COLD].flags.valid = 1;
 		}
 
 		/* Evaluate "_PSx" to see if we can do explicit sets */
 		object_name[2] = 'S';
 		status = acpi_get_handle(device->handle, object_name, &handle);
-		if (ACPI_SUCCESS(status)) {
+		if (ACPI_SUCCESS(status))
 			ps->flags.explicit_set = 1;
-			ps->flags.valid = 1;
-		}
 
 		/* State is valid if we have some power control */
 		if (ps->resources.count || ps->flags.explicit_set)
@@ -1153,11 +1137,6 @@ static void acpi_device_set_id(struct acpi_device *device)
 			for (i = 0; i < cid_list->count; i++)
 				acpi_add_id(device, cid_list->ids[i].string);
 		}
-#ifdef CONFIG_PCI_GUESTDEV
-		if (info->valid & ACPI_VALID_UID)
-			device->pnp.unique_id = kstrdup(info->unique_id.string,
-							GFP_KERNEL);
-#endif
 		if (info->valid & ACPI_VALID_ADR) {
 			device->pnp.bus_address = info->address;
 			device->flags.bus_address = 1;

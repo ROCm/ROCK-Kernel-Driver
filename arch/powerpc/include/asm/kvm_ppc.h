@@ -66,6 +66,7 @@ extern int kvmppc_emulate_instruction(struct kvm_run *run,
 extern int kvmppc_emulate_mmio(struct kvm_run *run, struct kvm_vcpu *vcpu);
 extern void kvmppc_emulate_dec(struct kvm_vcpu *vcpu);
 extern u32 kvmppc_get_dec(struct kvm_vcpu *vcpu, u64 tb);
+extern void kvmppc_decrementer_func(unsigned long data);
 extern int kvmppc_sanity_check(struct kvm_vcpu *vcpu);
 
 /* Core-specific hooks */
@@ -94,7 +95,7 @@ extern int kvmppc_core_vcpu_translate(struct kvm_vcpu *vcpu,
 extern void kvmppc_core_vcpu_load(struct kvm_vcpu *vcpu, int cpu);
 extern void kvmppc_core_vcpu_put(struct kvm_vcpu *vcpu);
 
-extern void kvmppc_core_deliver_interrupts(struct kvm_vcpu *vcpu);
+extern void kvmppc_core_prepare_to_enter(struct kvm_vcpu *vcpu);
 extern int kvmppc_core_pending_dec(struct kvm_vcpu *vcpu);
 extern void kvmppc_core_queue_program(struct kvm_vcpu *vcpu, ulong flags);
 extern void kvmppc_core_queue_dec(struct kvm_vcpu *vcpu);
@@ -120,8 +121,8 @@ extern long kvmppc_alloc_hpt(struct kvm *kvm);
 extern void kvmppc_free_hpt(struct kvm *kvm);
 extern long kvmppc_prepare_vrma(struct kvm *kvm,
 				struct kvm_userspace_memory_region *mem);
-extern void kvmppc_map_vrma(struct kvm *kvm,
-			    struct kvm_userspace_memory_region *mem);
+extern void kvmppc_map_vrma(struct kvm_vcpu *vcpu,
+			struct kvm_memory_slot *memslot, unsigned long porder);
 extern int kvmppc_pseries_do_hcall(struct kvm_vcpu *vcpu);
 extern long kvm_vm_ioctl_create_spapr_tce(struct kvm *kvm,
 				struct kvm_create_spapr_tce *args);
@@ -177,6 +178,9 @@ int kvmppc_core_set_sregs(struct kvm_vcpu *vcpu, struct kvm_sregs *sregs);
 void kvmppc_get_sregs_ivor(struct kvm_vcpu *vcpu, struct kvm_sregs *sregs);
 int kvmppc_set_sregs_ivor(struct kvm_vcpu *vcpu, struct kvm_sregs *sregs);
 
+int kvm_vcpu_ioctl_get_one_reg(struct kvm_vcpu *vcpu, struct kvm_one_reg *reg);
+int kvm_vcpu_ioctl_set_one_reg(struct kvm_vcpu *vcpu, struct kvm_one_reg *reg);
+
 void kvmppc_set_pid(struct kvm_vcpu *vcpu, u32 pid);
 
 #ifdef CONFIG_KVM_BOOK3S_64_HV
@@ -194,5 +198,10 @@ static inline void kvmppc_set_xics_phys(int cpu, unsigned long addr)
 static inline void kvm_linear_init(void)
 {}
 #endif
+
+int kvm_vcpu_ioctl_config_tlb(struct kvm_vcpu *vcpu,
+			      struct kvm_config_tlb *cfg);
+int kvm_vcpu_ioctl_dirty_tlb(struct kvm_vcpu *vcpu,
+			     struct kvm_dirty_tlb *cfg);
 
 #endif /* __POWERPC_KVM_PPC_H__ */
