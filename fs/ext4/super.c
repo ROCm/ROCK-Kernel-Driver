@@ -4310,7 +4310,7 @@ static int ext4_remount(struct super_block *sb, int *flags, char *data)
 	if (sbi->s_mount_flags & EXT4_MF_FS_ABORTED)
 		ext4_abort(sb, "Abort forced by user");
 
-	if (test_opt(sb, RICHACL))
+	if (sb->s_flags & MS_RICHACL)
 		acl_flags = MS_RICHACL;
 	else if (test_opt(sb, POSIX_ACL))
 		acl_flags = MS_POSIXACL;

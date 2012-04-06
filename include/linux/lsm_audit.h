@@ -123,6 +123,10 @@ struct common_audit_data {
 					u32 denied;
 					uid_t ouid;
 				} fs;
+				struct {
+					int type, protocol;
+					struct sock *sk;
+				} net;
 			};
 		} apparmor_audit_data;
 #endif
