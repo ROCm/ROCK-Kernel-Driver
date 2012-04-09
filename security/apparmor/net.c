@@ -38,22 +38,23 @@ static const char *sock_type_names[] = {
 static void audit_cb(struct audit_buffer *ab, void *va)
 {
 	struct common_audit_data *sa = va;
+	struct apparmor_audit_data *aad = sa->apparmor_audit_data;
 
 	audit_log_format(ab, " family=");
-	if (address_family_names[sa->u.net.family]) {
-		audit_log_string(ab, address_family_names[sa->u.net.family]);
+	if (address_family_names[sa->u.net->family]) {
+		audit_log_string(ab, address_family_names[sa->u.net->family]);
 	} else {
-		audit_log_format(ab, " \"unknown(%d)\"", sa->u.net.family);
+		audit_log_format(ab, " \"unknown(%d)\"", sa->u.net->family);
 	}
 
 	audit_log_format(ab, " sock_type=");
-	if (sock_type_names[sa->aad.net.type]) {
-		audit_log_string(ab, sock_type_names[sa->aad.net.type]);
+	if (sock_type_names[aad->net.type]) {
+		audit_log_string(ab, sock_type_names[aad->net.type]);
 	} else {
-		audit_log_format(ab, "\"unknown(%d)\"", sa->aad.net.type);
+		audit_log_format(ab, "\"unknown(%d)\"", aad->net.type);
 	}
 
-	audit_log_format(ab, " protocol=%d", sa->aad.net.protocol);
+	audit_log_format(ab, " protocol=%d", aad->net.protocol);
 }
 
 /**
@@ -73,6 +74,22 @@ static int audit_net(struct aa_profile *profile, int op, u16 family, int type,
 {
 	int audit_type = AUDIT_APPARMOR_AUTO;
 	struct common_audit_data sa;
+
+	struct apparmor_audit_data aad = {
+		.op = op,
+		.net = {
+			.type = type,
+			.protocol = protocol,
+		},
+		.error = error
+	};
+
+	struct lsm_network_audit net = {
+		.family = family,
+		.sk = sk,
+	};
+
+
 	if (sk) {
 		COMMON_AUDIT_DATA_INIT(&sa, NET);
 	} else {
@@ -80,23 +97,19 @@ static int audit_net(struct aa_profile *profile, int op, u16 family, int type,
 	}
 	/* todo fill in socket addr info */
 
-	sa.aad.op = op,
-	sa.u.net.family = family;
-	sa.u.net.sk = sk;
-	sa.aad.net.type = type;
-	sa.aad.net.protocol = protocol;
-	sa.aad.error = error;
+	sa.apparmor_audit_data = &aad;
+	sa.u.net = &net;
 
-	if (likely(!sa.aad.error)) {
-		u16 audit_mask = profile->net.audit[sa.u.net.family];
+	if (likely(!aad.error)) {
+		u16 audit_mask = profile->net.audit[net.family];
 		if (likely((AUDIT_MODE(profile) != AUDIT_ALL) &&
-			   !(1 << sa.aad.net.type & audit_mask)))
+			   !(1 << aad.net.type & audit_mask)))
 			return 0;
 		audit_type = AUDIT_APPARMOR_AUDIT;
 	} else {
-		u16 quiet_mask = profile->net.quiet[sa.u.net.family];
+		u16 quiet_mask = profile->net.quiet[net.family];
 		u16 kill_mask = 0;
-		u16 denied = (1 << sa.aad.net.type) & ~quiet_mask;
+		u16 denied = (1 << aad.net.type) & ~quiet_mask;
 
 		if (denied & kill_mask)
 			audit_type = AUDIT_APPARMOR_KILL;
@@ -104,7 +117,7 @@ static int audit_net(struct aa_profile *profile, int op, u16 family, int type,
 		if ((denied & quiet_mask) &&
 		    AUDIT_MODE(profile) != AUDIT_NOQUIET &&
 		    AUDIT_MODE(profile) != AUDIT_ALL)
-			return COMPLAIN_MODE(profile) ? 0 : sa.aad.error;
+			return COMPLAIN_MODE(profile) ? 0 : aad.error;
 	}
 
 	return aa_audit(audit_type, profile, GFP_KERNEL, &sa, audit_cb);
