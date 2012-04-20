@@ -682,3 +682,15 @@ ioat3_dca_init(struct pci_dev *pdev, void __iomem *iobase)
 
 	return dca;
 }
+
+void ioat_remove_dca_provider(struct pci_dev *pdev)
+{
+	struct ioatdma_device *device = pci_get_drvdata(pdev);
+
+	if (!device->dca)
+		return;
+
+	unregister_dca_provider(device->dca, &pdev->dev);
+	free_dca_provider(device->dca);
+	device->dca = NULL;
+}

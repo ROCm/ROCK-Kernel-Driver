@@ -1276,6 +1276,11 @@ int __must_check i915_add_request(struct intel_ring_buffer *ring,
 int __must_check i915_wait_request(struct intel_ring_buffer *ring,
 				   uint32_t seqno,
 				   bool do_retire);
+#ifdef CONFIG_XEN
+int i915_gem_mmap(struct file *filp, struct vm_area_struct *vma);
+#else
+#define i915_gem_mmap drm_gem_mmap
+#endif
 int i915_gem_fault(struct vm_area_struct *vma, struct vm_fault *vmf);
 int __must_check
 i915_gem_object_set_to_gtt_domain(struct drm_i915_gem_object *obj,
