@@ -1264,6 +1264,14 @@ rio_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 	struct netdev_desc *desc;
 	int i;
 
+	switch (cmd) {
+	case SIOCDEVPRIVATE + 2:
+	case SIOCDEVPRIVATE + 5:
+	case SIOCDEVPRIVATE + 6:
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
+	};
+
 	phy_addr = np->phy_addr;
 	switch (cmd) {
 	case SIOCDEVPRIVATE:
