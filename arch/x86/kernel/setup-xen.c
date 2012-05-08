@@ -1235,6 +1235,9 @@ void __init setup_arch(char **cmdline_p)
 #ifdef CONFIG_XEN
 #ifdef CONFIG_KEXEC
 	xen_machine_kexec_setup_resources();
+# define kexec_enabled() (crashk_res.start < crashk_res.end)
+#else
+# define kexec_enabled() 0
 #endif
 	p2m_pages = max_pfn;
 	if (xen_start_info->nr_pages > max_pfn) {
@@ -1344,9 +1347,7 @@ void __init setup_arch(char **cmdline_p)
 				     PFN_PHYS(PFN_UP(xen_start_info->nr_pages *
 						     sizeof(unsigned long))));
 
-#ifndef CONFIG_KEXEC
-		if (!is_initial_xendomain())
-#endif
+		if (!is_initial_xendomain() || kexec_enabled())
 			setup_pfn_to_mfn_frame_list(__alloc_bootmem);
 	}
 

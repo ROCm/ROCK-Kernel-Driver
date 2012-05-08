@@ -252,7 +252,7 @@ acpi_parse_x2apic(struct acpi_subtable_header *header, const unsigned long end)
 		printk(KERN_WARNING PREFIX "x2apic entry ignored\n");
 	else
 		acpi_register_lapic(apic_id, enabled);
-#else
+#elif !defined(CONFIG_XEN)
 	printk(KERN_WARNING PREFIX "x2apic entry ignored\n");
 #endif
 
