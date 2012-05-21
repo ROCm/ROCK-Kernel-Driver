@@ -605,7 +605,7 @@ void __init acpi_set_irq_model_ioapic(void)
 #include <acpi/processor.h>
 
 #ifndef CONFIG_XEN
-static void __cpuinitdata acpi_map_cpu2node(acpi_handle handle, int cpu, int physid)
+static void __cpuinit acpi_map_cpu2node(acpi_handle handle, int cpu, int physid)
 {
 #ifdef CONFIG_ACPI_NUMA
 	int nid;
