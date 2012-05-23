@@ -905,7 +905,7 @@ int __devinit
 #endif
 gnttab_init(void)
 {
-	int i;
+	int i, ret;
 	unsigned int max_nr_glist_frames, nr_glist_frames;
 	unsigned int nr_init_grefs;
 
@@ -928,12 +928,16 @@ gnttab_init(void)
 	nr_glist_frames = nr_freelist_frames(nr_grant_frames);
 	for (i = 0; i < nr_glist_frames; i++) {
 		gnttab_list[i] = (grant_ref_t *)__get_free_page(GFP_KERNEL);
-		if (gnttab_list[i] == NULL)
+		if (gnttab_list[i] == NULL) {
+			ret = -ENOMEM;
 			goto ini_nomem;
+		}
 	}
 
-	if (gnttab_resume() < 0)
-		return -ENODEV;
+	if (gnttab_resume() < 0) {
+		ret = -ENODEV;
+		goto ini_nomem;
+	}
 
 	nr_init_grefs = nr_grant_frames * ENTRIES_PER_GRANT_FRAME;
 
@@ -967,7 +971,7 @@ gnttab_init(void)
 	for (i--; i >= 0; i--)
 		free_page((unsigned long)gnttab_list[i]);
 	kfree(gnttab_list);
-	return -ENOMEM;
+	return ret;
 }
 
 #ifdef CONFIG_XEN

@@ -924,6 +924,7 @@ extern int set_tsc_mode(unsigned int val);
 
 extern int amd_get_nb_id(int cpu);
 
+#ifndef CONFIG_XEN
 struct aperfmperf {
 	u64 aperf, mperf;
 };
@@ -952,6 +953,7 @@ unsigned long calc_aperfmperf_ratio(struct aperfmperf *old,
 
 	return ratio;
 }
+#endif
 
 /*
  * AMD errata checking

@@ -283,3 +283,4 @@ module_init(blktap_init);
 module_exit(blktap_exit);
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_ALIAS("devname:" BLKTAP2_DEV_DIR "control");
+MODULE_ALIAS("xen-backend:tap2");

@@ -80,7 +80,6 @@ typedef struct gntdev_grant_info {
 			grant_ref_t ref;
 			grant_handle_t kernel_handle;
 			grant_handle_t user_handle;
-			uint64_t dev_bus_addr;
 		} valid;
 	} u;
 } gntdev_grant_info_t;
@@ -288,35 +287,27 @@ static void compress_free_list(gntdev_file_private_data_t *private_data)
 static int find_contiguous_free_range(gntdev_file_private_data_t *private_data,
 				      uint32_t num_slots) 
 {
-	uint32_t i, start_index = private_data->next_fit_index;
-	uint32_t range_start = 0, range_length;
+	/* First search from next_fit_index to the end of the array. */
+	uint32_t start_index = private_data->next_fit_index;
+	uint32_t end_index = private_data->grants_size;
 
-	/* First search from the start_index to the end of the array. */
-	range_length = 0;
-	for (i = start_index; i < private_data->grants_size; ++i) {
-		if (private_data->grants[i].state == GNTDEV_SLOT_INVALID) {
-			if (range_length == 0) {
-				range_start = i;
-			}
-			++range_length;
-			if (range_length == num_slots) {
-				return range_start;
-			}
+	for (;;) {
+		uint32_t i, range_start = 0, range_length = 0;
+
+		for (i = start_index; i < end_index; ++i) {
+			if (private_data->grants[i].state == GNTDEV_SLOT_INVALID) {
+				if (range_length == 0)
+					range_start = i;
+				if (++range_length == num_slots)
+					return range_start;
+			} else
+				range_length = 0;
 		}
-	}
-	
-	/* Now search from the start of the array to the start_index. */
-	range_length = 0;
-	for (i = 0; i < start_index; ++i) {
-		if (private_data->grants[i].state == GNTDEV_SLOT_INVALID) {
-			if (range_length == 0) {
-				range_start = i;
-			}
-			++range_length;
-			if (range_length == num_slots) {
-				return range_start;
-			}
-		}
+		/* Now search from the start of the array to next_fit_index. */
+		if (!start_index)
+			break;
+		end_index = start_index;
+		start_index = 0;
 	}
 	
 	return -ENOMEM;
@@ -457,14 +448,15 @@ static int gntdev_mmap (struct file *flip, struct vm_area_struct *vma)
 {
 	struct gnttab_map_grant_ref op;
 	unsigned long slot_index = vma->vm_pgoff;
-	unsigned long kernel_vaddr, user_vaddr;
-	uint32_t size = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
+	unsigned long kernel_vaddr, user_vaddr, mfn;
+	unsigned long size = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
 	uint64_t ptep;
 	int ret, exit_ret;
-	int flags;
-	int i;
+	unsigned int i, flags;
 	struct page *page;
 	gntdev_file_private_data_t *private_data = flip->private_data;
+	gntdev_grant_info_t *grants;
+	struct vm_foreign_map *foreign_map;
 
 	if (unlikely(!private_data)) {
 		pr_err("file's private data is NULL\n");
@@ -473,17 +465,19 @@ static int gntdev_mmap (struct file *flip, struct vm_area_struct *vma)
 
 	/* Test to make sure that the grants array has been initialised. */
 	down_read(&private_data->grants_sem);
-	if (unlikely(!private_data->grants)) {
-		up_read(&private_data->grants_sem);
+	grants = private_data->grants;
+	up_read(&private_data->grants_sem);
+
+	if (unlikely(!grants)) {
 		pr_err("attempted to mmap before ioctl\n");
 		return -EINVAL;
 	}
-	up_read(&private_data->grants_sem);
+	grants += slot_index;
 
-	if (unlikely((size <= 0) || 
-		     (size + slot_index) > private_data->grants_size)) {
+	if (unlikely(size + slot_index <= slot_index ||
+		     size + slot_index > private_data->grants_size)) {
 		pr_err("Invalid number of pages or offset"
-		       "(num_pages = %d, first_slot = %ld)\n",
+		       "(num_pages = %lu, first_slot = %lu)\n",
 		       size, slot_index);
 		return -ENXIO;
 	}
@@ -493,15 +487,21 @@ static int gntdev_mmap (struct file *flip, struct vm_area_struct *vma)
 		return -EINVAL;
 	}
 
+	foreign_map = kmalloc(sizeof(*foreign_map), GFP_KERNEL);
+	if (!foreign_map) {
+		pr_err("couldn't allocate mapping structure for VM area\n");
+		return -ENOMEM;
+	}
+	foreign_map->map = &private_data->foreign_pages[slot_index];
+
 	/* Slots must be in the NOT_YET_MAPPED state. */
 	down_write(&private_data->grants_sem);
 	for (i = 0; i < size; ++i) {
-		if (private_data->grants[slot_index + i].state != 
-		    GNTDEV_SLOT_NOT_YET_MAPPED) {
-			pr_err("Slot (index = %ld) is in the wrong "
-			       "state (%d)\n", slot_index + i,
-			       private_data->grants[slot_index + i].state);
+		if (grants[i].state != GNTDEV_SLOT_NOT_YET_MAPPED) {
+			pr_err("Slot (index = %lu) is in the wrong state (%d)\n",
+			       slot_index + i, grants[i].state);
 			up_write(&private_data->grants_sem);
+			kfree(foreign_map);
 			return -EINVAL;
 		}
 	}
@@ -510,13 +510,8 @@ static int gntdev_mmap (struct file *flip, struct vm_area_struct *vma)
 	vma->vm_ops = &gntdev_vmops;
     
 	/* The VM area contains pages from another VM. */
+	vma->vm_private_data = foreign_map;
 	vma->vm_flags |= VM_FOREIGN;
-	vma->vm_private_data = kzalloc(size * sizeof(struct page *),
-				       GFP_KERNEL);
-	if (vma->vm_private_data == NULL) {
-		pr_err("couldn't allocate mapping structure for VM area\n");
-		return -ENOMEM;
-	}
 
 	/* This flag prevents Bad PTE errors when the memory is unmapped. */
 	vma->vm_flags |= VM_RESERVED;
@@ -544,14 +539,11 @@ static int gntdev_mmap (struct file *flip, struct vm_area_struct *vma)
 			flags |= GNTMAP_readonly;
 
 		kernel_vaddr = get_kernel_vaddr(private_data, slot_index + i);
-		user_vaddr = get_user_vaddr(vma, i);
 		page = private_data->foreign_pages[slot_index + i];
 
 		gnttab_set_map_op(&op, kernel_vaddr, flags,   
-				  private_data->grants[slot_index+i]
-				  .u.valid.ref, 
-				  private_data->grants[slot_index+i]
-				  .u.valid.domid);
+				  grants[i].u.valid.ref,
+				  grants[i].u.valid.domid);
 
 		/* Carry out the mapping of the grant reference. */
 		ret = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, 
@@ -562,114 +554,90 @@ static int gntdev_mmap (struct file *flip, struct vm_area_struct *vma)
 				pr_err("Error mapping the grant reference "
 				       "into the kernel (%d). domid = %d; ref = %d\n",
 				       op.status,
-				       private_data->grants[slot_index+i]
-				       .u.valid.domid,
-				       private_data->grants[slot_index+i]
-				       .u.valid.ref);
+				       grants[i].u.valid.domid,
+				       grants[i].u.valid.ref);
 			else
 				/* Propagate eagain instead of trying to fix it up */
 				exit_ret = -EAGAIN;
 			goto undo_map_out;
 		}
 
-		/* Store a reference to the page that will be mapped into user
-		 * space.
-		 */
-		((struct page **) vma->vm_private_data)[i] = page;
-
 		/* Mark mapped page as reserved. */
 		SetPageReserved(page);
 
 		/* Record the grant handle, for use in the unmap operation. */
-		private_data->grants[slot_index+i].u.valid.kernel_handle = 
-			op.handle;
-		private_data->grants[slot_index+i].u.valid.dev_bus_addr = 
-			op.dev_bus_addr;
+		grants[i].u.valid.kernel_handle = op.handle;
 		
-		private_data->grants[slot_index+i].state = GNTDEV_SLOT_MAPPED;
-		private_data->grants[slot_index+i].u.valid.user_handle =
-			GNTDEV_INVALID_HANDLE;
+		grants[i].state = GNTDEV_SLOT_MAPPED;
+		grants[i].u.valid.user_handle = GNTDEV_INVALID_HANDLE;
 
 		/* Now perform the mapping to user space. */
-		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+		user_vaddr = get_user_vaddr(vma, i);
 
-			/* NOT USING SHADOW PAGE TABLES. */
-			/* In this case, we map the grant(s) straight into user
-			 * space.
-			 */
-
-			/* Get the machine address of the PTE for the user 
-			 *  page.
-			 */
-			if ((ret = create_lookup_pte_addr(vma->vm_mm, 
-							  vma->vm_start 
-							  + (i << PAGE_SHIFT), 
-							  &ptep)))
-			{
-				pr_err("Error obtaining PTE pointer (%d)\n",
-				       ret);
-				goto undo_map_out;
-			}
-			
-			/* Configure the map operation. */
-		
-			/* The reference is to be used by host CPUs. */
-			flags = GNTMAP_host_map;
-			
-			/* Specifies a user space mapping. */
-			flags |= GNTMAP_application_map;
-			
-			/* The map request contains the machine address of the
-			 * PTE to update.
-			 */
-			flags |= GNTMAP_contains_pte;
-			
-			if (!(vma->vm_flags & VM_WRITE))
-				flags |= GNTMAP_readonly;
-
-			gnttab_set_map_op(&op, ptep, flags, 
-					  private_data->grants[slot_index+i]
-					  .u.valid.ref, 
-					  private_data->grants[slot_index+i]
-					  .u.valid.domid);
-
-			/* Carry out the mapping of the grant reference. */
-			ret = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref,
-							&op, 1);
-			BUG_ON(ret);
-			if (op.status != GNTST_okay) {
-				pr_err("Error mapping the grant "
-				       "reference into user space (%d). domid "
-				       "= %d; ref = %d\n", op.status,
-				       private_data->grants[slot_index+i].u
-				       .valid.domid,
-				       private_data->grants[slot_index+i].u
-				       .valid.ref);
-				/* This should never happen after we've mapped into
-				* the kernel space. */
-				BUG_ON(op.status == GNTST_eagain);
-				goto undo_map_out;
-			}
-			
-			/* Record the grant handle, for use in the unmap 
-			 * operation. 
-			 */
-			private_data->grants[slot_index+i].u.
-				valid.user_handle = op.handle;
-
-			/* Update p2m structure with the new mapping. */
-			set_phys_to_machine(__pa(kernel_vaddr) >> PAGE_SHIFT,
-					    FOREIGN_FRAME(private_data->
-							  grants[slot_index+i]
-							  .u.valid.dev_bus_addr
-							  >> PAGE_SHIFT));
-		} else {
+		if (xen_feature(XENFEAT_auto_translated_physmap)) {
 			/* USING SHADOW PAGE TABLES. */
 			/* In this case, we simply insert the page into the VM
 			 * area. */
 			ret = vm_insert_page(vma, user_vaddr, page);
+			if (!ret)
+				continue;
+			exit_ret = ret;
+			goto undo_map_out;
 		}
 
+		/* NOT USING SHADOW PAGE TABLES. */
+		/* In this case, we map the grant(s) straight into user
+		 * space.
+		 */
+		mfn = op.dev_bus_addr >> PAGE_SHIFT;
+
+		/* Get the machine address of the PTE for the user page. */
+		if ((ret = create_lookup_pte_addr(vma->vm_mm,
+						  user_vaddr,
+						  &ptep)))
+		{
+			pr_err("Error obtaining PTE pointer (%d)\n", ret);
+			goto undo_map_out;
+		}
+
+		/* Configure the map operation. */
+
+		/* Specifies a user space mapping. */
+		flags |= GNTMAP_application_map;
+
+		/* The map request contains the machine address of the
+		 * PTE to update.
+		 */
+		flags |= GNTMAP_contains_pte;
+
+		gnttab_set_map_op(&op, ptep, flags,
+				  grants[i].u.valid.ref,
+				  grants[i].u.valid.domid);
+
+		/* Carry out the mapping of the grant reference. */
+		ret = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref,
+						&op, 1);
+		BUG_ON(ret);
+		if (op.status != GNTST_okay) {
+			pr_err("Error mapping the grant reference "
+			       "into user space (%d). domid = %d; ref = %d\n",
+			       op.status,
+			       grants[i].u.valid.domid,
+			       grants[i].u.valid.ref);
+			/* This should never happen after we've mapped into
+			 * the kernel space. */
+			BUG_ON(op.status == GNTST_eagain);
+			goto undo_map_out;
+		}
+
+		/* Record the grant handle, for use in the unmap
+		 * operation.
+		 */
+		grants[i].u.valid.user_handle = op.handle;
+
+		/* Update p2m structure with the new mapping. */
+		set_phys_to_machine(__pa(kernel_vaddr) >> PAGE_SHIFT,
+				    FOREIGN_FRAME(mfn));
 	}
 	exit_ret = 0;
 
@@ -681,7 +649,8 @@ undo_map_out:
 	 * by do_mmap_pgoff(), which will eventually call gntdev_clear_pte().
 	 * All we need to do here is free the vma_private_data.
 	 */
-	kfree(vma->vm_private_data);
+	vma->vm_flags &= ~VM_FOREIGN;
+	kfree(foreign_map);
 
 	/* THIS IS VERY UNPLEASANT: do_mmap_pgoff() will set the vma->vm_file
 	 * to NULL on failure. However, we need this in gntdev_clear_pte() to
@@ -698,9 +667,11 @@ undo_map_out:
 static pte_t gntdev_clear_pte(struct vm_area_struct *vma, unsigned long addr,
 			      pte_t *ptep, int is_fullmm)
 {
-	int slot_index, ret;
+	int ret;
+	unsigned int nr;
+	unsigned long slot_index;
 	pte_t copy;
-	struct gnttab_unmap_grant_ref op;
+	struct gnttab_unmap_grant_ref op[2];
 	gntdev_file_private_data_t *private_data;
 
 	/* THIS IS VERY UNPLEASANT: do_mmap_pgoff() will set the vma->vm_file
@@ -725,60 +696,53 @@ static pte_t gntdev_clear_pte(struct vm_area_struct *vma, unsigned long addr,
 	/* Only unmap grants if the slot has been mapped. This could be being
 	 * called from a failing mmap().
 	 */
-	if (private_data->grants[slot_index].state == GNTDEV_SLOT_MAPPED) {
+	if (private_data->grants[slot_index].state != GNTDEV_SLOT_MAPPED)
+		return xen_ptep_get_and_clear_full(vma, addr, ptep, is_fullmm);
 
-		/* First, we clear the user space mapping, if it has been made.
-		 */
-		if (private_data->grants[slot_index].u.valid.user_handle !=
-		    GNTDEV_INVALID_HANDLE && 
-		    !xen_feature(XENFEAT_auto_translated_physmap)) {
-			/* NOT USING SHADOW PAGE TABLES. */
+	/* Clear the user space mapping, if it has been made. */
+	if (private_data->grants[slot_index].u.valid.user_handle !=
+	    GNTDEV_INVALID_HANDLE) {
+		/* NOT USING SHADOW PAGE TABLES (and user handle valid). */
 
-			/* Copy the existing value of the PTE for returning. */
-			copy = *ptep;
+		/* Copy the existing value of the PTE for returning. */
+		copy = *ptep;
 
-			gnttab_set_unmap_op(&op, ptep_to_machine(ptep), 
-					    GNTMAP_contains_pte,
-					    private_data->grants[slot_index]
-					    .u.valid.user_handle);
-			ret = HYPERVISOR_grant_table_op(
-				GNTTABOP_unmap_grant_ref, &op, 1);
-			BUG_ON(ret);
-			if (op.status != GNTST_okay)
-				pr_warning("User unmap grant status = %d\n",
-					   op.status);
-		} else {
-			/* USING SHADOW PAGE TABLES. */
-			copy = xen_ptep_get_and_clear_full(vma, addr, ptep, is_fullmm);
-		}
-
-		/* Finally, we unmap the grant from kernel space. */
-		gnttab_set_unmap_op(&op, 
-				    get_kernel_vaddr(private_data, slot_index),
-				    GNTMAP_host_map, 
+		gnttab_set_unmap_op(&op[0], ptep_to_machine(ptep),
+				    GNTMAP_contains_pte,
 				    private_data->grants[slot_index].u.valid
-				    .kernel_handle);
-		ret = HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, 
-						&op, 1);
-		BUG_ON(ret);
-		if (op.status != GNTST_okay)
-			pr_warning("Kernel unmap grant status = %d\n",
-				   op.status);
+				    .user_handle);
+		nr = 1;
+	} else {
+		/* USING SHADOW PAGE TABLES (or user handle invalid). */
+		copy = xen_ptep_get_and_clear_full(vma, addr, ptep, is_fullmm);
+		nr = 0;
+	}
 
+	/* We always unmap the grant from kernel space. */
+	gnttab_set_unmap_op(&op[nr],
+			    get_kernel_vaddr(private_data, slot_index),
+			    GNTMAP_host_map,
+			    private_data->grants[slot_index].u.valid
+			    .kernel_handle);
 
-		/* Return slot to the not-yet-mapped state, so that it may be
-		 * mapped again, or removed by a subsequent ioctl.
-		 */
-		private_data->grants[slot_index].state = 
-			GNTDEV_SLOT_NOT_YET_MAPPED;
+	ret = HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref, op, nr + 1);
+	BUG_ON(ret);
 
+	if (nr && op[0].status != GNTST_okay)
+		pr_warning("User unmap grant status = %d\n", op[0].status);
+	if (op[nr].status != GNTST_okay)
+		pr_warning("Kernel unmap grant status = %d\n", op[nr].status);
+
+	/* Return slot to the not-yet-mapped state, so that it may be
+	 * mapped again, or removed by a subsequent ioctl.
+	 */
+	private_data->grants[slot_index].state = GNTDEV_SLOT_NOT_YET_MAPPED;
+
+	if (!xen_feature(XENFEAT_auto_translated_physmap)) {
 		/* Invalidate the physical to machine mapping for this page. */
 		set_phys_to_machine(
 			page_to_pfn(private_data->foreign_pages[slot_index]),
 			INVALID_P2M_ENTRY);
-
-	} else {
-		copy = xen_ptep_get_and_clear_full(vma, addr, ptep, is_fullmm);
 	}
 
 	return copy;
@@ -787,9 +751,8 @@ static pte_t gntdev_clear_pte(struct vm_area_struct *vma, unsigned long addr,
 /* "Destructor" for a VM area.
  */
 static void gntdev_vma_close(struct vm_area_struct *vma) {
-	if (vma->vm_private_data) {
+	if (vma->vm_flags & VM_FOREIGN)
 		kfree(vma->vm_private_data);
-	}
 }
 
 /* Called when an ioctl is made on the device.
@@ -903,7 +866,8 @@ private_data_initialised:
 			return -EFAULT;
 
 		start_index = op.index >> PAGE_SHIFT;
-		if (start_index + op.count > private_data->grants_size)
+		if (start_index + op.count < start_index ||
+		    start_index + op.count > private_data->grants_size)
 			return -EINVAL;
 
 		down_write(&private_data->grants_sem);
@@ -912,26 +876,28 @@ private_data_initialised:
 		 * state.
 		 */
 		for (i = 0; i < op.count; ++i) {
-			if (unlikely
-			    (private_data->grants[start_index + i].state
-			     != GNTDEV_SLOT_NOT_YET_MAPPED)) {
-				if (private_data->grants[start_index + i].state
-				    == GNTDEV_SLOT_INVALID) {
-					pr_err("Tried to remove an invalid "
-					       "grant at offset 0x%x.",
-					       (start_index + i) 
-					       << PAGE_SHIFT);
-					rc = -EINVAL;
-				} else {
-					pr_err("Tried to remove a grant which "
-					       "is currently mmap()-ed at "
-					       "offset 0x%x.",
-					       (start_index + i) 
-					       << PAGE_SHIFT);
-					rc = -EBUSY;
-				}
-				goto unmap_out;
+			const char *what;
+
+			switch (private_data->grants[start_index + i].state) {
+			case GNTDEV_SLOT_NOT_YET_MAPPED:
+				continue;
+			case GNTDEV_SLOT_INVALID:
+				what = "invalid";
+				rc = -EINVAL;
+				break;
+			case GNTDEV_SLOT_MAPPED:
+				what = "currently mmap()-ed";
+				rc = -EBUSY;
+				break;
+			default:
+				what = "in an invalid state";
+				rc = -ENXIO;
+				break;
 			}
+			pr_err("%s[%d] tried to remove a grant which is %s at %#x+%#x\n",
+			       current->comm, current->pid,
+			       what, start_index, i);
+			goto unmap_out;
 		}
 
 		down_write(&private_data->free_list_sem);

@@ -124,7 +124,7 @@ typedef struct tap_blkif {
 					[req id, idx] tuple                  */
 	blkif_t *blkif;               /*Associate blkif with tapdev          */
 	struct domid_translate_ext trans; /*Translation from domid to bus.   */
-	struct vm_foreign_map foreign_map;    /*Mapping page */
+	struct vm_foreign_map *foreign_maps; /*Mapping pages                 */
 } tap_blkif_t;
 
 static struct tap_blkif *tapfds[MAX_TAP_DEV];
@@ -340,7 +340,7 @@ static pte_t blktap_clear_pte(struct vm_area_struct *vma,
 
 	pg = idx_to_page(mmap_idx, pending_idx, seg);
 	ClearPageReserved(pg);
-	info->foreign_map.map[offset + RING_PAGES] = NULL;
+	info->foreign_maps->map[offset + RING_PAGES] = NULL;
 
 	khandle = &pending_handle(mmap_idx, pending_idx, seg);
 
@@ -388,12 +388,17 @@ static pte_t blktap_clear_pte(struct vm_area_struct *vma,
 static void blktap_vma_open(struct vm_area_struct *vma)
 {
 	tap_blkif_t *info;
+	unsigned long idx;
+	struct vm_foreign_map *foreign_map;
+
 	if (vma->vm_file == NULL)
 		return;
 
 	info = vma->vm_file->private_data;
-	vma->vm_private_data =
-		&info->foreign_map.map[(vma->vm_start - info->rings_vstart) >> PAGE_SHIFT];
+	idx = (vma->vm_start - info->rings_vstart) >> PAGE_SHIFT;
+	foreign_map = &info->foreign_maps[idx];
+	foreign_map->map = &info->foreign_maps->map[idx];
+	vma->vm_private_data = foreign_map;
 }
 
 /* tricky part
@@ -403,7 +408,6 @@ static void blktap_vma_open(struct vm_area_struct *vma)
  */
 static void blktap_vma_close(struct vm_area_struct *vma)
 {
-	tap_blkif_t *info;
 	struct vm_area_struct *next = vma->vm_next;
 
 	if (next == NULL ||
@@ -413,9 +417,7 @@ static void blktap_vma_close(struct vm_area_struct *vma)
 	    vma->vm_file != next->vm_file)
 		return;
 
-	info = vma->vm_file->private_data;
-	next->vm_private_data =
-		&info->foreign_map.map[(next->vm_start - info->rings_vstart) >> PAGE_SHIFT];
+	blktap_vma_open(next);
 }
 
 static struct vm_operations_struct blktap_vm_ops = {
@@ -653,8 +655,9 @@ static int blktap_release(struct inode *inode, struct file *filp)
 	mm = xchg(&info->mm, NULL);
 	if (mm)
 		mmput(mm);
-	kfree(info->foreign_map.map);
-	info->foreign_map.map = NULL;
+	kfree(info->foreign_maps->map);
+	kfree(info->foreign_maps);
+	info->foreign_maps = NULL;
 
 	/* Free the ring page. */
 	ClearPageReserved(virt_to_page(info->ufe_ring.sring));
@@ -743,14 +746,19 @@ static int blktap_mmap(struct file *filp, struct vm_area_struct *vma)
 	}
 
 	/* Mark this VM as containing foreign pages, and set up mappings. */
-	info->foreign_map.map = kzalloc(((vma->vm_end - vma->vm_start) >> PAGE_SHIFT) *
-			    sizeof(*info->foreign_map.map), GFP_KERNEL);
-	if (info->foreign_map.map == NULL) {
+	info->foreign_maps = kcalloc(size, sizeof(*info->foreign_maps),
+				     GFP_KERNEL);
+	if (info->foreign_maps)
+		info->foreign_maps->map =
+			kcalloc(size, sizeof(*info->foreign_maps->map),
+				GFP_KERNEL);
+	if (!info->foreign_maps || !info->foreign_maps->map) {
+		kfree(info->foreign_maps);
 		WPRINTK("Couldn't alloc VM_FOREIGN map.\n");
 		goto fail;
 	}
 
-	vma->vm_private_data = &info->foreign_map;
+	vma->vm_private_data = info->foreign_maps;
 	vma->vm_flags |= VM_FOREIGN;
 	vma->vm_flags |= VM_DONTCOPY;
 
@@ -1258,7 +1266,7 @@ static int blktap_read_ufe_ring(tap_blkif_t *info)
 			pg = idx_to_page(mmap_idx, pending_idx, j);
 			ClearPageReserved(pg);
 			offset = (uvaddr - info->rings_vstart) >> PAGE_SHIFT;
-			info->foreign_map.map[offset] = NULL;
+			info->foreign_maps->map[offset] = NULL;
 		}
 		fast_flush_area(pending_req, pending_idx, usr_idx, info);
 		make_response(blkif, pending_req->id, res.operation,
@@ -1559,7 +1567,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 					    FOREIGN_FRAME(map[i].dev_bus_addr
 							  >> PAGE_SHIFT));
 			offset = (uvaddr - info->rings_vstart) >> PAGE_SHIFT;
-			info->foreign_map.map[offset] = pg;
+			info->foreign_maps->map[offset] = pg;
 		}
 	} else {
 		for (i = 0; i < nseg; i++) {
@@ -1585,7 +1593,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 
 			offset = (uvaddr - info->rings_vstart) >> PAGE_SHIFT;
 			pg = idx_to_page(mmap_idx, pending_idx, i);
-			info->foreign_map.map[offset] = pg;
+			info->foreign_maps->map[offset] = pg;
 		}
 	}
 
