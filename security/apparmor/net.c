@@ -77,10 +77,6 @@ static int audit_net(struct aa_profile *profile, int op, u16 family, int type,
 
 	struct apparmor_audit_data aad = {
 		.op = op,
-		.net = {
-			.type = type,
-			.protocol = protocol,
-		},
 		.error = error
 	};
 
@@ -89,6 +85,12 @@ static int audit_net(struct aa_profile *profile, int op, u16 family, int type,
 		.sk = sk,
 	};
 
+	/*
+	 * Workaround gcc static initializer bug and initialize these
+	 * explicitely
+	 */
+	aad.net.type = type;
+	aad.net.protocol = protocol;
 
 	if (sk) {
 		COMMON_AUDIT_DATA_INIT(&sa, NET);
