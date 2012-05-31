@@ -167,7 +167,6 @@ struct piix_host_priv {
 static int piix_init_one(struct pci_dev *pdev,
 			 const struct pci_device_id *ent);
 static void piix_remove_one(struct pci_dev *pdev);
-static unsigned int piix_pata_read_id(struct ata_device *adev, struct ata_taskfile *tf, u16 *id);
 static int piix_pata_prereset(struct ata_link *link, unsigned long deadline);
 static void piix_set_piomode(struct ata_port *ap, struct ata_device *adev);
 static void piix_set_dmamode(struct ata_port *ap, struct ata_device *adev);
@@ -362,7 +361,6 @@ static struct ata_port_operations piix_pata_ops = {
 	.set_piomode		= piix_set_piomode,
 	.set_dmamode		= piix_set_dmamode,
 	.prereset		= piix_pata_prereset,
-	.read_id		= piix_pata_read_id,
 };
 
 static struct ata_port_operations piix_vmw_ops = {
@@ -650,26 +648,6 @@ MODULE_LICENSE("GPL");
 MODULE_DEVICE_TABLE(pci, piix_pci_tbl);
 MODULE_VERSION(DRV_VERSION);
 
-static int piix_msft_hyperv(void)
-{
-	int hv = 0;
-#if defined(CONFIG_HYPERV_STORAGE) || defined(CONFIG_HYPERV_STORAGE_MODULE)
-	static const struct dmi_system_id hv_dmi_ident[]  = {
-		{
-			.ident = "Hyper-V",
-			.matches = {
-				DMI_MATCH(DMI_SYS_VENDOR, "Microsoft Corporation"),
-				DMI_MATCH(DMI_PRODUCT_NAME, "Virtual Machine"),
-				DMI_MATCH(DMI_BOARD_NAME, "Virtual Machine"),
-			},
-		},
-		{ }	/* terminate list */
-	};
-	hv = !!dmi_check_system(hv_dmi_ident);
-#endif
-	return hv;
-}
-
 struct ich_laptop {
 	u16 device;
 	u16 subvendor;
@@ -759,26 +737,6 @@ static int piix_pata_prereset(struct ata_link *link, unsigned long deadline)
 	if (!pci_test_config_bits(pdev, &piix_enable_bits[ap->port_no]))
 		return -ENOENT;
 	return ata_sff_prereset(link, deadline);
-}
-
-static unsigned int piix_pata_read_id(struct ata_device *adev, struct ata_taskfile *tf, u16 *id)
-{
-	unsigned int err_mask = ata_do_dev_read_id(adev, tf, id);
-	/*
-	 * Ignore disks in a hyper-v guest.
-	 * There is no unplug protocol like it is done with xen_emul_unplug= option.
-	 * Emulate the unplug by ignoring disks when the hv_storvsc driver is enabled.
-	 * If the disks are not ignored, they will appear twice: once through
-	 * piix and once through hv_storvsc.
-	 * hv_storvsc can not handle ATAPI devices because they can only be
-	 * accessed through the emulated code path (not through the vm_bus
-	 * channel), the piix driver is still required.
-	 */
-	if (ata_id_is_ata(id) && piix_msft_hyperv()) {
-		ata_dev_printk(adev, KERN_WARNING, "ATA device ignored in Hyper-V guest\n");
-		id[ATA_ID_CONFIG] |= (1 << 15);
-	}
-	return err_mask;
 }
 
 static DEFINE_SPINLOCK(piix_lock);
@@ -1596,6 +1554,39 @@ static bool piix_broken_system_poweroff(struct pci_dev *pdev)
 	return false;
 }
 
+static int prefer_ms_hyperv = 1;
+module_param(prefer_ms_hyperv, int, 0);
+
+static void piix_ignore_devices_quirk(struct ata_host *host)
+{
+#if IS_ENABLED(CONFIG_HYPERV_STORAGE)
+	static const struct dmi_system_id ignore_hyperv[] = {
+		{
+			/* On Hyper-V hypervisors the disks are exposed on
+			 * both the emulated SATA controller and on the
+			 * paravirtualised drivers.  The CD/DVD devices
+			 * are only exposed on the emulated controller.
+			 * Request we ignore ATA devices on this host.
+			 */
+			.ident = "Hyper-V Virtual Machine",
+			.matches = {
+				DMI_MATCH(DMI_SYS_VENDOR,
+						"Microsoft Corporation"),
+				DMI_MATCH(DMI_PRODUCT_NAME, "Virtual Machine"),
+			},
+		},
+		{ }	/* terminate list */
+	};
+	const struct dmi_system_id *dmi = dmi_first_match(ignore_hyperv);
+
+	if (dmi && prefer_ms_hyperv) {
+		host->flags |= ATA_HOST_IGNORE_ATA;
+		dev_info(host->dev, "%s detected, ATA device ignore set\n",
+			dmi->ident);
+	}
+#endif
+}
+
 /**
  *	piix_init_one - Register PIIX ATA PCI device with kernel services
  *	@pdev: PCI device to register
@@ -1710,6 +1701,9 @@ static int __devinit piix_init_one(struct pci_dev *pdev,
 		host->ports[1]->udma_mask = 0;
 	}
 	host->flags |= ATA_HOST_PARALLEL_SCAN;
+
+	/* Allow hosts to specify device types to ignore when scanning. */
+	piix_ignore_devices_quirk(host);
 
 	pci_set_master(pdev);
 	return ata_pci_sff_activate_host(host, ata_bmdma_interrupt, sht);
