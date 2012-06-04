@@ -788,19 +788,17 @@ static void storvsc_command_completion(struct storvsc_cmd_request *cmd_request)
 	 * deployed on the host side. However, if the command
 	 * were a pass-through command deal with it appropriately.
 	 */
-	switch (vm_srb->srb_status) {
-	case SRB_STATUS_ERROR:
+	scmnd->result = vm_srb->scsi_status;
+
+	if (vm_srb->srb_status == SRB_STATUS_ERROR) {
 		switch (scmnd->cmnd[0]) {
 		case ATA_16:
 		case ATA_12:
-			scmnd->result = DID_PASSTHROUGH << 16;
+			set_host_byte(scmnd, DID_PASSTHROUGH);
 			break;
 		default:
-			scmnd->result = DID_TARGET_FAILURE << 16;
+			set_host_byte(scmnd, DID_TARGET_FAILURE);
 		}
-		break;
-	default:
-		scmnd->result = vm_srb->scsi_status;
 	}
 
 
