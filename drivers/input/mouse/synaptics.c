@@ -488,19 +488,31 @@ static void synaptics_sync_led(struct psmouse *psmouse)
 		synaptics_set_led(psmouse, priv->led->cdev.brightness);
 }
 
+static bool synaptics_has_led(struct synaptics_data *priv)
+{
+	if (!priv->ext_cap_0c)
+		return false;
+	/* FIXME: LED is supposedly detectable in cap0c[1] 0x20, but it seems
+	 * not working on real machines.
+	 * So we check the product id to be sure.
+	 */
+	if (SYN_CAP_PRODUCT_ID(priv->ext_cap) != 0xe4 &&
+	    SYN_CAP_PRODUCT_ID(priv->ext_cap) != 0x64)
+		return false;
+	if (!(priv->ext_cap_0c & 0x2000) &&
+	    (priv->capabilities & 0xd00ff) != 0xd0073)
+		return false;
+	return true;
+}
+
 static int synaptics_init_led(struct psmouse *psmouse)
 {
 	struct synaptics_data *priv = psmouse->private;
 	struct synaptics_led *led;
 	int err;
 
-	/* FIXME: LED is supposedly detectable in cap0c[1] 0x20, but it seems
-	 * not working on real machines.
-	 * So we check the product id to be sure.
-	 */
-	if (!priv->ext_cap_0c || SYN_CAP_PRODUCT_ID(priv->ext_cap) != 0xe4)
+	if (!synaptics_has_led(priv))
 		return 0;
-
 	printk(KERN_INFO "synaptics: support LED control\n");
 	led = kzalloc(sizeof(struct synaptics_led), GFP_KERNEL);
 	if (!led)
