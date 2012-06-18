@@ -66,10 +66,7 @@ config DUMMY
 	  <http://www.tldp.org/docs.html#guide>.
 
 	  To compile this driver as a module, choose M here: the module
-	  will be called dummy.  If you want to use more than one dummy
-	  device at a time, you need to compile this driver as a module.
-	  Instead of 'dummy', the devices will then be called 'dummy0',
-	  'dummy1' etc.
+	  will be called dummy.
 
 config EQUALIZER
 	tristate "EQL (serial line load balancing) support"
@@ -285,8 +282,6 @@ source "drivers/net/slip/Kconfig"
 
 source "drivers/s390/net/Kconfig"
 
-source "drivers/net/tokenring/Kconfig"
-
 source "drivers/net/usb/Kconfig"
 
 source "drivers/net/wireless/Kconfig"
@@ -295,9 +290,9 @@ source "drivers/net/wimax/Kconfig"
 
 source "drivers/net/wan/Kconfig"
 
-config PARAVIRT_XEN_NETDEV_FRONTEND
+config XEN_NETDEV_FRONTEND
 	tristate "Xen network device frontend driver"
-	depends on PARAVIRT_XEN
+	depends on XEN
 	select XEN_XENBUS_FRONTEND
 	default y
 	help
@@ -306,15 +301,15 @@ config PARAVIRT_XEN_NETDEV_FRONTEND
 	  domain 0).
 
 	  The corresponding Linux backend driver is enabled by the
-	  PARAVIRT_XEN_NETDEV_BACKEND option.
+	  CONFIG_XEN_NETDEV_BACKEND option.
 
 	  If you are compiling a kernel for use as Xen guest, you
 	  should say Y here. To compile this driver as a module, chose
 	  M here: the module will be called xen-netfront.
 
-config PARAVIRT_XEN_NETDEV_BACKEND
+config XEN_NETDEV_BACKEND
 	tristate "Xen backend network device"
-	depends on PARAVIRT_XEN_BACKEND
+	depends on XEN_BACKEND
 	help
 	  This driver allows the kernel to act as a Xen network driver
 	  domain which exports paravirtual network devices to other
@@ -322,7 +317,7 @@ config PARAVIRT_XEN_NETDEV_BACKEND
 	  system that implements a compatible front end.
 
 	  The corresponding Linux frontend driver is enabled by the
-	  PARAVIRT_XEN_NETDEV_FRONTEND configuration option.
+	  CONFIG_XEN_NETDEV_FRONTEND configuration option.
 
 	  The backend driver presents a standard network device
 	  endpoint for each paravirtual network device to the driver
@@ -336,7 +331,7 @@ config PARAVIRT_XEN_NETDEV_BACKEND
 
 config VMXNET3
 	tristate "VMware VMXNET3 ethernet driver"
-	depends on PCI && INET && !XEN
+	depends on PCI && INET
 	help
 	  This driver supports VMware's vmxnet3 virtual ethernet NIC.
 	  To compile this driver as a module, choose M here: the

@@ -519,7 +519,7 @@ config MAX_RAW_DEVS
 config HPET
 	bool "HPET - High Precision Event Timer" if (X86 || IA64)
 	default n
-	depends on ACPI && !XEN
+	depends on ACPI
 	help
 	  If you say Y here, you will have a miscdevice named "/dev/hpet/".  Each
 	  open selects one of the timers supported by the HPET.  The timers are
@@ -584,14 +584,6 @@ config DEVPORT
 	default y
 
 source "drivers/s390/char/Kconfig"
-
-config RAMOOPS
-	tristate "Log panic/oops to a RAM buffer"
-	depends on HAS_IOMEM
-	default n
-	help
-	  This enables panic and oops messages to be logged to a circular
-	  buffer in RAM where it can be read back at some later point.
 
 config CRASHER
 	tristate "Crasher Module"

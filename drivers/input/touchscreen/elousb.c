@@ -97,7 +97,7 @@ static void elousb_irq(struct urb *urb)
 resubmit:
 	status = usb_submit_urb (urb, GFP_ATOMIC);
 	if (status)
-		err ("can't resubmit intr, %s-%s/input0, status %d",
+		pr_err("can't resubmit intr, %s-%s/input0, status %d",
 				elo->usbdev->bus->bus_name,
 				elo->usbdev->devpath, status);
 }
@@ -147,7 +147,7 @@ static int elousb_probe(struct usb_interface *intf, const struct usb_device_id *
 	if (usb_get_extra_descriptor(interface, HID_DT_HID, &hdesc) &&
 			(!interface->desc.bNumEndpoints ||
 			 usb_get_extra_descriptor(&interface->endpoint[0], HID_DT_HID, &hdesc))) {
-		err("HID class descriptor not present");
+		pr_err("HID class descriptor not present");
 		return -ENODEV;
 	}
 
@@ -156,7 +156,7 @@ static int elousb_probe(struct usb_interface *intf, const struct usb_device_id *
 			rsize = le16_to_cpu(hdesc->desc[i].wDescriptorLength);
 
 	if (!rsize || rsize > HID_MAX_DESCRIPTOR_SIZE) {
-		err("weird size of report descriptor (%u)", rsize);
+		pr_err("weird size of report descriptor (%u)", rsize);
 		return -ENODEV;
 	}
 
@@ -186,7 +186,7 @@ static int elousb_probe(struct usb_interface *intf, const struct usb_device_id *
 					HID_REQ_SET_IDLE, USB_TYPE_CLASS | USB_RECIP_INTERFACE, 0,
 					interface->desc.bInterfaceNumber,
 					NULL, 0, USB_CTRL_SET_TIMEOUT)) < 0) {
-		err("setting HID idle timeout failed, error %d", error);
+		pr_err("setting HID idle timeout failed, error %d", error);
 		error = -ENODEV;
 		goto fail4;
 	}
@@ -195,7 +195,7 @@ static int elousb_probe(struct usb_interface *intf, const struct usb_device_id *
 					USB_REQ_GET_DESCRIPTOR, USB_RECIP_INTERFACE | USB_DIR_IN,
 					HID_DT_REPORT << 8, interface->desc.bInterfaceNumber,
 					rdesc, rsize, USB_CTRL_GET_TIMEOUT)) < rsize) {
-		err("reading HID report descriptor failed, error %d", error);
+		pr_err("reading HID report descriptor failed, error %d", error);
 		error = -ENODEV;
 		goto fail4;
 	}

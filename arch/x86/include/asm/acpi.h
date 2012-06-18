@@ -29,11 +29,7 @@
 #include <asm/processor.h>
 #include <asm/mmu.h>
 #include <asm/mpspec.h>
-#include <asm/trampoline.h>
-
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
-#include <xen/interface/platform.h>
-#endif
+#include <asm/realmode.h>
 
 #define COMPILER_DEPENDENT_INT64   long long
 #define COMPILER_DEPENDENT_UINT64  unsigned long long
@@ -119,45 +115,16 @@ static inline void acpi_disable_pci(void)
 }
 
 /* Low-level suspend routine. */
-#ifdef CONFIG_ACPI_PV_SLEEP
-#define acpi_suspend_lowlevel() acpi_enter_sleep_state(ACPI_STATE_S3, 0)
-#else
 extern int acpi_suspend_lowlevel(void);
-#endif
 
-extern const unsigned char acpi_wakeup_code[];
-#define acpi_wakeup_address (__pa(TRAMPOLINE_SYM(acpi_wakeup_code)))
-
-/* early initialization routine */
-extern void acpi_reserve_wakeup_memory(void);
-
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
-static inline int acpi_notify_hypervisor_state(u8 sleep_state,
-					       u32 pm1a_cnt_val,
-					       u32 pm1b_cnt_val)
-{
-	struct xen_platform_op op = {
-		.cmd = XENPF_enter_acpi_sleep,
-		.interface_version = XENPF_INTERFACE_VERSION,
-		.u = {
-			.enter_acpi_sleep = {
-				.pm1a_cnt_val = pm1a_cnt_val,
-				.pm1b_cnt_val = pm1b_cnt_val,
-				.sleep_state = sleep_state,
-			},
-		},
-	};
-
-	return HYPERVISOR_platform_op(&op);
-}
-#endif
+/* Physical address to resume after wakeup */
+#define acpi_wakeup_address ((unsigned long)(real_mode_header->wakeup_start))
 
 /*
  * Check if the CPU can handle C2 and deeper
  */
 static inline unsigned int acpi_processor_cstate_check(unsigned int max_cstate)
 {
-#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
 	/*
 	 * Early models (<=5) of AMD Opterons are not supposed to go into
 	 * C2 state.
@@ -172,7 +139,6 @@ static inline unsigned int acpi_processor_cstate_check(unsigned int max_cstate)
 	else if (amd_e400_c1e_detected)
 		return 1;
 	else
-#endif
 		return max_cstate;
 }
 
@@ -212,9 +178,7 @@ static inline void disable_acpi(void) { }
 
 #endif /* !CONFIG_ACPI */
 
-#ifndef CONFIG_XEN
 #define ARCH_HAS_POWER_INIT	1
-#endif
 
 #ifdef CONFIG_ACPI_NUMA
 extern int acpi_numa;

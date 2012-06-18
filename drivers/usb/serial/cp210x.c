@@ -82,6 +82,7 @@ static const struct usb_device_id id_table[] = {
 	{ USB_DEVICE(0x10C4, 0x8066) }, /* Argussoft In-System Programmer */
 	{ USB_DEVICE(0x10C4, 0x806F) }, /* IMS USB to RS422 Converter Cable */
 	{ USB_DEVICE(0x10C4, 0x807A) }, /* Crumb128 board */
+	{ USB_DEVICE(0x10C4, 0x80C4) }, /* Cygnal Integrated Products, Inc., Optris infrared thermometer */
 	{ USB_DEVICE(0x10C4, 0x80CA) }, /* Degree Controls Inc */
 	{ USB_DEVICE(0x10C4, 0x80DD) }, /* Tracient RFID */
 	{ USB_DEVICE(0x10C4, 0x80F6) }, /* Suunto sports instrument */
@@ -156,13 +157,6 @@ struct cp210x_port_private {
 	__u8			bInterfaceNumber;
 };
 
-static struct usb_driver cp210x_driver = {
-	.name		= "cp210x",
-	.probe		= usb_serial_probe,
-	.disconnect	= usb_serial_disconnect,
-	.id_table	= id_table,
-};
-
 static struct usb_serial_driver cp210x_device = {
 	.driver = {
 		.owner =	THIS_MODULE,
@@ -188,8 +182,10 @@ static struct usb_serial_driver * const serial_drivers[] = {
 };
 
 /* Config request types */
-#define REQTYPE_HOST_TO_DEVICE	0x41
-#define REQTYPE_DEVICE_TO_HOST	0xc1
+#define REQTYPE_HOST_TO_INTERFACE	0x41
+#define REQTYPE_INTERFACE_TO_HOST	0xc1
+#define REQTYPE_HOST_TO_DEVICE	0x40
+#define REQTYPE_DEVICE_TO_HOST	0xc0
 
 /* Config request codes */
 #define CP210X_IFC_ENABLE	0x00
@@ -286,7 +282,7 @@ static int cp210x_get_config(struct usb_serial_port *port, u8 request,
 
 	/* Issue the request, attempting to read 'size' bytes */
 	result = usb_control_msg(serial->dev, usb_rcvctrlpipe(serial->dev, 0),
-				request, REQTYPE_DEVICE_TO_HOST, 0x0000,
+				request, REQTYPE_INTERFACE_TO_HOST, 0x0000,
 				port_priv->bInterfaceNumber, buf, size,
 				USB_CTRL_GET_TIMEOUT);
 
@@ -340,13 +336,13 @@ static int cp210x_set_config(struct usb_serial_port *port, u8 request,
 	if (size > 2) {
 		result = usb_control_msg(serial->dev,
 				usb_sndctrlpipe(serial->dev, 0),
-				request, REQTYPE_HOST_TO_DEVICE, 0x0000,
+				request, REQTYPE_HOST_TO_INTERFACE, 0x0000,
 				port_priv->bInterfaceNumber, buf, size,
 				USB_CTRL_SET_TIMEOUT);
 	} else {
 		result = usb_control_msg(serial->dev,
 				usb_sndctrlpipe(serial->dev, 0),
-				request, REQTYPE_HOST_TO_DEVICE, data[0],
+				request, REQTYPE_HOST_TO_INTERFACE, data[0],
 				port_priv->bInterfaceNumber, NULL, 0,
 				USB_CTRL_SET_TIMEOUT);
 	}
@@ -422,8 +418,6 @@ static int cp210x_open(struct tty_struct *tty, struct usb_serial_port *port)
 {
 	int result;
 
-	dbg("%s - port %d", __func__, port->number);
-
 	result = cp210x_set_config_single(port, CP210X_IFC_ENABLE,
 								UART_ENABLE);
 	if (result) {
@@ -443,8 +437,6 @@ static int cp210x_open(struct tty_struct *tty, struct usb_serial_port *port)
 
 static void cp210x_close(struct usb_serial_port *port)
 {
-	dbg("%s - port %d", __func__, port->number);
-
 	usb_serial_generic_close(port);
 
 	mutex_lock(&port->serial->disc_mutex);
@@ -487,8 +479,6 @@ static void cp210x_get_termios_port(struct usb_serial_port *port,
 	unsigned int cflag, modem_ctl[4];
 	unsigned int baud;
 	unsigned int bits;
-
-	dbg("%s - port %d", __func__, port->number);
 
 	cp210x_get_config(port, CP210X_GET_BAUDRATE, &baud, 4);
 
@@ -787,8 +777,6 @@ static int cp210x_tiocmset_port(struct usb_serial_port *port,
 {
 	unsigned int control = 0;
 
-	dbg("%s - port %d", __func__, port->number);
-
 	if (set & TIOCM_RTS) {
 		control |= CONTROL_RTS;
 		control |= CONTROL_WRITE_RTS;
@@ -825,8 +813,6 @@ static int cp210x_tiocmget (struct tty_struct *tty)
 	unsigned int control;
 	int result;
 
-	dbg("%s - port %d", __func__, port->number);
-
 	cp210x_get_config(port, CP210X_GET_MDMSTS, &control, 1);
 
 	result = ((control & CONTROL_DTR) ? TIOCM_DTR : 0)
@@ -846,7 +832,6 @@ static void cp210x_break_ctl (struct tty_struct *tty, int break_state)
 	struct usb_serial_port *port = tty->driver_data;
 	unsigned int state;
 
-	dbg("%s - port %d", __func__, port->number);
 	if (break_state == 0)
 		state = BREAK_OFF;
 	else
@@ -891,7 +876,7 @@ static void cp210x_release(struct usb_serial *serial)
 	}
 }
 
-module_usb_serial_driver(cp210x_driver, serial_drivers);
+module_usb_serial_driver(serial_drivers, id_table);
 
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_VERSION(DRIVER_VERSION);

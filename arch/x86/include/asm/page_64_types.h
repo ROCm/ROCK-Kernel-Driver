@@ -1,8 +1,8 @@
 #ifndef _ASM_X86_PAGE_64_DEFS_H
 #define _ASM_X86_PAGE_64_DEFS_H
 
-#define THREAD_ORDER	1
-#define THREAD_SIZE  (PAGE_SIZE << THREAD_ORDER)
+#define THREAD_SIZE_ORDER	1
+#define THREAD_SIZE  (PAGE_SIZE << THREAD_SIZE_ORDER)
 #define CURRENT_MASK (~(THREAD_SIZE - 1))
 
 #define EXCEPTION_STACK_ORDER 0
@@ -69,15 +69,7 @@ extern void init_extra_mapping_wb(unsigned long phys, unsigned long size);
 #endif	/* !__ASSEMBLY__ */
 
 #ifdef CONFIG_FLATMEM
-/*
- * While max_pfn is not exported, max_mapnr never gets initialized for non-Xen
- * other than for hotplugged memory.
- */
-#ifndef CONFIG_XEN
 #define pfn_valid(pfn)          ((pfn) < max_pfn)
-#else
-#define pfn_valid(pfn)          ((pfn) < max_mapnr)
-#endif
 #endif
 
 #endif /* _ASM_X86_PAGE_64_DEFS_H */

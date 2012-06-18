@@ -48,7 +48,6 @@
 #include <xen/interface/sched.h>
 #include <xen/interface/physdev.h>
 #include <xen/interface/platform.h>
-#include <xen/interface/tmem.h>
 
 /*
  * The hypercall asms have to meet several constraints:

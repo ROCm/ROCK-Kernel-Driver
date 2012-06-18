@@ -118,10 +118,8 @@ void mce_setup(struct mce *m)
 	m->time = get_seconds();
 	m->cpuvendor = boot_cpu_data.x86_vendor;
 	m->cpuid = cpuid_eax(1);
-#ifndef CONFIG_XEN
 	m->socketid = cpu_data(m->extcpu).phys_proc_id;
 	m->apicid = cpu_data(m->extcpu).initial_apicid;
-#endif
 	rdmsrl(MSR_IA32_MCG_CAP, m->mcgcap);
 }
 
@@ -268,14 +266,9 @@ static void print_mce(struct mce *m)
 	 * Note this output is parsed by external tools and old fields
 	 * should not be changed.
 	 */
-#ifndef CONFIG_XEN
 	pr_emerg(HW_ERR "PROCESSOR %u:%x TIME %llu SOCKET %u APIC %x microcode %x\n",
 		m->cpuvendor, m->cpuid, m->time, m->socketid, m->apicid,
 		cpu_data(m->extcpu).microcode);
-#else
-	pr_emerg(HW_ERR "PROCESSOR %u:%x TIME %llu SOCKET %u APIC %x\n",
-		m->cpuvendor, m->cpuid, m->time, m->socketid, m->apicid);
-#endif
 
 	/*
 	 * Print out human-readable details about the MCE error,
@@ -444,6 +437,14 @@ static inline void mce_gather_info(struct mce *m, struct pt_regs *regs)
 		if (m->mcgstatus & (MCG_STATUS_RIPV|MCG_STATUS_EIPV)) {
 			m->ip = regs->ip;
 			m->cs = regs->cs;
+
+			/*
+			 * When in VM86 mode make the cs look like ring 3
+			 * always. This is a lie, but it's better than passing
+			 * the additional vm86 bit around everywhere.
+			 */
+			if (v8086_mode(regs))
+				m->cs |= 3;
 		}
 		/* Use accurate RIP reporting if available. */
 		if (rip_msr)
@@ -590,7 +591,7 @@ void machine_check_poll(enum mcp_flags flags, mce_banks_t *b)
 	struct mce m;
 	int i;
 
-	percpu_inc(mce_poll_count);
+	this_cpu_inc(mce_poll_count);
 
 	mce_gather_info(&m, NULL);
 
@@ -648,16 +649,18 @@ EXPORT_SYMBOL_GPL(machine_check_poll);
  * Do a quick check if any of the events requires a panic.
  * This decides if we keep the events around or clear them.
  */
-static int mce_no_way_out(struct mce *m, char **msg)
+static int mce_no_way_out(struct mce *m, char **msg, unsigned long *validp)
 {
-	int i;
+	int i, ret = 0;
 
 	for (i = 0; i < banks; i++) {
 		m->status = mce_rdmsrl(MSR_IA32_MCx_STATUS(i));
+		if (m->status & MCI_STATUS_VAL)
+			__set_bit(i, validp);
 		if (mce_severity(m, tolerant, msg) >= MCE_PANIC_SEVERITY)
-			return 1;
+			ret = 1;
 	}
-	return 0;
+	return ret;
 }
 
 /*
@@ -1020,11 +1023,12 @@ void do_machine_check(struct pt_regs *regs, long error_code)
 	 */
 	int kill_it = 0;
 	DECLARE_BITMAP(toclear, MAX_NR_BANKS);
+	DECLARE_BITMAP(valid_banks, MAX_NR_BANKS);
 	char *msg = "Unknown";
 
 	atomic_inc(&mce_entry);
 
-	percpu_inc(mce_exception_count);
+	this_cpu_inc(mce_exception_count);
 
 	if (!banks)
 		goto out;
@@ -1034,7 +1038,8 @@ void do_machine_check(struct pt_regs *regs, long error_code)
 	final = &__get_cpu_var(mces_seen);
 	*final = m;
 
-	no_way_out = mce_no_way_out(&m, &msg);
+	memset(valid_banks, 0, sizeof(valid_banks));
+	no_way_out = mce_no_way_out(&m, &msg, valid_banks);
 
 	barrier();
 
@@ -1054,6 +1059,8 @@ void do_machine_check(struct pt_regs *regs, long error_code)
 	order = mce_start(&no_way_out);
 	for (i = 0; i < banks; i++) {
 		__clear_bit(i, toclear);
+		if (!test_bit(i, valid_banks))
+			continue;
 		if (!mce_banks[i].ctl)
 			continue;
 
@@ -1243,23 +1250,16 @@ void mce_log_therm_throt_event(__u64 status)
  * Periodic polling timer for "silent" machine check errors.  If the
  * poller finds an MCE, poll 2x faster.  When the poller finds no more
  * errors, poll 2x slower (up to check_interval seconds).
- *
- * We will disable polling in DOM0 since all CMCI/Polling
- * mechanism will be done in XEN for Intel CPUs
  */
-#if defined (CONFIG_X86_XEN_MCE)
-static int check_interval = 0; /* disable polling */
-#else
-static int check_interval = 5 * 60; /* 5 minutes */
-#endif
+static unsigned long check_interval = 5 * 60; /* 5 minutes */
 
-static DEFINE_PER_CPU(int, mce_next_interval); /* in jiffies */
+static DEFINE_PER_CPU(unsigned long, mce_next_interval); /* in jiffies */
 static DEFINE_PER_CPU(struct timer_list, mce_timer);
 
-static void mce_start_timer(unsigned long data)
+static void mce_timer_fn(unsigned long data)
 {
-	struct timer_list *t = &per_cpu(mce_timer, data);
-	int *n;
+	struct timer_list *t = &__get_cpu_var(mce_timer);
+	unsigned long iv;
 
 	WARN_ON(smp_processor_id() != data);
 
@@ -1272,13 +1272,14 @@ static void mce_start_timer(unsigned long data)
 	 * Alert userspace if needed.  If we logged an MCE, reduce the
 	 * polling interval, otherwise increase the polling interval.
 	 */
-	n = &__get_cpu_var(mce_next_interval);
+	iv = __this_cpu_read(mce_next_interval);
 	if (mce_notify_irq())
-		*n = max(*n/2, HZ/100);
+		iv = max(iv / 2, (unsigned long) HZ/100);
 	else
-		*n = min(*n*2, (int)round_jiffies_relative(check_interval*HZ));
+		iv = min(iv * 2, round_jiffies_relative(check_interval * HZ));
+	__this_cpu_write(mce_next_interval, iv);
 
-	t->expires = jiffies + *n;
+	t->expires = jiffies + iv;
 	add_timer_on(t, smp_processor_id());
 }
 
@@ -1424,7 +1425,6 @@ static int __cpuinit __mcheck_cpu_apply_quirks(struct cpuinfo_x86 *c)
 
 	/* This should be disabled by the BIOS, but isn't always */
 	if (c->x86_vendor == X86_VENDOR_AMD) {
-#ifndef CONFIG_XEN
 		if (c->x86 == 15 && banks > 4) {
 			/*
 			 * disable GART TBL walk error reporting, which
@@ -1433,7 +1433,6 @@ static int __cpuinit __mcheck_cpu_apply_quirks(struct cpuinfo_x86 *c)
 			 */
 			clear_bit(10, (unsigned long *)&mce_banks[4].ctl);
 		}
-#endif
 		if (c->x86 <= 17 && mce_bootlog < 0) {
 			/*
 			 * Lots of broken BIOS around that don't clear them
@@ -1447,6 +1446,43 @@ static int __cpuinit __mcheck_cpu_apply_quirks(struct cpuinfo_x86 *c)
 		 */
 		 if (c->x86 == 6 && banks > 0)
 			mce_banks[0].ctl = 0;
+
+		 /*
+		  * Turn off MC4_MISC thresholding banks on those models since
+		  * they're not supported there.
+		  */
+		 if (c->x86 == 0x15 &&
+		     (c->x86_model >= 0x10 && c->x86_model <= 0x1f)) {
+			 int i;
+			 u64 val, hwcr;
+			 bool need_toggle;
+			 u32 msrs[] = {
+				0x00000413, /* MC4_MISC0 */
+				0xc0000408, /* MC4_MISC1 */
+			 };
+
+			 rdmsrl(MSR_K7_HWCR, hwcr);
+
+			 /* McStatusWrEn has to be set */
+			 need_toggle = !(hwcr & BIT(18));
+
+			 if (need_toggle)
+				 wrmsrl(MSR_K7_HWCR, hwcr | BIT(18));
+
+			 for (i = 0; i < ARRAY_SIZE(msrs); i++) {
+				 rdmsrl(msrs[i], val);
+
+				 /* CntP bit set? */
+				 if (val & BIT_64(62)) {
+					val &= ~BIT_64(62);
+					wrmsrl(msrs[i], val);
+				 }
+			 }
+
+			 /* restore old settings */
+			 if (need_toggle)
+				 wrmsrl(MSR_K7_HWCR, hwcr);
+		 }
 	}
 
 	if (c->x86_vendor == X86_VENDOR_INTEL) {
@@ -1506,7 +1542,6 @@ static int __cpuinit __mcheck_cpu_ancient_init(struct cpuinfo_x86 *c)
 
 static void __mcheck_cpu_init_vendor(struct cpuinfo_x86 *c)
 {
-#ifndef CONFIG_X86_64_XEN
 	switch (c->x86_vendor) {
 	case X86_VENDOR_INTEL:
 		mce_intel_feature_init(c);
@@ -1517,23 +1552,22 @@ static void __mcheck_cpu_init_vendor(struct cpuinfo_x86 *c)
 	default:
 		break;
 	}
-#endif
 }
 
 static void __mcheck_cpu_init_timer(void)
 {
 	struct timer_list *t = &__get_cpu_var(mce_timer);
-	int *n = &__get_cpu_var(mce_next_interval);
+	unsigned long iv = check_interval * HZ;
 
-	setup_timer(t, mce_start_timer, smp_processor_id());
+	setup_timer(t, mce_timer_fn, smp_processor_id());
 
 	if (mce_ignore_ce)
 		return;
 
-	*n = check_interval * HZ;
-	if (!*n)
+	__this_cpu_write(mce_next_interval, iv);
+	if (!iv)
 		return;
-	t->expires = round_jiffies(jiffies + *n);
+	t->expires = round_jiffies(jiffies + iv);
 	add_timer_on(t, smp_processor_id());
 }
 
@@ -2243,7 +2277,7 @@ mce_cpu_callback(struct notifier_block *nfb, unsigned long action, void *hcpu)
 	case CPU_DOWN_FAILED_FROZEN:
 		if (!mce_ignore_ce && check_interval) {
 			t->expires = round_jiffies(jiffies +
-					   __get_cpu_var(mce_next_interval));
+					per_cpu(mce_next_interval, cpu));
 			add_timer_on(t, cpu);
 		}
 		smp_call_function_single(cpu, mce_reenable_cpu, &action, 1);
@@ -2305,16 +2339,6 @@ static __init int mcheck_init_device(void)
 
 	/* register character device /dev/mcelog */
 	misc_register(&mce_chrdev_device);
-
-#ifdef CONFIG_X86_XEN_MCE
-	if (is_initial_xendomain()) {
-		/* Register vIRQ handler for MCE LOG processing */
-		extern int bind_virq_for_mce(void);
-
-		printk(KERN_DEBUG "MCE: bind virq for DOM0 logging\n");
-		bind_virq_for_mce();
-	}
-#endif
 
 	return err;
 }

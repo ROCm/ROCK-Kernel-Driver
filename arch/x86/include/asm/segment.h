@@ -188,9 +188,7 @@
 #define __KERNEL_DS	(GDT_ENTRY_KERNEL_DS*8)
 #define __USER_DS	(GDT_ENTRY_DEFAULT_USER_DS*8+3)
 #define __USER_CS	(GDT_ENTRY_DEFAULT_USER_CS*8+3)
-#if defined(CONFIG_X86_XEN)
-#define get_kernel_rpl()  (xen_feature(XENFEAT_supervisor_mode_kernel)?0:1)
-#elif !defined(CONFIG_PARAVIRT)
+#ifndef CONFIG_PARAVIRT
 #define get_kernel_rpl()  0
 #endif
 
@@ -207,13 +205,15 @@
 
 #define IDT_ENTRIES 256
 #define NUM_EXCEPTION_VECTORS 32
+/* Bitmask of exception vectors which push an error code on the stack */
+#define EXCEPTION_ERRCODE_MASK  0x00027d00
 #define GDT_SIZE (GDT_ENTRIES * 8)
 #define GDT_ENTRY_TLS_ENTRIES 3
 #define TLS_SIZE (GDT_ENTRY_TLS_ENTRIES * 8)
 
 #ifdef __KERNEL__
 #ifndef __ASSEMBLY__
-extern const char early_idt_handlers[NUM_EXCEPTION_VECTORS][10];
+extern const char early_idt_handlers[NUM_EXCEPTION_VECTORS][2+2+5];
 
 /*
  * Load a segment. Fall back on loading the zero

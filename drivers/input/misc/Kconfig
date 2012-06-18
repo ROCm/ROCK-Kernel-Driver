@@ -579,7 +579,7 @@ config INPUT_CMA3000_I2C
 
 config INPUT_XEN_KBDDEV_FRONTEND
 	tristate "Xen virtual keyboard and mouse support"
-	depends on PARAVIRT_XEN
+	depends on XEN
 	default y
 	select XEN_XENBUS_FRONTEND
 	help

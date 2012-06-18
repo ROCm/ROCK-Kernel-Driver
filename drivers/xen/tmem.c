@@ -18,14 +18,27 @@
 
 #include <xen/xen.h>
 #include <xen/interface/xen.h>
-#include <xen/interface/tmem.h>
-#ifdef CONFIG_PARAVIRT_XEN
 #include <asm/xen/hypercall.h>
 #include <asm/xen/page.h>
 #include <asm/xen/hypervisor.h>
-#else
-#include <asm/hypervisor.h>
-#endif
+
+#define TMEM_CONTROL               0
+#define TMEM_NEW_POOL              1
+#define TMEM_DESTROY_POOL          2
+#define TMEM_NEW_PAGE              3
+#define TMEM_PUT_PAGE              4
+#define TMEM_GET_PAGE              5
+#define TMEM_FLUSH_PAGE            6
+#define TMEM_FLUSH_OBJECT          7
+#define TMEM_READ                  8
+#define TMEM_WRITE                 9
+#define TMEM_XCHG                 10
+
+/* Bits for HYPERVISOR_tmem_op(TMEM_NEW_POOL) */
+#define TMEM_POOL_PERSIST          1
+#define TMEM_POOL_SHARED           2
+#define TMEM_POOL_PAGESIZE_SHIFT   4
+#define TMEM_VERSION_SHIFT        24
 
 
 struct tmem_pool_uuid {
@@ -60,7 +73,7 @@ static inline int xen_tmem_op(u32 tmem_cmd, u32 tmem_pool, struct tmem_oid oid,
 	op.u.gen.tmem_offset = tmem_offset;
 	op.u.gen.pfn_offset = pfn_offset;
 	op.u.gen.len = len;
-	op.u.gen.cmfn = gmfn;
+	set_xen_guest_handle(op.u.gen.gmfn, (void *)gmfn);
 	rc = HYPERVISOR_tmem_op(&op);
 	return rc;
 }
@@ -74,11 +87,11 @@ static int xen_tmem_new_pool(struct tmem_pool_uuid uuid,
 	for (pageshift = 0; pagesize != 1; pageshift++)
 		pagesize >>= 1;
 	flags |= (pageshift - 12) << TMEM_POOL_PAGESIZE_SHIFT;
-	flags |= TMEM_SPEC_VERSION << TMEM_POOL_VERSION_SHIFT;
+	flags |= TMEM_SPEC_VERSION << TMEM_VERSION_SHIFT;
 	op.cmd = TMEM_NEW_POOL;
-	op.u.creat.uuid[0] = uuid.uuid_lo;
-	op.u.creat.uuid[1] = uuid.uuid_hi;
-	op.u.creat.flags = flags;
+	op.u.new.uuid[0] = uuid.uuid_lo;
+	op.u.new.uuid[1] = uuid.uuid_hi;
+	op.u.new.flags = flags;
 	rc = HYPERVISOR_tmem_op(&op);
 	return rc;
 }
@@ -256,7 +269,7 @@ static inline struct tmem_oid oswiz(unsigned type, u32 ind)
 }
 
 /* returns 0 if the page was successfully put into frontswap, -1 if not */
-static int tmem_frontswap_put_page(unsigned type, pgoff_t offset,
+static int tmem_frontswap_store(unsigned type, pgoff_t offset,
 				   struct page *page)
 {
 	u64 ind64 = (u64)offset;
@@ -282,7 +295,7 @@ static int tmem_frontswap_put_page(unsigned type, pgoff_t offset,
  * returns 0 if the page was successfully gotten from frontswap, -1 if
  * was not present (should never happen!)
  */
-static int tmem_frontswap_get_page(unsigned type, pgoff_t offset,
+static int tmem_frontswap_load(unsigned type, pgoff_t offset,
 				   struct page *page)
 {
 	u64 ind64 = (u64)offset;
@@ -349,8 +362,8 @@ static int __init no_frontswap(char *s)
 __setup("nofrontswap", no_frontswap);
 
 static struct frontswap_ops __initdata tmem_frontswap_ops = {
-	.put_page = tmem_frontswap_put_page,
-	.get_page = tmem_frontswap_get_page,
+	.store = tmem_frontswap_store,
+	.load = tmem_frontswap_load,
 	.invalidate_page = tmem_frontswap_flush_page,
 	.invalidate_area = tmem_frontswap_flush_area,
 	.init = tmem_frontswap_init
@@ -375,7 +388,7 @@ static int __init xen_tmem_init(void)
 	}
 #endif
 #ifdef CONFIG_CLEANCACHE
-	BUILD_BUG_ON(sizeof(struct cleancache_filekey) != sizeof(struct tmem_oid));
+	BUG_ON(sizeof(struct cleancache_filekey) != sizeof(struct tmem_oid));
 	if (tmem_enabled && use_cleancache) {
 		char *s = "";
 		struct cleancache_ops old_ops =

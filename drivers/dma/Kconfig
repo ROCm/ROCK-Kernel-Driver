@@ -61,7 +61,7 @@ config INTEL_IOATDMA
 	tristate "Intel I/OAT DMA support"
 	depends on PCI && X86
 	select DMA_ENGINE
-	select DCA if !XEN
+	select DCA
 	select ASYNC_TX_DISABLE_PQ_VAL_DMA
 	select ASYNC_TX_DISABLE_XOR_VAL_DMA
 	help
@@ -238,6 +238,7 @@ config IMX_DMA
 config MXS_DMA
 	bool "MXS DMA support"
 	depends on SOC_IMX23 || SOC_IMX28
+	select STMP_DEVICE
 	select DMA_ENGINE
 	help
 	  Support the MXS DMA engine. This engine including APBH-DMA

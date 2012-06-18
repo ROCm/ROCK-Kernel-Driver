@@ -108,7 +108,7 @@ static inline void register_cpu_control(struct cpu *cpu)
 }
 #endif /* CONFIG_HOTPLUG_CPU */
 
-#if defined(CONFIG_KEXEC) && !defined(CONFIG_XEN)
+#ifdef CONFIG_KEXEC
 #include <linux/kexec.h>
 
 static ssize_t show_crash_notes(struct device *dev, struct device_attribute *attr,
@@ -256,7 +256,7 @@ int __cpuinit register_cpu(struct cpu *cpu, int num)
 	if (!error)
 		register_cpu_under_node(num, cpu_to_node(num));
 
-#if defined(CONFIG_KEXEC) && !defined(CONFIG_XEN)
+#ifdef CONFIG_KEXEC
 	if (!error)
 		error = device_create_file(&cpu->dev, &dev_attr_crash_notes);
 #endif
@@ -330,8 +330,4 @@ void __init cpu_dev_init(void)
 		panic("Failed to register CPU subsystem");
 
 	cpu_dev_register_generic();
-
-#if defined(CONFIG_SCHED_MC) || defined(CONFIG_SCHED_SMT)
-	sched_create_sysfs_power_savings_entries(cpu_subsys.dev_root);
-#endif
 }

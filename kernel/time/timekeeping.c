@@ -20,9 +20,6 @@
 #include <linux/time.h>
 #include <linux/tick.h>
 #include <linux/stop_machine.h>
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
-#include <asm/time.h>
-#endif
 
 /* Structure holding internal timekeeping values. */
 struct timekeeper {
@@ -243,7 +240,6 @@ void getnstimeofday(struct timespec *ts)
 
 	timespec_add_ns(ts, nsecs);
 }
-
 EXPORT_SYMBOL(getnstimeofday);
 
 ktime_t ktime_get(void)
@@ -360,8 +356,8 @@ void do_gettimeofday(struct timeval *tv)
 	tv->tv_sec = now.tv_sec;
 	tv->tv_usec = now.tv_nsec/1000;
 }
-
 EXPORT_SYMBOL(do_gettimeofday);
+
 /**
  * do_settimeofday - Sets the time of day
  * @tv:		pointer to the timespec variable containing the new time
@@ -387,9 +383,6 @@ int do_settimeofday(const struct timespec *tv)
 
 	timekeeper.xtime = *tv;
 	timekeeping_update(true);
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
-	xen_update_wallclock(tv);
-#endif
 
 	write_sequnlock_irqrestore(&timekeeper.lock, flags);
 
@@ -398,7 +391,6 @@ int do_settimeofday(const struct timespec *tv)
 
 	return 0;
 }
-
 EXPORT_SYMBOL(do_settimeofday);
 
 
@@ -970,6 +962,7 @@ static cycle_t logarithmic_accumulation(cycle_t offset, int shift)
 		timekeeper.xtime.tv_sec++;
 		leap = second_overflow(timekeeper.xtime.tv_sec);
 		timekeeper.xtime.tv_sec += leap;
+		timekeeper.wall_to_monotonic.tv_sec -= leap;
 	}
 
 	/* Accumulate raw time */
@@ -1085,6 +1078,7 @@ static void update_wall_time(void)
 		timekeeper.xtime.tv_sec++;
 		leap = second_overflow(timekeeper.xtime.tv_sec);
 		timekeeper.xtime.tv_sec += leap;
+		timekeeper.wall_to_monotonic.tv_sec -= leap;
 	}
 
 	timekeeping_update(false);

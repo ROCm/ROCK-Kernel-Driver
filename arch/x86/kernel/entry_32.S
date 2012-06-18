@@ -56,6 +56,7 @@
 #include <asm/irq_vectors.h>
 #include <asm/cpufeature.h>
 #include <asm/alternative-asm.h>
+#include <asm/asm.h>
 
 /* Avoid __ASSEMBLER__'ifying <linux/audit.h> just for this.  */
 #include <linux/elf-em.h>
@@ -151,10 +152,8 @@
 .pushsection .fixup, "ax"
 99:	movl $0, (%esp)
 	jmp 98b
-.section __ex_table, "a"
-	.align 4
-	.long 98b, 99b
 .popsection
+	_ASM_EXTABLE(98b,99b)
 .endm
 
 .macro PTGS_TO_GS
@@ -164,10 +163,8 @@
 .pushsection .fixup, "ax"
 99:	movl $0, PT_GS(%esp)
 	jmp 98b
-.section __ex_table, "a"
-	.align 4
-	.long 98b, 99b
 .popsection
+	_ASM_EXTABLE(98b,99b)
 .endm
 
 .macro GS_TO_REG reg
@@ -249,12 +246,10 @@
 	jmp 2b
 6:	movl $0, (%esp)
 	jmp 3b
-.section __ex_table, "a"
-	.align 4
-	.long 1b, 4b
-	.long 2b, 5b
-	.long 3b, 6b
 .popsection
+	_ASM_EXTABLE(1b,4b)
+	_ASM_EXTABLE(2b,5b)
+	_ASM_EXTABLE(3b,6b)
 	POP_GS_EX
 .endm
 
@@ -321,7 +316,6 @@ ret_from_exception:
 	preempt_stop(CLBR_ANY)
 ret_from_intr:
 	GET_THREAD_INFO(%ebp)
-resume_userspace_sig:
 #ifdef CONFIG_VM86
 	movl PT_EFLAGS(%esp), %eax	# mix EFLAGS and CS
 	movb PT_CS(%esp), %al
@@ -380,7 +374,7 @@ ENTRY(ia32_sysenter_target)
 	CFI_SIGNAL_FRAME
 	CFI_DEF_CFA esp, 0
 	CFI_REGISTER esp, ebp
-	movl SYSENTER_stack_sp0(%esp),%esp
+	movl TSS_sysenter_sp0(%esp),%esp
 sysenter_past_esp:
 	/*
 	 * Interrupts are disabled here, but we can't trace it until
@@ -415,10 +409,7 @@ sysenter_past_esp:
 	jae syscall_fault
 1:	movl (%ebp),%ebp
 	movl %ebp,PT_EBP(%esp)
-.section __ex_table,"a"
-	.align 4
-	.long 1b,syscall_fault
-.previous
+	_ASM_EXTABLE(1b,syscall_fault)
 
 	GET_THREAD_INFO(%ebp)
 
@@ -485,10 +476,8 @@ sysexit_audit:
 .pushsection .fixup,"ax"
 2:	movl $0,PT_FS(%esp)
 	jmp 1b
-.section __ex_table,"a"
-	.align 4
-	.long 1b,2b
 .popsection
+	_ASM_EXTABLE(1b,2b)
 	PTGS_TO_GS_EX
 ENDPROC(ia32_sysenter_target)
 
@@ -543,10 +532,7 @@ ENTRY(iret_exc)
 	pushl $do_iret_error
 	jmp error_code
 .previous
-.section __ex_table,"a"
-	.align 4
-	.long irq_return,iret_exc
-.previous
+	_ASM_EXTABLE(irq_return,iret_exc)
 
 	CFI_RESTORE_STATE
 ldt_ss:
@@ -628,9 +614,13 @@ work_notifysig:				# deal with pending signals and
 					# vm86-space
 	TRACE_IRQS_ON
 	ENABLE_INTERRUPTS(CLBR_NONE)
+	movb PT_CS(%esp), %bl
+	andb $SEGMENT_RPL_MASK, %bl
+	cmpb $USER_RPL, %bl
+	jb resume_kernel
 	xorl %edx, %edx
 	call do_notify_resume
-	jmp resume_userspace_sig
+	jmp resume_userspace
 
 	ALIGN
 work_notifysig_v86:
@@ -643,9 +633,13 @@ work_notifysig_v86:
 #endif
 	TRACE_IRQS_ON
 	ENABLE_INTERRUPTS(CLBR_NONE)
+	movb PT_CS(%esp), %bl
+	andb $SEGMENT_RPL_MASK, %bl
+	cmpb $USER_RPL, %bl
+	jb resume_kernel
 	xorl %edx, %edx
 	call do_notify_resume
-	jmp resume_userspace_sig
+	jmp resume_userspace
 END(work_pending)
 
 	# perform syscall exit tracing
@@ -901,10 +895,7 @@ END(device_not_available)
 #ifdef CONFIG_PARAVIRT
 ENTRY(native_iret)
 	iret
-.section __ex_table,"a"
-	.align 4
-	.long native_iret, iret_exc
-.previous
+	_ASM_EXTABLE(native_iret, iret_exc)
 END(native_iret)
 
 ENTRY(native_irq_enable_sysexit)
@@ -1048,7 +1039,7 @@ ENTRY(kernel_thread_helper)
 	CFI_ENDPROC
 ENDPROC(kernel_thread_helper)
 
-#ifdef CONFIG_PARAVIRT_XEN
+#ifdef CONFIG_XEN
 /* Xen doesn't set %esp to be precisely what the normal sysenter
    entrypoint expects, so fix it up before using the normal path. */
 ENTRY(xen_sysenter_target)
@@ -1128,19 +1119,16 @@ ENTRY(xen_failsafe_callback)
 	movl %eax,16(%esp)
 	jmp 4b
 .previous
-.section __ex_table,"a"
-	.align 4
-	.long 1b,6b
-	.long 2b,7b
-	.long 3b,8b
-	.long 4b,9b
-.previous
+	_ASM_EXTABLE(1b,6b)
+	_ASM_EXTABLE(2b,7b)
+	_ASM_EXTABLE(3b,8b)
+	_ASM_EXTABLE(4b,9b)
 ENDPROC(xen_failsafe_callback)
 
 BUILD_INTERRUPT3(xen_hvm_callback_vector, XEN_HVM_EVTCHN_CALLBACK,
 		xen_evtchn_do_upcall)
 
-#endif	/* CONFIG_PARAVIRT_XEN */
+#endif	/* CONFIG_XEN */
 
 #ifdef CONFIG_FUNCTION_TRACER
 #ifdef CONFIG_DYNAMIC_FTRACE
@@ -1303,7 +1291,7 @@ END(page_fault)
  * that sets up the real kernel stack. Check here, since we can't
  * allow the wrong stack to be used.
  *
- * "SYSENTER_stack_sp0+12" is because the NMI/debug handler will have
+ * "TSS_sysenter_sp0+12" is because the NMI/debug handler will have
  * already pushed 3 words if it hits on the sysenter instruction:
  * eflags, cs and eip.
  *
@@ -1315,7 +1303,7 @@ END(page_fault)
 	cmpw $__KERNEL_CS, 4(%esp)
 	jne \ok
 \label:
-	movl SYSENTER_stack_sp0 + \offset(%esp), %esp
+	movl TSS_sysenter_sp0 + \offset(%esp), %esp
 	CFI_DEF_CFA esp, 0
 	CFI_UNDEFINED eip
 	pushfl_cfi

@@ -50,14 +50,13 @@ obj-$(CONFIG_SLIP) += slip/
 obj-$(CONFIG_SLHC) += slip/
 obj-$(CONFIG_NET_SB1000) += sb1000.o
 obj-$(CONFIG_SUNGEM_PHY) += sungem_phy.o
-obj-$(CONFIG_TR) += tokenring/
 obj-$(CONFIG_WAN) += wan/
 obj-$(CONFIG_WLAN) += wireless/
 obj-$(CONFIG_WIMAX) += wimax/
 
 obj-$(CONFIG_VMXNET3) += vmxnet3/
-obj-$(CONFIG_PARAVIRT_XEN_NETDEV_FRONTEND) += xen-netfront.o
-obj-$(CONFIG_PARAVIRT_XEN_NETDEV_BACKEND) += xen-netback/
+obj-$(CONFIG_XEN_NETDEV_FRONTEND) += xen-netfront.o
+obj-$(CONFIG_XEN_NETDEV_BACKEND) += xen-netback/
 
 obj-$(CONFIG_USB_CATC)          += usb/
 obj-$(CONFIG_USB_KAWETH)        += usb/
