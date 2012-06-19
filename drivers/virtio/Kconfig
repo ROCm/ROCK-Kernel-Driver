@@ -8,6 +8,7 @@ config VIRTIO_RING
 	depends on VIRTIO
 
 menu "Virtio drivers"
+	depends on !XEN
 
 config VIRTIO_PCI
 	tristate "PCI driver for virtio devices (EXPERIMENTAL)"

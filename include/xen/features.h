@@ -10,6 +10,7 @@
 #define __XEN_FEATURES_H__
 
 #include <xen/interface/features.h>
+#include <xen/interface/version.h>
 
 void xen_setup_features(void);
 
@@ -20,4 +21,4 @@ static inline int xen_feature(int flag)
 	return xen_features[flag];
 }
 
-#endif /* __ASM_XEN_FEATURES_H__ */
+#endif /* __XEN_FEATURES_H__ */

@@ -87,14 +87,32 @@ relocate_kernel:
 	movl	PTR(PA_PGD)(%ebp), %eax
 	movl	%eax, %cr3
 
+	/* setup idt */
+	lidtl	idt_48 - relocate_kernel(%edi)
+
+	/* setup gdt */
+	leal	gdt - relocate_kernel(%edi), %eax
+	movl	%eax, (gdt_48 - relocate_kernel) + 2(%edi)
+	lgdtl	gdt_48 - relocate_kernel(%edi)
+
+	/* setup data segment registers */
+	mov	$(gdt_ds - gdt), %eax
+	mov	%eax, %ds
+	mov	%eax, %es
+	mov	%eax, %fs
+	mov	%eax, %gs
+	mov	%eax, %ss
+
 	/* setup a new stack at the end of the physical control page */
 	lea	PAGE_SIZE(%edi), %esp
 
-	/* jump to identity mapped page */
+	/* load new code segment and jump to identity mapped page */
+	pushl	$0
+	pushl	$(gdt_cs - gdt)
 	movl    %edi, %eax
 	addl    $(identity_mapped - relocate_kernel), %eax
 	pushl   %eax
-	ret
+	iretl
 
 identity_mapped:
 	/* set return address to 0 if not preserving context */
@@ -272,6 +290,23 @@ swap_pages:
 	popl	%ebx
 	popl	%ebp
 	ret
+
+	.align	16
+gdt:
+	.quad	0x0000000000000000	/* NULL descriptor */
+gdt_cs:
+	.quad	0x00cf9a000000ffff	/* kernel 4GB code at 0x00000000 */
+gdt_ds:
+	.quad	0x00cf92000000ffff	/* kernel 4GB data at 0x00000000 */
+gdt_end:
+
+gdt_48:
+	.word	gdt_end - gdt - 1	/* limit */
+	.long	0			/* base - filled in by code above */
+
+idt_48:
+	.word	0			/* limit */
+	.long	0			/* base */
 
 	.globl kexec_control_code_size
 .set kexec_control_code_size, . - relocate_kernel

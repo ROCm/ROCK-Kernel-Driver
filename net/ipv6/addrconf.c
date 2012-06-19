@@ -2931,6 +2931,7 @@ static void addrconf_dad_start(struct inet6_ifaddr *ifp)
 		goto out;
 
 	if (dev->flags&(IFF_NOARP|IFF_LOOPBACK) ||
+	    !(dev->flags&IFF_MULTICAST) ||
 	    idev->cnf.accept_dad < 1 ||
 	    !(ifp->flags&IFA_F_TENTATIVE) ||
 	    ifp->flags & IFA_F_NODAD) {
@@ -3034,6 +3035,7 @@ static void addrconf_dad_completed(struct inet6_ifaddr *ifp)
 	     ifp->idev->cnf.accept_ra == 2) &&
 	    ifp->idev->cnf.rtr_solicits > 0 &&
 	    (dev->flags&IFF_LOOPBACK) == 0 &&
+	    (dev->flags&IFF_MULTICAST) &&
 	    (ipv6_addr_type(&ifp->addr) & IPV6_ADDR_LINKLOCAL)) {
 		/*
 		 *	If a host as already performed a random delay

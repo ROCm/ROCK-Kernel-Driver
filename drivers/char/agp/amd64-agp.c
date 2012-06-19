@@ -178,7 +178,7 @@ static const struct aper_size_info_32 amd_8151_sizes[7] =
 
 static int amd_8151_configure(void)
 {
-	unsigned long gatt_bus = virt_to_phys(agp_bridge->gatt_table_real);
+	unsigned long gatt_bus = virt_to_gart(agp_bridge->gatt_table_real);
 	int i;
 
 	if (!amd_nb_has_feature(AMD_NB_GART))
@@ -583,7 +583,7 @@ static void __devexit agp_amd64_remove(struct pci_dev *pdev)
 {
 	struct agp_bridge_data *bridge = pci_get_drvdata(pdev);
 
-	release_mem_region(virt_to_phys(bridge->gatt_table_real),
+	release_mem_region(virt_to_gart(bridge->gatt_table_real),
 			   amd64_aperture_sizes[bridge->aperture_size_idx].size);
 	agp_remove_bridge(bridge);
 	agp_put_bridge(bridge);
