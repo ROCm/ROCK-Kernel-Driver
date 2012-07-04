@@ -77,6 +77,7 @@
 #define DOVE_SPI1_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE | 0x14600)
 
 /* North-South Bridge */
+#define BRIDGE_PHYS_BASE	(DOVE_SB_REGS_PHYS_BASE | 0x20000)
 #define BRIDGE_VIRT_BASE	(DOVE_SB_REGS_VIRT_BASE | 0x20000)
 
 /* Cryptographic Engine */
