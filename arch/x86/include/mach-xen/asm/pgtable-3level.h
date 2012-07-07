@@ -34,6 +34,53 @@ static inline void xen_set_pte(pte_t *ptep, pte_t pte)
 	ptep->pte_low = pte.pte_low;
 }
 
+#define pmd_read_atomic pmd_read_atomic
+/*
+ * pte_offset_map_lock on 32bit PAE kernels was reading the pmd_t with
+ * a "*pmdp" dereference done by gcc. Problem is, in certain places
+ * where pte_offset_map_lock is called, concurrent page faults are
+ * allowed, if the mmap_sem is hold for reading. An example is mincore
+ * vs page faults vs MADV_DONTNEED. On the page fault side
+ * pmd_populate rightfully does a set_64bit, but if we're reading the
+ * pmd_t with a "*pmdp" on the mincore side, a SMP race can happen
+ * because gcc will not read the 64bit of the pmd atomically. To fix
+ * this all places running pmd_offset_map_lock() while holding the
+ * mmap_sem in read mode, shall read the pmdp pointer using this
+ * function to know if the pmd is null nor not, and in turn to know if
+ * they can run pmd_offset_map_lock or pmd_trans_huge or other pmd
+ * operations.
+ *
+ * Without THP if the mmap_sem is hold for reading, the
+ * pmd can only transition from null to not null while pmd_read_atomic runs.
+ * So there's no need of literally reading it atomically.
+ *
+ * With THP if the mmap_sem is hold for reading, the pmd can become
+ * THP or null or point to a pte (and in turn become "stable") at any
+ * time under pmd_read_atomic, so it's mandatory to read it atomically
+ * with cmpxchg8b.
+ */
+#ifndef CONFIG_TRANSPARENT_HUGEPAGE
+static inline pmd_t pmd_read_atomic(pmd_t *pmdp)
+{
+	pmdval_t ret;
+	u32 *tmp = (u32 *)pmdp;
+
+	ret = (pmdval_t) (*tmp);
+	if (ret) {
+		/*
+		 * If the low part is null, we must not read the high part
+		 * or we can end up with a partial pmd.
+		 */
+		smp_rmb();
+		ret |= ((pmdval_t)*(tmp + 1)) << 32;
+	}
+
+	return (pmd_t) { ret };
+}
+#else /* CONFIG_TRANSPARENT_HUGEPAGE */
+# error Cannot use atomic64_read() on a PMD entry.
+#endif /* CONFIG_TRANSPARENT_HUGEPAGE */
+
 static inline void xen_set_pmd(pmd_t *pmdp, pmd_t pmd)
 {
 	xen_l2_entry_update(pmdp, pmd);

@@ -20,10 +20,11 @@
 #include "iomulti.h"
 #include "pci.h"
 #include <linux/export.h>
+#include <linux/kconfig.h>
 #include <linux/sort.h>
 #include <asm/setup.h>
 
-#if defined(CONFIG_HOTPLUG_PCI) || defined(CONFIG_HOTPLUG_PCI_MODULE)
+#if IS_ENABLED(CONFIG_HOTPLUG_PCI)
 #define __pcihp_init __devinit
 #else
 #define __pcihp_init __init
@@ -184,7 +185,7 @@ static void __devinit pci_iomul_switch_add_locked(struct pci_iomul_switch *sw)
 	list_add(&sw->list, &switch_list);
 }
 
-#if defined(CONFIG_HOTPLUG_PCI) || defined(CONFIG_HOTPLUG_PCI_MODULE)
+#if IS_ENABLED(CONFIG_HOTPLUG_PCI)
 static void __devinit pci_iomul_switch_del_locked(struct pci_iomul_switch *sw)
 {
 	BUG_ON(!mutex_is_locked(&switch_list_lock));
@@ -256,7 +257,7 @@ static void __devinit pci_iomul_slot_add_locked(struct pci_iomul_switch *sw,
 	list_add(&slot->sibling, &sw->slots);
 }
 
-#if defined(CONFIG_HOTPLUG_PCI) || defined(CONFIG_HOTPLUG_PCI_MODULE)
+#if IS_ENABLED(CONFIG_HOTPLUG_PCI)
 static void __devinit pci_iomul_slot_del_locked(struct pci_iomul_switch *sw,
 						struct pci_iomul_slot *slot)
 {
@@ -795,7 +796,7 @@ DECLARE_PCI_FIXUP_FINAL(PCI_ANY_ID, PCI_ANY_ID,
 			quirk_iomul_reassign_ioresource);
 
 /*****************************************************************************/
-#if defined(CONFIG_HOTPLUG_PCI) || defined(CONFIG_HOTPLUG_PCI_MODULE)
+#if IS_ENABLED(CONFIG_HOTPLUG_PCI)
 static int __devinit __pci_iomul_notifier_del_device(struct pci_dev *pdev)
 {
 	struct pci_iomul_switch *sw;

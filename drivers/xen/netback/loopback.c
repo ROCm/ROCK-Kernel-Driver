@@ -46,6 +46,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/highmem.h>
 #include <linux/netdevice.h>
 #include <linux/inetdevice.h>
 #include <linux/etherdevice.h>
@@ -54,7 +55,6 @@
 #include <net/dst.h>
 #include <net/xfrm.h>		/* secpath_reset() */
 #include <asm/hypervisor.h>	/* is_initial_xendomain() */
-#include <../net/core/kmap_skb.h> /* k{,un}map_skb_frag() */
 
 static int nloopbacks = -1;
 module_param(nloopbacks, int, 0);
@@ -99,7 +99,7 @@ static int skb_remove_foreign_references(struct sk_buff *skb)
 {
 	struct page *page;
 	unsigned long pfn;
-	int i, off;
+	unsigned int i;
 	char *vaddr;
 
 	BUG_ON(skb_shinfo(skb)->frag_list);
@@ -109,7 +109,9 @@ static int skb_remove_foreign_references(struct sk_buff *skb)
 		return 0;
 
 	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
-		pfn = page_to_pfn(skb_frag_page(&skb_shinfo(skb)->frags[i]));
+		skb_frag_t *f = &skb_shinfo(skb)->frags[i];
+
+		pfn = page_to_pfn(skb_frag_page(f));
 		if (!is_foreign(pfn))
 			continue;
 		
@@ -117,15 +119,14 @@ static int skb_remove_foreign_references(struct sk_buff *skb)
 		if (unlikely(!page))
 			return 0;
 
-		vaddr = kmap_skb_frag(&skb_shinfo(skb)->frags[i]);
-		off = skb_shinfo(skb)->frags[i].page_offset;
-		memcpy(page_address(page) + off,
-		       vaddr + off,
-		       skb_frag_size(&skb_shinfo(skb)->frags[i]));
-		kunmap_skb_frag(vaddr);
+		vaddr = kmap_atomic(skb_frag_page(f));
+		memcpy(page_address(page) + f->page_offset,
+		       vaddr + f->page_offset,
+		       skb_frag_size(f));
+		kunmap_atomic(vaddr);
 
-		skb_frag_unref(skb, i);
-		skb_frag_set_page(skb, i, page);
+		__skb_frag_unref(f);
+		__skb_frag_set_page(f, page);
 	}
 
 	return 1;

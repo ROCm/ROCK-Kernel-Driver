@@ -9,7 +9,11 @@
 #include <xen/xen.h>
 #ifdef CONFIG_PARAVIRT_XEN
 #include <xen/page.h>
+#include <xen/grant_table.h>
+#include <xen/events.h>
+#include <asm/xen/hypervisor.h>
 #endif
+#include <xen/xenbus.h>
 #include <xen/xenbus_dev.h>
 
 #include "xenbus_comms.h"
@@ -24,6 +28,54 @@ static int xenbus_backend_open(struct inode *inode, struct file *filp)
 	return nonseekable_open(inode, filp);
 }
 
+static long xenbus_alloc(domid_t domid)
+{
+#ifdef CONFIG_PARAVIRT_XEN
+	struct evtchn_alloc_unbound arg;
+	int err = -EEXIST;
+
+	xs_suspend();
+
+	/* If xenstored_ready is nonzero, that means we have already talked to
+	 * xenstore and set up watches. These watches will be restored by
+	 * xs_resume, but that requires communication over the port established
+	 * below that is not visible to anyone until the ioctl returns.
+	 *
+	 * This can be resolved by splitting the ioctl into two parts
+	 * (postponing the resume until xenstored is active) but this is
+	 * unnecessarily complex for the intended use where xenstored is only
+	 * started once - so return -EEXIST if it's already running.
+	 */
+	if (xenstored_ready)
+		goto out_err;
+
+	gnttab_grant_foreign_access_ref(GNTTAB_RESERVED_XENSTORE, domid,
+			virt_to_mfn(xen_store_interface), 0 /* writable */);
+
+	arg.dom = DOMID_SELF;
+	arg.remote_dom = domid;
+
+	err = HYPERVISOR_event_channel_op(EVTCHNOP_alloc_unbound, &arg);
+	if (err)
+		goto out_err;
+
+	if (xen_store_evtchn > 0)
+		xb_deinit_comms();
+
+	xen_store_evtchn = arg.port;
+
+	xs_resume();
+
+	return arg.port;
+
+ out_err:
+	xs_suspend_cancel();
+	return err;
+#else
+	return -EOPNOTSUPP;
+#endif
+}
+
 static long xenbus_backend_ioctl(struct file *file, unsigned int cmd, unsigned long data)
 {
 	if (!capable(CAP_SYS_ADMIN))
@@ -34,6 +86,9 @@ static long xenbus_backend_ioctl(struct file *file, unsigned int cmd, unsigned l
 			if (xen_store_evtchn > 0)
 				return xen_store_evtchn;
 			return -ENODEV;
+
+		case IOCTL_XENBUS_BACKEND_SETUP:
+			return xenbus_alloc(data);
 
 		default:
 			return -ENOTTY;

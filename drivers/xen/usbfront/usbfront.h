@@ -53,6 +53,7 @@
 #include <linux/wait.h>
 #include <linux/usb/hcd.h>
 #include <asm/io.h>
+#include <xen/barrier.h>
 #include <xen/xenbus.h>
 #include <xen/evtchn.h>
 #include <xen/gnttab.h>

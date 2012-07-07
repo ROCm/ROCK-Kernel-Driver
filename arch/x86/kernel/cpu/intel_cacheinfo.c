@@ -617,7 +617,7 @@ unsigned int __cpuinit init_intel_cacheinfo(struct cpuinfo_x86 *c)
 #ifdef CONFIG_X86_HT
 					num_threads_sharing = 1 + this_leaf.eax.split.num_threads_sharing;
 					index_msb = get_count_order(num_threads_sharing);
-					l2_id = c->apicid >> index_msb;
+					l2_id = c->apicid & ~((1 << index_msb) - 1);
 #endif
 					break;
 				case 3:
@@ -626,7 +626,7 @@ unsigned int __cpuinit init_intel_cacheinfo(struct cpuinfo_x86 *c)
 					num_threads_sharing = 1 + this_leaf.eax.split.num_threads_sharing;
 					index_msb = get_count_order(
 							num_threads_sharing);
-					l3_id = c->apicid >> index_msb;
+					l3_id = c->apicid & ~((1 << index_msb) - 1);
 #endif
 					break;
 				default:

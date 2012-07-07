@@ -603,12 +603,34 @@ static inline int GET_ID_FROM_FREELIST(
 	return free;
 }
 
-static inline void ADD_ID_TO_FREELIST(
+static inline int ADD_ID_TO_FREELIST(
 	struct blkfront_info *info, unsigned long id)
 {
+	if (info->shadow[id].req.id != id)
+		return -EINVAL;
+	if (!info->shadow[id].request)
+		return -ENXIO;
 	info->shadow[id].req.id  = info->shadow_free;
 	info->shadow[id].request = NULL;
 	info->shadow_free = id;
+	return 0;
+}
+
+static const char *op_name(unsigned int op)
+{
+	static const char *const names[] = {
+		[BLKIF_OP_READ] = "read",
+		[BLKIF_OP_WRITE] = "write",
+		[BLKIF_OP_WRITE_BARRIER] = "barrier",
+		[BLKIF_OP_FLUSH_DISKCACHE] = "flush",
+		[BLKIF_OP_PACKET] = "packet",
+		[BLKIF_OP_DISCARD] = "discard",
+	};
+
+	if (op >= ARRAY_SIZE(names))
+		return "unknown";
+
+	return names[op] ?: "reserved";
 }
 
 static inline void flush_requests(struct blkfront_info *info)
@@ -988,35 +1010,52 @@ static irqreturn_t blkif_int(int irq, void *dev_id)
 		int ret;
 
 		bret = RING_GET_RESPONSE(&info->ring, i);
+		if (unlikely(bret->id >= BLK_RING_SIZE)) {
+			/*
+			 * The backend has messed up and given us an id that
+			 * we would never have given to it (we stamp it up to
+			 * BLK_RING_SIZE - see GET_ID_FROM_FREELIST()).
+			 */
+			pr_warning("%s: response to %s has incorrect id (%#Lx)\n",
+				   info->gd->disk_name,
+				   op_name(bret->operation),
+				   (unsigned long long)bret->id);
+			continue;
+		}
 		id   = bret->id;
 		req  = info->shadow[id].request;
 
 		blkif_completion(&info->shadow[id]);
 
-		ADD_ID_TO_FREELIST(info, id);
+		ret = ADD_ID_TO_FREELIST(info, id);
+		if (unlikely(ret)) {
+			pr_warning("%s: id %#lx (response to %s) couldn't be recycled (%d)!\n",
+				   info->gd->disk_name, id,
+				   op_name(bret->operation), ret);
+			continue;
+		}
 
 		ret = bret->status == BLKIF_RSP_OKAY ? 0 : -EIO;
 		switch (bret->operation) {
-			const char *what;
+			const char *kind;
 
 		case BLKIF_OP_FLUSH_DISKCACHE:
 		case BLKIF_OP_WRITE_BARRIER:
-			what = bret->operation == BLKIF_OP_WRITE_BARRIER ?
-			       "write barrier" : "flush disk cache";
-			if (unlikely(bret->status == BLKIF_RSP_EOPNOTSUPP)) {
-				pr_warn("blkfront: %s: %s op failed\n",
-					what, info->gd->disk_name);
+			kind = "";
+			if (unlikely(bret->status == BLKIF_RSP_EOPNOTSUPP))
 				ret = -EOPNOTSUPP;
-			}
 			if (unlikely(bret->status == BLKIF_RSP_ERROR &&
 				     info->shadow[id].req.nr_segments == 0)) {
-				pr_warn("blkfront: %s: empty %s op failed\n",
-					what, info->gd->disk_name);
+				kind = "empty ";
 				ret = -EOPNOTSUPP;
 			}
 			if (unlikely(ret)) {
-				if (ret == -EOPNOTSUPP)
+				if (ret == -EOPNOTSUPP) {
+					pr_warn("blkfront: %s: %s%s op failed\n",
+					        info->gd->disk_name, kind,
+						op_name(bret->operation));
 					ret = 0;
+				}
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
 				info->feature_flush = 0;
 #else
@@ -1029,8 +1068,9 @@ static irqreturn_t blkif_int(int irq, void *dev_id)
 		case BLKIF_OP_WRITE:
 		case BLKIF_OP_PACKET:
 			if (unlikely(bret->status != BLKIF_RSP_OKAY))
-				DPRINTK("Bad return from blkdev data "
-					"request: %x\n", bret->status);
+				DPRINTK("Bad return from blkdev %s request: %d\n",
+					op_name(bret->operation),
+					bret->status);
 
 			__blk_end_request_all(req, ret);
 			break;

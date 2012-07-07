@@ -41,6 +41,7 @@
 #include <linux/swap.h>
 #include <linux/bootmem.h>
 #include <linux/highmem.h>
+#include <linux/kconfig.h>
 #include <linux/slab.h>
 #include <linux/mutex.h>
 #include <xen/xen_proc.h>
@@ -259,9 +260,7 @@ static int increase_reservation(unsigned long nr_pages)
 	long           rc;
 	int            need_zonelists_rebuild = 0;
 	struct xen_memory_reservation reservation = {
-		.address_bits = 0,
-		.extent_order = 0,
-		.domid        = DOMID_SELF
+		.domid = DOMID_SELF
 	};
 
 	if (nr_pages > ARRAY_SIZE(frame_list))
@@ -337,9 +336,7 @@ static int decrease_reservation(unsigned long nr_pages)
 	int            need_sleep = 0;
 	int ret;
 	struct xen_memory_reservation reservation = {
-		.address_bits = 0,
-		.extent_order = 0,
-		.domid        = DOMID_SELF
+		.domid = DOMID_SELF
 	};
 
 	if (nr_pages > ARRAY_SIZE(frame_list))
@@ -636,7 +633,7 @@ void balloon_update_driver_allowance(long delta)
 }
 EXPORT_SYMBOL_GPL(balloon_update_driver_allowance);
 
-#if defined(CONFIG_XEN_BACKEND) || defined(CONFIG_XEN_BACKEND_MODULE)
+#if IS_ENABLED(CONFIG_XEN_BACKEND)
 
 #ifdef CONFIG_XEN
 static int dealloc_pte_fn(
@@ -776,7 +773,7 @@ void free_empty_pages(struct page **pagevec, int nr_pages)
 }
 #endif
 
-#if defined(CONFIG_XEN_BACKEND) || defined(CONFIG_XEN_BACKEND_MODULE)
+#if IS_ENABLED(CONFIG_XEN_BACKEND)
 void free_empty_pages_and_pagevec(struct page **pagevec, int nr_pages)
 {
 	if (pagevec) {

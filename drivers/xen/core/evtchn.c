@@ -34,6 +34,7 @@
 #include <linux/slab.h>
 #include <linux/irq.h>
 #include <linux/interrupt.h>
+#include <linux/kconfig.h>
 #include <linux/sched.h>
 #include <linux/kernel_stat.h>
 #include <linux/ftrace.h>
@@ -252,7 +253,7 @@ static inline unsigned long active_evtchns(unsigned int idx)
 	shared_info_t *sh = HYPERVISOR_shared_info;
 
 	return (sh->evtchn_pending[idx] &
-		percpu_read(cpu_evtchn_mask[idx]) &
+		this_cpu_read(cpu_evtchn_mask[idx]) &
 		~sh->evtchn_mask[idx]);
 }
 
@@ -401,7 +402,7 @@ asmlinkage void __irq_entry evtchn_do_upcall(struct pt_regs *regs)
 		 * have just woken from a long idle period.
 		 */
 #ifdef PER_CPU_VIRQ_IRQ
-		if ((irq = percpu_read(virq_to_irq[VIRQ_TIMER])) != -1) {
+		if ((irq = __this_cpu_read(virq_to_irq[VIRQ_TIMER])) != -1) {
 			port = evtchn_from_irq(irq);
 #else
 		port = __this_cpu_read(virq_to_evtchn[VIRQ_TIMER]);
@@ -424,8 +425,8 @@ asmlinkage void __irq_entry evtchn_do_upcall(struct pt_regs *regs)
 
 		l1 = vcpu_info_xchg(evtchn_pending_sel, 0);
 
-		start_l1i = l1i = percpu_read(current_l1i);
-		start_l2i = percpu_read(current_l2i);
+		start_l1i = l1i = __this_cpu_read(current_l1i);
+		start_l2i = __this_cpu_read(current_l2i);
 
 		for (i = 0; l1 != 0; i++) {
 			masked_l1 = l1 & ((~0UL) << l1i);
@@ -474,9 +475,9 @@ asmlinkage void __irq_entry evtchn_do_upcall(struct pt_regs *regs)
 				l2i = (l2i + 1) % BITS_PER_LONG;
 
 				/* Next caller starts at last processed + 1 */
-				percpu_write(current_l1i,
+				__this_cpu_write(current_l1i,
 					l2i ? l1i : (l1i + 1) % BITS_PER_LONG);
-				percpu_write(current_l2i, l2i);
+				__this_cpu_write(current_l2i, l2i);
 
 			} while (l2i != 0);
 
@@ -1478,7 +1479,7 @@ void notify_remote_via_irq(int irq)
 }
 EXPORT_SYMBOL_GPL(notify_remote_via_irq);
 
-#if defined(CONFIG_XEN_BACKEND) || defined(CONFIG_XEN_BACKEND_MODULE)
+#if IS_ENABLED(CONFIG_XEN_BACKEND)
 int multi_notify_remote_via_irq(multicall_entry_t *mcl, int irq)
 {
 	const struct irq_cfg *cfg = irq_cfg(irq);
@@ -1690,7 +1691,8 @@ static void evtchn_resume(void)
 		struct physdev_pirq_eoi_gmfn eoi_gmfn;
 
 		eoi_gmfn.gmfn = virt_to_machine(pirq_needs_eoi) >> PAGE_SHIFT;
-		if (HYPERVISOR_physdev_op(PHYSDEVOP_pirq_eoi_gmfn, &eoi_gmfn))
+		if (HYPERVISOR_physdev_op(PHYSDEVOP_pirq_eoi_gmfn_v1,
+					  &eoi_gmfn))
 			BUG();
 	}
 
@@ -1967,7 +1969,7 @@ void __init xen_init_IRQ(void)
 	pirq_needs_eoi = (void *)__get_free_pages(GFP_KERNEL|__GFP_ZERO, i);
 	BUILD_BUG_ON(NR_PIRQS > PAGE_SIZE * 8);
  	eoi_gmfn.gmfn = virt_to_machine(pirq_needs_eoi) >> PAGE_SHIFT;
-	if (HYPERVISOR_physdev_op(PHYSDEVOP_pirq_eoi_gmfn, &eoi_gmfn) == 0)
+	if (HYPERVISOR_physdev_op(PHYSDEVOP_pirq_eoi_gmfn_v1, &eoi_gmfn) == 0)
 		pirq_eoi_does_unmask = true;
 
 	/* No event channels are 'live' right now. */

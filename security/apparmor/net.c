@@ -92,11 +92,10 @@ static int audit_net(struct aa_profile *profile, int op, u16 family, int type,
 	aad.net.type = type;
 	aad.net.protocol = protocol;
 
-	if (sk) {
-		COMMON_AUDIT_DATA_INIT(&sa, NET);
-	} else {
-		COMMON_AUDIT_DATA_INIT(&sa, NONE);
-	}
+	if (sk)
+		sa.type = LSM_AUDIT_DATA_NET;
+	else
+		sa.type = LSM_AUDIT_DATA_NONE;
 	/* todo fill in socket addr info */
 
 	sa.apparmor_audit_data = &aad;

@@ -8,7 +8,7 @@ config XEN
 if XEN
 config XEN_INTERFACE_VERSION
 	hex
-	default 0x00030207
+	default 0x00040200
 
 menu "XEN"
 
@@ -439,7 +439,7 @@ config XEN_DEV_EVTCHN
 	tristate "Xen /dev/xen/evtchn device"
 	default PARAVIRT_XEN || XEN_PRIVILEGED_GUEST || m
 	help
-	  The evtchn driver allows a userspace process to triger event
+	  The evtchn driver allows a userspace process to trigger event
 	  channels and to receive notification of an event channel
 	  firing.
 	  If in doubt, say yes.

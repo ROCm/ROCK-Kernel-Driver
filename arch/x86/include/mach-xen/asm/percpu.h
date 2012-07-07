@@ -55,7 +55,13 @@
 	pxo_ret__;					\
 })
 
-#define percpu_xchg(var, val)		percpu_exchange_op("xchg", var, val)
-#define percpu_xadd(var, val)		percpu_exchange_op("xadd", var, val)
+#if defined(CONFIG_XEN_VCPU_INFO_PLACEMENT)
+# define vcpu_info_read(fld) percpu_from_op("mov", vcpu_info.fld, "m" (vcpu_info.fld))
+# define vcpu_info_write(fld, val) percpu_to_op("mov", vcpu_info.fld, val)
+# define vcpu_info_xchg(fld, val) percpu_exchange_op("xchg", vcpu_info.fld, val)
+#elif defined(CONFIG_XEN)
+# define vcpu_info_read(fld) (current_vcpu_info()->fld)
+# define vcpu_info_write(fld, val) (current_vcpu_info()->fld = (val))
+#endif
 
 #endif /* _ASM_X86_XEN_PERCPU_H */

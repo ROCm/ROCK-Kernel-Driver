@@ -604,6 +604,7 @@ static inline int pgd_none(pgd_t pgd)
 #define KERNEL_PGD_PTRS		(PTRS_PER_PGD - KERNEL_PGD_BOUNDARY)
 
 #ifndef __ASSEMBLY__
+#include <asm/tlbflush.h>
 
 #define direct_gbpages 0
 

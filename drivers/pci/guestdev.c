@@ -22,6 +22,7 @@
 #include <linux/mm.h>
 #include <linux/pci.h>
 #include <linux/export.h>
+#include <linux/kconfig.h>
 #include <linux/string.h>
 #include <linux/acpi.h>
 #include <asm/setup.h>
@@ -757,7 +758,7 @@ int pci_is_guestdev_to_reassign(struct pci_dev *dev)
 	return FALSE;
 }
 
-#if defined(CONFIG_PCI_IOMULTI) || defined(CONFIG_PCI_IOMULTI_MODULE)
+#if IS_ENABLED(CONFIG_PCI_IOMULTI)
 static int pci_iomul_node_match(const struct devicepath_node *gdev_node,
 				const struct pcidev_sbdf_node *sbdf_node,
 				int options)

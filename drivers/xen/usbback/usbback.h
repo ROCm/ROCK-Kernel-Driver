@@ -54,6 +54,7 @@
 #include <linux/wait.h>
 #include <linux/list.h>
 #include <linux/kref.h>
+#include <xen/barrier.h>
 #include <xen/xenbus.h>
 #include <xen/interface/event_channel.h>
 #include <xen/interface/io/usbif.h>

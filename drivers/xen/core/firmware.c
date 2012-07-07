@@ -5,9 +5,10 @@
 #include <linux/edd.h>
 #include <video/edid.h>
 #include <xen/interface/platform.h>
+#include <xen/firmware.h>
 #include <asm/hypervisor.h>
 
-#if defined(CONFIG_EDD) || defined(CONFIG_EDD_MODULE)
+#if IS_ENABLED(CONFIG_EDD)
 void __init copy_edd(void)
 {
 	int ret;
@@ -73,3 +74,31 @@ void __init copy_edid(void)
 		memset(edid_info.dummy, 0x13, sizeof(edid_info.dummy));
 #endif
 }
+
+#if defined(CONFIG_VT) && defined(CONFIG_X86)
+#include <asm/kbdleds.h>
+
+int __init kbd_defleds(void)
+{
+	int ret = 0;
+#if 0//todo
+	struct xen_platform_op op;
+
+	if (!is_initial_xendomain())
+		return 0;
+
+	op.cmd = XENPF_firmware_info;
+	op.u.firmware_info.index = 0;
+	op.u.firmware_info.type = XEN_FW_KBD_SHIFT_FLAGS;
+	if (HYPERVISOR_platform_op(&op) != 0)
+		return 0;
+	if (op.u.firmware_info.u.kbd_shift_flags & 0x10)
+		ret |= 1 << VC_SCROLLOCK;
+	if (op.u.firmware_info.u.kbd_shift_flags & 0x20)
+		ret |= 1 << VC_NUMLOCK;
+	if (op.u.firmware_info.u.kbd_shift_flags & 0x40)
+		ret |= 1 << VC_CAPSLOCK;
+#endif
+	return ret;
+}
+#endif

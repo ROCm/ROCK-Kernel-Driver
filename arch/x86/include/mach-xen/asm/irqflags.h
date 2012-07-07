@@ -16,8 +16,18 @@
 
 #define xen_save_fl(void) vcpu_info_read(evtchn_upcall_mask)
 
-#define xen_restore_fl(f)					\
-do {								\
+#ifdef CONFIG_XEN_VCPU_INFO_PLACEMENT
+#define xen_restore_fl(f) ({					\
+	typeof(vcpu_info(0)->evtchn_upcall_mask) f__ = (f);	\
+	barrier();						\
+	vcpu_info_write(evtchn_upcall_mask, f__);		\
+	barrier(); /* unmask then check (avoid races) */	\
+	if (likely(!f__)					\
+	    && unlikely(vcpu_info_read(evtchn_upcall_pending)))	\
+		force_evtchn_callback();			\
+})
+#else
+#define xen_restore_fl(f) ({					\
 	vcpu_info_t *_vcpu;					\
 	barrier();						\
 	_vcpu = current_vcpu_info();				\
@@ -26,30 +36,21 @@ do {								\
 		if (unlikely(_vcpu->evtchn_upcall_pending))	\
 			force_evtchn_callback();		\
 	}							\
-} while (0)
+})
+#endif
 
-#define xen_irq_disable()					\
-do {								\
+#define xen_irq_disable() ({					\
 	vcpu_info_write(evtchn_upcall_mask, 1);			\
 	barrier();						\
-} while (0)
+})
 
-#define xen_irq_enable()					\
-do {								\
-	vcpu_info_t *_vcpu;					\
-	barrier();						\
-	_vcpu = current_vcpu_info();				\
-	_vcpu->evtchn_upcall_mask = 0;				\
-	barrier(); /* unmask then check (avoid races) */	\
-	if (unlikely(_vcpu->evtchn_upcall_pending))		\
-		force_evtchn_callback();			\
-} while (0)
+#define xen_irq_enable() xen_restore_fl(0)
 
 #define arch_local_save_flags() xen_save_fl()
 
 #define arch_local_irq_restore(flags) xen_restore_fl(flags)
 
-#define arch_local_irq_disable()	xen_irq_disable()
+#define arch_local_irq_disable() xen_irq_disable()
 
 #define arch_local_irq_enable() xen_irq_enable()
 

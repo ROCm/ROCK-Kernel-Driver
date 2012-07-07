@@ -45,6 +45,7 @@
 #include <scsi/scsi_device.h>
 #include <scsi/scsi.h>
 #include <scsi/scsi_host.h>
+#include <xen/barrier.h>
 #include <xen/xenbus.h>
 #include <xen/gnttab.h>
 #include <xen/evtchn.h>

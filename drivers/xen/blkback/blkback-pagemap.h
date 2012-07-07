@@ -1,6 +1,7 @@
 #ifndef _BLKBACK_PAGEMAP_H_
 #define _BLKBACK_PAGEMAP_H_
 
+#include <linux/kconfig.h>
 #include <linux/mm.h>
 #include <xen/interface/xen.h>
 #include <xen/interface/grant_table.h>
@@ -13,7 +14,7 @@ struct blkback_pagemap {
 	grant_ref_t      gref;
 };
 
-#if defined(CONFIG_XEN_BLKBACK_PAGEMAP) || defined(CONFIG_XEN_BLKBACK_PAGEMAP_MODULE)
+#if IS_ENABLED(CONFIG_XEN_BLKBACK_PAGEMAP)
 
 int blkback_pagemap_init(int);
 void blkback_pagemap_set(int, struct page *, domid_t, busid_t, grant_ref_t);

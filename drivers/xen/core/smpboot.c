@@ -159,14 +159,13 @@ static void __cpuinit cpu_bringup_and_idle(void)
 	cpu_idle();
 }
 
-static void __cpuinit cpu_initialize_context(unsigned int cpu)
+static void __cpuinit cpu_initialize_context(unsigned int cpu,
+					     unsigned long sp0)
 {
 	/* vcpu_guest_context_t is too large to allocate on the stack.
 	 * Hence we allocate statically and protect it with a lock */
 	static vcpu_guest_context_t ctxt;
 	static DEFINE_SPINLOCK(ctxt_lock);
-
-	struct task_struct *idle = idle_task(cpu);
 
 	if (cpumask_test_and_set_cpu(cpu, vcpu_initialized_mask))
 		return;
@@ -188,10 +187,10 @@ static void __cpuinit cpu_initialize_context(unsigned int cpu)
 	ctxt.gdt_ents = GDT_SIZE / 8;
 
 	ctxt.user_regs.cs = __KERNEL_CS;
-	ctxt.user_regs.esp = idle->thread.sp0 - sizeof(struct pt_regs);
+	ctxt.user_regs.esp = sp0 - sizeof(struct pt_regs);
 
 	ctxt.kernel_ss = __KERNEL_DS;
-	ctxt.kernel_sp = idle->thread.sp0;
+	ctxt.kernel_sp = sp0;
 
 	ctxt.event_callback_eip    = (unsigned long)hypervisor_callback;
 	ctxt.failsafe_callback_eip = (unsigned long)failsafe_callback;
@@ -220,7 +219,6 @@ static void __cpuinit cpu_initialize_context(unsigned int cpu)
 void __init smp_prepare_cpus(unsigned int max_cpus)
 {
 	unsigned int cpu;
-	struct task_struct *idle;
 	int apicid;
 	struct vcpu_get_physid cpu_id;
 	void *gdt_addr;
@@ -249,10 +247,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 		if (cpu == 0)
 			continue;
 
-		idle = fork_idle(cpu);
-		if (IS_ERR(idle))
-			panic("failed fork for CPU %d", cpu);
-
 		gdt_addr = get_cpu_gdt_table(cpu);
 		make_page_readonly(gdt_addr, XENFEAT_writable_descriptor_tables);
 
@@ -261,14 +255,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 			apicid = xen_vcpu_physid_to_x86_apicid(cpu_id.phys_id);
 		cpu_data(cpu) = boot_cpu_data;
 		cpu_data(cpu).cpu_index = cpu;
-
-#ifdef __x86_64__
-		clear_tsk_thread_flag(idle, TIF_FORK);
-		per_cpu(kernel_stack, cpu) =
-			(unsigned long)task_stack_page(idle) -
-			KERNEL_STACK_OFFSET + THREAD_SIZE;
-#endif
-	 	per_cpu(current_task, cpu) = idle;
 
 		irq_ctx_init(cpu);
 
@@ -347,7 +333,7 @@ void __cpuinit __cpu_die(unsigned int cpu)
 
 #endif /* CONFIG_HOTPLUG_CPU */
 
-int __cpuinit __cpu_up(unsigned int cpu)
+int __cpuinit __cpu_up(unsigned int cpu, struct task_struct *idle)
 {
 	int rc;
 
@@ -359,7 +345,14 @@ int __cpuinit __cpu_up(unsigned int cpu)
 	if (rc)
 		return rc;
 
-	cpu_initialize_context(cpu);
+#ifdef CONFIG_X86_64
+	clear_tsk_thread_flag(idle, TIF_FORK);
+	per_cpu(kernel_stack, cpu) = (unsigned long)task_stack_page(idle) -
+				     KERNEL_STACK_OFFSET + THREAD_SIZE;
+#endif
+ 	per_cpu(current_task, cpu) = idle;
+
+	cpu_initialize_context(cpu, idle->thread.sp0);
 
 	if (num_online_cpus() == 1)
 		alternatives_smp_switch(1);

@@ -38,6 +38,7 @@
 #include <linux/etherdevice.h>
 #include <linux/wait.h>
 #include <xen/interface/io/netif.h>
+#include <xen/barrier.h>
 #include <xen/xenbus.h>
 #include <xen/interface/event_channel.h>
 

@@ -31,6 +31,7 @@
 #include <linux/acpi.h>
 #include <linux/module.h>
 #include <linux/syscore_ops.h>
+struct msi_msg; /* #include <linux/msi.h> */
 #include <linux/freezer.h>
 #include <linux/kthread.h>
 #include <linux/jiffies.h>	/* time_after() */
@@ -51,6 +52,7 @@
 #include <asm/timer.h>
 #include <asm/i8259.h>
 #include <asm/setup.h>
+#include <asm/irq_remapping.h>
 #include <asm/hw_irq.h>
 
 #include <asm/apic.h>
@@ -76,23 +78,19 @@ unsigned long io_apic_irqs;
 #define for_each_irq_pin(entry, head) \
 	for (entry = head; entry; entry = entry->next)
 
-#ifndef CONFIG_XEN
-static void		__init __ioapic_init_mappings(void);
-
-static unsigned int	__io_apic_read  (unsigned int apic, unsigned int reg);
-static void		__io_apic_write (unsigned int apic, unsigned int reg, unsigned int val);
-static void		__io_apic_modify(unsigned int apic, unsigned int reg, unsigned int val);
-
-static struct io_apic_ops io_apic_ops = {
-	.init	= __ioapic_init_mappings,
-	.read	= __io_apic_read,
-	.write	= __io_apic_write,
-	.modify = __io_apic_modify,
-};
-
-void __init set_io_apic_ops(const struct io_apic_ops *ops)
+#ifdef CONFIG_IRQ_REMAP
+static void irq_remap_modify_chip_defaults(struct irq_chip *chip);
+static inline bool irq_remapped(struct irq_cfg *cfg)
 {
-	io_apic_ops = *ops;
+	return cfg->irq_2_iommu.iommu != NULL;
+}
+#else
+static inline bool irq_remapped(struct irq_cfg *cfg)
+{
+	return false;
+}
+static inline void irq_remap_modify_chip_defaults(struct irq_chip *chip)
+{
 }
 #endif
 
@@ -158,7 +156,7 @@ int mp_irq_entries;
 static int nr_irqs_gsi = NR_IRQS_LEGACY;
 #endif
 
-#if defined (CONFIG_MCA) || defined (CONFIG_EISA)
+#ifdef CONFIG_EISA
 int mp_bus_id_to_type[MAX_MP_BUSSES];
 #endif
 
@@ -330,21 +328,6 @@ static void free_irq_at(unsigned int at, struct irq_cfg *cfg)
 	irq_free_desc(at);
 }
 
-static inline unsigned int io_apic_read(unsigned int apic, unsigned int reg)
-{
-	return io_apic_ops.read(apic, reg);
-}
-
-static inline void io_apic_write(unsigned int apic, unsigned int reg, unsigned int value)
-{
-	io_apic_ops.write(apic, reg, value);
-}
-
-static inline void io_apic_modify(unsigned int apic, unsigned int reg, unsigned int value)
-{
-	io_apic_ops.modify(apic, reg, value);
-}
-
 
 struct io_apic {
 	unsigned int index;
@@ -366,14 +349,14 @@ static inline void io_apic_eoi(unsigned int apic, unsigned int vector)
 	writel(vector, &io_apic->eoi);
 }
 
-static unsigned int __io_apic_read(unsigned int apic, unsigned int reg)
+unsigned int native_io_apic_read(unsigned int apic, unsigned int reg)
 {
 	struct io_apic __iomem *io_apic = io_apic_base(apic);
 	writel(reg, &io_apic->index);
 	return readl(&io_apic->data);
 }
 
-static void __io_apic_write(unsigned int apic, unsigned int reg, unsigned int value)
+void native_io_apic_write(unsigned int apic, unsigned int reg, unsigned int value)
 {
 	struct io_apic __iomem *io_apic = io_apic_base(apic);
 
@@ -387,36 +370,13 @@ static void __io_apic_write(unsigned int apic, unsigned int reg, unsigned int va
  *
  * Older SiS APIC requires we rewrite the index register
  */
-static void __io_apic_modify(unsigned int apic, unsigned int reg, unsigned int value)
+void native_io_apic_modify(unsigned int apic, unsigned int reg, unsigned int value)
 {
 	struct io_apic __iomem *io_apic = io_apic_base(apic);
 
 	if (sis_apic_bug)
 		writel(reg, &io_apic->index);
 	writel(value, &io_apic->data);
-}
-
-static bool io_apic_level_ack_pending(struct irq_cfg *cfg)
-{
-	struct irq_pin_list *entry;
-	unsigned long flags;
-
-	raw_spin_lock_irqsave(&ioapic_lock, flags);
-	for_each_irq_pin(entry, cfg->irq_2_pin) {
-		unsigned int reg;
-		int pin;
-
-		pin = entry->pin;
-		reg = io_apic_read(entry->apic, 0x10 + pin*2);
-		/* Is the remote IRR bit set? */
-		if (reg & IO_APIC_REDIR_REMOTE_IRR) {
-			raw_spin_unlock_irqrestore(&ioapic_lock, flags);
-			return true;
-		}
-	}
-	raw_spin_unlock_irqrestore(&ioapic_lock, flags);
-
-	return false;
 }
 #else /* !CONFIG_XEN */
 static inline unsigned int io_apic_read(unsigned int apic, unsigned int reg)
@@ -929,7 +889,7 @@ static int __init find_isa_irq_apic(int irq, int type)
 }
 #endif
 
-#if defined(CONFIG_EISA) || defined(CONFIG_MCA)
+#ifdef CONFIG_EISA
 /*
  * EISA Edge/Level control register, ELCR
  */
@@ -965,12 +925,6 @@ static int EISA_ELCR(unsigned int irq)
 
 #define default_PCI_trigger(idx)	(1)
 #define default_PCI_polarity(idx)	(1)
-
-/* MCA interrupts are always polarity zero level triggered,
- * when listed as conforming in the MP table. */
-
-#define default_MCA_trigger(idx)	(1)
-#define default_MCA_polarity(idx)	default_ISA_polarity(idx)
 
 static int irq_polarity(int idx)
 {
@@ -1029,7 +983,7 @@ static int irq_trigger(int idx)
 				trigger = default_ISA_trigger(idx);
 			else
 				trigger = default_PCI_trigger(idx);
-#if defined(CONFIG_EISA) || defined(CONFIG_MCA)
+#ifdef CONFIG_EISA
 			switch (mp_bus_id_to_type[bus]) {
 				case MP_BUS_ISA: /* ISA pin */
 				{
@@ -1044,11 +998,6 @@ static int irq_trigger(int idx)
 				case MP_BUS_PCI: /* PCI pin */
 				{
 					/* set before the switch */
-					break;
-				}
-				case MP_BUS_MCA: /* MCA pin */
-				{
-					trigger = default_MCA_trigger(idx);
 					break;
 				}
 				default:
@@ -1305,7 +1254,7 @@ static void __clear_irq_vector(int irq, struct irq_cfg *cfg)
 	BUG_ON(!cfg->vector);
 
 	vector = cfg->vector;
-	for_each_cpu_and(cpu, cfg->domain, cpu_online_mask)
+	for_each_cpu(cpu, cfg->domain)
 		per_cpu(vector_irq, cpu)[vector] = -1;
 
 	cfg->vector = 0;
@@ -1313,7 +1262,7 @@ static void __clear_irq_vector(int irq, struct irq_cfg *cfg)
 
 	if (likely(!cfg->move_in_progress))
 		return;
-	for_each_cpu_and(cpu, cfg->old_domain, cpu_online_mask) {
+	for_each_cpu(cpu, cfg->old_domain) {
 		for (vector = FIRST_EXTERNAL_VECTOR; vector < NR_VECTORS;
 								vector++) {
 			if (per_cpu(vector_irq, cpu)[vector] != irq)
@@ -1419,69 +1368,6 @@ static void ioapic_register_intr(unsigned int irq, struct irq_cfg *cfg,
 	irq_set_chip_and_handler_name(irq, chip, hdl,
 				      fasteoi ? "fasteoi" : "edge");
 }
-
-
-static int setup_ir_ioapic_entry(int irq,
-			      struct IR_IO_APIC_route_entry *entry,
-			      unsigned int destination, int vector,
-			      struct io_apic_irq_attr *attr)
-{
-	int index;
-	struct irte irte;
-	int ioapic_id = mpc_ioapic_id(attr->ioapic);
-	struct intel_iommu *iommu = map_ioapic_to_ir(ioapic_id);
-
-	if (!iommu) {
-		pr_warn("No mapping iommu for ioapic %d\n", ioapic_id);
-		return -ENODEV;
-	}
-
-	index = alloc_irte(iommu, irq, 1);
-	if (index < 0) {
-		pr_warn("Failed to allocate IRTE for ioapic %d\n", ioapic_id);
-		return -ENOMEM;
-	}
-
-	prepare_irte(&irte, vector, destination);
-
-	/* Set source-id of interrupt request */
-	set_ioapic_sid(&irte, ioapic_id);
-
-	modify_irte(irq, &irte);
-
-	apic_printk(APIC_VERBOSE, KERN_DEBUG "IOAPIC[%d]: "
-		"Set IRTE entry (P:%d FPD:%d Dst_Mode:%d "
-		"Redir_hint:%d Trig_Mode:%d Dlvry_Mode:%X "
-		"Avail:%X Vector:%02X Dest:%08X "
-		"SID:%04X SQ:%X SVT:%X)\n",
-		attr->ioapic, irte.present, irte.fpd, irte.dst_mode,
-		irte.redir_hint, irte.trigger_mode, irte.dlvry_mode,
-		irte.avail, irte.vector, irte.dest_id,
-		irte.sid, irte.sq, irte.svt);
-
-	memset(entry, 0, sizeof(*entry));
-
-	entry->index2	= (index >> 15) & 0x1;
-	entry->zero	= 0;
-	entry->format	= 1;
-	entry->index	= (index & 0x7fff);
-	/*
-	 * IO-APIC RTE will be configured with virtual vector.
-	 * irq handler will do the explicit EOI to the io-apic.
-	 */
-	entry->vector	= attr->ioapic_pin;
-	entry->mask	= 0;			/* enable IRQ */
-	entry->trigger	= attr->trigger;
-	entry->polarity	= attr->polarity;
-
-	/* Mask level triggered irqs.
-	 * Use IRQ_DELAYED_DISABLE for edge triggered irqs.
-	 */
-	if (attr->trigger)
-		entry->mask = 1;
-
-	return 0;
-}
 #else /* !CONFIG_XEN */
 #define __clear_irq_vector(irq, cfg) ((void)0)
 #define ioapic_register_intr(irq, cfg, trigger) evtchn_register_pirq(irq)
@@ -1491,12 +1377,9 @@ static int setup_ioapic_entry(int irq, struct IO_APIC_route_entry *entry,
 			       unsigned int destination, int vector,
 			       struct io_apic_irq_attr *attr)
 {
-#ifndef CONFIG_XEN
-	if (intr_remapping_enabled)
-		return setup_ir_ioapic_entry(irq,
-			 (struct IR_IO_APIC_route_entry *)entry,
-			 destination, vector, attr);
-#endif
+	if (irq_remapping_enabled)
+		return setup_ioapic_remapped_entry(irq, entry, destination,
+						   vector, attr);
 
 	memset(entry, 0, sizeof(*entry));
 
@@ -1708,7 +1591,7 @@ static void __init setup_timer_IRQ0_pin(unsigned int ioapic_idx,
 {
 	struct IO_APIC_route_entry entry;
 
-	if (intr_remapping_enabled)
+	if (irq_remapping_enabled)
 		return;
 
 	memset(&entry, 0, sizeof(entry));
@@ -1794,7 +1677,7 @@ __apicdebuginit(void) print_IO_APIC(int ioapic_idx)
 
 	printk(KERN_DEBUG ".... IRQ redirection table:\n");
 
-	if (intr_remapping_enabled) {
+	if (irq_remapping_enabled) {
 		printk(KERN_DEBUG " NR Indx Fmt Mask Trig IRR"
 			" Pol Stat Indx2 Zero Vect:\n");
 	} else {
@@ -1803,7 +1686,7 @@ __apicdebuginit(void) print_IO_APIC(int ioapic_idx)
 	}
 
 	for (i = 0; i <= reg_01.bits.entries; i++) {
-		if (intr_remapping_enabled) {
+		if (irq_remapping_enabled) {
 			struct IO_APIC_route_entry entry;
 			struct IR_IO_APIC_route_entry *ir_entry;
 
@@ -2170,7 +2053,7 @@ void disable_IO_APIC(void)
 	 * IOAPIC RTE as well as interrupt-remapping table entry).
 	 * As this gets called during crash dump, keep this simple for now.
 	 */
-	if (ioapic_i8259.pin != -1 && !intr_remapping_enabled) {
+	if (ioapic_i8259.pin != -1 && !irq_remapping_enabled) {
 		struct IO_APIC_route_entry entry;
 
 		memset(&entry, 0, sizeof(entry));
@@ -2194,7 +2077,7 @@ void disable_IO_APIC(void)
 	 * Use virtual wire A mode when interrupt remapping is enabled.
 	 */
 	if (cpu_has_apic || apic_from_smp_config())
-		disconnect_bsp_APIC(!intr_remapping_enabled &&
+		disconnect_bsp_APIC(!irq_remapping_enabled &&
 				ioapic_i8259.pin != -1);
 }
 
@@ -2510,71 +2393,6 @@ ioapic_set_affinity(struct irq_data *data, const struct cpumask *mask,
 	return ret;
 }
 
-#ifdef CONFIG_IRQ_REMAP
-
-/*
- * Migrate the IO-APIC irq in the presence of intr-remapping.
- *
- * For both level and edge triggered, irq migration is a simple atomic
- * update(of vector and cpu destination) of IRTE and flush the hardware cache.
- *
- * For level triggered, we eliminate the io-apic RTE modification (with the
- * updated vector information), by using a virtual vector (io-apic pin number).
- * Real vector that is used for interrupting cpu will be coming from
- * the interrupt-remapping table entry.
- *
- * As the migration is a simple atomic update of IRTE, the same mechanism
- * is used to migrate MSI irq's in the presence of interrupt-remapping.
- */
-static int
-ir_ioapic_set_affinity(struct irq_data *data, const struct cpumask *mask,
-		       bool force)
-{
-	struct irq_cfg *cfg = data->chip_data;
-	unsigned int dest, irq = data->irq;
-	struct irte irte;
-
-	if (!cpumask_intersects(mask, cpu_online_mask))
-		return -EINVAL;
-
-	if (get_irte(irq, &irte))
-		return -EBUSY;
-
-	if (assign_irq_vector(irq, cfg, mask))
-		return -EBUSY;
-
-	dest = apic->cpu_mask_to_apicid_and(cfg->domain, mask);
-
-	irte.vector = cfg->vector;
-	irte.dest_id = IRTE_DEST(dest);
-
-	/*
-	 * Atomically updates the IRTE with the new destination, vector
-	 * and flushes the interrupt entry cache.
-	 */
-	modify_irte(irq, &irte);
-
-	/*
-	 * After this point, all the interrupts will start arriving
-	 * at the new destination. So, time to cleanup the previous
-	 * vector allocation.
-	 */
-	if (cfg->move_in_progress)
-		send_cleanup_vector(cfg);
-
-	cpumask_copy(data->affinity, mask);
-	return 0;
-}
-
-#else
-static inline int
-ir_ioapic_set_affinity(struct irq_data *data, const struct cpumask *mask,
-		       bool force)
-{
-	return 0;
-}
-#endif
-
 asmlinkage void smp_irq_move_cleanup_interrupt(void)
 {
 	unsigned vector, me;
@@ -2672,6 +2490,31 @@ static void ack_apic_edge(struct irq_data *data)
 atomic_t irq_mis_count;
 
 #ifdef CONFIG_GENERIC_PENDING_IRQ
+#ifndef CONFIG_XEN
+static bool io_apic_level_ack_pending(struct irq_cfg *cfg)
+{
+	struct irq_pin_list *entry;
+	unsigned long flags;
+
+	raw_spin_lock_irqsave(&ioapic_lock, flags);
+	for_each_irq_pin(entry, cfg->irq_2_pin) {
+		unsigned int reg;
+		int pin;
+
+		pin = entry->pin;
+		reg = io_apic_read(entry->apic, 0x10 + pin*2);
+		/* Is the remote IRR bit set? */
+		if (reg & IO_APIC_REDIR_REMOTE_IRR) {
+			raw_spin_unlock_irqrestore(&ioapic_lock, flags);
+			return true;
+		}
+	}
+	raw_spin_unlock_irqrestore(&ioapic_lock, flags);
+
+	return false;
+}
+#endif
+
 static inline bool ioapic_irqd_mask(struct irq_data *data, struct irq_cfg *cfg)
 {
 	/* If we are moving the irq we need to mask it */
@@ -2819,7 +2662,7 @@ static void irq_remap_modify_chip_defaults(struct irq_chip *chip)
 	chip->irq_eoi = ir_ack_apic_level;
 
 #ifdef CONFIG_SMP
-	chip->irq_set_affinity = ir_ioapic_set_affinity;
+	chip->irq_set_affinity = set_remapped_irq_affinity;
 #endif
 }
 #endif /* CONFIG_IRQ_REMAP */
@@ -3038,7 +2881,7 @@ static inline void __init check_timer(void)
 	 * 8259A.
 	 */
 	if (pin1 == -1) {
-		if (intr_remapping_enabled)
+		if (irq_remapping_enabled)
 			panic("BIOS bug: timer not connected to IO-APIC");
 		pin1 = pin2;
 		apic1 = apic2;
@@ -3071,7 +2914,7 @@ static inline void __init check_timer(void)
 				clear_IO_APIC_pin(0, pin1);
 			goto out;
 		}
-		if (intr_remapping_enabled)
+		if (irq_remapping_enabled)
 			panic("timer doesn't work through Interrupt-remapped IO-APIC");
 		local_irq_disable();
 		clear_IO_APIC_pin(apic1, pin1);
@@ -3309,7 +3152,7 @@ void destroy_irq(unsigned int irq)
 	irq_set_status_flags(irq, IRQ_NOREQUEST|IRQ_NOPROBE);
 
 	if (irq_remapped(cfg))
-		free_irte(irq);
+		free_remapped_irq(irq);
 	raw_spin_lock_irqsave(&vector_lock, flags);
 	__clear_irq_vector(irq, cfg);
 	raw_spin_unlock_irqrestore(&vector_lock, flags);
@@ -3339,54 +3182,34 @@ static int msi_compose_msg(struct pci_dev *pdev, unsigned int irq,
 	dest = apic->cpu_mask_to_apicid_and(cfg->domain, apic->target_cpus());
 
 	if (irq_remapped(cfg)) {
-		struct irte irte;
-		int ir_index;
-		u16 sub_handle;
-
-		ir_index = map_irq_to_irte_handle(irq, &sub_handle);
-		BUG_ON(ir_index == -1);
-
-		prepare_irte(&irte, cfg->vector, dest);
-
-		/* Set source-id of interrupt request */
-		if (pdev)
-			set_msi_sid(&irte, pdev);
-		else
-			set_hpet_sid(&irte, hpet_id);
-
-		modify_irte(irq, &irte);
-
-		msg->address_hi = MSI_ADDR_BASE_HI;
-		msg->data = sub_handle;
-		msg->address_lo = MSI_ADDR_BASE_LO | MSI_ADDR_IR_EXT_INT |
-				  MSI_ADDR_IR_SHV |
-				  MSI_ADDR_IR_INDEX1(ir_index) |
-				  MSI_ADDR_IR_INDEX2(ir_index);
-	} else {
-		if (x2apic_enabled())
-			msg->address_hi = MSI_ADDR_BASE_HI |
-					  MSI_ADDR_EXT_DEST_ID(dest);
-		else
-			msg->address_hi = MSI_ADDR_BASE_HI;
-
-		msg->address_lo =
-			MSI_ADDR_BASE_LO |
-			((apic->irq_dest_mode == 0) ?
-				MSI_ADDR_DEST_MODE_PHYSICAL:
-				MSI_ADDR_DEST_MODE_LOGICAL) |
-			((apic->irq_delivery_mode != dest_LowestPrio) ?
-				MSI_ADDR_REDIRECTION_CPU:
-				MSI_ADDR_REDIRECTION_LOWPRI) |
-			MSI_ADDR_DEST_ID(dest);
-
-		msg->data =
-			MSI_DATA_TRIGGER_EDGE |
-			MSI_DATA_LEVEL_ASSERT |
-			((apic->irq_delivery_mode != dest_LowestPrio) ?
-				MSI_DATA_DELIVERY_FIXED:
-				MSI_DATA_DELIVERY_LOWPRI) |
-			MSI_DATA_VECTOR(cfg->vector);
+		compose_remapped_msi_msg(pdev, irq, dest, msg, hpet_id);
+		return err;
 	}
+
+	if (x2apic_enabled())
+		msg->address_hi = MSI_ADDR_BASE_HI |
+				  MSI_ADDR_EXT_DEST_ID(dest);
+	else
+		msg->address_hi = MSI_ADDR_BASE_HI;
+
+	msg->address_lo =
+		MSI_ADDR_BASE_LO |
+		((apic->irq_dest_mode == 0) ?
+			MSI_ADDR_DEST_MODE_PHYSICAL:
+			MSI_ADDR_DEST_MODE_LOGICAL) |
+		((apic->irq_delivery_mode != dest_LowestPrio) ?
+			MSI_ADDR_REDIRECTION_CPU:
+			MSI_ADDR_REDIRECTION_LOWPRI) |
+		MSI_ADDR_DEST_ID(dest);
+
+	msg->data =
+		MSI_DATA_TRIGGER_EDGE |
+		MSI_DATA_LEVEL_ASSERT |
+		((apic->irq_delivery_mode != dest_LowestPrio) ?
+			MSI_DATA_DELIVERY_FIXED:
+			MSI_DATA_DELIVERY_LOWPRI) |
+		MSI_DATA_VECTOR(cfg->vector);
+
 	return err;
 }
 
@@ -3429,33 +3252,6 @@ static struct irq_chip msi_chip = {
 	.irq_retrigger		= ioapic_retrigger_irq,
 };
 
-/*
- * Map the PCI dev to the corresponding remapping hardware unit
- * and allocate 'nvec' consecutive interrupt-remapping table entries
- * in it.
- */
-static int msi_alloc_irte(struct pci_dev *dev, int irq, int nvec)
-{
-	struct intel_iommu *iommu;
-	int index;
-
-	iommu = map_dev_to_ir(dev);
-	if (!iommu) {
-		printk(KERN_ERR
-		       "Unable to map PCI %s to iommu\n", pci_name(dev));
-		return -ENOENT;
-	}
-
-	index = alloc_irte(iommu, irq, nvec);
-	if (index < 0) {
-		printk(KERN_ERR
-		       "Unable to allocate %d IRTE for PCI %s\n", nvec,
-		       pci_name(dev));
-		return -ENOSPC;
-	}
-	return index;
-}
-
 static int setup_msi_irq(struct pci_dev *dev, struct msi_desc *msidesc, int irq)
 {
 	struct irq_chip *chip = &msi_chip;
@@ -3486,7 +3282,6 @@ int native_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
 	int node, ret, sub_handle, index = 0;
 	unsigned int irq, irq_want;
 	struct msi_desc *msidesc;
-	struct intel_iommu *iommu = NULL;
 
 	/* x86 doesn't support multiple MSI yet */
 	if (type == PCI_CAP_ID_MSI && nvec > 1)
@@ -3500,7 +3295,7 @@ int native_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
 		if (irq == 0)
 			return -1;
 		irq_want = irq + 1;
-		if (!intr_remapping_enabled)
+		if (!irq_remapping_enabled)
 			goto no_ir;
 
 		if (!sub_handle) {
@@ -3508,23 +3303,16 @@ int native_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
 			 * allocate the consecutive block of IRTE's
 			 * for 'nvec'
 			 */
-			index = msi_alloc_irte(dev, irq, nvec);
+			index = msi_alloc_remapped_irq(dev, irq, nvec);
 			if (index < 0) {
 				ret = index;
 				goto error;
 			}
 		} else {
-			iommu = map_dev_to_ir(dev);
-			if (!iommu) {
-				ret = -ENOENT;
+			ret = msi_setup_remapped_irq(dev, irq, index,
+						     sub_handle);
+			if (ret < 0)
 				goto error;
-			}
-			/*
-			 * setup the mapping between the irq and the IRTE
-			 * base index, the sub_handle pointing to the
-			 * appropriate interrupt remap table entry.
-			 */
-			set_irte_irq(irq, iommu, index, sub_handle);
 		}
 no_ir:
 		ret = setup_msi_irq(dev, msidesc, irq);
@@ -3642,15 +3430,8 @@ int arch_setup_hpet_msi(unsigned int irq, unsigned int id)
 	struct msi_msg msg;
 	int ret;
 
-	if (intr_remapping_enabled) {
-		struct intel_iommu *iommu = map_hpet_to_ir(id);
-		int index;
-
-		if (!iommu)
-			return -1;
-
-		index = alloc_irte(iommu, irq, 1);
-		if (index < 0)
+	if (irq_remapping_enabled) {
+		if (!setup_hpet_msi_remapped(irq, id))
 			return -1;
 	}
 
@@ -4043,8 +3824,8 @@ void __init setup_ioapic_dest(void)
 		else
 			mask = apic->target_cpus();
 
-		if (intr_remapping_enabled)
-			ir_ioapic_set_affinity(idata, mask, false);
+		if (irq_remapping_enabled)
+			set_remapped_irq_affinity(idata, mask, false);
 		else
 			ioapic_set_affinity(idata, mask, false);
 	}
@@ -4086,12 +3867,7 @@ static struct resource * __init ioapic_setup_resources(int nr_ioapics)
 	return res;
 }
 
-void __init ioapic_and_gsi_init(void)
-{
-	io_apic_ops.init();
-}
-
-static void __init __ioapic_init_mappings(void)
+void __init native_io_apic_init_mappings(void)
 {
 	unsigned long ioapic_phys, idx = FIX_IO_APIC_BASE_0;
 	struct resource *ioapic_res;

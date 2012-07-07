@@ -49,9 +49,6 @@ extern shared_info_t *HYPERVISOR_shared_info;
 DECLARE_PER_CPU(struct vcpu_info, vcpu_info);
 # define vcpu_info(cpu) (&per_cpu(vcpu_info, cpu))
 # define current_vcpu_info() (&__get_cpu_var(vcpu_info))
-# define vcpu_info_read(fld) percpu_read(vcpu_info.fld)
-# define vcpu_info_write(fld, val) percpu_write(vcpu_info.fld, val)
-# define vcpu_info_xchg(fld, val) percpu_xchg(vcpu_info.fld, val)
 void setup_vcpu_info(unsigned int cpu);
 void adjust_boot_vcpu_info(void);
 #elif defined(CONFIG_XEN)
@@ -62,8 +59,6 @@ void adjust_boot_vcpu_info(void);
 # else
 #  define current_vcpu_info() vcpu_info(0)
 # endif
-# define vcpu_info_read(fld) (current_vcpu_info()->fld)
-# define vcpu_info_write(fld, val) (current_vcpu_info()->fld = (val))
 static inline void setup_vcpu_info(unsigned int cpu) {}
 #endif
 
@@ -173,16 +168,16 @@ int __must_check xen_multi_mmuext_op(struct mmuext_op *, unsigned int count,
 #define __HAVE_ARCH_ENTER_LAZY_MMU_MODE
 static inline void arch_enter_lazy_mmu_mode(void)
 {
-	percpu_write(xen_lazy_mmu, true);
+	this_cpu_write_1(xen_lazy_mmu, true);
 }
 
 static inline void arch_leave_lazy_mmu_mode(void)
 {
-	percpu_write(xen_lazy_mmu, false);
+	this_cpu_write_1(xen_lazy_mmu, false);
 	xen_multicall_flush();
 }
 
-#define arch_use_lazy_mmu_mode() unlikely(percpu_read(xen_lazy_mmu))
+#define arch_use_lazy_mmu_mode() unlikely(this_cpu_read_1(xen_lazy_mmu))
 
 #if 0 /* All uses are in places potentially called asynchronously, but
        * asynchronous code should rather not make use of lazy mode at all.
@@ -366,6 +361,14 @@ MULTI_mmu_update(multicall_entry_t *mcl, mmu_update_t *req,
 }
 
 static inline void
+MULTI_memory_op(multicall_entry_t *mcl, unsigned int cmd, void *arg)
+{
+	mcl->op = __HYPERVISOR_memory_op;
+	mcl->args[0] = cmd;
+	mcl->args[1] = (unsigned long)arg;
+}
+
+static inline void
 MULTI_grant_table_op(multicall_entry_t *mcl, unsigned int cmd,
 		     void *uop, unsigned int count)
 {
@@ -378,8 +381,15 @@ MULTI_grant_table_op(multicall_entry_t *mcl, unsigned int cmd,
 #else /* !defined(CONFIG_XEN) */
 
 /* Multicalls not supported for HVM guests. */
-#define MULTI_update_va_mapping(a,b,c,d) ((void)0)
-#define MULTI_grant_table_op(a,b,c,d) ((void)0)
+static inline void MULTI_bug(multicall_entry_t *mcl, ...)
+{
+	BUG_ON(mcl);
+}
+
+#define MULTI_update_va_mapping	MULTI_bug
+#define MULTI_mmu_update	MULTI_bug
+#define MULTI_memory_op		MULTI_bug
+#define MULTI_grant_table_op	MULTI_bug
 
 #endif
 

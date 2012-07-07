@@ -34,6 +34,8 @@
 #ifndef _XENBUS_PROBE_H
 #define _XENBUS_PROBE_H
 
+#include <linux/kconfig.h>
+
 #ifndef BUS_ID_SIZE
 #define XEN_BUS_ID_SIZE			20
 #else
@@ -47,7 +49,7 @@
 #define dev_name(dev) ((dev)->bus_id)
 #endif
 
-#if defined(CONFIG_XEN_BACKEND) || defined(CONFIG_XEN_BACKEND_MODULE)
+#if IS_ENABLED(CONFIG_XEN_BACKEND)
 extern void xenbus_backend_suspend(int (*fn)(struct device *, void *));
 extern void xenbus_backend_resume(int (*fn)(struct device *, void *));
 extern void xenbus_backend_probe_and_watch(void);

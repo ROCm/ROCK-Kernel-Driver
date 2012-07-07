@@ -9,6 +9,8 @@
  *	2 of the License, or (at your option) any later version.
  */
 
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
 #include <linux/module.h>
 #include <linux/skbuff.h>
 #include <linux/socket.h>
@@ -115,21 +117,14 @@ static void l2tp_eth_dev_recv(struct l2tp_session *session, struct sk_buff *skb,
 
 	if (session->debug & L2TP_MSG_DATA) {
 		unsigned int length;
-		int offset;
 		u8 *ptr = skb->data;
 
 		length = min(32u, skb->len);
 		if (!pskb_may_pull(skb, length))
 			goto error;
 
-		printk(KERN_DEBUG "%s: eth recv: ", session->name);
-
-		offset = 0;
-		do {
-			printk(" %02X", ptr[offset]);
-		} while (++offset < length);
-
-		printk("\n");
+		pr_debug("%s: eth recv\n", session->name);
+		print_hex_dump_bytes("", DUMP_PREFIX_OFFSET, ptr, length);
 	}
 
 	if (!pskb_may_pull(skb, sizeof(ETH_HLEN)))
@@ -167,6 +162,7 @@ static void l2tp_eth_delete(struct l2tp_session *session)
 		if (dev) {
 			unregister_netdev(dev);
 			spriv->dev = NULL;
+			module_put(THIS_MODULE);
 		}
 	}
 }
@@ -254,6 +250,7 @@ static int l2tp_eth_create(struct net *net, u32 tunnel_id, u32 session_id, u32 p
 	if (rc < 0)
 		goto out_del_dev;
 
+	__module_get(THIS_MODULE);
 	/* Must be done after register_netdev() */
 	strlcpy(session->ifname, dev->name, IFNAMSIZ);
 
@@ -308,7 +305,7 @@ static int __init l2tp_eth_init(void)
 	if (err)
 		goto out_unreg;
 
-	printk(KERN_INFO "L2TP ethernet pseudowire support (L2TPv3)\n");
+	pr_info("L2TP ethernet pseudowire support (L2TPv3)\n");
 
 	return 0;
 

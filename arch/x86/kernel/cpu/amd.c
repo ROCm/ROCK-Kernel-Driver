@@ -592,6 +592,7 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 		}
 	}
 
+#ifndef CONFIG_XEN
 	/* re-enable TopologyExtensions if switched off by BIOS */
 	if ((c->x86 == 0x15) &&
 	    (c->x86_model >= 0x10) && (c->x86_model <= 0x1f) &&
@@ -609,6 +610,7 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 			}
 		}
 	}
+#endif
 
 	cpu_detect_cache_sizes(c);
 

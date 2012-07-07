@@ -49,6 +49,7 @@
 #include <linux/major.h>
 #include <linux/mutex.h>
 #include <asm/hypervisor.h>
+#include <xen/barrier.h>
 #include <xen/xenbus.h>
 #include <xen/gnttab.h>
 #include <xen/interface/xen.h>

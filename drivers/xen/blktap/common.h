@@ -31,6 +31,7 @@
 #include <linux/slab.h>
 #include <linux/blkdev.h>
 #include <asm/hypervisor.h>
+#include <xen/barrier.h>
 #include <xen/blkif.h>
 #include <xen/xenbus.h>
 #include <xen/interface/event_channel.h>

@@ -12,7 +12,7 @@ DECLARE_PER_CPU(int, cpu_number);
  * from the initial startup. We map APIC_BASE very early in page_setup(),
  * so this is correct in the x86 case.
  */
-#define raw_smp_processor_id() percpu_read(cpu_number)
+#define raw_smp_processor_id() this_cpu_read_4(cpu_number)
 #define safe_smp_processor_id() smp_processor_id()
 
 #ifdef CONFIG_X86_64_SMP

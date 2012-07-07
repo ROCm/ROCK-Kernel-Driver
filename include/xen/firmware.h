@@ -1,7 +1,9 @@
 #ifndef __XEN_FIRMWARE_H__
 #define __XEN_FIRMWARE_H__
 
-#if defined(CONFIG_EDD) || defined(CONFIG_EDD_MODULE)
+#include <linux/kconfig.h>
+
+#if IS_ENABLED(CONFIG_EDD)
 void copy_edd(void);
 #endif
 

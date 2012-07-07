@@ -10,8 +10,8 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/device.h>
-#include <linux/io.h>
 #include <linux/sysfs.h>
+#include <linux/io.h>
 #include <acpi/acpi.h>
 #include <acpi/acpi_bus.h>
 

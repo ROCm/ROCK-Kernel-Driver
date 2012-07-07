@@ -131,6 +131,7 @@ void *dma_generic_alloc_coherent(struct device *dev, size_t size,
 {
 	unsigned long dma_mask;
 	struct page *page;
+	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
 #ifndef CONFIG_XEN
 	dma_addr_t addr;
 #else
@@ -146,7 +147,11 @@ again:
 #else
 	flag &= ~(__GFP_DMA | __GFP_DMA32);
 #endif
-	page = alloc_pages_node(dev_to_node(dev), flag, order);
+	page = NULL;
+	if (!(flag & GFP_ATOMIC))
+		page = dma_alloc_from_contiguous(dev, count, order);
+	if (!page)
+		page = alloc_pages_node(dev_to_node(dev), flag, order);
 	if (!page)
 		return NULL;
 
@@ -178,17 +183,20 @@ again:
 #endif
 }
 
-#ifdef CONFIG_XEN
 void dma_generic_free_coherent(struct device *dev, size_t size, void *vaddr,
 			       dma_addr_t dma_addr, struct dma_attrs *attrs)
 {
-	unsigned int order = get_order(size);
-	unsigned long va = (unsigned long)vaddr;
+	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+	struct page *page = virt_to_page(vaddr);
 
-	xen_destroy_contiguous_region(va, order);
-	free_pages(va, order);
+	if (!dma_release_from_contiguous(dev, page, count)) {
+		unsigned int order = get_order(size);
+		unsigned long va = (unsigned long)vaddr;
+
+		xen_destroy_contiguous_region(va, order);
+		free_pages(va, order);
+	}
 }
-#endif
 
 /*
  * See <Documentation/x86/x86_64/boot-options.txt> for the iommu kernel

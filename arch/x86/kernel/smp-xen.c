@@ -109,6 +109,9 @@
  *	about nothing of note with C stepping upwards.
  */
 
+static atomic_t stopping_cpu = ATOMIC_INIT(-1);
+static bool smp_no_nmi_ipi = false;
+
 /*
  * this function sends a 'reschedule' IPI to another CPU.
  * it goes straight through and wastes no time serializing
@@ -132,9 +135,6 @@ void xen_send_call_func_ipi(const struct cpumask *mask)
 {
 	xen_send_IPI_mask_allbutself(mask, CALL_FUNCTION_VECTOR);
 }
-
-static atomic_t stopping_cpu = ATOMIC_INIT(-1);
-static bool __read_mostly xen_smp_disable_nmi_ipi;
 
 static int smp_stop_nmi_callback(unsigned int val, struct pt_regs *regs)
 {
@@ -164,34 +164,26 @@ void xen_stop_other_cpus(int wait)
 	/*
 	 * Use an own vector here because smp_call_function
 	 * does lots of things not suitable in a panic situation.
-	 * On most systems we could also use an NMI here,
-	 * but there are a few systems around where NMI
-	 * is problematic so stay with an non NMI for now
-	 * (this implies we cannot stop CPUs spinning with irq off
-	 * currently)
+	 */
+
+	/*
+	 * We start by using the REBOOT_VECTOR irq.
+	 * The irq is treated as a sync point to allow critical
+	 * regions of code on other cpus to release their spin locks
+	 * and re-enable irqs.  Jumping straight to an NMI might
+	 * accidentally cause deadlocks with further shutdown/panic
+	 * code.  By syncing, we give the cpus up to one second to
+	 * finish their work before we force them off with the NMI.
 	 */
 	if (num_online_cpus() > 1) {
-		unsigned int vector = REBOOT_VECTOR;
+		/* did someone beat us here? */
+		if (atomic_cmpxchg(&stopping_cpu, -1, safe_smp_processor_id()) != -1)
+			return;
 
-		if (!xen_smp_disable_nmi_ipi) {
-			/* did someone beat us here? */
-			if (atomic_cmpxchg(&stopping_cpu, -1,
-					   safe_smp_processor_id()) != -1)
-				return;
+		/* sync above data before sending IRQ */
+		wmb();
 
-			if (register_nmi_handler(NMI_LOCAL,
-						 smp_stop_nmi_callback,
-						 NMI_FLAG_FIRST, "smp_stop"))
-				/* Note: we ignore failures here */
-				return;
-
-			/* sync above data before sending NMI */
-			wmb();
-
-			vector = NMI_VECTOR;
-		}
-
-		xen_send_IPI_allbutself(vector);
+		xen_send_IPI_allbutself(REBOOT_VECTOR);
 
 		/*
 		 * Don't wait longer than a second if the caller
@@ -202,6 +194,31 @@ void xen_stop_other_cpus(int wait)
 			udelay(1);
 	}
 
+	/* if the REBOOT_VECTOR didn't work, try with the NMI */
+	if ((num_online_cpus() > 1) && (!smp_no_nmi_ipi))  {
+		if (register_nmi_handler(NMI_LOCAL, smp_stop_nmi_callback,
+					 NMI_FLAG_FIRST, "smp_stop"))
+			/* Note: we ignore failures here */
+			/* Hope the REBOOT_IRQ is good enough */
+			goto finish;
+
+		/* sync above data before sending IRQ */
+		wmb();
+
+		pr_emerg("Shutting down cpus with NMI\n");
+
+		xen_send_IPI_allbutself(NMI_VECTOR);
+
+		/*
+		 * Don't wait longer than 10 ms if the caller
+		 * didn't ask us to wait.
+		 */
+		timeout = USEC_PER_MSEC * 10;
+		while (num_online_cpus() > 1 && (wait || timeout--))
+			udelay(1);
+	}
+
+finish:
 	local_irq_save(flags);
 	disable_all_local_evtchn();
 	local_irq_restore(flags);
@@ -230,8 +247,8 @@ void smp_call_function_single_interrupt(struct pt_regs *regs)
 
 static int __init nonmi_ipi_setup(char *str)
 {
-        xen_smp_disable_nmi_ipi = true;
-        return 1;
+	smp_no_nmi_ipi = true;
+	return 1;
 }
 
 __setup("nonmi_ipi", nonmi_ipi_setup);

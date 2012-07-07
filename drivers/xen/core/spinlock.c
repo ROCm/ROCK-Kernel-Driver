@@ -94,13 +94,13 @@ core_initcall(spinlock_register);
 
 static inline void sequence(unsigned int bias)
 {
-	unsigned int rm_idx = percpu_read(rm_seq.idx);
+	unsigned int rm_idx = __this_cpu_read(rm_seq.idx);
 
 	smp_wmb();
-	percpu_write(rm_seq.idx, (rm_idx + bias) ^ (SEQ_REMOVE_BIAS / 2));
+	__this_cpu_write(rm_seq.idx, (rm_idx + bias) ^ (SEQ_REMOVE_BIAS / 2));
 	smp_mb();
 	rm_idx &= 1;
-	while (percpu_read(rm_seq.ctr[rm_idx].counter))
+	while (__this_cpu_read(rm_seq.ctr[rm_idx].counter))
 		cpu_relax();
 }
 
@@ -137,7 +137,7 @@ static __ticket_t spin_adjust(struct spinning *spinning,
 struct __raw_tickets xen_spin_adjust(const arch_spinlock_t *lock,
 				     struct __raw_tickets token)
 {
-	token.tail = spin_adjust(percpu_read(_spinning), lock, token.tail);
+	token.tail = spin_adjust(__this_cpu_read(_spinning), lock, token.tail);
 	token.head = ACCESS_ONCE(lock->tickets.head);
 	return token;
 }
@@ -166,10 +166,10 @@ static unsigned int ticket_get(arch_spinlock_t *lock, struct spinning *prev)
 
 void xen_spin_irq_enter(void)
 {
-	struct spinning *spinning = percpu_read(_spinning);
+	struct spinning *spinning = __this_cpu_read(_spinning);
 	unsigned int cpu = raw_smp_processor_id();
 
-	percpu_inc(_irq_count);
+	__this_cpu_inc(_irq_count);
 	smp_mb();
 	for (; spinning; spinning = spinning->prev) {
 		arch_spinlock_t *lock = spinning->lock;
@@ -198,7 +198,7 @@ void xen_spin_irq_enter(void)
 
 void xen_spin_irq_exit(void)
 {
-	struct spinning *spinning = percpu_read(_spinning);
+	struct spinning *spinning = __this_cpu_read(_spinning);
 	unsigned int cpu = raw_smp_processor_id();
 	/*
 	 * Despite its counterpart being first in xen_spin_irq_enter() (to make
@@ -207,7 +207,7 @@ void xen_spin_irq_exit(void)
 	 * We're guaranteed to see another invocation of xen_spin_irq_enter()
 	 * if any of the tickets need to be dropped again.
 	 */
-	unsigned int irq_count = this_cpu_dec_return(_irq_count);
+	unsigned int irq_count = __this_cpu_dec_return(_irq_count);
 
 	/*
 	 * Make sure all xen_spin_kick() instances which may still have seen
@@ -246,13 +246,13 @@ unsigned int xen_spin_wait(arch_spinlock_t *lock, struct __raw_tickets *ptok,
 
 	/* If kicker interrupt not initialized yet, just spin. */
 	if (unlikely(!cpu_online(cpu))
-	    || unlikely(!this_cpu_read(poll_evtchn)))
+	    || unlikely(!__this_cpu_read(poll_evtchn)))
 		return UINT_MAX;
 
 	/* announce we're spinning */
 	spinning.ticket = ptok->tail;
 	spinning.lock = lock;
-	spinning.prev = percpu_read(_spinning);
+	spinning.prev = __this_cpu_read(_spinning);
 #if CONFIG_XEN_SPINLOCK_ACQUIRE_NESTING
 	spinning.irq_count = UINT_MAX;
 	if (upcall_mask > flags) {
@@ -268,10 +268,10 @@ unsigned int xen_spin_wait(arch_spinlock_t *lock, struct __raw_tickets *ptok,
 	arch_local_irq_disable();
 #endif
 	smp_wmb();
-	percpu_write(_spinning, &spinning);
+	__this_cpu_write(_spinning, &spinning);
 
 	for (;;) {
-		clear_evtchn(percpu_read(poll_evtchn));
+		clear_evtchn(__this_cpu_read(poll_evtchn));
 
 		/*
 		 * Check again to make sure it didn't become free while
@@ -284,19 +284,19 @@ unsigned int xen_spin_wait(arch_spinlock_t *lock, struct __raw_tickets *ptok,
 			 * without rechecking the lock.
 			 */
 			if (spinning.prev)
-				set_evtchn(percpu_read(poll_evtchn));
+				set_evtchn(__this_cpu_read(poll_evtchn));
 			break;
 		}
 
 #if CONFIG_XEN_SPINLOCK_ACQUIRE_NESTING
 		if (upcall_mask > flags) {
-			spinning.irq_count = percpu_read(_irq_count);
+			spinning.irq_count = __this_cpu_read(_irq_count);
 			smp_wmb();
 			arch_local_irq_restore(flags);
 		}
 #endif
 
-		if (!test_evtchn(percpu_read(poll_evtchn)) &&
+		if (!test_evtchn(__this_cpu_read(poll_evtchn)) &&
 		    HYPERVISOR_poll_no_timeout(&__get_cpu_var(poll_evtchn), 1))
 			BUG();
 
@@ -306,7 +306,7 @@ unsigned int xen_spin_wait(arch_spinlock_t *lock, struct __raw_tickets *ptok,
 		spinning.irq_count = UINT_MAX;
 #endif
 
-		if (test_evtchn(percpu_read(poll_evtchn))) {
+		if (test_evtchn(__this_cpu_read(poll_evtchn))) {
 			inc_irq_stat(irq_lock_count);
 			break;
 		}
@@ -318,7 +318,7 @@ unsigned int xen_spin_wait(arch_spinlock_t *lock, struct __raw_tickets *ptok,
 	 */
 
 	/* announce we're done */
-	percpu_write(_spinning, spinning.prev);
+	__this_cpu_write(_spinning, spinning.prev);
 	if (!CONFIG_XEN_SPINLOCK_ACQUIRE_NESTING)
 		arch_local_irq_disable();
 	sequence(SEQ_REMOVE_BIAS);
