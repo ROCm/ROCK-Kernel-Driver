@@ -1321,7 +1321,7 @@ static struct opal_secondary_data {
 
 extern char opal_secondary_entry;
 
-static void prom_query_opal(void)
+static void __init prom_query_opal(void)
 {
 	long rc;
 
@@ -1445,7 +1445,7 @@ static void __init prom_opal_hold_cpus(void)
 	prom_debug("prom_opal_hold_cpus: end...\n");
 }
 
-static void prom_opal_takeover(void)
+static void __init prom_opal_takeover(void)
 {
 	struct opal_secondary_data *data = &RELOC(opal_secondary_data);
 	struct opal_takeover_args *args = &data->args;
