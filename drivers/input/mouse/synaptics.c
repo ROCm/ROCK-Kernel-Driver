@@ -501,7 +501,7 @@ static bool synaptics_has_led(struct synaptics_data *priv)
 	    SYN_CAP_PRODUCT_ID(priv->ext_cap) != 0x84)
 		return false;
 	if (!(priv->ext_cap_0c & 0x2000) &&
-	    (priv->capabilities & 0xd00ff) != 0xd0073)
+	    (priv->capabilities & 0xd000ff) != 0xd00073)
 		return false;
 	return true;
 }
