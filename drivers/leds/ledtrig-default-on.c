@@ -23,7 +23,7 @@ static void defon_trig_activate(struct led_classdev *led_cdev)
 }
 
 static struct led_trigger defon_led_trigger = {
-	.name     = "default::on",
+	.name     = "default-on",
 	.activate = defon_trig_activate,
 };
 
