@@ -138,7 +138,6 @@ static struct bpt *in_breakpoint_table(unsigned long pc, unsigned long *offp);
 static int  do_step(struct pt_regs *);
 static void bpt_cmds(void);
 static void cacheflush(void);
-static void xmon_show_dmesg(void);
 static int  cpu_cmd(void);
 static void csum(void);
 static void bootcmds(void);
@@ -198,7 +197,6 @@ Commands:\n\
 #endif
   "\
   C	checksum\n\
-  D	show dmesg (printk) buffer\n\
   d	dump bytes\n\
   di	dump instructions\n\
   df	dump float values\n\
@@ -830,9 +828,6 @@ cmds(struct pt_regs *excp)
 			break;
 		case 'd':
 			dump();
-			break;
-		case 'D':
-			xmon_show_dmesg();
 			break;
 		case 'l':
 			symbol_lookup();
@@ -2592,58 +2587,6 @@ static void xmon_print_symbol(unsigned long address, const char *mid,
 			printf(" [%s]", modname);
 	}
 	printf("%s", after);
-}
-
-extern void kdb_syslog_data(char *syslog_data[]);
-#define SYSLOG_WRAP(p) if (p < syslog_data[0]) p = syslog_data[1]-1; \
-	else if (p >= syslog_data[1]) p = syslog_data[0];
-
-static void xmon_show_dmesg(void)
-{
-	char *syslog_data[4], *start, *end, c;
-	int logsize;
-
-	/* syslog_data[0,1] physical start, end+1.
-	 * syslog_data[2,3] logical start, end+1.
-	 */
-	kdb_syslog_data(syslog_data);
-	if (syslog_data[2] == syslog_data[3])
-		return;
-	logsize = syslog_data[1] - syslog_data[0];
-	start = syslog_data[0] + (syslog_data[2] - syslog_data[0]) % logsize;
-	end = syslog_data[0] + (syslog_data[3] - syslog_data[0]) % logsize;
-
-	/* Do a line at a time (max 200 chars) to reduce overhead */
-	c = '\0';
-	while(1) {
-		char *p;
-		int chars = 0;
-		if (!*start) {
-			while (!*start) {
-				++start;
-				SYSLOG_WRAP(start);
-				if (start == end)
-					break;
-			}
-			if (start == end)
-				break;
-		}
-		p = start;
-		while (*start && chars < 200) {
-			c = *start;
-			++chars;
-			++start;
-			SYSLOG_WRAP(start);
-			if (start == end || c == '\n')
-				break;
-		}
-		if (chars)
-			printf("%.*s", chars, p);
-		if (start == end)
-			break;
-	}
-	if (c != '\n')
-		printf("\n");
 }
 
 #ifdef CONFIG_PPC_BOOK3S_64
