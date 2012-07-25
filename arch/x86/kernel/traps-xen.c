@@ -602,6 +602,8 @@ void math_state_restore(void)
 {
 	struct task_struct *tsk = current;
 
+	/* NB. 'clts' is done for us by Xen during virtual trap. */
+	__this_cpu_and(xen_x86_cr0, ~X86_CR0_TS);
 	if (!tsk_used_math(tsk)) {
 		local_irq_enable();
 		/*
@@ -611,13 +613,13 @@ void math_state_restore(void)
 			/*
 			 * ran out of memory!
 			 */
+			stts();
 			do_group_exit(SIGKILL);
 			return;
 		}
 		local_irq_disable();
 	}
 
-	/* NB. 'clts' is done for us by Xen during virtual trap. */
 	xen_thread_fpu_begin(tsk, NULL);
 	/*
 	 * Paranoid restore. send a SIGSEGV if we fail to restore the state.

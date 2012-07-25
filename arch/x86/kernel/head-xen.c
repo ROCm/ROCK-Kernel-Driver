@@ -78,7 +78,7 @@ extern void nmi(void);
 
 unsigned long __initdata xen_initrd_start;
 
-unsigned long *__read_mostly machine_to_phys_mapping =
+const unsigned long *__read_mostly machine_to_phys_mapping =
 	(void *)MACH2PHYS_VIRT_START;
 EXPORT_SYMBOL(machine_to_phys_mapping);
 unsigned long __read_mostly machine_to_phys_nr;
@@ -92,7 +92,7 @@ void __init xen_start_kernel(void)
 	xen_setup_features();
 
 	if (HYPERVISOR_memory_op(XENMEM_machphys_mapping, &mapping) == 0) {
-		machine_to_phys_mapping = (unsigned long *)mapping.v_start;
+		machine_to_phys_mapping = (void *)mapping.v_start;
 		machine_to_phys_nr = mapping.max_mfn + 1;
 	} else
 		machine_to_phys_nr = MACH2PHYS_NR_ENTRIES;

@@ -43,14 +43,14 @@ typedef struct {
 #define XMMS_SAVE				\
 do {						\
 	preempt_disable();			\
+	cr0 = read_cr0();			\
+	clts();					\
 	asm volatile(				\
-		"movq %%cr0,%0		;\n\t"	\
-		"clts			;\n\t"	\
 		"movups %%xmm0,(%1)	;\n\t"	\
 		"movups %%xmm1,0x10(%1)	;\n\t"	\
 		"movups %%xmm2,0x20(%1)	;\n\t"	\
 		"movups %%xmm3,0x30(%1)	;\n\t"	\
-		: "=&r" (cr0)			\
+		: "+r" (cr0)			\
 		: "r" (xmm_save) 		\
 		: "memory");			\
 } while (0)
@@ -63,10 +63,10 @@ do {						\
 		"movups 0x10(%1),%%xmm1	;\n\t"	\
 		"movups 0x20(%1),%%xmm2	;\n\t"	\
 		"movups 0x30(%1),%%xmm3	;\n\t"	\
-		"movq 	%0,%%cr0	;\n\t"	\
 		:				\
 		: "r" (cr0), "r" (xmm_save)	\
 		: "memory");			\
+	write_cr0(cr0);				\
 	preempt_enable();			\
 } while (0)
 

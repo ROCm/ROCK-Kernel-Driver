@@ -3,6 +3,14 @@
 
 #include_next <asm/percpu.h>
 
+#ifdef CONFIG_64BIT
+# define __this_cpu_read_l  __this_cpu_read_8
+# define __this_cpu_write_l __this_cpu_write_8
+#else
+# define __this_cpu_read_l  __this_cpu_read_4
+# define __this_cpu_write_l __this_cpu_write_4
+#endif
+
 #define this_vcpu_read_1 this_cpu_read_1
 #define this_vcpu_read_2 this_cpu_read_2
 #define this_vcpu_read_4 this_cpu_read_4

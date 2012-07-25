@@ -141,6 +141,19 @@ static int addr_to_vsyscall_nr(unsigned long addr)
 	return nr;
 }
 
+#ifdef CONFIG_SECCOMP
+static int vsyscall_seccomp(struct task_struct *tsk, int syscall_nr)
+{
+	if (!seccomp_mode(&tsk->seccomp))
+		return 0;
+	task_pt_regs(tsk)->orig_ax = syscall_nr;
+	task_pt_regs(tsk)->ax = syscall_nr;
+	return __secure_computing(syscall_nr);
+}
+#else
+#define vsyscall_seccomp(_tsk, _nr) 0
+#endif
+
 static bool write_ok_or_segv(unsigned long ptr, size_t size)
 {
 	/*
@@ -176,6 +189,7 @@ bool emulate_vsyscall(struct pt_regs *regs, unsigned long address)
 	int vsyscall_nr;
 	int prev_sig_on_uaccess_error;
 	long ret;
+	int skip;
 
 	/*
 	 * No point in checking CS -- the only way to get here is a user mode
@@ -207,9 +221,6 @@ bool emulate_vsyscall(struct pt_regs *regs, unsigned long address)
 	}
 
 	tsk = current;
-	if (seccomp_mode(&tsk->seccomp))
-		do_exit(SIGKILL);
-
 	/*
 	 * With a real vsyscall, page faults cause SIGSEGV.  We want to
 	 * preserve that behavior to make writing exploits harder.
@@ -224,8 +235,13 @@ bool emulate_vsyscall(struct pt_regs *regs, unsigned long address)
 	 * address 0".
 	 */
 	ret = -EFAULT;
+	skip = 0;
 	switch (vsyscall_nr) {
 	case 0:
+		skip = vsyscall_seccomp(tsk, __NR_gettimeofday);
+		if (skip)
+			break;
+
 		if (!write_ok_or_segv(regs->di, sizeof(struct timeval)) ||
 		    !write_ok_or_segv(regs->si, sizeof(struct timezone)))
 			break;
@@ -236,6 +252,10 @@ bool emulate_vsyscall(struct pt_regs *regs, unsigned long address)
 		break;
 
 	case 1:
+		skip = vsyscall_seccomp(tsk, __NR_time);
+		if (skip)
+			break;
+
 		if (!write_ok_or_segv(regs->di, sizeof(time_t)))
 			break;
 
@@ -243,6 +263,10 @@ bool emulate_vsyscall(struct pt_regs *regs, unsigned long address)
 		break;
 
 	case 2:
+		skip = vsyscall_seccomp(tsk, __NR_getcpu);
+		if (skip)
+			break;
+
 		if (!write_ok_or_segv(regs->di, sizeof(unsigned)) ||
 		    !write_ok_or_segv(regs->si, sizeof(unsigned)))
 			break;
@@ -257,6 +281,12 @@ bool emulate_vsyscall(struct pt_regs *regs, unsigned long address)
 	}
 
 	current_thread_info()->sig_on_uaccess_error = prev_sig_on_uaccess_error;
+
+	if (skip) {
+		if ((long)regs->ax <= 0L) /* seccomp errno emulation */
+			goto do_ret;
+		goto done; /* seccomp trace/trap */
+	}
 
 	if (ret == -EFAULT) {
 		/* Bad news -- userspace fed a bad pointer to a vsyscall. */
@@ -276,10 +306,11 @@ bool emulate_vsyscall(struct pt_regs *regs, unsigned long address)
 
 	regs->ax = ret;
 
+do_ret:
 	/* Emulate a ret instruction. */
 	regs->ip = caller;
 	regs->sp += 8;
-
+done:
 	return true;
 
 sigsegv:

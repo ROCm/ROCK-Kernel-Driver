@@ -317,8 +317,17 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	BUG_ON(pdo > _pdo + ARRAY_SIZE(_pdo));
 #endif
 	BUG_ON(mcl > _mcl + ARRAY_SIZE(_mcl));
+	if (_mcl->op == __HYPERVISOR_fpu_taskswitch)
+		__this_cpu_write(xen_x86_cr0_upd, X86_CR0_TS);
 	if (unlikely(HYPERVISOR_multicall_check(_mcl, mcl - _mcl, NULL)))
 		BUG();
+	if (_mcl->op == __HYPERVISOR_fpu_taskswitch) {
+		if (_mcl->args[0])
+			__this_cpu_or(xen_x86_cr0, X86_CR0_TS);
+		else
+			__this_cpu_and(xen_x86_cr0, X86_CR0_TS);
+		xen_clear_cr0_upd();
+	}
 
 	/*
 	 * Now maybe handle debug registers

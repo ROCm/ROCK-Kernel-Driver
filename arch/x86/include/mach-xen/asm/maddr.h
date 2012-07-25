@@ -23,11 +23,11 @@ typedef unsigned long maddr_t;
 #ifdef CONFIG_XEN
 
 extern unsigned long *phys_to_machine_mapping;
-extern unsigned long  max_mapnr;
+extern unsigned long max_mapnr;
 
 #undef machine_to_phys_mapping
-extern unsigned long *machine_to_phys_mapping;
-extern unsigned long  machine_to_phys_nr;
+extern const unsigned long *machine_to_phys_mapping;
+extern unsigned long machine_to_phys_nr;
 
 static inline unsigned long pfn_to_mfn(unsigned long pfn)
 {

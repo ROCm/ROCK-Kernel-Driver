@@ -150,6 +150,13 @@ DEFINE_PER_CPU_PAGE_ALIGNED(struct gdt_page, gdt_page) = { .gdt = {
 } };
 EXPORT_PER_CPU_SYMBOL_GPL(gdt_page);
 
+#ifdef CONFIG_XEN
+DEFINE_PER_CPU(unsigned long, xen_x86_cr0);
+DEFINE_PER_CPU(unsigned long, xen_x86_cr0_upd) = ~0;
+EXPORT_PER_CPU_SYMBOL(xen_x86_cr0);
+EXPORT_PER_CPU_SYMBOL(xen_x86_cr0_upd);
+#endif
+
 static int __init x86_xsave_setup(char *s)
 {
 	setup_clear_cpu_cap(X86_FEATURE_XSAVE);
@@ -389,6 +396,10 @@ void __ref load_percpu_segment(int cpu)
 			(unsigned long)per_cpu(irq_stack_union.gs_base, cpu)))
 		BUG();
 #endif
+#endif
+#ifdef CONFIG_XEN
+	__this_cpu_write(xen_x86_cr0, native_read_cr0());
+	xen_clear_cr0_upd();
 #endif
 	load_stack_canary_segment();
 }
