@@ -145,8 +145,6 @@ struct synaptics_hw_state {
 	struct synaptics_mt_state mt_state;
 };
 
-struct synaptics_led;
-
 struct synaptics_data {
 	/* Data read from the touchpad */
 	unsigned long int model_id;		/* Model-ID */
@@ -176,7 +174,6 @@ struct synaptics_data {
 	 */
 	struct synaptics_hw_state agm;
 	bool agm_pending;			/* new AGM packet received */
-	struct synaptics_led *led;
 };
 
 void synaptics_module_init(void);
