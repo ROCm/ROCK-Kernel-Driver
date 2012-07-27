@@ -569,14 +569,14 @@ static void splash_free(struct vc_data *vc, struct fb_info *info)
 		sd->pic->ref_cnt--;
 		if (!sd->pic->ref_cnt) {
 			vfree(sd->pic->splash_pic);
-			vfree(sd->pic);
+			kfree(sd->pic);
 		}
 		sd->imgd->ref_cnt--;
 		if (!sd->imgd->ref_cnt) {
 			vfree(sd->imgd->splash_sboxes);
 			vfree(sd->imgd);
 		}
-		vfree(sd);
+		kfree(sd);
 	}
 	vc->vc_splash_data = 0;
 	if (info)
@@ -920,13 +920,13 @@ static int splash_getraw(unsigned char *start, unsigned char *end, int *update)
 		imgd = vmalloc(sizeof(*imgd)
 			       + splash_size + (version < 3 ? 2 * 12 : 0));
 		if (!imgd) {
-			vfree(sd);
+			kfree(sd);
 			break;
 		}
 		pic = kzalloc(sizeof(*pic), GFP_KERNEL);
 		if (!pic) {
-			vfree(sd);
-			vfree(pic);
+			kfree(sd);
+			kfree(pic);
 			break;
 		}
 		memset(imgd, 0, sizeof(*imgd));
@@ -941,7 +941,7 @@ static int splash_getraw(unsigned char *start, unsigned char *end, int *update)
 				      imgd->splash_height)) {
 			ndata += len + splash_size - 1;
 			vfree(imgd);
-			vfree(sd);
+			kfree(sd);
 			continue;
 		}
 		if (silentsize) {
@@ -1764,7 +1764,7 @@ static int splash_write_proc(struct file *file, const char *buffer,
 			for (sd = vc_splash_data; sd; sd = sd->next) {
 				sd->imgd->splash_silentjpeg = 0;
 				vfree(sd->imgd->splash_sboxes);
-				sd->imgd->splash_sboxes = 0;
+				sd->imgd->splash_sboxes = NULL;
 				sd->imgd->splash_sboxcount = 0;
 			}
 			if (vc_splash_data->splash_dosilent)
