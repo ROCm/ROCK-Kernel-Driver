@@ -458,10 +458,8 @@ static void __cpuinit early_init_amd(struct cpuinfo_x86 *c)
 	if (c->x86_power & (1 << 8)) {
 		set_cpu_cap(c, X86_FEATURE_CONSTANT_TSC);
 		set_cpu_cap(c, X86_FEATURE_NONSTOP_TSC);
-#ifndef CONFIG_XEN
 		if (!check_tsc_unstable())
 			sched_clock_stable = 1;
-#endif
 	}
 
 #ifdef CONFIG_X86_64

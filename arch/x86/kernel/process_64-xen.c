@@ -278,7 +278,7 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 {
 	struct thread_struct *prev = &prev_p->thread;
 	struct thread_struct *next = &next_p->thread;
-	int cpu = smp_processor_id();
+	int cpu = smp_processor_id(), cr0_ts;
 #ifndef CONFIG_X86_NO_TSS
 	struct tss_struct *tss = &per_cpu(init_tss, cpu);
 #endif
@@ -355,15 +355,18 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	BUG_ON(pdo > _pdo + ARRAY_SIZE(_pdo));
 #endif
 	BUG_ON(mcl > _mcl + ARRAY_SIZE(_mcl));
-	if (_mcl->op == __HYPERVISOR_fpu_taskswitch)
+	if (_mcl->op == __HYPERVISOR_fpu_taskswitch) {
 		__this_cpu_write(xen_x86_cr0_upd, X86_CR0_TS);
+		cr0_ts = _mcl->args[0] ? 1 : -1;
+	} else
+		cr0_ts = 0;
 	if (unlikely(HYPERVISOR_multicall_check(_mcl, mcl - _mcl, NULL)))
 		BUG();
-	if (_mcl->op == __HYPERVISOR_fpu_taskswitch) {
-		if (_mcl->args[0])
+	if (cr0_ts) {
+		if (cr0_ts > 0)
 			__this_cpu_or(xen_x86_cr0, X86_CR0_TS);
 		else
-			__this_cpu_and(xen_x86_cr0, X86_CR0_TS);
+			__this_cpu_and(xen_x86_cr0, ~X86_CR0_TS);
 		xen_clear_cr0_upd();
 	}
 

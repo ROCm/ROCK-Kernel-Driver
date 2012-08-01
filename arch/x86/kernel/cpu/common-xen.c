@@ -657,6 +657,9 @@ void __cpuinit get_cpu_cap(struct cpuinfo_x86 *c)
 
 	if (c->extended_cpuid_level >= 0x80000007)
 		c->x86_power = cpuid_edx(0x80000007);
+#ifdef CONFIG_XEN /* hide Invariant TSC flag */
+	c->x86_power &= ~(1 << 8);
+#endif
 
 	init_scattered_cpuid_features(c);
 }
