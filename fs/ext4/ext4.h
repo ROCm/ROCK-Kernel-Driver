@@ -927,6 +927,10 @@ struct ext4_inode_info {
 
 	/* Precomputed uuid+inum+igen checksum for seeding inode checksums */
 	__u32 i_csum_seed;
+#ifdef CONFIG_EXT4_FS_RICHACL
+	struct richacl   *i_richacl;
+#endif
+
 };
 
 /*
