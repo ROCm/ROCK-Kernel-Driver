@@ -107,9 +107,6 @@ static const struct xattr_handler *ext4_xattr_handler_map[] = {
 #ifdef CONFIG_EXT4_FS_SECURITY
 	[EXT4_XATTR_INDEX_SECURITY]	     = &ext4_xattr_security_handler,
 #endif
-#ifdef CONFIG_EXT4_FS_RICHACL
-	[EXT4_XATTR_INDEX_RICHACL]           = &ext4_richacl_xattr_handler,
-#endif
 };
 
 const struct xattr_handler *ext4_xattr_handlers[] = {
@@ -122,9 +119,6 @@ const struct xattr_handler *ext4_xattr_handlers[] = {
 #ifdef CONFIG_EXT4_FS_SECURITY
 	&ext4_xattr_security_handler,
 #endif
-#ifdef CONFIG_EXT4_FS_RICHACL
-	&ext4_richacl_xattr_handler,
-#endif
 	NULL
 };
 
@@ -133,19 +127,16 @@ static __le32 ext4_xattr_block_csum(struct inode *inode,
 				    struct ext4_xattr_header *hdr)
 {
 	struct ext4_sb_info *sbi = EXT4_SB(inode->i_sb);
-	struct ext4_inode_info *ei = EXT4_I(inode);
 	__u32 csum, old;
 
 	old = hdr->h_checksum;
 	hdr->h_checksum = 0;
-	if (le32_to_cpu(hdr->h_refcount) != 1) {
-		block_nr = cpu_to_le64(block_nr);
-		csum = ext4_chksum(sbi, sbi->s_csum_seed, (__u8 *)&block_nr,
-				   sizeof(block_nr));
-	} else
-		csum = ei->i_csum_seed;
+	block_nr = cpu_to_le64(block_nr);
+	csum = ext4_chksum(sbi, sbi->s_csum_seed, (__u8 *)&block_nr,
+			   sizeof(block_nr));
 	csum = ext4_chksum(sbi, csum, (__u8 *)hdr,
 			   EXT4_BLOCK_SIZE(inode->i_sb));
+
 	hdr->h_checksum = old;
 	return cpu_to_le32(csum);
 }

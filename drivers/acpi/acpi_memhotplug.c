@@ -88,14 +88,6 @@ struct acpi_memory_device {
 
 static int acpi_hotmem_initialized;
 
-#ifdef CONFIG_XEN
-#include "../xen/core/acpi_memhotplug.c"
-#define memory_add_physaddr_to_nid(start) 0
-#else
-static inline int xen_hotadd_mem_init(void) { return 0; }
-static inline void xen_hotadd_mem_exit(void) {}
-#endif
-
 static acpi_status
 acpi_memory_get_resource(struct acpi_resource *resource, void *context)
 {
@@ -237,10 +229,6 @@ static int acpi_memory_enable_device(struct acpi_memory_device *mem_device)
 		return result;
 	}
 
-#ifdef CONFIG_XEN
-	return xen_hotadd_memory(mem_device);
-#endif
-
 	node = acpi_get_node(mem_device->device->handle);
 	/*
 	 * Tell the VM there is more memory here...
@@ -324,10 +312,6 @@ static int acpi_memory_disable_device(struct acpi_memory_device *mem_device)
 	struct acpi_memory_info *info, *n;
 
 
-#ifdef CONFIG_XEN
-	return -EOPNOTSUPP;
-#endif
-
 	/*
 	 * Ask the VM to offline this memory range.
 	 * Note: Assume that this function returns zero on success
@@ -357,7 +341,7 @@ static void acpi_memory_device_notify(acpi_handle handle, u32 event, void *data)
 {
 	struct acpi_memory_device *mem_device;
 	struct acpi_device *device;
-
+	u32 ost_code = ACPI_OST_SC_NON_SPECIFIC_FAILURE; /* default */
 
 	switch (event) {
 	case ACPI_NOTIFY_BUS_CHECK:
@@ -370,15 +354,20 @@ static void acpi_memory_device_notify(acpi_handle handle, u32 event, void *data)
 					  "\nReceived DEVICE CHECK notification for device\n"));
 		if (acpi_memory_get_device(handle, &mem_device)) {
 			printk(KERN_ERR PREFIX "Cannot find driver data\n");
-			return;
+			break;
 		}
 
-		if (!acpi_memory_check_device(mem_device)) {
-			if (acpi_memory_enable_device(mem_device))
-				printk(KERN_ERR PREFIX
-					    "Cannot enable memory device\n");
+		if (acpi_memory_check_device(mem_device))
+			break;
+
+		if (acpi_memory_enable_device(mem_device)) {
+			printk(KERN_ERR PREFIX "Cannot enable memory device\n");
+			break;
 		}
+
+		ost_code = ACPI_OST_SC_SUCCESS;
 		break;
+
 	case ACPI_NOTIFY_EJECT_REQUEST:
 		ACPI_DEBUG_PRINT((ACPI_DB_INFO,
 				  "\nReceived EJECT REQUEST notification for device\n"));
@@ -399,19 +388,35 @@ static void acpi_memory_device_notify(acpi_handle handle, u32 event, void *data)
 		 * TBD: Can also be disabled by Callback registration
 		 *      with generic sysfs driver
 		 */
-		if (acpi_memory_disable_device(mem_device))
-			printk(KERN_ERR PREFIX
-				    "Disable memory device\n");
+		if (acpi_memory_disable_device(mem_device)) {
+			printk(KERN_ERR PREFIX "Disable memory device\n");
+			/*
+			 * If _EJ0 was called but failed, _OST is not
+			 * necessary.
+			 */
+			if (mem_device->state == MEMORY_INVALID_STATE)
+				return;
+
+			break;
+		}
+
 		/*
 		 * TBD: Invoke acpi_bus_remove to cleanup data structures
 		 */
-		break;
+
+		/* _EJ0 succeeded; _OST is not necessary */
+		return;
+
 	default:
 		ACPI_DEBUG_PRINT((ACPI_DB_INFO,
 				  "Unsupported event [0x%x]\n", event));
-		break;
+
+		/* non-hotplug event; possibly handled by other handler */
+		return;
 	}
 
+	/* Inform firmware that the hotplug operation has completed */
+	(void) acpi_evaluate_hotplug_ost(handle, event, ost_code, NULL);
 	return;
 }
 
@@ -547,10 +552,6 @@ static int __init acpi_memory_device_init(void)
 	acpi_status status;
 
 
-	result = xen_hotadd_mem_init();
-	if (result < 0)
-		return result;
-
 	result = acpi_bus_register_driver(&acpi_memory_device_driver);
 
 	if (result < 0)
@@ -589,8 +590,6 @@ static void __exit acpi_memory_device_exit(void)
 		ACPI_EXCEPTION((AE_INFO, status, "walk_namespace failed"));
 
 	acpi_bus_unregister_driver(&acpi_memory_device_driver);
-
-	xen_hotadd_mem_exit();
 
 	return;
 }

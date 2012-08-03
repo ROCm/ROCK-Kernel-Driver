@@ -1596,11 +1596,11 @@ megaraid_mbox_build_cmd(adapter_t *adapter, struct scsi_cmnd *scp, int *busy)
 			pg = sg_page(sgl);
 			if (pg) {
 				local_irq_save(flags);
-				vaddr = kmap_atomic(pg, KM_BIO_SRC_IRQ) + sgl->offset;
+				vaddr = kmap_atomic(pg) + sgl->offset;
 
 				memset(vaddr, 0, scp->cmnd[4]);
 
-				kunmap_atomic(vaddr, KM_BIO_SRC_IRQ);
+				kunmap_atomic(vaddr);
 				local_irq_restore(flags);
 			}
 			else {
@@ -2347,11 +2347,11 @@ megaraid_mbox_dpc(unsigned long devp)
 			pg = sg_page(sgl);
 			if (pg) {
 				local_irq_save(flags);
-				vaddr = kmap_atomic(pg, KM_BIO_SRC_IRQ) + sgl->offset;
+				vaddr = kmap_atomic(pg) + sgl->offset;
 
 				c = *vaddr;
 
-				kunmap_atomic(vaddr, KM_BIO_SRC_IRQ);
+				kunmap_atomic(vaddr);
 				local_irq_restore(flags);
 			} else {
 				con_log(CL_ANN, (KERN_WARNING
@@ -2749,7 +2749,7 @@ megaraid_reset_handler(struct scsi_cmnd *scp)
 	}
 
  out:
-	spin_unlock_irq(&adapter->lock);
+	spin_unlock(&adapter->lock);
 	return rval;
 }
 

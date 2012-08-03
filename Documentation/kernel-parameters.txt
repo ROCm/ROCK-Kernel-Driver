@@ -526,7 +526,7 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 
 	coherent_pool=nn[KMG]	[ARM,KNL]
 			Sets the size of memory pool for coherent, atomic dma
-			allocations if Contiguous Memory Allocator (CMA) is used.
+			allocations, by default set to 256K.
 
 	code_bytes	[X86] How many bytes of object code to print
 			in an oops report.
@@ -907,24 +907,6 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 	gpt		[EFI] Forces disk with valid GPT signature but
 			invalid Protective MBR to be treated as GPT.
 
-	guestdev=	[PCI,ACPI,XEN]
-			Format: {<device path>|<sbdf>}][,{<device path>|<sbdf>}[,...]]
-			Format of device path: <hid>[:<uid>]-<dev>.<func>[-<dev>.<func>[,...]][+iomul]
-			Format of sbdf: [<segment>:]<bus>:<dev>.<func>[+iomul]
-			Specifies PCI device for guest domain.
-			If PCI-PCI bridge is specified, all PCI devices
-			behind PCI-PCI bridge are reserved.
-			+iomul means that this PCI function will share
-			IO ports with other +iomul functions under same
-			switch. NOTE: if +iomul is specfied, all the functions
-			of the device will share IO ports.
-
-	guestiomuldev=	[PCI,ACPI,XEN]
-			Format: [sbd][,<sbd>][,...]
-			Format of sbdf: [<segment>:]<bus>:<dev>
-			Note: function shouldn't be specified.
-			Specifies PCI device for IO port multiplexing driver.
-
 	hashdist=	[KNL,NUMA] Large hashes allocated during boot
 			are distributed across NUMA nodes.  Defaults on
 			for 64-bit NUMA, off otherwise.
@@ -1154,7 +1136,6 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 		forcesac
 		soft
 		pt		[x86, IA-64]
-		group_mf	[x86, IA-64]
 
 
 	io7=		[HW] IO7 for Marvel based alpha systems
@@ -2215,13 +2196,6 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 				only look for one device below a PCIe downstream
 				port.
 
-	pci_reserve=	[PCI]
-			Format: [<sbdf>[+IO<size>][+MEM<size>]][,<sbdf>...]
-			Format of sbdf: [<segment>:]<bus>:<dev>.<func>
-			Specifies the least reserved io size or memory size
-			which is assigned to PCI bridge even when no child
-			pci device exists. This is useful with PCI hotplug.
-
 	pcie_aspm=	[PCIE] Forcibly enable or disable PCIe Active State Power
 			Management.
 		off	Disable ASPM.
@@ -2394,6 +2368,11 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			Set maximum number of finished RCU callbacks to process
 			in one batch.
 
+	rcutree.fanout_leaf=	[KNL,BOOT]
+			Increase the number of CPUs assigned to each
+			leaf rcu_node structure.  Useful for very large
+			systems.
+
 	rcutree.qhimark=	[KNL,BOOT]
 			Set threshold of queued
 			RCU callbacks over which batch limiting is disabled.
@@ -2488,10 +2467,6 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			Format: <full_path>
 			Run specified binary instead of /init from the ramdisk,
 			used for early userspace startup. See initrd.
-
-	reassign_resources	[PCI,ACPI,XEN]
-			Use guestdev= parameter to reassign device's
-			resources, or specify =all here.
 
 	reboot=		[BUGS=X86-32,BUGS=ARM,BUGS=IA-64] Rebooting mode
 			Format: <reboot_mode>[,<reboot_mode2>[,...]]
@@ -2971,6 +2946,8 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 					initial READ(10) command);
 				o = CAPACITY_OK (accept the capacity
 					reported by the device);
+				p = WRITE_CACHE (the device cache is ON
+					by default);
 				r = IGNORE_RESIDUE (the device reports
 					bogus residue values);
 				s = SINGLE_LUN (the device has only one

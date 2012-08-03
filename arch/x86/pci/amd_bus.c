@@ -121,7 +121,6 @@ static int __init early_fill_mp_bus_info(void)
 		link = (reg >> 8) & 0x03;
 
 		info = alloc_pci_root_info(min_bus, max_bus, node, link);
-		sprintf(info->name, "PCI Bus #%02x", min_bus);
 	}
 
 	/* get the default node and link for left over res */
@@ -300,9 +299,9 @@ static int __init early_fill_mp_bus_info(void)
 		int busnum;
 		struct pci_root_res *root_res;
 
-		busnum = info->bus_min;
-		printk(KERN_DEBUG "bus: [%02x, %02x] on node %x link %x\n",
-		       info->bus_min, info->bus_max, info->node, info->link);
+		busnum = info->busn.start;
+		printk(KERN_DEBUG "bus: %pR on node %x link %x\n",
+		       &info->busn, info->node, info->link);
 		list_for_each_entry(root_res, &info->resources, list)
 			printk(KERN_DEBUG "bus: %02x %pR\n",
 				       busnum, &root_res->res);
@@ -313,7 +312,6 @@ static int __init early_fill_mp_bus_info(void)
 
 #define ENABLE_CF8_EXT_CFG      (1ULL << 46)
 
-#ifndef CONFIG_XEN
 static void __cpuinit enable_pci_io_ecs(void *unused)
 {
 	u64 reg;
@@ -342,7 +340,6 @@ static int __cpuinit amd_cpu_notify(struct notifier_block *self,
 static struct notifier_block __cpuinitdata amd_cpu_notifier = {
 	.notifier_call	= amd_cpu_notify,
 };
-#endif /* CONFIG_XEN */
 
 static void __init pci_enable_pci_io_ecs(void)
 {
@@ -383,19 +380,10 @@ static int __init pci_io_ecs_init(void)
 	if (early_pci_allowed())
 		pci_enable_pci_io_ecs();
 
-#ifndef CONFIG_XEN
 	register_cpu_notifier(&amd_cpu_notifier);
 	for_each_online_cpu(cpu)
 		amd_cpu_notify(&amd_cpu_notifier, (unsigned long)CPU_ONLINE,
 			       (void *)(long)cpu);
-#else
-	if (cpu = 1, cpu) {
-		u64 reg;
-		rdmsrl(MSR_AMD64_NB_CFG, reg);
-		if (!(reg & ENABLE_CF8_EXT_CFG))
-			return 0;
-	}
-#endif
 	pci_probe |= PCI_HAS_IO_ECS;
 
 	return 0;
@@ -403,10 +391,6 @@ static int __init pci_io_ecs_init(void)
 
 static int __init amd_postcore_init(void)
 {
-#ifdef CONFIG_XEN
-	if (!is_initial_xendomain())
-		return 0;
-#endif
 	if (boot_cpu_data.x86_vendor != X86_VENDOR_AMD)
 		return 0;
 

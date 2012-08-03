@@ -17,10 +17,7 @@ struct ctl_table;
 extern int proc_nmi_enabled(struct ctl_table *, int ,
 			void __user *, size_t *, loff_t *);
 extern int unknown_nmi_panic;
-#endif
 
-#if (defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)) || \
-    (defined(CONFIG_XEN_SMPBOOT) && CONFIG_XEN_COMPAT >= 0x030200)
 void arch_trigger_all_cpu_backtrace(void);
 #define arch_trigger_all_cpu_backtrace arch_trigger_all_cpu_backtrace
 #endif
@@ -47,28 +44,14 @@ struct nmiaction {
 	const char		*name;
 };
 
-#define register_nmi_handler(t, fn, fg, n)		\
+#define register_nmi_handler(t, fn, fg, n, init...)	\
 ({							\
-	static struct nmiaction fn##_na = {		\
+	static struct nmiaction init fn##_na = {	\
 		.handler = (fn),			\
 		.name = (n),				\
 		.flags = (fg),				\
 	};						\
-	__register_nmi_handler((t), &fn##_na);	\
-})
-
-/*
- * For special handlers that register/unregister in the
- * init section only.  This should be considered rare.
- */
-#define register_nmi_handler_initonly(t, fn, fg, n)		\
-({							\
-	static struct nmiaction fn##_na __initdata = {		\
-		.handler = (fn),			\
-		.name = (n),				\
-		.flags = (fg),				\
-	};						\
-	__register_nmi_handler((t), &fn##_na);	\
+	__register_nmi_handler((t), &fn##_na);		\
 })
 
 int __register_nmi_handler(unsigned int, struct nmiaction *);

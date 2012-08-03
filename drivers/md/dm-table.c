@@ -566,12 +566,9 @@ EXPORT_SYMBOL_GPL(dm_set_device_limits);
  */
 void dm_put_device(struct dm_target *ti, struct dm_dev *d)
 {
-	struct dm_dev_internal *dd;
+	struct dm_dev_internal *dd = container_of(d, struct dm_dev_internal,
+						  dm_dev);
 
-	if (!d)
-		return;
-
-	dd = container_of(d, struct dm_dev_internal, dm_dev);
 	if (atomic_dec_and_test(&dd->count)) {
 		close_dev(dd, ti->table->md);
 		list_del(&dd->list);
@@ -1333,6 +1330,9 @@ static bool dm_table_supports_flush(struct dm_table *t, unsigned flush)
 
 		if (!ti->num_flush_requests)
 			continue;
+
+		if (ti->flush_supported)
+			return 1;
 
 		if (ti->type->iterate_devices &&
 		    ti->type->iterate_devices(ti, device_flush_capable, &flush))

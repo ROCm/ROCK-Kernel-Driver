@@ -39,11 +39,6 @@
 #include <asm/kmap_types.h>
 #include <asm/uaccess.h>
 
-#ifdef CONFIG_EPOLL
-#include <linux/poll.h>
-#include <linux/anon_inodes.h>
-#endif
-
 #if DEBUG > 1
 #define dprintk		printk
 #else
@@ -60,13 +55,6 @@ static struct kmem_cache	*kiocb_cachep;
 static struct kmem_cache	*kioctx_cachep;
 
 static struct workqueue_struct *aio_wq;
-
-/* Used for rare fput completion. */
-static void aio_fput_routine(struct work_struct *);
-static DECLARE_WORK(fput_work, aio_fput_routine);
-
-static DEFINE_SPINLOCK(fput_lock);
-static LIST_HEAD(fput_head);
 
 static void aio_kick_handler(struct work_struct *);
 static void aio_queue_work(struct kioctx *);
@@ -484,7 +472,6 @@ static int kiocb_batch_refill(struct kioctx *ctx, struct kiocb_batch *batch)
 {
 	unsigned short allocated, to_alloc;
 	long avail;
-	bool called_fput = false;
 	struct kiocb *req, *n;
 	struct aio_ring *ring;
 
@@ -500,28 +487,11 @@ static int kiocb_batch_refill(struct kioctx *ctx, struct kiocb_batch *batch)
 	if (allocated == 0)
 		goto out;
 
-retry:
 	spin_lock_irq(&ctx->ctx_lock);
 	ring = kmap_atomic(ctx->ring_info.ring_pages[0]);
 
 	avail = aio_ring_avail(&ctx->ring_info, ring) - ctx->reqs_active;
 	BUG_ON(avail < 0);
-	if (avail == 0 && !called_fput) {
-		/*
-		 * Handle a potential starvation case.  It is possible that
-		 * we hold the last reference on a struct file, causing us
-		 * to delay the final fput to non-irq context.  In this case,
-		 * ctx->reqs_active is artificially high.  Calling the fput
-		 * routine here may free up a slot in the event completion
-		 * ring, allowing this allocation to succeed.
-		 */
-		kunmap_atomic(ring);
-		spin_unlock_irq(&ctx->ctx_lock);
-		aio_fput_routine(NULL);
-		called_fput = true;
-		goto retry;
-	}
-
 	if (avail < allocated) {
 		/* Trim back the number of requests. */
 		list_for_each_entry_safe(req, n, &batch->head, ki_batch) {
@@ -575,36 +545,6 @@ static inline void really_put_req(struct kioctx *ctx, struct kiocb *req)
 		wake_up_all(&ctx->wait);
 }
 
-static void aio_fput_routine(struct work_struct *data)
-{
-	spin_lock_irq(&fput_lock);
-	while (likely(!list_empty(&fput_head))) {
-		struct kiocb *req = list_kiocb(fput_head.next);
-		struct kioctx *ctx = req->ki_ctx;
-
-		list_del(&req->ki_list);
-		spin_unlock_irq(&fput_lock);
-
-		/* Complete the fput(s) */
-		if (req->ki_filp != NULL)
-			fput(req->ki_filp);
-
-		/* Link the iocb into the context's free list */
-		rcu_read_lock();
-		spin_lock_irq(&ctx->ctx_lock);
-		really_put_req(ctx, req);
-		/*
-		 * at that point ctx might've been killed, but actual
-		 * freeing is RCU'd
-		 */
-		spin_unlock_irq(&ctx->ctx_lock);
-		rcu_read_unlock();
-
-		spin_lock_irq(&fput_lock);
-	}
-	spin_unlock_irq(&fput_lock);
-}
-
 /* __aio_put_req
  *	Returns true if this put was the last user of the request.
  */
@@ -623,21 +563,9 @@ static int __aio_put_req(struct kioctx *ctx, struct kiocb *req)
 	req->ki_cancel = NULL;
 	req->ki_retry = NULL;
 
-	/*
-	 * Try to optimize the aio and eventfd file* puts, by avoiding to
-	 * schedule work in case it is not final fput() time. In normal cases,
-	 * we would not be holding the last reference to the file*, so
-	 * this function will be executed w/out any aio kthread wakeup.
-	 */
-	if (unlikely(!fput_atomic(req->ki_filp))) {
-		spin_lock(&fput_lock);
-		list_add(&req->ki_list, &fput_head);
-		spin_unlock(&fput_lock);
-		schedule_work(&fput_work);
-	} else {
-		req->ki_filp = NULL;
-		really_put_req(ctx, req);
-	}
+	fput(req->ki_filp);
+	req->ki_filp = NULL;
+	really_put_req(ctx, req);
 	return 1;
 }
 
@@ -1058,11 +986,6 @@ put_rq:
 	if (waitqueue_active(&ctx->wait))
 		wake_up(&ctx->wait);
 
-#ifdef CONFIG_EPOLL
-	if (ctx->file && waitqueue_active(&ctx->poll_wait))
-		wake_up(&ctx->poll_wait);
-#endif
-
 	spin_unlock_irqrestore(&ctx->ctx_lock, flags);
 	return ret;
 }
@@ -1071,8 +994,6 @@ EXPORT_SYMBOL(aio_complete);
 /* aio_read_evt
  *	Pull an event off of the ioctx's event ring.  Returns the number of 
  *	events fetched (0 or 1 ;-)
- *	If ent parameter is 0, just returns the number of events that would
- *	be fetched.
  *	FIXME: make this use cmpxchg.
  *	TODO: make the ringbuffer user mmap()able (requires FIXME).
  */
@@ -1095,17 +1016,13 @@ static int aio_read_evt(struct kioctx *ioctx, struct io_event *ent)
 
 	head = ring->head % info->nr;
 	if (head != ring->tail) {
-		if (ent) { /* event requested */
-			struct io_event *evp = aio_ring_event(info, head);
-			*ent = *evp;
-			head = (head + 1) % info->nr;
-			/* finish reading the event before updatng the head */
-			smp_mb();
-			ring->head = head;
-			ret = 1;
-			put_aio_ring_event(evp);
-		} else /* only need to know availability */
-			ret = 1;
+		struct io_event *evp = aio_ring_event(info, head);
+		*ent = *evp;
+		head = (head + 1) % info->nr;
+		smp_mb(); /* finish reading the event before updatng the head */
+		ring->head = head;
+		ret = 1;
+		put_aio_ring_event(evp);
 	}
 	spin_unlock(&info->ring_lock);
 
@@ -1290,15 +1207,6 @@ static void io_destroy(struct kioctx *ioctx)
 
 	kill_ctx(ioctx);
 
-#ifdef CONFIG_EPOLL
-	/* forget the poll file, but it's up to the user to close it */
-	if (ioctx->file) {
-		fput(ioctx->file);
-		ioctx->file->private_data = 0;
-		ioctx->file = 0;
-	}
-#endif
-
 	/*
 	 * Wake up any waiters.  The setting of ctx->dead must be seen
 	 * by other CPUs at this point.  Right now, we rely on the
@@ -1306,70 +1214,6 @@ static void io_destroy(struct kioctx *ioctx)
 	 */
 	wake_up_all(&ioctx->wait);
 }
-
-#ifdef CONFIG_EPOLL
-
-static int aio_queue_fd_close(struct inode *inode, struct file *file)
-{
-	struct kioctx *ioctx = file->private_data;
-	if (ioctx) {
-		file->private_data = 0;
-		spin_lock_irq(&ioctx->ctx_lock);
-		ioctx->file = 0;
-		spin_unlock_irq(&ioctx->ctx_lock);
-		fput(file);
-	}
-	return 0;
-}
-
-static unsigned int aio_queue_fd_poll(struct file *file, poll_table *wait)
-{	unsigned int pollflags = 0;
-	struct kioctx *ioctx = file->private_data;
-
-	if (ioctx) {
-
-		spin_lock_irq(&ioctx->ctx_lock);
-		/* Insert inside our poll wait queue */
-		poll_wait(file, &ioctx->poll_wait, wait);
-
-		/* Check our condition */
-		if (aio_read_evt(ioctx, 0))
-			pollflags = POLLIN | POLLRDNORM;
-		spin_unlock_irq(&ioctx->ctx_lock);
-	}
-
-	return pollflags;
-}
-
-static const struct file_operations aioq_fops = {
-	.release	= aio_queue_fd_close,
-	.poll		= aio_queue_fd_poll
-};
-
-/* make_aio_fd:
- *  Create a file descriptor that can be used to poll the event queue.
- *  Based on the excellent epoll code.
- */
-
-static int make_aio_fd(struct kioctx *ioctx)
-{
-	int fd;
-	struct file *file;
-
-	fd = anon_inode_getfd("[aioq]", &aioq_fops, ioctx, 0);
-	if (fd < 0)
-		return fd;
-
-	/* associate the file with the IO context */
-	file = fget(fd);
-	if (!file)
-		return -EBADF;
-	file->private_data = ioctx;
-	ioctx->file = file;
-	init_waitqueue_head(&ioctx->poll_wait);
-	return fd;
-}
-#endif
 
 /* sys_io_setup:
  *	Create an aio_context capable of receiving at least nr_events.
@@ -1383,30 +1227,18 @@ static int make_aio_fd(struct kioctx *ioctx)
  *	resources are available.  May fail with -EFAULT if an invalid
  *	pointer is passed for ctxp.  Will fail with -ENOSYS if not
  *	implemented.
- *
- *	To request a selectable fd, the user context has to be initialized
- *	to 1, instead of 0, and the return value is the fd.
- *	This keeps the system call compatible, since a non-zero value
- *	was not allowed so far.
  */
 SYSCALL_DEFINE2(io_setup, unsigned, nr_events, aio_context_t __user *, ctxp)
 {
 	struct kioctx *ioctx = NULL;
 	unsigned long ctx;
 	long ret;
-	int make_fd = 0;
 
 	ret = get_user(ctx, ctxp);
 	if (unlikely(ret))
 		goto out;
 
 	ret = -EINVAL;
-#ifdef CONFIG_EPOLL
-	if (ctx == 1) {
-		make_fd = 1;
-		ctx = 0;
-	}
-#endif
 	if (unlikely(ctx || nr_events == 0)) {
 		pr_debug("EINVAL: io_setup: ctx %lu nr_events %u\n",
 		         ctx, nr_events);
@@ -1417,11 +1249,7 @@ SYSCALL_DEFINE2(io_setup, unsigned, nr_events, aio_context_t __user *, ctxp)
 	ret = PTR_ERR(ioctx);
 	if (!IS_ERR(ioctx)) {
 		ret = put_user(ioctx->user_id, ctxp);
-#ifdef CONFIG_EPOLL
-		if (make_fd && !ret)
-			ret = make_aio_fd(ioctx);
-#endif
-		if (ret < 0)
+		if (ret)
 			io_destroy(ioctx);
 		put_ioctx(ioctx);
 	}

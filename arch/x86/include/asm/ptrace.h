@@ -133,8 +133,6 @@ struct pt_regs {
 #include <linux/init.h>
 #ifdef CONFIG_PARAVIRT
 #include <asm/paravirt_types.h>
-#elif defined(CONFIG_X86_64_XEN)
-#include <xen/interface/xen.h>
 #endif
 
 struct cpuinfo_x86;
@@ -194,13 +192,7 @@ static inline int v8086_mode(struct pt_regs *regs)
 #ifdef CONFIG_X86_64
 static inline bool user_64bit_mode(struct pt_regs *regs)
 {
-#if defined(CONFIG_XEN)
-	/*
-	 * On Xen, these are the only long mode CPL 3 selectors.
-	 * We do not allow long mode selectors in the LDT.
-	 */
-	return regs->cs == __USER_CS || regs->cs == FLAT_USER_CS64;
-#elif !defined(CONFIG_PARAVIRT)
+#ifndef CONFIG_PARAVIRT
 	/*
 	 * On non-paravirt systems, this is the only long mode CPL 3
 	 * selector.  We do not allow long mode selectors in the LDT.
@@ -293,9 +285,7 @@ static inline unsigned long regs_get_kernel_stack_nth(struct pt_regs *regs,
 }
 
 #define arch_has_single_step()	(1)
-#if defined(CONFIG_XEN)
-#define arch_has_block_step()	(0)
-#elif defined(CONFIG_X86_DEBUGCTLMSR)
+#ifdef CONFIG_X86_DEBUGCTLMSR
 #define arch_has_block_step()	(1)
 #else
 #define arch_has_block_step()	(boot_cpu_data.x86 >= 6)

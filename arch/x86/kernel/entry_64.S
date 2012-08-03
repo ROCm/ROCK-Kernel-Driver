@@ -1051,24 +1051,6 @@ apicinterrupt LOCAL_TIMER_VECTOR \
 apicinterrupt X86_PLATFORM_IPI_VECTOR \
 	x86_platform_ipi smp_x86_platform_ipi
 
-#ifdef CONFIG_SMP
-	ALIGN
-	INTR_FRAME
-.irp idx,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15, \
-	16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31
-.if NUM_INVALIDATE_TLB_VECTORS > \idx
-ENTRY(invalidate_interrupt\idx)
-	pushq_cfi $~(INVALIDATE_TLB_VECTOR_START+\idx)
-	jmp .Lcommon_invalidate_interrupt0
-	CFI_ADJUST_CFA_OFFSET -8
-END(invalidate_interrupt\idx)
-.endif
-.endr
-	CFI_ENDPROC
-apicinterrupt INVALIDATE_TLB_VECTOR_START, \
-	invalidate_interrupt0, smp_invalidate_interrupt
-#endif
-
 apicinterrupt THRESHOLD_APIC_VECTOR \
 	threshold_interrupt smp_threshold_interrupt
 apicinterrupt THERMAL_APIC_VECTOR \
@@ -1329,7 +1311,7 @@ ENTRY(arch_unwind_init_running)
 END(arch_unwind_init_running)
 #endif
 
-#ifdef CONFIG_PARAVIRT_XEN
+#ifdef CONFIG_XEN
 zeroentry xen_hypervisor_callback xen_do_hypervisor_callback
 
 /*
@@ -1429,7 +1411,7 @@ END(xen_failsafe_callback)
 apicinterrupt XEN_HVM_EVTCHN_CALLBACK \
 	xen_hvm_callback_vector xen_evtchn_do_upcall
 
-#endif /* CONFIG_PARAVIRT_XEN */
+#endif /* CONFIG_XEN */
 
 /*
  * Some functions should be protected against kprobes
@@ -1439,7 +1421,7 @@ apicinterrupt XEN_HVM_EVTCHN_CALLBACK \
 paranoidzeroentry_ist debug do_debug DEBUG_STACK
 paranoidzeroentry_ist int3 do_int3 DEBUG_STACK
 paranoiderrorentry stack_segment do_stack_segment
-#ifdef CONFIG_PARAVIRT_XEN
+#ifdef CONFIG_XEN
 zeroentry xen_debug do_debug
 zeroentry xen_int3 do_int3
 errorentry xen_stack_segment do_stack_segment
@@ -1797,10 +1779,30 @@ end_repeat_nmi:
 	 */
 	call save_paranoid
 	DEFAULT_FRAME -1
+
+	/*
+	 * Save off the CR2 register. If we take a page fault in the NMI then
+	 * it could corrupt the CR2 value. If the NMI preempts a page fault
+	 * handler before it was able to read the CR2 register, and then the
+	 * NMI itself takes a page fault, the page fault that was preempted
+	 * will read the information from the NMI page fault and not the
+	 * origin fault. Save it off and restore it if it changes.
+	 * Use the r12 callee-saved register.
+	 */
+	movq %cr2, %r12
+
 	/* paranoidentry do_nmi, 0; without TRACE_IRQS_OFF */
 	movq %rsp,%rdi
 	movq $-1,%rsi
 	call do_nmi
+
+	/* Did the NMI take a page fault? Restore cr2 if it did */
+	movq %cr2, %rcx
+	cmpq %rcx, %r12
+	je 1f
+	movq %r12, %cr2
+1:
+	
 	testl %ebx,%ebx				/* swapgs needed? */
 	jnz nmi_restore
 nmi_swapgs:

@@ -413,11 +413,11 @@ nocache:
 		if (addr + size - 1 < addr)
 			goto overflow;
 
-		n = rb_next(&first->rb_node);
-		if (n)
-			first = rb_entry(n, struct vmap_area, rb_node);
-		else
+		if (list_is_last(&first->list, &vmap_area_list))
 			goto found;
+
+		first = list_entry(first->list.next,
+				struct vmap_area, list);
 	}
 
 found:
@@ -904,6 +904,14 @@ static void *vb_alloc(unsigned long size, gfp_t gfp_mask)
 
 	BUG_ON(size & ~PAGE_MASK);
 	BUG_ON(size > PAGE_SIZE*VMAP_MAX_ALLOC);
+	if (WARN_ON(size == 0)) {
+		/*
+		 * Allocating 0 bytes isn't what caller wants since
+		 * get_order(0) returns funny result. Just warn and terminate
+		 * early.
+		 */
+		return NULL;
+	}
 	order = get_order(size);
 
 again:
@@ -1280,7 +1288,7 @@ DEFINE_RWLOCK(vmlist_lock);
 struct vm_struct *vmlist;
 
 static void setup_vmalloc_vm(struct vm_struct *vm, struct vmap_area *va,
-			      unsigned long flags, void *caller)
+			      unsigned long flags, const void *caller)
 {
 	vm->flags = flags;
 	vm->addr = (void *)va->va_start;
@@ -1306,7 +1314,7 @@ static void insert_vmalloc_vmlist(struct vm_struct *vm)
 }
 
 static void insert_vmalloc_vm(struct vm_struct *vm, struct vmap_area *va,
-			      unsigned long flags, void *caller)
+			      unsigned long flags, const void *caller)
 {
 	setup_vmalloc_vm(vm, va, flags, caller);
 	insert_vmalloc_vmlist(vm);
@@ -1314,7 +1322,7 @@ static void insert_vmalloc_vm(struct vm_struct *vm, struct vmap_area *va,
 
 static struct vm_struct *__get_vm_area_node(unsigned long size,
 		unsigned long align, unsigned long flags, unsigned long start,
-		unsigned long end, int node, gfp_t gfp_mask, void *caller)
+		unsigned long end, int node, gfp_t gfp_mask, const void *caller)
 {
 	struct vmap_area *va;
 	struct vm_struct *area;
@@ -1375,7 +1383,7 @@ EXPORT_SYMBOL_GPL(__get_vm_area);
 
 struct vm_struct *__get_vm_area_caller(unsigned long size, unsigned long flags,
 				       unsigned long start, unsigned long end,
-				       void *caller)
+				       const void *caller)
 {
 	return __get_vm_area_node(size, 1, flags, start, end, -1, GFP_KERNEL,
 				  caller);
@@ -1397,13 +1405,21 @@ struct vm_struct *get_vm_area(unsigned long size, unsigned long flags)
 }
 
 struct vm_struct *get_vm_area_caller(unsigned long size, unsigned long flags,
-				void *caller)
+				const void *caller)
 {
 	return __get_vm_area_node(size, 1, flags, VMALLOC_START, VMALLOC_END,
 						-1, GFP_KERNEL, caller);
 }
 
-static struct vm_struct *find_vm_area(const void *addr)
+/**
+ *	find_vm_area  -  find a continuous kernel virtual area
+ *	@addr:		base address
+ *
+ *	Search for the kernel VM area starting at @addr, and return it.
+ *	It is up to the caller to do all required locking to keep the returned
+ *	pointer valid.
+ */
+struct vm_struct *find_vm_area(const void *addr)
 {
 	struct vmap_area *va;
 
@@ -1568,21 +1584,14 @@ EXPORT_SYMBOL(vmap);
 
 static void *__vmalloc_node(unsigned long size, unsigned long align,
 			    gfp_t gfp_mask, pgprot_t prot,
-			    int node, void *caller);
+			    int node, const void *caller);
 static void *__vmalloc_area_node(struct vm_struct *area, gfp_t gfp_mask,
-				 pgprot_t prot, int node, void *caller)
+				 pgprot_t prot, int node, const void *caller)
 {
 	const int order = 0;
 	struct page **pages;
 	unsigned int nr_pages, array_size, i;
 	gfp_t nested_gfp = (gfp_mask & GFP_RECLAIM_MASK) | __GFP_ZERO;
-#ifdef CONFIG_XEN
-	gfp_t dma_mask = gfp_mask & (__GFP_DMA | __GFP_DMA32);
-
-	BUILD_BUG_ON((__GFP_DMA | __GFP_DMA32) != (__GFP_DMA + __GFP_DMA32));
-	if (dma_mask == (__GFP_DMA | __GFP_DMA32))
-		gfp_mask &= ~(__GFP_DMA | __GFP_DMA32);
-#endif
 
 	nr_pages = (area->size - PAGE_SIZE) >> PAGE_SHIFT;
 	array_size = (nr_pages * sizeof(struct page *));
@@ -1619,16 +1628,6 @@ static void *__vmalloc_area_node(struct vm_struct *area, gfp_t gfp_mask,
 			goto fail;
 		}
 		area->pages[i] = page;
-#ifdef CONFIG_XEN
-		if (dma_mask) {
-			if (xen_limit_pages_to_max_mfn(page, 0, 32)) {
-				area->nr_pages = i + 1;
-				goto fail;
-			}
-			if (gfp_mask & __GFP_ZERO)
-				clear_highpage(page);
-		}
-#endif
 	}
 
 	if (map_vm_area(area, prot, &pages))
@@ -1660,7 +1659,7 @@ fail:
  */
 void *__vmalloc_node_range(unsigned long size, unsigned long align,
 			unsigned long start, unsigned long end, gfp_t gfp_mask,
-			pgprot_t prot, int node, void *caller)
+			pgprot_t prot, int node, const void *caller)
 {
 	struct vm_struct *area;
 	void *addr;
@@ -1716,7 +1715,7 @@ fail:
  */
 static void *__vmalloc_node(unsigned long size, unsigned long align,
 			    gfp_t gfp_mask, pgprot_t prot,
-			    int node, void *caller)
+			    int node, const void *caller)
 {
 	return __vmalloc_node_range(size, align, VMALLOC_START, VMALLOC_END,
 				gfp_mask, prot, node, caller);
@@ -1854,8 +1853,6 @@ void *vmalloc_exec(unsigned long size)
 #define GFP_VMALLOC32 GFP_DMA32 | GFP_KERNEL
 #elif defined(CONFIG_64BIT) && defined(CONFIG_ZONE_DMA)
 #define GFP_VMALLOC32 GFP_DMA | GFP_KERNEL
-#elif defined(CONFIG_XEN)
-#define GFP_VMALLOC32 GFP_DMA | GFP_DMA32 | GFP_KERNEL
 #else
 #define GFP_VMALLOC32 GFP_KERNEL
 #endif
@@ -1994,9 +1991,7 @@ static int aligned_vwrite(char *buf, char *addr, unsigned long count)
  *	IOREMAP area is treated as memory hole and no copy is done.
  *
  *	If [addr...addr+count) doesn't includes any intersects with alive
- *	vm_struct area, returns 0.
- *	@buf should be kernel's buffer. Because	this function uses KM_USER0,
- *	the caller should guarantee KM_USER0 is not used.
+ *	vm_struct area, returns 0. @buf should be kernel's buffer.
  *
  *	Note: In usual ops, vread() is never necessary because the caller
  *	should know vmalloc() area is valid and can use memcpy().
@@ -2070,9 +2065,7 @@ finished:
  *	IOREMAP area is treated as memory hole and no copy is done.
  *
  *	If [addr...addr+count) doesn't includes any intersects with alive
- *	vm_struct area, returns 0.
- *	@buf should be kernel's buffer. Because	this function uses KM_USER0,
- *	the caller should guarantee KM_USER0 is not used.
+ *	vm_struct area, returns 0. @buf should be kernel's buffer.
  *
  *	Note: In usual ops, vwrite() is never necessary because the caller
  *	should know vmalloc() area is valid and can use memcpy().
@@ -2229,17 +2222,6 @@ struct vm_struct *alloc_vm_area(size_t size, pte_t **ptes)
 		free_vm_area(area);
 		return NULL;
 	}
-
-#ifdef CONFIG_XEN
-	/*
-	 * If the allocated address space is passed to a hypercall before
-	 * being used then we cannot rely on a page fault to trigger an update
-	 * of the page tables.  So sync all the page tables here unless the
-	 * caller is going to have the affected PTEs updated directly.
-	 */
-	if (!ptes)
-		vmalloc_sync_all();
-#endif
 
 	return area;
 }

@@ -1096,7 +1096,7 @@ void set_task_cpu(struct task_struct *p, unsigned int new_cpu)
 	 * a task's CPU. ->pi_lock for waking tasks, rq->lock for runnable tasks.
 	 *
 	 * sched_move_task() holds both and thus holding either pins the cgroup,
-	 * see set_task_rq().
+	 * see task_group().
 	 *
 	 * Furthermore, all task_rq users should acquire both locks, see
 	 * task_rq_lock().
@@ -1910,12 +1910,12 @@ static inline void
 prepare_task_switch(struct rq *rq, struct task_struct *prev,
 		    struct task_struct *next)
 {
+	trace_sched_switch(prev, next);
 	sched_info_switch(prev, next);
 	perf_event_task_sched_out(prev, next);
 	fire_sched_out_preempt_notifiers(prev, next);
 	prepare_lock_switch(rq, next);
 	prepare_arch_switch(next);
-	trace_sched_switch(prev, next);
 }
 
 /**
@@ -2845,48 +2845,6 @@ static inline void task_group_account_field(struct task_struct *p, int index,
 }
 
 
-#if !defined(CONFIG_XEN) || defined(CONFIG_VIRT_CPU_ACCOUNTING)
-# define cputime_to_u64(t) ((__force u64)(t))
-#else
-# include <linux/syscore_ops.h>
-# define NS_PER_TICK (1000000000 / HZ)
-
-static DEFINE_PER_CPU(u64, steal_snapshot);
-static DEFINE_PER_CPU(unsigned int, steal_residual);
-
-static u64 cputime_to_u64(cputime_t t)
-{
-	u64 s = this_vcpu_read(runstate.time[RUNSTATE_runnable]);
-	unsigned long adj = div_u64_rem(s - __this_cpu_read(steal_snapshot)
-					  + __this_cpu_read(steal_residual),
-					NS_PER_TICK,
-					&__get_cpu_var(steal_residual));
-
-	__this_cpu_write(steal_snapshot, s);
-	if (t < jiffies_to_cputime(adj))
-		return 0;
-
-	return (__force u64)(t - jiffies_to_cputime(adj));
-}
-
-static void steal_resume(void)
-{
-	cputime_to_u64(((cputime_t)1 << (BITS_PER_LONG * sizeof(cputime_t)
-					 / sizeof(long) - 1)) - 1);
-}
-
-static struct syscore_ops steal_syscore_ops = {
-	.resume	= steal_resume,
-};
-
-static int __init steal_register(void)
-{
-	register_syscore_ops(&steal_syscore_ops);
-	return 0;
-}
-core_initcall(steal_register);
-#endif
-
 /*
  * Account user cpu time to a process.
  * @p: the process that the cpu time gets accounted to
@@ -2906,7 +2864,7 @@ void account_user_time(struct task_struct *p, cputime_t cputime,
 	index = (TASK_NICE(p) > 0) ? CPUTIME_NICE : CPUTIME_USER;
 
 	/* Add user time to cpustat. */
-	task_group_account_field(p, index, cputime_to_u64(cputime));
+	task_group_account_field(p, index, (__force u64) cputime);
 
 	/* Account for user time used */
 	acct_update_integrals(p);
@@ -2956,7 +2914,7 @@ void __account_system_time(struct task_struct *p, cputime_t cputime,
 	account_group_system_time(p, cputime);
 
 	/* Add system time to cpustat. */
-	task_group_account_field(p, index, cputime_to_u64(cputime));
+	task_group_account_field(p, index, (__force u64) cputime);
 
 	/* Account for system time used */
 	acct_update_integrals(p);
@@ -3010,9 +2968,9 @@ void account_idle_time(cputime_t cputime)
 	struct rq *rq = this_rq();
 
 	if (atomic_read(&rq->nr_iowait) > 0)
-		cpustat[CPUTIME_IOWAIT] += cputime_to_u64(cputime);
+		cpustat[CPUTIME_IOWAIT] += (__force u64) cputime;
 	else
-		cpustat[CPUTIME_IDLE] += cputime_to_u64(cputime);
+		cpustat[CPUTIME_IDLE] += (__force u64) cputime;
 }
 
 static __always_inline bool steal_account_process_tick(void)
@@ -3068,9 +3026,9 @@ static void irqtime_account_process_tick(struct task_struct *p, int user_tick,
 		return;
 
 	if (irqtime_account_hi_update()) {
-		cpustat[CPUTIME_IRQ] += cputime_to_u64(cputime_one_jiffy);
+		cpustat[CPUTIME_IRQ] += (__force u64) cputime_one_jiffy;
 	} else if (irqtime_account_si_update()) {
-		cpustat[CPUTIME_SOFTIRQ] += cputime_to_u64(cputime_one_jiffy);
+		cpustat[CPUTIME_SOFTIRQ] += (__force u64) cputime_one_jiffy;
 	} else if (this_cpu_ksoftirqd() == p) {
 		/*
 		 * ksoftirqd time do not get accounted in cpu_softirq_time.
@@ -3517,11 +3475,6 @@ void __sched schedule_preempt_disabled(void)
 }
 
 #ifdef CONFIG_MUTEX_SPIN_ON_OWNER
-#include <asm/mutex.h>
-
-#ifndef arch_cpu_is_running
-#define arch_cpu_is_running(cpu) true
-#endif
 
 static inline bool owner_running(struct mutex *lock, struct task_struct *owner)
 {
@@ -3536,8 +3489,7 @@ static inline bool owner_running(struct mutex *lock, struct task_struct *owner)
 	 */
 	barrier();
 
-	return owner->on_cpu
-	       && arch_cpu_is_running(task_thread_info(owner)->cpu);
+	return owner->on_cpu;
 }
 
 /*
@@ -6072,6 +6024,11 @@ static void destroy_sched_domains(struct sched_domain *sd, int cpu)
  * SD_SHARE_PKG_RESOURCE set (Last Level Cache Domain) for this
  * allows us to avoid some pointer chasing select_idle_sibling().
  *
+ * Iterate domains and sched_groups downward, assigning CPUs to be
+ * select_idle_sibling() hw buddy.  Cross-wiring hw makes bouncing
+ * due to random perturbation self canceling, ie sw buddies pull
+ * their counterpart to their CPU's hw counterpart.
+ *
  * Also keep a unique ID per domain (we use the first cpu number in
  * the cpumask of the domain), this allows us to quickly tell if
  * two cpus are in the same cache domain, see cpus_share_cache().
@@ -6085,8 +6042,40 @@ static void update_top_cache_domain(int cpu)
 	int id = cpu;
 
 	sd = highest_flag_domain(cpu, SD_SHARE_PKG_RESOURCES);
-	if (sd)
+	if (sd) {
+		struct sched_domain *tmp = sd;
+		struct sched_group *sg, *prev;
+		bool right;
+
+		/*
+		 * Traverse to first CPU in group, and count hops
+		 * to cpu from there, switching direction on each
+		 * hop, never ever pointing the last CPU rightward.
+		 */
+		do {
+			id = cpumask_first(sched_domain_span(tmp));
+			prev = sg = tmp->groups;
+			right = 1;
+
+			while (cpumask_first(sched_group_cpus(sg)) != id)
+				sg = sg->next;
+
+			while (!cpumask_test_cpu(cpu, sched_group_cpus(sg))) {
+				prev = sg;
+				sg = sg->next;
+				right = !right;
+			}
+
+			/* A CPU went down, never point back to domain start. */
+			if (right && cpumask_first(sched_group_cpus(sg->next)) == id)
+				right = false;
+
+			sg = right ? sg->next : prev;
+			tmp->idle_buddy = cpumask_first(sched_group_cpus(sg));
+		} while ((tmp = tmp->child));
+
 		id = cpumask_first(sched_domain_span(sd));
+	}
 
 	rcu_assign_pointer(per_cpu(sd_llc, cpu), sd);
 	per_cpu(sd_llc_id, cpu) = id;
@@ -7145,34 +7134,66 @@ match2:
 	mutex_unlock(&sched_domains_mutex);
 }
 
+static int num_cpus_frozen;	/* used to mark begin/end of suspend/resume */
+
 /*
  * Update cpusets according to cpu_active mask.  If cpusets are
  * disabled, cpuset_update_active_cpus() becomes a simple wrapper
  * around partition_sched_domains().
+ *
+ * If we come here as part of a suspend/resume, don't touch cpusets because we
+ * want to restore it back to its original state upon resume anyway.
  */
 static int cpuset_cpu_active(struct notifier_block *nfb, unsigned long action,
 			     void *hcpu)
 {
-	switch (action & ~CPU_TASKS_FROZEN) {
+	switch (action) {
+	case CPU_ONLINE_FROZEN:
+	case CPU_DOWN_FAILED_FROZEN:
+
+		/*
+		 * num_cpus_frozen tracks how many CPUs are involved in suspend
+		 * resume sequence. As long as this is not the last online
+		 * operation in the resume sequence, just build a single sched
+		 * domain, ignoring cpusets.
+		 */
+		num_cpus_frozen--;
+		if (likely(num_cpus_frozen)) {
+			partition_sched_domains(1, NULL, NULL);
+			break;
+		}
+
+		/*
+		 * This is the last CPU online operation. So fall through and
+		 * restore the original sched domains by considering the
+		 * cpuset configurations.
+		 */
+
 	case CPU_ONLINE:
 	case CPU_DOWN_FAILED:
-		cpuset_update_active_cpus();
-		return NOTIFY_OK;
+		cpuset_update_active_cpus(true);
+		break;
 	default:
 		return NOTIFY_DONE;
 	}
+	return NOTIFY_OK;
 }
 
 static int cpuset_cpu_inactive(struct notifier_block *nfb, unsigned long action,
 			       void *hcpu)
 {
-	switch (action & ~CPU_TASKS_FROZEN) {
+	switch (action) {
 	case CPU_DOWN_PREPARE:
-		cpuset_update_active_cpus();
-		return NOTIFY_OK;
+		cpuset_update_active_cpus(false);
+		break;
+	case CPU_DOWN_PREPARE_FROZEN:
+		num_cpus_frozen++;
+		partition_sched_domains(1, NULL, NULL);
+		break;
 	default:
 		return NOTIFY_DONE;
 	}
+	return NOTIFY_OK;
 }
 
 void __init sched_init_smp(void)
@@ -7637,6 +7658,7 @@ void sched_destroy_group(struct task_group *tg)
  */
 void sched_move_task(struct task_struct *tsk)
 {
+	struct task_group *tg;
 	int on_rq, running;
 	unsigned long flags;
 	struct rq *rq;
@@ -7650,6 +7672,12 @@ void sched_move_task(struct task_struct *tsk)
 		dequeue_task(rq, tsk, 0);
 	if (unlikely(running))
 		tsk->sched_class->put_prev_task(rq, tsk);
+
+	tg = container_of(task_subsys_state_check(tsk, cpu_cgroup_subsys_id,
+				lockdep_is_held(&tsk->sighand->siglock)),
+			  struct task_group, css);
+	tg = autogroup_task_group(tsk, tg);
+	tsk->sched_task_group = tg;
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	if (tsk->sched_class->task_move_group)

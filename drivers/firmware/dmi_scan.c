@@ -6,6 +6,7 @@
 #include <linux/dmi.h>
 #include <linux/efi.h>
 #include <linux/bootmem.h>
+#include <linux/random.h>
 #include <asm/dmi.h>
 
 /*
@@ -110,6 +111,8 @@ static int __init dmi_walk_early(void (*decode)(const struct dmi_header *,
 		return -1;
 
 	dmi_table(buf, dmi_len, dmi_num, decode, NULL);
+
+	add_device_randomness(buf, dmi_len);
 
 	dmi_iounmap(buf, dmi_len);
 	return 0;
@@ -481,11 +484,6 @@ void __init dmi_scan_machine(void)
 static bool dmi_matches(const struct dmi_system_id *dmi)
 {
 	int i;
-
-#ifdef CONFIG_XEN
-	if (!is_initial_xendomain())
-		return false;
-#endif
 
 	WARN(!dmi_initialized, KERN_ERR "dmi check: not initialized yet.\n");
 

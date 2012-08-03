@@ -21,7 +21,6 @@
 #define N_EXCEPTION_STACKS_END \
 		(N_EXCEPTION_STACKS + DEBUG_STKSZ/EXCEPTION_STKSZ - 2)
 
-#ifndef CONFIG_X86_NO_TSS
 static char x86_stack_ids[][8] = {
 		[ DEBUG_STACK-1			]	= "#DB",
 		[ NMI_STACK-1			]	= "NMI",
@@ -33,12 +32,10 @@ static char x86_stack_ids[][8] = {
 		  N_EXCEPTION_STACKS_END	]	= "#DB[?]"
 #endif
 };
-#endif
 
 static unsigned long *in_exception_stack(unsigned cpu, unsigned long stack,
 					 unsigned *usedp, char **idp)
 {
-#ifndef CONFIG_X86_NO_TSS
 	unsigned k;
 
 	/*
@@ -98,7 +95,6 @@ static unsigned long *in_exception_stack(unsigned cpu, unsigned long stack,
 		}
 #endif
 	}
-#endif /* CONFIG_X86_NO_TSS */
 	return NULL;
 }
 
@@ -239,20 +235,20 @@ show_stack_log_lvl(struct task_struct *task, struct pt_regs *regs,
 		if (stack >= irq_stack && stack <= irq_stack_end) {
 			if (stack == irq_stack_end) {
 				stack = (unsigned long *) (irq_stack_end[-1]);
-				printk(KERN_CONT " <EOI> ");
+				pr_cont(" <EOI> ");
 			}
 		} else {
 		if (((long) stack & (THREAD_SIZE-1)) == 0)
 			break;
 		}
 		if (i && ((i % STACKSLOTS_PER_LINE) == 0))
-			printk(KERN_CONT "\n");
-		printk(KERN_CONT " %016lx", *stack++);
+			pr_cont("\n");
+		pr_cont(" %016lx", *stack++);
 		touch_nmi_watchdog();
 	}
 	preempt_enable();
 
-	printk(KERN_CONT "\n");
+	pr_cont("\n");
 	show_trace_log_lvl(task, regs, sp, bp, log_lvl);
 }
 
@@ -265,10 +261,9 @@ void show_regs(struct pt_regs *regs)
 
 	sp = regs->sp;
 	printk("CPU %d ", cpu);
-	print_modules();
 	__show_regs(regs, 1);
-	printk("Process %s (pid: %d, threadinfo %p, task %p)\n",
-		cur->comm, cur->pid, task_thread_info(cur), cur);
+	printk(KERN_DEFAULT "Process %s (pid: %d, threadinfo %p, task %p)\n",
+	       cur->comm, cur->pid, task_thread_info(cur), cur);
 
 	/*
 	 * When in-kernel, we also print out the stack and code at the
@@ -295,16 +290,16 @@ void show_regs(struct pt_regs *regs)
 		for (i = 0; i < code_len; i++, ip++) {
 			if (ip < (u8 *)PAGE_OFFSET ||
 					probe_kernel_address(ip, c)) {
-				printk(KERN_CONT " Bad RIP value.");
+				pr_cont(" Bad RIP value.");
 				break;
 			}
 			if (ip == (u8 *)regs->ip)
-				printk(KERN_CONT "<%02x> ", c);
+				pr_cont("<%02x> ", c);
 			else
-				printk(KERN_CONT "%02x ", c);
+				pr_cont("%02x ", c);
 		}
 	}
-	printk(KERN_CONT "\n");
+	pr_cont("\n");
 }
 
 int is_valid_bugaddr(unsigned long ip)

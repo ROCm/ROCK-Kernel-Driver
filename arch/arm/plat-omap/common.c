@@ -21,7 +21,6 @@
 #include <plat/vram.h>
 #include <plat/dsp.h>
 #include <plat/dma.h>
-#include <plat/drm.h>
 
 #include <plat/omap-secure.h>
 
@@ -66,7 +65,6 @@ const void *__init omap_get_var_config(u16 tag, size_t *len)
 
 void __init omap_reserve(void)
 {
-	omapdrm_reserve_vram();
 	omap_vram_reserve_sdram_memblock();
 	omap_dsp_reserve_sdram_memblock();
 	omap_secure_ram_reserve_memblock();
@@ -78,4 +76,13 @@ void __init omap_init_consistent_dma_size(void)
 #ifdef CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE
 	init_consistent_dma_size(CONFIG_FB_OMAP_CONSISTENT_DMA_SIZE << 20);
 #endif
+}
+
+/*
+ * Stub function for OMAP2 so that common files
+ * continue to build when custom builds are used
+ */
+int __weak omap_secure_ram_reserve_memblock(void)
+{
+	return 0;
 }

@@ -326,11 +326,7 @@ acpi_map_lookup_virt(void __iomem *virt, acpi_size size)
 }
 
 #ifndef CONFIG_IA64
-#ifndef CONFIG_XEN
 #define should_use_kmap(pfn)   page_is_ram(pfn)
-#else
-#define should_use_kmap(mfn)   pfn_valid(pfn = mfn_to_local_pfn(mfn))
-#endif
 #else
 /* ioremap will take care of cache attributes */
 #define should_use_kmap(pfn)   0
@@ -895,7 +891,7 @@ static void acpi_os_execute_deferred(struct work_struct *work)
 	struct acpi_os_dpc *dpc = container_of(work, struct acpi_os_dpc, work);
 
 	if (dpc->wait)
-		acpi_os_wait_events_complete(NULL);
+		acpi_os_wait_events_complete();
 
 	dpc->function(dpc->context);
 	kfree(dpc);
@@ -991,7 +987,7 @@ acpi_status acpi_os_hotplug_execute(acpi_osd_exec_callback function,
 	return __acpi_os_execute(0, function, context, 1);
 }
 
-void acpi_os_wait_events_complete(void *context)
+void acpi_os_wait_events_complete(void)
 {
 	flush_workqueue(kacpid_wq);
 	flush_workqueue(kacpi_notify_wq);

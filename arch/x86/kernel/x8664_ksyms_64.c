@@ -28,6 +28,7 @@ EXPORT_SYMBOL(__put_user_8);
 
 EXPORT_SYMBOL(copy_user_generic_string);
 EXPORT_SYMBOL(copy_user_generic_unrolled);
+EXPORT_SYMBOL(copy_user_enhanced_fast_string);
 EXPORT_SYMBOL(__copy_user_nocache);
 EXPORT_SYMBOL(_copy_from_user);
 EXPORT_SYMBOL(_copy_to_user);
@@ -55,6 +56,6 @@ EXPORT_SYMBOL(__memcpy);
 EXPORT_SYMBOL(memmove);
 
 EXPORT_SYMBOL(empty_zero_page);
-#if !defined(CONFIG_PARAVIRT) && !defined(CONFIG_XEN)
+#ifndef CONFIG_PARAVIRT
 EXPORT_SYMBOL(native_load_gs_index);
 #endif

@@ -7,6 +7,9 @@
  * Copyright 2008 Intel Corporation
  * Author: Andi Kleen
  */
+
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
 #include <linux/thread_info.h>
 #include <linux/capability.h>
 #include <linux/miscdevice.h>
@@ -56,8 +59,6 @@ static DEFINE_MUTEX(mce_chrdev_read_mutex);
 #include <trace/events/mce.h>
 
 int mce_disabled __read_mostly;
-
-#define MISC_MCELOG_MINOR	227
 
 #define SPINUNIT 100	/* 100ns */
 
@@ -118,10 +119,8 @@ void mce_setup(struct mce *m)
 	m->time = get_seconds();
 	m->cpuvendor = boot_cpu_data.x86_vendor;
 	m->cpuid = cpuid_eax(1);
-#ifndef CONFIG_XEN
 	m->socketid = cpu_data(m->extcpu).phys_proc_id;
 	m->apicid = cpu_data(m->extcpu).initial_apicid;
-#endif
 	rdmsrl(MSR_IA32_MCG_CAP, m->mcgcap);
 }
 
@@ -212,7 +211,7 @@ static void drain_mcelog_buffer(void)
 				cpu_relax();
 
 				if (!m->finished && retries >= 4) {
-					pr_err("MCE: skipping error being logged currently!\n");
+					pr_err("skipping error being logged currently!\n");
 					break;
 				}
 			}
@@ -268,14 +267,9 @@ static void print_mce(struct mce *m)
 	 * Note this output is parsed by external tools and old fields
 	 * should not be changed.
 	 */
-#ifndef CONFIG_XEN
 	pr_emerg(HW_ERR "PROCESSOR %u:%x TIME %llu SOCKET %u APIC %x microcode %x\n",
 		m->cpuvendor, m->cpuid, m->time, m->socketid, m->apicid,
 		cpu_data(m->extcpu).microcode);
-#else
-	pr_emerg(HW_ERR "PROCESSOR %u:%x TIME %llu SOCKET %u APIC %x\n",
-		m->cpuvendor, m->cpuid, m->time, m->socketid, m->apicid);
-#endif
 
 	/*
 	 * Print out human-readable details about the MCE error,
@@ -1174,8 +1168,9 @@ int memory_failure(unsigned long pfn, int vector, int flags)
 {
 	/* mce_severity() should not hand us an ACTION_REQUIRED error */
 	BUG_ON(flags & MF_ACTION_REQUIRED);
-	printk(KERN_ERR "Uncorrected memory error in page 0x%lx ignored\n"
-		"Rebuild kernel with CONFIG_MEMORY_FAILURE=y for smarter handling\n", pfn);
+	pr_err("Uncorrected memory error in page 0x%lx ignored\n"
+	       "Rebuild kernel with CONFIG_MEMORY_FAILURE=y for smarter handling\n",
+	       pfn);
 
 	return 0;
 }
@@ -1193,6 +1188,7 @@ void mce_notify_process(void)
 {
 	unsigned long pfn;
 	struct mce_info *mi = mce_find_info();
+	int flags = MF_ACTION_REQUIRED;
 
 	if (!mi)
 		mce_panic("Lost physical address for unconsumed uncorrectable error", NULL, NULL);
@@ -1207,8 +1203,9 @@ void mce_notify_process(void)
 	 * doomed. We still need to mark the page as poisoned and alert any
 	 * other users of the page.
 	 */
-	if (memory_failure(pfn, MCE_VECTOR, MF_ACTION_REQUIRED) < 0 ||
-			   mi->restartable == 0) {
+	if (!mi->restartable)
+		flags |= MF_MUST_KILL;
+	if (memory_failure(pfn, MCE_VECTOR, flags) < 0) {
 		pr_err("Memory error not recovered");
 		force_sig(SIGBUS, current);
 	}
@@ -1257,15 +1254,8 @@ void mce_log_therm_throt_event(__u64 status)
  * Periodic polling timer for "silent" machine check errors.  If the
  * poller finds an MCE, poll 2x faster.  When the poller finds no more
  * errors, poll 2x slower (up to check_interval seconds).
- *
- * We will disable polling in DOM0 since all CMCI/Polling
- * mechanism will be done in XEN for Intel CPUs
  */
-#if defined (CONFIG_X86_XEN_MCE)
-static unsigned long check_interval = 0; /* disable polling */
-#else
 static unsigned long check_interval = 5 * 60; /* 5 minutes */
-#endif
 
 static DEFINE_PER_CPU(unsigned long, mce_next_interval); /* in jiffies */
 static DEFINE_PER_CPU(struct timer_list, mce_timer);
@@ -1372,11 +1362,10 @@ static int __cpuinit __mcheck_cpu_cap_init(void)
 
 	b = cap & MCG_BANKCNT_MASK;
 	if (!banks)
-		printk(KERN_INFO "mce: CPU supports %d MCE banks\n", b);
+		pr_info("CPU supports %d MCE banks\n", b);
 
 	if (b > MAX_NR_BANKS) {
-		printk(KERN_WARNING
-		       "MCE: Using only %u machine check banks out of %u\n",
+		pr_warn("Using only %u machine check banks out of %u\n",
 			MAX_NR_BANKS, b);
 		b = MAX_NR_BANKS;
 	}
@@ -1433,13 +1422,12 @@ static void __mcheck_cpu_init_generic(void)
 static int __cpuinit __mcheck_cpu_apply_quirks(struct cpuinfo_x86 *c)
 {
 	if (c->x86_vendor == X86_VENDOR_UNKNOWN) {
-		pr_info("MCE: unknown CPU type - not enabling MCE support.\n");
+		pr_info("unknown CPU type - not enabling MCE support\n");
 		return -EOPNOTSUPP;
 	}
 
 	/* This should be disabled by the BIOS, but isn't always */
 	if (c->x86_vendor == X86_VENDOR_AMD) {
-#ifndef CONFIG_XEN
 		if (c->x86 == 15 && banks > 4) {
 			/*
 			 * disable GART TBL walk error reporting, which
@@ -1448,7 +1436,6 @@ static int __cpuinit __mcheck_cpu_apply_quirks(struct cpuinfo_x86 *c)
 			 */
 			clear_bit(10, (unsigned long *)&mce_banks[4].ctl);
 		}
-#endif
 		if (c->x86 <= 17 && mce_bootlog < 0) {
 			/*
 			 * Lots of broken BIOS around that don't clear them
@@ -1558,7 +1545,6 @@ static int __cpuinit __mcheck_cpu_ancient_init(struct cpuinfo_x86 *c)
 
 static void __mcheck_cpu_init_vendor(struct cpuinfo_x86 *c)
 {
-#ifndef CONFIG_X86_64_XEN
 	switch (c->x86_vendor) {
 	case X86_VENDOR_INTEL:
 		mce_intel_feature_init(c);
@@ -1569,7 +1555,6 @@ static void __mcheck_cpu_init_vendor(struct cpuinfo_x86 *c)
 	default:
 		break;
 	}
-#endif
 }
 
 static void __mcheck_cpu_init_timer(void)
@@ -1592,7 +1577,7 @@ static void __mcheck_cpu_init_timer(void)
 /* Handle unconfigured int18 (should never happen) */
 static void unexpected_machine_check(struct pt_regs *regs, long error_code)
 {
-	printk(KERN_ERR "CPU#%d: Unexpected int18 (Machine Check).\n",
+	pr_err("CPU#%d: Unexpected int18 (Machine Check)\n",
 	       smp_processor_id());
 }
 
@@ -1911,8 +1896,7 @@ static int __init mcheck_enable(char *str)
 			get_option(&str, &monarch_timeout);
 		}
 	} else {
-		printk(KERN_INFO "mce argument %s ignored. Please use /sys\n",
-		       str);
+		pr_info("mce argument %s ignored. Please use /sys\n", str);
 		return 0;
 	}
 	return 1;
@@ -2358,19 +2342,9 @@ static __init int mcheck_init_device(void)
 	/* register character device /dev/mcelog */
 	misc_register(&mce_chrdev_device);
 
-#ifdef CONFIG_X86_XEN_MCE
-	if (is_initial_xendomain()) {
-		/* Register vIRQ handler for MCE LOG processing */
-		extern int bind_virq_for_mce(void);
-
-		printk(KERN_DEBUG "MCE: bind virq for DOM0 logging\n");
-		bind_virq_for_mce();
-	}
-#endif
-
 	return err;
 }
-device_initcall(mcheck_init_device);
+device_initcall_sync(mcheck_init_device);
 
 /*
  * Old style boot options parsing. Only for compatibility.

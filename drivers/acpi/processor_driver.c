@@ -93,6 +93,9 @@ static const struct acpi_device_id processor_device_ids[] = {
 };
 MODULE_DEVICE_TABLE(acpi, processor_device_ids);
 
+static SIMPLE_DEV_PM_OPS(acpi_processor_pm,
+			 acpi_processor_suspend, acpi_processor_resume);
+
 static struct acpi_driver acpi_processor_driver = {
 	.name = "processor",
 	.class = ACPI_PROCESSOR_CLASS,
@@ -100,19 +103,16 @@ static struct acpi_driver acpi_processor_driver = {
 	.ops = {
 		.add = acpi_processor_add,
 		.remove = acpi_processor_remove,
-		.suspend = acpi_processor_suspend,
-		.resume = acpi_processor_resume,
 		.notify = acpi_processor_notify,
 		},
+	.drv.pm = &acpi_processor_pm,
 };
 
 #define INSTALL_NOTIFY_HANDLER		1
 #define UNINSTALL_NOTIFY_HANDLER	2
 
 DEFINE_PER_CPU(struct acpi_processor *, processors);
-#ifndef CONFIG_XEN
 EXPORT_PER_CPU_SYMBOL(processors);
-#endif
 
 struct acpi_processor_errata errata __read_mostly;
 
@@ -326,16 +326,9 @@ static int acpi_processor_get_info(struct acpi_device *device)
 	 *  they are physically not present.
 	 */
 	if (pr->id == -1) {
-		if (ACPI_FAILURE(acpi_processor_hotadd_init(pr)) &&
-		    acpi_get_cpuid(pr->handle, ~device_declaration,
-				   pr->acpi_id) < 0)
+		if (ACPI_FAILURE(acpi_processor_hotadd_init(pr)))
 			return -ENODEV;
 	}
-#if defined(CONFIG_SMP) && defined(CONFIG_PROCESSOR_EXTERNAL_CONTROL)
-	if (pr->id >= setup_max_cpus && pr->id > 0)
-		pr->id = -1;
-#endif
-
 	/*
 	 * On some boxes several processors use the same processor bus id.
 	 * But they are located in different scope. For example:
@@ -345,14 +338,7 @@ static int acpi_processor_get_info(struct acpi_device *device)
 	 * generated as the following format:
 	 * CPU+CPU ID.
 	 */
-	if (pr->id != -1)
-		sprintf(acpi_device_bid(device), "CPU%X", pr->id);
-	else
-		snprintf(acpi_device_bid(device),
-			 ARRAY_SIZE(acpi_device_bid(device)),
-			 "#%0*X",
-			 (int)ARRAY_SIZE(acpi_device_bid(device)) - 2,
-			 pr->acpi_id);
+	sprintf(acpi_device_bid(device), "CPU%X", pr->id);
 	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Processor [%d:%d]\n", pr->id,
 			  pr->acpi_id));
 
@@ -384,20 +370,13 @@ static int acpi_processor_get_info(struct acpi_device *device)
 	 * of /proc/cpuinfo
 	 */
 	status = acpi_evaluate_object(pr->handle, "_SUN", NULL, &buffer);
-	if (ACPI_SUCCESS(status) && pr->id != -1)
+	if (ACPI_SUCCESS(status))
 		arch_fix_phys_package_id(pr->id, object.integer.value);
 
 	return 0;
 }
 
-#ifndef CONFIG_XEN
 static DEFINE_PER_CPU(void *, processor_device_array);
-#else
-#include <linux/mutex.h>
-#include <linux/radix-tree.h>
-static DEFINE_MUTEX(processor_device_mutex);
-static RADIX_TREE(processor_device_tree, GFP_KERNEL);
-#endif
 
 static void acpi_processor_notify(struct acpi_device *device, u32 event)
 {
@@ -450,18 +429,11 @@ static int acpi_cpu_soft_notify(struct notifier_block *nfb,
 		 * Initialize missing things
 		 */
 		if (pr->flags.need_hotplug_init) {
-			struct cpuidle_driver *idle_driver =
-				cpuidle_get_driver();
-
 			printk(KERN_INFO "Will online and init hotplugged "
 			       "CPU: %d\n", pr->id);
 			WARN(acpi_processor_start(pr), "Failed to start CPU:"
 				" %d\n", pr->id);
 			pr->flags.need_hotplug_init = 0;
-			if (idle_driver && !strcmp(idle_driver->name,
-						   "intel_idle")) {
-				intel_idle_cpu_init(pr->id);
-			}
 		/* Normal CPU soft online event */
 		} else {
 			acpi_processor_ppc_has_changed(pr, 0);
@@ -492,34 +464,17 @@ static struct notifier_block acpi_cpu_notifier =
  */
 static __ref int acpi_processor_start(struct acpi_processor *pr)
 {
-#ifndef CONFIG_XEN
 	struct acpi_device *device = per_cpu(processor_device_array, pr->id);
-#else
-	struct acpi_device *device = radix_tree_lookup(&processor_device_tree, pr->acpi_id);
-#endif
 	int result = 0;
 
-#if defined(CONFIG_CPU_FREQ) || defined(CONFIG_PROCESSOR_EXTERNAL_CONTROL)
+#ifdef CONFIG_CPU_FREQ
 	acpi_processor_ppc_has_changed(pr, 0);
 #endif
-	/*
-	 * pr->id may equal to -1 while processor_cntl_external enabled.
-	 * throttle and thermal module don't support this case.
-	 * Tx only works when dom0 vcpu == pcpu num by far, as we give
-	 * control to dom0.
-	 */
-	if (pr->id != -1) {
-		acpi_processor_get_throttling_info(pr);
-		acpi_processor_get_limit_info(pr);
-	}
+	acpi_processor_get_throttling_info(pr);
+	acpi_processor_get_limit_info(pr);
 
-	if (!cpuidle_get_driver() || cpuidle_get_driver() == &acpi_idle_driver
-	    || processor_pm_external())
+	if (!cpuidle_get_driver() || cpuidle_get_driver() == &acpi_idle_driver)
 		acpi_processor_power_init(pr, device);
-
-	result = processor_extcntl_prepare(pr);
-	if (result)
-		goto err_power_exit;
 
 	pr->cdev = thermal_cooling_device_register("Processor", device,
 						   &processor_cooling_ops);
@@ -585,58 +540,32 @@ static int __cpuinit acpi_processor_add(struct acpi_device *device)
 	device->driver_data = pr;
 
 	result = acpi_processor_get_info(device);
-	if (result ||
-	    ((pr->id == -1) && !processor_cntl_external())) {
+	if (result) {
 		/* Processor is physically not present */
 		return 0;
 	}
 
 #ifdef CONFIG_SMP
-	if (pr->id >= setup_max_cpus && pr->id != 0) {
-		if (!processor_cntl_external())
-			return 0;
-		WARN_ON(pr->id != -1);
-	}
+	if (pr->id >= setup_max_cpus && pr->id != 0)
+		return 0;
 #endif
 
-	BUG_ON(!processor_cntl_external() &&
-	       ((pr->id >= nr_cpu_ids) || (pr->id < 0)));
+	BUG_ON((pr->id >= nr_cpu_ids) || (pr->id < 0));
 
 	/*
 	 * Buggy BIOS check
 	 * ACPI id of processors can be reported wrongly by the BIOS.
 	 * Don't trust it blindly
 	 */
-#ifndef CONFIG_XEN
 	if (per_cpu(processor_device_array, pr->id) != NULL &&
 	    per_cpu(processor_device_array, pr->id) != device) {
-#else
-	mutex_lock(&processor_device_mutex);
-	result = radix_tree_insert(&processor_device_tree,
-				   pr->acpi_id, device);
-	switch (result) {
-	default:
-		mutex_unlock(&processor_device_mutex);
-		goto err_free_cpumask;
-	case -EEXIST:
-		if (radix_tree_lookup(&processor_device_tree,
-				      pr->acpi_id) == device) {
-	case 0:
-			mutex_unlock(&processor_device_mutex);
-			break;
-		}
-		mutex_unlock(&processor_device_mutex);
-#endif
 		printk(KERN_WARNING "BIOS reported wrong ACPI id "
 			"for the processor\n");
 		result = -ENODEV;
 		goto err_free_cpumask;
 	}
-#ifndef CONFIG_XEN
 	per_cpu(processor_device_array, pr->id) = device;
-#else
-	if (pr->id != -1) {
-#endif
+
 	per_cpu(processors, pr->id) = pr;
 
 	dev = get_cpu_device(pr->id);
@@ -644,9 +573,6 @@ static int __cpuinit acpi_processor_add(struct acpi_device *device)
 		result = -EFAULT;
 		goto err_clear_processor;
 	}
-#ifdef CONFIG_XEN
-	}
-#endif
 
 	/*
 	 * Do not start hotplugged CPUs now, but when they
@@ -662,18 +588,12 @@ static int __cpuinit acpi_processor_add(struct acpi_device *device)
 	return 0;
 
 err_remove_sysfs:
-#ifdef CONFIG_XEN
-	if (pr->id != -1) {
-#endif
 	sysfs_remove_link(&device->dev.kobj, "sysdev");
 err_clear_processor:
 	/*
 	 * processor_device_array is not cleared to allow checks for buggy BIOS
 	 */ 
 	per_cpu(processors, pr->id) = NULL;
-#ifdef CONFIG_XEN
-	}
-#endif
 err_free_cpumask:
 	free_cpumask_var(pr->throttling.shared_cpu_map);
 err_free_pr:
@@ -691,7 +611,7 @@ static int acpi_processor_remove(struct acpi_device *device, int type)
 
 	pr = acpi_driver_data(device);
 
-	if (!processor_cntl_external() && pr->id >= nr_cpu_ids)
+	if (pr->id >= nr_cpu_ids)
 		goto free;
 
 	if (type == ACPI_BUS_REMOVAL_EJECT) {
@@ -701,8 +621,7 @@ static int acpi_processor_remove(struct acpi_device *device, int type)
 
 	acpi_processor_power_exit(pr, device);
 
-	if (pr->id != -1)
-		sysfs_remove_link(&device->dev.kobj, "sysdev");
+	sysfs_remove_link(&device->dev.kobj, "sysdev");
 
 	if (pr->cdev) {
 		sysfs_remove_link(&device->dev.kobj, "thermal_cooling");
@@ -711,16 +630,8 @@ static int acpi_processor_remove(struct acpi_device *device, int type)
 		pr->cdev = NULL;
 	}
 
-#ifndef CONFIG_XEN
 	per_cpu(processors, pr->id) = NULL;
 	per_cpu(processor_device_array, pr->id) = NULL;
-#else
-	if (pr->id != -1)
-		per_cpu(processors, pr->id) = NULL;
-	mutex_lock(&processor_device_mutex);
-	radix_tree_delete(&processor_device_tree, pr->acpi_id);
-	mutex_unlock(&processor_device_mutex);
-#endif
 
 free:
 	free_cpumask_var(pr->throttling.shared_cpu_map);
@@ -776,10 +687,6 @@ int acpi_processor_device_add(acpi_handle handle, struct acpi_device **device)
 		return -ENODEV;
 	}
 
-	if (processor_cntl_external() && acpi_driver_data(*device))
-		processor_notify_external(acpi_driver_data(*device),
-			PROCESSOR_HOTPLUG, HOTPLUG_TYPE_ADD);
-
 	return 0;
 }
 
@@ -788,8 +695,8 @@ static void acpi_processor_hotplug_notify(acpi_handle handle,
 {
 	struct acpi_processor *pr;
 	struct acpi_device *device = NULL;
+	u32 ost_code = ACPI_OST_SC_NON_SPECIFIC_FAILURE; /* default */
 	int result;
-
 
 	switch (event) {
 	case ACPI_NOTIFY_BUS_CHECK:
@@ -802,18 +709,18 @@ static void acpi_processor_hotplug_notify(acpi_handle handle,
 		if (!is_processor_present(handle))
 			break;
 
-		if (acpi_bus_get_device(handle, &device)) {
-			result = acpi_processor_device_add(handle, &device);
-			if (result)
-				printk(KERN_ERR PREFIX
-					    "Unable to add the device\n");
+		if (!acpi_bus_get_device(handle, &device))
+			break;
+
+		result = acpi_processor_device_add(handle, &device);
+		if (result) {
+			printk(KERN_ERR PREFIX "Unable to add the device\n");
 			break;
 		}
-		pr = acpi_driver_data(device);
-		if (processor_cntl_external() && pr)
-			processor_notify_external(pr,
-					PROCESSOR_HOTPLUG, HOTPLUG_TYPE_ADD);
+
+		ost_code = ACPI_OST_SC_SUCCESS;
 		break;
+
 	case ACPI_NOTIFY_EJECT_REQUEST:
 		ACPI_DEBUG_PRINT((ACPI_DB_INFO,
 				  "received ACPI_NOTIFY_EJECT_REQUEST\n"));
@@ -827,18 +734,23 @@ static void acpi_processor_hotplug_notify(acpi_handle handle,
 		if (!pr) {
 			printk(KERN_ERR PREFIX
 				    "Driver data is NULL, dropping EJECT\n");
-			return;
+			break;
 		}
-		if (processor_cntl_external())
-			processor_notify_external(pr, PROCESSOR_HOTPLUG,
-						HOTPLUG_TYPE_REMOVE);
+
+		/* REVISIT: update when eject is supported */
+		ost_code = ACPI_OST_SC_EJECT_NOT_SUPPORTED;
 		break;
+
 	default:
 		ACPI_DEBUG_PRINT((ACPI_DB_INFO,
 				  "Unsupported event [0x%x]\n", event));
-		break;
+
+		/* non-hotplug event; possibly handled by other handler */
+		return;
 	}
 
+	/* Inform firmware that the hotplug operation has completed */
+	(void) acpi_evaluate_hotplug_ost(handle, event, ost_code, NULL);
 	return;
 }
 
@@ -907,19 +819,8 @@ static acpi_status acpi_processor_hotadd_init(struct acpi_processor *pr)
 {
 	acpi_handle handle = pr->handle;
 
-#ifdef CONFIG_XEN
-	if (xen_pcpu_index(pr->acpi_id, 1) != -1)
-		return AE_OK;
-#endif
-
 	if (!is_processor_present(handle)) {
 		return AE_ERROR;
-	}
-
-	if (processor_cntl_external()) {
-		processor_notify_external(pr, PROCESSOR_HOTPLUG,
-					  HOTPLUG_TYPE_ADD);
-		return AE_OK;
 	}
 
 	if (acpi_map_lsapic(handle, &pr->id))
@@ -946,12 +847,6 @@ static acpi_status acpi_processor_hotadd_init(struct acpi_processor *pr)
 
 static int acpi_processor_handle_eject(struct acpi_processor *pr)
 {
-	if (processor_cntl_external()) {
-		processor_notify_external(pr, PROCESSOR_HOTPLUG,
-					  HOTPLUG_TYPE_REMOVE);
-		return (0);
-	}
-
 	if (cpu_online(pr->id))
 		cpu_down(pr->id);
 
@@ -1038,30 +933,6 @@ static void __exit acpi_processor_exit(void)
 	acpi_processor_uninstall_hotplug_notify();
 
 	acpi_bus_unregister_driver(&acpi_processor_driver);
-
-#ifdef CONFIG_XEN
-	{
-		struct acpi_device *dev;
-		unsigned int idx = 0;
-
-		while (radix_tree_gang_lookup(&processor_device_tree,
-					      (void **)&dev, idx, 1)) {
-			struct acpi_processor *pr = acpi_driver_data(dev);
-
-			/* prevent live lock */
-			if (pr->acpi_id < idx) {
-				printk(KERN_WARNING PREFIX "ID %u unexpected"
-				       " (less than %u); leaking memory\n",
-				       pr->acpi_id, idx);
-				break;
-			}
-			idx = pr->acpi_id;
-			radix_tree_delete(&processor_device_tree, idx);
-			if (!++idx)
-				break;
-		}
-	}
-#endif
 
 	return;
 }
