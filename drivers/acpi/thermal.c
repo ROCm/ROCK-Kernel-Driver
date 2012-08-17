@@ -107,7 +107,9 @@ static const struct acpi_device_id  thermal_device_ids[] = {
 };
 MODULE_DEVICE_TABLE(acpi, thermal_device_ids);
 
+#ifdef CONFIG_PM_SLEEP
 static int acpi_thermal_resume(struct device *dev);
+#endif
 static SIMPLE_DEV_PM_OPS(acpi_thermal_pm, NULL, acpi_thermal_resume);
 
 static struct acpi_driver acpi_thermal_driver = {
@@ -1134,6 +1136,7 @@ static int acpi_thermal_remove(struct acpi_device *device, int type)
 	return 0;
 }
 
+#ifdef CONFIG_PM_SLEEP
 static int acpi_thermal_resume(struct device *dev)
 {
 	struct acpi_thermal *tz;
@@ -1168,6 +1171,7 @@ static int acpi_thermal_resume(struct device *dev)
 
 	return AE_OK;
 }
+#endif
 
 static int thermal_act(const struct dmi_system_id *d) {
 
