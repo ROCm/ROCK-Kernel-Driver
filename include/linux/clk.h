@@ -120,7 +120,7 @@ static inline void clk_unprepare(struct clk *clk)
 }
 #endif
 
-#ifdef CONFIG_HAVE_CLK
+#ifdef CONFIG_COMMON_CLK
 /**
  * clk_get - lookup and obtain a reference to a clock producer.
  * @dev: device for clock "consumer"
@@ -276,7 +276,7 @@ struct clk *clk_get_parent(struct clk *clk);
  */
 struct clk *clk_get_sys(const char *dev_id, const char *con_id);
 
-#else /* !CONFIG_HAVE_CLK */
+#else /* !CONFIG_COMMON_CLK */
 
 static inline struct clk *clk_get(struct device *dev, const char *id)
 {
