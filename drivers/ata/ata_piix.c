@@ -1608,7 +1608,7 @@ static void piix_ignore_devices_quirk(struct ata_host *host)
 	if (ignore && !allow && prefer_ms_hyperv) {
 		host->flags |= ATA_HOST_IGNORE_ATA;
 		dev_info(host->dev, "%s detected, ATA device ignore set\n",
-			dmi->ident);
+			ignore->ident);
 	}
 #endif
 }
