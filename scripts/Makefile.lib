@@ -22,6 +22,12 @@ obj-m := $(filter-out $(obj-y),$(obj-m))
 
 lib-y := $(filter-out $(obj-y), $(sort $(lib-y) $(lib-m)))
 
+# Remove objects forcibly disabled
+
+obj-y := $(filter-out $(disabled-obj-y),$(obj-y))
+obj-m := $(filter-out $(disabled-obj-y),$(obj-m))
+lib-y := $(filter-out $(disabled-obj-y),$(lib-y))
+
 
 # Handle objects in subdirs
 # ---------------------------------------------------------------------------

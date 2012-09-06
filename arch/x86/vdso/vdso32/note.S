@@ -13,7 +13,7 @@ ELFNOTE_START(Linux, 0, "a")
 	.long LINUX_VERSION_CODE
 ELFNOTE_END
 
-#ifdef CONFIG_XEN
+#if defined(CONFIG_X86_XEN) || defined(CONFIG_PARAVIRT_XEN)
 /*
  * Add a special note telling glibc's dynamic linker a fake hardware
  * flavor that it will use to choose the search path for libraries in the
@@ -37,8 +37,12 @@ ELFNOTE_END
 
 ELFNOTE_START(GNU, 2, "a")
 	.long 1			/* ncaps */
+#ifdef CONFIG_PARAVIRT_XEN
 VDSO32_NOTE_MASK:		/* Symbol used by arch/x86/xen/setup.c */
 	.long 0			/* mask */
+#else
+	.long 1 << VDSO_NOTE_NONEGSEG_BIT /* mask */
+#endif
 	.byte VDSO_NOTE_NONEGSEG_BIT; .asciz "nosegneg"	/* bit, name */
 ELFNOTE_END
 #endif

@@ -1,0 +1,11 @@
+#ifndef _XEN_SYSCTL_H
+#define _XEN_SYSCTL_H
+
+/* CTL_XEN names: */
+enum
+{
+	CTL_XEN_INDEPENDENT_WALLCLOCK=1,
+	CTL_XEN_PERMITTED_CLOCK_JITTER=2,
+};
+
+#endif /* _XEN_SYSCTL_H */

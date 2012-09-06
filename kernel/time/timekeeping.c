@@ -20,6 +20,9 @@
 #include <linux/time.h>
 #include <linux/tick.h>
 #include <linux/stop_machine.h>
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+#include <asm/time.h>
+#endif
 
 /* Structure holding internal timekeeping values. */
 struct timekeeper {
@@ -444,6 +447,10 @@ int do_settimeofday(const struct timespec *tv)
 	tk_set_xtime(tk, tv);
 
 	timekeeping_update(tk, true);
+
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+	xen_update_wallclock(tv);
+#endif
 
 	write_sequnlock_irqrestore(&tk->lock, flags);
 
