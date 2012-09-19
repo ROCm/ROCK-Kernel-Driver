@@ -835,7 +835,7 @@ prepare1: prepare2 include/linux/version.h include/generated/utsrelease.h \
                    include/config/auto.conf
 	$(cmd_crmodverdir)
 
-archprepare: archheaders archscripts prepare1 scripts_basic
+archprepare: archheaders scripts_basic archscripts prepare1
 
 prepare0: archprepare FORCE
 	$(Q)$(MAKE) $(build)=.
