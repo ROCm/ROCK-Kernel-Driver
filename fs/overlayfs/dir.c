@@ -417,6 +417,7 @@ static int ovl_link(struct dentry *old, struct inode *newdir,
 	struct dentry *olddentry;
 	struct dentry *newdentry;
 	struct dentry *upperdir;
+	struct inode *newinode;
 
 	err = ovl_copy_up(old);
 	if (err)
@@ -441,13 +442,17 @@ static int ovl_link(struct dentry *old, struct inode *newdir,
 			err = -ENOENT;
 			goto out_unlock;
 		}
+		newinode = ovl_new_inode(old->d_sb, newdentry->d_inode->i_mode,
+				new->d_fsdata);
+		if (!newinode)
+			goto link_fail;
 
 		ovl_dentry_version_inc(new->d_parent);
 		ovl_dentry_update(new, newdentry);
 
-		ihold(old->d_inode);
-		d_instantiate(new, old->d_inode);
+		d_instantiate(new, newinode);
 	} else {
+link_fail:
 		if (ovl_dentry_is_opaque(new))
 			ovl_whiteout(upperdir, new);
 		dput(newdentry);
