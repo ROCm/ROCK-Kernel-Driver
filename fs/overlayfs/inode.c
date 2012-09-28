@@ -371,6 +371,7 @@ struct inode *ovl_new_inode(struct super_block *sb, umode_t mode,
 
 	default:
 		WARN(1, "illegal file type: %i\n", mode);
+		iput(inode);
 		inode = NULL;
 	}
 
