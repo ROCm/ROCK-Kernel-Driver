@@ -100,19 +100,9 @@ int ovl_permission(struct inode *inode, int mask)
 		if (is_upper && !IS_RDONLY(inode) && IS_RDONLY(realinode) &&
 		    (S_ISREG(mode) || S_ISDIR(mode) || S_ISLNK(mode)))
 			goto out_dput;
-
-		/*
-		 * Nobody gets write access to an immutable file.
-		 */
-		err = -EACCES;
-		if (IS_IMMUTABLE(realinode))
-			goto out_dput;
 	}
 
-	if (realinode->i_op->permission)
-		err = realinode->i_op->permission(realinode, mask);
-	else
-		err = generic_permission(realinode, mask);
+	err = __inode_permission(realinode, mask);
 out_dput:
 	dput(alias);
 	return err;
