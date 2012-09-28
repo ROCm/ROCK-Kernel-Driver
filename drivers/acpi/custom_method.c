@@ -72,9 +72,15 @@ static ssize_t cm_write(struct file *file, const char __user * user_buf,
 	return count;
 }
 
+static int open_check_acc(struct inode *inode, struct file *filp)
+{
+	return capable(CAP_SYS_RAWIO) ? 0 : -EPERM;
+}
+
 static const struct file_operations cm_fops = {
-	.write = cm_write,
-	.llseek = default_llseek,
+	.write	= cm_write,
+	.llseek	= default_llseek,
+	.open	= open_check_acc,
 };
 
 static int __init acpi_custom_method_init(void)
