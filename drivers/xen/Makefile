@@ -20,7 +20,8 @@ ifeq ($(CONFIG_PARAVIRT_XEN),y)
 CFLAGS_features.o			:= $(nostackp)
 endif
 
-priv-$(CONFIG_PCI)			:= pci.o
+priv-$(CONFIG_USB_SUPPORT)		:= dbgp.o
+priv-$(CONFIG_PCI)			+= pci.o
 
 obj-$(CONFIG_XEN)			+= features.o $(xen-backend-y) $(xen-backend-m)
 obj-$(CONFIG_XEN_PRIVILEGED_GUEST)	+= $(priv-y)

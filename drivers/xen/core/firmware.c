@@ -76,12 +76,12 @@ void __init copy_edid(void)
 }
 
 #if defined(CONFIG_VT) && defined(CONFIG_X86)
+#include <linux/kbd_kern.h>
 #include <asm/kbdleds.h>
 
 int __init kbd_defleds(void)
 {
 	int ret = 0;
-#if 0//todo
 	struct xen_platform_op op;
 
 	if (!is_initial_xendomain())
@@ -98,7 +98,6 @@ int __init kbd_defleds(void)
 		ret |= 1 << VC_NUMLOCK;
 	if (op.u.firmware_info.u.kbd_shift_flags & 0x40)
 		ret |= 1 << VC_CAPSLOCK;
-#endif
 	return ret;
 }
 #endif

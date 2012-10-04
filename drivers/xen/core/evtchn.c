@@ -257,18 +257,18 @@ static inline unsigned long active_evtchns(unsigned int idx)
 		~sh->evtchn_mask[idx]);
 }
 
-static void bind_evtchn_to_cpu(unsigned int chn, unsigned int cpu)
+static void _bind_evtchn_to_cpu(unsigned int chn, unsigned int cpu,
+				struct irq_data *data,
+				const struct cpumask *cpumask)
 {
 	shared_info_t *s = HYPERVISOR_shared_info;
-	int irq = evtchn_to_irq[chn];
 
 	BUG_ON(!test_bit(chn, s->evtchn_mask));
 
-	if (irq != -1) {
-		struct irq_data *data = irq_get_irq_data(irq);
-
+	if (data) {
+		BUG_ON(!cpumask_test_cpu(cpu, cpumask));
 		if (!irqd_is_per_cpu(data))
-			cpumask_copy(data->affinity, cpumask_of(cpu));
+			cpumask_copy(data->affinity, cpumask);
 		else
 			cpumask_set_cpu(cpu, data->affinity);
 	}
@@ -276,6 +276,15 @@ static void bind_evtchn_to_cpu(unsigned int chn, unsigned int cpu)
 	clear_bit(chn, per_cpu(cpu_evtchn_mask, cpu_evtchn[chn]));
 	set_bit(chn, per_cpu(cpu_evtchn_mask, cpu));
 	cpu_evtchn[chn] = cpu;
+}
+
+static void bind_evtchn_to_cpu(unsigned int chn, unsigned int cpu)
+{
+	int irq = evtchn_to_irq[chn];
+
+	_bind_evtchn_to_cpu(chn, cpu,
+			    irq != -1 ? irq_get_irq_data(irq) : NULL,
+			    cpumask_of(cpu));
 }
 
 static void init_evtchn_cpu_bindings(void)
@@ -308,6 +317,12 @@ static inline unsigned long active_evtchns(unsigned int idx)
 	shared_info_t *sh = HYPERVISOR_shared_info;
 
 	return (sh->evtchn_pending[idx] & ~sh->evtchn_mask[idx]);
+}
+
+static void _bind_evtchn_to_cpu(unsigned int chn, unsigned int cpu,
+				struct irq_data *data,
+				const struct cpumask *cpumask)
+{
 }
 
 static void bind_evtchn_to_cpu(unsigned int chn, unsigned int cpu)
@@ -842,7 +857,7 @@ void unbind_from_per_cpu_irq(unsigned int irq, unsigned int cpu,
 		}
 
 		/* Closed ports are implicitly re-bound to VCPU0. */
-		bind_evtchn_to_cpu(evtchn, 0);
+		_bind_evtchn_to_cpu(evtchn, 0, NULL, NULL);
 
 		evtchn_to_irq[evtchn] = -1;
 	}
@@ -1183,9 +1198,8 @@ static int set_affinity_irq(struct irq_data *data,
 	masked = test_and_set_evtchn_mask(port);
 	rc = HYPERVISOR_event_channel_op(EVTCHNOP_bind_vcpu, &ebv);
 	if (rc == 0) {
-		bind_evtchn_to_cpu(port, cpu);
-		rc = evtchn_to_irq[port] != -1 ? IRQ_SET_MASK_OK_NOCOPY
-					       : IRQ_SET_MASK_OK;
+		_bind_evtchn_to_cpu(port, cpu, data, dest);
+		rc = IRQ_SET_MASK_OK_NOCOPY;
 	}
 	if (!masked)
 		unmask_evtchn(port);
@@ -1348,7 +1362,7 @@ static void enable_pirq(struct irq_data *data)
 	pirq_query_unmask(irq);
 
 	evtchn_to_irq[evtchn] = irq;
-	bind_evtchn_to_cpu(evtchn, 0);
+	_bind_evtchn_to_cpu(evtchn, 0, NULL, NULL);
 	cfg->info = mk_irq_info(IRQT_PIRQ, bind_pirq.pirq, evtchn);
 
  out:
@@ -1608,7 +1622,7 @@ static void restore_cpu_virqs(unsigned int cpu)
 				per_cpu(virq_to_evtchn, cpu)[virq] = evtchn;
 		}
 #endif
-		bind_evtchn_to_cpu(evtchn, cpu);
+		_bind_evtchn_to_cpu(evtchn, cpu, NULL, NULL);
 
 		/* Ready for use. */
 		unmask_evtchn(evtchn);
@@ -1652,7 +1666,7 @@ static void restore_cpu_ipis(unsigned int cpu)
 #else
 		per_cpu(ipi_evtchn, cpu) = evtchn;
 #endif
-		bind_evtchn_to_cpu(evtchn, cpu);
+		_bind_evtchn_to_cpu(evtchn, cpu, NULL, NULL);
 
 		/* Ready for use. */
 		if (!irqd_irq_disabled(data))

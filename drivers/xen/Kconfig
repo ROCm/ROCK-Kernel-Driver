@@ -300,6 +300,9 @@ choice
 	config XEN_COMPAT_040100_AND_LATER
 		bool "4.1.0 and later"
 
+	config XEN_COMPAT_040200_AND_LATER
+		bool "4.2.0 and later"
+
 	config XEN_COMPAT_LATEST_ONLY
 		bool "no compatibility code"
 
@@ -308,6 +311,7 @@ endchoice
 config XEN_COMPAT
 	hex
 	default 0xffffff if XEN_COMPAT_LATEST_ONLY
+	default 0x040200 if XEN_COMPAT_040200_AND_LATER
 	default 0x040100 if XEN_COMPAT_040100_AND_LATER
 	default 0x040000 if XEN_COMPAT_040000_AND_LATER
 	default 0x030400 if XEN_COMPAT_030400_AND_LATER

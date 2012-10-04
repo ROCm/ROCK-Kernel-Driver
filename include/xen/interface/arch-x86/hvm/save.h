@@ -577,13 +577,21 @@ DECLARE_HVM_SAVE_TYPE(VIRIDIAN_VCPU, 17, struct hvm_viridian_vcpu_context);
 
 struct hvm_vmce_vcpu {
     uint64_t caps;
+    uint64_t mci_ctl2_bank0;
+    uint64_t mci_ctl2_bank1;
 };
 
 DECLARE_HVM_SAVE_TYPE(VMCE_VCPU, 18, struct hvm_vmce_vcpu);
 
+struct hvm_tsc_adjust {
+    uint64_t tsc_adjust;
+};
+
+DECLARE_HVM_SAVE_TYPE(TSC_ADJUST, 19, struct hvm_tsc_adjust);
+
 /* 
  * Largest type-code in use
  */
-#define HVM_SAVE_CODE_MAX 18
+#define HVM_SAVE_CODE_MAX 19
 
 #endif /* __XEN_PUBLIC_HVM_SAVE_X86_H__ */

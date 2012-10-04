@@ -364,9 +364,6 @@ static void scsifront_backend_changed(struct xenbus_device *dev,
 	case XenbusStateUnknown:
 	case XenbusStateInitialising:
 	case XenbusStateInitWait:
-	case XenbusStateClosed:
-		break;
-
 	case XenbusStateInitialised:
 		break;
 
@@ -382,6 +379,10 @@ static void scsifront_backend_changed(struct xenbus_device *dev,
 		xenbus_switch_state(dev, XenbusStateConnected);
 		break;
 
+	case XenbusStateClosed:
+		if (dev->state == XenbusStateClosed)
+			break;
+		/* Missed the backend's Closing state -- fallthrough */
 	case XenbusStateClosing:
 		scsifront_disconnect(info);
 		break;
