@@ -415,8 +415,7 @@ enum {
  * The guest ID is a 64 bit entity and the structure of this ID is
  * specified in the Hyper-V specification:
  *
- * http://msdn.microsoft.com/en-us/library/windows/
- * hardware/ff542653%28v=vs.85%29.aspx
+ * http://msdn.microsoft.com/en-us/library/windows/hardware/ff542653%28v=vs.85%29.aspx
  *
  * While the current guideline does not specify how Linux guest ID(s)
  * need to be generated, our plan is to publish the guidelines for
