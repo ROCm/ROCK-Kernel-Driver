@@ -10,20 +10,17 @@
 #define _ASM_X86_XEN_INTERFACE_H
 
 #ifdef __XEN__
-#define ___DEFINE_XEN_GUEST_HANDLE(name, type) \
+#define __DEFINE_GUEST_HANDLE(name, type) \
     typedef struct { type *p; } __guest_handle_ ## name
 #else
-#define ___DEFINE_XEN_GUEST_HANDLE(name, type) \
+#define __DEFINE_GUEST_HANDLE(name, type) \
     typedef type * __guest_handle_ ## name
 #endif
 
-#define __DEFINE_XEN_GUEST_HANDLE(name, type) \
-    ___DEFINE_XEN_GUEST_HANDLE(name, type);   \
-    ___DEFINE_XEN_GUEST_HANDLE(const_##name, const type)
 #define DEFINE_GUEST_HANDLE_STRUCT(name) \
-	__DEFINE_XEN_GUEST_HANDLE(name, struct name)
-#define DEFINE_XEN_GUEST_HANDLE(name) __DEFINE_XEN_GUEST_HANDLE(name, name)
-#define XEN_GUEST_HANDLE(name)        __guest_handle_ ## name
+	__DEFINE_GUEST_HANDLE(name, struct name)
+#define DEFINE_GUEST_HANDLE(name) __DEFINE_GUEST_HANDLE(name, name)
+#define GUEST_HANDLE(name)        __guest_handle_ ## name
 
 #ifdef __XEN__
 #if defined(__i386__)
@@ -50,8 +47,22 @@
 #endif
 
 #ifndef __ASSEMBLY__
+/* Explicitly size integers that represent pfns in the public interface
+ * with Xen so that on ARM we can have one ABI that works for 32 and 64
+ * bit guests. */
 typedef unsigned long xen_pfn_t;
 typedef unsigned long xen_ulong_t;
+/* Guest handles for primitive C types. */
+__DEFINE_GUEST_HANDLE(uchar, unsigned char);
+__DEFINE_GUEST_HANDLE(uint,  unsigned int);
+__DEFINE_GUEST_HANDLE(ulong, unsigned long);
+DEFINE_GUEST_HANDLE(char);
+DEFINE_GUEST_HANDLE(int);
+DEFINE_GUEST_HANDLE(long);
+DEFINE_GUEST_HANDLE(void);
+DEFINE_GUEST_HANDLE(uint64_t);
+DEFINE_GUEST_HANDLE(uint32_t);
+DEFINE_GUEST_HANDLE(xen_pfn_t);
 #endif
 
 #ifndef HYPERVISOR_VIRT_START
@@ -63,7 +74,7 @@ typedef unsigned long xen_ulong_t;
 #define MACH2PHYS_NR_ENTRIES  ((MACH2PHYS_VIRT_END-MACH2PHYS_VIRT_START)>>__MACH2PHYS_SHIFT)
 
 /* Maximum number of virtual CPUs in multi-processor guests. */
-#define XEN_LEGACY_MAX_VCPUS 32
+#define MAX_VIRT_CPUS 32
 
 /*
  * SEGMENT DESCRIPTOR TABLES
@@ -111,10 +122,12 @@ struct arch_shared_info {
 #endif	/* !__ASSEMBLY__ */
 
 #ifdef CONFIG_X86_32
-#include "interface_32.h"
+#include <asm/xen/interface_32.h>
 #else
-#include "interface_64.h"
+#include <asm/xen/interface_64.h>
 #endif
+
+#include <asm/pvclock-abi.h>
 
 #ifndef __ASSEMBLY__
 /*

@@ -116,13 +116,6 @@
 #include <asm/fbio.h>
 #endif
 
-#ifdef CONFIG_XEN
-#include <xen/interface/xen.h>
-#include <xen/public/evtchn.h>
-#include <xen/public/privcmd.h>
-#include <xen/compat_ioctl.h>
-#endif
-
 static int w_long(unsigned int fd, unsigned int cmd,
 		compat_ulong_t __user *argp)
 {
@@ -873,6 +866,12 @@ COMPATIBLE_IOCTL(TIOCGPTN)
 COMPATIBLE_IOCTL(TIOCSPTLCK)
 COMPATIBLE_IOCTL(TIOCSERGETLSR)
 COMPATIBLE_IOCTL(TIOCSIG)
+#ifdef TIOCSRS485
+COMPATIBLE_IOCTL(TIOCSRS485)
+#endif
+#ifdef TIOCGRS485
+COMPATIBLE_IOCTL(TIOCGRS485)
+#endif
 #ifdef TCGETS2
 COMPATIBLE_IOCTL(TCGETS2)
 COMPATIBLE_IOCTL(TCSETS2)
@@ -904,6 +903,8 @@ COMPATIBLE_IOCTL(KDGKBSENT)
 COMPATIBLE_IOCTL(KDSKBSENT)
 COMPATIBLE_IOCTL(KDGKBDIACR)
 COMPATIBLE_IOCTL(KDSKBDIACR)
+COMPATIBLE_IOCTL(KDGKBDIACRUC)
+COMPATIBLE_IOCTL(KDSKBDIACRUC)
 COMPATIBLE_IOCTL(KDKBDREP)
 COMPATIBLE_IOCTL(KDGKBLED)
 COMPATIBLE_IOCTL(KDGETLED)
@@ -1421,16 +1422,6 @@ IGNORE_IOCTL(FBIOGETCMAP32)
 IGNORE_IOCTL(FBIOSCURSOR32)
 IGNORE_IOCTL(FBIOGCURSOR32)
 #endif
-
-#ifdef CONFIG_XEN
-COMPATIBLE_IOCTL(IOCTL_PRIVCMD_HYPERCALL)
-COMPATIBLE_IOCTL(IOCTL_EVTCHN_BIND_VIRQ)
-COMPATIBLE_IOCTL(IOCTL_EVTCHN_BIND_INTERDOMAIN)
-COMPATIBLE_IOCTL(IOCTL_EVTCHN_BIND_UNBOUND_PORT)
-COMPATIBLE_IOCTL(IOCTL_EVTCHN_UNBIND)
-COMPATIBLE_IOCTL(IOCTL_EVTCHN_NOTIFY)
-COMPATIBLE_IOCTL(IOCTL_EVTCHN_RESET)
-#endif
 };
 
 /*
@@ -1487,12 +1478,6 @@ static long do_ioctl_trans(int fd, unsigned int cmd,
 		return do_video_stillpicture(fd, cmd, argp);
 	case VIDEO_SET_SPU_PALETTE:
 		return do_video_set_spu_palette(fd, cmd, argp);
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
-	case IOCTL_PRIVCMD_MMAP_32:
-	case IOCTL_PRIVCMD_MMAPBATCH_32:
-	case IOCTL_PRIVCMD_MMAPBATCH_V2_32:
-		return privcmd_ioctl_32(fd, cmd, argp);
-#endif
 	}
 
 	/*
@@ -1554,16 +1539,13 @@ static int compat_ioctl_check_table(unsigned int xcmd)
 asmlinkage long compat_sys_ioctl(unsigned int fd, unsigned int cmd,
 				unsigned long arg)
 {
-	struct file *filp;
+	struct fd f = fdget(fd);
 	int error = -EBADF;
-	int fput_needed;
-
-	filp = fget_light(fd, &fput_needed);
-	if (!filp)
+	if (!f.file)
 		goto out;
 
 	/* RED-PEN how should LSM module know it's handling 32bit? */
-	error = security_file_ioctl(filp, cmd, arg);
+	error = security_file_ioctl(f.file, cmd, arg);
 	if (error)
 		goto out_fput;
 
@@ -1583,30 +1565,30 @@ asmlinkage long compat_sys_ioctl(unsigned int fd, unsigned int cmd,
 #if defined(CONFIG_IA64) || defined(CONFIG_X86_64)
 	case FS_IOC_RESVSP_32:
 	case FS_IOC_RESVSP64_32:
-		error = compat_ioctl_preallocate(filp, compat_ptr(arg));
+		error = compat_ioctl_preallocate(f.file, compat_ptr(arg));
 		goto out_fput;
 #else
 	case FS_IOC_RESVSP:
 	case FS_IOC_RESVSP64:
-		error = ioctl_preallocate(filp, compat_ptr(arg));
+		error = ioctl_preallocate(f.file, compat_ptr(arg));
 		goto out_fput;
 #endif
 
 	case FIBMAP:
 	case FIGETBSZ:
 	case FIONREAD:
-		if (S_ISREG(filp->f_path.dentry->d_inode->i_mode))
+		if (S_ISREG(f.file->f_path.dentry->d_inode->i_mode))
 			break;
 		/*FALL THROUGH*/
 
 	default:
-		if (filp->f_op && filp->f_op->compat_ioctl) {
-			error = filp->f_op->compat_ioctl(filp, cmd, arg);
+		if (f.file->f_op && f.file->f_op->compat_ioctl) {
+			error = f.file->f_op->compat_ioctl(f.file, cmd, arg);
 			if (error != -ENOIOCTLCMD)
 				goto out_fput;
 		}
 
-		if (!filp->f_op || !filp->f_op->unlocked_ioctl)
+		if (!f.file->f_op || !f.file->f_op->unlocked_ioctl)
 			goto do_ioctl;
 		break;
 	}
@@ -1614,7 +1596,7 @@ asmlinkage long compat_sys_ioctl(unsigned int fd, unsigned int cmd,
 	if (compat_ioctl_check_table(XFORM(cmd)))
 		goto found_handler;
 
-	error = do_ioctl_trans(fd, cmd, arg, filp);
+	error = do_ioctl_trans(fd, cmd, arg, f.file);
 	if (error == -ENOIOCTLCMD)
 		error = -ENOTTY;
 
@@ -1623,9 +1605,9 @@ asmlinkage long compat_sys_ioctl(unsigned int fd, unsigned int cmd,
  found_handler:
 	arg = (unsigned long)compat_ptr(arg);
  do_ioctl:
-	error = do_vfs_ioctl(filp, fd, cmd, arg);
+	error = do_vfs_ioctl(f.file, fd, cmd, arg);
  out_fput:
-	fput_light(filp, fput_needed);
+	fdput(f);
  out:
 	return error;
 }

@@ -15,9 +15,6 @@
 #define map_page_into_agp(page) set_pages_uc(page, 1)
 #define unmap_page_from_agp(page) set_pages_wb(page, 1)
 
-#define map_pages_into_agp set_pages_array_uc
-#define unmap_pages_from_agp set_pages_array_wb
-
 /*
  * Could use CLFLUSH here if the cpu supports it. But then it would
  * need to be called for each cacheline of the whole page so it may

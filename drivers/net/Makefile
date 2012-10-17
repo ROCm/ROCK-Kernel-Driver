@@ -21,6 +21,7 @@ obj-$(CONFIG_NET_TEAM) += team/
 obj-$(CONFIG_TUN) += tun.o
 obj-$(CONFIG_VETH) += veth.o
 obj-$(CONFIG_VIRTIO_NET) += virtio_net.o
+obj-$(CONFIG_VXLAN) += vxlan.o
 
 #
 # Networking Drivers
@@ -53,10 +54,11 @@ obj-$(CONFIG_SUNGEM_PHY) += sungem_phy.o
 obj-$(CONFIG_WAN) += wan/
 obj-$(CONFIG_WLAN) += wireless/
 obj-$(CONFIG_WIMAX) += wimax/
+obj-$(CONFIG_IEEE802154) += ieee802154/
 
 obj-$(CONFIG_VMXNET3) += vmxnet3/
-obj-$(CONFIG_PARAVIRT_XEN_NETDEV_FRONTEND) += xen-netfront.o
-obj-$(CONFIG_PARAVIRT_XEN_NETDEV_BACKEND) += xen-netback/
+obj-$(CONFIG_XEN_NETDEV_FRONTEND) += xen-netfront.o
+obj-$(CONFIG_XEN_NETDEV_BACKEND) += xen-netback/
 
 obj-$(CONFIG_USB_CATC)          += usb/
 obj-$(CONFIG_USB_KAWETH)        += usb/

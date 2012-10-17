@@ -138,9 +138,9 @@ void acpi_penalize_isa_irq(int irq, int active);
 void acpi_pci_irq_disable (struct pci_dev *dev);
 
 struct acpi_pci_driver {
-	struct acpi_pci_driver *next;
-	int (*add)(acpi_handle handle);
-	void (*remove)(acpi_handle handle);
+	struct list_head node;
+	int (*add)(struct acpi_pci_root *root);
+	void (*remove)(struct acpi_pci_root *root);
 };
 
 int acpi_pci_register_driver(struct acpi_pci_driver *driver);
@@ -256,8 +256,6 @@ int acpi_check_region(resource_size_t start, resource_size_t n,
 		      const char *name);
 
 int acpi_resources_are_enforced(void);
-
-int acpi_pci_get_root_seg_bbn(char *hid, char *uid, int *seg, int *bbn);
 
 #ifdef CONFIG_PM_SLEEP
 void __init acpi_no_s4_hw_signature(void);

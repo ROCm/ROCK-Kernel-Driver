@@ -17,7 +17,6 @@
 SVGA_MODE	:= -DSVGA_MODE=NORMAL_VGA
 
 targets		:= vmlinux.bin setup.bin setup.elf bzImage
-targets		+= vmlinuz vmlinux-stripped
 targets		+= fdimage fdimage144 fdimage288 image.iso mtools.conf
 subdir-		:= compressed
 
@@ -38,7 +37,8 @@ setup-y		+= video-bios.o
 targets		+= $(setup-y)
 hostprogs-y	:= mkcpustr tools/build
 
-HOST_EXTRACFLAGS += -I$(srctree)/tools/include $(LINUXINCLUDE) \
+HOST_EXTRACFLAGS += -I$(srctree)/tools/include \
+		    -include include/generated/autoconf.h \
 	            -D__EXPORTED_HEADERS__
 
 $(obj)/cpu.o: $(obj)/cpustr.h
@@ -53,7 +53,7 @@ $(obj)/cpustr.h: $(obj)/mkcpustr FORCE
 
 # How to compile the 16-bit code.  Note we always compile for -march=i386,
 # that way we can complain to the user if the CPU is insufficient.
-KBUILD_CFLAGS	:= $(LINUXINCLUDE) -g -Os -D_SETUP -D__KERNEL__ \
+KBUILD_CFLAGS	:= $(USERINCLUDE) -g -Os -D_SETUP -D__KERNEL__ \
 		   -DDISABLE_BRANCH_PROFILING \
 		   -Wall -Wstrict-prototypes \
 		   -march=i386 -mregparm=3 \
@@ -190,20 +190,6 @@ bzlilo: $(obj)/bzImage
 	cp System.map $(INSTALL_PATH)/
 	if [ -x /sbin/lilo ]; then /sbin/lilo; else /etc/lilo/install; fi
 
-$(obj)/vmlinuz: $(obj)/vmlinux-stripped FORCE
-	$(call if_changed,gzip)
-	@echo 'Kernel: $@ is ready' ' (#'`cat .version`')'
-
-$(obj)/vmlinux-stripped: OBJCOPYFLAGS := -g --strip-unneeded
-$(obj)/vmlinux-stripped: vmlinux FORCE
-	$(call if_changed,objcopy)
-
-ifndef CONFIG_XEN
-bzImage := bzImage
-else
-bzImage := vmlinuz
-endif
-
 install:
-	sh $(srctree)/$(src)/install.sh $(KERNELRELEASE) $(obj)/$(bzImage) \
+	sh $(srctree)/$(src)/install.sh $(KERNELRELEASE) $(obj)/bzImage \
 		System.map "$(INSTALL_PATH)"

@@ -29,6 +29,7 @@
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/interrupt.h>
+#include <linux/dca.h>
 #include <linux/slab.h>
 #include "dma.h"
 #include "dma_v2.h"
@@ -38,6 +39,17 @@
 MODULE_VERSION(IOAT_DMA_VERSION);
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_AUTHOR("Intel Corporation");
+
+#define PCI_DEVICE_ID_INTEL_IOAT_IVB0	0x0e20
+#define PCI_DEVICE_ID_INTEL_IOAT_IVB1	0x0e21
+#define PCI_DEVICE_ID_INTEL_IOAT_IVB2	0x0e22
+#define PCI_DEVICE_ID_INTEL_IOAT_IVB3	0x0e23
+#define PCI_DEVICE_ID_INTEL_IOAT_IVB4	0x0e24
+#define PCI_DEVICE_ID_INTEL_IOAT_IVB5	0x0e25
+#define PCI_DEVICE_ID_INTEL_IOAT_IVB6	0x0e26
+#define PCI_DEVICE_ID_INTEL_IOAT_IVB7	0x0e27
+#define PCI_DEVICE_ID_INTEL_IOAT_IVB8	0x0e2e
+#define PCI_DEVICE_ID_INTEL_IOAT_IVB9	0x0e2f
 
 static struct pci_device_id ioat_pci_tbl[] = {
 	/* I/OAT v1 platforms */
@@ -81,6 +93,17 @@ static struct pci_device_id ioat_pci_tbl[] = {
 	{ PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_IOAT_SNB7) },
 	{ PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_IOAT_SNB8) },
 	{ PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_IOAT_SNB9) },
+
+	{ PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_IOAT_IVB0) },
+	{ PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_IOAT_IVB1) },
+	{ PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_IOAT_IVB2) },
+	{ PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_IOAT_IVB3) },
+	{ PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_IOAT_IVB4) },
+	{ PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_IOAT_IVB5) },
+	{ PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_IOAT_IVB6) },
+	{ PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_IOAT_IVB7) },
+	{ PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_IOAT_IVB8) },
+	{ PCI_VDEVICE(INTEL, PCI_DEVICE_ID_INTEL_IOAT_IVB9) },
 
 	{ 0, }
 };
@@ -180,7 +203,11 @@ static void __devexit ioat_remove(struct pci_dev *pdev)
 		return;
 
 	dev_err(&pdev->dev, "Removing dma and dca services\n");
-	ioat_remove_dca_provider(pdev);
+	if (device->dca) {
+		unregister_dca_provider(device->dca, &pdev->dev);
+		free_dca_provider(device->dca);
+		device->dca = NULL;
+	}
 	ioat_dma_remove(device);
 }
 

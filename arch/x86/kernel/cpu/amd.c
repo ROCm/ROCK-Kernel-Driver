@@ -367,7 +367,7 @@ static void __cpuinit amd_detect_cmp(struct cpuinfo_x86 *c)
 int amd_get_nb_id(int cpu)
 {
 	int id = 0;
-#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
+#ifdef CONFIG_SMP
 	id = per_cpu(cpu_llc_id, cpu);
 #endif
 	return id;
@@ -504,7 +504,7 @@ static void __cpuinit early_init_amd(struct cpuinfo_x86 *c)
 		    (c->x86_model == 8 && c->x86_mask >= 8))
 			set_cpu_cap(c, X86_FEATURE_K6_MTRR);
 #endif
-#if defined(CONFIG_X86_LOCAL_APIC) && defined(CONFIG_PCI) && !defined(CONFIG_XEN)
+#if defined(CONFIG_X86_LOCAL_APIC) && defined(CONFIG_PCI)
 	/* check CPU config space for extended APIC ID */
 	if (cpu_has_apic && c->x86 >= 0xf) {
 		unsigned int val;
@@ -517,9 +517,7 @@ static void __cpuinit early_init_amd(struct cpuinfo_x86 *c)
 
 static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 {
-#ifndef CONFIG_XEN
 	u32 dummy;
-#endif
 
 #ifdef CONFIG_SMP
 	unsigned long long value;
@@ -564,26 +562,18 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 			u64 val;
 
 			clear_cpu_cap(c, X86_FEATURE_LAHF_LM);
-#ifndef CONFIG_XEN
 			if (!rdmsrl_amd_safe(0xc001100d, &val)) {
 				val &= ~(1ULL << 32);
 				wrmsrl_amd_safe(0xc001100d, val);
 			}
-#else
-			pr_warning("Long-mode LAHF feature wrongly enabled -"
-				   "hypervisor update needed\n");
-			(void)&val;
-#endif
 		}
 
 	}
 	if (c->x86 >= 0x10)
 		set_cpu_cap(c, X86_FEATURE_REP_GOOD);
 
-#ifndef CONFIG_XEN
 	/* get apicid instead of initial apic id from cpuid */
 	c->apicid = hard_smp_processor_id();
-#endif
 #else
 
 	/*
@@ -623,7 +613,6 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 		}
 	}
 
-#ifndef CONFIG_XEN
 	/* re-enable TopologyExtensions if switched off by BIOS */
 	if ((c->x86 == 0x15) &&
 	    (c->x86_model >= 0x10) && (c->x86_model <= 0x1f) &&
@@ -641,7 +630,6 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 			}
 		}
 	}
-#endif
 
 	cpu_detect_cache_sizes(c);
 
@@ -679,7 +667,6 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 		fam10h_check_enable_mmcfg();
 	}
 
-#ifndef CONFIG_XEN
 	if (c == &boot_cpu_data && c->x86 >= 0xf) {
 		unsigned long long tseg;
 
@@ -699,7 +686,6 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 		}
 	}
 #endif
-#endif
 
 	/*
 	 * Family 0x12 and above processors have APIC timer
@@ -708,7 +694,6 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 	if (c->x86 > 0x11)
 		set_cpu_cap(c, X86_FEATURE_ARAT);
 
-#ifndef CONFIG_XEN
 	/*
 	 * Disable GART TLB Walk Errors on Fam10h. We do this here
 	 * because this is always needed when GART is enabled, even in a
@@ -732,7 +717,6 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 	}
 
 	rdmsr_safe(MSR_AMD64_PATCH_LEVEL, &c->microcode, &dummy);
-#endif
 }
 
 #ifdef CONFIG_X86_32
@@ -753,6 +737,72 @@ static unsigned int __cpuinit amd_size_cache(struct cpuinfo_x86 *c,
 }
 #endif
 
+static void __cpuinit cpu_set_tlb_flushall_shift(struct cpuinfo_x86 *c)
+{
+	if (!cpu_has_invlpg)
+		return;
+
+	tlb_flushall_shift = 5;
+
+	if (c->x86 <= 0x11)
+		tlb_flushall_shift = 4;
+}
+
+static void __cpuinit cpu_detect_tlb_amd(struct cpuinfo_x86 *c)
+{
+	u32 ebx, eax, ecx, edx;
+	u16 mask = 0xfff;
+
+	if (c->x86 < 0xf)
+		return;
+
+	if (c->extended_cpuid_level < 0x80000006)
+		return;
+
+	cpuid(0x80000006, &eax, &ebx, &ecx, &edx);
+
+	tlb_lld_4k[ENTRIES] = (ebx >> 16) & mask;
+	tlb_lli_4k[ENTRIES] = ebx & mask;
+
+	/*
+	 * K8 doesn't have 2M/4M entries in the L2 TLB so read out the L1 TLB
+	 * characteristics from the CPUID function 0x80000005 instead.
+	 */
+	if (c->x86 == 0xf) {
+		cpuid(0x80000005, &eax, &ebx, &ecx, &edx);
+		mask = 0xff;
+	}
+
+	/* Handle DTLB 2M and 4M sizes, fall back to L1 if L2 is disabled */
+	if (!((eax >> 16) & mask)) {
+		u32 a, b, c, d;
+
+		cpuid(0x80000005, &a, &b, &c, &d);
+		tlb_lld_2m[ENTRIES] = (a >> 16) & 0xff;
+	} else {
+		tlb_lld_2m[ENTRIES] = (eax >> 16) & mask;
+	}
+
+	/* a 4M entry uses two 2M entries */
+	tlb_lld_4m[ENTRIES] = tlb_lld_2m[ENTRIES] >> 1;
+
+	/* Handle ITLB 2M and 4M sizes, fall back to L1 if L2 is disabled */
+	if (!(eax & mask)) {
+		/* Erratum 658 */
+		if (c->x86 == 0x15 && c->x86_model <= 0x1f) {
+			tlb_lli_2m[ENTRIES] = 1024;
+		} else {
+			cpuid(0x80000005, &eax, &ebx, &ecx, &edx);
+			tlb_lli_2m[ENTRIES] = eax & 0xff;
+		}
+	} else
+		tlb_lli_2m[ENTRIES] = eax & mask;
+
+	tlb_lli_4m[ENTRIES] = tlb_lli_2m[ENTRIES] >> 1;
+
+	cpu_set_tlb_flushall_shift(c);
+}
+
 static const struct cpu_dev __cpuinitconst amd_cpu_dev = {
 	.c_vendor	= "AMD",
 	.c_ident	= { "AuthenticAMD" },
@@ -772,6 +822,7 @@ static const struct cpu_dev __cpuinitconst amd_cpu_dev = {
 	.c_size_cache	= amd_size_cache,
 #endif
 	.c_early_init   = early_init_amd,
+	.c_detect_tlb	= cpu_detect_tlb_amd,
 	.c_bsp_init	= bsp_init_amd,
 	.c_init		= init_amd,
 	.c_x86_vendor	= X86_VENDOR_AMD,

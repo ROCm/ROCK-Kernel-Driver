@@ -37,6 +37,7 @@
 #include <linux/bio.h>		/* struct bio */
 #include <linux/buffer_head.h>	/* various write calls */
 #include <linux/prefetch.h>
+#include <linux/pagevec.h>
 
 #include "../pnfs.h"
 #include "../internal.h"
@@ -242,14 +243,6 @@ bl_end_par_io_read(void *data, int unused)
 	schedule_work(&rdata->task.u.tk_work);
 }
 
-static bool
-bl_check_alignment(u64 offset, u32 len, unsigned long blkmask)
-{
-	if ((offset & blkmask) || (len & blkmask))
-		return false;
-	return true;
-}
-
 static enum pnfs_try_status
 bl_read_pagelist(struct nfs_read_data *rdata)
 {
@@ -260,14 +253,14 @@ bl_read_pagelist(struct nfs_read_data *rdata)
 	sector_t isect, extent_length = 0;
 	struct parallel_io *par;
 	loff_t f_offset = rdata->args.offset;
+	size_t bytes_left = rdata->args.count;
+	unsigned int pg_offset, pg_len;
 	struct page **pages = rdata->args.pages;
 	int pg_index = rdata->args.pgbase >> PAGE_CACHE_SHIFT;
+	const bool is_dio = (header->dreq != NULL);
 
 	dprintk("%s enter nr_pages %u offset %lld count %u\n", __func__,
 	       rdata->pages.npages, f_offset, (unsigned int)rdata->args.count);
-
-	if (!bl_check_alignment(f_offset, rdata->args.count, PAGE_CACHE_MASK))
-		goto use_mds;
 
 	par = alloc_parallel(rdata);
 	if (!par)
@@ -298,36 +291,53 @@ bl_read_pagelist(struct nfs_read_data *rdata)
 				extent_length = min(extent_length, cow_length);
 			}
 		}
+
+		if (is_dio) {
+			pg_offset = f_offset & ~PAGE_CACHE_MASK;
+			if (pg_offset + bytes_left > PAGE_CACHE_SIZE)
+				pg_len = PAGE_CACHE_SIZE - pg_offset;
+			else
+				pg_len = bytes_left;
+
+			f_offset += pg_len;
+			bytes_left -= pg_len;
+			isect += (pg_offset >> SECTOR_SHIFT);
+		} else {
+			pg_offset = 0;
+			pg_len = PAGE_CACHE_SIZE;
+		}
+
 		hole = is_hole(be, isect);
 		if (hole && !cow_read) {
 			bio = bl_submit_bio(READ, bio);
 			/* Fill hole w/ zeroes w/o accessing device */
 			dprintk("%s Zeroing page for hole\n", __func__);
-			zero_user_segment(pages[i], 0, PAGE_CACHE_SIZE);
+			zero_user_segment(pages[i], pg_offset, pg_len);
 			print_page(pages[i]);
 			SetPageUptodate(pages[i]);
 		} else {
 			struct pnfs_block_extent *be_read;
 
 			be_read = (hole && cow_read) ? cow_read : be;
-			bio = bl_add_page_to_bio(bio, rdata->pages.npages - i,
+			bio = do_add_page_to_bio(bio, rdata->pages.npages - i,
 						 READ,
 						 isect, pages[i], be_read,
-						 bl_end_io_read, par);
+						 bl_end_io_read, par,
+						 pg_offset, pg_len);
 			if (IS_ERR(bio)) {
 				header->pnfs_error = PTR_ERR(bio);
 				bio = NULL;
 				goto out;
 			}
 		}
-		isect += PAGE_CACHE_SECTORS;
+		isect += (pg_len >> SECTOR_SHIFT);
 		extent_length -= PAGE_CACHE_SECTORS;
 	}
 	if ((isect << SECTOR_SHIFT) >= header->inode->i_size) {
 		rdata->res.eof = 1;
-		rdata->res.count = header->inode->i_size - f_offset;
+		rdata->res.count = header->inode->i_size - rdata->args.offset;
 	} else {
-		rdata->res.count = (isect << SECTOR_SHIFT) - f_offset;
+		rdata->res.count = (isect << SECTOR_SHIFT) - rdata->args.offset;
 	}
 out:
 	bl_put_extent(be);
@@ -688,10 +698,13 @@ bl_write_pagelist(struct nfs_write_data *wdata, int sync)
 	    NFS_SERVER(header->inode)->pnfs_blksize >> PAGE_CACHE_SHIFT;
 
 	dprintk("%s enter, %Zu@%lld\n", __func__, count, offset);
-	/* Check for alignment first */
-	if (!bl_check_alignment(offset, count, PAGE_CACHE_MASK))
-		goto out_mds;
 
+	if (header->dreq != NULL &&
+	    (!IS_ALIGNED(offset, NFS_SERVER(header->inode)->pnfs_blksize) ||
+	     !IS_ALIGNED(count, NFS_SERVER(header->inode)->pnfs_blksize))) {
+		dprintk("pnfsblock nonblock aligned DIO writes. Resend MDS\n");
+		goto out_mds;
+	}
 	/* At this point, wdata->pages is a (sequential) list of nfs_pages.
 	 * We want to write each, and if there is an error set pnfs_error
 	 * to have it redone using nfs.
@@ -1027,7 +1040,7 @@ static void free_blk_mountid(struct block_mount_id *mid)
 	}
 }
 
-/* This is mostly copied from the filelayout's get_device_info function.
+/* This is mostly copied from the filelayout_get_device_info function.
  * It seems much of this should be at the generic pnfs level.
  */
 static struct pnfs_block_dev *
@@ -1164,33 +1177,95 @@ bl_clear_layoutdriver(struct nfs_server *server)
 	return 0;
 }
 
+static bool
+is_aligned_req(struct nfs_page *req, unsigned int alignment)
+{
+	return IS_ALIGNED(req->wb_offset, alignment) &&
+	       IS_ALIGNED(req->wb_bytes, alignment);
+}
+
 static void
 bl_pg_init_read(struct nfs_pageio_descriptor *pgio, struct nfs_page *req)
 {
-	if (!bl_check_alignment(req->wb_offset, req->wb_bytes, PAGE_CACHE_MASK))
+	if (pgio->pg_dreq != NULL &&
+	    !is_aligned_req(req, SECTOR_SIZE))
 		nfs_pageio_reset_read_mds(pgio);
 	else
 		pnfs_generic_pg_init_read(pgio, req);
 }
 
+static bool
+bl_pg_test_read(struct nfs_pageio_descriptor *pgio, struct nfs_page *prev,
+		struct nfs_page *req)
+{
+	if (pgio->pg_dreq != NULL &&
+	    !is_aligned_req(req, SECTOR_SIZE))
+		return false;
+
+	return pnfs_generic_pg_test(pgio, prev, req);
+}
+
+/*
+ * Return the number of contiguous bytes for a given inode
+ * starting at page frame idx.
+ */
+static u64 pnfs_num_cont_bytes(struct inode *inode, pgoff_t idx)
+{
+	struct address_space *mapping = inode->i_mapping;
+	pgoff_t end;
+
+	/* Optimize common case that writes from 0 to end of file */
+	end = DIV_ROUND_UP(i_size_read(inode), PAGE_CACHE_SIZE);
+	if (end != NFS_I(inode)->npages) {
+		rcu_read_lock();
+		end = radix_tree_next_hole(&mapping->page_tree, idx + 1, ULONG_MAX);
+		rcu_read_unlock();
+	}
+
+	if (!end)
+		return i_size_read(inode) - (idx << PAGE_CACHE_SHIFT);
+	else
+		return (end - idx) << PAGE_CACHE_SHIFT;
+}
+
 static void
 bl_pg_init_write(struct nfs_pageio_descriptor *pgio, struct nfs_page *req)
 {
-	if (!bl_check_alignment(req->wb_offset, req->wb_bytes, PAGE_CACHE_MASK))
+	if (pgio->pg_dreq != NULL &&
+	    !is_aligned_req(req, PAGE_CACHE_SIZE)) {
 		nfs_pageio_reset_write_mds(pgio);
-	else
-		pnfs_generic_pg_init_write(pgio, req);
+	} else {
+		u64 wb_size;
+		if (pgio->pg_dreq == NULL)
+			wb_size = pnfs_num_cont_bytes(pgio->pg_inode,
+						      req->wb_index);
+		else
+			wb_size = nfs_dreq_bytes_left(pgio->pg_dreq);
+
+		pnfs_generic_pg_init_write(pgio, req, wb_size);
+	}
+}
+
+static bool
+bl_pg_test_write(struct nfs_pageio_descriptor *pgio, struct nfs_page *prev,
+		 struct nfs_page *req)
+{
+	if (pgio->pg_dreq != NULL &&
+	    !is_aligned_req(req, PAGE_CACHE_SIZE))
+		return false;
+
+	return pnfs_generic_pg_test(pgio, prev, req);
 }
 
 static const struct nfs_pageio_ops bl_pg_read_ops = {
 	.pg_init = bl_pg_init_read,
-	.pg_test = pnfs_generic_pg_test,
+	.pg_test = bl_pg_test_read,
 	.pg_doio = pnfs_generic_pg_readpages,
 };
 
 static const struct nfs_pageio_ops bl_pg_write_ops = {
 	.pg_init = bl_pg_init_write,
-	.pg_test = pnfs_generic_pg_test,
+	.pg_test = bl_pg_test_write,
 	.pg_doio = pnfs_generic_pg_writepages,
 };
 

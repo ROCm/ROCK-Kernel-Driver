@@ -386,11 +386,6 @@ static inline int disable_irq_wake(unsigned int irq)
 }
 #endif /* CONFIG_GENERIC_HARDIRQS */
 
-#ifdef CONFIG_HAVE_IRQ_IGNORE_UNHANDLED
-int irq_ignore_unhandled(unsigned int irq);
-#else
-#define irq_ignore_unhandled(irq) 0
-#endif
 
 #ifdef CONFIG_IRQ_FORCED_THREADING
 extern bool force_irqthreads;
@@ -434,6 +429,8 @@ enum
 
 	NR_SOFTIRQS
 };
+
+#define SOFTIRQ_STOP_IDLE_MASK (~(1 << RCU_SOFTIRQ))
 
 /* map softirq index to softirq name. update 'softirq_to_name' in
  * kernel/softirq.c when adding a new softirq.

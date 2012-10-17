@@ -83,6 +83,7 @@ static int			mce_dont_log_ce		__read_mostly;
 int				mce_cmci_disabled	__read_mostly;
 int				mce_ignore_ce		__read_mostly;
 int				mce_ser			__read_mostly;
+int				mce_bios_cmci_threshold	__read_mostly;
 
 struct mce_bank                *mce_banks		__read_mostly;
 
@@ -121,10 +122,8 @@ void mce_setup(struct mce *m)
 	m->time = get_seconds();
 	m->cpuvendor = boot_cpu_data.x86_vendor;
 	m->cpuid = cpuid_eax(1);
-#ifndef CONFIG_XEN
 	m->socketid = cpu_data(m->extcpu).phys_proc_id;
 	m->apicid = cpu_data(m->extcpu).initial_apicid;
-#endif
 	rdmsrl(MSR_IA32_MCG_CAP, m->mcgcap);
 }
 
@@ -271,14 +270,9 @@ static void print_mce(struct mce *m)
 	 * Note this output is parsed by external tools and old fields
 	 * should not be changed.
 	 */
-#ifndef CONFIG_XEN
 	pr_emerg(HW_ERR "PROCESSOR %u:%x TIME %llu SOCKET %u APIC %x microcode %x\n",
 		m->cpuvendor, m->cpuid, m->time, m->socketid, m->apicid,
 		cpu_data(m->extcpu).microcode);
-#else
-	pr_emerg(HW_ERR "PROCESSOR %u:%x TIME %llu SOCKET %u APIC %x\n",
-		m->cpuvendor, m->cpuid, m->time, m->socketid, m->apicid);
-#endif
 
 	/*
 	 * Print out human-readable details about the MCE error,
@@ -1267,18 +1261,19 @@ void mce_log_therm_throt_event(__u64 status)
  * Periodic polling timer for "silent" machine check errors.  If the
  * poller finds an MCE, poll 2x faster.  When the poller finds no more
  * errors, poll 2x slower (up to check_interval seconds).
- *
- * We will disable polling in DOM0 since all CMCI/Polling
- * mechanism will be done in XEN for Intel CPUs
  */
-#if defined (CONFIG_X86_XEN_MCE)
-static unsigned long check_interval = 0; /* disable polling */
-#else
 static unsigned long check_interval = 5 * 60; /* 5 minutes */
-#endif
 
 static DEFINE_PER_CPU(unsigned long, mce_next_interval); /* in jiffies */
 static DEFINE_PER_CPU(struct timer_list, mce_timer);
+
+static unsigned long mce_adjust_timer_default(unsigned long interval)
+{
+	return interval;
+}
+
+static unsigned long (*mce_adjust_timer)(unsigned long interval) =
+	mce_adjust_timer_default;
 
 static void mce_timer_fn(unsigned long data)
 {
@@ -1290,6 +1285,7 @@ static void mce_timer_fn(unsigned long data)
 	if (mce_available(__this_cpu_ptr(&cpu_info))) {
 		machine_check_poll(MCP_TIMESTAMP,
 				&__get_cpu_var(mce_poll_banks));
+		mce_intel_cmci_poll();
 	}
 
 	/*
@@ -1297,14 +1293,38 @@ static void mce_timer_fn(unsigned long data)
 	 * polling interval, otherwise increase the polling interval.
 	 */
 	iv = __this_cpu_read(mce_next_interval);
-	if (mce_notify_irq())
+	if (mce_notify_irq()) {
 		iv = max(iv / 2, (unsigned long) HZ/100);
-	else
+	} else {
 		iv = min(iv * 2, round_jiffies_relative(check_interval * HZ));
+		iv = mce_adjust_timer(iv);
+	}
 	__this_cpu_write(mce_next_interval, iv);
+	/* Might have become 0 after CMCI storm subsided */
+	if (iv) {
+		t->expires = jiffies + iv;
+		add_timer_on(t, smp_processor_id());
+	}
+}
 
-	t->expires = jiffies + iv;
-	add_timer_on(t, smp_processor_id());
+/*
+ * Ensure that the timer is firing in @interval from now.
+ */
+void mce_timer_kick(unsigned long interval)
+{
+	struct timer_list *t = &__get_cpu_var(mce_timer);
+	unsigned long when = jiffies + interval;
+	unsigned long iv = __this_cpu_read(mce_next_interval);
+
+	if (timer_pending(t)) {
+		if (time_before(when, t->expires))
+			mod_timer_pinned(t, when);
+	} else {
+		t->expires = round_jiffies(when);
+		add_timer_on(t, smp_processor_id());
+	}
+	if (interval < iv)
+		__this_cpu_write(mce_next_interval, interval);
 }
 
 /* Must not be called in IRQ context where del_timer_sync() can deadlock */
@@ -1476,7 +1496,6 @@ static int __cpuinit __mcheck_cpu_apply_quirks(struct cpuinfo_x86 *c)
 
 	/* This should be disabled by the BIOS, but isn't always */
 	if (c->x86_vendor == X86_VENDOR_AMD) {
-#ifndef CONFIG_XEN
 		if (c->x86 == 15 && banks > 4) {
 			/*
 			 * disable GART TBL walk error reporting, which
@@ -1485,7 +1504,6 @@ static int __cpuinit __mcheck_cpu_apply_quirks(struct cpuinfo_x86 *c)
 			 */
 			clear_bit(10, (unsigned long *)&mce_banks[4].ctl);
 		}
-#endif
 		if (c->x86 <= 17 && mce_bootlog < 0) {
 			/*
 			 * Lots of broken BIOS around that don't clear them
@@ -1598,10 +1616,10 @@ static int __cpuinit __mcheck_cpu_ancient_init(struct cpuinfo_x86 *c)
 
 static void __mcheck_cpu_init_vendor(struct cpuinfo_x86 *c)
 {
-#ifndef CONFIG_X86_64_XEN
 	switch (c->x86_vendor) {
 	case X86_VENDOR_INTEL:
 		mce_intel_feature_init(c);
+		mce_adjust_timer = mce_intel_adjust_timer;
 		break;
 	case X86_VENDOR_AMD:
 		mce_amd_feature_init(c);
@@ -1609,24 +1627,28 @@ static void __mcheck_cpu_init_vendor(struct cpuinfo_x86 *c)
 	default:
 		break;
 	}
-#endif
+}
+
+static void mce_start_timer(unsigned int cpu, struct timer_list *t)
+{
+	unsigned long iv = mce_adjust_timer(check_interval * HZ);
+
+	__this_cpu_write(mce_next_interval, iv);
+
+	if (mce_ignore_ce || !iv)
+		return;
+
+	t->expires = round_jiffies(jiffies + iv);
+	add_timer_on(t, smp_processor_id());
 }
 
 static void __mcheck_cpu_init_timer(void)
 {
 	struct timer_list *t = &__get_cpu_var(mce_timer);
-	unsigned long iv = check_interval * HZ;
+	unsigned int cpu = smp_processor_id();
 
-	setup_timer(t, mce_timer_fn, smp_processor_id());
-
-	if (mce_ignore_ce)
-		return;
-
-	__this_cpu_write(mce_next_interval, iv);
-	if (!iv)
-		return;
-	t->expires = round_jiffies(jiffies + iv);
-	add_timer_on(t, smp_processor_id());
+	setup_timer(t, mce_timer_fn, cpu);
+	mce_start_timer(cpu, t);
 }
 
 /* Handle unconfigured int18 (should never happen) */
@@ -1925,6 +1947,7 @@ static struct miscdevice mce_chrdev_device = {
  *	check, or 0 to not wait
  * mce=bootlog Log MCEs from before booting. Disabled by default on AMD.
  * mce=nobootlog Don't log MCEs from before booting.
+ * mce=bios_cmci_threshold Don't program the CMCI threshold
  */
 static int __init mcheck_enable(char *str)
 {
@@ -1944,6 +1967,8 @@ static int __init mcheck_enable(char *str)
 		mce_ignore_ce = 1;
 	else if (!strcmp(str, "bootlog") || !strcmp(str, "nobootlog"))
 		mce_bootlog = (str[0] == 'b');
+	else if (!strcmp(str, "bios_cmci_threshold"))
+		mce_bios_cmci_threshold = 1;
 	else if (isdigit(str[0])) {
 		get_option(&str, &tolerant);
 		if (*str == ',') {
@@ -2184,6 +2209,11 @@ static struct dev_ext_attribute dev_attr_cmci_disabled = {
 	&mce_cmci_disabled
 };
 
+static struct dev_ext_attribute dev_attr_bios_cmci_threshold = {
+	__ATTR(bios_cmci_threshold, 0444, device_show_int, NULL),
+	&mce_bios_cmci_threshold
+};
+
 static struct device_attribute *mce_device_attrs[] = {
 	&dev_attr_tolerant.attr,
 	&dev_attr_check_interval.attr,
@@ -2192,6 +2222,7 @@ static struct device_attribute *mce_device_attrs[] = {
 	&dev_attr_dont_log_ce.attr,
 	&dev_attr_ignore_ce.attr,
 	&dev_attr_cmci_disabled.attr,
+	&dev_attr_bios_cmci_threshold.attr,
 	NULL
 };
 
@@ -2312,38 +2343,33 @@ mce_cpu_callback(struct notifier_block *nfb, unsigned long action, void *hcpu)
 	unsigned int cpu = (unsigned long)hcpu;
 	struct timer_list *t = &per_cpu(mce_timer, cpu);
 
-	switch (action) {
+	switch (action & ~CPU_TASKS_FROZEN) {
 	case CPU_ONLINE:
-	case CPU_ONLINE_FROZEN:
 		mce_device_create(cpu);
 		if (threshold_cpu_callback)
 			threshold_cpu_callback(action, cpu);
 		break;
 	case CPU_DEAD:
-	case CPU_DEAD_FROZEN:
 		if (threshold_cpu_callback)
 			threshold_cpu_callback(action, cpu);
 		mce_device_remove(cpu);
+		mce_intel_hcpu_update(cpu);
 		break;
 	case CPU_DOWN_PREPARE:
-	case CPU_DOWN_PREPARE_FROZEN:
-		del_timer_sync(t);
 		smp_call_function_single(cpu, mce_disable_cpu, &action, 1);
+		del_timer_sync(t);
 		break;
 	case CPU_DOWN_FAILED:
-	case CPU_DOWN_FAILED_FROZEN:
-		if (!mce_ignore_ce && check_interval) {
-			t->expires = round_jiffies(jiffies +
-					per_cpu(mce_next_interval, cpu));
-			add_timer_on(t, cpu);
-		}
 		smp_call_function_single(cpu, mce_reenable_cpu, &action, 1);
-		break;
-	case CPU_POST_DEAD:
-		/* intentionally ignoring frozen here */
-		cmci_rediscover(cpu);
+		mce_start_timer(cpu, t);
 		break;
 	}
+
+	if (action == CPU_POST_DEAD) {
+		/* intentionally ignoring frozen here */
+		cmci_rediscover(cpu);
+	}
+
 	return NOTIFY_OK;
 }
 
@@ -2396,16 +2422,6 @@ static __init int mcheck_init_device(void)
 
 	/* register character device /dev/mcelog */
 	misc_register(&mce_chrdev_device);
-
-#ifdef CONFIG_X86_XEN_MCE
-	if (is_initial_xendomain()) {
-		/* Register vIRQ handler for MCE LOG processing */
-		extern int bind_virq_for_mce(void);
-
-		printk(KERN_DEBUG "MCE: bind virq for DOM0 logging\n");
-		bind_virq_for_mce();
-	}
-#endif
 
 	return err;
 }

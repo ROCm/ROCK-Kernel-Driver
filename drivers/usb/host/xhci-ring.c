@@ -2273,6 +2273,8 @@ static int process_bulk_intr_td(struct xhci_hcd *xhci, struct xhci_td *td,
  */
 static int handle_tx_event(struct xhci_hcd *xhci,
 		struct xhci_transfer_event *event)
+	__releases(&xhci->lock)
+	__acquires(&xhci->lock)
 {
 	struct xhci_virt_device *xdev;
 	struct xhci_virt_ep *ep;
@@ -2850,7 +2852,7 @@ static int prepare_ring(struct xhci_hcd *xhci, struct xhci_ring *ep_ring,
 			xhci_err(xhci, "Ring expansion failed\n");
 			return -ENOMEM;
 		}
-	};
+	}
 
 	if (enqueue_is_link_trb(ep_ring)) {
 		struct xhci_ring *ring = ep_ring;

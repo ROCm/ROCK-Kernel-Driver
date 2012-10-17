@@ -559,7 +559,7 @@ static void edac_mc_workq_setup(struct mem_ctl_info *mci, unsigned msec)
 		return;
 
 	INIT_DELAYED_WORK(&mci->work, edac_mc_workq_function);
-	queue_delayed_work(edac_workqueue, &mci->work, msecs_to_jiffies(msec));
+	mod_delayed_work(edac_workqueue, &mci->work, msecs_to_jiffies(msec));
 }
 
 /*
@@ -597,21 +597,6 @@ void edac_mc_reset_delay_period(int value)
 	struct mem_ctl_info *mci;
 	struct list_head *item;
 
-	mutex_lock(&mem_ctls_mutex);
-
-	/* scan the list and turn off all workq timers, doing so under lock
-	 */
-	list_for_each(item, &mc_devices) {
-		mci = list_entry(item, struct mem_ctl_info, link);
-
-		if (mci->op_state == OP_RUNNING_POLL)
-			cancel_delayed_work(&mci->work);
-	}
-
-	mutex_unlock(&mem_ctls_mutex);
-
-
-	/* re-walk the list, and reset the poll delay */
 	mutex_lock(&mem_ctls_mutex);
 
 	list_for_each(item, &mc_devices) {
@@ -844,10 +829,6 @@ static void edac_mc_scrub_block(unsigned long page, unsigned long offset,
 	unsigned long flags = 0;
 
 	edac_dbg(3, "\n");
-
-#ifdef CONFIG_XEN
-	page = mfn_to_local_pfn(page);
-#endif
 
 	/* ECC error page was not in our memory. Ignore it. */
 	if (!pfn_valid(page))

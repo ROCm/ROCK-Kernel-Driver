@@ -94,7 +94,6 @@ DECLARE_PER_CPU(unsigned long, cpu_dr7);
 
 static inline unsigned long native_get_debugreg(int regno)
 {
-#ifndef CONFIG_XEN
 	unsigned long val = 0;	/* Damn you, gcc! */
 
 	switch (regno) {
@@ -120,14 +119,10 @@ static inline unsigned long native_get_debugreg(int regno)
 		BUG();
 	}
 	return val;
-#else
-	return HYPERVISOR_get_debugreg(regno);
-#endif
 }
 
 static inline void native_set_debugreg(int regno, unsigned long value)
 {
-#ifndef CONFIG_XEN
 	switch (regno) {
 	case 0:
 		asm("mov %0, %%db0"	::"r" (value));
@@ -150,9 +145,6 @@ static inline void native_set_debugreg(int regno, unsigned long value)
 	default:
 		BUG();
 	}
-#else
-	WARN_ON(HYPERVISOR_set_debugreg(regno, value));
-#endif
 }
 
 static inline void hw_breakpoint_disable(void)
@@ -176,7 +168,7 @@ extern void aout_dump_debugregs(struct user *dump);
 
 extern void hw_breakpoint_restore(void);
 
-#if defined(CONFIG_X86_64) && !defined(CONFIG_X86_NO_IDT)
+#ifdef CONFIG_X86_64
 DECLARE_PER_CPU(int, debug_stack_usage);
 static inline void debug_stack_usage_inc(void)
 {

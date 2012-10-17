@@ -457,14 +457,6 @@ static int target_fabric_tf_ops_check(
 		pr_err("Missing tfo->queue_tm_rsp()\n");
 		return -EINVAL;
 	}
-	if (!tfo->set_fabric_sense_len) {
-		pr_err("Missing tfo->set_fabric_sense_len()\n");
-		return -EINVAL;
-	}
-	if (!tfo->get_fabric_sense_len) {
-		pr_err("Missing tfo->get_fabric_sense_len()\n");
-		return -EINVAL;
-	}
 	/*
 	 * We at least require tfo->fabric_make_wwn(), tfo->fabric_drop_wwn()
 	 * tfo->fabric_make_tpg() and tfo->fabric_drop_tpg() in
@@ -1208,7 +1200,7 @@ static ssize_t target_core_dev_pr_show_attr_res_pr_holder_tg_port(
 		" Target Node Endpoint: %s\n", tfo->get_fabric_name(),
 		tfo->tpg_get_wwn(se_tpg));
 	len += sprintf(page+len, "SPC-3 Reservation: Relative Port"
-		" Identifer Tag: %hu %s Portal Group Tag: %hu"
+		" Identifier Tag: %hu %s Portal Group Tag: %hu"
 		" %s Logical Unit: %u\n", lun->lun_sep->sep_rtpi,
 		tfo->get_fabric_name(), tfo->tpg_get_tag(se_tpg),
 		tfo->get_fabric_name(), lun->unpacked_lun);

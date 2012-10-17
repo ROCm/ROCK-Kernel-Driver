@@ -30,9 +30,9 @@
 
 #define pr_fmt(fmt) "[TTM] " fmt
 
-#include "ttm/ttm_module.h"
-#include "ttm/ttm_bo_driver.h"
-#include "ttm/ttm_placement.h"
+#include <drm/ttm/ttm_module.h>
+#include <drm/ttm/ttm_bo_driver.h>
+#include <drm/ttm/ttm_placement.h>
 #include <linux/jiffies.h>
 #include <linux/slab.h>
 #include <linux/sched.h>
@@ -1473,14 +1473,6 @@ int ttm_bo_global_init(struct drm_global_reference *ref)
 		ret = -ENOMEM;
 		goto out_no_drp;
 	}
-#ifdef CONFIG_XEN
-	ret = xen_limit_pages_to_max_mfn(glob->dummy_read_page, 0, 32);
-	if (!ret)
-		clear_page(page_address(glob->dummy_read_page));
-	else
-		printk(KERN_WARNING
-		       "Error restricting dummy read page: %d\n", ret);
-#endif
 
 	INIT_LIST_HEAD(&glob->swap_lru);
 	INIT_LIST_HEAD(&glob->device_list);

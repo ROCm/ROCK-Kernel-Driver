@@ -1592,13 +1592,6 @@ static void *__vmalloc_area_node(struct vm_struct *area, gfp_t gfp_mask,
 	struct page **pages;
 	unsigned int nr_pages, array_size, i;
 	gfp_t nested_gfp = (gfp_mask & GFP_RECLAIM_MASK) | __GFP_ZERO;
-#ifdef CONFIG_XEN
-	gfp_t dma_mask = gfp_mask & (__GFP_DMA | __GFP_DMA32);
-
-	BUILD_BUG_ON((__GFP_DMA | __GFP_DMA32) != (__GFP_DMA + __GFP_DMA32));
-	if (dma_mask == (__GFP_DMA | __GFP_DMA32))
-		gfp_mask &= ~(__GFP_DMA | __GFP_DMA32);
-#endif
 
 	nr_pages = (area->size - PAGE_SIZE) >> PAGE_SHIFT;
 	array_size = (nr_pages * sizeof(struct page *));
@@ -1635,16 +1628,6 @@ static void *__vmalloc_area_node(struct vm_struct *area, gfp_t gfp_mask,
 			goto fail;
 		}
 		area->pages[i] = page;
-#ifdef CONFIG_XEN
-		if (dma_mask) {
-			if (xen_limit_pages_to_max_mfn(page, 0, 32)) {
-				area->nr_pages = i + 1;
-				goto fail;
-			}
-			if (gfp_mask & __GFP_ZERO)
-				clear_highpage(page);
-		}
-#endif
 	}
 
 	if (map_vm_area(area, prot, &pages))
@@ -1870,8 +1853,6 @@ void *vmalloc_exec(unsigned long size)
 #define GFP_VMALLOC32 GFP_DMA32 | GFP_KERNEL
 #elif defined(CONFIG_64BIT) && defined(CONFIG_ZONE_DMA)
 #define GFP_VMALLOC32 GFP_DMA | GFP_KERNEL
-#elif defined(CONFIG_XEN)
-#define GFP_VMALLOC32 GFP_DMA | GFP_DMA32 | GFP_KERNEL
 #else
 #define GFP_VMALLOC32 GFP_KERNEL
 #endif
@@ -2182,8 +2163,7 @@ int remap_vmalloc_range(struct vm_area_struct *vma, void *addr,
 		usize -= PAGE_SIZE;
 	} while (usize > 0);
 
-	/* Prevent "things" like memory migration? VM_flags need a cleanup... */
-	vma->vm_flags |= VM_RESERVED;
+	vma->vm_flags |= VM_DONTEXPAND | VM_DONTDUMP;
 
 	return 0;
 }
@@ -2241,17 +2221,6 @@ struct vm_struct *alloc_vm_area(size_t size, pte_t **ptes)
 		free_vm_area(area);
 		return NULL;
 	}
-
-#ifdef CONFIG_XEN
-	/*
-	 * If the allocated address space is passed to a hypercall before
-	 * being used then we cannot rely on a page fault to trigger an update
-	 * of the page tables.  So sync all the page tables here unless the
-	 * caller is going to have the affected PTEs updated directly.
-	 */
-	if (!ptes)
-		vmalloc_sync_all();
-#endif
 
 	return area;
 }
@@ -2602,7 +2571,7 @@ static int s_show(struct seq_file *m, void *p)
 {
 	struct vm_struct *v = p;
 
-	seq_printf(m, "0x%p-0x%p %7ld",
+	seq_printf(m, "0x%pK-0x%pK %7ld",
 		v->addr, v->addr + v->size, v->size);
 
 	if (v->caller)

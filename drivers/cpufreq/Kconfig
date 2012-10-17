@@ -2,7 +2,6 @@ menu "CPU Frequency scaling"
 
 config CPU_FREQ
 	bool "CPU Frequency scaling"
-	depends on !PROCESSOR_EXTERNAL_CONTROL
 	help
 	  CPU Frequency scaling allows you to change the clock speed of 
 	  CPUs on the fly. This is a nice method to save power, because 
@@ -177,6 +176,17 @@ config CPU_FREQ_GOV_CONSERVATIVE
 	  module will be called cpufreq_conservative.
 
 	  For details, take a look at linux/Documentation/cpu-freq.
+
+	  If in doubt, say N.
+
+config GENERIC_CPUFREQ_CPU0
+	bool "Generic CPU0 cpufreq driver"
+	depends on HAVE_CLK && REGULATOR && PM_OPP && OF
+	select CPU_FREQ_TABLE
+	help
+	  This adds a generic cpufreq driver for CPU0 frequency management.
+	  It supports both uniprocessor (UP) and symmetric multiprocessor (SMP)
+	  systems which share clock and voltage across all CPUs.
 
 	  If in doubt, say N.
 

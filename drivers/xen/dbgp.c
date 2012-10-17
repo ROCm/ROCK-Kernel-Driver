@@ -2,11 +2,7 @@
 #include <linux/usb.h>
 #include <linux/usb/ehci_def.h>
 #include <linux/usb/hcd.h>
-#ifdef CONFIG_PARAVIRT_XEN
 #include <asm/xen/hypercall.h>
-#else
-#include <asm/hypervisor.h>
-#endif
 #include <xen/interface/physdev.h>
 #include <xen/xen.h>
 

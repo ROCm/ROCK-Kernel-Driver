@@ -89,7 +89,6 @@ int irq_set_handler_data(unsigned int irq, void *data)
 }
 EXPORT_SYMBOL(irq_set_handler_data);
 
-#ifndef CONFIG_XEN
 /**
  *	irq_set_msi_desc - set MSI descriptor data for an irq
  *	@irq:	Interrupt number
@@ -110,7 +109,6 @@ int irq_set_msi_desc(unsigned int irq, struct msi_desc *entry)
 	irq_put_desc_unlock(desc, flags);
 	return 0;
 }
-#endif
 
 /**
  *	irq_set_chip_data - set irq chip data for an irq
@@ -673,6 +671,7 @@ irq_set_chip_and_handler_name(unsigned int irq, struct irq_chip *chip,
 	irq_set_chip(irq, chip);
 	__irq_set_handler(irq, handle, 0, name);
 }
+EXPORT_SYMBOL_GPL(irq_set_chip_and_handler_name);
 
 void irq_modify_status(unsigned int irq, unsigned long clr, unsigned long set)
 {

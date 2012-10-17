@@ -22,7 +22,6 @@
 #include <linux/timer.h>
 #include <linux/list.h>
 #include <linux/interrupt.h>
-#include <linux/utsname.h>
 #include <linux/device.h>
 #include <linux/moduleparam.h>
 #include <linux/fs.h>
@@ -38,25 +37,13 @@
 #include <asm/unaligned.h>
 
 #include <linux/usb/ch9.h>
+#include <linux/usb/composite.h>
 #include <linux/usb/gadget.h>
 #include <linux/usb/g_printer.h>
 
 #include "gadget_chips.h"
 
-
-/*
- * Kbuild is not very cooperative with respect to linking separately
- * compiled library objects into one module.  So for now we won't use
- * separate compilation ... ensuring init/exit sections work to shrink
- * the runtime footprint, and giving us at least some parts of what
- * a "gcc --combine ... part1.c part2.c part3.c ... " build would.
- */
-#include "composite.c"
-#include "usbstring.c"
-#include "config.c"
-#include "epautoconf.c"
-
-/*-------------------------------------------------------------------------*/
+USB_GADGET_COMPOSITE_OPTIONS();
 
 #define DRIVER_DESC		"Printer Gadget"
 #define DRIVER_VERSION		"2007 OCT 06"
@@ -120,8 +107,7 @@ static struct printer_dev usb_printer_gadget;
  * parameters are in UTF-8 (superset of ASCII's 7 bit characters).
  */
 
-static char *iSerialNum;
-module_param(iSerialNum, charp, S_IRUGO);
+module_param_named(iSerialNum, coverwrite.serial_number, charp, S_IRUGO);
 MODULE_PARM_DESC(iSerialNum, "1");
 
 static char *iPNPstring;
@@ -140,10 +126,6 @@ module_param(qlen, uint, S_IRUGO|S_IWUSR);
  * DESCRIPTORS ... most are static, but strings and (full) configuration
  * descriptors are built on demand.
  */
-
-#define STRING_MANUFACTURER		0
-#define STRING_PRODUCT			1
-#define STRING_SERIALNUM		2
 
 /* holds our biggest descriptor */
 #define USB_DESC_BUFSIZE		256
@@ -244,7 +226,6 @@ static const struct usb_descriptor_header *otg_desc[] = {
 
 /* descriptors that are built on-demand */
 
-static char				manufacturer [50];
 static char				product_desc [40] = DRIVER_DESC;
 static char				serial_num [40] = "1";
 static char				pnp_string [1024] =
@@ -252,9 +233,9 @@ static char				pnp_string [1024] =
 
 /* static strings, in UTF-8 */
 static struct usb_string		strings [] = {
-	[STRING_MANUFACTURER].s = manufacturer,
-	[STRING_PRODUCT].s = product_desc,
-	[STRING_SERIALNUM].s =	serial_num,
+	[USB_GADGET_MANUFACTURER_IDX].s = "",
+	[USB_GADGET_PRODUCT_IDX].s = product_desc,
+	[USB_GADGET_SERIAL_IDX].s =	serial_num,
 	{  }		/* end of list */
 };
 
@@ -1120,7 +1101,6 @@ static int __init printer_bind_config(struct usb_configuration *c)
 	struct usb_gadget	*gadget = c->cdev->gadget;
 	struct printer_dev	*dev;
 	int			status = -ENOMEM;
-	int			gcnum;
 	size_t			len;
 	u32			i;
 	struct usb_request	*req;
@@ -1161,23 +1141,6 @@ static int __init printer_bind_config(struct usb_configuration *c)
 		ERROR(dev, "Failed to open char device\n");
 		goto fail;
 	}
-
-	gcnum = usb_gadget_controller_number(gadget);
-	if (gcnum >= 0) {
-		device_desc.bcdDevice = cpu_to_le16(0x0200 + gcnum);
-	} else {
-		dev_warn(&gadget->dev, "controller '%s' not recognized\n",
-			gadget->name);
-		/* unrecognized, but safe unless bulk is REALLY quirky */
-		device_desc.bcdDevice =
-			cpu_to_le16(0xFFFF);
-	}
-	snprintf(manufacturer, sizeof(manufacturer), "%s %s with %s",
-		init_utsname()->sysname, init_utsname()->release,
-		gadget->name);
-
-	if (iSerialNum)
-		strlcpy(serial_num, iSerialNum, sizeof serial_num);
 
 	if (iPNPstring)
 		strlcpy(&pnp_string[2], iPNPstring, (sizeof pnp_string)-2);
@@ -1263,19 +1226,23 @@ static int __init printer_bind(struct usb_composite_dev *cdev)
 	ret = usb_string_ids_tab(cdev, strings);
 	if (ret < 0)
 		return ret;
-	device_desc.iManufacturer = strings[STRING_MANUFACTURER].id;
-	device_desc.iProduct = strings[STRING_PRODUCT].id;
-	device_desc.iSerialNumber = strings[STRING_SERIALNUM].id;
+	device_desc.iManufacturer = strings[USB_GADGET_MANUFACTURER_IDX].id;
+	device_desc.iProduct = strings[USB_GADGET_PRODUCT_IDX].id;
+	device_desc.iSerialNumber = strings[USB_GADGET_SERIAL_IDX].id;
 
 	ret = usb_add_config(cdev, &printer_cfg_driver, printer_bind_config);
+	if (ret)
+		return ret;
+	usb_composite_overwrite_options(cdev, &coverwrite);
 	return ret;
 }
 
-static struct usb_composite_driver printer_driver = {
+static __refdata struct usb_composite_driver printer_driver = {
 	.name           = shortname,
 	.dev            = &device_desc,
 	.strings        = dev_strings,
 	.max_speed      = USB_SPEED_HIGH,
+	.bind		= printer_bind,
 	.unbind		= printer_unbind,
 };
 
@@ -1299,7 +1266,7 @@ init(void)
 		return status;
 	}
 
-	status = usb_composite_probe(&printer_driver, printer_bind);
+	status = usb_composite_probe(&printer_driver);
 	if (status) {
 		class_destroy(usb_gadget_class);
 		unregister_chrdev_region(g_printer_devno, 1);

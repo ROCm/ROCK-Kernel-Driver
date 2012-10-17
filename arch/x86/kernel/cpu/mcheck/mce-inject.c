@@ -78,6 +78,7 @@ static void raise_exception(struct mce *m, struct pt_regs *pregs)
 }
 
 static cpumask_var_t mce_inject_cpumask;
+static DEFINE_MUTEX(mce_inject_mutex);
 
 static int mce_raise_notify(unsigned int cmd, struct pt_regs *regs)
 {
@@ -93,7 +94,6 @@ static int mce_raise_notify(unsigned int cmd, struct pt_regs *regs)
 	return NMI_HANDLED;
 }
 
-#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
 static void mce_irq_ipi(void *info)
 {
 	int cpu = smp_processor_id();
@@ -105,7 +105,6 @@ static void mce_irq_ipi(void *info)
 		raise_exception(m, NULL);
 	}
 }
-#endif
 
 /* Inject mce on current CPU */
 static int raise_local(void)
@@ -153,7 +152,7 @@ static void raise_mce(struct mce *m)
 	if (context == MCJ_CTX_RANDOM)
 		return;
 
-#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
+#ifdef CONFIG_X86_LOCAL_APIC
 	if (m->inject_flags & (MCJ_IRQ_BRAODCAST | MCJ_NMI_BROADCAST)) {
 		unsigned long start;
 		int cpu;
@@ -196,7 +195,11 @@ static void raise_mce(struct mce *m)
 		put_online_cpus();
 	} else
 #endif
+	{
+		preempt_disable();
 		raise_local();
+		preempt_enable();
+	}
 }
 
 /* Error injection interface */
@@ -227,7 +230,10 @@ static ssize_t mce_write(struct file *filp, const char __user *ubuf,
 	 * so do it a jiffie or two later everywhere.
 	 */
 	schedule_timeout(2);
+
+	mutex_lock(&mce_inject_mutex);
 	raise_mce(&m);
+	mutex_unlock(&mce_inject_mutex);
 	return usize;
 }
 

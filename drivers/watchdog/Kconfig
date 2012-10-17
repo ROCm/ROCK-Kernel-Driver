@@ -237,12 +237,12 @@ config OMAP_WATCHDOG
 	  here to enable the OMAP1610/OMAP1710/OMAP2420/OMAP3430/OMAP4430 watchdog timer.
 
 config PNX4008_WATCHDOG
-	tristate "PNX4008 and LPC32XX Watchdog"
-	depends on ARCH_PNX4008 || ARCH_LPC32XX
+	tristate "LPC32XX Watchdog"
+	depends on ARCH_LPC32XX
 	select WATCHDOG_CORE
 	help
 	  Say Y here if to include support for the watchdog timer
-	  in the PNX4008 or LPC32XX processor.
+	  in the LPC32XX processor.
 	  This driver can be built as a module by choosing M. The module
 	  will be called pnx4008_wdt.
 
@@ -1208,7 +1208,7 @@ config WATCHDOG_RIO
 
 config XEN_WDT
 	tristate "Xen Watchdog support"
-	depends on XEN || PARAVIRT_XEN
+	depends on XEN
 	help
 	  Say Y here to support the hypervisor watchdog capability provided
 	  by Xen 4.0 and newer.  The watchdog timeout period is normally one

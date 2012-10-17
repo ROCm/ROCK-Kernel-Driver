@@ -84,40 +84,33 @@ static struct _intel_private {
 #define IS_IRONLAKE	intel_private.driver->is_ironlake
 #define HAS_PGTBL_EN	intel_private.driver->has_pgtbl_enable
 
-int intel_gtt_map_memory(struct page **pages, unsigned int num_entries,
-			 struct scatterlist **sg_list, int *num_sg)
+static int intel_gtt_map_memory(struct page **pages,
+				unsigned int num_entries,
+				struct sg_table *st)
 {
-	struct sg_table st;
 	struct scatterlist *sg;
 	int i;
 
-	if (*sg_list)
-		return 0; /* already mapped (for e.g. resume */
-
 	DBG("try mapping %lu pages\n", (unsigned long)num_entries);
 
-	if (sg_alloc_table(&st, num_entries, GFP_KERNEL))
+	if (sg_alloc_table(st, num_entries, GFP_KERNEL))
 		goto err;
 
-	*sg_list = sg = st.sgl;
-
-	for (i = 0 ; i < num_entries; i++, sg = sg_next(sg))
+	for_each_sg(st->sgl, sg, num_entries, i)
 		sg_set_page(sg, pages[i], PAGE_SIZE, 0);
 
-	*num_sg = pci_map_sg(intel_private.pcidev, *sg_list,
-				 num_entries, PCI_DMA_BIDIRECTIONAL);
-	if (unlikely(!*num_sg))
+	if (!pci_map_sg(intel_private.pcidev,
+			st->sgl, st->nents, PCI_DMA_BIDIRECTIONAL))
 		goto err;
 
 	return 0;
 
 err:
-	sg_free_table(&st);
+	sg_free_table(st);
 	return -ENOMEM;
 }
-EXPORT_SYMBOL(intel_gtt_map_memory);
 
-void intel_gtt_unmap_memory(struct scatterlist *sg_list, int num_sg)
+static void intel_gtt_unmap_memory(struct scatterlist *sg_list, int num_sg)
 {
 	struct sg_table st;
 	DBG("try unmapping %lu pages\n", (unsigned long)mem->page_count);
@@ -130,7 +123,6 @@ void intel_gtt_unmap_memory(struct scatterlist *sg_list, int num_sg)
 
 	sg_free_table(&st);
 }
-EXPORT_SYMBOL(intel_gtt_unmap_memory);
 
 static void intel_fake_agp_enable(struct agp_bridge_data *bridge, u32 mode)
 {
@@ -146,19 +138,8 @@ static struct page *i8xx_alloc_pages(void)
 	if (page == NULL)
 		return NULL;
 
-#ifdef CONFIG_XEN
-	if (xen_create_contiguous_region((unsigned long)page_address(page), 2, 32)) {
-		__free_pages(page, 2);
-		return NULL;
-	}
-#endif
-
 	if (set_pages_uc(page, 4) < 0) {
 		set_pages_wb(page, 4);
-#ifdef CONFIG_XEN
-		xen_destroy_contiguous_region((unsigned long)page_address(page),
-					      2);
-#endif
 		__free_pages(page, 2);
 		return NULL;
 	}
@@ -173,9 +154,6 @@ static void i8xx_destroy_pages(struct page *page)
 		return;
 
 	set_pages_wb(page, 4);
-#ifdef CONFIG_XEN
-	xen_destroy_contiguous_region((unsigned long)page_address(page), 2);
-#endif
 	put_page(page);
 	__free_pages(page, 2);
 	atomic_dec(&agp_bridge->current_memory_agp);
@@ -281,11 +259,7 @@ static struct agp_memory *alloc_agpphysmem_i8xx(size_t pg_count, int type)
 	new->page_count = pg_count;
 	new->num_scratch_pages = pg_count;
 	new->type = AGP_PHYS_MEMORY;
-#ifndef CONFIG_XEN
 	new->physical = page_to_phys(new->pages[0]);
-#else
-	new->physical = page_to_pseudophys(new->pages[0]);
-#endif
 	return new;
 }
 
@@ -692,9 +666,14 @@ static int intel_gtt_init(void)
 
 	gtt_map_size = intel_private.base.gtt_total_entries * 4;
 
-	intel_private.gtt = ioremap(intel_private.gtt_bus_addr,
-				    gtt_map_size);
-	if (!intel_private.gtt) {
+	intel_private.gtt = NULL;
+	if (INTEL_GTT_GEN < 6)
+		intel_private.gtt = ioremap_wc(intel_private.gtt_bus_addr,
+					       gtt_map_size);
+	if (intel_private.gtt == NULL)
+		intel_private.gtt = ioremap(intel_private.gtt_bus_addr,
+					    gtt_map_size);
+	if (intel_private.gtt == NULL) {
 		intel_private.driver->cleanup();
 		iounmap(intel_private.registers);
 		return -ENOMEM;
@@ -897,8 +876,7 @@ static bool i830_check_flags(unsigned int flags)
 	return false;
 }
 
-void intel_gtt_insert_sg_entries(struct scatterlist *sg_list,
-				 unsigned int sg_len,
+void intel_gtt_insert_sg_entries(struct sg_table *st,
 				 unsigned int pg_start,
 				 unsigned int flags)
 {
@@ -910,12 +888,11 @@ void intel_gtt_insert_sg_entries(struct scatterlist *sg_list,
 
 	/* sg may merge pages, but we have to separate
 	 * per-page addr for GTT */
-	for_each_sg(sg_list, sg, sg_len, i) {
+	for_each_sg(st->sgl, sg, st->nents, i) {
 		len = sg_dma_len(sg) >> PAGE_SHIFT;
 		for (m = 0; m < len; m++) {
 			dma_addr_t addr = sg_dma_address(sg) + (m << PAGE_SHIFT);
-			intel_private.driver->write_entry(addr,
-							  j, flags);
+			intel_private.driver->write_entry(addr, j, flags);
 			j++;
 		}
 	}
@@ -923,8 +900,10 @@ void intel_gtt_insert_sg_entries(struct scatterlist *sg_list,
 }
 EXPORT_SYMBOL(intel_gtt_insert_sg_entries);
 
-void intel_gtt_insert_pages(unsigned int first_entry, unsigned int num_entries,
-			    struct page **pages, unsigned int flags)
+static void intel_gtt_insert_pages(unsigned int first_entry,
+				   unsigned int num_entries,
+				   struct page **pages,
+				   unsigned int flags)
 {
 	int i, j;
 
@@ -935,7 +914,6 @@ void intel_gtt_insert_pages(unsigned int first_entry, unsigned int num_entries,
 	}
 	readl(intel_private.gtt+j-1);
 }
-EXPORT_SYMBOL(intel_gtt_insert_pages);
 
 static int intel_fake_agp_insert_entries(struct agp_memory *mem,
 					 off_t pg_start, int type)
@@ -971,13 +949,15 @@ static int intel_fake_agp_insert_entries(struct agp_memory *mem,
 		global_cache_flush();
 
 	if (intel_private.base.needs_dmar) {
-		ret = intel_gtt_map_memory(mem->pages, mem->page_count,
-					   &mem->sg_list, &mem->num_sg);
+		struct sg_table st;
+
+		ret = intel_gtt_map_memory(mem->pages, mem->page_count, &st);
 		if (ret != 0)
 			return ret;
 
-		intel_gtt_insert_sg_entries(mem->sg_list, mem->num_sg,
-					    pg_start, type);
+		intel_gtt_insert_sg_entries(&st, pg_start, type);
+		mem->sg_list = st.sgl;
+		mem->num_sg = st.nents;
 	} else
 		intel_gtt_insert_pages(pg_start, mem->page_count, mem->pages,
 				       type);

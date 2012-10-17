@@ -269,22 +269,44 @@ out:
 }
 
 
-static void orion_spi_work(struct orion_spi *orion_spi, struct spi_message *m)
+static int orion_spi_transfer_one_message(struct spi_master *master,
+					   struct spi_message *m)
 {
-	struct spi_device *spi;
+	struct orion_spi *orion_spi = spi_master_get_devdata(master);
+	struct spi_device *spi = m->spi;
 	struct spi_transfer *t = NULL;
 	int par_override = 0;
 	int status = 0;
 	int cs_active = 0;
 
-	spi = m->spi;
-
 	/* Load defaults */
 	status = orion_spi_setup_transfer(spi, NULL);
+
 	if (status < 0)
 		goto msg_done;
 
 	list_for_each_entry(t, &m->transfers, transfer_list) {
+		/* make sure buffer length is even when working in 16
+		 * bit mode*/
+		if ((t->bits_per_word == 16) && (t->len & 1)) {
+			dev_err(&spi->dev,
+				"message rejected : "
+				"odd data length %d while in 16 bit mode\n",
+				t->len);
+			status = -EIO;
+			goto msg_done;
+		}
+
+		if (t->speed_hz && t->speed_hz < orion_spi->min_speed) {
+			dev_err(&spi->dev,
+				"message rejected : "
+				"device min speed (%d Hz) exceeds "
+				"required transfer speed (%d Hz)\n",
+				orion_spi->min_speed, t->speed_hz);
+			status = -EIO;
+			goto msg_done;
+		}
+
 		if (par_override || t->speed_hz || t->bits_per_word) {
 			par_override = 1;
 			status = orion_spi_setup_transfer(spi, t);
@@ -316,6 +338,9 @@ msg_done:
 		orion_spi_set_cs(orion_spi, 0);
 
 	m->status = status;
+	spi_finalize_current_message(master);
+
+	return 0;
 }
 
 static int __init orion_spi_reset(struct orion_spi *orion_spi)
@@ -346,69 +371,6 @@ static int orion_spi_setup(struct spi_device *spi)
 	 * baudrate & width will be set orion_spi_setup_transfer
 	 */
 	return 0;
-}
-
-static int orion_spi_transfer_one_message(struct spi_master *spi,
-					  struct spi_message *m)
-{
-	struct orion_spi *orion_spi;
-	struct spi_transfer *t = NULL;
-
-	orion_spi = spi_master_get_devdata(spi);
-	m->actual_length = 0;
-	m->status = 0;
-
-	/* reject invalid messages and transfers */
-	if (list_empty(&m->transfers))
-		return -EINVAL;
-
-	list_for_each_entry(t, &m->transfers, transfer_list) {
-		unsigned int bits_per_word = m->spi->bits_per_word;
-
-		if (t->tx_buf == NULL && t->rx_buf == NULL && t->len) {
-			dev_err(&spi->dev,
-				"message rejected : "
-				"invalid transfer data buffers\n");
-			goto msg_rejected;
-		}
-
-		if (t->bits_per_word)
-			bits_per_word = t->bits_per_word;
-
-		if ((bits_per_word != 8) && (bits_per_word != 16)) {
-			dev_err(&spi->dev,
-				"message rejected : "
-				"invalid transfer bits_per_word (%d bits)\n",
-				bits_per_word);
-			goto msg_rejected;
-		}
-		/*make sure buffer length is even when working in 16 bit mode*/
-		if ((t->bits_per_word == 16) && (t->len & 1)) {
-			dev_err(&spi->dev,
-				"message rejected : "
-				"odd data length (%d) while in 16 bit mode\n",
-				t->len);
-			goto msg_rejected;
-		}
-
-		if (t->speed_hz && t->speed_hz < orion_spi->min_speed) {
-			dev_err(&spi->dev,
-				"message rejected : "
-				"device min speed (%d Hz) exceeds "
-				"required transfer speed (%d Hz)\n",
-				orion_spi->min_speed, t->speed_hz);
-			goto msg_rejected;
-		}
-	}
-
-	orion_spi_work(orion_spi, m);
-	spi_finalize_current_message(spi);
-
-	return 0;
-msg_rejected:
-	/* Message rejected and not queued */
-	m->status = -EINVAL;
-	return -EINVAL;
 }
 
 static int __init orion_spi_probe(struct platform_device *pdev)
@@ -497,8 +459,8 @@ out:
 static int __exit orion_spi_remove(struct platform_device *pdev)
 {
 	struct spi_master *master;
-	struct orion_spi *spi;
 	struct resource *r;
+	struct orion_spi *spi;
 
 	master = dev_get_drvdata(&pdev->dev);
 	spi = spi_master_get_devdata(master);

@@ -13,8 +13,12 @@
 #include <asm/ftrace.h>
 
 #ifdef CONFIG_FUNCTION_TRACER
-/* mcount is defined in assembly */
+/* mcount and __fentry__ are defined in assembly */
+#ifdef CC_USING_FENTRY
+EXPORT_SYMBOL(__fentry__);
+#else
 EXPORT_SYMBOL(mcount);
+#endif
 #endif
 
 EXPORT_SYMBOL(__get_user_1);
@@ -56,6 +60,6 @@ EXPORT_SYMBOL(__memcpy);
 EXPORT_SYMBOL(memmove);
 
 EXPORT_SYMBOL(empty_zero_page);
-#if !defined(CONFIG_PARAVIRT) && !defined(CONFIG_XEN)
+#ifndef CONFIG_PARAVIRT
 EXPORT_SYMBOL(native_load_gs_index);
 #endif

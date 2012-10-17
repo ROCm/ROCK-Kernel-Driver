@@ -20,7 +20,6 @@
 #include <linux/sh_dma.h>
 #include <linux/slab.h>
 #include <linux/module.h>
-#include <linux/workqueue.h>
 #include <sound/soc.h>
 #include <sound/sh_fsi.h>
 
@@ -224,7 +223,7 @@ struct fsi_stream {
 	 */
 	struct dma_chan		*chan;
 	struct sh_dmae_slave	slave; /* see fsi_handler_init() */
-	struct work_struct	work;
+	struct tasklet_struct	tasklet;
 	dma_addr_t		dma;
 };
 
@@ -1086,9 +1085,9 @@ static void fsi_dma_complete(void *data)
 	snd_pcm_period_elapsed(io->substream);
 }
 
-static void fsi_dma_do_work(struct work_struct *work)
+static void fsi_dma_do_tasklet(unsigned long data)
 {
-	struct fsi_stream *io = container_of(work, struct fsi_stream, work);
+	struct fsi_stream *io = (struct fsi_stream *)data;
 	struct fsi_priv *fsi = fsi_stream_to_priv(io);
 	struct snd_soc_dai *dai;
 	struct dma_async_tx_descriptor *desc;
@@ -1130,7 +1129,7 @@ static void fsi_dma_do_work(struct work_struct *work)
 	 * FIXME
 	 *
 	 * In DMAEngine case, codec and FSI cannot be started simultaneously
-	 * since FSI is using the scheduler work queue.
+	 * since FSI is using tasklet.
 	 * Therefore, in capture case, probably FSI FIFO will have got
 	 * overflow error in this point.
 	 * in that case, DMA cannot start transfer until error was cleared.
@@ -1154,7 +1153,7 @@ static bool fsi_dma_filter(struct dma_chan *chan, void *param)
 
 static int fsi_dma_transfer(struct fsi_priv *fsi, struct fsi_stream *io)
 {
-	schedule_work(&io->work);
+	tasklet_schedule(&io->tasklet);
 
 	return 0;
 }
@@ -1196,14 +1195,14 @@ static int fsi_dma_probe(struct fsi_priv *fsi, struct fsi_stream *io, struct dev
 		return fsi_stream_probe(fsi, dev);
 	}
 
-	INIT_WORK(&io->work, fsi_dma_do_work);
+	tasklet_init(&io->tasklet, fsi_dma_do_tasklet, (unsigned long)io);
 
 	return 0;
 }
 
 static int fsi_dma_remove(struct fsi_priv *fsi, struct fsi_stream *io)
 {
-	cancel_work_sync(&io->work);
+	tasklet_kill(&io->tasklet);
 
 	fsi_stream_stop(fsi, io);
 
@@ -1656,22 +1655,20 @@ static int fsi_probe(struct platform_device *pdev)
 	irq = platform_get_irq(pdev, 0);
 	if (!res || (int)irq <= 0) {
 		dev_err(&pdev->dev, "Not enough FSI platform resources.\n");
-		ret = -ENODEV;
-		goto exit;
+		return -ENODEV;
 	}
 
-	master = kzalloc(sizeof(*master), GFP_KERNEL);
+	master = devm_kzalloc(&pdev->dev, sizeof(*master), GFP_KERNEL);
 	if (!master) {
 		dev_err(&pdev->dev, "Could not allocate master\n");
-		ret = -ENOMEM;
-		goto exit;
+		return -ENOMEM;
 	}
 
-	master->base = ioremap_nocache(res->start, resource_size(res));
+	master->base = devm_ioremap_nocache(&pdev->dev,
+					    res->start, resource_size(res));
 	if (!master->base) {
-		ret = -ENXIO;
 		dev_err(&pdev->dev, "Unable to ioremap FSI registers.\n");
-		goto exit_kfree;
+		return -ENXIO;
 	}
 
 	/* master setting */
@@ -1687,7 +1684,7 @@ static int fsi_probe(struct platform_device *pdev)
 	ret = fsi_stream_probe(&master->fsia, &pdev->dev);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "FSIA stream probe failed\n");
-		goto exit_iounmap;
+		return ret;
 	}
 
 	/* FSI B setting */
@@ -1731,16 +1728,11 @@ exit_snd_soc:
 exit_free_irq:
 	free_irq(irq, master);
 exit_fsib:
+	pm_runtime_disable(&pdev->dev);
 	fsi_stream_remove(&master->fsib);
 exit_fsia:
 	fsi_stream_remove(&master->fsia);
-exit_iounmap:
-	iounmap(master->base);
-	pm_runtime_disable(&pdev->dev);
-exit_kfree:
-	kfree(master);
-	master = NULL;
-exit:
+
 	return ret;
 }
 
@@ -1758,9 +1750,6 @@ static int fsi_remove(struct platform_device *pdev)
 
 	fsi_stream_remove(&master->fsia);
 	fsi_stream_remove(&master->fsib);
-
-	iounmap(master->base);
-	kfree(master);
 
 	return 0;
 }

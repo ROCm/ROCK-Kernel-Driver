@@ -17,7 +17,6 @@
 #include <asm/paravirt.h>
 #include <asm/alternative.h>
 
-#ifndef CONFIG_XEN
 static int __init no_halt(char *s)
 {
 	WARN_ONCE(1, "\"no-hlt\" is deprecated, please use \"idle=poll\"\n");
@@ -26,7 +25,6 @@ static int __init no_halt(char *s)
 }
 
 __setup("no-hlt", no_halt);
-#endif
 
 static int __init no_387(char *s)
 {
@@ -86,16 +84,13 @@ static void __init check_fpu(void)
 
 	kernel_fpu_end();
 
-#ifndef CONFIG_XEN
 	boot_cpu_data.fdiv_bug = fdiv_bug;
 	if (boot_cpu_data.fdiv_bug)
 		pr_warn("Hmm, FPU with FDIV bug\n");
-#endif
 }
 
 static void __init check_hlt(void)
 {
-#ifndef CONFIG_XEN
 	if (boot_cpu_data.x86 >= 5 || paravirt_enabled())
 		return;
 
@@ -109,7 +104,6 @@ static void __init check_hlt(void)
 	halt();
 	halt();
 	pr_cont("OK\n");
-#endif
 }
 
 /*
@@ -171,10 +165,15 @@ void __init check_bugs(void)
 	print_cpu_info(&boot_cpu_data);
 #endif
 	check_config();
-	check_fpu();
 	check_hlt();
 	check_popad();
 	init_utsname()->machine[1] =
 		'0' + (boot_cpu_data.x86 > 6 ? 6 : boot_cpu_data.x86);
 	alternative_instructions();
+
+	/*
+	 * kernel_fpu_begin/end() in check_fpu() relies on the patched
+	 * alternative instructions.
+	 */
+	check_fpu();
 }
