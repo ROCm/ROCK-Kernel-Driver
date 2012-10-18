@@ -410,6 +410,8 @@ static void __init reserve_initrd(void)
 	relocate_initrd();
 
 	memblock_free(ramdisk_image, ramdisk_end - ramdisk_image);
+
+	acpi_initrd_override((void *)initrd_start, initrd_end - initrd_start);
 }
 #else
 static void __init reserve_initrd(void)
@@ -940,8 +942,6 @@ void __init setup_arch(char **cmdline_p)
 	setup_log_buf(1);
 
 	reserve_initrd();
-
-	acpi_initrd_override((void *)initrd_start, initrd_end - initrd_start);
 
 	reserve_crashkernel();
 
