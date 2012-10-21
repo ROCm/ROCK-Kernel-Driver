@@ -47,6 +47,7 @@
 #include <xen/xenbus.h>
 #include <xen/xen.h>
 #include "xenbus_comms.h"
+#include <asm/xen/hypervisor.h>
 
 #ifdef HAVE_XEN_PLATFORM_COMPAT_H
 #include <xen/platform-compat.h>
@@ -628,7 +629,24 @@ static struct xenbus_watch *find_watch(const char *token)
 
 	return NULL;
 }
+/*
+ * Certain older XenBus toolstack cannot handle reading values that are
+ * not populated. Some Xen 3.4 installation are incapable of doing this
+ * so if we are running on anything older than 4 do not attempt to read
+ * control/platform-feature-xs_reset_watches.
+ */
+static bool xen_strict_xenbus_quirk()
+{
+	uint32_t eax, ebx, ecx, edx, base;
 
+	base = xen_cpuid_base();
+	cpuid(base + 1, &eax, &ebx, &ecx, &edx);
+
+	if ((eax >> 16) < 4)
+		return true;
+	return false;
+
+}
 static void xs_reset_watches(void)
 {
 #if defined(CONFIG_PARAVIRT_XEN) || defined(MODULE)
@@ -638,6 +656,9 @@ static void xs_reset_watches(void)
 	if (!xen_hvm_domain())
 		return;
 #endif
+
+	if (xen_strict_xenbus_quirk())
+		return;
 
 	err = xenbus_scanf(XBT_NIL, "control",
 			   "platform-feature-xs_reset_watches", "%d",
