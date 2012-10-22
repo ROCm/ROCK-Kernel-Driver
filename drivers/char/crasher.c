@@ -12,6 +12,7 @@
 #include <linux/jiffies.h>
 #include <linux/sched.h>
 #include <linux/moduleparam.h>
+#include <linux/kthread.h>
 
 static int module_exiting;
 static struct completion startup = COMPLETION_INITIALIZER(startup);
@@ -207,7 +208,7 @@ static int __init crasher_init(void)
 	printk("\n");
 
 	for (i = 0 ; i < threads ; i++)
-		kernel_thread(crasher_thread, crasher_thread, "crasher");
+		kthread_run(crasher_thread, crasher_thread, "crasher");
 	for (i = 0 ; i < threads ; i++)
 		wait_for_completion(&startup);
 	return 0;
