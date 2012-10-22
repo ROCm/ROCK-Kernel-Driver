@@ -207,8 +207,7 @@ static int __init crasher_init(void)
 	printk("\n");
 
 	for (i = 0 ; i < threads ; i++)
-		kernel_thread(crasher_thread, crasher_thread,
-			      CLONE_FS | CLONE_FILES);
+		kernel_thread(crasher_thread, crasher_thread, "crasher");
 	for (i = 0 ; i < threads ; i++)
 		wait_for_completion(&startup);
 	return 0;
