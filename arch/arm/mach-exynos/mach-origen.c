@@ -122,6 +122,7 @@ static struct regulator_consumer_supply __initdata ldo14_consumer[] = {
 };
 static struct regulator_consumer_supply __initdata ldo17_consumer[] = {
 	REGULATOR_SUPPLY("vdd33", "swb-a31"), /* AR6003 WLAN & CSR 8810 BT */
+	REGULATOR_SUPPLY("vmmc", NULL),
 };
 static struct regulator_consumer_supply __initdata buck1_consumer[] = {
 	REGULATOR_SUPPLY("vdd_arm", NULL), /* CPUFREQ */

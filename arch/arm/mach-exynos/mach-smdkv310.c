@@ -14,6 +14,8 @@
 #include <linux/lcd.h>
 #include <linux/mmc/host.h>
 #include <linux/platform_device.h>
+#include <linux/regulator/fixed.h>
+#include <linux/regulator/machine.h>
 #include <linux/smsc911x.h>
 #include <linux/io.h>
 #include <linux/i2c.h>
@@ -385,12 +387,23 @@ static void __init smdkv310_reserve(void)
 	s5p_mfc_reserve_mem(0x43000000, 8 << 20, 0x51000000, 8 << 20);
 }
 
+static struct regulator_consumer_supply vddmmc_consumers[] __devinitdata = {
+	REGULATOR_SUPPLY("vmmc", "s3c-sdhci.0"),
+	REGULATOR_SUPPLY("vmmc", "s3c-sdhci.1"),
+	REGULATOR_SUPPLY("vmmc", "s3c-sdhci.2"),
+	REGULATOR_SUPPLY("vdd33a", "smsc911x"),
+	REGULATOR_SUPPLY("vddvario", "smsc911x"),
+};
+
 static void __init smdkv310_machine_init(void)
 {
 	s3c_i2c1_set_platdata(NULL);
 	i2c_register_board_info(1, i2c_devs1, ARRAY_SIZE(i2c_devs1));
 
 	smdkv310_smsc911x_init();
+
+	regulator_register_always_on(0, "fixed-3.3V", vddmmc_consumers,
+				     ARRAY_SIZE(vddmmc_consumers), 3300000);
 
 	s3c_sdhci0_set_platdata(&smdkv310_hsmmc0_pdata);
 	s3c_sdhci1_set_platdata(&smdkv310_hsmmc1_pdata);
