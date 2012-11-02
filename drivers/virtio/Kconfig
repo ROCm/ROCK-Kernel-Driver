@@ -6,6 +6,7 @@ config VIRTIO
 	  CONFIG_RPMSG or CONFIG_S390_GUEST.
 
 menu "Virtio drivers"
+	depends on !XEN
 
 config VIRTIO_PCI
 	tristate "PCI driver for virtio devices (EXPERIMENTAL)"

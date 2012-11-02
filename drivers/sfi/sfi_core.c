@@ -486,6 +486,11 @@ void __init sfi_init(void)
 	if (!acpi_disabled)
 		disable_sfi();
 
+#ifdef CONFIG_XEN
+	if (!is_initial_xendomain())
+		disable_sfi();
+#endif
+
 	if (sfi_disabled)
 		return;
 

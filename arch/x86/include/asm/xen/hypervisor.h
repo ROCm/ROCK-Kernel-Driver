@@ -58,7 +58,7 @@ static inline uint32_t xen_cpuid_base(void)
 	return 0;
 }
 
-#ifdef CONFIG_XEN
+#ifdef CONFIG_PARAVIRT_XEN
 extern bool xen_hvm_need_lapic(void);
 
 static inline bool xen_x2apic_para_available(void)

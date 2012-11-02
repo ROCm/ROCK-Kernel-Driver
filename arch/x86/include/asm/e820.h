@@ -66,7 +66,11 @@ struct e820map {
 	struct e820entry map[E820_X_MAX];
 };
 
+#ifndef CONFIG_XEN
 #define ISA_START_ADDRESS	0xa0000
+#else
+#define ISA_START_ADDRESS	0
+#endif
 #define ISA_END_ADDRESS		0x100000
 
 #define BIOS_BEGIN		0x000a0000
