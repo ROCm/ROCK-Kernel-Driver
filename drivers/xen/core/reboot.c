@@ -1,6 +1,7 @@
 #include <linux/kernel.h>
 #include <linux/unistd.h>
 #include <linux/init.h>
+#include <linux/kthread.h>
 #include <linux/slab.h>
 #include <linux/reboot.h>
 #include <linux/sched.h>
@@ -148,15 +149,15 @@ static void switch_shutdown_state(int new_state)
 
 static void __shutdown_handler(struct work_struct *unused)
 {
-	int err;
+	struct task_struct *taskp;
 
-	err = kernel_thread((shutting_down == SHUTDOWN_SUSPEND) ?
+	taskp = kthread_run((shutting_down == SHUTDOWN_SUSPEND) ?
 			    xen_suspend : shutdown_process,
-			    NULL, CLONE_FS | CLONE_FILES);
+			    NULL, "shutdown");
 
-	if (err < 0) {
-		pr_warning("Error creating shutdown process (%d): "
-			   "retrying...\n", -err);
+	if (IS_ERR(taskp)) {
+		pr_warning("Error creating shutdown process (%ld): "
+			   "retrying...\n", -PTR_ERR(taskp));
 		schedule_delayed_work(&shutdown_work, HZ/2);
 	}
 }

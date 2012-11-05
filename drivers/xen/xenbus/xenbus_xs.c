@@ -44,7 +44,7 @@
 #include <linux/rwsem.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
-#if !defined(CONFIG_XEN) && !defined(MODULE)
+#ifndef CONFIG_XEN
 #include <asm/xen/hypervisor.h>
 #endif
 #include <xen/xenbus.h>

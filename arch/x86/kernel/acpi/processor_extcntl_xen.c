@@ -59,7 +59,7 @@ static int xen_cx_notifier(struct acpi_processor *pr, int action)
 
 		data->type = cx->type;
 		data->latency = cx->latency;
-		data->power = 0 /* cx->power */;
+		/* data->power = cx->power; */
 		data->reg.space_id = cx->reg.space_id;
 		data->reg.bit_width = cx->reg.bit_width;
 		data->reg.bit_offset = cx->reg.bit_offset;
