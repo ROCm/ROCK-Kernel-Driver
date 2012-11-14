@@ -737,6 +737,8 @@ void __gnttab_dma_map_page(struct page *page)
 	if (!is_running_on_xen() || !PageForeign(page))
 		return;
 
+	BUG_ON(PageCompound(page));
+
 	do {
 		seq = read_seqbegin(&gnttab_dma_lock);
 

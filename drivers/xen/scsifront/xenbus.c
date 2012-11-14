@@ -33,9 +33,8 @@
 * 2010, Samuel Kvasnica, IMS Nanofabrication AG
 */
 
-#include <linux/version.h>
-#include <linux/slab.h>
 #include "common.h"
+#include <linux/slab.h>
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,11)
   #define DEFAULT_TASK_COMM_LEN	16

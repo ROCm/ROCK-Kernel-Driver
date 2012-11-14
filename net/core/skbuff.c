@@ -348,17 +348,7 @@ struct netdev_alloc_cache {
 };
 static DEFINE_PER_CPU(struct netdev_alloc_cache, netdev_alloc_cache);
 
-#ifndef CONFIG_XEN
 #define NETDEV_FRAG_PAGE_MAX_ORDER get_order(32768)
-#else
-/*
- * Pages aren't contiguous in "machine" memory anyway, so allocating
- * physically contiguous chunks isn't really useful. Furthermore,
- * neither netback nor netfront are really prepared to be seeing
- * compound pages in SKB fragments.
- */
-#define NETDEV_FRAG_PAGE_MAX_ORDER 0
-#endif
 #define NETDEV_FRAG_PAGE_MAX_SIZE  (PAGE_SIZE << NETDEV_FRAG_PAGE_MAX_ORDER)
 #define NETDEV_PAGECNT_MAX_BIAS	   NETDEV_FRAG_PAGE_MAX_SIZE
 

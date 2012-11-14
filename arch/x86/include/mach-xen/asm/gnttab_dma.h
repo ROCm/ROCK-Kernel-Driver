@@ -21,16 +21,24 @@
 #ifndef _ASM_I386_GNTTAB_DMA_H
 #define _ASM_I386_GNTTAB_DMA_H
 
+#include <asm/bug.h>
+
 static inline int gnttab_dma_local_pfn(struct page *page)
 {
 	/* Has it become a local MFN? */
 	return pfn_valid(mfn_to_local_pfn(pfn_to_mfn(page_to_pfn(page))));
 }
 
-static inline maddr_t gnttab_dma_map_page(struct page *page)
+static inline maddr_t gnttab_dma_map_page(struct page *page,
+					  unsigned long offset)
 {
+	unsigned int pgnr = offset >> PAGE_SHIFT;
+	unsigned int order = compound_order(page);
+
+	BUG_ON(pgnr >> order);
 	__gnttab_dma_map_page(page);
-	return ((maddr_t)pfn_to_mfn(page_to_pfn(page)) << PAGE_SHIFT);
+	return ((maddr_t)pfn_to_mfn(page_to_pfn(page) + pgnr) << PAGE_SHIFT)
+	       + (offset & ~PAGE_MASK);
 }
 
 static inline void gnttab_dma_unmap_page(maddr_t maddr)

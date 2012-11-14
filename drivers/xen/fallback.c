@@ -1,15 +1,20 @@
 #include <linux/kernel.h>
-#include <linux/module.h>
 #include <linux/string.h>
-#include <asm/bug.h>
+#include <linux/bug.h>
+#include <linux/export.h>
 #include <asm/hypervisor.h>
+#ifdef CONFIG_PARAVIRT_XEN
+#include <asm/xen/hypercall.h>
+#else
+#define xen_event_channel_op_compat HYPERVISOR_event_channel_op_compat
+#endif
 
-#if CONFIG_XEN_COMPAT <= 0x030002
+#if defined(CONFIG_PARAVIRT_XEN) || CONFIG_XEN_COMPAT <= 0x030002
 
 #include <xen/interface/event_channel.h>
 #include <xen/interface/physdev.h>
 
-int HYPERVISOR_event_channel_op_compat(int cmd, void *arg)
+int xen_event_channel_op_compat(int cmd, void *arg)
 {
 	struct evtchn_op op;
 	int rc;
@@ -46,7 +51,7 @@ int HYPERVISOR_event_channel_op_compat(int cmd, void *arg)
 
 	return rc;
 }
-EXPORT_SYMBOL(HYPERVISOR_event_channel_op_compat);
+EXPORT_SYMBOL_GPL(xen_event_channel_op_compat);
 
 int HYPERVISOR_physdev_op_compat(int cmd, void *arg)
 {

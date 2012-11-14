@@ -80,21 +80,17 @@ struct vscsifrnt_shadow {
 	 * VSCSIIF_ACT_SCSI_CDB or VSCSIIF_ACT_SCSI_RESET */
 	unsigned char act;
 	
+	/* Number of pieces of scatter-gather */
+	unsigned int nr_segments;
+
 	/* do reset function */
 	wait_queue_head_t wq_reset;	/* reset work queue           */
 	int wait_reset;			/* reset work queue condition */
 	int32_t rslt_reset;		/* reset response status      */
 					/* (SUCESS or FAILED)         */
 
-	/* for DMA_TO_DEVICE(1), DMA_FROM_DEVICE(2), DMA_NONE(3) 
-	   requests */
-	unsigned int sc_data_direction;
-	
-	/* Number of pieces of scatter-gather */
-	unsigned int nr_segments;
-
 	/* requested struct scsi_cmnd is stored from kernel */
-	unsigned long req_scsi_cmnd;
+	struct scsi_cmnd *sc;
 	int gref[VSCSIIF_SG_TABLESIZE];
 };
 

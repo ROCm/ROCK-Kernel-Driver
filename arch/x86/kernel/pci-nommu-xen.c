@@ -20,6 +20,30 @@ do {							\
 	}						\
 } while (0)
 
+static dma_addr_t
+gnttab_map_page(struct device *dev, struct page *page, unsigned long offset,
+		size_t size, enum dma_data_direction dir,
+		struct dma_attrs *attrs)
+{
+	dma_addr_t dma;
+
+	WARN_ON(size == 0);
+
+	dma = gnttab_dma_map_page(page, offset);
+	IOMMU_BUG_ON(range_straddles_page_boundary(page_to_pseudophys(page) +
+						   offset, size));
+	IOMMU_BUG_ON(!dma_capable(dev, dma, size));
+
+	return dma;
+}
+
+static void
+gnttab_unmap_page(struct device *dev, dma_addr_t dma_addr, size_t size,
+		  enum dma_data_direction dir, struct dma_attrs *attrs)
+{
+	gnttab_dma_unmap_page(dma_addr);
+}
+
 static int
 gnttab_map_sg(struct device *hwdev, struct scatterlist *sgl, int nents,
 	      enum dma_data_direction dir, struct dma_attrs *attrs)
@@ -31,14 +55,10 @@ gnttab_map_sg(struct device *hwdev, struct scatterlist *sgl, int nents,
 
 	for_each_sg(sgl, sg, nents, i) {
 		BUG_ON(!sg_page(sg));
-		sg->dma_address =
-			gnttab_dma_map_page(sg_page(sg)) + sg->offset;
+		sg->dma_address = gnttab_map_page(hwdev, sg_page(sg),
+						  sg->offset, sg->length,
+						  dir, attrs);
 		sg->dma_length  = sg->length;
-		IOMMU_BUG_ON(!dma_capable(
-			hwdev, sg->dma_address, sg->length));
-		IOMMU_BUG_ON(range_straddles_page_boundary(
-			page_to_pseudophys(sg_page(sg)) + sg->offset,
-			sg->length));
 	}
 
 	return nents;
@@ -53,30 +73,6 @@ gnttab_unmap_sg(struct device *hwdev, struct scatterlist *sgl, int nents,
 
 	for_each_sg(sgl, sg, nents, i)
 		gnttab_dma_unmap_page(sg->dma_address);
-}
-
-static dma_addr_t
-gnttab_map_page(struct device *dev, struct page *page, unsigned long offset,
-		size_t size, enum dma_data_direction dir,
-		struct dma_attrs *attrs)
-{
-	dma_addr_t dma;
-
-	WARN_ON(size == 0);
-
-	dma = gnttab_dma_map_page(page) + offset;
-	IOMMU_BUG_ON(range_straddles_page_boundary(page_to_pseudophys(page) +
-						   offset, size));
-	IOMMU_BUG_ON(!dma_capable(dev, dma, size));
-
-	return dma;
-}
-
-static void
-gnttab_unmap_page(struct device *dev, dma_addr_t dma_addr, size_t size,
-		  enum dma_data_direction dir, struct dma_attrs *attrs)
-{
-	gnttab_dma_unmap_page(dma_addr);
 }
 
 static void nommu_sync_single_for_device(struct device *dev,

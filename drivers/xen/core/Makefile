@@ -2,7 +2,7 @@
 # Makefile for the linux kernel.
 #
 
-obj-y := evtchn.o gnttab.o reboot.o machine_reboot.o fallback.o
+obj-y := evtchn.o gnttab.o reboot.o machine_reboot.o
 
 obj-$(CONFIG_XEN_PRIVILEGED_GUEST) += firmware.o pcpu.o
 obj-$(CONFIG_PROC_FS)		+= xen_proc.o

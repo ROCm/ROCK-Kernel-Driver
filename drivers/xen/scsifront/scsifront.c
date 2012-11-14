@@ -28,9 +28,8 @@
  * IN THE SOFTWARE.
  */
  
-
-#include <linux/version.h>
 #include "common.h"
+#include <linux/pfn.h>
 
 static int get_id_from_freelist(struct vscsifrnt_info *info)
 {
@@ -57,8 +56,8 @@ static void add_id_to_freelist(struct vscsifrnt_info *info, uint32_t id)
 
 	spin_lock_irqsave(&info->shadow_lock, flags);
 
-	info->shadow[id].next_free  = info->shadow_free;
-	info->shadow[id].req_scsi_cmnd = 0;
+	info->shadow[id].next_free = info->shadow_free;
+	info->shadow[id].sc = NULL;
 	info->shadow_free = id;
 
 	spin_unlock_irqrestore(&info->shadow_lock, flags);
@@ -111,7 +110,7 @@ static void scsifront_gnttab_done(struct vscsifrnt_shadow *s, uint32_t id)
 {
 	int i;
 
-	if (s->sc_data_direction == DMA_NONE)
+	if (s->sc->sc_data_direction == DMA_NONE)
 		return;
 
 	if (s->nr_segments) {
@@ -138,7 +137,7 @@ static void scsifront_cdb_cmd_done(struct vscsifrnt_info *info,
 	uint8_t sense_len;
 
 	id = ring_res->rqid;
-	sc = (struct scsi_cmnd *)info->shadow[id].req_scsi_cmnd;
+	sc = info->shadow[id].sc;
 
 	if (sc == NULL)
 		BUG();
@@ -250,8 +249,9 @@ static int map_data_for_request(struct vscsifrnt_info *info,
 	int write = (sc->sc_data_direction == DMA_TO_DEVICE);
 	unsigned int i, nr_pages, off, len, bytes;
 	unsigned long buffer_pfn;
+	unsigned int data_len = scsi_bufflen(sc);
 
-	if (sc->sc_data_direction == DMA_NONE)
+	if (sc->sc_data_direction == DMA_NONE || !data_len)
 		return 0;
 
 	err = gnttab_alloc_grant_references(VSCSIIF_SG_TABLESIZE, &gref_head);
@@ -260,17 +260,13 @@ static int map_data_for_request(struct vscsifrnt_info *info,
 		return -ENOMEM;
 	}
 
-	if (scsi_bufflen(sc)) {
-		/* quoted scsi_lib.c/scsi_req_map_sg . */
+	/* quoted scsi_lib.c/scsi_req_map_sg . */
+	nr_pages = PFN_UP(data_len + scsi_sglist(sc)->offset);
+	if (nr_pages > VSCSIIF_SG_TABLESIZE) {
+		pr_err("scsifront: Unable to map request_buffer for command!\n");
+		ref_cnt = -E2BIG;
+	} else {
 		struct scatterlist *sg, *sgl = scsi_sglist(sc);
-		unsigned int data_len = scsi_bufflen(sc);
-
-		nr_pages = (data_len + sgl->offset + PAGE_SIZE - 1) >> PAGE_SHIFT;
-		if (nr_pages > VSCSIIF_SG_TABLESIZE) {
-			pr_err("scsifront: Unable to map request_buffer for command!\n");
-			ref_cnt = (-E2BIG);
-			goto big_to_sg;
-		}
 
 		for_each_sg (sgl, sg, scsi_sg_count(sc), i) {
 			page = sg_page(sg);
@@ -307,8 +303,6 @@ static int map_data_for_request(struct vscsifrnt_info *info,
 			}
 		}
 	}
-
-big_to_sg:
 
 	gnttab_free_grant_references(gref_head);
 
@@ -357,9 +351,8 @@ static int scsifront_queuecommand(struct Scsi_Host *shost,
 	ring_req->sc_data_direction   = (uint8_t)sc->sc_data_direction;
 	ring_req->timeout_per_command = (sc->request->timeout / HZ);
 
-	info->shadow[rqid].req_scsi_cmnd     = (unsigned long)sc;
-	info->shadow[rqid].sc_data_direction = sc->sc_data_direction;
-	info->shadow[rqid].act               = ring_req->act;
+	info->shadow[rqid].sc  = sc;
+	info->shadow[rqid].act = VSCSIIF_ACT_SCSI_CDB;
 
 	ref_cnt = map_data_for_request(info, sc, ring_req, rqid);
 	if (ref_cnt < 0) {
