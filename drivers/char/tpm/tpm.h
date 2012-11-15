@@ -129,9 +129,6 @@ struct tpm_chip {
 	struct dentry **bios_dir;
 
 	struct list_head list;
-#ifdef CONFIG_XEN
-	void *priv;
-#endif
 	void (*release) (struct device *);
 };
 
@@ -313,17 +310,15 @@ struct tpm_cmd_t {
 
 ssize_t	tpm_getcap(struct device *, __be32, cap_t *, const char *);
 
-#ifdef CONFIG_XEN
 static inline void *chip_get_private(const struct tpm_chip *chip)
 {
-	return chip->priv;
+	return chip->vendor.data;
 }
 
 static inline void chip_set_private(struct tpm_chip *chip, void *priv)
 {
-	chip->priv = priv;
+	chip->vendor.data = priv;
 }
-#endif
 
 extern int tpm_get_timeouts(struct tpm_chip *);
 extern void tpm_gen_interrupt(struct tpm_chip *);

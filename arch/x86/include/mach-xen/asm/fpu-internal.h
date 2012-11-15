@@ -4,14 +4,19 @@
 #include_next <asm/fpu-internal.h>
 #undef switch_fpu_prepare
 
-static inline void xen_thread_fpu_begin(struct task_struct *tsk,
+static inline bool xen_thread_fpu_begin(struct task_struct *tsk,
 					multicall_entry_t *mcl)
 {
+	bool ret = false;
+
 	if (mcl && !use_eager_fpu()) {
 		mcl->op = __HYPERVISOR_fpu_taskswitch;
 		mcl->args[0] = 0;
+		ret = true;
 	}
 	__thread_set_has_fpu(tsk);
+
+	return ret;
 }
 
 static inline fpu_switch_t xen_switch_fpu_prepare(struct task_struct *old,
@@ -51,7 +56,8 @@ static inline fpu_switch_t xen_switch_fpu_prepare(struct task_struct *old,
 				fpu.preload = 0;
 			else
 				prefetch(new->thread.fpu.state);
-			xen_thread_fpu_begin(new, (*mcl)++);
+			if (xen_thread_fpu_begin(new, *mcl))
+				++*mcl;
 		}
 	}
 	return fpu;
