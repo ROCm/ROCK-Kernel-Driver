@@ -13,6 +13,8 @@
 
 # ifdef CONFIG_BOOTSPLASH
 
+extern int splash_black;
+
 struct fb_info;
 union pt {
 	u32 *ul;

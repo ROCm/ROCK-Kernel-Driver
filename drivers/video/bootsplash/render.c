@@ -250,14 +250,18 @@ void splashcopy(u8 *dst, u8 *src, int height, int width,
 	width *= octpp;
 	while (height-- > 0) {
 		union pt p, q;
-		p.ul = (u32 *)dst;
-		q.ul = (u32 *)src;
-		for (i = 0; i < width / 4; i++)
-			fb_writel(*q.ul++, p.ul++);
-		if (width & 2)
-			fb_writew(*q.us++, p.us++);
-		if (width & 1)
-			fb_writeb(*q.ub, p.ub);
+		if (splash_black) {
+			fb_memset(dst, 0, width);
+		} else {
+			p.ul = (u32 *)dst;
+			q.ul = (u32 *)src;
+			for (i = 0; i < width / 4; i++)
+				fb_writel(*q.ul++, p.ul++);
+			if (width & 2)
+				fb_writew(*q.us++, p.us++);
+			if (width & 1)
+				fb_writeb(*q.ub, p.ub);
+		}
 		dst += dstbytes;
 		src += srcbytes;
 	}

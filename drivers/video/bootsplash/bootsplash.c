@@ -62,6 +62,7 @@ static unsigned char *jpg_errors[] = {
 };
 
 static int splash_usesilent;
+int splash_black;
 static unsigned long splash_default = 0xf01;
 
 static int jpeg_get(unsigned char *buf, unsigned char *pic,
@@ -87,6 +88,14 @@ static int __init splash_setup(char *options)
 		if (strlen(options) == 7)
 			return 0;
 		options += 8;
+	}
+	if (!strncmp("black", options, 5)) {
+		printk(KERN_INFO "bootsplash: black mode.\n");
+		splash_usesilent = 1;
+		splash_black = 1;
+		if (strlen(options) == 5)
+			return 0;
+		options += 6;
 	}
 	if (strict_strtoul(options, 0, &splash_default) == -EINVAL)
 		splash_default = 0;
