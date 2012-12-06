@@ -325,14 +325,28 @@ struct hv_ring_buffer {
 
 	u32 interrupt_mask;
 
-	/* Pad it to PAGE_SIZE so that data starts on page boundary */
-	u8	reserved[4084];
-
-	/* NOTE:
-	 * The interrupt_mask field is used only for channels but since our
-	 * vmbus connection also uses this data structure and its data starts
-	 * here, we commented out this field.
+	/*
+	 * Win8 uses some of the reserved bits to implement
+	 * interrupt driven flow management. On the send side
+	 * we can request that the receiver interrupt the sender
+	 * when the ring transitions from being full to being able
+	 * to handle a message of size "pending_send_sz".
+	 *
+	 * Add necessary state for this enhancement.
 	 */
+	u32 pending_send_sz;
+
+	u32 reserved1[12];
+
+	union {
+		struct {
+			u32 feat_pending_send_sz:1;
+		};
+		u32 value;
+	} feature_bits;
+
+	/* Pad it to PAGE_SIZE so that data starts on page boundary */
+	u8	reserved2[4028];
 
 	/*
 	 * Ring data starts here + RingDataStartOffset
@@ -405,12 +419,22 @@ hv_get_ringbuffer_availbytes(struct hv_ring_buffer_info *rbi,
  */
 #define HV_DRV_VERSION           "3.1"
 
-
 /*
- * A revision number of vmbus that is used for ensuring both ends on a
- * partition are using compatible versions.
+ * VMBUS version is 32 bit entity broken up into
+ * two 16 bit quantities: major_number. minor_number.
+ *
+ * 0 . 13 (Windows Server 2008)
+ * 1 . 1  (Windows 7)
+ * 2 . 4  (Windows 8)
  */
-#define VMBUS_REVISION_NUMBER		13
+
+#define VERSION_WS2008  ((0 << 16) | (13))
+#define VERSION_WIN7    ((1 << 16) | (1))
+#define VERSION_WIN8    ((2 << 16) | (4))
+
+#define VERSION_INVAL -1
+
+#define VERSION_CURRENT VERSION_WIN8
 
 /* Make maximum size of pipe payload of 16K */
 #define MAX_PIPE_DATA_PAYLOAD		(sizeof(u8) * 16384)
@@ -432,9 +456,13 @@ hv_get_ringbuffer_availbytes(struct hv_ring_buffer_info *rbi,
 struct vmbus_channel_offer {
 	uuid_le if_type;
 	uuid_le if_instance;
-	u64 int_latency; /* in 100ns units */
-	u32 if_revision;
-	u32 server_ctx_size;	/* in bytes */
+
+	/*
+	 * These two fields are not currently used.
+	 */
+	u64 reserved1;
+	u64 reserved2;
+
 	u16 chn_flags;
 	u16 mmio_megabytes;		/* in bytes * 1024 * 1024 */
 
@@ -456,7 +484,11 @@ struct vmbus_channel_offer {
 			unsigned char user_def[MAX_PIPE_USER_DEFINED_BYTES];
 		} pipe;
 	} u;
-	u32 padding;
+	/*
+	 * The sub_channel_index is defined in win8.
+	 */
+	u16 sub_channel_index;
+	u16 reserved3;
 } __packed;
 
 /* Server Flags */
@@ -652,7 +684,25 @@ struct vmbus_channel_offer_channel {
 	struct vmbus_channel_offer offer;
 	u32 child_relid;
 	u8 monitorid;
-	u8 monitor_allocated;
+	/*
+	 * win7 and beyond splits this field into a bit field.
+	 */
+	u8 monitor_allocated:1;
+	u8 reserved:7;
+	/*
+	 * These are new fields added in win7 and later.
+	 * Do not access these fields without checking the
+	 * negotiated protocol.
+	 *
+	 * If "is_dedicated_interrupt" is set, we must not set the
+	 * associated bit in the channel bitmap while sending the
+	 * interrupt to the host.
+	 *
+	 * connection_id is to be used in signaling the host.
+	 */
+	u16 is_dedicated_interrupt:1;
+	u16 reserved1:15;
+	u32 connection_id;
 } __packed;
 
 /* Rescind Offer parameters */
@@ -683,8 +733,15 @@ struct vmbus_channel_open_channel {
 	/* GPADL for the channel's ring buffer. */
 	u32 ringbuffer_gpadlhandle;
 
-	/* GPADL for the channel's server context save area. */
-	u32 server_contextarea_gpadlhandle;
+	/*
+	 * Starting with win8, this field will be used to specify
+	 * the target virtual processor on which to deliver the interrupt for
+	 * the host to guest communication.
+	 * Prior to win8, incoming channel interrupts would only
+	 * be delivered on cpu 0. Setting this value to 0 would
+	 * preserve the earlier behavior.
+	 */
+	u32 target_vp;
 
 	/*
 	* The upstream ring buffer begins at offset zero in the memory
@@ -848,6 +905,27 @@ struct vmbus_close_msg {
 	struct vmbus_channel_close_channel msg;
 };
 
+/* Define connection identifier type. */
+union hv_connection_id {
+	u32 asu32;
+	struct {
+		u32 id:24;
+		u32 reserved:8;
+	} u;
+};
+
+/* Definition of the hv_signal_event hypercall input structure. */
+struct hv_input_signal_event {
+	union hv_connection_id connectionid;
+	u16 flag_number;
+	u16 rsvdz;
+};
+
+struct hv_input_signal_event_buffer {
+	u64 align8;
+	struct hv_input_signal_event event;
+};
+
 struct vmbus_channel {
 	struct list_head listentry;
 
@@ -882,7 +960,41 @@ struct vmbus_channel {
 
 	void (*onchannel_callback)(void *context);
 	void *channel_callback_context;
+
+	/*
+	 * A channel can be marked for efficient (batched)
+	 * reading:
+	 * If batched_reading is set to "true", we read until the
+	 * channel is empty and hold off interrupts from the host
+	 * during the entire read process.
+	 * If batched_reading is set to "false", the client is not
+	 * going to perform batched reading.
+	 *
+	 * By default we will enable batched reading; specific
+	 * drivers that don't want this behavior can turn it off.
+	 */
+
+	bool batched_reading;
+
+	bool is_dedicated_interrupt;
+	struct hv_input_signal_event_buffer sig_buf;
+	struct hv_input_signal_event *sig_event;
+
+	/*
+	 * Starting with win8, this field will be used to specify
+	 * the target virtual processor on which to deliver the interrupt for
+	 * the host to guest communication.
+	 * Prior to win8, incoming channel interrupts would only
+	 * be delivered on cpu 0. Setting this value to 0 would
+	 * preserve the earlier behavior.
+	 */
+	u32 target_vp;
 };
+
+static inline void set_channel_read_state(struct vmbus_channel *c, bool state)
+{
+	c->batched_reading = state;
+}
 
 void vmbus_onmessage(void *context);
 
@@ -1149,6 +1261,12 @@ extern void vmbus_prep_negotiate_resp(struct icmsg_hdr *,
 int hv_kvp_init(struct hv_util_service *);
 void hv_kvp_deinit(void);
 void hv_kvp_onchannelcallback(void *);
+
+/*
+ * Negotiated version with the Host.
+ */
+
+extern __u32 vmbus_proto_version;
 
 #endif /* __KERNEL__ */
 #endif /* _HYPERV_H */
