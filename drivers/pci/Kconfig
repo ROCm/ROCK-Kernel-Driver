@@ -119,7 +119,7 @@ config PCI_ATS
 config PCI_IOV
 	bool "PCI IOV support"
 	depends on PCI
-	select PCI_ATS
+	select PCI_ATS if !XEN
 	help
 	  I/O Virtualization is a PCI feature supported by some devices
 	  which allows them to create virtual devices which share their
@@ -129,7 +129,7 @@ config PCI_IOV
 
 config PCI_PRI
 	bool "PCI PRI support"
-	depends on PCI
+	depends on PCI && !XEN
 	select PCI_ATS
 	help
 	  PRI is the PCI Page Request Interface. It allows PCI devices that are
@@ -139,7 +139,7 @@ config PCI_PRI
 
 config PCI_PASID
 	bool "PCI PASID support"
-	depends on PCI
+	depends on PCI && !XEN
 	select PCI_ATS
 	help
 	  Process Address Space Identifiers (PASIDs) can be used by PCI devices

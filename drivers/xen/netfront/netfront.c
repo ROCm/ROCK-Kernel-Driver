@@ -33,6 +33,7 @@
 #include <linux/module.h>
 #include <linux/version.h>
 #include <linux/kernel.h>
+#include <linux/pfn.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/string.h>
@@ -904,27 +905,66 @@ static void xennet_make_frags(struct sk_buff *skb, struct net_device *dev,
 
 	for (i = 0; i < frags; i++) {
 		skb_frag_t *frag = skb_shinfo(skb)->frags + i;
+		struct page *page = skb_frag_page(frag);
 
-		tx->flags |= XEN_NETTXF_more_data;
+		len = skb_frag_size(frag);
+		offset = frag->page_offset;
 
-		id = get_id_from_freelist(np->tx_skbs);
-		np->tx_skbs[id] = skb_get(skb);
-		tx = RING_GET_REQUEST(&np->tx, prod++);
-		tx->id = id;
-		ref = gnttab_claim_grant_reference(&np->gref_tx_head);
-		BUG_ON((signed short)ref < 0);
+		/* Data must not cross a page boundary. */
+		BUG_ON(offset + len > (PAGE_SIZE << compound_order(page)));
 
-		mfn = pfn_to_mfn(page_to_pfn(skb_frag_page(frag)));
-		gnttab_grant_foreign_access_ref(ref, np->xbdev->otherend_id,
-						mfn, GTF_readonly);
+		/* Skip unused frames from start of page */
+		page += PFN_DOWN(offset);
+		for (offset &= ~PAGE_MASK; len; page++, offset = 0) {
+			unsigned int bytes = PAGE_SIZE - offset;
 
-		tx->gref = np->grant_tx_ref[id] = ref;
-		tx->offset = frag->page_offset;
-		tx->size = skb_frag_size(frag);
-		tx->flags = 0;
+			if (bytes > len)
+				bytes = len;
+
+			tx->flags |= XEN_NETTXF_more_data;
+
+			id = get_id_from_freelist(np->tx_skbs);
+			np->tx_skbs[id] = skb_get(skb);
+			tx = RING_GET_REQUEST(&np->tx, prod++);
+			tx->id = id;
+			ref = gnttab_claim_grant_reference(&np->gref_tx_head);
+			BUG_ON((signed short)ref < 0);
+
+			mfn = pfn_to_mfn(page_to_pfn(page));
+			gnttab_grant_foreign_access_ref(ref,
+							np->xbdev->otherend_id,
+							mfn, GTF_readonly);
+
+			tx->gref = np->grant_tx_ref[id] = ref;
+			tx->offset = offset;
+			tx->size = bytes;
+			tx->flags = 0;
+
+			len -= bytes;
+		}
 	}
 
 	np->tx.req_prod_pvt = prod;
+}
+
+/*
+ * Count how many ring slots are required to send the frags of this
+ * skb. Each frag might be a compound page.
+ */
+static unsigned int xennet_count_skb_frag_slots(const struct sk_buff *skb)
+{
+	unsigned int i, pages, frags = skb_shinfo(skb)->nr_frags;
+
+	for (pages = i = 0; i < frags; i++) {
+		const skb_frag_t *frag = skb_shinfo(skb)->frags + i;
+		unsigned int len = skb_frag_size(frag);
+
+		if (!len)
+			continue;
+		pages += PFN_UP((frag->page_offset & ~PAGE_MASK) + len);
+	}
+
+	return pages;
 }
 
 static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
@@ -939,9 +979,8 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	grant_ref_t ref;
 	unsigned long mfn, flags;
 	int notify;
-	int frags = skb_shinfo(skb)->nr_frags;
 	unsigned int offset = offset_in_page(data);
-	unsigned int len = skb_headlen(skb);
+	unsigned int slots, len = skb_headlen(skb);
 
 	/* Check the fast path, if hooks are available */
  	if (np->accel_vif_state.hooks && 
@@ -950,17 +989,17 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
  		return NETDEV_TX_OK;
  	} 
 
-	frags += DIV_ROUND_UP(offset + len, PAGE_SIZE);
-	if (unlikely(frags > MAX_SKB_FRAGS + 1)) {
-		pr_alert("xennet: skb rides the rocket: %d frags\n", frags);
-		dump_stack();
+	slots = PFN_UP(offset + len) + xennet_count_skb_frag_slots(skb);
+	if (unlikely(slots > MAX_SKB_FRAGS + 1)) {
+		net_alert_ratelimited("xennet: skb rides the rocket: %u slots\n",
+				      slots);
 		goto drop;
 	}
 
 	spin_lock_irqsave(&np->tx_lock, flags);
 
 	if (unlikely(!netfront_carrier_ok(np) ||
-		     (frags > 1 && !xennet_can_sg(dev)) ||
+		     (slots > 1 && !xennet_can_sg(dev)) ||
 		     netif_needs_gso(skb, netif_skb_features(skb)))) {
 		spin_unlock_irqrestore(&np->tx_lock, flags);
 		goto drop;

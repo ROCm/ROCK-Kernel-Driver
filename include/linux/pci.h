@@ -326,11 +326,13 @@ struct pci_dev {
 	struct kset *msi_kset;
 #endif
 	struct pci_vpd *vpd;
-#ifdef CONFIG_PCI_ATS
+#ifdef CONFIG_PCI_IOV /* doesn't imply CONFIG_PCI_ATS when CONFIG_XEN */
 	union {
 		struct pci_sriov *sriov;	/* SR-IOV capability related */
 		struct pci_dev *physfn;	/* the PF this VF is associated with */
 	};
+#endif
+#ifdef CONFIG_PCI_ATS
 	struct pci_ats	*ats;	/* Address Translation Service */
 #endif
 };

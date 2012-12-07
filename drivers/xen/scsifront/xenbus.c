@@ -206,7 +206,7 @@ static int scsifront_probe(struct xenbus_device *dev,
 	}
 
 	init_waitqueue_head(&info->wq);
-	spin_lock_init(&info->io_lock);
+	init_waitqueue_head(&info->wq_sync);
 	spin_lock_init(&info->shadow_lock);
 
 	snprintf(name, DEFAULT_TASK_COMM_LEN, "vscsiif.%d", info->host->host_no);
@@ -215,7 +215,7 @@ static int scsifront_probe(struct xenbus_device *dev,
 	if (IS_ERR(info->kthread)) {
 		err = PTR_ERR(info->kthread);
 		info->kthread = NULL;
-		pr_err("scsifront: kthread start err %d\n", err);
+		dev_err(&dev->dev, "kthread start err %d\n", err);
 		goto free_sring;
 	}
 
@@ -227,7 +227,7 @@ static int scsifront_probe(struct xenbus_device *dev,
 
 	err = scsi_add_host(host, &dev->dev);
 	if (err) {
-		pr_err("scsifront: fail to add scsi host %d\n", err);
+		dev_err(&dev->dev, "fail to add scsi host %d\n", err);
 		goto free_sring;
 	}
 
@@ -318,7 +318,7 @@ static void scsifront_do_lun_hotplug(struct vscsifrnt_info *info, int op)
 			if (device_state == XenbusStateInitialised) {
 				sdev = scsi_device_lookup(info->host, chn, tgt, lun);
 				if (sdev) {
-					pr_err("scsifront: Device already in use.\n");
+					dev_err(&dev->dev, "Device already in use.\n");
 					scsi_device_put(sdev);
 					xenbus_printf(XBT_NIL, dev->nodename,
 						state_str, "%d", XenbusStateClosed);
@@ -412,12 +412,12 @@ static DEFINE_XENBUS_DRIVER(scsifront, ,
 	.otherend_changed	= scsifront_backend_changed,
 );
 
-int scsifront_xenbus_init(void)
+int __init scsifront_xenbus_init(void)
 {
 	return xenbus_register_frontend(&scsifront_driver);
 }
 
-void scsifront_xenbus_unregister(void)
+void __exit scsifront_xenbus_unregister(void)
 {
 	xenbus_unregister_driver(&scsifront_driver);
 }

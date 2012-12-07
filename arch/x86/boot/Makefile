@@ -35,6 +35,8 @@ setup-y		+= video-vga.o
 setup-y		+= video-vesa.o
 setup-y		+= video-bios.o
 
+setup-$(CONFIG_XEN) := header.o version.o
+
 targets		+= $(setup-y)
 hostprogs-y	:= mkcpustr tools/build
 
@@ -199,7 +201,7 @@ $(obj)/vmlinux-stripped: OBJCOPYFLAGS := -g --strip-unneeded
 $(obj)/vmlinux-stripped: vmlinux FORCE
 	$(call if_changed,objcopy)
 
-ifndef CONFIG_XEN
+ifneq ($(CONFIG_XEN)-$(CONFIG_XEN_BZIMAGE),y-)
 bzImage := bzImage
 else
 bzImage := vmlinuz

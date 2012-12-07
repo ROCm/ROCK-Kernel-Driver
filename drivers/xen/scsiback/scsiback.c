@@ -149,7 +149,6 @@ void scsiback_do_resp_with_sense(char *sense_buffer, int32_t result,
 	vscsiif_response_t *ring_res;
 	struct vscsibk_info *info = pending_req->info;
 	int notify;
-	int more_to_do = 1;
 	struct scsi_sense_hdr sshdr;
 	unsigned long flags;
 
@@ -182,16 +181,7 @@ void scsiback_do_resp_with_sense(char *sense_buffer, int32_t result,
 	ring_res->residual_len = resid;
 
 	RING_PUSH_RESPONSES_AND_CHECK_NOTIFY(&info->ring, notify);
-	if (info->ring.rsp_prod_pvt == info->ring.req_cons) {
-		RING_FINAL_CHECK_FOR_REQUESTS(&info->ring, more_to_do);
-	} else if (RING_HAS_UNCONSUMED_REQUESTS(&info->ring)) {
-		more_to_do = 1;
-	}
-	
 	spin_unlock_irqrestore(&info->ring_lock, flags);
-
-	if (more_to_do)
-		scsiback_notify_work(info);
 
 	if (notify)
 		notify_remote_via_irq(info->irq);
@@ -204,14 +194,10 @@ static void scsiback_print_status(char *sense_buffer, int errors,
 {
 	struct scsi_device *sdev = pending_req->sdev;
 	
-	pr_err("scsiback: %d:%d:%d:%d ",
-	       sdev->host->host_no, sdev->channel, sdev->id, sdev->lun);
-	pr_err("status = 0x%02x, message = 0x%02x, host = 0x%02x,"
-	       " driver = 0x%02x\n",
-	       status_byte(errors), msg_byte(errors),
+	pr_err("scsiback[%d:%d:%d:%d] cmnd[0]=%02x -> st=%02x msg=%02x host=%02x drv=%02x\n",
+	       sdev->host->host_no, sdev->channel, sdev->id, sdev->lun,
+	       pending_req->cmnd[0], status_byte(errors), msg_byte(errors),
 	       host_byte(errors), driver_byte(errors));
-
-	pr_err("scsiback: cmnd[0]=0x%02X\n", pending_req->cmnd[0]);
 
 	if (CHECK_CONDITION & status_byte(errors))
 		__scsi_print_sense("scsiback", sense_buffer, SCSI_SENSE_BUFFERSIZE);
@@ -380,7 +366,6 @@ static struct bio *request_map_sg(pending_req_t *pending_req)
 
 			if (bio_add_pc_page(q, bio, page, bytes, off) !=
 						bytes) {
-				bio_put(bio);
 				err = -EINVAL;
 				goto free_bios;
 			}
@@ -415,6 +400,7 @@ void scsiback_cmd_exec(pending_req_t *pending_req)
 	int cmd_len  = (int)pending_req->cmd_len;
 	int data_dir = (int)pending_req->sc_data_direction;
 	unsigned int timeout;
+	struct bio *bio;
 	struct request *rq;
 	int write;
 
@@ -428,17 +414,21 @@ void scsiback_cmd_exec(pending_req_t *pending_req)
 
 	write = (data_dir == DMA_TO_DEVICE);
 	if (pending_req->nr_segments) {
-		struct bio *bio = request_map_sg(pending_req);
-
+		bio = request_map_sg(pending_req);
 		if (IS_ERR(bio)) {
-			pr_err("scsiback: SG Request Map Error\n");
+			pr_err("scsiback: SG Request Map Error %ld\n",
+			       PTR_ERR(bio));
 			return;
 		}
+	} else
+		bio = NULL;
 
+	if (bio) {
 		rq = blk_make_request(pending_req->sdev->request_queue, bio,
 				      GFP_KERNEL);
 		if (IS_ERR(rq)) {
-			pr_err("scsiback: Make Request Error\n");
+			pr_err("scsiback: Make Request Error %ld\n",
+			       PTR_ERR(rq));
 			return;
 		}
 
@@ -569,7 +559,7 @@ invalid_value:
 }
 
 
-static int scsiback_do_cmd_fn(struct vscsibk_info *info)
+static int _scsiback_do_cmd_fn(struct vscsibk_info *info)
 {
 	struct vscsiif_back_ring *ring = &info->ring;
 	vscsiif_request_t  *ring_req;
@@ -631,6 +621,21 @@ static int scsiback_do_cmd_fn(struct vscsibk_info *info)
 
 	/* Yield point for this unbounded loop. */
 	cond_resched();
+
+	return more_to_do;
+}
+
+static int scsiback_do_cmd_fn(struct vscsibk_info *info)
+{
+	int more_to_do;
+
+	do {
+		more_to_do = _scsiback_do_cmd_fn(info);
+		if (more_to_do)
+			break;
+
+		RING_FINAL_CHECK_FOR_REQUESTS(&info->ring, more_to_do);
+	} while (more_to_do);
 
 	return more_to_do;
 }

@@ -114,7 +114,13 @@ ENTRY(startup_32)
 .org HYPERCALL_PAGE_OFFSET
 ENTRY(hypercall_page)
 	CFI_STARTPROC
-.skip 0x1000
+	.skip __HYPERVISOR_iret * 32
+	CFI_REMEMBER_STATE
+	.skip 1 /* push %eax */
+	CFI_ADJUST_CFA_OFFSET	8
+	CFI_REL_OFFSET	eax,0
+	CFI_RESTORE_STATE
+	.balign 0x1000,0
 	CFI_ENDPROC
 
 /*

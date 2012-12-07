@@ -221,6 +221,7 @@ typedef unsigned int pending_ring_idx_t;
 struct netbk_rx_meta {
 	skb_frag_t frag;
 	int id;
+	u8 tail:1;
 	u8 copy:1;
 };
 

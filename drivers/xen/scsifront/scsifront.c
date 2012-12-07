@@ -31,6 +31,8 @@
 #include "common.h"
 #include <linux/pfn.h>
 
+#define PREFIX(lvl) KERN_##lvl "scsifront: "
+
 static int get_id_from_freelist(struct vscsifrnt_info *info)
 {
 	unsigned long flags;
@@ -50,16 +52,19 @@ static int get_id_from_freelist(struct vscsifrnt_info *info)
 	return free;
 }
 
+static void _add_id_to_freelist(struct vscsifrnt_info *info, uint32_t id)
+{
+	info->shadow[id].next_free = info->shadow_free;
+	info->shadow[id].sc = NULL;
+	info->shadow_free = id;
+}
+
 static void add_id_to_freelist(struct vscsifrnt_info *info, uint32_t id)
 {
 	unsigned long flags;
 
 	spin_lock_irqsave(&info->shadow_lock, flags);
-
-	info->shadow[id].next_free = info->shadow_free;
-	info->shadow[id].sc = NULL;
-	info->shadow_free = id;
-
+	_add_id_to_freelist(info, id);
 	spin_unlock_irqrestore(&info->shadow_lock, flags);
 }
 
@@ -106,26 +111,22 @@ irqreturn_t scsifront_intr(int irq, void *dev_id)
 }
 
 
-static void scsifront_gnttab_done(struct vscsifrnt_shadow *s, uint32_t id)
+static void scsifront_gnttab_done(struct vscsifrnt_info *info, uint32_t id)
 {
+	struct vscsifrnt_shadow *s = &info->shadow[id];
 	int i;
 
 	if (s->sc->sc_data_direction == DMA_NONE)
 		return;
 
-	if (s->nr_segments) {
-		for (i = 0; i < s->nr_segments; i++) {
-			if (unlikely(gnttab_query_foreign_access(
-				s->gref[i]) != 0)) {
-				pr_alert("scsifront: "
-					 "grant still in use by backend\n");
-				BUG();
-			}
-			gnttab_end_foreign_access(s->gref[i], 0UL);
+	for (i = 0; i < s->nr_segments; i++) {
+		if (unlikely(gnttab_query_foreign_access(s->gref[i]) != 0)) {
+			shost_printk(PREFIX(ALERT), info->host,
+				     "grant still in use by backend\n");
+			BUG();
 		}
+		gnttab_end_foreign_access(s->gref[i], 0UL);
 	}
-
-	return;
 }
 
 
@@ -142,7 +143,7 @@ static void scsifront_cdb_cmd_done(struct vscsifrnt_info *info,
 	if (sc == NULL)
 		BUG();
 
-	scsifront_gnttab_done(&info->shadow[id], id);
+	scsifront_gnttab_done(info, id);
 	add_id_to_freelist(info, id);
 
 	sc->result = ring_res->rslt;
@@ -170,14 +171,26 @@ static void scsifront_sync_cmd_done(struct vscsifrnt_info *info,
 	
 	spin_lock_irqsave(&info->shadow_lock, flags);
 	info->shadow[id].wait_reset = 1;
-	info->shadow[id].rslt_reset = ring_res->rslt;
+	switch (info->shadow[id].rslt_reset) {
+	case 0:
+		info->shadow[id].rslt_reset = ring_res->rslt;
+		break;
+	case -1:
+		_add_id_to_freelist(info, id);
+		break;
+	default:
+		shost_printk(PREFIX(ERR), info->host,
+			     "bad reset state %d, possibly leaking %u\n",
+			     info->shadow[id].rslt_reset, id);
+		break;
+	}
 	spin_unlock_irqrestore(&info->shadow_lock, flags);
 
 	wake_up(&(info->shadow[id].wq_reset));
 }
 
 
-int scsifront_cmd_done(struct vscsifrnt_info *info)
+static int scsifront_cmd_done(struct vscsifrnt_info *info)
 {
 	vscsiif_response_t *ring_res;
 
@@ -185,7 +198,7 @@ int scsifront_cmd_done(struct vscsifrnt_info *info)
 	int more_to_do = 0;
 	unsigned long flags;
 
-	spin_lock_irqsave(&info->io_lock, flags);
+	spin_lock_irqsave(info->host->host_lock, flags);
 
 	rp = info->ring.sring->rsp_prod;
 	rmb();
@@ -207,8 +220,11 @@ int scsifront_cmd_done(struct vscsifrnt_info *info)
 		info->ring.sring->rsp_event = i + 1;
 	}
 
-	spin_unlock_irqrestore(&info->io_lock, flags);
+	info->waiting_sync = 0;
 
+	spin_unlock_irqrestore(info->host->host_lock, flags);
+
+	wake_up(&info->wq_sync);
 
 	/* Yield point for this unbounded loop. */
 	cond_resched();
@@ -248,7 +264,6 @@ static int map_data_for_request(struct vscsifrnt_info *info,
 	int err, ref, ref_cnt = 0;
 	int write = (sc->sc_data_direction == DMA_TO_DEVICE);
 	unsigned int i, nr_pages, off, len, bytes;
-	unsigned long buffer_pfn;
 	unsigned int data_len = scsi_bufflen(sc);
 
 	if (sc->sc_data_direction == DMA_NONE || !data_len)
@@ -256,14 +271,16 @@ static int map_data_for_request(struct vscsifrnt_info *info,
 
 	err = gnttab_alloc_grant_references(VSCSIIF_SG_TABLESIZE, &gref_head);
 	if (err) {
-		pr_err("scsifront: gnttab_alloc_grant_references() error\n");
+		shost_printk(PREFIX(ERR), info->host,
+			     "gnttab_alloc_grant_references() error\n");
 		return -ENOMEM;
 	}
 
 	/* quoted scsi_lib.c/scsi_req_map_sg . */
 	nr_pages = PFN_UP(data_len + scsi_sglist(sc)->offset);
 	if (nr_pages > VSCSIIF_SG_TABLESIZE) {
-		pr_err("scsifront: Unable to map request_buffer for command!\n");
+		shost_printk(PREFIX(ERR), info->host,
+			     "Unable to map request_buffer for command!\n");
 		ref_cnt = -E2BIG;
 	} else {
 		struct scatterlist *sg, *sgl = scsi_sglist(sc);
@@ -272,8 +289,6 @@ static int map_data_for_request(struct vscsifrnt_info *info,
 			page = sg_page(sg);
 			off = sg->offset;
 			len = sg->length;
-
-			buffer_pfn = page_to_phys(page) >> PAGE_SHIFT;
 
 			while (len > 0 && data_len > 0) {
 				/*
@@ -288,14 +303,14 @@ static int map_data_for_request(struct vscsifrnt_info *info,
 				BUG_ON(ref == -ENOSPC);
 
 				gnttab_grant_foreign_access_ref(ref, info->dev->otherend_id,
-					buffer_pfn, write);
+					page_to_phys(page) >> PAGE_SHIFT, write);
 
 				info->shadow[id].gref[ref_cnt]  = ref;
 				ring_req->seg[ref_cnt].gref     = ref;
 				ring_req->seg[ref_cnt].offset   = (uint16_t)off;
 				ring_req->seg[ref_cnt].length   = (uint16_t)bytes;
 
-				buffer_pfn++;
+				page++;
 				len -= bytes;
 				data_len -= bytes;
 				off = 0;
@@ -319,9 +334,11 @@ static int scsifront_queuecommand(struct Scsi_Host *shost,
 	uint16_t rqid;
 
 /* debug printk to identify more missing scsi commands
-	printk(KERN_INFO "scsicmd: len=%i, 0x%x,0x%x,0x%x,0x%x,0x%x,0x%x,0x%x,0x%x,0x%x,0x%x",sc->cmd_len,
-		sc->cmnd[0],sc->cmnd[1],sc->cmnd[2],sc->cmnd[3],sc->cmnd[4],
-		sc->cmnd[5],sc->cmnd[6],sc->cmnd[7],sc->cmnd[8],sc->cmnd[9]);
+	shost_printk(KERN_INFO "scsicmd: ", sc->device->host,
+		     "len=%u %#x,%#x,%#x,%#x,%#x,%#x,%#x,%#x,%#x,%#x\n",
+		     sc->cmd_len, sc->cmnd[0], sc->cmnd[1],
+		     sc->cmnd[2], sc->cmnd[3], sc->cmnd[4], sc->cmnd[5],
+		     sc->cmnd[6], sc->cmnd[7], sc->cmnd[8], sc->cmnd[9]);
 */
 	spin_lock_irqsave(shost->host_lock, flags);
 	scsi_cmd_get_serial(shost, sc);
@@ -388,17 +405,33 @@ static int scsifront_dev_reset_handler(struct scsi_cmnd *sc)
 
 	vscsiif_request_t *ring_req;
 	uint16_t rqid;
-	int err;
+	int err = 0;
 
+	for (;;) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,12)
-	spin_lock_irq(host->host_lock);
+		spin_lock_irq(host->host_lock);
 #endif
+		if (!RING_FULL(&info->ring))
+			break;
+		if (err) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,12)
+			spin_unlock_irq(host->host_lock);
+#endif
+			return FAILED;
+		}
+		info->waiting_sync = 1;
+		spin_unlock_irq(host->host_lock);
+		err = wait_event_interruptible(info->wq_sync,
+					       !info->waiting_sync);
+		spin_lock_irq(host->host_lock);
+	}
 
 	ring_req      = scsifront_pre_request(info);
 	ring_req->act = VSCSIIF_ACT_SCSI_RESET;
 
 	rqid          = ring_req->rqid;
 	info->shadow[rqid].act = VSCSIIF_ACT_SCSI_RESET;
+	info->shadow[rqid].rslt_reset = 0;
 
 	ring_req->channel = sc->device->channel;
 	ring_req->id      = sc->device->id;
@@ -417,13 +450,19 @@ static int scsifront_dev_reset_handler(struct scsi_cmnd *sc)
 	scsifront_do_request(info);	
 
 	spin_unlock_irq(host->host_lock);
-	wait_event_interruptible(info->shadow[rqid].wq_reset,
-			 info->shadow[rqid].wait_reset);
+	err = wait_event_interruptible(info->shadow[rqid].wq_reset,
+				       info->shadow[rqid].wait_reset);
 	spin_lock_irq(host->host_lock);
 
-	err = info->shadow[rqid].rslt_reset;
-
-	add_id_to_freelist(info, rqid);
+	if (!err) {
+		err = info->shadow[rqid].rslt_reset;
+		add_id_to_freelist(info, rqid);
+	} else {
+		spin_lock(&info->shadow_lock);
+		info->shadow[rqid].rslt_reset = -1;
+		spin_unlock(&info->shadow_lock);
+		err = FAILED;
+	}
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,12)
 	spin_unlock_irq(host->host_lock);

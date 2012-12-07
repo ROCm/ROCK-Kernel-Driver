@@ -334,6 +334,17 @@ config XEN_VCPU_INFO_PLACEMENT
 	  This allows faster access to the per-vCPU shared info
 	  structure.
 
+config XEN_ADVANCED_COMPRESSION
+	def_bool y
+#	depends on XEN && (XEN_UNPRIVILEGED_GUEST || X86) && (XEN_COMPAT >= 0x040000)
+	depends on XEN && (XEN_UNPRIVILEGED_GUEST || X86)
+	depends on !XEN_COMPAT_030002_AND_LATER
+	depends on !XEN_COMPAT_030004_AND_LATER
+	depends on !XEN_COMPAT_030100_AND_LATER
+	depends on !XEN_COMPAT_030200_AND_LATER
+	depends on !XEN_COMPAT_030300_AND_LATER
+	depends on !XEN_COMPAT_030400_AND_LATER
+
 endmenu
 
 config HAVE_IRQ_IGNORE_UNHANDLED

@@ -22,6 +22,7 @@
 #include <asm/cache.h>
 #include <asm/dwarf2.h>
 #include <asm/percpu.h>
+#include <xen/interface/xen.h>
 #include <xen/interface/elfnote.h>
 #include <xen/interface/features.h>
 
@@ -79,6 +80,7 @@ NEXT_PAGE(level1_fixmap_pgt)
 NEXT_PAGE(hypercall_page)
 	phys_hypercall_page = . - .head.text
 	CFI_STARTPROC
+	i = 0
 	.rept 0x1000 / 0x20
 	.skip 1 /* push %rcx */
 	CFI_ADJUST_CFA_OFFSET	8
@@ -86,15 +88,25 @@ NEXT_PAGE(hypercall_page)
 	.skip 2 /* push %r11 */
 	CFI_ADJUST_CFA_OFFSET	8
 	CFI_REL_OFFSET	r11,0
+	.if i == __HYPERVISOR_iret
+	.skip 1 /* push %rax */
+	CFI_ADJUST_CFA_OFFSET	8
+	CFI_REL_OFFSET	rax,0
+	.endif
 	.skip 5 /* mov $#,%eax */
 	.skip 2 /* syscall */
+	.if i == __HYPERVISOR_iret
+	CFI_ADJUST_CFA_OFFSET	-3*8
+	.else
 	.skip 2 /* pop %r11 */
 	CFI_ADJUST_CFA_OFFSET -8
 	CFI_RESTORE r11
 	.skip 1 /* pop %rcx */
 	CFI_ADJUST_CFA_OFFSET -8
 	CFI_RESTORE rcx
-	.align 0x20,0 /* ret */
+	.endif
+	.balign 0x20,0 /* ret */
+	i = i + 1
 	.endr
 	CFI_ENDPROC
 

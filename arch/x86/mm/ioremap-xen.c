@@ -43,7 +43,7 @@ static int direct_remap_area_pte_fn(pte_t *pte,
 
 static int __direct_remap_pfn_range(struct mm_struct *mm,
 				    unsigned long address,
-				    phys_addr_t mfn,
+				    unsigned long mfn,
 				    unsigned long size,
 				    pgprot_t prot,
 				    domid_t  domid)
@@ -107,7 +107,7 @@ static int __direct_remap_pfn_range(struct mm_struct *mm,
 
 int direct_remap_pfn_range(struct vm_area_struct *vma,
 			   unsigned long address,
-			   phys_addr_t mfn,
+			   unsigned long mfn,
 			   unsigned long size,
 			   pgprot_t prot,
 			   domid_t  domid)
@@ -119,7 +119,6 @@ int direct_remap_pfn_range(struct vm_area_struct *vma,
 		return -EINVAL;
 
 	vma->vm_flags |= VM_IO | VM_PFNMAP | VM_DONTEXPAND | VM_DONTDUMP;
-
 	vma->vm_mm->context.has_foreign_mappings = 1;
 
 	return __direct_remap_pfn_range(
@@ -225,8 +224,8 @@ int ioremap_check_change_attr(unsigned long mfn, unsigned long size,
 static void __iomem *__ioremap_caller(resource_size_t phys_addr,
 		unsigned long size, unsigned long prot_val, void *caller)
 {
-	unsigned long offset, vaddr;
-	phys_addr_t mfn, last_mfn, last_addr;
+	unsigned long mfn, last_mfn, offset, vaddr;
+	resource_size_t last_addr;
 	const resource_size_t unaligned_phys_addr = phys_addr;
 	const unsigned long unaligned_size = size;
 	struct vm_struct *area;

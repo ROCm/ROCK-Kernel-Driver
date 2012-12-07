@@ -152,7 +152,8 @@ static efi_status_t xen_efi_get_variable(efi_char16_t *name,
 		return EFI_UNSUPPORTED;
 
 	*data_size = call.u.get_variable.size;
-	*attr = call.misc;
+	if (attr)
+		*attr = call.misc;
 
 	return call.status;
 }

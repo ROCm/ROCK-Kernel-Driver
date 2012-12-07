@@ -193,7 +193,9 @@ LINUXINCLUDE := -D__XEN_INTERFACE_VERSION__=$(CONFIG_XEN_INTERFACE_VERSION) \
 ifdef CONFIG_X86_64
 LDFLAGS_vmlinux := -e startup_64
 endif
+endif
 
+ifeq ($(CONFIG_XEN)-$(CONFIG_XEN_BZIMAGE),y-)
 # Default kernel to build
 all: vmlinuz
 

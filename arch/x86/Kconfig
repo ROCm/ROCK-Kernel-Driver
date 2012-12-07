@@ -1569,7 +1569,7 @@ config EFI
 
 config EFI_STUB
        bool "EFI stub support"
-       depends on EFI && !XEN
+       depends on EFI && (!XEN || XEN_BZIMAGE)
        ---help---
           This kernel feature allows a bzImage to be loaded directly
 	  by EFI firmware without the use of a bootloader.
@@ -1738,6 +1738,30 @@ config PHYSICAL_ALIGN
 	  above alignment restrictions.
 
 	  Don't change this unless you know what you are doing.
+
+config XEN_BZIMAGE
+	bool "Produce bzImage (rather than ELF) format executable"
+#	depends on XEN && (XEN_COMPAT >= (XEN_UNPRIVILEGED_GUEST ? 0x030402 : 0x040000))
+	depends on XEN
+	depends on !XEN_COMPAT_030002_AND_LATER
+	depends on !XEN_COMPAT_030004_AND_LATER
+	depends on !XEN_COMPAT_030100_AND_LATER
+	depends on !XEN_COMPAT_030200_AND_LATER
+	depends on !XEN_COMPAT_030300_AND_LATER
+	depends on !XEN_COMPAT_030400_AND_LATER
+#	depends on XEN_UNPRIVILEGED_GUEST || !XEN_COMPAT_030402_AND_LATER
+	select HAVE_KERNEL_BZIP2 if XEN_ADVANCED_COMPRESSION
+	select HAVE_KERNEL_LZMA if XEN_ADVANCED_COMPRESSION
+#	select HAVE_KERNEL_XZ if XEN_ADVANCED_COMPRESSION && (XEN_COMPAT > 0x040100)
+	select HAVE_KERNEL_XZ if XEN_ADVANCED_COMPRESSION && !XEN_COMPAT_040000_AND_LATER && !XEN_COMPAT_040100_AND_LATER
+	select HAVE_KERNEL_LZO if XEN_ADVANCED_COMPRESSION && !XEN_COMPAT_040000_AND_LATER
+	---help---
+	  Select whether, at the price of being incompatible with pre-3.4
+	  (pre-4.0 for Dom0) hypervisor versions, you want the final image
+	  to be in bzImage format, including the option to compress its
+	  embedded ELF image with methods better than gzip.
+	  Note that this is a prerequiste for building a kernel that can be
+	  used for secure boot from UEFI.
 
 config HOTPLUG_CPU
 	bool "Support for hot-pluggable CPUs"

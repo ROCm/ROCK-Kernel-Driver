@@ -871,18 +871,18 @@ void make_pages_writable(void *va, unsigned int nr, unsigned int feature);
 
 struct vm_area_struct;
 
-int direct_remap_pfn_range(struct vm_area_struct *vma,
+int direct_remap_pfn_range(struct vm_area_struct *,
                            unsigned long address,
-                           phys_addr_t mfn,
+                           unsigned long mfn,
                            unsigned long size,
-                           pgprot_t prot,
-                           domid_t  domid);
+                           pgprot_t,
+                           domid_t);
 int direct_kernel_remap_pfn_range(unsigned long address,
 				  unsigned long mfn,
 				  unsigned long size,
-				  pgprot_t prot,
-				  domid_t  domid);
-int create_lookup_pte_addr(struct mm_struct *mm,
+				  pgprot_t,
+				  domid_t);
+int create_lookup_pte_addr(struct mm_struct *,
                            unsigned long address,
                            uint64_t *ptep);
 

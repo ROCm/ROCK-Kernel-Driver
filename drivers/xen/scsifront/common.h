@@ -99,7 +99,6 @@ struct vscsifrnt_info {
 
 	struct Scsi_Host *host;
 
-	spinlock_t io_lock;
 	spinlock_t shadow_lock;
 	unsigned int evtchn;
 	unsigned int irq;
@@ -113,8 +112,9 @@ struct vscsifrnt_info {
 
 	struct task_struct *kthread;
 	wait_queue_head_t wq;
-	unsigned int waiting_resp;
-
+	wait_queue_head_t wq_sync;
+	unsigned int waiting_resp:1;
+	unsigned int waiting_sync:1;
 };
 
 #define DPRINTK(_f, _a...)				\
@@ -125,7 +125,6 @@ int scsifront_xenbus_init(void);
 void scsifront_xenbus_unregister(void);
 int scsifront_schedule(void *data);
 irqreturn_t scsifront_intr(int irq, void *dev_id);
-int scsifront_cmd_done(struct vscsifrnt_info *info);
 
 
 #endif /* __XEN_DRIVERS_SCSIFRONT_H__  */
