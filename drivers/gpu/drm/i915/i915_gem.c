@@ -1807,7 +1807,7 @@ i915_gem_object_get_pages_gtt(struct drm_i915_gem_object *obj)
 	 */
 	mapping = obj->base.filp->f_path.dentry->d_inode->i_mapping;
 	gfp = mapping_gfp_mask(mapping);
-	gfp |= __GFP_NORETRY | __GFP_NOWARN;
+	gfp |= __GFP_NORETRY | __GFP_NOWARN | __GFP_NO_KSWAPD;
 	gfp &= ~(__GFP_IO | __GFP_WAIT);
 	for_each_sg(st->sgl, sg, page_count, i) {
 		page = shmem_read_mapping_page_gfp(mapping, i, gfp);
@@ -1820,7 +1820,7 @@ i915_gem_object_get_pages_gtt(struct drm_i915_gem_object *obj)
 			 * our own buffer, now let the real VM do its job and
 			 * go down in flames if truly OOM.
 			 */
-			gfp &= ~(__GFP_NORETRY | __GFP_NOWARN);
+			gfp &= ~(__GFP_NORETRY | __GFP_NOWARN | __GFP_NO_KSWAPD);
 			gfp |= __GFP_IO | __GFP_WAIT;
 
 			i915_gem_shrink_all(dev_priv);
@@ -1828,7 +1828,7 @@ i915_gem_object_get_pages_gtt(struct drm_i915_gem_object *obj)
 			if (IS_ERR(page))
 				goto err_pages;
 
-			gfp |= __GFP_NORETRY | __GFP_NOWARN;
+			gfp |= __GFP_NORETRY | __GFP_NOWARN | __GFP_NO_KSWAPD;
 			gfp &= ~(__GFP_IO | __GFP_WAIT);
 		}
 
