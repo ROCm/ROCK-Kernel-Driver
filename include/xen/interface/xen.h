@@ -47,12 +47,15 @@ DEFINE_XEN_GUEST_HANDLE(char);
 __DEFINE_XEN_GUEST_HANDLE(uchar, unsigned char);
 DEFINE_XEN_GUEST_HANDLE(int);
 __DEFINE_XEN_GUEST_HANDLE(uint,  unsigned int);
+#if __XEN_INTERFACE_VERSION__ < 0x00040300
 DEFINE_XEN_GUEST_HANDLE(long);
 __DEFINE_XEN_GUEST_HANDLE(ulong, unsigned long);
+#endif
 DEFINE_XEN_GUEST_HANDLE(void);
 
 DEFINE_XEN_GUEST_HANDLE(uint64_t);
 DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
+DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
 #endif
 
 /*
@@ -322,7 +325,13 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 /*
  * MMU EXTENDED OPERATIONS
  *
- * HYPERVISOR_mmuext_op() accepts a list of mmuext_op structures.
+ * ` enum neg_errnoval
+ * ` HYPERVISOR_mmuext_op(mmuext_op_t uops[],
+ * `                      unsigned int count,
+ * `                      unsigned int *pdone,
+ * `                      unsigned int foreigndom)
+ */
+/* HYPERVISOR_mmuext_op() accepts a list of mmuext_op structures.
  * A foreigndom (FD) can be specified (or DOMID_SELF for none).
  * Where the FD has some effect, it is described below.
  *
@@ -377,6 +386,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
  * cmd: MMUEXT_[UN]MARK_SUPER
  * mfn: Machine frame number of head of superpage to be [un]marked.
  */
+/* ` enum mmuext_cmd { */
 #define MMUEXT_PIN_L1_TABLE      0
 #define MMUEXT_PIN_L2_TABLE      1
 #define MMUEXT_PIN_L3_TABLE      2
@@ -397,10 +407,11 @@ DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 #define MMUEXT_FLUSH_CACHE_GLOBAL 18
 #define MMUEXT_MARK_SUPER       19
 #define MMUEXT_UNMARK_SUPER     20
+/* ` } */
 
 #ifndef __ASSEMBLY__
 struct mmuext_op {
-	unsigned int cmd;
+	unsigned int cmd; /* => enum mmuext_cmd */
 	union {
 		/* [UN]PIN_TABLE, NEW_BASEPTR, NEW_USER_BASEPTR
 		 * CLEAR_PAGE, COPY_PAGE, [UN]MARK_SUPER */
@@ -426,9 +437,24 @@ typedef struct mmuext_op mmuext_op_t;
 DEFINE_XEN_GUEST_HANDLE(mmuext_op_t);
 #endif
 
+/*
+ * ` enum neg_errnoval
+ * ` HYPERVISOR_update_va_mapping(unsigned long va, u64 val,
+ * `                              enum uvm_flags flags)
+ * `
+ * ` enum neg_errnoval
+ * ` HYPERVISOR_update_va_mapping_otherdomain(unsigned long va, u64 val,
+ * `                                          enum uvm_flags flags,
+ * `                                          domid_t domid)
+ * `
+ * ` @va: The virtual address whose mapping we want to change
+ * ` @val: The new page table entry, must contain a machine address
+ * ` @flags: Control TLB flushes
+ */
 /* These are passed as 'flags' to update_va_mapping. They can be ORed. */
 /* When specifying UVMF_MULTI, also OR in a pointer to a CPU bitmap.   */
 /* UVMF_LOCAL is merely UVMF_MULTI with a NULL bitmap pointer.         */
+/* ` enum uvm_flags { */
 #define UVMF_NONE               (0UL<<0) /* No flushing at all.   */
 #define UVMF_TLB_FLUSH          (1UL<<0) /* Flush entire TLB(s).  */
 #define UVMF_INVLPG             (2UL<<0) /* Flush only one entry. */
@@ -436,6 +462,7 @@ DEFINE_XEN_GUEST_HANDLE(mmuext_op_t);
 #define UVMF_MULTI              (0UL<<2) /* Flush subset of TLBs. */
 #define UVMF_LOCAL              (0UL<<2) /* Flush local TLB.      */
 #define UVMF_ALL                (1UL<<2) /* Flush all TLBs.       */
+/* ` } */
 
 /*
  * Commands to HYPERVISOR_console_io().
@@ -519,7 +546,10 @@ typedef struct mmu_update mmu_update_t;
 DEFINE_XEN_GUEST_HANDLE(mmu_update_t);
 
 /*
- * Send an array of these to HYPERVISOR_multicall().
+ * ` enum neg_errnoval
+ * ` HYPERVISOR_multicall(multicall_entry_t call_list[],
+ * `                      unsigned int nr_calls);
+ *
  * NB. The fields are natural register size for this architecture.
  */
 struct multicall_entry {
@@ -673,7 +703,8 @@ typedef struct shared_info shared_info_t;
 #endif
 
 /*
- * Start-of-day memory layout:
+ * `incontents 200 startofday Start-of-day memory layout
+ *
  *  1. The domain is started within contiguous virtual-memory region.
  *  2. The contiguous region ends on an aligned 4MB boundary.
  *  3. This the order of bootstrap elements in the initial virtual region:

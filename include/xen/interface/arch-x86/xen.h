@@ -38,12 +38,21 @@
     typedef type * __guest_handle_ ## name
 #endif
 
+/*
+ * XEN_GUEST_HANDLE represents a guest pointer, when passed as a field
+ * in a struct in memory.
+ * XEN_GUEST_HANDLE_PARAM represent a guest pointer, when passed as an
+ * hypercall argument.
+ * XEN_GUEST_HANDLE_PARAM and XEN_GUEST_HANDLE are the same on X86 but
+ * they might not be on other architectures.
+ */
 #define __DEFINE_XEN_GUEST_HANDLE(name, type) \
     ___DEFINE_XEN_GUEST_HANDLE(name, type);   \
     ___DEFINE_XEN_GUEST_HANDLE(const_##name, const type)
 #define DEFINE_XEN_GUEST_HANDLE(name)   __DEFINE_XEN_GUEST_HANDLE(name, name)
 #define __XEN_GUEST_HANDLE(name)        __guest_handle_ ## name
 #define XEN_GUEST_HANDLE(name)          __XEN_GUEST_HANDLE(name)
+#define XEN_GUEST_HANDLE_PARAM(name)    XEN_GUEST_HANDLE(name)
 #define set_xen_guest_handle_raw(hnd, val)  do { (hnd).p = val; } while (0)
 #ifdef __XEN_TOOLS__
 #define get_xen_guest_handle(val, hnd)  do { val = (hnd).p; } while (0)
@@ -65,7 +74,7 @@ typedef unsigned long xen_pfn_t;
 #endif
 
 /*
- * SEGMENT DESCRIPTOR TABLES
+ * `incontents 200 segdesc Segment Descriptor Tables
  */
 /*
  * ` enum neg_errnoval
@@ -77,10 +86,23 @@ typedef unsigned long xen_pfn_t;
  * start of the GDT because some stupid OSes export hard-coded selector values
  * in their ABI. These hard-coded values are always near the start of the GDT,
  * so Xen places itself out of the way, at the far end of the GDT.
+ *
+ * NB The LDT is set using the MMUEXT_SET_LDT op of HYPERVISOR_mmuext_op
  */
 #define FIRST_RESERVED_GDT_PAGE  14
 #define FIRST_RESERVED_GDT_BYTE  (FIRST_RESERVED_GDT_PAGE * 4096)
 #define FIRST_RESERVED_GDT_ENTRY (FIRST_RESERVED_GDT_BYTE / 8)
+
+
+/*
+ * ` enum neg_errnoval
+ * ` HYPERVISOR_update_descriptor(u64 pa, u64 desc);
+ * `
+ * ` @pa   The machine physical address of the descriptor to
+ * `       update. Must be either a descriptor page or writable.
+ * ` @desc The descriptor value to update, in the same format as a
+ * `       native descriptor table entry.
+ */
 
 /* Maximum number of virtual CPUs in legacy multi-processor guests. */
 #define XEN_LEGACY_MAX_VCPUS 32

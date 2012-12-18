@@ -52,8 +52,8 @@ struct list_head pending_free;
 DEFINE_SPINLOCK(pending_free_lock);
 DECLARE_WAIT_QUEUE_HEAD(pending_free_wq);
 
-int vscsiif_reqs = VSCSIIF_BACK_MAX_PENDING_REQS;
-module_param_named(reqs, vscsiif_reqs, int, 0);
+static unsigned int vscsiif_reqs = 128;
+module_param_named(reqs, vscsiif_reqs, uint, 0);
 MODULE_PARM_DESC(reqs, "Number of scsiback requests to allocate");
 
 static unsigned int log_print_stat = 0;

@@ -208,6 +208,7 @@ static int blkback_remove(struct xenbus_device *dev)
 		be->blkif = NULL;
 	}
 
+	kfree(be->mode);
 	kfree(be);
 	dev_set_drvdata(&dev->dev, NULL);
 	return 0;
@@ -342,6 +343,7 @@ static void backend_changed(struct xenbus_watch *watch,
 		= container_of(watch, struct backend_info, backend_watch);
 	struct xenbus_device *dev = be->dev;
 	int cdrom = 0;
+	unsigned long handle;
 	char *device_type;
 
 	DPRINTK("");
@@ -359,11 +361,11 @@ static void backend_changed(struct xenbus_watch *watch,
 		return;
 	}
 
-	if ((be->major || be->minor) &&
-	    ((be->major != major) || (be->minor != minor))) {
-		pr_warning("blkback: changing physical device (from %x:%x to"
-			   " %x:%x) not supported\n", be->major, be->minor,
-			   major, minor);
+	if (be->major | be->minor) {
+		if (be->major != major || be->minor != minor)
+			pr_warning("blkback: changing physical device"
+				   " (from %x:%x to %x:%x) not supported\n",
+				   be->major, be->minor, major, minor);
 		return;
 	}
 
@@ -381,40 +383,40 @@ static void backend_changed(struct xenbus_watch *watch,
 		kfree(device_type);
 	}
 
-	if (be->major == 0 && be->minor == 0) {
-		/* Front end dir is a number, which is used as the handle. */
+	/* Front end dir is a number, which is used as the handle. */
+	handle = simple_strtoul(strrchr(dev->otherend, '/') + 1, NULL, 0);
 
-		char *p = strrchr(dev->otherend, '/') + 1;
-		long handle = simple_strtoul(p, NULL, 0);
+	be->major = major;
+	be->minor = minor;
 
-		be->major = major;
-		be->minor = minor;
+	err = vbd_create(be->blkif, handle, major, minor,
+			 FMODE_READ
+			 | (strchr(be->mode, 'w') ? FMODE_WRITE : 0)
+			 | (strchr(be->mode, '!') ? 0 : FMODE_EXCL),
+			 cdrom);
 
-		err = vbd_create(be->blkif, handle, major, minor,
-				 FMODE_READ
-				 | (strchr(be->mode, 'w') ? FMODE_WRITE : 0)
-				 | (strchr(be->mode, '!') ? 0 : FMODE_EXCL),
-				 cdrom);
-		switch (err) {
-		case -ENOMEDIUM:
-			if (be->blkif->vbd.type
-			    & (VDISK_CDROM | VDISK_REMOVABLE))
-		case 0:
-				break;
-		default:
-			be->major = be->minor = 0;
+	switch (err) {
+	case -ENOMEDIUM:
+		if (!(be->blkif->vbd.type & (VDISK_CDROM | VDISK_REMOVABLE))) {
+	default:
 			xenbus_dev_fatal(dev, err, "creating vbd structure");
-			return;
+			break;
 		}
-
+		/* fall through */
+	case 0:
 		err = xenvbd_sysfs_addif(dev);
 		if (err) {
 			vbd_free(&be->blkif->vbd);
-			be->major = be->minor = 0;
 			xenbus_dev_fatal(dev, err, "creating sysfs entries");
-			return;
 		}
+		break;
+	}
 
+	if (err) {
+		kfree(be->mode);
+		be->mode = NULL;
+		be->major = be->minor = 0;
+	} else {
 		/* We're potentially connected now */
 		update_blkif_status(be->blkif);
 
