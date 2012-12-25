@@ -10,20 +10,17 @@
 #define _ASM_X86_XEN_INTERFACE_H
 
 #ifdef __XEN__
-#define ___DEFINE_XEN_GUEST_HANDLE(name, type) \
+#define __DEFINE_GUEST_HANDLE(name, type) \
     typedef struct { type *p; } __guest_handle_ ## name
 #else
-#define ___DEFINE_XEN_GUEST_HANDLE(name, type) \
+#define __DEFINE_GUEST_HANDLE(name, type) \
     typedef type * __guest_handle_ ## name
 #endif
 
-#define __DEFINE_XEN_GUEST_HANDLE(name, type) \
-    ___DEFINE_XEN_GUEST_HANDLE(name, type);   \
-    ___DEFINE_XEN_GUEST_HANDLE(const_##name, const type)
 #define DEFINE_GUEST_HANDLE_STRUCT(name) \
-	__DEFINE_XEN_GUEST_HANDLE(name, struct name)
-#define DEFINE_XEN_GUEST_HANDLE(name) __DEFINE_XEN_GUEST_HANDLE(name, name)
-#define XEN_GUEST_HANDLE(name)        __guest_handle_ ## name
+	__DEFINE_GUEST_HANDLE(name, struct name)
+#define DEFINE_GUEST_HANDLE(name) __DEFINE_GUEST_HANDLE(name, name)
+#define GUEST_HANDLE(name)        __guest_handle_ ## name
 
 #ifdef __XEN__
 #if defined(__i386__)
@@ -57,6 +54,16 @@ typedef unsigned long xen_pfn_t;
 #define PRI_xen_pfn "lx"
 typedef unsigned long xen_ulong_t;
 #define PRI_xen_ulong "lx"
+/* Guest handles for primitive C types. */
+__DEFINE_GUEST_HANDLE(uchar, unsigned char);
+__DEFINE_GUEST_HANDLE(uint,  unsigned int);
+DEFINE_GUEST_HANDLE(char);
+DEFINE_GUEST_HANDLE(int);
+DEFINE_GUEST_HANDLE(void);
+DEFINE_GUEST_HANDLE(uint64_t);
+DEFINE_GUEST_HANDLE(uint32_t);
+DEFINE_GUEST_HANDLE(xen_pfn_t);
+DEFINE_GUEST_HANDLE(xen_ulong_t);
 #endif
 
 #ifndef HYPERVISOR_VIRT_START
@@ -68,7 +75,7 @@ typedef unsigned long xen_ulong_t;
 #define MACH2PHYS_NR_ENTRIES  ((MACH2PHYS_VIRT_END-MACH2PHYS_VIRT_START)>>__MACH2PHYS_SHIFT)
 
 /* Maximum number of virtual CPUs in multi-processor guests. */
-#define XEN_LEGACY_MAX_VCPUS 32
+#define MAX_VIRT_CPUS 32
 
 /*
  * SEGMENT DESCRIPTOR TABLES

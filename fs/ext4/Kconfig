@@ -39,22 +39,8 @@ config EXT4_USE_FOR_EXT23
 	  compiled kernel size by using one file system driver for
 	  ext2, ext3, and ext4 file systems.
 
-config EXT4_FS_XATTR
-	bool "Ext4 extended attributes"
-	depends on EXT4_FS
-	default y
-	help
-	  Extended attributes are name:value pairs associated with inodes by
-	  the kernel or by users (see the attr(5) manual page, or visit
-	  <http://acl.bestbits.at/> for details).
-
-	  If unsure, say N.
-
-	  You need this for POSIX ACL support on ext4.
-
 config EXT4_FS_POSIX_ACL
 	bool "Ext4 POSIX Access Control Lists"
-	depends on EXT4_FS_XATTR
 	select FS_POSIX_ACL
 	help
 	  POSIX Access Control Lists (ACLs) support permissions for users and
@@ -67,7 +53,6 @@ config EXT4_FS_POSIX_ACL
 
 config EXT4_FS_SECURITY
 	bool "Ext4 Security Labels"
-	depends on EXT4_FS_XATTR
 	help
 	  Security labels support alternative access control models
 	  implemented by security modules like SELinux.  This option
@@ -85,13 +70,3 @@ config EXT4_DEBUG
 
 	  If you select Y here, then you will be able to turn on debugging
 	  with a command such as "echo 1 > /sys/kernel/debug/ext4/mballoc-debug"
-
-config EXT4_FS_RICHACL
-      bool "Ext4 Rich Access Control Lists (EXPERIMENTAL)"
-      depends on EXT4_FS_XATTR && EXPERIMENTAL
-      select FS_RICHACL
-      help
-	Rich ACLs are an implementation of NFSv4 ACLs, extended by file masks
-	to fit into the standard POSIX file permission model.  They are
-	designed to work seamlessly locally as well as across the NFSv4 and
-	CIFS/SMB2 network file system protocols.

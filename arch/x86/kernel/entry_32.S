@@ -424,7 +424,7 @@ ENTRY(ia32_sysenter_target)
 	CFI_SIGNAL_FRAME
 	CFI_DEF_CFA esp, 0
 	CFI_REGISTER esp, ebp
-	movl SYSENTER_stack_sp0(%esp),%esp
+	movl TSS_sysenter_sp0(%esp),%esp
 sysenter_past_esp:
 	/*
 	 * Interrupts are disabled here, but we can't trace it until
@@ -774,29 +774,10 @@ ENTRY(ptregs_##name) ; \
 ENDPROC(ptregs_##name)
 
 PTREGSCALL1(iopl)
-PTREGSCALL0(fork)
-PTREGSCALL0(vfork)
-PTREGSCALL2(sigaltstack)
 PTREGSCALL0(sigreturn)
 PTREGSCALL0(rt_sigreturn)
 PTREGSCALL2(vm86)
 PTREGSCALL1(vm86old)
-
-/* Clone is an oddball.  The 4th arg is in %edi */
-ENTRY(ptregs_clone)
-	CFI_STARTPROC
-	leal 4(%esp),%eax
-	pushl_cfi %eax
-	pushl_cfi PT_EDI(%eax)
-	movl PT_EDX(%eax),%ecx
-	movl PT_ECX(%eax),%edx
-	movl PT_EBX(%eax),%eax
-	call sys_clone
-	addl $8,%esp
-	CFI_ADJUST_CFA_OFFSET -8
-	ret
-	CFI_ENDPROC
-ENDPROC(ptregs_clone)
 
 .macro FIXUP_ESPFIX_STACK
 /*
@@ -1058,7 +1039,7 @@ END(spurious_interrupt_bug)
  */
 	.popsection
 
-#ifdef CONFIG_PARAVIRT_XEN
+#ifdef CONFIG_XEN
 /* Xen doesn't set %esp to be precisely what the normal sysenter
    entrypoint expects, so fix it up before using the normal path. */
 ENTRY(xen_sysenter_target)
@@ -1149,7 +1130,7 @@ ENDPROC(xen_failsafe_callback)
 BUILD_INTERRUPT3(xen_hvm_callback_vector, XEN_HVM_EVTCHN_CALLBACK,
 		xen_evtchn_do_upcall)
 
-#endif	/* CONFIG_PARAVIRT_XEN */
+#endif	/* CONFIG_XEN */
 
 #ifdef CONFIG_FUNCTION_TRACER
 #ifdef CONFIG_DYNAMIC_FTRACE
@@ -1379,7 +1360,7 @@ END(page_fault)
  * that sets up the real kernel stack. Check here, since we can't
  * allow the wrong stack to be used.
  *
- * "SYSENTER_stack_sp0+12" is because the NMI/debug handler will have
+ * "TSS_sysenter_sp0+12" is because the NMI/debug handler will have
  * already pushed 3 words if it hits on the sysenter instruction:
  * eflags, cs and eip.
  *
@@ -1391,7 +1372,7 @@ END(page_fault)
 	cmpw $__KERNEL_CS, 4(%esp)
 	jne \ok
 \label:
-	movl SYSENTER_stack_sp0 + \offset(%esp), %esp
+	movl TSS_sysenter_sp0 + \offset(%esp), %esp
 	CFI_DEF_CFA esp, 0
 	CFI_UNDEFINED eip
 	pushfl_cfi

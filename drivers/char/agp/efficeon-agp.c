@@ -227,7 +227,7 @@ static int efficeon_create_gatt_table(struct agp_bridge_data *bridge)
 
 		efficeon_private.l1_table[index] = page;
 
-		value = virt_to_gart((unsigned long *)page) | pati | present | index;
+		value = virt_to_phys((unsigned long *)page) | pati | present | index;
 
 		pci_write_config_dword(agp_bridge->dev,
 			EFFICEON_ATTPAGE, value);
@@ -407,7 +407,7 @@ static int __devinit agp_efficeon_probe(struct pci_dev *pdev,
 	return agp_add_bridge(bridge);
 }
 
-static void __devexit agp_efficeon_remove(struct pci_dev *pdev)
+static void agp_efficeon_remove(struct pci_dev *pdev)
 {
 	struct agp_bridge_data *bridge = pci_get_drvdata(pdev);
 

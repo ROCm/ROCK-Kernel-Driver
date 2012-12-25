@@ -1,7 +1,3 @@
-#ifdef CONFIG_XEN
-# define e820 machine_e820
-# include <asm/hypervisor.h>
-#endif
 #include <linux/ioport.h>
 #include <asm/e820.h>
 
@@ -41,10 +37,6 @@ static void remove_e820_regions(struct resource *avail)
 
 void arch_remove_reservations(struct resource *avail)
 {
-#ifdef CONFIG_XEN
-	if (!is_initial_xendomain())
-		return;
-#endif
 	/* Trim out BIOS areas (low 1MB and high 2MB) and E820 regions */
 	if (avail->flags & IORESOURCE_MEM) {
 		if (avail->start < BIOS_END)

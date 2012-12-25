@@ -22,12 +22,10 @@
 #include <asm/hpet.h>
 #include <asm/unistd.h>
 #include <asm/io.h>
+#include <asm/pvclock.h>
 
 #define gtod (&VVAR(vsyscall_gtod_data))
 
-#ifdef CONFIG_XEN
-#define VCLOCK_NONE 0
-#else
 notrace static cycle_t vread_tsc(void)
 {
 	cycle_t ret;
@@ -64,7 +62,76 @@ static notrace cycle_t vread_hpet(void)
 {
 	return readl((const void __iomem *)fix_to_virt(VSYSCALL_HPET) + 0xf0);
 }
-#endif /* CONFIG_XEN */
+
+#ifdef CONFIG_PARAVIRT_CLOCK
+
+static notrace const struct pvclock_vsyscall_time_info *get_pvti(int cpu)
+{
+	const struct pvclock_vsyscall_time_info *pvti_base;
+	int idx = cpu / (PAGE_SIZE/PVTI_SIZE);
+	int offset = cpu % (PAGE_SIZE/PVTI_SIZE);
+
+	BUG_ON(PVCLOCK_FIXMAP_BEGIN + idx > PVCLOCK_FIXMAP_END);
+
+	pvti_base = (struct pvclock_vsyscall_time_info *)
+		    __fix_to_virt(PVCLOCK_FIXMAP_BEGIN+idx);
+
+	return &pvti_base[offset];
+}
+
+static notrace cycle_t vread_pvclock(int *mode)
+{
+	const struct pvclock_vsyscall_time_info *pvti;
+	cycle_t ret;
+	u64 last;
+	u32 version;
+	u32 migrate_count;
+	u8 flags;
+	unsigned cpu, cpu1;
+
+
+	/*
+	 * When looping to get a consistent (time-info, tsc) pair, we
+	 * also need to deal with the possibility we can switch vcpus,
+	 * so make sure we always re-fetch time-info for the current vcpu.
+	 */
+	do {
+		cpu = __getcpu() & VGETCPU_CPU_MASK;
+		/* TODO: We can put vcpu id into higher bits of pvti.version.
+		 * This will save a couple of cycles by getting rid of
+		 * __getcpu() calls (Gleb).
+		 */
+
+		pvti = get_pvti(cpu);
+
+		migrate_count = pvti->migrate_count;
+
+		version = __pvclock_read_cycles(&pvti->pvti, &ret, &flags);
+
+		/*
+		 * Test we're still on the cpu as well as the version.
+		 * We could have been migrated just after the first
+		 * vgetcpu but before fetching the version, so we
+		 * wouldn't notice a version change.
+		 */
+		cpu1 = __getcpu() & VGETCPU_CPU_MASK;
+	} while (unlikely(cpu != cpu1 ||
+			  (pvti->pvti.version & 1) ||
+			  pvti->pvti.version != version ||
+			  pvti->migrate_count != migrate_count));
+
+	if (unlikely(!(flags & PVCLOCK_TSC_STABLE_BIT)))
+		*mode = VCLOCK_NONE;
+
+	/* refer to tsc.c read_tsc() comment for rationale */
+	last = VVAR(vsyscall_gtod_data).clock.cycle_last;
+
+	if (likely(ret >= last))
+		return ret;
+
+	return last;
+}
+#endif
 
 notrace static long vdso_fallback_gettime(long clock, struct timespec *ts)
 {
@@ -84,8 +151,7 @@ notrace static long vdso_fallback_gtod(struct timeval *tv, struct timezone *tz)
 }
 
 
-#ifndef CONFIG_XEN
-notrace static inline u64 vgetsns(void)
+notrace static inline u64 vgetsns(int *mode)
 {
 	long v;
 	cycles_t cycles;
@@ -93,6 +159,10 @@ notrace static inline u64 vgetsns(void)
 		cycles = vread_tsc();
 	else if (gtod->clock.vclock_mode == VCLOCK_HPET)
 		cycles = vread_hpet();
+#ifdef CONFIG_PARAVIRT_CLOCK
+	else if (gtod->clock.vclock_mode == VCLOCK_PVCLOCK)
+		cycles = vread_pvclock(mode);
+#endif
 	else
 		return 0;
 	v = (cycles - gtod->clock.cycle_last) & gtod->clock.mask;
@@ -112,7 +182,7 @@ notrace static int __always_inline do_realtime(struct timespec *ts)
 		mode = gtod->clock.vclock_mode;
 		ts->tv_sec = gtod->wall_time_sec;
 		ns = gtod->wall_time_snsec;
-		ns += vgetsns();
+		ns += vgetsns(&mode);
 		ns >>= gtod->clock.shift;
 	} while (unlikely(read_seqcount_retry(&gtod->seq, seq)));
 
@@ -132,14 +202,13 @@ notrace static int do_monotonic(struct timespec *ts)
 		mode = gtod->clock.vclock_mode;
 		ts->tv_sec = gtod->monotonic_time_sec;
 		ns = gtod->monotonic_time_snsec;
-		ns += vgetsns();
+		ns += vgetsns(&mode);
 		ns >>= gtod->clock.shift;
 	} while (unlikely(read_seqcount_retry(&gtod->seq, seq)));
 	timespec_add_ns(ts, ns);
 
 	return mode;
 }
-#endif /* CONFIG_XEN */
 
 notrace static int do_realtime_coarse(struct timespec *ts)
 {
@@ -169,14 +238,12 @@ notrace int __vdso_clock_gettime(clockid_t clock, struct timespec *ts)
 	int ret = VCLOCK_NONE;
 
 	switch (clock) {
-#ifndef CONFIG_XEN
 	case CLOCK_REALTIME:
 		ret = do_realtime(ts);
 		break;
 	case CLOCK_MONOTONIC:
 		ret = do_monotonic(ts);
 		break;
-#endif
 	case CLOCK_REALTIME_COARSE:
 		return do_realtime_coarse(ts);
 	case CLOCK_MONOTONIC_COARSE:
@@ -194,7 +261,6 @@ notrace int __vdso_gettimeofday(struct timeval *tv, struct timezone *tz)
 {
 	long ret = VCLOCK_NONE;
 
-#ifndef CONFIG_XEN
 	if (likely(tv != NULL)) {
 		BUILD_BUG_ON(offsetof(struct timeval, tv_usec) !=
 			     offsetof(struct timespec, tv_nsec) ||
@@ -207,7 +273,6 @@ notrace int __vdso_gettimeofday(struct timeval *tv, struct timezone *tz)
 		tz->tz_minuteswest = gtod->sys_tz.tz_minuteswest;
 		tz->tz_dsttime = gtod->sys_tz.tz_dsttime;
 	}
-#endif
 
 	if (ret == VCLOCK_NONE)
 		return vdso_fallback_gtod(tv, tz);

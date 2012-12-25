@@ -127,7 +127,6 @@ static struct dmi_system_id __cpuinitdata processor_power_dmi_table[] = {
 };
 
 
-#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
 /*
  * Callers should disable interrupts before the call and enable
  * interrupts after return.
@@ -146,7 +145,6 @@ static void acpi_safe_halt(void)
 	}
 	current_thread_info()->status |= TS_POLLING;
 }
-#endif
 
 #ifdef ARCH_APICTIMER_STOPS_ON_C3
 
@@ -217,7 +215,7 @@ static void lapic_timer_state_broadcast(struct acpi_processor *pr,
 static void lapic_timer_check_state(int state, struct acpi_processor *pr,
 				   struct acpi_processor_cx *cstate) { }
 static void lapic_timer_propagate_broadcast(struct acpi_processor *pr) { }
-static inline void lapic_timer_state_broadcast(struct acpi_processor *pr,
+static void lapic_timer_state_broadcast(struct acpi_processor *pr,
 				       struct acpi_processor_cx *cx,
 				       int broadcast)
 {
@@ -253,7 +251,7 @@ int acpi_processor_resume(struct device *dev)
 	return 0;
 }
 
-#if defined(CONFIG_X86) && !defined(CONFIG_PROCESSOR_EXTERNAL_CONTROL)
+#if defined(CONFIG_X86)
 static void tsc_check_state(int state)
 {
 	switch (boot_cpu_data.x86_vendor) {
@@ -450,8 +448,7 @@ static int acpi_processor_get_power_info_cst(struct acpi_processor *pr)
 				 */
 				cx.entry_method = ACPI_CSTATE_HALT;
 				snprintf(cx.desc, ACPI_CX_DESC_LEN, "ACPI HLT");
-			/* This doesn't apply to external control case */
-			} else if (!processor_pm_external()) {
+			} else {
 				continue;
 			}
 			if (cx.type == ACPI_STATE_C1 &&
@@ -488,12 +485,6 @@ static int acpi_processor_get_power_info_cst(struct acpi_processor *pr)
 		if (obj->type != ACPI_TYPE_INTEGER)
 			continue;
 
-#ifdef CONFIG_PROCESSOR_EXTERNAL_CONTROL
-		/* cache control methods to notify external logic */
-		if (processor_pm_external())
-			memcpy(&cx.reg, reg, sizeof(*reg));
-#endif
-
 		current_count++;
 		memcpy(&(pr->power.states[current_count]), &cx, sizeof(cx));
 
@@ -515,7 +506,7 @@ static int acpi_processor_get_power_info_cst(struct acpi_processor *pr)
 			  current_count));
 
 	/* Validate number of power states discovered */
-	if (current_count < (processor_pm_external() ? 1 : 2))
+	if (current_count < 2)
 		status = -EFAULT;
 
       end:
@@ -610,9 +601,7 @@ static int acpi_processor_power_verify(struct acpi_processor *pr)
 	unsigned int i;
 	unsigned int working = 0;
 
-#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
 	pr->power.timer_broadcast_on_state = INT_MAX;
-#endif
 
 	for (i = 1; i < ACPI_PROCESSOR_MAX_POWER && i <= max_cstate; i++) {
 		struct acpi_processor_cx *cx = &pr->power.states[i];
@@ -683,7 +672,6 @@ static int acpi_processor_get_power_info(struct acpi_processor *pr)
 	return 0;
 }
 
-#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
 /**
  * acpi_idle_bm_check - checks if bus master activity was detected
  */
@@ -747,31 +735,18 @@ static inline void acpi_idle_do_entry(struct acpi_processor_cx *cx)
 static int acpi_idle_enter_c1(struct cpuidle_device *dev,
 		struct cpuidle_driver *drv, int index)
 {
-	ktime_t  kt1, kt2;
-	s64 idle_time;
 	struct acpi_processor *pr;
 	struct cpuidle_state_usage *state_usage = &dev->states_usage[index];
 	struct acpi_processor_cx *cx = cpuidle_get_statedata(state_usage);
 
 	pr = __this_cpu_read(processors);
-	dev->last_residency = 0;
 
 	if (unlikely(!pr))
 		return -EINVAL;
 
-	local_irq_disable();
-
-
 	lapic_timer_state_broadcast(pr, cx, 1);
-	kt1 = ktime_get_real();
 	acpi_idle_do_entry(cx);
-	kt2 = ktime_get_real();
-	idle_time =  ktime_to_us(ktime_sub(kt2, kt1));
 
-	/* Update device last_residency*/
-	dev->last_residency = (int)idle_time;
-
-	local_irq_enable();
 	lapic_timer_state_broadcast(pr, cx, 0);
 
 	return index;
@@ -818,18 +793,11 @@ static int acpi_idle_enter_simple(struct cpuidle_device *dev,
 	struct acpi_processor *pr;
 	struct cpuidle_state_usage *state_usage = &dev->states_usage[index];
 	struct acpi_processor_cx *cx = cpuidle_get_statedata(state_usage);
-	ktime_t  kt1, kt2;
-	s64 idle_time_ns;
-	s64 idle_time;
 
 	pr = __this_cpu_read(processors);
-	dev->last_residency = 0;
 
 	if (unlikely(!pr))
 		return -EINVAL;
-
-	local_irq_disable();
-
 
 	if (cx->entry_method != ACPI_CSTATE_FFH) {
 		current_thread_info()->status &= ~TS_POLLING;
@@ -841,7 +809,6 @@ static int acpi_idle_enter_simple(struct cpuidle_device *dev,
 
 		if (unlikely(need_resched())) {
 			current_thread_info()->status |= TS_POLLING;
-			local_irq_enable();
 			return -EINVAL;
 		}
 	}
@@ -855,22 +822,12 @@ static int acpi_idle_enter_simple(struct cpuidle_device *dev,
 	if (cx->type == ACPI_STATE_C3)
 		ACPI_FLUSH_CPU_CACHE();
 
-	kt1 = ktime_get_real();
 	/* Tell the scheduler that we are going deep-idle: */
 	sched_clock_idle_sleep_event();
 	acpi_idle_do_entry(cx);
-	kt2 = ktime_get_real();
-	idle_time_ns = ktime_to_ns(ktime_sub(kt2, kt1));
-	idle_time = idle_time_ns;
-	do_div(idle_time, NSEC_PER_USEC);
 
-	/* Update device last_residency*/
-	dev->last_residency = (int)idle_time;
+	sched_clock_idle_wakeup_event(0);
 
-	/* Tell the scheduler how much we idled: */
-	sched_clock_idle_wakeup_event(idle_time_ns);
-
-	local_irq_enable();
 	if (cx->entry_method != ACPI_CSTATE_FFH)
 		current_thread_info()->status |= TS_POLLING;
 
@@ -895,13 +852,8 @@ static int acpi_idle_enter_bm(struct cpuidle_device *dev,
 	struct acpi_processor *pr;
 	struct cpuidle_state_usage *state_usage = &dev->states_usage[index];
 	struct acpi_processor_cx *cx = cpuidle_get_statedata(state_usage);
-	ktime_t  kt1, kt2;
-	s64 idle_time_ns;
-	s64 idle_time;
-
 
 	pr = __this_cpu_read(processors);
-	dev->last_residency = 0;
 
 	if (unlikely(!pr))
 		return -EINVAL;
@@ -911,15 +863,10 @@ static int acpi_idle_enter_bm(struct cpuidle_device *dev,
 			return drv->states[drv->safe_state_index].enter(dev,
 						drv, drv->safe_state_index);
 		} else {
-			local_irq_disable();
 			acpi_safe_halt();
-			local_irq_enable();
 			return -EBUSY;
 		}
 	}
-
-	local_irq_disable();
-
 
 	if (cx->entry_method != ACPI_CSTATE_FFH) {
 		current_thread_info()->status &= ~TS_POLLING;
@@ -931,7 +878,6 @@ static int acpi_idle_enter_bm(struct cpuidle_device *dev,
 
 		if (unlikely(need_resched())) {
 			current_thread_info()->status |= TS_POLLING;
-			local_irq_enable();
 			return -EINVAL;
 		}
 	}
@@ -946,7 +892,6 @@ static int acpi_idle_enter_bm(struct cpuidle_device *dev,
 	 */
 	lapic_timer_state_broadcast(pr, cx, 1);
 
-	kt1 = ktime_get_real();
 	/*
 	 * disable bus master
 	 * bm_check implies we need ARB_DIS
@@ -977,18 +922,9 @@ static int acpi_idle_enter_bm(struct cpuidle_device *dev,
 		c3_cpu_count--;
 		raw_spin_unlock(&c3_lock);
 	}
-	kt2 = ktime_get_real();
-	idle_time_ns = ktime_to_ns(ktime_sub(kt2, kt1));
-	idle_time = idle_time_ns;
-	do_div(idle_time, NSEC_PER_USEC);
 
-	/* Update device last_residency*/
-	dev->last_residency = (int)idle_time;
+	sched_clock_idle_wakeup_event(0);
 
-	/* Tell the scheduler how much we idled: */
-	sched_clock_idle_wakeup_event(idle_time_ns);
-
-	local_irq_enable();
 	if (cx->entry_method != ACPI_CSTATE_FFH)
 		current_thread_info()->status |= TS_POLLING;
 
@@ -999,6 +935,7 @@ static int acpi_idle_enter_bm(struct cpuidle_device *dev,
 struct cpuidle_driver acpi_idle_driver = {
 	.name =		"acpi_idle",
 	.owner =	THIS_MODULE,
+	.en_core_tk_irqen = 1,
 };
 
 /**
@@ -1140,10 +1077,6 @@ static int acpi_processor_setup_cpuidle_states(struct acpi_processor *pr)
 
 	return 0;
 }
-#else
-static void acpi_processor_setup_cpuidle_cx(struct acpi_processor *pr) {}
-static void acpi_processor_setup_cpuidle_states(struct acpi_processor *pr) {}
-#endif /* CONFIG_PROCESSOR_EXTERNAL_CONTROL */
 
 int acpi_processor_hotplug(struct acpi_processor *pr)
 {
@@ -1162,14 +1095,6 @@ int acpi_processor_hotplug(struct acpi_processor *pr)
 
 	if (!pr->flags.power_setup_done)
 		return -ENODEV;
-
-	if (processor_pm_external()) {
-		pr->flags.power = 0;
-		ret = acpi_processor_get_power_info(pr);
-		processor_notify_external(pr,
-			PROCESSOR_PM_CHANGE, PM_TYPE_IDLE);
-		return ret;
-	}
 
 	dev = per_cpu(acpi_cpuidle_device, pr->id);
 	cpuidle_pause_and_lock();
@@ -1250,6 +1175,8 @@ static int acpi_processor_registered;
 int __cpuinit acpi_processor_power_init(struct acpi_processor *pr)
 {
 	acpi_status status = 0;
+	int retval;
+	struct cpuidle_device *dev;
 	static int first_run;
 
 	if (disabled_by_idle_boot_param())
@@ -1280,16 +1207,12 @@ int __cpuinit acpi_processor_power_init(struct acpi_processor *pr)
 	acpi_processor_get_power_info(pr);
 	pr->flags.power_setup_done = 1;
 
-#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
 	/*
 	 * Install the idle handler if processor power management is supported.
 	 * Note that we use previously set idle handler will be used on
 	 * platforms that only support C1.
 	 */
 	if (pr->flags.power) {
-		struct cpuidle_device *dev;
-		int retval;
-
 		/* Register acpi_idle_driver if not already registered */
 		if (!acpi_processor_registered) {
 			acpi_processor_setup_cpuidle_states(pr);
@@ -1318,12 +1241,6 @@ int __cpuinit acpi_processor_power_init(struct acpi_processor *pr)
 		}
 		acpi_processor_registered++;
 	}
-#endif
-
-	if (processor_pm_external())
-		processor_notify_external(pr,
-			PROCESSOR_PM_INIT, PM_TYPE_IDLE);
-
 	return 0;
 }
 

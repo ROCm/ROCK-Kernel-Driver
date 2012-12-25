@@ -1,44 +1,12 @@
 #ifndef _ASM_X86_PTRACE_H
 #define _ASM_X86_PTRACE_H
 
-#include <linux/compiler.h>	/* For __user */
-#include <asm/ptrace-abi.h>
-#include <asm/processor-flags.h>
-
-#ifdef __KERNEL__
 #include <asm/segment.h>
 #include <asm/page_types.h>
-#endif
+#include <uapi/asm/ptrace.h>
 
 #ifndef __ASSEMBLY__
-
 #ifdef __i386__
-/* this struct defines the way the registers are stored on the
-   stack during a system call. */
-
-#ifndef __KERNEL__
-
-struct pt_regs {
-	long ebx;
-	long ecx;
-	long edx;
-	long esi;
-	long edi;
-	long ebp;
-	long eax;
-	int  xds;
-	int  xes;
-	int  xfs;
-	int  xgs;
-	long orig_eax;
-	long eip;
-	int  xcs;
-	long eflags;
-	long esp;
-	int  xss;
-};
-
-#else /* __KERNEL__ */
 
 struct pt_regs {
 	unsigned long bx;
@@ -60,41 +28,7 @@ struct pt_regs {
 	unsigned long ss;
 };
 
-#endif /* __KERNEL__ */
-
 #else /* __i386__ */
-
-#ifndef __KERNEL__
-
-struct pt_regs {
-	unsigned long r15;
-	unsigned long r14;
-	unsigned long r13;
-	unsigned long r12;
-	unsigned long rbp;
-	unsigned long rbx;
-/* arguments: non interrupts/non tracing syscalls only save up to here*/
-	unsigned long r11;
-	unsigned long r10;
-	unsigned long r9;
-	unsigned long r8;
-	unsigned long rax;
-	unsigned long rcx;
-	unsigned long rdx;
-	unsigned long rsi;
-	unsigned long rdi;
-	unsigned long orig_rax;
-/* end of arguments */
-/* cpu exception frame or undefined */
-	unsigned long rip;
-	unsigned long cs;
-	unsigned long eflags;
-	unsigned long rsp;
-	unsigned long ss;
-/* top of stack page */
-};
-
-#else /* __KERNEL__ */
 
 struct pt_regs {
 	unsigned long r15;
@@ -124,17 +58,11 @@ struct pt_regs {
 /* top of stack page */
 };
 
-#endif /* __KERNEL__ */
 #endif /* !__i386__ */
-
-
-#ifdef __KERNEL__
 
 #include <linux/init.h>
 #ifdef CONFIG_PARAVIRT
 #include <asm/paravirt_types.h>
-#elif defined(CONFIG_X86_64_XEN)
-#include <xen/interface/xen.h>
 #endif
 
 struct cpuinfo_x86;
@@ -194,13 +122,7 @@ static inline int v8086_mode(struct pt_regs *regs)
 #ifdef CONFIG_X86_64
 static inline bool user_64bit_mode(struct pt_regs *regs)
 {
-#if defined(CONFIG_XEN)
-	/*
-	 * On Xen, these are the only long mode CPL 3 selectors.
-	 * We do not allow long mode selectors in the LDT.
-	 */
-	return regs->cs == __USER_CS || regs->cs == FLAT_USER_CS64;
-#elif !defined(CONFIG_PARAVIRT)
+#ifndef CONFIG_PARAVIRT
 	/*
 	 * On non-paravirt systems, this is the only long mode CPL 3
 	 * selector.  We do not allow long mode selectors in the LDT.
@@ -211,6 +133,13 @@ static inline bool user_64bit_mode(struct pt_regs *regs)
 	return regs->cs == __USER_CS || regs->cs == pv_info.extra_user_64bit_cs;
 #endif
 }
+
+#define current_user_stack_pointer()	this_cpu_read(old_rsp)
+/* ia32 vs. x32 difference */
+#define compat_user_stack_pointer()	\
+	(test_thread_flag(TIF_IA32) 	\
+	 ? current_pt_regs()->sp 	\
+	 : this_cpu_read(old_rsp))
 #endif
 
 #ifdef CONFIG_X86_32
@@ -247,6 +176,15 @@ static inline unsigned long regs_get_register(struct pt_regs *regs,
 {
 	if (unlikely(offset > MAX_REG_OFFSET))
 		return 0;
+#ifdef CONFIG_X86_32
+	/*
+	 * Traps from the kernel do not save sp and ss.
+	 * Use the helper function to retrieve sp.
+	 */
+	if (offset == offsetof(struct pt_regs, sp) &&
+	    regs->cs == __KERNEL_CS)
+		return kernel_stack_pointer(regs);
+#endif
 	return *(unsigned long *)((unsigned long)regs + offset);
 }
 
@@ -286,9 +224,7 @@ static inline unsigned long regs_get_kernel_stack_nth(struct pt_regs *regs,
 }
 
 #define arch_has_single_step()	(1)
-#if defined(CONFIG_XEN)
-#define arch_has_block_step()	(0)
-#elif defined(CONFIG_X86_DEBUGCTLMSR)
+#ifdef CONFIG_X86_DEBUGCTLMSR
 #define arch_has_block_step()	(1)
 #else
 #define arch_has_block_step()	(boot_cpu_data.x86 >= 6)
@@ -302,8 +238,5 @@ extern int do_get_thread_area(struct task_struct *p, int idx,
 extern int do_set_thread_area(struct task_struct *p, int idx,
 			      struct user_desc __user *info, int can_allocate);
 
-#endif /* __KERNEL__ */
-
 #endif /* !__ASSEMBLY__ */
-
 #endif /* _ASM_X86_PTRACE_H */

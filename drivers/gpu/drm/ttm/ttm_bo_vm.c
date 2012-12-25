@@ -171,13 +171,7 @@ static int ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	if (bo->mem.bus.is_iomem) {
 		vma->vm_page_prot = ttm_io_prot(bo->mem.placement,
 						vma->vm_page_prot);
-#if defined(CONFIG_XEN) && defined(_PAGE_IOMAP)
-		pgprot_val(vma->vm_page_prot) |= _PAGE_IOMAP;
-#endif
 	} else {
-#if defined(CONFIG_XEN) && defined(_PAGE_IOMAP)
-		pgprot_val(vma->vm_page_prot) &= ~_PAGE_IOMAP;
-#endif
 		ttm = bo->ttm;
 		vma->vm_page_prot = (bo->mem.placement & TTM_PL_FLAG_CACHED) ?
 		    vm_get_page_prot(vma->vm_flags) :
@@ -265,8 +259,8 @@ int ttm_bo_mmap(struct file *filp, struct vm_area_struct *vma,
 	read_lock(&bdev->vm_lock);
 	bo = ttm_bo_vm_lookup_rb(bdev, vma->vm_pgoff,
 				 (vma->vm_end - vma->vm_start) >> PAGE_SHIFT);
-	if (likely(bo != NULL))
-		ttm_bo_reference(bo);
+	if (likely(bo != NULL) && !kref_get_unless_zero(&bo->kref))
+		bo = NULL;
 	read_unlock(&bdev->vm_lock);
 
 	if (unlikely(bo == NULL)) {

@@ -137,8 +137,6 @@ EXPORT_SYMBOL(tty_mutex);
 /* Spinlock to protect the tty->tty_files list */
 DEFINE_SPINLOCK(tty_files_lock);
 
-int console_use_vt = 1;
-
 static ssize_t tty_read(struct file *, char __user *, size_t, loff_t *);
 static ssize_t tty_write(struct file *, const char __user *, size_t, loff_t *);
 ssize_t redirected_tty_write(struct file *, const char __user *,
@@ -188,7 +186,6 @@ void free_tty_struct(struct tty_struct *tty)
 	if (tty->dev)
 		put_device(tty->dev);
 	kfree(tty->write_buf);
-	tty_buffer_free_all(tty);
 	tty->magic = 0xDEADDEAD;
 	kfree(tty);
 }
@@ -239,7 +236,7 @@ void tty_free_file(struct file *file)
 }
 
 /* Delete file from its tty */
-void tty_del_file(struct file *file)
+static void tty_del_file(struct file *file)
 {
 	struct tty_file_private *priv = file->private_data;
 
@@ -557,7 +554,7 @@ EXPORT_SYMBOL_GPL(tty_wakeup);
  *		  tasklist_lock to walk task list for hangup event
  *		    ->siglock to protect ->signal/->sighand
  */
-void __tty_hangup(struct tty_struct *tty)
+static void __tty_hangup(struct tty_struct *tty)
 {
 	struct file *cons_filp = NULL;
 	struct file *filp, *f = NULL;
@@ -1419,6 +1416,8 @@ struct tty_struct *tty_init_dev(struct tty_driver *driver, int idx)
 			"%s: %s driver does not set tty->port. This will crash the kernel later. Fix the driver!\n",
 			__func__, tty->driver->name);
 
+	tty->port->itty = tty;
+
 	/*
 	 * Structures all installed ... call the ldisc open routines.
 	 * If we fail here just call release_tty to clean up.  No need
@@ -1554,6 +1553,7 @@ static void release_tty(struct tty_struct *tty, int idx)
 		tty->ops->shutdown(tty);
 	tty_free_termios(tty);
 	tty_driver_remove_tty(tty->driver, tty);
+	tty->port->itty = NULL;
 
 	if (tty->link)
 		tty_kref_put(tty->link);
@@ -1627,7 +1627,6 @@ int tty_release(struct inode *inode, struct file *filp)
 	struct tty_struct *tty = file_tty(filp);
 	struct tty_struct *o_tty;
 	int	pty_master, tty_closing, o_tty_closing, do_sleep;
-	int	devpts;
 	int	idx;
 	char	buf[64];
 
@@ -1642,7 +1641,6 @@ int tty_release(struct inode *inode, struct file *filp)
 	idx = tty->index;
 	pty_master = (tty->driver->type == TTY_DRIVER_TYPE_PTY &&
 		      tty->driver->subtype == PTY_TYPE_MASTER);
-	devpts = (tty->driver->flags & TTY_DRIVER_DEVPTS_MEM) != 0;
 	/* Review: parallel close */
 	o_tty = tty->link;
 
@@ -1801,9 +1799,6 @@ int tty_release(struct inode *inode, struct file *filp)
 	release_tty(tty, idx);
 	mutex_unlock(&tty_mutex);
 
-	/* Make this pty number available for reallocation */
-	if (devpts)
-		devpts_kill_index(inode, idx);
 	return 0;
 }
 
@@ -1860,10 +1855,6 @@ static struct tty_driver *tty_lookup_driver(dev_t device, struct file *filp,
 #ifdef CONFIG_VT
 	case MKDEV(TTY_MAJOR, 0): {
 		extern struct tty_driver *console_driver;
-
-		if (!console_use_vt)
-			return get_tty_driver(device, index)
-			       ?: ERR_PTR(-ENODEV);
 		driver = tty_driver_kref_get(console_driver);
 		*index = fg_console;
 		*noctty = 1;
@@ -2696,6 +2687,11 @@ long tty_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case TIOCNXCL:
 		clear_bit(TTY_EXCLUSIVE, &tty->flags);
 		return 0;
+	case TIOCGEXCL:
+	{
+		int excl = test_bit(TTY_EXCLUSIVE, &tty->flags);
+		return put_user(excl, (int __user *)p);
+	}
 	case TIOCNOTTY:
 		if (current->signal->tty != tty)
 			return -ENOTTY;
@@ -2943,19 +2939,13 @@ void initialize_tty_struct(struct tty_struct *tty,
 	tty_ldisc_init(tty);
 	tty->session = NULL;
 	tty->pgrp = NULL;
-	tty->overrun_time = jiffies;
-	tty_buffer_init(tty);
 	mutex_init(&tty->legacy_mutex);
 	mutex_init(&tty->termios_mutex);
 	mutex_init(&tty->ldisc_mutex);
 	init_waitqueue_head(&tty->write_wait);
 	init_waitqueue_head(&tty->read_wait);
 	INIT_WORK(&tty->hangup_work, do_tty_hangup);
-	mutex_init(&tty->atomic_read_lock);
 	mutex_init(&tty->atomic_write_lock);
-	mutex_init(&tty->output_lock);
-	mutex_init(&tty->echo_lock);
-	spin_lock_init(&tty->read_lock);
 	spin_lock_init(&tty->ctrl_lock);
 	INIT_LIST_HEAD(&tty->tty_files);
 	INIT_WORK(&tty->SAK_work, do_SAK_work);
@@ -3513,8 +3503,7 @@ int __init tty_init(void)
 		WARN_ON(device_create_file(consdev, &dev_attr_active) < 0);
 
 #ifdef CONFIG_VT
-	if (console_use_vt)
-		vty_init(&console_fops);
+	vty_init(&console_fops);
 #endif
 	return 0;
 }

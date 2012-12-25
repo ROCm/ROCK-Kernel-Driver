@@ -604,6 +604,23 @@ static int ioat3_dca_count_dca_slots(void *iobase, u16 dca_offset)
 	return slots;
 }
 
+static inline int dca3_tag_map_invalid(u8 *tag_map)
+{
+	/*
+	 * If the tag map is not programmed by the BIOS the default is:
+	 * 0x80 0x80 0x80 0x80 0x80 0x00 0x00 0x00
+	 *
+	 * This an invalid map and will result in only 2 possible tags
+	 * 0x1F and 0x00.  0x00 is an invalid DCA tag so we know that
+	 * this entire definition is invalid.
+	 */
+	return ((tag_map[0] == DCA_TAG_MAP_VALID) &&
+		(tag_map[1] == DCA_TAG_MAP_VALID) &&
+		(tag_map[2] == DCA_TAG_MAP_VALID) &&
+		(tag_map[3] == DCA_TAG_MAP_VALID) &&
+		(tag_map[4] == DCA_TAG_MAP_VALID));
+}
+
 struct dca_provider * __devinit
 ioat3_dca_init(struct pci_dev *pdev, void __iomem *iobase)
 {
@@ -674,6 +691,12 @@ ioat3_dca_init(struct pci_dev *pdev, void __iomem *iobase)
 		ioatdca->tag_map[i] = bit & DCA_TAG_MAP_MASK;
 	}
 
+	if (dca3_tag_map_invalid(ioatdca->tag_map)) {
+		dev_err(&pdev->dev, "APICID_TAG_MAP set incorrectly by BIOS, disabling DCA\n");
+		free_dca_provider(dca);
+		return NULL;
+	}
+
 	err = register_dca_provider(dca, &pdev->dev);
 	if (err) {
 		free_dca_provider(dca);
@@ -681,16 +704,4 @@ ioat3_dca_init(struct pci_dev *pdev, void __iomem *iobase)
 	}
 
 	return dca;
-}
-
-void ioat_remove_dca_provider(struct pci_dev *pdev)
-{
-	struct ioatdma_device *device = pci_get_drvdata(pdev);
-
-	if (!device->dca)
-		return;
-
-	unregister_dca_provider(device->dca, &pdev->dev);
-	free_dca_provider(device->dca);
-	device->dca = NULL;
 }

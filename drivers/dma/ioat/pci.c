@@ -29,6 +29,7 @@
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/interrupt.h>
+#include <linux/dca.h>
 #include <linux/slab.h>
 #include "dma.h"
 #include "dma_v2.h"
@@ -124,7 +125,7 @@ static struct pci_driver ioat_pci_driver = {
 	.name		= DRV_NAME,
 	.id_table	= ioat_pci_tbl,
 	.probe		= ioat_pci_probe,
-	.remove		= __devexit_p(ioat_remove),
+	.remove		= ioat_remove,
 };
 
 static struct ioatdma_device *
@@ -202,7 +203,11 @@ static void __devexit ioat_remove(struct pci_dev *pdev)
 		return;
 
 	dev_err(&pdev->dev, "Removing dma and dca services\n");
-	ioat_remove_dca_provider(pdev);
+	if (device->dca) {
+		unregister_dca_provider(device->dca, &pdev->dev);
+		free_dca_provider(device->dca);
+		device->dca = NULL;
+	}
 	ioat_dma_remove(device);
 }
 

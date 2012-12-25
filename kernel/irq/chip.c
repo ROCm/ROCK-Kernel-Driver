@@ -89,7 +89,6 @@ int irq_set_handler_data(unsigned int irq, void *data)
 }
 EXPORT_SYMBOL(irq_set_handler_data);
 
-#ifndef CONFIG_XEN
 /**
  *	irq_set_msi_desc - set MSI descriptor data for an irq
  *	@irq:	Interrupt number
@@ -110,7 +109,6 @@ int irq_set_msi_desc(unsigned int irq, struct msi_desc *entry)
 	irq_put_desc_unlock(desc, flags);
 	return 0;
 }
-#endif
 
 /**
  *	irq_set_chip_data - set irq chip data for an irq
@@ -274,6 +272,7 @@ void handle_nested_irq(unsigned int irq)
 
 	raw_spin_lock_irq(&desc->lock);
 
+	desc->istate &= ~(IRQS_REPLAY | IRQS_WAITING);
 	kstat_incr_irqs_this_cpu(irq, desc);
 
 	action = desc->action;

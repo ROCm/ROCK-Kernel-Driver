@@ -1,8 +1,7 @@
 /*
  *	Xen Watchdog Driver
  *
- *	(c) Copyright 2010,2011 Novell, Inc.
- *	(c) Copyright 2011,2012 SuSE
+ *	(c) Copyright 2010 Novell, Inc.
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -29,10 +28,8 @@
 #include <linux/spinlock.h>
 #include <linux/uaccess.h>
 #include <linux/watchdog.h>
-#ifdef CONFIG_PARAVIRT_XEN
 #include <xen/xen.h>
 #include <asm/xen/hypercall.h>
-#endif
 #include <xen/interface/sched.h>
 
 static struct platform_device *platform_device;
@@ -247,7 +244,7 @@ static struct miscdevice xen_wdt_miscdev = {
 	.fops =		&xen_wdt_fops,
 };
 
-static int __devinit xen_wdt_probe(struct platform_device *dev)
+static int xen_wdt_probe(struct platform_device *dev)
 {
 	struct sched_watchdog wd = { .id = ~0 };
 	int ret = HYPERVISOR_sched_op(SCHEDOP_watchdog, &wd);
@@ -283,7 +280,7 @@ static int __devinit xen_wdt_probe(struct platform_device *dev)
 	return ret;
 }
 
-static int __devexit xen_wdt_remove(struct platform_device *dev)
+static int xen_wdt_remove(struct platform_device *dev)
 {
 	/* Stop the timer before we leave */
 	if (!nowayout)
@@ -318,7 +315,7 @@ static int xen_wdt_resume(struct platform_device *dev)
 
 static struct platform_driver xen_wdt_driver = {
 	.probe          = xen_wdt_probe,
-	.remove         = __devexit_p(xen_wdt_remove),
+	.remove         = xen_wdt_remove,
 	.shutdown       = xen_wdt_shutdown,
 	.suspend        = xen_wdt_suspend,
 	.resume         = xen_wdt_resume,
@@ -332,19 +329,17 @@ static int __init xen_wdt_init_module(void)
 {
 	int err;
 
-#ifdef CONFIG_PARAVIRT_XEN
 	if (!xen_domain())
 		return -ENODEV;
-#endif
 
-	printk(KERN_INFO "Xen WatchDog Timer Driver v%s\n", DRV_VERSION);
+	pr_info("Xen WatchDog Timer Driver v%s\n", DRV_VERSION);
 
 	err = platform_driver_register(&xen_wdt_driver);
 	if (err)
 		return err;
 
 	platform_device = platform_device_register_simple(DRV_NAME,
-							  -1, NULL, 0);
+								  -1, NULL, 0);
 	if (IS_ERR(platform_device)) {
 		err = PTR_ERR(platform_device);
 		platform_driver_unregister(&xen_wdt_driver);

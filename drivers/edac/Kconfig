@@ -7,7 +7,7 @@
 menuconfig EDAC
 	bool "EDAC (Error Detection And Correction) reporting"
 	depends on HAS_IOMEM
-	depends on X86 || PPC || TILE || ARM
+	depends on X86 || PPC || TILE || ARM || EDAC_SUPPORT
 	help
 	  EDAC is designed to report errors in the core system.
 	  These are low-level errors that are reported in the CPU or
@@ -27,6 +27,9 @@ menuconfig EDAC
 	  There is also a mailing list for the EDAC project, which can
 	  be found via the sourceforge page.
 
+config EDAC_SUPPORT
+	bool
+
 if EDAC
 
 comment "Reporting subsystems"
@@ -42,14 +45,14 @@ config EDAC_LEGACY_SYSFS
 config EDAC_DEBUG
 	bool "Debugging"
 	help
-	  This turns on debugging information for the entire EDAC
-	  sub-system. You can insert module with "debug_level=x", current
-	  there're four debug levels (x=0,1,2,3 from low to high).
-	  Usually you should select 'N'.
+	  This turns on debugging information for the entire EDAC subsystem.
+	  You do so by inserting edac_module with "edac_debug_level=x." Valid
+	  levels are 0-4 (from low to high) and by default it is set to 2.
+	  Usually you should select 'N' here.
 
 config EDAC_DECODE_MCE
 	tristate "Decode MCEs in human-readable form (only on AMD for now)"
-	depends on CPU_SUP_AMD && (X86_MCE_AMD || X86_XEN_MCE)
+	depends on CPU_SUP_AMD && X86_MCE_AMD
 	default y
 	---help---
 	  Enable this option if you want to decode Machine Check Exceptions
@@ -82,7 +85,6 @@ config EDAC_MM_EDAC
 config EDAC_AMD64
 	tristate "AMD64 (Opteron, Athlon64) K8, F10h"
 	depends on EDAC_MM_EDAC && AMD_NB && X86_64 && EDAC_DECODE_MCE
-	depends on !XEN
 	help
 	  Support for error detection and correction of DRAM ECC errors on
 	  the AMD64 families of memory controllers (K8 and F10h)
@@ -179,7 +181,7 @@ config EDAC_I5400
 
 config EDAC_I7CORE
 	tristate "Intel i7 Core (Nehalem) processors"
-	depends on EDAC_MM_EDAC && PCI && X86 && (X86_MCE_INTEL || X86_XEN_MCE)
+	depends on EDAC_MM_EDAC && PCI && X86 && X86_MCE_INTEL
 	help
 	  Support for error detection and correction the Intel
 	  i7 Core (Nehalem) Integrated Memory Controller that exists on
@@ -223,7 +225,7 @@ config EDAC_I7300
 
 config EDAC_SBRIDGE
 	tristate "Intel Sandy-Bridge Integrated MC"
-	depends on EDAC_MM_EDAC && PCI && X86_64 && (X86_MCE_INTEL || X86_XEN_MCE)
+	depends on EDAC_MM_EDAC && PCI && X86_64 && X86_MCE_INTEL
 	depends on PCI_MMCONFIG && EXPERIMENTAL
 	help
 	  Support for error detection and correction the Intel
@@ -316,5 +318,33 @@ config EDAC_HIGHBANK_L2
 	help
 	  Support for error detection and correction on the
 	  Calxeda Highbank memory controller.
+
+config EDAC_OCTEON_PC
+	tristate "Cavium Octeon Primary Caches"
+	depends on EDAC_MM_EDAC && CPU_CAVIUM_OCTEON
+	help
+	  Support for error detection and correction on the primary caches of
+	  the cnMIPS cores of Cavium Octeon family SOCs.
+
+config EDAC_OCTEON_L2C
+	tristate "Cavium Octeon Secondary Caches (L2C)"
+	depends on EDAC_MM_EDAC && CPU_CAVIUM_OCTEON
+	help
+	  Support for error detection and correction on the
+	  Cavium Octeon family of SOCs.
+
+config EDAC_OCTEON_LMC
+	tristate "Cavium Octeon DRAM Memory Controller (LMC)"
+	depends on EDAC_MM_EDAC && CPU_CAVIUM_OCTEON
+	help
+	  Support for error detection and correction on the
+	  Cavium Octeon family of SOCs.
+
+config EDAC_OCTEON_PCI
+	tristate "Cavium Octeon PCI Controller"
+	depends on EDAC_MM_EDAC && PCI && CPU_CAVIUM_OCTEON
+	help
+	  Support for error detection and correction on the
+	  Cavium Octeon family of SOCs.
 
 endif # EDAC

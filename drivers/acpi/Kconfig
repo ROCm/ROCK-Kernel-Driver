@@ -181,10 +181,16 @@ config ACPI_DOCK
 	  This driver supports ACPI-controlled docking stations and removable
 	  drive bays such as the IBM Ultrabay and the Dell Module Bay.
 
+config ACPI_I2C
+	def_tristate I2C
+	depends on I2C
+	help
+	  ACPI I2C enumeration support.
+
 config ACPI_PROCESSOR
 	tristate "Processor"
 	select THERMAL
-	select CPU_IDLE if !PROCESSOR_EXTERNAL_CONTROL
+	select CPU_IDLE
 	default y
 	help
 	  This driver installs ACPI as the idle handler for Linux and uses
@@ -318,7 +324,6 @@ config ACPI_PCI_SLOT
 config X86_PM_TIMER
 	bool "Power Management Timer Support" if EXPERT
 	depends on X86
-	depends on !XEN
 	default y
 	help
 	  The Power Management Timer is available on all ACPI-capable,
@@ -347,7 +352,7 @@ config ACPI_CONTAINER
 
 config ACPI_HOTPLUG_MEMORY
 	tristate "Memory Hotplug"
-	depends on MEMORY_HOTPLUG || XEN_PRIVILEGED_GUEST
+	depends on MEMORY_HOTPLUG
 	default n
 	help
 	  This driver supports ACPI memory hotplug.  The driver
@@ -406,13 +411,4 @@ config ACPI_BGRT
 
 source "drivers/acpi/apei/Kconfig"
 
-config ACPI_PV_SLEEP
-	bool
-	depends on X86 && XEN && ACPI_SLEEP
-	default y
-
-config PROCESSOR_EXTERNAL_CONTROL
-	bool
-	depends on (X86 || IA64) && XEN
-	default y
 endif	# ACPI

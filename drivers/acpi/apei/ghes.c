@@ -206,7 +206,7 @@ static void __iomem *ghes_ioremap_pfn_nmi(u64 pfn)
 
 	vaddr = (unsigned long)GHES_IOREMAP_NMI_PAGE(ghes_ioremap_area->addr);
 	ioremap_page_range(vaddr, vaddr + PAGE_SIZE,
-			   pfn << PAGE_SHIFT, PAGE_KERNEL_IO);
+			   pfn << PAGE_SHIFT, PAGE_KERNEL);
 
 	return (void __iomem *)vaddr;
 }
@@ -217,7 +217,7 @@ static void __iomem *ghes_ioremap_pfn_irq(u64 pfn)
 
 	vaddr = (unsigned long)GHES_IOREMAP_IRQ_PAGE(ghes_ioremap_area->addr);
 	ioremap_page_range(vaddr, vaddr + PAGE_SIZE,
-			   pfn << PAGE_SHIFT, PAGE_KERNEL_IO);
+			   pfn << PAGE_SHIFT, PAGE_KERNEL);
 
 	return (void __iomem *)vaddr;
 }
@@ -901,7 +901,7 @@ static unsigned long ghes_esource_prealloc_size(
 	return prealloc_size;
 }
 
-static int __devinit ghes_probe(struct platform_device *ghes_dev)
+static int ghes_probe(struct platform_device *ghes_dev)
 {
 	struct acpi_hest_generic *generic;
 	struct ghes *ghes = NULL;
@@ -994,7 +994,7 @@ err:
 	return rc;
 }
 
-static int __devexit ghes_remove(struct platform_device *ghes_dev)
+static int ghes_remove(struct platform_device *ghes_dev)
 {
 	struct ghes *ghes;
 	struct acpi_hest_generic *generic;

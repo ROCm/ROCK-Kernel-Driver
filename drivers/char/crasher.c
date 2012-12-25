@@ -134,7 +134,6 @@ static void mem_verify(void) {
 
 static int crasher_thread(void *unused)
 {
-	daemonize("crasher");
 	complete(&startup);
 	mem_verify();
 	complete(&startup);
