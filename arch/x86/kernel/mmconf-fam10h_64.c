@@ -205,12 +205,20 @@ void __cpuinit fam10h_check_enable_mmcfg(void)
 		return;
 	}
 
+#ifndef CONFIG_XEN
 	printk(KERN_INFO "Enable MMCONFIG on AMD Family 10h\n");
 	val &= ~((FAM10H_MMIO_CONF_BASE_MASK<<FAM10H_MMIO_CONF_BASE_SHIFT) |
 	     (FAM10H_MMIO_CONF_BUSRANGE_MASK<<FAM10H_MMIO_CONF_BUSRANGE_SHIFT));
 	val |= fam10h_pci_mmconf_base | (8 << FAM10H_MMIO_CONF_BUSRANGE_SHIFT) |
 	       FAM10H_MMIO_CONF_ENABLE;
 	wrmsrl(address, val);
+#else
+	if ((val & ~((FAM10H_MMIO_CONF_BASE_MASK<<FAM10H_MMIO_CONF_BASE_SHIFT) |
+	     (FAM10H_MMIO_CONF_BUSRANGE_MASK<<FAM10H_MMIO_CONF_BUSRANGE_SHIFT)))
+	    != (fam10h_pci_mmconf_base | (8 << FAM10H_MMIO_CONF_BUSRANGE_SHIFT) |
+	 	FAM10H_MMIO_CONF_ENABLE))
+		pci_probe &= ~PCI_CHECK_ENABLE_AMD_MMCONF;
+#endif
 }
 
 static int __init set_check_enable_amd_mmconf(const struct dmi_system_id *d)

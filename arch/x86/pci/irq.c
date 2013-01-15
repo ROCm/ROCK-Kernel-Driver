@@ -94,13 +94,18 @@ static struct irq_routing_table * __init pirq_find_routing_table(void)
 	u8 *addr;
 	struct irq_routing_table *rt;
 
+#ifdef CONFIG_XEN
+	if (!is_initial_xendomain())
+		return NULL;
+#endif
 	if (pirq_table_addr) {
-		rt = pirq_check_routing_table((u8 *) __va(pirq_table_addr));
+		rt = pirq_check_routing_table((u8 *) isa_bus_to_virt(pirq_table_addr));
 		if (rt)
 			return rt;
 		printk(KERN_WARNING "PCI: PIRQ table NOT found at pirqaddr\n");
 	}
-	for (addr = (u8 *) __va(0xf0000); addr < (u8 *) __va(0x100000); addr += 16) {
+	for (addr = (u8 *) isa_bus_to_virt(0xf0000);
+	     addr < (u8 *) isa_bus_to_virt(0x100000); addr += 16) {
 		rt = pirq_check_routing_table(addr);
 		if (rt)
 			return rt;

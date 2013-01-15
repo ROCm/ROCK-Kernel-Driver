@@ -612,6 +612,7 @@ unsigned int pcibios_assign_all_busses(void)
 
 int pcibios_add_device(struct pci_dev *dev)
 {
+#ifndef CONFIG_XEN
 	struct setup_data *data;
 	struct pci_setup_rom *rom;
 	u64 pa_data;
@@ -636,6 +637,7 @@ int pcibios_add_device(struct pci_dev *dev)
 		}
 		pa_data = data->next;
 	}
+#endif
 	return 0;
 }
 

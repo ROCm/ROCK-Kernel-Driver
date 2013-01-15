@@ -69,7 +69,15 @@ extern void init_extra_mapping_wb(unsigned long phys, unsigned long size);
 #endif	/* !__ASSEMBLY__ */
 
 #ifdef CONFIG_FLATMEM
+/*
+ * While max_pfn is not exported, max_mapnr never gets initialized for non-Xen
+ * other than for hotplugged memory.
+ */
+#ifndef CONFIG_XEN
 #define pfn_valid(pfn)          ((pfn) < max_pfn)
+#else
+#define pfn_valid(pfn)          ((pfn) < max_mapnr)
+#endif
 #endif
 
 #endif /* _ASM_X86_PAGE_64_DEFS_H */

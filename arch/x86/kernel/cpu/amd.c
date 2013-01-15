@@ -367,7 +367,7 @@ static void __cpuinit amd_detect_cmp(struct cpuinfo_x86 *c)
 int amd_get_nb_id(int cpu)
 {
 	int id = 0;
-#ifdef CONFIG_SMP
+#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
 	id = per_cpu(cpu_llc_id, cpu);
 #endif
 	return id;
@@ -504,7 +504,7 @@ static void __cpuinit early_init_amd(struct cpuinfo_x86 *c)
 		    (c->x86_model == 8 && c->x86_mask >= 8))
 			set_cpu_cap(c, X86_FEATURE_K6_MTRR);
 #endif
-#if defined(CONFIG_X86_LOCAL_APIC) && defined(CONFIG_PCI)
+#if defined(CONFIG_X86_LOCAL_APIC) && defined(CONFIG_PCI) && !defined(CONFIG_XEN)
 	/* check CPU config space for extended APIC ID */
 	if (cpu_has_apic && c->x86 >= 0xf) {
 		unsigned int val;
@@ -517,7 +517,9 @@ static void __cpuinit early_init_amd(struct cpuinfo_x86 *c)
 
 static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 {
+#ifndef CONFIG_XEN
 	u32 dummy;
+#endif
 
 #ifdef CONFIG_SMP
 	unsigned long long value;
@@ -562,18 +564,26 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 			u64 val;
 
 			clear_cpu_cap(c, X86_FEATURE_LAHF_LM);
+#ifndef CONFIG_XEN
 			if (!rdmsrl_amd_safe(0xc001100d, &val)) {
 				val &= ~(1ULL << 32);
 				wrmsrl_amd_safe(0xc001100d, val);
 			}
+#else
+			pr_warning("Long-mode LAHF feature wrongly enabled -"
+				   "hypervisor update needed\n");
+			(void)&val;
+#endif
 		}
 
 	}
 	if (c->x86 >= 0x10)
 		set_cpu_cap(c, X86_FEATURE_REP_GOOD);
 
+#ifndef CONFIG_XEN
 	/* get apicid instead of initial apic id from cpuid */
 	c->apicid = hard_smp_processor_id();
+#endif
 #else
 
 	/*
@@ -613,6 +623,7 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 		}
 	}
 
+#ifndef CONFIG_XEN
 	/* re-enable TopologyExtensions if switched off by BIOS */
 	if ((c->x86 == 0x15) &&
 	    (c->x86_model >= 0x10) && (c->x86_model <= 0x1f) &&
@@ -644,6 +655,7 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 			wrmsrl_safe(0xc0011021, val);
 		}
 	}
+#endif
 
 	cpu_detect_cache_sizes(c);
 
@@ -676,6 +688,7 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 		fam10h_check_enable_mmcfg();
 	}
 
+#ifndef CONFIG_XEN
 	if (c == &boot_cpu_data && c->x86 >= 0xf) {
 		unsigned long long tseg;
 
@@ -695,6 +708,7 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 		}
 	}
 #endif
+#endif
 
 	/*
 	 * Family 0x12 and above processors have APIC timer
@@ -703,6 +717,7 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 	if (c->x86 > 0x11)
 		set_cpu_cap(c, X86_FEATURE_ARAT);
 
+#ifndef CONFIG_XEN
 	/*
 	 * Disable GART TLB Walk Errors on Fam10h. We do this here
 	 * because this is always needed when GART is enabled, even in a
@@ -726,6 +741,7 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 	}
 
 	rdmsr_safe(MSR_AMD64_PATCH_LEVEL, &c->microcode, &dummy);
+#endif
 }
 
 #ifdef CONFIG_X86_32

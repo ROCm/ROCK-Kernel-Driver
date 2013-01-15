@@ -130,7 +130,7 @@ static void __kcore_update_ram(struct list_head *list)
 }
 
 
-#ifdef CONFIG_HIGHMEM
+#if defined(CONFIG_HIGHMEM) || defined(CONFIG_XEN)
 /*
  * If no highmem, we can assume [0...max_low_pfn) continuous range of memory
  * because memory hole is not as big as !HIGHMEM case.
@@ -146,7 +146,11 @@ static int kcore_update_ram(void)
 	if (!ent)
 		return -ENOMEM;
 	ent->addr = (unsigned long)__va(0);
+#ifdef CONFIG_HIGHMEM
 	ent->size = max_low_pfn << PAGE_SHIFT;
+#else
+	ent->size = max_pfn << PAGE_SHIFT;
+#endif
 	ent->type = KCORE_RAM;
 	list_add(&ent->list, &head);
 	__kcore_update_ram(&head);

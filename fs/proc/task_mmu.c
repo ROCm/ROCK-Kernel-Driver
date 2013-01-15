@@ -569,8 +569,12 @@ static void show_smap_vma_flags(struct seq_file *m, struct vm_area_struct *vma)
 		[ilog2(VM_ARCH_1)]	= "ar",
 		[ilog2(VM_DONTDUMP)]	= "dd",
 		[ilog2(VM_MIXEDMAP)]	= "mm",
+#ifndef CONFIG_XEN
 		[ilog2(VM_HUGEPAGE)]	= "hg",
 		[ilog2(VM_NOHUGEPAGE)]	= "nh",
+#else
+		[ilog2(VM_FOREIGN)]	= "fo",
+#endif
 		[ilog2(VM_MERGEABLE)]	= "mg",
 	};
 	size_t i;

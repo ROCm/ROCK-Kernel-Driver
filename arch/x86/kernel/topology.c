@@ -37,7 +37,9 @@ static DEFINE_PER_CPU(struct x86_cpu, cpu_devices);
 
 #ifdef CONFIG_HOTPLUG_CPU
 
-#ifdef CONFIG_BOOTPARAM_HOTPLUG_CPU0
+#if defined(CONFIG_XEN)
+#define cpu0_hotpluggable 0
+#elif defined(CONFIG_BOOTPARAM_HOTPLUG_CPU0)
 static int cpu0_hotpluggable = 1;
 #else
 static int cpu0_hotpluggable;
@@ -103,6 +105,7 @@ late_initcall_sync(debug_hotplug_cpu);
 
 int __ref arch_register_cpu(int num)
 {
+#ifndef cpu0_hotpluggable
 	struct cpuinfo_x86 *c = &cpu_data(num);
 
 	/*
@@ -133,6 +136,7 @@ int __ref arch_register_cpu(int num)
 			}
 		}
 	}
+#endif
 	if (num || cpu0_hotpluggable)
 		per_cpu(cpu_devices, num).cpu.hotpluggable = 1;
 
