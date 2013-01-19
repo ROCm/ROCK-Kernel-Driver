@@ -19,6 +19,8 @@
 #ifndef _TIOMAP_IO_
 #define _TIOMAP_IO_
 
+#include "../../../../arch/arm/mach-omap2/cm3xxx.h"
+
 /*
  * Symbol that defines beginning of shared memory.
  * For OMAP (Helen) this is the DSP Virtual base address of SDRAM.
