@@ -113,9 +113,6 @@ static void omap_connector_dpms(struct drm_connector *connector, int mode)
 	if (mode == DRM_MODE_DPMS_ON) {
 		/* store resume info for suspended displays */
 		switch (dssdev->state) {
-		case OMAP_DSS_DISPLAY_SUSPENDED:
-			dssdev->activate_after_resume = true;
-			break;
 		case OMAP_DSS_DISPLAY_DISABLED: {
 			int ret = dssdev->driver->enable(dssdev);
 			if (ret) {
