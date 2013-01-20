@@ -36,7 +36,7 @@
 #include <linux/usb/gadget.h>
 
 #include <linux/platform_data/usb-imx_udc.h>
-#include <mach/hardware.h>
+#include "../../../arch/arm/mach-imx/hardware.h"
 
 #include "imx_udc.h"
 
