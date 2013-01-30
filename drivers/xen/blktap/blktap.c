@@ -131,10 +131,10 @@ static struct tap_blkif *tapfds[MAX_TAP_DEV];
 static int blktap_next_minor;
 
 /* Run-time switchable: /sys/module/blktap/parameters/ */
-static unsigned int log_stats = 0;
-static unsigned int debug_lvl = 0;
-module_param(log_stats, int, 0644);
-module_param(debug_lvl, int, 0644);
+static bool log_stats;
+static unsigned int debug_lvl;
+module_param(log_stats, bool, 0644);
+module_param(debug_lvl, uint, 0644);
 
 /*
  * Each outstanding request that we've passed to the lower device layers has a 

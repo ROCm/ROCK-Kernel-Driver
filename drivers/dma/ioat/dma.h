@@ -332,7 +332,7 @@ static inline void ioat_remove_dca_provider(struct pci_dev *pdev)
 	struct ioatdma_device *device = pci_get_drvdata(pdev);
 	BUG_ON(device->dca);
 }
-static inline struct dca_provider *__devinit
+static inline struct dca_provider *
 __ioat_dca_init(struct pci_dev *pdev, void __iomem *iobase)
 {
 	return NULL;

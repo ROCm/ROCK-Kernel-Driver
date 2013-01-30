@@ -218,6 +218,7 @@ DEFINE_XEN_GUEST_HANDLE(xenpf_efi_runtime_call_t);
 #define  XEN_FW_EFI_VENDOR         2
 #define  XEN_FW_EFI_MEM_INFO       3
 #define  XEN_FW_EFI_RT_VERSION     4
+#define  XEN_FW_EFI_PCI_ROM        5
 #define XEN_FW_KBD_SHIFT_FLAGS    5 /* Int16, Fn02: Get keyboard shift flags. */
 struct xenpf_firmware_info {
 	/* IN variables. */
@@ -267,6 +268,17 @@ struct xenpf_firmware_info {
 				uint64_t attr;
 				uint32_t type;
 			} mem;
+			struct {
+				/* IN variables */
+				uint16_t segment;
+				uint8_t bus;
+				uint8_t devfn;
+				uint16_t vendor;
+				uint16_t devid;
+				/* OUT variables */
+				uint64_t address;
+				xen_ulong_t size;
+			} pci_rom;
 		} efi_info; /* XEN_FW_EFI_INFO */
 
 		/* Int16, Fn02: Get keyboard shift flags. */

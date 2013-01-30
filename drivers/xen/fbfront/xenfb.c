@@ -141,8 +141,8 @@ struct xenfb_info
 #define XENFB_DEFAULT_FB_LEN (XENFB_WIDTH * XENFB_HEIGHT * XENFB_DEPTH / 8)
 
 enum {KPARAM_MEM, KPARAM_WIDTH, KPARAM_HEIGHT, KPARAM_CNT};
-static int video[KPARAM_CNT] = {2, XENFB_WIDTH, XENFB_HEIGHT};
-module_param_array(video, int, NULL, 0);
+static unsigned int video[KPARAM_CNT] = {2, XENFB_WIDTH, XENFB_HEIGHT};
+module_param_array(video, uint, NULL, 0);
 MODULE_PARM_DESC(video,
 		"Size of video memory in MB and width,height in pixels, default = (2,800,600)");
 

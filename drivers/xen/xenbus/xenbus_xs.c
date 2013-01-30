@@ -44,6 +44,9 @@
 #include <linux/rwsem.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
+#ifndef CONFIG_XEN
+#include <asm/xen/hypervisor.h>
+#endif
 #include <xen/xenbus.h>
 #include <xen/xen.h>
 #include "xenbus_comms.h"
@@ -281,10 +284,8 @@ static void *xs_talkv(struct xenbus_transaction t,
 	}
 
 	if (msg.type != type) {
-		if (printk_ratelimit())
-			pr_warning("XENBUS unexpected type [%d],"
-				   " expected [%d]\n",
-				   msg.type, type);
+		pr_warn_ratelimited("XENBUS unexpected type [%d], expected [%d]\n",
+				    msg.type, type);
 		kfree(ret);
 		return ERR_PTR(-EINVAL);
 	}

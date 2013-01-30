@@ -1038,12 +1038,10 @@ ENTRY(failsafe_callback)
 4:	mov 16(%esp),%gs
 	testl %eax,%eax
 	popl %eax
-	jz 5f
-	addl $16,%esp		# EAX != 0 => Category 2 (Bad IRET)
-	jmp iret_exc
-5:	addl $16,%esp		# EAX == 0 => Category 1 (Bad segment)
+	leal 16(%esp),%esp
 	RING0_INT_FRAME
-	pushl_cfi $-1
+	jnz iret_exc		# EAX != 0 => Category 2 (Bad IRET)
+	pushl_cfi $-1		# EAX == 0 => Category 1 (Bad segment)
 	SAVE_ALL
 	jmp ret_from_exception
 .section .fixup,"ax";		\

@@ -215,9 +215,8 @@ _out:
 
 	return err;
 fail:
-	if (printk_ratelimit())
-		dev_warn(disk_to_dev(tapdev->gd),
-			 "make request: %d, failing\n", err);
+	dev_warn_ratelimited(disk_to_dev(tapdev->gd),
+			     "make request: %d, failing\n", err);
 	goto _out;
 }
 

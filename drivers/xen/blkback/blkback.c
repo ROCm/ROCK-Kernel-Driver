@@ -64,10 +64,10 @@ module_param_named(reqs, blkif_reqs, uint, 0444);
 MODULE_PARM_DESC(reqs, "Number of blkback requests to allocate");
 
 /* Run-time switchable: /sys/module/blkback/parameters/ */
-static unsigned int log_stats = 0;
-static unsigned int debug_lvl = 0;
-module_param(log_stats, int, 0644);
-module_param(debug_lvl, int, 0644);
+static bool log_stats;
+static unsigned int debug_lvl;
+module_param(log_stats, bool, 0644);
+module_param(debug_lvl, uint, 0644);
 
 /* Order of maximum shared ring size advertised to the front end. */
 unsigned int blkif_max_ring_page_order/* XXX = sizeof(long) / 4 */;
@@ -380,7 +380,6 @@ static void dispatch_discard(blkif_t *blkif, struct blkif_request_discard *req)
 
 	blkif->st_ds_req++;
 
-	preq.dev           = req->handle;
 	preq.sector_number = req->sector_number;
 	preq.nr_sects      = req->nr_sectors;
 
@@ -561,7 +560,6 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 		goto fail_response;
 	}
 
-	preq.dev           = req->handle;
 	preq.sector_number = req->sector_number;
 	preq.nr_sects      = 0;
 

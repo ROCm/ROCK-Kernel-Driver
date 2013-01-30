@@ -501,6 +501,8 @@ static __ref int acpi_processor_start(struct acpi_processor *pr)
 
 #if defined(CONFIG_CPU_FREQ) || defined(CONFIG_PROCESSOR_EXTERNAL_CONTROL)
 	acpi_processor_ppc_has_changed(pr, 0);
+#endif
+#ifdef CONFIG_CPU_FREQ
 	acpi_processor_load_module(pr);
 #endif
 	/*

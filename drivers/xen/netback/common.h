@@ -45,8 +45,6 @@
 #define DPRINTK(_f, _a...)			\
 	pr_debug("(file=%s, line=%d) " _f,	\
 		 __FILE__ , __LINE__ , ## _a )
-#define IPRINTK(fmt, args...) pr_info("xen_net: " fmt, ##args)
-#define WPRINTK(fmt, args...) pr_warning("xen_net: " fmt, ##args)
 
 typedef struct netif_st {
 	/* Unique identifier for this interface. */

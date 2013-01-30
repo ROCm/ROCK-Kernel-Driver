@@ -12,8 +12,8 @@
 #include <xen/evtchn.h>
 #include "pcifront.h"
 
-static int verbose_request = 0;
-module_param(verbose_request, int, 0644);
+static bool verbose_request;
+module_param(verbose_request, bool, 0644);
 
 static void pcifront_init_sd(struct pcifront_sd *sd,
 			     unsigned int domain, unsigned int bus,

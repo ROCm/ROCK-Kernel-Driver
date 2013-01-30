@@ -350,10 +350,12 @@ void __init dom0_init_screen_info(const struct dom0_vga_console_info *info, size
 #define DUMMY_TTY(_tty) ((xc_mode == XC_TTY) &&		\
 			 ((_tty)->index != (xc_num - 1)))
 
-static struct ktermios *xencons_termios[MAX_NR_CONSOLES];
+static struct tty_port *xencons_ports;
 static struct tty_struct *xencons_tty;
 static int xencons_priv_irq;
 static char x_char;
+
+static const struct tty_port_operations xencons_port_ops = {};
 
 void xencons_rx(char *buf, unsigned len)
 {
@@ -590,6 +592,25 @@ static void xencons_wait_until_sent(struct tty_struct *tty, int timeout)
 	set_current_state(TASK_RUNNING);
 }
 
+static int xencons_install(struct tty_driver *drv, struct tty_struct *tty)
+{
+	struct tty_port *port = &xencons_ports[tty->index];
+	int rc;
+
+	if (DUMMY_TTY(tty))
+		return 0;
+
+	tty->driver_data = NULL;
+
+	tty_port_init(port);
+	port->ops = &xencons_port_ops;
+
+	rc = tty_port_install(port, drv, tty);
+	if (rc)
+		tty_port_put(port);
+	return rc;
+}
+
 static int xencons_open(struct tty_struct *tty, struct file *filp)
 {
 	unsigned long flags;
@@ -598,7 +619,6 @@ static int xencons_open(struct tty_struct *tty, struct file *filp)
 		return 0;
 
 	spin_lock_irqsave(&xencons_lock, flags);
-	tty->driver_data = NULL;
 	if (xencons_tty == NULL)
 		xencons_tty = tty;
 	__xencons_tx_flush();
@@ -644,6 +664,7 @@ static void xencons_close(struct tty_struct *tty, struct file *filp)
 }
 
 static const struct tty_operations xencons_ops = {
+	.install = xencons_install,
 	.open = xencons_open,
 	.close = xencons_close,
 	.write = xencons_write,
@@ -674,10 +695,16 @@ static int __init xencons_init(void)
 			return rc;
 	}
 
-	xencons_driver = alloc_tty_driver((xc_mode == XC_TTY) ?
-					  MAX_NR_CONSOLES : 1);
-	if (xencons_driver == NULL)
+	rc = xc_mode == XC_TTY ? MAX_NR_CONSOLES : 1;
+	xencons_ports = kcalloc(rc, sizeof(*xencons_ports), GFP_KERNEL);
+	if (!xencons_ports)
 		return -ENOMEM;
+	xencons_driver = alloc_tty_driver(rc);
+	if (!xencons_driver) {
+		kfree(xencons_ports);
+		xencons_ports = NULL;
+		return -ENOMEM;
+	}
 
 	DRV(xencons_driver)->name            = "xencons";
 	DRV(xencons_driver)->major           = TTY_MAJOR;
@@ -687,7 +714,6 @@ static int __init xencons_init(void)
 	DRV(xencons_driver)->flags           =
 		TTY_DRIVER_REAL_RAW |
 		TTY_DRIVER_RESET_TERMIOS;
-	DRV(xencons_driver)->termios         = xencons_termios;
 
 	switch (xc_mode) {
 	case XC_XVC:
@@ -723,6 +749,8 @@ static int __init xencons_init(void)
 			   DRV(xencons_driver)->name_base);
 		put_tty_driver(xencons_driver);
 		xencons_driver = NULL;
+		kfree(xencons_ports);
+		xencons_ports = NULL;
 		return rc;
 	}
 

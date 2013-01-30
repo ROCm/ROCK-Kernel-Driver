@@ -28,13 +28,13 @@ static int local_cpu_hotplug_request(void)
 static void __cpuinit vcpu_hotplug(unsigned int cpu, struct device *dev)
 {
 	int err;
-	char dir[32], state[32];
+	char dir[16], state[16];
 
 	if ((cpu >= NR_CPUS) || !cpu_possible(cpu))
 		return;
 
 	sprintf(dir, "cpu/%u", cpu);
-	err = xenbus_scanf(XBT_NIL, dir, "availability", "%s", state);
+	err = xenbus_scanf(XBT_NIL, dir, "availability", "%15s", state);
 	if (err != 1) {
 		pr_err("XENBUS: Unable to read cpu state\n");
 		return;

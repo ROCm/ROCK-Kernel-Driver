@@ -56,8 +56,8 @@ static unsigned int vscsiif_reqs = 128;
 module_param_named(reqs, vscsiif_reqs, uint, 0);
 MODULE_PARM_DESC(reqs, "Number of scsiback requests to allocate");
 
-static unsigned int log_print_stat = 0;
-module_param(log_print_stat, int, 0644);
+static bool log_print_stat;
+module_param(log_print_stat, bool, 0644);
 
 #define SCSIBACK_INVALID_HANDLE (~0)
 
@@ -215,10 +215,8 @@ static void scsiback_cmd_done(struct request *req, int uptodate)
 	resid        = blk_rq_bytes(req);
 	errors       = req->errors;
 
-	if (errors != 0) {
-		if (log_print_stat)
-			scsiback_print_status(sense_buffer, errors, pending_req);
-	}
+	if (errors && log_print_stat)
+		scsiback_print_status(sense_buffer, errors, pending_req);
 
 	/* The Host mode is through as for Emulation. */
 	if (pending_req->info->feature != VSCSI_TYPE_HOST)

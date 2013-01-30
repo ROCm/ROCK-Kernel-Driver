@@ -53,8 +53,8 @@
 #include "../../usb/core/hub.h"
 #endif
 
-int usbif_reqs = USBIF_BACK_MAX_PENDING_REQS;
-module_param_named(reqs, usbif_reqs, int, 0);
+static unsigned int usbif_reqs = 128;
+module_param_named(reqs, usbif_reqs, uint, 0);
 MODULE_PARM_DESC(reqs, "Number of usbback requests to allocate");
 
 struct pending_req_segment {

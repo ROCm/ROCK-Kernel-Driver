@@ -57,6 +57,7 @@ static int __direct_remap_pfn_range(struct mm_struct *mm,
 		return -ENOMEM;
 
 	start_address = address;
+	pgprot_val(prot) |= _PAGE_IOMAP;
 
 	flush_cache_all();
 
@@ -79,7 +80,6 @@ static int __direct_remap_pfn_range(struct mm_struct *mm,
 		 * Fill in the machine address: PTE ptr is done later by
 		 * apply_to_page_range().
 		 */
-		pgprot_val(prot) |= _PAGE_IOMAP;
 		v->val = __pte_val(pte_mkspecial(pfn_pte_ma(mfn, prot)));
 
 		mfn++;

@@ -66,8 +66,7 @@
 #include <xen/net-util.h>
 
 struct netfront_cb {
-	struct page *page;
-	unsigned offset;
+	unsigned int pull_to;
 };
 
 #define NETFRONT_SKB_CB(skb)	((struct netfront_cb *)((skb)->cb))
@@ -206,8 +205,6 @@ static inline grant_ref_t xennet_get_rx_ref(struct netfront_info *np,
 #define DPRINTK(fmt, args...)				\
 	pr_debug("netfront (%s:%d) " fmt,		\
 		 __FUNCTION__, __LINE__, ##args)
-#define IPRINTK(fmt, args...) pr_info("netfront: " fmt, ##args)
-#define WPRINTK(fmt, args...) pr_warning("netfront: " fmt, ##args)
 
 static int setup_device(struct xenbus_device *, struct netfront_info *);
 static struct net_device *create_netdev(struct xenbus_device *);
@@ -1132,7 +1129,8 @@ int xennet_get_extras(struct netfront_info *np,
 
 		if (unlikely(cons + 1 == rp)) {
 			if (net_ratelimit())
-				WPRINTK("Missing extra info\n");
+				netdev_warn(np->netdev,
+					    "Missing extra info\n");
 			err = -EBADR;
 			break;
 		}
@@ -1143,8 +1141,9 @@ int xennet_get_extras(struct netfront_info *np,
 		if (unlikely(!extra->type ||
 			     extra->type >= XEN_NETIF_EXTRA_TYPE_MAX)) {
 			if (net_ratelimit())
-				WPRINTK("Invalid extra type: %d\n",
-					extra->type);
+				netdev_warn(np->netdev,
+					    "Invalid extra type: %d\n",
+					    extra->type);
 			err = -EINVAL;
 		} else {
 			memcpy(&extras[extra->type - 1], extra,
@@ -1189,8 +1188,9 @@ static int xennet_get_responses(struct netfront_info *np,
 		if (unlikely(rx->status < 0 ||
 			     rx->offset + rx->status > PAGE_SIZE)) {
 			if (net_ratelimit())
-				WPRINTK("rx->offset: %x, size: %u\n",
-					rx->offset, rx->status);
+				netdev_warn(np->netdev,
+					    "rx->offset: %x, size: %u\n",
+					    rx->offset, rx->status);
 			xennet_move_rx_slot(np, skb, ref);
 			err = -EINVAL;
 			goto next;
@@ -1203,7 +1203,9 @@ static int xennet_get_responses(struct netfront_info *np,
 		 */
 		if (ref == GRANT_INVALID_REF) {
 			if (net_ratelimit())
-				WPRINTK("Bad rx response id %d.\n", rx->id);
+				netdev_warn(np->netdev,
+					    "Bad rx response id %d.\n",
+					    rx->id);
 			err = -EINVAL;
 			goto next;
 		}
@@ -1213,9 +1215,9 @@ static int xennet_get_responses(struct netfront_info *np,
 			 * headroom, ... */
 			if (!(mfn = gnttab_end_foreign_transfer_ref(ref))) {
 				if (net_ratelimit())
-					WPRINTK("Unfulfilled rx req "
-						"(id=%d, st=%d).\n",
-						rx->id, rx->status);
+					netdev_warn(np->netdev,
+						    "Unfulfilled rx req (id=%d, st=%d).\n",
+						    rx->id, rx->status);
 				xennet_move_rx_slot(np, skb, ref);
 				err = -ENOMEM;
 				goto next;
@@ -1258,7 +1260,7 @@ next:
 
 		if (cons + frags == rp) {
 			if (net_ratelimit())
-				WPRINTK("Need more frags\n");
+				netdev_warn(np->netdev, "Need more frags\n");
 			err = -ENOENT;
 			break;
 		}
@@ -1271,7 +1273,7 @@ next:
 
 	if (unlikely(frags > max)) {
 		if (net_ratelimit())
-			WPRINTK("Too many frags\n");
+			netdev_warn(np->netdev, "Too many frags\n");
 		err = -E2BIG;
 	}
 
@@ -1317,14 +1319,16 @@ static int xennet_set_skb_gso(struct sk_buff *skb,
 {
 	if (!gso->u.gso.size) {
 		if (net_ratelimit())
-			WPRINTK("GSO size must not be zero.\n");
+			netdev_warn(skb->dev,
+				    "GSO size must not be zero.\n");
 		return -EINVAL;
 	}
 
 	/* Currently only TCPv4 S.O. is supported. */
 	if (gso->u.gso.type != XEN_NETIF_GSO_TYPE_TCPV4) {
 		if (net_ratelimit())
-			WPRINTK("Bad GSO type %d.\n", gso->u.gso.type);
+			netdev_warn(skb->dev, "Bad GSO type %d.\n",
+				    gso->u.gso.type);
 		return -EINVAL;
 	}
 
@@ -1341,7 +1345,7 @@ static int xennet_set_skb_gso(struct sk_buff *skb,
 	return 0;
 #else
 	if (net_ratelimit())
-		WPRINTK("GSO unsupported by this kernel.\n");
+		netdev_warn(skb->dev, "GSO unsupported by this kernel.\n");
 	return -EINVAL;
 #endif
 }
@@ -1361,7 +1365,6 @@ static int netif_poll(struct napi_struct *napi, int budget)
 	struct sk_buff_head errq;
 	struct sk_buff_head tmpq;
 	unsigned long flags;
-	unsigned int len;
 	int pages_flipped = 0;
 	int err;
 
@@ -1410,25 +1413,13 @@ err:
 			}
 		}
 
-		NETFRONT_SKB_CB(skb)->page =
-			skb_frag_page(skb_shinfo(skb)->frags);
-		NETFRONT_SKB_CB(skb)->offset = rx->offset;
+		NETFRONT_SKB_CB(skb)->pull_to = rx->status;
+		if (NETFRONT_SKB_CB(skb)->pull_to > RX_COPY_THRESHOLD)
+			NETFRONT_SKB_CB(skb)->pull_to = RX_COPY_THRESHOLD;
 
-		len = rx->status;
-		if (len > RX_COPY_THRESHOLD)
-			len = RX_COPY_THRESHOLD;
-		skb_put(skb, len);
-
-		if (rx->status > len) {
-			skb_shinfo(skb)->frags[0].page_offset =
-				rx->offset + len;
-			skb_frag_size_set(skb_shinfo(skb)->frags,
-					  rx->status - len);
-			skb->data_len = rx->status - len;
-		} else {
-			__skb_fill_page_desc(skb, 0, NULL, 0, 0);
-			skb_shinfo(skb)->nr_frags = 0;
-		}
+		skb_shinfo(skb)->frags[0].page_offset = rx->offset;
+		skb_frag_size_set(skb_shinfo(skb)->frags, rx->status);
+		skb->data_len = rx->status;
 
 		i = xennet_fill_frags(np, skb, &tmpq);
 
@@ -1476,14 +1467,9 @@ err:
 	__skb_queue_purge(&errq);
 
 	while ((skb = __skb_dequeue(&rxq)) != NULL) {
-		struct page *page = NETFRONT_SKB_CB(skb)->page;
-		void *vaddr = page_address(page);
-		unsigned offset = NETFRONT_SKB_CB(skb)->offset;
+		unsigned int pull_to = NETFRONT_SKB_CB(skb)->pull_to;
 
-		memcpy(skb->data, vaddr + offset, skb_headlen(skb));
-
-		if (page != skb_frag_page(skb_shinfo(skb)->frags))
-			__free_page(page);
+		__pskb_pull_tail(skb, pull_to - skb_headlen(skb));
 
 		/* Ethernet work: Delayed to here as it peeks the header. */
 		skb->protocol = eth_type_trans(skb, dev);
@@ -2270,7 +2256,7 @@ static int __init netif_init(void)
 
 #ifdef CONFIG_XEN
 	if (MODPARM_rx_flip && MODPARM_rx_copy) {
-		WPRINTK("Cannot specify both rx_copy and rx_flip.\n");
+		pr_warning("Cannot specify both rx_copy and rx_flip.\n");
 		return -EINVAL;
 	}
 
@@ -2280,7 +2266,7 @@ static int __init netif_init(void)
 
 	netif_init_accel();
 
-	IPRINTK("Initialising virtual ethernet driver.\n");
+	pr_info("Initialising virtual ethernet driver.\n");
 
 	return xenbus_register_frontend(&netfront_driver);
 }

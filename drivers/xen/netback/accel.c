@@ -37,12 +37,6 @@
 
 #include "common.h"
 
-#if 0
-#undef DPRINTK
-#define DPRINTK(fmt, args...)						\
-	printk("netback/accel (%s:%d) " fmt ".\n", __FUNCTION__, __LINE__, ##args)
-#endif
-
 /* 
  * A list of available netback accelerator plugin modules (each list
  * entry is of type struct netback_accelerator) 
