@@ -298,7 +298,6 @@ static const uuid_le hp_devs[] = {
 };
 
 
-#if 0
 /*
  * We use this state to statically distribute the channel interrupt load.
  */
@@ -340,10 +339,6 @@ static u32 get_vp_index(uuid_le *type_guid)
 	cur_cpu = (++next_vp % max_cpus);
 	return hv_context.vp_index[cur_cpu];
 }
-#else
-/* Legacy IRQs can not be handled on all cpus, bind to cpu 0. */
-static inline u32 get_vp_index(uuid_le *type_guid) { return 0; }
-#endif
 
 /*
  * vmbus_onoffer - Handler for channel offers from vmbus in parent partition.
