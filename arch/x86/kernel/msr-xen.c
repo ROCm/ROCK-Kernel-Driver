@@ -156,6 +156,9 @@ static int pmsr_open(struct inode *inode, struct file *file)
 {
 	unsigned int cpu;
 
+	if (!capable(CAP_SYS_RAWIO))
+		return -EPERM;
+
 	cpu = pmsr_minor(file->f_path.dentry->d_inode);
 	if (cpu >= nr_xen_cpu_ids || !test_bit(cpu, xen_cpu_online_map))
 		return -ENXIO;	/* No such CPU */

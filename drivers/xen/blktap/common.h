@@ -39,7 +39,8 @@
 #define DPRINTK(_f, _a...) pr_debug("(file=%s, line=%d) " _f, \
                                     __FILE__ , __LINE__ , ## _a )
 
-#define WPRINTK(fmt, args...) pr_warning("blktap: " fmt, ##args)
+#define WPRINTK(fmt, args...) \
+	((void)(printk_ratelimit() && pr_warning("blktap: " fmt, ##args)))
 
 struct backend_info;
 

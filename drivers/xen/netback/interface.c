@@ -329,19 +329,23 @@ err_rx:
 	return err;
 }
 
+void xenvif_carrier_off(netif_t *netif)
+{
+	rtnl_lock();
+	netback_carrier_off(netif);
+	netif_carrier_off(netif->dev); /* discard queued packets */
+	if (netif_running(netif->dev))
+		__netif_down(netif);
+	rtnl_unlock();
+	netif_put(netif);
+}
+
 void netif_disconnect(struct backend_info *be)
 {
 	netif_t *netif = be->netif;
 
-	if (netback_carrier_ok(netif)) {
-		rtnl_lock();
-		netback_carrier_off(netif);
-		netif_carrier_off(netif->dev); /* discard queued packets */
-		if (netif_running(netif->dev))
-			__netif_down(netif);
-		rtnl_unlock();
-		netif_put(netif);
-	}
+	if (netback_carrier_ok(netif))
+		xenvif_carrier_off(netif);
 
 	atomic_dec(&netif->refcnt);
 	wait_event(netif->waiting_to_free, atomic_read(&netif->refcnt) == 0);

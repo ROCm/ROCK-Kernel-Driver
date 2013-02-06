@@ -1015,7 +1015,8 @@ static int usbbk_start_submit_urb(usbif_t *usbif)
 
 	while (rc != rp) {
 		if (RING_REQUEST_CONS_OVERFLOW(urb_ring, rc)) {
-			pr_warning("RING_REQUEST_CONS_OVERFLOW\n");
+			if(printk_ratelimit())
+				pr_warning("RING_REQUEST_CONS_OVERFLOW\n");
 			break;
 		}
 
@@ -1030,11 +1031,11 @@ static int usbbk_start_submit_urb(usbif_t *usbif)
 
 		dispatch_request_to_pending_reqs(usbif, req,
 							pending_req);
+
+		cond_resched();
 	}
 
 	RING_FINAL_CHECK_FOR_REQUESTS(&usbif->urb_ring, more_to_do);
-
-	cond_resched();
 
 	return more_to_do;
 }

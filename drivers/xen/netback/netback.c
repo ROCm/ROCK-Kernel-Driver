@@ -1108,12 +1108,20 @@ static void netbk_tx_err(netif_t *netif, netif_tx_request_t *txp, RING_IDX end)
 
 	do {
 		make_tx_response(netif, txp, XEN_NETIF_RSP_ERROR);
-		if (cons >= end)
+		if (cons == end)
 			break;
 		txp = RING_GET_REQUEST(&netif->tx, cons++);
 	} while (1);
 	netif->tx.req_cons = cons;
 	netif_schedule_work(netif);
+	netif_put(netif);
+}
+
+static void netbk_fatal_tx_err(netif_t *netif)
+{
+	printk(KERN_ERR "%s: fatal error; disabling device\n",
+	       netif->dev->name);
+	xenvif_carrier_off(netif);
 	netif_put(netif);
 }
 
@@ -1128,19 +1136,22 @@ static int netbk_count_requests(netif_t *netif, netif_tx_request_t *first,
 
 	do {
 		if (frags >= work_to_do) {
-			netdev_dbg(netif->dev, "Need more frags\n");
+			netdev_err(netif->dev, "Need more frags\n");
+			netbk_fatal_tx_err(netif);
 			return -frags;
 		}
 
 		if (unlikely(frags >= MAX_SKB_FRAGS)) {
-			netdev_dbg(netif->dev, "Too many frags\n");
+			netdev_err(netif->dev, "Too many frags\n");
+			netbk_fatal_tx_err(netif);
 			return -frags;
 		}
 
 		memcpy(txp, RING_GET_REQUEST(&netif->tx, cons + frags),
 		       sizeof(*txp));
 		if (txp->size > first->size) {
-			netdev_dbg(netif->dev, "Frags galore\n");
+			netdev_err(netif->dev, "Frags galore\n");
+			netbk_fatal_tx_err(netif);
 			return -frags;
 		}
 
@@ -1148,8 +1159,9 @@ static int netbk_count_requests(netif_t *netif, netif_tx_request_t *first,
 		frags++;
 
 		if (unlikely((txp->offset + txp->size) > PAGE_SIZE)) {
-			netdev_dbg(netif->dev, "txp->offset: %x, size: %u\n",
+			netdev_err(netif->dev, "txp->offset: %x, size: %u\n",
 				   txp->offset, txp->size);
+			netbk_fatal_tx_err(netif);
 			return -frags;
 		}
 	} while ((txp++)->flags & XEN_NETTXF_more_data);
@@ -1298,7 +1310,8 @@ int netbk_get_extras(netif_t *netif, struct netif_extra_info *extras,
 
 	do {
 		if (unlikely(work_to_do-- <= 0)) {
-			netdev_dbg(netif->dev, "Missing extra info\n");
+			netdev_err(netif->dev, "Missing extra info\n");
+			netbk_fatal_tx_err(netif);
 			return -EBADR;
 		}
 
@@ -1309,6 +1322,7 @@ int netbk_get_extras(netif_t *netif, struct netif_extra_info *extras,
 			netif->tx.req_cons = ++cons;
 			netdev_dbg(netif->dev, "Invalid extra type: %d\n",
 				   extra.type);
+			netbk_fatal_tx_err(netif);
 			return -EINVAL;
 		}
 
@@ -1319,16 +1333,19 @@ int netbk_get_extras(netif_t *netif, struct netif_extra_info *extras,
 	return work_to_do;
 }
 
-static int netbk_set_skb_gso(struct sk_buff *skb, struct netif_extra_info *gso)
+static int netbk_set_skb_gso(netif_t *netif, struct sk_buff *skb,
+			     struct netif_extra_info *gso)
 {
 	if (!gso->u.gso.size) {
-		netdev_dbg(skb->dev, "GSO size must not be zero.\n");
+		netdev_err(skb->dev, "GSO size must not be zero.\n");
+		netbk_fatal_tx_err(netif);
 		return -EINVAL;
 	}
 
 	/* Currently only TCPv4 S.O. is supported. */
 	if (gso->u.gso.type != XEN_NETIF_GSO_TYPE_TCPV4) {
-		netdev_dbg(skb->dev, "Bad GSO type %d.\n", gso->u.gso.type);
+		netdev_err(skb->dev, "Bad GSO type %d.\n", gso->u.gso.type);
+		netbk_fatal_tx_err(netif);
 		return -EINVAL;
 	}
 
@@ -1365,8 +1382,24 @@ static void net_tx_action(unsigned long group)
 	       !list_empty(&netbk->schedule_list)) {
 		/* Get a netif from the list with work to do. */
 		netif = poll_net_schedule_list(netbk);
+		/*
+		 * This can sometimes happen because the test of
+		 * list_empty(net_schedule_list) at the top of the
+		 * loop is unlocked.  Just go back and have another
+		 * look.
+		 */
 		if (!netif)
 			continue;
+
+		if (netif->tx.sring->req_prod - netif->tx.req_cons >
+		    NET_TX_RING_SIZE) {
+			printk(KERN_ERR "%s: Impossible number of requests. "
+			       "req_prod %u, req_cons %u, size %lu\n",
+			       netif->dev->name, netif->tx.sring->req_prod,
+			       netif->tx.req_cons, NET_TX_RING_SIZE);
+			netbk_fatal_tx_err(netif);
+			continue;
+		}
 
 		RING_FINAL_CHECK_FOR_REQUESTS(&netif->tx, work_to_do);
 		if (!work_to_do) {
@@ -1418,17 +1451,14 @@ static void net_tx_action(unsigned long group)
 			work_to_do = netbk_get_extras(netif, extras,
 						      work_to_do);
 			i = netif->tx.req_cons;
-			if (unlikely(work_to_do < 0)) {
-				netbk_tx_err(netif, &txreq, i);
+			if (unlikely(work_to_do < 0))
 				continue;
-			}
 		}
 
 		ret = netbk_count_requests(netif, &txreq, txfrags, work_to_do);
-		if (unlikely(ret < 0)) {
-			netbk_tx_err(netif, &txreq, i - ret);
+		if (unlikely(ret < 0))
 			continue;
-		}
+
 		i += ret;
 
 		if (unlikely(txreq.size < ETH_HLEN)) {
@@ -1440,11 +1470,11 @@ static void net_tx_action(unsigned long group)
 
 		/* No crossing a page as the payload mustn't fragment. */
 		if (unlikely((txreq.offset + txreq.size) > PAGE_SIZE)) {
-			netdev_dbg(netif->dev,
+			netdev_err(netif->dev,
 				   "txreq.offset: %x, size: %u, end: %lu\n",
 				   txreq.offset, txreq.size,
 				   (txreq.offset & ~PAGE_MASK) + txreq.size);
-			netbk_tx_err(netif, &txreq, i);
+			netbk_fatal_tx_err(netif);
 			continue;
 		}
 
@@ -1471,9 +1501,9 @@ static void net_tx_action(unsigned long group)
 			struct netif_extra_info *gso;
 			gso = &extras[XEN_NETIF_EXTRA_TYPE_GSO - 1];
 
-			if (netbk_set_skb_gso(skb, gso)) {
+			if (netbk_set_skb_gso(netif, skb, gso)) {
+				/* Failure in netbk_set_skb_gso is fatal. */
 				kfree_skb(skb);
-				netbk_tx_err(netif, &txreq, i);
 				continue;
 			}
 		}

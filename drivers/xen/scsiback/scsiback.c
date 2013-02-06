@@ -586,39 +586,35 @@ static int _scsiback_do_cmd_fn(struct vscsibk_info *info)
 
 		err = prepare_pending_reqs(info, ring_req,
 						pending_req);
-		if (err == -EINVAL) {
-			scsiback_do_resp_with_sense(NULL, (DRIVER_ERROR << 24),
-				0, pending_req);
-			continue;
-		} else if (err == -ENODEV) {
-			scsiback_do_resp_with_sense(NULL, (DID_NO_CONNECT << 16),
-				0, pending_req);
-			continue;
-		}
-
-		if (pending_req->act == VSCSIIF_ACT_SCSI_CDB) {
-
+		switch (err ?: pending_req->act) {
+		case VSCSIIF_ACT_SCSI_CDB:
 			/* The Host mode is through as for Emulation. */
 			if (info->feature == VSCSI_TYPE_HOST)
 				scsiback_cmd_exec(pending_req);
 			else
 				scsiback_req_emulation_or_cmdexec(pending_req);
-
-		} else if (pending_req->act == VSCSIIF_ACT_SCSI_RESET) {
+			break;
+		case VSCSIIF_ACT_SCSI_RESET:
 			scsiback_device_reset_exec(pending_req);
-		} else {
-			pr_err("scsiback: invalid parameter for request\n");
-			scsiback_do_resp_with_sense(NULL, (DRIVER_ERROR << 24),
-				0, pending_req);
-			continue;
+			break;
+		default:
+			if(!err && printk_ratelimit())
+				pr_err("scsiback: invalid request\n");
+			scsiback_do_resp_with_sense(NULL, DRIVER_ERROR << 24,
+						    0, pending_req);
+			break;
+		case -ENODEV:
+			scsiback_do_resp_with_sense(NULL, DID_NO_CONNECT << 16,
+						    0, pending_req);
+			break;
 		}
+
+		/* Yield point for this unbounded loop. */
+		cond_resched();
 	}
 
 	if (RING_HAS_UNCONSUMED_REQUESTS(ring))
 		more_to_do = 1;
-
-	/* Yield point for this unbounded loop. */
-	cond_resched();
 
 	return more_to_do;
 }

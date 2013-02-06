@@ -198,6 +198,9 @@ void netif_deschedule_work(netif_t *netif);
 int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev);
 irqreturn_t netif_be_int(int irq, void *dev_id);
 
+/* Prevent the device from generating any further traffic. */
+void xenvif_carrier_off(netif_t *netif);
+
 static inline int netbk_can_queue(struct net_device *dev)
 {
 	netif_t *netif = netdev_priv(dev);
