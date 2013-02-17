@@ -1159,6 +1159,17 @@ void vmbus_driver_unregister(struct hv_driver *hv_driver);
 		  g8, g9, ga, gb, gc, gd, ge, gf },
 
 /*
+ * Synthetic Video GUID
+ * {DA0A7802-E377-4aac-8E77-0558EB1073F8}
+ */
+#define HV_SYNTHVID_GUID \
+	.guid = { \
+			0x02, 0x78, 0x0a, 0xda, 0x77, 0xe3, 0xac, 0x4a, \
+			0x8e, 0x77, 0x05, 0x58, 0xeb, 0x10, 0x73, 0xf8 \
+		}
+
+
+/*
  * Common header for Hyper-V ICs
  */
 

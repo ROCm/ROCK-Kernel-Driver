@@ -19,6 +19,7 @@
 #include <linux/init.h>
 #include <linux/platform_device.h>
 #include <linux/screen_info.h>
+#include <linux/dmi.h>
 
 #include <video/vga.h>
 #include <asm/io.h>
@@ -495,6 +496,41 @@ err:
 	return err;
 }
 
+
+#if IS_ENABLED(CONFIG_HYPERV_FB)
+static struct dmi_system_id __initdata hyperv_dmi[] = {
+	{
+		.ident = "Microsoft Virtual PC",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Microsoft Corporation"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "Virtual Machine"),
+			DMI_MATCH(DMI_PRODUCT_VERSION, "VS2005R2"),
+		},
+	},
+
+	{
+		.ident = "Microsoft Hyper-V",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Microsoft Corporation"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "Virtual Machine"),
+		},
+	},
+
+	{}
+};
+
+/* Check if we are running on Microsoft Hyper-V platform */
+static bool __init is_hyperv(void)
+{
+	/*
+	 * If the first match is "Microsoft Hyper-V", it means we are not
+	 * running on the MS Virtual PC or other platforms, but on Hyper-V.
+	 */
+	return dmi_first_match(hyperv_dmi) == hyperv_dmi + 1;
+}
+#endif
+
+
 static struct platform_driver vesafb_driver = {
 	.driver	= {
 		.name	= "vesafb",
@@ -507,6 +543,18 @@ static int __init vesafb_init(void)
 {
 	int ret;
 	char *option = NULL;
+
+#if IS_ENABLED(CONFIG_HYPERV_FB)
+	/*
+	 * On Hyper-V both the emulated and synthetic video devices are
+	 * available. To avoid conflicts, we disable vesafb for the emulated
+	 * video if hyperv_fb is configured.
+	 */
+	if (is_hyperv()) {
+		pr_info("Disabled vesafb on Hyper-V.\n");
+		return -ENODEV;
+	}
+#endif
 
 	/* ignore error return of fb_get_options */
 	fb_get_options("vesafb", &option);
