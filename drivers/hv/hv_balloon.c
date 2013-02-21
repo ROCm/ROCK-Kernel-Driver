@@ -418,6 +418,11 @@ struct balloon_state {
 	struct work_struct wrk;
 };
 
+struct hot_add_wrk {
+	union dm_mem_page_range ha_page_range;
+	struct work_struct wrk;
+};
+
 static bool hot_add;
 static bool do_hot_add;
 /*
@@ -471,6 +476,11 @@ struct hv_dynmem_device {
 	struct balloon_state balloon_wrk;
 
 	/*
+	 * State to execute the "hot-add" operation.
+	 */
+	struct hot_add_wrk ha_wrk;
+
+	/*
 	 * This thread handles hot-add
 	 * requests from the host as well as notifying
 	 * the host with regards to memory pressure in
@@ -488,7 +498,7 @@ struct hv_dynmem_device {
 
 static struct hv_dynmem_device dm_device;
 
-static void hot_add_req(struct hv_dynmem_device *dm, struct dm_hot_add *msg)
+static void hot_add_req(struct work_struct *dummy)
 {
 
 	struct dm_hot_add_response resp;
@@ -511,8 +521,8 @@ static void hot_add_req(struct hv_dynmem_device *dm, struct dm_hot_add *msg)
 	resp.page_count = 0;
 	resp.result = 0;
 
-	dm->state = DM_INITIALIZED;
-	vmbus_sendpacket(dm->dev->channel, &resp,
+	dm_device.state = DM_INITIALIZED;
+	vmbus_sendpacket(dm_device.dev->channel, &resp,
 			sizeof(struct dm_hot_add_response),
 			(unsigned long)NULL,
 			VM_PKT_DATA_INBAND, 0);
@@ -775,7 +785,6 @@ static int dm_thread_func(void *dm_dev)
 {
 	struct hv_dynmem_device *dm = dm_dev;
 	int t;
-	unsigned long  scan_start;
 
 	while (!kthread_should_stop()) {
 		t = wait_for_completion_timeout(&dm_device.config_event, 1*HZ);
@@ -785,19 +794,6 @@ static int dm_thread_func(void *dm_dev)
 		 */
 
 		if (t == 0)
-			post_status(dm);
-
-		scan_start = jiffies;
-		switch (dm->state) {
-
-		case DM_HOT_ADD:
-			hot_add_req(dm, (struct dm_hot_add *)recv_buffer);
-			break;
-		default:
-			break;
-		}
-
-		if (!time_in_range(jiffies, scan_start, scan_start + HZ))
 			post_status(dm);
 
 	}
@@ -873,6 +869,8 @@ static void balloon_onchannelcallback(void *context)
 	struct dm_header *dm_hdr;
 	struct hv_dynmem_device *dm = hv_get_drvdata(dev);
 	struct dm_balloon *bal_msg;
+	struct dm_hot_add *ha_msg;
+	union dm_mem_page_range *ha_pg_range;
 
 	memset(recv_buffer, 0, sizeof(recv_buffer));
 	vmbus_recvpacket(dev->channel, recv_buffer,
@@ -909,8 +907,13 @@ static void balloon_onchannelcallback(void *context)
 			break;
 
 		case DM_MEM_HOT_ADD_REQUEST:
+			if (dm->state == DM_HOT_ADD)
+				pr_warn("Currently hot-adding\n");
 			dm->state = DM_HOT_ADD;
-			complete(&dm->config_event);
+			ha_msg = (struct dm_hot_add *)recv_buffer;
+			ha_pg_range = &ha_msg->range;
+			dm_device.ha_wrk.ha_page_range = *ha_pg_range;
+			schedule_work(&dm_device.ha_wrk.wrk);
 			break;
 
 		case DM_INFO_MESSAGE:
@@ -954,6 +957,7 @@ static int balloon_probe(struct hv_device *dev,
 	init_completion(&dm_device.host_event);
 	init_completion(&dm_device.config_event);
 	INIT_WORK(&dm_device.balloon_wrk.wrk, balloon_up);
+	INIT_WORK(&dm_device.ha_wrk.wrk, hot_add_req);
 
 	dm_device.thread =
 		 kthread_run(dm_thread_func, &dm_device, "hv_balloon");
