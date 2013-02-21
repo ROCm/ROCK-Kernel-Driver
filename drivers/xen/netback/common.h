@@ -74,6 +74,8 @@ typedef struct netif_st {
 	u8 can_queue:1;	/* can queue packets for receiver? */
 	u8 copying_receiver:1;	/* copy packets to receiver?       */
 
+	u8 busted:1;
+
 	/* Allow netif_be_start_xmit() to peek ahead in the rx request ring. */
 	RING_IDX rx_req_cons_peek;
 
@@ -190,16 +192,14 @@ int netif_map(struct backend_info *be, grant_ref_t tx_ring_ref,
 void netif_xenbus_init(void);
 
 #define netif_schedulable(netif)				\
-	(netif_running((netif)->dev) && netback_carrier_ok(netif))
+	(likely(!(netif)->busted) &&				\
+	 netif_running((netif)->dev) &&	netback_carrier_ok(netif))
 
 void netif_schedule_work(netif_t *netif);
 void netif_deschedule_work(netif_t *netif);
 
 int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev);
 irqreturn_t netif_be_int(int irq, void *dev_id);
-
-/* Prevent the device from generating any further traffic. */
-void xenvif_carrier_off(netif_t *netif);
 
 static inline int netbk_can_queue(struct net_device *dev)
 {

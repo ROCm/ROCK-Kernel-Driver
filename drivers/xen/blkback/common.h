@@ -82,7 +82,6 @@ typedef struct blkif_st {
 	atomic_t            drain;
 	struct task_struct  *xenblkd;
 	unsigned int        waiting_reqs;
-	struct request_queue *plug;
 
 	/* statistics */
 	unsigned long       st_print;

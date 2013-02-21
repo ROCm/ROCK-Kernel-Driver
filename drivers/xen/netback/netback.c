@@ -929,7 +929,7 @@ void netif_schedule_work(netif_t *netif)
 	RING_FINAL_CHECK_FOR_REQUESTS(&netif->tx, more_to_do);
 #endif
 
-	if (more_to_do) {
+	if (more_to_do && likely(!netif->busted)) {
 		add_to_net_schedule_list_tail(netif);
 		maybe_schedule_tx_action(GET_GROUP_INDEX(netif));
 	}
@@ -1121,7 +1121,9 @@ static void netbk_fatal_tx_err(netif_t *netif)
 {
 	printk(KERN_ERR "%s: fatal error; disabling device\n",
 	       netif->dev->name);
-	xenvif_carrier_off(netif);
+	netif->busted = 1;
+	disable_irq(netif->irq);
+	netif_deschedule_work(netif);
 	netif_put(netif);
 }
 
@@ -1138,13 +1140,13 @@ static int netbk_count_requests(netif_t *netif, netif_tx_request_t *first,
 		if (frags >= work_to_do) {
 			netdev_err(netif->dev, "Need more frags\n");
 			netbk_fatal_tx_err(netif);
-			return -frags;
+			return -ENODATA;
 		}
 
 		if (unlikely(frags >= MAX_SKB_FRAGS)) {
 			netdev_err(netif->dev, "Too many frags\n");
 			netbk_fatal_tx_err(netif);
-			return -frags;
+			return -E2BIG;
 		}
 
 		memcpy(txp, RING_GET_REQUEST(&netif->tx, cons + frags),
@@ -1152,7 +1154,7 @@ static int netbk_count_requests(netif_t *netif, netif_tx_request_t *first,
 		if (txp->size > first->size) {
 			netdev_err(netif->dev, "Frags galore\n");
 			netbk_fatal_tx_err(netif);
-			return -frags;
+			return -EIO;
 		}
 
 		first->size -= txp->size;
@@ -1162,7 +1164,7 @@ static int netbk_count_requests(netif_t *netif, netif_tx_request_t *first,
 			netdev_err(netif->dev, "txp->offset: %x, size: %u\n",
 				   txp->offset, txp->size);
 			netbk_fatal_tx_err(netif);
-			return -frags;
+			return -EINVAL;
 		}
 	} while ((txp++)->flags & XEN_NETTXF_more_data);
 
@@ -1390,6 +1392,11 @@ static void net_tx_action(unsigned long group)
 		 */
 		if (!netif)
 			continue;
+
+		if (unlikely(netif->busted)) {
+			netif_put(netif);
+			continue;
+		}
 
 		if (netif->tx.sring->req_prod - netif->tx.req_cons >
 		    NET_TX_RING_SIZE) {
@@ -1777,7 +1784,7 @@ static irqreturn_t netif_be_dbg(int irq, void *dev_id)
 			i++;
 		}
 
-		spin_unlock_irq(&netbk->netbk->schedule_list_lock);
+		spin_unlock_irq(&netbk->schedule_list_lock);
 	}
 
 	pr_alert(" ** End of netif_schedule_list **\n");

@@ -15,6 +15,7 @@
 #include <asm/dwarf2.h>
 #include <asm/percpu.h>
 #include <xen/interface/xen.h>
+#include <xen/interface/arch-x86/xen-mca.h>
 #include <xen/interface/elfnote.h>
 #include <xen/interface/features.h>
 
@@ -110,8 +111,13 @@ ENTRY(startup_32)
 	pushl $0		# fake return address for unwinder
 	jmp i386_start_kernel
 
+#if CONFIG_XEN_COMPAT <= 0x030002
 #define HYPERCALL_PAGE_OFFSET 0x1000
 .org HYPERCALL_PAGE_OFFSET
+#else
+	.text
+	.balign PAGE_SIZE
+#endif
 ENTRY(hypercall_page)
 	CFI_STARTPROC
 	.skip __HYPERVISOR_iret * 32
@@ -122,6 +128,12 @@ ENTRY(hypercall_page)
 	CFI_RESTORE_STATE
 	.balign 0x1000,0
 	CFI_ENDPROC
+
+#define HYPERCALL(n) \
+	.equ HYPERVISOR_##n, hypercall_page + __HYPERVISOR_##n * 32; \
+	.type HYPERVISOR_##n, function; .size HYPERVISOR_##n, 32
+#include <asm/xen-hypercalls.h>
+#undef HYPERCALL
 
 /*
  * BSS section

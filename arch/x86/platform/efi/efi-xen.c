@@ -61,7 +61,7 @@ EXPORT_SYMBOL(efi_enabled);
 
 static int __init setup_noefi(char *arg)
 {
-	__clear_bit(EFI_BOOT, &efi_facility);
+	__clear_bit(EFI_RUNTIME_SERVICES, &efi_facility);
 	return 0;
 }
 early_param("noefi", setup_noefi);

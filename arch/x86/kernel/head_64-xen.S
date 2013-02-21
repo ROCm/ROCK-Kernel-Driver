@@ -23,6 +23,7 @@
 #include <asm/dwarf2.h>
 #include <asm/percpu.h>
 #include <xen/interface/xen.h>
+#include <xen/interface/arch-x86/xen-mca.h>
 #include <xen/interface/elfnote.h>
 #include <xen/interface/features.h>
 
@@ -76,9 +77,15 @@ NEXT_PAGE(level2_fixmap_pgt)
 NEXT_PAGE(level1_fixmap_pgt)
 	.fill	512,8,0
 
+#if CONFIG_XEN_COMPAT <= 0x030002
 	.previous
+#else
+	.text
+#endif
 NEXT_PAGE(hypercall_page)
+#if CONFIG_XEN_COMPAT <= 0x030002
 	phys_hypercall_page = . - .head.text
+#endif
 	CFI_STARTPROC
 	i = 0
 	.rept 0x1000 / 0x20
@@ -109,6 +116,12 @@ NEXT_PAGE(hypercall_page)
 	i = i + 1
 	.endr
 	CFI_ENDPROC
+
+#define HYPERCALL(n) \
+	.equ HYPERVISOR_##n, hypercall_page + __HYPERVISOR_##n * 32; \
+	.type HYPERVISOR_##n, function; .size HYPERVISOR_##n, 32
+#include <asm/xen-hypercalls.h>
+#undef HYPERCALL
 
 #undef NEXT_PAGE
 
