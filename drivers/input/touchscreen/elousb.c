@@ -63,26 +63,25 @@ static void elousb_irq(struct urb *urb)
 	int status;
 
 	switch (urb->status) {
-		case 0:            /* success */
-			break;
-		case -ECONNRESET:    /* unlink */
-		case -ENOENT:
-		case -ESHUTDOWN:
-			return;
-			/* -EPIPE:  should clear the halt */
-		default:        /* error */
-			goto resubmit;
+	case 0:			/* success */
+		break;
+	case -ECONNRESET:	/* unlink */
+	case -ENOENT:
+	case -ESHUTDOWN:
+		return;
+		/* -EPIPE:  should clear the halt */
+	default:		/* error */
+		goto resubmit;
 	}
 
-	if (data[0] != 'T')    /* Mandatory ELO packet marker */
+	if (data[0] != 'T')	/* Mandatory ELO packet marker */
 		return;
-
 
 	input_report_abs(dev, ABS_X, ((u32)data[3] << 8) | data[2]);
 	input_report_abs(dev, ABS_Y, ((u32)data[5] << 8) | data[4]);
 
 	input_report_abs(dev, ABS_PRESSURE,
-			(data[1] & 0x80) ? (((u32)data[7] << 8) | data[6]): 0);
+			(data[1] & 0x80) ? (((u32)data[7] << 8) | data[6]) : 0);
 
 	if (data[1] & 0x03) {
 		input_report_key(dev, BTN_TOUCH, 1);
@@ -95,9 +94,9 @@ static void elousb_irq(struct urb *urb)
 	input_sync(dev);
 
 resubmit:
-	status = usb_submit_urb (urb, GFP_ATOMIC);
+	status = usb_submit_urb(urb, GFP_ATOMIC);
 	if (status)
-		pr_err("can't resubmit intr, %s-%s/input0, status %d",
+		pr_err("can't resubmit intr, %s-%s/input0, status %d\n",
 				elo->usbdev->bus->bus_name,
 				elo->usbdev->devpath, status);
 }
@@ -120,7 +119,8 @@ static void elousb_close(struct input_dev *dev)
 	usb_kill_urb(elo->irq);
 }
 
-static int elousb_probe(struct usb_interface *intf, const struct usb_device_id *id)
+static int elousb_probe(struct usb_interface *intf,
+		const struct usb_device_id *id)
 {
 	struct usb_device *dev = interface_to_usbdev(intf);
 	struct usb_host_interface *interface;
@@ -141,13 +141,15 @@ static int elousb_probe(struct usb_interface *intf, const struct usb_device_id *
 	endpoint = &interface->endpoint[0].desc;
 	if (!(endpoint->bEndpointAddress & USB_DIR_IN))
 		return -ENODEV;
-	if ((endpoint->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) != USB_ENDPOINT_XFER_INT)
+	if ((endpoint->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) !=
+			USB_ENDPOINT_XFER_INT)
 		return -ENODEV;
 
 	if (usb_get_extra_descriptor(interface, HID_DT_HID, &hdesc) &&
 			(!interface->desc.bNumEndpoints ||
-			 usb_get_extra_descriptor(&interface->endpoint[0], HID_DT_HID, &hdesc))) {
-		pr_err("HID class descriptor not present");
+			 usb_get_extra_descriptor(&interface->endpoint[0],
+				 HID_DT_HID, &hdesc))) {
+		pr_err("HID class descriptor not present\n");
 		return -ENODEV;
 	}
 
@@ -156,10 +158,9 @@ static int elousb_probe(struct usb_interface *intf, const struct usb_device_id *
 			rsize = le16_to_cpu(hdesc->desc[i].wDescriptorLength);
 
 	if (!rsize || rsize > HID_MAX_DESCRIPTOR_SIZE) {
-		pr_err("weird size of report descriptor (%u)", rsize);
+		pr_err("weird size of report descriptor (%u)\n", rsize);
 		return -ENODEV;
 	}
-
 
 	pipe = usb_rcvintpipe(dev, endpoint->bEndpointAddress);
 
@@ -176,26 +177,31 @@ static int elousb_probe(struct usb_interface *intf, const struct usb_device_id *
 	if (!elo->irq)
 		goto fail2;
 
-	if (!(rdesc = kmalloc(rsize, GFP_KERNEL)))
+	rdesc = kmalloc(rsize, GFP_KERNEL);
+	if (!rdesc)
 		goto fail3;
 
 	elo->usbdev = dev;
 	elo->dev = input_dev;
 
-	if ((error = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
-					HID_REQ_SET_IDLE, USB_TYPE_CLASS | USB_RECIP_INTERFACE, 0,
-					interface->desc.bInterfaceNumber,
-					NULL, 0, USB_CTRL_SET_TIMEOUT)) < 0) {
-		pr_err("setting HID idle timeout failed, error %d", error);
+	error = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
+			HID_REQ_SET_IDLE, USB_TYPE_CLASS | USB_RECIP_INTERFACE,
+			0, interface->desc.bInterfaceNumber, NULL, 0,
+			USB_CTRL_SET_TIMEOUT);
+	if (error < 0) {
+		pr_err("setting HID idle timeout failed, error %d\n", error);
 		error = -ENODEV;
 		goto fail4;
 	}
 
-	if ((error = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
-					USB_REQ_GET_DESCRIPTOR, USB_RECIP_INTERFACE | USB_DIR_IN,
-					HID_DT_REPORT << 8, interface->desc.bInterfaceNumber,
-					rdesc, rsize, USB_CTRL_GET_TIMEOUT)) < rsize) {
-		pr_err("reading HID report descriptor failed, error %d", error);
+	error = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
+			USB_REQ_GET_DESCRIPTOR,
+			USB_RECIP_INTERFACE | USB_DIR_IN, HID_DT_REPORT << 8,
+			interface->desc.bInterfaceNumber, rdesc, rsize,
+			USB_CTRL_GET_TIMEOUT);
+	if (error < rsize) {
+		pr_err("reading HID report descriptor failed, error %d\n",
+				error);
 		error = -ENODEV;
 		goto fail4;
 	}
@@ -263,25 +269,25 @@ fail1:
 
 static void elousb_disconnect(struct usb_interface *intf)
 {
-	struct elousb *elo = usb_get_intfdata (intf);
+	struct elousb *elo = usb_get_intfdata(intf);
 
 	usb_set_intfdata(intf, NULL);
 	if (elo) {
 		usb_kill_urb(elo->irq);
 		input_unregister_device(elo->dev);
 		usb_free_urb(elo->irq);
-		usb_free_coherent(interface_to_usbdev(intf), 8, elo->data, elo->data_dma);
+		usb_free_coherent(interface_to_usbdev(intf), 8, elo->data,
+				elo->data_dma);
 		kfree(elo);
 	}
 }
 
-static struct usb_device_id elousb_id_table [] = {
+static const struct usb_device_id elousb_id_table[] = {
 	{ USB_DEVICE(0x04e7, 0x0009) }, /* CarrolTouch 4000U */
 	{ USB_DEVICE(0x04e7, 0x0030) }, /* CarrolTouch 4500U */
 	{ }    /* Terminating entry */
 };
-
-MODULE_DEVICE_TABLE (usb, elousb_id_table);
+MODULE_DEVICE_TABLE(usb, elousb_id_table);
 
 static struct usb_driver elousb_driver = {
 	.name        = "elousb",
@@ -294,7 +300,8 @@ static int __init elousb_init(void)
 {
 	int retval = usb_register(&elousb_driver);
 	if (retval == 0)
-		printk(KERN_INFO KBUILD_MODNAME ": " DRIVER_VERSION ":" DRIVER_DESC);
+		pr_info(KBUILD_MODNAME ": " DRIVER_VERSION ":"
+				DRIVER_DESC "\n");
 	return retval;
 }
 
