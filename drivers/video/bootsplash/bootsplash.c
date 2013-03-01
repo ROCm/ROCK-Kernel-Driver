@@ -1406,7 +1406,8 @@ int splash_prepare(struct vc_data *vc, struct fb_info *info)
 		 * fb area; maybe other FBs would need similar hack, but
 		 * so far I don't care.
 		 */
-		if (!strcmp(info->fix.id, "xen")) {
+		if (!strcmp(info->fix.id, "xen") ||
+		    !strcmp(info->fix.id, "mgadrmfb")) {
 			info->splash_data->need_sync = 1;
 			/* sync the whole splash once */
 			splash_sync_region(info, 0, 0,
