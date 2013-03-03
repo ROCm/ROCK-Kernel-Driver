@@ -269,7 +269,7 @@ config ACPI_CUSTOM_DSDT
 
 config ACPI_INITRD_TABLE_OVERRIDE
 	bool "ACPI tables override via initrd"
-	depends on BLK_DEV_INITRD
+	depends on BLK_DEV_INITRD && X86
 	default n
 	help
 	  This option provides functionality to override arbitrary ACPI tables
