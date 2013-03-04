@@ -1407,7 +1407,9 @@ int splash_prepare(struct vc_data *vc, struct fb_info *info)
 		 * so far I don't care.
 		 */
 		if (!strcmp(info->fix.id, "xen") ||
-		    !strcmp(info->fix.id, "mgadrmfb")) {
+		    !strcmp(info->fix.id, "mgadrmfb") ||
+		    !strcmp(info->fix.id, "astdrmfb") ||
+		    !strcmp(info->fix.id, "cirrusdrmfb")) {
 			info->splash_data->need_sync = 1;
 			/* sync the whole splash once */
 			splash_sync_region(info, 0, 0,
