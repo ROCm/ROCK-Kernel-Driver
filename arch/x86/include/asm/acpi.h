@@ -31,10 +31,6 @@
 #include <asm/mpspec.h>
 #include <asm/realmode.h>
 
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
-#include <xen/interface/platform.h>
-#endif
-
 #define COMPILER_DEPENDENT_INT64   long long
 #define COMPILER_DEPENDENT_UINT64  unsigned long long
 
@@ -127,27 +123,6 @@ extern int acpi_suspend_lowlevel(void);
 
 /* Physical address to resume after wakeup */
 #define acpi_wakeup_address ((unsigned long)(real_mode_header->wakeup_start))
-
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
-static inline int acpi_notify_hypervisor_state(u8 sleep_state,
-					       u32 pm1a_cnt_val,
-					       u32 pm1b_cnt_val)
-{
-	struct xen_platform_op op = {
-		.cmd = XENPF_enter_acpi_sleep,
-		.interface_version = XENPF_INTERFACE_VERSION,
-		.u = {
-			.enter_acpi_sleep = {
-				.pm1a_cnt_val = pm1a_cnt_val,
-				.pm1b_cnt_val = pm1b_cnt_val,
-				.sleep_state = sleep_state,
-			},
-		},
-	};
-
-	return HYPERVISOR_platform_op(&op);
-}
-#endif
 
 /*
  * Check if the CPU can handle C2 and deeper

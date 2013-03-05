@@ -365,7 +365,8 @@ static void dispatch_discard(blkif_t *blkif, struct blkif_request_discard *req)
 	if (vbd_translate(&preq, blkif, REQ_DISCARD) != 0) {
 		DPRINTK("access denied: discard of [%Lu,%Lu) on dev=%04x\n",
 			preq.sector_number,
-			preq.sector_number + preq.nr_sects, preq.dev);
+			preq.sector_number + preq.nr_sects,
+			blkif->vbd.pdevice);
 		make_response(blkif, req->id, req->operation, BLKIF_RSP_ERROR);
 		msleep(1); /* back off a bit */
 		return;
@@ -597,7 +598,8 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 		DPRINTK("access denied: %s of [%llu,%llu] on dev=%04x\n", 
 			operation == READ ? "read" : "write",
 			preq.sector_number,
-			preq.sector_number + preq.nr_sects, preq.dev);
+			preq.sector_number + preq.nr_sects,
+			blkif->vbd.pdevice);
 		goto fail_flush;
 	}
 

@@ -246,10 +246,19 @@ static struct processor_extcntl_ops xen_extcntl_ops = {
 	.hotplug		= xen_hotplug_notifier,
 };
 
-static int xen_sleep(u8 sleep_state, u32 pm1a_ctrl, u32 pm1b_ctrl)
+static int xen_sleep(u8 sleep_state, u32 val_a, u32 val_b, bool extended)
 {
-	int err = acpi_notify_hypervisor_state(sleep_state,
-					       pm1a_ctrl, pm1b_ctrl);
+	struct xen_platform_op op = {
+		.cmd = XENPF_enter_acpi_sleep,
+		.interface_version = XENPF_INTERFACE_VERSION,
+		.u.enter_acpi_sleep = {
+			.pm1a_cnt_val = val_a,
+			.pm1b_cnt_val = val_b,
+			.sleep_state = sleep_state,
+			.flags = extended ? XENPF_ACPI_SLEEP_EXTENDED : 0,
+		},
+	};
+	int err = HYPERVISOR_platform_op(&op);
 
 	if (!err)
 		return 1;

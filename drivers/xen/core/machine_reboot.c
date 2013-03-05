@@ -163,7 +163,7 @@ static int take_machine_down(void *_suspend)
 	if (suspend_cancelled >= 0)
 		post_suspend(suspend_cancelled, suspend->fast_suspend);
 	if (!suspend_cancelled)
-		xen_clockevents_resume();
+		xen_clockevents_resume(false);
 	if (suspend_cancelled >= 0)
 		syscore_resume();
 	if (!suspend_cancelled) {
@@ -276,9 +276,14 @@ int __xen_suspend(int fast_suspend, void (*resume_notifier)(int))
 
 		if (!fast_suspend)
 			smp_resume();
+		else
+			xen_clockevents_resume(true);
 	}
 
 	dpm_resume_end(PMSG_RESUME);
+
+	/* Make sure timer events get retriggered on all CPUs */
+	clock_was_set();
 
 	return err;
 }

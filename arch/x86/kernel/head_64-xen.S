@@ -104,6 +104,9 @@ NEXT_PAGE(hypercall_page)
 	.skip 2 /* syscall */
 	.if i == __HYPERVISOR_iret
 	CFI_ADJUST_CFA_OFFSET	-3*8
+	CFI_SAME_VALUE	rax
+	CFI_SAME_VALUE	r11
+	CFI_SAME_VALUE	rcx
 	.else
 	.skip 2 /* pop %r11 */
 	CFI_ADJUST_CFA_OFFSET -8
