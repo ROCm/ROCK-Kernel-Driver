@@ -3015,7 +3015,7 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			1 = warn when loading unsupported modules,
 			2 = don't warn.
 
-			CONFIG_ENTERPRISE_SUPPORT must be enabled for this
+			CONFIG_SUSE_KERNEL_SUPPORTED must be enabled for this
 			to have any effect.
 
 	usbcore.authorized_default=

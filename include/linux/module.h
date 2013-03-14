@@ -398,7 +398,9 @@ struct module *__module_address(unsigned long addr);
 bool is_module_address(unsigned long addr);
 bool is_module_percpu_address(unsigned long addr);
 bool is_module_text_address(unsigned long addr);
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
 const char *supported_printable(int taint);
+#endif
 
 static inline int within_module_core(unsigned long addr, struct module *mod)
 {

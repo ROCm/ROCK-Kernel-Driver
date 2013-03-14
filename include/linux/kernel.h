@@ -396,11 +396,15 @@ extern int panic_timeout;
 extern int panic_on_oops;
 extern int panic_on_unrecovered_nmi;
 extern int panic_on_io_nmi;
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
 extern int unsupported;
+#endif
 extern int sysctl_panic_on_stackoverflow;
 extern const char *print_tainted(void);
 extern void add_taint(unsigned flag);
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
 extern void add_nonfatal_taint(unsigned flag);
+#endif
 extern int test_taint(unsigned flag);
 extern unsigned long get_taint(void);
 extern int root_mountflags;
@@ -430,7 +434,7 @@ extern enum system_states {
 #define TAINT_FIRMWARE_WORKAROUND	11
 #define TAINT_OOT_MODULE		12
 
-#ifdef CONFIG_ENTERPRISE_SUPPORT
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
 /*
  * Take the upper bits to hopefully allow them
  * to stay the same for more than one release.

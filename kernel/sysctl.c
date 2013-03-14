@@ -713,7 +713,7 @@ static struct ctl_table kern_table[] = {
 		.extra1		= &pid_max_min,
 		.extra2		= &pid_max_max,
 	},
-#if defined(CONFIG_MODULES) && defined(CONFIG_ENTERPRISE_SUPPORT)
+#if defined(CONFIG_MODULES) && defined(CONFIG_SUSE_KERNEL_SUPPORTED)
 	{
 		.procname	= "unsupported",
 		.data		= &unsupported,

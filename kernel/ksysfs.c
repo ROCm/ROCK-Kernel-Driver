@@ -187,7 +187,7 @@ static struct bin_attribute notes_attr = {
 struct kobject *kernel_kobj;
 EXPORT_SYMBOL_GPL(kernel_kobj);
 
-#ifdef CONFIG_ENTERPRISE_SUPPORT
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
 const char *supported_printable(int taint)
 {
 	int mask = TAINT_PROPRIETARY_MODULE|TAINT_NO_SUPPORT;
@@ -225,7 +225,7 @@ static struct attribute * kernel_attrs[] = {
 	&vmcoreinfo_attr.attr,
 #endif
 	&rcu_expedited_attr.attr,
-#ifdef CONFIG_ENTERPRISE_SUPPORT
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
 	&supported_attr.attr,
 #endif
 	NULL

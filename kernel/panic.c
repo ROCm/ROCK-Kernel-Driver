@@ -206,7 +206,7 @@ static const struct tnt tnts[] = {
 	{ TAINT_CRAP,			'C', ' ' },
 	{ TAINT_FIRMWARE_WORKAROUND,	'I', ' ' },
 	{ TAINT_OOT_MODULE,		'O', ' ' },
-#ifdef CONFIG_ENTERPRISE_SUPPORT
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
 	{ TAINT_NO_SUPPORT,		'N', ' ' },
 	{ TAINT_EXTERNAL_SUPPORT,	'X', ' ' },
 #endif
@@ -265,10 +265,12 @@ unsigned long get_taint(void)
 	return tainted_mask;
 }
 
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
 void add_nonfatal_taint(unsigned flag)
 {
 	set_bit(flag, &tainted_mask);
 }
+#endif
 
 void add_taint(unsigned flag)
 {

@@ -82,7 +82,7 @@ modpost = scripts/mod/modpost                    \
  $(if $(CONFIG_DEBUG_SECTION_MISMATCH),,-S)      \
  $(if $(KBUILD_EXTMOD)$(KBUILD_MODPOST_WARN),-w) \
  $(if $(cross_build),-c)                         \
- $(if $(CONFIG_ENTERPRISE_SUPPORT),              \
+ $(if $(CONFIG_SUSE_KERNEL_SUPPORTED),              \
       -N $(firstword $(wildcard $(dir $(MODVERDIR))/Module.supported \
 				$(objtree)/Module.supported \
 				$(srctree)/Module.supported /dev/null)))

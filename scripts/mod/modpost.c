@@ -1695,6 +1695,7 @@ static void check_sec_ref(struct module *mod, const char *modname,
 	}
 }
 
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
 void *supported_file;
 unsigned long supported_size;
 
@@ -1736,6 +1737,7 @@ static const char *supported(struct module *mod)
 	}
 	return NULL;
 }
+#endif
 
 static void read_symbols(char *modname)
 {
@@ -1930,12 +1932,14 @@ static void add_staging_flag(struct buffer *b, const char *name)
 		buf_printf(b, "\nMODULE_INFO(staging, \"Y\");\n");
 }
 
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
 static void add_supported_flag(struct buffer *b, struct module *mod)
 {
 	const char *how = supported(mod);
 	if (how)
 		buf_printf(b, "\nMODULE_INFO(supported, \"%s\");\n", how);
 }
+#endif
 
 /**
  * Record CRCs for unresolved symbols
@@ -2077,12 +2081,14 @@ static void write_if_changed(struct buffer *b, const char *fname)
 	fclose(file);
 }
 
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
 static void read_supported(const char *fname)
 {
 	supported_file = grab_file(fname, &supported_size);
 	if (!supported_file)
 		; /* ignore error */
 }
+#endif
 
 /* parse Module.symvers file. line format:
  * 0x12345678<tab>symbol<tab>module[[<tab>export]<tab>something]
@@ -2177,7 +2183,9 @@ int main(int argc, char **argv)
 	struct buffer buf = { };
 	char *kernel_read = NULL, *module_read = NULL;
 	char *dump_write = NULL;
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
 	const char *supported = NULL;
+#endif
 	int opt;
 	int err;
 	struct ext_sym_list *extsym_iter;
@@ -2222,15 +2230,19 @@ int main(int argc, char **argv)
 			warn_unresolved = 1;
 			break;
 		case 'N':
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
 			supported = optarg;
+#endif
 			break;
 		default:
 			exit(1);
 		}
 	}
 
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
 	if (supported)
 		read_supported(supported);
+#endif
 	if (kernel_read)
 		read_dump(kernel_read, 1);
 	if (module_read)
@@ -2264,7 +2276,9 @@ int main(int argc, char **argv)
 		add_header(&buf, mod);
 		add_intree_flag(&buf, !external_module);
 		add_staging_flag(&buf, mod->name);
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
 		add_supported_flag(&buf, mod);
+#endif
 		err |= add_versions(&buf, mod);
 		add_depends(&buf, mod, modules);
 		add_moddevtable(&buf, mod);

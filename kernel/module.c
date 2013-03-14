@@ -95,7 +95,7 @@
 /* If this is set, the section belongs in the init part of the module */
 #define INIT_OFFSET_MASK (1UL << (BITS_PER_LONG-1))
 
-#ifdef CONFIG_ENTERPRISE_SUPPORT
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
 /* Allow unsupported modules switch. */
 #ifdef UNSUPPORTED_MODULES
 int unsupported = UNSUPPORTED_MODULES;
@@ -1077,7 +1077,7 @@ static size_t module_flags_taint(struct module *mod, char *buf)
 		buf[l++] = 'F';
 	if (mod->taints & (1 << TAINT_CRAP))
 		buf[l++] = 'C';
-#ifdef CONFIG_ENTERPRISE_SUPPORT
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
 	if (mod->taints & (1 << TAINT_NO_SUPPORT))
 		buf[l++] = 'N';
 	if (mod->taints & (1 << TAINT_EXTERNAL_SUPPORT))
@@ -1160,7 +1160,7 @@ static ssize_t show_taint(struct module_attribute *mattr,
 static struct module_attribute modinfo_taint =
 	__ATTR(taint, 0444, show_taint, NULL);
 
-#ifdef CONFIG_ENTERPRISE_SUPPORT
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
 static void setup_modinfo_supported(struct module *mod, const char *s)
 {
 	if (!s) {
@@ -1195,7 +1195,7 @@ static struct module_attribute *modinfo_attrs[] = {
 	&modinfo_coresize,
 	&modinfo_initsize,
 	&modinfo_taint,
-#ifdef CONFIG_ENTERPRISE_SUPPORT
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
 	&modinfo_supported,
 #endif
 #ifdef CONFIG_MODULE_UNLOAD
@@ -1739,14 +1739,14 @@ static int mod_sysfs_setup(struct module *mod,
 	add_sect_attrs(mod, info);
 	add_notes_attrs(mod, info);
 
-#ifdef CONFIG_ENTERPRISE_SUPPORT
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
 	/* We don't use add_taint() here because it also disables lockdep. */
 	if (mod->taints & (1 << TAINT_EXTERNAL_SUPPORT))
 		add_nonfatal_taint(TAINT_EXTERNAL_SUPPORT);
 	else if (mod->taints == (1 << TAINT_NO_SUPPORT)) {
 		if (unsupported == 0) {
 			printk(KERN_WARNING "%s: module not supported by "
-			       "Novell, refusing to load. To override, echo "
+			       "SUSE, refusing to load. To override, echo "
 			       "1 > /proc/sys/kernel/unsupported\n", mod->name);
 			err = -ENOEXEC;
 			goto out_remove_attrs;
@@ -1754,9 +1754,9 @@ static int mod_sysfs_setup(struct module *mod,
 		add_nonfatal_taint(TAINT_NO_SUPPORT);
 		if (unsupported == 1) {
 			printk(KERN_WARNING "%s: module is not supported by "
-			       "Novell. Novell Technical Services may decline "
-			       "your support request if it involves a kernel "
-			       "fault.\n", mod->name);
+			       "SUSE. Our support organization may not be "
+			       "able to address your support request if it "
+			       "involves a kernel fault.\n", mod->name);
 		}
 	}
 #endif
@@ -1764,11 +1764,13 @@ static int mod_sysfs_setup(struct module *mod,
 	kobject_uevent(&mod->mkobj.kobj, KOBJ_ADD);
 	return 0;
 
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
 out_remove_attrs:
 	remove_notes_attrs(mod);
 	remove_sect_attrs(mod);
 	del_usage_links(mod);
 	module_remove_modinfo_attrs(mod);
+#endif
 out_unreg_param:
 	module_param_sysfs_remove(mod);
 out_unreg_holders:
@@ -3907,7 +3909,7 @@ void print_modules(void)
 	if (last_unloaded_module[0])
 		printk(" [last unloaded: %s]", last_unloaded_module);
 	printk("\n");
-#ifdef CONFIG_ENTERPRISE_SUPPORT
+#ifdef CONFIG_SUSE_KERNEL_SUPPORTED
 	printk("Supported: %s\n", supported_printable(get_taint()));
 #endif
 }
