@@ -115,11 +115,6 @@ static struct resource *find_oprom(struct pci_dev *pdev)
 	struct resource *oprom = NULL;
 	int i;
 
-#ifdef CONFIG_XEN
-	if (!is_initial_xendomain())
-		return NULL;
-#endif
-
 	for (i = 0; i < ARRAY_SIZE(adapter_rom_resources); i++) {
 		struct resource *res = &adapter_rom_resources[i];
 		unsigned short offset, vendor, device, list, rev;
@@ -238,7 +233,7 @@ void __init probe_roms(void)
 	upper = system_rom_resource.start;
 
 	/* check for extension rom (ignore length byte!) */
-	rom = isa_bus_to_virt((unsigned long)extension_rom_resource.start);
+	rom = isa_bus_to_virt(extension_rom_resource.start);
 	if (romsignature(rom)) {
 		length = resource_size(&extension_rom_resource);
 		if (romchecksum(rom, length)) {

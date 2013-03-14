@@ -223,7 +223,7 @@ extern struct console early_dbgp_console;
 
 struct usb_hcd;
 
-#if defined(CONFIG_XEN_PRIVILEGED_GUEST) || defined(CONFIG_XEN_DOM0)
+#ifdef CONFIG_XEN_DOM0
 extern int xen_dbgp_reset_prep(struct usb_hcd *);
 extern int xen_dbgp_external_startup(struct usb_hcd *);
 #else

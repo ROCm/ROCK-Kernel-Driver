@@ -392,7 +392,7 @@ static void pci_device_shutdown(struct device *dev)
 	 * Turn off Bus Master bit on the device to tell it to not
 	 * continue to do DMA
 	 */
-	pci_disable_device(pci_dev);
+	pci_clear_master(pci_dev);
 }
 
 #ifdef CONFIG_PM
@@ -1190,9 +1190,13 @@ pci_dev_driver(const struct pci_dev *dev)
 static int pci_bus_match(struct device *dev, struct device_driver *drv)
 {
 	struct pci_dev *pci_dev = to_pci_dev(dev);
-	struct pci_driver *pci_drv = to_pci_driver(drv);
+	struct pci_driver *pci_drv;
 	const struct pci_device_id *found_id;
 
+	if (!pci_dev->match_driver)
+		return 0;
+
+	pci_drv = to_pci_driver(drv);
 	found_id = pci_match_device(pci_drv, pci_dev);
 	if (found_id)
 		return 1;

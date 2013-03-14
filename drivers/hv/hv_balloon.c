@@ -29,7 +29,6 @@
 #include <linux/memory_hotplug.h>
 #include <linux/memory.h>
 #include <linux/notifier.h>
-#include <linux/mman.h>
 #include <linux/percpu_counter.h>
 
 #include <linux/hyperv.h>
@@ -618,8 +617,6 @@ static void post_status(struct hv_dynmem_device *dm)
 
 }
 
-
-
 static void free_balloon_pages(struct hv_dynmem_device *dm,
 			 union dm_mem_page_range *range_array)
 {
@@ -1079,9 +1076,7 @@ static int balloon_remove(struct hv_device *dev)
 static const struct hv_vmbus_device_id id_table[] = {
 	/* Dynamic Memory Class ID */
 	/* 525074DC-8985-46e2-8057-A307DC18A502 */
-	{ VMBUS_DEVICE(0xdc, 0x74, 0x50, 0X52, 0x85, 0x89, 0xe2, 0x46,
-		       0x80, 0x57, 0xa3, 0x07, 0xdc, 0x18, 0xa5, 0x02)
-	},
+	{ HV_DM_GUID, },
 	{ },
 };
 

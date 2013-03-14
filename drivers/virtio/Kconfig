@@ -6,11 +6,10 @@ config VIRTIO
 	  CONFIG_RPMSG or CONFIG_S390_GUEST.
 
 menu "Virtio drivers"
-	depends on !XEN
 
 config VIRTIO_PCI
-	tristate "PCI driver for virtio devices (EXPERIMENTAL)"
-	depends on PCI && EXPERIMENTAL
+	tristate "PCI driver for virtio devices"
+	depends on PCI
 	select VIRTIO
 	---help---
 	  This drivers provides support for virtio based paravirtual device
@@ -33,8 +32,8 @@ config VIRTIO_BALLOON
 	 If unsure, say M.
 
  config VIRTIO_MMIO
- 	tristate "Platform bus driver for memory mapped virtio devices (EXPERIMENTAL)"
- 	depends on HAS_IOMEM && EXPERIMENTAL
+	tristate "Platform bus driver for memory mapped virtio devices"
+	depends on HAS_IOMEM
  	select VIRTIO
  	---help---
  	 This drivers provides support for memory mapped virtio

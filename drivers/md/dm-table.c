@@ -217,7 +217,6 @@ int dm_table_create(struct dm_table **result, fmode_t mode,
 
 	if (alloc_targets(t, num_targets)) {
 		kfree(t);
-		t = NULL;
 		return -ENOMEM;
 	}
 
@@ -835,8 +834,8 @@ int dm_table_add_target(struct dm_table *t, const char *type,
 
 	t->highs[t->num_targets++] = tgt->begin + tgt->len - 1;
 
-	if (!tgt->num_discard_requests && tgt->discards_supported)
-		DMWARN("%s: %s: ignoring discards_supported because num_discard_requests is zero.",
+	if (!tgt->num_discard_bios && tgt->discards_supported)
+		DMWARN("%s: %s: ignoring discards_supported because num_discard_bios is zero.",
 		       dm_device_name(t->md), type);
 
 	return 0;
@@ -1372,7 +1371,7 @@ static bool dm_table_supports_flush(struct dm_table *t, unsigned flush)
 	while (i < dm_table_get_num_targets(t)) {
 		ti = dm_table_get_target(t, i++);
 
-		if (!ti->num_flush_requests)
+		if (!ti->num_flush_bios)
 			continue;
 
 		if (ti->flush_supported)
@@ -1451,7 +1450,7 @@ static bool dm_table_supports_write_same(struct dm_table *t)
 	while (i < dm_table_get_num_targets(t)) {
 		ti = dm_table_get_target(t, i++);
 
-		if (!ti->num_write_same_requests)
+		if (!ti->num_write_same_bios)
 			return false;
 
 		if (!ti->type->iterate_devices ||
@@ -1669,7 +1668,7 @@ bool dm_table_supports_discards(struct dm_table *t)
 	while (i < dm_table_get_num_targets(t)) {
 		ti = dm_table_get_target(t, i++);
 
-		if (!ti->num_discard_requests)
+		if (!ti->num_discard_bios)
 			continue;
 
 		if (ti->discards_supported)

@@ -527,9 +527,7 @@ typedef struct {
  * All runtime access to EFI goes through this structure:
  */
 extern struct efi {
-#ifndef CONFIG_XEN
 	efi_system_table_t *systab;	/* EFI system table */
-#endif
 	unsigned int runtime_version;	/* Runtime services version */
 	unsigned long mps;		/* MPS table */
 	unsigned long acpi;		/* ACPI table  (IA64 ext 0.71) */
@@ -551,10 +549,8 @@ extern struct efi {
 	efi_update_capsule_t *update_capsule;
 	efi_query_capsule_caps_t *query_capsule_caps;
 	efi_get_next_high_mono_count_t *get_next_high_mono_count;
-#ifndef CONFIG_XEN
 	efi_reset_system_t *reset_system;
 	efi_set_virtual_address_map_t *set_virtual_address_map;
-#endif
 } efi;
 
 static inline int
@@ -744,7 +740,8 @@ struct efivars {
 	 * 1) ->list - adds, removals, reads, writes
 	 * 2) ops.[gs]et_variable() calls.
 	 * It must not be held when creating sysfs entries or calling kmalloc.
-	 * ops.get_next_variable() is only called from register_efivars(),
+	 * ops.get_next_variable() is only called from register_efivars()
+	 * or efivar_update_sysfs_entries(),
 	 * which is protected by the BKL, so that path is safe.
 	 */
 	spinlock_t lock;

@@ -27,7 +27,6 @@
 #define CFI_REMEMBER_STATE	.cfi_remember_state
 #define CFI_RESTORE_STATE	.cfi_restore_state
 #define CFI_UNDEFINED		.cfi_undefined
-#define CFI_SAME_VALUE		.cfi_same_value
 #define CFI_ESCAPE		.cfi_escape
 
 #ifdef CONFIG_AS_CFI_SIGNAL_FRAME
@@ -71,7 +70,6 @@
 #define CFI_REMEMBER_STATE	cfi_ignore
 #define CFI_RESTORE_STATE	cfi_ignore
 #define CFI_UNDEFINED		cfi_ignore
-#define CFI_SAME_VALUE		cfi_ignore
 #define CFI_ESCAPE		cfi_ignore
 #define CFI_SIGNAL_FRAME	cfi_ignore
 

@@ -247,7 +247,7 @@ static int ovl_dir_getattr(struct vfsmount *mnt, struct dentry *dentry,
 	struct path realpath;
 
 	type = ovl_path_real(dentry, &realpath);
-	err = vfs_getattr(realpath.mnt, realpath.dentry, stat);
+	err = vfs_getattr(&realpath, stat);
 	if (err)
 		return err;
 

@@ -374,6 +374,14 @@ xloadflags:
 #else
 # define XLF0 0
 #endif
+
+#if defined(CONFIG_RELOCATABLE) && defined(CONFIG_X86_64)
+   /* kernel/boot_param/ramdisk could be loaded above 4g */
+# define XLF1 XLF_CAN_BE_LOADED_ABOVE_4G
+#else
+# define XLF1 0
+#endif
+
 #ifdef CONFIG_EFI_STUB
 # ifdef CONFIG_X86_64
 #  define XLF23 XLF_EFI_HANDOVER_64		/* 64-bit EFI handover ok */
@@ -383,7 +391,7 @@ xloadflags:
 #else
 # define XLF23 0
 #endif
-			.word XLF0 | XLF23
+			.word XLF0 | XLF1 | XLF23
 
 cmdline_size:   .long   COMMAND_LINE_SIZE-1     #length of the command line,
                                                 #added with boot protocol
@@ -403,9 +411,6 @@ setup_data:		.quad 0			# 64-bit physical pointer to
 
 pref_address:		.quad LOAD_PHYSICAL_ADDR	# preferred load addr
 
-#ifdef CONFIG_XEN
-#define ZO_startup_32 0
-#endif
 #define ZO_INIT_SIZE	(ZO__end - ZO_startup_32 + ZO_z_extract_offset)
 #define VO_INIT_SIZE	(VO__end - VO__text)
 #if ZO_INIT_SIZE > VO_INIT_SIZE
@@ -426,7 +431,6 @@ handover_offset:
 
 	.section ".entrytext", "ax"
 start_of_setup:
-#ifndef CONFIG_XEN
 # Force %es = %ds
 	movw	%ds, %ax
 	movw	%ax, %es
@@ -499,4 +503,3 @@ die:
 setup_corrupt:
 	.byte	7
 	.string	"No setup signature found...\n"
-#endif /* CONFIG_XEN */

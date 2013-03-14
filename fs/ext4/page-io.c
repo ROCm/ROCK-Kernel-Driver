@@ -23,6 +23,7 @@
 #include <linux/workqueue.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
+#include <linux/mm.h>
 
 #include "ext4_jbd2.h"
 #include "xattr.h"
@@ -73,8 +74,6 @@ void ext4_free_io_end(ext4_io_end_t *io)
 	BUG_ON(!list_empty(&io->list));
 	BUG_ON(io->flag & EXT4_IO_END_UNWRITTEN);
 
-	if (io->page)
-		put_page(io->page);
 	for (i = 0; i < io->num_io_pages; i++)
 		put_io_page(io->pages[i]);
 	io->num_io_pages = 0;
@@ -118,7 +117,6 @@ static void dump_completed_IO(struct inode *inode)
 #ifdef	EXT4FS_DEBUG
 	struct list_head *cur, *before, *after;
 	ext4_io_end_t *io, *io0, *io1;
-	unsigned long flags;
 
 	if (list_empty(&EXT4_I(inode)->i_completed_io_list)) {
 		ext4_debug("inode %lu completed_io list is empty\n",
@@ -151,25 +149,19 @@ void ext4_add_complete_io(ext4_io_end_t *io_end)
 	wq = EXT4_SB(io_end->inode->i_sb)->dio_unwritten_wq;
 
 	spin_lock_irqsave(&ei->i_completed_io_lock, flags);
-	if (list_empty(&ei->i_completed_io_list)) {
-		io_end->flag |= EXT4_IO_END_QUEUED;
-		queue_work(wq, &io_end->work);
-	}
+	if (list_empty(&ei->i_completed_io_list))
+		queue_work(wq, &ei->i_unwritten_work);
 	list_add_tail(&io_end->list, &ei->i_completed_io_list);
 	spin_unlock_irqrestore(&ei->i_completed_io_lock, flags);
 }
 
-static int ext4_do_flush_completed_IO(struct inode *inode,
-				      ext4_io_end_t *work_io)
+static int ext4_do_flush_completed_IO(struct inode *inode)
 {
 	ext4_io_end_t *io;
-	struct list_head unwritten, complete, to_free;
+	struct list_head unwritten;
 	unsigned long flags;
 	struct ext4_inode_info *ei = EXT4_I(inode);
 	int err, ret = 0;
-
-	INIT_LIST_HEAD(&complete);
-	INIT_LIST_HEAD(&to_free);
 
 	spin_lock_irqsave(&ei->i_completed_io_lock, flags);
 	dump_completed_IO(inode);
@@ -184,32 +176,7 @@ static int ext4_do_flush_completed_IO(struct inode *inode,
 		err = ext4_end_io(io);
 		if (unlikely(!ret && err))
 			ret = err;
-
-		list_add_tail(&io->list, &complete);
-	}
-	spin_lock_irqsave(&ei->i_completed_io_lock, flags);
-	while (!list_empty(&complete)) {
-		io = list_entry(complete.next, ext4_io_end_t, list);
 		io->flag &= ~EXT4_IO_END_UNWRITTEN;
-		/* end_io context can not be destroyed now because it still
-		 * used by queued worker. Worker thread will destroy it later */
-		if (io->flag & EXT4_IO_END_QUEUED)
-			list_del_init(&io->list);
-		else
-			list_move(&io->list, &to_free);
-	}
-	/* If we are called from worker context, it is time to clear queued
-	 * flag, and destroy it's end_io if it was converted already */
-	if (work_io) {
-		work_io->flag &= ~EXT4_IO_END_QUEUED;
-		if (!(work_io->flag & EXT4_IO_END_UNWRITTEN))
-			list_add_tail(&work_io->list, &to_free);
-	}
-	spin_unlock_irqrestore(&ei->i_completed_io_lock, flags);
-
-	while (!list_empty(&to_free)) {
-		io = list_entry(to_free.next, ext4_io_end_t, list);
-		list_del_init(&io->list);
 		ext4_free_io_end(io);
 	}
 	return ret;
@@ -218,10 +185,11 @@ static int ext4_do_flush_completed_IO(struct inode *inode,
 /*
  * work on completed aio dio IO, to convert unwritten extents to extents
  */
-static void ext4_end_io_work(struct work_struct *work)
+void ext4_end_io_work(struct work_struct *work)
 {
-	ext4_io_end_t *io = container_of(work, ext4_io_end_t, work);
-	ext4_do_flush_completed_IO(io->inode, io);
+	struct ext4_inode_info *ei = container_of(work, struct ext4_inode_info,
+						  i_unwritten_work);
+	ext4_do_flush_completed_IO(&ei->vfs_inode);
 }
 
 int ext4_flush_unwritten_io(struct inode *inode)
@@ -229,7 +197,7 @@ int ext4_flush_unwritten_io(struct inode *inode)
 	int ret;
 	WARN_ON_ONCE(!mutex_is_locked(&inode->i_mutex) &&
 		     !(inode->i_state & I_FREEING));
-	ret = ext4_do_flush_completed_IO(inode, NULL);
+	ret = ext4_do_flush_completed_IO(inode);
 	ext4_unwritten_wait(inode);
 	return ret;
 }
@@ -240,7 +208,6 @@ ext4_io_end_t *ext4_init_io_end(struct inode *inode, gfp_t flags)
 	if (io) {
 		atomic_inc(&EXT4_I(inode)->i_ioend_count);
 		io->inode = inode;
-		INIT_WORK(&io->work, ext4_end_io_work);
 		INIT_LIST_HEAD(&io->list);
 	}
 	return io;
@@ -381,14 +348,6 @@ static int io_submit_add_bh(struct ext4_io_submit *io,
 		unmap_underlying_metadata(bh->b_bdev, bh->b_blocknr);
 	}
 
-	if (!buffer_mapped(bh) || buffer_delay(bh)) {
-		if (!buffer_mapped(bh))
-			clear_buffer_dirty(bh);
-		if (io->io_bio)
-			ext4_io_submit(io);
-		return 0;
-	}
-
 	if (io->io_bio && bh->b_blocknr != io->io_next_block) {
 submit_and_retry:
 		ext4_io_submit(io);
@@ -435,7 +394,7 @@ int ext4_bio_write_page(struct ext4_io_submit *io,
 
 	io_page = kmem_cache_alloc(io_page_cachep, GFP_NOFS);
 	if (!io_page) {
-		set_page_dirty(page);
+		redirty_page_for_writepage(wbc, page);
 		unlock_page(page);
 		return -ENOMEM;
 	}
@@ -467,7 +426,15 @@ int ext4_bio_write_page(struct ext4_io_submit *io,
 			set_buffer_uptodate(bh);
 			continue;
 		}
-		clear_buffer_dirty(bh);
+		if (!buffer_dirty(bh) || buffer_delay(bh) ||
+		    !buffer_mapped(bh) || buffer_unwritten(bh)) {
+			/* A hole? We can safely clear the dirty bit */
+			if (!buffer_mapped(bh))
+				clear_buffer_dirty(bh);
+			if (io->io_bio)
+				ext4_io_submit(io);
+			continue;
+		}
 		ret = io_submit_add_bh(io, io_page, inode, wbc, bh);
 		if (ret) {
 			/*
@@ -475,9 +442,10 @@ int ext4_bio_write_page(struct ext4_io_submit *io,
 			 * we can do but mark the page as dirty, and
 			 * better luck next time.
 			 */
-			set_page_dirty(page);
+			redirty_page_for_writepage(wbc, page);
 			break;
 		}
+		clear_buffer_dirty(bh);
 	}
 	unlock_page(page);
 	/*

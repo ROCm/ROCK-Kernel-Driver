@@ -44,7 +44,7 @@ static int ovl_getattr(struct vfsmount *mnt, struct dentry *dentry,
 	struct path realpath;
 
 	ovl_path_real(dentry, &realpath);
-	return vfs_getattr(realpath.mnt, realpath.dentry, stat);
+	return vfs_getattr(&realpath, stat);
 }
 
 int ovl_permission(struct inode *inode, int mask)

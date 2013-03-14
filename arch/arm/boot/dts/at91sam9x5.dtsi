@@ -197,9 +197,9 @@
 				};
 
 				usart3 {
-					pinctrl_uart3: usart3-0 {
+					pinctrl_usart3: usart3-0 {
 						atmel,pins =
-							<2 23 0x2 0x1	/* PC22 periph B with pullup */
+							<2 22 0x2 0x1	/* PC22 periph B with pullup */
 							 2 23 0x2 0x0>;	/* PC23 periph B */
 					};
 
@@ -512,7 +512,11 @@
 			#address-cells = <1>;
 			#size-cells = <1>;
 			reg = <0x40000000 0x10000000
+			       0xffffe000 0x600		/* PMECC Registers */
+			       0xffffe600 0x200		/* PMECC Error Location Registers */
+			       0x00108000 0x18000	/* PMECC looup table in ROM code  */
 			      >;
+			atmel,pmecc-lookup-table-offset = <0x0 0x8000>;
 			atmel,nand-addr-offset = <21>;
 			atmel,nand-cmd-offset = <22>;
 			pinctrl-names = "default";

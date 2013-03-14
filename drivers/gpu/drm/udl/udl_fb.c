@@ -457,7 +457,6 @@ static void udl_user_framebuffer_destroy(struct drm_framebuffer *fb)
 static const struct drm_framebuffer_funcs udlfb_funcs = {
 	.destroy = udl_user_framebuffer_destroy,
 	.dirty = udl_user_framebuffer_dirty,
-	.create_handle = NULL,
 };
 
 
@@ -471,15 +470,16 @@ udl_framebuffer_init(struct drm_device *dev,
 
 	spin_lock_init(&ufb->dirty_lock);
 	ufb->obj = obj;
-	ret = drm_framebuffer_init(dev, &ufb->base, &udlfb_funcs);
 	drm_helper_mode_fill_fb_struct(&ufb->base, mode_cmd);
+	ret = drm_framebuffer_init(dev, &ufb->base, &udlfb_funcs);
 	return ret;
 }
 
 
-static int udlfb_create(struct udl_fbdev *ufbdev,
+static int udlfb_create(struct drm_fb_helper *helper,
 			struct drm_fb_helper_surface_size *sizes)
 {
+	struct udl_fbdev *ufbdev = (struct udl_fbdev *)helper;
 	struct drm_device *dev = ufbdev->helper.dev;
 	struct fb_info *info;
 	struct device *device = &dev->usbdev->dev;
@@ -557,27 +557,10 @@ out:
 	return ret;
 }
 
-static int udl_fb_find_or_create_single(struct drm_fb_helper *helper,
-					struct drm_fb_helper_surface_size *sizes)
-{
-	struct udl_fbdev *ufbdev = (struct udl_fbdev *)helper;
-	int new_fb = 0;
-	int ret;
-
-	if (!helper->fb) {
-		ret = udlfb_create(ufbdev, sizes);
-		if (ret)
-			return ret;
-
-		new_fb = 1;
-	}
-	return new_fb;
-}
-
 static struct drm_fb_helper_funcs udl_fb_helper_funcs = {
 	.gamma_set = udl_crtc_fb_gamma_set,
 	.gamma_get = udl_crtc_fb_gamma_get,
-	.fb_probe = udl_fb_find_or_create_single,
+	.fb_probe = udlfb_create,
 };
 
 static void udl_fbdev_destroy(struct drm_device *dev,
@@ -592,6 +575,7 @@ static void udl_fbdev_destroy(struct drm_device *dev,
 		framebuffer_release(info);
 	}
 	drm_fb_helper_fini(&ufbdev->helper);
+	drm_framebuffer_unregister_private(&ufbdev->ufb.base);
 	drm_framebuffer_cleanup(&ufbdev->ufb.base);
 	drm_gem_object_unreference_unlocked(&ufbdev->ufb.obj->base);
 }
@@ -619,6 +603,10 @@ int udl_fbdev_init(struct drm_device *dev)
 	}
 
 	drm_fb_helper_single_add_all_connectors(&ufbdev->helper);
+
+	/* disable all the possible outputs/crtcs before entering KMS mode */
+	drm_helper_disable_unused_functions(dev);
+
 	drm_fb_helper_initial_config(&ufbdev->helper, bpp_sel);
 	return 0;
 }

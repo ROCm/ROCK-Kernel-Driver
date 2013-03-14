@@ -73,12 +73,14 @@ NI manuals:
 
 */
 
+#include <linux/pci.h>
 #include <linux/interrupt.h>
 #include <linux/slab.h>
 #include <linux/io.h>
+#include <linux/delay.h>
+
 #include "../comedidev.h"
 
-#include <linux/delay.h>
 #include <asm/dma.h>
 
 #include "8253.h"
@@ -568,13 +570,11 @@ int labpc_common_attach(struct comedi_device *dev, unsigned long iobase,
 		return -EINVAL;
 	} else if (dma_chan) {
 		/* allocate dma buffer */
-		devpriv->dma_buffer =
-		    kmalloc(dma_buffer_size, GFP_KERNEL | GFP_DMA);
-		if (devpriv->dma_buffer == NULL) {
-			dev_err(dev->class_dev,
-				"failed to allocate dma buffer\n");
+		devpriv->dma_buffer = kmalloc(dma_buffer_size,
+					      GFP_KERNEL | GFP_DMA);
+		if (devpriv->dma_buffer == NULL)
 			return -ENOMEM;
-		}
+
 		if (request_dma(dma_chan, DRV_NAME)) {
 			dev_err(dev->class_dev,
 				"failed to allocate dma channel %u\n",
@@ -2118,16 +2118,11 @@ static int labpc_pci_probe(struct pci_dev *dev,
 	return comedi_pci_auto_config(dev, &labpc_driver);
 }
 
-static void labpc_pci_remove(struct pci_dev *dev)
-{
-	comedi_pci_auto_unconfig(dev);
-}
-
 static struct pci_driver labpc_pci_driver = {
 	.name = DRV_NAME,
 	.id_table = labpc_pci_table,
 	.probe = labpc_pci_probe,
-	.remove = labpc_pci_remove
+	.remove		= comedi_pci_auto_unconfig,
 };
 module_comedi_pci_driver(labpc_driver, labpc_pci_driver);
 #else

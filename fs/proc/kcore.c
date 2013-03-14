@@ -17,6 +17,7 @@
 #include <linux/elfcore.h>
 #include <linux/vmalloc.h>
 #include <linux/highmem.h>
+#include <linux/printk.h>
 #include <linux/bootmem.h>
 #include <linux/init.h>
 #include <linux/slab.h>
@@ -130,7 +131,7 @@ static void __kcore_update_ram(struct list_head *list)
 }
 
 
-#if defined(CONFIG_HIGHMEM) || defined(CONFIG_XEN)
+#ifdef CONFIG_HIGHMEM
 /*
  * If no highmem, we can assume [0...max_low_pfn) continuous range of memory
  * because memory hole is not as big as !HIGHMEM case.
@@ -146,11 +147,7 @@ static int kcore_update_ram(void)
 	if (!ent)
 		return -ENOMEM;
 	ent->addr = (unsigned long)__va(0);
-#ifdef CONFIG_HIGHMEM
 	ent->size = max_low_pfn << PAGE_SHIFT;
-#else
-	ent->size = max_pfn << PAGE_SHIFT;
-#endif
 	ent->type = KCORE_RAM;
 	list_add(&ent->list, &head);
 	__kcore_update_ram(&head);
@@ -623,7 +620,7 @@ static int __init proc_kcore_init(void)
 	proc_root_kcore = proc_create("kcore", S_IRUSR, NULL,
 				      &proc_kcore_operations);
 	if (!proc_root_kcore) {
-		printk(KERN_ERR "couldn't create /proc/kcore\n");
+		pr_err("couldn't create /proc/kcore\n");
 		return 0; /* Always returns 0. */
 	}
 	/* Store text area if it's special */

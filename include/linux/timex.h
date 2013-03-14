@@ -127,9 +127,6 @@ extern unsigned long tick_nsec;		/* SHIFTED_HZ period (nsec) */
 
 extern void ntp_init(void);
 extern void ntp_clear(void);
-#ifdef CONFIG_XEN
-extern int ntp_synced(void);
-#endif
 
 /* Required to safely shift negative values */
 #define shift_right(x, s) ({	\

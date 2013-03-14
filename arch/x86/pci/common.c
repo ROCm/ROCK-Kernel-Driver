@@ -34,7 +34,6 @@ int noioapicreroute = 1;
 #endif
 int pcibios_last_bus = -1;
 unsigned long pirq_table_addr;
-struct pci_bus *pci_root_bus;
 const struct pci_raw_ops *__read_mostly raw_pci_ops;
 const struct pci_raw_ops *__read_mostly raw_pci_ext_ops;
 
@@ -612,7 +611,6 @@ unsigned int pcibios_assign_all_busses(void)
 
 int pcibios_add_device(struct pci_dev *dev)
 {
-#if !defined(CONFIG_XEN)
 	struct setup_data *data;
 	struct pci_setup_rom *rom;
 	u64 pa_data;
@@ -637,27 +635,6 @@ int pcibios_add_device(struct pci_dev *dev)
 		}
 		pa_data = data->next;
 	}
-#elif defined(CONFIG_EFI)
-	struct xen_platform_op op = {
-		.cmd = XENPF_firmware_info,
-		.u.firmware_info = {
-			.type = XEN_FW_EFI_INFO,
-			.index = XEN_FW_EFI_PCI_ROM,
-			.u.efi_info.pci_rom = {
-				.segment = pci_domain_nr(dev->bus),
-				.bus = dev->bus->number,
-				.devfn = dev->devfn,
-				.vendor = dev->vendor,
-				.devid = dev->device
-			}
-		}
-	};
-
-	if (HYPERVISOR_platform_op(&op) == 0) {
-		dev->rom = op.u.firmware_info.u.efi_info.pci_rom.address;
-		dev->romlen = op.u.firmware_info.u.efi_info.pci_rom.size;
-	}
-#endif
 	return 0;
 }
 

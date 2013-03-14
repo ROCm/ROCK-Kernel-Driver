@@ -424,7 +424,7 @@ ENTRY(ia32_sysenter_target)
 	CFI_SIGNAL_FRAME
 	CFI_DEF_CFA esp, 0
 	CFI_REGISTER esp, ebp
-	movl SYSENTER_stack_sp0(%esp),%esp
+	movl TSS_sysenter_sp0(%esp),%esp
 sysenter_past_esp:
 	/*
 	 * Interrupts are disabled here, but we can't trace it until
@@ -734,51 +734,6 @@ END(syscall_badsys)
  */
 	.popsection
 
-/*
- * System calls that need a pt_regs pointer.
- */
-#define PTREGSCALL0(name) \
-ENTRY(ptregs_##name) ;  \
-	leal 4(%esp),%eax; \
-	jmp sys_##name; \
-ENDPROC(ptregs_##name)
-
-#define PTREGSCALL1(name) \
-ENTRY(ptregs_##name) ; \
-	leal 4(%esp),%edx; \
-	movl (PT_EBX+4)(%esp),%eax; \
-	jmp sys_##name; \
-ENDPROC(ptregs_##name)
-
-#define PTREGSCALL2(name) \
-ENTRY(ptregs_##name) ; \
-	leal 4(%esp),%ecx; \
-	movl (PT_ECX+4)(%esp),%edx; \
-	movl (PT_EBX+4)(%esp),%eax; \
-	jmp sys_##name; \
-ENDPROC(ptregs_##name)
-
-#define PTREGSCALL3(name) \
-ENTRY(ptregs_##name) ; \
-	CFI_STARTPROC; \
-	leal 4(%esp),%eax; \
-	pushl_cfi %eax; \
-	movl PT_EDX(%eax),%ecx; \
-	movl PT_ECX(%eax),%edx; \
-	movl PT_EBX(%eax),%eax; \
-	call sys_##name; \
-	addl $4,%esp; \
-	CFI_ADJUST_CFA_OFFSET -4; \
-	ret; \
-	CFI_ENDPROC; \
-ENDPROC(ptregs_##name)
-
-PTREGSCALL1(iopl)
-PTREGSCALL0(sigreturn)
-PTREGSCALL0(rt_sigreturn)
-PTREGSCALL2(vm86)
-PTREGSCALL1(vm86old)
-
 .macro FIXUP_ESPFIX_STACK
 /*
  * Switch back for ESPFIX stack to the normal zerobased stack
@@ -1039,7 +994,7 @@ END(spurious_interrupt_bug)
  */
 	.popsection
 
-#ifdef CONFIG_PARAVIRT_XEN
+#ifdef CONFIG_XEN
 /* Xen doesn't set %esp to be precisely what the normal sysenter
    entrypoint expects, so fix it up before using the normal path. */
 ENTRY(xen_sysenter_target)
@@ -1129,7 +1084,7 @@ ENDPROC(xen_failsafe_callback)
 BUILD_INTERRUPT3(xen_hvm_callback_vector, HYPERVISOR_CALLBACK_VECTOR,
 		xen_evtchn_do_upcall)
 
-#endif	/* CONFIG_PARAVIRT_XEN */
+#endif	/* CONFIG_XEN */
 
 #if IS_ENABLED(CONFIG_HYPERV)
 
@@ -1366,7 +1321,7 @@ END(page_fault)
  * that sets up the real kernel stack. Check here, since we can't
  * allow the wrong stack to be used.
  *
- * "SYSENTER_stack_sp0+12" is because the NMI/debug handler will have
+ * "TSS_sysenter_sp0+12" is because the NMI/debug handler will have
  * already pushed 3 words if it hits on the sysenter instruction:
  * eflags, cs and eip.
  *
@@ -1378,7 +1333,7 @@ END(page_fault)
 	cmpw $__KERNEL_CS, 4(%esp)
 	jne \ok
 \label:
-	movl SYSENTER_stack_sp0 + \offset(%esp), %esp
+	movl TSS_sysenter_sp0 + \offset(%esp), %esp
 	CFI_DEF_CFA esp, 0
 	CFI_UNDEFINED eip
 	pushfl_cfi

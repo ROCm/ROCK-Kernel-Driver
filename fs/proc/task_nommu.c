@@ -149,12 +149,12 @@ static int nommu_vma_show(struct seq_file *m, struct vm_area_struct *vma,
 	file = vma->vm_file;
 
 	if (file) {
-		struct inode *inode = vma->vm_file->f_path.dentry->d_inode;
+		struct inode *inode = file_inode(vma->vm_file);
 
 		if (inode->i_sb->s_magic == BTRFS_SUPER_MAGIC) {
 			struct kstat stat;
 
-			vfs_getattr(file->f_path.mnt, file->f_path.dentry, &stat);
+			vfs_getattr(&file->f_path, &stat);
 			dev = stat.dev;
 		} else {
 			dev = inode->i_sb->s_dev;

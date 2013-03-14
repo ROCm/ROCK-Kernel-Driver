@@ -639,7 +639,7 @@ static void get_memory_layout(const struct mem_ctl_info *mci)
 	tmp_mb = (1 + pvt->tohm) >> 20;
 
 	mb = div_u64_rem(tmp_mb, 1000, &kb);
-	edac_dbg(0, "TOHM: %u.%03u GB (0x%016Lx)", mb, kb, (u64)pvt->tohm);
+	edac_dbg(0, "TOHM: %u.%03u GB (0x%016Lx)\n", mb, kb, (u64)pvt->tohm);
 
 	/*
 	 * Step 2) Get SAD range and SAD Interleave list
@@ -1552,11 +1552,7 @@ static int sbridge_mce_check_error(struct notifier_block *nb, unsigned long val,
 		mce->socketid, mce->apicid);
 
 	/* Only handle if it is the right mc controller */
-#ifdef CONFIG_XEN /* Could easily be used for non-Xen too. */
-	if (mce->socketid != pvt->sbridge_dev->mc)
-#else
 	if (cpu_data(mce->cpu).phys_proc_id != pvt->sbridge_dev->mc)
-#endif
 		return NOTIFY_DONE;
 
 	smp_rmb();

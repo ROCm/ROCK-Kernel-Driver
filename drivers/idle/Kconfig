@@ -10,7 +10,7 @@ config INTEL_IDLE
 	  processors intel_idle does not support.
 
 menu "Memory power savings"
-depends on X86_64 && !XEN
+depends on X86_64
 
 config I7300_IDLE_IOAT_CHANNEL
 	bool
@@ -18,7 +18,6 @@ config I7300_IDLE_IOAT_CHANNEL
 config I7300_IDLE
 	tristate "Intel chipset idle memory power saving driver"
 	select I7300_IDLE_IOAT_CHANNEL
-	depends on EXPERIMENTAL
 	help
 	  Enable memory power savings when idle with certain Intel server
 	  chipsets. The chipset must have I/O AT support, such as the

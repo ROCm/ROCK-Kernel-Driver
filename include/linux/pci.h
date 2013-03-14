@@ -286,6 +286,7 @@ struct pci_dev {
 	unsigned int	irq;
 	struct resource resource[DEVICE_COUNT_RESOURCE]; /* I/O and memory regions + expansion ROMs */
 
+	bool match_driver;		/* Skip attaching driver */
 	/* These fields are used by common fixups */
 	unsigned int	transparent:1;	/* Transparent PCI bridge */
 	unsigned int	multifunction:1;/* Part of multi-function device */
@@ -326,13 +327,11 @@ struct pci_dev {
 	struct kset *msi_kset;
 #endif
 	struct pci_vpd *vpd;
-#ifdef CONFIG_PCI_IOV /* doesn't imply CONFIG_PCI_ATS when CONFIG_XEN */
+#ifdef CONFIG_PCI_ATS
 	union {
 		struct pci_sriov *sriov;	/* SR-IOV capability related */
 		struct pci_dev *physfn;	/* the PF this VF is associated with */
 	};
-#endif
-#ifdef CONFIG_PCI_ATS
 	struct pci_ats	*ats;	/* Address Translation Service */
 #endif
 	phys_addr_t rom; /* Physical address of ROM if it's not from the BAR */
@@ -379,6 +378,8 @@ struct pci_host_bridge {
 void pci_set_host_bridge_release(struct pci_host_bridge *bridge,
 		     void (*release_fn)(struct pci_host_bridge *),
 		     void *release_data);
+
+int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge);
 
 /*
  * The first PCI_BRIDGE_RESOURCE_NUM PCI bus resources (those that correspond
@@ -676,6 +677,7 @@ extern struct list_head pci_root_buses;	/* list of all known PCI buses */
 /* Some device drivers need know if pci is initiated */
 extern int no_pci_devices(void);
 
+void pcibios_resource_survey_bus(struct pci_bus *bus);
 void pcibios_fixup_bus(struct pci_bus *);
 int __must_check pcibios_enable_device(struct pci_dev *, int mask);
 /* Architecture specific versions may override this (weak) */
@@ -907,9 +909,6 @@ void pci_update_resource(struct pci_dev *dev, int resno);
 int __must_check pci_assign_resource(struct pci_dev *dev, int i);
 int __must_check pci_reassign_resource(struct pci_dev *dev, int i, resource_size_t add_size, resource_size_t align);
 int pci_select_bars(struct pci_dev *dev, unsigned long flags);
-#ifdef CONFIG_XEN
-void pci_restore_bars(struct pci_dev *);
-#endif
 
 /* ROM control related routines */
 int pci_enable_rom(struct pci_dev *pdev);
@@ -1106,6 +1105,12 @@ static inline int pci_enable_msi_block(struct pci_dev *dev, unsigned int nvec)
 	return -1;
 }
 
+static inline int
+pci_enable_msi_block_auto(struct pci_dev *dev, unsigned int *maxvec)
+{
+	return -1;
+}
+
 static inline void pci_msi_shutdown(struct pci_dev *dev)
 { }
 static inline void pci_disable_msi(struct pci_dev *dev)
@@ -1137,6 +1142,7 @@ static inline int pci_msi_enabled(void)
 }
 #else
 extern int pci_enable_msi_block(struct pci_dev *dev, unsigned int nvec);
+extern int pci_enable_msi_block_auto(struct pci_dev *dev, unsigned int *maxvec);
 extern void pci_msi_shutdown(struct pci_dev *dev);
 extern void pci_disable_msi(struct pci_dev *dev);
 extern int pci_msix_table_size(struct pci_dev *dev);
@@ -1147,10 +1153,6 @@ extern void pci_disable_msix(struct pci_dev *dev);
 extern void msi_remove_pci_irq_vectors(struct pci_dev *dev);
 extern void pci_restore_msi_state(struct pci_dev *dev);
 extern int pci_msi_enabled(void);
-#ifdef CONFIG_XEN
-extern int register_msi_get_owner(int (*func)(struct pci_dev *dev));
-extern int unregister_msi_get_owner(int (*func)(struct pci_dev *dev));
-#endif
 #endif
 
 #ifdef CONFIG_PCIEPORTBUS
@@ -1702,12 +1704,21 @@ static inline bool pci_is_pcie(struct pci_dev *dev)
 }
 
 /**
+ * pcie_caps_reg - get the PCIe Capabilities Register
+ * @dev: PCI device
+ */
+static inline u16 pcie_caps_reg(const struct pci_dev *dev)
+{
+	return dev->pcie_flags_reg;
+}
+
+/**
  * pci_pcie_type - get the PCIe device/port type
  * @dev: PCI device
  */
 static inline int pci_pcie_type(const struct pci_dev *dev)
 {
-	return (dev->pcie_flags_reg & PCI_EXP_FLAGS_TYPE) >> 4;
+	return (pcie_caps_reg(dev) & PCI_EXP_FLAGS_TYPE) >> 4;
 }
 
 void pci_request_acs(void);
@@ -1849,11 +1860,5 @@ static inline struct eeh_dev *pci_dev_to_eeh_dev(struct pci_dev *pdev)
  * parent
  */
 struct pci_dev *pci_find_upstream_pcie_bridge(struct pci_dev *pdev);
-
-#ifdef CONFIG_PCI_GUESTDEV
-int pci_is_guestdev(struct pci_dev *dev);
-#else
-#define pci_is_guestdev(dev)	0
-#endif
 
 #endif /* LINUX_PCI_H */

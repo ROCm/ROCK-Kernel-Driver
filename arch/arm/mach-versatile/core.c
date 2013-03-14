@@ -32,6 +32,7 @@
 #include <linux/amba/mmci.h>
 #include <linux/amba/pl022.h>
 #include <linux/io.h>
+#include <linux/irqchip/arm-vic.h>
 #include <linux/irqchip/versatile-fpga.h>
 #include <linux/gfp.h>
 #include <linux/clkdev.h>
@@ -41,7 +42,6 @@
 #include <asm/irq.h>
 #include <asm/hardware/arm_timer.h>
 #include <asm/hardware/icst.h>
-#include <asm/hardware/vic.h>
 #include <asm/mach-types.h>
 
 #include <asm/mach/arch.h>
@@ -127,7 +127,7 @@ void __init versatile_init_irq(void)
 	writel(PIC_MASK, VA_SIC_BASE + SIC_INT_PIC_ENABLE);
 }
 
-static struct map_desc versatile_io_desc[] __initdata = {
+static struct map_desc versatile_io_desc[] __initdata __maybe_unused = {
 	{
 		.virtual	=  IO_ADDRESS(VERSATILE_SYS_BASE),
 		.pfn		= __phys_to_pfn(VERSATILE_SYS_BASE),
@@ -783,7 +783,7 @@ void __init versatile_init(void)
 /*
  * Set up timer interrupt, and return the current time in seconds.
  */
-static void __init versatile_timer_init(void)
+void __init versatile_timer_init(void)
 {
 	u32 val;
 
@@ -810,8 +810,3 @@ static void __init versatile_timer_init(void)
 	sp804_clocksource_init(TIMER3_VA_BASE, "timer3");
 	sp804_clockevents_init(TIMER0_VA_BASE, IRQ_TIMERINT0_1, "timer0");
 }
-
-struct sys_timer versatile_timer = {
-	.init		= versatile_timer_init,
-};
-

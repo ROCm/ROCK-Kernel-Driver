@@ -887,7 +887,7 @@ inserted:
 				  (unsigned long long)block);
 
 			new_bh = sb_getblk(sb, block);
-			if (!new_bh) {
+			if (unlikely(!new_bh)) {
 				error = -ENOMEM;
 getblk_failed:
 				ext4_free_blocks(handle, inode, NULL, block, 1,
@@ -1166,17 +1166,10 @@ ext4_xattr_set(struct inode *inode, int name_index, const char *name,
 {
 	handle_t *handle;
 	int error, retries = 0;
-	int credits = EXT4_DATA_TRANS_BLOCKS(inode->i_sb);
+	int credits = ext4_jbd2_credits_xattr(inode);
 
 retry:
-	/*
-	 * In case of inline data, we may push out the data to a block,
-	 * So reserve the journal space first.
-	 */
-	if (ext4_has_inline_data(inode))
-		credits += ext4_writepage_trans_blocks(inode) + 1;
-
-	handle = ext4_journal_start(inode, credits);
+	handle = ext4_journal_start(inode, EXT4_HT_XATTR, credits);
 	if (IS_ERR(handle)) {
 		error = PTR_ERR(handle);
 	} else {

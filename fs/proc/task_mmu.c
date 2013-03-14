@@ -271,12 +271,12 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma, int is_pid)
 	const char *name = NULL;
 
 	if (file) {
-		struct inode *inode = vma->vm_file->f_path.dentry->d_inode;
+		struct inode *inode = file_inode(vma->vm_file);
 
 		if (inode->i_sb->s_magic == BTRFS_SUPER_MAGIC) {
 			struct kstat stat;
 
-			vfs_getattr(file->f_path.mnt, file->f_path.dentry, &stat);
+			vfs_getattr(&file->f_path, &stat);
 			dev = stat.dev;
 		} else {
 			dev = inode->i_sb->s_dev;
@@ -569,12 +569,8 @@ static void show_smap_vma_flags(struct seq_file *m, struct vm_area_struct *vma)
 		[ilog2(VM_ARCH_1)]	= "ar",
 		[ilog2(VM_DONTDUMP)]	= "dd",
 		[ilog2(VM_MIXEDMAP)]	= "mm",
-#ifndef CONFIG_XEN
 		[ilog2(VM_HUGEPAGE)]	= "hg",
 		[ilog2(VM_NOHUGEPAGE)]	= "nh",
-#else
-		[ilog2(VM_FOREIGN)]	= "fo",
-#endif
 		[ilog2(VM_MERGEABLE)]	= "mg",
 	};
 	size_t i;
@@ -755,7 +751,7 @@ static ssize_t clear_refs_write(struct file *file, const char __user *buf,
 		return rv;
 	if (type < CLEAR_REFS_ALL || type > CLEAR_REFS_MAPPED)
 		return -EINVAL;
-	task = get_proc_task(file->f_path.dentry->d_inode);
+	task = get_proc_task(file_inode(file));
 	if (!task)
 		return -ESRCH;
 	mm = get_task_mm(task);
@@ -1027,7 +1023,7 @@ static int pagemap_hugetlb_range(pte_t *pte, unsigned long hmask,
 static ssize_t pagemap_read(struct file *file, char __user *buf,
 			    size_t count, loff_t *ppos)
 {
-	struct task_struct *task = get_proc_task(file->f_path.dentry->d_inode);
+	struct task_struct *task = get_proc_task(file_inode(file));
 	struct mm_struct *mm;
 	struct pagemapread pm;
 	int ret = -ESRCH;

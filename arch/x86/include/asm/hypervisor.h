@@ -25,6 +25,7 @@
 
 extern void init_hypervisor(struct cpuinfo_x86 *c);
 extern void init_hypervisor_platform(void);
+extern bool hypervisor_x2apic_available(void);
 
 /*
  * x86 hypervisor information
@@ -41,6 +42,9 @@ struct hypervisor_x86 {
 
 	/* Platform setup (run once per boot) */
 	void		(*init_platform)(void);
+
+	/* X2APIC detection (run once per boot) */
+	bool		(*x2apic_available)(void);
 };
 
 extern const struct hypervisor_x86 *x86_hyper;
@@ -51,17 +55,4 @@ extern const struct hypervisor_x86 x86_hyper_ms_hyperv;
 extern const struct hypervisor_x86 x86_hyper_xen_hvm;
 extern const struct hypervisor_x86 x86_hyper_kvm;
 
-static inline bool hypervisor_x2apic_available(void)
-{
-	if (kvm_para_available())
-		return true;
-	if (xen_x2apic_para_available())
-		return true;
-	return false;
-}
-
-#endif
-
-#ifdef HAVE_XEN_PLATFORM_COMPAT_H
-#include_next <asm/hypervisor.h>
 #endif

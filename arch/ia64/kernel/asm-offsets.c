@@ -41,7 +41,7 @@ void foo(void)
 	DEFINE(TI_FLAGS, offsetof(struct thread_info, flags));
 	DEFINE(TI_CPU, offsetof(struct thread_info, cpu));
 	DEFINE(TI_PRE_COUNT, offsetof(struct thread_info, preempt_count));
-#ifdef CONFIG_VIRT_CPU_ACCOUNTING
+#ifdef CONFIG_VIRT_CPU_ACCOUNTING_NATIVE
 	DEFINE(TI_AC_STAMP, offsetof(struct thread_info, ac_stamp));
 	DEFINE(TI_AC_LEAVE, offsetof(struct thread_info, ac_leave));
 	DEFINE(TI_AC_STIME, offsetof(struct thread_info, ac_stime));
@@ -290,7 +290,7 @@ void foo(void)
 	DEFINE(IA64_ITC_LASTCYCLE_OFFSET,
 		offsetof (struct itc_jitter_data_t, itc_lastcycle));
 
-#ifdef CONFIG_PARAVIRT_XEN
+#ifdef CONFIG_XEN
 	BLANK();
 
 	DEFINE(XEN_NATIVE_ASM, XEN_NATIVE);

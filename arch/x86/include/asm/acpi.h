@@ -49,10 +49,6 @@
 
 /* Asm macros */
 
-#define ACPI_ASM_MACROS
-#define BREAKPOINT3
-#define ACPI_DISABLE_IRQS() local_irq_disable()
-#define ACPI_ENABLE_IRQS()  local_irq_enable()
 #define ACPI_FLUSH_CPU_CACHE()	wbinvd()
 
 int __acpi_acquire_global_lock(unsigned int *lock);
@@ -115,11 +111,7 @@ static inline void acpi_disable_pci(void)
 }
 
 /* Low-level suspend routine. */
-#ifdef CONFIG_ACPI_PV_SLEEP
-#define acpi_suspend_lowlevel() acpi_enter_sleep_state(ACPI_STATE_S3)
-#else
 extern int acpi_suspend_lowlevel(void);
-#endif
 
 /* Physical address to resume after wakeup */
 #define acpi_wakeup_address ((unsigned long)(real_mode_header->wakeup_start))
@@ -129,7 +121,6 @@ extern int acpi_suspend_lowlevel(void);
  */
 static inline unsigned int acpi_processor_cstate_check(unsigned int max_cstate)
 {
-#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
 	/*
 	 * Early models (<=5) of AMD Opterons are not supposed to go into
 	 * C2 state.
@@ -144,7 +135,6 @@ static inline unsigned int acpi_processor_cstate_check(unsigned int max_cstate)
 	else if (amd_e400_c1e_detected)
 		return 1;
 	else
-#endif
 		return max_cstate;
 }
 
@@ -184,9 +174,7 @@ static inline void disable_acpi(void) { }
 
 #endif /* !CONFIG_ACPI */
 
-#ifndef CONFIG_XEN
 #define ARCH_HAS_POWER_INIT	1
-#endif
 
 #ifdef CONFIG_ACPI_NUMA
 extern int acpi_numa;

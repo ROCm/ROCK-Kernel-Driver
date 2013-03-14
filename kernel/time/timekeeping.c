@@ -22,15 +22,15 @@
 #include <linux/tick.h>
 #include <linux/stop_machine.h>
 #include <linux/pvclock_gtod.h>
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
-#include <asm/time.h>
-#endif
 
 
 static struct timekeeper timekeeper;
 
 /* flag for if timekeeping is suspended */
 int __read_mostly timekeeping_suspended;
+
+/* Flag for if there is a persistent clock on this platform */
+bool __read_mostly persistent_clock_exist = false;
 
 static inline void tk_normalize_xtime(struct timekeeper *tk)
 {
@@ -138,6 +138,20 @@ static void tk_setup_internals(struct timekeeper *tk, struct clocksource *clock)
 }
 
 /* Timekeeper helper functions. */
+
+#ifdef CONFIG_ARCH_USES_GETTIMEOFFSET
+u32 (*arch_gettimeoffset)(void);
+
+u32 get_arch_timeoffset(void)
+{
+	if (likely(arch_gettimeoffset))
+		return arch_gettimeoffset();
+	return 0;
+}
+#else
+static inline u32 get_arch_timeoffset(void) { return 0; }
+#endif
+
 static inline s64 timekeeping_get_ns(struct timekeeper *tk)
 {
 	cycle_t cycle_now, cycle_delta;
@@ -154,8 +168,8 @@ static inline s64 timekeeping_get_ns(struct timekeeper *tk)
 	nsec = cycle_delta * tk->mult + tk->xtime_nsec;
 	nsec >>= tk->shift;
 
-	/* If arch requires, add in gettimeoffset() */
-	return nsec + arch_gettimeoffset();
+	/* If arch requires, add in get_arch_timeoffset() */
+	return nsec + get_arch_timeoffset();
 }
 
 static inline s64 timekeeping_get_ns_raw(struct timekeeper *tk)
@@ -174,8 +188,8 @@ static inline s64 timekeeping_get_ns_raw(struct timekeeper *tk)
 	/* convert delta to nanoseconds. */
 	nsec = clocksource_cyc2ns(cycle_delta, clock->mult, clock->shift);
 
-	/* If arch requires, add in gettimeoffset() */
-	return nsec + arch_gettimeoffset();
+	/* If arch requires, add in get_arch_timeoffset() */
+	return nsec + get_arch_timeoffset();
 }
 
 static RAW_NOTIFIER_HEAD(pvclock_gtod_chain);
@@ -257,8 +271,8 @@ static void timekeeping_forward_now(struct timekeeper *tk)
 
 	tk->xtime_nsec += cycle_delta * tk->mult;
 
-	/* If arch requires, add in gettimeoffset() */
-	tk->xtime_nsec += (u64)arch_gettimeoffset() << tk->shift;
+	/* If arch requires, add in get_arch_timeoffset() */
+	tk->xtime_nsec += (u64)get_arch_timeoffset() << tk->shift;
 
 	tk_normalize_xtime(tk);
 
@@ -267,18 +281,17 @@ static void timekeeping_forward_now(struct timekeeper *tk)
 }
 
 /**
- * getnstimeofday - Returns the time of day in a timespec
+ * __getnstimeofday - Returns the time of day in a timespec.
  * @ts:		pointer to the timespec to be set
  *
- * Returns the time of day in a timespec.
+ * Updates the time of day in the timespec.
+ * Returns 0 on success, or -ve when suspended (timespec will be undefined).
  */
-void getnstimeofday(struct timespec *ts)
+int __getnstimeofday(struct timespec *ts)
 {
 	struct timekeeper *tk = &timekeeper;
 	unsigned long seq;
 	s64 nsecs = 0;
-
-	WARN_ON(timekeeping_suspended);
 
 	do {
 		seq = read_seqbegin(&tk->lock);
@@ -290,6 +303,26 @@ void getnstimeofday(struct timespec *ts)
 
 	ts->tv_nsec = 0;
 	timespec_add_ns(ts, nsecs);
+
+	/*
+	 * Do not bail out early, in case there were callers still using
+	 * the value, even in the face of the WARN_ON.
+	 */
+	if (unlikely(timekeeping_suspended))
+		return -EAGAIN;
+	return 0;
+}
+EXPORT_SYMBOL(__getnstimeofday);
+
+/**
+ * getnstimeofday - Returns the time of day in a timespec.
+ * @ts:		pointer to the timespec to be set
+ *
+ * Returns the time of day in a timespec (WARN if suspended).
+ */
+void getnstimeofday(struct timespec *ts)
+{
+	WARN_ON(__getnstimeofday(ts));
 }
 EXPORT_SYMBOL(getnstimeofday);
 
@@ -428,10 +461,6 @@ int do_settimeofday(const struct timespec *tv)
 	tk_set_xtime(tk, tv);
 
 	timekeeping_update(tk, true);
-
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
-	xen_update_wallclock(tv);
-#endif
 
 	write_sequnlock_irqrestore(&tk->lock, flags);
 
@@ -647,12 +676,14 @@ void __init timekeeping_init(void)
 	struct timespec now, boot, tmp;
 
 	read_persistent_clock(&now);
+
 	if (!timespec_valid_strict(&now)) {
 		pr_warn("WARNING: Persistent clock returned invalid value!\n"
 			"         Check your CMOS/BIOS settings.\n");
 		now.tv_sec = 0;
 		now.tv_nsec = 0;
-	}
+	} else if (now.tv_sec || now.tv_nsec)
+		persistent_clock_exist = true;
 
 	read_boot_clock(&boot);
 	if (!timespec_valid_strict(&boot)) {
@@ -725,11 +756,12 @@ void timekeeping_inject_sleeptime(struct timespec *delta)
 {
 	struct timekeeper *tk = &timekeeper;
 	unsigned long flags;
-	struct timespec ts;
 
-	/* Make sure we don't set the clock twice */
-	read_persistent_clock(&ts);
-	if (!(ts.tv_sec == 0 && ts.tv_nsec == 0))
+	/*
+	 * Make sure we don't set the clock twice, as timekeeping_resume()
+	 * already did it
+	 */
+	if (has_persistent_clock())
 		return;
 
 	write_seqlock_irqsave(&tk->lock, flags);

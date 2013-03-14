@@ -933,7 +933,7 @@ static int raid_dev_lookup(struct raid_set *rs, struct raid_dev *dev_lookup)
  * Stripe hash functions
  */
 /* Initialize/destroy stripe hash. */
-static int hash_init(struct stripe_hash *hash, unsigned stripes)
+static int dm_raid_hash_init(struct stripe_hash *hash, unsigned stripes)
 {
 	unsigned buckets = roundup_pow_of_two(stripes >> 1);
 	static unsigned hash_primes[] = {
@@ -1015,7 +1015,7 @@ static int sc_hash_resize(struct stripe_cache *sc)
 		int r;
 		struct stripe_hash hash;
 
-		r = hash_init(&hash, atomic_read(&sc->stripes));
+		r = dm_raid_hash_init(&hash, atomic_read(&sc->stripes));
 		if (r)
 			return r;
 
@@ -4194,8 +4194,7 @@ static void raid_dtr(struct dm_target *ti)
 }
 
 /* Raid mapping function. */
-static int raid_map(struct dm_target *ti, struct bio *bio,
-		    union map_info *map_context)
+static int raid_map(struct dm_target *ti, struct bio *bio)
 {
 	/* I don't want to waste stripe cache capacity. */
 	if (bio_rw(bio) == READA)
@@ -4339,8 +4338,8 @@ static void raid_devel_stats(struct dm_target *ti, char *result,
 	*size = sz;
 }
 
-static int raid_status(struct dm_target *ti, status_type_t type,
-		       unsigned status_flags, char *result, unsigned maxlen)
+static void raid_status(struct dm_target *ti, status_type_t type,
+			unsigned status_flags, char *result, unsigned maxlen)
 {
 	unsigned p, sz = 0;
 	char buf[BDEVNAME_SIZE];
@@ -4405,8 +4404,6 @@ static int raid_status(struct dm_target *ti, status_type_t type,
 			       format_dev_t(buf, rs->dev[p].dev->bdev->bd_dev),
 			       (unsigned long long) rs->dev[p].start);
 	}
-
-	return 0;
 }
 
 /*
