@@ -385,7 +385,7 @@ config DM_REGION_HASH_LOG
 
 config DM_RAID45
 	tristate "RAID 4/5 target (EXPERIMENTAL)"
-	depends on BLK_DEV_DM && EXPERIMENTAL
+	depends on BLK_DEV_DM
 	select ASYNC_XOR
 	select DM_REGION_HASH_LOG
 	---help---
