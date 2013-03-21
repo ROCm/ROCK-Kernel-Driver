@@ -705,7 +705,7 @@ void kvm_free_irq_source_id(struct kvm *kvm, int irq_source_id);
 /* For vcpu->arch.iommu_flags */
 #define KVM_IOMMU_CACHE_COHERENCY	0x1
 
-#ifdef CONFIG_IOMMU_API
+#if defined(CONFIG_IOMMU_API) && (defined(__i386__) || defined(__x86_64__))
 int kvm_iommu_map_pages(struct kvm *kvm, struct kvm_memory_slot *slot);
 void kvm_iommu_unmap_pages(struct kvm *kvm, struct kvm_memory_slot *slot);
 int kvm_iommu_map_guest(struct kvm *kvm);

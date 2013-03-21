@@ -31,6 +31,7 @@
 #include <linux/mutex.h>
 #include <linux/videodev2.h>
 #include <linux/wait.h>
+#include <linux/mm_types.h>
 
 struct isp_video_queue;
 struct page;
