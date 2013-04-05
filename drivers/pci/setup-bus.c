@@ -747,7 +747,7 @@ static void pbus_size_io(struct pci_bus *bus, resource_size_t min_size,
 {
 	struct pci_dev *dev;
 	struct resource *b_res = find_free_bus_resource(bus, IORESOURCE_IO);
-	unsigned long size = 0, size0 = 0, size1 = 0;
+	unsigned long size = 0, size0 = 0, size1 = 0, res_size;
 	resource_size_t children_add_size = 0;
 	resource_size_t min_align, io_align, align;
 
@@ -791,6 +791,11 @@ static void pbus_size_io(struct pci_bus *bus, resource_size_t min_size,
 	size1 = (!realloc_head || (realloc_head && !add_size)) ? size0 :
 		calculate_iosize(size, min_size, add_size + size1,
 			resource_size(b_res), min_align);
+	res_size = pci_reserve_size_io(bus);
+	if (size0 < res_size)
+		size0 = ALIGN(res_size, min_align);
+	if (size1 < res_size)
+		size1 = ALIGN(res_size, min_align);
 	if (!size0 && !size1) {
 		if (b_res->start || b_res->end)
 			dev_info(&bus->self->dev, "disabling bridge window "
@@ -916,6 +921,7 @@ static int pbus_size_mem(struct pci_bus *bus, unsigned long mask,
 
 	min_align = calculate_mem_align(aligns, max_order);
 	min_align = max(min_align, window_alignment(bus, b_res->flags & mask));
+	size = max(size, (resource_size_t)pci_reserve_size_mem(bus));
 	size0 = calculate_memsize(size, min_size, 0, resource_size(b_res), min_align);
 	if (children_add_size > add_size)
 		add_size = children_add_size;

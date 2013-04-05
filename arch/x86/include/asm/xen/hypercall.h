@@ -48,6 +48,7 @@
 #include <xen/interface/sched.h>
 #include <xen/interface/physdev.h>
 #include <xen/interface/platform.h>
+#include <xen/interface/tmem.h>
 #include <xen/interface/xen-mca.h>
 
 /*

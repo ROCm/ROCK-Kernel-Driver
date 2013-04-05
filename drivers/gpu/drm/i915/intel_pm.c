@@ -2683,7 +2683,11 @@ static void gen6_update_ring_freq(struct drm_device *dev)
 	 * over
 	 */
 	if (!max_ia_freq)
+#ifndef CONFIG_XEN
 		max_ia_freq = tsc_khz;
+#else
+		max_ia_freq = cpu_khz;
+#endif
 
 	/* Convert from kHz to MHz */
 	max_ia_freq /= 1000;

@@ -406,6 +406,41 @@ out:
 }
 EXPORT_SYMBOL(acpi_pci_osc_control_set);
 
+#ifdef CONFIG_PCI_GUESTDEV
+#include <linux/sysfs.h>
+
+static ssize_t seg_show(struct device *dev,
+			struct device_attribute *attr, char *buf)
+{
+	struct list_head *entry;
+
+	list_for_each(entry, &acpi_pci_roots) {
+		struct acpi_pci_root *root;
+		root = list_entry(entry, struct acpi_pci_root, node);
+		if (&root->device->dev == dev)
+			return sprintf(buf, "%04x\n", root->segment);
+	}
+	return 0;
+}
+static DEVICE_ATTR(seg, 0444, seg_show, NULL);
+
+static ssize_t bbn_show(struct device *dev,
+			struct device_attribute *attr, char *buf)
+{
+	struct list_head *entry;
+
+	list_for_each(entry, &acpi_pci_roots) {
+		struct acpi_pci_root *root;
+		root = list_entry(entry, struct acpi_pci_root, node);
+		if (&root->device->dev == dev)
+			return sprintf(buf, "%02x\n",
+				       (unsigned int)root->secondary.start);
+	}
+	return 0;
+}
+static DEVICE_ATTR(bbn, 0444, bbn_show, NULL);
+#endif
+
 static int acpi_pci_root_add(struct acpi_device *device,
 			     const struct acpi_device_id *not_used)
 {
@@ -563,6 +598,13 @@ static int acpi_pci_root_add(struct acpi_device *device,
 			"disabling ASPM\n");
 		pcie_no_aspm();
 	}
+
+#ifdef CONFIG_PCI_GUESTDEV
+	if (device_create_file(&device->dev, &dev_attr_seg))
+		dev_warn(&device->dev, "could not create seg attr\n");
+	if (device_create_file(&device->dev, &dev_attr_bbn))
+		dev_warn(&device->dev, "could not create bbn attr\n");
+#endif
 
 	pci_acpi_add_bus_pm_notifier(device, root->bus);
 	if (device->wakeup.flags.run_wake)
@@ -764,3 +806,31 @@ void __init acpi_pci_root_hp_init(void)
 
 	printk(KERN_DEBUG "Found %d acpi root devices\n", num);
 }
+
+#ifdef CONFIG_PCI_GUESTDEV
+int acpi_pci_get_root_seg_bbn(char *hid, char *uid, int *seg, int *bbn)
+{
+	struct list_head *entry;
+
+	list_for_each(entry, &acpi_pci_roots) {
+		struct acpi_pci_root *root;
+
+		root = list_entry(entry, struct acpi_pci_root, node);
+		if (strcmp(acpi_device_hid(root->device), hid))
+			continue;
+
+		if (!root->device->pnp.unique_id) {
+			if (strlen(uid))
+				continue;
+		} else {
+			if (strcmp(root->device->pnp.unique_id, uid))
+				continue;
+		}
+
+		*seg = (int)root->segment;
+		*bbn = (int)root->secondary.start;
+		return TRUE;
+	}
+	return FALSE;
+}
+#endif

@@ -143,8 +143,8 @@ static DEFINE_PER_CPU(struct tls_descs, shadow_tls_desc);
 static void clamp_max_cpus(void)
 {
 #ifdef CONFIG_SMP
-	if (setup_max_cpus > MAX_VIRT_CPUS)
-		setup_max_cpus = MAX_VIRT_CPUS;
+	if (setup_max_cpus > XEN_LEGACY_MAX_VCPUS)
+		setup_max_cpus = XEN_LEGACY_MAX_VCPUS;
 #endif
 }
 
@@ -156,11 +156,11 @@ static void xen_vcpu_setup(int cpu)
 
 	BUG_ON(HYPERVISOR_shared_info == &xen_dummy_shared_info);
 
-	if (cpu < MAX_VIRT_CPUS)
+	if (cpu < XEN_LEGACY_MAX_VCPUS)
 		per_cpu(xen_vcpu,cpu) = &HYPERVISOR_shared_info->vcpu_info[cpu];
 
 	if (!have_vcpu_info_placement) {
-		if (cpu >= MAX_VIRT_CPUS)
+		if (cpu >= XEN_LEGACY_MAX_VCPUS)
 			clamp_max_cpus();
 		return;
 	}

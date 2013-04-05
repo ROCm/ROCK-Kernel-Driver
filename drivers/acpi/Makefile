@@ -77,6 +77,7 @@ obj-$(CONFIG_ACPI_I2C)		+= acpi_i2c.o
 processor-y			:= processor_driver.o processor_throttling.o
 processor-y			+= processor_idle.o processor_thermal.o
 processor-$(CONFIG_CPU_FREQ)	+= processor_perflib.o
+processor-$(CONFIG_PROCESSOR_EXTERNAL_CONTROL) += processor_perflib.o processor_extcntl.o
 
 obj-$(CONFIG_ACPI_PROCESSOR_AGGREGATOR) += acpi_pad.o
 

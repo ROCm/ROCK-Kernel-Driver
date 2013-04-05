@@ -997,7 +997,7 @@ extern unsigned long arch_align_stack(unsigned long sp);
 extern void free_init_pages(char *what, unsigned long begin, unsigned long end);
 
 void default_idle(void);
-#ifdef	CONFIG_XEN
+#ifdef CONFIG_PARAVIRT_XEN
 bool xen_set_default_idle(void);
 #else
 #define xen_set_default_idle 0

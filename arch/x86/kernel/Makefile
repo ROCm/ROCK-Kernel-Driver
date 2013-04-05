@@ -103,6 +103,8 @@ obj-$(CONFIG_UPROBES)			+= uprobes.o
 
 obj-$(CONFIG_PERF_EVENTS)		+= perf_regs.o
 
+obj-$(CONFIG_X86_XEN)		+= fixup.o
+
 ###
 # 64 bit specific files
 ifeq ($(CONFIG_X86_64),y)
@@ -114,3 +116,8 @@ ifeq ($(CONFIG_X86_64),y)
 	obj-$(CONFIG_PCI_MMCONFIG)	+= mmconf-fam10h_64.o
 	obj-y				+= vsmp_64.o
 endif
+
+disabled-obj-$(CONFIG_XEN) := crash.o early-quirks.o hpet.o i8237.o i8253.o \
+	i8259.o irqinit.o pci-swiotlb.o reboot.o smpboot.o trampoline%.o \
+	tsc.o tsc_sync.o vsmp_64.o
+disabled-obj-$(CONFIG_XEN_UNPRIVILEGED_GUEST) += probe_roms.o

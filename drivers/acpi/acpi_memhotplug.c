@@ -88,6 +88,14 @@ struct acpi_memory_device {
 	struct list_head res_list;
 };
 
+#ifdef CONFIG_XEN
+#include "../xen/core/acpi_memhotplug.c"
+#define memory_add_physaddr_to_nid(start) 0
+#else
+static inline int xen_hotadd_mem_init(void) { return 0; }
+static inline void xen_hotadd_mem_exit(void) {}
+#endif
+
 static acpi_status
 acpi_memory_get_resource(struct acpi_resource *resource, void *context)
 {
@@ -220,6 +228,10 @@ static int acpi_memory_enable_device(struct acpi_memory_device *mem_device)
 	int result, num_enabled = 0;
 	struct acpi_memory_info *info;
 	int node;
+
+#ifdef CONFIG_XEN
+	return xen_hotadd_memory(mem_device);
+#endif
 
 	node = acpi_get_node(mem_device->device->handle);
 	/*
@@ -442,6 +454,10 @@ static int acpi_memory_device_remove(struct acpi_device *device)
 	struct acpi_memory_device *mem_device = NULL;
 	int result;
 
+#ifdef CONFIG_XEN
+	return -EOPNOTSUPP;
+#endif
+
 	if (!device || !acpi_driver_data(device))
 		return -EINVAL;
 
@@ -524,6 +540,10 @@ static int __init acpi_memory_device_init(void)
 	acpi_status status;
 
 
+	result = xen_hotadd_mem_init();
+	if (result < 0)
+		return result;
+
 	result = acpi_bus_register_driver(&acpi_memory_device_driver);
 
 	if (result < 0)
@@ -561,6 +581,8 @@ static void __exit acpi_memory_device_exit(void)
 		ACPI_EXCEPTION((AE_INFO, status, "walk_namespace failed"));
 
 	acpi_bus_unregister_driver(&acpi_memory_device_driver);
+
+	xen_hotadd_mem_exit();
 
 	return;
 }

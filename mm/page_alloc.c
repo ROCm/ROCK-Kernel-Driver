@@ -701,6 +701,13 @@ static bool free_pages_prepare(struct page *page, unsigned int order)
 	int i;
 	int bad = 0;
 
+#ifdef CONFIG_XEN
+	if (PageForeign(page)) {
+		PageForeignDestructor(page, order);
+		return false;
+	}
+#endif
+
 	trace_mm_page_free(page, order);
 	kmemcheck_free_shadow(page, order);
 
@@ -3960,7 +3967,11 @@ static void __meminit zone_init_free_lists(struct zone *zone)
 	memmap_init_zone((size), (nid), (zone), (start_pfn), MEMMAP_EARLY)
 #endif
 
-static int __meminit zone_batchsize(struct zone *zone)
+static int
+#ifndef CONFIG_XEN
+__meminit
+#endif
+zone_batchsize(struct zone *zone)
 {
 #ifdef CONFIG_MMU
 	int batch;
@@ -5306,6 +5317,22 @@ static void __setup_per_zone_wmarks(void)
 		spin_unlock_irqrestore(&zone->lock, flags);
 	}
 
+#ifdef CONFIG_XEN
+	for_each_populated_zone(zone) {
+		unsigned int cpu;
+
+		for_each_online_cpu(cpu) {
+			unsigned long high;
+
+			high = percpu_pagelist_fraction
+			       ? zone->present_pages / percpu_pagelist_fraction
+			       : 5 * zone_batchsize(zone);
+			setup_pagelist_highmark(
+				per_cpu_ptr(zone->pageset, cpu), high);
+		}
+	}
+#endif
+
 	/* update totalreserve_pages */
 	calculate_totalreserve_pages();
 }
@@ -6148,6 +6175,11 @@ static const struct trace_print_flags pageflag_names[] = {
 #endif
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
 	{1UL << PG_compound_lock,	"compound_lock"	},
+#endif
+#ifdef CONFIG_XEN
+	{1UL << PG_foreign,		"foreign"	},
+/*	{1UL << PG_netback,		"netback"	}, */
+	{1UL << PG_blkback,		"blkback"	},
 #endif
 };
 

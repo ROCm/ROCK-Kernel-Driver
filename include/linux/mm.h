@@ -104,8 +104,14 @@ extern unsigned int kobjsize(const void *objp);
 #define VM_DONTDUMP	0x04000000	/* Do not include in the core dump */
 
 #define VM_MIXEDMAP	0x10000000	/* Can contain "struct page" and pure PFN pages */
+#ifndef CONFIG_XEN
 #define VM_HUGEPAGE	0x20000000	/* MADV_HUGEPAGE marked this vma */
 #define VM_NOHUGEPAGE	0x40000000	/* MADV_NOHUGEPAGE marked this vma */
+#else
+#define VM_HUGEPAGE	0
+#define VM_NOHUGEPAGE	0
+#define VM_FOREIGN	0x20000000	/* Has pages belonging to another VM */
+#endif
 #define VM_MERGEABLE	0x80000000	/* KSM may merge identical pages */
 
 #if defined(CONFIG_X86)
@@ -150,6 +156,12 @@ extern unsigned int kobjsize(const void *objp);
  * Note: mm/huge_memory.c VM_NO_THP depends on this definition.
  */
 #define VM_SPECIAL (VM_IO | VM_DONTEXPAND | VM_PFNMAP)
+
+#ifdef CONFIG_XEN
+struct vm_foreign_map {
+	struct page **map;
+};
+#endif
 
 /*
  * mapping from the currently active vm_flags protection bits (the
@@ -204,6 +216,15 @@ struct vm_operations_struct {
 	 */
 	int (*access)(struct vm_area_struct *vma, unsigned long addr,
 		      void *buf, int len, int write);
+#ifdef CONFIG_XEN
+	/* Area-specific function for clearing the PTE at @ptep. Returns the
+	 * original value of @ptep. */
+	pte_t (*zap_pte)(struct vm_area_struct *vma,
+			 unsigned long addr, pte_t *ptep, int is_fullmm);
+
+	/* called before close() to indicate no more pages should be mapped */
+	void (*unmap)(struct vm_area_struct *area);
+#endif
 #ifdef CONFIG_NUMA
 	/*
 	 * set_policy() op must add a reference to any non-NULL @new mempolicy

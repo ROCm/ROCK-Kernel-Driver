@@ -3311,7 +3311,17 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	 * register at least one net device.
 	 */
 	for_each_port(adapter, i) {
+#ifndef CONFIG_XEN
 		err = register_netdev(adapter->port[i]);
+#else
+		rtnl_lock();
+		err = register_netdevice(adapter->port[i]);
+		if (!err) {
+			adapter->port[i]->wanted_features &= ~NETIF_F_GRO;
+			netdev_update_features(adapter->port[i]);
+		}
+		rtnl_unlock();
+#endif
 		if (err)
 			dev_warn(&pdev->dev,
 				 "cannot register net device %s, skipping\n",

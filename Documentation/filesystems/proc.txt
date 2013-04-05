@@ -463,6 +463,7 @@ manner. The codes are the following:
     mm  - mixed map area
     hg  - huge page advise flag
     nh  - no-huge page advise flag
+    fo  - area has foreign pages
     mg  - mergable advise flag
 
 Note that there is no guarantee that every flag and associated mnemonic will

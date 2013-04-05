@@ -284,6 +284,8 @@ int acpi_check_region(resource_size_t start, resource_size_t n,
 
 int acpi_resources_are_enforced(void);
 
+int acpi_pci_get_root_seg_bbn(char *hid, char *uid, int *seg, int *bbn);
+
 #ifdef CONFIG_HIBERNATION
 void __init acpi_no_s4_hw_signature(void);
 #endif
@@ -478,11 +480,11 @@ static inline bool acpi_driver_match_device(struct device *dev,
 #endif	/* !CONFIG_ACPI */
 
 #ifdef CONFIG_ACPI
-void acpi_os_set_prepare_sleep(int (*func)(u8 sleep_state,
-			       u32 pm1a_ctrl,  u32 pm1b_ctrl));
+void acpi_os_set_prepare_sleep(int (*func)(u8 sleep_state, u32 val_a,
+					   u32 val_b, bool extended));
 
-acpi_status acpi_os_prepare_sleep(u8 sleep_state,
-				  u32 pm1a_control, u32 pm1b_control);
+acpi_status acpi_os_prepare_sleep(u8 sleep_state, u32 val_a, u32 val_b,
+				  bool extended);
 #ifdef CONFIG_X86
 void arch_reserve_mem_area(acpi_physical_address addr, size_t size);
 #else
@@ -492,7 +494,7 @@ static inline void arch_reserve_mem_area(acpi_physical_address addr,
 }
 #endif /* CONFIG_X86 */
 #else
-#define acpi_os_set_prepare_sleep(func, pm1a_ctrl, pm1b_ctrl) do { } while (0)
+#define acpi_os_set_prepare_sleep(func, val_a, val_b, ext) do { } while (0)
 #endif
 
 #ifdef CONFIG_ACPI_INITRD_TABLE_OVERRIDE

@@ -1881,9 +1881,9 @@ config CC_STACKPROTECTOR
 
 config XEN_DOM0
 	def_bool y
-	depends on XEN
+	depends on PARAVIRT_XEN
 
-config XEN
+config PARAVIRT_XEN
 	bool "Xen guest support on ARM (EXPERIMENTAL)"
 	depends on ARM && AEABI && OF
 	depends on CPU_V7 && !CPU_V6

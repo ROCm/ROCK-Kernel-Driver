@@ -17,7 +17,7 @@
 #include <asm/bootparam.h>
 #include <asm/suspend.h>
 
-#ifdef CONFIG_XEN
+#if defined(CONFIG_XEN) || defined(CONFIG_PARAVIRT_XEN)
 #include <xen/interface/xen.h>
 #endif
 
@@ -55,7 +55,7 @@ void common(void) {
 	OFFSET(PV_MMU_read_cr2, pv_mmu_ops, read_cr2);
 #endif
 
-#ifdef CONFIG_XEN
+#ifdef CONFIG_PARAVIRT_XEN
 	BLANK();
 	OFFSET(XEN_vcpu_info_mask, vcpu_info, evtchn_upcall_mask);
 	OFFSET(XEN_vcpu_info_pending, vcpu_info, evtchn_upcall_pending);

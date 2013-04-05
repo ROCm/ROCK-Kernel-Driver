@@ -462,7 +462,7 @@ bool i915_semaphore_is_enabled(struct drm_device *dev)
 	if (i915_semaphores >= 0)
 		return i915_semaphores;
 
-#ifdef CONFIG_INTEL_IOMMU
+#if defined(CONFIG_INTEL_IOMMU) || defined(CONFIG_XEN)
 	/* Enable semaphores on SNB when IO remapping is off */
 	if (INTEL_INFO(dev)->gen == 6 && intel_iommu_gfx_mapped)
 		return false;
@@ -1025,7 +1025,7 @@ static const struct file_operations i915_driver_fops = {
 	.open = drm_open,
 	.release = drm_release,
 	.unlocked_ioctl = drm_ioctl,
-	.mmap = drm_gem_mmap,
+	.mmap = i915_gem_mmap,
 	.poll = drm_poll,
 	.fasync = drm_fasync,
 	.read = drm_read,

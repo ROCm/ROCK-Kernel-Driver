@@ -46,7 +46,11 @@
 #define PCI_DEVICE_ID_INTEL_IOAT_IVB8	0x0e2e
 #define PCI_DEVICE_ID_INTEL_IOAT_IVB9	0x0e2f
 
+#ifndef CONFIG_XEN
 int system_has_dca_enabled(struct pci_dev *pdev);
+#else
+static inline int system_has_dca_enabled(struct pci_dev *pdev) { return 0; }
+#endif
 
 struct ioat_dma_descriptor {
 	uint32_t	size;
