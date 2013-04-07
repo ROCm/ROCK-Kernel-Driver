@@ -338,13 +338,16 @@ void __init exynos_init_io(struct map_desc *mach_desc, int size)
 {
 	struct map_desc *iodesc = exynos_iodesc;
 	int iodesc_sz = ARRAY_SIZE(exynos_iodesc);
-#if defined(CONFIG_OF) && defined(CONFIG_ARCH_EXYNOS5)
-	unsigned long root = of_get_flat_dt_root();
 
-	/* initialize the io descriptors we need for initialization */
-	if (of_flat_dt_is_compatible(root, "samsung,exynos5440")) {
-		iodesc = exynos5440_iodesc;
-		iodesc_sz = ARRAY_SIZE(exynos5440_iodesc);
+#if defined(CONFIG_OF) && defined(CONFIG_ARCH_EXYNOS5)
+	if (initial_boot_params) {
+		unsigned long root = of_get_flat_dt_root();
+
+		/* initialize the io descriptors we need for initialization */
+		if (of_flat_dt_is_compatible(root, "samsung,exynos5440")) {
+			iodesc = exynos5440_iodesc;
+			iodesc_sz = ARRAY_SIZE(exynos5440_iodesc);
+		}
 	}
 #endif
 
