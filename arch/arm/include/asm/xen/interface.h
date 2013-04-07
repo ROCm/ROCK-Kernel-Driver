@@ -43,6 +43,7 @@ typedef uint64_t xen_ulong_t;
 
 /* Maximum number of virtual CPUs in multi-processor guests. */
 #define MAX_VIRT_CPUS 1
+#define XEN_LEGACY_MAX_VCPUS MAX_VIRT_CPUS
 
 struct arch_vcpu_info { };
 struct arch_shared_info { };
