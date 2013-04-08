@@ -39,7 +39,7 @@ struct splash_data;
 
 /* splash.c */
 extern int splash_prepare(struct vc_data *, struct fb_info *);
-extern void splash_init(void);
+extern void splash_init(bool do_lock);
 extern int splash_verbose(void);
 
 /* splash_render.c */
@@ -70,7 +70,7 @@ extern void splash_blank(struct vc_data *vc, struct fb_info *info,
 extern void con_remap_def_color(struct vc_data *vc, int new_color);
 
 # else
-#  define splash_init()
+#  define splash_init(x)
 #  define splash_verbose() 0
 #  define SPLASH_VERBOSE()
 #  define splash_blank(vc, info, blank)

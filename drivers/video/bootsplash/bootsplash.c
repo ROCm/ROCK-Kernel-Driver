@@ -1911,7 +1911,7 @@ static int splash_proc_register(void)
 
 #define INIT_CONSOLE 0
 
-void splash_init(void)
+void splash_init(bool do_lock)
 {
 	static bool splash_not_initialized = true;
 	struct fb_info *info;
@@ -1930,12 +1930,12 @@ void splash_init(void)
 	    || !info
 	    || info->var.bits_per_pixel < 16) /* not supported */
 		return;
+	if (vc->vc_splash_data)
+		return;
+	splash_not_initialized = false;
 #ifdef CONFIG_PROC_FS
 	splash_proc_register();
 #endif
-	splash_not_initialized = false;
-	if (vc->vc_splash_data)
-		return;
 	fd = sys_open("/bootsplash", O_RDONLY, 0);
 	if (fd < 0) {
 		isramfs = 0;
@@ -1961,14 +1961,16 @@ void splash_init(void)
 
 	mem = vmalloc(len);
 	if (mem) {
-		console_lock();
+		if (do_lock)
+			console_lock();
 		if ((int)sys_read(fd, mem, len) == len
 		    && (splash_getraw((unsigned char *)mem,
 				      (unsigned char *)mem + len, (int *)0)
 			== INIT_CONSOLE)
 		    && vc->vc_splash_data)
 			vc->vc_splash_data->splash_state = splash_default & 1;
-		console_unlock();
+		if (do_lock)
+			console_unlock();
 		vfree(mem);
 	}
 	sys_close(fd);
