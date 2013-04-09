@@ -66,9 +66,6 @@ module_param(latency_factor, uint, 0644);
 
 static DEFINE_PER_CPU(struct cpuidle_device *, acpi_cpuidle_device);
 
-static DEFINE_PER_CPU(struct acpi_processor_cx * [CPUIDLE_STATE_MAX],
-								acpi_cstate);
-
 static int disabled_by_idle_boot_param(void)
 {
 	return boot_option_idle_override == IDLE_POLL ||
@@ -722,6 +719,9 @@ static inline void acpi_idle_do_entry(struct acpi_processor_cx *cx)
 	}
 	start_critical_timings();
 }
+
+static DEFINE_PER_CPU(struct acpi_processor_cx * [CPUIDLE_STATE_MAX],
+								acpi_cstate);
 
 /**
  * acpi_idle_enter_c1 - enters an ACPI C1 state-type
