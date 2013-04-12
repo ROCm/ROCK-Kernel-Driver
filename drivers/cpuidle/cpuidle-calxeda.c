@@ -141,6 +141,7 @@ static int __init calxeda_cpuidle_init(void)
 		dev = per_cpu_ptr(calxeda_idle_cpuidle_devices, cpu_id);
 		dev->cpu = cpu_id;
 		dev->state_count = drv->state_count;
+		dev->states_usage[1].disable = 1;
 
 		ret = cpuidle_register_device(dev);
 		if (ret) {
