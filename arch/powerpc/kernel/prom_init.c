@@ -2973,8 +2973,8 @@ unsigned long __init prom_init(unsigned long r3, unsigned long r4,
 	/* 
 	 * Initialize display devices
 	 */
-	if (RELOC(prom_no_display) == 0)
-	prom_check_displays();
+	if (prom_no_display == 0)
+		prom_check_displays();
 
 #ifdef CONFIG_PPC64
 	/*
