@@ -2992,8 +2992,7 @@ pl330_probe(struct amba_device *adev, const struct amba_id *id)
 					 of_dma_pl330_xlate, pdmac);
 		if (ret) {
 			dev_err(&adev->dev,
-				"unable to register DMA to the generic"
-				"DT DMA helpers\n");
+			"unable to register DMA to the generic DT DMA helpers\n");
 		}
 	}
 
@@ -3011,9 +3010,15 @@ probe_err3:
 
 	/* Idle the DMAC */
 	list_for_each_entry_safe(pch, _p, &pdmac->ddma.channels,
-			chan.device_node)
+			chan.device_node) {
+
 		/* Remove the channel */
 		list_del(&pch->chan.device_node);
+
+		/* Flush the channel */
+		pl330_control(&pch->chan, DMA_TERMINATE_ALL, 0);
+		pl330_free_chan_resources(&pch->chan);
+	}
 probe_err2:
 	pl330_del(pi);
 probe_err1:
