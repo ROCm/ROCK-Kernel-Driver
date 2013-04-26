@@ -8,7 +8,6 @@
 
 #include <linux/slab.h>
 #include <linux/spinlock.h>
-#include <linux/pci.h>
 #include <xen/xenbus.h>
 #include <xen/interface/io/pciif.h>
 #include <linux/interrupt.h>
@@ -53,5 +52,38 @@ void pcifront_free_roots(struct pcifront_device *pdev);
 void pcifront_do_aer(struct work_struct *data);
 
 irqreturn_t pcifront_handler_aer(int irq, void *dev);
+
+#ifndef __ia64__
+
+#define pcifront_sd pci_sysdata
+
+static inline struct pcifront_device *
+pcifront_get_pdev(struct pcifront_sd *sd)
+{
+	return sd->pdev;
+}
+
+static inline void pcifront_setup_root_resources(struct pci_bus *bus,
+						 struct pcifront_sd *sd)
+{
+}
+
+#else /* __ia64__ */
+
+#define pcifront_sd pci_controller
+
+static inline struct pcifront_device *
+pcifront_get_pdev(struct pcifront_sd *sd)
+{
+	return (struct pcifront_device *)sd->platform_data;
+}
+
+static inline void pcifront_setup_root_resources(struct pci_bus *bus,
+						 struct pcifront_sd *sd)
+{
+	xen_pcibios_setup_root_windows(bus, sd);
+}
+
+#endif /* __ia64__ */
 
 #endif	/* __XEN_PCIFRONT_H__ */

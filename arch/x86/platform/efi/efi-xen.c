@@ -36,6 +36,7 @@
 #include <linux/platform_device.h>
 #include <linux/spinlock.h>
 #include <linux/time.h>
+#include <linux/ucs2_string.h>
 
 #include <asm/setup.h>
 #include <asm/efi.h>
@@ -47,6 +48,20 @@
 #include <xen/interface/platform.h>
 
 #define EFI_DEBUG	1
+
+/*
+ * There's some additional metadata associated with each
+ * variable. Intel's reference implementation is 60 bytes - bump that
+ * to account for potential alignment constraints
+ */
+#define VAR_METADATA_SIZE 64
+
+static u64 __initdata efi_var_store_size;
+static u64 __initdata efi_var_remaining_size;
+static u64 __initdata efi_var_max_var_size;
+static u64 boot_used_size;
+static u64 boot_var_size;
+static u64 active_size;
 
 static unsigned long efi_facility;
 
@@ -65,6 +80,15 @@ static int __init setup_noefi(char *arg)
 	return 0;
 }
 early_param("noefi", setup_noefi);
+
+static bool efi_no_storage_paranoia;
+
+static int __init setup_storage_paranoia(char *arg)
+{
+	efi_no_storage_paranoia = true;
+	return 0;
+}
+early_param("efi_no_storage_paranoia", setup_storage_paranoia);
 
 #define call op.u.efi_runtime_call
 #define DECLARE_CALL(what) \
@@ -177,6 +201,8 @@ static efi_status_t xen_efi_get_next_variable(unsigned long *name_size,
 					      efi_char16_t *name,
 					      efi_guid_t *vendor)
 {
+	static bool finished = false;
+	static u64 var_size;
 	int err;
 	DECLARE_CALL(get_next_variable_name);
 
@@ -194,6 +220,45 @@ static efi_status_t xen_efi_get_next_variable(unsigned long *name_size,
 	memcpy(vendor, &call.u.get_next_variable_name.vendor_guid,
 	       sizeof(*vendor));
 
+	if (call.status == EFI_NOT_FOUND) {
+		finished = true;
+		if (var_size < boot_used_size) {
+			boot_var_size = boot_used_size - var_size;
+			active_size += boot_var_size;
+		} else {
+			pr_warn(FW_BUG "efi: Inconsistent initial sizes\n");
+		}
+	}
+
+	if (boot_used_size && !finished) {
+		unsigned long size;
+		u32 attr;
+		efi_status_t s;
+		void *tmp;
+
+		s = xen_efi_get_variable(name, vendor, &attr, &size, NULL);
+
+		if (s != EFI_BUFFER_TOO_SMALL || !size)
+			return call.status;
+
+		tmp = kmalloc(size, GFP_ATOMIC);
+
+		if (!tmp)
+			return call.status;
+
+		s = xen_efi_get_variable(name, vendor, &attr, &size, tmp);
+
+		if (s == EFI_SUCCESS && (attr & EFI_VARIABLE_NON_VOLATILE)) {
+			var_size += size;
+			var_size += ucs2_strsize(name, 1024);
+			active_size += size;
+			active_size += VAR_METADATA_SIZE;
+			active_size += ucs2_strsize(name, 1024);
+		}
+
+		kfree(tmp);
+	}
+
 	return call.status;
 }
 
@@ -203,7 +268,16 @@ static efi_status_t xen_efi_set_variable(efi_char16_t *name,
 					 unsigned long data_size,
 					 void *data)
 {
+	efi_status_t status;
+	u32 orig_attr = 0;
+	unsigned long orig_size = 0;
 	DECLARE_CALL(set_variable);
+
+	status = xen_efi_get_variable(name, vendor, &orig_attr, &orig_size,
+				      NULL);
+
+	if (status != EFI_BUFFER_TOO_SMALL)
+		orig_size = 0;
 
 	set_xen_guest_handle(call.u.set_variable.name, name);
 	call.misc = attr;
@@ -213,7 +287,22 @@ static efi_status_t xen_efi_set_variable(efi_char16_t *name,
 	call.u.set_variable.size = data_size;
 	set_xen_guest_handle(call.u.set_variable.data, data);
 
-	return HYPERVISOR_platform_op(&op) ? EFI_UNSUPPORTED : call.status;
+	status = HYPERVISOR_platform_op(&op) ? EFI_UNSUPPORTED : call.status;
+
+	if (status == EFI_SUCCESS) {
+		if (orig_size) {
+			active_size -= orig_size;
+			active_size -= ucs2_strsize(name, 1024);
+			active_size -= VAR_METADATA_SIZE;
+		}
+		if (data_size) {
+			active_size += data_size;
+			active_size += ucs2_strsize(name, 1024);
+			active_size += VAR_METADATA_SIZE;
+		}
+	}
+
+	return status;
 }
 
 static efi_status_t xen_efi_query_variable_info(u32 attr,
@@ -293,9 +382,6 @@ static efi_status_t xen_efi_query_capsule_caps(efi_capsule_header_t **capsules,
 
 	return call.status;
 }
-
-#undef DECLARE_CALL
-#undef call
 
 struct efi __read_mostly efi = {
 	.mps                      = EFI_INVALID_TABLE_ADDR,
@@ -477,6 +563,27 @@ void __init efi_init(void)
 	else
 		pr_warn("Could not get runtime services revision.\n");
 
+	if (efi.runtime_version >= EFI_2_00_SYSTEM_TABLE_REVISION) {
+		DECLARE_CALL(query_variable_info);
+
+		call.misc = XEN_EFI_VARINFO_BOOT_SNAPSHOT;
+		call.u.query_variable_info.attr =
+			EFI_VARIABLE_NON_VOLATILE |
+			EFI_VARIABLE_BOOTSERVICE_ACCESS |
+			EFI_VARIABLE_RUNTIME_ACCESS;
+		ret = HYPERVISOR_platform_op(&op);
+		if (!ret && call.status == EFI_SUCCESS) {
+			efi_var_store_size =
+				call.u.query_variable_info.max_store_size;
+			efi_var_remaining_size =
+				call.u.query_variable_info.remain_store_size;
+			efi_var_max_var_size =
+				call.u.query_variable_info.max_size;
+		}
+	}
+
+	boot_used_size = efi_var_store_size - efi_var_remaining_size;
+
 	x86_platform.get_wallclock = efi_get_time;
 	x86_platform.set_wallclock = efi_set_rtc_mmss;
 
@@ -488,6 +595,9 @@ void __init efi_init(void)
 
 	__set_bit(EFI_CONFIG_TABLES, &efi_facility);
 }
+
+#undef DECLARE_CALL
+#undef call
 
 void __init efi_late_init(void)
 {
@@ -545,3 +655,48 @@ u64 efi_mem_attributes(unsigned long phys_addr)
 	info->mem.size = 0;
 	return HYPERVISOR_platform_op(&op) ? 0 : info->mem.attr;
 }
+
+/*
+ * Some firmware has serious problems when using more than 50% of the EFI
+ * variable store, i.e. it triggers bugs that can brick machines. Ensure that
+ * we never use more than this safe limit.
+ *
+ * Return EFI_SUCCESS if it is safe to write 'size' bytes to the variable
+ * store.
+ */
+efi_status_t efi_query_variable_store(u32 attributes, unsigned long size)
+{
+	efi_status_t status;
+	u64 storage_size, remaining_size, max_size;
+
+	status = xen_efi_query_variable_info(attributes, &storage_size,
+					     &remaining_size, &max_size);
+	if (status != EFI_SUCCESS)
+		return status;
+
+	if (!max_size && remaining_size > size)
+		printk_once(KERN_ERR FW_BUG "Broken EFI implementation"
+			    " is returning MaxVariableSize=0\n");
+	/*
+	 * Some firmware implementations refuse to boot if there's insufficient
+	 * space in the variable store. We account for that by refusing the
+	 * write if permitting it would reduce the available space to under
+	 * 50%. However, some firmware won't reclaim variable space until
+	 * after the used (not merely the actively used) space drops below
+	 * a threshold. We can approximate that case with the value calculated
+	 * above. If both the firmware and our calculations indicate that the
+	 * available space would drop below 50%, refuse the write.
+	 */
+
+	if (!storage_size || size > remaining_size ||
+	    (max_size && size > max_size))
+		return EFI_OUT_OF_RESOURCES;
+
+	if (!efi_no_storage_paranoia &&
+	    ((active_size + size + VAR_METADATA_SIZE > storage_size / 2) &&
+	     (remaining_size - size < storage_size / 2)))
+		return EFI_OUT_OF_RESOURCES;
+
+	return EFI_SUCCESS;
+}
+EXPORT_SYMBOL_GPL(efi_query_variable_store);
