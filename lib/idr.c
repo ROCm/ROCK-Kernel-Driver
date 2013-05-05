@@ -1039,6 +1039,7 @@ void ida_remove(struct ida *ida, int id)
  err:
 	printk(KERN_WARNING
 	       "ida_remove called for id=%d which is not allocated.\n", id);
+	dump_stack();
 }
 EXPORT_SYMBOL(ida_remove);
 
