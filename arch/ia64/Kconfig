@@ -534,7 +534,6 @@ config IA64_MC_ERR_INJECT
 
 config SGI_SN
 	def_bool y if (IA64_SGI_SN2 || IA64_GENERIC)
-	select HAVE_UNSTABLE_SCHED_CLOCK
 
 config IA64_ESI
 	bool "ESI (Extensible SAL Interface) support"
