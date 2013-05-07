@@ -826,9 +826,6 @@ static int nfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 	desc->dir_cookie = &dir_ctx->dir_cookie;
 	desc->decode = NFS_PROTO(inode)->decode_dirent;
 	desc->plus = nfs_use_readdirplus(inode, filp) ? 1 : 0;
-	if (filp->f_pos > 0 && !test_bit(NFS_INO_SEEN_GETATTR, &NFS_I(inode)->flags))
-		desc->plus = 0;
-	clear_bit(NFS_INO_SEEN_GETATTR, &NFS_I(inode)->flags);
 
 	nfs_block_sillyrename(dentry);
 	res = nfs_revalidate_mapping(inode, filp->f_mapping);
