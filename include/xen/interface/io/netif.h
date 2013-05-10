@@ -71,6 +71,7 @@ struct netif_tx_request {
     uint16_t flags;        /* XEN_NETTXF_* */
     uint16_t id;           /* Echoed in response message. */
     uint16_t size;         /* Packet size in bytes.       */
+#define XEN_NETIF_MAX_TX_SIZE 0xFFFF
 };
 typedef struct netif_tx_request netif_tx_request_t;
 

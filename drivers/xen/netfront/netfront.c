@@ -52,6 +52,7 @@
 #include <net/sock.h>
 #include <net/pkt_sched.h>
 #include <net/route.h>
+#include <net/tcp.h>
 #include <asm/uaccess.h>
 #include <xen/evtchn.h>
 #include <xen/xenbus.h>
@@ -986,6 +987,16 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
  		return NETDEV_TX_OK;
  	} 
 
+	/*
+	 * If skb->len is too big for wire format, drop skb and alert
+	 * user about misconfiguration.
+	 */
+	if (unlikely(skb->len > XEN_NETIF_MAX_TX_SIZE)) {
+		net_alert_ratelimited("xennet: length %u too big for interface\n",
+				      skb->len);
+		goto drop;
+	}
+
 	slots = PFN_UP(offset + len) + xennet_count_skb_frag_slots(skb);
 	if (unlikely(slots > MAX_SKB_FRAGS + 1)) {
 		net_alert_ratelimited("xennet: skb rides the rocket: %u slots\n",
@@ -1697,7 +1708,8 @@ static int xennet_set_mac_address(struct net_device *dev, void *p)
 
 static int xennet_change_mtu(struct net_device *dev, int mtu)
 {
-	int max = xennet_can_sg(dev) ? 65535 - ETH_HLEN : ETH_DATA_LEN;
+	int max = xennet_can_sg(dev) ? XEN_NETIF_MAX_TX_SIZE - MAX_TCP_HEADER
+				     : ETH_DATA_LEN;
 
 	if (mtu > max)
 		return -EINVAL;
@@ -2180,6 +2192,10 @@ static struct net_device *create_netdev(struct xenbus_device *dev)
 
 	SET_ETHTOOL_OPS(netdev, &network_ethtool_ops);
 	SET_NETDEV_DEV(netdev, &dev->dev);
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,26)
+	netif_set_gso_max_size(netdev, XEN_NETIF_MAX_TX_SIZE - MAX_TCP_HEADER);
+#endif
 
 	np->netdev = netdev;
 

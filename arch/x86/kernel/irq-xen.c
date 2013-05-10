@@ -189,10 +189,6 @@ u64 arch_irq_stat(void)
 {
 #ifndef CONFIG_XEN
 	u64 sum = atomic_read(&irq_err_count);
-
-#ifdef CONFIG_X86_IO_APIC
-	sum += atomic_read(&irq_mis_count);
-#endif
 	return sum;
 #else
 	return 0;

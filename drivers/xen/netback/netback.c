@@ -1119,8 +1119,7 @@ static void netbk_tx_err(netif_t *netif, netif_tx_request_t *txp, RING_IDX end)
 
 static void netbk_fatal_tx_err(netif_t *netif)
 {
-	printk(KERN_ERR "%s: fatal error; disabling device\n",
-	       netif->dev->name);
+	netdev_err(netif->dev, "fatal error; disabling device\n");
 	netif->busted = 1;
 	disable_irq(netif->irq);
 	netif_deschedule_work(netif);
@@ -1131,7 +1130,7 @@ static int netbk_count_requests(netif_t *netif, netif_tx_request_t *first,
 				netif_tx_request_t *txp, int work_to_do)
 {
 	RING_IDX cons = netif->tx.req_cons;
-	int frags = 0;
+	int frags = 0, drop_err = 0;
 
 	if (!(first->flags & XEN_NETTXF_more_data))
 		return 0;
@@ -1151,10 +1150,21 @@ static int netbk_count_requests(netif_t *netif, netif_tx_request_t *first,
 
 		memcpy(txp, RING_GET_REQUEST(&netif->tx, cons + frags),
 		       sizeof(*txp));
-		if (txp->size > first->size) {
-			netdev_err(netif->dev, "Frags galore\n");
-			netbk_fatal_tx_err(netif);
-			return -EIO;
+
+		/*
+		 * If the guest submitted a frame >= 64 KiB then first->size
+		 * overflowed and following slots will appear to be larger
+		 * than the frame. This cannot be fatal error as there are
+		 * buggy frontends that do this.
+		 *
+		 * Consume all slots and drop the packet.
+		 */
+		if (!drop_err && txp->size > first->size) {
+			if (net_ratelimit())
+				netdev_dbg(netif->dev,
+					   "Invalid tx request (slot size %u > remaining size %u)\n",
+					   txp->size, first->size);
+			drop_err = -EIO;
 		}
 
 		first->size -= txp->size;
@@ -1167,6 +1177,11 @@ static int netbk_count_requests(netif_t *netif, netif_tx_request_t *first,
 			return -EINVAL;
 		}
 	} while ((txp++)->flags & XEN_NETTXF_more_data);
+
+	if (drop_err) {
+		netbk_tx_err(netif, first, cons + frags);
+		return drop_err;
+	}
 
 	return frags;
 }
@@ -1400,10 +1415,11 @@ static void net_tx_action(unsigned long group)
 
 		if (netif->tx.sring->req_prod - netif->tx.req_cons >
 		    NET_TX_RING_SIZE) {
-			printk(KERN_ERR "%s: Impossible number of requests. "
-			       "req_prod %u, req_cons %u, size %lu\n",
-			       netif->dev->name, netif->tx.sring->req_prod,
-			       netif->tx.req_cons, NET_TX_RING_SIZE);
+			netdev_err(netif->dev,
+				   "Impossible number of requests"
+				   " (prod=%u cons=%u size=%lu)\n",
+				   netif->tx.sring->req_prod,
+				   netif->tx.req_cons, NET_TX_RING_SIZE);
 			netbk_fatal_tx_err(netif);
 			continue;
 		}
