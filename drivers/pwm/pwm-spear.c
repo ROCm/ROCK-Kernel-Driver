@@ -49,13 +49,11 @@
  * @mmio_base: base address of pwm chip
  * @clk: pointer to clk structure of pwm chip
  * @chip: linux pwm chip representation
- * @dev: pointer to device structure of pwm chip
  */
 struct spear_pwm_chip {
 	void __iomem *mmio_base;
 	struct clk *clk;
 	struct pwm_chip chip;
-	struct device *dev;
 };
 
 static inline struct spear_pwm_chip *to_spear_pwm_chip(struct pwm_chip *chip)
@@ -200,7 +198,6 @@ static int spear_pwm_probe(struct platform_device *pdev)
 	if (IS_ERR(pc->clk))
 		return PTR_ERR(pc->clk);
 
-	pc->dev = &pdev->dev;
 	platform_set_drvdata(pdev, pc);
 
 	pc->chip.dev = &pdev->dev;
@@ -251,7 +248,7 @@ static int spear_pwm_remove(struct platform_device *pdev)
 	return pwmchip_remove(&pc->chip);
 }
 
-static struct of_device_id spear_pwm_of_match[] = {
+static const struct of_device_id spear_pwm_of_match[] = {
 	{ .compatible = "st,spear320-pwm" },
 	{ .compatible = "st,spear1340-pwm" },
 	{ }

@@ -45,8 +45,6 @@
 
 #include <asm/irq_regs.h>
 
-#include <linux/bootsplash.h>
-
 extern void ctrl_alt_del(void);
 
 /*
@@ -1276,13 +1274,6 @@ static void kbd_keycode(unsigned int keycode, int down, int hw_raw)
 			if (keycode < BTN_MISC && printk_ratelimit())
 				pr_warning("can't emulate rawmode for keycode %d\n",
 					   keycode);
-
-	/* This code has to be redone for some non-x86 platforms */
-	if (down == 1 && (keycode == 0x3c || keycode == 0x01)) {
-		/* F2 and ESC on PC keyboard */
-		if (splash_verbose())
-			return;
-	}
 
 #ifdef CONFIG_SPARC
 	if (keycode == KEY_A && sparc_l1_a_state) {

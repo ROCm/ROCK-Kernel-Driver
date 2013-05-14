@@ -10,16 +10,12 @@
 #include <linux/interrupt.h>
 #include <xen/xenbus.h>
 #include <linux/list.h>
-#include <linux/mutex.h>
+#include <linux/spinlock.h>
 #include <linux/workqueue.h>
 #include <linux/atomic.h>
 #include <xen/interface/io/pciif.h>
 
-#ifndef CONFIG_XEN
 #define DRV_NAME	"xen-pciback"
-#else
-#define DRV_NAME	"pciback"
-#endif
 
 struct pci_dev_entry {
 	struct list_head list;
@@ -38,9 +34,6 @@ struct xen_pcibk_device {
 	struct xenbus_watch be_watch;
 	u8 be_watching;
 	int evtchn_irq;
-#ifdef CONFIG_XEN
-	struct vm_struct *sh_area;
-#endif
 	struct xen_pci_sharedinfo *sh_info;
 	unsigned long flags;
 	struct work_struct op_work;
@@ -51,14 +44,12 @@ struct xen_pcibk_dev_data {
 	struct pci_saved_state *pci_saved_state;
 	unsigned int permissive:1;
 	unsigned int warned_on_write:1;
-#ifndef CONFIG_XEN
 	unsigned int enable_intx:1;
 	unsigned int isr_on:1; /* Whether the IRQ handler is installed. */
 	unsigned int ack_intr:1; /* .. and ACK-ing */
 	unsigned long handled;
 	unsigned int irq; /* Saved in case device transitions to MSI/MSI-X */
 	char irq_name[0]; /* xen-pcibk[000:04:00.0] */
-#endif
 };
 
 /* Used by XenBus and xen_pcibk_ops.c */
@@ -96,11 +87,9 @@ typedef int (*publish_pci_dev_cb) (struct xen_pcibk_device *pdev,
 typedef int (*publish_pci_root_cb) (struct xen_pcibk_device *pdev,
 				    unsigned int domain, unsigned int bus);
 
-/* Backend registration for the different types of BDF representation:
+/* Backend registration for the two types of BDF representation:
  *  vpci - BDFs start at 00
  *  passthrough - BDFs are exactly like in the host.
- *  slot - like vpci, but each function becoming a separate slot
- *  controller - devices on same host bus will also be on same virtual bus
  */
 struct xen_pcibk_backend {
 	const char *name;
@@ -118,10 +107,8 @@ struct xen_pcibk_backend {
 			       unsigned int devfn);
 };
 
-extern const struct xen_pcibk_backend __weak xen_pcibk_vpci_backend;
-extern const struct xen_pcibk_backend __weak xen_pcibk_passthrough_backend;
-extern const struct xen_pcibk_backend __weak xen_pcibk_slot_backend;
-extern const struct xen_pcibk_backend __weak xen_pcibk_controller_backend;
+extern const struct xen_pcibk_backend xen_pcibk_vpci_backend;
+extern const struct xen_pcibk_backend xen_pcibk_passthrough_backend;
 extern const struct xen_pcibk_backend *xen_pcibk_backend;
 
 static inline int xen_pcibk_add_pci_dev(struct xen_pcibk_device *pdev,

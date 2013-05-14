@@ -41,6 +41,7 @@
 #include <linux/init.h>
 #include <linux/completion.h>
 #include <linux/fb.h>
+#include <linux/pci.h>
 
 #include <linux/hyperv.h>
 
@@ -60,6 +61,9 @@
 #define SYNTHVID_HEIGHT_MAX_WIN7 1200
 
 #define SYNTHVID_FB_SIZE_WIN8 (8 * 1024 * 1024)
+
+#define PCI_VENDOR_ID_MICROSOFT 0x1414
+#define PCI_DEVICE_ID_HYPERV_VIDEO 0x5353
 
 
 enum pipe_msg_type {
@@ -204,17 +208,16 @@ struct synthvid_msg {
 
 #define RING_BUFSIZE (256 * 1024)
 #define VSP_TIMEOUT (10 * HZ)
-#define HVFB_UPDATE_DELAY (HZ / 30)
+#define HVFB_UPDATE_DELAY (HZ / 20)
 
 struct hvfb_par {
 	struct fb_info *info;
-	bool info_ready; /* info and its fields are set up */
+	bool fb_ready; /* fb device is ready */
 	struct completion wait;
 	u32 synthvid_version;
 
 	struct delayed_work dwork;
-	spinlock_t area_lock; /* protect changed area */
-	int x1, y1, x2, y2; /* changed rectangle area */
+	bool update;
 
 	u32 pseudo_palette[16];
 	u8 init_buf[MAX_VMBUS_PKT_SIZE];
@@ -252,14 +255,9 @@ static inline int synthvid_send(struct hv_device *hdev,
 static int synthvid_send_situ(struct hv_device *hdev)
 {
 	struct fb_info *info = hv_get_drvdata(hdev);
-	struct hvfb_par *par;
 	struct synthvid_msg msg;
 
 	if (!info)
-		return -ENODEV;
-
-	par = info->par;
-	if (!par->info_ready)
 		return -ENODEV;
 
 	memset(&msg, 0, sizeof(struct synthvid_msg));
@@ -316,8 +314,7 @@ static int synthvid_send_ptr(struct hv_device *hdev)
 }
 
 /* Send updated screen area (dirty rectangle) location to host */
-static int synthvid_update(struct fb_info *info, int x1, int y1,
-			   int x2, int y2)
+static int synthvid_update(struct fb_info *info)
 {
 	struct hv_device *hdev = device_to_hv_device(info->device);
 	struct synthvid_msg msg;
@@ -329,10 +326,10 @@ static int synthvid_update(struct fb_info *info, int x1, int y1,
 		sizeof(struct synthvid_dirt);
 	msg.dirt.video_output = 0;
 	msg.dirt.dirt_count = 1;
-	msg.dirt.rect[0].x1 = x1;
-	msg.dirt.rect[0].y1 = y1;
-	msg.dirt.rect[0].x2 = x2;
-	msg.dirt.rect[0].y2 = y2;
+	msg.dirt.rect[0].x1 = 0;
+	msg.dirt.rect[0].y1 = 0;
+	msg.dirt.rect[0].x2 = info->var.xres;
+	msg.dirt.rect[0].y2 = info->var.yres;
 
 	synthvid_send(hdev, &msg);
 
@@ -367,10 +364,15 @@ static void synthvid_recv_sub(struct hv_device *hdev)
 
 	/* Reply with screen and cursor info */
 	if (msg->vid_hdr.type == SYNTHVID_FEATURE_CHANGE) {
-		synthvid_send_situ(hdev);
-		synthvid_send_ptr(hdev);
-	}
+		if (par->fb_ready) {
+			synthvid_send_ptr(hdev);
+			synthvid_send_situ(hdev);
+		}
 
+		par->update = msg->feature_chg.is_dirt_needed;
+		if (par->update)
+			schedule_delayed_work(&par->dwork, HVFB_UPDATE_DELAY);
+	}
 }
 
 /* Receive callback for messages from the host */
@@ -486,8 +488,7 @@ static int synthvid_send_config(struct hv_device *hdev)
 	msg->vid_hdr.type = SYNTHVID_VRAM_LOCATION;
 	msg->vid_hdr.size = sizeof(struct synthvid_msg_hdr) +
 		sizeof(struct synthvid_vram_location);
-	msg->vram.user_ctx = msg->vram.vram_gpa =
-		virt_to_phys(info->screen_base);
+	msg->vram.user_ctx = msg->vram.vram_gpa = info->fix.smem_start;
 	msg->vram.is_vram_gpa_specified = 1;
 	synthvid_send(hdev, msg);
 
@@ -495,107 +496,42 @@ static int synthvid_send_config(struct hv_device *hdev)
 	if (!t) {
 		pr_err("Time out on waiting vram location ack\n");
 		ret = -ETIMEDOUT;
-		goto error;
+		goto out;
 	}
-	if (msg->vram_ack.user_ctx != virt_to_phys(info->screen_base)) {
+	if (msg->vram_ack.user_ctx != info->fix.smem_start) {
 		pr_err("Unable to set VRAM location\n");
 		ret = -ENODEV;
-		goto error;
+		goto out;
 	}
 
-	/* Send situation and pointer update */
-	synthvid_send_situ(hdev);
+	/* Send pointer and situation update */
 	synthvid_send_ptr(hdev);
+	synthvid_send_situ(hdev);
 
-	return 0;
-
-error:
+out:
 	return ret;
 }
 
 
-static inline void hvfb_init_rect(struct hvfb_par *par)
-{
-	par->x1 = par->y1 = INT_MAX;
-	par->x2 = par->y2 = 0;
-}
-
 /*
  * Delayed work callback:
  * It is called at HVFB_UPDATE_DELAY or longer time interval to process
- * screen updates from non-deferred I/O, such as imageblit, which can happen
- * at high frequency.
+ * screen updates. It is re-scheduled if further update is necessary.
  */
 static void hvfb_update_work(struct work_struct *w)
 {
 	struct hvfb_par *par = container_of(w, struct hvfb_par, dwork.work);
 	struct fb_info *info = par->info;
-	int x1, y1, x2, y2;
-	ulong flags;
 
-	spin_lock_irqsave(&par->area_lock, flags);
+	if (par->fb_ready)
+		synthvid_update(info);
 
-	x1 = par->x1;
-	y1 = par->y1;
-	x2 = par->x2;
-	y2 = par->y2;
-
-	hvfb_init_rect(par);
-
-	spin_unlock_irqrestore(&par->area_lock, flags);
-
-	if (x1 == INT_MAX)
-		return;
-
-	synthvid_update(info, x1, y1, x2, y2);
+	if (par->update)
+		schedule_delayed_work(&par->dwork, HVFB_UPDATE_DELAY);
 }
-
-/*
- * Record the updated screen area, and schedule the delayed work.
- * If the work is still on the queue, schedule_delayed_work() will
- * automatically ignore the new request. But the updated area is
- * always recorded, and will be handled by the queued work.
- */
-static void hvfb_add_rect(struct fb_info *info, int x1, int y1,
-			  int x2, int y2)
-{
-	struct hvfb_par *par = info->par;
-	ulong flags;
-
-	spin_lock_irqsave(&par->area_lock, flags);
-
-	if (x1 < par->x1)
-		par->x1 = x1;
-	if (y1 < par->y1)
-		par->y1 = y1;
-
-	if (x2 > par->x2)
-		par->x2 = x2;
-	if (y2 > par->y2)
-		par->y2 = y2;
-
-	spin_unlock_irqrestore(&par->area_lock, flags);
-
-	schedule_delayed_work(&par->dwork, HVFB_UPDATE_DELAY);
-}
-
 
 
 /* Framebuffer operation handlers */
-
-static ssize_t hvfb_write(struct fb_info *info, const char __user *buf,
-			  size_t count, loff_t *ppos)
-{
-	ssize_t ret;
-
-	ret = fb_sys_write(info, buf, count, ppos);
-
-	hvfb_add_rect(info, 0, 0,
-		      info->var.xres, info->var.yres);
-
-	return ret;
-}
-
 
 static int hvfb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 {
@@ -633,82 +569,21 @@ static int hvfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 
 	pal[regno] = chan_to_field(red, &info->var.red)
 		| chan_to_field(green, &info->var.green)
-		| chan_to_field(blue, &info->var.blue);
+		| chan_to_field(blue, &info->var.blue)
+		| chan_to_field(transp, &info->var.transp);
 
 	return 0;
 }
 
-static void hvfb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
-{
-	sys_fillrect(info, rect);
-
-	hvfb_add_rect(info, rect->dx, rect->dy,
-		      rect->dx + rect->width, rect->dy + rect->height);
-}
-
-static void hvfb_copyarea(struct fb_info *info, const struct fb_copyarea *area)
-{
-	sys_copyarea(info, area);
-
-	hvfb_add_rect(info, area->dx, area->dy,
-		      area->dx + area->width, area->dy + area->height);
-}
-
-static void hvfb_imageblit(struct fb_info *info, const struct fb_image *image)
-{
-	sys_imageblit(info, image);
-
-	hvfb_add_rect(info, image->dx, image->dy,
-		      image->dx + image->width, image->dy + image->height);
-}
 
 static struct fb_ops hvfb_ops = {
 	.owner = THIS_MODULE,
-	.fb_read = fb_sys_read,
-	.fb_write = hvfb_write,
 	.fb_check_var = hvfb_check_var,
 	.fb_set_par = hvfb_set_par,
 	.fb_setcolreg = hvfb_setcolreg,
-	.fb_fillrect = hvfb_fillrect,
-	.fb_copyarea = hvfb_copyarea,
-	.fb_imageblit = hvfb_imageblit,
-};
-
-
-/*
- * Callback for the deferred I/O.
- * Applications, such as X-Window, use deferred I/O mechanism to put screen
- * updates in batches, and send to fb driver periodically.
- */
-static void hvfb_deferred_io(struct fb_info *info, struct list_head *pl)
-{
-	struct page *page;
-	ulong pa, pb, min = ULONG_MAX, max = 0;
-	int ymin, ymax;
-
-	list_for_each_entry(page, pl, lru) {
-		pa = page->index << PAGE_SHIFT;
-		pb = pa + PAGE_SIZE - 1;
-		if (pa < min)
-			min = pa;
-		if (pb > max)
-			max = pb;
-	}
-
-	if (max == 0)
-		return;
-
-	ymin = min / info->fix.line_length;
-	ymax = max / info->fix.line_length + 1;
-	if (ymax > info->var.yres)
-		ymax = info->var.yres;
-
-	synthvid_update(info, 0, ymin, info->var.xres, ymax);
-}
-
-static struct fb_deferred_io hvfb_defio = {
-	.delay = HVFB_UPDATE_DELAY,
-	.deferred_io = hvfb_deferred_io,
+	.fb_fillrect = cfb_fillrect,
+	.fb_copyarea = cfb_copyarea,
+	.fb_imageblit = cfb_imageblit,
 };
 
 
@@ -719,7 +594,7 @@ static void hvfb_get_option(struct fb_info *info)
 	char *opt = NULL, *p;
 	uint x = 0, y = 0;
 
-	if (fb_get_options("hyperv_fb", &opt) || !opt || !*opt)
+	if (fb_get_options(KBUILD_MODNAME, &opt) || !opt || !*opt)
 		return;
 
 	p = strsep(&opt, "x");
@@ -744,80 +619,60 @@ static void hvfb_get_option(struct fb_info *info)
 }
 
 
-/* Allocate framebuffer memory */
-#define FOUR_MEGA (4*1024*1024)
-#define NALLOC 10
-static void *hvfb_getmem(void)
+/* Get framebuffer memory from Hyper-V video pci space */
+static int hvfb_getmem(struct fb_info *info)
 {
-	ulong *p;
-	int i, j;
-	ulong ret = 0;
+	struct pci_dev *pdev;
+	ulong fb_phys;
+	void __iomem *fb_virt;
 
-	if (screen_fb_size == FOUR_MEGA) {
-		ret = __get_free_pages(GFP_KERNEL|__GFP_ZERO,
-				       get_order(FOUR_MEGA));
-		goto out1;
+	pdev = pci_get_device(PCI_VENDOR_ID_MICROSOFT,
+			      PCI_DEVICE_ID_HYPERV_VIDEO, NULL);
+	if (!pdev) {
+		pr_err("Unable to find PCI Hyper-V video\n");
+		return -ENODEV;
 	}
 
-	if (screen_fb_size != FOUR_MEGA * 2)
-		return NULL;
+	if (!(pci_resource_flags(pdev, 0) & IORESOURCE_MEM) ||
+	    pci_resource_len(pdev, 0) < screen_fb_size)
+		goto err1;
 
-	/*
-	 * Windows 2012 requires frame buffer size to be 8MB, which exceeds
-	 * the limit of __get_free_pages(). So, we allocate multiple 4MB
-	 * chunks, and find out two adjacent ones.
-	 */
-	p = kmalloc(NALLOC * sizeof(ulong), GFP_KERNEL);
-	if (!p)
-		return NULL;
+	fb_phys = pci_resource_end(pdev, 0) - screen_fb_size + 1;
+	if (!request_mem_region(fb_phys, screen_fb_size, KBUILD_MODNAME))
+		goto err1;
 
-	for (i = 0; i < NALLOC; i++)
-		p[i] = __get_free_pages(GFP_KERNEL|__GFP_ZERO,
-					get_order(FOUR_MEGA));
+	fb_virt = ioremap(fb_phys, screen_fb_size);
+	if (!fb_virt)
+		goto err2;
 
-	for (i = 0; i < NALLOC; i++)
-		for (j = 0; j < NALLOC; j++) {
-			if (p[j] && p[i] && virt_to_phys((void *)p[j]) -
-			    virt_to_phys((void *)p[i]) == FOUR_MEGA &&
-			    p[j] - p[i] == FOUR_MEGA) {
-				ret = p[i];
-				goto out;
-			}
-		}
+	info->apertures = alloc_apertures(1);
+	if (!info->apertures)
+		goto err3;
 
-out:
-	for (i = 0; i < NALLOC; i++)
-		if (p[i] && !(ret && (p[i] == ret || p[i] == ret + FOUR_MEGA)))
-			free_pages(p[i], get_order(FOUR_MEGA));
+	info->apertures->ranges[0].base = pci_resource_start(pdev, 0);
+	info->apertures->ranges[0].size = pci_resource_len(pdev, 0);
+	info->fix.smem_start = fb_phys;
+	info->fix.smem_len = screen_fb_size;
+	info->screen_base = fb_virt;
+	info->screen_size = screen_fb_size;
 
-	kfree(p);
+	pci_dev_put(pdev);
+	return 0;
 
-out1:
-	if (!ret)
-		return NULL;
-
-	/* Get an extra ref-count to prevent page error when x-window exits */
-	for (i = 0; i < screen_fb_size; i += PAGE_SIZE)
-		atomic_inc(&virt_to_page((void *)ret + i)->_count);
-
-	return (void *)ret;
+err3:
+	iounmap(fb_virt);
+err2:
+	release_mem_region(fb_phys, screen_fb_size);
+err1:
+	pci_dev_put(pdev);
+	return -ENOMEM;
 }
 
-/* Free the frame buffer */
-static void hvfb_putmem(void *p)
+/* Release the framebuffer */
+static void hvfb_putmem(struct fb_info *info)
 {
-	int i;
-
-	if (!p)
-		return;
-
-	for (i = 0; i < screen_fb_size; i += PAGE_SIZE)
-		atomic_dec(&virt_to_page(p + i)->_count);
-
-	free_pages((ulong)p, get_order(FOUR_MEGA));
-
-	if (screen_fb_size == FOUR_MEGA * 2)
-		free_pages((ulong)p + FOUR_MEGA, get_order(FOUR_MEGA));
+	iounmap(info->screen_base);
+	release_mem_region(info->fix.smem_start, screen_fb_size);
 }
 
 
@@ -825,9 +680,8 @@ static int hvfb_probe(struct hv_device *hdev,
 		      const struct hv_vmbus_device_id *dev_id)
 {
 	struct fb_info *info;
-	void *fb = NULL;
 	struct hvfb_par *par;
-	int ret = 0;
+	int ret;
 
 	info = framebuffer_alloc(sizeof(struct hvfb_par), &hdev->device);
 	if (!info) {
@@ -837,8 +691,9 @@ static int hvfb_probe(struct hv_device *hdev,
 
 	par = info->par;
 	par->info = info;
-	par->info_ready = false;
+	par->fb_ready = false;
 	init_completion(&par->wait);
+	INIT_DELAYED_WORK(&par->dwork, hvfb_update_work);
 
 	/* Connect to VSP */
 	hv_set_drvdata(hdev, info);
@@ -848,10 +703,9 @@ static int hvfb_probe(struct hv_device *hdev,
 		goto error1;
 	}
 
-	fb = hvfb_getmem();
-	if (!fb) {
+	ret = hvfb_getmem(info);
+	if (ret) {
 		pr_err("No memory for framebuffer\n");
-		ret = -ENOMEM;
 		goto error2;
 	}
 
@@ -861,7 +715,7 @@ static int hvfb_probe(struct hv_device *hdev,
 
 
 	/* Set up fb_info */
-	info->flags = FBINFO_DEFAULT | FBINFO_VIRTFB;
+	info->flags = FBINFO_DEFAULT;
 
 	info->var.xres_virtual = info->var.xres = screen_width;
 	info->var.yres_virtual = info->var.yres = screen_height;
@@ -871,11 +725,12 @@ static int hvfb_probe(struct hv_device *hdev,
 		info->var.red = (struct fb_bitfield){11, 5, 0};
 		info->var.green = (struct fb_bitfield){5, 6, 0};
 		info->var.blue = (struct fb_bitfield){0, 5, 0};
-
+		info->var.transp = (struct fb_bitfield){0, 0, 0};
 	} else {
 		info->var.red = (struct fb_bitfield){16, 8, 0};
 		info->var.green = (struct fb_bitfield){8, 8, 0};
 		info->var.blue = (struct fb_bitfield){0, 8, 0};
+		info->var.transp = (struct fb_bitfield){24, 8, 0};
 	}
 
 	info->var.activate = FB_ACTIVATE_NOW;
@@ -883,48 +738,38 @@ static int hvfb_probe(struct hv_device *hdev,
 	info->var.width = -1;
 	info->var.vmode = FB_VMODE_NONINTERLACED;
 
-	strcpy(info->fix.id, "hyperv");
-	info->fix.smem_start = virt_to_phys(fb);
-	info->fix.smem_len = screen_width * screen_height * screen_depth / 8;
+	strcpy(info->fix.id, KBUILD_MODNAME);
 	info->fix.type = FB_TYPE_PACKED_PIXELS;
 	info->fix.visual = FB_VISUAL_TRUECOLOR;
 	info->fix.line_length = screen_width * screen_depth / 8;
 	info->fix.accel = FB_ACCEL_NONE;
 
 	info->fbops = &hvfb_ops;
-	info->screen_base = fb;
 	info->pseudo_palette = par->pseudo_palette;
-
-	par->info_ready = true;
 
 	/* Send config to host */
 	ret = synthvid_send_config(hdev);
 	if (ret)
-		goto error2;
+		goto error;
 
-	info->fbdefio = &hvfb_defio;
-	fb_deferred_io_init(info);
-
-	INIT_DELAYED_WORK(&par->dwork, hvfb_update_work);
-	spin_lock_init(&par->area_lock);
-	hvfb_init_rect(par);
 	ret = register_framebuffer(info);
 	if (ret) {
 		pr_err("Unable to register framebuffer\n");
 		goto error;
 	}
 
+	par->fb_ready = true;
+
 	return 0;
 
 error:
-	cancel_delayed_work_sync(&par->dwork);
-	fb_deferred_io_cleanup(info);
+	hvfb_putmem(info);
 error2:
 	vmbus_close(hdev->channel);
 error1:
+	cancel_delayed_work_sync(&par->dwork);
 	hv_set_drvdata(hdev, NULL);
 	framebuffer_release(info);
-	hvfb_putmem(fb);
 	return ret;
 }
 
@@ -932,18 +777,19 @@ error1:
 static int hvfb_remove(struct hv_device *hdev)
 {
 	struct fb_info *info = hv_get_drvdata(hdev);
-	void *fb = info->screen_base;
 	struct hvfb_par *par = info->par;
 
-	fb_deferred_io_cleanup(info);
+	par->update = false;
+	par->fb_ready = false;
+
 	unregister_framebuffer(info);
 	cancel_delayed_work_sync(&par->dwork);
 
 	vmbus_close(hdev->channel);
 	hv_set_drvdata(hdev, NULL);
 
+	hvfb_putmem(info);
 	framebuffer_release(info);
-	hvfb_putmem(fb);
 
 	return 0;
 }

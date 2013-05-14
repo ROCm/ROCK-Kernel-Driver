@@ -73,13 +73,12 @@ int main(void)
 	ENTRY(cr3);
 	ENTRY(cr4);
 	ENTRY(cr8);
+	ENTRY(gdt_desc);
 	BLANK();
 #undef ENTRY
 
-#ifndef CONFIG_X86_NO_TSS
 	OFFSET(TSS_ist, tss_struct, x86_tss.ist);
 	BLANK();
-#endif
 
 	DEFINE(__NR_syscall_max, sizeof(syscalls_64) - 1);
 	DEFINE(NR_syscalls, sizeof(syscalls_64));

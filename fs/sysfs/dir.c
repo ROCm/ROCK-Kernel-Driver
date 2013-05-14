@@ -165,21 +165,8 @@ struct sysfs_dirent *sysfs_get_active(struct sysfs_dirent *sd)
 	if (unlikely(!sd))
 		return NULL;
 
-	while (1) {
-		int v, t;
-
-		v = atomic_read(&sd->s_active);
-		if (unlikely(v < 0))
-			return NULL;
-
-		t = atomic_cmpxchg(&sd->s_active, v, v + 1);
-		if (likely(t == v))
-			break;
-		if (t < 0)
-			return NULL;
-
-		cpu_relax();
-	}
+	if (!atomic_inc_unless_negative(&sd->s_active))
+		return NULL;
 
 	if (likely(!ignore_lockdep(sd)))
 		rwsem_acquire_read(&sd->dep_map, 0, 1, _RET_IP_);
@@ -280,6 +267,10 @@ void release_sysfs_dirent(struct sysfs_dirent * sd)
 	 * sd->s_parent won't change beneath us.
 	 */
 	parent_sd = sd->s_parent;
+
+	WARN(!(sd->s_flags & SYSFS_FLAG_REMOVED),
+		"sysfs: free using entry: %s/%s\n",
+		parent_sd ? parent_sd->s_name : "", sd->s_name);
 
 	if (sysfs_type(sd) == SYSFS_KOBJ_LINK)
 		sysfs_put(sd->s_symlink.target_sd);
@@ -399,7 +390,7 @@ struct sysfs_dirent *sysfs_new_dirent(const char *name, umode_t mode, int type)
 
 	sd->s_name = name;
 	sd->s_mode = mode;
-	sd->s_flags = type;
+	sd->s_flags = type | SYSFS_FLAG_REMOVED;
 
 	return sd;
 
@@ -478,6 +469,9 @@ int __sysfs_add_one(struct sysfs_addrm_cxt *acxt, struct sysfs_dirent *sd)
 		struct iattr *ps_iattrs = &ps_iattr->ia_iattr;
 		ps_iattrs->ia_ctime = ps_iattrs->ia_mtime = CURRENT_TIME;
 	}
+
+	/* Mark the entry added into directory tree */
+	sd->s_flags &= ~SYSFS_FLAG_REMOVED;
 
 	return 0;
 }

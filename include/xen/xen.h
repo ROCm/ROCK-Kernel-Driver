@@ -7,10 +7,8 @@ enum xen_domain_type {
 	XEN_HVM_DOMAIN,		/* running in a Xen hvm domain */
 };
 
-#if defined(CONFIG_PARAVIRT_XEN)
+#ifdef CONFIG_XEN
 extern enum xen_domain_type xen_domain_type;
-#elif defined(CONFIG_XEN)
-#define xen_domain_type		XEN_PV_DOMAIN
 #else
 #define xen_domain_type		XEN_NATIVE
 #endif
@@ -27,8 +25,6 @@ extern enum xen_domain_type xen_domain_type;
 
 #define xen_initial_domain()	(xen_domain() && \
 				 xen_start_info && xen_start_info->flags & SIF_INITDOMAIN)
-#elif defined(CONFIG_XEN)
-#define xen_initial_domain()	is_initial_xendomain()
 #else  /* !CONFIG_XEN_DOM0 */
 #define xen_initial_domain()	(0)
 #endif	/* CONFIG_XEN_DOM0 */

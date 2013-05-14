@@ -20,11 +20,11 @@
 
 static inline int rdmsrl_amd_safe(unsigned msr, unsigned long long *p)
 {
-	struct cpuinfo_x86 *c = &cpu_data(smp_processor_id());
 	u32 gprs[8] = { 0 };
 	int err;
 
-	WARN_ONCE((c->x86 != 0xf), "%s should only be used on K8!\n", __func__);
+	WARN_ONCE((boot_cpu_data.x86 != 0xf),
+		  "%s should only be used on K8!\n", __func__);
 
 	gprs[1] = msr;
 	gprs[7] = 0x9c5a203a;
@@ -38,10 +38,10 @@ static inline int rdmsrl_amd_safe(unsigned msr, unsigned long long *p)
 
 static inline int wrmsrl_amd_safe(unsigned msr, unsigned long long val)
 {
-	struct cpuinfo_x86 *c = &cpu_data(smp_processor_id());
 	u32 gprs[8] = { 0 };
 
-	WARN_ONCE((c->x86 != 0xf), "%s should only be used on K8!\n", __func__);
+	WARN_ONCE((boot_cpu_data.x86 != 0xf),
+		  "%s should only be used on K8!\n", __func__);
 
 	gprs[0] = (u32)val;
 	gprs[1] = msr;
@@ -192,11 +192,11 @@ static void __cpuinit amd_k7_smp_check(struct cpuinfo_x86 *c)
 	/* Athlon 660/661 is valid. */
 	if ((c->x86_model == 6) && ((c->x86_mask == 0) ||
 	    (c->x86_mask == 1)))
-		goto valid_k7;
+		return;
 
 	/* Duron 670 is valid */
 	if ((c->x86_model == 7) && (c->x86_mask == 0))
-		goto valid_k7;
+		return;
 
 	/*
 	 * Athlon 662, Duron 671, and Athlon >model 7 have capability
@@ -209,7 +209,7 @@ static void __cpuinit amd_k7_smp_check(struct cpuinfo_x86 *c)
 	    ((c->x86_model == 7) && (c->x86_mask >= 1)) ||
 	     (c->x86_model > 7))
 		if (cpu_has_mp)
-			goto valid_k7;
+			return;
 
 	/* If we get here, not a certified SMP capable AMD system. */
 
@@ -220,9 +220,6 @@ static void __cpuinit amd_k7_smp_check(struct cpuinfo_x86 *c)
 	WARN_ONCE(1, "WARNING: This combination of AMD"
 		" processors is not suitable for SMP.\n");
 	add_taint(TAINT_UNSAFE_SMP, LOCKDEP_NOW_UNRELIABLE);
-
-valid_k7:
-	;
 }
 
 static void __cpuinit init_amd_k7(struct cpuinfo_x86 *c)
@@ -365,7 +362,7 @@ static void __cpuinit amd_detect_cmp(struct cpuinfo_x86 *c)
 u16 amd_get_nb_id(int cpu)
 {
 	u16 id = 0;
-#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
+#ifdef CONFIG_SMP
 	id = per_cpu(cpu_llc_id, cpu);
 #endif
 	return id;
@@ -502,7 +499,7 @@ static void __cpuinit early_init_amd(struct cpuinfo_x86 *c)
 		    (c->x86_model == 8 && c->x86_mask >= 8))
 			set_cpu_cap(c, X86_FEATURE_K6_MTRR);
 #endif
-#if defined(CONFIG_X86_LOCAL_APIC) && defined(CONFIG_PCI) && !defined(CONFIG_XEN)
+#if defined(CONFIG_X86_LOCAL_APIC) && defined(CONFIG_PCI)
 	/* check CPU config space for extended APIC ID */
 	if (cpu_has_apic && c->x86 >= 0xf) {
 		unsigned int val;
@@ -513,11 +510,13 @@ static void __cpuinit early_init_amd(struct cpuinfo_x86 *c)
 #endif
 }
 
+static const int amd_erratum_383[];
+static const int amd_erratum_400[];
+static bool cpu_has_amd_erratum(const int *erratum);
+
 static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 {
-#ifndef CONFIG_XEN
 	u32 dummy;
-#endif
 	unsigned long long value;
 
 #ifdef CONFIG_SMP
@@ -559,25 +558,18 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 		 */
 		if (c->x86_model < 0x14 && cpu_has(c, X86_FEATURE_LAHF_LM)) {
 			clear_cpu_cap(c, X86_FEATURE_LAHF_LM);
-#ifndef CONFIG_XEN
 			if (!rdmsrl_amd_safe(0xc001100d, &value)) {
 				value &= ~(1ULL << 32);
 				wrmsrl_amd_safe(0xc001100d, value);
 			}
-#else
-			pr_warning("Long-mode LAHF feature wrongly enabled -"
-				   "hypervisor update needed\n");
-#endif
 		}
 
 	}
 	if (c->x86 >= 0x10)
 		set_cpu_cap(c, X86_FEATURE_REP_GOOD);
 
-#ifndef CONFIG_XEN
 	/* get apicid instead of initial apic id from cpuid */
 	c->apicid = hard_smp_processor_id();
-#endif
 #else
 
 	/*
@@ -617,7 +609,6 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 		}
 	}
 
-#ifndef CONFIG_XEN
 	/* re-enable TopologyExtensions if switched off by BIOS */
 	if ((c->x86 == 0x15) &&
 	    (c->x86_model >= 0x10) && (c->x86_model <= 0x1f) &&
@@ -647,7 +638,6 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 			wrmsrl_safe(0xc0011021, value);
 		}
 	}
-#endif
 
 	cpu_detect_cache_sizes(c);
 
@@ -680,7 +670,6 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 		fam10h_check_enable_mmcfg();
 	}
 
-#ifndef CONFIG_XEN
 	if (c == &boot_cpu_data && c->x86 >= 0xf) {
 		unsigned long long tseg;
 
@@ -698,7 +687,6 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 		}
 	}
 #endif
-#endif
 
 	/*
 	 * Family 0x12 and above processors have APIC timer
@@ -707,7 +695,6 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 	if (c->x86 > 0x11)
 		set_cpu_cap(c, X86_FEATURE_ARAT);
 
-#ifndef CONFIG_XEN
 	if (c->x86 == 0x10) {
 		/*
 		 * Disable GART TLB Walk Errors on Fam10h. We do this here
@@ -741,10 +728,15 @@ static void __cpuinit init_amd(struct cpuinfo_x86 *c)
 		rdmsrl_safe(MSR_AMD64_BU_CFG2, &value);
 		value &= ~(1ULL << 24);
 		wrmsrl_safe(MSR_AMD64_BU_CFG2, value);
+
+		if (cpu_has_amd_erratum(amd_erratum_383))
+			set_cpu_bug(c, X86_BUG_AMD_TLB_MMATCH);
 	}
 
+	if (cpu_has_amd_erratum(amd_erratum_400))
+		set_cpu_bug(c, X86_BUG_AMD_APIC_C1E);
+
 	rdmsr_safe(MSR_AMD64_PATCH_LEVEL, &c->microcode, &dummy);
-#endif
 }
 
 #ifdef CONFIG_X86_32
@@ -862,8 +854,7 @@ cpu_dev_register(amd_cpu_dev);
  * AMD_OSVW_ERRATUM() macros. The latter is intended for newer errata that
  * have an OSVW id assigned, which it takes as first argument. Both take a
  * variable number of family-specific model-stepping ranges created by
- * AMD_MODEL_RANGE(). Each erratum also has to be declared as extern const
- * int[] in arch/x86/include/asm/processor.h.
+ * AMD_MODEL_RANGE().
  *
  * Example:
  *
@@ -873,16 +864,22 @@ cpu_dev_register(amd_cpu_dev);
  *			   AMD_MODEL_RANGE(0x10, 0x9, 0x0, 0x9, 0x0));
  */
 
-const int amd_erratum_400[] =
+#define AMD_LEGACY_ERRATUM(...)		{ -1, __VA_ARGS__, 0 }
+#define AMD_OSVW_ERRATUM(osvw_id, ...)	{ osvw_id, __VA_ARGS__, 0 }
+#define AMD_MODEL_RANGE(f, m_start, s_start, m_end, s_end) \
+	((f << 24) | (m_start << 16) | (s_start << 12) | (m_end << 4) | (s_end))
+#define AMD_MODEL_RANGE_FAMILY(range)	(((range) >> 24) & 0xff)
+#define AMD_MODEL_RANGE_START(range)	(((range) >> 12) & 0xfff)
+#define AMD_MODEL_RANGE_END(range)	((range) & 0xfff)
+
+static const int amd_erratum_400[] =
 	AMD_OSVW_ERRATUM(1, AMD_MODEL_RANGE(0xf, 0x41, 0x2, 0xff, 0xf),
 			    AMD_MODEL_RANGE(0x10, 0x2, 0x1, 0xff, 0xf));
-EXPORT_SYMBOL_GPL(amd_erratum_400);
 
-const int amd_erratum_383[] =
+static const int amd_erratum_383[] =
 	AMD_OSVW_ERRATUM(3, AMD_MODEL_RANGE(0x10, 0, 0, 0xff, 0xf));
-EXPORT_SYMBOL_GPL(amd_erratum_383);
 
-bool cpu_has_amd_erratum(const int *erratum)
+static bool cpu_has_amd_erratum(const int *erratum)
 {
 	struct cpuinfo_x86 *cpu = __this_cpu_ptr(&cpu_info);
 	int osvw_id = *erratum++;
@@ -923,5 +920,3 @@ bool cpu_has_amd_erratum(const int *erratum)
 
 	return false;
 }
-
-EXPORT_SYMBOL_GPL(cpu_has_amd_erratum);

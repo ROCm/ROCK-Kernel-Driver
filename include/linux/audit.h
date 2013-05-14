@@ -84,7 +84,12 @@ extern int audit_classify_arch(int arch);
 #define	AUDIT_TYPE_CHILD_DELETE 3	/* a child being deleted */
 #define	AUDIT_TYPE_CHILD_CREATE 4	/* a child being created */
 
+/* maximized args number that audit_socketcall can process */
+#define AUDITSC_ARGS		6
+
 struct filename;
+
+extern void audit_log_session_info(struct audit_buffer *ab);
 
 #ifdef CONFIG_AUDITSYSCALL
 /* These are defined in auditsc.c */
@@ -185,12 +190,10 @@ static inline int audit_get_sessionid(struct task_struct *tsk)
 	return tsk->sessionid;
 }
 
-extern void audit_log_task_context(struct audit_buffer *ab);
-extern void audit_log_task_info(struct audit_buffer *ab, struct task_struct *tsk);
 extern void __audit_ipc_obj(struct kern_ipc_perm *ipcp);
 extern void __audit_ipc_set_perm(unsigned long qbytes, uid_t uid, gid_t gid, umode_t mode);
 extern int __audit_bprm(struct linux_binprm *bprm);
-extern void __audit_socketcall(int nargs, unsigned long *args);
+extern int __audit_socketcall(int nargs, unsigned long *args);
 extern int __audit_sockaddr(int len, void *addr);
 extern void __audit_fd_pair(int fd1, int fd2);
 extern void __audit_mq_open(int oflag, umode_t mode, struct mq_attr *attr);
@@ -224,10 +227,11 @@ static inline int audit_bprm(struct linux_binprm *bprm)
 		return __audit_bprm(bprm);
 	return 0;
 }
-static inline void audit_socketcall(int nargs, unsigned long *args)
+static inline int audit_socketcall(int nargs, unsigned long *args)
 {
 	if (unlikely(!audit_dummy_context()))
-		__audit_socketcall(nargs, args);
+		return __audit_socketcall(nargs, args);
+	return 0;
 }
 static inline int audit_sockaddr(int len, void *addr)
 {
@@ -340,11 +344,6 @@ static inline int audit_get_sessionid(struct task_struct *tsk)
 {
 	return -1;
 }
-static inline void audit_log_task_context(struct audit_buffer *ab)
-{ }
-static inline void audit_log_task_info(struct audit_buffer *ab,
-				       struct task_struct *tsk)
-{ }
 static inline void audit_ipc_obj(struct kern_ipc_perm *ipcp)
 { }
 static inline void audit_ipc_set_perm(unsigned long qbytes, uid_t uid,
@@ -354,8 +353,10 @@ static inline int audit_bprm(struct linux_binprm *bprm)
 {
 	return 0;
 }
-static inline void audit_socketcall(int nargs, unsigned long *args)
-{ }
+static inline int audit_socketcall(int nargs, unsigned long *args)
+{
+	return 0;
+}
 static inline void audit_fd_pair(int fd1, int fd2)
 { }
 static inline int audit_sockaddr(int len, void *addr)
@@ -434,14 +435,17 @@ static inline void	    audit_log_secctx(struct audit_buffer *ab, u32 secid)
 { }
 #endif
 
+extern int audit_log_task_context(struct audit_buffer *ab);
+extern void audit_log_task_info(struct audit_buffer *ab,
+				struct task_struct *tsk);
+
 extern int		    audit_update_lsm_rules(void);
 
 				/* Private API (for audit.c only) */
-extern int audit_filter_user(void);
+extern int audit_filter_user(int type);
 extern int audit_filter_type(int type);
 extern int  audit_receive_filter(int type, int pid, int seq,
-				void *data, size_t datasz, kuid_t loginuid,
-				u32 sessionid, u32 sid);
+				void *data, size_t datasz);
 extern int audit_enabled;
 #else /* CONFIG_AUDIT */
 static inline __printf(4, 5)
@@ -480,6 +484,13 @@ static inline void audit_log_link_denied(const char *string,
 					 const struct path *link)
 { }
 static inline void audit_log_secctx(struct audit_buffer *ab, u32 secid)
+{ }
+static inline int audit_log_task_context(struct audit_buffer *ab)
+{
+	return 0;
+}
+static inline void audit_log_task_info(struct audit_buffer *ab,
+				       struct task_struct *tsk)
 { }
 #define audit_enabled 0
 #endif /* CONFIG_AUDIT */

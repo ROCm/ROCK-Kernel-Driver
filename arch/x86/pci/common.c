@@ -6,6 +6,7 @@
 
 #include <linux/sched.h>
 #include <linux/pci.h>
+#include <linux/pci-acpi.h>
 #include <linux/ioport.h>
 #include <linux/init.h>
 #include <linux/dmi.h>
@@ -168,6 +169,16 @@ void pcibios_fixup_bus(struct pci_bus *b)
 	pci_read_bridge_bases(b);
 	list_for_each_entry(dev, &b->devices, bus_list)
 		pcibios_fixup_device_resources(dev);
+}
+
+void pcibios_add_bus(struct pci_bus *bus)
+{
+	acpi_pci_add_bus(bus);
+}
+
+void pcibios_remove_bus(struct pci_bus *bus)
+{
+	acpi_pci_remove_bus(bus);
 }
 
 /*
@@ -611,7 +622,6 @@ unsigned int pcibios_assign_all_busses(void)
 
 int pcibios_add_device(struct pci_dev *dev)
 {
-#if !defined(CONFIG_XEN)
 	struct setup_data *data;
 	struct pci_setup_rom *rom;
 	u64 pa_data;
@@ -636,27 +646,6 @@ int pcibios_add_device(struct pci_dev *dev)
 		}
 		pa_data = data->next;
 	}
-#elif defined(CONFIG_EFI)
-	struct xen_platform_op op = {
-		.cmd = XENPF_firmware_info,
-		.u.firmware_info = {
-			.type = XEN_FW_EFI_INFO,
-			.index = XEN_FW_EFI_PCI_ROM,
-			.u.efi_info.pci_rom = {
-				.segment = pci_domain_nr(dev->bus),
-				.bus = dev->bus->number,
-				.devfn = dev->devfn,
-				.vendor = dev->vendor,
-				.devid = dev->device
-			}
-		}
-	};
-
-	if (HYPERVISOR_platform_op(&op) == 0) {
-		dev->rom = op.u.firmware_info.u.efi_info.pci_rom.address;
-		dev->romlen = op.u.firmware_info.u.efi_info.pci_rom.size;
-	}
-#endif
 	return 0;
 }
 

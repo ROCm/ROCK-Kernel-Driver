@@ -12,21 +12,20 @@ typedef struct {
 	unsigned int irq_spurious_count;
 	unsigned int icr_read_retry_count;
 #endif
+#ifdef CONFIG_HAVE_KVM
+	unsigned int kvm_posted_intr_ipis;
+#endif
 	unsigned int x86_platform_ipis;	/* arch dependent */
 	unsigned int apic_perf_irqs;
 	unsigned int apic_irq_work_irqs;
 #ifdef CONFIG_SMP
 	unsigned int irq_resched_count;
 	unsigned int irq_call_count;
-#ifndef CONFIG_XEN
 	/*
 	 * irq_tlb_count is double-counted in irq_call_count, so it must be
 	 * subtracted from irq_call_count when displaying irq_call_count
 	 */
 	unsigned int irq_tlb_count;
-#else
-	unsigned int irq_lock_count;
-#endif
 #endif
 #ifdef CONFIG_X86_THERMAL_VECTOR
 	unsigned int irq_thermal_count;

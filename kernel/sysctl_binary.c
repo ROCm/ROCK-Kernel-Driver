@@ -15,6 +15,7 @@
 #include <linux/netdevice.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
+#include <linux/compat.h>
 
 #ifdef CONFIG_SYSCTL_SYSCALL
 
@@ -872,15 +873,6 @@ static const struct bin_table bin_bus_table[] = {
 };
 
 
-#ifdef CONFIG_XEN
-#include <xen/sysctl.h>
-static const struct bin_table bin_xen_table[] = {
-	{ CTL_INT,	CTL_XEN_INDEPENDENT_WALLCLOCK,	"independent_wallclock" },
-	{ CTL_ULONG,	CTL_XEN_PERMITTED_CLOCK_JITTER,	"permitted_clock_jitter" },
-	{}
-};
-#endif
-
 static const struct bin_table bin_s390dbf_table[] = {
 	{ CTL_INT,	5678 /* CTL_S390DBF_STOPPABLE */, "debug_stoppable" },
 	{ CTL_INT,	5679 /* CTL_S390DBF_ACTIVE */,	  "debug_active" },
@@ -920,9 +912,6 @@ static const struct bin_table bin_root_table[] = {
 	{ CTL_DIR,	CTL_BUS,	"bus",		bin_bus_table },
 	{ CTL_DIR,	CTL_ABI,	"abi" },
 	/* CTL_CPU not used */
-#ifdef CONFIG_XEN
-	{ CTL_DIR,	CTL_XEN,	"xen",		bin_xen_table },
-#endif
 	/* CTL_ARLAN "arlan" no longer used */
 	{ CTL_DIR,	CTL_S390DBF,	"s390dbf",	bin_s390dbf_table },
 	{ CTL_DIR,	CTL_SUNRPC,	"sunrpc",	bin_sunrpc_table },
@@ -1460,7 +1449,6 @@ SYSCALL_DEFINE1(sysctl, struct __sysctl_args __user *, args)
 
 
 #ifdef CONFIG_COMPAT
-#include <asm/compat.h>
 
 struct compat_sysctl_args {
 	compat_uptr_t	name;
@@ -1472,7 +1460,7 @@ struct compat_sysctl_args {
 	compat_ulong_t	__unused[4];
 };
 
-asmlinkage long compat_sys_sysctl(struct compat_sysctl_args __user *args)
+COMPAT_SYSCALL_DEFINE1(sysctl, struct compat_sysctl_args __user *, args)
 {
 	struct compat_sysctl_args tmp;
 	compat_size_t __user *compat_oldlenp;

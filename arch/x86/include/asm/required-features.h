@@ -54,7 +54,7 @@
 #endif
 
 #ifdef CONFIG_X86_64
-#if defined(CONFIG_PARAVIRT) || defined(CONFIG_XEN)
+#ifdef CONFIG_PARAVIRT
 /* Paravirtualized systems may not have PSE or PGE available */
 #define NEED_PSE	0
 #define NEED_PGE	0

@@ -491,10 +491,6 @@ struct fb_info {
 	void *fbcon_par;                /* fbcon use-only private area */
 	/* From here on everything is device dependent */
 	void *par;
-#ifdef CONFIG_BOOTSPLASH
-	struct splash_data *splash_data;
-	char fb_cursordata[64];
-#endif
 	/* we need the PCI or similar aperture base/size not
 	   smem_start/size as smem_start may just be an object
 	   allocated inside the aperture so may not actually overlap */
@@ -505,6 +501,8 @@ struct fb_info {
 			resource_size_t size;
 		} ranges[0];
 	} *apertures;
+
+	bool skip_vt_switch; /* no VT switch on suspend/resume required */
 };
 
 static inline struct apertures_struct *alloc_apertures(unsigned int max_num) {

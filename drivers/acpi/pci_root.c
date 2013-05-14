@@ -65,43 +65,11 @@ static struct acpi_scan_handler pci_root_handler = {
 	.detach = acpi_pci_root_remove,
 };
 
-/* Lock to protect both acpi_pci_roots and acpi_pci_drivers lists */
+/* Lock to protect both acpi_pci_roots lists */
 static DEFINE_MUTEX(acpi_pci_root_lock);
 static LIST_HEAD(acpi_pci_roots);
-static LIST_HEAD(acpi_pci_drivers);
 
 static DEFINE_MUTEX(osc_lock);
-
-int acpi_pci_register_driver(struct acpi_pci_driver *driver)
-{
-	int n = 0;
-	struct acpi_pci_root *root;
-
-	mutex_lock(&acpi_pci_root_lock);
-	list_add_tail(&driver->node, &acpi_pci_drivers);
-	if (driver->add)
-		list_for_each_entry(root, &acpi_pci_roots, node) {
-			driver->add(root);
-			n++;
-		}
-	mutex_unlock(&acpi_pci_root_lock);
-
-	return n;
-}
-EXPORT_SYMBOL(acpi_pci_register_driver);
-
-void acpi_pci_unregister_driver(struct acpi_pci_driver *driver)
-{
-	struct acpi_pci_root *root;
-
-	mutex_lock(&acpi_pci_root_lock);
-	list_del(&driver->node);
-	if (driver->remove)
-		list_for_each_entry(root, &acpi_pci_roots, node)
-			driver->remove(root);
-	mutex_unlock(&acpi_pci_root_lock);
-}
-EXPORT_SYMBOL(acpi_pci_unregister_driver);
 
 /**
  * acpi_is_root_bridge - determine whether an ACPI CA node is a PCI root bridge
@@ -406,41 +374,6 @@ out:
 }
 EXPORT_SYMBOL(acpi_pci_osc_control_set);
 
-#ifdef CONFIG_PCI_GUESTDEV
-#include <linux/sysfs.h>
-
-static ssize_t seg_show(struct device *dev,
-			struct device_attribute *attr, char *buf)
-{
-	struct list_head *entry;
-
-	list_for_each(entry, &acpi_pci_roots) {
-		struct acpi_pci_root *root;
-		root = list_entry(entry, struct acpi_pci_root, node);
-		if (&root->device->dev == dev)
-			return sprintf(buf, "%04x\n", root->segment);
-	}
-	return 0;
-}
-static DEVICE_ATTR(seg, 0444, seg_show, NULL);
-
-static ssize_t bbn_show(struct device *dev,
-			struct device_attribute *attr, char *buf)
-{
-	struct list_head *entry;
-
-	list_for_each(entry, &acpi_pci_roots) {
-		struct acpi_pci_root *root;
-		root = list_entry(entry, struct acpi_pci_root, node);
-		if (&root->device->dev == dev)
-			return sprintf(buf, "%02x\n",
-				       (unsigned int)root->secondary.start);
-	}
-	return 0;
-}
-static DEVICE_ATTR(bbn, 0444, bbn_show, NULL);
-#endif
-
 static int acpi_pci_root_add(struct acpi_device *device,
 			     const struct acpi_device_id *not_used)
 {
@@ -448,7 +381,6 @@ static int acpi_pci_root_add(struct acpi_device *device,
 	acpi_status status;
 	int result;
 	struct acpi_pci_root *root;
-	struct acpi_pci_driver *driver;
 	u32 flags, base_flags;
 
 	root = kzalloc(sizeof(struct acpi_pci_root), GFP_KERNEL);
@@ -597,13 +529,6 @@ static int acpi_pci_root_add(struct acpi_device *device,
 			 "(_OSC support mask: 0x%02x)\n", flags);
 	}
 
-#ifdef CONFIG_PCI_GUESTDEV
-	if (device_create_file(&device->dev, &dev_attr_seg))
-		dev_warn(&device->dev, "could not create seg attr\n");
-	if (device_create_file(&device->dev, &dev_attr_bbn))
-		dev_warn(&device->dev, "could not create bbn attr\n");
-#endif
-
 	pci_acpi_add_bus_pm_notifier(device, root->bus);
 	if (device->wakeup.flags.run_wake)
 		device_set_run_wake(root->bus->bridge, true);
@@ -612,12 +537,6 @@ static int acpi_pci_root_add(struct acpi_device *device,
 		pcibios_resource_survey_bus(root->bus);
 		pci_assign_unassigned_bus_resources(root->bus);
 	}
-
-	mutex_lock(&acpi_pci_root_lock);
-	list_for_each_entry(driver, &acpi_pci_drivers, node)
-		if (driver->add)
-			driver->add(root);
-	mutex_unlock(&acpi_pci_root_lock);
 
 	/* need to after hot-added ioapic is registered */
 	if (system_state != SYSTEM_BOOTING)
@@ -639,15 +558,8 @@ end:
 static void acpi_pci_root_remove(struct acpi_device *device)
 {
 	struct acpi_pci_root *root = acpi_driver_data(device);
-	struct acpi_pci_driver *driver;
 
 	pci_stop_root_bus(root->bus);
-
-	mutex_lock(&acpi_pci_root_lock);
-	list_for_each_entry_reverse(driver, &acpi_pci_drivers, node)
-		if (driver->remove)
-			driver->remove(root);
-	mutex_unlock(&acpi_pci_root_lock);
 
 	device_set_run_wake(root->bus->bridge, false);
 	pci_acpi_remove_bus_pm_notifier(device);
@@ -804,31 +716,3 @@ void __init acpi_pci_root_hp_init(void)
 
 	printk(KERN_DEBUG "Found %d acpi root devices\n", num);
 }
-
-#ifdef CONFIG_PCI_GUESTDEV
-int acpi_pci_get_root_seg_bbn(char *hid, char *uid, int *seg, int *bbn)
-{
-	struct list_head *entry;
-
-	list_for_each(entry, &acpi_pci_roots) {
-		struct acpi_pci_root *root;
-
-		root = list_entry(entry, struct acpi_pci_root, node);
-		if (strcmp(acpi_device_hid(root->device), hid))
-			continue;
-
-		if (!root->device->pnp.unique_id) {
-			if (strlen(uid))
-				continue;
-		} else {
-			if (strcmp(root->device->pnp.unique_id, uid))
-				continue;
-		}
-
-		*seg = (int)root->segment;
-		*bbn = (int)root->secondary.start;
-		return TRUE;
-	}
-	return FALSE;
-}
-#endif

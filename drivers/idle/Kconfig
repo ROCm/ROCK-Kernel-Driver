@@ -10,7 +10,7 @@ config INTEL_IDLE
 	  processors intel_idle does not support.
 
 menu "Memory power savings"
-depends on X86_64 && !XEN
+depends on X86_64
 
 config I7300_IDLE_IOAT_CHANNEL
 	bool

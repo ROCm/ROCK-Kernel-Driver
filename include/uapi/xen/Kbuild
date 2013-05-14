@@ -1,2 +1,3 @@
 # UAPI Header export list
-header-y += public/
+header-y += evtchn.h
+header-y += privcmd.h

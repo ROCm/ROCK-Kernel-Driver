@@ -42,12 +42,11 @@
  */
 static void free_substream(struct snd_usb_substream *subs)
 {
-	struct list_head *p, *n;
+	struct audioformat *fp, *n;
 
 	if (!subs->num_formats)
 		return; /* not initialized */
-	list_for_each_safe(p, n, &subs->fmt_list) {
-		struct audioformat *fp = list_entry(p, struct audioformat, list);
+	list_for_each_entry_safe(fp, n, &subs->fmt_list, list) {
 		kfree(fp->rate_table);
 		kfree(fp->chmap);
 		kfree(fp);
@@ -314,14 +313,12 @@ int snd_usb_add_audio_stream(struct snd_usb_audio *chip,
 			     int stream,
 			     struct audioformat *fp)
 {
-	struct list_head *p;
 	struct snd_usb_stream *as;
 	struct snd_usb_substream *subs;
 	struct snd_pcm *pcm;
 	int err;
 
-	list_for_each(p, &chip->pcm_list) {
-		as = list_entry(p, struct snd_usb_stream, list);
+	list_for_each_entry(as, &chip->pcm_list, list) {
 		if (as->fmt_type != fp->fmt_type)
 			continue;
 		subs = &as->substream[stream];
@@ -333,8 +330,7 @@ int snd_usb_add_audio_stream(struct snd_usb_audio *chip,
 		}
 	}
 	/* look for an empty stream */
-	list_for_each(p, &chip->pcm_list) {
-		as = list_entry(p, struct snd_usb_stream, list);
+	list_for_each_entry(as, &chip->pcm_list, list) {
 		if (as->fmt_type != fp->fmt_type)
 			continue;
 		subs = &as->substream[stream];
@@ -472,7 +468,7 @@ int snd_usb_parse_audio_interface(struct snd_usb_audio *chip, int iface_no)
 	struct usb_host_interface *alts;
 	struct usb_interface_descriptor *altsd;
 	int i, altno, err, stream;
-	int format = 0, num_channels = 0;
+	unsigned int format = 0, num_channels = 0;
 	struct audioformat *fp = NULL;
 	int num, protocol, clock = 0;
 	struct uac_format_type_i_continuous_descriptor *fmt;

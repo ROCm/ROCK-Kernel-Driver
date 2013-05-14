@@ -410,20 +410,16 @@ int drm_prime_fd_to_handle_ioctl(struct drm_device *dev, void *data,
 struct sg_table *drm_prime_pages_to_sg(struct page **pages, int nr_pages)
 {
 	struct sg_table *sg = NULL;
-	struct scatterlist *iter;
-	int i;
 	int ret;
 
 	sg = kmalloc(sizeof(struct sg_table), GFP_KERNEL);
 	if (!sg)
 		goto out;
 
-	ret = sg_alloc_table(sg, nr_pages, GFP_KERNEL);
+	ret = sg_alloc_table_from_pages(sg, pages, nr_pages, 0,
+				nr_pages << PAGE_SHIFT, GFP_KERNEL);
 	if (ret)
 		goto out;
-
-	for_each_sg(sg->sgl, iter, nr_pages, i)
-		sg_set_page(iter, pages[i], PAGE_SIZE, 0);
 
 	return sg;
 out:
@@ -492,11 +488,8 @@ EXPORT_SYMBOL(drm_prime_init_file_private);
 
 void drm_prime_destroy_file_private(struct drm_prime_file_private *prime_fpriv)
 {
-	struct drm_prime_member *member, *safe;
-	list_for_each_entry_safe(member, safe, &prime_fpriv->head, entry) {
-		list_del(&member->entry);
-		kfree(member);
-	}
+	/* by now drm_gem_release should've made sure the list is empty */
+	WARN_ON(!list_empty(&prime_fpriv->head));
 }
 EXPORT_SYMBOL(drm_prime_destroy_file_private);
 

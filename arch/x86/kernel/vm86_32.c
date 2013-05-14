@@ -33,6 +33,7 @@
 #include <linux/capability.h>
 #include <linux/errno.h>
 #include <linux/interrupt.h>
+#include <linux/syscalls.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
 #include <linux/signal.h>
@@ -48,7 +49,6 @@
 #include <asm/io.h>
 #include <asm/tlbflush.h>
 #include <asm/irq.h>
-#include <asm/syscalls.h>
 
 /*
  * Known problems:
@@ -127,9 +127,7 @@ static int copy_vm86_regs_from_user(struct kernel_vm86_regs *regs,
 
 struct pt_regs *save_v86_state(struct kernel_vm86_regs *regs)
 {
-#ifndef CONFIG_X86_NO_TSS
 	struct tss_struct *tss;
-#endif
 	struct pt_regs *ret;
 	unsigned long tmp;
 
@@ -152,16 +150,12 @@ struct pt_regs *save_v86_state(struct kernel_vm86_regs *regs)
 		do_exit(SIGSEGV);
 	}
 
-#ifndef CONFIG_X86_NO_TSS
 	tss = &per_cpu(init_tss, get_cpu());
-#endif
 	current->thread.sp0 = current->thread.saved_sp0;
 	current->thread.sysenter_cs = __KERNEL_CS;
 	load_sp0(tss, &current->thread);
 	current->thread.saved_sp0 = 0;
-#ifndef CONFIG_X86_NO_TSS
 	put_cpu();
-#endif
 
 	ret = KVM86->regs32;
 
@@ -208,36 +202,32 @@ out:
 static int do_vm86_irq_handling(int subfunction, int irqnumber);
 static void do_sys_vm86(struct kernel_vm86_struct *info, struct task_struct *tsk);
 
-int sys_vm86old(struct vm86_struct __user *v86)
+SYSCALL_DEFINE1(vm86old, struct vm86_struct __user *, v86)
 {
 	struct kernel_vm86_struct info; /* declare this _on top_,
 					 * this avoids wasting of stack space.
 					 * This remains on the stack until we
 					 * return to 32 bit user space.
 					 */
-	struct task_struct *tsk;
-	int tmp, ret = -EPERM;
+	struct task_struct *tsk = current;
+	int tmp;
 
-	tsk = current;
 	if (tsk->thread.saved_sp0)
-		goto out;
+		return -EPERM;
 	tmp = copy_vm86_regs_from_user(&info.regs, &v86->regs,
 				       offsetof(struct kernel_vm86_struct, vm86plus) -
 				       sizeof(info.regs));
-	ret = -EFAULT;
 	if (tmp)
-		goto out;
+		return -EFAULT;
 	memset(&info.vm86plus, 0, (int)&info.regs32 - (int)&info.vm86plus);
 	info.regs32 = current_pt_regs();
 	tsk->thread.vm86_info = v86;
 	do_sys_vm86(&info, tsk);
-	ret = 0;	/* we never return here */
-out:
-	return ret;
+	return 0;	/* we never return here */
 }
 
 
-int sys_vm86(unsigned long cmd, unsigned long arg)
+SYSCALL_DEFINE2(vm86, unsigned long, cmd, unsigned long, arg)
 {
 	struct kernel_vm86_struct info; /* declare this _on top_,
 					 * this avoids wasting of stack space.
@@ -245,7 +235,7 @@ int sys_vm86(unsigned long cmd, unsigned long arg)
 					 * return to 32 bit user space.
 					 */
 	struct task_struct *tsk;
-	int tmp, ret;
+	int tmp;
 	struct vm86plus_struct __user *v86;
 
 	tsk = current;
@@ -254,8 +244,7 @@ int sys_vm86(unsigned long cmd, unsigned long arg)
 	case VM86_FREE_IRQ:
 	case VM86_GET_IRQ_BITS:
 	case VM86_GET_AND_RESET_IRQ:
-		ret = do_vm86_irq_handling(cmd, (int)arg);
-		goto out;
+		return do_vm86_irq_handling(cmd, (int)arg);
 	case VM86_PLUS_INSTALL_CHECK:
 		/*
 		 * NOTE: on old vm86 stuff this will return the error
@@ -263,36 +252,29 @@ int sys_vm86(unsigned long cmd, unsigned long arg)
 		 *  interpreted as (invalid) address to vm86_struct.
 		 *  So the installation check works.
 		 */
-		ret = 0;
-		goto out;
+		return 0;
 	}
 
 	/* we come here only for functions VM86_ENTER, VM86_ENTER_NO_BYPASS */
-	ret = -EPERM;
 	if (tsk->thread.saved_sp0)
-		goto out;
+		return -EPERM;
 	v86 = (struct vm86plus_struct __user *)arg;
 	tmp = copy_vm86_regs_from_user(&info.regs, &v86->regs,
 				       offsetof(struct kernel_vm86_struct, regs32) -
 				       sizeof(info.regs));
-	ret = -EFAULT;
 	if (tmp)
-		goto out;
+		return -EFAULT;
 	info.regs32 = current_pt_regs();
 	info.vm86plus.is_vm86pus = 1;
 	tsk->thread.vm86_info = (struct vm86_struct __user *)v86;
 	do_sys_vm86(&info, tsk);
-	ret = 0;	/* we never return here */
-out:
-	return ret;
+	return 0;	/* we never return here */
 }
 
 
 static void do_sys_vm86(struct kernel_vm86_struct *info, struct task_struct *tsk)
 {
-#ifndef CONFIG_X86_NO_TSS
 	struct tss_struct *tss;
-#endif
 /*
  * make sure the vm86() system call doesn't try to do anything silly
  */
@@ -336,16 +318,12 @@ static void do_sys_vm86(struct kernel_vm86_struct *info, struct task_struct *tsk
 	tsk->thread.saved_fs = info->regs32->fs;
 	tsk->thread.saved_gs = get_user_gs(info->regs32);
 
-#ifndef CONFIG_X86_NO_TSS
 	tss = &per_cpu(init_tss, get_cpu());
-#endif
 	tsk->thread.sp0 = (unsigned long) &info->VM86_TSS_ESP0;
 	if (cpu_has_sep)
 		tsk->thread.sysenter_cs = 0;
 	load_sp0(tss, &tsk->thread);
-#ifndef CONFIG_X86_NO_TSS
 	put_cpu();
-#endif
 
 	tsk->thread.screen_bitmap = info->screen_bitmap;
 	if (info->flags & VM86_SCREEN_BITMAP)

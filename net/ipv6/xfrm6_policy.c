@@ -103,10 +103,8 @@ static int xfrm6_fill_dst(struct xfrm_dst *xdst, struct net_device *dev,
 	dev_hold(dev);
 
 	xdst->u.rt6.rt6i_idev = in6_dev_get(dev);
-	if (!xdst->u.rt6.rt6i_idev) {
-		dev_put(dev);
+	if (!xdst->u.rt6.rt6i_idev)
 		return -ENODEV;
-	}
 
 	rt6_transfer_peer(&xdst->u.rt6, rt);
 

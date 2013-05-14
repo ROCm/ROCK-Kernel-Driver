@@ -15,7 +15,6 @@ fb-objs                           := $(fb-y)
 obj-$(CONFIG_VT)		  += console/
 obj-$(CONFIG_LOGO)		  += logo/
 obj-y				  += backlight/
-obj-$(CONFIG_BOOTSPLASH)	  += bootsplash/
 
 obj-$(CONFIG_EXYNOS_VIDEO)     += exynos/
 
@@ -150,7 +149,7 @@ obj-$(CONFIG_FB_MSM)              += msm/
 obj-$(CONFIG_FB_NUC900)           += nuc900fb.o
 obj-$(CONFIG_FB_JZ4740)		  += jz4740_fb.o
 obj-$(CONFIG_FB_PUV3_UNIGFX)      += fb-puv3.o
-obj-$(CONFIG_HYPERV_FB)		  += hyperv_fb.o
+obj-$(CONFIG_FB_HYPERV)		  += hyperv_fb.o
 
 # Platform or fallback drivers go here
 obj-$(CONFIG_FB_UVESA)            += uvesafb.o
@@ -173,7 +172,7 @@ obj-$(CONFIG_FB_VIRTUAL)          += vfb.o
 
 #video output switch sysfs driver
 obj-$(CONFIG_VIDEO_OUTPUT_CONTROL) += output.o
-obj-$(CONFIG_DISPLAY_TIMING) += display_timing.o
-obj-$(CONFIG_OF_DISPLAY_TIMING) += of_display_timing.o
-obj-$(CONFIG_VIDEOMODE) += videomode.o
-obj-$(CONFIG_OF_VIDEOMODE) += of_videomode.o
+obj-$(CONFIG_VIDEOMODE_HELPERS) += display_timing.o videomode.o
+ifeq ($(CONFIG_OF),y)
+obj-$(CONFIG_VIDEOMODE_HELPERS) += of_display_timing.o of_videomode.o
+endif

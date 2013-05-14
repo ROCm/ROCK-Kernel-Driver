@@ -31,6 +31,7 @@
 #include <linux/pci.h>
 #include <linux/gfp.h>
 #include <linux/memblock.h>
+#include <linux/edd.h>
 
 #include <xen/xen.h>
 #include <xen/events.h>
@@ -84,7 +85,29 @@
 
 EXPORT_SYMBOL_GPL(hypercall_page);
 
+/*
+ * Pointer to the xen_vcpu_info structure or
+ * &HYPERVISOR_shared_info->vcpu_info[cpu]. See xen_hvm_init_shared_info
+ * and xen_vcpu_setup for details. By default it points to share_info->vcpu_info
+ * but if the hypervisor supports VCPUOP_register_vcpu_info then it can point
+ * to xen_vcpu_info. The pointer is used in __xen_evtchn_do_upcall to
+ * acknowledge pending events.
+ * Also more subtly it is used by the patched version of irq enable/disable
+ * e.g. xen_irq_enable_direct and xen_iret in PV mode.
+ *
+ * The desire to be able to do those mask/unmask operations as a single
+ * instruction by using the per-cpu offset held in %gs is the real reason
+ * vcpu info is in a per-cpu pointer and the original reason for this
+ * hypercall.
+ *
+ */
 DEFINE_PER_CPU(struct vcpu_info *, xen_vcpu);
+
+/*
+ * Per CPU pages used if hypervisor supports VCPUOP_register_vcpu_info
+ * hypercall. This can be used both in PV and PVHVM mode. The structure
+ * overrides the default per_cpu(xen_vcpu, cpu) value.
+ */
 DEFINE_PER_CPU(struct vcpu_info, xen_vcpu_info);
 
 enum xen_domain_type xen_domain_type = XEN_NATIVE;
@@ -143,8 +166,8 @@ static DEFINE_PER_CPU(struct tls_descs, shadow_tls_desc);
 static void clamp_max_cpus(void)
 {
 #ifdef CONFIG_SMP
-	if (setup_max_cpus > XEN_LEGACY_MAX_VCPUS)
-		setup_max_cpus = XEN_LEGACY_MAX_VCPUS;
+	if (setup_max_cpus > MAX_VIRT_CPUS)
+		setup_max_cpus = MAX_VIRT_CPUS;
 #endif
 }
 
@@ -171,11 +194,11 @@ static void xen_vcpu_setup(int cpu)
 		if (per_cpu(xen_vcpu, cpu) == &per_cpu(xen_vcpu_info, cpu))
 			return;
 	}
-	if (cpu < XEN_LEGACY_MAX_VCPUS)
+	if (cpu < MAX_VIRT_CPUS)
 		per_cpu(xen_vcpu,cpu) = &HYPERVISOR_shared_info->vcpu_info[cpu];
 
 	if (!have_vcpu_info_placement) {
-		if (cpu >= XEN_LEGACY_MAX_VCPUS)
+		if (cpu >= MAX_VIRT_CPUS)
 			clamp_max_cpus();
 		return;
 	}
@@ -186,7 +209,12 @@ static void xen_vcpu_setup(int cpu)
 
 	/* Check to see if the hypervisor will put the vcpu_info
 	   structure where we want it, which allows direct access via
-	   a percpu-variable. */
+	   a percpu-variable.
+	   N.B. This hypercall can _only_ be called once per CPU. Subsequent
+	   calls will error out with -EINVAL. This is due to the fact that
+	   hypervisor has no unregister variant and this hypercall does not
+	   allow to over-write info.mfn and info.offset.
+	 */
 	err = HYPERVISOR_vcpu_op(VCPUOP_register_vcpu_info, cpu, &info);
 
 	if (err) {
@@ -401,6 +429,9 @@ static void __init xen_init_cpuid_mask(void)
 		cpuid_leaf1_edx_mask &=
 			~((1 << X86_FEATURE_APIC) |  /* disable local APIC */
 			  (1 << X86_FEATURE_ACPI));  /* disable ACPI */
+
+	cpuid_leaf1_ecx_mask &= ~(1 << (X86_FEATURE_X2APIC % 32));
+
 	ax = 1;
 	cx = 0;
 	xen_cpuid(&ax, &bx, &cx, &dx);
@@ -1235,7 +1266,6 @@ static const struct pv_cpu_ops xen_cpu_ops __initconst = {
 	.alloc_ldt = xen_alloc_ldt,
 	.free_ldt = xen_free_ldt,
 
-	.store_gdt = native_store_gdt,
 	.store_idt = native_store_idt,
 	.store_tr = xen_store_tr,
 
@@ -1320,6 +1350,55 @@ static const struct machine_ops xen_machine_ops __initconst = {
 	.crash_shutdown = xen_crash_shutdown,
 	.emergency_restart = xen_emergency_restart,
 };
+
+static void __init xen_boot_params_init_edd(void)
+{
+#if IS_ENABLED(CONFIG_EDD)
+	struct xen_platform_op op;
+	struct edd_info *edd_info;
+	u32 *mbr_signature;
+	unsigned nr;
+	int ret;
+
+	edd_info = boot_params.eddbuf;
+	mbr_signature = boot_params.edd_mbr_sig_buffer;
+
+	op.cmd = XENPF_firmware_info;
+
+	op.u.firmware_info.type = XEN_FW_DISK_INFO;
+	for (nr = 0; nr < EDDMAXNR; nr++) {
+		struct edd_info *info = edd_info + nr;
+
+		op.u.firmware_info.index = nr;
+		info->params.length = sizeof(info->params);
+		set_xen_guest_handle(op.u.firmware_info.u.disk_info.edd_params,
+				     &info->params);
+		ret = HYPERVISOR_dom0_op(&op);
+		if (ret)
+			break;
+
+#define C(x) info->x = op.u.firmware_info.u.disk_info.x
+		C(device);
+		C(version);
+		C(interface_support);
+		C(legacy_max_cylinder);
+		C(legacy_max_head);
+		C(legacy_sectors_per_track);
+#undef C
+	}
+	boot_params.eddbuf_entries = nr;
+
+	op.u.firmware_info.type = XEN_FW_DISK_MBR_SIGNATURE;
+	for (nr = 0; nr < EDD_MBR_SIG_MAX; nr++) {
+		op.u.firmware_info.index = nr;
+		ret = HYPERVISOR_dom0_op(&op);
+		if (ret)
+			break;
+		mbr_signature[nr] = op.u.firmware_info.u.disk_mbr_signature.mbr_signature;
+	}
+	boot_params.edd_mbr_sig_buf_entries = nr;
+#endif
+}
 
 /*
  * Set up the GDT and segment registers for -fstack-protector.  Until
@@ -1523,6 +1602,8 @@ asmlinkage void __init xen_start_kernel(void)
 		/* Avoid searching for BIOS MP tables */
 		x86_init.mpparse.find_smp_config = x86_init_noop;
 		x86_init.mpparse.get_smp_config = x86_init_uint_noop;
+
+		xen_boot_params_init_edd();
 	}
 #ifdef CONFIG_PCI
 	/* PCI BIOS service won't work from a PV guest. */
@@ -1567,6 +1648,9 @@ void __ref xen_hvm_init_shared_info(void)
 	 * online but xen_hvm_init_shared_info is run at resume time too and
 	 * in that case multiple vcpus might be online. */
 	for_each_online_cpu(cpu) {
+		/* Leave it to be NULL. */
+		if (cpu >= MAX_VIRT_CPUS)
+			continue;
 		per_cpu(xen_vcpu, cpu) = &HYPERVISOR_shared_info->vcpu_info[cpu];
 	}
 }

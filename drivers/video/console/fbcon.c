@@ -79,7 +79,6 @@
 #include <asm/irq.h>
 
 #include "fbcon.h"
-#include <linux/bootsplash.h>
 
 #ifdef FBCONDEBUG
 #  define DPRINTK(fmt, args...) printk(KERN_DEBUG "%s: " fmt, __func__ , ## args)
@@ -95,11 +94,7 @@ enum {
 
 static struct display fb_display[MAX_NR_CONSOLES];
 
-#ifdef CONFIG_BOOTSPLASH
-signed char con2fb_map[MAX_NR_CONSOLES];
-#else
 static signed char con2fb_map[MAX_NR_CONSOLES];
-#endif
 static signed char con2fb_map_boot[MAX_NR_CONSOLES];
 
 static int logo_lines;
@@ -547,8 +542,6 @@ static int do_fbcon_takeover(int show_logo)
 	for (i = first_fb_vc; i <= last_fb_vc; i++)
 		con2fb_map[i] = info_idx;
 
-	splash_init(false);
-
 	err = do_take_over_console(&fb_con, first_fb_vc, last_fb_vc,
 				fbcon_is_default);
 
@@ -575,8 +568,6 @@ static int fbcon_takeover(int show_logo)
 
 	for (i = first_fb_vc; i <= last_fb_vc; i++)
 		con2fb_map[i] = info_idx;
-
-	splash_init(true);
 
 	err = take_over_console(&fb_con, first_fb_vc, last_fb_vc,
 				fbcon_is_default);
@@ -1142,21 +1133,6 @@ static void fbcon_init(struct vc_data *vc, int init)
 	new_rows = FBCON_SWAP(ops->rotate, info->var.yres, info->var.xres);
 	new_cols /= vc->vc_font.width;
 	new_rows /= vc->vc_font.height;
-
-#ifdef CONFIG_BOOTSPLASH
-	if (vc->vc_splash_data && vc->vc_splash_data->splash_state) {
-		new_cols = vc->vc_splash_data->splash_vc_text_wi
-			/ vc->vc_font.width;
-		new_rows = vc->vc_splash_data->splash_vc_text_he
-			/ vc->vc_font.height;
-		logo = 0;
-		con_remap_def_color(vc,
-				    (vc->vc_splash_data->imgd->splash_color
-				     << 4) |
-				    vc->vc_splash_data->imgd->splash_fg_color);
-	}
-#endif
-
 
 	/*
 	 * We must always set the mode. The mode of the previous console
@@ -1873,8 +1849,6 @@ static int fbcon_scroll(struct vc_data *vc, int t, int b, int dir,
 			fbcon_softback_note(vc, t, count);
 		if (logo_shown >= 0)
 			goto redraw_up;
-		if (SPLASH_DATA(info))
-			goto redraw_up;
 		switch (p->scrollmode) {
 		case SCROLL_MOVE:
 			fbcon_redraw_blit(vc, info, p, t, b - t - count,
@@ -1965,8 +1939,6 @@ static int fbcon_scroll(struct vc_data *vc, int t, int b, int dir,
 		if (count > vc->vc_rows)	/* Maximum realistic size */
 			count = vc->vc_rows;
 		if (logo_shown >= 0)
-			goto redraw_down;
-		if (SPLASH_DATA(info))
 			goto redraw_down;
 		switch (p->scrollmode) {
 		case SCROLL_MOVE:
@@ -2116,12 +2088,6 @@ static void fbcon_bmove_rec(struct vc_data *vc, struct display *p, int sy, int s
 		}
 		return;
 	}
-
-	if (SPLASH_DATA(info) && sy == dy && height == 1) {
-		/*must use slower redraw bmove to keep background pic intact*/
-		splash_bmove_redraw(vc, info, sy, sx, dx, width);
-		return;
-	}
 	ops->bmove(vc, info, real_y(p, sy), sx, real_y(p, dy), dx,
 		   height, width);
 }
@@ -2229,23 +2195,6 @@ static int fbcon_switch(struct vc_data *vc)
 
 	info = registered_fb[con2fb_map[vc->vc_num]];
 	ops = info->fbcon_par;
-
-#ifdef CONFIG_BOOTSPLASH
-	{
-		struct splash_data *prev_sd = vc->vc_splash_data;
-		splash_prepare(vc, info);
-		if (vc->vc_splash_data && vc->vc_splash_data->splash_state &&
-		    vc->vc_splash_data != prev_sd) {
-			vc_resize(vc, vc->vc_splash_data->splash_vc_text_wi
-				  / vc->vc_font.width,
-				  vc->vc_splash_data->splash_vc_text_he
-				  / vc->vc_font.height);
-			con_remap_def_color(vc,
-					    vc->vc_splash_data->imgd->splash_color << 4
-					    | vc->vc_splash_data->imgd->splash_fg_color);
-		}
-	}
-#endif
 
 	if (softback_top) {
 		if (softback_lines)
@@ -2379,11 +2328,6 @@ static void fbcon_generic_blank(struct vc_data *vc, struct fb_info *info,
 				int blank)
 {
 	struct fb_event event;
-
-	if (SPLASH_DATA(info)) {
-		splash_blank(vc, info, blank);
-		return;
-	}
 
 	if (blank) {
 		unsigned short charmask = vc->vc_hi_font_mask ?
@@ -2610,10 +2554,6 @@ static int fbcon_do_set_font(struct vc_data *vc, int w, int h,
 
 		cols = FBCON_SWAP(ops->rotate, info->var.xres, info->var.yres);
 		rows = FBCON_SWAP(ops->rotate, info->var.yres, info->var.xres);
-		if (SPLASH_DATA(info)) {
-			cols = TEXT_WIDTH_FROM_SPLASH_DATA(info);
-			rows = TEXT_HIGHT_FROM_SPLASH_DATA(info);
-		}
 		cols /= w;
 		rows /= h;
 		vc_resize(vc, cols, rows);

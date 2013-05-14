@@ -19,9 +19,6 @@
 #include <asm/types.h>
 #include "fbcon.h"
 
-#include <linux/bootsplash.h>
-
-
 /*
  * Accelerated handlers.
  */
@@ -51,12 +48,6 @@ static void bit_bmove(struct vc_data *vc, struct fb_info *info, int sy,
 {
 	struct fb_copyarea area;
 
-	if (SPLASH_DATA(info)) {
-		splash_bmove(vc, info,
-			sy, sx, dy, dx, height, width);
-		return;
-	}
-
 	area.sx = sx * vc->vc_font.width;
 	area.sy = sy * vc->vc_font.height;
 	area.dx = dx * vc->vc_font.width;
@@ -72,12 +63,6 @@ static void bit_clear(struct vc_data *vc, struct fb_info *info, int sy,
 {
 	int bgshift = (vc->vc_hi_font_mask) ? 13 : 12;
 	struct fb_fillrect region;
-
-	if (SPLASH_DATA(info)) {
-		splash_clear(vc, info,
-			     sy, sx, height, width);
-		return;
-	}
 
 	region.color = attr_bgcol_ec(bgshift, vc, info);
 	region.dx = sx * vc->vc_font.width;
@@ -176,11 +161,6 @@ static void bit_putcs(struct vc_data *vc, struct fb_info *info,
 	image.height = vc->vc_font.height;
 	image.depth = 1;
 
-	if (SPLASH_DATA(info)) {
-		splash_putcs(vc, info, s, count, yy, xx);
-		return;
-	}
-
 	if (attribute) {
 		buf = kmalloc(cellsize, GFP_ATOMIC);
 		if (!buf)
@@ -233,11 +213,6 @@ static void bit_clear_margins(struct vc_data *vc, struct fb_info *info,
 	unsigned int rs = info->var.xres - rw;
 	unsigned int bs = info->var.yres - bh;
 	struct fb_fillrect region;
-
-	if (SPLASH_DATA(info)) {
-		splash_clear_margins(vc, info, bottom_only);
-		return;
-	}
 
 	region.color = attr_bgcol_ec(bgshift, vc, info);
 	region.rop = ROP_COPY;
@@ -404,12 +379,6 @@ static void bit_cursor(struct vc_data *vc, struct fb_info *info, int mode,
 	cursor.enable = ops->cursor_state.enable;
 	cursor.image.depth = 1;
 	cursor.rop = ROP_XOR;
-
-	if (SPLASH_DATA(info)) {
-		splash_cursor(info, &cursor);
-		ops->cursor_reset = 0;
-		return;
-	}
 
 	if (info->fbops->fb_cursor)
 		err = info->fbops->fb_cursor(info, &cursor);

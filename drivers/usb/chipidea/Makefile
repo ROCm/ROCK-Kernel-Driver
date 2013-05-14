@@ -11,4 +11,4 @@ ci_hdrc-$(CONFIG_USB_CHIPIDEA_DEBUG)	+= debug.o
 
 obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_msm.o
 obj-$(CONFIG_USB_CHIPIDEA_PCI)	+= ci13xxx_pci.o
-obj-$(CONFIG_USB_CHIPIDEA_IMX)	+= ci13xxx_imx.o usbmisc_imx6q.o
+obj-$(CONFIG_USB_CHIPIDEA_IMX)	+= ci13xxx_imx.o usbmisc_imx.o

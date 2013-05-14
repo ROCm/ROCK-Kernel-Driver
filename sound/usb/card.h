@@ -28,6 +28,8 @@ struct audioformat {
 	unsigned int *rate_table;	/* rate table */
 	unsigned char clock;		/* associated clock */
 	struct snd_pcm_chmap_elem *chmap; /* (optional) channel map */
+	bool dsd_dop;			/* add DOP headers in case of DSD samples */
+	bool dsd_bitrev;		/* reverse the bits of each DSD sample */
 };
 
 struct snd_usb_substream;
@@ -139,6 +141,12 @@ struct snd_usb_substream {
 
 	int last_frame_number;          /* stored frame number */
 	int last_delay;                 /* stored delay */
+
+	struct {
+		int marker;
+		int channel;
+		int byte_idx;
+	} dsd_dop;
 };
 
 struct snd_usb_stream {

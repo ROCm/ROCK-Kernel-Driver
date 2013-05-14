@@ -97,9 +97,6 @@ struct thread_info {
 #define TIF_SYSCALL_TRACEPOINT	28	/* syscall tracepoint instrumentation */
 #define TIF_ADDR32		29	/* 32-bit address space on 64 bits */
 #define TIF_X32			30	/* 32-bit native x86-64 binary */
-#if defined(CONFIG_X86_XEN) && defined(CONFIG_CPU_SUP_AMD)
-#define TIF_CSTAR		31      /* cstar-based syscall (special handling) */
-#endif
 
 #define _TIF_SYSCALL_TRACE	(1 << TIF_SYSCALL_TRACE)
 #define _TIF_NOTIFY_RESUME	(1 << TIF_NOTIFY_RESUME)
@@ -124,7 +121,6 @@ struct thread_info {
 #define _TIF_SYSCALL_TRACEPOINT	(1 << TIF_SYSCALL_TRACEPOINT)
 #define _TIF_ADDR32		(1 << TIF_ADDR32)
 #define _TIF_X32		(1 << TIF_X32)
-#define _TIF_CSTAR		(1 << TIF_CSTAR)
 
 /* work to do in syscall_trace_enter() */
 #define _TIF_WORK_SYSCALL_ENTRY	\
@@ -154,13 +150,9 @@ struct thread_info {
 	 _TIF_USER_RETURN_NOTIFY)
 
 /* flags to check in __switch_to() */
-#ifndef CONFIG_XEN
 #define _TIF_WORK_CTXSW							\
 	(_TIF_IO_BITMAP|_TIF_NOTSC|_TIF_BLOCKSTEP)
 
-#else
-#define _TIF_WORK_CTXSW (_TIF_NOTSC /*todo | _TIF_BLOCKSTEP */)
-#endif
 #define _TIF_WORK_CTXSW_PREV (_TIF_WORK_CTXSW|_TIF_USER_RETURN_NOTIFY)
 #define _TIF_WORK_CTXSW_NEXT (_TIF_WORK_CTXSW|_TIF_DEBUG)
 
@@ -248,8 +240,6 @@ static inline struct thread_info *current_thread_info(void)
 #define TS_POLLING		0x0004	/* idle task polling need_resched,
 					   skip sending interrupt */
 #define TS_RESTORE_SIGMASK	0x0008	/* restore signal mask in do_signal() */
-
-#define tsk_is_polling(t) (task_thread_info(t)->status & TS_POLLING)
 
 #ifndef __ASSEMBLY__
 #define HAVE_SET_RESTORE_SIGMASK	1

@@ -673,6 +673,8 @@ add_dev:
 	ret = device_register(&child->dev);
 	WARN_ON(ret < 0);
 
+	pcibios_add_bus(child);
+
 	/* Create legacy_io and legacy_mem files for this bus */
 	pci_create_legacy_files(child);
 
@@ -988,7 +990,6 @@ int pci_setup_device(struct pci_dev *dev)
 	dev->sysdata = dev->bus->sysdata;
 	dev->dev.parent = dev->bus->bridge;
 	dev->dev.bus = &pci_bus_type;
-	dev->dev.type = &pci_dev_type;
 	dev->hdr_type = hdr_type & 0x7f;
 	dev->multifunction = !!(hdr_type & 0x80);
 	dev->error_state = pci_channel_io_normal;
@@ -1208,6 +1209,7 @@ struct pci_dev *alloc_pci_dev(void)
 		return NULL;
 
 	INIT_LIST_HEAD(&dev->bus_list);
+	dev->dev.type = &pci_dev_type;
 
 	return dev;
 }
@@ -1293,11 +1295,6 @@ static void pci_init_capabilities(struct pci_dev *dev)
 
 	/* Vital Product Data */
 	pci_vpd_pci22_init(dev);
-
-#ifdef CONFIG_XEN
-	if (!is_initial_xendomain())
-		return;
-#endif
 
 	/* Alternative Routing-ID Forwarding */
 	pci_configure_ari(dev);
@@ -1399,10 +1396,6 @@ static unsigned next_fn(struct pci_bus *bus, struct pci_dev *dev, unsigned fn)
 	/* dev may be NULL for non-contiguous multifunction devices */
 	if (!dev || dev->multifunction)
 		return (fn + 1) % 8;
-#ifdef pcibios_scan_all_fns
-	if (pcibios_scan_all_fns(bus, dev->devfn))
-		return (fn + 1) % 8;
-#endif
 
 	return 0;
 }
@@ -1441,12 +1434,9 @@ int pci_scan_slot(struct pci_bus *bus, int devfn)
 		return 0; /* Already scanned the entire slot */
 
 	dev = pci_scan_single_device(bus, devfn);
-	if (!dev) {
-#ifdef pcibios_scan_all_fns
-		if (!pcibios_scan_all_fns(bus, devfn))
-#endif
+	if (!dev)
 		return 0;
-	} else if (!dev->is_added)
+	if (!dev->is_added)
 		nr++;
 
 	for (fn = next_fn(bus, dev, 0); fn > 0; fn = next_fn(bus, dev, fn)) {
@@ -1638,8 +1628,7 @@ unsigned int pci_scan_child_bus(struct pci_bus *bus)
 	if (!bus->is_added) {
 		dev_dbg(&bus->dev, "fixups for bus\n");
 		pcibios_fixup_bus(bus);
-		if (pci_is_root_bus(bus))
-			bus->is_added = 1;
+		bus->is_added = 1;
 	}
 
 	for (pass=0; pass < 2; pass++)
@@ -1670,6 +1659,14 @@ unsigned int pci_scan_child_bus(struct pci_bus *bus)
 int __weak pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
 {
 	return 0;
+}
+
+void __weak pcibios_add_bus(struct pci_bus *bus)
+{
+}
+
+void __weak pcibios_remove_bus(struct pci_bus *bus)
+{
 }
 
 struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
@@ -1725,6 +1722,8 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
 	error = device_register(&b->dev);
 	if (error)
 		goto class_dev_reg_err;
+
+	pcibios_add_bus(b);
 
 	/* Create legacy_io and legacy_mem files for this bus */
 	pci_create_legacy_files(b);
