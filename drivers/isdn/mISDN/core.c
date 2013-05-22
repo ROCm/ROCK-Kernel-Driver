@@ -21,12 +21,13 @@
 #include "core.h"
 
 static u_int debug;
-u_int misdn_permitted_gid;
+static u_int gid;
+kgid_t misdn_permitted_gid;
 
 MODULE_AUTHOR("Karsten Keil");
 MODULE_LICENSE("GPL");
 module_param(debug, uint, S_IRUGO | S_IWUSR);
-module_param_named(gid, misdn_permitted_gid, uint, 0);
+module_param(gid, uint, 0);
 MODULE_PARM_DESC(gid, "Unix group for accessing misdn socket (default 0)");
 
 static u64		device_ids;
@@ -374,6 +375,8 @@ static int
 mISDNInit(void)
 {
 	int	err;
+
+	misdn_permitted_gid = make_kgid(current_user_ns(), gid);
 
 	printk(KERN_INFO "Modular ISDN core version %d.%d.%d\n",
 	       MISDN_MAJOR_VERSION, MISDN_MINOR_VERSION, MISDN_RELEASE);
