@@ -416,7 +416,7 @@ struct hfs_bnode *hfs_bnode_create(struct hfs_btree *tree, u32 num)
 	node = hfs_bnode_findhash(tree, num);
 	spin_unlock(&tree->hash_lock);
 	if (node) {
-		printk(KERN_CRIT "new node %u already hashed?\n", num);
+		pr_crit("new node %u already hashed?\n", num);
 		WARN_ON(1);
 		return node;
 	}
