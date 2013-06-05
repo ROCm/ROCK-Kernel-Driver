@@ -375,6 +375,25 @@ ENTRY(early_idt_handler)
 
 11:
 #ifdef CONFIG_EARLY_PRINTK
+#include <asm/dwarf2.h>
+	CFI_STARTPROC	simple
+	CFI_SIGNAL_FRAME
+	CFI_DEF_CFA	rsp, 16*8
+#	CFI_REL_OFFSET	ss, 15*8
+	CFI_REL_OFFSET	rsp, 14*8
+#	CFI_REL_OFFSET	rflags, 13*8
+#	CFI_REL_OFFSET	cs, 12*8
+	CFI_REL_OFFSET	rip, 11*8
+	CFI_REL_OFFSET	rax, 8*8
+	CFI_REL_OFFSET	rcx, 7*8
+	CFI_REL_OFFSET	rdx, 6*8
+	CFI_REL_OFFSET	rsi, 5*8
+	CFI_REL_OFFSET	rdi, 4*8
+	CFI_REL_OFFSET	r8, 3*8
+	CFI_REL_OFFSET	r9, 2*8
+	CFI_REL_OFFSET	r10, 1*8
+	CFI_REL_OFFSET	r11, 0*8
+
 	GET_CR2_INTO(%r9)	# can clobber any volatile register if pv
 	movl 80(%rsp),%r8d	# error code
 	movl 72(%rsp),%esi	# vector number
@@ -391,6 +410,7 @@ ENTRY(early_idt_handler)
 	movq 40(%rsp),%rsi	# %rip again
 	call __print_symbol
 #endif
+	CFI_ENDPROC
 #endif /* EARLY_PRINTK */
 1:	hlt
 	jmp 1b
