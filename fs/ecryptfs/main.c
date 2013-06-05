@@ -571,7 +571,7 @@ static struct dentry *ecryptfs_mount(struct file_system_type *fs_type, int flags
 
 	rc = -EINVAL;
 	if (s->s_stack_depth > FILESYSTEM_MAX_STACK_DEPTH) {
-		printk(KERN_ERR "eCryptfs: maximum fs stacking depth exceeded\n");
+		pr_err("eCryptfs: maximum fs stacking depth exceeded\n");
 		goto out_free;
 	}
 

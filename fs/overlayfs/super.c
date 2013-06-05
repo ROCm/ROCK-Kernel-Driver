@@ -473,15 +473,15 @@ static const struct super_operations ovl_super_operations = {
 };
 
 enum {
-	Opt_lowerdir,
-	Opt_upperdir,
-	Opt_err,
+	OPT_LOWERDIR,
+	OPT_UPPERDIR,
+	OPT_ERR,
 };
 
 static const match_table_t ovl_tokens = {
-	{Opt_lowerdir,			"lowerdir=%s"},
-	{Opt_upperdir,			"upperdir=%s"},
-	{Opt_err,			NULL}
+	{OPT_LOWERDIR,			"lowerdir=%s"},
+	{OPT_UPPERDIR,			"upperdir=%s"},
+	{OPT_ERR,			NULL}
 };
 
 static int ovl_parse_opt(char *opt, struct ovl_config *config)
@@ -500,14 +500,14 @@ static int ovl_parse_opt(char *opt, struct ovl_config *config)
 
 		token = match_token(p, ovl_tokens, args);
 		switch (token) {
-		case Opt_upperdir:
+		case OPT_UPPERDIR:
 			kfree(config->upperdir);
 			config->upperdir = match_strdup(&args[0]);
 			if (!config->upperdir)
 				return -ENOMEM;
 			break;
 
-		case Opt_lowerdir:
+		case OPT_LOWERDIR:
 			kfree(config->lowerdir);
 			config->lowerdir = match_strdup(&args[0]);
 			if (!config->lowerdir)
@@ -543,7 +543,7 @@ static int ovl_fill_super(struct super_block *sb, void *data, int silent)
 
 	err = -EINVAL;
 	if (!ufs->config.upperdir || !ufs->config.lowerdir) {
-		printk(KERN_ERR "overlayfs: missing upperdir or lowerdir\n");
+		pr_err("overlayfs: missing upperdir or lowerdir\n");
 		goto out_free_config;
 	}
 
@@ -566,7 +566,7 @@ static int ovl_fill_super(struct super_block *sb, void *data, int silent)
 
 	err = vfs_statfs(&lowerpath, &statfs);
 	if (err) {
-		printk(KERN_ERR "overlayfs: statfs failed on lowerpath\n");
+		pr_err("overlayfs: statfs failed on lowerpath\n");
 		goto out_put_lowerpath;
 	}
 	ufs->lower_namelen = statfs.f_namelen;
@@ -576,7 +576,7 @@ static int ovl_fill_super(struct super_block *sb, void *data, int silent)
 
 	err = -EINVAL;
 	if (sb->s_stack_depth > FILESYSTEM_MAX_STACK_DEPTH) {
-		printk(KERN_ERR "overlayfs: maximum fs stacking depth exceeded\n");
+		pr_err("overlayfs: maximum fs stacking depth exceeded\n");
 		goto out_put_lowerpath;
 	}
 
@@ -584,14 +584,14 @@ static int ovl_fill_super(struct super_block *sb, void *data, int silent)
 	ufs->upper_mnt = clone_private_mount(&upperpath);
 	err = PTR_ERR(ufs->upper_mnt);
 	if (IS_ERR(ufs->upper_mnt)) {
-		printk(KERN_ERR "overlayfs: failed to clone upperpath\n");
+		pr_err("overlayfs: failed to clone upperpath\n");
 		goto out_put_lowerpath;
 	}
 
 	ufs->lower_mnt = clone_private_mount(&lowerpath);
 	err = PTR_ERR(ufs->lower_mnt);
 	if (IS_ERR(ufs->lower_mnt)) {
-		printk(KERN_ERR "overlayfs: failed to clone lowerpath\n");
+		pr_err("overlayfs: failed to clone lowerpath\n");
 		goto out_put_upper_mnt;
 	}
 
@@ -670,6 +670,7 @@ static struct file_system_type ovl_fs_type = {
 	.mount		= ovl_mount,
 	.kill_sb	= kill_anon_super,
 };
+MODULE_ALIAS_FS("overlayfs");
 
 static int __init ovl_init(void)
 {

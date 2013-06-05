@@ -72,7 +72,7 @@ out:
 		 * There's no way to recover from failure to whiteout.
 		 * What should we do?  Log a big fat error and... ?
 		 */
-		printk(KERN_ERR "overlayfs: ERROR - failed to whiteout '%s'\n",
+		pr_err("overlayfs: ERROR - failed to whiteout '%s'\n",
 		       dentry->d_name.name);
 	}
 
@@ -445,8 +445,10 @@ static int ovl_link(struct dentry *old, struct inode *newdir,
 		}
 		newinode = ovl_new_inode(old->d_sb, newdentry->d_inode->i_mode,
 				new->d_fsdata);
-		if (!newinode)
+		if (!newinode) {
+			err = -ENOMEM;
 			goto link_fail;
+		}
 		ovl_copyattr(upperdir->d_inode, newinode);
 
 		ovl_dentry_version_inc(new->d_parent);
@@ -463,7 +465,6 @@ out_unlock:
 	mutex_unlock(&upperdir->d_inode->i_mutex);
 out:
 	return err;
-
 }
 
 static int ovl_rename(struct inode *olddir, struct dentry *old,

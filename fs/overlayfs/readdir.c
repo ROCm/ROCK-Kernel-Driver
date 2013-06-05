@@ -354,7 +354,7 @@ static loff_t ovl_dir_llseek(struct file *file, loff_t offset, int origin)
 	loff_t res;
 	struct ovl_dir_file *od = file->private_data;
 
-	mutex_lock(&file->f_dentry->d_inode->i_mutex);
+	mutex_lock(&file_inode(file)->i_mutex);
 	if (!file->f_pos)
 		ovl_dir_reset(file);
 
@@ -384,7 +384,7 @@ static loff_t ovl_dir_llseek(struct file *file, loff_t offset, int origin)
 		res = offset;
 	}
 out_unlock:
-	mutex_unlock(&file->f_dentry->d_inode->i_mutex);
+	mutex_unlock(&file_inode(file)->i_mutex);
 
 	return res;
 }
@@ -530,7 +530,7 @@ static int ovl_remove_whiteouts(struct dentry *dir, struct list_head *list)
 
 		dentry = lookup_one_len(p->name, upperdir, p->len);
 		if (IS_ERR(dentry)) {
-			printk(KERN_WARNING
+			pr_warn(
 			    "overlayfs: failed to lookup whiteout %.*s: %li\n",
 			    p->len, p->name, PTR_ERR(dentry));
 			continue;
@@ -538,7 +538,7 @@ static int ovl_remove_whiteouts(struct dentry *dir, struct list_head *list)
 		ret = vfs_unlink(upperdir->d_inode, dentry);
 		dput(dentry);
 		if (ret)
-			printk(KERN_WARNING
+			pr_warn(
 			    "overlayfs: failed to unlink whiteout %.*s: %i\n",
 			    p->len, p->name, ret);
 	}
