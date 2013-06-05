@@ -14,9 +14,14 @@
 #include <linux/wait.h>
 #include <linux/sched.h>
 #include <linux/atomic.h>
+#ifndef CONFIG_XEN
 #include <xen/events.h>
 #include <asm/xen/pci.h>
 #include <asm/xen/hypervisor.h>
+#else
+#include <xen/evtchn.h>
+#endif
+#include <xen/xen.h>
 #include <xen/interface/physdev.h>
 #include "pciback.h"
 #include "conf_space.h"
@@ -95,7 +100,9 @@ static void pcistub_device_release(struct kref *kref)
 
 	dev_dbg(&dev->dev, "pcistub_device_release\n");
 
+#ifndef CONFIG_XEN
 	xen_unregister_device_domain_owner(dev);
+#endif
 
 	/* Call the reset function which does not take lock as this
 	 * is called from "unbind" which takes a device_lock mutex.
@@ -278,7 +285,9 @@ void pcistub_put_pci_dev(struct pci_dev *dev)
 	xen_pcibk_config_free_dyn_fields(found_psdev->dev);
 	xen_pcibk_config_reset_dev(found_psdev->dev);
 
+#ifndef CONFIG_XEN
 	xen_unregister_device_domain_owner(found_psdev->dev);
+#endif
 
 	spin_lock_irqsave(&found_psdev->lock, flags);
 	found_psdev->pdev = NULL;
@@ -338,19 +347,25 @@ static int pcistub_init_device(struct pci_dev *dev)
 	 * would need to be called somewhere to free the memory allocated
 	 * here and then to call kfree(pci_get_drvdata(psdev->dev)).
 	 */
+#ifndef CONFIG_XEN
 	dev_data = kzalloc(sizeof(*dev_data) +  strlen(DRV_NAME "[]")
 				+ strlen(pci_name(dev)) + 1, GFP_ATOMIC);
+#else
+	dev_data = kzalloc(sizeof(*dev_data), GFP_ATOMIC);
+#endif
 	if (!dev_data) {
 		err = -ENOMEM;
 		goto out;
 	}
 	pci_set_drvdata(dev, dev_data);
 
+#ifndef CONFIG_XEN
 	/*
 	 * Setup name for fake IRQ handler. It will only be enabled
 	 * once the device is turned on by the guest.
 	 */
 	sprintf(dev_data->irq_name, DRV_NAME "[%s]", pci_name(dev));
+#endif
 
 	dev_dbg(&dev->dev, "initializing config\n");
 
@@ -511,6 +526,16 @@ static int pcistub_probe(struct pci_dev *dev, const struct pci_device_id *id)
 
 		dev_info(&dev->dev, "seizing device\n");
 		err = pcistub_seize(dev);
+#ifdef CONFIG_PCI_GUESTDEV
+	} else if (dev->hdr_type == PCI_HEADER_TYPE_NORMAL) {
+		if (!pci_is_guestdev(dev)) {
+			err = -ENODEV;
+			goto out;
+		}
+
+		dev_info(&dev->dev, "seizing device\n");
+		err = pcistub_seize(dev);
+#endif /* CONFIG_PCI_GUESTDEV */
 	} else
 		/* Didn't find the device */
 		err = -ENODEV;
@@ -915,8 +940,10 @@ static const struct pci_error_handlers xen_pcibk_error_handler = {
  */
 
 static struct pci_driver xen_pcibk_pci_driver = {
+#ifndef CONFIG_XEN
 	/* The name should be xen_pciback, but until the tools are updated
 	 * we will keep it as pciback. */
+#endif
 	.name = "pciback",
 	.id_table = pcistub_ids,
 	.probe = pcistub_probe,
@@ -1160,6 +1187,7 @@ static ssize_t pcistub_slot_show(struct device_driver *drv, char *buf)
 }
 static DRIVER_ATTR(slots, S_IRUSR, pcistub_slot_show, NULL);
 
+#ifndef CONFIG_XEN
 static ssize_t pcistub_irq_handler_show(struct device_driver *drv, char *buf)
 {
 	struct pcistub_device *psdev;
@@ -1226,6 +1254,7 @@ out:
 }
 static DRIVER_ATTR(irq_handler_state, S_IWUSR, NULL,
 		   pcistub_irq_handler_switch);
+#endif
 
 static ssize_t pcistub_quirk_add(struct device_driver *drv, const char *buf,
 				 size_t count)
@@ -1357,6 +1386,21 @@ static ssize_t permissive_show(struct device_driver *drv, char *buf)
 static DRIVER_ATTR(permissive, S_IRUSR | S_IWUSR, permissive_show,
 		   permissive_add);
 
+#if defined(CONFIG_XEN) && defined(CONFIG_PCI_MSI)
+static int xen_pcibk_get_owner(struct pci_dev *dev)
+{
+	struct pcistub_device *psdev;
+
+	psdev = pcistub_device_find(pci_domain_nr(dev->bus), dev->bus->number,
+			PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
+
+	if (!psdev || !psdev->pdev)
+		return -1;
+
+	return psdev->pdev->xdev->otherend_id;
+}
+#endif
+
 static void pcistub_exit(void)
 {
 	driver_remove_file(&xen_pcibk_pci_driver.driver, &driver_attr_new_slot);
@@ -1366,10 +1410,14 @@ static void pcistub_exit(void)
 	driver_remove_file(&xen_pcibk_pci_driver.driver, &driver_attr_quirks);
 	driver_remove_file(&xen_pcibk_pci_driver.driver,
 			   &driver_attr_permissive);
+#if !defined(CONFIG_XEN)
 	driver_remove_file(&xen_pcibk_pci_driver.driver,
 			   &driver_attr_irq_handlers);
 	driver_remove_file(&xen_pcibk_pci_driver.driver,
 			   &driver_attr_irq_handler_state);
+#elif defined(CONFIG_PCI_MSI)
+	WARN_ON(unregister_msi_get_owner(xen_pcibk_get_owner));
+#endif
 	pci_unregister_driver(&xen_pcibk_pci_driver);
 }
 
@@ -1457,12 +1505,17 @@ static int __init pcistub_init(void)
 		err = driver_create_file(&xen_pcibk_pci_driver.driver,
 					 &driver_attr_permissive);
 
+#if !defined(CONFIG_XEN)
 	if (!err)
 		err = driver_create_file(&xen_pcibk_pci_driver.driver,
 					 &driver_attr_irq_handlers);
 	if (!err)
 		err = driver_create_file(&xen_pcibk_pci_driver.driver,
 					&driver_attr_irq_handler_state);
+#elif defined(CONFIG_PCI_MSI)
+	if (!err)
+		err = register_msi_get_owner(xen_pcibk_get_owner);
+#endif
 	if (err)
 		pcistub_exit();
 

@@ -26,6 +26,7 @@
 
 #define gtod (&VVAR(vsyscall_gtod_data))
 
+#ifndef CONFIG_XEN
 notrace static cycle_t vread_tsc(void)
 {
 	cycle_t ret;
@@ -62,6 +63,7 @@ static notrace cycle_t vread_hpet(void)
 {
 	return readl((const void __iomem *)fix_to_virt(VSYSCALL_HPET) + HPET_COUNTER);
 }
+#endif /* CONFIG_XEN */
 
 #ifdef CONFIG_PARAVIRT_CLOCK
 
@@ -155,16 +157,25 @@ notrace static inline u64 vgetsns(int *mode)
 {
 	long v;
 	cycles_t cycles;
-	if (gtod->clock.vclock_mode == VCLOCK_TSC)
+
+	switch (*mode) {
+#ifndef CONFIG_XEN
+	case VCLOCK_TSC:
 		cycles = vread_tsc();
-	else if (gtod->clock.vclock_mode == VCLOCK_HPET)
+		break;
+	case VCLOCK_HPET:
 		cycles = vread_hpet();
-#ifdef CONFIG_PARAVIRT_CLOCK
-	else if (gtod->clock.vclock_mode == VCLOCK_PVCLOCK)
-		cycles = vread_pvclock(mode);
+		break;
 #endif
-	else
+#ifdef CONFIG_PARAVIRT_CLOCK
+	case VCLOCK_PVCLOCK:
+		cycles = vread_pvclock(mode);
+		break;
+#endif
+	default:
+		*mode = VCLOCK_NONE;
 		return 0;
+	}
 	v = (cycles - gtod->clock.cycle_last) & gtod->clock.mask;
 	return v * gtod->clock.mult;
 }
@@ -261,6 +272,7 @@ notrace int __vdso_gettimeofday(struct timeval *tv, struct timezone *tz)
 {
 	long ret = VCLOCK_NONE;
 
+#ifndef CONFIG_XEN
 	if (likely(tv != NULL)) {
 		BUILD_BUG_ON(offsetof(struct timeval, tv_usec) !=
 			     offsetof(struct timespec, tv_nsec) ||
@@ -273,6 +285,7 @@ notrace int __vdso_gettimeofday(struct timeval *tv, struct timezone *tz)
 		tz->tz_minuteswest = gtod->sys_tz.tz_minuteswest;
 		tz->tz_dsttime = gtod->sys_tz.tz_dsttime;
 	}
+#endif
 
 	if (ret == VCLOCK_NONE)
 		return vdso_fallback_gtod(tv, tz);

@@ -15,7 +15,7 @@
  */
 
 #include <linux/context_tracking.h>
-#include <linux/kvm_host.h>
+#include <linux/kconfig.h>
 #include <linux/rcupdate.h>
 #include <linux/sched.h>
 #include <linux/hardirq.h>
@@ -103,6 +103,10 @@ void user_exit(void)
 	local_irq_restore(flags);
 }
 
+#if IS_ENABLED(CONFIG_KVM)
+
+#include <linux/kvm_host.h>
+
 void guest_enter(void)
 {
 	if (vtime_accounting_enabled())
@@ -121,6 +125,7 @@ void guest_exit(void)
 }
 EXPORT_SYMBOL_GPL(guest_exit);
 
+#endif
 
 /**
  * context_tracking_task_switch - context switch the syscall callbacks

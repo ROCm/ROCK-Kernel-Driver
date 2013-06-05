@@ -17,6 +17,7 @@
 SVGA_MODE	:= -DSVGA_MODE=NORMAL_VGA
 
 targets		:= vmlinux.bin setup.bin setup.elf bzImage
+targets		+= vmlinuz vmlinux-stripped
 targets		+= fdimage fdimage144 fdimage288 image.iso mtools.conf
 subdir-		:= compressed
 
@@ -33,6 +34,8 @@ setup-$(CONFIG_X86_APM_BOOT) += apm.o
 setup-y		+= video-vga.o
 setup-y		+= video-vesa.o
 setup-y		+= video-bios.o
+
+setup-$(CONFIG_XEN) := header.o version.o
 
 targets		+= $(setup-y)
 hostprogs-y	:= mkcpustr tools/build
@@ -190,6 +193,20 @@ bzlilo: $(obj)/bzImage
 	cp System.map $(INSTALL_PATH)/
 	if [ -x /sbin/lilo ]; then /sbin/lilo; else /etc/lilo/install; fi
 
+$(obj)/vmlinuz: $(obj)/vmlinux-stripped FORCE
+	$(call if_changed,gzip)
+	@echo 'Kernel: $@ is ready' ' (#'`cat .version`')'
+
+$(obj)/vmlinux-stripped: OBJCOPYFLAGS := -g --strip-unneeded
+$(obj)/vmlinux-stripped: vmlinux FORCE
+	$(call if_changed,objcopy)
+
+ifneq ($(CONFIG_XEN)-$(CONFIG_XEN_BZIMAGE),y-)
+bzImage := bzImage
+else
+bzImage := vmlinuz
+endif
+
 install:
-	sh $(srctree)/$(src)/install.sh $(KERNELRELEASE) $(obj)/bzImage \
+	sh $(srctree)/$(src)/install.sh $(KERNELRELEASE) $(obj)/$(bzImage) \
 		System.map "$(INSTALL_PATH)"

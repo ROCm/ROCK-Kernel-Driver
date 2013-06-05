@@ -46,7 +46,7 @@
 struct device_attribute;
 /*The limit of outstanding scsi command that firmware can handle*/
 #define ARCMSR_MAX_OUTSTANDING_CMD						256
-#ifdef CONFIG_XEN
+#if defined(CONFIG_XEN) || defined(CONFIG_PARAVIRT_XEN)
 	#define ARCMSR_MAX_FREECCB_NUM	160
 #else
 	#define ARCMSR_MAX_FREECCB_NUM	320

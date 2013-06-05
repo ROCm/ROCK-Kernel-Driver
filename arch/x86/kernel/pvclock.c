@@ -24,6 +24,7 @@
 #include <asm/fixmap.h>
 #include <asm/pvclock.h>
 
+#ifndef CONFIG_XEN
 static u8 valid_flags __read_mostly = 0;
 
 void pvclock_set_flags(u8 flags)
@@ -127,6 +128,7 @@ void pvclock_read_wallclock(struct pvclock_wall_clock *wall_clock,
 
 	set_normalized_timespec(ts, now.tv_sec, now.tv_nsec);
 }
+#endif /* !CONFIG_XEN */
 
 static struct pvclock_vsyscall_time_info *pvclock_vdso_info;
 

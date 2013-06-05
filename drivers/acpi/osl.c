@@ -77,8 +77,8 @@ EXPORT_SYMBOL(acpi_in_debugger);
 extern char line_buf[80];
 #endif				/*ENABLE_DEBUGGER */
 
-static int (*__acpi_os_prepare_sleep)(u8 sleep_state, u32 pm1a_ctrl,
-				      u32 pm1b_ctrl);
+static int (*__acpi_os_prepare_sleep)(u8 sleep_state, u32 val_a, u32 val_b,
+				      bool extended);
 
 static acpi_osd_handler acpi_irq_handler;
 static void *acpi_irq_context;
@@ -325,7 +325,11 @@ acpi_map_lookup_virt(void __iomem *virt, acpi_size size)
 }
 
 #ifndef CONFIG_IA64
+#ifndef CONFIG_XEN
 #define should_use_kmap(pfn)   page_is_ram(pfn)
+#else
+#define should_use_kmap(mfn)   pfn_valid(pfn = mfn_to_local_pfn(mfn))
+#endif
 #else
 /* ioremap will take care of cache attributes */
 #define should_use_kmap(pfn)   0
@@ -1757,13 +1761,13 @@ acpi_status acpi_os_terminate(void)
 	return AE_OK;
 }
 
-acpi_status acpi_os_prepare_sleep(u8 sleep_state, u32 pm1a_control,
-				  u32 pm1b_control)
+acpi_status acpi_os_prepare_sleep(u8 sleep_state, u32 val_a, u32 val_b,
+				  bool extended)
 {
 	int rc = 0;
 	if (__acpi_os_prepare_sleep)
-		rc = __acpi_os_prepare_sleep(sleep_state,
-					     pm1a_control, pm1b_control);
+		rc = __acpi_os_prepare_sleep(sleep_state, val_a, val_b,
+					     extended);
 	if (rc < 0)
 		return AE_ERROR;
 	else if (rc > 0)
@@ -1772,8 +1776,8 @@ acpi_status acpi_os_prepare_sleep(u8 sleep_state, u32 pm1a_control,
 	return AE_OK;
 }
 
-void acpi_os_set_prepare_sleep(int (*func)(u8 sleep_state,
-			       u32 pm1a_ctrl, u32 pm1b_ctrl))
+void acpi_os_set_prepare_sleep(int (*func)(u8 sleep_state, u32 val_a,
+					   u32 val_b, bool extended))
 {
 	__acpi_os_prepare_sleep = func;
 }

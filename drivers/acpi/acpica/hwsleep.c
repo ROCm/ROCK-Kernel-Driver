@@ -153,7 +153,7 @@ acpi_status acpi_hw_legacy_sleep(u8 sleep_state)
 	ACPI_FLUSH_CPU_CACHE();
 
 	status = acpi_os_prepare_sleep(sleep_state, pm1a_control,
-				       pm1b_control);
+				       pm1b_control, false);
 	if (ACPI_SKIP(status))
 		return_ACPI_STATUS(AE_OK);
 	if (ACPI_FAILURE(status))

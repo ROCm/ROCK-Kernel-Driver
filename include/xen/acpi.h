@@ -75,8 +75,8 @@ static inline int xen_acpi_get_pxm(acpi_handle h)
 	return -ENXIO;
 }
 
-int xen_acpi_notify_hypervisor_state(u8 sleep_state,
-				     u32 pm1a_cnt, u32 pm1b_cnd);
+int xen_acpi_notify_hypervisor_state(u8 sleep_state, u32 val_a, u32 val_b,
+				     bool extended);
 
 static inline void xen_acpi_sleep_register(void)
 {

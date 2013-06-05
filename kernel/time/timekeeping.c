@@ -22,6 +22,9 @@
 #include <linux/tick.h>
 #include <linux/stop_machine.h>
 #include <linux/pvclock_gtod.h>
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+#include <asm/time.h>
+#endif
 
 #include "tick-internal.h"
 #include "ntp_internal.h"
@@ -509,6 +512,10 @@ int do_settimeofday(const struct timespec *tv)
 	tk_set_xtime(tk, tv);
 
 	timekeeping_update(tk, true, true);
+
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+	xen_update_wallclock(tv);
+#endif
 
 	write_seqcount_end(&timekeeper_seq);
 	raw_spin_unlock_irqrestore(&timekeeper_lock, flags);

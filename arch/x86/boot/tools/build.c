@@ -42,8 +42,10 @@ typedef unsigned int   u32;
 #define DEFAULT_MINOR_ROOT 0
 #define DEFAULT_ROOT_DEV (DEFAULT_MAJOR_ROOT << 8 | DEFAULT_MINOR_ROOT)
 
+#ifndef CONFIG_XEN
 /* Minimal number of setup sectors */
 #define SETUP_SECT_MIN 5
+#endif
 #define SETUP_SECT_MAX 64
 
 /* This must be large enough to hold the entire setup */
@@ -291,8 +293,8 @@ int main(int argc, char ** argv)
 	c = fread(buf, 1, sizeof(buf), file);
 	if (ferror(file))
 		die("read-error on `setup'");
-	if (c < 1024)
-		die("The setup must be at least 1024 bytes");
+	if (c <= 512)
+		die("The setup must be more than 512 bytes");
 	if (get_unaligned_le16(&buf[510]) != 0xAA55)
 		die("Boot block hasn't got boot flag (0xAA55)");
 	fclose(file);
@@ -305,8 +307,10 @@ int main(int argc, char ** argv)
 
 	/* Pad unused space with zeros */
 	setup_sectors = (c + 511) / 512;
+#ifdef SETUP_SECT_MIN
 	if (setup_sectors < SETUP_SECT_MIN)
 		setup_sectors = SETUP_SECT_MIN;
+#endif
 	i = setup_sectors*512;
 	memset(buf+c, 0, i-c);
 

@@ -91,4 +91,13 @@ config TCG_ST33_I2C
         To compile this driver as a module, choose M here; the module will be
         called tpm_stm_st33_i2c.
 
+config TCG_XEN
+	tristate "XEN TPM Interface"
+	depends on XEN
+	---help---
+	  If you want to make TPM support available to a Xen user domain,
+	  say Yes and it will be accessible from within Linux.
+	  To compile this driver as a module, choose M here; the module
+	  will be called tpm_xenu.
+
 endif # TCG_TPM
