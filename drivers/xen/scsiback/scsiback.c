@@ -572,6 +572,15 @@ static int _scsiback_do_cmd_fn(struct vscsibk_info *info)
 	rp = ring->sring->req_prod;
 	rmb();
 
+	if (RING_REQUEST_PROD_OVERFLOW(ring, rp)) {
+		rc = ring->rsp_prod_pvt;
+		pr_warning("scsiback:"
+			   " Dom%d provided bogus ring requests (%#x - %#x = %u)."
+			   " Halting ring processing\n",
+			   info->domid, rp, rc, rp - rc);
+		return -EACCES;
+	}
+
 	while ((rc != rp)) {
 		if (RING_REQUEST_CONS_OVERFLOW(ring, rc))
 			break;
@@ -652,8 +661,18 @@ int scsiback_schedule(void *data)
 		info->waiting_reqs = 0;
 		smp_mb();
 
-		if (scsiback_do_cmd_fn(info))
+		switch (scsiback_do_cmd_fn(info)) {
+		case 1:
 			info->waiting_reqs = 1;
+		case 0:
+			break;
+		case -EACCES:
+			wait_event_interruptible(info->shutdown_wq,
+						 kthread_should_stop());
+			break;
+		default:
+			BUG();
+		}
 	}
 
 	return 0;

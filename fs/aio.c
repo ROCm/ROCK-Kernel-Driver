@@ -439,6 +439,15 @@ static void kill_ioctx(struct kioctx *ctx)
 	if (!atomic_xchg(&ctx->dead, 1)) {
 		hlist_del_rcu(&ctx->list);
 
+#ifdef CONFIG_EPOLL
+		/* forget the poll file, but it's up to the user to close it */
+		if (ctx->file) {
+			fput(ctx->file);
+			ctx->file->private_data = 0;
+			ctx->file = 0;
+		}
+#endif
+
 		/*
 		 * It'd be more correct to do this in free_ioctx(), after all
 		 * the outstanding kiocbs have finished - but by then io_destroy
@@ -456,15 +465,6 @@ static void kill_ioctx(struct kioctx *ctx)
 
 		/* Between hlist_del_rcu() and dropping the initial ref */
 		call_rcu(&ctx->rcu_head, kill_ioctx_rcu);
-
-#ifdef CONFIG_EPOLL
-		/* forget the poll file, but it's up to the user to close it */
-		if (ctx->file) {
-			fput(ctx->file);
-			ctx->file->private_data = 0;
-			ctx->file = 0;
-		}
-#endif
 	}
 }
 

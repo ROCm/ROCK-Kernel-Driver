@@ -91,6 +91,7 @@ struct vscsibk_info {
 	struct task_struct *kthread;
 	wait_queue_head_t waiting_to_free;
 	wait_queue_head_t wq;
+	wait_queue_head_t shutdown_wq;
 	unsigned int waiting_reqs;
 	struct page **mmap_pages;
 

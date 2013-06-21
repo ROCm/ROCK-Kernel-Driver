@@ -184,8 +184,11 @@ static int blktap_remove(struct xenbus_device *dev)
 		be->backend_watch.node = NULL;
 	}
 	if (be->blkif) {
-		if (be->blkif->xenblkd)
+		if (be->blkif->xenblkd) {
 			kthread_stop(be->blkif->xenblkd);
+			be->blkif->xenblkd = NULL;
+			wake_up(&be->blkif->shutdown_wq);
+		}
 		signal_tapdisk(be->blkif->dev_num);
 		tap_blkif_free(be->blkif, dev);
 		tap_blkif_kmem_cache_free(be->blkif);
@@ -336,6 +339,7 @@ static void blkif_disconnect(blkif_t *blkif)
 	if (blkif->xenblkd) {
 		kthread_stop(blkif->xenblkd);
 		blkif->xenblkd = NULL;
+		wake_up(&blkif->shutdown_wq);
 	}
 
 	/* idempotent */

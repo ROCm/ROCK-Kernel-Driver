@@ -75,6 +75,7 @@ typedef struct blkif_st {
 	unsigned long       st_wr_sect;
 
 	wait_queue_head_t waiting_to_free;
+	wait_queue_head_t shutdown_wq;
 
 	int		dev_num;
 	uint64_t        sectors;

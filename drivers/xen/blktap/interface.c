@@ -51,6 +51,7 @@ blkif_t *tap_alloc_blkif(domid_t domid)
 	init_waitqueue_head(&blkif->wq);
 	blkif->st_print = jiffies;
 	init_waitqueue_head(&blkif->waiting_to_free);
+	init_waitqueue_head(&blkif->shutdown_wq);
 
 	return blkif;
 }

@@ -55,6 +55,7 @@ struct vscsibk_info *vscsibk_info_alloc(domid_t domid)
 	spin_lock_init(&info->ring_lock);
 	atomic_set(&info->nr_unreplied_reqs, 0);
 	init_waitqueue_head(&info->wq);
+	init_waitqueue_head(&info->shutdown_wq);
 	init_waitqueue_head(&info->waiting_to_free);
 
 	return info;
@@ -102,6 +103,7 @@ void scsiback_disconnect(struct vscsibk_info *info)
 	if (info->kthread) {
 		kthread_stop(info->kthread);
 		info->kthread = NULL;
+		wake_up(&info->shutdown_wq);
 	}
 
 	wait_event(info->waiting_to_free, 

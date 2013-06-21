@@ -221,6 +221,7 @@ static inline int netbk_can_sg(struct net_device *dev)
 
 struct pending_tx_info {
 	netif_tx_request_t req;
+	grant_handle_t grant_handle;
 	netif_t *netif;
 };
 typedef unsigned int pending_ring_idx_t;
@@ -261,9 +262,11 @@ struct xen_netbk {
 		union {
 			gnttab_map_grant_ref_t map_ops[MAX_PENDING_REQS];
 			gnttab_unmap_grant_ref_t unmap_ops[MAX_PENDING_REQS];
+			gnttab_copy_t copy_ops[2 * MAX_PENDING_REQS - 1];
 			multicall_entry_t mcl[0];
 		};
-		grant_handle_t grant_handle[MAX_PENDING_REQS];
+		gnttab_copy_t copy_op;
+		netif_tx_request_t slots[XEN_NETIF_NR_SLOTS_MIN];
 	} tx;
 
 	wait_queue_head_t netbk_action_wq;

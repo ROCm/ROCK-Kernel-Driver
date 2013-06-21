@@ -175,21 +175,6 @@ typedef struct __name##_back_ring __name##_back_ring_t
     (_r)->sring = (_s);							\
 } while (0)
 
-/* Initialize to existing shared indexes -- for recovery */
-#define FRONT_RING_ATTACH(_r, _s, __size) do {				\
-    (_r)->sring = (_s);							\
-    (_r)->req_prod_pvt = (_s)->req_prod;				\
-    (_r)->rsp_cons = (_s)->rsp_prod;					\
-    (_r)->nr_ents = __RING_SIZE(_s, __size);				\
-} while (0)
-
-#define BACK_RING_ATTACH(_r, _s, __size) do {				\
-    (_r)->sring = (_s);							\
-    (_r)->rsp_prod_pvt = (_s)->rsp_prod;				\
-    (_r)->req_cons = (_s)->req_prod;					\
-    (_r)->nr_ents = __RING_SIZE(_s, __size);				\
-} while (0)
-
 /* How big is this ring? */
 #define RING_SIZE(_r)							\
     ((_r)->nr_ents)
@@ -235,6 +220,10 @@ typedef struct __name##_back_ring __name##_back_ring_t
 /* Loop termination condition: Would the specified index overflow the ring? */
 #define RING_REQUEST_CONS_OVERFLOW(_r, _cons)				\
     (((_cons) - (_r)->rsp_prod_pvt) >= RING_SIZE(_r))
+
+/* Ill-behaved frontend determination: Can there be this many requests? */
+#define RING_REQUEST_PROD_OVERFLOW(_r, _prod)				\
+    (((_prod) - (_r)->rsp_prod_pvt) > RING_SIZE(_r))
 
 #define RING_PUSH_REQUESTS(_r) do {					\
     xen_wmb(); /* back sees requests /before/ updated producer index */	\

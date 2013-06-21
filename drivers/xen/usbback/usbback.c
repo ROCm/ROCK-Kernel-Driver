@@ -1013,6 +1013,15 @@ static int usbbk_start_submit_urb(usbif_t *usbif)
 	rp = urb_ring->sring->req_prod;
 	rmb();
 
+	if (RING_REQUEST_PROD_OVERFLOW(urb_ring, rp)) {
+		rc = urb_ring->rsp_prod_pvt;
+		pr_warning("usbback:"
+			   " Dom%d provided bogus ring requests (%#x - %#x = %u)."
+			   " Halting ring processing on dev=%#x\n",
+			   usbif->domid, rp, rc, rp - rc, usbif->handle);
+		return -EACCES;
+	}
+
 	while (rc != rp) {
 		if (RING_REQUEST_CONS_OVERFLOW(urb_ring, rc)) {
 			if(printk_ratelimit())
@@ -1085,8 +1094,18 @@ int usbbk_schedule(void *arg)
 		usbif->waiting_reqs = 0;
 		smp_mb();
 
-		if (usbbk_start_submit_urb(usbif))
+		switch (usbbk_start_submit_urb(usbif)) {
+		case 1:
 			usbif->waiting_reqs = 1;
+		case 0:
+			break;
+		case -EACCES:
+			wait_event_interruptible(usbif->shutdown_wq,
+						 kthread_should_stop());
+			break;
+		default:
+			BUG();
+		}
 
 		usbbk_free_urbs();
 	}

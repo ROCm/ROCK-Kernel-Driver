@@ -104,6 +104,7 @@ typedef struct usbif_st {
 	unsigned int waiting_reqs;
 	wait_queue_head_t waiting_to_free;
 	wait_queue_head_t wq;
+	wait_queue_head_t shutdown_wq;
 } usbif_t;
 
 struct vusb_port_id {

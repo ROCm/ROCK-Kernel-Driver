@@ -435,7 +435,7 @@ int xen_get_topology_info(unsigned int cpu, u32 *core, u32 *sock, u32 *node)
 	nr = sysctl.v##ver.topologyinfo.max_cpu_index + 1;		\
 } while (0)
 
-	BUILD_BUG_ON(XEN_SYSCTL_INTERFACE_VERSION > 9);
+	BUILD_BUG_ON(XEN_SYSCTL_INTERFACE_VERSION > 10);
 	topologyinfo(10);
 /* #if CONFIG_XEN_COMPAT < 0x040300 */
 	if (rc)

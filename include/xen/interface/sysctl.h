@@ -34,7 +34,7 @@
 #include "xen.h"
 #include "domctl.h"
 
-#define XEN_SYSCTL_INTERFACE_VERSION 0x00000009
+#define XEN_SYSCTL_INTERFACE_VERSION 0x0000000A
 
 /*
  * Read console content from Xen buffer ring.
@@ -71,7 +71,7 @@ struct xen_sysctl_tbuf_op {
 #define XEN_SYSCTL_TBUFOP_disable      5
     uint32_t cmd;
     /* IN/OUT variables */
-    struct xenctl_cpumap cpu_mask;
+    struct xenctl_bitmap cpu_mask;
     uint32_t             evt_mask;
     /* OUT variables */
     uint64_aligned_t buffer_mfn;
@@ -101,6 +101,7 @@ struct xen_sysctl_physinfo {
     uint64_aligned_t total_pages;
     uint64_aligned_t free_pages;
     uint64_aligned_t scrub_pages;
+    uint64_aligned_t outstanding_pages;
     uint32_t hw_cap[8];
 
     /* XEN_SYSCTL_PHYSCAP_??? */
@@ -532,7 +533,7 @@ struct xen_sysctl_cpupool_op {
     uint32_t domid;       /* IN: M              */
     uint32_t cpu;         /* IN: AR             */
     uint32_t n_dom;       /*            OUT: I  */
-    struct xenctl_cpumap cpumap; /*     OUT: IF */
+    struct xenctl_bitmap cpumap; /*     OUT: IF */
 };
 typedef struct xen_sysctl_cpupool_op xen_sysctl_cpupool_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_cpupool_op_t);

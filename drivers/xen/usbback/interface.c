@@ -89,6 +89,7 @@ usbif_t *usbif_alloc(domid_t domid, unsigned int handle)
 	atomic_set(&usbif->refcnt, 0);
 	init_waitqueue_head(&usbif->wq);
 	init_waitqueue_head(&usbif->waiting_to_free);
+	init_waitqueue_head(&usbif->shutdown_wq);
 	spin_lock_init(&usbif->stub_lock);
 	INIT_LIST_HEAD(&usbif->stub_list);
 	spin_lock_init(&usbif->addr_lock);
@@ -155,6 +156,7 @@ void usbif_disconnect(usbif_t *usbif)
 	if (usbif->xenusbd) {
 		kthread_stop(usbif->xenusbd);
 		usbif->xenusbd = NULL;
+		wake_up(&usbif->shutdown_wq);
 	}
 
 	spin_lock_irqsave(&usbif->stub_lock, flags);
