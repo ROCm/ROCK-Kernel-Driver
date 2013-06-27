@@ -73,6 +73,8 @@ static int ovl_copy_up_data(struct path *old, struct path *new, loff_t len)
 {
 	struct file *old_file;
 	struct file *new_file;
+	loff_t old_pos = 0;
+	loff_t new_pos = 0;
 	int error = 0;
 
 	if (len == 0)
@@ -90,7 +92,6 @@ static int ovl_copy_up_data(struct path *old, struct path *new, loff_t len)
 
 	/* FIXME: copy up sparse files efficiently */
 	while (len) {
-		loff_t offset = new_file->f_pos;
 		size_t this_len = OVL_COPY_UP_CHUNK_SIZE;
 		long bytes;
 
@@ -102,8 +103,9 @@ static int ovl_copy_up_data(struct path *old, struct path *new, loff_t len)
 			break;
 		}
 
-		bytes = do_splice_direct(old_file, &offset, new_file, this_len,
-				 SPLICE_F_MOVE);
+		bytes = do_splice_direct(old_file, &old_pos,
+					 new_file, &new_pos,
+					 this_len, SPLICE_F_MOVE);
 		if (bytes <= 0) {
 			error = bytes;
 			break;
