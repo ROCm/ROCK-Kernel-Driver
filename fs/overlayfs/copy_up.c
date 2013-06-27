@@ -15,6 +15,7 @@
 #include <linux/security.h>
 #include <linux/uaccess.h>
 #include <linux/sched.h>
+#include "internal.h"
 #include "overlayfs.h"
 
 #define OVL_COPY_UP_CHUNK_SIZE (1 << 20)
@@ -90,9 +91,10 @@ static int ovl_copy_up_data(struct path *old, struct path *new, loff_t len)
 
 	/* FIXME: copy up sparse files efficiently */
 	while (len) {
-		loff_t offset = new_file->f_pos;
-		size_t this_len = OVL_COPY_UP_CHUNK_SIZE;
+		loff_t ipos, opos;
+		loff_t this_len = OVL_COPY_UP_CHUNK_SIZE;
 		long bytes;
+		ipos = opos = new_file->f_pos;
 
 		if (len < this_len)
 			this_len = len;
@@ -102,8 +104,8 @@ static int ovl_copy_up_data(struct path *old, struct path *new, loff_t len)
 			break;
 		}
 
-		bytes = do_splice_direct(old_file, &offset, new_file, this_len,
-				 SPLICE_F_MOVE);
+		bytes = do_splice_direct(old_file, &ipos, new_file, &opos,
+					 this_len, SPLICE_F_MOVE);
 		if (bytes <= 0) {
 			error = bytes;
 			break;
