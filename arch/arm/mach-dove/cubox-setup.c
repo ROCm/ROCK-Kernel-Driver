@@ -98,6 +98,6 @@ MACHINE_START(CUBOX, "SolidRun CuBox")
 	.map_io		= dove_map_io,
 	.init_early	= dove_init_early,
 	.init_irq	= dove_init_irq,
-	.timer		= &dove_timer,
+	.init_time      = dove_timer_init,
 	.restart	= dove_restart,
 MACHINE_END
