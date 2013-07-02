@@ -233,8 +233,7 @@ static void flush_notify_list(netif_t *list, unsigned int idx,
 static void netbk_rx_schedule(struct xen_netbk_rx *netbk)
 {
 	if (use_kthreads)
-		wake_up(&container_of(netbk, struct xen_netbk,
-				      rx)->netbk_action_wq);
+		wake_up(&container_of(netbk, struct xen_netbk, rx)->action_wq);
 	else
 		tasklet_schedule(&netbk->tasklet);
 }
@@ -242,7 +241,7 @@ static void netbk_rx_schedule(struct xen_netbk_rx *netbk)
 static void netbk_tx_schedule(struct xen_netbk *netbk)
 {
 	if (use_kthreads)
-		wake_up(&netbk->netbk_action_wq);
+		wake_up(&netbk->action_wq);
 	else
 		tasklet_schedule(&netbk->tx.tasklet);
 }
@@ -2012,7 +2011,7 @@ static int netbk_action_thread(void *index)
 	struct xen_netbk *netbk = &xen_netbk[group];
 
 	while (!kthread_should_stop()) {
-		wait_event_interruptible(netbk->netbk_action_wq,
+		wait_event_interruptible(netbk->action_wq,
 					 rx_work_todo(netbk) ||
 					 tx_work_todo(netbk) ||
 					 kthread_should_stop());
@@ -2103,7 +2102,7 @@ static int __init netback_init(void)
 		}
 
 		if (use_kthreads) {
-			init_waitqueue_head(&netbk->netbk_action_wq);
+			init_waitqueue_head(&netbk->action_wq);
 			netbk->task = kthread_create(netbk_action_thread,
 						     (void *)(long)group,
 						     "netback/%u", group);

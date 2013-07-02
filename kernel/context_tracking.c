@@ -15,7 +15,6 @@
  */
 
 #include <linux/context_tracking.h>
-#include <linux/kconfig.h>
 #include <linux/rcupdate.h>
 #include <linux/sched.h>
 #include <linux/hardirq.h>
@@ -143,9 +142,7 @@ void user_exit(void)
 	local_irq_restore(flags);
 }
 
-#if IS_ENABLED(CONFIG_KVM)
-
-#include <linux/kvm_host.h>
+#ifndef CONFIG_XEN
 
 void guest_enter(void)
 {
@@ -165,7 +162,7 @@ void guest_exit(void)
 }
 EXPORT_SYMBOL_GPL(guest_exit);
 
-#endif
+#endif /* CONFIG_XEN */
 
 /**
  * context_tracking_task_switch - context switch the syscall callbacks

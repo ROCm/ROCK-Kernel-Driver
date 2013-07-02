@@ -269,7 +269,7 @@ struct xen_netbk {
 		netif_tx_request_t slots[XEN_NETIF_NR_SLOTS_MIN];
 	} tx;
 
-	wait_queue_head_t netbk_action_wq;
+	wait_queue_head_t action_wq;
 	struct task_struct *task;
 
 	struct xen_netbk_rx {

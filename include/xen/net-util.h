@@ -14,6 +14,7 @@ static inline int skb_checksum_setup(struct sk_buff *skb,
 	__be16 *csum = NULL;
 	int err = -EPROTO;
 
+	skb_reset_network_header(skb);
 	if (skb->ip_summed != CHECKSUM_PARTIAL) {
 		/* A non-CHECKSUM_PARTIAL SKB does not require setup. */
 		if (!skb_is_gso(skb))
@@ -60,6 +61,8 @@ static inline int skb_checksum_setup(struct sk_buff *skb,
 					   IPPROTO_TCP, 0);
 		skb->ip_summed = CHECKSUM_PARTIAL;
 	}
+
+	skb_probe_transport_header(skb, 0);
 
 	err = 0;
 out:
