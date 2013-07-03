@@ -71,6 +71,29 @@ static void s5p_setup_vbus_gpio(struct platform_device *pdev)
 		dev_err(dev, "can't request ehci vbus gpio %d", gpio);
 }
 
+static void s5p_setup_reset_gpio(struct platform_device *pdev)
+{
+	struct device *dev = &pdev->dev;
+	int err;
+	int gpio;
+
+	if (!dev->of_node)
+		return;
+
+	gpio = of_get_named_gpio(dev->of_node, "samsung,reset-gpio", 0);
+	if (!gpio_is_valid(gpio))
+		return;
+
+	/* reset pulls the line down, then up again */
+	err = devm_gpio_request_one(dev, gpio, GPIOF_OUT_INIT_LOW,
+				    "ehci_reset_gpio");
+	if (err)
+		dev_err(dev, "can't request ehci reset gpio %d", gpio);
+
+	mdelay(1);
+	__gpio_set_value(gpio, 1);
+}
+
 static int s5p_ehci_probe(struct platform_device *pdev)
 {
 	struct s5p_ehci_platdata *pdata = pdev->dev.platform_data;
@@ -115,6 +138,8 @@ static int s5p_ehci_probe(struct platform_device *pdev)
 		s5p_ehci->phy = phy;
 		s5p_ehci->otg = phy->otg;
 	}
+
+	s5p_setup_reset_gpio(pdev);
 
 	s5p_ehci->clk = devm_clk_get(&pdev->dev, "usbhost");
 

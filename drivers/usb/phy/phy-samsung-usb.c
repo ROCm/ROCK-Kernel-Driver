@@ -234,3 +234,7 @@ int samsung_usbphy_get_refclk_freq(struct samsung_usbphy *sphy)
 	return refclk_freq;
 }
 EXPORT_SYMBOL_GPL(samsung_usbphy_get_refclk_freq);
+
+MODULE_DESCRIPTION("Samsung USB phy controller helpers");
+MODULE_AUTHOR("Praveen Paneri <p.paneri@samsung.com>");
+MODULE_LICENSE("GPL");
