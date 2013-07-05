@@ -194,6 +194,7 @@ static struct platform_driver dw_mci_exynos_pltfm_driver = {
 	.remove		= __exit_p(dw_mci_pltfm_remove),
 	.driver		= {
 		.name		= "dwmmc_exynos",
+		.owner		= THIS_MODULE,
 		.of_match_table	= dw_mci_exynos_match,
 		.pm		= &dw_mci_pltfm_pmops,
 	},
