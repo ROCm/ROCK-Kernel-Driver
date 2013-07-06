@@ -21,6 +21,8 @@
 #include <linux/of.h>
 #include <linux/of_irq.h>
 #include <linux/of_address.h>
+#include <linux/cpuidle.h>
+#include <linux/cpufreq.h>
 
 #include <linux/mm.h>
 
@@ -274,6 +276,11 @@ static int __init xen_pm_init(void)
 {
 	pm_power_off = xen_power_off;
 	arm_pm_restart = xen_restart;
+	/*
+	 * Making sure board specific code will not set up ops for
+	 * cpu idle and cpu freq
+	 */
+	disable_cpuidle();
 
 	return 0;
 }
