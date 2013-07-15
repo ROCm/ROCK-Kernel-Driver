@@ -228,9 +228,9 @@ typedef unsigned int pending_ring_idx_t;
 
 struct netbk_rx_meta {
 	skb_frag_t frag;
-	int id;
+	u16 id;
+	u8 copy:2;
 	u8 tail:1;
-	u8 copy:1;
 };
 
 struct netbk_tx_pending_inuse {
@@ -279,7 +279,7 @@ struct xen_netbk {
 		unsigned int alloc_index;
 		struct multicall_entry mcl[NET_RX_RING_SIZE+3];
 		struct mmu_update mmu[NET_RX_RING_SIZE];
-		struct gnttab_copy grant_copy_op[NET_RX_RING_SIZE];
+		struct gnttab_copy grant_copy_op[2 * NET_RX_RING_SIZE];
 		struct gnttab_transfer grant_trans_op;
 		struct netbk_rx_meta meta[NET_RX_RING_SIZE];
 		unsigned long mfn_list[MAX_MFN_ALLOC];

@@ -55,6 +55,12 @@ static bool __initdata bind_threads;
 
 #define GET_GROUP_INDEX(netif) ((netif)->group)
 
+struct netbk_rx_cb {
+	unsigned int nr_frags;
+	unsigned int nr_slots;
+};
+#define netbk_rx_cb(skb) ((struct netbk_rx_cb *)skb->cb)
+
 struct netbk_tx_cb {
 	u16 copy_slots;
 	u16 pending_idx[1 + XEN_NETIF_NR_SLOTS_MIN];
@@ -112,19 +118,16 @@ static inline void netif_set_page_ext(struct page *pg, unsigned int group,
 	pg->mapping = ext.mapping;
 }
 
-static inline unsigned int netif_page_group(const struct page *pg)
-{
-	union page_ext ext = { .mapping = pg->mapping };
-
-	return ext.e.grp - 1;
-}
-
-static inline unsigned int netif_page_index(const struct page *pg)
-{
-	union page_ext ext = { .mapping = pg->mapping };
-
-	return ext.e.idx;
-}
+#define netif_get_page_ext(pg, netbk, index) do { \
+	const struct page *pg__ = (pg); \
+	union page_ext ext__ = { .mapping = pg__->mapping }; \
+	unsigned int grp__ = ext__.e.grp - 1; \
+	unsigned int idx__ = index = ext__.e.idx; \
+	netbk = grp__ < netbk_nr_groups ? &xen_netbk[grp__] : NULL; \
+	if (!PageForeign(pg__) || idx__ >= MAX_PENDING_REQS || \
+	    (netbk && netbk->tx.mmap_pages[idx__] != pg__)) \
+		netbk = NULL; \
+} while (0)
 
 static u16 frag_get_pending_idx(const skb_frag_t *frag)
 {
@@ -246,9 +249,9 @@ static void netbk_tx_schedule(struct xen_netbk *netbk)
 		tasklet_schedule(&netbk->tx.tasklet);
 }
 
-static inline void maybe_schedule_tx_action(unsigned int group)
+static inline void maybe_schedule_tx_action(netif_t *netif)
 {
-	struct xen_netbk *netbk = &xen_netbk[group];
+	struct xen_netbk *netbk = &xen_netbk[GET_GROUP_INDEX(netif)];
 
 	smp_mb();
 	if ((nr_pending_reqs(netbk) < (MAX_PENDING_REQS/2)) &&
@@ -334,14 +337,15 @@ static struct sk_buff *netbk_copy_skb(struct sk_buff *skb)
 	return NULL;
 }
 
-static inline int netbk_max_required_rx_slots(netif_t *netif)
+static inline unsigned int netbk_max_required_rx_slots(const netif_t *netif)
 {
-	if (netif->can_sg || netif->gso)
-		return MAX_SKB_FRAGS + 2; /* header + extra_info + frags */
-	return 1; /* all in one */
+	return netif->can_sg || netif->gso
+	       ? max_t(unsigned int, XEN_NETIF_NR_SLOTS_MIN,
+		       MAX_SKB_FRAGS + 2/* header + extra_info + frags */)
+	       : 1; /* all in one */
 }
 
-static inline int netbk_queue_full(netif_t *netif)
+static inline bool netbk_queue_full(const netif_t *netif)
 {
 	RING_IDX peek   = netif->rx_req_cons_peek;
 	RING_IDX needed = netbk_max_required_rx_slots(netif);
@@ -357,17 +361,19 @@ static void tx_queue_callback(unsigned long data)
 		netif_wake_queue(netif->dev);
 }
 
-static unsigned int netbk_count_slots(const struct skb_shared_info *shinfo)
+static unsigned int netbk_count_slots(const struct skb_shared_info *shinfo,
+				      bool copying)
 {
 	unsigned int i, slots;
 
 	for (slots = i = 0; i < shinfo->nr_frags; ++i) {
 		const skb_frag_t *frag = shinfo->frags + i;
-		unsigned int len = skb_frag_size(frag);
+		unsigned int len = skb_frag_size(frag), offs;
 
 		if (!len)
 			continue;
-		slots += PFN_UP((frag->page_offset & ~PAGE_MASK) + len);
+		offs = copying ? 0 : offset_in_page(frag->page_offset);
+		slots += PFN_UP(offs + len);
 	}
 
 	return slots;
@@ -408,8 +414,10 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		skb = nskb;
 	}
 
-	netif->rx_req_cons_peek += 1 + netbk_count_slots(skb_shinfo(skb)) +
-				   !!skb_shinfo(skb)->gso_size;
+	netbk_rx_cb(skb)->nr_slots = 1 + !!skb_shinfo(skb)->gso_size +
+				     netbk_count_slots(skb_shinfo(skb),
+						       netif->copying_receiver);
+	netif->rx_req_cons_peek += netbk_rx_cb(skb)->nr_slots;
 	netif_get(netif);
 
 	if (netbk_can_queue(dev) && netbk_queue_full(netif)) {
@@ -477,57 +485,52 @@ struct netrx_pending_operations {
 
 /* Set up the grant operations for this fragment.  If it's a flipping
    interface, we also set up the unmap request from here. */
-static u16 netbk_gop_frag(netif_t *netif, struct netbk_rx_meta *meta,
-			  int i, struct netrx_pending_operations *npo,
-			  struct page *page, unsigned long size,
-			  unsigned long offset)
+static void netbk_gop_frag(netif_t *netif, struct netbk_rx_meta *meta,
+			   unsigned int i,
+			   struct netrx_pending_operations *npo,
+			   struct page *page, unsigned int size,
+			   unsigned int offset)
 {
 	mmu_update_t *mmu;
 	gnttab_transfer_t *gop;
 	gnttab_copy_t *copy_gop;
 	multicall_entry_t *mcl;
 	netif_rx_request_t *req;
-	unsigned long old_mfn, new_mfn;
-
-	old_mfn = virt_to_mfn(page_address(page));
 
 	req = RING_GET_REQUEST(&netif->rx, netif->rx.req_cons + i);
 	if (netif->copying_receiver) {
-		unsigned int group, idx;
+		struct xen_netbk *netbk;
+		unsigned int idx;
 
 		/* The fragment needs to be copied rather than
 		   flipped. */
-		meta->copy = 1;
+		meta->copy++;
 		copy_gop = npo->copy + npo->copy_prod++;
 		copy_gop->flags = GNTCOPY_dest_gref;
-		if (PageForeign(page) &&
-		    page->mapping != NULL &&
-		    (idx = netif_page_index(page)) < MAX_PENDING_REQS &&
-		    (group = netif_page_group(page)) < netbk_nr_groups) {
-			struct xen_netbk *netbk = &xen_netbk[group];
+		netif_get_page_ext(page, netbk, idx);
+		if (netbk) {
 			struct pending_tx_info *src_pend;
 			unsigned int grp;
 
-			BUG_ON(netbk->tx.mmap_pages[idx] != page);
 			src_pend = &netbk->tx.pending_info[idx];
 			grp = GET_GROUP_INDEX(src_pend->netif);
-			BUG_ON(group != grp && grp != UINT_MAX);
+			BUG_ON(netbk != &xen_netbk[grp] && grp != UINT_MAX);
 			copy_gop->source.domid = src_pend->netif->domid;
 			copy_gop->source.u.ref = src_pend->req.gref;
 			copy_gop->flags |= GNTCOPY_source_gref;
 		} else {
 			copy_gop->source.domid = DOMID_SELF;
-			copy_gop->source.u.gmfn = old_mfn;
+			copy_gop->source.u.gmfn = virt_to_mfn(page_address(page));
 		}
 		copy_gop->source.offset = offset;
 		copy_gop->dest.domid = netif->domid;
-		copy_gop->dest.offset = 0;
+		copy_gop->dest.offset = i ? meta->frag.size : 0;
 		copy_gop->dest.u.ref = req->gref;
 		copy_gop->len = size;
 	} else {
-		meta->copy = 0;
 		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
-			new_mfn = alloc_mfn(&xen_netbk[GET_GROUP_INDEX(netif)].rx);
+			unsigned long new_mfn =
+				alloc_mfn(&xen_netbk[GET_GROUP_INDEX(netif)].rx);
 
 			/*
 			 * Set the new P2M table entry before
@@ -549,11 +552,11 @@ static u16 netbk_gop_frag(netif_t *netif, struct netbk_rx_meta *meta,
 		}
 
 		gop = npo->trans - npo->trans_prod++;
-		gop->mfn = old_mfn;
+		gop->mfn = virt_to_mfn(page_address(page));
 		gop->domid = netif->domid;
 		gop->ref = req->gref;
 	}
-	return req->id;
+	meta->id = req->id;
 }
 
 static void netbk_gop_skb(struct sk_buff *skb,
@@ -567,30 +570,44 @@ static void netbk_gop_skb(struct sk_buff *skb,
 	head_meta = npo->meta + npo->meta_prod++;
 	head_meta->frag.page_offset = skb_shinfo(skb)->gso_type;
 	head_meta->frag.size = skb_shinfo(skb)->gso_size;
+	head_meta->copy = 0;
 	n = !!head_meta->frag.size + 1;
 
-	for (i = 0; i < nr_frags; i++) {
+	for (i = 0; i < nr_frags; i++, n++) {
 		const skb_frag_t *frag = skb_shinfo(skb)->frags + i;
 		unsigned int offset = frag->page_offset;
 		unsigned int len = skb_frag_size(frag);
 		struct page *frag_page = skb_frag_page(frag);
 		struct page *page = frag_page + PFN_DOWN(offset);
 
+		if (!len)
+			continue;
+		meta = NULL;
 		for (offset &= ~PAGE_MASK; len; page++, offset = 0) {
 			unsigned int bytes = PAGE_SIZE - offset;
 
 			if (bytes > len)
 				bytes = len;
-			meta = npo->meta + npo->meta_prod++;
-			__skb_frag_set_page(&meta->frag, frag_page);
-			frag_page = NULL;
-			meta->frag.page_offset = offset;
-			meta->frag.size = bytes;
-			meta->id = netbk_gop_frag(netif, meta, n++, npo,
-						  page, bytes, offset);
+			if (meta && bytes + meta->frag.size > PAGE_SIZE &&
+			    offset_in_page(len) + meta->frag.size <= PAGE_SIZE)
+				bytes = PAGE_SIZE - meta->frag.size;
+			if (!meta || !meta->copy ||
+			    bytes > PAGE_SIZE - meta->frag.size) {
+				if (meta)
+					n++;
+				meta = npo->meta + npo->meta_prod++;
+				__skb_frag_set_page(&meta->frag, frag_page);
+				frag_page = NULL;
+				meta->frag.page_offset = offset;
+				meta->frag.size = 0;
+				meta->copy = 0;
+			}
+			netbk_gop_frag(netif, meta, n, npo, page, bytes,
+				       offset);
+			meta->frag.size += bytes;
 			len -= bytes;
-			meta->tail = !len;
 		}
+		meta->tail = 1;
 	}
 
 	/*
@@ -598,10 +615,8 @@ static void netbk_gop_skb(struct sk_buff *skb,
 	 * until we're done. We know that the head doesn't cross a page
 	 * boundary because such packets get copied in netif_be_start_xmit.
 	 */
-	head_meta->id = netbk_gop_frag(netif, head_meta, 0, npo,
-				       virt_to_page(skb->data),
-				       skb_headlen(skb),
-				       offset_in_page(skb->data));
+	netbk_gop_frag(netif, head_meta, 0, npo, virt_to_page(skb->data),
+		       skb_headlen(skb), offset_in_page(skb->data));
 	head_meta->tail = 1;
 
 	netif->rx.req_cons += n;
@@ -625,7 +640,8 @@ static inline void netbk_free_pages(int nr_frags, struct netbk_rx_meta *meta)
    used to set up the operations on the top of
    netrx_pending_operations, which have since been done.  Check that
    they didn't give any errors and advance over them. */
-static int netbk_check_gop(int nr_frags, netif_t *netif, struct netrx_pending_operations *npo)
+static int netbk_check_gop(unsigned int nr_frags, const netif_t *netif,
+			   struct netrx_pending_operations *npo)
 {
 	multicall_entry_t *mcl;
 	gnttab_transfer_t *gop;
@@ -635,16 +651,20 @@ static int netbk_check_gop(int nr_frags, netif_t *netif, struct netrx_pending_op
 	const struct netbk_rx_meta *meta = npo->meta + npo->meta_cons;
 
 	for (i = 0; i <= nr_frags; i += meta++->tail) {
-		if (meta->copy) {
-			copy_op = npo->copy + npo->copy_cons++;
-			if (unlikely(copy_op->status == GNTST_eagain))
-				gnttab_check_GNTST_eagain_while(GNTTABOP_copy, copy_op);
-			if (unlikely(copy_op->status != GNTST_okay)) {
-				netdev_dbg(netif->dev,
-					   "Bad status %d from copy to DOM%d.\n",
-					   copy_op->status, netif->domid);
-				status = XEN_NETIF_RSP_ERROR;
-			}
+		unsigned int copy = meta->copy;
+
+		if (copy) {
+			do {
+				copy_op = npo->copy + npo->copy_cons++;
+				if (unlikely(copy_op->status == GNTST_eagain))
+					gnttab_check_GNTST_eagain_while(GNTTABOP_copy, copy_op);
+				if (unlikely(copy_op->status != GNTST_okay)) {
+					netdev_dbg(netif->dev,
+						   "Bad status %d from copy to DOM%d.\n",
+						   copy_op->status, netif->domid);
+					status = XEN_NETIF_RSP_ERROR;
+				}
+			} while (--copy);
 		} else {
 			if (!xen_feature(XENFEAT_auto_translated_physmap)) {
 				mcl = npo->mcl + npo->mcl_cons++;
@@ -713,18 +733,25 @@ static void net_rx_action(unsigned long group)
 		.meta  = netbk->meta,
 	};
 
+	BUILD_BUG_ON(sizeof(skb->cb) < sizeof(struct netbk_rx_cb));
+
 	skb_queue_head_init(&rxq);
 
 	count = 0;
 
 	while ((skb = skb_dequeue(&netbk->queue)) != NULL) {
-		nr_frags = skb_shinfo(skb)->nr_frags;
-		*(int *)skb->cb = nr_frags;
+		netbk_rx_cb(skb)->nr_frags = skb_shinfo(skb)->nr_frags;
+		nr_frags = netbk_rx_cb(skb)->nr_slots;
 
-		nr_frags = netbk_count_slots(skb_shinfo(skb));
+		/* Filled the batch queue? */
+		if (count + nr_frags > NET_RX_RING_SIZE) {
+			skb_queue_head(&netbk->queue, skb);
+			break;
+		}
+
 		if (!xen_feature(XENFEAT_auto_translated_physmap) &&
 		    !((netif_t *)netdev_priv(skb->dev))->copying_receiver &&
-		    check_mfn(netbk, nr_frags + 1)) {
+		    check_mfn(netbk, nr_frags)) {
 			/* Memory squeeze? Back off for an arbitrary while. */
 			if ( net_ratelimit() )
 				netdev_warn(skb->dev, "memory squeeze\n");
@@ -735,13 +762,9 @@ static void net_rx_action(unsigned long group)
 
 		netbk_gop_skb(skb, &npo);
 
-		count += nr_frags + 1;
+		count += nr_frags;
 
 		__skb_queue_tail(&rxq, skb);
-
-		/* Filled the batch queue? */
-		if (count + MAX_SKB_FRAGS >= NET_RX_RING_SIZE)
-			break;
 	}
 
 	BUG_ON(npo.meta_prod > ARRAY_SIZE(netbk->meta));
@@ -785,7 +808,7 @@ static void net_rx_action(unsigned long group)
 	BUG_ON(npo.mmu_mcl && npo.mcl[npo.mmu_mcl].result != 0);
 
 	while ((skb = __skb_dequeue(&rxq)) != NULL) {
-		nr_frags = *(int *)skb->cb;
+		nr_frags = netbk_rx_cb(skb)->nr_frags;
 
 		netif = netdev_priv(skb->dev);
 
@@ -963,7 +986,7 @@ void netif_schedule_work(netif_t *netif)
 
 	if (more_to_do && likely(!netif->busted)) {
 		add_to_net_schedule_list_tail(netif);
-		maybe_schedule_tx_action(GET_GROUP_INDEX(netif));
+		maybe_schedule_tx_action(netif);
 	}
 }
 
@@ -1841,13 +1864,12 @@ static void netif_idx_release(struct xen_netbk *netbk, u16 pending_idx)
 
 static void netif_page_release(struct page *page, unsigned int order)
 {
-	unsigned int idx = netif_page_index(page);
-	unsigned int group = netif_page_group(page);
-	struct xen_netbk *netbk = &xen_netbk[group];
+	struct xen_netbk *netbk;
+	unsigned int idx;
 
 	BUG_ON(order);
-	BUG_ON(group >= netbk_nr_groups || idx >= MAX_PENDING_REQS);
-	BUG_ON(netbk->tx.mmap_pages[idx] != page);
+	netif_get_page_ext(page, netbk, idx);
+	BUG_ON(!netbk);
 	netif_idx_release(netbk, idx);
 }
 
@@ -1867,7 +1889,7 @@ irqreturn_t netif_be_int(int irq, void *dev_id)
 	}
 
 	add_to_net_schedule_list_tail(netif);
-	maybe_schedule_tx_action(group);
+	maybe_schedule_tx_action(netif);
 
 	if (netif_schedulable(netif) && !netbk_queue_full(netif))
 		netif_wake_queue(netif->dev);
