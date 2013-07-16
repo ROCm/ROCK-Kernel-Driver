@@ -424,7 +424,7 @@ ENTRY(ia32_sysenter_target)
 	CFI_SIGNAL_FRAME
 	CFI_DEF_CFA esp, 0
 	CFI_REGISTER esp, ebp
-	movl SYSENTER_stack_sp0(%esp),%esp
+	movl TSS_sysenter_sp0(%esp),%esp
 sysenter_past_esp:
 	/*
 	 * Interrupts are disabled here, but we can't trace it until
@@ -836,7 +836,17 @@ ENTRY(name)				\
 	CFI_ENDPROC;			\
 ENDPROC(name)
 
-#define BUILD_INTERRUPT(name, nr)	BUILD_INTERRUPT3(name, nr, smp_##name)
+
+#ifdef CONFIG_TRACING
+#define TRACE_BUILD_INTERRUPT(name, nr)		\
+	BUILD_INTERRUPT3(trace_##name, nr, smp_trace_##name)
+#else
+#define TRACE_BUILD_INTERRUPT(name, nr)
+#endif
+
+#define BUILD_INTERRUPT(name, nr) \
+	BUILD_INTERRUPT3(name, nr, smp_##name); \
+	TRACE_BUILD_INTERRUPT(name, nr)
 
 /* The include is where all of the SMP etc. interrupts come from */
 #include <asm/entry_arch.h>
@@ -994,7 +1004,7 @@ END(spurious_interrupt_bug)
  */
 	.popsection
 
-#ifdef CONFIG_PARAVIRT_XEN
+#ifdef CONFIG_XEN
 /* Xen doesn't set %esp to be precisely what the normal sysenter
    entrypoint expects, so fix it up before using the normal path. */
 ENTRY(xen_sysenter_target)
@@ -1084,7 +1094,7 @@ ENDPROC(xen_failsafe_callback)
 BUILD_INTERRUPT3(xen_hvm_callback_vector, HYPERVISOR_CALLBACK_VECTOR,
 		xen_evtchn_do_upcall)
 
-#endif	/* CONFIG_PARAVIRT_XEN */
+#endif	/* CONFIG_XEN */
 
 #if IS_ENABLED(CONFIG_HYPERV)
 
@@ -1321,7 +1331,7 @@ END(page_fault)
  * that sets up the real kernel stack. Check here, since we can't
  * allow the wrong stack to be used.
  *
- * "SYSENTER_stack_sp0+12" is because the NMI/debug handler will have
+ * "TSS_sysenter_sp0+12" is because the NMI/debug handler will have
  * already pushed 3 words if it hits on the sysenter instruction:
  * eflags, cs and eip.
  *
@@ -1333,7 +1343,7 @@ END(page_fault)
 	cmpw $__KERNEL_CS, 4(%esp)
 	jne \ok
 \label:
-	movl SYSENTER_stack_sp0 + \offset(%esp), %esp
+	movl TSS_sysenter_sp0 + \offset(%esp), %esp
 	CFI_DEF_CFA esp, 0
 	CFI_UNDEFINED eip
 	pushfl_cfi

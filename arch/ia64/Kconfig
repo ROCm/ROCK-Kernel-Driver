@@ -234,7 +234,7 @@ config IA64_HP_SIM
 config IA64_XEN_GUEST
 	bool "Xen guest"
 	select SWIOTLB
-	depends on PARAVIRT_XEN
+	depends on XEN
 	help
 	  Build a kernel that runs on Xen guest domain. At this moment only
 	  16KB page size in supported.
@@ -376,7 +376,6 @@ config NR_CPUS
 config HOTPLUG_CPU
 	bool "Support for hot-pluggable CPUs"
 	depends on SMP
-	select HOTPLUG
 	default n
 	---help---
 	  Say Y here to experiment with turning CPUs off and on.  CPUs

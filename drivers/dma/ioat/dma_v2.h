@@ -123,7 +123,6 @@ static inline u16 ioat2_xferlen_to_descs(struct ioat2_dma_chan *ioat, size_t len
 struct ioat_ring_ent {
 	union {
 		struct ioat_dma_descriptor *hw;
-		struct ioat_fill_descriptor *fill;
 		struct ioat_xor_descriptor *xor;
 		struct ioat_xor_ext_descriptor *xor_ex;
 		struct ioat_pq_descriptor *pq;
@@ -178,10 +177,4 @@ int ioat2_quiesce(struct ioat_chan_common *chan, unsigned long tmo);
 int ioat2_reset_sync(struct ioat_chan_common *chan, unsigned long tmo);
 extern struct kobj_type ioat2_ktype;
 extern struct kmem_cache *ioat2_cache;
-
-#ifdef CONFIG_XEN
-#define ioat2_dca_init __ioat_dca_init
-#define ioat3_dca_init __ioat_dca_init
-#endif
-
 #endif /* IOATDMA_V2_H */

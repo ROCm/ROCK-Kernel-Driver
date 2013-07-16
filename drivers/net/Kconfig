@@ -25,6 +25,9 @@ menuconfig NETDEVICES
 # that for each of the symbols.
 if NETDEVICES
 
+config MII
+	tristate
+
 config NET_CORE
 	default y
 	bool "Network core driver support"
@@ -99,13 +102,6 @@ config NET_FC
 	  adaptor card in your computer; say Y here and to the driver for your
 	  adaptor below. You also should have said Y to "SCSI support" and
 	  "SCSI generic support".
-
-config MII
-	tristate "Generic Media Independent Interface device support"
-	help
-	  Most ethernet controllers have MII transceiver either as an external
-	  or internal device.  It is safe to say Y or M here even if your
-	  ethernet card lacks MII.
 
 config IFB
 	tristate "Intermediate Functional Block support"
@@ -244,6 +240,16 @@ config VIRTIO_NET
 	  This is the virtual network driver for virtio.  It can be used with
 	  lguest or QEMU based VMMs (like KVM or Xen).  Say Y or M.
 
+config NLMON
+	tristate "Virtual netlink monitoring device"
+	---help---
+	  This option enables a monitoring net device for netlink skbs. The
+	  purpose of this is to analyze netlink messages with packet sockets.
+	  Thus applications like tcpdump will be able to see local netlink
+	  messages if they tap into the netlink device, record pcaps for further
+	  diagnostics, etc. This is mostly intended for developers or support
+	  to debug netlink issues. If unsure, say N.
+
 endif # NET_CORE
 
 config SUNGEM_PHY
@@ -307,9 +313,9 @@ source "drivers/net/wan/Kconfig"
 
 source "drivers/net/ieee802154/Kconfig"
 
-config PARAVIRT_XEN_NETDEV_FRONTEND
+config XEN_NETDEV_FRONTEND
 	tristate "Xen network device frontend driver"
-	depends on PARAVIRT_XEN
+	depends on XEN
 	select XEN_XENBUS_FRONTEND
 	default y
 	help
@@ -318,15 +324,15 @@ config PARAVIRT_XEN_NETDEV_FRONTEND
 	  domain 0).
 
 	  The corresponding Linux backend driver is enabled by the
-	  PARAVIRT_XEN_NETDEV_BACKEND option.
+	  CONFIG_XEN_NETDEV_BACKEND option.
 
 	  If you are compiling a kernel for use as Xen guest, you
 	  should say Y here. To compile this driver as a module, chose
 	  M here: the module will be called xen-netfront.
 
-config PARAVIRT_XEN_NETDEV_BACKEND
+config XEN_NETDEV_BACKEND
 	tristate "Xen backend network device"
-	depends on PARAVIRT_XEN_BACKEND
+	depends on XEN_BACKEND
 	help
 	  This driver allows the kernel to act as a Xen network driver
 	  domain which exports paravirtual network devices to other
@@ -334,7 +340,7 @@ config PARAVIRT_XEN_NETDEV_BACKEND
 	  system that implements a compatible front end.
 
 	  The corresponding Linux frontend driver is enabled by the
-	  PARAVIRT_XEN_NETDEV_FRONTEND configuration option.
+	  CONFIG_XEN_NETDEV_FRONTEND configuration option.
 
 	  The backend driver presents a standard network device
 	  endpoint for each paravirtual network device to the driver
@@ -348,7 +354,7 @@ config PARAVIRT_XEN_NETDEV_BACKEND
 
 config VMXNET3
 	tristate "VMware VMXNET3 ethernet driver"
-	depends on PCI && INET && !XEN
+	depends on PCI && INET
 	help
 	  This driver supports VMware's vmxnet3 virtual ethernet NIC.
 	  To compile this driver as a module, choose M here: the

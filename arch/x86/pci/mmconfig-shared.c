@@ -23,10 +23,6 @@
 #include <asm/pci_x86.h>
 #include <asm/acpi.h>
 
-#ifdef CONFIG_XEN
-#include <xen/interface/physdev.h>
-#endif
-
 #define PREFIX "PCI: "
 
 /* Indicate if the mmcfg resources have been placed into the resource table. */
@@ -441,36 +437,6 @@ static int is_acpi_reserved(u64 start, u64 end, unsigned not_used)
 	return mcfg_res.flags;
 }
 
-static int xen_report_mmconf_reserved(const struct pci_mmcfg_region *cfg,
-				      int valid, int with_e820)
-{
-#ifdef CONFIG_XEN
-	if (!with_e820)	{
-		struct physdev_pci_mmcfg_reserved r = {
-			.address = cfg->address,
-			.segment = cfg->segment,
-			.start_bus = cfg->start_bus,
-			.end_bus = cfg->end_bus,
-			.flags = valid ? XEN_PCI_MMCFG_RESERVED : 0
-		};
-		int rc;
-
-		rc = HYPERVISOR_physdev_op(PHYSDEVOP_pci_mmcfg_reserved, &r);
-		switch (rc) {
-		case 0: case -ENOSYS:
-			break;
-		default:
-			pr_warn(PREFIX "Failed to report MMCONFIG reservation"
-				" state for %04x [bus%02x-%02x] to hypervisor"
-				" (%d)\n",
-				cfg->segment, cfg->start_bus, cfg->end_bus,
-				rc);
-		}
-	}
-#endif
-	return valid;
-}
-
 typedef int (*check_reserved_t)(u64 start, u64 end, unsigned type);
 
 static int __ref is_mmconf_reserved(check_reserved_t is_reserved,
@@ -490,7 +456,7 @@ static int __ref is_mmconf_reserved(check_reserved_t is_reserved,
 	}
 
 	if (size < (16UL<<20) && size != old_size)
-		return xen_report_mmconf_reserved(cfg, 0, with_e820);
+		return 0;
 
 	if (dev)
 		dev_info(dev, "MMCONFIG at %pR reserved in %s\n",
@@ -522,7 +488,7 @@ static int __ref is_mmconf_reserved(check_reserved_t is_reserved,
 				&cfg->res, (unsigned long) cfg->address);
 	}
 
-	return xen_report_mmconf_reserved(cfg, 1, with_e820);
+	return 1;
 }
 
 static int __ref pci_mmcfg_check_reserved(struct device *dev,

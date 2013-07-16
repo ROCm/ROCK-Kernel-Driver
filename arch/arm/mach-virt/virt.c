@@ -18,7 +18,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <linux/irqchip.h>
 #include <linux/of_irq.h>
 #include <linux/of_platform.h>
 #include <linux/smp.h>
@@ -37,7 +36,6 @@ static const char *virt_dt_match[] = {
 };
 
 DT_MACHINE_START(VIRT, "Dummy Virtual Machine")
-	.init_irq	= irqchip_init,
 	.init_machine	= virt_init,
 	.dt_compat	= virt_dt_match,
 MACHINE_END

@@ -14,6 +14,7 @@
 #include <linux/kprobes.h>
 #include <linux/kdebug.h>
 #include <linux/nmi.h>
+#include <linux/debugfs.h>
 #include <linux/delay.h>
 #include <linux/hardirq.h>
 #include <linux/slab.h>
@@ -28,6 +29,9 @@
 #include <asm/mach_traps.h>
 #include <asm/nmi.h>
 #include <asm/x86_init.h>
+
+#define CREATE_TRACE_POINTS
+#include <trace/events/nmi.h>
 
 struct nmi_desc {
 	spinlock_t lock;
@@ -82,6 +86,15 @@ __setup("unknown_nmi_panic", setup_unknown_nmi_panic);
 
 #define nmi_to_desc(type) (&nmi_desc[type])
 
+static u64 nmi_longest_ns = 1 * NSEC_PER_MSEC;
+static int __init nmi_warning_debugfs(void)
+{
+	debugfs_create_u64("nmi_longest_ns", 0644,
+			arch_debugfs_dir, &nmi_longest_ns);
+	return 0;
+}
+fs_initcall(nmi_warning_debugfs);
+
 static int __kprobes nmi_handle(unsigned int type, struct pt_regs *regs, bool b2b)
 {
 	struct nmi_desc *desc = nmi_to_desc(type);
@@ -96,8 +109,28 @@ static int __kprobes nmi_handle(unsigned int type, struct pt_regs *regs, bool b2
 	 * can be latched at any given time.  Walk the whole list
 	 * to handle those situations.
 	 */
-	list_for_each_entry_rcu(a, &desc->head, list)
-		handled += a->handler(type, regs);
+	list_for_each_entry_rcu(a, &desc->head, list) {
+		u64 before, delta, whole_msecs;
+		int remainder_ns, decimal_msecs, thishandled;
+
+		before = local_clock();
+		thishandled = a->handler(type, regs);
+		handled += thishandled;
+		delta = local_clock() - before;
+		trace_nmi_handler(a->handler, (int)delta, thishandled);
+
+		if (delta < nmi_longest_ns)
+			continue;
+
+		nmi_longest_ns = delta;
+		whole_msecs = delta;
+		remainder_ns = do_div(whole_msecs, (1000 * 1000));
+		decimal_msecs = remainder_ns / 1000;
+		printk_ratelimited(KERN_INFO
+			"INFO: NMI handler (%ps) took too long to run: "
+			"%lld.%03d msecs\n", a->handler, whole_msecs,
+			decimal_msecs);
+	}
 
 	rcu_read_unlock();
 
@@ -191,12 +224,15 @@ pci_serr_error(unsigned char reason, struct pt_regs *regs)
 	pr_emerg("Dazed and confused, but trying to continue\n");
 
 	/* Clear and disable the PCI SERR error line. */
-	clear_serr_error(reason);
+	reason = (reason & NMI_REASON_CLEAR_MASK) | NMI_REASON_CLEAR_SERR;
+	outb(reason, NMI_REASON_PORT);
 }
 
 static __kprobes void
 io_check_error(unsigned char reason, struct pt_regs *regs)
 {
+	unsigned long i;
+
 	/* check to see if anyone registered against these types of errors */
 	if (nmi_handle(NMI_IO_CHECK, regs, false))
 		return;
@@ -210,7 +246,17 @@ io_check_error(unsigned char reason, struct pt_regs *regs)
 		panic("NMI IOCK error: Not continuing");
 
 	/* Re-enable the IOCK line, wait for a few seconds */
-	clear_io_check_error(reason);
+	reason = (reason & NMI_REASON_CLEAR_MASK) | NMI_REASON_CLEAR_IOCHK;
+	outb(reason, NMI_REASON_PORT);
+
+	i = 20000;
+	while (--i) {
+		touch_nmi_watchdog();
+		udelay(100);
+	}
+
+	reason &= ~NMI_REASON_CLEAR_IOCHK;
+	outb(reason, NMI_REASON_PORT);
 }
 
 static __kprobes void

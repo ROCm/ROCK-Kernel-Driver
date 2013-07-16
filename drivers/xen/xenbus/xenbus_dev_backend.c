@@ -1,3 +1,5 @@
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/mm.h>
@@ -7,14 +9,12 @@
 #include <linux/capability.h>
 
 #include <xen/xen.h>
-#ifdef CONFIG_PARAVIRT_XEN
 #include <xen/page.h>
+#include <xen/xenbus.h>
+#include <xen/xenbus_dev.h>
 #include <xen/grant_table.h>
 #include <xen/events.h>
 #include <asm/xen/hypervisor.h>
-#endif
-#include <xen/xenbus.h>
-#include <xen/xenbus_dev.h>
 
 #include "xenbus_comms.h"
 
@@ -30,7 +30,6 @@ static int xenbus_backend_open(struct inode *inode, struct file *filp)
 
 static long xenbus_alloc(domid_t domid)
 {
-#ifdef CONFIG_PARAVIRT_XEN
 	struct evtchn_alloc_unbound arg;
 	int err = -EEXIST;
 
@@ -71,9 +70,6 @@ static long xenbus_alloc(domid_t domid)
  out_err:
 	xs_suspend_cancel();
 	return err;
-#else
-	return -EOPNOTSUPP;
-#endif
 }
 
 static long xenbus_backend_ioctl(struct file *file, unsigned int cmd,
@@ -105,7 +101,7 @@ static int xenbus_backend_mmap(struct file *file, struct vm_area_struct *vma)
 		return -EINVAL;
 
 	if (remap_pfn_range(vma, vma->vm_start,
-			    PFN_DOWN(__pa(xen_store_interface)),
+			    virt_to_pfn(xen_store_interface),
 			    size, vma->vm_page_prot))
 		return -EAGAIN;
 
@@ -133,7 +129,7 @@ static int __init xenbus_backend_init(void)
 
 	err = misc_register(&xenbus_backend_dev);
 	if (err)
-		printk(KERN_ERR "Could not register xenbus backend device\n");
+		pr_err("Could not register xenbus backend device\n");
 	return err;
 }
 

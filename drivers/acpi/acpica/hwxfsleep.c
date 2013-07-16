@@ -166,7 +166,6 @@ ACPI_EXPORT_SYMBOL(acpi_set_firmware_waking_vector64)
  *              THIS FUNCTION MUST BE CALLED WITH INTERRUPTS DISABLED
  *
  ******************************************************************************/
-#ifndef CONFIG_XEN
 acpi_status asmlinkage acpi_enter_sleep_state_s4bios(void)
 {
 	u32 in_value;
@@ -220,7 +219,6 @@ acpi_status asmlinkage acpi_enter_sleep_state_s4bios(void)
 }
 
 ACPI_EXPORT_SYMBOL(acpi_enter_sleep_state_s4bios)
-#endif
 #endif				/* !ACPI_REDUCED_HARDWARE */
 /*******************************************************************************
  *
@@ -318,20 +316,24 @@ acpi_status acpi_enter_sleep_state_prep(u8 sleep_state)
 
 	switch (sleep_state) {
 	case ACPI_STATE_S0:
+
 		sst_value = ACPI_SST_WORKING;
 		break;
 
 	case ACPI_STATE_S1:
 	case ACPI_STATE_S2:
 	case ACPI_STATE_S3:
+
 		sst_value = ACPI_SST_SLEEPING;
 		break;
 
 	case ACPI_STATE_S4:
+
 		sst_value = ACPI_SST_SLEEP_CONTEXT;
 		break;
 
 	default:
+
 		sst_value = ACPI_SST_INDICATOR_OFF;	/* Default is off */
 		break;
 	}

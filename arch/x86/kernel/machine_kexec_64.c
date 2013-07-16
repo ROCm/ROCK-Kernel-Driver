@@ -22,44 +22,6 @@
 #include <asm/mmu_context.h>
 #include <asm/debugreg.h>
 
-#ifdef CONFIG_XEN
-
-#include <xen/interface/kexec.h>
-#include <xen/interface/memory.h>
-
-#define __ma(x) (pfn_to_mfn(__pa((x)) >> PAGE_SHIFT) << PAGE_SHIFT)
-
-#if PAGES_NR > KEXEC_XEN_NO_PAGES
-#error PAGES_NR is greater than KEXEC_XEN_NO_PAGES - Xen support will break
-#endif
-
-#if PA_CONTROL_PAGE != 0
-#error PA_CONTROL_PAGE is non zero - Xen support will break
-#endif
-
-void machine_kexec_setup_load_arg(xen_kexec_image_t *xki, struct kimage *image)
-{
-	void *control_page;
-	void *table_page;
-
-	memset(xki->page_list, 0, sizeof(xki->page_list));
-
-	control_page = page_address(image->control_code_page) + PAGE_SIZE;
-	memcpy(control_page, relocate_kernel, PAGE_SIZE);
-
-	table_page = page_address(image->control_code_page);
-
-	xki->page_list[PA_CONTROL_PAGE] = __ma(control_page);
-	xki->page_list[PA_TABLE_PAGE] = __ma(table_page);
-
-	if (image->type == KEXEC_TYPE_DEFAULT)
-		xki->page_list[PA_SWAP_PAGE] = page_to_phys(image->swap_page);
-}
-
-#include "machine_kexec_xen.c"
-
-#endif /* CONFIG_XEN */
-
 static void free_transition_pgtable(struct kimage *image)
 {
 	free_page((unsigned long)image->arch.pud);
@@ -168,6 +130,47 @@ static int init_pgtable(struct kimage *image, unsigned long start_pgtable)
 	return init_transition_pgtable(image, level4p);
 }
 
+static void set_idt(void *newidt, u16 limit)
+{
+	struct desc_ptr curidt;
+
+	/* x86-64 supports unaliged loads & stores */
+	curidt.size    = limit;
+	curidt.address = (unsigned long)newidt;
+
+	__asm__ __volatile__ (
+		"lidtq %0\n"
+		: : "m" (curidt)
+		);
+};
+
+
+static void set_gdt(void *newgdt, u16 limit)
+{
+	struct desc_ptr curgdt;
+
+	/* x86-64 supports unaligned loads & stores */
+	curgdt.size    = limit;
+	curgdt.address = (unsigned long)newgdt;
+
+	__asm__ __volatile__ (
+		"lgdtq %0\n"
+		: : "m" (curgdt)
+		);
+};
+
+static void load_segments(void)
+{
+	__asm__ __volatile__ (
+		"\tmovl %0,%%ds\n"
+		"\tmovl %0,%%es\n"
+		"\tmovl %0,%%ss\n"
+		"\tmovl %0,%%fs\n"
+		"\tmovl %0,%%gs\n"
+		: : "a" (__KERNEL_DS) : "memory"
+		);
+}
+
 int machine_kexec_prepare(struct kimage *image)
 {
 	unsigned long start_pgtable;
@@ -189,7 +192,6 @@ void machine_kexec_cleanup(struct kimage *image)
 	free_transition_pgtable(image);
 }
 
-#ifndef CONFIG_XEN
 /*
  * Do not allocate memory (or fail in any way) in machine_kexec().
  * We are past the point of no return, committed to rebooting now.
@@ -236,6 +238,24 @@ void machine_kexec(struct kimage *image)
 		page_list[PA_SWAP_PAGE] = (page_to_pfn(image->swap_page)
 						<< PAGE_SHIFT);
 
+	/*
+	 * The segment registers are funny things, they have both a
+	 * visible and an invisible part.  Whenever the visible part is
+	 * set to a specific selector, the invisible part is loaded
+	 * with from a table in memory.  At no other time is the
+	 * descriptor table in memory accessed.
+	 *
+	 * I take advantage of this here by force loading the
+	 * segments, before I zap the gdt with an invalid value.
+	 */
+	load_segments();
+	/*
+	 * The gdt & idt are now invalid.
+	 * If you want to load them you must set up your own idt & gdt.
+	 */
+	set_gdt(phys_to_virt(0), 0);
+	set_idt(phys_to_virt(0), 0);
+
 	/* now call it */
 	image->start = relocate_kernel((unsigned long)image->head,
 				       (unsigned long)page_list,
@@ -249,13 +269,10 @@ void machine_kexec(struct kimage *image)
 
 	__ftrace_enabled_restore(save_ftrace_enabled);
 }
-#endif
 
 void arch_crash_save_vmcoreinfo(void)
 {
-#ifndef CONFIG_XEN /* could really be CONFIG_RELOCATABLE */
 	VMCOREINFO_SYMBOL(phys_base);
-#endif
 	VMCOREINFO_SYMBOL(init_level4_pgt);
 
 #ifdef CONFIG_NUMA

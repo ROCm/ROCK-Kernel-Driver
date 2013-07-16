@@ -9,7 +9,7 @@ config 64BIT
 config X86_32
 	def_bool y
 	depends on !64BIT
-	select CLKSRC_I8253 if !XEN
+	select CLKSRC_I8253
 	select HAVE_UID16
 
 config X86_64
@@ -27,7 +27,7 @@ config X86
 	select ARCH_WANTS_PROT_NUMA_PROT_NONE
 	select HAVE_IDE
 	select HAVE_OPROFILE
-	select HAVE_PCSPKR_PLATFORM if !XEN_UNPRIVILEGED_GUEST
+	select HAVE_PCSPKR_PLATFORM
 	select HAVE_PERF_EVENTS
 	select HAVE_IOREMAP_PROT
 	select HAVE_KPROBES
@@ -37,7 +37,7 @@ config X86
 	select ARCH_WANT_OPTIONAL_GPIOLIB
 	select ARCH_WANT_FRAME_POINTERS
 	select HAVE_DMA_ATTRS
-	select HAVE_DMA_CONTIGUOUS if !SWIOTLB && !XEN
+	select HAVE_DMA_CONTIGUOUS if !SWIOTLB
 	select HAVE_KRETPROBES
 	select HAVE_OPTPROBES
 	select HAVE_KPROBES_ON_FTRACE
@@ -52,8 +52,8 @@ config X86
 	select HAVE_FUNCTION_TRACE_MCOUNT_TEST
 	select HAVE_SYSCALL_TRACEPOINTS
 	select SYSCTL_EXCEPTION_TRACE
-	select HAVE_KVM if !XEN
-	select HAVE_ARCH_KGDB if !XEN
+	select HAVE_KVM
+	select HAVE_ARCH_KGDB
 	select HAVE_ARCH_TRACEHOOK
 	select HAVE_GENERIC_DMA_COHERENT if X86_32
 	select HAVE_EFFICIENT_UNALIGNED_ACCESS
@@ -61,14 +61,15 @@ config X86
 	select HAVE_REGS_AND_STACK_ACCESS_API
 	select HAVE_DMA_API_DEBUG
 	select HAVE_KERNEL_GZIP
-	select HAVE_KERNEL_BZIP2 if !XEN
-	select HAVE_KERNEL_LZMA if !XEN
-	select HAVE_KERNEL_XZ if !XEN
-	select HAVE_KERNEL_LZO if !XEN
+	select HAVE_KERNEL_BZIP2
+	select HAVE_KERNEL_LZMA
+	select HAVE_KERNEL_XZ
+	select HAVE_KERNEL_LZO
+	select HAVE_KERNEL_LZ4
 	select HAVE_HW_BREAKPOINT
 	select HAVE_MIXED_BREAKPOINTS_REGS
 	select PERF_EVENTS
-	select HAVE_PERF_EVENTS_NMI if !XEN
+	select HAVE_PERF_EVENTS_NMI
 	select HAVE_PERF_REGS
 	select HAVE_PERF_USER_STACK_DUMP
 	select HAVE_DEBUG_KMEMLEAK
@@ -92,8 +93,8 @@ config X86
 	select IRQ_FORCED_THREADING
 	select USE_GENERIC_SMP_HELPERS if SMP
 	select HAVE_BPF_JIT if X86_64
-	select HAVE_ARCH_TRANSPARENT_HUGEPAGE if !XEN
-	select CLKEVT_I8253 if !XEN
+	select HAVE_ARCH_TRANSPARENT_HUGEPAGE
+	select CLKEVT_I8253
 	select ARCH_HAVE_NMI_SAFE_CMPXCHG
 	select GENERIC_IOMAP
 	select DCACHE_WORD_ACCESS
@@ -102,10 +103,11 @@ config X86
 	select HAVE_ARCH_SECCOMP_FILTER
 	select BUILDTIME_EXTABLE_SORT
 	select GENERIC_CMOS_UPDATE
-	select CLOCKSOURCE_WATCHDOG if !XEN
+	select HAVE_ARCH_SOFT_DIRTY
+	select CLOCKSOURCE_WATCHDOG
 	select GENERIC_CLOCKEVENTS
 	select ARCH_CLOCKSOURCE_DATA if X86_64
-	select GENERIC_CLOCKEVENTS_BROADCAST if (X86_64 || (X86_32 && X86_LOCAL_APIC)) && !XEN
+	select GENERIC_CLOCKEVENTS_BROADCAST if X86_64 || (X86_32 && X86_LOCAL_APIC)
 	select GENERIC_TIME_VSYSCALL if X86_64
 	select KTIME_SCALAR if X86_32
 	select GENERIC_STRNCPY_FROM_USER
@@ -121,6 +123,7 @@ config X86
 	select OLD_SIGACTION if X86_32
 	select COMPAT_OLD_SIGACTION if IA32_EMULATION
 	select RTC_LIB
+	select HAVE_DEBUG_STACKOVERFLOW
 
 config INSTRUCTION_DECODER
 	def_bool y
@@ -153,7 +156,7 @@ config SBUS
 
 config NEED_DMA_MAP_STATE
 	def_bool y
-	depends on X86_64 || INTEL_IOMMU || DMA_API_DEBUG || SWIOTLB
+	depends on X86_64 || INTEL_IOMMU || DMA_API_DEBUG
 
 config NEED_SG_DMA_LENGTH
 	def_bool y
@@ -203,9 +206,14 @@ config NEED_PER_CPU_PAGE_FIRST_CHUNK
 
 config ARCH_HIBERNATION_POSSIBLE
 	def_bool y
-	depends on !XEN
 
 config ARCH_SUSPEND_POSSIBLE
+	def_bool y
+
+config ARCH_WANT_HUGE_PMD_SHARE
+	def_bool y
+
+config ARCH_WANT_GENERAL_HUGETLB
 	def_bool y
 
 config ZONE_DMA32
@@ -236,15 +244,7 @@ config X86_64_SMP
 
 config X86_HT
 	def_bool y
-	depends on SMP && !XEN
-
-config X86_NO_TSS
-	def_bool y
-	depends on XEN
-
-config X86_NO_IDT
-	def_bool y
-	depends on XEN
+	depends on SMP
 
 config X86_32_LAZY_GS
 	def_bool y
@@ -257,7 +257,7 @@ config ARCH_HWEIGHT_CFLAGS
 
 config ARCH_CPU_PROBE_RELEASE
 	def_bool y
-	depends on HOTPLUG_CPU && !XEN
+	depends on HOTPLUG_CPU
 
 config ARCH_SUPPORTS_UPROBES
 	def_bool y
@@ -324,18 +324,9 @@ config X86_MPPARSE
 	  For old smp systems that do not have proper acpi support. Newer systems
 	  (esp with 64bit cpus) with acpi support, MADT and DSDT will override it
 
-config X86_XEN
-	bool "Xen-compatible"
-	depends on X86_32
-	select XEN
-	select X86_PAE
-	help
-	  Choose this option if you plan to run this kernel on top of the
-	  Xen Hypervisor.
-
 config X86_BIGSMP
 	bool "Support for big SMP systems with more than 8 CPUs"
-	depends on X86_32 && SMP && !XEN
+	depends on X86_32 && SMP
 	---help---
 	  This option is needed for the systems that have more than 8 CPUs
 
@@ -343,7 +334,7 @@ config GOLDFISH
        def_bool y
        depends on X86_GOLDFISH
 
-if X86_32 && !XEN
+if X86_32
 config X86_EXTENDED_PLATFORM
 	bool "Support for extended (non-PC) x86 platforms"
 	default y
@@ -354,6 +345,7 @@ config X86_EXTENDED_PLATFORM
 
 	  If you enable this option then you'll be able to select support
 	  for the following (non-PC) 32 bit x86 platforms:
+		Goldfish (Android emulator)
 		AMD Elan
 		NUMAQ (IBM/Sequent)
 		RDC R-321x SoC
@@ -367,15 +359,7 @@ config X86_EXTENDED_PLATFORM
 	  generic distribution kernel, say Y here - otherwise say N.
 endif
 
-config X86_64_XEN
-	bool "Enable Xen compatible kernel"
-	depends on X86_64
-	select XEN
-	select PARAVIRT_CLOCK
-	help
-	  This option will compile a kernel compatible with Xen hypervisor
-
-if X86_64 && !XEN
+if X86_64
 config X86_EXTENDED_PLATFORM
 	bool "Support for extended (non-PC) x86 platforms"
 	default y
@@ -435,7 +419,8 @@ config X86_UV
 
 config X86_GOLDFISH
        bool "Goldfish (Virtual Platform)"
-       depends on X86_32 && !XEN
+       depends on X86_32
+       depends on X86_EXTENDED_PLATFORM
        ---help---
 	 Enable support for the Goldfish virtual platform used primarily
 	 for Android development. Unless you are building for the Android
@@ -594,7 +579,7 @@ config X86_ES7000
 
 config X86_32_IRIS
 	tristate "Eurobraille/Iris poweroff module"
-	depends on X86_32 && !XEN
+	depends on X86_32
 	---help---
 	  The Iris machines from EuroBraille do not have APM or ACPI support
 	  to shut themselves down properly.  A special I/O sequence is
@@ -619,7 +604,6 @@ config SCHED_OMIT_FRAME_POINTER
 
 menuconfig HYPERVISOR_GUEST
 	bool "Linux guest support"
-	depends on !XEN
 	---help---
 	  Say Y here to enable options for running Linux under various hyper-
 	  visors. This option enables basic hypervisor detection and platform
@@ -686,17 +670,16 @@ config PARAVIRT_TIME_ACCOUNTING
 
 	  If in doubt, say N here.
 
-endif #HYPERVISOR_GUEST
-
 config PARAVIRT_CLOCK
 	bool
+
+endif #HYPERVISOR_GUEST
 
 config NO_BOOTMEM
 	def_bool y
 
 config MEMTEST
 	bool "Memtest"
-	depends on !XEN
 	---help---
 	  This option adds a kernel parameter 'memtest', which allows memtest
 	  to be set.
@@ -719,7 +702,6 @@ source "arch/x86/Kconfig.cpu"
 config HPET_TIMER
 	def_bool X86_64
 	prompt "HPET Timer Support" if X86_32
-	depends on !XEN
 	---help---
 	  Use the IA-PC HPET (High Precision Event Timer) to manage
 	  time in preference to the PIT and RTC, if a HPET is
@@ -757,7 +739,6 @@ config APB_TIMER
 config DMI
 	default y
 	bool "Enable DMI scanning" if EXPERT
-	depends on !XEN_UNPRIVILEGED_GUEST
 	---help---
 	  Enabled scanning of DMI to identify machine quirks. Say Y
 	  here unless you have verified that your setup is not
@@ -768,7 +749,7 @@ config GART_IOMMU
 	bool "GART IOMMU support" if EXPERT
 	default y
 	select SWIOTLB
-	depends on X86_64 && PCI && AMD_NB && !X86_64_XEN
+	depends on X86_64 && PCI && AMD_NB
 	---help---
 	  Support for full DMA access of devices with 32bit memory access only
 	  on systems with more than 3GB. This is usually needed for USB,
@@ -783,7 +764,7 @@ config GART_IOMMU
 config CALGARY_IOMMU
 	bool "IBM Calgary IOMMU support"
 	select SWIOTLB
-	depends on X86_64 && PCI && !X86_64_XEN
+	depends on X86_64 && PCI
 	---help---
 	  Support for hardware IOMMUs in IBM's xSeries x366 and x460
 	  systems. Needed to run systems with more than 3GB of memory
@@ -811,8 +792,7 @@ config CALGARY_IOMMU_ENABLED_BY_DEFAULT
 
 # need this always selected by IOMMU for the VIA workaround
 config SWIOTLB
-	def_bool y if X86_64 || XEN
-	prompt "Software I/O TLB" if XEN_UNPRIVILEGED_GUEST && !XEN_PCIDEV_FRONTEND
+	def_bool y if X86_64
 	---help---
 	  Support for software bounce buffers used on x86-64 systems
 	  which don't have a hardware IOMMU. Using this PCI devices
@@ -834,12 +814,11 @@ config MAXSMP
 
 config NR_CPUS
 	int "Maximum number of CPUs" if SMP && !MAXSMP
-	range 2 8 if SMP && X86_32 && !X86_BIGSMP && !X86_XEN
+	range 2 8 if SMP && X86_32 && !X86_BIGSMP
 	range 2 512 if SMP && !MAXSMP
 	default "1" if !SMP
 	default "4096" if MAXSMP
 	default "32" if SMP && (X86_NUMAQ || X86_SUMMIT || X86_BIGSMP || X86_ES7000)
-	default "16" if X86_64_XEN
 	default "8" if SMP
 	---help---
 	  This allows you to specify the maximum number of CPUs which this
@@ -871,7 +850,7 @@ source "kernel/Kconfig.preempt"
 
 config X86_UP_APIC
 	bool "Local APIC support on uniprocessors"
-	depends on X86_32 && !SMP && !X86_32_NON_STANDARD && !XEN_UNPRIVILEGED_GUEST
+	depends on X86_32 && !SMP && !X86_32_NON_STANDARD
 	---help---
 	  A local APIC (Advanced Programmable Interrupt Controller) is an
 	  integrated interrupt controller in the CPU. If you have a single-CPU
@@ -897,12 +876,10 @@ config X86_UP_IOAPIC
 config X86_LOCAL_APIC
 	def_bool y
 	depends on X86_64 || SMP || X86_32_NON_STANDARD || X86_UP_APIC
-	depends on !XEN_UNPRIVILEGED_GUEST
 
 config X86_IO_APIC
 	def_bool y
 	depends on X86_64 || SMP || X86_32_NON_STANDARD || X86_UP_IOAPIC
-	depends on !XEN_UNPRIVILEGED_GUEST
 
 config X86_VISWS_APIC
 	def_bool y
@@ -910,7 +887,7 @@ config X86_VISWS_APIC
 
 config X86_REROUTE_FOR_BROKEN_BOOT_IRQS
 	bool "Reroute for broken boot IRQs"
-	depends on X86_IO_APIC && !XEN
+	depends on X86_IO_APIC
 	---help---
 	  This option enables a workaround that fixes a source of
 	  spurious interrupts. This is recommended when threaded
@@ -934,7 +911,6 @@ config X86_REROUTE_FOR_BROKEN_BOOT_IRQS
 config X86_MCE
 	bool "Machine Check / overheating reporting"
 	default y
-	depends on !XEN_UNPRIVILEGED_GUEST
 	---help---
 	  Machine Check support allows the processor to notify the
 	  kernel if it detects a problem (e.g. overheating, data corruption).
@@ -944,7 +920,7 @@ config X86_MCE
 config X86_MCE_INTEL
 	def_bool y
 	prompt "Intel MCE features"
-	depends on X86_MCE && X86_LOCAL_APIC && !XEN
+	depends on X86_MCE && X86_LOCAL_APIC
 	---help---
 	   Additional support for intel specific MCE features such as
 	   the thermal monitor.
@@ -952,14 +928,14 @@ config X86_MCE_INTEL
 config X86_MCE_AMD
 	def_bool y
 	prompt "AMD MCE features"
-	depends on X86_MCE && X86_LOCAL_APIC && !XEN
+	depends on X86_MCE && X86_LOCAL_APIC
 	---help---
 	   Additional support for AMD specific MCE features such as
 	   the DRAM Error Threshold.
 
 config X86_ANCIENT_MCE
 	bool "Support for old Pentium 5 / WinChip machine checks"
-	depends on X86_32 && X86_MCE && !XEN
+	depends on X86_32 && X86_MCE
 	---help---
 	  Include support for machine check handling on old Pentium 5 or WinChip
 	  systems. These typically need to be enabled explicitely on the command
@@ -976,10 +952,6 @@ config X86_MCE_INJECT
 	  Provide support for injecting machine checks for testing purposes.
 	  If you don't know what a machine check is and you don't do kernel
 	  QA it is safe to say n.
-
-config X86_XEN_MCE
-	def_bool y
-	depends on XEN && X86_MCE
 
 config X86_THERMAL_VECTOR
 	def_bool y
@@ -1034,7 +1006,7 @@ config I8K
 
 config X86_REBOOTFIXUPS
 	bool "Enable X86 board specific fixups for reboot"
-	depends on X86_32 && !XEN
+	depends on X86_32
 	---help---
 	  This enables chipset and/or board specific fixups to be done
 	  in order to get reboot to work correctly. This is only needed on
@@ -1051,7 +1023,6 @@ config X86_REBOOTFIXUPS
 
 config MICROCODE
 	tristate "CPU microcode loading support"
-	depends on !XEN_UNPRIVILEGED_GUEST
 	select FW_LOADER
 	---help---
 
@@ -1070,7 +1041,7 @@ config MICROCODE
 
 config MICROCODE_INTEL
 	bool "Intel microcode loading support"
-	depends on MICROCODE && !XEN
+	depends on MICROCODE
 	default MICROCODE
 	select FW_LOADER
 	---help---
@@ -1083,7 +1054,7 @@ config MICROCODE_INTEL
 
 config MICROCODE_AMD
 	bool "AMD microcode loading support"
-	depends on MICROCODE && !XEN
+	depends on MICROCODE
 	select FW_LOADER
 	---help---
 	  If you select this option, microcode patch loading support for AMD
@@ -1098,8 +1069,16 @@ config MICROCODE_INTEL_LIB
 	depends on MICROCODE_INTEL
 
 config MICROCODE_INTEL_EARLY
+	def_bool n
+
+config MICROCODE_AMD_EARLY
+	def_bool n
+
+config MICROCODE_EARLY
 	bool "Early load microcode"
-	depends on MICROCODE_INTEL && BLK_DEV_INITRD
+	depends on MICROCODE=y && BLK_DEV_INITRD
+	select MICROCODE_INTEL_EARLY if MICROCODE_INTEL
+	select MICROCODE_AMD_EARLY if MICROCODE_AMD
 	default y
 	help
 	  This option provides functionality to read additional microcode data
@@ -1107,13 +1086,8 @@ config MICROCODE_INTEL_EARLY
 	  microcode to CPU's as early as possible. No functional change if no
 	  microcode data is glued to the initrd, therefore it's safe to say Y.
 
-config MICROCODE_EARLY
-	def_bool y
-	depends on MICROCODE_INTEL_EARLY
-
 config X86_MSR
 	tristate "/dev/cpu/*/msr - Model-specific register support"
-	select XEN_DOMCTL if XEN_PRIVILEGED_GUEST
 	---help---
 	  This device gives privileged processes access to the x86
 	  Model-Specific Registers (MSRs).  It is a character device with
@@ -1131,7 +1105,7 @@ config X86_CPUID
 
 choice
 	prompt "High Memory Support"
-	default HIGHMEM64G if X86_NUMAQ || XEN
+	default HIGHMEM64G if X86_NUMAQ
 	default HIGHMEM4G
 	depends on X86_32
 
@@ -1174,7 +1148,7 @@ config NOHIGHMEM
 
 config HIGHMEM4G
 	bool "4GB"
-	depends on !X86_NUMAQ && !XEN
+	depends on !X86_NUMAQ
 	---help---
 	  Select this if you have a 32-bit processor and between 1 and 4
 	  gigabytes of physical RAM.
@@ -1251,12 +1225,12 @@ config ARCH_PHYS_ADDR_T_64BIT
 
 config ARCH_DMA_ADDR_T_64BIT
 	def_bool y
-	depends on X86_64 || XEN || HIGHMEM64G
+	depends on X86_64 || HIGHMEM64G
 
 config DIRECT_GBPAGES
 	bool "Enable 1GB pages for kernel pagetables" if EXPERT
 	default y
-	depends on X86_64 && !XEN
+	depends on X86_64
 	---help---
 	  Allow the kernel linear mapping to use 1GB pages on CPUs that
 	  support it. This can improve the kernel's performance a tiny bit by
@@ -1265,7 +1239,7 @@ config DIRECT_GBPAGES
 # Common NUMA Features
 config NUMA
 	bool "Numa Memory Allocation and Scheduler Support"
-	depends on SMP && !XEN
+	depends on SMP
 	depends on X86_64 || (X86_32 && HIGHMEM64G && (X86_NUMAQ || X86_BIGSMP || X86_SUMMIT && ACPI))
 	default y if (X86_NUMAQ || X86_SUMMIT || X86_BIGSMP)
 	---help---
@@ -1358,13 +1332,12 @@ config ARCH_DISCONTIGMEM_DEFAULT
 config ARCH_SPARSEMEM_ENABLE
 	def_bool y
 	depends on X86_64 || NUMA || X86_32 || X86_32_NON_STANDARD
-	depends on !XEN
 	select SPARSEMEM_STATIC if X86_32
 	select SPARSEMEM_VMEMMAP_ENABLE if X86_64
 
 config ARCH_SPARSEMEM_DEFAULT
 	def_bool y
-	depends on X86_64 && !X86_64_XEN
+	depends on X86_64
 
 config ARCH_SELECT_MEMORY_MODEL
 	def_bool y
@@ -1396,7 +1369,6 @@ config HIGHPTE
 
 config X86_CHECK_BIOS_CORRUPTION
 	bool "Check for low memory corruption"
-	depends on !XEN
 	---help---
 	  Periodically check for memory corruption in low memory, which
 	  is suspected to be caused by BIOS.  Even when enabled in the
@@ -1427,7 +1399,6 @@ config X86_BOOTPARAM_MEMORY_CORRUPTION_CHECK
 
 config X86_RESERVE_LOW
 	int "Amount of low memory, in kilobytes, to reserve for the BIOS"
-	depends on !XEN
 	default 64
 	range 4 640
 	---help---
@@ -1458,7 +1429,6 @@ config X86_RESERVE_LOW
 config MATH_EMULATION
 	bool
 	prompt "Math emulation" if X86_32
-	depends on !XEN
 	---help---
 	  Linux can emulate a math coprocessor (used for floating point
 	  operations) if you don't have one. 486DX and Pentium processors have
@@ -1485,7 +1455,6 @@ config MATH_EMULATION
 config MTRR
 	def_bool y
 	prompt "MTRR (Memory Type Range Register) support" if EXPERT
-	depends on !XEN_UNPRIVILEGED_GUEST
 	---help---
 	  On Intel P6 family processors (Pentium Pro, Pentium II and later)
 	  the Memory Type Range Registers (MTRRs) may be used to control
@@ -1521,7 +1490,7 @@ config MTRR
 config MTRR_SANITIZER
 	def_bool y
 	prompt "MTRR cleanup support"
-	depends on MTRR && !XEN
+	depends on MTRR
 	---help---
 	  Convert MTRR layout from continuous to discrete, so X drivers can
 	  add writeback entries.
@@ -1551,8 +1520,8 @@ config MTRR_SANITIZER_SPARE_REG_NR_DEFAULT
 
 config X86_PAT
 	def_bool y
-	prompt "x86 PAT support" if EXPERT || XEN_UNPRIVILEGED_GUEST
-	depends on MTRR || (XEN_UNPRIVILEGED_GUEST && XEN_PCIDEV_FRONTEND)
+	prompt "x86 PAT support" if EXPERT
+	depends on MTRR
 	---help---
 	  Use PAT attributes to setup page level cache control.
 
@@ -1580,7 +1549,6 @@ config ARCH_RANDOM
 config X86_SMAP
 	def_bool y
 	prompt "Supervisor Mode Access Prevention" if EXPERT
-	depends on !XEN
 	---help---
 	  Supervisor Mode Access Prevention (SMAP) is a security
 	  feature in newer Intel processors.  There is a small
@@ -1591,7 +1559,7 @@ config X86_SMAP
 
 config EFI
 	bool "EFI runtime service support"
-	depends on ACPI && !XEN_UNPRIVILEGED_GUEST
+	depends on ACPI
 	select UCS2_STRING
 	---help---
 	  This enables the kernel to use EFI runtime services that are
@@ -1606,7 +1574,7 @@ config EFI
 
 config EFI_STUB
        bool "EFI stub support"
-       depends on EFI && (!XEN || XEN_BZIMAGE)
+       depends on EFI
        ---help---
           This kernel feature allows a bzImage to be loaded directly
 	  by EFI firmware without the use of a bootloader.
@@ -1649,7 +1617,6 @@ source kernel/Kconfig.hz
 
 config KEXEC
 	bool "kexec system call"
-	depends on !XEN_UNPRIVILEGED_GUEST
 	---help---
 	  kexec is a system call that implements the ability to shutdown your
 	  current kernel, and to start another kernel.  It is like a reboot
@@ -1667,7 +1634,6 @@ config KEXEC
 config CRASH_DUMP
 	bool "kernel crash dumps"
 	depends on X86_64 || (X86_32 && HIGHMEM)
-	depends on !XEN
 	---help---
 	  Generate crash dump after being started by kexec.
 	  This should be normally only set in special crash dump kernels
@@ -1687,8 +1653,7 @@ config KEXEC_JUMP
 	  code in physical address mode via KEXEC
 
 config PHYSICAL_START
-	hex "Physical address where the kernel is loaded" if (EXPERT || CRASH_DUMP || XEN)
-	default 0x100000 if XEN
+	hex "Physical address where the kernel is loaded" if (EXPERT || CRASH_DUMP)
 	default "0x1000000"
 	---help---
 	  This gives the physical address where the kernel is loaded.
@@ -1730,7 +1695,6 @@ config PHYSICAL_START
 
 config RELOCATABLE
 	bool "Build a relocatable kernel"
-	depends on !XEN
 	default y
 	---help---
 	  This builds a kernel image that retains relocation information
@@ -1752,8 +1716,7 @@ config X86_NEED_RELOCS
 	depends on X86_32 && RELOCATABLE
 
 config PHYSICAL_ALIGN
-	hex "Alignment value to which kernel should be aligned" if X86_32 && !XEN
-	default 0x2000 if XEN
+	hex "Alignment value to which kernel should be aligned" if X86_32
 	default "0x1000000"
 	range 0x2000 0x1000000
 	---help---
@@ -1775,33 +1738,9 @@ config PHYSICAL_ALIGN
 
 	  Don't change this unless you know what you are doing.
 
-config XEN_BZIMAGE
-	bool "Produce bzImage (rather than ELF) format executable"
-#	depends on XEN && (XEN_COMPAT >= (XEN_UNPRIVILEGED_GUEST ? 0x030402 : 0x040000))
-	depends on XEN
-	depends on !XEN_COMPAT_030002_AND_LATER
-	depends on !XEN_COMPAT_030004_AND_LATER
-	depends on !XEN_COMPAT_030100_AND_LATER
-	depends on !XEN_COMPAT_030200_AND_LATER
-	depends on !XEN_COMPAT_030300_AND_LATER
-	depends on !XEN_COMPAT_030400_AND_LATER
-#	depends on XEN_UNPRIVILEGED_GUEST || !XEN_COMPAT_030402_AND_LATER
-	select HAVE_KERNEL_BZIP2 if XEN_ADVANCED_COMPRESSION
-	select HAVE_KERNEL_LZMA if XEN_ADVANCED_COMPRESSION
-#	select HAVE_KERNEL_XZ if XEN_ADVANCED_COMPRESSION && (XEN_COMPAT > 0x040100)
-	select HAVE_KERNEL_XZ if XEN_ADVANCED_COMPRESSION && !XEN_COMPAT_040000_AND_LATER && !XEN_COMPAT_040100_AND_LATER
-	select HAVE_KERNEL_LZO if XEN_ADVANCED_COMPRESSION && !XEN_COMPAT_040000_AND_LATER
-	---help---
-	  Select whether, at the price of being incompatible with pre-3.4
-	  (pre-4.0 for Dom0) hypervisor versions, you want the final image
-	  to be in bzImage format, including the option to compress its
-	  embedded ELF image with methods better than gzip.
-	  Note that this is a prerequiste for building a kernel that can be
-	  used for secure boot from UEFI.
-
 config HOTPLUG_CPU
 	bool "Support for hot-pluggable CPUs"
-	depends on SMP && HOTPLUG
+	depends on SMP
 	---help---
 	  Say Y here to allow turning CPUs off and on. CPUs can be
 	  controlled through /sys/devices/system/cpu.
@@ -1812,7 +1751,7 @@ config HOTPLUG_CPU
 config BOOTPARAM_HOTPLUG_CPU0
 	bool "Set default setting of cpu0_hotpluggable"
 	default n
-	depends on HOTPLUG_CPU && !XEN
+	depends on HOTPLUG_CPU
 	---help---
 	  Set whether default state of cpu0_hotpluggable is on or off.
 
@@ -1841,7 +1780,7 @@ config BOOTPARAM_HOTPLUG_CPU0
 config DEBUG_HOTPLUG_CPU0
 	def_bool n
 	prompt "Debug CPU0 hotplug"
-	depends on HOTPLUG_CPU && !XEN
+	depends on HOTPLUG_CPU
 	---help---
 	  Enabling this option offlines CPU0 (if CPU0 can be offlined) as
 	  soon as possible and boots up userspace with CPU0 offlined. User
@@ -1914,7 +1853,6 @@ endmenu
 config ARCH_ENABLE_MEMORY_HOTPLUG
 	def_bool y
 	depends on X86_64 || (X86_32 && HIGHMEM)
-	depends on !XEN
 
 config ARCH_ENABLE_MEMORY_HOTREMOVE
 	def_bool y
@@ -1932,8 +1870,6 @@ config ARCH_HIBERNATION_HEADER
 
 source "kernel/power/Kconfig"
 
-if !XEN_UNPRIVILEGED_GUEST
-
 source "drivers/acpi/Kconfig"
 
 source "drivers/sfi/Kconfig"
@@ -1944,7 +1880,7 @@ config X86_APM_BOOT
 
 menuconfig APM
 	tristate "APM (Advanced Power Management) BIOS support"
-	depends on X86_32 && PM_SLEEP && !XEN
+	depends on X86_32 && PM_SLEEP
 	---help---
 	  APM is a BIOS specification for saving power using several different
 	  techniques. This is mostly useful for battery powered laptops with
@@ -2070,8 +2006,6 @@ source "drivers/cpuidle/Kconfig"
 
 source "drivers/idle/Kconfig"
 
-endif # !XEN_UNPRIVILEGED_GUEST
-
 endmenu
 
 
@@ -2081,7 +2015,6 @@ config PCI
 	bool "PCI support"
 	default y
 	select ARCH_SUPPORTS_MSI if (X86_LOCAL_APIC && X86_IO_APIC)
-	select ARCH_SUPPORTS_MSI if (XEN_UNPRIVILEGED_GUEST && XEN_PCIDEV_FRONTEND)
 	---help---
 	  Find out whether you have a PCI motherboard. PCI is the name of a
 	  bus system, i.e. the way the CPU talks to the other stuff inside
@@ -2109,36 +2042,25 @@ choice
 
 config PCI_GOBIOS
 	bool "BIOS"
-	depends on !XEN
 
 config PCI_GOMMCONFIG
 	bool "MMConfig"
-	depends on !XEN_UNPRIVILEGED_GUEST
 
 config PCI_GODIRECT
 	bool "Direct"
-	depends on !XEN_UNPRIVILEGED_GUEST
 
 config PCI_GOOLPC
 	bool "OLPC XO-1"
-	depends on OLPC && !XEN_UNPRIVILEGED_GUEST
-
-config PCI_GOXEN_FE
-	bool "Xen PCI Frontend"
-	depends on X86_XEN
-	help
-	  The PCI device frontend driver allows the kernel to import arbitrary
-	  PCI devices from a PCI backend to support PCI driver domains.
+	depends on OLPC
 
 config PCI_GOANY
 	bool "Any"
-	depends on !XEN_UNPRIVILEGED_GUEST
 
 endchoice
 
 config PCI_BIOS
 	def_bool y
-	depends on X86_32 && PCI && !XEN && (PCI_GOBIOS || PCI_GOANY)
+	depends on X86_32 && PCI && (PCI_GOBIOS || PCI_GOANY)
 
 # x86-64 doesn't support PCI BIOS access from long mode so always go direct.
 config PCI_DIRECT
@@ -2155,7 +2077,7 @@ config PCI_OLPC
 
 config PCI_XEN
 	def_bool y
-	depends on PCI && PARAVIRT_XEN
+	depends on PCI && XEN
 	select SWIOTLB_XEN
 
 config PCI_DOMAINS
@@ -2185,7 +2107,7 @@ source "drivers/pci/Kconfig"
 
 # x86_64 have no ISA slots, but can have ISA-style DMA.
 config ISA_DMA_API
-	bool "ISA-style DMA support" if ((X86_64 || XEN) && EXPERT) || XEN_UNPRIVILEGED_GUEST
+	bool "ISA-style DMA support" if (X86_64 && EXPERT)
 	default y
 	help
 	  Enables ISA-style DMA support for devices requiring such controllers.
@@ -2195,7 +2117,6 @@ if X86_32
 
 config ISA
 	bool "ISA support"
-	depends on !XEN
 	---help---
 	  Find out whether you have ISA slots on your motherboard.  ISA is the
 	  name of a bus system, i.e. the way the CPU talks to the other stuff
@@ -2244,7 +2165,7 @@ config SCx200HR_TIMER
 
 config OLPC
 	bool "One Laptop Per Child support"
-	depends on !X86_PAE && !XEN
+	depends on !X86_PAE
 	select GPIOLIB
 	select OF
 	select OF_PROMTREE
@@ -2333,18 +2254,18 @@ endif # X86_32
 
 config AMD_NB
 	def_bool y
-	depends on CPU_SUP_AMD && PCI && !XEN_UNPRIVILEGED_GUEST
+	depends on CPU_SUP_AMD && PCI
 
 source "drivers/pcmcia/Kconfig"
 
 source "drivers/pci/hotplug/Kconfig"
 
 config RAPIDIO
-	bool "RapidIO support"
+	tristate "RapidIO support"
 	depends on PCI
 	default n
 	help
-	  If you say Y here, the kernel will include drivers and
+	  If enabled this option will include drivers and the core
 	  infrastructure code to support RapidIO interconnect devices.
 
 source "drivers/rapidio/Kconfig"
@@ -2427,9 +2348,7 @@ source "net/Kconfig"
 
 source "drivers/Kconfig"
 
-if !XEN_UNPRIVILEGED_GUEST
 source "drivers/firmware/Kconfig"
-endif
 
 source "fs/Kconfig"
 

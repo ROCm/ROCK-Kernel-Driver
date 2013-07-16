@@ -465,7 +465,7 @@ NEXT_PAGE(early_dynamic_pgts)
 
 	.data
 
-#ifndef CONFIG_PARAVIRT_XEN
+#ifndef CONFIG_XEN
 NEXT_PAGE(init_level4_pgt)
 	.fill	512,8,0
 #else
@@ -538,8 +538,14 @@ ENTRY(idt_table)
 	.skip IDT_ENTRIES * 16
 
 	.align L1_CACHE_BYTES
-ENTRY(nmi_idt_table)
+ENTRY(debug_idt_table)
 	.skip IDT_ENTRIES * 16
+
+#ifdef CONFIG_TRACING
+	.align L1_CACHE_BYTES
+ENTRY(trace_idt_table)
+	.skip IDT_ENTRIES * 16
+#endif
 
 	__PAGE_ALIGNED_BSS
 NEXT_PAGE(empty_zero_page)

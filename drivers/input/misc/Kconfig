@@ -626,7 +626,7 @@ config INPUT_CMA3000_I2C
 
 config INPUT_XEN_KBDDEV_FRONTEND
 	tristate "Xen virtual keyboard and mouse support"
-	depends on PARAVIRT_XEN
+	depends on XEN
 	default y
 	select XEN_XENBUS_FRONTEND
 	help
@@ -636,5 +636,15 @@ config INPUT_XEN_KBDDEV_FRONTEND
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called xen-kbdfront.
+
+config INPUT_SIRFSOC_ONKEY
+	bool "CSR SiRFSoC power on/off/suspend key support"
+	depends on ARCH_SIRF && OF
+	default y
+	help
+	  Say Y here if you want to support for the SiRFSoC power on/off/suspend key
+	  in Linux, after you press the onkey, system will suspend.
+
+	  If unsure, say N.
 
 endif

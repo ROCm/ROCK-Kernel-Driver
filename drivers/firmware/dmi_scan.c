@@ -545,20 +545,21 @@ static bool dmi_matches(const struct dmi_system_id *dmi)
 {
 	int i;
 
-#ifdef CONFIG_XEN
-	if (!is_initial_xendomain())
-		return false;
-#endif
-
 	WARN(!dmi_initialized, KERN_ERR "dmi check: not initialized yet.\n");
 
 	for (i = 0; i < ARRAY_SIZE(dmi->matches); i++) {
 		int s = dmi->matches[i].slot;
 		if (s == DMI_NONE)
 			break;
-		if (dmi_ident[s]
-		    && strstr(dmi_ident[s], dmi->matches[i].substr))
-			continue;
+		if (dmi_ident[s]) {
+			if (!dmi->matches[i].exact_match &&
+			    strstr(dmi_ident[s], dmi->matches[i].substr))
+				continue;
+			else if (dmi->matches[i].exact_match &&
+				 !strcmp(dmi_ident[s], dmi->matches[i].substr))
+				continue;
+		}
+
 		/* No match */
 		return false;
 	}

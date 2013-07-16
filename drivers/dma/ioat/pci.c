@@ -29,6 +29,7 @@
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/interrupt.h>
+#include <linux/dca.h>
 #include <linux/slab.h>
 #include "dma.h"
 #include "dma_v2.h"
@@ -210,7 +211,11 @@ static void ioat_remove(struct pci_dev *pdev)
 		ioat3_dma_remove(device);
 
 	dev_err(&pdev->dev, "Removing dma and dca services\n");
-	ioat_remove_dca_provider(pdev);
+	if (device->dca) {
+		unregister_dca_provider(device->dca, &pdev->dev);
+		free_dca_provider(device->dca);
+		device->dca = NULL;
+	}
 	ioat_dma_remove(device);
 }
 

@@ -2181,12 +2181,8 @@ static void reada_for_search(struct btrfs_root *root,
 	}
 }
 
-/*
- * returns -EAGAIN if it had to drop the path, or zero if everything was in
- * cache
- */
-static noinline int reada_for_balance(struct btrfs_root *root,
-				      struct btrfs_path *path, int level)
+static noinline void reada_for_balance(struct btrfs_root *root,
+				       struct btrfs_path *path, int level)
 {
 	int slot;
 	int nritems;
@@ -2195,12 +2191,11 @@ static noinline int reada_for_balance(struct btrfs_root *root,
 	u64 gen;
 	u64 block1 = 0;
 	u64 block2 = 0;
-	int ret = 0;
 	int blocksize;
 
 	parent = path->nodes[level + 1];
 	if (!parent)
-		return 0;
+		return;
 
 	nritems = btrfs_header_nritems(parent);
 	slot = path->slots[level + 1];
@@ -2227,28 +2222,11 @@ static noinline int reada_for_balance(struct btrfs_root *root,
 			block2 = 0;
 		free_extent_buffer(eb);
 	}
-	if (block1 || block2) {
-		ret = -EAGAIN;
 
-		/* release the whole path */
-		btrfs_release_path(path);
-
-		/* read the blocks */
-		if (block1)
-			readahead_tree_block(root, block1, blocksize, 0);
-		if (block2)
-			readahead_tree_block(root, block2, blocksize, 0);
-
-		if (block1) {
-			eb = read_tree_block(root, block1, blocksize, 0);
-			free_extent_buffer(eb);
-		}
-		if (block2) {
-			eb = read_tree_block(root, block2, blocksize, 0);
-			free_extent_buffer(eb);
-		}
-	}
-	return ret;
+	if (block1)
+		readahead_tree_block(root, block1, blocksize, 0);
+	if (block2)
+		readahead_tree_block(root, block2, blocksize, 0);
 }
 
 
@@ -2362,35 +2340,28 @@ read_block_for_search(struct btrfs_trans_handle *trans,
 	tmp = btrfs_find_tree_block(root, blocknr, blocksize);
 	if (tmp) {
 		/* first we do an atomic uptodate check */
-		if (btrfs_buffer_uptodate(tmp, 0, 1) > 0) {
-			if (btrfs_buffer_uptodate(tmp, gen, 1) > 0) {
-				/*
-				 * we found an up to date block without
-				 * sleeping, return
-				 * right away
-				 */
-				*eb_ret = tmp;
-				return 0;
-			}
-			/* the pages were up to date, but we failed
-			 * the generation number check.  Do a full
-			 * read for the generation number that is correct.
-			 * We must do this without dropping locks so
-			 * we can trust our generation number
-			 */
-			free_extent_buffer(tmp);
-			btrfs_set_path_blocking(p);
-
-			/* now we're allowed to do a blocking uptodate check */
-			tmp = read_tree_block(root, blocknr, blocksize, gen);
-			if (tmp && btrfs_buffer_uptodate(tmp, gen, 0) > 0) {
-				*eb_ret = tmp;
-				return 0;
-			}
-			free_extent_buffer(tmp);
-			btrfs_release_path(p);
-			return -EIO;
+		if (btrfs_buffer_uptodate(tmp, gen, 1) > 0) {
+			*eb_ret = tmp;
+			return 0;
 		}
+
+		/* the pages were up to date, but we failed
+		 * the generation number check.  Do a full
+		 * read for the generation number that is correct.
+		 * We must do this without dropping locks so
+		 * we can trust our generation number
+		 */
+		btrfs_set_path_blocking(p);
+
+		/* now we're allowed to do a blocking uptodate check */
+		ret = btrfs_read_buffer(tmp, gen);
+		if (!ret) {
+			*eb_ret = tmp;
+			return 0;
+		}
+		free_extent_buffer(tmp);
+		btrfs_release_path(p);
+		return -EIO;
 	}
 
 	/*
@@ -2451,11 +2422,8 @@ setup_nodes_for_search(struct btrfs_trans_handle *trans,
 			goto again;
 		}
 
-		sret = reada_for_balance(root, p, level);
-		if (sret)
-			goto again;
-
 		btrfs_set_path_blocking(p);
+		reada_for_balance(root, p, level);
 		sret = split_node(trans, root, p, level);
 		btrfs_clear_path_blocking(p, NULL, 0);
 
@@ -2475,11 +2443,8 @@ setup_nodes_for_search(struct btrfs_trans_handle *trans,
 			goto again;
 		}
 
-		sret = reada_for_balance(root, p, level);
-		if (sret)
-			goto again;
-
 		btrfs_set_path_blocking(p);
+		reada_for_balance(root, p, level);
 		sret = balance_level(trans, root, p, level);
 		btrfs_clear_path_blocking(p, NULL, 0);
 
@@ -3146,7 +3111,7 @@ static int balance_node_right(struct btrfs_trans_handle *trans,
  */
 static noinline int insert_new_root(struct btrfs_trans_handle *trans,
 			   struct btrfs_root *root,
-			   struct btrfs_path *path, int level, int log_removal)
+			   struct btrfs_path *path, int level)
 {
 	u64 lower_gen;
 	struct extent_buffer *lower;
@@ -3197,7 +3162,7 @@ static noinline int insert_new_root(struct btrfs_trans_handle *trans,
 	btrfs_mark_buffer_dirty(c);
 
 	old = root->node;
-	tree_mod_log_set_root_pointer(root, c, log_removal);
+	tree_mod_log_set_root_pointer(root, c, 0);
 	rcu_assign_pointer(root->node, c);
 
 	/* the super has an extra ref to root->node */
@@ -3281,14 +3246,14 @@ static noinline int split_node(struct btrfs_trans_handle *trans,
 		/*
 		 * trying to split the root, lets make a new one
 		 *
-		 * tree mod log: We pass 0 as log_removal parameter to
+		 * tree mod log: We don't log_removal old root in
 		 * insert_new_root, because that root buffer will be kept as a
 		 * normal node. We are going to log removal of half of the
 		 * elements below with tree_mod_log_eb_copy. We're holding a
 		 * tree lock on the buffer, which is why we cannot race with
 		 * other tree_mod_log users.
 		 */
-		ret = insert_new_root(trans, root, path, level + 1, 0);
+		ret = insert_new_root(trans, root, path, level + 1);
 		if (ret)
 			return ret;
 	} else {
@@ -3989,7 +3954,7 @@ static noinline int split_leaf(struct btrfs_trans_handle *trans,
 		return -EOVERFLOW;
 
 	/* first try to make some room by pushing left and right */
-	if (data_size) {
+	if (data_size && path->nodes[1]) {
 		wret = push_leaf_right(trans, root, path, data_size,
 				       data_size, 0, 0);
 		if (wret < 0)
@@ -4008,7 +3973,7 @@ static noinline int split_leaf(struct btrfs_trans_handle *trans,
 	}
 
 	if (!path->nodes[1]) {
-		ret = insert_new_root(trans, root, path, 1, 1);
+		ret = insert_new_root(trans, root, path, 1);
 		if (ret)
 			return ret;
 	}
@@ -4433,7 +4398,7 @@ void btrfs_truncate_item(struct btrfs_root *root, struct btrfs_path *path,
 }
 
 /*
- * make the item pointed to by the path bigger, data_size is the new size.
+ * make the item pointed to by the path bigger, data_size is the added size.
  */
 void btrfs_extend_item(struct btrfs_root *root, struct btrfs_path *path,
 		       u32 data_size)

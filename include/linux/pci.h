@@ -343,13 +343,11 @@ struct pci_dev {
 	struct kset *msi_kset;
 #endif
 	struct pci_vpd *vpd;
-#ifdef CONFIG_PCI_IOV /* doesn't imply CONFIG_PCI_ATS when CONFIG_XEN */
+#ifdef CONFIG_PCI_ATS
 	union {
 		struct pci_sriov *sriov;	/* SR-IOV capability related */
 		struct pci_dev *physfn;	/* the PF this VF is associated with */
 	};
-#endif
-#ifdef CONFIG_PCI_ATS
 	struct pci_ats	*ats;	/* Address Translation Service */
 #endif
 	phys_addr_t rom; /* Physical address of ROM if it's not from the BAR */
@@ -366,7 +364,8 @@ static inline struct pci_dev *pci_physfn(struct pci_dev *dev)
 	return dev;
 }
 
-struct pci_dev *alloc_pci_dev(void);
+struct pci_dev *pci_alloc_dev(struct pci_bus *bus);
+struct pci_dev * __deprecated alloc_pci_dev(void);
 
 #define	to_pci_dev(n) container_of(n, struct pci_dev, dev)
 #define for_each_pci_dev(d) while ((d = pci_get_device(PCI_ANY_ID, PCI_ANY_ID, d)) != NULL)
@@ -929,9 +928,6 @@ void pci_update_resource(struct pci_dev *dev, int resno);
 int __must_check pci_assign_resource(struct pci_dev *dev, int i);
 int __must_check pci_reassign_resource(struct pci_dev *dev, int i, resource_size_t add_size, resource_size_t align);
 int pci_select_bars(struct pci_dev *dev, unsigned long flags);
-#ifdef CONFIG_XEN
-void pci_restore_bars(struct pci_dev *);
-#endif
 
 /* ROM control related routines */
 int pci_enable_rom(struct pci_dev *pdev);
@@ -1023,6 +1019,8 @@ int pci_request_selected_regions_exclusive(struct pci_dev *, int, const char *);
 void pci_release_selected_regions(struct pci_dev *, int);
 
 /* drivers/pci/bus.c */
+struct pci_bus *pci_bus_get(struct pci_bus *bus);
+void pci_bus_put(struct pci_bus *bus);
 void pci_add_resource(struct list_head *resources, struct resource *res);
 void pci_add_resource_offset(struct list_head *resources, struct resource *res,
 			     resource_size_t offset);
@@ -1176,10 +1174,6 @@ void pci_disable_msix(struct pci_dev *dev);
 void msi_remove_pci_irq_vectors(struct pci_dev *dev);
 void pci_restore_msi_state(struct pci_dev *dev);
 int pci_msi_enabled(void);
-#ifdef CONFIG_XEN
-int register_msi_get_owner(int (*func)(struct pci_dev *dev));
-int unregister_msi_get_owner(int (*func)(struct pci_dev *dev));
-#endif
 #endif
 
 #ifdef CONFIG_PCIEPORTBUS
@@ -1652,6 +1646,7 @@ void pcibios_set_master(struct pci_dev *dev);
 int pcibios_set_pcie_reset_state(struct pci_dev *dev,
 				 enum pcie_reset_state state);
 int pcibios_add_device(struct pci_dev *dev);
+void pcibios_release_device(struct pci_dev *dev);
 
 #ifdef CONFIG_PCI_MMCONFIG
 void __init pci_mmcfg_early_init(void);
@@ -1892,11 +1887,5 @@ static inline struct eeh_dev *pci_dev_to_eeh_dev(struct pci_dev *pdev)
  * parent
  */
 struct pci_dev *pci_find_upstream_pcie_bridge(struct pci_dev *pdev);
-
-#ifdef CONFIG_PCI_GUESTDEV
-int pci_is_guestdev(struct pci_dev *dev);
-#else
-#define pci_is_guestdev(dev)	0
-#endif
 
 #endif /* LINUX_PCI_H */

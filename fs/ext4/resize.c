@@ -79,12 +79,20 @@ static int verify_group_input(struct super_block *sb,
 	ext4_fsblk_t end = start + input->blocks_count;
 	ext4_group_t group = input->group;
 	ext4_fsblk_t itend = input->inode_table + sbi->s_itb_per_group;
-	unsigned overhead = ext4_group_overhead_blocks(sb, group);
-	ext4_fsblk_t metaend = start + overhead;
+	unsigned overhead;
+	ext4_fsblk_t metaend;
 	struct buffer_head *bh = NULL;
 	ext4_grpblk_t free_blocks_count, offset;
 	int err = -EINVAL;
 
+	if (group != sbi->s_groups_count) {
+		ext4_warning(sb, "Cannot add at group %u (only %u groups)",
+			     input->group, sbi->s_groups_count);
+		return -EINVAL;
+	}
+
+	overhead = ext4_group_overhead_blocks(sb, group);
+	metaend = start + overhead;
 	input->free_blocks_count = free_blocks_count =
 		input->blocks_count - 2 - overhead - sbi->s_itb_per_group;
 
@@ -96,10 +104,7 @@ static int verify_group_input(struct super_block *sb,
 		       free_blocks_count, input->reserved_blocks);
 
 	ext4_get_group_no_and_offset(sb, start, NULL, &offset);
-	if (group != sbi->s_groups_count)
-		ext4_warning(sb, "Cannot add at group %u (only %u groups)",
-			     input->group, sbi->s_groups_count);
-	else if (offset != 0)
+	if (offset != 0)
 			ext4_warning(sb, "Last group not full");
 	else if (input->reserved_blocks > input->blocks_count / 5)
 		ext4_warning(sb, "Reserved blocks too high (%u)",
@@ -1551,11 +1556,10 @@ int ext4_group_add(struct super_block *sb, struct ext4_new_group_data *input)
 	int reserved_gdb = ext4_bg_has_super(sb, input->group) ?
 		le16_to_cpu(es->s_reserved_gdt_blocks) : 0;
 	struct inode *inode = NULL;
-	int gdb_off, gdb_num;
+	int gdb_off;
 	int err;
 	__u16 bg_flags = 0;
 
-	gdb_num = input->group / EXT4_DESC_PER_BLOCK(sb);
 	gdb_off = input->group % EXT4_DESC_PER_BLOCK(sb);
 
 	if (gdb_off == 0 && !EXT4_HAS_RO_COMPAT_FEATURE(sb,

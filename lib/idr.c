@@ -524,8 +524,7 @@ EXPORT_SYMBOL(idr_alloc_cyclic);
 
 static void idr_remove_warning(int id)
 {
-	printk(KERN_WARNING
-		"idr_remove called for id=%d which is not allocated.\n", id);
+	WARN(1, "idr_remove called for id=%d which is not allocated.\n", id);
 	dump_stack();
 }
 
@@ -1064,9 +1063,7 @@ void ida_remove(struct ida *ida, int id)
 	return;
 
  err:
-	printk(KERN_WARNING
-	       "ida_remove called for id=%d which is not allocated.\n", id);
-	dump_stack();
+	WARN(1, "ida_remove called for id=%d which is not allocated.\n", id);
 }
 EXPORT_SYMBOL(ida_remove);
 

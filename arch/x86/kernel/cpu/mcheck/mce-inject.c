@@ -94,7 +94,6 @@ static int mce_raise_notify(unsigned int cmd, struct pt_regs *regs)
 	return NMI_HANDLED;
 }
 
-#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
 static void mce_irq_ipi(void *info)
 {
 	int cpu = smp_processor_id();
@@ -106,7 +105,6 @@ static void mce_irq_ipi(void *info)
 		raise_exception(m, NULL);
 	}
 }
-#endif
 
 /* Inject mce on current CPU */
 static int raise_local(void)
@@ -154,8 +152,8 @@ static void raise_mce(struct mce *m)
 	if (context == MCJ_CTX_RANDOM)
 		return;
 
-#if defined(CONFIG_X86_LOCAL_APIC) && !defined(CONFIG_XEN)
-	if (m->inject_flags & (MCJ_IRQ_BRAODCAST | MCJ_NMI_BROADCAST)) {
+#ifdef CONFIG_X86_LOCAL_APIC
+	if (m->inject_flags & (MCJ_IRQ_BROADCAST | MCJ_NMI_BROADCAST)) {
 		unsigned long start;
 		int cpu;
 
@@ -169,7 +167,7 @@ static void raise_mce(struct mce *m)
 				cpumask_clear_cpu(cpu, mce_inject_cpumask);
 		}
 		if (!cpumask_empty(mce_inject_cpumask)) {
-			if (m->inject_flags & MCJ_IRQ_BRAODCAST) {
+			if (m->inject_flags & MCJ_IRQ_BROADCAST) {
 				/*
 				 * don't wait because mce_irq_ipi is necessary
 				 * to be sync with following raise_local

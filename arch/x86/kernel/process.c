@@ -317,7 +317,7 @@ void default_idle(void)
 EXPORT_SYMBOL(default_idle);
 #endif
 
-#ifdef CONFIG_PARAVIRT_XEN
+#ifdef CONFIG_XEN
 bool xen_set_default_idle(void)
 {
 	bool ret = !!x86_idle;

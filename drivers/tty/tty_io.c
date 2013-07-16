@@ -137,8 +137,6 @@ EXPORT_SYMBOL(tty_mutex);
 /* Spinlock to protect the tty->tty_files list */
 DEFINE_SPINLOCK(tty_files_lock);
 
-int console_use_vt = 1;
-
 static ssize_t tty_read(struct file *, char __user *, size_t, loff_t *);
 static ssize_t tty_write(struct file *, const char __user *, size_t, loff_t *);
 ssize_t redirected_tty_write(struct file *, const char __user *,
@@ -1933,10 +1931,6 @@ static struct tty_driver *tty_lookup_driver(dev_t device, struct file *filp,
 #ifdef CONFIG_VT
 	case MKDEV(TTY_MAJOR, 0): {
 		extern struct tty_driver *console_driver;
-
-		if (!console_use_vt)
-			return get_tty_driver(device, index)
-			       ?: ERR_PTR(-ENODEV);
 		driver = tty_driver_kref_get(console_driver);
 		*index = fg_console;
 		*noctty = 1;
@@ -2146,6 +2140,7 @@ static unsigned int tty_poll(struct file *filp, poll_table *wait)
 static int __tty_fasync(int fd, struct file *filp, int on)
 {
 	struct tty_struct *tty = file_tty(filp);
+	struct tty_ldisc *ldisc;
 	unsigned long flags;
 	int retval = 0;
 
@@ -2156,11 +2151,17 @@ static int __tty_fasync(int fd, struct file *filp, int on)
 	if (retval <= 0)
 		goto out;
 
+	ldisc = tty_ldisc_ref(tty);
+	if (ldisc) {
+		if (ldisc->ops->fasync)
+			ldisc->ops->fasync(tty, on);
+		tty_ldisc_deref(ldisc);
+	}
+
 	if (on) {
 		enum pid_type type;
 		struct pid *pid;
-		if (!waitqueue_active(&tty->read_wait))
-			tty->minimum_to_wake = 1;
+
 		spin_lock_irqsave(&tty->ctrl_lock, flags);
 		if (tty->pgrp) {
 			pid = tty->pgrp;
@@ -2173,13 +2174,7 @@ static int __tty_fasync(int fd, struct file *filp, int on)
 		spin_unlock_irqrestore(&tty->ctrl_lock, flags);
 		retval = __f_setown(filp, pid, type, 0);
 		put_pid(pid);
-		if (retval)
-			goto out;
-	} else {
-		if (!tty->fasync && !waitqueue_active(&tty->read_wait))
-			tty->minimum_to_wake = N_TTY_BUF_SIZE;
 	}
-	retval = 0;
 out:
 	return retval;
 }
@@ -3584,8 +3579,7 @@ int __init tty_init(void)
 		WARN_ON(device_create_file(consdev, &dev_attr_active) < 0);
 
 #ifdef CONFIG_VT
-	if (console_use_vt)
-		vty_init(&console_fops);
+	vty_init(&console_fops);
 #endif
 	return 0;
 }

@@ -28,6 +28,7 @@
  */
 
 #include <linux/acpi.h>
+#include <linux/memory.h>
 #include <linux/memory_hotplug.h>
 
 #include "internal.h"
@@ -80,11 +81,6 @@ struct acpi_memory_device {
 	unsigned int state;	/* State of the memory device */
 	struct list_head res_list;
 };
-
-#ifdef CONFIG_XEN
-#include "../xen/core/acpi_memhotplug.c"
-#define memory_add_physaddr_to_nid(start) 0
-#endif
 
 static acpi_status
 acpi_memory_get_resource(struct acpi_resource *resource, void *context)
@@ -171,17 +167,50 @@ static int acpi_memory_check_device(struct acpi_memory_device *mem_device)
 	return 0;
 }
 
+static unsigned long acpi_meminfo_start_pfn(struct acpi_memory_info *info)
+{
+	return PFN_DOWN(info->start_addr);
+}
+
+static unsigned long acpi_meminfo_end_pfn(struct acpi_memory_info *info)
+{
+	return PFN_UP(info->start_addr + info->length-1);
+}
+
+static int acpi_bind_memblk(struct memory_block *mem, void *arg)
+{
+	return acpi_bind_one(&mem->dev, (acpi_handle)arg);
+}
+
+static int acpi_bind_memory_blocks(struct acpi_memory_info *info,
+				   acpi_handle handle)
+{
+	return walk_memory_range(acpi_meminfo_start_pfn(info),
+				 acpi_meminfo_end_pfn(info), (void *)handle,
+				 acpi_bind_memblk);
+}
+
+static int acpi_unbind_memblk(struct memory_block *mem, void *arg)
+{
+	acpi_unbind_one(&mem->dev);
+	return 0;
+}
+
+static void acpi_unbind_memory_blocks(struct acpi_memory_info *info,
+				      acpi_handle handle)
+{
+	walk_memory_range(acpi_meminfo_start_pfn(info),
+			  acpi_meminfo_end_pfn(info), NULL, acpi_unbind_memblk);
+}
+
 static int acpi_memory_enable_device(struct acpi_memory_device *mem_device)
 {
+	acpi_handle handle = mem_device->device->handle;
 	int result, num_enabled = 0;
 	struct acpi_memory_info *info;
 	int node;
 
-#ifdef CONFIG_XEN
-	return xen_hotadd_memory(mem_device);
-#endif
-
-	node = acpi_get_node(mem_device->device->handle);
+	node = acpi_get_node(handle);
 	/*
 	 * Tell the VM there is more memory here...
 	 * Note: Assume that this function returns zero on success
@@ -212,6 +241,12 @@ static int acpi_memory_enable_device(struct acpi_memory_device *mem_device)
 		if (result && result != -EEXIST)
 			continue;
 
+		result = acpi_bind_memory_blocks(info, handle);
+		if (result) {
+			acpi_unbind_memory_blocks(info, handle);
+			return -ENODEV;
+		}
+
 		info->enabled = 1;
 
 		/*
@@ -236,12 +271,11 @@ static int acpi_memory_enable_device(struct acpi_memory_device *mem_device)
 	return 0;
 }
 
-static int acpi_memory_remove_memory(struct acpi_memory_device *mem_device)
+static void acpi_memory_remove_memory(struct acpi_memory_device *mem_device)
 {
-	int result = 0, nid;
+	acpi_handle handle = mem_device->device->handle;
 	struct acpi_memory_info *info, *n;
-
-	nid = acpi_get_node(mem_device->device->handle);
+	int nid = acpi_get_node(handle);
 
 	list_for_each_entry_safe(info, n, &mem_device->res_list, list) {
 		if (!info->enabled)
@@ -249,15 +283,12 @@ static int acpi_memory_remove_memory(struct acpi_memory_device *mem_device)
 
 		if (nid < 0)
 			nid = memory_add_physaddr_to_nid(info->start_addr);
-		result = remove_memory(nid, info->start_addr, info->length);
-		if (result)
-			return result;
 
+		acpi_unbind_memory_blocks(info, handle);
+		remove_memory(nid, info->start_addr, info->length);
 		list_del(&info->list);
 		kfree(info);
 	}
-
-	return result;
 }
 
 static void acpi_memory_device_free(struct acpi_memory_device *mem_device)
@@ -309,7 +340,7 @@ static int acpi_memory_device_add(struct acpi_device *device,
 	if (result) {
 		dev_err(&device->dev, "acpi_memory_enable_device() error\n");
 		acpi_memory_device_free(mem_device);
-		return -ENODEV;
+		return result;
 	}
 
 	dev_dbg(&device->dev, "Memory device configured by ACPI\n");
@@ -319,10 +350,6 @@ static int acpi_memory_device_add(struct acpi_device *device,
 static void acpi_memory_device_remove(struct acpi_device *device)
 {
 	struct acpi_memory_device *mem_device;
-
-#ifdef CONFIG_XEN
-	return; /* not supported */
-#endif
 
 	if (!device || !acpi_driver_data(device))
 		return;
@@ -335,8 +362,4 @@ static void acpi_memory_device_remove(struct acpi_device *device)
 void __init acpi_memory_hotplug_init(void)
 {
 	acpi_scan_add_handler_with_hotplug(&memory_device_handler, "memory");
-
-#ifdef CONFIG_XEN
-	xen_hotadd_mem_init();
-#endif
 }

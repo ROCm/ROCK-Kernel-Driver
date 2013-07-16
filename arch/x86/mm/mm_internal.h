@@ -14,8 +14,6 @@ unsigned long kernel_physical_mapping_init(unsigned long start,
 					     unsigned long page_size_mask);
 void zone_sizes_init(void);
 
-bool in_pgt_buf(unsigned long paddr);
-
 extern int after_bootmem;
 
 #endif	/* __X86_MM_INTERNAL_H */

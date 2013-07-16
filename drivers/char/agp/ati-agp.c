@@ -236,14 +236,14 @@ static int ati_configure(void)
 static int agp_ati_suspend(struct pci_dev *dev, pm_message_t state)
 {
 	pci_save_state(dev);
-	pci_set_power_state(dev, 3);
+	pci_set_power_state(dev, PCI_D3hot);
 
 	return 0;
 }
 
 static int agp_ati_resume(struct pci_dev *dev)
 {
-	pci_set_power_state(dev, 0);
+	pci_set_power_state(dev, PCI_D0);
 	pci_restore_state(dev);
 
 	return ati_configure();
@@ -361,7 +361,7 @@ static int ati_create_gatt_table(struct agp_bridge_data *bridge)
 
 	agp_bridge->gatt_table_real = (u32 *)page_dir.real;
 	agp_bridge->gatt_table = (u32 __iomem *) page_dir.remapped;
-	agp_bridge->gatt_bus_addr = virt_to_gart(page_dir.real);
+	agp_bridge->gatt_bus_addr = virt_to_phys(page_dir.real);
 
 	/* Write out the size register */
 	current_size = A_SIZE_LVL2(agp_bridge->current_size);
@@ -391,7 +391,7 @@ static int ati_create_gatt_table(struct agp_bridge_data *bridge)
 
 	/* Calculate the agp offset */
 	for (i = 0; i < value->num_entries / 1024; i++, addr += 0x00400000) {
-		writel(virt_to_gart(ati_generic_private.gatt_pages[i]->real) | 1,
+		writel(virt_to_phys(ati_generic_private.gatt_pages[i]->real) | 1,
 			page_dir.remapped+GET_PAGE_DIR_OFF(addr));
 		readl(page_dir.remapped+GET_PAGE_DIR_OFF(addr));	/* PCI Posting. */
 	}

@@ -5,8 +5,6 @@
 #ifndef _ASM_X86_MACH_DEFAULT_MACH_TRAPS_H
 #define _ASM_X86_MACH_DEFAULT_MACH_TRAPS_H
 
-#include <linux/nmi.h>
-#include <asm/delay.h>
 #include <asm/mc146818rtc.h>
 
 #define NMI_REASON_PORT		0x61
@@ -22,29 +20,6 @@
 static inline unsigned char default_get_nmi_reason(void)
 {
 	return inb(NMI_REASON_PORT);
-}
-
-static inline void clear_serr_error(unsigned char reason)
-{
-	reason = (reason & NMI_REASON_CLEAR_MASK) | NMI_REASON_CLEAR_SERR;
-	outb(reason, NMI_REASON_PORT);
-}
-
-static inline void clear_io_check_error(unsigned char reason)
-{
-	unsigned long i;
-
-	reason = (reason & NMI_REASON_CLEAR_MASK) | NMI_REASON_CLEAR_IOCHK;
-	outb(reason, NMI_REASON_PORT);
-
-	i = 20000;
-	while (--i) {
-		touch_nmi_watchdog();
-		udelay(100);
-	}
-
-	reason &= ~NMI_REASON_CLEAR_IOCHK;
-	outb(reason, NMI_REASON_PORT);
 }
 
 static inline void reassert_nmi(void)

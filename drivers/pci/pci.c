@@ -436,12 +436,7 @@ pci_find_parent_resource(const struct pci_dev *dev, struct resource *res)
  * Restore the BAR values for a given device, so as to make it
  * accessible by its driver.
  */
-#ifndef CONFIG_XEN
 static void
-#else
-EXPORT_SYMBOL_GPL(pci_restore_bars);
-void
-#endif
 pci_restore_bars(struct pci_dev *dev)
 {
 	int i;
@@ -810,7 +805,7 @@ pci_power_t pci_choose_state(struct pci_dev *dev, pm_message_t state)
 {
 	pci_power_t ret;
 
-	if (!pci_find_capability(dev, PCI_CAP_ID_PM))
+	if (!dev->pm_cap)
 		return PCI_D0;
 
 	ret = platform_pci_choose_state(dev);
@@ -1338,6 +1333,16 @@ int __weak pcibios_add_device (struct pci_dev *dev)
 {
 	return 0;
 }
+
+/**
+ * pcibios_release_device - provide arch specific hooks when releasing device dev
+ * @dev: the PCI device being released
+ *
+ * Permits the platform to provide architecture specific functionality when
+ * devices are released. This is the default implementation. Architecture
+ * implementations can override this.
+ */
+void __weak pcibios_release_device(struct pci_dev *dev) {}
 
 /**
  * pcibios_disable_device - disable arch specific PCI resources for device dev
@@ -2426,7 +2431,7 @@ bool pci_acs_path_enabled(struct pci_dev *start,
 /**
  * pci_swizzle_interrupt_pin - swizzle INTx for device behind bridge
  * @dev: the PCI device
- * @pin: the INTx pin (1=INTA, 2=INTB, 3=INTD, 4=INTD)
+ * @pin: the INTx pin (1=INTA, 2=INTB, 3=INTC, 4=INTD)
  *
  * Perform INTx swizzling for a device behind one level of bridge.  This is
  * required by section 9.1 of the PCI-to-PCI bridge specification for devices
@@ -3765,7 +3770,7 @@ void pci_reassigndev_resource_alignment(struct pci_dev *dev)
 
 	/* check if specified PCI is target device to reassign */
 	align = pci_specified_resource_alignment(dev);
-	if (!align && !pci_is_guestdev_to_reassign(dev))
+	if (!align)
 		return;
 
 	if (dev->hdr_type == PCI_HEADER_TYPE_NORMAL &&

@@ -77,8 +77,8 @@ EXPORT_SYMBOL(acpi_in_debugger);
 extern char line_buf[80];
 #endif				/*ENABLE_DEBUGGER */
 
-static int (*__acpi_os_prepare_sleep)(u8 sleep_state, u32 val_a, u32 val_b,
-				      bool extended);
+static int (*__acpi_os_prepare_sleep)(u8 sleep_state, u32 pm1a_ctrl,
+				      u32 pm1b_ctrl);
 
 static acpi_osd_handler acpi_irq_handler;
 static void *acpi_irq_context;
@@ -325,11 +325,7 @@ acpi_map_lookup_virt(void __iomem *virt, acpi_size size)
 }
 
 #ifndef CONFIG_IA64
-#ifndef CONFIG_XEN
 #define should_use_kmap(pfn)   page_is_ram(pfn)
-#else
-#define should_use_kmap(mfn)   pfn_valid(pfn = mfn_to_local_pfn(mfn))
-#endif
 #else
 /* ioremap will take care of cache attributes */
 #define should_use_kmap(pfn)   0
@@ -839,19 +835,9 @@ void acpi_os_stall(u32 us)
  */
 u64 acpi_os_get_timer(void)
 {
-	static u64 t;
-
-#ifdef	CONFIG_HPET
-	/* TBD: use HPET if available */
-#endif
-
-#ifdef	CONFIG_X86_PM_TIMER
-	/* TBD: default to PM timer if HPET was not available */
-#endif
-	if (!t)
-		printk(KERN_ERR PREFIX "acpi_os_get_timer() TBD\n");
-
-	return ++t;
+	u64 time_ns = ktime_to_ns(ktime_get());
+	do_div(time_ns, 100);
+	return time_ns;
 }
 
 acpi_status acpi_os_read_port(acpi_io_address port, u32 * value, u32 width)
@@ -1719,6 +1705,17 @@ acpi_status acpi_os_release_object(acpi_cache_t * cache, void *object)
 }
 #endif
 
+static int __init acpi_no_auto_ssdt_setup(char *s)
+{
+        printk(KERN_NOTICE PREFIX "SSDT auto-load disabled\n");
+
+        acpi_gbl_disable_ssdt_table_load = TRUE;
+
+        return 1;
+}
+
+__setup("acpi_no_auto_ssdt", acpi_no_auto_ssdt_setup);
+
 acpi_status __init acpi_os_initialize(void)
 {
 	acpi_os_map_generic_address(&acpi_gbl_FADT.xpm1a_event_block);
@@ -1761,13 +1758,13 @@ acpi_status acpi_os_terminate(void)
 	return AE_OK;
 }
 
-acpi_status acpi_os_prepare_sleep(u8 sleep_state, u32 val_a, u32 val_b,
-				  bool extended)
+acpi_status acpi_os_prepare_sleep(u8 sleep_state, u32 pm1a_control,
+				  u32 pm1b_control)
 {
 	int rc = 0;
 	if (__acpi_os_prepare_sleep)
-		rc = __acpi_os_prepare_sleep(sleep_state, val_a, val_b,
-					     extended);
+		rc = __acpi_os_prepare_sleep(sleep_state,
+					     pm1a_control, pm1b_control);
 	if (rc < 0)
 		return AE_ERROR;
 	else if (rc > 0)
@@ -1776,8 +1773,8 @@ acpi_status acpi_os_prepare_sleep(u8 sleep_state, u32 val_a, u32 val_b,
 	return AE_OK;
 }
 
-void acpi_os_set_prepare_sleep(int (*func)(u8 sleep_state, u32 val_a,
-					   u32 val_b, bool extended))
+void acpi_os_set_prepare_sleep(int (*func)(u8 sleep_state,
+			       u32 pm1a_ctrl, u32 pm1b_ctrl))
 {
 	__acpi_os_prepare_sleep = func;
 }

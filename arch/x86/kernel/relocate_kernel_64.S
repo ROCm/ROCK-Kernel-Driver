@@ -91,30 +91,13 @@ relocate_kernel:
 	/* Switch to the identity mapped page tables */
 	movq	%r9, %cr3
 
-	/* setup idt */
-	lidtq	idt_80 - relocate_kernel(%r8)
-
-	/* setup gdt */
-	leaq	gdt - relocate_kernel(%r8), %rax
-	movq	%rax, (gdt_80 - relocate_kernel) + 2(%r8)
-	lgdtq	gdt_80 - relocate_kernel(%r8)
-
-	/* setup data segment registers */
-	xorl	%eax, %eax
-	movl	%eax, %ds
-	movl	%eax, %es
-	movl	%eax, %fs
-	movl	%eax, %gs
-	movl	%eax, %ss
-
 	/* setup a new stack at the end of the physical control page */
 	lea	PAGE_SIZE(%r8), %rsp
 
-	/* load new code segment and jump to identity mapped page */
+	/* jump to identity mapped page */
 	addq	$(identity_mapped - relocate_kernel), %r8
-	pushq	$(gdt_cs - gdt)
 	pushq	%r8
-	lretq
+	ret
 
 identity_mapped:
 	/* set return address to 0 if not preserving context */
@@ -168,21 +151,21 @@ identity_mapped:
 
 	testq	%r11, %r11
 	jnz 1f
-	xorq	%rax, %rax
-	xorq	%rbx, %rbx
-	xorq    %rcx, %rcx
-	xorq    %rdx, %rdx
-	xorq    %rsi, %rsi
-	xorq    %rdi, %rdi
-	xorq    %rbp, %rbp
-	xorq	%r8,  %r8
-	xorq	%r9,  %r9
-	xorq	%r10, %r10
-	xorq	%r11, %r11
-	xorq	%r12, %r12
-	xorq	%r13, %r13
-	xorq	%r14, %r14
-	xorq	%r15, %r15
+	xorl	%eax, %eax
+	xorl	%ebx, %ebx
+	xorl    %ecx, %ecx
+	xorl    %edx, %edx
+	xorl    %esi, %esi
+	xorl    %edi, %edi
+	xorl    %ebp, %ebp
+	xorl	%r8d, %r8d
+	xorl	%r9d, %r9d
+	xorl	%r10d, %r10d
+	xorl	%r11d, %r11d
+	xorl	%r12d, %r12d
+	xorl	%r13d, %r13d
+	xorl	%r14d, %r14d
+	xorl	%r15d, %r15d
 
 	ret
 
@@ -229,8 +212,8 @@ virtual_mapped:
 	/* Do the copies */
 swap_pages:
 	movq	%rdi, %rcx 	/* Put the page_list in %rcx */
-	xorq	%rdi, %rdi
-	xorq	%rsi, %rsi
+	xorl	%edi, %edi
+	xorl	%esi, %esi
 	jmp	1f
 
 0:	/* top, read another word for the indirection page */
@@ -280,21 +263,6 @@ swap_pages:
 	jmp	0b
 3:
 	ret
-
-	.align  16
-gdt:
-	.quad	0x0000000000000000	/* NULL descriptor */
-gdt_cs:
-	.quad   0x00af9a000000ffff
-gdt_end:
-
-gdt_80:
-	.word	gdt_end - gdt - 1	/* limit */
-	.quad	0			/* base - filled in by code above */
-
-idt_80:
-	.word	0			/* limit */
-	.quad	0			/* base */
 
 	.globl kexec_control_code_size
 .set kexec_control_code_size, . - relocate_kernel

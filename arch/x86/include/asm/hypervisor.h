@@ -62,8 +62,3 @@ static inline void init_hypervisor_platform(void) { }
 static inline bool hypervisor_x2apic_available(void) { return false; }
 #endif /* CONFIG_HYPERVISOR_GUEST */
 #endif /* _ASM_X86_HYPERVISOR_H */
-
-#ifdef HAVE_XEN_PLATFORM_COMPAT_H
-#include <asm/xen/hypervisor.h>
-#include_next <asm/hypervisor.h>
-#endif

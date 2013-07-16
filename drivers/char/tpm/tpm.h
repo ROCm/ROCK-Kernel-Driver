@@ -272,7 +272,6 @@ typedef union {
 	struct	tpm_output_header out;
 } tpm_cmd_header;
 
-#define TPM_DIGEST_SIZE 20
 struct tpm_pcrread_out {
 	u8	pcr_result[TPM_DIGEST_SIZE];
 } __packed;
@@ -325,16 +324,6 @@ struct tpm_cmd_t {
 
 ssize_t	tpm_getcap(struct device *, __be32, cap_t *, const char *);
 
-static inline void *chip_get_private(const struct tpm_chip *chip)
-{
-	return chip->vendor.priv;
-}
-
-static inline void chip_set_private(struct tpm_chip *chip, void *priv)
-{
-	chip->vendor.priv = priv;
-}
-
 extern int tpm_get_timeouts(struct tpm_chip *);
 extern void tpm_gen_interrupt(struct tpm_chip *);
 extern int tpm_do_selftest(struct tpm_chip *);
@@ -343,6 +332,7 @@ extern struct tpm_chip* tpm_register_hardware(struct device *,
 				 const struct tpm_vendor_specific *);
 extern int tpm_open(struct inode *, struct file *);
 extern int tpm_release(struct inode *, struct file *);
+extern void tpm_dev_release(struct device *dev);
 extern void tpm_dev_vendor_release(struct tpm_chip *);
 extern ssize_t tpm_write(struct file *, const char __user *, size_t,
 			 loff_t *);

@@ -633,7 +633,7 @@ config SCSI_BUSLOGIC
 
 config SCSI_FLASHPOINT
 	bool "FlashPoint support"
-	depends on SCSI_BUSLOGIC && PCI && X86_32
+	depends on SCSI_BUSLOGIC && PCI
 	help
 	  This option allows you to add FlashPoint support to the
 	  BusLogic SCSI driver. The FlashPoint SCCB Manager code is
@@ -642,7 +642,7 @@ config SCSI_FLASHPOINT
 
 config VMWARE_PVSCSI
 	tristate "VMware PVSCSI driver support"
-	depends on PCI && SCSI && !XEN && X86
+	depends on PCI && SCSI && X86
 	help
 	  This driver supports VMware's para virtualized SCSI HBA.
 	  To compile this driver as a module, choose M here: the

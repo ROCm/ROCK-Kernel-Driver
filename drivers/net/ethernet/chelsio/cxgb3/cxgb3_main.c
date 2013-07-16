@@ -3037,7 +3037,9 @@ static void t3_io_resume(struct pci_dev *pdev)
 	CH_ALERT(adapter, "adapter recovering, PEX ERR 0x%x\n",
 		 t3_read_reg(adapter, A_PCIE_PEX_ERR));
 
+	rtnl_lock();
 	t3_resume_ports(adapter);
+	rtnl_unlock();
 }
 
 static const struct pci_error_handlers t3_err_handler = {
@@ -3313,17 +3315,7 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	 * register at least one net device.
 	 */
 	for_each_port(adapter, i) {
-#ifndef CONFIG_XEN
 		err = register_netdev(adapter->port[i]);
-#else
-		rtnl_lock();
-		err = register_netdevice(adapter->port[i]);
-		if (!err) {
-			adapter->port[i]->wanted_features &= ~NETIF_F_GRO;
-			netdev_update_features(adapter->port[i]);
-		}
-		rtnl_unlock();
-#endif
 		if (err)
 			dev_warn(&pdev->dev,
 				 "cannot register net device %s, skipping\n",

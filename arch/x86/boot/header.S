@@ -411,9 +411,6 @@ setup_data:		.quad 0			# 64-bit physical pointer to
 
 pref_address:		.quad LOAD_PHYSICAL_ADDR	# preferred load addr
 
-#ifdef CONFIG_XEN
-#define ZO_startup_32 0
-#endif
 #define ZO_INIT_SIZE	(ZO__end - ZO_startup_32 + ZO_z_extract_offset)
 #define VO_INIT_SIZE	(VO__end - VO__text)
 #if ZO_INIT_SIZE > VO_INIT_SIZE
@@ -434,7 +431,6 @@ handover_offset:
 
 	.section ".entrytext", "ax"
 start_of_setup:
-#ifndef CONFIG_XEN
 # Force %es = %ds
 	movw	%ds, %ax
 	movw	%ax, %es
@@ -507,4 +503,3 @@ die:
 setup_corrupt:
 	.byte	7
 	.string	"No setup signature found...\n"
-#endif /* CONFIG_XEN */

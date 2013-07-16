@@ -189,29 +189,8 @@ boot := arch/x86/boot
 
 BOOT_TARGETS = bzlilo bzdisk fdimage fdimage144 fdimage288 isoimage
 
-PHONY += bzImage vmlinuz $(BOOT_TARGETS)
+PHONY += bzImage $(BOOT_TARGETS)
 
-ifdef CONFIG_XEN
-LINUXINCLUDE := -D__XEN_INTERFACE_VERSION__=$(CONFIG_XEN_INTERFACE_VERSION) \
-	-I$(srctree)/arch/x86/include/mach-xen $(LINUXINCLUDE)
-
-ifdef CONFIG_X86_64
-LDFLAGS_vmlinux := -e startup_64
-endif
-endif
-
-ifeq ($(CONFIG_XEN)-$(CONFIG_XEN_BZIMAGE),y-)
-# Default kernel to build
-all: vmlinuz
-
-# KBUILD_IMAGE specifies the target image being built
-KBUILD_IMAGE := $(boot)/vmlinuz
-
-vmlinuz: vmlinux
-	$(Q)$(MAKE) $(build)=$(boot) $(KBUILD_IMAGE)
-	$(Q)mkdir -p $(objtree)/arch/$(UTS_MACHINE)/boot
-	$(Q)ln -fsn ../../x86/boot/$@ $(objtree)/arch/$(UTS_MACHINE)/boot/$@
-else
 # Default kernel to build
 all: bzImage
 
@@ -225,7 +204,6 @@ endif
 	$(Q)$(MAKE) $(build)=$(boot) $(KBUILD_IMAGE)
 	$(Q)mkdir -p $(objtree)/arch/$(UTS_MACHINE)/boot
 	$(Q)ln -fsn ../../x86/boot/bzImage $(objtree)/arch/$(UTS_MACHINE)/boot/$@
-endif
 
 $(BOOT_TARGETS): vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $@
@@ -244,6 +222,12 @@ archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)
 	$(Q)$(MAKE) $(clean)=arch/x86/tools
 
+PHONY += kvmconfig
+kvmconfig:
+	$(if $(wildcard $(objtree)/.config),, $(error You need an existing .config for this target))
+	$(Q)$(CONFIG_SHELL) $(srctree)/scripts/kconfig/merge_config.sh -m -O $(objtree) $(objtree)/.config arch/x86/configs/kvm_guest.config
+	$(Q)yes "" | $(MAKE) oldconfig
+
 define archhelp
   echo  '* bzImage      - Compressed kernel image (arch/x86/boot/bzImage)'
   echo  '  install      - Install kernel using'
@@ -257,4 +241,5 @@ define archhelp
   echo  '                  bzdisk/fdimage*/isoimage also accept:'
   echo  '                  FDARGS="..."  arguments for the booted kernel'
   echo  '                  FDINITRD=file initrd for the booted kernel'
+  echo  '  kvmconfig	- Enable additional options for guest kernel support'
 endef

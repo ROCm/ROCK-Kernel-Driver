@@ -1,9 +1,7 @@
 #include <asm/ucontext.h>
 
-#ifdef CONFIG_LGUEST_GUEST
 #include <linux/lguest.h>
 #include "../../../drivers/lguest/lg.h"
-#endif
 
 #define __SYSCALL_I386(nr, sym, compat) [nr] = 1,
 static char syscalls[] = {
@@ -30,7 +28,6 @@ void foo(void)
 	OFFSET(CPUINFO_x86_vendor, cpuinfo_x86, x86_vendor);
 	OFFSET(CPUINFO_x86_model, cpuinfo_x86, x86_model);
 	OFFSET(CPUINFO_x86_mask, cpuinfo_x86, x86_mask);
-	OFFSET(CPUINFO_hard_math, cpuinfo_x86, hard_math);
 	OFFSET(CPUINFO_cpuid_level, cpuinfo_x86, cpuid_level);
 	OFFSET(CPUINFO_x86_capability, cpuinfo_x86, x86_capability);
 	OFFSET(CPUINFO_x86_vendor_id, cpuinfo_x86, x86_vendor_id);
@@ -65,19 +62,9 @@ void foo(void)
 	OFFSET(saved_context_gdt_desc, saved_context, gdt_desc);
 	BLANK();
 
-#ifndef CONFIG_X86_NO_TSS
 	/* Offset from the sysenter stack to tss.sp0 */
-	DEFINE(SYSENTER_stack_sp0, offsetof(struct tss_struct, x86_tss.sp0) -
+	DEFINE(TSS_sysenter_sp0, offsetof(struct tss_struct, x86_tss.sp0) -
 		 sizeof(struct tss_struct));
-#else
-	/* sysenter stack points directly to sp0 */
-	DEFINE(SYSENTER_stack_sp0, 0);
-#endif
-
-#ifdef CONFIG_XEN
-	BLANK();
-	OFFSET(XEN_START_mfn_list, start_info, mfn_list);
-#endif
 
 #if defined(CONFIG_LGUEST) || defined(CONFIG_LGUEST_GUEST) || defined(CONFIG_LGUEST_MODULE)
 	BLANK();

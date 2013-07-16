@@ -31,7 +31,6 @@ EXPORT_SYMBOL(cmos_lock);
 DEFINE_SPINLOCK(rtc_lock);
 EXPORT_SYMBOL(rtc_lock);
 
-#ifndef CONFIG_XEN_UNPRIVILEGED_GUEST
 /*
  * In order to set the CMOS clock precisely, set_rtc_mmss has to be
  * called 500 ms after the second nowtime has started, because when
@@ -39,8 +38,9 @@ EXPORT_SYMBOL(rtc_lock);
  * jump to the next second precisely 500 ms later. Check the Motorola
  * MC146818A or Dallas DS12887 data sheet for details.
  */
-int mach_set_rtc_mmss(unsigned long nowtime)
+int mach_set_rtc_mmss(const struct timespec *now)
 {
+	unsigned long nowtime = now->tv_sec;
 	struct rtc_time tm;
 	int retval = 0;
 
@@ -59,7 +59,7 @@ int mach_set_rtc_mmss(unsigned long nowtime)
 	return retval;
 }
 
-unsigned long mach_get_cmos_time(void)
+void mach_get_cmos_time(struct timespec *now)
 {
 	unsigned int status, year, mon, day, hour, min, sec, century = 0;
 	unsigned long flags;
@@ -108,9 +108,9 @@ unsigned long mach_get_cmos_time(void)
 	} else
 		year += CMOS_YEARS_OFFS;
 
-	return mktime(year, mon, day, hour, min, sec);
+	now->tv_sec = mktime(year, mon, day, hour, min, sec);
+	now->tv_nsec = 0;
 }
-#endif /* CONFIG_XEN_UNPRIVILEGED_GUEST */
 
 /* Routines for accessing the CMOS RAM/RTC. */
 unsigned char rtc_cmos_read(unsigned char addr)
@@ -137,22 +137,16 @@ EXPORT_SYMBOL(rtc_cmos_write);
 
 int update_persistent_clock(struct timespec now)
 {
-	return x86_platform.set_wallclock(now.tv_sec);
+	return x86_platform.set_wallclock(&now);
 }
 
 /* not static: needed by APM */
 void read_persistent_clock(struct timespec *ts)
 {
-	unsigned long retval;
-
-	retval = x86_platform.get_wallclock();
-
-	ts->tv_sec = retval;
-	ts->tv_nsec = 0;
+	x86_platform.get_wallclock(ts);
 }
 
 
-#ifndef CONFIG_XEN_UNPRIVILEGED_GUEST
 static struct resource rtc_resources[] = {
 	[0] = {
 		.start	= RTC_PORT(0),
@@ -198,11 +192,6 @@ static __init int add_rtc_cmos(void)
 	if (mrst_identify_cpu())
 		return -ENODEV;
 
-#ifdef CONFIG_XEN
-	if (!is_initial_xendomain())
-		return -ENODEV;
-#endif
-
 	platform_device_register(&rtc_device);
 	dev_info(&rtc_device.dev,
 		 "registered platform RTC device (no PNP device found)\n");
@@ -210,4 +199,3 @@ static __init int add_rtc_cmos(void)
 	return 0;
 }
 device_initcall(add_rtc_cmos);
-#endif /* CONFIG_XEN_UNPRIVILEGED_GUEST */

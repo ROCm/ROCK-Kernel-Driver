@@ -48,9 +48,6 @@
 
 static void scsi_eh_done(struct scsi_cmnd *scmd);
 
-#define SENSE_TIMEOUT		(10*HZ)
-#define TEST_UNIT_READY_TIMEOUT	(30*HZ)
-
 /*
  * These should *probably* be handled by the host itself.
  * Since it is allowed to sleep, it probably should.
@@ -619,7 +616,7 @@ static void scsi_eh_done(struct scsi_cmnd *scmd)
 
 /**
  * scsi_try_host_reset - ask host adapter to reset itself
- * @scmd:	SCSI cmd to send hsot reset.
+ * @scmd:	SCSI cmd to send host reset.
  */
 static int scsi_try_host_reset(struct scsi_cmnd *scmd)
 {
@@ -962,7 +959,7 @@ retry:
  */
 static int scsi_request_sense(struct scsi_cmnd *scmd)
 {
-	return scsi_send_eh_cmnd(scmd, NULL, 0, SENSE_TIMEOUT, ~0);
+	return scsi_send_eh_cmnd(scmd, NULL, 0, scmd->device->eh_timeout, ~0);
 }
 
 /**
@@ -1063,7 +1060,8 @@ static int scsi_eh_tur(struct scsi_cmnd *scmd)
 	int retry_cnt = 1, rtn;
 
 retry_tur:
-	rtn = scsi_send_eh_cmnd(scmd, tur_command, 6, TEST_UNIT_READY_TIMEOUT, 0);
+	rtn = scsi_send_eh_cmnd(scmd, tur_command, 6,
+				scmd->device->eh_timeout, 0);
 
 	SCSI_LOG_ERROR_RECOVERY(3, printk("%s: scmd %p rtn %x\n",
 		__func__, scmd, rtn));
@@ -1621,31 +1619,6 @@ int scsi_decide_disposition(struct scsi_cmnd *scmd)
 		}
 	case DID_RESET:
 		return SUCCESS;
-#ifdef CONFIG_XEN /* Shouldn't this be done always?
-		   *
-		   * Overall, shouldn't the return value of this function be
-		   * the same when called twice in immediate succession?
-		   */
-	case DID_TARGET_FAILURE:
-		/*
-		 * scsi_check_sense(scmd) returning TARGET_ERROR gets
-		 * converted to DID_TARGET_FAILURE below, so if that
-		 * happened on the backend side, the frontend side
-		 * handling here would otherwise cause error handling to be
-		 * invoked from scsi_softirq_done().
-		 */
-		if (msg_byte(scmd->result) == COMMAND_COMPLETE &&
-		    status_byte(scmd->result) == CHECK_CONDITION &&
-		    scsi_check_sense(scmd) == TARGET_ERROR)
-			return SUCCESS;
-		return FAILED;
-	case DID_NEXUS_FAILURE:
-		/* Similarly for the respective conversion above/below. */
-		if (msg_byte(scmd->result) == COMMAND_COMPLETE &&
-		    status_byte(scmd->result) == RESERVATION_CONFLICT)
-			break;
-		/* fallthrough */
-#endif
 	default:
 		return FAILED;
 	}

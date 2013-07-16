@@ -9,6 +9,6 @@ ci_hdrc-$(CONFIG_USB_CHIPIDEA_DEBUG)	+= debug.o
 
 # Glue/Bridge layers go here
 
-obj-$(CONFIG_USB_CHIPIDEA)	+= ci13xxx_msm.o
-obj-$(CONFIG_USB_CHIPIDEA_PCI)	+= ci13xxx_pci.o
-obj-$(CONFIG_USB_CHIPIDEA_IMX)	+= ci13xxx_imx.o usbmisc_imx.o
+obj-$(CONFIG_USB_CHIPIDEA)	+= ci_hdrc_msm.o
+obj-$(CONFIG_USB_CHIPIDEA_PCI)	+= ci_hdrc_pci.o
+obj-$(CONFIG_USB_CHIPIDEA_IMX)	+= ci_hdrc_imx.o usbmisc_imx.o

@@ -331,7 +331,7 @@ extern void early_iounmap(void __iomem *addr, unsigned long size);
 extern void fixup_early_ioremap(void);
 extern bool is_early_ioremap_ptep(pte_t *ptep);
 
-#ifdef CONFIG_PARAVIRT_XEN
+#ifdef CONFIG_XEN
 #include <xen/xen.h>
 struct bio_vec;
 
@@ -341,8 +341,15 @@ extern bool xen_biovec_phys_mergeable(const struct bio_vec *vec1,
 #define BIOVEC_PHYS_MERGEABLE(vec1, vec2)				\
 	(__BIOVEC_PHYS_MERGEABLE(vec1, vec2) &&				\
 	 (!xen_domain() || xen_biovec_phys_mergeable(vec1, vec2)))
-#endif	/* CONFIG_PARAVIRT_XEN */
+#endif	/* CONFIG_XEN */
 
 #define IO_SPACE_LIMIT 0xffff
+
+#ifdef CONFIG_MTRR
+extern int __must_check arch_phys_wc_add(unsigned long base,
+					 unsigned long size);
+extern void arch_phys_wc_del(int handle);
+#define arch_phys_wc_add arch_phys_wc_add
+#endif
 
 #endif /* _ASM_X86_IO_H */

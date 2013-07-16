@@ -4,8 +4,6 @@
 #include <linux/kobject.h>
 #include <linux/list.h>
 
-#ifndef CONFIG_XEN
-
 struct msi_msg {
 	u32	address_lo;	/* low 32 bits of msi message address */
 	u32	address_hi;	/* high 32 bits of msi message address */
@@ -37,6 +35,7 @@ struct msi_desc {
 
 	u32 masked;			/* mask bits */
 	unsigned int irq;
+	unsigned int nvec_used;		/* number of messages */
 	struct list_head list;
 
 	union {
@@ -50,11 +49,6 @@ struct msi_desc {
 
 	struct kobject kobj;
 };
-
-#else /* CONFIG_XEN */
-struct pci_dev;
-struct msi_desc;
-#endif /* CONFIG_XEN */
 
 /*
  * The arch hook for setup up msi irqs

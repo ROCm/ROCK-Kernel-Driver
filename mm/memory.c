@@ -82,7 +82,6 @@ EXPORT_SYMBOL(max_mapnr);
 EXPORT_SYMBOL(mem_map);
 #endif
 
-unsigned long num_physpages;
 /*
  * A number of key systems in x86 including ioremap() rely on the assumption
  * that high_memory defines the upper bound on direct map memory, then end
@@ -92,7 +91,6 @@ unsigned long num_physpages;
  */
 void * high_memory;
 
-EXPORT_SYMBOL(num_physpages);
 EXPORT_SYMBOL(high_memory);
 
 /*
@@ -772,12 +770,6 @@ struct page *vm_normal_page(struct vm_area_struct *vma, unsigned long addr,
 {
 	unsigned long pfn = pte_pfn(pte);
 
-#if defined(CONFIG_XEN) && defined(CONFIG_X86)
-	/* XEN: Covers user-space grant mappings (even of local pages). */
-	if (unlikely(vma->vm_flags & VM_FOREIGN))
-		return NULL;
-#endif
-
 	if (HAVE_PTE_SPECIAL) {
 		if (likely(!pte_special(pte)))
 			goto check_pfn;
@@ -809,9 +801,6 @@ struct page *vm_normal_page(struct vm_area_struct *vma, unsigned long addr,
 		return NULL;
 check_pfn:
 	if (unlikely(pfn > highest_memmap_pfn)) {
-#ifdef CONFIG_XEN
-		if (!(vma->vm_flags & VM_DONTEXPAND))
-#endif
 		print_bad_pte(vma, addr, pte, NULL);
 		return NULL;
 	}
@@ -1110,6 +1099,7 @@ static unsigned long zap_pte_range(struct mmu_gather *tlb,
 	spinlock_t *ptl;
 	pte_t *start_pte;
 	pte_t *pte;
+	unsigned long range_start = addr;
 
 again:
 	init_rss_vec(rss);
@@ -1144,14 +1134,8 @@ again:
 				     page->index > details->last_index))
 					continue;
 			}
-#ifdef CONFIG_XEN
-			if (unlikely(vma->vm_ops && vma->vm_ops->zap_pte))
-				ptent = vma->vm_ops->zap_pte(vma, addr, pte,
-							     tlb->fullmm);
-			else
-#endif
-				ptent = ptep_get_and_clear_full(mm, addr, pte,
-								tlb->fullmm);
+			ptent = ptep_get_and_clear_full(mm, addr, pte,
+							tlb->fullmm);
 			tlb_remove_tlb_entry(tlb, pte, addr);
 			if (unlikely(!page))
 				continue;
@@ -1166,7 +1150,7 @@ again:
 				if (pte_dirty(ptent))
 					set_page_dirty(page);
 				if (pte_young(ptent) &&
-				    likely(!VM_SequentialReadHint(vma)))
+				    likely(!(vma->vm_flags & VM_SEQ_READ)))
 					mark_page_accessed(page);
 				rss[MM_FILEPAGES]--;
 			}
@@ -1221,12 +1205,14 @@ again:
 		force_flush = 0;
 
 #ifdef HAVE_GENERIC_MMU_GATHER
-		tlb->start = addr;
-		tlb->end = end;
+		tlb->start = range_start;
+		tlb->end = addr;
 #endif
 		tlb_flush_mmu(tlb);
-		if (addr != end)
+		if (addr != end) {
+			range_start = addr;
 			goto again;
+		}
 	}
 
 	return addr;
@@ -1419,7 +1405,6 @@ void zap_page_range(struct vm_area_struct *vma, unsigned long start,
 	mmu_notifier_invalidate_range_end(mm, start, end);
 	tlb_finish_mmu(&tlb, start, end);
 }
-EXPORT_SYMBOL(zap_page_range);
 
 /**
  * zap_page_range_single - remove user pages in a given range
@@ -1795,28 +1780,6 @@ long __get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 			goto next_page;
 		}
 
-#ifdef CONFIG_XEN
-		if (vma && (vma->vm_flags & VM_FOREIGN)) {
-			struct vm_foreign_map *foreign_map =
-				vma->vm_private_data;
-			struct page **map = foreign_map->map;
-			int offset = (start - vma->vm_start) >> PAGE_SHIFT;
-			if (map[offset] != NULL) {
-			        if (pages) {
-			                struct page *page = map[offset];
-
-					pages[i] = page;
-					get_page(page);
-				}
-				if (vmas)
-					vmas[i] = vma;
-				i++;
-				start += PAGE_SIZE;
-				nr_pages--;
-				continue;
-			}
-		}
-#endif
 		if (!vma ||
 		    (vma->vm_flags & (VM_IO | VM_PFNMAP)) ||
 		    !(vm_flags & vma->vm_flags))
@@ -2557,10 +2520,6 @@ int apply_to_page_range(struct mm_struct *mm, unsigned long addr,
 	unsigned long end = addr + size;
 	int err;
 
-#ifdef CONFIG_XEN
-	if (!mm)
-		mm = &init_mm;
-#endif
 	BUG_ON(addr >= end);
 	pgd = pgd_offset(mm, addr);
 	do {
@@ -2946,7 +2905,7 @@ static inline void unmap_mapping_range_tree(struct rb_root *root,
 			details->first_index, details->last_index) {
 
 		vba = vma->vm_pgoff;
-		vea = vba + ((vma->vm_end - vma->vm_start) >> PAGE_SHIFT) - 1;
+		vea = vba + vma_pages(vma) - 1;
 		/* Assume for now that PAGE_CACHE_SHIFT == PAGE_SHIFT */
 		zba = details->first_index;
 		if (zba < vba)
@@ -4243,7 +4202,7 @@ void print_vma_addr(char *prefix, unsigned long ip)
 	up_read(&mm->mmap_sem);
 }
 
-#ifdef CONFIG_PROVE_LOCKING
+#if defined(CONFIG_PROVE_LOCKING) || defined(CONFIG_DEBUG_ATOMIC_SLEEP)
 void might_fault(void)
 {
 	/*
@@ -4255,13 +4214,17 @@ void might_fault(void)
 	if (segment_eq(get_fs(), KERNEL_DS))
 		return;
 
-	might_sleep();
 	/*
 	 * it would be nicer only to annotate paths which are not under
 	 * pagefault_disable, however that requires a larger audit and
 	 * providing helpers like get_user_atomic.
 	 */
-	if (!in_atomic() && current->mm)
+	if (in_atomic())
+		return;
+
+	__might_sleep(__FILE__, __LINE__, 0);
+
+	if (current->mm)
 		might_lock_read(&current->mm->mmap_sem);
 }
 EXPORT_SYMBOL(might_fault);

@@ -159,7 +159,7 @@ static void pstore_dump(struct kmsg_dumper *dumper,
 			break;
 
 		ret = psinfo->write(PSTORE_TYPE_DMESG, reason, &id, part,
-				    oopscount, hsize + len, psinfo);
+				    oopscount, hsize, hsize + len, psinfo);
 		if (ret == 0 && reason == KMSG_DUMP_OOPS && pstore_is_mounted())
 			pstore_new_entry = 1;
 
@@ -196,7 +196,7 @@ static void pstore_console_write(struct console *con, const char *s, unsigned c)
 			spin_lock_irqsave(&psinfo->buf_lock, flags);
 		}
 		memcpy(psinfo->buf, s, c);
-		psinfo->write(PSTORE_TYPE_CONSOLE, 0, &id, 0, 0, c, psinfo);
+		psinfo->write(PSTORE_TYPE_CONSOLE, 0, &id, 0, 0, 0, c, psinfo);
 		spin_unlock_irqrestore(&psinfo->buf_lock, flags);
 		s += c;
 		c = e - s;
@@ -221,9 +221,11 @@ static void pstore_register_console(void) {}
 static int pstore_write_compat(enum pstore_type_id type,
 			       enum kmsg_dump_reason reason,
 			       u64 *id, unsigned int part, int count,
-			       size_t size, struct pstore_info *psi)
+			       size_t hsize, size_t size,
+			       struct pstore_info *psi)
 {
-	return psi->write_buf(type, reason, id, part, psinfo->buf, size, psi);
+	return psi->write_buf(type, reason, id, part, psinfo->buf, hsize,
+			     size, psi);
 }
 
 /*
@@ -239,12 +241,6 @@ int pstore_register(struct pstore_info *psi)
 {
 	struct module *owner = psi->owner;
 
-	spin_lock(&pstore_lock);
-	if (psinfo) {
-		spin_unlock(&pstore_lock);
-		return -EBUSY;
-	}
-
 	if (!backend && !strcmp(psi->name, "efi")) {
 		pr_info("Efi pstore disabled, enforce via pstore.backend=efi");
 		pr_info("On a broken BIOS, this can severely harm your system");
@@ -253,9 +249,13 @@ int pstore_register(struct pstore_info *psi)
 		return -EINVAL;
 	}
 
-	if (backend && strcmp(backend, psi->name)) {
+	if (backend && strcmp(backend, psi->name))
+		return -EPERM;
+
+	spin_lock(&pstore_lock);
+	if (psinfo) {
 		spin_unlock(&pstore_lock);
-		return -EINVAL;
+		return -EBUSY;
 	}
 
 	if (!psi->write)
@@ -281,6 +281,9 @@ int pstore_register(struct pstore_info *psi)
 			msecs_to_jiffies(pstore_update_ms);
 		add_timer(&pstore_timer);
 	}
+
+	pr_info("pstore: Registered %s as persistent store backend\n",
+		psi->name);
 
 	return 0;
 }
