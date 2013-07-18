@@ -599,9 +599,6 @@ static int xencons_install(struct tty_driver *drv, struct tty_struct *tty)
 	struct tty_port *port = &xencons_ports[tty->index];
 	int rc;
 
-	if (DUMMY_TTY(tty))
-		return 0;
-
 	tty->driver_data = NULL;
 
 	tty_port_init(port);
