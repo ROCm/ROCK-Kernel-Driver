@@ -1728,7 +1728,7 @@ static void bio_copy_page_list(int rw, struct stripe *stripe,
 	bio_for_each_segment(bv, bio, i) {
 		int len = bv->bv_len, size;
 		unsigned bio_offset = 0;
-		void *bio_addr = __bio_kmap_atomic(bio, i, KM_USER0);
+		void *bio_addr = __bio_kmap_atomic(bio, i);
 redo:
 		size = (page_offset + len > PAGE_SIZE) ?
 		       PAGE_SIZE - page_offset : len;
@@ -1761,7 +1761,7 @@ redo:
 			}
 		}
 
-		__bio_kunmap_atomic(bio_addr, KM_USER0);
+		__bio_kunmap_atomic(bio_addr);
 	}
 }
 
