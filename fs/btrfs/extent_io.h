@@ -294,6 +294,7 @@ static inline unsigned long num_extent_pages(u64 start, u64 len)
 static inline struct page *extent_buffer_page(struct extent_buffer *eb,
 					      unsigned long i)
 {
+	BUG_ON(i >= INLINE_EXTENT_BUFFER_PAGES);
 	return eb->pages[i];
 }
 
