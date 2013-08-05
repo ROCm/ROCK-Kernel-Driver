@@ -550,7 +550,8 @@ static bool search_by_key_reada(struct super_block *s,
 		 */
 		if (!buffer_uptodate(bh[j])) {
 			if (!unlocked) {
-				reiserfs_write_unlock(s);
+				int depth = -1; /* avoiding __must_check */
+				depth = reiserfs_write_unlock_nested(s);
 				unlocked = true;
 			}
 			ll_rw_block(READA, 1, bh + j);
@@ -625,7 +626,7 @@ int search_by_key(struct super_block *sb, const struct cpu_key *key,	/* Key to s
 	block_number = SB_ROOT_BLOCK(sb);
 	expected_level = -1;
 	while (1) {
-
+		int depth;
 #ifdef CONFIG_REISERFS_CHECK
 		if (!(++repeat_counter % 50000))
 			reiserfs_warning(sb, "PAP-5100",
@@ -646,25 +647,29 @@ int search_by_key(struct super_block *sb, const struct cpu_key *key,	/* Key to s
 		if ((bh = last_element->pe_buffer =
 		     sb_getblk(sb, block_number))) {
 			bool unlocked = false;
-
+			depth = REISERFS_SB(sb)->lock_depth;
 			if (!buffer_uptodate(bh) && reada_count > 1)
 				/* may unlock the write lock */
 				unlocked = search_by_key_reada(sb, reada_bh,
 						    reada_blocks, reada_count);
+
 			/*
 			 * If we haven't already unlocked the write lock,
 			 * then we need to do that here before reading
 			 * the current block
 			 */
 			if (!buffer_uptodate(bh) && !unlocked) {
-				reiserfs_write_unlock(sb);
+				depth = reiserfs_write_unlock_nested(sb);
+				unlocked = true;
+			} else if (!unlocked) { /* debug */
+				depth = reiserfs_write_unlock_nested(sb);
 				unlocked = true;
 			}
 			ll_rw_block(READ, 1, &bh);
 			wait_on_buffer(bh);
 
 			if (unlocked)
-				reiserfs_write_lock(sb);
+				reiserfs_write_lock_nested(sb, depth);
 			if (!buffer_uptodate(bh))
 				goto io_error;
 		} else {
@@ -991,6 +996,7 @@ static char prepare_for_delete_or_cut(struct reiserfs_transaction_handle *th, st
 	struct super_block *sb = inode->i_sb;
 	struct item_head *p_le_ih = PATH_PITEM_HEAD(path);
 	struct buffer_head *bh = PATH_PLAST_BUFFER(path);
+	int depth;
 
 	BUG_ON(!th->t_trans_id);
 
@@ -1059,9 +1065,11 @@ static char prepare_for_delete_or_cut(struct reiserfs_transaction_handle *th, st
 			reiserfs_free_block(th, inode, block, 1);
 		    }
 
-		    reiserfs_write_unlock(sb);
-		    cond_resched();
-		    reiserfs_write_lock(sb);
+		    if (need_resched()) {
+			    depth = reiserfs_write_unlock_nested(sb);
+			    cond_resched();
+			    reiserfs_write_lock_nested(sb, depth);
+		    }
 
 		    if (item_moved (&s_ih, path))  {
 			need_re_search = 1;
