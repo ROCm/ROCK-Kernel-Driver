@@ -13,6 +13,7 @@
 #include <linux/bitops.h>
 #include <linux/proc_fs.h>
 #include <linux/buffer_head.h>
+#include <linux/quotaops.h>
 
 /* the 32 bit compat definitions with int argument */
 #define REISERFS_IOC32_UNPACK		_IOW(0xCD, 1, int)
@@ -632,6 +633,7 @@ void reiserfs_write_lock(struct super_block *s);
 void reiserfs_write_unlock(struct super_block *s);
 int __must_check reiserfs_write_unlock_nested(struct super_block *s);
 void reiserfs_write_lock_nested(struct super_block *s, int depth);
+void reiserfs_check_lock_nested(struct super_block *s, const char *caller);
 
 #ifdef CONFIG_REISERFS_CHECK
 void reiserfs_lock_check_recursive(struct super_block *s);
@@ -667,52 +669,26 @@ static inline void reiserfs_lock_check_recursive(struct super_block *s) { }
  * - The inode mutex
  */
 
-#define reiserfs_safe(sb, action)			\
-do {							\
-	struct super_block *__sb = (sb);		\
-	int __depth;					\
-	__depth = reiserfs_write_unlock_nested(__sb);	\
-	(action);					\
-	reiserfs_write_lock_nested(__sb, __depth);	\
-} while(0)
-
-#define reiserfs_mutex_lock_safe(mtx, s) reiserfs_safe(s, mutex_lock(mtx))
-#define reiserfs_mutex_lock_nested_safe(mtx, subclass, s) \
-	reiserfs_safe(s, mutex_lock_nested(mtx, subclass))
-#define reiserfs_down_read_safe(sem, s) reiserfs_safe(s, down_read(sem))
-
 /*
  * When we schedule, we usually want to also release the write lock,
  * according to the previous bkl based locking scheme of reiserfs.
  */
 static inline void reiserfs_cond_resched(struct super_block *s)
 {
-	if (need_resched())
-		reiserfs_safe(s, schedule());
+	if (need_resched()) {
+		int depth = reiserfs_write_unlock_nested(s);
+		schedule();
+		reiserfs_write_lock_nested(s, depth);
+	}
 }
 
-static inline struct buffer_head *
-reiserfs_safe_sb_bread(struct super_block *s, sector_t block)
-{
-	int depth;
-	struct buffer_head *bh;
-
-	depth = reiserfs_write_unlock_nested(s);
-	bh = sb_bread(s, block);
-	reiserfs_write_lock_nested(s, depth);
-
-	return bh;
-}
-
-void reiserfs_safe_lock_buffer(struct buffer_head *bh);
-
-static inline void
-reiserfs_safe_wait_on_buffer(struct buffer_head *bh, struct super_block *s)
+static inline void reiserfs_mutex_lock_safe(struct mutex *m,
+                              struct super_block *s)
 {
 	int depth;
 
 	depth = reiserfs_write_unlock_nested(s);
-	__wait_on_buffer(bh);
+	mutex_lock(m);
 	reiserfs_write_lock_nested(s, depth);
 }
 

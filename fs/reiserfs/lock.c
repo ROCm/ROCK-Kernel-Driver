@@ -111,6 +111,13 @@ void reiserfs_check_lock_depth(struct super_block *sb, char *caller)
 	WARN_ON(sb_i->lock_depth < 0);
 }
 
+void reiserfs_check_lock_nested(struct super_block *sb, const char *caller)
+{
+	struct reiserfs_sb_info *sb_i = REISERFS_SB(sb);
+
+	WARN_ON(sb_i->lock_depth > 0);
+}
+
 #ifdef CONFIG_REISERFS_CHECK
 void reiserfs_lock_check_recursive(struct super_block *sb)
 {

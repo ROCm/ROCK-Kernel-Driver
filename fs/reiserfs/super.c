@@ -198,6 +198,7 @@ static int finish_unfinished(struct super_block *s)
 	int done;
 	struct inode *inode;
 	int truncate;
+	int depth;
 #ifdef CONFIG_QUOTA
 	int i;
 	int ms_active_set;
@@ -298,9 +299,9 @@ static int finish_unfinished(struct super_block *s)
 			retval = remove_save_link_only(s, &save_link_key, 0);
 			continue;
 		}
-		reiserfs_write_unlock(s);
+		depth = reiserfs_write_unlock_nested(inode->i_sb);
 		dquot_initialize(inode);
-		reiserfs_write_lock(s);
+		reiserfs_write_lock_nested(inode->i_sb, depth);
 
 		if (truncate && S_ISDIR(inode->i_mode)) {
 			/* We got a truncate request for a dir which is impossible.
@@ -356,10 +357,12 @@ static int finish_unfinished(struct super_block *s)
 
 #ifdef CONFIG_QUOTA
 	/* Turn quotas off */
+	reiserfs_write_unlock(s);
 	for (i = 0; i < MAXQUOTAS; i++) {
 		if (sb_dqopt(s)->files[i] && quota_enabled[i])
 			dquot_quota_off(s, i);
 	}
+	reiserfs_write_lock(s);
 	if (ms_active_set)
 		/* Restore the flag back */
 		s->s_flags &= ~MS_ACTIVE;
@@ -2097,7 +2100,7 @@ static int reiserfs_statfs(struct dentry *dentry, struct kstatfs *buf)
 static int reiserfs_write_dquot(struct dquot *dquot)
 {
 	struct reiserfs_transaction_handle th;
-	int ret, err;
+	int ret, err, depth;
 
 	reiserfs_write_lock(dquot->dq_sb);
 	ret =
@@ -2105,9 +2108,9 @@ static int reiserfs_write_dquot(struct dquot *dquot)
 			  REISERFS_QUOTA_TRANS_BLOCKS(dquot->dq_sb));
 	if (ret)
 		goto out;
-	reiserfs_write_unlock(dquot->dq_sb);
+	depth = reiserfs_write_unlock_nested(dquot->dq_sb);
 	ret = dquot_commit(dquot);
-	reiserfs_write_lock(dquot->dq_sb);
+	reiserfs_write_lock_nested(dquot->dq_sb, depth);
 	err =
 	    journal_end(&th, dquot->dq_sb,
 			REISERFS_QUOTA_TRANS_BLOCKS(dquot->dq_sb));
@@ -2121,7 +2124,7 @@ out:
 static int reiserfs_acquire_dquot(struct dquot *dquot)
 {
 	struct reiserfs_transaction_handle th;
-	int ret, err;
+	int ret, err, depth;
 
 	reiserfs_write_lock(dquot->dq_sb);
 	ret =
@@ -2129,9 +2132,9 @@ static int reiserfs_acquire_dquot(struct dquot *dquot)
 			  REISERFS_QUOTA_INIT_BLOCKS(dquot->dq_sb));
 	if (ret)
 		goto out;
-	reiserfs_write_unlock(dquot->dq_sb);
+	depth = reiserfs_write_unlock_nested(dquot->dq_sb);
 	ret = dquot_acquire(dquot);
-	reiserfs_write_lock(dquot->dq_sb);
+	reiserfs_write_lock_nested(dquot->dq_sb, depth);
 	err =
 	    journal_end(&th, dquot->dq_sb,
 			REISERFS_QUOTA_INIT_BLOCKS(dquot->dq_sb));
@@ -2145,20 +2148,21 @@ out:
 static int reiserfs_release_dquot(struct dquot *dquot)
 {
 	struct reiserfs_transaction_handle th;
-	int ret, err;
+	int ret, err, depth;
 
 	reiserfs_write_lock(dquot->dq_sb);
 	ret =
 	    journal_begin(&th, dquot->dq_sb,
 			  REISERFS_QUOTA_DEL_BLOCKS(dquot->dq_sb));
-	reiserfs_write_unlock(dquot->dq_sb);
+	depth = reiserfs_write_unlock_nested(dquot->dq_sb);
 	if (ret) {
 		/* Release dquot anyway to avoid endless cycle in dqput() */
 		dquot_release(dquot);
+		reiserfs_write_lock_nested(dquot->dq_sb, depth);
 		goto out;
 	}
 	ret = dquot_release(dquot);
-	reiserfs_write_lock(dquot->dq_sb);
+	reiserfs_write_lock_nested(dquot->dq_sb, depth);
 	err =
 	    journal_end(&th, dquot->dq_sb,
 			REISERFS_QUOTA_DEL_BLOCKS(dquot->dq_sb));
@@ -2183,16 +2187,16 @@ static int reiserfs_mark_dquot_dirty(struct dquot *dquot)
 static int reiserfs_write_info(struct super_block *sb, int type)
 {
 	struct reiserfs_transaction_handle th;
-	int ret, err;
+	int ret, err, depth;
 
 	/* Data block + inode block */
 	reiserfs_write_lock(sb);
 	ret = journal_begin(&th, sb, 2);
 	if (ret)
 		goto out;
-	reiserfs_write_unlock(sb);
+	depth = reiserfs_write_unlock_nested(sb);
 	ret = dquot_commit_info(sb, type);
-	reiserfs_write_lock(sb);
+	reiserfs_write_lock_nested(sb, depth);
 	err = journal_end(&th, sb, 2);
 	if (!ret && err)
 		ret = err;
@@ -2206,8 +2210,14 @@ out:
  */
 static int reiserfs_quota_on_mount(struct super_block *sb, int type)
 {
-	return dquot_quota_on_mount(sb, REISERFS_SB(sb)->s_qf_names[type],
-					REISERFS_SB(sb)->s_jquota_fmt, type);
+	int ret, depth;
+
+	depth = reiserfs_write_unlock_nested(sb);
+	ret = dquot_quota_on_mount(sb, REISERFS_SB(sb)->s_qf_names[type],
+				   REISERFS_SB(sb)->s_jquota_fmt, type);
+	reiserfs_write_lock_nested(sb, depth);
+
+	return ret;
 }
 
 /*
