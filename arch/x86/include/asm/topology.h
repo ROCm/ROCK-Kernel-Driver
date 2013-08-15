@@ -30,7 +30,7 @@
 #  define ENABLE_TOPO_DEFINES
 # endif
 #else
-# ifdef CONFIG_SMP
+# if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
 #  define ENABLE_TOPO_DEFINES
 # endif
 #endif

@@ -27,4 +27,7 @@ obj-$(CONFIG_AMD_NUMA)		+= amdtopology.o
 obj-$(CONFIG_ACPI_NUMA)		+= srat.o
 obj-$(CONFIG_NUMA_EMU)		+= numa_emulation.o
 
+obj-$(CONFIG_XEN)		+= hypervisor.o
+disabled-obj-$(CONFIG_XEN)	:= gup.o
+
 obj-$(CONFIG_MEMTEST)		+= memtest.o

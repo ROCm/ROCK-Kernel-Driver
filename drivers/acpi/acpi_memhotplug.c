@@ -82,6 +82,11 @@ struct acpi_memory_device {
 	struct list_head res_list;
 };
 
+#ifdef CONFIG_XEN
+#include "../xen/core/acpi_memhotplug.c"
+#define memory_add_physaddr_to_nid(start) 0
+#endif
+
 static acpi_status
 acpi_memory_get_resource(struct acpi_resource *resource, void *context)
 {
@@ -209,6 +214,10 @@ static int acpi_memory_enable_device(struct acpi_memory_device *mem_device)
 	int result, num_enabled = 0;
 	struct acpi_memory_info *info;
 	int node;
+
+#ifdef CONFIG_XEN
+	return xen_hotadd_memory(mem_device);
+#endif
 
 	node = acpi_get_node(handle);
 	/*
@@ -352,6 +361,10 @@ static void acpi_memory_device_remove(struct acpi_device *device)
 {
 	struct acpi_memory_device *mem_device;
 
+#ifdef CONFIG_XEN
+	return; /* not supported */
+#endif
+
 	if (!device || !acpi_driver_data(device))
 		return;
 
@@ -363,4 +376,8 @@ static void acpi_memory_device_remove(struct acpi_device *device)
 void __init acpi_memory_hotplug_init(void)
 {
 	acpi_scan_add_handler_with_hotplug(&memory_device_handler, "memory");
+
+#ifdef CONFIG_XEN
+	xen_hotadd_mem_init();
+#endif
 }

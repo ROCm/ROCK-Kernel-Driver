@@ -142,6 +142,8 @@ void user_exit(void)
 	local_irq_restore(flags);
 }
 
+#ifndef CONFIG_XEN
+
 void guest_enter(void)
 {
 	if (vtime_accounting_enabled())
@@ -160,6 +162,7 @@ void guest_exit(void)
 }
 EXPORT_SYMBOL_GPL(guest_exit);
 
+#endif /* CONFIG_XEN */
 
 /**
  * context_tracking_task_switch - context switch the syscall callbacks

@@ -51,9 +51,15 @@
 #include <linux/cpu.h>
 
 #include <xen/xen.h>
+#ifdef CONFIG_PARAVIRT_XEN
 #include <xen/events.h>
 #include <xen/evtchn.h>
 #include <asm/xen/hypervisor.h>
+#else
+#include <xen/evtchn.h>
+#include <xen/public/evtchn.h>
+#define bind_evtchn_to_irqhandler bind_caller_port_to_irqhandler
+#endif
 
 struct per_user_data {
 	struct mutex bind_mutex; /* serialize bind/unbind operations */
@@ -290,6 +296,9 @@ static void evtchn_unbind_from_user(struct per_user_data *u, int port)
 	BUG_ON(irq < 0);
 
 	unbind_from_irqhandler(irq, (void *)(unsigned long)port);
+#ifdef CONFIG_XEN
+	WARN_ON(close_evtchn(port));
+#endif
 
 	set_port_user(port, NULL);
 }
@@ -456,7 +465,8 @@ static int evtchn_open(struct inode *inode, struct file *filp)
 	if (u == NULL)
 		return -ENOMEM;
 
-	u->name = kasprintf(GFP_KERNEL, "evtchn:%s", current->comm);
+	u->name = kasprintf(GFP_KERNEL, "evtchn:%s[%d]",
+			    current->comm, current->pid);
 	if (u->name == NULL) {
 		kfree(u);
 		return -ENOMEM;
@@ -513,7 +523,12 @@ static const struct file_operations evtchn_fops = {
 
 static struct miscdevice evtchn_miscdev = {
 	.minor        = MISC_DYNAMIC_MINOR,
+#ifdef CONFIG_PARAVIRT_XEN
 	.name         = "xen/evtchn",
+#else
+	.name         = "evtchn",
+#endif
+	.nodename     = "xen/evtchn",
 	.fops         = &evtchn_fops,
 };
 static int __init evtchn_init(void)
@@ -553,3 +568,4 @@ module_init(evtchn_init);
 module_exit(evtchn_cleanup);
 
 MODULE_LICENSE("GPL");
+MODULE_ALIAS("devname:xen/evtchn");

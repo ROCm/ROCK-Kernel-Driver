@@ -369,6 +369,28 @@ out:
 }
 EXPORT_SYMBOL(acpi_pci_osc_control_set);
 
+#ifdef CONFIG_PCI_GUESTDEV
+#include <linux/sysfs.h>
+
+static ssize_t seg_show(struct device *dev,
+			struct device_attribute *attr, char *buf)
+{
+	struct acpi_pci_root *root = acpi_driver_data(to_acpi_device(dev));
+
+	return sprintf(buf, "%04x\n", root->segment);
+}
+static DEVICE_ATTR(seg, 0444, seg_show, NULL);
+
+static ssize_t bbn_show(struct device *dev,
+			struct device_attribute *attr, char *buf)
+{
+	struct acpi_pci_root *root = acpi_driver_data(to_acpi_device(dev));
+
+	return sprintf(buf, "%02x\n", (unsigned int)root->secondary.start);
+}
+static DEVICE_ATTR(bbn, 0444, bbn_show, NULL);
+#endif
+
 static int acpi_pci_root_add(struct acpi_device *device,
 			     const struct acpi_device_id *not_used)
 {
@@ -519,6 +541,13 @@ static int acpi_pci_root_add(struct acpi_device *device,
 			 "Unable to request _OSC control "
 			 "(_OSC support mask: 0x%02x)\n", flags);
 	}
+
+#ifdef CONFIG_PCI_GUESTDEV
+	if (device_create_file(&device->dev, &dev_attr_seg))
+		dev_warn(&device->dev, "could not create seg attr\n");
+	if (device_create_file(&device->dev, &dev_attr_bbn))
+		dev_warn(&device->dev, "could not create bbn attr\n");
+#endif
 
 	pci_acpi_add_bus_pm_notifier(device, root->bus);
 	if (device->wakeup.flags.run_wake)
@@ -695,3 +724,45 @@ void __init acpi_pci_root_hp_init(void)
 
 	printk(KERN_DEBUG "Found %d acpi root devices\n", num);
 }
+
+#ifdef CONFIG_PCI_GUESTDEV
+struct acpi_pci_get_root_seg_bbn {
+	const char *hid, *uid;
+	int *seg, *bbn;
+};
+
+static int _acpi_pci_get_root_seg_bbn(struct device *dev, void *ctxt)
+{
+	struct acpi_device *device = to_acpi_device(dev);
+	const struct acpi_pci_root *root = acpi_driver_data(device);
+	const struct acpi_pci_get_root_seg_bbn *data = ctxt;
+
+	if (!acpi_is_root_bridge(ACPI_HANDLE(dev))
+	    || strcmp(acpi_device_hid(device), data->hid)
+	    || (device->pnp.unique_id ? strcmp(device->pnp.unique_id,
+					       data->uid)
+				      : strlen(data->uid)))
+		return 0;
+
+	if (WARN_ON_ONCE(device != root->device))
+		return 0;
+
+	*data->seg = root->segment;
+	*data->bbn = root->secondary.start;
+
+	return 1;
+}
+
+int acpi_pci_get_root_seg_bbn(char *hid, char *uid, int *seg, int *bbn)
+{
+	struct acpi_pci_get_root_seg_bbn data = {
+		.hid = hid,
+		.uid = uid,
+		.seg = seg,
+		.bbn = bbn
+	};
+
+	return bus_for_each_dev(&acpi_bus_type, NULL, &data,
+				_acpi_pci_get_root_seg_bbn) > 0;
+}
+#endif

@@ -174,15 +174,30 @@ static int __acpi_processor_start(struct acpi_device *device)
 	if (pr->flags.need_hotplug_init)
 		return 0;
 
-#ifdef CONFIG_CPU_FREQ
+#if defined(CONFIG_CPU_FREQ) || defined(CONFIG_PROCESSOR_EXTERNAL_CONTROL)
 	acpi_processor_ppc_has_changed(pr, 0);
+#endif
+#ifdef CONFIG_CPU_FREQ
 	acpi_processor_load_module(pr);
 #endif
-	acpi_processor_get_throttling_info(pr);
-	acpi_processor_get_limit_info(pr);
+	/*
+	 * pr->id may equal to -1 while processor_cntl_external enabled.
+	 * throttle and thermal module don't support this case.
+	 * Tx only works when dom0 vcpu == pcpu num by far, as we give
+	 * control to dom0.
+	 */
+	if (pr->id != -1) {
+		acpi_processor_get_throttling_info(pr);
+		acpi_processor_get_limit_info(pr);
+	}
 
-	if (!cpuidle_get_driver() || cpuidle_get_driver() == &acpi_idle_driver)
+	if (!cpuidle_get_driver() || cpuidle_get_driver() == &acpi_idle_driver
+	    || processor_pm_external())
 		acpi_processor_power_init(pr);
+
+	result = processor_extcntl_prepare(pr);
+	if (result)
+		goto err_power_exit;
 
 	pr->cdev = thermal_cooling_device_register("Processor", device,
 						   &processor_cooling_ops);

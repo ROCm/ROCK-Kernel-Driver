@@ -1,6 +1,7 @@
 
 menuconfig CPU_IDLE
 	bool "CPU idle PM support"
+	depends on !PROCESSOR_EXTERNAL_CONTROL
 	default y if ACPI || PPC_PSERIES
 	select CPU_IDLE_GOV_LADDER if (!NO_HZ && !NO_HZ_IDLE)
 	select CPU_IDLE_GOV_MENU if (NO_HZ || NO_HZ_IDLE)
