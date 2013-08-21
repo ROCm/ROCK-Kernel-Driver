@@ -563,6 +563,10 @@ int timekeeping_inject_offset(struct timespec *ts)
 	tk_xtime_add(tk, ts);
 	tk_set_wall_to_mono(tk, timespec_sub(tk->wall_to_monotonic, *ts));
 
+#ifdef CONFIG_XEN_PRIVILEGED_GUEST
+	xen_update_wallclock(&tmp);
+#endif
+
 error: /* even if we error out, we forwarded the time, so call update */
 	timekeeping_update(tk, TK_CLEAR_NTP | TK_MIRROR | TK_CLOCK_WAS_SET);
 

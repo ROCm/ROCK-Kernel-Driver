@@ -414,6 +414,7 @@ int netif_be_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		skb = nskb;
 	}
 
+	netbk_rx_cb(skb)->nr_frags = skb_shinfo(skb)->nr_frags;
 	netbk_rx_cb(skb)->nr_slots = 1 + !!skb_shinfo(skb)->gso_size +
 				     netbk_count_slots(skb_shinfo(skb),
 						       netif->copying_receiver);
@@ -559,12 +560,11 @@ static void netbk_gop_frag(netif_t *netif, struct netbk_rx_meta *meta,
 	meta->id = req->id;
 }
 
-static void netbk_gop_skb(struct sk_buff *skb,
-			  struct netrx_pending_operations *npo)
+static unsigned int netbk_gop_skb(struct sk_buff *skb,
+				  struct netrx_pending_operations *npo)
 {
 	netif_t *netif = netdev_priv(skb->dev);
-	int nr_frags = skb_shinfo(skb)->nr_frags;
-	unsigned int i, n;
+	unsigned int i, n, nr_frags = netbk_rx_cb(skb)->nr_frags;
 	struct netbk_rx_meta *head_meta, *meta;
 
 	head_meta = npo->meta + npo->meta_prod++;
@@ -582,14 +582,22 @@ static void netbk_gop_skb(struct sk_buff *skb,
 
 		if (!len)
 			continue;
-		meta = NULL;
-		for (offset &= ~PAGE_MASK; len; page++, offset = 0) {
+		for (meta = NULL, offset &= ~PAGE_MASK; len; ) {
 			unsigned int bytes = PAGE_SIZE - offset;
 
 			if (bytes > len)
 				bytes = len;
-			if (meta && bytes + meta->frag.size > PAGE_SIZE &&
-			    offset_in_page(len) + meta->frag.size <= PAGE_SIZE)
+			/*
+			 * Try to reduce the number of slots needed (at the
+			 * expense of more copy operations), so that frontends
+			 * only coping with the minimum slot count required to
+			 * be supported have a better chance of receiving this
+			 * packet.
+			 */
+			else if (meta && meta->copy &&
+				 (bytes > PAGE_SIZE - meta->frag.size) &&
+				 (offset_in_page(len) + meta->frag.size <=
+				  PAGE_SIZE))
 				bytes = PAGE_SIZE - meta->frag.size;
 			if (!meta || !meta->copy ||
 			    bytes > PAGE_SIZE - meta->frag.size) {
@@ -601,11 +609,16 @@ static void netbk_gop_skb(struct sk_buff *skb,
 				meta->frag.page_offset = offset;
 				meta->frag.size = 0;
 				meta->copy = 0;
+				meta->tail = 0;
 			}
 			netbk_gop_frag(netif, meta, n, npo, page, bytes,
 				       offset);
 			meta->frag.size += bytes;
 			len -= bytes;
+			if ((offset += bytes) == PAGE_SIZE) {
+				++page;
+				offset = 0;
+			}
 		}
 		meta->tail = 1;
 	}
@@ -620,6 +633,7 @@ static void netbk_gop_skb(struct sk_buff *skb,
 	head_meta->tail = 1;
 
 	netif->rx.req_cons += n;
+	return n;
 }
 
 static inline void netbk_free_pages(int nr_frags, struct netbk_rx_meta *meta)
@@ -740,7 +754,6 @@ static void net_rx_action(unsigned long group)
 	count = 0;
 
 	while ((skb = skb_dequeue(&netbk->queue)) != NULL) {
-		netbk_rx_cb(skb)->nr_frags = skb_shinfo(skb)->nr_frags;
 		nr_frags = netbk_rx_cb(skb)->nr_slots;
 
 		/* Filled the batch queue? */
@@ -760,9 +773,7 @@ static void net_rx_action(unsigned long group)
 			break;
 		}
 
-		netbk_gop_skb(skb, &npo);
-
-		count += nr_frags;
+		count += netbk_gop_skb(skb, &npo);
 
 		__skb_queue_tail(&rxq, skb);
 	}
