@@ -570,7 +570,7 @@ struct blkif_request {
 		uint8_t        indirect_op;
 		uint16_t       nr_segments;
 #ifdef CONFIG_X86_64
-		uint32_t       _pad1     /* offsetof(blkif_...,u.indirect.id) == 8 */
+		uint32_t       _pad1;    /* offsetof(blkif_...,u.indirect.id) == 8 */
 #endif
 		uint64_t       id;
 		blkif_sector_t sector_number;

@@ -57,7 +57,7 @@
 #include <linux/gfp.h>
 #include <linux/poll.h>
 #include <linux/delay.h>
-#include <linux/nsproxy.h>
+#include <linux/pid_namespace.h>
 #include <asm/tlbflush.h>
 
 #define MAX_TAP_DEV 256     /*the maximum number of tapdisk ring devices    */
@@ -822,7 +822,7 @@ static long blktap_ioctl(struct file *filp, unsigned int cmd,
 	{
 		if (info) {
 			info->pid = (pid_t)arg;
-			info->pid_ns = current->nsproxy->pid_ns;
+			info->pid_ns = task_active_pid_ns(current);
 			DPRINTK("pid received %p:%d\n",
 			        info->pid_ns, info->pid);
 		}
