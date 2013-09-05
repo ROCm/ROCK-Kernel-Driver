@@ -584,7 +584,6 @@ void hv_kvp_onchannelcallback(void *context)
 	struct hv_kvp_msg *kvp_msg;
 
 	struct icmsg_hdr *icmsghdrp;
-	struct icmsg_negotiate *negop = NULL;
 
 	if (kvp_transaction.active) {
 		/*
@@ -607,13 +606,13 @@ void hv_kvp_onchannelcallback(void *context)
 			 * We start with win8 version and if the host cannot
 			 * support that we use the previous version.
 			 */
-			if (vmbus_prep_negotiate_resp(icmsghdrp, negop,
-				 recv_buffer, UTIL_FW_MAJOR_MINOR,
+			if (vmbus_prep_negotiate_resp(icmsghdrp, recv_buffer,
+				 false, UTIL_FW_MAJOR_MINOR,
 				 WIN8_SRV_MAJOR_MINOR))
 				goto done;
 
-			vmbus_prep_negotiate_resp(icmsghdrp, negop,
-				 recv_buffer, UTIL_FW_MAJOR_MINOR,
+			vmbus_prep_negotiate_resp(icmsghdrp, recv_buffer,
+				 true, UTIL_FW_MAJOR_MINOR,
 				 WIN7_SRV_MAJOR_MINOR);
 
 		} else {

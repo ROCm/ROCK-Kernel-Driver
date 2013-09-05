@@ -41,11 +41,10 @@ struct vmbus_channel_message_table_entry {
 /**
  * vmbus_prep_negotiate_resp() - Create default response for Hyper-V Negotiate message
  * @icmsghdrp: Pointer to msg header structure
- * @icmsg_negotiate: Pointer to negotiate message structure
  * @buf: Raw buffer channel data
  *
  * @icmsghdrp is of type &struct icmsg_hdr.
- * @negop is of type &struct icmsg_negotiate.
+ * @final if true signifies that this the final version negotiated.
  * Set up and fill in default negotiate response message.
  *
  * The fw_version specifies the  framework version that
@@ -55,7 +54,7 @@ struct vmbus_channel_message_table_entry {
  * Mainly used by Hyper-V drivers.
  */
 bool vmbus_prep_negotiate_resp(struct icmsg_hdr *icmsghdrp,
-				struct icmsg_negotiate *negop, u8 *buf,
+				u8 *buf, bool final,
 				int fw_version, int srv_version)
 {
 	int icframe_major, icframe_minor;
@@ -63,9 +62,9 @@ bool vmbus_prep_negotiate_resp(struct icmsg_hdr *icmsghdrp,
 	int fw_major, fw_minor;
 	int srv_major, srv_minor;
 	int i;
+	struct icmsg_negotiate *negop;
 	bool found_match = false;
 
-	icmsghdrp->icmsgsize = 0x10;
 	fw_major = (fw_version >> 16);
 	fw_minor = (fw_version & 0xFFFF);
 
@@ -76,11 +75,7 @@ bool vmbus_prep_negotiate_resp(struct icmsg_hdr *icmsghdrp,
 		sizeof(struct vmbuspipe_hdr) +
 		sizeof(struct icmsg_hdr)];
 
-	icframe_major = negop->icframe_vercnt;
-	icframe_minor = 0;
-
-	icmsg_major = negop->icmsg_vercnt;
-	icmsg_minor = 0;
+	icframe_major = icframe_minor = icmsg_major = icmsg_minor = 0;
 
 	/*
 	 * Select the framework version number we will
@@ -117,18 +112,20 @@ bool vmbus_prep_negotiate_resp(struct icmsg_hdr *icmsghdrp,
 	 */
 
 fw_error:
-	if (!found_match) {
-		negop->icframe_vercnt = 0;
-		negop->icmsg_vercnt = 0;
-	} else {
+	if (found_match) {
+		icmsghdrp->icmsgsize = 0x10;
 		negop->icframe_vercnt = 1;
 		negop->icmsg_vercnt = 1;
+		negop->icversion_data[0].major = icframe_major;
+		negop->icversion_data[0].minor = icframe_minor;
+		negop->icversion_data[1].major = icmsg_major;
+		negop->icversion_data[1].minor = icmsg_minor;
+	} else if (final) {
+		icmsghdrp->icmsgsize = 0x10;
+		negop->icframe_vercnt = 0;
+		negop->icmsg_vercnt = 0;
 	}
 
-	negop->icversion_data[0].major = icframe_major;
-	negop->icversion_data[0].minor = icframe_minor;
-	negop->icversion_data[1].major = icmsg_major;
-	negop->icversion_data[1].minor = icmsg_minor;
 	return found_match;
 }
 

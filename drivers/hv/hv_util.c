@@ -88,7 +88,6 @@ static void shutdown_onchannelcallback(void *context)
 	struct shutdown_msg_data *shutdown_msg;
 
 	struct icmsg_hdr *icmsghdrp;
-	struct icmsg_negotiate *negop = NULL;
 
 	vmbus_recvpacket(channel, shut_txf_buf,
 			 PAGE_SIZE, &recvlen, &requestid);
@@ -98,8 +97,8 @@ static void shutdown_onchannelcallback(void *context)
 			sizeof(struct vmbuspipe_hdr)];
 
 		if (icmsghdrp->icmsgtype == ICMSGTYPE_NEGOTIATE) {
-			vmbus_prep_negotiate_resp(icmsghdrp, negop,
-					shut_txf_buf, UTIL_FW_MAJOR_MINOR,
+			vmbus_prep_negotiate_resp(icmsghdrp, shut_txf_buf,
+					true, UTIL_FW_MAJOR_MINOR,
 					SHUTDOWN_MAJOR_MINOR);
 		} else {
 			shutdown_msg =
@@ -225,8 +224,8 @@ static void timesync_onchannelcallback(void *context)
 				sizeof(struct vmbuspipe_hdr)];
 
 		if (icmsghdrp->icmsgtype == ICMSGTYPE_NEGOTIATE) {
-			vmbus_prep_negotiate_resp(icmsghdrp, NULL, time_txf_buf,
-						UTIL_FW_MAJOR_MINOR,
+			vmbus_prep_negotiate_resp(icmsghdrp, time_txf_buf,
+						true, UTIL_FW_MAJOR_MINOR,
 						TIMESYNCH_MAJOR_MINOR);
 		} else {
 			timedatap = (struct ictimesync_data *)&time_txf_buf[
@@ -266,8 +265,8 @@ static void heartbeat_onchannelcallback(void *context)
 				sizeof(struct vmbuspipe_hdr)];
 
 		if (icmsghdrp->icmsgtype == ICMSGTYPE_NEGOTIATE) {
-			vmbus_prep_negotiate_resp(icmsghdrp, NULL,
-				hbeat_txf_buf, UTIL_FW_MAJOR_MINOR,
+			vmbus_prep_negotiate_resp(icmsghdrp, hbeat_txf_buf,
+				true, UTIL_FW_MAJOR_MINOR,
 				HEARTBEAT_MAJOR_MINOR);
 		} else {
 			heartbeat_msg =
