@@ -604,9 +604,8 @@ static int reiserfs_create(struct inode *dir, struct dentry *dentry, umode_t mod
 	retval =
 	    reiserfs_new_inode(&th, dir, mode, NULL, 0 /*i_size */ , dentry,
 			       inode, &security);
-	/* inode is dropped and write lock is released */
 	if (retval)
-		return retval;
+		goto out_failed;
 
 	inode->i_op = &reiserfs_file_inode_operations;
 	inode->i_fop = &reiserfs_file_operations;
@@ -679,9 +678,9 @@ static int reiserfs_mknod(struct inode *dir, struct dentry *dentry, umode_t mode
 	retval =
 	    reiserfs_new_inode(&th, dir, mode, NULL, 0 /*i_size */ , dentry,
 			       inode, &security);
-	/* inode is dropped and write lock is released */
-	if (retval)
-		return retval;
+	if (retval) {
+		goto out_failed;
+	}
 
 	inode->i_op = &reiserfs_special_inode_operations;
 	init_special_inode(inode, inode->i_mode, rdev);
@@ -764,10 +763,9 @@ static int reiserfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode
 					old_format_only(dir->i_sb) ?
 					EMPTY_DIR_SIZE_V1 : EMPTY_DIR_SIZE,
 					dentry, inode, &security);
-	/* inode is dropped and write lock is released */
 	if (retval) {
 		DEC_DIR_INODE_NLINK(dir)
-		return retval;
+		goto out_failed;
 	}
 
 	reiserfs_update_inode_transaction(inode);
@@ -789,9 +787,8 @@ static int reiserfs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode
 		if (err)
 			retval = err;
 		unlock_new_inode(inode);
-		reiserfs_write_unlock(dir->i_sb);
 		iput(inode);
-		return retval;
+		goto out_failed;
 	}
 	// the above add_entry did not update dir's stat data
 	reiserfs_update_sd(&th, dir);
@@ -1063,9 +1060,9 @@ static int reiserfs_symlink(struct inode *parent_dir,
 	    reiserfs_new_inode(&th, parent_dir, mode, name, strlen(symname),
 			       dentry, inode, &security);
 	kfree(name);
-	/* inode is dropped and write lock is released */
-	if (retval)
-		return retval;
+	if (retval) {		/* reiserfs_new_inode iputs for us */
+		goto out_failed;
+	}
 
 	reiserfs_update_inode_transaction(inode);
 	reiserfs_update_inode_transaction(parent_dir);
@@ -1087,9 +1084,8 @@ static int reiserfs_symlink(struct inode *parent_dir,
 		if (err)
 			retval = err;
 		unlock_new_inode(inode);
-		reiserfs_write_unlock(parent_dir->i_sb);
 		iput(inode);
-		return retval;
+		goto out_failed;
 	}
 
 	unlock_new_inode(inode);

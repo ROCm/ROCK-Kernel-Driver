@@ -524,14 +524,14 @@ static int is_tree_node(struct buffer_head *bh, int level)
  * the caller (search_by_key) will perform other schedule-unsafe
  * operations just after calling this function.
  *
- * @return true if we have unlocked
+ * @return depth of lock to be restored after read completes
  */
-static bool search_by_key_reada(struct super_block *s,
+static int search_by_key_reada(struct super_block *s,
 				struct buffer_head **bh,
 				b_blocknr_t *b, int num)
 {
 	int i, j;
-	bool unlocked = false;
+	int depth = -1;
 
 	for (i = 0; i < num; i++) {
 		bh[i] = sb_getblk(s, b[i]);
@@ -549,16 +549,13 @@ static bool search_by_key_reada(struct super_block *s,
 		 * you have to make sure the prepared bit isn't set on this buffer
 		 */
 		if (!buffer_uptodate(bh[j])) {
-			if (!unlocked) {
-				int depth = -1; /* avoiding __must_check */
+			if (depth == -1)
 				depth = reiserfs_write_unlock_nested(s);
-				unlocked = true;
-			}
 			ll_rw_block(READA, 1, bh + j);
 		}
 		brelse(bh[j]);
 	}
-	return unlocked;
+	return depth;
 }
 
 /**************************************************************************
@@ -626,7 +623,7 @@ int search_by_key(struct super_block *sb, const struct cpu_key *key,	/* Key to s
 	block_number = SB_ROOT_BLOCK(sb);
 	expected_level = -1;
 	while (1) {
-		int depth;
+
 #ifdef CONFIG_REISERFS_CHECK
 		if (!(++repeat_counter % 50000))
 			reiserfs_warning(sb, "PAP-5100",
@@ -646,29 +643,25 @@ int search_by_key(struct super_block *sb, const struct cpu_key *key,	/* Key to s
 		   have a pointer to it. */
 		if ((bh = last_element->pe_buffer =
 		     sb_getblk(sb, block_number))) {
-			bool unlocked = false;
-			depth = REISERFS_SB(sb)->lock_depth;
-			if (!buffer_uptodate(bh) && reada_count > 1)
-				/* may unlock the write lock */
-				unlocked = search_by_key_reada(sb, reada_bh,
-						    reada_blocks, reada_count);
 
 			/*
-			 * If we haven't already unlocked the write lock,
-			 * then we need to do that here before reading
-			 * the current block
+			 * We'll need to drop the lock if we encounter any
+			 * buffers that need to be read. If all of them are
+			 * already up to date, we don't need to drop the lock.
 			 */
-			if (!buffer_uptodate(bh) && !unlocked) {
+			int depth = -1;
+
+			if (!buffer_uptodate(bh) && reada_count > 1)
+				depth = search_by_key_reada(sb, reada_bh,
+						    reada_blocks, reada_count);
+
+			if (!buffer_uptodate(bh) && depth == -1)
 				depth = reiserfs_write_unlock_nested(sb);
-				unlocked = true;
-			} else if (!unlocked) { /* debug */
-				depth = reiserfs_write_unlock_nested(sb);
-				unlocked = true;
-			}
+
 			ll_rw_block(READ, 1, &bh);
 			wait_on_buffer(bh);
 
-			if (unlocked)
+			if (depth != -1)
 				reiserfs_write_lock_nested(sb, depth);
 			if (!buffer_uptodate(bh))
 				goto io_error;
@@ -996,7 +989,6 @@ static char prepare_for_delete_or_cut(struct reiserfs_transaction_handle *th, st
 	struct super_block *sb = inode->i_sb;
 	struct item_head *p_le_ih = PATH_PITEM_HEAD(path);
 	struct buffer_head *bh = PATH_PLAST_BUFFER(path);
-	int depth;
 
 	BUG_ON(!th->t_trans_id);
 
@@ -1065,11 +1057,7 @@ static char prepare_for_delete_or_cut(struct reiserfs_transaction_handle *th, st
 			reiserfs_free_block(th, inode, block, 1);
 		    }
 
-		    if (need_resched()) {
-			    depth = reiserfs_write_unlock_nested(sb);
-			    cond_resched();
-			    reiserfs_write_lock_nested(sb, depth);
-		    }
+		    reiserfs_cond_resched(sb);
 
 		    if (item_moved (&s_ih, path))  {
 			need_re_search = 1;
@@ -1308,9 +1296,9 @@ int reiserfs_delete_item(struct reiserfs_transaction_handle *th,
 		       "reiserquota delete_item(): freeing %u, id=%u type=%c",
 		       quota_cut_bytes, inode->i_uid, head2type(&s_ih));
 #endif
-	depth = reiserfs_write_unlock_nested(sb);
+	depth = reiserfs_write_unlock_nested(inode->i_sb);
 	dquot_free_space_nodirty(inode, quota_cut_bytes);
-	reiserfs_write_lock_nested(sb, depth);
+	reiserfs_write_lock_nested(inode->i_sb, depth);
 
 	/* Return deleted body length */
 	return ret_value;
@@ -1336,6 +1324,7 @@ int reiserfs_delete_item(struct reiserfs_transaction_handle *th,
 void reiserfs_delete_solid_item(struct reiserfs_transaction_handle *th,
 				struct inode *inode, struct reiserfs_key *key)
 {
+	struct super_block *sb = th->t_super;
 	struct tree_balance tb;
 	INITIALIZE_PATH(path);
 	int item_len = 0;
@@ -1343,7 +1332,6 @@ void reiserfs_delete_solid_item(struct reiserfs_transaction_handle *th,
 	struct cpu_key cpu_key;
 	int retval;
 	int quota_cut_bytes = 0;
-	struct super_block *sb = th->t_super;
 
 	BUG_ON(!th->t_trans_id);
 
@@ -1971,6 +1959,7 @@ int reiserfs_paste_into_item(struct reiserfs_transaction_handle *th, struct tree
 			     const char *body,	/* Pointer to the bytes to paste.    */
 			     int pasted_size)
 {				/* Size of pasted bytes.             */
+	struct super_block *sb = inode->i_sb;
 	struct tree_balance s_paste_balance;
 	int retval;
 	int fs_gen;
@@ -1987,9 +1976,9 @@ int reiserfs_paste_into_item(struct reiserfs_transaction_handle *th, struct tree
 		       key2type(&(key->on_disk_key)));
 #endif
 
-	depth = reiserfs_write_unlock_nested(inode->i_sb);
+	depth = reiserfs_write_unlock_nested(sb);
 	retval = dquot_alloc_space_nodirty(inode, pasted_size);
-	reiserfs_write_lock_nested(inode->i_sb, depth);
+	reiserfs_write_lock_nested(sb, depth);
 	if (retval) {
 		pathrelse(search_path);
 		return retval;
@@ -2046,9 +2035,9 @@ int reiserfs_paste_into_item(struct reiserfs_transaction_handle *th, struct tree
 		       pasted_size, inode->i_uid,
 		       key2type(&(key->on_disk_key)));
 #endif
-	depth = reiserfs_write_unlock_nested(inode->i_sb);
+	depth = reiserfs_write_unlock_nested(sb);
 	dquot_free_space_nodirty(inode, pasted_size);
-	reiserfs_write_lock_nested(inode->i_sb, depth);
+	reiserfs_write_lock_nested(sb, depth);
 	return retval;
 }
 
@@ -2063,16 +2052,15 @@ int reiserfs_insert_item(struct reiserfs_transaction_handle *th,
 			 struct item_head *ih, struct inode *inode,
 			 const char *body)
 {
-	struct super_block *sb = th->t_super;
 	struct tree_balance s_ins_balance;
 	int retval;
 	int fs_gen = 0;
 	int quota_bytes = 0;
-	int depth;
 
 	BUG_ON(!th->t_trans_id);
 
 	if (inode) {		/* Do we count quotas for item? */
+		int depth;
 		fs_gen = get_generation(inode->i_sb);
 		quota_bytes = ih_item_len(ih);
 
@@ -2088,9 +2076,9 @@ int reiserfs_insert_item(struct reiserfs_transaction_handle *th,
 #endif
 		/* We can't dirty inode here. It would be immediately written but
 		 * appropriate stat item isn't inserted yet... */
-		depth = reiserfs_write_unlock_nested(sb);
+		depth = reiserfs_write_unlock_nested(inode->i_sb);
 		retval = dquot_alloc_space_nodirty(inode, quota_bytes);
-		reiserfs_write_lock_nested(sb, depth);
+		reiserfs_write_lock_nested(inode->i_sb, depth);
 		if (retval) {
 			pathrelse(path);
 			return retval;
@@ -2142,9 +2130,9 @@ int reiserfs_insert_item(struct reiserfs_transaction_handle *th,
 		       quota_bytes, inode->i_uid, head2type(ih));
 #endif
 	if (inode) {
-		depth = reiserfs_write_unlock_nested(sb);
+		int depth = reiserfs_write_unlock_nested(inode->i_sb);
 		dquot_free_space_nodirty(inode, quota_bytes);
-		reiserfs_write_lock_nested(sb, depth);
+		reiserfs_write_lock_nested(inode->i_sb, depth);
 	}
 	return retval;
 }

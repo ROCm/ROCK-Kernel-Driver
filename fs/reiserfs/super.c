@@ -198,7 +198,6 @@ static int finish_unfinished(struct super_block *s)
 	int done;
 	struct inode *inode;
 	int truncate;
-	int depth;
 #ifdef CONFIG_QUOTA
 	int i;
 	int ms_active_set;
@@ -244,6 +243,7 @@ static int finish_unfinished(struct super_block *s)
 	done = 0;
 	REISERFS_SB(s)->s_is_unlinked_ok = 1;
 	while (!retval) {
+		int depth;
 		retval = search_item(s, &max_cpu_key, &path);
 		if (retval != ITEM_NOT_FOUND) {
 			reiserfs_error(s, "vs-2140",
@@ -2099,7 +2099,8 @@ static int reiserfs_statfs(struct dentry *dentry, struct kstatfs *buf)
 static int reiserfs_write_dquot(struct dquot *dquot)
 {
 	struct reiserfs_transaction_handle th;
-	int ret, err, depth;
+	int ret, err;
+	int depth;
 
 	reiserfs_write_lock(dquot->dq_sb);
 	ret =
@@ -2123,7 +2124,8 @@ out:
 static int reiserfs_acquire_dquot(struct dquot *dquot)
 {
 	struct reiserfs_transaction_handle th;
-	int ret, err, depth;
+	int ret, err;
+	int depth;
 
 	reiserfs_write_lock(dquot->dq_sb);
 	ret =
@@ -2147,21 +2149,20 @@ out:
 static int reiserfs_release_dquot(struct dquot *dquot)
 {
 	struct reiserfs_transaction_handle th;
-	int ret, err, depth;
+	int ret, err;
 
 	reiserfs_write_lock(dquot->dq_sb);
 	ret =
 	    journal_begin(&th, dquot->dq_sb,
 			  REISERFS_QUOTA_DEL_BLOCKS(dquot->dq_sb));
-	depth = reiserfs_write_unlock_nested(dquot->dq_sb);
+	reiserfs_write_unlock(dquot->dq_sb);
 	if (ret) {
 		/* Release dquot anyway to avoid endless cycle in dqput() */
 		dquot_release(dquot);
-		reiserfs_write_lock_nested(dquot->dq_sb, depth);
 		goto out;
 	}
 	ret = dquot_release(dquot);
-	reiserfs_write_lock_nested(dquot->dq_sb, depth);
+	reiserfs_write_lock(dquot->dq_sb);
 	err =
 	    journal_end(&th, dquot->dq_sb,
 			REISERFS_QUOTA_DEL_BLOCKS(dquot->dq_sb));
@@ -2186,7 +2187,8 @@ static int reiserfs_mark_dquot_dirty(struct dquot *dquot)
 static int reiserfs_write_info(struct super_block *sb, int type)
 {
 	struct reiserfs_transaction_handle th;
-	int ret, err, depth;
+	int ret, err;
+	int depth;
 
 	/* Data block + inode block */
 	reiserfs_write_lock(sb);
@@ -2209,14 +2211,8 @@ out:
  */
 static int reiserfs_quota_on_mount(struct super_block *sb, int type)
 {
-	int ret, depth;
-
-	depth = reiserfs_write_unlock_nested(sb);
-	ret = dquot_quota_on_mount(sb, REISERFS_SB(sb)->s_qf_names[type],
-				   REISERFS_SB(sb)->s_jquota_fmt, type);
-	reiserfs_write_lock_nested(sb, depth);
-
-	return ret;
+	return dquot_quota_on_mount(sb, REISERFS_SB(sb)->s_qf_names[type],
+					REISERFS_SB(sb)->s_jquota_fmt, type);
 }
 
 /*

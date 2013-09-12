@@ -25,7 +25,6 @@ int reiserfs_commit_write(struct file *f, struct page *page,
 
 void reiserfs_evict_inode(struct inode *inode)
 {
-	struct super_block *sb = inode->i_sb;
 	/* We need blocks for transaction + (user+group) quota update (possibly delete) */
 	int jbegin_count =
 	    JOURNAL_PER_BALANCE_CNT * 2 +
@@ -59,9 +58,9 @@ void reiserfs_evict_inode(struct inode *inode)
 		 * after delete_object so that quota updates go into the same transaction as
 		 * stat data deletion */
 		if (!err) {
-			int depth = reiserfs_write_unlock_nested(sb);
+			int depth = reiserfs_write_unlock_nested(inode->i_sb);
 			dquot_free_inode(inode);
-			reiserfs_write_lock_nested(sb, depth);
+			reiserfs_write_lock_nested(inode->i_sb, depth);
 		}
 
 		if (journal_end(&th, inode->i_sb, jbegin_count))
@@ -1527,10 +1526,7 @@ struct inode *reiserfs_iget(struct super_block *s, const struct cpu_key *key)
 
 	if (comp_short_keys(INODE_PKEY(inode), key) || is_bad_inode(inode)) {
 		/* either due to i/o error or a stale NFS handle */
-		int depth;
-		depth = reiserfs_write_unlock_nested(s);
 		iput(inode);
-		reiserfs_write_lock_nested(s, depth);
 		inode = NULL;
 	}
 	return inode;
@@ -1547,12 +1543,12 @@ static struct dentry *reiserfs_get_dentry(struct super_block *sb,
 	key.on_disk_key.k_dir_id = dir_id;
 	reiserfs_write_lock(sb);
 	inode = reiserfs_iget(sb, &key);
-	reiserfs_write_unlock(sb);
 	if (inode && !IS_ERR(inode) && generation != 0 &&
 	    generation != inode->i_generation) {
 		iput(inode);
 		inode = NULL;
 	}
+	reiserfs_write_unlock(sb);
 
 	return d_obtain_alias(inode);
 }
@@ -1775,7 +1771,7 @@ int reiserfs_new_inode(struct reiserfs_transaction_handle *th,
 		       struct inode *inode,
 		       struct reiserfs_security_handle *security)
 {
-	struct super_block *sb;
+	struct super_block *sb = dir->i_sb;
 	struct reiserfs_iget_args args;
 	INITIALIZE_PATH(path_to_key);
 	struct cpu_key key;
@@ -1785,21 +1781,17 @@ int reiserfs_new_inode(struct reiserfs_transaction_handle *th,
 	int err;
 	int depth;
 
-	reiserfs_check_lock_nested(dir->i_sb, __func__);
-
 	BUG_ON(!th->t_trans_id);
 
-	depth = reiserfs_write_unlock_nested(dir->i_sb);
+	depth = reiserfs_write_unlock_nested(sb);
 	err = dquot_alloc_inode(inode);
-	reiserfs_write_lock_nested(dir->i_sb, depth);
+	reiserfs_write_lock_nested(sb, depth);
 	if (err)
 		goto out_end_trans;
 	if (!dir->i_nlink) {
 		err = -EPERM;
 		goto out_bad_inode;
 	}
-
-	sb = dir->i_sb;
 
 	/* item head of new item */
 	ih.ih_key.k_dir_id = reiserfs_choose_packing(dir);
@@ -1818,10 +1810,10 @@ int reiserfs_new_inode(struct reiserfs_transaction_handle *th,
 	memcpy(INODE_PKEY(inode), &(ih.ih_key), KEY_SIZE);
 	args.dirid = le32_to_cpu(ih.ih_key.k_dir_id);
 
-	reiserfs_write_unlock(inode->i_sb);
+	depth = reiserfs_write_unlock_nested(inode->i_sb);
 	err = insert_inode_locked4(inode, args.objectid,
 			     reiserfs_find_actor, &args);
-	reiserfs_write_lock(inode->i_sb);
+	reiserfs_write_lock_nested(inode->i_sb, depth);
 	if (err) {
 		err = -EINVAL;
 		goto out_bad_inode;
@@ -2009,7 +2001,6 @@ int reiserfs_new_inode(struct reiserfs_transaction_handle *th,
 	clear_nlink(inode);
 	th->t_trans_id = 0;	/* so the caller can't use this handle later */
 	unlock_new_inode(inode); /* OK to do even if we hadn't locked it */
-	reiserfs_write_unlock(inode->i_sb);
 	iput(inode);
 	return err;
 }
@@ -3179,7 +3170,6 @@ int reiserfs_setattr(struct dentry *dentry, struct iattr *attr)
 	if ((((attr->ia_valid & ATTR_UID) && (from_kuid(&init_user_ns, attr->ia_uid) & ~0xffff)) ||
 	     ((attr->ia_valid & ATTR_GID) && (from_kgid(&init_user_ns, attr->ia_gid) & ~0xffff))) &&
 	    (get_inode_sd_version(inode) == STAT_DATA_V1)) {
-		reiserfs_write_unlock(inode->i_sb);
 		/* stat data of format v3.5 has 16 bit uid and gid */
 		error = -EINVAL;
 		goto out;
@@ -3245,7 +3235,7 @@ int reiserfs_setattr(struct dentry *dentry, struct iattr *attr)
 			error = reiserfs_acl_chmod(inode);
 	}
 
-      out:
+out:
 	return error;
 }
 

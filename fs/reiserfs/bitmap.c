@@ -1190,8 +1190,7 @@ static inline int blocknrs_and_prealloc_arrays_from_search_start
 #endif
 				/* Free not allocated blocks */
 				depth = reiserfs_write_unlock_nested(s);
-				dquot_free_block_nodirty(
-					hint->inode,
+				dquot_free_block_nodirty(hint->inode,
 					amount_needed + hint->prealloc_size -
 					nr_allocated);
 				reiserfs_write_lock_nested(s, depth);
@@ -1225,10 +1224,12 @@ static inline int blocknrs_and_prealloc_arrays_from_search_start
 			       REISERFS_I(hint->inode)->i_prealloc_count,
 			       hint->inode->i_uid);
 #endif
+
 		depth = reiserfs_write_unlock_nested(s);
-		dquot_free_block_nodirty(hint->inode,
-			amount_needed + hint->prealloc_size - nr_allocated -
-			REISERFS_I(hint->inode)->i_prealloc_count);
+		dquot_free_block_nodirty(hint->inode, amount_needed +
+					 hint->prealloc_size - nr_allocated -
+					 REISERFS_I(hint->inode)->
+					 i_prealloc_count);
 		reiserfs_write_lock_nested(s, depth);
 	}
 
