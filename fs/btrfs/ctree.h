@@ -32,6 +32,7 @@
 #include <asm/kmap_types.h>
 #include <linux/pagemap.h>
 #include <linux/btrfs.h>
+#include <linux/kobj_completion.h>
 #include "extent_io.h"
 #include "extent_map.h"
 #include "async-thread.h"
@@ -1519,8 +1520,7 @@ struct btrfs_fs_info {
 	struct task_struct *cleaner_kthread;
 	int thread_pool_size;
 
-	struct kobject super_kobj;
-	struct completion kobj_unregister;
+	struct kobj_completion super_kc;
 	int do_barriers;
 	int closing;
 	int log_root_recovering;
