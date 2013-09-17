@@ -52,4 +52,6 @@ static struct btrfs_feature_attr btrfs_attr_##_name = {			     \
 #define to_btrfs_attr(a) container_of(a, struct btrfs_attr, attr)
 #define to_btrfs_feature_attr(a) \
 			container_of(a, struct btrfs_feature_attr, attr)
+char *btrfs_printable_features(enum btrfs_feature_set set, u64 flags);
+extern const char * const btrfs_feature_set_names[FEAT_MAX];
 #endif /* _BTRFS_SYSFS_H_ */

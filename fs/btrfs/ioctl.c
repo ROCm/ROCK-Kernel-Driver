@@ -56,6 +56,7 @@
 #include "rcu-string.h"
 #include "send.h"
 #include "dev-replace.h"
+#include "sysfs.h"
 
 /* Mask out flags that are inappropriate for the given type of inode. */
 static inline __u32 btrfs_mask_flags(umode_t mode, __u32 flags)
@@ -4158,17 +4159,27 @@ static int btrfs_ioctl_get_features(struct file *file, void __user *arg)
 	return 0;
 }
 
-static int check_feature_bits(struct btrfs_root *root, const char *type,
+static int check_feature_bits(struct btrfs_root *root,
+			      enum btrfs_feature_set set,
 			      u64 change_mask, u64 flags, u64 supported_flags,
 			      u64 safe_set, u64 safe_clear)
 {
+	const char *type = btrfs_feature_set_names[set];
+	char *names;
 	u64 disallowed, unsupported;
 	u64 set_mask = flags & change_mask;
 	u64 clear_mask = ~flags & change_mask;
 
 	unsupported = set_mask & ~supported_flags;
 	if (unsupported) {
-		btrfs_warn(root->fs_info,
+		names = btrfs_printable_features(set, unsupported);
+		if (names) {
+			btrfs_warn(root->fs_info,
+			   "this kernel does not support the %s feature bit%s",
+			   names, strchr(names, ',') ? "s" : "");
+			kfree(names);
+		} else
+			btrfs_warn(root->fs_info,
 			   "this kernel does not support %s bits 0x%llx",
 			   type, unsupported);
 		return -EOPNOTSUPP;
@@ -4176,7 +4187,14 @@ static int check_feature_bits(struct btrfs_root *root, const char *type,
 
 	disallowed = set_mask & ~safe_set;
 	if (disallowed) {
-		btrfs_warn(root->fs_info,
+		names = btrfs_printable_features(set, disallowed);
+		if (names) {
+			btrfs_warn(root->fs_info,
+			   "can't set the %s feature bit%s while mounted",
+			   names, strchr(names, ',') ? "s" : "");
+			kfree(names);
+		} else
+			btrfs_warn(root->fs_info,
 			   "can't set %s bits 0x%llx while mounted",
 			   type, disallowed);
 		return -EPERM;
@@ -4184,7 +4202,14 @@ static int check_feature_bits(struct btrfs_root *root, const char *type,
 
 	disallowed = clear_mask & ~safe_clear;
 	if (disallowed) {
-		btrfs_warn(root->fs_info,
+		names = btrfs_printable_features(set, disallowed);
+		if (names) {
+			btrfs_warn(root->fs_info,
+			   "can't clear the %s feature bit%s while mounted",
+			   names, strchr(names, ',') ? "s" : "");
+			kfree(names);
+		} else
+			btrfs_warn(root->fs_info,
 			   "can't clear %s bits 0x%llx while mounted",
 			   type, disallowed);
 		return -EPERM;
@@ -4194,7 +4219,7 @@ static int check_feature_bits(struct btrfs_root *root, const char *type,
 }
 
 #define check_feature(root, change_mask, flags, mask_base)	\
-check_feature_bits(root, # mask_base, change_mask, flags,	\
+check_feature_bits(root, FEAT_##mask_base, change_mask, flags,	\
 		   BTRFS_FEATURE_ ## mask_base ## _SUPP,	\
 		   BTRFS_FEATURE_ ## mask_base ## _SAFE_SET,	\
 		   BTRFS_FEATURE_ ## mask_base ## _SAFE_CLEAR)

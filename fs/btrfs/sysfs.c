@@ -77,6 +77,31 @@ const char * const btrfs_feature_set_names[FEAT_MAX] = {
 static char btrfs_feature_names[FEAT_MAX][64][13];
 static struct btrfs_feature_attr btrfs_feature_attrs[FEAT_MAX][64];
 
+char *btrfs_printable_features(enum btrfs_feature_set set, u64 flags)
+{
+	size_t bufsize = 4096; /* safe max, 64 names * 64 bytes */
+	int len = 0;
+	int i;
+	char *str;
+
+	str = kmalloc(bufsize, GFP_KERNEL);
+	if (!str)
+		return str;
+
+	for (i = 0; i < ARRAY_SIZE(btrfs_feature_attrs[set]); i++) {
+		if (!(flags & (1ULL << i)))
+			continue;
+
+		flags &= ~(1ULL << i);
+
+		len += snprintf(str + len, bufsize - len,
+				"%s%s", len ? "," : "",
+				btrfs_feature_attrs[set][i].attr.name);
+	}
+
+	return str;
+}
+
 static void init_feature_set_attrs(enum btrfs_feature_set set)
 {
 	int i;
