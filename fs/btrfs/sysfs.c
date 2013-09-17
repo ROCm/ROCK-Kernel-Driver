@@ -68,6 +68,58 @@ static struct kobj_type btrfs_supp_feat_ktype = {
 	.release	= kobj_completion_release,
 };
 
+const char * const btrfs_feature_set_names[FEAT_MAX] = {
+	[FEAT_COMPAT]	 = "compat",
+	[FEAT_COMPAT_RO] = "compat_ro",
+	[FEAT_INCOMPAT]	 = "incompat",
+};
+
+static char btrfs_feature_names[FEAT_MAX][64][13];
+static struct btrfs_feature_attr btrfs_feature_attrs[FEAT_MAX][64];
+
+static void init_feature_set_attrs(enum btrfs_feature_set set)
+{
+	int i;
+	int len = strlen(btrfs_feature_set_names[set]) + 4;
+
+	for (i = 0; i < 64; i++) {
+		char *name = btrfs_feature_names[set][i];
+		struct btrfs_feature_attr *fa;
+
+		snprintf(name, len, "%s:%u", btrfs_feature_set_names[set], i);
+
+		fa = &btrfs_feature_attrs[set][i];
+		fa->attr.name = name;
+		fa->attr.mode = S_IRUGO;
+		fa->feature_set = set;
+		fa->feature_bit = (1ULL << i);
+	}
+}
+
+static void init_feature_attrs(void)
+{
+	int i;
+
+	init_feature_set_attrs(FEAT_COMPAT);
+	init_feature_set_attrs(FEAT_COMPAT_RO);
+	init_feature_set_attrs(FEAT_INCOMPAT);
+
+	/* Copy the names over for supported features */
+	for (i = 0; btrfs_supp_feature_attrs[i]; i++) {
+		struct btrfs_feature_attr *fa;
+		struct attribute *attr;
+		int n;
+
+		fa = to_btrfs_feature_attr(btrfs_supp_feature_attrs[i]);
+		n = ilog2(fa->feature_bit);
+
+		attr = &btrfs_feature_attrs[fa->feature_set][n].attr;
+		attr->name = fa->attr.name;
+
+		btrfs_feature_names[fa->feature_set][n][0] = '\0';
+	}
+}
+
 static u64 get_features(struct btrfs_fs_info *fs_info,
 			enum btrfs_feature_set set)
 {
@@ -138,12 +190,12 @@ static struct kobj_type btrfs_ktype = {
 	.release	= kobj_completion_release,
 };
 
-static int add_per_fs_features(struct btrfs_fs_info *fs_info)
+static int add_per_fs_feature_set(struct btrfs_fs_info *fs_info,
+				  enum btrfs_feature_set set)
 {
 	int i;
-	for (i = 0; btrfs_supp_feature_attrs[i]; i++) {
-		struct attribute *attr = btrfs_supp_feature_attrs[i];
-		struct btrfs_feature_attr *fa = to_btrfs_feature_attr(attr);
+	for (i = 0; i < ARRAY_SIZE(btrfs_feature_attrs[0]); i++) {
+		struct btrfs_feature_attr *fa = &btrfs_feature_attrs[set][i];
 		u64 features = get_features(fs_info, fa->feature_set);
 		int error;
 
@@ -155,6 +207,20 @@ static int add_per_fs_features(struct btrfs_fs_info *fs_info)
 		if (error)
 			return error;
 	}
+	return 0;
+}
+
+static int add_per_fs_features(struct btrfs_fs_info *fs_info)
+{
+	enum btrfs_feature_set set;
+	int error;
+
+	for (set = FEAT_COMPAT; set < FEAT_MAX; set++) {
+		error = add_per_fs_feature_set(fs_info, set);
+		if (error)
+			return error;
+	}
+
 	return 0;
 }
 
@@ -207,6 +273,7 @@ int btrfs_init_sysfs(void)
 	if (!btrfs_kset)
 		return -ENOMEM;
 
+	init_feature_attrs();
 	kobj_completion_init(&btrfs_features, &btrfs_supp_feat_ktype);
 	btrfs_features.kc_kobj.kset = btrfs_kset;
 	ret = kobject_add(&btrfs_features.kc_kobj, NULL, "features");
