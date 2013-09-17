@@ -28,7 +28,7 @@ static struct btrfs_attr btrfs_attr_##_name =				\
 #define BTRFS_ATTR_LIST(_name)    (&btrfs_attr_##_name.attr),
 
 struct btrfs_feature_attr {
-	struct attribute attr;			/* global show, no store */
+	struct attribute attr;		/* per-fs/global show, no store */
 	enum btrfs_feature_set feature_set;
 	u64 feature_bit;
 };

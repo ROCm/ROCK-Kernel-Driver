@@ -1521,6 +1521,7 @@ struct btrfs_fs_info {
 	int thread_pool_size;
 
 	struct kobj_completion super_kc;
+	struct kobj_completion features_kc;
 	int do_barriers;
 	int closing;
 	int log_root_recovering;
