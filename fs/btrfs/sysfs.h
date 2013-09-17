@@ -8,6 +8,25 @@ enum btrfs_feature_set {
 	FEAT_MAX
 };
 
+struct btrfs_attr {
+	struct attribute attr;
+	ssize_t (*show)(struct btrfs_attr *, struct btrfs_fs_info *, char *);
+	ssize_t (*store)(struct btrfs_attr *, struct btrfs_fs_info *,
+			 const char *, size_t);
+};
+
+#define __INIT_BTRFS_ATTR(_name, _mode, _show, _store)			\
+{									\
+	.attr	= { .name = __stringify(_name), .mode = _mode },	\
+	.show	= _show,						\
+	.store	= _store,						\
+}
+
+#define BTRFS_ATTR(_name, _mode, _show, _store)				\
+static struct btrfs_attr btrfs_attr_##_name =				\
+			__INIT_BTRFS_ATTR(_name, _mode, _show, _store)
+#define BTRFS_ATTR_LIST(_name)    (&btrfs_attr_##_name.attr),
+
 struct btrfs_feature_attr {
 	struct attribute attr;			/* global show, no store */
 	enum btrfs_feature_set feature_set;
@@ -30,6 +49,7 @@ static struct btrfs_feature_attr btrfs_attr_##_name = {			     \
 	BTRFS_FEAT_ATTR(name, FEAT_INCOMPAT, BTRFS_FEATURE_INCOMPAT, feature)
 
 /* convert from attribute */
+#define to_btrfs_attr(a) container_of(a, struct btrfs_attr, attr)
 #define to_btrfs_feature_attr(a) \
 			container_of(a, struct btrfs_feature_attr, attr)
 #endif /* _BTRFS_SYSFS_H_ */

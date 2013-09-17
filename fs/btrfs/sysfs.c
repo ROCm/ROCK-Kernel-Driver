@@ -27,6 +27,7 @@
 #include "ctree.h"
 #include "disk-io.h"
 #include "transaction.h"
+#include "sysfs.h"
 
 BTRFS_FEAT_ATTR_INCOMPAT(mixed_backref, MIXED_BACKREF);
 BTRFS_FEAT_ATTR_INCOMPAT(default_subvol, DEFAULT_SUBVOL);
@@ -67,8 +68,63 @@ static struct kobj_type btrfs_supp_feat_ktype = {
 	.release	= kobj_completion_release,
 };
 
+static struct attribute *btrfs_attrs[] = {
+	NULL,
+};
+
+#define super_kobj_to_fs_info(kobj) \
+	container_of(kobj, struct btrfs_fs_info, super_kc.kc_kobj)
+
+static ssize_t btrfs_attr_show(struct kobject *kobj,
+			       struct attribute *attr, char *buf)
+{
+	struct btrfs_attr *a = container_of(attr, struct btrfs_attr, attr);
+	struct btrfs_fs_info *fs_info = super_kobj_to_fs_info(kobj);
+
+	return a->show ? a->show(a, fs_info, buf) : 0;
+}
+
+static ssize_t btrfs_attr_store(struct kobject *kobj,
+				struct attribute *attr,
+				const char *buf, size_t len)
+{
+	struct btrfs_attr *a = container_of(attr, struct btrfs_attr, attr);
+	struct btrfs_fs_info *fs_info = super_kobj_to_fs_info(kobj);
+
+	return a->store ? a->store(a, fs_info, buf, len) : 0;
+}
+
+static const struct sysfs_ops btrfs_attr_ops = {
+	.show = btrfs_attr_show,
+	.store = btrfs_attr_store,
+};
+
+static struct kobj_type btrfs_ktype = {
+	.default_attrs	= btrfs_attrs,
+	.sysfs_ops	= &btrfs_attr_ops,
+	.release	= kobj_completion_release,
+};
+
 /* /sys/fs/btrfs/ entry */
 static struct kset *btrfs_kset;
+
+int btrfs_sysfs_add_one(struct btrfs_fs_info *fs_info)
+{
+	int error;
+
+	kobj_completion_init(&fs_info->super_kc, &btrfs_ktype);
+	fs_info->super_kc.kc_kobj.kset = btrfs_kset;
+	error = kobject_add(&fs_info->super_kc.kc_kobj, NULL,
+			    "%pU", fs_info->fsid);
+
+	return error;
+}
+
+void btrfs_sysfs_remove_one(struct btrfs_fs_info *fs_info)
+{
+	kobj_completion_del_and_wait(&fs_info->super_kc);
+}
+
 static struct kobj_completion btrfs_features;
 
 int btrfs_init_sysfs(void)

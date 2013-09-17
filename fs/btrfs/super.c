@@ -301,6 +301,8 @@ void __btrfs_panic(struct btrfs_fs_info *fs_info, const char *function,
 
 static void btrfs_put_super(struct super_block *sb)
 {
+	btrfs_sysfs_remove_one(btrfs_sb(sb));
+
 	(void)close_ctree(btrfs_sb(sb)->tree_root);
 	/* FIXME: need to fix VFS to return error? */
 	/* AV: return it _where_?  ->put_super() can be triggered by any number
@@ -1159,8 +1161,17 @@ static struct dentry *btrfs_mount(struct file_system_type *fs_type, int flags,
 	}
 
 	root = !error ? get_default_root(s, subvol_objectid) : ERR_PTR(error);
-	if (IS_ERR(root))
+	if (IS_ERR(root)) {
 		deactivate_locked_super(s);
+		return root;
+	}
+
+	error = btrfs_sysfs_add_one(fs_info);
+	if (error) {
+		dput(root);
+		deactivate_locked_super(s);
+		return ERR_PTR(error);
+	}
 
 	return root;
 
