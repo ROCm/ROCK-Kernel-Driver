@@ -96,6 +96,23 @@ static void init_feature_set_attrs(enum btrfs_feature_set set)
 	}
 }
 
+static u64 writeable_mask[FEAT_MAX] = {
+	[FEAT_COMPAT] = BTRFS_FEATURE_COMPAT_SAFE_SET |
+			  BTRFS_FEATURE_COMPAT_SAFE_CLEAR,
+	[FEAT_COMPAT_RO] = BTRFS_FEATURE_COMPAT_RO_SAFE_SET |
+			  BTRFS_FEATURE_COMPAT_RO_SAFE_CLEAR,
+	[FEAT_INCOMPAT] = BTRFS_FEATURE_INCOMPAT_SAFE_SET |
+			  BTRFS_FEATURE_INCOMPAT_SAFE_CLEAR,
+};
+
+static inline umode_t fa_mode(struct btrfs_feature_attr *fa)
+{
+	umode_t mode = S_IRUGO;
+	if (writeable_mask[fa->feature_set] & fa->feature_bit)
+		mode |= S_IWUSR;
+	return mode;
+}
+
 static void init_feature_attrs(void)
 {
 	int i;
@@ -115,6 +132,7 @@ static void init_feature_attrs(void)
 
 		attr = &btrfs_feature_attrs[fa->feature_set][n].attr;
 		attr->name = fa->attr.name;
+		attr->mode = fa_mode(fa);
 
 		btrfs_feature_names[fa->feature_set][n][0] = '\0';
 	}
@@ -132,6 +150,18 @@ static u64 get_features(struct btrfs_fs_info *fs_info,
 		return btrfs_super_incompat_flags(disk_super);
 }
 
+static void set_features(struct btrfs_fs_info *fs_info,
+			 enum btrfs_feature_set set, u64 features)
+{
+	struct btrfs_super_block *disk_super = fs_info->super_copy;
+	if (set == FEAT_COMPAT)
+		btrfs_set_super_compat_flags(disk_super, features);
+	else if (set == FEAT_COMPAT_RO)
+		btrfs_set_super_compat_ro_flags(disk_super, features);
+	else
+		btrfs_set_super_incompat_flags(disk_super, features);
+}
+
 #define feat_kobj_to_fs_info(kobj) \
 	container_of(kobj, struct btrfs_fs_info, features_kc.kc_kobj)
 static ssize_t btrfs_feat_show(struct kobject *kobj, struct attribute *attr,
@@ -144,8 +174,72 @@ static ssize_t btrfs_feat_show(struct kobject *kobj, struct attribute *attr,
 	return snprintf(buf, PAGE_SIZE, "%u\n", !!(features & fa->feature_bit));
 }
 
+static ssize_t btrfs_feat_store(struct kobject *kobj, struct attribute *attr,
+				const char *buf, size_t count)
+{
+	struct btrfs_fs_info *fs_info = feat_kobj_to_fs_info(kobj);
+	struct btrfs_feature_attr *fa = to_btrfs_feature_attr(attr);
+	struct btrfs_trans_handle *trans;
+	u64 features, set, clear;
+	unsigned long val;
+	int ret;
+
+	ret = kstrtoul(skip_spaces(buf), 0, &val);
+	if (ret)
+		return ret;
+
+	if (fa->feature_set == FEAT_COMPAT) {
+		set = BTRFS_FEATURE_COMPAT_SAFE_SET;
+		clear = BTRFS_FEATURE_COMPAT_SAFE_CLEAR;
+	} else if (fa->feature_set == FEAT_COMPAT_RO) {
+		set = BTRFS_FEATURE_COMPAT_RO_SAFE_SET;
+		clear = BTRFS_FEATURE_COMPAT_RO_SAFE_CLEAR;
+	} else {
+		set = BTRFS_FEATURE_INCOMPAT_SAFE_SET;
+		clear = BTRFS_FEATURE_INCOMPAT_SAFE_CLEAR;
+	}
+
+	features = get_features(fs_info, fa->feature_set);
+
+	/* Nothing to do */
+	if ((val && (features & fa->feature_bit)) ||
+	    (!val && !(features & fa->feature_bit)))
+		return count;
+
+	if ((val && !(set & fa->feature_bit)) ||
+	    (!val && !(clear & fa->feature_bit))) {
+		btrfs_info(fs_info,
+			"%sabling feature %s on mounted fs is not supported.",
+			val ? "En" : "Dis", fa->attr.name);
+		return -EPERM;
+	}
+
+	btrfs_info(fs_info, "%s %s feature flag",
+		   val ? "Setting" : "Clearing", fa->attr.name);
+
+	trans = btrfs_start_transaction(fs_info->fs_root, 1);
+	if (IS_ERR(trans))
+		return PTR_ERR(trans);
+
+	spin_lock(&fs_info->super_lock);
+	features = get_features(fs_info, fa->feature_set);
+	if (val)
+		features |= fa->feature_bit;
+	else
+		features &= ~fa->feature_bit;
+	set_features(fs_info, fa->feature_set, features);
+	spin_unlock(&fs_info->super_lock);
+
+	ret = btrfs_commit_transaction(trans, fs_info->fs_root);
+	if (ret)
+		return ret;
+
+	return count;
+}
+
 static const struct sysfs_ops btrfs_feat_attr_ops = {
 	.show	= btrfs_feat_show,
+	.store	= btrfs_feat_store,
 };
 
 static struct kobj_type btrfs_feat_ktype = {
@@ -199,7 +293,8 @@ static int add_per_fs_feature_set(struct btrfs_fs_info *fs_info,
 		u64 features = get_features(fs_info, fa->feature_set);
 		int error;
 
-		if (!(features & fa->feature_bit))
+		if (!(features & fa->feature_bit) &&
+		    !(fa->attr.mode & S_IWUSR))
 			continue;
 
 		error = sysfs_create_file(&fs_info->features_kc.kc_kobj,
