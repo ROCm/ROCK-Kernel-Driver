@@ -335,7 +335,7 @@ static void backref_tree_panic(struct rb_node *rb_node, int errno, u64 bytenr)
 	if (bnode->root)
 		fs_info = bnode->root->fs_info;
 	btrfs_panic(fs_info, errno, "Inconsistency in backref cache "
-		    "found at offset %llu\n", (unsigned long long)bytenr);
+		    "found at offset %llu\n", bytenr);
 }
 
 /*
@@ -588,7 +588,7 @@ static struct btrfs_root *read_fs_root(struct btrfs_fs_info *fs_info,
 	else
 		key.offset = (u64)-1;
 
-	return btrfs_read_fs_root_no_name(fs_info, &key);
+	return btrfs_get_fs_root(fs_info, &key, false);
 }
 
 #ifdef BTRFS_COMPAT_EXTENT_TREE_V0
@@ -639,6 +639,11 @@ int find_inline_backref(struct extent_buffer *leaf, int slot,
 	if (key.type == BTRFS_EXTENT_ITEM_KEY &&
 	    item_size <= sizeof(*ei) + sizeof(*bi)) {
 		WARN_ON(item_size < sizeof(*ei) + sizeof(*bi));
+		return 1;
+	}
+	if (key.type == BTRFS_METADATA_ITEM_KEY &&
+	    item_size <= sizeof(*ei)) {
+		WARN_ON(item_size < sizeof(*ei));
 		return 1;
 	}
 
@@ -1543,7 +1548,7 @@ static int get_new_location(struct inode *reloc_inode, u64 *new_bytenr,
 	       btrfs_file_extent_other_encoding(leaf, fi));
 
 	if (num_bytes != btrfs_file_extent_disk_num_bytes(leaf, fi)) {
-		ret = 1;
+		ret = -EINVAL;
 		goto out;
 	}
 
@@ -1574,7 +1579,7 @@ int replace_file_extents(struct btrfs_trans_handle *trans,
 	u64 end;
 	u32 nritems;
 	u32 i;
-	int ret;
+	int ret = 0;
 	int first = 1;
 	int dirty = 0;
 
@@ -1637,11 +1642,13 @@ int replace_file_extents(struct btrfs_trans_handle *trans,
 
 		ret = get_new_location(rc->data_inode, &new_bytenr,
 				       bytenr, num_bytes);
-		if (ret > 0) {
-			WARN_ON(1);
-			continue;
+		if (ret) {
+			/*
+			 * Don't have to abort since we've not changed anything
+			 * in the file extent yet.
+			 */
+			break;
 		}
-		BUG_ON(ret < 0);
 
 		btrfs_set_file_extent_disk_bytenr(leaf, fi, new_bytenr);
 		dirty = 1;
@@ -1651,18 +1658,24 @@ int replace_file_extents(struct btrfs_trans_handle *trans,
 					   num_bytes, parent,
 					   btrfs_header_owner(leaf),
 					   key.objectid, key.offset, 1);
-		BUG_ON(ret);
+		if (ret) {
+			btrfs_abort_transaction(trans, root, ret);
+			break;
+		}
 
 		ret = btrfs_free_extent(trans, root, bytenr, num_bytes,
 					parent, btrfs_header_owner(leaf),
 					key.objectid, key.offset, 1);
-		BUG_ON(ret);
+		if (ret) {
+			btrfs_abort_transaction(trans, root, ret);
+			break;
+		}
 	}
 	if (dirty)
 		btrfs_mark_buffer_dirty(leaf);
 	if (inode)
 		btrfs_add_delayed_iput(inode);
-	return 0;
+	return ret;
 }
 
 static noinline_for_stack
@@ -2347,9 +2360,6 @@ again:
 			root = read_fs_root(rc->extent_root->fs_info,
 					    objectid);
 			if (IS_ERR(root))
-				continue;
-
-			if (btrfs_root_refs(&root->root_item) == 0)
 				continue;
 
 			trans = btrfs_join_transaction(root);
@@ -4229,15 +4239,14 @@ int btrfs_relocate_block_group(struct btrfs_root *extent_root, u64 group_start)
 	}
 
 	printk(KERN_INFO "btrfs: relocating block group %llu flags %llu\n",
-	       (unsigned long long)rc->block_group->key.objectid,
-	       (unsigned long long)rc->block_group->flags);
+	       rc->block_group->key.objectid, rc->block_group->flags);
 
 	ret = btrfs_start_all_delalloc_inodes(fs_info, 0);
 	if (ret < 0) {
 		err = ret;
 		goto out;
 	}
-	btrfs_wait_all_ordered_extents(fs_info, 0);
+	btrfs_wait_all_ordered_extents(fs_info);
 
 	while (1) {
 		mutex_lock(&fs_info->cleaner_mutex);
@@ -4252,7 +4261,7 @@ int btrfs_relocate_block_group(struct btrfs_root *extent_root, u64 group_start)
 			break;
 
 		printk(KERN_INFO "btrfs: found %llu extents\n",
-			(unsigned long long)rc->extents_found);
+			rc->extents_found);
 
 		if (rc->stage == MOVE_DATA_EXTENTS && rc->found_file_extent) {
 			btrfs_wait_ordered_range(rc->data_inode, 0, (u64)-1);
@@ -4472,6 +4481,7 @@ int btrfs_reloc_clone_csums(struct inode *inode, u64 file_pos, u64 len)
 	struct btrfs_root *root = BTRFS_I(inode)->root;
 	int ret;
 	u64 disk_bytenr;
+	u64 new_bytenr;
 	LIST_HEAD(list);
 
 	ordered = btrfs_lookup_ordered_extent(inode, file_pos);
@@ -4483,13 +4493,24 @@ int btrfs_reloc_clone_csums(struct inode *inode, u64 file_pos, u64 len)
 	if (ret)
 		goto out;
 
-	disk_bytenr = ordered->start;
 	while (!list_empty(&list)) {
 		sums = list_entry(list.next, struct btrfs_ordered_sum, list);
 		list_del_init(&sums->list);
 
-		sums->bytenr = disk_bytenr;
-		disk_bytenr += sums->len;
+		/*
+		 * We need to offset the new_bytenr based on where the csum is.
+		 * We need to do this because we will read in entire prealloc
+		 * extents but we may have written to say the middle of the
+		 * prealloc extent, so we need to make sure the csum goes with
+		 * the right disk offset.
+		 *
+		 * We can do this because the data reloc inode refers strictly
+		 * to the on disk bytes, so we don't have to worry about
+		 * disk_len vs real len like with real inodes since it's all
+		 * disk length.
+		 */
+		new_bytenr = ordered->start + (sums->bytenr - disk_bytenr);
+		sums->bytenr = new_bytenr;
 
 		btrfs_add_ordered_sum(inode, ordered, sums);
 	}
@@ -4498,19 +4519,19 @@ out:
 	return ret;
 }
 
-void btrfs_reloc_cow_block(struct btrfs_trans_handle *trans,
-			   struct btrfs_root *root, struct extent_buffer *buf,
-			   struct extent_buffer *cow)
+int btrfs_reloc_cow_block(struct btrfs_trans_handle *trans,
+			  struct btrfs_root *root, struct extent_buffer *buf,
+			  struct extent_buffer *cow)
 {
 	struct reloc_control *rc;
 	struct backref_node *node;
 	int first_cow = 0;
 	int level;
-	int ret;
+	int ret = 0;
 
 	rc = root->fs_info->reloc_ctl;
 	if (!rc)
-		return;
+		return 0;
 
 	BUG_ON(rc->stage == UPDATE_DATA_PTRS &&
 	       root->root_key.objectid == BTRFS_DATA_RELOC_TREE_OBJECTID);
@@ -4546,10 +4567,9 @@ void btrfs_reloc_cow_block(struct btrfs_trans_handle *trans,
 			rc->nodes_relocated += buf->len;
 	}
 
-	if (level == 0 && first_cow && rc->stage == UPDATE_DATA_PTRS) {
+	if (level == 0 && first_cow && rc->stage == UPDATE_DATA_PTRS)
 		ret = replace_file_extents(trans, rc, root, cow);
-		BUG_ON(ret);
-	}
+	return ret;
 }
 
 /*

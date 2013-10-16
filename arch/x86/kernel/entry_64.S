@@ -490,21 +490,6 @@ ENDPROC(native_usergs_sysret64)
 	TRACE_IRQS_OFF
 	.endm
 
-ENTRY(save_rest)
-	CFI_STARTPROC
-	movq 5*8+16(%rsp), %r11	/* save return address */
-	movq %rbx, RBX+16(%rsp)
-	movq %rbp, RBP+16(%rsp)
-	movq %r12, R12+16(%rsp)
-	movq %r13, R13+16(%rsp)
-	movq %r14, R14+16(%rsp)
-	movq %r15, R15+16(%rsp)
-	movq %r11, 8(%rsp)	/* return address */
-	FIXUP_TOP_OF_STACK %r11, 16
-	ret
-	CFI_ENDPROC
-END(save_rest)
-
 /* save complete stack frame */
 	.pushsection .kprobes.text, "ax"
 ENTRY(save_paranoid)

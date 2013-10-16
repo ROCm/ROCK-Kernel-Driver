@@ -90,6 +90,9 @@ int alloc_xenballooned_pages(int nr_pages, struct page **pages,
 		bool highmem);
 void free_xenballooned_pages(int nr_pages, struct page **pages);
 
+struct page *get_balloon_scratch_page(void);
+void put_balloon_scratch_page(void);
+
 #endif /* CONFIG_PARAVIRT_XEN */
 
 struct device;

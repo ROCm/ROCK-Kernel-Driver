@@ -502,7 +502,7 @@ void __init init_mem_mapping(void)
 int devmem_is_allowed(unsigned long pagenr)
 {
 	if (pagenr < 256)
-		return 1;
+		return is_initial_xendomain();
 	if (iomem_is_exclusive(pagenr << PAGE_SHIFT))
 		return 0;
 	if (mfn_to_local_pfn(pagenr) >= max_pfn)

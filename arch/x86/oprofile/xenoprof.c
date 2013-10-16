@@ -141,27 +141,29 @@ out:
 
 struct op_counter_config counter_config[OP_MAX_COUNTER];
 
-int xenoprof_create_files(struct super_block * sb, struct dentry * root)
+int xenoprof_create_files(struct dentry *root)
 {
 	unsigned int i;
 
 	for (i = 0; i < num_events; ++i) {
 		struct dentry * dir;
-		char buf[2];
+		char buf[4];
  
-		snprintf(buf, 2, "%d", i);
-		dir = oprofilefs_mkdir(sb, root, buf);
-		oprofilefs_create_ulong(sb, dir, "enabled",
+		snprintf(buf, sizeof(buf), "%d", i);
+		dir = oprofilefs_mkdir(root, buf);
+		if (!dir)
+			continue;
+		oprofilefs_create_ulong(dir, "enabled",
 					&counter_config[i].enabled);
-		oprofilefs_create_ulong(sb, dir, "event",
+		oprofilefs_create_ulong(dir, "event",
 					&counter_config[i].event);
-		oprofilefs_create_ulong(sb, dir, "count",
+		oprofilefs_create_ulong(dir, "count",
 					&counter_config[i].count);
-		oprofilefs_create_ulong(sb, dir, "unit_mask",
+		oprofilefs_create_ulong(dir, "unit_mask",
 					&counter_config[i].unit_mask);
-		oprofilefs_create_ulong(sb, dir, "kernel",
+		oprofilefs_create_ulong(dir, "kernel",
 					&counter_config[i].kernel);
-		oprofilefs_create_ulong(sb, dir, "user",
+		oprofilefs_create_ulong(dir, "user",
 					&counter_config[i].user);
 	}
 

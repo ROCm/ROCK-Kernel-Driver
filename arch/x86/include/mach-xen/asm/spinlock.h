@@ -40,6 +40,9 @@
 
 #ifdef TICKET_SHIFT
 
+/* How long a lock should spin before we consider blocking */
+#define SPIN_THRESHOLD	(1 << 15)
+
 #include <asm/irqflags.h>
 #include <asm/smp-processor-id.h>
 
@@ -55,6 +58,11 @@ struct __raw_tickets xen_spin_adjust(const arch_spinlock_t *,
 unsigned int xen_spin_wait(arch_spinlock_t *, struct __raw_tickets *,
 			   unsigned int flags);
 void xen_spin_kick(const arch_spinlock_t *, unsigned int ticket);
+
+static __always_inline int __ticket_spin_value_unlocked(arch_spinlock_t lock)
+{
+	return lock.tickets.head == lock.tickets.tail;
+}
 
 /*
  * Ticket locks are conceptually two parts, one indicating the current head of
@@ -74,7 +82,7 @@ void xen_spin_kick(const arch_spinlock_t *, unsigned int ticket);
 #if CONFIG_XEN_SPINLOCK_ACQUIRE_NESTING
 static __always_inline void __ticket_spin_lock(arch_spinlock_t *lock)
 {
-	struct __raw_tickets inc = { .tail = 1 };
+	struct __raw_tickets inc = { .tail = TICKET_LOCK_INC };
 	unsigned int count, flags = arch_local_irq_save();
 
 	inc = xadd(&lock->tickets, inc);
@@ -83,7 +91,7 @@ static __always_inline void __ticket_spin_lock(arch_spinlock_t *lock)
 	else {
 		inc = xen_spin_adjust(lock, inc);
 		arch_local_irq_restore(flags);
-		count = 1 << 12;
+		count = SPIN_THRESHOLD;
 		do {
 			while (inc.head != inc.tail
 			       && __spin_count_dec(count, lock)) {
@@ -103,11 +111,11 @@ static __always_inline void __ticket_spin_lock(arch_spinlock_t *lock)
 static __always_inline void __ticket_spin_lock_flags(arch_spinlock_t *lock,
 						     unsigned long flags)
 {
-	struct __raw_tickets inc = { .tail = 1 };
+	struct __raw_tickets inc = { .tail = TICKET_LOCK_INC };
 
 	inc = xadd(&lock->tickets, inc);
 	if (unlikely(inc.head != inc.tail)) {
-		unsigned int count = 1 << 12;
+		unsigned int count = SPIN_THRESHOLD;
 
 		inc = xen_spin_adjust(lock, inc);
 		do {
@@ -135,7 +143,7 @@ static __always_inline int __ticket_spin_trylock(arch_spinlock_t *lock)
 
 	/* cmpxchg is a full barrier, so nothing can move before it */
 	if (cmpxchg(&lock->head_tail, old.head_tail,
-		    old.head_tail + (1 << TICKET_SHIFT)) != old.head_tail)
+		    old.head_tail + (TICKET_LOCK_INC << TICKET_SHIFT)) != old.head_tail)
 		return 0;
 	lock->owner = raw_smp_processor_id();
 	return 1;
@@ -174,6 +182,11 @@ static inline int __ticket_spin_is_contended(arch_spinlock_t *lock)
 
 static inline int xen_spinlock_init(unsigned int cpu) { return 0; }
 static inline void xen_spinlock_cleanup(unsigned int cpu) {}
+
+static __always_inline int __byte_spin_value_unlocked(arch_spinlock_t lock)
+{
+	return lock.lock == 0;
+}
 
 static inline int __byte_spin_is_locked(arch_spinlock_t *lock)
 {
@@ -223,6 +236,11 @@ static inline void __byte_spin_unlock(arch_spinlock_t *lock)
 #define __arch_spin(n) __byte_spin_##n
 
 #endif /* TICKET_SHIFT */
+
+static __always_inline int arch_spin_value_unlocked(arch_spinlock_t lock)
+{
+	return __arch_spin(value_unlocked)(lock);
+}
 
 static inline int arch_spin_is_locked(arch_spinlock_t *lock)
 {

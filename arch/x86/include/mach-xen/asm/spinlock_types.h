@@ -1,13 +1,11 @@
 #ifndef _ASM_X86_SPINLOCK_TYPES_H
 #define _ASM_X86_SPINLOCK_TYPES_H
 
-#ifndef __LINUX_SPINLOCK_TYPES_H
-# error "please don't include this file directly"
-#endif
-
 #include <linux/types.h>
 
 #ifdef CONFIG_XEN_SPINLOCK_ACQUIRE_NESTING
+#define __TICKET_LOCK_INC	1
+#define TICKET_SLOWPATH_FLAG	((__ticket_t)0)
 /*
  * On Xen we support CONFIG_XEN_SPINLOCK_ACQUIRE_NESTING levels of
  * interrupt re-enabling per IRQ-safe lock. Hence we can have
@@ -24,6 +22,8 @@ typedef u16 __ticket_t;
 # define TICKET_SHIFT 16
 typedef u32 __ticketpair_t;
 #endif
+
+#define TICKET_LOCK_INC	((__ticket_t)__TICKET_LOCK_INC)
 
 typedef union {
 	__ticketpair_t head_tail;

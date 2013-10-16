@@ -18,8 +18,6 @@
 #include <linux/platform_device.h>
 #include <linux/io.h>
 
-#include "../../../arch/arm/mach-imx/hardware.h"
-
 static struct clk *mxc_ahb_clk;
 static struct clk *mxc_per_clk;
 static struct clk *mxc_ipg_clk;
@@ -35,7 +33,7 @@ int fsl_udc_clk_init(struct platform_device *pdev)
 	unsigned long freq;
 	int ret;
 
-	pdata = pdev->dev.platform_data;
+	pdata = dev_get_platdata(&pdev->dev);
 
 	mxc_ipg_clk = devm_clk_get(&pdev->dev, "ipg");
 	if (IS_ERR(mxc_ipg_clk)) {
@@ -82,7 +80,7 @@ eclkrate:
 
 int fsl_udc_clk_finalize(struct platform_device *pdev)
 {
-	struct fsl_usb2_platform_data *pdata = pdev->dev.platform_data;
+	struct fsl_usb2_platform_data *pdata = dev_get_platdata(&pdev->dev);
 	int ret = 0;
 
 	/* workaround ENGcm09152 for i.MX35 */

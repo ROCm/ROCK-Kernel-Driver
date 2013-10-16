@@ -98,7 +98,7 @@ static void s5p_setup_reset_gpio(struct platform_device *pdev)
 
 static int s5p_ehci_probe(struct platform_device *pdev)
 {
-	struct s5p_ehci_platdata *pdata = pdev->dev.platform_data;
+	struct s5p_ehci_platdata *pdata = dev_get_platdata(&pdev->dev);
 	struct s5p_ehci_hcd *s5p_ehci;
 	struct usb_hcd *hcd;
 	struct ehci_hcd *ehci;
@@ -245,14 +245,6 @@ static int s5p_ehci_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static void s5p_ehci_shutdown(struct platform_device *pdev)
-{
-	struct usb_hcd *hcd = platform_get_drvdata(pdev);
-
-	if (hcd->driver->shutdown)
-		hcd->driver->shutdown(hcd);
-}
-
 #ifdef CONFIG_PM
 static int s5p_ehci_suspend(struct device *dev)
 {
@@ -322,7 +314,7 @@ MODULE_DEVICE_TABLE(of, exynos_ehci_match);
 static struct platform_driver s5p_ehci_driver = {
 	.probe		= s5p_ehci_probe,
 	.remove		= s5p_ehci_remove,
-	.shutdown	= s5p_ehci_shutdown,
+	.shutdown	= usb_hcd_platform_shutdown,
 	.driver = {
 		.name	= "s5p-ehci",
 		.owner	= THIS_MODULE,

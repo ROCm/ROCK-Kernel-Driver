@@ -14,6 +14,7 @@
 #include <linux/memblock.h>
 #include <linux/io.h>
 #include <linux/clocksource.h>
+#include <linux/dma-mapping.h>
 
 #include <asm/mach/arch.h>
 #include <mach/regs-pmu.h>
@@ -22,6 +23,26 @@
 #include <plat/mfc.h>
 
 #include "common.h"
+
+static u64 dma_mask64 = DMA_BIT_MASK(64);
+
+static int exynos5250_platform_notifier(struct notifier_block *nb,
+				  unsigned long event, void *__dev)
+{
+	struct device *dev = __dev;
+
+	if (event != BUS_NOTIFY_ADD_DEVICE)
+		return NOTIFY_DONE;
+
+	dev->dma_mask = &dma_mask64;
+	dev->coherent_dma_mask = DMA_BIT_MASK(64);
+
+	return NOTIFY_OK;
+}
+
+static struct notifier_block exynos5250_platform_nb = {
+	.notifier_call = exynos5250_platform_notifier,
+};
 
 static void __init exynos5_dt_machine_init(void)
 {
@@ -46,6 +67,9 @@ static void __init exynos5_dt_machine_init(void)
 			}
 		}
 	}
+
+	if (of_machine_is_compatible("samsung,exynos5250"))
+		bus_register_notifier(&platform_bus_type, &exynos5250_platform_nb);
 
 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
 }

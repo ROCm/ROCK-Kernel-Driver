@@ -152,7 +152,7 @@ static inline void native_wbinvd(void)
 	asm volatile("wbinvd": : :"memory");
 }
 
-extern void xen_load_gs_index(unsigned);
+extern asmlinkage void xen_load_gs_index(unsigned);
 
 static inline unsigned long read_cr0(void)
 {

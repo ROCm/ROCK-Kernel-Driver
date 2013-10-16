@@ -1158,6 +1158,15 @@ static int xsd_kva_mmap(struct file *file, struct vm_area_struct *vma)
 	return 0;
 }
 
+static unsigned long xsd_kva_get_unmapped_area(struct file *file,
+					       unsigned long addr,
+					       unsigned long len,
+					       unsigned long pgoff,
+					       unsigned long flags)
+{
+	return current->mm->get_unmapped_area(file, addr, len, pgoff, flags);
+}
+
 static int xsd_kva_show(struct seq_file *m, void *v)
 {
 	return seq_printf(m, "0x%p", xen_store_interface);
@@ -1173,6 +1182,7 @@ static const struct file_operations xsd_kva_fops = {
 	.llseek = seq_lseek,
 	.read = seq_read,
 	.mmap = xsd_kva_mmap,
+	.get_unmapped_area = xsd_kva_get_unmapped_area,
 	.release = single_release
 };
 

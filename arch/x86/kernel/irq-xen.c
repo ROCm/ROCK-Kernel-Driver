@@ -204,7 +204,7 @@ u64 arch_irq_stat(void)
  * SMP cross-CPU interrupts have their own specific
  * handlers).
  */
-unsigned int __irq_entry do_IRQ(struct pt_regs *regs)
+__visible unsigned int __irq_entry do_IRQ(struct pt_regs *regs)
 {
 	struct pt_regs *old_regs = set_irq_regs(regs);
 
@@ -242,7 +242,7 @@ void __smp_x86_platform_ipi(void)
 		x86_platform_ipi_callback();
 }
 
-void smp_x86_platform_ipi(struct pt_regs *regs)
+__visible void smp_x86_platform_ipi(struct pt_regs *regs)
 {
 	struct pt_regs *old_regs = set_irq_regs(regs);
 
@@ -256,7 +256,7 @@ void smp_x86_platform_ipi(struct pt_regs *regs)
 /*
  * Handler for POSTED_INTERRUPT_VECTOR.
  */
-void smp_kvm_posted_intr_ipi(struct pt_regs *regs)
+__visible void smp_kvm_posted_intr_ipi(struct pt_regs *regs)
 {
 	struct pt_regs *old_regs = set_irq_regs(regs);
 
@@ -274,7 +274,7 @@ void smp_kvm_posted_intr_ipi(struct pt_regs *regs)
 }
 #endif
 
-void smp_trace_x86_platform_ipi(struct pt_regs *regs)
+__visible void smp_trace_x86_platform_ipi(struct pt_regs *regs)
 {
 	struct pt_regs *old_regs = set_irq_regs(regs);
 

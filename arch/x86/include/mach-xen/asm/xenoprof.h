@@ -25,7 +25,7 @@
 
 struct super_block;
 struct dentry;
-int xenoprof_create_files(struct super_block * sb, struct dentry * root);
+int xenoprof_create_files(struct dentry *);
 #define HAVE_XENOPROF_CREATE_FILES
 
 struct xenoprof_init;

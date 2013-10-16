@@ -60,12 +60,10 @@ struct msi_dev_list {
 
 /* Arch hooks */
 
-#ifndef arch_msi_check_device
 int arch_msi_check_device(struct pci_dev *dev, int nvec, int type)
 {
 	return 0;
 }
-#endif
 
 static void msi_set_enable(struct pci_dev *dev, int enable)
 {

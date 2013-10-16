@@ -168,7 +168,7 @@ static int usbback_probe(struct xenbus_device *dev,
 			  const struct xenbus_device_id *id)
 {
 	usbif_t *usbif;
-	unsigned int handle;
+	unsigned long handle;
 	int num_ports;
 	int usb_ver;
 	int err;
@@ -176,7 +176,10 @@ static int usbback_probe(struct xenbus_device *dev,
 	if (usb_disabled())
 		return -ENODEV;
 
-	handle = simple_strtoul(strrchr(dev->otherend, '/') + 1, NULL, 0);
+	err = kstrtoul(strrchr(dev->otherend, '/') + 1, 0, &handle);
+	if (err)
+		return err;
+
 	usbif = usbif_alloc(dev->otherend_id, handle);
 	if (!usbif) {
 		xenbus_dev_fatal(dev, -ENOMEM, "allocating backend interface");

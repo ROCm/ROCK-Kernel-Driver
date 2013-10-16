@@ -386,7 +386,8 @@ static void backend_changed(struct xenbus_watch *watch,
 	}
 
 	/* Front end dir is a number, which is used as the handle. */
-	handle = simple_strtoul(strrchr(dev->otherend, '/') + 1, NULL, 0);
+	if (kstrtoul(strrchr(dev->otherend, '/') + 1, 0, &handle))
+		return;
 
 	be->major = major;
 	be->minor = minor;

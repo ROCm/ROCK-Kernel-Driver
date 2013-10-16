@@ -35,8 +35,9 @@
 #include <asm/xen/hypercall.h>
 #include <asm/xen/hypervisor.h>
 
-int xen_acpi_notify_hypervisor_state(u8 sleep_state, u32 val_a, u32 val_b,
-				     bool extended)
+static int xen_acpi_notify_hypervisor_state(u8 sleep_state,
+					    u32 val_a, u32 val_b,
+					    bool extended)
 {
 	unsigned int bits = extended ? 8 : 16;
 
@@ -59,4 +60,18 @@ int xen_acpi_notify_hypervisor_state(u8 sleep_state, u32 val_a, u32 val_b,
 
 	HYPERVISOR_dom0_op(&op);
 	return 1;
+}
+
+int xen_acpi_notify_hypervisor_sleep(u8 sleep_state,
+				     u32 pm1a_cnt, u32 pm1b_cnt)
+{
+	return xen_acpi_notify_hypervisor_state(sleep_state, pm1a_cnt,
+						pm1b_cnt, false);
+}
+
+int xen_acpi_notify_hypervisor_extended_sleep(u8 sleep_state,
+				     u32 val_a, u32 val_b)
+{
+	return xen_acpi_notify_hypervisor_state(sleep_state, val_a,
+						val_b, true);
 }

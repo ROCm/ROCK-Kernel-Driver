@@ -340,34 +340,46 @@ unsigned int xen_spin_wait(arch_spinlock_t *lock, struct __raw_tickets *ptok,
 	ptok->head = lock->tickets.head;
 	ptok->tail = spinning.ticket;
 
-	return 1 << 10;
+	return SPIN_THRESHOLD >> 2;
+}
+
+static inline unsigned int cpumask_cycle(int n, const struct cpumask *srcp)
+{
+	unsigned int nxt = cpumask_next(n, srcp);
+
+	if (nxt >= nr_cpu_ids)
+		nxt = cpumask_first(srcp);
+	return nxt;
 }
 
 void xen_spin_kick(const arch_spinlock_t *lock, unsigned int ticket)
 {
-	unsigned int cpu = raw_smp_processor_id(), anchor = cpu;
+	unsigned int local = raw_smp_processor_id(), start, stop = local, cpu;
 
 	if (nopoll)
 		return;
 
-	if (unlikely(!cpu_online(cpu)))
-		cpu = -1, anchor = nr_cpu_ids;
+	if (unlikely(!cpu_online(local)))
+		stop = start = cpumask_cycle(local, cpu_online_mask);
+#if CONFIG_XEN_SPINLOCK_ACQUIRE_NESTING
+	else if (__this_cpu_read(_spinning))
+		start = local;
+#endif
+	else {
+		start = cpumask_cycle(local, cpu_online_mask);
+		if (start == stop)
+			return;
+	}
 
-	while ((cpu = cpumask_next(cpu, cpu_online_mask)) != anchor) {
+	for (cpu = start; ; ) {
 		unsigned int flags;
-		atomic_t *rm_ctr;
+		atomic_t *rm_ctr = NULL;
 		struct spinning *spinning;
 
-		if (cpu >= nr_cpu_ids) {
-			if (anchor == nr_cpu_ids)
-				return;
-			cpu = cpumask_first(cpu_online_mask);
-			if (cpu == anchor)
-				return;
-		}
-
 		flags = arch_local_irq_save();
-		for (;;) {
+		if (cpu == local)
+			spinning = __this_cpu_read(_spinning);
+		else for (;;) {
 			unsigned int rm_idx = per_cpu(rm_seq.idx, cpu);
 
 			rm_ctr = per_cpu(rm_seq.ctr, cpu) + (rm_idx & 1);
@@ -398,7 +410,8 @@ void xen_spin_kick(const arch_spinlock_t *lock, unsigned int ticket)
 				break;
 			}
 
-		atomic_dec(rm_ctr);
+		if (rm_ctr)
+			atomic_dec(rm_ctr);
 		arch_local_irq_restore(flags);
 
 		if (unlikely(spinning)) {
@@ -406,13 +419,16 @@ void xen_spin_kick(const arch_spinlock_t *lock, unsigned int ticket)
 			if (!(ticket + 1))
 				return;
 			if (ticket + 2) {
-				cpu = anchor < nr_cpu_ids ? anchor : -1;
+				cpu = start;
 				continue;
 			}
 #endif
 			notify_remote_via_evtchn(per_cpu(poll_evtchn, cpu));
 			return;
 		}
+		cpu = cpumask_cycle(cpu, cpu_online_mask);
+		if (cpu == stop)
+			break;
 	}
 }
 EXPORT_SYMBOL(xen_spin_kick);

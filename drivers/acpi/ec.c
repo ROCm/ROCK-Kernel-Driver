@@ -948,7 +948,7 @@ static int ec_enlarge_storm_threshold(const struct dmi_system_id *id)
 	return 0;
 }
 
-static struct dmi_system_id __initdata ec_dmi_table[] = {
+static struct dmi_system_id ec_dmi_table[] __initdata = {
 	{
 	ec_skip_dsdt_scan, "Compal JFL92", {
 	DMI_MATCH(DMI_BIOS_VENDOR, "COMPAL"),
@@ -1053,10 +1053,8 @@ int __init acpi_ec_ecdt_probe(void)
 		* which needs it, has fake EC._INI method, so use it as flag.
 		* Keep boot_ec struct as it will be needed soon.
 		*/
-		acpi_handle dummy;
 		if (!dmi_name_in_vendors("ASUS") ||
-		    ACPI_FAILURE(acpi_get_handle(boot_ec->handle, "_INI",
-							&dummy)))
+		    !acpi_has_method(boot_ec->handle, "_INI"))
 			return -ENODEV;
 	}
 install:

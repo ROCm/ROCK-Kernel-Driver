@@ -49,7 +49,6 @@
 #define IBS_FETCH_CODE			13
 #define IBS_OP_CODE			14
 
-struct super_block;
 struct dentry;
 struct file_operations;
 struct pt_regs;
@@ -58,7 +57,7 @@ struct pt_regs;
 struct oprofile_operations {
 	/* create any necessary configuration files in the oprofile fs.
 	 * Optional. */
-	int (*create_files)(struct super_block * sb, struct dentry * root);
+	int (*create_files)(struct dentry * root);
 #ifdef CONFIG_XEN
 	/* setup active domains with Xen */
 	int (*set_active)(int *active_domains, unsigned int adomains);
@@ -143,27 +142,26 @@ int oprofile_add_domain_switch(int32_t domain_id);
  * Create a file of the given name as a child of the given root, with
  * the specified file operations.
  */
-int oprofilefs_create_file(struct super_block * sb, struct dentry * root,
+int oprofilefs_create_file(struct dentry * root,
 	char const * name, const struct file_operations * fops);
 
-int oprofilefs_create_file_perm(struct super_block * sb, struct dentry * root,
+int oprofilefs_create_file_perm(struct dentry * root,
 	char const * name, const struct file_operations * fops, int perm);
  
 /** Create a file for read/write access to an unsigned long. */
-int oprofilefs_create_ulong(struct super_block * sb, struct dentry * root,
+int oprofilefs_create_ulong(struct dentry * root,
 	char const * name, ulong * val);
  
 /** Create a file for read-only access to an unsigned long. */
-int oprofilefs_create_ro_ulong(struct super_block * sb, struct dentry * root,
+int oprofilefs_create_ro_ulong(struct dentry * root,
 	char const * name, ulong * val);
  
 /** Create a file for read-only access to an atomic_t. */
-int oprofilefs_create_ro_atomic(struct super_block * sb, struct dentry * root,
+int oprofilefs_create_ro_atomic(struct dentry * root,
 	char const * name, atomic_t * val);
  
 /** create a directory */
-struct dentry * oprofilefs_mkdir(struct super_block * sb, struct dentry * root,
-	char const * name);
+struct dentry *oprofilefs_mkdir(struct dentry *parent, char const *name);
 
 /**
  * Write the given asciz string to the given user buffer @buf, updating *offset

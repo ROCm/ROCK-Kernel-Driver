@@ -73,10 +73,13 @@ void flush_tlb_mm_range(struct mm_struct *mm, unsigned long start,
 	    <= (act_entries >> tlb_flushall_shift)
 	    && !has_large_page(mm, start, end)) {
 		/* flush range by one by one 'invlpg' */
-		for (addr = start; addr < end; addr += PAGE_SIZE)
+		for (addr = start; addr < end; addr += PAGE_SIZE) {
+			count_vm_event(NR_TLB_LOCAL_FLUSH_ONE);
 			xen_invlpg_mask(mask, addr);
+		}
 	} else {
 flush_all:
+		count_vm_event(NR_TLB_LOCAL_FLUSH_ALL);
 		xen_tlb_flush_mask(mask);
 	}
 

@@ -246,7 +246,7 @@ static struct processor_extcntl_ops xen_extcntl_ops = {
 	.hotplug		= xen_hotplug_notifier,
 };
 
-static int xen_sleep(u8 sleep_state, u32 val_a, u32 val_b, bool extended)
+static int _xen_sleep(u8 sleep_state, u32 val_a, u32 val_b, unsigned int flags)
 {
 	struct xen_platform_op op = {
 		.cmd = XENPF_enter_acpi_sleep,
@@ -255,7 +255,7 @@ static int xen_sleep(u8 sleep_state, u32 val_a, u32 val_b, bool extended)
 			.pm1a_cnt_val = val_a,
 			.pm1b_cnt_val = val_b,
 			.sleep_state = sleep_state,
-			.flags = extended ? XENPF_ACPI_SLEEP_EXTENDED : 0,
+			.flags = flags,
 		},
 	};
 	int err = HYPERVISOR_platform_op(&op);
@@ -265,6 +265,16 @@ static int xen_sleep(u8 sleep_state, u32 val_a, u32 val_b, bool extended)
 
 	pr_err("ACPI: Hypervisor failure [%d]\n", err);
 	return -1;
+}
+
+static int xen_sleep(u8 sleep_state, u32 pm1a_cnt_val, u32 pm1b_cnt_val)
+{
+	return _xen_sleep(sleep_state, pm1a_cnt_val, pm1b_cnt_val, 0);
+}
+
+static int xen_extended_sleep(u8 sleep_state, u32 val_a, u32 val_b)
+{
+	return _xen_sleep(sleep_state, val_a, val_b, XENPF_ACPI_SLEEP_EXTENDED);
 }
 
 static int xen_acpi_suspend_lowlevel(void)
@@ -278,6 +288,7 @@ static int __init init_extcntl(void)
 	unsigned int pmbits = (xen_start_info->flags & SIF_PM_MASK) >> 8;
 
 	acpi_os_set_prepare_sleep(xen_sleep);
+	acpi_os_set_prepare_extended_sleep(xen_extended_sleep);
 	acpi_suspend_lowlevel = xen_acpi_suspend_lowlevel;
 
 #ifndef CONFIG_ACPI_HOTPLUG_CPU

@@ -129,8 +129,9 @@ acpi_status acpi_hw_extended_sleep(u8 sleep_state)
 
 	ACPI_FLUSH_CPU_CACHE();
 
-	status = acpi_os_prepare_sleep(sleep_state, acpi_gbl_sleep_type_a,
-				       acpi_gbl_sleep_type_b, true);
+	status = acpi_os_prepare_extended_sleep(sleep_state,
+						acpi_gbl_sleep_type_a,
+						acpi_gbl_sleep_type_b);
 	if (ACPI_SKIP(status))
 		return_ACPI_STATUS(AE_OK);
 	if (ACPI_FAILURE(status))

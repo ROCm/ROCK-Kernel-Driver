@@ -7,6 +7,7 @@
 #include <linux/bcd.h>
 #include <linux/export.h>
 #include <linux/pnp.h>
+#include <linux/efi.h>
 #include <linux/of.h>
 
 #include <asm/vsyscall.h>
@@ -190,6 +191,12 @@ static __init int add_rtc_cmos(void)
 #endif
 	if (of_have_populated_dt())
 		return 0;
+
+#ifdef CONFIG_XEN
+	/* EFI-based systems should not access CMOS directly. */
+	if (efi_enabled(EFI_RUNTIME_SERVICES))
+		return -ENODEV;
+#endif
 
 	/* Intel MID platforms don't have ioport rtc */
 	if (mrst_identify_cpu())

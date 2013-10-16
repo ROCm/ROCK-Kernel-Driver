@@ -342,7 +342,7 @@ ia32_badsys:
 
 	CFI_ENDPROC
 	
-	.macro PTREGSCALL label, func, arg
+	.macro PTREGSCALL label, func
 	ALIGN
 GLOBAL(\label)
 	leaq \func(%rip),%rax
