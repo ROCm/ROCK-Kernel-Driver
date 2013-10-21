@@ -10,6 +10,7 @@
 #include <linux/errno.h>
 #include <linux/err.h>
 #include <linux/interrupt.h>
+#include <xen/xen.h>
 #include <xen/interface/io/tpmif.h>
 #ifdef CONFIG_PARAVIRT_XEN
 #include <xen/events.h>
