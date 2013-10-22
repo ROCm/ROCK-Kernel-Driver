@@ -180,12 +180,11 @@ nouveau_fence_wait_uevent_handler(struct nouveau_eventh *event, int index)
 }
 
 static int
-nouveau_fence_wait_uevent(struct nouveau_fence *fence, bool intr)
-
+nouveau_fence_wait_uevent(struct nouveau_fence *fence,
+			  struct nouveau_drm *drm, bool intr)
 {
-	struct nouveau_channel *chan = fence->channel;
-	struct nouveau_fifo *pfifo = nouveau_fifo(chan->drm->device);
-	struct nouveau_fence_priv *priv = chan->drm->fence;
+	struct nouveau_fifo *pfifo = nouveau_fifo(drm->device);
+	struct nouveau_fence_priv *priv = drm->fence;
 	struct nouveau_fence_uevent uevent = {
 		.handler.func = nouveau_fence_wait_uevent_handler,
 		.priv = priv,
@@ -241,7 +240,7 @@ nouveau_fence_wait(struct nouveau_fence *fence, bool lazy, bool intr)
 	int ret = 0;
 
 	while (priv && priv->uevent && lazy && !nouveau_fence_done(fence)) {
-		ret = nouveau_fence_wait_uevent(fence, intr);
+		ret = nouveau_fence_wait_uevent(fence, chan->drm, intr);
 		if (ret < 0)
 			return ret;
 	}
