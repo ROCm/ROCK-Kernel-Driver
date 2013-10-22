@@ -49,6 +49,7 @@
 #include "rcu-string.h"
 #include "dev-replace.h"
 #include "raid56.h"
+#include "sysfs.h"
 
 #ifdef CONFIG_X86
 #include <asm/cpufeature.h>
@@ -2179,6 +2180,7 @@ int open_ctree(struct super_block *sb,
 	mutex_init(&fs_info->reloc_mutex);
 	seqlock_init(&fs_info->profiles_lock);
 
+	init_completion(&fs_info->kobj_unregister);
 	INIT_LIST_HEAD(&fs_info->dirty_cowonly_roots);
 	INIT_LIST_HEAD(&fs_info->space_info);
 	INIT_LIST_HEAD(&fs_info->tree_mod_seq_list);
@@ -2749,6 +2751,12 @@ retry_root_backup:
 	}
 
 	btrfs_close_extra_devices(fs_info, fs_devices, 1);
+
+	ret = btrfs_sysfs_add_one(fs_info);
+	if (ret) {
+		pr_err("btrfs: failed to init sysfs interface: %d\n", ret);
+		goto fail_block_groups;
+	}
 
 	ret = btrfs_init_space_info(fs_info);
 	if (ret) {
@@ -3616,6 +3624,8 @@ int close_ctree(struct btrfs_root *root)
 	btrfs_free_block_groups(fs_info);
 
 	btrfs_stop_all_workers(fs_info);
+
+	btrfs_sysfs_remove_one(fs_info);
 
 	del_fs_roots(fs_info);
 
