@@ -1621,9 +1621,8 @@ static void net_tx_action(unsigned long group)
 
 		/* Credit-based scheduling. */
 		if (txreq.size > netif->remaining_credit) {
-			unsigned long now = jiffies;
-			unsigned long next_credit = 
-				netif->credit_timeout.expires +
+			u64 now = get_jiffies_64();
+			u64 next_credit = netif->credit_window_start +
 				msecs_to_jiffies(netif->credit_usec / 1000);
 
 			/* Timer could already be pending in rare cases. */
@@ -1633,8 +1632,8 @@ static void net_tx_action(unsigned long group)
 			}
 
 			/* Passed the point where we can replenish credit? */
-			if (time_after_eq(now, next_credit)) {
-				netif->credit_timeout.expires = now;
+			if (time_after_eq64(now, next_credit)) {
+				netif->credit_window_start = now;
 				tx_add_credit(netif);
 			}
 
@@ -1645,6 +1644,7 @@ static void net_tx_action(unsigned long group)
 				netif->credit_timeout.function =
 					tx_credit_callback;
 				mod_timer(&netif->credit_timeout, next_credit);
+				netif->credit_window_start = next_credit;
 				netif_put(netif);
 				continue;
 			}

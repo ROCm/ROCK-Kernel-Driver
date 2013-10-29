@@ -17,7 +17,6 @@
 #include <xen/grant_table.h>
 #include <xen/page.h>
 #else
-#include <xen/xen.h>
 #include <xen/evtchn.h>
 #define bind_evtchn_to_irqhandler bind_caller_port_to_irqhandler
 #include <xen/gnttab.h>

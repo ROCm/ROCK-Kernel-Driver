@@ -235,8 +235,7 @@ netif_t *netif_alloc(struct device *parent, domid_t domid, unsigned int handle)
 	netif->credit_bytes = netif->remaining_credit = ~0UL;
 	netif->credit_usec  = 0UL;
 	init_timer(&netif->credit_timeout);
-	/* Initialize 'expires' now: it's used to track the credit window. */
-	netif->credit_timeout.expires = jiffies;
+	netif->credit_window_start = get_jiffies_64();
 
 	init_timer(&netif->tx_queue_timeout);
 

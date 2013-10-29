@@ -20,10 +20,8 @@ int pcifront_connect(struct pcifront_device *pdev)
 		dev_info(&pdev->xdev->dev, "Installing PCI frontend\n");
 		pcifront_dev = pdev;
 	}
-	else {
-		dev_err(&pdev->xdev->dev, "PCI frontend already installed!\n");
-		err = -EEXIST;
-	}
+	else
+		dev_info(&pdev->xdev->dev, "PCI frontend already installed\n");
 
 	spin_unlock(&pcifront_dev_lock);
 
