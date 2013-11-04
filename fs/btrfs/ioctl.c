@@ -4507,22 +4507,19 @@ out_unlock:
 	return ret;
 }
 
+#define INIT_FEATURE_FLAGS(suffix) \
+	{ .compat_flags = BTRFS_FEATURE_COMPAT_##suffix, \
+	  .compat_ro_flags = BTRFS_FEATURE_COMPAT_RO_##suffix, \
+	  .incompat_flags = BTRFS_FEATURE_INCOMPAT_##suffix }
+
 static int btrfs_ioctl_get_supported_features(struct file *file,
 					      void __user *arg)
 {
-	struct btrfs_ioctl_feature_flags features[3];
-
-	features[0].compat_flags = BTRFS_FEATURE_COMPAT_SUPP;
-	features[0].compat_ro_flags = BTRFS_FEATURE_COMPAT_RO_SUPP;
-	features[0].incompat_flags = BTRFS_FEATURE_INCOMPAT_SUPP;
-
-	features[1].compat_flags = BTRFS_FEATURE_COMPAT_SAFE_SET;
-	features[1].compat_ro_flags = BTRFS_FEATURE_COMPAT_RO_SAFE_SET;
-	features[1].incompat_flags = BTRFS_FEATURE_INCOMPAT_SAFE_SET;
-
-	features[2].compat_flags = BTRFS_FEATURE_COMPAT_SAFE_CLEAR;
-	features[2].compat_ro_flags = BTRFS_FEATURE_COMPAT_RO_SAFE_CLEAR;
-	features[2].incompat_flags = BTRFS_FEATURE_INCOMPAT_SAFE_CLEAR;
+	static struct btrfs_ioctl_feature_flags features[3] = {
+		INIT_FEATURE_FLAGS(SUPP),
+		INIT_FEATURE_FLAGS(SAFE_SET),
+		INIT_FEATURE_FLAGS(SAFE_CLEAR)
+	};
 
 	if (copy_to_user(arg, &features, sizeof(features)))
 		return -EFAULT;
