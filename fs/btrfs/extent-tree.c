@@ -3390,12 +3390,22 @@ int btrfs_extent_readonly(struct btrfs_root *root, u64 bytenr)
 	return readonly;
 }
 
-static const char * const alloc_names[] = {
-	"data",
-	"system",
-	"mixed",
-	"metadata",
-};
+static const char *alloc_name(u64 flags)
+{
+	switch (flags) {
+	case BTRFS_BLOCK_GROUP_METADATA|BTRFS_BLOCK_GROUP_DATA:
+		return "mixed";
+	case BTRFS_BLOCK_GROUP_METADATA:
+		return "metadata";
+	case BTRFS_BLOCK_GROUP_DATA:
+		return "data";
+	case BTRFS_BLOCK_GROUP_SYSTEM:
+		return "system";
+	default:
+		WARN_ON(1);
+		return "invalid-combination";
+	};
+}
 
 static int update_space_info(struct btrfs_fs_info *info, u64 flags,
 			     u64 total_bytes, u64 bytes_used,
@@ -3455,7 +3465,7 @@ static int update_space_info(struct btrfs_fs_info *info, u64 flags,
 
 	ret = kobject_init_and_add(&found->kobj, &space_info_ktype,
 				    info->space_info_kobj, "%s",
-				    alloc_names[found->flags - 1]);
+				    alloc_name(found->flags));
 	if (ret) {
 		kfree(found);
 		return ret;
