@@ -631,13 +631,12 @@ asmlinkage void __attribute__((weak)) smp_threshold_interrupt(void)
  * Must be called with kernel preemption disabled (eg with local
  * local interrupts as in the case of do_device_not_available).
  */
-void math_state_restore(void)
+static void _math_state_restore(void)
 {
 	struct task_struct *tsk = current;
 
-	/* NB. 'clts' is done for us by Xen during virtual trap. */
-	__this_cpu_and(xen_x86_cr0, ~X86_CR0_TS);
 	if (!tsk_used_math(tsk)) {
+		stts();
 		local_irq_enable();
 		/*
 		 * does a slab alloc which can sleep
@@ -646,11 +645,11 @@ void math_state_restore(void)
 			/*
 			 * ran out of memory!
 			 */
-			stts();
 			do_group_exit(SIGKILL);
 			return;
 		}
 		local_irq_disable();
+		clts();
 	}
 
 	xen_thread_fpu_begin(tsk, NULL);
@@ -665,6 +664,12 @@ void math_state_restore(void)
 	}
 
 	tsk->fpu_counter++;
+}
+
+void math_state_restore(void)
+{
+	clts();
+	_math_state_restore();
 }
 
 dotraplinkage void __kprobes
@@ -687,7 +692,9 @@ do_device_not_available(struct pt_regs *regs, long error_code)
 		return;
 	}
 #endif
-	math_state_restore(); /* interrupts still off */
+	/* NB. 'clts' is done for us by Xen during virtual trap. */
+	__this_cpu_and(xen_x86_cr0, ~X86_CR0_TS);
+	_math_state_restore(); /* interrupts still off */
 #ifdef CONFIG_X86_32
 	conditional_sti(regs);
 #endif
