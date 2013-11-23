@@ -9,77 +9,30 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/list.h>
+#include <linux/vmalloc.h>
 #include <linux/workqueue.h>
 #include <xen/xenbus.h>
-#ifndef CONFIG_XEN
 #include <xen/events.h>
 #include <asm/xen/pci.h>
-#else
-#include <xen/evtchn.h>
-#endif
 #include "pciback.h"
 
 #define INVALID_EVTCHN_IRQ  (-1)
 struct workqueue_struct *xen_pcibk_wq;
 
-static char __read_mostly mode[16] = CONFIG_XEN_PCIDEV_BACKEND_DEFAULT;
-module_param_string(mode, mode, sizeof(mode), S_IRUGO);
-MODULE_PARM_DESC(mode,
-	"Option to specify how to export PCI topology to guest:\n"
-#ifdef CONFIG_XEN_PCIDEV_BACKEND_VPCI
-	" vpci"
-# ifdef CONFIG_XEN_PCIDEV_BACKEND_DEFAULT_VPCI
-	" (default)"
-# endif
-	"\n"
-	"   Hides the true PCI topology and makes the frontend think there\n"
-	"   is a single PCI bus with only the exported devices on it.\n"
-	"   For example, a device at 03:05.0 will be re-assigned to 00:00.0\n"
-	"   while second device at 02:1a.1 will be re-assigned to 00:01.1.\n"
-#endif
-#ifdef CONFIG_XEN_PCIDEV_BACKEND_PASSTHROUGH
-	" passthrough"
-# ifdef CONFIG_XEN_PCIDEV_BACKEND_DEFAULT_PASSTHROUGH
-	" (default)"
-# endif
-	"\n"
-	"   Passthrough provides a real view of the PCI topology to the\n"
-	"   frontend (for example, a device at 06:01.b will still appear at\n"
-	"   06:01.b to the frontend). This is similar to how Xen 2.0.x\n"
-	"   exposed PCI devices to its driver domains. This may be required\n"
-	"   for drivers which depend on finding their hardware in certain\n"
-	"   bus/slot locations.\n"
-#endif
-#ifdef CONFIG_XEN_PCIDEV_BACKEND_SLOT
-	" slot\n"
-# ifdef CONFIG_XEN_PCIDEV_BACKEND_DEFAULT_SLOT
-	" (default)"
-# endif
-	"   Hides the true PCI topology and makes the frontend think there\n"
-	"   is a single PCI bus with only the exported devices on it.\n"
-	"   Contrary to the virtual PCI backend, each function becomes a\n"
-	"   new slot.\n"
-	"   For example, a device at 03:05.2 will be re-assigned to 00:00.0.\n"
-	"   A second device at 02:1a.1 will be re-assigned to 00:01.0.\n"
-#endif
-#ifdef CONFIG_XEN_PCIDEV_BACKEND_CONTROLLER
-	" controller\n"
-# ifdef CONFIG_XEN_PCIDEV_BACKEND_DEFAULT_CONTROLLER
-	" (default)"
-# endif
-	"   Virtualizes the PCI bus topology by providing a virtual bus\n"
-	"   per PCI root device.  Devices which are physically under\n"
-	"   the same root bus will appear on the same virtual bus.  For\n"
-	"   systems with complex I/O addressing, this is the only backend\n"
-	"   which supports extended I/O port spaces and MMIO translation\n"
-	"   offsets.  This backend also supports slot virtualization.\n"
-	"   For example, a device at 0000:01:02.1 will be re-assigned to\n"
-	"   0000:00:00.0.  A second device at 0000:02:05.0 (behind a P2P\n"
-	"   bridge on bus 0000:01) will be re-assigned to 0000:00:01.0.  A\n"
-	"   third device at 0000:16:05.0 (under a different PCI root bus)\n"
-	"   will be re-assigned to 0000:01:00.0.\n"
-#endif
-	);
+static bool __read_mostly passthrough;
+module_param(passthrough, bool, S_IRUGO);
+MODULE_PARM_DESC(passthrough,
+	"Option to specify how to export PCI topology to guest:\n"\
+	" 0 - (default) Hide the true PCI topology and makes the frontend\n"\
+	"   there is a single PCI bus with only the exported devices on it.\n"\
+	"   For example, a device at 03:05.0 will be re-assigned to 00:00.0\n"\
+	"   while second device at 02:1a.1 will be re-assigned to 00:01.1.\n"\
+	" 1 - Passthrough provides a real view of the PCI topology to the\n"\
+	"   frontend (for example, a device at 06:01.b will still appear at\n"\
+	"   06:01.b to the frontend). This is similar to how Xen 2.0.x\n"\
+	"   exposed PCI devices to its driver domains. This may be required\n"\
+	"   for drivers which depend on finding their hardward in certain\n"\
+	"   bus/slot locations.");
 
 static struct xen_pcibk_device *alloc_pdev(struct xenbus_device *xdev)
 {
@@ -95,9 +48,6 @@ static struct xen_pcibk_device *alloc_pdev(struct xenbus_device *xdev)
 
 	mutex_init(&pdev->dev_lock);
 
-#ifdef CONFIG_XEN
-	pdev->sh_area = NULL;
-#endif
 	pdev->sh_info = NULL;
 	pdev->evtchn_irq = INVALID_EVTCHN_IRQ;
 	pdev->be_watching = 0;
@@ -128,11 +78,7 @@ static void xen_pcibk_disconnect(struct xen_pcibk_device *pdev)
 	flush_workqueue(xen_pcibk_wq);
 
 	if (pdev->sh_info != NULL) {
-#ifndef CONFIG_XEN
 		xenbus_unmap_ring_vfree(pdev->xdev, pdev->sh_info);
-#else
-		xenbus_unmap_ring_vfree(pdev->xdev, pdev->sh_area);
-#endif
 		pdev->sh_info = NULL;
 	}
 	mutex_unlock(&pdev->dev_lock);
@@ -159,35 +105,20 @@ static int xen_pcibk_do_attach(struct xen_pcibk_device *pdev, int gnt_ref,
 			     int remote_evtchn)
 {
 	int err = 0;
-#ifndef CONFIG_XEN
 	void *vaddr;
-#else
-	struct vm_struct *area;
-#endif
 
 	dev_dbg(&pdev->xdev->dev,
 		"Attaching to frontend resources - gnt_ref=%d evtchn=%d\n",
 		gnt_ref, remote_evtchn);
 
-#ifndef CONFIG_XEN
 	err = xenbus_map_ring_valloc(pdev->xdev, gnt_ref, &vaddr);
 	if (err < 0) {
-#else
-	area = xenbus_map_ring_valloc(pdev->xdev, &gnt_ref, 1);
-	if (IS_ERR(area)) {
-		err = PTR_ERR(area);
-#endif
 		xenbus_dev_fatal(pdev->xdev, err,
 				"Error mapping other domain page in ours.");
 		goto out;
 	}
 
-#ifndef CONFIG_XEN
 	pdev->sh_info = vaddr;
-#else
-	pdev->sh_area = area;
-	pdev->sh_info = area->addr;
-#endif
 
 	err = bind_interdomain_evtchn_to_irqhandler(
 		pdev->xdev->otherend_id, remote_evtchn, xen_pcibk_handle_event,
@@ -313,7 +244,6 @@ static int xen_pcibk_export_device(struct xen_pcibk_device *pdev,
 	if (err)
 		goto out;
 
-#ifndef CONFIG_XEN
 	dev_dbg(&dev->dev, "registering for %d\n", pdev->xdev->otherend_id);
 	if (xen_register_device_domain_owner(dev,
 					     pdev->xdev->otherend_id) != 0) {
@@ -322,7 +252,6 @@ static int xen_pcibk_export_device(struct xen_pcibk_device *pdev,
 		xen_unregister_device_domain_owner(dev);
 		xen_register_device_domain_owner(dev, pdev->xdev->otherend_id);
 	}
-#endif
 
 	/* TODO: It'd be nice to export a bridge and have all of its children
 	 * get exported with it. This may be best done in xend (which will
@@ -354,10 +283,8 @@ static int xen_pcibk_remove_device(struct xen_pcibk_device *pdev,
 		goto out;
 	}
 
-#ifndef CONFIG_XEN
 	dev_dbg(&dev->dev, "unregistering for %d\n", pdev->xdev->otherend_id);
 	xen_unregister_device_domain_owner(dev);
-#endif
 
 	xen_pcibk_release_pci_dev(pdev, dev);
 
@@ -794,30 +721,17 @@ static DEFINE_XENBUS_DRIVER(xen_pcibk, DRV_NAME,
 );
 
 const struct xen_pcibk_backend *__read_mostly xen_pcibk_backend;
-static const struct xen_pcibk_backend *__initdata xen_pcibk_backends[] = {
-	&xen_pcibk_vpci_backend,
-	&xen_pcibk_passthrough_backend,
-	&xen_pcibk_slot_backend,
-	&xen_pcibk_controller_backend,
-};
 
 int __init xen_pcibk_xenbus_register(void)
 {
-	unsigned int i;
-
 	xen_pcibk_wq = create_workqueue("xen_pciback_workqueue");
 	if (!xen_pcibk_wq) {
 		pr_err("%s: create xen_pciback_workqueue failed\n", __func__);
 		return -EFAULT;
 	}
-	for (i = 0; i < ARRAY_SIZE(xen_pcibk_backends); ++i) {
-		if (!xen_pcibk_backends[i])
-			continue;
-		if (strcmp(xen_pcibk_backends[i]->name, mode) == 0) {
-			xen_pcibk_backend = xen_pcibk_backends[i];
-			break;
-		}
-	}
+	xen_pcibk_backend = &xen_pcibk_vpci_backend;
+	if (passthrough)
+		xen_pcibk_backend = &xen_pcibk_passthrough_backend;
 	pr_info("backend is %s\n", xen_pcibk_backend->name);
 	return xenbus_register_backend(&xen_pcibk_driver);
 }

@@ -14,6 +14,8 @@ void pvclock_read_wallclock(struct pvclock_wall_clock *wall,
 			    struct timespec *ts);
 void pvclock_resume(void);
 
+void pvclock_touch_watchdogs(void);
+
 /*
  * Scale a 64-bit delta by scaling and multiplying by a 32-bit fraction,
  * yielding a 64-bit result.
@@ -83,11 +85,7 @@ unsigned __pvclock_read_cycles(const struct pvclock_vcpu_time_info *src,
 	rdtsc_barrier();
 	offset = pvclock_get_nsec_offset(src);
 	ret = src->system_time + offset;
-#ifndef CONFIG_XEN
 	ret_flags = src->flags;
-#else
-	ret_flags = PVCLOCK_TSC_STABLE_BIT;
-#endif
 	rdtsc_barrier();
 
 	*cycles = ret;

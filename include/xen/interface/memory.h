@@ -3,31 +3,13 @@
  *
  * Memory reservation and information.
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to
- * deal in the Software without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- * sell copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
- *
  * Copyright (c) 2005, Keir Fraser <keir@xensource.com>
  */
 
 #ifndef __XEN_PUBLIC_MEMORY_H__
 #define __XEN_PUBLIC_MEMORY_H__
 
-#include "xen.h"
+#include <linux/spinlock.h>
 
 /*
  * Increase or decrease the specified domain's memory reservation. Returns a
@@ -37,26 +19,6 @@
 #define XENMEM_increase_reservation 0
 #define XENMEM_decrease_reservation 1
 #define XENMEM_populate_physmap     6
-
-#if __XEN_INTERFACE_VERSION__ >= 0x00030209
-/*
- * Maximum # bits addressable by the user of the allocated region (e.g., I/O
- * devices often have a 32-bit limitation even in 64-bit systems). If zero
- * then the user has no addressing restriction. This field is not used by
- * XENMEM_decrease_reservation.
- */
-#define XENMEMF_address_bits(x)     (x)
-#define XENMEMF_get_address_bits(x) ((x) & 0xffu)
-/* NUMA node to allocate from. */
-#define XENMEMF_node(x)     (((x) + 1) << 8)
-#define XENMEMF_get_node(x) ((((x) >> 8) - 1) & 0xffu)
-/* Flag to populate physmap with populate-on-demand entries */
-#define XENMEMF_populate_on_demand (1<<16)
-/* Flag to request allocation only from the node specified */
-#define XENMEMF_exact_node_request  (1<<17)
-#define XENMEMF_exact_node(n) (XENMEMF_node(n) | XENMEMF_exact_node_request)
-#endif
-
 struct xen_memory_reservation {
 
     /*
@@ -68,19 +30,13 @@ struct xen_memory_reservation {
      *   IN:  GPFN bases of extents to populate with memory
      *   OUT: GMFN bases of extents that were allocated
      *   (NB. This command also updates the mach_to_phys translation table)
-     * XENMEM_claim_pages:
-     *   IN: must be zero
      */
-    XEN_GUEST_HANDLE(xen_pfn_t) extent_start;
+    GUEST_HANDLE(xen_pfn_t) extent_start;
 
     /* Number of extents, and size/alignment of each (2^extent_order pages). */
-    xen_ulong_t    nr_extents;
+    xen_ulong_t  nr_extents;
     unsigned int   extent_order;
 
-#if __XEN_INTERFACE_VERSION__ >= 0x00030209
-    /* XENMEMF flags. */
-    unsigned int   mem_flags;
-#else
     /*
      * Maximum # bits addressable by the user of the allocated region (e.g.,
      * I/O devices often have a 32-bit limitation even in 64-bit systems). If
@@ -88,17 +44,15 @@ struct xen_memory_reservation {
      * This field is not used by XENMEM_decrease_reservation.
      */
     unsigned int   address_bits;
-#endif
 
     /*
      * Domain whose reservation is being changed.
      * Unprivileged domains can specify only DOMID_SELF.
      */
     domid_t        domid;
+
 };
 DEFINE_GUEST_HANDLE_STRUCT(xen_memory_reservation);
-typedef struct xen_memory_reservation xen_memory_reservation_t;
-DEFINE_XEN_GUEST_HANDLE(xen_memory_reservation_t);
 
 /*
  * An atomic exchange of memory pages. If return code is zero then
@@ -140,10 +94,8 @@ struct xen_memory_exchange {
      */
     xen_ulong_t nr_exchanged;
 };
-DEFINE_GUEST_HANDLE_STRUCT(xen_memory_exchange);
-typedef struct xen_memory_exchange xen_memory_exchange_t;
-DEFINE_XEN_GUEST_HANDLE(xen_memory_exchange_t);
 
+DEFINE_GUEST_HANDLE_STRUCT(xen_memory_exchange);
 /*
  * Returns the maximum machine frame number of mapped RAM in this system.
  * This command always succeeds (it never returns an error code).
@@ -158,11 +110,6 @@ DEFINE_XEN_GUEST_HANDLE(xen_memory_exchange_t);
  */
 #define XENMEM_current_reservation  3
 #define XENMEM_maximum_reservation  4
-
-/*
- * Returns the maximum GPFN in use by the guest, or -ve errcode on failure.
- */
-#define XENMEM_maximum_gpfn         14
 
 /*
  * Returns a list of MFN bases of 2MB extents comprising the machine_to_phys
@@ -183,7 +130,7 @@ struct xen_machphys_mfn_list {
      * any large discontiguities in the machine address space, 2MB gaps in
      * the machphys table will be represented by an MFN base of zero.
      */
-    XEN_GUEST_HANDLE(xen_pfn_t) extent_start;
+    GUEST_HANDLE(xen_pfn_t) extent_start;
 
     /*
      * Number of extents written to the above array. This will be smaller
@@ -192,8 +139,6 @@ struct xen_machphys_mfn_list {
     unsigned int nr_extents;
 };
 DEFINE_GUEST_HANDLE_STRUCT(xen_machphys_mfn_list);
-typedef struct xen_machphys_mfn_list xen_machphys_mfn_list_t;
-DEFINE_XEN_GUEST_HANDLE(xen_machphys_mfn_list_t);
 
 /*
  * Returns the location in virtual address space of the machine_to_phys
@@ -206,12 +151,8 @@ struct xen_machphys_mapping {
     xen_ulong_t v_start, v_end; /* Start and end virtual addresses.   */
     xen_ulong_t max_mfn;        /* Maximum MFN that can be looked up. */
 };
-DEFINE_GUEST_HANDLE_STRUCT(xen_machphys_mapping);
-typedef struct xen_machphys_mapping xen_machphys_mapping_t;
-DEFINE_XEN_GUEST_HANDLE(xen_machphys_mapping_t);
+DEFINE_GUEST_HANDLE_STRUCT(xen_machphys_mapping_t);
 
-/* Source mapping space. */
-/* ` enum phys_map_space { */
 #define XENMAPSPACE_shared_info  0 /* shared info page */
 #define XENMAPSPACE_grant_table  1 /* grant table page */
 #define XENMAPSPACE_gmfn         2 /* GMFN */
@@ -219,7 +160,6 @@ DEFINE_XEN_GUEST_HANDLE(xen_machphys_mapping_t);
 #define XENMAPSPACE_gmfn_foreign 4 /* GMFN from another dom,
 				    * XENMEM_add_to_physmap_range only.
 				    */
-/* ` } */
 
 /*
  * Sets the GPFN at which a particular page appears in the specified guest's
@@ -234,21 +174,20 @@ struct xen_add_to_physmap {
     /* Number of pages to go through for gmfn_range */
     uint16_t    size;
 
-    unsigned int space; /* => enum phys_map_space */
+    /* Source mapping space. */
+    unsigned int space;
 
-#define XENMAPIDX_grant_table_status 0x80000000
-
-    /* Index into space being mapped. */
+    /* Index into source mapping space. */
     xen_ulong_t idx;
 
-    /* GPFN in domid where the source mapping page should appear. */
-    xen_pfn_t     gpfn;
+    /* GPFN where the source mapping page should appear. */
+    xen_pfn_t gpfn;
 };
 DEFINE_GUEST_HANDLE_STRUCT(xen_add_to_physmap);
-typedef struct xen_add_to_physmap xen_add_to_physmap_t;
-DEFINE_XEN_GUEST_HANDLE(xen_add_to_physmap_t);
 
-/* A batched version of add_to_physmap. */
+/*** REMOVED ***/
+/*#define XENMEM_translate_gpfn_list  8*/
+
 #define XENMEM_add_to_physmap_range 23
 struct xen_add_to_physmap_range {
     /* IN */
@@ -261,39 +200,17 @@ struct xen_add_to_physmap_range {
     domid_t foreign_domid; /* IFF gmfn_foreign */
 
     /* Indexes into space being mapped. */
-    XEN_GUEST_HANDLE(xen_ulong_t) idxs;
+    GUEST_HANDLE(xen_ulong_t) idxs;
 
     /* GPFN in domid where the source mapping page should appear. */
-    XEN_GUEST_HANDLE(xen_pfn_t) gpfns;
+    GUEST_HANDLE(xen_pfn_t) gpfns;
 
     /* OUT */
 
     /* Per index error code. */
-    XEN_GUEST_HANDLE(int) errs;
+    GUEST_HANDLE(int) errs;
 };
 DEFINE_GUEST_HANDLE_STRUCT(xen_add_to_physmap_range);
-typedef struct xen_add_to_physmap_range xen_add_to_physmap_range_t;
-DEFINE_XEN_GUEST_HANDLE(xen_add_to_physmap_range_t);
-
-/*
- * Unmaps the page appearing at a particular GPFN from the specified guest's
- * pseudophysical address space.
- * arg == addr of xen_remove_from_physmap_t.
- */
-#define XENMEM_remove_from_physmap      15
-struct xen_remove_from_physmap {
-    /* Which domain to change the mapping for. */
-    domid_t domid;
-
-    /* GPFN of the current mapping of the page. */
-    xen_pfn_t     gpfn;
-};
-DEFINE_GUEST_HANDLE_STRUCT(xen_remove_from_physmap);
-typedef struct xen_remove_from_physmap xen_remove_from_physmap_t;
-DEFINE_XEN_GUEST_HANDLE(xen_remove_from_physmap_t);
-
-/*** REMOVED ***/
-/*#define XENMEM_translate_gpfn_list  8*/
 
 /*
  * Returns the pseudo-physical memory map as it was when the domain
@@ -313,11 +230,9 @@ struct xen_memory_map {
      * Entries in the buffer are in the same format as returned by the
      * BIOS INT 0x15 EAX=0xE820 call.
      */
-    XEN_GUEST_HANDLE(void) buffer;
+    GUEST_HANDLE(void) buffer;
 };
 DEFINE_GUEST_HANDLE_STRUCT(xen_memory_map);
-typedef struct xen_memory_map xen_memory_map_t;
-DEFINE_XEN_GUEST_HANDLE(xen_memory_map_t);
 
 /*
  * Returns the real physical memory map. Passes the same structure as
@@ -326,163 +241,26 @@ DEFINE_XEN_GUEST_HANDLE(xen_memory_map_t);
  */
 #define XENMEM_machine_memory_map   10
 
-/*
- * Set the pseudo-physical memory map of a domain, as returned by
- * XENMEM_memory_map.
- * arg == addr of xen_foreign_memory_map_t.
- */
-#define XENMEM_set_memory_map       13
-struct xen_foreign_memory_map {
-    domid_t domid;
-    struct xen_memory_map map;
-};
-typedef struct xen_foreign_memory_map xen_foreign_memory_map_t;
-DEFINE_XEN_GUEST_HANDLE(xen_foreign_memory_map_t);
-
-#define XENMEM_set_pod_target       16
-#define XENMEM_get_pod_target       17
-struct xen_pod_target {
-    /* IN */
-    uint64_t target_pages;
-    /* OUT */
-    uint64_t tot_pages;
-    uint64_t pod_cache_pages;
-    uint64_t pod_entries;
-    /* IN */
-    domid_t domid;
-};
-typedef struct xen_pod_target xen_pod_target_t;
-
-#if defined(__XEN__) || defined(__XEN_TOOLS__)
-
-#ifndef uint64_aligned_t
-#define uint64_aligned_t uint64_t
-#endif
-
-/*
- * Get the number of MFNs saved through memory sharing.
- * The call never fails.
- */
-#define XENMEM_get_sharing_freed_pages    18
-#define XENMEM_get_sharing_shared_pages   19
-
-#define XENMEM_paging_op                    20
-#define XENMEM_paging_op_nominate           0
-#define XENMEM_paging_op_evict              1
-#define XENMEM_paging_op_prep               2
-
-#define XENMEM_access_op                    21
-#define XENMEM_access_op_resume             0
-
-struct xen_mem_event_op {
-    uint8_t     op;         /* XENMEM_*_op_* */
-    domid_t     domain;
-
-
-    /* PAGING_PREP IN: buffer to immediately fill page in */
-    uint64_aligned_t    buffer;
-    /* Other OPs */
-    uint64_aligned_t    gfn;           /* IN:  gfn of page being operated on */
-};
-typedef struct xen_mem_event_op xen_mem_event_op_t;
-DEFINE_XEN_GUEST_HANDLE(xen_mem_event_op_t);
-
-#define XENMEM_sharing_op                   22
-#define XENMEM_sharing_op_nominate_gfn      0
-#define XENMEM_sharing_op_nominate_gref     1
-#define XENMEM_sharing_op_share             2
-#define XENMEM_sharing_op_resume            3
-#define XENMEM_sharing_op_debug_gfn         4
-#define XENMEM_sharing_op_debug_mfn         5
-#define XENMEM_sharing_op_debug_gref        6
-#define XENMEM_sharing_op_add_physmap       7
-#define XENMEM_sharing_op_audit             8
-
-#define XENMEM_SHARING_OP_S_HANDLE_INVALID  (-10)
-#define XENMEM_SHARING_OP_C_HANDLE_INVALID  (-9)
-
-/* The following allows sharing of grant refs. This is useful
- * for sharing utilities sitting as "filters" in IO backends
- * (e.g. memshr + blktap(2)). The IO backend is only exposed
- * to grant references, and this allows sharing of the grefs */
-#define XENMEM_SHARING_OP_FIELD_IS_GREF_FLAG   (1ULL << 62)
-
-#define XENMEM_SHARING_OP_FIELD_MAKE_GREF(field, val)  \
-    (field) = (XENMEM_SHARING_OP_FIELD_IS_GREF_FLAG | val)
-#define XENMEM_SHARING_OP_FIELD_IS_GREF(field)         \
-    ((field) & XENMEM_SHARING_OP_FIELD_IS_GREF_FLAG)
-#define XENMEM_SHARING_OP_FIELD_GET_GREF(field)        \
-    ((field) & (~XENMEM_SHARING_OP_FIELD_IS_GREF_FLAG))
-
-struct xen_mem_sharing_op {
-    uint8_t     op;     /* XENMEM_sharing_op_* */
-    domid_t     domain;
-
-    union {
-        struct mem_sharing_op_nominate {  /* OP_NOMINATE_xxx           */
-            union {
-                uint64_aligned_t gfn;     /* IN: gfn to nominate       */
-                uint32_t      grant_ref;  /* IN: grant ref to nominate */
-            } u;
-            uint64_aligned_t  handle;     /* OUT: the handle           */
-        } nominate;
-        struct mem_sharing_op_share {     /* OP_SHARE/ADD_PHYSMAP */
-            uint64_aligned_t source_gfn;    /* IN: the gfn of the source page */
-            uint64_aligned_t source_handle; /* IN: handle to the source page */
-            uint64_aligned_t client_gfn;    /* IN: the client gfn */
-            uint64_aligned_t client_handle; /* IN: handle to the client page */
-            domid_t  client_domain; /* IN: the client domain id */
-        } share;
-        struct mem_sharing_op_debug {     /* OP_DEBUG_xxx */
-            union {
-                uint64_aligned_t gfn;      /* IN: gfn to debug          */
-                uint64_aligned_t mfn;      /* IN: mfn to debug          */
-                uint32_t gref;     /* IN: gref to debug         */
-            } u;
-        } debug;
-    } u;
-};
-typedef struct xen_mem_sharing_op xen_mem_sharing_op_t;
-DEFINE_XEN_GUEST_HANDLE(xen_mem_sharing_op_t);
-
-/*
- * Attempt to stake a claim for a domain on a quantity of pages
- * of system RAM, but _not_ assign specific pageframes.  Only
- * arithmetic is performed so the hypercall is very fast and need
- * not be preemptible, thus sidestepping time-of-check-time-of-use
- * races for memory allocation.  Returns 0 if the hypervisor page
- * allocator has atomically and successfully claimed the requested
- * number of pages, else non-zero.
- *
- * Any domain may have only one active claim.  When sufficient memory
- * has been allocated to resolve the claim, the claim silently expires.
- * Claiming zero pages effectively resets any outstanding claim and
- * is always successful.
- *
- * Note that a valid claim may be staked even after memory has been
- * allocated for a domain.  In this case, the claim is not incremental,
- * i.e. if the domain's tot_pages is 3, and a claim is staked for 10,
- * only 7 additional pages are claimed.
- *
- * Caller must be privileged or the hypercall fails.
- */
-#define XENMEM_claim_pages                  24
-
-/*
- * XENMEM_claim_pages flags - the are no flags at this time.
- * The zero value is appropiate.
- */
-
-#endif /* defined(__XEN__) || defined(__XEN_TOOLS__) */
-
-#ifndef CONFIG_XEN
-#include <linux/spinlock.h>
 
 /*
  * Prevent the balloon driver from changing the memory reservation
  * during a driver critical region.
  */
 extern spinlock_t xen_reservation_lock;
-#endif
+
+/*
+ * Unmaps the page appearing at a particular GPFN from the specified guest's
+ * pseudophysical address space.
+ * arg == addr of xen_remove_from_physmap_t.
+ */
+#define XENMEM_remove_from_physmap      15
+struct xen_remove_from_physmap {
+    /* Which domain to change the mapping for. */
+    domid_t domid;
+
+    /* GPFN of the current mapping of the page. */
+    xen_pfn_t gpfn;
+};
+DEFINE_GUEST_HANDLE_STRUCT(xen_remove_from_physmap);
 
 #endif /* __XEN_PUBLIC_MEMORY_H__ */

@@ -813,7 +813,7 @@ config INTEL_SMARTCONNECT
 
 config PVPANIC
 	tristate "pvpanic device support"
-	depends on ACPI && !XEN
+	depends on ACPI
 	---help---
 	  This driver provides support for the pvpanic device.  pvpanic is
 	  a paravirtualized device provided by QEMU; it lets a virtual machine

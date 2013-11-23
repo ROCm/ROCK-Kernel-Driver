@@ -788,8 +788,10 @@ int edac_mc_add_mc(struct mem_ctl_info *mci)
 	}
 
 	/* Report action taken */
-	edac_mc_printk(mci, KERN_INFO, "Giving out device to '%s' '%s':"
-		" DEV %s\n", mci->mod_name, mci->ctl_name, edac_dev_name(mci));
+	edac_mc_printk(mci, KERN_INFO,
+		"Giving out device to module %s controller %s: DEV %s (%s)\n",
+		mci->mod_name, mci->ctl_name, mci->dev_name,
+		edac_op_state_to_string(mci->op_state));
 
 	edac_mc_owner = mci->mod_name;
 
@@ -856,10 +858,6 @@ static void edac_mc_scrub_block(unsigned long page, unsigned long offset,
 	unsigned long flags = 0;
 
 	edac_dbg(3, "\n");
-
-#ifdef CONFIG_XEN
-	page = mfn_to_local_pfn(page);
-#endif
 
 	/* ECC error page was not in our memory. Ignore it. */
 	if (!pfn_valid(page))

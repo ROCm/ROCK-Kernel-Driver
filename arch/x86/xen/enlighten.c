@@ -166,8 +166,8 @@ static DEFINE_PER_CPU(struct tls_descs, shadow_tls_desc);
 static void clamp_max_cpus(void)
 {
 #ifdef CONFIG_SMP
-	if (setup_max_cpus > XEN_LEGACY_MAX_VCPUS)
-		setup_max_cpus = XEN_LEGACY_MAX_VCPUS;
+	if (setup_max_cpus > MAX_VIRT_CPUS)
+		setup_max_cpus = MAX_VIRT_CPUS;
 #endif
 }
 
@@ -194,11 +194,11 @@ static void xen_vcpu_setup(int cpu)
 		if (per_cpu(xen_vcpu, cpu) == &per_cpu(xen_vcpu_info, cpu))
 			return;
 	}
-	if (cpu < XEN_LEGACY_MAX_VCPUS)
+	if (cpu < MAX_VIRT_CPUS)
 		per_cpu(xen_vcpu,cpu) = &HYPERVISOR_shared_info->vcpu_info[cpu];
 
 	if (!have_vcpu_info_placement) {
-		if (cpu >= XEN_LEGACY_MAX_VCPUS)
+		if (cpu >= MAX_VIRT_CPUS)
 			clamp_max_cpus();
 		return;
 	}
@@ -1652,7 +1652,7 @@ void __ref xen_hvm_init_shared_info(void)
 	 * in that case multiple vcpus might be online. */
 	for_each_online_cpu(cpu) {
 		/* Leave it to be NULL. */
-		if (cpu >= XEN_LEGACY_MAX_VCPUS)
+		if (cpu >= MAX_VIRT_CPUS)
 			continue;
 		per_cpu(xen_vcpu, cpu) = &HYPERVISOR_shared_info->vcpu_info[cpu];
 	}

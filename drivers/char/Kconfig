@@ -508,7 +508,7 @@ config MAX_RAW_DEVS
 config HPET
 	bool "HPET - High Precision Event Timer" if (X86 || IA64)
 	default n
-	depends on ACPI && !XEN
+	depends on ACPI
 	help
 	  If you say Y here, you will have a miscdevice named "/dev/hpet/".  Each
 	  open selects one of the timers supported by the HPET.  The timers are
@@ -522,10 +522,16 @@ config HPET_MMAP
 	  If you say Y here, user applications will be able to mmap
 	  the HPET registers.
 
+config HPET_MMAP_DEFAULT
+	bool "Enable HPET MMAP access by default"
+	default y
+	depends on HPET_MMAP
+	help
 	  In some hardware implementations, the page containing HPET
 	  registers may also contain other things that shouldn't be
-	  exposed to the user.  If this applies to your hardware,
-	  say N here.
+	  exposed to the user.  This option selects the default (if
+	  kernel parameter hpet_mmap is not set) user access to the
+	  registers for applications that require it.
 
 config HANGCHECK_TIMER
 	tristate "Hangcheck timer"

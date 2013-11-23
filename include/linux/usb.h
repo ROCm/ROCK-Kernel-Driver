@@ -704,7 +704,7 @@ extern int usb_alloc_streams(struct usb_interface *interface,
 		unsigned int num_streams, gfp_t mem_flags);
 
 /* Reverts a group of bulk endpoints back to not using stream IDs. */
-extern void usb_free_streams(struct usb_interface *interface,
+extern int usb_free_streams(struct usb_interface *interface,
 		struct usb_host_endpoint **eps, unsigned int num_eps,
 		gfp_t mem_flags);
 
@@ -1211,11 +1211,13 @@ struct usb_anchor {
 	struct list_head urb_list;
 	wait_queue_head_t wait;
 	spinlock_t lock;
+	atomic_t suspend_wakeups;
 	unsigned int poisoned:1;
 };
 
 static inline void init_usb_anchor(struct usb_anchor *anchor)
 {
+	memset(anchor, 0, sizeof(*anchor));
 	INIT_LIST_HEAD(&anchor->urb_list);
 	init_waitqueue_head(&anchor->wait);
 	spin_lock_init(&anchor->lock);
@@ -1576,6 +1578,8 @@ extern void usb_kill_anchored_urbs(struct usb_anchor *anchor);
 extern void usb_poison_anchored_urbs(struct usb_anchor *anchor);
 extern void usb_unpoison_anchored_urbs(struct usb_anchor *anchor);
 extern void usb_unlink_anchored_urbs(struct usb_anchor *anchor);
+extern void usb_anchor_suspend_wakeups(struct usb_anchor *anchor);
+extern void usb_anchor_resume_wakeups(struct usb_anchor *anchor);
 extern void usb_anchor_urb(struct urb *urb, struct usb_anchor *anchor);
 extern void usb_unanchor_urb(struct urb *urb);
 extern int usb_wait_anchor_empty_timeout(struct usb_anchor *anchor,

@@ -153,10 +153,10 @@ static inline int pci_no_d1d2(struct pci_dev *dev)
 	return (dev->no_d1d2 || parent_dstates);
 
 }
-extern struct device_attribute pci_dev_attrs[];
+extern const struct attribute_group *pci_dev_groups[];
 extern const struct attribute_group *pcibus_groups[];
 extern struct device_type pci_dev_type;
-extern struct bus_attribute pci_bus_attrs[];
+extern const struct attribute_group *pci_bus_groups[];
 
 
 /**
@@ -319,28 +319,5 @@ static inline int pci_dev_specific_reset(struct pci_dev *dev, int probe)
 	return -ENOTTY;
 }
 #endif
-
-#ifdef CONFIG_PCI_GUESTDEV
-extern int pci_is_guestdev_to_reassign(struct pci_dev *dev);
-extern int pci_is_iomuldev(struct pci_dev *dev);
-#else
-#define pci_is_guestdev_to_reassign(dev) 0
-#define pci_is_iomuldev(dev) 0
-#endif
-
-#ifdef CONFIG_PCI_RESERVE
-unsigned long pci_reserve_size_io(struct pci_bus *bus);
-unsigned long pci_reserve_size_mem(struct pci_bus *bus);
-#else
-static inline unsigned long pci_reserve_size_io(struct pci_bus *bus)
-{
-	return 0;
-}
-
-static inline unsigned long pci_reserve_size_mem(struct pci_bus *bus)
-{
-	return 0;
-}
-#endif /* CONFIG_PCI_RESERVE */
 
 #endif /* DRIVERS_PCI_H */

@@ -36,8 +36,22 @@ asmlinkage void alignment_check(void);
 asmlinkage void machine_check(void);
 #endif /* CONFIG_X86_MCE */
 asmlinkage void simd_coprocessor_error(void);
-#ifdef CONFIG_X86_XEN
-asmlinkage void fixup_4gb_segment(void);
+
+#ifdef CONFIG_TRACING
+asmlinkage void trace_page_fault(void);
+#define trace_divide_error divide_error
+#define trace_bounds bounds
+#define trace_invalid_op invalid_op
+#define trace_device_not_available device_not_available
+#define trace_coprocessor_segment_overrun coprocessor_segment_overrun
+#define trace_invalid_TSS invalid_TSS
+#define trace_segment_not_present segment_not_present
+#define trace_general_protection general_protection
+#define trace_spurious_interrupt_bug spurious_interrupt_bug
+#define trace_coprocessor_error coprocessor_error
+#define trace_alignment_check alignment_check
+#define trace_simd_coprocessor_error simd_coprocessor_error
+#define trace_async_page_fault async_page_fault
 #endif
 
 dotraplinkage void do_divide_error(struct pt_regs *, long);
@@ -58,6 +72,9 @@ asmlinkage __kprobes struct pt_regs *sync_regs(struct pt_regs *);
 #endif
 dotraplinkage void do_general_protection(struct pt_regs *, long);
 dotraplinkage void do_page_fault(struct pt_regs *, unsigned long);
+#ifdef CONFIG_TRACING
+dotraplinkage void trace_do_page_fault(struct pt_regs *, unsigned long);
+#endif
 dotraplinkage void do_spurious_interrupt_bug(struct pt_regs *, long);
 dotraplinkage void do_coprocessor_error(struct pt_regs *, long);
 dotraplinkage void do_alignment_check(struct pt_regs *, long);
@@ -67,9 +84,6 @@ dotraplinkage void do_machine_check(struct pt_regs *, long);
 dotraplinkage void do_simd_coprocessor_error(struct pt_regs *, long);
 #ifdef CONFIG_X86_32
 dotraplinkage void do_iret_error(struct pt_regs *, long);
-#ifdef CONFIG_XEN
-void do_fixup_4gb_segment(struct pt_regs *, long);
-#endif
 #endif
 
 static inline int get_si_code(unsigned long condition)

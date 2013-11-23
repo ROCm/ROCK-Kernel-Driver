@@ -234,10 +234,7 @@ static inline void pps_fill_timex(struct timex *txc)
  * ntp_synced - Returns 1 if the NTP status is not UNSYNC
  *
  */
-#ifndef CONFIG_XEN
-static
-#endif
-inline int ntp_synced(void)
+static inline int ntp_synced(void)
 {
 	return !(time_status & STA_UNSYNC);
 }
@@ -478,6 +475,7 @@ static void sync_cmos_clock(struct work_struct *work)
 	 * called as close as possible to 500 ms before the new second starts.
 	 * This code is run on a timer.  If the clock is set, that timer
 	 * may not expire at the correct time.  Thus, we adjust...
+	 * We want the clock to be within a couple of ticks from the target.
 	 */
 	if (!ntp_synced()) {
 		/*
@@ -488,7 +486,7 @@ static void sync_cmos_clock(struct work_struct *work)
 	}
 
 	getnstimeofday(&now);
-	if (abs(now.tv_nsec - (NSEC_PER_SEC / 2)) <= tick_nsec / 2) {
+	if (abs(now.tv_nsec - (NSEC_PER_SEC / 2)) <= tick_nsec * 5) {
 		struct timespec adjust = now;
 
 		fail = -ENODEV;

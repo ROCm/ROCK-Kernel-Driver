@@ -61,7 +61,7 @@ config HVC_IUCV
 
 config HVC_XEN
 	bool "Xen Hypervisor Console support"
-	depends on PARAVIRT_XEN
+	depends on XEN
 	select HVC_DRIVER
 	select HVC_IRQ
 	default y

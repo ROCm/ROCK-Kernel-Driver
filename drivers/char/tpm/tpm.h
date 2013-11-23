@@ -59,8 +59,6 @@ extern ssize_t tpm_show_pcrs(struct device *, struct device_attribute *attr,
 				char *);
 extern ssize_t tpm_show_caps(struct device *, struct device_attribute *attr,
 				char *);
-extern ssize_t tpm_show_caps_1_2(struct device *, struct device_attribute *attr,
-				char *);
 extern ssize_t tpm_store_cancel(struct device *, struct device_attribute *attr,
 				const char *, size_t);
 extern ssize_t tpm_show_enabled(struct device *, struct device_attribute *attr,
@@ -122,6 +120,7 @@ struct tpm_chip {
 	struct device *dev;	/* Device stuff */
 
 	int dev_num;		/* /dev/tpm# */
+	char devname[7];
 	unsigned long is_open;	/* only one allowed */
 	int time_expired;
 
@@ -323,16 +322,6 @@ struct tpm_cmd_t {
 } __packed;
 
 ssize_t	tpm_getcap(struct device *, __be32, cap_t *, const char *);
-
-static inline void *chip_get_private(const struct tpm_chip *chip)
-{
-	return chip->vendor.priv;
-}
-
-static inline void chip_set_private(struct tpm_chip *chip, void *priv)
-{
-	chip->vendor.priv = priv;
-}
 
 extern int tpm_get_timeouts(struct tpm_chip *);
 extern void tpm_gen_interrupt(struct tpm_chip *);

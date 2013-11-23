@@ -41,11 +41,10 @@ static int command_read(struct pci_dev *dev, int offset, u16 *value, void *data)
 
 static int command_write(struct pci_dev *dev, int offset, u16 value, void *data)
 {
-#ifndef CONFIG_XEN
-	struct xen_pcibk_dev_data *dev_data = dev_data = pci_get_drvdata(dev);
-#endif
+	struct xen_pcibk_dev_data *dev_data;
 	int err;
 
+	dev_data = pci_get_drvdata(dev);
 	if (!pci_is_enabled(dev) && is_enable_cmd(value)) {
 		if (unlikely(verbose_request))
 			printk(KERN_DEBUG DRV_NAME ": %s: enable\n",
@@ -53,19 +52,15 @@ static int command_write(struct pci_dev *dev, int offset, u16 value, void *data)
 		err = pci_enable_device(dev);
 		if (err)
 			return err;
-#ifndef CONFIG_XEN
 		if (dev_data)
 			dev_data->enable_intx = 1;
-#endif
 	} else if (pci_is_enabled(dev) && !is_enable_cmd(value)) {
 		if (unlikely(verbose_request))
 			printk(KERN_DEBUG DRV_NAME ": %s: disable\n",
 			       pci_name(dev));
 		pci_disable_device(dev);
-#ifndef CONFIG_XEN
 		if (dev_data)
 			dev_data->enable_intx = 0;
-#endif
 	}
 
 	if (!dev->is_busmaster && is_master_cmd(value)) {

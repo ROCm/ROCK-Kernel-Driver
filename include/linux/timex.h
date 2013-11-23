@@ -153,9 +153,6 @@ extern unsigned long tick_nsec;		/* SHIFTED_HZ period (nsec) */
 
 extern int do_adjtimex(struct timex *);
 extern void hardpps(const struct timespec *, const struct timespec *);
-#ifdef CONFIG_XEN
-extern int ntp_synced(void);
-#endif
 
 int read_current_timer(unsigned long *timer_val);
 void ntp_notify_cmos_timer(void);

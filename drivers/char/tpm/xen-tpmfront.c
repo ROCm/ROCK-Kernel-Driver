@@ -11,25 +11,18 @@
 #include <linux/err.h>
 #include <linux/interrupt.h>
 #include <xen/xen.h>
-#include <xen/interface/io/tpmif.h>
-#ifdef CONFIG_PARAVIRT_XEN
 #include <xen/events.h>
+#include <xen/interface/io/tpmif.h>
 #include <xen/grant_table.h>
-#include <xen/page.h>
-#else
-#include <xen/evtchn.h>
-#define bind_evtchn_to_irqhandler bind_caller_port_to_irqhandler
-#include <xen/gnttab.h>
-#define gnttab_end_foreign_access(g, r, p) gnttab_end_foreign_access(g, p)
-#endif
 #include <xen/xenbus.h>
+#include <xen/page.h>
 #include "tpm.h"
 
 struct tpm_private {
 	struct tpm_chip *chip;
 	struct xenbus_device *dev;
 
-	struct tpmif_shared_page *shr;
+	struct vtpm_shared_page *shr;
 
 	unsigned int evtchn;
 	int ring_ref;
@@ -47,12 +40,12 @@ static u8 vtpm_status(struct tpm_chip *chip)
 {
 	struct tpm_private *priv = TPM_VPRIV(chip);
 	switch (priv->shr->state) {
-	case TPMIF_STATE_IDLE:
+	case VTPM_STATE_IDLE:
 		return VTPM_STATUS_IDLE | VTPM_STATUS_CANCELED;
-	case TPMIF_STATE_FINISH:
+	case VTPM_STATE_FINISH:
 		return VTPM_STATUS_IDLE | VTPM_STATUS_RESULT;
-	case TPMIF_STATE_SUBMIT:
-	case TPMIF_STATE_CANCEL: /* cancel requested, not yet canceled */
+	case VTPM_STATE_SUBMIT:
+	case VTPM_STATE_CANCEL: /* cancel requested, not yet canceled */
 		return VTPM_STATUS_RUNNING;
 	default:
 		return 0;
@@ -67,12 +60,12 @@ static bool vtpm_req_canceled(struct tpm_chip *chip, u8 status)
 static void vtpm_cancel(struct tpm_chip *chip)
 {
 	struct tpm_private *priv = TPM_VPRIV(chip);
-	priv->shr->state = TPMIF_STATE_CANCEL;
+	priv->shr->state = VTPM_STATE_CANCEL;
 	wmb();
 	notify_remote_via_evtchn(priv->evtchn);
 }
 
-static unsigned int shr_data_offset(struct tpmif_shared_page *shr)
+static unsigned int shr_data_offset(struct vtpm_shared_page *shr)
 {
 	return sizeof(*shr) + sizeof(u32) * shr->nr_extra_pages;
 }
@@ -80,7 +73,7 @@ static unsigned int shr_data_offset(struct tpmif_shared_page *shr)
 static int vtpm_send(struct tpm_chip *chip, u8 *buf, size_t count)
 {
 	struct tpm_private *priv = TPM_VPRIV(chip);
-	struct tpmif_shared_page *shr = priv->shr;
+	struct vtpm_shared_page *shr = priv->shr;
 	unsigned int offset = shr_data_offset(shr);
 
 	u32 ordinal;
@@ -102,7 +95,7 @@ static int vtpm_send(struct tpm_chip *chip, u8 *buf, size_t count)
 	memcpy(offset + (u8 *)shr, buf, count);
 	shr->length = count;
 	barrier();
-	shr->state = TPMIF_STATE_SUBMIT;
+	shr->state = VTPM_STATE_SUBMIT;
 	wmb();
 	notify_remote_via_evtchn(priv->evtchn);
 
@@ -122,11 +115,11 @@ static int vtpm_send(struct tpm_chip *chip, u8 *buf, size_t count)
 static int vtpm_recv(struct tpm_chip *chip, u8 *buf, size_t count)
 {
 	struct tpm_private *priv = TPM_VPRIV(chip);
-	struct tpmif_shared_page *shr = priv->shr;
+	struct vtpm_shared_page *shr = priv->shr;
 	unsigned int offset = shr_data_offset(shr);
 	size_t length = shr->length;
 
-	if (shr->state == TPMIF_STATE_IDLE)
+	if (shr->state == VTPM_STATE_IDLE)
 		return -ECANCELED;
 
 	/* In theory the wait at the end of _send makes this one unnecessary */
@@ -208,12 +201,12 @@ static irqreturn_t tpmif_interrupt(int dummy, void *dev_id)
 	struct tpm_private *priv = dev_id;
 
 	switch (priv->shr->state) {
-	case TPMIF_STATE_IDLE:
-	case TPMIF_STATE_FINISH:
+	case VTPM_STATE_IDLE:
+	case VTPM_STATE_FINISH:
 		wake_up_interruptible(&priv->chip->vendor.read_queue);
 		break;
-	case TPMIF_STATE_SUBMIT:
-	case TPMIF_STATE_CANCEL:
+	case VTPM_STATE_SUBMIT:
+	case VTPM_STATE_CANCEL:
 	default:
 		break;
 	}
@@ -357,8 +350,6 @@ static int tpmfront_probe(struct xenbus_device *dev,
 	}
 
 	tpm_get_timeouts(priv->chip);
-
-	dev_set_drvdata(&dev->dev, priv->chip);
 
 	return rv;
 }

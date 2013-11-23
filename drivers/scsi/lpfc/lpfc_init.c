@@ -4545,7 +4545,7 @@ lpfc_enable_pci_dev(struct lpfc_hba *phba)
 	pci_save_state(pdev);
 
 	/* PCIe EEH recovery on powerpc platforms needs fundamental reset */
-	if (pci_find_capability(pdev, PCI_CAP_ID_EXP))
+	if (pci_is_pcie(pdev))
 		pdev->needs_freset = 1;
 
 	return 0;
@@ -4581,8 +4581,6 @@ lpfc_disable_pci_dev(struct lpfc_hba *phba)
 	/* Release PCI resource and disable PCI device */
 	pci_release_selected_regions(pdev, bars);
 	pci_disable_device(pdev);
-	/* Null out PCI private reference to driver */
-	pci_set_drvdata(pdev, NULL);
 
 	return;
 }
@@ -8392,6 +8390,9 @@ lpfc_sli4_set_affinity(struct lpfc_hba *phba, int vectors)
 	int max_phys_id, min_phys_id;
 	int num_io_channel, first_cpu, chan;
 	struct lpfc_vector_map_info *cpup;
+#ifdef CONFIG_X86
+	struct cpuinfo_x86 *cpuinfo;
+#endif
 	struct cpumask *mask;
 	uint8_t chann[LPFC_FCP_IO_CHAN_MAX+1];
 
@@ -8413,8 +8414,8 @@ lpfc_sli4_set_affinity(struct lpfc_hba *phba, int vectors)
 	/* Update CPU map with physical id and core id of each CPU */
 	cpup = phba->sli4_hba.cpu_map;
 	for (cpu = 0; cpu < phba->sli4_hba.num_present_cpu; cpu++) {
-#if defined(CONFIG_X86) && !defined(CONFIG_XEN)
-		const struct cpuinfo_x86 *cpuinfo = &cpu_data(cpu);
+#ifdef CONFIG_X86
+		cpuinfo = &cpu_data(cpu);
 		cpup->phys_id = cpuinfo->phys_proc_id;
 		cpup->core_id = cpuinfo->cpu_core_id;
 #else
@@ -9426,7 +9427,6 @@ lpfc_pci_remove_one_s3(struct pci_dev *pdev)
 	/* Disable interrupt */
 	lpfc_sli_disable_intr(phba);
 
-	pci_set_drvdata(pdev, NULL);
 	scsi_host_put(shost);
 
 	/*

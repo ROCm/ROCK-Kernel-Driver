@@ -24,7 +24,6 @@
 #include <asm/fixmap.h>
 #include <asm/pvclock.h>
 
-#ifndef CONFIG_XEN
 static u8 valid_flags __read_mostly = 0;
 
 void pvclock_set_flags(u8 flags)
@@ -42,6 +41,14 @@ unsigned long pvclock_tsc_khz(struct pvclock_vcpu_time_info *src)
 	else
 		pv_tsc_khz >>= src->tsc_shift;
 	return pv_tsc_khz;
+}
+
+void pvclock_touch_watchdogs(void)
+{
+	touch_softlockup_watchdog_sync();
+	clocksource_touch_watchdog();
+	rcu_cpu_stall_reset();
+	reset_hung_task_detector();
 }
 
 static atomic64_t last_value = ATOMIC64_INIT(0);
@@ -74,6 +81,11 @@ cycle_t pvclock_clocksource_read(struct pvclock_vcpu_time_info *src)
 	do {
 		version = __pvclock_read_cycles(src, &ret, &flags);
 	} while ((src->version & 1) || version != src->version);
+
+	if (unlikely((flags & PVCLOCK_GUEST_STOPPED) != 0)) {
+		src->flags &= ~PVCLOCK_GUEST_STOPPED;
+		pvclock_touch_watchdogs();
+	}
 
 	if ((valid_flags & PVCLOCK_TSC_STABLE_BIT) &&
 		(flags & PVCLOCK_TSC_STABLE_BIT))
@@ -128,7 +140,6 @@ void pvclock_read_wallclock(struct pvclock_wall_clock *wall_clock,
 
 	set_normalized_timespec(ts, now.tv_sec, now.tv_nsec);
 }
-#endif /* !CONFIG_XEN */
 
 #ifdef CONFIG_X86_64
 /*

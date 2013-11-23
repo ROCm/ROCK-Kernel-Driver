@@ -3,11 +3,9 @@
 #define XEN_HVM_H__
 
 #include <xen/interface/hvm/params.h>
-#ifndef HAVE_XEN_PLATFORM_COMPAT_H
 #include <asm/xen/hypercall.h>
-#endif
 
-static inline const char *param_name(int op)
+static const char *param_name(int op)
 {
 #define PARAM(x) [HVM_PARAM_##x] = #x
 	static const char *const names[] = {
@@ -37,7 +35,6 @@ static inline const char *param_name(int op)
 
 	return names[op];
 }
-
 static inline int hvm_get_parameter(int idx, uint64_t *value)
 {
 	struct xen_hvm_param xhv;

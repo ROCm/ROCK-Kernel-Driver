@@ -15,9 +15,8 @@ $(obj)/inat.o: $(obj)/inat-tables.c
 clean-files := inat-tables.c
 
 obj-$(CONFIG_SMP) += msr-smp.o cache-smp.o
-obj-$(CONFIG_XEN) += cache-smp.o
 
-lib-y := delay.o
+lib-y := delay.o misc.o
 lib-y += thunk_$(BITS).o
 lib-y += usercopy_$(BITS).o usercopy.o getuser.o putuser.o
 lib-y += memcpy_$(BITS).o
@@ -45,5 +44,3 @@ else
         lib-y += copy_user_64.o copy_user_nocache_64.o
 	lib-y += cmpxchg16b_emu.o
 endif
-
-lib-$(CONFIG_XEN_SCRUB_PAGES) += scrub.o

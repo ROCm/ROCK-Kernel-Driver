@@ -36,18 +36,13 @@
 #include <linux/eventfd.h>
 #include <linux/blkdev.h>
 #include <linux/compat.h>
-#include <linux/anon_inodes.h>
 #include <linux/migrate.h>
 #include <linux/ramfs.h>
 #include <linux/percpu-refcount.h>
+#include <linux/mount.h>
 
 #include <asm/kmap_types.h>
 #include <asm/uaccess.h>
-
-#ifdef CONFIG_EPOLL
-#include <linux/poll.h>
-#include <linux/anon_inodes.h>
-#endif
 
 #include "internal.h"
 
@@ -85,6 +80,8 @@ struct kioctx {
 	struct percpu_ref	users;
 	atomic_t		dead;
 
+	struct percpu_ref	reqs;
+
 	unsigned long		user_id;
 
 	struct __percpu kioctx_cpu *cpu;
@@ -112,14 +109,7 @@ struct kioctx {
 	struct page		**ring_pages;
 	long			nr_pages;
 
-	struct rcu_head		rcu_head;
 	struct work_struct	free_work;
-
-#ifdef CONFIG_EPOLL
-	/* poll integration */
-	wait_queue_head_t       poll_wait;
-	struct file		*file;
-#endif
 
 	struct {
 		/*
@@ -163,12 +153,67 @@ unsigned long aio_max_nr = 0x10000; /* system wide maximum number of aio request
 static struct kmem_cache	*kiocb_cachep;
 static struct kmem_cache	*kioctx_cachep;
 
+static struct vfsmount *aio_mnt;
+
+static const struct file_operations aio_ring_fops;
+static const struct address_space_operations aio_ctx_aops;
+
+static struct file *aio_private_file(struct kioctx *ctx, loff_t nr_pages)
+{
+	struct qstr this = QSTR_INIT("[aio]", 5);
+	struct file *file;
+	struct path path;
+	struct inode *inode = alloc_anon_inode(aio_mnt->mnt_sb);
+	if (IS_ERR(inode))
+		return ERR_CAST(inode);
+
+	inode->i_mapping->a_ops = &aio_ctx_aops;
+	inode->i_mapping->private_data = ctx;
+	inode->i_size = PAGE_SIZE * nr_pages;
+
+	path.dentry = d_alloc_pseudo(aio_mnt->mnt_sb, &this);
+	if (!path.dentry) {
+		iput(inode);
+		return ERR_PTR(-ENOMEM);
+	}
+	path.mnt = mntget(aio_mnt);
+
+	d_instantiate(path.dentry, inode);
+	file = alloc_file(&path, FMODE_READ | FMODE_WRITE, &aio_ring_fops);
+	if (IS_ERR(file)) {
+		path_put(&path);
+		return file;
+	}
+
+	file->f_flags = O_RDWR;
+	file->private_data = ctx;
+	return file;
+}
+
+static struct dentry *aio_mount(struct file_system_type *fs_type,
+				int flags, const char *dev_name, void *data)
+{
+	static const struct dentry_operations ops = {
+		.d_dname	= simple_dname,
+	};
+	return mount_pseudo(fs_type, "aio:", NULL, &ops, 0xa10a10a1);
+}
+
 /* aio_setup
  *	Creates the slab caches used by the aio routines, panic on
  *	failure as this is done early during the boot sequence.
  */
 static int __init aio_setup(void)
 {
+	static struct file_system_type aio_fs = {
+		.name		= "aio",
+		.mount		= aio_mount,
+		.kill_sb	= kill_anon_super,
+	};
+	aio_mnt = kern_mount(&aio_fs);
+	if (IS_ERR(aio_mnt))
+		panic("Failed to create aio fs mount.");
+
 	kiocb_cachep = KMEM_CACHE(kiocb, SLAB_HWCACHE_ALIGN|SLAB_PANIC);
 	kioctx_cachep = KMEM_CACHE(kioctx,SLAB_HWCACHE_ALIGN|SLAB_PANIC);
 
@@ -206,8 +251,10 @@ static void aio_free_ring(struct kioctx *ctx)
 
 	put_aio_ring_file(ctx);
 
-	if (ctx->ring_pages && ctx->ring_pages != ctx->internal_pages)
+	if (ctx->ring_pages && ctx->ring_pages != ctx->internal_pages) {
 		kfree(ctx->ring_pages);
+		ctx->ring_pages = NULL;
+	}
 }
 
 static int aio_ring_mmap(struct file *file, struct vm_area_struct *vma)
@@ -294,15 +341,11 @@ static int aio_setup_ring(struct kioctx *ctx)
 	if (nr_pages < 0)
 		return -EINVAL;
 
-	file = anon_inode_getfile_private("[aio]", &aio_ring_fops, ctx, O_RDWR);
+	file = aio_private_file(ctx, nr_pages);
 	if (IS_ERR(file)) {
 		ctx->aio_ring_file = NULL;
 		return -EAGAIN;
 	}
-
-	file->f_inode->i_mapping->a_ops = &aio_ctx_aops;
-	file->f_inode->i_mapping->private_data = ctx;
-	file->f_inode->i_size = PAGE_SIZE * (loff_t)nr_pages;
 
 	for (i = 0; i < nr_pages; i++) {
 		struct page *page;
@@ -423,12 +466,23 @@ static int kiocb_cancel(struct kioctx *ctx, struct kiocb *kiocb)
 	return cancel(kiocb);
 }
 
-static void free_ioctx_rcu(struct rcu_head *head)
+static void free_ioctx(struct work_struct *work)
 {
-	struct kioctx *ctx = container_of(head, struct kioctx, rcu_head);
+	struct kioctx *ctx = container_of(work, struct kioctx, free_work);
 
+	pr_debug("freeing %p\n", ctx);
+
+	aio_free_ring(ctx);
 	free_percpu(ctx->cpu);
 	kmem_cache_free(kioctx_cachep, ctx);
+}
+
+static void free_ioctx_reqs(struct percpu_ref *ref)
+{
+	struct kioctx *ctx = container_of(ref, struct kioctx, reqs);
+
+	INIT_WORK(&ctx->free_work, free_ioctx);
+	schedule_work(&ctx->free_work);
 }
 
 /*
@@ -436,13 +490,10 @@ static void free_ioctx_rcu(struct rcu_head *head)
  * and ctx->users has dropped to 0, so we know no more kiocbs can be submitted -
  * now it's safe to cancel any that need to be.
  */
-static void free_ioctx(struct work_struct *work)
+static void free_ioctx_users(struct percpu_ref *ref)
 {
-	struct kioctx *ctx = container_of(work, struct kioctx, free_work);
-	struct aio_ring *ring;
+	struct kioctx *ctx = container_of(ref, struct kioctx, users);
 	struct kiocb *req;
-	unsigned cpu, avail;
-	DEFINE_WAIT(wait);
 
 	spin_lock_irq(&ctx->ctx_lock);
 
@@ -456,54 +507,8 @@ static void free_ioctx(struct work_struct *work)
 
 	spin_unlock_irq(&ctx->ctx_lock);
 
-	for_each_possible_cpu(cpu) {
-		struct kioctx_cpu *kcpu = per_cpu_ptr(ctx->cpu, cpu);
-
-		atomic_add(kcpu->reqs_available, &ctx->reqs_available);
-		kcpu->reqs_available = 0;
-	}
-
-	while (1) {
-		prepare_to_wait(&ctx->wait, &wait, TASK_UNINTERRUPTIBLE);
-
-		ring = kmap_atomic(ctx->ring_pages[0]);
-		avail = (ring->head <= ring->tail)
-			 ? ring->tail - ring->head
-			 : ctx->nr_events - ring->head + ring->tail;
-
-		atomic_add(avail, &ctx->reqs_available);
-		ring->head = ring->tail;
-		kunmap_atomic(ring);
-
-		if (atomic_read(&ctx->reqs_available) >= ctx->nr_events - 1)
-			break;
-
-		schedule();
-	}
-	finish_wait(&ctx->wait, &wait);
-
-	WARN_ON(atomic_read(&ctx->reqs_available) > ctx->nr_events - 1);
-
-	aio_free_ring(ctx);
-
-	pr_debug("freeing %p\n", ctx);
-
-	/*
-	 * Here the call_rcu() is between the wait_event() for reqs_active to
-	 * hit 0, and freeing the ioctx.
-	 *
-	 * aio_complete() decrements reqs_active, but it has to touch the ioctx
-	 * after to issue a wakeup so we use rcu.
-	 */
-	call_rcu(&ctx->rcu_head, free_ioctx_rcu);
-}
-
-static void free_ioctx_ref(struct percpu_ref *ref)
-{
-	struct kioctx *ctx = container_of(ref, struct kioctx, users);
-
-	INIT_WORK(&ctx->free_work, free_ioctx);
-	schedule_work(&ctx->free_work);
+	percpu_ref_kill(&ctx->reqs);
+	percpu_ref_put(&ctx->reqs);
 }
 
 static int ioctx_add_table(struct kioctx *ctx, struct mm_struct *mm)
@@ -562,6 +567,16 @@ static int ioctx_add_table(struct kioctx *ctx, struct mm_struct *mm)
 	}
 }
 
+static void aio_nr_sub(unsigned nr)
+{
+	spin_lock(&aio_nr_lock);
+	if (WARN_ON(aio_nr - nr > aio_nr))
+		aio_nr = 0;
+	else
+		aio_nr -= nr;
+	spin_unlock(&aio_nr_lock);
+}
+
 /* ioctx_alloc
  *	Allocates and initializes an ioctx.  Returns an ERR_PTR if it failed.
  */
@@ -599,8 +614,11 @@ static struct kioctx *ioctx_alloc(unsigned nr_events)
 
 	ctx->max_reqs = nr_events;
 
-	if (percpu_ref_init(&ctx->users, free_ioctx_ref))
-		goto out_freectx;
+	if (percpu_ref_init(&ctx->users, free_ioctx_users))
+		goto err;
+
+	if (percpu_ref_init(&ctx->reqs, free_ioctx_reqs))
+		goto err;
 
 	spin_lock_init(&ctx->ctx_lock);
 	spin_lock_init(&ctx->completion_lock);
@@ -611,10 +629,10 @@ static struct kioctx *ioctx_alloc(unsigned nr_events)
 
 	ctx->cpu = alloc_percpu(struct kioctx_cpu);
 	if (!ctx->cpu)
-		goto out_freeref;
+		goto err;
 
 	if (aio_setup_ring(ctx) < 0)
-		goto out_freepcpu;
+		goto err;
 
 	atomic_set(&ctx->reqs_available, ctx->nr_events - 1);
 	ctx->req_batch = (ctx->nr_events - 1) / (num_possible_cpus() * 4);
@@ -626,7 +644,8 @@ static struct kioctx *ioctx_alloc(unsigned nr_events)
 	if (aio_nr + nr_events > (aio_max_nr * 2UL) ||
 	    aio_nr + nr_events < aio_nr) {
 		spin_unlock(&aio_nr_lock);
-		goto out_cleanup;
+		err = -EAGAIN;
+		goto err;
 	}
 	aio_nr += ctx->max_reqs;
 	spin_unlock(&aio_nr_lock);
@@ -635,23 +654,18 @@ static struct kioctx *ioctx_alloc(unsigned nr_events)
 
 	err = ioctx_add_table(ctx, mm);
 	if (err)
-		goto out_cleanup_put;
+		goto err_cleanup;
 
 	pr_debug("allocated ioctx %p[%ld]: mm=%p mask=0x%x\n",
 		 ctx, ctx->user_id, mm, ctx->nr_events);
 	return ctx;
 
-out_cleanup_put:
-	percpu_ref_put(&ctx->users);
-out_cleanup:
-	err = -EAGAIN;
-	aio_free_ring(ctx);
-out_freepcpu:
+err_cleanup:
+	aio_nr_sub(ctx->max_reqs);
+err:
 	free_percpu(ctx->cpu);
-out_freeref:
+	free_percpu(ctx->reqs.pcpu_count);
 	free_percpu(ctx->users.pcpu_count);
-out_freectx:
-	put_aio_ring_file(ctx);
 	kmem_cache_free(kioctx_cachep, ctx);
 	pr_debug("error allocating ioctx %d\n", err);
 	return ERR_PTR(err);
@@ -679,15 +693,6 @@ static void kill_ioctx(struct mm_struct *mm, struct kioctx *ctx)
 		/* percpu_ref_kill() will do the necessary call_rcu() */
 		wake_up_all(&ctx->wait);
 
-#ifdef CONFIG_EPOLL
-		/* forget the poll file, but it's up to the user to close it */
-		if (ctx->file) {
-			fput(ctx->file);
-			ctx->file->private_data = 0;
-			ctx->file = 0;
-		}
-#endif
-
 		/*
 		 * It'd be more correct to do this in free_ioctx(), after all
 		 * the outstanding kiocbs have finished - but by then io_destroy
@@ -695,10 +700,7 @@ static void kill_ioctx(struct mm_struct *mm, struct kioctx *ctx)
 		 * -EAGAIN with no ioctxs actually in use (as far as userspace
 		 *  could tell).
 		 */
-		spin_lock(&aio_nr_lock);
-		BUG_ON(aio_nr - ctx->max_reqs > aio_nr);
-		aio_nr -= ctx->max_reqs;
-		spin_unlock(&aio_nr_lock);
+		aio_nr_sub(ctx->max_reqs);
 
 		if (ctx->mmap_size)
 			vm_munmap(ctx->mmap_base, ctx->mmap_size);
@@ -830,6 +832,8 @@ static inline struct kiocb *aio_get_req(struct kioctx *ctx)
 	if (unlikely(!req))
 		goto out_put;
 
+	percpu_ref_get(&ctx->reqs);
+
 	req->ki_ctx = ctx;
 	return req;
 out_put:
@@ -898,12 +902,6 @@ void aio_complete(struct kiocb *iocb, long res, long res2)
 		wake_up_process(iocb->ki_obj.tsk);
 		return;
 	}
-
-	/*
-	 * Take rcu_read_lock() in case the kioctx is being destroyed, as we
-	 * need to issue a wakeup after incrementing reqs_available.
-	 */
-	rcu_read_lock();
 
 	if (iocb->ki_list.next) {
 		unsigned long flags;
@@ -979,20 +977,13 @@ void aio_complete(struct kiocb *iocb, long res, long res2)
 	if (waitqueue_active(&ctx->wait))
 		wake_up(&ctx->wait);
 
-#ifdef CONFIG_EPOLL
-	if (ctx->file && waitqueue_active(&ctx->poll_wait))
-		wake_up(&ctx->poll_wait);
-#endif
-
-	rcu_read_unlock();
+	percpu_ref_put(&ctx->reqs);
 }
 EXPORT_SYMBOL(aio_complete);
 
 /* aio_read_events
  *	Pull an event off of the ioctx's event ring.  Returns the number of
  *	events fetched
- *	If event parameter is NULL, just returns the number of events that
- *	would be fetched.
  */
 static long aio_read_events_ring(struct kioctx *ctx,
 				 struct io_event __user *event, long nr)
@@ -1026,13 +1017,6 @@ static long aio_read_events_ring(struct kioctx *ctx,
 		avail = min(avail, nr - ret);
 		avail = min_t(long, avail, AIO_EVENTS_PER_PAGE -
 			    ((head + AIO_EVENTS_OFFSET) % AIO_EVENTS_PER_PAGE));
-
-#ifdef CONFIG_EPOLL
-		if (!event) { /* only need to know availability */
-			ret = avail;
-			goto out;
-		}
-#endif
 
 		pos = head + AIO_EVENTS_OFFSET;
 		page = ctx->ring_pages[pos / AIO_EVENTS_PER_PAGE];
@@ -1091,11 +1075,6 @@ static long read_events(struct kioctx *ctx, long min_nr, long nr,
 	ktime_t until = { .tv64 = KTIME_MAX };
 	long ret = 0;
 
-#ifdef CONFIG_EPOLL
-	if (!event && nr)
-		return -EFAULT;
-#endif
-
 	if (timeout) {
 		struct timespec	ts;
 
@@ -1128,69 +1107,6 @@ static long read_events(struct kioctx *ctx, long min_nr, long nr,
 	return ret;
 }
 
-#ifdef CONFIG_EPOLL
-
-static int aio_queue_fd_close(struct inode *inode, struct file *file)
-{
-	struct kioctx *ioctx = file->private_data;
-	if (ioctx) {
-		file->private_data = 0;
-		spin_lock_irq(&ioctx->ctx_lock);
-		ioctx->file = 0;
-		spin_unlock_irq(&ioctx->ctx_lock);
-		fput(file);
-	}
-	return 0;
-}
-
-static unsigned int aio_queue_fd_poll(struct file *file, poll_table *wait)
-{	unsigned int pollflags = 0;
-	struct kioctx *ioctx = file->private_data;
-
-	if (ioctx) {
-		/* Insert inside our poll wait queue */
-		spin_lock_irq(&ioctx->ctx_lock);
-		poll_wait(file, &ioctx->poll_wait, wait);
-		spin_unlock_irq(&ioctx->ctx_lock);
-
-		/* Check our condition */
-		if (aio_read_events_ring(ioctx, NULL, 1))
-			pollflags = POLLIN | POLLRDNORM;
-	}
-
-	return pollflags;
-}
-
-static const struct file_operations aioq_fops = {
-	.release	= aio_queue_fd_close,
-	.poll		= aio_queue_fd_poll
-};
-
-/* make_aio_fd:
- *  Create a file descriptor that can be used to poll the event queue.
- *  Based on the excellent epoll code.
- */
-
-static int make_aio_fd(struct kioctx *ioctx)
-{
-	int fd;
-	struct file *file;
-
-	fd = anon_inode_getfd("[aioq]", &aioq_fops, ioctx, 0);
-	if (fd < 0)
-		return fd;
-
-	/* associate the file with the IO context */
-	file = fget(fd);
-	if (!file)
-		return -EBADF;
-	file->private_data = ioctx;
-	ioctx->file = file;
-	init_waitqueue_head(&ioctx->poll_wait);
-	return fd;
-}
-#endif
-
 /* sys_io_setup:
  *	Create an aio_context capable of receiving at least nr_events.
  *	ctxp must not point to an aio_context that already exists, and
@@ -1203,30 +1119,18 @@ static int make_aio_fd(struct kioctx *ioctx)
  *	resources are available.  May fail with -EFAULT if an invalid
  *	pointer is passed for ctxp.  Will fail with -ENOSYS if not
  *	implemented.
- *
- *	To request a selectable fd, the user context has to be initialized
- *	to 1, instead of 0, and the return value is the fd.
- *	This keeps the system call compatible, since a non-zero value
- *	was not allowed so far.
  */
 SYSCALL_DEFINE2(io_setup, unsigned, nr_events, aio_context_t __user *, ctxp)
 {
 	struct kioctx *ioctx = NULL;
 	unsigned long ctx;
 	long ret;
-	int make_fd = 0;
 
 	ret = get_user(ctx, ctxp);
 	if (unlikely(ret))
 		goto out;
 
 	ret = -EINVAL;
-#ifdef CONFIG_EPOLL
-	if (ctx == 1) {
-		make_fd = 1;
-		ctx = 0;
-	}
-#endif
 	if (unlikely(ctx || nr_events == 0)) {
 		pr_debug("EINVAL: io_setup: ctx %lu nr_events %u\n",
 		         ctx, nr_events);
@@ -1237,11 +1141,7 @@ SYSCALL_DEFINE2(io_setup, unsigned, nr_events, aio_context_t __user *, ctxp)
 	ret = PTR_ERR(ioctx);
 	if (!IS_ERR(ioctx)) {
 		ret = put_user(ioctx->user_id, ctxp);
-#ifdef CONFIG_EPOLL
-		if (make_fd && !ret)
-			ret = make_aio_fd(ioctx);
-#endif
-		if (ret < 0)
+		if (ret)
 			kill_ioctx(current->mm, ioctx);
 		percpu_ref_put(&ioctx->users);
 	}
@@ -1488,6 +1388,7 @@ static int io_submit_one(struct kioctx *ctx, struct iocb __user *user_iocb,
 	return 0;
 out_put_req:
 	put_reqs_available(ctx, 1);
+	percpu_ref_put(&ctx->reqs);
 	kiocb_free(req);
 	return ret;
 }

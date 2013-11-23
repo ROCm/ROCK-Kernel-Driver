@@ -339,7 +339,7 @@ static void amd_get_topology(struct cpuinfo_x86 *c)
 #endif
 
 /*
- * On a AMD dual core setup the lower bits of the APIC id distingush the cores.
+ * On a AMD dual core setup the lower bits of the APIC id distinguish the cores.
  * Assumes number of cores is a power of two.
  */
 static void amd_detect_cmp(struct cpuinfo_x86 *c)
@@ -362,7 +362,7 @@ static void amd_detect_cmp(struct cpuinfo_x86 *c)
 u16 amd_get_nb_id(int cpu)
 {
 	u16 id = 0;
-#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
+#ifdef CONFIG_SMP
 	id = per_cpu(cpu_llc_id, cpu);
 #endif
 	return id;
@@ -499,7 +499,7 @@ static void early_init_amd(struct cpuinfo_x86 *c)
 		    (c->x86_model == 8 && c->x86_mask >= 8))
 			set_cpu_cap(c, X86_FEATURE_K6_MTRR);
 #endif
-#if defined(CONFIG_X86_LOCAL_APIC) && defined(CONFIG_PCI) && !defined(CONFIG_XEN)
+#if defined(CONFIG_X86_LOCAL_APIC) && defined(CONFIG_PCI)
 	/* check CPU config space for extended APIC ID */
 	if (cpu_has_apic && c->x86 >= 0xf) {
 		unsigned int val;
@@ -510,17 +510,13 @@ static void early_init_amd(struct cpuinfo_x86 *c)
 #endif
 }
 
-#ifndef CONFIG_XEN
 static const int amd_erratum_383[];
 static const int amd_erratum_400[];
 static bool cpu_has_amd_erratum(struct cpuinfo_x86 *cpu, const int *erratum);
-#endif
 
 static void init_amd(struct cpuinfo_x86 *c)
 {
-#ifndef CONFIG_XEN
 	u32 dummy;
-#endif
 	unsigned long long value;
 
 #ifdef CONFIG_SMP
@@ -562,25 +558,18 @@ static void init_amd(struct cpuinfo_x86 *c)
 		 */
 		if (c->x86_model < 0x14 && cpu_has(c, X86_FEATURE_LAHF_LM)) {
 			clear_cpu_cap(c, X86_FEATURE_LAHF_LM);
-#ifndef CONFIG_XEN
 			if (!rdmsrl_amd_safe(0xc001100d, &value)) {
 				value &= ~(1ULL << 32);
 				wrmsrl_amd_safe(0xc001100d, value);
 			}
-#else
-			pr_warning("Long-mode LAHF feature wrongly enabled -"
-				   "hypervisor update needed\n");
-#endif
 		}
 
 	}
 	if (c->x86 >= 0x10)
 		set_cpu_cap(c, X86_FEATURE_REP_GOOD);
 
-#ifndef CONFIG_XEN
 	/* get apicid instead of initial apic id from cpuid */
 	c->apicid = hard_smp_processor_id();
-#endif
 #else
 
 	/*
@@ -620,7 +609,6 @@ static void init_amd(struct cpuinfo_x86 *c)
 		}
 	}
 
-#ifndef CONFIG_XEN
 	/* re-enable TopologyExtensions if switched off by BIOS */
 	if ((c->x86 == 0x15) &&
 	    (c->x86_model >= 0x10) && (c->x86_model <= 0x1f) &&
@@ -650,7 +638,6 @@ static void init_amd(struct cpuinfo_x86 *c)
 			wrmsrl_safe(0xc0011021, value);
 		}
 	}
-#endif
 
 	cpu_detect_cache_sizes(c);
 
@@ -683,7 +670,6 @@ static void init_amd(struct cpuinfo_x86 *c)
 		fam10h_check_enable_mmcfg();
 	}
 
-#ifndef CONFIG_XEN
 	if (c == &boot_cpu_data && c->x86 >= 0xf) {
 		unsigned long long tseg;
 
@@ -701,7 +687,6 @@ static void init_amd(struct cpuinfo_x86 *c)
 		}
 	}
 #endif
-#endif
 
 	/*
 	 * Family 0x12 and above processors have APIC timer
@@ -710,7 +695,6 @@ static void init_amd(struct cpuinfo_x86 *c)
 	if (c->x86 > 0x11)
 		set_cpu_cap(c, X86_FEATURE_ARAT);
 
-#ifndef CONFIG_XEN
 	if (c->x86 == 0x10) {
 		/*
 		 * Disable GART TLB Walk Errors on Fam10h. We do this here
@@ -753,7 +737,6 @@ static void init_amd(struct cpuinfo_x86 *c)
 		set_cpu_bug(c, X86_BUG_AMD_APIC_C1E);
 
 	rdmsr_safe(MSR_AMD64_PATCH_LEVEL, &c->microcode, &dummy);
-#endif
 }
 
 #ifdef CONFIG_X86_32
@@ -840,8 +823,8 @@ static const struct cpu_dev amd_cpu_dev = {
 	.c_vendor	= "AMD",
 	.c_ident	= { "AuthenticAMD" },
 #ifdef CONFIG_X86_32
-	.c_models = {
-		{ .vendor = X86_VENDOR_AMD, .family = 4, .model_names =
+	.legacy_models = {
+		{ .family = 4, .model_names =
 		  {
 			  [3] = "486 DX/2",
 			  [7] = "486 DX/2-WB",
@@ -852,7 +835,7 @@ static const struct cpu_dev amd_cpu_dev = {
 		  }
 		},
 	},
-	.c_size_cache	= amd_size_cache,
+	.legacy_cache_size = amd_size_cache,
 #endif
 	.c_early_init   = early_init_amd,
 	.c_detect_tlb	= cpu_detect_tlb_amd,
@@ -863,7 +846,6 @@ static const struct cpu_dev amd_cpu_dev = {
 
 cpu_dev_register(amd_cpu_dev);
 
-#ifndef CONFIG_XEN
 /*
  * AMD errata checking
  *
@@ -927,4 +909,3 @@ static bool cpu_has_amd_erratum(struct cpuinfo_x86 *cpu, const int *erratum)
 
 	return false;
 }
-#endif

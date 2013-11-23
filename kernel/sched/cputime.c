@@ -126,48 +126,6 @@ static inline void task_group_account_field(struct task_struct *p, int index,
 	cpuacct_account_field(p, index, tmp);
 }
 
-#if !defined(CONFIG_XEN) || defined(CONFIG_VIRT_CPU_ACCOUNTING)
-# define cputime_to_u64(t) ((__force u64)(t))
-#else
-# include <linux/syscore_ops.h>
-# define NS_PER_TICK (1000000000 / HZ)
-
-static DEFINE_PER_CPU(u64, steal_snapshot);
-static DEFINE_PER_CPU(unsigned int, steal_residual);
-
-static u64 cputime_to_u64(cputime_t t)
-{
-	u64 s = this_vcpu_read(runstate.time[RUNSTATE_runnable]);
-	unsigned long adj = div_u64_rem(s - __this_cpu_read(steal_snapshot)
-					  + __this_cpu_read(steal_residual),
-					NS_PER_TICK,
-					&__get_cpu_var(steal_residual));
-
-	__this_cpu_write(steal_snapshot, s);
-	if (t < jiffies_to_cputime(adj))
-		return 0;
-
-	return (__force u64)(t - jiffies_to_cputime(adj));
-}
-
-static void steal_resume(void)
-{
-	cputime_to_u64(((cputime_t)1 << (BITS_PER_LONG * sizeof(cputime_t)
-					 / sizeof(long) - 1)) - 1);
-}
-
-static struct syscore_ops steal_syscore_ops = {
-	.resume	= steal_resume,
-};
-
-static int __init steal_register(void)
-{
-	register_syscore_ops(&steal_syscore_ops);
-	return 0;
-}
-core_initcall(steal_register);
-#endif
-
 /*
  * Account user cpu time to a process.
  * @p: the process that the cpu time gets accounted to
@@ -187,7 +145,7 @@ void account_user_time(struct task_struct *p, cputime_t cputime,
 	index = (TASK_NICE(p) > 0) ? CPUTIME_NICE : CPUTIME_USER;
 
 	/* Add user time to cpustat. */
-	task_group_account_field(p, index, cputime_to_u64(cputime));
+	task_group_account_field(p, index, (__force u64) cputime);
 
 	/* Account for user time used */
 	acct_account_cputime(p);
@@ -237,7 +195,7 @@ void __account_system_time(struct task_struct *p, cputime_t cputime,
 	account_group_system_time(p, cputime);
 
 	/* Add system time to cpustat. */
-	task_group_account_field(p, index, cputime_to_u64(cputime));
+	task_group_account_field(p, index, (__force u64) cputime);
 
 	/* Account for system time used */
 	acct_account_cputime(p);
@@ -291,9 +249,9 @@ void account_idle_time(cputime_t cputime)
 	struct rq *rq = this_rq();
 
 	if (atomic_read(&rq->nr_iowait) > 0)
-		cpustat[CPUTIME_IOWAIT] += cputime_to_u64(cputime);
+		cpustat[CPUTIME_IOWAIT] += (__force u64) cputime;
 	else
-		cpustat[CPUTIME_IDLE] += cputime_to_u64(cputime);
+		cpustat[CPUTIME_IDLE] += (__force u64) cputime;
 }
 
 static __always_inline bool steal_account_process_tick(void)
@@ -377,9 +335,9 @@ static void irqtime_account_process_tick(struct task_struct *p, int user_tick,
 		return;
 
 	if (irqtime_account_hi_update()) {
-		cpustat[CPUTIME_IRQ] += cputime_to_u64(cputime_one_jiffy);
+		cpustat[CPUTIME_IRQ] += (__force u64) cputime_one_jiffy;
 	} else if (irqtime_account_si_update()) {
-		cpustat[CPUTIME_SOFTIRQ] += cputime_to_u64(cputime_one_jiffy);
+		cpustat[CPUTIME_SOFTIRQ] += (__force u64) cputime_one_jiffy;
 	} else if (this_cpu_ksoftirqd() == p) {
 		/*
 		 * ksoftirqd time do not get accounted in cpu_softirq_time.

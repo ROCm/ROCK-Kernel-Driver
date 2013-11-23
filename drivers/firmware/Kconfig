@@ -19,7 +19,7 @@ config EDD
 
 config EDD_OFF
 	bool "Sets default behavior for EDD detection to off"
-	depends on EDD && !XEN
+	depends on EDD
 	default n
 	help
 	  Say Y if you want EDD disabled by default, even though it is compiled into the
@@ -75,7 +75,6 @@ config DELL_RBU
 config DCDBAS
 	tristate "Dell Systems Management Base Driver"
 	depends on X86
-	select XEN_DOMCTL if XEN
 	help
 	  The Dell Systems Management Base Driver provides a sysfs interface
 	  for systems management software to perform System Management

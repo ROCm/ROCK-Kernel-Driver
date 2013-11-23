@@ -52,7 +52,6 @@
 enum ioat_irq_mode {
 	IOAT_NOIRQ = 0,
 	IOAT_MSIX,
-	IOAT_MSIX_SINGLE,
 	IOAT_MSI,
 	IOAT_INTX
 };
@@ -83,7 +82,6 @@ struct ioatdma_device {
 	struct pci_pool *completion_pool;
 #define MAX_SED_POOLS	5
 	struct dma_pool *sed_hw_pool[MAX_SED_POOLS];
-	struct kmem_cache *sed_pool;
 	struct dma_device common;
 	u8 version;
 	struct msix_entry msix_entries[4];
@@ -342,16 +340,6 @@ static inline bool is_ioat_bug(unsigned long err)
 	return !!err;
 }
 
-static inline void ioat_unmap(struct pci_dev *pdev, dma_addr_t addr, size_t len,
-			      int direction, enum dma_ctrl_flags flags, bool dst)
-{
-	if ((dst && (flags & DMA_COMPL_DEST_UNMAP_SINGLE)) ||
-	    (!dst && (flags & DMA_COMPL_SRC_UNMAP_SINGLE)))
-		pci_unmap_single(pdev, addr, len, direction);
-	else
-		pci_unmap_page(pdev, addr, len, direction);
-}
-
 int ioat_probe(struct ioatdma_device *device);
 int ioat_register(struct ioatdma_device *device);
 int ioat1_dma_probe(struct ioatdma_device *dev, int dca);
@@ -363,8 +351,6 @@ void ioat_init_channel(struct ioatdma_device *device,
 		       struct ioat_chan_common *chan, int idx);
 enum dma_status ioat_dma_tx_status(struct dma_chan *c, dma_cookie_t cookie,
 				   struct dma_tx_state *txstate);
-void ioat_dma_unmap(struct ioat_chan_common *chan, enum dma_ctrl_flags flags,
-		    size_t len, struct ioat_dma_descriptor *hw);
 bool ioat_cleanup_preamble(struct ioat_chan_common *chan,
 			   dma_addr_t *phys_complete);
 void ioat_kobject_add(struct ioatdma_device *device, struct kobj_type *type);
@@ -373,21 +359,4 @@ int ioat_dma_setup_interrupts(struct ioatdma_device *device);
 extern const struct sysfs_ops ioat_sysfs_ops;
 extern struct ioat_sysfs_entry ioat_version_attr;
 extern struct ioat_sysfs_entry ioat_cap_attr;
-
-#ifndef CONFIG_XEN
-void ioat_remove_dca_provider(struct pci_dev *);
-#else
-static inline void ioat_remove_dca_provider(struct pci_dev *pdev)
-{
-	struct ioatdma_device *device = pci_get_drvdata(pdev);
-	BUG_ON(device->dca);
-}
-static inline struct dca_provider *
-__ioat_dca_init(struct pci_dev *pdev, void __iomem *iobase)
-{
-	return NULL;
-}
-#define ioat_dca_init __ioat_dca_init
-#endif
-
 #endif /* IOATDMA_H */

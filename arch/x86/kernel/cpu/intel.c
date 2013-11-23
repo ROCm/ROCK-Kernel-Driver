@@ -35,15 +35,10 @@ static void early_init_intel(struct cpuinfo_x86 *c)
 		rdmsrl(MSR_IA32_MISC_ENABLE, misc_enable);
 
 		if (misc_enable & MSR_IA32_MISC_ENABLE_LIMIT_CPUID) {
-#ifndef CONFIG_XEN
 			misc_enable &= ~MSR_IA32_MISC_ENABLE_LIMIT_CPUID;
 			wrmsrl(MSR_IA32_MISC_ENABLE, misc_enable);
 			c->cpuid_level = cpuid_eax(0);
 			get_cpu_cap(c);
-#else
-			pr_warning("CPUID levels are restricted -"
-				   " update hypervisor\n");
-#endif
 		}
 	}
 
@@ -51,7 +46,6 @@ static void early_init_intel(struct cpuinfo_x86 *c)
 		(c->x86 == 0x6 && c->x86_model >= 0x0e))
 		set_cpu_cap(c, X86_FEATURE_CONSTANT_TSC);
 
-#ifndef CONFIG_XEN
 	if (c->x86 >= 6 && !cpu_has(c, X86_FEATURE_IA64)) {
 		unsigned lower_word;
 
@@ -74,7 +68,6 @@ static void early_init_intel(struct cpuinfo_x86 *c)
 		printk(KERN_WARNING "Atom PSE erratum detected, BIOS microcode update recommended\n");
 		clear_cpu_cap(c, X86_FEATURE_PSE);
 	}
-#endif
 
 #ifdef CONFIG_X86_64
 	set_cpu_cap(c, X86_FEATURE_SYSENTER32);
@@ -240,13 +233,9 @@ static void intel_workarounds(struct cpuinfo_x86 *c)
 		rdmsr(MSR_IA32_MISC_ENABLE, lo, hi);
 		if ((lo & MSR_IA32_MISC_ENABLE_PREFETCH_DISABLE) == 0) {
 			printk (KERN_INFO "CPU: C0 stepping P4 Xeon detected.\n");
-#ifndef CONFIG_XEN
 			printk (KERN_INFO "CPU: Disabling hardware prefetching (Errata 037)\n");
 			lo |= MSR_IA32_MISC_ENABLE_PREFETCH_DISABLE;
 			wrmsr(MSR_IA32_MISC_ENABLE, lo, hi);
-#else
-			pr_warning("CPU: Hypervisor update needed\n");
-#endif
 		}
 	}
 
@@ -291,7 +280,6 @@ static void intel_workarounds(struct cpuinfo_x86 *c)
 }
 #endif
 
-#ifndef CONFIG_XEN
 static void srat_detect_node(struct cpuinfo_x86 *c)
 {
 #ifdef CONFIG_NUMA
@@ -364,7 +352,6 @@ static void detect_vmx_virtcap(struct cpuinfo_x86 *c)
 			set_cpu_cap(c, X86_FEATURE_VPID);
 	}
 }
-#endif
 
 static void init_intel(struct cpuinfo_x86 *c)
 {
@@ -448,7 +435,6 @@ static void init_intel(struct cpuinfo_x86 *c)
 		set_cpu_cap(c, X86_FEATURE_P3);
 #endif
 
-#ifndef CONFIG_XEN
 	if (!cpu_has(c, X86_FEATURE_XTOPOLOGY)) {
 		/*
 		 * let's use the legacy cpuid vector 0x1 and 0x4 for topology
@@ -465,7 +451,6 @@ static void init_intel(struct cpuinfo_x86 *c)
 
 	if (cpu_has(c, X86_FEATURE_VMX))
 		detect_vmx_virtcap(c);
-#endif
 
 	/*
 	 * Initialize MSR_IA32_ENERGY_PERF_BIAS if BIOS did not.
@@ -680,8 +665,8 @@ static const struct cpu_dev intel_cpu_dev = {
 	.c_vendor	= "Intel",
 	.c_ident	= { "GenuineIntel" },
 #ifdef CONFIG_X86_32
-	.c_models = {
-		{ .vendor = X86_VENDOR_INTEL, .family = 4, .model_names =
+	.legacy_models = {
+		{ .family = 4, .model_names =
 		  {
 			  [0] = "486 DX-25/33",
 			  [1] = "486 DX-50",
@@ -694,7 +679,7 @@ static const struct cpu_dev intel_cpu_dev = {
 			  [9] = "486 DX/4-WB"
 		  }
 		},
-		{ .vendor = X86_VENDOR_INTEL, .family = 5, .model_names =
+		{ .family = 5, .model_names =
 		  {
 			  [0] = "Pentium 60/66 A-step",
 			  [1] = "Pentium 60/66",
@@ -705,7 +690,7 @@ static const struct cpu_dev intel_cpu_dev = {
 			  [8] = "Mobile Pentium MMX"
 		  }
 		},
-		{ .vendor = X86_VENDOR_INTEL, .family = 6, .model_names =
+		{ .family = 6, .model_names =
 		  {
 			  [0] = "Pentium Pro A-step",
 			  [1] = "Pentium Pro",
@@ -719,7 +704,7 @@ static const struct cpu_dev intel_cpu_dev = {
 			  [11] = "Pentium III (Tualatin)",
 		  }
 		},
-		{ .vendor = X86_VENDOR_INTEL, .family = 15, .model_names =
+		{ .family = 15, .model_names =
 		  {
 			  [0] = "Pentium 4 (Unknown)",
 			  [1] = "Pentium 4 (Willamette)",
@@ -729,7 +714,7 @@ static const struct cpu_dev intel_cpu_dev = {
 		  }
 		},
 	},
-	.c_size_cache	= intel_size_cache,
+	.legacy_cache_size = intel_size_cache,
 #endif
 	.c_detect_tlb	= intel_detect_tlb,
 	.c_early_init   = early_init_intel,

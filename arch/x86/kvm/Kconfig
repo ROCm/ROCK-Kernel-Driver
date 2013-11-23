@@ -7,7 +7,6 @@ source "virt/kvm/Kconfig"
 menuconfig VIRTUALIZATION
 	bool "Virtualization"
 	depends on HAVE_KVM || X86
-	depends on !XEN
 	default y
 	---help---
 	  Say Y here to get to see options for using your Linux host to run other
@@ -39,6 +38,7 @@ config KVM
 	select PERF_EVENTS
 	select HAVE_KVM_MSI
 	select HAVE_KVM_CPU_RELAX_INTERCEPT
+	select KVM_VFIO
 	---help---
 	  Support hosting fully virtualized guest machines using hardware
 	  virtualization extensions.  You will need a fairly recent

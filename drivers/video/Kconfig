@@ -19,9 +19,9 @@ source "drivers/char/agp/Kconfig"
 
 source "drivers/gpu/vga/Kconfig"
 
-source "drivers/gpu/drm/Kconfig"
-
 source "drivers/gpu/host1x/Kconfig"
+
+source "drivers/gpu/drm/Kconfig"
 
 config VGASTATE
        tristate
@@ -754,7 +754,7 @@ config FB_UVESA
 
 config FB_VESA
 	bool "VESA VGA graphics support"
-	depends on (FB = y) && X86 && !XEN_UNPRIVILEGED_GUEST
+	depends on (FB = y) && X86
 	select FB_CFB_FILLRECT
 	select FB_CFB_COPYAREA
 	select FB_CFB_IMAGEBLIT
@@ -996,6 +996,8 @@ config FB_ATMEL
 	select FB_CFB_FILLRECT
 	select FB_CFB_COPYAREA
 	select FB_CFB_IMAGEBLIT
+	select FB_MODE_HELPERS
+	select VIDEOMODE_HELPERS
 	help
 	  This enables support for the AT91/AT32 LCD Controller.
 
@@ -2259,7 +2261,7 @@ config FB_VIRTUAL
 
 config XEN_FBDEV_FRONTEND
 	tristate "Xen virtual frame buffer support"
-	depends on FB && PARAVIRT_XEN
+	depends on FB && XEN
 	select FB_SYS_FILLRECT
 	select FB_SYS_COPYAREA
 	select FB_SYS_IMAGEBLIT

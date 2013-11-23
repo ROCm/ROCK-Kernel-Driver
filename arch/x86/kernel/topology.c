@@ -37,9 +37,7 @@ static DEFINE_PER_CPU(struct x86_cpu, cpu_devices);
 
 #ifdef CONFIG_HOTPLUG_CPU
 
-#if defined(CONFIG_XEN)
-#define cpu0_hotpluggable 0
-#elif defined(CONFIG_BOOTPARAM_HOTPLUG_CPU0)
+#ifdef CONFIG_BOOTPARAM_HOTPLUG_CPU0
 static int cpu0_hotpluggable = 1;
 #else
 static int cpu0_hotpluggable;
@@ -67,29 +65,32 @@ int __ref _debug_hotplug_cpu(int cpu, int action)
 	if (!cpu_is_hotpluggable(cpu))
 		return -EINVAL;
 
-	cpu_hotplug_driver_lock();
+	lock_device_hotplug();
 
 	switch (action) {
 	case 0:
 		ret = cpu_down(cpu);
 		if (!ret) {
 			pr_info("CPU %u is now offline\n", cpu);
+			dev->offline = true;
 			kobject_uevent(&dev->kobj, KOBJ_OFFLINE);
 		} else
 			pr_debug("Can't offline CPU%d.\n", cpu);
 		break;
 	case 1:
 		ret = cpu_up(cpu);
-		if (!ret)
+		if (!ret) {
+			dev->offline = false;
 			kobject_uevent(&dev->kobj, KOBJ_ONLINE);
-		else
+		} else {
 			pr_debug("Can't online CPU%d.\n", cpu);
+		}
 		break;
 	default:
 		ret = -EINVAL;
 	}
 
-	cpu_hotplug_driver_unlock();
+	unlock_device_hotplug();
 
 	return ret;
 }
@@ -105,7 +106,6 @@ late_initcall_sync(debug_hotplug_cpu);
 
 int __ref arch_register_cpu(int num)
 {
-#ifndef cpu0_hotpluggable
 	struct cpuinfo_x86 *c = &cpu_data(num);
 
 	/*
@@ -136,7 +136,6 @@ int __ref arch_register_cpu(int num)
 			}
 		}
 	}
-#endif
 	if (num || cpu0_hotpluggable)
 		per_cpu(cpu_devices, num).cpu.hotpluggable = 1;
 

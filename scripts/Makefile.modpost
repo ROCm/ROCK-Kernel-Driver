@@ -83,9 +83,11 @@ modpost = scripts/mod/modpost                    \
 				$(objtree)/Module.supported \
 				$(srctree)/Module.supported /dev/null)))
 
+MODPOST_OPT=$(subst -i,-n,$(filter -i,$(MAKEFLAGS)))
+
 # We can go over command line length here, so be careful.
 quiet_cmd_modpost = MODPOST $(words $(filter-out vmlinux FORCE, $^)) modules
-      cmd_modpost = $(MODLISTCMD) | sed 's/\.ko$$/.o/' | $(modpost) -s -T -
+      cmd_modpost = $(MODLISTCMD) | sed 's/\.ko$$/.o/' | $(modpost) $(MODPOST_OPT) -s -T -
 
 PHONY += __modpost
 __modpost: $(modules:.ko=.o) FORCE

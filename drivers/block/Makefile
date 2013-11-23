@@ -23,6 +23,7 @@ obj-$(CONFIG_CDROM_PKTCDVD)	+= pktcdvd.o
 obj-$(CONFIG_MG_DISK)		+= mg_disk.o
 obj-$(CONFIG_SUNVDC)		+= sunvdc.o
 obj-$(CONFIG_BLK_DEV_NVME)	+= nvme.o
+obj-$(CONFIG_BLK_DEV_SKD)	+= skd.o
 obj-$(CONFIG_BLK_DEV_OSD)	+= osdblk.o
 
 obj-$(CONFIG_BLK_DEV_UMEM)	+= umem.o
@@ -34,13 +35,15 @@ obj-$(CONFIG_VIODASD)		+= viodasd.o
 obj-$(CONFIG_BLK_DEV_SX8)	+= sx8.o
 obj-$(CONFIG_BLK_DEV_HD)	+= hd.o
 
-obj-$(CONFIG_PARAVIRT_XEN_BLKDEV_FRONTEND) += xen-blkfront.o
-obj-$(CONFIG_PARAVIRT_XEN_BLKDEV_BACKEND) += xen-blkback/
+obj-$(CONFIG_XEN_BLKDEV_FRONTEND)	+= xen-blkfront.o
+obj-$(CONFIG_XEN_BLKDEV_BACKEND)	+= xen-blkback/
 obj-$(CONFIG_BLK_DEV_DRBD)     += drbd/
 obj-$(CONFIG_BLK_DEV_RBD)     += rbd.o
 obj-$(CONFIG_BLK_DEV_PCIESSD_MTIP32XX)	+= mtip32xx/
 
 obj-$(CONFIG_BLK_DEV_RSXX) += rsxx/
+obj-$(CONFIG_BLK_DEV_NULL_BLK)	+= null_blk.o
 
 nvme-y		:= nvme-core.o nvme-scsi.o
+skd-y		:= skd_main.o
 swim_mod-y	:= swim.o swim_asm.o

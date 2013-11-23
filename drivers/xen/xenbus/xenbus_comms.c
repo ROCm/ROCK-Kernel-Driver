@@ -37,57 +37,24 @@
 #include <linux/sched.h>
 #include <linux/err.h>
 #include <xen/xenbus.h>
-#if defined(CONFIG_XEN) || defined(MODULE)
-#include <xen/evtchn.h>
-#include <asm/hypervisor.h>
-#else
 #include <asm/xen/hypervisor.h>
 #include <xen/events.h>
 #include <xen/page.h>
-#endif
-
 #include "xenbus_comms.h"
 
-#ifdef HAVE_XEN_PLATFORM_COMPAT_H
-#include <xen/platform-compat.h>
-#endif
-
 static int xenbus_irq;
+
+static DECLARE_WORK(probe_work, xenbus_probe);
 
 static DECLARE_WAIT_QUEUE_HEAD(xb_waitq);
 
 static irqreturn_t wake_waiting(int irq, void *unused)
 {
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
-	static DECLARE_WORK(probe_work, xenbus_probe);
-	int old, new;
-
-	old = atomic_read(&xenbus_xsd_state);
-	switch (old) {
-		case XENBUS_XSD_UNCOMMITTED:
-			BUG();
-			return IRQ_HANDLED;
-
-		case XENBUS_XSD_FOREIGN_INIT:
-			new = XENBUS_XSD_FOREIGN_READY;
-			break;
-
-		case XENBUS_XSD_LOCAL_INIT:
-			new = XENBUS_XSD_LOCAL_READY;
-			break;
-
-		case XENBUS_XSD_FOREIGN_READY:
-		case XENBUS_XSD_LOCAL_READY:
-		default:
-			goto wake;
+	if (unlikely(xenstored_ready == 0)) {
+		xenstored_ready = 1;
+		schedule_work(&probe_work);
 	}
 
-	old = atomic_cmpxchg(&xenbus_xsd_state, old, new);
-	if (old != new)
-		schedule_work(&probe_work);
-
-wake:
-#endif
 	wake_up(&xb_waitq);
 	return IRQ_HANDLED;
 }
@@ -238,7 +205,6 @@ int xb_read(void *data, unsigned len)
 int xb_init_comms(void)
 {
 	struct xenstore_domain_interface *intf = xen_store_interface;
-	int err;
 
 	if (intf->req_prod != intf->req_cons)
 		pr_err("request ring is not quiescent (%08x:%08x)!\n",
@@ -252,41 +218,26 @@ int xb_init_comms(void)
 			intf->rsp_cons = intf->rsp_prod;
 	}
 
-#if defined(CONFIG_XEN) || defined(MODULE)
-	if (xenbus_irq)
-		unbind_from_irqhandler(xenbus_irq, &xb_waitq);
-
-	err = bind_caller_port_to_irqhandler(
-		xen_store_evtchn, wake_waiting,
-		0, "xenbus", &xb_waitq);
-	if (err <= 0) {
-		pr_err("request irq failed %i\n", err);
-		return err;
-	}
-
-	xenbus_irq = err;
-#else
 	if (xenbus_irq) {
 		/* Already have an irq; assume we're resuming */
 		rebind_evtchn_irq(xen_store_evtchn, xenbus_irq);
 	} else {
+		int err;
 		err = bind_evtchn_to_irqhandler(xen_store_evtchn, wake_waiting,
 						0, "xenbus", &xb_waitq);
 		if (err < 0) {
 			pr_err("request irq failed %i\n", err);
 			return err;
 		}
+
 		xenbus_irq = err;
 	}
-#endif
 
 	return 0;
 }
 
-#if !defined(CONFIG_XEN) && !defined(MODULE)
 void xb_deinit_comms(void)
 {
 	unbind_from_irqhandler(xenbus_irq, &xb_waitq);
 	xenbus_irq = 0;
 }
-#endif

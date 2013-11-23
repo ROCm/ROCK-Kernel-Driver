@@ -15,6 +15,9 @@ menuconfig BLK_DEV
 
 if BLK_DEV
 
+config BLK_DEV_NULL_BLK
+	tristate "Null test block driver"
+
 config BLK_DEV_FD
 	tristate "Normal floppy disk support"
 	depends on ARCH_MAY_HAVE_PC_FDC
@@ -107,7 +110,7 @@ source "drivers/block/mtip32xx/Kconfig"
 
 config BLK_CPQ_DA
 	tristate "Compaq SMART2 support"
-	depends on PCI && VIRT_TO_BUS
+	depends on PCI && VIRT_TO_BUS && 0
 	help
 	  This is the driver for Compaq Smart Array controllers.  Everyone
 	  using these boards should say Y here.  See the file
@@ -316,6 +319,16 @@ config BLK_DEV_NVME
 	  To compile this driver as a module, choose M here: the
 	  module will be called nvme.
 
+config BLK_DEV_SKD
+	tristate "STEC S1120 Block Driver"
+	depends on PCI
+	depends on 64BIT
+	---help---
+	Saying Y or M here will enable support for the
+	STEC, Inc. S1120 PCIe SSD.
+
+	Use device /dev/skd$N amd /dev/skd$Np$M.
+
 config BLK_DEV_OSD
 	tristate "OSD object-as-blkdev support"
 	depends on SCSI_OSD_ULD
@@ -464,9 +477,9 @@ config XILINX_SYSACE
 	help
 	  Include support for the Xilinx SystemACE CompactFlash interface
 
-config PARAVIRT_XEN_BLKDEV_FRONTEND
+config XEN_BLKDEV_FRONTEND
 	tristate "Xen virtual block device support"
-	depends on PARAVIRT_XEN
+	depends on XEN
 	default y
 	select XEN_XENBUS_FRONTEND
 	help
@@ -474,16 +487,16 @@ config PARAVIRT_XEN_BLKDEV_FRONTEND
 	  block device driver.  It communicates with a back-end driver
 	  in another domain which drives the actual block device.
 
-config PARAVIRT_XEN_BLKDEV_BACKEND
+config XEN_BLKDEV_BACKEND
 	tristate "Xen block-device backend driver"
-	depends on PARAVIRT_XEN_BACKEND
+	depends on XEN_BACKEND
 	help
 	  The block-device backend driver allows the kernel to export its
 	  block devices to other guests via a high-performance shared-memory
 	  interface.
 
 	  The corresponding Linux frontend driver is enabled by the
-	  CONFIG_PARAVIRT_XEN_BLKDEV_FRONTEND configuration option.
+	  CONFIG_XEN_BLKDEV_FRONTEND configuration option.
 
 	  The backend driver attaches itself to a any block device specified
 	  in the XenBus configuration. There are no limits to what the block
@@ -505,7 +518,7 @@ config VIRTIO_BLK
 config BLK_DEV_HD
 	bool "Very old hard disk (MFM/RLL/IDE) driver"
 	depends on HAVE_IDE
-	depends on !ARM || ARCH_RPC || ARCH_SHARK || BROKEN
+	depends on !ARM || ARCH_RPC || BROKEN
 	help
 	  This is a very old hard disk driver that lacks the enhanced
 	  functionality of the newer ones.

@@ -37,10 +37,6 @@
 #include <linux/mutex.h>
 #include <asm/io.h>
 
-#ifdef CONFIG_XEN
-#include "../xen/core/domctl.h"
-#endif
-
 #include "dcdbas.h"
 
 #define DRIVER_NAME		"dcdbas"
@@ -111,7 +107,7 @@ static int smi_data_buf_realloc(unsigned long size)
 	/* set up new buffer for use */
 	smi_data_buf = buf;
 	smi_data_buf_handle = handle;
-	smi_data_buf_phys_addr = (u32) handle;
+	smi_data_buf_phys_addr = (u32) virt_to_phys(buf);
 	smi_data_buf_size = size;
 
 	dev_dbg(&dcdbas_pdev->dev, "%s: phys: %x size: %lu\n",
@@ -249,9 +245,7 @@ static ssize_t host_control_on_shutdown_store(struct device *dev,
  */
 int dcdbas_smi_request(struct smi_cmd *smi_cmd)
 {
-#ifndef CONFIG_XEN
 	cpumask_var_t old_mask;
-#endif
 	int ret = 0;
 
 	if (smi_cmd->magic != SMI_CMD_MAGIC) {
@@ -261,7 +255,6 @@ int dcdbas_smi_request(struct smi_cmd *smi_cmd)
 	}
 
 	/* SMI requires CPU 0 */
-#ifndef CONFIG_XEN
 	if (!alloc_cpumask_var(&old_mask, GFP_KERNEL))
 		return -ENOMEM;
 
@@ -273,14 +266,6 @@ int dcdbas_smi_request(struct smi_cmd *smi_cmd)
 		ret = -EBUSY;
 		goto out;
 	}
-#else
-	ret = xen_set_physical_cpu_affinity(0);
-	if (ret) {
-		dev_dbg(&dcdbas_pdev->dev, "%s: failed (%d) to get CPU 0\n",
-			__func__, ret);
-		return ret;
-	}
-#endif
 
 	/* generate SMI */
 	/* inb to force posted write through and make SMI happen now */
@@ -295,13 +280,9 @@ int dcdbas_smi_request(struct smi_cmd *smi_cmd)
 		: "memory"
 	);
 
-#ifndef CONFIG_XEN
 out:
 	set_cpus_allowed_ptr(current, old_mask);
 	free_cpumask_var(old_mask);
-#else
-	xen_set_physical_cpu_affinity(-1);
-#endif
 	return ret;
 }
 
@@ -341,7 +322,7 @@ static ssize_t smi_request_store(struct device *dev,
 		break;
 	case 1:
 		/* Calling Interface SMI */
-		smi_cmd->ebx = (u32) virt_to_bus(smi_cmd->command_buffer);
+		smi_cmd->ebx = (u32) virt_to_phys(smi_cmd->command_buffer);
 		ret = dcdbas_smi_request(smi_cmd);
 		if (!ret)
 			ret = count;
@@ -564,12 +545,15 @@ static int dcdbas_probe(struct platform_device *dev)
 	host_control_action = HC_ACTION_NONE;
 	host_control_smi_type = HC_SMITYPE_NONE;
 
+	dcdbas_pdev = dev;
+
 	/*
 	 * BIOS SMI calls require buffer addresses be in 32-bit address space.
 	 * This is done by setting the DMA mask below.
 	 */
-	dcdbas_pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
-	dcdbas_pdev->dev.dma_mask = &dcdbas_pdev->dev.coherent_dma_mask;
+	error = dma_set_coherent_mask(&dcdbas_pdev->dev, DMA_BIT_MASK(32));
+	if (error)
+		return error;
 
 	error = sysfs_create_group(&dev->dev.kobj, &dcdbas_attr_group);
 	if (error)
@@ -600,6 +584,14 @@ static struct platform_driver dcdbas_driver = {
 	.remove		= dcdbas_remove,
 };
 
+static const struct platform_device_info dcdbas_dev_info __initdata = {
+	.name		= DRIVER_NAME,
+	.id		= -1,
+	.dma_mask	= DMA_BIT_MASK(32),
+};
+
+static struct platform_device *dcdbas_pdev_reg;
+
 /**
  * dcdbas_init: initialize driver
  */
@@ -607,29 +599,18 @@ static int __init dcdbas_init(void)
 {
 	int error;
 
-#ifdef CONFIG_XEN
-	if (!is_initial_xendomain())
-		return -ENODEV;
-#endif
-
 	error = platform_driver_register(&dcdbas_driver);
 	if (error)
 		return error;
 
-	dcdbas_pdev = platform_device_alloc(DRIVER_NAME, -1);
-	if (!dcdbas_pdev) {
-		error = -ENOMEM;
+	dcdbas_pdev_reg = platform_device_register_full(&dcdbas_dev_info);
+	if (IS_ERR(dcdbas_pdev_reg)) {
+		error = PTR_ERR(dcdbas_pdev_reg);
 		goto err_unregister_driver;
 	}
 
-	error = platform_device_add(dcdbas_pdev);
-	if (error)
-		goto err_free_device;
-
 	return 0;
 
- err_free_device:
-	platform_device_put(dcdbas_pdev);
  err_unregister_driver:
 	platform_driver_unregister(&dcdbas_driver);
 	return error;
@@ -652,8 +633,9 @@ static void __exit dcdbas_exit(void)
 	 * all sysfs attributes belonging to this module have been
 	 * released.
 	 */
-	smi_data_buf_free();
-	platform_device_unregister(dcdbas_pdev);
+	if (dcdbas_pdev)
+		smi_data_buf_free();
+	platform_device_unregister(dcdbas_pdev_reg);
 	platform_driver_unregister(&dcdbas_driver);
 }
 

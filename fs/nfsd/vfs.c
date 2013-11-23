@@ -454,7 +454,7 @@ nfsd_setattr(struct svc_rqst *rqstp, struct svc_fh *fhp, struct iattr *iap,
 		goto out_put_write_access_nfserror;
 
 	fh_lock(fhp);
-	host_err = notify_change(dentry, iap);
+	host_err = notify_change(dentry, iap, NULL);
 	fh_unlock(fhp);
 
 out_put_write_access_nfserror:
@@ -1013,7 +1013,11 @@ static void kill_suid(struct dentry *dentry)
 	ia.ia_valid = ATTR_KILL_SUID | ATTR_KILL_SGID | ATTR_KILL_PRIV;
 
 	mutex_lock(&dentry->d_inode->i_mutex);
-	notify_change(dentry, &ia);
+	/*
+	 * Note we call this on write, so notify_change will not
+	 * encounter any conflicting delegations:
+	 */
+	notify_change(dentry, &ia, NULL);
 	mutex_unlock(&dentry->d_inode->i_mutex);
 }
 
@@ -1342,9 +1346,8 @@ nfsd_create(struct svc_rqst *rqstp, struct svc_fh *fhp,
 		if (!fhp->fh_locked) {
 			/* not actually possible */
 			printk(KERN_ERR
-				"nfsd_create: parent %s/%s not locked!\n",
-				dentry->d_parent->d_name.name,
-				dentry->d_name.name);
+				"nfsd_create: parent %pd2 not locked!\n",
+				dentry);
 			err = nfserr_io;
 			goto out;
 		}
@@ -1354,8 +1357,8 @@ nfsd_create(struct svc_rqst *rqstp, struct svc_fh *fhp,
 	 */
 	err = nfserr_exist;
 	if (dchild->d_inode) {
-		dprintk("nfsd_create: dentry %s/%s not negative!\n",
-			dentry->d_name.name, dchild->d_name.name);
+		dprintk("nfsd_create: dentry %pd/%pd not negative!\n",
+			dentry, dchild);
 		goto out; 
 	}
 
@@ -1762,7 +1765,7 @@ nfsd_link(struct svc_rqst *rqstp, struct svc_fh *ffhp,
 		err = nfserrno(host_err);
 		goto out_dput;
 	}
-	host_err = vfs_link(dold, dirp, dnew);
+	host_err = vfs_link(dold, dirp, dnew, NULL);
 	if (!host_err) {
 		err = nfserrno(commit_metadata(ffhp));
 		if (!err)
@@ -1863,7 +1866,7 @@ nfsd_rename(struct svc_rqst *rqstp, struct svc_fh *ffhp, char *fname, int flen,
 		if (host_err)
 			goto out_dput_new;
 	}
-	host_err = vfs_rename(fdir, odentry, tdir, ndentry);
+	host_err = vfs_rename(fdir, odentry, tdir, ndentry, NULL);
 	if (!host_err) {
 		host_err = commit_metadata(tfhp);
 		if (!host_err)
@@ -1936,7 +1939,7 @@ nfsd_unlink(struct svc_rqst *rqstp, struct svc_fh *fhp, int type,
 	if (host_err)
 		goto out_put;
 	if (type != S_IFDIR)
-		host_err = vfs_unlink(dirp, rdentry);
+		host_err = vfs_unlink(dirp, rdentry, NULL);
 	else
 		host_err = vfs_rmdir(dirp, rdentry);
 	if (!host_err)

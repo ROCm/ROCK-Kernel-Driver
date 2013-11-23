@@ -17,7 +17,7 @@
 #include <asm/bootparam.h>
 #include <asm/suspend.h>
 
-#if defined(CONFIG_XEN) || defined(CONFIG_PARAVIRT_XEN)
+#ifdef CONFIG_XEN
 #include <xen/interface/xen.h>
 #endif
 
@@ -32,7 +32,6 @@ void common(void) {
 	OFFSET(TI_flags, thread_info, flags);
 	OFFSET(TI_status, thread_info, status);
 	OFFSET(TI_addr_limit, thread_info, addr_limit);
-	OFFSET(TI_preempt_count, thread_info, preempt_count);
 
 	BLANK();
 	OFFSET(crypto_tfm_ctx_offset, crypto_tfm, __crt_ctx);
@@ -55,7 +54,7 @@ void common(void) {
 	OFFSET(PV_MMU_read_cr2, pv_mmu_ops, read_cr2);
 #endif
 
-#ifdef CONFIG_PARAVIRT_XEN
+#ifdef CONFIG_XEN
 	BLANK();
 	OFFSET(XEN_vcpu_info_mask, vcpu_info, evtchn_upcall_mask);
 	OFFSET(XEN_vcpu_info_pending, vcpu_info, evtchn_upcall_pending);

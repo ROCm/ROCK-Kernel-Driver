@@ -143,17 +143,18 @@ static void rpipe_init(struct wa_rpipe *rpipe)
 	kref_init(&rpipe->refcnt);
 	spin_lock_init(&rpipe->seg_lock);
 	INIT_LIST_HEAD(&rpipe->seg_list);
+	INIT_LIST_HEAD(&rpipe->list_node);
 }
 
 static unsigned rpipe_get_idx(struct wahc *wa, unsigned rpipe_idx)
 {
 	unsigned long flags;
 
-	spin_lock_irqsave(&wa->rpipe_bm_lock, flags);
+	spin_lock_irqsave(&wa->rpipe_lock, flags);
 	rpipe_idx = find_next_zero_bit(wa->rpipe_bm, wa->rpipes, rpipe_idx);
 	if (rpipe_idx < wa->rpipes)
 		set_bit(rpipe_idx, wa->rpipe_bm);
-	spin_unlock_irqrestore(&wa->rpipe_bm_lock, flags);
+	spin_unlock_irqrestore(&wa->rpipe_lock, flags);
 
 	return rpipe_idx;
 }
@@ -162,9 +163,9 @@ static void rpipe_put_idx(struct wahc *wa, unsigned rpipe_idx)
 {
 	unsigned long flags;
 
-	spin_lock_irqsave(&wa->rpipe_bm_lock, flags);
+	spin_lock_irqsave(&wa->rpipe_lock, flags);
 	clear_bit(rpipe_idx, wa->rpipe_bm);
-	spin_unlock_irqrestore(&wa->rpipe_bm_lock, flags);
+	spin_unlock_irqrestore(&wa->rpipe_lock, flags);
 }
 
 void rpipe_destroy(struct kref *_rpipe)
@@ -364,8 +365,10 @@ static int rpipe_aim(struct wa_rpipe *rpipe, struct wahc *wa,
 			epcd->bMaxSequence, 32U), 2U);
 	rpipe->descr.bMaxDataSequence = epcd_max_sequence - 1;
 	rpipe->descr.bInterval = ep->desc.bInterval;
-	/* FIXME: bOverTheAirInterval */
-	rpipe->descr.bOverTheAirInterval = 0;	/* 0 if not isoc */
+	if (usb_endpoint_xfer_isoc(&ep->desc))
+		rpipe->descr.bOverTheAirInterval = epcd->bOverTheAirInterval;
+	else
+		rpipe->descr.bOverTheAirInterval = 0;	/* 0 if not isoc */
 	/* FIXME: xmit power & preamble blah blah */
 	rpipe->descr.bmAttribute = (ep->desc.bmAttributes &
 					USB_ENDPOINT_XFERTYPE_MASK);
@@ -480,7 +483,7 @@ error:
  */
 int wa_rpipes_create(struct wahc *wa)
 {
-	wa->rpipes = wa->wa_descr->wNumRPipes;
+	wa->rpipes = le16_to_cpu(wa->wa_descr->wNumRPipes);
 	wa->rpipe_bm = kzalloc(BITS_TO_LONGS(wa->rpipes)*sizeof(unsigned long),
 			       GFP_KERNEL);
 	if (wa->rpipe_bm == NULL)

@@ -20,47 +20,6 @@
 #define _COMPONENT		ACPI_PROCESSOR_COMPONENT
 ACPI_MODULE_NAME("processor_core");
 
-#ifdef CONFIG_PROCESSOR_EXTERNAL_CONTROL
-/*
- * External processor control logic may register with its own set of
- * ops to get ACPI related notification. One example is like VMM.
- */
-const struct processor_extcntl_ops *processor_extcntl_ops;
-EXPORT_SYMBOL(processor_extcntl_ops);
-
-int processor_notify_external(struct acpi_processor *pr, int event, int type)
-{
-	int ret = -EINVAL;
-
-	if (!processor_cntl_external())
-		return -EINVAL;
-
-	switch (event) {
-	case PROCESSOR_PM_INIT:
-	case PROCESSOR_PM_CHANGE:
-		if (type >= PM_TYPE_MAX
-		    || !processor_extcntl_ops->pm_ops[type])
-			break;
-
-		ret = processor_extcntl_ops->pm_ops[type](pr, event);
-		break;
-#ifdef CONFIG_ACPI_HOTPLUG_CPU
-	case PROCESSOR_HOTPLUG:
-		if (processor_extcntl_ops->hotplug)
-			ret = processor_extcntl_ops->hotplug(pr, type);
-		xen_pcpu_hotplug(type);
-		break;
-#endif
-	default:
-		pr_err("Unsupported processor event %d.\n", event);
-		break;
-	}
-
-	return ret;
-}
-EXPORT_SYMBOL_GPL(processor_notify_external);
-#endif
-
 static int __init set_no_mwait(const struct dmi_system_id *id)
 {
 	printk(KERN_NOTICE PREFIX "%s detected - "
@@ -203,21 +162,24 @@ exit:
 	return apic_id;
 }
 
-int acpi_get_cpuid(acpi_handle handle, int type, u32 acpi_id)
+int acpi_get_apicid(acpi_handle handle, int type, u32 acpi_id)
 {
-	int i = 0, apic_id = -1;
-
-	if (type < 0) {
-		if (!processor_cntl_external())
-			return -1;
-		type = ~type;
-		i = 1;
-	}
+	int apic_id;
 
 	apic_id = map_mat_entry(handle, type, acpi_id);
 	if (apic_id == -1)
 		apic_id = map_madt_entry(type, acpi_id);
-	if (apic_id == -1 || i) {
+
+	return apic_id;
+}
+
+int acpi_map_cpuid(int apic_id, u32 acpi_id)
+{
+#ifdef CONFIG_SMP
+	int i;
+#endif
+
+	if (apic_id == -1) {
 		/*
 		 * On UP processor, there is no _MAT or MADT table.
 		 * So above apic_id is always set to -1.
@@ -238,33 +200,32 @@ int acpi_get_cpuid(acpi_handle handle, int type, u32 acpi_id)
 		 * This should be the case if SMP tables are not found.
 		 * Return -1 for other CPU's handle.
 		 */
-		if (nr_cpu_ids <= 1 && acpi_id == 0 && !i)
+		if (nr_cpu_ids <= 1 && acpi_id == 0)
 			return acpi_id;
 		else
 			return apic_id;
 	}
 
 #ifdef CONFIG_SMP
-#ifndef CONFIG_PROCESSOR_EXTERNAL_CONTROL
 	for_each_possible_cpu(i) {
 		if (cpu_physical_id(i) == apic_id)
 			return i;
 	}
-#else
-	/*
-	 * Use of cpu_physical_id() is bogus here. Rather than defining a
-	 * stub enforcing a 1:1 mapping, we keep it undefined to catch bad
-	 * uses. Return as if there was a 1:1 mapping.
-	 */
-	if (apic_id < nr_cpu_ids && cpu_possible(apic_id))
-		return apic_id;
-#endif
 #else
 	/* In UP kernel, only processor 0 is valid */
 	if (apic_id == 0)
 		return apic_id;
 #endif
 	return -1;
+}
+
+int acpi_get_cpuid(acpi_handle handle, int type, u32 acpi_id)
+{
+	int apic_id;
+
+	apic_id = acpi_get_apicid(handle, type, acpi_id);
+
+	return acpi_map_cpuid(apic_id, acpi_id);
 }
 EXPORT_SYMBOL_GPL(acpi_get_cpuid);
 
@@ -300,8 +261,6 @@ static bool __init processor_physically_present(acpi_handle handle)
 	}
 
 	type = (acpi_type == ACPI_TYPE_DEVICE) ? 1 : 0;
-	if (processor_cntl_external())
-		type = ~type;
 	cpuid = acpi_get_cpuid(handle, type, acpi_id);
 
 	if (cpuid == -1)
@@ -370,31 +329,19 @@ acpi_processor_eval_pdc(acpi_handle handle, struct acpi_object_list *pdc_in)
 {
 	acpi_status status = AE_OK;
 
-#ifndef CONFIG_XEN
 	if (boot_option_idle_override == IDLE_NOMWAIT) {
 		/*
 		 * If mwait is disabled for CPU C-states, the C2C3_FFH access
 		 * mode will be disabled in the parameter of _PDC object.
 		 * Of course C1_FFH access mode will also be disabled.
 		 */
-#else
-	{
-		struct xen_platform_op op;
-#endif
 		union acpi_object *obj;
 		u32 *buffer = NULL;
 
 		obj = pdc_in->pointer;
 		buffer = (u32 *)(obj->buffer.pointer);
-#ifndef CONFIG_XEN
 		buffer[2] &= ~(ACPI_PDC_C_C2C3_FFH | ACPI_PDC_C_C1_FFH);
-#else
-		op.cmd = XENPF_set_processor_pminfo;
-		op.u.set_pminfo.id = -1;
-		op.u.set_pminfo.type = XEN_PM_PDC;
-		set_xen_guest_handle(op.u.set_pminfo.u.pdc, buffer);
-		VOID(HYPERVISOR_platform_op(&op));
-#endif
+
 	}
 	status = acpi_evaluate_object(handle, "_PDC", pdc_in, NULL);
 

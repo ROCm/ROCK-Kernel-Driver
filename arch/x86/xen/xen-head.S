@@ -1,7 +1,7 @@
 /* Xen-specific pieces of head.S, intended to be included in the right
 	place in head.S */
 
-#ifdef CONFIG_PARAVIRT_XEN
+#ifdef CONFIG_XEN
 
 #include <linux/elfnote.h>
 #include <linux/init.h>
@@ -104,4 +104,4 @@ NEXT_HYPERCALL(arch_6)
 	ELFNOTE(Xen, XEN_ELFNOTE_HV_START_LOW,   _ASM_PTR __HYPERVISOR_VIRT_START)
 	ELFNOTE(Xen, XEN_ELFNOTE_PADDR_OFFSET,   _ASM_PTR 0)
 
-#endif /* CONFIG_PARAVIRT_XEN */
+#endif /*CONFIG_XEN */

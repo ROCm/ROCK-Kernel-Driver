@@ -22,9 +22,6 @@
 #include <linux/tick.h>
 #include <linux/stop_machine.h>
 #include <linux/pvclock_gtod.h>
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
-#include <asm/time.h>
-#endif
 
 #include "tick-internal.h"
 #include "ntp_internal.h"
@@ -518,10 +515,6 @@ int do_settimeofday(const struct timespec *tv)
 
 	timekeeping_update(tk, TK_CLEAR_NTP | TK_MIRROR | TK_CLOCK_WAS_SET);
 
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
-	xen_update_wallclock(tv);
-#endif
-
 	write_seqcount_end(&timekeeper_seq);
 	raw_spin_unlock_irqrestore(&timekeeper_lock, flags);
 
@@ -562,10 +555,6 @@ int timekeeping_inject_offset(struct timespec *ts)
 
 	tk_xtime_add(tk, ts);
 	tk_set_wall_to_mono(tk, timespec_sub(tk->wall_to_monotonic, *ts));
-
-#ifdef CONFIG_XEN_PRIVILEGED_GUEST
-	xen_update_wallclock(&tmp);
-#endif
 
 error: /* even if we error out, we forwarded the time, so call update */
 	timekeeping_update(tk, TK_CLEAR_NTP | TK_MIRROR | TK_CLOCK_WAS_SET);
@@ -1624,9 +1613,10 @@ void get_xtime_and_monotonic_and_sleep_offset(struct timespec *xtim,
  * ktime_get_update_offsets - hrtimer helper
  * @offs_real:	pointer to storage for monotonic -> realtime offset
  * @offs_boot:	pointer to storage for monotonic -> boottime offset
+ * @offs_tai:	pointer to storage for monotonic -> clock tai offset
  *
  * Returns current monotonic time and updates the offsets
- * Called from hrtimer_interupt() or retrigger_next_event()
+ * Called from hrtimer_interrupt() or retrigger_next_event()
  */
 ktime_t ktime_get_update_offsets(ktime_t *offs_real, ktime_t *offs_boot,
 							ktime_t *offs_tai)

@@ -37,7 +37,6 @@
 #include <linux/mod_devicetable.h>
 #include <linux/log2.h>
 #include <linux/pm.h>
-#include <linux/efi.h>
 #include <linux/of.h>
 #include <linux/of_platform.h>
 
@@ -596,7 +595,7 @@ static irqreturn_t cmos_interrupt(int irq, void *p)
 static int INITSECTION
 cmos_do_probe(struct device *dev, struct resource *ports, int rtc_irq)
 {
-	struct cmos_rtc_board_info	*info = dev->platform_data;
+	struct cmos_rtc_board_info	*info = dev_get_platdata(dev);
 	int				retval = 0;
 	unsigned char			rtc_control;
 	unsigned			address_space;
@@ -790,7 +789,6 @@ static void __exit cmos_do_remove(struct device *dev)
 	cmos->iomem = NULL;
 
 	cmos->dev = NULL;
-	dev_set_drvdata(dev, NULL);
 }
 
 #ifdef	CONFIG_PM
@@ -1145,11 +1143,6 @@ static bool platform_driver_registered;
 static int __init cmos_init(void)
 {
 	int retval = 0;
-
-#ifdef CONFIG_XEN
-	if (efi_enabled(EFI_RUNTIME_SERVICES))
-		return -ENODEV;
-#endif
 
 #ifdef	CONFIG_PNP
 	retval = pnp_register_driver(&cmos_pnp_driver);

@@ -157,7 +157,6 @@ static inline void ioat2_set_chainaddr(struct ioat2_dma_chan *ioat, u64 addr)
 
 int ioat2_dma_probe(struct ioatdma_device *dev, int dca);
 int ioat3_dma_probe(struct ioatdma_device *dev, int dca);
-void ioat3_dma_remove(struct ioatdma_device *dev);
 struct dca_provider *ioat2_dca_init(struct pci_dev *pdev, void __iomem *iobase);
 struct dca_provider *ioat3_dca_init(struct pci_dev *pdev, void __iomem *iobase);
 int ioat2_check_space_lock(struct ioat2_dma_chan *ioat, int num_descs);
@@ -177,10 +176,4 @@ int ioat2_quiesce(struct ioat_chan_common *chan, unsigned long tmo);
 int ioat2_reset_sync(struct ioat_chan_common *chan, unsigned long tmo);
 extern struct kobj_type ioat2_ktype;
 extern struct kmem_cache *ioat2_cache;
-
-#ifdef CONFIG_XEN
-#define ioat2_dca_init __ioat_dca_init
-#define ioat3_dca_init __ioat_dca_init
-#endif
-
 #endif /* IOATDMA_V2_H */

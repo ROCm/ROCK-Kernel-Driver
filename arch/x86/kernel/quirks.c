@@ -4,7 +4,9 @@
 #include <linux/pci.h>
 #include <linux/irq.h>
 
-#if defined(CONFIG_X86_IO_APIC) && (defined(CONFIG_SMP) || defined(CONFIG_XEN)) && defined(CONFIG_PCI)
+#include <asm/hpet.h>
+
+#if defined(CONFIG_X86_IO_APIC) && defined(CONFIG_SMP) && defined(CONFIG_PCI)
 
 static void quirk_intel_irqbalance(struct pci_dev *dev)
 {
@@ -32,20 +34,9 @@ static void quirk_intel_irqbalance(struct pci_dev *dev)
 	if (!(word & (1 << 13))) {
 		dev_info(&dev->dev, "Intel E7520/7320/7525 detected; "
 			"disabling irq balancing and affinity\n");
-#ifndef CONFIG_XEN
 		noirqdebug_setup("");
 #ifdef CONFIG_PROC_FS
 		no_irq_affinity = 1;
-#endif
-#else
-		{
-			struct xen_platform_op op = {
-				.cmd = XENPF_platform_quirk,
-				.u.platform_quirk.quirk_id = QUIRK_NOIRQBALANCING
-			};
-
-			WARN_ON(HYPERVISOR_platform_op(&op));
-		}
 #endif
 	}
 
@@ -62,8 +53,6 @@ DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_E7520_MCH,
 #endif
 
 #if defined(CONFIG_HPET_TIMER)
-#include <asm/hpet.h>
-
 unsigned long force_hpet_address;
 
 static enum {

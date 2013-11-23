@@ -106,7 +106,6 @@ static ssize_t kexec_crash_size_show(struct kobject *kobj,
 {
 	return sprintf(buf, "%zu\n", crash_get_memory_size());
 }
-#ifndef CONFIG_XEN
 static ssize_t kexec_crash_size_store(struct kobject *kobj,
 				   struct kobj_attribute *attr,
 				   const char *buf, size_t count)
@@ -121,9 +120,6 @@ static ssize_t kexec_crash_size_store(struct kobject *kobj,
 	return ret < 0 ? ret : count;
 }
 KERNEL_ATTR_RW(kexec_crash_size);
-#else
-KERNEL_ATTR_RO(kexec_crash_size);
-#endif
 
 static ssize_t vmcoreinfo_show(struct kobject *kobj,
 			       struct kobj_attribute *attr, char *buf)

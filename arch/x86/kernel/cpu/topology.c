@@ -28,7 +28,7 @@
  */
 void detect_extended_topology(struct cpuinfo_x86 *c)
 {
-#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
+#ifdef CONFIG_SMP
 	unsigned int eax, ebx, ecx, edx, sub_index;
 	unsigned int ht_mask_width, core_plus_mask_width;
 	unsigned int core_select_mask, core_level_siblings;

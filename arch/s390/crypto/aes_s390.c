@@ -35,6 +35,7 @@ static u8 *ctrblk;
 static char keylen_flag;
 
 struct s390_aes_ctx {
+	u8 iv[AES_BLOCK_SIZE];
 	u8 key[AES_MAX_KEY_SIZE];
 	long enc;
 	long dec;
@@ -440,36 +441,30 @@ static int cbc_aes_set_key(struct crypto_tfm *tfm, const u8 *in_key,
 	return aes_set_key(tfm, in_key, key_len);
 }
 
-static int cbc_aes_crypt(struct blkcipher_desc *desc, long func,
+static int cbc_aes_crypt(struct blkcipher_desc *desc, long func, void *param,
 			 struct blkcipher_walk *walk)
 {
-	struct s390_aes_ctx *sctx = crypto_blkcipher_ctx(desc->tfm);
 	int ret = blkcipher_walk_virt(desc, walk);
 	unsigned int nbytes = walk->nbytes;
-	struct {
-		u8 iv[AES_BLOCK_SIZE];
-		u8 key[AES_MAX_KEY_SIZE];
-	} param;
 
 	if (!nbytes)
 		goto out;
 
-	memcpy(param.iv, walk->iv, AES_BLOCK_SIZE);
-	memcpy(param.key, sctx->key, sctx->key_len);
+	memcpy(param, walk->iv, AES_BLOCK_SIZE);
 	do {
 		/* only use complete blocks */
 		unsigned int n = nbytes & ~(AES_BLOCK_SIZE - 1);
 		u8 *out = walk->dst.virt.addr;
 		u8 *in = walk->src.virt.addr;
 
-		ret = crypt_s390_kmc(func, &param, out, in, n);
+		ret = crypt_s390_kmc(func, param, out, in, n);
 		if (ret < 0 || ret != n)
 			return -EIO;
 
 		nbytes &= AES_BLOCK_SIZE - 1;
 		ret = blkcipher_walk_done(desc, walk, nbytes);
 	} while ((nbytes = walk->nbytes));
-	memcpy(walk->iv, param.iv, AES_BLOCK_SIZE);
+	memcpy(walk->iv, param, AES_BLOCK_SIZE);
 
 out:
 	return ret;
@@ -486,7 +481,7 @@ static int cbc_aes_encrypt(struct blkcipher_desc *desc,
 		return fallback_blk_enc(desc, dst, src, nbytes);
 
 	blkcipher_walk_init(&walk, dst, src, nbytes);
-	return cbc_aes_crypt(desc, sctx->enc, &walk);
+	return cbc_aes_crypt(desc, sctx->enc, sctx->iv, &walk);
 }
 
 static int cbc_aes_decrypt(struct blkcipher_desc *desc,
@@ -500,7 +495,7 @@ static int cbc_aes_decrypt(struct blkcipher_desc *desc,
 		return fallback_blk_dec(desc, dst, src, nbytes);
 
 	blkcipher_walk_init(&walk, dst, src, nbytes);
-	return cbc_aes_crypt(desc, sctx->dec, &walk);
+	return cbc_aes_crypt(desc, sctx->dec, sctx->iv, &walk);
 }
 
 static struct crypto_alg cbc_aes_alg = {
@@ -730,6 +725,8 @@ static struct crypto_alg xts_aes_alg = {
 	}
 };
 
+static int xts_aes_alg_reg;
+
 static int ctr_aes_set_key(struct crypto_tfm *tfm, const u8 *in_key,
 			   unsigned int key_len)
 {
@@ -851,6 +848,8 @@ static struct crypto_alg ctr_aes_alg = {
 	}
 };
 
+static int ctr_aes_alg_reg;
+
 static int __init aes_s390_init(void)
 {
 	int ret;
@@ -889,6 +888,7 @@ static int __init aes_s390_init(void)
 		ret = crypto_register_alg(&xts_aes_alg);
 		if (ret)
 			goto xts_aes_err;
+		xts_aes_alg_reg = 1;
 	}
 
 	if (crypt_s390_func_available(KMCTR_AES_128_ENCRYPT,
@@ -907,6 +907,7 @@ static int __init aes_s390_init(void)
 			free_page((unsigned long) ctrblk);
 			goto ctr_aes_err;
 		}
+		ctr_aes_alg_reg = 1;
 	}
 
 out:
@@ -926,9 +927,12 @@ aes_err:
 
 static void __exit aes_s390_fini(void)
 {
-	crypto_unregister_alg(&ctr_aes_alg);
-	free_page((unsigned long) ctrblk);
-	crypto_unregister_alg(&xts_aes_alg);
+	if (ctr_aes_alg_reg) {
+		crypto_unregister_alg(&ctr_aes_alg);
+		free_page((unsigned long) ctrblk);
+	}
+	if (xts_aes_alg_reg)
+		crypto_unregister_alg(&xts_aes_alg);
 	crypto_unregister_alg(&cbc_aes_alg);
 	crypto_unregister_alg(&ecb_aes_alg);
 	crypto_unregister_alg(&aes_alg);
