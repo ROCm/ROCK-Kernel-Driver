@@ -59,7 +59,7 @@ static int ovl_whiteout(struct dentry *upperdir, struct dentry *dentry)
 
 	err = vfs_setxattr(newdentry, ovl_whiteout_xattr, "y", 1, 0);
 	if (err)
-		vfs_unlink(upperdir->d_inode, newdentry);
+		vfs_unlink(upperdir->d_inode, newdentry, NULL);
 
 out_dput:
 	dput(newdentry);
@@ -117,7 +117,7 @@ static struct dentry *ovl_lookup_create(struct dentry *upperdir,
 
 		err = -EEXIST;
 		if (ovl_is_whiteout(newdentry))
-			err = vfs_unlink(upperdir->d_inode, newdentry);
+			err = vfs_unlink(upperdir->d_inode, newdentry, NULL);
 
 		revert_creds(old_cred);
 		put_cred(override_cred);
@@ -367,7 +367,8 @@ static int ovl_do_remove(struct dentry *dentry, bool is_dir)
 		if (is_dir)
 			err = vfs_rmdir(upperdir->d_inode, realpath.dentry);
 		else
-			err = vfs_unlink(upperdir->d_inode, realpath.dentry);
+			err = vfs_unlink(upperdir->d_inode, realpath.dentry,
+					 NULL);
 		if (err)
 			goto out_d_drop;
 
@@ -436,7 +437,7 @@ static int ovl_link(struct dentry *old, struct inode *newdir,
 		goto out_unlock;
 
 	olddentry = ovl_dentry_upper(old);
-	err = vfs_link(olddentry, upperdir->d_inode, newdentry);
+	err = vfs_link(olddentry, upperdir->d_inode, newdentry, NULL);
 	if (!err) {
 		if (WARN_ON(!newdentry->d_inode)) {
 			dput(newdentry);
@@ -557,7 +558,7 @@ static int ovl_rename(struct inode *olddir, struct dentry *old,
 	}
 
 	err = vfs_rename(old_upperdir->d_inode, olddentry,
-			 new_upperdir->d_inode, newdentry);
+			 new_upperdir->d_inode, newdentry, NULL);
 
 	if (err) {
 		if (new_create && ovl_dentry_is_opaque(new))

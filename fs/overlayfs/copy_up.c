@@ -164,7 +164,7 @@ static int ovl_set_timestamps(struct dentry *upperdentry, struct kstat *stat)
 		.ia_mtime = stat->mtime,
 	};
 
-	return notify_change(upperdentry, &attr);
+	return notify_change(upperdentry, &attr, NULL);
 }
 
 static int ovl_set_mode(struct dentry *upperdentry, umode_t mode)
@@ -174,7 +174,7 @@ static int ovl_set_mode(struct dentry *upperdentry, umode_t mode)
 		.ia_mode = mode,
 	};
 
-	return notify_change(upperdentry, &attr);
+	return notify_change(upperdentry, &attr, NULL);
 }
 
 static int ovl_copy_up_locked(struct dentry *upperdir, struct dentry *dentry,
@@ -229,7 +229,7 @@ err_remove:
 	if (S_ISDIR(stat->mode))
 		vfs_rmdir(upperdir->d_inode, newpath.dentry);
 	else
-		vfs_unlink(upperdir->d_inode, newpath.dentry);
+		vfs_unlink(upperdir->d_inode, newpath.dentry, NULL);
 
 	dput(newpath.dentry);
 

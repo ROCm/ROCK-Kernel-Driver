@@ -536,7 +536,7 @@ static int ovl_remove_whiteouts(struct dentry *dir, struct list_head *list)
 			    p->len, p->name, PTR_ERR(dentry));
 			continue;
 		}
-		ret = vfs_unlink(upperdir->d_inode, dentry);
+		ret = vfs_unlink(upperdir->d_inode, dentry, NULL);
 		dput(dentry);
 		if (ret)
 			pr_warn(
