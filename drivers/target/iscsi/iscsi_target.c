@@ -457,15 +457,21 @@ int iscsit_del_np(struct iscsi_np *np)
 	}
 	np->np_thread_state = ISCSI_NP_THREAD_SHUTDOWN;
 	spin_unlock_bh(&np->np_thread_lock);
-
-	if (np->np_thread) {
+	/* Give __iscsi_target_login_thread() a chance to run */
+	schedule();
+	spin_lock_bh(&np->np_thread_lock);
+	if ((np->np_thread_state == ISCSI_NP_THREAD_SHUTDOWN)
+	    && np->np_thread) {
+		np->np_thread_state = ISCSI_NP_THREAD_EXIT;
+		spin_unlock_bh(&np->np_thread_lock);
 		/*
 		 * We need to send the signal to wakeup Linux/Net
 		 * which may be sleeping in sock_accept()..
 		 */
 		send_sig(SIGINT, np->np_thread, 1);
 		kthread_stop(np->np_thread);
-	}
+	} else
+		spin_unlock_bh(&np->np_thread_lock);
 
 	np->np_transport->iscsit_free_np(np);
 
