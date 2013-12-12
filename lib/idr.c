@@ -525,7 +525,6 @@ EXPORT_SYMBOL(idr_alloc_cyclic);
 static void idr_remove_warning(int id)
 {
 	WARN(1, "idr_remove called for id=%d which is not allocated.\n", id);
-	dump_stack();
 }
 
 static void sub_remove(struct idr *idp, int shift, int id)
