@@ -222,7 +222,7 @@ core-$(CONFIG_PERF_EVENTS)	+= arch/powerpc/perf/
 drivers-$(CONFIG_OPROFILE)	+= arch/powerpc/oprofile/
 
 # Default to zImage, override when needed
-all: zImage
+all: vmlinux 
 
 # With make 3.82 we cannot mix normal and wildcard targets
 BOOT_TARGETS1 := zImage zImage.initrd uImage
