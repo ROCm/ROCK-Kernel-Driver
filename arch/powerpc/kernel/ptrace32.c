@@ -28,14 +28,11 @@
 #include <linux/security.h>
 #include <linux/signal.h>
 #include <linux/compat.h>
-#include <linux/elf.h>
 
 #include <asm/uaccess.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/switch_to.h>
-
-#include "ppc32.h"
 
 /*
  * does not yet catch signals sent when the child dies.
@@ -46,27 +43,6 @@
 #define FPRNUMBER(i) (((i) - PT_FPR0) >> 1)
 #define FPRHALF(i) (((i) - PT_FPR0) & 1)
 #define FPRINDEX(i) TS_FPRWIDTH * FPRNUMBER(i) * 2 + FPRHALF(i)
-
-static int compat_ptrace_getsiginfo(struct task_struct *child, compat_siginfo_t __user *data)
-{
-	siginfo_t lastinfo;
-	int error = -ESRCH;
-
-	read_lock(&tasklist_lock);
-	if (likely(child->sighand != NULL)) {
-		error = -EINVAL;
-		spin_lock_irq(&child->sighand->siglock);
-		if (likely(child->last_siginfo != NULL)) {
-			lastinfo = *child->last_siginfo;
-			error = 0;
-		}
-		spin_unlock_irq(&child->sighand->siglock);
-	}
-	read_unlock(&tasklist_lock);
-	if (!error)
-		return copy_siginfo_to_user32(data, &lastinfo);
-	return error;
-}
 
 long compat_arch_ptrace(struct task_struct *child, compat_long_t request,
 			compat_ulong_t caddr, compat_ulong_t cdata)
@@ -311,9 +287,6 @@ long compat_arch_ptrace(struct task_struct *child, compat_long_t request,
 			child, task_user_regset_view(current), 0,
 			0, PT_REGS_COUNT * sizeof(compat_long_t),
 			compat_ptr(data));
-
-	case PTRACE_GETSIGINFO:
-		return compat_ptrace_getsiginfo(child, compat_ptr(data));
 
 	case PTRACE_GETFPREGS:
 	case PTRACE_SETFPREGS:
