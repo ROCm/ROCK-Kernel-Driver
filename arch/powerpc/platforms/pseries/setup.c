@@ -67,6 +67,9 @@
 #include <asm/eeh.h>
 #include <asm/reg.h>
 #include <asm/plpar_wrappers.h>
+#include <asm/cacheflush.h>
+#include <asm/cputable.h>
+#include <asm/code-patching.h>
 
 #include "pseries.h"
 
@@ -455,6 +458,40 @@ long pseries_big_endian_exceptions(void)
 	}
 }
 
+static void swizzle_endian(u32 *start, u32 *end)
+{
+	for (; (long)start < (long)end; start++)
+		patch_instruction(start, swab32(*start));
+}
+
+static void fixup_missing_little_endian_exceptions(void)
+{
+	extern u32 *__start___fake_ile, *__stop___fake_ile;
+	extern u32 *__start___be_patch, *__stop___be_patch;
+	u32 **be_table = &__start___be_patch;
+	u32 **fake_table = &__start___fake_ile;
+
+	/* Make our big endian code look like big endian code */
+	for (; (long)be_table < (long)&__stop___be_patch; be_table += 2)
+		swizzle_endian(be_table[0], be_table[1]);
+
+	/* Now patch the interrupt handlers to branch to our BE code */
+	for (; (long)fake_table < (long)&__stop___fake_ile; fake_table += 3) {
+		u32 *le_handler = fake_table[0];
+		u32 *patched_insn = fake_table[1];
+		u32 *be_handler = fake_table[2];
+		u32 le_be_diff = (long)be_handler - (long)le_handler;
+		patch_instruction(patched_insn, *le_handler);
+		/* This patches the interrupt handler's first instruction into
+		   a branch that jumps to our BE handler that enables MSR_LE */
+		patch_instruction(le_handler, swab32(0x48000000 | le_be_diff));
+		/* Make sure that feature fixups use the new address for its
+		   code patching */
+		relocate_fixup_entry(&__start___ftr_fixup, &__stop___ftr_fixup,
+				     le_handler, patched_insn);
+	}
+}
+
 static long pseries_little_endian_exceptions(void)
 {
 	long rc;
@@ -737,6 +774,19 @@ static int __init pSeries_probe(void)
 			ppc_md.progress("H_SET_MODE LE exception fail", 0);
 			panic("Could not enable little endian exceptions");
 		}
+	} else {
+		/*
+		 * The hypervisor we're running on does not know how to
+		 * configure us to run interrupts in little endian mode,
+		 * so we have to cheat a bit.
+		 *
+		 * This call reprograms all interrupt handlers' first
+		 * instruction into a branch to a big endian fixup section
+		 * which only transitions us into little endian mode, then
+		 * returns back to the normal little endian interrupt
+		 * handler.
+		 */
+		fixup_missing_little_endian_exceptions();
 	}
 #endif
 
