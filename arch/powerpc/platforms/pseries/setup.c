@@ -446,9 +446,14 @@ static void pSeries_machine_kexec(struct kimage *image)
 #endif
 
 #ifdef __LITTLE_ENDIAN__
+static bool ile_enabled;
+
 long pseries_big_endian_exceptions(void)
 {
 	long rc;
+
+	if (!ile_enabled)
+		return H_SUCCESS;
 
 	while (1) {
 		rc = enable_big_endian_exceptions();
@@ -498,8 +503,12 @@ static long pseries_little_endian_exceptions(void)
 
 	while (1) {
 		rc = enable_little_endian_exceptions();
-		if (!H_IS_LONG_BUSY(rc))
+
+		if (!H_IS_LONG_BUSY(rc)) {
+			ile_enabled = true;
 			return rc;
+		}
+
 		mdelay(get_longbusy_msecs(rc));
 	}
 }
