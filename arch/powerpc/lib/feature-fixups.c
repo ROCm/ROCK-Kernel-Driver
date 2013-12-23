@@ -151,6 +151,28 @@ void do_final_fixups(void)
 #endif
 }
 
+/*
+ * This changes the internal fixup location of a code block from
+ * old_addr to new_addr.
+ */
+void relocate_fixup_entry(void *fixup_start, void *fixup_end,
+			  void *old_addr, void *new_addr)
+{
+	struct fixup_entry *fcur, *fend;
+
+	fcur = fixup_start;
+	fend = fixup_end;
+
+	for (; fcur < fend; fcur++) {
+		long diff = (long)new_addr -
+			    (long)calc_addr(fcur, fcur->start_off);
+		if (calc_addr(fcur, fcur->start_off) == old_addr) {
+			fcur->start_off += diff;
+			fcur->end_off += diff;
+		}
+	}
+}
+
 #ifdef CONFIG_FTR_FIXUP_SELFTEST
 
 #define check(x)	\
