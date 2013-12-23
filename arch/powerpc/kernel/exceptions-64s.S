@@ -148,6 +148,7 @@ END_FTR_SECTION_IFSET(CPU_FTR_HVMODE | CPU_FTR_ARCH_206)
 				 NOTEST, 0x100)
 
 	. = 0x200
+	.globl machine_check_pSeries_1
 machine_check_pSeries_1:
 	/* This is moved out of line as it can be patched by FW, but
 	 * some code path might still want to branch into the original
@@ -328,24 +329,28 @@ hv_doorbell_trampoline:
 	 * trickery is thus necessary
 	 */
 	. = 0xf00
+	.global performance_monitor_pseries_trampoline
 performance_monitor_pseries_trampoline:
 	SET_SCRATCH0(r13)
 	EXCEPTION_PROLOG_0(PACA_EXGEN)
 	b	performance_monitor_pSeries
 
 	. = 0xf20
+	.global altivec_unavailable_pseries_trampoline
 altivec_unavailable_pseries_trampoline:
 	SET_SCRATCH0(r13)
 	EXCEPTION_PROLOG_0(PACA_EXGEN)
 	b	altivec_unavailable_pSeries
 
 	. = 0xf40
+	.global vsx_unavailable_pseries_trampoline
 vsx_unavailable_pseries_trampoline:
 	SET_SCRATCH0(r13)
 	EXCEPTION_PROLOG_0(PACA_EXGEN)
 	b	vsx_unavailable_pSeries
 
 	. = 0xf60
+	.global facility_unavailable_trampoline
 facility_unavailable_trampoline:
 	SET_SCRATCH0(r13)
 	EXCEPTION_PROLOG_0(PACA_EXGEN)
