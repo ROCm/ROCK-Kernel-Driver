@@ -1403,22 +1403,13 @@ old_sess_out:
 
 out:
 	stop = kthread_should_stop();
-	if (!stop && signal_pending(current)) {
-		spin_lock_bh(&np->np_thread_lock);
-		stop = (np->np_thread_state == ISCSI_NP_THREAD_SHUTDOWN ||
-			np->np_thread_state == ISCSI_NP_THREAD_EXIT);
-		spin_unlock_bh(&np->np_thread_lock);
-	}
 	/* Wait for another socket.. */
 	if (!stop)
 		return 1;
 exit:
 	iscsi_stop_login_thread_timer(np);
 	spin_lock_bh(&np->np_thread_lock);
-	if (np->np_thread_state != ISCSI_NP_THREAD_EXIT) {
-		np->np_thread_state = ISCSI_NP_THREAD_EXIT;
-		np->np_thread = NULL;
-	}
+	np->np_thread_state = ISCSI_NP_THREAD_EXIT;
 	spin_unlock_bh(&np->np_thread_lock);
 
 	return 0;
