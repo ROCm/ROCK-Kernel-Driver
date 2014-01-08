@@ -16,7 +16,9 @@
 #include <linux/timer.h>
 #include <linux/init.h>
 #include <asm/div64.h>
+#ifndef CONFIG_XEN /* This seems unmotivated even outside of Xen... */
 #include <asm/io.h>
+#endif
 
 /* clocksource cycle base type */
 typedef u64 cycle_t;

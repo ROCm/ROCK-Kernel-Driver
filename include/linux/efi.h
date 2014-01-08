@@ -545,7 +545,9 @@ typedef struct _efi_file_io_interface {
  * All runtime access to EFI goes through this structure:
  */
 extern struct efi {
+#ifndef CONFIG_XEN
 	efi_system_table_t *systab;	/* EFI system table */
+#endif
 	unsigned int runtime_version;	/* Runtime services version */
 	unsigned long mps;		/* MPS table */
 	unsigned long acpi;		/* ACPI table  (IA64 ext 0.71) */
@@ -567,9 +569,11 @@ extern struct efi {
 	efi_update_capsule_t *update_capsule;
 	efi_query_capsule_caps_t *query_capsule_caps;
 	efi_get_next_high_mono_count_t *get_next_high_mono_count;
+#ifndef CONFIG_XEN
 	efi_reset_system_t *reset_system;
 	efi_set_virtual_address_map_t *set_virtual_address_map;
 	struct efi_memory_map *memmap;
+#endif
 } efi;
 
 static inline int
@@ -605,7 +609,11 @@ static inline efi_status_t efi_query_variable_store(u32 attributes, unsigned lon
 }
 #endif
 extern void __iomem *efi_lookup_mapped_addr(u64 phys_addr);
-extern int efi_config_init(efi_config_table_type_t *arch_tables);
+extern int efi_config_init(
+#ifdef CONFIG_XEN
+			   u64 tables, unsigned int nr_tables,
+#endif
+			   efi_config_table_type_t *arch_tables);
 extern u64 efi_get_iobase (void);
 extern u32 efi_mem_type (unsigned long phys_addr);
 extern u64 efi_mem_attributes (unsigned long phys_addr);

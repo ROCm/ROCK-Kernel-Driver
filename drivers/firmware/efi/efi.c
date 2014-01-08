@@ -157,6 +157,7 @@ subsys_initcall(efisubsys_init);
  */
 void __iomem *efi_lookup_mapped_addr(u64 phys_addr)
 {
+#ifndef CONFIG_XEN
 	struct efi_memory_map *map;
 	void *p;
 	map = efi.memmap;
@@ -179,6 +180,7 @@ void __iomem *efi_lookup_mapped_addr(u64 phys_addr)
 			return (__force void __iomem *)(unsigned long)phys_addr;
 		}
 	}
+#endif
 	return NULL;
 }
 
@@ -218,12 +220,24 @@ static __init int match_config_table(efi_guid_t *guid,
 	return 0;
 }
 
-int __init efi_config_init(efi_config_table_type_t *arch_tables)
+int __init efi_config_init(
+#ifdef CONFIG_XEN
+			   u64 tables, unsigned int nr_tables,
+#endif
+			   efi_config_table_type_t *arch_tables)
 {
+#ifndef CONFIG_XEN
+	u64 tables = efi.systab->tables;
+	unsigned int nr_tables = efi.systab->nr_tables;
+	const bool efi_64bit = efi_enabled(EFI_64BIT);
+#else
+	const bool efi_64bit = true;
+#define early_memremap early_ioremap
+#endif
 	void *config_tables, *tablep;
 	int i, sz;
 
-	if (efi_enabled(EFI_64BIT))
+	if (efi_64bit)
 		sz = sizeof(efi_config_table_64_t);
 	else
 		sz = sizeof(efi_config_table_32_t);
@@ -231,8 +245,7 @@ int __init efi_config_init(efi_config_table_type_t *arch_tables)
 	/*
 	 * Let's see what config tables the firmware passed to us.
 	 */
-	config_tables = early_memremap(efi.systab->tables,
-				       efi.systab->nr_tables * sz);
+	config_tables = early_memremap(tables, nr_tables * sz);
 	if (config_tables == NULL) {
 		pr_err("Could not map Configuration table!\n");
 		return -ENOMEM;
@@ -240,11 +253,11 @@ int __init efi_config_init(efi_config_table_type_t *arch_tables)
 
 	tablep = config_tables;
 	pr_info("");
-	for (i = 0; i < efi.systab->nr_tables; i++) {
+	for (i = 0; i < nr_tables; i++) {
 		efi_guid_t guid;
 		unsigned long table;
 
-		if (efi_enabled(EFI_64BIT)) {
+		if (efi_64bit) {
 			u64 table64;
 			guid = ((efi_config_table_64_t *)tablep)->guid;
 			table64 = ((efi_config_table_64_t *)tablep)->table;
@@ -253,8 +266,7 @@ int __init efi_config_init(efi_config_table_type_t *arch_tables)
 			if (table64 >> 32) {
 				pr_cont("\n");
 				pr_err("Table located above 4GB, disabling EFI.\n");
-				early_iounmap(config_tables,
-					       efi.systab->nr_tables * sz);
+				early_iounmap(config_tables, nr_tables * sz);
 				return -EINVAL;
 			}
 #endif
@@ -269,6 +281,7 @@ int __init efi_config_init(efi_config_table_type_t *arch_tables)
 		tablep += sz;
 	}
 	pr_cont("\n");
-	early_iounmap(config_tables, efi.systab->nr_tables * sz);
+	early_iounmap(config_tables, nr_tables * sz);
 	return 0;
+#undef early_memremap
 }

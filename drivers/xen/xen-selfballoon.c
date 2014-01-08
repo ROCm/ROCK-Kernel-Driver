@@ -78,6 +78,10 @@
 #include <xen/tmem.h>
 #include <xen/xen.h>
 
+#ifdef CONFIG_XEN
+#include "balloon/common.h"
+#endif
+
 /* Enable/disable with sysfs. */
 static int xen_selfballooning_enabled __read_mostly;
 
@@ -520,7 +524,6 @@ int register_xen_selfballooning(struct device *dev)
 #endif
 	return error;
 }
-EXPORT_SYMBOL(register_xen_selfballooning);
 
 int xen_selfballoon_init(bool use_selfballooning, bool use_frontswap_selfshrink)
 {

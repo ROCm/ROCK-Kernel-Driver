@@ -3977,7 +3977,11 @@ void gen6_update_ring_freq(struct drm_device *dev)
 		 * Default to measured freq if none found, PCU will ensure we
 		 * don't go over
 		 */
+#ifndef CONFIG_XEN
 		max_ia_freq = tsc_khz;
+#else
+		max_ia_freq = cpu_khz;
+#endif
 	}
 
 	/* Convert from kHz to MHz */

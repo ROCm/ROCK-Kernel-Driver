@@ -437,7 +437,12 @@ pci_find_parent_resource(const struct pci_dev *dev, struct resource *res)
  * Restore the BAR values for a given device, so as to make it
  * accessible by its driver.
  */
+#ifndef CONFIG_XEN
 static void
+#else
+EXPORT_SYMBOL_GPL(pci_restore_bars);
+void
+#endif
 pci_restore_bars(struct pci_dev *dev)
 {
 	int i;
@@ -4250,7 +4255,7 @@ void pci_reassigndev_resource_alignment(struct pci_dev *dev)
 
 	/* check if specified PCI is target device to reassign */
 	align = pci_specified_resource_alignment(dev);
-	if (!align)
+	if (!align && !pci_is_guestdev_to_reassign(dev))
 		return;
 
 	if (dev->hdr_type == PCI_HEADER_TYPE_NORMAL &&

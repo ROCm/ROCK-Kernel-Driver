@@ -8390,9 +8390,6 @@ lpfc_sli4_set_affinity(struct lpfc_hba *phba, int vectors)
 	int max_phys_id, min_phys_id;
 	int num_io_channel, first_cpu, chan;
 	struct lpfc_vector_map_info *cpup;
-#ifdef CONFIG_X86
-	struct cpuinfo_x86 *cpuinfo;
-#endif
 	struct cpumask *mask;
 	uint8_t chann[LPFC_FCP_IO_CHAN_MAX+1];
 
@@ -8414,8 +8411,8 @@ lpfc_sli4_set_affinity(struct lpfc_hba *phba, int vectors)
 	/* Update CPU map with physical id and core id of each CPU */
 	cpup = phba->sli4_hba.cpu_map;
 	for (cpu = 0; cpu < phba->sli4_hba.num_present_cpu; cpu++) {
-#ifdef CONFIG_X86
-		cpuinfo = &cpu_data(cpu);
+#if defined(CONFIG_X86) && !defined(CONFIG_XEN)
+		const struct cpuinfo_x86 *cpuinfo = &cpu_data(cpu);
 		cpup->phys_id = cpuinfo->phys_proc_id;
 		cpup->core_id = cpuinfo->cpu_core_id;
 #else

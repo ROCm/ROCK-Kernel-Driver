@@ -30,7 +30,7 @@
 #include <asm/x86_init.h>
 
 /* Interrupt control for vSMPowered x86_64 systems */
-#ifdef CONFIG_X86_64
+#if defined(CONFIG_X86_64) && !defined(CONFIG_XEN)
 void vsmp_init(void);
 #else
 static inline void vsmp_init(void) { }

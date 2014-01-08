@@ -214,9 +214,9 @@ source "mm/Kconfig"
 
 config XEN_DOM0
 	def_bool y
-	depends on XEN
+	depends on PARAVIRT_XEN
 
-config XEN
+config PARAVIRT_XEN
 	bool "Xen guest support on ARM64 (EXPERIMENTAL)"
 	depends on ARM64 && OF
 	select SWIOTLB_XEN

@@ -17,6 +17,8 @@
 #include <linux/debugfs.h>
 #include <linux/delay.h>
 #include <linux/hardirq.h>
+#include <linux/printk.h>
+#include <linux/ratelimit.h>
 #include <linux/slab.h>
 #include <linux/export.h>
 
@@ -224,15 +226,12 @@ pci_serr_error(unsigned char reason, struct pt_regs *regs)
 	pr_emerg("Dazed and confused, but trying to continue\n");
 
 	/* Clear and disable the PCI SERR error line. */
-	reason = (reason & NMI_REASON_CLEAR_MASK) | NMI_REASON_CLEAR_SERR;
-	outb(reason, NMI_REASON_PORT);
+	clear_serr_error(reason);
 }
 
 static __kprobes void
 io_check_error(unsigned char reason, struct pt_regs *regs)
 {
-	unsigned long i;
-
 	/* check to see if anyone registered against these types of errors */
 	if (nmi_handle(NMI_IO_CHECK, regs, false))
 		return;
@@ -246,17 +245,7 @@ io_check_error(unsigned char reason, struct pt_regs *regs)
 		panic("NMI IOCK error: Not continuing");
 
 	/* Re-enable the IOCK line, wait for a few seconds */
-	reason = (reason & NMI_REASON_CLEAR_MASK) | NMI_REASON_CLEAR_IOCHK;
-	outb(reason, NMI_REASON_PORT);
-
-	i = 20000;
-	while (--i) {
-		touch_nmi_watchdog();
-		udelay(100);
-	}
-
-	reason &= ~NMI_REASON_CLEAR_IOCHK;
-	outb(reason, NMI_REASON_PORT);
+	clear_io_check_error(reason);
 }
 
 static __kprobes void

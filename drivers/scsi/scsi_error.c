@@ -1797,6 +1797,18 @@ int scsi_decide_disposition(struct scsi_cmnd *scmd)
 		}
 	case DID_RESET:
 		return SUCCESS;
+#ifdef CONFIG_XEN /* Shouldn't this be done always?
+		   *
+		   * Overall, shouldn't the return value of this function be
+		   * the same when called twice in immediate succession?
+		   */
+	case DID_NEXUS_FAILURE:
+		/* Similarly for the respective conversion above/below. */
+		if (msg_byte(scmd->result) == COMMAND_COMPLETE &&
+		    status_byte(scmd->result) == RESERVATION_CONFLICT)
+			break;
+		/* fallthrough */
+#endif
 	default:
 		return FAILED;
 	}

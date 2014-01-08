@@ -39,7 +39,9 @@ static inline void stack_overflow_check(struct pt_regs *regs)
 {
 #ifdef CONFIG_DEBUG_STACKOVERFLOW
 #define STACK_TOP_MARGIN	128
+#ifndef CONFIG_X86_NO_TSS
 	struct orig_ist *oist;
+#endif
 	u64 irq_stack_top, irq_stack_bottom;
 	u64 estack_top, estack_bottom;
 	u64 curbase = (u64)task_stack_page(current);
@@ -58,11 +60,15 @@ static inline void stack_overflow_check(struct pt_regs *regs)
 	if (regs->sp >= irq_stack_top && regs->sp <= irq_stack_bottom)
 		return;
 
+#ifndef CONFIG_X86_NO_TSS
 	oist = &__get_cpu_var(orig_ist);
 	estack_top = (u64)oist->ist[0] - EXCEPTION_STKSZ + STACK_TOP_MARGIN;
 	estack_bottom = (u64)oist->ist[N_EXCEPTION_STACKS - 1];
 	if (regs->sp >= estack_top && regs->sp <= estack_bottom)
 		return;
+#else
+	estack_top = estack_bottom = 0;
+#endif
 
 	WARN_ONCE(1, "do_IRQ(): %s has overflown the kernel stack (cur:%Lx,sp:%lx,irq stk top-bottom:%Lx-%Lx,exception stk top-bottom:%Lx-%Lx)\n",
 		current->comm, curbase, regs->sp,

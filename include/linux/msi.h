@@ -4,6 +4,8 @@
 #include <linux/kobject.h>
 #include <linux/list.h>
 
+#ifndef CONFIG_XEN
+
 struct msi_msg {
 	u32	address_lo;	/* low 32 bits of msi message address */
 	u32	address_hi;	/* high 32 bits of msi message address */
@@ -50,6 +52,11 @@ struct msi_desc {
 	struct kobject kobj;
 };
 
+#else /* CONFIG_XEN */
+struct pci_dev;
+struct msi_desc;
+#endif /* CONFIG_XEN */
+
 /*
  * The arch hooks to setup up msi irqs. Those functions are
  * implemented as weak symbols so that they /can/ be overriden by
@@ -67,6 +74,7 @@ void default_restore_msi_irqs(struct pci_dev *dev, int irq);
 u32 default_msi_mask_irq(struct msi_desc *desc, u32 mask, u32 flag);
 u32 default_msix_mask_irq(struct msi_desc *desc, u32 flag);
 
+#ifndef CONFIG_XEN
 struct msi_chip {
 	struct module *owner;
 	struct device *dev;
@@ -79,5 +87,6 @@ struct msi_chip {
 	int (*check_device)(struct msi_chip *chip, struct pci_dev *dev,
 			    int nvec, int type);
 };
+#endif
 
 #endif /* LINUX_MSI_H */

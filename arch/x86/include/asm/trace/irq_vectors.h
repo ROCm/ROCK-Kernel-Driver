@@ -1,3 +1,5 @@
+#ifndef CONFIG_X86_NO_IDT
+
 #undef TRACE_SYSTEM
 #define TRACE_SYSTEM irq_vectors
 
@@ -113,3 +115,5 @@ DEFINE_IRQ_VECTOR_EVENT(thermal_apic);
 
 /* This part must be outside protection */
 #include <trace/define_trace.h>
+
+#endif /* CONFIG_X86_NO_IDT */

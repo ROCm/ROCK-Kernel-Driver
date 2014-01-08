@@ -1,4 +1,5 @@
 menu "CPU Idle"
+	depends on !PROCESSOR_EXTERNAL_CONTROL
 
 config CPU_IDLE
 	bool "CPU idle PM support"

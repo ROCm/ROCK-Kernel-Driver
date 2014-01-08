@@ -23,12 +23,21 @@
 #include <xen/interface/physdev.h>
 #include <xen/interface/xen.h>
 
+#ifdef CONFIG_PARAVIRT_XEN
+#define CONFIG_XEN_COMPAT 0x040000
 #include <asm/xen/hypervisor.h>
 #include <asm/xen/hypercall.h>
+#else
+#include <asm/hypervisor.h>
+#endif
 #include "../pci/pci.h"
 #include <asm/pci_x86.h>
 
+#if CONFIG_XEN_COMPAT < 0x040200
 static bool __read_mostly pci_seg_supported = true;
+#else
+#define pci_seg_supported true
+#endif
 
 static int xen_add_device(struct device *dev)
 {
@@ -87,7 +96,9 @@ static int xen_add_device(struct device *dev)
 		r = HYPERVISOR_physdev_op(PHYSDEVOP_pci_device_add, &add);
 		if (r != -ENOSYS)
 			return r;
+#if CONFIG_XEN_COMPAT < 0x040200
 		pci_seg_supported = false;
+#endif
 	}
 
 	if (pci_domain_nr(pci_dev->bus))
@@ -194,7 +205,7 @@ static int __init register_xen_pci_notifier(void)
 
 arch_initcall(register_xen_pci_notifier);
 
-#ifdef CONFIG_PCI_MMCONFIG
+#if defined(CONFIG_PCI_MMCONFIG) && !defined(CONFIG_XEN)
 static int __init xen_mcfg_late(void)
 {
 	struct pci_mmcfg_region *cfg;

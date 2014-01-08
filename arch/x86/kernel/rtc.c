@@ -7,6 +7,7 @@
 #include <linux/bcd.h>
 #include <linux/export.h>
 #include <linux/pnp.h>
+#include <linux/efi.h>
 #include <linux/of.h>
 
 #include <asm/vsyscall.h>
@@ -31,6 +32,7 @@ EXPORT_SYMBOL(cmos_lock);
 DEFINE_SPINLOCK(rtc_lock);
 EXPORT_SYMBOL(rtc_lock);
 
+#ifndef CONFIG_XEN_UNPRIVILEGED_GUEST
 /*
  * In order to set the CMOS clock precisely, set_rtc_mmss has to be
  * called 500 ms after the second nowtime has started, because when
@@ -111,6 +113,7 @@ void mach_get_cmos_time(struct timespec *now)
 	now->tv_sec = mktime(year, mon, day, hour, min, sec);
 	now->tv_nsec = 0;
 }
+#endif /* CONFIG_XEN_UNPRIVILEGED_GUEST */
 
 /* Routines for accessing the CMOS RAM/RTC. */
 unsigned char rtc_cmos_read(unsigned char addr)
@@ -147,6 +150,7 @@ void read_persistent_clock(struct timespec *ts)
 }
 
 
+#ifndef CONFIG_XEN_UNPRIVILEGED_GUEST
 static struct resource rtc_resources[] = {
 	[0] = {
 		.start	= RTC_PORT(0),
@@ -188,9 +192,20 @@ static __init int add_rtc_cmos(void)
 	if (of_have_populated_dt())
 		return 0;
 
+#ifdef CONFIG_XEN
+	/* EFI-based systems should not access CMOS directly. */
+	if (efi_enabled(EFI_RUNTIME_SERVICES))
+		return -ENODEV;
+#endif
+
 	/* Intel MID platforms don't have ioport rtc */
 	if (intel_mid_identify_cpu())
 		return -ENODEV;
+
+#ifdef CONFIG_XEN
+	if (!is_initial_xendomain())
+		return -ENODEV;
+#endif
 
 #ifdef CONFIG_ACPI
 	if (acpi_gbl_FADT.boot_flags & ACPI_FADT_NO_CMOS_RTC) {
@@ -207,3 +222,4 @@ static __init int add_rtc_cmos(void)
 	return 0;
 }
 device_initcall(add_rtc_cmos);
+#endif /* CONFIG_XEN_UNPRIVILEGED_GUEST */

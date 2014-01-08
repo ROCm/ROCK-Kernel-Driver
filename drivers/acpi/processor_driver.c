@@ -72,6 +72,16 @@ static struct device_driver acpi_processor_driver = {
 	.remove = acpi_processor_stop,
 };
 
+#ifdef CONFIG_XEN
+static struct device_driver acpi_xen_processor_driver = {
+	.name = "xen-processor",
+	.bus = &xen_pcpu_subsys,
+	.acpi_match_table = processor_device_ids,
+	.probe = acpi_processor_start,
+	.remove = acpi_processor_stop,
+};
+#endif
+
 static void acpi_processor_notify(acpi_handle handle, u32 event, void *data)
 {
 	struct acpi_device *device = data;
@@ -169,16 +179,29 @@ static int __acpi_processor_start(struct acpi_device *device)
 	if (pr->flags.need_hotplug_init)
 		return 0;
 
-#ifdef CONFIG_CPU_FREQ
+#if defined(CONFIG_CPU_FREQ) || defined(CONFIG_PROCESSOR_EXTERNAL_CONTROL)
 	acpi_processor_ppc_has_changed(pr, 0);
 #endif
-	acpi_processor_get_throttling_info(pr);
+	/*
+	 * pr->id may equal to -1 while processor_cntl_external enabled.
+	 * throttle and thermal module don't support this case.
+	 * Tx only works when dom0 vcpu == pcpu num by far, as we give
+	 * control to dom0.
+	 */
+	if (pr->id != -1) {
+		acpi_processor_get_throttling_info(pr);
 
-	if (pr->flags.throttling)
-		pr->flags.limit = 1;
+		if (pr->flags.throttling)
+			pr->flags.limit = 1;
+	}
 
-	if (!cpuidle_get_driver() || cpuidle_get_driver() == &acpi_idle_driver)
+	if (!cpuidle_get_driver() || cpuidle_get_driver() == &acpi_idle_driver
+	    || processor_pm_external())
 		acpi_processor_power_init(pr);
+
+	result = processor_extcntl_prepare(pr);
+	if (result)
+		goto err_power_exit;
 
 	pr->cdev = thermal_cooling_device_register("Processor", device,
 						   &processor_cooling_ops);
@@ -271,6 +294,14 @@ static int __init acpi_processor_driver_init(void)
 	if (acpi_disabled)
 		return 0;
 
+#ifdef CONFIG_XEN
+	result = driver_register(&acpi_xen_processor_driver);
+	if (result < 0) {
+		pr_warn("Xen processor driver not registered (%d)\n", result);
+		acpi_xen_processor_driver.acpi_match_table = NULL;
+	}
+#endif
+
 	result = driver_register(&acpi_processor_driver);
 	if (result < 0)
 		return result;
@@ -293,6 +324,10 @@ static void __exit acpi_processor_driver_exit(void)
 	unregister_hotcpu_notifier(&acpi_cpu_notifier);
 	acpi_processor_syscore_exit();
 	driver_unregister(&acpi_processor_driver);
+#ifdef CONFIG_XEN
+	if (acpi_xen_processor_driver.acpi_match_table)
+		driver_unregister(&acpi_xen_processor_driver);
+#endif
 }
 
 module_init(acpi_processor_driver_init);

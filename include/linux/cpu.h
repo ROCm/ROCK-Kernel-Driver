@@ -172,6 +172,10 @@ static inline void cpu_maps_update_done(void)
 
 #endif /* CONFIG_SMP */
 extern struct bus_type cpu_subsys;
+#ifdef CONFIG_XEN
+extern struct bus_type xen_pcpu_subsys;
+struct device *get_pcpu_device(unsigned int acpi_id);
+#endif
 
 #ifdef CONFIG_HOTPLUG_CPU
 /* Stop CPUs going up and down. */

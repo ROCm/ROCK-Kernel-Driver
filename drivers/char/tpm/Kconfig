@@ -112,8 +112,8 @@ config TCG_ST33_I2C
 
 config TCG_XEN
 	tristate "XEN TPM Interface"
-	depends on TCG_TPM && XEN
-	select XEN_XENBUS_FRONTEND
+	depends on PARAVIRT_XEN || XEN
+	select XEN_XENBUS_FRONTEND if PARAVIRT_XEN
 	---help---
 	  If you want to make TPM support available to a Xen user domain,
 	  say Yes and it will be accessible from within Linux. See
@@ -121,5 +121,14 @@ config TCG_XEN
 	  the Xen source repository for more details.
 	  To compile this driver as a module, choose M here; the module
 	  will be called xen-tpmfront.
+
+config TCG_XEN_V1
+	tristate "XEN TPM Interface (v1, deprecated)"
+	depends on XEN
+	---help---
+	  If you want to make TPM v1 support available to a Xen user domain,
+	  say Yes and it will be accessible from within Linux.
+	  To compile this driver as a module, choose M here; the module
+	  will be called tpm_xenu.
 
 endif # TCG_TPM
