@@ -134,6 +134,8 @@ int hv_init(void)
 	int max_leaf;
 	union hv_x64_msr_hypercall_contents hypercall_msr;
 	void *virtaddr = NULL;
+	__u8 d1 = 0x10; /* SuSE */
+	__u16 d2 = 0x0; /* -d of a.b.c-d */
 
 	memset(hv_context.synic_event_page, 0, sizeof(void *) * NR_CPUS);
 	memset(hv_context.synic_message_page, 0,
@@ -148,7 +150,7 @@ int hv_init(void)
 	/*
 	 * Write our OS ID.
 	 */
-	hv_context.guestid = generate_guest_id(0, LINUX_VERSION_CODE, 0);
+	hv_context.guestid = generate_guest_id(d1, LINUX_VERSION_CODE, d2);
 	wrmsrl(HV_X64_MSR_GUEST_OS_ID, hv_context.guestid);
 
 	/* See if the hypercall page is already set */
