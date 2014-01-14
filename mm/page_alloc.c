@@ -2111,13 +2111,7 @@ void warn_alloc_failed(gfp_t gfp_mask, int order, const char *fmt, ...)
 		va_end(args);
 	}
 
-	if (!(gfp_mask & __GFP_WAIT)) {
-		pr_info("The following is only an harmless informational message.\n");
-		pr_info("Unless you get a _continuous_flood_ of these messages it means\n");
-		pr_info("everything is working fine. Allocations from irqs cannot be\n");
-		pr_info("perfectly reliable and the kernel is designed to handle that.\n");
-	}
-	pr_info("%s: page allocation failure. order:%d, mode:0x%x\n",
+	pr_warn("%s: page allocation failure: order:%d, mode:0x%x\n",
 		current->comm, order, gfp_mask);
 
 	dump_stack();
