@@ -25,8 +25,56 @@
 #include <linux/sched.h>
 #include <linux/ktime.h>
 #include <asm/dma.h>	/* isa_dma_bridge_buggy */
+#include <xen/xen_pvonhvm.h>
 #include "pci.h"
 
+#ifndef CONFIG_XEN
+/*
+ * Disable native drivers for emulated hardware until xen-platform-pci.ko
+ * from xen-kmp loads. Its not predictable which modular or built-in driver
+ * is initialized before xen-platform-pci is loaded. The default is to skip
+ * init of native drivers unless booted with xen_emul_unplug=options.
+ */
+int xen_pvonhvm_unplug;
+EXPORT_SYMBOL_GPL(xen_pvonhvm_unplug);
+static int __init parse_xen_emul_unplug(char *arg)
+{
+	char *p, *q;
+	int l;
+
+	for (p = arg; p; p = q) {
+		q = strchr(p, ',');
+		if (q) {
+			l = q - p;
+			q++;
+		} else {
+			l = strlen(p);
+		}
+		if (!strncmp(p, "all", l))
+			xen_pvonhvm_unplug |= XEN_PVONHVM_UNPLUG_ALL;
+		else if (!strncmp(p, "ide-disks", l))
+			xen_pvonhvm_unplug |= XEN_PVONHVM_UNPLUG_IDE_DISKS;
+		else if (!strncmp(p, "nics", l))
+			xen_pvonhvm_unplug |= XEN_PVONHVM_UNPLUG_NICS;
+		else if (!strncmp(p, "never", l))
+			xen_pvonhvm_unplug = XEN_PVONHVM_UNPLUG_NEVER;
+		else
+			printk(KERN_WARNING "unrecognised option '%s' "
+				 "in parameter 'xen_emul_unplug'\n", p);
+	}
+	return 0;
+}
+__setup("xen_emul_unplug=", parse_xen_emul_unplug);
+
+static void quirk_xen_pvonhvm(struct pci_dev *dev)
+{
+	if (!xen_pvonhvm_unplug) {
+		/* Default to unplug everything, unless booted with xen_emul_unplug= */
+		xen_pvonhvm_unplug = XEN_PVONHVM_UNPLUG_ALL;
+	}
+}
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_XEN, PCI_DEVICE_ID_XEN_PLATFORM, quirk_xen_pvonhvm);
+#endif
 /*
  * Decoding should be disabled for a PCI device during BAR sizing to avoid
  * conflict. But doing so may cause problems on host bridge and perhaps other

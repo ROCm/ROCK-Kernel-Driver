@@ -21,4 +21,15 @@ static inline int xen_feature(int flag)
 	return xen_features[flag];
 }
 
+/*
+ * unmodified_drivers/linux-2.6/platform-pci/platform-pci.c from xen-kmp has to
+ * include a new header to get the unplug defines from xen/xen_pvonhvm.h.  To
+ * allow compiliation of xen-kmp with older kernel-source a guard has to be
+ * provided to skip inclusion of the new header.  An easy place was
+ * xen/features.h, but any header included by platform-pci.c would do.
+ */
+#ifndef CONFIG_XEN
+#define HAVE_XEN_PVONHVM_UNPLUG 1
+#endif
+
 #endif /* __XEN_FEATURES_H__ */

@@ -77,6 +77,7 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>
+#include <xen/xen_pvonhvm.h>
 
 /* These identify the driver base version and may not be removed. */
 static char version[] =
@@ -2126,6 +2127,9 @@ static struct pci_driver cp_driver = {
 
 static int __init cp_init (void)
 {
+	if (xen_pvonhvm_unplugged_nics)
+		return -EBUSY;
+
 #ifdef MODULE
 	pr_info("%s", version);
 #endif

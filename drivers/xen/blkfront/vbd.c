@@ -36,6 +36,7 @@
 #include <linux/bitmap.h>
 #include <linux/blkdev.h>
 #include <linux/list.h>
+#include <xen/xen_pvonhvm.h>
 
 #ifdef HAVE_XEN_PLATFORM_COMPAT_H
 #include <xen/platform-compat.h>
@@ -399,6 +400,37 @@ xlvbd_init_blk_queue(struct gendisk *gd, unsigned int sector_size,
 	return 0;
 }
 
+static inline bool
+xlvbd_ide_unplugged(int major)
+{
+#ifndef CONFIG_XEN
+	/*
+	 * For HVM guests:
+	 * - pv driver required if booted with xen_emul_unplug=ide-disks|all
+	 * - native driver required with xen_emul_unplug=nics|never
+	 */
+	if (xen_pvonhvm_unplugged_disks)
+		return true;
+
+	switch (major) {
+	case IDE0_MAJOR:
+	case IDE1_MAJOR:
+	case IDE2_MAJOR:
+	case IDE3_MAJOR:
+	case IDE4_MAJOR:
+	case IDE5_MAJOR:
+	case IDE6_MAJOR:
+	case IDE7_MAJOR:
+	case IDE8_MAJOR:
+	case IDE9_MAJOR:
+		return false;
+	default:
+		break;
+	}
+#endif
+	return true;
+}
+
 int
 xlvbd_add(blkif_sector_t capacity, int vdevice, unsigned int vdisk_info,
 	  unsigned int sector_size, unsigned int physical_sector_size,
@@ -431,6 +463,10 @@ xlvbd_add(blkif_sector_t capacity, int vdevice, unsigned int vdisk_info,
 				   " ignoring\n", vdevice, minor);
 			return -ENODEV;
 		}
+	}
+	if (!xlvbd_ide_unplugged(major)) {
+		pr_warning("blkfront: skipping IDE major on %x, native driver required\n", vdevice);
+		return -ENODEV;
 	}
 
 	BUG_ON(info->gd != NULL);

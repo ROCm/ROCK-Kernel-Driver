@@ -66,6 +66,7 @@
 #include <xen/interface/grant_table.h>
 #include <xen/gnttab.h>
 #include <xen/net-util.h>
+#include <xen/xen_pvonhvm.h>
 
 struct netfront_cb {
 	unsigned int pull_to;
@@ -253,6 +254,34 @@ static void netfront_enable_arp_notify(struct netfront_info *info)
 #endif
 }
 
+static bool netfront_nic_unplugged(struct xenbus_device *dev)
+{
+	bool ret = true;
+#ifndef CONFIG_XEN
+	char *typestr;
+	/*
+	 * For HVM guests:
+	 * - pv driver required if booted with xen_emul_unplug=nics|all
+	 * - native driver required with xen_emul_unplug=ide-disks|never
+	 */
+
+	/* Use pv driver if emulated hardware was unplugged */
+	if (xen_pvonhvm_unplugged_nics)
+		return true;
+
+	typestr  = xenbus_read(XBT_NIL, dev->otherend, "type", NULL);
+
+	/* Assume emulated+pv interface (ioemu+vif) when type property is missing. */
+	if (IS_ERR(typestr))
+		return false;
+
+	/* If the interface is emulated and not unplugged, skip it. */
+	if (strcmp(typestr, "vif_ioem") == 0 || strcmp(typestr, "ioemu") == 0)
+		ret = false;
+	kfree(typestr);
+#endif
+	return ret;
+}
 /**
  * Entry point to this code when a new device is created.  Allocate the basic
  * structures and the ring buffers for communication with the backend, and
@@ -264,6 +293,11 @@ static int netfront_probe(struct xenbus_device *dev,
 	int err;
 	struct net_device *netdev;
 	struct netfront_info *info;
+
+	if (!netfront_nic_unplugged(dev)) {
+		pr_warning("netfront: skipping emulated interface, native driver required\n");
+		return -ENODEV;
+	}
 
 	netdev = create_netdev(dev);
 	if (IS_ERR(netdev)) {

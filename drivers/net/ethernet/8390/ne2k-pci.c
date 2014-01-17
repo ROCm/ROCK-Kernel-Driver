@@ -57,6 +57,7 @@ static int options[MAX_UNITS];
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>
+#include <xen/xen_pvonhvm.h>
 
 #include "8390.h"
 
@@ -704,6 +705,8 @@ static struct pci_driver ne2k_driver = {
 
 static int __init ne2k_pci_init(void)
 {
+	if (xen_pvonhvm_unplugged_nics)
+		return -EBUSY;
 /* when a module, this is printed whether or not devices are found in probe */
 #ifdef MODULE
 	printk(version);
