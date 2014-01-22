@@ -282,6 +282,7 @@ static bool netfront_nic_unplugged(struct xenbus_device *dev)
 #endif
 	return ret;
 }
+
 /**
  * Entry point to this code when a new device is created.  Allocate the basic
  * structures and the ring buffers for communication with the backend, and

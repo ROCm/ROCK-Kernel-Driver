@@ -142,12 +142,13 @@ static inline u64 processed_system_time(u64 jiffies_64)
 	return (jiffies_64 - jiffies_bias) * NS_PER_TICK + system_time_bias;
 }
 
-static void update_wallclock(bool local)
+static void update_wallclock(void)
 {
-	static DEFINE_MUTEX(uwc_mutex);
+	static DEFINE_SPINLOCK(uwc_lock);
 	shared_info_t *s = HYPERVISOR_shared_info;
+	u32 version;
 
-	mutex_lock(&uwc_mutex);
+	spin_lock(&uwc_lock);
 
 	do {
 		shadow_tv_version = s->wc_version;
@@ -155,24 +156,25 @@ static void update_wallclock(bool local)
 		shadow_tv.tv_sec  = s->wc_sec;
 		shadow_tv.tv_nsec = s->wc_nsec;
 		rmb();
-	} while ((s->wc_version & 1) | (shadow_tv_version ^ s->wc_version));
+		version = s->wc_version;
+	} while ((version & 1) | (shadow_tv_version ^ version));
 
-	if (local) {
-		u64 tmp = processed_system_time(get_jiffies_64());
-		long nsec = do_div(tmp, NSEC_PER_SEC);
-		struct timespec tv;
-
-		set_normalized_timespec(&tv, shadow_tv.tv_sec + tmp,
-					shadow_tv.tv_nsec + nsec);
-		do_settimeofday(&tv);
-	}
-
-	mutex_unlock(&uwc_mutex);
+	spin_unlock(&uwc_lock);
 }
 
 static void _update_wallclock(struct work_struct *unused)
 {
-	update_wallclock(true);
+	u64 stamp;
+	unsigned int nsec;
+	struct timespec tv;
+
+	update_wallclock();
+
+	stamp = processed_system_time(get_jiffies_64());
+	nsec = do_div(stamp, NSEC_PER_SEC);
+	set_normalized_timespec(&tv, shadow_tv.tv_sec + stamp,
+				shadow_tv.tv_nsec + nsec);
+	do_settimeofday(&tv);
 }
 static DECLARE_WORK(update_wallclock_work, _update_wallclock);
 
@@ -253,7 +255,7 @@ int xen_update_wallclock(const struct timespec *tv)
 	op.u.settime.nsecs       = now.tv_nsec;
 	op.u.settime.system_time = shadow->system_timestamp;
 	WARN_ON(HYPERVISOR_platform_op(&op));
-	update_wallclock(false);
+	update_wallclock();
 
 	return 0;
 }
@@ -278,7 +280,7 @@ static void sync_xen_wallclock(unsigned long dummy)
 	op.u.settime.system_time = processed_system_time(get_jiffies_64());
 	WARN_ON(HYPERVISOR_platform_op(&op));
 
-	update_wallclock(false);
+	update_wallclock();
 
 	/* Once per minute. */
 	mod_timer(&sync_xen_wallclock_timer, jiffies + 60*HZ);
@@ -544,7 +546,7 @@ static void __init _late_time_init(void)
 	} else if (area.addr.v)
 		free_pages_exact(array, size);
 #endif
-	update_wallclock(false);
+	update_wallclock();
 	xen_clockevents_init();
 }
 

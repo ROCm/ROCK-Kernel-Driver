@@ -707,6 +707,7 @@ static int __init ne2k_pci_init(void)
 {
 	if (xen_pvonhvm_unplugged_nics)
 		return -EBUSY;
+
 /* when a module, this is printed whether or not devices are found in probe */
 #ifdef MODULE
 	printk(version);

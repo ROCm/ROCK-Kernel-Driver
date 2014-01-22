@@ -458,35 +458,22 @@ static void backend_changed(struct xenbus_device *dev,
 
 static void blkfront_setup_discard(struct blkfront_info *info)
 {
-	int err;
-	char *type;
 	unsigned int discard_granularity;
 	unsigned int discard_alignment;
 	int discard_secure;
 
-	type = xenbus_read(XBT_NIL, info->xbdev->otherend, "type", NULL);
-	if (IS_ERR(type))
-		return;
-
-	info->feature_secdiscard = 0;
-	if (strncmp(type, "phy", 3) == 0) {
-		err = xenbus_gather(XBT_NIL, info->xbdev->otherend,
-			"discard-granularity", "%u", &discard_granularity,
-			"discard-alignment", "%u", &discard_alignment,
-			NULL);
-		if (!err) {
-			info->feature_discard = 1;
-			info->discard_granularity = discard_granularity;
-			info->discard_alignment = discard_alignment;
-		}
-		err = xenbus_scanf(XBT_NIL, info->xbdev->otherend,
-			    "discard-secure", "%d", &discard_secure);
-		if (err == 1)
-			info->feature_secdiscard = discard_secure;
-	} else if (strncmp(type, "file", 4) == 0)
-		info->feature_discard = 1;
-
-	kfree(type);
+	info->feature_discard = 1;
+	if (!xenbus_gather(XBT_NIL, info->xbdev->otherend,
+			   "discard-granularity", "%u", &discard_granularity,
+			   "discard-alignment", "%u", &discard_alignment,
+			   NULL)) {
+		info->discard_granularity = discard_granularity;
+		info->discard_alignment = discard_alignment;
+	}
+	if (xenbus_scanf(XBT_NIL, info->xbdev->otherend,
+			 "discard-secure", "%d", &discard_secure) != 1)
+		discard_secure = 0;
+	info->feature_secdiscard = !!discard_secure;
 }
 
 /*

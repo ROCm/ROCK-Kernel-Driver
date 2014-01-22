@@ -25,10 +25,10 @@
 #include <linux/sched.h>
 #include <linux/ktime.h>
 #include <asm/dma.h>	/* isa_dma_bridge_buggy */
-#include <xen/xen_pvonhvm.h>
 #include "pci.h"
 
 #ifndef CONFIG_XEN
+#include <xen/xen_pvonhvm.h>
 /*
  * Disable native drivers for emulated hardware until xen-platform-pci.ko
  * from xen-kmp loads. Its not predictable which modular or built-in driver
@@ -37,6 +37,7 @@
  */
 int xen_pvonhvm_unplug;
 EXPORT_SYMBOL_GPL(xen_pvonhvm_unplug);
+
 static int __init parse_xen_emul_unplug(char *arg)
 {
 	char *p, *q;
@@ -75,6 +76,7 @@ static void quirk_xen_pvonhvm(struct pci_dev *dev)
 }
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_XEN, PCI_DEVICE_ID_XEN_PLATFORM, quirk_xen_pvonhvm);
 #endif
+
 /*
  * Decoding should be disabled for a PCI device during BAR sizing to avoid
  * conflict. But doing so may cause problems on host bridge and perhaps other
