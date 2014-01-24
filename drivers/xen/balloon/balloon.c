@@ -76,18 +76,6 @@ struct balloon_stats balloon_stats;
 /* We increase/decrease in batches which fit in a page */
 static unsigned long frame_list[PAGE_SIZE / sizeof(unsigned long)];
 
-#ifndef CONFIG_XEN
-/*
- * In HVM guests accounting here uses the Xen visible values, but the kernel
- * determined totalram_pages value shouldn't get altered. Since totalram_pages
- * includes neither the kernel static image nor any memory allocated prior to
- * or from the bootmem allocator, we have to synchronize the two values.
- */
-static unsigned long __read_mostly totalram_bias;
-#else
-#define totalram_bias 0
-#endif
-
 /* List of ballooned pages, threaded through the mem_map array. */
 static LIST_HEAD(ballooned_pages);
 
@@ -546,6 +534,7 @@ static int __init balloon_init(void)
 	} xen_pod_target_t;
 # endif
 	xen_pod_target_t pod_target = { .domid = DOMID_SELF };
+	unsigned long num_physpages = balloon_num_physpages();
 	int rc;
 #elif defined(CONFIG_X86)
 	unsigned long pfn;
@@ -574,7 +563,6 @@ static int __init balloon_init(void)
 			   - pod_target.pod_cache_pages;
 	if (rc || bs.current_pages > num_physpages)
 		bs.current_pages = num_physpages;
-	totalram_bias = bs.current_pages - totalram_pages;
 #endif
 	bs.target_pages  = bs.current_pages;
 	bs.balloon_low   = 0;
@@ -754,10 +742,8 @@ static void _free_empty_pages(struct page **pagevec, int nr_pages,
 		BUG_ON(page_count(pagevec[i]) != 1);
 		balloon_append(pagevec[i], account);
 	}
-	if (account) {
+	if (account)
 		bs.current_pages -= nr_pages;
-		totalram_pages = bs.current_pages - totalram_bias;
-	}
 	balloon_unlock(flags);
 
 	schedule_work(&balloon_worker);
