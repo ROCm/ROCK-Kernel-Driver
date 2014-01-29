@@ -780,22 +780,25 @@ asmlinkage long compat_sys_recvmmsg(int fd, struct compat_mmsghdr __user *mmsg,
 	if (flags & MSG_CMSG_COMPAT)
 		return -EINVAL;
 
-	if (COMPAT_USE_64BIT_TIME)
-		return __sys_recvmmsg(fd, (struct mmsghdr __user *)mmsg, vlen,
-				      flags | MSG_CMSG_COMPAT,
-				      (struct timespec *) timeout);
-
 	if (timeout == NULL)
 		return __sys_recvmmsg(fd, (struct mmsghdr __user *)mmsg, vlen,
 				      flags | MSG_CMSG_COMPAT, NULL);
 
-	if (get_compat_timespec(&ktspec, timeout))
+	if (COMPAT_USE_64BIT_TIME) {
+		if (copy_from_user(&ktspec, timeout, sizeof(ktspec)))
+			return -EFAULT;
+	} else if (get_compat_timespec(&ktspec, timeout))
 		return -EFAULT;
 
 	datagrams = __sys_recvmmsg(fd, (struct mmsghdr __user *)mmsg, vlen,
 				   flags | MSG_CMSG_COMPAT, &ktspec);
-	if (datagrams > 0 && put_compat_timespec(&ktspec, timeout))
-		datagrams = -EFAULT;
+	if (datagrams > 0) {
+		if (COMPAT_USE_64BIT_TIME) {
+			if (copy_to_user(timeout, &ktspec, sizeof(ktspec)))
+				datagrams = -EFAULT;
+		} else if (put_compat_timespec(&ktspec, timeout))
+			datagrams = -EFAULT;
+	}
 
 	return datagrams;
 }
