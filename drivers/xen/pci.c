@@ -31,7 +31,9 @@
 #include <asm/hypervisor.h>
 #endif
 #include "../pci/pci.h"
+#ifdef CONFIG_PCI_MMCONFIG
 #include <asm/pci_x86.h>
+#endif
 
 #if CONFIG_XEN_COMPAT < 0x040200
 static bool __read_mostly pci_seg_supported = true;
