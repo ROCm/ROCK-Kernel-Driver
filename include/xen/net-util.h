@@ -30,58 +30,68 @@ static inline int _maybe_pull_tail(struct sk_buff *skb, unsigned int len,
 	return 0;
 }
 
+static inline __be16 *_checksum_setup_ip(struct sk_buff *skb,
+					 typeof(IPPROTO_IP) proto,
+					 unsigned int off, unsigned int ver)
+{
+	switch (proto) {
+		int err;
+
+	case IPPROTO_TCP:
+		err = _maybe_pull_tail(skb, off + sizeof(struct tcphdr),
+				       off + sizeof(struct tcphdr));
+		if (!err && !skb_partial_csum_set(skb, off,
+						  offsetof(struct tcphdr,
+							   check)))
+			err = -EPROTO;
+		return err ? ERR_PTR(err) : &tcp_hdr(skb)->check;
+
+	case IPPROTO_UDP:
+		err = _maybe_pull_tail(skb, off + sizeof(struct udphdr),
+				       off + sizeof(struct udphdr));
+		if (!err && !skb_partial_csum_set(skb, off,
+						  offsetof(struct udphdr,
+							   check)))
+			err = -EPROTO;
+		return err ? ERR_PTR(err) : &udp_hdr(skb)->check;
+	}
+
+	net_err_ratelimited("Attempting to checksum a non-TCPv%u/UDPv%u packet,"
+			    " dropping a protocol %d packet\n",
+			    proto, ver, ver);
+	return ERR_PTR(-EPROTO);
+}
+
 /*
  * This value should be large enough to cover a tagged ethernet header plus
  * maximally sized IP and TCP or UDP headers.
  */
 #define MAX_IP_HDR_LEN 128
 
-static inline int _checksum_setup_ip(struct sk_buff *skb, __be16 *csum)
+static inline int _checksum_setup_ipv4(struct sk_buff *skb, bool recalc)
 {
- 	const struct iphdr *iph;
+	const struct iphdr *iph;
+	__be16 *csum;
 	unsigned int off;
 	int err = _maybe_pull_tail(skb, sizeof(*iph), MAX_IP_HDR_LEN);
 
 	if (err)
 		return err;
- 	iph = ip_hdr(skb);
+	iph = ip_hdr(skb);
 	if (iph->frag_off & htons(IP_OFFSET | IP_MF)) {
-		net_err_ratelimited("%s\n", "Packet is a fragment");
+		net_err_ratelimited("Packet is a fragment\n");
 		return -EPROTO;
 	}
 	off = 4 * iph->ihl;
+	csum = _checksum_setup_ip(skb, iph->protocol, off, 4);
+	if (IS_ERR(csum))
+		return PTR_ERR(csum);
 
-	switch (iph->protocol) {
-	case IPPROTO_TCP:
-		err = _maybe_pull_tail(skb, off + sizeof(struct tcphdr),
-				       off + sizeof(struct tcphdr));
-		if (err || !csum)
-			return err;
-		if (!skb_partial_csum_set(skb, off,
-					  offsetof(struct tcphdr, check)))
-			return -EPROTO;
-		csum = &tcp_hdr(skb)->check;
-		break;
-	case IPPROTO_UDP:
-		err = _maybe_pull_tail(skb, off + sizeof(struct udphdr),
-				       off + sizeof(struct udphdr));
-		if (err || !csum)
-			return err;
-		if (!skb_partial_csum_set(skb, off,
-					  offsetof(struct udphdr, check)))
-			return -EPROTO;
-		csum = &udp_hdr(skb)->check;
-		break;
-	default:
-		net_err_ratelimited("Attempting to checksum a non-TCP/UDP packet,"
-				    " dropping a protocol %d packet\n",
-				    iph->protocol);
-		return -EPROTO;
+	if (recalc) {
+		iph = ip_hdr(skb);
+		*csum = ~csum_tcpudp_magic(iph->saddr, iph->daddr,
+					   skb->len - off, iph->protocol, 0);
 	}
-
- 	iph = ip_hdr(skb);
-	*csum = ~csum_tcpudp_magic(iph->saddr, iph->daddr,
-				   skb->len - off, iph->protocol, 0);
 
 	return 0;
 }
@@ -92,10 +102,11 @@ static inline int _checksum_setup_ip(struct sk_buff *skb, __be16 *csum)
  */
 #define MAX_IPV6_HDR_LEN 256
 
-static inline int _checksum_setup_ipv6(struct sk_buff *skb, __be16 *csum)
+static inline int _checksum_setup_ipv6(struct sk_buff *skb, bool recalc)
 {
 #define OPT_HDR(type, skb, off) ((type *)(skb_network_header(skb) + (off)))
 	const struct ipv6hdr *ipv6h;
+	__be16 *csum;
 	unsigned int off = sizeof(*ipv6h);
 	u8 nexthdr;
 	bool done = false, fragment = false;
@@ -144,7 +155,7 @@ static inline int _checksum_setup_ipv6(struct sk_buff *skb, __be16 *csum)
 			hp = OPT_HDR(struct frag_hdr, skb, off);
 			if (hp->frag_off & htons(IP6_OFFSET | IP6_MF))
 				fragment = true;
- 			nexthdr = hp->nexthdr;
+			nexthdr = hp->nexthdr;
 			off += sizeof(*hp);
 			break;
 		}
@@ -162,37 +173,15 @@ static inline int _checksum_setup_ipv6(struct sk_buff *skb, __be16 *csum)
 		return -EPROTO;
 	}
 
-	switch (nexthdr) {
-	case IPPROTO_TCP:
-		err = _maybe_pull_tail(skb, off + sizeof(struct tcphdr),
-				       off + sizeof(struct tcphdr));
-		if (err || !csum)
-			return err;
-		if (!skb_partial_csum_set(skb, off,
-					  offsetof(struct tcphdr, check)))
-			return -EPROTO;
-		csum = &tcp_hdr(skb)->check;
-		break;
-	case IPPROTO_UDP:
-		err = _maybe_pull_tail(skb, off + sizeof(struct udphdr),
-				       off + sizeof(struct udphdr));
-		if (err || !csum)
-			return err;
-		if (!skb_partial_csum_set(skb, off,
-					  offsetof(struct udphdr, check)))
-			return -EPROTO;
-		csum = &udp_hdr(skb)->check;
-		break;
-	default:
-		net_err_ratelimited("Attempting to checksum a non-TCPv6/UDPv6 packet,"
-				    " dropping a protocol %d packet\n",
-				    nexthdr);
-		return -EPROTO;
-	}
+	csum = _checksum_setup_ip(skb, nexthdr, off, 4);
+	if (IS_ERR(csum))
+		return PTR_ERR(csum);
 
-	ipv6h = ipv6_hdr(skb);
-	*csum = ~csum_ipv6_magic(&ipv6h->saddr, &ipv6h->daddr,
-				 skb->len - off, nexthdr, 0);
+	if (recalc) {
+		ipv6h = ipv6_hdr(skb);
+		*csum = ~csum_ipv6_magic(&ipv6h->saddr, &ipv6h->daddr,
+					 skb->len - off, nexthdr, 0);
+	}
 
 	return 0;
 #undef OPT_HDR
@@ -201,7 +190,7 @@ static inline int _checksum_setup_ipv6(struct sk_buff *skb, __be16 *csum)
 static inline int skb_checksum_setup(struct sk_buff *skb,
 				     unsigned long *fixup_counter)
 {
-	__be16 *csum = NULL;
+	bool recalc = false;
 	int err = -EPROTO;
 
 	skb_reset_network_header(skb);
@@ -217,13 +206,17 @@ static inline int skb_checksum_setup(struct sk_buff *skb,
 		 * recalculate the partial checksum.
 		 */
 		++*fixup_counter;
-		--csum;
+		recalc = true;
 	}
 
-	if (skb->protocol == htons(ETH_P_IP))
-		err = _checksum_setup_ip(skb, csum);
-	else if (skb->protocol == htons(ETH_P_IPV6))
-		err = _checksum_setup_ipv6(skb, csum);
+	switch (skb->protocol) {
+	case htons(ETH_P_IP):
+		err = _checksum_setup_ipv4(skb, recalc);
+		break;
+	case htons(ETH_P_IPV6):
+		err = _checksum_setup_ipv6(skb, recalc);
+		break;
+	}
 	if (!err)
 		skb_probe_transport_header(skb, 0);
 
