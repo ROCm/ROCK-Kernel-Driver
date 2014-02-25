@@ -613,7 +613,7 @@ static inline int queue_pages_pgd_range(struct vm_area_struct *vma,
 	return 0;
 }
 
-#ifdef CONFIG_ARCH_USES_NUMA_PROT_NONE
+#ifdef CONFIG_NUMA_BALANCING
 /*
  * This is used to mark a range of virtual addresses to be inaccessible.
  * These are later cleared by a NUMA hinting fault. Depending on these
@@ -627,7 +627,6 @@ unsigned long change_prot_numa(struct vm_area_struct *vma,
 			unsigned long addr, unsigned long end)
 {
 	int nr_updated;
-	BUILD_BUG_ON(_PAGE_NUMA != _PAGE_PROTNONE);
 
 	nr_updated = change_protection(vma, addr, end, vma->vm_page_prot, 0, 1);
 	if (nr_updated)
@@ -641,7 +640,7 @@ static unsigned long change_prot_numa(struct vm_area_struct *vma,
 {
 	return 0;
 }
-#endif /* CONFIG_ARCH_USES_NUMA_PROT_NONE */
+#endif /* CONFIG_NUMA_BALANCING */
 
 /*
  * Walk through page tables and collect pages to be migrated.
@@ -1199,10 +1198,8 @@ static struct page *new_vma_page(struct page *page, unsigned long private, int *
 	}
 
 	if (PageHuge(page)) {
-		if (vma)
-			return alloc_huge_page_noerr(vma, address, 1);
-		else
-			return NULL;
+		BUG_ON(!vma);
+		return alloc_huge_page_noerr(vma, address, 1);
 	}
 	/*
 	 * if !vma, alloc_page_vma() will use task or system default policy
@@ -2671,7 +2668,7 @@ static void __init check_numabalancing_enable(void)
 		set_numabalancing_state(numabalancing_override == 1);
 
 	if (nr_node_ids > 1 && !numabalancing_override) {
-		printk(KERN_INFO "%s automatic NUMA balancing. "
+		pr_info("%s automatic NUMA balancing. "
 			"Configure with numa_balancing= or the "
 			"kernel.numa_balancing sysctl",
 			numabalancing_default ? "Enabling" : "Disabling");
@@ -2694,7 +2691,7 @@ static int __init setup_numabalancing(char *str)
 	}
 out:
 	if (!ret)
-		printk(KERN_WARNING "Unable to parse numa_balancing=\n");
+		pr_warn("Unable to parse numa_balancing=\n");
 
 	return ret;
 }

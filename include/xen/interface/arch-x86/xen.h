@@ -73,6 +73,10 @@ typedef unsigned long xen_pfn_t;
 #define PRI_xen_pfn "lx"
 #endif
 
+#define XEN_HAVE_PV_GUEST_ENTRY 1
+
+#define XEN_HAVE_PV_UPCALL_MASK 1
+
 /*
  * `incontents 200 segdesc Segment Descriptor Tables
  */
@@ -153,6 +157,15 @@ typedef uint64_t tsc_timestamp_t; /* RDTSC timestamp */
 /*
  * The following is all CPU context. Note that the fpu_ctxt block is filled 
  * in by FXSAVE if the CPU has feature FXSR; otherwise FSAVE is used.
+ *
+ * Also note that when calling DOMCTL_setvcpucontext and VCPU_initialise
+ * for HVM and PVH guests, not all information in this structure is updated:
+ *
+ * - For HVM guests, the structures read include: fpu_ctxt (if
+ * VGCT_I387_VALID is set), flags, user_regs, debugreg[*]
+ *
+ * - PVH guests are the same as HVM guests, but additionally use ctrlreg[3] to
+ * set cr3. All other fields not used should be set to 0.
  */
 struct vcpu_guest_context {
     /* FPU registers come first so they can be aligned for FXSAVE/FXRSTOR. */

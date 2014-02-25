@@ -1116,19 +1116,6 @@ static __init void ftrace_profile_debugfs(struct dentry *d_tracer)
 
 static struct pid * const ftrace_swapper_pid = &init_struct_pid;
 
-loff_t
-ftrace_filter_lseek(struct file *file, loff_t offset, int whence)
-{
-	loff_t ret;
-
-	if (file->f_mode & FMODE_READ)
-		ret = seq_lseek(file, offset, whence);
-	else
-		file->f_pos = ret = 1;
-
-	return ret;
-}
-
 #ifdef CONFIG_DYNAMIC_FTRACE
 
 #ifndef CONFIG_FTRACE_MCOUNT_RECORD
@@ -2810,7 +2797,7 @@ static void ftrace_filter_reset(struct ftrace_hash *hash)
  * routine, you can use ftrace_filter_write() for the write
  * routine if @flag has FTRACE_ITER_FILTER set, or
  * ftrace_notrace_write() if @flag has FTRACE_ITER_NOTRACE set.
- * ftrace_filter_lseek() should be used as the lseek routine, and
+ * tracing_lseek() should be used as the lseek routine, and
  * release must call ftrace_regex_release().
  */
 int
@@ -3838,7 +3825,7 @@ static const struct file_operations ftrace_filter_fops = {
 	.open = ftrace_filter_open,
 	.read = seq_read,
 	.write = ftrace_filter_write,
-	.llseek = ftrace_filter_lseek,
+	.llseek = tracing_lseek,
 	.release = ftrace_regex_release,
 };
 
@@ -3846,7 +3833,7 @@ static const struct file_operations ftrace_notrace_fops = {
 	.open = ftrace_notrace_open,
 	.read = seq_read,
 	.write = ftrace_notrace_write,
-	.llseek = ftrace_filter_lseek,
+	.llseek = tracing_lseek,
 	.release = ftrace_regex_release,
 };
 
@@ -4109,7 +4096,7 @@ static const struct file_operations ftrace_graph_fops = {
 	.open		= ftrace_graph_open,
 	.read		= seq_read,
 	.write		= ftrace_graph_write,
-	.llseek		= ftrace_filter_lseek,
+	.llseek		= tracing_lseek,
 	.release	= ftrace_graph_release,
 };
 
@@ -4117,7 +4104,7 @@ static const struct file_operations ftrace_graph_notrace_fops = {
 	.open		= ftrace_graph_notrace_open,
 	.read		= seq_read,
 	.write		= ftrace_graph_write,
-	.llseek		= ftrace_filter_lseek,
+	.llseek		= tracing_lseek,
 	.release	= ftrace_graph_release,
 };
 #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
@@ -4790,7 +4777,7 @@ static const struct file_operations ftrace_pid_fops = {
 	.open		= ftrace_pid_open,
 	.write		= ftrace_pid_write,
 	.read		= seq_read,
-	.llseek		= ftrace_filter_lseek,
+	.llseek		= tracing_lseek,
 	.release	= ftrace_pid_release,
 };
 

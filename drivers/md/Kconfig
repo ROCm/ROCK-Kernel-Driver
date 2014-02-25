@@ -242,6 +242,7 @@ config DM_CRYPT
 config DM_SNAPSHOT
        tristate "Snapshot target"
        depends on BLK_DEV_DM
+       select DM_BUFIO
        ---help---
          Allow volume managers to take writable snapshots of a device.
 
@@ -254,12 +255,12 @@ config DM_THIN_PROVISIONING
          Provides thin provisioning and snapshots that share a data store.
 
 config DM_DEBUG_BLOCK_STACK_TRACING
-	boolean "Keep stack trace of thin provisioning block lock holders"
-	depends on STACKTRACE_SUPPORT && DM_THIN_PROVISIONING
+	boolean "Keep stack trace of persistent data block lock holders"
+	depends on STACKTRACE_SUPPORT && DM_PERSISTENT_DATA
 	select STACKTRACE
 	---help---
 	  Enable this for messages that may help debug problems with the
-	  block manager locking used by thin provisioning.
+	  block manager locking used by thin provisioning and caching.
 
 	  If unsure, say N.
 
@@ -297,7 +298,6 @@ config DM_CACHE_CLEANER
 config DM_MIRROR
        tristate "Mirror target"
        depends on BLK_DEV_DM
-	select DM_REGION_HASH_LOG
        ---help---
          Allow volume managers to mirror logical volumes, also
          needed for live data migration tools such as 'pvmove'.
@@ -382,20 +382,6 @@ config DM_DELAY
 	---help---
 	A target that delays reads and/or writes and can send
 	them to different devices.  Useful for testing.
-
-	If unsure, say N.
-
-config DM_REGION_HASH_LOG
-	tristate
-	default n
-
-config DM_RAID45
-	tristate "RAID 4/5 target (EXPERIMENTAL)"
-	depends on BLK_DEV_DM
-	select ASYNC_XOR
-	select DM_REGION_HASH_LOG
-	---help---
-	A target that supports RAID4 and RAID5 mappings.
 
 	If unsure, say N.
 

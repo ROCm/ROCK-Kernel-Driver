@@ -28,6 +28,7 @@
 #define HVM_XS_HVMLOADER               "hvmloader"
 #define HVM_XS_BIOS                    "hvmloader/bios"
 #define HVM_XS_GENERATION_ID_ADDRESS   "hvmloader/generation-id-address"
+#define HVM_XS_ALLOW_MEMORY_RELOCATE   "hvmloader/allow-memory-relocate"
 
 /* The following values allow additional ACPI tables to be added to the
  * virtual ACPI BIOS that hvmloader constructs. The values specify the guest
@@ -74,6 +75,6 @@
 /* 1 to 99 OEM strings can be set in xenstore using values of the form
  * below. These strings will be loaded into the SMBIOS type 11 structure.
  */
-#define HVM_XS_OEM_STRINGS             "bios-strings/oem-%02d"
+#define HVM_XS_OEM_STRINGS             "bios-strings/oem-%d"
 
 #endif /* __XEN_PUBLIC_HVM_HVM_XS_STRINGS_H__ */

@@ -26,7 +26,7 @@ static inline unsigned char xen_get_nmi_reason(void)
 	 */
 	if (test_bit(_XEN_NMIREASON_io_error, &s->arch.nmi_reason))
 		reason |= NMI_REASON_IOCHK;
-	if (test_bit(_XEN_NMIREASON_parity_error, &s->arch.nmi_reason))
+	if (test_bit(_XEN_NMIREASON_pci_serr, &s->arch.nmi_reason))
 		reason |= NMI_REASON_SERR;
 
         return reason;

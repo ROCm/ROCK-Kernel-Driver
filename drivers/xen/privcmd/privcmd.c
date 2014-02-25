@@ -24,6 +24,18 @@
 #include <xen/interface/xen.h>
 #include <xen/xen_proc.h>
 #include <xen/features.h>
+#include <xen/evtchn.h>
+
+#ifndef CONFIG_PREEMPT
+DEFINE_PER_CPU(bool, privcmd_hcall);
+#endif
+
+static inline void _privcmd_hcall(bool state)
+{
+#ifndef CONFIG_PREEMPT
+	this_cpu_write(privcmd_hcall, state);
+#endif
+}
 
 #ifndef CONFIG_XEN_PRIVILEGED_GUEST
 #define HAVE_ARCH_PRIVCMD_MMAP
@@ -72,6 +84,7 @@ static long privcmd_ioctl(struct file *file,
 		ret = -ENOSYS;
 		if (hypercall.op >= (PAGE_SIZE >> 5))
 			break;
+		_privcmd_hcall(true);
 		ret = _hypercall(long, (unsigned int)hypercall.op,
 				 (unsigned long)hypercall.arg[0],
 				 (unsigned long)hypercall.arg[1],
@@ -79,8 +92,10 @@ static long privcmd_ioctl(struct file *file,
 				 (unsigned long)hypercall.arg[3],
 				 (unsigned long)hypercall.arg[4]);
 #else
+		_privcmd_hcall(true);
 		ret = privcmd_hypercall(&hypercall);
 #endif
+		_privcmd_hcall(false);
 	}
 	break;
 
@@ -104,6 +119,9 @@ static long privcmd_ioctl(struct file *file,
 
 		p = mmapcmd.entry;
 		for (i = 0; i < mmapcmd.num;) {
+			if (i)
+				cond_resched();
+
 			nr = min(mmapcmd.num - i, MMAP_NR_PER_PAGE);
 
 			ret = -ENOMEM;
@@ -136,6 +154,9 @@ static long privcmd_ioctl(struct file *file,
 
 		i = 0;
 		list_for_each(l, &pagelist) {
+			if (i)
+				cond_resched();
+
 			nr = i + min(mmapcmd.num - i, MMAP_NR_PER_PAGE);
 
 			msg = (privcmd_mmap_entry_t*)(l + 1);
@@ -164,6 +185,9 @@ static long privcmd_ioctl(struct file *file,
 		addr = vma->vm_start;
 		i = 0;
 		list_for_each(l, &pagelist) {
+			if (i)
+				cond_resched();
+
 			nr = i + min(mmapcmd.num - i, MMAP_NR_PER_PAGE);
 
 			msg = (privcmd_mmap_entry_t*)(l + 1);
@@ -187,8 +211,12 @@ static long privcmd_ioctl(struct file *file,
 
 	mmap_out:
 		up_write(&mm->mmap_sem);
-		list_for_each_safe(l,l2,&pagelist)
+		i = 0;
+		list_for_each_safe(l, l2, &pagelist) {
+			if (!(++i & 7))
+				cond_resched();
 			free_page((unsigned long)l);
+		}
 	}
 #undef MMAP_NR_PER_PAGE
 	break;
@@ -214,6 +242,9 @@ static long privcmd_ioctl(struct file *file,
 
 		p = m.arr;
 		for (i=0; i<nr_pages; )	{
+			if (i)
+				cond_resched();
+
 			nr = min(nr_pages - i, MMAPBATCH_NR_PER_PAGE);
 
 			ret = -ENOMEM;
@@ -248,6 +279,9 @@ static long privcmd_ioctl(struct file *file,
 		ret = 0;
 		paged_out = 0;
 		list_for_each(l, &pagelist) {
+			if (i)
+				cond_resched();
+
 			nr = i + min(nr_pages - i, MMAPBATCH_NR_PER_PAGE);
 			mfn = (unsigned long *)(l + 1);
 
@@ -280,6 +314,9 @@ static long privcmd_ioctl(struct file *file,
 			else
 				ret = 0;
 			list_for_each(l, &pagelist) {
+				if (i)
+					cond_resched();
+
 				nr = min(nr_pages - i, MMAPBATCH_NR_PER_PAGE);
 				mfn = (unsigned long *)(l + 1);
 				if (copy_to_user(p, mfn, nr*sizeof(*mfn)))
@@ -288,8 +325,12 @@ static long privcmd_ioctl(struct file *file,
 			}
 		}
 	mmapbatch_out:
-		list_for_each_safe(l,l2,&pagelist)
+		i = 0;
+		list_for_each_safe(l, l2, &pagelist) {
+			if (!(++i & 7))
+				cond_resched();
 			free_page((unsigned long)l);
+		}
 	}
 	break;
 
@@ -313,6 +354,9 @@ static long privcmd_ioctl(struct file *file,
 
 		p = m.arr;
 		for (i = 0; i < nr_pages; i += nr, p += nr) {
+			if (i)
+				cond_resched();
+
 			nr = min(nr_pages - i, MMAPBATCH_NR_PER_PAGE);
 
 			ret = -ENOMEM;
@@ -345,6 +389,9 @@ static long privcmd_ioctl(struct file *file,
 		ret = 0;
 		paged_out = 0;
 		list_for_each(l, &pagelist) {
+			if (i)
+				cond_resched();
+
 			nr = i + min(nr_pages - i, MMAPBATCH_NR_PER_PAGE);
 			mfn = (void *)(l + 1);
 			err = (void *)(l + 1);
@@ -375,6 +422,9 @@ static long privcmd_ioctl(struct file *file,
 			ret = paged_out ? -ENOENT : 0;
 			i = 0;
 			list_for_each(l, &pagelist) {
+				if (i)
+					cond_resched();
+
 				nr = min(nr_pages - i, MMAPBATCH_NR_PER_PAGE);
 				err = (void *)(l + 1);
 				if (copy_to_user(p, err, nr * sizeof(*err)))
@@ -385,8 +435,12 @@ static long privcmd_ioctl(struct file *file,
 			ret = -EFAULT;
 
 	mmapbatch_v2_out:
-		list_for_each_safe(l, l2, &pagelist)
+		i = 0;
+		list_for_each_safe(l, l2, &pagelist) {
+			if (!(++i & 7))
+				cond_resched();
 			free_page((unsigned long)l);
+		}
 #undef MMAPBATCH_NR_PER_PAGE
 	}
 	break;

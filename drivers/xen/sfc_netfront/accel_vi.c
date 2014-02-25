@@ -769,7 +769,7 @@ static void  netfront_accel_vi_rx_complete(netfront_accel_vnic *vnic,
 		spin_unlock_irqrestore(&vnic->table_lock, flags);
 	}
 
-	if (compare_ether_addr(skb->data, vnic->mac)) {
+	if (!ether_addr_equal(skb->data, vnic->mac)) {
 		struct iphdr *ip = (struct iphdr *)(skb->data + ETH_HLEN);
 		u16 port;
 

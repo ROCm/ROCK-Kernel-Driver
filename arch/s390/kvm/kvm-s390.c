@@ -395,6 +395,9 @@ int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
 						    CPUSTAT_STOPPED |
 						    CPUSTAT_GED);
 	vcpu->arch.sie_block->ecb   = 6;
+	if (test_vfacility(50) && test_vfacility(73))
+		vcpu->arch.sie_block->ecb |= 0x10;
+
 	vcpu->arch.sie_block->ecb2  = 8;
 	vcpu->arch.sie_block->eca   = 0xC1002001U;
 	vcpu->arch.sie_block->fac   = (int) (long) vfacilities;
@@ -411,6 +414,7 @@ struct kvm_vcpu *kvm_arch_vcpu_create(struct kvm *kvm,
 				      unsigned int id)
 {
 	struct kvm_vcpu *vcpu;
+	struct sie_page *sie_page;
 	int rc = -EINVAL;
 
 	if (id >= KVM_MAX_VCPUS)
@@ -422,11 +426,12 @@ struct kvm_vcpu *kvm_arch_vcpu_create(struct kvm *kvm,
 	if (!vcpu)
 		goto out;
 
-	vcpu->arch.sie_block = (struct kvm_s390_sie_block *)
-					get_zeroed_page(GFP_KERNEL);
-
-	if (!vcpu->arch.sie_block)
+	sie_page = (struct sie_page *) get_zeroed_page(GFP_KERNEL);
+	if (!sie_page)
 		goto out_free_cpu;
+
+	vcpu->arch.sie_block = &sie_page->sie_block;
+	vcpu->arch.sie_block->itdba = (unsigned long) &sie_page->itdb;
 
 	vcpu->arch.sie_block->icpua = id;
 	if (!kvm_is_ucontrol(kvm)) {
@@ -732,14 +737,16 @@ static int vcpu_post_run(struct kvm_vcpu *vcpu, int exit_reason)
 
 	if (exit_reason >= 0) {
 		rc = 0;
+	} else if (kvm_is_ucontrol(vcpu->kvm)) {
+		vcpu->run->exit_reason = KVM_EXIT_S390_UCONTROL;
+		vcpu->run->s390_ucontrol.trans_exc_code =
+						current->thread.gmap_addr;
+		vcpu->run->s390_ucontrol.pgm_code = 0x10;
+		rc = -EREMOTE;
 	} else {
-		if (kvm_is_ucontrol(vcpu->kvm)) {
-			rc = SIE_INTERCEPT_UCONTROL;
-		} else {
-			VCPU_EVENT(vcpu, 3, "%s", "fault in sie instruction");
-			trace_kvm_s390_sie_fault(vcpu);
-			rc = kvm_s390_inject_program_int(vcpu, PGM_ADDRESSING);
-		}
+		VCPU_EVENT(vcpu, 3, "%s", "fault in sie instruction");
+		trace_kvm_s390_sie_fault(vcpu);
+		rc = kvm_s390_inject_program_int(vcpu, PGM_ADDRESSING);
 	}
 
 	memcpy(&vcpu->run->s.regs.gprs[14], &vcpu->arch.sie_block->gg14, 16);
@@ -833,16 +840,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *kvm_run)
 		rc = -EINTR;
 	}
 
-#ifdef CONFIG_KVM_S390_UCONTROL
-	if (rc == SIE_INTERCEPT_UCONTROL) {
-		kvm_run->exit_reason = KVM_EXIT_S390_UCONTROL;
-		kvm_run->s390_ucontrol.trans_exc_code =
-			current->thread.gmap_addr;
-		kvm_run->s390_ucontrol.pgm_code = 0x10;
-		rc = 0;
-	}
-#endif
-
 	if (rc == -EOPNOTSUPP) {
 		/* intercept cannot be handled in-kernel, prepare kvm-run */
 		kvm_run->exit_reason         = KVM_EXIT_S390_SIEIC;
@@ -889,6 +886,7 @@ int kvm_s390_store_status_unloaded(struct kvm_vcpu *vcpu, unsigned long addr)
 {
 	unsigned char archmode = 1;
 	int prefix;
+	u64 clkcomp;
 
 	if (addr == KVM_S390_STORE_STATUS_NOADDR) {
 		if (copy_to_guest_absolute(vcpu, 163ul, &archmode, 1))
@@ -932,8 +930,9 @@ int kvm_s390_store_status_unloaded(struct kvm_vcpu *vcpu, unsigned long addr)
 			&vcpu->arch.sie_block->cputm, 8, prefix))
 		return -EFAULT;
 
+	clkcomp = vcpu->arch.sie_block->ckc >> 8;
 	if (__guestcopy(vcpu, addr + offsetof(struct save_area, clk_cmp),
-			&vcpu->arch.sie_block->ckc, 8, prefix))
+			&clkcomp, 8, prefix))
 		return -EFAULT;
 
 	if (__guestcopy(vcpu, addr + offsetof(struct save_area, acc_regs),
@@ -1188,8 +1187,8 @@ static int __init kvm_s390_init(void)
 		return -ENOMEM;
 	}
 	memcpy(vfacilities, S390_lowcore.stfle_fac_list, 16);
-	vfacilities[0] &= 0xff82fff3f47c0000UL;
-	vfacilities[1] &= 0x001c000000000000UL;
+	vfacilities[0] &= 0xff82fff3f4fc2000UL;
+	vfacilities[1] &= 0x005c000000000000UL;
 	return 0;
 }
 

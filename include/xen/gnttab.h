@@ -124,7 +124,7 @@ void gnttab_reset_grant_page(struct page *page);
 int gnttab_resume(void);
 #endif
 
-void *arch_gnttab_alloc_shared(unsigned long *frames);
+void *arch_gnttab_alloc_shared(xen_pfn_t *frames);
 
 static inline void
 gnttab_set_map_op(struct gnttab_map_grant_ref *map, maddr_t addr,
@@ -186,7 +186,7 @@ gnttab_set_replace_op(struct gnttab_unmap_and_replace *unmap, maddr_t addr,
 		(__HCarg_p)->status = GNTST_bad_page;				\
 	}									\
 	if ((__HCarg_p)->status != GNTST_okay)					\
-		pr_err("%s: %s gnt status %x\n", 				\
+		pr_err("%s: %s gnt status %x\n",				\
 			__func__, current->comm, (__HCarg_p)->status);		\
 }
 
@@ -205,7 +205,7 @@ gnttab_set_replace_op(struct gnttab_unmap_and_replace *unmap, maddr_t addr,
 		(__HCarg_p)->status = GNTST_bad_page;				\
 	}									\
 	if ((__HCarg_p)->status != GNTST_okay)					\
-		pr_err("%s: %s gnt status %x\n", 				\
+		pr_err("%s: %s gnt status %x\n",				\
 			__func__, current->comm, (__HCarg_p)->status);		\
 }
 

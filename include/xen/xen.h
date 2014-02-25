@@ -29,8 +29,23 @@ extern enum xen_domain_type xen_domain_type;
 				 xen_start_info && xen_start_info->flags & SIF_INITDOMAIN)
 #elif defined(CONFIG_XEN)
 #define xen_initial_domain()	is_initial_xendomain()
+#define xen_has_pv_devices()	is_running_on_xen()
 #else  /* !CONFIG_XEN_DOM0 */
 #define xen_initial_domain()	(0)
 #endif	/* CONFIG_XEN_DOM0 */
 
+#ifdef CONFIG_XEN_PVH
+/* This functionality exists only for x86. The XEN_PVHVM support exists
+ * only in x86 world - hence on ARM it will be always disabled.
+ * N.B. ARM guests are neither PV nor HVM nor PVHVM.
+ * It's a bit like PVH but is different also (it's further towards the H
+ * end of the spectrum than even PVH).
+ */
+#include <xen/features.h>
+#define xen_pvh_domain() (xen_pv_domain() && \
+			  xen_feature(XENFEAT_auto_translated_physmap) && \
+			  xen_have_vector_callback)
+#else
+#define xen_pvh_domain()	(0)
+#endif
 #endif	/* _XEN_XEN_H */

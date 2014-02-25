@@ -46,7 +46,6 @@
 
 #include "sleep.h" /* To include x86_acpi_suspend_lowlevel */
 static int __initdata acpi_force = 0;
-u32 acpi_rsdt_forced;
 int acpi_disabled;
 EXPORT_SYMBOL(acpi_disabled);
 
@@ -1057,9 +1056,7 @@ static int mp_config_acpi_gsi(struct device *dev, u32 gsi, int trigger,
 
 	if (!acpi_ioapic)
 		return 0;
-	if (!dev)
-		return 0;
-	if (dev->bus != &pci_bus_type)
+	if (!dev || !dev_is_pci(dev))
 		return 0;
 
 	pdev = to_pci_dev(dev);
@@ -1341,7 +1338,7 @@ static int __init force_acpi_rsdt(const struct dmi_system_id *d)
 	if (!acpi_force) {
 		printk(KERN_NOTICE "%s detected: force use of acpi=rsdt\n",
 		       d->ident);
-		acpi_rsdt_forced = 1;
+		acpi_gbl_do_not_use_xsdt = TRUE;
 	} else {
 		printk(KERN_NOTICE
 		       "Warning: acpi=force overrules DMI blacklist: "
@@ -1634,7 +1631,7 @@ static int __init parse_acpi(char *arg)
 	}
 	/* acpi=rsdt use RSDT instead of XSDT */
 	else if (strcmp(arg, "rsdt") == 0) {
-		acpi_rsdt_forced = 1;
+		acpi_gbl_do_not_use_xsdt = TRUE;
 	}
 	/* "acpi=noirq" disables ACPI interrupt routing */
 	else if (strcmp(arg, "noirq") == 0) {
@@ -1659,7 +1656,7 @@ early_param("acpi", parse_acpi);
 static int __init parse_acpi_root_table(char *opt)
 {
 	if (!strcmp(opt, "rsdt")) {
-		acpi_rsdt_forced = 1;
+		acpi_gbl_do_not_use_xsdt = TRUE;
 		printk(KERN_WARNING "acpi_root_table=rsdt is deprecated. "
 		       "Please use acpi=rsdt instead.\n");
 	}

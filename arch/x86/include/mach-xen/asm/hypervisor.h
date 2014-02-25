@@ -236,6 +236,9 @@ static inline int gnttab_post_map_adjust(const struct gnttab_map_grant_ref *m,
 #ifdef CONFIG_XEN
 #define is_running_on_xen() 1
 extern char hypercall_page[PAGE_SIZE];
+#define in_hypercall(regs) (!user_mode_vm(regs) && \
+	(regs)->ip >= (unsigned long)hypercall_page && \
+	(regs)->ip < (unsigned long)hypercall_page + PAGE_SIZE)
 #else
 extern char *hypercall_stubs;
 #define is_running_on_xen() (!!hypercall_stubs)

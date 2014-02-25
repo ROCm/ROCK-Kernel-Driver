@@ -51,11 +51,11 @@ int xen_spinlock_init(unsigned int cpu)
 	if (nopoll)
 		return 0;
 
- 	WARN_ON(per_cpu(poll_evtchn, cpu));
+	WARN_ON(per_cpu(poll_evtchn, cpu));
 	bind_ipi.vcpu = cpu;
 	rc = HYPERVISOR_event_channel_op(EVTCHNOP_bind_ipi, &bind_ipi);
 	if (!rc)
-	 	per_cpu(poll_evtchn, cpu) = bind_ipi.port;
+		per_cpu(poll_evtchn, cpu) = bind_ipi.port;
 	else
 		pr_warning("No spinlock poll event channel for CPU#%u (%d)\n",
 			   cpu, rc);
@@ -70,7 +70,7 @@ void xen_spinlock_cleanup(unsigned int cpu)
 	close.port = per_cpu(poll_evtchn, cpu);
 	if (!close.port)
 		return;
- 	per_cpu(poll_evtchn, cpu) = 0;
+	per_cpu(poll_evtchn, cpu) = 0;
 	WARN_ON(HYPERVISOR_event_channel_op(EVTCHNOP_close, &close));
 }
 
@@ -165,7 +165,7 @@ static unsigned int ticket_drop(struct spinning *spinning,
 static unsigned int ticket_get(arch_spinlock_t *lock, struct spinning *prev)
 {
 	struct __raw_tickets token = xadd(&lock->tickets,
-				 	  (struct __raw_tickets){ .tail = 1 });
+					  (struct __raw_tickets){ .tail = 1 });
 
 	return token.head == token.tail ? token.tail
 					: spin_adjust(prev, lock, token.tail);

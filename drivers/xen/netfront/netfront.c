@@ -511,6 +511,16 @@ again:
 		goto abort_transaction;
 	}
 
+#ifdef NETIF_F_TSO6
+	err = xenbus_write(xbt, dev->nodename, "feature-gso-tcpv6", "1");
+	if (err) {
+		message = "writing feature-gso-tcpv6";
+		goto abort_transaction;
+	}
+#else
+#define NETIF_F_TSO6 0
+#endif
+
 	err = xenbus_transaction_end(xbt, 0);
 	if (err) {
 		if (err == -EAGAIN)
@@ -1031,7 +1041,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
  	if (np->accel_vif_state.hooks && 
  	    np->accel_vif_state.hooks->start_xmit(skb, dev)) { 
  		/* Fast path has sent this packet */ 
- 		return NETDEV_TX_OK;
+		return NETDEV_TX_OK;
  	} 
 
 	/*
@@ -1096,7 +1106,9 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 			tx->flags |= XEN_NETTXF_extra_info;
 
 		gso->u.gso.size = skb_shinfo(skb)->gso_size;
-		gso->u.gso.type = XEN_NETIF_GSO_TYPE_TCPV4;
+		gso->u.gso.type = skb_shinfo(skb)->gso_type & SKB_GSO_TCPV6 ?
+			XEN_NETIF_GSO_TYPE_TCPV6 :
+			XEN_NETIF_GSO_TYPE_TCPV4;
 		gso->u.gso.pad = 0;
 		gso->u.gso.features = 0;
 
@@ -1383,8 +1395,8 @@ static int xennet_set_skb_gso(struct sk_buff *skb,
 		return -EINVAL;
 	}
 
-	/* Currently only TCPv4 S.O. is supported. */
-	if (gso->u.gso.type != XEN_NETIF_GSO_TYPE_TCPV4) {
+	if (gso->u.gso.type != XEN_NETIF_GSO_TYPE_TCPV4 &&
+	    gso->u.gso.type != XEN_NETIF_GSO_TYPE_TCPV6) {
 		if (net_ratelimit())
 			netdev_warn(skb->dev, "Bad GSO type %d.\n",
 				    gso->u.gso.type);
@@ -1394,7 +1406,9 @@ static int xennet_set_skb_gso(struct sk_buff *skb,
 #if HAVE_TSO
 	skb_shinfo(skb)->gso_size = gso->u.gso.size;
 #if HAVE_GSO
-	skb_shinfo(skb)->gso_type = SKB_GSO_TCPV4;
+	skb_shinfo(skb)->gso_type =
+		gso->u.gso.type == XEN_NETIF_GSO_TYPE_TCPV4
+		? SKB_GSO_TCPV4 : SKB_GSO_TCPV6;
 
 	/* Header must be checked, and gso_segs computed. */
 	skb_shinfo(skb)->gso_type |= SKB_GSO_DODGY;
@@ -1522,7 +1536,7 @@ err:
 		/* Ethernet work: Delayed to here as it peeks the header. */
 		skb->protocol = eth_type_trans(skb, dev);
 
-		if (skb_checksum_setup(skb, &np->rx_gso_csum_fixups)) {
+		if (xennet_checksum_setup(skb, &np->rx_gso_csum_fixups)) {
 			kfree_skb(skb);
 			dev->stats.rx_errors++;
 			--work_done;
@@ -2135,6 +2149,15 @@ static netdev_features_t xennet_fix_features(struct net_device *dev,
 			features &= ~NETIF_F_IPV6_CSUM;
 	}
 
+	if (features & NETIF_F_TSO6) {
+		if (xenbus_scanf(XBT_NIL, np->xbdev->otherend,
+				 "feature-gso-tcpv6", "%d", &val) < 0)
+			val = 0;
+
+		if (!val)
+			features &= ~NETIF_F_TSO6;
+	}
+
 	return features;
 }
 
@@ -2237,7 +2260,7 @@ static struct net_device *create_netdev(struct xenbus_device *dev)
 	netif_napi_add(netdev, &np->napi, netif_poll, 64);
 	netdev->features        = NETIF_F_RXCSUM | NETIF_F_GSO_ROBUST;
 	netdev->hw_features	= NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM
-				  | NETIF_F_SG | NETIF_F_TSO;
+				  | NETIF_F_SG | NETIF_F_TSO | NETIF_F_TSO6;
 
 	/*
          * Assume that all hw features are available for now. This set

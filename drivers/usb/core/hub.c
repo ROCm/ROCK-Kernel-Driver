@@ -33,13 +33,6 @@
 
 #include "hub.h"
 
-/* if we are in debug mode, always announce new devices */
-#ifdef DEBUG
-#ifndef CONFIG_USB_ANNOUNCE_NEW_DEVICES
-#define CONFIG_USB_ANNOUNCE_NEW_DEVICES
-#endif
-#endif
-
 #define USB_VENDOR_GENESYS_LOGIC		0x05e3
 #define HUB_QUIRK_CHECK_PORT_AUTOSUSPEND	0x01
 
@@ -135,7 +128,7 @@ struct usb_hub *usb_hub_to_struct_hub(struct usb_device *hdev)
 	return usb_get_intfdata(hdev->actconfig->interface[0]);
 }
 
-int usb_device_supports_lpm(struct usb_device *udev)
+static int usb_device_supports_lpm(struct usb_device *udev)
 {
 	/* USB 2.1 (and greater) devices indicate LPM support through
 	 * their USB 2.0 Extended Capabilities BOS descriptor.
@@ -156,11 +149,6 @@ int usb_device_supports_lpm(struct usb_device *udev)
 				"Power management will be impacted.\n");
 		return 0;
 	}
-
-	/* udev is root hub */
-	if (!udev->parent)
-		return 1;
-
 	if (udev->parent->lpm_capable)
 		return 1;
 
@@ -1154,7 +1142,8 @@ static void hub_activate(struct usb_hub *hub, enum hub_activation_type type)
 			/* Tell khubd to disconnect the device or
 			 * check for a new connection
 			 */
-			if (udev || (portstatus & USB_PORT_STAT_CONNECTION))
+			if (udev || (portstatus & USB_PORT_STAT_CONNECTION) ||
+			    (portstatus & USB_PORT_STAT_OVERCURRENT))
 				set_bit(port1, hub->change_bits);
 
 		} else if (portstatus & USB_PORT_STAT_ENABLE) {
@@ -2502,10 +2491,25 @@ static unsigned hub_is_wusb(struct usb_hub *hub)
 #define HUB_LONG_RESET_TIME	200
 #define HUB_RESET_TIMEOUT	800
 
+/*
+ * "New scheme" enumeration causes an extra state transition to be
+ * exposed to an xhci host and causes USB3 devices to receive control
+ * commands in the default state.  This has been seen to cause
+ * enumeration failures, so disable this enumeration scheme for USB3
+ * devices.
+ */
+static bool use_new_scheme(struct usb_device *udev, int retry)
+{
+	if (udev->speed == USB_SPEED_SUPER)
+		return false;
+
+	return USE_NEW_SCHEME(retry);
+}
+
 static int hub_port_reset(struct usb_hub *hub, int port1,
 			struct usb_device *udev, unsigned int delay, bool warm);
 
-/* Is a USB 3.0 port in the Inactive or Complinance Mode state?
+/* Is a USB 3.0 port in the Inactive or Compliance Mode state?
  * Port worm reset is required to recover
  */
 static bool hub_port_warm_reset_required(struct usb_hub *hub, u16 portstatus)
@@ -3313,7 +3317,8 @@ static int hub_suspend(struct usb_interface *intf, pm_message_t msg)
 
 		udev = hub->ports[port1 - 1]->child;
 		if (udev && udev->can_submit) {
-			dev_warn(&intf->dev, "port %d nyet suspended\n", port1);
+			dev_warn(&intf->dev, "port %d not suspended yet\n",
+					port1);
 			if (PMSG_IS_AUTO(msg))
 				return -EBUSY;
 		}
@@ -3960,6 +3965,20 @@ static void hub_set_initial_usb2_lpm_policy(struct usb_device *udev)
 	}
 }
 
+static int hub_enable_device(struct usb_device *udev)
+{
+	struct usb_hcd *hcd = bus_to_hcd(udev->bus);
+
+	if (!hcd->driver->enable_device)
+		return 0;
+	if (udev->state == USB_STATE_ADDRESS)
+		return 0;
+	if (udev->state != USB_STATE_DEFAULT)
+		return -EINVAL;
+
+	return hcd->driver->enable_device(hcd, udev);
+}
+
 /* Reset device, (re)assign address, get device descriptor.
  * Device connection must be stable, no more debouncing needed.
  * Returns device in USB_STATE_ADDRESS, except on error.
@@ -4072,7 +4091,7 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 	 * this area, and this is how Linux has done it for ages.
 	 * Change it cautiously.
 	 *
-	 * NOTE:  If USE_NEW_SCHEME() is true we will start by issuing
+	 * NOTE:  If use_new_scheme() is true we will start by issuing
 	 * a 64-byte GET_DESCRIPTOR request.  This is what Windows does,
 	 * so it may help with some non-standards-compliant devices.
 	 * Otherwise we start with SET_ADDRESS and then try to read the
@@ -4080,9 +4099,16 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 	 * value.
 	 */
 	for (i = 0; i < GET_DESCRIPTOR_TRIES; (++i, msleep(100))) {
-		if (USE_NEW_SCHEME(retry_counter) && !(hcd->driver->flags & HCD_USB3)) {
+		bool did_new_scheme = false;
+
+		if (use_new_scheme(udev, retry_counter)) {
 			struct usb_device_descriptor *buf;
 			int r = 0;
+
+			did_new_scheme = true;
+			retval = hub_enable_device(udev);
+			if (retval < 0)
+				goto fail;
 
 #define GET_DESCRIPTOR_BUFSIZE	64
 			buf = kmalloc(GET_DESCRIPTOR_BUFSIZE, GFP_NOIO);
@@ -4172,7 +4198,11 @@ hub_port_init (struct usb_hub *hub, struct usb_device *udev, int port1,
 			 *  - read ep0 maxpacket even for high and low speed,
 			 */
 			msleep(10);
-			if (USE_NEW_SCHEME(retry_counter) && !(hcd->driver->flags & HCD_USB3))
+			/* use_new_scheme() checks the speed which may have
+			 * changed since the initial look so we cache the result
+			 * in did_new_scheme
+			 */
+			if (did_new_scheme)
 				break;
 		}
 
@@ -4879,7 +4909,7 @@ static void hub_events(void)
 
 static int hub_thread(void *__unused)
 {
-	/* khubd needs to be freezable to avoid intefering with USB-PERSIST
+	/* khubd needs to be freezable to avoid interfering with USB-PERSIST
 	 * port handover.  Otherwise it might see that a full-speed device
 	 * was gone before the EHCI controller had handed its port over to
 	 * the companion full-speed controller.

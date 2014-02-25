@@ -36,14 +36,16 @@
 #define TMEM_CONTROL               0
 #define TMEM_NEW_POOL              1
 #define TMEM_DESTROY_POOL          2
-#define TMEM_NEW_PAGE              3
 #define TMEM_PUT_PAGE              4
 #define TMEM_GET_PAGE              5
 #define TMEM_FLUSH_PAGE            6
 #define TMEM_FLUSH_OBJECT          7
+#if __XEN_INTERFACE_VERSION__ < 0x00040400
+#define TMEM_NEW_PAGE              3
 #define TMEM_READ                  8
 #define TMEM_WRITE                 9
 #define TMEM_XCHG                 10
+#endif
 
 /* Privileged commands to HYPERVISOR_tmem_op() */
 #define TMEM_AUTH                 101 
@@ -95,7 +97,9 @@
 
 
 #ifndef __ASSEMBLY__
+#if __XEN_INTERFACE_VERSION__ < 0x00040400
 typedef xen_pfn_t tmem_cli_mfn_t;
+#endif
 typedef XEN_GUEST_HANDLE(char) tmem_cli_va_t;
 struct tmem_op {
     uint32_t cmd;
@@ -121,7 +125,7 @@ struct tmem_op {
             uint32_t tmem_offset;
             uint32_t pfn_offset;
             uint32_t len;
-            tmem_cli_mfn_t cmfn; /* client machine page frame */
+            xen_pfn_t cmfn; /* client machine page frame */
         } gen; /* for all other cmd ("generic") */
     } u;
 };

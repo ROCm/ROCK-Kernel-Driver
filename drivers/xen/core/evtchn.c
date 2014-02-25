@@ -55,8 +55,8 @@
 static DEFINE_SPINLOCK(irq_mapping_update_lock);
 
 /* IRQ <-> event-channel mappings. */
-static int evtchn_to_irq[NR_EVENT_CHANNELS] = {
-	[0 ...  NR_EVENT_CHANNELS-1] = -1 };
+static int evtchn_to_irq[EVTCHN_2L_NR_CHANNELS] = {
+	[0 ...  EVTCHN_2L_NR_CHANNELS-1] = -1 };
 
 #if defined(CONFIG_SMP) && defined(CONFIG_X86)
 static struct percpu_irqaction {
@@ -143,7 +143,7 @@ static inline u32 mk_irq_info(u32 type, u32 index, u32 evtchn)
 #endif
 	BUG_ON(index >> _INDEX_BITS);
 
-	BUILD_BUG_ON(NR_EVENT_CHANNELS > (1U << _EVTCHN_BITS));
+	BUILD_BUG_ON(EVTCHN_2L_NR_CHANNELS > (1U << _EVTCHN_BITS));
 
 	return ((type << (32 - _IRQT_BITS)) | (index << _EVTCHN_BITS) | evtchn);
 }
@@ -241,11 +241,11 @@ DEFINE_PER_CPU(int[NR_IPIS], ipi_to_irq) = {[0 ... NR_IPIS-1] = -1};
 #ifdef CONFIG_SMP
 
 #if CONFIG_NR_CPUS <= 256
-static u8 cpu_evtchn[NR_EVENT_CHANNELS];
+static u8 cpu_evtchn[EVTCHN_2L_NR_CHANNELS];
 #else
-static u16 cpu_evtchn[NR_EVENT_CHANNELS];
+static u16 cpu_evtchn[EVTCHN_2L_NR_CHANNELS];
 #endif
-static DEFINE_PER_CPU(unsigned long[BITS_TO_LONGS(NR_EVENT_CHANNELS)],
+static DEFINE_PER_CPU(unsigned long[BITS_TO_LONGS(EVTCHN_2L_NR_CHANNELS)],
 		      cpu_evtchn_mask);
 
 static inline unsigned long active_evtchns(unsigned int idx)
@@ -378,7 +378,14 @@ static DEFINE_PER_CPU(unsigned int, current_l2i);
 #endif
 
 /* NB. Interrupts are disabled on entry. */
-asmlinkage void __irq_entry evtchn_do_upcall(struct pt_regs *regs)
+asmlinkage
+#ifdef CONFIG_PREEMPT
+void
+#define return(x) return
+#else
+bool
+#endif
+__irq_entry evtchn_do_upcall(struct pt_regs *regs)
 {
 	unsigned long       l1, l2;
 	unsigned long       masked_l1, masked_l2;
@@ -392,7 +399,7 @@ asmlinkage void __irq_entry evtchn_do_upcall(struct pt_regs *regs)
 		__this_cpu_or(upcall_state, UPC_NESTED_LATCH);
 		/* Avoid a callback storm when we reenable delivery. */
 		vcpu_info_write(evtchn_upcall_pending, 0);
-		return;
+		return(false);
 	}
 
 	old_regs = set_irq_regs(regs);
@@ -510,6 +517,9 @@ asmlinkage void __irq_entry evtchn_do_upcall(struct pt_regs *regs)
 	irq_exit();
 	xen_spin_irq_exit();
 	set_irq_regs(old_regs);
+
+	return(__this_cpu_read(privcmd_hcall) && in_hypercall(regs));
+#undef return
 }
 
 static int find_unbound_irq(unsigned int node, struct irq_cfg **pcfg,
@@ -1583,7 +1593,7 @@ void disable_all_local_evtchn(void)
 	unsigned i, cpu = smp_processor_id();
 	shared_info_t *s = HYPERVISOR_shared_info;
 
-	for (i = 0; i < NR_EVENT_CHANNELS; ++i)
+	for (i = 0; i < EVTCHN_2L_NR_CHANNELS; ++i)
 		if (cpu_from_evtchn(i) == cpu)
 			sync_set_bit(i, &s->evtchn_mask[0]);
 }
@@ -1731,7 +1741,7 @@ static void evtchn_resume(void)
 	}
 
 	/* New event-channel space is not 'live' yet. */
-	for (evtchn = 0; evtchn < NR_EVENT_CHANNELS; evtchn++)
+	for (evtchn = 0; evtchn < EVTCHN_2L_NR_CHANNELS; evtchn++)
 		mask_evtchn(evtchn);
 
 	/* No IRQ <-> event-channel mappings. */
@@ -1751,7 +1761,7 @@ static void evtchn_resume(void)
 
 		cfg->info &= ~((1U << _EVTCHN_BITS) - 1);
 	}
-	for (evtchn = 0; evtchn < NR_EVENT_CHANNELS; evtchn++)
+	for (evtchn = 0; evtchn < EVTCHN_2L_NR_CHANNELS; evtchn++)
 		evtchn_to_irq[evtchn] = -1;
 
 	for_each_possible_cpu(cpu) {
@@ -1843,8 +1853,8 @@ int __init arch_probe_nr_irqs(void)
 
 	if (nr_pirqs > nr_irqs_gsi)
 		nr_pirqs = nr_irqs_gsi;
-	if (nr > min_t(int, NR_DYNIRQS, NR_EVENT_CHANNELS))
-		nr = min_t(int, NR_DYNIRQS, NR_EVENT_CHANNELS);
+	if (nr > min_t(int, NR_DYNIRQS, EVTCHN_2L_NR_CHANNELS))
+		nr = min_t(int, NR_DYNIRQS, EVTCHN_2L_NR_CHANNELS);
 	nr_irqs = min_t(int, nr_pirqs + nr, PAGE_SIZE * 8);
 
 	printk(KERN_DEBUG "nr_pirqs: %d\n", nr_pirqs);
@@ -2026,7 +2036,7 @@ void __init xen_init_IRQ(void)
 		pirq_eoi_does_unmask = true;
 
 	/* No event channels are 'live' right now. */
-	for (i = 0; i < NR_EVENT_CHANNELS; i++)
+	for (i = 0; i < EVTCHN_2L_NR_CHANNELS; i++)
 		mask_evtchn(i);
 
 #ifndef CONFIG_SPARSE_IRQ

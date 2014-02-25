@@ -250,8 +250,8 @@ static int _xen_sleep(u8 sleep_state, u32 val_a, u32 val_b, unsigned int flags)
 		.cmd = XENPF_enter_acpi_sleep,
 		.interface_version = XENPF_INTERFACE_VERSION,
 		.u.enter_acpi_sleep = {
-			.pm1a_cnt_val = val_a,
-			.pm1b_cnt_val = val_b,
+			.val_a = val_a,
+			.val_b = val_b,
 			.sleep_state = sleep_state,
 			.flags = flags,
 		},

@@ -234,9 +234,9 @@ int xen_guest_address_size(int domid)
 
 	BUILD_BUG_ON(XEN_DOMCTL_INTERFACE_VERSION > 9);
 	guest_address_size(9);
-/* #if CONFIG_XEN_COMPAT < 0x040300 */
+#if CONFIG_XEN_COMPAT < 0x040300
 	guest_address_size(8);
-/* #endif */
+#endif
 #if CONFIG_XEN_COMPAT < 0x040200
 	guest_address_size(7);
 #endif
@@ -293,10 +293,10 @@ static inline int get_vcpuaffinity(unsigned int nr, void *mask)
 
 	BUILD_BUG_ON(XEN_DOMCTL_INTERFACE_VERSION > 9);
 	rc = vcpuaffinity(get, 9);
-/* #if CONFIG_XEN_COMPAT < 0x040300 */
+#if CONFIG_XEN_COMPAT < 0x040300
 	if (rc)
 		rc = vcpuaffinity(get, 8);
-/* #endif */
+#endif
 #if CONFIG_XEN_COMPAT < 0x040200
 	if (rc)
 		rc = vcpuaffinity(get, 7);
@@ -323,10 +323,10 @@ static inline int set_vcpuaffinity(unsigned int nr, void *mask)
 
 	BUILD_BUG_ON(XEN_DOMCTL_INTERFACE_VERSION > 9);
 	rc = vcpuaffinity(set, 9);
-/* #if CONFIG_XEN_COMPAT < 0x040300 */
+#if CONFIG_XEN_COMPAT < 0x040300
 	if (rc)
 		rc = vcpuaffinity(set, 8);
-/* #endif */
+#endif
 #if CONFIG_XEN_COMPAT < 0x040200
 	if (rc)
 		rc = vcpuaffinity(set, 7);

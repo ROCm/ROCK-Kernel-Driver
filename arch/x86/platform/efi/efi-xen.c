@@ -12,6 +12,8 @@
  *	Bibo Mao <bibo.mao@intel.com>
  *	Chandramouli Narayanan <mouli@linux.intel.com>
  *	Huang Ying <ying.huang@intel.com>
+ * Copyright (C) 2013 SuSE Labs
+ *	Borislav Petkov <bp@suse.de> - runtime services VA mapping
  *
  * Copied from efi_32.c to eliminate the duplicated code between EFI
  * 32/64 support code. --ying 2007-10-26
@@ -48,7 +50,7 @@
 
 #include <xen/interface/platform.h>
 
-#define EFI_DEBUG	1
+#define EFI_DEBUG
 
 #define EFI_MIN_RESERVE 5120
 
@@ -322,9 +324,9 @@ static efi_status_t xen_efi_query_capsule_caps(efi_capsule_header_t **capsules,
 int efi_set_rtc_mmss(const struct timespec *now)
 {
 	unsigned long nowtime = now->tv_sec;
-	efi_status_t 	status;
-	efi_time_t 	eft;
-	efi_time_cap_t 	cap;
+	efi_status_t	status;
+	efi_time_t	eft;
+	efi_time_cap_t	cap;
 	struct rtc_time	tm;
 
 	status = efi.get_time(&eft, &cap);

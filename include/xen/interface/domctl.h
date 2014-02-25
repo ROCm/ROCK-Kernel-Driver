@@ -47,7 +47,7 @@ struct xen_domctl_createdomain {
     /* IN parameters */
     uint32_t ssidref;
     xen_domain_handle_t handle;
- /* Is this an HVM guest (as opposed to a PV guest)? */
+ /* Is this an HVM guest (as opposed to a PVH or PV guest)? */
 #define _XEN_DOMCTL_CDF_hvm_guest     0
 #define XEN_DOMCTL_CDF_hvm_guest      (1U<<_XEN_DOMCTL_CDF_hvm_guest)
  /* Use hardware-assisted paging if available? */
@@ -59,6 +59,9 @@ struct xen_domctl_createdomain {
  /* Disable out-of-sync shadow page tables? */
 #define _XEN_DOMCTL_CDF_oos_off       3
 #define XEN_DOMCTL_CDF_oos_off        (1U<<_XEN_DOMCTL_CDF_oos_off)
+ /* Is this a PVH guest (as opposed to an HVM or PV guest)? */
+#define _XEN_DOMCTL_CDF_pvh_guest     4
+#define XEN_DOMCTL_CDF_pvh_guest      (1U<<_XEN_DOMCTL_CDF_pvh_guest)
     uint32_t flags;
 };
 typedef struct xen_domctl_createdomain xen_domctl_createdomain_t;
@@ -89,6 +92,9 @@ struct xen_domctl_getdomaininfo {
  /* Being debugged.  */
 #define _XEN_DOMINF_debugged  6
 #define XEN_DOMINF_debugged   (1U<<_XEN_DOMINF_debugged)
+/* domain is PVH */
+#define _XEN_DOMINF_pvh_guest 7
+#define XEN_DOMINF_pvh_guest  (1U<<_XEN_DOMINF_pvh_guest)
  /* XEN_DOMINF_shutdown guest-supplied code.  */
 #define XEN_DOMINF_shutdownmask 255
 #define XEN_DOMINF_shutdownshift 16
@@ -635,6 +641,22 @@ typedef struct xen_domctl_cpuid xen_domctl_cpuid_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_cpuid_t);
 #endif
 
+/*
+ * Arranges that if the domain suspends (specifically, if it shuts
+ * down with code SHUTDOWN_suspend), this event channel will be
+ * notified.
+ *
+ * This is _instead of_ the usual notification to the global
+ * VIRQ_DOM_EXC.  (In most systems that pirq is owned by xenstored.)
+ *
+ * Only one subscription per domain is possible.  Last subscriber
+ * wins; others are silently displaced.
+ *
+ * NB that contrary to the rather general name, it only applies to
+ * domain shutdown with code suspend.  Shutdown for other reasons
+ * (including crash), and domain death, are notified to VIRQ_DOM_EXC
+ * regardless.
+ */
 /* XEN_DOMCTL_subscribe */
 struct xen_domctl_subscribe {
     uint32_t port; /* IN */
@@ -874,6 +896,17 @@ struct xen_domctl_set_broken_page_p2m {
 typedef struct xen_domctl_set_broken_page_p2m xen_domctl_set_broken_page_p2m_t;
 DEFINE_XEN_GUEST_HANDLE(xen_domctl_set_broken_page_p2m_t);
 
+/*
+ * XEN_DOMCTL_set_max_evtchn: sets the maximum event channel port
+ * number the guest may use.  Use this limit the amount of resources
+ * (global mapping space, xenheap) a guest may use for event channels.
+ */
+struct xen_domctl_set_max_evtchn {
+    uint32_t max_port;
+};
+typedef struct xen_domctl_set_max_evtchn xen_domctl_set_max_evtchn_t;
+DEFINE_XEN_GUEST_HANDLE(xen_domctl_set_max_evtchn_t);
+
 struct xen_domctl {
     uint32_t cmd;
 #define XEN_DOMCTL_createdomain                   1
@@ -942,6 +975,7 @@ struct xen_domctl {
 #define XEN_DOMCTL_set_broken_page_p2m           67
 #define XEN_DOMCTL_setnodeaffinity               68
 #define XEN_DOMCTL_getnodeaffinity               69
+#define XEN_DOMCTL_set_max_evtchn                70
 #define XEN_DOMCTL_gdbsx_guestmemio            1000
 #define XEN_DOMCTL_gdbsx_pausevcpu             1001
 #define XEN_DOMCTL_gdbsx_unpausevcpu           1002
@@ -998,6 +1032,7 @@ struct xen_domctl {
         struct xen_domctl_set_access_required access_required;
         struct xen_domctl_audit_p2m         audit_p2m;
         struct xen_domctl_set_virq_handler  set_virq_handler;
+        struct xen_domctl_set_max_evtchn    set_max_evtchn;
         struct xen_domctl_gdbsx_memio       gdbsx_guest_memio;
         struct xen_domctl_set_broken_page_p2m set_broken_page_p2m;
         struct xen_domctl_gdbsx_pauseunp_vcpu gdbsx_pauseunp_vcpu;

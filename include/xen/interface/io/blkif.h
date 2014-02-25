@@ -467,7 +467,7 @@
 #define BLKIF_OP_DISCARD           5
 
 /*
- * Recognized if "feature-max-indirect-segments" is present in the backend
+ * Recognized if "feature-max-indirect-segments" in present in the backend
  * xenbus info. The "feature-max-indirect-segments" node contains the maximum
  * number of segments allowed by the backend per request. If the node is
  * present, the frontend might use blkif_request_indirect structs in order to
@@ -477,13 +477,13 @@
  * it's less than the number provided by the backend. The indirect_grefs field
  * in blkif_request_indirect should be filled by the frontend with the
  * grant references of the pages that are holding the indirect segments.
- * This pages are filled with an array of blkif_request_segment_aligned
- * that hold the information about the segments. The number of indirect
- * pages to use is determined by the maximum number of segments
- * a indirect request contains. Every indirect page can contain a maximum
- * of 512 segments (PAGE_SIZE/sizeof(blkif_request_segment_aligned)),
- * so to calculate the number of indirect pages to use we have to do
- * ceil(indirect_segments/512).
+ * These pages are filled with an array of blkif_request_segment that hold the
+ * information about the segments. The number of indirect pages to use is
+ * determined by the number of segments an indirect request contains. Every
+ * indirect page can contain a maximum of
+ * (PAGE_SIZE / sizeof(struct blkif_request_segment)) segments, so to
+ * calculate the number of indirect pages to use we have to do
+ * ceil(indirect_segments / (PAGE_SIZE / sizeof(struct blkif_request_segment))).
  *
  * If a backend does not recognize BLKIF_OP_INDIRECT, it should *not*
  * create the "feature-max-indirect-segments" node!
@@ -498,6 +498,11 @@
 #define BLKIF_MAX_SEGMENTS_PER_REQUEST 11
 
 /*
+ * Maximum number of indirect pages to use per request.
+ */
+#define BLKIF_MAX_INDIRECT_PAGES_PER_REQUEST 8
+
+/*
  * NB. first_sect and last_sect in blkif_request_segment, as well as
  * sector_number in blkif_request, are always expressed in 512-byte units.
  * However they must be properly aligned to the real sector size of the
@@ -506,21 +511,11 @@
  * 512-byte units.
  */
 struct blkif_request_segment {
-    grant_ref_t gref;        /* reference to I/O buffer frame        */
-    /* @first_sect: first sector in frame to transfer (inclusive).   */
-    /* @last_sect: last sector in frame to transfer (inclusive).     */
-    uint8_t     first_sect, last_sect;
+		grant_ref_t gref;        /* reference to I/O buffer frame        */
+		/* @first_sect: first sector in frame to transfer (inclusive).   */
+		/* @last_sect: last sector in frame to transfer (inclusive).     */
+		uint8_t     first_sect, last_sect;
 };
-
-#define BLKIF_MAX_INDIRECT_PAGES_PER_REQUEST 8
-
-struct blkif_request_segment_aligned {
-	grant_ref_t gref;        /* reference to I/O buffer frame        */
-	/* @first_sect: first sector in frame to transfer (inclusive).   */
-	/* @last_sect: last sector in frame to transfer (inclusive).     */
-	uint8_t     first_sect, last_sect;
-	uint16_t    _pad; /* padding to make it 8 bytes, so it's cache-aligned */
-} __attribute__((__packed__));
 
 /*
  * Starting ring element for any I/O request.
@@ -603,6 +598,20 @@ struct blkif_request_discard {
     uint64_t       nr_sectors;   /* number of contiguous sectors to discard*/
 };
 typedef struct blkif_request_discard blkif_request_discard_t;
+
+struct blkif_request_indirect {
+    uint8_t        operation;    /* BLKIF_OP_INDIRECT                    */
+    uint8_t        indirect_op;  /* BLKIF_OP_{READ/WRITE}                */
+    uint16_t       nr_segments;  /* number of segments                   */
+    uint64_t       id;           /* private guest value, echoed in resp  */
+    blkif_sector_t sector_number;/* start sector idx on disk (r/w only)  */
+    blkif_vdev_t   handle;       /* same as for read/write requests      */
+    grant_ref_t    indirect_grefs[BLKIF_MAX_INDIRECT_PAGES_PER_REQUEST];
+#ifdef __i386__
+    uint64_t       pad;          /* Make it 64 byte aligned on i386      */
+#endif
+};
+typedef struct blkif_request_indirect blkif_request_indirect_t;
 #endif
 
 struct blkif_response {

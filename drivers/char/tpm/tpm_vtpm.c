@@ -455,42 +455,9 @@ static bool vtpm_req_canceled(struct tpm_chip *chip, u8 status)
 	return status == STATUS_READY;
 }
 
-static struct file_operations vtpm_ops = {
-	.owner = THIS_MODULE,
-	.llseek = no_llseek,
-	.open = tpm_open,
-	.read = tpm_read,
-	.write = tpm_write,
-	.release = tpm_release,
-};
-
-static DEVICE_ATTR(pubek, S_IRUGO, tpm_show_pubek, NULL);
-static DEVICE_ATTR(pcrs, S_IRUGO, tpm_show_pcrs, NULL);
-static DEVICE_ATTR(enabled, S_IRUGO, tpm_show_enabled, NULL);
-static DEVICE_ATTR(active, S_IRUGO, tpm_show_active, NULL);
-static DEVICE_ATTR(owned, S_IRUGO, tpm_show_owned, NULL);
-static DEVICE_ATTR(temp_deactivated, S_IRUGO, tpm_show_temp_deactivated,
-		   NULL);
-static DEVICE_ATTR(caps, S_IRUGO, tpm_show_caps, NULL);
-static DEVICE_ATTR(cancel, S_IWUSR |S_IWGRP, NULL, tpm_store_cancel);
-
-static struct attribute *vtpm_attrs[] = {
-	&dev_attr_pubek.attr,
-	&dev_attr_pcrs.attr,
-	&dev_attr_enabled.attr,
-	&dev_attr_active.attr,
-	&dev_attr_owned.attr,
-	&dev_attr_temp_deactivated.attr,
-	&dev_attr_caps.attr,
-	&dev_attr_cancel.attr,
-	NULL,
-};
-
-static struct attribute_group vtpm_attr_grp = { .attrs = vtpm_attrs };
-
 #define TPM_LONG_TIMEOUT   (10 * 60 * HZ)
 
-static struct tpm_vendor_specific tpm_vtpm = {
+static const struct tpm_class_ops tpm_vtpm = {
 	.recv = vtpm_recv,
 	.send = vtpm_send,
 	.cancel = vtpm_cancel,
@@ -498,15 +465,6 @@ static struct tpm_vendor_specific tpm_vtpm = {
 	.req_complete_mask = STATUS_BUSY | STATUS_DATA_AVAIL,
 	.req_complete_val  = STATUS_DATA_AVAIL,
 	.req_canceled = vtpm_req_canceled,
-	.attr_group = &vtpm_attr_grp,
-	.miscdev = {
-		.fops = &vtpm_ops,
-	},
-	.duration = {
-		TPM_LONG_TIMEOUT,
-		TPM_LONG_TIMEOUT,
-		TPM_LONG_TIMEOUT,
-	},
 };
 
 struct tpm_chip *init_vtpm(struct device *dev,
@@ -530,6 +488,8 @@ struct tpm_chip *init_vtpm(struct device *dev,
 	}
 
 	chip_set_private(chip, vtpms);
+	for (rc = 0; rc < ARRAY_SIZE(chip->vendor.duration); ++rc)
+		chip->vendor.duration[rc] = TPM_LONG_TIMEOUT;
 
 	return chip;
 

@@ -2821,16 +2821,12 @@ static int parport_pc_pci_probe(struct pci_dev *dev,
 		if (irq == IRQ_NONE) {
 			printk(KERN_DEBUG
 	"PCI parallel port detected: %04x:%04x, I/O at %#lx(%#lx)\n",
-				parport_pc_pci_tbl[i + last_sio].vendor,
-				parport_pc_pci_tbl[i + last_sio].device,
-				io_lo, io_hi);
+				id->vendor, id->device, io_lo, io_hi);
 			irq = PARPORT_IRQ_NONE;
 		} else {
 			printk(KERN_DEBUG
 	"PCI parallel port detected: %04x:%04x, I/O at %#lx(%#lx), IRQ %d\n",
-				parport_pc_pci_tbl[i + last_sio].vendor,
-				parport_pc_pci_tbl[i + last_sio].device,
-				io_lo, io_hi, irq);
+				id->vendor, id->device, io_lo, io_hi, irq);
 		}
 		data->ports[count] =
 			parport_pc_probe_port(io_lo, io_hi, irq,
@@ -2859,8 +2855,6 @@ static void parport_pc_pci_remove(struct pci_dev *dev)
 {
 	struct pci_parport_data *data = pci_get_drvdata(dev);
 	int i;
-
-	pci_set_drvdata(dev, NULL);
 
 	if (data) {
 		for (i = data->num - 1; i >= 0; i--)

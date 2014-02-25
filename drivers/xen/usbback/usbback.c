@@ -1046,7 +1046,7 @@ static int usbbk_start_submit_urb(usbif_t *usbif)
 
 	RING_FINAL_CHECK_FOR_REQUESTS(&usbif->urb_ring, more_to_do);
 
-	return more_to_do;
+	return !!more_to_do;
 }
 
 void usbbk_hotplug_notify(usbif_t *usbif, int portnum, int speed)

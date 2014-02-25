@@ -347,7 +347,7 @@ static struct bio *request_map_sg(pending_req_t *pending_req)
 
 			if (!bio) {
 				nr_vecs = min_t(unsigned int, BIO_MAX_PAGES,
-					 	nr_pages);
+						nr_pages);
 				nr_pages -= nr_vecs;
 				bio = bio_alloc(GFP_KERNEL, nr_vecs);
 				if (!bio) {

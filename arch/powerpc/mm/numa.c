@@ -570,16 +570,38 @@ out:
 	return nid;
 }
 
+static void verify_cpu_node_mapping(int cpu, int node)
+{
+	int base, sibling, i;
+
+	/* Verify that all the threads in the core belong to the same node */
+	base = cpu_first_thread_sibling(cpu);
+
+	for (i = 0; i < threads_per_core; i++) {
+		sibling = base + i;
+
+		if (sibling == cpu || cpu_is_offline(sibling))
+			continue;
+
+		if (cpu_to_node(sibling) != node) {
+			WARN(1, "CPU thread siblings %d and %d don't belong"
+				" to the same node!\n", cpu, sibling);
+			break;
+		}
+	}
+}
+
 static int cpu_numa_callback(struct notifier_block *nfb, unsigned long action,
 			     void *hcpu)
 {
 	unsigned long lcpu = (unsigned long)hcpu;
-	int ret = NOTIFY_DONE;
+	int ret = NOTIFY_DONE, nid;
 
 	switch (action) {
 	case CPU_UP_PREPARE:
 	case CPU_UP_PREPARE_FROZEN:
-		numa_setup_cpu(lcpu);
+		nid = numa_setup_cpu(lcpu);
+		verify_cpu_node_mapping((int)lcpu, nid);
 		ret = NOTIFY_OK;
 		break;
 #ifdef CONFIG_HOTPLUG_CPU
@@ -698,7 +720,8 @@ static void __init parse_drconf_memory(struct device_node *memory)
 			node_set_online(nid);
 			sz = numa_enforce_memory_limit(base, size);
 			if (sz)
-				memblock_set_node(base, sz, nid);
+				memblock_set_node(base, sz,
+						  &memblock.memory, nid);
 		} while (--ranges);
 	}
 }
@@ -788,7 +811,7 @@ new_range:
 				continue;
 		}
 
-		memblock_set_node(start, size, nid);
+		memblock_set_node(start, size, &memblock.memory, nid);
 
 		if (--ranges)
 			goto new_range;
@@ -825,7 +848,8 @@ static void __init setup_nonnuma(void)
 
 		fake_numa_create_new_node(end_pfn, &nid);
 		memblock_set_node(PFN_PHYS(start_pfn),
-				  PFN_PHYS(end_pfn - start_pfn), nid);
+				  PFN_PHYS(end_pfn - start_pfn),
+				  &memblock.memory, nid);
 		node_set_online(nid);
 	}
 }
@@ -1761,7 +1785,7 @@ static const struct file_operations topology_ops = {
 static int topology_update_init(void)
 {
 	start_topology_update();
-	proc_create("powerpc/topology_updates", 644, NULL, &topology_ops);
+	proc_create("powerpc/topology_updates", 0644, NULL, &topology_ops);
 
 	return 0;
 }

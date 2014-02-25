@@ -247,9 +247,9 @@ static int __acpi_processor_start(struct acpi_device *device)
 
 static int acpi_processor_start(struct device *dev)
 {
-	struct acpi_device *device;
+	struct acpi_device *device = ACPI_COMPANION(dev);
 
-	if (acpi_bus_get_device(ACPI_HANDLE(dev), &device))
+	if (!device)
 		return -ENODEV;
 
 	return __acpi_processor_start(device);
@@ -257,10 +257,10 @@ static int acpi_processor_start(struct device *dev)
 
 static int acpi_processor_stop(struct device *dev)
 {
-	struct acpi_device *device;
+	struct acpi_device *device = ACPI_COMPANION(dev);
 	struct acpi_processor *pr;
 
-	if (acpi_bus_get_device(ACPI_HANDLE(dev), &device))
+	if (!device)
 		return 0;
 
 	acpi_remove_notify_handler(device->handle, ACPI_DEVICE_NOTIFY,

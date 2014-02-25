@@ -8,7 +8,8 @@ ifeq ($(filter y, $(CONFIG_ARM) $(CONFIG_ARM64)),)
 obj-$(CONFIG_HOTPLUG_CPU)	+= $(xen-hotplug-y)
 endif
 obj-$(CONFIG_X86)		+= fallback.o
-obj-$(CONFIG_PARAVIRT_XEN)	+= grant-table.o features.o events.o balloon.o manage.o
+obj-$(CONFIG_PARAVIRT_XEN)	+= grant-table.o features.o balloon.o manage.o
+obj-$(CONFIG_PARAVIRT_XEN)	+= events/
 
 xen-balloon_$(CONFIG_XEN)	:= balloon/
 xen-privcmd_$(CONFIG_XEN)	:= privcmd/
@@ -37,7 +38,6 @@ xen-pad-$(CONFIG_X86) += xen-acpi-pad.o
 dom0-$(CONFIG_X86) += pcpu.o
 obj-$(CONFIG_XEN_DOM0)			+= $(dom0-y)
 obj-$(CONFIG_BLOCK)			+= $(xen-biomerge-y)
-obj-$(CONFIG_XEN_XENCOMM)		+= xencomm.o
 obj-$(CONFIG_XEN_BALLOON)		+= $(xen-balloon_y)
 obj-$(CONFIG_XEN_SELFBALLOONING)	+= xen-selfballoon.o
 obj-$(CONFIG_XEN_DEV_EVTCHN)		+= $(xen-evtchn-name-y).o

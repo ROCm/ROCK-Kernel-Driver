@@ -1426,9 +1426,8 @@ static struct dentry *ext4_lookup(struct inode *dir, struct dentry *dentry, unsi
 			return ERR_PTR(-EIO);
 		}
 		if (unlikely(ino == dir->i_ino)) {
-			EXT4_ERROR_INODE(dir, "'%.*s' linked to parent dir",
-					 dentry->d_name.len,
-					 dentry->d_name.name);
+			EXT4_ERROR_INODE(dir, "'%pd' linked to parent dir",
+					 dentry);
 			return ERR_PTR(-EIO);
 		}
 		inode = ext4_iget(dir->i_sb, ino);
@@ -3226,6 +3225,7 @@ const struct inode_operations ext4_dir_inode_operations = {
 	.listxattr	= ext4_listxattr,
 	.removexattr	= generic_removexattr,
 	.get_acl	= ext4_get_acl,
+	.set_acl	= ext4_set_acl,
 	.fiemap         = ext4_fiemap,
 	.permission	= ext4_permission,
 	.may_create	= ext4_may_create,
@@ -3239,6 +3239,7 @@ const struct inode_operations ext4_special_inode_operations = {
 	.listxattr	= ext4_listxattr,
 	.removexattr	= generic_removexattr,
 	.get_acl	= ext4_get_acl,
+	.set_acl	= ext4_set_acl,
 	.permission	= ext4_permission,
 	.may_create	= ext4_may_create,
 	.may_delete	= ext4_may_delete,

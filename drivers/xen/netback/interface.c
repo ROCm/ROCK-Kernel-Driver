@@ -130,9 +130,11 @@ static netdev_features_t netbk_fix_features(struct net_device *dev,
 		features &= ~NETIF_F_SG;
 	if (!netif->gso)
 		features &= ~NETIF_F_TSO;
-	if (!netif->ip_csum)
+	if (!netif->gso6)
+		features &= ~NETIF_F_TSO6;
+	if (!netif->csum)
 		features &= ~NETIF_F_IP_CSUM;
-	if (!netif->ipv6_csum)
+	if (!netif->csum6)
 		features &= ~NETIF_F_IPV6_CSUM;
 
 	return features;
@@ -227,7 +229,7 @@ netif_t *netif_alloc(struct device *parent, domid_t domid, unsigned int handle)
 	netif->group = UINT_MAX;
 	netif->handle = handle;
 	netif->can_sg = 1;
-	netif->ip_csum = 1;
+	netif->csum = 1;
 	atomic_set(&netif->refcnt, 1);
 	init_waitqueue_head(&netif->waiting_to_free);
 	netif->dev = dev;
@@ -244,7 +246,7 @@ netif_t *netif_alloc(struct device *parent, domid_t domid, unsigned int handle)
 	dev->netdev_ops = &netif_be_netdev_ops;
 
 	dev->hw_features = NETIF_F_SG | NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM
-			   | NETIF_F_TSO;
+			   | NETIF_F_TSO | NETIF_F_TSO6;
 	dev->features = dev->hw_features;
 
 	SET_ETHTOOL_OPS(dev, &network_ethtool_ops);

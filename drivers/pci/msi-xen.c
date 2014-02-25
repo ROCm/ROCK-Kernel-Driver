@@ -43,7 +43,6 @@ struct msi_pirq_entry {
 	int pirq;
 	int entry_nr;
 	struct msi_dev_list *dev_entry;
-	struct kobject kobj;
 };
 
 struct msi_dev_list {
@@ -150,7 +149,6 @@ static int attach_pirq_entry(int pirq, int entry_nr,
 	entry->pirq = pirq;
 	entry->entry_nr = entry_nr;
 	entry->dev_entry = msi_dev_entry;
-	memset(&entry->kobj, 0, sizeof(entry->kobj));
 	spin_lock_irqsave(&msi_dev_entry->pirq_list_lock, flags);
 	list_add_tail(&entry->list, &msi_dev_entry->dev->msi_list);
 	spin_unlock_irqrestore(&msi_dev_entry->pirq_list_lock, flags);
@@ -200,7 +198,7 @@ EXPORT_SYMBOL(unregister_msi_get_owner);
 #endif
 
 static void msi_unmap_pirq(struct pci_dev *dev, int pirq, unsigned int nr,
-			   domid_t owner, struct kobject *kobj)
+			   domid_t owner)
 {
 	struct physdev_unmap_pirq unmap;
 	int rc;
@@ -215,16 +213,6 @@ static void msi_unmap_pirq(struct pci_dev *dev, int pirq, unsigned int nr,
 	if ((rc = HYPERVISOR_physdev_op(PHYSDEVOP_unmap_pirq, &unmap)))
 		dev_warn(&dev->dev, "unmap irq %d failed (%d)\n", pirq, rc);
 
-	/*
-	 * Its possible that we get into this path when populate_msi_sysfs()
-	 * fails, which means the entries were not registered with sysfs.
-	 * In that case don't unregister them.
-	 */
-	if (kobj->parent) {
-		kobject_del(kobj);
-		kobject_put(kobj);
-	}
-
 	if (unmap.domid == DOMID_SELF)
 		evtchn_map_pirq(pirq, 0, nr);
 }
@@ -235,7 +223,7 @@ static u64 find_table_base(struct pci_dev *dev)
 	u32 reg;
 	unsigned long flags;
 
- 	pci_read_config_dword(dev, dev->msix_cap + PCI_MSIX_TABLE, &reg);
+	pci_read_config_dword(dev, dev->msix_cap + PCI_MSIX_TABLE, &reg);
 	bar = reg & PCI_MSIX_PBA_BIR;
 
 	flags = pci_resource_flags(dev, bar);
@@ -372,140 +360,183 @@ void pci_restore_msi_state(struct pci_dev *dev)
 }
 EXPORT_SYMBOL_GPL(pci_restore_msi_state);
 
-
-#define to_msi_attr(obj) container_of(obj, struct msi_attribute, attr)
-#define to_pirq_entry(obj) container_of(obj, struct msi_pirq_entry, kobj)
-
-struct msi_attribute {
-	struct attribute        attr;
-	ssize_t (*show)(struct msi_pirq_entry *, struct msi_attribute *,
-			char *buf);
-	ssize_t (*store)(struct msi_pirq_entry *, struct msi_attribute *,
-			 const char *buf, size_t count);
-};
-
-static ssize_t show_msi_mode(struct msi_pirq_entry *entry,
-			     struct msi_attribute *attr, char *buf)
+static ssize_t msi_mode_show(struct device *dev, struct device_attribute *attr,
+			     char *buf)
 {
-	return sprintf(buf, "%s\n", entry->entry_nr >= 0 ? "msix" : "msi");
+	struct pci_dev *pdev = to_pci_dev(dev);
+
+	return sprintf(buf, "msi%s\n", pdev->msix_enabled ? "x" : "");
 }
 
-static ssize_t show_xen_irq(struct msi_pirq_entry *entry,
-			    struct msi_attribute *attr, char *buf)
+static ssize_t msi_xen_irq_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
 {
-	return sprintf(buf, "%d\n", entry->dev_entry->owner == DOMID_SELF
-				    ? evtchn_get_xen_pirq(entry->pirq)
-				    : entry->pirq);
+	struct pci_dev *pdev = to_pci_dev(dev);
+	struct msi_dev_list *dev_entry = get_msi_dev_pirq_list(pdev);
+	struct msi_pirq_entry *entry;
+	unsigned long pirq, flags;
+	int retval;
+
+	retval = kstrtoul(attr->attr.name, 10, &pirq);
+	if (retval)
+		return retval;
+
+	if (pdev->msi_enabled) {
+		if (pirq < pdev->irq ||
+		    pirq >= pdev->irq - dev_entry->e.entry_nr)
+			return -ENODEV;
+		return sprintf(buf, "%ld\n",
+			       dev_entry->owner == DOMID_SELF
+			       ? evtchn_get_xen_pirq(pirq) : pirq);
+	}
+
+	spin_lock_irqsave(&dev_entry->pirq_list_lock, flags);
+	list_for_each_entry(entry, &pdev->msi_list, list)
+		if (entry->pirq == pirq) {
+			spin_unlock_irqrestore(&dev_entry->pirq_list_lock, flags);
+			return sprintf(buf, "%ld\n",
+				       dev_entry->owner == DOMID_SELF
+				       ? evtchn_get_xen_pirq(pirq) : pirq);
+		}
+	spin_unlock_irqrestore(&dev_entry->pirq_list_lock, flags);
+
+	return -ENODEV;
 }
-
-static ssize_t msi_irq_attr_show(struct kobject *kobj,
-				 struct attribute *attr, char *buf)
-{
-	struct msi_attribute *attribute = to_msi_attr(attr);
-	struct msi_pirq_entry *entry = to_pirq_entry(kobj);
-
-	if (!attribute->show)
-		return -EIO;
-
-	return attribute->show(entry, attribute, buf);
-}
-
-static const struct sysfs_ops msi_irq_sysfs_ops = {
-	.show = msi_irq_attr_show,
-};
-
-static struct msi_attribute mode_attribute =
-	__ATTR(mode, S_IRUGO, show_msi_mode, NULL);
-
-static struct msi_attribute xen_irq_attribute =
-	__ATTR(xen_irq, S_IRUGO, show_xen_irq, NULL);
-
-static struct attribute *msi_irq_default_attrs[] = {
-	&mode_attribute.attr,
-	&xen_irq_attribute.attr,
-	NULL
-};
-
-static struct attribute *msi_pirq_default_attrs[] = {
-	&mode_attribute.attr,
-	NULL
-};
-
-static void msi_kobj_release(struct kobject *kobj)
-{
-	struct msi_dev_list *entry = to_pirq_entry(kobj)->dev_entry;
-
-	pci_dev_put(entry->dev);
-}
-
-static struct kobj_type msi_irq_ktype = {
-	.release = msi_kobj_release,
-	.sysfs_ops = &msi_irq_sysfs_ops,
-	.default_attrs = msi_irq_default_attrs,
-};
-
-static struct kobj_type msi_pirq_ktype = {
-	.release = msi_kobj_release,
-	.sysfs_ops = &msi_irq_sysfs_ops,
-	.default_attrs = msi_pirq_default_attrs,
-};
 
 static int populate_msi_sysfs(struct pci_dev *pdev)
 {
-	struct msi_dev_list *dev_entry = get_msi_dev_pirq_list(pdev);
-	domid_t owner = dev_entry->owner;
-	struct msi_pirq_entry *pirq_entry;
-	struct kobject *kobj;
-	int ret;
+	struct attribute **msi_attrs, **msi_xen_attrs;
+	struct attribute *msi_attr;
+	struct device_attribute *msi_dev_attr;
+	struct attribute_group *msi_irq_group;
+	const struct attribute_group **msi_irq_groups;
+	const struct msi_dev_list *dev_entry = get_msi_dev_pirq_list(pdev);
+	const struct msi_pirq_entry *entry;
+	int ret = -ENOMEM;
+	int num_msi = 0;
 	int count = 0;
 
-	pdev->msi_kset = kset_create_and_add("msi_irqs", NULL, &pdev->dev.kobj);
-	if (!pdev->msi_kset)
+	/* Determine how many msi entries we have */
+	if (pdev->msi_enabled)
+		num_msi = -dev_entry->e.entry_nr;
+	else
+		list_for_each_entry(entry, &pdev->msi_list, list)
+			++num_msi;
+	if (!num_msi)
+		return 0;
+
+	/* Dynamically create the MSI attributes for the PCI device */
+	msi_attrs = kzalloc(sizeof(void *) * (num_msi + 1) * 2, GFP_KERNEL);
+	if (!msi_attrs)
 		return -ENOMEM;
+	msi_xen_attrs = msi_attrs + num_msi + 1;
+	if (pdev->msi_enabled)
+		while (count < num_msi) {
+			msi_dev_attr = kzalloc(sizeof(*msi_dev_attr) * 2,
+					       GFP_KERNEL);
+			if (!msi_dev_attr)
+				goto error_attrs;
+			msi_attrs[count] = &msi_dev_attr[0].attr;
+			sysfs_attr_init(&msi_dev_attr[0].attr);
+			msi_xen_attrs[count] = &msi_dev_attr[1].attr;
+			sysfs_attr_init(&msi_dev_attr[1].attr);
+			msi_dev_attr[0].attr.name = kasprintf(GFP_KERNEL, "%d",
+							      pdev->irq + count);
+			if (!msi_dev_attr[0].attr.name)
+				goto error_attrs;
+			msi_dev_attr[1].attr.name = msi_dev_attr[0].attr.name;
+			msi_dev_attr[0].attr.mode = S_IRUGO;
+			msi_dev_attr[1].attr.mode = S_IRUGO;
+			msi_dev_attr[0].show = msi_mode_show;
+			msi_dev_attr[1].show = msi_xen_irq_show;
+			++count;
+		}
+	else
+		list_for_each_entry(entry, &pdev->msi_list, list) {
+			msi_dev_attr = kzalloc(sizeof(*msi_dev_attr) * 2,
+					       GFP_KERNEL);
+			if (!msi_dev_attr)
+				goto error_attrs;
+			msi_attrs[count] = &msi_dev_attr[0].attr;
+			sysfs_attr_init(&msi_dev_attr[0].attr);
+			msi_xen_attrs[count] = &msi_dev_attr[1].attr;
+			sysfs_attr_init(&msi_dev_attr[1].attr);
+			msi_dev_attr[0].attr.name = kasprintf(GFP_KERNEL, "%d",
+							      entry->pirq);
+			if (!msi_dev_attr[0].attr.name)
+				goto error_attrs;
+			msi_dev_attr[1].attr.name = msi_dev_attr[0].attr.name;
+			msi_dev_attr[0].attr.mode = S_IRUGO;
+			msi_dev_attr[1].attr.mode = S_IRUGO;
+			msi_dev_attr[0].show = msi_mode_show;
+			msi_dev_attr[1].show = msi_xen_irq_show;
+			++count;
+		}
 
-	if (pdev->msi_enabled) {
-		kobj = &dev_entry->e.kobj;
-		kobj->kset = pdev->msi_kset;
-		pci_dev_get(pdev);
-		if (owner == DOMID_SELF)
-			ret = kobject_init_and_add(kobj, &msi_irq_ktype, NULL,
-						   "%u", pdev->irq);
-		else
-			ret = kobject_init_and_add(kobj, &msi_pirq_ktype, NULL,
-						   "xen-%u", pdev->irq);
-		if (ret)
-			pci_dev_put(pdev);
-		return ret;
-	}
+	msi_irq_group = kzalloc(sizeof(*msi_irq_group) * 2, GFP_KERNEL);
+	if (!msi_irq_group)
+		goto error_attrs;
+	msi_irq_group[0].name = "msi_irqs";
+	msi_irq_group[0].attrs = msi_attrs;
+	msi_irq_group[1].name = "msi_pirqs";
+	msi_irq_group[1].attrs = msi_xen_attrs;
 
-	list_for_each_entry(pirq_entry, &pdev->msi_list, list) {
-		kobj = &pirq_entry->kobj;
-		kobj->kset = pdev->msi_kset;
-		pci_dev_get(pdev);
-		if (owner == DOMID_SELF)
-			ret = kobject_init_and_add(kobj, &msi_irq_ktype, NULL,
-						   "%u", pirq_entry->pirq);
-		else
-			ret = kobject_init_and_add(kobj, &msi_pirq_ktype, NULL,
-						   "xen-%u", pirq_entry->pirq);
-		if (ret)
-			goto out_unroll;
+	msi_irq_groups = kzalloc(sizeof(void *) * 3, GFP_KERNEL);
+	if (!msi_irq_groups)
+		goto error_irq_group;
+	msi_irq_groups[0] = msi_irq_group;
+	if (dev_entry->owner == DOMID_SELF)
+		msi_irq_groups[1] = msi_irq_group + 1;
 
-		count++;
-	}
+	ret = sysfs_create_groups(&pdev->dev.kobj, msi_irq_groups);
+	if (ret)
+		goto error_irq_groups;
+	pdev->msi_irq_groups = msi_irq_groups;
 
 	return 0;
 
-out_unroll:
-	pci_dev_put(pdev);
-	list_for_each_entry(pirq_entry, &pdev->msi_list, list) {
-		if (!count)
-			break;
-		kobject_del(&pirq_entry->kobj);
-		kobject_put(&pirq_entry->kobj);
-		count--;
+error_irq_groups:
+	kfree(msi_irq_groups);
+error_irq_group:
+	kfree(msi_irq_group);
+error_attrs:
+	count = 0;
+	msi_attr = msi_attrs[count];
+	while (msi_attr) {
+		msi_dev_attr = container_of(msi_attr, struct device_attribute, attr);
+		kfree(msi_attr->name);
+		kfree(msi_dev_attr);
+		++count;
+		msi_attr = msi_attrs[count];
 	}
+	kfree(msi_attrs);
 	return ret;
+}
+
+static void cleanup_msi_sysfs(struct pci_dev *pdev)
+{
+	struct attribute **msi_attrs, *msi_attr;
+	unsigned int count = 0;
+
+	if (!pdev->msi_irq_groups)
+		return;
+
+	sysfs_remove_groups(&pdev->dev.kobj, pdev->msi_irq_groups);
+	msi_attrs = pdev->msi_irq_groups[0]->attrs;
+	msi_attr = msi_attrs[count];
+	while (msi_attr) {
+		struct device_attribute *dev_attr;
+
+		dev_attr = container_of(msi_attr, struct device_attribute,
+					attr);
+		kfree(dev_attr->attr.name);
+		kfree(dev_attr);
+		msi_attr = msi_attrs[++count];
+	}
+	kfree(msi_attrs);
+	kfree(pdev->msi_irq_groups[0]);
+	kfree(pdev->msi_irq_groups);
+	pdev->msi_irq_groups = NULL;
 }
 
 /**
@@ -615,8 +646,7 @@ static int msix_capability_init(struct pci_dev *dev,
 				if (pirq_entry->entry_nr == entries[i].entry)
 					break;
 			msi_unmap_pirq(dev, entries[j].vector, 1,
-				       msi_dev_entry->owner,
-				       &pirq_entry->kobj);
+				       msi_dev_entry->owner);
 			detach_pirq_entry(entries[j].entry, msi_dev_entry);
 			entries[j].vector = 0;
 		}
@@ -685,6 +715,31 @@ static int pci_msi_check_device(struct pci_dev *dev, int nvec, int type)
 }
 
 /**
+ * pci_msi_vec_count - Return the number of MSI vectors a device can send
+ * @dev: device to report about
+ *
+ * This function returns the number of MSI vectors a device requested via
+ * Multiple Message Capable register. It returns a negative errno if the
+ * device is not capable sending MSI interrupts. Otherwise, the call succeeds
+ * and returns a power of two, up to a maximum of 2^5 (32), according to the
+ * MSI specification.
+ **/
+int pci_msi_vec_count(struct pci_dev *dev)
+{
+	int ret;
+	u16 msgctl;
+
+	if (!dev->msi_cap)
+		return -EINVAL;
+
+	pci_read_config_word(dev, dev->msi_cap + PCI_MSI_FLAGS, &msgctl);
+	ret = 1 << ((msgctl & PCI_MSI_FLAGS_QMASK) >> 1);
+
+	return ret;
+}
+EXPORT_SYMBOL(pci_msi_vec_count);
+
+/**
  * pci_enable_msi_block - configure device's MSI capability structure
  * @dev: device to configure
  * @nvec: number of interrupts to configure
@@ -697,20 +752,20 @@ static int pci_msi_check_device(struct pci_dev *dev, int nvec, int type)
  * updates the @dev's irq member to the lowest new interrupt number; the
  * other interrupt numbers allocated to this device are consecutive.
  */
-int pci_enable_msi_block(struct pci_dev *dev, unsigned int nvec)
+int pci_enable_msi_block(struct pci_dev *dev, int nvec)
 {
 	int temp, status, maxvec;
-	u16 msgctl;
 	struct msi_dev_list *msi_dev_entry = get_msi_dev_pirq_list(dev);
 
-	if (!dev->msi_cap || dev->current_state != PCI_D0)
+	if (dev->current_state != PCI_D0)
 		return -EINVAL;
 
-	pci_read_config_word(dev, dev->msi_cap + PCI_MSI_FLAGS, &msgctl);
 	if (msi_multi_vec_supported)
-		maxvec = 1 << ((msgctl & PCI_MSI_FLAGS_QMASK) >> 1);
+		maxvec = pci_msi_vec_count(dev);
 	else
 		maxvec = 1;
+	if (maxvec < 0)
+		return maxvec;
 	if (nvec > maxvec)
 		return maxvec;
 
@@ -757,31 +812,6 @@ int pci_enable_msi_block(struct pci_dev *dev, unsigned int nvec)
 }
 EXPORT_SYMBOL(pci_enable_msi_block);
 
-int pci_enable_msi_block_auto(struct pci_dev *dev, unsigned int *maxvec)
-{
-	int ret, nvec;
-	u16 msgctl;
-
-	if (!dev->msi_cap || dev->current_state != PCI_D0)
-		return -EINVAL;
-
-	pci_read_config_word(dev, dev->msi_cap + PCI_MSI_FLAGS, &msgctl);
-	ret = 1 << ((msgctl & PCI_MSI_FLAGS_QMASK) >> 1);
-
-	if (maxvec)
-		*maxvec = ret;
-
-	do {
-		nvec = ret;
-		ret = pci_enable_msi_block(dev, nvec);
-	} while (ret > 0);
-
-	if (ret < 0)
-		return ret;
-	return nvec;
-}
-EXPORT_SYMBOL(pci_enable_msi_block_auto);
-
 void pci_msi_shutdown(struct pci_dev *dev)
 {
 	int pirq;
@@ -804,9 +834,8 @@ void pci_msi_shutdown(struct pci_dev *dev)
 	/* Restore dev->irq to its default pin-assertion vector */
 	dev->irq = msi_dev_entry->default_irq;
 	msi_unmap_pirq(dev, pirq, -msi_dev_entry->e.entry_nr,
-		       msi_dev_entry->owner, &msi_dev_entry->e.kobj);
+		       msi_dev_entry->owner);
 	msi_dev_entry->owner = DOMID_IO;
-	memset(&msi_dev_entry->e.kobj, 0, sizeof(msi_dev_entry->e.kobj));
 
 	/* Disable MSI mode */
 	msi_set_enable(dev, 0);
@@ -817,25 +846,29 @@ void pci_msi_shutdown(struct pci_dev *dev)
 void pci_disable_msi(struct pci_dev *dev)
 {
 	pci_msi_shutdown(dev);
-	kset_unregister(dev->msi_kset);
-	dev->msi_kset = NULL;
+	cleanup_msi_sysfs(dev);
 }
 EXPORT_SYMBOL(pci_disable_msi);
 
 /**
- * pci_msix_table_size - return the number of device's MSI-X table entries
+ * pci_msix_vec_count - return the number of device's MSI-X table entries
  * @dev: pointer to the pci_dev data structure of MSI-X device function
- */
-int pci_msix_table_size(struct pci_dev *dev)
+ * This function returns the number of device's MSI-X table entries and
+ * therefore the number of MSI-X vectors device is capable of sending.
+ * It returns a negative errno if the device is not capable of sending MSI-X
+ * interrupts.
+ **/
+int pci_msix_vec_count(struct pci_dev *dev)
 {
 	u16 control;
 
 	if (!dev->msix_cap)
-		return 0;
+		return -EINVAL;
 
 	pci_read_config_word(dev, dev->msix_cap + PCI_MSIX_FLAGS, &control);
 	return msix_table_size(control);
 }
+EXPORT_SYMBOL(pci_msix_vec_count);
 
 /**
  * pci_enable_msix - configure device's MSI-X capability structure
@@ -905,7 +938,9 @@ int pci_enable_msix(struct pci_dev *dev, struct msix_entry *entries, int nvec)
 	if (status)
 		return status;
 
-	nr_entries = pci_msix_table_size(dev);
+	nr_entries = pci_msix_vec_count(dev);
+	if (nr_entries < 0)
+		return nr_entries;
 	if (nvec > nr_entries)
 		return nr_entries;
 
@@ -961,8 +996,6 @@ void pci_msix_shutdown(struct pci_dev *dev)
 void pci_disable_msix(struct pci_dev *dev)
 {
 	pci_msix_shutdown(dev);
-	kset_unregister(dev->msi_kset);
-	dev->msi_kset = NULL;
 }
 EXPORT_SYMBOL(pci_disable_msix);
 
@@ -984,14 +1017,15 @@ void msi_remove_pci_irq_vectors(struct pci_dev *dev)
 	if (!pci_msi_enable || !dev)
 		return;
 
+	cleanup_msi_sysfs(dev);
+
 	msi_dev_entry = get_msi_dev_pirq_list(dev);
 
 	spin_lock_irqsave(&msi_dev_entry->pirq_list_lock, flags);
 	list_for_each_entry_safe(pirq_entry, tmp, &dev->msi_list, list) {
 		if (is_initial_xendomain())
 			msi_unmap_pirq(dev, pirq_entry->pirq, 1,
-				       msi_dev_entry->owner,
-				       &pirq_entry->kobj);
+				       msi_dev_entry->owner);
 		else
 			evtchn_map_pirq(pirq_entry->pirq, 0, 1);
 		list_del(&pirq_entry->list);
@@ -1041,3 +1075,77 @@ void pci_msi_init_pci_dev(struct pci_dev *dev)
 	if (dev->msix_cap)
 		msix_set_enable(dev, 0);
 }
+
+/**
+ * pci_enable_msi_range - configure device's MSI capability structure
+ * @dev: device to configure
+ * @minvec: minimal number of interrupts to configure
+ * @maxvec: maximum number of interrupts to configure
+ *
+ * This function tries to allocate a maximum possible number of interrupts in a
+ * range between @minvec and @maxvec. It returns a negative errno if an error
+ * occurs. If it succeeds, it returns the actual number of interrupts allocated
+ * and updates the @dev's irq member to the lowest new interrupt number;
+ * the other interrupt numbers allocated to this device are consecutive.
+ **/
+int pci_enable_msi_range(struct pci_dev *dev, int minvec, int maxvec)
+{
+	int nvec = maxvec;
+	int rc;
+
+	if (maxvec < minvec)
+		return -ERANGE;
+
+	do {
+		rc = pci_enable_msi_block(dev, nvec);
+		if (rc < 0) {
+			return rc;
+		} else if (rc > 0) {
+			if (rc < minvec)
+				return -ENOSPC;
+			nvec = rc;
+		}
+	} while (rc);
+
+	return nvec;
+}
+EXPORT_SYMBOL(pci_enable_msi_range);
+
+/**
+ * pci_enable_msix_range - configure device's MSI-X capability structure
+ * @dev: pointer to the pci_dev data structure of MSI-X device function
+ * @entries: pointer to an array of MSI-X entries
+ * @minvec: minimum number of MSI-X irqs requested
+ * @maxvec: maximum number of MSI-X irqs requested
+ *
+ * Setup the MSI-X capability structure of device function with a maximum
+ * possible number of interrupts in the range between @minvec and @maxvec
+ * upon its software driver call to request for MSI-X mode enabled on its
+ * hardware device function. It returns a negative errno if an error occurs.
+ * If it succeeds, it returns the actual number of interrupts allocated and
+ * indicates the successful configuration of MSI-X capability structure
+ * with new allocated MSI-X interrupts.
+ **/
+int pci_enable_msix_range(struct pci_dev *dev, struct msix_entry *entries,
+			       int minvec, int maxvec)
+{
+	int nvec = maxvec;
+	int rc;
+
+	if (maxvec < minvec)
+		return -ERANGE;
+
+	do {
+		rc = pci_enable_msix(dev, entries, nvec);
+		if (rc < 0) {
+			return rc;
+		} else if (rc > 0) {
+			if (rc < minvec)
+				return -ENOSPC;
+			nvec = rc;
+		}
+	} while (rc);
+
+	return nvec;
+}
+EXPORT_SYMBOL(pci_enable_msix_range);

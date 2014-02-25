@@ -8,7 +8,7 @@ config XEN
 if XEN
 config XEN_INTERFACE_VERSION
 	hex
-	default 0x00040200
+	default 0x00040400
 
 menu "XEN"
 
@@ -303,6 +303,12 @@ choice
 	config XEN_COMPAT_040200_AND_LATER
 		bool "4.2.0 and later"
 
+	config XEN_COMPAT_040300_AND_LATER
+		bool "4.3.0 and later"
+
+	config XEN_COMPAT_040400_AND_LATER
+		bool "4.4.0 and later"
+
 	config XEN_COMPAT_LATEST_ONLY
 		bool "no compatibility code"
 
@@ -311,6 +317,8 @@ endchoice
 config XEN_COMPAT
 	hex
 	default 0xffffff if XEN_COMPAT_LATEST_ONLY
+	default 0x040400 if XEN_COMPAT_040400_AND_LATER
+	default 0x040300 if XEN_COMPAT_040300_AND_LATER
 	default 0x040200 if XEN_COMPAT_040200_AND_LATER
 	default 0x040100 if XEN_COMPAT_040100_AND_LATER
 	default 0x040000 if XEN_COMPAT_040000_AND_LATER
@@ -383,7 +391,7 @@ menu "Xen driver support"
 
 config XEN_BALLOON
 	bool "Xen memory balloon driver" if PARAVIRT_XEN
-	depends on (PARAVIRT_XEN && !ARM) || !PPC_XEN
+	depends on PARAVIRT_XEN || !PPC_XEN
 	default y
 	help
 	  The balloon driver allows the Xen domain to request more memory from
@@ -695,7 +703,7 @@ config XEN_ACPI_PROCESSOR
 
 	  To do that the driver parses the Power Management data and uploads
 	  said information to the Xen hypervisor. Then the Xen hypervisor can
-	  select the proper Cx and Pxx states. It also registers itslef as the
+	  select the proper Cx and Pxx states. It also registers itself as the
 	  SMM so that other drivers (such as ACPI cpufreq scaling driver) will
 	  not load.
 

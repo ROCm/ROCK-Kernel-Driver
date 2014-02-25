@@ -38,7 +38,6 @@
 #include <linux/ioport.h>
 #include <linux/i2c.h>
 #include <linux/slab.h>
-#include <linux/init.h>
 #include <linux/dmi.h>
 #include <linux/acpi.h>
 #include <linux/io.h>
@@ -208,16 +207,16 @@ static int piix4_setup(struct pci_dev *PIIX4_dev,
 				   "WARNING: SMBus interface has been FORCEFULLY ENABLED!\n");
 		} else {
 			dev_err(&PIIX4_dev->dev,
-				"Host SMBus controller not enabled!\n");
+				"SMBus Host Controller not enabled!\n");
 			release_region(piix4_smba, SMBIOSIZE);
 			return -ENODEV;
 		}
 	}
 
 	if (((temp & 0x0E) == 8) || ((temp & 0x0E) == 2))
-		dev_dbg(&PIIX4_dev->dev, "Using Interrupt 9 for SMBus.\n");
+		dev_dbg(&PIIX4_dev->dev, "Using IRQ for SMBus\n");
 	else if ((temp & 0x0E) == 0)
-		dev_dbg(&PIIX4_dev->dev, "Using Interrupt SMI# for SMBus.\n");
+		dev_dbg(&PIIX4_dev->dev, "Using SMI# for SMBus\n");
 	else
 		dev_err(&PIIX4_dev->dev, "Illegal Interrupt configuration "
 			"(or code out of date)!\n");
@@ -279,7 +278,7 @@ static int piix4_setup_sb800(struct pci_dev *PIIX4_dev,
 
 	if (!smb_en_status) {
 		dev_err(&PIIX4_dev->dev,
-			"Host SMBus controller not enabled!\n");
+			"SMBus Host Controller not enabled!\n");
 		return -ENODEV;
 	}
 
@@ -295,7 +294,8 @@ static int piix4_setup_sb800(struct pci_dev *PIIX4_dev,
 	/* Aux SMBus does not support IRQ information */
 	if (aux) {
 		dev_info(&PIIX4_dev->dev,
-			 "SMBus Host Controller at 0x%x\n", piix4_smba);
+			 "Auxiliary SMBus Host Controller at 0x%x\n",
+			 piix4_smba);
 		return piix4_smba;
 	}
 
@@ -310,9 +310,9 @@ static int piix4_setup_sb800(struct pci_dev *PIIX4_dev,
 	release_region(piix4_smba + i2ccfg_offset, 1);
 
 	if (i2ccfg & 1)
-		dev_dbg(&PIIX4_dev->dev, "Using IRQ for SMBus.\n");
+		dev_dbg(&PIIX4_dev->dev, "Using IRQ for SMBus\n");
 	else
-		dev_dbg(&PIIX4_dev->dev, "Using SMI# for SMBus.\n");
+		dev_dbg(&PIIX4_dev->dev, "Using SMI# for SMBus\n");
 
 	dev_info(&PIIX4_dev->dev,
 		 "SMBus Host Controller at 0x%x, revision %d\n",

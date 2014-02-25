@@ -665,7 +665,7 @@ static int xenbus_uevent_frontend(struct device *dev, struct kobj_uevent_env *en
 /* Bus type for frontend drivers. */
 static struct xen_bus_type xenbus_frontend = {
 	.root = "device",
-	.levels = 2, 		/* device/type/<id> */
+	.levels = 2,		/* device/type/<id> */
 	.get_bus_id = frontend_bus_id,
 	.probe = xenbus_probe_frontend,
 	.error = -ENODEV,

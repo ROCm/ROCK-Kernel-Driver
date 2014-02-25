@@ -42,10 +42,9 @@
 #include <linux/reboot.h>
 #include <linux/device.h>
 #include <linux/dmi.h>
-#include <asm/uaccess.h>
 #include <linux/thermal.h>
-#include <acpi/acpi_bus.h>
-#include <acpi/acpi_drivers.h>
+#include <linux/acpi.h>
+#include <asm/uaccess.h>
 
 #define PREFIX "ACPI: "
 
@@ -104,6 +103,8 @@ MODULE_DEVICE_TABLE(acpi, thermal_device_ids);
 
 #ifdef CONFIG_PM_SLEEP
 static int acpi_thermal_resume(struct device *dev);
+#else
+#define acpi_thermal_resume NULL
 #endif
 static SIMPLE_DEV_PM_OPS(acpi_thermal_pm, NULL, acpi_thermal_resume);
 
@@ -863,7 +864,7 @@ acpi_thermal_unbind_cooling_device(struct thermal_zone_device *thermal,
 	return acpi_thermal_cooling_device_cb(thermal, cdev, false);
 }
 
-static const struct thermal_zone_device_ops acpi_thermal_zone_ops = {
+static struct thermal_zone_device_ops acpi_thermal_zone_ops = {
 	.bind = acpi_thermal_bind_cooling_device,
 	.unbind	= acpi_thermal_unbind_cooling_device,
 	.get_temp = thermal_get_temp,

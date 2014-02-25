@@ -282,15 +282,15 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
  *  refer to Intel SDM 10.12. The PAT allows to set the caching attributes of
  *  pages instead of using MTRRs.
  *
- *  The PAT MSR is as follow (it is a 64-bit value, each entry is 8 bits):
- *             PAT4                 PAT0
- *   +---+----+----+----+-----+----+----+
- *    WC | WC | WB | UC | UC- | WC | WB |  <= Linux
- *   +---+----+----+----+-----+----+----+
- *    WC | WT | WB | UC | UC- | WT | WB |  <= BIOS (default when machine boots)
- *   +---+----+----+----+-----+----+----+
- *    WC | WP | WC | UC | UC- | WT | WB |  <= Xen
- *   +---+----+----+----+-----+----+----+
+ *  The PAT MSR is as follows (it is a 64-bit value, each entry is 8 bits):
+ *                    PAT4                 PAT0
+ *  +-----+-----+----+----+----+-----+----+----+
+ *  | UC  | UC- | WC | WB | UC | UC- | WC | WB |  <= Linux
+ *  +-----+-----+----+----+----+-----+----+----+
+ *  | UC  | UC- | WT | WB | UC | UC- | WT | WB |  <= BIOS (default when machine boots)
+ *  +-----+-----+----+----+----+-----+----+----+
+ *  | rsv | rsv | WP | WC | UC | UC- | WT | WB |  <= Xen
+ *  +-----+-----+----+----+----+-----+----+----+
  *
  *  The lookup of this index table translates to looking up
  *  Bit 7, Bit 4, and Bit 3 of val entry:
@@ -565,11 +565,13 @@ DEFINE_GUEST_HANDLE_STRUCT(multicall_entry);
 typedef struct multicall_entry multicall_entry_t;
 DEFINE_XEN_GUEST_HANDLE(multicall_entry_t);
 
+#if defined(__XEN_INTERFACE_VERSION__) && __XEN_INTERFACE_VERSION__ < 0x00040400
 /*
- * Event channel endpoints per domain:
+ * Event channel endpoints per domain (when using the 2-level ABI):
  *  1024 if a long is 32 bits; 4096 if a long is 64 bits.
  */
-#define NR_EVENT_CHANNELS (sizeof(xen_ulong_t) * sizeof(xen_ulong_t) * 64)
+#define NR_EVENT_CHANNELS EVTCHN_2L_NR_CHANNELS
+#endif
 
 struct vcpu_time_info {
 	/*
@@ -625,7 +627,11 @@ struct vcpu_info {
 	 * to block: this avoids wakeup-waiting races.
 	 */
 	uint8_t evtchn_upcall_pending;
+#ifdef XEN_HAVE_PV_UPCALL_MASK
 	uint8_t evtchn_upcall_mask;
+#else /* XEN_HAVE_PV_UPCALL_MASK */
+	uint8_t pad0;
+#endif /* XEN_HAVE_PV_UPCALL_MASK */
 	xen_ulong_t evtchn_pending_sel;
 	struct arch_vcpu_info arch;
 #ifdef CONFIG_PARAVIRT_XEN
@@ -737,8 +743,7 @@ typedef struct shared_info shared_info_t;
  * 32-bit and runs under a 64-bit hypervisor should _NOT_ use two of the
  * pages preceding pt_base and mark them as reserved/unused.
  */
-
-#define MAX_GUEST_CMDLINE 1024
+#ifdef XEN_HAVE_PV_GUEST_ENTRY
 struct start_info {
 	/* THE FOLLOWING ARE FILLED IN BOTH ON INITIAL BOOT AND ON RESUME.    */
 	char magic[32];             /* "xen-<version>-<platform>".            */
@@ -762,7 +767,10 @@ struct start_info {
 	unsigned long nr_pt_frames; /* Number of bootstrap p.t. frames.       */
 	unsigned long mfn_list;     /* VIRTUAL address of page-frame list.    */
 	unsigned long mod_start;    /* VIRTUAL address of pre-loaded module.  */
+	                            /* (PFN of pre-loaded module if           */
+	                            /*  SIF_MOD_START_PFN set in flags).      */
 	unsigned long mod_len;      /* Size (bytes) of pre-loaded module.     */
+#define MAX_GUEST_CMDLINE 1024
 	int8_t cmd_line[MAX_GUEST_CMDLINE];
 	/* The pfn range here covers both page table and p->m table frames.   */
 	unsigned long first_p2m_pfn;/* 1st pfn forming initial P->M table.    */
@@ -775,6 +783,7 @@ typedef struct start_info start_info_t;
 #define console_mfn    console.domU.mfn
 #define console_evtchn console.domU.evtchn
 #endif
+#endif /* XEN_HAVE_PV_GUEST_ENTRY */
 
 /* These flags are passed in the 'flags' field of start_info_t. */
 #define SIF_PRIVILEGED    (1<<0)  /* Is the domain privileged? */

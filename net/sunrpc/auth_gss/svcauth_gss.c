@@ -1263,40 +1263,34 @@ out:
 	return ret;
 }
 
-DEFINE_SPINLOCK(use_gssp_lock);
+/*
+ * Try to set the sn->use_gss_proxy variable to a new value. We only allow
+ * it to be changed if it's currently undefined (-1). If it's any other value
+ * then return -EBUSY unless the type wouldn't have changed anyway.
+ */
+static int set_gss_proxy(struct net *net, int type)
+{
+	struct sunrpc_net *sn = net_generic(net, sunrpc_net_id);
+	int ret;
+
+	WARN_ON_ONCE(type != 0 && type != 1);
+	ret = cmpxchg(&sn->use_gss_proxy, -1, type);
+	if (ret != -1 && ret != type)
+		return -EBUSY;
+	return 0;
+}
 
 static bool use_gss_proxy(struct net *net)
 {
 	struct sunrpc_net *sn = net_generic(net, sunrpc_net_id);
 
-	if (sn->use_gss_proxy != -1)
-		return sn->use_gss_proxy;
-	spin_lock(&use_gssp_lock);
-	/*
-	 * If you wanted gss-proxy, you should have said so before
-	 * starting to accept requests:
-	 */
-	sn->use_gss_proxy = 0;
-	spin_unlock(&use_gssp_lock);
-	return 0;
+	/* If use_gss_proxy is still undefined, then try to disable it */
+	if (sn->use_gss_proxy == -1)
+		set_gss_proxy(net, 0);
+	return sn->use_gss_proxy;
 }
 
 #ifdef CONFIG_PROC_FS
-
-static int set_gss_proxy(struct net *net, int type)
-{
-	struct sunrpc_net *sn = net_generic(net, sunrpc_net_id);
-	int ret = 0;
-
-	WARN_ON_ONCE(type != 0 && type != 1);
-	spin_lock(&use_gssp_lock);
-	if (sn->use_gss_proxy == -1 || sn->use_gss_proxy == type)
-		sn->use_gss_proxy = type;
-	else
-		ret = -EBUSY;
-	spin_unlock(&use_gssp_lock);
-	return ret;
-}
 
 static ssize_t write_gssp(struct file *file, const char __user *buf,
 			 size_t count, loff_t *ppos)
@@ -1317,10 +1311,10 @@ static ssize_t write_gssp(struct file *file, const char __user *buf,
 		return res;
 	if (i != 1)
 		return -EINVAL;
-	res = set_gss_proxy(net, 1);
+	res = set_gssp_clnt(net);
 	if (res)
 		return res;
-	res = set_gssp_clnt(net);
+	res = set_gss_proxy(net, 1);
 	if (res)
 		return res;
 	return count;
@@ -1597,8 +1591,7 @@ svcauth_gss_wrap_resp_integ(struct svc_rqst *rqstp)
 	BUG_ON(integ_len % 4);
 	*p++ = htonl(integ_len);
 	*p++ = htonl(gc->gc_seq);
-	if (xdr_buf_subsegment(resbuf, &integ_buf, integ_offset,
-				integ_len))
+	if (xdr_buf_subsegment(resbuf, &integ_buf, integ_offset, integ_len))
 		BUG();
 	if (resbuf->tail[0].iov_base == NULL) {
 		if (resbuf->head[0].iov_len + RPC_MAX_AUTH_SIZE > PAGE_SIZE)
@@ -1606,10 +1599,8 @@ svcauth_gss_wrap_resp_integ(struct svc_rqst *rqstp)
 		resbuf->tail[0].iov_base = resbuf->head[0].iov_base
 						+ resbuf->head[0].iov_len;
 		resbuf->tail[0].iov_len = 0;
-		resv = &resbuf->tail[0];
-	} else {
-		resv = &resbuf->tail[0];
 	}
+	resv = &resbuf->tail[0];
 	mic.data = (u8 *)resv->iov_base + resv->iov_len + 4;
 	if (gss_get_mic(gsd->rsci->mechctx, &integ_buf, &mic))
 		goto out_err;

@@ -819,7 +819,7 @@ int netfront_accelerator_call_get_stats(struct netfront_info *np,
 		spin_lock_irqsave(&accelerator->vif_states_lock, flags); 
 		if (np->accel_vif_state.hooks && 
 		    np->accelerator == accelerator)
- 			rc = np->accel_vif_state.hooks->get_stats(dev, &dev->stats,
+			rc = np->accel_vif_state.hooks->get_stats(dev, &dev->stats,
 								  this_cpu_ptr(np->stats));
 		spin_unlock_irqrestore(&accelerator->vif_states_lock, flags);
 	}

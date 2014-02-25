@@ -135,7 +135,7 @@ extern int blkif_release(struct gendisk *disk, fmode_t mode);
 extern void blkif_release(struct gendisk *disk, fmode_t mode);
 #endif
 extern int blkif_ioctl(struct block_device *bdev, fmode_t mode,
- 		       unsigned command, unsigned long argument);
+		       unsigned command, unsigned long argument);
 #endif
 extern int blkif_getgeo(struct block_device *, struct hd_geometry *);
 extern int blkif_check(dev_t dev);

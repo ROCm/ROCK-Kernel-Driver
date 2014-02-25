@@ -459,9 +459,12 @@ int pcifront_scan_root(struct pcifront_device *pdev,
 	}
 	pcifront_init_sd(sd, domain, bus, pdev);
 
+	pci_lock_rescan_remove();
+
 	b = pci_scan_bus_parented(&pdev->xdev->dev, bus,
 				  &pcifront_bus_ops, sd);
 	if (!b) {
+		pci_unlock_rescan_remove();
 		dev_err(&pdev->xdev->dev,
 			"Error creating PCI Frontend Bus!\n");
 		err = -ENOMEM;
@@ -477,6 +480,7 @@ int pcifront_scan_root(struct pcifront_device *pdev,
 	pci_walk_bus(b, pcifront_claim_resource, pdev);
 
 	pci_bus_add_devices(b);
+	pci_unlock_rescan_remove();
 
 	return 0;
 
@@ -559,6 +563,7 @@ void pcifront_free_roots(struct pcifront_device *pdev)
 
 	dev_dbg(&pdev->xdev->dev, "cleaning up root buses\n");
 
+	pci_lock_rescan_remove();
 	list_for_each_entry_safe(bus_entry, t, &pdev->root_buses, list) {
 		list_del(&bus_entry->list);
 
@@ -571,6 +576,7 @@ void pcifront_free_roots(struct pcifront_device *pdev)
 
 		kfree(bus_entry);
 	}
+	pci_unlock_rescan_remove();
 }
 
 static pci_ers_result_t pcifront_common_process( int cmd, struct pcifront_device *pdev,

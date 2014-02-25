@@ -16,6 +16,7 @@
 #include <xen/events.h>
 #include <xen/grant_table.h>
 #include <xen/page.h>
+#include <xen/platform_pci.h>
 #else
 #include <xen/evtchn.h>
 #define bind_evtchn_to_irqhandler bind_caller_port_to_irqhandler
@@ -24,7 +25,6 @@
 #endif
 #include <xen/xenbus.h>
 #include "tpm.h"
-#include <xen/platform_pci.h>
 
 struct tpm_private {
 	struct tpm_chip *chip;
@@ -151,46 +151,7 @@ static int vtpm_recv(struct tpm_chip *chip, u8 *buf, size_t count)
 	return length;
 }
 
-static const struct file_operations vtpm_ops = {
-	.owner = THIS_MODULE,
-	.llseek = no_llseek,
-	.open = tpm_open,
-	.read = tpm_read,
-	.write = tpm_write,
-	.release = tpm_release,
-};
-
-static DEVICE_ATTR(pubek, S_IRUGO, tpm_show_pubek, NULL);
-static DEVICE_ATTR(pcrs, S_IRUGO, tpm_show_pcrs, NULL);
-static DEVICE_ATTR(enabled, S_IRUGO, tpm_show_enabled, NULL);
-static DEVICE_ATTR(active, S_IRUGO, tpm_show_active, NULL);
-static DEVICE_ATTR(owned, S_IRUGO, tpm_show_owned, NULL);
-static DEVICE_ATTR(temp_deactivated, S_IRUGO, tpm_show_temp_deactivated,
-		NULL);
-static DEVICE_ATTR(caps, S_IRUGO, tpm_show_caps, NULL);
-static DEVICE_ATTR(cancel, S_IWUSR | S_IWGRP, NULL, tpm_store_cancel);
-static DEVICE_ATTR(durations, S_IRUGO, tpm_show_durations, NULL);
-static DEVICE_ATTR(timeouts, S_IRUGO, tpm_show_timeouts, NULL);
-
-static struct attribute *vtpm_attrs[] = {
-	&dev_attr_pubek.attr,
-	&dev_attr_pcrs.attr,
-	&dev_attr_enabled.attr,
-	&dev_attr_active.attr,
-	&dev_attr_owned.attr,
-	&dev_attr_temp_deactivated.attr,
-	&dev_attr_caps.attr,
-	&dev_attr_cancel.attr,
-	&dev_attr_durations.attr,
-	&dev_attr_timeouts.attr,
-	NULL,
-};
-
-static struct attribute_group vtpm_attr_grp = {
-	.attrs = vtpm_attrs,
-};
-
-static const struct tpm_vendor_specific tpm_vtpm = {
+static const struct tpm_class_ops tpm_vtpm = {
 	.status = vtpm_status,
 	.recv = vtpm_recv,
 	.send = vtpm_send,
@@ -198,10 +159,6 @@ static const struct tpm_vendor_specific tpm_vtpm = {
 	.req_complete_mask = VTPM_STATUS_IDLE | VTPM_STATUS_RESULT,
 	.req_complete_val  = VTPM_STATUS_IDLE | VTPM_STATUS_RESULT,
 	.req_canceled      = vtpm_req_canceled,
-	.attr_group = &vtpm_attr_grp,
-	.miscdev = {
-		.fops = &vtpm_ops,
-	},
 };
 
 static irqreturn_t tpmif_interrupt(int dummy, void *dev_id)

@@ -153,7 +153,7 @@ ext4_file_dio_write(struct kiocb *iocb, const struct iovec *iov,
 	if (ret > 0) {
 		ssize_t err;
 
-		err = generic_write_sync(file, pos, ret);
+		err = generic_write_sync(file, iocb->ki_pos - ret, ret);
 		if (err < 0 && ret > 0)
 			ret = err;
 	}
@@ -618,6 +618,7 @@ const struct inode_operations ext4_file_inode_operations = {
 	.listxattr	= ext4_listxattr,
 	.removexattr	= generic_removexattr,
 	.get_acl	= ext4_get_acl,
+	.set_acl	= ext4_set_acl,
 	.fiemap		= ext4_fiemap,
 	.permission	= ext4_permission,
 	.may_create	= ext4_may_create,

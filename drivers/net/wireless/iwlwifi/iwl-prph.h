@@ -5,7 +5,7 @@
  *
  * GPL LICENSE SUMMARY
  *
- * Copyright(c) 2005 - 2013 Intel Corporation. All rights reserved.
+ * Copyright(c) 2005 - 2014 Intel Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of version 2 of the GNU General Public License as
@@ -30,7 +30,7 @@
  *
  * BSD LICENSE
  *
- * Copyright(c) 2005 - 2013 Intel Corporation. All rights reserved.
+ * Copyright(c) 2005 - 2014 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -101,6 +101,9 @@
 
 /* Device system time */
 #define DEVICE_SYSTEM_TIME_REG 0xA0206C
+
+/* Device NMI register */
+#define DEVICE_SET_NMI_REG 0x00a01c30
 
 /*****************************************************************************
  *                        7000/3000 series SHR DTS addresses                 *

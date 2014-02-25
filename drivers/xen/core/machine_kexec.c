@@ -333,12 +333,12 @@ static void setup_load_arg(xen_kexec_image_t *xki, struct kimage *image)
  */
 int xen_machine_kexec_load(struct kimage *image)
 {
-	xen_kexec_load_t xkl;
+	xen_kexec_load_v1_t xkl;
 
 	memset(&xkl, 0, sizeof(xkl));
 	xkl.type = image->type;
 	setup_load_arg(&xkl.image, image);
-	return HYPERVISOR_kexec_op(KEXEC_CMD_kexec_load, &xkl);
+	return HYPERVISOR_kexec_op(KEXEC_CMD_kexec_load_v1, &xkl);
 }
 
 /*
@@ -349,11 +349,11 @@ int xen_machine_kexec_load(struct kimage *image)
  */
 void xen_machine_kexec_unload(struct kimage *image)
 {
-	xen_kexec_load_t xkl;
+	xen_kexec_load_v1_t xkl;
 
 	memset(&xkl, 0, sizeof(xkl));
 	xkl.type = image->type;
-	WARN_ON(HYPERVISOR_kexec_op(KEXEC_CMD_kexec_unload, &xkl));
+	WARN_ON(HYPERVISOR_kexec_op(KEXEC_CMD_kexec_unload_v1, &xkl));
 }
 
 /*

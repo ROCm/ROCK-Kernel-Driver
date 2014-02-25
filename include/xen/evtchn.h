@@ -47,6 +47,7 @@
 /*
  * LOW-LEVEL DEFINITIONS
  */
+#define xen_evtchn_nr_channels() EVTCHN_2L_NR_CHANNELS
 
 #ifdef CONFIG_XEN
 struct irq_cfg {
@@ -103,7 +104,7 @@ int bind_virq_to_irqaction(
 #else
 #define bind_virq_to_irqaction(virq, cpu, action) \
 	bind_virq_to_irqhandler(virq, cpu, (action)->handler, \
-			 	(action)->flags | IRQF_NOBALANCING, \
+				(action)->flags | IRQF_NOBALANCING, \
 				(action)->name, action)
 #endif
 #if defined(CONFIG_SMP) && !defined(MODULE)
@@ -144,7 +145,13 @@ void irq_resume(void);
 #endif
 
 /* Entry point for notifications into Linux subsystems. */
-asmlinkage void evtchn_do_upcall(struct pt_regs *regs);
+asmlinkage
+#ifdef CONFIG_PREEMPT
+void
+#else
+bool
+#endif
+evtchn_do_upcall(struct pt_regs *regs);
 
 /* Mark a PIRQ as unavailable for dynamic allocation. */
 void evtchn_register_pirq(int irq);
@@ -221,6 +228,8 @@ int irq_to_evtchn_port(int irq);
 void notify_remote_via_ipi(unsigned int ipi, unsigned int cpu);
 void clear_ipi_evtchn(void);
 #endif
+
+DECLARE_PER_CPU(bool, privcmd_hcall);
 
 #if defined(CONFIG_XEN_SPINLOCK_ACQUIRE_NESTING) \
     && CONFIG_XEN_SPINLOCK_ACQUIRE_NESTING

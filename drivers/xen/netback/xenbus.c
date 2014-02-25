@@ -107,6 +107,13 @@ static int netback_probe(struct xenbus_device *dev,
 			goto abort_transaction;
 		}
 
+		err = xenbus_printf(xbt, dev->nodename, "feature-gso-tcpv6",
+				    "%d", sg);
+		if (err) {
+			message = "writing feature-gso-tcpv6";
+			goto abort_transaction;
+		}
+
 		/* We support partial checksum setup for IPv6 packets */
 		err = xenbus_write(xbt, dev->nodename,
 				   "feature-ipv6-csum-offload", "1");
@@ -456,15 +463,20 @@ static int connect_rings(struct backend_info *be)
 		val = 0;
 	netif->gso = !!val;
 
+	if (xenbus_scanf(XBT_NIL, dev->otherend, "feature-gso-tcpv6", "%d",
+			 &val) < 0)
+		val = 0;
+	netif->gso6 = !!val;
+
 	if (xenbus_scanf(XBT_NIL, dev->otherend, "feature-no-csum-offload",
 			 "%d", &val) < 0)
 		val = 0;
-	netif->ip_csum = !val;
+	netif->csum = !val;
 
 	if (xenbus_scanf(XBT_NIL, dev->otherend, "feature-ipv6-csum-offload",
 			 "%d", &val) < 0)
 		val = 0;
-	netif->ipv6_csum = !!val;
+	netif->csum6 = !!val;
 
 	/* Map the shared frame, irq etc. */
 	err = netif_map(be, tx_ring_ref, rx_ring_ref, evtchn);

@@ -650,7 +650,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 			bio->bi_bdev    = preq.bdev;
 			bio->bi_private = pending_req;
 			bio->bi_end_io  = end_block_io_op;
-			bio->bi_sector  = preq.sector_number;
+			bio->bi_iter.bi_sector = preq.sector_number;
 		}
 
 		preq.sector_number += seg[i].nsec;
@@ -671,7 +671,7 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 		bio->bi_bdev    = preq.bdev;
 		bio->bi_private = pending_req;
 		bio->bi_end_io  = end_block_io_op;
-		bio->bi_sector  = -1;
+		bio->bi_iter.bi_sector = -1;
 	}
 
 	atomic_set(&pending_req->pendcnt, nbio);

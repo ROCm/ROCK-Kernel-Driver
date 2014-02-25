@@ -74,8 +74,9 @@ typedef struct netif_st {
 	/* Frontend feature information. */
 	u8 can_sg:1;
 	u8 gso:1;
-	u8 ip_csum:1;
-	u8 ipv6_csum:1;
+	u8 gso6:1;
+	u8 csum:1;
+	u8 csum6:1;
 
 	/* Internal feature information. */
 	u8 can_queue:1;	/* can queue packets for receiver? */

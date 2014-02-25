@@ -339,7 +339,7 @@ static struct sk_buff *netbk_copy_skb(struct sk_buff *skb)
 
 static inline unsigned int netbk_max_required_rx_slots(const netif_t *netif)
 {
-	return netif->can_sg || netif->gso
+	return netif->can_sg || netif->gso || netif->gso6
 	       ? max_t(unsigned int, XEN_NETIF_NR_SLOTS_MIN,
 		       MAX_SKB_FRAGS + 2/* header + extra_info + frags */)
 	       : 1; /* all in one */
@@ -873,7 +873,14 @@ static void net_rx_action(unsigned long group)
 			resp->flags |= XEN_NETRXF_extra_info;
 
 			gso->u.gso.size = netbk->meta[npo.meta_cons].frag.size;
-			gso->u.gso.type = XEN_NETIF_GSO_TYPE_TCPV4;
+			if (netbk->meta[npo.meta_cons].frag.page_offset
+			    & SKB_GSO_TCPV4)
+				gso->u.gso.type = XEN_NETIF_GSO_TYPE_TCPV4;
+			else if (netbk->meta[npo.meta_cons].frag.page_offset
+				 & SKB_GSO_TCPV6)
+				gso->u.gso.type = XEN_NETIF_GSO_TYPE_TCPV6;
+			else
+				gso->u.gso.type = XEN_NETIF_GSO_TYPE_NONE;
 			gso->u.gso.pad = 0;
 			gso->u.gso.features = 0;
 
@@ -1545,19 +1552,21 @@ static int netbk_set_skb_gso(netif_t *netif, struct sk_buff *skb,
 		return -EINVAL;
 	}
 
-	/* Currently only TCPv4 S.O. is supported. */
-	if (gso->u.gso.type != XEN_NETIF_GSO_TYPE_TCPV4) {
+	switch (gso->u.gso.type) {
+	case XEN_NETIF_GSO_TYPE_TCPV4:
+		skb_shinfo(skb)->gso_type = SKB_GSO_TCPV4;
+		break;
+	case XEN_NETIF_GSO_TYPE_TCPV6:
+		skb_shinfo(skb)->gso_type = SKB_GSO_TCPV6;
+		break;
+	default:
 		netdev_err(skb->dev, "Bad GSO type %d.\n", gso->u.gso.type);
 		netbk_fatal_tx_err(netif);
 		return -EINVAL;
 	}
 
 	skb_shinfo(skb)->gso_size = gso->u.gso.size;
-	skb_shinfo(skb)->gso_type = SKB_GSO_TCPV4;
-
-	/* Header must be checked, and gso_segs computed. */
-	skb_shinfo(skb)->gso_type |= SKB_GSO_DODGY;
-	skb_shinfo(skb)->gso_segs = 0;
+	/* gso_segs will be calculated later */
 
 	return 0;
 }
@@ -1827,7 +1836,7 @@ static void net_tx_action(unsigned long group)
 
 		skb->protocol = eth_type_trans(skb, dev);
 
-		if (skb_checksum_setup(skb, &netif->rx_gso_csum_fixups)) {
+		if (xennet_checksum_setup(skb, &netif->rx_gso_csum_fixups)) {
 			netdev_dbg(dev,
 				   "Can't setup checksum in net_tx_action\n");
 			kfree_skb(skb);
@@ -1836,6 +1845,21 @@ static void net_tx_action(unsigned long group)
 		}
 
 		skb_probe_transport_header(skb, 0);
+
+		/*
+		 * If the packet is GSO then we will have just set up the
+		 * transport header offset in checksum_setup so it's now
+		 * straightforward to calculate gso_segs.
+		 */
+		if (skb_is_gso(skb)) {
+			unsigned int mss = skb_shinfo(skb)->gso_size;
+			unsigned int hdrlen = skb_transport_header(skb) -
+					      skb_mac_header(skb) +
+					      tcp_hdrlen(skb);
+
+			skb_shinfo(skb)->gso_segs =
+				DIV_ROUND_UP(skb->len - hdrlen, mss);
+		}
 
 		dev->stats.rx_bytes += skb->len;
 		dev->stats.rx_packets++;

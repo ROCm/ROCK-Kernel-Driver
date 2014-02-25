@@ -139,8 +139,10 @@ again:
 	flag &= ~(__GFP_DMA | __GFP_DMA32);
 #endif
 	page = NULL;
-	if (!(flag & GFP_ATOMIC))
+	/* CMA can be used only in the context which permits sleeping */
+	if (flag & __GFP_WAIT)
 		page = dma_alloc_from_contiguous(dev, count, order);
+	/* fallback */
 	if (!page)
 		page = alloc_pages_node(dev_to_node(dev), flag, order);
 	if (!page)
