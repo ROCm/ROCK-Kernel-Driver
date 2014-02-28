@@ -2088,6 +2088,9 @@ static void stac92hd83xxx_fixup_hp(struct hda_codec *codec,
 		snd_printd("mute LED gpio %d polarity %d\n",
 				spec->gpio_led,
 				spec->gpio_led_polarity);
+
+	/* allow auto-switching of dock line-in */
+	spec->gen.line_in_auto_switch = true;
 }
 
 static void stac92hd83xxx_fixup_hp_zephyr(struct hda_codec *codec,
