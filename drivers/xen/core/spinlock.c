@@ -145,7 +145,7 @@ struct __raw_tickets xen_spin_adjust(const arch_spinlock_t *lock,
 				     struct __raw_tickets token)
 {
 	token.tail = spin_adjust(__this_cpu_read(_spinning), lock, token.tail);
-	token.head = ACCESS_ONCE(lock->tickets.head);
+	token.head = lock->tickets.head;
 	return token;
 }
 
@@ -236,8 +236,10 @@ void xen_spin_irq_exit(void)
 		if (spinning->ticket + 1)
 			continue;
 		spinning->ticket = ticket_get(lock, spinning->prev);
-		if (ACCESS_ONCE(lock->tickets.head) == spinning->ticket)
+		if (lock->tickets.head == spinning->ticket) {
 			lock->owner = raw_smp_processor_id();
+			set_evtchn(__this_cpu_read(poll_evtchn));
+		}
 	}
 }
 #endif

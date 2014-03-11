@@ -28,10 +28,6 @@ static unsigned long min_pfn_mapped;
 
 static bool __initdata can_use_brk_pgt = true;
 
-#ifdef CONFIG_X86_64
-extern void xen_finish_init_mapping(void);
-#endif
-
 /*
  * Pages returned are already directly mapped.
  *
@@ -376,10 +372,8 @@ unsigned long __init_refok init_memory_mapping(unsigned long start,
 
 	add_pfn_range_mapped(start >> PAGE_SHIFT, ret >> PAGE_SHIFT);
 
-#ifdef CONFIG_X86_64
 	if (!start)
 		xen_finish_init_mapping();
-#endif
 
 	return ret >> PAGE_SHIFT;
 }

@@ -889,6 +889,7 @@ void __init xen_finish_init_mapping(void)
 {
 	unsigned long va;
 	struct mmuext_op mmuext;
+	pud_t *pud;
 
 	/* Re-vector virtual addresses pointing into the initial
 	   mapping to the just-established permanent ones. */
@@ -908,10 +909,13 @@ void __init xen_finish_init_mapping(void)
 
 	/* Destroy the Xen-created mappings beyond the kernel image. */
 	va = PAGE_ALIGN(_brk_end);
-	while (!pmd_none(*early_get_pmd(va))) {
+	pud = pud_offset(pgd_offset_k(va), va);
+	while (!pmd_none(*pmd_offset(pud, va))) {
 		if (HYPERVISOR_update_va_mapping(va, __pte_ma(0), 0))
 			BUG();
 		va += PAGE_SIZE;
+		if (!(va & (PUD_SIZE - 1)))
+			pud = pud_offset(pgd_offset_k(va), va);
 	}
 }
 

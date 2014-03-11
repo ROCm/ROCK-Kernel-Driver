@@ -1096,7 +1096,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		tx->flags |= XEN_NETTXF_data_validated;
 
 #if HAVE_TSO
-	if (skb_shinfo(skb)->gso_size) {
+	if (skb_is_gso(skb)) {
 		struct netif_extra_info *gso = (struct netif_extra_info *)
 			RING_GET_REQUEST(&np->tx, ++i);
 
