@@ -434,7 +434,7 @@ module_exit(pci_iomul_cleanup);
  */
 late_initcall(pci_iomul_init);
 
-MODULE_ALIAS("devname:xen/pci_iomul");
+/* MODULE_ALIAS("devname:xen/pci_iomul"); */
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Isaku Yamahata <yamahata@valinux.co.jp>");
 MODULE_DESCRIPTION("PCI IO space multiplexing driver");

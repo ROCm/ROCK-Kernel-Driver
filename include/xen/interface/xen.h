@@ -743,7 +743,7 @@ typedef struct shared_info shared_info_t;
  * 32-bit and runs under a 64-bit hypervisor should _NOT_ use two of the
  * pages preceding pt_base and mark them as reserved/unused.
  */
-#ifdef XEN_HAVE_PV_GUEST_ENTRY
+#if defined(XEN_HAVE_PV_GUEST_ENTRY) || defined(CONFIG_PARAVIRT_XEN)
 struct start_info {
 	/* THE FOLLOWING ARE FILLED IN BOTH ON INITIAL BOOT AND ON RESUME.    */
 	char magic[32];             /* "xen-<version>-<platform>".            */

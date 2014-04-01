@@ -80,7 +80,7 @@ static int __init xencons_setup(char *str)
 	char *q;
 	int n;
 
-	console_use_vt = 1;
+	console_use_vt = -1;
 	if (!strncmp(str, "ttyS", 4)) {
 		xc_mode = XC_SERIAL;
 		str += 4;
@@ -185,13 +185,13 @@ static struct console kcons_info = {
 static int __init xen_console_init(void)
 {
 	if (!is_running_on_xen())
-		goto out;
+		return 0;
 
 	if (is_initial_xendomain()) {
 		kcons_info.write = kcons_write_dom0;
 	} else {
 		if (!xen_start_info->console.domU.evtchn)
-			goto out;
+			return 0;
 		kcons_info.write = kcons_write;
 	}
 
@@ -221,16 +221,22 @@ static int __init xen_console_init(void)
 		break;
 
 	default:
-		goto out;
+		return 0;
 	}
 
 	wbuf = kmalloc(wbuf_size, GFP_KERNEL);
+	if (!wbuf) {
+		xc_mode = XC_OFF;
+		pr_err("Xen virtual console turned off - no memory\n");
+		return 0;
+	}
 
-	if (!is_initial_xendomain())
+	if (console_use_vt <= 0 || !is_initial_xendomain())
 		add_preferred_console(kcons_info.name, xc_num, NULL);
+	else
+		kcons_info.index = xc_num;
 	register_console(&kcons_info);
 
- out:
 	return 0;
 }
 console_initcall(xen_console_init);

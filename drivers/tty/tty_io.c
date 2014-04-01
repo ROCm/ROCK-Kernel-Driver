@@ -137,7 +137,9 @@ EXPORT_SYMBOL(tty_mutex);
 /* Spinlock to protect the tty->tty_files list */
 DEFINE_SPINLOCK(tty_files_lock);
 
+#ifndef console_use_vt
 int console_use_vt = 1;
+#endif
 
 static ssize_t tty_read(struct file *, char __user *, size_t, loff_t *);
 static ssize_t tty_write(struct file *, const char __user *, size_t, loff_t *);

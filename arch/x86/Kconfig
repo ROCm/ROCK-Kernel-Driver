@@ -1118,7 +1118,7 @@ config MICROCODE_AMD_EARLY
 
 config MICROCODE_EARLY
 	bool "Early load microcode"
-	depends on MICROCODE=y && BLK_DEV_INITRD
+	depends on MICROCODE=y && BLK_DEV_INITRD && !XEN
 	select MICROCODE_INTEL_EARLY if MICROCODE_INTEL
 	select MICROCODE_AMD_EARLY if MICROCODE_AMD
 	default y

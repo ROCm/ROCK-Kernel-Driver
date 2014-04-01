@@ -96,6 +96,11 @@ module_param_call(max_ring_page_order,
 		  &blkif_max_ring_page_order, 0644);
 MODULE_PARM_DESC(max_ring_order, "log2 of maximum ring size (in pages)");
 
+/* Maximum number of indirect segments advertised to the front end. */
+unsigned int blkif_max_segs_per_req = BITS_PER_LONG;
+module_param_named(max_indirect_segments, blkif_max_segs_per_req, uint, 0444);
+MODULE_PARM_DESC(max_indirect_segments, "maximum number of indirect segments");
+
 /*
  * Each outstanding request that we've passed to the lower device layers has a 
  * 'pending_req' allocated to it. Each buffer_head that completes decrements 
@@ -123,7 +128,7 @@ static grant_handle_t *pending_grant_handles;
 
 static inline int vaddr_pagenr(pending_req_t *req, int seg)
 {
-	return (req - pending_reqs) * BLKIF_MAX_SEGMENTS_PER_REQUEST + seg;
+	return (req - pending_reqs) * blkif_max_segs_per_req + seg;
 }
 
 #define pending_page(req, seg) pending_pages[vaddr_pagenr(req, seg)]
@@ -139,9 +144,8 @@ static inline unsigned long vaddr(pending_req_t *req, int seg)
 
 
 static int do_block_io_op(blkif_t *blkif);
-static void dispatch_rw_block_io(blkif_t *blkif,
-				 blkif_request_t *req,
-				 pending_req_t *pending_req);
+static void _dispatch_rw_block_io(blkif_t *, pending_req_t *,
+				  unsigned int max_seg);
 static void make_response(blkif_t *blkif, u64 id,
 			  unsigned short op, int st);
 
@@ -177,10 +181,9 @@ static void free_req(pending_req_t *req)
 
 static void fast_flush_area(pending_req_t *req)
 {
-	struct gnttab_unmap_grant_ref unmap[BLKIF_MAX_SEGMENTS_PER_REQUEST];
+	struct gnttab_unmap_grant_ref unmap[32];
 	unsigned int i, invcount = 0;
 	grant_handle_t handle;
-	int ret;
 
 	for (i = 0; i < req->nr_pages; i++) {
 		handle = pending_handle(req, i);
@@ -190,12 +193,18 @@ static void fast_flush_area(pending_req_t *req)
 		gnttab_set_unmap_op(&unmap[invcount], vaddr(req, i),
 				    GNTMAP_host_map, handle);
 		pending_handle(req, i) = BLKBACK_INVALID_HANDLE;
-		invcount++;
+		if (++invcount == ARRAY_SIZE(unmap)) {
+			if (HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref,
+						      unmap, invcount))
+				BUG();
+			invcount = 0;
+		}
 	}
 
-	ret = HYPERVISOR_grant_table_op(
-		GNTTABOP_unmap_grant_ref, unmap, invcount);
-	BUG_ON(ret);
+	if (invcount &&
+	    HYPERVISOR_grant_table_op(GNTTABOP_unmap_grant_ref,
+				      unmap, invcount))
+		BUG();
 }
 
 /******************************************************************
@@ -399,6 +408,65 @@ static void dispatch_discard(blkif_t *blkif, struct blkif_request_discard *req)
 	make_response(blkif, req->id, req->operation, status);
 }
 
+static void dispatch_rw_block_io(blkif_t *blkif,
+				 blkif_request_t *greq,
+				 pending_req_t *pending_req)
+{
+	struct blkbk_request *req = blkif->req;
+
+	req->operation     = greq->operation;
+	req->handle        = greq->handle;
+	req->nr_segments   = greq->nr_segments;
+	req->id            = greq->id;
+	req->sector_number = greq->sector_number;
+	if (likely(req->nr_segments <= BLKIF_MAX_SEGMENTS_PER_REQUEST))
+		memcpy(req->seg, greq->seg, req->nr_segments * sizeof(*req->seg));
+	_dispatch_rw_block_io(blkif, pending_req,
+			      BLKIF_MAX_SEGMENTS_PER_REQUEST);
+}
+
+static void dispatch_indirect(blkif_t *blkif,
+			      struct blkif_request_indirect *greq,
+			      pending_req_t *pending_req)
+{
+	struct blkbk_request *req = blkif->req;
+
+	req->operation     = greq->indirect_op;
+	req->handle        = greq->handle;
+	req->nr_segments   = greq->nr_segments;
+	req->id            = greq->id;
+	req->sector_number = greq->sector_number;
+	if (likely(req->nr_segments <= blkif_max_segs_per_req)) {
+		struct gnttab_copy gc[BLKIF_MAX_INDIRECT_PAGES_PER_REQUEST];
+		unsigned int i, n = BLKIF_INDIRECT_PAGES(req->nr_segments);
+
+		for (i = 0; i < n; ++i) {
+			gc[i].source.u.ref = greq->indirect_grefs[i];
+			gc[i].source.domid = blkif->domid;
+			gc[i].source.offset = 0;
+			gc[i].dest.u.gmfn = blkif->seg_mfn[i];
+			gc[i].dest.domid = DOMID_SELF;
+			gc[i].dest.offset = blkif->seg_offs;
+			gc[i].len = PAGE_SIZE;
+			gc[i].flags = GNTCOPY_source_gref;
+		}
+		if ((req->nr_segments * sizeof(*req->seg)) & ~PAGE_MASK)
+			gc[n - 1].len = (req->nr_segments * sizeof(*req->seg))
+					& ~PAGE_MASK;
+		if (HYPERVISOR_grant_table_op(GNTTABOP_copy, gc, n))
+			BUG();
+		for (i = 0; i < n; ++i) {
+			if (unlikely(gc[i].status == GNTST_eagain))
+				gnttab_check_GNTST_eagain_do_while(GNTTABOP_copy,
+								   &gc[i]);
+			if (gc[i].status != GNTST_okay)
+				/* force failure in _dispatch_rw_block_io() */
+				req->operation = BLKIF_OP_INDIRECT;
+		}
+	}
+	_dispatch_rw_block_io(blkif, pending_req, blkif_max_segs_per_req);
+}
+
 static int _do_block_io_op(blkif_t *blkif)
 {
 	blkif_back_rings_t *blk_rings = &blkif->blk_rings;
@@ -467,6 +535,16 @@ static int _do_block_io_op(blkif_t *blkif)
 			barrier();
 			dispatch_discard(blkif, (void *)&req);
 			break;
+		case BLKIF_OP_INDIRECT:
+			pending_req = alloc_req();
+			if (!pending_req) {
+				blkif->st_oo_req++;
+				return 1;
+			}
+			blk_rings->common.req_cons = rc;
+			barrier();
+			dispatch_indirect(blkif, (void *)&req, pending_req);
+			break;
 		case BLKIF_OP_PACKET:
 			blk_rings->common.req_cons = rc;
 			barrier();
@@ -512,16 +590,14 @@ do_block_io_op(blkif_t *blkif)
 	return more_to_do;
 }
 
-static void dispatch_rw_block_io(blkif_t *blkif,
-				 blkif_request_t *req,
-				 pending_req_t *pending_req)
+static void _dispatch_rw_block_io(blkif_t *blkif,
+				  pending_req_t *pending_req,
+				  unsigned int max_seg)
 {
-	struct gnttab_map_grant_ref map[BLKIF_MAX_SEGMENTS_PER_REQUEST];
+	struct blkbk_request *req = blkif->req;
+	struct gnttab_map_grant_ref *map = blkif->map;
 	struct phys_req preq;
-	union {
-		unsigned int nsec;
-		struct bio *bio;
-	} seg[BLKIF_MAX_SEGMENTS_PER_REQUEST];
+	union blkif_seg *seg = blkif->seg;
 	unsigned int nseg, i, nbio = 0;
 	struct bio *bio = NULL;
 	uint32_t flags;
@@ -546,14 +622,13 @@ static void dispatch_rw_block_io(blkif_t *blkif,
 		operation = WRITE_FLUSH;
 		break;
 	default:
-		operation = 0; /* make gcc happy */
-		BUG();
+		goto fail_response;
 	}
 
 	/* Check that number of segments is sane. */
 	nseg = req->nr_segments;
 	if (unlikely(nseg == 0 && !(operation & REQ_FLUSH)) ||
-	    unlikely(nseg > BLKIF_MAX_SEGMENTS_PER_REQUEST)) {
+	    unlikely(nseg > max_seg)) {
 		DPRINTK("Bad number of segments in request (%d)\n", nseg);
 		goto fail_response;
 	}
@@ -753,17 +828,23 @@ static void make_response(blkif_t *blkif, u64 id,
 
 static int __init blkif_init(void)
 {
-	int i, mmap_pages;
+	unsigned long i, mmap_pages;
 
 	if (!is_running_on_xen())
 		return -ENODEV;
 
-	mmap_pages = blkif_reqs * BLKIF_MAX_SEGMENTS_PER_REQUEST;
+	if (blkif_max_segs_per_req < BLKIF_MAX_SEGMENTS_PER_REQUEST)
+		blkif_max_segs_per_req = BLKIF_MAX_SEGMENTS_PER_REQUEST;
+	else if (BLKIF_INDIRECT_PAGES(blkif_max_segs_per_req) >
+		 BLKIF_MAX_INDIRECT_PAGES_PER_REQUEST)
+		blkif_max_segs_per_req = BLKIF_MAX_INDIRECT_PAGES_PER_REQUEST *
+					 BLKIF_SEGS_PER_INDIRECT_FRAME;
+	mmap_pages = blkif_reqs * 1UL * blkif_max_segs_per_req;
 
 	pending_reqs          = kzalloc(sizeof(pending_reqs[0]) *
 					blkif_reqs, GFP_KERNEL);
-	pending_grant_handles = kmalloc(sizeof(pending_grant_handles[0]) *
-					mmap_pages, GFP_KERNEL);
+	pending_grant_handles = vmalloc(sizeof(pending_grant_handles[0]) *
+					mmap_pages);
 	pending_pages         = alloc_empty_pages_and_pagevec(mmap_pages);
 
 	if (blkback_pagemap_init(mmap_pages))

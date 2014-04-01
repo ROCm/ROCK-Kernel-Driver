@@ -599,4 +599,4 @@ module_init(evtchn_init);
 module_exit(evtchn_cleanup);
 
 MODULE_LICENSE("GPL");
-MODULE_ALIAS("devname:xen/evtchn");
+/* MODULE_ALIAS("devname:xen/evtchn"); */

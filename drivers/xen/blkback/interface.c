@@ -35,15 +35,51 @@
 #include <linux/kthread.h>
 #include <linux/vmalloc.h>
 
+#define BLKBK_REQ_SIZE(req, segs) \
+	(offsetof(typeof(*(req)), seg[segs]) <= PAGE_SIZE \
+	 ? offsetof(typeof(*(req)), seg[segs]) \
+	 : offsetof(typeof(*(req)), seg) + \
+	   PAGE_ALIGN((segs) * sizeof(*(req)->seg)))
+
 static struct kmem_cache *blkif_cachep;
 
 blkif_t *blkif_alloc(domid_t domid)
 {
 	blkif_t *blkif;
+	unsigned int size;
+	void *ptr;
 
 	blkif = kmem_cache_zalloc(blkif_cachep, GFP_KERNEL);
 	if (!blkif)
 		return ERR_PTR(-ENOMEM);
+
+	smp_rmb();
+	blkif->seg = kcalloc(blkif_max_segs_per_req, sizeof(*blkif->seg),
+			     GFP_KERNEL);
+	blkif->map = kcalloc(blkif_max_segs_per_req, sizeof(*blkif->map),
+			     GFP_KERNEL);
+	size = BLKBK_REQ_SIZE(blkif->req, blkif_max_segs_per_req);
+	ptr = alloc_pages_exact(size, GFP_KERNEL);
+	if (!blkif->seg || !blkif->map || !ptr) {
+		if (ptr)
+			free_pages_exact(ptr, size);
+		kfree(blkif->seg);
+		kfree(blkif->map);
+		kmem_cache_free(blkif_cachep, blkif);
+		return ERR_PTR(-ENOMEM);
+	}
+	if (size > PAGE_SIZE) {
+		struct blkif_request_segment *seg = ptr + PAGE_SIZE;
+		unsigned int i;
+
+		blkif->req = container_of(seg, struct blkbk_request, seg[0]);
+		for (i = 0; i < BLKIF_INDIRECT_PAGES(blkif_max_segs_per_req); ++i)
+			blkif->seg_mfn[i] = virt_to_mfn(ptr + (i + 1) * PAGE_SIZE);
+	} else {
+		blkif->req = ptr;
+		blkif->seg_mfn[0] = virt_to_mfn(ptr);
+		blkif->seg_offs = offsetof(struct blkbk_request, seg);
+	}
 
 	blkif->domid = domid;
 	spin_lock_init(&blkif->blk_ring_lock);
@@ -153,6 +189,11 @@ void blkif_free(blkif_t *blkif)
 {
 	if (!atomic_dec_and_test(&blkif->refcnt))
 		BUG();
+	free_pages_exact((void*)((unsigned long)blkif->req & PAGE_MASK),
+			 BLKBK_REQ_SIZE(blkif->req,
+					blkif_max_segs_per_req));
+	kfree(blkif->seg);
+	kfree(blkif->map);
 	kmem_cache_free(blkif_cachep, blkif);
 }
 

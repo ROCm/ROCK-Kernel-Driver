@@ -76,9 +76,12 @@ struct xlbd_major_info
 };
 
 struct blk_shadow {
-	blkif_request_t req;
+	union {
+		blkif_request_t req;
+		blkif_request_indirect_t ind;
+	};
 	struct request *request;
-	unsigned long frame[BLKIF_MAX_SEGMENTS_PER_REQUEST];
+	unsigned long *frame;
 };
 
 #define BLK_MAX_RING_PAGE_ORDER 4U
@@ -102,14 +105,16 @@ struct blkfront_info
 	unsigned int ring_size;
 	blkif_front_ring_t ring;
 	spinlock_t io_lock;
-	struct scatterlist sg[BLKIF_MAX_SEGMENTS_PER_REQUEST];
+	struct scatterlist *sg;
+	struct blkif_request_segment **indirect_segs;
 	unsigned int irq;
+	unsigned int max_segs_per_req;
 	struct xlbd_major_info *mi;
 	struct request_queue *rq;
 	struct work_struct work;
 	struct gnttab_free_callback callback;
 	struct blk_shadow shadow[BLK_MAX_RING_SIZE];
-	struct list_head resume_list;
+	struct list_head resume_list, resume_split;
 	grant_ref_t ring_refs[BLK_MAX_RING_PAGES];
 	struct page *ring_pages[BLK_MAX_RING_PAGES];
 	unsigned long shadow_free;

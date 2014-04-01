@@ -75,6 +75,21 @@ typedef struct blkif_st {
 	/* Private fields. */
 	spinlock_t       blk_ring_lock;
 	atomic_t         refcnt;
+	struct gnttab_map_grant_ref *map;
+	union blkif_seg {
+		unsigned int nsec;
+		struct bio *bio;
+	}                *seg;
+	struct blkbk_request {
+		uint8_t        operation;
+		blkif_vdev_t   handle;
+		unsigned int   nr_segments;
+		uint64_t       id;
+		blkif_sector_t sector_number;
+		struct blkif_request_segment seg[];
+	}                *req;
+	xen_pfn_t         seg_mfn[BLKIF_MAX_INDIRECT_PAGES_PER_REQUEST];
+	unsigned int      seg_offs;
 
 	wait_queue_head_t   wq;
 	/* for barrier (drain) requests */
@@ -111,6 +126,7 @@ struct backend_info
 };
 
 extern unsigned int blkif_max_ring_page_order;
+extern unsigned int blkif_max_segs_per_req;
 
 blkif_t *blkif_alloc(domid_t domid);
 void blkif_disconnect(blkif_t *blkif);
