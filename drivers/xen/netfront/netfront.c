@@ -276,7 +276,7 @@ static bool netfront_nic_unplugged(struct xenbus_device *dev)
 		return false;
 
 	/* If the interface is emulated and not unplugged, skip it. */
-	if (strcmp(typestr, "vif_ioem") == 0 || strcmp(typestr, "ioemu") == 0)
+	if (strcmp(typestr, "vif_ioemu") == 0 || strcmp(typestr, "ioemu") == 0)
 		ret = false;
 	kfree(typestr);
 #endif
