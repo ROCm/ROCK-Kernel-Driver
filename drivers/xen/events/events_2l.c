@@ -287,7 +287,11 @@ irqreturn_t xen_debug_interrupt(int irq, void *dev_id)
 		v = per_cpu(xen_vcpu, i);
 		pending = (get_irq_regs() && i == cpu)
 			? xen_irqs_disabled(get_irq_regs())
+#ifdef XEN_HAVE_PV_UPCALL_MASK
 			: v->evtchn_upcall_mask;
+#else
+			: -1;
+#endif
 		printk("%d: masked=%d pending=%d event_sel %0*"PRI_xen_ulong"\n  ", i,
 		       pending, v->evtchn_upcall_pending,
 		       (int)(sizeof(v->evtchn_pending_sel)*2),
