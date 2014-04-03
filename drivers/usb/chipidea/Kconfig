@@ -38,7 +38,7 @@ config USB_CHIPIDEA_PCI
 
 config USB_CHIPIDEA_IMX
 	bool "ChipIdea IMX support"
-	depends on OF_DEVICE
+	depends on OF
 	help
 	  This option enables ChipIdea support on IMX.
 endif
