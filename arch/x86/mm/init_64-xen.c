@@ -907,6 +907,14 @@ void __init xen_finish_init_mapping(void)
 	if (HYPERVISOR_mmuext_op(&mmuext, 1, NULL, DOMID_SELF))
 		BUG();
 
+	/* Kill mapping of memory below _text. */
+	va = __START_KERNEL_map;
+	while (va < (unsigned long)&_text) {
+		if (HYPERVISOR_update_va_mapping(va, __pte_ma(0), 0))
+			BUG();
+		va += PAGE_SIZE;
+	}
+
 	/* Destroy the Xen-created mappings beyond the kernel image. */
 	va = PAGE_ALIGN(_brk_end);
 	pud = pud_offset(pgd_offset_k(va), va);

@@ -541,18 +541,18 @@ static int find_unbound_irq(unsigned int node, struct irq_cfg **pcfg,
 			return -ENOMEM;
 
 		spin_lock(&irq_mapping_update_lock);
-		if ((data->chip == &no_irq_chip || data->chip == chip)
-		    && !cfg->bindcount) {
+		if ((data->chip == &no_irq_chip || data->chip == chip) &&
+		    !cfg->bindcount) {
 			irq_flow_handler_t handle;
 			const char *name;
 
 			cfg->bindcount = 1;
+			spin_unlock(&irq_mapping_update_lock);
 			if (nr > 1) {
 				if (!count)
 					result = irq;
 				if (++count == nr)
 					break;
-		 		spin_unlock(&irq_mapping_update_lock);
 				continue;
 			}
 
@@ -569,9 +569,9 @@ static int find_unbound_irq(unsigned int node, struct irq_cfg **pcfg,
 						      handle, name);
 			return irq;
 		}
-		spin_unlock(&irq_mapping_update_lock);
 		while (count)
 			irq_cfg(result + --count)->bindcount = 0;
+		spin_unlock(&irq_mapping_update_lock);
 	}
 
 	if (nr > 1 && count == nr) {
@@ -608,6 +608,7 @@ static int bind_caller_port_to_irq(unsigned int caller_port)
 		if ((irq = find_unbound_irq(numa_node_id(), &cfg,
 					    &dynirq_chip, 1)) < 0)
 			return irq;
+		spin_lock(&irq_mapping_update_lock);
 		if (evtchn_to_irq[caller_port] == -1) {
 			evtchn_to_irq[caller_port] = irq;
 			cfg->info = mk_irq_info(IRQT_CALLER_PORT, 0, caller_port);
@@ -634,6 +635,8 @@ static int bind_local_port_to_irq(unsigned int local_port)
 			BUG();
 		return irq;
 	}
+
+	spin_lock(&irq_mapping_update_lock);
 
 	BUG_ON(evtchn_to_irq[local_port] != -1);
 	evtchn_to_irq[local_port] = irq;
@@ -685,6 +688,7 @@ static int bind_virq_to_irq(unsigned int virq, unsigned int cpu)
 		if ((irq = find_unbound_irq(cpu_to_node(cpu), &cfg,
 					    &dynirq_chip, 1)) < 0)
 			return irq;
+		spin_lock(&irq_mapping_update_lock);
 
 		if (per_cpu(virq_to_irq, cpu)[virq] == -1) {
 			struct evtchn_bind_virq bind_virq = {
@@ -737,6 +741,7 @@ static int bind_ipi_to_irq(unsigned int ipi, unsigned int cpu)
 		if ((irq = find_unbound_irq(cpu_to_node(cpu), &cfg,
 					    &dynirq_chip, 1)) < 0)
 			return irq;
+		spin_lock(&irq_mapping_update_lock);
 
 		if (per_cpu(ipi_to_irq, cpu)[ipi] == -1) {
 			struct evtchn_bind_ipi bind_ipi = { .vcpu = cpu };
@@ -1067,8 +1072,10 @@ int bind_virq_to_irqaction(
 
 		spin_unlock(&irq_mapping_update_lock);
 		BUG_ON(!retval);
-		if ((irq = find_unbound_irq(cpu_to_node(cpu), &cfg,
-					    &dynirq_chip, 0)) < 0) {
+		irq = find_unbound_irq(cpu_to_node(cpu), &cfg,
+				       &dynirq_chip, 0);
+		spin_lock(&irq_mapping_update_lock);
+		if (irq < 0) {
 			new = virq_actions[virq];
 			if (new == cur)
 				virq_actions[virq] = cur->next;
@@ -1077,6 +1084,7 @@ int bind_virq_to_irqaction(
 					new = new->next;
 				new->next = cur->next;
 			}
+			spin_unlock(&irq_mapping_update_lock);
 			free_percpu_irqaction(cur);
 			return irq;
 		}
@@ -1183,6 +1191,7 @@ int bind_ipi_to_irqaction(
 		if ((retval = find_unbound_irq(cpu_to_node(cpu), &cfg,
 					       &dynirq_chip, 0)) < 0)
 			return retval;
+		spin_lock(&irq_mapping_update_lock);
 
 		if (ipi_irq < 0) {
 			ipi_irq = retval;
@@ -1937,25 +1946,23 @@ int evtchn_map_pirq(int irq, unsigned int xen_pirq, unsigned int nr)
 	if (irq < 0) {
 #ifdef CONFIG_SPARSE_IRQ
 		struct irq_cfg *cfg = NULL;
+		unsigned int i;
 
 		if (nr <= 0)
 			return -EINVAL;
 		irq = find_unbound_irq(numa_node_id(), nr == 1 ? &cfg : NULL,
 				       &pirq_chip, nr);
-		if (irq >= 0) {
-			unsigned int i;
-
-			for (i = 0; i < nr; ++i) {
-				if (!cfg || i)
-					cfg = irq_cfg(irq + i);
-				BUG_ON(type_from_irq_cfg(cfg) != IRQT_UNBOUND);
-				cfg->info = mk_irq_info(IRQT_PIRQ,
-							xen_pirq + i, 0);
-			}
-			spin_unlock(&irq_mapping_update_lock);
-		}
 		if (irq < 0)
 			return irq;
+		spin_lock(&irq_mapping_update_lock);
+		for (i = 0; i < nr; ++i) {
+			if (!cfg || i)
+				cfg = irq_cfg(irq + i);
+			BUG_ON(type_from_irq_cfg(cfg) != IRQT_UNBOUND);
+			cfg->info = mk_irq_info(IRQT_PIRQ,
+						xen_pirq + i, 0);
+		}
+		spin_unlock(&irq_mapping_update_lock);
 	} else if (irq >= PIRQ_BASE && irq < PIRQ_BASE + nr_pirqs) {
 		WARN_ONCE(1, "Non-MSI IRQ#%d (Xen %d)\n", irq, xen_pirq);
 		return -EINVAL;
