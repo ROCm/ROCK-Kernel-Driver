@@ -1,7 +1,6 @@
 #ifndef _BLKBACK_PAGEMAP_H_
 #define _BLKBACK_PAGEMAP_H_
 
-#include <linux/kconfig.h>
 #include <linux/mm.h>
 #include <xen/interface/xen.h>
 #include <xen/interface/grant_table.h>

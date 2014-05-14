@@ -64,5 +64,7 @@ syshdr-$(CONFIG_XEN)		+= xen-hypercalls.h
 
 targets	+= $(uapisyshdr-y) $(syshdr-y)
 
+PHONY += all
 all: $(addprefix $(uapi)/,$(uapisyshdr-y))
 all: $(addprefix $(out)/,$(syshdr-y))
+	@:

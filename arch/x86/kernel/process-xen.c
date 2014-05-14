@@ -289,10 +289,7 @@ void arch_cpu_idle_dead(void)
  */
 void arch_cpu_idle(void)
 {
-	if (cpuidle_idle_call())
-		xen_idle();
-	else
-		local_irq_enable();
+	xen_idle();
 }
 
 /*

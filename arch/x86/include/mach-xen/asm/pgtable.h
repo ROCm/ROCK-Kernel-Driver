@@ -15,8 +15,9 @@
 	 : (prot))
 
 #ifndef __ASSEMBLY__
-
 #include <asm/x86_init.h>
+
+void ptdump_walk_pgd_level(struct seq_file *m, pgd_t *pgd);
 
 /*
  * ZERO_PAGE is a global shared page that is always zero: used
@@ -993,6 +994,14 @@ int direct_remap_pfn_range(struct vm_area_struct *,
                            unsigned long size,
                            pgprot_t,
                            domid_t);
+int direct_remap_pfns_range(struct vm_area_struct *,
+			    unsigned long address,
+			    const unsigned long *mfns,
+			    unsigned long size,
+			    pgprot_t,
+			    domid_t,
+			    void (*)(unsigned int idx, int rc, void *),
+			    void *ctxt);
 int direct_kernel_remap_pfn_range(unsigned long address,
 				  unsigned long mfn,
 				  unsigned long size,

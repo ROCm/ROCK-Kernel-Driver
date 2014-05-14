@@ -66,7 +66,6 @@ struct unwind_frame_info
 
 #else /* X86_32 */
 
-#include <asm/fixmap.h>
 
 #define FRAME_RETADDR_OFFSET 4
 
@@ -141,8 +140,6 @@ static inline int arch_unw_user_mode(/*const*/ struct unwind_frame_info *info)
 #else
 	return user_mode_vm(&info->regs)
 	       || info->regs.ip < PAGE_OFFSET
-	       || (info->regs.ip >= __fix_to_virt(FIX_VDSO)
-	           && info->regs.ip < __fix_to_virt(FIX_VDSO) + PAGE_SIZE)
 	       || info->regs.sp < PAGE_OFFSET;
 #endif
 }

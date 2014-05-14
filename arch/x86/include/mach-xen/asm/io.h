@@ -39,6 +39,7 @@
 #include <linux/string.h>
 #include <linux/compiler.h>
 #include <asm/page.h>
+#include <asm/early_ioremap.h>
 #ifdef __KERNEL__
 #include <asm/fixmap.h>
 #endif
@@ -321,21 +322,6 @@ extern int ioremap_check_change_attr(unsigned long mfn, unsigned long size,
 				     unsigned long prot_val);
 extern void __iomem *ioremap_wc(resource_size_t offset, unsigned long size);
 
-/*
- * early_ioremap() and early_iounmap() are for temporary early boot-time
- * mappings, before the real ioremap() is functional.
- * A boot-time mapping is currently limited to at most 16 pages.
- */
-extern void early_ioremap_init(void);
-extern void early_ioremap_reset(void);
-extern void __iomem *early_ioremap(resource_size_t phys_addr,
-				   unsigned long size);
-extern void __iomem *early_memremap(resource_size_t phys_addr,
-				    unsigned long size);
-extern void __iomem *early_memremap_ro(resource_size_t phys_addr,
-				       unsigned long size);
-extern void early_iounmap(void __iomem *addr, unsigned long size);
-extern void fixup_early_ioremap(void);
 extern bool is_early_ioremap_ptep(pte_t *ptep);
 
 #define IO_SPACE_LIMIT 0xffff

@@ -40,7 +40,6 @@
 #include <asm/hypervisor.h>
 #include <asm/maddr.h> /* maddr_t */
 #include <linux/mm.h>
-#include <linux/kconfig.h>
 #include <linux/delay.h>
 #include <xen/interface/grant_table.h>
 #include <xen/features.h>

@@ -166,7 +166,12 @@ struct physdev_map_pirq {
     int bus;
     /* IN */
     int devfn;
-    /* IN (also OUT for ..._MULTI_MSI) */
+    /* IN
+     * - For MSI-X contains entry number.
+     * - For MSI with ..._MULTI_MSI contains number of vectors.
+     * OUT (..._MULTI_MSI only)
+     * - Number of vectors allocated.
+     */
     int entry_nr;
     /* IN */
     uint64_t table_base;

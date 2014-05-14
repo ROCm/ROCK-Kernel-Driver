@@ -1145,7 +1145,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
  drop:
 	dev->stats.tx_dropped++;
-	dev_kfree_skb(skb);
+	dev_kfree_skb_any(skb);
 	return NETDEV_TX_OK;
 }
 
@@ -1791,13 +1791,13 @@ static struct rtnl_link_stats64 *xennet_get_stats64(struct net_device *dev,
 		unsigned int start;
 
 		do {
-			start = u64_stats_fetch_begin_bh(&stats->syncp);
+			start = u64_stats_fetch_begin_irq(&stats->syncp);
 
 			rx_packets = stats->rx_packets;
 			tx_packets = stats->tx_packets;
 			rx_bytes = stats->rx_bytes;
 			tx_bytes = stats->tx_bytes;
-		} while (u64_stats_fetch_retry_bh(&stats->syncp, start));
+		} while (u64_stats_fetch_retry_irq(&stats->syncp, start));
 
 		tot->rx_packets += rx_packets;
 		tot->tx_packets += tx_packets;
@@ -2224,11 +2224,9 @@ static struct net_device *create_netdev(struct xenbus_device *dev)
 	np->rx_refill_timer.function = rx_refill_timeout;
 
 	err = -ENOMEM;
-	np->stats = alloc_percpu(struct netfront_stats);
+	np->stats = netdev_alloc_pcpu_stats(struct netfront_stats);
 	if (np->stats == NULL)
 		goto exit;
-	for_each_possible_cpu(i)
-		u64_stats_init(&per_cpu_ptr(np->stats, i)->syncp);
 
 	/* Initialise {tx,rx}_skbs as a free chain containing every entry. */
 	for (i = 0; i <= NET_TX_RING_SIZE; i++) {

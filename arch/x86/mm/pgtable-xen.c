@@ -985,7 +985,6 @@ void xen_set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t flags)
 		return;
 #else
 	case FIX_WP_TEST:
-	case FIX_VDSO:
 		pte = pfn_pte(phys >> PAGE_SHIFT, flags);
 		break;
 #endif

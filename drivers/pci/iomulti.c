@@ -20,7 +20,6 @@
 #include "iomulti.h"
 #include "pci.h"
 #include <linux/export.h>
-#include <linux/kconfig.h>
 #include <linux/sort.h>
 #include <asm/setup.h>
 

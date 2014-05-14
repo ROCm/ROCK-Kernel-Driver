@@ -426,7 +426,9 @@ static int tpmfront_suspend(struct xenbus_device *dev)
 			printk("TPM-FE [INFO]: Waiting for outstanding "
 			       "request.\n");
 		/* Wait for a request to be responded to. */
-		interruptible_sleep_on_timeout(&tp->wait_q, 100);
+		wait_event_interruptible_timeout(tp->wait_q,
+						 !atomic_read(&tp->tx_busy),
+						 100);
 	}
 
 	return 0;

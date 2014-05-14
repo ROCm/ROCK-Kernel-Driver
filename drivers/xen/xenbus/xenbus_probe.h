@@ -34,8 +34,6 @@
 #ifndef _XENBUS_PROBE_H
 #define _XENBUS_PROBE_H
 
-#include <linux/kconfig.h>
-
 #ifndef BUS_ID_SIZE
 #define XEN_BUS_ID_SIZE			20
 #else

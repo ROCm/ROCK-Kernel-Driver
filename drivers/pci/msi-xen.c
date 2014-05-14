@@ -1010,9 +1010,7 @@ EXPORT_SYMBOL(pci_disable_msix);
  **/
 void msi_remove_pci_irq_vectors(struct pci_dev *dev)
 {
-	unsigned long flags;
 	struct msi_dev_list *msi_dev_entry;
-	struct msi_pirq_entry *pirq_entry, *tmp;
 
 	if (!pci_msi_enable || !dev)
 		return;
@@ -1021,17 +1019,26 @@ void msi_remove_pci_irq_vectors(struct pci_dev *dev)
 
 	msi_dev_entry = get_msi_dev_pirq_list(dev);
 
-	spin_lock_irqsave(&msi_dev_entry->pirq_list_lock, flags);
-	list_for_each_entry_safe(pirq_entry, tmp, &dev->msi_list, list) {
+	for (;;) {
+		struct msi_pirq_entry *pirq_entry;
+		unsigned long flags;
+
+		spin_lock_irqsave(&msi_dev_entry->pirq_list_lock, flags);
+		pirq_entry = list_first_entry_or_null(&dev->msi_list,
+						      struct msi_pirq_entry,
+						      list);
+		if (pirq_entry)
+			list_del(&pirq_entry->list);
+		spin_unlock_irqrestore(&msi_dev_entry->pirq_list_lock, flags);
+		if (!pirq_entry)
+			break;
 		if (is_initial_xendomain())
 			msi_unmap_pirq(dev, pirq_entry->pirq, 1,
 				       msi_dev_entry->owner);
 		else
 			evtchn_map_pirq(pirq_entry->pirq, 0, 1);
-		list_del(&pirq_entry->list);
 		kfree(pirq_entry);
 	}
-	spin_unlock_irqrestore(&msi_dev_entry->pirq_list_lock, flags);
 	msi_dev_entry->owner = DOMID_IO;
 	dev->irq = msi_dev_entry->default_irq;
 }

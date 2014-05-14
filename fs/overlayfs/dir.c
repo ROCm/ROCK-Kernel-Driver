@@ -558,7 +558,7 @@ static int ovl_rename(struct inode *olddir, struct dentry *old,
 	}
 
 	err = vfs_rename(old_upperdir->d_inode, olddentry,
-			 new_upperdir->d_inode, newdentry, NULL);
+			 new_upperdir->d_inode, newdentry, NULL, 0);
 
 	if (err) {
 		if (new_create && ovl_dentry_is_opaque(new))

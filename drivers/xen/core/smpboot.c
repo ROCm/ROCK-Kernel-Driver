@@ -345,9 +345,9 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
 
 #ifdef CONFIG_X86_64
 	clear_tsk_thread_flag(idle, TIF_FORK);
+#endif
 	per_cpu(kernel_stack, cpu) = (unsigned long)task_stack_page(idle) -
 				     KERNEL_STACK_OFFSET + THREAD_SIZE;
-#endif
  	per_cpu(current_task, cpu) = idle;
 
 	cpu_initialize_context(cpu, idle->thread.sp0);

@@ -91,6 +91,8 @@ struct temp_data {
 	bool valid;
 	struct sensor_device_attribute sd_attrs[TOTAL_ATTRS];
 	char attr_name[TOTAL_ATTRS][CORETEMP_NAME_LENGTH];
+	struct attribute *attrs[TOTAL_ATTRS + 1];
+	struct attribute_group attr_group;
 	struct mutex update_lock;
 };
 
@@ -98,7 +100,8 @@ struct temp_data {
 struct platform_data {
 	struct device *hwmon_dev;
 	u16 phys_proc_id;
-	u8 x86_model, x86_mask;
+	u8 x86_model, x86_mask:4;
+	u8 managed:1;
 	struct temp_data *core_data[MAX_CORE_DATA];
 	struct device_attribute name_attr;
 };
@@ -118,12 +121,6 @@ struct cpu_info {
 
 static LIST_HEAD(pdev_list);
 static DEFINE_MUTEX(pdev_list_mutex);
-
-static ssize_t show_name(struct device *dev,
-			struct device_attribute *devattr, char *buf)
-{
-	return sprintf(buf, "%s\n", DRVNAME);
-}
 
 static ssize_t show_label(struct device *dev,
 				struct device_attribute *devattr, char *buf)
@@ -377,12 +374,12 @@ static int get_tjmax(struct platform_data *c, u32 id, struct device *dev)
 		if (cpu_has_tjmax(c))
 			dev_warn(dev, "Unable to read TjMax from CPU %u\n", id);
 	} else {
-		val = (eax >> 16) & 0x7f;
+		val = (eax >> 16) & 0xff;
 		/*
 		 * If the TjMax is not plausible, an assumption
 		 * will be used
 		 */
-		if (val >= 85) {
+		if (val) {
 			dev_dbg(dev, "TjMax is %d degrees C\n", val);
 			return val * 1000;
 		}
@@ -401,19 +398,10 @@ static int get_tjmax(struct platform_data *c, u32 id, struct device *dev)
 	return adjust_tjmax(c, id, dev);
 }
 
-static int create_name_attr(struct platform_data *pdata, struct device *dev)
-{
-	sysfs_attr_init(&pdata->name_attr.attr);
-	pdata->name_attr.attr.name = "name";
-	pdata->name_attr.attr.mode = S_IRUGO;
-	pdata->name_attr.show = show_name;
-	return device_create_file(dev, &pdata->name_attr);
-}
-
 static int create_core_attrs(struct temp_data *tdata, struct device *dev,
-				int attr_no)
+			     int attr_no)
 {
-	int err, i;
+	int i;
 	static ssize_t (*const rd_ptr[TOTAL_ATTRS]) (struct device *dev,
 			struct device_attribute *devattr, char *buf) = {
 			show_label, show_crit_alarm, show_temp, show_tjmax,
@@ -431,16 +419,10 @@ static int create_core_attrs(struct temp_data *tdata, struct device *dev,
 		tdata->sd_attrs[i].dev_attr.attr.mode = S_IRUGO;
 		tdata->sd_attrs[i].dev_attr.show = rd_ptr[i];
 		tdata->sd_attrs[i].index = attr_no;
-		err = device_create_file(dev, &tdata->sd_attrs[i].dev_attr);
-		if (err)
-			goto exit_free;
+		tdata->attrs[i] = &tdata->sd_attrs[i].dev_attr.attr;
 	}
-	return 0;
-
-exit_free:
-	while (--i >= 0)
-		device_remove_file(dev, &tdata->sd_attrs[i].dev_attr);
-	return err;
+	tdata->attr_group.attrs = tdata->attrs;
+	return sysfs_create_group(&dev->kobj, &tdata->attr_group);
 }
 
 
@@ -555,7 +537,7 @@ static int create_core_data(struct platform_device *pdev,
 	pdata->core_data[attr_no] = tdata;
 
 	/* Create sysfs interfaces */
-	err = create_core_attrs(tdata, &pdev->dev, attr_no);
+	err = create_core_attrs(tdata, pdata->hwmon_dev, attr_no);
 	if (err)
 		goto exit_free;
 
@@ -578,14 +560,12 @@ static void coretemp_add_core(unsigned int cpu,
 }
 
 static void coretemp_remove_core(struct platform_data *pdata,
-				struct device *dev, int indx)
+				 int indx)
 {
-	int i;
 	struct temp_data *tdata = pdata->core_data[indx];
 
 	/* Remove the sysfs attributes */
-	for (i = 0; i < tdata->attr_size; i++)
-		device_remove_file(dev, &tdata->sd_attrs[i].dev_attr);
+	sysfs_remove_group(&pdata->hwmon_dev->kobj, &tdata->attr_group);
 
 	kfree(pdata->core_data[indx]);
 	pdata->core_data[indx] = NULL;
@@ -593,25 +573,16 @@ static void coretemp_remove_core(struct platform_data *pdata,
 
 static int coretemp_probe(struct platform_device *pdev)
 {
+	struct device *dev = &pdev->dev;
 	struct platform_data *pdata = platform_get_drvdata(pdev);
-	int err;
+
+	devres_add(dev, pdata);
+	pdata->managed = true;
 
 	/* Initialize the per-package data structures */
-	err = create_name_attr(pdata, &pdev->dev);
-	if (err)
-		return err;
-
-	pdata->hwmon_dev = hwmon_device_register(&pdev->dev);
-	if (IS_ERR(pdata->hwmon_dev)) {
-		err = PTR_ERR(pdata->hwmon_dev);
-		dev_err(&pdev->dev, "Class registration failed (%d)\n", err);
-		goto exit_name;
-	}
-	return 0;
-
-exit_name:
-	device_remove_file(&pdev->dev, &pdata->name_attr);
-	return err;
+	pdata->hwmon_dev = devm_hwmon_device_register_with_groups(dev, DRVNAME,
+								  pdata, NULL);
+	return PTR_ERR_OR_ZERO(pdata->hwmon_dev);
 }
 
 static int coretemp_remove(struct platform_device *pdev)
@@ -621,11 +592,8 @@ static int coretemp_remove(struct platform_device *pdev)
 
 	for (i = MAX_CORE_DATA - 1; i >= 0; --i)
 		if (pdata->core_data[i])
-			coretemp_remove_core(pdata, &pdev->dev, i);
+			coretemp_remove_core(pdata, i);
 
-	device_remove_file(&pdev->dev, &pdata->name_attr);
-	hwmon_device_unregister(pdata->hwmon_dev);
-	kfree(pdata);
 	return 0;
 }
 
@@ -637,6 +605,8 @@ static struct platform_driver coretemp_driver = {
 	.probe = coretemp_probe,
 	.remove = coretemp_remove,
 };
+
+static void coretemp_release(struct device *dev, void *res) { }
 
 static int coretemp_device_add(unsigned int cpu, struct cpu_info *c)
 {
@@ -654,7 +624,8 @@ static int coretemp_device_add(unsigned int cpu, struct cpu_info *c)
 		goto exit;
 	}
 
-	pdata = kzalloc(sizeof(struct platform_data), GFP_KERNEL);
+	pdata = devres_alloc(coretemp_release, sizeof(struct platform_data),
+			     GFP_KERNEL);
 	if (!pdata) {
 		err = -ENOMEM;
 		goto exit_device_put;
@@ -690,7 +661,8 @@ exit_device_free:
 	kfree(pdev_entry);
 exit_device_put:
 	platform_device_put(pdev);
-	kfree(pdata);
+	if (pdata && !pdata->managed)
+		devres_free(pdata);
 exit:
 	mutex_unlock(&pdev_list_mutex);
 	return err;
@@ -832,7 +804,7 @@ static void put_core_offline(unsigned int cpu)
 		return;
 
 	if (pdata->core_data[indx] && pdata->core_data[indx]->cpu == cpu)
-		coretemp_remove_core(pdata, &pdev->dev, indx);
+		coretemp_remove_core(pdata, indx);
 
 	/*
 	 * If a HT sibling of a core is taken offline, but another HT sibling

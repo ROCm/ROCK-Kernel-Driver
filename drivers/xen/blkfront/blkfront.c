@@ -424,6 +424,9 @@ static int setup_blkring(struct xenbus_device *dev,
 				 GFP_KERNEL);
 		if (!frame)
 			goto fail;
+		if (!info->shadow[i].frame)
+			memset(frame, ~0,
+			       info->max_segs_per_req * sizeof(*frame));
 		info->shadow[i].frame = frame;
 	}
 
@@ -819,7 +822,7 @@ static inline void flush_requests(struct blkfront_info *info)
 }
 
 static void split_request(struct blkif_request *req,
-			  const struct blk_shadow *copy,
+			  struct blk_shadow *copy,
 			  const struct blkfront_info *info,
 			  const struct blkif_request_segment *segs)
 {
@@ -835,7 +838,9 @@ static void split_request(struct blkif_request *req,
 			pfn_to_mfn(copy->frame[i]),
 			rq_data_dir(copy->request) ?
 			GTF_readonly : 0);
+		info->shadow[req->id].frame[i] = copy->frame[i];
 	}
+	copy->ind.id = req->id;
 }
 
 static void kick_pending_request_queues(struct blkfront_info *info)
@@ -850,14 +855,17 @@ static void kick_pending_request_queues(struct blkfront_info *info)
 					 struct blk_resume_entry, list);
 		blkif_request_t *req =
 			RING_GET_REQUEST(&info->ring, info->ring.req_prod_pvt);
+		unsigned long *frame;
 		unsigned int i;
 
 		*req = ent->copy.req;
 
 		/* We get a new request id, and must reset the shadow state. */
 		req->id = GET_ID_FROM_FREELIST(info);
+		frame = info->shadow[req->id].frame;
 		info->shadow[req->id] = ent->copy;
 		info->shadow[req->id].req.id = req->id;
+		info->shadow[req->id].frame = frame;
 
 		/* Rewrite any grant references invalidated by susp/resume. */
 		if (req->operation == BLKIF_OP_INDIRECT) {
@@ -892,18 +900,22 @@ static void kick_pending_request_queues(struct blkfront_info *info)
 					page_to_phys(pg) >> PAGE_SHIFT,
 					GTF_readonly);
 			}
-			for (i = 0; i < ind->nr_segments; ++i)
+			for (i = 0; i < ind->nr_segments; ++i) {
 				gnttab_grant_foreign_access_ref(segs[i].gref,
 					info->xbdev->otherend_id,
 					pfn_to_mfn(ent->copy.frame[i]),
 					rq_data_dir(ent->copy.request) ?
 					GTF_readonly : 0);
-		} else for (i = 0; i < req->nr_segments; ++i)
+				frame[i] = ent->copy.frame[i];
+			}
+		} else for (i = 0; i < req->nr_segments; ++i) {
 			gnttab_grant_foreign_access_ref(req->seg[i].gref,
 				info->xbdev->otherend_id,
 				pfn_to_mfn(ent->copy.frame[i]),
 				rq_data_dir(ent->copy.request) ?
 				GTF_readonly : 0);
+			frame[i] = ent->copy.frame[i];
+		}
 
 		info->ring.req_prod_pvt++;
 		queued = true;
@@ -1498,10 +1510,9 @@ static bool blkif_completion(struct blkfront_info *info, unsigned long id,
 			kfree(ent);
 			break;
 		}
-		for (j = 0; i < ent->copy.ind.nr_segments; ++i, ++j) {
+		for (j = 0; i < ent->copy.ind.nr_segments; ++i, ++j)
 			segs[j] = segs[i];
-			ent->copy.frame[j] = ent->copy.frame[i];
-		}
+		ent->copy.frame += BLKIF_MAX_SEGMENTS_PER_REQUEST;
 		ent->copy.ind.nr_segments -= BLKIF_MAX_SEGMENTS_PER_REQUEST;
 		if (ent->copy.ind.nr_segments
 		    <= BLKIF_MAX_SEGMENTS_PER_REQUEST) {
@@ -1534,14 +1545,30 @@ static int blkif_recover(struct blkfront_info *info,
 
 	/* Stage 1: Make a safe copy of the shadow state. */
 	for (i = 0; i < old_ring_size; i++) {
+		unsigned int nr_segs;
+
 		/* Not in use? */
 		if (!info->shadow[i].request)
 			continue;
-		ent = kmalloc(sizeof(*ent),
+		switch (info->shadow[i].req.operation) {
+		default:
+			nr_segs = info->shadow[i].req.nr_segments;
+			break;
+		case BLKIF_OP_INDIRECT:
+			nr_segs = info->shadow[i].ind.nr_segments;
+			break;
+		case BLKIF_OP_DISCARD:
+			nr_segs = 0;
+			break;
+		}
+		ent = kmalloc(sizeof(*ent) + nr_segs * sizeof(*ent->copy.frame),
 			      GFP_NOIO | __GFP_NOFAIL | __GFP_HIGH);
 		if (!ent)
 			break;
 		ent->copy = info->shadow[i];
+		ent->copy.frame = (void *)(ent + 1);
+		memcpy(ent->copy.frame, info->shadow[i].frame,
+		       nr_segs * sizeof(*ent->copy.frame));
 		if (info->indirect_segs) {
 			ent->indirect_segs = info->indirect_segs[i];
 			info->indirect_segs[i] = NULL;
@@ -1561,7 +1588,13 @@ static int blkif_recover(struct blkfront_info *info,
 	list_splice_tail(&list, &info->resume_list);
 
 	/* Stage 2: Set up free list. */
-	memset(&info->shadow, 0, sizeof(info->shadow));
+	for (i = 0; i < old_ring_size; ++i) {
+		unsigned long *frame = info->shadow[i].frame;
+
+		memset(info->shadow + i, 0, sizeof(*info->shadow));
+		memset(frame, ~0, info->max_segs_per_req * sizeof(*frame));
+		info->shadow[i].frame = frame;
+	}
 	shadow_init(info->shadow, ring_size);
 	info->shadow_free = info->ring.req_prod_pvt;
 

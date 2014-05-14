@@ -125,7 +125,7 @@ blktap_control_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 		if (copy_to_user((struct blktap_handle __user *)arg,
 				 &h, sizeof(h))) {
-			blktap_control_destroy_device(tap);
+			blktap_control_destroy_device(tap, NULL);
 			return -EFAULT;
 		}
 
@@ -138,7 +138,7 @@ blktap_control_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		if (dev >= CONFIG_XEN_NR_TAP2_DEVICES || !blktaps[dev])
 			return -EINVAL;
 
-		blktap_control_destroy_device(blktaps[dev]);
+		blktap_control_destroy_device(blktaps[dev], NULL);
 		return 0;
 	}
 
@@ -158,7 +158,8 @@ static struct miscdevice blktap_misc = {
 };
 
 int
-blktap_control_destroy_device(struct blktap *tap)
+blktap_control_destroy_device(struct blktap *tap,
+			       const struct device_attribute *attr)
 {
 	int err;
 	unsigned long inuse;
@@ -180,7 +181,7 @@ blktap_control_destroy_device(struct blktap *tap)
 			goto wait;
 
 		inuse = tap->dev_inuse;
-		err   = blktap_sysfs_destroy(tap);
+		err   = blktap_sysfs_destroy(tap, attr);
 		if (err)
 			goto wait;
 
@@ -230,7 +231,7 @@ blktap_control_free(void)
 	int i;
 
 	for (i = 0; i < CONFIG_XEN_NR_TAP2_DEVICES; i++)
-		blktap_control_destroy_device(blktaps[i]);
+		blktap_control_destroy_device(blktaps[i], NULL);
 
 	if (blktap_control_registered)
 		if (misc_deregister(&blktap_misc) < 0)

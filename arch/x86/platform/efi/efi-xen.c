@@ -59,27 +59,16 @@
 
 static efi_char16_t efi_dummy_name[6] = { 'D', 'U', 'M', 'M', 'Y', 0 };
 
-static unsigned long efi_facility;
-
-static __initdata efi_config_table_type_t arch_tables[] = {
+static efi_config_table_type_t arch_tables[] __initdata = {
 #ifdef CONFIG_X86_UV
 	{UV_SYSTEM_TABLE_GUID, "UVsystab", &efi.uv_systab},
 #endif
 	{NULL_GUID, NULL, NULL},
 };
 
-/*
- * Returns 1 if 'facility' is enabled, 0 otherwise.
- */
-int efi_enabled(int facility)
-{
-	return test_bit(facility, &efi_facility) != 0;
-}
-EXPORT_SYMBOL(efi_enabled);
-
 static int __init setup_noefi(char *arg)
 {
-	__clear_bit(EFI_RUNTIME_SERVICES, &efi_facility);
+	__clear_bit(EFI_RUNTIME_SERVICES, &efi.flags);
 	return 0;
 }
 early_param("noefi", setup_noefi);
@@ -346,9 +335,8 @@ int efi_set_rtc_mmss(const struct timespec *now)
 		eft.second = tm.tm_sec;
 		eft.nanosecond = 0;
 	} else {
-		printk(KERN_ERR
-		       "%s: Invalid EFI RTC value: write of %lx to EFI RTC failed\n",
-		       __FUNCTION__, nowtime);
+		pr_err("%s: Invalid EFI RTC value: write of %lx to EFI RTC failed\n",
+		       __func__, nowtime);
 		return -1;
 	}
 
@@ -401,13 +389,13 @@ void __init efi_probe(void)
 		efi.update_capsule           = xen_efi_update_capsule;
 		efi.query_capsule_caps       = xen_efi_query_capsule_caps;
 
-		__set_bit(EFI_BOOT, &efi_facility);
+		__set_bit(EFI_BOOT, &efi.flags);
 #ifdef CONFIG_64BIT
-		__set_bit(EFI_64BIT, &efi_facility);
+		__set_bit(EFI_64BIT, &efi.flags);
 #endif
-		__set_bit(EFI_SYSTEM_TABLES, &efi_facility);
-		__set_bit(EFI_RUNTIME_SERVICES, &efi_facility);
-		__set_bit(EFI_MEMMAP, &efi_facility);
+		__set_bit(EFI_SYSTEM_TABLES, &efi.flags);
+		__set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
+		__set_bit(EFI_MEMMAP, &efi.flags);
 	}
 }
 
@@ -463,7 +451,7 @@ void __init efi_init(void)
 	if (efi_config_init(info->cfg.addr, info->cfg.nent, arch_tables))
 		return;
 
-	__set_bit(EFI_CONFIG_TABLES, &efi_facility);
+	__set_bit(EFI_CONFIG_TABLES, &efi.flags);
 }
 
 #undef DECLARE_CALL
@@ -535,9 +523,8 @@ u64 efi_mem_attributes(unsigned long phys_addr)
 }
 
 /*
- * Some firmware has serious problems when using more than 50% of the EFI
- * variable store, i.e. it triggers bugs that can brick machines. Ensure that
- * we never use more than this safe limit.
+ * Some firmware implementations refuse to boot if there's insufficient space
+ * in the variable store. Ensure that we never use more than a safe limit.
  *
  * Return EFI_SUCCESS if it is safe to write 'size' bytes to the variable
  * store.
@@ -556,10 +543,9 @@ efi_status_t efi_query_variable_store(u32 attributes, unsigned long size)
 		return status;
 
 	/*
-	 * Some firmware implementations refuse to boot if there's insufficient
-	 * space in the variable store. We account for that by refusing the
-	 * write if permitting it would reduce the available space to under
-	 * 5KB. This figure was provided by Samsung, so should be safe.
+	 * We account for that by refusing the write if permitting it would
+	 * reduce the available space to under 5KB. This figure was provided by
+	 * Samsung, so should be safe.
 	 */
 	if ((remaining_size - size < EFI_MIN_RESERVE) &&
 		!efi_no_storage_paranoia) {

@@ -5,6 +5,7 @@
 #include <linux/slab.h>
 #include <linux/reboot.h>
 #include <linux/sched.h>
+#include <linux/syscalls.h>
 #include <linux/sysrq.h>
 #include <asm/hypervisor.h>
 #include <xen/xenbus.h>
@@ -40,9 +41,6 @@ static int shutdown_process(void *__unused)
 	static char *envp[] = { "HOME=/", "TERM=linux",
 				"PATH=/sbin:/usr/sbin:/bin:/usr/bin", NULL };
 	static char *poweroff_argv[] = { "/sbin/poweroff", NULL };
-
-	extern asmlinkage long sys_reboot(int magic1, int magic2,
-					  unsigned int cmd, void *arg);
 
 	if ((shutting_down == SHUTDOWN_POWEROFF) ||
 	    (shutting_down == SHUTDOWN_HALT)) {

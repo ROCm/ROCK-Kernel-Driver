@@ -234,13 +234,10 @@ static int vtpm_recv(struct tpm_chip *chip, u8 *buf, size_t count)
 	 * Check whether something is in the responselist and if
 	 * there's nothing in the list wait for something to appear.
 	 */
-
-	if (!vtpms->current_response) {
-		spin_unlock_irqrestore(&vtpms->resp_list_lock, flags);
-		interruptible_sleep_on_timeout(&vtpms->resp_wait_queue,
-		                               1000);
-		spin_lock_irqsave(&vtpms->resp_list_lock ,flags);
-	}
+	wait_event_interruptible_lock_irq_timeout(vtpms->resp_wait_queue,
+						  vtpms->current_response,
+						  vtpms->resp_list_lock,
+						  1000);
 
 	if (vtpms->current_response) {
 		struct transmission *t = vtpms->current_response;
@@ -409,11 +406,10 @@ static void vtpm_cancel(struct tpm_chip *chip)
 
 	spin_lock_irqsave(&vtpms->resp_list_lock,flags);
 
-	if (!vtpms->current_response && vtpms->current_request) {
-		spin_unlock_irqrestore(&vtpms->resp_list_lock, flags);
-		interruptible_sleep_on(&vtpms->resp_wait_queue);
-		spin_lock_irqsave(&vtpms->resp_list_lock,flags);
-	}
+	if (vtpms->current_request)
+		wait_event_interruptible_lock_irq(vtpms->resp_wait_queue,
+						  vtpms->current_response,
+						  vtpms->resp_list_lock);
 
 	if (vtpms->current_response) {
 		struct transmission *t = vtpms->current_response;

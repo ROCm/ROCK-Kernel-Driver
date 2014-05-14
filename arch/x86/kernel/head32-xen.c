@@ -28,7 +28,7 @@ static void __init i386_default_early_setup(void)
 #endif
 }
 
-asmlinkage void __init i386_start_kernel(void)
+asmlinkage __visible void __init i386_start_kernel(void)
 {
 #ifdef CONFIG_XEN
 	struct xen_platform_parameters pp;

@@ -41,7 +41,6 @@
 #include <linux/swap.h>
 #include <linux/bootmem.h>
 #include <linux/highmem.h>
-#include <linux/kconfig.h>
 #include <linux/slab.h>
 #include <linux/mutex.h>
 #include <linux/seq_file.h>

@@ -34,7 +34,6 @@
 #include <linux/slab.h>
 #include <linux/irq.h>
 #include <linux/interrupt.h>
-#include <linux/kconfig.h>
 #include <linux/sched.h>
 #include <linux/kernel_stat.h>
 #include <linux/ftrace.h>
@@ -378,7 +377,7 @@ static DEFINE_PER_CPU(unsigned int, current_l2i);
 #endif
 
 /* NB. Interrupts are disabled on entry. */
-asmlinkage
+asmlinkage __visible
 #ifdef CONFIG_PREEMPT
 void
 #define return(x) return
@@ -1251,7 +1250,7 @@ static int set_affinity_irq(struct irq_data *data,
 {
 	const struct irq_cfg *cfg = irq_data_cfg(data);
 	unsigned int port = evtchn_from_irq_cfg(cfg);
-	unsigned int cpu = cpumask_any(dest);
+	unsigned int cpu = cpumask_any_and(dest, cpu_online_mask);
 	struct evtchn_bind_vcpu ebv = { .port = port, .vcpu = cpu };
 	bool masked;
 	int rc;

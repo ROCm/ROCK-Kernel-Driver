@@ -205,7 +205,9 @@ blktap_validate_params(struct blktap *tap, struct blktap_params *params)
 	return 0;
 }
 
-int blktap_control_destroy_device(struct blktap *);
+struct device_attribute;
+int blktap_control_destroy_device(struct blktap *,
+				   const struct device_attribute *);
 int blktap_control_finish_destroy(struct blktap *);
 
 int blktap_ring_init(int *);
@@ -220,12 +222,14 @@ void blktap_ring_kick_user(struct blktap *);
 int blktap_sysfs_init(void);
 void blktap_sysfs_free(void);
 int blktap_sysfs_create(struct blktap *);
-int blktap_sysfs_destroy(struct blktap *);
+int blktap_sysfs_destroy(struct blktap *, const struct device_attribute *);
 #else
 static inline int blktap_sysfs_init(void) { return 0; }
 static inline void blktap_sysfs_exit(void) {}
 static inline int blktap_sysfs_create(struct blktap *tapdev) { return 0; }
-static inline int blktap_sysfs_destroy(struct blktap *tapdev) { return 0; }
+static inline int blktap_sysfs_destroy(struct blktap *tapdev,
+				       const struct device_attribute *attr)
+{ return 0; }
 #endif
 
 int blktap_device_init(int *);

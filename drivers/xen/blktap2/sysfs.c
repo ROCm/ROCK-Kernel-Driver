@@ -119,7 +119,7 @@ blktap_sysfs_remove_device(struct device *dev, struct device_attribute *attr,
 	if (test_and_set_bit(BLKTAP_SHUTDOWN_REQUESTED, &tap->dev_inuse))
 		return -EBUSY;
 
-	err = blktap_control_destroy_device(tap);
+	err = blktap_control_destroy_device(tap, attr);
 
 	return (err ? : size);
 }
@@ -341,26 +341,8 @@ blktap_sysfs_create(struct blktap *tap)
 	return err;
 }
 
-static void
-_blktap_sysfs_destroy(struct device *dev)
-{
-	struct blktap *tap = dev_get_drvdata(dev);
-
-	device_remove_file(dev, &dev_attr_name);
-	device_remove_file(dev, &dev_attr_remove);
-	device_remove_file(dev, &dev_attr_pause);
-	device_remove_file(dev, &dev_attr_resume);
-	device_remove_file(dev, &dev_attr_debug);
-
-	device_unregister(dev);
-
-	clear_bit(BLKTAP_SYSFS, &tap->dev_inuse);
-
-	blktap_control_finish_destroy(tap);
-}
-
 int
-blktap_sysfs_destroy(struct blktap *tap)
+blktap_sysfs_destroy(struct blktap *tap, const struct device_attribute *attr)
 {
 	struct blktap_ring *ring;
 	struct device *dev;
@@ -375,7 +357,21 @@ blktap_sysfs_destroy(struct blktap *tap)
 				     !atomic_read(&tap->ring.sysfs_refcnt)))
 		return -EAGAIN;
 
-	return device_schedule_callback(dev, _blktap_sysfs_destroy);
+	if (attr) {
+		BUG_ON(attr != &dev_attr_remove);
+		device_remove_file_self(dev, attr);
+	} else
+		device_remove_file(dev, &dev_attr_remove);
+	device_remove_file(dev, &dev_attr_name);
+	device_remove_file(dev, &dev_attr_pause);
+	device_remove_file(dev, &dev_attr_resume);
+	device_remove_file(dev, &dev_attr_debug);
+
+	device_unregister(dev);
+
+	clear_bit(BLKTAP_SYSFS, &tap->dev_inuse);
+
+	return 0;
 }
 
 static ssize_t

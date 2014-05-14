@@ -35,7 +35,7 @@
 #include <asm/vgtod.h>
 
 struct pvclock_vsyscall_time_info *__read_mostly pvclock_vsyscall_time;
-DEFINE_VVAR(volatile unsigned long, jiffies) = INITIAL_JIFFIES;
+__visible DEFINE_VVAR(volatile unsigned long, jiffies) = INITIAL_JIFFIES;
 #endif
 
 #define XEN_SHIFT 22
@@ -517,7 +517,7 @@ void setup_vsyscall_time_area(unsigned int cpu)
 		if (HYPERVISOR_vcpu_op(VCPUOP_register_vcpu_time_memory_area,
 				       cpu, &area)) {
 			clocksource_xen.archdata.vclock_mode = VCLOCK_NONE;
-			vsyscall_gtod_data.clock.vclock_mode = VCLOCK_NONE;
+			vsyscall_gtod_data.vclock_mode = VCLOCK_NONE;
 		}
 	}
 #endif
@@ -538,7 +538,7 @@ static void __init _late_time_init(void)
 				  0, &area) == 0) {
 		pvclock_vsyscall_time = array;
 		clocksource_xen.archdata.vclock_mode = VCLOCK_PVCLOCK;
-		vsyscall_gtod_data.clock.vclock_mode = VCLOCK_PVCLOCK;
+		vsyscall_gtod_data.vclock_mode = VCLOCK_PVCLOCK;
 	} else if (area.addr.v)
 		free_pages_exact(array, size);
 #endif

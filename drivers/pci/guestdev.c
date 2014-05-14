@@ -22,7 +22,6 @@
 #include <linux/mm.h>
 #include <linux/pci.h>
 #include <linux/export.h>
-#include <linux/kconfig.h>
 #include <linux/string.h>
 #include <linux/acpi.h>
 #include <asm/setup.h>
@@ -531,7 +530,6 @@ static int __init pci_parse_guestdev(void)
 	}
 	return 0;
 }
-
 arch_initcall(pci_parse_guestdev);
 
 /* Get command line */
@@ -877,6 +875,4 @@ static int __init pci_check_guestdev_exists(void)
 	}
 	return 0;
 }
-
 fs_initcall(pci_check_guestdev_exists);
-

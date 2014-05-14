@@ -67,6 +67,9 @@ static ssize_t read_mem(struct file *file, char __user *buf,
 	ssize_t read = 0, sz;
 	void __iomem *v;
 
+	if (p != *ppos)
+		return 0;
+
 	while (count > 0) {
 		unsigned long remaining;
 
@@ -112,6 +115,9 @@ static ssize_t write_mem(struct file *file, const char __user *buf,
 	phys_addr_t p = *ppos;
 	ssize_t written = 0, sz, ignored;
 	void __iomem *v;
+
+	if (p != *ppos)
+		return -EFBIG;
 
 	while (count > 0) {
 		sz = size_inside_page(p, count);

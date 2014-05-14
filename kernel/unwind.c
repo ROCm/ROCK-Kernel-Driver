@@ -1612,7 +1612,7 @@ EXPORT_SYMBOL_GPL(unwind_init_blocked);
  * Prepare to unwind the currently running thread.
  */
 int unwind_init_running(struct unwind_frame_info *info,
-			asmlinkage unwind_callback_fn callback,
+			unwind_callback_fn callback,
 			const struct stacktrace_ops *ops, void *data)
 {
 	info->task = current;

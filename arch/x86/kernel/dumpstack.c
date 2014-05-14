@@ -76,8 +76,9 @@ print_ftrace_graph_addr(unsigned long addr, void *data,
 { }
 #endif
 
-int asmlinkage dump_trace_unwind(struct unwind_frame_info *info,
-		      const struct stacktrace_ops *ops, void *data)
+static int asmlinkage dump_trace_unwind(struct unwind_frame_info *info,
+					const struct stacktrace_ops *ops,
+					void *data)
 {
 	int n = 0;
 #ifdef CONFIG_STACK_UNWIND

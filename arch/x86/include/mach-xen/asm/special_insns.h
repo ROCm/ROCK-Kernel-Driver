@@ -13,7 +13,7 @@ DECLARE_PER_CPU(unsigned long, xen_x86_cr0_upd);
 
 static inline unsigned long xen_read_cr0_upd(void)
 {
-	unsigned long upd = __this_cpu_read_l(xen_x86_cr0_upd);
+	unsigned long upd = raw_cpu_read_l(xen_x86_cr0_upd);
 	rmb();
 	return upd;
 }
@@ -21,17 +21,17 @@ static inline unsigned long xen_read_cr0_upd(void)
 static inline void xen_clear_cr0_upd(void)
 {
 	wmb();
-	__this_cpu_write_l(xen_x86_cr0_upd, 0);
+	raw_cpu_write_l(xen_x86_cr0_upd, 0);
 }
 
 static inline void xen_clts(void)
 {
 	if (unlikely(xen_read_cr0_upd()))
 		HYPERVISOR_fpu_taskswitch(0);
-	else if (__this_cpu_read_4(xen_x86_cr0) & X86_CR0_TS) {
-		__this_cpu_write_4(xen_x86_cr0_upd, X86_CR0_TS);
+	else if (raw_cpu_read_4(xen_x86_cr0) & X86_CR0_TS) {
+		raw_cpu_write_4(xen_x86_cr0_upd, X86_CR0_TS);
 		HYPERVISOR_fpu_taskswitch(0);
-		__this_cpu_and_4(xen_x86_cr0, ~X86_CR0_TS);
+		raw_cpu_and_4(xen_x86_cr0, ~X86_CR0_TS);
 		xen_clear_cr0_upd();
 	}
 }
@@ -40,10 +40,10 @@ static inline void xen_stts(void)
 {
 	if (unlikely(xen_read_cr0_upd()))
 		HYPERVISOR_fpu_taskswitch(1);
-	else if (!(__this_cpu_read_4(xen_x86_cr0) & X86_CR0_TS)) {
-		__this_cpu_write_4(xen_x86_cr0_upd, X86_CR0_TS);
+	else if (!(raw_cpu_read_4(xen_x86_cr0) & X86_CR0_TS)) {
+		raw_cpu_write_4(xen_x86_cr0_upd, X86_CR0_TS);
 		HYPERVISOR_fpu_taskswitch(1);
-		__this_cpu_or_4(xen_x86_cr0, X86_CR0_TS);
+		raw_cpu_or_4(xen_x86_cr0, X86_CR0_TS);
 		xen_clear_cr0_upd();
 	}
 }
@@ -67,7 +67,7 @@ static inline unsigned long native_read_cr0(void)
 static inline unsigned long xen_read_cr0(void)
 {
 	return likely(!xen_read_cr0_upd()) ?
-	       __this_cpu_read_l(xen_x86_cr0) : native_read_cr0();
+	       raw_cpu_read_l(xen_x86_cr0) : native_read_cr0();
 }
 
 static inline void native_write_cr0(unsigned long val)
@@ -77,7 +77,7 @@ static inline void native_write_cr0(unsigned long val)
 
 static inline void xen_write_cr0(unsigned long val)
 {
-	unsigned long upd = val ^ __this_cpu_read_l(xen_x86_cr0);
+	unsigned long upd = val ^ raw_cpu_read_l(xen_x86_cr0);
 
 	if (unlikely(percpu_cmpxchg_op(xen_x86_cr0_upd, 0, upd))) {
 		native_write_cr0(val);
@@ -93,7 +93,7 @@ static inline void xen_write_cr0(unsigned long val)
 		native_write_cr0(val);
 		break;
 	}
-	__this_cpu_write_l(xen_x86_cr0, val);
+	raw_cpu_write_l(xen_x86_cr0, val);
 	xen_clear_cr0_upd();
 }
 
@@ -152,7 +152,7 @@ static inline void native_wbinvd(void)
 	asm volatile("wbinvd": : :"memory");
 }
 
-extern asmlinkage void xen_load_gs_index(unsigned);
+extern void xen_load_gs_index(unsigned);
 
 static inline unsigned long read_cr0(void)
 {
@@ -237,6 +237,14 @@ static inline void stts(void)
 static inline void clflush(volatile void *__p)
 {
 	asm volatile("clflush %0" : "+m" (*(volatile char __force *)__p));
+}
+
+static inline void clflushopt(volatile void *__p)
+{
+	alternative_io(".byte " __stringify(NOP_DS_PREFIX) "; clflush %P0",
+		       ".byte 0x66; clflush %P0",
+		       X86_FEATURE_CLFLUSHOPT,
+		       "+m" (*(volatile char __force *)__p));
 }
 
 #define nop() asm volatile ("nop")
