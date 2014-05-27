@@ -1078,8 +1078,9 @@ static struct mem_cgroup *get_mem_cgroup_from_mm(struct mm_struct *mm)
 	rcu_read_lock();
 	do {
 		/*
-		 * Page cache or loopback insertions can happen without an
-		 * actual mm context, e.g. during disk probing on boot
+		 * Page cache insertions can happen withou an
+		 * actual mm context, e.g. during disk probing
+		 * on boot, loopback IO, acct() writes etc.
 		 */
 		if (unlikely(!mm))
 			memcg = root_mem_cgroup;
