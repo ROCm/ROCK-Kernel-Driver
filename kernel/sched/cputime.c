@@ -128,6 +128,7 @@ static inline void task_group_account_field(struct task_struct *p, int index,
 
 #if !defined(CONFIG_XEN) || defined(CONFIG_VIRT_CPU_ACCOUNTING)
 # define cputime_to_u64(t) ((__force u64)(t))
+# define _cputime_adjust(t) (t)
 #else
 # include <linux/syscore_ops.h>
 # define NS_PER_TICK (1000000000 / HZ)
@@ -148,6 +149,12 @@ static u64 cputime_to_u64(cputime_t t)
 		return 0;
 
 	return (__force u64)(t - jiffies_to_cputime(adj));
+}
+
+static inline u64 _cputime_adjust(u64 cputime)
+{
+	BUILD_BUG_ON(!__same_type(cputime_t, cputime));
+	return cputime_to_u64((__force cputime_t)cputime);
 }
 
 static void steal_resume(void)
@@ -377,7 +384,7 @@ static void irqtime_account_process_tick(struct task_struct *p, int user_tick,
 					 struct rq *rq, int ticks)
 {
 	cputime_t scaled = cputime_to_scaled(cputime_one_jiffy);
-	u64 cputime = cputime_to_u64(cputime_one_jiffy);
+	u64 cputime = (__force u64) cputime_one_jiffy;
 	u64 *cpustat = kcpustat_this_cpu->cpustat;
 
 	if (steal_account_process_tick())
@@ -387,9 +394,9 @@ static void irqtime_account_process_tick(struct task_struct *p, int user_tick,
 	scaled *= ticks;
 
 	if (irqtime_account_hi_update()) {
-		cpustat[CPUTIME_IRQ] += cputime;
+		cpustat[CPUTIME_IRQ] += _cputime_adjust(cputime);
 	} else if (irqtime_account_si_update()) {
-		cpustat[CPUTIME_SOFTIRQ] += cputime;
+		cpustat[CPUTIME_SOFTIRQ] += _cputime_adjust(cputime);
 	} else if (this_cpu_ksoftirqd() == p) {
 		/*
 		 * ksoftirqd time do not get accounted in cpu_softirq_time.
