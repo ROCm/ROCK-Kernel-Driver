@@ -17,6 +17,7 @@
 #include <asm/idle.h>
 #include <asm/mce.h>
 #include <asm/hw_irq.h>
+#include <asm/desc.h>
 
 #define CREATE_TRACE_POINTS
 #include <asm/trace/irq_vectors.h>
@@ -142,7 +143,7 @@ int arch_show_interrupts(struct seq_file *p, int prec)
 	seq_printf(p, "  Machine check polls\n");
 #endif
 #if IS_ENABLED(CONFIG_HYPERV) || defined(CONFIG_PARAVIRT_XEN)
-	seq_printf(p, "%*s: ", prec, "THR");
+	seq_printf(p, "%*s: ", prec, "HYP");
 	for_each_online_cpu(j)
 		seq_printf(p, "%10u ", irq_stats(j)->irq_hv_callback_count);
 	seq_printf(p, "  Hypervisor callback interrupts\n");
@@ -366,10 +367,17 @@ int check_irq_vectors_for_cpu_disable(void)
 	for_each_online_cpu(cpu) {
 		if (cpu == this_cpu)
 			continue;
-		for (vector = FIRST_EXTERNAL_VECTOR; vector < NR_VECTORS;
-		     vector++) {
-			if (per_cpu(vector_irq, cpu)[vector] < 0)
-				count++;
+		/*
+		 * We scan from FIRST_EXTERNAL_VECTOR to first system
+		 * vector. If the vector is marked in the used vectors
+		 * bitmap or an irq is assigned to it, we don't count
+		 * it as available.
+		 */
+		for (vector = FIRST_EXTERNAL_VECTOR;
+		     vector < first_system_vector; vector++) {
+			if (!test_bit(vector, used_vectors) &&
+			    per_cpu(vector_irq, cpu)[vector] < 0)
+					count++;
 		}
 	}
 

@@ -1760,10 +1760,12 @@ config X86_NEED_RELOCS
 	depends on RANDOMIZE_BASE || (X86_32 && RELOCATABLE)
 
 config PHYSICAL_ALIGN
-	hex "Alignment value to which kernel should be aligned" if !XEN
-	default 0x2000 if XEN
+	hex "Alignment value to which kernel should be aligned" if !XEN || EXPERT
+	default 0x2000 if X86_XEN
+	default 0x4000 if X86_64_XEN
 	default "0x200000"
-	range 0x2000 0x1000000 if X86_32 || XEN
+	range 0x2000 0x1000000 if X86_32
+	range 0x4000 0x1000000 if X86_64_XEN
 	range 0x200000 0x1000000 if X86_64
 	---help---
 	  This value puts the alignment restrictions on physical address
