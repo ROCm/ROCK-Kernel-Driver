@@ -108,12 +108,14 @@ static long privcmd_ioctl(struct file *file,
 		if (hypercall.op >= (PAGE_SIZE >> 5))
 			break;
 		_privcmd_hcall(true);
+		stac();
 		ret = _hypercall(long, (unsigned int)hypercall.op,
 				 (unsigned long)hypercall.arg[0],
 				 (unsigned long)hypercall.arg[1],
 				 (unsigned long)hypercall.arg[2],
 				 (unsigned long)hypercall.arg[3],
 				 (unsigned long)hypercall.arg[4]);
+		clac();
 #else
 		_privcmd_hcall(true);
 		ret = privcmd_hypercall(&hypercall);

@@ -50,13 +50,20 @@ struct xenctl_cpumap_v5 {
 };
 
 struct xen_domctl_vcpuaffinity_v4 {
-    uint32_t vcpu;
-    struct xenctl_cpumap_v4 cpumap;
+	uint32_t vcpu;
+	struct xenctl_cpumap_v4 cpumap;
 };
 
 struct xen_domctl_vcpuaffinity_v5 {
-    uint32_t vcpu;
-    struct xenctl_cpumap_v5 cpumap;
+	uint32_t vcpu;
+	struct xenctl_cpumap_v5 cpumap;
+};
+
+struct xen_domctl_vcpuaffinity_v10 {
+	uint32_t vcpu;
+	uint32_t flags;
+	struct xenctl_cpumap_v5 cpumap_hard;
+	struct xenctl_cpumap_v5 cpumap_soft;
 };
 
 union xen_domctl {
@@ -80,7 +87,6 @@ union xen_domctl {
 	 * v7: upstream: xen 4.1; sle11 sp1: xen 4.0 + cpupools patches
 	 * v8: upstream: xen 4.2
 	 * v9: upstream: xen 4.3 and 4.4
-	 * v10: upstream: xen 4.5
 	 */
 	struct {
 		uint32_t cmd;
@@ -92,7 +98,22 @@ union xen_domctl {
 			uint64_aligned_t                     dummy_align;
 			uint8_t                              dummy_pad[128];
 		};
-	} v5, v6, v7, v8, v9, v10;
+	} v5, v6, v7, v8, v9;
+
+	/*
+	 * v10: upstream: xen 4.5
+	 */
+	struct {
+		uint32_t cmd;
+		uint32_t interface_version;
+		domid_t  domain;
+		union {
+			struct xen_domctl_address_size       address_size;
+			struct xen_domctl_vcpuaffinity_v10   vcpu_affinity;
+			uint64_aligned_t                     dummy_align;
+			uint8_t                              dummy_pad[128];
+		};
+	} v10;
 };
 
 struct xen_sysctl_physinfo_v6 {
@@ -291,13 +312,26 @@ EXPORT_SYMBOL_GPL(xen_guest_blkif_protocol);
 	hypervisor_domctl(&domctl);					\
 })
 
+#define vcpu_hard_affinity(what, ver) ({				\
+	memset(&domctl, 0, sizeof(domctl));				\
+	domctl.v##ver.cmd = XEN_DOMCTL_##what##vcpuaffinity;		\
+	domctl.v##ver.interface_version = ver;				\
+	/* domctl.v##ver.domain = 0; */					\
+	domctl.v##ver.vcpu_affinity.vcpu = smp_processor_id();		\
+	domctl.v##ver.vcpu_affinity.flags = 1/*XEN_VCPUAFFINITY_HARD*/;	\
+	domctl.v##ver.vcpu_affinity.cpumap_hard.nr_cpus = nr;		\
+	set_xen_guest_handle(domctl.v##ver.vcpu_affinity.cpumap_hard.bitmap, \
+			     mask);					\
+	hypervisor_domctl(&domctl);					\
+})
+
 static inline int get_vcpuaffinity(unsigned int nr, void *mask)
 {
 	union xen_domctl domctl;
 	int rc;
 
 	BUILD_BUG_ON(XEN_DOMCTL_INTERFACE_VERSION > 10);
-	rc = vcpuaffinity(get, 10);
+	rc = vcpu_hard_affinity(get, 10);
 /* #if CONFIG_XEN_COMPAT < 0x040500 */
 	if (rc)
 		rc = vcpuaffinity(get, 9);
@@ -331,7 +365,7 @@ static inline int set_vcpuaffinity(unsigned int nr, void *mask)
 	int rc;
 
 	BUILD_BUG_ON(XEN_DOMCTL_INTERFACE_VERSION > 10);
-	rc = vcpuaffinity(set, 10);
+	rc = vcpu_hard_affinity(set, 10);
 /* #if CONFIG_XEN_COMPAT < 0x040500 */
 	if (rc)
 		rc = vcpuaffinity(set, 9);

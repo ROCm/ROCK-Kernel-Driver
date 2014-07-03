@@ -856,10 +856,10 @@ blktap_device_run_queue(struct blktap *tap)
 			goto wait;
 		}
 
-		BTDBG("req %p: dev %d cmd %p, sec 0x%llx, (0x%x/0x%x) "
-		      "buffer:%p [%s], pending: %p\n", req, tap->minor,
-		      req->cmd, (unsigned long long)blk_rq_pos(req),
-		      blk_rq_cur_sectors(req), blk_rq_sectors(req), req->buffer,
+		BTDBG("req %p: dev %d cmd %p, sec %#llx, (%#x/%#x) [%s], pending: %p\n",
+		      req, tap->minor, req->cmd,
+		      (unsigned long long)blk_rq_pos(req),
+		      blk_rq_cur_sectors(req), blk_rq_sectors(req),
 		      rq_data_dir(req) ? "write" : "read", request);
 
 		blk_start_request(req);

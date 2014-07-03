@@ -158,13 +158,17 @@ int xen_pcibk_enable_msi(struct xen_pcibk_device *pdev,
 	if (unlikely(verbose_request))
 		printk(KERN_DEBUG DRV_NAME ": %s: enable MSI\n", pci_name(dev));
 
-	status = pci_enable_msi_block(dev, nvec);
-
-	if (status) {
-		pr_warn_ratelimited("%s: error enabling MSI for guest %u: err %d\n",
-				    pci_name(dev), pdev->xdev->otherend_id,
-				    status);
-		op->value = status > 0 && status < nvec ? status : 0;
+	status = pci_enable_msi_range(dev, 1, nvec);
+	if (status < 0 || status > nvec) {
+		pr_warn_ratelimited("%s: error %d enabling %u-vector MSI for Dom%u\n",
+				    pci_name(dev), status, nvec,
+				    pdev->xdev->otherend_id);
+		op->value = 0;
+		return XEN_PCI_ERR_op_failed;
+	}
+	if (status != nvec) {
+		op->value = status;
+		pci_disable_msi(dev);
 		return XEN_PCI_ERR_op_failed;
 	}
 
@@ -402,9 +406,9 @@ void xen_pcibk_do_op(struct work_struct *data)
 	notify_remote_via_irq(pdev->evtchn_irq);
 
 	/* Mark that we're done. */
-	smp_mb__before_clear_bit(); /* /after/ clearing PCIF_active */
+	smp_mb__before_atomic(); /* /after/ clearing PCIF_active */
 	clear_bit(_PDEVF_op_active, &pdev->flags);
-	smp_mb__after_clear_bit(); /* /before/ final check for work */
+	smp_mb__after_atomic(); /* /before/ final check for work */
 
 	/* Check to see if the driver domain tried to start another request in
 	 * between clearing _XEN_PCIF_active and clearing _PDEVF_op_active.

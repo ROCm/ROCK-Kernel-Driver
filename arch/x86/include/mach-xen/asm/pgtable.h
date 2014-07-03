@@ -123,7 +123,8 @@ static inline int pte_exec(pte_t pte)
 
 static inline int pte_special(pte_t pte)
 {
-	return pte_flags(pte) & _PAGE_SPECIAL;
+	return (pte_flags(pte) & (_PAGE_PRESENT|_PAGE_SPECIAL)) ==
+				 (_PAGE_PRESENT|_PAGE_SPECIAL);
 }
 
 #define pte_mfn(_pte) ((_pte).pte_low & _PAGE_PRESENT ? \
@@ -329,7 +330,8 @@ static inline int pte_file_soft_dirty(pte_t pte)
 {
 	return pte_flags(pte) & _PAGE_SOFT_DIRTY;
 }
-#endif
+
+#endif /* CONFIG_HAVE_ARCH_SOFT_DIRTY */
 
 /*
  * Mask out unsupported bits in a present pgprot.  Non-present pgprots
@@ -452,6 +454,12 @@ static inline int pte_present(pte_t a)
 {
 	return pte_flags(a) & (_PAGE_PRESENT | _PAGE_PROTNONE |
 			       _PAGE_NUMA);
+}
+
+#define pte_present_nonuma pte_present_nonuma
+static inline int pte_present_nonuma(pte_t a)
+{
+	return pte_flags(a) & (_PAGE_PRESENT | _PAGE_PROTNONE);
 }
 
 #define pte_accessible pte_accessible
@@ -961,19 +969,19 @@ static inline void ptep_modify_prot_commit(struct mm_struct *mm, unsigned long a
 #ifdef CONFIG_HAVE_ARCH_SOFT_DIRTY
 static inline pte_t pte_swp_mksoft_dirty(pte_t pte)
 {
-	VM_BUG_ON(pte_present(pte));
+	VM_BUG_ON(pte_present_nonuma(pte));
 	return pte_set_flags(pte, _PAGE_SWP_SOFT_DIRTY);
 }
 
 static inline int pte_swp_soft_dirty(pte_t pte)
 {
-	VM_BUG_ON(pte_present(pte));
+	VM_BUG_ON(pte_present_nonuma(pte));
 	return pte_flags(pte) & _PAGE_SWP_SOFT_DIRTY;
 }
 
 static inline pte_t pte_swp_clear_soft_dirty(pte_t pte)
 {
-	VM_BUG_ON(pte_present(pte));
+	VM_BUG_ON(pte_present_nonuma(pte));
 	return pte_clear_flags(pte, _PAGE_SWP_SOFT_DIRTY);
 }
 #endif

@@ -39,7 +39,7 @@
  * - FIXUP_TOP_OF_STACK/RESTORE_TOP_OF_STACK - Fix up the hardware stack
  * frame that is otherwise undefined after a SYSCALL
  * - TRACE_IRQ_* - Trace hard interrupt state for lock debugging.
- * - errorentry/paranoidentry/zeroentry - Define exception entry points.
+ * - idtentry - Define exception entry points.
  */
 
 #include <linux/linkage.h>
@@ -56,11 +56,11 @@
 #include <asm/page_types.h>
 #include <asm/irqflags.h>
 #include <asm/processor-flags.h>
-#include <asm/ftrace.h>
 #include <asm/percpu.h>
 #include <asm/asm.h>
 #include <asm/context_tracking.h>
 #include <asm/smap.h>
+#include <asm/pgtable_types.h>
 #include <linux/err.h>
 #include <xen/interface/xen.h>
 #include <xen/interface/features.h>
@@ -73,209 +73,6 @@
 
 	.code64
 	.section .entry.text, "ax"
-
-#ifdef CONFIG_FUNCTION_TRACER
-
-#ifdef CC_USING_FENTRY
-# define function_hook	__fentry__
-#else
-# define function_hook	mcount
-#endif
-
-#ifdef CONFIG_DYNAMIC_FTRACE
-
-ENTRY(function_hook)
-	retq
-END(function_hook)
-
-/* skip is set if stack has been adjusted */
-.macro ftrace_caller_setup skip=0
-	MCOUNT_SAVE_FRAME \skip
-
-	/* Load the ftrace_ops into the 3rd parameter */
-	movq function_trace_op(%rip), %rdx
-
-	/* Load ip into the first parameter */
-	movq RIP(%rsp), %rdi
-	subq $MCOUNT_INSN_SIZE, %rdi
-	/* Load the parent_ip into the second parameter */
-#ifdef CC_USING_FENTRY
-	movq SS+16(%rsp), %rsi
-#else
-	movq 8(%rbp), %rsi
-#endif
-.endm
-
-ENTRY(ftrace_caller)
-	/* Check if tracing was disabled (quick check) */
-	cmpl $0, function_trace_stop
-	jne  ftrace_stub
-
-	ftrace_caller_setup
-	/* regs go into 4th parameter (but make it NULL) */
-	movq $0, %rcx
-
-GLOBAL(ftrace_call)
-	call ftrace_stub
-
-	MCOUNT_RESTORE_FRAME
-ftrace_return:
-
-#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-GLOBAL(ftrace_graph_call)
-	jmp ftrace_stub
-#endif
-
-GLOBAL(ftrace_stub)
-	retq
-END(ftrace_caller)
-
-ENTRY(ftrace_regs_caller)
-	/* Save the current flags before compare (in SS location)*/
-	pushfq
-
-	/* Check if tracing was disabled (quick check) */
-	cmpl $0, function_trace_stop
-	jne  ftrace_restore_flags
-
-	/* skip=8 to skip flags saved in SS */
-	ftrace_caller_setup 8
-
-	/* Save the rest of pt_regs */
-	movq %r15, R15(%rsp)
-	movq %r14, R14(%rsp)
-	movq %r13, R13(%rsp)
-	movq %r12, R12(%rsp)
-	movq %r11, R11(%rsp)
-	movq %r10, R10(%rsp)
-	movq %rbp, RBP(%rsp)
-	movq %rbx, RBX(%rsp)
-	/* Copy saved flags */
-	movq SS(%rsp), %rcx
-	movq %rcx, EFLAGS(%rsp)
-	/* Kernel segments */
-	movq $__KERNEL_DS, %rcx
-	movq %rcx, SS(%rsp)
-	movq $__KERNEL_CS, %rcx
-	movq %rcx, CS(%rsp)
-	/* Stack - skipping return address */
-	leaq SS+16(%rsp), %rcx
-	movq %rcx, RSP(%rsp)
-
-	/* regs go into 4th parameter */
-	leaq (%rsp), %rcx
-
-GLOBAL(ftrace_regs_call)
-	call ftrace_stub
-
-	/* Copy flags back to SS, to restore them */
-	movq EFLAGS(%rsp), %rax
-	movq %rax, SS(%rsp)
-
-	/* Handlers can change the RIP */
-	movq RIP(%rsp), %rax
-	movq %rax, SS+8(%rsp)
-
-	/* restore the rest of pt_regs */
-	movq R15(%rsp), %r15
-	movq R14(%rsp), %r14
-	movq R13(%rsp), %r13
-	movq R12(%rsp), %r12
-	movq R10(%rsp), %r10
-	movq RBP(%rsp), %rbp
-	movq RBX(%rsp), %rbx
-
-	/* skip=8 to skip flags saved in SS */
-	MCOUNT_RESTORE_FRAME 8
-
-	/* Restore flags */
-	popfq
-
-	jmp ftrace_return
-ftrace_restore_flags:
-	popfq
-	jmp  ftrace_stub
-
-END(ftrace_regs_caller)
-
-
-#else /* ! CONFIG_DYNAMIC_FTRACE */
-
-ENTRY(function_hook)
-	cmpl $0, function_trace_stop
-	jne  ftrace_stub
-
-	cmpq $ftrace_stub, ftrace_trace_function
-	jnz trace
-
-#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-	cmpq $ftrace_stub, ftrace_graph_return
-	jnz ftrace_graph_caller
-
-	cmpq $ftrace_graph_entry_stub, ftrace_graph_entry
-	jnz ftrace_graph_caller
-#endif
-
-GLOBAL(ftrace_stub)
-	retq
-
-trace:
-	MCOUNT_SAVE_FRAME
-
-	movq RIP(%rsp), %rdi
-#ifdef CC_USING_FENTRY
-	movq SS+16(%rsp), %rsi
-#else
-	movq 8(%rbp), %rsi
-#endif
-	subq $MCOUNT_INSN_SIZE, %rdi
-
-	call   *ftrace_trace_function
-
-	MCOUNT_RESTORE_FRAME
-
-	jmp ftrace_stub
-END(function_hook)
-#endif /* CONFIG_DYNAMIC_FTRACE */
-#endif /* CONFIG_FUNCTION_TRACER */
-
-#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-ENTRY(ftrace_graph_caller)
-	MCOUNT_SAVE_FRAME
-
-#ifdef CC_USING_FENTRY
-	leaq SS+16(%rsp), %rdi
-	movq $0, %rdx	/* No framepointers needed */
-#else
-	leaq 8(%rbp), %rdi
-	movq (%rbp), %rdx
-#endif
-	movq RIP(%rsp), %rsi
-	subq $MCOUNT_INSN_SIZE, %rsi
-
-	call	prepare_ftrace_return
-
-	MCOUNT_RESTORE_FRAME
-
-	retq
-END(ftrace_graph_caller)
-
-GLOBAL(return_to_handler)
-	subq  $24, %rsp
-
-	/* Save the return values */
-	movq %rax, (%rsp)
-	movq %rdx, 8(%rsp)
-	movq %rbp, %rdi
-
-	call ftrace_return_to_handler
-
-	movq %rax, %rdi
-	movq 8(%rsp), %rdx
-	movq (%rsp), %rax
-	addq $24, %rsp
-	jmp *%rdi
-#endif
 
 
 #ifndef CONFIG_PREEMPT
@@ -516,11 +313,7 @@ NMI_MASK = 0x80000000
 	/* We entered an interrupt context - irqs are off: */
 	TRACE_IRQS_OFF
 	.endm
-#endif
 
-#ifndef CONFIG_XEN
-/* save complete stack frame */
-	.pushsection .kprobes.text, "ax"
 ENTRY(save_paranoid)
 	XCPT_FRAME offset=(ORIG_RAX-R15+8)
 	cld
@@ -549,7 +342,6 @@ ENTRY(save_paranoid)
 1:	ret
 	CFI_ENDPROC
 END(save_paranoid)
-	.popsection
 #endif
 
 /*
@@ -997,78 +789,133 @@ ENTRY(retint_kernel)
 	call preempt_schedule_irq
 	jmp retint_kernel       /* check again */
 #endif
-
 	CFI_ENDPROC
 END(retint_check)
+
+	/*
+	 * If IRET takes a fault on the espfix stack, then we
+	 * end up promoting it to a doublefault.  In that case,
+	 * modify the stack to make it look like we just entered
+	 * the #GP handler from user space, similar to bad_iret.
+	 */
+#ifdef CONFIG_X86_ESPFIX64
+	ALIGN
+__do_double_fault:
+	XCPT_FRAME 1 RDI+8
+	movq RSP(%rdi),%rax		/* Trap on the espfix stack? */
+	sarq $PGDIR_SHIFT,%rax
+	cmpl $ESPFIX_PGD_ENTRY,%eax
+	jne do_double_fault		/* No, just deliver the fault */
+	cmpl $__KERNEL_CS,CS(%rdi)
+	jne do_double_fault
+	movq RIP(%rdi),%rax
+	cmpq $irq_return_iret,%rax
+#ifdef CONFIG_PARAVIRT
+	je 1f
+	cmpq $native_iret,%rax
+#endif
+	jne do_double_fault		/* This shouldn't happen... */
+1:
+	movq PER_CPU_VAR(kernel_stack),%rax
+	subq $(6*8-KERNEL_STACK_OFFSET),%rax	/* Reset to original stack */
+	movq %rax,RSP(%rdi)
+	movq $0,(%rax)			/* Missing (lost) #GP error code */
+	movq $general_protection,RIP(%rdi)
+	retq
+	CFI_ENDPROC
+END(__do_double_fault)
+#else
+# define __do_double_fault do_double_fault
+#endif
 
 /*
  * Exception entry points.
  */
-.macro zeroentry sym do_sym
+#define INIT_TSS_IST(x) PER_CPU_VAR(init_tss) + (TSS_ist + ((x) - 1) * 8)
+
+.macro idtentry sym do_sym has_error_code:req paranoid=0 shift_ist=-1
 ENTRY(\sym)
+	/* Sanity check */
+	.if \shift_ist != -1 && \paranoid == 0
+	.error "using shift_ist requires paranoid=1"
+	.endif
+
+	.if \has_error_code
+	XCPT_FRAME
+	.else
 	INTR_FRAME
+	.endif
+
 	ASM_CLAC
-        movq (%rsp),%rcx
+	movq (%rsp),%rcx
 	CFI_RESTORE rcx
-        movq 8(%rsp),%r11
+	movq 8(%rsp),%r11
 	CFI_RESTORE r11
+
+	.if \has_error_code
+	subq $ORIG_RAX-R15-2*8,%rsp
+	CFI_ADJUST_CFA_OFFSET ORIG_RAX-R15-2*8
+	.else
 	movq $-1,8(%rsp)	/* ORIG_RAX: no syscall to restart */
 	subq $ORIG_RAX-R15-1*8,%rsp
 	CFI_ADJUST_CFA_OFFSET ORIG_RAX-R15-1*8
+	.endif
+
+	.if \paranoid
+	call save_paranoid
+	.else
 	call error_entry
+	.endif
+
 	DEFAULT_FRAME -1
-	movq %rsp,%rdi		/* pt_regs pointer */
-	xorl %esi,%esi		/* no error code */
-	call \do_sym
-	jmp error_exit		/* %ebx: no swapgs flag */
-	CFI_ENDPROC
-END(\sym)
-.endm
 
-.macro paranoidzeroentry sym do_sym
-	zeroentry \sym \do_sym
-.endm
+	.if \paranoid
+	.if \shift_ist != -1
+	TRACE_IRQS_OFF_DEBUG		/* reload IDT in case of recursion */
+	.else
+	TRACE_IRQS_OFF
+	.endif
+	.endif
 
-.macro paranoidzeroentry_ist sym do_sym ist
-	zeroentry \sym \do_sym
-.endm
-
-.macro errorentry sym do_sym
-ENTRY(\sym)
-	XCPT_FRAME
-	ASM_CLAC
-        movq (%rsp),%rcx
-	CFI_RESTORE rcx
-        movq 8(%rsp),%r11
-	CFI_RESTORE r11
-	subq $ORIG_RAX-R15-2*8,%rsp
-	CFI_ADJUST_CFA_OFFSET ORIG_RAX-R15-2*8
-	call error_entry
-	DEFAULT_FRAME -1
 	movq %rsp,%rdi			/* pt_regs pointer */
+
+	.if \has_error_code
 	movq ORIG_RAX(%rsp),%rsi	/* get error code */
 	movq $-1,ORIG_RAX(%rsp)		/* no syscall to restart */
+	.else
+	xorl %esi,%esi			/* no error code */
+	.endif
+
+	.if \shift_ist != -1
+	subq $EXCEPTION_STKSZ, INIT_TSS_IST(\shift_ist)
+	.endif
+
 	call \do_sym
+
+	.if \shift_ist != -1
+	addq $EXCEPTION_STKSZ, INIT_TSS_IST(\shift_ist)
+	.endif
+
+	.if \paranoid
+	jmp paranoid_exit		/* %ebx: no swapgs flag */
+	.else
 	jmp error_exit			/* %ebx: no swapgs flag */
+	.endif
+
 	CFI_ENDPROC
 END(\sym)
 .endm
 
 #ifdef CONFIG_TRACING
-.macro trace_errorentry sym do_sym
-errorentry trace_\sym trace_\do_sym
-errorentry \sym \do_sym
+.macro trace_idtentry sym do_sym has_error_code:req
+idtentry trace_\sym trace_\do_sym has_error_code=\has_error_code
+idtentry \sym \do_sym has_error_code=\has_error_code
 .endm
 #else
-.macro trace_errorentry sym do_sym
-errorentry \sym \do_sym
+.macro trace_idtentry sym do_sym has_error_code:req
+idtentry \sym \do_sym has_error_code=\has_error_code
 .endm
 #endif
-
-	/* error code is on the stack already */
-.macro paranoiderrorentry sym do_sym
-	errorentry \sym \do_sym
-.endm
 
 /*
  * Copied from arch/xen/i386/kernel/entry.S
@@ -1190,18 +1037,18 @@ ENTRY(failsafe_callback)
 	jmp error_exit
 	CFI_ENDPROC
 
-zeroentry divide_error do_divide_error
-zeroentry overflow do_overflow
-zeroentry bounds do_bounds
-zeroentry invalid_op do_invalid_op
-zeroentry device_not_available do_device_not_available
-zeroentry hypervisor_callback do_hypervisor_callback
-zeroentry coprocessor_segment_overrun do_coprocessor_segment_overrun
-errorentry invalid_TSS do_invalid_TSS
-errorentry segment_not_present do_segment_not_present
-zeroentry coprocessor_error do_coprocessor_error
-errorentry alignment_check do_alignment_check
-zeroentry simd_coprocessor_error do_simd_coprocessor_error
+idtentry divide_error do_divide_error has_error_code=0
+idtentry overflow do_overflow has_error_code=0
+idtentry bounds do_bounds has_error_code=0
+idtentry invalid_op do_invalid_op has_error_code=0
+idtentry device_not_available do_device_not_available has_error_code=0
+idtentry hypervisor_callback do_hypervisor_callback has_error_code=0
+idtentry coprocessor_segment_overrun do_coprocessor_segment_overrun has_error_code=0
+idtentry invalid_TSS do_invalid_TSS has_error_code=1
+idtentry segment_not_present do_segment_not_present has_error_code=1
+idtentry coprocessor_error do_coprocessor_error has_error_code=0
+idtentry alignment_check do_alignment_check has_error_code=1
+idtentry simd_coprocessor_error do_simd_coprocessor_error has_error_code=0
 
 /* Call softirq on interrupt stack. Interrupts are off. */
 ENTRY(do_softirq_own_stack)
@@ -1257,22 +1104,17 @@ ENTRY(arch_unwind_init_running)
 END(arch_unwind_init_running)
 #endif
 
-/*
- * Some functions should be protected against kprobes
- */
-	.pushsection .kprobes.text, "ax"
-
-paranoidzeroentry_ist debug do_debug DEBUG_STACK
-zeroentry nmi do_nmi_callback
-paranoidzeroentry_ist int3 do_int3 DEBUG_STACK
-paranoiderrorentry stack_segment do_stack_segment
-errorentry general_protection do_general_protection
-trace_errorentry page_fault do_page_fault
+idtentry debug do_debug has_error_code=0
+idtentry nmi do_nmi_callback has_error_code=0
+idtentry int3 do_int3 has_error_code=0
+idtentry stack_segment do_stack_segment has_error_code=1
+idtentry general_protection do_general_protection has_error_code=1
+trace_idtentry page_fault do_page_fault has_error_code=1
 #ifdef CONFIG_KVM_GUEST
-errorentry async_page_fault do_async_page_fault
+idtentry async_page_fault do_async_page_fault has_error_code=1
 #endif
 #ifdef CONFIG_X86_MCE
-paranoidzeroentry machine_check *machine_check_vector(%rip)
+idtentry machine_check has_error_code=0 do_sym=*machine_check_vector(%rip)
 #endif
 
 #ifndef CONFIG_XEN
@@ -1382,7 +1224,7 @@ error_sti:
 error_kernelspace:
 	CFI_REL_OFFSET rcx, RCX+8
 	incl %ebx
-	leaq irq_return(%rip),%rcx
+	leaq irq_return_iret(%rip),%rcx
 	cmpq %rcx,RIP+8(%rsp)
 	je error_swapgs
 	movl %ecx,%eax	/* zero extend */
@@ -1464,7 +1306,3 @@ ENTRY(ignore_sysret)
 END(ignore_sysret)
 #endif
 
-/*
- * End of kprobes section
- */
-	.popsection

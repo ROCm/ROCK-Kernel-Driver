@@ -1280,11 +1280,10 @@ void do_blkif_request(struct request_queue *rq)
 			continue;
 		}
 
-		DPRINTK("do_blk_req %p: cmd %p, sec %llx, "
-			"(%u/%u) buffer:%p [%s]\n",
+		DPRINTK("do_blk_req %p: cmd %p, sec %llx, (%u/%u) [%s]\n",
 			req, req->cmd, (long long)blk_rq_pos(req),
 			blk_rq_cur_sectors(req), blk_rq_sectors(req),
-			req->buffer, rq_data_dir(req) ? "write" : "read");
+			rq_data_dir(req) ? "write" : "read");
 
 		if (blkif_queue_request(req)) {
 			blk_requeue_request(rq, req);

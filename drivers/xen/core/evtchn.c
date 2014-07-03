@@ -813,7 +813,7 @@ static void unbind_from_irq(unsigned int irq)
 		evtchn_to_irq[evtchn] = -1;
 		cfg->info = IRQ_UNBOUND;
 
-		dynamic_irq_cleanup(irq);
+		irq_set_chip_and_handler(irq, NULL, NULL);
 	}
 
 	spin_unlock(&irq_mapping_update_lock);
@@ -2002,13 +2002,6 @@ int evtchn_map_pirq(int irq, unsigned int xen_pirq, unsigned int nr)
 			if (!cfg
 			    || unlikely(type_from_irq_cfg(cfg) != IRQT_PIRQ))
 				return -EINVAL;
-			/*
-			 * dynamic_irq_cleanup(irq) would seem to be the
-			 * correct thing here, but cannot be used as we get
-			 * here also during shutdown when a driver didn't
-			 * free_irq() its MSI(-X) IRQ(s), which then causes
-			 * a warning in dynamic_irq_cleanup().
-			 */
 			irq_set_chip_and_handler(irq, NULL, NULL);
 			cfg->info = IRQ_UNBOUND;
 #ifdef CONFIG_SPARSE_IRQ

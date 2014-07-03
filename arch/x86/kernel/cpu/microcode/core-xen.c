@@ -52,6 +52,9 @@ module_param(verbose, int, 0644);
 
 #define MICROCODE_VERSION	"2.00-xen"
 
+bool dis_ucode_ldr;
+module_param(dis_ucode_ldr, bool, 0);
+
 /*
  * Synchronization.
  *
@@ -254,6 +257,9 @@ static int __init microcode_init(void)
 	char buf[36];
 	const char *fw_name = buf;
 	int error;
+
+	if (dis_ucode_ldr)
+		return 0;
 
 	if (c->x86_vendor == X86_VENDOR_INTEL)
 		snprintf(buf, sizeof(buf), intel_uc_fmt,

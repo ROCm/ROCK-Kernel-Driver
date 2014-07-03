@@ -317,7 +317,7 @@ static struct symbol *sym_add_exported(const char *name, struct module *mod,
 			     s->module->name,
 			     is_vmlinux(s->module->name) ?"":".ko");
 		} else {
-			/* In case Modules.symvers was out of date */
+			/* In case Module.symvers was out of date */
 			s->module = mod;
 		}
 	}
@@ -863,7 +863,7 @@ static const char *section_white_list[] =
  * without "ax" / "aw".
  */
 static void check_section(const char *modname, struct elf_info *elf,
-                          Elf_Shdr *sechdr)
+			  Elf_Shdr *sechdr)
 {
 	const char *sec = sech_name(elf, sechdr);
 
@@ -1297,12 +1297,12 @@ static void print_section_list(const char * const list[20])
  */
 static void report_sec_mismatch(const char *modname,
 				const struct sectioncheck *mismatch,
-                                const char *fromsec,
-                                unsigned long long fromaddr,
-                                const char *fromsym,
-                                int from_is_func,
-                                const char *tosec, const char *tosym,
-                                int to_is_func)
+				const char *fromsec,
+				unsigned long long fromaddr,
+				const char *fromsym,
+				int from_is_func,
+				const char *tosec, const char *tosym,
+				int to_is_func)
 {
 	const char *from, *from_p;
 	const char *to, *to_p;
@@ -1442,7 +1442,7 @@ static void report_sec_mismatch(const char *modname,
 }
 
 static void check_section_mismatch(const char *modname, struct elf_info *elf,
-                                   Elf_Rela *r, Elf_Sym *sym, const char *fromsec)
+				   Elf_Rela *r, Elf_Sym *sym, const char *fromsec)
 {
 	const char *tosec;
 	const struct sectioncheck *mismatch;
@@ -1529,7 +1529,7 @@ static int addend_arm_rel(struct elf_info *elf, Elf_Shdr *sechdr, Elf_Rela *r)
 	case R_ARM_ABS32:
 		/* From ARM ABI: (S + A) | T */
 		r->r_addend = (int)(long)
-		              (elf->symtab_start + ELF_R_SYM(r->r_info));
+			      (elf->symtab_start + ELF_R_SYM(r->r_info));
 		break;
 	case R_ARM_PC24:
 	case R_ARM_CALL:
@@ -1539,8 +1539,8 @@ static int addend_arm_rel(struct elf_info *elf, Elf_Shdr *sechdr, Elf_Rela *r)
 	case R_ARM_THM_JUMP19:
 		/* From ARM ABI: ((S + A) | T) - P */
 		r->r_addend = (int)(long)(elf->hdr +
-		              sechdr->sh_offset +
-		              (r->r_offset - sechdr->sh_addr));
+			      sechdr->sh_offset +
+			      (r->r_offset - sechdr->sh_addr));
 		break;
 	default:
 		return 1;
@@ -1572,7 +1572,7 @@ static int addend_mips_rel(struct elf_info *elf, Elf_Shdr *sechdr, Elf_Rela *r)
 }
 
 static void section_rela(const char *modname, struct elf_info *elf,
-                         Elf_Shdr *sechdr)
+			 Elf_Shdr *sechdr)
 {
 	Elf_Sym  *sym;
 	Elf_Rela *rela;
@@ -1616,7 +1616,7 @@ static void section_rela(const char *modname, struct elf_info *elf,
 }
 
 static void section_rel(const char *modname, struct elf_info *elf,
-                        Elf_Shdr *sechdr)
+			Elf_Shdr *sechdr)
 {
 	Elf_Sym *sym;
 	Elf_Rel *rel;
@@ -1686,7 +1686,7 @@ static void section_rel(const char *modname, struct elf_info *elf,
  * be discarded and warns about it.
  **/
 static void check_sec_ref(struct module *mod, const char *modname,
-                          struct elf_info *elf)
+			  struct elf_info *elf)
 {
 	int i;
 	Elf_Shdr *sechdrs = elf->sechdrs;
@@ -2048,7 +2048,7 @@ static int add_versions(struct buffer *b, struct module *mod)
 					     s->name, mod->name);
 				} else {
 					merror("\"%s\" [%s.ko] undefined!\n",
-					          s->name, mod->name);
+					       s->name, mod->name);
 					err = 1;
 				}
 			}
@@ -2225,8 +2225,10 @@ static void read_dump(const char *fname, unsigned int kernel)
 		s->preloaded = 1;
 		sym_update_crc(symname, mod, crc, export_no(export));
 	}
+	release_file(file, size);
 	return;
 fail:
+	release_file(file, size);
 	fatal("parse error in symbol dump file\n");
 }
 

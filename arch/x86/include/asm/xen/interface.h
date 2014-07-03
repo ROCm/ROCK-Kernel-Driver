@@ -57,6 +57,9 @@ typedef unsigned long xen_pfn_t;
 #define PRI_xen_pfn "lx"
 typedef unsigned long xen_ulong_t;
 #define PRI_xen_ulong "lx"
+typedef long xen_long_t;
+#define PRI_xen_long "lx"
+
 #endif
 
 #ifndef HYPERVISOR_VIRT_START

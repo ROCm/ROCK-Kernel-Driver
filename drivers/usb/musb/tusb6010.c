@@ -24,13 +24,14 @@
 #include <linux/io.h>
 #include <linux/platform_device.h>
 #include <linux/dma-mapping.h>
-#include <linux/usb/usb_phy_gen_xceiv.h>
+#include <linux/usb/usb_phy_generic.h>
 
 #include "musb_core.h"
 
 struct tusb6010_glue {
 	struct device		*dev;
 	struct platform_device	*musb;
+	struct platform_device	*phy;
 };
 
 static void tusb_musb_set_vbus(struct musb *musb, int is_on);
@@ -1063,7 +1064,6 @@ static int tusb_musb_init(struct musb *musb)
 	void __iomem		*sync = NULL;
 	int			ret;
 
-	usb_nop_xceiv_register();
 	musb->xceiv = usb_get_phy(USB_PHY_TYPE_USB2);
 	if (IS_ERR_OR_NULL(musb->xceiv))
 		return -EPROBE_DEFER;
@@ -1115,7 +1115,6 @@ done:
 			iounmap(sync);
 
 		usb_put_phy(musb->xceiv);
-		usb_nop_xceiv_unregister();
 	}
 	return ret;
 }
@@ -1131,7 +1130,6 @@ static int tusb_musb_exit(struct musb *musb)
 	iounmap(musb->sync_va);
 
 	usb_put_phy(musb->xceiv);
-	usb_nop_xceiv_unregister();
 	return 0;
 }
 
@@ -1174,6 +1172,7 @@ static int tusb_probe(struct platform_device *pdev)
 
 	pdata->platform_ops		= &tusb_ops;
 
+	usb_phy_generic_register();
 	platform_set_drvdata(pdev, glue);
 
 	memset(musb_resources, 0x00, sizeof(*musb_resources) *
@@ -1222,6 +1221,7 @@ static int tusb_remove(struct platform_device *pdev)
 	struct tusb6010_glue		*glue = platform_get_drvdata(pdev);
 
 	platform_device_unregister(glue->musb);
+	usb_phy_generic_unregister(glue->phy);
 	kfree(glue);
 
 	return 0;

@@ -319,10 +319,6 @@ ENTRY(ret_from_kernel_thread)
 ENDPROC(ret_from_kernel_thread)
 
 /*
- * Interrupt exit functions should be protected against kprobes
- */
-	.pushsection .kprobes.text, "ax"
-/*
  * Return to user mode is not as complex as all this looks,
  * but we want the default path for a system call return to
  * go as quickly as possible which is why some of this is
@@ -376,10 +372,6 @@ need_resched:
 END(resume_kernel)
 #endif
 	CFI_ENDPROC
-/*
- * End of kprobes section
- */
-	.popsection
 
 /* SYSENTER_RETURN points to after the "sysenter" instruction in
    the vsyscall page.  See vsyscall-sysentry.S, which defines the symbol.  */
@@ -435,9 +427,10 @@ sysenter_past_esp:
 	jnz sysenter_audit
 sysenter_do_call:
 	cmpl $(NR_syscalls), %eax
-	jae syscall_badsys
+	jae sysenter_badsys
 	call *sys_call_table(,%eax,4)
 	movl %eax,PT_EAX(%esp)
+sysenter_after_call:
 	LOCKDEP_SYS_EXIT
 	DISABLE_INTERRUPTS(CLBR_ANY)
 	TRACE_IRQS_OFF
@@ -505,6 +498,7 @@ ENDPROC(ia32_sysenter_target)
 	# pv sysenter call handler stub
 ENTRY(ia32pv_sysenter_target)
 	RING0_INT_FRAME
+	ASM_CLAC
 	movl $__USER_DS,16(%esp)
 	movl %ebp,12(%esp)
 	movl $__USER_CS,4(%esp)
@@ -518,16 +512,14 @@ ENTRY(ia32pv_sysenter_target)
  */
 	cmpl $__PAGE_OFFSET-3,%ebp
 	jae syscall_fault
+	ASM_STAC
 1:	movl (%ebp),%ebp
+	ASM_CLAC
 	_ASM_EXTABLE(1b,syscall_fault)
 	jmp system_call
 	CFI_ENDPROC
 ENDPROC(ia32pv_sysenter_target)
 
-/*
- * syscall stub including irq exit should be protected against kprobes
- */
-	.pushsection .kprobes.text, "ax"
 	# system call handler stub
 ENTRY(system_call)
 	RING0_INT_FRAME			# can't unwind into user space anyway
@@ -556,7 +548,7 @@ syscall_exit:
 restore_all:
 	TRACE_IRQS_IRET
 restore_all_notrace:
-#ifndef CONFIG_XEN
+#ifdef CONFIG_X86_ESPFIX32
 	movl PT_EFLAGS(%esp), %eax	# mix EFLAGS, SS and CS
 	# Warning: PT_OLDSS(%esp) contains the wrong/random values if we
 	# are returning to the kernel.
@@ -567,9 +559,9 @@ restore_all_notrace:
 	cmpl $((SEGMENT_LDT << 8) | USER_RPL), %eax
 	CFI_REMEMBER_STATE
 	je ldt_ss			# returning to user-space with LDT SS
+#endif
 restore_nocheck:
-#else
-restore_nocheck:
+#ifdef CONFIG_XEN
 	movl PT_EFLAGS(%esp), %eax
 	testl $(X86_EFLAGS_VM|NMI_MASK), %eax
 	CFI_REMEMBER_STATE
@@ -593,13 +585,8 @@ ENTRY(iret_exc)
 	_ASM_EXTABLE(irq_return,iret_exc)
 
 	CFI_RESTORE_STATE
-#ifndef CONFIG_XEN
+#ifdef CONFIG_X86_ESPFIX32
 ldt_ss:
-	larl PT_OLDSS(%esp), %eax
-	jnz restore_nocheck
-	testl $0x00400000, %eax		# returning to 32bit stack?
-	jnz restore_nocheck		# allright, normal return
-
 #ifdef CONFIG_PARAVIRT
 	/*
 	 * The kernel can't run on a non-flat stack if paravirt mode
@@ -641,7 +628,8 @@ ldt_ss:
 	lss (%esp), %esp		/* switch to espfix segment */
 	CFI_ADJUST_CFA_OFFSET -8
 	jmp restore_nocheck
-#else
+#endif
+#ifdef CONFIG_XEN
         ALIGN
 restore_all_enable_events:
 	TRACE_IRQS_ON
@@ -754,13 +742,14 @@ END(syscall_fault)
 
 syscall_badsys:
 	movl $-ENOSYS,PT_EAX(%esp)
-	jmp resume_userspace
+	jmp syscall_exit
 END(syscall_badsys)
+
+sysenter_badsys:
+	movl $-ENOSYS,PT_EAX(%esp)
+	jmp sysenter_after_call
+END(sysenter_badsys)
 	CFI_ENDPROC
-/*
- * End of kprobes section
- */
-	.popsection
 
 #ifndef CONFIG_XEN
 .macro FIXUP_ESPFIX_STACK
@@ -771,6 +760,7 @@ END(syscall_badsys)
  * the high word of the segment base from the GDT and swiches to the
  * normal stack and adjusts ESP with the matching offset.
  */
+#ifdef CONFIG_X86_ESPFIX32
 	/* fixup the stack */
 	mov GDT_ESPFIX_SS + 4, %al /* bits 16..23 */
 	mov GDT_ESPFIX_SS + 7, %ah /* bits 24..31 */
@@ -780,8 +770,10 @@ END(syscall_badsys)
 	pushl_cfi %eax
 	lss (%esp), %esp		/* switch to the normal stack segment */
 	CFI_ADJUST_CFA_OFFSET -8
+#endif
 .endm
 .macro UNWIND_ESPFIX_STACK
+#ifdef CONFIG_X86_ESPFIX32
 	movl %ss, %eax
 	/* see if on espfix stack */
 	cmpw $__ESPFIX_SS, %ax
@@ -792,6 +784,7 @@ END(syscall_badsys)
 	/* switch to normal stack */
 	FIXUP_ESPFIX_STACK
 27:
+#endif
 .endm
 
 /*
@@ -848,10 +841,6 @@ common_interrupt:
 ENDPROC(common_interrupt)
 	CFI_ENDPROC
 
-/*
- *  Irq entries should be protected against kprobes
- */
-	.pushsection .kprobes.text, "ax"
 #define BUILD_INTERRUPT3(name, nr, fn)	\
 ENTRY(name)				\
 	RING0_INT_FRAME;		\
@@ -882,8 +871,6 @@ ENDPROC(name)
 
 #else
 #define UNWIND_ESPFIX_STACK
-
-	.pushsection .kprobes.text, "ax"
 
 # A note on the "critical region" in our callback handler.
 # We want to avoid stacking callback handlers due to events occurring
@@ -1195,10 +1182,6 @@ ENTRY(fixup_4gb_segment)
 	jmp error_code
 	CFI_ENDPROC
 END(fixup_4gb_segment)
-/*
- * End of kprobes section
- */
-	.popsection
 
 #ifdef CONFIG_STACK_UNWIND
 ENTRY(arch_unwind_init_running)
@@ -1426,7 +1409,9 @@ ENTRY(ia32pv_cstar_target)
 	cmpl $__PAGE_OFFSET-4,%ebp
 	CFI_REMEMBER_STATE
 	ja cstar_fault
+	ASM_STAC
 1:	movl (%ebp),%ebp
+	ASM_CLAC
 	_ASM_EXTABLE(1b,cstar_fault)
 	SAVE_ALL
 	GET_THREAD_INFO(%ebp)
@@ -1484,16 +1469,16 @@ cstar_trace_entry:
 	jmp syscall_exit
 cstar_badsys:
 	movl $-ENOSYS,PT_EAX(%esp)
-.Lcstar_resume:
-	movl PT_ECX(%esp),%ecx
-	movl %ecx,PT_EBP(%esp)		# put user EBP back in place
-	jmp resume_userspace
+	jmp .Lcstar_exit
 	CFI_RESTORE_STATE
 cstar_fault:
+	ASM_CLAC
 	movl $-EFAULT,%eax
 	SAVE_ALL
 	GET_THREAD_INFO(%ebp)
-	jmp .Lcstar_resume
+	movl PT_ECX(%esp),%ecx
+	movl %ecx,PT_EBP(%esp)		# put user EBP back in place
+	jmp resume_userspace
 	CFI_ENDPROC
 ENDPROC(ia32pv_cstar_target)
 
@@ -1528,11 +1513,6 @@ mask=0
 .endr
 .popsection
 #endif /* TIF_CSTAR */
-
-/*
- * Some functions should be protected against kprobes
- */
-	.pushsection .kprobes.text, "ax"
 
 #ifdef CONFIG_TRACING
 ENTRY(trace_page_fault)
@@ -1649,12 +1629,14 @@ END(debug)
 ENTRY(nmi)
 	RING0_INT_FRAME
 	ASM_CLAC
+#ifdef CONFIG_X86_ESPFIX32
 	pushl_cfi %eax
-#ifndef CONFIG_XEN
 	movl %ss, %eax
 	cmpw $__ESPFIX_SS, %ax
 	popl_cfi %eax
 	je nmi_espfix_stack
+#endif
+#ifndef CONFIG_XEN
 	cmpl $ia32_sysenter_target,(%esp)
 	je nmi_stack_fixup
 	pushl_cfi %eax
@@ -1694,6 +1676,7 @@ nmi_debug_stack_check:
 	FIX_STACK 24, nmi_stack_correct, 1
 	jmp nmi_stack_correct
 
+#ifdef CONFIG_X86_ESPFIX32
 nmi_espfix_stack:
 	/* We have a RING0_INT_FRAME here.
 	 *
@@ -1715,7 +1698,9 @@ nmi_espfix_stack:
 	lss 12+4(%esp), %esp		# back to espfix stack
 	CFI_ADJUST_CFA_OFFSET -24
 	jmp irq_return
-#else
+#endif
+#else /* CONFIG_XEN */
+ 	pushl_cfi %eax
 	SAVE_ALL
 	xorl %edx,%edx		# zero error code
 	movl %esp,%eax		# pt_regs pointer
@@ -1756,7 +1741,3 @@ ENTRY(async_page_fault)
 END(async_page_fault)
 #endif
 
-/*
- * End of kprobes section
- */
-	.popsection

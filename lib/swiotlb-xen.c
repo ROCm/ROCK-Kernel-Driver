@@ -313,7 +313,7 @@ static inline int range_needs_mapping(phys_addr_t pa, size_t size)
 	return range_straddles_page_boundary(pa, size);
 }
 
-static int is_swiotlb_buffer(dma_addr_t addr)
+static int _is_swiotlb_buffer(dma_addr_t addr)
 {
 	unsigned long pfn = mfn_to_local_pfn(PFN_DOWN(addr));
 	phys_addr_t paddr = (phys_addr_t)pfn << PAGE_SHIFT;
@@ -658,7 +658,7 @@ static void unmap_single(struct device *hwdev, dma_addr_t dev_addr,
 
 	BUG_ON(dir == DMA_NONE);
 
-	if (is_swiotlb_buffer(dev_addr)) {
+	if (_is_swiotlb_buffer(dev_addr)) {
 		swiotlb_tbl_unmap_single(hwdev, paddr, size, dir);
 		return;
 	}
@@ -693,7 +693,7 @@ swiotlb_sync_single(struct device *hwdev, dma_addr_t dev_addr,
 
 	BUG_ON(dir == DMA_NONE);
 
-	if (is_swiotlb_buffer(dev_addr))
+	if (_is_swiotlb_buffer(dev_addr))
 		swiotlb_tbl_sync_single(hwdev, paddr, size, dir, target);
 }
 

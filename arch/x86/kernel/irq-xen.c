@@ -398,6 +398,7 @@ void fixup_irqs(void)
 	struct irq_desc *desc;
 	struct irq_data *data;
 	struct irq_chip *chip;
+	int ret;
 	static DECLARE_BITMAP(irqs_used, NR_IRQS);
 
 	for_each_irq_desc(irq, desc) {
@@ -433,9 +434,11 @@ void fixup_irqs(void)
 		if (!irqd_can_move_in_process_context(data) && chip->irq_mask)
 			chip->irq_mask(data);
 
-		if (chip->irq_set_affinity)
-			chip->irq_set_affinity(data, affinity, true);
-		else if (data->chip != &no_irq_chip && !(warned++))
+		if (chip->irq_set_affinity) {
+			ret = chip->irq_set_affinity(data, affinity, true);
+			if (ret == -ENOSPC)
+				pr_crit("IRQ %d set affinity failed because there are no available vectors.  The device assigned to this IRQ is unstable.\n", irq);
+		} else if (data->chip != &no_irq_chip && !(warned++))
 			set_affinity = 0;
 
 		/*

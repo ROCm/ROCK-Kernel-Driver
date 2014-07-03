@@ -64,7 +64,7 @@ struct acpi_power_register {
 	u8 bit_offset;
 	u8 access_size;
 	u64 address;
-} __attribute__ ((packed));
+} __packed;
 
 struct acpi_processor_cx {
 	u8 valid;
@@ -105,7 +105,7 @@ struct acpi_psd_package {
 	u64 domain;
 	u64 coord_type;
 	u64 num_processors;
-} __attribute__ ((packed));
+} __packed;
 
 struct acpi_pct_register {
 	u8 descriptor;
@@ -115,7 +115,7 @@ struct acpi_pct_register {
 	u8 bit_offset;
 	u8 reserved;
 	u64 address;
-} __attribute__ ((packed));
+} __packed;
 
 struct acpi_processor_px {
 	u64 core_frequency;	/* megahertz */
@@ -146,7 +146,7 @@ struct acpi_tsd_package {
 	u64 domain;
 	u64 coord_type;
 	u64 num_processors;
-} __attribute__ ((packed));
+} __packed;
 
 struct acpi_ptc_register {
 	u8 descriptor;
@@ -156,7 +156,7 @@ struct acpi_ptc_register {
 	u8 bit_offset;
 	u8 reserved;
 	u64 address;
-} __attribute__ ((packed));
+} __packed;
 
 struct acpi_processor_tx_tss {
 	u64 freqpercentage;	/* */

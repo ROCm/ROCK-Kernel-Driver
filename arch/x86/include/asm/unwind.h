@@ -135,7 +135,8 @@ static inline int arch_unw_user_mode(/*const*/ struct unwind_frame_info *info)
 #ifdef CONFIG_X86_64
 	return user_mode(&info->regs)
 	       || (long)info->regs.ip >= 0
-	       || (info->regs.ip >= VSYSCALL_START && info->regs.ip < VSYSCALL_END)
+	       || (info->regs.ip >= VSYSCALL_ADDR &&
+		   info->regs.ip < VSYSCALL_ADDR + PAGE_SIZE)
 	       || (long)info->regs.sp >= 0;
 #else
 	return user_mode_vm(&info->regs)

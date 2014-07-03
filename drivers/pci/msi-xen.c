@@ -10,7 +10,6 @@
 #include <linux/mm.h>
 #include <linux/irq.h>
 #include <linux/interrupt.h>
-#include <linux/init.h>
 #include <linux/export.h>
 #include <linux/ioport.h>
 #include <linux/pci.h>
@@ -739,79 +738,6 @@ int pci_msi_vec_count(struct pci_dev *dev)
 }
 EXPORT_SYMBOL(pci_msi_vec_count);
 
-/**
- * pci_enable_msi_block - configure device's MSI capability structure
- * @dev: device to configure
- * @nvec: number of interrupts to configure
- *
- * Allocate IRQs for a device with the MSI capability.
- * This function returns a negative errno if an error occurs.  If it
- * is unable to allocate the number of interrupts requested, it returns
- * the number of interrupts it might be able to allocate.  If it successfully
- * allocates at least the number of interrupts requested, it returns 0 and
- * updates the @dev's irq member to the lowest new interrupt number; the
- * other interrupt numbers allocated to this device are consecutive.
- */
-int pci_enable_msi_block(struct pci_dev *dev, int nvec)
-{
-	int temp, status, maxvec;
-	struct msi_dev_list *msi_dev_entry = get_msi_dev_pirq_list(dev);
-
-	if (dev->current_state != PCI_D0)
-		return -EINVAL;
-
-	if (msi_multi_vec_supported)
-		maxvec = pci_msi_vec_count(dev);
-	else
-		maxvec = 1;
-	if (maxvec < 0)
-		return maxvec;
-	if (nvec > maxvec)
-		return maxvec;
-
-	status = pci_msi_check_device(dev, nvec, PCI_CAP_ID_MSI);
-	if (status)
-		return status;
-
-	if (!is_initial_xendomain()) {
-#ifdef CONFIG_XEN_PCIDEV_FRONTEND
-		int ret;
-
-		temp = dev->irq;
-		ret = pci_frontend_enable_msi(dev, nvec);
-		if (ret)
-			return ret;
-
-		dev->irq = evtchn_map_pirq(-1, dev->irq, nvec);
-		msi_dev_entry->e.entry_nr = -nvec;
-		dev->msi_enabled = 1;
-		msi_dev_entry->default_irq = temp;
-		populate_msi_sysfs(dev);
-		return ret;
-#else
-		return -EOPNOTSUPP;
-#endif
-	}
-
-	temp = dev->irq;
-
-	/* Check whether driver already requested MSI-X irqs */
-	if (dev->msix_enabled) {
-		dev_info(&dev->dev, "can't enable MSI "
-			 "(MSI-X already enabled)\n");
-		return -EINVAL;
-	}
-
-	status = msi_capability_init(dev, nvec);
-	if ( !status )
-		msi_dev_entry->default_irq = temp;
-	else if (nvec > 1)
-		status = 1;
-
-	return status;
-}
-EXPORT_SYMBOL(pci_enable_msi_block);
-
 void pci_msi_shutdown(struct pci_dev *dev)
 {
 	int pirq;
@@ -957,8 +883,7 @@ int pci_enable_msix(struct pci_dev *dev, struct msix_entry *entries, int nvec)
 	temp = dev->irq;
 	/* Check whether driver already requested for MSI vector */
 	if (dev->msi_enabled) {
-		dev_info(&dev->dev, "can't enable MSI-X "
-		       "(MSI IRQ already assigned)\n");
+		dev_info(&dev->dev, "can't enable MSI-X (MSI IRQ already assigned)\n");
 		return -EINVAL;
 	}
 
@@ -1097,14 +1022,38 @@ void pci_msi_init_pci_dev(struct pci_dev *dev)
  **/
 int pci_enable_msi_range(struct pci_dev *dev, int minvec, int maxvec)
 {
-	int nvec = maxvec;
+	int nvec, temp;
 	int rc;
+	struct msi_dev_list *msi_dev_entry = get_msi_dev_pirq_list(dev);
 
-	if (maxvec < minvec)
+	if (dev->current_state != PCI_D0)
+		return -EINVAL;
+
+	WARN_ON(!!dev->msi_enabled);
+
+	/* Check whether driver already requested MSI-X irqs */
+	if (dev->msix_enabled) {
+		dev_info(&dev->dev,
+			 "can't enable MSI (MSI-X already enabled)\n");
+		return -EINVAL;
+	}
+
+	if (minvec <= 0 || maxvec < minvec)
 		return -ERANGE;
 
+	if (msi_multi_vec_supported)
+		nvec = pci_msi_vec_count(dev);
+	else
+		nvec = 1;
+	if (nvec < 0)
+		return nvec;
+	else if (nvec < minvec)
+		return -EINVAL;
+	else if (nvec > maxvec)
+		nvec = maxvec;
+
 	do {
-		rc = pci_enable_msi_block(dev, nvec);
+		rc = pci_msi_check_device(dev, nvec, PCI_CAP_ID_MSI);
 		if (rc < 0) {
 			return rc;
 		} else if (rc > 0) {
@@ -1113,6 +1062,37 @@ int pci_enable_msi_range(struct pci_dev *dev, int minvec, int maxvec)
 			nvec = rc;
 		}
 	} while (rc);
+
+	temp = dev->irq;
+
+	do {
+		if (is_initial_xendomain())
+			rc = msi_capability_init(dev, nvec);
+		else
+#ifdef CONFIG_XEN_PCIDEV_FRONTEND
+			rc = pci_frontend_enable_msi(dev, nvec);
+#else
+			return -EOPNOTSUPP;
+#endif
+		if (rc < 0) {
+			return rc;
+		} else if (rc > 0) {
+			if (rc < minvec)
+				return -ENOSPC;
+			nvec = rc;
+		}
+	} while (rc);
+
+	msi_dev_entry->default_irq = temp;
+
+#ifdef CONFIG_XEN_PCIDEV_FRONTEND
+	if (!is_initial_xendomain()) {
+		dev->irq = evtchn_map_pirq(-1, dev->irq, nvec);
+		msi_dev_entry->e.entry_nr = -nvec;
+		dev->msi_enabled = 1;
+		populate_msi_sysfs(dev);
+	}
+#endif
 
 	return nvec;
 }

@@ -92,7 +92,7 @@ void scsiback_fast_flush_area(pending_req_t *req)
 			handle = pending_handle(req, i);
 			if (handle == SCSIBACK_INVALID_HANDLE)
 				continue;
-			gnttab_set_unmap_op(&unmap[i], vaddr(req, i),
+			gnttab_set_unmap_op(&unmap[invcount], vaddr(req, i),
 						GNTMAP_host_map, handle);
 			pending_handle(req, i) = SCSIBACK_INVALID_HANDLE;
 			invcount++;
@@ -429,8 +429,6 @@ void scsiback_cmd_exec(pending_req_t *pending_req)
 			       PTR_ERR(rq));
 			return;
 		}
-
-		rq->buffer = NULL;
 	} else {
 		rq = blk_get_request(pending_req->sdev->request_queue, write,
 				     GFP_KERNEL);

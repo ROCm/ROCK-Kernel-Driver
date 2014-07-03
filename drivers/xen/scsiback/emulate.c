@@ -191,12 +191,12 @@ static int __maybe_unused __copy_from_sg(struct scatterlist *sgl,
 	return 0;
 }
 
-static int __nr_luns_under_host(struct vscsibk_info *info)
+static unsigned int __nr_luns_under_host(struct vscsibk_info *info)
 {
 	struct v2p_entry *entry;
 	struct list_head *head = &(info->v2p_entry_lists);
 	unsigned long flags;
-	int lun_cnt = 0;
+	unsigned int lun_cnt = 0;
 
 	spin_lock_irqsave(&info->v2p_lock, flags);
 	list_for_each_entry(entry, head, l) {
@@ -211,6 +211,7 @@ static int __nr_luns_under_host(struct vscsibk_info *info)
 /* REPORT LUNS Define*/
 #define VSCSI_REPORT_LUNS_HEADER	8
 #define VSCSI_REPORT_LUNS_RETRY		3
+#define VSCSI_REPORT_LUNS_SPARE		3
 
 /* quoted scsi_debug.c/resp_report_luns() */
 static void __report_luns(pending_req_t *pending_req, void *data)
@@ -222,13 +223,11 @@ static void __report_luns(pending_req_t *pending_req, void *data)
 	unsigned char *cmd = (unsigned char *)pending_req->cmnd;
 	
 	unsigned char *buff = NULL;
-	unsigned char alloc_len;
-	unsigned int alloc_luns = 0;
-	unsigned int req_bufflen = 0;
-	unsigned int actual_len = 0;
+	size_t alloc_len;
+	unsigned int alloc_luns, req_bufflen, actual_len;
 	unsigned int retry_cnt = 0;
-	int select_report = (int)cmd[2];
-	int i, lun_cnt = 0, lun, upper, err = 0;
+	int err, select_report = (int)cmd[2];
+	unsigned int i, lun_cnt, lun, upper;
 	
 	struct v2p_entry *entry;
 	struct list_head *head = &(info->v2p_entry_lists);
@@ -240,16 +239,18 @@ static void __report_luns(pending_req_t *pending_req, void *data)
 	if ((req_bufflen < 4) || (select_report != 0))
 		goto fail;
 
-	alloc_luns = __nr_luns_under_host(info);
+retry:
+	alloc_luns = __nr_luns_under_host(info)
+		     + retry_cnt * VSCSI_REPORT_LUNS_SPARE;
 	alloc_len  = sizeof(struct scsi_lun) * alloc_luns
 				+ VSCSI_REPORT_LUNS_HEADER;
-retry:
 	if ((buff = kzalloc(alloc_len, GFP_KERNEL)) == NULL) {
 		pr_err("scsiback:%s kmalloc err\n", __FUNCTION__);
 		goto fail;
 	}
 
-	one_lun = (struct scsi_lun *) &buff[8];
+	one_lun = (struct scsi_lun *)&buff[VSCSI_REPORT_LUNS_HEADER];
+	lun_cnt = 0;
 	spin_lock_irqsave(&info->v2p_lock, flags);
 	list_for_each_entry(entry, head, l) {
 		if ((entry->v.chn == channel) &&
@@ -262,8 +263,7 @@ retry:
 
 				if (retry_cnt < VSCSI_REPORT_LUNS_RETRY) {
 					retry_cnt++;
-					if (buff)
-						kfree(buff);
+					kfree(buff);
 					goto retry;
 				}
 
@@ -307,8 +307,7 @@ fail:
 		INVALID_FIELD_IN_CDB, 0);
 	pending_req->rslt  = check_condition_result;
 	pending_req->resid = 0;
-	if (buff)
-		kfree(buff);
+	kfree(buff);
 	return;
 }
 

@@ -196,7 +196,7 @@ static irqreturn_t xenoprof_ovf_interrupt(int irq, void *dev_id)
 
 	if (xenoprof_is_primary && !test_and_set_bit(0, &flag)) {
 		xenoprof_handle_passive();
-		smp_mb__before_clear_bit();
+		smp_mb__before_atomic();
 		clear_bit(0, &flag);
 	}
 

@@ -544,7 +544,7 @@ static void pgd_ctor(struct mm_struct *mm, pgd_t *pgd)
 
 #ifdef CONFIG_X86_64
 	/* set level3_user_pgt for vsyscall area */
-	__user_pgd(pgd)[pgd_index(VSYSCALL_START)] =
+	__user_pgd(pgd)[pgd_index(VSYSCALL_ADDR)] =
 		__pgd(__pa_symbol(level3_user_pgt) | _PAGE_TABLE);
 #endif
 
@@ -948,9 +948,9 @@ void __init reserve_top_address(unsigned long reserve)
 {
 #ifdef CONFIG_X86_32
 	BUG_ON(fixmaps_set > 0);
-	printk(KERN_INFO "Reserving virtual address space above 0x%08x\n",
-	       (int)-reserve);
-	__FIXADDR_TOP = -reserve - PAGE_SIZE;
+	__FIXADDR_TOP = round_down(-reserve, 1 << PMD_SHIFT) - PAGE_SIZE;
+	printk(KERN_INFO "Reserving virtual address space above 0x%08lx (rounded to 0x%08lx)\n",
+	       -reserve, __FIXADDR_TOP + PAGE_SIZE);
 #endif
 }
 
@@ -970,8 +970,7 @@ void xen_set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t flags)
 #ifdef CONFIG_X86_64
 	extern pte_t level1_fixmap_pgt[PTRS_PER_PTE];
 
-	case VSYSCALL_LAST_PAGE ... VSYSCALL_FIRST_PAGE:
-	case VVAR_PAGE:
+	case VSYSCALL_PAGE:
 	case PVCLOCK_FIXMAP_BEGIN ... PVCLOCK_FIXMAP_END:
 		pte = pfn_pte(phys >> PAGE_SHIFT, flags);
 		set_pte_vaddr_pud(level3_user_pgt, address, pte);

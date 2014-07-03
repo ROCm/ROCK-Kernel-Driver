@@ -980,7 +980,7 @@ gnttab_init(void)
 	    && xen_feature(XENFEAT_gnttab_map_avail_bits)) {
 #ifdef CONFIG_X86
 		GNTMAP_pte_special = (__pte_val(pte_mkspecial(__pte_ma(0)))
-				      >> _PAGE_BIT_UNUSED1) << _GNTMAP_guest_avail0;
+				      >> _PAGE_BIT_SPECIAL) << _GNTMAP_guest_avail0;
 #else
 #error Architecture not yet supported.
 #endif

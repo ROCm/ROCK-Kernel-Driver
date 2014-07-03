@@ -8,25 +8,12 @@
 
 #include <linux/init.h>
 #include <linux/smp.h>
-#include <linux/thread_info.h>
-#include <linux/sched.h>
-#include <linux/gfp.h>
-#include <linux/string.h>
-#include <linux/elf.h>
-#include <linux/mm.h>
-#include <linux/err.h>
-#include <linux/module.h>
-#include <linux/slab.h>
+#include <linux/kernel.h>
+#include <linux/mm_types.h>
 
 #include <asm/cpufeature.h>
-#include <asm/msr.h>
-#include <asm/pgtable.h>
-#include <asm/unistd.h>
-#include <asm/elf.h>
-#include <asm/tlbflush.h>
+#include <asm/processor.h>
 #include <asm/vdso.h>
-#include <asm/proto.h>
-#include <asm/vvar.h>
 
 #include <xen/interface/callback.h>
 
@@ -36,23 +23,17 @@
 #define VDSO_DEFAULT	1
 #endif
 
-#ifdef CONFIG_X86_64
-#define vdso_enabled			sysctl_vsyscall32
-#define arch_setup_additional_pages	syscall32_setup_pages
-extern int sysctl_ldt16;
-#endif
-
 /*
  * Should the kernel map a VDSO page into processes and pass its
  * address down to glibc upon exec()?
  */
-unsigned int __read_mostly vdso_enabled = VDSO_DEFAULT;
+unsigned int __read_mostly vdso32_enabled = VDSO_DEFAULT;
 
-static int __init vdso_setup(char *s)
+static int __init vdso32_setup(char *s)
 {
-	vdso_enabled = simple_strtoul(s, NULL, 0);
+	vdso32_enabled = simple_strtoul(s, NULL, 0);
 
-	if (vdso_enabled > 1)
+	if (vdso32_enabled > 1)
 		pr_warn("vdso32 values other than 0 and 1 are no longer allowed; vdso disabled\n");
 
 	return 1;
@@ -63,38 +44,16 @@ static int __init vdso_setup(char *s)
  * behavior on both 64-bit and 32-bit kernels.
  * On 32-bit kernels, vdso=[012] means the same thing.
  */
-__setup("vdso32=", vdso_setup);
+__setup("vdso32=", vdso32_setup);
 
 #ifdef CONFIG_X86_32
-__setup_param("vdso=", vdso32_setup, vdso_setup, 0);
-
-EXPORT_SYMBOL_GPL(vdso_enabled);
+__setup_param("vdso=", vdso_setup, vdso32_setup, 0);
 #endif
-
-static struct page **vdso32_pages;
-static unsigned vdso32_size;
 
 #ifdef CONFIG_X86_64
 
 #define	vdso32_sysenter()	(boot_cpu_has(X86_FEATURE_SYSENTER32))
 #define	vdso32_syscall()	(boot_cpu_has(X86_FEATURE_SYSCALL32))
-
-void syscall32_cpu_init(void)
-{
-	static const struct callback_register cstar = {
-		.type = CALLBACKTYPE_syscall32,
-		.address = (unsigned long)ia32_cstar_target
-	};
-	static const struct callback_register sysenter = {
-		.type = CALLBACKTYPE_sysenter,
-		.address = (unsigned long)ia32_sysenter_target
-	};
-
-	if (HYPERVISOR_callback_op(CALLBACKOP_register, &sysenter) < 0)
-		setup_clear_cpu_cap(X86_FEATURE_SYSENTER32);
-	if (HYPERVISOR_callback_op(CALLBACKOP_register, &cstar) < 0)
-		setup_clear_cpu_cap(X86_FEATURE_SYSCALL32);
-}
 
 #else  /* CONFIG_X86_32 */
 
@@ -103,61 +62,25 @@ void syscall32_cpu_init(void)
 #define vdso32_syscall()	0
 #else
 #define vdso32_syscall()	(boot_cpu_has(X86_FEATURE_SYSCALL32))
-
-extern asmlinkage void ia32pv_cstar_target(void);
-static const struct callback_register cstar = {
-	.type = CALLBACKTYPE_syscall32,
-	.address = { __KERNEL_CS, (unsigned long)ia32pv_cstar_target },
-};
 #endif
-
-void enable_sep_cpu(void)
-{
-	extern asmlinkage void ia32pv_sysenter_target(void);
-	static struct callback_register sysenter = {
-		.type = CALLBACKTYPE_sysenter,
-		.address = { __KERNEL_CS, (unsigned long)ia32pv_sysenter_target },
-	};
-
-#ifdef TIF_CSTAR
-	if (vdso32_syscall()) {
-		if (HYPERVISOR_callback_op(CALLBACKOP_register, &cstar) != 0)
-			BUG();
-		return;
-	}
-#endif
-
-	if (!vdso32_sysenter())
-		return;
-
-	if (xen_feature(XENFEAT_supervisor_mode_kernel))
-		sysenter.address.eip = (unsigned long)ia32_sysenter_target;
-
-	switch (HYPERVISOR_callback_op(CALLBACKOP_register, &sysenter)) {
-	case 0:
-		break;
-#if CONFIG_XEN_COMPAT < 0x030200
-	case -ENOSYS:
-		sysenter.type = CALLBACKTYPE_sysenter_deprecated;
-		if (HYPERVISOR_callback_op(CALLBACKOP_register, &sysenter) == 0)
-			break;
-#endif
-	default:
-		setup_clear_cpu_cap(X86_FEATURE_SEP);
-		break;
-	}
-}
 
 #endif	/* CONFIG_X86_64 */
 
+#if defined(CONFIG_X86_32) || defined(CONFIG_COMPAT)
+const struct vdso_image *selected_vdso32;
+#endif
+
 int __init sysenter_setup(void)
 {
-	char *vdso32_start, *vdso32_end;
-	int npages, i;
-
 #ifdef CONFIG_X86_32
 	if (boot_cpu_has(X86_FEATURE_SYSCALL)) {
 # ifdef TIF_CSTAR
+		extern asmlinkage void ia32pv_cstar_target(void);
+		static const struct callback_register __initconst cstar = {
+			.type = CALLBACKTYPE_syscall32,
+			.address = { __KERNEL_CS,
+			             (unsigned long)ia32pv_cstar_target },
+		};
 		if (boot_cpu_data.x86_vendor == X86_VENDOR_AMD
 		    && HYPERVISOR_callback_op(CALLBACKOP_register, &cstar) == 0)
 			setup_force_cpu_cap(X86_FEATURE_SYSCALL32);
@@ -171,117 +94,18 @@ int __init sysenter_setup(void)
 #endif
 
 #if defined(CONFIG_COMPAT) || defined(CONFIG_X86_XEN)
-	if (vdso32_syscall()) {
-		vdso32_start = vdso32_syscall_start;
-		vdso32_end = vdso32_syscall_end;
-		vdso32_pages = vdso32_syscall_pages;
-	} else
+	if (vdso32_syscall())
+		selected_vdso32 = &vdso_image_32_syscall;
+	else
 #endif
-	if (vdso32_sysenter()) {
-		vdso32_start = vdso32_sysenter_start;
-		vdso32_end = vdso32_sysenter_end;
-		vdso32_pages = vdso32_sysenter_pages;
-	} else {
-		vdso32_start = vdso32_int80_start;
-		vdso32_end = vdso32_int80_end;
-		vdso32_pages = vdso32_int80_pages;
-	}
+	if (vdso32_sysenter())
+		selected_vdso32 = &vdso_image_32_sysenter;
+	else
+		selected_vdso32 = &vdso_image_32_int80;
 
-	npages = ((vdso32_end - vdso32_start) + PAGE_SIZE - 1) / PAGE_SIZE;
-	vdso32_size = npages << PAGE_SHIFT;
-	for (i = 0; i < npages; i++)
-		vdso32_pages[i] = virt_to_page(vdso32_start + i*PAGE_SIZE);
-
-	patch_vdso32(vdso32_start, vdso32_size);
+	init_vdso_image(selected_vdso32);
 
 	return 0;
-}
-
-/* Setup a VMA at program startup for the vsyscall page */
-int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
-{
-	struct mm_struct *mm = current->mm;
-	unsigned long addr;
-	int ret = 0;
-	struct vm_area_struct *vma;
-	static struct page *no_pages[] = {NULL};
-
-#ifdef CONFIG_X86_X32_ABI
-	if (test_thread_flag(TIF_X32))
-		return x32_setup_additional_pages(bprm, uses_interp);
-#endif
-
-	if (vdso_enabled != 1)  /* Other values all mean "disabled" */
-		return 0;
-
-	down_write(&mm->mmap_sem);
-
-	addr = get_unmapped_area(NULL, 0, vdso32_size + VDSO_OFFSET(VDSO_PREV_PAGES), 0, 0);
-	if (IS_ERR_VALUE(addr)) {
-		ret = addr;
-		goto up_fail;
-	}
-
-	addr += VDSO_OFFSET(VDSO_PREV_PAGES);
-
-	current->mm->context.vdso = (void *)addr;
-
-	/*
-	 * MAYWRITE to allow gdb to COW and set breakpoints
-	 */
-	ret = install_special_mapping(mm,
-			addr,
-			vdso32_size,
-			VM_READ|VM_EXEC|
-			VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC,
-			vdso32_pages);
-
-	if (ret)
-		goto up_fail;
-
-	vma = _install_special_mapping(mm,
-			addr -  VDSO_OFFSET(VDSO_PREV_PAGES),
-			VDSO_OFFSET(VDSO_PREV_PAGES),
-			VM_READ,
-			no_pages);
-
-	if (IS_ERR(vma)) {
-		ret = PTR_ERR(vma);
-		goto up_fail;
-	}
-
-	ret = remap_pfn_range(vma,
-		addr - VDSO_OFFSET(VDSO_VVAR_PAGE),
-		__pa_symbol(&__vvar_page) >> PAGE_SHIFT,
-		PAGE_SIZE,
-		PAGE_READONLY);
-
-	if (ret)
-		goto up_fail;
-
-#ifdef CONFIG_HPET_TIMER
-	if (hpet_address) {
-		ret = io_remap_pfn_range(vma,
-			addr - VDSO_OFFSET(VDSO_HPET_PAGE),
-			hpet_address >> PAGE_SHIFT,
-			PAGE_SIZE,
-			pgprot_noncached(PAGE_READONLY));
-
-		if (ret)
-			goto up_fail;
-	}
-#endif
-
-	current_thread_info()->sysenter_return =
-		VDSO32_SYMBOL(addr, SYSENTER_RETURN);
-
-  up_fail:
-	if (ret)
-		current->mm->context.vdso = NULL;
-
-	up_write(&mm->mmap_sem);
-
-	return ret;
 }
 
 #ifdef CONFIG_X86_64
@@ -295,14 +119,7 @@ subsys_initcall(sysenter_setup);
 static struct ctl_table abi_table2[] = {
 	{
 		.procname	= "vsyscall32",
-		.data		= &sysctl_vsyscall32,
-		.maxlen		= sizeof(int),
-		.mode		= 0644,
-		.proc_handler	= proc_dointvec
-	},
-	{
-		.procname	= "ldt16",
-		.data		= &sysctl_ldt16,
+		.data		= &vdso32_enabled,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec
@@ -328,13 +145,6 @@ __initcall(ia32_binfmt_init);
 #endif
 
 #else  /* CONFIG_X86_32 */
-
-const char *arch_vma_name(struct vm_area_struct *vma)
-{
-	if (vma->vm_mm && vma->vm_start == (long)vma->vm_mm->context.vdso)
-		return "[vdso]";
-	return NULL;
-}
 
 struct vm_area_struct *get_gate_vma(struct mm_struct *mm)
 {

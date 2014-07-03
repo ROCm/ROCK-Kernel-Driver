@@ -2268,7 +2268,7 @@ static struct net_device *create_netdev(struct xenbus_device *dev)
          */
 	netdev->features |= netdev->hw_features;
 
-	SET_ETHTOOL_OPS(netdev, &network_ethtool_ops);
+	netdev->ethtool_ops = &network_ethtool_ops;
 	SET_NETDEV_DEV(netdev, &dev->dev);
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,26)

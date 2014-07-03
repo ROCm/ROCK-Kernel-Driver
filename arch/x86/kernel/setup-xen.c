@@ -122,7 +122,8 @@
 
 static int xen_panic_event(struct notifier_block *, unsigned long, void *);
 static struct notifier_block xen_panic_block = {
-	xen_panic_event, NULL, 0 /* try to go last */
+	.notifier_call = xen_panic_event,
+	.priority = INT_MIN /* try to go last */
 };
 
 unsigned long *phys_to_machine_mapping;
@@ -1318,7 +1319,7 @@ void __init setup_arch(char **cmdline_p)
 #endif
 
 	memblock_set_current_limit(get_max_mapped());
-	dma_contiguous_reserve(0);
+	dma_contiguous_reserve(max_pfn_mapped << PAGE_SHIFT);
 
 	/*
 	 * NOTE: On x86-32, only from this point on, fixmaps are ready for use.

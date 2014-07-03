@@ -249,7 +249,7 @@ netif_t *netif_alloc(struct device *parent, domid_t domid, unsigned int handle)
 			   | NETIF_F_TSO | NETIF_F_TSO6;
 	dev->features = dev->hw_features;
 
-	SET_ETHTOOL_OPS(dev, &network_ethtool_ops);
+	dev->ethtool_ops = &network_ethtool_ops;
 
 	dev->tx_queue_len = netbk_queue_length;
 

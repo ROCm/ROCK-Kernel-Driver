@@ -553,13 +553,13 @@ DEFINE_XEN_GUEST_HANDLE(mmu_update_t);
  * NB. The fields are natural register size for this architecture.
  */
 struct multicall_entry {
-    unsigned long op;
+    xen_ulong_t op;
 #if !defined(CONFIG_PARAVIRT_XEN) || defined(HAVE_XEN_PLATFORM_COMPAT_H)
-    unsigned long result;
+    xen_ulong_t result;
 #else
-    long result;
+    xen_long_t result;
 #endif
-    unsigned long args[6];
+    xen_ulong_t args[6];
 };
 DEFINE_GUEST_HANDLE_STRUCT(multicall_entry);
 typedef struct multicall_entry multicall_entry_t;

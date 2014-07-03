@@ -203,7 +203,7 @@ static void loopback_construct(struct net_device *dev, struct net_device *lo,
 				NETIF_F_SG |
 				NETIF_F_IP_CSUM);
 
-	SET_ETHTOOL_OPS(dev, &network_ethtool_ops);
+	dev->ethtool_ops = &network_ethtool_ops;
 
 	/*
 	 * We do not set a jumbo MTU on the interface. Otherwise the network

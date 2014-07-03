@@ -23,6 +23,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/ptrace.h>
+#include <linux/uprobes.h>
 #include <linux/string.h>
 #include <linux/delay.h>
 #include <linux/errno.h>
@@ -112,7 +113,7 @@ static inline void preempt_conditional_cli(struct pt_regs *regs)
 	preempt_count_dec();
 }
 
-static int __kprobes
+static nokprobe_inline int
 do_trap_no_signal(struct task_struct *tsk, int trapnr, char *str,
 		  struct pt_regs *regs,	long error_code)
 {
@@ -142,7 +143,38 @@ do_trap_no_signal(struct task_struct *tsk, int trapnr, char *str,
 	return -1;
 }
 
-static void __kprobes
+static siginfo_t *fill_trap_info(struct pt_regs *regs, int signr, int trapnr,
+				siginfo_t *info)
+{
+	unsigned long siaddr;
+	int sicode;
+
+	switch (trapnr) {
+	default:
+		return SEND_SIG_PRIV;
+
+	case X86_TRAP_DE:
+		sicode = FPE_INTDIV;
+		siaddr = uprobe_get_trap_addr(regs);
+		break;
+	case X86_TRAP_UD:
+		sicode = ILL_ILLOPN;
+		siaddr = uprobe_get_trap_addr(regs);
+		break;
+	case X86_TRAP_AC:
+		sicode = BUS_ADRALN;
+		siaddr = 0;
+		break;
+	}
+
+	info->si_signo = signr;
+	info->si_errno = 0;
+	info->si_code = sicode;
+	info->si_addr = (void __user *)siaddr;
+	return info;
+}
+
+static void
 do_trap(int trapnr, int signr, char *str, struct pt_regs *regs,
 	long error_code, siginfo_t *info)
 {
@@ -174,60 +206,43 @@ do_trap(int trapnr, int signr, char *str, struct pt_regs *regs,
 	}
 #endif
 
-	if (info)
-		force_sig_info(signr, info, tsk);
-	else
-		force_sig(signr, tsk);
+	force_sig_info(signr, info ?: SEND_SIG_PRIV, tsk);
+}
+NOKPROBE_SYMBOL(do_trap);
+
+static void do_error_trap(struct pt_regs *regs, long error_code, char *str,
+			  unsigned long trapnr, int signr)
+{
+	enum ctx_state prev_state = exception_enter();
+	siginfo_t info;
+
+	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr) !=
+			NOTIFY_STOP) {
+		conditional_sti(regs);
+		do_trap(trapnr, signr, str, regs, error_code,
+			fill_trap_info(regs, signr, trapnr, &info));
+	}
+
+	exception_exit(prev_state);
 }
 
 #define DO_ERROR(trapnr, signr, str, name)				\
 dotraplinkage void do_##name(struct pt_regs *regs, long error_code)	\
 {									\
-	enum ctx_state prev_state;					\
-									\
-	prev_state = exception_enter();					\
-	if (notify_die(DIE_TRAP, str, regs, error_code,			\
-			trapnr, signr) == NOTIFY_STOP) {		\
-		exception_exit(prev_state);				\
-		return;							\
-	}								\
-	conditional_sti(regs);						\
-	do_trap(trapnr, signr, str, regs, error_code, NULL);		\
-	exception_exit(prev_state);					\
+	do_error_trap(regs, error_code, str, trapnr, signr);		\
 }
 
-#define DO_ERROR_INFO(trapnr, signr, str, name, sicode, siaddr)		\
-dotraplinkage void do_##name(struct pt_regs *regs, long error_code)	\
-{									\
-	siginfo_t info;							\
-	enum ctx_state prev_state;					\
-									\
-	info.si_signo = signr;						\
-	info.si_errno = 0;						\
-	info.si_code = sicode;						\
-	info.si_addr = (void __user *)siaddr;				\
-	prev_state = exception_enter();					\
-	if (notify_die(DIE_TRAP, str, regs, error_code,			\
-			trapnr, signr) == NOTIFY_STOP) {		\
-		exception_exit(prev_state);				\
-		return;							\
-	}								\
-	conditional_sti(regs);						\
-	do_trap(trapnr, signr, str, regs, error_code, &info);		\
-	exception_exit(prev_state);					\
-}
-
-DO_ERROR_INFO(X86_TRAP_DE,     SIGFPE,  "divide error",			divide_error,		     FPE_INTDIV, regs->ip )
-DO_ERROR     (X86_TRAP_OF,     SIGSEGV, "overflow",			overflow					  )
-DO_ERROR     (X86_TRAP_BR,     SIGSEGV, "bounds",			bounds						  )
-DO_ERROR_INFO(X86_TRAP_UD,     SIGILL,  "invalid opcode",		invalid_op,		     ILL_ILLOPN, regs->ip )
-DO_ERROR     (X86_TRAP_OLD_MF, SIGFPE,  "coprocessor segment overrun",	coprocessor_segment_overrun			  )
-DO_ERROR     (X86_TRAP_TS,     SIGSEGV, "invalid TSS",			invalid_TSS					  )
-DO_ERROR     (X86_TRAP_NP,     SIGBUS,  "segment not present",		segment_not_present				  )
+DO_ERROR(X86_TRAP_DE,     SIGFPE,  "divide error",		divide_error)
+DO_ERROR(X86_TRAP_OF,     SIGSEGV, "overflow",			overflow)
+DO_ERROR(X86_TRAP_BR,     SIGSEGV, "bounds",			bounds)
+DO_ERROR(X86_TRAP_UD,     SIGILL,  "invalid opcode",		invalid_op)
+DO_ERROR(X86_TRAP_OLD_MF, SIGFPE,  "coprocessor segment overrun",coprocessor_segment_overrun)
+DO_ERROR(X86_TRAP_TS,     SIGSEGV, "invalid TSS",		invalid_TSS)
+DO_ERROR(X86_TRAP_NP,     SIGBUS,  "segment not present",	segment_not_present)
 #ifdef CONFIG_X86_32
-DO_ERROR     (X86_TRAP_SS,     SIGBUS,  "stack segment",		stack_segment					  )
+DO_ERROR(X86_TRAP_SS,     SIGBUS,  "stack segment",		stack_segment)
 #endif
-DO_ERROR_INFO(X86_TRAP_AC,     SIGBUS,  "alignment check",		alignment_check,	     BUS_ADRALN, 0	  )
+DO_ERROR(X86_TRAP_AC,     SIGBUS,  "alignment check",		alignment_check)
 
 #ifdef CONFIG_X86_64
 /* Runs on IST stack */
@@ -269,7 +284,7 @@ dotraplinkage void do_double_fault(struct pt_regs *regs, long error_code)
 }
 #endif
 
-dotraplinkage void __kprobes
+dotraplinkage void
 do_general_protection(struct pt_regs *regs, long error_code)
 {
 	struct task_struct *tsk;
@@ -311,13 +326,14 @@ do_general_protection(struct pt_regs *regs, long error_code)
 		pr_cont("\n");
 	}
 
-	force_sig(SIGSEGV, tsk);
+	force_sig_info(SIGSEGV, SEND_SIG_PRIV, tsk);
 exit:
 	exception_exit(prev_state);
 }
+NOKPROBE_SYMBOL(do_general_protection);
 
 /* May run on IST stack. */
-dotraplinkage void __kprobes notrace do_int3(struct pt_regs *regs, long error_code)
+dotraplinkage void notrace do_int3(struct pt_regs *regs, long error_code)
 {
 	enum ctx_state prev_state;
 
@@ -340,6 +356,11 @@ dotraplinkage void __kprobes notrace do_int3(struct pt_regs *regs, long error_co
 		goto exit;
 #endif /* CONFIG_KGDB_LOW_LEVEL_TRAP */
 
+#ifdef CONFIG_KPROBES
+	if (kprobe_int3_handler(regs))
+		goto exit;
+#endif
+
 	if (notify_die(DIE_INT3, "int3", regs, error_code, X86_TRAP_BP,
 			SIGTRAP) == NOTIFY_STOP)
 		goto exit;
@@ -356,6 +377,7 @@ dotraplinkage void __kprobes notrace do_int3(struct pt_regs *regs, long error_co
 exit:
 	exception_exit(prev_state);
 }
+NOKPROBE_SYMBOL(do_int3);
 
 #if defined(CONFIG_X86_64) && !defined(CONFIG_XEN)
 /*
@@ -363,7 +385,7 @@ exit:
  * for scheduling or signal handling. The actual stack switch is done in
  * entry.S
  */
-asmlinkage __visible __kprobes struct pt_regs *sync_regs(struct pt_regs *eregs)
+asmlinkage __visible struct pt_regs *sync_regs(struct pt_regs *eregs)
 {
 	struct pt_regs *regs = eregs;
 	/* Did already sync */
@@ -382,6 +404,7 @@ asmlinkage __visible __kprobes struct pt_regs *sync_regs(struct pt_regs *eregs)
 		*regs = *eregs;
 	return regs;
 }
+NOKPROBE_SYMBOL(sync_regs);
 #endif
 
 /*
@@ -408,7 +431,7 @@ asmlinkage __visible __kprobes struct pt_regs *sync_regs(struct pt_regs *eregs)
  *
  * May run on IST stack.
  */
-dotraplinkage void __kprobes do_debug(struct pt_regs *regs, long error_code)
+dotraplinkage void do_debug(struct pt_regs *regs, long error_code)
 {
 	struct task_struct *tsk = current;
 	enum ctx_state prev_state;
@@ -445,6 +468,11 @@ dotraplinkage void __kprobes do_debug(struct pt_regs *regs, long error_code)
 
 	/* Store the virtualized DR6 value */
 	tsk->thread.debugreg6 = dr6;
+
+#ifdef CONFIG_KPROBES
+	if (kprobe_debug_handler(regs))
+		goto exit;
+#endif
 
 	if (notify_die(DIE_DEBUG, "debug", regs, (long)&dr6, error_code,
 							SIGTRAP) == NOTIFY_STOP)
@@ -488,13 +516,14 @@ dotraplinkage void __kprobes do_debug(struct pt_regs *regs, long error_code)
 exit:
 	exception_exit(prev_state);
 }
+NOKPROBE_SYMBOL(do_debug);
 
 /*
  * Note that we play around with the 'TS' bit in an attempt to get
  * the correct behaviour even in the presence of the asynchronous
  * IRQ13 behaviour
  */
-void math_error(struct pt_regs *regs, int error_code, int trapnr)
+static void math_error(struct pt_regs *regs, int error_code, int trapnr)
 {
 	struct task_struct *task = current;
 	siginfo_t info;
@@ -524,7 +553,7 @@ void math_error(struct pt_regs *regs, int error_code, int trapnr)
 	task->thread.error_code = error_code;
 	info.si_signo = SIGFPE;
 	info.si_errno = 0;
-	info.si_addr = (void __user *)regs->ip;
+	info.si_addr = (void __user *)uprobe_get_trap_addr(regs);
 	if (trapnr == X86_TRAP_MF) {
 		unsigned short cwd, swd;
 		/*
@@ -655,7 +684,7 @@ static void _math_state_restore(void)
 	 */
 	if (unlikely(restore_fpu_checking(tsk))) {
 		drop_init_fpu(tsk);
-		force_sig(SIGSEGV, tsk);
+		force_sig_info(SIGSEGV, SEND_SIG_PRIV, tsk);
 		return;
 	}
 
@@ -668,7 +697,7 @@ void math_state_restore(void)
 	_math_state_restore();
 }
 
-dotraplinkage void __kprobes
+dotraplinkage void
 do_device_not_available(struct pt_regs *regs, long error_code)
 {
 	enum ctx_state prev_state;
@@ -696,6 +725,7 @@ do_device_not_available(struct pt_regs *regs, long error_code)
 #endif
 	exception_exit(prev_state);
 }
+NOKPROBE_SYMBOL(do_device_not_available);
 
 #ifdef CONFIG_X86_32
 dotraplinkage void do_iret_error(struct pt_regs *regs, long error_code)
@@ -832,7 +862,7 @@ void __init trap_init(void)
 
 void smp_trap_init(trap_info_t *trap_ctxt)
 {
-	const trap_info_t *t = trap_table;
+	const trap_info_t *t;
 
 	for (t = trap_table; t->address; t++) {
 		trap_ctxt[t->vector].flags = t->flags;
