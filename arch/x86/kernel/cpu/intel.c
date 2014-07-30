@@ -454,8 +454,8 @@ static void init_intel(struct cpuinfo_x86 *c)
 	if (c->x86 == 6)
 		set_cpu_cap(c, X86_FEATURE_P3);
 #endif
-#ifndef CONFIG_XEN
 
+#ifndef CONFIG_XEN
 	/* Work around errata */
 	srat_detect_node(c);
 

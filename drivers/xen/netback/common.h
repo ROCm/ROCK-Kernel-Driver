@@ -186,6 +186,7 @@ void netif_accel_init(void);
 #define NET_RX_RING_SIZE __CONST_RING_SIZE(netif_rx, PAGE_SIZE)
 
 void netif_disconnect(struct backend_info *be);
+void netif_free(struct backend_info *be);
 
 netif_t *netif_alloc(struct device *parent, domid_t domid, unsigned int handle);
 int netif_map(struct backend_info *be, grant_ref_t tx_ring_ref,

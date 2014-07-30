@@ -343,16 +343,16 @@ void scsiback_rsp_emulation(pending_req_t *pending_req)
 }
 
 
-void scsiback_req_emulation_or_cmdexec(pending_req_t *pending_req)
+int scsiback_req_emulation_or_cmdexec(pending_req_t *pending_req)
 {
-	if (__pre_do_emulation(pending_req, NULL)) {
-		scsiback_cmd_exec(pending_req);
-	}
-	else {
-		scsiback_fast_flush_area(pending_req);
-		scsiback_do_resp_with_sense(pending_req->sense_buffer,
-		  pending_req->rslt, pending_req->resid, pending_req);
-	}
+	if (__pre_do_emulation(pending_req, NULL))
+		return scsiback_cmd_exec(pending_req);
+
+	scsiback_fast_flush_area(pending_req);
+	scsiback_do_resp_with_sense(pending_req->sense_buffer,
+				    pending_req->rslt, pending_req->resid,
+				    pending_req);
+	return 0;
 }
 
 

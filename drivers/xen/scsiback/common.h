@@ -162,13 +162,13 @@ struct scsi_device *scsiback_do_translation(struct vscsibk_info *info,
 void scsiback_release_translation_entry(struct vscsibk_info *info);
 
 
-void scsiback_cmd_exec(pending_req_t *pending_req);
+int scsiback_cmd_exec(pending_req_t *pending_req);
 void scsiback_do_resp_with_sense(char *sense_buffer, int32_t result,
 			uint32_t resid, pending_req_t *pending_req);
 void scsiback_fast_flush_area(pending_req_t *req);
 
 void scsiback_rsp_emulation(pending_req_t *pending_req);
-void scsiback_req_emulation_or_cmdexec(pending_req_t *pending_req);
+int scsiback_req_emulation_or_cmdexec(pending_req_t *pending_req);
 void scsiback_emulation_init(void);
 
 

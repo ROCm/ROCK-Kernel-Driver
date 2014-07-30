@@ -28,7 +28,6 @@ static int connect_rings(struct backend_info *);
 static void connect(struct backend_info *);
 static void backend_create_netif(struct backend_info *be);
 static void unregister_hotplug_status_watch(struct backend_info *be);
-static void netback_disconnect(struct device *, bool);
 
 static int netback_remove(struct xenbus_device *dev)
 {
@@ -36,29 +35,27 @@ static int netback_remove(struct xenbus_device *dev)
 
 	netback_remove_accelerators(be, dev);
 
-	netback_disconnect(&dev->dev, true);
+	xenbus_switch_state(dev, XenbusStateClosed);
+	unregister_hotplug_status_watch(be);
+	kobject_uevent(&dev->dev.kobj, KOBJ_OFFLINE);
+	down_write(&teardown_sem);
+	if (be->netif) {
+		xenbus_rm(XBT_NIL, be->dev->nodename, "hotplug-status");
+		netif_free(be);
+		be->netif = NULL;
+	}
+	dev_set_drvdata(&dev->dev, NULL);
+	up_write(&teardown_sem);
 	kfree(be);
 	return 0;
 }
 
-static void netback_disconnect(struct device *xbdev_dev, bool clear)
+static void netback_disconnect(struct device *xbdev_dev)
 {
 	struct backend_info *be = dev_get_drvdata(xbdev_dev);
 
-	unregister_hotplug_status_watch(be);
-	if (be->netif)
-		kobject_uevent(&xbdev_dev->kobj, KOBJ_OFFLINE);
-
-	xenbus_rm(XBT_NIL, be->dev->nodename, "hotplug-status");
-
-	down_write(&teardown_sem);
-	if (be->netif) {
+	if (be && be->netif)
 		netif_disconnect(be);
-		be->netif = NULL;
-	}
-	if (clear)
-		dev_set_drvdata(xbdev_dev, NULL);
-	up_write(&teardown_sem);
 }
 
 /**
@@ -255,15 +252,12 @@ static void frontend_changed(struct xenbus_device *dev,
 	case XenbusStateConnected:
 		if (dev->state == XenbusStateConnected)
 			break;
-
-		/* backend_create_netif() is idempotent */
-		backend_create_netif(be);
 		if (be->netif)
 			connect(be);
 		break;
 
 	case XenbusStateClosing:
-		netback_disconnect(&dev->dev, false);
+		netback_disconnect(&dev->dev);
 		xenbus_switch_state(dev, XenbusStateClosing);
 		break;
 

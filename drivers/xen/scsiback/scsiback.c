@@ -393,7 +393,7 @@ free_bios:
 }
 
 
-void scsiback_cmd_exec(pending_req_t *pending_req)
+int scsiback_cmd_exec(pending_req_t *pending_req)
 {
 	int cmd_len  = (int)pending_req->cmd_len;
 	int data_dir = (int)pending_req->sc_data_direction;
@@ -416,7 +416,7 @@ void scsiback_cmd_exec(pending_req_t *pending_req)
 		if (IS_ERR(bio)) {
 			pr_err("scsiback: SG Request Map Error %ld\n",
 			       PTR_ERR(bio));
-			return;
+			return PTR_ERR(bio);
 		}
 	} else
 		bio = NULL;
@@ -425,16 +425,22 @@ void scsiback_cmd_exec(pending_req_t *pending_req)
 		rq = blk_make_request(pending_req->sdev->request_queue, bio,
 				      GFP_KERNEL);
 		if (IS_ERR(rq)) {
+			do {
+				struct bio *b = bio->bi_next;
+
+				bio_put(bio);
+				bio = b;
+			} while (bio);
 			pr_err("scsiback: Make Request Error %ld\n",
 			       PTR_ERR(rq));
-			return;
+			return PTR_ERR(rq);
 		}
 	} else {
 		rq = blk_get_request(pending_req->sdev->request_queue, write,
 				     GFP_KERNEL);
 		if (unlikely(!rq)) {
 			pr_err("scsiback: Get Request Error\n");
-			return;
+			return -ENOMEM;
 		}
 	}
 
@@ -454,7 +460,7 @@ void scsiback_cmd_exec(pending_req_t *pending_req)
 	scsiback_get(pending_req->info);
 	blk_execute_rq_nowait(rq->q, NULL, rq, 1, scsiback_cmd_done);
 
-	return ;
+	return 0;
 }
 
 
@@ -596,17 +602,27 @@ static int _scsiback_do_cmd_fn(struct vscsibk_info *info)
 		switch (err ?: pending_req->act) {
 		case VSCSIIF_ACT_SCSI_CDB:
 			/* The Host mode is through as for Emulation. */
-			if (info->feature == VSCSI_TYPE_HOST)
-				scsiback_cmd_exec(pending_req);
-			else
-				scsiback_req_emulation_or_cmdexec(pending_req);
+			if (info->feature == VSCSI_TYPE_HOST ?
+			    scsiback_cmd_exec(pending_req) :
+			    scsiback_req_emulation_or_cmdexec(pending_req)) {
+				scsiback_fast_flush_area(pending_req);
+				scsiback_do_resp_with_sense(NULL,
+							    DRIVER_ERROR << 24,
+							    0, pending_req);
+			}
 			break;
 		case VSCSIIF_ACT_SCSI_RESET:
+			/* Just for pointlessly specified segments: */
+			scsiback_fast_flush_area(pending_req);
 			scsiback_device_reset_exec(pending_req);
 			break;
 		default:
-			if(!err && printk_ratelimit())
-				pr_err("scsiback: invalid request\n");
+			if(!err) {
+				scsiback_fast_flush_area(pending_req);
+				if (printk_ratelimit())
+					pr_err("scsiback: invalid request %#x\n",
+					       pending_req->act);
+			}
 			scsiback_do_resp_with_sense(NULL, DRIVER_ERROR << 24,
 						    0, pending_req);
 			break;

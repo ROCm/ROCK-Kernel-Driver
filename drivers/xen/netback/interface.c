@@ -324,6 +324,7 @@ int netif_map(struct backend_info *be, grant_ref_t tx_ring_ref,
 		dev_set_mtu(netif->dev, ETH_DATA_LEN);
 	netdev_update_features(netif->dev);
 	netback_carrier_on(netif);
+	netif_carrier_on(netif->dev);
 	if (netif_running(netif->dev))
 		__netif_up(netif);
 	rtnl_unlock();
@@ -350,21 +351,26 @@ void netif_disconnect(struct backend_info *be)
 		netif_put(netif);
 	}
 
-	atomic_dec(&netif->refcnt);
-	wait_event(netif->waiting_to_free, atomic_read(&netif->refcnt) == 0);
+	wait_event(netif->waiting_to_free, atomic_read(&netif->refcnt) == 1);
 
 	del_timer_sync(&netif->credit_timeout);
 	del_timer_sync(&netif->tx_queue_timeout);
 
-	if (netif->irq)
+	if (netif->irq) {
 		unbind_from_irqhandler(netif->irq, netif);
+		netif->irq = 0;
+	}
 	
-	unregister_netdev(netif->dev);
-
 	if (netif->tx.sring) {
 		xenbus_unmap_ring_vfree(be->dev, netif->tx_comms_area);
 		xenbus_unmap_ring_vfree(be->dev, netif->rx_comms_area);
 	}
+}
 
+void netif_free(struct backend_info *be)
+{
+	netif_t *netif = be->netif;
+
+	unregister_netdev(netif->dev);
 	free_netdev(netif->dev);
 }
