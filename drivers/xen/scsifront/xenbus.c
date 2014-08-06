@@ -42,6 +42,10 @@
   #define DEFAULT_TASK_COMM_LEN	TASK_COMM_LEN
 #endif
 
+static unsigned int max_nr_segs = VSCSIIF_SG_TABLESIZE;
+module_param_named(max_segs, max_nr_segs, uint, 0);
+MODULE_PARM_DESC(max_segs, "Maximum number of segments per request");
+
 extern struct scsi_host_template scsifront_sht;
 
 static void scsifront_free(struct vscsifrnt_info *info)
@@ -180,7 +184,9 @@ static int scsifront_probe(struct xenbus_device *dev,
 	int i, err = -ENOMEM;
 	char name[DEFAULT_TASK_COMM_LEN];
 
-	host = scsi_host_alloc(&scsifront_sht, sizeof(*info));
+	host = scsi_host_alloc(&scsifront_sht,
+			       offsetof(struct vscsifrnt_info,
+					active.segs[max_nr_segs]));
 	if (!host) {
 		xenbus_dev_fatal(dev, err, "fail to allocate scsi host");
 		return err;
@@ -222,7 +228,7 @@ static int scsifront_probe(struct xenbus_device *dev,
 	host->max_id      = VSCSIIF_MAX_TARGET;
 	host->max_channel = 0;
 	host->max_lun     = VSCSIIF_MAX_LUN;
-	host->max_sectors = (VSCSIIF_SG_TABLESIZE - 1) * PAGE_SIZE / 512;
+	host->max_sectors = (host->sg_tablesize - 1) * PAGE_SIZE / 512;
 	host->max_cmd_len = VSCSIIF_MAX_COMMAND_SIZE;
 
 	err = scsi_add_host(host, &dev->dev);
@@ -275,6 +281,23 @@ static int scsifront_disconnect(struct vscsifrnt_info *info)
 	xenbus_frontend_closed(dev);
 
 	return 0;
+}
+
+static void scsifront_read_backend_params(struct xenbus_device *dev,
+					  struct vscsifrnt_info *info)
+{
+	unsigned int nr_segs;
+	int ret;
+	struct Scsi_Host *host = info->host;
+
+	ret = xenbus_scanf(XBT_NIL, dev->otherend, "segs-per-req", "%u",
+			   &nr_segs);
+	if (ret == 1 && nr_segs > host->sg_tablesize) {
+		host->sg_tablesize = min(nr_segs, max_nr_segs);
+		dev_info(&dev->dev, "using up to %d SG entries\n",
+			 host->sg_tablesize);
+		host->max_sectors = (host->sg_tablesize - 1) * PAGE_SIZE / 512;
+	}
 }
 
 #define VSCSIFRONT_OP_ADD_LUN	1
@@ -367,6 +390,7 @@ static void scsifront_backend_changed(struct xenbus_device *dev,
 		break;
 
 	case XenbusStateConnected:
+		scsifront_read_backend_params(dev, info);
 		if (xenbus_read_driver_state(dev->nodename) ==
 			XenbusStateInitialised) {
 			scsifront_do_lun_hotplug(info, VSCSIFRONT_OP_ADD_LUN);
@@ -414,6 +438,11 @@ static DEFINE_XENBUS_DRIVER(scsifront, ,
 
 int __init scsifront_xenbus_init(void)
 {
+	if (max_nr_segs > SG_ALL)
+		max_nr_segs = SG_ALL;
+	if (max_nr_segs < VSCSIIF_SG_TABLESIZE)
+		max_nr_segs = VSCSIIF_SG_TABLESIZE;
+
 	return xenbus_register_frontend(&scsifront_driver);
 }
 

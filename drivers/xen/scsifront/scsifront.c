@@ -110,6 +110,66 @@ irqreturn_t scsifront_intr(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+static bool push_cmd_to_ring(struct vscsifrnt_info *info,
+			     vscsiif_request_t *ring_req)
+{
+	unsigned int left, rqid = info->active.rqid;
+	struct scsi_cmnd *sc;
+
+	for (; ; ring_req = NULL) {
+		struct vscsiif_sg_list *sgl;
+
+		if (!ring_req) {
+			struct vscsiif_front_ring *ring = &info->ring;
+
+			ring_req = RING_GET_REQUEST(ring, ring->req_prod_pvt);
+			ring->req_prod_pvt++;
+			ring_req->rqid = rqid;
+		}
+
+		left = info->shadow[rqid].nr_segments - info->active.done;
+		if (left <= VSCSIIF_SG_TABLESIZE)
+			break;
+
+		sgl = (void *)ring_req;
+		sgl->act = VSCSIIF_ACT_SCSI_SG_PRESET;
+
+		if (left > VSCSIIF_SG_LIST_SIZE)
+			left = VSCSIIF_SG_LIST_SIZE;
+		memcpy(sgl->seg, info->active.segs + info->active.done,
+		       left * sizeof(*sgl->seg));
+
+		sgl->nr_segments = left;
+		info->active.done += left;
+
+		if (RING_FULL(&info->ring))
+			return false;
+	}
+
+	sc = info->active.sc;
+
+	ring_req->act     = VSCSIIF_ACT_SCSI_CDB;
+	ring_req->id      = sc->device->id;
+	ring_req->lun     = sc->device->lun;
+	ring_req->channel = sc->device->channel;
+	ring_req->cmd_len = sc->cmd_len;
+
+	if ( sc->cmd_len )
+		memcpy(ring_req->cmnd, sc->cmnd, sc->cmd_len);
+	else
+		memset(ring_req->cmnd, 0, VSCSIIF_MAX_COMMAND_SIZE);
+
+	ring_req->sc_data_direction   = sc->sc_data_direction;
+	ring_req->timeout_per_command = sc->request->timeout / HZ;
+	ring_req->nr_segments         = left;
+
+	memcpy(ring_req->seg, info->active.segs + info->active.done,
+               left * sizeof(*ring_req->seg));
+
+	info->active.sc = NULL;
+
+	return !RING_FULL(&info->ring);
+}
 
 static void scsifront_gnttab_done(struct vscsifrnt_info *info, uint32_t id)
 {
@@ -206,6 +266,16 @@ static int scsifront_cmd_done(struct vscsifrnt_info *info)
 		
 		ring_res = RING_GET_RESPONSE(&info->ring, i);
 
+		if (info->host->sg_tablesize > VSCSIIF_SG_TABLESIZE) {
+			u8 act = ring_res->act;
+
+			if (act == VSCSIIF_ACT_SCSI_SG_PRESET)
+				continue;
+			if (act != info->shadow[ring_res->rqid].act)
+				DPRINTK("Bogus backend response (%02x vs %02x)\n",
+					act, info->shadow[ring_res->rqid].act);
+		}
+
 		if (info->shadow[ring_res->rqid].act == VSCSIIF_ACT_SCSI_CDB)
 			scsifront_cdb_cmd_done(info, ring_res);
 		else
@@ -218,6 +288,11 @@ static int scsifront_cmd_done(struct vscsifrnt_info *info)
 		RING_FINAL_CHECK_FOR_RESPONSES(&info->ring, more_to_do);
 	} else {
 		info->ring.sring->rsp_event = i + 1;
+	}
+
+	if (info->active.sc && !RING_FULL(&info->ring)) {
+		push_cmd_to_ring(info, NULL);
+		scsifront_do_request(info);
 	}
 
 	info->waiting_sync = 0;
@@ -257,7 +332,8 @@ int scsifront_schedule(void *data)
 
 
 static int map_data_for_request(struct vscsifrnt_info *info,
-		struct scsi_cmnd *sc, vscsiif_request_t *ring_req, uint32_t id)
+				struct scsi_cmnd *sc,
+				struct vscsifrnt_shadow *shadow)
 {
 	grant_ref_t gref_head;
 	struct page *page;
@@ -269,7 +345,7 @@ static int map_data_for_request(struct vscsifrnt_info *info,
 	if (sc->sc_data_direction == DMA_NONE || !data_len)
 		return 0;
 
-	err = gnttab_alloc_grant_references(VSCSIIF_SG_TABLESIZE, &gref_head);
+	err = gnttab_alloc_grant_references(info->host->sg_tablesize, &gref_head);
 	if (err) {
 		shost_printk(PREFIX(ERR), info->host,
 			     "gnttab_alloc_grant_references() error\n");
@@ -278,7 +354,7 @@ static int map_data_for_request(struct vscsifrnt_info *info,
 
 	/* quoted scsi_lib.c/scsi_req_map_sg . */
 	nr_pages = PFN_UP(data_len + scsi_sglist(sc)->offset);
-	if (nr_pages > VSCSIIF_SG_TABLESIZE) {
+	if (nr_pages > info->host->sg_tablesize) {
 		shost_printk(PREFIX(ERR), info->host,
 			     "Unable to map request_buffer for command!\n");
 		ref_cnt = -E2BIG;
@@ -305,10 +381,10 @@ static int map_data_for_request(struct vscsifrnt_info *info,
 				gnttab_grant_foreign_access_ref(ref, info->dev->otherend_id,
 					page_to_phys(page) >> PAGE_SHIFT, write);
 
-				info->shadow[id].gref[ref_cnt]  = ref;
-				ring_req->seg[ref_cnt].gref     = ref;
-				ring_req->seg[ref_cnt].offset   = (uint16_t)off;
-				ring_req->seg[ref_cnt].length   = (uint16_t)bytes;
+				shadow->gref[ref_cnt] = ref;
+				info->active.segs[ref_cnt].gref   = ref;
+				info->active.segs[ref_cnt].offset = off;
+				info->active.segs[ref_cnt].length = bytes;
 
 				page++;
 				len -= bytes;
@@ -347,33 +423,26 @@ static int scsifront_queuecommand(struct Scsi_Host *shost,
 		return SCSI_MLQUEUE_HOST_BUSY;
 	}
 
+	if (info->active.sc && !push_cmd_to_ring(info, NULL)) {
+		scsifront_do_request(info);
+		spin_unlock_irqrestore(shost->host_lock, flags);
+		return SCSI_MLQUEUE_HOST_BUSY;
+	}
+
 	sc->result    = 0;
 
 	ring_req          = scsifront_pre_request(info);
 	rqid              = ring_req->rqid;
-	ring_req->act     = VSCSIIF_ACT_SCSI_CDB;
-
-	ring_req->id      = sc->device->id;
-	ring_req->lun     = sc->device->lun;
-	ring_req->channel = sc->device->channel;
-	ring_req->cmd_len = sc->cmd_len;
 
 	BUG_ON(sc->cmd_len > VSCSIIF_MAX_COMMAND_SIZE);
-
-	if ( sc->cmd_len )
-		memcpy(ring_req->cmnd, sc->cmnd, sc->cmd_len);
-	else
-		memset(ring_req->cmnd, 0, VSCSIIF_MAX_COMMAND_SIZE);
-
-	ring_req->sc_data_direction   = (uint8_t)sc->sc_data_direction;
-	ring_req->timeout_per_command = (sc->request->timeout / HZ);
 
 	info->shadow[rqid].sc  = sc;
 	info->shadow[rqid].act = VSCSIIF_ACT_SCSI_CDB;
 
-	ref_cnt = map_data_for_request(info, sc, ring_req, rqid);
+	ref_cnt = map_data_for_request(info, sc, &info->shadow[rqid]);
 	if (ref_cnt < 0) {
 		add_id_to_freelist(info, rqid);
+		scsifront_do_request(info);
 		spin_unlock_irqrestore(shost->host_lock, flags);
 		if (ref_cnt == (-ENOMEM))
 			return SCSI_MLQUEUE_HOST_BUSY;
@@ -382,8 +451,12 @@ static int scsifront_queuecommand(struct Scsi_Host *shost,
 		return 0;
 	}
 
-	ring_req->nr_segments          = (uint8_t)ref_cnt;
 	info->shadow[rqid].nr_segments = ref_cnt;
+
+	info->active.sc  = sc;
+	info->active.rqid = rqid;
+	info->active.done = 0;
+	push_cmd_to_ring(info, ring_req);
 
 	scsifront_do_request(info);
 	spin_unlock_irqrestore(shost->host_lock, flags);

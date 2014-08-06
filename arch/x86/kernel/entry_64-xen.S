@@ -809,13 +809,8 @@ __do_double_fault:
 	cmpl $__KERNEL_CS,CS(%rdi)
 	jne do_double_fault
 	movq RIP(%rdi),%rax
-	cmpq $irq_return_iret,%rax
-#ifdef CONFIG_PARAVIRT
-	je 1f
-	cmpq $native_iret,%rax
-#endif
+	cmpq $native_irq_return_iret,%rax
 	jne do_double_fault		/* This shouldn't happen... */
-1:
 	movq PER_CPU_VAR(kernel_stack),%rax
 	subq $(6*8-KERNEL_STACK_OFFSET),%rax	/* Reset to original stack */
 	movq %rax,RSP(%rdi)
@@ -1224,7 +1219,7 @@ error_sti:
 error_kernelspace:
 	CFI_REL_OFFSET rcx, RCX+8
 	incl %ebx
-	leaq irq_return_iret(%rip),%rcx
+	leaq native_irq_return_iret(%rip),%rcx
 	cmpq %rcx,RIP+8(%rsp)
 	je error_swapgs
 	movl %ecx,%eax	/* zero extend */

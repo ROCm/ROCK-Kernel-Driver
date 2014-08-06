@@ -338,6 +338,13 @@ static int scsiback_probe(struct xenbus_device *dev,
 	if (val)
 		be->info->feature = VSCSI_TYPE_HOST;
 
+	if (vscsiif_segs > VSCSIIF_SG_TABLESIZE) {
+		err = xenbus_printf(XBT_NIL, dev->nodename, "segs-per-req",
+				    "%u", vscsiif_segs);
+		if (err)
+			xenbus_dev_error(dev, err, "writing segs-per-req");
+	}
+
 	err = xenbus_switch_state(dev, XenbusStateInitWait);
 	if (err)
 		goto fail;

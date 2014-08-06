@@ -56,6 +56,10 @@ static unsigned int vscsiif_reqs = 128;
 module_param_named(reqs, vscsiif_reqs, uint, 0);
 MODULE_PARM_DESC(reqs, "Number of scsiback requests to allocate");
 
+unsigned int vscsiif_segs = VSCSIIF_SG_TABLESIZE;
+module_param_named(segs, vscsiif_segs, uint, 0);
+MODULE_PARM_DESC(segs, "Number of segments to allow per request");
+
 static bool log_print_stat;
 module_param(log_print_stat, bool, 0644);
 
@@ -67,7 +71,7 @@ static grant_handle_t *pending_grant_handles;
 
 static int vaddr_pagenr(pending_req_t *req, int seg)
 {
-	return (req - pending_reqs) * VSCSIIF_SG_TABLESIZE + seg;
+	return (req - pending_reqs) * vscsiif_segs + seg;
 }
 
 static unsigned long vaddr(pending_req_t *req, int seg)
@@ -82,7 +86,7 @@ static unsigned long vaddr(pending_req_t *req, int seg)
 
 void scsiback_fast_flush_area(pending_req_t *req)
 {
-	struct gnttab_unmap_grant_ref unmap[VSCSIIF_SG_TABLESIZE];
+	struct gnttab_unmap_grant_ref *unmap = req->info->gunmap;
 	unsigned int i, invcount = 0;
 	grant_handle_t handle;
 	int err;
@@ -117,6 +121,7 @@ static pending_req_t * alloc_req(struct vscsibk_info *info)
 	if (!list_empty(&pending_free)) {
 		req = list_entry(pending_free.next, pending_req_t, free_list);
 		list_del(&req->free_list);
+		req->nr_segments = 0;
 	}
 	spin_unlock_irqrestore(&pending_free_lock, flags);
 	return req;
@@ -144,7 +149,8 @@ static void scsiback_notify_work(struct vscsibk_info *info)
 }
 
 void scsiback_do_resp_with_sense(char *sense_buffer, int32_t result,
-			uint32_t resid, pending_req_t *pending_req)
+				 uint32_t resid, pending_req_t *pending_req,
+				 uint8_t act)
 {
 	vscsiif_response_t *ring_res;
 	struct vscsibk_info *info = pending_req->info;
@@ -159,6 +165,7 @@ void scsiback_do_resp_with_sense(char *sense_buffer, int32_t result,
 	ring_res = RING_GET_RESPONSE(&info->ring, info->ring.rsp_prod_pvt);
 	info->ring.rsp_prod_pvt++;
 
+	ring_res->act    = act;
 	ring_res->rslt   = result;
 	ring_res->rqid   = pending_req->rqid;
 
@@ -186,7 +193,8 @@ void scsiback_do_resp_with_sense(char *sense_buffer, int32_t result,
 	if (notify)
 		notify_remote_via_irq(info->irq);
 
-	free_req(pending_req);
+	if (act != VSCSIIF_ACT_SCSI_SG_PRESET)
+		free_req(pending_req);
 }
 
 static void scsiback_print_status(char *sense_buffer, int errors,
@@ -223,25 +231,25 @@ static void scsiback_cmd_done(struct request *req, int uptodate)
 		scsiback_rsp_emulation(pending_req);
 
 	scsiback_fast_flush_area(pending_req);
-	scsiback_do_resp_with_sense(sense_buffer, errors, resid, pending_req);
+	scsiback_do_resp_with_sense(sense_buffer, errors, resid, pending_req,
+				    VSCSIIF_ACT_SCSI_CDB);
 	scsiback_put(pending_req->info);
 
 	__blk_put_request(req->q, req);
 }
 
 
-static int scsiback_gnttab_data_map(vscsiif_request_t *ring_req,
-					pending_req_t *pending_req)
+static int scsiback_gnttab_data_map(const vscsiif_segment_t *segs,
+				    unsigned int nr_segs,
+				    pending_req_t *pending_req)
 {
 	u32 flags;
-	int write;
-	int i, err = 0;
-	unsigned int data_len = 0;
-	struct gnttab_map_grant_ref map[VSCSIIF_SG_TABLESIZE];
+	int write, err = 0;
+	unsigned int i, j, data_len = 0;
 	struct vscsibk_info *info   = pending_req->info;
-
+	struct gnttab_map_grant_ref *map = info->gmap;
 	int data_dir = (int)pending_req->sc_data_direction;
-	unsigned int nr_segments = (unsigned int)pending_req->nr_segments;
+	unsigned int nr_segments = pending_req->nr_segments + nr_segs;
 
 	write = (data_dir == DMA_TO_DEVICE);
 
@@ -262,14 +270,20 @@ static int scsiback_gnttab_data_map(vscsiif_request_t *ring_req,
 		if (write)
 			flags |= GNTMAP_readonly;
 
-		for (i = 0; i < nr_segments; i++)
+		for (i = 0; i < pending_req->nr_segments; i++)
 			gnttab_set_map_op(&map[i], vaddr(pending_req, i), flags,
-						ring_req->seg[i].gref,
+						pending_req->segs[i].gref,
 						info->domid);
+		for (j = 0; i < nr_segments; i++, j++)
+			gnttab_set_map_op(&map[i], vaddr(pending_req, i), flags,
+						segs[j].gref,
+						info->domid);
+
 
 		err = HYPERVISOR_grant_table_op(GNTTABOP_map_grant_ref, map, nr_segments);
 		BUG_ON(err);
 
+		j = 0;
 		for_each_sg (pending_req->sgl, sg, nr_segments, i) {
 			struct page *pg;
 
@@ -292,8 +306,15 @@ static int scsiback_gnttab_data_map(vscsiif_request_t *ring_req,
 			set_phys_to_machine(page_to_pfn(pg),
 				FOREIGN_FRAME(map[i].dev_bus_addr >> PAGE_SHIFT));
 
-			sg_set_page(sg, pg, ring_req->seg[i].length,
-				    ring_req->seg[i].offset);
+			if (i < pending_req->nr_segments)
+				sg_set_page(sg, pg,
+					    pending_req->segs[i].length,
+					    pending_req->segs[i].offset);
+			else {
+				sg_set_page(sg, pg, segs[j].length,
+					    segs[j].offset);
+				++j;
+			}
 			data_len += sg->length;
 
 			barrier();
@@ -303,6 +324,8 @@ static int scsiback_gnttab_data_map(vscsiif_request_t *ring_req,
 				err |= 1;
 
 		}
+
+		pending_req->nr_segments = nr_segments;
 
 		if (err)
 			goto fail_flush;
@@ -473,7 +496,8 @@ static void scsiback_device_reset_exec(pending_req_t *pending_req)
 	scsiback_get(info);
 	err = scsi_reset_provider(sdev, SCSI_TRY_RESET_DEVICE);
 
-	scsiback_do_resp_with_sense(NULL, err, 0, pending_req);
+	scsiback_do_resp_with_sense(NULL, err, 0, pending_req,
+				    VSCSIIF_ACT_SCSI_RESET);
 	scsiback_put(info);
 
 	return;
@@ -491,12 +515,10 @@ static int prepare_pending_reqs(struct vscsibk_info *info,
 {
 	struct scsi_device *sdev;
 	struct ids_tuple vir;
+	unsigned int nr_segs;
 	int err = -EINVAL;
 
 	DPRINTK("%s\n",__FUNCTION__);
-
-	pending_req->rqid       = ring_req->rqid;
-	pending_req->act        = ring_req->act;
 
 	pending_req->info       = info;
 
@@ -527,11 +549,10 @@ static int prepare_pending_reqs(struct vscsibk_info *info,
 		goto invalid_value;
 	}
 
-	pending_req->nr_segments = ring_req->nr_segments;
+	nr_segs = ring_req->nr_segments;
 	barrier();
-	if (pending_req->nr_segments > VSCSIIF_SG_TABLESIZE) {
-		DPRINTK("scsiback: invalid parameter nr_seg = %d\n",
-			pending_req->nr_segments);
+	if (pending_req->nr_segments + nr_segs > vscsiif_segs) {
+		DPRINTK("scsiback: invalid nr_segs = %u\n", nr_segs);
 		err = -EINVAL;
 		goto invalid_value;
 	}
@@ -548,7 +569,7 @@ static int prepare_pending_reqs(struct vscsibk_info *info,
 	
 	pending_req->timeout_per_command = ring_req->timeout_per_command;
 
-	if(scsiback_gnttab_data_map(ring_req, pending_req)) {
+	if (scsiback_gnttab_data_map(ring_req->seg, nr_segs, pending_req)) {
 		DPRINTK("scsiback: invalid buffer\n");
 		err = -EINVAL;
 		goto invalid_value;
@@ -560,6 +581,20 @@ invalid_value:
 	return err;
 }
 
+static void latch_segments(pending_req_t *pending_req,
+			   const struct vscsiif_sg_list *sgl)
+{
+	unsigned int nr_segs = sgl->nr_segments;
+
+	barrier();
+	if (pending_req->nr_segments + nr_segs <= vscsiif_segs) {
+		memcpy(pending_req->segs + pending_req->nr_segments,
+		       sgl->seg, nr_segs * sizeof(*sgl->seg));
+		pending_req->nr_segments += nr_segs;
+	}
+	else
+		DPRINTK("scsiback: invalid nr_segs = %u\n", nr_segs);
+}
 
 static int _scsiback_do_cmd_fn(struct vscsibk_info *info)
 {
@@ -586,9 +621,11 @@ static int _scsiback_do_cmd_fn(struct vscsibk_info *info)
 	}
 
 	while ((rc != rp)) {
+		int act, rqid;
+
 		if (RING_REQUEST_CONS_OVERFLOW(ring, rc))
 			break;
-		pending_req = alloc_req(info);
+		pending_req = info->preq ?: alloc_req(info);
 		if (NULL == pending_req) {
 			more_to_do = 1;
 			break;
@@ -597,9 +634,26 @@ static int _scsiback_do_cmd_fn(struct vscsibk_info *info)
 		ring_req = RING_GET_REQUEST(ring, rc);
 		ring->req_cons = ++rc;
 
-		err = prepare_pending_reqs(info, ring_req,
-						pending_req);
-		switch (err ?: pending_req->act) {
+		act = ring_req->act;
+		rqid = ring_req->rqid;
+		barrier();
+		if (!pending_req->nr_segments)
+			pending_req->rqid = rqid;
+		else if (pending_req->rqid != rqid)
+			DPRINTK("scsiback: invalid rqid %04x, expected %04x\n",
+				rqid, pending_req->rqid);
+
+		info->preq = NULL;
+		if (pending_req->rqid != rqid)
+			err = -EINVAL;
+		else if (act == VSCSIIF_ACT_SCSI_SG_PRESET) {
+			latch_segments(pending_req, (void *)ring_req);
+			info->preq = pending_req;
+			err = 0;
+		} else
+			err = prepare_pending_reqs(info, ring_req,
+						   pending_req);
+		switch (err ?: act) {
 		case VSCSIIF_ACT_SCSI_CDB:
 			/* The Host mode is through as for Emulation. */
 			if (info->feature == VSCSI_TYPE_HOST ?
@@ -608,7 +662,8 @@ static int _scsiback_do_cmd_fn(struct vscsibk_info *info)
 				scsiback_fast_flush_area(pending_req);
 				scsiback_do_resp_with_sense(NULL,
 							    DRIVER_ERROR << 24,
-							    0, pending_req);
+							    0, pending_req,
+							    act);
 			}
 			break;
 		case VSCSIIF_ACT_SCSI_RESET:
@@ -616,19 +671,27 @@ static int _scsiback_do_cmd_fn(struct vscsibk_info *info)
 			scsiback_fast_flush_area(pending_req);
 			scsiback_device_reset_exec(pending_req);
 			break;
+		case VSCSIIF_ACT_SCSI_SG_PRESET:
+			scsiback_do_resp_with_sense(NULL, 0, 0, pending_req,
+						    act);
+			break;
 		default:
 			if(!err) {
 				scsiback_fast_flush_area(pending_req);
 				if (printk_ratelimit())
 					pr_err("scsiback: invalid request %#x\n",
-					       pending_req->act);
+					       act);
 			}
 			scsiback_do_resp_with_sense(NULL, DRIVER_ERROR << 24,
-						    0, pending_req);
+						    0, pending_req, act);
+			break;
+		case -EINVAL:
+			scsiback_do_resp_with_sense(NULL, DRIVER_INVALID << 24,
+						    0, pending_req, act);
 			break;
 		case -ENODEV:
 			scsiback_do_resp_with_sense(NULL, DID_NO_CONNECT << 16,
-						    0, pending_req);
+						    0, pending_req, act);
 			break;
 		}
 
@@ -700,16 +763,31 @@ static int __init scsiback_init(void)
 	if (!is_running_on_xen())
 		return -ENODEV;
 
-	mmap_pages = vscsiif_reqs * VSCSIIF_SG_TABLESIZE;
+	if (vscsiif_segs < VSCSIIF_SG_TABLESIZE)
+		vscsiif_segs = VSCSIIF_SG_TABLESIZE;
+	if (vscsiif_segs != (uint8_t)vscsiif_segs)
+		return -EINVAL;
+	mmap_pages = vscsiif_reqs * vscsiif_segs;
 
 	pending_reqs          = kzalloc(sizeof(pending_reqs[0]) *
 					vscsiif_reqs, GFP_KERNEL);
+	if (!pending_reqs)
+		return -ENOMEM;
 	pending_grant_handles = kmalloc(sizeof(pending_grant_handles[0]) *
 					mmap_pages, GFP_KERNEL);
 	pending_pages         = alloc_empty_pages_and_pagevec(mmap_pages);
 
-	if (!pending_reqs || !pending_grant_handles || !pending_pages)
+	if (!pending_grant_handles || !pending_pages)
 		goto out_of_memory;
+
+	for (i = 0; i < vscsiif_reqs; ++i) {
+		pending_reqs[i].gref = kcalloc(sizeof(*pending_reqs->gref),
+					       vscsiif_segs, GFP_KERNEL);
+		pending_reqs[i].segs = kcalloc(sizeof(*pending_reqs->segs),
+					       vscsiif_segs, GFP_KERNEL);
+		if (!pending_reqs[i].gref || !pending_reqs[i].segs)
+			goto out_of_memory;
+	}
 
 	for (i = 0; i < mmap_pages; i++)
 		pending_grant_handles[i] = SCSIBACK_INVALID_HANDLE;
@@ -732,6 +810,10 @@ static int __init scsiback_init(void)
 out_interface:
 	scsiback_interface_exit();
 out_of_memory:
+	for (i = 0; i < vscsiif_reqs; ++i) {
+		kfree(pending_reqs[i].gref);
+		kfree(pending_reqs[i].segs);
+	}
 	kfree(pending_reqs);
 	kfree(pending_grant_handles);
 	free_empty_pages_and_pagevec(pending_pages, mmap_pages);
@@ -742,12 +824,17 @@ out_of_memory:
 #if 0
 static void __exit scsiback_exit(void)
 {
+	unsigned int i;
+
 	scsiback_xenbus_unregister();
 	scsiback_interface_exit();
+	for (i = 0; i < vscsiif_reqs; ++i) {
+		kfree(pending_reqs[i].gref);
+		kfree(pending_reqs[i].segs);
+	}
 	kfree(pending_reqs);
 	kfree(pending_grant_handles);
-	free_empty_pages_and_pagevec(pending_pages, (vscsiif_reqs * VSCSIIF_SG_TABLESIZE));
-
+	free_empty_pages_and_pagevec(pending_pages, vscsiif_reqs * vscsiif_segs);
 }
 #endif
 

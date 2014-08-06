@@ -91,7 +91,7 @@ struct vscsifrnt_shadow {
 
 	/* requested struct scsi_cmnd is stored from kernel */
 	struct scsi_cmnd *sc;
-	int gref[VSCSIIF_SG_TABLESIZE];
+	int gref[SG_ALL];
 };
 
 struct vscsifrnt_info {
@@ -105,7 +105,6 @@ struct vscsifrnt_info {
 
 	grant_ref_t ring_ref;
 	struct vscsiif_front_ring ring;
-	struct vscsiif_response	ring_res;
 
 	struct vscsifrnt_shadow shadow[VSCSIIF_MAX_REQS];
 	uint32_t shadow_free;
@@ -115,6 +114,13 @@ struct vscsifrnt_info {
 	wait_queue_head_t wq_sync;
 	unsigned int waiting_resp:1;
 	unsigned int waiting_sync:1;
+
+	struct {
+		struct scsi_cmnd *sc;
+		unsigned int rqid;
+		unsigned int done;
+		vscsiif_segment_t segs[];
+	} active;
 };
 
 #define DPRINTK(_f, _a...)				\

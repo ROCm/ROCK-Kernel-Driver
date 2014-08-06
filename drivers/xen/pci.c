@@ -50,11 +50,15 @@ static int xen_add_device(struct device *dev)
 #endif
 
 	if (pci_seg_supported) {
-		struct physdev_pci_device_add add = {
+		struct {
+			struct physdev_pci_device_add ppda;
+			uint32_t optarr[1];
+		} add = { .ppda = {
 			.seg = pci_domain_nr(pci_dev->bus),
 			.bus = pci_dev->bus->number,
 			.devfn = pci_dev->devfn
-		};
+		}};
+#define add add.ppda
 #ifdef CONFIG_ACPI
 		acpi_handle handle;
 #endif
@@ -101,6 +105,7 @@ static int xen_add_device(struct device *dev)
 #if CONFIG_XEN_COMPAT < 0x040200
 		pci_seg_supported = false;
 #endif
+#undef add
 	}
 
 	if (pci_domain_nr(pci_dev->bus))

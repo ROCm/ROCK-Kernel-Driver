@@ -51,6 +51,13 @@ struct vscsibk_info *vscsibk_info_alloc(domid_t domid)
 	if (!info)
 		return ERR_PTR(-ENOMEM);
 
+	info->gmap = kcalloc(max(sizeof(*info->gmap), sizeof(*info->gunmap)),
+			     vscsiif_segs, GFP_KERNEL);
+	if (!info->gmap) {
+		kfree(info);
+		return ERR_PTR(-ENOMEM);
+	}
+
 	info->domid = domid;
 	spin_lock_init(&info->ring_lock);
 	atomic_set(&info->nr_unreplied_reqs, 0);
@@ -122,6 +129,7 @@ void scsiback_disconnect(struct vscsibk_info *info)
 
 void scsiback_free(struct vscsibk_info *info)
 {
+	kfree(info->gmap);
 	kmem_cache_free(scsiback_cachep, info);
 }
 

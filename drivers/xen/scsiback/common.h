@@ -95,10 +95,15 @@ struct vscsibk_info {
 	unsigned int waiting_reqs;
 	struct page **mmap_pages;
 
+	struct pending_req *preq;
+
+	union {
+		struct gnttab_map_grant_ref   *gmap;
+		struct gnttab_unmap_grant_ref *gunmap;
+	};
 };
 
-typedef struct {
-	unsigned char act;
+typedef struct pending_req {
 	struct vscsibk_info *info;
 	struct scsi_device *sdev;
 
@@ -115,7 +120,8 @@ typedef struct {
 	
 	uint32_t request_bufflen;
 	struct scatterlist *sgl;
-	grant_ref_t gref[VSCSIIF_SG_TABLESIZE];
+	grant_ref_t *gref;
+	vscsiif_segment_t *segs;
 
 	int32_t rslt;
 	uint32_t resid;
@@ -124,7 +130,7 @@ typedef struct {
 	struct list_head free_list;
 } pending_req_t;
 
-
+extern unsigned int vscsiif_segs;
 
 #define scsiback_get(_b) (atomic_inc(&(_b)->nr_unreplied_reqs))
 #define scsiback_put(_b)				\
@@ -164,7 +170,7 @@ void scsiback_release_translation_entry(struct vscsibk_info *info);
 
 int scsiback_cmd_exec(pending_req_t *pending_req);
 void scsiback_do_resp_with_sense(char *sense_buffer, int32_t result,
-			uint32_t resid, pending_req_t *pending_req);
+			uint32_t resid, pending_req_t *, uint8_t act);
 void scsiback_fast_flush_area(pending_req_t *req);
 
 void scsiback_rsp_emulation(pending_req_t *pending_req);
