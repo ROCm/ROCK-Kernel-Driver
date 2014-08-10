@@ -115,6 +115,10 @@ struct kgd2kfd_shared_resources {
  * @hqd_sdma_destroy: Destructs and preempts the SDMA queue assigned to that
  * SDMA hqd slot.
  *
+ * @map_memory_to_gpu: Allocates and pins BO, PD and all related PTs
+ *
+ * @unmap_memory_to_gpu: Releases and unpins BO, PD and all related PTs
+ *
  * @get_fw_version: Returns FW versions from the header
  *
  * This structure contains function pointers to services that the kgd driver
@@ -132,6 +136,16 @@ struct kfd2kgd_calls {
 	uint64_t (*get_gpu_clock_counter)(struct kgd_dev *kgd);
 
 	uint32_t (*get_max_engine_clock_in_mhz)(struct kgd_dev *kgd);
+
+	int (*create_process_vm)(struct kgd_dev *kgd, void **vm);
+	void (*destroy_process_vm)(struct kgd_dev *kgd, void *vm);
+
+	int (*create_process_gpumem)(struct kgd_dev *kgd, uint64_t va, size_t size, void *vm, struct kgd_mem **mem);
+	void (*destroy_process_gpumem)(struct kgd_dev *kgd, struct kgd_mem *mem);
+
+	uint32_t (*get_process_page_dir)(void *vm);
+
+	int (*open_graphic_handle)(struct kgd_dev *kgd, uint64_t va, void *vm, int fd, uint32_t handle, struct kgd_mem **mem);
 
 	/* Register access functions */
 	void (*program_sh_mem_settings)(struct kgd_dev *kgd, uint32_t vmid,
@@ -176,6 +190,16 @@ struct kfd2kgd_calls {
 	uint32_t (*address_watch_get_offset)(struct kgd_dev *kgd,
 					unsigned int watch_point_id,
 					unsigned int reg_offset);
+	bool (*read_atc_vmid_pasid_mapping_reg_valid_field)(
+					struct kgd_dev *kgd,
+					uint8_t vmid);
+	uint16_t (*read_atc_vmid_pasid_mapping_reg_pasid_field)(
+					struct kgd_dev *kgd,
+					uint8_t vmid);
+	void (*write_vmid_invalidate_request)(struct kgd_dev *kgd,
+					uint8_t vmid);
+	int (*map_memory_to_gpu)(struct kgd_dev *kgd, uint64_t va, size_t size, void *vm, struct kgd_mem **mem);
+	int (*unmap_memory_to_gpu)(struct kgd_dev *kgd, struct kgd_mem *mem);
 
 	uint16_t (*get_fw_version)(struct kgd_dev *kgd,
 				enum kgd_engine_type type);
