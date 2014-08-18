@@ -34,6 +34,7 @@ static const struct kfd_device_info kaveri_device_info = {
 	.asic_family = CHIP_KAVERI,
 	.max_pasid_bits = 16,
 	.ih_ring_entry_size = 4 * sizeof(uint32_t),
+	.event_interrupt_class = &event_interrupt_class_cik,
 	.mqd_size_aligned = MQD_SIZE_ALIGNED
 };
 
@@ -343,15 +344,17 @@ int kgd2kfd_resume(struct kfd_dev *kfd)
 /* This is called directly from KGD at ISR. */
 void kgd2kfd_interrupt(struct kfd_dev *kfd, const void *ih_ring_entry)
 {
-	if (kfd->init_complete) {
-		spin_lock(&kfd->interrupt_lock);
+	if (!kfd->init_complete)
+		return;
 
-		if (kfd->interrupts_active
-		    && enqueue_ih_ring_entry(kfd, ih_ring_entry))
-			schedule_work(&kfd->interrupt_work);
+	spin_lock(&kfd->interrupt_lock);
 
-		spin_unlock(&kfd->interrupt_lock);
-	}
+	if (kfd->interrupts_active
+	    && interrupt_is_wanted(kfd, ih_ring_entry)
+	    && enqueue_ih_ring_entry(kfd, ih_ring_entry))
+		schedule_work(&kfd->interrupt_work);
+
+	spin_unlock(&kfd->interrupt_lock);
 }
 
 static int kfd_gtt_sa_init(struct kfd_dev *kfd, unsigned int buf_size,

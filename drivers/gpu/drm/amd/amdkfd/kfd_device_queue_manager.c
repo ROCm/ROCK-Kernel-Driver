@@ -523,6 +523,15 @@ int init_pipelines(struct device_queue_manager *dqm,
 	return 0;
 }
 
+static void init_interrupts(struct device_queue_manager *dqm)
+{
+	unsigned int i;
+
+	BUG_ON(dqm == NULL);
+
+	for (i = 0 ; i < get_pipes_num(dqm) ; i++)
+		kfd2kgd->init_interrupts(dqm->dev->kgd, i);
+}
 static int init_scheduler(struct device_queue_manager *dqm)
 {
 	int retval;
@@ -582,6 +591,7 @@ static void uninitialize_nocpsch(struct device_queue_manager *dqm)
 
 static int start_nocpsch(struct device_queue_manager *dqm)
 {
+	init_interrupts(dqm);
 	return 0;
 }
 
@@ -751,6 +761,9 @@ static int start_cpsch(struct device_queue_manager *dqm)
 
 	dqm->fence_addr = dqm->fence_mem->cpu_ptr;
 	dqm->fence_gpu_addr = dqm->fence_mem->gpu_addr;
+
+	init_interrupts(dqm);
+
 	list_for_each_entry(node, &dqm->queues, list)
 		if (node->qpd->pqm->process && dqm->dev)
 			kfd_bind_process_to_device(dqm->dev,
