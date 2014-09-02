@@ -29,10 +29,11 @@
 #define KFD_DRIVER_AUTHOR	"AMD Inc. and others"
 
 #define KFD_DRIVER_DESC		"Standalone HSA driver for AMD's GPUs"
-#define KFD_DRIVER_DATE		"20150122"
+#define KFD_DRIVER_DATE		"20141022"
 #define KFD_DRIVER_MAJOR	0
-#define KFD_DRIVER_MINOR	7
-#define KFD_DRIVER_PATCHLEVEL	1
+#define KFD_DRIVER_MINOR	9
+#define KFD_DRIVER_PATCHLEVEL	9
+#define KFD_DRIVER_RC_LEVEL	"-rc2"
 
 static const struct kgd2kfd_calls kgd2kfd = {
 	.exit		= kgd2kfd_exit,
@@ -135,4 +136,5 @@ MODULE_DESCRIPTION(KFD_DRIVER_DESC);
 MODULE_LICENSE("GPL and additional rights");
 MODULE_VERSION(__stringify(KFD_DRIVER_MAJOR) "."
 	       __stringify(KFD_DRIVER_MINOR) "."
-	       __stringify(KFD_DRIVER_PATCHLEVEL));
+	       __stringify(KFD_DRIVER_PATCHLEVEL)
+	       KFD_DRIVER_RC_LEVEL);
