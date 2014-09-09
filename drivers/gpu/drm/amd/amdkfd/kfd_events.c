@@ -111,10 +111,8 @@ static int map_signal_page_to_user(struct file *devkfd, struct signal_page *page
 {
 	void __user *user_address;
 
-#if 0
 	user_address = (void __user *)vm_mmap(devkfd, 0, PAGE_SIZE, PROT_WRITE | PROT_READ, MAP_SHARED,
 					      (KFD_MMAP_EVENTS_START + page->page_index) << PAGE_SHIFT);
-#endif
 
 	if (IS_ERR(user_address))
 		return PTR_ERR(user_address);
@@ -716,7 +714,7 @@ fail:
 int radeon_kfd_event_mmap(struct kfd_process *p,
 			  struct vm_area_struct *vma)
 {
-#if 0
+
 	unsigned int page_index;
 	unsigned long pfn;
 	struct signal_page *page;
@@ -750,7 +748,4 @@ int radeon_kfd_event_mmap(struct kfd_process *p,
 
 	/* mapping the page to user process */
 	return remap_pfn_range(vma, vma->vm_start, pfn, PAGE_SIZE, vma->vm_page_prot);
-#else
-	return 0;
-#endif
 }

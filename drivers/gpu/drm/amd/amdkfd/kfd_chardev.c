@@ -712,5 +712,8 @@ static int kfd_mmap(struct file *filp, struct vm_area_struct *vma)
 	if (IS_ERR(process))
 		return PTR_ERR(process);
 
-	return kfd_doorbell_mmap(process, vma);
+	if (vma->vm_pgoff >= KFD_MMAP_EVENTS_START && vma->vm_pgoff < KFD_MMAP_EVENTS_END)
+		return radeon_kfd_event_mmap(process, vma);
+	else
+		return kfd_doorbell_mmap(process, vma);
 }

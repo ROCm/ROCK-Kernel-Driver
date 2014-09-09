@@ -35,6 +35,8 @@
 
 #define KFD_SYSFS_FILE_MODE 0444
 
+#define KFD_MMAP_EVENTS_START	(((1ULL << 32)*2) >> PAGE_SHIFT)
+#define KFD_MMAP_EVENTS_END	(KFD_MMAP_EVENTS_START + (1ULL << (32 - PAGE_SHIFT)))
 /*
  * When working with cp scheduler we should assign the HIQ manually or via
  * the radeon driver to a fixed hqd slot, here are the fixed HIQ hqd slot
