@@ -514,6 +514,64 @@ static int kfd_ioctl_get_process_apertures(struct file *filp,
 	return 0;
 }
 
+static int
+kfd_ioctl_create_event(struct file *filp, struct kfd_process *p, void *data)
+{
+	struct kfd_ioctl_create_event_args *args = data;
+	void __user *event_trigger_address;
+	int err;
+
+	err = kfd_event_create(filp, p, args->event_type,
+				args->auto_reset != 0, args->node_id,
+				&args->event_id, &event_trigger_address,
+				&args->event_trigger_data);
+
+	args->event_trigger_address = (uint64_t)(uintptr_t)event_trigger_address;
+
+	return err;
+}
+
+static int
+kfd_ioctl_destroy_event(struct file *filp, struct kfd_process *p, void *data)
+{
+	struct kfd_ioctl_destroy_event_args *args = data;
+
+	return kfd_event_destroy(p, args->event_id);
+}
+
+static int
+kfd_ioctl_set_event(struct file *filp, struct kfd_process *p, void *data)
+{
+	struct kfd_ioctl_set_event_args *args = data;
+
+	return kfd_set_event(p, args->event_id);
+}
+
+static int
+kfd_ioctl_reset_event(struct file *filp, struct kfd_process *p, void *data)
+{
+	struct kfd_ioctl_reset_event_args *args = data;
+
+	return kfd_reset_event(p, args->event_id);
+}
+
+static int
+kfd_ioctl_wait_events(struct file *filp, struct kfd_process *p, void *data)
+{
+	struct kfd_ioctl_wait_events_args *args = data;
+	enum kfd_event_wait_result wait_result;
+	int err;
+
+	err = kfd_wait_on_events(p, args->num_events,
+				(uint32_t __user *)args->events_ptr,
+				(args->wait_for_all != 0), args->timeout,
+				&wait_result);
+
+	args->wait_result = wait_result;
+
+	return err;
+}
+
 #define AMDKFD_IOCTL_DEF(ioctl, _func, _flags) \
 	[_IOC_NR(ioctl)] = {.cmd = ioctl, .func = _func, .flags = _flags, .cmd_drv = 0, .name = #ioctl}
 
@@ -539,6 +597,21 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_UPDATE_QUEUE,
 			kfd_ioctl_update_queue, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_CREATE_EVENT,
+			kfd_ioctl_create_event, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_DESTROY_EVENT,
+			kfd_ioctl_destroy_event, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_SET_EVENT,
+			kfd_ioctl_set_event, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_RESET_EVENT,
+			kfd_ioctl_reset_event, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_WAIT_EVENTS,
+			kfd_ioctl_wait_events, 0),
 };
 
 #define AMDKFD_CORE_IOCTL_COUNT	ARRAY_SIZE(amdkfd_ioctls)
