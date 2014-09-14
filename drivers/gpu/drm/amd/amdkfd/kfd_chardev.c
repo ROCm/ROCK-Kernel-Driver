@@ -36,6 +36,7 @@
 #include "kfd_priv.h"
 #include "kfd_device_queue_manager.h"
 #include "kfd_dbgmgr.h"
+#include "cik_regs.h"
 
 static long kfd_ioctl(struct file *, unsigned int, unsigned long);
 static int kfd_open(struct inode *, struct file *);
@@ -862,6 +863,89 @@ kfd_ioctl_wait_events(struct file *filp, struct kfd_process *p, void *data)
 	return err;
 }
 
+static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
+					struct kfd_process *p, void *data)
+{
+	struct kfd_ioctl_map_memory_to_gpu_args *args = data;
+	struct kfd_process_device *pdd;
+	void *mem;
+	struct kfd_dev *dev;
+	int idr_handle;
+	long err;
+
+	if (args->size == 0)
+		return -EINVAL;
+
+	dev = kfd_device_by_id(args->gpu_id);
+	if (dev == NULL)
+		return -EINVAL;
+
+	mutex_lock(&p->mutex);
+
+	pdd = kfd_bind_process_to_device(dev, p);
+	if (IS_ERR(pdd) < 0) {
+		err = PTR_ERR(pdd);
+		goto bind_process_to_device_failed;
+	}
+
+	err = kfd2kgd->map_memory_to_gpu(dev->kgd, args->va_addr, args->size,
+					pdd->vm, (struct kgd_mem **) &mem);
+	if (err != 0)
+		goto map_memory_to_gpu_failed;
+
+	idr_handle = kfd_process_device_create_obj_handle(pdd, mem);
+	if (idr_handle < 0) {
+		err = -EFAULT;
+		goto handle_creation_failed;
+	}
+
+	args->handle = MAKE_HANDLE(args->gpu_id, idr_handle);
+
+	radeon_flush_tlb(dev, p->pasid);
+
+	mutex_unlock(&p->mutex);
+
+	return 0;
+
+handle_creation_failed:
+	kfd2kgd->unmap_memory_to_gpu(dev->kgd, (struct kgd_mem *) mem);
+map_memory_to_gpu_failed:
+bind_process_to_device_failed:
+	mutex_unlock(&p->mutex);
+	return err;
+}
+
+static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
+					struct kfd_process *p, void *data)
+{
+	struct kfd_ioctl_unmap_memory_from_gpu_args *args = data;
+	struct kfd_process_device *pdd;
+	void *mem;
+	struct kfd_dev *dev;
+
+	dev = kfd_device_by_id(GET_GPU_ID(args->handle));
+	if (dev == NULL)
+		return -EINVAL;
+
+	mutex_lock(&p->mutex);
+
+	pdd = kfd_get_process_device_data(dev, p);
+	BUG_ON(pdd == NULL);
+
+	mem = kfd_process_device_translate_handle(pdd,
+						GET_IDR_HANDLE(args->handle));
+	BUG_ON(mem == NULL);
+
+	kfd_process_device_remove_obj_handle(pdd, GET_IDR_HANDLE(args->handle));
+
+	kfd2kgd->unmap_memory_to_gpu(dev->kgd, mem);
+
+	radeon_flush_tlb(dev, p->pasid);
+
+	mutex_unlock(&p->mutex);
+	return 0;
+}
+
 #define AMDKFD_IOCTL_DEF(ioctl, _func, _flags) \
 	[_IOC_NR(ioctl)] = {.cmd = ioctl, .func = _func, .flags = _flags, .cmd_drv = 0, .name = #ioctl}
 
@@ -914,6 +998,12 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_DBG_WAVE_CONTROL,
 			kfd_ioctl_dbg_wave_control, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_MAP_MEMORY_TO_GPU,
+			kfd_ioctl_map_memory_to_gpu, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_UNMAP_MEMORY_FROM_GPU,
+			kfd_ioctl_unmap_memory_from_gpu, 0),
 };
 
 #define AMDKFD_CORE_IOCTL_COUNT	ARRAY_SIZE(amdkfd_ioctls)
