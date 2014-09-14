@@ -398,6 +398,7 @@ static struct mqd_manager *get_mqd_manager_nocpsch(
 static int register_process_nocpsch(struct device_queue_manager *dqm,
 					struct qcm_process_device *qpd)
 {
+	struct kfd_process_device *pdd;
 	struct device_process_node *n;
 	int retval;
 
@@ -413,6 +414,9 @@ static int register_process_nocpsch(struct device_queue_manager *dqm,
 
 	mutex_lock(&dqm->lock);
 	list_add(&n->list, &dqm->queues);
+
+	pdd = qpd_to_pdd(qpd);
+	qpd->page_table_base = kfd2kgd->get_process_page_dir(pdd->vm);
 
 	retval = dqm->ops_asic_specific.register_process(dqm, qpd);
 

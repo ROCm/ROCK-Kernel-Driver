@@ -57,6 +57,9 @@ struct kfd_process_release_work {
 	struct kfd_process *p;
 };
 
+#define MIN_IDR_ID 1
+#define MAX_IDR_ID 0 /*0 - for unlimited*/
+
 static struct kfd_process *find_process(const struct task_struct *thread);
 static struct kfd_process *create_process(const struct task_struct *thread);
 
@@ -158,6 +161,8 @@ static void kfd_process_wq_release(struct work_struct *work)
 	struct kfd_process_release_work *my_work;
 	struct kfd_process_device *pdd, *temp;
 	struct kfd_process *p;
+	void *mem;
+	int id;
 
 	my_work = (struct kfd_process_release_work *) work;
 
@@ -175,6 +180,16 @@ static void kfd_process_wq_release(struct work_struct *work)
 
 		amd_iommu_unbind_pasid(pdd->dev->pdev, p->pasid);
 		list_del(&pdd->per_device_list);
+
+		/*Remove all handles from idr and release appropriate local memory object*/
+		idr_for_each_entry(&pdd->alloc_idr, mem, id) {
+			idr_remove(&pdd->alloc_idr, id);
+			kfd2kgd->unmap_memory_to_gpu(pdd->dev->kgd, mem);
+		}
+
+		/* Destroy the GPUVM VM context */
+		if (pdd->vm)
+			kfd2kgd->destroy_process_vm(pdd->dev->kgd, pdd->vm);
 
 		kfree(pdd);
 	}
@@ -372,9 +387,18 @@ struct kfd_process_device *kfd_bind_process_to_device(struct kfd_dev *dev,
 	if (pdd->bound)
 		return pdd;
 
-	err = amd_iommu_bind_pasid(dev->pdev, p->pasid, p->lead_thread);
-	if (err < 0)
+	idr_init(&pdd->alloc_idr);
+
+	/* Create the GPUVM context for this specific device */
+	err = kfd2kgd->create_process_vm(dev->kgd, &pdd->vm);
+	if (err != 0)
 		return ERR_PTR(err);
+
+	err = amd_iommu_bind_pasid(dev->pdev, p->pasid, p->lead_thread);
+	if (err < 0) {
+		kfd2kgd->destroy_process_vm(dev->kgd, pdd->vm);
+		return ERR_PTR(err);
+	}
 
 	pdd->bound = true;
 
@@ -446,6 +470,48 @@ struct kfd_process_device *kfd_get_next_process_device_data(struct kfd_process *
 bool kfd_has_process_device_data(struct kfd_process *p)
 {
 	return !(list_empty(&p->per_device_data));
+}
+
+/* Create specific handle mapped to mem from process local memory idr
+ * Assumes that the process lock is held. */
+int kfd_process_device_create_obj_handle(struct kfd_process_device *pdd, void *mem)
+{
+	int handle;
+
+	BUG_ON(pdd == NULL);
+	BUG_ON(mem == NULL);
+
+	idr_preload(GFP_KERNEL);
+
+	handle = idr_alloc(&pdd->alloc_idr, mem, MIN_IDR_ID, MAX_IDR_ID, GFP_NOWAIT);
+
+	idr_preload_end();
+
+	return handle;
+}
+
+/* Translate specific handle from process local memory idr
+ * Assumes that the process lock is held. */
+void *kfd_process_device_translate_handle(struct kfd_process_device *pdd, int handle)
+{
+	BUG_ON(pdd == NULL);
+
+	if (handle < 0)
+		return NULL;
+
+	return idr_find(&pdd->alloc_idr, handle);
+}
+
+/* Remove specific handle from process local memory idr
+ * Assumes that the process lock is held. */
+void kfd_process_device_remove_obj_handle(struct kfd_process_device *pdd, int handle)
+{
+	BUG_ON(pdd == NULL);
+
+	if (handle < 0)
+		return;
+
+	idr_remove(&pdd->alloc_idr, handle);
 }
 
 /* This returns with process->mutex locked. */

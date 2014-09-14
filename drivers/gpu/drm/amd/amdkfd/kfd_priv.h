@@ -30,6 +30,7 @@
 #include <linux/atomic.h>
 #include <linux/workqueue.h>
 #include <linux/spinlock.h>
+#include <linux/idr.h>
 #include <linux/kfd_ioctl.h>
 #include <kgd_kfd_interface.h>
 
@@ -207,6 +208,14 @@ enum kfd_mempool {
 	KFD_MEMPOOL_SYSTEM_WRITECOMBINE = 2,
 	KFD_MEMPOOL_FRAMEBUFFER = 3,
 };
+
+/* GPU memory support for the user mode process */
+int radeon_kfd_process_create_vm(struct kfd_dev *kfd, void **vm);
+void radeon_kfd_process_destroy_vm(struct kfd_dev *kfd, void *vm);
+uint64_t radeon_kfd_process_get_pd(void *vm);
+int radeon_kfd_process_gpuvm_alloc(struct kfd_dev *kfd, uint64_t va, size_t size, void *vm, void **mem_obj);
+void radeon_kfd_process_gpuvm_free(struct kfd_dev *kfd, void *mem_obj);
+int radeon_kfd_process_open_graphic_handle(struct kfd_dev *kfd, uint64_t va, void *vm, int32_t fd, uint32_t handle, void **mem_obj);
 
 /* Character device interface */
 int kfd_chardev_init(void);
@@ -431,6 +440,12 @@ struct qcm_process_device {
 	uint32_t num_oac;
 };
 
+/*8 byte handle containing GPU ID in the most significant 4 bytes and
+ * idr_handle in the least significant 4 bytes*/
+#define MAKE_HANDLE(gpu_id, idr_handle) (((uint64_t)(gpu_id) << 32) + idr_handle)
+#define GET_GPU_ID(handle) (handle >> 32)
+#define GET_IDR_HANDLE(handle) (handle & 0xFFFFFFFF)
+
 /* Data that is per-process-per device. */
 struct kfd_process_device {
 	/*
@@ -456,6 +471,12 @@ struct kfd_process_device {
 
 	/* Is this process/pasid bound to this device? (amd_iommu_bind_pasid) */
 	bool bound;
+
+	/* VM context for GPUVM allocations */
+	void *vm;
+
+	/* GPUVM allocations storage */
+	struct idr alloc_idr;
 };
 
 #define qpd_to_pdd(x) container_of(x, struct kfd_process_device, qpd)
@@ -546,6 +567,11 @@ struct kfd_process_device *kfd_get_process_device_data(struct kfd_dev *dev,
 							struct kfd_process *p);
 struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 							struct kfd_process *p);
+
+/* KFD process API for creating and translating handles */
+int kfd_process_device_create_obj_handle(struct kfd_process_device *p, void *mem);
+void *kfd_process_device_translate_handle(struct kfd_process_device *p, int handle);
+void kfd_process_device_remove_obj_handle(struct kfd_process_device *p, int handle);
 
 /* Process device data iterator */
 struct kfd_process_device *kfd_get_first_process_device_data(struct kfd_process *p);
@@ -710,5 +736,7 @@ int kfd_event_create(struct file *devkfd, struct kfd_process *p,
 		     uint32_t event_type, bool auto_reset, uint32_t node_id,
 		     uint32_t *event_id, void __user **event_trigger_address, uint32_t *event_trigger_data);
 int kfd_event_destroy(struct kfd_process *p, uint32_t event_id);
+
+void radeon_flush_tlb(struct kfd_dev *dev, uint32_t pasid);
 
 #endif
