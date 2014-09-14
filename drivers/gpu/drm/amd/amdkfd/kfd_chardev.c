@@ -946,6 +946,58 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 	return 0;
 }
 
+static int kfd_ioctl_open_graphic_handle(struct file *filep,
+					struct kfd_process *p,
+					void *data)
+{
+	struct kfd_ioctl_open_graphic_handle_args *args = data;
+	struct kfd_dev *dev;
+	struct kfd_process_device *pdd;
+	void *mem;
+	int idr_handle;
+	long err;
+
+	dev = kfd_device_by_id(args->gpu_id);
+	if (dev == NULL)
+		return -EINVAL;
+
+	mutex_lock(&p->mutex);
+
+	pdd = kfd_bind_process_to_device(dev, p);
+	if (IS_ERR(pdd) < 0) {
+		err = PTR_ERR(pdd);
+		goto bind_process_to_device_failed;
+	}
+
+	err = kfd2kgd->open_graphic_handle(dev->kgd,
+			args->va_addr,
+			(struct kgd_vm *) pdd->vm,
+			args->graphic_device_fd,
+			args->graphic_handle,
+			(struct kgd_mem **) &mem);
+
+	if (err != 0)
+		goto gpuvm_alloc_failed;
+
+	idr_handle = kfd_process_device_create_obj_handle(pdd, mem);
+	if (idr_handle < 0)
+		goto handle_creation_failed;
+
+	args->handle = MAKE_HANDLE(args->gpu_id, idr_handle);
+
+	mutex_unlock(&p->mutex);
+
+	return 0;
+
+handle_creation_failed:
+	kfd2kgd->destroy_process_gpumem(dev->kgd, mem);
+gpuvm_alloc_failed:
+bind_process_to_device_failed:
+	mutex_unlock(&p->mutex);
+
+	return err;
+}
+
 #define AMDKFD_IOCTL_DEF(ioctl, _func, _flags) \
 	[_IOC_NR(ioctl)] = {.cmd = ioctl, .func = _func, .flags = _flags, .cmd_drv = 0, .name = #ioctl}
 
@@ -1004,6 +1056,9 @@ static const struct amdkfd_ioctl_desc amdkfd_ioctls[] = {
 
 	AMDKFD_IOCTL_DEF(AMDKFD_IOC_UNMAP_MEMORY_FROM_GPU,
 			kfd_ioctl_unmap_memory_from_gpu, 0),
+
+	AMDKFD_IOCTL_DEF(AMDKFD_IOC_OPEN_GRAPHIC_HANDLE,
+			kfd_ioctl_open_graphic_handle, 0),
 };
 
 #define AMDKFD_CORE_IOCTL_COUNT	ARRAY_SIZE(amdkfd_ioctls)
