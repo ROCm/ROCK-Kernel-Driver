@@ -3,6 +3,10 @@
 
 #include <asm/desc.h>
 #include <linux/atomic.h>
+#include <linux/mm_types.h>
+
+#include <trace/events/tlb.h>
+
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
 
@@ -100,6 +104,7 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 		op->cmd = MMUEXT_NEW_BASEPTR;
 		op->arg1.mfn = virt_to_mfn(next->pgd);
 		op++;
+		trace_tlb_flush(TLB_FLUSH_ON_TASK_SWITCH, TLB_FLUSH_ALL);
 
 		/* xen_new_user_pt(next->pgd) */
 #ifdef CONFIG_X86_64
@@ -142,6 +147,7 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 			 * to make sure to use no freed page tables.
 			 */
 			load_cr3(next->pgd);
+			trace_tlb_flush(TLB_FLUSH_ON_TASK_SWITCH, TLB_FLUSH_ALL);
 			xen_new_user_pt(next->pgd);
 			load_LDT_nolock(&next->context);
 		}

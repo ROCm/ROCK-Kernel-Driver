@@ -23,6 +23,7 @@
 
 #include <asm/vsyscall.h>
 #include <asm/delay.h>
+#include <asm/efi.h>
 #include <asm/time.h>
 #include <asm/timer.h>
 
@@ -633,7 +634,7 @@ core_initcall(cpufreq_time_setup);
  * /proc/sys/xen: This really belongs in another file. It can stay here for
  * now however.
  */
-static ctl_table xen_subtable[] = {
+static struct ctl_table xen_subtable[] = {
 	{
 		.procname	= "independent_wallclock",
 		.data		= &independent_wallclock,
@@ -650,7 +651,7 @@ static ctl_table xen_subtable[] = {
 	},
 	{ }
 };
-static ctl_table xen_table[] = {
+static struct ctl_table xen_table[] = {
 	{
 		.procname	= "xen",
 		.mode		= 0555,

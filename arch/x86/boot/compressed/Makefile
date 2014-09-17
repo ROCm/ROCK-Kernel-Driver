@@ -36,7 +36,8 @@ VMLINUX_OBJS = $(obj)/vmlinux.lds $(obj)/head_$(BITS).o $(obj)/misc.o \
 $(obj)/eboot.o: KBUILD_CFLAGS += -fshort-wchar -mno-red-zone
 
 ifeq ($(CONFIG_EFI_STUB), y)
-	VMLINUX_OBJS += $(obj)/eboot.o $(obj)/efi_stub_$(BITS).o
+	VMLINUX_OBJS += $(obj)/eboot.o $(obj)/efi_stub_$(BITS).o \
+				$(objtree)/drivers/firmware/efi/libstub/lib.a
 endif
 ifeq ($(CONFIG_XEN), y)
 	VMLINUX_OBJS = $(obj)/vmlinux.lds $(obj)/piggy.o

@@ -41,6 +41,7 @@ static int netback_remove(struct xenbus_device *dev)
 	down_write(&teardown_sem);
 	if (be->netif) {
 		xenbus_rm(XBT_NIL, be->dev->nodename, "hotplug-status");
+		netif_disconnect(be);
 		netif_free(be);
 		be->netif = NULL;
 	}
@@ -52,10 +53,13 @@ static int netback_remove(struct xenbus_device *dev)
 
 static void netback_disconnect(struct device *xbdev_dev)
 {
-	struct backend_info *be = dev_get_drvdata(xbdev_dev);
+	struct backend_info *be;
 
+	down_read(&teardown_sem);
+	be = dev_get_drvdata(xbdev_dev);
 	if (be && be->netif)
 		netif_disconnect(be);
+	up_read(&teardown_sem);
 }
 
 /**

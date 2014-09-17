@@ -1267,12 +1267,6 @@ void __init memblock_x86_fill(void)
 		memblock_add(ei->addr, ei->size);
 	}
 
-#ifdef CONFIG_XEN
-	if (max_pfn > xen_start_info->nr_pages)
-		memblock_reserve(PFN_PHYS(xen_start_info->nr_pages),
-				 PFN_PHYS(max_pfn - xen_start_info->nr_pages));
-#endif
-
 	/* throw away partial pages */
 	memblock_trim_memory(PAGE_SIZE);
 

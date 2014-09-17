@@ -66,7 +66,17 @@ struct legacy_pic {
 	void (*make_irq)(unsigned int irq);
 };
 
+#ifndef CONFIG_XEN
 extern struct legacy_pic *legacy_pic;
 extern struct legacy_pic null_legacy_pic;
+#else
+extern const struct legacy_pic xen_legacy_pic;
+#define legacy_pic (&xen_legacy_pic)
+#endif
+
+static inline int nr_legacy_irqs(void)
+{
+	return legacy_pic->nr_legacy_irqs;
+}
 
 #endif /* _ASM_X86_I8259_H */

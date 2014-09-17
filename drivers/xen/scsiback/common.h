@@ -61,7 +61,7 @@ struct ids_tuple {
 	unsigned int hst;		/* host    */
 	unsigned int chn;		/* channel */
 	unsigned int tgt;		/* target  */
-	unsigned int lun;		/* LUN     */
+	u64 lun;			/* LUN     */
 };
 
 struct v2p_entry {

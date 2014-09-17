@@ -202,7 +202,7 @@ static void scsiback_print_status(char *sense_buffer, int errors,
 {
 	struct scsi_device *sdev = pending_req->sdev;
 	
-	pr_err("scsiback[%d:%d:%d:%d] cmnd[0]=%02x -> st=%02x msg=%02x host=%02x drv=%02x\n",
+	pr_err("scsiback[%u:%u:%u:%Lu] cmnd[0]=%02x -> st=%02x msg=%02x host=%02x drv=%02x\n",
 	       sdev->host->host_no, sdev->channel, sdev->id, sdev->lun,
 	       pending_req->cmnd[0], status_byte(errors), msg_byte(errors),
 	       host_byte(errors), driver_byte(errors));

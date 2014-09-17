@@ -105,7 +105,7 @@ struct scsi_device *scsiback_get_scsi_device(struct ids_tuple *phy)
 	}
 	sdev   = scsi_device_lookup(shost, phy->chn, phy->tgt, phy->lun);
 	if (!sdev) {
-		pr_err("scsiback: %d:%d:%d:%d doesn't exist\n",
+		pr_err("scsiback: %u:%u:%u:%Lu doesn't exist\n",
 		       phy->hst, phy->chn, phy->tgt, phy->lun);
 		scsi_host_put(shost);
 		return NULL;
@@ -146,7 +146,7 @@ static void scsiback_do_lun_hotplug(struct backend_info *be, int op)
 		/* physical SCSI device */
 		snprintf(str, sizeof(str), "vscsi-devs/%s/p-dev", dir[i]);
 		err = xenbus_scanf(XBT_NIL, dev->nodename, str,
-			"%u:%u:%u:%u", &phy.hst, &phy.chn, &phy.tgt, &phy.lun);
+			"%u:%u:%u:%Lu", &phy.hst, &phy.chn, &phy.tgt, &phy.lun);
 		if (XENBUS_EXIST_ERR(err)) {
 			xenbus_printf(XBT_NIL, dev->nodename, state_str,
 					"%d", XenbusStateClosed);
@@ -156,8 +156,9 @@ static void scsiback_do_lun_hotplug(struct backend_info *be, int op)
 		/* virtual SCSI device */
 		snprintf(str, sizeof(str), "vscsi-devs/%s/v-dev", dir[i]);
 		err = xenbus_scanf(XBT_NIL, dev->nodename, str,
-			"%u:%u:%u:%u", &vir.hst, &vir.chn, &vir.tgt, &vir.lun);
-		if (XENBUS_EXIST_ERR(err)) {
+			"%u:%u:%u:%Lu", &vir.hst, &vir.chn, &vir.tgt, &vir.lun);
+		if (XENBUS_EXIST_ERR(err)
+		    || vir.lun > 0x3fff /* see emulate.c:__report_luns() */) {
 			xenbus_printf(XBT_NIL, dev->nodename, state_str,
 					"%d", XenbusStateClosed);
 			continue;

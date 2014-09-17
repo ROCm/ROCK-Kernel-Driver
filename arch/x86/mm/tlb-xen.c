@@ -9,12 +9,24 @@
 #include <asm/cache.h>
 #include <linux/debugfs.h>
 
+/*
+ * See Documentation/x86/tlb.txt for details.  We choose 33
+ * because it is large enough to cover the vast majority (at
+ * least 95%) of allocations, and is small enough that we are
+ * confident it will not cause too much overhead.  Each single
+ * flush is about 100 ns, so this caps the maximum overhead at
+ * _about_ 3,000 ns.
+ *
+ * This is in units of pages.
+ */
+static unsigned long tlb_single_page_flush_ceiling __read_mostly = 33;
+
 void flush_tlb_mm_range(struct mm_struct *mm, unsigned long start,
 				unsigned long end, unsigned long vmflag)
 {
 	unsigned long addr;
-	unsigned act_entries, tlb_entries = 0;
-	unsigned long nr_base_pages;
+	/* do a global flush by default */
+	unsigned long base_pages_to_flush = TLB_FLUSH_ALL;
 	const cpumask_t *mask = mm_cpumask(mm);
 	cpumask_var_t temp;
 
@@ -31,34 +43,21 @@ void flush_tlb_mm_range(struct mm_struct *mm, unsigned long start,
 		}
 	}
 
-	if (end == TLB_FLUSH_ALL || tlb_flushall_shift == -1
-				 || vmflag & VM_HUGETLB)
-		goto flush_all;
+	if ((end != TLB_FLUSH_ALL) && !(vmflag & VM_HUGETLB))
+		base_pages_to_flush = (end - start) >> PAGE_SHIFT;
 
-	/* In modern CPU, last level tlb used for both data/ins */
-	if (vmflag & VM_EXEC)
-		tlb_entries = tlb_lli_4k[ENTRIES];
-	else
-		tlb_entries = tlb_lld_4k[ENTRIES];
-
-	/* Assume all of TLB entries was occupied by this task */
-	act_entries = tlb_entries >> tlb_flushall_shift;
-	act_entries = mm->total_vm > act_entries ? act_entries : mm->total_vm;
-	nr_base_pages = (end - start) >> PAGE_SHIFT;
-
-	/* tlb_flushall_shift is on balance point, details in commit log */
-	if (nr_base_pages <= act_entries) {
+	if (base_pages_to_flush > tlb_single_page_flush_ceiling) {
+		base_pages_to_flush = TLB_FLUSH_ALL;
+		count_vm_tlb_event(NR_TLB_LOCAL_FLUSH_ALL);
+		xen_tlb_flush_mask(mask);
+	} else {
 		/* flush range by one by one 'invlpg' */
 		for (addr = start; addr < end; addr += PAGE_SIZE) {
 			count_vm_tlb_event(NR_TLB_LOCAL_FLUSH_ONE);
 			xen_invlpg_mask(mask, addr);
 		}
-	} else {
-flush_all:
-		count_vm_tlb_event(NR_TLB_LOCAL_FLUSH_ALL);
-		xen_tlb_flush_mask(mask);
 	}
-
+	trace_tlb_flush(TLB_LOCAL_MM_SHOOTDOWN, base_pages_to_flush);
 	if (mask != mm_cpumask(mm))
 		free_cpumask_var(temp);
 	preempt_enable();
@@ -66,17 +65,12 @@ flush_all:
 
 void flush_tlb_kernel_range(unsigned long start, unsigned long end)
 {
-	unsigned act_entries;
-
-	/* In modern CPU, last level tlb used for both data/ins */
-	act_entries = tlb_lld_4k[ENTRIES];
 
 	/* Balance as user space task's flush, a bit conservative */
-	if (end == TLB_FLUSH_ALL || tlb_flushall_shift == -1 ||
-		(end - start) >> PAGE_SHIFT > act_entries >> tlb_flushall_shift)
-
+	if (end == TLB_FLUSH_ALL ||
+	    (end - start) > tlb_single_page_flush_ceiling * PAGE_SIZE) {
 		xen_tlb_flush_all();
-	else {
+	} else {
 		unsigned long addr;
 
 		/* flush range by one by one 'invlpg' */
@@ -85,14 +79,13 @@ void flush_tlb_kernel_range(unsigned long start, unsigned long end)
 	}
 }
 
-#ifdef CONFIG_DEBUG_TLBFLUSH
 static ssize_t tlbflush_read_file(struct file *file, char __user *user_buf,
 			     size_t count, loff_t *ppos)
 {
 	char buf[32];
 	unsigned int len;
 
-	len = sprintf(buf, "%hd\n", tlb_flushall_shift);
+	len = sprintf(buf, "%ld\n", tlb_single_page_flush_ceiling);
 	return simple_read_from_buffer(user_buf, count, ppos, buf, len);
 }
 
@@ -101,20 +94,20 @@ static ssize_t tlbflush_write_file(struct file *file,
 {
 	char buf[32];
 	ssize_t len;
-	s8 shift;
+	int ceiling;
 
 	len = min(count, sizeof(buf) - 1);
 	if (copy_from_user(buf, user_buf, len))
 		return -EFAULT;
 
 	buf[len] = '\0';
-	if (kstrtos8(buf, 0, &shift))
+	if (kstrtoint(buf, 0, &ceiling))
 		return -EINVAL;
 
-	if (shift < -1 || shift >= BITS_PER_LONG)
+	if (ceiling < 0)
 		return -EINVAL;
 
-	tlb_flushall_shift = shift;
+	tlb_single_page_flush_ceiling = ceiling;
 	return count;
 }
 
@@ -124,11 +117,10 @@ static const struct file_operations fops_tlbflush = {
 	.llseek = default_llseek,
 };
 
-static int __init create_tlb_flushall_shift(void)
+static int __init create_tlb_single_page_flush_ceiling(void)
 {
-	debugfs_create_file("tlb_flushall_shift", S_IRUSR | S_IWUSR,
+	debugfs_create_file("tlb_single_page_flush_ceiling", S_IRUSR | S_IWUSR,
 			    arch_debugfs_dir, NULL, &fops_tlbflush);
 	return 0;
 }
-late_initcall(create_tlb_flushall_shift);
-#endif
+late_initcall(create_tlb_single_page_flush_ceiling);

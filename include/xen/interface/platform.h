@@ -126,86 +126,88 @@ DEFINE_XEN_GUEST_HANDLE(xenpf_platform_quirk_t);
 #define XEN_EFI_query_variable_info           9
 #define XEN_EFI_query_capsule_capabilities   10
 #define XEN_EFI_update_capsule               11
-struct xenpf_efi_runtime_call {
-    uint32_t function;
-    /*
-     * This field is generally used for per sub-function flags (defined
-     * below), except for the XEN_EFI_get_next_high_monotonic_count case,
-     * where it holds the single returned value.
-     */
-    uint32_t misc;
-    unsigned long status;
-    union {
-#define XEN_EFI_GET_TIME_SET_CLEARS_NS 0x00000001
-        struct {
-            struct xenpf_efi_time {
-                uint16_t year;
-                uint8_t month;
-                uint8_t day;
-                uint8_t hour;
-                uint8_t min;
-                uint8_t sec;
-                uint32_t ns;
-                int16_t tz;
-                uint8_t daylight;
-            } time;
-            uint32_t resolution;
-            uint32_t accuracy;
-        } get_time;
 
-        struct xenpf_efi_time set_time;
+struct xenpf_efi_runtime_call {
+	uint32_t function;
+	/*
+	 * This field is generally used for per sub-function flags (defined
+	 * below), except for the XEN_EFI_get_next_high_monotonic_count case,
+	 * where it holds the single returned value.
+	 */
+	uint32_t misc;
+	xen_ulong_t status;
+	union {
+#define XEN_EFI_GET_TIME_SET_CLEARS_NS 0x00000001
+		struct {
+			struct xenpf_efi_time {
+				uint16_t year;
+				uint8_t month;
+				uint8_t day;
+				uint8_t hour;
+				uint8_t min;
+				uint8_t sec;
+				uint32_t ns;
+				int16_t tz;
+				uint8_t daylight;
+			} time;
+			uint32_t resolution;
+			uint32_t accuracy;
+		} get_time;
+
+		struct xenpf_efi_time set_time;
 
 #define XEN_EFI_GET_WAKEUP_TIME_ENABLED 0x00000001
 #define XEN_EFI_GET_WAKEUP_TIME_PENDING 0x00000002
-        struct xenpf_efi_time get_wakeup_time;
+		struct xenpf_efi_time get_wakeup_time;
 
 #define XEN_EFI_SET_WAKEUP_TIME_ENABLE      0x00000001
 #define XEN_EFI_SET_WAKEUP_TIME_ENABLE_ONLY 0x00000002
-        struct xenpf_efi_time set_wakeup_time;
+		struct xenpf_efi_time set_wakeup_time;
 
 #define XEN_EFI_VARIABLE_NON_VOLATILE       0x00000001
 #define XEN_EFI_VARIABLE_BOOTSERVICE_ACCESS 0x00000002
 #define XEN_EFI_VARIABLE_RUNTIME_ACCESS     0x00000004
-        struct {
-            XEN_GUEST_HANDLE(void) name;  /* UCS-2/UTF-16 string */
-            unsigned long size;
-            XEN_GUEST_HANDLE(void) data;
-            struct xenpf_efi_guid {
-                uint32_t data1;
-                uint16_t data2;
-                uint16_t data3;
-                uint8_t data4[8];
-            } vendor_guid;
-        } get_variable, set_variable;
+		struct {
+			XEN_GUEST_HANDLE(void) name;  /* UCS-2/UTF-16 string */
+			xen_ulong_t size;
+			XEN_GUEST_HANDLE(void) data;
+			struct xenpf_efi_guid {
+				uint32_t data1;
+				uint16_t data2;
+				uint16_t data3;
+				uint8_t data4[8];
+			} vendor_guid;
+		} get_variable, set_variable;
 
-        struct {
-            unsigned long size;
-            XEN_GUEST_HANDLE(void) name;  /* UCS-2/UTF-16 string */
-            struct xenpf_efi_guid vendor_guid;
-        } get_next_variable_name;
+		struct {
+			xen_ulong_t size;
+			XEN_GUEST_HANDLE(void) name;  /* UCS-2/UTF-16 string */
+			struct xenpf_efi_guid vendor_guid;
+		} get_next_variable_name;
 
 #define XEN_EFI_VARINFO_BOOT_SNAPSHOT       0x00000001
-        struct {
-            uint32_t attr;
-            uint64_t max_store_size;
-            uint64_t remain_store_size;
-            uint64_t max_size;
-        } query_variable_info;
+		struct {
+			uint32_t attr;
+			uint64_t max_store_size;
+			uint64_t remain_store_size;
+			uint64_t max_size;
+		} query_variable_info;
 
-        struct {
-            XEN_GUEST_HANDLE(void) capsule_header_array;
-            unsigned long capsule_count;
-            uint64_t max_capsule_size;
-            unsigned int reset_type;
-        } query_capsule_capabilities;
+		struct {
+			XEN_GUEST_HANDLE(void) capsule_header_array;
+			xen_ulong_t capsule_count;
+			uint64_t max_capsule_size;
+			uint32_t reset_type;
+		} query_capsule_capabilities;
 
-        struct {
-            XEN_GUEST_HANDLE(void) capsule_header_array;
-            unsigned long capsule_count;
-            uint64_t sg_list; /* machine address */
-        } update_capsule;
-    } u;
+		struct {
+			XEN_GUEST_HANDLE(void) capsule_header_array;
+			xen_ulong_t capsule_count;
+			uint64_t sg_list; /* machine address */
+		} update_capsule;
+	} u;
 };
+DEFINE_GUEST_HANDLE_STRUCT(xenpf_efi_runtime_call);
 typedef struct xenpf_efi_runtime_call xenpf_efi_runtime_call_t;
 DEFINE_XEN_GUEST_HANDLE(xenpf_efi_runtime_call_t);
 
@@ -221,6 +223,7 @@ DEFINE_XEN_GUEST_HANDLE(xenpf_efi_runtime_call_t);
 #define  XEN_FW_EFI_RT_VERSION     4
 #define  XEN_FW_EFI_PCI_ROM        5
 #define XEN_FW_KBD_SHIFT_FLAGS    5 /* Int16, Fn02: Get keyboard shift flags. */
+
 struct xenpf_firmware_info {
 	/* IN variables. */
 	uint32_t type;
@@ -255,12 +258,12 @@ struct xenpf_firmware_info {
 		union xenpf_efi_info {
 			uint32_t version;
 			struct {
-				uint64_t addr;            /* EFI_CONFIGURATION_TABLE */
+				uint64_t addr;   /* EFI_CONFIGURATION_TABLE */
 				uint32_t nent;
 			} cfg;
 			struct {
 				uint32_t revision;
-				uint32_t bufsz;           /* input, in bytes */
+				uint32_t bufsz;  /* input, in bytes */
 				XEN_GUEST_HANDLE(void) name; /* UCS-2/UTF-16 string */
 			} vendor;
 			struct {

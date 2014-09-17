@@ -25,6 +25,7 @@ nostackp := $(call cc-option, -fno-stack-protector)
 ifeq ($(CONFIG_PARAVIRT_XEN),y)
 CFLAGS_features.o			:= $(nostackp)
 endif
+CFLAGS_efi.o				+= -fshort-wchar
 
 priv-$(CONFIG_USB_SUPPORT)		:= dbgp.o
 priv-$(CONFIG_PCI)			+= pci.o
@@ -55,6 +56,7 @@ obj-$(CONFIG_XEN_STUB)			+= xen-stub.o
 obj-$(CONFIG_XEN_ACPI_HOTPLUG_MEMORY)	+= xen-acpi-memhotplug.o
 obj-$(CONFIG_XEN_ACPI_HOTPLUG_CPU)	+= xen-acpi-cpuhotplug.o
 obj-$(CONFIG_XEN_ACPI_PROCESSOR)	+= xen-acpi-processor.o
+obj-$(CONFIG_XEN_EFI)			+= efi.o
 xen-evtchn-y				:= evtchn.o
 xen-gntdev-y				:= gntdev.o
 xen-gntalloc-y				:= gntalloc.o

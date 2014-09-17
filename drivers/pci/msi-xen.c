@@ -74,15 +74,14 @@ static void msi_set_enable(struct pci_dev *dev, int enable)
 	pci_write_config_word(dev, dev->msi_cap + PCI_MSI_FLAGS, control);
 }
 
-static void msix_set_enable(struct pci_dev *dev, int enable)
+static void msix_clear_and_set_ctrl(struct pci_dev *dev, u16 clear, u16 set)
 {
-	u16 control;
+	u16 ctrl;
 
-	pci_read_config_word(dev, dev->msix_cap + PCI_MSIX_FLAGS, &control);
-	control &= ~PCI_MSIX_FLAGS_ENABLE;
-	if (enable)
-		control |= PCI_MSIX_FLAGS_ENABLE;
-	pci_write_config_word(dev, dev->msix_cap + PCI_MSIX_FLAGS, control);
+	pci_read_config_word(dev, dev->msix_cap + PCI_MSIX_FLAGS, &ctrl);
+	ctrl &= ~clear;
+	ctrl |= set;
+	pci_write_config_word(dev, dev->msix_cap + PCI_MSIX_FLAGS, ctrl);
 }
 
 static int (*get_owner)(struct pci_dev *dev);
@@ -332,7 +331,7 @@ void pci_restore_msi_state(struct pci_dev *dev)
 	if (dev->msi_enabled)
 		msi_set_enable(dev, 0);
 	if (dev->msix_enabled)
-		msix_set_enable(dev, 0);
+		msix_clear_and_set_ctrl(dev, PCI_MSIX_FLAGS_ENABLE, 0);
 
 	if (pci_seg_supported) {
 		struct physdev_pci_device restore = {
@@ -553,11 +552,8 @@ static int msi_capability_init(struct pci_dev *dev, int nvec)
 {
 	struct msi_dev_list *dev_entry = get_msi_dev_pirq_list(dev);
 	int pirq;
-	u16 control;
 
 	msi_set_enable(dev, 0);	/* Disable MSI during set up */
-
-	pci_read_config_word(dev, dev->msi_cap + PCI_MSI_FLAGS, &control);
 
 	pirq = msi_map_vector(dev, nvec, 0, dev_entry->owner);
 	if (pirq < 0)
@@ -589,20 +585,14 @@ static int msix_capability_init(struct pci_dev *dev,
 {
 	u64 table_base;
 	int pirq, i, j, mapped;
-	u16 control;
 	struct msi_dev_list *msi_dev_entry = get_msi_dev_pirq_list(dev);
 	struct msi_pirq_entry *pirq_entry;
 
 	if (!msi_dev_entry)
 		return -ENOMEM;
 
-	msix_set_enable(dev, 0);/* Ensure msix is disabled as I set it up */
-
-	pci_read_config_word(dev, dev->msix_cap + PCI_MSIX_FLAGS, &control);
-
 	/* Ensure MSI-X is disabled while it is set up */
-	control &= ~PCI_MSIX_FLAGS_ENABLE;
-	pci_write_config_word(dev, dev->msix_cap + PCI_MSIX_FLAGS, control);
+	msix_clear_and_set_ctrl(dev, PCI_MSIX_FLAGS_ENABLE, 0);
 
 	table_base = find_table_base(dev);
 	if (!table_base)
@@ -613,8 +603,8 @@ static int msix_capability_init(struct pci_dev *dev,
 	 * MSI-X registers.  We need to mask all the vectors to prevent
 	 * interrupts coming in before they're fully set up.
 	 */
-	control |= PCI_MSIX_FLAGS_MASKALL | PCI_MSIX_FLAGS_ENABLE;
-	pci_write_config_word(dev, dev->msix_cap + PCI_MSIX_FLAGS, control);
+	msix_clear_and_set_ctrl(dev, 0,
+				PCI_MSIX_FLAGS_MASKALL | PCI_MSIX_FLAGS_ENABLE);
 
 	for (i = 0; i < nvec; i++) {
 		mapped = 0;
@@ -662,8 +652,7 @@ static int msix_capability_init(struct pci_dev *dev,
 	dev->msix_enabled = 1;
 	populate_msi_sysfs(dev);
 
-	control &= ~PCI_MSIX_FLAGS_MASKALL;
-	pci_write_config_word(dev, dev->msix_cap + PCI_MSIX_FLAGS, control);
+	msix_clear_and_set_ctrl(dev, PCI_MSIX_FLAGS_MASKALL, 0);
 
 	return 0;
 }
@@ -898,6 +887,8 @@ EXPORT_SYMBOL(pci_enable_msix);
 
 void pci_msix_shutdown(struct pci_dev *dev)
 {
+	struct msi_dev_list *msi_dev_entry;
+
 	if (!pci_msi_enable || !dev || !dev->msix_enabled)
 		return;
 
@@ -908,43 +899,9 @@ void pci_msix_shutdown(struct pci_dev *dev)
 		return;
 #endif
 
-	msi_remove_pci_irq_vectors(dev);
-
-	/* Disable MSI mode */
-	if (is_initial_xendomain()) {
-		msix_set_enable(dev, 0);
-		pci_intx_for_msi(dev, 1);
-	}
-	dev->msix_enabled = 0;
-}
-
-void pci_disable_msix(struct pci_dev *dev)
-{
-	pci_msix_shutdown(dev);
-}
-EXPORT_SYMBOL(pci_disable_msix);
-
-/**
- * msi_remove_pci_irq_vectors - reclaim MSI(X) irqs to unused state
- * @dev: pointer to the pci_dev data structure of MSI(X) device function
- *
- * Being called during hotplug remove, from which the device function
- * is hot-removed. All previous assigned MSI/MSI-X irqs, if
- * allocated for this device function, are reclaimed to unused state,
- * which may be used later on.
- **/
-void msi_remove_pci_irq_vectors(struct pci_dev *dev)
-{
-	struct msi_dev_list *msi_dev_entry;
-
-	if (!pci_msi_enable || !dev)
-		return;
-
 	cleanup_msi_sysfs(dev);
 
-	msi_dev_entry = get_msi_dev_pirq_list(dev);
-
-	for (;;) {
+	for (msi_dev_entry = get_msi_dev_pirq_list(dev); ; ) {
 		struct msi_pirq_entry *pirq_entry;
 		unsigned long flags;
 
@@ -966,7 +923,20 @@ void msi_remove_pci_irq_vectors(struct pci_dev *dev)
 	}
 	msi_dev_entry->owner = DOMID_IO;
 	dev->irq = msi_dev_entry->default_irq;
+
+	/* Disable MSI mode */
+	if (is_initial_xendomain()) {
+		msix_clear_and_set_ctrl(dev, PCI_MSIX_FLAGS_ENABLE, 0);
+		pci_intx_for_msi(dev, 1);
+	}
+	dev->msix_enabled = 0;
 }
+
+void pci_disable_msix(struct pci_dev *dev)
+{
+	pci_msix_shutdown(dev);
+}
+EXPORT_SYMBOL(pci_disable_msix);
 
 void pci_no_msi(void)
 {
@@ -1005,7 +975,7 @@ void pci_msi_init_pci_dev(struct pci_dev *dev)
 
 	dev->msix_cap = pci_find_capability(dev, PCI_CAP_ID_MSIX);
 	if (dev->msix_cap)
-		msix_set_enable(dev, 0);
+		msix_clear_and_set_ctrl(dev, PCI_MSIX_FLAGS_ENABLE, 0);
 }
 
 /**

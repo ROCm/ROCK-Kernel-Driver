@@ -223,12 +223,14 @@ static int __init make_loopback(int i)
 	int err = -ENOMEM;
 
 	sprintf(dev_name, "vif0.%d", i);
-	dev1 = alloc_netdev(sizeof(struct net_private), dev_name, ether_setup);
+	dev1 = alloc_netdev(sizeof(struct net_private), dev_name,
+			    NET_NAME_UNKNOWN, ether_setup);
 	if (!dev1)
 		return err;
 
 	sprintf(dev_name, "veth%d", i);
-	dev2 = alloc_netdev(sizeof(struct net_private), dev_name, ether_setup);
+	dev2 = alloc_netdev(sizeof(struct net_private), dev_name,
+			    NET_NAME_UNKNOWN, ether_setup);
 	if (!dev2)
 		goto fail_netdev2;
 

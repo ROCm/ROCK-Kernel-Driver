@@ -622,7 +622,7 @@ static int acpi_pci_root_add(struct acpi_device *device,
 		dev_warn(&device->dev, "could not create bbn attr\n");
 #endif
 
-	pci_acpi_add_bus_pm_notifier(device, root->bus);
+	pci_acpi_add_bus_pm_notifier(device);
 	if (device->wakeup.flags.run_wake)
 		device_set_run_wake(root->bus->bridge, true);
 

@@ -1076,10 +1076,10 @@ void __init setup_arch(char **cmdline_p)
 #endif
 #ifdef CONFIG_EFI
 	if (!strncmp((char *)&boot_params.efi_info.efi_loader_signature,
-		     "EL32", 4)) {
+		     EFI32_LOADER_SIGNATURE, 4)) {
 		set_bit(EFI_BOOT, &efi.flags);
 	} else if (!strncmp((char *)&boot_params.efi_info.efi_loader_signature,
-		     "EL64", 4)) {
+		     EFI64_LOADER_SIGNATURE, 4)) {
 		set_bit(EFI_BOOT, &efi.flags);
 		set_bit(EFI_64BIT, &efi.flags);
 	}
@@ -1241,6 +1241,10 @@ void __init setup_arch(char **cmdline_p)
 #ifndef CONFIG_XEN
 	if (mtrr_trim_uncached_memory(max_pfn))
 		max_pfn = e820_end_of_ram_pfn();
+#else
+	if (max_pfn > xen_start_info->nr_pages)
+		memblock_reserve(PFN_PHYS(xen_start_info->nr_pages),
+				 PFN_PHYS(max_pfn - xen_start_info->nr_pages));
 #endif
 
 #ifdef CONFIG_X86_32
@@ -1492,7 +1496,7 @@ void __init setup_arch(char **cmdline_p)
 							  & PAGE_MASK),
 						     PAGE_SIZE);
 				}
-			} while (pud_index(va));
+			} while (pud_index(va) | pmd_index(va));
 			ClearPagePinned(virt_to_page(pud_page));
 			make_page_writable(pud_page,
 					   XENFEAT_writable_page_tables);

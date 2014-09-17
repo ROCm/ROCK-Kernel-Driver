@@ -52,13 +52,6 @@
 
 #define EFI_DEBUG
 
-#define EFI_MIN_RESERVE 5120
-
-#define EFI_DUMMY_GUID \
-	EFI_GUID(0x4424ac57, 0xbe4b, 0x47dd, 0x9e, 0x97, 0xed, 0x50, 0xf0, 0x9f, 0x92, 0xa9)
-
-static efi_char16_t efi_dummy_name[6] = { 'D', 'U', 'M', 'M', 'Y', 0 };
-
 static efi_config_table_type_t arch_tables[] __initdata = {
 #ifdef CONFIG_X86_UV
 	{UV_SYSTEM_TABLE_GUID, "UVsystab", &efi.uv_systab},
@@ -72,15 +65,6 @@ static int __init setup_noefi(char *arg)
 	return 0;
 }
 early_param("noefi", setup_noefi);
-
-static bool efi_no_storage_paranoia;
-
-static int __init setup_storage_paranoia(char *arg)
-{
-	efi_no_storage_paranoia = true;
-	return 0;
-}
-early_param("efi_no_storage_paranoia", setup_storage_paranoia);
 
 #define call op.u.efi_runtime_call
 #define DECLARE_CALL(what) \
@@ -399,9 +383,6 @@ void __init efi_probe(void)
 	}
 }
 
-void __init efi_reserve_boot_services(void) { }
-void __init efi_free_boot_services(void) { }
-
 void __init efi_init(void)
 {
 	efi_char16_t c16[100];
@@ -465,30 +446,8 @@ void __init efi_late_init(void)
 void __init efi_enter_virtual_mode(void)
 {
 	/* clean DUMMY object */
-	xen_efi_set_variable(efi_dummy_name, &EFI_DUMMY_GUID,
-			     EFI_VARIABLE_NON_VOLATILE |
-			     EFI_VARIABLE_BOOTSERVICE_ACCESS |
-			     EFI_VARIABLE_RUNTIME_ACCESS,
-			     0, NULL);
+	efi_delete_dummy_variable();
 }
-
-static struct platform_device rtc_efi_dev = {
-	.name = "rtc-efi",
-	.id = -1,
-};
-
-static int __init rtc_init(void)
-{
-	if (!efi_enabled(EFI_RUNTIME_SERVICES))
-		return -ENODEV;
-
-	if (platform_device_register(&rtc_efi_dev) < 0)
-		pr_err("unable to register EFI RTC device...\n");
-
-	/* not necessarily an error */
-	return 0;
-}
-arch_initcall(rtc_init);
 
 /*
  * Convenience functions to obtain memory types and attributes
@@ -514,6 +473,9 @@ u64 efi_mem_attributes(unsigned long phys_addr)
 	struct xen_platform_op op;
 	union xenpf_efi_info *info = &op.u.firmware_info.u.efi_info;
 
+	if (!efi_enabled(EFI_MEMMAP))
+		return 0;
+
 	op.cmd = XENPF_firmware_info;
 	op.u.firmware_info.type = XEN_FW_EFI_INFO;
 	op.u.firmware_info.index = XEN_FW_EFI_MEM_INFO;
@@ -521,82 +483,3 @@ u64 efi_mem_attributes(unsigned long phys_addr)
 	info->mem.size = 0;
 	return HYPERVISOR_platform_op(&op) ? 0 : info->mem.attr;
 }
-
-/*
- * Some firmware implementations refuse to boot if there's insufficient space
- * in the variable store. Ensure that we never use more than a safe limit.
- *
- * Return EFI_SUCCESS if it is safe to write 'size' bytes to the variable
- * store.
- */
-efi_status_t efi_query_variable_store(u32 attributes, unsigned long size)
-{
-	efi_status_t status;
-	u64 storage_size, remaining_size, max_size;
-
-	if (!(attributes & EFI_VARIABLE_NON_VOLATILE))
-		return 0;
-
-	status = xen_efi_query_variable_info(attributes, &storage_size,
-					     &remaining_size, &max_size);
-	if (status != EFI_SUCCESS)
-		return status;
-
-	/*
-	 * We account for that by refusing the write if permitting it would
-	 * reduce the available space to under 5KB. This figure was provided by
-	 * Samsung, so should be safe.
-	 */
-	if ((remaining_size - size < EFI_MIN_RESERVE) &&
-		!efi_no_storage_paranoia) {
-
-		/*
-		 * Triggering garbage collection may require that the firmware
-		 * generate a real EFI_OUT_OF_RESOURCES error. We can force
-		 * that by attempting to use more space than is available.
-		 */
-		unsigned long dummy_size = remaining_size + 1024;
-		void *dummy = kzalloc(dummy_size, GFP_ATOMIC);
-
-		if (!dummy)
-			return EFI_OUT_OF_RESOURCES;
-
-		status = xen_efi_set_variable(efi_dummy_name, &EFI_DUMMY_GUID,
-					      EFI_VARIABLE_NON_VOLATILE |
-					      EFI_VARIABLE_BOOTSERVICE_ACCESS |
-					      EFI_VARIABLE_RUNTIME_ACCESS,
-					      dummy_size, dummy);
-		kfree(dummy);
-
-		if (status == EFI_SUCCESS) {
-			/*
-			 * This should have failed, so if it didn't make sure
-			 * that we delete it...
-			 */
-			xen_efi_set_variable(efi_dummy_name, &EFI_DUMMY_GUID,
-					     EFI_VARIABLE_NON_VOLATILE |
-					     EFI_VARIABLE_BOOTSERVICE_ACCESS |
-					     EFI_VARIABLE_RUNTIME_ACCESS,
-					     0, NULL);
-		}
-
-		/*
-		 * The runtime code may now have triggered a garbage collection
-		 * run, so check the variable info again
-		 */
-		status = xen_efi_query_variable_info(attributes, &storage_size,
-						     &remaining_size, &max_size);
-
-		if (status != EFI_SUCCESS)
-			return status;
-
-		/*
-		 * There still isn't enough room, so return an error
-		 */
-		if (remaining_size - size < EFI_MIN_RESERVE)
-			return EFI_OUT_OF_RESOURCES;
-	}
-
-	return EFI_SUCCESS;
-}
-EXPORT_SYMBOL_GPL(efi_query_variable_store);
