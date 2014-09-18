@@ -1259,6 +1259,8 @@ static int pirq_enable_irq(struct pci_dev *dev)
 	return 0;
 }
 
+/* Even for native this really doesn't belong in kernel/apic/io_apic.c. */
+#ifdef CONFIG_XEN
 bool mp_should_keep_irq(struct device *dev)
 {
 	if (dev->power.is_prepared)
@@ -1270,6 +1272,7 @@ bool mp_should_keep_irq(struct device *dev)
 
 	return false;
 }
+#endif
 
 static void pirq_disable_irq(struct pci_dev *dev)
 {
