@@ -12,12 +12,12 @@
 #include <linux/unwind.h>
 #include <linux/module.h>
 #include <linux/bootmem.h>
+#include <linux/slab.h>
 #include <linux/sort.h>
 #include <linux/stop_machine.h>
 #include <linux/uaccess.h>
 #include <asm/sections.h>
 #include <asm/unaligned.h>
-#include <linux/slab.h>
 
 extern const char __start_unwind[], __end_unwind[];
 extern const u8 __start_unwind_hdr[], __end_unwind_hdr[];
@@ -225,16 +225,12 @@ static unsigned long read_pointer(const u8 **pLoc,
                                   unsigned long text_base,
                                   unsigned long data_base);
 
-static void init_unwind_table(struct unwind_table *table,
-                              const char *name,
-                              const void *core_start,
-                              unsigned long core_size,
-                              const void *init_start,
-                              unsigned long init_size,
-                              const void *table_start,
-                              unsigned long table_size,
-                              const u8 *header_start,
-                              unsigned long header_size)
+static void __init_or_module
+init_unwind_table(struct unwind_table *table, const char *name,
+		  const void *core_start, unsigned long core_size,
+		  const void *init_start, unsigned long init_size,
+		  const void *table_start, unsigned long table_size,
+		  const u8 *header_start, unsigned long header_size)
 {
 	const u8 *ptr = header_start + 4;
 	const u8 *end = header_start + header_size;
@@ -266,8 +262,13 @@ static void init_unwind_table(struct unwind_table *table,
 void __init unwind_init(void)
 {
 	init_unwind_table(&root_table, "kernel",
+#ifdef CONFIG_DEBUG_RODATA
+	                  _text, _etext - _text,
+	                  __init_begin, __init_end - __init_begin,
+#else
 	                  _text, _end - _text,
 	                  NULL, 0,
+#endif
 	                  __start_unwind, __end_unwind - __start_unwind,
 	                  __start_unwind_hdr, __end_unwind_hdr - __start_unwind_hdr);
 }
@@ -280,7 +281,8 @@ struct eh_frame_hdr_table_entry {
 	unsigned long start, fde;
 };
 
-static int cmp_eh_frame_hdr_table_entries(const void *p1, const void *p2)
+static int __init_or_module
+cmp_eh_frame_hdr_table_entries(const void *p1, const void *p2)
 {
 	const struct eh_frame_hdr_table_entry *e1 = p1;
 	const struct eh_frame_hdr_table_entry *e2 = p2;
@@ -288,7 +290,8 @@ static int cmp_eh_frame_hdr_table_entries(const void *p1, const void *p2)
 	return (e1->start > e2->start) - (e1->start < e2->start);
 }
 
-static void swap_eh_frame_hdr_table_entries(void *p1, void *p2, int size)
+static void __init_or_module
+swap_eh_frame_hdr_table_entries(void *p1, void *p2, int size)
 {
 	struct eh_frame_hdr_table_entry *e1 = p1;
 	struct eh_frame_hdr_table_entry *e2 = p2;
@@ -302,8 +305,9 @@ static void swap_eh_frame_hdr_table_entries(void *p1, void *p2, int size)
 	e2->fde = v;
 }
 
-static void __init setup_unwind_table(struct unwind_table *table,
-					void *(*alloc)(unsigned long))
+static void __init_or_module
+setup_unwind_table(struct unwind_table *table,
+		   void *(*alloc)(size_t, gfp_t))
 {
 	const u8 *ptr;
 	unsigned long tableSize = table->size, hdrSize;
@@ -323,8 +327,8 @@ static void __init setup_unwind_table(struct unwind_table *table,
 		return;
 
 	if (table->hdrsz)
-		printk(KERN_WARNING ".eh_frame_hdr for '%s' present but unusable\n",
-		       table->name);
+		pr_warn(".eh_frame_hdr for '%s' present but unusable\n",
+			table->name);
 
 	if (tableSize & (sizeof(*fde) - 1))
 		return;
@@ -349,13 +353,12 @@ static void __init setup_unwind_table(struct unwind_table *table,
 		++n;
 	}
 
-	if (tableSize || !n)
+	if (tableSize || n < 32)
 		return;
 
-	hdrSize = 4 + sizeof(unsigned long) + sizeof(unsigned int)
-	        + 2 * n * sizeof(unsigned long);
+	hdrSize = sizeof(*header) + n * sizeof(*header->table);
 	dprintk(2, "Binary lookup table size for %s: %lu bytes", table->name, hdrSize);
-	header = alloc(hdrSize);
+	header = alloc(hdrSize, GFP_KERNEL);
 	if (!header)
 		return;
 	header->version          = 1;
@@ -396,10 +399,10 @@ static void __init setup_unwind_table(struct unwind_table *table,
 	table->header = (const void *)header;
 }
 
-static void *__init balloc(unsigned long sz)
+static void *__init balloc(size_t sz, gfp_t unused)
 {
 	return __alloc_bootmem_nopanic(sz,
-	                               sizeof(unsigned int),
+	                               sizeof(unsigned long),
 	                               __pa(MAX_DMA_ADDRESS));
 }
 
@@ -427,10 +430,16 @@ void *unwind_add_table(struct module *module,
 		return NULL;
 
 	init_unwind_table(table, module->name,
+#ifdef CONFIG_DEBUG_SET_MODULE_RONX
+	                  module->module_core, module->core_text_size,
+	                  module->module_init, module->init_text_size,
+#else
 	                  module->module_core, module->core_size,
 	                  module->module_init, module->init_size,
+#endif
 	                  table_start, table_size,
 	                  NULL, 0);
+	setup_unwind_table(table, kmalloc);
 
 	if (last_table)
 		last_table->link = table;
@@ -444,7 +453,7 @@ void *unwind_add_table(struct module *module,
 struct unlink_table_info
 {
 	struct unwind_table *table;
-	int init_only;
+	bool init_only;
 };
 
 static int unlink_table(void *arg)
@@ -472,7 +481,7 @@ static int unlink_table(void *arg)
 }
 
 /* Must be called with module_mutex held. */
-void unwind_remove_table(void *handle, int init_only)
+void unwind_remove_table(void *handle, bool init_only)
 {
 	struct unwind_table *table = handle;
 	struct unlink_table_info info;
@@ -490,8 +499,10 @@ void unwind_remove_table(void *handle, int init_only)
 	info.init_only = init_only;
 	stop_machine(unlink_table, &info, NULL);
 
-	if (info.table)
+	if (info.table) {
+		kfree(table->header);
 		kfree(table);
+	}
 }
 
 #endif /* CONFIG_MODULES */

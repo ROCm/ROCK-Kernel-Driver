@@ -1949,7 +1949,7 @@ static void free_module(struct module *mod)
 	/* Remove dynamic debug info */
 	ddebug_remove_module(mod->name);
 
-	unwind_remove_table(mod->unwind_info, 0);
+	unwind_remove_table(mod->unwind_info, false);
 
 	/* Arch-specific cleanup. */
 	module_arch_cleanup(mod);
@@ -3175,7 +3175,7 @@ static int do_init_module(struct module *mod)
 	/* Drop initial reference. */
 	module_put(mod);
 	trim_init_extable(mod);
-	unwind_remove_table(mod->unwind_info, 1);
+	unwind_remove_table(mod->unwind_info, true);
 #ifdef CONFIG_KALLSYMS
 	mod->num_symtab = mod->core_num_syms;
 	mod->symtab = mod->core_symtab;

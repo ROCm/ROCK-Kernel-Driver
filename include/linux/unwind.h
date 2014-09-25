@@ -43,7 +43,7 @@ extern void *unwind_add_table(struct module *,
                               const void *table_start,
                               unsigned long table_size);
 
-extern void unwind_remove_table(void *handle, int init_only);
+extern void unwind_remove_table(void *handle, bool init_only);
 
 #endif
 
@@ -96,7 +96,7 @@ static inline void *unwind_add_table(struct module *mod,
 
 #endif
 
-static inline void unwind_remove_table(void *handle, int init_only)
+static inline void unwind_remove_table(void *handle, bool init_only)
 {
 }
 
