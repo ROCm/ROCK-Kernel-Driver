@@ -102,6 +102,9 @@ amdgpu-y += \
 	../scheduler/gpu_scheduler.o \
 	../scheduler/sched_fence.o \
 	amdgpu_sched.o
+# add amdkfd interfaces
+amdgpu-y += \
+	 amdgpu_amdkfd_gfx_v7.o
 
 amdgpu-$(CONFIG_COMPAT) += amdgpu_ioc32.o
 amdgpu-$(CONFIG_VGA_SWITCHEROO) += amdgpu_atpx_handler.o

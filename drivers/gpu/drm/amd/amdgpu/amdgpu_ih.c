@@ -24,6 +24,7 @@
 #include <drm/drmP.h>
 #include "amdgpu.h"
 #include "amdgpu_ih.h"
+#include "amdgpu_amdkfd.h"
 
 /**
  * amdgpu_ih_ring_alloc - allocate memory for the IH ring
@@ -197,6 +198,10 @@ restart_ih:
 			&adev->irq.ih.ring[adev->irq.ih.rptr >> 2];
 		amdgpu_ih_decode_iv(adev, &entry);
 		adev->irq.ih.rptr &= adev->irq.ih.ptr_mask;
+
+		/* Before dispatching irq to IP blocks, send it to amdkfd */
+		amdgpu_amdkfd_interrupt(adev,
+				(const void *) &entry);
 
 		amdgpu_irq_dispatch(adev, &entry);
 	}
