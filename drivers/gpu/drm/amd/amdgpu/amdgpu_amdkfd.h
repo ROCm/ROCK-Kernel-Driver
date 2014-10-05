@@ -33,6 +33,8 @@ struct amdgpu_device;
 bool amdgpu_amdkfd_init(void);
 void amdgpu_amdkfd_fini(void);
 
+bool amdgpu_amdkfd_load_interface(struct amdgpu_device *rdev);
+
 void amdgpu_amdkfd_suspend(struct amdgpu_device *rdev);
 int amdgpu_amdkfd_resume(struct amdgpu_device *rdev);
 void amdgpu_amdkfd_interrupt(struct amdgpu_device *rdev,
@@ -40,5 +42,7 @@ void amdgpu_amdkfd_interrupt(struct amdgpu_device *rdev,
 void amdgpu_amdkfd_device_probe(struct amdgpu_device *rdev);
 void amdgpu_amdkfd_device_init(struct amdgpu_device *rdev);
 void amdgpu_amdkfd_device_fini(struct amdgpu_device *rdev);
+
+struct kfd2kgd_calls *amdgpu_amdkfd_gfx_7_get_functions(void);
 
 #endif /* AMDGPU_AMDKFD_H_INCLUDED */

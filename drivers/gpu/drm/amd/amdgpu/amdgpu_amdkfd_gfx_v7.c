@@ -20,7 +20,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <linux/module.h>
 #include <linux/fdtable.h>
 #include <linux/uaccess.h>
 #include <linux/firmware.h>
@@ -192,89 +191,9 @@ static const struct kfd2kgd_calls kfd2kgd = {
 
 };
 
-static const struct kgd2kfd_calls *kgd2kfd;
-
-bool amdgpu_amdkfd_init(void)
+struct kfd2kgd_calls *amdgpu_amdkfd_gfx_7_get_functions()
 {
-	bool (*kgd2kfd_init_p)(unsigned, const struct kfd2kgd_calls*,
-				const struct kgd2kfd_calls**);
-
-	kgd2kfd_init_p = symbol_request(kgd2kfd_init);
-
-	if (kgd2kfd_init_p == NULL)
-		return false;
-
-	if (!kgd2kfd_init_p(KFD_INTERFACE_VERSION, &kfd2kgd, &kgd2kfd)) {
-		symbol_put(kgd2kfd_init);
-		kgd2kfd = NULL;
-
-		return false;
-	}
-
-	return true;
-}
-
-void amdgpu_amdkfd_fini(void)
-{
-	if (kgd2kfd) {
-		kgd2kfd->exit();
-		symbol_put(kgd2kfd_init);
-	}
-}
-
-void amdgpu_amdkfd_device_probe(struct amdgpu_device *adev)
-{
-	if (kgd2kfd)
-		adev->kfd = kgd2kfd->probe((struct kgd_dev *)adev, adev->pdev);
-}
-
-void amdgpu_amdkfd_device_init(struct amdgpu_device *adev)
-{
-	if (adev->kfd) {
-		struct kgd2kfd_shared_resources gpu_resources = {
-			.compute_vmid_bitmap = 0xFF00,
-
-			.first_compute_pipe = 1,
-			.compute_pipe_count = 8 - 1,
-		};
-
-		amdgpu_doorbell_get_kfd_info(adev,
-				&gpu_resources.doorbell_physical_address,
-				&gpu_resources.doorbell_aperture_size,
-				&gpu_resources.doorbell_start_offset);
-
-		kgd2kfd->device_init(adev->kfd, &gpu_resources);
-	}
-}
-
-void amdgpu_amdkfd_device_fini(struct amdgpu_device *adev)
-{
-	if (adev->kfd) {
-		kgd2kfd->device_exit(adev->kfd);
-		adev->kfd = NULL;
-	}
-}
-
-void amdgpu_amdkfd_interrupt(struct amdgpu_device *adev, const void *ih_ring_entry)
-{
-	if (adev->kfd)
-		kgd2kfd->interrupt(adev->kfd, ih_ring_entry);
-}
-
-void amdgpu_amdkfd_suspend(struct amdgpu_device *adev)
-{
-	if (adev->kfd)
-		kgd2kfd->suspend(adev->kfd);
-}
-
-int amdgpu_amdkfd_resume(struct amdgpu_device *adev)
-{
-	int r = 0;
-
-	if (adev->kfd)
-		r = kgd2kfd->resume(adev->kfd);
-
-	return r;
+	return (struct kfd2kgd_calls *)&kfd2kgd;
 }
 
 static int alloc_gtt_mem(struct kgd_dev *kgd, size_t size,

@@ -123,6 +123,7 @@ int amdgpu_driver_load_kms(struct drm_device *dev, unsigned long flags)
 				"Error during ACPI methods call\n");
 	}
 
+	amdgpu_amdkfd_load_interface(adev);
 	amdgpu_amdkfd_device_probe(adev);
 	amdgpu_amdkfd_device_init(adev);
 
