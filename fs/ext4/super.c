@@ -50,7 +50,6 @@
 #include "xattr.h"
 #include "acl.h"
 #include "mballoc.h"
-#include "richacl.h"
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/ext4.h>
@@ -878,9 +877,7 @@ static struct inode *ext4_alloc_inode(struct super_block *sb)
 	ei = kmem_cache_alloc(ext4_inode_cachep, GFP_NOFS);
 	if (!ei)
 		return NULL;
-#ifdef CONFIG_EXT4_FS_RICHACL
-	ei->i_richacl = EXT4_RICHACL_NOT_CACHED;
-#endif
+
 	ei->vfs_inode.i_version = 1;
 	spin_lock_init(&ei->i_raw_lock);
 	INIT_LIST_HEAD(&ei->i_prealloc_list);
@@ -976,13 +973,6 @@ void ext4_clear_inode(struct inode *inode)
 	invalidate_inode_buffers(inode);
 	clear_inode(inode);
 	dquot_drop(inode);
-#ifdef CONFIG_EXT4_FS_RICHACL
-	if (EXT4_I(inode)->i_richacl &&
-		EXT4_I(inode)->i_richacl != EXT4_RICHACL_NOT_CACHED) {
-		richacl_put(EXT4_I(inode)->i_richacl);
-		EXT4_I(inode)->i_richacl = EXT4_RICHACL_NOT_CACHED;
-	}
-#endif
 	ext4_discard_preallocations(inode);
 	ext4_es_remove_extent(inode, 0, EXT_MAX_BLOCKS);
 	ext4_es_lru_del(inode);
@@ -1163,7 +1153,7 @@ enum {
 	Opt_bsd_df, Opt_minix_df, Opt_grpid, Opt_nogrpid,
 	Opt_resgid, Opt_resuid, Opt_sb, Opt_err_cont, Opt_err_panic, Opt_err_ro,
 	Opt_nouid32, Opt_debug, Opt_removed,
-	Opt_user_xattr, Opt_nouser_xattr, Opt_acl, Opt_richacl, Opt_noacl,
+	Opt_user_xattr, Opt_nouser_xattr, Opt_acl, Opt_noacl,
 	Opt_auto_da_alloc, Opt_noauto_da_alloc, Opt_noload,
 	Opt_commit, Opt_min_batch_time, Opt_max_batch_time, Opt_journal_dev,
 	Opt_journal_path, Opt_journal_checksum, Opt_journal_async_commit,
@@ -1201,7 +1191,6 @@ static const match_table_t tokens = {
 	{Opt_user_xattr, "user_xattr"},
 	{Opt_nouser_xattr, "nouser_xattr"},
 	{Opt_acl, "acl"},
-	{Opt_richacl, "richacl"},
 	{Opt_noacl, "noacl"},
 	{Opt_noload, "norecovery"},
 	{Opt_noload, "noload"},
@@ -1481,9 +1470,6 @@ static int handle_mount_opt(struct super_block *sb, char *opt, int token,
 	case Opt_nouser_xattr:
 		ext4_msg(sb, KERN_WARNING, deprecated_msg, opt, "3.5");
 		break;
-	case Opt_richacl:
-		sb->s_flags |= MS_RICHACL;
-		return 1;
 	case Opt_sb:
 		return 1;	/* handled by get_sb_block() */
 	case Opt_removed:
@@ -1745,10 +1731,6 @@ static int parse_options(char *options, struct super_block *sb,
 			return 0;
 		}
 	}
-#if defined(CONFIG_EXT4_FS_RICHACL) && defined(CONFIG_EXT4_FS_POSIX_ACL)
-	if (test_opt(sb, POSIX_ACL) && (sb->s_flags & MS_RICHACL))
-		clear_opt(sb, POSIX_ACL);
-#endif
 	return 1;
 }
 
@@ -1870,9 +1852,6 @@ static int _ext4_show_options(struct seq_file *seq, struct super_block *sb,
 		SEQ_OPTS_PRINT("init_itable=%u", sbi->s_li_wait_mult);
 	if (nodefs || sbi->s_max_dir_size_kb)
 		SEQ_OPTS_PRINT("max_dir_size_kb=%u", sbi->s_max_dir_size_kb);
-
-	if (sb->s_flags & MS_RICHACL)
-		SEQ_OPTS_PUTS("richacl");
 
 	ext4_show_quota_options(seq, sb);
 	return 0;
@@ -3415,7 +3394,6 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 	int err = 0;
 	unsigned int journal_ioprio = DEFAULT_JOURNAL_IOPRIO;
 	ext4_group_t first_not_zeroed;
-	unsigned long acl_flags = 0;
 
 	sbi = kzalloc(sizeof(*sbi), GFP_KERNEL);
 	if (!sbi)
@@ -3598,12 +3576,8 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 			clear_opt(sb, DELALLOC);
 	}
 
-	if (sb->s_flags & MS_RICHACL)
-		acl_flags = MS_RICHACL;
-	else if (test_opt(sb, POSIX_ACL))
-		acl_flags = MS_POSIXACL;
-
-	sb->s_flags = (sb->s_flags & ~(MS_POSIXACL | MS_RICHACL)) | acl_flags;
+	sb->s_flags = (sb->s_flags & ~MS_POSIXACL) |
+		(test_opt(sb, POSIX_ACL) ? MS_POSIXACL : 0);
 
 	if (le32_to_cpu(es->s_rev_level) == EXT4_GOOD_OLD_REV &&
 	    (EXT4_HAS_COMPAT_FEATURE(sb, ~0U) ||
@@ -4810,7 +4784,6 @@ static int ext4_remount(struct super_block *sb, int *flags, char *data)
 	ext4_group_t g;
 	unsigned int journal_ioprio = DEFAULT_JOURNAL_IOPRIO;
 	int err = 0;
-	unsigned long acl_flags = 0;
 #ifdef CONFIG_QUOTA
 	int i, j;
 #endif
@@ -4869,12 +4842,8 @@ static int ext4_remount(struct super_block *sb, int *flags, char *data)
 	if (sbi->s_mount_flags & EXT4_MF_FS_ABORTED)
 		ext4_abort(sb, "Abort forced by user");
 
-	if (sb->s_flags & MS_RICHACL)
-		acl_flags = MS_RICHACL;
-	else if (test_opt(sb, POSIX_ACL))
-		acl_flags = MS_POSIXACL;
-
-	sb->s_flags = (sb->s_flags & ~(MS_POSIXACL | MS_RICHACL)) | acl_flags;
+	sb->s_flags = (sb->s_flags & ~MS_POSIXACL) |
+		(test_opt(sb, POSIX_ACL) ? MS_POSIXACL : 0);
 
 	es = sbi->s_es;
 
