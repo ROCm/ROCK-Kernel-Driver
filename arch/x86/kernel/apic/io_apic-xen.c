@@ -746,7 +746,7 @@ static void clear_IO_APIC (void)
 #define __add_pin_to_irq_node(cfg, node, apic, pin) 0
 #endif /* !CONFIG_XEN */
 
-#ifdef CONFIG_X86_32
+#if defined(CONFIG_X86_32) && !defined(CONFIG_XEN)
 /*
  * support for broken MP BIOSs, enables hand-redirection of PIRQ0-7 to
  * specific CPU-side IRQs.
@@ -1157,7 +1157,7 @@ static int pin_2_irq(int idx, int ioapic, int pin, unsigned int flags)
 	if (mp_irqs[idx].dstirq != pin)
 		pr_err("broken BIOS or MPTABLE parser, ayiee!!\n");
 
-#ifdef CONFIG_X86_32
+#if defined(CONFIG_X86_32) && !defined(CONFIG_XEN)
 	/*
 	 * PCI IRQ command line redirection. Yes, limits are hardcoded.
 	 */

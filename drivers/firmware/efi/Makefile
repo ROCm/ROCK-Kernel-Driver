@@ -9,4 +9,4 @@ obj-$(CONFIG_EFI_RUNTIME_MAP)		+= runtime-map.o
 obj-$(CONFIG_EFI_RUNTIME_WRAPPERS)	+= runtime-wrappers.o
 obj-$(CONFIG_EFI_ARM_STUB)		+= libstub/
 
-disabled-obj-$(CONFIG_XEN)	:= libstub/ reboot.o
+disabled-obj-$(CONFIG_XEN)	:= reboot.o

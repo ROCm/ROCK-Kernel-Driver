@@ -962,19 +962,21 @@ void pci_msi_init_pci_dev(struct pci_dev *dev)
 	/* Disable the msi hardware to avoid screaming interrupts
 	 * during boot.  This is the power on reset default so
 	 * usually this should be a noop.
-	 * But on a Xen host don't do this for IOMMUs which the hypervisor
-	 * is in control of (and hence has already enabled on purpose).
+	 * But on a Xen host don't do this for
+	 * - IOMMUs which the hypervisor is in control of (and hence has
+	 *   already enabled on purpose),
+	 * - unprivileged domains.
 	 */
 	if (is_initial_xendomain()
 	    && (dev->class >> 8) == PCI_CLASS_SYSTEM_IOMMU
 	    && dev->vendor == PCI_VENDOR_ID_AMD)
 		return;
 	dev->msi_cap = pci_find_capability(dev, PCI_CAP_ID_MSI);
-	if (dev->msi_cap)
+	if (dev->msi_cap && is_initial_xendomain())
 		msi_set_enable(dev, 0);
 
 	dev->msix_cap = pci_find_capability(dev, PCI_CAP_ID_MSIX);
-	if (dev->msix_cap)
+	if (dev->msix_cap && is_initial_xendomain())
 		msix_clear_and_set_ctrl(dev, PCI_MSIX_FLAGS_ENABLE, 0);
 }
 

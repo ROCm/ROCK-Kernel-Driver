@@ -1004,7 +1004,6 @@ fail_response:
 static int usbbk_start_submit_urb(usbif_t *usbif)
 {
 	usbif_urb_back_ring_t *urb_ring = &usbif->urb_ring;
-	usbif_urb_request_t *req;
 	pending_req_t *pending_req;
 	RING_IDX rc, rp;
 	int more_to_do = 0;
@@ -1023,6 +1022,8 @@ static int usbbk_start_submit_urb(usbif_t *usbif)
 	}
 
 	while (rc != rp) {
+		usbif_urb_request_t req;
+
 		if (RING_REQUEST_CONS_OVERFLOW(urb_ring, rc)) {
 			if(printk_ratelimit())
 				pr_warning("RING_REQUEST_CONS_OVERFLOW\n");
@@ -1035,11 +1036,11 @@ static int usbbk_start_submit_urb(usbif_t *usbif)
 			break;
 		}
 
-		req = RING_GET_REQUEST(urb_ring, rc);
+		req = *RING_GET_REQUEST(urb_ring, rc);
 		urb_ring->req_cons = ++rc;
+		barrier();
 
-		dispatch_request_to_pending_reqs(usbif, req,
-							pending_req);
+		dispatch_request_to_pending_reqs(usbif, &req, pending_req);
 
 		cond_resched();
 	}
@@ -1052,7 +1053,6 @@ static int usbbk_start_submit_urb(usbif_t *usbif)
 void usbbk_hotplug_notify(usbif_t *usbif, int portnum, int speed)
 {
 	usbif_conn_back_ring_t *ring = &usbif->conn_ring;
-	usbif_conn_request_t *req;
 	usbif_conn_response_t *res;
 	unsigned long flags;
 	u16 id;
@@ -1060,8 +1060,7 @@ void usbbk_hotplug_notify(usbif_t *usbif, int portnum, int speed)
 
 	spin_lock_irqsave(&usbif->conn_ring_lock, flags);
 
-	req = RING_GET_REQUEST(ring, ring->req_cons);;
-	id = req->id;
+	id = RING_GET_REQUEST(ring, ring->req_cons)->id;
 	ring->req_cons++;
 	ring->sring->req_event = ring->req_cons + 1;
 

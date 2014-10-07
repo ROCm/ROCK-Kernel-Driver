@@ -310,7 +310,6 @@ EXPORT_SYMBOL_GPL(vector_used_by_percpu_irq);
  * failure so declare these two cpumasks as global.
  */
 static struct cpumask affinity_new, online_new;
-#endif
 
 /*
  * This cpu is going to be removed and its vectors migrated to the remaining
@@ -319,7 +318,6 @@ static struct cpumask affinity_new, online_new;
  */
 int check_irq_vectors_for_cpu_disable(void)
 {
-#ifndef CONFIG_XEN
 	int irq, cpu;
 	unsigned int this_cpu, vector, this_count, count;
 	struct irq_desc *desc;
@@ -386,9 +384,9 @@ int check_irq_vectors_for_cpu_disable(void)
 			this_cpu, this_count, count);
 		return -ERANGE;
 	}
-#endif
 	return 0;
 }
+#endif
 
 /* A cpu has been removed from cpu_online_mask.  Reset irq affinities. */
 void fixup_irqs(void)
