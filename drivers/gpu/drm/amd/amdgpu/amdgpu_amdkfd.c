@@ -25,8 +25,10 @@
 #include "amdgpu.h"
 #include <linux/module.h>
 
-static const struct kgd2kfd_calls *kgd2kfd;
-static bool (*kgd2kfd_init_p)(unsigned, const struct kfd2kgd_calls*,
+#define AMDKFD_SKIP_UNCOMPILED_CODE 1
+
+const struct kgd2kfd_calls *kgd2kfd;
+bool (*kgd2kfd_init_p)(unsigned, const struct kfd2kgd_calls*,
 				const struct kgd2kfd_calls**);
 
 bool amdgpu_amdkfd_init(void)
@@ -46,6 +48,9 @@ bool amdgpu_amdkfd_load_interface(struct amdgpu_device *rdev)
 	switch (rdev->asic_type) {
 	case CHIP_KAVERI:
 		kfd2kgd = amdgpu_amdkfd_gfx_7_get_functions();
+		break;
+	case CHIP_CARRIZO:
+		kfd2kgd = amdgpu_amdkfd_gfx_8_0_get_functions();
 		break;
 	default:
 		return false;
@@ -122,4 +127,111 @@ int amdgpu_amdkfd_resume(struct amdgpu_device *rdev)
 		r = kgd2kfd->resume(rdev->kfd);
 
 	return r;
+}
+
+u32 pool_to_domain(enum kgd_memory_pool p)
+{
+	switch (p) {
+	case KGD_POOL_FRAMEBUFFER: return AMDGPU_GEM_DOMAIN_VRAM;
+	default: return AMDGPU_GEM_DOMAIN_GTT;
+	}
+}
+
+int alloc_gtt_mem(struct kgd_dev *kgd, size_t size,
+			void **mem_obj, uint64_t *gpu_addr,
+			void **cpu_ptr)
+{
+	struct amdgpu_device *rdev = (struct amdgpu_device *)kgd;
+	struct kgd_mem **mem = (struct kgd_mem **) mem_obj;
+	int r;
+
+	BUG_ON(kgd == NULL);
+	BUG_ON(gpu_addr == NULL);
+	BUG_ON(cpu_ptr == NULL);
+
+	*mem = kmalloc(sizeof(struct kgd_mem), GFP_KERNEL);
+	if ((*mem) == NULL)
+		return -ENOMEM;
+
+	r = amdgpu_bo_create(rdev, size, PAGE_SIZE, true, AMDGPU_GEM_DOMAIN_GTT,
+			AMDGPU_GEM_CREATE_CPU_GTT_USWC, NULL, NULL, &((*mem)->data1.bo));
+	if (r) {
+		dev_err(rdev->dev,
+			"failed to allocate BO for amdkfd (%d)\n", r);
+		return r;
+	}
+
+	/* map the buffer */
+	r = amdgpu_bo_reserve((*mem)->data1.bo, true);
+	if (r) {
+		dev_err(rdev->dev, "(%d) failed to reserve bo for amdkfd\n", r);
+		goto allocate_mem_reserve_bo_failed;
+	}
+
+	r = amdgpu_bo_pin((*mem)->data1.bo, AMDGPU_GEM_DOMAIN_GTT,
+				&(*mem)->data1.gpu_addr);
+	if (r) {
+		dev_err(rdev->dev, "(%d) failed to pin bo for amdkfd\n", r);
+		goto allocate_mem_pin_bo_failed;
+	}
+	*gpu_addr = (*mem)->data1.gpu_addr;
+
+	r = amdgpu_bo_kmap((*mem)->data1.bo, &(*mem)->data1.cpu_ptr);
+	if (r) {
+		dev_err(rdev->dev,
+			"(%d) failed to map bo to kernel for amdkfd\n", r);
+		goto allocate_mem_kmap_bo_failed;
+	}
+	*cpu_ptr = (*mem)->data1.cpu_ptr;
+
+	amdgpu_bo_unreserve((*mem)->data1.bo);
+
+	return 0;
+
+allocate_mem_kmap_bo_failed:
+	amdgpu_bo_unpin((*mem)->data1.bo);
+allocate_mem_pin_bo_failed:
+	amdgpu_bo_unreserve((*mem)->data1.bo);
+allocate_mem_reserve_bo_failed:
+	amdgpu_bo_unref(&(*mem)->data1.bo);
+
+	return r;
+}
+
+void free_gtt_mem(struct kgd_dev *kgd, void *mem_obj)
+{
+	struct kgd_mem *mem = (struct kgd_mem *) mem_obj;
+
+	BUG_ON(mem == NULL);
+
+	amdgpu_bo_reserve(mem->data1.bo, true);
+	amdgpu_bo_kunmap(mem->data1.bo);
+	amdgpu_bo_unpin(mem->data1.bo);
+	amdgpu_bo_unreserve(mem->data1.bo);
+	amdgpu_bo_unref(&(mem->data1.bo));
+	kfree(mem);
+}
+
+uint64_t get_vmem_size(struct kgd_dev *kgd)
+{
+	struct amdgpu_device *rdev = (struct amdgpu_device *)kgd;
+
+	BUG_ON(kgd == NULL);
+
+	return rdev->mc.real_vram_size;
+}
+
+uint64_t get_gpu_clock_counter(struct kgd_dev *kgd)
+{
+	struct amdgpu_device *rdev = (struct amdgpu_device *)kgd;
+
+	return rdev->asic_funcs->get_gpu_clock_counter(rdev);
+}
+
+uint32_t get_max_engine_clock_in_mhz(struct kgd_dev *kgd)
+{
+	struct amdgpu_device *rdev = (struct amdgpu_device *)kgd;
+
+	/* The sclk is in quantas of 10kHz */
+	return rdev->pm.dpm.dyn_state.max_clock_voltage_on_ac.sclk / 100;
 }

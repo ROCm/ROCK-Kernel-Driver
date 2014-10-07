@@ -30,6 +30,20 @@
 
 struct amdgpu_device;
 
+struct kgd_mem {
+	union {
+		struct {
+			struct amdgpu_bo *bo;
+			uint64_t gpu_addr;
+			void *cpu_ptr;
+		} data1;
+		struct {
+			struct amdgpu_bo *bo;
+			struct amdgpu_bo_va *bo_va;
+		} data2;
+	};
+};
+
 bool amdgpu_amdkfd_init(void);
 void amdgpu_amdkfd_fini(void);
 
@@ -44,5 +58,18 @@ void amdgpu_amdkfd_device_init(struct amdgpu_device *rdev);
 void amdgpu_amdkfd_device_fini(struct amdgpu_device *rdev);
 
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_7_get_functions(void);
+struct kfd2kgd_calls *amdgpu_amdkfd_gfx_8_0_get_functions(void);
+
+/* Shared API */
+int map_bo(struct amdgpu_device *rdev, uint64_t va, void *vm,
+		struct amdgpu_bo *bo, struct amdgpu_bo_va **bo_va);
+int alloc_gtt_mem(struct kgd_dev *kgd, size_t size,
+			void **mem_obj, uint64_t *gpu_addr,
+			void **cpu_ptr);
+void free_gtt_mem(struct kgd_dev *kgd, void *mem_obj);
+uint64_t get_vmem_size(struct kgd_dev *kgd);
+uint64_t get_gpu_clock_counter(struct kgd_dev *kgd);
+
+uint32_t get_max_engine_clock_in_mhz(struct kgd_dev *kgd);
 
 #endif /* AMDGPU_AMDKFD_H_INCLUDED */
