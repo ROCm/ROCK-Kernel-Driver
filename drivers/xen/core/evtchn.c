@@ -1927,14 +1927,14 @@ int assign_irq_vector(int irq, struct irq_cfg *cfg, const struct cpumask *mask)
 #define identity_mapped_irq(irq) (1)
 #endif
 
-void evtchn_register_pirq(int irq)
+void evtchn_register_pirq(int irq, unsigned int xen_pirq)
 {
 	struct irq_cfg *cfg = irq_cfg(irq);
 
 	BUG_ON(irq < PIRQ_BASE || irq - PIRQ_BASE >= nr_pirqs);
 	if (identity_mapped_irq(irq) || type_from_irq_cfg(cfg) != IRQT_UNBOUND)
 		return;
-	cfg->info = mk_irq_info(IRQT_PIRQ, irq, 0);
+	cfg->info = mk_irq_info(IRQT_PIRQ, xen_pirq, 0);
 	irq_set_chip_and_handler_name(irq, &pirq_chip, handle_fasteoi_irq,
 				      "fasteoi");
 }

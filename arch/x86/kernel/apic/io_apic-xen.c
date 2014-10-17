@@ -1523,7 +1523,6 @@ static void ioapic_register_intr(unsigned int irq, struct irq_cfg *cfg,
 }
 #else /* !CONFIG_XEN */
 #define __clear_irq_vector(irq, cfg) ((void)0)
-#define ioapic_register_intr(irq, cfg, trigger) evtchn_register_pirq(irq)
 #endif
 
 #ifndef CONFIG_XEN
@@ -1571,16 +1570,18 @@ static void setup_ioapic_irq(unsigned int irq, struct irq_cfg *cfg,
 	 */
 	if (irq >= legacy_pic->nr_legacy_irqs
 	    || mp_pin_info(attr->ioapic, attr->ioapic_pin)->set) {
+		unsigned int gsi = mp_pin_to_gsi(attr->ioapic,
+						 attr->ioapic_pin);
 		struct physdev_setup_gsi setup_gsi = {
-			.gsi = irq,
+			.gsi = gsi,
 			.triggering = attr->trigger,
 			.polarity = attr->polarity
 		};
 		struct physdev_map_pirq map_pirq = {
 			.domid = DOMID_SELF,
 			.type = MAP_PIRQ_TYPE_GSI,
-			.index = irq,
-			.pirq = irq
+			.index = gsi,
+			.pirq = gsi
 		};
 
 		switch (HYPERVISOR_physdev_op(PHYSDEVOP_setup_gsi,
@@ -1590,11 +1591,11 @@ static void setup_ioapic_irq(unsigned int irq, struct irq_cfg *cfg,
 				break;
 			/* fall through */
 		case 0:
-			evtchn_register_pirq(irq);
+			evtchn_register_pirq(irq, gsi);
 			if (HYPERVISOR_physdev_op(PHYSDEVOP_map_pirq,
 						  &map_pirq) == 0) {
 				/* fake (for init_IO_APIC_traps()): */
-				cfg->vector = irq;
+				cfg->vector = gsi;
 				return;
 			}
 		}
@@ -1635,10 +1636,13 @@ static void setup_ioapic_irq(unsigned int irq, struct irq_cfg *cfg,
 		return;
 	}
 
-	ioapic_register_intr(irq, cfg, attr->trigger);
 #ifndef CONFIG_XEN
+	ioapic_register_intr(irq, cfg, attr->trigger);
 	if (irq < nr_legacy_irqs())
 		legacy_pic->mask(irq);
+#else
+	evtchn_register_pirq(irq, mp_pin_to_gsi(attr->ioapic,
+						attr->ioapic_pin));
 #endif
 
 	ioapic_write_entry(attr->ioapic, attr->ioapic_pin, entry);
@@ -2591,7 +2595,6 @@ static void ack_apic_edge(struct irq_data *data)
 atomic_t irq_mis_count;
 
 #ifdef CONFIG_GENERIC_PENDING_IRQ
-#ifndef CONFIG_XEN
 static bool io_apic_level_ack_pending(struct irq_cfg *cfg)
 {
 	struct irq_pin_list *entry;
@@ -2614,7 +2617,6 @@ static bool io_apic_level_ack_pending(struct irq_cfg *cfg)
 
 	return false;
 }
-#endif
 
 static inline bool ioapic_irqd_mask(struct irq_data *data, struct irq_cfg *cfg)
 {

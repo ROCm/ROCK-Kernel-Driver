@@ -55,7 +55,7 @@ struct irq_cfg {
 	union {
 		int bindcount; /* for dynamic IRQs */
 #ifdef CONFIG_X86_IO_APIC
-		u8 vector; /* for physical IRQs */
+		unsigned int vector; /* for physical IRQs */
 #endif
 	};
 };
@@ -154,7 +154,7 @@ bool
 evtchn_do_upcall(struct pt_regs *regs);
 
 /* Mark a PIRQ as unavailable for dynamic allocation. */
-void evtchn_register_pirq(int irq);
+void evtchn_register_pirq(int irq, unsigned int xen_pirq);
 /* Map a Xen-supplied PIRQ to a dynamically allocated one. */
 int evtchn_map_pirq(int irq, unsigned int xen_pirq, unsigned int nr);
 /* Look up a Xen-supplied PIRQ for a dynamically allocated one. */

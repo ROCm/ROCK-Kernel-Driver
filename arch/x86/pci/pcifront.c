@@ -17,7 +17,7 @@ static int pcifront_enable_irq(struct pci_dev *dev)
 	pci_read_config_byte(dev, PCI_INTERRUPT_LINE, &irq);
 	if (!alloc_irq_and_cfg_at(irq, numa_node_id()))
 		return -ENOMEM;
-	evtchn_register_pirq(irq);
+	evtchn_register_pirq(irq, irq);
 	dev->irq = irq;
 
 	return 0;
