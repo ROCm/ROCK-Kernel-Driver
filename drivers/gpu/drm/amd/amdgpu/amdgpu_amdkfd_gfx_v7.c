@@ -85,10 +85,8 @@ union TCP_WATCH_CNTL_BITS {
 struct kgd_mem {
 	union {
 		struct {
-			struct amdgpu_sa_bo *sa_bo;
-			uint64_t gpu_addr;
-			uint32_t *ptr;
 			struct amdgpu_bo *bo;
+			uint64_t gpu_addr;
 			void *cpu_ptr;
 		} data1;
 		struct {
@@ -98,13 +96,6 @@ struct kgd_mem {
 	};
 };
 static int map_bo(struct amdgpu_device *adev, uint64_t va, void *vm, struct amdgpu_bo *bo, struct amdgpu_bo_va **bo_va);
-static int init_sa_manager(struct kgd_dev *kgd, unsigned int size);
-static void fini_sa_manager(struct kgd_dev *kgd);
-
-static int allocate_mem(struct kgd_dev *kgd, size_t size, size_t alignment,
-		enum kgd_memory_pool pool, struct kgd_mem **mem);
-
-static void free_mem(struct kgd_dev *kgd, struct kgd_mem *mem);
 
 static int alloc_gtt_mem(struct kgd_dev *kgd, size_t size,
 			void **mem_obj, uint64_t *gpu_addr,
@@ -165,10 +156,6 @@ static uint16_t read_atc_vmid_pasid_mapping_reg_pasid_field(struct kgd_dev *kgd,
 static void write_vmid_invalidate_request(struct kgd_dev *kgd, uint8_t vmid);
 
 static const struct kfd2kgd_calls kfd2kgd = {
-	.init_sa_manager = init_sa_manager,
-	.fini_sa_manager = fini_sa_manager,
-	.allocate_mem = allocate_mem,
-	.free_mem = free_mem,
 	.init_gtt_mem_allocation = alloc_gtt_mem,
 	.free_gtt_mem = free_gtt_mem,
 	.get_vmem_size = get_vmem_size,
@@ -284,88 +271,6 @@ int amdgpu_amdkfd_resume(struct amdgpu_device *adev)
 		r = kgd2kfd->resume(adev->kfd);
 
 	return r;
-}
-
-static u32 pool_to_domain(enum kgd_memory_pool p)
-{
-	switch (p) {
-	case KGD_POOL_FRAMEBUFFER: return AMDGPU_GEM_DOMAIN_VRAM;
-	default: return AMDGPU_GEM_DOMAIN_GTT;
-	}
-}
-
-static int init_sa_manager(struct kgd_dev *kgd, unsigned int size)
-{
-	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
-	int r;
-
-	BUG_ON(kgd == NULL);
-
-	r = amdgpu_sa_bo_manager_init(adev, &adev->kfd_bo,
-				      size,
-				      AMDGPU_GPU_PAGE_SIZE,
-				      AMDGPU_GEM_DOMAIN_GTT);
-
-	if (r)
-		return r;
-
-	r = amdgpu_sa_bo_manager_start(adev, &adev->kfd_bo);
-	if (r)
-		amdgpu_sa_bo_manager_fini(adev, &adev->kfd_bo);
-
-	return r;
-}
-
-static void fini_sa_manager(struct kgd_dev *kgd)
-{
-	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
-
-	BUG_ON(kgd == NULL);
-
-	amdgpu_sa_bo_manager_suspend(adev, &adev->kfd_bo);
-	amdgpu_sa_bo_manager_fini(adev, &adev->kfd_bo);
-}
-
-static int allocate_mem(struct kgd_dev *kgd, size_t size, size_t alignment,
-		enum kgd_memory_pool pool, struct kgd_mem **mem)
-{
-	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
-	u32 domain;
-	int r;
-
-	BUG_ON(kgd == NULL);
-
-	domain = pool_to_domain(pool);
-	if (domain != AMDGPU_GEM_DOMAIN_GTT) {
-		dev_err(adev->dev,
-			"Only allowed to allocate gart memory for kfd\n");
-		return -EINVAL;
-	}
-
-	*mem = kmalloc(sizeof(struct kgd_mem), GFP_KERNEL);
-	if ((*mem) == NULL)
-		return -ENOMEM;
-
-	r = amdgpu_sa_bo_new(adev, &adev->kfd_bo, &(*mem)->data1.sa_bo, size, alignment);
-	if (r) {
-		dev_err(adev->dev, "failed to get memory for kfd (%d)\n", r);
-		return r;
-	}
-
-	(*mem)->data1.ptr = amdgpu_sa_bo_cpu_addr((*mem)->data1.sa_bo);
-	(*mem)->data1.gpu_addr = amdgpu_sa_bo_gpu_addr((*mem)->data1.sa_bo);
-
-	return 0;
-}
-
-static void free_mem(struct kgd_dev *kgd, struct kgd_mem *mem)
-{
-	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
-
-	BUG_ON(kgd == NULL);
-
-	amdgpu_sa_bo_free(adev, &mem->data1.sa_bo, NULL);
-	kfree(mem);
 }
 
 static int alloc_gtt_mem(struct kgd_dev *kgd, size_t size,
