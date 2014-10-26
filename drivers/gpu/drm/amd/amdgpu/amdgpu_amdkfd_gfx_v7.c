@@ -37,6 +37,7 @@
 #include "oss/oss_2_0_sh_mask.h"
 #include "gmc/gmc_7_1_d.h"
 #include "gmc/gmc_7_1_sh_mask.h"
+#include "cik_structs.h"
 
 #define CIK_PIPE_PER_MEC	(4)
 
