@@ -1,0 +1,7 @@
+menu "AMD GNB BUS"
+	visible if 0
+
+config DRM_AMD_GNB_BUS
+	tristate "AMD GNB bus - used for GNB IPs such as ACP and ISP"
+
+endmenu

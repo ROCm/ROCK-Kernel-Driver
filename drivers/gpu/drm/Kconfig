@@ -120,6 +120,8 @@ config DRM_RADEON
 
 source "drivers/gpu/drm/radeon/Kconfig"
 
+source "drivers/gpu/drm/amd/bus/Kconfig"
+
 config DRM_AMDGPU
 	tristate "AMD GPU"
 	depends on DRM && PCI
@@ -134,6 +136,7 @@ config DRM_AMDGPU
 	select HWMON
 	select BACKLIGHT_CLASS_DEVICE
 	select INTERVAL_TREE
+	select DRM_AMD_GNB_BUS
 	help
 	  Choose this option if you have a recent AMD Radeon graphics card.
 
