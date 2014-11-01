@@ -31,6 +31,7 @@
 struct mm_struct;
 
 #include "kfd_priv.h"
+#include "kfd_dbgmgr.h"
 
 /*
  * Initial size for the array of queues.
@@ -399,6 +400,17 @@ void kfd_unbind_process_from_device(struct kfd_dev *dev, unsigned int pasid)
 	BUG_ON(p->pasid != pasid);
 
 	mutex_lock(&p->mutex);
+
+	if ((dev->dbgmgr) && (dev->dbgmgr->pasid == p->pasid)) {
+
+		pr_debug("\t dbg mgr pasid is %u\n", dev->dbgmgr->pasid);
+		if (!kfd_dbgmgr_abnormal_termination(dev->dbgmgr, p)) {
+			kfd_dbgmgr_destroy(dev->dbgmgr);
+			dev->dbgmgr = NULL;
+		} else {
+			BUG();
+		}
+	}
 
 	pqm_uninit(&p->pqm);
 

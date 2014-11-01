@@ -173,7 +173,6 @@
 #define CPC_INT_CNTL					0xC2D0
 
 #define CP_HQD_IQ_RPTR					0xC970u
-#define AQL_ENABLE					(1U << 0)
 #define SDMA0_RLC0_RB_CNTL				0xD400u
 #define	SDMA_RB_VMID(x)					(x << 24)
 #define	SDMA0_RLC0_RB_BASE				0xD404u

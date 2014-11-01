@@ -47,6 +47,7 @@
 #define KFD_CIK_HIQ_PIPE 4
 #define KFD_CIK_HIQ_QUEUE 0
 
+
 /* GPU ID hash width in bits */
 #define KFD_GPU_ID_HASH_WIDTH 16
 
@@ -119,6 +120,7 @@ struct kfd_device_info {
 	unsigned int asic_family;
 	const struct kfd_event_interrupt_class *event_interrupt_class;
 	unsigned int max_pasid_bits;
+	unsigned int max_no_of_hqd;
 	size_t ih_ring_entry_size;
 	uint8_t num_of_watch_points;
 	uint16_t mqd_size_aligned;
@@ -187,6 +189,9 @@ struct kfd_dev {
 	 * from the HW ring into a SW ring.
 	 */
 	bool interrupts_active;
+
+	/* Debug manager */	
+	struct kfd_dbgmgr           *dbgmgr;
 };
 
 /* KGD2KFD callbacks */
@@ -223,6 +228,7 @@ struct device *kfd_chardev(void);
 enum kfd_preempt_type_filter {
 	KFD_PREEMPT_TYPE_FILTER_SINGLE_QUEUE,
 	KFD_PREEMPT_TYPE_FILTER_ALL_QUEUES,
+	KFD_PREEMPT_TYPE_FILTER_DYNAMIC_QUEUES,
 	KFD_PREEMPT_TYPE_FILTER_BY_PASID
 };
 
@@ -641,6 +647,8 @@ int pqm_create_queue(struct process_queue_manager *pqm,
 int pqm_destroy_queue(struct process_queue_manager *pqm, unsigned int qid);
 int pqm_update_queue(struct process_queue_manager *pqm, unsigned int qid,
 			struct queue_properties *p);
+struct kernel_queue *pqm_get_kernel_queue(struct process_queue_manager *pqm,
+						unsigned int qid);
 
 /* Packet Manager */
 
@@ -676,6 +684,8 @@ void pm_release_ib(struct packet_manager *pm);
 uint64_t kfd_get_number_elems(struct kfd_dev *kfd);
 phys_addr_t kfd_get_process_doorbells(struct kfd_dev *dev,
 					struct kfd_process *process);
+int fence_wait_timeout(unsigned int *fence_addr, unsigned int fence_value,
+			unsigned long timeout);
 
 /* Events */
 extern const struct kfd_event_interrupt_class event_interrupt_class_cik;

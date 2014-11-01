@@ -33,6 +33,8 @@
 static const struct kfd_device_info kaveri_device_info = {
 	.asic_family = CHIP_KAVERI,
 	.max_pasid_bits = 16,
+	/* max num of queues for KV.TODO should be a dynamic value */
+	.max_no_of_hqd	= 24,
 	.ih_ring_entry_size = 4 * sizeof(uint32_t),
 	.event_interrupt_class = &event_interrupt_class_cik,
 	.mqd_size_aligned = MQD_SIZE_ALIGNED
@@ -266,6 +268,8 @@ bool kgd2kfd_device_init(struct kfd_dev *kfd,
 			kfd->pdev->vendor, kfd->pdev->device);
 		goto dqm_start_error;
 	}
+
+	kfd->dbgmgr = NULL;
 
 	kfd->init_complete = true;
 	dev_info(kfd_device, "added device (%x:%x)\n", kfd->pdev->vendor,
