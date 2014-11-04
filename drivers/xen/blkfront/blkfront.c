@@ -86,7 +86,7 @@ static bool blkif_completion(struct blkfront_info *, unsigned long id,
 			     int status);
 static void blkif_free(struct blkfront_info *, int);
 
-/* Maximum number of indirect segments advertised to the front end. */
+/* Maximum number of indirect segments to be used by the front end. */
 static unsigned int max_segs_per_req = BITS_PER_LONG;
 module_param_named(max_indirect_segments, max_segs_per_req, uint, 0644);
 MODULE_PARM_DESC(max_indirect_segments, "maximum number of indirect segments");

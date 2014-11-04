@@ -283,6 +283,7 @@ static void __iomem *__ioremap_caller(resource_size_t phys_addr,
 	int retval;
 	domid_t domid = DOMID_IO;
 	void __iomem *ret_addr;
+	int ram_region;
 
 	/* Don't allow wraparound or zero size */
 	last_addr = phys_addr + size - 1;
@@ -305,14 +306,27 @@ static void __iomem *__ioremap_caller(resource_size_t phys_addr,
 	/*
 	 * Don't allow anybody to remap normal RAM that we're using..
 	 */
-	last_mfn = PFN_DOWN(last_addr);
-	for (mfn = PFN_DOWN(phys_addr); mfn <= last_mfn; mfn++) {
-		unsigned long pfn = mfn_to_local_pfn(mfn);
+	/* First check if whole region can be identified as RAM or not */
+	ram_region = is_initial_xendomain() ? region_is_ram(phys_addr, size)
+					    : -1;
+	if (ram_region > 0) {
+		WARN_ONCE(1, "ioremap on RAM at %#Lx - %#Lx\n",
+			  (unsigned long long)phys_addr,
+			  (unsigned long long)last_addr);
+		return NULL;
+	}
 
-		if (pfn_valid(pfn)) {
-			if (!PageReserved(pfn_to_page(pfn)))
-				return NULL;
-			domid = DOMID_SELF;
+	/* If could not be identified(-1), check page by page */
+	if (ram_region < 0) {
+		last_mfn = PFN_DOWN(last_addr);
+		for (mfn = PFN_DOWN(phys_addr); mfn <= last_mfn; mfn++) {
+			unsigned long pfn = mfn_to_local_pfn(mfn);
+
+			if (pfn_valid(pfn)) {
+				if (!PageReserved(pfn_to_page(pfn)))
+					return NULL;
+				domid = DOMID_SELF;
+			}
 		}
 	}
 	WARN_ON_ONCE(domid == DOMID_SELF);

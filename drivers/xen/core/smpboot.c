@@ -74,7 +74,7 @@ static irqreturn_t ipi_interrupt(int irq, void *dev_id)
 		[IRQ_WORK_VECTOR] = smp_irq_work_interrupt,
 #endif
 	};
-	unsigned long *pending = __get_cpu_var(ipi_pending);
+	unsigned long *pending = this_cpu_ptr(ipi_pending);
 	struct pt_regs *regs = get_irq_regs();
 	irqreturn_t ret = IRQ_NONE;
 
@@ -143,7 +143,7 @@ static void cpu_bringup(void)
 	unsigned int cpu;
 
 	cpu_init();
-	identify_secondary_cpu(__this_cpu_ptr(&cpu_info));
+	identify_secondary_cpu(raw_cpu_ptr(&cpu_info));
 	touch_softlockup_watchdog();
 	preempt_disable();
 	xen_setup_cpu_clockevents();

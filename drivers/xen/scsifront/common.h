@@ -119,7 +119,7 @@ struct vscsifrnt_info {
 		struct scsi_cmnd *sc;
 		unsigned int rqid;
 		unsigned int done;
-		vscsiif_segment_t segs[];
+		struct scsiif_request_segment segs[];
 	} active;
 };
 

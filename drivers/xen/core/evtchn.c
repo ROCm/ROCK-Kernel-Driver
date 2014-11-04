@@ -1498,6 +1498,7 @@ static struct irq_chip pirq_chip = {
 	.irq_set_affinity = set_affinity_irq,
 #endif
 	.irq_retrigger    = resend_irq_on_evtchn,
+	.flags            = IRQCHIP_SKIP_SET_WAKE,
 };
 
 int irq_ignore_unhandled(unsigned int irq)

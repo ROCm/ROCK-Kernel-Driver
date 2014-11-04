@@ -48,7 +48,7 @@ extern shared_info_t *HYPERVISOR_shared_info;
 #if defined(CONFIG_XEN_VCPU_INFO_PLACEMENT)
 DECLARE_PER_CPU(struct vcpu_info, vcpu_info);
 # define vcpu_info(cpu) (&per_cpu(vcpu_info, cpu))
-# define current_vcpu_info() (&__get_cpu_var(vcpu_info))
+# define current_vcpu_info() this_cpu_ptr(&vcpu_info)
 void setup_vcpu_info(unsigned int cpu);
 void adjust_boot_vcpu_info(void);
 #elif defined(CONFIG_XEN)

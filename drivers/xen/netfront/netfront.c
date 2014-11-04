@@ -108,6 +108,9 @@ static inline void dev_disable_gso_features(struct net_device *dev)
 	dev->features &= ~NETIF_F_GSO_MASK;
 	dev->features |= NETIF_F_GSO_ROBUST;
 }
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,18,0)
+#define netif_needs_gso(dev, skb, feat) netif_needs_gso(skb, feat)
+#endif
 #elif defined(NETIF_F_TSO)
 #define HAVE_GSO		       0
 #define HAVE_TSO                       1
@@ -136,7 +139,8 @@ static inline int skb_gso_ok(struct sk_buff *skb, int features)
 }
 
 #define netif_skb_features(skb) ((skb)->dev->features)
-static inline int netif_needs_gso(struct sk_buff *skb, int features)
+static inline int netif_needs_gso(struct net_device *dev, struct sk_buff *skb,
+				  int features)
 {
         return skb_is_gso(skb) &&
                (!skb_gso_ok(skb, features) ||
@@ -146,7 +150,7 @@ static inline int netif_needs_gso(struct sk_buff *skb, int features)
 #define HAVE_GSO			0
 #define HAVE_TSO			0
 #define NO_CSUM_OFFLOAD			1
-#define netif_needs_gso(skb, feat)	0
+#define netif_needs_gso(dev, skb, feat)	0
 #define dev_disable_gso_features(dev)	((void)0)
 #define ethtool_op_set_tso(dev, data)	(-ENOSYS)
 #endif
@@ -1065,7 +1069,7 @@ static int network_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	if (unlikely(!netfront_carrier_ok(np) ||
 		     (slots > 1 && !xennet_can_sg(dev)) ||
-		     netif_needs_gso(skb, netif_skb_features(skb)))) {
+		     netif_needs_gso(dev, skb, netif_skb_features(skb)))) {
 		spin_unlock_irqrestore(&np->tx_lock, flags);
 		goto drop;
 	}

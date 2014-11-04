@@ -171,7 +171,7 @@ static void init_missing_ticks_accounting(unsigned int cpu)
 
 static irqreturn_t timer_interrupt(int irq, void *dev_id)
 {
-	struct clock_event_device *evt = &__get_cpu_var(xen_clock_event);
+	struct clock_event_device *evt = this_cpu_ptr(&xen_clock_event);
 	u64 runnable, offline;
 	s64 stolen;
 	irqreturn_t ret = IRQ_NONE;
@@ -192,7 +192,7 @@ static irqreturn_t timer_interrupt(int irq, void *dev_id)
 
 	if (stolen >= NS_PER_TICK)
 		account_steal_ticks(div_u64_rem(stolen, NS_PER_TICK,
-						&__get_cpu_var(residual_stolen)));
+						this_cpu_ptr(&residual_stolen)));
 	else
 		__this_cpu_write(residual_stolen, stolen > 0 ? stolen : 0);
 
@@ -274,7 +274,7 @@ void xen_clockevents_resume(bool late)
 void __init xen_clockevents_init(void)
 {
 	unsigned int cpu = smp_processor_id();
-	struct clock_event_device *evt = &__get_cpu_var(xen_clock_event);
+	struct clock_event_device *evt = this_cpu_ptr(&xen_clock_event);
 
 	switch (HYPERVISOR_vcpu_op(VCPUOP_stop_periodic_timer,
 				   cpu, NULL)) {

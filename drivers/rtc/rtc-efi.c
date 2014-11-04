@@ -236,6 +236,4 @@ MODULE_ALIAS("platform:rtc-efi");
 MODULE_AUTHOR("dann frazier <dannf@hp.com>");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("EFI RTC driver");
-#ifdef CONFIG_XEN
 MODULE_ALIAS("platform:rtc-efi");
-#endif

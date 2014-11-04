@@ -374,14 +374,22 @@ void xenbus_dev_shutdown(struct device *_dev)
 PARAVIRT_EXPORT_SYMBOL(xenbus_dev_shutdown);
 
 int xenbus_register_driver_common(struct xenbus_driver *drv,
-				  struct xen_bus_type *bus)
+				  struct xen_bus_type *bus,
+				  struct module *owner, const char *mod_name)
 {
 	int ret;
 
 	if (bus->error)
 		return bus->error;
 
+#ifdef CONFIG_PARAVIRT_XEN
+	drv->driver.name = drv->name ? drv->name : drv->ids[0].devicetype;
+#endif
 	drv->driver.bus = &bus->bus;
+#ifdef CONFIG_PARAVIRT_XEN
+	drv->driver.owner = owner;
+	drv->driver.mod_name = mod_name;
+#endif
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,16)
 	drv->driver.probe = xenbus_dev_probe;
 	drv->driver.remove = xenbus_dev_remove;
@@ -695,7 +703,7 @@ int xenbus_register_frontend(struct xenbus_driver *drv)
 
 	drv->read_otherend_details = read_backend_details;
 
-	ret = xenbus_register_driver_common(drv, &xenbus_frontend);
+	ret = (xenbus_register_driver_common)(drv, &xenbus_frontend);
 	if (ret)
 		return ret;
 

@@ -9,7 +9,7 @@ static inline bool xen_thread_fpu_begin(struct task_struct *tsk,
 {
 	bool ret = false;
 
-	if (mcl && !static_cpu_has_safe(X86_FEATURE_EAGER_FPU)) {
+	if (mcl && !use_eager_fpu()) {
 		mcl->op = __HYPERVISOR_fpu_taskswitch;
 		mcl->args[0] = 0;
 		ret = true;

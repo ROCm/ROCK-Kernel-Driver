@@ -59,13 +59,6 @@ static efi_config_table_type_t arch_tables[] __initdata = {
 	{NULL_GUID, NULL, NULL},
 };
 
-static int __init setup_noefi(char *arg)
-{
-	__clear_bit(EFI_RUNTIME_SERVICES, &efi.flags);
-	return 0;
-}
-early_param("noefi", setup_noefi);
-
 #define call op.u.efi_runtime_call
 #define DECLARE_CALL(what) \
 	struct xen_platform_op op; \
@@ -421,7 +414,7 @@ void __init efi_init(void)
 	ret = HYPERVISOR_platform_op(&op);
 	if (!ret)
 		efi.runtime_version = info->version;
-	else
+	else if(__test_and_clear_bit(EFI_RUNTIME_SERVICES, &efi.flags))
 		pr_warn("Could not get runtime services revision.\n");
 
 	x86_platform.get_wallclock = efi_get_time;

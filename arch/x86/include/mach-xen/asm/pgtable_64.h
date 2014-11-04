@@ -133,7 +133,8 @@ static inline void xen_set_pgd(pgd_t *pgdp, pgd_t pgd)
 
 extern unsigned long early_arbitrary_virt_to_mfn(void *va);
 
-extern void sync_global_pgds(unsigned long start, unsigned long end);
+extern void sync_global_pgds(unsigned long start, unsigned long end,
+			     int removed);
 
 /*
  * Conversion functions: convert a page and protection to a page entry,

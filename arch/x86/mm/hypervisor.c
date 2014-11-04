@@ -91,7 +91,7 @@ void __init adjust_boot_vcpu_info(void)
 	 * hence we must swap the underlying MFNs of the two pages holding old
 	 * and new vcpu_info of the boot CPU.
 	 *
-	 * Do *not* use __get_cpu_var() or this_cpu_{write,...}() here, as the
+	 * Do *not* use this_cpu_ptr() or this_cpu_{write,...}() here, as the
 	 * per-CPU segment didn't get reloaded yet. Using this_cpu_read(), as
 	 * in arch_use_lazy_mmu_mode(), though undesirable, is safe except for
 	 * the accesses to variables that were updated in setup_percpu_areas().
@@ -184,7 +184,7 @@ static void multicall_failed(const multicall_entry_t *mc, int rc)
 }
 
 static int _xen_multicall_flush(bool ret_last) {
-	struct lazy_mmu *lazy = &__get_cpu_var(lazy_mmu);
+	struct lazy_mmu *lazy = this_cpu_ptr(&lazy_mmu);
 	multicall_entry_t *mc = lazy->mc;
 	unsigned int count = lazy->nr_mc;
 
@@ -225,7 +225,7 @@ void xen_multicall_flush(void) {
 int xen_multi_update_va_mapping(unsigned long va, pte_t pte,
 				unsigned long uvmf)
 {
-	struct lazy_mmu *lazy = &__get_cpu_var(lazy_mmu);
+	struct lazy_mmu *lazy = this_cpu_ptr(&lazy_mmu);
 	multicall_entry_t *mc;
 
 	if (unlikely(!use_lazy_mmu_mode()))
@@ -264,7 +264,7 @@ static inline bool mmu_may_merge(const multicall_entry_t *mc,
 int xen_multi_mmu_update(mmu_update_t *src, unsigned int count,
 			 unsigned int *success_count, domid_t domid)
 {
-	struct lazy_mmu *lazy = &__get_cpu_var(lazy_mmu);
+	struct lazy_mmu *lazy = this_cpu_ptr(&lazy_mmu);
 	multicall_entry_t *mc = lazy->mc + lazy->nr_mc;
 	mmu_update_t *dst;
 	bool commit, merge;
@@ -316,7 +316,7 @@ int xen_multi_mmu_update(mmu_update_t *src, unsigned int count,
 int xen_multi_mmuext_op(struct mmuext_op *src, unsigned int count,
 			unsigned int *success_count, domid_t domid)
 {
-	struct lazy_mmu *lazy = &__get_cpu_var(lazy_mmu);
+	struct lazy_mmu *lazy = this_cpu_ptr(&lazy_mmu);
 	multicall_entry_t *mc;
 	struct mmuext_op *dst;
 	bool commit, merge;

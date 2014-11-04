@@ -18,3 +18,6 @@ obj-$(CONFIG_PCNET32) += pcnet32.o
 obj-$(CONFIG_SUN3LANCE) += sun3lance.o
 obj-$(CONFIG_SUNLANCE) += sunlance.o
 obj-$(CONFIG_AMD_XGBE) += xgbe/
+ifeq ($(CONFIG_ARM64),y)
+obj-$(CONFIG_AMD_XGBE) += xgbe-a0/
+endif

@@ -57,7 +57,7 @@ static int map_lapic_id(struct acpi_subtable_header *entry,
 		 u32 acpi_id, int *apic_id)
 {
 	struct acpi_madt_local_apic *lapic =
-		(struct acpi_madt_local_apic *)entry;
+		container_of(entry, struct acpi_madt_local_apic, header);
 
 	if (!(lapic->lapic_flags & ACPI_MADT_ENABLED))
 		return -ENODEV;
@@ -73,7 +73,7 @@ static int map_x2apic_id(struct acpi_subtable_header *entry,
 			 int device_declaration, u32 acpi_id, int *apic_id)
 {
 	struct acpi_madt_local_x2apic *apic =
-		(struct acpi_madt_local_x2apic *)entry;
+		container_of(entry, struct acpi_madt_local_x2apic, header);
 
 	if (!(apic->lapic_flags & ACPI_MADT_ENABLED))
 		return -ENODEV;
@@ -90,7 +90,7 @@ static int map_lsapic_id(struct acpi_subtable_header *entry,
 		int device_declaration, u32 acpi_id, int *apic_id)
 {
 	struct acpi_madt_local_sapic *lsapic =
-		(struct acpi_madt_local_sapic *)entry;
+		container_of(entry, struct acpi_madt_local_sapic, header);
 
 	if (!(lsapic->lapic_flags & ACPI_MADT_ENABLED))
 		return -ENODEV;

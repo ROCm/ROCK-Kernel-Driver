@@ -42,6 +42,12 @@ static struct netvsc_device *alloc_net_device(struct hv_device *device)
 	if (!net_device)
 		return NULL;
 
+	net_device->cb_buffer = kzalloc(NETVSC_PACKET_SIZE, GFP_KERNEL);
+	if (!net_device->cb_buffer) {
+		kfree(net_device);
+		return NULL;
+	}
+
 	init_waitqueue_head(&net_device->wait_drain);
 	net_device->start_remove = false;
 	net_device->destroy = false;
@@ -50,6 +56,12 @@ static struct netvsc_device *alloc_net_device(struct hv_device *device)
 
 	hv_set_drvdata(device, net_device);
 	return net_device;
+}
+
+static void free_netvsc_device(struct netvsc_device *nvdev)
+{
+	kfree(nvdev->cb_buffer);
+	kfree(nvdev);
 }
 
 static struct netvsc_device *get_outbound_net_device(struct hv_device *device)
@@ -551,7 +563,7 @@ int netvsc_device_remove(struct hv_device *device)
 	if (net_device->sub_cb_buf)
 		vfree(net_device->sub_cb_buf);
 
-	kfree(net_device);
+	free_netvsc_device(net_device);
 	return 0;
 }
 
@@ -1043,10 +1055,8 @@ int netvsc_device_add(struct hv_device *device, void *additional_info)
 	struct net_device *ndev;
 
 	net_device = alloc_net_device(device);
-	if (!net_device) {
-		ret = -ENOMEM;
-		goto cleanup;
-	}
+	if (!net_device)
+		return -ENOMEM;
 
 	net_device->ring_size = ring_size;
 
@@ -1094,7 +1104,7 @@ close:
 	vmbus_close(device->channel);
 
 cleanup:
-	kfree(net_device);
+	free_netvsc_device(net_device);
 
 	return ret;
 }

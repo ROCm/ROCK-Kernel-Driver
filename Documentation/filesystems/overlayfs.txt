@@ -45,8 +45,7 @@ The lower filesystem can be any filesystem supported by Linux and does
 not need to be writable.  The lower filesystem can even be another
 overlayfs.  The upper filesystem will normally be writable and if it
 is it must support the creation of trusted.* extended attributes, and
-must provide valid d_type in readdir responses, at least for symbolic
-links - so NFS is not suitable.
+must provide valid d_type in readdir responses, so NFS is not suitable.
 
 A read-only overlay of two read-only filesystems may use any
 filesystem type.
@@ -62,10 +61,14 @@ object.
 Where both upper and lower objects are directories, a merged directory
 is formed.
 
-At mount time, the two directories given as mount options are combined
-into a merged directory:
+At mount time, the two directories given as mount options "lowerdir" and
+"upperdir" are combined into a merged directory:
 
-  mount -t overlayfs overlayfs -olowerdir=/lower,upperdir=/upper /overlay
+  mount -t overlayfs overlayfs -olowerdir=/lower,upperdir=/upper,\
+workdir=/work /merged
+
+The "workdir" needs to be an empty directory on the same filesystem
+as upperdir.
 
 Then whenever a lookup is requested in such a merged directory, the
 lookup is performed in each actual directory and the combined result
@@ -86,11 +89,7 @@ filesystem, an overlay filesystem needs to record in the upper filesystem
 that files have been removed.  This is done using whiteouts and opaque
 directories (non-directories are always opaque).
 
-The overlay filesystem uses extended attributes with a
-"trusted.overlay."  prefix to record these details.
-
-A whiteout is created as a symbolic link with target
-"(overlay-whiteout)" and with xattr "trusted.overlay.whiteout" set to "y".
+A whiteout is created as a character device with 0/0 device number.
 When a whiteout is found in the upper level of a merged directory, any
 matching name in the lower level is ignored, and the whiteout itself
 is also hidden.

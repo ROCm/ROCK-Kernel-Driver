@@ -434,6 +434,7 @@ static inline bool acpi_driver_match_device(struct device *dev,
 int acpi_device_uevent_modalias(struct device *, struct kobj_uevent_env *);
 int acpi_device_modalias(struct device *, char *, int);
 
+struct platform_device *acpi_create_platform_device(struct acpi_device *);
 #define ACPI_PTR(_ptr)	(_ptr)
 
 #else	/* !CONFIG_ACPI */
@@ -589,7 +590,6 @@ static inline int acpi_subsys_freeze(struct device *dev) { return 0; }
 #if defined(CONFIG_ACPI) && defined(CONFIG_PM)
 struct acpi_device *acpi_dev_pm_get_node(struct device *dev);
 int acpi_dev_pm_attach(struct device *dev, bool power_on);
-void acpi_dev_pm_detach(struct device *dev, bool power_off);
 #else
 static inline struct acpi_device *acpi_dev_pm_get_node(struct device *dev)
 {
@@ -599,7 +599,6 @@ static inline int acpi_dev_pm_attach(struct device *dev, bool power_on)
 {
 	return -ENODEV;
 }
-static inline void acpi_dev_pm_detach(struct device *dev, bool power_off) {}
 #endif
 
 #ifdef CONFIG_ACPI

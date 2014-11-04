@@ -139,6 +139,15 @@ static int bcm_sysport_set_rx_csum(struct net_device *dev,
 	else
 		reg &= ~RXCHK_SKIP_FCS;
 
+	/* If Broadcom tags are enabled (e.g: using a switch), make
+	 * sure we tell the RXCHK hardware to expect a 4-bytes Broadcom
+	 * tag after the Ethernet MAC Source Address.
+	 */
+	if (netdev_uses_dsa(dev))
+		reg |= RXCHK_BRCM_TAG_EN;
+	else
+		reg &= ~RXCHK_BRCM_TAG_EN;
+
 	rxchk_writel(priv, reg, RXCHK_CONTROL);
 
 	return 0;
@@ -427,7 +436,8 @@ static int bcm_sysport_set_wol(struct net_device *dev,
 	/* Flag the device and relevant IRQ as wakeup capable */
 	if (wol->wolopts) {
 		device_set_wakeup_enable(kdev, 1);
-		enable_irq_wake(priv->wol_irq);
+		if (priv->wol_irq_disabled)
+			enable_irq_wake(priv->wol_irq);
 		priv->wol_irq_disabled = 0;
 	} else {
 		device_set_wakeup_enable(kdev, 0);
@@ -1070,16 +1080,19 @@ static void bcm_sysport_adj_link(struct net_device *dev)
 	if (!phydev->pause)
 		cmd_bits |= CMD_RX_PAUSE_IGNORE | CMD_TX_PAUSE_IGNORE;
 
-	if (changed) {
+	if (!changed)
+		return;
+
+	if (phydev->link) {
 		reg = umac_readl(priv, UMAC_CMD);
 		reg &= ~((CMD_SPEED_MASK << CMD_SPEED_SHIFT) |
 			CMD_HD_EN | CMD_RX_PAUSE_IGNORE |
 			CMD_TX_PAUSE_IGNORE);
 		reg |= cmd_bits;
 		umac_writel(priv, reg, UMAC_CMD);
-
-		phy_print_status(priv->phydev);
 	}
+
+	phy_print_status(priv->phydev);
 }
 
 static int bcm_sysport_init_tx_ring(struct bcm_sysport_priv *priv,
@@ -1384,6 +1397,9 @@ static void bcm_sysport_netif_start(struct net_device *dev)
 	/* Enable NAPI */
 	napi_enable(&priv->napi);
 
+	/* Enable RX interrupt and TX ring full interrupt */
+	intrl2_0_mask_clear(priv, INTRL2_0_RDMA_MBDONE | INTRL2_0_TX_RING_FULL);
+
 	phy_start(priv->phydev);
 
 	/* Enable TX interrupts for the 32 TXQs */
@@ -1485,9 +1501,6 @@ static int bcm_sysport_open(struct net_device *dev)
 	ret = rdma_enable_set(priv, 1);
 	if (ret)
 		goto out_free_rx_ring;
-
-	/* Enable RX interrupt and TX ring full interrupt */
-	intrl2_0_mask_clear(priv, INTRL2_0_RDMA_MBDONE | INTRL2_0_TX_RING_FULL);
 
 	/* Turn on TDMA */
 	ret = tdma_enable_set(priv, 1);
@@ -1845,6 +1858,8 @@ static int bcm_sysport_resume(struct device *d)
 	if (!netif_running(dev))
 		return 0;
 
+	umac_reset(priv);
+
 	/* We may have been suspended and never received a WOL event that
 	 * would turn off MPD detection, take care of that now
 	 */
@@ -1871,9 +1886,6 @@ static int bcm_sysport_resume(struct device *d)
 	}
 
 	netif_device_attach(dev);
-
-	/* Enable RX interrupt and TX ring full interrupt */
-	intrl2_0_mask_clear(priv, INTRL2_0_RDMA_MBDONE | INTRL2_0_TX_RING_FULL);
 
 	/* RX pipe enable */
 	topctrl_writel(priv, 0, RX_FLUSH_CNTL);

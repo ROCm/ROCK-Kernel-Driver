@@ -239,7 +239,7 @@ static void scsiback_cmd_done(struct request *req, int uptodate)
 }
 
 
-static int scsiback_gnttab_data_map(const vscsiif_segment_t *segs,
+static int scsiback_gnttab_data_map(const struct scsiif_request_segment *segs,
 				    unsigned int nr_segs,
 				    pending_req_t *pending_req)
 {

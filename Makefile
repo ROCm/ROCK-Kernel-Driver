@@ -1,8 +1,8 @@
 VERSION = 3
-PATCHLEVEL = 17
-SUBLEVEL = 1
-EXTRAVERSION =
-NAME = Shuffling Zombie Juror
+PATCHLEVEL = 18
+SUBLEVEL = 0
+EXTRAVERSION = -rc3
+NAME = Diseased Newt
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
@@ -10,11 +10,9 @@ NAME = Shuffling Zombie Juror
 # Comments in this file are targeted only to the developer, do not
 # expect to learn how to build the kernel reading this file.
 
-# Do not:
-# o  use make's built-in rules and variables
-#    (this increases performance and avoids hard-to-debug behaviour);
-# o  print "Entering directory ...";
-MAKEFLAGS += -rR --no-print-directory
+# Do not use make's built-in rules and variables
+# (this increases performance and avoids hard-to-debug behaviour);
+MAKEFLAGS += -rR
 
 # Avoid funny character set dependencies
 unexport LC_ALL
@@ -97,6 +95,69 @@ endif
 
 export quiet Q KBUILD_VERBOSE
 
+# kbuild supports saving output files in a separate directory.
+# To locate output files in a separate directory two syntaxes are supported.
+# In both cases the working directory must be the root of the kernel src.
+# 1) O=
+# Use "make O=dir/to/store/output/files/"
+#
+# 2) Set KBUILD_OUTPUT
+# Set the environment variable KBUILD_OUTPUT to point to the directory
+# where the output files shall be placed.
+# export KBUILD_OUTPUT=dir/to/store/output/files/
+# make
+#
+# The O= assignment takes precedence over the KBUILD_OUTPUT environment
+# variable.
+
+# KBUILD_SRC is set on invocation of make in OBJ directory
+# KBUILD_SRC is not intended to be used by the regular user (for now)
+ifeq ($(KBUILD_SRC),)
+
+# OK, Make called in directory where kernel src resides
+# Do we want to locate output files in a separate directory?
+ifeq ("$(origin O)", "command line")
+  KBUILD_OUTPUT := $(O)
+endif
+
+# That's our default target when none is given on the command line
+PHONY := _all
+_all:
+
+# Cancel implicit rules on top Makefile
+$(CURDIR)/Makefile Makefile: ;
+
+ifneq ($(KBUILD_OUTPUT),)
+# Invoke a second make in the output directory, passing relevant variables
+# check that the output directory actually exists
+saved-output := $(KBUILD_OUTPUT)
+KBUILD_OUTPUT := $(shell mkdir -p $(KBUILD_OUTPUT) && cd $(KBUILD_OUTPUT) \
+								&& /bin/pwd)
+$(if $(KBUILD_OUTPUT),, \
+     $(error failed to create output directory "$(saved-output)"))
+
+PHONY += $(MAKECMDGOALS) sub-make
+
+$(filter-out _all sub-make $(CURDIR)/Makefile, $(MAKECMDGOALS)) _all: sub-make
+	@:
+
+sub-make: FORCE
+	$(Q)$(MAKE) -C $(KBUILD_OUTPUT) KBUILD_SRC=$(CURDIR) \
+	-f $(CURDIR)/Makefile $(filter-out _all sub-make,$(MAKECMDGOALS))
+
+# Leave processing to above invocation of make
+skip-makefile := 1
+endif # ifneq ($(KBUILD_OUTPUT),)
+endif # ifeq ($(KBUILD_SRC),)
+
+# We process the rest of the Makefile if this is the final invocation of make
+ifeq ($(skip-makefile),)
+
+# Do not print "Entering directory ...",
+# but we want to display it when entering to the output directory
+# so that IDEs/editors are able to understand relative filenames.
+MAKEFLAGS += --no-print-directory
+
 # Call a source code checker (by default, "sparse") as part of the
 # C compilation.
 #
@@ -138,73 +199,6 @@ endif
 ifeq ("$(origin M)", "command line")
   KBUILD_EXTMOD := $(M)
 endif
-
-# kbuild supports saving output files in a separate directory.
-# To locate output files in a separate directory two syntaxes are supported.
-# In both cases the working directory must be the root of the kernel src.
-# 1) O=
-# Use "make O=dir/to/store/output/files/"
-#
-# 2) Set KBUILD_OUTPUT
-# Set the environment variable KBUILD_OUTPUT to point to the directory
-# where the output files shall be placed.
-# export KBUILD_OUTPUT=dir/to/store/output/files/
-# make
-#
-# The O= assignment takes precedence over the KBUILD_OUTPUT environment
-# variable.
-
-
-# KBUILD_SRC is set on invocation of make in OBJ directory
-# KBUILD_SRC is not intended to be used by the regular user (for now)
-ifeq ($(KBUILD_SRC),)
-
-# OK, Make called in directory where kernel src resides
-# Do we want to locate output files in a separate directory?
-ifeq ("$(origin O)", "command line")
-  KBUILD_OUTPUT := $(O)
-endif
-
-# That's our default target when none is given on the command line
-PHONY := _all
-_all:
-
-# Cancel implicit rules on top Makefile
-$(CURDIR)/Makefile Makefile: ;
-
-ifneq ($(KBUILD_OUTPUT),)
-# Invoke a second make in the output directory, passing relevant variables
-# check that the output directory actually exists
-saved-output := $(KBUILD_OUTPUT)
-KBUILD_OUTPUT := $(shell mkdir -p $(KBUILD_OUTPUT) && cd $(KBUILD_OUTPUT) \
-								&& /bin/pwd)
-$(if $(KBUILD_OUTPUT),, \
-     $(error failed to create output directory "$(saved-output)"))
-
-PHONY += $(MAKECMDGOALS) sub-make
-
-$(filter-out _all sub-make $(CURDIR)/Makefile, $(MAKECMDGOALS)) _all: sub-make
-	@:
-
-# Fake the "Entering directory" message once, so that IDEs/editors are
-# able to understand relative filenames.
-       echodir := @echo
- quiet_echodir := @echo
-silent_echodir := @:
-sub-make: FORCE
-	$($(quiet)echodir) "make[1]: Entering directory \`$(KBUILD_OUTPUT)'"
-	$(if $(KBUILD_VERBOSE:1=),@)$(MAKE) -C $(KBUILD_OUTPUT) \
-	KBUILD_SRC=$(CURDIR) \
-	KBUILD_EXTMOD="$(KBUILD_EXTMOD)" -f $(CURDIR)/Makefile \
-	$(filter-out _all sub-make,$(MAKECMDGOALS))
-
-# Leave processing to above invocation of make
-skip-makefile := 1
-endif # ifneq ($(KBUILD_OUTPUT),)
-endif # ifeq ($(KBUILD_SRC),)
-
-# We process the rest of the Makefile if this is the final invocation of make
-ifeq ($(skip-makefile),)
 
 # If building an external module we do not care about the all: rule
 # but instead _all depend on modules
@@ -868,6 +862,21 @@ mod_strip_cmd = true
 endif # INSTALL_MOD_STRIP
 export mod_strip_cmd
 
+# CONFIG_MODULE_COMPRESS, if defined, will cause module to be compressed
+# after they are installed in agreement with CONFIG_MODULE_COMPRESS_GZIP
+# or CONFIG_MODULE_COMPRESS_XZ.
+
+mod_compress_cmd = true
+ifdef CONFIG_MODULE_COMPRESS
+  ifdef CONFIG_MODULE_COMPRESS_GZIP
+    mod_compress_cmd = gzip -n
+  endif # CONFIG_MODULE_COMPRESS_GZIP
+  ifdef CONFIG_MODULE_COMPRESS_XZ
+    mod_compress_cmd = xz
+  endif # CONFIG_MODULE_COMPRESS_XZ
+endif # CONFIG_MODULE_COMPRESS
+export mod_compress_cmd
+
 # Select initial ramdisk compression format, default is gzip(1).
 # This shall be used by the dracut(8) tool while creating an initramfs image.
 #
@@ -900,9 +909,7 @@ vmlinux-dirs	:= $(patsubst %/,%,$(filter %/, $(init-y) $(init-m) \
 		     $(net-y) $(net-m) $(libs-y) $(libs-m)))
 
 vmlinux-alldirs	:= $(sort $(vmlinux-dirs) $(patsubst %/,%,$(filter %/, \
-		     $(init-n) $(init-) \
-		     $(core-n) $(core-) $(drivers-n) $(drivers-) \
-		     $(net-n)  $(net-)  $(libs-n)    $(libs-))))
+		     $(init-) $(core-) $(drivers-) $(net-) $(libs-))))
 
 init-y		:= $(patsubst %/, %/built-in.o, $(init-y))
 core-y		:= $(patsubst %/, %/built-in.o, $(core-y))
@@ -1558,6 +1565,8 @@ endif
 	$(cmd_crmodverdir)
 	$(Q)$(MAKE) KBUILD_MODULES=$(if $(CONFIG_MODULES),1) \
 	$(build)=$(build-dir)
+# Make sure the latest headers are built for Documentation
+Documentation/: headers_install
 %/: prepare scripts FORCE
 	$(cmd_crmodverdir)
 	$(Q)$(MAKE) KBUILD_MODULES=$(if $(CONFIG_MODULES),1) \
@@ -1600,7 +1609,7 @@ endif
 # Shorthand for $(Q)$(MAKE) -f scripts/Makefile.clean obj=dir
 # Usage:
 # $(Q)$(MAKE) $(clean)=dir
-clean := -f $(if $(KBUILD_SRC),$(srctree)/)scripts/Makefile.clean obj
+clean := -f $(srctree)/scripts/Makefile.clean obj
 
 endif	# skip-makefile
 

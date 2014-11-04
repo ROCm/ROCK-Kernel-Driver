@@ -232,7 +232,7 @@ int xen_update_wallclock(const struct timespec *tv)
 	if (!is_initial_xendomain() || independent_wallclock)
 		return -EPERM;
 
-	shadow = &__get_cpu_var(shadow_time);
+	shadow = this_cpu_ptr(&shadow_time);
 
 	/*
 	 * Ensure we don't get blocked for a long time so that our time delta
@@ -349,7 +349,7 @@ static void get_runstate_snapshot(struct vcpu_runstate_info *res)
 
 	BUG_ON(preemptible());
 
-	state = &__get_cpu_var(runstate);
+	state = this_cpu_ptr(&runstate);
 
 	do {
 		state_time = get_64bit_local(&state->state_entry_time);

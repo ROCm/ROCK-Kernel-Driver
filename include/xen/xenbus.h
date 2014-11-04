@@ -103,6 +103,9 @@ struct xenbus_device_id
 
 /* A xenbus driver. */
 struct xenbus_driver {
+#if !defined(CONFIG_XEN) && !defined(HAVE_XEN_PLATFORM_COMPAT_H)
+	const char *name;       /* defaults to ids[0].devicetype */
+#endif
 	const struct xenbus_device_id *ids;
 	int (*probe)(struct xenbus_device *dev,
 		     const struct xenbus_device_id *id);
@@ -139,8 +142,22 @@ static inline struct xenbus_driver *to_xenbus_driver(struct device_driver *drv)
 	return container_of(drv, struct xenbus_driver, driver);
 }
 
-int __must_check xenbus_register_frontend(struct xenbus_driver *drv);
-int __must_check xenbus_register_backend(struct xenbus_driver *drv);
+#if defined(CONFIG_XEN) || defined(HAVE_XEN_PLATFORM_COMPAT_H)
+#define __xenbus_register_frontend(drv, mod, mn) xenbus_register_frontend(drv)
+#define __xenbus_register_backend(drv, mod, mn) xenbus_register_backend(drv)
+#endif
+int __must_check __xenbus_register_frontend(struct xenbus_driver *drv,
+					    struct module *owner,
+					    const char *mod_name);
+int __must_check __xenbus_register_backend(struct xenbus_driver *drv,
+					   struct module *owner,
+					   const char *mod_name);
+
+#define xenbus_register_frontend(drv) \
+	__xenbus_register_frontend(drv, THIS_MODULE, KBUILD_MODNAME)
+#define xenbus_register_backend(drv) \
+	__xenbus_register_backend(drv, THIS_MODULE, KBUILD_MODNAME)
+
 void xenbus_unregister_driver(struct xenbus_driver *drv);
 
 struct xenbus_transaction

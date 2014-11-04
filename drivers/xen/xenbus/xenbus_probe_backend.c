@@ -259,13 +259,20 @@ int xenbus_dev_is_online(struct xenbus_device *dev)
 EXPORT_SYMBOL_GPL(xenbus_dev_is_online);
 #endif
 
+#if defined(CONFIG_XEN) || defined(MODULE)
+EXPORT_SYMBOL_GPL(xenbus_register_backend);
 int xenbus_register_backend(struct xenbus_driver *drv)
+#else
+EXPORT_SYMBOL_GPL(__xenbus_register_backend);
+int __xenbus_register_backend(struct xenbus_driver *drv, struct module *owner,
+			      const char *mod_name)
+#endif
 {
 	drv->read_otherend_details = read_frontend_details;
 
-	return xenbus_register_driver_common(drv, &xenbus_backend);
+	return xenbus_register_driver_common(drv, &xenbus_backend,
+					     owner, mod_name);
 }
-EXPORT_SYMBOL_GPL(xenbus_register_backend);
 
 #if defined(CONFIG_XEN) && defined(CONFIG_PM_SLEEP)
 void xenbus_backend_suspend(int (*fn)(struct device *, void *))

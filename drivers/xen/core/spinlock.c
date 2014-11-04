@@ -305,7 +305,7 @@ unsigned int xen_spin_wait(arch_spinlock_t *lock, struct __raw_tickets *ptok,
 #endif
 
 		if (!test_evtchn(__this_cpu_read(poll_evtchn)) &&
-		    HYPERVISOR_poll_no_timeout(&__get_cpu_var(poll_evtchn), 1))
+		    HYPERVISOR_poll_no_timeout(this_cpu_ptr(&poll_evtchn), 1))
 			BUG();
 
 #if CONFIG_XEN_SPINLOCK_ACQUIRE_NESTING

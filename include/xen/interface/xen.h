@@ -220,12 +220,12 @@ DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
  *  2). Keep on going, filling out the upper (PUD or L3), and middle (PMD
  *      or L2).
  *  3). Start filling out the PTE table (L1) with the PTE entries. Once
- *  	done, make sure to set each of those entries to RO (so writeable bit
- *  	is unset). Once that has been completed, set the PMD (L2) for this
- *  	PTE table as RO.
+ *      done, make sure to set each of those entries to RO (so writeable bit
+ *      is unset). Once that has been completed, set the PMD (L2) for this
+ *      PTE table as RO.
  *  4). When completed with all of the PMD (L2) entries, and all of them have
- *  	been set to RO, make sure to set RO the PUD (L3). Do the same
- *  	operation on PGD (L4) pagetable entries that have a PUD (L3) entry.
+ *      been set to RO, make sure to set RO the PUD (L3). Do the same
+ *      operation on PGD (L4) pagetable entries that have a PUD (L3) entry.
  *  5). Now before you can use those pages (so setting the cr3), you MUST also
  *      pin them so that the hypervisor can verify the entries. This is done
  *      via the HYPERVISOR_mmuext_op(MMUEXT_PIN_L4_TABLE, guest physical frame
@@ -415,7 +415,7 @@ struct mmuext_op {
 	union {
 		/* [UN]PIN_TABLE, NEW_BASEPTR, NEW_USER_BASEPTR
 		 * CLEAR_PAGE, COPY_PAGE, [UN]MARK_SUPER */
-		xen_pfn_t     mfn;
+		xen_pfn_t mfn;
 		/* INVLPG_LOCAL, INVLPG_ALL, SET_LDT */
 		unsigned long linear_addr;
 	} arg1;
@@ -523,8 +523,7 @@ typedef uint16_t domid_t;
  */
 #define DOMID_XEN  (0x7FF2U)
 
-/*
- * DOMID_COW is used as the owner of sharable pages */
+/* DOMID_COW is used as the owner of sharable pages */
 #define DOMID_COW  (0x7FF3U)
 
 /* DOMID_INVALID is used to identify pages with unknown owner. */
@@ -550,7 +549,9 @@ DEFINE_XEN_GUEST_HANDLE(mmu_update_t);
  * ` HYPERVISOR_multicall(multicall_entry_t call_list[],
  * `                      unsigned int nr_calls);
  *
- * NB. The fields are natural register size for this architecture.
+ * NB. The fields are logically the natural register size for this
+ * architecture. In cases where xen_ulong_t is larger than this then
+ * any unused bits in the upper portion must be zero.
  */
 struct multicall_entry {
     xen_ulong_t op;
@@ -806,16 +807,15 @@ typedef struct start_info start_info_t;
  * file, and let the PV guest easily rebase the addresses to virtual addresses
  * and at the same time count the number of modules.
  */
-struct xen_multiboot_mod_list
-{
-    /* Address of first byte of the module */
-    uint32_t mod_start;
-    /* Address of last byte of the module (inclusive) */
-    uint32_t mod_end;
-    /* Address of zero-terminated command line */
-    uint32_t cmdline;
-    /* Unused, must be zero */
-    uint32_t pad;
+struct xen_multiboot_mod_list {
+	/* Address of first byte of the module */
+	uint32_t mod_start;
+	/* Address of last byte of the module (inclusive) */
+	uint32_t mod_end;
+	/* Address of zero-terminated command line */
+	uint32_t cmdline;
+	/* Unused, must be zero */
+	uint32_t pad;
 };
 /*
  * `incontents 200 startofday_dom0_console Dom0_console
@@ -826,44 +826,44 @@ struct xen_multiboot_mod_list
  * have a working VGA/VESA console.
  */
 typedef struct dom0_vga_console_info {
-    uint8_t video_type; /* DOM0_VGA_CONSOLE_??? */
+	uint8_t video_type; /* DOM0_VGA_CONSOLE_??? */
 #define XEN_VGATYPE_TEXT_MODE_3 0x03
 #define XEN_VGATYPE_VESA_LFB    0x23
 #define XEN_VGATYPE_EFI_LFB     0x70
 
-    union {
-        struct {
-            /* Font height, in pixels. */
-            uint16_t font_height;
-            /* Cursor location (column, row). */
-            uint16_t cursor_x, cursor_y;
-            /* Number of rows and columns (dimensions in characters). */
-            uint16_t rows, columns;
-        } text_mode_3;
+	union {
+		struct {
+			/* Font height, in pixels. */
+			uint16_t font_height;
+			/* Cursor location (column, row). */
+			uint16_t cursor_x, cursor_y;
+			/* Number of rows and columns (dimensions in characters). */
+			uint16_t rows, columns;
+		} text_mode_3;
 
-        struct {
-            /* Width and height, in pixels. */
-            uint16_t width, height;
-            /* Bytes per scan line. */
-            uint16_t bytes_per_line;
-            /* Bits per pixel. */
-            uint16_t bits_per_pixel;
-            /* LFB physical address, and size (in units of 64kB). */
-            uint32_t lfb_base;
-            uint32_t lfb_size;
-            /* RGB mask offsets and sizes, as defined by VBE 1.2+ */
-            uint8_t  red_pos, red_size;
-            uint8_t  green_pos, green_size;
-            uint8_t  blue_pos, blue_size;
-            uint8_t  rsvd_pos, rsvd_size;
+		struct {
+			/* Width and height, in pixels. */
+			uint16_t width, height;
+			/* Bytes per scan line. */
+			uint16_t bytes_per_line;
+			/* Bits per pixel. */
+			uint16_t bits_per_pixel;
+			/* LFB physical address, and size (in units of 64kB). */
+			uint32_t lfb_base;
+			uint32_t lfb_size;
+			/* RGB mask offsets and sizes, as defined by VBE 1.2+ */
+			uint8_t  red_pos, red_size;
+			uint8_t  green_pos, green_size;
+			uint8_t  blue_pos, blue_size;
+			uint8_t  rsvd_pos, rsvd_size;
 #if __XEN_INTERFACE_VERSION__ >= 0x00030206 || (defined(CONFIG_PARAVIRT_XEN) && !defined(HAVE_XEN_PLATFORM_COMPAT_H))
-            /* VESA capabilities (offset 0xa, VESA command 0x4f00). */
-            uint32_t gbl_caps;
-            /* Mode attributes (offset 0x0, VESA command 0x4f01). */
-            uint16_t mode_attrs;
+			/* VESA capabilities (offset 0xa, VESA command 0x4f00). */
+			uint32_t gbl_caps;
+			/* Mode attributes (offset 0x0, VESA command 0x4f01). */
+			uint16_t mode_attrs;
 #endif
-        } vesa_lfb;
-    } u;
+		} vesa_lfb;
+	} u;
 } dom0_vga_console_info_t;
 #define xen_vga_console_info dom0_vga_console_info
 #define xen_vga_console_info_t dom0_vga_console_info_t

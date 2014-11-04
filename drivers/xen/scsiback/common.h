@@ -121,7 +121,7 @@ typedef struct pending_req {
 	uint32_t request_bufflen;
 	struct scatterlist *sgl;
 	grant_ref_t *gref;
-	vscsiif_segment_t *segs;
+	struct scsiif_request_segment *segs;
 
 	int32_t rslt;
 	uint32_t resid;
