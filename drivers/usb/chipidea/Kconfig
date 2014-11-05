@@ -30,15 +30,4 @@ config USB_CHIPIDEA_DEBUG
 	help
 	  Say Y here to enable debugging output of the ChipIdea driver.
 
-config USB_CHIPIDEA_PCI
-	bool "ChipIdea PCI support"
-	depends on PCI
-	help
-	  This option enables ChipIdea support on PCI.
-
-config USB_CHIPIDEA_IMX
-	bool "ChipIdea IMX support"
-	depends on OF
-	help
-	  This option enables ChipIdea support on IMX.
 endif
