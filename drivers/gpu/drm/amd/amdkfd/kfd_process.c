@@ -360,6 +360,16 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 		INIT_LIST_HEAD(&pdd->qpd.priv_queue_list);
 		pdd->qpd.dqm = dev->dqm;
 		list_add(&pdd->per_device_list, &p->per_device_data);
+
+		/* Init idr used for memory handle translation */
+		idr_init(&pdd->alloc_idr);
+
+		/* Create the GPUVM context for this specific device */
+		if (kfd2kgd->create_process_vm(dev->kgd, &pdd->vm)) {
+			list_del(&pdd->per_device_list);
+			kfree(pdd);
+			pdd = NULL;
+		}
 	}
 
 	return pdd;
@@ -378,7 +388,7 @@ struct kfd_process_device *kfd_bind_process_to_device(struct kfd_dev *dev,
 	struct kfd_process_device *pdd;
 	int err;
 
-	pdd = kfd_get_process_device_data(dev, p);
+
 	if (!pdd) {
 		pr_err("Process device data doesn't exist\n");
 		return ERR_PTR(-ENOMEM);
@@ -387,18 +397,9 @@ struct kfd_process_device *kfd_bind_process_to_device(struct kfd_dev *dev,
 	if (pdd->bound)
 		return pdd;
 
-	idr_init(&pdd->alloc_idr);
-
-	/* Create the GPUVM context for this specific device */
-	err = kfd2kgd->create_process_vm(dev->kgd, &pdd->vm);
-	if (err != 0)
-		return ERR_PTR(err);
-
 	err = amd_iommu_bind_pasid(dev->pdev, p->pasid, p->lead_thread);
-	if (err < 0) {
-		kfd2kgd->destroy_process_vm(dev->kgd, pdd->vm);
+	if (err < 0)
 		return ERR_PTR(err);
-	}
 
 	pdd->bound = true;
 
