@@ -306,7 +306,7 @@ int kfd_init_apertures(struct kfd_process *process)
 		pdd = kfd_create_process_device_data(dev, process);
 		if (pdd == NULL) {
 			pr_err("Failed to create process device data\n");
-			return -1;
+			goto err;
 		}
 		/*
 		 * For 64 bit process aperture will be statically reserved in
@@ -350,6 +350,10 @@ int kfd_init_apertures(struct kfd_process *process)
 	}
 
 	return 0;
+
+err:
+	mutex_unlock(&process->mutex);
+	return -1;
 }
 
 void radeon_flush_tlb(struct kfd_dev *dev, uint32_t pasid)

@@ -930,7 +930,10 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 	mutex_lock(&p->mutex);
 
 	pdd = kfd_get_process_device_data(dev, p);
-	BUG_ON(pdd == NULL);
+	if (!pdd) {
+		pr_err("Process device data doesn't exist\n");
+		return -EINVAL;
+	}
 
 	mem = kfd_process_device_translate_handle(pdd,
 						GET_IDR_HANDLE(args->handle));
