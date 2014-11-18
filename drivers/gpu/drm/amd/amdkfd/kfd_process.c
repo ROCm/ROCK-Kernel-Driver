@@ -366,6 +366,7 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 
 		/* Create the GPUVM context for this specific device */
 		if (kfd2kgd->create_process_vm(dev->kgd, &pdd->vm)) {
+			pr_err("Failed to create process VM object\n");
 			list_del(&pdd->per_device_list);
 			kfree(pdd);
 			pdd = NULL;
@@ -388,7 +389,7 @@ struct kfd_process_device *kfd_bind_process_to_device(struct kfd_dev *dev,
 	struct kfd_process_device *pdd;
 	int err;
 
-
+	pdd = kfd_get_process_device_data(dev, p);
 	if (!pdd) {
 		pr_err("Process device data doesn't exist\n");
 		return ERR_PTR(-ENOMEM);
