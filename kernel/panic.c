@@ -248,6 +248,7 @@ static const struct tnt tnts[] = {
  *  'I' - Working around severe firmware bug.
  *  'O' - Out-of-tree module has been loaded.
  *  'E' - Unsigned module has been loaded.
+ *  'L' - A soft lockup has previously occurred.
  *  'N' - Unsuported modules loaded.
  *  'X' - Modules with external support loaded.
  *
