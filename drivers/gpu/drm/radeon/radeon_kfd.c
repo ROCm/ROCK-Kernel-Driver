@@ -600,7 +600,8 @@ static int kgd_init_interrupts(struct kgd_dev *kgd, uint32_t pipe_id)
 
 	lock_srbm(kgd, mec, pipe, 0, 0);
 
-	write_register(kgd, CPC_INT_CNTL, TIME_STAMP_INT_ENABLE);
+	write_register(kgd, CPC_INT_CNTL,
+			TIME_STAMP_INT_ENABLE | OPCODE_ERROR_INT_ENABLE);
 
 	unlock_srbm(kgd);
 
