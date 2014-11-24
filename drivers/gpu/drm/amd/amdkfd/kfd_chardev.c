@@ -854,9 +854,9 @@ kfd_ioctl_wait_events(struct file *filp, struct kfd_process *p, void *data)
 	int err;
 
 	err = kfd_wait_on_events(p, args->num_events,
-				(uint32_t __user *)args->events_ptr,
-				(args->wait_for_all != 0), args->timeout,
-				&wait_result);
+			(void __user *)args->events_ptr,
+			(args->wait_for_all != 0),
+			args->timeout, &wait_result);
 
 	args->wait_result = wait_result;
 

@@ -29,6 +29,7 @@
 #include <linux/mman.h>
 #include "kfd_priv.h"
 #include "kfd_events.h"
+#include <linux/device.h>
 
 #define SIGNAL_EVENT_LIMIT 256
 
@@ -45,6 +46,10 @@ struct kfd_event_waiter {
 
 	/* Transitions to true when the event this belongs to is signaled. */
 	bool activated;
+
+	/* Event */
+	struct kfd_event *event;
+	uint32_t input_index;
 };
 
 /* Over-complicated pooled allocator for event notification slots.
@@ -574,13 +579,18 @@ static struct kfd_event_waiter *alloc_event_waiters(uint32_t num_events)
 	return event_waiters;
 }
 
-static int init_event_waiter(struct kfd_process *p, struct kfd_event_waiter *waiter, uint32_t event_id)
+static int init_event_waiter(struct kfd_process *p,
+		struct kfd_event_waiter *waiter,
+		uint32_t event_id,
+		uint32_t input_index)
 {
 	struct kfd_event *ev = lookup_event_by_id(p, event_id);
 
 	if (!ev)
 		return -EINVAL;
 
+	waiter->event = ev;
+	waiter->input_index = input_index;
 	waiter->activated = ev->signaled;
 	ev->signaled = ev->signaled && !ev->auto_reset;
 
@@ -605,6 +615,30 @@ static bool test_event_condition(bool all, uint32_t num_events, struct kfd_event
 
 	return activated_count == num_events;
 }
+
+/*
+ * Copy event specific data, if defined.
+ * Currently only memory exception events have additional data to copy to user
+ */
+static bool copy_signaled_event_data(uint32_t num_events,
+		struct kfd_event_waiter *event_waiters,
+		struct kfd_event_data __user *data)
+{
+	uint32_t i;
+
+	for (i = 0; i < num_events; i++)
+		if (event_waiters[i].activated &&
+			event_waiters[i].event->type == KFD_EVENT_TYPE_MEMORY)
+			if (copy_to_user(&data[event_waiters[i].input_index].memory_exception_data,
+					&event_waiters[i].event->memory_exception_data,
+					sizeof(struct kfd_hsa_memory_exception_data)))
+				return false;
+
+	return true;
+
+}
+
+
 
 static long user_timeout_to_jiffies(uint32_t user_timeout_ms)
 {
@@ -633,10 +667,11 @@ static void free_waiters(uint32_t num_events, struct kfd_event_waiter *waiters)
 }
 
 int kfd_wait_on_events(struct kfd_process *p,
-		       uint32_t num_events, const uint32_t __user *event_ids,
+		       uint32_t num_events, void __user *data,
 		       bool all, uint32_t user_timeout_ms,
 		       enum kfd_event_wait_result *wait_result)
 {
+	struct kfd_event_data __user *events = (struct kfd_event_data *) data;
 	uint32_t i;
 	int ret = 0;
 	struct kfd_event_waiter *event_waiters = NULL;
@@ -651,12 +686,14 @@ int kfd_wait_on_events(struct kfd_process *p,
 	}
 
 	for (i = 0; i < num_events; i++) {
-		uint32_t event_id;
-		ret = get_user(event_id, &event_ids[i]);
-		if (ret)
+		struct kfd_event_data event_data;
+
+		if (copy_from_user(&event_data, &events[i],
+				sizeof(struct kfd_event_data)))
 			goto fail;
 
-		ret = init_event_waiter(p, &event_waiters[i], event_id);
+		ret = init_event_waiter(p, &event_waiters[i],
+				event_data.event_id, i);
 		if (ret)
 			goto fail;
 	}
@@ -681,7 +718,11 @@ int kfd_wait_on_events(struct kfd_process *p,
 		}
 
 		if (test_event_condition(all, num_events, event_waiters)) {
-			*wait_result = KFD_WAIT_COMPLETE;
+			if (copy_signaled_event_data(num_events,
+					event_waiters, events))
+				*wait_result = KFD_WAIT_COMPLETE;
+			else
+				*wait_result = KFD_WAIT_ERROR;
 			break;
 		}
 
@@ -748,4 +789,91 @@ int radeon_kfd_event_mmap(struct kfd_process *p,
 
 	/* mapping the page to user process */
 	return remap_pfn_range(vma, vma->vm_start, pfn, PAGE_SIZE, vma->vm_page_prot);
+}
+
+/*
+ * Assumes that p->event_mutex is held and of course
+ * that p is not going away (current or locked).
+ */
+static void lookup_events_by_type_and_signal(struct kfd_process *p,
+		int type, void *event_data)
+{
+	struct kfd_event *ev;
+	int bkt;
+	bool send_signal = true;
+
+	hash_for_each(p->events, bkt, ev, events) {
+		if (ev->type == type) {
+			send_signal = false;
+			dev_dbg(kfd_device,
+					"Event found: id %X type %d",
+					ev->event_id, ev->type);
+			set_event(ev);
+			if (ev->type == KFD_EVENT_TYPE_MEMORY && event_data)
+				ev->memory_exception_data =
+						*(struct kfd_hsa_memory_exception_data *)event_data;
+		}
+	}
+
+	/* Send SIGTERM no event of type "type" has been found*/
+	if (send_signal)
+		send_sig(SIGTERM, p->lead_thread, 0);
+}
+
+void kfd_signal_iommu_event(struct kfd_dev *dev, unsigned int pasid,
+		unsigned long address, bool is_write_requested,
+		bool is_execute_requested)
+{
+	struct kfd_hsa_memory_exception_data memory_exception_data;
+	struct vm_area_struct *vma;
+
+	/*
+	 * Because we are called from arbitrary context (workqueue) as opposed
+	 * to process context, kfd_process could attempt to exit while we are
+	 * running so the lookup function returns a locked process.
+	 */
+	struct kfd_process *p = kfd_lookup_process_by_pasid(pasid);
+
+	if (!p)
+		return; /* Presumably process exited. */
+
+	memset(&memory_exception_data, 0, sizeof(memory_exception_data));
+
+	down_read(&p->mm->mmap_sem);
+	vma = find_vma(p->mm, address);
+
+	memory_exception_data.gpu_id = dev->id;
+	memory_exception_data.va = address;
+	/* Set failure reason */
+	memory_exception_data.failure.NotPresent = true;
+	memory_exception_data.failure.NoExecute = false;
+	memory_exception_data.failure.ReadOnly = false;
+	if (vma) {
+		if (vma->vm_start > address) {
+			memory_exception_data.failure.NotPresent = true;
+			memory_exception_data.failure.NoExecute = false;
+			memory_exception_data.failure.ReadOnly = false;
+		} else {
+			memory_exception_data.failure.NotPresent = false;
+			if (is_write_requested && !(vma->vm_flags & VM_WRITE))
+				memory_exception_data.failure.ReadOnly = true;
+			else
+				memory_exception_data.failure.ReadOnly = false;
+			if (is_execute_requested && !(vma->vm_flags & VM_EXEC))
+				memory_exception_data.failure.NoExecute = true;
+			else
+				memory_exception_data.failure.NoExecute = false;
+		}
+	}
+
+	up_read(&p->mm->mmap_sem);
+
+	mutex_lock(&p->event_mutex);
+
+	/* Lookup events by type and signal them */
+	lookup_events_by_type_and_signal(p, KFD_EVENT_TYPE_MEMORY,
+			&memory_exception_data);
+
+	mutex_unlock(&p->event_mutex);
+	mutex_unlock(&p->mutex);
 }
