@@ -122,6 +122,9 @@ struct kgd2kfd_shared_resources {
  *
  * @get_fw_version: Returns FW versions from the header
  *
+ * @set_num_of_requests: Sets number of Peripheral Page Request (PPR) sent to
+ * IOMMU when address translation failed
+ *
  * This structure contains function pointers to services that the kgd driver
  * provides to amdkfd driver.
  *
@@ -204,6 +207,9 @@ struct kfd2kgd_calls {
 
 	uint16_t (*get_fw_version)(struct kgd_dev *kgd,
 				enum kgd_engine_type type);
+
+	void (*set_num_of_requests)(struct kgd_dev *kgd,
+			uint8_t num_of_requests);
 };
 
 /**
