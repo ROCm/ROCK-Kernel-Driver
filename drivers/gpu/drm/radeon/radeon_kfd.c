@@ -125,6 +125,7 @@ static uint32_t kgd_address_watch_get_offset(struct kgd_dev *kgd,
 static bool read_atc_vmid_pasid_mapping_reg_valid_field(struct kgd_dev *kgd, uint8_t vmid);
 static uint16_t read_atc_vmid_pasid_mapping_reg_pasid_field(struct kgd_dev *kgd, uint8_t vmid);
 static void write_vmid_invalidate_request(struct kgd_dev *kgd, uint8_t vmid);
+static void set_num_of_requests(struct kgd_dev *dev, uint8_t num_of_req);
 
 static const struct kfd2kgd_calls kfd2kgd = {
 	.init_gtt_mem_allocation = alloc_gtt_mem,
@@ -155,7 +156,8 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.write_vmid_invalidate_request = write_vmid_invalidate_request,
 	.map_memory_to_gpu = map_memory_to_gpu,
 	.unmap_memory_to_gpu = unmap_memory_from_gpu,
-	.get_fw_version = get_fw_version
+	.get_fw_version = get_fw_version,
+	.set_num_of_requests = set_num_of_requests
 };
 
 static const struct kgd2kfd_calls *kgd2kfd;
@@ -1289,4 +1291,15 @@ static uint16_t get_fw_version(struct kgd_dev *kgd, enum kgd_engine_type type)
 
 	/* Only 12 bit in use*/
 	return hdr->common.ucode_version;
+}
+
+static void set_num_of_requests(struct kgd_dev *dev, uint8_t num_of_req)
+{
+	uint32_t value;
+
+	value = read_register(dev, ATC_ATS_DEBUG);
+	value &= ~NUM_REQUESTS_AT_ERR_MASK;
+	value |= NUM_REQUESTS_AT_ERR(num_of_req);
+
+	write_register(dev, ATC_ATS_DEBUG, value);
 }

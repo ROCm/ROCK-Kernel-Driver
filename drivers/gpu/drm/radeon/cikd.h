@@ -1367,6 +1367,7 @@
 #       define DEQUEUE_REQUEST_INT_ENABLE               (1 << 13)
 #       define WRM_POLL_TIMEOUT_INT_ENABLE              (1 << 17)
 #       define PRIV_REG_INT_ENABLE                      (1 << 23)
+#       define OPCODE_ERROR_INT_ENABLE                  (1 << 24)
 #       define TIME_STAMP_INT_ENABLE                    (1 << 26)
 #       define GENERIC2_INT_ENABLE                      (1 << 29)
 #       define GENERIC1_INT_ENABLE                      (1 << 30)
@@ -2167,5 +2168,9 @@
 #define ATC_VM_APERTURE1_LOW_ADDR				0x3304u
 
 #define IH_VMID_0_LUT						0x3D40u
+
+#define ATC_ATS_DEBUG					0x3328
+#define NUM_REQUESTS_AT_ERR(x)				((x) << 10)
+#define NUM_REQUESTS_AT_ERR_MASK			(0x1F << 10)
 
 #endif
