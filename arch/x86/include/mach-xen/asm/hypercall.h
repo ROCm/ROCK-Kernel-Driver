@@ -160,6 +160,11 @@
 	__res;							\
 })
 
+#if CONFIG_XEN_COMPAT <= 0x030002
+int __must_check HYPERVISOR_event_channel_op_compat(int, void *);
+int __must_check HYPERVISOR_physdev_op_compat(int, void *);
+#endif
+
 #ifdef CONFIG_X86_32
 # include "hypercall_32.h"
 #else
@@ -262,13 +267,13 @@ HYPERVISOR_get_debugreg(
 	return _hypercall1(unsigned long, get_debugreg, reg);
 }
 
-static inline int __must_check
+static inline long __must_check
 HYPERVISOR_memory_op(
 	unsigned int cmd, void *arg)
 {
 	if (arch_use_lazy_mmu_mode())
 		xen_multicall_flush();
-	return _hypercall2(int, memory_op, cmd, arg);
+	return _hypercall2(long, memory_op, cmd, arg);
 }
 
 static inline int __must_check
@@ -285,13 +290,8 @@ HYPERVISOR_event_channel_op(
 	int rc = _hypercall2(int, event_channel_op, cmd, arg);
 
 #if CONFIG_XEN_COMPAT <= 0x030002
-	if (unlikely(rc == -ENOSYS)) {
-		struct evtchn_op op;
-		op.cmd = cmd;
-		memcpy(&op.u, arg, sizeof(op.u));
-		rc = _hypercall1(int, event_channel_op_compat, &op);
-		memcpy(arg, &op.u, sizeof(op.u));
-	}
+	if (unlikely(rc == -ENOSYS))
+		rc = HYPERVISOR_event_channel_op_compat(cmd, arg);
 #endif
 
 	return rc;
@@ -318,13 +318,8 @@ HYPERVISOR_physdev_op(
 	int rc = _hypercall2(int, physdev_op, cmd, arg);
 
 #if CONFIG_XEN_COMPAT <= 0x030002
-	if (unlikely(rc == -ENOSYS)) {
-		struct physdev_op op;
-		op.cmd = cmd;
-		memcpy(&op.u, arg, sizeof(op.u));
-		rc = _hypercall1(int, physdev_op_compat, &op);
-		memcpy(arg, &op.u, sizeof(op.u));
-	}
+	if (unlikely(rc == -ENOSYS))
+		rc = HYPERVISOR_physdev_op_compat(cmd, arg);
 #endif
 
 	return rc;

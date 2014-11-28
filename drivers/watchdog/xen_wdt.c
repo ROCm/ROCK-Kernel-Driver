@@ -337,7 +337,7 @@ static int __init xen_wdt_init_module(void)
 		return -ENODEV;
 #endif
 
-	printk(KERN_INFO "Xen WatchDog Timer Driver v%s\n", DRV_VERSION);
+	pr_info("Xen WatchDog Timer Driver v%s\n", DRV_VERSION);
 
 	err = platform_driver_register(&xen_wdt_driver);
 	if (err)

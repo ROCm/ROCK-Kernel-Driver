@@ -257,9 +257,9 @@ int xen_guest_address_size(int domid)
 
 	BUILD_BUG_ON(XEN_DOMCTL_INTERFACE_VERSION > 10);
 	guest_address_size(10);
-/* #if CONFIG_XEN_COMPAT < 0x040500 */
+#if CONFIG_XEN_COMPAT < 0x040500
 	guest_address_size(9);
-/* #endif */
+#endif
 #if CONFIG_XEN_COMPAT < 0x040300
 	guest_address_size(8);
 #endif
@@ -332,10 +332,10 @@ static inline int get_vcpuaffinity(unsigned int nr, void *mask)
 
 	BUILD_BUG_ON(XEN_DOMCTL_INTERFACE_VERSION > 10);
 	rc = vcpu_hard_affinity(get, 10);
-/* #if CONFIG_XEN_COMPAT < 0x040500 */
+#if CONFIG_XEN_COMPAT < 0x040500
 	if (rc)
 		rc = vcpuaffinity(get, 9);
-/* #endif */
+#endif
 #if CONFIG_XEN_COMPAT < 0x040300
 	if (rc)
 		rc = vcpuaffinity(get, 8);
@@ -366,10 +366,10 @@ static inline int set_vcpuaffinity(unsigned int nr, void *mask)
 
 	BUILD_BUG_ON(XEN_DOMCTL_INTERFACE_VERSION > 10);
 	rc = vcpu_hard_affinity(set, 10);
-/* #if CONFIG_XEN_COMPAT < 0x040500 */
+#if CONFIG_XEN_COMPAT < 0x040500
 	if (rc)
 		rc = vcpuaffinity(set, 9);
-/* #endif */
+#endif
 #if CONFIG_XEN_COMPAT < 0x040300
 	if (rc)
 		rc = vcpuaffinity(set, 8);
@@ -484,10 +484,10 @@ int xen_get_topology_info(unsigned int cpu, u32 *core, u32 *sock, u32 *node)
 
 	BUILD_BUG_ON(XEN_SYSCTL_INTERFACE_VERSION > 11);
 	topologyinfo(11);
-/* #if CONFIG_XEN_COMPAT < 0x040500 */
+#if CONFIG_XEN_COMPAT < 0x040500
 	if (rc)
 		topologyinfo(10);
-/* #endif */
+#endif
 #if CONFIG_XEN_COMPAT < 0x040300
 	if (rc)
 		topologyinfo(9);

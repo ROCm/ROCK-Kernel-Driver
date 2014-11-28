@@ -6,6 +6,8 @@
 #include <linux/pci.h>
 #include <linux/kmemleak.h>
 
+#include <xen/interface/memory.h>
+
 #include <asm/proto.h>
 #include <asm/dma.h>
 #include <asm/iommu.h>
@@ -265,6 +267,15 @@ static __init int iommu_setup(char *p)
 	return 0;
 }
 early_param("iommu", iommu_setup);
+
+u64 dma_get_required_mask(struct device *dev)
+{
+	unsigned long max_mfn = HYPERVISOR_memory_op(XENMEM_maximum_ram_page,
+						     NULL);
+
+	return DMA_BIT_MASK(__fls(max_mfn - 1) + 1 + PAGE_SHIFT);
+}
+EXPORT_SYMBOL_GPL(dma_get_required_mask);
 
 static int check_pages_physically_contiguous(unsigned long pfn,
 					     unsigned int offset,

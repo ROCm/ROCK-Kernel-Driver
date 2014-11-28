@@ -163,6 +163,8 @@ EXPORT_PER_CPU_SYMBOL(xen_x86_cr0_upd);
 
 static int __init x86_xsave_setup(char *s)
 {
+	if (s && *s)
+		return 0;
 	setup_clear_cpu_cap(X86_FEATURE_XSAVE);
 	setup_clear_cpu_cap(X86_FEATURE_XSAVEOPT);
 	setup_clear_cpu_cap(X86_FEATURE_XSAVES);

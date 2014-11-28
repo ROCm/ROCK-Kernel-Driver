@@ -95,12 +95,12 @@ static inline void split_page_count(int level) { }
 
 static inline unsigned long highmap_start_pfn(void)
 {
-	return __pa_symbol(_text) >> PAGE_SHIFT;
+	return PFN_DOWN(__pa_symbol(_text));
 }
 
 static inline unsigned long highmap_end_pfn(void)
 {
-	return __pa_symbol(roundup(_brk_end, PMD_SIZE)) >> PAGE_SHIFT;
+	return PFN_UP(__pa_symbol(_brk_end));
 }
 
 #endif
