@@ -816,8 +816,12 @@ static void lookup_events_by_type_and_signal(struct kfd_process *p,
 	}
 
 	/* Send SIGTERM no event of type "type" has been found*/
-	if (send_signal)
+	if (send_signal) {
+		dev_warn(kfd_device,
+			"Sending SIGTERM to HSA Process with PID %d ",
+				p->lead_thread->pid);
 		send_sig(SIGTERM, p->lead_thread, 0);
+	}
 }
 
 void kfd_signal_iommu_event(struct kfd_dev *dev, unsigned int pasid,
