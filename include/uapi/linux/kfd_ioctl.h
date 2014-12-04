@@ -27,7 +27,7 @@
 #include <linux/ioctl.h>
 
 #define KFD_IOCTL_MAJOR_VERSION 1
-#define KFD_IOCTL_MINOR_VERSION 0
+#define KFD_IOCTL_MINOR_VERSION 2
 
 struct kfd_ioctl_get_version_args {
 	uint32_t major_version;	/* from KFD */
