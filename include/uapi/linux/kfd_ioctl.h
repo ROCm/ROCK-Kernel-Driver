@@ -128,6 +128,32 @@ struct kfd_ioctl_get_process_apertures_args {
 	uint32_t pad;
 };
 
+#define MAX_ALLOWED_NUM_POINTS    100
+#define MAX_ALLOWED_AW_BUFF_SIZE 4096
+#define MAX_ALLOWED_WAC_BUFF_SIZE  128
+
+struct kfd_ioctl_dbg_register_args {
+	uint32_t gpu_id;		/* to KFD */
+	uint32_t pad;
+};
+
+struct kfd_ioctl_dbg_unregister_args {
+	uint32_t gpu_id;		/* to KFD */
+	uint32_t pad;
+};
+
+struct kfd_ioctl_dbg_address_watch_args {
+	uint32_t gpu_id;		/* to KFD */
+	uint32_t buf_size_in_bytes;	/*including gpu_id and buf_size */
+	unsigned char content[0];
+};
+
+struct kfd_ioctl_dbg_wave_control_args {
+	uint32_t gpu_id;		/* to KFD */
+	uint32_t buf_size_in_bytes;	/*including gpu_id and buf_size */
+	unsigned char content[0];
+};
+
 /* Matching HSA_EVENTTYPE */
 #define KFD_IOC_EVENT_SIGNAL		0
 #define KFD_IOC_EVENT_NODECHANGE	1
@@ -169,7 +195,8 @@ struct kfd_ioctl_reset_event_args {
 };
 
 struct kfd_ioctl_wait_events_args {
-	uint64_t events_ptr;		/* to KFD */
+	uint64_t events_ptr;		/* pointed to struct
+					   kfd_event_data array, to KFD */
 	uint32_t num_events;		/* to KFD */
 	uint32_t wait_for_all;		/* to KFD */
 	uint32_t timeout;		/* to KFD */
@@ -218,7 +245,19 @@ struct kfd_ioctl_wait_events_args {
 #define AMDKFD_IOC_WAIT_EVENTS			\
 		AMDKFD_IOWR(0x0C, struct kfd_ioctl_wait_events_args)
 
+#define AMDKFD_IOC_DBG_REGISTER			\
+		AMDKFD_IOW(0x0D, struct kfd_ioctl_dbg_register_args)
+
+#define AMDKFD_IOC_DBG_UNREGISTER		\
+		AMDKFD_IOW(0x0E, struct kfd_ioctl_dbg_unregister_args)
+
+#define AMDKFD_IOC_DBG_ADDRESS_WATCH		\
+		AMDKFD_IOW(0x0F, struct kfd_ioctl_dbg_address_watch_args)
+
+#define AMDKFD_IOC_DBG_WAVE_CONTROL		\
+		AMDKFD_IOW(0x10, struct kfd_ioctl_dbg_wave_control_args)
+
 #define AMDKFD_COMMAND_START		0x01
-#define AMDKFD_COMMAND_END		0x0D
+#define AMDKFD_COMMAND_END		0x11
 
 #endif
