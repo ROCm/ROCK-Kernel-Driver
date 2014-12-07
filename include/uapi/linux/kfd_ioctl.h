@@ -215,6 +215,15 @@ struct kfd_ioctl_unmap_memory_from_gpu_args {
 	uint64_t handle;	/* to KFD */
 };
 
+struct kfd_ioctl_open_graphic_handle_args {
+	uint64_t va_addr;		/* to KFD */
+	uint64_t handle;		/* from KFD */
+	uint32_t gpu_id;		/* to KFD */
+	int graphic_device_fd;		/* to KFD */
+	uint32_t graphic_handle;	/* to KFD */
+	uint32_t pad;
+};
+
 #define AMDKFD_IOCTL_BASE 'K'
 #define AMDKFD_IO(nr)			_IO(AMDKFD_IOCTL_BASE, nr)
 #define AMDKFD_IOR(nr, type)		_IOR(AMDKFD_IOCTL_BASE, nr, type)
@@ -275,7 +284,10 @@ struct kfd_ioctl_unmap_memory_from_gpu_args {
 #define AMDKFD_IOC_UNMAP_MEMORY_FROM_GPU	\
 		AMDKFD_IOWR(0x12, struct kfd_ioctl_unmap_memory_from_gpu_args)
 
+#define AMDKFD_IOC_OPEN_GRAPHIC_HANDLE		\
+		AMDKFD_IOWR(0x13, struct kfd_ioctl_open_graphic_handle_args)
+
 #define AMDKFD_COMMAND_START		0x01
-#define AMDKFD_COMMAND_END		0x13
+#define AMDKFD_COMMAND_END		0x14
 
 #endif
