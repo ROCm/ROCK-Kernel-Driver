@@ -203,6 +203,18 @@ struct kfd_ioctl_wait_events_args {
 	uint32_t wait_result;		/* from KFD */
 };
 
+struct kfd_ioctl_map_memory_to_gpu_args {
+	uint64_t va_addr;	/* to KFD */
+	uint64_t size;		/* to KFD */
+	uint64_t handle;	/* from KFD */
+	uint32_t gpu_id;	/* to KFD */
+	uint32_t pad;
+};
+
+struct kfd_ioctl_unmap_memory_from_gpu_args {
+	uint64_t handle;	/* to KFD */
+};
+
 #define AMDKFD_IOCTL_BASE 'K'
 #define AMDKFD_IO(nr)			_IO(AMDKFD_IOCTL_BASE, nr)
 #define AMDKFD_IOR(nr, type)		_IOR(AMDKFD_IOCTL_BASE, nr, type)
@@ -257,7 +269,13 @@ struct kfd_ioctl_wait_events_args {
 #define AMDKFD_IOC_DBG_WAVE_CONTROL		\
 		AMDKFD_IOW(0x10, struct kfd_ioctl_dbg_wave_control_args)
 
+#define AMDKFD_IOC_MAP_MEMORY_TO_GPU		\
+		AMDKFD_IOWR(0x11, struct kfd_ioctl_map_memory_to_gpu_args)
+
+#define AMDKFD_IOC_UNMAP_MEMORY_FROM_GPU	\
+		AMDKFD_IOWR(0x12, struct kfd_ioctl_unmap_memory_from_gpu_args)
+
 #define AMDKFD_COMMAND_START		0x01
-#define AMDKFD_COMMAND_END		0x11
+#define AMDKFD_COMMAND_END		0x13
 
 #endif
