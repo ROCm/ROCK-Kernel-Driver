@@ -221,6 +221,7 @@ __releases(info->lock)
 __acquires(info->lock)
 {
 	struct urb_priv *urbp = (struct urb_priv *) urb->hcpriv;
+	int urbp_status = urbp->status;
 
 	list_del_init(&urbp->list);
 	free_urb_priv(urbp);
@@ -237,7 +238,7 @@ __acquires(info->lock)
 	}
 	spin_unlock(&info->lock);
 	usb_hcd_giveback_urb(info_to_hcd(info), urb,
-			     urbp->status <= 0 ? urbp->status : urb->status);
+			     urbp_status <= 0 ? urbp_status : urb->status);
 	spin_lock(&info->lock);
 }
 

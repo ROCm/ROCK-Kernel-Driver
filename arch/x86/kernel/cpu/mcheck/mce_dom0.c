@@ -55,8 +55,8 @@ static int convert_log(struct mc_info *mi)
 			m.addr = mc_bank->mc_addr;
 			m.tsc = mc_bank->mc_tsc;
 			m.bank = mc_bank->mc_bank;
-			printk(KERN_DEBUG "[CPU%d, BANK%d, addr %llx, state %llx]\n", 
-						m.bank, m.cpu, m.addr, m.status);
+			printk(KERN_DEBUG "[CPU%d, BANK%d, addr %Lx, state %Lx]\n",
+			       m.cpu, m.bank, m.addr, m.status);
 			/*log this record*/
 			mce_log(&m);
 		}

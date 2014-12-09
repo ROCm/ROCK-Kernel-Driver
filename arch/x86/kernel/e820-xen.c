@@ -1193,10 +1193,11 @@ char *__init default_machine_specific_memory_setup(void)
 			maxmem += e820.map[rc].size >> PAGE_SHIFT;
 	if (is_initial_xendomain()) {
 		domid_t domid = DOMID_SELF;
+		long res = HYPERVISOR_memory_op(XENMEM_maximum_reservation,
+						&domid);
 
-		rc = HYPERVISOR_memory_op(XENMEM_maximum_reservation, &domid);
-		if (rc > 0 && maxmem > rc)
-			maxmem = rc;
+		if (res > 0 && maxmem > res)
+			maxmem = res;
 	}
 	if ((maxmem >> 5) > xen_start_info->nr_pages) {
 		unsigned long long size = (u64)xen_start_info->nr_pages << 5;
