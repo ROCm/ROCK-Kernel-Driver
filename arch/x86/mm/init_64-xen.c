@@ -765,14 +765,16 @@ phys_pud_init(pud_t *pud_page, unsigned long addr, unsigned long end,
 	return last_map_addr;
 }
 
-RESERVE_BRK(kernel_pgt_alloc, (2 + KERNEL_IMAGE_SIZE / PMD_SIZE) * PAGE_SIZE);
+RESERVE_BRK(kernel_pgt_alloc,
+	    (1
+	     + (PUD_SIZE - 1 - __START_KERNEL_map) / PUD_SIZE
+	     + -__START_KERNEL_map / PMD_SIZE) * PAGE_SIZE);
 
 void __init xen_init_pt(void)
 {
-	unsigned long addr, *page, end, size, pte_pa;
+	unsigned long addr, *page, end, size, pmd_pa, pte_pa;
 	pud_t *pud;
 	pmd_t *pmd;
-	const pmd_t *pmd_k;
 	pte_t *pte;
 
 	/* Find the initial pte page that was built for us. */
@@ -836,37 +838,42 @@ void __init xen_init_pt(void)
 	level2_fixmap_pgt[pmd_index(addr)] =
 		__pmd(__pa_symbol(level1_fixmap_pgt) | _PAGE_TABLE);
 
-	/* Construct 1:1 mapping of kernel image. */
+	/* Construct 1:1 mapping of the initial allocation. */
 	pud = extend_brk(PAGE_SIZE, PAGE_SIZE);
 	addr = __pa(pud);
 	printk(KERN_DEBUG "BRK [%#010lx, %#010lx] PUD\n",
 	       addr, addr + PAGE_SIZE - 1);
 	init_level4_pgt[pgd_index(PAGE_OFFSET)] = __pgd(addr | _PAGE_TABLE);
 
-	BUILD_BUG_ON(KERNEL_IMAGE_SIZE > PUD_SIZE);
+	BUILD_BUG_ON(pgd_index(PAGE_OFFSET)
+		     != pgd_index(PAGE_OFFSET - __START_KERNEL_map - 1));
 	BUILD_BUG_ON(pmd_index(__START_KERNEL_map));
-
-	pmd = extend_brk(PAGE_SIZE, PAGE_SIZE);
-	addr = __pa(pmd);
-	printk(KERN_DEBUG "BRK [%#010lx, %#010lx] PMD\n",
-	       addr, addr + PAGE_SIZE - 1);
-	pud[pud_index(PAGE_OFFSET)] = __pud(addr | _PAGE_TABLE);
-	pmd_k = early_get_pmd(__START_KERNEL_map);
 
 	end = __pa(xen_start_info->pt_base)
 	      + (xen_start_info->nr_pt_frames << PAGE_SHIFT);
+	size = ((end + PUD_SIZE - 1) >> PUD_SHIFT) << PAGE_SHIFT;
+	pmd = extend_brk(size, PAGE_SIZE);
+	pmd_pa = __pa(pmd);
+	printk(KERN_DEBUG "BRK [%#010lx, %#010lx] PMD\n",
+	       pmd_pa, pmd_pa + size - 1);
+	for (addr = 0; addr < end; addr += PUD_SIZE)
+		pud[pud_index(PAGE_OFFSET + addr)]
+			= __pud((pmd_pa + (addr >> (PUD_SHIFT - PAGE_SHIFT)))
+				| _PAGE_TABLE);
+
 	size = ((end + PMD_SIZE - 1) >> PMD_SHIFT) << PAGE_SHIFT;
 	pte = extend_brk(size, PAGE_SIZE);
 	pte_pa = __pa(pte);
 	printk(KERN_DEBUG "BRK [%#010lx, %#010lx] PTE\n",
 	       pte_pa, pte_pa + size - 1);
 	for (addr = 0; addr < end; addr += PMD_SIZE) {
-		unsigned long i, pmd_idx = pmd_index(addr);
+		unsigned int i;
 		unsigned long pa = pte_pa + (addr >> (PMD_SHIFT - PAGE_SHIFT));
 		const pte_t *pte_k = (void *)__START_KERNEL_map
-			+ (pmd_val(pmd_k[pmd_idx]) & PTE_PFN_MASK);
+			+ (pmd_val(*early_get_pmd(__START_KERNEL_map + addr))
+			   & PTE_PFN_MASK);
 
-		pmd[pmd_idx] = __pmd(pa | _PAGE_TABLE);
+		pmd[addr >> PMD_SHIFT] = __pmd(pa | _PAGE_TABLE);
 		for (i = 0; i < PTRS_PER_PTE; ++i, ++pte) {
 			pa = addr + (i << PAGE_SHIFT);
 			*pte = make_readonly(pa)
@@ -878,7 +885,10 @@ void __init xen_init_pt(void)
 					 XENFEAT_writable_page_tables);
 	}
 	max_pfn_mapped = PFN_DOWN(addr);
-	early_make_page_readonly(pmd, XENFEAT_writable_page_tables);
+	for (addr = 0; addr < end; addr += PUD_SIZE)
+		early_make_page_readonly(pmd + PTRS_PER_PMD
+					       * (addr >> PUD_SHIFT),
+					 XENFEAT_writable_page_tables);
 	early_make_page_readonly(pud, XENFEAT_writable_page_tables);
 
 	early_make_page_readonly(init_level4_pgt,

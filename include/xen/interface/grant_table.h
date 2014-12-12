@@ -124,7 +124,7 @@ typedef uint32_t grant_ref_t;
  * Version 1 of the grant table entry structure is maintained purely
  * for backwards compatibility.  New guests should use version 2.
  */
-#if defined(CONFIG_PARAVIRT_XEN)
+#if defined(CONFIG_PARAVIRT_XEN) && !defined(HAVE_XEN_PLATFORM_COMPAT_H)
 #define grant_entry grant_entry_v1
 #elif __XEN_INTERFACE_VERSION__ < 0x0003020a
 #define grant_entry_v1 grant_entry
@@ -214,7 +214,7 @@ typedef struct grant_entry_v1 grant_entry_v1_t;
  * The interface by which domains use grant references does not depend
  * on the grant table version in use by the other domain.
  */
-#if defined(CONFIG_PARAVIRT_XEN) || __XEN_INTERFACE_VERSION__ >= 0x0003020a
+#if __XEN_INTERFACE_VERSION__ >= 0x0003020a || (defined(CONFIG_PARAVIRT_XEN) && !defined(HAVE_XEN_PLATFORM_COMPAT_H))
 /*
  * Version 1 and version 2 grant entries share a common prefix.  The
  * fields of the prefix are documented as part of struct
@@ -307,7 +307,7 @@ typedef uint16_t grant_status_t;
 #define GNTTABOP_copy                 5
 #define GNTTABOP_query_size           6
 #define GNTTABOP_unmap_and_replace    7
-#if defined(CONFIG_PARAVIRT_XEN) || __XEN_INTERFACE_VERSION__ >= 0x0003020a
+#if __XEN_INTERFACE_VERSION__ >= 0x0003020a || (defined(CONFIG_PARAVIRT_XEN) && !defined(HAVE_XEN_PLATFORM_COMPAT_H))
 #define GNTTABOP_set_version          8
 #define GNTTABOP_get_status_frames    9
 #define GNTTABOP_get_version          10
@@ -390,7 +390,7 @@ struct gnttab_setup_table {
     uint32_t nr_frames;
     /* OUT parameters. */
     int16_t  status;              /* => enum grant_status */
-#if !defined(CONFIG_PARAVIRT_XEN) && __XEN_INTERFACE_VERSION__ < 0x00040300
+#if __XEN_INTERFACE_VERSION__ < 0x00040300 && (!defined(CONFIG_PARAVIRT_XEN) || defined(HAVE_XEN_PLATFORM_COMPAT_H))
     XEN_GUEST_HANDLE(ulong) frame_list;
 #else
     XEN_GUEST_HANDLE(xen_pfn_t) frame_list;
@@ -519,7 +519,7 @@ DEFINE_GUEST_HANDLE_STRUCT(gnttab_unmap_and_replace);
 typedef struct gnttab_unmap_and_replace gnttab_unmap_and_replace_t;
 DEFINE_XEN_GUEST_HANDLE(gnttab_unmap_and_replace_t);
 
-#if defined(CONFIG_PARAVIRT_XEN) || __XEN_INTERFACE_VERSION__ >= 0x0003020a
+#if __XEN_INTERFACE_VERSION__ >= 0x0003020a || (defined(CONFIG_PARAVIRT_XEN) && !defined(HAVE_XEN_PLATFORM_COMPAT_H))
 /*
  * GNTTABOP_set_version: Request a particular version of the grant
  * table shared table structure.  This operation can only be performed

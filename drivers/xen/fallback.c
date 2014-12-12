@@ -77,7 +77,7 @@ int xen_physdev_op_compat(int cmd, void *arg)
 
 	COPY_BACK(irq_status_query, irq_status_query);
 	COPY_BACK(apic_read, apic_op);
-	COPY_BACK(ASSIGN_VECTOR, irq_op);
+	COPY_BACK(alloc_irq_vector, irq_op);
 #undef COPY_BACK
 
 	default:

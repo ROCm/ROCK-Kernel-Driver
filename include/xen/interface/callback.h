@@ -103,7 +103,7 @@ struct callback_unregister {
 typedef struct callback_unregister callback_unregister_t;
 DEFINE_XEN_GUEST_HANDLE(callback_unregister_t);
 
-#if __XEN_INTERFACE_VERSION__ < 0x00030207
+#if __XEN_INTERFACE_VERSION__ < 0x00030207 && (!defined(CONFIG_PARAVIRT_XEN) || defined(HAVE_XEN_PLATFORM_COMPAT_H))
 #undef CALLBACKTYPE_sysenter
 #define CALLBACKTYPE_sysenter CALLBACKTYPE_sysenter_deprecated
 #endif

@@ -274,7 +274,7 @@ DEFINE_GUEST_HANDLE_STRUCT(xen_add_to_physmap_batch);
 typedef struct xen_add_to_physmap_batch xen_add_to_physmap_batch_t;
 DEFINE_XEN_GUEST_HANDLE(xen_add_to_physmap_batch_t);
 
-#if defined(CONFIG_PARAVIRT_XEN) || __XEN_INTERFACE_VERSION__ < 0x00040400
+#if __XEN_INTERFACE_VERSION__ < 0x00040400 || (defined(CONFIG_PARAVIRT_XEN) && !defined(HAVE_XEN_PLATFORM_COMPAT_H))
 #define XENMEM_add_to_physmap_range XENMEM_add_to_physmap_batch
 __DEFINE_XEN_GUEST_HANDLE(xen_add_to_physmap_range, struct xen_add_to_physmap_batch);
 #define xen_add_to_physmap_range xen_add_to_physmap_batch

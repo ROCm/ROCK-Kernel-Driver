@@ -344,6 +344,8 @@ DEFINE_XEN_GUEST_HANDLE(physdev_dbgp_op_t);
  */
 #define PHYSDEVOP_IRQ_UNMASK_NOTIFY	 4
 
+#if !defined(CONFIG_PARAVIRT_XEN) || defined(HAVE_XEN_PLATFORM_COMPAT_H)
+
 /*
  * These all-capitals physdev operation names are superceded by the new names
  * (defined above) since interface version 0x00030202.
@@ -363,5 +365,7 @@ DEFINE_XEN_GUEST_HANDLE(physdev_dbgp_op_t);
 #else
 #define PHYSDEVOP_pirq_eoi_gmfn PHYSDEVOP_pirq_eoi_gmfn_v2
 #endif
+
+#endif /* !CONFIG_PARAVIRT_XEN || HAVE_XEN_PLATFORM_COMPAT_H */
 
 #endif /* __XEN_PUBLIC_PHYSDEV_H__ */

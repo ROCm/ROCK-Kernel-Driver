@@ -295,7 +295,7 @@ DEFINE_XEN_GUEST_HANDLE(xenpf_firmware_info_t);
 #define XENPF_enter_acpi_sleep    51
 struct xenpf_enter_acpi_sleep {
 	/* IN variables */
-#if !defined(CONFIG_PARAVIRT_XEN) && __XEN_INTERFACE_VERSION__ < 0x00040300
+#if __XEN_INTERFACE_VERSION__ < 0x00040300 && (!defined(CONFIG_PARAVIRT_XEN) || defined(HAVE_XEN_PLATFORM_COMPAT_H))
 	uint16_t pm1a_cnt_val;      /* PM1a control value. */
 	uint16_t pm1b_cnt_val;      /* PM1b control value. */
 #else
