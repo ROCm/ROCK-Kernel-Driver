@@ -194,14 +194,17 @@ restart_ih:
 	rmb();
 
 	while (adev->irq.ih.rptr != wptr) {
+
+		u32 ring_index = adev->irq.ih.rptr >> 2;
+
+		/* Before dispatching irq to IP blocks, send it to amdkfd */
+		amdgpu_amdkfd_interrupt(adev,
+				(const void *) &adev->irq.ih.ring[ring_index]);
+
 		entry.iv_entry = (const uint32_t *)
 			&adev->irq.ih.ring[adev->irq.ih.rptr >> 2];
 		amdgpu_ih_decode_iv(adev, &entry);
 		adev->irq.ih.rptr &= adev->irq.ih.ptr_mask;
-
-		/* Before dispatching irq to IP blocks, send it to amdkfd */
-		amdgpu_amdkfd_interrupt(adev,
-				(const void *) &entry);
 
 		amdgpu_irq_dispatch(adev, &entry);
 	}
