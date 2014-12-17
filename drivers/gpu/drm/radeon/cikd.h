@@ -2173,4 +2173,6 @@
 #define NUM_REQUESTS_AT_ERR(x)				((x) << 10)
 #define NUM_REQUESTS_AT_ERR_MASK			(0x1F << 10)
 
+#define IH_VMID_0_LUT					0x3D40u
+
 #endif
