@@ -31,8 +31,8 @@
 #include "gca/gfx_8_0_sh_mask.h"
 #include "gca/gfx_8_0_d.h"
 #include "gca/gfx_8_0_enum.h"
-#include "oss/oss_2_0_sh_mask.h"
-#include "oss/oss_2_0_d.h"
+#include "oss/oss_3_0_sh_mask.h"
+#include "oss/oss_3_0_d.h"
 #include "gmc/gmc_8_1_sh_mask.h"
 #include "gmc/gmc_8_1_d.h"
 #include "vi_structs.h"
@@ -261,6 +261,9 @@ static int kgd_set_pasid_vmid_mapping(struct kgd_dev *kgd, unsigned int pasid,
 	while (!(RREG32(mmATC_VMID_PASID_MAPPING_UPDATE_STATUS) & (1U << vmid)))
 		cpu_relax();
 	WREG32(mmATC_VMID_PASID_MAPPING_UPDATE_STATUS, 1U << vmid);
+
+	/* Mapping vmid to pasid also for IH block */
+	WREG32(mmIH_VMID_0_LUT + vmid, pasid_mapping);
 
 	return 0;
 }
