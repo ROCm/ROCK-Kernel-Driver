@@ -225,7 +225,9 @@ uint64_t get_gpu_clock_counter(struct kgd_dev *kgd)
 {
 	struct amdgpu_device *rdev = (struct amdgpu_device *)kgd;
 
-	return rdev->asic_funcs->get_gpu_clock_counter(rdev);
+	if (rdev->asic_funcs->get_gpu_clock_counter)
+		return rdev->asic_funcs->get_gpu_clock_counter(rdev);
+	return 0;
 }
 
 uint32_t get_max_engine_clock_in_mhz(struct kgd_dev *kgd)
