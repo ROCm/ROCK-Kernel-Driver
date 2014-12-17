@@ -86,7 +86,7 @@ void amdgpu_amdkfd_device_init(struct amdgpu_device *rdev)
 			.compute_vmid_bitmap = 0xFF00,
 
 			.first_compute_pipe = 1,
-			.compute_pipe_count = 8 - 1,
+			.compute_pipe_count = 4 - 1,
 		};
 
 		amdgpu_doorbell_get_kfd_info(rdev,
