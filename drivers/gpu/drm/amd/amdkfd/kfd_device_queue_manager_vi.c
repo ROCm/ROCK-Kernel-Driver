@@ -34,11 +34,13 @@ static bool set_cache_memory_policy_vi(struct device_queue_manager *dqm,
 				   uint64_t alternate_aperture_size);
 static int register_process_vi(struct device_queue_manager *dqm,
 					struct qcm_process_device *qpd);
+static int initialize_cpsch_vi(struct device_queue_manager *dqm);
 
 void device_queue_manager_init_vi(struct device_queue_manager_ops *ops)
 {
 	ops->set_cache_memory_policy = set_cache_memory_policy_vi;
 	ops->register_process = register_process_vi;
+	ops->initialize = initialize_cpsch_vi;
 }
 
 static uint32_t compute_sh_mem_bases_64bit(unsigned int top_address_nybble)
@@ -136,5 +138,10 @@ static int register_process_vi(struct device_queue_manager *dqm,
 	pr_debug("kfd: is32bit process: %d sh_mem_bases nybble: 0x%X and register 0x%X\n",
 		qpd->pqm->process->is_32bit_user_mode, temp, qpd->sh_mem_bases);
 
+	return 0;
+}
+
+static int initialize_cpsch_vi(struct device_queue_manager *dqm)
+{
 	return 0;
 }
