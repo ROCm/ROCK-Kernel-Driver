@@ -102,6 +102,8 @@ static int map_memory_to_gpu(struct kgd_dev *kgd, uint64_t va,
 		size_t size, void *vm, struct kgd_mem **mem);
 static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem);
 static uint16_t get_fw_version(struct kgd_dev *kgd, enum kgd_engine_type type);
+static void set_num_of_requests(struct kgd_dev *kgd,
+			uint8_t num_of_requests);
 
 static const struct kfd2kgd_calls kfd2kgd = {
 	.init_gtt_mem_allocation = alloc_gtt_mem,
@@ -136,7 +138,8 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.write_vmid_invalidate_request = write_vmid_invalidate_request,
 	.map_memory_to_gpu = map_memory_to_gpu,
 	.unmap_memory_to_gpu = unmap_memory_from_gpu,
-	.get_fw_version = get_fw_version
+	.get_fw_version = get_fw_version,
+	.set_num_of_requests = set_num_of_requests
 };
 
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_8_0_get_functions()
@@ -593,4 +596,10 @@ static uint16_t get_fw_version(struct kgd_dev *kgd, enum kgd_engine_type type)
 
 	/* Only 12 bit in use*/
 	return hdr->common.ucode_version;
+}
+
+static void set_num_of_requests(struct kgd_dev *kgd,
+			uint8_t num_of_requests)
+{
+	pr_debug("in %s this is a stub\n", __func__);
 }
