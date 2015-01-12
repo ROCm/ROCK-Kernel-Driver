@@ -845,7 +845,8 @@ static void destroy_kernel_queue_cpsch(struct device_queue_manager *dqm,
 	pr_debug("kfd: In %s\n", __func__);
 
 	mutex_lock(&dqm->lock);
-	destroy_queues_cpsch(dqm, true, false); /* here we actually preempt the DIQ */
+	/* here we actually preempt the DIQ */
+	destroy_queues_cpsch(dqm, true, false);
 	list_del(&kq->list);
 	dqm->queue_count--;
 	qpd->is_debug = false;
