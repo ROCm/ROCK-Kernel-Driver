@@ -23,11 +23,13 @@
 #include <linux/module.h>
 #include <linux/fdtable.h>
 #include <linux/uaccess.h>
+#include <linux/firmware.h>
 #include <drm/drmP.h>
 #include "amdgpu.h"
 #include "amdgpu_amdkfd.h"
 #include "cikd.h"
 #include "cik_sdma.h"
+#include "amdgpu_ucode.h"
 #include "gca/gfx_7_2_d.h"
 #include "gca/gfx_7_2_enum.h"
 #include "gca/gfx_7_2_sh_mask.h"
@@ -117,6 +119,7 @@ static void destroy_process_gpumem(struct kgd_dev *kgd, struct kgd_mem *mem);
 static uint32_t get_process_page_dir(void *vm);
 
 static int open_graphic_handle(struct kgd_dev *kgd, uint64_t va, void *vm, int fd, uint32_t handle, struct kgd_mem **mem);
+static uint16_t get_fw_version(struct kgd_dev *kgd, enum kgd_engine_type type);
 
 /*
  * Register access functions
@@ -185,7 +188,9 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.address_watch_get_offset = kgd_address_watch_get_offset,
 	.read_atc_vmid_pasid_mapping_reg_pasid_field = read_atc_vmid_pasid_mapping_reg_pasid_field,
 	.read_atc_vmid_pasid_mapping_reg_valid_field = read_atc_vmid_pasid_mapping_reg_valid_field,
-	.write_vmid_invalidate_request = write_vmid_invalidate_request
+	.write_vmid_invalidate_request = write_vmid_invalidate_request,
+	.get_fw_version = get_fw_version
+
 };
 
 static const struct kgd2kfd_calls *kgd2kfd;
@@ -1067,3 +1072,61 @@ err:
 	return ret;
 }
 
+static uint16_t get_fw_version(struct kgd_dev *kgd, enum kgd_engine_type type)
+{
+	struct amdgpu_device *adev = (struct amdgpu_device *) kgd;
+	const union amdgpu_firmware_header *hdr;
+
+	BUG_ON(kgd == NULL);
+
+	switch (type) {
+	case KGD_ENGINE_PFP:
+		hdr = (const union amdgpu_firmware_header *)
+							adev->gfx.pfp_fw->data;
+		break;
+
+	case KGD_ENGINE_ME:
+		hdr = (const union amdgpu_firmware_header *)
+							adev->gfx.me_fw->data;
+		break;
+
+	case KGD_ENGINE_CE:
+		hdr = (const union amdgpu_firmware_header *)
+							adev->gfx.ce_fw->data;
+		break;
+
+	case KGD_ENGINE_MEC1:
+		hdr = (const union amdgpu_firmware_header *)
+							adev->gfx.mec_fw->data;
+		break;
+
+	case KGD_ENGINE_MEC2:
+		hdr = (const union amdgpu_firmware_header *)
+							adev->gfx.mec2_fw->data;
+		break;
+
+	case KGD_ENGINE_RLC:
+		hdr = (const union amdgpu_firmware_header *)
+							adev->gfx.rlc_fw->data;
+		break;
+
+	case KGD_ENGINE_SDMA1:
+		hdr = (const union amdgpu_firmware_header *)
+							adev->sdma[0].fw->data;
+		break;
+
+	case KGD_ENGINE_SDMA2:
+		hdr = (const union amdgpu_firmware_header *)
+							adev->sdma[1].fw->data;
+		break;
+
+	default:
+		return 0;
+	}
+
+	if (hdr == NULL)
+		return 0;
+
+	/* Only 12 bit in use*/
+	return hdr->common.ucode_version;
+}
