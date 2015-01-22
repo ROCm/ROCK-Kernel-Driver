@@ -64,7 +64,7 @@
 })
 
 #if defined(CONFIG_XEN_VCPU_INFO_PLACEMENT)
-# define vcpu_info_read(fld) percpu_from_op("mov", vcpu_info.fld, "m" (vcpu_info.fld))
+# define vcpu_info_read(fld) percpu_from_op("mov", vcpu_info.fld)
 # define vcpu_info_write(fld, val) percpu_to_op("mov", vcpu_info.fld, val)
 # define vcpu_info_xchg(fld, val) percpu_exchange_op("xchg", vcpu_info.fld, val)
 #elif defined(CONFIG_XEN)

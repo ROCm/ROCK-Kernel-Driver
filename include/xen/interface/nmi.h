@@ -1,8 +1,8 @@
 /******************************************************************************
  * nmi.h
- * 
+ *
  * NMI callback registration and reason codes.
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
  * deal in the Software without restriction, including without limitation the
@@ -63,6 +63,7 @@ struct xennmi_callback {
     unsigned long handler_address;
     unsigned long pad;
 };
+DEFINE_GUEST_HANDLE_STRUCT(xennmi_callback);
 typedef struct xennmi_callback xennmi_callback_t;
 DEFINE_XEN_GUEST_HANDLE(xennmi_callback_t);
 
@@ -73,13 +74,3 @@ DEFINE_XEN_GUEST_HANDLE(xennmi_callback_t);
 #define XENNMI_unregister_callback 1
 
 #endif /* __XEN_PUBLIC_NMI_H__ */
-
-/*
- * Local variables:
- * mode: C
- * c-file-style: "BSD"
- * c-basic-offset: 4
- * tab-width: 4
- * indent-tabs-mode: nil
- * End:
- */

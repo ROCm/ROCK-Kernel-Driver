@@ -131,13 +131,3 @@ struct tpmif_shared_page {
 typedef struct tpmif_shared_page tpmif_shared_page_t;
 
 #endif
-
-/*
- * Local variables:
- * mode: C
- * c-file-style: "BSD"
- * c-basic-offset: 4
- * tab-width: 4
- * indent-tabs-mode: nil
- * End:
- */

@@ -569,16 +569,27 @@ xlvbd_del(struct blkfront_info *info)
 	info->rq = NULL;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
+static const char *flush_info(unsigned int feature_flush)
+{
+	switch (feature_flush & (REQ_FLUSH | REQ_FUA)) {
+	case REQ_FLUSH | REQ_FUA:
+		return "barrier";
+	case REQ_FLUSH:
+		return "flush diskcache";
+	default:
+		return "barrier or flush";
+	}
+}
+#endif
+
 void
 xlvbd_flush(struct blkfront_info *info)
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
 	blk_queue_flush(info->rq, info->feature_flush);
 	pr_info("blkfront: %s: %s: %s\n",
-		info->gd->disk_name,
-		info->flush_op == BLKIF_OP_WRITE_BARRIER ?
-		"barrier" : (info->flush_op == BLKIF_OP_FLUSH_DISKCACHE ?
-			     "flush diskcache" : "barrier or flush"),
+		info->gd->disk_name, flush_info(info->feature_flush),
 		info->feature_flush ? "enabled" : "disabled");
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,16)
 	int err;

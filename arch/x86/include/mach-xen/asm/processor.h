@@ -139,7 +139,7 @@ struct cpuinfo_x86 {
 #ifndef CONFIG_XEN
 	u32			microcode;
 #endif
-} __attribute__((__aligned__(SMP_CACHE_BYTES)));
+};
 
 #define X86_VENDOR_INTEL	0
 #define X86_VENDOR_CYRIX	1
@@ -162,7 +162,7 @@ extern __u32			cpu_caps_cleared[NCAPINTS];
 extern __u32			cpu_caps_set[NCAPINTS];
 
 #ifdef CONFIG_SMP
-DECLARE_PER_CPU_SHARED_ALIGNED(struct cpuinfo_x86, cpu_info);
+DECLARE_PER_CPU_READ_MOSTLY(struct cpuinfo_x86, cpu_info);
 #define cpu_data(cpu)		per_cpu(cpu_info, cpu)
 #else
 #define cpu_info		boot_cpu_data
@@ -390,13 +390,14 @@ struct lwp_struct {
 	u8 reserved[128];
 };
 
-struct bndregs_struct {
-	u64 bndregs[8];
+struct bndreg {
+	u64 lower_bound;
+	u64 upper_bound;
 } __packed;
 
-struct bndcsr_struct {
-	u64 cfg_reg_u;
-	u64 status_reg;
+struct bndcsr {
+	u64 bndcfgu;
+	u64 bndstatus;
 } __packed;
 
 struct xsave_hdr_struct {
@@ -410,8 +411,8 @@ struct xsave_struct {
 	struct xsave_hdr_struct xsave_hdr;
 	struct ymmh_struct ymmh;
 	struct lwp_struct lwp;
-	struct bndregs_struct bndregs;
-	struct bndcsr_struct bndcsr;
+	struct bndreg bndreg[4];
+	struct bndcsr bndcsr;
 	/* new processor state extensions will go here */
 } __attribute__ ((packed, aligned (64)));
 
@@ -890,7 +891,13 @@ extern unsigned long thread_saved_pc(struct task_struct *tsk);
 
 #else
 /*
- * User space process size. 47bits minus one guard page.
+ * User space process size. 47bits minus one guard page.  The guard
+ * page is necessary on Intel CPUs: if a SYSCALL instruction is at
+ * the highest possible canonical userspace address, then that
+ * syscall will enter the kernel with a non-canonical return
+ * address, and SYSRET will explode dangerously.  We avoid this
+ * particular problem by preventing anything from being mapped
+ * at the maximum canonical address.
  */
 #define TASK_SIZE_MAX	((1UL << 47) - PAGE_SIZE)
 
@@ -949,6 +956,24 @@ extern void start_thread(struct pt_regs *regs, unsigned long new_ip,
 
 extern int get_tsc_mode(unsigned long adr);
 extern int set_tsc_mode(unsigned int val);
+
+/* Register/unregister a process' MPX related resource */
+#define MPX_ENABLE_MANAGEMENT(tsk)	mpx_enable_management((tsk))
+#define MPX_DISABLE_MANAGEMENT(tsk)	mpx_disable_management((tsk))
+
+#ifdef CONFIG_X86_INTEL_MPX
+extern int mpx_enable_management(struct task_struct *tsk);
+extern int mpx_disable_management(struct task_struct *tsk);
+#else
+static inline int mpx_enable_management(struct task_struct *tsk)
+{
+	return -EINVAL;
+}
+static inline int mpx_disable_management(struct task_struct *tsk)
+{
+	return -EINVAL;
+}
+#endif /* CONFIG_X86_INTEL_MPX */
 
 extern u16 amd_get_nb_id(int cpu);
 

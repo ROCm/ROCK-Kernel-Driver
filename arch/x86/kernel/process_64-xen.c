@@ -301,17 +301,15 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 
 	fpu = xen_switch_fpu_prepare(prev_p, next_p, cpu, &mcl);
 
-	/*
-	 * Reload sp0.
-	 * This is load_sp0(tss, next) with a multicall.
-	 */
+	/* Reload sp0. This is load_sp0(tss, next) with a multicall. */
 	mcl->op      = __HYPERVISOR_stack_switch;
 	mcl->args[0] = __KERNEL_DS;
 	mcl->args[1] = next->sp0;
 	mcl++;
 
 	/*
-	 * Load the per-thread Thread-Local Storage descriptor.
+	 * Load TLS before restoring any segments so that segment loads
+	 * reference the correct GDT entries.
 	 * This is load_TLS(next, cpu) with multicalls.
 	 */
 #define C(i) do {							\
@@ -376,9 +374,19 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 		xen_clear_cr0_upd();
 	}
 
-	/*
-	 * Switch DS and ES.
-	 * This won't pick up thread selector changes, but I guess that is ok.
+	/* Switch DS and ES.
+	 *
+	 * Reading them only returns the selectors, but writing them (if
+	 * nonzero) loads the full descriptor from the GDT or LDT.  The
+	 * LDT for next is loaded in switch_mm, and the GDT is loaded
+	 * above.
+	 *
+	 * We therefore need to write new values to the segment
+	 * registers on every context switch unless both the new and old
+	 * values are zero.
+	 *
+	 * Note that we don't need to do anything for CS and SS, as
+	 * those are saved and restored as part of pt_regs.
 	 */
 	if (unlikely(next->es))
 		loadsegment(es, next->es);
@@ -387,20 +395,48 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 		loadsegment(ds, next->ds);
 
 	/*
-	 * Leave lazy mode, flushing any hypercalls made here.
-	 * This must be done before restoring TLS segments so
-	 * the GDT and LDT are properly updated, and must be
-	 * done before math_state_restore, so the TS bit is up
-	 * to date.
+	 * Leave lazy mode, flushing any hypercalls made here.  This
+	 * must be done after loading TLS entries in the GDT but before
+	 * loading segments that might reference them, and and it must
+	 * be done before math_state_restore, so the TS bit is up to
+	 * date.
 	 */
 	arch_end_context_switch(next_p);
 
 	/*
 	 * Switch FS and GS.
 	 *
-	 * Segment register != 0 always requires a reload.  Also
-	 * reload when it has changed.  When prev process used 64bit
-	 * base always reload to avoid an information leak.
+	 * These are even more complicated than FS and GS: they have
+	 * 64-bit bases are that controlled by arch_prctl.  Those bases
+	 * only differ from the values in the GDT or LDT if the selector
+	 * is 0.
+	 *
+	 * Loading the segment register resets the hidden base part of
+	 * the register to 0 or the value from the GDT / LDT.  If the
+	 * next base address zero, writing 0 to the segment register is
+	 * much faster than using wrmsr to explicitly zero the base.
+	 *
+	 * The thread_struct.fs and thread_struct.gs values are 0
+	 * if the fs and gs bases respectively are not overridden
+	 * from the values implied by fsindex and gsindex.  They
+	 * are nonzero, and store the nonzero base addresses, if
+	 * the bases are overridden.
+	 *
+	 * (fs != 0 && fsindex != 0) || (gs != 0 && gsindex != 0) should
+	 * be impossible.
+	 *
+	 * Therefore we need to reload the segment registers if either
+	 * the old or new selector is nonzero, and we need to override
+	 * the base address if next thread expects it to be overridden.
+	 *
+	 * This code is unnecessarily slow in the case where the old and
+	 * new indexes are zero and the new base is nonzero -- it will
+	 * unnecessarily write 0 to the selector before writing the new
+	 * base address.
+	 *
+	 * Note: This all depends on arch_prctl being the only way that
+	 * user code can override the segment base.  Once wrfsbase and
+	 * wrgsbase are enabled, most of this code will need to change.
 	 */
 	if (unlikely(next->fsindex))
 		loadsegment(fs, next->fsindex);

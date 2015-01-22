@@ -88,7 +88,7 @@ static int _xen_pcibk_add_pci_dev(struct xen_pcibk_device *pdev,
 }
 
 static void _xen_pcibk_release_pci_dev(struct xen_pcibk_device *pdev,
-				       struct pci_dev *dev)
+				       struct pci_dev *dev, bool lock)
 {
 	int slot, bus;
 	struct slot_dev_data *slot_dev = pdev->pci_dev_data;
@@ -109,8 +109,13 @@ static void _xen_pcibk_release_pci_dev(struct xen_pcibk_device *pdev,
       out:
 	spin_unlock_irqrestore(&slot_dev->lock, flags);
 
-	if (found_dev)
+	if (found_dev) {
+		if (lock)
+			device_lock(&found_dev->dev);
 		pcistub_put_pci_dev(found_dev);
+		if (lock)
+			device_unlock(&found_dev->dev);
+	}
 }
 
 static int _xen_pcibk_init_devices(struct xen_pcibk_device *pdev)
@@ -149,8 +154,11 @@ static void _xen_pcibk_release_devices(struct xen_pcibk_device *pdev)
 	for (bus = 0; bus < PCI_BUS_NBR; bus++)
 		for (slot = 0; slot < PCI_SLOT_MAX; slot++) {
 			dev = slot_dev->slots[bus][slot];
-			if (dev != NULL)
+			if (dev != NULL) {
+				device_lock(&dev->dev);
 				pcistub_put_pci_dev(dev);
+				device_unlock(&dev->dev);
+			}
 		}
 
 	kfree(slot_dev);

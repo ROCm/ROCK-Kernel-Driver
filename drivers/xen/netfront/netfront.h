@@ -50,10 +50,8 @@
 #endif
 
 struct netfront_stats {
-	u64			rx_packets;
-	u64			tx_packets;
-	u64			rx_bytes;
-	u64			tx_bytes;
+	u64			packets;
+	u64			bytes;
 	struct u64_stats_sync	syncp;
 };
 
@@ -100,7 +98,8 @@ struct netfront_accel_hooks {
 	 */
 	int (*get_stats)(struct net_device *dev,
 			 struct net_device_stats *dev_stats,
-			 struct netfront_stats *link_stats);
+			 struct netfront_stats *rx_stats,
+			 struct netfront_stats *tx_stats);
 };
 
 
@@ -204,7 +203,8 @@ struct netfront_info {
 	struct mmu_update rx_mmu[NET_RX_RING_SIZE];
 
 	/* Statistics */
-	struct netfront_stats __percpu *stats;
+	struct netfront_stats __percpu *rx_stats;
+	struct netfront_stats __percpu *tx_stats;
 	unsigned long rx_gso_csum_fixups;
 
 	/* Private pointer to state internal to accelerator module */

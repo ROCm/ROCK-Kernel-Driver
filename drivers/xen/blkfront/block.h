@@ -119,7 +119,6 @@ struct blkfront_info
 	struct page *ring_pages[BLK_MAX_RING_PAGES];
 	unsigned long shadow_free;
 	unsigned int feature_flush;
-	unsigned int flush_op;
 	bool feature_discard;
 	bool feature_secdiscard;
 	unsigned int discard_granularity;

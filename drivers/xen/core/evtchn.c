@@ -116,6 +116,8 @@ static struct irq_cfg _irq_cfg[] = {
 		       - 1].info = IRQ_UNBOUND
 };
 
+#if !defined(CONFIG_SPARSE_IRQ) || \
+    (defined(CONFIG_X86) && !defined(CONFIG_X86_LOCAL_APIC))
 static inline struct irq_cfg *__pure irq_cfg(unsigned int irq)
 {
 #ifdef CONFIG_SPARSE_IRQ
@@ -125,10 +127,11 @@ static inline struct irq_cfg *__pure irq_cfg(unsigned int irq)
 #endif
 }
 
-static inline struct irq_cfg *__pure irq_data_cfg(struct irq_data *data)
+static inline struct irq_cfg *__pure irqd_cfg(struct irq_data *data)
 {
 	return irq_data_get_irq_chip_data(data);
 }
+#endif
 
 /* Constructor for packed IRQ information. */
 static inline u32 mk_irq_info(u32 type, u32 index, u32 evtchn)
@@ -208,7 +211,7 @@ static inline unsigned int evtchn_from_irq_cfg(const struct irq_cfg *cfg)
 
 static inline unsigned int evtchn_from_irq_data(struct irq_data *data)
 {
-	const struct irq_cfg *cfg = irq_data_cfg(data);
+	const struct irq_cfg *cfg = irqd_cfg(data);
 
 	return cfg ? evtchn_from_irq_cfg(cfg) : 0;
 }
@@ -844,7 +847,7 @@ void unbind_from_per_cpu_irq(unsigned int irq, unsigned int cpu,
 {
 	struct evtchn_close close;
 	struct irq_data *data = irq_get_irq_data(irq);
-	struct irq_cfg *cfg = irq_data_cfg(data);
+	struct irq_cfg *cfg = irqd_cfg(data);
 	unsigned int evtchn = evtchn_from_per_cpu_irq(cfg, cpu);
 	struct percpu_irqaction *free_action = NULL;
 
@@ -1248,7 +1251,7 @@ EXPORT_SYMBOL_GPL(unbind_from_irqhandler);
 static int set_affinity_irq(struct irq_data *data,
 			    const struct cpumask *dest, bool force)
 {
-	const struct irq_cfg *cfg = irq_data_cfg(data);
+	const struct irq_cfg *cfg = irqd_cfg(data);
 	unsigned int port = evtchn_from_irq_cfg(cfg);
 	unsigned int cpu = cpumask_any_and(dest, cpu_online_mask);
 	struct evtchn_bind_vcpu ebv = { .port = port, .vcpu = cpu };
@@ -1402,7 +1405,7 @@ static int set_type_pirq(struct irq_data *data, unsigned int type)
 static void enable_pirq(struct irq_data *data)
 {
 	struct evtchn_bind_pirq bind_pirq;
-	struct irq_cfg *cfg = irq_data_cfg(data);
+	struct irq_cfg *cfg = irqd_cfg(data);
 	unsigned int evtchn = evtchn_from_irq_cfg(cfg);
 	unsigned int irq = data->irq, pirq = irq - PIRQ_BASE;
 
@@ -1445,7 +1448,7 @@ static unsigned int startup_pirq(struct irq_data *data)
 
 static void shutdown_pirq(struct irq_data *data)
 {
-	struct irq_cfg *cfg = irq_data_cfg(data);
+	struct irq_cfg *cfg = irqd_cfg(data);
 	unsigned int evtchn = evtchn_from_irq_cfg(cfg);
 
 	if (!VALID_EVTCHN(evtchn))
@@ -1719,7 +1722,7 @@ static void restore_cpu_ipis(unsigned int cpu)
 #endif
 
 		data = irq_get_irq_data(irq);
-		BUG_ON(irq_data_cfg(data)->info != mk_irq_info(IRQT_IPI, ipi, 0));
+		BUG_ON(irqd_cfg(data)->info != mk_irq_info(IRQT_IPI, ipi, 0));
 
 		/* Get a new binding from Xen. */
 		bind_ipi.vcpu = cpu;
@@ -1731,7 +1734,7 @@ static void restore_cpu_ipis(unsigned int cpu)
 		/* Record the new mapping. */
 		evtchn_to_irq[evtchn] = irq;
 #ifdef PER_CPU_IPI_IRQ
-		irq_data_cfg(data)->info = mk_irq_info(IRQT_IPI, ipi, evtchn);
+		irqd_cfg(data)->info = mk_irq_info(IRQT_IPI, ipi, evtchn);
 #else
 		per_cpu(ipi_evtchn, cpu) = evtchn;
 #endif

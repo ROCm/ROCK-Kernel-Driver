@@ -605,9 +605,6 @@ static void connect(struct blkfront_info *info)
 	if (err <= 0)
 		physical_sector_size = sector_size;
 
-	info->feature_flush = 0;
-	info->flush_op = 0;
-
 	err = xenbus_scanf(XBT_NIL, info->xbdev->otherend,
 			   "feature-barrier", "%d", &barrier);
 	/*
@@ -618,20 +615,17 @@ static void connect(struct blkfront_info *info)
 	 * If there are barriers, then we use flush.
 	 */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
-	if (err > 0 && barrier) {
+	info->feature_flush = 0;
+	if (err > 0 && barrier)
 		info->feature_flush = REQ_FLUSH | REQ_FUA;
-		info->flush_op = BLKIF_OP_WRITE_BARRIER;
-	}
 	/*
 	 * And if there is "feature-flush-cache" use that above
 	 * barriers.
 	 */
 	err = xenbus_scanf(XBT_NIL, info->xbdev->otherend,
 			   "feature-flush-cache", "%d", &flush);
-	if (err > 0 && flush) {
+	if (err > 0 && flush)
 		info->feature_flush = REQ_FLUSH;
-		info->flush_op = BLKIF_OP_FLUSH_DISKCACHE;
-	}
 #else
 	if (err <= 0)
 		info->feature_flush = QUEUE_ORDERED_DRAIN;
@@ -1169,10 +1163,18 @@ static int blkif_queue_request(struct request *req)
 		BLKIF_OP_WRITE : BLKIF_OP_READ;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
 	if (req->cmd_flags & (REQ_FLUSH | REQ_FUA))
+		switch (info->feature_flush & (REQ_FLUSH | REQ_FUA)) {
+		case REQ_FLUSH | REQ_FUA:
+			ring_req->operation = BLKIF_OP_WRITE_BARRIER;
+			break;
+		case REQ_FLUSH:
+			ring_req->operation = BLKIF_OP_FLUSH_DISKCACHE;
+			break;
+		}
 #else
 	if (req->cmd_flags & REQ_HARDBARRIER)
+		ring_req->operation = BLKIF_OP_WRITE_BARRIER;
 #endif
-		ring_req->operation = info->flush_op;
 	if (req->cmd_type == REQ_TYPE_BLOCK_PC)
 		ring_req->operation = BLKIF_OP_PACKET;
 
@@ -1272,11 +1274,11 @@ void do_blkif_request(struct request_queue *rq)
 
 		if ((req->cmd_type != REQ_TYPE_FS &&
 		     (req->cmd_type != REQ_TYPE_BLOCK_PC || req->cmd_len)) ||
-		    ((req->cmd_flags & (REQ_FLUSH | REQ_FUA)) &&
-		     !info->flush_op)) {
+		    ((req->cmd_flags & (REQ_FLUSH | REQ_FUA)) >
+		     (info->feature_flush & (REQ_FLUSH | REQ_FUA)))) {
 			req->errors = (DID_ERROR << 16) |
 				      (DRIVER_INVALID << 24);
-			__blk_end_request_all(req, -EIO);
+			__blk_end_request_all(req, -EOPNOTSUPP);
 			continue;
 		}
 

@@ -80,8 +80,7 @@ modpost = scripts/mod/modpost                    \
  $(if $(KBUILD_EXTMOD)$(KBUILD_MODPOST_WARN),-w) \
  $(if $(CONFIG_SUSE_KERNEL_SUPPORTED),              \
       -N $(firstword $(wildcard $(dir $(MODVERDIR))/Module.supported \
-				$(objtree)/Module.supported \
-				$(srctree)/Module.supported /dev/null)))
+             $(if $(KBUILD_EXTMOD),,$(srctree)/Module.supported) /dev/null)))
 
 MODPOST_OPT=$(subst -i,-n,$(filter -i,$(MAKEFLAGS)))
 

@@ -97,6 +97,28 @@
  *
  *      The type of the backing device/object.
  *
+ *
+ * direct-io-safe
+ *      Values:         0/1 (boolean)
+ *      Default Value:  0
+ *
+ *      The underlying storage is not affected by the direct IO memory
+ *      lifetime bug.  See:
+ *        http://lists.xen.org/archives/html/xen-devel/2012-12/msg01154.html
+ *
+ *      Therefore this option gives the backend permission to use
+ *      O_DIRECT, notwithstanding that bug.
+ *
+ *      That is, if this option is enabled, use of O_DIRECT is safe,
+ *      in circumstances where we would normally have avoided it as a
+ *      workaround for that bug.  This option is not relevant for all
+ *      backends, and even not necessarily supported for those for
+ *      which it is relevant.  A backend which knows that it is not
+ *      affected by the bug can ignore this option.
+ *
+ *      This option doesn't require a backend to use O_DIRECT, so it
+ *      should not be used to try to control the caching behaviour.
+ *
  *--------------------------------- Features ---------------------------------
  *
  * feature-barrier
@@ -174,6 +196,16 @@
  *      machine pages.  The value must be a power of 2.
  *
  *------------------------- Backend Device Properties -------------------------
+ *
+ * discard-enable
+ *      Values:         0/1 (boolean)
+ *      Default Value:  1
+ *
+ *      This optional property, set by the toolstack, instructs the backend
+ *      to offer discard to the frontend. If the property is missing the
+ *      backend should offer discard if the backing storage actually supports
+ *      it. This optional property, set by the toolstack, requests that the
+ *      backend offer, or not offer, discard to the frontend.
  *
  * discard-alignment
  *      Values:         <uint32_t>

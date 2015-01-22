@@ -36,7 +36,7 @@
 #include <asm/vgtod.h>
 
 struct pvclock_vsyscall_time_info *__read_mostly pvclock_vsyscall_time;
-__visible DEFINE_VVAR(volatile unsigned long, jiffies) = INITIAL_JIFFIES;
+__visible volatile unsigned long jiffies __cacheline_aligned = INITIAL_JIFFIES;
 #endif
 
 #define XEN_SHIFT 22
@@ -222,9 +222,9 @@ static inline int time_values_up_to_date(void)
 }
 
 #ifdef CONFIG_XEN_PRIVILEGED_GUEST
-int xen_update_wallclock(const struct timespec *tv)
+int xen_update_wallclock(const struct timespec64 *ts)
 {
-	struct timespec now;
+	struct timespec64 now;
 	s64 nsec;
 	struct shadow_time_info *shadow;
 	struct xen_platform_op op;
@@ -240,14 +240,14 @@ int xen_update_wallclock(const struct timespec *tv)
 	 * be stale, so we can retry with fresh ones.
 	 */
 	for (;;) {
-		nsec = tv->tv_nsec - get_nsec_offset(shadow);
+		nsec = ts->tv_nsec - get_nsec_offset(shadow);
 		if (time_values_up_to_date())
 			break;
 		get_time_values_from_xen(smp_processor_id());
 	}
-	set_normalized_timespec(&now, tv->tv_sec, nsec);
+	set_normalized_timespec64(&now, ts->tv_sec, nsec);
 
-	op.cmd = XENPF_settime;
+	op.cmd = XENPF_settime; /* XXX need XENPF_settime64 */
 	op.u.settime.secs        = now.tv_sec;
 	op.u.settime.nsecs       = now.tv_nsec;
 	op.u.settime.system_time = shadow->system_timestamp;

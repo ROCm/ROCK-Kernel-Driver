@@ -653,8 +653,6 @@ static void xencons_close(struct tty_struct *tty, struct file *filp)
 		return;
 	}
 
-	/* Prevent other threads from re-opening this tty. */
-	set_bit(TTY_CLOSING, &tty->flags);
 	mutex_unlock(&tty_mutex);
 
 	tty->closing = 1;

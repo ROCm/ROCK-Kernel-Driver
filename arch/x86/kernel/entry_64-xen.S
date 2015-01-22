@@ -663,6 +663,20 @@ ENTRY(stub_execve)
 	CFI_ENDPROC
 END(stub_execve)
 
+ENTRY(stub_execveat)
+	CFI_STARTPROC
+	addq $8, %rsp
+	PARTIAL_FRAME 0
+	SAVE_REST
+	FIXUP_TOP_OF_STACK %r11
+	call sys_execveat
+	RESTORE_TOP_OF_STACK %r11
+	movq %rax,RAX(%rsp)
+	RESTORE_REST
+	jmp int_ret_from_sys_call
+	CFI_ENDPROC
+END(stub_execveat)
+
 /*
  * sigreturn is special because it needs to restore all registers on return.
  * This cannot be done with SYSRET, so use the IRET return path instead.
@@ -707,6 +721,20 @@ ENTRY(stub_x32_execve)
 	jmp int_ret_from_sys_call
 	CFI_ENDPROC
 END(stub_x32_execve)
+
+ENTRY(stub_x32_execveat)
+	CFI_STARTPROC
+	addq $8, %rsp
+	PARTIAL_FRAME 0
+	SAVE_REST
+	FIXUP_TOP_OF_STACK %r11
+	call compat_sys_execveat
+	RESTORE_TOP_OF_STACK %r11
+	movq %rax,RAX(%rsp)
+	RESTORE_REST
+	jmp int_ret_from_sys_call
+	CFI_ENDPROC
+END(stub_x32_execveat)
 
 #endif
 
@@ -903,7 +931,7 @@ ENTRY(do_hypervisor_callback)   # do_hypervisor_callback(struct *pt_regs)
 	jz   error_exit
 	cmpl $0,PER_CPU_VAR(__preempt_count)
 	jnz  error_exit
-	bt   $9,EFLAGS-ARGOFFSET(%rsp)
+	bt   $9,EFLAGS(%rsp)
 	jnc  error_exit
 	movb $0,PER_CPU_VAR(privcmd_hcall)
 	call preempt_schedule_irq
@@ -923,7 +951,7 @@ scrit:	/**** START OF CRITICAL REGION ****/
 	__TEST_PENDING
 	CFI_REMEMBER_STATE
 	jnz  14f			# process more events if necessary...
-        RESTORE_ARGS 1,8,1
+	RESTORE_ARGS 1,8,1
         HYPERVISOR_IRET 0
         
 	CFI_RESTORE_STATE

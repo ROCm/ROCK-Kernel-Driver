@@ -173,9 +173,10 @@ static int pcifront_try_connect(struct pcifront_device *pdev)
 	if (err == -ENOENT) {
 		xenbus_dev_error(pdev->xdev, err,
 				 "No PCI Roots found, trying 0000:00");
-		err = pcifront_scan_root(pdev, 0, 0);
-		num_roots = 0;
-	} else if (err != 1) {
+		domain = bus = i = num_roots = 0;
+		goto scan;
+	}
+	if (err != 1) {
 		if (err == 0)
 			err = -EINVAL;
 		xenbus_dev_fatal(pdev->xdev, err,
@@ -200,6 +201,7 @@ static int pcifront_try_connect(struct pcifront_device *pdev)
 			goto out;
 		}
 
+      scan:
 		err = pcifront_scan_root(pdev, domain, bus);
 		if (err) {
 			xenbus_dev_fatal(pdev->xdev, err,
@@ -261,9 +263,10 @@ static int pcifront_attach_devices(struct pcifront_device *pdev)
 	if (err == -ENOENT) {
 		xenbus_dev_error(pdev->xdev, err,
 				 "No PCI Roots found, trying 0000:00");
-		err = pcifront_rescan_root(pdev, 0, 0);
-		num_roots = 0;
-	} else if (err != 1) {
+		domain = bus = i = num_roots = 0;
+		goto rescan;
+	}
+	if (err != 1) {
 		if (err == 0)
 			err = -EINVAL;
 		xenbus_dev_fatal(pdev->xdev, err,
@@ -288,6 +291,7 @@ static int pcifront_attach_devices(struct pcifront_device *pdev)
 			goto out;
 		}
 
+      rescan:
 		err = pcifront_rescan_root(pdev, domain, bus);
 		if (err) {
 			xenbus_dev_fatal(pdev->xdev, err,

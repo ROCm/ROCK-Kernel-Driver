@@ -191,7 +191,8 @@ static int netfront_accel_check_ready(struct net_device *net_dev)
 
 static int netfront_accel_get_stats(struct net_device *net_dev,
 				    struct net_device_stats *devst,
-				    struct netfront_stats *lnkst)
+				    struct netfront_stats *rxst,
+				    struct netfront_stats *txst)
 {
 	netfront_accel_vnic *vnic = NETFRONT_ACCEL_VNIC_FROM_NETDEV(net_dev);
 	struct netfront_accel_netdev_stats now;
@@ -205,16 +206,20 @@ static int netfront_accel_get_stats(struct net_device *net_dev,
 	now.fastpath_tx_bytes  = vnic->netdev_stats.fastpath_tx_bytes;
 	now.fastpath_tx_errors = vnic->netdev_stats.fastpath_tx_errors;
 	
-	lnkst->rx_packets += (now.fastpath_rx_pkts -
+	u64_stats_update_begin(&rxst->syncp);
+	rxst->packets     += (now.fastpath_rx_pkts -
 			      vnic->stats_last_read.fastpath_rx_pkts);
-	lnkst->rx_bytes   += (now.fastpath_rx_bytes -
+	rxst->bytes       += (now.fastpath_rx_bytes -
 			      vnic->stats_last_read.fastpath_rx_bytes);
+	u64_stats_update_end(&rxst->syncp);
 	devst->rx_errors  += (now.fastpath_rx_errors -
 			      vnic->stats_last_read.fastpath_rx_errors);
-	lnkst->tx_packets += (now.fastpath_tx_pkts -
+	u64_stats_update_begin(&txst->syncp);
+	txst->packets     += (now.fastpath_tx_pkts -
 			      vnic->stats_last_read.fastpath_tx_pkts);
-	lnkst->tx_bytes   += (now.fastpath_tx_bytes -
+	txst->bytes       += (now.fastpath_tx_bytes -
 			      vnic->stats_last_read.fastpath_tx_bytes);
+	u64_stats_update_end(&txst->syncp);
 	devst->tx_errors  += (now.fastpath_tx_errors -
 			      vnic->stats_last_read.fastpath_tx_errors);
 	

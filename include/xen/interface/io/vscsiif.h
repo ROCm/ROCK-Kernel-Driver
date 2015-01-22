@@ -193,7 +193,7 @@ struct vscsiif_request {
 	uint8_t cmd_len;	/* valid CDB bytes */
 
 	uint8_t cmnd[VSCSIIF_MAX_COMMAND_SIZE];	/* the CDB */
-	uint16_t timeout_per_command;	/* deprecated */
+	uint16_t timeout_per_command;	/* deprecated: timeout in secs, 0=default */
 	uint16_t channel, id, lun;	/* (virtual) device specification */
 	uint16_t ref_rqid;		/* command abort reference */
 	uint8_t sc_data_direction;	/* for DMA_TO_DEVICE(1)
@@ -213,6 +213,9 @@ struct vscsiif_request {
 };
 typedef struct vscsiif_request vscsiif_request_t;
 
+/*
+ * The following interface is deprecated!
+ */
 #define VSCSIIF_SG_LIST_SIZE ((sizeof(vscsiif_request_t) - 4) \
                               / sizeof(struct scsiif_request_segment))
 
@@ -223,6 +226,7 @@ struct vscsiif_sg_list {
     uint8_t nr_segments;    /* Number of pieces of scatter-gather */
     struct scsiif_request_segment seg[VSCSIIF_SG_LIST_SIZE];
 };
+/* End of deprecated interface */
 
 /* Size of one response is 252 bytes */
 struct vscsiif_response {

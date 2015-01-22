@@ -634,6 +634,7 @@ EXPORT_SYMBOL_GPL(xen_invlpg_mask);
 void xen_pgd_pin(pgd_t *pgd)
 {
 	struct mmuext_op op[NR_PGD_PIN_OPS];
+	unsigned int nr = NR_PGD_PIN_OPS;
 
 	op[0].cmd = MMUEXT_PIN_L3_TABLE;
 	op[0].arg1.mfn = virt_to_mfn(pgd);
@@ -643,12 +644,16 @@ void xen_pgd_pin(pgd_t *pgd)
 	if (pgd)
 		op[1].arg1.mfn = virt_to_mfn(pgd);
 	else {
+#ifdef CONFIG_X86_VSYSCALL_EMULATION
 		op[1].cmd = MMUEXT_PIN_L3_TABLE;
 		op[1].arg1.mfn = pfn_to_mfn(__pa_symbol(level3_user_pgt)
 					    >> PAGE_SHIFT);
+#else
+		nr = 1;
+#endif
 	}
 #endif
-	if (HYPERVISOR_mmuext_op(op, NR_PGD_PIN_OPS, NULL, DOMID_SELF) < 0)
+	if (HYPERVISOR_mmuext_op(op, nr, NULL, DOMID_SELF) < 0)
 		BUG();
 }
 

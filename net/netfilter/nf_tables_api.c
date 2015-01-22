@@ -713,14 +713,10 @@ static int nft_flush_table(struct nft_ctx *ctx)
 	struct nft_chain *chain, *nc;
 	struct nft_set *set, *ns;
 
-	list_for_each_entry_safe(chain, nc, &ctx->table->chains, list) {
+	list_for_each_entry(chain, &ctx->table->chains, list) {
 		ctx->chain = chain;
 
 		err = nft_delrule_by_chain(ctx);
-		if (err < 0)
-			goto out;
-
-		err = nft_delchain(ctx);
 		if (err < 0)
 			goto out;
 	}
@@ -731,6 +727,14 @@ static int nft_flush_table(struct nft_ctx *ctx)
 			continue;
 
 		err = nft_delset(ctx, set);
+		if (err < 0)
+			goto out;
+	}
+
+	list_for_each_entry_safe(chain, nc, &ctx->table->chains, list) {
+		ctx->chain = chain;
+
+		err = nft_delchain(ctx);
 		if (err < 0)
 			goto out;
 	}
@@ -2477,7 +2481,7 @@ static int nf_tables_getset(struct sock *nlsk, struct sk_buff *skb,
 	const struct nfgenmsg *nfmsg = nlmsg_data(nlh);
 	int err;
 
-	/* Verify existance before starting dump */
+	/* Verify existence before starting dump */
 	err = nft_ctx_init_from_setattr(&ctx, skb, nlh, nla);
 	if (err < 0)
 		return err;
@@ -3665,8 +3669,7 @@ static int nf_tables_abort(struct sk_buff *skb)
 			break;
 		case NFT_MSG_NEWCHAIN:
 			if (nft_trans_chain_update(trans)) {
-				if (nft_trans_chain_stats(trans))
-					free_percpu(nft_trans_chain_stats(trans));
+				free_percpu(nft_trans_chain_stats(trans));
 
 				nft_trans_destroy(trans);
 			} else {

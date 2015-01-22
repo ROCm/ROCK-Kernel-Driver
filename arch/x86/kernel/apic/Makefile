@@ -2,10 +2,12 @@
 # Makefile for local APIC drivers and for the IO-APIC code
 #
 
-obj-$(CONFIG_X86_LOCAL_APIC)	+= apic.o apic_noop.o ipi.o
+obj-$(CONFIG_X86_LOCAL_APIC)	+= apic.o apic_noop.o ipi.o vector.o
 obj-y				+= hw_nmi.o
 
 obj-$(CONFIG_X86_IO_APIC)	+= io_apic.o
+obj-$(CONFIG_PCI_MSI)		+= msi.o
+obj-$(CONFIG_HT_IRQ)		+= htirq.o
 obj-$(CONFIG_SMP)		+= ipi.o
 
 ifeq ($(CONFIG_X86_64),y)
@@ -25,4 +27,4 @@ obj-$(CONFIG_X86_LOCAL_APIC)	+= probe_$(BITS).o
 
 probe_64-$(CONFIG_XEN)		:= probe_32.o
 
-disabled-obj-$(CONFIG_XEN)	:= apic_%.o
+disabled-obj-$(CONFIG_XEN)	:= apic_%.o msi.o

@@ -64,12 +64,14 @@ NEXT_PAGE(init_level4_pgt)
 NEXT_PAGE(level3_kernel_pgt)
 	.fill	512,8,0
 
+#ifdef CONFIG_X86_VSYSCALL_EMULATION
         /*
          * This is used for vsyscall area mapping as we have a different
          * level4 page table for user.
          */
 NEXT_PAGE(level3_user_pgt)
         .fill	512,8,0
+#endif
 
 NEXT_PAGE(level2_fixmap_pgt)
 	.fill	512,8,0
@@ -122,7 +124,7 @@ NEXT_PAGE(hypercall_page)
 
 #define HYPERCALL(n) \
 	.equ HYPERVISOR_##n, hypercall_page + __HYPERVISOR_##n * 32; \
-	.type HYPERVISOR_##n, function; .size HYPERVISOR_##n, 32
+	.type HYPERVISOR_##n, @function; .size HYPERVISOR_##n, 32
 #include <asm/xen-hypercalls.h>
 #undef HYPERCALL
 

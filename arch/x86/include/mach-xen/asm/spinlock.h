@@ -95,7 +95,7 @@ static __always_inline void __ticket_spin_lock(arch_spinlock_t *lock)
 			while (inc.head != inc.tail
 			       && __spin_count_dec(count, lock)) {
 				cpu_relax();
-				inc.head = ACCESS_ONCE(lock->tickets.head);
+				inc.head = READ_ONCE(lock->tickets.head);
 			}
 		} while (unlikely(!count)
 			 && (count = xen_spin_wait(lock, &inc, flags)));
@@ -121,7 +121,7 @@ static __always_inline void __ticket_spin_lock_flags(arch_spinlock_t *lock,
 			while (inc.head != inc.tail
 			       && __spin_count_dec(count, lock)) {
 				cpu_relax();
-				inc.head = ACCESS_ONCE(lock->tickets.head);
+				inc.head = READ_ONCE(lock->tickets.head);
 			}
 		} while (unlikely(!count)
 			 && (count = xen_spin_wait(lock, &inc, flags)));
@@ -136,7 +136,7 @@ static __always_inline int __ticket_spin_trylock(arch_spinlock_t *lock)
 {
 	arch_spinlock_t old;
 
-	old.tickets = ACCESS_ONCE(lock->tickets);
+	old.tickets = READ_ONCE(lock->tickets);
 	if (old.tickets.head != old.tickets.tail)
 		return 0;
 
@@ -156,23 +156,41 @@ static __always_inline void __ticket_spin_unlock(arch_spinlock_t *lock)
 #if !defined(XEN_SPINLOCK_SOURCE) || !CONFIG_XEN_SPINLOCK_ACQUIRE_NESTING
 # undef UNLOCK_LOCK_PREFIX
 #endif
-	new = ACCESS_ONCE(lock->tickets);
+	new = READ_ONCE(lock->tickets);
 	if (new.head != new.tail)
 		xen_spin_kick(lock, new.head);
 }
 
 static inline int __ticket_spin_is_locked(arch_spinlock_t *lock)
 {
-	struct __raw_tickets tmp = ACCESS_ONCE(lock->tickets);
+	struct __raw_tickets tmp = READ_ONCE(lock->tickets);
 
 	return tmp.tail != tmp.head;
 }
 
 static inline int __ticket_spin_is_contended(arch_spinlock_t *lock)
 {
-	struct __raw_tickets tmp = ACCESS_ONCE(lock->tickets);
+	struct __raw_tickets tmp = READ_ONCE(lock->tickets);
 
 	return (__ticket_t)(tmp.tail - tmp.head) > 1;
+}
+
+static inline void __ticket_spin_unlock_wait(arch_spinlock_t *lock)
+{
+	__ticket_t head = READ_ONCE(lock->tickets.head);
+
+	for (;;) {
+		struct __raw_tickets tmp = READ_ONCE(lock->tickets);
+		/*
+		 * We need to check "unlocked" in a loop, tmp.head == head
+		 * can be false positive because of overflow.
+		 */
+		if (tmp.head == tmp.tail ||
+		    tmp.head != head)
+			break;
+
+		cpu_relax();
+	}
 }
 
 #define __arch_spin(n) __ticket_spin_##n
@@ -232,6 +250,12 @@ static inline void __byte_spin_unlock(arch_spinlock_t *lock)
 	lock->lock = 0;
 }
 
+static inline void __byte_spin_unlock_wait(arch_spinlock_t *lock)
+{
+	while (__byte_spin_is_locked(lock))
+		cpu_relax();
+}
+
 #define __arch_spin(n) __byte_spin_##n
 
 #endif /* TICKET_SHIFT */
@@ -273,13 +297,12 @@ static __always_inline void arch_spin_lock_flags(arch_spinlock_t *lock,
 	__arch_spin(lock_flags)(lock, flags);
 }
 
-#undef __arch_spin
-
-static inline void arch_spin_unlock_wait(arch_spinlock_t *lock)
+static __always_inline void arch_spin_unlock_wait(arch_spinlock_t *lock)
 {
-	while (arch_spin_is_locked(lock))
-		cpu_relax();
+	__arch_spin(unlock_wait)(lock);
 }
+
+#undef __arch_spin
 
 /*
  * Read-write spinlocks, allowing multiple readers

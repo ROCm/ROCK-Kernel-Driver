@@ -211,8 +211,8 @@ static int xen_hotplug_notifier(struct acpi_processor *pr, int event)
 		return -EOPNOTSUPP;
 	}
 
-	if (pr->apic_id == -1) {
-		pr_warn("no valid apic_id for acpi_id %#x\n", pr->acpi_id);
+	if (pr->phys_id == -1) {
+		pr_warn("no valid phys_id for acpi_id %#x\n", pr->acpi_id);
 		return -ENODATA;
 	}
 
@@ -225,7 +225,7 @@ static int xen_hotplug_notifier(struct acpi_processor *pr, int event)
 	switch (event) {
 	case HOTPLUG_TYPE_ADD:
 		op.cmd = XENPF_cpu_hotadd;
-		op.u.cpu_add.apic_id = pr->apic_id;
+		op.u.cpu_add.apic_id = pr->phys_id;
 		op.u.cpu_add.acpi_id = pr->acpi_id;
 		op.u.cpu_add.pxm = pxm;
 		ret = HYPERVISOR_platform_op(&op);

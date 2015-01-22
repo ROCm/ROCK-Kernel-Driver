@@ -455,6 +455,7 @@ void scsiback_emulation_init(void)
 	NO_EMULATE(EXCHANGE_MEDIUM);       /*0xa6*/ /* ch */
 	/*NO_EMULATE(READ_12);               *//*0xa8*/
 	/*NO_EMULATE(WRITE_12);              *//*0xaa*/
+	/*NO_EMULATE(SERVICE_ACTION_IN_12);  *//*0xab*/
 	/*NO_EMULATE(WRITE_VERIFY_12);       *//*0xae*/
 	/*NO_EMULATE(SEARCH_HIGH_12);        *//*0xb0*/
 	/*NO_EMULATE(SEARCH_EQUAL_12);       *//*0xb1*/
@@ -465,7 +466,7 @@ void scsiback_emulation_init(void)
 	NO_EMULATE(READ_16);               /*0x88*/ /* sd >2TB */
 	NO_EMULATE(WRITE_16);              /*0x8a*/ /* sd >2TB */
 	NO_EMULATE(VERIFY_16);	           /*0x8f*/
-	NO_EMULATE(SERVICE_ACTION_IN);     /*0x9e*/ /* sd >2TB */
+	NO_EMULATE(SERVICE_ACTION_IN_16);  /*0x9e*/ /* sd >2TB */
 
 /* st: QFA_REQUEST_BLOCK, QFA_SEEK_BLOCK might be needed ? */
 	/*

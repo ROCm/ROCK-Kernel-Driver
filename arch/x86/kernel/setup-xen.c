@@ -1138,6 +1138,8 @@ void __init setup_arch(char **cmdline_p)
 	init_mm.end_data = (unsigned long) _edata;
 	init_mm.brk = _brk_end;
 
+	mpx_mm_init(&init_mm);
+
 	code_resource.start = __pa_symbol(_text);
 	code_resource.end = __pa_symbol(_etext)-1;
 	data_resource.start = __pa_symbol(_etext);
@@ -1401,9 +1403,7 @@ void __init setup_arch(char **cmdline_p)
 
 	tboot_probe();
 
-#ifdef CONFIG_X86_64
 	map_vsyscall();
-#endif
 
 #ifdef CONFIG_XEN
 #ifdef CONFIG_KEXEC
@@ -1514,7 +1514,7 @@ void __init setup_arch(char **cmdline_p)
 		} else if (!WARN_ON(xen_start_info->mfn_list
 				    < __START_KERNEL_map))
 #endif
-			free_bootmem(__pa(xen_start_info->mfn_list),
+			free_bootmem(__pa_symbol(xen_start_info->mfn_list),
 				     PFN_PHYS(PFN_UP(xen_start_info->nr_pages *
 						     sizeof(unsigned long))));
 

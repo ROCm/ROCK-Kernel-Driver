@@ -131,7 +131,7 @@ ENTRY(hypercall_page)
 
 #define HYPERCALL(n) \
 	.equ HYPERVISOR_##n, hypercall_page + __HYPERVISOR_##n * 32; \
-	.type HYPERVISOR_##n, function; .size HYPERVISOR_##n, 32
+	.type HYPERVISOR_##n, @function; .size HYPERVISOR_##n, 32
 #include <asm/xen-hypercalls.h>
 #undef HYPERCALL
 

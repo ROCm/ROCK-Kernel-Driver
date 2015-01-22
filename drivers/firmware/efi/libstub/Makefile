@@ -23,4 +23,6 @@ GCOV_PROFILE			:= n
 lib-y				:= efi-stub-helper.o
 lib-$(CONFIG_EFI_ARMSTUB)	+= arm-stub.o fdt.o
 
+disabled-obj-$(CONFIG_XEN)	:= efi-stub-*.o
+
 CFLAGS_fdt.o			+= -I$(srctree)/scripts/dtc/libfdt/

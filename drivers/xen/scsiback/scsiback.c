@@ -44,6 +44,7 @@
 #include <scsi/scsi_device.h>
 #include <scsi/scsi_dbg.h>
 #include <scsi/scsi_eh.h>
+#include <scsi/sg.h>
 
 #include "common.h"
 
@@ -208,7 +209,8 @@ static void scsiback_print_status(char *sense_buffer, int errors,
 	       host_byte(errors), driver_byte(errors));
 
 	if (CHECK_CONDITION & status_byte(errors))
-		__scsi_print_sense("scsiback", sense_buffer, SCSI_SENSE_BUFFERSIZE);
+		__scsi_print_sense(sdev, "scsiback", sense_buffer,
+				   SCSI_SENSE_BUFFERSIZE);
 }
 
 
@@ -490,14 +492,18 @@ int scsiback_cmd_exec(pending_req_t *pending_req)
 static void scsiback_device_reset_exec(pending_req_t *pending_req)
 {
 	struct vscsibk_info *info = pending_req->info;
-	int err;
+	int err, op = SG_SCSI_RESET_DEVICE;
 	struct scsi_device *sdev = pending_req->sdev;
+	mm_segment_t old_fs = get_fs();
 
 	scsiback_get(info);
-	err = scsi_reset_provider(sdev, SCSI_TRY_RESET_DEVICE);
 
-	scsiback_do_resp_with_sense(NULL, err, 0, pending_req,
-				    VSCSIIF_ACT_SCSI_RESET);
+	set_fs(KERNEL_DS);
+	err = scsi_ioctl_reset(sdev, (typeof(op) __force __user *)&op);
+	set_fs(old_fs);
+
+	scsiback_do_resp_with_sense(NULL, err ? FAILED : SUCCESS, 0,
+				    pending_req, VSCSIIF_ACT_SCSI_RESET);
 	scsiback_put(info);
 
 	return;

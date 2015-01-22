@@ -17,6 +17,7 @@
  */
 #undef __XEN_PUBLIC_XEN_H__
 #undef __XEN_PUBLIC_GRANT_TABLE_H__
+#undef __XEN_PUBLIC_MEMORY_H__
 #undef __XEN_TOOLS__
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -318,7 +319,7 @@ EXPORT_SYMBOL_GPL(xen_guest_blkif_protocol);
 	domctl.v##ver.interface_version = ver;				\
 	/* domctl.v##ver.domain = 0; */					\
 	domctl.v##ver.vcpu_affinity.vcpu = smp_processor_id();		\
-	domctl.v##ver.vcpu_affinity.flags = 1/*XEN_VCPUAFFINITY_HARD*/;	\
+	domctl.v##ver.vcpu_affinity.flags = XEN_VCPUAFFINITY_HARD;	\
 	domctl.v##ver.vcpu_affinity.cpumap_hard.nr_cpus = nr;		\
 	set_xen_guest_handle(domctl.v##ver.vcpu_affinity.cpumap_hard.bitmap, \
 			     mask);					\

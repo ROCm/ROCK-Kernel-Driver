@@ -312,6 +312,7 @@ typedef uint16_t grant_status_t;
 #define GNTTABOP_get_status_frames    9
 #define GNTTABOP_get_version          10
 #define GNTTABOP_swap_grant_ref	      11
+#define GNTTABOP_cache_flush	      12
 #endif /* __XEN_INTERFACE_VERSION__ */
 /* ` } */
 
@@ -587,6 +588,26 @@ struct gnttab_swap_grant_ref {
 };
 typedef struct gnttab_swap_grant_ref gnttab_swap_grant_ref_t;
 DEFINE_XEN_GUEST_HANDLE(gnttab_swap_grant_ref_t);
+
+/*
+ * Issue one or more cache maintenance operations on a portion of a
+ * page granted to the calling domain by a foreign domain.
+ */
+struct gnttab_cache_flush {
+    union {
+        uint64_t dev_bus_addr;
+        grant_ref_t ref;
+    } a;
+    uint16_t offset; /* offset from start of grant */
+    uint16_t length; /* size within the grant */
+#define GNTTAB_CACHE_CLEAN          (1<<0)
+#define GNTTAB_CACHE_INVAL          (1<<1)
+#define GNTTAB_CACHE_SOURCE_GREF    (1<<31)
+    uint32_t op;
+};
+DEFINE_GUEST_HANDLE_STRUCT(gnttab_cache_flush);
+typedef struct gnttab_cache_flush gnttab_cache_flush_t;
+DEFINE_XEN_GUEST_HANDLE(gnttab_cache_flush_t);
 
 #endif /* __XEN_INTERFACE_VERSION__ */
 

@@ -542,7 +542,7 @@ static void pgd_ctor(struct mm_struct *mm, pgd_t *pgd)
 				KERNEL_PGD_PTRS);
 	}
 
-#ifdef CONFIG_X86_64
+#ifdef CONFIG_X86_VSYSCALL_EMULATION
 	/* set level3_user_pgt for vsyscall area */
 	__user_pgd(pgd)[pgd_index(VSYSCALL_ADDR)] =
 		__pgd(__pa_symbol(level3_user_pgt) | _PAGE_TABLE);
@@ -970,7 +970,9 @@ void xen_set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t flags)
 #ifdef CONFIG_X86_64
 	extern pte_t level1_fixmap_pgt[PTRS_PER_PTE];
 
+#ifdef CONFIG_X86_VSYSCALL_EMULATION
 	case VSYSCALL_PAGE:
+#endif
 	case PVCLOCK_FIXMAP_BEGIN ... PVCLOCK_FIXMAP_END:
 		pte = pfn_pte(phys >> PAGE_SHIFT, flags);
 		set_pte_vaddr_pud(level3_user_pgt, address, pte);

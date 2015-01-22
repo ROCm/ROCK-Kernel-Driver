@@ -297,11 +297,9 @@ unsigned int xen_spin_wait(arch_spinlock_t *lock, struct __raw_tickets *ptok,
 		}
 
 #if CONFIG_XEN_SPINLOCK_ACQUIRE_NESTING
-		if (upcall_mask > flags) {
-			spinning.irq_count = __this_cpu_read(_irq_count);
-			smp_wmb();
-			arch_local_irq_restore(flags);
-		}
+		spinning.irq_count = __this_cpu_read(_irq_count);
+		smp_wmb();
+		arch_local_irq_restore(flags);
 #endif
 
 		if (!test_evtchn(__this_cpu_read(poll_evtchn)) &&

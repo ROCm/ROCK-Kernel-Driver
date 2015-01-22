@@ -164,7 +164,6 @@ static struct page *i8xx_alloc_pages(void)
 		__free_pages(page, 2);
 		return NULL;
 	}
-	get_page(page);
 	atomic_inc(&agp_bridge->current_memory_agp);
 	return page;
 }
@@ -178,7 +177,6 @@ static void i8xx_destroy_pages(struct page *page)
 #ifdef CONFIG_XEN
 	xen_destroy_contiguous_region((unsigned long)page_address(page), 2);
 #endif
-	put_page(page);
 	__free_pages(page, 2);
 	atomic_dec(&agp_bridge->current_memory_agp);
 }
@@ -318,7 +316,6 @@ static int intel_gtt_setup_scratch_page(void)
 	page = alloc_page(GFP_KERNEL | GFP_DMA32 | __GFP_ZERO);
 	if (page == NULL)
 		return -ENOMEM;
-	get_page(page);
 	set_pages_uc(page, 1);
 
 	if (intel_private.needs_dmar) {
@@ -578,7 +575,6 @@ static void intel_gtt_teardown_scratch_page(void)
 	set_pages_wb(intel_private.scratch_page, 1);
 	pci_unmap_page(intel_private.pcidev, intel_private.scratch_page_dma,
 		       PAGE_SIZE, PCI_DMA_BIDIRECTIONAL);
-	put_page(intel_private.scratch_page);
 	__free_page(intel_private.scratch_page);
 }
 
@@ -1460,5 +1456,5 @@ void intel_gmch_remove(void)
 }
 EXPORT_SYMBOL(intel_gmch_remove);
 
-MODULE_AUTHOR("Dave Jones <davej@redhat.com>");
+MODULE_AUTHOR("Dave Jones, Various @Intel");
 MODULE_LICENSE("GPL and additional rights");

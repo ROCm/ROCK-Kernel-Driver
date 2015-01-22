@@ -5,10 +5,11 @@ struct timespec;
 void xen_read_wallclock(struct timespec *);
 int xen_write_wallclock(const struct timespec *);
 
+struct timespec64;
 #ifdef CONFIG_XEN_PRIVILEGED_GUEST
-int xen_update_wallclock(const struct timespec *);
+int xen_update_wallclock(const struct timespec64 *);
 #else
-static inline int xen_update_wallclock(const struct timespec *tv) {
+static inline int xen_update_wallclock(const struct timespec64 *ts) {
 	return -EPERM;
 }
 #endif

@@ -544,7 +544,7 @@ DECLARE_HVM_SAVE_TYPE(MTRR, 14, struct hvm_hw_mtrr);
  */
 
 struct hvm_hw_cpu_xsave {
-    uint64_t xfeature_mask;
+    uint64_t xfeature_mask;        /* Ignored */
     uint64_t xcr0;                 /* Updated by XSETBV */
     uint64_t xcr0_accum;           /* Updated by XSETBV */
     struct {
@@ -568,6 +568,7 @@ struct hvm_hw_cpu_xsave {
 struct hvm_viridian_domain_context {
     uint64_t hypercall_gpa;
     uint64_t guest_os_id;
+    uint64_t time_ref_count;
 };
 
 DECLARE_HVM_SAVE_TYPE(VIRIDIAN_DOMAIN, 15, struct hvm_viridian_domain_context);
@@ -592,9 +593,27 @@ struct hvm_tsc_adjust {
 
 DECLARE_HVM_SAVE_TYPE(TSC_ADJUST, 19, struct hvm_tsc_adjust);
 
+
+struct hvm_msr {
+    uint32_t count;
+    struct hvm_one_msr {
+        uint32_t index;
+        uint32_t _rsvd;
+        uint64_t val;
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
+    } msr[];
+#elif defined(__GNUC__)
+    } msr[0];
+#else
+    } msr[1 /* variable size */];
+#endif
+};
+
+#define CPU_MSR_CODE  20
+
 /* 
  * Largest type-code in use
  */
-#define HVM_SAVE_CODE_MAX 19
+#define HVM_SAVE_CODE_MAX 20
 
 #endif /* __XEN_PUBLIC_HVM_SAVE_X86_H__ */

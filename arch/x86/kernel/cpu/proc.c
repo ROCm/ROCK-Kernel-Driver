@@ -76,7 +76,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	if (c->x86_mask || c->cpuid_level >= 0)
 		seq_printf(m, "stepping\t: %d\n", c->x86_mask);
 	else
-		seq_printf(m, "stepping\t: unknown\n");
+		seq_puts(m, "stepping\t: unknown\n");
 #ifndef CONFIG_XEN
 	if (c->microcode)
 		seq_printf(m, "microcode\t: 0x%x\n", c->microcode);
@@ -98,12 +98,12 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	show_cpuinfo_core(m, c, cpu);
 	show_cpuinfo_misc(m, c);
 
-	seq_printf(m, "flags\t\t:");
+	seq_puts(m, "flags\t\t:");
 	for (i = 0; i < 32*NCAPINTS; i++)
 		if (cpu_has(c, i) && x86_cap_flags[i] != NULL)
 			seq_printf(m, " %s", x86_cap_flags[i]);
 
-	seq_printf(m, "\nbugs\t\t:");
+	seq_puts(m, "\nbugs\t\t:");
 	for (i = 0; i < 32*NBUGINTS; i++) {
 		unsigned int bug_bit = 32*NCAPINTS + i;
 
@@ -124,7 +124,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	seq_printf(m, "address sizes\t: %u bits physical, %u bits virtual\n",
 		   c->x86_phys_bits, c->x86_virt_bits);
 
-	seq_printf(m, "power management:");
+	seq_puts(m, "power management:");
 	for (i = 0; i < 32; i++) {
 		if (c->x86_power & (1 << i)) {
 			if (i < ARRAY_SIZE(x86_power_flags) &&
@@ -137,7 +137,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		}
 	}
 
-	seq_printf(m, "\n\n");
+	seq_puts(m, "\n\n");
 
 	return 0;
 }

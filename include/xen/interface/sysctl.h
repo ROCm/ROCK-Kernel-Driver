@@ -34,7 +34,7 @@
 #include "xen.h"
 #include "domctl.h"
 
-#define XEN_SYSCTL_INTERFACE_VERSION 0x0000000A
+#define XEN_SYSCTL_INTERFACE_VERSION 0x0000000B
 
 /*
  * Read console content from Xen buffer ring.
@@ -226,13 +226,17 @@ struct pm_cx_stat {
     uint64_aligned_t idle_time;                 /* idle time from boot */
     XEN_GUEST_HANDLE_64(uint64) triggers;    /* Cx trigger counts */
     XEN_GUEST_HANDLE_64(uint64) residencies; /* Cx residencies */
-    uint64_aligned_t pc2;
-    uint64_aligned_t pc3;
-    uint64_aligned_t pc6;
-    uint64_aligned_t pc7;
-    uint64_aligned_t cc3;
-    uint64_aligned_t cc6;
-    uint64_aligned_t cc7;
+    uint32_t nr_pc;                          /* entry nr in pc[] */
+    uint32_t nr_cc;                          /* entry nr in cc[] */
+    /*
+     * These two arrays may (and generally will) have unused slots; slots not
+     * having a corresponding hardware register will not be written by the
+     * hypervisor. It is therefore up to the caller to put a suitable sentinel
+     * into all slots before invoking the function.
+     * Indexing is 1-biased (PC1/CC1 being at index 0).
+     */
+    XEN_GUEST_HANDLE_64(uint64) pc;
+    XEN_GUEST_HANDLE_64(uint64) cc;
 };
 
 struct xen_sysctl_get_pmstat {
@@ -632,6 +636,24 @@ struct xen_sysctl_coverage_op {
 typedef struct xen_sysctl_coverage_op xen_sysctl_coverage_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_coverage_op_t);
 
+#define XEN_SYSCTL_PSR_CMT_get_total_rmid            0
+#define XEN_SYSCTL_PSR_CMT_get_l3_upscaling_factor   1
+/* The L3 cache size is returned in KB unit */
+#define XEN_SYSCTL_PSR_CMT_get_l3_cache_size         2
+#define XEN_SYSCTL_PSR_CMT_enabled                   3
+struct xen_sysctl_psr_cmt_op {
+    uint32_t cmd;       /* IN: XEN_SYSCTL_PSR_CMT_* */
+    uint32_t flags;     /* padding variable, may be extended for future use */
+    union {
+        uint64_t data;  /* OUT */
+        struct {
+            uint32_t cpu;   /* IN */
+            uint32_t rsvd;
+        } l3_cache;
+    } u;
+};
+typedef struct xen_sysctl_psr_cmt_op xen_sysctl_psr_cmt_op_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_psr_cmt_op_t);
 
 struct xen_sysctl {
     uint32_t cmd;
@@ -654,6 +676,7 @@ struct xen_sysctl {
 #define XEN_SYSCTL_cpupool_op                    18
 #define XEN_SYSCTL_scheduler_op                  19
 #define XEN_SYSCTL_coverage_op                   20
+#define XEN_SYSCTL_psr_cmt_op                    21
     uint32_t interface_version; /* XEN_SYSCTL_INTERFACE_VERSION */
     union {
         struct xen_sysctl_readconsole       readconsole;
@@ -675,6 +698,7 @@ struct xen_sysctl {
         struct xen_sysctl_cpupool_op        cpupool_op;
         struct xen_sysctl_scheduler_op      scheduler_op;
         struct xen_sysctl_coverage_op       coverage_op;
+        struct xen_sysctl_psr_cmt_op        psr_cmt_op;
         uint8_t                             pad[128];
     } u;
 };

@@ -434,12 +434,15 @@ pte_t * __init populate_extra_pte(unsigned long vaddr)
  * Create large page table mappings for a range of physical addresses.
  */
 static void __init __init_extra_mapping(unsigned long phys, unsigned long size,
-						pgprot_t prot)
+					enum page_cache_mode cache)
 {
 	pgd_t *pgd;
 	pud_t *pud;
 	pmd_t *pmd;
+	pgprot_t prot;
 
+	pgprot_val(prot) = pgprot_val(PAGE_KERNEL_LARGE) |
+		pgprot_val(pgprot_4k_2_large(cachemode2pgprot(cache)));
 	BUG_ON((phys & ~PMD_MASK) || (size & ~PMD_MASK));
 	for (; size; phys += PMD_SIZE, size -= PMD_SIZE) {
 		pgd = pgd_offset_k((unsigned long)__va(phys));
@@ -462,12 +465,12 @@ static void __init __init_extra_mapping(unsigned long phys, unsigned long size,
 
 void __init init_extra_mapping_wb(unsigned long phys, unsigned long size)
 {
-	__init_extra_mapping(phys, size, PAGE_KERNEL_LARGE);
+	__init_extra_mapping(phys, size, _PAGE_CACHE_MODE_WB);
 }
 
 void __init init_extra_mapping_uc(unsigned long phys, unsigned long size)
 {
-	__init_extra_mapping(phys, size, PAGE_KERNEL_LARGE_NOCACHE);
+	__init_extra_mapping(phys, size, _PAGE_CACHE_MODE_UC);
 }
 
 /*
@@ -772,7 +775,7 @@ RESERVE_BRK(kernel_pgt_alloc,
 
 void __init xen_init_pt(void)
 {
-	unsigned long addr, *page, end, size, pmd_pa, pte_pa;
+	unsigned long addr, *page, end, pmd_sz, pmd_pa, pte_sz, pte_pa;
 	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte;
@@ -840,7 +843,7 @@ void __init xen_init_pt(void)
 
 	/* Construct 1:1 mapping of the initial allocation. */
 	pud = extend_brk(PAGE_SIZE, PAGE_SIZE);
-	addr = __pa(pud);
+	addr = __pa_symbol(pud);
 	printk(KERN_DEBUG "BRK [%#010lx, %#010lx] PUD\n",
 	       addr, addr + PAGE_SIZE - 1);
 	init_level4_pgt[pgd_index(PAGE_OFFSET)] = __pgd(addr | _PAGE_TABLE);
@@ -849,23 +852,23 @@ void __init xen_init_pt(void)
 		     != pgd_index(PAGE_OFFSET - __START_KERNEL_map - 1));
 	BUILD_BUG_ON(pmd_index(__START_KERNEL_map));
 
-	end = __pa(xen_start_info->pt_base)
+	end = __pa_symbol(xen_start_info->pt_base)
 	      + (xen_start_info->nr_pt_frames << PAGE_SHIFT);
-	size = ((end + PUD_SIZE - 1) >> PUD_SHIFT) << PAGE_SHIFT;
-	pmd = extend_brk(size, PAGE_SIZE);
-	pmd_pa = __pa(pmd);
+	pmd_sz = ((end + PUD_SIZE - 1) >> PUD_SHIFT) << PAGE_SHIFT;
+	pmd = extend_brk(pmd_sz, PAGE_SIZE);
+	pmd_pa = __pa_symbol(pmd);
 	printk(KERN_DEBUG "BRK [%#010lx, %#010lx] PMD\n",
-	       pmd_pa, pmd_pa + size - 1);
+	       pmd_pa, pmd_pa + pmd_sz - 1);
 	for (addr = 0; addr < end; addr += PUD_SIZE)
 		pud[pud_index(PAGE_OFFSET + addr)]
 			= __pud((pmd_pa + (addr >> (PUD_SHIFT - PAGE_SHIFT)))
 				| _PAGE_TABLE);
 
-	size = ((end + PMD_SIZE - 1) >> PMD_SHIFT) << PAGE_SHIFT;
-	pte = extend_brk(size, PAGE_SIZE);
-	pte_pa = __pa(pte);
+	pte_sz = ((end + PMD_SIZE - 1) >> PMD_SHIFT) << PAGE_SHIFT;
+	pte = extend_brk(pte_sz, PAGE_SIZE);
+	pte_pa = __pa_symbol(pte);
 	printk(KERN_DEBUG "BRK [%#010lx, %#010lx] PTE\n",
-	       pte_pa, pte_pa + size - 1);
+	       pte_pa, pte_pa + pte_sz - 1);
 	for (addr = 0; addr < end; addr += PMD_SIZE) {
 		unsigned int i;
 		unsigned long pa = pte_pa + (addr >> (PMD_SHIFT - PAGE_SHIFT));
@@ -877,8 +880,9 @@ void __init xen_init_pt(void)
 		for (i = 0; i < PTRS_PER_PTE; ++i, ++pte) {
 			pa = addr + (i << PAGE_SHIFT);
 			*pte = make_readonly(pa)
-			       || pa == __pa(pud) || pa == __pa(pmd)
-			       || (pa >= pte_pa && pa < pte_pa + size)
+			       || pa == __pa_symbol(pud)
+			       || (pa >= pmd_pa && pa < pmd_pa + pmd_sz)
+			       || (pa >= pte_pa && pa < pte_pa + pte_sz)
 			       ? pte_wrprotect(pte_k[i]) : pte_k[i];
 		}
 		early_make_page_readonly(pte - PTRS_PER_PTE,
@@ -895,8 +899,10 @@ void __init xen_init_pt(void)
 				 XENFEAT_writable_page_tables);
 	early_make_page_readonly(level3_kernel_pgt,
 				 XENFEAT_writable_page_tables);
+#ifdef CONFIG_X86_VSYSCALL_EMULATION
 	early_make_page_readonly(level3_user_pgt,
 				 XENFEAT_writable_page_tables);
+#endif
 	early_make_page_readonly(level2_fixmap_pgt,
 				 XENFEAT_writable_page_tables);
 	early_make_page_readonly(level1_fixmap_pgt,
@@ -920,7 +926,7 @@ void __init xen_finish_init_mapping(void)
 	if (!xen_feature(XENFEAT_auto_translated_physmap)
 	    && xen_start_info->mfn_list >= __START_KERNEL_map)
 		phys_to_machine_mapping =
-			__va(__pa(xen_start_info->mfn_list));
+			__va(__pa_symbol(xen_start_info->mfn_list));
 
 	/* Unpin the no longer used Xen provided page tables. */
 	mmuext.cmd = MMUEXT_UNPIN_TABLE;
@@ -1572,67 +1578,16 @@ int kern_addr_valid(unsigned long addr)
 	return pfn_valid(pte_pfn(*pte));
 }
 
-/*
- * A pseudo VMA to allow ptrace access for the vsyscall page.  This only
- * covers the 64bit vsyscall page now. 32bit has a real VMA now and does
- * not need special handling anymore:
- */
-static const char *gate_vma_name(struct vm_area_struct *vma)
-{
-	return "[vsyscall]";
-}
-static struct vm_operations_struct gate_vma_ops = {
-	.name = gate_vma_name,
-};
-static struct vm_area_struct gate_vma = {
-	.vm_start	= VSYSCALL_ADDR,
-	.vm_end		= VSYSCALL_ADDR + PAGE_SIZE,
-	.vm_page_prot	= PAGE_READONLY_EXEC,
-	.vm_flags	= VM_READ | VM_EXEC,
-	.vm_ops		= &gate_vma_ops,
-};
-
-struct vm_area_struct *get_gate_vma(struct mm_struct *mm)
-{
-#ifdef CONFIG_IA32_EMULATION
-	if (!mm || mm->context.ia32_compat)
-		return NULL;
-#endif
-	return &gate_vma;
-}
-
-int in_gate_area(struct mm_struct *mm, unsigned long addr)
-{
-	struct vm_area_struct *vma = get_gate_vma(mm);
-
-	if (!vma)
-		return 0;
-
-	return (addr >= vma->vm_start) && (addr < vma->vm_end);
-}
-
-/*
- * Use this when you have no reliable mm, typically from interrupt
- * context. It is less reliable than using a task's mm and may give
- * false positives.
- */
-int in_gate_area_no_mm(unsigned long addr)
-{
-	return (addr & PAGE_MASK) == VSYSCALL_ADDR;
-}
-
 #ifdef CONFIG_MEMORY_HOTPLUG_SPARSE
 static unsigned long probe_memory_block_size(void)
 {
 	/* start from 2g */
 	unsigned long bz = 1UL<<31;
 
-#ifdef CONFIG_X86_UV
-	if (is_uv_system()) {
-		printk(KERN_INFO "UV: memory block size 2GB\n");
+	if (totalram_pages >= (64ULL << (30 - PAGE_SHIFT))) {
+		pr_info("Using 2GB memory block size for large-memory system\n");
 		return 2UL * 1024 * 1024 * 1024;
 	}
-#endif
 
 	/* less than 64g installed */
 	if ((max_pfn << PAGE_SHIFT) < (16UL << 32))

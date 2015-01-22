@@ -432,7 +432,7 @@ void oprofile_add_pc(unsigned long pc, int is_kernel, unsigned long event)
  */
 void oprofile_add_mode(int cpu_mode)
 {
-	struct oprofile_cpu_buffer *cpu_buf = &__get_cpu_var(op_cpu_buffer);
+	struct oprofile_cpu_buffer *cpu_buf = this_cpu_ptr(&op_cpu_buffer);
 
 	if (op_add_code(cpu_buf, 1, cpu_mode, current))
 		cpu_buf->sample_lost_overflow++;

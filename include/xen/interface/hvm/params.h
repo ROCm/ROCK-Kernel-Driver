@@ -61,9 +61,46 @@
 #define HVM_PARAM_BUFPIOREQ_PFN	9
 
 #elif defined(__i386__) || defined(__x86_64__)
-
-/* Expose Viridian interfaces to this HVM guest? */
+/*
+ * Viridian enlightenments
+ *
+ * (See http://download.microsoft.com/download/A/B/4/AB43A34E-BDD0-4FA6-BDEF-79EEF16E880B/Hypervisor%20Top%20Level%20Functional%20Specification%20v4.0.docx)
+ *
+ * To expose viridian enlightenments to the guest set this parameter
+ * to the desired feature mask. The base feature set must be present
+ * in any valid feature mask.
+ */
 #define HVM_PARAM_VIRIDIAN     9
+
+/* Base+Freq viridian feature sets:
+ *
+ * - Hypercall MSRs (HV_X64_MSR_GUEST_OS_ID and HV_X64_MSR_HYPERCALL)
+ * - APIC access MSRs (HV_X64_MSR_EOI, HV_X64_MSR_ICR and HV_X64_MSR_TPR)
+ * - Virtual Processor index MSR (HV_X64_MSR_VP_INDEX)
+ * - Timer frequency MSRs (HV_X64_MSR_TSC_FREQUENCY and
+ *   HV_X64_MSR_APIC_FREQUENCY)
+ */
+#define _HVMPV_base_freq 0
+#define HVMPV_base_freq  (1 << _HVMPV_base_freq)
+
+/* Feature set modifications */
+
+/* Disable timer frequency MSRs (HV_X64_MSR_TSC_FREQUENCY and
+ * HV_X64_MSR_APIC_FREQUENCY).
+ * This modification restores the viridian feature set to the
+ * original 'base' set exposed in releases prior to Xen 4.4.
+ */
+#define _HVMPV_no_freq 1
+#define HVMPV_no_freq  (1 << _HVMPV_no_freq)
+
+/* Enable Partition Time Reference Counter (HV_X64_MSR_TIME_REF_COUNT) */
+#define _HVMPV_time_ref_count 2
+#define HVMPV_time_ref_count  (1 << _HVMPV_time_ref_count)
+
+#define HVMPV_feature_mask \
+	(HVMPV_base_freq | \
+	 HVMPV_no_freq | \
+	 HVMPV_time_ref_count)
 
 #endif
 
@@ -151,6 +188,12 @@
 /* SHUTDOWN_* action in case of a triple fault */
 #define HVM_PARAM_TRIPLE_FAULT_REASON 31
 
-#define HVM_NR_PARAMS          32
+#define HVM_PARAM_IOREQ_SERVER_PFN 32
+#define HVM_PARAM_NR_IOREQ_SERVER_PAGES 33
+
+/* Location of the VM Generation ID in guest physical address space. */
+#define HVM_PARAM_VM_GENERATION_ID_ADDR 34
+
+#define HVM_NR_PARAMS          35
 
 #endif /* __XEN_PUBLIC_HVM_PARAMS_H__ */

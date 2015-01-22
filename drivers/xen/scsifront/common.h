@@ -112,8 +112,8 @@ struct vscsifrnt_info {
 	struct task_struct *kthread;
 	wait_queue_head_t wq;
 	wait_queue_head_t wq_sync;
-	unsigned int waiting_resp:1;
-	unsigned int waiting_sync:1;
+	unsigned char waiting_resp;
+	unsigned char waiting_sync;
 
 	struct {
 		struct scsi_cmnd *sc;

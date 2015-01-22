@@ -94,7 +94,7 @@ static inline unsigned long idx_to_kaddr(struct xen_netbk *netbk, u16 idx)
 }
 
 /* extra field used in struct page */
-union page_ext {
+union pg_ext {
 	struct {
 #if BITS_PER_LONG < 64
 #define GROUP_WIDTH (BITS_PER_LONG - CONFIG_XEN_NETDEV_TX_SHIFT)
@@ -109,18 +109,18 @@ union page_ext {
 	void *mapping;
 };
 
-static inline void netif_set_page_ext(struct page *pg, unsigned int group,
-				      unsigned int idx)
+static inline void netif_set_pg_ext(struct page *pg, unsigned int group,
+				    unsigned int idx)
 {
-	union page_ext ext = { .e = { .grp = group + 1, .idx = idx } };
+	union pg_ext ext = { .e = { .grp = group + 1, .idx = idx } };
 
 	BUILD_BUG_ON(sizeof(ext) > sizeof(ext.mapping));
 	pg->mapping = ext.mapping;
 }
 
-#define netif_get_page_ext(pg, netbk, index) do { \
+#define netif_get_pg_ext(pg, netbk, index) do { \
 	const struct page *pg__ = (pg); \
-	union page_ext ext__ = { .mapping = pg__->mapping }; \
+	union pg_ext ext__ = { .mapping = pg__->mapping }; \
 	unsigned int grp__ = ext__.e.grp - 1; \
 	unsigned int idx__ = index = ext__.e.idx; \
 	netbk = grp__ < netbk_nr_groups ? &xen_netbk[grp__] : NULL; \
@@ -508,7 +508,7 @@ static void netbk_gop_frag(netif_t *netif, struct netbk_rx_meta *meta,
 		meta->copy++;
 		copy_gop = npo->copy + npo->copy_prod++;
 		copy_gop->flags = GNTCOPY_dest_gref;
-		netif_get_page_ext(page, netbk, idx);
+		netif_get_pg_ext(page, netbk, idx);
 		if (netbk) {
 			struct pending_tx_info *src_pend;
 			unsigned int grp;
@@ -1908,7 +1908,7 @@ static void netif_page_release(struct page *page, unsigned int order)
 	unsigned int idx;
 
 	BUG_ON(order);
-	netif_get_page_ext(page, netbk, idx);
+	netif_get_pg_ext(page, netbk, idx);
 	BUG_ON(!netbk);
 	netif_idx_release(netbk, idx);
 }
@@ -2158,7 +2158,7 @@ static int __init netback_init(void)
 		for (i = 0; i < MAX_PENDING_REQS; i++) {
 			page = netbk->tx.mmap_pages[i];
 			SetPageForeign(page, netif_page_release);
-			netif_set_page_ext(page, group, i);
+			netif_set_pg_ext(page, group, i);
 			netbk->tx.pending_ring[i] = i;
 			INIT_LIST_HEAD(&netbk->tx.pending_inuse[i].list);
 		}

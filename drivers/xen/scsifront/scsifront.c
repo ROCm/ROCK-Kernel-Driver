@@ -480,12 +480,10 @@ static int scsifront_dev_reset_handler(struct scsi_cmnd *sc)
 	uint16_t rqid;
 	int err = 0;
 
-	for (;;) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,12)
-		spin_lock_irq(host->host_lock);
+	spin_lock_irq(host->host_lock);
 #endif
-		if (!RING_FULL(&info->ring))
-			break;
+	while (RING_FULL(&info->ring)) {
 		if (err) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,12)
 			spin_unlock_irq(host->host_lock);
