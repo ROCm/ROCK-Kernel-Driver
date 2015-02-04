@@ -1169,6 +1169,17 @@ static int map_bo_to_gpuvm(struct radeon_device *rdev, struct radeon_bo *bo,
 
 	mutex_lock(&vm->mutex);
 
+	/*
+	 * The previously "released" BOs are really released and their VAs are
+	 * removed from PT. This function is called here because it requires
+	 * the radeon_vm::mutex to be locked and PT to be reserved
+	 */
+	ret = radeon_vm_clear_freed(rdev, vm);
+	if (ret != 0) {
+		pr_err("amdkfd: Failed to radeon_vm_clear_freed\n");
+		goto err_failed_vm_clear_freed;
+	}
+
 	/* Update the page tables  */
 	ret = radeon_vm_bo_update(rdev, bo_va, &bo->tbo.mem);
 	if (ret != 0) {
@@ -1183,13 +1194,11 @@ static int map_bo_to_gpuvm(struct radeon_device *rdev, struct radeon_bo *bo,
 		goto err_failed_to_update_pd;
 	}
 
-	/*
-	 * The previously "released" BOs are really released and their VAs are removed from PT
-	 * This function is called here because it requires the radeon_vm::mutex to be locked
-	 * and PT to be reserved
-	 * */
-	radeon_vm_clear_freed(rdev, vm);
-	radeon_vm_clear_invalids(rdev, vm);
+	ret = radeon_vm_clear_invalids(rdev, vm);
+	if (ret != 0) {
+		pr_err("amdkfd: Failed to radeon_vm_clear_invalids\n");
+		goto err_failed_to_vm_clear_invalids;
+	}
 
 	mutex_unlock(&vm->mutex);
 
@@ -1198,9 +1207,11 @@ static int map_bo_to_gpuvm(struct radeon_device *rdev, struct radeon_bo *bo,
 
 	return 0;
 
+err_failed_to_vm_clear_invalids:
 err_failed_to_update_pd:
 	radeon_vm_bo_update(rdev, bo_va, NULL);
 err_failed_to_update_pts:
+err_failed_vm_clear_freed:
 	mutex_unlock(&vm->mutex);
 	ttm_eu_backoff_reservation(&ticket, &list);
 err_failed_to_ttm_reserve:
