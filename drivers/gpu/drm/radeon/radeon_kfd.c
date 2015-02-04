@@ -972,13 +972,18 @@ static int add_bo_to_vm(struct radeon_device *rdev, uint64_t va, struct radeon_v
 	*bo_va = radeon_vm_bo_add(rdev, rvm, bo);
 	if (bo_va == NULL) {
 		ret = -EINVAL;
+		pr_err("amdkfd: Failed to add BO object to VM. ret == %d\n",
+				ret);
 		goto err_vmadd;
 	}
 
 	/* Set virtual address for the allocation, allocate PTs, if needed, and zero them */
 	ret = radeon_vm_bo_set_addr(rdev, *bo_va, va, RADEON_VM_PAGE_READABLE | RADEON_VM_PAGE_WRITEABLE);
-	if (ret != 0)
+	if (ret != 0) {
+		pr_err("amdkfd: Failed to set virtual address for BO. ret == %d\n",
+				ret);
 		goto err_vmsetaddr;
+	}
 
 	return 0;
 
@@ -1136,14 +1141,14 @@ static int map_bo_to_gpuvm(struct radeon_device *rdev, struct radeon_bo *bo,
 	/* Pin BO*/
 	ret = try_pin_bo(bo, NULL);
 	if (ret != 0) {
-		pr_err("Failed to pin BO\n");
+		pr_err("amdkfd: Failed to pin BO\n");
 		return ret;
 	}
 
 	/* Pin PTs */
 	ret = try_pin_pts(bo_va);
 	if (ret != 0) {
-		pr_err("Failed to pin PTs\n");
+		pr_err("amdkfd: Failed to pin PTs\n");
 		goto err_failed_to_pin_pts;
 	}
 
@@ -1151,7 +1156,7 @@ static int map_bo_to_gpuvm(struct radeon_device *rdev, struct radeon_bo *bo,
 	vm_id = &vm->ids[CAYMAN_RING_TYPE_CP1_INDEX];
 	ret = try_pin_bo(vm->page_directory, &vm_id->pd_gpu_addr);
 	if (ret != 0) {
-		pr_err("Failed to pin PD\n");
+		pr_err("amdkfd: Failed to pin PD\n");
 		goto err_failed_to_pin_pd;
 	}
 
@@ -1183,14 +1188,14 @@ static int map_bo_to_gpuvm(struct radeon_device *rdev, struct radeon_bo *bo,
 	/* Update the page tables  */
 	ret = radeon_vm_bo_update(rdev, bo_va, &bo->tbo.mem);
 	if (ret != 0) {
-		pr_err("Failed to radeon_vm_bo_update\n");
+		pr_err("amdkfd: Failed to radeon_vm_bo_update\n");
 		goto err_failed_to_update_pts;
 	}
 
 	/* Update the page directory */
 	ret = radeon_vm_update_page_directory(rdev, vm);
 	if (ret != 0) {
-		pr_err("Failed to radeon_vm_update_page_directory\n");
+		pr_err("amdkfd: Failed to radeon_vm_update_page_directory\n");
 		goto err_failed_to_update_pd;
 	}
 
@@ -1247,8 +1252,11 @@ static int map_memory_to_gpu(struct kgd_dev *kgd, uint64_t va, size_t size, void
 	ret = radeon_bo_create(rdev, size, PAGE_SIZE, false,
 				RADEON_GEM_DOMAIN_VRAM,
 				0, NULL, NULL, &bo);
-	if (ret != 0)
+	if (ret != 0) {
+		pr_err("amdkfd: Failed to create BO object on VRAM. ret == %d\n",
+				ret);
 		goto err_bo_create;
+	}
 
 	ret = add_bo_to_vm(rdev, va, vm, bo, &bo_va);
 	if (ret != 0)
