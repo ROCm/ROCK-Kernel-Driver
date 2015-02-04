@@ -58,7 +58,7 @@ struct kgd_mem {
 static int add_bo_to_vm(struct radeon_device *rdev, uint64_t va, struct radeon_vm *vm,
 		struct radeon_bo *bo, struct radeon_bo_va **bo_va);
 static int map_bo_to_gpuvm(struct radeon_device *rdev, struct radeon_bo *bo,
-		struct radeon_bo_va *bo_va, struct radeon_vm *vm);
+		struct radeon_bo_va *bo_va);
 static void remove_bo_from_vm(struct radeon_device *rdev, struct radeon_bo *bo, struct radeon_bo_va *bo_va);
 
 static int alloc_gtt_mem(struct kgd_dev *kgd, size_t size,
@@ -460,7 +460,7 @@ static int open_graphic_handle(struct kgd_dev *kgd, uint64_t va, void *vm,
 		goto err_map;
 
 	/* The allocated BO, PD and appropriate PTs are pinned, virtual to MC address mapping created */
-	ret = map_bo_to_gpuvm(rdev, bo, bo_va, vm);
+	ret = map_bo_to_gpuvm(rdev, bo, bo_va);
 	if (ret != 0)
 		goto err_failed_to_pin_bo;
 
@@ -1039,11 +1039,13 @@ static int unpin_bo(struct radeon_bo *bo)
 }
 
 
-static int try_pin_pts(struct radeon_bo_va *bo_va, struct radeon_vm *vm)
+static int try_pin_pts(struct radeon_bo_va *bo_va)
 {
 	int ret;
 	uint64_t pt_idx, start, last, failed;
+	struct radeon_vm *vm;
 
+	vm = bo_va->vm;
 	start = bo_va->it.start >> radeon_vm_block_size;
 	last = bo_va->it.last >> radeon_vm_block_size;
 
@@ -1114,10 +1116,13 @@ static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 }
 
 static int map_bo_to_gpuvm(struct radeon_device *rdev, struct radeon_bo *bo,
-		struct radeon_bo_va *bo_va, struct radeon_vm *vm)
+		struct radeon_bo_va *bo_va)
 {
 	struct radeon_vm_id *vm_id;
+	struct radeon_vm *vm;
 	int ret;
+
+	vm = bo_va->vm;
 
 	/* Pin BO*/
 	ret = try_pin_bo(bo, NULL);
@@ -1127,7 +1132,7 @@ static int map_bo_to_gpuvm(struct radeon_device *rdev, struct radeon_bo *bo,
 	}
 
 	/* Pin PTs */
-	ret = try_pin_pts(bo_va, vm);
+	ret = try_pin_pts(bo_va);
 	if (ret != 0) {
 		pr_err("Failed to pin PTs\n");
 		goto err_failed_to_pin_pts;
@@ -1226,7 +1231,7 @@ static int map_memory_to_gpu(struct kgd_dev *kgd, uint64_t va, size_t size, void
 		goto err_map;
 
 	/* We need to pin the allocated BO, PD and appropriate PTs and to create a mapping of virtual to MC address */
-	ret = map_bo_to_gpuvm(rdev, bo, bo_va, vm);
+	ret = map_bo_to_gpuvm(rdev, bo, bo_va);
 	if (ret != 0)
 		goto err_failed_to_pin_bo;
 
