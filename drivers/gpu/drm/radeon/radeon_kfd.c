@@ -1121,8 +1121,17 @@ static int map_bo_to_gpuvm(struct radeon_device *rdev, struct radeon_bo *bo,
 	struct radeon_vm_id *vm_id;
 	struct radeon_vm *vm;
 	int ret;
+	struct ttm_validate_buffer tv;
+	struct radeon_bo_list *vm_bos;
+	struct ww_acquire_ctx ticket;
+	struct list_head list;
+
+	INIT_LIST_HEAD(&list);
 
 	vm = bo_va->vm;
+	tv.bo = &bo_va->bo->tbo;
+	tv.shared = true;
+	list_add(&tv.head, &list);
 
 	/* Pin BO*/
 	ret = try_pin_bo(bo, NULL);
@@ -1144,6 +1153,18 @@ static int map_bo_to_gpuvm(struct radeon_device *rdev, struct radeon_bo *bo,
 	if (ret != 0) {
 		pr_err("Failed to pin PD\n");
 		goto err_failed_to_pin_pd;
+	}
+
+	vm_bos = radeon_vm_get_bos(rdev, vm, &list);
+	if (!vm_bos) {
+		pr_err("amdkfd: Failed to get bos from vm\n");
+		goto err_failed_to_get_bos;
+	}
+
+	ret = ttm_eu_reserve_buffers(&ticket, &list, true, NULL);
+	if (ret) {
+		pr_err("amdkfd: Failed to reserve buffers in ttm\n");
+		goto err_failed_to_ttm_reserve;
 	}
 
 	mutex_lock(&vm->mutex);
@@ -1172,27 +1193,19 @@ static int map_bo_to_gpuvm(struct radeon_device *rdev, struct radeon_bo *bo,
 
 	mutex_unlock(&vm->mutex);
 
-	/* Wait for the page table update to complete. */
-	ret = reservation_object_wait_timeout_rcu(bo_va->bo->tbo.resv,
-						true, true,
-						MAX_SCHEDULE_TIMEOUT);
-	if (ret <= 0)
-		goto err_failed_to_wait;
-
-	ret = reservation_object_wait_timeout_rcu(vm->page_directory->tbo.resv,
-						true, true,
-						MAX_SCHEDULE_TIMEOUT);
-	if (ret <= 0)
-		goto err_failed_to_wait;
+	ttm_eu_backoff_reservation(&ticket, &list);
+	drm_free_large(vm_bos);
 
 	return 0;
 
-err_failed_to_wait:
-	mutex_lock(&vm->mutex);
 err_failed_to_update_pd:
 	radeon_vm_bo_update(rdev, bo_va, NULL);
 err_failed_to_update_pts:
 	mutex_unlock(&vm->mutex);
+	ttm_eu_backoff_reservation(&ticket, &list);
+err_failed_to_ttm_reserve:
+	drm_free_large(vm_bos);
+err_failed_to_get_bos:
 	unpin_bo(vm->page_directory);
 err_failed_to_pin_pd:
 	unpin_pts(bo_va, vm);
