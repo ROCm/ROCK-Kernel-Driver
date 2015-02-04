@@ -54,7 +54,7 @@ struct shadow_time_info {
 	u32 version;
 };
 static DEFINE_PER_CPU(struct shadow_time_info, shadow_time);
-static struct timespec shadow_tv;
+static struct timespec64 shadow_tv;
 static u32 shadow_tv_version;
 
 static u64 __read_mostly jiffies_bias;
@@ -150,7 +150,7 @@ static void update_wallclock(void)
 	do {
 		shadow_tv_version = s->wc_version;
 		rmb();
-		shadow_tv.tv_sec  = s->wc_sec;
+		shadow_tv.tv_sec  = s->wc_sec | ((u64)s->xen_wc_sec_hi << 32);
 		shadow_tv.tv_nsec = s->wc_nsec;
 		rmb();
 		version = s->wc_version;
@@ -163,15 +163,15 @@ static void _update_wallclock(struct work_struct *unused)
 {
 	u64 stamp;
 	unsigned int nsec;
-	struct timespec tv;
+	struct timespec64 tv;
 
 	update_wallclock();
 
 	stamp = xen_local_clock();
 	nsec = do_div(stamp, NSEC_PER_SEC);
-	set_normalized_timespec(&tv, shadow_tv.tv_sec + stamp,
-				shadow_tv.tv_nsec + nsec);
-	do_settimeofday(&tv);
+	set_normalized_timespec64(&tv, shadow_tv.tv_sec + stamp,
+				  shadow_tv.tv_nsec + nsec);
+	do_settimeofday64(&tv);
 }
 static DECLARE_WORK(update_wallclock_work, _update_wallclock);
 
@@ -222,12 +222,44 @@ static inline int time_values_up_to_date(void)
 }
 
 #ifdef CONFIG_XEN_PRIVILEGED_GUEST
+static int xen_settime(u64 sec, unsigned int nsec, u64 systime)
+{
+	static bool xen_time_64 = true;
+	struct timespec64 ts;
+	struct xen_platform_op op;
+	int rc = -ENOSYS;
+
+	set_normalized_timespec64(&ts, sec, nsec);
+
+	if (likely(xen_time_64)) {
+		op.cmd = XENPF_settime64;
+		op.u.settime64.secs        = ts.tv_sec;
+		op.u.settime64.nsecs       = ts.tv_nsec;
+		op.u.settime64.mbz         = 0;
+		op.u.settime64.system_time = systime;
+		rc = HYPERVISOR_platform_op(&op);
+	}
+/* #if CONFIG_XEN_COMPAT < 0x040600 */
+	if (rc == -ENOSYS) {
+		xen_time_64 = false;
+		op.cmd = XENPF_settime32;
+		op.u.settime32.secs        = ts.tv_sec;
+		op.u.settime32.nsecs       = ts.tv_nsec;
+		op.u.settime32.system_time = systime;
+		rc = op.u.settime32.secs == ts.tv_sec
+		     ? HYPERVISOR_platform_op(&op)
+		     : -ERANGE;
+	}
+/* #endif */
+	WARN_ON_ONCE(rc);
+	return rc;
+}
+
 int xen_update_wallclock(const struct timespec64 *ts)
 {
-	struct timespec64 now;
 	s64 nsec;
 	struct shadow_time_info *shadow;
-	struct xen_platform_op op;
+	int rc;
 
 	if (!is_initial_xendomain() || independent_wallclock)
 		return -EPERM;
@@ -245,16 +277,11 @@ int xen_update_wallclock(const struct timespec64 *ts)
 			break;
 		get_time_values_from_xen(smp_processor_id());
 	}
-	set_normalized_timespec64(&now, ts->tv_sec, nsec);
+	rc = xen_settime(ts->tv_sec, nsec, shadow->system_timestamp);
 
-	op.cmd = XENPF_settime; /* XXX need XENPF_settime64 */
-	op.u.settime.secs        = now.tv_sec;
-	op.u.settime.nsecs       = now.tv_nsec;
-	op.u.settime.system_time = shadow->system_timestamp;
-	WARN_ON(HYPERVISOR_platform_op(&op));
 	update_wallclock();
 
-	return 0;
+	return rc;
 }
 
 static void sync_xen_wallclock(unsigned long dummy);
@@ -262,20 +289,13 @@ static DEFINE_TIMER(sync_xen_wallclock_timer, sync_xen_wallclock, 0, 0);
 static void sync_xen_wallclock(unsigned long dummy)
 {
 	struct timespec now;
-	struct xen_platform_op op;
 
 	BUG_ON(!is_initial_xendomain());
 	if (!ntp_synced() || independent_wallclock)
 		return;
 
 	now = current_kernel_time();
-	set_normalized_timespec(&now, now.tv_sec, now.tv_nsec);
-
-	op.cmd = XENPF_settime;
-	op.u.settime.secs        = now.tv_sec;
-	op.u.settime.nsecs       = now.tv_nsec;
-	op.u.settime.system_time = xen_local_clock();
-	WARN_ON(HYPERVISOR_platform_op(&op));
+	xen_settime(now.tv_sec, now.tv_nsec, xen_local_clock());
 
 	update_wallclock();
 
@@ -308,18 +328,18 @@ unsigned long long xen_local_clock(void)
 void xen_read_wallclock(struct timespec *now)
 {
 	const shared_info_t *s = HYPERVISOR_shared_info;
-	u32 version, sec, nsec;
-	u64 delta;
+	u32 version, nsec;
+	u64 sec, delta;
 
 	do {
 		version = s->wc_version;
 		rmb();
-		sec     = s->wc_sec;
+		sec     = s->wc_sec | ((u64)s->xen_wc_sec_hi << 32);
 		nsec    = s->wc_nsec;
 		rmb();
 	} while ((s->wc_version & 1) | (version ^ s->wc_version));
 
-	delta = xen_local_clock() + (u64)sec * NSEC_PER_SEC + nsec;
+	delta = xen_local_clock() + sec * NSEC_PER_SEC + nsec;
 	now->tv_nsec = do_div(delta, NSEC_PER_SEC);
 	now->tv_sec = delta;
 }

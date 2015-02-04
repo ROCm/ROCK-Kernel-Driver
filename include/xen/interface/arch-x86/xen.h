@@ -227,7 +227,13 @@ struct arch_shared_info {
     /* Frame containing list of mfns containing list of mfns containing p2m. */
     xen_pfn_t     pfn_to_mfn_frame_list_list;
     unsigned long nmi_reason;
-    uint64_t pad[32];
+    unsigned long p2m_cr3;         /* cr3 value of the p2m address space */
+    unsigned long p2m_vaddr;       /* virtual address of the p2m list */
+    unsigned long p2m_generation;  /* generation count of p2m mapping */
+#ifdef __i386__
+    /* There's no room for this field in the generic structure. */
+    uint32_t wc_sec_hi;
+#endif
 };
 typedef struct arch_shared_info arch_shared_info_t;
 

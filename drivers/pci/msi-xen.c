@@ -220,7 +220,9 @@ static u64 find_table_base(struct pci_dev *dev)
 	bar = reg & PCI_MSIX_PBA_BIR;
 
 	flags = pci_resource_flags(dev, bar);
-	if (flags & (IORESOURCE_DISABLED | IORESOURCE_UNSET | IORESOURCE_BUSY))
+	if (!flags ||
+	     (flags & (IORESOURCE_DISABLED | IORESOURCE_UNSET |
+		       IORESOURCE_BUSY)))
 		return 0;
 
 	return pci_resource_start(dev, bar);

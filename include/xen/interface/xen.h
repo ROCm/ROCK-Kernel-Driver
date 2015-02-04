@@ -701,6 +701,12 @@ struct shared_info {
 	uint32_t wc_version;      /* Version counter: see vcpu_time_info_t. */
 	uint32_t wc_sec;          /* Secs  00:00:00 UTC, Jan 1, 1970.  */
 	uint32_t wc_nsec;         /* Nsecs 00:00:00 UTC, Jan 1, 1970.  */
+# if !defined(__i386__)
+	uint32_t wc_sec_hi;
+#  define xen_wc_sec_hi wc_sec_hi
+# elif !defined(__XEN__) && !defined(__XEN_TOOLS__)
+#  define xen_wc_sec_hi arch.wc_sec_hi
+# endif
 #endif
 
 	struct arch_shared_info arch;

@@ -584,15 +584,16 @@ static pci_ers_result_t pcifront_common_process( int cmd, struct pcifront_device
 {
 	pci_ers_result_t result = PCI_ERS_RESULT_NONE;
 	struct pci_driver *pdrv;
+	int domain = pdev->sh_info->aer_op.domain;
 	int bus = pdev->sh_info->aer_op.bus;
 	int devfn = pdev->sh_info->aer_op.devfn;
 	struct pci_dev *pcidev;
 
 	dev_dbg(&pdev->xdev->dev, 
-		"pcifront AER process: cmd %x (bus %x devfn %x)",
-		cmd, bus, devfn);
+		"pcifront AER process: cmd %x (%04x:%02x:%02x.%u)",
+		cmd, domain, bus, PCI_SLOT(devfn), PCI_FUNC(devfn));
 
-	pcidev = pci_get_bus_and_slot(bus, devfn);
+	pcidev = pci_get_domain_bus_and_slot(domain, bus, devfn);
 	if (!pcidev || !pcidev->driver) {
 		pci_dev_put(pcidev);
 		dev_err(&pdev->xdev->dev, "AER device or driver is NULL\n");

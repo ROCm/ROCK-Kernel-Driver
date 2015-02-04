@@ -166,35 +166,48 @@ static void scsiback_do_lun_hotplug(struct backend_info *be, int op)
 
 		switch (op) {
 		case VSCSIBACK_OP_ADD_OR_DEL_LUN:
-			if (device_state == XenbusStateInitialising) {
+			switch (device_state) {
+			case XenbusStateInitialising:
+			case XenbusStateConnected:
 				sdev = scsiback_get_scsi_device(&phy);
-				if (!sdev)
-					xenbus_printf(XBT_NIL, dev->nodename, state_str, 
-							    "%d", XenbusStateClosed);
-				else {
-					err = scsiback_add_translation_entry(be->info, sdev, &vir);
-					if (!err) {
-						if (xenbus_printf(XBT_NIL, dev->nodename, state_str, 
-								    "%d", XenbusStateInitialised)) {
-							pr_err("scsiback: xenbus_printf error %s\n",
-							       state_str);
-							scsiback_del_translation_entry(be->info, &vir);
-						}
-					} else {
-						scsi_device_put(sdev);
-						xenbus_printf(XBT_NIL, dev->nodename, state_str, 
-								    "%d", XenbusStateClosed);
-					}
+				if (!sdev) {
+					xenbus_printf(XBT_NIL, dev->nodename,
+						      state_str,
+						      "%d", XenbusStateClosed);
+					break;
 				}
-			}
+				if (scsiback_add_translation_entry(be->info,
+								sdev, &vir)) {
+					scsi_device_put(sdev);
+					if (device_state == XenbusStateConnected)
+						break;
+					xenbus_printf(XBT_NIL, dev->nodename,
+						      state_str,
+						      "%d", XenbusStateClosed);
+					break;
+				}
+				if (!xenbus_printf(XBT_NIL, dev->nodename,
+						  state_str, "%d",
+						  XenbusStateInitialised))
+					break;
+				pr_err("scsiback: xenbus_printf error %s\n",
+				       state_str);
+				scsiback_del_translation_entry(be->info, &vir);
+				break;
 
-			if (device_state == XenbusStateClosing) {
-				if (!scsiback_del_translation_entry(be->info, &vir)) {
-					if (xenbus_printf(XBT_NIL, dev->nodename, state_str, 
-							    "%d", XenbusStateClosed))
-						pr_err("scsiback: xenbus_printf error %s\n",
-						       state_str);
-				}
+			case XenbusStateClosing:
+				if (scsiback_del_translation_entry(be->info,
+								   &vir))
+					break;
+				if (xenbus_printf(XBT_NIL, dev->nodename,
+						  state_str, "%d",
+						  XenbusStateClosed))
+					pr_err("scsiback: xenbus_printf error %s\n",
+					       state_str);
+				break;
+
+			default:
+				break;
 			}
 			break;
 

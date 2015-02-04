@@ -904,6 +904,7 @@ config X86_UP_APIC
 
 config X86_UP_APIC_MSI
 	def_bool y
+	depends on !XEN_UNPRIVILEGED_GUEST
 	select X86_UP_APIC if X86_32 && !SMP && !X86_32_NON_STANDARD && PCI_MSI
 
 config X86_UP_IOAPIC

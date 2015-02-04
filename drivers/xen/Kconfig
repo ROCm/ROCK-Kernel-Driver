@@ -8,7 +8,7 @@ config XEN
 if XEN
 config XEN_INTERFACE_VERSION
 	hex
-	default 0x00040400
+	default 0x00040500
 
 menu "XEN"
 
@@ -309,6 +309,9 @@ choice
 	config XEN_COMPAT_040400_AND_LATER
 		bool "4.4.0 and later"
 
+	config XEN_COMPAT_040500_AND_LATER
+		bool "4.5.0 and later"
+
 	config XEN_COMPAT_LATEST_ONLY
 		bool "no compatibility code"
 
@@ -317,6 +320,7 @@ endchoice
 config XEN_COMPAT
 	hex
 	default 0xffffff if XEN_COMPAT_LATEST_ONLY
+	default 0x040500 if XEN_COMPAT_040500_AND_LATER
 	default 0x040400 if XEN_COMPAT_040400_AND_LATER
 	default 0x040300 if XEN_COMPAT_040300_AND_LATER
 	default 0x040200 if XEN_COMPAT_040200_AND_LATER

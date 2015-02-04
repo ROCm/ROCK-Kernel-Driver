@@ -75,7 +75,9 @@
 
 struct vscsifrnt_shadow {
 	uint16_t next_free;
-	
+#define VSCSIIF_IN_USE		0x0fff
+#define VSCSIIF_NONE		0x0ffe
+
 	/* command between backend and frontend
 	 * VSCSIIF_ACT_SCSI_CDB or VSCSIIF_ACT_SCSI_RESET */
 	unsigned char act;
@@ -112,8 +114,12 @@ struct vscsifrnt_info {
 	struct task_struct *kthread;
 	wait_queue_head_t wq;
 	wait_queue_head_t wq_sync;
+	wait_queue_head_t wq_pause;
 	unsigned char waiting_resp;
 	unsigned char waiting_sync;
+	unsigned char waiting_pause;
+	unsigned char pause;
+	unsigned callers;
 
 	struct {
 		struct scsi_cmnd *sc;
@@ -130,7 +136,7 @@ struct vscsifrnt_info {
 int scsifront_xenbus_init(void);
 void scsifront_xenbus_unregister(void);
 int scsifront_schedule(void *data);
+void scsifront_finish_all(struct vscsifrnt_info *info);
 irqreturn_t scsifront_intr(int irq, void *dev_id);
-
 
 #endif /* __XEN_DRIVERS_SCSIFRONT_H__  */

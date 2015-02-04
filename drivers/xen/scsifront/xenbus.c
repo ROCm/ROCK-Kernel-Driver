@@ -48,6 +48,20 @@ MODULE_PARM_DESC(max_segs, "Maximum number of segments per request");
 
 extern struct scsi_host_template scsifront_sht;
 
+static void scsifront_free_ring(struct vscsifrnt_info *info)
+{
+	if (info->ring_ref != GRANT_INVALID_REF) {
+		gnttab_end_foreign_access(info->ring_ref,
+					(unsigned long)info->ring.sring);
+		info->ring_ref = GRANT_INVALID_REF;
+		info->ring.sring = NULL;
+	}
+
+	if (info->irq)
+		unbind_from_irqhandler(info->irq, info);
+	info->irq = 0;
+}
+
 static void scsifront_free(struct vscsifrnt_info *info)
 {
 	struct Scsi_Host *host = info->host;
@@ -60,16 +74,7 @@ static void scsifront_free(struct vscsifrnt_info *info)
 		scsi_remove_host(info->host);
 	}
 
-	if (info->ring_ref != GRANT_INVALID_REF) {
-		gnttab_end_foreign_access(info->ring_ref,
-					(unsigned long)info->ring.sring);
-		info->ring_ref = GRANT_INVALID_REF;
-		info->ring.sring = NULL;
-	}
-
-	if (info->irq)
-		unbind_from_irqhandler(info->irq, info);
-	info->irq = 0;
+	scsifront_free_ring(info);
 
 	scsi_host_put(info->host);
 }
@@ -203,7 +208,7 @@ static int scsifront_probe(struct xenbus_device *dev,
 		init_waitqueue_head(&(info->shadow[i].wq_reset));
 		info->shadow[i].wait_reset = 0;
 	}
-	info->shadow[VSCSIIF_MAX_REQS - 1].next_free = 0x0fff;
+	info->shadow[VSCSIIF_MAX_REQS - 1].next_free = VSCSIIF_NONE;
 
 	err = scsifront_init_ring(info);
 	if (err) {
@@ -214,6 +219,11 @@ static int scsifront_probe(struct xenbus_device *dev,
 	init_waitqueue_head(&info->wq);
 	init_waitqueue_head(&info->wq_sync);
 	spin_lock_init(&info->shadow_lock);
+
+	info->pause = 0;
+	info->callers = 0;
+	info->waiting_pause = 0;
+	init_waitqueue_head(&info->wq_pause);
 
 	snprintf(name, DEFAULT_TASK_COMM_LEN, "vscsiif.%d", info->host->host_no);
 
@@ -245,6 +255,66 @@ free_sring:
 	/* free resource */
 	scsifront_free(info);
 	return err;
+}
+
+static int scsifront_resume(struct xenbus_device *dev)
+{
+	struct vscsifrnt_info *info = dev->dev.driver_data;
+	struct Scsi_Host *host = info->host;
+	int err;
+
+	spin_lock_irq(host->host_lock);
+
+	/* finish all still pending commands */
+	scsifront_finish_all(info);
+
+	spin_unlock_irq(host->host_lock);
+
+	/* reconnect to dom0 */
+	scsifront_free_ring(info);
+	err = scsifront_init_ring(info);
+	if (err) {
+		dev_err(&dev->dev, "fail to resume %d\n", err);
+		scsifront_free(info);
+		return err;
+	}
+
+	xenbus_switch_state(dev, XenbusStateInitialised);
+
+	return 0;
+}
+
+static int scsifront_suspend(struct xenbus_device *dev)
+{
+	struct vscsifrnt_info *info = dev->dev.driver_data;
+	struct Scsi_Host *host = info->host;
+	int err = 0;
+
+	/* no new commands for the backend */
+	spin_lock_irq(host->host_lock);
+	info->pause = 1;
+	while (info->callers && !err) {
+		info->waiting_pause = 1;
+		info->waiting_sync = 0;
+		spin_unlock_irq(host->host_lock);
+		wake_up(&info->wq_sync);
+		err = wait_event_interruptible(info->wq_pause,
+					       !info->waiting_pause);
+		spin_lock_irq(host->host_lock);
+	}
+	spin_unlock_irq(host->host_lock);
+	return err;
+}
+
+static int scsifront_suspend_cancel(struct xenbus_device *dev)
+{
+	struct vscsifrnt_info *info = dev->dev.driver_data;
+	struct Scsi_Host *host = info->host;
+
+	spin_lock_irq(host->host_lock);
+	info->pause = 0;
+	spin_unlock_irq(host->host_lock);
+	return 0;
 }
 
 static int scsifront_remove(struct xenbus_device *dev)
@@ -292,16 +362,22 @@ static void scsifront_read_backend_params(struct xenbus_device *dev,
 
 	ret = xenbus_scanf(XBT_NIL, dev->otherend, "segs-per-req", "%u",
 			   &nr_segs);
-	if (ret == 1 && nr_segs > host->sg_tablesize) {
+	if (ret != 1)
+		nr_segs = VSCSIIF_SG_TABLESIZE;
+	if (!info->pause && nr_segs > host->sg_tablesize) {
 		host->sg_tablesize = min(nr_segs, max_nr_segs);
 		dev_info(&dev->dev, "using up to %d SG entries\n",
 			 host->sg_tablesize);
 		host->max_sectors = (host->sg_tablesize - 1) * PAGE_SIZE / 512;
-	}
+	} else if (info->pause && nr_segs < host->sg_tablesize)
+		dev_warn(&dev->dev,
+			 "SG entries decreased from %d to %u - device may not work properly anymore\n",
+			 host->sg_tablesize, nr_segs);
 }
 
 #define VSCSIFRONT_OP_ADD_LUN	1
 #define VSCSIFRONT_OP_DEL_LUN	2
+#define VSCSIFRONT_OP_READD_LUN	3
 
 static void scsifront_do_lun_hotplug(struct vscsifrnt_info *info, int op)
 {
@@ -363,6 +439,11 @@ static void scsifront_do_lun_hotplug(struct vscsifrnt_info *info, int op)
 				}
 			}
 			break;
+		case VSCSIFRONT_OP_READD_LUN:
+			if (device_state == XenbusStateConnected)
+				xenbus_printf(XBT_NIL, dev->nodename, state_str,
+					      "%d", XenbusStateConnected);
+			break;
 		default:
 			break;
 		}
@@ -391,6 +472,13 @@ static void scsifront_backend_changed(struct xenbus_device *dev,
 
 	case XenbusStateConnected:
 		scsifront_read_backend_params(dev, info);
+		if (info->pause) {
+			scsifront_do_lun_hotplug(info, VSCSIFRONT_OP_READD_LUN);
+			xenbus_switch_state(dev, XenbusStateConnected);
+			info->pause = 0;
+			return;
+		}
+
 		if (xenbus_read_driver_state(dev->nodename) ==
 			XenbusStateInitialised) {
 			scsifront_do_lun_hotplug(info, VSCSIFRONT_OP_ADD_LUN);
@@ -432,7 +520,9 @@ MODULE_ALIAS("xen:vscsi");
 static DEFINE_XENBUS_DRIVER(scsifront, ,
 	.probe			= scsifront_probe,
 	.remove			= scsifront_remove,
-/* 	.resume			= scsifront_resume, */
+	.resume			= scsifront_resume,
+	.suspend		= scsifront_suspend,
+	.suspend_cancel		= scsifront_suspend_cancel,
 	.otherend_changed	= scsifront_backend_changed,
 );
 

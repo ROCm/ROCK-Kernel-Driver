@@ -41,9 +41,9 @@ static int get_id_from_freelist(struct vscsifrnt_info *info)
 	spin_lock_irqsave(&info->shadow_lock, flags);
 
 	free = info->shadow_free;
-	BUG_ON(free > VSCSIIF_MAX_REQS);
+	BUG_ON(free >= VSCSIIF_MAX_REQS);
 	info->shadow_free = info->shadow[free].next_free;
-	info->shadow[free].next_free = 0x0fff;
+	info->shadow[free].next_free = VSCSIIF_IN_USE;
 
 	info->shadow[free].wait_reset = 0;
 
@@ -249,37 +249,36 @@ static void scsifront_sync_cmd_done(struct vscsifrnt_info *info,
 	wake_up(&(info->shadow[id].wq_reset));
 }
 
+static void scsifront_do_response(struct vscsifrnt_info *info,
+				  vscsiif_response_t *ring_res)
+{
+	if (info->host->sg_tablesize > VSCSIIF_SG_TABLESIZE) {
+		u8 act = ring_res->act;
 
-static int scsifront_cmd_done(struct vscsifrnt_info *info)
+		if (act == VSCSIIF_ACT_SCSI_SG_PRESET)
+			return;
+		if (act != info->shadow[ring_res->rqid].act)
+			DPRINTK("Bogus backend response (%02x vs %02x)\n",
+				act, info->shadow[ring_res->rqid].act);
+	}
+
+	if (info->shadow[ring_res->rqid].act == VSCSIIF_ACT_SCSI_CDB)
+		scsifront_cdb_cmd_done(info, ring_res);
+	else
+		scsifront_sync_cmd_done(info, ring_res);
+}
+
+static int scsifront_ring_drain(struct vscsifrnt_info *info)
 {
 	vscsiif_response_t *ring_res;
-
 	RING_IDX i, rp;
 	int more_to_do = 0;
-	unsigned long flags;
-
-	spin_lock_irqsave(info->host->host_lock, flags);
 
 	rp = info->ring.sring->rsp_prod;
 	rmb();
 	for (i = info->ring.rsp_cons; i != rp; i++) {
-		
 		ring_res = RING_GET_RESPONSE(&info->ring, i);
-
-		if (info->host->sg_tablesize > VSCSIIF_SG_TABLESIZE) {
-			u8 act = ring_res->act;
-
-			if (act == VSCSIIF_ACT_SCSI_SG_PRESET)
-				continue;
-			if (act != info->shadow[ring_res->rqid].act)
-				DPRINTK("Bogus backend response (%02x vs %02x)\n",
-					act, info->shadow[ring_res->rqid].act);
-		}
-
-		if (info->shadow[ring_res->rqid].act == VSCSIIF_ACT_SCSI_CDB)
-			scsifront_cdb_cmd_done(info, ring_res);
-		else
-			scsifront_sync_cmd_done(info, ring_res);
+		scsifront_do_response(info, ring_res);
 	}
 
 	info->ring.rsp_cons = i;
@@ -289,6 +288,18 @@ static int scsifront_cmd_done(struct vscsifrnt_info *info)
 	} else {
 		info->ring.sring->rsp_event = i + 1;
 	}
+
+	return more_to_do;
+}
+
+static int scsifront_cmd_done(struct vscsifrnt_info *info)
+{
+	int more_to_do;
+	unsigned long flags;
+
+	spin_lock_irqsave(info->host->host_lock, flags);
+
+	more_to_do = scsifront_ring_drain(info);
 
 	if (info->active.sc && !RING_FULL(&info->ring)) {
 		push_cmd_to_ring(info, NULL);
@@ -307,8 +318,23 @@ static int scsifront_cmd_done(struct vscsifrnt_info *info)
 	return more_to_do;
 }
 
+void scsifront_finish_all(struct vscsifrnt_info *info)
+{
+	unsigned i;
+	struct vscsiif_response resp;
 
+	scsifront_ring_drain(info);
 
+	for (i = 0; i < VSCSIIF_MAX_REQS; i++) {
+		if (info->shadow[i].next_free != VSCSIIF_IN_USE)
+			continue;
+		resp.rqid = i;
+		resp.sense_len = 0;
+		resp.rslt = DID_RESET << 16;
+		resp.residual_len = 0;
+		scsifront_do_response(info, &resp);
+	}
+}
 
 int scsifront_schedule(void *data)
 {
@@ -400,6 +426,27 @@ static int map_data_for_request(struct vscsifrnt_info *info,
 	return ref_cnt;
 }
 
+static int scsifront_enter(struct vscsifrnt_info *info)
+{
+	if (info->pause)
+		return 1;
+	info->callers++;
+	return 0;
+}
+
+static void scsifront_return(struct vscsifrnt_info *info)
+{
+	info->callers--;
+	if (info->callers)
+		return;
+
+	if (!info->waiting_pause)
+		return;
+
+	info->waiting_pause = 0;
+	wake_up(&info->wq_pause);
+}
+
 static int scsifront_queuecommand(struct Scsi_Host *shost,
 				  struct scsi_cmnd *sc)
 {
@@ -408,6 +455,9 @@ static int scsifront_queuecommand(struct Scsi_Host *shost,
 	unsigned long flags;
 	int ref_cnt;
 	uint16_t rqid;
+
+	if (scsifront_enter(info))
+		return SCSI_MLQUEUE_HOST_BUSY;
 
 /* debug printk to identify more missing scsi commands
 	shost_printk(KERN_INFO "scsicmd: ", sc->device->host,
@@ -419,12 +469,14 @@ static int scsifront_queuecommand(struct Scsi_Host *shost,
 	spin_lock_irqsave(shost->host_lock, flags);
 	scsi_cmd_get_serial(shost, sc);
 	if (RING_FULL(&info->ring)) {
+		scsifront_return(info);
 		spin_unlock_irqrestore(shost->host_lock, flags);
 		return SCSI_MLQUEUE_HOST_BUSY;
 	}
 
 	if (info->active.sc && !push_cmd_to_ring(info, NULL)) {
 		scsifront_do_request(info);
+		scsifront_return(info);
 		spin_unlock_irqrestore(shost->host_lock, flags);
 		return SCSI_MLQUEUE_HOST_BUSY;
 	}
@@ -443,6 +495,7 @@ static int scsifront_queuecommand(struct Scsi_Host *shost,
 	if (ref_cnt < 0) {
 		add_id_to_freelist(info, rqid);
 		scsifront_do_request(info);
+		scsifront_return(info);
 		spin_unlock_irqrestore(shost->host_lock, flags);
 		if (ref_cnt == (-ENOMEM))
 			return SCSI_MLQUEUE_HOST_BUSY;
@@ -459,8 +512,9 @@ static int scsifront_queuecommand(struct Scsi_Host *shost,
 	push_cmd_to_ring(info, ring_req);
 
 	scsifront_do_request(info);
-	spin_unlock_irqrestore(shost->host_lock, flags);
 
+	scsifront_return(info);
+	spin_unlock_irqrestore(shost->host_lock, flags);
 	return 0;
 }
 
@@ -484,7 +538,7 @@ static int scsifront_dev_reset_handler(struct scsi_cmnd *sc)
 	spin_lock_irq(host->host_lock);
 #endif
 	while (RING_FULL(&info->ring)) {
-		if (err) {
+		if (err || info->pause) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,12)
 			spin_unlock_irq(host->host_lock);
 #endif
@@ -495,6 +549,11 @@ static int scsifront_dev_reset_handler(struct scsi_cmnd *sc)
 		err = wait_event_interruptible(info->wq_sync,
 					       !info->waiting_sync);
 		spin_lock_irq(host->host_lock);
+	}
+
+	if (scsifront_enter(info)) {
+		spin_unlock_irq(host->host_lock);
+		return FAILED;
 	}
 
 	ring_req      = scsifront_pre_request(info);
@@ -534,6 +593,8 @@ static int scsifront_dev_reset_handler(struct scsi_cmnd *sc)
 		spin_unlock(&info->shadow_lock);
 		err = FAILED;
 	}
+
+	scsifront_return(info);
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,12)
 	spin_unlock_irq(host->host_lock);
