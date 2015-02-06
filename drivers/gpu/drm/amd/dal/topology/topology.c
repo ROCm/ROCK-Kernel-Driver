@@ -3982,11 +3982,7 @@ void dal_tm_disable_all_dcp_pipes(struct topology_mgr *tm)
 		 * command table. */
 		dal_controller_blank_crtc(controller,
 				COLOR_SPACE_SRGB_FULL_RANGE);
-
-		/* disable memory requests on controller */
-		dal_controller_disable_memory_requests(controller);
 	}
-
 }
 
 /* Callback interface - a way for tm_detection_mgr to notify

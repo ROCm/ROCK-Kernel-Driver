@@ -419,18 +419,6 @@ void dal_controller_set_fe_clock(struct controller *crtc, bool enable)
 		crtc->pc->funcs->enable_fe_clock(crtc->pc, enable);
 }
 
-bool dal_controller_disable_memory_requests(struct controller *crtc)
-{
-	return true;
-	/* TODO to be implemented */
-}
-
-bool dal_controller_enable_memory_requests(struct controller *crtc)
-{
-	return true;
-	/* TODO to be implemented */
-}
-
 void dal_controller_enable_display_pipe_clock_gating(
 	struct controller *crtc,
 	bool enable)

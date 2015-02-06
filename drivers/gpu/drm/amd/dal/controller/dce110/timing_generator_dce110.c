@@ -207,7 +207,10 @@ static bool blank_crtc(
 	struct bp_blank_crtc_parameters params;
 	struct crtc_black_color black_color;
 
-	tg->funcs->color_space_to_black_color(color_space, &black_color);
+	dal_timing_generator_color_space_to_black_color(
+		color_space,
+		&black_color);
+
 	dal_memset(&params, 0, sizeof(struct bp_blank_crtc_parameters));
 	params.controller_id = tg->controller_id;
 	params.black_color_rcr = black_color.black_color_r_cr;
@@ -262,7 +265,9 @@ static bool unblank_crtc(
 	struct bp_blank_crtc_parameters bp_params;
 	struct crtc_black_color value;
 
-	tg->funcs->color_space_to_black_color(color_space, &value);
+	dal_timing_generator_color_space_to_black_color(
+		color_space,
+		&value);
 
 	dal_memset(&bp_params, 0,
 		sizeof(struct bp_blank_crtc_parameters));
@@ -1087,8 +1092,6 @@ static const struct timing_generator_funcs timing_generator_dce110_funcs = {
 		.unblank_crtc = unblank_crtc,
 		.validate_timing = dal_timing_generator_validate_timing,
 		.destroy = destroy,
-		.color_space_to_black_color =
-				dal_timing_generator_color_space_to_black_color,
 		.wait_for_vactive =
 				dal_timing_generator_wait_for_vactive,
 		.force_triggered_reset_now =

@@ -1414,8 +1414,6 @@ void dal_hw_sequencer_enable_memory_requests(struct hw_sequencer *hws,
 		/* no need to enable memory requests if source is not blanked */
 		return;
 
-	dal_controller_enable_memory_requests(controller);
-
 	dal_line_buffer_reset_on_vblank(
 			dal_controller_get_line_buffer(controller),
 			dal_controller_get_id(controller));
@@ -1444,8 +1442,6 @@ void dal_hw_sequencer_disable_memory_requests(
 		return;
 
 	dal_controller_blank_crtc(controller, color_space);
-
-	dal_controller_disable_memory_requests(controller);
 
 	dal_display_path_set_source_blanked(
 			hw_path_mode->display_path,

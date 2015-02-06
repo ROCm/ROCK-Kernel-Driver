@@ -454,7 +454,6 @@ static const struct timing_generator_funcs timing_generator_dce110_funcs = {
 		.unblank_crtc = NULL,
 		.validate_timing = NULL,
 		.destroy = destroy,
-		.color_space_to_black_color = NULL,
 		.wait_for_vactive = NULL,
 		.force_triggered_reset_now = NULL,
 		.wait_for_vblank = NULL,

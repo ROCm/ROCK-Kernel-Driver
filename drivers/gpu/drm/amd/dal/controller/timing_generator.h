@@ -180,8 +180,6 @@ struct timing_generator_funcs {
 		const struct trigger_params *trigger_params);
 	void (*wait_for_vactive)(struct timing_generator *tg);
 	void (*wait_for_vblank)(struct timing_generator *tg);
-	void (*color_space_to_black_color)(enum color_space colorspace,
-		struct crtc_black_color *black_color);
 	uint32_t (*get_crtc_scanoutpos)(
 		struct timing_generator *tg,
 		int32_t *vpos,

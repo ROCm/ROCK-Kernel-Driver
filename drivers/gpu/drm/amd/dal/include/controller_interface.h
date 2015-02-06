@@ -168,8 +168,6 @@ uint32_t dal_controller_get_vblank_counter(struct controller *crtc);
 /* Set */
 bool dal_controller_enable_timing_generator(struct controller *crtc);
 bool dal_controller_disable_timing_generator(struct controller *crtc);
-bool dal_controller_enable_memory_requests(struct controller *crtc);
-bool dal_controller_disable_memory_requests(struct controller *crtc);
 bool dal_controller_program_timing_generator(
 	struct controller *crtc,
 	struct hw_crtc_timing *timing);
