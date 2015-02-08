@@ -518,7 +518,9 @@ kfd_ioctl_dbg_unrgesiter(struct file *filep, struct kfd_process *p, void *data)
  */
 
 static int
-kfd_ioctl_dbg_address_watch(struct file *filep, struct kfd_process *p, void *data)
+kfd_ioctl_dbg_address_watch(struct file *filep,
+		struct kfd_process *p,
+		void *data)
 {
 	long status = -EFAULT;
 	struct kfd_ioctl_dbg_address_watch_args *args = data;
@@ -531,7 +533,9 @@ kfd_ioctl_dbg_address_watch(struct file *filep, struct kfd_process *p, void *dat
 	do {
 		dev = kfd_device_by_id(args->gpu_id);
 		if (!dev) {
-			dev_info(NULL, "Error! kfd: In func %s >> getting device by id failed\n", __func__);
+			dev_info(NULL,
+			"Error! kfd: In func %s >> get device by id failed\n",
+			__func__);
 			break;
 		}
 
@@ -540,24 +544,34 @@ kfd_ioctl_dbg_address_watch(struct file *filep, struct kfd_process *p, void *dat
 			break;
 		}
 
+		if (args->buf_size_in_bytes <= sizeof(*args)) {
+			status = -EINVAL;
+			break;
+		}
+
 		/* this is the actual buffer to work with */
 
-		args_buff = (unsigned char *) kzalloc(args->buf_size_in_bytes, GFP_KERNEL);
-
+		args_buff = kzalloc(args->buf_size_in_bytes -
+						sizeof(*args), GFP_KERNEL);
 		if (args_buff == NULL) {
 			status = -ENOMEM;
 			break;
 		}
 
-#if 0
-		if (copy_from_user(args_buff , arg, args->buf_size_in_bytes)) {
-			dev_info(NULL, "Error! kfd: In func %s >> copy_from_user failed\n", __func__);
+		if (args->content_ptr == NULL) {
+			status = -EINVAL;
 			break;
 		}
-#endif
-		/* move ptr to the start of the "pay-load" area */
 
-		args_idx = sizeof(args->gpu_id) + sizeof(args->buf_size_in_bytes);
+		if (copy_from_user(args_buff,
+				args->content_ptr,
+				args->buf_size_in_bytes - sizeof(*args))) {
+			dev_info(NULL,
+			"Error! kfd: In func %s >> copy_from_user failed\n",
+			__func__);
+			break;
+		}
+
 
 		aw_info.process = p;
 
@@ -639,8 +653,12 @@ kfd_ioctl_dbg_wave_control(struct file *filep, struct kfd_process *p, void *data
 
 	/* we use compact form, independent of the packing attribute value */
 
-	uint32_t computed_buff_size = sizeof(args) + sizeof(wac_info.mode) + sizeof(wac_info.operand) +
-	    +sizeof(wac_info.dbgWave_msg.DbgWaveMsg) + sizeof(wac_info.dbgWave_msg.MemoryVA) + sizeof(wac_info.trapId);
+	uint32_t computed_buff_size = sizeof(*args) +
+				sizeof(wac_info.mode) +
+				sizeof(wac_info.operand) +
+				sizeof(wac_info.dbgWave_msg.DbgWaveMsg) +
+				sizeof(wac_info.dbgWave_msg.MemoryVA) +
+				sizeof(wac_info.trapId);
 
 
 	dev_info(NULL, "kfd: In func %s - start\n", __func__);
@@ -655,7 +673,8 @@ kfd_ioctl_dbg_wave_control(struct file *filep, struct kfd_process *p, void *data
 		/* input size must match the computed "compact" size */
 
 		if (args->buf_size_in_bytes != computed_buff_size) {
-			dev_info(NULL, "Error! kfd: In func %s >> size mismatch, computed : actual %u : %u\n",
+			dev_info(NULL,
+					 "Error! kfd: In func %s >> size mismatch, computed : actual %u : %u\n",
 					__func__, args->buf_size_in_bytes, computed_buff_size);
 			status = -EINVAL;
 			break;
@@ -663,24 +682,34 @@ kfd_ioctl_dbg_wave_control(struct file *filep, struct kfd_process *p, void *data
 
 		/* this is the actual buffer to work with */
 
-		args_buff = (unsigned char *) kzalloc(args->buf_size_in_bytes, GFP_KERNEL);
+		args_buff = kzalloc(args->buf_size_in_bytes - sizeof(*args),
+				GFP_KERNEL);
 
 		if (args_buff == NULL) {
 			status = -ENOMEM;
 			break;
 		}
-		/* Now copy the entire buffer from user */
 
-#if 0
-		if (copy_from_user(args_buff , arg, args->buf_size_in_bytes)) {
-			dev_info(NULL, "Error! kfd: In func %s >> copy_from_user failed\n", __func__);
+		if (args->content_ptr == NULL) {
+			status = -EINVAL;
 			break;
 		}
-#endif
+
+
+		/* Now copy the entire buffer from user */
+
+
+		if (copy_from_user(args_buff,
+				args->content_ptr,
+				args->buf_size_in_bytes - sizeof(*args))) {
+			dev_info(NULL,
+			"Error! kfd: In func %s >> copy_from_user failed\n",
+			 __func__);
+			break;
+		}
 
 		/* move ptr to the start of the "pay-load" area */
 
-		args_idx = sizeof(args->gpu_id) + sizeof(args->buf_size_in_bytes);
 
 		wac_info.process = p;
 

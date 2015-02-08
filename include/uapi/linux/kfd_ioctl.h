@@ -145,13 +145,13 @@ struct kfd_ioctl_dbg_unregister_args {
 struct kfd_ioctl_dbg_address_watch_args {
 	uint32_t gpu_id;		/* to KFD */
 	uint32_t buf_size_in_bytes;	/*including gpu_id and buf_size */
-	unsigned char content[0];
+	void	*content_ptr;	/* a pointer to the actual content */
 };
 
 struct kfd_ioctl_dbg_wave_control_args {
 	uint32_t gpu_id;		/* to KFD */
 	uint32_t buf_size_in_bytes;	/*including gpu_id and buf_size */
-	unsigned char content[0];
+	void	*content_ptr;	/* a pointer to the actual content */
 };
 
 /* Matching HSA_EVENTTYPE */
