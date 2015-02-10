@@ -42,7 +42,7 @@ static int command_read(struct pci_dev *dev, int offset, u16 *value, void *data)
 static int command_write(struct pci_dev *dev, int offset, u16 value, void *data)
 {
 #ifndef CONFIG_XEN
-	struct xen_pcibk_dev_data *dev_data = dev_data = pci_get_drvdata(dev);
+	struct xen_pcibk_dev_data *dev_data = pci_get_drvdata(dev);
 #endif
 	int err;
 
