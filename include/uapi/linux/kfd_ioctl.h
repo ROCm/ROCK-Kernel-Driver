@@ -242,11 +242,7 @@ struct kfd_ioctl_free_memory_of_gpu_args {
 };
 
 struct kfd_ioctl_map_memory_to_gpu_args {
-	uint64_t va_addr;	/* to KFD */
-	uint64_t size;		/* to KFD */
-	uint64_t handle;	/* from KFD */
-	uint32_t gpu_id;	/* to KFD */
-	uint32_t pad;
+	uint64_t handle;	/* to KFD */
 };
 
 struct kfd_ioctl_unmap_memory_from_gpu_args {

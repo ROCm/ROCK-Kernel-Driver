@@ -981,13 +981,9 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 	struct kfd_process_device *pdd;
 	void *mem;
 	struct kfd_dev *dev;
-	int idr_handle;
 	long err;
 
-	if (args->size == 0)
-		return -EINVAL;
-
-	dev = kfd_device_by_id(args->gpu_id);
+	dev = kfd_device_by_id(GET_GPU_ID(args->handle));
 	if (dev == NULL)
 		return -EINVAL;
 
@@ -999,18 +995,16 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 		goto bind_process_to_device_failed;
 	}
 
-	err = kfd2kgd->map_memory_to_gpu(dev->kgd, args->va_addr, args->size,
-					pdd->vm, (struct kgd_mem **) &mem);
-	if (err != 0)
-		goto map_memory_to_gpu_failed;
-
-	idr_handle = kfd_process_device_create_obj_handle(pdd, mem);
-	if (idr_handle < 0) {
-		err = -EFAULT;
-		goto handle_creation_failed;
+	mem = kfd_process_device_translate_handle(pdd,
+						GET_IDR_HANDLE(args->handle));
+	if (mem == NULL) {
+		err = PTR_ERR(mem);
+		goto get_mem_obj_from_handle_failed;
 	}
 
-	args->handle = MAKE_HANDLE(args->gpu_id, idr_handle);
+	err = kfd2kgd->map_memory_to_gpu(dev->kgd, (struct kgd_mem *) mem);
+	if (err != 0)
+		goto map_memory_to_gpu_failed;
 
 	radeon_flush_tlb(dev, p->pasid);
 
@@ -1018,9 +1012,8 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 
 	return 0;
 
-handle_creation_failed:
-	kfd2kgd->unmap_memory_to_gpu(dev->kgd, (struct kgd_mem *) mem);
 map_memory_to_gpu_failed:
+get_mem_obj_from_handle_failed:
 bind_process_to_device_failed:
 	mutex_unlock(&p->mutex);
 	return err;
@@ -1033,6 +1026,7 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 	struct kfd_process_device *pdd;
 	void *mem;
 	struct kfd_dev *dev;
+	long err;
 
 	dev = kfd_device_by_id(GET_GPU_ID(args->handle));
 	if (dev == NULL)
@@ -1043,12 +1037,16 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 	pdd = kfd_get_process_device_data(dev, p);
 	if (!pdd) {
 		pr_err("Process device data doesn't exist\n");
-		return -EINVAL;
+		err = PTR_ERR(pdd);
+		goto bind_process_to_device_failed;
 	}
 
 	mem = kfd_process_device_translate_handle(pdd,
 						GET_IDR_HANDLE(args->handle));
-	BUG_ON(mem == NULL);
+	if (mem == NULL) {
+		err = PTR_ERR(mem);
+		goto get_mem_obj_from_handle_failed;
+	}
 
 	kfd2kgd->unmap_memory_to_gpu(dev->kgd, mem);
 
@@ -1056,6 +1054,11 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 
 	mutex_unlock(&p->mutex);
 	return 0;
+
+get_mem_obj_from_handle_failed:
+bind_process_to_device_failed:
+	mutex_unlock(&p->mutex);
+	return err;
 }
 
 static int kfd_ioctl_open_graphic_handle(struct file *filep,

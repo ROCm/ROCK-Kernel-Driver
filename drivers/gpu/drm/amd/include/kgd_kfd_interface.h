@@ -202,10 +202,10 @@ struct kfd2kgd_calls {
 					uint8_t vmid);
 	void (*write_vmid_invalidate_request)(struct kgd_dev *kgd,
 					uint8_t vmid);
-	int (*map_memory_to_gpu)(struct kgd_dev *kgd, uint64_t va, size_t size, void *vm, struct kgd_mem **mem);
 	int (*alloc_memory_of_gpu)(struct kgd_dev *kgd, uint64_t va,
 				size_t size, void *vm, struct kgd_mem **mem);
 	int (*free_memory_of_gpu)(struct kgd_dev *kgd, struct kgd_mem *mem);
+	int (*map_memory_to_gpu)(struct kgd_dev *kgd, struct kgd_mem *mem);
 	int (*unmap_memory_to_gpu)(struct kgd_dev *kgd, struct kgd_mem *mem);
 
 	uint16_t (*get_fw_version)(struct kgd_dev *kgd,

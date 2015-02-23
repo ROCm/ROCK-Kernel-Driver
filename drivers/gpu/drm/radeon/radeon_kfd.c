@@ -78,7 +78,7 @@ static void destroy_process_vm(struct kgd_dev *kgd, void *vm);
 static uint32_t get_process_page_dir(void *vm);
 
 static int open_graphic_handle(struct kgd_dev *kgd, uint64_t va, void *vm, int fd, uint32_t handle, struct kgd_mem **mem);
-static int map_memory_to_gpu(struct kgd_dev *kgd, uint64_t va, size_t size, void *vm, struct kgd_mem **mem);
+static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem);
 static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem);
 static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
 			size_t size, void *vm, struct kgd_mem **mem);
@@ -1150,6 +1150,13 @@ static int map_bo_to_gpuvm(struct radeon_device *rdev, struct radeon_bo *bo,
 
 	mutex_lock(&vm->mutex);
 
+	/* Update the page directory */
+	ret = radeon_vm_update_page_directory(rdev, vm);
+	if (ret != 0) {
+		pr_err("amdkfd: Failed to radeon_vm_update_page_directory\n");
+		goto err_failed_to_update_pd;
+	}
+
 	/*
 	 * The previously "released" BOs are really released and their VAs are
 	 * removed from PT. This function is called here because it requires
@@ -1168,13 +1175,6 @@ static int map_bo_to_gpuvm(struct radeon_device *rdev, struct radeon_bo *bo,
 		goto err_failed_to_update_pts;
 	}
 
-	/* Update the page directory */
-	ret = radeon_vm_update_page_directory(rdev, vm);
-	if (ret != 0) {
-		pr_err("amdkfd: Failed to radeon_vm_update_page_directory\n");
-		goto err_failed_to_update_pd;
-	}
-
 	ret = radeon_vm_clear_invalids(rdev, vm);
 	if (ret != 0) {
 		pr_err("amdkfd: Failed to radeon_vm_clear_invalids\n");
@@ -1189,10 +1189,10 @@ static int map_bo_to_gpuvm(struct radeon_device *rdev, struct radeon_bo *bo,
 	return 0;
 
 err_failed_to_vm_clear_invalids:
-err_failed_to_update_pd:
 	radeon_vm_bo_update(rdev, bo_va, NULL);
 err_failed_to_update_pts:
 err_failed_vm_clear_freed:
+err_failed_to_update_pd:
 	mutex_unlock(&vm->mutex);
 	ttm_eu_backoff_reservation(&ticket, &list);
 err_failed_to_ttm_reserve:
@@ -1273,7 +1273,7 @@ static int free_memory_of_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 	return 0;
 }
 
-static int map_memory_to_gpu(struct kgd_dev *kgd, uint64_t va, size_t size, void *vm, struct kgd_mem **mem)
+static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 {
 	struct radeon_device *rdev = (struct radeon_device *) kgd;
 	int ret;
@@ -1281,54 +1281,25 @@ static int map_memory_to_gpu(struct kgd_dev *kgd, uint64_t va, size_t size, void
 	struct radeon_bo *bo;
 
 	BUG_ON(kgd == NULL);
-	BUG_ON(size == 0);
 	BUG_ON(mem == NULL);
-	BUG_ON(vm == NULL);
 
-	*mem = kzalloc(sizeof(struct kgd_mem), GFP_KERNEL);
-	if (*mem == NULL) {
-		ret = -ENOMEM;
-		goto err;
-	}
+	bo = mem->data2.bo;
+	bo_va = mem->data2.bo_va;
 
-	/* Allocate buffer object on VRAM */
-	ret = radeon_bo_create(rdev, size, PAGE_SIZE, false,
-				RADEON_GEM_DOMAIN_VRAM,
-				0, NULL, NULL, &bo);
-	if (ret != 0) {
-		pr_err("amdkfd: Failed to create BO object on VRAM. ret == %d\n",
-				ret);
-		goto err_bo_create;
-	}
-
-	ret = add_bo_to_vm(rdev, va, vm, bo, &bo_va);
-	if (ret != 0)
-		goto err_map;
-
-	/* We need to pin the allocated BO, PD and appropriate PTs and to create a mapping of virtual to MC address */
+	/*
+	 * We need to pin the allocated BO, PD and appropriate PTs and to
+	 * create a mapping of virtual to MC address
+	 */
 	ret = map_bo_to_gpuvm(rdev, bo, bo_va);
 	if (ret != 0)
-		goto err_failed_to_pin_bo;
+		pr_err("amdkfd: Failed to map radeon bo to gpuvm\n");
 
-	(*mem)->data2.bo = bo;
-	(*mem)->data2.bo_va = bo_va;
-	return 0;
-
-err_failed_to_pin_bo:
-	remove_bo_from_vm(rdev, bo, bo_va);
-err_map:
-	radeon_bo_unref(&bo);
-err_bo_create:
-	kfree(*mem);
-err:
 	return ret;
-
 }
 
 static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 {
 	struct radeon_vm *rvm;
-	struct radeon_device *rdev = (struct radeon_device *) kgd;
 
 	BUG_ON(kgd == NULL);
 	BUG_ON(mem == NULL);
@@ -1343,13 +1314,6 @@ static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 
 	/* Unpin the PD directory*/
 	unpin_bo(mem->data2.bo_va->vm->page_directory);
-
-	/* Remove from VM internal data structures */
-	remove_bo_from_vm(rdev, mem->data2.bo, mem->data2.bo_va);
-
-	/* Free the BO*/
-	radeon_bo_unref(&mem->data2.bo);
-	kfree(mem);
 
 	return 0;
 }

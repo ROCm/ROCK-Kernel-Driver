@@ -185,6 +185,7 @@ static void kfd_process_wq_release(struct work_struct *work)
 		idr_for_each_entry(&pdd->alloc_idr, mem, id) {
 			idr_remove(&pdd->alloc_idr, id);
 			kfd2kgd->unmap_memory_to_gpu(pdd->dev->kgd, mem);
+			kfd2kgd->free_memory_of_gpu(pdd->dev->kgd, mem);
 		}
 
 		/* Destroy the GPUVM VM context */
