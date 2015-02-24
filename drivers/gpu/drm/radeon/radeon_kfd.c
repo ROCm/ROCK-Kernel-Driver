@@ -80,6 +80,9 @@ static uint32_t get_process_page_dir(void *vm);
 static int open_graphic_handle(struct kgd_dev *kgd, uint64_t va, void *vm, int fd, uint32_t handle, struct kgd_mem **mem);
 static int map_memory_to_gpu(struct kgd_dev *kgd, uint64_t va, size_t size, void *vm, struct kgd_mem **mem);
 static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem);
+static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
+			size_t size, void *vm, struct kgd_mem **mem);
+static int free_memory_of_gpu(struct kgd_dev *kgd, struct kgd_mem *mem);
 
 static uint16_t get_fw_version(struct kgd_dev *kgd, enum kgd_engine_type type);
 
@@ -154,6 +157,8 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.read_atc_vmid_pasid_mapping_reg_pasid_field = read_atc_vmid_pasid_mapping_reg_pasid_field,
 	.read_atc_vmid_pasid_mapping_reg_valid_field = read_atc_vmid_pasid_mapping_reg_valid_field,
 	.write_vmid_invalidate_request = write_vmid_invalidate_request,
+	.alloc_memory_of_gpu = alloc_memory_of_gpu,
+	.free_memory_of_gpu = free_memory_of_gpu,
 	.map_memory_to_gpu = map_memory_to_gpu,
 	.unmap_memory_to_gpu = unmap_memory_from_gpu,
 	.get_fw_version = get_fw_version,
@@ -1091,35 +1096,6 @@ static void unpin_pts(struct radeon_bo_va *bo_va, struct radeon_vm *vm)
 
 }
 
-static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
-{
-	struct radeon_vm *rvm;
-	struct radeon_device *rdev = (struct radeon_device *) kgd;
-
-	BUG_ON(kgd == NULL);
-	BUG_ON(mem == NULL);
-
-	rvm = mem->data2.bo_va->vm;
-
-	/* Unpin BO*/
-	unpin_bo(mem->data2.bo);
-
-	/* Unpin PTs */
-	unpin_pts(mem->data2.bo_va, mem->data2.bo_va->vm);
-
-	/* Unpin the PD directory*/
-	unpin_bo(mem->data2.bo_va->vm->page_directory);
-
-	/* Remove from VM internal data structures */
-	remove_bo_from_vm(rdev, mem->data2.bo, mem->data2.bo_va);
-
-	/* Free the BO*/
-	radeon_bo_unref(&mem->data2.bo);
-	kfree(mem);
-
-	return 0;
-}
-
 static int map_bo_to_gpuvm(struct radeon_device *rdev, struct radeon_bo *bo,
 		struct radeon_bo_va *bo_va)
 {
@@ -1230,6 +1206,73 @@ err_failed_to_pin_pts:
 
 	return ret;
 }
+
+static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
+				void *vm, struct kgd_mem **mem)
+{
+	struct radeon_device *rdev = (struct radeon_device *) kgd;
+	int ret;
+	struct radeon_bo_va *bo_va;
+	struct radeon_bo *bo;
+
+	BUG_ON(kgd == NULL);
+	BUG_ON(size == 0);
+	BUG_ON(mem == NULL);
+	BUG_ON(vm == NULL);
+
+	*mem = kzalloc(sizeof(struct kgd_mem), GFP_KERNEL);
+	if (*mem == NULL) {
+		ret = -ENOMEM;
+		goto err;
+	}
+
+	/* Allocate buffer object on VRAM */
+	ret = radeon_bo_create(rdev, size, PAGE_SIZE, false,
+				RADEON_GEM_DOMAIN_VRAM,
+				0, NULL, NULL, &bo);
+	if (ret != 0) {
+		pr_err("amdkfd: Failed to create BO object on VRAM. ret == %d\n",
+				ret);
+		goto err_bo_create;
+	}
+
+	ret = add_bo_to_vm(rdev, va, vm, bo, &bo_va);
+	if (ret != 0)
+		goto err_map;
+
+	(*mem)->data2.bo = bo;
+	(*mem)->data2.bo_va = bo_va;
+	return 0;
+
+err_map:
+	radeon_bo_unref(&bo);
+err_bo_create:
+	kfree(*mem);
+err:
+	return ret;
+
+}
+
+static int free_memory_of_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
+{
+	struct radeon_vm *rvm;
+	struct radeon_device *rdev = (struct radeon_device *) kgd;
+
+	BUG_ON(kgd == NULL);
+	BUG_ON(mem == NULL);
+
+	rvm = mem->data2.bo_va->vm;
+
+	/* Remove from VM internal data structures */
+	remove_bo_from_vm(rdev, mem->data2.bo, mem->data2.bo_va);
+
+	/* Free the BO*/
+	radeon_bo_unref(&mem->data2.bo);
+	kfree(mem);
+
+	return 0;
+}
+
 static int map_memory_to_gpu(struct kgd_dev *kgd, uint64_t va, size_t size, void *vm, struct kgd_mem **mem)
 {
 	struct radeon_device *rdev = (struct radeon_device *) kgd;
@@ -1280,6 +1323,35 @@ err_bo_create:
 err:
 	return ret;
 
+}
+
+static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
+{
+	struct radeon_vm *rvm;
+	struct radeon_device *rdev = (struct radeon_device *) kgd;
+
+	BUG_ON(kgd == NULL);
+	BUG_ON(mem == NULL);
+
+	rvm = mem->data2.bo_va->vm;
+
+	/* Unpin BO*/
+	unpin_bo(mem->data2.bo);
+
+	/* Unpin PTs */
+	unpin_pts(mem->data2.bo_va, mem->data2.bo_va->vm);
+
+	/* Unpin the PD directory*/
+	unpin_bo(mem->data2.bo_va->vm->page_directory);
+
+	/* Remove from VM internal data structures */
+	remove_bo_from_vm(rdev, mem->data2.bo, mem->data2.bo_va);
+
+	/* Free the BO*/
+	radeon_bo_unref(&mem->data2.bo);
+	kfree(mem);
+
+	return 0;
 }
 
 static uint16_t get_fw_version(struct kgd_dev *kgd, enum kgd_engine_type type)
