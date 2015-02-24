@@ -181,7 +181,10 @@ static void kfd_process_wq_release(struct work_struct *work)
 		amd_iommu_unbind_pasid(pdd->dev->pdev, p->pasid);
 		list_del(&pdd->per_device_list);
 
-		/*Remove all handles from idr and release appropriate local memory object*/
+		/*
+		 * Remove all handles from idr and release appropriate
+		 * local memory object
+		 */
 		idr_for_each_entry(&pdd->alloc_idr, mem, id) {
 			idr_remove(&pdd->alloc_idr, id);
 			kfd2kgd->unmap_memory_to_gpu(pdd->dev->kgd, mem);
