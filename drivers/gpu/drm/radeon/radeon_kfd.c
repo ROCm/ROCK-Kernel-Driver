@@ -390,6 +390,8 @@ static int create_process_vm(struct kgd_dev *kgd, void **vm)
 
 	*vm = (void *) new_vm;
 
+	pr_debug("Created process vm with address %p\n", *vm);
+
 	return ret;
 }
 
@@ -403,6 +405,8 @@ static void destroy_process_vm(struct kgd_dev *kgd, void *vm)
 
 	BUG_ON(kgd == NULL);
 	BUG_ON(vm == NULL);
+
+	pr_debug("Destroying process vm with address %p\n", vm);
 
 	/* Release the VM context */
 	radeon_vm_fini(rdev, rvm);
@@ -1237,9 +1241,13 @@ static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
 		goto err_bo_create;
 	}
 
+	pr_debug("Created BO on VRAM with size %lu bytes\n", size);
+
 	ret = add_bo_to_vm(rdev, va, vm, bo, &bo_va);
 	if (ret != 0)
 		goto err_map;
+
+	pr_debug("Set BO to VA %p\n", (void *) va);
 
 	(*mem)->data2.bo = bo;
 	(*mem)->data2.bo_va = bo_va;
@@ -1263,6 +1271,10 @@ static int free_memory_of_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 
 	BUG_ON(kgd == NULL);
 	BUG_ON(mem == NULL);
+
+	pr_debug("Releasing BO with VA %p, size %lu bytes\n",
+		(void *) (mem->data2.bo_va->it.start * RADEON_GPU_PAGE_SIZE),
+		mem->data2.bo->tbo.mem.size);
 
 	rvm = mem->data2.bo_va->vm;
 
@@ -1296,6 +1308,10 @@ static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 		return 0;
 	}
 
+	pr_debug("Mapping BO with VA %p, size %lu bytes to GPU memory\n",
+		(void *) (mem->data2.bo_va->it.start * RADEON_GPU_PAGE_SIZE),
+		mem->data2.bo->tbo.mem.size);
+
 	/*
 	 * We need to pin the allocated BO, PD and appropriate PTs and to
 	 * create a mapping of virtual to MC address
@@ -1324,6 +1340,10 @@ static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 		mem->data2.bo->tbo.mem.size);
 		return 0;
 	}
+
+	pr_debug("Unmapping BO with VA %p, size %lu bytes from GPU memory\n",
+		(void *) (mem->data2.bo_va->it.start * RADEON_GPU_PAGE_SIZE),
+		mem->data2.bo->tbo.mem.size);
 
 	rvm = mem->data2.bo_va->vm;
 
