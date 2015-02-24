@@ -52,8 +52,14 @@ static void destroy_process_gpumem(struct kgd_dev *kgd, struct kgd_mem *mem);
 static uint32_t get_process_page_dir(void *vm);
 
 static int open_graphic_handle(struct kgd_dev *kgd, uint64_t va, void *vm,
-		int fd, uint32_t handle, struct kgd_mem **mem);
+				int fd, uint32_t handle, struct kgd_mem **mem);
+static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem);
+static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem);
+static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va,
+			size_t size, void *vm, struct kgd_mem **mem);
+static int free_memory_of_gpu(struct kgd_dev *kgd, struct kgd_mem *mem);
 
+static uint16_t get_fw_version(struct kgd_dev *kgd, enum kgd_engine_type type);
 
 /*
  * Register access functions
@@ -98,10 +104,6 @@ static bool read_atc_vmid_pasid_mapping_reg_valid_field(struct kgd_dev *kgd,
 static uint16_t read_atc_vmid_pasid_mapping_reg_pasid_field(struct kgd_dev *kgd,
 		uint8_t vmid);
 static void write_vmid_invalidate_request(struct kgd_dev *kgd, uint8_t vmid);
-static int map_memory_to_gpu(struct kgd_dev *kgd, uint64_t va,
-		size_t size, void *vm, struct kgd_mem **mem);
-static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem);
-static uint16_t get_fw_version(struct kgd_dev *kgd, enum kgd_engine_type type);
 static void set_num_of_requests(struct kgd_dev *kgd,
 			uint8_t num_of_requests);
 
@@ -136,6 +138,8 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.read_atc_vmid_pasid_mapping_reg_valid_field =
 			read_atc_vmid_pasid_mapping_reg_valid_field,
 	.write_vmid_invalidate_request = write_vmid_invalidate_request,
+	.alloc_memory_of_gpu = alloc_memory_of_gpu,
+	.free_memory_of_gpu = free_memory_of_gpu,
 	.map_memory_to_gpu = map_memory_to_gpu,
 	.unmap_memory_to_gpu = unmap_memory_from_gpu,
 	.get_fw_version = get_fw_version,
@@ -531,8 +535,16 @@ static uint32_t kgd_address_watch_get_offset(struct kgd_dev *kgd,
 	return 0;
 }
 
-static int map_memory_to_gpu(struct kgd_dev *kgd, uint64_t va,
-		size_t size, void *vm, struct kgd_mem **mem)
+static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
+				void *vm, struct kgd_mem **mem)
+{
+	return -EFAULT;
+}
+static int free_memory_of_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
+{
+	return -EFAULT;
+}
+static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 {
 	return -EFAULT;
 }
