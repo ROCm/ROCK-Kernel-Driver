@@ -51,6 +51,7 @@ struct kgd_mem {
 		struct {
 			struct radeon_bo *bo;
 			struct radeon_bo_va *bo_va;
+			bool mapped_to_gpu_memory;
 		} data2;
 	};
 };
@@ -1242,6 +1243,8 @@ static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
 
 	(*mem)->data2.bo = bo;
 	(*mem)->data2.bo_va = bo_va;
+	(*mem)->data2.mapped_to_gpu_memory = 0;
+
 	return 0;
 
 err_map:
@@ -1286,13 +1289,24 @@ static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 	bo = mem->data2.bo;
 	bo_va = mem->data2.bo_va;
 
+	if (mem->data2.mapped_to_gpu_memory == 1) {
+		pr_debug("BO with VA %p, size %lu bytes already mapped to GPU memory\n",
+		(void *) (mem->data2.bo_va->it.start * RADEON_GPU_PAGE_SIZE),
+		mem->data2.bo->tbo.mem.size);
+		return 0;
+	}
+
 	/*
 	 * We need to pin the allocated BO, PD and appropriate PTs and to
 	 * create a mapping of virtual to MC address
 	 */
 	ret = map_bo_to_gpuvm(rdev, bo, bo_va);
-	if (ret != 0)
+	if (ret != 0) {
 		pr_err("amdkfd: Failed to map radeon bo to gpuvm\n");
+		return ret;
+	}
+
+	mem->data2.mapped_to_gpu_memory = 1;
 
 	return ret;
 }
@@ -1304,6 +1318,13 @@ static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 	BUG_ON(kgd == NULL);
 	BUG_ON(mem == NULL);
 
+	if (mem->data2.mapped_to_gpu_memory == 0) {
+		pr_debug("Unmapping BO with VA %p, size %lu bytes from GPU memory is unnecessary\n",
+		(void *) (mem->data2.bo_va->it.start * RADEON_GPU_PAGE_SIZE),
+		mem->data2.bo->tbo.mem.size);
+		return 0;
+	}
+
 	rvm = mem->data2.bo_va->vm;
 
 	/* Unpin BO*/
@@ -1314,6 +1335,8 @@ static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 
 	/* Unpin the PD directory*/
 	unpin_bo(mem->data2.bo_va->vm->page_directory);
+
+	mem->data2.mapped_to_gpu_memory = 0;
 
 	return 0;
 }
