@@ -1008,10 +1008,16 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 
 	radeon_flush_tlb(dev, p->pasid);
 
+	err = dev->dqm->ops.set_page_directory_base(dev->dqm, &pdd->qpd);
+	if (err != 0)
+		goto set_pd_base_failed;
+
 	mutex_unlock(&p->mutex);
 
 	return 0;
 
+set_pd_base_failed:
+	kfd2kgd->unmap_memory_to_gpu(dev->kgd, (struct kgd_mem *) mem);
 map_memory_to_gpu_failed:
 get_mem_obj_from_handle_failed:
 bind_process_to_device_failed:
