@@ -404,7 +404,7 @@ static int register_process_nocpsch(struct device_queue_manager *dqm,
 
 	BUG_ON(!dqm || !qpd);
 
-	pr_debug("kfd: In func %s\n", __func__);
+	pr_debug("In func %s\n", __func__);
 
 	n = kzalloc(sizeof(struct device_process_node), GFP_KERNEL);
 	if (!n)
@@ -417,6 +417,7 @@ static int register_process_nocpsch(struct device_queue_manager *dqm,
 
 	pdd = qpd_to_pdd(qpd);
 	qpd->page_table_base = kfd2kgd->get_process_page_dir(pdd->vm);
+	pr_debug("Retrieved PD address == 0x%08u\n", qpd->page_table_base);
 
 	retval = dqm->ops_asic_specific.register_process(dqm, qpd);
 
@@ -1181,6 +1182,42 @@ out:
 	return false;
 }
 
+static int set_page_directory_base(struct device_queue_manager *dqm,
+					struct qcm_process_device *qpd)
+{
+	struct kfd_process_device *pdd;
+	uint32_t pd_base;
+	int retval = 0;
+
+	BUG_ON(!dqm || !qpd);
+
+	mutex_lock(&dqm->lock);
+
+	pdd = qpd_to_pdd(qpd);
+
+	/* Retrieve PD base */
+	pd_base = kfd2kgd->get_process_page_dir(pdd->vm);
+
+	/* If it has not changed, just get out */
+	if (qpd->page_table_base == pd_base)
+		goto out;
+
+	/* Update PD Base in QPD */
+	qpd->page_table_base = pd_base;
+	pr_debug("Updated PD address == 0x%08u\n", pd_base);
+
+	/*
+	 * Preempt queues, destroy runlist and create new runlist. Queues
+	 * will have the update PD base address
+	 */
+	retval = execute_queues_cpsch(dqm, false);
+
+out:
+	mutex_unlock(&dqm->lock);
+
+	return retval;
+}
+
 struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev)
 {
 	struct device_queue_manager *dqm;
@@ -1211,6 +1248,7 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev)
 		dqm->ops.create_kernel_queue = create_kernel_queue_cpsch;
 		dqm->ops.destroy_kernel_queue = destroy_kernel_queue_cpsch;
 		dqm->ops.set_cache_memory_policy = set_cache_memory_policy;
+		dqm->ops.set_page_directory_base = set_page_directory_base;
 		break;
 	case KFD_SCHED_POLICY_NO_HWS:
 		/* initialize dqm for no cp scheduling */
@@ -1225,6 +1263,7 @@ struct device_queue_manager *device_queue_manager_init(struct kfd_dev *dev)
 		dqm->ops.initialize = initialize_nocpsch;
 		dqm->ops.uninitialize = uninitialize_nocpsch;
 		dqm->ops.set_cache_memory_policy = set_cache_memory_policy;
+		dqm->ops.set_page_directory_base = set_page_directory_base;
 		break;
 	default:
 		BUG();

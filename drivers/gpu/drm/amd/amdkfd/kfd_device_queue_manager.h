@@ -81,6 +81,10 @@ struct device_process_node {
  * @set_cache_memory_policy: Sets memory policy (cached/ non cached) for the
  * memory apertures.
  *
+ * @set_page_directory_base: Sets the PD base address (GPU local memory)
+ * in all the queues of the relevant process running on the specified device.
+ * It preempts the queues, updates the value and execute the runlist again.
+ *
  */
 
 struct device_queue_manager_ops {
@@ -124,6 +128,9 @@ struct device_queue_manager_ops {
 					   enum cache_policy alternate_policy,
 					   void __user *alternate_aperture_base,
 					   uint64_t alternate_aperture_size);
+
+	int	(*set_page_directory_base)(struct device_queue_manager *dqm,
+					struct qcm_process_device *qpd);
 };
 
 /**
