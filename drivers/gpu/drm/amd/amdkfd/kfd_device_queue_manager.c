@@ -931,7 +931,7 @@ out:
 	return retval;
 }
 
-int fence_wait_timeout(unsigned int *fence_addr,
+int amdkfd_fence_wait_timeout(unsigned int *fence_addr,
 				unsigned int fence_value,
 				unsigned long timeout)
 {

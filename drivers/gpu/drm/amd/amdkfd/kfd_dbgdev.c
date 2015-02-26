@@ -143,7 +143,9 @@ static int dbgdev_diq_submit_ib(struct kfd_dbgdev *dbgdev,
 
 			/* Wait till CP writes sync code: */
 
-			status = fence_wait_timeout((unsigned int *) rm_state, QUEUESTATE__ACTIVE, 1500);
+			status = amdkfd_fence_wait_timeout(
+					(unsigned int *) rm_state,
+					QUEUESTATE__ACTIVE, 1500);
 
 		} else {
 			pr_debug("Error! kfd: In func %s >> failed to allocate GART memory\n", __func__);

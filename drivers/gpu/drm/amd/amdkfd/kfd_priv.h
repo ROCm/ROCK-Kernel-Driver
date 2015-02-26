@@ -716,8 +716,9 @@ void pm_release_ib(struct packet_manager *pm);
 uint64_t kfd_get_number_elems(struct kfd_dev *kfd);
 phys_addr_t kfd_get_process_doorbells(struct kfd_dev *dev,
 					struct kfd_process *process);
-int fence_wait_timeout(unsigned int *fence_addr, unsigned int fence_value,
-			unsigned long timeout);
+int amdkfd_fence_wait_timeout(unsigned int *fence_addr,
+				unsigned int fence_value,
+				unsigned long timeout);
 
 /* Events */
 extern const struct kfd_event_interrupt_class event_interrupt_class_cik;
