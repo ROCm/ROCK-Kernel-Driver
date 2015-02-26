@@ -1234,7 +1234,7 @@ static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
 	/* Allocate buffer object on VRAM */
 	ret = radeon_bo_create(rdev, size, PAGE_SIZE, false,
 				RADEON_GEM_DOMAIN_VRAM,
-				0, NULL, NULL, &bo);
+				RADEON_GEM_NO_CPU_ACCESS, NULL, NULL, &bo);
 	if (ret != 0) {
 		pr_err("amdkfd: Failed to create BO object on VRAM. ret == %d\n",
 				ret);
