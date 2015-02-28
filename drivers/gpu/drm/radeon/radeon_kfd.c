@@ -1015,46 +1015,54 @@ static void remove_bo_from_vm(struct radeon_device *rdev, struct radeon_bo *bo, 
 }
 
 
-static int try_pin_bo(struct radeon_bo *bo, uint64_t *mc_address)
+static int try_pin_bo(struct radeon_bo *bo, uint64_t *mc_address, bool resv)
 {
 	int ret;
 
-	ret = radeon_bo_reserve(bo, true);
-	if (ret != 0)
-		return ret;
+	if (resv) {
+		ret = radeon_bo_reserve(bo, true);
+		if (ret != 0)
+			return ret;
+	}
 
 	ret = radeon_bo_pin(bo, RADEON_GEM_DOMAIN_VRAM, mc_address);
 	if (ret != 0) {
-		radeon_bo_unreserve(bo);
+		if (resv)
+			radeon_bo_unreserve(bo);
 		return ret;
 	}
 
-	radeon_bo_unreserve(bo);
+	if (resv)
+		radeon_bo_unreserve(bo);
 
 	return 0;
 }
 
-static int unpin_bo(struct radeon_bo *bo)
+static int unpin_bo(struct radeon_bo *bo, bool resv)
 {
 	int ret;
 
-	ret = radeon_bo_reserve(bo, true);
-	if (ret != 0)
-		return ret;
+	if (resv) {
+		ret = radeon_bo_reserve(bo, true);
+		if (ret != 0)
+			return ret;
+	}
 
 	ret = radeon_bo_unpin(bo);
 	if (ret != 0) {
-		radeon_bo_unreserve(bo);
+		if (resv)
+			radeon_bo_unreserve(bo);
 		return ret;
 	}
 
-	radeon_bo_unreserve(bo);
+	if (resv)
+		radeon_bo_unreserve(bo);
 
 	return 0;
 }
 
 
-static int try_pin_pts(struct radeon_bo_va *bo_va)
+static int try_pin_pts(struct radeon_bo_va *bo_va, bool resv)
 {
 	int ret;
 	uint64_t pt_idx, start, last, failed;
@@ -1068,7 +1076,7 @@ static int try_pin_pts(struct radeon_bo_va *bo_va)
 
 	/* walk over the address space and pin the page tables BOs*/
 	for (pt_idx = start; pt_idx <= last; pt_idx++) {
-		ret = try_pin_bo(vm->page_tables[pt_idx].bo, NULL);
+		ret = try_pin_bo(vm->page_tables[pt_idx].bo, NULL, resv);
 		if (ret != 0) {
 			failed = pt_idx;
 			goto err;
@@ -1081,12 +1089,13 @@ err:
 	/* Unpin all already pinned BOs*/
 	if (failed > 0) {
 		for (pt_idx = start; pt_idx <= failed - 1; pt_idx++)
-			unpin_bo(vm->page_tables[pt_idx].bo);
+			unpin_bo(vm->page_tables[pt_idx].bo, resv);
 	}
 	return ret;
 }
 
-static void unpin_pts(struct radeon_bo_va *bo_va, struct radeon_vm *vm)
+static void unpin_pts(struct radeon_bo_va *bo_va, struct radeon_vm *vm,
+			bool resv)
 {
 	uint64_t pt_idx, start, last;
 
@@ -1097,7 +1106,7 @@ static void unpin_pts(struct radeon_bo_va *bo_va, struct radeon_vm *vm)
 
 	/* walk over the address space and unpin the page tables BOs*/
 	for (pt_idx = start; pt_idx <= last; pt_idx++)
-		unpin_bo(vm->page_tables[pt_idx].bo);
+		unpin_bo(vm->page_tables[pt_idx].bo, resv);
 
 }
 
@@ -1120,25 +1129,10 @@ static int map_bo_to_gpuvm(struct radeon_device *rdev, struct radeon_bo *bo,
 	list_add(&tv.head, &list);
 
 	/* Pin BO*/
-	ret = try_pin_bo(bo, NULL);
+	ret = try_pin_bo(bo, NULL, true);
 	if (ret != 0) {
 		pr_err("amdkfd: Failed to pin BO\n");
 		return ret;
-	}
-
-	/* Pin PTs */
-	ret = try_pin_pts(bo_va);
-	if (ret != 0) {
-		pr_err("amdkfd: Failed to pin PTs\n");
-		goto err_failed_to_pin_pts;
-	}
-
-	/* Pin the PD directory*/
-	vm_id = &vm->ids[CAYMAN_RING_TYPE_CP1_INDEX];
-	ret = try_pin_bo(vm->page_directory, &vm_id->pd_gpu_addr);
-	if (ret != 0) {
-		pr_err("amdkfd: Failed to pin PD\n");
-		goto err_failed_to_pin_pd;
 	}
 
 	vm_bos = radeon_vm_get_bos(rdev, vm, &list);
@@ -1147,10 +1141,25 @@ static int map_bo_to_gpuvm(struct radeon_device *rdev, struct radeon_bo *bo,
 		goto err_failed_to_get_bos;
 	}
 
-	ret = ttm_eu_reserve_buffers(&ticket, &list, true, NULL);
+	ret = ttm_eu_reserve_buffers(&ticket, &list, false, NULL);
 	if (ret) {
 		pr_err("amdkfd: Failed to reserve buffers in ttm\n");
 		goto err_failed_to_ttm_reserve;
+	}
+
+	/* Pin PTs */
+	ret = try_pin_pts(bo_va, false);
+	if (ret != 0) {
+		pr_err("amdkfd: Failed to pin PTs\n");
+		goto err_failed_to_pin_pts;
+	}
+
+	/* Pin the PD directory*/
+	vm_id = &vm->ids[CAYMAN_RING_TYPE_CP1_INDEX];
+	ret = try_pin_bo(vm->page_directory, &vm_id->pd_gpu_addr, false);
+	if (ret != 0) {
+		pr_err("amdkfd: Failed to pin PD\n");
+		goto err_failed_to_pin_pd;
 	}
 
 	mutex_lock(&vm->mutex);
@@ -1199,15 +1208,15 @@ err_failed_to_update_pts:
 err_failed_vm_clear_freed:
 err_failed_to_update_pd:
 	mutex_unlock(&vm->mutex);
+	unpin_bo(vm->page_directory, false);
+err_failed_to_pin_pd:
+	unpin_pts(bo_va, vm, false);
+err_failed_to_pin_pts:
 	ttm_eu_backoff_reservation(&ticket, &list);
 err_failed_to_ttm_reserve:
 	drm_free_large(vm_bos);
 err_failed_to_get_bos:
-	unpin_bo(vm->page_directory);
-err_failed_to_pin_pd:
-	unpin_pts(bo_va, vm);
-err_failed_to_pin_pts:
-	unpin_bo(bo);
+	unpin_bo(bo, true);
 
 	return ret;
 }
@@ -1348,13 +1357,13 @@ static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 	rvm = mem->data2.bo_va->vm;
 
 	/* Unpin BO*/
-	unpin_bo(mem->data2.bo);
+	unpin_bo(mem->data2.bo, true);
 
 	/* Unpin PTs */
-	unpin_pts(mem->data2.bo_va, mem->data2.bo_va->vm);
+	unpin_pts(mem->data2.bo_va, mem->data2.bo_va->vm, true);
 
 	/* Unpin the PD directory*/
-	unpin_bo(mem->data2.bo_va->vm->page_directory);
+	unpin_bo(mem->data2.bo_va->vm->page_directory, true);
 
 	mem->data2.mapped_to_gpu_memory = 0;
 
