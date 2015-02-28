@@ -1124,9 +1124,6 @@ static int map_bo_to_gpuvm(struct radeon_device *rdev, struct radeon_bo *bo,
 	INIT_LIST_HEAD(&list);
 
 	vm = bo_va->vm;
-	tv.bo = &bo_va->bo->tbo;
-	tv.shared = true;
-	list_add(&tv.head, &list);
 
 	/* Pin BO*/
 	ret = try_pin_bo(bo, NULL, true);
