@@ -1116,8 +1116,7 @@ static int map_bo_to_gpuvm(struct radeon_device *rdev, struct radeon_bo *bo,
 	struct radeon_vm_id *vm_id;
 	struct radeon_vm *vm;
 	int ret;
-	struct ttm_validate_buffer tv;
-	struct radeon_bo_list *vm_bos;
+	struct radeon_bo_list *vm_bos, *lobj;
 	struct ww_acquire_ctx ticket;
 	struct list_head list;
 
@@ -1194,11 +1193,23 @@ static int map_bo_to_gpuvm(struct radeon_device *rdev, struct radeon_bo *bo,
 
 	mutex_unlock(&vm->mutex);
 
+	list_for_each_entry(lobj, &list, tv.head) {
+		struct radeon_bo *bo = lobj->robj;
+		ret = ttm_bo_wait(&bo->tbo, true, false, false);
+		if (ret != 0) {
+			pr_err("amdkfd: Failed to wait for PT/PD update (err == %d)\n",
+					ret);
+			goto err_failed_to_wait_pt_pd_update;
+		}
+	}
+
 	ttm_eu_backoff_reservation(&ticket, &list);
 	drm_free_large(vm_bos);
 
 	return 0;
 
+err_failed_to_wait_pt_pd_update:
+	mutex_lock(&vm->mutex);
 err_failed_to_vm_clear_invalids:
 	radeon_vm_bo_update(rdev, bo_va, NULL);
 err_failed_to_update_pts:
