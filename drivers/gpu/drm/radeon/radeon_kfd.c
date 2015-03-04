@@ -56,11 +56,15 @@ struct kgd_mem {
 	};
 };
 /* Helper functions*/
-static int add_bo_to_vm(struct radeon_device *rdev, uint64_t va, struct radeon_vm *vm,
-		struct radeon_bo *bo, struct radeon_bo_va **bo_va);
+static int add_bo_to_vm(struct radeon_device *rdev, uint64_t va,
+			struct radeon_vm *vm, struct radeon_bo *bo,
+			struct radeon_bo_va **bo_va);
 static int map_bo_to_gpuvm(struct radeon_device *rdev, struct radeon_bo *bo,
 		struct radeon_bo_va *bo_va);
-static void remove_bo_from_vm(struct radeon_device *rdev, struct radeon_bo *bo, struct radeon_bo_va *bo_va);
+static int unmap_bo_from_gpuvm(struct radeon_device *rdev,
+				struct radeon_bo_va *bo_va);
+static void remove_bo_from_vm(struct radeon_device *rdev, struct radeon_bo *bo,
+				struct radeon_bo_va *bo_va);
 
 static int alloc_gtt_mem(struct kgd_dev *kgd, size_t size,
 			void **mem_obj, uint64_t *gpu_addr,
@@ -1229,6 +1233,62 @@ err_failed_to_get_bos:
 	return ret;
 }
 
+static int unmap_bo_from_gpuvm(struct radeon_device *rdev,
+				struct radeon_bo_va *bo_va)
+{
+	struct radeon_vm *vm;
+	int ret;
+	struct ttm_validate_buffer tv;
+	struct radeon_bo_list *vm_bos;
+	struct ww_acquire_ctx ticket;
+	struct list_head list;
+
+	INIT_LIST_HEAD(&list);
+
+	vm = bo_va->vm;
+	tv.bo = &bo_va->bo->tbo;
+	tv.shared = true;
+	list_add(&tv.head, &list);
+
+	vm_bos = radeon_vm_get_bos(rdev, vm, &list);
+	if (!vm_bos) {
+		pr_err("amdkfd: Failed to get bos from vm\n");
+		goto err_failed_to_get_bos;
+	}
+
+	ret = ttm_eu_reserve_buffers(&ticket, &list, false, NULL);
+	if (ret) {
+		pr_err("amdkfd: Failed to reserve buffers in ttm\n");
+		goto err_failed_to_ttm_reserve;
+	}
+
+	mutex_lock(&vm->mutex);
+
+	/*
+	 * The previously "released" BOs are really released and their VAs are
+	 * removed from PT. This function is called here because it requires
+	 * the radeon_vm::mutex to be locked and PT to be reserved
+	 */
+	radeon_vm_clear_freed(rdev, vm);
+
+	/* Update the page tables - Remove the mapping from bo_va */
+	radeon_vm_bo_update(rdev, bo_va, NULL);
+
+	radeon_vm_clear_invalids(rdev, vm);
+
+	mutex_unlock(&vm->mutex);
+
+	ttm_eu_backoff_reservation(&ticket, &list);
+	drm_free_large(vm_bos);
+
+	return 0;
+
+err_failed_to_ttm_reserve:
+	drm_free_large(vm_bos);
+err_failed_to_get_bos:
+	return ret;
+}
+
 static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
 				void *vm, struct kgd_mem **mem)
 {
@@ -1283,7 +1343,6 @@ err:
 
 static int free_memory_of_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 {
-	struct radeon_vm *rvm;
 	struct radeon_device *rdev = (struct radeon_device *) kgd;
 
 	BUG_ON(kgd == NULL);
@@ -1292,8 +1351,6 @@ static int free_memory_of_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 	pr_debug("Releasing BO with VA %p, size %lu bytes\n",
 		(void *) (mem->data2.bo_va->it.start * RADEON_GPU_PAGE_SIZE),
 		mem->data2.bo->tbo.mem.size);
-
-	rvm = mem->data2.bo_va->vm;
 
 	/* Remove from VM internal data structures */
 	remove_bo_from_vm(rdev, mem->data2.bo, mem->data2.bo_va);
@@ -1346,7 +1403,9 @@ static int map_memory_to_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 
 static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 {
-	struct radeon_vm *rvm;
+	struct radeon_device *rdev = (struct radeon_device *) kgd;
+	struct radeon_bo_va *bo_va;
+	int ret = 0;
 
 	BUG_ON(kgd == NULL);
 	BUG_ON(mem == NULL);
@@ -1362,20 +1421,22 @@ static int unmap_memory_from_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 		(void *) (mem->data2.bo_va->it.start * RADEON_GPU_PAGE_SIZE),
 		mem->data2.bo->tbo.mem.size);
 
-	rvm = mem->data2.bo_va->vm;
+	bo_va = mem->data2.bo_va;
+
+	/* Unpin the PD directory*/
+	unpin_bo(bo_va->vm->page_directory, true);
+
+	/* Unpin PTs */
+	unpin_pts(bo_va, bo_va->vm, true);
 
 	/* Unpin BO*/
 	unpin_bo(mem->data2.bo, true);
 
-	/* Unpin PTs */
-	unpin_pts(mem->data2.bo_va, mem->data2.bo_va->vm, true);
-
-	/* Unpin the PD directory*/
-	unpin_bo(mem->data2.bo_va->vm->page_directory, true);
+	ret = unmap_bo_from_gpuvm(rdev, bo_va);
 
 	mem->data2.mapped_to_gpu_memory = 0;
 
-	return 0;
+	return ret;
 }
 
 static uint16_t get_fw_version(struct kgd_dev *kgd, enum kgd_engine_type type)
