@@ -44,7 +44,7 @@
 #include <linux/device.h>
 #include "kfd_priv.h"
 
-#define KFD_INTERRUPT_RING_SIZE 256
+#define KFD_INTERRUPT_RING_SIZE 1024
 
 static void interrupt_wq(struct work_struct *);
 
