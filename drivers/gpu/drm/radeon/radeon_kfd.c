@@ -1348,6 +1348,13 @@ static int free_memory_of_gpu(struct kgd_dev *kgd, struct kgd_mem *mem)
 	BUG_ON(kgd == NULL);
 	BUG_ON(mem == NULL);
 
+	if (mem->data2.mapped_to_gpu_memory == 1) {
+		pr_debug("BO with VA %p, size %lu bytes is mapped to GPU. Need to unmap it before release\n",
+		(void *) (mem->data2.bo_va->it.start * RADEON_GPU_PAGE_SIZE),
+		mem->data2.bo->tbo.mem.size);
+		unmap_memory_from_gpu(kgd, mem);
+	}
+
 	pr_debug("Releasing BO with VA %p, size %lu bytes\n",
 		(void *) (mem->data2.bo_va->it.start * RADEON_GPU_PAGE_SIZE),
 		mem->data2.bo->tbo.mem.size);
