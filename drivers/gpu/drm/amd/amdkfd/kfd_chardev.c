@@ -291,8 +291,10 @@ static int kfd_ioctl_create_queue(struct file *filep, struct kfd_process *p,
 
 	args->queue_id = queue_id;
 
+
 	/* Return gpu_id as doorbell offset for mmap usage */
-	args->doorbell_offset = args->gpu_id << PAGE_SHIFT;
+	args->doorbell_offset = (KFD_MMAP_DOORBELL_MASK | args->gpu_id);
+	args->doorbell_offset <<= PAGE_SHIFT;
 
 	mutex_unlock(&p->mutex);
 
@@ -838,15 +840,13 @@ static int
 kfd_ioctl_create_event(struct file *filp, struct kfd_process *p, void *data)
 {
 	struct kfd_ioctl_create_event_args *args = data;
-	void __user *event_trigger_address;
 	int err;
 
 	err = kfd_event_create(filp, p, args->event_type,
 				args->auto_reset != 0, args->node_id,
-				&args->event_id, &event_trigger_address,
-				&args->event_trigger_data);
-
-	args->event_trigger_address = (uint64_t)(uintptr_t)event_trigger_address;
+				&args->event_id, &args->event_trigger_data,
+				&args->event_page_offset,
+				&args->event_slot_index);
 
 	return err;
 }
@@ -1290,8 +1290,15 @@ static int kfd_mmap(struct file *filp, struct vm_area_struct *vma)
 	if (IS_ERR(process))
 		return PTR_ERR(process);
 
-	if (vma->vm_pgoff >= KFD_MMAP_EVENTS_START && vma->vm_pgoff < KFD_MMAP_EVENTS_END)
-		return radeon_kfd_event_mmap(process, vma);
-	else
+	if ((vma->vm_pgoff & KFD_MMAP_DOORBELL_MASK) ==
+			KFD_MMAP_DOORBELL_MASK) {
+		vma->vm_pgoff = vma->vm_pgoff ^ KFD_MMAP_DOORBELL_MASK;
 		return kfd_doorbell_mmap(process, vma);
+	} else if ((vma->vm_pgoff & KFD_MMAP_EVENTS_MASK) ==
+			KFD_MMAP_EVENTS_MASK) {
+		vma->vm_pgoff = vma->vm_pgoff ^ KFD_MMAP_EVENTS_MASK;
+		return radeon_kfd_event_mmap(process, vma);
+	}
+
+	return -EFAULT;
 }

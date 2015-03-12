@@ -170,13 +170,13 @@ struct kfd_ioctl_dbg_wave_control_args {
 #define KFD_IOC_WAIT_RESULT_FAIL	2
 
 struct kfd_ioctl_create_event_args {
-	uint64_t event_trigger_address;	/* from KFD - signal events only */
+	uint64_t event_page_offset;	/* from KFD */
 	uint32_t event_trigger_data;	/* from KFD - signal events only */
 	uint32_t event_type;		/* to KFD */
 	uint32_t auto_reset;		/* to KFD */
 	uint32_t node_id;		/* to KFD - only valid for certain event types */
 	uint32_t event_id;		/* from KFD */
-	uint32_t pad;
+	uint32_t event_slot_index;	/* from KFD */
 };
 
 struct kfd_ioctl_destroy_event_args {

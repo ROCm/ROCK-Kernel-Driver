@@ -27,6 +27,7 @@
 #include <linux/uaccess.h>
 #include <linux/mm.h>
 #include <linux/mman.h>
+#include <linux/memory.h>
 #include "kfd_priv.h"
 #include "kfd_events.h"
 #include <linux/device.h>
@@ -112,21 +113,6 @@ allocate_free_slot(struct kfd_process *process,
 	return false;
 }
 
-static int map_signal_page_to_user(struct file *devkfd, struct signal_page *page)
-{
-	void __user *user_address;
-
-	user_address = (void __user *)vm_mmap(devkfd, 0, PAGE_SIZE, PROT_WRITE | PROT_READ, MAP_SHARED,
-					      (KFD_MMAP_EVENTS_START + page->page_index) << PAGE_SHIFT);
-
-	if (IS_ERR(user_address))
-		return PTR_ERR(user_address);
-
-	page->user_address = user_address;
-
-	return 0;
-}
-
 #define list_tail_entry(head, type, member) \
 	list_entry((head)->prev, type, member)
 
@@ -141,7 +127,7 @@ bool allocate_signal_page(struct file *devkfd, struct kfd_process *p)
 
 	page->free_slots = SLOTS_PER_PAGE;
 
-	backing_store = vmalloc(PAGE_SIZE);
+	backing_store = (void *)get_zeroed_page(GFP_KERNEL);
 	if (!backing_store)
 		goto fail_alloc_signal_store;
 
@@ -157,14 +143,8 @@ bool allocate_signal_page(struct file *devkfd, struct kfd_process *p)
 
 	list_add(&page->event_pages, &p->signal_event_pages);
 
-	if (map_signal_page_to_user(devkfd, page))
-		goto fail_map_signal_page;
-
 	return true;
 
-fail_map_signal_page:
-	list_del(&page->event_pages);
-	vfree(backing_store);
 fail_alloc_signal_store:
 	kfree(page);
 fail_alloc_signal_page:
@@ -360,7 +340,7 @@ static void shutdown_signal_pages(struct kfd_process *p)
 	struct signal_page *page, *tmp;
 
 	list_for_each_entry_safe(page, tmp, &p->signal_event_pages, event_pages) {
-		vfree(page->kernel_address);
+		free_page((unsigned long)page->kernel_address);
 		kfree(page);
 	}
 }
@@ -383,7 +363,8 @@ static bool event_can_be_cpu_signaled(const struct kfd_event *ev)
 
 int kfd_event_create(struct file *devkfd, struct kfd_process *p,
 		     uint32_t event_type, bool auto_reset, uint32_t node_id,
-		     uint32_t *event_id, void __user **event_trigger_address, uint32_t *event_trigger_data)
+		     uint32_t *event_id, uint32_t *event_trigger_data,
+		     uint64_t *event_page_offset, uint32_t *event_slot_index)
 {
 	int ret = 0;
 
@@ -397,12 +378,21 @@ int kfd_event_create(struct file *devkfd, struct kfd_process *p,
 
 	INIT_LIST_HEAD(&ev->waiters);
 
+	*event_page_offset = 0;
+
 	mutex_lock(&p->event_mutex);
 
 	switch (event_type) {
 	case KFD_EVENT_TYPE_SIGNAL:
 	case KFD_EVENT_TYPE_DEBUG:
 		ret = create_signal_event(devkfd, p, ev);
+		if (ret == 0) {
+			*event_page_offset = (ev->signal_page->page_index |
+					KFD_MMAP_EVENTS_MASK);
+			*event_page_offset <<= PAGE_SHIFT;
+			*event_slot_index = ev->signal_slot_index;
+		} else
+			pr_err("amdkfd: error signal page\n");
 		break;
 	default:
 		ret = create_other_event(p, ev);
@@ -413,7 +403,6 @@ int kfd_event_create(struct file *devkfd, struct kfd_process *p,
 		hash_add(p->events, &ev->events, ev->event_id);
 
 		*event_id = ev->event_id;
-		*event_trigger_address = ev->user_signal_address;
 		*event_trigger_data = ev->event_id;
 	} else {
 		kfree(ev);
@@ -765,7 +754,7 @@ int radeon_kfd_event_mmap(struct kfd_process *p,
 		return -EINVAL;
 	}
 
-	page_index = vma->vm_pgoff - KFD_MMAP_EVENTS_START;
+	page_index = vma->vm_pgoff;
 
 	page = lookup_signal_page_by_index(p, page_index);
 	if (!page) {
@@ -774,7 +763,8 @@ int radeon_kfd_event_mmap(struct kfd_process *p,
 		return -EINVAL;
 	}
 
-	pfn = vmalloc_to_pfn(page->kernel_address);
+	pfn = __pa(page->kernel_address);
+	pfn >>= PAGE_SHIFT;
 
 	vma->vm_flags |= VM_IO | VM_DONTCOPY | VM_DONTEXPAND | VM_NORESERVE
 		       | VM_DONTDUMP | VM_PFNMAP;
@@ -786,6 +776,8 @@ int radeon_kfd_event_mmap(struct kfd_process *p,
 			 "     size                == 0x%08lX\n",
 			 (long long unsigned int) vma->vm_start,
 			 (unsigned long)pfn, vma->vm_flags, PAGE_SIZE);
+
+	page->user_address = (uint64_t __user *)vma->vm_start;
 
 	/* mapping the page to user process */
 	return remap_pfn_range(vma, vma->vm_start, pfn, PAGE_SIZE, vma->vm_page_prot);
