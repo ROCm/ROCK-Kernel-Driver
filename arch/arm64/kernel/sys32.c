@@ -24,6 +24,7 @@
 
 #include <linux/compiler.h>
 #include <linux/syscalls.h>
+#include <asm/page.h>
 
 asmlinkage long compat_sys_sigreturn_wrapper(void);
 asmlinkage long compat_sys_rt_sigreturn_wrapper(void);
@@ -37,6 +38,11 @@ asmlinkage long compat_sys_readahead_wrapper(void);
 asmlinkage long compat_sys_fadvise64_64_wrapper(void);
 asmlinkage long compat_sys_sync_file_range2_wrapper(void);
 asmlinkage long compat_sys_fallocate_wrapper(void);
+#if PAGE_SHIFT > 12
+asmlinkage long compat_sys_mmap2_wrapper(void);
+#else
+#define compat_sys_mmap2_wrapper sys_mmap_pgoff
+#endif
 
 #undef __SYSCALL
 #define __SYSCALL(nr, sym)	[nr] = sym,
