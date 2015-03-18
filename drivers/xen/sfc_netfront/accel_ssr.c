@@ -118,7 +118,7 @@ static void netfront_accel_ssr_deliver(netfront_accel_vnic *vnic,
 					     c->iph->ihl);
 	}
 
-	VPRINTK("%s: %d\n", __FUNCTION__, c->skb->len);
+	VPRINTK("%s: %d\n", __func__, c->skb->len);
 
 	netif_receive_skb(c->skb); 
 	c->skb = NULL;

@@ -272,7 +272,7 @@ EXPORT_SYMBOL_GPL(net_accel_grant_page);
 int net_accel_ungrant_page(grant_ref_t gntref)
 {
 	if (unlikely(gnttab_query_foreign_access(gntref) != 0)) {
-		EPRINTK("%s: remote domain still using grant %d\n", __FUNCTION__, 
+		EPRINTK("%s: remote domain still using grant %d\n", __func__,
 			gntref);
 		return -EBUSY;
 	}
@@ -312,11 +312,11 @@ void net_accel_update_state(struct xenbus_device *dev, int state)
 	struct xenbus_transaction tr;
 	int err;
 
-	DPRINTK("%s: setting accelstate to %s\n", __FUNCTION__,
+	DPRINTK("%s: setting accelstate to %s\n", __func__,
 		xenbus_strstate(state));
 
 	if (xenbus_exists(XBT_NIL, dev->nodename, "")) {
-		VPRINTK("%s: nodename %s\n", __FUNCTION__, dev->nodename);
+		VPRINTK("%s: nodename %s\n", __func__, dev->nodename);
 	again:
 		err = xenbus_transaction_start(&tr);
 		if (err == 0)

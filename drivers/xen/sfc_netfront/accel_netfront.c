@@ -64,7 +64,7 @@ static int netfront_accel_netdev_start_xmit(struct sk_buff *skb,
 	handled = netfront_accel_vi_tx_post(vnic, skb);
 	if (handled == NETFRONT_ACCEL_STATUS_BUSY) {
 		BUG_ON(vnic->net_dev != net_dev);
-		DPRINTK("%s stopping queue\n", __FUNCTION__);
+		DPRINTK("%s stopping queue\n", __func__);
 
 		/* Need netfront's tx_lock and vnic tx_lock to write tx_skb */
 		spin_lock_irqsave(&np->tx_lock, flags2);
@@ -105,7 +105,7 @@ static int netfront_accel_netdev_poll(struct net_device *net_dev, int *budget)
 	NETFRONT_ACCEL_STATS_OP(vnic->stats.poll_call_count++);
 
 	VPRINTK("%s: done %d allowed %d\n",
-		__FUNCTION__, rx_done, rx_allowed);
+		__func__, rx_done, rx_allowed);
 
 	netfront_accel_ssr_end_of_burst(vnic, &vnic->ssr_state);
 
@@ -270,7 +270,7 @@ static int __init netfront_accel_init(void)
 		return 0;
 
 	if (!is_pow2(sizeof(struct net_accel_msg)))
-		EPRINTK("%s: bad structure size\n", __FUNCTION__);
+		EPRINTK("%s: bad structure size\n", __func__);
 
 	netfront_accel_workqueue = create_workqueue(frontend_name);
 
@@ -311,12 +311,12 @@ static void __exit netfront_accel_exit(void)
 	if (is_initial_xendomain())
 		return;
 
-	DPRINTK("%s: unhooking\n", __FUNCTION__);
+	DPRINTK("%s: unhooking\n", __func__);
 
 	/* Unhook from normal netfront */
 	netfront_accelerator_stop(frontend_name);
 
-	DPRINTK("%s: done\n", __FUNCTION__);
+	DPRINTK("%s: done\n", __func__);
 
 	netfront_accel_debugfs_fini();
 

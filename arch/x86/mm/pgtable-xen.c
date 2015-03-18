@@ -621,7 +621,7 @@ void pud_populate(struct mm_struct *mm, pud_t *pudp, pmd_t *pmd)
 
 #endif	/* CONFIG_X86_PAE */
 
-static void free_pmds(pmd_t *pmds[], struct mm_struct *mm, bool contig)
+static void free_pmds(struct mm_struct *mm, pmd_t *pmds[], bool contig)
 {
 	int i;
 
@@ -631,11 +631,13 @@ static void free_pmds(pmd_t *pmds[], struct mm_struct *mm, bool contig)
 #endif
 
 	for(i = 0; i < PREALLOCATED_PMDS; i++)
-		if (pmds[i])
+		if (pmds[i]) {
 			pmd_free(mm, pmds[i]);
+			mm_dec_nr_pmds(mm);
+		}
 }
 
-static int preallocate_pmds(pmd_t *pmds[], struct mm_struct *mm)
+static int preallocate_pmds(struct mm_struct *mm, pmd_t *pmds[])
 {
 	int i;
 	bool failed = false;
@@ -644,11 +646,13 @@ static int preallocate_pmds(pmd_t *pmds[], struct mm_struct *mm)
 		pmd_t *pmd = pmd_alloc_one(mm, i << PUD_SHIFT);
 		if (pmd == NULL)
 			failed = true;
+		else
+			mm_inc_nr_pmds(mm);
 		pmds[i] = pmd;
 	}
 
 	if (failed) {
-		free_pmds(pmds, mm, false);
+		free_pmds(mm, pmds, false);
 		return -ENOMEM;
 	}
 
@@ -675,6 +679,7 @@ static void pgd_mop_up_pmds(struct mm_struct *mm, pgd_t *pgdp)
 
 			paravirt_release_pmd(pgd_val(pgd) >> PAGE_SHIFT);
 			pmd_free(mm, pmd);
+			mm_dec_nr_pmds(mm);
 		}
 	}
 
@@ -744,7 +749,7 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
 
 	mm->pgd = pgd;
 
-	if (preallocate_pmds(pmds, mm) != 0)
+	if (preallocate_pmds(mm, pmds) != 0)
 		goto out_free_pgd;
 
 	if (paravirt_pgd_alloc(mm) != 0)
@@ -774,7 +779,7 @@ pgd_t *pgd_alloc(struct mm_struct *mm)
 	return pgd;
 
 out_free_pmds:
-	free_pmds(pmds, mm, !xen_feature(XENFEAT_pae_pgdir_above_4gb));
+	free_pmds(mm, pmds, !xen_feature(XENFEAT_pae_pgdir_above_4gb));
 out_free_pgd:
 	user_pgd_free(pgd);
 	free_page((unsigned long)pgd);

@@ -361,7 +361,7 @@ static struct frontswap_ops tmem_frontswap_ops = {
 };
 #endif
 
-static int xen_tmem_init(void)
+static int __init xen_tmem_init(void)
 {
 	if (!xen_domain())
 		return 0;

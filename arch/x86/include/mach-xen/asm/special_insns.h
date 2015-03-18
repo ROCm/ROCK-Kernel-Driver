@@ -184,17 +184,17 @@ static inline void write_cr3(unsigned long x)
 	xen_write_cr3(x);
 }
 
-static inline unsigned long read_cr4(void)
+static inline unsigned long __read_cr4(void)
 {
 	return xen_read_cr4();
 }
 
-static inline unsigned long read_cr4_safe(void)
+static inline unsigned long __read_cr4_safe(void)
 {
 	return xen_read_cr4_safe();
 }
 
-static inline void write_cr4(unsigned long x)
+static inline void __write_cr4(unsigned long x)
 {
 	xen_write_cr4(x);
 }

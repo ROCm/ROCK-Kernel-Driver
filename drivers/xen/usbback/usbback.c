@@ -198,16 +198,29 @@ static void fast_flush_area(pending_req_t *pending_req)
 }
 
 static void copy_buff_to_pages(void *buff, pending_req_t *pending_req,
-		int start, int nr_pages)
+			       unsigned int start, unsigned int nr_pages,
+			       unsigned int offset, unsigned int length)
 {
-	unsigned long copied = 0;
-	int i;
+	const struct pending_req_segment *seg = pending_req->seg + start;
+	unsigned int i, off, len, buf_off = 0;
 
-	for (i = start; i < start + nr_pages; i++) {
-		memcpy((void *) vaddr(pending_req, i) + pending_req->seg[i].offset,
-			buff + copied,
-			pending_req->seg[i].length);
-		copied += pending_req->seg[i].length;
+	for (i = start; i < start + nr_pages; i++, seg++) {
+		len = seg->length;
+		off = seg->offset;
+		if (buf_off + len > offset) {
+			if (buf_off < offset) {
+				len -= offset - buf_off;
+				off += offset - buf_off;
+				buf_off += offset - buf_off;
+			}
+			if (buf_off + len > offset + length)
+				len -= offset + length - buf_off;
+			memcpy((void *)vaddr(pending_req, i) + off,
+			       buff + buf_off, len);
+		}
+		buf_off += len;
+		if (buf_off >= offset + length)
+			break;
 	}
 }
 
@@ -353,17 +366,39 @@ static void usbbk_do_response(pending_req_t *pending_req, int32_t status,
 		notify_remote_via_irq(usbif->irq);
 }
 
+static void usbbk_copy_isoc_to_pages(struct urb *urb)
+{
+	pending_req_t *pending_req = urb->context;
+	struct usb_iso_packet_descriptor *isoc = &urb->iso_frame_desc[0];
+	unsigned int n_isoc = urb->number_of_packets;
+
+	copy_buff_to_pages(isoc, pending_req,
+			   pending_req->nr_buffer_segs,
+			   pending_req->nr_extra_segs, 0,
+			   n_isoc * sizeof(*isoc));
+
+	if (!usb_pipein(urb->pipe))
+		return;
+
+	while (n_isoc--) {
+		copy_buff_to_pages(pending_req->buffer,
+				   pending_req, 0,
+				   pending_req->nr_buffer_segs,
+				   isoc->offset, isoc->actual_length);
+		isoc++;
+	}
+}
+
 static void usbbk_urb_complete(struct urb *urb)
 {
 	pending_req_t *pending_req = (pending_req_t *)urb->context;
 
-	if (usb_pipein(urb->pipe) && urb->status == 0 && urb->actual_length > 0)
-		copy_buff_to_pages(pending_req->buffer, pending_req,
-					0, pending_req->nr_buffer_segs);
-
 	if (usb_pipeisoc(urb->pipe))
-		copy_buff_to_pages(&urb->iso_frame_desc[0], pending_req,
-					pending_req->nr_buffer_segs, pending_req->nr_extra_segs);
+		usbbk_copy_isoc_to_pages(urb);
+	else if (usb_pipein(urb->pipe) && urb->actual_length > 0)
+		copy_buff_to_pages(pending_req->buffer, pending_req,
+				   0, pending_req->nr_buffer_segs,
+				   0, urb->actual_length);
 
 	barrier();
 

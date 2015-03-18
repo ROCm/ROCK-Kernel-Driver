@@ -226,6 +226,7 @@ static const struct tnt tnts[] = {
 	{ TAINT_OOT_MODULE,		'O', ' ' },
 	{ TAINT_UNSIGNED_MODULE,	'E', ' ' },
 	{ TAINT_SOFTLOCKUP,		'L', ' ' },
+	{ TAINT_LIVEPATCH,		'K', ' ' },
 #ifdef CONFIG_SUSE_KERNEL_SUPPORTED
 	{ TAINT_NO_SUPPORT,		'N', ' ' },
 	{ TAINT_EXTERNAL_SUPPORT,	'X', ' ' },
@@ -250,6 +251,7 @@ static const struct tnt tnts[] = {
  *  'O' - Out-of-tree module has been loaded.
  *  'E' - Unsigned module has been loaded.
  *  'L' - A soft lockup has previously occurred.
+ *  'K' - Kernel has been live patched.
  *  'N' - Unsuported modules loaded.
  *  'X' - Modules with external support loaded.
  *

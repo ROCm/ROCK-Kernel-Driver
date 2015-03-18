@@ -41,7 +41,7 @@
 
 #define DPRINTK(fmt, args...)				\
 	pr_debug("netfront/accel (%s:%d) " fmt,		\
-	       __FUNCTION__, __LINE__, ##args)
+	       __func__, __LINE__, ##args)
 
 static int netfront_remove_accelerator(struct netfront_info *np,
 				       struct xenbus_device *dev);
@@ -177,7 +177,7 @@ void netfront_accelerator_add_watch(struct netfront_info *np)
 				 accel_watch_changed);
 	if (err) {
 		DPRINTK("%s: Failed to register accel watch: %d\n",
-                        __FUNCTION__, err);
+                        __func__, err);
 		np->accel_vif_state.accel_watch.node = NULL;
         }
 }

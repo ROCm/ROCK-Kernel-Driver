@@ -163,7 +163,7 @@ static int setup_config_accel_watch(struct xenbus_device *dev,
 
 	if (err) {
 		EPRINTK("%s: Failed to register xenbus watch: %d\n",
-			__FUNCTION__, err);
+			__func__, err);
 		bend->config_accel_watch.node = NULL;
 		return err;
 	}
@@ -349,13 +349,13 @@ static int publish_frontend_name(struct xenbus_device *dev)
 	do {
 		err = xenbus_transaction_start(&tr);
 		if (err != 0) { 
-			EPRINTK("%s: transaction start failed\n", __FUNCTION__);
+			EPRINTK("%s: transaction start failed\n", __func__);
 			return err;
 		}
 		err = xenbus_printf(tr, dev->nodename, "accel-frontend", 
 				    "%s", frontend_name);
 		if (err != 0) {
-			EPRINTK("%s: xenbus_printf failed\n", __FUNCTION__);
+			EPRINTK("%s: xenbus_printf failed\n", __func__);
 			xenbus_transaction_end(tr, 1);
 			return err;
 		}
@@ -397,16 +397,16 @@ static void cleanup_vnic(struct netback_accel *bend)
 
 	dev = (struct xenbus_device *)bend->hdev_data;
 
-	DPRINTK("%s: bend %p dev %p\n", __FUNCTION__, bend, dev);
+	DPRINTK("%s: bend %p dev %p\n", __func__, bend, dev);
 
 	DPRINTK("%s: Remove %p's mac from fwd table...\n", 
-		__FUNCTION__, bend);
+		__func__, bend);
 	netback_accel_fwd_remove(bend->mac, bend->fwd_priv);
 
 	/* Free buffer table allocations */
 	netback_accel_remove_buffers(bend);
 
-	DPRINTK("%s: Release hardware resources...\n", __FUNCTION__);
+	DPRINTK("%s: Release hardware resources...\n", __func__);
 	if (bend->accel_shutdown)
 		bend->accel_shutdown(bend);
 
@@ -421,7 +421,7 @@ static void cleanup_vnic(struct netback_accel *bend)
 	}
 
 	if (bend->sh_pages_unmap) {
-		DPRINTK("%s: Unmap grants %p\n", __FUNCTION__, 
+		DPRINTK("%s: Unmap grants %p\n", __func__,
 			bend->sh_pages_unmap);
 		net_accel_unmap_grants_contig(dev, bend->sh_pages_unmap);
 		bend->sh_pages_unmap = NULL;
@@ -459,7 +459,7 @@ static void netback_accel_frontend_changed(struct xenbus_device *dev,
 	XenbusState backend_state;
 
 	DPRINTK("%s: changing from %s to %s. nodename %s, otherend %s\n",
-		__FUNCTION__, xenbus_strstate(bend->frontend_state),
+		__func__, xenbus_strstate(bend->frontend_state),
 		xenbus_strstate(frontend_state),dev->nodename, dev->otherend);
 
 	/*
@@ -585,7 +585,7 @@ static int setup_domu_accel_watch(struct xenbus_device *dev,
 				 bend_domu_accel_change);
 	if (err) {
 		EPRINTK("%s: Failed to register xenbus watch: %d\n",
-			__FUNCTION__, err);
+			__func__, err);
 		goto fail;
 	}
 	return 0;
@@ -601,12 +601,12 @@ int netback_accel_probe(struct xenbus_device *dev)
 	struct backend_info *binfo;
 	int err;
 
-	DPRINTK("%s: passed device %s\n", __FUNCTION__, dev->nodename);
+	DPRINTK("%s: passed device %s\n", __func__, dev->nodename);
 
 	/* Allocate structure to store all our state... */
 	bend = kzalloc(sizeof(struct netback_accel), GFP_KERNEL);
 	if (bend == NULL) {
-		DPRINTK("%s: no memory for bend\n", __FUNCTION__);
+		DPRINTK("%s: no memory for bend\n", __func__);
 		return -ENOMEM;
 	}
 	
@@ -620,7 +620,7 @@ int netback_accel_probe(struct xenbus_device *dev)
 	/* And vice-versa */
 	bend->hdev_data = dev;
 
-	DPRINTK("%s: Adding bend %p to list\n", __FUNCTION__, bend);
+	DPRINTK("%s: Adding bend %p to list\n", __func__, bend);
 	
 	init_waitqueue_head(&bend->state_wait_queue);
 	bend->vnic_is_setup = 0;
@@ -732,7 +732,7 @@ int netback_accel_remove(struct xenbus_device *dev)
 	binfo = dev_get_drvdata(&dev->dev);
 	bend = (struct netback_accel *) binfo->netback_accel_priv;
 
-	DPRINTK("%s: dev %p bend %p\n", __FUNCTION__, dev, bend);
+	DPRINTK("%s: dev %p bend %p\n", __func__, dev, bend);
 	
 	BUG_ON(bend == NULL);
 	

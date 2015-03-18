@@ -37,7 +37,7 @@
 #define NET_ACCEL_CHECK_MAGIC(_p, _errval)				\
 	if (_p->magic != NET_ACCEL_MSG_MAGIC) {				\
 		pr_err("%s: passed invalid shared page %p!\n",		\
-		       __FUNCTION__, _p);				\
+		       __func__, _p);					\
 		return _errval;						\
 	}
 #define NET_ACCEL_SHOW_QUEUE(_t, _q, _id)				\

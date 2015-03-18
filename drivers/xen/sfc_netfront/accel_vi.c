@@ -81,7 +81,7 @@ int netfront_accel_vi_init_fini(netfront_accel_vnic *vnic,
 			(vnic->dev, hw_msg->resources.falcon_a.evq_rptr_gnt,
 			 &vnic->hw.falcon.evq_rptr_mapping);
 		if (io_kva == NULL) {
-			EPRINTK("%s: evq_rptr permission failed\n", __FUNCTION__);
+			EPRINTK("%s: evq_rptr permission failed\n", __func__);
 			goto evq_rptr_fail;
 		}
 
@@ -110,7 +110,7 @@ int netfront_accel_vi_init_fini(netfront_accel_vnic *vnic,
 		net_accel_map_grants_contig(vnic->dev, evq_gnts, 1 << evq_order,
 					    &vnic->evq_mapping);
 	if (evq_base == NULL) {
-		EPRINTK("%s: evq_base failed\n", __FUNCTION__);
+		EPRINTK("%s: evq_base failed\n", __func__);
 		goto evq_fail;
 	}
 
@@ -120,7 +120,7 @@ int netfront_accel_vi_init_fini(netfront_accel_vnic *vnic,
 		net_accel_map_iomem_page(vnic->dev, hw_info->doorbell_gnt,
 					 &vnic->hw.falcon.doorbell_mapping);
 	if (doorbell_kva == NULL) {
-		EPRINTK("%s: doorbell permission failed\n", __FUNCTION__);
+		EPRINTK("%s: doorbell permission failed\n", __func__);
 		goto doorbell_fail;
 	}
 	vnic->hw.falcon.doorbell = doorbell_kva;
@@ -140,7 +140,7 @@ int netfront_accel_vi_init_fini(netfront_accel_vnic *vnic,
 		(vnic->dev, &(hw_info->txdmaq_gnt), 1, 
 		 &vnic->hw.falcon.txdmaq_mapping);
 	if (tx_dma_kva == NULL) {
-		EPRINTK("%s: TX dma failed\n", __FUNCTION__);
+		EPRINTK("%s: TX dma failed\n", __func__);
 		goto tx_dma_fail;
 	}
 
@@ -148,7 +148,7 @@ int netfront_accel_vi_init_fini(netfront_accel_vnic *vnic,
 		(vnic->dev, &(hw_info->rxdmaq_gnt), 1, 
 		 &vnic->hw.falcon.rxdmaq_mapping);
 	if (rx_dma_kva == NULL) {
-		EPRINTK("%s: RX dma failed\n", __FUNCTION__);
+		EPRINTK("%s: RX dma failed\n", __func__);
 		goto rx_dma_fail;
 	}
 
@@ -186,7 +186,7 @@ int netfront_accel_vi_init_fini(netfront_accel_vnic *vnic,
 					       hw_info->tx_capacity);
 	vnic->vi_state = (ef_vi_state *)kmalloc(vi_state_size, GFP_KERNEL);
 	if (vnic->vi_state == NULL) {
-		EPRINTK("%s: kmalloc for VI state failed\n", __FUNCTION__);
+		EPRINTK("%s: kmalloc for VI state failed\n", __func__);
 		goto vi_state_fail;
 	}
 	ef_vi_init(&vnic->vi, vi_data, vnic->vi_state, &vnic->evq_state, 0);
@@ -288,7 +288,7 @@ void netfront_accel_vi_post_rx_or_free(netfront_accel_vnic *vnic, u16 id,
 				       netfront_accel_pkt_desc *buf)
 {
 
-	VPRINTK("%s: %d\n", __FUNCTION__, id);
+	VPRINTK("%s: %d\n", __func__, id);
 
 	if (ef_vi_receive_space(&vnic->vi) <= vnic->rx_dma_batched) {
 		VPRINTK("RX space is full\n");
@@ -322,7 +322,7 @@ void netfront_accel_vi_add_bufs(netfront_accel_vnic *vnic, int is_rx)
 	       ef_vi_receive_space(&vnic->vi) > vnic->rx_dma_batched) {
 		netfront_accel_pkt_desc *buf;
 		
-		VPRINTK("%s: %d\n", __FUNCTION__, vnic->rx_dma_level);
+		VPRINTK("%s: %d\n", __func__, vnic->rx_dma_level);
 		
 		/* Try to allocate a buffer. */
 		buf = netfront_accel_buf_get(vnic->rx_bufs);
@@ -334,7 +334,7 @@ void netfront_accel_vi_add_bufs(netfront_accel_vnic *vnic, int is_rx)
 		netfront_accel_vi_post_rx(vnic, buf->buf_id, buf);
 	}
 
-	VPRINTK("%s: done\n", __FUNCTION__);
+	VPRINTK("%s: done\n", __func__);
 }
 
 
@@ -374,7 +374,7 @@ static int multi_post_start_new_buffer(netfront_accel_vnic *vnic,
 	/* Get a mapped packet buffer */
 	buf = netfront_accel_buf_get(vnic->tx_bufs);
 	if (buf == NULL) {
-		DPRINTK("%s: No buffer for TX\n", __FUNCTION__);
+		DPRINTK("%s: No buffer for TX\n", __func__);
 		return -1;
 	}
 
@@ -438,7 +438,7 @@ static inline void multi_post_unwind(netfront_accel_vnic *vnic,
 {
 	struct netfront_accel_tso_buffer *tso_buf;
 
-	DPRINTK("%s\n", __FUNCTION__);
+	DPRINTK("%s\n", __func__);
 
 	while (st->output_buffers != NULL) {
 		tso_buf = st->output_buffers;
@@ -469,7 +469,7 @@ netfront_accel_enqueue_skb_multi(netfront_accel_vnic *vnic, struct sk_buff *skb)
 	}
 
 	if (multi_post_start_new_buffer(vnic, &state)) {
-		DPRINTK("%s: out of buffers\n", __FUNCTION__);
+		DPRINTK("%s: out of buffers\n", __func__);
 		goto unwind;
 	}
 
@@ -491,14 +491,14 @@ netfront_accel_enqueue_skb_multi(netfront_accel_vnic *vnic, struct sk_buff *skb)
 		if ((state.output_buffers->length == 
 		     NETFRONT_ACCEL_TX_BUF_LENGTH) &&
 		    multi_post_start_new_buffer(vnic, &state)) {
-			DPRINTK("%s: out of buffers\n", __FUNCTION__);
+			DPRINTK("%s: out of buffers\n", __func__);
 			goto unwind;
 		}
 	}
 
 	/* Check for space */
 	if (ef_vi_transmit_space(&vnic->vi) < state.buffers) {
-		DPRINTK("%s: Not enough TX space (%d)\n", __FUNCTION__, state.buffers);
+		DPRINTK("%s: Not enough TX space (%d)\n", __func__, state.buffers);
 		goto unwind;
 	}
 
@@ -554,14 +554,14 @@ netfront_accel_enqueue_skb_single(netfront_accel_vnic *vnic, struct sk_buff *skb
 	int rc;
 
 	if (ef_vi_transmit_space(&vnic->vi) < 1) {
-		DPRINTK("%s: No TX space\n", __FUNCTION__);
+		DPRINTK("%s: No TX space\n", __func__);
 		NETFRONT_ACCEL_STATS_OP(vnic->stats.fastpath_tx_busy++);
 		return NETFRONT_ACCEL_STATUS_BUSY;
 	}
 
 	buf = netfront_accel_buf_get(vnic->tx_bufs);
 	if (buf == NULL) {
-		DPRINTK("%s: No buffer for TX\n", __FUNCTION__);
+		DPRINTK("%s: No buffer for TX\n", __func__);
 		NETFRONT_ACCEL_STATS_OP(vnic->stats.fastpath_tx_busy++);
 		return NETFRONT_ACCEL_STATUS_BUSY;
 	}
@@ -597,7 +597,7 @@ netfront_accel_enqueue_skb_single(netfront_accel_vnic *vnic, struct sk_buff *skb
 			kva += frag_len;
 		});
 
-	VPRINTK("%s: id %d pkt %p kva %p buff_addr 0x%08x\n", __FUNCTION__,
+	VPRINTK("%s: id %d pkt %p kva %p buff_addr 0x%08x\n", __func__,
 		buf->buf_id, buf, buf->pkt_kva, buf->pkt_buff_addr);
 
 
@@ -653,7 +653,7 @@ netfront_accel_vi_tx_post(netfront_accel_vnic *vnic, struct sk_buff *skb)
 
 	/* Check to see if the packet can be sent. */
 	if (skb_headlen(skb) < sizeof(*pkt_eth_hdr) + sizeof(*pkt_ipv4_hdr)) {
-		EPRINTK("%s: Packet header is too small\n", __FUNCTION__);
+		EPRINTK("%s: Packet header is too small\n", __func__);
 		return NETFRONT_ACCEL_STATUS_CANT;
 	}
 
@@ -661,7 +661,7 @@ netfront_accel_vi_tx_post(netfront_accel_vnic *vnic, struct sk_buff *skb)
 	pkt_ipv4_hdr = (void*)(pkt_eth_hdr+1);
 
 	if (be16_to_cpu(pkt_eth_hdr->h_proto) != ETH_P_IP) {
-		DPRINTK("%s: Packet is not IPV4 (ether_type=0x%04x)\n", __FUNCTION__,
+		DPRINTK("%s: Packet is not IPV4 (ether_type=0x%04x)\n", __func__,
 			be16_to_cpu(pkt_eth_hdr->h_proto));
 		return NETFRONT_ACCEL_STATUS_CANT;
 	}
@@ -669,11 +669,11 @@ netfront_accel_vi_tx_post(netfront_accel_vnic *vnic, struct sk_buff *skb)
 	if (pkt_ipv4_hdr->protocol != IPPROTO_TCP &&
 	    pkt_ipv4_hdr->protocol != IPPROTO_UDP) {
 		DPRINTK("%s: Packet is not TCP/UDP (ip_protocol=0x%02x)\n",
-			__FUNCTION__, pkt_ipv4_hdr->protocol);
+			__func__, pkt_ipv4_hdr->protocol);
 		return NETFRONT_ACCEL_STATUS_CANT;
 	}
 	
-	VPRINTK("%s: %d bytes, gso %d\n", __FUNCTION__, skb->len, 
+	VPRINTK("%s: %d bytes, gso %d\n", __func__, skb->len,
 		skb_shinfo(skb)->gso_size);
 	
 	if (skb_is_gso(skb))
@@ -772,7 +772,7 @@ static void  netfront_accel_vi_rx_complete(netfront_accel_vnic *vnic,
 		u16 port;
 
 		DPRINTK("%s: saw wrong MAC address %pM\n",
-			__FUNCTION__, skb->data);
+			__func__, skb->data);
 
 		if (ip->protocol == IPPROTO_TCP) {
 			struct tcphdr *tcp = (struct tcphdr *)
@@ -880,7 +880,7 @@ static int netfront_accel_vi_poll_process_rx(netfront_accel_vnic *vnic,
 
 			if (skb == NULL) {
 				DPRINTK("%s: Couldn't get an rx skb.\n",
-					__FUNCTION__);
+					__func__);
 				netfront_accel_vi_post_rx_or_free(vnic, (u16)id, buf);
 				/*
 				 * Dropping this fragment means we
@@ -901,7 +901,7 @@ static int netfront_accel_vi_poll_process_rx(netfront_accel_vnic *vnic,
 			 * received
 			 */
 			EPRINTK("%s: Rx packet too large (%d)\n",
-				__FUNCTION__, len);
+				__func__, len);
 			netfront_accel_vi_post_rx_or_free(vnic, (u16)id, buf);
 			discard_jumbo_state(vnic);
 			return 0;
@@ -930,28 +930,28 @@ static int netfront_accel_vi_poll_process_rx(netfront_accel_vnic *vnic,
 		    == EF_EVENT_RX_DISCARD_TRUNC) {
 			DPRINTK("%s: " EF_EVENT_FMT 
 				" buffer %d FRM_TRUNC q_id %d\n",
-				__FUNCTION__, EF_EVENT_PRI_ARG(*ev), id,
+				__func__, EF_EVENT_PRI_ARG(*ev), id,
 				EF_EVENT_RX_DISCARD_Q_ID(*ev) );
 			NETFRONT_ACCEL_STATS_OP(++vnic->stats.fastpath_frm_trunc);
 		} else if (EF_EVENT_RX_DISCARD_TYPE(*ev) 
 			  == EF_EVENT_RX_DISCARD_OTHER) {
 			DPRINTK("%s: " EF_EVENT_FMT 
 				" buffer %d RX_DISCARD_OTHER q_id %d\n",
-				__FUNCTION__, EF_EVENT_PRI_ARG(*ev), id,
+				__func__, EF_EVENT_PRI_ARG(*ev), id,
 				EF_EVENT_RX_DISCARD_Q_ID(*ev) );
 			NETFRONT_ACCEL_STATS_OP(++vnic->stats.fastpath_discard_other);
 		} else if (EF_EVENT_RX_DISCARD_TYPE(*ev) ==
 			   EF_EVENT_RX_DISCARD_CSUM_BAD) {
 			DPRINTK("%s: " EF_EVENT_FMT 
 				" buffer %d DISCARD CSUM_BAD q_id %d\n",
-				__FUNCTION__, EF_EVENT_PRI_ARG(*ev), id,
+				__func__, EF_EVENT_PRI_ARG(*ev), id,
 				EF_EVENT_RX_DISCARD_Q_ID(*ev) );
 			NETFRONT_ACCEL_STATS_OP(++vnic->stats.fastpath_csum_bad);
 		} else if (EF_EVENT_RX_DISCARD_TYPE(*ev) ==
 			   EF_EVENT_RX_DISCARD_CRC_BAD) {
 			DPRINTK("%s: " EF_EVENT_FMT 
 				" buffer %d DISCARD CRC_BAD q_id %d\n",
-				__FUNCTION__, EF_EVENT_PRI_ARG(*ev), id,
+				__func__, EF_EVENT_PRI_ARG(*ev), id,
 				EF_EVENT_RX_DISCARD_Q_ID(*ev) );
 			NETFRONT_ACCEL_STATS_OP(++vnic->stats.fastpath_crc_bad);
 		} else {
@@ -959,7 +959,7 @@ static int netfront_accel_vi_poll_process_rx(netfront_accel_vnic *vnic,
 			       EF_EVENT_RX_DISCARD_RIGHTS);
 			DPRINTK("%s: " EF_EVENT_FMT 
 				" buffer %d DISCARD RIGHTS q_id %d\n",
-				__FUNCTION__, EF_EVENT_PRI_ARG(*ev), id,
+				__func__, EF_EVENT_PRI_ARG(*ev), id,
 				EF_EVENT_RX_DISCARD_Q_ID(*ev) );
 			NETFRONT_ACCEL_STATS_OP(++vnic->stats.fastpath_rights_bad);
 		}
@@ -982,7 +982,7 @@ missing_head:
 	vnic->netdev_stats.fastpath_rx_errors++;
 
 	DPRINTK("%s experienced bad packet/missing fragment error: %d \n",
-		__FUNCTION__, ev->rx.flags);
+		__func__, ev->rx.flags);
 
 	return 0;
 }
@@ -1001,12 +1001,12 @@ static void netfront_accel_vi_not_busy(netfront_accel_vnic *vnic)
 	 */
 
 	if (vnic->tx_skb != NULL) {
-		DPRINTK("%s trying to send spare buffer\n", __FUNCTION__);
+		DPRINTK("%s trying to send spare buffer\n", __func__);
 		
 		handled = netfront_accel_vi_tx_post(vnic, vnic->tx_skb);
 		
 		if (handled != NETFRONT_ACCEL_STATUS_BUSY) {
-			DPRINTK("%s restarting tx\n", __FUNCTION__);
+			DPRINTK("%s restarting tx\n", __func__);
 
 			/* Need netfront tx_lock and vnic tx_lock to
 			 * write tx_skb */
@@ -1111,11 +1111,11 @@ int netfront_accel_vi_poll(netfront_accel_vnic *vnic, int rx_packets)
 	i = 0;
 	NETFRONT_ACCEL_STATS_OP(n_evs_polled += events);
 
-	VPRINTK("%s: %d events\n", __FUNCTION__, events);
+	VPRINTK("%s: %d events\n", __func__, events);
 
 	/* Loop over each event */
 	while (events) {
-		VPRINTK("%s: Event "EF_EVENT_FMT", index %lu\n", __FUNCTION__, 
+		VPRINTK("%s: Event "EF_EVENT_FMT", index %lu\n", __func__,
 			EF_EVENT_PRI_ARG(ev[i]),	
 			(unsigned long)(vnic->vi.evq_state->evq_ptr));
 
@@ -1131,7 +1131,7 @@ int netfront_accel_vi_poll(netfront_accel_vnic *vnic, int rx_packets)
 		} else if (EF_EVENT_TYPE(ev[i]) == 
 			   EF_EVENT_TYPE_RX_NO_DESC_TRUNC) {
 			DPRINTK("%s: RX_NO_DESC_TRUNC " EF_EVENT_FMT "\n",
-				__FUNCTION__, EF_EVENT_PRI_ARG(ev[i]));
+				__func__, EF_EVENT_PRI_ARG(ev[i]));
 			discard_jumbo_state(vnic);
 			NETFRONT_ACCEL_STATS_OP(vnic->stats.rx_no_desc_trunc++);
 		} else {
@@ -1174,14 +1174,14 @@ int netfront_accel_vi_enable_interrupts(netfront_accel_vnic *vnic)
 {
 	u32 sw_evq_ptr;
 
-	VPRINTK("%s: checking for event on %p\n", __FUNCTION__, &vnic->vi.evq_state);
+	VPRINTK("%s: checking for event on %p\n", __func__, &vnic->vi.evq_state);
 
 	BUG_ON(vnic == NULL);
 	BUG_ON(vnic->vi.evq_state == NULL);
 
 	/* Do a quick check for an event. */
 	if (ef_eventq_has_event(&vnic->vi)) {
-		VPRINTK("%s: found event\n",  __FUNCTION__);
+		VPRINTK("%s: found event\n", __func__);
 		return 0;
 	}
 

@@ -72,7 +72,7 @@ int scsiback_add_translation_entry(struct vscsibk_info *info,
 
 	/* Create a new translation entry and add to the list */
 	if ((new = kmalloc(sizeof(struct v2p_entry), GFP_ATOMIC)) == NULL) {
-		pr_err("scsiback: %s: kmalloc() error\n", __FUNCTION__);
+		pr_err("scsiback: %s: kmalloc() error\n", __func__);
 		err = -ENOMEM;
 		goto out;
 	}

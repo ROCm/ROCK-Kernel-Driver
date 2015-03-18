@@ -214,7 +214,6 @@ int vgic_v2_probe(struct device_node *vgic_node,
 		goto out_unmap;
 	}
 
-#if 0
 	if (!PAGE_ALIGNED(vcpu_res.start)) {
 		kvm_err("GICV physical address 0x%llx not page aligned\n",
 			(unsigned long long)vcpu_res.start);
@@ -229,7 +228,9 @@ int vgic_v2_probe(struct device_node *vgic_node,
 		ret = -ENXIO;
 		goto out_unmap;
 	}
-#endif
+
+	vgic->can_emulate_gicv2 = true;
+	kvm_register_device_ops(&kvm_arm_vgic_v2_ops, KVM_DEV_TYPE_ARM_VGIC_V2);
 
 	vgic->vcpu_base = vcpu_res.start;
 
@@ -237,6 +238,7 @@ int vgic_v2_probe(struct device_node *vgic_node,
 		 vctrl_res.start, vgic->maint_irq);
 
 	vgic->type = VGIC_V2;
+	vgic->max_gic_vcpus = VGIC_V2_MAX_CPUS;
 	*ops = &vgic_v2_ops;
 	*params = vgic;
 	goto out;

@@ -342,9 +342,13 @@ static ssize_t xenbus_dev_write(struct file *filp,
 		}
 
 		if (msg_type == XS_TRANSACTION_START) {
-			trans->handle.id = simple_strtoul(reply, NULL, 0);
-			list_add(&trans->list, &u->transactions);
-		} else if (msg_type == XS_TRANSACTION_END) {
+			if (u->u.msg.type == XS_ERROR)
+				kfree(trans);
+			else {
+				trans->handle.id = simple_strtoul(reply, NULL, 0);
+				list_add(&trans->list, &u->transactions);
+			}
+		} else if (u->u.msg.type == XS_TRANSACTION_END) {
 			list_del(&trans->list);
 			kfree(trans);
 		}

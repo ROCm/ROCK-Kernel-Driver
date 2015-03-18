@@ -133,7 +133,7 @@ static int scsifront_init_ring(struct vscsifrnt_info *info)
 	struct xenbus_transaction xbt;
 	int err;
 
-	DPRINTK("%s\n",__FUNCTION__);
+	DPRINTK("%s\n", __func__);
 
 	err = scsifront_alloc_ring(info);
 	if (err)
@@ -259,7 +259,7 @@ free_sring:
 
 static int scsifront_resume(struct xenbus_device *dev)
 {
-	struct vscsifrnt_info *info = dev->dev.driver_data;
+	struct vscsifrnt_info *info = dev_get_drvdata(&dev->dev);
 	struct Scsi_Host *host = info->host;
 	int err;
 
@@ -286,7 +286,7 @@ static int scsifront_resume(struct xenbus_device *dev)
 
 static int scsifront_suspend(struct xenbus_device *dev)
 {
-	struct vscsifrnt_info *info = dev->dev.driver_data;
+	struct vscsifrnt_info *info = dev_get_drvdata(&dev->dev);
 	struct Scsi_Host *host = info->host;
 	int err = 0;
 
@@ -308,7 +308,7 @@ static int scsifront_suspend(struct xenbus_device *dev)
 
 static int scsifront_suspend_cancel(struct xenbus_device *dev)
 {
-	struct vscsifrnt_info *info = dev->dev.driver_data;
+	struct vscsifrnt_info *info = dev_get_drvdata(&dev->dev);
 	struct Scsi_Host *host = info->host;
 
 	spin_lock_irq(host->host_lock);
@@ -321,7 +321,7 @@ static int scsifront_remove(struct xenbus_device *dev)
 {
 	struct vscsifrnt_info *info = dev_get_drvdata(&dev->dev);
 
-	DPRINTK("%s: %s removed\n",__FUNCTION__ ,dev->nodename);
+	DPRINTK("%s: %s removed\n", __func__, dev->nodename);
 
 	if (info->kthread) {
 		kthread_stop(info->kthread);
@@ -339,7 +339,7 @@ static int scsifront_disconnect(struct vscsifrnt_info *info)
 	struct xenbus_device *dev = info->dev;
 	struct Scsi_Host *host = info->host;
 
-	DPRINTK("%s: %s disconnect\n",__FUNCTION__ ,dev->nodename);
+	DPRINTK("%s: %s disconnect\n", __func__, dev->nodename);
 
 	/* 
 	  When this function is executed,  all devices of 

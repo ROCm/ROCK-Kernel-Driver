@@ -153,77 +153,77 @@
 
 #define CI_TRACE(exp,fmt)						\
   ci_log("%s:%d:%s] " #exp "=" fmt,                                     \
-         __FILE__, __LINE__, __FUNCTION__, (exp))
+         __FILE__, __LINE__, __func__, (exp))
 
 
 #define CI_TRACE_INT(integer)						\
   ci_log("%s:%d:%s] " #integer "=%d",                                   \
-         __FILE__, __LINE__, __FUNCTION__, (integer))
+         __FILE__, __LINE__, __func__, (integer))
 
 
 #define CI_TRACE_INT32(integer)						\
   ci_log("%s:%d:%s] " #integer "=%d",                                   \
-         __FILE__, __LINE__, __FUNCTION__, ((ci_int32)integer))
+         __FILE__, __LINE__, __func__, ((ci_int32)integer))
 
 
 #define CI_TRACE_INT64(integer)						\
   ci_log("%s:%d:%s] " #integer "=%lld",                                 \
-         __FILE__, __LINE__, __FUNCTION__, ((ci_int64)integer))
+         __FILE__, __LINE__, __func__, ((ci_int64)integer))
 
 
 #define CI_TRACE_UINT(integer)						\
   ci_log("%s:%d:%s] " #integer "=%ud",                                  \
-         __FILE__, __LINE__, __FUNCTION__, (integer))
+         __FILE__, __LINE__, __func__, (integer))
 
 
 #define CI_TRACE_UINT32(integer)			  	        \
   ci_log("%s:%d:%s] " #integer "=%ud",                                  \
-         __FILE__, __LINE__, __FUNCTION__, ((ci_uint32)integer))
+         __FILE__, __LINE__, __func__, ((ci_uint32)integer))
 
 
 #define CI_TRACE_UINT64(integer)			  	        \
   ci_log("%s:%d:%s] " #integer "=%ulld",                                \
-         __FILE__, __LINE__, __FUNCTION__, ((ci_uint64)integer))
+         __FILE__, __LINE__, __func__, ((ci_uint64)integer))
 
 
 #define CI_TRACE_HEX(integer)						\
   ci_log("%s:%d:%s] " #integer "=0x%x",                                 \
-         __FILE__, __LINE__, __FUNCTION__, (integer))
+         __FILE__, __LINE__, __func__, (integer))
 
 
 #define CI_TRACE_HEX32(integer)						\
   ci_log("%s:%d:%s] " #integer "=0x%x",                                 \
-         __FILE__, __LINE__, __FUNCTION__, ((ci_uint32)integer))
+         __FILE__, __LINE__, __func__, ((ci_uint32)integer))
 
 
 #define CI_TRACE_HEX64(integer)						\
   ci_log("%s:%d:%s] " #integer "=0x%llx",                               \
-         __FILE__, __LINE__, __FUNCTION__, ((ci_uint64)integer))
+         __FILE__, __LINE__, __func__, ((ci_uint64)integer))
 
 
 #define CI_TRACE_PTR(pointer)				                \
   ci_log("%s:%d:%s] " #pointer "=0x%p",                                 \
-         __FILE__, __LINE__, __FUNCTION__, (pointer))
+         __FILE__, __LINE__, __func__, (pointer))
 
 
 #define CI_TRACE_STRING(string)					        \
   ci_log("%s:%d:%s] " #string "=%s",                                    \
-         __FILE__, __LINE__, __FUNCTION__, (string))
+         __FILE__, __LINE__, __func__, (string))
 
 
 #define CI_TRACE_MAC(mac)						\
   ci_log("%s:%d:%s] " #mac "=" CI_MAC_PRINTF_FORMAT,                    \
-         __FILE__, __LINE__, __FUNCTION__, CI_MAC_PRINTF_ARGS(mac))
+         __FILE__, __LINE__, __func__, CI_MAC_PRINTF_ARGS(mac))
 
 
 #define CI_TRACE_IP(ip_be32)						\
   ci_log("%s:%d:%s] " #ip_be32 "=" CI_IP_PRINTF_FORMAT, __FILE__,       \
-         __LINE__, __FUNCTION__, CI_IP_PRINTF_ARGS(&(ip_be32)))
+         __LINE__, __func__, CI_IP_PRINTF_ARGS(&(ip_be32)))
 
 
 #define CI_TRACE_ARP(arp_pkt)                                           \
   ci_log("%s:%d:%s]\n"CI_ARP_PRINTF_FORMAT,                             \
-         __FILE__, __LINE__, __FUNCTION__, CI_ARP_PRINTF_ARGS(arp_pkt))
+         __FILE__, __LINE__, __func__, CI_ARP_PRINTF_ARGS(arp_pkt))
 
 #endif  /* NDEBUG */
 

@@ -35,7 +35,7 @@
 
 #define DPRINTK(fmt, args...)				\
 	pr_debug("xenbus_probe (%s:%d) " fmt ".\n",	\
-		 __FUNCTION__, __LINE__, ##args)
+		 __func__, __LINE__, ##args)
 
 #include <linux/kernel.h>
 #include <linux/version.h>
@@ -355,7 +355,7 @@ void xenbus_dev_shutdown(struct device *_dev)
 
 	get_device(&dev->dev);
 	if (dev->state != XenbusStateConnected) {
-		dev_info(&dev->dev, "%s: %s: %s != Connected, skipping\n", __FUNCTION__,
+		dev_info(&dev->dev, "%s: %s: %s != Connected, skipping\n", __func__,
 		         dev->nodename, xenbus_strstate(dev->state));
 		goto out;
 	}
@@ -367,7 +367,7 @@ void xenbus_dev_shutdown(struct device *_dev)
 	timeout = wait_for_completion_timeout(&dev->down, timeout);
 	if (!timeout)
 		dev_info(&dev->dev, "%s: %s timeout closing device\n",
-		         __FUNCTION__, dev->nodename);
+		         __func__, dev->nodename);
  out:
 	put_device(&dev->dev);
 }

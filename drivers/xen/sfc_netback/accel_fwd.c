@@ -400,7 +400,7 @@ void netback_accel_tx_packet(struct sk_buff *skb, void *fwd_priv)
 		mac = skb_mac_header(skb)+ETH_ALEN;
 
 		DPRINTK("%s: found gratuitous ARP for %pM\n",
-			__FUNCTION__, mac);
+			__func__, mac);
 
 		spin_lock_irqsave(&fwd_set->fwd_lock, flags);
 		/*

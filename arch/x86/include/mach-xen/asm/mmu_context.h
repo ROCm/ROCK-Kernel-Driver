@@ -25,6 +25,21 @@ static inline void xen_activate_mm(struct mm_struct *prev,
 		mm_pin(next);
 }
 
+#if defined(CONFIG_PERF_EVENTS) && !defined(CONFIG_XEN)
+extern struct static_key rdpmc_always_available;
+
+static inline void load_mm_cr4(struct mm_struct *mm)
+{
+	if (static_key_true(&rdpmc_always_available) ||
+	    atomic_read(&mm->context.perf_rdpmc_allowed))
+		cr4_set_bits(X86_CR4_PCE);
+	else
+		cr4_clear_bits(X86_CR4_PCE);
+}
+#else
+static inline void load_mm_cr4(struct mm_struct *mm) {}
+#endif
+
 /*
  * Used for LDT copy/destruction.
  */
@@ -115,15 +130,20 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 		op++;
 #endif
 
+		/* Load per-mm CR4 state */
+		load_mm_cr4(next);
+
 		/*
 		 * Load the LDT, if the LDT is different.
 		 *
-		 * It's possible leave_mm(prev) has been called.  If so,
-		 * then prev->context.ldt could be out of sync with the
-		 * LDT descriptor or the LDT register.  This can only happen
-		 * if prev->context.ldt is non-null, since we never free
-		 * an LDT.  But LDTs can't be shared across mms, so
-		 * prev->context.ldt won't be equal to next->context.ldt.
+		 * It's possible that prev->context.ldt doesn't match
+		 * the LDT register.  This can happen if leave_mm(prev)
+		 * was called and then modify_ldt changed
+		 * prev->context.ldt but suppressed an IPI to this CPU.
+		 * In this case, prev->context.ldt != NULL, because we
+		 * never free an LDT while the mm still exists.  That
+		 * means that next->context.ldt != prev->context.ldt,
+		 * because mms never share an LDT.
 		 */
 		if (unlikely(prev->context.ldt != next->context.ldt)) {
 			/* load_LDT_nolock(&next->context) */
@@ -158,6 +178,7 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
 			 */
 			load_cr3(next->pgd);
 			trace_tlb_flush(TLB_FLUSH_ON_TASK_SWITCH, TLB_FLUSH_ALL);
+			load_mm_cr4(next);
 			xen_new_user_pt(next->pgd);
 			load_LDT_nolock(&next->context);
 		}

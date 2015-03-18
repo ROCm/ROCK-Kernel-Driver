@@ -876,7 +876,7 @@ static void tpm_tx_action(unsigned long unused)
 	tpmif_t *tpmif;
 	tpmif_tx_request_t *tx;
 
-	DPRINTK("%s: Getting data from front-end(s)!\n", __FUNCTION__);
+	DPRINTK("%s: Getting data from front-end(s)!\n", __func__);
 
 	while (!list_empty(&tpm_schedule_list)) {
 		/* Get a tpmif from the list with work to do. */

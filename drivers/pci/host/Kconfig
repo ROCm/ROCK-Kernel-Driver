@@ -53,7 +53,7 @@ config PCI_RCAR_GEN2_PCIE
 
 config PCI_HOST_GENERIC
 	bool "Generic PCI host controller"
-	depends on (ARM || ARM64) && OF
+	depends on ARM && OF
 	help
 	  Say Y here if you want to support a simple generic PCI host
 	  controller, such as the one emulated by kvmtool.
@@ -101,5 +101,9 @@ config PCI_LAYERSCAPE
 	select MFD_SYSCON
 	help
 	  Say Y here if you want PCIe controller support on Layerscape SoCs.
+
+config PCI_VERSATILE
+	bool "ARM Versatile PB PCI controller"
+	depends on ARCH_VERSATILE
 
 endmenu

@@ -52,7 +52,7 @@ static void mac_address_change(struct xenbus_watch *watch,
 	struct xenbus_device *dev;
 	int rc;
 
-	DPRINTK("%s\n", __FUNCTION__);
+	DPRINTK("%s\n", __func__);
 	
 	vnic = container_of(watch, netfront_accel_vnic, 
 				mac_address_watch);
@@ -61,7 +61,7 @@ static void mac_address_change(struct xenbus_watch *watch,
 	rc = net_accel_xen_net_read_mac(dev, vnic->mac);
 
 	if (rc != 0)
-		EPRINTK("%s: failed to read mac (%d)\n", __FUNCTION__, rc);
+		EPRINTK("%s: failed to read mac (%d)\n", __func__, rc);
 }
 
 
@@ -77,7 +77,7 @@ static int setup_mac_address_watch(struct xenbus_device *dev,
 				 mac_address_change);
 	if (err) {
 		EPRINTK("%s: Failed to register xenbus watch: %d\n",
-			__FUNCTION__, err);
+			__func__, err);
 		goto fail;
 	}
 
@@ -104,12 +104,12 @@ static int make_named_grant(struct xenbus_device *dev, void *page,
 		err = xenbus_transaction_start(&tr);
 		if (err != 0) {
 			EPRINTK("%s: transaction start failed %d\n",
-				__FUNCTION__, err);
+				__func__, err);
 			return err;
 		}
 		err = xenbus_printf(tr, dev->nodename, name, "%d", gnt);
 		if (err != 0) {
-			EPRINTK("%s: xenbus_printf failed %d\n", __FUNCTION__,
+			EPRINTK("%s: xenbus_printf failed %d\n", __func__,
 				err);
 			xenbus_transaction_end(tr, 1);
 			return err;
@@ -118,7 +118,7 @@ static int make_named_grant(struct xenbus_device *dev, void *page,
 	} while (err == -EAGAIN);
 	
 	if (err != 0) {
-		EPRINTK("%s: transaction end failed %d\n", __FUNCTION__, err);
+		EPRINTK("%s: transaction end failed %d\n", __func__, err);
 		return err;
 	}
 	
@@ -140,12 +140,12 @@ static int remove_named_grant(struct xenbus_device *dev,
 		err = xenbus_transaction_start(&tr);
 		if (err != 0) {
 			EPRINTK("%s: transaction start failed %d\n",
-				__FUNCTION__, err);
+				__func__, err);
 			return err;
 		}
 		err = xenbus_rm(tr, dev->nodename, name);
 		if (err != 0) {
-			EPRINTK("%s: xenbus_rm failed %d\n", __FUNCTION__,
+			EPRINTK("%s: xenbus_rm failed %d\n", __func__,
 				err);
 			xenbus_transaction_end(tr, 1);
 			return err;
@@ -154,7 +154,7 @@ static int remove_named_grant(struct xenbus_device *dev,
 	} while (err == -EAGAIN);
 	
 	if (err != 0) {
-		EPRINTK("%s: transaction end failed %d\n", __FUNCTION__, err);
+		EPRINTK("%s: transaction end failed %d\n", __func__, err);
 		return err;
 	}
 
@@ -182,7 +182,7 @@ netfront_accel_vnic *netfront_accel_vnic_ctor(struct net_device *net_dev,
 	/* Alloc mem for state */
 	vnic = kzalloc(sizeof(netfront_accel_vnic), GFP_KERNEL);
 	if (vnic == NULL) {
-		EPRINTK("%s: no memory for vnic state\n", __FUNCTION__);
+		EPRINTK("%s: no memory for vnic state\n", __func__);
 		return ERR_PTR(-ENOMEM);
 	}
 
@@ -263,7 +263,7 @@ static void netfront_accel_vnic_dtor(netfront_accel_vnic *vnic)
 	 * this watch and synchonrise with the completion of
 	 * watches
 	 */
-	DPRINTK("%s: unregistering xenbus mac watch\n", __FUNCTION__);
+	DPRINTK("%s: unregistering xenbus mac watch\n", __func__);
 	unregister_xenbus_watch(&vnic->mac_address_watch);
 	kfree(vnic->mac_address_watch.node);
 
@@ -303,14 +303,14 @@ static int vnic_setup_domU_shared_state(struct xenbus_device *dev,
 	vnic->tx_bufs = netfront_accel_init_bufs(&vnic->tx_lock);
 	if (vnic->tx_bufs == NULL) {
 		err = -ENOMEM;
-		EPRINTK("%s: Failed to allocate tx buffers\n", __FUNCTION__);
+		EPRINTK("%s: Failed to allocate tx buffers\n", __func__);
 		goto fail_tx_bufs;
 	}
 
 	vnic->rx_bufs = netfront_accel_init_bufs(NULL);
 	if (vnic->rx_bufs == NULL) {
 		err = -ENOMEM;
-		EPRINTK("%s: Failed to allocate rx buffers\n", __FUNCTION__);
+		EPRINTK("%s: Failed to allocate rx buffers\n", __func__);
 		goto fail_rx_bufs;
 	}
 
@@ -321,7 +321,7 @@ static int vnic_setup_domU_shared_state(struct xenbus_device *dev,
 	vnic->shared_page = (struct net_accel_shared_page *)
 		__get_free_pages(GFP_KERNEL, 1);
 	if (vnic->shared_page == NULL) {
-		EPRINTK("%s: no memory for shared pages\n", __FUNCTION__);
+		EPRINTK("%s: no memory for shared pages\n", __func__);
 		err = -ENOMEM;
 		goto fail_shared_page;
 	}
@@ -385,7 +385,7 @@ static int vnic_setup_domU_shared_state(struct xenbus_device *dev,
 		err = xenbus_transaction_start(&tr);
 		if (err != 0) {
 			EPRINTK("%s: Transaction start failed %d\n",
-				__FUNCTION__, err);
+				__func__, err);
 			goto fail_transaction;
 		}
 
@@ -393,7 +393,7 @@ static int vnic_setup_domU_shared_state(struct xenbus_device *dev,
 				    "%u", vnic->msg_channel);
 		if (err != 0) {
 			EPRINTK("%s: event channel xenbus write failed %d\n",
-				__FUNCTION__, err);
+				__func__, err);
 			xenbus_transaction_end(tr, 1);
 			goto fail_transaction;
 		}
@@ -402,7 +402,7 @@ static int vnic_setup_domU_shared_state(struct xenbus_device *dev,
 				    "%u", vnic->net_channel);
 		if (err != 0) {
 			EPRINTK("%s: net channel xenbus write failed %d\n",
-				__FUNCTION__, err);
+				__func__, err);
 			xenbus_transaction_end(tr, 1);
 			goto fail_transaction;
 		}
@@ -411,7 +411,7 @@ static int vnic_setup_domU_shared_state(struct xenbus_device *dev,
 	} while (err == -EAGAIN);
 
 	if (err != 0) {
-		EPRINTK("%s: Transaction end failed %d\n", __FUNCTION__, err);
+		EPRINTK("%s: Transaction end failed %d\n", __func__, err);
 		goto fail_transaction;
 	}
 
@@ -465,7 +465,7 @@ static void vnic_remove_domU_shared_state(struct xenbus_device *dev,
 	 */
 
 	DPRINTK("%s: removing event channel irq handlers %d %d\n",
-		__FUNCTION__, vnic->net_channel_irq, vnic->msg_channel_irq);
+		__func__, vnic->net_channel_irq, vnic->msg_channel_irq);
 	do {
 		if (xenbus_transaction_start(&tr) != 0)
 			break;
@@ -556,7 +556,7 @@ static void netfront_accel_backend_accel_changed(netfront_accel_vnic *vnic,
 	int state;
 
 	DPRINTK("%s: changing from %s to %s. nodename %s, otherend %s\n",
-		__FUNCTION__, xenbus_strstate(vnic->backend_state),
+		__func__, xenbus_strstate(vnic->backend_state),
 		xenbus_strstate(backend_state), dev->nodename, dev->otherend);
 
 	/*
@@ -646,7 +646,7 @@ static void backend_accel_state_change(struct xenbus_watch *watch,
 	netfront_accel_vnic *vnic;
 	struct xenbus_device *dev;
 
-	DPRINTK("%s\n", __FUNCTION__);
+	DPRINTK("%s\n", __func__);
 
 	vnic = container_of(watch, struct netfront_accel_vnic,
 				backend_accel_watch);
@@ -675,7 +675,7 @@ static int setup_dom0_accel_watch(struct xenbus_device *dev,
 				 backend_accel_state_change);
 	if (err) {
 		EPRINTK("%s: Failed to register xenbus watch: %d\n",
-			__FUNCTION__, err);
+			__func__, err);
 		goto fail;
 	}
 	return 0;
@@ -703,7 +703,7 @@ int netfront_accel_probe(struct net_device *net_dev, struct xenbus_device *dev)
 	err = setup_dom0_accel_watch(dev, vnic);
 	if (err) {
 		netfront_accel_vnic_dtor(vnic);
-		EPRINTK("%s: probe failed with code %d\n", __FUNCTION__, err);
+		EPRINTK("%s: probe failed with code %d\n", __func__, err);
 		return err;
 	}
 
@@ -730,7 +730,7 @@ int netfront_accel_remove(struct xenbus_device *dev)
 	struct netfront_info *np = dev_get_drvdata(&dev->dev);
 	netfront_accel_vnic *vnic = (netfront_accel_vnic *)np->accel_priv;
 
-	DPRINTK("%s %s\n", __FUNCTION__, dev->nodename);
+	DPRINTK("%s %s\n", __func__, dev->nodename);
 
 	BUG_ON(vnic == NULL);
 
@@ -747,7 +747,7 @@ int netfront_accel_remove(struct xenbus_device *dev)
 
 	mutex_unlock(&vnic->vnic_mutex);
 
-	DPRINTK("%s waiting for release of %s\n", __FUNCTION__, dev->nodename);
+	DPRINTK("%s waiting for release of %s\n", __func__, dev->nodename);
 
 	/*
 	 * Wait for the xenbus watch to release the shared resources.
@@ -762,14 +762,13 @@ int netfront_accel_remove(struct xenbus_device *dev)
 	 * Now we don't need this watch anymore it is safe to remove
 	 * it (and so synchronise with it completing if outstanding)
 	 */
-	DPRINTK("%s: unregistering xenbus accel watch\n",
-		__FUNCTION__);
+	DPRINTK("%s: unregistering xenbus accel watch\n", __func__);
 	unregister_xenbus_watch(&vnic->backend_accel_watch);
 	kfree(vnic->backend_accel_watch.node);
 
 	netfront_accel_vnic_dtor(vnic);
 
-	DPRINTK("%s done %s\n", __FUNCTION__, dev->nodename);
+	DPRINTK("%s done %s\n", __func__, dev->nodename);
 
 	return 0;
 }

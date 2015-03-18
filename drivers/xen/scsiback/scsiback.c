@@ -159,7 +159,7 @@ void scsiback_do_resp_with_sense(char *sense_buffer, int32_t result,
 	struct scsi_sense_hdr sshdr;
 	unsigned long flags;
 
-	DPRINTK("%s\n",__FUNCTION__);
+	DPRINTK("%s\n", __func__);
 
 	spin_lock_irqsave(&info->ring_lock, flags);
 
@@ -262,7 +262,7 @@ static int scsiback_gnttab_data_map(const struct scsiif_request_segment *segs,
 		pending_req->sgl = kmalloc(sizeof(struct scatterlist) * nr_segments,
 						GFP_KERNEL);
 		if (!pending_req->sgl) {
-			pr_err("scsiback: %s: kmalloc() error\n", __FUNCTION__);
+			pr_err("scsiback: %s: kmalloc() error\n", __func__);
 			return -ENOMEM;
 		}
 
@@ -427,7 +427,7 @@ int scsiback_cmd_exec(pending_req_t *pending_req)
 	struct request *rq;
 	int write;
 
-	DPRINTK("%s\n",__FUNCTION__);
+	DPRINTK("%s\n", __func__);
 
 	/* because it doesn't timeout backend earlier than frontend.*/
 	if (pending_req->timeout_per_command)
@@ -524,7 +524,7 @@ static int prepare_pending_reqs(struct vscsibk_info *info,
 	unsigned int nr_segs;
 	int err = -EINVAL;
 
-	DPRINTK("%s\n",__FUNCTION__);
+	DPRINTK("%s\n", __func__);
 
 	pending_req->info       = info;
 
@@ -611,7 +611,7 @@ static int _scsiback_do_cmd_fn(struct vscsibk_info *info)
 	RING_IDX rc, rp;
 	int err, more_to_do = 0;
 
-	DPRINTK("%s\n",__FUNCTION__);
+	DPRINTK("%s\n", __func__);
 
 	rc = ring->req_cons;
 	rp = ring->sring->req_prod;
@@ -731,7 +731,7 @@ int scsiback_schedule(void *data)
 {
 	struct vscsibk_info *info = (struct vscsibk_info *)data;
 
-	DPRINTK("%s\n",__FUNCTION__);
+	DPRINTK("%s\n", __func__);
 
 	while (!kthread_should_stop()) {
 		wait_event_interruptible(
@@ -823,7 +823,7 @@ out_of_memory:
 	kfree(pending_reqs);
 	kfree(pending_grant_handles);
 	free_empty_pages_and_pagevec(pending_pages, mmap_pages);
-	pr_err("scsiback: %s: out of memory\n", __FUNCTION__);
+	pr_err("scsiback: %s: out of memory\n", __func__);
 	return -ENOMEM;
 }
 

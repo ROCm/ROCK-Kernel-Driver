@@ -367,7 +367,7 @@ static int scsiback_probe(struct xenbus_device *dev,
 
 
 fail:
-	pr_warning("scsiback: %s failed\n",__FUNCTION__);
+	pr_warning("scsiback: %s failed\n", __func__);
 	scsiback_remove(dev);
 
 	return err;

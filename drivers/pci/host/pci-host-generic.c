@@ -44,29 +44,12 @@ struct gen_pci {
 	struct list_head			resources;
 };
 
-/* fake sysdata for cheating ARCH's pcibios code */
-static char	gen_sysdata[256];
-
-static struct gen_pci *gen_pci_get_drvdata(struct pci_bus *bus)
-{
-	struct device *dev = bus->dev.parent->parent;
-	struct gen_pci *pci;
-
-	while (dev) {
-		pci = dev_get_drvdata(dev);
-		if (pci)
-			return pci;
-		dev = dev->parent;
-	}
-
-	return NULL;
-}
-
 static void __iomem *gen_pci_map_cfg_bus_cam(struct pci_bus *bus,
 					     unsigned int devfn,
 					     int where)
 {
-	struct gen_pci *pci = gen_pci_get_drvdata(bus);
+	struct pci_sys_data *sys = bus->sysdata;
+	struct gen_pci *pci = sys->private_data;
 	resource_size_t idx = bus->number - pci->cfg.bus_range->start;
 
 	return pci->cfg.win[idx] + ((devfn << 8) | where);
@@ -81,7 +64,8 @@ static void __iomem *gen_pci_map_cfg_bus_ecam(struct pci_bus *bus,
 					      unsigned int devfn,
 					      int where)
 {
-	struct gen_pci *pci = gen_pci_get_drvdata(bus);
+	struct pci_sys_data *sys = bus->sysdata;
+	struct gen_pci *pci = sys->private_data;
 	resource_size_t idx = bus->number - pci->cfg.bus_range->start;
 
 	return pci->cfg.win[idx] + ((devfn << 12) | where);
@@ -92,61 +76,9 @@ static struct gen_pci_cfg_bus_ops gen_pci_cfg_ecam_bus_ops = {
 	.map_bus	= gen_pci_map_cfg_bus_ecam,
 };
 
-static int gen_pci_config_read(struct pci_bus *bus, unsigned int devfn,
-				int where, int size, u32 *val)
-{
-	void __iomem *addr;
-	struct gen_pci *pci = gen_pci_get_drvdata(bus);
-
-	WARN_ON(!pci);
-	if (!pci)
-		return PCIBIOS_DEVICE_NOT_FOUND;
-
-	addr = pci->cfg.ops->map_bus(bus, devfn, where);
-
-	switch (size) {
-	case 1:
-		*val = readb(addr);
-		break;
-	case 2:
-		*val = readw(addr);
-		break;
-	default:
-		*val = readl(addr);
-	}
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int gen_pci_config_write(struct pci_bus *bus, unsigned int devfn,
-				 int where, int size, u32 val)
-{
-	void __iomem *addr;
-	struct gen_pci *pci = gen_pci_get_drvdata(bus);
-
-	WARN_ON(!pci);
-	if (!pci)
-		return PCIBIOS_DEVICE_NOT_FOUND;
-
-	addr = pci->cfg.ops->map_bus(bus, devfn, where);
-
-	switch (size) {
-	case 1:
-		writeb(val, addr);
-		break;
-	case 2:
-		writew(val, addr);
-		break;
-	default:
-		writel(val, addr);
-	}
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
 static struct pci_ops gen_pci_ops = {
-	.read	= gen_pci_config_read,
-	.write	= gen_pci_config_write,
+	.read	= pci_generic_config_read,
+	.write	= pci_generic_config_write,
 };
 
 static const struct of_device_id gen_pci_of_match[] = {
@@ -163,6 +95,60 @@ MODULE_DEVICE_TABLE(of, gen_pci_of_match);
 static void gen_pci_release_of_pci_ranges(struct gen_pci *pci)
 {
 	pci_free_resource_list(&pci->resources);
+}
+
+static int gen_pci_parse_request_of_pci_ranges(struct gen_pci *pci)
+{
+	int err, res_valid = 0;
+	struct device *dev = pci->host.dev.parent;
+	struct device_node *np = dev->of_node;
+	resource_size_t iobase;
+	struct resource_entry *win;
+
+	err = of_pci_get_host_bridge_resources(np, 0, 0xff, &pci->resources,
+					       &iobase);
+	if (err)
+		return err;
+
+	resource_list_for_each_entry(win, &pci->resources) {
+		struct resource *parent, *res = win->res;
+
+		switch (resource_type(res)) {
+		case IORESOURCE_IO:
+			parent = &ioport_resource;
+			err = pci_remap_iospace(res, iobase);
+			if (err) {
+				dev_warn(dev, "error %d: failed to map resource %pR\n",
+					 err, res);
+				continue;
+			}
+			break;
+		case IORESOURCE_MEM:
+			parent = &iomem_resource;
+			res_valid |= !(res->flags & IORESOURCE_PREFETCH);
+			break;
+		case IORESOURCE_BUS:
+			pci->cfg.bus_range = res;
+		default:
+			continue;
+		}
+
+		err = devm_request_resource(dev, parent, res);
+		if (err)
+			goto out_release_res;
+	}
+
+	if (!res_valid) {
+		dev_err(dev, "non-prefetchable memory resource required\n");
+		err = -EINVAL;
+		goto out_release_res;
+	}
+
+	return 0;
+
+out_release_res:
+	gen_pci_release_of_pci_ranges(pci);
+	return err;
 }
 
 static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
@@ -212,33 +198,11 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
 	return 0;
 }
 
-static int gen_pci_map_ranges(struct gen_pci *pci,
-		resource_size_t io_base)
+static int gen_pci_setup(int nr, struct pci_sys_data *sys)
 {
-	struct list_head *res = &pci->resources;
-	struct pci_host_bridge_window *window;
-	int ret;
-
-	list_for_each_entry(window, res, list) {
-		struct resource *res = window->res;
-		u64 restype = resource_type(res);
-
-		switch (restype) {
-		case IORESOURCE_IO:
-			ret = pci_remap_iospace(res, io_base);
-			if (ret < 0)
-				return ret;
-			break;
-		case IORESOURCE_MEM:
-			break;
-		case IORESOURCE_BUS:
-			pci->cfg.bus_range = res;
-			break;
-		default:
-			return -EINVAL;
-		}
-	}
-	return 0;
+	struct gen_pci *pci = sys->private_data;
+	list_splice_init(&pci->resources, &sys->resources);
+	return 1;
 }
 
 static int gen_pci_probe(struct platform_device *pdev)
@@ -249,11 +213,14 @@ static int gen_pci_probe(struct platform_device *pdev)
 	const int *prop;
 	struct device *dev = &pdev->dev;
 	struct device_node *np = dev->of_node;
-	resource_size_t iobase = 0;
 	struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
-	struct pci_bus *bus;
-	struct pci_dev *pci_dev = NULL;
-	bool probe_only = false;
+	struct hw_pci hw = {
+		.nr_controllers	= 1,
+		.private_data	= (void **)&pci,
+		.setup		= gen_pci_setup,
+		.map_irq	= of_irq_parse_and_map_pci,
+		.ops		= &gen_pci_ops,
+	};
 
 	if (!pci)
 		return -ENOMEM;
@@ -267,51 +234,32 @@ static int gen_pci_probe(struct platform_device *pdev)
 	prop = of_get_property(of_chosen, "linux,pci-probe-only", NULL);
 	if (prop) {
 		if (*prop)
-			probe_only = true;
+			pci_add_flags(PCI_PROBE_ONLY);
 		else
-			probe_only = false;
+			pci_clear_flags(PCI_PROBE_ONLY);
 	}
 
 	of_id = of_match_node(gen_pci_of_match, np);
 	pci->cfg.ops = of_id->data;
+	gen_pci_ops.map_bus = pci->cfg.ops->map_bus;
 	pci->host.dev.parent = dev;
 	INIT_LIST_HEAD(&pci->host.windows);
 	INIT_LIST_HEAD(&pci->resources);
 
-	err = of_pci_get_host_bridge_resources(np, 0, 0xff,
-			&pci->resources, &iobase);
+	/* Parse our PCI ranges and request their resources */
+	err = gen_pci_parse_request_of_pci_ranges(pci);
 	if (err)
 		return err;
 
-	err = gen_pci_map_ranges(pci, iobase);
-	if (err)
-		goto fail;
-
 	/* Parse and map our Configuration Space windows */
 	err = gen_pci_parse_map_cfg_windows(pci);
-	if (err)
-		goto fail;
-
-	err = -ENOMEM;
-	platform_set_drvdata(pdev, pci);
-	bus = pci_scan_root_bus(dev, 0, &gen_pci_ops, gen_sysdata,
-				&pci->resources);
-	if (!bus)
-		goto fail;
-
-	for_each_pci_dev(pci_dev)
-		pci_dev->irq = of_irq_parse_and_map_pci(pci_dev, 0, 0);
-
-	if (!probe_only) {
-		pci_bus_size_bridges(bus);
-		pci_bus_assign_resources(bus);
-		pci_bus_add_devices(bus);
+	if (err) {
+		gen_pci_release_of_pci_ranges(pci);
+		return err;
 	}
 
+	pci_common_init_dev(dev, &hw);
 	return 0;
- fail:
-	gen_pci_release_of_pci_ranges(pci);
-	return err;
 }
 
 static struct platform_driver gen_pci_driver = {

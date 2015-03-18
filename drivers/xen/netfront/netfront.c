@@ -211,7 +211,7 @@ static inline grant_ref_t xennet_get_rx_ref(struct netfront_info *np,
 
 #define DPRINTK(fmt, args...)				\
 	pr_debug("netfront (%s:%d) " fmt,		\
-		 __FUNCTION__, __LINE__, ##args)
+		 __func__, __LINE__, ##args)
 
 static int setup_device(struct xenbus_device *, struct netfront_info *);
 static struct net_device *create_netdev(struct xenbus_device *);
@@ -227,11 +227,7 @@ static void network_alloc_rx_buffers(struct net_device *);
 static irqreturn_t netif_int(int irq, void *dev_id);
 
 #ifdef CONFIG_SYSFS
-static int xennet_sysfs_addif(struct net_device *netdev);
-static void xennet_sysfs_delif(struct net_device *netdev);
-#else /* !CONFIG_SYSFS */
-#define xennet_sysfs_addif(dev) (0)
-#define xennet_sysfs_delif(dev) do { } while(0)
+static const struct attribute_group xennet_dev_group;
 #endif
 
 static inline bool xennet_can_sg(struct net_device *dev)
@@ -322,23 +318,16 @@ static int netfront_probe(struct xenbus_device *dev,
 
 	info = netdev_priv(netdev);
 	dev_set_drvdata(&dev->dev, info);
-
+#ifdef CONFIG_SYSFS
+	info->netdev->sysfs_groups[0] = &xennet_dev_group;
+#endif
 	err = register_netdev(info->netdev);
 	if (err) {
-		pr_warning("%s: register_netdev err=%d\n",
-			   __FUNCTION__, err);
+		pr_warn("%s: register_netdev err=%d\n", __func__, err);
 		goto fail;
 	}
 
 	netfront_enable_arp_notify(info);
-
-	err = xennet_sysfs_addif(info->netdev);
-	if (err) {
-		unregister_netdev(info->netdev);
-		pr_warning("%s: add sysfs failed err=%d\n",
-			   __FUNCTION__, err);
-		goto fail;
-	}
 
 	return 0;
 
@@ -359,8 +348,6 @@ static int netfront_remove(struct xenbus_device *dev)
 	netif_disconnect_backend(info);
 
 	del_timer_sync(&info->rx_refill_timer);
-
-	xennet_sysfs_delif(info->netdev);
 
 	unregister_netdev(info->netdev);
 
@@ -1692,7 +1679,7 @@ static void netif_release_rx_bufs_flip(struct netfront_info *np)
 	}
 
 	DPRINTK("%s: %d xfer, %d noxfer, %d unused\n",
-		__FUNCTION__, xfer, noxfer, unused);
+		__func__, xfer, noxfer, unused);
 
 	if (xfer) {
 		/* Some pages are no longer absent... */
@@ -1746,7 +1733,7 @@ static void netif_release_rx_bufs_copy(struct netfront_info *np)
 
 	if (busy)
 		DPRINTK("%s: Unable to release %d of %d inuse grant references out of %ld total.\n",
-			__FUNCTION__, busy, inuse, NET_RX_RING_SIZE);
+			__func__, busy, inuse, NET_RX_RING_SIZE);
 
 	spin_unlock_bh(&np->rx_lock);
 }
@@ -2089,39 +2076,19 @@ static ssize_t show_rxbuf_cur(struct device *dev,
 	return sprintf(buf, "%u\n", info->rx_target);
 }
 
-static struct device_attribute xennet_attrs[] = {
-	__ATTR(rxbuf_min, S_IRUGO|S_IWUSR, show_rxbuf_min, store_rxbuf_min),
-	__ATTR(rxbuf_max, S_IRUGO|S_IWUSR, show_rxbuf_max, store_rxbuf_max),
-	__ATTR(rxbuf_cur, S_IRUGO, show_rxbuf_cur, NULL),
+static DEVICE_ATTR(rxbuf_min, S_IRUGO|S_IWUSR, show_rxbuf_min, store_rxbuf_min);
+static DEVICE_ATTR(rxbuf_max, S_IRUGO|S_IWUSR, show_rxbuf_max, store_rxbuf_max);
+static DEVICE_ATTR(rxbuf_cur, S_IRUGO, show_rxbuf_cur, NULL);
+
+static struct attribute *xennet_dev_attrs[] = {
+	&dev_attr_rxbuf_min.attr,
+	&dev_attr_rxbuf_max.attr,
+	&dev_attr_rxbuf_cur.attr,
+	NULL
 };
-
-static int xennet_sysfs_addif(struct net_device *netdev)
-{
-	int i;
-	int error = 0;
-
-	for (i = 0; i < ARRAY_SIZE(xennet_attrs); i++) {
-		error = device_create_file(&netdev->dev,
-					   &xennet_attrs[i]);
-		if (error)
-			goto fail;
-	}
-	return 0;
-
- fail:
-	while (--i >= 0)
-		device_remove_file(&netdev->dev, &xennet_attrs[i]);
-	return error;
-}
-
-static void xennet_sysfs_delif(struct net_device *netdev)
-{
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(xennet_attrs); i++)
-		device_remove_file(&netdev->dev, &xennet_attrs[i]);
-}
-
+static const struct attribute_group xennet_dev_group = {
+	.attrs = xennet_dev_attrs
+};
 #endif /* CONFIG_SYSFS */
 
 

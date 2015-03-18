@@ -157,7 +157,7 @@ static unsigned int ticket_drop(struct spinning *spinning,
 	if (cmpxchg(&spinning->ticket, ticket, -1) != ticket)
 		return -1;
 	lock->owner = cpu;
-	__add(&lock->tickets.head, 1, UNLOCK_LOCK_PREFIX);
+	__add(&lock->tickets.head, TICKET_LOCK_INC, UNLOCK_LOCK_PREFIX);
 	ticket = (__ticket_t)(ticket + 1);
 	return ticket != lock->tickets.tail ? ticket : -1;
 }
@@ -165,10 +165,11 @@ static unsigned int ticket_drop(struct spinning *spinning,
 static unsigned int ticket_get(arch_spinlock_t *lock, struct spinning *prev)
 {
 	struct __raw_tickets token = xadd(&lock->tickets,
-					  (struct __raw_tickets){ .tail = 1 });
+					  (struct __raw_tickets)
+					  { .tail = TICKET_LOCK_INC });
 
-	return token.head == token.tail ? token.tail
-					: spin_adjust(prev, lock, token.tail);
+	return __tickets_equal(token.head, token.tail)
+	       ? token.tail : spin_adjust(prev, lock, token.tail);
 }
 
 void xen_spin_irq_enter(void)

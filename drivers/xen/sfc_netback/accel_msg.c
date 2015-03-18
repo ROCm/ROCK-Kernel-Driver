@@ -82,7 +82,7 @@ static void netback_accel_msg_tx_localmac(struct netback_accel *bend,
 		 * traffic
 		 */
 		EPRINTK("%s: saw full queue, may need ARP timer to recover\n",
-			__FUNCTION__);
+			__func__);
 	}
 }
 
@@ -103,7 +103,7 @@ static int netback_accel_msg_rx_buffer_map(struct netback_accel *bend,
 	log2_pages = log2_ge(msg->u.mapbufs.pages, 0);
 	if (msg->u.mapbufs.pages != pow2(log2_pages)) {
 		EPRINTK("%s: Can only alloc bufs in power of 2 sizes (%d)\n",
-			__FUNCTION__, msg->u.mapbufs.pages);
+			__func__, msg->u.mapbufs.pages);
 		rc = -EINVAL;
 		goto err_out;
 	}
@@ -114,7 +114,7 @@ static int netback_accel_msg_rx_buffer_map(struct netback_accel *bend,
 	 */
 	if (msg->u.mapbufs.pages > NET_ACCEL_MSG_MAX_PAGE_REQ) {
 		EPRINTK("%s: too many pages in a single message: %d %d\n", 
-			__FUNCTION__, msg->u.mapbufs.pages,
+			__func__, msg->u.mapbufs.pages,
 			NET_ACCEL_MSG_MAX_PAGE_REQ);
 		rc = -EINVAL;
 		goto err_out;
@@ -131,7 +131,7 @@ static int netback_accel_msg_rx_buffer_map(struct netback_accel *bend,
 	return 0;
 
  err_out:
-	EPRINTK("%s: err_out\n", __FUNCTION__);
+	EPRINTK("%s: err_out\n", __func__);
 	msg->id |= NET_ACCEL_MSG_ERROR | NET_ACCEL_MSG_REPLY;
 	return rc;
 }
@@ -375,7 +375,7 @@ void netback_accel_msg_rx_handler(void *bend_void)
 		err = process_rx_msg(bend, &msg);
 		
 		if (err != 0) {
-			EPRINTK("%s: Error %d\n", __FUNCTION__, err);
+			EPRINTK("%s: Error %d\n", __func__, err);
 			goto err;
 		}
 	}

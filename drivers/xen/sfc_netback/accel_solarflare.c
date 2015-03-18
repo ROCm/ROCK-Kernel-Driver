@@ -172,7 +172,7 @@ static int bend_dl_probe(struct efx_dl_device *efx_dl_dev,
 	enum net_accel_hw_type type;
 	struct driverlink_port *port;
 
-	DPRINTK("%s: %s\n", __FUNCTION__, silicon_rev);
+	DPRINTK("%s: %s\n", __func__, silicon_rev);
 
 	if (strcmp(silicon_rev, "falcon/a1") == 0)
 		type = NET_ACCEL_MSG_HWTYPE_FALCON_A;
@@ -181,15 +181,14 @@ static int bend_dl_probe(struct efx_dl_device *efx_dl_dev,
 	else if (strcmp(silicon_rev, "siena/a0") == 0)
 		type = NET_ACCEL_MSG_HWTYPE_SIENA_A;
 	else {
-		EPRINTK("%s: unsupported silicon %s\n", __FUNCTION__,
-			silicon_rev);
+		EPRINTK("%s: unsupported silicon %s\n", __func__, silicon_rev);
 		rc = -EINVAL;
 		goto fail1;
 	}
 	
 	port = kmalloc(sizeof(struct driverlink_port), GFP_KERNEL);
 	if (port == NULL) {
-		EPRINTK("%s: no memory for dl probe\n", __FUNCTION__);
+		EPRINTK("%s: no memory for dl probe\n", __func__);
 		rc = -ENOMEM;
 		goto fail1;
 	}
@@ -200,14 +199,14 @@ static int bend_dl_probe(struct efx_dl_device *efx_dl_dev,
 	port->fwd_priv = netback_accel_init_fwd_port();
 	if (port->fwd_priv == NULL) {
 		EPRINTK("%s: failed to set up forwarding for port\n",
-			__FUNCTION__);
+			__func__);
 		rc = -ENOMEM;
 		goto fail2;
 	}
 
 	rc = efx_dl_register_callbacks(efx_dl_dev, &bend_dl_callbacks);
 	if (rc != 0) {
-		EPRINTK("%s: register_callbacks failed\n", __FUNCTION__);
+		EPRINTK("%s: register_callbacks failed\n", __func__);
 		goto fail3;
 	}
 
@@ -416,14 +415,14 @@ static int alloc_page_state(struct netback_accel *bend, int max_pages)
 	struct falcon_bend_accel_priv *accel_hw_priv;
 
 	if (max_pages < 0 || max_pages > bend->quotas.max_buf_pages) {
-		EPRINTK("%s: invalid max_pages: %d\n", __FUNCTION__, max_pages);
+		EPRINTK("%s: invalid max_pages: %d\n", __func__, max_pages);
 		return -EINVAL;
 	}
 
 	accel_hw_priv = kzalloc(sizeof(struct falcon_bend_accel_priv),
 				GFP_KERNEL);
 	if (accel_hw_priv == NULL) {
-		EPRINTK("%s: no memory for accel_hw_priv\n", __FUNCTION__);
+		EPRINTK("%s: no memory for accel_hw_priv\n", __func__);
 		return -ENOMEM;
 	}
 
@@ -431,7 +430,7 @@ static int alloc_page_state(struct netback_accel *bend, int max_pages)
 		(sizeof(struct efx_vi_dma_map_state **) * 
 		 (max_pages / NET_ACCEL_MSG_MAX_PAGE_REQ), GFP_KERNEL);
 	if (accel_hw_priv->dma_maps == NULL) {
-		EPRINTK("%s: no memory for dma_maps\n", __FUNCTION__);
+		EPRINTK("%s: no memory for dma_maps\n", __func__);
 		kfree(accel_hw_priv);
 		return -ENOMEM;
 	}
@@ -439,7 +438,7 @@ static int alloc_page_state(struct netback_accel *bend, int max_pages)
 	bend->buffer_maps = kzalloc(sizeof(struct vm_struct *) * max_pages, 
 				    GFP_KERNEL);
 	if (bend->buffer_maps == NULL) {
-		EPRINTK("%s: no memory for buffer_maps\n", __FUNCTION__);
+		EPRINTK("%s: no memory for buffer_maps\n", __func__);
 		kfree(accel_hw_priv->dma_maps);
 		kfree(accel_hw_priv);
 		return -ENOMEM;
@@ -463,7 +462,7 @@ static int free_page_state(struct netback_accel *bend)
 {
 	struct falcon_bend_accel_priv *accel_hw_priv;
 
-	DPRINTK("%s: %p\n", __FUNCTION__, bend);
+	DPRINTK("%s: %p\n", __func__, bend);
 
 	accel_hw_priv = bend->accel_hw_priv;
 
@@ -520,7 +519,7 @@ static int ef_get_vnic(struct netback_accel *bend)
 
 	rc = efx_vi_alloc(&accel_hw_priv->efx_vih, bend->net_dev->ifindex);
 	if (rc != 0) {
-		EPRINTK("%s: efx_vi_alloc failed %d\n", __FUNCTION__, rc);
+		EPRINTK("%s: efx_vi_alloc failed %d\n", __func__, rc);
 		free_page_state(bend);
 		return rc;
 	}
@@ -529,7 +528,7 @@ static int ef_get_vnic(struct netback_accel *bend)
 					     bend_evq_timeout,
 					     bend);
 	if (rc != 0) {
-		EPRINTK("%s: register_callback failed %d\n", __FUNCTION__, rc);
+		EPRINTK("%s: register_callback failed %d\n", __func__, rc);
 		efx_vi_free(accel_hw_priv->efx_vih);
 		free_page_state(bend);
 		return rc;
@@ -608,8 +607,7 @@ static int ef_bend_hwinfo_falcon_common(struct netback_accel *bend,
 	rc = efx_vi_hw_resource_get_phys(accel_hw_priv->efx_vih, &res_mdata,
 					 res_array, &len);
 	if (rc != 0) {
-		DPRINTK("%s: resource_get_phys returned %d\n",
-			__FUNCTION__, rc);
+		DPRINTK("%s: resource_get_phys returned %d\n", __func__, rc);
 		return rc;
 	}
 
@@ -652,7 +650,7 @@ static int ef_bend_hwinfo_falcon_common(struct netback_accel *bend,
 			break;
 		default:
 			EPRINTK("%s: Unknown hardware resource type %d\n",
-				__FUNCTION__, res->type);
+				__func__, res->type);
 			break;
 		}
 	}
@@ -900,7 +898,7 @@ int netback_accel_add_buffers(struct netback_accel *bend, int pages, int log2_pa
 	if (accel_hw_priv->dma_maps_index >= 
 	    bend->max_pages / NET_ACCEL_MSG_MAX_PAGE_REQ) {
 		EPRINTK("%s: too many buffer table allocations: %d %d\n",
-			__FUNCTION__, accel_hw_priv->dma_maps_index, 
+			__func__, accel_hw_priv->dma_maps_index,
 			bend->max_pages / NET_ACCEL_MSG_MAX_PAGE_REQ);
 		return -EINVAL;
 	}
@@ -908,13 +906,13 @@ int netback_accel_add_buffers(struct netback_accel *bend, int pages, int log2_pa
 	/* Make sure we can't overflow the buffer_maps array */
 	if (bend->buffer_maps_index + pages > bend->max_pages) {
 		EPRINTK("%s: too many pages mapped: %d + %d > %d\n", 
-			__FUNCTION__, bend->buffer_maps_index,
+			__func__, bend->buffer_maps_index,
 			pages, bend->max_pages);
 		return -EINVAL;
 	}
 
 	for (i = 0; i < pages; i++) {
-		VPRINTK("%s: mapping page %d\n", __FUNCTION__, i);
+		VPRINTK("%s: mapping page %d\n", __func__, i);
 		rc = net_accel_map_device_page
 			(bend->hdev_data, grants[i],
 			 &bend->buffer_maps[bend->buffer_maps_index],
@@ -933,7 +931,7 @@ int netback_accel_add_buffers(struct netback_accel *bend, int pages, int log2_pa
 		addr_array[i] = dev_bus_addr;
 	}
 
-	VPRINTK("%s: mapping dma addresses to vih %p\n", __FUNCTION__, 
+	VPRINTK("%s: mapping dma addresses to vih %p\n", __func__,
 		accel_hw_priv->efx_vih);
 
 	index = accel_hw_priv->dma_maps_index;
@@ -947,12 +945,12 @@ int netback_accel_add_buffers(struct netback_accel *bend, int pages, int log2_pa
 	accel_hw_priv->dma_maps_index++;
 	NETBACK_ACCEL_STATS_OP(bend->stats.num_buffer_pages += pages);
 
-	//DPRINTK("%s: getting map address\n", __FUNCTION__);
+	//DPRINTK("%s: getting map address\n", __func__);
 
 	*buf_addr_out = efx_vi_dma_get_map_addr(accel_hw_priv->efx_vih, 
 						accel_hw_priv->dma_maps[index]);
 
-	//DPRINTK("%s: done\n", __FUNCTION__);
+	//DPRINTK("%s: done\n", __func__);
 
 	return 0;
 }
@@ -1059,7 +1057,7 @@ void netback_accel_free_filter(struct falcon_bend_accel_priv *accel_hw_priv,
 		if (cuckoo_hash_remove(&accel_hw_priv->filter_hash_table,
 				       (cuckoo_hash_key *)&filter_key)) {
 			EPRINTK("%s: Couldn't find filter to remove from table\n",
-				__FUNCTION__);
+				__func__);
 			BUG();
 		}
 	}
@@ -1215,7 +1213,7 @@ netback_accel_filter_check_add(struct netback_accel *bend,
 
 	NETBACK_ACCEL_STATS_OP(bend->stats.num_filters++);
 
-	VPRINTK("%s: success index %d handle %p\n", __FUNCTION__, filter_index, 
+	VPRINTK("%s: success index %d handle %p\n", __func__, filter_index,
 		fs->filter_handle);
 
 	rc = filter_index;

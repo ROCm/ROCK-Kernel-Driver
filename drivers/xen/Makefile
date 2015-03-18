@@ -8,7 +8,7 @@ ifeq ($(filter y, $(CONFIG_ARM) $(CONFIG_ARM64)),)
 obj-$(CONFIG_HOTPLUG_CPU)	+= $(xen-hotplug-y)
 endif
 obj-$(CONFIG_X86)		+= fallback.o
-obj-$(CONFIG_PARAVIRT_XEN)	+= grant-table.o features.o balloon.o manage.o
+obj-$(CONFIG_PARAVIRT_XEN)	+= grant-table.o features.o balloon.o manage.o preempt.o
 obj-$(CONFIG_PARAVIRT_XEN)	+= events/
 
 xen-balloon_$(CONFIG_XEN)	:= balloon/

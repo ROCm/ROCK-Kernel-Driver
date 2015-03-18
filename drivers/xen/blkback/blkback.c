@@ -871,7 +871,7 @@ static int __init blkif_init(void)
 	kfree(pending_reqs);
 	kfree(pending_grant_handles);
 	free_empty_pages_and_pagevec(pending_pages, mmap_pages);
-	pr_warning("%s: out of memory\n", __FUNCTION__);
+	pr_warning("%s: out of memory\n", __func__);
 	return -ENOMEM;
 }
 

@@ -110,7 +110,7 @@ ef_vi_inline int falcon_rx_check_dup(ef_vi* evq, ef_event* ev_out,
 #endif
 	BUG_ON(!QWORD_TEST_BIT(RX_EV_FRM_TRUNC, *ev));
 	BUG_ON( QWORD_TEST_BIT(RX_EV_PKT_OK, *ev));
-	BUG_ON(!QWORD_GET_U(RX_EV_BYTE_CNT, *ev) == 0);
+	BUG_ON(QWORD_GET_U(RX_EV_BYTE_CNT, *ev));
 	ev_out->rx_no_desc_trunc.type = EF_EVENT_TYPE_RX_NO_DESC_TRUNC;
 	ev_out->rx_no_desc_trunc.q_id = q_id;
 	return 1;

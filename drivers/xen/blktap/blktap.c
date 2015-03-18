@@ -983,7 +983,7 @@ static int req_increase(void)
  out_of_memory:
 	free_empty_pages_and_pagevec(foreign_pages[mmap_alloc], mmap_pages);
 	kfree(pending_reqs[mmap_alloc]);
-	WPRINTK("%s: out of memory\n", __FUNCTION__);
+	WPRINTK("%s: out of memory\n", __func__);
 	return -ENOMEM;
 }
 

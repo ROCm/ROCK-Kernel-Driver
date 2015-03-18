@@ -12,6 +12,75 @@
 #define __flush_tlb_global() xen_tlb_flush()
 #define __flush_tlb_single(addr) xen_invlpg(addr)
 
+struct tlb_state {
+#if defined(CONFIG_SMP) && !defined(CONFIG_XEN)
+	struct mm_struct *active_mm;
+	int state;
+#endif
+
+	/*
+	 * Access to this CR4 shadow and to H/W CR4 is protected by
+	 * disabling interrupts when modifying either one.
+	 */
+	unsigned long cr4;
+};
+DECLARE_PER_CPU_SHARED_ALIGNED(struct tlb_state, cpu_tlbstate);
+
+/* Initialize cr4 shadow for this CPU. */
+static inline void cr4_init_shadow(void)
+{
+	this_cpu_write(cpu_tlbstate.cr4, __read_cr4());
+}
+
+/* Set in this cpu's CR4. */
+static inline void cr4_set_bits(unsigned long mask)
+{
+	unsigned long cr4;
+
+	cr4 = this_cpu_read(cpu_tlbstate.cr4);
+	if ((cr4 | mask) != cr4) {
+		cr4 |= mask;
+		this_cpu_write(cpu_tlbstate.cr4, cr4);
+		__write_cr4(cr4);
+	}
+}
+
+/* Clear in this cpu's CR4. */
+static inline void cr4_clear_bits(unsigned long mask)
+{
+	unsigned long cr4;
+
+	cr4 = this_cpu_read(cpu_tlbstate.cr4);
+	if ((cr4 & ~mask) != cr4) {
+		cr4 &= ~mask;
+		this_cpu_write(cpu_tlbstate.cr4, cr4);
+		__write_cr4(cr4);
+	}
+}
+
+/* Read the CR4 shadow. */
+static inline unsigned long cr4_read_shadow(void)
+{
+	return this_cpu_read(cpu_tlbstate.cr4);
+}
+
+/*
+ * Save some of cr4 feature set we're using (e.g.  Pentium 4MB
+ * enable and PPro Global page enable), so that any CPU's that boot
+ * up after us can get the correct flags.  This should only be used
+ * during boot on the boot cpu.
+ */
+extern unsigned long mmu_cr4_features;
+#define trampoline_cr4_features ((u32 *)NULL)
+
+static inline void cr4_set_bits_and_update_boot(unsigned long mask)
+{
+	mmu_cr4_features |= mask;
+	if (trampoline_cr4_features)
+		*trampoline_cr4_features = mmu_cr4_features;
+	cr4_set_bits(mask);
+}
+
 static inline void __flush_tlb_all(void)
 {
 	__flush_tlb_global();
@@ -129,12 +198,6 @@ extern void flush_tlb_kernel_range(unsigned long start, unsigned long end);
 #ifndef CONFIG_XEN
 #define TLBSTATE_OK	1
 #define TLBSTATE_LAZY	2
-
-struct tlb_state {
-	struct mm_struct *active_mm;
-	int state;
-};
-DECLARE_PER_CPU_SHARED_ALIGNED(struct tlb_state, cpu_tlbstate);
 
 static inline void reset_lazy_tlbstate(void)
 {

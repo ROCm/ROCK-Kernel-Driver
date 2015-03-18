@@ -48,6 +48,7 @@ asmlinkage __visible void __init i386_start_kernel(void)
 	set_cpu_cap(&new_cpu_data, X86_FEATURE_FPU);
 #endif
 
+	cr4_init_shadow();
 #ifndef CONFIG_XEN
 	sanitize_boot_params(&boot_params);
 

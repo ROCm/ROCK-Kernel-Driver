@@ -50,7 +50,7 @@ static tpmif_t *alloc_tpmif(domid_t domid, struct backend_info *bi)
  out_of_memory:
 	if (tpmif != NULL)
 		kmem_cache_free(tpmif_cachep, tpmif);
-	pr_err("%s: out of memory\n", __FUNCTION__);
+	pr_err("%s: out of memory\n", __func__);
 	return ERR_PTR(-ENOMEM);
 }
 

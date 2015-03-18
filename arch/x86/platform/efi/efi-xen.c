@@ -383,6 +383,7 @@ void __init efi_init(void)
 	int ret, i;
 	struct xen_platform_op op;
 	union xenpf_efi_info *info = &op.u.firmware_info.u.efi_info;
+	void *cfgtab;
 
 	op.cmd = XENPF_firmware_info;
 	op.u.firmware_info.type = XEN_FW_EFI_INFO;
@@ -422,10 +423,16 @@ void __init efi_init(void)
 	op.u.firmware_info.index = XEN_FW_EFI_CONFIG_TABLE;
 	if (HYPERVISOR_platform_op(&op))
 		BUG();
-	if (efi_config_init(info->cfg.addr, info->cfg.nent, arch_tables))
-		return;
 
-	__set_bit(EFI_CONFIG_TABLES, &efi.flags);
+	cfgtab = early_ioremap(info->cfg.addr,
+			       info->cfg.nent * sizeof(efi_config_table_64_t));
+	if (!cfgtab) {
+		pr_err("Couldn't map configuration table!\n");
+		return;
+	}
+	efi_config_parse_tables(cfgtab, info->cfg.nent,
+				sizeof(efi_config_table_64_t), arch_tables);
+	early_iounmap(cfgtab, info->cfg.nent * sizeof(efi_config_table_64_t));
 }
 
 #undef DECLARE_CALL

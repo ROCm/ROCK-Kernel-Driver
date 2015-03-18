@@ -16,6 +16,11 @@
 #include <linux/efi.h>
 #include <linux/efi-bgrt.h>
 
+#ifdef CONFIG_XEN
+#define early_memremap early_ioremap
+#define early_memunmap early_iounmap
+#endif
+
 struct acpi_table_bgrt *bgrt_tab;
 void *__initdata bgrt_image;
 size_t __initdata bgrt_image_size;

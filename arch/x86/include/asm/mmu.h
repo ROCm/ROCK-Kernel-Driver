@@ -22,6 +22,10 @@ typedef struct {
 
 	struct mutex lock;
 	void __user *vdso;
+
+#ifndef CONFIG_XEN
+	atomic_t perf_rdpmc_allowed;	/* nonzero if rdpmc is allowed */
+#endif
 } mm_context_t;
 
 #if defined(CONFIG_SMP) && !defined(CONFIG_XEN)

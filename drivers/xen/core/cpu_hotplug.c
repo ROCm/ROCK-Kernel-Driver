@@ -160,7 +160,7 @@ int cpu_up_check(unsigned int cpu)
 		cpumask_set_cpu(cpu, local_allowed_cpumask);
 		if (!cpumask_test_cpu(cpu, xenbus_allowed_cpumask)) {
 			pr_warning("%s: attempt to bring up CPU %u disallowed "
-				   "by remote admin.\n", __FUNCTION__, cpu);
+				   "by remote admin.\n", __func__, cpu);
 			rc = -EBUSY;
 		}
 	} else if (!cpumask_test_cpu(cpu, local_allowed_cpumask) ||

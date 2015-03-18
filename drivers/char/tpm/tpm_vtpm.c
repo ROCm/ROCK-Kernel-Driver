@@ -477,9 +477,9 @@ struct tpm_chip *init_vtpm(struct device *dev,
 	vtpm_state_init(vtpms);
 	vtpms->tpm_private = tp;
 
-	chip = tpm_register_hardware(dev, &tpm_vtpm);
-	if (!chip) {
-		rc = -ENODEV;
+	chip = tpmm_chip_alloc(dev, &tpm_vtpm);
+	if (IS_ERR(chip)) {
+		rc = PTR_ERR(chip);
 		goto err_free_mem;
 	}
 
@@ -499,6 +499,6 @@ void cleanup_vtpm(struct device *dev)
 {
 	struct tpm_chip *chip = dev_get_drvdata(dev);
 	struct vtpm_state *vtpms = (struct vtpm_state*)chip_get_private(chip);
-	tpm_remove_hardware(dev);
+	tpm_chip_unregister(chip);
 	kfree(vtpms);
 }

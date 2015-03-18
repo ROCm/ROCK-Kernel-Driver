@@ -77,7 +77,7 @@ static void vnic_start_fastpath(netfront_accel_vnic *vnic)
 	struct netfront_info *np = netdev_priv(net_dev);
 	unsigned long flags;
 
-	DPRINTK("%s\n", __FUNCTION__);
+	DPRINTK("%s\n", __func__);
 
 	spin_lock_irqsave(&vnic->tx_lock, flags);
 	vnic->tx_enabled = 1;
@@ -97,7 +97,7 @@ void vnic_stop_fastpath(netfront_accel_vnic *vnic)
 	struct netfront_info *np = (struct netfront_info *)netdev_priv(net_dev);
 	unsigned long flags1, flags2;
 
-	DPRINTK("%s\n", __FUNCTION__);
+	DPRINTK("%s\n", __func__);
 
 	vnic_stop_interrupts(vnic);
 	
@@ -168,12 +168,12 @@ static int vnic_add_bufs(netfront_accel_vnic *vnic,
 		netfront_accel_vi_add_bufs(vnic, bufinfo == vnic->rx_bufs);
 
 		if (offset + msg->u.mapbufs.pages == vnic->bufpages.max_pages) {
-			VPRINTK("%s: got all buffers back\n", __FUNCTION__);
+			VPRINTK("%s: got all buffers back\n", __func__);
 			vnic->frontend_ready = 1;
 			if (vnic->backend_netdev_up)
 				vnic_start_fastpath(vnic);
 		} else {
-			VPRINTK("%s: got buffers back %d %d\n", __FUNCTION__, 
+			VPRINTK("%s: got buffers back %d %d\n", __func__,
 				offset, msg->u.mapbufs.pages);
 		}
 	}
@@ -214,13 +214,13 @@ static int vnic_send_buffer_requests(netfront_accel_vnic *vnic,
 						&vnic->to_dom0, &msg);
 			if (rc < 0) {
 				VPRINTK("%s: queue full, stopping for now\n",
-					__FUNCTION__);
+					__func__);
 				break;
 			}
 			sent++;
 		} else {
 			EPRINTK("%s: problem with grant, stopping for now\n",
-				__FUNCTION__);
+				__func__);
 			break;
 		}
 
@@ -439,7 +439,7 @@ void netfront_accel_msg_from_bend(void *context)
 
 		if (vnic->shared_page->aflags &
 		    NET_ACCEL_MSG_AFLAGS_NETUPDOWN) {
-			DPRINTK("%s: net interface change\n", __FUNCTION__);
+			DPRINTK("%s: net interface change\n", __func__);
 			clear_bit(NET_ACCEL_MSG_AFLAGS_NETUPDOWN_B,
 				  (unsigned long *)&vnic->shared_page->aflags);
 			if (vnic->shared_page->net_dev_up)
@@ -480,7 +480,7 @@ void netfront_accel_msg_from_bend(void *context)
 		vnic_set_queue_not_full(vnic);
 
 	if (err != 0) {
-		EPRINTK("%s returned %d\n", __FUNCTION__, err);
+		EPRINTK("%s returned %d\n", __func__, err);
 		netfront_accel_set_closing(vnic);
 	}
 
@@ -535,7 +535,7 @@ irqreturn_t netfront_accel_net_channel_irq_from_bend(int irq, void *context)
 	else {
 		spin_unlock_irqrestore(&vnic->irq_enabled_lock, flags);
 		NETFRONT_ACCEL_STATS_OP(vnic->stats.useless_irq_count++);
-		DPRINTK("%s: irq when disabled\n", __FUNCTION__);
+		DPRINTK("%s: irq when disabled\n", __func__);
 	}
 	
 	return IRQ_HANDLED;

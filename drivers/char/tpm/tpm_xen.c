@@ -103,7 +103,7 @@ static void destroy_tpmring(struct tpm_private *tp);
 void __exit tpmif_exit(void);
 
 #define DPRINTK(fmt, args...) \
-    pr_debug("xen_tpm_fr (%s:%d) " fmt, __FUNCTION__, __LINE__, ##args)
+    pr_debug("xen_tpm_fr (%s:%d) " fmt, __func__, __LINE__, ##args)
 #define IPRINTK(fmt, args...) \
     pr_info("xen_tpm_fr: " fmt, ##args)
 #define WPRINTK(fmt, args...) \
@@ -629,7 +629,7 @@ static int tpm_xmit(struct tpm_private *tp,
 			spin_unlock_irq(&tp->tx_lock);
 			DPRINTK("Grant table claim reference failed in "
 				"func:%s line:%d file:%s\n",
-				__FUNCTION__, __LINE__, __FILE__);
+				__func__, __LINE__, __FILE__);
 			return -ENOSPC;
 		}
 		gnttab_grant_foreign_access_ref(tx->ref,

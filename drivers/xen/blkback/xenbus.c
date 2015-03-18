@@ -25,7 +25,7 @@
 #undef DPRINTK
 #define DPRINTK(fmt, args...)				\
 	pr_debug("blkback/xenbus (%s:%d) " fmt ".\n",	\
-		 __FUNCTION__, __LINE__, ##args)
+		 __func__, __LINE__, ##args)
 
 static void connect(struct backend_info *);
 static int connect_ring(struct backend_info *);
@@ -458,7 +458,7 @@ static void frontend_changed(struct xenbus_device *dev,
 	case XenbusStateInitialising:
 		if (dev->state == XenbusStateClosed) {
 			pr_info("%s: %s: prepare for reconnect\n",
-				__FUNCTION__, dev->nodename);
+				__func__, dev->nodename);
 			xenbus_switch_state(dev, XenbusStateInitWait);
 		}
 		break;

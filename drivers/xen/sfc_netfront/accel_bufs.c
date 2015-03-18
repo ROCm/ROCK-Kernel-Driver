@@ -94,8 +94,8 @@ int netfront_accel_alloc_buffer_mem(struct netfront_accel_bufpages *bufpages,
 	}
 
 	if (n != pages) {
-		EPRINTK("%s: not enough pages: %d != %d\n", __FUNCTION__, n, 
-			pages);
+		EPRINTK("%s: not enough pages: %d != %d\n", __func__, n,
+		        pages);
 		for (; n >= 0; n--)
 			free_page((unsigned long)(bufpages->page_list[n]));
 		rc = -ENOMEM;
@@ -212,7 +212,7 @@ int netfront_accel_buf_map_request(struct xenbus_device *dev,
 
 		mfn = virt_to_mfn(bufpages->page_list[offset+i]);
 		VPRINTK("%s: Granting page %d, mfn %08x\n",
-			__FUNCTION__, i, mfn);
+			__func__, i, mfn);
 
 		bufpages->grant_list[offset+i] =
 			net_accel_grant_page(dev, mfn, 0);
@@ -220,7 +220,7 @@ int netfront_accel_buf_map_request(struct xenbus_device *dev,
 
 		if (msg->u.mapbufs.grants[i] < 0) {
 			EPRINTK("%s: Failed to grant buffer: %d\n",
-				__FUNCTION__, msg->u.mapbufs.grants[i]);
+				__func__, msg->u.mapbufs.grants[i]);
 			err = -EIO;
 			goto error;
 		}
@@ -251,7 +251,7 @@ int netfront_accel_add_bufs(struct netfront_accel_bufpages *bufpages,
 	u32 msg_buf;
 	unsigned long flags;
 
-	VPRINTK("%s: manager %p msg %p\n", __FUNCTION__, manager, msg);
+	VPRINTK("%s: manager %p msg %p\n", __func__, manager, msg);
 
 	BUG_ON(msg->id != (NET_ACCEL_MSG_MAPBUF | NET_ACCEL_MSG_REPLY));
 

@@ -129,7 +129,7 @@ static int __copy_to_sg(struct scatterlist *sgl, unsigned int nr_sg,
 	for_each_sg (sgl, sg, nr_sg, i) {
 		if (sg_page(sg) == NULL) {
 			pr_warning("%s: inconsistent length field in "
-				   "scatterlist\n", __FUNCTION__);
+				   "scatterlist\n", __func__);
 			return -ENOMEM;
 		}
 
@@ -148,7 +148,7 @@ static int __copy_to_sg(struct scatterlist *sgl, unsigned int nr_sg,
 		from += copy_size;
 	}
 
-	pr_warning("%s: no space in scatterlist\n", __FUNCTION__);
+	pr_warning("%s: no space in scatterlist\n", __func__);
 	return -ENOMEM;
 }
 
@@ -168,14 +168,14 @@ static int __maybe_unused __copy_from_sg(struct scatterlist *sgl,
 	for_each_sg (sgl, sg, nr_sg, i) {
 		if (sg_page(sg) == NULL) {
 			pr_warning("%s: inconsistent length field in "
-				   "scatterlist\n", __FUNCTION__);
+				   "scatterlist\n", __func__);
 			return -ENOMEM;
 		}
 
 		from_rest = sg->length;
 		if ((from_rest > 0) && (to_capa < from_rest)) {
 			pr_warning("%s: no space in destination buffer\n",
-				   __FUNCTION__);
+				   __func__);
 			return -ENOMEM;
 		}
 		copy_size = from_rest;
@@ -245,7 +245,7 @@ retry:
 	alloc_len  = sizeof(struct scsi_lun) * alloc_luns
 				+ VSCSI_REPORT_LUNS_HEADER;
 	if ((buff = kzalloc(alloc_len, GFP_KERNEL)) == NULL) {
-		pr_err("scsiback:%s kmalloc err\n", __FUNCTION__);
+		pr_err("scsiback:%s kmalloc err\n", __func__);
 		goto fail;
 	}
 

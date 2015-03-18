@@ -658,6 +658,9 @@ static int azx_pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 		azx_writel(chip, SSYNC, azx_readl(chip, SSYNC) & ~sbits);
 	if (start) {
 		azx_timecounter_init(substream, 0, 0);
+		snd_pcm_gettime(substream->runtime, &substream->runtime->trigger_tstamp);
+		substream->runtime->trigger_tstamp_latched = true;
+
 		if (nsync > 1) {
 			cycle_t cycle_last;
 
@@ -940,7 +943,8 @@ static int azx_attach_pcm_stream(struct hda_bus *bus, struct hda_codec *codec,
 					      chip->card->dev,
 					      size, MAX_PREALLOC_SIZE);
 	/* link to codec */
-	pcm->dev = &codec->dev;
+	for (s = 0; s < 2; s++)
+		pcm->streams[s].dev.parent = &codec->dev;
 	return 0;
 }
 
@@ -958,7 +962,6 @@ static int azx_alloc_cmd_io(struct azx *chip)
 		dev_err(chip->card->dev, "cannot allocate CORB/RIRB\n");
 	return err;
 }
-EXPORT_SYMBOL_GPL(azx_alloc_cmd_io);
 
 static void azx_init_cmd_io(struct azx *chip)
 {
@@ -1023,7 +1026,6 @@ static void azx_init_cmd_io(struct azx *chip)
 	azx_writeb(chip, RIRBCTL, AZX_RBCTL_DMA_EN | AZX_RBCTL_IRQ_EN);
 	spin_unlock_irq(&chip->reg_lock);
 }
-EXPORT_SYMBOL_GPL(azx_init_cmd_io);
 
 static void azx_free_cmd_io(struct azx *chip)
 {
@@ -1033,7 +1035,6 @@ static void azx_free_cmd_io(struct azx *chip)
 	azx_writeb(chip, CORBCTL, 0);
 	spin_unlock_irq(&chip->reg_lock);
 }
-EXPORT_SYMBOL_GPL(azx_free_cmd_io);
 
 static unsigned int azx_command_addr(u32 cmd)
 {
@@ -1164,7 +1165,7 @@ static unsigned int azx_rirb_get_response(struct hda_bus *bus,
 		}
 	}
 
-	if (!bus->no_response_fallback)
+	if (bus->no_response_fallback)
 		return -1;
 
 	if (!chip->polling_mode && chip->poll_count < 2) {
@@ -1313,7 +1314,6 @@ static int azx_send_cmd(struct hda_bus *bus, unsigned int val)
 	else
 		return azx_corb_send_cmd(bus, val);
 }
-EXPORT_SYMBOL_GPL(azx_send_cmd);
 
 /* get a response */
 static unsigned int azx_get_response(struct hda_bus *bus,
@@ -1327,7 +1327,6 @@ static unsigned int azx_get_response(struct hda_bus *bus,
 	else
 		return azx_rirb_get_response(bus, addr);
 }
-EXPORT_SYMBOL_GPL(azx_get_response);
 
 #ifdef CONFIG_SND_HDA_DSP_LOADER
 /*
@@ -1994,4 +1993,4 @@ void azx_notifier_unregister(struct azx *chip)
 EXPORT_SYMBOL_GPL(azx_notifier_unregister);
 
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("Common HDA driver funcitons");
+MODULE_DESCRIPTION("Common HDA driver functions");

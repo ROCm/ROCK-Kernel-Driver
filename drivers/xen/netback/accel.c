@@ -60,7 +60,7 @@ static int match_accelerator(struct xenbus_device *xendev,
 	if (IS_ERR(eth_name)) {
 		/* Probably means not present */
 		DPRINTK("%s: no match due to xenbus_read accel error %ld\n",
-			__FUNCTION__, PTR_ERR(eth_name));
+			__func__, PTR_ERR(eth_name));
 		return 0;
 	} else {
 		if (!strcmp(eth_name, accelerator->eth_name))
@@ -161,7 +161,7 @@ int netback_connect_accelerator(unsigned version, int id, const char *eth_name,
 		kmalloc(sizeof(struct netback_accelerator), GFP_KERNEL);
 	if (!new_accelerator) {
 		DPRINTK("%s: failed to allocate memory for accelerator\n",
-			__FUNCTION__);
+			__func__);
 		return -ENOMEM;
 	}
 
@@ -171,7 +171,7 @@ int netback_connect_accelerator(unsigned version, int id, const char *eth_name,
 	new_accelerator->eth_name = kmalloc(eth_name_len, GFP_KERNEL);
 	if (!new_accelerator->eth_name) {
 		DPRINTK("%s: failed to allocate memory for eth_name string\n",
-			__FUNCTION__);
+			__func__);
 		kfree(new_accelerator);
 		return -ENOMEM;
 	}

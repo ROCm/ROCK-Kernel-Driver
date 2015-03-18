@@ -67,3 +67,10 @@ int __init APIC_init_uniprocessor(void)
 	return 0;
 }
 #endif
+
+#ifdef CONFIG_UP_LATE_INIT
+void __init up_late_init(void)
+{
+	APIC_init_uniprocessor();
+}
+#endif

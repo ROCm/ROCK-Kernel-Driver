@@ -361,7 +361,7 @@ static void tap_frontend_changed(struct xenbus_device *dev,
 	case XenbusStateInitialising:
 		if (dev->state == XenbusStateClosed) {
 			pr_info("%s: %s: prepare for reconnect\n",
-				__FUNCTION__, dev->nodename);
+				__func__, dev->nodename);
 			xenbus_switch_state(dev, XenbusStateInitWait);
 		}
 		break;

@@ -345,7 +345,7 @@ int cuckoo_hash_rehash(cuckoo_hash_table *hashtab)
 
 	return 0;
  err:
-	EPRINTK("%s: Rehash failed, giving up\n", __FUNCTION__);
+	EPRINTK("%s: Rehash failed, giving up\n", __func__);
 	/* Some other error, give up, at least restore table to how it was */
 	memcpy(hashtab, &old_hashtab, sizeof(cuckoo_hash_table));
 	if (new_table)
@@ -422,7 +422,7 @@ int cuckoo_hash_add(cuckoo_hash_table *hashtab, cuckoo_hash_key *key,
 		goto again;
 	}
   
-	EPRINTK("%s: failed hash add\n", __FUNCTION__);
+	EPRINTK("%s: failed hash add\n", __func__);
 	/*
 	 * Couldn't do it - bad as we've now removed some random thing
 	 * from the table, and will just drop it on the floor.  Better
@@ -556,7 +556,7 @@ void cuckoo_hash_valid(cuckoo_hash_table *hashtab)
 	}
 	
 	if (entry_count != hashtab->entries) {
-		EPRINTK("%s: bad count\n", __FUNCTION__);
+		EPRINTK("%s: bad count\n", __func__);
 		cuckoo_hash_dump(hashtab);
 		return;
 	}
@@ -567,7 +567,7 @@ void cuckoo_hash_valid(cuckoo_hash_table *hashtab)
 						     &hashtab->table0[i].key, 
 						     &hashtab->a0)) {
 				EPRINTK("%s: Bad key table 0 index %d\n",
-					__FUNCTION__, i);
+					__func__, i);
 				cuckoo_hash_dump(hashtab);
 				return;
 			}
@@ -576,7 +576,7 @@ void cuckoo_hash_valid(cuckoo_hash_table *hashtab)
 						     &hashtab->table1[i].key, 
 						     &hashtab->a1)) {
 				EPRINTK("%s: Bad key table 1 index %d\n",
-					__FUNCTION__, i);
+					__func__, i);
 				cuckoo_hash_dump(hashtab);
 				return;
 			}

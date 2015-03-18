@@ -58,9 +58,14 @@ unsigned int xen_spin_wait(arch_spinlock_t *, struct __raw_tickets *,
 			   unsigned int flags);
 void xen_spin_kick(const arch_spinlock_t *, unsigned int ticket);
 
+static inline bool __tickets_equal(__ticket_t one, __ticket_t two)
+{
+	return one == two;
+}
+
 static __always_inline int __ticket_spin_value_unlocked(arch_spinlock_t lock)
 {
-	return lock.tickets.head == lock.tickets.tail;
+	return __tickets_equal(lock.tickets.head, lock.tickets.tail);
 }
 
 /*
@@ -85,14 +90,14 @@ static __always_inline void __ticket_spin_lock(arch_spinlock_t *lock)
 	unsigned int count, flags = arch_local_irq_save();
 
 	inc = xadd(&lock->tickets, inc);
-	if (likely(inc.head == inc.tail))
+	if (likely(__tickets_equal(inc.head, inc.tail)))
 		arch_local_irq_restore(flags);
 	else {
 		inc = xen_spin_adjust(lock, inc);
 		arch_local_irq_restore(flags);
 		count = SPIN_THRESHOLD;
 		do {
-			while (inc.head != inc.tail
+			while (!__tickets_equal(inc.head, inc.tail)
 			       && __spin_count_dec(count, lock)) {
 				cpu_relax();
 				inc.head = READ_ONCE(lock->tickets.head);
@@ -113,12 +118,12 @@ static __always_inline void __ticket_spin_lock_flags(arch_spinlock_t *lock,
 	struct __raw_tickets inc = { .tail = TICKET_LOCK_INC };
 
 	inc = xadd(&lock->tickets, inc);
-	if (unlikely(inc.head != inc.tail)) {
+	if (unlikely(!__tickets_equal(inc.head, inc.tail))) {
 		unsigned int count = SPIN_THRESHOLD;
 
 		inc = xen_spin_adjust(lock, inc);
 		do {
-			while (inc.head != inc.tail
+			while (!__tickets_equal(inc.head, inc.tail)
 			       && __spin_count_dec(count, lock)) {
 				cpu_relax();
 				inc.head = READ_ONCE(lock->tickets.head);
@@ -137,7 +142,7 @@ static __always_inline int __ticket_spin_trylock(arch_spinlock_t *lock)
 	arch_spinlock_t old;
 
 	old.tickets = READ_ONCE(lock->tickets);
-	if (old.tickets.head != old.tickets.tail)
+	if (!__tickets_equal(old.tickets.head, old.tickets.tail))
 		return 0;
 
 	/* cmpxchg is a full barrier, so nothing can move before it */
@@ -152,12 +157,12 @@ static __always_inline void __ticket_spin_unlock(arch_spinlock_t *lock)
 {
 	register struct __raw_tickets new;
 
-	__add(&lock->tickets.head, 1, UNLOCK_LOCK_PREFIX);
+	__add(&lock->tickets.head, TICKET_LOCK_INC, UNLOCK_LOCK_PREFIX);
 #if !defined(XEN_SPINLOCK_SOURCE) || !CONFIG_XEN_SPINLOCK_ACQUIRE_NESTING
 # undef UNLOCK_LOCK_PREFIX
 #endif
 	new = READ_ONCE(lock->tickets);
-	if (new.head != new.tail)
+	if (!__tickets_equal(new.head, new.tail))
 		xen_spin_kick(lock, new.head);
 }
 
@@ -165,14 +170,14 @@ static inline int __ticket_spin_is_locked(arch_spinlock_t *lock)
 {
 	struct __raw_tickets tmp = READ_ONCE(lock->tickets);
 
-	return tmp.tail != tmp.head;
+	return !__tickets_equal(tmp.tail, tmp.head);
 }
 
 static inline int __ticket_spin_is_contended(arch_spinlock_t *lock)
 {
 	struct __raw_tickets tmp = READ_ONCE(lock->tickets);
 
-	return (__ticket_t)(tmp.tail - tmp.head) > 1;
+	return (tmp.tail - tmp.head) > TICKET_LOCK_INC;
 }
 
 static inline void __ticket_spin_unlock_wait(arch_spinlock_t *lock)
@@ -185,8 +190,8 @@ static inline void __ticket_spin_unlock_wait(arch_spinlock_t *lock)
 		 * We need to check "unlocked" in a loop, tmp.head == head
 		 * can be false positive because of overflow.
 		 */
-		if (tmp.head == tmp.tail ||
-		    tmp.head != head)
+		if (__tickets_equal(tmp.head, tmp.tail) ||
+				!__tickets_equal(tmp.head, head))
 			break;
 
 		cpu_relax();

@@ -163,7 +163,7 @@ static inline int tso_start_new_buffer(netfront_accel_vnic *vnic,
 	/* Get a mapped packet buffer */
 	buf = netfront_accel_buf_get(vnic->tx_bufs);
 	if (buf == NULL) {
-		DPRINTK("%s: No buffer for TX\n", __FUNCTION__);
+		DPRINTK("%s: No buffer for TX\n", __func__);
 		return -1;
 	}
 
@@ -290,7 +290,7 @@ static inline void tso_unwind(netfront_accel_vnic *vnic,
 	struct netfront_accel_tso_buffer *tso_buf;
 	struct netfront_accel_tso_output_packet *output_packet;
 
-	DPRINTK("%s\n", __FUNCTION__);
+	DPRINTK("%s\n", __func__);
 
 	while (st->output_packets != NULL) {
 		output_packet = st->output_packets;
@@ -386,8 +386,7 @@ int netfront_accel_enqueue_skb_tso(netfront_accel_vnic *vnic,
 	}
 
 	if (tso_start_new_packet(vnic, skb, &state) < 0) {
-		DPRINTK("%s: out of first start-packet memory\n",
-			__FUNCTION__);
+		DPRINTK("%s: out of first start-packet memory\n", __func__);
 		goto unwind;
 	}
 
@@ -409,8 +408,7 @@ int netfront_accel_enqueue_skb_tso(netfront_accel_vnic *vnic,
 		if ((state.output_packets->tso_bufs->length == 
 		     NETFRONT_ACCEL_TSO_BUF_LENGTH) &&
 		    tso_start_new_buffer(vnic, &state, 0)) {
-			DPRINTK("%s: out of start-buffer memory\n",
-				__FUNCTION__);
+			DPRINTK("%s: out of start-buffer memory\n", __func__);
 			goto unwind;
 		}
 
@@ -421,8 +419,7 @@ int netfront_accel_enqueue_skb_tso(netfront_accel_vnic *vnic,
 		      (state.output_packets->tso_bufs->length >= 
 		       NETFRONT_ACCEL_TSO_BUF_LENGTH))) &&
 		    tso_start_new_packet(vnic, skb, &state) < 0) {
-			DPRINTK("%s: out of start-packet memory\n",
-				__FUNCTION__);
+			DPRINTK("%s: out of start-packet memory\n", __func__);
 			goto unwind;
 		}
 
@@ -431,7 +428,7 @@ int netfront_accel_enqueue_skb_tso(netfront_accel_vnic *vnic,
 	/* Check for space */
 	if (ef_vi_transmit_space(&vnic->vi) < state.buffers) {
 		DPRINTK("%s: Not enough TX space (%d)\n",
-			__FUNCTION__, state.buffers);
+			__func__, state.buffers);
 		goto unwind;
 	}
 
