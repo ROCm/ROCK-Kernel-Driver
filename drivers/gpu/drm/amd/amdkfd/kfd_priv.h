@@ -541,6 +541,8 @@ struct kfd_process {
 	struct list_head signal_event_pages;	/* struct slot_page_header.event_pages */
 	u32 next_nonsignal_event_id;
 	size_t signal_event_count;
+	/* This flag tells if we shuold reset all wavefronts on process termination*/
+	bool reset_wavefronts;
 };
 
 /**
@@ -752,5 +754,7 @@ int kfd_event_create(struct file *devkfd, struct kfd_process *p,
 int kfd_event_destroy(struct kfd_process *p, uint32_t event_id);
 
 void radeon_flush_tlb(struct kfd_dev *dev, uint32_t pasid);
+
+int dbgdev_wave_reset_wavefronts(struct kfd_dev *dev, struct kfd_process *p);
 
 #endif

@@ -325,6 +325,8 @@ static struct kfd_process *create_process(const struct task_struct *thread)
 	if (kfd_init_apertures(process) != 0)
 		goto err_init_apretures;
 
+	process->reset_wavefronts = false;
+
 	return process;
 
 err_init_apretures:
@@ -434,18 +436,12 @@ void kfd_unbind_process_from_device(struct kfd_dev *dev, unsigned int pasid)
 
 	mutex_lock(&p->mutex);
 
-	if ((dev->dbgmgr) && (dev->dbgmgr->pasid == p->pasid)) {
-
-		pr_debug("\t dbg mgr pasid is %u\n", dev->dbgmgr->pasid);
-		if (!kfd_dbgmgr_abnormal_termination(dev->dbgmgr, p)) {
-			kfd_dbgmgr_destroy(dev->dbgmgr);
-			dev->dbgmgr = NULL;
-		} else {
-			BUG();
-		}
-	}
+	if ((dev->dbgmgr) && (dev->dbgmgr->pasid == p->pasid))
+		kfd_dbgmgr_destroy(dev->dbgmgr);
 
 	pqm_uninit(&p->pqm);
+	if (p->reset_wavefronts)
+		dbgdev_wave_reset_wavefronts(dev, p);
 
 	pdd = kfd_get_process_device_data(dev, p);
 
