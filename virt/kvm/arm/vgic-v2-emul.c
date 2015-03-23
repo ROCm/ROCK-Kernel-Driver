@@ -517,6 +517,13 @@ static int vgic_v2_map_resources(struct kvm *kvm,
 		goto out;
 	}
 
+	if ((kvm->arch.vgic.vgic_cpu_base & ~PAGE_MASK) !=
+	    (params->vcpu_base & ~PAGE_MASK)) {
+		kvm_err("Need to align vgic identically in guest and host\n");
+		ret = -ENXIO;
+		goto out;
+	}
+
 	ret = kvm_phys_addr_ioremap(kvm, kvm->arch.vgic.vgic_cpu_base,
 				    params->vcpu_base, KVM_VGIC_V2_CPU_SIZE,
 				    true);

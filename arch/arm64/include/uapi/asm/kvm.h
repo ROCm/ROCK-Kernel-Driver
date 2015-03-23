@@ -74,6 +74,7 @@ struct kvm_regs {
 /* Supported VGIC address types  */
 #define KVM_VGIC_V2_ADDR_TYPE_DIST	0
 #define KVM_VGIC_V2_ADDR_TYPE_CPU	1
+#define KVM_VGIC_V2_PAGE_OFFSET		0xfff2
 
 #define KVM_VGIC_V2_DIST_SIZE		0x1000
 #define KVM_VGIC_V2_CPU_SIZE		0x2000
