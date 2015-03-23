@@ -9,6 +9,7 @@
  * 2 of the License, or (at your option) any later version.
  */
 
+#include <linux/irqdomain.h>
 #include <linux/kernel.h>
 #include <linux/pci.h>
 #include <linux/of.h>
@@ -58,4 +59,18 @@ struct device_node * __weak pcibios_get_phb_of_node(struct pci_bus *bus)
 	if (bus->bridge->parent && bus->bridge->parent->of_node)
 		return of_node_get(bus->bridge->parent->of_node);
 	return NULL;
+}
+
+void pci_set_phb_of_msi_domain(struct pci_bus *bus)
+{
+#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
+	struct device_node *np;
+
+	if (!bus->dev.of_node)
+		return;
+	np = of_parse_phandle(bus->dev.of_node, "msi-parent", 0);
+	if (!np)
+		return;
+	dev_set_msi_domain(&bus->dev, irq_find_host(np));
+#endif
 }
