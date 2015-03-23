@@ -48,8 +48,12 @@ static void __iomem *gen_pci_map_cfg_bus_cam(struct pci_bus *bus,
 					     unsigned int devfn,
 					     int where)
 {
+#ifndef CONFIG_ARM64
 	struct pci_sys_data *sys = bus->sysdata;
 	struct gen_pci *pci = sys->private_data;
+#else
+	struct gen_pci *pci = ((struct gen_pci *)bus->sysdata);
+#endif
 	resource_size_t idx = bus->number - pci->cfg.bus_range->start;
 
 	return pci->cfg.win[idx] + ((devfn << 8) | where);
@@ -64,8 +68,12 @@ static void __iomem *gen_pci_map_cfg_bus_ecam(struct pci_bus *bus,
 					      unsigned int devfn,
 					      int where)
 {
+#ifndef CONFIG_ARM64
 	struct pci_sys_data *sys = bus->sysdata;
 	struct gen_pci *pci = sys->private_data;
+#else
+	struct gen_pci *pci = ((struct gen_pci *)bus->sysdata);
+#endif
 	resource_size_t idx = bus->number - pci->cfg.bus_range->start;
 
 	return pci->cfg.win[idx] + ((devfn << 12) | where);
@@ -198,12 +206,14 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
 	return 0;
 }
 
+#ifndef CONFIG_ARM64
 static int gen_pci_setup(int nr, struct pci_sys_data *sys)
 {
 	struct gen_pci *pci = sys->private_data;
 	list_splice_init(&pci->resources, &sys->resources);
 	return 1;
 }
+#endif
 
 static int gen_pci_probe(struct platform_device *pdev)
 {
@@ -214,6 +224,7 @@ static int gen_pci_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct device_node *np = dev->of_node;
 	struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
+#ifndef CONFIG_ARM64
 	struct hw_pci hw = {
 		.nr_controllers	= 1,
 		.private_data	= (void **)&pci,
@@ -221,6 +232,9 @@ static int gen_pci_probe(struct platform_device *pdev)
 		.map_irq	= of_irq_parse_and_map_pci,
 		.ops		= &gen_pci_ops,
 	};
+#else
+	struct pci_bus *bus;
+#endif
 
 	if (!pci)
 		return -ENOMEM;
@@ -258,7 +272,24 @@ static int gen_pci_probe(struct platform_device *pdev)
 		return err;
 	}
 
+#ifndef CONFIG_ARM64
 	pci_common_init_dev(dev, &hw);
+#else
+	bus = pci_scan_root_bus(&pdev->dev, pci->cfg.bus_range->start,
+				&gen_pci_ops, pci, &pci->resources);
+	if (!bus) {
+		dev_err(&pdev->dev, "failed to enable PCIe ports\n");
+		return -ENODEV;
+	}
+
+	if (!pci_has_flag(PCI_PROBE_ONLY)) {
+		pci_bus_size_bridges(bus);
+		pci_bus_assign_resources(bus);
+	}
+
+	pci_bus_add_devices(bus);
+
+#endif
 	return 0;
 }
 
