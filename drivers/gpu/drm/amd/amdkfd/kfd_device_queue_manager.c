@@ -416,7 +416,8 @@ static int register_process_nocpsch(struct device_queue_manager *dqm,
 	list_add(&n->list, &dqm->queues);
 
 	pdd = qpd_to_pdd(qpd);
-	qpd->page_table_base = kfd2kgd->get_process_page_dir(pdd->vm);
+	qpd->page_table_base =
+		dqm->dev->kfd2kgd->get_process_page_dir(pdd->vm);
 	pr_debug("Retrieved PD address == 0x%08u\n", qpd->page_table_base);
 
 	retval = dqm->ops_asic_specific.register_process(dqm, qpd);
@@ -536,7 +537,7 @@ static void init_interrupts(struct device_queue_manager *dqm)
 	BUG_ON(dqm == NULL);
 
 	for (i = 0 ; i < get_pipes_num(dqm) ; i++)
-		kfd2kgd->init_interrupts(dqm->dev->kgd, i);
+		dqm->dev->kfd2kgd->init_interrupts(dqm->dev->kgd, i);
 }
 static int init_scheduler(struct device_queue_manager *dqm)
 {
@@ -1196,7 +1197,7 @@ static int set_page_directory_base(struct device_queue_manager *dqm,
 	pdd = qpd_to_pdd(qpd);
 
 	/* Retrieve PD base */
-	pd_base = kfd2kgd->get_process_page_dir(pdd->vm);
+	pd_base = dqm->dev->kfd2kgd->get_process_page_dir(pdd->vm);
 
 	/* If it has not changed, just get out */
 	if (qpd->page_table_base == pd_base)

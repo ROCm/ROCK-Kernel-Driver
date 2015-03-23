@@ -917,8 +917,10 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 		goto bind_process_to_device_failed;
 	}
 
-	err = kfd2kgd->alloc_memory_of_gpu(dev->kgd, args->va_addr, args->size,
-					pdd->vm, (struct kgd_mem **) &mem);
+	err = dev->kfd2kgd->alloc_memory_of_gpu(
+		dev->kgd, args->va_addr, args->size,
+		pdd->vm, (struct kgd_mem **) &mem);
+
 	if (err != 0)
 		goto alloc_memory_of_gpu_failed;
 
@@ -935,7 +937,7 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 	return 0;
 
 handle_creation_failed:
-	kfd2kgd->free_memory_of_gpu(dev->kgd, (struct kgd_mem *) mem);
+	dev->kfd2kgd->free_memory_of_gpu(dev->kgd, (struct kgd_mem *) mem);
 alloc_memory_of_gpu_failed:
 bind_process_to_device_failed:
 	mutex_unlock(&p->mutex);
@@ -968,7 +970,7 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 
 	kfd_process_device_remove_obj_handle(pdd, GET_IDR_HANDLE(args->handle));
 
-	kfd2kgd->free_memory_of_gpu(dev->kgd, mem);
+	dev->kfd2kgd->free_memory_of_gpu(dev->kgd, mem);
 
 	mutex_unlock(&p->mutex);
 	return 0;
@@ -1002,7 +1004,9 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 		goto get_mem_obj_from_handle_failed;
 	}
 
-	err = kfd2kgd->map_memory_to_gpu(dev->kgd, (struct kgd_mem *) mem);
+	err = dev->kfd2kgd->map_memory_to_gpu(
+		dev->kgd, (struct kgd_mem *) mem);
+
 	if (err != 0)
 		goto map_memory_to_gpu_failed;
 
@@ -1017,7 +1021,7 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 	return 0;
 
 set_pd_base_failed:
-	kfd2kgd->unmap_memory_to_gpu(dev->kgd, (struct kgd_mem *) mem);
+	dev->kfd2kgd->unmap_memory_to_gpu(dev->kgd, (struct kgd_mem *) mem);
 map_memory_to_gpu_failed:
 get_mem_obj_from_handle_failed:
 bind_process_to_device_failed:
@@ -1054,7 +1058,7 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 		goto get_mem_obj_from_handle_failed;
 	}
 
-	kfd2kgd->unmap_memory_to_gpu(dev->kgd, mem);
+	dev->kfd2kgd->unmap_memory_to_gpu(dev->kgd, mem);
 
 	radeon_flush_tlb(dev, p->pasid);
 
@@ -1090,7 +1094,7 @@ static int kfd_ioctl_open_graphic_handle(struct file *filep,
 		goto bind_process_to_device_failed;
 	}
 
-	err = kfd2kgd->open_graphic_handle(dev->kgd,
+	err = dev->kfd2kgd->open_graphic_handle(dev->kgd,
 			args->va_addr,
 			(struct kgd_vm *) pdd->vm,
 			args->graphic_device_fd,
@@ -1111,7 +1115,7 @@ static int kfd_ioctl_open_graphic_handle(struct file *filep,
 	return 0;
 
 handle_creation_failed:
-	kfd2kgd->destroy_process_gpumem(dev->kgd, mem);
+	dev->kfd2kgd->destroy_process_gpumem(dev->kgd, mem);
 gpuvm_alloc_failed:
 bind_process_to_device_failed:
 	mutex_unlock(&p->mutex);

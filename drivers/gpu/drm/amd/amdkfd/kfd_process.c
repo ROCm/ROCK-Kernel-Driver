@@ -187,13 +187,16 @@ static void kfd_process_wq_release(struct work_struct *work)
 		 */
 		idr_for_each_entry(&pdd->alloc_idr, mem, id) {
 			idr_remove(&pdd->alloc_idr, id);
-			kfd2kgd->unmap_memory_to_gpu(pdd->dev->kgd, mem);
-			kfd2kgd->free_memory_of_gpu(pdd->dev->kgd, mem);
+			pdd->dev->kfd2kgd->unmap_memory_to_gpu(
+				pdd->dev->kgd, mem);
+			pdd->dev->kfd2kgd->free_memory_of_gpu(
+				pdd->dev->kgd, mem);
 		}
 
 		/* Destroy the GPUVM VM context */
 		if (pdd->vm)
-			kfd2kgd->destroy_process_vm(pdd->dev->kgd, pdd->vm);
+			pdd->dev->kfd2kgd->destroy_process_vm(
+				pdd->dev->kgd, pdd->vm);
 
 		kfree(pdd);
 	}
@@ -369,7 +372,7 @@ struct kfd_process_device *kfd_create_process_device_data(struct kfd_dev *dev,
 		idr_init(&pdd->alloc_idr);
 
 		/* Create the GPUVM context for this specific device */
-		if (kfd2kgd->create_process_vm(dev->kgd, &pdd->vm)) {
+		if (dev->kfd2kgd->create_process_vm(dev->kgd, &pdd->vm)) {
 			pr_err("Failed to create process VM object\n");
 			list_del(&pdd->per_device_list);
 			kfree(pdd);

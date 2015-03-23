@@ -362,14 +362,19 @@ void radeon_flush_tlb(struct kfd_dev *dev, uint32_t pasid)
 	int first_vmid_to_scan = 8;
 	int last_vmid_to_scan = 15;
 
+	const struct kfd2kgd_calls *f2g = dev->kfd2kgd;
 	/* Scan all registers in the range ATC_VMID8_PASID_MAPPING .. ATC_VMID15_PASID_MAPPING
 	 * to check which VMID the current process is mapped to
 	 * and flush TLB for this VMID if found*/
 	for (vmid = first_vmid_to_scan; vmid <= last_vmid_to_scan; vmid++) {
-		if (kfd2kgd->read_atc_vmid_pasid_mapping_reg_valid_field(dev->kgd, vmid)) {
-			if (kfd2kgd->read_atc_vmid_pasid_mapping_reg_pasid_field(dev->kgd, vmid) == pasid) {
-				dev_dbg(kfd_device, "TLB of vmid %u", vmid);
-				kfd2kgd->write_vmid_invalidate_request(dev->kgd, vmid);
+		if (f2g->get_atc_vmid_pasid_mapping_valid(
+			dev->kgd, vmid)) {
+			if (f2g->get_atc_vmid_pasid_mapping_pasid(
+				dev->kgd, vmid) == pasid) {
+				dev_dbg(kfd_device,
+					"TLB of vmid %u", vmid);
+				f2g->write_vmid_invalidate_request(
+					dev->kgd, vmid);
 				break;
 			}
 		}

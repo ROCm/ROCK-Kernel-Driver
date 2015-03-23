@@ -42,7 +42,7 @@
 
 void dbgdev_address_watch_disable_nodiq(struct kfd_dev *dev)
 {
-	kfd2kgd->address_watch_disable(dev->kgd);
+	dev->kfd2kgd->address_watch_disable(dev->kgd);
 }
 
 static int dbgdev_diq_submit_ib(struct kfd_dbgdev *dbgdev,
@@ -325,7 +325,8 @@ static int dbgdev_address_watch_nodiq(struct kfd_dbgdev *dbgdev,
 			pr_debug("\t\t\%20s %08x\n", "Control atc  is :", cntl.bitfields.atc);
 			pr_debug("\t\t\%30s\n", "* * * * * * * * * * * * * * * * * *");
 
-			kfd2kgd->address_watch_execute(dbgdev->dev->kgd,
+			pdd->dev->kfd2kgd->address_watch_execute(
+							dbgdev->dev->kgd,
 							i,
 							cntl.u32All,
 							addrHi.u32All,
@@ -421,28 +422,37 @@ static int dbgdev_address_watch_diq(struct kfd_dbgdev *dbgdev,
 			pr_debug("\t\t\%20s %08x\n", "Control atc  is :", cntl.bitfields.atc);
 			pr_debug("\t\t\%30s\n", "* * * * * * * * * * * * * * * * * *");
 
-			aw_reg_add_dword = kfd2kgd->address_watch_get_offset(
+			aw_reg_add_dword =
+					dbgdev->dev->kfd2kgd
+					->address_watch_get_offset(
 						dbgdev->dev->kgd,
 						i,
 						ADDRESS_WATCH_REG_CNTL);
+
 			aw_reg_add_dword /= sizeof(uint32_t);
 
 			packets_vec[0].bitfields2.reg_offset = aw_reg_add_dword - CONFIG_REG_BASE;
 			packets_vec[0].reg_data[0] = cntl.u32All;
 
-			aw_reg_add_dword = kfd2kgd->address_watch_get_offset(
+			aw_reg_add_dword =
+					dbgdev->dev->kfd2kgd
+					->address_watch_get_offset(
 						dbgdev->dev->kgd,
 						i,
 						ADDRESS_WATCH_REG_ADDR_HI);
+
 			aw_reg_add_dword /= sizeof(uint32_t);
 
 			packets_vec[1].bitfields2.reg_offset = aw_reg_add_dword - CONFIG_REG_BASE;
 			packets_vec[1].reg_data[0] = addrHi.u32All;
 
-			aw_reg_add_dword = kfd2kgd->address_watch_get_offset(
+			aw_reg_add_dword =
+					dbgdev->dev->kfd2kgd
+					->address_watch_get_offset(
 						dbgdev->dev->kgd,
 						i,
 						ADDRESS_WATCH_REG_ADDR_LO);
+
 			aw_reg_add_dword /= sizeof(uint32_t);
 
 			packets_vec[2].bitfields2.reg_offset = aw_reg_add_dword - CONFIG_REG_BASE;
@@ -453,10 +463,14 @@ static int dbgdev_address_watch_diq(struct kfd_dbgdev *dbgdev,
 				cntl.bitfields.valid = 1;
 			else
 				cntl.bitfields.valid = 0;
-			aw_reg_add_dword = kfd2kgd->address_watch_get_offset(
+
+			aw_reg_add_dword =
+					dbgdev->dev->kfd2kgd
+					->address_watch_get_offset(
 						dbgdev->dev->kgd,
 						i,
 						ADDRESS_WATCH_REG_CNTL);
+
 			aw_reg_add_dword /= sizeof(uint32_t);
 
 			packets_vec[3].bitfields2.reg_offset = aw_reg_add_dword - CONFIG_REG_BASE;
@@ -728,7 +742,8 @@ static int dbgdev_wave_control_nodiq(struct kfd_dbgdev *dbgdev,
 
 			pr_debug("\t\t %30s\n", "* * * * * * * * * * * * * * * * * *");
 
-			kfd2kgd->wave_control_execute(dbgdev->dev->kgd,
+			dbgdev->dev->kfd2kgd
+				->wave_control_execute(dbgdev->dev->kgd,
 							reg_gfx_index.u32All,
 							reg_sq_cmd.u32All);
 		} else {

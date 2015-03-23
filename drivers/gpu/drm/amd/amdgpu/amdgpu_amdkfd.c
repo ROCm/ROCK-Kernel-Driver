@@ -27,9 +27,9 @@
 
 #define AMDKFD_SKIP_UNCOMPILED_CODE 1
 
+const struct kfd2kgd_calls *kfd2kgd;
 const struct kgd2kfd_calls *kgd2kfd;
-bool (*kgd2kfd_init_p)(unsigned, const struct kfd2kgd_calls*,
-				const struct kgd2kfd_calls**);
+bool (*kgd2kfd_init_p)(unsigned, const struct kgd2kfd_calls**);
 
 bool amdgpu_amdkfd_init(void)
 {
@@ -43,8 +43,6 @@ bool amdgpu_amdkfd_init(void)
 
 bool amdgpu_amdkfd_load_interface(struct amdgpu_device *rdev)
 {
-	struct kfd2kgd_calls *kfd2kgd;
-
 	switch (rdev->asic_type) {
 	case CHIP_KAVERI:
 		kfd2kgd = amdgpu_amdkfd_gfx_7_get_functions();
@@ -56,7 +54,7 @@ bool amdgpu_amdkfd_load_interface(struct amdgpu_device *rdev)
 		return false;
 	}
 
-	if (!kgd2kfd_init_p(KFD_INTERFACE_VERSION, kfd2kgd, &kgd2kfd)) {
+	if (!kgd2kfd_init_p(KFD_INTERFACE_VERSION, &kgd2kfd)) {
 		symbol_put(kgd2kfd_init);
 		kgd2kfd = NULL;
 		return false;
@@ -76,7 +74,8 @@ void amdgpu_amdkfd_fini(void)
 void amdgpu_amdkfd_device_probe(struct amdgpu_device *rdev)
 {
 	if (kgd2kfd)
-		rdev->kfd = kgd2kfd->probe((struct kgd_dev *)rdev, rdev->pdev);
+		rdev->kfd = kgd2kfd->probe((struct kgd_dev *)rdev,
+					rdev->pdev, kfd2kgd);
 }
 
 void amdgpu_amdkfd_device_init(struct amdgpu_device *rdev)
@@ -214,7 +213,8 @@ void free_gtt_mem(struct kgd_dev *kgd, void *mem_obj)
 
 uint64_t get_vmem_size(struct kgd_dev *kgd)
 {
-	struct amdgpu_device *rdev = (struct amdgpu_device *)kgd;
+	struct amdgpu_device *rdev =
+		(struct amdgpu_device *)kgd;
 
 	BUG_ON(kgd == NULL);
 

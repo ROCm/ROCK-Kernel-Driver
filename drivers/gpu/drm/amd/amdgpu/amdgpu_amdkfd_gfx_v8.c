@@ -99,9 +99,9 @@ static uint32_t kgd_address_watch_get_offset(struct kgd_dev *kgd,
 					unsigned int watch_point_id,
 					unsigned int reg_offset);
 
-static bool read_atc_vmid_pasid_mapping_reg_valid_field(struct kgd_dev *kgd,
+static bool get_atc_vmid_pasid_mapping_valid(struct kgd_dev *kgd,
 		uint8_t vmid);
-static uint16_t read_atc_vmid_pasid_mapping_reg_pasid_field(struct kgd_dev *kgd,
+static uint16_t get_atc_vmid_pasid_mapping_pasid(struct kgd_dev *kgd,
 		uint8_t vmid);
 static void write_vmid_invalidate_request(struct kgd_dev *kgd, uint8_t vmid);
 static void set_num_of_requests(struct kgd_dev *kgd,
@@ -133,10 +133,10 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.address_watch_execute = kgd_address_watch_execute,
 	.wave_control_execute = kgd_wave_control_execute,
 	.address_watch_get_offset = kgd_address_watch_get_offset,
-	.read_atc_vmid_pasid_mapping_reg_pasid_field =
-			read_atc_vmid_pasid_mapping_reg_pasid_field,
-	.read_atc_vmid_pasid_mapping_reg_valid_field =
-			read_atc_vmid_pasid_mapping_reg_valid_field,
+	.get_atc_vmid_pasid_mapping_pasid =
+			get_atc_vmid_pasid_mapping_pasid,
+	.get_atc_vmid_pasid_mapping_valid =
+			get_atc_vmid_pasid_mapping_valid,
 	.write_vmid_invalidate_request = write_vmid_invalidate_request,
 	.alloc_memory_of_gpu = alloc_memory_of_gpu,
 	.free_memory_of_gpu = free_memory_of_gpu,
@@ -480,7 +480,7 @@ static int kgd_hqd_sdma_destroy(struct kgd_dev *kgd, void *mqd,
 	return 0;
 }
 
-static bool read_atc_vmid_pasid_mapping_reg_valid_field(struct kgd_dev *kgd,
+static bool get_atc_vmid_pasid_mapping_valid(struct kgd_dev *kgd,
 							uint8_t vmid)
 {
 	uint32_t reg;
@@ -490,7 +490,7 @@ static bool read_atc_vmid_pasid_mapping_reg_valid_field(struct kgd_dev *kgd,
 	return reg & ATC_VMID0_PASID_MAPPING__VALID_MASK;
 }
 
-static uint16_t read_atc_vmid_pasid_mapping_reg_pasid_field(struct kgd_dev *kgd,
+static uint16_t get_atc_vmid_pasid_mapping_pasid(struct kgd_dev *kgd,
 								uint8_t vmid)
 {
 	uint32_t reg;

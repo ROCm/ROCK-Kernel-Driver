@@ -130,8 +130,9 @@ static uint32_t kgd_address_watch_get_offset(struct kgd_dev *kgd,
 					unsigned int watch_point_id,
 					unsigned int reg_offset);
 
-static bool read_atc_vmid_pasid_mapping_reg_valid_field(struct kgd_dev *kgd, uint8_t vmid);
-static uint16_t read_atc_vmid_pasid_mapping_reg_pasid_field(struct kgd_dev *kgd, uint8_t vmid);
+static bool get_atc_vmid_pasid_mapping_valid(struct kgd_dev *kgd, uint8_t vmid);
+static uint16_t get_atc_vmid_pasid_mapping_pasid(struct kgd_dev *kgd,
+							uint8_t vmid);
 static void write_vmid_invalidate_request(struct kgd_dev *kgd, uint8_t vmid);
 static void set_num_of_requests(struct kgd_dev *dev, uint8_t num_of_req);
 
@@ -159,8 +160,8 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.address_watch_execute = kgd_address_watch_execute,
 	.wave_control_execute = kgd_wave_control_execute,
 	.address_watch_get_offset = kgd_address_watch_get_offset,
-	.read_atc_vmid_pasid_mapping_reg_pasid_field = read_atc_vmid_pasid_mapping_reg_pasid_field,
-	.read_atc_vmid_pasid_mapping_reg_valid_field = read_atc_vmid_pasid_mapping_reg_valid_field,
+	.get_atc_vmid_pasid_mapping_pasid = get_atc_vmid_pasid_mapping_pasid,
+	.get_atc_vmid_pasid_mapping_valid = get_atc_vmid_pasid_mapping_valid,
 	.write_vmid_invalidate_request = write_vmid_invalidate_request,
 	.alloc_memory_of_gpu = alloc_memory_of_gpu,
 	.free_memory_of_gpu = free_memory_of_gpu,
@@ -951,7 +952,7 @@ static uint32_t kgd_address_watch_get_offset(struct kgd_dev *kgd,
 	return watchRegs[watch_point_id * ADDRESS_WATCH_REG_MAX + reg_offset];
 }
 
-static bool read_atc_vmid_pasid_mapping_reg_valid_field(struct kgd_dev *kgd, uint8_t vmid)
+static bool get_atc_vmid_pasid_mapping_valid(struct kgd_dev *kgd, uint8_t vmid)
 {
 	uint32_t reg;
 	struct radeon_device *rdev = (struct radeon_device *) kgd;
@@ -959,7 +960,8 @@ static bool read_atc_vmid_pasid_mapping_reg_valid_field(struct kgd_dev *kgd, uin
 	return reg & ATC_VMID_PASID_MAPPING_VALID_MASK;
 }
 
-static uint16_t read_atc_vmid_pasid_mapping_reg_pasid_field(struct kgd_dev *kgd, uint8_t vmid)
+static uint16_t get_atc_vmid_pasid_mapping_pasid(struct kgd_dev *kgd,
+							uint8_t vmid)
 {
 	uint32_t reg;
 	struct radeon_device *rdev = (struct radeon_device *) kgd;
