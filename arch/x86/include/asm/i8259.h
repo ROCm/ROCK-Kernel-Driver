@@ -70,8 +70,7 @@ struct legacy_pic {
 extern struct legacy_pic *legacy_pic;
 extern struct legacy_pic null_legacy_pic;
 #else
-extern const struct legacy_pic xen_legacy_pic;
-#define legacy_pic (&xen_legacy_pic)
+extern const struct legacy_pic null_legacy_pic, *legacy_pic;
 #endif
 
 static inline int nr_legacy_irqs(void)

@@ -61,12 +61,16 @@
 
 /* Fake i8259 */
 static void make_8259A_irq(unsigned int irq) { io_apic_irqs &= ~(1UL<<irq); }
-#undef legacy_pic
-const struct legacy_pic xen_legacy_pic = {
+static const struct legacy_pic xen_legacy_pic = {
 	.nr_legacy_irqs = NR_IRQS_LEGACY,
 	.make_irq = make_8259A_irq
 };
-#define legacy_pic (&xen_legacy_pic)
+const struct legacy_pic *legacy_pic = &xen_legacy_pic;
+
+static void make_null_irq(unsigned int irq) {};
+const struct legacy_pic null_legacy_pic = {
+	.make_irq = make_null_irq
+};
 
 unsigned long io_apic_irqs;
 #endif /* CONFIG_XEN */
