@@ -484,6 +484,11 @@ struct kfd_process_device {
 
 	/* GPUVM allocations storage */
 	struct idr alloc_idr;
+
+	/* This flag tells if we should reset all
+	 * wavefronts on process termination
+	 */
+	bool reset_wavefronts;
 };
 
 #define qpd_to_pdd(x) container_of(x, struct kfd_process_device, qpd)
@@ -541,8 +546,6 @@ struct kfd_process {
 	struct list_head signal_event_pages;	/* struct slot_page_header.event_pages */
 	u32 next_nonsignal_event_id;
 	size_t signal_event_count;
-	/* This flag tells if we shuold reset all wavefronts on process termination*/
-	bool reset_wavefronts;
 };
 
 /**
