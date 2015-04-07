@@ -120,7 +120,6 @@
 #include "xgbe.h"
 #include "xgbe-common.h"
 
-
 static int xgbe_dcb_ieee_getets(struct net_device *netdev,
 				struct ieee_ets *ets)
 {
@@ -264,7 +263,7 @@ static const struct dcbnl_rtnl_ops xgbe_dcbnl_ops = {
 	.setdcbx     = xgbe_dcb_setdcbx,
 };
 
-const struct dcbnl_rtnl_ops *xgbe_get_dcbnl_ops(void)
+const struct dcbnl_rtnl_ops *xgbe_a0_get_dcbnl_ops(void)
 {
 	return &xgbe_dcbnl_ops;
 }

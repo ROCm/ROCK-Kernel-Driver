@@ -123,7 +123,6 @@
 #include "xgbe.h"
 #include "xgbe-common.h"
 
-
 static int xgbe_mdio_read(struct mii_bus *mii, int prtad, int mmd_reg)
 {
 	struct xgbe_prv_data *pdata = mii->priv;
@@ -157,7 +156,7 @@ static int xgbe_mdio_write(struct mii_bus *mii, int prtad, int mmd_reg,
 	return 0;
 }
 
-void xgbe_dump_phy_registers(struct xgbe_prv_data *pdata)
+void xgbe_a0_dump_phy_registers(struct xgbe_prv_data *pdata)
 {
 	struct device *dev = pdata->dev;
 	struct phy_device *phydev = pdata->mii->phy_map[XGBE_PRTAD];
@@ -204,27 +203,18 @@ void xgbe_dump_phy_registers(struct xgbe_prv_data *pdata)
 	dev_alert(dev, "\n*************************************************\n");
 }
 
-int xgbe_mdio_register(struct xgbe_prv_data *pdata)
+int xgbe_a0_mdio_register(struct xgbe_prv_data *pdata)
 {
-	struct device_node *phy_node;
 	struct mii_bus *mii;
 	struct phy_device *phydev;
 	int ret = 0;
 
-	DBGPR("-->xgbe_mdio_register\n");
-
-	/* Retrieve the phy-handle */
-	phy_node = of_parse_phandle(pdata->dev->of_node, "phy-handle", 0);
-	if (!phy_node) {
-		dev_err(pdata->dev, "unable to parse phy-handle\n");
-		return -EINVAL;
-	}
+	DBGPR("-->xgbe_a0_mdio_register\n");
 
 	mii = mdiobus_alloc();
-	if (mii == NULL) {
+	if (!mii) {
 		dev_err(pdata->dev, "mdiobus_alloc failed\n");
-		ret = -ENOMEM;
-		goto err_node_get;
+		return -ENOMEM;
 	}
 
 	/* Register on the MDIO bus (don't probe any PHYs) */
@@ -253,18 +243,19 @@ int xgbe_mdio_register(struct xgbe_prv_data *pdata)
 	request_module(MDIO_MODULE_PREFIX MDIO_ID_FMT,
 		       MDIO_ID_ARGS(phydev->c45_ids.device_ids[MDIO_MMD_PCS]));
 
-	of_node_get(phy_node);
-	phydev->dev.of_node = phy_node;
 	ret = phy_device_register(phydev);
 	if (ret) {
 		dev_err(pdata->dev, "phy_device_register failed\n");
-		of_node_put(phy_node);
+		goto err_phy_device;
+	}
+	if (!phydev->dev.driver) {
+		dev_err(pdata->dev, "phy driver probe failed\n");
+		ret = -EIO;
 		goto err_phy_device;
 	}
 
 	/* Add a reference to the PHY driver so it can't be unloaded */
-	pdata->phy_module = phydev->dev.driver ?
-			    phydev->dev.driver->owner : NULL;
+	pdata->phy_module = phydev->dev.driver->owner;
 	if (!try_module_get(pdata->phy_module)) {
 		dev_err(pdata->dev, "try_module_get failed\n");
 		ret = -EIO;
@@ -276,10 +267,6 @@ int xgbe_mdio_register(struct xgbe_prv_data *pdata)
 
 	phydev->autoneg = pdata->default_autoneg;
 	if (phydev->autoneg == AUTONEG_DISABLE) {
-		/* Add settings needed to force speed */
-		phydev->supported |= SUPPORTED_1000baseT_Full;
-		phydev->supported |= SUPPORTED_10000baseT_Full;
-
 		phydev->speed = pdata->default_speed;
 		phydev->duplex = DUPLEX_FULL;
 
@@ -288,11 +275,9 @@ int xgbe_mdio_register(struct xgbe_prv_data *pdata)
 
 	pdata->phydev = phydev;
 
-	of_node_put(phy_node);
-
 	DBGPHY_REGS(pdata);
 
-	DBGPR("<--xgbe_mdio_register\n");
+	DBGPR("<--xgbe_a0_mdio_register\n");
 
 	return 0;
 
@@ -305,15 +290,12 @@ err_mdiobus_register:
 err_mdiobus_alloc:
 	mdiobus_free(mii);
 
-err_node_get:
-	of_node_put(phy_node);
-
 	return ret;
 }
 
-void xgbe_mdio_unregister(struct xgbe_prv_data *pdata)
+void xgbe_a0_mdio_unregister(struct xgbe_prv_data *pdata)
 {
-	DBGPR("-->xgbe_mdio_unregister\n");
+	DBGPR("-->xgbe_a0_mdio_unregister\n");
 
 	pdata->phydev = NULL;
 
@@ -326,5 +308,5 @@ void xgbe_mdio_unregister(struct xgbe_prv_data *pdata)
 	mdiobus_free(pdata->mii);
 	pdata->mii = NULL;
 
-	DBGPR("<--xgbe_mdio_unregister\n");
+	DBGPR("<--xgbe_a0_mdio_unregister\n");
 }
