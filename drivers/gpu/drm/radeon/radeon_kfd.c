@@ -1255,6 +1255,7 @@ static int unmap_bo_from_gpuvm(struct radeon_device *rdev,
 	vm_bos = radeon_vm_get_bos(rdev, vm, &list);
 	if (!vm_bos) {
 		pr_err("amdkfd: Failed to get bos from vm\n");
+		ret = -ENOMEM;
 		goto err_failed_to_get_bos;
 	}
 
@@ -1320,7 +1321,7 @@ static int alloc_memory_of_gpu(struct kgd_dev *kgd, uint64_t va, size_t size,
 		goto err_bo_create;
 	}
 
-	pr_debug("Created BO on VRAM with size %lu bytes\n", size);
+	pr_debug("Created BO on VRAM with size %zu bytes\n", size);
 
 	ret = add_bo_to_vm(rdev, va, vm, bo, &bo_va);
 	if (ret != 0)
