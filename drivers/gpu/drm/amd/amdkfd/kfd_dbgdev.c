@@ -261,9 +261,9 @@ static void dbgdev_address_watch_set_registers(
 	cntl->bitfields.mode = adw_info->watch_mode[index];
 	cntl->bitfields.vmid = (uint32_t) vmid;
 	cntl->u32All |= ADDRESS_WATCH_REG_CNTL_ATC_BIT;	/*  for now assume it is an ATC address.  */
-	pr_debug("\t\t\%20s %08x\n", "set reg mask :", cntl->bitfields.mask);
-	pr_debug("\t\t\%20s %08x\n", "set reg add high :", addrHi->bitfields.addr);
-	pr_debug("\t\t\%20s %08x\n", "set reg add low :", addrLo->bitfields.addr);
+	pr_debug("\t\t%20s %08x\n", "set reg mask :", cntl->bitfields.mask);
+	pr_debug("\t\t%20s %08x\n", "set reg add high :", addrHi->bitfields.addr);
+	pr_debug("\t\t%20s %08x\n", "set reg add low :", addrLo->bitfields.addr);
 
 }
 
@@ -313,17 +313,17 @@ static int dbgdev_address_watch_nodiq(struct kfd_dbgdev *dbgdev,
 
 			dbgdev_address_watch_set_registers(adw_info, &addrHi, &addrLo, &cntl, i, vmid);
 
-			pr_debug("\t\t\%30s\n", "* * * * * * * * * * * * * * * * * *");
-			pr_debug("\t\t\%20s %08x\n", "register index :", i);
-			pr_debug("\t\t\%20s %08x\n", "vmid is :", vmid);
-			pr_debug("\t\t\%20s %08x\n", "Address Low is :", addrLo.bitfields.addr);
-			pr_debug("\t\t\%20s %08x\n", "Address high is :", addrHi.bitfields.addr);
-			pr_debug("\t\t\%20s %08x\n", "Address high is :", addrHi.bitfields.addr);
-			pr_debug("\t\t\%20s %08x\n", "Control Mask is :", cntl.bitfields.mask);
-			pr_debug("\t\t\%20s %08x\n", "Control Mode is :", cntl.bitfields.mode);
-			pr_debug("\t\t\%20s %08x\n", "Control Vmid is :", cntl.bitfields.vmid);
-			pr_debug("\t\t\%20s %08x\n", "Control atc  is :", cntl.bitfields.atc);
-			pr_debug("\t\t\%30s\n", "* * * * * * * * * * * * * * * * * *");
+			pr_debug("\t\t%30s\n", "* * * * * * * * * * * * * * * * * *");
+			pr_debug("\t\t%20s %08x\n", "register index :", i);
+			pr_debug("\t\t%20s %08x\n", "vmid is :", vmid);
+			pr_debug("\t\t%20s %08x\n", "Address Low is :", addrLo.bitfields.addr);
+			pr_debug("\t\t%20s %08x\n", "Address high is :", addrHi.bitfields.addr);
+			pr_debug("\t\t%20s %08x\n", "Address high is :", addrHi.bitfields.addr);
+			pr_debug("\t\t%20s %08x\n", "Control Mask is :", cntl.bitfields.mask);
+			pr_debug("\t\t%20s %08x\n", "Control Mode is :", cntl.bitfields.mode);
+			pr_debug("\t\t%20s %08x\n", "Control Vmid is :", cntl.bitfields.vmid);
+			pr_debug("\t\t%20s %08x\n", "Control atc  is :", cntl.bitfields.atc);
+			pr_debug("\t\t%30s\n", "* * * * * * * * * * * * * * * * * *");
 
 			pdd->dev->kfd2kgd->address_watch_execute(
 							dbgdev->dev->kgd,
@@ -409,18 +409,18 @@ static int dbgdev_address_watch_diq(struct kfd_dbgdev *dbgdev,
 											i,
 											vmid);
 
-			pr_debug("\t\t\%30s\n", "* * * * * * * * * * * * * * * * * *");
-			pr_debug("\t\t\%20s %08x\n", "register index :", i);
-			pr_debug("\t\t\%20s %08x\n", "vmid is :", vmid);
-			pr_debug("\t\t\%20s %p\n", "Add ptr is :", adw_info->watch_address);
-			pr_debug("\t\t\%20s %08llx\n", "Add     is :", adw_info->watch_address[i]);
-			pr_debug("\t\t\%20s %08x\n", "Address Low is :", addrLo.bitfields.addr);
-			pr_debug("\t\t\%20s %08x\n", "Address high is :", addrHi.bitfields.addr);
-			pr_debug("\t\t\%20s %08x\n", "Control Mask is :", cntl.bitfields.mask);
-			pr_debug("\t\t\%20s %08x\n", "Control Mode is :", cntl.bitfields.mode);
-			pr_debug("\t\t\%20s %08x\n", "Control Vmid is :", cntl.bitfields.vmid);
-			pr_debug("\t\t\%20s %08x\n", "Control atc  is :", cntl.bitfields.atc);
-			pr_debug("\t\t\%30s\n", "* * * * * * * * * * * * * * * * * *");
+			pr_debug("\t\t%30s\n", "* * * * * * * * * * * * * * * * * *");
+			pr_debug("\t\t%20s %08x\n", "register index :", i);
+			pr_debug("\t\t%20s %08x\n", "vmid is :", vmid);
+			pr_debug("\t\t%20s %p\n", "Add ptr is :", adw_info->watch_address);
+			pr_debug("\t\t%20s %08llx\n", "Add     is :", adw_info->watch_address[i]);
+			pr_debug("\t\t%20s %08x\n", "Address Low is :", addrLo.bitfields.addr);
+			pr_debug("\t\t%20s %08x\n", "Address high is :", addrHi.bitfields.addr);
+			pr_debug("\t\t%20s %08x\n", "Control Mask is :", cntl.bitfields.mask);
+			pr_debug("\t\t%20s %08x\n", "Control Mode is :", cntl.bitfields.mode);
+			pr_debug("\t\t%20s %08x\n", "Control Vmid is :", cntl.bitfields.vmid);
+			pr_debug("\t\t%20s %08x\n", "Control atc  is :", cntl.bitfields.atc);
+			pr_debug("\t\t%30s\n", "* * * * * * * * * * * * * * * * * *");
 
 			aw_reg_add_dword =
 					dbgdev->dev->kfd2kgd
