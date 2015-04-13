@@ -164,25 +164,6 @@ allocate_event_notification_slot(struct file *devkfd, struct kfd_process *p,
 	return true;
 }
 
-/* Given the kernel-mode pointer to a signal notification slot, return the page
- * that it belongs to.
- * Requires that p->event_mutex is held and p isn't going away.
- * We do this when destroying an event, maybe the event should just store the page pointer.
- */
-static struct signal_page *slot_to_page(struct kfd_process *p, uint64_t *slot)
-{
-	struct signal_page *page;
-
-	list_for_each_entry(page, &p->signal_event_pages, event_pages) {
-		uint64_t *slots = page_slots(page);
-
-		if (slot >= slots && slot < slots + SLOTS_PER_PAGE)
-			return page;
-	}
-
-	return NULL;
-}
-
 /* Assumes that the process's event_mutex is locked. */
 static void release_event_notification_slot(struct signal_page *page,
 						size_t slot_index)
