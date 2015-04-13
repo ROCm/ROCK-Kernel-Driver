@@ -642,7 +642,8 @@ int kfd_wait_on_events(struct kfd_process *p,
 		       bool all, uint32_t user_timeout_ms,
 		       enum kfd_event_wait_result *wait_result)
 {
-	struct kfd_event_data __user *events = (struct kfd_event_data *) data;
+	struct kfd_event_data __user *events =
+			(struct kfd_event_data __user *) data;
 	uint32_t i;
 	int ret = 0;
 	struct kfd_event_waiter *event_waiters = NULL;
