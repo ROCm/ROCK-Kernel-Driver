@@ -116,7 +116,7 @@ allocate_free_slot(struct kfd_process *process,
 #define list_tail_entry(head, type, member) \
 	list_entry((head)->prev, type, member)
 
-bool allocate_signal_page(struct file *devkfd, struct kfd_process *p)
+static bool allocate_signal_page(struct file *devkfd, struct kfd_process *p)
 {
 	void *backing_store;
 	struct signal_page *page;
@@ -169,7 +169,7 @@ allocate_event_notification_slot(struct file *devkfd, struct kfd_process *p,
  * Requires that p->event_mutex is held and p isn't going away.
  * We do this when destroying an event, maybe the event should just store the page pointer.
  */
-struct signal_page *slot_to_page(struct kfd_process *p, uint64_t *slot)
+static struct signal_page *slot_to_page(struct kfd_process *p, uint64_t *slot)
 {
 	struct signal_page *page;
 
@@ -184,7 +184,8 @@ struct signal_page *slot_to_page(struct kfd_process *p, uint64_t *slot)
 }
 
 /* Assumes that the process's event_mutex is locked. */
-void release_event_notification_slot(struct signal_page *page, size_t slot_index)
+static void release_event_notification_slot(struct signal_page *page,
+						size_t slot_index)
 {
 	__clear_bit(slot_index, page->used_slot_bitmap);
 	page->free_slots++;
@@ -193,7 +194,7 @@ void release_event_notification_slot(struct signal_page *page, size_t slot_index
 	 * and reused until it exits. */
 }
 
-struct signal_page *lookup_signal_page_by_index(struct kfd_process *p,
+static struct signal_page *lookup_signal_page_by_index(struct kfd_process *p,
 						unsigned int page_index)
 {
 	struct signal_page *page;

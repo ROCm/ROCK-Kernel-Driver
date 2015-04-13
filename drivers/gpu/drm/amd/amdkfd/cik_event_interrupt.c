@@ -24,7 +24,8 @@
 #include "kfd_events.h"
 #include "cik_int.h"
 
-bool cik_event_interrupt_isr(struct kfd_dev *dev, const uint32_t *ih_ring_entry)
+static bool cik_event_interrupt_isr(struct kfd_dev *dev,
+					const uint32_t *ih_ring_entry)
 {
 	const struct cik_ih_ring_entry *ihre =
 			(const struct cik_ih_ring_entry *)ih_ring_entry;
@@ -36,7 +37,8 @@ bool cik_event_interrupt_isr(struct kfd_dev *dev, const uint32_t *ih_ring_entry)
 		ihre->source_id == CIK_INTSRC_CP_BAD_OPCODE);
 }
 
-void cik_event_interrupt_wq(struct kfd_dev *dev, const uint32_t *ih_ring_entry)
+static void cik_event_interrupt_wq(struct kfd_dev *dev,
+					const uint32_t *ih_ring_entry)
 {
 	const struct cik_ih_ring_entry *ihre =
 			(const struct cik_ih_ring_entry *)ih_ring_entry;
