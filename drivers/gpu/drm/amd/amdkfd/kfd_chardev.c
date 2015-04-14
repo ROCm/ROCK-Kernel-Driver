@@ -527,10 +527,12 @@ kfd_ioctl_dbg_address_watch(struct file *filep,
 	long status = -EFAULT;
 	struct kfd_ioctl_dbg_address_watch_args *args = data;
 	struct kfd_dev *dev;
-	struct dbg_address_watch_info aw_info = { 0 };
+	struct dbg_address_watch_info aw_info;
 	unsigned char *args_buff = NULL;
 	unsigned int args_idx = 0;
 	uint64_t watch_mask_value = 0;
+
+	memset((void *) &aw_info, 0, sizeof(struct dbg_address_watch_info));
 
 	do {
 		dev = kfd_device_by_id(args->gpu_id);
@@ -649,13 +651,16 @@ kfd_ioctl_dbg_wave_control(struct file *filep, struct kfd_process *p, void *data
 	long status = -EFAULT;
 	struct kfd_ioctl_dbg_wave_control_args *args = data;
 	struct kfd_dev *dev;
-	struct dbg_wave_control_info wac_info = { 0 };
+	struct dbg_wave_control_info wac_info;
 	unsigned char *args_buff = NULL;
 	unsigned int args_idx = 0;
+	uint32_t computed_buff_size;
+
+	memset((void *) &wac_info, 0, sizeof(struct dbg_wave_control_info));
 
 	/* we use compact form, independent of the packing attribute value */
 
-	uint32_t computed_buff_size = sizeof(*args) +
+	computed_buff_size = sizeof(*args) +
 				sizeof(wac_info.mode) +
 				sizeof(wac_info.operand) +
 				sizeof(wac_info.dbgWave_msg.DbgWaveMsg) +
