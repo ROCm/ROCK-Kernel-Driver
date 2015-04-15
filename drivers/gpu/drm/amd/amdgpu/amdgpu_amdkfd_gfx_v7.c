@@ -128,19 +128,17 @@ static uint16_t get_fw_version(struct kgd_dev *kgd, enum kgd_engine_type type);
 static void kgd_program_sh_mem_settings(struct kgd_dev *kgd, uint32_t vmid, uint32_t sh_mem_config,
 		uint32_t sh_mem_ape1_base, uint32_t sh_mem_ape1_limit, uint32_t sh_mem_bases);
 static int kgd_set_pasid_vmid_mapping(struct kgd_dev *kgd, unsigned int pasid, unsigned int vmid);
-static int kgd_init_memory(struct kgd_dev *kgd);
 static int kgd_init_pipeline(struct kgd_dev *kgd, uint32_t pipe_id, uint32_t hpd_size, uint64_t hpd_gpu_addr);
 static int kgd_init_interrupts(struct kgd_dev *kgd, uint32_t pipe_id);
 static int kgd_hqd_load(struct kgd_dev *kgd, void *mqd, uint32_t pipe_id, uint32_t queue_id, uint32_t __user *wptr);
 static int kgd_hqd_sdma_load(struct kgd_dev *kgd, void *mqd);
 static bool kgd_hqd_is_occupies(struct kgd_dev *kgd, uint64_t queue_address, uint32_t pipe_id, uint32_t queue_id);
-static bool kgd_hqd_sdma_is_occupies(struct kgd_dev *kgd, void *mqd);
+static bool kgd_hqd_sdma_is_occupied(struct kgd_dev *kgd, void *mqd);
 static int kgd_hqd_destroy(struct kgd_dev *kgd, uint32_t reset_type,
 				unsigned int timeout, uint32_t pipe_id,
 				uint32_t queue_id);
 static int kgd_hqd_sdma_destroy(struct kgd_dev *kgd, void *mqd,
 				unsigned int timeout);
-static int kgd_init_sdma_engines(struct kgd_dev *kgd);
 static int kgd_address_watch_disable(struct kgd_dev *kgd);
 static int kgd_address_watch_execute(struct kgd_dev *kgd,
 					unsigned int watch_point_id,
@@ -172,14 +170,12 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.open_graphic_handle = open_graphic_handle,
 	.program_sh_mem_settings = kgd_program_sh_mem_settings,
 	.set_pasid_vmid_mapping = kgd_set_pasid_vmid_mapping,
-	.init_memory = kgd_init_memory,
 	.init_pipeline = kgd_init_pipeline,
 	.init_interrupts = kgd_init_interrupts,
-	.init_sdma_engines = kgd_init_sdma_engines,
 	.hqd_load = kgd_hqd_load,
 	.hqd_sdma_load = kgd_hqd_sdma_load,
 	.hqd_is_occupied = kgd_hqd_is_occupies,
-	.hqd_sdma_is_occupies = kgd_hqd_sdma_is_occupies,
+	.hqd_sdma_is_occupied = kgd_hqd_sdma_is_occupied,
 	.hqd_destroy = kgd_hqd_destroy,
 	.hqd_sdma_destroy = kgd_hqd_sdma_destroy,
 	.address_watch_disable = kgd_address_watch_disable,
@@ -295,7 +291,7 @@ static int alloc_gtt_mem(struct kgd_dev *kgd, size_t size,
 		return -ENOMEM;
 
 	r = amdgpu_bo_create(rdev, size, PAGE_SIZE, true, AMDGPU_GEM_DOMAIN_GTT,
-				NULL, &(*mem)->data1.bo);
+				0, NULL, &(*mem)->data1.bo);
 	if (r) {
 		dev_err(rdev->dev,
 			"failed to allocate BO for amdkfd (%d)\n", r);
@@ -456,7 +452,7 @@ static int create_process_gpumem(struct kgd_dev *kgd, uint64_t va, size_t size,
 	/* Allocate buffer object on VRAM */
 	ret = amdgpu_bo_create(adev, size, PAGE_SIZE, false,
 				AMDGPU_GEM_DOMAIN_VRAM,
-				NULL, &bo);
+				0, NULL, &bo);
 	if (ret != 0)
 		goto err_bo_create;
 
@@ -596,44 +592,6 @@ static int kgd_set_pasid_vmid_mapping(struct kgd_dev *kgd, unsigned int pasid,
 	return 0;
 }
 
-static int kgd_init_memory(struct kgd_dev *kgd)
-{
-	struct amdgpu_device *adev = get_amdgpu_device(kgd);
-
-	/*
-	 * Configure apertures:
-	 * LDS:         0x60000000'00000000 - 0x60000001'00000000 (4GB)
-	 * Scratch:     0x60000001'00000000 - 0x60000002'00000000 (4GB)
-	 * GPUVM:       0x60010000'00000000 - 0x60020000'00000000 (1TB)
-	 */
-	int i;
-	uint32_t sh_mem_bases = PRIVATE_BASE(0x6000) | SHARED_BASE(0x6000);
-
-	for (i = 8; i < 16; i++) {
-		uint32_t sh_mem_config;
-
-		lock_srbm(kgd, 0, 0, 0, i);
-
-		sh_mem_config = SH_MEM_ALIGNMENT_MODE_UNALIGNED << SH_MEM_CONFIG__ALIGNMENT_MODE__SHIFT;
-		sh_mem_config |= MTYPE_NONCACHED << SH_MEM_CONFIG__DEFAULT_MTYPE__SHIFT;
-
-		WREG32(mmSH_MEM_CONFIG, sh_mem_config);
-
-		WREG32(mmSH_MEM_BASES, sh_mem_bases);
-
-		/* Scratch aperture is not supported for now. */
-		WREG32(mmSH_STATIC_MEM_CONFIG, 0);
-
-		/* APE1 disabled for now. */
-		WREG32(mmSH_MEM_APE1_BASE, 1);
-		WREG32(mmSH_MEM_APE1_LIMIT, 0);
-
-		unlock_srbm(kgd);
-	}
-
-	return 0;
-}
-
 static int kgd_init_pipeline(struct kgd_dev *kgd, uint32_t pipe_id,
 				uint32_t hpd_size, uint64_t hpd_gpu_addr)
 {
@@ -666,22 +624,6 @@ static int kgd_init_interrupts(struct kgd_dev *kgd, uint32_t pipe_id)
 	WREG32(mmCPC_INT_CNTL, CP_INT_CNTL_RING0__TIME_STAMP_INT_ENABLE_MASK);
 
 	unlock_srbm(kgd);
-
-	return 0;
-}
-
-static int kgd_init_sdma_engines(struct kgd_dev *kgd)
-{
-	struct amdgpu_device *adev = get_amdgpu_device(kgd);
-	uint32_t value;
-
-	value = RREG32(mmSDMA0_CNTL);
-	value |= SDMA0_CNTL__AUTO_CTXSW_ENABLE_MASK;
-	WREG32(mmSDMA0_CNTL, value);
-
-	value = RREG32(mmSDMA1_CNTL);
-	value |= SDMA1_CNTL__AUTO_CTXSW_ENABLE_MASK;
-	WREG32(mmSDMA1_CNTL, value);
 
 	return 0;
 }
@@ -811,7 +753,7 @@ static bool kgd_hqd_is_occupies(struct kgd_dev *kgd, uint64_t queue_address,
 	return retval;
 }
 
-static bool kgd_hqd_sdma_is_occupies(struct kgd_dev *kgd, void *mqd)
+static bool kgd_hqd_sdma_is_occupied(struct kgd_dev *kgd, void *mqd)
 {
 	struct amdgpu_device *adev = get_amdgpu_device(kgd);
 	struct cik_sdma_rlc_registers *m;
@@ -1024,10 +966,12 @@ static int map_bo(struct amdgpu_device *adev, uint64_t va, void *vm, struct amdg
 		goto err_vmadd;
 	}
 
+#ifndef AMDKFD_SKIP_UNCOMPILED_CODE
 	/* Set virtual address for the allocation, allocate PTs, if needed, and zero them */
 	ret = amdgpu_vm_bo_set_addr(adev, *bo_va, va, AMDGPU_VM_PAGE_READABLE | AMDGPU_VM_PAGE_WRITEABLE);
 	if (ret != 0)
 		goto err_vmsetaddr;
+#endif
 
 	mutex_lock(&rvm->mutex);
 
@@ -1044,7 +988,7 @@ static int map_bo(struct amdgpu_device *adev, uint64_t va, void *vm, struct amdg
 	mutex_unlock(&rvm->mutex);
 
 	/* Wait for the page table update to complete. */
-#if 0
+#ifndef AMDKFD_SKIP_UNCOMPILED_CODE
 	ret = amdgpu_fence_wait(rvm->fence, true);
 #endif
 	if (ret != 0)
@@ -1058,9 +1002,9 @@ err_wait_fence:
 err_update_pt:
 err_update_pd:
 	mutex_unlock(&rvm->mutex);
+#ifndef AMDKFD_SKIP_UNCOMPILED_CODE
 err_vmsetaddr:
 	amdgpu_vm_bo_rmv(adev, *bo_va);
-#ifndef AMDKFD_SKIP_UNCOMPILED_CODE
 	mutex_lock(&rvm->mutex);
 	amdgpu_vm_clear_freed(adev, rvm);
 	mutex_unlock(&rvm->mutex);
