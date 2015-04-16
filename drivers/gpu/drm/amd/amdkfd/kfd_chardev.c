@@ -568,7 +568,7 @@ kfd_ioctl_dbg_address_watch(struct file *filep,
 		}
 
 		if (copy_from_user(args_buff,
-				args->content_ptr,
+				(void __user *) args->content_ptr,
 				args->buf_size_in_bytes - sizeof(*args))) {
 			dev_info(NULL,
 			"Error! kfd: In func %s >> copy_from_user failed\n",
@@ -707,7 +707,7 @@ kfd_ioctl_dbg_wave_control(struct file *filep, struct kfd_process *p, void *data
 
 
 		if (copy_from_user(args_buff,
-				args->content_ptr,
+				(void __user *) args->content_ptr,
 				args->buf_size_in_bytes - sizeof(*args))) {
 			dev_info(NULL,
 			"Error! kfd: In func %s >> copy_from_user failed\n",
