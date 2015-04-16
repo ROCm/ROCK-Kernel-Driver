@@ -198,8 +198,8 @@ struct kfd_dev {
 	 */
 	bool interrupts_active;
 
-	/* Debug manager */	
-	struct kfd_dbgmgr           *dbgmgr;
+	/* Debug manager */
+	struct kfd_dbgmgr *dbgmgr;
 };
 
 /* KGD2KFD callbacks */
