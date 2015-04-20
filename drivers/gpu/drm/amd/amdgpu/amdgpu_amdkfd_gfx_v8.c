@@ -525,6 +525,24 @@ static int kgd_wave_control_execute(struct kgd_dev *kgd,
 					uint32_t gfx_index_val,
 					uint32_t sq_cmd)
 {
+	struct amdgpu_device *adev = get_amdgpu_device(kgd);
+	uint32_t data = 0;
+
+	mutex_lock(&adev->grbm_idx_mutex);
+
+	WREG32(mmGRBM_GFX_INDEX, gfx_index_val);
+	WREG32(mmSQ_CMD, sq_cmd);
+
+	data = REG_SET_FIELD(data, GRBM_GFX_INDEX,
+		INSTANCE_BROADCAST_WRITES, 1);
+	data = REG_SET_FIELD(data, GRBM_GFX_INDEX,
+		SH_BROADCAST_WRITES, 1);
+	data = REG_SET_FIELD(data, GRBM_GFX_INDEX,
+		SE_BROADCAST_WRITES, 1);
+
+	WREG32(mmGRBM_GFX_INDEX, data);
+	mutex_unlock(&adev->grbm_idx_mutex);
+
 	return 0;
 }
 
