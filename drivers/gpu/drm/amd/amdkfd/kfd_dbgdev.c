@@ -779,7 +779,7 @@ int dbgdev_wave_reset_wavefronts(struct kfd_dev *dev, struct kfd_process *p)
 	wac_info.mode = HSA_DBG_WAVEMODE_BROADCAST_PROCESS;
 	wac_info.operand = HSA_DBG_WAVEOP_KILL;
 
-	pr_debug("amdkfd: Killing all process wavefronts\n");
+	pr_debug("Killing all process wavefronts\n");
 
 	/* Scan all registers in the range ATC_VMID8_PASID_MAPPING ..
 	 * ATC_VMID15_PASID_MAPPING
@@ -790,6 +790,8 @@ int dbgdev_wave_reset_wavefronts(struct kfd_dev *dev, struct kfd_process *p)
 				(dev->kgd, vmid)) {
 			if (dev->kfd2kgd->get_atc_vmid_pasid_mapping_valid
 					(dev->kgd, vmid) == p->pasid) {
+				pr_debug("Killing wave fronts of vmid %d and pasid %d\n",
+						vmid, p->pasid);
 				break;
 			}
 		}

@@ -265,6 +265,7 @@ static void kfd_process_notifier_release(struct mmu_notifier *mn,
 	 * if we should reset all wavefronts */
 	list_for_each_entry(pdd, &p->per_device_data, per_device_list)
 		if (pdd->reset_wavefronts) {
+			pr_warn("amdkfd: Resetting all wave fronts\n");
 			dbgdev_wave_reset_wavefronts(pdd->dev, p);
 			pdd->reset_wavefronts = false;
 		}
