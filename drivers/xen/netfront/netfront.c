@@ -1766,8 +1766,7 @@ static int xennet_set_mac_address(struct net_device *dev, void *p)
 
 static int xennet_change_mtu(struct net_device *dev, int mtu)
 {
-	int max = xennet_can_sg(dev) ? XEN_NETIF_MAX_TX_SIZE - MAX_TCP_HEADER
-				     : ETH_DATA_LEN;
+	int max = xennet_can_sg(dev) ? XEN_NETIF_MAX_TX_SIZE : ETH_DATA_LEN;
 
 	if (mtu > max)
 		return -EINVAL;
@@ -2257,10 +2256,6 @@ static struct net_device *create_netdev(struct xenbus_device *dev)
 
 	netdev->ethtool_ops = &network_ethtool_ops;
 	SET_NETDEV_DEV(netdev, &dev->dev);
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,26)
-	netif_set_gso_max_size(netdev, XEN_NETIF_MAX_TX_SIZE - MAX_TCP_HEADER);
-#endif
 
 	np->netdev = netdev;
 
