@@ -891,7 +891,7 @@ static int create_queue_cpsch(struct device_queue_manager *dqm, struct queue *q,
 		return -ENOMEM;
 	}
 
-	init_sdma_vm(dqm, q, qpd);
+	dqm->ops_asic_specific.init_sdma_vm(dqm, q, qpd);
 
 	retval = mqd->init_mqd(mqd, &q->mqd, &q->mqd_mem_obj,
 				&q->gart_mqd_addr, &q->properties);
