@@ -99,6 +99,7 @@ struct drm_amdgpu_gem_create_in  {
 struct drm_amdgpu_gem_create_out  {
 	/** returned GEM object handle */
 	uint32_t handle;
+	uint32_t _pad;
 };
 
 union drm_amdgpu_gem_create {
@@ -136,6 +137,7 @@ struct drm_amdgpu_bo_list_entry {
 struct drm_amdgpu_bo_list_out {
 	/** Handle of resource list  */
 	uint32_t list_handle;
+	uint32_t _pad;
 };
 
 union drm_amdgpu_bo_list {
@@ -154,12 +156,13 @@ struct drm_amdgpu_ctx_in {
 	uint32_t	op;
 	uint32_t	flags;
 	uint32_t	ctx_id;
-	uint32_t	pad;
+	uint32_t	_pad;
 };
 
 union drm_amdgpu_ctx_out {
 		struct {
 			uint32_t	ctx_id;
+			uint32_t	_pad;
 		} alloc;
 
 		struct {
@@ -226,6 +229,7 @@ struct drm_amdgpu_gem_metadata {
 
 struct drm_amdgpu_gem_mmap_in {
 	uint32_t handle;		/** the GEM object handle */
+	uint32_t _pad;
 };
 
 struct drm_amdgpu_gem_mmap_out {
@@ -259,6 +263,7 @@ struct drm_amdgpu_wait_cs_in {
 	uint32_t ip_type;
 	uint32_t ip_instance;
 	uint32_t ring;
+	uint32_t _pad;
 };
 
 struct drm_amdgpu_wait_cs_out {
@@ -298,7 +303,7 @@ struct drm_amdgpu_gem_op {
 struct drm_amdgpu_gem_va_in {
 	/* GEM object handle */
 	uint32_t handle;
-	uint32_t pad;
+	uint32_t _pad;
 	/* map or unmap*/
 	uint32_t operation;
 	/* specify mapping flags */
@@ -314,6 +319,7 @@ struct drm_amdgpu_gem_va_in {
 
 struct drm_amdgpu_gem_va_out {
 	uint32_t result;
+	uint32_t _pad;
 };
 
 union drm_amdgpu_gem_va {
@@ -344,7 +350,7 @@ struct drm_amdgpu_cs_in {
 	/**  Handle of resource list associated with CS */
 	uint32_t		bo_list_handle;
 	uint32_t		num_chunks;
-	uint32_t		pad;
+	uint32_t		_pad;
 	/* this points to uint64_t * which point to cs chunks */
 	uint64_t		chunks;
 };
@@ -465,6 +471,7 @@ struct drm_amdgpu_info {
 	union {
 		struct {
 			uint32_t id;
+			uint32_t _pad;
 		} mode_crtc;
 
 		struct {
@@ -494,6 +501,7 @@ struct drm_amdgpu_info {
 			 * on the firmware type. (e.g. MEC, SDMA)
 			 */
 			uint32_t index;
+			uint32_t _pad;
 		} query_fw;
 	};
 };
@@ -513,6 +521,7 @@ struct drm_amdgpu_info_gds {
 	uint32_t oa_per_gfx_partition;
 	/** OA size per compute partition */
 	uint32_t oa_per_compute_partition;
+	uint32_t _pad;
 };
 
 struct drm_amdgpu_info_vram_gtt {
@@ -566,6 +575,7 @@ struct drm_amdgpu_info_hw_ip {
 	uint64_t  capabilities_flags;
 	/** Bitmask of available rings. Bit 0 means ring 0, etc. */
 	uint32_t  available_rings;
+	uint32_t  _pad;
 };
 
 /*
