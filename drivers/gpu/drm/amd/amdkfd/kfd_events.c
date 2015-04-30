@@ -156,12 +156,16 @@ allocate_event_notification_slot(struct file *devkfd, struct kfd_process *p,
 				 struct signal_page **page,
 				 unsigned int *signal_slot_index)
 {
-	if (!allocate_free_slot(p, page, signal_slot_index)) {
-		allocate_signal_page(devkfd, p);
-		return allocate_free_slot(p, page, signal_slot_index);
+	bool ret;
+
+	ret = allocate_free_slot(p, page, signal_slot_index);
+	if (ret == false) {
+		ret = allocate_signal_page(devkfd, p);
+		if (ret == true)
+			ret = allocate_free_slot(p, page, signal_slot_index);
 	}
 
-	return true;
+	return ret;
 }
 
 /* Assumes that the process's event_mutex is locked. */
@@ -255,11 +259,15 @@ lookup_event_by_page_slot(struct kfd_process *p,
 static int
 create_signal_event(struct file *devkfd, struct kfd_process *p, struct kfd_event *ev)
 {
-	if (p->signal_event_count == SIGNAL_EVENT_LIMIT)
+	if (p->signal_event_count == SIGNAL_EVENT_LIMIT) {
+		pr_warn("amdkfd: Signal event wasn't created because limit was reached\n");
 		return -ENOMEM;
+	}
 
-	if (!allocate_event_notification_slot(devkfd, p, &ev->signal_page, &ev->signal_slot_index))
+	if (!allocate_event_notification_slot(devkfd, p, &ev->signal_page, &ev->signal_slot_index)) {
+		pr_warn("amdkfd: Signal event wasn't created because out of kernel memory\n");
 		return -ENOMEM;
+	}
 
 	p->signal_event_count++;
 
@@ -368,13 +376,12 @@ int kfd_event_create(struct file *devkfd, struct kfd_process *p,
 	case KFD_EVENT_TYPE_SIGNAL:
 	case KFD_EVENT_TYPE_DEBUG:
 		ret = create_signal_event(devkfd, p, ev);
-		if (ret == 0) {
+		if (!ret) {
 			*event_page_offset = (ev->signal_page->page_index |
 					KFD_MMAP_EVENTS_MASK);
 			*event_page_offset <<= PAGE_SHIFT;
 			*event_slot_index = ev->signal_slot_index;
-		} else
-			pr_err("amdkfd: error signal page\n");
+		}
 		break;
 	default:
 		ret = create_other_event(p, ev);
