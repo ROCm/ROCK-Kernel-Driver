@@ -570,13 +570,18 @@ static void amdgpu_ttm_tt_unpin_userptr(struct ttm_tt *ttm)
 	dma_unmap_sg(adev->dev, ttm->sg->sgl, ttm->sg->nents, direction);
 
 	for_each_sg(ttm->sg->sgl, sg, ttm->sg->nents, i) {
+		int len = sg->length >> PAGE_SHIFT;
 		struct page *page = sg_page(sg);
+		while (len > 0) {
+			if (!(gtt->userflags & AMDGPU_GEM_USERPTR_READONLY))
+				set_page_dirty(page);
 
-		if (!(gtt->userflags & AMDGPU_GEM_USERPTR_READONLY))
-			set_page_dirty(page);
+			mark_page_accessed(page);
+			page_cache_release(page);
 
-		mark_page_accessed(page);
-		page_cache_release(page);
+			page++;
+			len--;
+		}
 	}
 
 	sg_free_table(ttm->sg);
