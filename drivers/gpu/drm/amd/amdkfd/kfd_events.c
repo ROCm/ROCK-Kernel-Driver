@@ -724,8 +724,7 @@ fail:
 	return ret;
 }
 
-int radeon_kfd_event_mmap(struct kfd_process *p,
-			  struct vm_area_struct *vma)
+int kfd_event_mmap(struct kfd_process *p, struct vm_area_struct *vma)
 {
 
 	unsigned int page_index;

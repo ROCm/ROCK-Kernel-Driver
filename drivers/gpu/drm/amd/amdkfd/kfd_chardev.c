@@ -1302,7 +1302,7 @@ static int kfd_mmap(struct file *filp, struct vm_area_struct *vma)
 	} else if ((vma->vm_pgoff & KFD_MMAP_EVENTS_MASK) ==
 			KFD_MMAP_EVENTS_MASK) {
 		vma->vm_pgoff = vma->vm_pgoff ^ KFD_MMAP_EVENTS_MASK;
-		return radeon_kfd_event_mmap(process, vma);
+		return kfd_event_mmap(process, vma);
 	}
 
 	return -EFAULT;
