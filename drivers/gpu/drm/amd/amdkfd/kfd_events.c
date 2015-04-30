@@ -32,8 +32,6 @@
 #include "kfd_events.h"
 #include <linux/device.h>
 
-#define SIGNAL_EVENT_LIMIT 256
-
 /* A task can only be on a single wait_queue at a time, but we need to support
  * waiting on multiple events (any/all).
  * Instead of each event simply having a wait_queue with sleeping tasks, it has a
@@ -71,7 +69,7 @@ struct signal_page {
 	unsigned long used_slot_bitmap[0];
 };
 
-#define SLOTS_PER_PAGE (PAGE_SIZE / sizeof(uint64_t))
+#define SLOTS_PER_PAGE KFD_SIGNAL_EVENT_LIMIT
 #define SLOT_BITMAP_SIZE BITS_TO_LONGS(SLOTS_PER_PAGE)
 #define BITS_PER_PAGE (ilog2(SLOTS_PER_PAGE)+1)
 #define SIGNAL_PAGE_SIZE (sizeof(struct signal_page) + SLOT_BITMAP_SIZE * sizeof(long))
@@ -81,7 +79,7 @@ struct signal_page {
  * limit to 256 signal events and simply use all the available bits.
  */
 
-#define INTERRUPT_DATA_BITS 8
+#define INTERRUPT_DATA_BITS 12
 #define SIGNAL_EVENT_ID_SLOT_SHIFT 0
 
 static uint64_t *page_slots(struct signal_page *page)
@@ -270,7 +268,7 @@ lookup_event_by_page_slot(struct kfd_process *p,
 static int
 create_signal_event(struct file *devkfd, struct kfd_process *p, struct kfd_event *ev)
 {
-	if (p->signal_event_count == SIGNAL_EVENT_LIMIT) {
+	if (p->signal_event_count == KFD_SIGNAL_EVENT_LIMIT) {
 		pr_warn("amdkfd: Signal event wasn't created because limit was reached\n");
 		return -ENOMEM;
 	}
@@ -752,11 +750,6 @@ int kfd_event_mmap(struct kfd_process *p, struct vm_area_struct *vma)
 	unsigned int page_index;
 	unsigned long pfn;
 	struct signal_page *page;
-
-	if (vma->vm_end - vma->vm_start != PAGE_SIZE) {
-		pr_debug("start address(0x%lx) - end address(0x%lx) != len(0x%lx)\n", vma->vm_end, vma->vm_start, PAGE_SIZE);
-		return -EINVAL;
-	}
 
 	page_index = vma->vm_pgoff;
 
