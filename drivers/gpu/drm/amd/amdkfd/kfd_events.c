@@ -106,9 +106,16 @@ allocate_free_slot(struct kfd_process *process,
 
 			*out_page = page;
 			*out_slot_index = slot;
+
+			pr_debug("allocated event signal slot in page %p, slot %d\n",
+					page, slot);
+
 			return true;
 		}
 	}
+
+	pr_debug("No free event signal slots were found for process %p\n",
+			process);
 
 	return false;
 }
@@ -140,6 +147,10 @@ static bool allocate_signal_page(struct file *devkfd, struct kfd_process *p)
 		page->page_index = list_tail_entry(&p->signal_event_pages,
 						   struct signal_page,
 						   event_pages)->page_index + 1;
+
+	pr_debug("allocated new event signal page at %p, for process %p\n",
+			page, p);
+	pr_debug("page index is %d\n", page->page_index);
 
 	list_add(&page->event_pages, &p->signal_event_pages);
 
@@ -274,6 +285,10 @@ create_signal_event(struct file *devkfd, struct kfd_process *p, struct kfd_event
 	ev->user_signal_address = &ev->signal_page->user_address[ev->signal_slot_index];
 
 	ev->event_id = make_signal_event_id(ev->signal_page, ev->signal_slot_index);
+
+	pr_debug("signal event number %zu created with id %d, address %p\n",
+			p->signal_event_count, ev->event_id,
+			ev->user_signal_address);
 
 	return 0;
 }
@@ -758,18 +773,19 @@ int kfd_event_mmap(struct kfd_process *p, struct vm_area_struct *vma)
 	vma->vm_flags |= VM_IO | VM_DONTCOPY | VM_DONTEXPAND | VM_NORESERVE
 		       | VM_DONTDUMP | VM_PFNMAP;
 
-	pr_debug("kfd: mapping signal page\n"
-			 "     target user address == 0x%016llX\n"
-			 "     pfn                 == 0x%016lX\n"
-			 "     vm_flags            == 0x%08lX\n"
-			 "     size                == 0x%08lX\n",
-			 (long long unsigned int) vma->vm_start,
-			 (unsigned long)pfn, vma->vm_flags, PAGE_SIZE);
+	pr_debug("mapping signal page\n");
+	pr_debug("     start user address  == 0x%08lx\n", vma->vm_start);
+	pr_debug("     end user address    == 0x%08lx\n", vma->vm_end);
+	pr_debug("     pfn                 == 0x%016lX\n", pfn);
+	pr_debug("     vm_flags            == 0x%08lX\n", vma->vm_flags);
+	pr_debug("     size                == 0x%08lX\n",
+			vma->vm_end - vma->vm_start);
 
 	page->user_address = (uint64_t __user *)vma->vm_start;
 
 	/* mapping the page to user process */
-	return remap_pfn_range(vma, vma->vm_start, pfn, PAGE_SIZE, vma->vm_page_prot);
+	return remap_pfn_range(vma, vma->vm_start, pfn,
+			vma->vm_end - vma->vm_start, vma->vm_page_prot);
 }
 
 /*
