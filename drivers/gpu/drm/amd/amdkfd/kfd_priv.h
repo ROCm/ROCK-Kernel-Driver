@@ -216,14 +216,6 @@ enum kfd_mempool {
 	KFD_MEMPOOL_FRAMEBUFFER = 3,
 };
 
-/* GPU memory support for the user mode process */
-int radeon_kfd_process_create_vm(struct kfd_dev *kfd, void **vm);
-void radeon_kfd_process_destroy_vm(struct kfd_dev *kfd, void *vm);
-uint64_t radeon_kfd_process_get_pd(void *vm);
-int radeon_kfd_process_gpuvm_alloc(struct kfd_dev *kfd, uint64_t va, size_t size, void *vm, void **mem_obj);
-void radeon_kfd_process_gpuvm_free(struct kfd_dev *kfd, void *mem_obj);
-int radeon_kfd_process_open_graphic_handle(struct kfd_dev *kfd, uint64_t va, void *vm, int32_t fd, uint32_t handle, void **mem_obj);
-
 /* Character device interface */
 int kfd_chardev_init(void);
 void kfd_chardev_exit(void);
