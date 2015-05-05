@@ -727,9 +727,17 @@ static ssize_t node_show(struct kobject *kobj, struct attribute *attr,
 				dev->gpu->kfd2kgd->get_max_engine_clock_in_mhz(
 					dev->gpu->kgd));
 
-		sysfs_show_64bit_prop(buffer, "local_mem_size",
-				dev->gpu->kfd2kgd->get_vmem_size(
-					dev->gpu->kgd));
+		/*
+		 * If the ASIC is CZ, set local memory size to 0 to disable
+		 * local memory support
+		 */
+		if (dev->gpu->device_info->asic_family != CHIP_CARRIZO)
+			sysfs_show_64bit_prop(buffer, "local_mem_size",
+					dev->gpu->kfd2kgd->get_vmem_size(
+						dev->gpu->kgd));
+		else
+			sysfs_show_64bit_prop(buffer, "local_mem_size",
+					(unsigned long long int) 0);
 
 		sysfs_show_32bit_prop(buffer, "fw_version",
 				dev->gpu->kfd2kgd->get_fw_version(
