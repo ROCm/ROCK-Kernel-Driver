@@ -501,7 +501,8 @@ static int dbgdev_address_watch_diq(struct kfd_dbgdev *dbgdev,
 static int dbgdev_wave_control_set_registers(
 				struct dbg_wave_control_info *wac_info,
 				union SQ_CMD_BITS *in_reg_sq_cmd,
-				union GRBM_GFX_INDEX_BITS *in_reg_gfx_index)
+				union GRBM_GFX_INDEX_BITS *in_reg_gfx_index,
+				unsigned int asic_family)
 {
 	int status = 0;
 	union SQ_CMD_BITS reg_sq_cmd;
@@ -553,11 +554,25 @@ static int dbgdev_wave_control_set_registers(
 
 	switch (wac_info->operand) {
 	case HSA_DBG_WAVEOP_HALT:
-		reg_sq_cmd.bits.cmd = SQ_IND_CMD_CMD_HALT;
+		if (asic_family == CHIP_KAVERI) {
+			reg_sq_cmd.bits.cmd = SQ_IND_CMD_CMD_HALT;
+			pr_debug("kfd:dbgdev: halting KV\n");
+		} else {
+			reg_sq_cmd.bits_sethalt.cmd  = SQ_IND_CMD_NEW_SETHALT;
+			reg_sq_cmd.bits_sethalt.data = SQ_IND_CMD_DATA_HALT;
+			pr_debug("kfd:dbgdev: halting CZ\n");
+		}
 		break;
 
 	case HSA_DBG_WAVEOP_RESUME:
-		reg_sq_cmd.bits.cmd = SQ_IND_CMD_CMD_RESUME;
+		if (asic_family == CHIP_KAVERI) {
+			reg_sq_cmd.bits.cmd = SQ_IND_CMD_CMD_RESUME;
+			pr_debug("kfd:dbgdev: resuming KV\n");
+		} else {
+			reg_sq_cmd.bits_sethalt.cmd  = SQ_IND_CMD_NEW_SETHALT;
+			reg_sq_cmd.bits_sethalt.data = SQ_IND_CMD_DATA_RESUME;
+			pr_debug("kfd:dbgdev: resuming CZ\n");
+		}
 		break;
 
 	case HSA_DBG_WAVEOP_KILL:
@@ -605,7 +620,10 @@ static int dbgdev_wave_control_diq(struct kfd_dbgdev *dbgdev,
 	reg_sq_cmd.u32All = 0;
 	do {
 
-		status = dbgdev_wave_control_set_registers(wac_info, &reg_sq_cmd, &reg_gfx_index);
+		status = dbgdev_wave_control_set_registers(wac_info,
+				&reg_sq_cmd,
+				&reg_gfx_index,
+				dbgdev->dev->device_info->asic_family);
 
 		/* we do not control the VMID in DIQ,so reset it to a known value */
 		reg_sq_cmd.bits.vm_id = 0;
@@ -709,7 +727,10 @@ static int dbgdev_wave_control_nodiq(struct kfd_dbgdev *dbgdev,
 	pdd = kfd_get_process_device_data(dbgdev->dev, wac_info->process);
 
 	if (pdd) {
-		status = dbgdev_wave_control_set_registers(wac_info, &reg_sq_cmd, &reg_gfx_index);
+		status = dbgdev_wave_control_set_registers(wac_info,
+				&reg_sq_cmd,
+				&reg_gfx_index,
+				dbgdev->dev->device_info->asic_family);
 		if (status == 0) {
 
 			/* for non DIQ we need to patch the VMID: */
@@ -808,7 +829,7 @@ int dbgdev_wave_reset_wavefronts(struct kfd_dev *dev, struct kfd_process *p)
 		return -EFAULT;
 
 	status = dbgdev_wave_control_set_registers(&wac_info, &reg_sq_cmd,
-			&reg_gfx_index);
+			&reg_gfx_index, dev->device_info->asic_family);
 	if (status != 0)
 		return -EINVAL;
 

@@ -64,15 +64,32 @@ enum {
 	SH_REG_SIZE = SH_REG_END - SH_REG_BASE
 };
 
-typedef enum SQ_IND_CMD_CMD {
+/* SQ_CMD definitions */
+
+enum {
+	SQ_IND_CMD_DATA_RESUME = 0,
+	SQ_IND_CMD_DATA_HALT = 1
+};
+
+enum SQ_IND_CMD_NEW {
+	SQ_IND_CMD_NEW_NULL = 0x00000000,
+	SQ_IND_CMD_NEW_SETHALT = 0x00000001,
+	SQ_IND_CMD_NEW_SAVECTX = 0x00000002,
+	SQ_IND_CMD_NEW_KILL = 0x00000003,
+	SQ_IND_CMD_NEW_DEBUG = 0x00000004,
+	SQ_IND_CMD_NEW_TRAP = 0x00000005,
+	SQ_IND_CMD_NEW_SET_PRIO = 0x00000006
+
+};
+
+enum SQ_IND_CMD_CMD {
 	SQ_IND_CMD_CMD_NULL = 0x00000000,
 	SQ_IND_CMD_CMD_HALT = 0x00000001,
 	SQ_IND_CMD_CMD_RESUME = 0x00000002,
 	SQ_IND_CMD_CMD_KILL = 0x00000003,
 	SQ_IND_CMD_CMD_DEBUG = 0x00000004,
-	SQ_IND_CMD_CMD_TRAP = 0x00000005,
-} SQ_IND_CMD_CMD;
-
+	SQ_IND_CMD_CMD_TRAP = 0x00000005
+};
 /*
  * SQ_IND_CMD_MODE enum
  */
@@ -114,18 +131,32 @@ union SQ_IND_CMD_BITS {
 union SQ_CMD_BITS {
 	struct {
 		uint32_t cmd:3;
-		 uint32_t:1;
+		uint32_t:1;
 		uint32_t mode:3;
 		uint32_t check_vmid:1;
 		uint32_t trap_id:3;
-		 uint32_t:5;
+		uint32_t:5;
 		uint32_t wave_id:4;
 		uint32_t simd_id:2;
-		 uint32_t:2;
+		uint32_t:2;
 		uint32_t queue_id:3;
-		 uint32_t:1;
+		uint32_t:1;
 		uint32_t vm_id:4;
 	} bitfields, bits;
+	struct {
+		uint32_t cmd:3;
+		uint32_t:1;
+		uint32_t mode:3;
+		uint32_t check_vmid:1;
+		uint32_t data:3;
+		uint32_t:5;
+		uint32_t wave_id:4;
+		uint32_t simd_id:2;
+		uint32_t:2;
+		uint32_t queue_id:3;
+		uint32_t:1;
+		uint32_t vm_id:4;
+	} bitfields_sethalt, bits_sethalt;
 	uint32_t u32All;
 	signed int i32All;
 	float f32All;
