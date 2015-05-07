@@ -74,9 +74,9 @@ struct signal_page {
 #define BITS_PER_PAGE (ilog2(SLOTS_PER_PAGE)+1)
 #define SIGNAL_PAGE_SIZE (sizeof(struct signal_page) + SLOT_BITMAP_SIZE * sizeof(long))
 
-/* For signal events, the event ID is used as the interrupt user data.
- * For SQ s_sendmsg interrupts, this is limited to 8 bits. We will
- * limit to 256 signal events and simply use all the available bits.
+/*
+ * For signal events, the event ID is used as the interrupt user data.
+ * For SQ s_sendmsg interrupts, this is limited to 8 bits.
  */
 
 #define INTERRUPT_DATA_BITS 12
@@ -132,7 +132,8 @@ static bool allocate_signal_page(struct file *devkfd, struct kfd_process *p)
 
 	page->free_slots = SLOTS_PER_PAGE;
 
-	backing_store = (void *)get_zeroed_page(GFP_KERNEL);
+	backing_store = (void *) __get_free_pages(GFP_KERNEL | __GFP_ZERO, \
+					get_order(KFD_SIGNAL_EVENT_LIMIT * 8));
 	if (!backing_store)
 		goto fail_alloc_signal_store;
 
@@ -343,7 +344,8 @@ static void shutdown_signal_pages(struct kfd_process *p)
 	struct signal_page *page, *tmp;
 
 	list_for_each_entry_safe(page, tmp, &p->signal_event_pages, event_pages) {
-		free_page((unsigned long)page->kernel_address);
+		free_pages((unsigned long)page->kernel_address,
+				get_order(KFD_SIGNAL_EVENT_LIMIT * 8));
 		kfree(page);
 	}
 }
@@ -750,6 +752,13 @@ int kfd_event_mmap(struct kfd_process *p, struct vm_area_struct *vma)
 	unsigned int page_index;
 	unsigned long pfn;
 	struct signal_page *page;
+
+	/* check required size is logical */
+	if (get_order(KFD_SIGNAL_EVENT_LIMIT * 8) !=
+			get_order(vma->vm_end - vma->vm_start)) {
+		pr_err("amdkfd: event page mmap requested illegal size\n");
+		return -EINVAL;
+	}
 
 	page_index = vma->vm_pgoff;
 
