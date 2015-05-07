@@ -974,13 +974,10 @@ static int destroy_queues_cpsch(struct device_queue_manager *dqm,
 			KFD_PREEMPT_TYPE_FILTER_ALL_QUEUES :
 			KFD_PREEMPT_TYPE_FILTER_DYNAMIC_QUEUES;
 
-	/* if only sdma queues exist, no need to unmap compute queues */
-	if ((dqm->queue_count - dqm->sdma_queue_count) > 0) {
-		retval = pm_send_unmap_queue(&dqm->packets,
-			KFD_QUEUE_TYPE_COMPUTE, preempt_type, 0, false, 0);
-		if (retval != 0)
-			goto out;
-	}
+	retval = pm_send_unmap_queue(&dqm->packets, KFD_QUEUE_TYPE_COMPUTE,
+			preempt_type, 0, false, 0);
+	if (retval != 0)
+		goto out;
 
 	*dqm->fence_addr = KFD_FENCE_INIT;
 	pm_send_query_status(&dqm->packets, dqm->fence_gpu_addr,
