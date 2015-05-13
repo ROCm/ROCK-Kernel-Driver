@@ -975,8 +975,9 @@ static void write_vmid_invalidate_request(struct kgd_dev *kgd, uint8_t vmid)
 	return WREG32(VM_INVALIDATE_REQUEST, 1 << vmid);
 }
 
-static int add_bo_to_vm(struct radeon_device *rdev, uint64_t va, struct radeon_vm *rvm,
-		struct radeon_bo *bo, struct radeon_bo_va **bo_va)
+static int add_bo_to_vm(struct radeon_device *rdev, uint64_t va,
+			struct radeon_vm *rvm, struct radeon_bo *bo,
+			struct radeon_bo_va **bo_va)
 {
 	int ret;
 
@@ -993,11 +994,16 @@ static int add_bo_to_vm(struct radeon_device *rdev, uint64_t va, struct radeon_v
 		goto err_vmadd;
 	}
 
-	/* Set virtual address for the allocation, allocate PTs, if needed, and zero them */
-	ret = radeon_vm_bo_set_addr(rdev, *bo_va, va, RADEON_VM_PAGE_READABLE | RADEON_VM_PAGE_WRITEABLE);
+	/*
+	 * Set virtual address for the allocation, allocate PTs, if needed,
+	 * and zero them
+	 */
+	ret = radeon_vm_bo_set_addr(rdev, *bo_va, va,
+			RADEON_VM_PAGE_READABLE | RADEON_VM_PAGE_WRITEABLE);
 	if (ret != 0) {
 		pr_err("amdkfd: Failed to set virtual address for BO. ret == %d\n",
 				ret);
+		pr_debug("va == 0x%08llx\n", va);
 		goto err_vmsetaddr;
 	}
 
@@ -1013,7 +1019,8 @@ err_vmadd:
 	return ret;
 }
 
-static void remove_bo_from_vm(struct radeon_device *rdev, struct radeon_bo *bo, struct radeon_bo_va *bo_va)
+static void remove_bo_from_vm(struct radeon_device *rdev, struct radeon_bo *bo,
+				struct radeon_bo_va *bo_va)
 {
 	radeon_bo_reserve(bo, true);
 	radeon_vm_bo_rmv(rdev, bo_va);
