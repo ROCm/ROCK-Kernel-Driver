@@ -451,6 +451,12 @@ kfd_ioctl_dbg_register(struct file *filep, struct kfd_process *p, void *data)
 		dev_info(NULL, "Error! kfd: In func %s >> getting device by id failed\n", __func__);
 		return status;
 	}
+
+	if (dev->device_info->asic_family == CHIP_CARRIZO) {
+		pr_debug("kfd_ioctl_alloc_memory_of_gpu not supported on CZ\n");
+		return status;
+	}
+
 	mutex_lock(get_dbgmgr_mutex());
 	mutex_lock(&p->mutex);
 
@@ -496,6 +502,12 @@ kfd_ioctl_dbg_unrgesiter(struct file *filep, struct kfd_process *p, void *data)
 		dev_info(NULL, "Error! kfd: In func %s >> getting device by id failed\n", __func__);
 		return status;
 	}
+
+	if (dev->device_info->asic_family == CHIP_CARRIZO) {
+		pr_debug("kfd_ioctl_alloc_memory_of_gpu not supported on CZ\n");
+		return status;
+	}
+
 	mutex_lock(get_dbgmgr_mutex());
 
 	status = kfd_dbgmgr_unregister(dev->dbgmgr, p);
@@ -540,6 +552,11 @@ kfd_ioctl_dbg_address_watch(struct file *filep,
 			dev_info(NULL,
 			"Error! kfd: In func %s >> get device by id failed\n",
 			__func__);
+			break;
+		}
+
+		if (dev->device_info->asic_family == CHIP_CARRIZO) {
+			pr_debug("kfd_ioctl_alloc_memory_of_gpu not supported on CZ\n");
 			break;
 		}
 
@@ -674,6 +691,11 @@ kfd_ioctl_dbg_wave_control(struct file *filep, struct kfd_process *p, void *data
 		dev = kfd_device_by_id(args->gpu_id);
 		if (!dev) {
 			dev_info(NULL, "Error! kfd: In func %s >> getting device by id failed\n", __func__);
+			break;
+		}
+
+		if (dev->device_info->asic_family == CHIP_CARRIZO) {
+			pr_debug("kfd_ioctl_alloc_memory_of_gpu not supported on CZ\n");
 			break;
 		}
 
@@ -914,6 +936,11 @@ static int kfd_ioctl_alloc_memory_of_gpu(struct file *filep,
 	if (dev == NULL)
 		return -EINVAL;
 
+	if (dev->device_info->asic_family == CHIP_CARRIZO) {
+		pr_debug("kfd_ioctl_alloc_memory_of_gpu not supported on CZ\n");
+		return -EINVAL;
+	}
+
 	mutex_lock(&p->mutex);
 
 	pdd = kfd_bind_process_to_device(dev, p);
@@ -961,6 +988,11 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 	if (dev == NULL)
 		return -EINVAL;
 
+	if (dev->device_info->asic_family == CHIP_CARRIZO) {
+		pr_debug("kfd_ioctl_alloc_memory_of_gpu not supported on CZ\n");
+		return -EINVAL;
+	}
+
 	mutex_lock(&p->mutex);
 
 	pdd = kfd_get_process_device_data(dev, p);
@@ -993,6 +1025,11 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 	dev = kfd_device_by_id(GET_GPU_ID(args->handle));
 	if (dev == NULL)
 		return -EINVAL;
+
+	if (dev->device_info->asic_family == CHIP_CARRIZO) {
+		pr_debug("kfd_ioctl_alloc_memory_of_gpu not supported on CZ\n");
+		return -EINVAL;
+	}
 
 	mutex_lock(&p->mutex);
 
@@ -1047,6 +1084,11 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 	if (dev == NULL)
 		return -EINVAL;
 
+	if (dev->device_info->asic_family == CHIP_CARRIZO) {
+		pr_debug("kfd_ioctl_alloc_memory_of_gpu not supported on CZ\n");
+		return -EINVAL;
+	}
+
 	mutex_lock(&p->mutex);
 
 	pdd = kfd_get_process_device_data(dev, p);
@@ -1090,6 +1132,11 @@ static int kfd_ioctl_open_graphic_handle(struct file *filep,
 	dev = kfd_device_by_id(args->gpu_id);
 	if (dev == NULL)
 		return -EINVAL;
+
+	if (dev->device_info->asic_family == CHIP_CARRIZO) {
+		pr_debug("kfd_ioctl_alloc_memory_of_gpu not supported on CZ\n");
+		return -EINVAL;
+	}
 
 	mutex_lock(&p->mutex);
 
