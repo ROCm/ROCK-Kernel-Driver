@@ -169,7 +169,14 @@ struct kfd_ioctl_dbg_wave_control_args {
 #define KFD_IOC_WAIT_RESULT_TIMEOUT	1
 #define KFD_IOC_WAIT_RESULT_FAIL	2
 
-#define KFD_SIGNAL_EVENT_LIMIT		4096
+/*
+ * The added 512 is because, currently, 8*(4096/256) signal events are
+ * reserved for debugger events, and we want to provide at least 4K signal
+ * events for EOP usage.
+ * We add 512 to make the allocated size (KFD_SIGNAL_EVENT_LIMIT * 8) be
+ * page aligned.
+ */
+#define KFD_SIGNAL_EVENT_LIMIT		(4096 + 512)
 
 struct kfd_ioctl_create_event_args {
 	uint64_t event_page_offset;	/* from KFD */

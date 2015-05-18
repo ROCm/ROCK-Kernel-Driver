@@ -538,6 +538,7 @@ struct kfd_process {
 	struct list_head signal_event_pages;	/* struct slot_page_header.event_pages */
 	u32 next_nonsignal_event_id;
 	size_t signal_event_count;
+	size_t debug_event_count;
 };
 
 /**

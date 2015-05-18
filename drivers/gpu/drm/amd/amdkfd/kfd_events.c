@@ -79,8 +79,14 @@ struct signal_page {
  * For SQ s_sendmsg interrupts, this is limited to 8 bits.
  */
 
-#define INTERRUPT_DATA_BITS 12
+#define INTERRUPT_DATA_BITS 8
 #define SIGNAL_EVENT_ID_SLOT_SHIFT 0
+
+/* We can only create 8 debug events */
+
+#define KFD_DEBUG_EVENT_LIMIT 8
+#define KFD_DEBUG_EVENT_MASK 0x1F
+#define KFD_DEBUG_EVENT_SHIFT 5
 
 static uint64_t *page_slots(struct signal_page *page)
 {
@@ -125,6 +131,8 @@ static bool allocate_signal_page(struct file *devkfd, struct kfd_process *p)
 {
 	void *backing_store;
 	struct signal_page *page;
+	unsigned int slot;
+	int i;
 
 	page = kzalloc(SIGNAL_PAGE_SIZE, GFP_KERNEL);
 	if (!page)
@@ -140,6 +148,14 @@ static bool allocate_signal_page(struct file *devkfd, struct kfd_process *p)
 	/* prevent user-mode info leaks */
 	memset(backing_store, (uint8_t) UNSIGNALED_EVENT_SLOT, KFD_SIGNAL_EVENT_LIMIT * 8);
 	page->kernel_address = backing_store;
+
+	/* Set bits of debug events to prevent allocation */
+	for (i = 0 ; i < KFD_DEBUG_EVENT_LIMIT ; i++) {
+		slot = (i << KFD_DEBUG_EVENT_SHIFT) |
+				KFD_DEBUG_EVENT_MASK;
+		__set_bit(slot, page->used_slot_bitmap);
+		page->free_slots--;
+	}
 
 	if (list_empty(&p->signal_event_pages))
 		page->page_index = 0;
@@ -177,6 +193,40 @@ allocate_event_notification_slot(struct file *devkfd, struct kfd_process *p,
 	}
 
 	return ret;
+}
+
+static bool
+allocate_debug_event_notification_slot(struct file *devkfd,
+				struct kfd_process *p,
+				struct signal_page **out_page,
+				unsigned int *out_slot_index)
+{
+	struct signal_page *page;
+	unsigned int slot;
+	bool ret;
+
+	if (list_empty(&p->signal_event_pages)) {
+		ret = allocate_signal_page(devkfd, p);
+		if (ret == false)
+			return ret;
+	}
+
+	page = list_entry((&p->signal_event_pages)->next, struct signal_page,
+				event_pages);
+	slot = (p->debug_event_count << KFD_DEBUG_EVENT_SHIFT) |
+			KFD_DEBUG_EVENT_MASK;
+
+	pr_debug("page == %p\n", page);
+	pr_debug("slot == %d\n", slot);
+
+	page_slots(page)[slot] = UNSIGNALED_EVENT_SLOT;
+	*out_page = page;
+	*out_slot_index = slot;
+
+	pr_debug("allocated debug event signal slot in page %p, slot %d\n",
+			page, slot);
+
+	return true;
 }
 
 /* Assumes that the process's event_mutex is locked. */
@@ -270,17 +320,40 @@ lookup_event_by_page_slot(struct kfd_process *p,
 static int
 create_signal_event(struct file *devkfd, struct kfd_process *p, struct kfd_event *ev)
 {
-	if (p->signal_event_count == KFD_SIGNAL_EVENT_LIMIT) {
+	if ((ev->type == KFD_EVENT_TYPE_SIGNAL) &&
+			(p->signal_event_count == KFD_SIGNAL_EVENT_LIMIT)) {
 		pr_warn("amdkfd: Signal event wasn't created because limit was reached\n");
 		return -ENOMEM;
-	}
-
-	if (!allocate_event_notification_slot(devkfd, p, &ev->signal_page, &ev->signal_slot_index)) {
-		pr_warn("amdkfd: Signal event wasn't created because out of kernel memory\n");
+	} else if ((ev->type == KFD_EVENT_TYPE_DEBUG) &&
+			(p->debug_event_count == KFD_DEBUG_EVENT_LIMIT)) {
+		pr_warn("amdkfd: Debug event wasn't created because limit was reached\n");
 		return -ENOMEM;
 	}
 
-	p->signal_event_count++;
+	if (ev->type == KFD_EVENT_TYPE_SIGNAL) {
+		if (!allocate_event_notification_slot(devkfd, p,
+						&ev->signal_page,
+						&ev->signal_slot_index)) {
+			pr_warn("amdkfd: Signal event wasn't created because out of kernel memory\n");
+			return -ENOMEM;
+		}
+
+		p->signal_event_count++;
+
+		if ((p->signal_event_count & KFD_DEBUG_EVENT_MASK) ==
+				KFD_DEBUG_EVENT_MASK)
+			p->signal_event_count++;
+
+	} else if (ev->type == KFD_EVENT_TYPE_DEBUG) {
+		if (!allocate_debug_event_notification_slot(devkfd, p,
+						&ev->signal_page,
+						&ev->signal_slot_index)) {
+			pr_warn("amdkfd: Debug event wasn't created because out of kernel memory\n");
+			return -ENOMEM;
+		}
+
+		p->debug_event_count++;
+	}
 
 	ev->user_signal_address = &ev->signal_page->user_address[ev->signal_slot_index];
 
@@ -312,13 +385,22 @@ void kfd_event_init_process(struct kfd_process *p)
 	INIT_LIST_HEAD(&p->signal_event_pages);
 	p->next_nonsignal_event_id = KFD_FIRST_NONSIGNAL_EVENT_ID;
 	p->signal_event_count = 0;
+	p->debug_event_count = 0;
 }
 
 static void destroy_event(struct kfd_process *p, struct kfd_event *ev)
 {
 	if (ev->signal_page != NULL) {
-		release_event_notification_slot(ev->signal_page, ev->signal_slot_index);
-		p->signal_event_count--;
+		if (ev->type == KFD_EVENT_TYPE_SIGNAL) {
+			release_event_notification_slot(ev->signal_page,
+							ev->signal_slot_index);
+			p->signal_event_count--;
+			if ((p->signal_event_count & KFD_DEBUG_EVENT_MASK) ==
+					KFD_DEBUG_EVENT_MASK)
+				p->signal_event_count--;
+		} else if (ev->type == KFD_EVENT_TYPE_DEBUG) {
+			p->debug_event_count--;
+		}
 	}
 
 	/* Abandon the list of waiters. Individual waiting threads will clean up their own data.*/
@@ -531,7 +613,9 @@ void kfd_signal_event_interrupt(unsigned int pasid, uint32_t partial_id,
 
 	mutex_lock(&p->event_mutex);
 
-	if (valid_id_bits >= INTERRUPT_DATA_BITS) {
+	if ((valid_id_bits >= INTERRUPT_DATA_BITS) &&
+			((partial_id & KFD_DEBUG_EVENT_MASK) ==
+					KFD_DEBUG_EVENT_MASK)) {
 		/* Partial ID is a full ID. */
 		ev = lookup_event_by_id(p, partial_id);
 		set_event_from_interrupt(p, ev);
