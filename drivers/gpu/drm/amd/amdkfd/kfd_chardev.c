@@ -453,7 +453,7 @@ kfd_ioctl_dbg_register(struct file *filep, struct kfd_process *p, void *data)
 	}
 
 	if (dev->device_info->asic_family == CHIP_CARRIZO) {
-		pr_debug("kfd_ioctl_alloc_memory_of_gpu not supported on CZ\n");
+		pr_debug("kfd_ioctl_dbg_register not supported on CZ\n");
 		return status;
 	}
 
@@ -504,7 +504,7 @@ kfd_ioctl_dbg_unrgesiter(struct file *filep, struct kfd_process *p, void *data)
 	}
 
 	if (dev->device_info->asic_family == CHIP_CARRIZO) {
-		pr_debug("kfd_ioctl_alloc_memory_of_gpu not supported on CZ\n");
+		pr_debug("kfd_ioctl_dbg_unrgesiter not supported on CZ\n");
 		return status;
 	}
 
@@ -556,7 +556,7 @@ kfd_ioctl_dbg_address_watch(struct file *filep,
 		}
 
 		if (dev->device_info->asic_family == CHIP_CARRIZO) {
-			pr_debug("kfd_ioctl_alloc_memory_of_gpu not supported on CZ\n");
+			pr_debug("kfd_ioctl_dbg_address_watch not supported on CZ\n");
 			break;
 		}
 
@@ -695,7 +695,7 @@ kfd_ioctl_dbg_wave_control(struct file *filep, struct kfd_process *p, void *data
 		}
 
 		if (dev->device_info->asic_family == CHIP_CARRIZO) {
-			pr_debug("kfd_ioctl_alloc_memory_of_gpu not supported on CZ\n");
+			pr_debug("kfd_ioctl_dbg_wave_control not supported on CZ\n");
 			break;
 		}
 
@@ -989,7 +989,7 @@ static int kfd_ioctl_free_memory_of_gpu(struct file *filep,
 		return -EINVAL;
 
 	if (dev->device_info->asic_family == CHIP_CARRIZO) {
-		pr_debug("kfd_ioctl_alloc_memory_of_gpu not supported on CZ\n");
+		pr_debug("kfd_ioctl_free_memory_of_gpu not supported on CZ\n");
 		return -EINVAL;
 	}
 
@@ -1027,7 +1027,7 @@ static int kfd_ioctl_map_memory_to_gpu(struct file *filep,
 		return -EINVAL;
 
 	if (dev->device_info->asic_family == CHIP_CARRIZO) {
-		pr_debug("kfd_ioctl_alloc_memory_of_gpu not supported on CZ\n");
+		pr_debug("kfd_ioctl_map_memory_to_gpu not supported on CZ\n");
 		return -EINVAL;
 	}
 
@@ -1085,7 +1085,7 @@ static int kfd_ioctl_unmap_memory_from_gpu(struct file *filep,
 		return -EINVAL;
 
 	if (dev->device_info->asic_family == CHIP_CARRIZO) {
-		pr_debug("kfd_ioctl_alloc_memory_of_gpu not supported on CZ\n");
+		pr_debug("kfd_ioctl_unmap_memory_from_gpu not supported on CZ\n");
 		return -EINVAL;
 	}
 
@@ -1134,7 +1134,7 @@ static int kfd_ioctl_open_graphic_handle(struct file *filep,
 		return -EINVAL;
 
 	if (dev->device_info->asic_family == CHIP_CARRIZO) {
-		pr_debug("kfd_ioctl_alloc_memory_of_gpu not supported on CZ\n");
+		pr_debug("kfd_ioctl_open_graphic_handle not supported on CZ\n");
 		return -EINVAL;
 	}
 
