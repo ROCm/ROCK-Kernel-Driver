@@ -3,7 +3,9 @@
 # Direct Rendering Infrastructure (DRI) in XFree86 4.1.0 and higher.
 
 ccflags-y := -Iinclude/drm -Idrivers/gpu/drm/amd/include/asic_reg \
-	-Idrivers/gpu/drm/amd/include
+		-Idrivers/gpu/drm/amd/include \
+		-Idrivers/gpu/drm/amd/include/bus \
+		-Idrivers/gpu/drm/amd/acp/include
 
 amdgpu-y := amdgpu_drv.o
 
@@ -73,6 +75,16 @@ amdgpu-y += \
 
 # add cgs
 amdgpu-y += amdgpu_cgs.o
+
+# ACP componet
+ifneq ($(CONFIG_DRM_AMD_ACP),)
+amdgpu-y += amdgpu_acp.o
+
+AMDACPPATH := ../acp
+include drivers/gpu/drm/amd/acp/Makefile
+
+amdgpu-y += $(AMD_ACP_FILES)
+endif
 
 amdgpu-$(CONFIG_COMPAT) += amdgpu_ioc32.o
 amdgpu-$(CONFIG_VGA_SWITCHEROO) += amdgpu_atpx_handler.o

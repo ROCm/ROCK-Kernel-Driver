@@ -1,0 +1,99 @@
+#ifndef __ACP_HW_H
+#define __ACP_HW_H
+
+#define ACP_MODE_I2S				0
+#define ACP_MODE_AZ				1
+
+#define DISABLE					0
+#define ENABLE					1
+
+#define PAGE_SIZE_4K				4096
+#define PAGE_SIZE_4K_ENABLE			0x02
+
+#define PLAYBACK_PTE_OFFSET			10
+#define CAPTURE_PTE_OFFSET			0
+
+#define GARLIC_CNTL_DEFAULT			0x00000FB4
+#define ONION_CNTL_DEFAULT			0x00000FB4
+
+#define ACP_PHYSICAL_BASE			0x14000
+
+/* Playback SRAM address (as a destination in dma descriptor) */
+#define ACP_SHARED_RAM_BANK_38_ADDRESS		0x404A000
+
+/* Capture SRAM address (as a source in dma descriptor) */
+#define ACP_SHARED_RAM_BANK_47_ADDRESS		0x405C000
+
+#define ACP_DMA_RESET_TIME			10000
+#define ACP_CLOCK_EN_TIME_OUT_VALUE		0x000000FF
+#define ACP_SOFT_RESET_DONE_TIME_OUT_VALUE	0x000000FF
+#define ACP_DMA_COMPLETE_TIME_OUT_VALUE		0x000000FF
+
+#define ACP_SRAM_BASE_ADDRESS			0x4000000
+#define ACP_DAGB_GRP_SRAM_BASE_ADDRESS		0x4001000
+#define ACP_DAGB_GRP_SRBM_SRAM_BASE_OFFSET	0x1000
+#define ACP_INTERNAL_APERTURE_WINDOW_0_ADDRESS	0x00000000
+#define ACP_INTERNAL_APERTURE_WINDOW_4_ADDRESS	0x01800000
+
+enum {
+	STREAM_PLAYBACK = 0,
+	STREAM_CAPTURE,
+	STREAM_LAST = STREAM_CAPTURE,
+};
+
+enum {
+	To_DAGB_O = 0x0,
+	To_DAGB_G,
+	TO_ACP_I2S_1,
+	TO_BLUETOOTH,
+	TO_ACP_I2S_2,
+	FROM_DAGB_O,
+	FROM_DAGB_G,
+	FROM_ACP_I2S_1,
+	FROM_ACP_I2S_2
+};
+
+enum {
+	ACP_DMA_ATTRIBUTES_SHAREDMEM_TO_DAGB_ONION = 0x0,
+	ACP_DMA_ATTRIBUTES_SHARED_MEM_TO_DAGB_GARLIC = 0x1,
+	ACP_DMA_ATTRIBUTES_DAGB_ONION_TO_SHAREDMEM = 0x8,
+	ACP_DMA_ATTRIBUTES_DAGB_GARLIC_TO_SHAREDMEM = 0x9,
+	ACP_DMA_ATTRIBUTES_FORCE_SIZE = 0xF
+};
+
+typedef struct acp_dma_dscr_size_transfer_direction {
+	/* Specifies the number of bytes need to be transferred
+	 *  from source to destination memory. */
+	u32 size:16;
+	/* Specifies transfer direction. */
+	u32 trans_direction:4;
+	/* reserved. */
+	u32 reserved1:2;
+	/* Specifies the IOC enable or not for descriptor. */
+	/* Defaultly this will be 0, for the last descriptor, make it Enable */
+	u32 ioc:1;
+	/* reserved. */
+	u32 reserved2:9;
+} acp_dma_dscr_size_transfer_direction_t;
+
+typedef union {
+	u32 val:32;
+	acp_dma_dscr_size_transfer_direction_t s;
+} acp_dma_dscr_size_transfer_direction_u;
+
+typedef struct acp_dma_dscr_transfer {
+	/* Specifies the source memory location for the DMA data transfer. */
+	u32 src;
+	/* Specifies the destination memory location to where the data will
+	   be transferred.
+	 */
+	u32 dest;
+	/* Specifies the number of bytes need to be transferred
+	 * from source to destination memory.Transfer direction & IOC enable
+	 */
+	acp_dma_dscr_size_transfer_direction_u size_xfer_dir;
+	/** Reserved for future use */
+	u32 reserved;
+} acp_dma_dscr_transfer_t;
+
+#endif /*__ACP_HW_H */

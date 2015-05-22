@@ -53,6 +53,7 @@
 #include "amdgpu_irq.h"
 #include "amdgpu_ucode.h"
 #include "amdgpu_gds.h"
+#include "amdgpu_acp.h"
 
 /*
  * Modules parameters.
@@ -1852,6 +1853,12 @@ int amdgpu_ctx_put(struct amdgpu_ctx *ctx);
 
 extern int amdgpu_ctx_ioctl(struct drm_device *dev, void *data,
 						 struct drm_file *filp);
+/*
+ * CGS
+ */
+void *amdgpu_cgs_create_device(struct amdgpu_device *adev);
+void amdgpu_cgs_destroy_device(void *cgs_device);
+
 
 /*
  * Core structure, functions and helpers.
@@ -1867,6 +1874,10 @@ struct amdgpu_device {
 	struct drm_device		*ddev;
 	struct pci_dev			*pdev;
 	struct rw_semaphore		exclusive_lock;
+
+#ifdef CONFIG_DRM_AMD_ACP
+	struct amdgpu_acp		acp;
+#endif
 
 	/* ASIC */
 	enum amdgpu_asic_type           asic_type;
