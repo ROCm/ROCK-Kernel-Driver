@@ -55,6 +55,8 @@
 #include "amdgpu_acp.h"
 #include "amdgpu_dm.h"
 
+#include "gpu_scheduler.h"
+
 /*
  * Modules parameters.
  */
@@ -80,6 +82,7 @@ extern int amdgpu_deep_color;
 extern int amdgpu_vm_size;
 extern int amdgpu_vm_block_size;
 extern int amdgpu_dal;
+extern int amdgpu_enable_scheduler;
 
 #define AMDGPU_MAX_USEC_TIMEOUT			100000	/* 100 ms */
 #define AMDGPU_FENCE_JIFFIES_TIMEOUT		(HZ / 2)
@@ -861,6 +864,7 @@ struct amdgpu_ring {
 	struct amdgpu_device		*adev;
 	const struct amdgpu_ring_funcs	*funcs;
 	struct amdgpu_fence_driver	fence_drv;
+	struct amd_gpu_scheduler 	*scheduler;
 
 	struct mutex		*ring_lock;
 	struct amdgpu_bo	*ring_obj;

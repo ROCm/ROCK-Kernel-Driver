@@ -13,7 +13,8 @@ ccflags-y := -Iinclude/drm -I$(FULL_AMD_PATH)/include/asic_reg \
 		-I$(FULL_AMD_PATH)/amdgpu \
 		-I$(FULL_AMD_DAL_PATH) \
 		-I$(FULL_AMD_DAL_PATH)/include \
-		-I$(FULL_AMD_PATH)/dsat
+		-I$(FULL_AMD_PATH)/dsat \
+		-I$(FULL_AMD_PATH)/scheduler
 		
 amdgpu-y := amdgpu_drv.o
 
@@ -93,6 +94,10 @@ include $(FULL_AMD_PATH)/acp/Makefile
 
 amdgpu-y += $(AMD_ACP_FILES)
 endif
+
+# GPU scheduler
+amdgpu-y += \
+	../scheduler/gpu_scheduler.o
 
 amdgpu-$(CONFIG_COMPAT) += amdgpu_ioc32.o
 amdgpu-$(CONFIG_VGA_SWITCHEROO) += amdgpu_atpx_handler.o
