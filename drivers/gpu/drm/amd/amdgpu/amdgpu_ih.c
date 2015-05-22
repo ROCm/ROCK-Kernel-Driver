@@ -199,6 +199,8 @@ restart_ih:
 	rmb();
 
 	while (adev->irq.ih.rptr != wptr) {
+		entry.iv_entry = (const uint32_t *)
+			&adev->irq.ih.ring[adev->irq.ih.rptr >> 2];
 		amdgpu_ih_decode_iv(adev, &entry);
 		adev->irq.ih.rptr &= adev->irq.ih.ptr_mask;
 
