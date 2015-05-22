@@ -42,6 +42,7 @@
 #include <ttm/ttm_module.h>
 #include <ttm/ttm_execbuf_util.h>
 
+#include <drm/drmP.h>
 #include <drm/drm_gem.h>
 #include <drm/amdgpu_drm.h>
 
