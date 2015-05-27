@@ -91,16 +91,7 @@ struct topology_mgr {
 	/* This flag indicates that if DAL is in process to power down HW.*/
 	bool hw_power_down_required;
 
-	/* Skip audio attachment in post detection during initial detection.*/
-	bool skip_audio_attachment;
-
 	uint32_t attached_hdmi_num;
-
-	/* Bitvector of newly connected displays, which are *possibly*
-	 * audio capable. By "newly connected" we mean:
-	 *  1. new
-	 *  2. signal changed on a dongle.*/
-	uint32_t audio_possible_displays;
 };
 
 
@@ -154,10 +145,6 @@ static bool tm_can_display_paths_be_enabled_at_the_same_time(
 		struct tm_resource_mgr *tm_rm_clone,
 		const uint32_t *displays,
 		uint32_t array_size);
-
-static void path_assign_audio_by_signal_priority(struct topology_mgr *tm,
-		uint32_t display_index,
-		enum tm_audio_priority audio_priority);
 
 static void handle_signal_downgrade(struct topology_mgr *tm,
 		struct display_path *display_path,
@@ -2336,97 +2323,6 @@ static bool tm_is_path_locked(struct topology_mgr *tm,
  * Audio-related code.
  ****************************************************************************/
 
-/*
- * This function returns priority of display path from the audio aspect.
- *	According to "Output Device Management" spec:
- *		1)  Native HDMI (Highest)
- *		2)  HDMI with DP-HDMI dongle
- *		3)  HDMI with DVI-HDMI dongle
- *		4)  DP (Lowest)
- *
- * For disconnected display paths or display paths that not mentioned in
- * list above audio priority will be undefined (lowest, lower the DP audio
- * of course)
- *
- * \param [in] pDisplayPath: Display path which priority should be determined
- *
- * \return Audio priority of given display path
- */
-static enum tm_audio_priority get_path_audio_priority(struct topology_mgr *tm,
-		struct display_path *display_path)
-{
-	enum signal_type sink_signal;
-	enum tm_audio_priority audio_priority = TM_AUDIOPRIORITY_UNDEFINED;
-	struct connector *connector;
-	struct graphics_object_id id;
-	struct dal_context *dal_context = tm->dal_context;
-
-	sink_signal = dal_display_path_get_query_signal(display_path,
-			SINK_LINK_INDEX);
-
-	if (false == dal_display_path_is_target_connected(display_path))
-		return audio_priority;
-
-	connector = dal_display_path_get_connector(display_path);
-	id = dal_connector_get_graphics_object_id(connector);
-
-	if (dal_is_hdmi_signal(sink_signal)) {
-		/* If display path has HDMI signal after full detection
-		 * procedure, we know that audio is supported by display
-		 * (target) and by by display path (source) */
-		switch (id.id) {
-		case CONNECTOR_ID_HDMI_TYPE_A:
-			audio_priority = TM_AUDIOPRIORITY_HDMI_NATIVE;
-			break;
-		case CONNECTOR_ID_DISPLAY_PORT:
-			audio_priority = TM_AUDIOPRIORITY_HDMI_OVER_DP;
-			break;
-		case CONNECTOR_ID_SINGLE_LINK_DVII:
-		case CONNECTOR_ID_DUAL_LINK_DVII:
-		case CONNECTOR_ID_SINGLE_LINK_DVID:
-		case CONNECTOR_ID_DUAL_LINK_DVID:
-			audio_priority = TM_AUDIOPRIORITY_HDMI_OVER_DVI;
-			break;
-
-		default:
-			break;
-		}
-	} else if (dal_is_dp_signal(sink_signal)) {
-
-		union display_path_properties path_props;
-
-		struct dcs *dcs = dal_display_path_get_dcs(display_path);
-		if (!dcs) {
-			TM_ERROR("%s: no DCS on the Path!\n", __func__);
-			return audio_priority;
-		}
-
-		path_props = dal_display_path_get_properties(display_path);
-
-		/* Check if this DP Display supports audio, and that the
-		 * DP Path supports DP audio as well - only in this case
-		 * DP Path can get audio priority. */
-		if (dal_dcs_is_audio_supported(dcs) &&
-				path_props.bits.IS_DP_AUDIO_SUPPORTED) {
-			audio_priority =
-				(sink_signal == SIGNAL_TYPE_EDP ?
-						TM_AUDIOPRIORITY_EDP_NATIVE :
-						TM_AUDIOPRIORITY_DP_NATIVE);
-		}
-	}
-
-	return audio_priority;
-}
-
-static void update_audio_possible_displays_bitmap(struct topology_mgr *tm,
-		struct display_path *display_path)
-{
-	uint32_t display_index = dal_display_path_get_display_index(
-			display_path);
-
-	tm_utils_set_bit(&tm->audio_possible_displays, display_index);
-}
-
 /**
  * This function handles arbitration of audio resources when display was
  * just connected.
@@ -2679,89 +2575,14 @@ static void update_path_audio(struct topology_mgr *tm,
 		 * the old one. */
 		/* handle disconnect on the path */
 		arbitrate_audio_on_disconnect(tm, display_path);
-		/* handle connect on the path */
-		update_audio_possible_displays_bitmap(tm, display_path);
 	} else if (connect_event) {
-		update_audio_possible_displays_bitmap(tm, display_path);
-		/* Skip audio attachment in post detection
-		 * during initial detection.*/
-		if (!tm->skip_audio_attachment) {
-			arbitrate_audio_on_connect(tm,
-			display_path);
-		}
-
+		arbitrate_audio_on_connect(tm, display_path);
 	} else if (disconnect_event) {
 		arbitrate_audio_on_disconnect(tm, display_path);
 	} else if (signal_change_event) {
 		arbitrate_audio_on_signal_change(tm, display_path,
 				detect_status);
 	}
-}
-
-/**
- * This function assigns audio resources to connected displays, giving priority
- * based on TMAudioPriority until all audio resources are used up.
- * For displays with the same audio priority, the audio can be assigned
- * arbitrarily, but this code flow will assign the audio to the displays with
- * the lowest display index.
- * Once all audio resources are used up, the remaining displays will have their
- * signals downgraded.
- *
- * We should not assign audio after resume inside this function unless there is
- * a display connectivity change.
- * The bit vector audio_possible_displays represents all displays with
- * connectivity change that COULD be assigned audio.
- * This function will attempt to assign audio only to these displays by
- * checking the bit vector.
- *
- * For initial detection on boot-up, audio assignment will still be the same,
- * since the bit vector will initially contain all connected displays.
- */
-static void assign_audio_by_signal_priority(struct topology_mgr *tm)
-{
-	enum tm_audio_priority audio_priority;
-	uint32_t display_index;
-	uint32_t display_paths_num = tm_get_display_path_count(tm);
-
-	for (audio_priority = TM_AUDIOPRIORITY_HIGHEST;
-		audio_priority > TM_AUDIOPRIORITY_UNDEFINED;
-		audio_priority--) {
-		/* Assign audio to all audio-ready displays with current
-		 * priority (priority is given only for connected displays). */
-		for (display_index = 0;
-			display_index < display_paths_num;
-			display_index++) {
-			/* Only displays with connectivity change will be
-			 * assigned audio. */
-			if (tm_utils_test_bit(&tm->audio_possible_displays,
-					display_index)) {
-
-				path_assign_audio_by_signal_priority(tm,
-						display_index, audio_priority);
-			}
-		} /* for() */
-	} /* for() */
-}
-
-static void path_assign_audio_by_signal_priority(struct topology_mgr *tm,
-		uint32_t display_index,
-		enum tm_audio_priority audio_priority_in)
-{
-	struct display_path *display_path;
-	enum tm_audio_priority path_current_audio_priority;
-
-	display_path = tm_get_display_path_at_index(tm, display_index);
-
-	path_current_audio_priority = get_path_audio_priority(tm, display_path);
-
-	if (path_current_audio_priority != audio_priority_in) {
-		/* Path audio priority is different from the one we are
-		 * checking - we should not do anything here. */
-		return;
-	}
-
-	arbitrate_audio_on_connect(tm, display_path);
-
 }
 
 static void handle_signal_downgrade(struct topology_mgr *tm,
@@ -3451,16 +3272,7 @@ void dal_tm_do_initial_detection(struct topology_mgr *tm)
 
 	dal_tm_detection_mgr_set_blocking_detection(tm->tm_dm, true);
 
-	/* NOTE: audio resources will NOT be assigned until display detection
-	 * is complete (it will be done by assign_audio_by_signal_priority()).
-	 */
-	tm->audio_possible_displays = 0;
-
-	/* Skip audio attachment in post detection during initial detection.*/
-	tm->skip_audio_attachment = true;
-
 	for (ind = 0; ind < display_paths_num; ind++) {
-
 		display_path = tm_get_display_path_at_index(tm, ind);
 
 		/* TODO: Create EDID emulator??? (TM does not care if it fails)
@@ -3480,16 +3292,9 @@ void dal_tm_do_initial_detection(struct topology_mgr *tm)
 		}
 	} /* for() */
 
-	/* Audio resources will now be assigned based on signal priority of
-	 * connected displays. */
-	assign_audio_by_signal_priority(tm);
-
 	/* After initial detection, we can start reporting detection
 	 * changes (to base driver). */
 	tm->report_detection_changes = true;
-
-	/* Post detection during initial detection done.*/
-	tm->skip_audio_attachment = false;
 
 	/* After initial detection, we always do asynchronous (non-blocking)
 	 * MST link data fetching. */
@@ -3532,8 +3337,6 @@ uint32_t dal_tm_do_complete_detection(
 		return connected_num;
 	}
 
-	tm->audio_possible_displays = 0;
-
 	/* First round - only previously connected displays
 	 * TODO: Here should be number of (display paths - number of cf display
 	 * paths)
@@ -3559,8 +3362,6 @@ uint32_t dal_tm_do_complete_detection(
 				connected_num++;
 		}
 	}
-
-	assign_audio_by_signal_priority(tm);
 
 	return connected_num;
 }

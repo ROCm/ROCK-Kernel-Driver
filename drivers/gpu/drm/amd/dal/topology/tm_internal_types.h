@@ -142,22 +142,6 @@ enum tm_display_type {
 	TM_DISPLAY_TYPE_WIRELESS = 0x00000040
 };
 
-enum tm_audio_priority {
-	/* Lowest priority */
-	TM_AUDIOPRIORITY_UNDEFINED = 0,
-	/* eDP Audio */
-	TM_AUDIOPRIORITY_EDP_NATIVE,
-	/* DP Audio */
-	TM_AUDIOPRIORITY_DP_NATIVE,
-	/* HDMI on DVI connector through DVI-HDMI dongle */
-	TM_AUDIOPRIORITY_HDMI_OVER_DVI,
-	/* HDMI on DP connector through DP-HDMI dongle */
-	TM_AUDIOPRIORITY_HDMI_OVER_DP,
-	/* HDMI native connector */
-	TM_AUDIOPRIORITY_HDMI_NATIVE,
-	TM_AUDIOPRIORITY_HIGHEST = TM_AUDIOPRIORITY_HDMI_NATIVE
-};
-
 enum tm_stereo_priority {
 	/* Lowest priority */
 	TM_STEREO_PRIORITY_UNDEFINED = 0,
