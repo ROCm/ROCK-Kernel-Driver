@@ -28,6 +28,24 @@
 #ifndef __AMDGPU_H__
 #define __AMDGPU_H__
 
+/* Initialization path:
+ *  We expect that acceleration initialization might fail for various
+ *  reasons even thought we work hard to make it works on most
+ *  configurations. In order to still have a working userspace in such
+ *  situation the init path must succeed up to the memory controller
+ *  initialization point. Failure before this point are considered as
+ *  fatal error. Here is the init callchain :
+ *      amdgpu_device_init  perform common structure, mutex initialization
+ *      asic_init           setup the GPU memory layout and perform all
+ *                          one time initialization (failure in this
+ *                          function are considered fatal)
+ *      asic_startup        setup the GPU acceleration, in order to
+ *                          follow guideline the first thing this
+ *                          function should do is setting the GPU
+ *                          memory controller (only MC setup failure
+ *                          are considered as fatal)
+ */
+
 #include <linux/atomic.h>
 #include <linux/wait.h>
 #include <linux/list.h>
