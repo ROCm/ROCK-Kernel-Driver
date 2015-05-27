@@ -142,6 +142,9 @@ module_param_named(exp_hw_support, amdgpu_exp_hw_support, int, 0444);
 MODULE_PARM_DESC(dal, "DAL display driver (1 = enable (default), 0 = disable)");
 module_param_named(dal, amdgpu_dal, int, 0444);
 
+MODULE_PARM_DESC(enable_scheduler, "enable SW GPU scheduler (1 = enable, 0 = disable ((default))");
+module_param_named(enable_scheduler, amdgpu_enable_scheduler, int, 0444);
+
 static struct pci_device_id pciidlist[] = {
 #ifdef CONFIG_DRM_AMDGPU_CIK
 	/* Kaveri */
