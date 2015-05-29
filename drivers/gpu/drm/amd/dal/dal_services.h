@@ -210,6 +210,26 @@ bool dal_get_platform_info(
 	struct dal_context *dal_context,
 	struct platform_info_params *params);
 
+
+#ifndef BUILD_DAL_TEST
+static inline uint32_t dal_bios_cmd_table_para_revision(
+	struct dal_context *ctx,
+	uint32_t index)
+{
+	uint8_t frev;
+	uint8_t crev;
+
+	if (cgs_atom_get_cmd_table_revs(ctx->cgs_device, index, &frev, &crev) != 0)
+		return 0;
+
+	return crev;
+}
+#else
+uint32_t dal_bios_cmd_table_para_revision(
+		struct dal_context *ctx,
+		uint32_t index);
+#endif
+
 /**************************************
  * Calls to Power Play (PP) component
  **************************************/
@@ -332,19 +352,17 @@ bool dal_exec_bios_cmd_table(
 	uint32_t index,
 	void *params);
 
+#ifdef BUILD_DAL_TEST
 uint32_t dal_bios_cmd_table_para_revision(
-	struct dal_context *ctx,
+struct dal_context *ctx,
 	uint32_t index);
-
-struct cmd_table_revision {
-	uint32_t revision;
-	uint32_t content_revision;
-};
 
 bool dal_bios_cmd_table_revision(
 	struct dal_context *ctx,
 	uint32_t index,
-	struct cmd_table_revision *table_revision);
+	uint8_t *frev,
+	uint8_t *crev);
+#endif
 
 /*
  *

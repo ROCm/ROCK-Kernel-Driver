@@ -34,18 +34,31 @@
 #include "bios_parser_helper.h"
 #include "bios_parser.h"
 
+#ifndef BUILD_DAL_TEST
+#define EXEC_BIOS_CMD_TABLE(command, params)\
+	(cgs_atom_exec_cmd_table(bp->dal_context->cgs_device, \
+		GetIndexIntoMasterTable(COMMAND, command), \
+		&params) == 0)
+
+#define BIOS_CMD_TABLE_REVISION(command, frev, crev)\
+	cgs_atom_get_cmd_table_revs(bp->dal_context->cgs_device, \
+		GetIndexIntoMasterTable(COMMAND, command), &frev, &crev)
+#else
 #define EXEC_BIOS_CMD_TABLE(command, params)\
 	dal_exec_bios_cmd_table(bp->dal_context, \
 		GetIndexIntoMasterTable(COMMAND, command), \
 		&params)
 
+#define BIOS_CMD_TABLE_REVISION(command, frev, crev)\
+		dal_bios_cmd_table_revision(bp->dal_context, \
+		GetIndexIntoMasterTable(COMMAND, command), &frev, &crev)
+
+#endif
+
 #define BIOS_CMD_TABLE_PARA_REVISION(command)\
 	dal_bios_cmd_table_para_revision(bp->dal_context, \
 		GetIndexIntoMasterTable(COMMAND, command))
 
-#define BIOS_CMD_TABLE_REVISION(command, revision)\
-	dal_bios_cmd_table_revision(bp->dal_context, \
-		GetIndexIntoMasterTable(COMMAND, command), &revision)
 
 static void init_dig_encoder_control(struct bios_parser *bp);
 static void init_dvo_encoder_control(struct bios_parser *bp);
@@ -378,12 +391,13 @@ static enum bp_result transmitter_control_v1_5(
 
 static void init_transmitter_control(struct bios_parser *bp)
 {
-	struct cmd_table_revision table_revision;
+	uint8_t frev;
+	uint8_t crev;
 
-	if (!BIOS_CMD_TABLE_REVISION(UNIPHYTransmitterControl,
-			table_revision))
+	if (BIOS_CMD_TABLE_REVISION(UNIPHYTransmitterControl,
+			frev, crev) != 0)
 		BREAK_TO_DEBUGGER();
-	switch (table_revision.revision) {
+	switch (crev) {
 	case 2:
 		bp->cmd_tbl.transmitter_control = transmitter_control_v2;
 		break;

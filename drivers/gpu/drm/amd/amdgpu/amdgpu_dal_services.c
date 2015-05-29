@@ -36,8 +36,6 @@
 
 #include "amdgpu.h"
 #include "dal_services.h"
-#include "atom.h"
-#include "bios_parser_interface.h"
 #include "amdgpu_dm.h"
 #include "amdgpu_dm_irq.h"
 #include "include/dal_interface.h"
@@ -106,47 +104,6 @@ void dal_delay_in_nanoseconds(uint32_t nanoseconds)
 void dal_delay_in_microseconds(uint32_t microseconds)
 {
 	udelay(microseconds);
-}
-
-uint32_t dal_bios_cmd_table_para_revision(
-	struct dal_context *ctx,
-	uint32_t index)
-{
-	uint8_t frev;
-	uint8_t crev;
-
-	if (!amdgpu_atom_parse_cmd_header(
-		((struct amdgpu_device *)ctx->driver_context)->
-		mode_info.atom_context,
-		index,
-		&frev,
-		&crev))
-		return 0;
-
-	return crev;
-}
-
-bool dal_bios_cmd_table_revision(
-	struct dal_context *ctx,
-	uint32_t index,
-	struct cmd_table_revision *table_revision)
-{
-	uint8_t frev;
-	uint8_t crev;
-
-	if (!table_revision ||
-		!amdgpu_atom_parse_cmd_header(
-			((struct amdgpu_device *)ctx->driver_context)->
-			mode_info.atom_context,
-			index,
-			&frev,
-			&crev))
-		return false;
-
-	table_revision->revision = crev;
-	table_revision->content_revision = 0;
-
-	return true;
 }
 
 /******************************************************************************
@@ -239,19 +196,6 @@ void dal_isr_release_lock(struct dal_context *context)
 /******************************************************************************
  * End-of-IRQ Interfaces.
  *****************************************************************************/
-
-bool dal_exec_bios_cmd_table(
-	struct dal_context *ctx,
-	uint32_t index,
-	void *params)
-{
-	/* TODO */
-	return amdgpu_atom_execute_table(
-		((struct amdgpu_device *)ctx->driver_context)->
-		mode_info.atom_context,
-		index, params) == 0;
-	return false;
-}
 
 bool dal_get_platform_info(struct dal_context *dal_context,
 			struct platform_info_params *params)
