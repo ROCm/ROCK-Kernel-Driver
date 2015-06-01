@@ -817,7 +817,7 @@ amdgpu_cs_find_mapping(struct amdgpu_cs_parser *parser,
 		if (!reloc->bo_va)
 			continue;
 
-		list_for_each_entry(mapping, &reloc->bo_va->valids, list) {
+		list_for_each_entry(mapping, &reloc->bo_va->mappings, list) {
 			if (mapping->it.start > addr ||
 			    addr > mapping->it.last)
 				continue;
