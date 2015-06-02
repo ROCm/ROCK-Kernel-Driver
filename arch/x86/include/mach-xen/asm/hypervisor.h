@@ -79,6 +79,7 @@ extern start_info_t *xen_start_info;
 
 DECLARE_PER_CPU(struct vcpu_runstate_info, runstate);
 #define vcpu_running(cpu) (per_cpu(runstate.state, cpu) == RUNSTATE_running)
+#define arch_cpu_is_running(cpu) vcpu_running(cpu)
 
 /* arch/xen/kernel/evtchn.c */
 /* Force a proper event-channel callback from Xen. */
@@ -236,7 +237,7 @@ static inline int gnttab_post_map_adjust(const struct gnttab_map_grant_ref *m,
 #ifdef CONFIG_XEN
 #define is_running_on_xen() 1
 extern char hypercall_page[PAGE_SIZE];
-#define in_hypercall(regs) (!user_mode_vm(regs) && \
+#define in_hypercall(regs) (!user_mode(regs) && \
 	(regs)->ip >= (unsigned long)hypercall_page && \
 	(regs)->ip < (unsigned long)hypercall_page + PAGE_SIZE)
 #else

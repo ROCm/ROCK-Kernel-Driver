@@ -30,6 +30,7 @@
 #include <linux/kernel.h>
 #include <linux/kernel_stat.h>
 #include <linux/math64.h>
+#include <linux/tick.h>
 #include <asm/hypervisor.h>
 #include <xen/clock.h>
 #include <xen/evtchn.h>
@@ -204,7 +205,7 @@ static irqreturn_t timer_interrupt(int irq, void *dev_id)
 
 static struct irqaction timer_action = {
 	.handler = timer_interrupt,
-	.flags   = IRQF_DISABLED|IRQF_TIMER,
+	.flags   = IRQF_TIMER,
 	.name    = "timer"
 };
 
@@ -246,9 +247,19 @@ void local_teardown_timer(unsigned int cpu)
 }
 #endif
 
+static void _clockevents_suspend(void *unused)
+{
+	tick_suspend_local();
+}
+
+void xen_clockevents_suspend(void)
+{
+	on_each_cpu(_clockevents_suspend, NULL, 1);
+}
+
 static void _clockevents_resume(void *unused)
 {
-	clockevents_notify(CLOCK_EVT_NOTIFY_RESUME, NULL);
+	tick_resume_local();
 }
 
 void xen_clockevents_resume(bool late)

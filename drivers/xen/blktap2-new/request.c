@@ -165,7 +165,7 @@ blktap_page_pool_resize(struct blktap_page_pool *pool, int target)
 	/* NB. mempool asserts min_nr >= 1 */
 	target = max(1, target);
 
-	err = mempool_resize(bufs, target, GFP_KERNEL);
+	err = mempool_resize(bufs, target);
 	if (err)
 		return err;
 

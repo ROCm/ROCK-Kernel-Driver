@@ -32,30 +32,21 @@ static int connect_ring(struct backend_info *);
 static void backend_changed(struct xenbus_watch *, const char **,
 			    unsigned int);
 
-static int blkback_name(blkif_t *blkif, char *buf)
+static char *blkback_name(const struct xenbus_device *dev)
 {
 	char *devpath, *devname;
-	struct xenbus_device *dev = blkif->be->dev;
 
 	devpath = xenbus_read(XBT_NIL, dev->nodename, "dev", NULL);
-	if (IS_ERR(devpath)) 
-		return PTR_ERR(devpath);
-	
-	if ((devname = strstr(devpath, "/dev/")) != NULL)
-		devname += strlen("/dev/");
-	else
-		devname  = devpath;
+	if (!IS_ERR(devpath) && (devname = strstr(devpath, "/dev/")) != NULL)
+		return devname + strlen("/dev/");
 
-	snprintf(buf, TASK_COMM_LEN, "blkback.%d.%s", blkif->domid, devname);
-	kfree(devpath);
-	
-	return 0;
+	return devpath;
 }
 
 static void update_blkif_status(blkif_t *blkif)
 { 
 	int err;
-	char name[TASK_COMM_LEN];
+	char *devname;
 
 	/* Not ready to connect? */
 	if (!blkif->irq)
@@ -70,12 +61,6 @@ static void update_blkif_status(blkif_t *blkif)
 	if (blkif->be->dev->state != XenbusStateConnected)
 		return;
 
-	err = blkback_name(blkif, name);
-	if (err) {
-		xenbus_dev_error(blkif->be->dev, err, "get blkback dev name");
-		return;
-	}
-
 	if (blkif->vbd.bdev) {
 		struct address_space *mapping
 			= blkif->vbd.bdev->bd_inode->i_mapping;
@@ -88,7 +73,16 @@ static void update_blkif_status(blkif_t *blkif)
 		invalidate_inode_pages2(mapping);
 	}
 
-	blkif->xenblkd = kthread_run(blkif_schedule, blkif, name);
+	devname = blkback_name(blkif->be->dev);
+	if (IS_ERR(devname)) {
+		xenbus_dev_error(blkif->be->dev, PTR_ERR(devname),
+				 "get blkback dev name");
+		return;
+	}
+
+	blkif->xenblkd = kthread_run(blkif_schedule, blkif,
+				     "blkbk.%d.%s", blkif->domid, devname);
+	kfree(devname);
 	if (IS_ERR(blkif->xenblkd)) {
 		err = PTR_ERR(blkif->xenblkd);
 		blkif->xenblkd = NULL;

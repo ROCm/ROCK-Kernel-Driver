@@ -260,7 +260,7 @@ netif_t *netif_alloc(struct device *parent, domid_t domid, unsigned int handle)
 	 * stolen by an Ethernet bridge for STP purposes.
 	 * (FE:FF:FF:FF:FF:FF)
 	 */ 
-	memset(dev->dev_addr, 0xFF, ETH_ALEN);
+	eth_broadcast_addr(dev->dev_addr);
 	dev->dev_addr[0] &= ~0x01;
 
 	rtnl_lock();

@@ -200,6 +200,7 @@ static int setup_ring(struct xenbus_device *dev, struct tpm_private *priv)
 	struct xenbus_transaction xbt;
 	const char *message = NULL;
 	int rv;
+	grant_ref_t gref;
 
 	priv->shr = (void *)__get_free_page(GFP_KERNEL|__GFP_ZERO);
 	if (!priv->shr) {
@@ -207,11 +208,15 @@ static int setup_ring(struct xenbus_device *dev, struct tpm_private *priv)
 		return -ENOMEM;
 	}
 
-	rv = xenbus_grant_ring(dev, virt_to_mfn(priv->shr));
+#ifndef CONFIG_XEN
+	rv = xenbus_grant_ring(dev, &priv->shr, 1, &gref);
+#else
+	gref = rv = xenbus_grant_ring(dev, virt_to_mfn(priv->shr));
+#endif
 	if (rv < 0)
 		return rv;
 
-	priv->ring_ref = rv;
+	priv->ring_ref = gref;
 
 	rv = xenbus_alloc_evtchn(dev, &priv->evtchn);
 	if (rv)

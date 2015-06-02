@@ -9,9 +9,6 @@
 #include <scsi/scsi.h>
 #include <scsi/scsi_ioctl.h>
 
-#include <xen/xenbus.h>
-#include <xen/interface/io/blkif.h>
-
 #include "blktap.h"
 
 #include "../blkback/blkback-pagemap.h"

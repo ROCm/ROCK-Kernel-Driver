@@ -1,3 +1,2 @@
-#define arch_cpu_is_running(cpu) vcpu_running(cpu)
-
+#include <asm/hypervisor.h>
 #include_next <asm/mutex.h>

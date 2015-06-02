@@ -49,11 +49,9 @@
 static int start_xenusbd(usbif_t *usbif)
 {
 	int err = 0;
-	char name[TASK_COMM_LEN];
 
-	snprintf(name, TASK_COMM_LEN, "usbback.%d.%d", usbif->domid,
-			usbif->handle);
-	usbif->xenusbd = kthread_run(usbbk_schedule, usbif, name);
+	usbif->xenusbd = kthread_run(usbbk_schedule, usbif, "usbback.%d.%u",
+				     usbif->domid, usbif->handle);
 	if (IS_ERR(usbif->xenusbd)) {
 		err = PTR_ERR(usbif->xenusbd);
 		usbif->xenusbd = NULL;

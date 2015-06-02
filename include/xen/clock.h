@@ -12,9 +12,11 @@ void xen_check_wallclock_update(void);
 #ifdef CONFIG_GENERIC_CLOCKEVENTS
 void xen_clockevents_init(void);
 void xen_setup_cpu_clockevents(void);
+void xen_clockevents_suspend(void);
 void xen_clockevents_resume(bool late);
 #else
 static inline void xen_setup_cpu_clockevents(void) {}
+static inline void xen_clockevents_resume(void) {}
 static inline void xen_clockevents_resume(bool late) {}
 #endif
 

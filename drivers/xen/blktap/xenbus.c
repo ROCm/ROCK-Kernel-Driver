@@ -90,24 +90,16 @@ static long get_id(const char *str)
         return simple_strtol(num, NULL, 10);
 }				
 
-static int blktap_name(blkif_t *blkif, char *buf)
+static char *blktap_name(const struct xenbus_device *dev)
 {
 	char *devpath, *devname;
-	struct xenbus_device *dev = blkif->be->dev;
 
 	devpath = xenbus_read(XBT_NIL, dev->nodename, "dev", NULL);
-	if (IS_ERR(devpath)) 
-		return PTR_ERR(devpath);
 	
-	if ((devname = strstr(devpath, "/dev/")) != NULL)
-		devname += strlen("/dev/");
-	else
-		devname  = devpath;
+	if (!IS_ERR(devpath) && (devname = strstr(devpath, "/dev/")) != NULL)
+		return devname + strlen("/dev/");
 
-	snprintf(buf, TASK_COMM_LEN, "blktap.%d.%s", blkif->domid, devname);
-	kfree(devpath);
-	
-	return 0;
+	return devpath;
 }
 
 /****************************************************************
@@ -202,7 +194,7 @@ static int blktap_remove(struct xenbus_device *dev)
 static void tap_update_blkif_status(blkif_t *blkif)
 { 
 	int err;
-	char name[TASK_COMM_LEN];
+	char *devname;
 
 	/* Not ready to connect? */
 	if(!blkif->irq || !blkif->sectors) {
@@ -218,12 +210,6 @@ static void tap_update_blkif_status(blkif_t *blkif)
 	if (blkif->be->dev->state != XenbusStateConnected)
 		return;
 
-	err = blktap_name(blkif, name);
-	if (err) {
-		xenbus_dev_error(blkif->be->dev, err, "get blktap dev name");
-		return;
-	}
-
 	if (!blkif->be->group_added) {
 		err = xentap_sysfs_addif(blkif->be->dev);
 		if (err) {
@@ -233,16 +219,25 @@ static void tap_update_blkif_status(blkif_t *blkif)
 		}
 	}
 
-	blkif->xenblkd = kthread_run(tap_blkif_schedule, blkif, name);
+	devname = blktap_name(blkif->be->dev);
+	if (IS_ERR(devname)) {
+		xenbus_dev_error(blkif->be->dev, PTR_ERR(devname),
+				 "get blktap dev name");
+		return;
+	}
+
+	blkif->xenblkd = kthread_run(tap_blkif_schedule, blkif,
+				     "blktap.%d.%s", blkif->domid, devname);
 	if (IS_ERR(blkif->xenblkd)) {
 		err = PTR_ERR(blkif->xenblkd);
 		blkif->xenblkd = NULL;
 		xenbus_dev_fatal(blkif->be->dev, err, "start xenblkd");
-		WPRINTK("Error starting thread %s\n", name);
+		WPRINTK("Error starting d%d:%s thread\n",
+			blkif->domid, devname);
 	} else
 		DPRINTK("Thread started for domid %d, connected disk %d\n",
 			blkif->domid, blkif->dev_num);
-
+	kfree(devname);
 }
 
 /**

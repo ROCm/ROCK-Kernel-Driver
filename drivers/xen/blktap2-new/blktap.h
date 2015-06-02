@@ -67,12 +67,6 @@ extern int blktap_device_major;
          ((_req) * BLKIF_MAX_SEGMENTS_PER_REQUEST * PAGE_SIZE) +        \
          ((_seg) * PAGE_SIZE))
 
-struct grant_handle_pair {
-	grant_handle_t                 kernel;
-	grant_handle_t                 user;
-};
-#define INVALID_GRANT_HANDLE           0xFFFF
-
 struct blktap_handle {
 	unsigned int                   ring;
 	unsigned int                   device;

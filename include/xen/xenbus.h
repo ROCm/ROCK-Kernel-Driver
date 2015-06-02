@@ -48,6 +48,10 @@
 #include <xen/interface/io/xenbus.h>
 #include <xen/interface/io/xs_wire.h>
 
+#define XENBUS_MAX_RING_PAGE_ORDER 4
+#define XENBUS_MAX_RING_PAGES      (1U << XENBUS_MAX_RING_PAGE_ORDER)
+#define INVALID_GRANT_HANDLE       (~0U)
+
 /* Register callback to watch this node. */
 struct xenbus_watch
 {
@@ -276,10 +280,14 @@ int xenbus_switch_state(struct xenbus_device *dev, enum xenbus_state new_state);
  * 0 on success, or -errno on error.  On error, the device will switch to
  * XenbusStateClosing, and the error will be saved in the store.
  */
+#if defined(CONFIG_XEN) || defined(HAVE_XEN_PLATFORM_COMPAT_H)
 int xenbus_grant_ring(struct xenbus_device *dev, unsigned long ring_mfn);
-
 int xenbus_multi_grant_ring(struct xenbus_device *, unsigned int nr,
 			    struct page *[], grant_ref_t []);
+#else
+int xenbus_grant_ring(struct xenbus_device *dev, void *vaddr,
+		      unsigned int nr_pages, grant_ref_t *grefs);
+#endif
 
 /**
  * Map a page of memory into this domain from another domain's grant table.
@@ -294,11 +302,13 @@ struct vm_struct *xenbus_map_ring_valloc(struct xenbus_device *dev,
 					 const grant_ref_t refs[],
 					 unsigned int nr_refs);
 #else
-int xenbus_map_ring_valloc(struct xenbus_device *dev,
-			   grant_ref_t gnt_ref, void **vaddr);
+int xenbus_map_ring_valloc(struct xenbus_device *dev, grant_ref_t *gnt_refs,
+			   unsigned int nr_grefs, void **vaddr);
+int xenbus_map_ring(struct xenbus_device *dev,
+		    grant_ref_t *gnt_refs, unsigned int nr_grefs,
+		    grant_handle_t *handles, unsigned long *vaddrs,
+		    bool *leaked);
 #endif
-int xenbus_map_ring(struct xenbus_device *dev, grant_ref_t gnt_ref,
-			   grant_handle_t *handle, void *vaddr);
 
 /**
  * Unmap a page of memory in this domain that was imported from another domain
@@ -310,9 +320,10 @@ int xenbus_map_ring(struct xenbus_device *dev, grant_ref_t gnt_ref,
 int xenbus_unmap_ring_vfree(struct xenbus_device *dev, struct vm_struct *);
 #else
 int xenbus_unmap_ring_vfree(struct xenbus_device *dev, void *vaddr);
-#endif
 int xenbus_unmap_ring(struct xenbus_device *dev,
-		      grant_handle_t handle, void *vaddr);
+		      grant_handle_t *handles, unsigned int nr_handles,
+		      unsigned long *vaddrs);
+#endif
 
 /**
  * Allocate an event channel for the given xenbus_device, assigning the newly

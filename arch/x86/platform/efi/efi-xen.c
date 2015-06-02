@@ -483,3 +483,12 @@ u64 efi_mem_attributes(unsigned long phys_addr)
 	info->mem.size = 0;
 	return HYPERVISOR_platform_op(&op) ? 0 : info->mem.attr;
 }
+
+static int __init arch_parse_efi_cmdline(char *str)
+{
+	if (parse_option_str(str, "debug"))
+		set_bit(EFI_DBG, &efi.flags);
+
+	return 0;
+}
+early_param("efi", arch_parse_efi_cmdline);

@@ -922,7 +922,8 @@ static void kick_pending_request_queues(struct blkfront_info *info)
 	if (queued)
 		flush_requests(info);
 
-	if (list_empty(&info->resume_split) && !RING_FULL(&info->ring)) {
+	if (list_empty(&info->resume_split) &&
+	    list_empty(&info->resume_list) && !RING_FULL(&info->ring)) {
 		/* Re-enable calldowns. */
 		blk_start_queue(info->rq);
 		/* Kick things off immediately. */
@@ -1570,7 +1571,7 @@ static int blkif_recover(struct blkfront_info *info,
 		ent->copy.frame = (void *)(ent + 1);
 		memcpy(ent->copy.frame, info->shadow[i].frame,
 		       nr_segs * sizeof(*ent->copy.frame));
-		if (info->indirect_segs) {
+		if (ent->copy.req.operation == BLKIF_OP_INDIRECT) {
 			ent->indirect_segs = info->indirect_segs[i];
 			info->indirect_segs[i] = NULL;
 		} else

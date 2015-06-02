@@ -280,6 +280,11 @@ int printk_hash(const char *, const char *, ...);
 	pr_printk_hash(KERN_NOTICE, fmt, ##__VA_ARGS__)
 #define pr_info(fmt, ...) \
 	pr_printk_hash(KERN_INFO, fmt, ##__VA_ARGS__)
+/*
+ * Like KERN_CONT, pr_cont() should only be used when continuing
+ * a line with no newline ('\n') enclosed. Otherwise it defaults
+ * back to KERN_DEFAULT.
+ */
 #define pr_cont(fmt, ...) \
 	__pr_printk_hash(KERN_CONT, fmt, ##__VA_ARGS__)
 

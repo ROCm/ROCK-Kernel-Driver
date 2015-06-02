@@ -169,33 +169,9 @@ static inline int arch_irqs_disabled_flags(unsigned long flags)
 									\
 	arch_irqs_disabled_flags(flags);				\
 })
+#endif /* !__ASSEMBLY__ */
 
-#else
-
-#ifdef CONFIG_X86_64
-#define ARCH_LOCKDEP_SYS_EXIT		call lockdep_sys_exit_thunk
-#define ARCH_LOCKDEP_SYS_EXIT_IRQ	\
-	TRACE_IRQS_ON; \
-	ENABLE_INTERRUPTS(CLBR_NONE); \
-	SAVE_REST; \
-	LOCKDEP_SYS_EXIT; \
-	RESTORE_REST; \
-	__DISABLE_INTERRUPTS; \
-	TRACE_IRQS_OFF;
-
-#else
-#define ARCH_LOCKDEP_SYS_EXIT			\
-	pushl %eax;				\
-	pushl %ecx;				\
-	pushl %edx;				\
-	call lockdep_sys_exit;			\
-	popl %edx;				\
-	popl %ecx;				\
-	popl %eax;
-
-#define ARCH_LOCKDEP_SYS_EXIT_IRQ
-#endif
-
+#ifdef __ASSEMBLY__
 #ifdef CONFIG_TRACE_IRQFLAGS
 #  define TRACE_IRQS_ON		call trace_hardirqs_on_thunk;
 #  define TRACE_IRQS_OFF	call trace_hardirqs_off_thunk;
@@ -204,12 +180,29 @@ static inline int arch_irqs_disabled_flags(unsigned long flags)
 #  define TRACE_IRQS_OFF
 #endif
 #ifdef CONFIG_DEBUG_LOCK_ALLOC
-#  define LOCKDEP_SYS_EXIT	ARCH_LOCKDEP_SYS_EXIT
-#  define LOCKDEP_SYS_EXIT_IRQ	ARCH_LOCKDEP_SYS_EXIT_IRQ
-# else
+#  ifdef CONFIG_X86_64
+#    define LOCKDEP_SYS_EXIT		call lockdep_sys_exit_thunk
+#    define LOCKDEP_SYS_EXIT_IRQ \
+	TRACE_IRQS_ON; \
+	ENABLE_INTERRUPTS(CLBR_NONE); \
+	call lockdep_sys_exit_thunk; \
+	__DISABLE_INTERRUPTS; \
+	TRACE_IRQS_OFF;
+#  else
+#    define LOCKDEP_SYS_EXIT \
+	pushl %eax;				\
+	pushl %ecx;				\
+	pushl %edx;				\
+	call lockdep_sys_exit;			\
+	popl %edx;				\
+	popl %ecx;				\
+	popl %eax;
+#    define LOCKDEP_SYS_EXIT_IRQ
+#  endif
+#else
 #  define LOCKDEP_SYS_EXIT
 #  define LOCKDEP_SYS_EXIT_IRQ
-# endif
-
+#endif
 #endif /* __ASSEMBLY__ */
+
 #endif

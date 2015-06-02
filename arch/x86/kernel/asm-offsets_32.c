@@ -71,7 +71,7 @@ void foo(void)
 #ifndef CONFIG_X86_NO_TSS
 	/* Offset from the sysenter stack to tss.sp0 */
 	DEFINE(SYSENTER_stack_sp0, offsetof(struct tss_struct, x86_tss.sp0) -
-		 sizeof(struct tss_struct));
+	       offsetofend(struct tss_struct, SYSENTER_stack));
 #else
 	/* sysenter stack points directly to sp0 */
 	DEFINE(SYSENTER_stack_sp0, 0);

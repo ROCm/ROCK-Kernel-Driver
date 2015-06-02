@@ -10,6 +10,7 @@
 #include <xen/barrier.h>
 #include <xen/blkif.h>
 #include <xen/gnttab.h>
+#include <xen/xenbus.h>
 
 //#define ENABLE_PASSTHROUGH
 
@@ -93,7 +94,6 @@ struct grant_handle_pair {
 	grant_handle_t                 kernel;
 	grant_handle_t                 user;
 };
-#define INVALID_GRANT_HANDLE           0xFFFF
 
 struct blktap_handle {
 	unsigned int                   ring;

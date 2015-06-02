@@ -1029,11 +1029,17 @@ void start_tty(struct tty_struct *tty)
 }
 EXPORT_SYMBOL(start_tty);
 
-/* We limit tty time update visibility to every 8 seconds or so. */
 static void tty_update_time(struct timespec *time)
 {
 	unsigned long sec = get_seconds();
-	if (abs(sec - time->tv_sec) & ~7)
+
+	/*
+	 * We only care if the two values differ in anything other than the
+	 * lower three bits (i.e every 8 seconds).  If so, then we can update
+	 * the time of the tty device, otherwise it could be construded as a
+	 * security leak to let userspace know the exact timing of the tty.
+	 */
+	if ((sec ^ time->tv_sec) & ~7)
 		time->tv_sec = sec;
 }
 
@@ -3601,6 +3607,13 @@ static ssize_t show_cons_active(struct device *dev,
 }
 static DEVICE_ATTR(active, S_IRUGO, show_cons_active, NULL);
 
+static struct attribute *cons_dev_attrs[] = {
+	&dev_attr_active.attr,
+	NULL
+};
+
+ATTRIBUTE_GROUPS(cons_dev);
+
 static struct device *consdev;
 
 void console_sysfs_notify(void)
@@ -3625,12 +3638,11 @@ int __init tty_init(void)
 	if (cdev_add(&console_cdev, MKDEV(TTYAUX_MAJOR, 1), 1) ||
 	    register_chrdev_region(MKDEV(TTYAUX_MAJOR, 1), 1, "/dev/console") < 0)
 		panic("Couldn't register /dev/console driver\n");
-	consdev = device_create(tty_class, NULL, MKDEV(TTYAUX_MAJOR, 1), NULL,
-			      "console");
+	consdev = device_create_with_groups(tty_class, NULL,
+					    MKDEV(TTYAUX_MAJOR, 1), NULL,
+					    cons_dev_groups, "console");
 	if (IS_ERR(consdev))
 		consdev = NULL;
-	else
-		WARN_ON(device_create_file(consdev, &dev_attr_active) < 0);
 
 #ifdef CONFIG_VT
 	if (console_use_vt)

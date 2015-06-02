@@ -29,32 +29,36 @@
 
 /*
  * Tables translating between page_cache_type_t and pte encoding.
- * Minimal supported modes are defined statically, modified if more supported
- * cache modes are available.
- * Index into __cachemode2pte_tbl is the cachemode.
- * Index into __pte2cachemode_tbl are the caching attribute bits of the pte
- * (_PAGE_PWT, _PAGE_PCD, _PAGE_PAT) at index bit positions 0, 1, 2.
+ *
+ * Minimal supported modes are defined statically, they are modified
+ * during bootup if more supported cache modes are available.
+ *
+ *   Index into __cachemode2pte_tbl[] is the cachemode.
+ *
+ *   Index into __pte2cachemode_tbl[] are the caching attribute bits of the pte
+ *   (_PAGE_PWT, _PAGE_PCD, _PAGE_PAT) at index bit positions 0, 1, 2.
  *
  * PAT settings are part of the hypervisor interface, which sets the
  * MSR to 0x050100070406 (i.e. WB, WT, UC-, UC, WC, WP [, UC, UC]).
  */
 uint16_t __cachemode2pte_tbl[_PAGE_CACHE_MODE_NUM] = {
-	[_PAGE_CACHE_MODE_WB]		= 0,
-	[_PAGE_CACHE_MODE_WC]		= _PAGE_PAT,
-	[_PAGE_CACHE_MODE_UC_MINUS]	= _PAGE_PCD,
-	[_PAGE_CACHE_MODE_UC]		= _PAGE_PCD | _PAGE_PWT,
-	[_PAGE_CACHE_MODE_WT]		= _PAGE_PWT,
-	[_PAGE_CACHE_MODE_WP]		= _PAGE_PAT | _PAGE_PWT,
+	[_PAGE_CACHE_MODE_WB      ]	= 0         | 0         | 0        ,
+	[_PAGE_CACHE_MODE_WC      ]	= 0         | 0         | _PAGE_PAT,
+	[_PAGE_CACHE_MODE_UC_MINUS]	= 0         | _PAGE_PCD | 0        ,
+	[_PAGE_CACHE_MODE_UC      ]	= _PAGE_PWT | _PAGE_PCD | 0        ,
+	[_PAGE_CACHE_MODE_WT      ]	= _PAGE_PWT | 0         | 0        ,
+	[_PAGE_CACHE_MODE_WP      ]	= _PAGE_PWT | 0         | _PAGE_PAT,
 };
 EXPORT_SYMBOL(__cachemode2pte_tbl);
+
 uint8_t __pte2cachemode_tbl[8] = {
-	[__pte2cm_idx(0)] = _PAGE_CACHE_MODE_WB,
-	[__pte2cm_idx(_PAGE_PWT)] = _PAGE_CACHE_MODE_WT,
-	[__pte2cm_idx(_PAGE_PCD)] = _PAGE_CACHE_MODE_UC_MINUS,
-	[__pte2cm_idx(_PAGE_PWT | _PAGE_PCD)] = _PAGE_CACHE_MODE_UC,
-	[__pte2cm_idx(_PAGE_PAT)] = _PAGE_CACHE_MODE_WC,
-	[__pte2cm_idx(_PAGE_PWT | _PAGE_PAT)] = _PAGE_CACHE_MODE_WP,
-	[__pte2cm_idx(_PAGE_PCD | _PAGE_PAT)] = _PAGE_CACHE_MODE_UC,
+	[__pte2cm_idx( 0        | 0         | 0        )] = _PAGE_CACHE_MODE_WB,
+	[__pte2cm_idx(_PAGE_PWT | 0         | 0        )] = _PAGE_CACHE_MODE_WT,
+	[__pte2cm_idx( 0        | _PAGE_PCD | 0        )] = _PAGE_CACHE_MODE_UC_MINUS,
+	[__pte2cm_idx(_PAGE_PWT | _PAGE_PCD | 0        )] = _PAGE_CACHE_MODE_UC,
+	[__pte2cm_idx( 0        | 0         | _PAGE_PAT)] = _PAGE_CACHE_MODE_WC,
+	[__pte2cm_idx(_PAGE_PWT | 0         | _PAGE_PAT)] = _PAGE_CACHE_MODE_WP,
+	[__pte2cm_idx(0         | _PAGE_PCD | _PAGE_PAT)] = _PAGE_CACHE_MODE_UC,
 	[__pte2cm_idx(_PAGE_PWT | _PAGE_PCD | _PAGE_PAT)] = _PAGE_CACHE_MODE_UC,
 };
 EXPORT_SYMBOL(__pte2cachemode_tbl);
@@ -148,23 +152,9 @@ bool __ref in_pgt_buf(unsigned long paddr)
 
 int after_bootmem;
 
-#ifndef CONFIG_XEN
-int direct_gbpages
-#ifdef CONFIG_DIRECT_GBPAGES
-				= 1
+#ifndef direct_gbpages
+early_param_on_off("gbpages", "nogbpages", direct_gbpages, CONFIG_X86_DIRECT_GBPAGES);
 #endif
-;
-#endif
-
-static void __init init_gbpages(void)
-{
-#if defined(CONFIG_X86_64) && !defined(CONFIG_XEN)
-	if (direct_gbpages && cpu_has_gbpages)
-		printk(KERN_INFO "Using GB pages for direct mapping\n");
-	else
-		direct_gbpages = 0;
-#endif
-}
 
 struct map_range {
 	unsigned long start;
@@ -176,16 +166,12 @@ static int page_size_mask;
 
 static void __init probe_page_size_mask(void)
 {
-	init_gbpages();
-
 #if !defined(CONFIG_DEBUG_PAGEALLOC) && !defined(CONFIG_KMEMCHECK)
 	/*
 	 * For CONFIG_DEBUG_PAGEALLOC, identity mapping will use small pages.
 	 * This will simplify cpa(), which otherwise needs to support splitting
 	 * large pages into small in interrupt context, etc.
 	 */
-	if (direct_gbpages)
-		page_size_mask |= 1 << PG_LEVEL_1G;
 	if (cpu_has_pse)
 		page_size_mask |= 1 << PG_LEVEL_2M;
 #endif
@@ -200,6 +186,16 @@ static void __init probe_page_size_mask(void)
 		__supported_pte_mask |= _PAGE_GLOBAL;
 	} else
 		__supported_pte_mask &= ~_PAGE_GLOBAL;
+
+#ifndef direct_gbpages
+	/* Enable 1 GB linear kernel mappings if available: */
+	if (direct_gbpages && cpu_has_gbpages) {
+		printk(KERN_INFO "Using GB pages for direct mapping\n");
+		page_size_mask |= 1 << PG_LEVEL_1G;
+	} else {
+		direct_gbpages = 0;
+	}
+#endif
 }
 
 #ifdef CONFIG_X86_32

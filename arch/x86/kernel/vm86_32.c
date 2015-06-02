@@ -153,7 +153,7 @@ struct pt_regs *save_v86_state(struct kernel_vm86_regs *regs)
 	}
 
 #ifndef CONFIG_X86_NO_TSS
-	tss = &per_cpu(init_tss, get_cpu());
+	tss = &per_cpu(cpu_tss, get_cpu());
 #endif
 	current->thread.sp0 = current->thread.saved_sp0;
 	current->thread.sysenter_cs = __KERNEL_CS;
@@ -327,7 +327,7 @@ static void do_sys_vm86(struct kernel_vm86_struct *info, struct task_struct *tsk
 	tsk->thread.saved_gs = get_user_gs(info->regs32);
 
 #ifndef CONFIG_X86_NO_TSS
-	tss = &per_cpu(init_tss, get_cpu());
+	tss = &per_cpu(cpu_tss, get_cpu());
 #endif
 	tsk->thread.sp0 = (unsigned long) &info->VM86_TSS_ESP0;
 	if (cpu_has_sep)

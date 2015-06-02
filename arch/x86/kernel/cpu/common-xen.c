@@ -696,6 +696,30 @@ void get_cpu_cap(struct cpuinfo_x86 *c)
 		c->x86_capability[10] = eax;
 	}
 
+	/* Additional Intel-defined flags: level 0x0000000F */
+	if (c->cpuid_level >= 0x0000000F) {
+		u32 eax, ebx, ecx, edx;
+
+		/* QoS sub-leaf, EAX=0Fh, ECX=0 */
+		cpuid_count(0x0000000F, 0, &eax, &ebx, &ecx, &edx);
+		c->x86_capability[11] = edx;
+		if (cpu_has(c, X86_FEATURE_CQM_LLC)) {
+			/* will be overridden if occupancy monitoring exists */
+			c->x86_cache_max_rmid = ebx;
+
+			/* QoS sub-leaf, EAX=0Fh, ECX=1 */
+			cpuid_count(0x0000000F, 1, &eax, &ebx, &ecx, &edx);
+			c->x86_capability[12] = edx;
+			if (cpu_has(c, X86_FEATURE_CQM_OCCUP_LLC)) {
+				c->x86_cache_max_rmid = ecx;
+				c->x86_cache_occ_scale = ebx;
+			}
+		} else {
+			c->x86_cache_max_rmid = -1;
+			c->x86_cache_occ_scale = -1;
+		}
+	}
+
 	/* AMD-defined flags: level 0x80000001 */
 	xlvl = cpuid_eax(0x80000000);
 	c->extended_cpuid_level = xlvl;
@@ -893,6 +917,20 @@ static void generic_identify(struct cpuinfo_x86 *c)
 	detect_nopl(c);
 }
 
+static void x86_init_cache_qos(struct cpuinfo_x86 *c)
+{
+	/*
+	 * The heavy lifting of max_rmid and cache_occ_scale are handled
+	 * in get_cpu_cap().  Here we just set the max_rmid for the boot_cpu
+	 * in case CQM bits really aren't there in this CPU.
+	 */
+	if (c != &boot_cpu_data) {
+		boot_cpu_data.x86_cache_max_rmid =
+			min(boot_cpu_data.x86_cache_max_rmid,
+			    c->x86_cache_max_rmid);
+	}
+}
+
 /*
  * This does the hard work of actually picking apart the CPU stuff...
  */
@@ -986,6 +1024,7 @@ static void identify_cpu(struct cpuinfo_x86 *c)
 
 	init_hypervisor(c);
 	x86_init_rdrand(c);
+	x86_init_cache_qos(c);
 
 	/*
 	 * Clear/Set all flags overriden by options, need do it
@@ -1022,28 +1061,10 @@ static void identify_cpu(struct cpuinfo_x86 *c)
 #endif
 }
 
-#ifdef CONFIG_X86_64
-#ifdef CONFIG_IA32_EMULATION
-/* May not be __init: called during resume */
-static void syscall32_cpu_init(void)
-{
-	static const struct callback_register cstar = {
-		.type = CALLBACKTYPE_syscall32,
-		.address = (unsigned long)ia32_cstar_target
-	};
-	static const struct callback_register sysenter = {
-		.type = CALLBACKTYPE_sysenter,
-		.address = (unsigned long)ia32_sysenter_target
-	};
-
-	if (HYPERVISOR_callback_op(CALLBACKOP_register, &sysenter) < 0)
-		setup_clear_cpu_cap(X86_FEATURE_SYSENTER32);
-	if (HYPERVISOR_callback_op(CALLBACKOP_register, &cstar) < 0)
-		setup_clear_cpu_cap(X86_FEATURE_SYSCALL32);
-}
-#endif		/* CONFIG_IA32_EMULATION */
-#endif		/* CONFIG_X86_64 */
-
+/*
+ * Set up the CPU state needed to execute SYSENTER/SYSEXIT instructions
+ * on 32-bit kernels:
+ */
 #ifdef CONFIG_X86_32
 void enable_sep_cpu(void)
 {
@@ -1217,7 +1238,7 @@ static __init int setup_disablecpuid(char *arg)
 __setup("clearcpuid=", setup_disablecpuid);
 
 DEFINE_PER_CPU(unsigned long, kernel_stack) =
-	(unsigned long)&init_thread_union - KERNEL_STACK_OFFSET + THREAD_SIZE;
+	(unsigned long)&init_thread_union + THREAD_SIZE;
 EXPORT_PER_CPU_SYMBOL(kernel_stack);
 
 #ifdef CONFIG_X86_64
@@ -1238,8 +1259,8 @@ void xen_switch_pt(void)
 }
 
 /*
- * The following four percpu variables are hot.  Align current_task to
- * cacheline size such that all four fall in the same cacheline.
+ * The following percpu variables are hot.  Align current_task to
+ * cacheline size such that they fall in the same cacheline.
  */
 DEFINE_PER_CPU(struct task_struct *, current_task) ____cacheline_aligned =
 	&init_task;
@@ -1281,12 +1302,45 @@ void syscall_init(void)
 	 */
 	wrmsrl(MSR_STAR,  ((u64)__USER32_CS)<<48  | ((u64)__KERNEL_CS)<<32);
 	wrmsrl(MSR_LSTAR, system_call);
-	wrmsrl(MSR_CSTAR, ignore_sysret);
-#endif
 
 #ifdef CONFIG_IA32_EMULATION
-	syscall32_cpu_init();
-#elif defined(CONFIG_XEN)
+	wrmsrl(MSR_CSTAR, ia32_cstar_target);
+	/*
+	 * This only works on Intel CPUs.
+	 * On AMD CPUs these MSRs are 32-bit, CPU truncates MSR_IA32_SYSENTER_EIP.
+	 * This does not cause SYSENTER to jump to the wrong location, because
+	 * AMD doesn't allow SYSENTER in long mode (either 32- or 64-bit).
+	 */
+	wrmsrl_safe(MSR_IA32_SYSENTER_CS, (u64)__KERNEL_CS);
+	wrmsrl_safe(MSR_IA32_SYSENTER_ESP, 0ULL);
+	wrmsrl_safe(MSR_IA32_SYSENTER_EIP, (u64)ia32_sysenter_target);
+#else
+	wrmsrl(MSR_CSTAR, ignore_sysret);
+	wrmsrl_safe(MSR_IA32_SYSENTER_CS, (u64)GDT_ENTRY_INVALID_SEG);
+	wrmsrl_safe(MSR_IA32_SYSENTER_ESP, 0ULL);
+	wrmsrl_safe(MSR_IA32_SYSENTER_EIP, 0ULL);
+#endif
+
+	/* Flags to clear on syscall */
+	wrmsrl(MSR_SYSCALL_MASK,
+	       X86_EFLAGS_TF|X86_EFLAGS_DF|X86_EFLAGS_IF|
+	       X86_EFLAGS_IOPL|X86_EFLAGS_AC|X86_EFLAGS_NT);
+#else /* CONFIG_XEN */
+#ifdef CONFIG_IA32_EMULATION
+	static const struct callback_register cstar = {
+		.type = CALLBACKTYPE_syscall32,
+		.address = (unsigned long)ia32_cstar_target
+	};
+	static const struct callback_register sysenter = {
+		.type = CALLBACKTYPE_sysenter,
+		.address = (unsigned long)ia32_sysenter_target
+	};
+
+	if (HYPERVISOR_callback_op(CALLBACKOP_register, &sysenter) < 0)
+		setup_clear_cpu_cap(X86_FEATURE_SYSENTER32);
+	if (HYPERVISOR_callback_op(CALLBACKOP_register, &cstar) < 0)
+		setup_clear_cpu_cap(X86_FEATURE_SYSCALL32);
+#else
 	struct callback_register cb = {
 		.type = CALLBACKTYPE_syscall32,
 		.address = (unsigned long)ignore_sysret
@@ -1298,12 +1352,6 @@ void syscall_init(void)
 	if (HYPERVISOR_callback_op(CALLBACKOP_register, &cb))
 		pr_warning("Unable to register SEP stub\n");
 #endif
-
-#ifndef CONFIG_XEN
-	/* Flags to clear on syscall */
-	wrmsrl(MSR_SYSCALL_MASK,
-	       X86_EFLAGS_TF|X86_EFLAGS_DF|X86_EFLAGS_IF|
-	       X86_EFLAGS_IOPL|X86_EFLAGS_AC|X86_EFLAGS_NT);
 #endif
 }
 
@@ -1353,6 +1401,15 @@ EXPORT_PER_CPU_SYMBOL(current_task);
 DEFINE_PER_CPU(int, __preempt_count) = INIT_PREEMPT_COUNT;
 EXPORT_PER_CPU_SYMBOL(__preempt_count);
 DEFINE_PER_CPU(struct task_struct *, fpu_owner_task);
+
+/*
+ * On x86_32, vm86 modifies tss.sp0, so sp0 isn't a reliable way to find
+ * the top of the kernel stack.  Use an extra percpu variable to track the
+ * top of the kernel stack directly.
+ */
+DEFINE_PER_CPU(unsigned long, cpu_current_top_of_stack) =
+	(unsigned long)&init_thread_union + THREAD_SIZE;
+EXPORT_PER_CPU_SYMBOL(cpu_current_top_of_stack);
 
 #ifdef CONFIG_CC_STACKPROTECTOR
 DEFINE_PER_CPU_ALIGNED(struct stack_canary, stack_canary);
@@ -1443,7 +1500,7 @@ void cpu_init(void)
 	if (cpu != 0)
 		xen_switch_pt();
 #ifndef CONFIG_X86_NO_TSS
-	t = &per_cpu(init_tss, cpu);
+	t = &per_cpu(cpu_tss, cpu);
 	oist = &per_cpu(orig_ist, cpu);
 #endif
 
@@ -1541,7 +1598,7 @@ void cpu_init(void)
 	int cpu = smp_processor_id();
 	struct task_struct *curr = current;
 #ifndef CONFIG_X86_NO_TSS
-	struct tss_struct *t = &per_cpu(init_tss, cpu);
+	struct tss_struct *t = &per_cpu(cpu_tss, cpu);
 #endif
 	struct thread_struct *thread = &curr->thread;
 

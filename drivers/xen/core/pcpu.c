@@ -148,22 +148,27 @@ static ssize_t show_acpiid(struct device *dev,
 }
 static DEVICE_ATTR(acpi_id, 0444, show_acpiid, NULL);
 
+static struct attribute *xen_pcpu_attrs[] = {
+	&dev_attr_online.attr,
+	&dev_attr_apic_id.attr,
+	&dev_attr_acpi_id.attr,
+	NULL
+};
+
+static const struct attribute_group xen_pcpu_group = {
+	.attrs = xen_pcpu_attrs
+};
+
+static const struct attribute_group *xen_pcpu_groups[] = {
+	&xen_pcpu_group,
+	NULL
+};
+
 struct bus_type xen_pcpu_subsys = {
 	.name = "xen_pcpu",
 	.dev_name = "xen_pcpu",
 };
 EXPORT_SYMBOL_GPL(xen_pcpu_subsys);
-
-static int xen_pcpu_remove(struct pcpu *pcpu)
-{
-	device_remove_file(&pcpu->dev, &dev_attr_online);
-	device_remove_file(&pcpu->dev, &dev_attr_apic_id);
-	device_remove_file(&pcpu->dev, &dev_attr_acpi_id);
-	device_unregister(&pcpu->dev);
-	list_del(&pcpu->list);
-
-	return 0;
-}
 
 static inline int same_pcpu(struct xenpf_pcpuinfo *info,
 			    struct pcpu *pcpu)
@@ -201,18 +206,6 @@ static int xen_pcpu_online_check(struct xenpf_pcpuinfo *info,
 	}
 
 	return result;
-}
-
-static int pcpu_dev_init(struct pcpu *cpu)
-{
-	int err = device_register(&cpu->dev);
-
-	if (!err) {
-		device_create_file(&cpu->dev, &dev_attr_online);
-		device_create_file(&cpu->dev, &dev_attr_apic_id);
-		device_create_file(&cpu->dev, &dev_attr_acpi_id);
-	}
-	return err;
 }
 
 static struct pcpu *get_pcpu(unsigned int xen_id)
@@ -271,8 +264,9 @@ static struct pcpu *init_pcpu(struct xenpf_pcpuinfo *info)
 
 	pcpu->dev.bus = &xen_pcpu_subsys;
 	pcpu->dev.id = info->xen_cpuid;
+	pcpu->dev.groups = xen_pcpu_groups;
 
-	err = pcpu_dev_init(pcpu);
+	err = device_register(&pcpu->dev);
 	if (err) {
 		if (found)
 			list_add(&pcpu->list, &orphan_pcpus);
@@ -320,7 +314,8 @@ static int _sync_pcpu(unsigned int cpu_num, unsigned int *max_id)
 	if (info->flags & XEN_PCPU_FLAGS_INVALID) {
 		/* The pcpu has been removed */
 		if (pcpu) {
-			xen_pcpu_remove(pcpu);
+			device_unregister(&pcpu->dev);
+			list_del(&pcpu->list);
 			list_add(&pcpu->list, &orphan_pcpus);
 			return PCPU_REMOVED;
 		}
@@ -384,7 +379,8 @@ static int xen_sync_pcpus(bool init)
 		struct pcpu *pcpu, *tmp;
 
 		list_for_each_entry_safe(pcpu, tmp, &xen_pcpus, list) {
-			xen_pcpu_remove(pcpu);
+			device_unregister(&pcpu->dev);
+			list_del(&pcpu->list);
 			kfree(pcpu);
 		}
 	}

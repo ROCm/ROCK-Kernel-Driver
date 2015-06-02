@@ -100,7 +100,6 @@ static int xen_smp_intr_init(unsigned int cpu)
 {
 	static struct irqaction ipi_action = {
 		.handler = ipi_interrupt,
-		.flags   = IRQF_DISABLED,
 		.name    = "ipi"
 	};
 	int rc;
@@ -150,6 +149,7 @@ static void cpu_bringup(void)
 	cpu = smp_processor_id();
 	notify_cpu_starting(cpu);
 	set_cpu_online(cpu, true);
+	cpu_set_state_online(cpu);
 	local_irq_enable();
 }
 
@@ -333,6 +333,14 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
 {
 	int rc;
 
+	/*
+	 * PV VCPUs are always successfully taken down (see 'while' loop
+	 * in __cpu_die()), so -EBUSY is an error.
+	 */
+	rc = cpu_check_up_prepare(cpu);
+	if (rc)
+		return rc;
+
 	rc = cpu_up_check(cpu);
 	if (rc)
 		return rc;
@@ -345,9 +353,12 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
 
 #ifdef CONFIG_X86_64
 	clear_tsk_thread_flag(idle, TIF_FORK);
+#else
+	per_cpu(cpu_current_top_of_stack, cpu) =
+		(unsigned long)task_stack_page(idle) + THREAD_SIZE;
 #endif
-	per_cpu(kernel_stack, cpu) = (unsigned long)task_stack_page(idle) -
-				     KERNEL_STACK_OFFSET + THREAD_SIZE;
+	per_cpu(kernel_stack, cpu) = (unsigned long)task_stack_page(idle) +
+				     THREAD_SIZE;
  	per_cpu(current_task, cpu) = idle;
 
 	cpu_initialize_context(cpu, idle->thread.sp0);
@@ -383,6 +394,7 @@ void __ref play_dead(void)
 	idle_task_exit();
 	local_irq_disable();
 	cpumask_clear_cpu(smp_processor_id(), cpu_initialized_mask);
+	cpu_report_death();
 	preempt_enable_no_resched();
 	VOID(HYPERVISOR_vcpu_op(VCPUOP_down, smp_processor_id(), NULL));
 	cpu_bringup();

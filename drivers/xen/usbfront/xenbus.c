@@ -190,17 +190,15 @@ static int connect(struct xenbus_device *dev)
 	usbif_conn_request_t *req;
 	int i, idx, err;
 	int notify;
-	char name[TASK_COMM_LEN];
 	struct usb_hcd *hcd;
-
-	hcd = info_to_hcd(info);
-	snprintf(name, TASK_COMM_LEN, "xenhcd.%d", hcd->self.busnum);
 
 	err = talk_to_backend(dev, info);
 	if (err)
 		return err;
 
-	info->kthread = kthread_run(xenhcd_schedule, info, name);
+	hcd = info_to_hcd(info);
+	info->kthread = kthread_run(xenhcd_schedule, info,
+				    "xenhcd.%d", hcd->self.busnum);
 	if (IS_ERR(info->kthread)) {
 		err = PTR_ERR(info->kthread);
 		info->kthread = NULL;

@@ -108,7 +108,8 @@ static inline void dev_disable_gso_features(struct net_device *dev)
 	dev->features &= ~NETIF_F_GSO_MASK;
 	dev->features |= NETIF_F_GSO_ROBUST;
 }
-#if LINUX_VERSION_CODE < KERNEL_VERSION(3,18,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,18,0) || \
+    LINUX_VERSION_CODE >= KERNEL_VERSION(4,1,0)
 #define netif_needs_gso(dev, skb, feat) netif_needs_gso(skb, feat)
 #endif
 #elif defined(NETIF_F_TSO)
@@ -1435,7 +1436,6 @@ static int netif_poll(struct napi_struct *napi, int budget)
 	struct sk_buff_head rxq;
 	struct sk_buff_head errq;
 	struct sk_buff_head tmpq;
-	unsigned long flags;
 	int pages_flipped = 0;
 	int err;
 
@@ -1574,9 +1574,7 @@ err:
 	}
 
 	if (work_done < budget) {
-		napi_gro_flush(napi, false);
-
-		local_irq_save(flags);
+		napi_complete(napi);
 
 		RING_FINAL_CHECK_FOR_RESPONSES(&np->rx, more_to_do);
 
@@ -1590,10 +1588,8 @@ err:
 				np->accel_vif_state.hooks->start_napi_irq(dev);
 		}
 
-		if (!more_to_do && !accel_more_to_do)
-			__napi_complete(napi);
-
-		local_irq_restore(flags);
+		if (more_to_do || accel_more_to_do)
+			napi_schedule(napi);
 	}
 
 	spin_unlock(&np->rx_lock);

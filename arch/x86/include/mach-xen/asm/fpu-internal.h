@@ -30,13 +30,17 @@ static inline fpu_switch_t xen_switch_fpu_prepare(struct task_struct *old,
 	 * If the task has used the math, pre-load the FPU on xsave processors
 	 * or if the past 5 consecutive context-switches used math.
 	 */
-	fpu.preload = tsk_used_math(new) && (use_eager_fpu() ||
-					     new->thread.fpu_counter > 5);
+	fpu.preload = tsk_used_math(new) &&
+		      (use_eager_fpu() || new->thread.fpu_counter > 5);
+
 	if (__thread_has_fpu(old)) {
 		if (!__save_init_fpu(old))
-			cpu = ~0;
-		old->thread.fpu.last_cpu = cpu;
-		old->thread.fpu.has_fpu = 0;	/* But leave fpu_owner_task! */
+			task_disable_lazy_fpu_restore(old);
+		else
+			old->thread.fpu.last_cpu = cpu;
+
+		/* But leave fpu_owner_task! */
+		old->thread.fpu.has_fpu = 0;
 
 		/* Don't change CR0.TS if we just switch! */
 		if (fpu.preload) {
@@ -49,10 +53,10 @@ static inline fpu_switch_t xen_switch_fpu_prepare(struct task_struct *old,
 		}
 	} else {
 		old->thread.fpu_counter = 0;
-		old->thread.fpu.last_cpu = ~0;
+		task_disable_lazy_fpu_restore(old);
 		if (fpu.preload) {
 			new->thread.fpu_counter++;
-			if (!use_eager_fpu() && fpu_lazy_restore(new, cpu))
+			if (fpu_lazy_restore(new, cpu))
 				fpu.preload = 0;
 			else
 				prefetch(new->thread.fpu.state);

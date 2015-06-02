@@ -215,7 +215,7 @@ int copy_thread(unsigned long clone_flags, unsigned long sp,
 	 */
 	if (clone_flags & CLONE_SETTLS) {
 #ifdef CONFIG_IA32_EMULATION
-		if (test_thread_flag(TIF_IA32))
+		if (is_ia32_task())
 			err = do_set_thread_area(p, -1,
 				(struct user_desc __user *)childregs->si, 0);
 		else
@@ -250,6 +250,7 @@ start_thread_common(struct pt_regs *regs, unsigned long new_ip,
 	regs->cs		= _cs;
 	regs->ss		= _ss;
 	regs->flags		= X86_EFLAGS_IF;
+	force_iret();
 }
 
 void
@@ -286,7 +287,7 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	struct thread_struct *next = &next_p->thread;
 	int cpu = smp_processor_id(), cr0_ts;
 #ifndef CONFIG_X86_NO_TSS
-	struct tss_struct *tss = &per_cpu(init_tss, cpu);
+	struct tss_struct *tss = &per_cpu(cpu_tss, cpu);
 #endif
 	fpu_switch_t fpu;
 #if CONFIG_XEN_COMPAT > 0x030002
@@ -465,9 +466,11 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	task_thread_info(prev_p)->saved_preempt_count = this_cpu_read(__preempt_count);
 	this_cpu_write(__preempt_count, task_thread_info(next_p)->saved_preempt_count);
 
+	/* Reload esp0 and ss1.  This changes current_thread_info(). */
+	load_sp0(tss, next);
+
 	this_cpu_write(kernel_stack,
-		  (unsigned long)task_stack_page(next_p) +
-		  THREAD_SIZE - KERNEL_STACK_OFFSET);
+		(unsigned long)task_stack_page(next_p) + THREAD_SIZE);
 
 	/*
 	 * Now maybe reload the debug registers
@@ -475,6 +478,36 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	if (unlikely(task_thread_info(next_p)->flags & _TIF_WORK_CTXSW_NEXT ||
 		     task_thread_info(prev_p)->flags & _TIF_WORK_CTXSW_PREV))
 		__switch_to_xtra(prev_p, next_p);
+
+#ifndef CONFIG_XEN
+	if (static_cpu_has_bug(X86_BUG_SYSRET_SS_ATTRS)) {
+		/*
+		 * AMD CPUs have a misfeature: SYSRET sets the SS selector but
+		 * does not update the cached descriptor.  As a result, if we
+		 * do SYSRET while SS is NULL, we'll end up in user mode with
+		 * SS apparently equal to __USER_DS but actually unusable.
+		 *
+		 * The straightforward workaround would be to fix it up just
+		 * before SYSRET, but that would slow down the system call
+		 * fast paths.  Instead, we ensure that SS is never NULL in
+		 * system call context.  We do this by replacing NULL SS
+		 * selectors at every context switch.  SYSCALL sets up a valid
+		 * SS, so the only way to get NULL is to re-enter the kernel
+		 * from CPL 3 through an interrupt.  Since that can't happen
+		 * in the same task as a running syscall, we are guaranteed to
+		 * context switch between every interrupt vector entry and a
+		 * subsequent SYSRET.
+		 *
+		 * We read SS first because SS reads are much faster than
+		 * writes.  Out of caution, we force SS to __KERNEL_DS even if
+		 * it previously had a different non-NULL value.
+		 */
+		unsigned short ss_sel;
+		savesegment(ss, ss_sel);
+		if (ss_sel != __KERNEL_DS)
+			loadsegment(ss, __KERNEL_DS);
+	}
+#endif
 
 	return prev_p;
 }

@@ -242,7 +242,7 @@ static int __init make_loopback(int i)
 	 * choose the numerically largest non-broadcast address to prevent the
 	 * address getting stolen by an Ethernet bridge for STP purposes.
 	 */
-	memset(dev1->dev_addr, 0xFF, ETH_ALEN);
+	eth_broadcast_addr(dev1->dev_addr);
 	dev1->dev_addr[0] &= ~0x01;
 
 	if ((err = register_netdev(dev1)) != 0)

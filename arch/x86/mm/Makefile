@@ -35,6 +35,4 @@ obj-$(CONFIG_NUMA_EMU)		+= numa_emulation.o
 obj-$(CONFIG_XEN)		+= hypervisor.o
 disabled-obj-$(CONFIG_XEN)	:= gup.o
 
-obj-$(CONFIG_MEMTEST)		+= memtest.o
-
 obj-$(CONFIG_X86_INTEL_MPX)	+= mpx.o

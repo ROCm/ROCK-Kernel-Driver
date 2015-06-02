@@ -20,8 +20,6 @@ typedef union {
 
 #define SHARED_KERNEL_PMD	0
 
-#define PAGETABLE_LEVELS	3
-
 /*
  * PGDIR_SHIFT determines what a top-level page table entry can map
  */

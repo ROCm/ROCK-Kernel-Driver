@@ -70,6 +70,7 @@
 #include <xen/xen.h>
 #include <xen/xenbus.h>
 #include <xen/events.h>
+#include <xen/xen-ops.h>
 #include <xen/page.h>
 
 #define PARAVIRT_EXPORT_SYMBOL EXPORT_SYMBOL_GPL
@@ -1317,6 +1318,32 @@ static int __init xenstored_local_init(void)
 	return err;
 }
 
+#if !defined(CONFIG_XEN) && !defined(MODULE)
+static int xenbus_resume_cb(struct notifier_block *nb,
+			    unsigned long action, void *data)
+{
+	int err = 0;
+
+	if (xen_hvm_domain()) {
+		uint64_t v;
+
+		err = hvm_get_parameter(HVM_PARAM_STORE_EVTCHN, &v);
+		if (!err && v)
+			xen_store_evtchn = v;
+		else
+			pr_warn("Cannot update xenstore event channel: %d\n",
+				err);
+	} else
+		xen_store_evtchn = xen_start_info->store_evtchn;
+
+	return err;
+}
+
+static struct notifier_block xenbus_resume_nb = {
+	.notifier_call = xenbus_resume_cb,
+};
+#endif
+
 #ifndef MODULE
 static int __init
 #else
@@ -1453,6 +1480,11 @@ xenbus_init(void)
 
 	if (!is_initial_xendomain())
 		xenbus_probe(NULL);
+#else
+	if ((xen_store_domain_type != XS_LOCAL) &&
+	    (xen_store_domain_type != XS_UNKNOWN))
+		xen_resume_notifier_register(&xenbus_resume_nb);
+
 #endif
 
 #if defined(CONFIG_XEN_COMPAT_XENFS) && !defined(MODULE)

@@ -72,7 +72,7 @@ void __init efi_bgrt_init(void)
 
 	image = efi_lookup_mapped_addr(bgrt_tab->image_address);
 	if (!image) {
-		image = early_memremap(bgrt_tab->image_address,
+		image = early_ioremap(bgrt_tab->image_address,
 				       sizeof(bmp_header));
 		ioremapped = true;
 		if (!image) {
@@ -94,7 +94,7 @@ void __init efi_bgrt_init(void)
 	}
 
 	if (ioremapped) {
-		image = early_memremap(bgrt_tab->image_address,
+		image = early_ioremap(bgrt_tab->image_address,
 				       bmp_header.size);
 		if (!image) {
 			pr_err("Ignoring BGRT: failed to map image memory\n");

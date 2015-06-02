@@ -193,7 +193,6 @@ struct grant_handle_pair
         grant_handle_t kernel;
         grant_handle_t user;
 };
-#define INVALID_GRANT_HANDLE	0xFFFF
 
 static struct grant_handle_pair 
     pending_grant_handles[MAX_DYNAMIC_MEM][MMAP_PAGES];

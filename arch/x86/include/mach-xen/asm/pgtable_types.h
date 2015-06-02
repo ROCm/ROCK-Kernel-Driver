@@ -242,7 +242,7 @@ static inline pgd_t xen_make_pgd(pgdval_t val)
 static inline pgdval_t xen_pgd_val(pgd_t pgd)
 {
 	pgdval_t ret = __pgd_val(pgd);
-#if PAGETABLE_LEVELS == 2 && CONFIG_XEN_COMPAT <= 0x030002
+#if CONFIG_PGTABLE_LEVELS == 2 && CONFIG_XEN_COMPAT <= 0x030002
 	if (likely(ret))
 		ret = machine_to_phys(ret) | _PAGE_PRESENT;
 #else
@@ -257,7 +257,7 @@ static inline pgdval_t pgd_flags(pgd_t pgd)
 	return __pgd_val(pgd) & PTE_FLAGS_MASK;
 }
 
-#if PAGETABLE_LEVELS > 3
+#if CONFIG_PGTABLE_LEVELS > 3
 typedef struct { pudval_t pud; } pud_t;
 
 #define __pud_ma(x) ((pud_t) { (x) } )
@@ -286,7 +286,7 @@ static inline pudval_t xen_pud_val(pud_t pud)
 }
 #endif
 
-#if PAGETABLE_LEVELS > 2
+#if CONFIG_PGTABLE_LEVELS > 2
 typedef struct { pmdval_t pmd; } pmd_t;
 
 #define __pmd_ma(x)	((pmd_t) { (x) } )

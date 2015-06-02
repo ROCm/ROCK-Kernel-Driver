@@ -36,12 +36,6 @@
 #include "common.h"
 #include <linux/slab.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,11)
-  #define DEFAULT_TASK_COMM_LEN	16
-#else
-  #define DEFAULT_TASK_COMM_LEN	TASK_COMM_LEN
-#endif
-
 static unsigned int max_nr_segs = VSCSIIF_SG_TABLESIZE;
 module_param_named(max_segs, max_nr_segs, uint, 0);
 MODULE_PARM_DESC(max_segs, "Maximum number of segments per request");
@@ -187,7 +181,6 @@ static int scsifront_probe(struct xenbus_device *dev,
 	struct vscsifrnt_info *info;
 	struct Scsi_Host *host;
 	int i, err = -ENOMEM;
-	char name[DEFAULT_TASK_COMM_LEN];
 
 	host = scsi_host_alloc(&scsifront_sht,
 			       offsetof(struct vscsifrnt_info,
@@ -225,9 +218,8 @@ static int scsifront_probe(struct xenbus_device *dev,
 	info->waiting_pause = 0;
 	init_waitqueue_head(&info->wq_pause);
 
-	snprintf(name, DEFAULT_TASK_COMM_LEN, "vscsiif.%d", info->host->host_no);
-
-	info->kthread = kthread_run(scsifront_schedule, info, name);
+	info->kthread = kthread_run(scsifront_schedule, info,
+				    "vscsiif.%d", info->host->host_no);
 	if (IS_ERR(info->kthread)) {
 		err = PTR_ERR(info->kthread);
 		info->kthread = NULL;

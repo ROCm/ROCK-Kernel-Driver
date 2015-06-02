@@ -76,7 +76,7 @@ void __show_regs(struct pt_regs *regs, int all)
 	unsigned long sp;
 	unsigned short ss, gs;
 
-	if (user_mode_vm(regs)) {
+	if (user_mode(regs)) {
 		sp = regs->sp;
 		ss = regs->ss & 0xffff;
 		gs = get_user_gs(regs);
@@ -215,11 +215,7 @@ start_thread(struct pt_regs *regs, unsigned long new_ip, unsigned long new_sp)
 	regs->ip		= new_ip;
 	regs->sp		= new_sp;
 	regs->flags		= X86_EFLAGS_IF;
-	/*
-	 * force it to the iret return path by making it look as if there was
-	 * some work pending.
-	 */
-	set_thread_flag(TIF_NOTIFY_RESUME);
+	force_iret();
 }
 EXPORT_SYMBOL_GPL(start_thread);
 
@@ -257,7 +253,7 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 				 *next = &next_p->thread;
 	int cpu = smp_processor_id(), cr0_ts;
 #ifndef CONFIG_X86_NO_TSS
-	struct tss_struct *tss = &per_cpu(init_tss, cpu);
+	struct tss_struct *tss = &per_cpu(cpu_tss, cpu);
 #endif
 	fpu_switch_t fpu;
 #if CONFIG_XEN_COMPAT > 0x030002
@@ -373,9 +369,16 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	 */
 	arch_end_context_switch(next_p);
 
+	/*
+	 * Reload kernel_stack and current_top_of_stack.  This changes
+	 * current_thread_info().
+	 */
 	this_cpu_write(kernel_stack,
-		  (unsigned long)task_stack_page(next_p) +
-		  THREAD_SIZE - KERNEL_STACK_OFFSET);
+		       (unsigned long)task_stack_page(next_p) +
+		       THREAD_SIZE);
+	this_cpu_write(cpu_current_top_of_stack,
+		       (unsigned long)task_stack_page(next_p) +
+		       THREAD_SIZE);
 
 	/*
 	 * Restore %gs if needed (which is common)

@@ -565,7 +565,7 @@ static inline unsigned long pages_to_mb(unsigned long npg)
 #define io_remap_pfn_range(vma, vaddr, pfn, size, prot)	\
 	direct_remap_pfn_range(vma, vaddr, pfn, size, prot, DOMID_IO)
 
-#if PAGETABLE_LEVELS > 2
+#if CONFIG_PGTABLE_LEVELS > 2
 static inline int pud_none(pud_t pud)
 {
 	return __pud_val(pud) == 0;
@@ -608,9 +608,9 @@ static inline int pud_large(pud_t pud)
 {
 	return 0;
 }
-#endif	/* PAGETABLE_LEVELS > 2 */
+#endif	/* CONFIG_PGTABLE_LEVELS > 2 */
 
-#if PAGETABLE_LEVELS > 3
+#if CONFIG_PGTABLE_LEVELS > 3
 static inline int pgd_present(pgd_t pgd)
 {
 	return pgd_flags(pgd) & _PAGE_PRESENT;
@@ -647,7 +647,7 @@ static inline int pgd_none(pgd_t pgd)
 {
 	return !__pgd_val(pgd);
 }
-#endif	/* PAGETABLE_LEVELS > 3 */
+#endif	/* CONFIG_PGTABLE_LEVELS > 3 */
 
 #endif	/* __ASSEMBLY__ */
 

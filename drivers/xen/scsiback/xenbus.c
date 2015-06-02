@@ -45,23 +45,11 @@ struct backend_info
 };
 
 
-static int __vscsiif_name(struct backend_info *be, char *buf)
-{
-	struct xenbus_device *dev = be->dev;
-	unsigned int domid, id;
-
-	sscanf(dev->nodename, "backend/vscsi/%u/%u", &domid, &id);
-	snprintf(buf, TASK_COMM_LEN, "vscsi.%u.%u", be->info->domid, id);
-
-	return 0;
-}
-
 static int scsiback_map(struct backend_info *be)
 {
 	struct xenbus_device *dev = be->dev;
-	unsigned int ring_ref, evtchn;
+	unsigned int ring_ref, evtchn, dom, id;
 	int err;
-	char name[TASK_COMM_LEN];
 
 	err = xenbus_gather(XBT_NIL, dev->otherend,
 			"ring-ref", "%u", &ring_ref,
@@ -75,13 +63,16 @@ static int scsiback_map(struct backend_info *be)
 	if (err)
 		return err;
 
-	err = __vscsiif_name(be, name);
-	if (err) {
-		xenbus_dev_error(dev, err, "get scsiback dev name");
+	err = sscanf(be->dev->nodename, "backend/vscsi/%u/%u", &dom, &id);
+	if (err != 2) {
+		if (err >= 0)
+			err = -EILSEQ;
+		xenbus_dev_error(dev, err, "get scsiback devid");
 		return err;
 	}
 
-	be->info->kthread = kthread_run(scsiback_schedule, be->info, name);
+	be->info->kthread = kthread_run(scsiback_schedule, be->info,
+					"vscsi.%d.%u", be->info->domid, id);
 	if (IS_ERR(be->info->kthread)) {
 		err = PTR_ERR(be->info->kthread);
 		be->info->kthread = NULL;

@@ -177,7 +177,7 @@ static inline int __ticket_spin_is_contended(arch_spinlock_t *lock)
 {
 	struct __raw_tickets tmp = READ_ONCE(lock->tickets);
 
-	return (tmp.tail - tmp.head) > TICKET_LOCK_INC;
+	return (__ticket_t)(tmp.tail - tmp.head) > TICKET_LOCK_INC;
 }
 
 static inline void __ticket_spin_unlock_wait(arch_spinlock_t *lock)

@@ -218,6 +218,8 @@ int __xen_suspend(int fast_suspend, void (*resume_notifier)(int))
 		return err;
 	}
 
+	xen_clockevents_suspend();
+
 	if (fast_suspend) {
 		xenbus_suspend();
 
@@ -229,7 +231,7 @@ int __xen_suspend(int fast_suspend, void (*resume_notifier)(int))
 		}
 
 		err = stop_machine(take_machine_down, &suspend,
-				   &cpumask_of_cpu(0));
+				   cpumask_of(0));
 		if (err < 0)
 			xenbus_suspend_cancel();
 	} else {

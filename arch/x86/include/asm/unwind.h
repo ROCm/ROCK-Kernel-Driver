@@ -66,7 +66,6 @@ struct unwind_frame_info
 
 #else /* X86_32 */
 
-
 #define FRAME_RETADDR_OFFSET 4
 
 #define UNW_REGISTER_INFO \
@@ -92,7 +91,7 @@ static inline void arch_unw_init_frame_info(struct unwind_frame_info *info,
 #ifdef CONFIG_X86_64
 	info->regs = *regs;
 #else
-	if (user_mode_vm(regs))
+	if (user_mode(regs))
 		info->regs = *regs;
 	else {
 		memcpy(&info->regs, regs, offsetof(struct pt_regs, sp));
@@ -132,14 +131,13 @@ arch_unwind_init_running(struct unwind_frame_info *,
 
 static inline int arch_unw_user_mode(/*const*/ struct unwind_frame_info *info)
 {
-#ifdef CONFIG_X86_64
 	return user_mode(&info->regs)
+#ifdef CONFIG_X86_64
 	       || (long)info->regs.ip >= 0
 	       || (info->regs.ip >= VSYSCALL_ADDR &&
 		   info->regs.ip < VSYSCALL_ADDR + PAGE_SIZE)
 	       || (long)info->regs.sp >= 0;
 #else
-	return user_mode_vm(&info->regs)
 	       || info->regs.ip < PAGE_OFFSET
 	       || info->regs.sp < PAGE_OFFSET;
 #endif

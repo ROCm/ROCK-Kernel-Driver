@@ -215,22 +215,6 @@ int kernel_ident_mapping_init(struct x86_mapping_info *info, pgd_t *pgd_page,
 	return 0;
 }
 
-#ifndef CONFIG_XEN
-static int __init parse_direct_gbpages_off(char *arg)
-{
-	direct_gbpages = 0;
-	return 0;
-}
-early_param("nogbpages", parse_direct_gbpages_off);
-
-static int __init parse_direct_gbpages_on(char *arg)
-{
-	direct_gbpages = 1;
-	return 0;
-}
-early_param("gbpages", parse_direct_gbpages_on);
-#endif
-
 /*
  * NOTE: pagetable_init alloc all the fixmap pagetables contiguous on the
  * physical space so we can cache the place of the first one and move

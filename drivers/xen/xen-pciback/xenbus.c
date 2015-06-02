@@ -172,7 +172,7 @@ static int xen_pcibk_do_attach(struct xen_pcibk_device *pdev, int gnt_ref,
 		gnt_ref, remote_evtchn);
 
 #ifndef CONFIG_XEN
-	err = xenbus_map_ring_valloc(pdev->xdev, gnt_ref, &vaddr);
+	err = xenbus_map_ring_valloc(pdev->xdev, &gnt_ref, 1, &vaddr);
 	if (err < 0) {
 #else
 	area = xenbus_map_ring_valloc(pdev->xdev, &gnt_ref, 1);

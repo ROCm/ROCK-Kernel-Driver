@@ -594,10 +594,10 @@ EXPORT_SYMBOL_GPL(xen_tlb_flush_all);
 void xen_tlb_flush_mask(const cpumask_t *mask)
 {
 	struct mmuext_op op;
-	if ( cpus_empty(*mask) )
+	if ( cpumask_empty(mask) )
 		return;
 	op.cmd = MMUEXT_TLB_FLUSH_MULTI;
-	set_xen_guest_handle(op.arg2.vcpumask, cpus_addr(*mask));
+	set_xen_guest_handle(op.arg2.vcpumask, cpumask_bits(mask));
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 EXPORT_SYMBOL_GPL(xen_tlb_flush_mask);
@@ -614,11 +614,11 @@ EXPORT_SYMBOL_GPL(xen_invlpg_all);
 void xen_invlpg_mask(const cpumask_t *mask, unsigned long ptr)
 {
 	struct mmuext_op op;
-	if ( cpus_empty(*mask) )
+	if ( cpumask_empty(mask) )
 		return;
 	op.cmd = MMUEXT_INVLPG_MULTI;
 	op.arg1.linear_addr = ptr & PAGE_MASK;
-	set_xen_guest_handle(op.arg2.vcpumask, cpus_addr(*mask));
+	set_xen_guest_handle(op.arg2.vcpumask, cpumask_bits(mask));
 	BUG_ON(HYPERVISOR_mmuext_op(&op, 1, NULL, DOMID_SELF) < 0);
 }
 EXPORT_SYMBOL_GPL(xen_invlpg_mask);

@@ -31,10 +31,12 @@ static int call_trace = 1;
 #endif
 static int die_counter;
 
-static void printk_stack_address(unsigned long address, int reliable)
+static void printk_stack_address(unsigned long address, int reliable,
+		void *data)
 {
-	pr_cont(" [<%p>] %s%pB\n",
-		(void *)address, reliable ? "" : "? ", (void *)address);
+	printk("%s [<%p>] %s%pB\n",
+		(char *)data, (void *)address, reliable ? "" : "? ",
+		(void *)address);
 }
 
 void printk_address(unsigned long address)
@@ -239,8 +241,7 @@ static int print_trace_stack(void *data, char *name)
 static void print_trace_address(void *data, unsigned long addr, int reliable)
 {
 	touch_nmi_watchdog();
-	printk(data);
-	printk_stack_address(addr, reliable);
+	printk_stack_address(addr, reliable, data);
 }
 
 static const struct stacktrace_ops print_trace_ops = {
@@ -364,7 +365,7 @@ int __die(const char *str, struct pt_regs *regs, long err)
 	print_modules();
 	show_regs(regs);
 #ifdef CONFIG_X86_32
-	if (user_mode_vm(regs)) {
+	if (user_mode(regs)) {
 		sp = regs->sp;
 		ss = regs->ss & 0xffff;
 	} else {
@@ -393,7 +394,7 @@ void die(const char *str, struct pt_regs *regs, long err)
 	unsigned long flags = oops_begin();
 	int sig = SIGSEGV;
 
-	if (!user_mode_vm(regs))
+	if (!user_mode(regs))
 		report_bug(regs->ip, regs);
 
 	if (__die(str, regs, err))

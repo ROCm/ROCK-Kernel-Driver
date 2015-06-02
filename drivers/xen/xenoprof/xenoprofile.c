@@ -205,7 +205,6 @@ static irqreturn_t xenoprof_ovf_interrupt(int irq, void *dev_id)
 
 static struct irqaction ovf_action = {
 	.handler = xenoprof_ovf_interrupt,
-	.flags   = IRQF_DISABLED,
 	.name    = "xenoprof"
 };
 
