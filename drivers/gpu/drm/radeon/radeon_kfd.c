@@ -135,6 +135,7 @@ static uint16_t get_atc_vmid_pasid_mapping_pasid(struct kgd_dev *kgd,
 							uint8_t vmid);
 static void write_vmid_invalidate_request(struct kgd_dev *kgd, uint8_t vmid);
 static void set_num_of_requests(struct kgd_dev *dev, uint8_t num_of_req);
+static void get_cu_info(struct kgd_dev *kgd, struct kfd_cu_info *cu_info);
 
 static const struct kfd2kgd_calls kfd2kgd = {
 	.init_gtt_mem_allocation = alloc_gtt_mem,
@@ -168,7 +169,8 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.map_memory_to_gpu = map_memory_to_gpu,
 	.unmap_memory_to_gpu = unmap_memory_from_gpu,
 	.get_fw_version = get_fw_version,
-	.set_num_of_requests = set_num_of_requests
+	.set_num_of_requests = set_num_of_requests,
+	.get_cu_info = get_cu_info
 };
 
 static const struct kgd2kfd_calls *kgd2kfd;
@@ -1514,4 +1516,24 @@ static void set_num_of_requests(struct kgd_dev *dev, uint8_t num_of_req)
 	value |= NUM_REQUESTS_AT_ERR(num_of_req);
 
 	write_register(dev, ATC_ATS_DEBUG, value);
+}
+
+static void get_cu_info(struct kgd_dev *kgd, struct kfd_cu_info *cu_info)
+{
+	struct radeon_device *rdev = (struct radeon_device *) kgd;
+	struct radeon_cu_info rcu_info;
+
+	memset(cu_info, 0, sizeof(*cu_info));
+	if (sizeof(cu_info->cu_bitmap) != sizeof(rcu_info.bitmap))
+		return;
+	if (rdev->asic->get_cu_info == NULL)
+		return;
+
+	memset(&rcu_info, 0, sizeof(rcu_info));
+	rdev->asic->get_cu_info(rdev, &rcu_info);
+	cu_info->cu_active_number = rcu_info.number;
+	cu_info->cu_ao_mask = rcu_info.ao_cu_mask;
+	memcpy(&cu_info->cu_bitmap[0], &rcu_info.bitmap[0], sizeof(rcu_info.bitmap));
+	cu_info->num_shader_engines = rdev->config.cik.max_shader_engines;
+	cu_info->num_shader_arrays_per_engine = rdev->config.cik.max_sh_per_se;
 }
