@@ -554,8 +554,15 @@ static int radeon_info_ioctl(struct drm_device *dev, void *data, struct drm_file
 		value64 = atomic64_read(&rdev->gtt_usage);
 		break;
 	case RADEON_INFO_ACTIVE_CU_COUNT:
-		if (rdev->family >= CHIP_BONAIRE)
-			*value = rdev->config.cik.active_cus;
+		if (rdev->family >= CHIP_BONAIRE) {
+			if (rdev->asic->get_cu_info) {
+				struct radeon_cu_info cu_info;
+
+				rdev->asic->get_cu_info(rdev, &cu_info);
+				*value = cu_info.number;
+			} else
+				*value = rdev->config.cik.active_cus;
+		}
 		else if (rdev->family >= CHIP_TAHITI)
 			*value = rdev->config.si.active_cus;
 		else if (rdev->family >= CHIP_CAYMAN)

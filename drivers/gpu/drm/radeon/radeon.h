@@ -1841,6 +1841,12 @@ struct radeon_asic_ring {
 	void (*ring_start)(struct radeon_device *rdev, struct radeon_ring *cp);
 };
 
+struct radeon_cu_info {
+	uint32_t number; /* total active CU number */
+	uint32_t ao_cu_mask;
+	uint32_t bitmap[4][4];
+};
+
 /*
  * ASIC specific functions.
  */
@@ -1863,6 +1869,7 @@ struct radeon_asic {
 	uint64_t (*get_gpu_clock_counter)(struct radeon_device *rdev);
 	/* get register for info ioctl */
 	int (*get_allowed_info_register)(struct radeon_device *rdev, u32 reg, u32 *val);
+	int (*get_cu_info)(struct radeon_device *rdev, struct radeon_cu_info *info);
 	/* gart */
 	struct {
 		void (*tlb_flush)(struct radeon_device *rdev);

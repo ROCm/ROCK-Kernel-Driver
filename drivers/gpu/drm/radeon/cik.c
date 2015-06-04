@@ -9813,3 +9813,39 @@ static void cik_program_aspm(struct radeon_device *rdev)
 		}
 	}
 }
+
+int cik_get_cu_info(struct radeon_device *rdev, struct radeon_cu_info *cu_info)
+{
+	int i, j, k, counter, active_cu_number = 0;
+	u32 mask, bitmap, ao_bitmap, ao_cu_mask = 0;
+
+	if (!rdev || !cu_info)
+		return -EINVAL;
+
+	memset(cu_info, 0, sizeof(*cu_info));
+	for (i = 0; i < rdev->config.cik.max_shader_engines; i++) {
+		for (j = 0; j < rdev->config.cik.max_sh_per_se; j++) {
+			mask = 1;
+			ao_bitmap = 0;
+			counter = 0;
+			bitmap = cik_get_cu_active_bitmap(rdev, i, j);
+			cu_info->bitmap[i][j] = bitmap;
+
+			for (k = 0; k < rdev->config.cik.max_cu_per_sh; k++) {
+				if (bitmap & mask) {
+					if (counter < 2)
+						ao_bitmap |= mask;
+					counter++;
+				}
+				mask <<= 1;
+			}
+			active_cu_number += counter;
+			ao_cu_mask |= (ao_bitmap << (i * 16 + j * 8));
+		}
+	}
+
+	cu_info->number = active_cu_number;
+	cu_info->ao_cu_mask = ao_cu_mask;
+
+	return 0;
+}
