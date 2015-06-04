@@ -143,7 +143,8 @@ static const struct kfd2kgd_calls kfd2kgd = {
 	.map_memory_to_gpu = map_memory_to_gpu,
 	.unmap_memory_to_gpu = unmap_memory_from_gpu,
 	.get_fw_version = get_fw_version,
-	.set_num_of_requests = set_num_of_requests
+	.set_num_of_requests = set_num_of_requests,
+	.get_cu_info = get_cu_info
 };
 
 struct kfd2kgd_calls *amdgpu_amdkfd_gfx_8_0_get_functions()

@@ -237,3 +237,21 @@ uint32_t get_max_engine_clock_in_mhz(struct kgd_dev *kgd)
 	/* The sclk is in quantas of 10kHz */
 	return rdev->pm.dpm.dyn_state.max_clock_voltage_on_ac.sclk / 100;
 }
+
+void get_cu_info(struct kgd_dev *kgd, struct kfd_cu_info *cu_info)
+{
+	struct amdgpu_device *adev = (struct amdgpu_device *)kgd;
+	struct amdgpu_cu_info acu_info;
+
+	memset(cu_info, 0, sizeof(*cu_info));
+	if (sizeof(cu_info->cu_bitmap) != sizeof(acu_info.bitmap))
+		return;
+
+	memset(&acu_info, 0, sizeof(acu_info));
+	amdgpu_asic_get_cu_info(adev, &acu_info);
+	cu_info->cu_active_number = acu_info.number;
+	cu_info->cu_ao_mask = acu_info.ao_cu_mask;
+	memcpy(&cu_info->cu_bitmap[0], &acu_info.bitmap[0], sizeof(acu_info.bitmap));
+	cu_info->num_shader_engines = adev->gfx.config.max_shader_engines;
+	cu_info->num_shader_arrays_per_engine = adev->gfx.config.max_sh_per_se;
+}
