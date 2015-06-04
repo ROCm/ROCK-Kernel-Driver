@@ -2207,6 +2207,7 @@ static struct radeon_asic kv_asic = {
 	.get_xclk = &cik_get_xclk,
 	.get_gpu_clock_counter = &cik_get_gpu_clock_counter,
 	.get_allowed_info_register = cik_get_allowed_info_register,
+	.get_cu_info = &cik_get_cu_info,
 	.gart = {
 		.tlb_flush = &cik_pcie_gart_tlb_flush,
 		.get_page_entry = &rs600_gart_get_page_entry,
