@@ -39,6 +39,14 @@ struct kgd_dev;
 
 struct kgd_mem;
 
+struct kfd_cu_info {
+	uint32_t num_shader_engines;
+	uint32_t num_shader_arrays_per_engine;
+	uint32_t cu_active_number;
+	uint32_t cu_ao_mask;
+	uint32_t cu_bitmap[4][4];
+};
+
 enum kgd_memory_pool {
 	KGD_POOL_SYSTEM_CACHEABLE = 1,
 	KGD_POOL_SYSTEM_WRITECOMBINE = 2,
@@ -124,6 +132,8 @@ struct kgd2kfd_shared_resources {
  *
  * @set_num_of_requests: Sets number of Peripheral Page Request (PPR) sent to
  * IOMMU when address translation failed
+ *
+ * @get_cu_info: Retrieves activated cu info
  *
  * This structure contains function pointers to services that the kgd driver
  * provides to amdkfd driver.
@@ -213,6 +223,9 @@ struct kfd2kgd_calls {
 
 	void (*set_num_of_requests)(struct kgd_dev *kgd,
 			uint8_t num_of_requests);
+
+	void (*get_cu_info)(struct kgd_dev *kgd,
+			struct kfd_cu_info *cu_info);
 };
 
 /**
