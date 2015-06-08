@@ -1555,6 +1555,7 @@
 #define CP_HQD_HQ_SCHEDULER1			0xC998u
 
 #define SH_STATIC_MEM_CONFIG			0x9604u
+#define SH_HIDDEN_PRIVATE_BASE_VMID             0x2580
 
 #define DB_RENDER_CONTROL                               0x28000
 
