@@ -31,6 +31,7 @@
 #include "set_mode_types.h"
 #include "plane_types.h"
 #include "dcs_types.h"
+#include "timing_list_query_interface.h"
 
 struct dal;
 struct dal_to_path_mode_set;
@@ -162,15 +163,6 @@ uint32_t dal_get_interrupt_source(const struct dal_display_index_set *set,
 /* Timing List Query */
 struct dal_timing_list_query *dal_create_timing_list_query(struct dal *dal,
 	uint32_t display_index);
-
-void dal_timing_list_query_destroy(struct dal_timing_list_query **tl_q);
-
-uint32_t dal_timing_list_query_get_mode_timing_count(
-	struct dal_timing_list_query *tl_q);
-
-/* get mode timing at an index in the list */
-const struct mode_timing *dal_timing_list_query_get_mode_timing_at_index(
-	struct dal_timing_list_query *tl_q, uint32_t index);
 
 /*hard code color square at CRTC0 for HDMI light up*/
 void dal_set_crtc_test_pattern(struct dal *dal);

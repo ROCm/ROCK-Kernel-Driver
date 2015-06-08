@@ -146,7 +146,7 @@ void dal_timing_list_query_destroy(struct dal_timing_list_query **tlsq)
 
 /* Get count of mode timings in the list. */
 uint32_t dal_timing_list_query_get_mode_timing_count(
-		struct dal_timing_list_query *tlsq)
+	const struct dal_timing_list_query *tlsq)
 {
 	if (NULL == tlsq) {
 		/* getting here if OS ignores error in
@@ -159,8 +159,8 @@ uint32_t dal_timing_list_query_get_mode_timing_count(
 }
 
 const struct mode_timing *dal_timing_list_query_get_mode_timing_at_index(
-		struct dal_timing_list_query *tlsq,
-		uint32_t index)
+	const struct dal_timing_list_query *tlsq,
+	uint32_t index)
 {
 	if (NULL == tlsq) {
 		/* getting here if OS ignores error in
