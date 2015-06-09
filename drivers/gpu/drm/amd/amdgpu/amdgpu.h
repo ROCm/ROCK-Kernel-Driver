@@ -54,6 +54,7 @@
 #include "amdgpu_ucode.h"
 #include "amdgpu_gds.h"
 #include "amdgpu_acp.h"
+#include "amdgpu_dm.h"
 
 /*
  * Modules parameters.
@@ -1968,6 +1969,7 @@ struct amdgpu_device {
 
 	/* display */
 	struct amdgpu_mode_info		mode_info;
+	/* For pre-DCE11. DCE11 and later are in "struct amdgpu_device->dm" */
 	struct work_struct		hotplug_work;
 	struct amdgpu_irq_src		crtc_irq;
 	struct amdgpu_irq_src		pageflip_irq;
@@ -2013,6 +2015,9 @@ struct amdgpu_device {
 
 	/* GDS */
 	struct amdgpu_gds		gds;
+
+	/* display related functionality */
+	struct amdgpu_display_manager dm;
 
 	const struct amdgpu_ip_block_version *ip_blocks;
 	int				num_ip_blocks;
