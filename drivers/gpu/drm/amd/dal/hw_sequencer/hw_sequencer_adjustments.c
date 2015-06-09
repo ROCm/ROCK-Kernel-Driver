@@ -136,7 +136,7 @@ static enum hwss_result program_overscan(
 			scaler_data.pixel_type,
 			param->hw_path_mode->mode.scaling_info.src.width,
 			param->hw_path_mode->mode.scaling_info.dst.width,
-			param->taps[plane].v_taps,
+			&param->taps[plane],
 			param->line_buffer_array[plane].depth,
 			param->hw_path_mode->mode.scaling_info.src.height,
 			param->hw_path_mode->mode.scaling_info.dst.height,
@@ -164,7 +164,7 @@ static enum hwss_result program_overscan(
 			scaler_data.pixel_type,
 			param->hw_path_mode->mode.scaling_info.src.width,
 			param->hw_path_mode->mode.scaling_info.dst.width,
-			param->taps[plane].v_taps,
+			&param->taps[plane],
 			param->line_buffer_array[plane].depth,
 			param->hw_path_mode->mode.scaling_info.src.height,
 			param->hw_path_mode->mode.scaling_info.dst.height,
@@ -228,7 +228,8 @@ enum hwss_result dal_hw_sequencer_set_overscan_adj(
 	build_params = dal_hw_sequencer_prepare_path_parameters(
 		hws,
 		set,
-		params_mask);
+		params_mask,
+		false);
 
 	if (NULL == build_params)
 		return HWSS_RESULT_ERROR;

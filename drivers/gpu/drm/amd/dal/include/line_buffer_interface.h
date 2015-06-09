@@ -27,6 +27,7 @@
 #define __LINE_BUFFER_INTERFACE_H__
 
 #include "grph_object_id.h"
+#include "scaler_types.h"
 
 enum lb_pixel_depth {
 	/* do not change the values because it is used as bit vector */
@@ -37,10 +38,10 @@ enum lb_pixel_depth {
 };
 
 struct lb_config_data {
-	/*enum lb_storage_type storage_type;*//*this is always 30 bpp not used*/
 	uint32_t src_pixel_width;
+	uint32_t src_pixel_width_c;
 	uint32_t dst_pixel_width;
-	uint32_t v_taps;
+	struct scaling_tap_info taps;
 	enum lb_pixel_depth depth; /* for dce8 and up use this */
 	uint32_t src_height; /* dce8 vsr calculation on lb power gating */
 	uint32_t dst_height; /* dce8 vsr calculation on lb power gating */
@@ -94,5 +95,8 @@ void dal_line_buffer_set_vblank_irq(
 void dal_line_buffer_enable_alpha(
 	struct line_buffer *lb,
 	bool enable);
+bool dal_line_buffer_is_prefetch_supported(
+	struct line_buffer *lb,
+	struct lb_config_data *lb_config);
 
 #endif /* __LINE_BUFFER_INTERFACE_H__ */

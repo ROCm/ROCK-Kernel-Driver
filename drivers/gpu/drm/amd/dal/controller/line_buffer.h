@@ -64,6 +64,9 @@ struct line_buffer_funcs {
 	void (*enable_alpha)(
 		struct line_buffer *lb,
 		bool enable);
+	bool (*is_prefetch_supported)(
+		struct line_buffer *lb,
+		struct lb_config_data *lb_config);
 };
 
 struct line_buffer {
@@ -85,9 +88,15 @@ bool dal_line_buffer_construct_base(
 void dal_line_buffer_destruct_base(struct line_buffer *lb);
 void dal_line_buffer_destroy(struct line_buffer **lb);
 
-enum lb_pixel_depth dal_line_buffer_display_bpp_to_lb_depth(uint32_t disp_bpp);
+enum lb_pixel_depth dal_line_buffer_display_bpp_to_lb_depth(
+	uint32_t disp_bpp);
 
+bool dal_line_buffer_base_is_prefetch_supported(
+	struct line_buffer *lb,
+	struct lb_config_data *lb_config);
 
-
+uint32_t dal_line_buffer_base_calculate_pitch(
+	enum lb_pixel_depth depth,
+	uint32_t width);
 
 #endif /* __DAL_LINE_BUFFER_H__ */

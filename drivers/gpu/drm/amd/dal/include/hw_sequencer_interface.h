@@ -324,7 +324,7 @@ bool dal_hw_sequencer_enable_line_buffer_power_gating(
 	enum pixel_type pixel_type,
 	uint32_t src_pixel_width,
 	uint32_t dst_pixel_width,
-	uint32_t v_taps,
+	struct scaling_tap_info *taps,
 	enum lb_pixel_depth lb_depth,
 	uint32_t src_height,
 	uint32_t dst_height,

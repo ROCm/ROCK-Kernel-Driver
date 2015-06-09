@@ -988,7 +988,7 @@ bool dal_hw_sequencer_enable_line_buffer_power_gating(
 	enum pixel_type pixel_type,
 	uint32_t src_pixel_width,
 	uint32_t dst_pixel_width,
-	uint32_t v_taps,
+	struct scaling_tap_info *taps,
 	enum lb_pixel_depth lb_depth,
 	uint32_t src_height,
 	uint32_t dst_height,
@@ -1002,7 +1002,7 @@ bool dal_hw_sequencer_enable_line_buffer_power_gating(
 
 	lb_config_data.src_pixel_width = src_pixel_width;
 	lb_config_data.dst_pixel_width = dst_pixel_width;
-	lb_config_data.v_taps = v_taps;
+	lb_config_data.taps = *taps;
 	/* this parameter is meaningful for DCE8 and up */
 	lb_config_data.depth = lb_depth;
 	/* this parameter is meaningful for DCE8 and up */
@@ -2224,7 +2224,8 @@ enum hwss_result dal_hw_sequencer_set_mode(
 	build_params = dal_hw_sequencer_prepare_path_parameters(
 			hws,
 			path_set,
-			params_mask);
+			params_mask,
+			false);
 
 	if (NULL == build_params) {
 		dal_logger_write(dal_context->logger,
@@ -2641,7 +2642,7 @@ static void program_scaler(
 		scaler_data.pixel_type,
 		path_mode->mode.scaling_info.src.width,
 		path_mode->mode.scaling_info.dst.width,
-		build_params->scaling_taps_params[path_id][plane_id].v_taps,
+		&build_params->scaling_taps_params[path_id][plane_id],
 		build_params->line_buffer_params[path_id][plane_id].depth,
 		path_mode->mode.scaling_info.src.height,
 		path_mode->mode.scaling_info.dst.height,
@@ -3030,8 +3031,12 @@ enum hwss_result dal_hw_sequencer_validate_display_hwpms(
 	params_mask.bits.BANDWIDTH = true;
 
 	/* fill information for active set of display paths */
-	build_params = dal_hw_sequencer_prepare_path_parameters(
-		hws, path_set, params_mask);
+	build_params =
+		dal_hw_sequencer_prepare_path_parameters(
+			hws,
+			path_set,
+			params_mask,
+			true);
 
 	if (NULL == build_params)
 		return HWSS_RESULT_ERROR;
@@ -3082,8 +3087,12 @@ enum hwss_result dal_hw_sequencer_set_safe_displaymark(
 
 	/* TODO: do we really need to calculate anything for SAFE marks?
 	 * If not, we don't need to "prepare parameters" too. */
-	build_params = dal_hw_sequencer_prepare_path_parameters(
-		hws, path_set, params_mask);
+	build_params =
+		dal_hw_sequencer_prepare_path_parameters(
+			hws,
+			path_set,
+			params_mask,
+			false);
 
 	if (NULL == build_params) {
 		dal_logger_write(hws->dal_context->logger, LOG_MAJOR_ERROR,
@@ -3127,7 +3136,7 @@ enum hwss_result dal_hw_sequencer_set_displaymark(
 	params_mask.bits.BANDWIDTH = true;
 
 	build_params = dal_hw_sequencer_prepare_path_parameters(
-		hws, path_set, params_mask);
+		hws, path_set, params_mask, false);
 
 	if (NULL == build_params) {
 		dal_logger_write(hws->dal_context->logger, LOG_MAJOR_ERROR,
@@ -3468,7 +3477,11 @@ enum hwss_result dal_hw_sequencer_set_plane_config(
 	mask.bits.LINE_BUFFER = true;
 
 	build_params =
-		dal_hw_sequencer_prepare_path_parameters(hws, path_set, mask);
+		dal_hw_sequencer_prepare_path_parameters(
+			hws,
+			path_set,
+			mask,
+			false);
 
 	if (!build_params) {
 		dal_logger_write(dal_context->logger,

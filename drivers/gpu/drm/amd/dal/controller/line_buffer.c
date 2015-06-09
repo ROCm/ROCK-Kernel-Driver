@@ -179,3 +179,44 @@ void dal_line_buffer_enable_alpha(
 	lb->funcs->enable_alpha(lb, enable);
 }
 
+bool dal_line_buffer_is_prefetch_supported(
+	struct line_buffer *lb,
+	struct lb_config_data *lb_config)
+{
+	return lb->funcs->is_prefetch_supported(lb, lb_config);
+}
+
+bool dal_line_buffer_base_is_prefetch_supported(
+	struct line_buffer *lb,
+	struct lb_config_data *lb_config)
+{
+	return false;
+}
+
+uint32_t dal_line_buffer_base_calculate_pitch(
+	enum lb_pixel_depth depth,
+	uint32_t width)
+{
+	uint32_t pitch = 0;
+
+	switch (depth) {
+	case LB_PIXEL_DEPTH_18BPP:
+		pitch = (width + 7) >> 3;
+		break;
+
+	case LB_PIXEL_DEPTH_24BPP:
+		pitch = ((width + 7) / 8) * 683;
+		pitch = (pitch + 511) >> 9;
+		break;
+
+	case LB_PIXEL_DEPTH_30BPP:
+		pitch = ((width + 7) / 8) * 854;
+		pitch = (pitch + 511) >> 9;
+		break;
+
+	case LB_PIXEL_DEPTH_36BPP:
+		pitch = (width + 3) >> 2;
+		break;
+	}
+	return pitch;
+}

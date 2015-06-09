@@ -88,6 +88,10 @@ struct scaler_validation_params {
 	struct view source_view;
 	struct view dest_view;
 	enum signal_type signal_type;
+
+	struct scaling_tap_info taps_requested;
+	enum pixel_format pixel_format;
+	enum rotation_angle rotation;
 };
 
 struct adjustment_factor {
@@ -119,7 +123,8 @@ enum scaler_validation_code {
 	SCALER_VALIDATION_INVALID_INPUT_PARAMETERS,
 	SCALER_VALIDATION_SCALING_RATIO_NOT_SUPPORTED,
 	SCALER_VALIDATION_SOURCE_VIEW_WIDTH_EXCEEDING_LIMIT,
-	SCALER_VALIDATION_DISPLAY_CLOCK_BELOW_PIXEL_CLOCK
+	SCALER_VALIDATION_DISPLAY_CLOCK_BELOW_PIXEL_CLOCK,
+	SCALER_VALIDATION_FAILURE_PREDEFINED_TAPS_NUMBER
 };
 
 /* Pixel format */

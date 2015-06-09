@@ -154,7 +154,7 @@ bool dal_line_buffer_dce110_get_pixel_storage_depth(
 	/* default value */
 	display_depth = dal_line_buffer_display_bpp_to_lb_depth(display_bpp);
 
-	if (lb->capabilites & display_depth) {
+	if (lb->caps & display_depth) {
 		/*we got the match lb and display bpp*/
 		*depth = display_depth;
 	} else {
@@ -162,7 +162,7 @@ bool dal_line_buffer_dce110_get_pixel_storage_depth(
 		uint32_t i;
 		uint32_t max_depth = LB_PIXEL_DEPTH_36BPP;
 		for (i = display_depth; i <= max_depth; i <<= 1) {
-			if (i & lb->capabilites) {
+			if (i & lb->caps) {
 				*depth = i;
 				break;
 			}
@@ -294,7 +294,7 @@ static bool set_pixel_storage_depth(
 		set_reg_field_value(value, 0, LB_DATA_FORMAT, ALPHA_EN);
 		dal_write_reg(
 				base->dal_context, lb->lbx_data_format, value);
-		if (!(lb->capabilites & depth)) {
+		if (!(lb->caps & depth)) {
 			/*we should use unsupported capabilities
 			 *  unless it is required by w/a*/
 			dal_logger_write(base->dal_context->logger,
@@ -350,17 +350,17 @@ static bool enable_power_gating(
 	/* Calculate maximum number of lines*/
 	num_lines_max = LB_ENTRIES_TOTAL_NUMBER / pitch;
 	/* DCE 11.0 LB line calculation, scalar enabled case*/
-	if (lb_config->v_taps > 1) {
+	if (lb_config->taps.v_taps > 1) {
 		struct fixed32_32 scale_ratio = dal_fixed32_32_from_fraction(
 			lb_config->src_height, lb_config->dst_height);
 
 		uint32_t vsr_ceil = dal_fixed32_32_ceil(scale_ratio) *
 			(lb_config->interlaced ? 2 : 1);
 
-		if (lb_config->v_taps == vsr_ceil && (vsr_ceil % 2) != 0)
-			num_lines_required = lb_config->v_taps + 2;
+		if (lb_config->taps.v_taps == vsr_ceil && (vsr_ceil % 2) != 0)
+			num_lines_required = lb_config->taps.v_taps + 2;
 		else
-			num_lines_required = lb_config->v_taps + 1;
+			num_lines_required = lb_config->taps.v_taps + 1;
 
 	} else if (pixel_width <= 2560) {
 		/*Usually 3 lines, no scalar enabled case.
@@ -417,7 +417,7 @@ static bool enable_power_gating(
 		" MEMORY_SIZE:0x%x, NUM_PARTITIONS:%d, MEMORY_CONFIG:%d (%s)\n",
 		idx, lb->index,
 		lb_config->src_pixel_width, lb_config->src_height,
-		lb_config->dst_height, lb_config->v_taps,
+		lb_config->dst_height, lb_config->taps.v_taps,
 		get_reg_field_value(value, LB_MEMORY_CTRL, LB_MEMORY_SIZE),
 		get_reg_field_value(value, LB_MEMORY_CTRL, LB_NUM_PARTITIONS),
 		get_reg_field_value(value, LB_MEMORY_CTRL, LB_MEMORY_CONFIG),
@@ -462,6 +462,62 @@ static void enable_alpha(
 	dal_write_reg(dal_ctx, addr, value);
 }
 
+static enum lb_pixel_depth translate_display_bpp_to_lb_depth(
+	uint32_t display_bpp)
+{
+	switch (display_bpp) {
+	case 18:
+		return LB_PIXEL_DEPTH_18BPP;
+	case 24:
+		return LB_PIXEL_DEPTH_24BPP;
+	case 36:
+	case 42:
+	case 48:
+		return LB_PIXEL_DEPTH_36BPP;
+	case 30:
+	default:
+		return LB_PIXEL_DEPTH_30BPP;
+	}
+}
+
+static bool get_next_lower_pixel_storage_depth(
+	struct line_buffer *base,
+	uint32_t display_bpp,
+	enum lb_pixel_depth depth,
+	enum lb_pixel_depth *lower_depth)
+{
+	struct line_buffer_dce110 *lb = LB110_FROM_BASE(base);
+	enum lb_pixel_depth depth_req_by_display =
+		translate_display_bpp_to_lb_depth(display_bpp);
+	uint32_t current_required_depth = depth_req_by_display;
+	uint32_t current_depth = depth;
+
+	/* if required display depth < current we could go down, for example
+	 * from LB_PIXEL_DEPTH_30BPP to LB_PIXEL_DEPTH_24BPP
+	 */
+	if (current_required_depth < current_depth) {
+		current_depth = current_depth >> 1;
+		if (lb->caps & current_depth) {
+			*lower_depth = current_depth;
+			return true;
+		}
+	}
+	return false;
+}
+
+static bool is_prefetch_supported(
+	struct line_buffer *base,
+	struct lb_config_data *lb_config)
+{
+	struct line_buffer_dce110 *lb = LB110_FROM_BASE(base);
+	uint32_t value = dal_read_reg(base->dal_context, lb->lbx_data_format);
+
+	if (get_reg_field_value(value, LB_DATA_FORMAT, PREFETCH) == 1)
+		return true;
+
+	return false;
+}
+
 static const struct line_buffer_funcs funcs = {
 	.destroy = destroy,
 	.power_up = power_up,
@@ -470,12 +526,14 @@ static const struct line_buffer_funcs funcs = {
 	.get_current_pixel_storage_depth = get_current_pixel_storage_depth,
 	.get_pixel_storage_depth =
 		dal_line_buffer_dce110_get_pixel_storage_depth,
-	.get_next_lower_pixel_storage_depth = NULL,
+	.get_next_lower_pixel_storage_depth =
+		get_next_lower_pixel_storage_depth,
 	.get_max_num_of_supported_lines =
 		dal_line_buffer_dce110_get_max_num_of_supported_lines,
 	.reset_lb_on_vblank = reset_lb_on_vblank,
 	.set_vblank_irq = set_vblank_irq,
-	.enable_alpha = enable_alpha
+	.enable_alpha = enable_alpha,
+	.is_prefetch_supported = is_prefetch_supported
 };
 
 bool dal_line_buffer_dce110_construct(
@@ -495,7 +553,7 @@ bool dal_line_buffer_dce110_construct(
 	base->funcs = &funcs;
 
 	/* data members init */
-	lb->capabilites = LB_PIXEL_DEPTH_30BPP;
+	lb->caps = LB_PIXEL_DEPTH_30BPP;
 	lb->default_pixel_depth = LB_PIXEL_DEPTH_30BPP;
 	lb->controller_id = init_data->id;
 
@@ -506,14 +564,14 @@ bool dal_line_buffer_dce110_construct(
 
 		/*we may change lb capability here*/
 		if (flags.bits.WORKSTATION) {
-			lb->capabilites |= LB_PIXEL_DEPTH_18BPP;
-			lb->capabilites |= LB_PIXEL_DEPTH_24BPP;
+			lb->caps |= LB_PIXEL_DEPTH_18BPP;
+			lb->caps |= LB_PIXEL_DEPTH_24BPP;
 			/* 04/13: HW removed 12bpc LB. */
 
 		} else if (dal_adapter_service_is_feature_supported(
 			FEATURE_LINE_BUFFER_ENHANCED_PIXEL_DEPTH)) {
-			lb->capabilites |= LB_PIXEL_DEPTH_18BPP;
-			lb->capabilites |= LB_PIXEL_DEPTH_24BPP;
+			lb->caps |= LB_PIXEL_DEPTH_18BPP;
+			lb->caps |= LB_PIXEL_DEPTH_24BPP;
 		}
 
 		/* TODO: read FEATURE_POWER_GATING_LINE_BUFFER_PORTION when

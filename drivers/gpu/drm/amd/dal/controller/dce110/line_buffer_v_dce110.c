@@ -204,7 +204,7 @@ static bool set_pixel_storage_depth(
 
 		set_reg_field_value(value, 0, LBV_DATA_FORMAT, ALPHA_EN);
 		dal_write_reg(base->dal_context, lb->lbx_data_format, value);
-		if (!(lb->capabilites & depth)) {
+		if (!(lb->caps & depth)) {
 			/*we should use unsupported capabilities
 			 *  unless it is required by w/a*/
 			dal_logger_write(base->dal_context->logger,
@@ -233,6 +233,41 @@ static void enable_alpha(
 {
 }
 
+static bool is_prefetch_supported(
+	struct line_buffer *base,
+	struct lb_config_data *lb_config_data)
+{
+	uint32_t pitch_l =
+		dal_line_buffer_base_calculate_pitch(
+			lb_config_data->depth,
+			lb_config_data->src_pixel_width);
+	uint32_t pitch_c =
+		dal_line_buffer_base_calculate_pitch(
+			lb_config_data->depth,
+			lb_config_data->src_pixel_width_c);
+
+	/* Required number of lines from taps, minimum is 3 for prefetch */
+	uint32_t num_lines_required_l = lb_config_data->taps.v_taps + 2;
+	uint32_t num_lines_required_c = lb_config_data->taps.v_taps_c + 2;
+	uint32_t min_req_lb_entries_l;
+	uint32_t min_req_lb_entries_c;
+
+	if (num_lines_required_l < 3)
+		num_lines_required_l = 3;
+
+	if (num_lines_required_c < 3)
+		num_lines_required_c = 3;
+
+	min_req_lb_entries_l = num_lines_required_l * pitch_l;
+	min_req_lb_entries_c = num_lines_required_c * pitch_c;
+
+	if (min_req_lb_entries_l < LB_ENTRIES_TOTAL_NUMBER &&
+		min_req_lb_entries_c <= LB_ENTRIES_TOTAL_NUMBER)
+		return true;
+
+	return false;
+}
+
 static const struct line_buffer_funcs funcs = {
 	.destroy = destroy,
 	.power_up = power_up,
@@ -246,7 +281,8 @@ static const struct line_buffer_funcs funcs = {
 		dal_line_buffer_dce110_get_max_num_of_supported_lines,
 	.reset_lb_on_vblank = NULL,
 	.set_vblank_irq = NULL,
-	.enable_alpha = enable_alpha
+	.enable_alpha = enable_alpha,
+	.is_prefetch_supported = is_prefetch_supported
 };
 
 static bool construct(
@@ -257,7 +293,7 @@ static bool construct(
 	if (!dal_line_buffer_dce110_construct(lb, init_data))
 		return false;
 
-	lb->capabilites = LB_PIXEL_DEPTH_24BPP;
+	lb->caps = LB_PIXEL_DEPTH_24BPP;
 	lb->default_pixel_depth = LB_PIXEL_DEPTH_24BPP;
 
 	switch (lb->controller_id) {

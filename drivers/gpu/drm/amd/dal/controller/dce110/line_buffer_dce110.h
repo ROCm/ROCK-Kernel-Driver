@@ -38,7 +38,7 @@ struct line_buffer_dce110 {
 
 	enum lb_pixel_depth default_pixel_depth;
 
-	uint32_t capabilites;
+	uint32_t caps;
 	uint32_t index;
 	uint32_t power_gating;
 

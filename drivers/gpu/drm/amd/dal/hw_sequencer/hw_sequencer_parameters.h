@@ -100,11 +100,11 @@ struct hwss_build_params {
 	void *mem_block;
 };
 
-
 struct hwss_build_params *dal_hw_sequencer_prepare_path_parameters(
 	struct hw_sequencer *hws,
 	struct hw_path_mode_set *path_set,
-	union hwss_build_params_mask params_mask);
+	union hwss_build_params_mask params_mask,
+	bool use_predefined_hw_state);
 
 void dal_hw_sequencer_free_path_parameters(
 	struct hwss_build_params *build_params);

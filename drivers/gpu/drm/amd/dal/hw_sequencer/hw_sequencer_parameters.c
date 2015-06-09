@@ -433,6 +433,171 @@ translate_lb_pixel_depth_to_scaler_efficiency(
 	return scaler_eff;
 }
 
+static enum scaler_validation_code get_optimal_number_of_taps(
+	struct controller *crtc,
+	struct scaler_validation_params *scaling_params,
+	enum hw_color_depth display_color_depth,
+	struct lb_params_data *lb_params,
+	struct scaling_tap_info *actual_taps_info,
+	bool interlaced,
+	enum hw_pixel_encoding pixel_encoding)
+{
+	enum scaler_validation_code code =
+		SCALER_VALIDATION_INVALID_INPUT_PARAMETERS;
+
+	uint32_t max_lines_number = 0;
+
+	struct line_buffer *lb = dal_controller_get_line_buffer(crtc);
+
+	uint32_t display_bpp = translate_to_display_bpp(display_color_depth);
+	enum lb_pixel_depth depth = lb_params->depth;
+	enum lb_pixel_depth lower_depth = depth;
+
+	bool failure_max_number_of_supported_lines = false;
+	bool failure_next_lower_number_of_taps = false;
+	bool use_predefined_taps = false;
+
+	/* Variable to pass in to calculate number of lines supported by
+	 * Line Buffer */
+	uint32_t pixel_width = 0;
+	uint32_t pixel_width_c;
+
+	/* If downscaling, use destination pixel width to calculate Line Buffer
+	 * size (how many lines can fit in line buffer) (We assume the 4:1
+	 * scaling ratio is already checked in static validation -> no modes
+	 * should be here that doesn't fit that limitation)
+	 */
+	if (scaling_params->source_view.width >
+		scaling_params->dest_view.width)
+		pixel_width = scaling_params->dest_view.width;
+	else
+		pixel_width = scaling_params->source_view.width;
+
+	pixel_width_c = pixel_width;
+
+	/* Source width for chroma is half size for 420 and 422 rotated to 90
+	 * or 270 */
+	if (scaling_params->pixel_format == PIXEL_FORMAT_420BPP12 ||
+		((scaling_params->rotation == ROTATION_ANGLE_90 ||
+			scaling_params->rotation == ROTATION_ANGLE_270) &&
+		scaling_params->pixel_format == PIXEL_FORMAT_420BPP12)) {
+		if (scaling_params->source_view.width / 2 <
+			scaling_params->dest_view.width) {
+			pixel_width_c = scaling_params->source_view.width / 2;
+		}
+	}
+
+	if (!dal_line_buffer_get_max_num_of_supported_lines(
+		lb,
+		depth,
+		pixel_width,
+		&max_lines_number))
+		return code;
+
+	/* TODO: before usage check taps_requested initialized
+	if (false && scaling_params->taps_requested.h_taps > 0 &&
+		scaling_params->taps_requested.v_taps > 0) {
+		struct lb_config_data lb_config_data = { 0 };
+		lb_config_data.src_height =
+			scaling_params->source_view.height;
+		lb_config_data.src_pixel_width = pixel_width;
+		lb_config_data.src_pixel_width_c = pixel_width_c;
+		lb_config_data.dst_height =
+			scaling_params->dest_view.height;
+		lb_config_data.dst_pixel_width =
+			scaling_params->dest_view.width;
+		lb_config_data.taps.h_taps =
+			scaling_params->taps_requested.h_taps;
+		lb_config_data.taps.v_taps =
+			scaling_params->taps_requested.v_taps;
+		lb_config_data.taps.h_taps_c =
+			scaling_params->taps_requested.h_taps_c;
+		lb_config_data.taps.v_taps_c =
+			scaling_params->taps_requested.v_taps_c;
+		lb_config_data.interlaced = interlaced;
+		lb_config_data.depth = lb_params->depth;
+
+		if (dal_line_buffer_validate_taps_info(
+			lb,
+			&lb_config_data,
+			display_bpp)) {
+			*actual_taps_info = scaling_params->taps_requested;
+			use_predefined_taps = true;
+		}
+	} else */
+
+	/* To get the number of taps, we still want to know the original scaling
+	 * parameters. The horizontal downscaling TAPS use a value that is
+	 * consistent to the original scaling parameters. ie. We don't need to
+	 * use the destination horizontal width
+	 */
+	if (dal_controller_get_optimal_taps_number(
+		crtc,
+		scaling_params,
+		actual_taps_info) != SCALER_VALIDATION_OK) {
+		return code;
+	}
+
+	/* v_taps go lower and maxNumberOfLines could go higher when lb format
+	 * is changed
+	 * Do loop until taps <  lines - 1, taps + 1 = lines
+	 */
+	while (actual_taps_info->v_taps > max_lines_number - 1) {
+		/* adjust lb size */
+		if (dal_line_buffer_get_next_lower_pixel_storage_depth(
+			lb,
+			display_bpp,
+			depth,
+			&lower_depth)) {
+			depth = lower_depth;
+			if (!dal_line_buffer_get_max_num_of_supported_lines(
+				lb,
+				depth,
+				pixel_width,
+				&max_lines_number)) {
+				failure_max_number_of_supported_lines = true;
+				break;
+			}
+
+			continue;
+		}
+
+		if (use_predefined_taps == true) {
+			code = SCALER_VALIDATION_FAILURE_PREDEFINED_TAPS_NUMBER;
+			break;
+		} else if (dal_controller_get_next_lower_taps_number(
+			crtc,
+			NULL,
+			actual_taps_info) != SCALER_VALIDATION_OK) {
+			failure_next_lower_number_of_taps = true;
+			break;
+		}
+	}
+
+	if (use_predefined_taps == true &&
+		code == SCALER_VALIDATION_FAILURE_PREDEFINED_TAPS_NUMBER)
+		return code;
+
+	if (actual_taps_info->v_taps > 1 && max_lines_number <= 2)
+		return SCALER_VALIDATION_SOURCE_VIEW_WIDTH_EXCEEDING_LIMIT;
+
+	if (failure_max_number_of_supported_lines == true
+		|| failure_next_lower_number_of_taps == true) {
+		/* we requested scaling ,but it could not be supported */
+		return SCALER_VALIDATION_SOURCE_VIEW_WIDTH_EXCEEDING_LIMIT;
+	}
+
+	if (actual_taps_info->v_taps == 1 && max_lines_number < 2) {
+		/* no scaling ,but LB should accommodate at least 2 source lines
+		 */
+		return SCALER_VALIDATION_SOURCE_VIEW_WIDTH_EXCEEDING_LIMIT;
+	}
+
+	lb_params->depth = depth;
+
+	return SCALER_VALIDATION_OK;
+}
+
 static enum scaler_validation_code build_path_parameters(
 	struct hw_sequencer *hws,
 	const struct hw_path_mode *path_mode,
@@ -443,7 +608,8 @@ static enum scaler_validation_code build_path_parameters(
 	struct min_clock_params *min_clock_params,
 	struct watermark_input_params *wm_input_params,
 	struct bandwidth_params *bandwidth_params,
-	struct lb_params_data *line_buffer_params)
+	struct lb_params_data *line_buffer_params,
+	bool use_predefined_hw_state)
 {
 	enum scaler_validation_code scaler_return_code = SCALER_VALIDATION_OK;
 	struct pixel_clk_params pixel_clk_params = { 0 };
@@ -480,6 +646,62 @@ static enum scaler_validation_code build_path_parameters(
 	struct lb_params_data *actual_line_buffer_params =
 			line_buffer_params != NULL ?
 				line_buffer_params : &line_buffer_params_local;
+
+	bool line_buffer_prefetch_enabled;
+
+	uint32_t pixel_width;
+	uint32_t pixel_width_c;
+
+	/* If downscaling, use destination pixel width to calculate Line Buffer
+	 * size (how many lines can fit in line buffer) (We assume the 4:1
+	 * scaling ratio is already checked in static validation -> no modes
+	 * should be here that doesn't fit that limitation)
+	 */
+	if (path_mode->mode.scaling_info.src.width >
+		path_mode->mode.scaling_info.dst.width)
+		pixel_width = path_mode->mode.scaling_info.dst.width;
+	else
+		pixel_width = path_mode->mode.scaling_info.src.width;
+
+	pixel_width_c = pixel_width;
+
+	if (pl_cfg &&
+		(pl_cfg->config.dal_pixel_format == PIXEL_FORMAT_420BPP12 ||
+		(pl_cfg->config.dal_pixel_format == PIXEL_FORMAT_422BPP16 &&
+			(pl_cfg->config.rotation == PLANE_ROTATION_ANGLE_90 ||
+				pl_cfg->config.rotation ==
+					PLANE_ROTATION_ANGLE_270)))) {
+		if (path_mode->mode.scaling_info.src.width / 2 <
+			path_mode->mode.scaling_info.dst.width)
+			pixel_width_c = path_mode->mode.scaling_info.src.width;
+	}
+
+	if (use_predefined_hw_state)
+		line_buffer_prefetch_enabled = false;
+	else {
+		struct lb_config_data lb_config_data;
+
+		dal_memset(&lb_config_data, 0, sizeof(lb_config_data));
+		lb_config_data.src_height =
+			path_mode->mode.scaling_info.src.height;
+		lb_config_data.src_pixel_width = pixel_width;
+		lb_config_data.src_pixel_width_c = pixel_width_c;
+		lb_config_data.dst_height =
+			path_mode->mode.scaling_info.dst.height;
+		lb_config_data.dst_pixel_width =
+			path_mode->mode.scaling_info.dst.width;
+		lb_config_data.taps.h_taps = actual_tap_info->h_taps;
+		lb_config_data.taps.v_taps = actual_tap_info->v_taps;
+		lb_config_data.taps.h_taps_c = actual_tap_info->h_taps_c;
+		lb_config_data.taps.v_taps_c = actual_tap_info->v_taps_c;
+		lb_config_data.interlaced =
+			path_mode->mode.timing.flags.INTERLACED;
+		lb_config_data.depth = actual_line_buffer_params->depth;
+		line_buffer_prefetch_enabled =
+			dal_line_buffer_is_prefetch_supported(
+				dal_controller_get_line_buffer(crtc),
+				&lb_config_data);
+	}
 
 	/* calc pixel clock parameters and PLL dividers */
 	dal_hw_sequencer_get_pixel_clock_parameters(path_mode,
@@ -529,10 +751,14 @@ static enum scaler_validation_code build_path_parameters(
 
 		/** get taps that are fit to lb size the lb depth could be
 		 * updated , taps are set if return code is Ok */
-		scaler_return_code = dal_controller_get_optimal_taps_number(
+		scaler_return_code = get_optimal_number_of_taps(
 				crtc,
 				&scaler_params,
-				actual_tap_info);
+				path_mode->mode.timing.flags.COLOR_DEPTH,
+				actual_line_buffer_params,
+				actual_tap_info,
+				path_mode->mode.timing.flags.INTERLACED == 0,
+				path_mode->mode.timing.flags.PIXEL_ENCODING);
 
 		/* Prepare min clock params */
 
@@ -589,7 +815,8 @@ static enum scaler_validation_code build_path_parameters(
 		actual_min_clock_params->scaler_efficiency =
 				translate_lb_pixel_depth_to_scaler_efficiency(
 					actual_line_buffer_params->depth);
-		actual_min_clock_params->line_buffer_prefetch_enabled = false;
+		actual_min_clock_params->line_buffer_prefetch_enabled =
+			line_buffer_prefetch_enabled;
 		actual_line_buffer_params->id = path_index;
 
 		/* validate taps if it is set */
@@ -704,7 +931,8 @@ static uint32_t prepare_per_path_parameters(
 	union hwss_build_params_mask params_mask,
 	struct hwss_build_params *build_params,
 	uint32_t path_index,
-	uint32_t param_num_in)
+	uint32_t param_num_in,
+	bool use_predefined_hw_state)
 {
 	struct dal_context *dal_context = hws->dal_context;
 	enum scaler_validation_code build_result = SCALER_VALIDATION_OK;
@@ -775,7 +1003,8 @@ static uint32_t prepare_per_path_parameters(
 			(params_mask.bits.LINE_BUFFER ?
 				&build_params->
 				line_buffer_params[path_index][plane_index] :
-				NULL));
+				NULL),
+			use_predefined_hw_state);
 
 		if (build_result != SCALER_VALIDATION_OK) {
 			/* we can't support requested mode */
@@ -830,7 +1059,8 @@ static void compute_minimum_clocks_for_path_mode_set(
 struct hwss_build_params *dal_hw_sequencer_prepare_path_parameters(
 	struct hw_sequencer *hws,
 	struct hw_path_mode_set *path_set,
-	union hwss_build_params_mask params_mask)
+	union hwss_build_params_mask params_mask,
+	bool use_predefined_hw_state)
 {
 	struct dal_context *dal_context = hws->dal_context;
 	struct hw_path_mode *path_mode;
@@ -890,7 +1120,8 @@ struct hwss_build_params *dal_hw_sequencer_prepare_path_parameters(
 				params_mask,
 				build_params,
 				i,
-				total_params_num_prepared);
+				total_params_num_prepared,
+				use_predefined_hw_state);
 
 		if (!path_params_num_prepared) {
 			dal_hw_sequencer_free_path_parameters(build_params);

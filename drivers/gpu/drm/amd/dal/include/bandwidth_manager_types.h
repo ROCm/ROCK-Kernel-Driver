@@ -26,6 +26,7 @@
 #define __DAL_BANDWIDTH_MANAGER_TYPES_H__
 
 #include "hw_sequencer_types.h"
+#include "scaler_types.h"
 
 #include "set_mode_types.h"
 
@@ -60,13 +61,6 @@ struct watermark_input_params {
 	enum hw_stereo_format stereo_format;
 };
 
-struct scaling_taps {
-	uint32_t h_taps;
-	uint32_t v_taps;
-	uint32_t h_taps_c;
-	uint32_t v_taps_c;
-};
-
 struct validation_timing_params {
 	uint32_t PREFETCH:1;
 	uint32_t INTERLACED:1;
@@ -81,7 +75,7 @@ struct bandwidth_params {
 	struct view_params src_vw;
 	struct view_params dst_vw;
 	struct validation_timing_params timing_info;
-	struct scaling_taps scaler_taps;
+	struct scaling_tap_info scaler_taps;
 	struct color_quality color_info;
 	enum hw_tiling_mode tiling_mode;
 	bool is_tiling_rotated;

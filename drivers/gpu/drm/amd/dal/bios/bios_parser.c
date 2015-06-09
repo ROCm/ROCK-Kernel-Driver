@@ -1125,9 +1125,11 @@ static enum bp_result get_ss_info_v3_1(
 	uint32_t index,
 	struct spread_spectrum_info *ss_info)
 {
-	ATOM_ASIC_INTERNAL_SS_INFO_V3 *ssTableHeaderInclude;
+	ATOM_ASIC_INTERNAL_SS_INFO_V3 *ss_table_header_include;
 	ATOM_ASIC_SS_ASSIGNMENT_V3 *tbl;
-	uint32_t tableSize, i, tableIndex = 0;
+	uint32_t table_size;
+	uint32_t i;
+	uint32_t table_index = 0;
 
 	if (!ss_info)
 		return BP_RESULT_BADINPUT;
@@ -1135,23 +1137,23 @@ static enum bp_result get_ss_info_v3_1(
 	if (!DATA_TABLES(ASIC_InternalSS_Info))
 		return BP_RESULT_UNSUPPORTED;
 
-	ssTableHeaderInclude = GET_IMAGE(ATOM_ASIC_INTERNAL_SS_INFO_V3,
+	ss_table_header_include = GET_IMAGE(ATOM_ASIC_INTERNAL_SS_INFO_V3,
 		DATA_TABLES(ASIC_InternalSS_Info));
-	tableSize = (ssTableHeaderInclude->sHeader.usStructureSize
+	table_size = (ss_table_header_include->sHeader.usStructureSize
 		- sizeof(ATOM_COMMON_TABLE_HEADER))
 				/ sizeof(ATOM_ASIC_SS_ASSIGNMENT_V3);
 
 	tbl = (ATOM_ASIC_SS_ASSIGNMENT_V3 *)
-		&ssTableHeaderInclude->asSpreadSpectrum[0];
+		&ss_table_header_include->asSpreadSpectrum[0];
 
 	dal_memset(ss_info, 0, sizeof(struct spread_spectrum_info));
 
-	for (i = 0; i < tableSize; i++) {
+	for (i = 0; i < table_size; i++) {
 		if (tbl[i].ucClockIndication != (uint8_t) id)
 			continue;
 
-		if (tableIndex != index) {
-			tableIndex++;
+		if (table_index != index) {
+			table_index++;
 			continue;
 		}
 		/* VBIOS introduced new defines for Version 3, same values as
