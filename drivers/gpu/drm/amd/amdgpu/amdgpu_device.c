@@ -1737,7 +1737,21 @@ int amdgpu_resume_kms(struct drm_device *dev, bool resume, bool fbcon)
 
 	/* blat the mode back in */
 	if (fbcon) {
+#ifdef CONFIG_DRM_AMD_DAL
+		switch (adev->asic_type) {
+		case CHIP_CARRIZO:
+			/* DAL handles DCE11 and up.
+			 * See amdgpu_dm.c. dm_resume() */
+			break;
+		default:
+			/* pre DCE11 */
+			drm_helper_resume_force_mode(dev);
+			break;
+		}
+#else
 		drm_helper_resume_force_mode(dev);
+#endif
+
 		/* turn on display hw */
 		list_for_each_entry(connector, &dev->mode_config.connector_list, head) {
 			drm_helper_connector_dpms(connector, DRM_MODE_DPMS_ON);

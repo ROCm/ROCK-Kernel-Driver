@@ -612,7 +612,7 @@ int amdgpu_dm_init(struct amdgpu_device *adev)
 		adev->mode_info.atom_context->bios;
 	init_data.asic_id.runtime_flags.bits.SKIP_POWER_DOWN_ON_RESUME = 1;
 
-	if ((adev->family == CHIP_CARRIZO))
+	if (adev->asic_type == CHIP_CARRIZO)
 		init_data.asic_id.runtime_flags.bits.GNB_WAKEUP_SUPPORTED = 1;
 
 	init_data.driver = adev;
@@ -741,6 +741,73 @@ static int dm_hw_fini(void *handle)
 	return 0;
 }
 
+static int dm_suspend(void *handle)
+{
+	struct amdgpu_device *adev = handle;
+	struct amdgpu_display_manager *dm = &adev->dm;
+
+	/*
+	amdsoc_dm_vblank_irq_state_disable(adev);
+	*/
+
+	dal_set_power_state(
+		dm->dal,
+		DAL_ACPI_CM_POWER_STATE_D3,
+		DAL_VIDEO_POWER_SUSPEND);
+
+	return 0;
+}
+
+static int dm_resume(void *handle)
+{
+	uint32_t connected_displays_vector;
+	uint32_t prev_connected_displays_vector;
+	uint32_t supported_disp = 0; /* vector of supported displays */
+	uint32_t displays_number;
+	uint32_t current_display_index;
+	struct amdgpu_device *adev = handle;
+	struct amdgpu_display_manager *dm = &adev->dm;
+	uint32_t displays_vector[MAX_COFUNC_PATH];
+
+	/*
+	amdsoc_dm_vblank_irq_state_disable(adev);
+	*/
+
+	dal_set_power_state(
+		dm->dal,
+		DAL_ACPI_CM_POWER_STATE_D0,
+		DAL_VIDEO_POWER_ON);
+
+	prev_connected_displays_vector =
+		dal_get_connected_targets_vector(dm->dal);
+	supported_disp = dal_get_supported_displays_vector(dm->dal);
+
+	/* save previous connected display to reset mode correctly */
+	connected_displays_vector = prev_connected_displays_vector;
+
+	dal_resume(dm->dal);
+
+	for (displays_number = 0, current_display_index = 0;
+			connected_displays_vector != 0;
+			connected_displays_vector >>= 1,
+			current_display_index++) {
+		if ((connected_displays_vector & 1) == 1) {
+			struct amdgpu_crtc *crtc =
+				adev->mode_info.crtcs[displays_number];
+
+			displays_vector[displays_number] =
+				current_display_index;
+
+			memset(&crtc->base.mode, 0, sizeof(crtc->base.mode));
+
+			++displays_number;
+		}
+	}
+
+	dal_reset_path_mode(dm->dal, displays_number, displays_vector);
+
+	return 0;
+}
 const struct amd_ip_funcs amdgpu_dm_funcs = {
 	.early_init = dm_early_init,
 	.late_init = NULL,
@@ -748,8 +815,8 @@ const struct amd_ip_funcs amdgpu_dm_funcs = {
 	.sw_fini = dm_sw_fini,
 	.hw_init = dm_hw_init,
 	.hw_fini = dm_hw_fini,
-	.suspend = NULL,
-	.resume = NULL,
+	.suspend = dm_suspend,
+	.resume = dm_resume,
 	.is_idle = dm_is_idle,
 	.wait_for_idle = dm_wait_for_idle,
 	.soft_reset = dm_soft_reset,
